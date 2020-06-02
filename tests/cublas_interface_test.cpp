@@ -4,6 +4,7 @@
 #include <math.h>
 #include <string.h>
 #include <complex>
+#include <inttypes.h>
 
 #include <util_quda.h>
 #include <host_utils.h>
@@ -44,24 +45,6 @@ void fillEigenArrayRowMaj(MatrixXcd &EigenArr, complex<double>* arr, int rows, i
   }
 }
 
-void diffEigenArrayColMaj(MatrixXcd &EigenArr, complex<double>* arr, int rows, int cols, int counter = 0){
-  for(int j=0; j<cols; j++) {
-    for(int i=0; i<rows; i++) {
-      EigenArr(i,j) -= arr[counter];
-      counter++;
-    }
-  }
-}
-
-void diffEigenArrayRowMaj(MatrixXcd &EigenArr, complex<double>* arr, int rows, int cols, int counter = 0){
-  for(int i=0; i<rows; i++) {
-    for(int j=0; j<cols; j++) {
-      EigenArr(i,j) -= arr[counter];
-      counter++;
-    }
-  }
-}
-
 void cublasGEMMQudaVerify(void *arrayA, void *arrayB, void *arrayCcopy, void*arrayC,
 			  QudaCublasParam *cublas_param){
 
@@ -76,10 +59,23 @@ void cublasGEMMQudaVerify(void *arrayA, void *arrayB, void *arrayCcopy, void*arr
   complex<double> beta = cublas_param->beta;
 
   // Eigen objects to store data
-  MatrixXcd A = MatrixXd::Zero(m, lda);
-  MatrixXcd B = MatrixXd::Zero(k, ldb);
-  MatrixXcd C = MatrixXd::Zero(m, ldc);
-
+  uint64_t A_r, A_c, B_r, B_c, C_r, C_c;
+  if(cublas_param->data_order == QUDA_CUBLAS_DATAORDER_COL) {
+    A_r = lda; A_c = k;
+    B_r = ldb; B_c = n;
+    C_r = ldc; C_c = n;
+  } else {
+    A_r = m; A_c = lda;
+    B_r = k; B_c = ldb;
+    C_r = m; C_c = ldc;
+  }
+  
+  MatrixXcd A = MatrixXd::Zero(A_r, A_c);
+  MatrixXcd B = MatrixXd::Zero(B_r, B_c);
+  MatrixXcd C_eigen = MatrixXd::Zero(C_r, C_c);
+  MatrixXcd C_gpu = MatrixXd::Zero(C_r, C_c);
+  MatrixXcd C_resid = MatrixXd::Zero(C_r, C_c);
+  
   // Pointers to data
   complex<double>* A_ptr = (complex<double>*)(&arrayA)[0];
   complex<double>* B_ptr = (complex<double>*)(&arrayB)[0];
@@ -88,14 +84,16 @@ void cublasGEMMQudaVerify(void *arrayA, void *arrayB, void *arrayCcopy, void*arr
 
   // Populate Eigen objects
   if(cublas_param->data_order == QUDA_CUBLAS_DATAORDER_COL) {
-    fillEigenArrayColMaj(A, A_ptr, lda, m);
-    fillEigenArrayColMaj(B, B_ptr, ldb, k);
-    fillEigenArrayColMaj(C, Ccopy_ptr, ldc, m);    
+    fillEigenArrayColMaj(A, A_ptr, A_r, A_c);
+    fillEigenArrayColMaj(B, B_ptr, B_r, B_c);
+    fillEigenArrayColMaj(C_eigen, Ccopy_ptr, C_r, C_c);
+    fillEigenArrayColMaj(C_gpu, C_ptr, C_r, C_c);
   }
   else {
-    fillEigenArrayRowMaj(A, A_ptr, m, lda);
-    fillEigenArrayRowMaj(B, B_ptr, ldb, k);
-    fillEigenArrayRowMaj(C, Ccopy_ptr, ldc, m);        
+    fillEigenArrayRowMaj(A, A_ptr, A_r, A_c);
+    fillEigenArrayRowMaj(B, B_ptr, B_r, B_c);
+    fillEigenArrayRowMaj(C_eigen, Ccopy_ptr, C_r, C_c);
+    fillEigenArrayRowMaj(C_gpu, C_ptr, C_r, C_c);
   }
 
   // Apply the matrix operation types to A and B
@@ -114,24 +112,23 @@ void cublasGEMMQudaVerify(void *arrayA, void *arrayB, void *arrayCcopy, void*arr
   default :
     errorQuda("Unknown cuBLAS op type %d", cublas_param->trans_b);
   }
+  
+  // Perform GEMM using Eigen
+  printfQuda("a * A_{%lu,%lu} * B_{%lu,%lu} + b * C_{%lu,%lu} = C_{%lu,%lu}\n",
+	     A_r, A_c, B_r, B_c, C_r, C_c, C_r, C_c);
 
-  // Perform GEMM
-  C = alpha * A * B + beta * C;  
-
+  C_eigen = alpha * A * B + beta * C_eigen;
+  
   // Check Eigen result against cuBLAS
-  if(cublas_param->data_order == QUDA_CUBLAS_DATAORDER_COL) {
-    diffEigenArrayColMaj(C, C_ptr, ldc, m);
-  }
-  else {
-    diffEigenArrayRowMaj(C, C_ptr, ldc, m);
-  }
-  printfQuda("(C_host - C_gpu) Frobenius norm = %e. Relative deviation = %e\n", C.norm(), C.norm()/(C.rows() * C.cols()));
+  C_resid = C_gpu - C_eigen;
+  
+  printfQuda("(C_host - C_gpu) Frobenius norm = %e. Relative deviation = %e\n", C_resid.norm(), C_resid.norm()/(C_resid.rows() * C_resid.cols()));
 }
 
 void display_test_info()
 {
   printfQuda("running the following test:\n");
-
+  
   printfQuda("prec    sloppy_prec\n");
   printfQuda("%s   %s\n", get_prec_str(prec), get_prec_str(prec_sloppy));
   
@@ -144,7 +141,7 @@ void display_test_info()
 
 int main(int argc, char **argv)
 {
-
+  
   // QUDA initialise
   //-----------------------------------------------------------------------------
   // command line options
@@ -183,19 +180,34 @@ int main(int argc, char **argv)
 
   // Testing for batch not yet supported.
   cublas_param.batch_count = cublas_batch;
-  
-  uint64_t refA_size = cublas_param.m * cublas_param.lda; //A_mk
-  uint64_t refB_size = cublas_param.n * cublas_param.ldb; //B_kn
-  uint64_t refC_size = cublas_param.n * cublas_param.ldc; //C_mn
 
   // Reference data is always in complex double
   size_t data_size = 2 * sizeof(double);
+  uint64_t refA_size = 0, refB_size = 0, refC_size = 0;
+  if(cublas_param.data_order == QUDA_CUBLAS_DATAORDER_COL) {
+    // leading dimension is in terms of consecutive data
+    // elements in a column, multiplied by number of rows
+    refA_size = cublas_param.lda * cublas_param.k; //A_mk
+    refB_size = cublas_param.ldb * cublas_param.n; //B_kn
+    refC_size = cublas_param.ldc * cublas_param.n; //C_mn
+  } else {
+    // leading dimension is in terms of consecutive data
+    // elements in a row, multiplied by number of columns
+    refA_size = cublas_param.m * cublas_param.lda; //A_mk
+    refB_size = cublas_param.k * cublas_param.ldb; //B_kn
+    refC_size = cublas_param.m * cublas_param.ldc; //C_mn
+  }
   
   void *refA = malloc(refA_size * data_size);
   void *refB = malloc(refB_size * data_size);
   void *refC = malloc(refC_size * data_size);
   void *refCcopy = malloc(refC_size * data_size);
 
+  memset(refA, 0.0, refA_size * data_size);
+  memset(refB, 0.0, refB_size * data_size);
+  memset(refC, 0.0, refC_size * data_size);
+  memset(refCcopy, 0.0, refC_size * data_size);
+  
   // Populate the real part with rands
   for (uint64_t i = 0; i < 2 * refA_size; i+=2) {
     ((double *)refA)[i] = rand() / (double)RAND_MAX;
@@ -208,19 +220,9 @@ int main(int argc, char **argv)
     ((double *)refCcopy)[i] = ((double *)refC)[i];
   }
 
-  // Populate the imaginary part with rands or zeros
-  if (cublas_param.data_type == QUDA_CUBLAS_DATATYPE_S || cublas_param.data_type == QUDA_CUBLAS_DATATYPE_D) {
-    for (uint64_t i = 1; i < 2 * refA_size; i+=2) {
-      ((double *)refA)[i] = 0.0;
-    }
-    for (uint64_t i = 1; i < 2 * refB_size; i+=2) {
-      ((double *)refB)[i] = 0.0;
-    }
-    for (uint64_t i = 1; i < 2 * refC_size; i+=2) {
-      ((double *)refC)[i] = 0.0;
-      ((double *)refCcopy)[i] = ((double *)refC)[i];
-    }
-  } else {
+  // Populate the imaginary part with rands
+  if (cublas_param.data_type == QUDA_CUBLAS_DATATYPE_C ||
+      cublas_param.data_type == QUDA_CUBLAS_DATATYPE_Z) {
     for (uint64_t i = 1; i < 2 * refA_size; i+=2) {
       ((double *)refA)[i] = rand() / (double)RAND_MAX;
     }
@@ -233,12 +235,12 @@ int main(int argc, char **argv)
     }    
   }
 
+  // Create new arrays appropriate for the requested problem, and copy the data.
   void *arrayA;
   void *arrayB;
   void *arrayC;
   void *arrayCcopy;
 
-  // Create new arrays appropriate for the requested problem, and copy the data.
   switch (cublas_param.data_type) {
   case QUDA_CUBLAS_DATATYPE_S :
     arrayA = malloc(refA_size * sizeof(float));
