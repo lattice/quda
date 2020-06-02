@@ -5902,9 +5902,21 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
   // and it will handle the data movement for the user.
 
   // Extract data from the param struct for device malloc
-  unsigned int arrayA_size = cublas_param->m * cublas_param->lda; //A_mk
-  unsigned int arrayB_size = cublas_param->k * cublas_param->ldb; //B_kn
-  unsigned int arrayC_size = cublas_param->m * cublas_param->ldc; //C_mn
+  uint64_t arrayA_size = 0, arrayB_size = 0, arrayC_size = 0;
+  if(cublas_param->data_order == QUDA_CUBLAS_DATAORDER_COL) {
+    // leading dimension is in terms of consecutive data
+    // elements in a column, multiplied by number of rows
+    arrayA_size = cublas_param->lda * cublas_param->k; //A_mk
+    arrayB_size = cublas_param->ldb * cublas_param->n; //B_kn
+    arrayC_size = cublas_param->ldc * cublas_param->n; //C_mn
+  } else {
+    // leading dimension is in terms of consecutive data
+    // elements in a row, multiplied by number of columns.
+    arrayA_size = cublas_param->m * cublas_param->lda; //A_mk
+    arrayB_size = cublas_param->k * cublas_param->ldb; //B_kn
+    arrayC_size = cublas_param->m * cublas_param->ldc; //C_mn
+  }
+
   size_t data_size = (cublas_param->data_type == QUDA_CUBLAS_DATATYPE_D ||
 		      cublas_param->data_type == QUDA_CUBLAS_DATATYPE_Z) ? sizeof(double) : sizeof(float);
   int re_im = 1;  
@@ -5930,29 +5942,51 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
   // Compute Batched GEMM
   profileCuBLAS.TPSTART(QUDA_PROFILE_COMPUTE);
   if(cublas_param->data_order == QUDA_CUBLAS_DATAORDER_ROW) {
-    // cuBLAS works exclusively in column major order. Therefore, if
-    // the input data is in row major order, we may treat the A and B and C
-    // arrays as A^\dag, B^\dag, and C^\dag.
+    // cuBLAS works exclusively in column major order. If the input data is in
+    // row major order, we may treat the A and B and C arrays as A^T, B^T, and C^T.
     // We must now swap the order of the A * B multiplication and swap the
     // operation types to recover the the desired result in the desired order.
     // E.g: in row major, the operation,
-    // C = a * A^\dag * B + b * C
+    // C = a * A^T * B + b * C
     //
     // will become the column major operation
-    // C^\dag = a * B^\dag * A + b * C^\dag
+    // C^T = a * B^T * A + b * C^T
     //
     // By inspection, one can see that transposition of the above column major
     // operation will result in the desired row major answer:
     //
-    // (C^\dag)^\dag = a * (B^\dag * A)^\dag + b * (C^\dag)^\dag
-    //        -->  C = a *  A^\dag * B       + b *  C    
+    // (C^T)^T = a * (B^T * A)^T + b * (C^T)^T
+    //  -->  C = a *  A^T * B    + b *  C
+    //
+    // We must also swap around some parameters. The Row major indices,
+    // A_{m, lda}, B_{k, ldb}, C_{m, ldc}
+    // becomes
+    // A^T_{lda, m}, B^T_{ldb, k}, C^T_{ldc, m}.
+    // so the leading dimensions remain the same. However, we must change the actual
+    // matrix dims m,n,k to reflect the change to column major.
+    // m_{col} = n_{row}
+    // n_{col} = m_{row}
+    // k_{col} = k_{row}
+    // And because we are swapping the A and B arrays, we must also swap their
+    // leading dim values.
+        
+    printfQuda("pre swap\n");
+    printQudaCublasParam(cublas_param);
+    std::swap(cublas_param->m, cublas_param->n);
+    std::swap(cublas_param->lda, cublas_param->ldb);
     std::swap(cublas_param->trans_a, cublas_param->trans_b);
+    printfQuda("post swap\n");
+    printQudaCublasParam(cublas_param);      
+
     cublas::BatchGEMM(B_d, A_d, C_d, *cublas_param, QUDA_CUDA_FIELD_LOCATION);
     std::swap(cublas_param->trans_a, cublas_param->trans_b);
+    std::swap(cublas_param->m, cublas_param->n);
+    std::swap(cublas_param->lda, cublas_param->ldb);
   } else {
     // Data is already in column major format, no need for changes.
     cublas::BatchGEMM(A_d, B_d, C_d, *cublas_param, QUDA_CUDA_FIELD_LOCATION);
   }
+  printfQuda("BatchGEMM success!\n");
   profileCuBLAS.TPSTOP(QUDA_PROFILE_COMPUTE);
   
   // Copy device C array back to host
