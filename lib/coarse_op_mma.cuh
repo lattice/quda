@@ -121,6 +121,66 @@ namespace quda
         }
       }
 
+      template <int dim, QudaDirection dir, int bM, int bN, int bK, int block_y, int block_z>
+      void launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+      {
+        tp.block.x = 1;
+        tp.block.y = block_y;
+        tp.block.z = block_z;
+        constexpr int shared_bytes = shared_memory_bytes(bM, bN, bK);
+        tp.shared_bytes = shared_bytes;
+        static_assert(shared_bytes <= 96 * 1024, "too much shared memory");
+
+        // TODO: Fix the split M/N.
+        constexpr int t_m = 1;
+        constexpr int t_n = 1;
+
+        tp.grid = dim3(min_threads * t_m * t_n, 2, 1);
+
+        auto kernel
+          = ComputeVUVMMA<from_coarse, Float, dim, dir, fineSpin, coarseSpin, bM, bN, bK, block_y, block_z, Arg>;
+        setMaxDynamicSharedBytesPerBlock(kernel);
+        kernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+      }
+
+      template <int bM, int bN, int bK, int block_y, int block_z>
+      void launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+      {
+        if (arg.dir == QUDA_BACKWARDS) {
+          switch (arg.dim) {
+          case 0:
+            launch_compute_vuv_kernel<0, QUDA_BACKWARDS, bM, bN, bK, block_y, block_z>(tp, arg, min_threads, stream);
+            break;
+          case 1:
+            launch_compute_vuv_kernel<1, QUDA_BACKWARDS, bM, bN, bK, block_y, block_z>(tp, arg, min_threads, stream);
+            break;
+          case 2:
+            launch_compute_vuv_kernel<2, QUDA_BACKWARDS, bM, bN, bK, block_y, block_z>(tp, arg, min_threads, stream);
+            break;
+          case 3:
+            launch_compute_vuv_kernel<3, QUDA_BACKWARDS, bM, bN, bK, block_y, block_z>(tp, arg, min_threads, stream);
+            break;
+          default: errorQuda("arg.dim(=%d) is NOT supported.", arg.dim);
+          }
+        } else {
+          switch (arg.dim) {
+          case 0:
+            launch_compute_vuv_kernel<0, QUDA_FORWARDS, bM, bN, bK, block_y, block_z>(tp, arg, min_threads, stream);
+            break;
+          case 1:
+            launch_compute_vuv_kernel<1, QUDA_FORWARDS, bM, bN, bK, block_y, block_z>(tp, arg, min_threads, stream);
+            break;
+          case 2:
+            launch_compute_vuv_kernel<2, QUDA_FORWARDS, bM, bN, bK, block_y, block_z>(tp, arg, min_threads, stream);
+            break;
+          case 3:
+            launch_compute_vuv_kernel<3, QUDA_FORWARDS, bM, bN, bK, block_y, block_z>(tp, arg, min_threads, stream);
+            break;
+          default: errorQuda("arg.dim(=%d) is NOT supported.", arg.dim);
+          }
+        }
+      }
+
       Launch(Arg &arg, CUresult &error, TuneParam &tp, ComputeType type, int min_threads, const cudaStream_t &stream)
       {
 #ifdef JITIFY
@@ -128,22 +188,17 @@ namespace quda
 #endif
         if (type == COMPUTE_UV) {
 
-          if (arg.dir != QUDA_BACKWARDS && arg.dir != QUDA_FORWARDS) errorQuda("Undefined direction %d", arg.dir);
-#ifdef JITIFY
-          error = program->kernel("quda::ComputeUVGPU")
-                    .instantiate(from_coarse, Type<Float>(), arg.dim, arg.dir, fineSpin, coarseSpin, Type<Arg>())
-                    .configure(tp.grid, tp.block, tp.shared_bytes, stream)
-                    .launch(arg);
-#else
           // clang-format off
           switch (tp.aux.x) {
           case 0: launch_compute_uv_kernel<  48,  64,  24,   8,   8>(tp, arg, min_threads, stream); break;
           case 1: launch_compute_uv_kernel<  48,  64,  24,  12,   8>(tp, arg, min_threads, stream); break;
           case 2: launch_compute_uv_kernel<  48,  64,  24,  24,   8>(tp, arg, min_threads, stream); break;
-          default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 48", tp.aux.x);
+          case 3: launch_compute_uv_kernel<  48,  64,  24,   8,  16>(tp, arg, min_threads, stream); break;
+          case 4: launch_compute_uv_kernel<  48,  64,  24,  12,  16>(tp, arg, min_threads, stream); break;
+          case 5: launch_compute_uv_kernel<  48,  64,  24,  24,  16>(tp, arg, min_threads, stream); break;
+          default: errorQuda("tp.aux.x(=%d) is NOT supported by (48, 64, 24).", tp.aux.x);
           }
           // clang-format on
-#endif
 
         } else if (type == COMPUTE_AV) {
 
@@ -247,139 +302,19 @@ namespace quda
 
         } else if (type == COMPUTE_VUV) {
 
-          // need to resize the grid since we don't tune over the entire coarseColor dimension
-          // factor of two comes from parity onto different blocks (e.g. in the grid)
-          tp.grid.y = (2 * arg.vuvTile.M_tiles + tp.block.y - 1) / tp.block.y;
-          tp.grid.z = (arg.vuvTile.N_tiles + tp.block.z - 1) / tp.block.z;
-
-          arg.shared_atomic = tp.aux.y;
-          arg.parity_flip = tp.aux.z;
-
-          if (arg.shared_atomic) {
-            // check we have a valid problem size for shared atomics
-            // constraint is due to how shared memory initialization and global store are done
-            int block_size = arg.fineVolumeCB / arg.coarseVolumeCB;
-            if (block_size / 2 < coarseSpin * coarseSpin)
-              errorQuda("Block size %d not supported in shared-memory atomic coarsening", block_size);
-
-            arg.aggregates_per_block = tp.aux.x;
-            tp.block.x *= tp.aux.x;
-            tp.grid.x /= tp.aux.x;
+          // clang-format off
+          switch (tp.aux.x) {
+          case 0: launch_compute_vuv_kernel<  64,  64,  24,   8,   8>(tp, arg, min_threads, stream); break;
+          case 1: launch_compute_vuv_kernel<  64,  64,  24,   8,  16>(tp, arg, min_threads, stream); break;
+          case 2: launch_compute_vuv_kernel<  64,  64,  24,   8,  32>(tp, arg, min_threads, stream); break;
+          case 3: launch_compute_vuv_kernel<  64,  64,  24,  16,   8>(tp, arg, min_threads, stream); break;
+          case 4: launch_compute_vuv_kernel<  64,  64,  24,  16,  16>(tp, arg, min_threads, stream); break;
+          case 5: launch_compute_vuv_kernel<  64,  64,  24,  16,  32>(tp, arg, min_threads, stream); break;
+          case 6: launch_compute_vuv_kernel<  64,  64,  24,  32,   8>(tp, arg, min_threads, stream); break;
+          case 7: launch_compute_vuv_kernel<  64,  64,  24,  32,  16>(tp, arg, min_threads, stream); break;
+          default: errorQuda("tp.aux.x(=%d) is NOT supported by (64, 64, 24).", tp.aux.x);
           }
-
-          if (arg.coarse_color_wave) {
-            // swap x and y grids
-            std::swap(tp.grid.y, tp.grid.x);
-            // augment x grid with coarseColor row grid (z grid)
-            arg.grid_z = tp.grid.z;
-            arg.coarse_color_grid_z = arg.vuvTile.M_tiles * tp.grid.z;
-            tp.grid.x *= tp.grid.z;
-            tp.grid.z = 1;
-          }
-
-#ifdef JITIFY
-          error = program->kernel("quda::ComputeVUVGPU")
-                    .instantiate(arg.shared_atomic, arg.parity_flip, from_coarse, Type<Float>(), arg.dim, arg.dir,
-                                 fineSpin, coarseSpin, Type<Arg>())
-                    .configure(tp.grid, tp.block, tp.shared_bytes, stream)
-                    .launch(arg);
-#else
-          if (arg.shared_atomic) {
-            if (arg.parity_flip != true) errorQuda("parity_flip = %d not instantiated", arg.parity_flip);
-            constexpr bool parity_flip = true;
-
-            if (arg.dir == QUDA_BACKWARDS) {
-              if (arg.dim == 0) {
-#if 1
-                printfQuda("Launching backward MMA\n");
-                const int shared_bytes = shared_memory_bytes(64, 64, 24);
-                ComputeVUVMMA<false, false, from_coarse, Float, 0, QUDA_BACKWARDS, fineSpin, coarseSpin>
-                  <<<{8*8*8*16/2, 2, 1}, {1, 8, 8}, shared_bytes>>>(arg);
-#else
-                ComputeVUVGPU<true, parity_flip, from_coarse, Float, 0, QUDA_BACKWARDS, fineSpin, coarseSpin>
-                  <<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
-#endif
-              }
-              else if (arg.dim == 1)
-                ComputeVUVGPU<true, parity_flip, from_coarse, Float, 1, QUDA_BACKWARDS, fineSpin, coarseSpin>
-                  <<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
-              else if (arg.dim == 2)
-                ComputeVUVGPU<true, parity_flip, from_coarse, Float, 2, QUDA_BACKWARDS, fineSpin, coarseSpin>
-                  <<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
-              else if (arg.dim == 3)
-                ComputeVUVGPU<true, parity_flip, from_coarse, Float, 3, QUDA_BACKWARDS, fineSpin, coarseSpin>
-                  <<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
-            } else if (arg.dir == QUDA_FORWARDS) {
-              if (arg.dim == 0) {
-#if 1
-                printfQuda("Launching forward MMA\n");
-                const int shared_bytes = shared_memory_bytes(64, 64, 24);
-                ComputeVUVMMA<false, false, from_coarse, Float, 0, QUDA_FORWARDS, fineSpin, coarseSpin>
-                  <<<{8*8*8*16/2, 2, 1}, {1, 8, 8}, shared_bytes>>>(arg);
-#else
-                ComputeVUVGPU<true, parity_flip, from_coarse, Float, 0, QUDA_FORWARDS, fineSpin, coarseSpin>
-                  <<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
-#endif
-              }
-              else if (arg.dim == 1)
-                ComputeVUVGPU<true, parity_flip, from_coarse, Float, 1, QUDA_FORWARDS, fineSpin, coarseSpin>
-                  <<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
-              else if (arg.dim == 2)
-                ComputeVUVGPU<true, parity_flip, from_coarse, Float, 2, QUDA_FORWARDS, fineSpin, coarseSpin>
-                  <<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
-              else if (arg.dim == 3)
-                ComputeVUVGPU<true, parity_flip, from_coarse, Float, 3, QUDA_FORWARDS, fineSpin, coarseSpin>
-                  <<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
-            } else {
-              errorQuda("Undefined direction %d", arg.dir);
-            }
-          } else {
-            // if (arg.parity_flip != false) errorQuda("parity_flip = %d not instantiated", arg.parity_flip);
-            constexpr bool parity_flip = false;
-
-            if (arg.dir == QUDA_BACKWARDS) {
-              if (arg.dim == 0)
-                ComputeVUVGPU<false, parity_flip, from_coarse, Float, 0, QUDA_BACKWARDS, fineSpin, coarseSpin>
-                  <<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
-              else if (arg.dim == 1)
-                ComputeVUVGPU<false, parity_flip, from_coarse, Float, 1, QUDA_BACKWARDS, fineSpin, coarseSpin>
-                  <<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
-              else if (arg.dim == 2)
-                ComputeVUVGPU<false, parity_flip, from_coarse, Float, 2, QUDA_BACKWARDS, fineSpin, coarseSpin>
-                  <<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
-              else if (arg.dim == 3)
-                ComputeVUVGPU<false, parity_flip, from_coarse, Float, 3, QUDA_BACKWARDS, fineSpin, coarseSpin>
-                  <<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
-            } else if (arg.dir == QUDA_FORWARDS) {
-              if (arg.dim == 0)
-                ComputeVUVGPU<false, parity_flip, from_coarse, Float, 0, QUDA_FORWARDS, fineSpin, coarseSpin>
-                  <<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
-              else if (arg.dim == 1)
-                ComputeVUVGPU<false, parity_flip, from_coarse, Float, 1, QUDA_FORWARDS, fineSpin, coarseSpin>
-                  <<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
-              else if (arg.dim == 2)
-                ComputeVUVGPU<false, parity_flip, from_coarse, Float, 2, QUDA_FORWARDS, fineSpin, coarseSpin>
-                  <<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
-              else if (arg.dim == 3)
-                ComputeVUVGPU<false, parity_flip, from_coarse, Float, 3, QUDA_FORWARDS, fineSpin, coarseSpin>
-                  <<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
-            } else {
-              errorQuda("Undefined direction %d", arg.dir);
-            }
-          }
-#endif
-
-          if (arg.coarse_color_wave) {
-            // revert the grids
-            tp.grid.z = arg.grid_z;
-            tp.grid.x /= tp.grid.z;
-            std::swap(tp.grid.x, tp.grid.y);
-          }
-
-          if (arg.shared_atomic) {
-            tp.block.x /= tp.aux.x;
-            tp.grid.x *= tp.aux.x;
-          }
+          // clang-format on
 
         } else if (type == COMPUTE_COARSE_CLOVER) {
 
@@ -679,51 +614,7 @@ namespace quda
         tune_block_x = (type == COMPUTE_VUV || type == COMPUTE_COARSE_CLOVER) ? false : true;
       }
 
-      bool advanceAux(TuneParam &param) const
-      {
-        if (type != COMPUTE_VUV) return false;
-
-        // exhausted the global-atomic search space so switch to
-        // shared-atomic space
-        if (param.aux.y == 0) {
-
-          // pre-Maxwell does not support shared-memory atomics natively so no point in trying
-          if (deviceProp.major < 5) return false;
-
-          // before advancing, check we can use shared-memory atomics
-          int block_size = arg.fineVolumeCB / arg.coarseVolumeCB;
-          if (block_size / 2 < coarseSpin * coarseSpin) return false;
-
-          arg.shared_atomic = true;
-          arg.parity_flip = true; // this is usually optimal for shared atomics
-
-          resizeVector((arg.parity_flip ? 1 : 2) * arg.max_height_tiles_per_block, arg.max_width_tiles_per_block);
-          if (!arg.parity_flip) resizeStep(2, 1);
-
-          // need to reset since we're switching to shared-memory atomics
-          initTuneParam(param);
-
-          return true;
-        } else {
-          // already doing shared-memory atomics but can tune number of
-          // coarse grid points per block
-
-          if (param.aux.x < 4) {
-            param.aux.x *= 2;
-            return true;
-          } else {
-            param.aux.x = 1;
-
-            // completed all shared-memory tuning so reset to global atomics
-            arg.shared_atomic = false;
-            arg.parity_flip = false; // this is usually optimal for global atomics
-
-            initTuneParam(param);
-
-            return false;
-          }
-        }
-      }
+      bool advanceAux(TuneParam &param) const { return false; }
 
       bool advanceSharedBytes(TuneParam &param) const
       {
@@ -735,7 +626,16 @@ namespace quda
       bool advanceTuneParam(TuneParam &param) const
       {
         if (type == COMPUTE_UV) {
-          if (param.aux.x < 2) {
+          if (param.aux.x < 5) {
+            param.aux.x++;
+            return true;
+          } else {
+            return false;
+          }
+        }
+
+        if (type == COMPUTE_VUV) {
+          if (param.aux.x < 7) {
             param.aux.x++;
             return true;
           } else {
@@ -753,30 +653,14 @@ namespace quda
       void initTuneParam(TuneParam &param) const
       {
         TunableVectorYZ::initTuneParam(param);
-        param.aux.x = 1; // aggregates per block
-        param.aux.y = arg.shared_atomic;
-        param.aux.z = arg.parity_flip; // not actually tuned over at present
-
-        // with shared-atomic VUV, each block.x matches exactly to a c/b aggregate
-        if (arg.shared_atomic && type == COMPUTE_VUV) {
-          param.block.x = arg.fineVolumeCB / (2 * arg.coarseVolumeCB); // checker-boarded block size
-          param.grid.x = 2 * arg.coarseVolumeCB;
-        }
+        param.aux.x = 0; // aggregates per block
       }
 
       /** sets default values for when tuning is disabled */
       void defaultTuneParam(TuneParam &param) const
       {
         TunableVectorYZ::defaultTuneParam(param);
-        param.aux.x = 1; // aggregates per block
-        param.aux.y = arg.shared_atomic;
-        param.aux.z = arg.parity_flip; // not actually tuned over at present
-
-        // with shared-atomic VUV, each block.x matches exactly to a c/b aggregate
-        if (arg.shared_atomic && type == COMPUTE_VUV) {
-          param.block.x = arg.fineVolumeCB / (2 * arg.coarseVolumeCB); // checker-boarded block size
-          param.grid.x = 2 * arg.coarseVolumeCB;
-        }
+        param.aux.x = 0; // aggregates per block
       }
 
       TuneKey tuneKey() const

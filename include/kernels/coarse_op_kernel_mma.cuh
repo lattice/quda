@@ -320,8 +320,8 @@ namespace quda
     namespace impl
     {
 
-      template <bool from_coarse, typename Float, int dim, QudaDirection dir, int fineSpin, int coarseSpin,
-                typename Arg, typename Gamma>
+      template <bool from_coarse, typename Float, int dim, QudaDirection dir, int fineSpin, int coarseSpin, int bM,
+                int bN, int bK, int block_y, int block_z, typename Arg, typename Gamma>
       __device__ void computeVUV(Arg &arg, const Gamma &gamma, int parity, int x_cb)
       {
         constexpr int nDim = 4;
@@ -423,17 +423,17 @@ namespace quda
           constexpr int ldb = N;
           constexpr int ldc = N * coarseSpin;
 
-          constexpr int bM = M;
-          constexpr int bN = N;
-          constexpr int bK = K;
-
           extern __shared__ half smem_ptr[];
 
-          using Config = MmaConfig<M, N, K, lda, ldb, ldc, bM, bN, bK, 8, 8, a_dagger, b_dagger>;
+          using Config = MmaConfig<M, N, K, lda, ldb, ldc, bM, bN, bK, block_y, block_z, a_dagger, b_dagger>;
           Config config(smem_ptr);
 
           constexpr int m_offset = 0;
           constexpr int n_offset = 0;
+
+          static_assert(M == bM, "Dividing M/N has NOT been implemented yet.\n");
+          static_assert(N == bN, "Dividing M/N has NOT been implemented yet.\n");
+          static_assert(K == bK, "This implementation ONLY works for K == bK.\n");
 
           // Not unrolling to lift regiter pressure
           for (int s = 0; s < fineSpin; s++) {
@@ -497,35 +497,12 @@ namespace quda
         }     // from_coarse
       }
 
-      // compute indices for global-atomic kernel
-      template <bool shared_atomic, bool parity_flip, typename Arg>
-      __device__ inline void getIndices(const Arg &arg, int &parity, int &x_cb, int &parity_coarse, int &x_coarse_cb,
-                                        int &c_row, int &c_col)
-      {
-        if (arg.coarse_color_wave) {
-          // blank
-        } else {
-          parity = blockIdx.y; // coarse color row index
-        }
-
-        if (!shared_atomic) {
-          x_cb = blockDim.x * (arg.coarse_color_wave ? blockIdx.y : blockIdx.x) + threadIdx.x;
-          x_coarse_cb = 0;
-          parity_coarse = 0;
-        } else {
-          // blank
-        }
-      }
-
     } // namespace impl
 
-    template <bool shared_atomic, bool parity_flip, bool from_coarse, typename Float, int dim, QudaDirection dir,
-              int fineSpin, int coarseSpin, typename Arg>
+    template <bool from_coarse, typename Float, int dim, QudaDirection dir, int fineSpin, int coarseSpin, int bM,
+              int bN, int bK, int block_y, int block_z, typename Arg>
     __global__ void ComputeVUVMMA(Arg arg)
     {
-      static_assert(shared_atomic == false, "shared_atomic == true NOT implemented");
-      static_assert(parity_flip == false, "parity_flip == true NOT implemented");
-
       Gamma<Float, QUDA_DEGRAND_ROSSI_GAMMA_BASIS, dim> gamma;
 
       int parity = blockIdx.y;
@@ -533,7 +510,8 @@ namespace quda
       int x_cb = blockDim.x * blockIdx.x + threadIdx.x;
       if (x_cb >= arg.fineVolumeCB) return;
 
-      impl::computeVUV<from_coarse, Float, dim, dir, fineSpin, coarseSpin>(arg, gamma, parity, x_cb);
+      impl::computeVUV<from_coarse, Float, dim, dir, fineSpin, coarseSpin, bM, bN, bK, block_y, block_z>(arg, gamma,
+                                                                                                         parity, x_cb);
     }
 
   } // namespace mma

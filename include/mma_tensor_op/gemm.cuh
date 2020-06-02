@@ -58,8 +58,8 @@ namespace quda
       static constexpr int m_dim = (M + m_stride_pack - 1) / m_stride_pack;
       static constexpr int n_dim = (N + n_stride - 1) / n_stride;
 
-      static_assert(M % m_stride_pack == 0, "M needs to be divisible by (m_stride * 2).");
-      static_assert(N % n_stride == 0, "N needs to be divisible by n_stride.");
+      // static_assert(M % m_stride_pack == 0, "M needs to be divisible by (m_stride * 2).");
+      // static_assert(N % n_stride == 0, "N needs to be divisible by n_stride.");
 
       SmemAccessor smem_real;
       SmemAccessor smem_imag;
@@ -90,31 +90,34 @@ namespace quda
           for (int m = 0; m < m_dim; m++) {
             const int n_idx = n * n_stride + y + n_offset;
             const int m_idx = m * m_stride_pack + z + m_offset;
-            if (transpose == dagger) {
-              auto xx = p[(m_idx + 0) * ld + n_idx];
-              auto yy = p[(m_idx + 1) * ld + n_idx];
 
-              if (fixed) {
-                reg_real[m * n_dim + n] = __floats2half2_rn(scale_inv * xx.real(), scale_inv * yy.real());
-                auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
-                reg_imag[m * n_dim + n] = __floats2half2_rn(scale_inv_conj * xx.imag(), scale_inv_conj * yy.imag());
-              } else {
-                reg_real[m * n_dim + n] = __floats2half2_rn(+xx.real(), +yy.real());
-                reg_imag[m * n_dim + n]
-                  = __floats2half2_rn(dagger ? -xx.imag() : +xx.imag(), dagger ? -yy.imag() : +yy.imag());
-              }
-            } else {
-              using store_type = typename GmemAccessor::store_type;
-              using store_vector_type = typename VectorType<store_type, 4>::type;
-              store_vector_type v = *reinterpret_cast<store_vector_type *>(&p[n_idx * ld + m_idx]);
+            if (m_idx - m_offset < M && n_idx - n_offset < N) {
+              if (transpose == dagger) {
+                auto xx = p[(m_idx + 0) * ld + n_idx];
+                auto yy = p[(m_idx + 1) * ld + n_idx];
 
-              if (fixed) {
-                reg_real[m * n_dim + n] = __floats2half2_rn(scale_inv * v.x, scale_inv * v.z);
-                auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
-                reg_imag[m * n_dim + n] = __floats2half2_rn(scale_inv_conj * v.y, scale_inv_conj * v.w);
+                if (fixed) {
+                  reg_real[m * n_dim + n] = __floats2half2_rn(scale_inv * xx.real(), scale_inv * yy.real());
+                  auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
+                  reg_imag[m * n_dim + n] = __floats2half2_rn(scale_inv_conj * xx.imag(), scale_inv_conj * yy.imag());
+                } else {
+                  reg_real[m * n_dim + n] = __floats2half2_rn(+xx.real(), +yy.real());
+                  reg_imag[m * n_dim + n]
+                    = __floats2half2_rn(dagger ? -xx.imag() : +xx.imag(), dagger ? -yy.imag() : +yy.imag());
+                }
               } else {
-                reg_real[m * n_dim + n] = __floats2half2_rn(+v.x, +v.z);
-                reg_imag[m * n_dim + n] = __floats2half2_rn(dagger ? -v.y : +v.y, dagger ? -v.w : +v.w);
+                using store_type = typename GmemAccessor::store_type;
+                using store_vector_type = typename VectorType<store_type, 4>::type;
+                store_vector_type v = *reinterpret_cast<store_vector_type *>(&p[n_idx * ld + m_idx]);
+
+                if (fixed) {
+                  reg_real[m * n_dim + n] = __floats2half2_rn(scale_inv * v.x, scale_inv * v.z);
+                  auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
+                  reg_imag[m * n_dim + n] = __floats2half2_rn(scale_inv_conj * v.y, scale_inv_conj * v.w);
+                } else {
+                  reg_real[m * n_dim + n] = __floats2half2_rn(+v.x, +v.z);
+                  reg_imag[m * n_dim + n] = __floats2half2_rn(dagger ? -v.y : +v.y, dagger ? -v.w : +v.w);
+                }
               }
             }
           }
@@ -129,8 +132,10 @@ namespace quda
           for (int m = 0; m < m_dim; m++) {
             const int n_idx = n * n_stride + y;
             const int m_idx = m * m_stride_pack + z;
-            smem_real.vector_load(m_idx, n_idx, reg_real[m * n_dim + n]);
-            smem_imag.vector_load(m_idx, n_idx, reg_imag[m * n_dim + n]);
+            if (m_idx < M && n_idx < N) {
+              smem_real.vector_load(m_idx, n_idx, reg_real[m * n_dim + n]);
+              smem_imag.vector_load(m_idx, n_idx, reg_imag[m * n_dim + n]);
+            }
           }
         }
       }
