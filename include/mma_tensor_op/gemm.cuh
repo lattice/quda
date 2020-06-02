@@ -200,6 +200,15 @@ namespace quda
 
       __device__ inline MmaOp(int thread_id) : wrm(thread_id) { }
 
+      __device__ inline void zero()
+      {
+#pragma unroll
+        for (int c = 0; c < warp_cycle; c++) {
+          op_c_real[c].zero();
+          op_c_imag[c].zero();
+        }
+      }
+
       __device__ inline void ax(float alpha)
       {
 #pragma unroll
@@ -247,7 +256,7 @@ namespace quda
         }
       }
 
-      template <int ldc, class C> __device__ inline void store(const C &cc, int m_offset, int n_offset)
+      template <int ldc, class C> __device__ inline void store(C &cc, int m_offset, int n_offset)
       {
 
 #pragma unroll
@@ -261,6 +270,23 @@ namespace quda
           const int warp_n_offset = warp_col * WMMA_N + n_offset;
 
           store_complex<ldc>(warp_m_offset, warp_n_offset, wrm, cc, op_c_real[c], op_c_imag[c]);
+        }
+      }
+
+      template <int ldc, bool dagger, class C> __device__ inline void store_atomic(C &cc, int m_offset, int n_offset)
+      {
+
+#pragma unroll
+        for (int c = 0; c < warp_cycle; c++) {
+
+          const int logical_warp_index = wrm.warp_id * warp_cycle + c;
+          const int warp_row = logical_warp_index / tile_col_dim;
+          const int warp_col = logical_warp_index - warp_row * tile_col_dim;
+
+          const int warp_m_offset = warp_row * WMMA_M + m_offset;
+          const int warp_n_offset = warp_col * WMMA_N + n_offset;
+
+          store_complex_atomic<ldc, dagger>(warp_m_offset, warp_n_offset, wrm, cc, op_c_real[c], op_c_imag[c]);
         }
       }
 
@@ -399,101 +425,6 @@ namespace quda
         return max;
       }
     };
-
-#if 0
-    template <EpilogueType epilogue_type, class Config, class A, class B, class C>
-    __device__ inline float perform_mma(Config &config, const A &aa, const B &bb, C &cc, int m_offset, int n_offset)
-    {
-      float max = 0;
-
-      constexpr bool a_transpose = false;
-      constexpr bool b_transpose = true;
-
-#ifdef USE_GMEM_MMA_PIPELINING
-      config.aa_loader.g2r<Config::lda, a_transpose>(aa, m_offset, 0);
-      config.aa_loader.r2s();
-
-      config.bb_loader.g2r<Config::ldb, b_transpose>(bb, n_offset, 0);
-      config.bb_loader.r2s();
-
-      __syncthreads();
-#endif
-
-#pragma unroll 1
-      for (int bk = 0; bk < Config::K; bk += Config::bK) {
-
-#ifdef USE_GMEM_MMA_PIPELINING
-        if (bk + Config::bK < Config::K) {
-          config.aa_loader.g2r<Config::lda, a_transpose>(aa, m_offset, bk + Config::bK);
-          config.bb_loader.g2r<Config::ldb, b_transpose>(bb, n_offset, bk + Config::bK);
-        }
-#else
-        __syncthreads();
-        config.aa_loader.g2s<Config::lda, a_transpose>(aa, m_offset, bk);
-        config.bb_loader.g2s<Config::ldb, b_transpose>(bb, n_offset, bk);
-        __syncthreads();
-#endif
-
-        config.mma_op.mma<Config::tile_acc_dim>(config.smem_obj_a_real, config.smem_obj_a_imag, config.smem_obj_b_real,
-                                                config.smem_obj_b_imag);
-
-#ifdef USE_GMEM_MMA_PIPELINING
-        if (bk + Config::bK < Config::K) {
-          __syncthreads();
-
-          config.aa_loader.r2s();
-          config.bb_loader.r2s();
-
-          __syncthreads();
-        }
-#endif
-      }
-
-      // wrap up!
-      if (epilogue_type == EpilogueType::COMPUTE_MAX_ONLY) {
-        config.mma_op.abs_max(max);
-      } else if (epilogue_type == EpilogueType::VECTOR_STORE) {
-        config.mma_op.store<Config::ldc>(cc, m_offset, n_offset);
-      }
-#if 0
-#pragma unroll
-      for (int c = 0; c < warp_cycle; c++) {
-
-        if (epilogue_type == EpilogueType::COMPUTE_MAX_ONLY) {
-
-          op_c_real[c].abs_max(max);
-          op_c_imag[c].abs_max(max);
-
-        } else {
-
-          const int logical_warp_index = warp_id * warp_cycle + c;
-          const int warp_row = logical_warp_index / tile_col_dim;
-          const int warp_col = logical_warp_index - warp_row * tile_col_dim;
-
-          const int warp_m_offset = warp_row * WMMA_M + m_offset;
-          const int warp_n_offset = warp_col * WMMA_N + n_offset;
-
-          if (epilogue_type == EpilogueType::VECTOR_STORE) {
-
-            store_complex<Config::ldc>(warp_m_offset, warp_n_offset, wrm, cc, op_c_real[c], op_c_imag[c]);
-
-          } else if (epilogue_type == EpilogueType::ATOMIC_STORE_DAGGER_NO) {
-
-            // dagger == false
-            store_complex_atomic<Config::ldc, false>(warp_m_offset, warp_n_offset, wrm, cc, op_c_real[c], op_c_imag[c]);
-
-          } else if (epilogue_type == EpilogueType::ATOMIC_STORE_DAGGER_YES) {
-
-            // dagger == true
-            store_complex_atomic<Config::ldc, true>(warp_m_offset, warp_m_offset, wrm, cc, op_c_real[c], op_c_imag[c]);
-          }
-        }
-      }
-#endif
-      return max;
-    }
-
-#endif
 
   } // namespace mma
 

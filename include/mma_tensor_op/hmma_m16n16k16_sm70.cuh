@@ -94,10 +94,22 @@ namespace quda
       using reg_type = unsigned;
       reg_type reg[4];
 
-      __device__ inline MmaOperandC()
+      __device__ inline MmaOperandC() { zero(); }
+
+      __device__ inline void zero()
       {
 #pragma unroll
         for (int i = 0; i < 4; i++) { reg[i] = 0; }
+      }
+
+      __device__ inline void ax(float alpha)
+      {
+        half2 alpha_h2 = __float2half2_rn(alpha);
+#pragma unroll
+        for (int i = 0; i < 4; i++) {
+          half2 &h2 = *(reinterpret_cast<half2 *>(&(reg[i])));
+          h2 = __hmul2(alpha_h2, h2);
+        }
       }
 
       template <int ldc>
@@ -128,10 +140,18 @@ namespace quda
       using reg_type = float;
       reg_type reg[8];
 
-      __device__ inline MmaOperandC()
+      __device__ inline MmaOperandC() { zero(); }
+
+      __device__ inline void zero()
       {
 #pragma unroll
         for (int i = 0; i < 8; i++) { reg[i] = 0; }
+      }
+
+      __device__ inline void ax(float alpha)
+      {
+#pragma unroll
+        for (int i = 0; i < 8; i++) { reg[i] *= alpha; }
       }
 
       template <int ldc>
@@ -310,7 +330,7 @@ namespace quda
 
       constexpr bool fixed = GmemOperandC::fixed;
 
-      using vector_type = typename VectorType<store_type, 2>::type;
+      using vector_type = typename vector<store_type, 2>::type;
       auto ptr = reinterpret_cast<vector_type *>(cc.data());
 
 #pragma unroll
