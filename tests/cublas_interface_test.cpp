@@ -164,6 +164,33 @@ int main(int argc, char **argv)
   initQuda(device);
   //-----------------------------------------------------------------------------
 
+  int dCount;
+  cudaGetDeviceCount( &dCount );  
+  int device;
+  for (device = 0; device < dCount; ++device ) {
+    
+    cudaDeviceProp deviceProp;      
+    cudaGetDeviceProperties( &deviceProp, device );
+    printfQuda( "%d - name:                    %s\n" ,device ,deviceProp.name );
+    printfQuda( "%d - totalGlobalMem:          %d bytes ( %.2f Gbytes)\n" ,device ,deviceProp.totalGlobalMem , deviceProp.totalGlobalMem / (float)( 1024 * 1024 * 1024)  );
+    printfQuda( "%d - sharedMemPerBlock:       %d bytes ( %.2f Kbytes)\n" ,device ,deviceProp.sharedMemPerBlock ,deviceProp.sharedMemPerBlock / (float)1024  );
+    printfQuda( "%d - regsPerBlock:            %d\n" ,device ,deviceProp.regsPerBlock );
+    printfQuda( "%d - warpSize:                %d\n" ,device ,deviceProp.warpSize );
+    printfQuda( "%d - memPitch:                %d\n" ,device ,deviceProp.memPitch );
+    printfQuda( "%d - maxThreadsPerBlock:      %d\n" ,device ,deviceProp.maxThreadsPerBlock );
+    printfQuda( "%d - maxThreadsDim[0]:        %d\n" ,device ,deviceProp.maxThreadsDim[0] );
+    printfQuda( "%d - maxThreadsDim[1]:        %d\n" ,device ,deviceProp.maxThreadsDim[1] );
+    printfQuda( "%d - maxThreadsDim[2]:        %d\n" ,device ,deviceProp.maxThreadsDim[2] );
+    printfQuda( "%d - maxGridSize[0]:          %d\n" ,device ,deviceProp.maxGridSize[0] );
+    printfQuda( "%d - maxGridSize[1]:          %d\n" ,device ,deviceProp.maxGridSize[1] );
+    printfQuda( "%d - maxGridSize[2]:          %d\n" ,device ,deviceProp.maxGridSize[2] );
+    printfQuda( "%d - totalConstMem:           %d bytes ( %.2f Kbytes)\n" ,device ,deviceProp.totalConstMem ,deviceProp.totalConstMem / (float) 1024 );
+    printfQuda( "%d - compute capability:      %d.%d\n" ,device ,deviceProp.major ,deviceProp.minor);
+    printfQuda( "%d - clockRate                %d kilohertz\n" ,device ,deviceProp.clockRate );
+    printfQuda( "%d - textureAlignment         %d\n\n" ,device ,deviceProp.textureAlignment );
+  }
+  
+  
   QudaCublasParam cublas_param = newQudaCublasParam();
   cublas_param.trans_a = cublas_trans_a;
   cublas_param.trans_b = cublas_trans_b;
@@ -182,7 +209,8 @@ int main(int argc, char **argv)
   cublas_param.batch_count = cublas_batch;
 
   // Reference data is always in complex double
-  size_t data_size = 2 * sizeof(double);
+  size_t data_size = sizeof(double);
+  int re_im = 2;
   uint64_t refA_size = 0, refB_size = 0, refC_size = 0;
   if(cublas_param.data_order == QUDA_CUBLAS_DATAORDER_COL) {
     // leading dimension is in terms of consecutive data
@@ -198,15 +226,15 @@ int main(int argc, char **argv)
     refC_size = cublas_param.m * cublas_param.ldc; //C_mn
   }
   
-  void *refA = malloc(refA_size * data_size);
-  void *refB = malloc(refB_size * data_size);
-  void *refC = malloc(refC_size * data_size);
-  void *refCcopy = malloc(refC_size * data_size);
+  void *refA = malloc(refA_size * re_im * data_size);
+  void *refB = malloc(refB_size * re_im * data_size);
+  void *refC = malloc(refC_size * re_im * data_size);
+  void *refCcopy = malloc(refC_size * re_im * data_size);
 
-  memset(refA, 0.0, refA_size * data_size);
-  memset(refB, 0.0, refB_size * data_size);
-  memset(refC, 0.0, refC_size * data_size);
-  memset(refCcopy, 0.0, refC_size * data_size);
+  memset(refA, 0, refA_size * re_im * data_size);
+  memset(refB, 0, refB_size * re_im * data_size);
+  memset(refC, 0, refC_size * re_im * data_size);
+  memset(refCcopy, 0, refC_size * re_im * data_size);
   
   // Populate the real part with rands
   for (uint64_t i = 0; i < 2 * refA_size; i+=2) {
@@ -320,15 +348,15 @@ int main(int argc, char **argv)
   if(verify_results) {
 
     // Copy data from problem sized array to reference sized array.
-    void *checkA = malloc(refA_size * data_size);
-    void *checkB = malloc(refB_size * data_size);
-    void *checkC = malloc(refC_size * data_size);
-    void *checkCcopy = malloc(refC_size * data_size);
+    void *checkA = malloc(refA_size * re_im * data_size);
+    void *checkB = malloc(refB_size * re_im * data_size);
+    void *checkC = malloc(refC_size * re_im * data_size);
+    void *checkCcopy = malloc(refC_size * re_im * data_size);
 
-    memset(checkA, 0, refA_size * data_size);
-    memset(checkB, 0, refB_size * data_size);
-    memset(checkC, 0, refC_size * data_size);
-    memset(checkCcopy, 0, refC_size * data_size);
+    memset(checkA, 0, refA_size * re_im * data_size);
+    memset(checkB, 0, refB_size * re_im * data_size);
+    memset(checkC, 0, refC_size * re_im * data_size);
+    memset(checkCcopy, 0, refC_size * re_im * data_size);
     
     switch (cublas_param.data_type) {
     case QUDA_CUBLAS_DATATYPE_S :
