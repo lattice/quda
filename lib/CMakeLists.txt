@@ -206,8 +206,12 @@ if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")
   add_subdirectory(targets/cuda)
 endif()
 if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
-  #set(QUDA_TARGET_DIR "hip")
+  add_subdirectory(targets/hip)
 endif()
+if(${QUDA_TARGET_TYPE} STREQUAL "CPU")
+  add_subdirectory(targets/cpu)
+endif()
+
 
 target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_target>)
 
