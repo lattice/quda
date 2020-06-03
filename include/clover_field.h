@@ -249,7 +249,7 @@ namespace quda {
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    void prefetch(QudaFieldLocation mem_space, cudaStream_t stream = 0) const;
+    void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
 
     /**
       @brief If managed memory and prefetch is enabled, prefetch
@@ -260,7 +260,7 @@ namespace quda {
       @param[in] type Whether to grab the clover, inverse, or both
       @param[in] parity Whether to grab the full clover or just the even/odd parity
     */
-    void prefetch(QudaFieldLocation mem_space, cudaStream_t stream, CloverPrefetchType type,
+    void prefetch(QudaFieldLocation mem_space, qudaStream_t stream, CloverPrefetchType type,
                   QudaParity parity = QUDA_INVALID_PARITY) const;
 
     friend class DiracClover;

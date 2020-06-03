@@ -127,7 +127,7 @@ namespace quda {
     }
     virtual ~CopyGaugeEx() { ; }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
       if (location == QUDA_CPU_FIELD_LOCATION) {
@@ -357,19 +357,44 @@ namespace quda {
 #else
         errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
 #endif
+      } else {
+        errorQuda("Precision %d not instantiated", in.Precision());
       }
     } else if (out.Precision() == QUDA_SINGLE_PRECISION) {
       if (in.Precision() == QUDA_DOUBLE_PRECISION) {
-	copyGaugeEx(out, in, location, (float*)Out, (double*)In);
+        copyGaugeEx(out, in, location, (float *)Out, (double *)In);
       } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
 #if QUDA_PRECISION & 4
-        copyGaugeEx(out, in, location, (float*)Out, (float*)In);
+        copyGaugeEx(out, in, location, (float *)Out, (float *)In);
 #else
         errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
 #endif
+      } else {
+        errorQuda("Precision %d not instantiated", in.Precision());
       }
+    } else if (out.Precision() == QUDA_HALF_PRECISION) {
+      if (in.Precision() == QUDA_HALF_PRECISION) {
+#if QUDA_PRECISION & 2
+        copyGaugeEx(out, in, location, (short *)Out, (short *)In);
+#else
+        errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+#endif
+      } else {
+        errorQuda("Precision %d not instantiated", in.Precision());
+      }
+    } else if (out.Precision() == QUDA_QUARTER_PRECISION) {
+      if (in.Precision() == QUDA_QUARTER_PRECISION) {
+#if QUDA_PRECISION & 1
+        copyGaugeEx(out, in, location, (char *)Out, (char *)In);
+#else
+        errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+#endif
+      } else {
+        errorQuda("Precision %d not instantiated", in.Precision());
+      }
+    } else {
+      errorQuda("Precision %d not instantiated", out.Precision());
     }
-
   }
 
 } // namespace quda

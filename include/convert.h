@@ -16,12 +16,16 @@ namespace quda
 
   inline __host__ __device__ float s2f_(short a_16)
   {
+#if 0
+    return static_cast<float>(a_16);
+#else
     union {
       uint a_32;
       float f_32;
     };
     a_32 = 0x4b7f8000 ^ (a_16 & 0xFFFF);
     return f_32 - 16744448.f;
+#endif
   }
 
   inline __host__ __device__ float c2f_(char a_8)

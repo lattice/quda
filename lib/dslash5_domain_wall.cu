@@ -2,20 +2,11 @@
 #include <color_spinor_field_order.h>
 #include <dslash_quda.h>
 #include <index_helper.cuh>
-#include <dslash_quda.h>
 
-#include <include/kernels/dslash_domain_wall_m5.cuh>
+#include <kernels/dslash_domain_wall_m5.cuh>
 
 namespace quda
 {
-
-  /*
-    FIXME
-    - fix flops counters
-    - check dagger operators are correct - there might need to be a
-    shift by 1 in which coefficients are used and conjugation of coefficients
-    - use kappa notation and not b/c for consistency with other codes and sanity
-  */
 
   template <typename Float, int nColor, typename Arg> class Dslash5 : public TunableVectorYZ
   {
@@ -46,13 +37,9 @@ protected:
         break;
       case M5_INV_DWF:
       case M5_INV_MOBIUS: // FIXME flops
-        // flops_ = ((2 + 8 * n) * Ls + (arg.xpay ? 4ll : 0)) * meta.Volume();
-        flops_ = (144 * Ls + (arg.xpay ? 4ll : 0)) * meta.Volume();
+        flops_ = ((2 + 8 * n) * Ls + (arg.xpay ? 4ll : 0)) * meta.Volume();
         break;
-      case M5_INV_ZMOBIUS:
-        // flops_ = ((12 + 16 * n) * Ls + (arg.xpay ? 8ll : 0)) * meta.Volume();
-        flops_ = (144 * Ls + (arg.xpay ? 8ll : 0)) * meta.Volume();
-        break;
+      case M5_INV_ZMOBIUS: flops_ = ((12 + 16 * n) * Ls + (arg.xpay ? 8ll : 0)) * meta.Volume(); break;
       default: errorQuda("Unknown Dslash5Type %d", arg.type);
       }
 
@@ -117,7 +104,7 @@ public:
     }
     virtual ~Dslash5() {}
 
-    template <typename T> inline void launch(T *f, const TuneParam &tp, Arg &arg, const cudaStream_t &stream)
+    template <typename T> inline void launch(T *f, const TuneParam &tp, Arg &arg, const qudaStream_t &stream)
     {
       if (shared && (arg.type == M5_INV_DWF || arg.type == M5_INV_MOBIUS || arg.type == M5_INV_ZMOBIUS)) {
         // if inverse kernel uses shared memory then maximize total shared memory pool
@@ -127,7 +114,7 @@ public:
       qudaLaunchKernel((const void *)f, tp.grid, tp.block, args, tp.shared_bytes, stream);
     }
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
         errorQuda("CPU variant not instantiated");

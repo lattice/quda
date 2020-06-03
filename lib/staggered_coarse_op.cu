@@ -53,7 +53,7 @@ namespace quda {
       strcat(aux,X.VolString());
     }
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_VERBOSE);
 

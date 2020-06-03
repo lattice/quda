@@ -13,7 +13,7 @@ namespace quda {
 
   namespace blas {
 
-    cudaStream_t* getStream();
+    qudaStream_t* getStream();
 
     template <int NXZ, typename FloatN, int M, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW,
         typename Functor, typename T>
@@ -97,7 +97,7 @@ namespace quda {
         return TuneKey(x[0]->VolString(), name, aux);
       }
 
-      inline void apply(const cudaStream_t &stream)
+      inline void apply(const qudaStream_t &stream)
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
