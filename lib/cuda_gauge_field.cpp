@@ -84,7 +84,6 @@ namespace quda {
       createTexObject(oddPhaseTex, (char*)odd + phase_offset, false, isPhase);
     }
 #endif
-
   }
 
   void cudaGaugeField::zeroPad() {
@@ -634,8 +633,7 @@ namespace quda {
 
     if (link_type == QUDA_ASQTAD_FAT_LINKS) {
       fat_link_max = src.LinkMax();
-      if ((precision == QUDA_HALF_PRECISION  || precision == QUDA_QUARTER_PRECISION) && fat_link_max == 0.0) 
-        errorQuda("fat_link_max has not been computed");
+      if (fat_link_max == 0.0 && precision < QUDA_SINGLE_PRECISION) fat_link_max = src.abs_max();
     } else {
       fat_link_max = 1.0;
     }
