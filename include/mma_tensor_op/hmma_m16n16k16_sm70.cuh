@@ -55,12 +55,16 @@ namespace quda
       template <class SmemObj>
       __device__ inline void load(SmemObj smem_obj, int k, int warp_row, const WarpRegisterMapping &wrm)
       {
-        // unsigned *A = reinterpret_cast<unsigned *>(smem);
-        const int idx_strided = k * 4 + wrm.quad_thread;
-        const int idx_contiguous = warp_row * 16 + wrm.quad_row * 8 + wrm.quad_hilo * 4;
-        // const int thread_offset_a = idx_strided * stride + idx_contiguous;
-        smem_obj.vector_store(idx_contiguous + 0, idx_strided, reg[0]); // A[thread_offset_a + 0];
-        smem_obj.vector_store(idx_contiguous + 2, idx_strided, reg[1]); // A[thread_offset_a + 1];
+        unsigned *A = reinterpret_cast<unsigned *>(smem_obj.ptr);
+        int idx_strided = k * 4 + wrm.quad_thread;
+        int idx_contiguous = warp_row * 16 + wrm.quad_row * 8 + wrm.quad_hilo * 4;
+        const int thread_offset_a = idx_strided * SmemObj::ldn + idx_contiguous;
+        reg[0] = A[thread_offset_a / 2 + 0];
+        reg[1] = A[thread_offset_a / 2 + 1];
+
+        // XXX the following code is more concise, but CUDA spills the registers if we use it
+        // smem_obj.vector_store(idx_contiguous + 0, idx_strided, reg[0]);
+        // smem_obj.vector_store(idx_contiguous + 2, idx_strided, reg[1]);
       }
 
       __device__ inline void negate()
@@ -77,12 +81,16 @@ namespace quda
       template <class SmemObj>
       __device__ inline void load(SmemObj smem_obj, int k, int warp_col, const WarpRegisterMapping &wrm)
       {
-        // unsigned *B = reinterpret_cast<unsigned *>(smem);
-        const int idx_strided = k * 4 + wrm.quad_thread;
-        const int idx_contiguous = warp_col * 16 + wrm.quad_col * 8 + wrm.quad_hilo * 4;
-        // const int thread_offset_b = idx_strided * stride + idx_contiguous;
-        smem_obj.vector_store(idx_contiguous + 0, idx_strided, reg[0]); // B[thread_offset_b + 0];
-        smem_obj.vector_store(idx_contiguous + 2, idx_strided, reg[1]); // B[thread_offset_b + 1];
+        unsigned *B = reinterpret_cast<unsigned *>(smem_obj.ptr);
+        int idx_strided = k * 4 + wrm.quad_thread;
+        int idx_contiguous = warp_col * 16 + wrm.quad_col * 8 + wrm.quad_hilo * 4;
+        const int thread_offset_b = idx_strided * SmemObj::ldn + idx_contiguous;
+        reg[0] = B[thread_offset_b / 2 + 0];
+        reg[1] = B[thread_offset_b / 2 + 1];
+
+        // XXX the following code is more concise, but CUDA spills the registers if we use it
+        // smem_obj.vector_store(idx_contiguous + 0, idx_strided, reg[0]);
+        // smem_obj.vector_store(idx_contiguous + 2, idx_strided, reg[1]);
       }
     };
 
@@ -277,7 +285,7 @@ namespace quda
       }
     }
 
-    template <int ldc, class TC, class GmemOperandC>
+    template <int ldc, bool dagger, class TC, class GmemOperandC>
     inline __device__ typename std::enable_if<std::is_same<typename TC::reg_type, unsigned>::value, void>::type
     store_complex_atomic(int warp_row, int warp_col, const WarpRegisterMapping &wrm, GmemOperandC &cc,
                          const TC &op_c_real, const TC &op_c_imag)
@@ -288,9 +296,9 @@ namespace quda
       const int col = warp_col + wrm.quad_col * 8;
 
       constexpr bool fixed = GmemOperandC::fixed;
-      using structure = Structure<store_type, 16>;
-      trove::coalesced_ptr<structure> ptr_(reinterpret_cast<structure *>(cc.data()));
-      structure s;
+
+      using vector_type = typename vector<store_type, 2>::type;
+      auto ptr = reinterpret_cast<vector_type *>(cc.data());
 
 #pragma unroll
       for (int i = 0; i < 4; i++) {
@@ -298,14 +306,31 @@ namespace quda
         const half2 i2 = *(reinterpret_cast<const half2 *>(&(op_c_imag.reg[i])));
         if (fixed) {
           auto scale = cc.scale;
-          // TODO: Add the atomic code here.
-#if 0
-          s[i * 4 + 0] = __half2short_rn(__half2float(r2.x) * scale);
-          s[i * 4 + 1] = __half2short_rn(__half2float(i2.x) * scale);
-          s[i * 4 + 2] = __half2short_rn(__half2float(r2.y) * scale);
-          s[i * 4 + 3] = __half2short_rn(__half2float(i2.y) * scale);
-#endif
+
+          int m_index = row;
+          int n_index = col + 2 * i;
+
+          vector_type value;
+          if (dagger) {
+            value.x = +static_cast<store_type>(__half2float(r2.x) * scale);
+            value.y = -static_cast<store_type>(__half2float(i2.x) * scale);
+            atomicAdd(&ptr[(n_index + 0) * ldc + m_index], value);
+
+            value.x = +static_cast<store_type>(__half2float(r2.y) * scale);
+            value.y = -static_cast<store_type>(__half2float(i2.y) * scale);
+            atomicAdd(&ptr[(n_index + 1) * ldc + m_index], value);
+          } else {
+            value.x = +static_cast<store_type>(__half2float(r2.x) * scale);
+            value.y = +static_cast<store_type>(__half2float(i2.x) * scale);
+            atomicAdd(&ptr[m_index * ldc + (n_index + 0)], value);
+
+            value.x = +static_cast<store_type>(__half2float(r2.y) * scale);
+            value.y = +static_cast<store_type>(__half2float(i2.y) * scale);
+            atomicAdd(&ptr[m_index * ldc + (n_index + 1)], value);
+          }
+
         } else {
+          // TODO: Need to be added.
 #if 0
           s[i * 4 + 0] = __half2float(r2.x);
           s[i * 4 + 1] = __half2float(i2.x);
@@ -314,8 +339,6 @@ namespace quda
 #endif
         }
       }
-
-      ptr_[(row * ldc + col) / 8] = s;
     }
 
     template <int ldc, bool dagger, class TC, class GmemOperandC>
@@ -359,15 +382,9 @@ namespace quda
             value.y = +static_cast<store_type>(op_c_imag.reg[i * 2 + 1] * scale);
             atomicAdd(&ptr[m_index * ldc + (n_index + 1)], value);
           }
-#if 0
-          s[0] = static_cast<store_type>(op_c_real.reg[i * 2 + 0] * scale);
-          s[1] = static_cast<store_type>(op_c_imag.reg[i * 2 + 0] * scale);
-          s[2] = static_cast<store_type>(op_c_real.reg[i * 2 + 1] * scale);
-          s[3] = static_cast<store_type>(op_c_imag.reg[i * 2 + 1] * scale);
-#endif
+
         } else {
           // TODO: Need to be added.
-
 #if 0
           s[0] = op_c_real.reg[i * 2 + 0];
           s[1] = op_c_imag.reg[i * 2 + 0];

@@ -705,14 +705,15 @@ namespace quda
         if (type == COMPUTE_UV || type == COMPUTE_VUV) {
           strcat(Aux, ",tile_size=");
           char tile[16];
-          u32toa(tile, type == COMPUTE_UV ? arg.uvTile.M : arg.vuvTile.M);
+          u32toa(tile, arg.uvTile.m);
           strcat(Aux, tile);
           strcat(Aux, "x");
-          u32toa(tile, type == COMPUTE_UV ? arg.uvTile.N : arg.vuvTile.N);
+          u32toa(tile, arg.uvTile.n);
           strcat(Aux, tile);
           strcat(Aux, "x");
-          u32toa(tile, type == COMPUTE_UV ? arg.uvTile.K : arg.vuvTile.K);
+          u32toa(tile, arg.uvTile.k);
           strcat(Aux, tile);
+          strcat(Aux, accumulate_precision() == QUDA_SINGLE_PRECISION ? ",fp32_acc" : ",fp16_acc");
         }
 
         if (type == COMPUTE_UV || type == COMPUTE_VUV) {
