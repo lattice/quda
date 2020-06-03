@@ -23,7 +23,7 @@ namespace quda
   public:
     WilsonClover(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
@@ -106,16 +106,6 @@ namespace quda
       double a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
 #ifdef GPU_CLOVER_DIRAC
-    if (in.V() == out.V()) errorQuda("Aliasing pointers");
-    if (in.FieldOrder() != out.FieldOrder())
-      errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
-
-    // check all precisions match
-    checkPrecision(out, in, U, A);
-
-    // check all locations match
-    checkLocation(out, in, U, A);
-
     instantiate<WilsonCloverApply>(out, in, U, A, a, x, parity, dagger, comm_override, profile);
 #else
     errorQuda("Clover dslash has not been built");

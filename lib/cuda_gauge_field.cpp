@@ -205,7 +205,7 @@ namespace quda {
     if ( !isNative() ) {
       for (int i=0; i<nDim; i++) {
         if (ghost[i]) pool_device_free(ghost[i]);
-        if (ghost[i+4] && geometry == QUDA_COARSE_GEOMETRY) pool_device_free(ghost[i]);
+        if (ghost[i+4] && geometry == QUDA_COARSE_GEOMETRY) pool_device_free(ghost[i+4]);
       }
     }
 
@@ -425,7 +425,7 @@ namespace quda {
     }
   }
 
-  void cudaGaugeField::sendStart(int dim, int dir, cudaStream_t* stream_p)
+  void cudaGaugeField::sendStart(int dim, int dir, qudaStream_t *stream_p)
   {
     if (!comm_dim_partitioned(dim)) return;
 
@@ -522,7 +522,7 @@ namespace quda {
 
       // silence cuda-memcheck initcheck errors that arise since we
       // have an oversized ghost buffer when doing the extended exchange
-      cudaMemsetAsync(send_d[dim], 0, 2*ghost_face_bytes[dim]);
+      qudaMemsetAsync(send_d[dim], 0, 2 * ghost_face_bytes[dim], 0);
       offset += 2*ghost_face_bytes[dim]; // factor of two from fwd/back
     }
 
@@ -840,9 +840,30 @@ namespace quda {
     backed_up = false;
   }
 
-  void cudaGaugeField::zero() {
-    cudaMemset(gauge, 0, bytes);
+  void cudaGaugeField::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
+  {
+
+    if (is_prefetch_enabled() && mem_type == QUDA_MEMORY_DEVICE) {
+      int dev_id = 0;
+      if (mem_space == QUDA_CUDA_FIELD_LOCATION)
+        dev_id = comm_gpuid();
+      else if (mem_space == QUDA_CPU_FIELD_LOCATION)
+        dev_id = cudaCpuDeviceId;
+      else
+        errorQuda("Invalid QudaFieldLocation.");
+
+      if (gauge) cudaMemPrefetchAsync(gauge, bytes, dev_id, stream);
+      if (!isNative()) {
+        for (int i = 0; i < nDim; i++) {
+          size_t nbytes = nFace * surface[i] * nInternal * precision;
+          if (ghost[i] && nbytes) cudaMemPrefetchAsync(ghost[i], nbytes, dev_id, stream);
+          if (ghost[i + 4] && nbytes && geometry == QUDA_COARSE_GEOMETRY)
+            cudaMemPrefetchAsync(ghost[i + 4], nbytes, dev_id, stream);
+        }
+      }
+    }
   }
 
+  void cudaGaugeField::zero() { qudaMemset(gauge, 0, bytes); }
 
 } // namespace quda

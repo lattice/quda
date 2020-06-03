@@ -1,4 +1,4 @@
-#ifdef QUDA_REDUCE_SINGLE_WARP
+#ifdef QUDA_FAST_COMPILE_REDUCE
 // only compile block size with a single warp
 #define LAUNCH_KERNEL(kernel, tunable, tp, stream, arg, ...)            \
   switch (tp.block.x) {							\
@@ -179,9 +179,9 @@ default:								\
     errorQuda("%s not implemented for %d threads", #kernel, tp.block.x); \
     }
 
-#endif // REDUCE_SINGLE_WARP
+#endif // QUDA_FAST_COMPILE_REDUCE
 
-#ifdef QUDA_REDUCE_SINGLE_WARP
+#ifdef QUDA_FAST_COMPILE_REDUCE
 
 // only compile block size with a single warp
 #define LAUNCH_KERNEL_LOCAL_PARITY(kernel, tunable, tp, stream, arg, ...) \
@@ -289,11 +289,15 @@ default:								\
   switch (tp.block.x) {                                                                                                \
   case 4: kernel<4, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                          \
   case 8: kernel<8, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                          \
+  case 9: kernel<9, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                          \
   case 12: kernel<12, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                        \
   case 16: kernel<16, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                        \
+  case 18: kernel<18, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                        \
+  case 24: kernel<24, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                        \
   case 27: kernel<27, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                        \
   case 32: kernel<32, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                        \
   case 36: kernel<36, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                        \
+  case 48: kernel<48, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                        \
   case 54: kernel<54, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                        \
   case 64: kernel<64, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                        \
   case 72: kernel<72, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                        \
@@ -313,7 +317,7 @@ default:								\
   default: errorQuda("%s block size %d not instantiated", #kernel, tp.block.x);                                        \
   }
 
-#ifdef QUDA_REDUCE_SINGLE_WARP
+#ifdef QUDA_FAST_COMPILE_REDUCE
 
  // only compile block size with a single warp
 #define LAUNCH_KERNEL_REDUCE(kernel, tunable, tp, stream, arg, ...)                                                    \

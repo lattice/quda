@@ -16,6 +16,22 @@ namespace quda {
 
   struct FullClover;
 
+  /**
+     @brief Helper function for getting the implied spinor parity from a matrix preconditioning type.
+     @param[in] matpc_type The matrix preconditioning type
+     @return Even or Odd as appropriate, invalid if the preconditioning type is invalid (implicitly non-preconditioned)
+   */
+  constexpr QudaParity impliedParityFromMatPC(const QudaMatPCType &matpc_type)
+  {
+    if (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
+      return QUDA_EVEN_PARITY;
+    } else if (matpc_type == QUDA_MATPC_ODD_ODD || matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
+      return QUDA_ODD_PARITY;
+    } else {
+      return QUDA_INVALID_PARITY;
+    }
+  }
+
   /** Typedef for a set of spinors. Can be further divided into subsets ,e.g., with different precisions (not implemented currently) */
   typedef std::vector<ColorSpinorField*> CompositeColorSpinorField;
 
@@ -96,6 +112,12 @@ namespace quda {
 
     QudaPCType pc_type; // used to select preconditioning method in DWF
 
+    /** Used to specify whether a single parity field is even/odd
+     * By construction not enforced, this is more of an optional
+     * metadata to specify, for ex, if an eigensolver is for an
+     * even or odd parity. */
+    QudaParity suggested_parity;
+
     void *v; // pointer to field
     void *norm;
 
@@ -108,26 +130,28 @@ namespace quda {
     ColorSpinorParam(const ColorSpinorField &a);
 
     ColorSpinorParam() :
-        LatticeFieldParam(),
-        location(QUDA_INVALID_FIELD_LOCATION),
-        nColor(0),
-        nSpin(0),
-        nVec(1),
-        twistFlavor(QUDA_TWIST_INVALID),
-        siteOrder(QUDA_INVALID_SITE_ORDER),
-        fieldOrder(QUDA_INVALID_FIELD_ORDER),
-        gammaBasis(QUDA_INVALID_GAMMA_BASIS),
-        create(QUDA_INVALID_FIELD_CREATE),
-        pc_type(QUDA_PC_INVALID),
-        is_composite(false),
-        composite_dim(0),
-        is_component(false),
-        component_id(0)
+      LatticeFieldParam(),
+      location(QUDA_INVALID_FIELD_LOCATION),
+      nColor(0),
+      nSpin(0),
+      nVec(1),
+      twistFlavor(QUDA_TWIST_INVALID),
+      siteOrder(QUDA_INVALID_SITE_ORDER),
+      fieldOrder(QUDA_INVALID_FIELD_ORDER),
+      gammaBasis(QUDA_INVALID_GAMMA_BASIS),
+      create(QUDA_INVALID_FIELD_CREATE),
+      pc_type(QUDA_PC_INVALID),
+      suggested_parity(QUDA_INVALID_PARITY),
+      is_composite(false),
+      composite_dim(0),
+      is_component(false),
+      component_id(0)
     {
       ;
     }
 
       // used to create cpu params
+
     ColorSpinorParam(void *V, QudaInvertParam &inv_param, const int *X, const bool pc_solution,
         QudaFieldLocation location = QUDA_CPU_FIELD_LOCATION) :
         LatticeFieldParam(4, X, 0, inv_param.cpu_prec),
@@ -161,8 +185,10 @@ namespace quda {
         siteSubset = QUDA_PARITY_SITE_SUBSET;
       }
 
+      suggested_parity = impliedParityFromMatPC(inv_param.matpc_type);
+
       if (inv_param.dslash_type == QUDA_DOMAIN_WALL_DSLASH || inv_param.dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
-          || inv_param.dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+          || inv_param.dslash_type == QUDA_MOBIUS_DWF_DSLASH || inv_param.dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
         nDim++;
         x[4] = inv_param.Ls;
       } else if (inv_param.dslash_type == QUDA_TWISTED_MASS_DSLASH && (twistFlavor == QUDA_TWIST_NONDEG_DOUBLET)) {
@@ -171,6 +197,8 @@ namespace quda {
       } else if (inv_param.dslash_type == QUDA_STAGGERED_DSLASH || inv_param.dslash_type == QUDA_ASQTAD_DSLASH) {
         nDim++;
         x[4] = inv_param.Ls;
+      } else {
+        x[4] = 1;
       }
 
       if (inv_param.dirac_order == QUDA_INTERNAL_DIRAC_ORDER) {
@@ -198,27 +226,29 @@ namespace quda {
     }
 
     // normally used to create cuda param from a cpu param
-    ColorSpinorParam(
-        ColorSpinorParam &cpuParam, QudaInvertParam &inv_param, QudaFieldLocation location = QUDA_CUDA_FIELD_LOCATION) :
-        LatticeFieldParam(cpuParam.nDim, cpuParam.x, inv_param.sp_pad, inv_param.cuda_prec),
-        location(location),
-        nColor(cpuParam.nColor),
-        nSpin(cpuParam.nSpin),
-        nVec(cpuParam.nVec),
-        twistFlavor(cpuParam.twistFlavor),
-        siteOrder(QUDA_EVEN_ODD_SITE_ORDER),
-        fieldOrder(QUDA_INVALID_FIELD_ORDER),
-        gammaBasis(nSpin == 4 ? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS),
-        create(QUDA_COPY_FIELD_CREATE),
-        pc_type(cpuParam.pc_type),
-        v(0),
-        is_composite(cpuParam.is_composite),
-        composite_dim(cpuParam.composite_dim),
-        is_component(false),
-        component_id(0)
+    ColorSpinorParam(ColorSpinorParam &cpuParam, QudaInvertParam &inv_param,
+                     QudaFieldLocation location = QUDA_CUDA_FIELD_LOCATION) :
+      LatticeFieldParam(cpuParam.nDim, cpuParam.x, 0, inv_param.cuda_prec),
+      location(location),
+      nColor(cpuParam.nColor),
+      nSpin(cpuParam.nSpin),
+      nVec(cpuParam.nVec),
+      twistFlavor(cpuParam.twistFlavor),
+      siteOrder(QUDA_EVEN_ODD_SITE_ORDER),
+      fieldOrder(QUDA_INVALID_FIELD_ORDER),
+      gammaBasis(nSpin == 4 ? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS),
+      create(QUDA_COPY_FIELD_CREATE),
+      pc_type(cpuParam.pc_type),
+      suggested_parity(cpuParam.suggested_parity),
+      v(0),
+      is_composite(cpuParam.is_composite),
+      composite_dim(cpuParam.composite_dim),
+      is_component(false),
+      component_id(0)
     {
       siteSubset = cpuParam.siteSubset;
       fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1 || nSpin == 2) ? QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
+      for (int d = 0; d < QUDA_MAX_DIM; d++) x[d] = cpuParam.x[d];
     }
 
     /**
@@ -258,6 +288,8 @@ namespace quda {
       printfQuda("fieldOrder = %d\n", fieldOrder);
       printfQuda("gammaBasis = %d\n", gammaBasis);
       printfQuda("create = %d\n", create);
+      printfQuda("pc_type = %d\n", pc_type);
+      printfQuda("suggested_parity = %d\n", suggested_parity);
       printfQuda("v = %lx\n", (unsigned long)v);
       printfQuda("norm = %lx\n", (unsigned long)norm);
       //! for deflation etc.
@@ -311,10 +343,10 @@ namespace quda {
   class ColorSpinorField : public LatticeField {
 
   private:
-      void create(int nDim, const int *x, int Nc, int Ns, int Nvec, QudaTwistFlavorType Twistflavor,
-          QudaPrecision precision, int pad, QudaSiteSubset subset, QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder,
-          QudaGammaBasis gammaBasis, QudaPCType pc_type);
-      void destroy();
+    void create(int nDim, const int *x, int Nc, int Ns, int Nvec, QudaTwistFlavorType Twistflavor,
+                QudaPrecision precision, int pad, QudaSiteSubset subset, QudaSiteOrder siteOrder,
+                QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis, QudaPCType pc_type, QudaParity suggested_parity);
+    void destroy();
 
   protected:
     bool init;
@@ -337,6 +369,12 @@ namespace quda {
     QudaTwistFlavorType twistFlavor;
 
     QudaPCType pc_type; // used to select preconditioning method in DWF
+
+    /** Used to specify whether a single parity field is even/odd
+     * By construction not enforced, this is more of an optional
+     * metadata to specify, for ex, if an eigensolver is for an
+     * even or odd parity. */
+    QudaParity suggested_parity;
 
     size_t real_length; // physical length only
     size_t length; // length including pads, but not ghost zone - used for BLAS
@@ -477,6 +515,8 @@ namespace quda {
     size_t ComponentNormBytes() const { return composite_descr.norm_bytes; }
 
     QudaPCType PCType() const { return pc_type; }
+    QudaParity SuggestedParity() const { return suggested_parity; }
+    void setSuggestedParity(QudaParity suggested_parity) { this->suggested_parity = suggested_parity; }
 
     QudaSiteSubset SiteSubset() const { return siteSubset; }
     QudaSiteOrder SiteOrder() const { return siteOrder; }
@@ -678,11 +718,11 @@ namespace quda {
        @param[in] c Twisted mass parameter (chiral twist factor, default=0)
       */
     void packGhost(const int nFace, const QudaParity parity, const int dim, const QudaDirection dir, const int dagger,
-                   cudaStream_t *stream, MemoryLocation location[2 * QUDA_MAX_DIM], MemoryLocation location_label,
+                   qudaStream_t *stream, MemoryLocation location[2 * QUDA_MAX_DIM], MemoryLocation location_label,
                    bool spin_project, double a = 0, double b = 0, double c = 0);
 
-    void packGhostExtended(const int nFace, const int R[], const QudaParity parity, const int dim, const QudaDirection dir,
-			   const int dagger,cudaStream_t* stream, bool zero_copy=false);
+    void packGhostExtended(const int nFace, const int R[], const QudaParity parity, const int dim,
+                           const QudaDirection dir, const int dagger, qudaStream_t *stream, bool zero_copy = false);
 
     /**
       Initiate the gpu to cpu send of the ghost zone (halo)
@@ -693,8 +733,8 @@ namespace quda {
       @param dagger Whether the operator is daggerer or not
       @param stream The array of streams to use
       */
-    void sendGhost(void *ghost_spinor, const int nFace, const int dim, const QudaDirection dir,
-        const int dagger, cudaStream_t *stream);
+    void sendGhost(void *ghost_spinor, const int nFace, const int dim, const QudaDirection dir, const int dagger,
+                   qudaStream_t *stream);
 
     /**
       Initiate the cpu to gpu send of the ghost zone (halo)
@@ -705,8 +745,8 @@ namespace quda {
       @param dagger Whether the operator is daggerer or not
       @param stream The array of streams to use
       */
-    void unpackGhost(const void* ghost_spinor, const int nFace, const int dim,
-        const QudaDirection dir, const int dagger, cudaStream_t* stream);
+    void unpackGhost(const void *ghost_spinor, const int nFace, const int dim, const QudaDirection dir,
+                     const int dagger, qudaStream_t *stream);
 
     /**
       Initiate the cpu to gpu copy of the extended border region
@@ -719,11 +759,10 @@ namespace quda {
       @param stream The array of streams to use
       @param zero_copy Whether we are unpacking from zero_copy memory
       */
-    void unpackGhostExtended(const void* ghost_spinor, const int nFace, const QudaParity parity,
-			     const int dim, const QudaDirection dir, const int dagger, cudaStream_t* stream, bool zero_copy);
+    void unpackGhostExtended(const void *ghost_spinor, const int nFace, const QudaParity parity, const int dim,
+                             const QudaDirection dir, const int dagger, qudaStream_t *stream, bool zero_copy);
 
-
-    void streamInit(cudaStream_t *stream_p);
+    void streamInit(qudaStream_t *stream_p);
 
     /**
        Pack the field halos in preparation for halo exchange, e.g., for Dslash
@@ -744,10 +783,10 @@ namespace quda {
     void pack(int nFace, int parity, int dagger, int stream_idx, MemoryLocation location[],
               MemoryLocation location_label, bool spin_project = true, double a = 0, double b = 0, double c = 0);
 
-    void packExtended(const int nFace, const int R[], const int parity, const int dagger,
-        const int dim,  cudaStream_t *stream_p, const bool zeroCopyPack=false);
+    void packExtended(const int nFace, const int R[], const int parity, const int dagger, const int dim,
+                      qudaStream_t *stream_p, const bool zeroCopyPack = false);
 
-    void gather(int nFace, int dagger, int dir, cudaStream_t *stream_p=NULL);
+    void gather(int nFace, int dagger, int dir, qudaStream_t *stream_p = NULL);
 
     /**
        @brief Initiate halo communication receive
@@ -758,7 +797,7 @@ namespace quda {
        @param[in] stream CUDA stream to be used (unused)
        @param[in] gdr Whether we are using GDR on the receive side
     */
-    void recvStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=nullptr, bool gdr=false);
+    void recvStart(int nFace, int dir, int dagger = 0, qudaStream_t *stream_p = nullptr, bool gdr = false);
 
     /**
        @brief Initiate halo communication sending
@@ -771,7 +810,8 @@ namespace quda {
        @param[in] gdr Whether we are using GDR on the send side
        @param[in] remote_write Whether we are writing direct to remote memory (or using copy engines)
     */
-    void sendStart(int nFace, int d, int dagger=0, cudaStream_t *stream_p=nullptr, bool gdr=false, bool remote_write=false);
+    void sendStart(int nFace, int d, int dagger = 0, qudaStream_t *stream_p = nullptr, bool gdr = false,
+                   bool remote_write = false);
 
     /**
        @brief Initiate halo communication
@@ -783,7 +823,8 @@ namespace quda {
        @param[in] gdr_send Whether we are using GDR on the send side
        @param[in] gdr_recv Whether we are using GDR on the receive side
     */
-    void commsStart(int nFace, int d, int dagger=0, cudaStream_t *stream_p=nullptr, bool gdr_send=false, bool gdr_recv=false);
+    void commsStart(int nFace, int d, int dagger = 0, qudaStream_t *stream_p = nullptr, bool gdr_send = false,
+                    bool gdr_recv = false);
 
     /**
        @brief Non-blocking query if the halo communication has completed
@@ -795,7 +836,8 @@ namespace quda {
        @param[in] gdr_send Whether we are using GDR on the send side
        @param[in] gdr_recv Whether we are using GDR on the receive side
     */
-    int commsQuery(int nFace, int d, int dagger=0, cudaStream_t *stream_p=nullptr, bool gdr_send=false, bool gdr_recv=false);
+    int commsQuery(int nFace, int d, int dagger = 0, qudaStream_t *stream_p = nullptr, bool gdr_send = false,
+                   bool gdr_recv = false);
 
     /**
        @brief Wait on halo communication to complete
@@ -807,9 +849,10 @@ namespace quda {
        @param[in] gdr_send Whether we are using GDR on the send side
        @param[in] gdr_recv Whether we are using GDR on the receive side
     */
-    void commsWait(int nFace, int d, int dagger=0, cudaStream_t *stream_p=nullptr, bool gdr_send=false, bool gdr_recv=false);
+    void commsWait(int nFace, int d, int dagger = 0, qudaStream_t *stream_p = nullptr, bool gdr_send = false,
+                   bool gdr_recv = false);
 
-    void scatter(int nFace, int dagger, int dir, cudaStream_t *stream_p);
+    void scatter(int nFace, int dagger, int dir, qudaStream_t *stream_p);
     void scatter(int nFace, int dagger, int dir);
 
     void scatterExtended(int nFace, int parity, int dagger, int dir);
@@ -870,6 +913,14 @@ namespace quda {
        @brief Restores the cudaColorSpinorField
     */
     void restore() const;
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      the spinor, the norm field (as appropriate), to the CPU or the GPU
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
+    */
+    void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
   };
 
   // CPU implementation
@@ -975,7 +1026,7 @@ namespace quda {
   void genericPrintVector(const cpuColorSpinorField &a, unsigned int x);
   void genericCudaPrintVector(const cudaColorSpinorField &a, unsigned x);
 
-  void exchangeExtendedGhost(cudaColorSpinorField* spinor, int R[], int parity, cudaStream_t *stream_p);
+  void exchangeExtendedGhost(cudaColorSpinorField *spinor, int R[], int parity, qudaStream_t *stream_p);
 
   void copyExtendedColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,
       QudaFieldLocation location, const int parity, void *Dst, void *Src, void *dstNorm, void *srcNorm);
@@ -1042,6 +1093,39 @@ namespace quda {
   }
 
 #define checkPCType(...) PCType_(__func__, __FILE__, __LINE__, __VA_ARGS__)
+
+  /**
+     @brief Helper function for determining if the order of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @return If order is unique return the order
+   */
+  inline QudaFieldOrder Order_(const char *func, const char *file, int line, const ColorSpinorField &a,
+                               const ColorSpinorField &b)
+  {
+    QudaFieldOrder order = QUDA_INVALID_FIELD_ORDER;
+    if (a.FieldOrder() == b.FieldOrder())
+      order = a.FieldOrder();
+    else
+      errorQuda("Orders %d %d do not match  (%s:%d in %s())\n", a.FieldOrder(), b.FieldOrder(), file, line, func);
+    return order;
+  }
+
+  /**
+     @brief Helper function for determining if the order of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @param[in] args List of additional fields to check order on
+     @return If order is unique return the order
+   */
+  template <typename... Args>
+  inline QudaFieldOrder Order_(const char *func, const char *file, int line, const ColorSpinorField &a,
+                               const ColorSpinorField &b, const Args &... args)
+  {
+    return static_cast<QudaFieldOrder>(Order_(func, file, line, a, b) & Order_(func, file, line, a, args...));
+  }
+
+#define checkOrder(...) Order_(__func__, __FILE__, __LINE__, __VA_ARGS__)
 
 } // namespace quda
 

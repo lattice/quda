@@ -28,7 +28,7 @@ namespace quda
       TunableVectorYZ::resizeVector(in.X(4), arg.nParity);
     }
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
@@ -74,16 +74,6 @@ namespace quda
                          const int *comm_override, TimeProfile &profile)
   {
 #ifdef GPU_DOMAIN_WALL_DIRAC
-    if (in.V() == out.V()) errorQuda("Aliasing pointers");
-    if (in.FieldOrder() != out.FieldOrder())
-      errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
-
-    // check all precisions match
-    checkPrecision(out, in, x, U);
-
-    // check all locations match
-    checkLocation(out, in, x, U);
-
     instantiate<DomainWall4DApply>(out, in, U, a, m_5, b_5, c_5, x, parity, dagger, comm_override, profile);
 #else
     errorQuda("Domain-wall dslash has not been built");

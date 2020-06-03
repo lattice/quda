@@ -89,7 +89,7 @@ namespace quda {
       if ( comm_dim_partitioned(dir)) {
         dim3 blocks((faceVolume[dir] + nthreads.x - 1) / nthreads.x,1,1);
         for ( int oddbit = 0; oddbit < 2; oddbit++ )
-          ComputeBorderPointsActiveFaceIndex << < blocks, nthreads >> > (arg, borderpoints[oddbit] + start, faceVolume[dir], dir, oddbit);
+          ComputeBorderPointsActiveFaceIndex <<< blocks, nthreads >>> (arg, borderpoints[oddbit] + start, faceVolume[dir], dir, oddbit);
         start += faceVolume[dir];
       }
     }

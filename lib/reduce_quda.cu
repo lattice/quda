@@ -21,7 +21,7 @@ namespace quda {
 
 #include <generic_reduce.cuh>
 
-    cudaStream_t* getStream();
+    qudaStream_t* getStream();
 
     void* getDeviceReduceBuffer() { return d_reduce; }
     void* getMappedHostReduceBuffer() { return hd_reduce; }
@@ -136,7 +136,7 @@ namespace quda {
        Generic reduction kernel launcher
     */
     template <typename doubleN, typename ReduceType, typename FloatN, int M, typename Arg>
-    doubleN reduceLaunch(Arg &arg, const TuneParam &tp, const cudaStream_t &stream, Tunable &tunable)
+    doubleN reduceLaunch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream, Tunable &tunable)
     {
       if (tp.grid.x > (unsigned int)deviceProp.maxGridSize[0])
         errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, deviceProp.maxGridSize[0]);
@@ -243,7 +243,7 @@ namespace quda {
 
       inline TuneKey tuneKey() const { return TuneKey(x.VolString(), typeid(arg.r).name(), aux); }
 
-      void apply(const cudaStream_t &stream)
+      void apply(const qudaStream_t &stream)
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         result = reduceLaunch<doubleN, ReduceType, FloatN, M>(arg, tp, stream, *this);
@@ -355,8 +355,9 @@ namespace quda {
       doubleN value;
       if (checkLocation(x, y, z, w, v) == QUDA_CUDA_FIELD_LOCATION) {
 
-        if (!x.isNative() && x.FieldOrder() != QUDA_FLOAT2_FIELD_ORDER) {
-          warningQuda("Device reductions on non-native fields is not supported\n");
+        if (!x.isNative() && x.FieldOrder() != QUDA_FLOAT2_FIELD_ORDER && x.FieldOrder() != QUDA_FLOAT8_FIELD_ORDER) {
+          warningQuda("Device reductions on non-native fields is not supported (prec = %d, order = %d)", x.Precision(),
+                      x.FieldOrder());
           doubleN value;
           ::quda::zero(value);
           return value;
@@ -377,7 +378,7 @@ namespace quda {
             value = nativeReduce<doubleN, ReduceType, double2, double2, double2, M, Reducer, writeX, writeY, writeZ,
                 writeW, writeV>(a, b, x, y, z, w, v, reduce_length / (2 * M));
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
           } else if (x.Nspin() == 1) { // staggered
 #if defined(NSPIN1)
@@ -385,7 +386,7 @@ namespace quda {
             value = nativeReduce<doubleN, ReduceType, double2, double2, double2, M, Reducer, writeX, writeY, writeZ,
                 writeW, writeV>(a, b, x, y, z, w, v, reduce_length / (2 * M));
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
           } else {
             errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin());
@@ -403,7 +404,7 @@ namespace quda {
             value = nativeReduce<doubleN, ReduceType, float4, float4, float4, M, Reducer, writeX, writeY, writeZ,
                 writeW, writeV>(a, b, x, y, z, w, v, reduce_length / (4 * M));
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
           } else if (x.Nspin() == 1 || x.Nspin() == 2 || (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER)) {
 #if defined(NSPIN1) || defined(NSPIN2) || defined(GPU_MULTIGRID)
@@ -412,7 +413,7 @@ namespace quda {
             value = nativeReduce<doubleN, ReduceType, float2, float2, float2, M, Reducer, writeX, writeY, writeZ,
                 writeW, writeV>(a, b, x, y, z, w, v, reduce_length / (2 * M));
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
           } else {
             errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin());
@@ -430,7 +431,7 @@ namespace quda {
             value = nativeReduce<doubleN, ReduceType, float4, short4, short4, M, Reducer, writeX, writeY, writeZ,
                 writeW, writeV>(a, b, x, y, z, w, v, y.Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
           } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) { // wilson
 #if defined(GPU_MULTIGRID)  // FIXME eventually we should get rid of this and use float4 ordering
@@ -439,7 +440,16 @@ namespace quda {
                 = nativeReduce<doubleN, ReduceType, float2, short2, short2, M, Reducer, writeX, writeY, writeZ, writeW, writeV>(
                     a, b, x, y, z, w, v, y.Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
+#endif
+          } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER) { // wilson
+#if defined(NSPIN4) && defined(FLOAT8)
+            const int M = 3; // determines how much work per thread to do
+            value
+                = nativeReduce<doubleN, ReduceType, float8, short8, short8, M, Reducer, writeX, writeY, writeZ, writeW, writeV>(
+                    a, b, x, y, z, w, v, y.Volume());
+#else
+            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
           } else if (x.Nspin() == 1) { // staggered
 #if defined(NSPIN1)
@@ -447,7 +457,7 @@ namespace quda {
             value = nativeReduce<doubleN, ReduceType, float2, short2, short2, M, Reducer, writeX, writeY, writeZ,
                 writeW, writeV>(a, b, x, y, z, w, v, y.Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
           } else {
             errorQuda("nSpin=%d is not supported\n", x.Nspin());
@@ -466,7 +476,7 @@ namespace quda {
                 = nativeReduce<doubleN, ReduceType, float4, char4, char4, M, Reducer, writeX, writeY, writeZ, writeW, writeV>(
                     a, b, x, y, z, w, v, y.Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
           } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) { // wilson
 #if defined(GPU_MULTIGRID)  // FIXME eventually we should get rid of this and use float4 ordering
@@ -475,7 +485,16 @@ namespace quda {
               = nativeReduce<doubleN, ReduceType, float2, char2, char2, M, Reducer, writeX, writeY, writeZ, writeW, writeV>(
                 a, b, x, y, z, w, v, y.Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
+#endif
+          } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER) { // wilson
+#if defined(NSPIN4) && defined(FLOAT8)
+            const int M = 3;
+            value
+              = nativeReduce<doubleN, ReduceType, float8, char8, char8, M, Reducer, writeX, writeY, writeZ, writeW, writeV>(
+                a, b, x, y, z, w, v, y.Volume());
+#else
+            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
           } else if (x.Nspin() == 1) { // staggered
 #ifdef NSPIN1
@@ -484,7 +503,7 @@ namespace quda {
                 = nativeReduce<doubleN, ReduceType, float2, char2, char2, M, Reducer, writeX, writeY, writeZ, writeW, writeV>(
                     a, b, x, y, z, w, v, y.Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
           } else {
             errorQuda("nSpin=%d is not supported\n", x.Nspin());
@@ -527,15 +546,14 @@ namespace quda {
     doubleN mixed_reduce(const double2 &a, const double2 &b, ColorSpinorField &x, ColorSpinorField &y,
         ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v)
     {
-
       checkPrecision(x, y, w, v);
 
       doubleN value;
       if (checkLocation(x, y, z, w, v) == QUDA_CUDA_FIELD_LOCATION) {
 
-        if (!x.isNative()
-            && !(x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && x.Precision() == QUDA_SINGLE_PRECISION)) {
-          warningQuda("Device reductions on non-native fields is not supported\n");
+        if (!x.isNative() && !(x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && x.Precision() == QUDA_SINGLE_PRECISION)) {
+          warningQuda("Device reductions on non-native fields is not supported (prec = %d, order = %d)", x.Precision(),
+                      x.FieldOrder());
           doubleN value;
           ::quda::zero(value);
           return value;
@@ -556,7 +574,7 @@ namespace quda {
               value = nativeReduce<doubleN, ReduceType, double2, float4, double2, M, Reducer, writeX, writeY, writeZ,
                   writeW, writeV>(a, b, x, y, z, w, v, x.Volume());
 #else
-              errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+              errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
             } else if (x.Nspin() == 1) { // staggered
 #if defined(NSPIN1)
@@ -565,7 +583,7 @@ namespace quda {
               value = nativeReduce<doubleN, ReduceType, double2, float2, double2, M, Reducer, writeX, writeY, writeZ,
                   writeW, writeV>(a, b, x, y, z, w, v, reduce_length / (2 * M));
 #else
-              errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+              errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
             } else {
               errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin());
@@ -583,7 +601,7 @@ namespace quda {
               value = nativeReduce<doubleN, ReduceType, double2, short4, double2, M, Reducer, writeX, writeY, writeZ,
                   writeW, writeV>(a, b, x, y, z, w, v, x.Volume());
 #else
-              errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+              errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
             } else if (x.Nspin() == 1) { // staggered
 #if defined(NSPIN1)
@@ -591,7 +609,7 @@ namespace quda {
               value = nativeReduce<doubleN, ReduceType, double2, short2, double2, M, Reducer, writeX, writeY, writeZ,
                   writeW, writeV>(a, b, x, y, z, w, v, x.Volume());
 #else
-              errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+              errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
             } else {
               errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin());
@@ -609,7 +627,7 @@ namespace quda {
               value = nativeReduce<doubleN, ReduceType, double2, char4, double2, M, Reducer, writeX, writeY, writeZ,
                   writeW, writeV>(a, b, x, y, z, w, v, x.Volume());
 #else
-              errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+              errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
             } else if (x.Nspin() == 1) { // staggered
 #if defined(NSPIN1)
@@ -617,7 +635,7 @@ namespace quda {
               value = nativeReduce<doubleN, ReduceType, double2, char2, double2, M, Reducer, writeX, writeY, writeZ,
                   writeW, writeV>(a, b, x, y, z, w, v, x.Volume());
 #else
-              errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+              errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
             } else {
               errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin());
@@ -645,7 +663,7 @@ namespace quda {
               value = nativeReduce<doubleN, ReduceType, float4, short4, float4, M, Reducer, writeX, writeY, writeZ,
                   writeW, writeV>(a, b, x, y, z, w, v, x.Volume());
 #else
-              errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+              errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
             } else if (x.Nspin() == 1) { // staggered
 #if defined(NSPIN1)
@@ -653,7 +671,7 @@ namespace quda {
               value = nativeReduce<doubleN, ReduceType, float2, short2, float2, M, Reducer, writeX, writeY, writeZ,
                   writeW, writeV>(a, b, x, y, z, w, v, x.Volume());
 #else
-              errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+              errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
             } else {
               errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin());
@@ -672,7 +690,7 @@ namespace quda {
               value = nativeReduce<doubleN, ReduceType, float4, char4, float4, M, Reducer, writeX, writeY, writeZ,
                   writeW, writeV>(a, b, x, y, z, w, v, x.Volume());
 #else
-              errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+              errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
             } else if (x.Nspin() == 1) { // staggered
 #if defined(NSPIN1)
@@ -680,7 +698,7 @@ namespace quda {
               value = nativeReduce<doubleN, ReduceType, float2, char2, float2, M, Reducer, writeX, writeY, writeZ,
                   writeW, writeV>(a, b, x, y, z, w, v, x.Volume());
 #else
-              errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+              errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
             } else {
               errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin());

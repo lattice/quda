@@ -21,15 +21,27 @@ namespace quda
   template <typename Arg> class Staggered : public Dslash<staggered, Arg>
   {
     using Dslash = Dslash<staggered, Arg>;
+    using Dslash::arg;
 
   public:
     Staggered(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
-      Dslash::template instantiate<packStaggeredShmem>(tp, stream);
+      // operator is anti-Hermitian so do not instantiate dagger
+      if (arg.nParity == 1) {
+        if (arg.xpay)
+          Dslash::template instantiate<packStaggeredShmem, 1, false, true>(tp, stream);
+        else
+          Dslash::template instantiate<packStaggeredShmem, 1, false, false>(tp, stream);
+      } else if (arg.nParity == 2) {
+        if (arg.xpay)
+          Dslash::template instantiate<packStaggeredShmem, 2, false, true>(tp, stream);
+        else
+          Dslash::template instantiate<packStaggeredShmem, 2, false, false>(tp, stream);
+      }
     }
   };
 
@@ -83,16 +95,6 @@ namespace quda
                       const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
 #ifdef GPU_STAGGERED_DIRAC
-    if (in.V() == out.V()) errorQuda("Aliasing pointers");
-    if (in.FieldOrder() != out.FieldOrder())
-      errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
-
-    // check all precisions match
-    checkPrecision(out, in, U);
-
-    // check all locations match
-    checkLocation(out, in, U);
-
     instantiate<StaggeredApply, StaggeredReconstruct>(out, in, U, a, x, parity, dagger, comm_override, profile);
 #else
     errorQuda("Staggered dslash has not been built");

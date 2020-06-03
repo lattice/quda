@@ -169,23 +169,7 @@ namespace quda {
     staggeredPhaseApplied = false;
   }
 
-  bool GaugeField::isNative() const {
-    if (precision == QUDA_DOUBLE_PRECISION) {
-      if (order  == QUDA_FLOAT2_GAUGE_ORDER) return true;
-    } else if (precision == QUDA_SINGLE_PRECISION || precision == QUDA_HALF_PRECISION
-        || precision == QUDA_QUARTER_PRECISION) {
-      if (reconstruct == QUDA_RECONSTRUCT_NO) {
-	if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
-      } else if (reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_13) {
-	if (order == QUDA_FLOAT4_GAUGE_ORDER) return true;
-      } else if (reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9) {
-	if (order == QUDA_FLOAT4_GAUGE_ORDER) return true;
-      } else if (reconstruct == QUDA_RECONSTRUCT_10) {
-	if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
-      }
-    }
-    return false;
-  }
+  bool GaugeField::isNative() const { return gauge::isNative(order, precision, reconstruct); }
 
   void GaugeField::exchange(void **ghost_link, void **link_sendbuf, QudaDirection dir) const {
     MsgHandle *mh_send[4];
@@ -373,6 +357,55 @@ namespace quda {
     }
 
     return field;
+  }
+
+  // helper for creating extended gauge fields
+  cudaGaugeField *createExtendedGauge(cudaGaugeField &in, const int *R, TimeProfile &profile, bool redundant_comms,
+                                      QudaReconstructType recon)
+  {
+    profile.TPSTART(QUDA_PROFILE_INIT);
+    GaugeFieldParam gParamEx(in);
+    gParamEx.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
+    gParamEx.pad = 0;
+    gParamEx.nFace = 1;
+    gParamEx.tadpole = in.Tadpole();
+    gParamEx.anisotropy = in.Anisotropy();
+    for (int d = 0; d < 4; d++) {
+      gParamEx.x[d] += 2 * R[d];
+      gParamEx.r[d] = R[d];
+    }
+
+    auto *out = new cudaGaugeField(gParamEx);
+
+    // copy input field into the extended device gauge field
+    copyExtendedGauge(*out, in, QUDA_CUDA_FIELD_LOCATION);
+
+    profile.TPSTOP(QUDA_PROFILE_INIT);
+
+    // now fill up the halos
+    out->exchangeExtendedGhost(R, profile, redundant_comms);
+
+    return out;
+  }
+
+  // helper for creating extended (cpu) gauge fields
+  cpuGaugeField *createExtendedGauge(void **gauge, QudaGaugeParam &gauge_param, const int *R)
+  {
+    GaugeFieldParam gauge_field_param(gauge, gauge_param);
+    cpuGaugeField cpu(gauge_field_param);
+
+    gauge_field_param.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
+    gauge_field_param.create = QUDA_ZERO_FIELD_CREATE;
+    for (int d = 0; d < 4; d++) {
+      gauge_field_param.x[d] += 2 * R[d];
+      gauge_field_param.r[d] = R[d];
+    }
+    cpuGaugeField *padded_cpu = new cpuGaugeField(gauge_field_param);
+
+    copyExtendedGauge(*padded_cpu, cpu, QUDA_CPU_FIELD_LOCATION);
+    padded_cpu->exchangeExtendedGhost(R, true); // Do comm to fill halo = true
+
+    return padded_cpu;
   }
 
 } // namespace quda

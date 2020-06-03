@@ -22,7 +22,7 @@ namespace quda {
 
   using namespace colorspinor;
   
-  void exchangeExtendedGhost(cudaColorSpinorField* spinor, int R[], int parity, cudaStream_t *stream_p)
+  void exchangeExtendedGhost(cudaColorSpinorField* spinor, int R[], int parity, qudaStream_t *stream_p)
   {
 #ifdef MULTI_GPU
     int nFace = 0;
@@ -82,19 +82,16 @@ namespace quda {
   }
 
 
-
   /** Straight copy with no basis change */
   template <typename FloatOut, typename FloatIn, int Ns, int Nc>
     class PreserveBasis {
       typedef typename mapper<FloatIn>::type RegTypeIn;
       typedef typename mapper<FloatOut>::type RegTypeOut;
       public:
-      __device__ __host__ inline void operator()(RegTypeOut out[Ns*Nc*2], const RegTypeIn in[Ns*Nc*2]) {
+      __device__ __host__ inline void operator()(ColorSpinor<RegTypeOut,Nc,Ns> &out, const ColorSpinor<RegTypeIn,Nc,Ns> &in) {
         for (int s=0; s<Ns; s++) {
           for (int c=0; c<Nc; c++) {
-            for (int z=0; z<2; z++) {
-              out[(s*Nc+c)*2+z] = in[(s*Nc+c)*2+z];
-            }
+            out(s,c) = in(s,c);
           }
         }
       }
@@ -105,7 +102,7 @@ namespace quda {
     struct NonRelBasis {
       typedef typename mapper<FloatIn>::type RegTypeIn;
       typedef typename mapper<FloatOut>::type RegTypeOut;
-      __device__ __host__ inline void operator()(RegTypeOut out[Ns*Nc*2], const RegTypeIn in[Ns*Nc*2]) {
+      __device__ __host__ inline void operator()(ColorSpinor<RegTypeOut,Nc,Ns> &out, const ColorSpinor<RegTypeIn,Nc,Ns> &in) {
         int s1[4] = {1, 2, 3, 0};
         int s2[4] = {3, 0, 1, 2};
         RegTypeOut K1[4] = {static_cast<RegTypeOut>(kP), static_cast<RegTypeOut>(-kP),
@@ -114,21 +111,19 @@ namespace quda {
 			    static_cast<RegTypeOut>(kP), static_cast<RegTypeOut>(kP)};
         for (int s=0; s<Ns; s++) {
           for (int c=0; c<Nc; c++) {
-            for (int z=0; z<2; z++) {
-              out[(s*Nc+c)*2+z] = K1[s]*in[(s1[s]*Nc+c)*2+z] + K2[s]*in[(s2[s]*Nc+c)*2+z];
-            }
+            out(s,c).real(K1[s]*in(s1[s],c).real() + K2[s]*in(s2[s],c).real());
+            out(s,c).imag(K1[s]*in(s1[s],c).imag() + K2[s]*in(s2[s],c).imag());
           }
         }
       }
     };
-
 
   /** Transform from non-relativistic into relavisitic basis */
   template <typename FloatOut, typename FloatIn, int Ns, int Nc>
     struct RelBasis {
       typedef typename mapper<FloatIn>::type RegTypeIn;
       typedef typename mapper<FloatOut>::type RegTypeOut;
-      __device__ __host__ inline void operator()(RegTypeOut out[Ns*Nc*2], const RegTypeIn in[Ns*Nc*2]) {
+      __device__ __host__ inline void operator()(ColorSpinor<RegTypeOut,Nc,Ns> &out, const ColorSpinor<RegTypeIn,Nc,Ns> &in) {
         int s1[4] = {1, 2, 3, 0};
         int s2[4] = {3, 0, 1, 2};
         RegTypeOut K1[4] = {static_cast<RegTypeOut>(-kU), static_cast<RegTypeOut>(kU),
@@ -137,16 +132,12 @@ namespace quda {
 			    static_cast<RegTypeOut>(-kU), static_cast<RegTypeOut>(-kU)};
         for (int s=0; s<Ns; s++) {
           for (int c=0; c<Nc; c++) {
-            for (int z=0; z<2; z++) {
-              out[(s*Nc+c)*2+z] = K1[s]*in[(s1[s]*Nc+c)*2+z] + K2[s]*in[(s2[s]*Nc+c)*2+z];
-            }
+            out(s,c).real(K1[s]*in(s1[s],c).real() + K2[s]*in(s2[s],c).real());
+            out(s,c).imag(K1[s]*in(s1[s],c).imag() + K2[s]*in(s2[s],c).imag());
           }
         }
       }
     };
-
-
-
 
   template<typename OutOrder, typename InOrder, typename Basis>
     struct CopySpinorExArg{
@@ -192,17 +183,18 @@ namespace quda {
       typedef typename mapper<FloatIn>::type RegTypeIn;
       typedef typename mapper<FloatOut>::type RegTypeOut;
 
-      RegTypeIn   in[Ns*Nc*2] = { };
-      RegTypeOut  out[Ns*Nc*2] = { };
+      ColorSpinor<RegTypeIn,Nc,Ns> in;
+      ColorSpinor<RegTypeOut,Nc,Ns> out;
+      int parity = 0;
 
       if(extend){
-        arg.in.load(in, X);
+        in = arg.in(X, parity);
         arg.basis(out, in);
-        arg.out.save(out, Y);
+        arg.out(Y, parity) = out;
       }else{
-        arg.in.load(in, Y);
-        arg.basis(out,in);
-        arg.out.save(out, Y);
+        in = arg.in(Y, parity);
+        arg.basis(out, in);
+        arg.out(Y, parity) = out;
       }
     }
 
@@ -253,7 +245,7 @@ namespace quda {
       }
       virtual ~CopySpinorEx() {}
 
-      void apply(const cudaStream_t &stream){
+      void apply(const qudaStream_t &stream){
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
         if(location == QUDA_CPU_FIELD_LOCATION){
@@ -491,6 +483,16 @@ namespace quda {
         CopyExtendedColorSpinor(dst, src, parity, location, static_cast<short*>(Dst), static_cast<float*>(Src), static_cast<float*>(dstNorm), 0);
       }else if(src.Precision() == QUDA_HALF_PRECISION){
         CopyExtendedColorSpinor(dst, src, parity, location, static_cast<short*>(Dst), static_cast<short*>(Src), static_cast<float*>(dstNorm), static_cast<float*>(srcNorm));
+      }else{
+        errorQuda("Unsupported Precision %d", src.Precision());
+      }
+    } else if (dst.Precision() == QUDA_QUARTER_PRECISION){
+      if(src.Precision() == QUDA_DOUBLE_PRECISION){
+        CopyExtendedColorSpinor(dst, src, parity, location, static_cast<char*>(Dst), static_cast<double*>(Src), static_cast<float*>(dstNorm), 0);
+      }else if(src.Precision() == QUDA_SINGLE_PRECISION){
+        CopyExtendedColorSpinor(dst, src, parity, location, static_cast<char*>(Dst), static_cast<float*>(Src), static_cast<float*>(dstNorm), 0);
+      }else if(src.Precision() == QUDA_HALF_PRECISION){
+        CopyExtendedColorSpinor(dst, src, parity, location, static_cast<char*>(Dst), static_cast<short*>(Src), static_cast<float*>(dstNorm), static_cast<float*>(srcNorm));
       }else{
         errorQuda("Unsupported Precision %d", src.Precision());
       }

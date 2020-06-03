@@ -1,5 +1,6 @@
 #include <tune_quda.h>
 #include <gauge_field_order.h>
+#include <quda_matrix.h>
 
 namespace quda {
 
@@ -49,6 +50,7 @@ namespace quda {
   __device__ __host__ void copyGaugeEx(CopyGaugeExArg<OutOrder,InOrder> &arg, int X, int parity) {
     typedef typename mapper<FloatIn>::type RegTypeIn;
     typedef typename mapper<FloatOut>::type RegTypeOut;
+    constexpr int nColor = Ncolor(length);
 
     int x[4];
     int R[4];
@@ -80,12 +82,10 @@ namespace quda {
       xin = ((((x[3]+R[3])*arg.Xin[2] + (x[2]+R[2]))*arg.Xin[1] + (x[1]+R[1]))*arg.Xin[0]+(x[0]+R[0])) >> 1;
       xout = X;
     }
-    for (int d=0; d<arg.geometry; d++){
-      RegTypeIn in[length];
-      RegTypeOut out[length];
-      arg.in.load(in, xin, d, parity);
-      for (int i=0; i<length; i++) out[i] = in[i];
-      arg.out.save(out, xout, d, parity);
+    for (int d=0; d<arg.geometry; d++) {
+      const Matrix<complex<RegTypeIn>,nColor> in = arg.in(d, xin, parity);
+      Matrix<complex<RegTypeOut>,nColor> out = in;
+      arg.out(d, xout, parity) = out;
     }//dir
   }
 
@@ -93,7 +93,7 @@ namespace quda {
   void copyGaugeEx(CopyGaugeExArg<OutOrder,InOrder> arg) {
     for (int parity=0; parity<2; parity++) {
       for(int X=0; X<arg.volume/2; X++){
-  copyGaugeEx<FloatOut, FloatIn, length, OutOrder, InOrder, regularToextended>(arg, X, parity);
+        copyGaugeEx<FloatOut, FloatIn, length, OutOrder, InOrder, regularToextended>(arg, X, parity);
       }
     }
   }
@@ -127,7 +127,7 @@ namespace quda {
     }
     virtual ~CopyGaugeEx() { ; }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
       if (location == QUDA_CPU_FIELD_LOCATION) {
@@ -357,19 +357,44 @@ namespace quda {
 #else
         errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
 #endif
+      } else {
+        errorQuda("Precision %d not instantiated", in.Precision());
       }
     } else if (out.Precision() == QUDA_SINGLE_PRECISION) {
       if (in.Precision() == QUDA_DOUBLE_PRECISION) {
-	copyGaugeEx(out, in, location, (float*)Out, (double*)In);
+        copyGaugeEx(out, in, location, (float *)Out, (double *)In);
       } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
 #if QUDA_PRECISION & 4
-        copyGaugeEx(out, in, location, (float*)Out, (float*)In);
+        copyGaugeEx(out, in, location, (float *)Out, (float *)In);
 #else
         errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
 #endif
+      } else {
+        errorQuda("Precision %d not instantiated", in.Precision());
       }
+    } else if (out.Precision() == QUDA_HALF_PRECISION) {
+      if (in.Precision() == QUDA_HALF_PRECISION) {
+#if QUDA_PRECISION & 2
+        copyGaugeEx(out, in, location, (short *)Out, (short *)In);
+#else
+        errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+#endif
+      } else {
+        errorQuda("Precision %d not instantiated", in.Precision());
+      }
+    } else if (out.Precision() == QUDA_QUARTER_PRECISION) {
+      if (in.Precision() == QUDA_QUARTER_PRECISION) {
+#if QUDA_PRECISION & 1
+        copyGaugeEx(out, in, location, (char *)Out, (char *)In);
+#else
+        errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+#endif
+      } else {
+        errorQuda("Precision %d not instantiated", in.Precision());
+      }
+    } else {
+      errorQuda("Precision %d not instantiated", out.Precision());
     }
-
   }
 
 } // namespace quda

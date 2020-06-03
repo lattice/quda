@@ -6,6 +6,14 @@
 
 namespace quda {
 
+  // Prefetch type
+  enum class CloverPrefetchType {
+    BOTH_CLOVER_PREFETCH_TYPE,    // clover and inverse
+    CLOVER_CLOVER_PREFETCH_TYPE,  // clover only
+    INVERSE_CLOVER_PREFETCH_TYPE, // inverse clover only
+    INVALID_CLOVER_PREFETCH_TYPE = QUDA_INVALID_ENUM
+  };
+
   struct CloverFieldParam : public LatticeFieldParam {
     bool direct; // whether to create the direct clover 
     bool inverse; // whether to create the inverse clover
@@ -115,7 +123,7 @@ namespace quda {
     /**
        @return Clover coefficient (usually includes kappa)
     */
-    bool Csw() const { return csw; }
+    double Csw() const { return csw; }
 
     /**
        @return If the clover field is associated with twisted-clover fermions
@@ -143,26 +151,25 @@ namespace quda {
        @brief Compute the L1 norm of the field
        @return L1 norm
      */
-    double norm1() const;
+    double norm1(bool inverse = false) const;
 
     /**
        @brief Compute the L2 norm squared of the field
        @return L2 norm squared
      */
-    double norm2() const;
+    double norm2(bool inverse = false) const;
 
     /**
        @brief Compute the absolute maximum of the field (Linfinity norm)
        @return Absolute maximum value
      */
-    double abs_max() const;
+    double abs_max(bool inverse = false) const;
 
     /**
        @brief Compute the absolute minimum of the field
        @return Absolute minimum value
      */
-    double abs_min() const;
-
+    double abs_min(bool inverse = false) const;
   };
 
   class cudaCloverField : public CloverField {
@@ -235,8 +242,31 @@ namespace quda {
     */
     void saveCPUField(cpuCloverField &cpu) const;
 
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      the clover, the norm field (as appropriate), and the inverse
+      fields (as appropriate) to the CPU or the GPU.
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
+    */
+    void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      the clover, norm field and/or the inverse
+      fields as specified to the CPU or the GPU.
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in
+      @param[in] type Whether to grab the clover, inverse, or both
+      @param[in] parity Whether to grab the full clover or just the even/odd parity
+    */
+    void prefetch(QudaFieldLocation mem_space, qudaStream_t stream, CloverPrefetchType type,
+                  QudaParity parity = QUDA_INVALID_PARITY) const;
+
     friend class DiracClover;
     friend class DiracCloverPC;
+    friend class DiracTwistedClover;
+    friend class DiracTwistedCloverPC;
     friend struct FullClover;
   };
 

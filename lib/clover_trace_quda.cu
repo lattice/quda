@@ -139,7 +139,7 @@ namespace quda {
 	  }
 
 	  mat *= arg.coeff;
-	  arg.gauge.save((Float*)(mat.data), x, (mu-1)*mu/2 + nu, parity);
+	  arg.gauge((mu-1)*mu/2 + nu, x, parity) = mat;
 	} // nu
       } // mu
 
@@ -185,7 +185,7 @@ namespace quda {
       }
       virtual ~CloverSigmaTrace() {;}
 
-      void apply(const cudaStream_t &stream){
+      void apply(const qudaStream_t &stream){
         if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
 	  TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
           cloverSigmaTraceKernel<Float,Arg><<<tp.grid,tp.block,0>>>(arg);

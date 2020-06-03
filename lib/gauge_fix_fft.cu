@@ -19,16 +19,11 @@ namespace quda {
 
 #ifdef GPU_GAUGE_ALG
 
-//Comment if you don't want to use textures for Delta(x) and g(x)
-#define GAUGEFIXING_SITE_MATRIX_LOAD_TEX
-
 //UNCOMMENT THIS IF YOU WAN'T TO USE LESS MEMORY
 #define GAUGEFIXING_DONT_USE_GX
 //Without using the precalculation of g(x),
 //we loose some performance, because Delta(x) is written in normal lattice coordinates need for the FFTs
 //and the gauge array in even/odd format
-
-
 
 #ifdef HOST_DEBUG
 #ifdef GAUGEFIXING_DONT_USE_GX
@@ -43,80 +38,6 @@ namespace quda {
 #define FL_UNITARIZE_PI 3.14159265358979323846
 #endif
 
-
-  texture<float2, 1, cudaReadModeElementType> GXTexSingle;
-  texture<int4, 1, cudaReadModeElementType> GXTexDouble;
-//Delta is only stored using 12 real number parameters,
-//	(0,0), (0,1), (0,2), (1,1), (1,2) and (2,2)
-//	(0,0), (1,1) and (0,1) don't have real part, however we need a complex for the FFTs
-  texture<float2, 1, cudaReadModeElementType> DELTATexSingle;
-  texture<int4, 1, cudaReadModeElementType> DELTATexDouble;
-
-
-  template <class T>
-  inline __device__ T TEXTURE_GX(int id){
-    return 0.0;
-  }
-  template <>
-  inline __device__ complex<float> TEXTURE_GX<complex<float> >(int id){
-    return tex1Dfetch(GXTexSingle, id);
-  }
-  template <>
-  inline __device__ complex<double> TEXTURE_GX<complex<double> >(int id){
-    int4 u = tex1Dfetch(GXTexDouble, id);
-    return complex<double>(__hiloint2double(u.y, u.x), __hiloint2double(u.w, u.z));
-  }
-  template <class T>
-  inline __device__ T TEXTURE_DELTA(int id){
-    return 0.0;
-  }
-  template <>
-  inline __device__ complex<float> TEXTURE_DELTA<complex<float> >(int id){
-    return tex1Dfetch(DELTATexSingle, id);
-  }
-  template <>
-  inline __device__ complex<double> TEXTURE_DELTA<complex<double> >(int id){
-    int4 u = tex1Dfetch(DELTATexDouble, id);
-    return complex<double>(__hiloint2double(u.y, u.x), __hiloint2double(u.w, u.z));
-  }
-
-  static void BindTex(complex<float> *delta, complex<float> *gx, size_t bytes){
-#ifdef GAUGEFIXING_SITE_MATRIX_LOAD_TEX
-#ifndef GAUGEFIXING_DONT_USE_GX
-    cudaBindTexture(0, GXTexSingle, gx, bytes);
-#endif
-    cudaBindTexture(0, DELTATexSingle, delta, bytes);
-#endif
-  }
-
-  static void BindTex(complex<double> *delta, complex<double> *gx, size_t bytes){
-#ifdef GAUGEFIXING_SITE_MATRIX_LOAD_TEX
-#ifndef GAUGEFIXING_DONT_USE_GX
-    cudaBindTexture(0, GXTexDouble, gx, bytes);
-#endif
-    cudaBindTexture(0, DELTATexDouble, delta, bytes);
-#endif
-  }
-
-  static void UnBindTex(complex<float> *delta, complex<float> *gx){
-#ifdef GAUGEFIXING_SITE_MATRIX_LOAD_TEX
-#ifndef GAUGEFIXING_DONT_USE_GX
-    cudaUnbindTexture(GXTexSingle);
-#endif
-    cudaUnbindTexture(DELTATexSingle);
-#endif
-  }
-
-  static void UnBindTex(complex<double> *delta, complex<double> *gx){
-#ifdef GAUGEFIXING_SITE_MATRIX_LOAD_TEX
-#ifndef GAUGEFIXING_DONT_USE_GX
-    cudaUnbindTexture(GXTexDouble);
-#endif
-    cudaUnbindTexture(DELTATexDouble);
-#endif
-  }
-
-
   template <typename Float>
   struct GaugeFixFFTRotateArg {
     int threads;     // number of active threads required
@@ -130,8 +51,6 @@ namespace quda {
       tmp1 = 0;
     }
   };
-
-
 
   template <int direction, typename Float>
   __global__ void fft_rotate_kernel_2D2D(GaugeFixFFTRotateArg<Float> arg){ //Cmplx *data_in, Cmplx *data_out){
@@ -199,12 +118,12 @@ namespace quda {
       arg.tmp1 = data_out;
     }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if ( direction == 0 )
-        fft_rotate_kernel_2D2D<0, Float ><< < tp.grid, tp.block, 0, stream >> > (arg);
+        fft_rotate_kernel_2D2D<0, Float > <<< tp.grid, tp.block, 0, stream >>> (arg);
       else if ( direction == 1 )
-        fft_rotate_kernel_2D2D<1, Float ><< < tp.grid, tp.block, 0, stream >> > (arg);
+        fft_rotate_kernel_2D2D<1, Float > <<< tp.grid, tp.block, 0, stream >>> (arg);
       else
         errorQuda("Error in GaugeFixFFTRotate option.\n");
     }
@@ -261,16 +180,14 @@ namespace quda {
       setZero(&delta);
       //idx = linkIndex(x,X);
       for ( int mu = 0; mu < gauge_dir; mu++ ) {
-        Matrix<Cmplx,3> U;
-        argQ.dataOr.load((Float *)(U.data), idx_cb, mu, parity);
+        Matrix<Cmplx,3> U = argQ.dataOr(mu, idx_cb, parity);
         delta -= U;
       }
       //18*gauge_dir
       data.x += -delta(0, 0).x - delta(1, 1).x - delta(2, 2).x;
       //2
       for ( int mu = 0; mu < gauge_dir; mu++ ) {
-        Matrix<Cmplx,3> U;
-        argQ.dataOr.load((Float*)(U.data),linkIndexM1(x,argQ.X,mu), mu, 1 - parity);
+        Matrix<Cmplx,3> U = argQ.dataOr(mu, linkIndexM1(x,argQ.X,mu), 1 - parity);
         delta += U;
       }
       //18*gauge_dir
@@ -313,7 +230,7 @@ namespace quda {
     }
     ~GaugeFixQuality () { }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       argQ.result_h[0] = make_double2(0.0,0.0);
       LAUNCH_KERNEL_LOCAL_PARITY(computeFix_quality, (*this), tp, stream, argQ, Elems, Float, Gauge, gauge_dir);
@@ -359,10 +276,8 @@ namespace quda {
 #else
       gx = (complex<Float>*)device_malloc(sizeof(complex<Float>) * threads * Elems);
 #endif
-      BindTex(delta, gx, sizeof(complex<Float>) * threads * Elems);
     }
     void free(){
-      UnBindTex(delta, gx);
       device_free(invpsq);
       device_free(delta);
       device_free(gx);
@@ -418,9 +333,9 @@ namespace quda {
     GaugeFixSETINVPSP(GaugeFixArg<Float> &arg) : arg(arg) { }
     ~GaugeFixSETINVPSP () { }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      kernel_gauge_set_invpsq<Float><< < tp.grid, tp.block, 0, stream >> > (arg);
+      kernel_gauge_set_invpsq<Float> <<< tp.grid, tp.block, 0, stream >>> (arg);
     }
 
     TuneKey tuneKey() const {
@@ -477,9 +392,9 @@ namespace quda {
     ~GaugeFixINVPSP () {
     }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      kernel_gauge_mult_norm_2D<Float><< < tp.grid, tp.block, 0, stream >> > (arg);
+      kernel_gauge_mult_norm_2D<Float> <<< tp.grid, tp.block, 0, stream >>> (arg);
     }
 
     TuneKey tuneKey() const {
@@ -569,21 +484,13 @@ namespace quda {
     int idx = ((x[3] * arg.X[2] + x[2]) * arg.X[1] + x[1]) * arg.X[0] + x[0];
     Matrix<Cmplx,3> de;
     //Read Delta
-#ifdef GAUGEFIXING_SITE_MATRIX_LOAD_TEX
-    de(0,0) = TEXTURE_DELTA<Cmplx>(idx + 0 * arg.threads);
-    de(0,1) = TEXTURE_DELTA<Cmplx>(idx + 1 * arg.threads);
-    de(0,2) = TEXTURE_DELTA<Cmplx>(idx + 2 * arg.threads);
-    de(1,1) = TEXTURE_DELTA<Cmplx>(idx + 3 * arg.threads);
-    de(1,2) = TEXTURE_DELTA<Cmplx>(idx + 4 * arg.threads);
-    de(2,2) = TEXTURE_DELTA<Cmplx>(idx + 5 * arg.threads);
-#else
     de(0,0) = arg.delta[idx + 0 * arg.threads];
     de(0,1) = arg.delta[idx + 1 * arg.threads];
     de(0,2) = arg.delta[idx + 2 * arg.threads];
     de(1,1) = arg.delta[idx + 3 * arg.threads];
     de(1,2) = arg.delta[idx + 4 * arg.threads];
     de(2,2) = arg.delta[idx + 5 * arg.threads];
-#endif
+
     de(1,0) = Cmplx(-de(0,1).x, de(0,1).y);
     de(2,0) = Cmplx(-de(0,2).x, de(0,2).y);
     de(2,1) = Cmplx(-de(1,2).x, de(1,2).y);
@@ -596,28 +503,19 @@ namespace quda {
 
 
     for ( int mu = 0; mu < 4; mu++ ) {
-      Matrix<Cmplx,3> U;
+      Matrix<Cmplx,3> U = dataOr(mu, id, parity);
       Matrix<Cmplx,3> g0;
-      dataOr.load((Float*)(U.data),id, mu, parity);
       U = g * U;
       //198
       idx = linkNormalIndexP1(x,arg.X,mu);
       //Read Delta
-#ifdef GAUGEFIXING_SITE_MATRIX_LOAD_TEX
-      de(0,0) = TEXTURE_DELTA<Cmplx>(idx + 0 * arg.threads);
-      de(0,1) = TEXTURE_DELTA<Cmplx>(idx + 1 * arg.threads);
-      de(0,2) = TEXTURE_DELTA<Cmplx>(idx + 2 * arg.threads);
-      de(1,1) = TEXTURE_DELTA<Cmplx>(idx + 3 * arg.threads);
-      de(1,2) = TEXTURE_DELTA<Cmplx>(idx + 4 * arg.threads);
-      de(2,2) = TEXTURE_DELTA<Cmplx>(idx + 5 * arg.threads);
-#else
       de(0,0) = arg.delta[idx + 0 * arg.threads];
       de(0,1) = arg.delta[idx + 1 * arg.threads];
       de(0,2) = arg.delta[idx + 2 * arg.threads];
       de(1,1) = arg.delta[idx + 3 * arg.threads];
       de(1,2) = arg.delta[idx + 4 * arg.threads];
       de(2,2) = arg.delta[idx + 5 * arg.threads];
-#endif
+
       de(1,0) = Cmplx(-de(0,1).x, de(0,1).y);
       de(2,0) = Cmplx(-de(0,2).x, de(0,2).y);
       de(2,1) = Cmplx(-de(1,2).x, de(1,2).y);
@@ -630,7 +528,7 @@ namespace quda {
 
       U = U * conj(g0);
       //198
-      dataOr.save((Float*)(U.data),id, mu, parity);
+      dataOr(mu, id, parity) = U;
     }
   }
 
@@ -658,9 +556,9 @@ namespace quda {
 
     void setAlpha(Float alpha){ half_alpha = alpha * 0.5; }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      kernel_gauge_fix_U_EO_NEW<Float, Gauge><< < tp.grid, tp.block, 0, stream >> > (arg, dataOr, half_alpha);
+      kernel_gauge_fix_U_EO_NEW<Float, Gauge> <<< tp.grid, tp.block, 0, stream >>> (arg, dataOr, half_alpha);
     }
 
     TuneKey tuneKey() const {
@@ -702,21 +600,13 @@ namespace quda {
 
     Matrix<Cmplx,3> de;
     //Read Delta
-        #ifdef GAUGEFIXING_SITE_MATRIX_LOAD_TEX
-    de(0,0) = TEXTURE_DELTA<Cmplx>(id);
-    de(0,1) = TEXTURE_DELTA<Cmplx>(id + arg.threads);
-    de(0,2) = TEXTURE_DELTA<Cmplx>(id + 2 * arg.threads);
-    de(1,1) = TEXTURE_DELTA<Cmplx>(id + 3 * arg.threads);
-    de(1,2) = TEXTURE_DELTA<Cmplx>(id + 4 * arg.threads);
-    de(2,2) = TEXTURE_DELTA<Cmplx>(id + 5 * arg.threads);
-        #else
     de(0,0) = arg.delta[id];
     de(0,1) = arg.delta[id + arg.threads];
     de(0,2) = arg.delta[id + 2 * arg.threads];
     de(1,1) = arg.delta[id + 3 * arg.threads];
     de(1,2) = arg.delta[id + 4 * arg.threads];
     de(2,2) = arg.delta[id + 5 * arg.threads];
-        #endif
+
     de(1,0) = makeComplex(-de(0,1).x, de(0,1).y);
     de(2,0) = makeComplex(-de(0,2).x, de(0,2).y);
     de(2,1) = makeComplex(-de(1,2).x, de(1,2).y);
@@ -779,9 +669,9 @@ namespace quda {
     }
 
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      kernel_gauge_GX<Elems, Float><< < tp.grid, tp.block, 0, stream >> > (arg, half_alpha);
+      kernel_gauge_GX<Elems, Float> <<< tp.grid, tp.block, 0, stream >>> (arg, half_alpha);
     }
 
     TuneKey tuneKey() const {
@@ -823,11 +713,7 @@ namespace quda {
     Matrix<Cmplx,3> g;
     //for(int i = 0; i < Elems; i++) g.data[i] = arg.gx[idd + i * arg.threads];
     for ( int i = 0; i < Elems; i++ ) {
-                #ifdef GAUGEFIXING_SITE_MATRIX_LOAD_TEX
-      g.data[i] = TEXTURE_GX<Cmplx>(idd + i * arg.threads);
-                #else
       g.data[i] = arg.gx[idd + i * arg.threads];
-                #endif
     }
     if ( Elems == 6 ) {
       g(2,0) = conj(g(0,1) * g(1,2) - g(0,2) * g(1,1));
@@ -838,20 +724,15 @@ namespace quda {
     int x[4];
     getCoords(x, id, arg.X, parity);
     for ( int mu = 0; mu < 4; mu++ ) {
-      Matrix<Cmplx,3> U;
+      Matrix<Cmplx,3> U = dataOr(mu, id, parity);
       Matrix<Cmplx,3> g0;
-      dataOr.load((Float*)(U.data),id, mu, parity);
       U = g * U;
       //198
       int idm1 = linkIndexP1(x,arg.X,mu);
       idm1 += (1 - parity) * arg.threads / 2;
       //for(int i = 0; i < Elems; i++) g0.data[i] = arg.gx[idm1 + i * arg.threads];
       for ( int i = 0; i < Elems; i++ ) {
-                        #ifdef GAUGEFIXING_SITE_MATRIX_LOAD_TEX
-        g0.data[i] = TEXTURE_GX<Cmplx>(idm1 + i * arg.threads);
-                        #else
         g0.data[i] = arg.gx[idm1 + i * arg.threads];
-                        #endif
       }
       if ( Elems == 6 ) {
         g0(2,0) = conj(g0(0,1) * g0(1,2) - g0(0,2) * g0(1,1));
@@ -861,7 +742,7 @@ namespace quda {
       }
       U = U * conj(g0);
       //198
-      dataOr.save((Float*)(U.data),id, mu, parity);
+      dataOr.save(mu, id, parity) = U;
     }
     //T=42+4*(198*2+42) Elems=6
     //T=4*(198*2) Elems=9
@@ -897,9 +778,9 @@ namespace quda {
     ~GaugeFix () { }
 
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      kernel_gauge_fix_U_EO<Elems, Float, Gauge><< < tp.grid, tp.block, 0, stream >> > (arg, dataOr);
+      kernel_gauge_fix_U_EO<Elems, Float, Gauge> <<< tp.grid, tp.block, 0, stream >>> (arg, dataOr);
     }
 
     TuneKey tuneKey() const {

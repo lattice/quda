@@ -19,16 +19,25 @@
 
 namespace quda {
 
-  CG::CG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), yp(nullptr), rp(nullptr),
-    rnewp(nullptr), pp(nullptr), App(nullptr), tmpp(nullptr), tmp2p(nullptr), tmp3p(nullptr),
-    rSloppyp(nullptr), xSloppyp(nullptr), init(false)
+  CG::CG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
+    Solver(mat, matSloppy, matPrecon, param, profile),
+    yp(nullptr),
+    rp(nullptr),
+    rnewp(nullptr),
+    pp(nullptr),
+    App(nullptr),
+    tmpp(nullptr),
+    tmp2p(nullptr),
+    tmp3p(nullptr),
+    rSloppyp(nullptr),
+    xSloppyp(nullptr),
+    init(false)
   {
   }
 
   CG::~CG()
   {
-    profile.TPSTART(QUDA_PROFILE_FREE);
+    if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_FREE);
     if ( init ) {
       for (auto pi : p) if (pi) delete pi;
       if (rp) delete rp;
@@ -49,12 +58,18 @@ namespace quda {
 
       destroyDeflationSpace();
     }
-    profile.TPSTOP(QUDA_PROFILE_FREE);
+    if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
-  CGNE::CGNE(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    CG(mmdag, mmdagSloppy, param, profile), mmdag(mat.Expose()), mmdagSloppy(matSloppy.Expose()),
-    xp(nullptr), yp(nullptr), init(false) {
+  CGNE::CGNE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
+    CG(mmdag, mmdagSloppy, mmdagPrecon, param, profile),
+    mmdag(mat.Expose()),
+    mmdagSloppy(matSloppy.Expose()),
+    mmdagPrecon(matPrecon.Expose()),
+    xp(nullptr),
+    yp(nullptr),
+    init(false)
+  {
   }
 
   CGNE::~CGNE() {
@@ -134,9 +149,14 @@ namespace quda {
 
   }
 
-  CGNR::CGNR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    CG(mdagm, mdagmSloppy, param, profile), mdagm(mat.Expose()), mdagmSloppy(matSloppy.Expose()),
-    bp(nullptr), init(false) {
+  CGNR::CGNR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
+    CG(mdagm, mdagmSloppy, mdagmPrecon, param, profile),
+    mdagm(mat.Expose()),
+    mdagmSloppy(matSloppy.Expose()),
+    mdagmPrecon(matPrecon.Expose()),
+    bp(nullptr),
+    init(false)
+  {
   }
 
   CGNR::~CGNR() {
@@ -200,6 +220,8 @@ namespace quda {
 
   void CG::operator()(ColorSpinorField &x, ColorSpinorField &b, ColorSpinorField *p_init, double r2_old_init)
   {
+    if (param.is_preconditioner && param.global_reduction == false) commGlobalReductionSet(false);
+
     if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
       errorQuda("Not supported");
     if (checkPrecision(x, b) != param.precision)
@@ -216,14 +238,14 @@ namespace quda {
     // whether to select alternative reliable updates
     bool alternative_reliable = param.use_alternative_reliable;
 
-    profile.TPSTART(QUDA_PROFILE_INIT);
+    if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_INIT);
 
     // Check to see that we're not trying to invert on a zero-field source
     double b2 = blas::norm2(b);
 
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0 && param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
-      profile.TPSTOP(QUDA_PROFILE_INIT);
+      if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_INIT);
       printfQuda("Warning: inverting on zero-field source\n");
       x = b;
       param.true_res = 0.0;
@@ -266,17 +288,16 @@ namespace quda {
 
     if (param.deflate) {
       // Construct the eigensolver and deflation space if requested.
-      constructDeflationSpace(b, mat);
-
+      constructDeflationSpace(b, matPrecon);
       if (deflate_compute) {
         // compute the deflation space.
-        profile.TPSTOP(QUDA_PROFILE_INIT);
+        if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_INIT);
         (*eig_solve)(evecs, evals);
-        profile.TPSTART(QUDA_PROFILE_INIT);
+        if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_INIT);
         deflate_compute = false;
       }
       if (recompute_evals) {
-        eig_solve->computeEvals(mat, evecs, evals);
+        eig_solve->computeEvals(matPrecon, evecs, evals);
         recompute_evals = false;
       }
     }
@@ -308,7 +329,7 @@ namespace quda {
     const double u = param.precision_sloppy == 8 ?
       std::numeric_limits<double>::epsilon() / 2. :
       param.precision_sloppy == 4 ? std::numeric_limits<float>::epsilon() / 2. :
-                                    param.precision == 2 ? pow(2., -13) : pow(2., -6);
+                                    param.precision_sloppy == 2 ? pow(2., -13) : pow(2., -6);
     const double uhigh = param.precision == 8 ? std::numeric_limits<double>::epsilon() / 2. :
                                                 param.precision == 4 ? std::numeric_limits<float>::epsilon() / 2. :
                                                                        param.precision == 2 ? pow(2., -13) : pow(2., -6);
@@ -325,7 +346,7 @@ namespace quda {
     double beta = 0.0;
 
     // for alternative reliable updates
-    if(alternative_reliable){
+    if (alternative_reliable) {
       // estimate norm for reliable updates
       mat(r, b, y, tmp3);
       Anorm = sqrt(blas::norm2(r)/b2);
@@ -347,26 +368,10 @@ namespace quda {
     }
 
     if (param.deflate && param.maxiter > 1) {
-      std::vector<ColorSpinorField *> rhs;
-      // Use residual from supplied guess r, or original
-      // rhs b. use `x` as a temp.
-      blas::copy(x, r);
-      rhs.push_back(&x);
-
-      // Deflate
-      eig_solve->deflate(defl_tmp1, rhs, evecs, evals);
-
-      // Compute r_defl = RHS - A * LHS
-      mat(r, *defl_tmp1[0], tmp2, tmp3);
-      r2 = blas::xmyNorm(*rhs[0], r);
-
-      if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-        // defl_tmp1 and y must be added to the solution at the end
-        blas::axpy(1.0, *defl_tmp1[0], y);
-      } else {
-        // Just add defl_tmp1 to y, which has been zeroed out
-        blas::copy(y, *defl_tmp1[0]);
-      }
+      // Deflate and accumulate to solution vector
+      eig_solve->deflate(y, r, evecs, evals, true);
+      mat(r, y, x, tmp3);
+      r2 = blas::xmyNorm(b, r);
     }
 
     blas::zero(x);
@@ -397,8 +402,10 @@ namespace quda {
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
     bool heavy_quark_restart = false;
 
-    profile.TPSTOP(QUDA_PROFILE_INIT);
-    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+    if (!param.is_preconditioner) {
+      profile.TPSTOP(QUDA_PROFILE_INIT);
+      profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+    }
 
     double stop = stopping(param.tol, b2, param.residual_type);  // stopping condition of solver
 
@@ -419,6 +426,7 @@ namespace quda {
     double r0Norm = rNorm;
     double maxrx = rNorm;
     double maxrr = rNorm;
+    double maxr_deflate = rNorm; // The maximum residual since the last deflation
     double delta = param.delta;
 
     // this parameter determines how many consective reliable update
@@ -442,9 +450,11 @@ namespace quda {
     bool L2breakdown = false;
     const double L2breakdown_eps = 100. * uhigh;
 
-    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
-    blas::flops = 0;
+    if (!param.is_preconditioner) {
+      profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      blas::flops = 0;
+    }
 
     int k = 0;
     int j = 0;
@@ -533,7 +543,6 @@ namespace quda {
       if ( !(updateR || updateX )) {
         beta = sigma / r2_old;  // use the alternative beta computation
 
-
         if (param.pipeline && !breakdown) {
 
 	  if (Np == 1) {
@@ -548,30 +557,27 @@ namespace quda {
 	  } else {
 
 	    if ( (j+1)%Np == 0 ) {
-	      const auto alpha_ = std::unique_ptr<Complex[]>(new Complex[Np]);
-	      for (int i=0; i<Np; i++) alpha_[i] = alpha[i];
 	      std::vector<ColorSpinorField*> x_;
 	      x_.push_back(&xSloppy);
-	      blas::caxpy(alpha_.get(), p, x_);
-	      blas::flops -= 4*j*xSloppy.RealLength(); // correct for over flop count since using caxpy
-	    }
+              blas::axpy(alpha, p, x_);
+            }
 
-	    //p[(k+1)%Np] = r + beta * p[k%Np]
-	    blas::xpayz(rSloppy, beta, *p[j], *p[(j+1)%Np]);
-	  }
-	}
+            // p[(k+1)%Np] = r + beta * p[k%Np]
+            blas::xpayz(rSloppy, beta, *p[j], *p[(j + 1) % Np]);
+          }
+        }
 
-	if (use_heavy_quark_res && k%heavy_quark_check==0) {
-	  if (&x != &xSloppy) {
+        if (use_heavy_quark_res && k % heavy_quark_check == 0) {
+          if (&x != &xSloppy) {
 	    blas::copy(tmp,y);
 	    heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy, tmp, rSloppy).z);
 	  } else {
 	    blas::copy(r, rSloppy);
 	    heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x, y, r).z);
 	  }
-	}
+        }
 
-	// alternative reliable updates
+        // alternative reliable updates
 	if (alternative_reliable) {
 	  d = d_new;
 	  pnorm = pnorm + alpha[j] * alpha[j]* (ppnorm);
@@ -585,21 +591,29 @@ namespace quda {
       } else {
 
 	{
-	  const auto alpha_ = std::unique_ptr<Complex[]>(new Complex[Np]);
-	  for (int i=0; i<=j; i++) alpha_[i] = alpha[i];
 	  std::vector<ColorSpinorField*> x_;
 	  x_.push_back(&xSloppy);
 	  std::vector<ColorSpinorField*> p_;
 	  for (int i=0; i<=j; i++) p_.push_back(p[i]);
-	  blas::caxpy(alpha_.get(), p_, x_);
-	  blas::flops -= 4*j*xSloppy.RealLength(); // correct for over flop count since using caxpy
-	}
+          blas::axpy(alpha, p_, x_);
+        }
 
         blas::copy(x, xSloppy); // nop when these pointers alias
 
         blas::xpy(x, y); // swap these around?
         mat(r, y, x, tmp3); //  here we can use x as tmp
         r2 = blas::xmyNorm(b, r);
+
+        if (param.deflate && sqrt(r2) < maxr_deflate * param.tol_restart) {
+          // Deflate and accumulate to solution vector
+          eig_solve->deflate(y, r, evecs, evals, true);
+
+          // Compute r_defl = RHS - A * LHS
+          mat(r, y, x, tmp3);
+          r2 = blas::xmyNorm(b, r);
+
+          maxr_deflate = sqrt(r2);
+        }
 
         blas::copy(rSloppy, r); //nop when these pointers alias
         blas::zero(xSloppy);
@@ -712,14 +726,11 @@ namespace quda {
 
       // if we have converged and need to update any trailing solutions
       if (converged && steps_since_reliable > 0 && (j+1)%Np != 0 ) {
-	const auto alpha_ = std::unique_ptr<Complex[]>(new Complex[Np]);
-	for (int i=0; i<=j; i++) alpha_[i] = alpha[i];
 	std::vector<ColorSpinorField*> x_;
 	x_.push_back(&xSloppy);
 	std::vector<ColorSpinorField*> p_;
 	for (int i=0; i<=j; i++) p_.push_back(p[i]);
-	blas::caxpy(alpha_.get(), p_, x_);
-	blas::flops -= 4*j*xSloppy.RealLength(); // correct for over flop count since using caxpy
+        blas::axpy(alpha, p_, x_);
       }
 
       j = steps_since_reliable == 0 ? 0 : (j+1)%Np; // if just done a reliable update then reset j
@@ -728,16 +739,17 @@ namespace quda {
     blas::copy(x, xSloppy);
     blas::xpy(y, x);
 
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+    if (!param.is_preconditioner) {
+      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+      profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
-    param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (blas::flops + mat.flops() + matSloppy.flops())*1e-9;
-    param.gflops = gflops;
-    param.iter += k;
+      param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
+      double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops()) * 1e-9;
+      param.gflops = gflops;
+      param.iter += k;
 
-    if (k == param.maxiter)
-      warningQuda("Exceeded maximum iterations %d", param.maxiter);
+      if (k == param.maxiter) warningQuda("Exceeded maximum iterations %d", param.maxiter);
+    }
 
     if (getVerbosity() >= QUDA_VERBOSE)
       printfQuda("CG: Reliable updates = %d\n", rUpdate);
@@ -751,14 +763,17 @@ namespace quda {
 
     PrintSummary("CG", k, r2, b2, stop, param.tol_hq);
 
-    // reset the flops counters
-    blas::flops = 0;
-    mat.flops();
-    matSloppy.flops();
+    if (!param.is_preconditioner) {
+      // reset the flops counters
+      blas::flops = 0;
+      mat.flops();
+      matSloppy.flops();
+      matPrecon.flops();
 
-    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+      profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+    }
 
-    return;
+    if (param.is_preconditioner && param.global_reduction == false) commGlobalReductionSet(true);
   }
 
 // use BlockCGrQ algortithm or BlockCG (with / without GS, see BLOCKCG_GS option)

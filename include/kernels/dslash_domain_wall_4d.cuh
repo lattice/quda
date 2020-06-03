@@ -6,7 +6,7 @@ namespace quda
 {
 
   constexpr int size = 4096;
-  static __constant__ char mobius_d[size]; // constant buffer used for Mobius coefficients for GPU kernel
+  __constant__ char mobius_d[size]; // constant buffer used for Mobius coefficients for GPU kernel
 
   template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_>
   struct DomainWall4DArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
@@ -55,14 +55,13 @@ namespace quda
       bool active
         = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
-      int coord[Arg::nDim];
-      int x_cb = getCoords<QUDA_4D_PC, kernel_type>(coord, arg, idx, parity, thread_dim);
+      auto coord = getCoords<QUDA_4D_PC, kernel_type>(arg, idx, s, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
-      applyWilson<nParity, dagger, kernel_type>(out, arg, coord, x_cb, s, parity, idx, thread_dim, active);
+      applyWilson<nParity, dagger, kernel_type>(out, arg, coord, parity, idx, thread_dim, active);
 
-      int xs = x_cb + s * arg.dc.volume_4d_cb;
+      int xs = coord.x_cb + s * arg.dc.volume_4d_cb;
       if (xpay && kernel_type == INTERIOR_KERNEL) {
         Vector x = arg.x(xs, my_spinor_parity);
         out = x + arg.a5(s) * out;

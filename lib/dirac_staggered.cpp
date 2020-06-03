@@ -1,5 +1,6 @@
 #include <dirac_quda.h>
 #include <blas_quda.h>
+#include <multigrid.h>
 
 namespace quda {
 
@@ -128,8 +129,7 @@ namespace quda {
 
   void DiracStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
            double kappa, double mass, double mu, double mu_factor) const {
-    errorQuda("Cannot coarsen a staggered operator (yet!), we're just getting the functions in place.");
-    //CoarseStaggeredOp(Y, X, T, *gauge, mass, QUDA_STAGGERED_DIRAC, QUDA_MATPC_INVALID);
+    StaggeredCoarseOp(Y, X, T, *gauge, mass, QUDA_STAGGERED_DIRAC, QUDA_MATPC_INVALID);
   }
 
 

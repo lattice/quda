@@ -1,6 +1,6 @@
-#define QUDA_VERSION_MAJOR     0
-#define QUDA_VERSION_MINOR     9
-#define QUDA_VERSION_SUBMINOR  1
+#define QUDA_VERSION_MAJOR     1
+#define QUDA_VERSION_MINOR     0
+#define QUDA_VERSION_SUBMINOR  0
 
 /**
  * @def   QUDA_VERSION
