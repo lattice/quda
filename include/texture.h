@@ -125,10 +125,6 @@ struct Spinor : SpinorNorm<RegType_, StoreType_, isFixed<StoreType_>::value> {
   StoreType *spinor;
   int stride;
   unsigned int cb_offset;
-#ifndef BLAS_SPINOR
-  StoreType *ghost;
-  int ghost_stride[4];
-#endif
 
 public:
   Spinor() :
@@ -136,9 +132,6 @@ public:
     spinor(nullptr),
     stride(0),
     cb_offset(0)
-#ifndef BLAS_SPINOR
-    , ghost(nullptr)
-#endif
   { }
 
   Spinor(const ColorSpinorField &x, int nFace = 1) :
@@ -146,14 +139,8 @@ public:
     spinor(static_cast<StoreType*>(const_cast<ColorSpinorField &>(x).V())),
     stride(x.Stride()),
     cb_offset(x.Bytes() / (2 * sizeof(StoreType)))
-#ifndef BLAS_SPINOR
-    , ghost(static_cast<StoreType*>(x.Ghost2()))
-#endif
   {
     checkTypes<RegType, InterType, StoreType>();
-#ifndef BLAS_SPINOR
-    for (int d = 0; d < 4; d++) ghost_stride[d] = nFace * x.SurfaceCB(d);
-#endif
   }
 
   Spinor(const Spinor &st) :
@@ -161,13 +148,7 @@ public:
     spinor(st.spinor),
     stride(st.stride),
     cb_offset(st.cb_offset)
-#ifndef BLAS_SPINOR
-    , ghost(st.ghost)
-#endif
   {
-#ifndef BLAS_SPINOR
-    for (int d = 0; d < 4; d++) ghost_stride[d] = st.ghost_stride[d];
-#endif
   }
 
   Spinor &operator=(const Spinor &src)
@@ -177,10 +158,6 @@ public:
       spinor = src.spinor;
       stride = src.stride;
       cb_offset = src.cb_offset;
-#ifndef BLAS_SPINOR
-      ghost = src.ghost;
-      for (int d = 0; d < 4; d++) ghost_stride[d] = src.ghost_stride[d];
-#endif
     }
     return *this;
   }
@@ -191,10 +168,6 @@ public:
     spinor = static_cast<StoreType*>(const_cast<ColorSpinorField &>(x).V());
     stride = x.Stride();
     cb_offset = x.Bytes() / (2 * sizeof(StoreType));
-#ifndef BLAS_SPINOR
-    ghost = static_cast<StoreType*>(x.Ghost2());
-    for (int d = 0; d < 4; d++) ghost_stride[d] = nFace * x.SurfaceCB(d);
-#endif
     checkTypes<RegType, InterType, StoreType>();
   }
 
@@ -217,35 +190,6 @@ public:
     // now convert into desired register order
     convert<RegType, InterType>(x, y, N);
   }
-
-#ifndef BLAS_SPINOR
-  /**
-     Load the ghost spinor.  For Wilson fermions, we assume that the
-     ghost is spin projected
-  */
-  __device__ inline void loadGhost(RegType x[], const int i, const int dim) const
-  {
-    // load data into registers first using the storage order
-    const int Nspin = (N * vec_length<RegType>::value) / (3 * 2);
-    // if Wilson, then load only half the number of components
-    constexpr int M = ((N * vec_length<RegType>::value ) / vec_length<InterType>::value) / ((Nspin == 4) ? 2 : 1);
-
-    InterType y[M];
-
-    // fixed precision types (FIXME - these don't look correct?)
-    if (isFixed<StoreType>::value) {
-      float xN = SN::load_norm(i);
-#pragma unroll
-      for (int j = 0; j < M; j++) copy_and_scale(y[j], ghost[i + j * ghost_stride[dim]], xN);
-    } else { // other types
-#pragma unroll
-      for (int j = 0; j < M; j++) copyFloatN(y[j], ghost[i + j * ghost_stride[dim]]);
-    }
-
-    // now convert into desired register order
-    convert<RegType, InterType>(x, y, N);
-  }
-#endif
 
   __device__ inline void save(RegType x[], int i, const int parity = 0)
   {

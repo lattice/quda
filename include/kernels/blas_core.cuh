@@ -9,7 +9,6 @@ namespace quda
   namespace blas
   {
 
-#define BLAS_SPINOR // do not include ghost functions in Spinor class to reduce parameter space overhead
 #include <texture.h>
 
     /**

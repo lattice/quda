@@ -517,7 +517,6 @@ namespace quda {
     {
       checkPrecision(x, y, w, v);
 
-      constexpr bool siteUnroll = Reducer<double, double>::site_unroll;
       using host_reduce_t = typename Reducer<double, double>::reduce_t;
       host_reduce_t value;
 
@@ -549,6 +548,7 @@ namespace quda {
 #endif
             } else if (x.Nspin() == 1) { // staggered
 #if defined(NSPIN1)
+              constexpr bool siteUnroll = Reducer<double, double>::site_unroll;
               const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
               const int reduce_length = siteUnroll ? x.RealLength() : x.Length();
               value = nativeReduce<double2, float2, double2, M, Reducer>(a, b, x, y, z, w, v, reduce_length / (2 * M));
