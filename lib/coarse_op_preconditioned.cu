@@ -1,6 +1,6 @@
 #include <typeinfo>
 #include <gauge_field.h>
-#include <blas_cublas.h>
+#include <blas_lapack.h>
 #include <blas_quda.h>
 #include <tune_quda.h>
 
@@ -158,7 +158,7 @@ namespace quda {
       cudaGaugeField X_(param);
       cudaGaugeField Xinv_(param);
       X_.copy(X);
-      blas::flops += cublas::BatchInvertMatrix((void*)Xinv_.Gauge_p(), (void*)X_.Gauge_p(), n, X_.Volume(), X_.Precision(), X.Location());
+      blas::flops += blas_lapack::BatchInvertMatrix((void*)Xinv_.Gauge_p(), (void*)X_.Gauge_p(), n, X_.Volume(), X_.Precision(), X.Location());
 
       if (Xinv.Precision() < QUDA_SINGLE_PRECISION) Xinv.Scale( Xinv_.abs_max() );
 
@@ -167,7 +167,7 @@ namespace quda {
     } else if (X.Location() == QUDA_CPU_FIELD_LOCATION && X.Order() == QUDA_QDP_GAUGE_ORDER) {
       const cpuGaugeField *X_h = static_cast<const cpuGaugeField*>(&X);
       cpuGaugeField *Xinv_h = static_cast<cpuGaugeField*>(&Xinv);
-      blas::flops += cublas::BatchInvertMatrix(((void**)Xinv_h->Gauge_p())[0], ((void**)X_h->Gauge_p())[0], n, X_h->Volume(), X.Precision(), QUDA_CPU_FIELD_LOCATION);
+      blas::flops += blas_lapack::BatchInvertMatrix(((void**)Xinv_h->Gauge_p())[0], ((void**)X_h->Gauge_p())[0], n, X_h->Volume(), X.Precision(), QUDA_CPU_FIELD_LOCATION);
     } else {
       errorQuda("Unsupported location=%d and order=%d", X.Location(), X.Order());
     }

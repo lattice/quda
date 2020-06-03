@@ -1,28 +1,12 @@
 #ifdef CUBLAS_LIB
-#include <blas_cublas.h>
+#include <blas_lapack.h>
 #include <cublas_v2.h>
 #endif
 #include <malloc_quda.h>
 
-#define FMULS_GETRF(m_, n_) ( ((m_) < (n_)) \
-    ? (0.5 * (m_) * ((m_) * ((n_) - (1./3.) * (m_) - 1. ) + (n_)) + (2. / 3.) * (m_)) \
-    : (0.5 * (n_) * ((n_) * ((m_) - (1./3.) * (n_) - 1. ) + (m_)) + (2. / 3.) * (n_)) )
-#define FADDS_GETRF(m_, n_) ( ((m_) < (n_)) \
-    ? (0.5 * (m_) * ((m_) * ((n_) - (1./3.) * (m_)      ) - (n_)) + (1. / 6.) * (m_)) \
-    : (0.5 * (n_) * ((n_) * ((m_) - (1./3.) * (n_)      ) - (m_)) + (1. / 6.) * (n_)) )
-
-#define FLOPS_ZGETRF(m_, n_) (6. * FMULS_GETRF((double)(m_), (double)(n_)) + 2.0 * FADDS_GETRF((double)(m_), (double)(n_)) )
-#define FLOPS_CGETRF(m_, n_) (6. * FMULS_GETRF((double)(m_), (double)(n_)) + 2.0 * FADDS_GETRF((double)(m_), (double)(n_)) )
-
-#define FMULS_GETRI(n_) ( (n_) * ((5. / 6.) + (n_) * ((2. / 3.) * (n_) + 0.5)) )
-#define FADDS_GETRI(n_) ( (n_) * ((5. / 6.) + (n_) * ((2. / 3.) * (n_) - 1.5)) )
-
-#define FLOPS_ZGETRI(n_) (6. * FMULS_GETRI((double)(n_)) + 2.0 * FADDS_GETRI((double)(n_)) )
-#define FLOPS_CGETRI(n_) (6. * FMULS_GETRI((double)(n_)) + 2.0 * FADDS_GETRI((double)(n_)) )
-
 namespace quda {
 
-  namespace cublas { 
+  namespace blas_lapack { 
 
 #ifdef CUBLAS_LIB
     static cublasHandle_t handle;
@@ -136,6 +120,6 @@ namespace quda {
       return flops;
     }
 
-  } // namespace cublas
+  } // namespace blas_lapack
 
 } // namespace quda
