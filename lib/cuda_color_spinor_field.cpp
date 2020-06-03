@@ -1308,10 +1308,10 @@ namespace quda {
     if (!commDimPartitioned(dim)) return;
     unpackGhostExtended(from_face_dim_dir_h[bufferIndex][dim][dir], nFace, static_cast<QudaParity>(parity), dim, dir == 0 ? QUDA_BACKWARDS : QUDA_FORWARDS, dagger, &stream[2*dim/*+0*/], zero_copy);
   }
- 
-  void cudaColorSpinorField::exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *pack_destination_,
-					   const MemoryLocation *halo_location_, bool gdr_send, bool gdr_recv,
-					   QudaPrecision ghost_precision_) const
+
+  void cudaColorSpinorField::exchangeGhost(QudaParity parity, int nFace, int dagger,
+                                           const MemoryLocation *pack_destination_, const MemoryLocation *halo_location_,
+                                           bool gdr_send, bool gdr_recv, QudaPrecision ghost_precision_) const
   {
 
     // we are overriding the ghost precision, and it doesn't match what has already been allocated
@@ -1453,10 +1453,10 @@ namespace quda {
     }
 
     // ensure that the p2p sending is completed before returning
-    for (int dim=0; dim<nDimComms; dim++) {
+    for (int dim = 0; dim < nDimComms; dim++) {
       if (!comm_dim_partitioned(dim)) continue;
-      for (int dir=0; dir<2; dir++) {
-	if (comm_peer2peer_enabled(dir,dim)) qudaStreamWaitEvent(0, ipcCopyEvent[bufferIndex][dir][dim], 0);
+      for (int dir = 0; dir < 2; dir++) {
+        if (comm_peer2peer_enabled(dir, dim)) qudaStreamWaitEvent(0, ipcCopyEvent[bufferIndex][dir][dim], 0);
       }
     }
 

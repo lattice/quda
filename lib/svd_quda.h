@@ -53,15 +53,13 @@ inline double getNorm(const Array<complex<double>,3>& a){
   return quadSum(temp1,temp3);
 }
 
-
-template <class T, class V>
-inline DEVICEHOST auto constructHHMat(const T & tau, const V & v)
+template <class T, class V> inline DEVICEHOST auto constructHHMat(const T &tau, const V &v)
 {
-  Matrix<T,3> hh, temp1, temp2;
+  Matrix<T, 3> hh, temp1, temp2;
 
   ColorSpinor<decltype(tau.real()), 3, 1> v_;
-  for (int i=0; i<3; i++) v_(0, i) = v[i];
-  temp1 = outerProduct(v_,v_);
+  for (int i = 0; i < 3; i++) v_(0, i) = v[i];
+  temp1 = outerProduct(v_, v_);
 
   temp2 = conj(tau)*temp1;
 
@@ -260,7 +258,7 @@ void getRealBidiagMatrix(const Matrix<complex<Float>,3> &mat, Matrix<complex<Flo
 {
   typedef complex<Float> Complex;
 
-  Matrix<Complex,3> p, temp;
+  Matrix<Complex, 3> p, temp;
   Array<Complex,3> vec;
 
   const Complex COMPLEX_UNITY(1.0,0.0);
