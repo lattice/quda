@@ -1031,7 +1031,6 @@ namespace quda {
 
   void cudaColorSpinorField::sendStart(int nFace, int d, int dagger, qudaStream_t *stream_p, bool gdr, bool remote_write)
   {
-
     // note this is scatter centric, so dir=0 (1) is send backwards
     // (forwards) and receive from forwards (backwards)
 
@@ -1312,7 +1311,8 @@ namespace quda {
  
   void cudaColorSpinorField::exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *pack_destination_,
 					   const MemoryLocation *halo_location_, bool gdr_send, bool gdr_recv,
-					   QudaPrecision ghost_precision_)  const {
+					   QudaPrecision ghost_precision_) const
+  {
 
     // we are overriding the ghost precision, and it doesn't match what has already been allocated
     if (ghost_precision_ != QUDA_INVALID_PRECISION && ghost_precision != ghost_precision_) {
@@ -1449,6 +1449,14 @@ namespace quda {
 	}
       } else if (total_bytes && !halo_host) {
 	cudaMemcpyAsync(ghost_recv_buffer_d[bufferIndex], from_face_h[bufferIndex], total_bytes, cudaMemcpyHostToDevice, 0);
+      }
+    }
+
+    // ensure that the p2p sending is completed before returning
+    for (int dim=0; dim<nDimComms; dim++) {
+      if (!comm_dim_partitioned(dim)) continue;
+      for (int dir=0; dir<2; dir++) {
+	if (comm_peer2peer_enabled(dir,dim)) qudaStreamWaitEvent(0, ipcCopyEvent[bufferIndex][dir][dim], 0);
       }
     }
 
