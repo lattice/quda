@@ -4,12 +4,6 @@
 #endif
 #include <malloc_quda.h>
 
-#define CPU_INVERT
-
-#ifdef CPU_INVERT
-#include <Eigen/LU>
-#endif
-
 #define FMULS_GETRF(m_, n_) ( ((m_) < (n_)) \
     ? (0.5 * (m_) * ((m_) * ((n_) - (1./3.) * (m_) - 1. ) + (n_)) + (2. / 3.) * (m_)) \
     : (0.5 * (n_) * ((n_) * ((m_) - (1./3.) * (n_) - 1. ) + (m_)) + (2. / 3.) * (n_)) )
@@ -59,13 +53,12 @@ namespace quda {
     // FIXME do this in pipelined fashion to reduce memory overhead.
     long long BatchInvertMatrix(void *Ainv, void* A, const int n, const uint64_t batch, QudaPrecision prec, QudaFieldLocation location)
     {
-      long long flops = 0;
-      printfQuda("BatchInvertMatrix: Nc=%d, batch=%d\n",n,batch);
-      timeval start, stop;
-      size_t size = 2*n*n*prec*batch;
+      long long flops = 0;      
 #ifdef CUBLAS_LIB
+      timeval start, stop;
       gettimeofday(&start, NULL);
 
+      size_t size = 2*n*n*prec*batch;
       void *A_d = location == QUDA_CUDA_FIELD_LOCATION ? A : pool_device_malloc(size);
       void *Ainv_d = location == QUDA_CUDA_FIELD_LOCATION ? Ainv : pool_device_malloc(size);
       if (location == QUDA_CPU_FIELD_LOCATION) qudaMemcpy(A_d, A, size, cudaMemcpyHostToDevice);
@@ -139,66 +132,7 @@ namespace quda {
       if (getVerbosity() >= QUDA_VERBOSE)
 	printfQuda("Batched matrix inversion completed in %f seconds with GFLOPS = %f\n", time, 1e-9 * flops / time);
 #endif // CUBLAS_LIB
-
-#ifdef CPU_INVERT
-      gettimeofday(&start, NULL);
-      void *A_h = location == QUDA_CUDA_FIELD_LOCATION ? pool_pinned_malloc(size): A;
-      void *Ainv_h = pool_pinned_malloc(size);
-      if (location == QUDA_CUDA_FIELD_LOCATION) qudaMemcpy(A_h, A, size,cudaMemcpyDeviceToHost);
-
-      if (prec == QUDA_SINGLE_PRECISION) {
-
-        std::complex<float> *A_eig=(std::complex<float> *)A_h;
-        std::complex<float> *Ainv_eig=(std::complex<float> *)Ainv_h;
-
-#pragma omp parallel for
-        for(int i=0;i<batch;i++)
-        {
-                Eigen::MatrixXcd res=Eigen::MatrixXcd::Zero(n,n),inv;
-                for(int j=0;j<n;j++)
-                for(int k=0;k<n;k++)
-                        res(j,k)=A_eig[i*n*n+j*n+k];
-                inv=res.inverse();
-                for(int j=0;j<n;j++)
-                for(int k=0;k<n;k++)
-                        Ainv_eig[i*n*n+j*n+k]=inv(j,k);
-        }
-      }
-      else {
-        errorQuda("%s not implemented for precision=%d", __func__, prec);
-      }
-
-     gettimeofday(&stop, NULL);
-     long dsh = stop.tv_sec - start.tv_sec;
-     long dush = stop.tv_usec - start.tv_usec;
-     double timeh = dsh + 0.000001*dush;
-
-        printfQuda("CPU: Batched matrix inversion completed in %f seconds with GFLOPS = %f\n", timeh, 1e-9 * batch*FLOPS_CGETRI(n) / timeh);
-
-#ifdef CUBLAS_LIB
-        void *Ainv_ref_h = location == QUDA_CUDA_FIELD_LOCATION ? pool_pinned_malloc(size): Ainv;
-        if (location == QUDA_CUDA_FIELD_LOCATION) cudaMemcpy(Ainv_ref_h, Ainv, size,cudaMemcpyDeviceToHost);
-
-        double res=0.0,res2=0.0,norm=0.0;
-        float *Ainv_c=(float *)Ainv_h, *Ainv_g=(float *)Ainv_ref_h;
-        for(int i=0;i<2*n*n*batch;i++)
-        {
-                res+=pow(Ainv_c[i]-Ainv_g[i],2);
-                res2+=pow(Ainv_c[i]-Ainv_g[i],2)/pow(Ainv_g[i],2);
-                norm+=pow(Ainv_g[i],2);
-        }
-        printfQuda("BatchInvertMatrix: relative difference=%e, diff2 = %e\n",
-                sqrt(res/norm),sqrt(res2/2*n*n*batch));
-#endif // CUBLAS_LIB
-
-      if (location == QUDA_CUDA_FIELD_LOCATION) {
-        qudaMemcpy(Ainv, Ainv_h, size, cudaMemcpyHostToDevice);
-        pool_pinned_free(Ainv_h);
-        pool_pinned_free(A_h);
-      }
-#endif // CPU_INVERT
-
-
+      
       return flops;
     }
 
