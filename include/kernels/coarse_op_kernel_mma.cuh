@@ -21,11 +21,18 @@ namespace quda
     // by using integers we have deterministic atomics
     typedef int storeType;
 
-    template <typename Float_, int fineSpin, int coarseSpin, int fineColor, int coarseColor, typename coarseGauge,
+    template <typename Float_, int fineSpin_, int coarseSpin_, int fineColor_, int coarseColor_, typename coarseGauge,
               typename coarseGaugeAtomic, typename fineGauge, typename fineSpinor, typename fineSpinorTmp,
               typename fineSpinorV, typename fineClover>
     struct CalculateYArg {
+
       using Float = Float_;
+
+      static constexpr int fineSpin = fineSpin_;
+      static constexpr int coarseSpin = coarseSpin_;
+
+      static constexpr int fineColor = fineColor_;
+      static constexpr int coarseColor = coarseColor_;
 
       coarseGauge Y; /** Computed coarse link field */
       coarseGauge X; /** Computed coarse clover field */

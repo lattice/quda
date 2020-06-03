@@ -70,7 +70,6 @@ namespace quda
         tp.block.z = block_z;
         constexpr int shared_bytes = shared_memory_bytes(bM, bN, bK);
         tp.shared_bytes = shared_bytes;
-        static_assert(shared_bytes <= 96 * 1024, "too much shared memory");
 
         // TODO: Fix the split M/N.
         constexpr int t_m = 1;
@@ -121,6 +120,46 @@ namespace quda
         }
       }
 
+      template <class Arg_>
+      typename std::enable_if<
+        Arg_::fineColor == 24 && Arg_::coarseColor == 64 && Arg_::fineSpin == 2 && Arg_::coarseSpin == 2, void>::type
+      launch_compute_uv_kernel(TuneParam &tp, const Arg_ &arg, int min_threads, const cudaStream_t &stream)
+      {
+        // clang-format off
+        switch (tp.aux.x) {
+        case 0: launch_compute_uv_kernel<  48,  64,  24,   8,   8>(tp, arg, min_threads, stream); break;
+        case 1: launch_compute_uv_kernel<  48,  64,  24,  12,   8>(tp, arg, min_threads, stream); break;
+        case 2: launch_compute_uv_kernel<  48,  64,  24,  24,   8>(tp, arg, min_threads, stream); break;
+        case 3: launch_compute_uv_kernel<  48,  64,  24,   8,  16>(tp, arg, min_threads, stream); break;
+        case 4: launch_compute_uv_kernel<  48,  64,  24,  12,  16>(tp, arg, min_threads, stream); break;
+        case 5: launch_compute_uv_kernel<  48,  64,  24,  24,  16>(tp, arg, min_threads, stream); break;
+        case 6: launch_compute_uv_kernel<  48,  64,  24,  24,  16>(tp, arg, min_threads, stream); break;
+        case 7: launch_compute_uv_kernel<  48,  64,  24,  24,  16>(tp, arg, min_threads, stream); break;
+        default: errorQuda("tp.aux.x(=%d) is NOT supported by (%d, %d, %d, %d).", tp.aux.x, Arg::fineSpin, Arg::coarseSpin, Arg::fineColor, Arg::coarseColor);
+        }
+        // clang-format on
+      }
+
+      template <class Arg_>
+      typename std::enable_if<
+        Arg_::fineColor == 24 && Arg_::coarseColor == 96 && Arg_::fineSpin == 2 && Arg_::coarseSpin == 2, void>::type
+      launch_compute_uv_kernel(TuneParam &tp, const Arg_ &arg, int min_threads, const cudaStream_t &stream)
+      {
+        // clang-format off
+        switch (tp.aux.x) {
+        case 0: launch_compute_uv_kernel<  48,  96,  24,  12,   8>(tp, arg, min_threads, stream); break;
+        case 1: launch_compute_uv_kernel<  48,  96,  24,  24,   8>(tp, arg, min_threads, stream); break;
+        case 2: launch_compute_uv_kernel<  48,  96,  24,   6,  16>(tp, arg, min_threads, stream); break;
+        case 3: launch_compute_uv_kernel<  48,  96,  24,  12,  16>(tp, arg, min_threads, stream); break;
+        case 4: launch_compute_uv_kernel<  48,  96,  24,  12,  16>(tp, arg, min_threads, stream); break;
+        case 5: launch_compute_uv_kernel<  48,  96,  24,  12,  24>(tp, arg, min_threads, stream); break;
+        case 6: launch_compute_uv_kernel<  48,  96,  24,  24,  24>(tp, arg, min_threads, stream); break;
+        case 7: launch_compute_uv_kernel<  48,  96,  24,  24,  24>(tp, arg, min_threads, stream); break;
+        default: errorQuda("tp.aux.x(=%d) is NOT supported by (%d, %d, %d, %d).", tp.aux.x, Arg::fineSpin, Arg::coarseSpin, Arg::fineColor, Arg::coarseColor);
+        }
+        // clang-format on
+      }
+
       template <int dim, QudaDirection dir, int bM, int bN, int bK, int block_y, int block_z>
       void launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
       {
@@ -129,7 +168,6 @@ namespace quda
         tp.block.z = block_z;
         constexpr int shared_bytes = shared_memory_bytes(bM, bN, bK);
         tp.shared_bytes = shared_bytes;
-        static_assert(shared_bytes <= 96 * 1024, "too much shared memory");
 
         // TODO: Fix the split M/N.
         constexpr int t_m = 1;
@@ -181,6 +219,46 @@ namespace quda
         }
       }
 
+      template <class Arg_>
+      typename std::enable_if<
+        Arg_::fineColor == 24 && Arg_::coarseColor == 64 && Arg_::fineSpin == 2 && Arg_::coarseSpin == 2, void>::type
+      launch_compute_vuv_kernel(TuneParam &tp, const Arg_ &arg, int min_threads, const cudaStream_t &stream)
+      {
+        // clang-format off
+        switch (tp.aux.x) {
+        case 0: launch_compute_vuv_kernel<  64,  64,  24,    8,   8>(tp, arg, min_threads, stream); break;
+        case 1: launch_compute_vuv_kernel<  64,  64,  24,    8,  16>(tp, arg, min_threads, stream); break;
+        case 2: launch_compute_vuv_kernel<  64,  64,  24,    8,  32>(tp, arg, min_threads, stream); break;
+        case 3: launch_compute_vuv_kernel<  64,  64,  24,   16,   8>(tp, arg, min_threads, stream); break;
+        case 4: launch_compute_vuv_kernel<  64,  64,  24,   16,  16>(tp, arg, min_threads, stream); break;
+        case 5: launch_compute_vuv_kernel<  64,  64,  24,   16,  32>(tp, arg, min_threads, stream); break;
+        case 6: launch_compute_vuv_kernel<  64,  64,  24,   32,   8>(tp, arg, min_threads, stream); break;
+        case 7: launch_compute_vuv_kernel<  64,  64,  24,   32,  16>(tp, arg, min_threads, stream); break;
+        default: errorQuda("tp.aux.x(=%d) is NOT supported by (%d, %d, %d, %d).", tp.aux.x, Arg::fineSpin, Arg::coarseSpin, Arg::fineColor, Arg::coarseColor);
+        }
+        // clang-format on
+      }
+
+      template <class Arg_>
+      typename std::enable_if<
+        Arg_::fineColor == 24 && Arg_::coarseColor == 96 && Arg_::fineSpin == 2 && Arg_::coarseSpin == 2, void>::type
+      launch_compute_vuv_kernel(TuneParam &tp, const Arg_ &arg, int min_threads, const cudaStream_t &stream)
+      {
+        // clang-format off
+        switch (tp.aux.x) {
+        case 0: launch_compute_vuv_kernel<  96,  96,  24,  12,   8>(tp, arg, min_threads, stream); break;
+        case 1: launch_compute_vuv_kernel<  96,  96,  24,  24,   8>(tp, arg, min_threads, stream); break;
+        case 2: launch_compute_vuv_kernel<  96,  96,  24,   6,  16>(tp, arg, min_threads, stream); break;
+        case 3: launch_compute_vuv_kernel<  96,  96,  24,  12,  16>(tp, arg, min_threads, stream); break;
+        case 4: launch_compute_vuv_kernel<  96,  96,  24,  24,  16>(tp, arg, min_threads, stream); break;
+        case 5: launch_compute_vuv_kernel<  96,  96,  24,  12,  24>(tp, arg, min_threads, stream); break;
+        case 6: launch_compute_vuv_kernel<  96,  96,  24,  24,  24>(tp, arg, min_threads, stream); break;
+        case 7: launch_compute_vuv_kernel<  96,  96,  24,  24,  24>(tp, arg, min_threads, stream); break;
+        default: errorQuda("tp.aux.x(=%d) is NOT supported by (%d, %d, %d, %d).", tp.aux.x, Arg::fineSpin, Arg::coarseSpin, Arg::fineColor, Arg::coarseColor);
+        }
+        // clang-format on
+      }
+
       Launch(Arg &arg, CUresult &error, TuneParam &tp, ComputeType type, int min_threads, const cudaStream_t &stream)
       {
 #ifdef JITIFY
@@ -188,17 +266,7 @@ namespace quda
 #endif
         if (type == COMPUTE_UV) {
 
-          // clang-format off
-          switch (tp.aux.x) {
-          case 0: launch_compute_uv_kernel<  48,  64,  24,   8,   8>(tp, arg, min_threads, stream); break;
-          case 1: launch_compute_uv_kernel<  48,  64,  24,  12,   8>(tp, arg, min_threads, stream); break;
-          case 2: launch_compute_uv_kernel<  48,  64,  24,  24,   8>(tp, arg, min_threads, stream); break;
-          case 3: launch_compute_uv_kernel<  48,  64,  24,   8,  16>(tp, arg, min_threads, stream); break;
-          case 4: launch_compute_uv_kernel<  48,  64,  24,  12,  16>(tp, arg, min_threads, stream); break;
-          case 5: launch_compute_uv_kernel<  48,  64,  24,  24,  16>(tp, arg, min_threads, stream); break;
-          default: errorQuda("tp.aux.x(=%d) is NOT supported by (48, 64, 24).", tp.aux.x);
-          }
-          // clang-format on
+          launch_compute_uv_kernel(tp, arg, min_threads, stream);
 
         } else if (type == COMPUTE_AV) {
 
@@ -302,19 +370,7 @@ namespace quda
 
         } else if (type == COMPUTE_VUV) {
 
-          // clang-format off
-          switch (tp.aux.x) {
-          case 0: launch_compute_vuv_kernel<  64,  64,  24,   8,   8>(tp, arg, min_threads, stream); break;
-          case 1: launch_compute_vuv_kernel<  64,  64,  24,   8,  16>(tp, arg, min_threads, stream); break;
-          case 2: launch_compute_vuv_kernel<  64,  64,  24,   8,  32>(tp, arg, min_threads, stream); break;
-          case 3: launch_compute_vuv_kernel<  64,  64,  24,  16,   8>(tp, arg, min_threads, stream); break;
-          case 4: launch_compute_vuv_kernel<  64,  64,  24,  16,  16>(tp, arg, min_threads, stream); break;
-          case 5: launch_compute_vuv_kernel<  64,  64,  24,  16,  32>(tp, arg, min_threads, stream); break;
-          case 6: launch_compute_vuv_kernel<  64,  64,  24,  32,   8>(tp, arg, min_threads, stream); break;
-          case 7: launch_compute_vuv_kernel<  64,  64,  24,  32,  16>(tp, arg, min_threads, stream); break;
-          default: errorQuda("tp.aux.x(=%d) is NOT supported by (64, 64, 24).", tp.aux.x);
-          }
-          // clang-format on
+          launch_compute_vuv_kernel(tp, arg, min_threads, stream);
 
         } else if (type == COMPUTE_COARSE_CLOVER) {
 
@@ -625,16 +681,7 @@ namespace quda
 
       bool advanceTuneParam(TuneParam &param) const
       {
-        if (type == COMPUTE_UV) {
-          if (param.aux.x < 5) {
-            param.aux.x++;
-            return true;
-          } else {
-            return false;
-          }
-        }
-
-        if (type == COMPUTE_VUV) {
+        if (type == COMPUTE_UV || type == COMPUTE_VUV) {
           if (param.aux.x < 7) {
             param.aux.x++;
             return true;

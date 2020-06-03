@@ -178,13 +178,13 @@ namespace quda
 #endif
         if (fineColor == 24) { // coarsened Wilson or free field staggered
         if (coarseColor == 24) {
-          //           calculateYcoarse<Float, vFloat, 24, fineSpin, 24, coarseSpin>(
-          //             Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc, need_bidirectional);
+          // calculateYcoarse<Float, vFloat, 24, fineSpin, 24, coarseSpin>(
+          //   Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc, need_bidirectional);
         } else
 #ifdef NSPIN4
           if (coarseColor == 32) {
-          //           calculateYcoarse<Float, vFloat, 24, fineSpin, 32, coarseSpin>(
-          //             Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc, need_bidirectional);
+          // calculateYcoarse<Float, vFloat, 24, fineSpin, 32, coarseSpin>(
+          //   Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc, need_bidirectional);
         } else
 #endif // NSPIN4
 #ifdef NSPIN1
@@ -192,8 +192,8 @@ namespace quda
           calculateYcoarse<Float, vFloat, 24, fineSpin, 64, coarseSpin>(
             Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc, need_bidirectional);
         } else if (coarseColor == 96) {
-          //           calculateYcoarse<Float, vFloat, 24, fineSpin, 96, coarseSpin>(
-          //             Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc, need_bidirectional);
+          calculateYcoarse<Float, vFloat, 24, fineSpin, 96, coarseSpin>(
+            Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc, need_bidirectional);
         } else
 #endif
         {
