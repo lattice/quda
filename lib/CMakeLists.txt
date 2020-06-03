@@ -214,6 +214,9 @@ endif()
 
 target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_target>)
 
+add_subdirectory(targets/generic)
+target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_generic>)
+
 # propagate CXX flags to CUDA host compiler
 if(${QUDA_PROPAGATE_CXX_FLAGS})
   target_compile_options(
@@ -294,9 +297,12 @@ if(QUDA_DIRAC_NDEG_TWISTED_MASS)
   target_compile_definitions(quda PUBLIC GPU_NDEG_TWISTED_MASS_DIRAC)
 endif(QUDA_DIRAC_NDEG_TWISTED_MASS)
 
-if(QUDA_MULTIGRID)
+if(QUDA_CUDA_LAPACK)
   target_link_libraries(quda PUBLIC ${CUDA_cublas_LIBRARY})
   target_compile_definitions(quda PRIVATE CUBLAS_LIB)
+endif()
+  
+if(QUDA_MULTIGRID)
   target_compile_definitions(quda PRIVATE GPU_MULTIGRID)
 endif(QUDA_MULTIGRID)
 

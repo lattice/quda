@@ -216,7 +216,9 @@ option(QUDA_TEX "enable texture reads?" ON)
 option(QUDA_FLOAT8 "enable float-8 ordered fixed-point fields?" OFF)
 option(QUDA_NVML "use NVML to report CUDA graphics driver version" OFF)
 option(QUDA_NUMA_NVML "experimental use of NVML to set numa affinity" OFF)
-option(QUDA_VERBOSE_BUILD "display kernel register useage" OFF)
+option(QUDA_VERBOSE_BUILD "display kernel register usage" OFF)
+option(QUDA_CUDA_LAPACK "use cuBLAS lapack" ON)
+
 set(QUDA_MAX_MULTI_BLAS_N
     "4"
     CACHE STRING "maximum value to initialize template for multi-blas /-reduce")
@@ -276,6 +278,7 @@ mark_as_advanced(QUDA_CTEST_SEP_DSLASH_POLICIES)
 mark_as_advanced(QUDA_CTEST_LAUNCH)
 mark_as_advanced(QUDA_CTEST_LAUNCH_ARGS)
 mark_as_advanced(QUDA_OPENMP)
+mark_as_advanced(QUDA_CUDA_LAPACK)
 
 mark_as_advanced(QUDA_BACKWARDS)
 

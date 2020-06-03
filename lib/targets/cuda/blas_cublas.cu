@@ -1,29 +1,22 @@
 #ifdef CUBLAS_LIB
 #include <blas_lapack.h>
 #include <cublas_v2.h>
-#endif
 #include <malloc_quda.h>
 
 namespace quda {
 
   namespace blas_lapack { 
 
-#ifdef CUBLAS_LIB
     static cublasHandle_t handle;
-#endif
 
     void init() {
-#ifdef CUBLAS_LIB
       cublasStatus_t error = cublasCreate(&handle);
       if (error != CUBLAS_STATUS_SUCCESS) errorQuda("cublasCreate failed with error %d", error);
-#endif
     }
 
     void destroy() {
-#ifdef CUBLAS_LIB
       cublasStatus_t error = cublasDestroy(handle);
       if (error != CUBLAS_STATUS_SUCCESS) errorQuda("\nError indestroying cublas context, error code = %d\n", error);
-#endif
     }
 
     // mini kernel to set the array of pointers needed for batched cublas
@@ -38,7 +31,6 @@ namespace quda {
     long long BatchInvertMatrix(void *Ainv, void* A, const int n, const uint64_t batch, QudaPrecision prec, QudaFieldLocation location)
     {
       long long flops = 0;      
-#ifdef CUBLAS_LIB
       timeval start, stop;
       gettimeofday(&start, NULL);
 
@@ -115,7 +107,6 @@ namespace quda {
 
       if (getVerbosity() >= QUDA_VERBOSE)
 	printfQuda("Batched matrix inversion completed in %f seconds with GFLOPS = %f\n", time, 1e-9 * flops / time);
-#endif // CUBLAS_LIB
       
       return flops;
     }
@@ -123,3 +114,4 @@ namespace quda {
   } // namespace blas_lapack
 
 } // namespace quda
+#endif
