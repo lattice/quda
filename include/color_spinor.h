@@ -920,6 +920,28 @@ namespace quda {
   }
 
   /**
+     @brief Compute the color contraction over color at spin s
+     dot = \sum_s,c a(s,c) * b(s,c)
+     @param a Left-hand side ColorSpinor
+     @param b Right-hand side ColorSpinor
+     @return The color contraction
+  */
+  template <typename Float, int Nc, int Ns>
+  __device__ __host__ inline complex<Float> colorContract(const ColorSpinor<Float, Nc, Ns> &a,
+							  const ColorSpinor<Float, Nc, Ns> &b, int sa, int sb)
+  {
+    complex<Float> dot = 0;
+    for (int c = 0; c < Nc; c++) {
+      dot.x += a(sa, c).real() * b(sb, c).real();
+      dot.x -= a(sa, c).imag() * b(sb, c).imag();
+      dot.y += a(sa, c).real() * b(sb, c).imag();
+      dot.y += a(sa, c).imag() * b(sb, c).real();
+    }
+    
+    return dot;
+  }
+
+  /**
      Compute the inner product over color at spin s between two ColorSpinor fields
      dot = \sum_c conj(a(s,c)) * b(s,c)
      @param a Left-hand side ColorSpinor
