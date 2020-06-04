@@ -267,7 +267,6 @@ void qudaLoadUnitarizedLink(int prec, QudaFatLinkArgs_t fatlink_args,
 					   QUDA_GENERAL_LINKS);
 
   computeKSLinkQuda(fatlink, nullptr, ulink, inlink, const_cast<double*>(act_path_coeff), &param);
-  qudamilc_called<false>(__func__);
 
   // requires loadGaugeQuda to be called in subequent solver
   invalidateGaugeQuda();
