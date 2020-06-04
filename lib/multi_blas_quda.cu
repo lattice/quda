@@ -30,10 +30,6 @@ namespace quda {
     const coeff_array<T> &a, &b, &c;
     std::vector<ColorSpinorField *> &x, &y, &z, &w;
 
-    // host pointers used for backing up fields when tuning
-    // don't curry into the Spinors to minimize parameter size
-    char *Y_h[NYW_max], *W_h[NYW_max], *Ynorm_h[NYW_max], *Wnorm_h[NYW_max];
-
     bool tuneSharedBytes() const { return false; }
 
     // for these streaming kernels, there is no need to tune the grid size, just use max
@@ -55,11 +51,7 @@ namespace quda {
       x(x),
       y(y),
       z(z),
-      w(w),
-      Y_h(),
-      W_h(),
-      Ynorm_h(),
-      Wnorm_h()
+      w(w)
     {
       // heuristic for enabling if we need the warp-splitting optimization
       const int gpu_size = 2 * deviceProp.maxThreadsPerBlock * deviceProp.multiProcessorCount;
@@ -177,16 +169,16 @@ namespace quda {
       void preTune()
       {
         for (int i = 0; i < NYW; ++i) {
-          if (arg.f.write.Y) arg.Y[i].backup(&Y_h[i], &Ynorm_h[i], y[i]->Bytes(), y[i]->NormBytes());
-          if (arg.f.write.W) arg.W[i].backup(&W_h[i], &Wnorm_h[i], w[i]->Bytes(), w[i]->NormBytes());
+          if (arg.f.write.Y) y[i]->backup();
+          if (arg.f.write.W) w[i]->backup();
         }
       }
 
       void postTune()
       {
         for (int i = 0; i < NYW; ++i) {
-          if (arg.f.write.Y) arg.Y[i].restore(&Y_h[i], &Ynorm_h[i], y[i]->Bytes(), y[i]->NormBytes());
-          if (arg.f.write.W) arg.W[i].restore(&W_h[i], &Wnorm_h[i], w[i]->Bytes(), w[i]->NormBytes());
+          if (arg.f.write.Y) y[i]->restore();
+          if (arg.f.write.W) w[i]->restore();
         }
       }
 

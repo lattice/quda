@@ -186,11 +186,6 @@ namespace quda {
 
       const ColorSpinorField &x, &y, &z, &w, &v;
 
-      // host pointers used for backing up fields when tuning
-      // these can't be curried into the Spinors because of Tesla argument length restriction
-      char *X_h, *Y_h, *Z_h, *W_h, *V_h;
-      char *Xnorm_h, *Ynorm_h, *Znorm_h, *Wnorm_h, *Vnorm_h;
-
       unsigned int sharedBytesPerThread() const { return 0; }
       unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
@@ -216,17 +211,7 @@ namespace quda {
           z(z),
           w(w),
           v(v),
-          result(result),
-          X_h(0),
-          Y_h(0),
-          Z_h(0),
-          W_h(0),
-          V_h(0),
-          Xnorm_h(0),
-          Ynorm_h(0),
-          Znorm_h(0),
-          Wnorm_h(0),
-          Vnorm_h(0)
+          result(result)
       {
         strcpy(aux, x.AuxString());
         if (x.Precision() != z.Precision()) {
@@ -251,20 +236,20 @@ namespace quda {
 
       void preTune()
       {
-        if (arg.r.write.X) arg.X.backup(&X_h, &Xnorm_h, x.Bytes(), x.NormBytes());
-        if (arg.r.write.Y) arg.Y.backup(&Y_h, &Ynorm_h, y.Bytes(), y.NormBytes());
-        if (arg.r.write.Z) arg.Z.backup(&Z_h, &Znorm_h, z.Bytes(), z.NormBytes());
-        if (arg.r.write.W) arg.W.backup(&W_h, &Wnorm_h, w.Bytes(), w.NormBytes());
-        if (arg.r.write.V) arg.V.backup(&V_h, &Vnorm_h, v.Bytes(), v.NormBytes());
+        if (arg.r.write.X) x.backup();
+        if (arg.r.write.Y) y.backup();
+        if (arg.r.write.Z) z.backup();
+        if (arg.r.write.W) w.backup();
+        if (arg.r.write.V) v.backup();
       }
 
       void postTune()
       {
-        if (arg.r.write.X) arg.X.restore(&X_h, &Xnorm_h, x.Bytes(), x.NormBytes());
-        if (arg.r.write.Y) arg.Y.restore(&Y_h, &Ynorm_h, y.Bytes(), y.NormBytes()); 
-        if (arg.r.write.Z) arg.Z.restore(&Z_h, &Znorm_h, z.Bytes(), z.NormBytes());
-        if (arg.r.write.W) arg.W.restore(&W_h, &Wnorm_h, w.Bytes(), w.NormBytes());
-        if (arg.r.write.V) arg.V.restore(&V_h, &Vnorm_h, v.Bytes(), v.NormBytes());
+        if (arg.r.write.X) x.restore();
+        if (arg.r.write.Y) y.restore();
+        if (arg.r.write.Z) z.restore();
+        if (arg.r.write.W) w.restore();
+        if (arg.r.write.V) v.restore();
       }
 
       void initTuneParam(TuneParam &param) const

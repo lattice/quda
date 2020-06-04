@@ -31,7 +31,7 @@ template <typename RegType, typename InterType, typename StoreType> void checkTy
 }
 
 template <typename RegType, typename StoreType, bool is_fixed> struct SpinorNorm {
-  typedef typename bridge_mapper<RegType, StoreType>::type InterType;
+  using InterType = typename bridge_mapper<RegType, StoreType>::type;
   float *norm;
   unsigned int cb_norm_offset;
 
@@ -69,27 +69,6 @@ template <typename RegType, typename StoreType, bool is_fixed> struct SpinorNorm
     for (int j = 1; j < M/2; j++) c[0] = fmaxf(c[j], c[0]);
     norm[cb_norm_offset * parity + i] = c[0];
     return __fdividef(fixedMaxValue<StoreType>::value, c[0]);
-  }
-
-  // used to backup the field to the host
-  void backup(char **norm_h, size_t norm_bytes)
-  {
-    if (norm_bytes > 0) {
-      *norm_h = new char[norm_bytes];
-      cudaMemcpy(*norm_h, norm, norm_bytes, cudaMemcpyDeviceToHost);
-    }
-    checkCudaError();
-  }
-
-  // restore the field from the host
-  void restore(char **norm_h, size_t norm_bytes)
-  {
-    if (norm_bytes > 0) {
-      cudaMemcpy(norm, *norm_h, norm_bytes, cudaMemcpyHostToDevice);
-      delete[] * norm_h;
-      *norm_h = 0;
-    }
-    checkCudaError();
   }
 
   float *Norm() { return norm; }
@@ -134,7 +113,7 @@ public:
     cb_offset(0)
   { }
 
-  Spinor(const ColorSpinorField &x, int nFace = 1) :
+ Spinor(const ColorSpinorField &x) :
     SN(x),
     spinor(static_cast<StoreType*>(const_cast<ColorSpinorField &>(x).V())),
     stride(x.Stride()),
@@ -162,7 +141,7 @@ public:
     return *this;
   }
 
-  void set(const ColorSpinorField &x, int nFace = 1)
+  void set(const ColorSpinorField &x)
   {
     SN::set(x);
     spinor = static_cast<StoreType*>(const_cast<ColorSpinorField &>(x).V());
@@ -207,46 +186,4 @@ public:
     }
   }
 
-  // used to backup the field to the host
-  void backup(char **spinor_h, char **norm_h, size_t bytes, size_t norm_bytes)
-  {
-    *spinor_h = new char[bytes];
-    cudaMemcpy(*spinor_h, spinor, bytes, cudaMemcpyDeviceToHost);
-    SN::backup(norm_h, norm_bytes);
-    checkCudaError();
-  }
-
-  // restore the field from the host
-  void restore(char **spinor_h, char **norm_h, size_t bytes, size_t norm_bytes)
-  {
-    cudaMemcpy(spinor, *spinor_h, bytes, cudaMemcpyHostToDevice);
-    SN::restore(norm_h, norm_bytes);
-    delete[] * spinor_h;
-    *spinor_h = 0;
-    checkCudaError();
-  }
-
-  void *V()
-  {
-    return (void *)spinor;
-  }
-
-  QudaPrecision Precision() const
-  {
-    QudaPrecision precision = QUDA_INVALID_PRECISION;
-    if (sizeof(((StoreType *)0)->x) == sizeof(double))
-      precision = QUDA_DOUBLE_PRECISION;
-    else if (sizeof(((StoreType *)0)->x) == sizeof(float))
-      precision = QUDA_SINGLE_PRECISION;
-    else if (sizeof(((StoreType *)0)->x) == sizeof(short))
-      precision = QUDA_HALF_PRECISION;
-    else if (sizeof(((StoreType *)0)->x) == sizeof(char))
-      precision = QUDA_QUARTER_PRECISION;
-    else
-      errorQuda("Unknown precision type\n");
-    return precision;
-  }
-
-  int Stride() const { return stride; }
-  int Bytes() const { return N * sizeof(RegType); }
 };

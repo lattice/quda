@@ -83,9 +83,6 @@ namespace quda {
 
       std::vector<ColorSpinorField *> &x, &y, &z, &w;
 
-      // don't curry into the Spinors to minimize parameter size
-      char *Y_h[NYW_max], *W_h[NYW_max], *Ynorm_h[NYW_max], *Wnorm_h[NYW_max];
-
       unsigned int sharedBytesPerThread() const { return 0; }
       unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
@@ -114,11 +111,7 @@ namespace quda {
         y(y),
         z(z),
         w(w),
-        result(result),
-        Y_h(),
-        W_h(),
-        Ynorm_h(),
-        Wnorm_h()
+        result(result)
       {
         if (sizeof(arg) > MAX_MATRIX_SIZE)
           errorQuda("Kernel argument size %lu greater than maximum %d", sizeof(arg), MAX_MATRIX_SIZE);
@@ -209,16 +202,16 @@ namespace quda {
       void preTune()
       {
         for (int i = 0; i < NYW; ++i) {
-          if (arg.r.write.Y) arg.Y[i].backup(&Y_h[i], &Ynorm_h[i], y[i]->Bytes(), y[i]->NormBytes());
-          if (arg.r.write.W) arg.W[i].backup(&W_h[i], &Wnorm_h[i], w[i]->Bytes(), w[i]->NormBytes());
+          if (arg.r.write.Y) y[i]->backup();
+          if (arg.r.write.W) w[i]->backup();
         }
       }
 
       void postTune()
       {
         for (int i = 0; i < NYW; ++i) {
-          if (arg.r.write.Y) arg.Y[i].restore(&Y_h[i], &Ynorm_h[i], y[i]->Bytes(), y[i]->NormBytes());
-          if (arg.r.write.W) arg.W[i].restore(&W_h[i], &Wnorm_h[i], w[i]->Bytes(), w[i]->NormBytes());
+          if (arg.r.write.Y) y[i]->restore();
+          if (arg.r.write.W) w[i]->restore();
         }
       }
 
