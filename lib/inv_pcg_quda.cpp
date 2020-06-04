@@ -83,7 +83,8 @@ namespace quda
     profile.TPSTART(QUDA_PROFILE_FREE);
 
     if (K) delete K;
-
+    destroyDeflationSpace();
+    
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
@@ -102,7 +103,23 @@ namespace quda
 
     int k = 0;
     int rUpdate = 0;
-
+    
+    if (param.deflate) {
+      // Construct the eigensolver and deflation space if requested.
+      constructDeflationSpace(b, matPrecon);
+      if (deflate_compute) {
+        // compute the deflation space.
+        if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_INIT);
+        (*eig_solve)(evecs, evals);
+        if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_INIT);
+        deflate_compute = false;
+      }
+      if (recompute_evals) {
+        eig_solve->computeEvals(matPrecon, evecs, evals);
+        recompute_evals = false;
+      }
+    }
+    
     cudaColorSpinorField *minvrPre = NULL;
     cudaColorSpinorField *rPre = NULL;
     cudaColorSpinorField *minvr = NULL;
@@ -114,10 +131,18 @@ namespace quda
     if (K) minvr = new cudaColorSpinorField(b);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     cudaColorSpinorField y(b, csParam);
-
+    
     mat(r, x, y); // => r = A*x;
     double r2 = xmyNorm(b, r);
 
+    if (param.deflate && param.maxiter > 1) {
+      // Deflate and accumulate to solution vector
+      eig_solve->deflate(y, r, evecs, evals, true);
+      mat(r, y);
+      r2 = blas::xmyNorm(b, r);
+    }
+
+    
     csParam.setPrecision(param.precision_sloppy);
     cudaColorSpinorField tmpSloppy(x, csParam);
     cudaColorSpinorField Ap(x, csParam);
@@ -143,7 +168,7 @@ namespace quda
 
     cudaColorSpinorField &xSloppy = *x_sloppy;
     cudaColorSpinorField &rSloppy = *r_sloppy;
-
+    
     if (&x != &xSloppy) {
       copy(y, x); // copy x to y
       zero(xSloppy);
@@ -191,6 +216,7 @@ namespace quda
     double r0Norm = rNorm;
     double maxrx = rNorm;
     double maxrr = rNorm;
+    double maxr_deflate = rNorm; // The maximum residual since the last deflation
     double delta = param.delta;
 
     if (K) rMinvr = reDotProduct(rSloppy, *minvrSloppy);
@@ -261,6 +287,19 @@ namespace quda
         // Now compute r
         mat(r, y, x); // x is just a temporary here
         r2 = xmyNorm(b, r);
+
+        if (param.deflate && sqrt(r2) < maxr_deflate * param.tol_restart) {
+          // Deflate and accumulate to solution vector
+          eig_solve->deflate(y, r, evecs, evals, true);
+
+          // Compute r_defl = RHS - A * LHS
+          mat(r, y);
+          r2 = blas::xmyNorm(b, r);
+
+          maxr_deflate = sqrt(r2);
+        }
+	
+	
         copy(rSloppy, r); // copy r to rSloppy
         zero(xSloppy);
 
