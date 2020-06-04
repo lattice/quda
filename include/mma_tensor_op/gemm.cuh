@@ -3,7 +3,7 @@
 // XXX: Load different header for different archs.
 #include <mma_tensor_op/hmma_m16n16k16_sm70.cuh>
 
-#define USE_GMEM_MMA_PIPELINING
+// #define USE_GMEM_MMA_PIPELINING
 
 namespace quda
 {
@@ -61,12 +61,6 @@ namespace quda
       static constexpr int m_dim = (sM + m_stride_pack - 1) / m_stride_pack;
       static constexpr int n_dim = (sN + n_stride - 1) / n_stride;
 
-      // static_assert(M % m_stride_pack == 0, "M needs to be divisible by (m_stride * 2).");
-      // static_assert(N % n_stride == 0, "N needs to be divisible by n_stride.");
-
-      SmemAccessor smem_real;
-      SmemAccessor smem_imag;
-
 #ifdef USE_GMEM_MMA_PIPELINING
       half2 reg_real[m_dim * n_dim];
       half2 reg_imag[m_dim * n_dim];
@@ -75,10 +69,7 @@ namespace quda
       const int y;
       const int z;
 
-      __device__ inline GlobalMemoryLoader(SmemAccessor real_, SmemAccessor imag_) :
-        smem_real(real_), smem_imag(imag_), y(threadIdx.y), z(threadIdx.z * 2)
-      {
-      }
+      __device__ inline GlobalMemoryLoader() : y(threadIdx.y), z(threadIdx.z * 2) { }
 
 #ifdef USE_GMEM_MMA_PIPELINING
       template <int ld, bool transpose, class GmemAccessor>
@@ -139,7 +130,7 @@ namespace quda
         }
       }
 
-      __device__ inline void r2s()
+      template <class SmemObj> __device__ inline void r2s(SmemObj &smem_real, SmemObj &smem_imag)
       {
 #pragma unroll
         for (int n = 0; n < n_dim; n++) {
@@ -155,8 +146,9 @@ namespace quda
         }
       }
 #else
-      template <int ld, bool transpose, class GmemAccessor>
-      __device__ inline void g2s(const GmemAccessor &gmem, int m_offset, int n_offset)
+      template <int ld, bool transpose, class SmemObj, class GmemAccessor>
+      __device__ inline void g2s(SmemObj &smem_real, SmemObj &smem_imag, const GmemAccessor &gmem, int m_offset,
+                                 int n_offset)
       {
         auto p = gmem.data();
         auto scale_inv = gmem.scale_inv;
@@ -168,39 +160,53 @@ namespace quda
             const int n_idx_smem = n * n_stride + y;
             const int m_idx_smem = m * m_stride_pack + z;
 
-            const int n_idx = n_idx_smem + n_offset;
-            const int m_idx = m_idx_smem + m_offset;
+            if (m_idx_smem < sM && n_idx_smem < sN) {
 
-            if (transpose == dagger) {
-              auto xx = p[(m_idx + 0) * ld + n_idx];
-              auto yy = p[(m_idx + 1) * ld + n_idx];
+              const int n_idx = n_idx_smem + n_offset;
+              const int m_idx = m_idx_smem + m_offset;
 
-              if (fixed) {
-                smem_real.vector_load(m_idx_smem, n_idx_smem,
-                                      __floats2half2_rn(scale_inv * xx.real(), scale_inv * yy.real()));
-                auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
-                smem_imag.vector_load(m_idx_smem, n_idx_smem,
-                                      __floats2half2_rn(scale_inv_conj * xx.imag(), scale_inv_conj * yy.imag()));
+              if (n_idx < N && m_idx < M) {
+
+                if (transpose == dagger) {
+
+                  auto xx = p[(m_idx + 0) * ld + n_idx];
+                  auto yy = p[(m_idx + 1) * ld + n_idx];
+
+                  if (fixed) {
+                    smem_real.vector_load(m_idx_smem, n_idx_smem,
+                                          __floats2half2_rn(scale_inv * xx.real(), scale_inv * yy.real()));
+                    auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
+                    smem_imag.vector_load(m_idx_smem, n_idx_smem,
+                                          __floats2half2_rn(scale_inv_conj * xx.imag(), scale_inv_conj * yy.imag()));
+                  } else {
+                    smem_real.vector_load(m_idx_smem, n_idx_smem, __floats2half2_rn(+xx.real(), +yy.real()));
+                    smem_imag.vector_load(
+                      m_idx_smem, n_idx_smem,
+                      __floats2half2_rn(dagger ? -xx.imag() : +xx.imag(), dagger ? -yy.imag() : +yy.imag()));
+                  }
+
+                } else {
+
+                  using store_type = typename GmemAccessor::store_type;
+                  using store_vector_type = typename VectorType<store_type, 4>::type;
+                  store_vector_type v = *reinterpret_cast<store_vector_type *>(&p[n_idx * ld + m_idx]);
+
+                  if (fixed) {
+                    smem_real.vector_load(m_idx_smem, n_idx_smem, __floats2half2_rn(scale_inv * v.x, scale_inv * v.z));
+                    auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
+                    smem_imag.vector_load(m_idx_smem, n_idx_smem,
+                                          __floats2half2_rn(scale_inv_conj * v.y, scale_inv_conj * v.w));
+                  } else {
+                    smem_real.vector_load(m_idx_smem, n_idx_smem, __floats2half2_rn(+v.x, +v.z));
+                    smem_imag.vector_load(m_idx_smem, n_idx_smem,
+                                          __floats2half2_rn(dagger ? -v.y : +v.y, dagger ? -v.w : +v.w));
+                  }
+                }
+
               } else {
-                smem_real.vector_load(m_idx_smem, n_idx_smem, __floats2half2_rn(+xx.real(), +yy.real()));
-                smem_imag.vector_load(
-                  m_idx_smem, n_idx_smem,
-                  __floats2half2_rn(dagger ? -xx.imag() : +xx.imag(), dagger ? -yy.imag() : +yy.imag()));
-              }
-            } else {
-              using store_type = typename GmemAccessor::store_type;
-              using store_vector_type = typename VectorType<store_type, 4>::type;
-              store_vector_type v = *reinterpret_cast<store_vector_type *>(&p[n_idx * ld + m_idx]);
 
-              if (fixed) {
-                smem_real.vector_load(m_idx_smem, n_idx_smem, __floats2half2_rn(scale_inv * v.x, scale_inv * v.z));
-                auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
-                smem_imag.vector_load(m_idx_smem, n_idx_smem,
-                                      __floats2half2_rn(scale_inv_conj * v.y, scale_inv_conj * v.w));
-              } else {
-                smem_real.vector_load(m_idx_smem, n_idx_smem, __floats2half2_rn(+v.x, +v.z));
-                smem_imag.vector_load(m_idx_smem, n_idx_smem,
-                                      __floats2half2_rn(dagger ? -v.y : +v.y, dagger ? -v.w : +v.w));
+                smem_real.vector_load(m_idx_smem, n_idx_smem, __half2half2(0));
+                smem_imag.vector_load(m_idx_smem, n_idx_smem, __half2half2(0));
               }
             }
           }
@@ -239,8 +245,8 @@ namespace quda
       }
 
       template <int tile_acc_dim, class SmemObjA, class SmemObjB>
-      __device__ inline void mma(SmemObjA smem_obj_a_real, SmemObjA smem_obj_a_imag, SmemObjB smem_obj_b_real,
-                                 SmemObjB smem_obj_b_imag)
+      __device__ inline void mma(const SmemObjA &smem_obj_a_real, const SmemObjA &smem_obj_a_imag,
+                                 const SmemObjB &smem_obj_b_real, const SmemObjB &smem_obj_b_imag)
       {
 
 #pragma unroll
@@ -251,25 +257,23 @@ namespace quda
           const int warp_row = logical_warp_index / tile_col_dim;
           const int warp_col = logical_warp_index - warp_row * tile_col_dim;
 
-#pragma unroll
+#pragma unroll 1
           for (int tile_k = 0; tile_k < tile_acc_dim; tile_k++) {
 
-            const int k_idx = tile_k;
-
             MmaOperandA op_a_real;
-            op_a_real.load(smem_obj_a_real, k_idx, warp_row, wrm);
+            op_a_real.load(smem_obj_a_real, tile_k, warp_row, wrm);
             MmaOperandA op_a_imag;
-            op_a_imag.load(smem_obj_a_imag, k_idx, warp_row, wrm);
+            op_a_imag.load(smem_obj_a_imag, tile_k, warp_row, wrm);
 
             MmaOperandB op_b_real;
-            op_b_real.load(smem_obj_b_real, k_idx, warp_col, wrm);
+            op_b_real.load(smem_obj_b_real, tile_k, warp_col, wrm);
             MmaOperandB op_b_imag;
-            op_b_imag.load(smem_obj_b_imag, k_idx, warp_col, wrm);
+            op_b_imag.load(smem_obj_b_imag, tile_k, warp_col, wrm);
 
             gemm(op_a_real, op_b_real, op_c_real[c]);
             gemm(op_a_imag, op_b_real, op_c_imag[c]);
             gemm(op_a_real, op_b_imag, op_c_imag[c]);
-            // revert op_imag
+            // negate op_imag
             op_a_imag.negate();
             gemm(op_a_imag, op_b_imag, op_c_real[c]);
           }
@@ -278,7 +282,6 @@ namespace quda
 
       template <int ldc, class C> __device__ inline void store(C &c_accessor, int m_offset, int n_offset)
       {
-
 #pragma unroll
         for (int c = 0; c < warp_cycle; c++) {
 
@@ -296,7 +299,6 @@ namespace quda
       template <int ldc, bool dagger, class C>
       __device__ inline void store_atomic(C &c_accessor, int m_offset, int n_offset)
       {
-
 #pragma unroll
         for (int c = 0; c < warp_cycle; c++) {
 
@@ -313,7 +315,6 @@ namespace quda
 
       __device__ inline void abs_max(float &max)
       {
-
 #pragma unroll
         for (int c = 0; c < warp_cycle; c++) {
           op_c_real[c].abs_max(max);
@@ -369,17 +370,16 @@ namespace quda
       using SmemObjA = SharedMemoryObject<half, bM, bK, 1, smem_lda>;
       using SmemObjB = SharedMemoryObject<half, bN, bK, 1, smem_ldb>;
 
-      SmemObjA smem_obj_a_real; // = make_smem_obj<bM, bK, 1, smem_lda>(smem_a_real);
-      SmemObjA smem_obj_a_imag; // = make_smem_obj<bM, bK, 1, smem_lda>(smem_a_imag);
-      SmemObjB smem_obj_b_real; // = make_smem_obj<bN, bK, 1, smem_ldb>(smem_b_real);
-      SmemObjB smem_obj_b_imag; // = make_smem_obj<bN, bK, 1, smem_ldb>(smem_b_imag);
+      SmemObjA smem_obj_a_real;
+      SmemObjA smem_obj_a_imag;
+      SmemObjB smem_obj_b_real;
+      SmemObjB smem_obj_b_imag;
 
       MmaOp<MmaOperandC<accumuate_reg_type>, warp_cycle, tile_col_dim> mma_op; // (thread_id);
 
-      GlobalMemoryLoader<M, K, n_row, n_col, a_dag, SmemObjA> a_loader; // (smem_obj_a_real,
-                                                                        // smem_obj_a_imag);
-      GlobalMemoryLoader<N, K, n_row, n_col, b_dag, SmemObjB> b_loader; // (smem_obj_b_real,
-                                                                        // smem_obj_b_imag);
+      GlobalMemoryLoader<M, K, n_row, n_col, a_dag, SmemObjA> a_loader;
+
+      GlobalMemoryLoader<N, K, n_row, n_col, b_dag, SmemObjB> b_loader;
 
       __device__ inline MmaConfig(half *smem_ptr) :
         smem_obj_a_real(smem_ptr),
@@ -387,8 +387,8 @@ namespace quda
         smem_obj_b_real(smem_obj_a_imag.ptr + smem_lda * bK),
         smem_obj_b_imag(smem_obj_b_real.ptr + smem_ldb * bK),
         mma_op((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x),
-        a_loader(smem_obj_a_real, smem_obj_a_imag),
-        b_loader(smem_obj_b_real, smem_obj_b_imag)
+        a_loader(),
+        b_loader()
       {
       }
 
@@ -399,10 +399,10 @@ namespace quda
 
 #ifdef USE_GMEM_MMA_PIPELINING
         a_loader.g2r<lda, a_transpose>(a, m_offset, 0);
-        a_loader.r2s();
+        a_loader.r2s(smem_obj_a_real, smem_obj_a_imag);
 
         b_loader.g2r<ldb, b_transpose>(b, n_offset, 0);
-        b_loader.r2s();
+        b_loader.r2s(smem_obj_b_real, smem_obj_b_imag);
 
         __syncthreads();
 #endif
@@ -417,8 +417,8 @@ namespace quda
           }
 #else
           __syncthreads();
-          a_loader.g2s<lda, a_transpose>(a, m_offset, bk);
-          b_loader.g2s<ldb, b_transpose>(b, n_offset, bk);
+          a_loader.g2s<lda, a_transpose>(smem_obj_a_real, smem_obj_a_imag, a, m_offset, bk);
+          b_loader.g2s<ldb, b_transpose>(smem_obj_b_real, smem_obj_b_imag, b, n_offset, bk);
           __syncthreads();
 #endif
 
@@ -428,8 +428,8 @@ namespace quda
           if (bk + bK < K) {
             __syncthreads();
 
-            a_loader.r2s();
-            b_loader.r2s();
+            a_loader.r2s(smem_obj_a_real, smem_obj_a_imag);
+            b_loader.r2s(smem_obj_b_real, smem_obj_b_imag);
 
             __syncthreads();
           }

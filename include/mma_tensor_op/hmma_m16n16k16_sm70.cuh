@@ -1,6 +1,5 @@
 #pragma once
 
-#include <mma.h>
 #include <type_traits>
 
 // #define USE_FP16_HMMA_ACCUMULATE
@@ -53,9 +52,9 @@ namespace quda
       unsigned reg[2];
 
       template <class SmemObj>
-      __device__ inline void load(SmemObj smem_obj, int k, int warp_row, const WarpRegisterMapping &wrm)
+      __device__ inline void load(const SmemObj &smem_obj, int k, int warp_row, const WarpRegisterMapping &wrm)
       {
-        unsigned *A = reinterpret_cast<unsigned *>(smem_obj.ptr);
+        const unsigned *A = reinterpret_cast<const unsigned *>(smem_obj.ptr);
         int idx_strided = k * 4 + wrm.quad_thread;
         int idx_contiguous = warp_row * 16 + wrm.quad_row * 8 + wrm.quad_hilo * 4;
         const int thread_offset_a = idx_strided * SmemObj::ldn + idx_contiguous;
@@ -79,9 +78,9 @@ namespace quda
       unsigned reg[2];
 
       template <class SmemObj>
-      __device__ inline void load(SmemObj smem_obj, int k, int warp_col, const WarpRegisterMapping &wrm)
+      __device__ inline void load(const SmemObj &smem_obj, int k, int warp_col, const WarpRegisterMapping &wrm)
       {
-        unsigned *B = reinterpret_cast<unsigned *>(smem_obj.ptr);
+        const unsigned *B = reinterpret_cast<const unsigned *>(smem_obj.ptr);
         int idx_strided = k * 4 + wrm.quad_thread;
         int idx_contiguous = warp_col * 16 + wrm.quad_col * 8 + wrm.quad_hilo * 4;
         const int thread_offset_b = idx_strided * SmemObj::ldn + idx_contiguous;

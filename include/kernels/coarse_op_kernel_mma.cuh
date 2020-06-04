@@ -448,8 +448,13 @@ namespace quda
             auto a = arg.AV.wrap(parity, x_cb, s);
 
             __syncthreads();
+#ifdef USE_GMEM_MMA_PIPELINING
             config.a_loader.g2r<Config::lda, Config::a_transpose>(a, m_offset, 0);
-            config.a_loader.r2s();
+            config.a_loader.r2s(config.smem_obj_a_real, config.smem_obj_a_imag);
+#else
+            config.a_loader.g2s<Config::lda, Config::a_transpose>(config.smem_obj_a_real, config.smem_obj_a_imag, a,
+                                                                  m_offset, 0);
+#endif
             __syncthreads();
 
             for (int s_col = 0; s_col < fineSpin; s_col++) { // which chiral block
@@ -457,8 +462,13 @@ namespace quda
               auto b = arg.UV.wrap(parity, x_cb, s_col * fineSpin + s);
 
               __syncthreads();
+#ifdef USE_GMEM_MMA_PIPELINING
               config.b_loader.g2r<Config::ldb, Config::b_transpose>(b, n_offset, 0);
-              config.b_loader.r2s();
+              config.b_loader.r2s(config.smem_obj_b_real, config.smem_obj_b_imag);
+#else
+              config.b_loader.g2s<Config::ldb, Config::b_transpose>(config.smem_obj_b_real, config.smem_obj_b_imag, b,
+                                                                    n_offset, 0);
+#endif
               __syncthreads();
 
               config.mma_op.zero();

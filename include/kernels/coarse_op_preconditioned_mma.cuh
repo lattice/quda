@@ -55,14 +55,8 @@ namespace quda
       constexpr EpilogueType epilogue_type
         = compute_max_only ? EpilogueType::COMPUTE_MAX_ONLY : EpilogueType::VECTOR_STORE;
 
-      // first do the backwards links Y^{+\mu} * X^{-\dagger}
-      if (arg.comm_dim[d] && (coord[d] - arg.nFace < 0)) {
-
-        const int ghost_idx = ghostFaceIndex<0, nDim>(coord, arg.dim, d, arg.nFace);
-
-        auto a = arg.Y.wrap_ghost(d, 1 - parity, ghost_idx);
-        auto b = arg.Xinv.wrap(0, parity, x_cb);
-        auto c = arg.Yhat.wrap_ghost(d, 1 - parity, ghost_idx);
+      {
+        // first do the backwards links Y^{+\mu} * X^{-\dagger}
 
         constexpr bool a_dagger = false;
         constexpr bool b_dagger = true;
@@ -70,22 +64,27 @@ namespace quda
         using Config
           = MmaConfig<Arg::M, Arg::N, Arg::K, Arg::M, Arg::N, Arg::K, bM, bN, bK, block_y, block_z, a_dagger, b_dagger>;
         Config config(smem_ptr);
-        yHatMax = config.perform_mma<epilogue_type>(a, b, c, m, n);
 
-      } else {
+        if (arg.comm_dim[d] && (coord[d] - arg.nFace < 0)) {
 
-        const int back_idx = linkIndexM1(coord, arg.dim, d);
+          const int ghost_idx = ghostFaceIndex<0, nDim>(coord, arg.dim, d, arg.nFace);
 
-        auto a = arg.Y.wrap(d, 1 - parity, back_idx);
-        auto b = arg.Xinv.wrap(0, parity, x_cb);
-        auto c = arg.Yhat.wrap(d, 1 - parity, back_idx);
+          auto a = arg.Y.wrap_ghost(d, 1 - parity, ghost_idx);
+          auto b = arg.Xinv.wrap(0, parity, x_cb);
+          auto c = arg.Yhat.wrap_ghost(d, 1 - parity, ghost_idx);
 
-        constexpr bool a_dagger = false;
-        constexpr bool b_dagger = true;
-        using Config
-          = MmaConfig<Arg::M, Arg::N, Arg::K, Arg::M, Arg::N, Arg::K, bM, bN, bK, block_y, block_z, a_dagger, b_dagger>;
-        Config config(smem_ptr);
-        yHatMax = config.perform_mma<epilogue_type>(a, b, c, m, n);
+          yHatMax = config.perform_mma<epilogue_type>(a, b, c, m, n);
+
+        } else {
+
+          const int back_idx = linkIndexM1(coord, arg.dim, d);
+
+          auto a = arg.Y.wrap(d, 1 - parity, back_idx);
+          auto b = arg.Xinv.wrap(0, parity, x_cb);
+          auto c = arg.Yhat.wrap(d, 1 - parity, back_idx);
+
+          yHatMax = config.perform_mma<epilogue_type>(a, b, c, m, n);
+        }
       }
 
       { // now do the forwards links X^{-1} * Y^{-\mu}
