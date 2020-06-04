@@ -9,7 +9,7 @@
 #include <su3_project.cuh>
 #include <index_helper.cuh>
 #include <instantiate.h>
-
+#include <color_spinor.h>
 
 namespace quda {
 
