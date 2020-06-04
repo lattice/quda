@@ -5896,6 +5896,35 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
   profileCuBLAS.TPSTART(QUDA_PROFILE_TOTAL);
   profileCuBLAS.TPSTART(QUDA_PROFILE_INIT);
   checkCublasParam(cublas_param);
+
+  /*
+  int dCount;
+  cudaGetDeviceCount( &dCount );  
+  int device;
+  for (device = 0; device < dCount; ++device ) {
+    
+    cudaDeviceProp deviceProp;      
+    cudaGetDeviceProperties( &deviceProp, device );
+    printfQuda( "%d - name:                    %s\n" ,device ,deviceProp.name );
+    printfQuda( "%d - totalGlobalMem:          %d bytes ( %.2f Gbytes)\n" ,device ,deviceProp.totalGlobalMem , deviceProp.totalGlobalMem / (float)( 1024 * 1024 * 1024)  );
+    printfQuda( "%d - sharedMemPerBlock:       %d bytes ( %.2f Kbytes)\n" ,device ,deviceProp.sharedMemPerBlock ,deviceProp.sharedMemPerBlock / (float)1024  );
+    printfQuda( "%d - regsPerBlock:            %d\n" ,device ,deviceProp.regsPerBlock );
+    printfQuda( "%d - warpSize:                %d\n" ,device ,deviceProp.warpSize );
+    printfQuda( "%d - memPitch:                %d\n" ,device ,deviceProp.memPitch );
+    printfQuda( "%d - maxThreadsPerBlock:      %d\n" ,device ,deviceProp.maxThreadsPerBlock );
+    printfQuda( "%d - maxThreadsDim[0]:        %d\n" ,device ,deviceProp.maxThreadsDim[0] );
+    printfQuda( "%d - maxThreadsDim[1]:        %d\n" ,device ,deviceProp.maxThreadsDim[1] );
+    printfQuda( "%d - maxThreadsDim[2]:        %d\n" ,device ,deviceProp.maxThreadsDim[2] );
+    printfQuda( "%d - maxGridSize[0]:          %d\n" ,device ,deviceProp.maxGridSize[0] );
+    printfQuda( "%d - maxGridSize[1]:          %d\n" ,device ,deviceProp.maxGridSize[1] );
+    printfQuda( "%d - maxGridSize[2]:          %d\n" ,device ,deviceProp.maxGridSize[2] );
+    printfQuda( "%d - totalConstMem:           %d bytes ( %.2f Kbytes)\n" ,device ,deviceProp.totalConstMem ,deviceProp.totalConstMem / (float) 1024 );
+    printfQuda( "%d - compute capability:      %d.%d\n" ,device ,deviceProp.major ,deviceProp.minor);
+    printfQuda( "%d - clockRate                %d kilohertz\n" ,device ,deviceProp.clockRate );
+    printfQuda( "%d - textureAlignment         %d\n\n" ,device ,deviceProp.textureAlignment );
+  }
+  */
+
     
   // The data in the arrays is on the host. We transfer the data to the devis here
   // for timing purposes. One can pass host pointers to the BatchGEMM function
@@ -5999,7 +6028,7 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
   pool_device_free(A_d);
   pool_device_free(B_d);
   pool_device_free(C_d);
-profileCuBLAS.TPSTOP(QUDA_PROFILE_FREE);  
+  profileCuBLAS.TPSTOP(QUDA_PROFILE_FREE);  
   
   profileCuBLAS.TPSTOP(QUDA_PROFILE_TOTAL);
 }
