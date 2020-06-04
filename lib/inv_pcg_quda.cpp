@@ -84,7 +84,7 @@ namespace quda
 
     if (K) delete K;
     destroyDeflationSpace();
-    
+
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
@@ -103,7 +103,7 @@ namespace quda
 
     int k = 0;
     int rUpdate = 0;
-    
+
     if (param.deflate) {
       // Construct the eigensolver and deflation space if requested.
       constructDeflationSpace(b, matPrecon);
@@ -119,7 +119,7 @@ namespace quda
         recompute_evals = false;
       }
     }
-    
+
     cudaColorSpinorField *minvrPre = NULL;
     cudaColorSpinorField *rPre = NULL;
     cudaColorSpinorField *minvr = NULL;
@@ -131,7 +131,7 @@ namespace quda
     if (K) minvr = new cudaColorSpinorField(b);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     cudaColorSpinorField y(b, csParam);
-    
+
     mat(r, x, y); // => r = A*x;
     double r2 = xmyNorm(b, r);
 
@@ -142,7 +142,6 @@ namespace quda
       r2 = blas::xmyNorm(b, r);
     }
 
-    
     csParam.setPrecision(param.precision_sloppy);
     cudaColorSpinorField tmpSloppy(x, csParam);
     cudaColorSpinorField Ap(x, csParam);
@@ -168,7 +167,7 @@ namespace quda
 
     cudaColorSpinorField &xSloppy = *x_sloppy;
     cudaColorSpinorField &rSloppy = *r_sloppy;
-    
+
     if (&x != &xSloppy) {
       copy(y, x); // copy x to y
       zero(xSloppy);
@@ -298,8 +297,7 @@ namespace quda
 
           maxr_deflate = sqrt(r2);
         }
-	
-	
+
         copy(rSloppy, r); // copy r to rSloppy
         zero(xSloppy);
 
