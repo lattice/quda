@@ -305,25 +305,12 @@ namespace quda {
         } else if (y[0]->Precision() == QUDA_SINGLE_PRECISION && x[0]->Precision() == QUDA_SINGLE_PRECISION) {
 
 #if QUDA_PRECISION & 4
-          if (x[0]->Nspin() == 4) {
-#if defined(NSPIN4)
-            const int M = 1;
-            multiBlas<NXZ, float4, float4, float4, M, Functor>(a, b, c, x, y, z, w, x[0]->Length() / (4 * M));
+#if defined(NSPIN4) || defined(NSPIN2) || defined(NSPIN1)
+          const int M = 1;
+          multiBlas<NXZ, float4, float4, float4, M, Functor>(a, b, c, x, y, z, w, x[0]->Length() / (4 * M));
 #else
-            errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
+          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
-
-          } else if (x[0]->Nspin() == 2 || x[0]->Nspin() == 1) {
-
-#if defined(NSPIN2) || defined(NSPIN1)
-            const int M = 1;
-            multiBlas<NXZ, float2, float2, float2, M, Functor>(a, b, c, x, y, z, w, x[0]->Length() / (2 * M));
-#else
-            errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
-#endif
-          } else {
-            errorQuda("nSpin=%d is not supported\n", x[0]->Nspin());
-          }
 #else
           errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x[0]->Precision());
 #endif

@@ -180,23 +180,12 @@ namespace quda {
         } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
 
 #if QUDA_PRECISION & 4
-          if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) {
-#if defined(NSPIN4)
-            const int M = 1;
-            nativeBlas<float4, float4, float4, M, Functor>(a, b, c, x, y, z, w, v, x.Length() / (4 * M));
+#if defined(NSPIN4) || defined(NSPIN2) || defined(NSPIN1)
+          const int M = 1;
+          nativeBlas<float4, float4, float4, M, Functor>(a, b, c, x, y, z, w, v, x.Length() / (4 * M));
 #else
-            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
+          errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
-          } else if (x.Nspin() == 1 || x.Nspin() == 2 || (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER)) {
-#if defined(NSPIN1) || defined(NSPIN2)
-            const int M = 1;
-            nativeBlas<float2, float2, float2, M, Functor>(a, b, c, x, y, z, w, v, x.Length() / (2 * M));
-#else
-            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
-#endif
-          } else {
-            errorQuda("nSpin=%d is not supported\n", x.Nspin());
-          }
 #else
           errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
 #endif
