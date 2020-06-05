@@ -41,7 +41,7 @@ namespace quda
   {
     int idx_cb = threadIdx.x + blockIdx.x * blockDim.x;
     int parity = threadIdx.y + blockIdx.y * blockDim.y;
-    
+
     constexpr int nSpin = Arg::nSpin;
     constexpr int nColor = Arg::nColor;
     typedef ColorSpinor<Float, nColor, nSpin> Vector;
@@ -55,8 +55,8 @@ namespace quda
     y = arg.y_vec(idx_cb, parity);
     
     // Compute the inner product over color
-    res = colorContract(y, x, 0, 0);
+    res = colorContract(x, y, 0, 0);
     
-    arg.s[idx_cb + arg.threads*parity] = res;    
+    arg.s[idx_cb + parity*arg.threads] = res;    
   }
 }

@@ -6248,6 +6248,9 @@ void laphColorContract(void *host_diq, void *host_q3, void *host_singlet, QudaIn
   cuda_q3_param.nSpin = 1;
   std::vector<ColorSpinorField *> quda_q3;
   quda_q3.push_back(ColorSpinorField::Create(cuda_q3_param));
+
+  size_t data_bytes = diq[0]->Volume() * diq[0]->Nspin() * 2 * diq[0]->Precision();
+  void *d_singlet = pool_device_malloc(data_bytes);
   profileColorContract.TPSTOP(QUDA_PROFILE_INIT);  
 
 
@@ -6256,22 +6259,19 @@ void laphColorContract(void *host_diq, void *host_q3, void *host_singlet, QudaIn
   *quda_q3[0] = *q3[0];
   *quda_diq[0] = *diq[0];
   profileColorContract.TPSTOP(QUDA_PROFILE_H2D);
-    
-  // check we are safe to cast into a Complex (= std::complex<double>)
-  if (sizeof(Complex) != sizeof(double _Complex)) {
-    errorQuda("Irreconcilable difference between interface and internal complex number conventions");
-  }
-  
-  //void* hostSingletPtr = reinterpret_cast<std::complex<double>*>(host_singlet);
-  
+      
   // We now perfrom the color contraction
   profileColorContract.TPSTART(QUDA_PROFILE_COMPUTE);
-  //colorContractQuda(*quda_diq[0], *quda_q3[0], hostSingletPtr);
-  colorContractQuda(*quda_diq[0], *quda_q3[0], host_singlet);
+  colorContractQuda(*quda_diq[0], *quda_q3[0], d_singlet);
   profileColorContract.TPSTOP(QUDA_PROFILE_COMPUTE);     
-    
+
+  profileContract.TPSTART(QUDA_PROFILE_D2H);
+  qudaMemcpy(host_singlet, d_singlet, data_bytes, cudaMemcpyDeviceToHost);
+  profileContract.TPSTOP(QUDA_PROFILE_D2H);
+  
   // Clean up memory allocations
   profileColorContract.TPSTART(QUDA_PROFILE_FREE);
+  pool_device_free(d_singlet);
   delete diq[0];
   delete quda_diq[0];
   delete q3[0];

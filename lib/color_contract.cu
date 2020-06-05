@@ -18,7 +18,8 @@ namespace quda
     const ColorSpinorField &y;
 
   private:
-    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
+    bool tuneSharedBytes() const { return false; }
+    bool tuneGridDim() const { return true; }
     unsigned int minThreads() const { return arg.threads; }
     
   public:

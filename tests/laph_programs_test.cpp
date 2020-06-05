@@ -23,15 +23,13 @@ namespace quda
 
 void laphColorCrossCheck(void *spinorY, void *spinorZ, void *spinorT) {
 
-  void *spinorC = pinned_malloc(2 * 1 * 3 * sizeof(double _Complex));
+  void *spinorC = pinned_malloc(3 * sizeof(double _Complex));
 
   ((complex<double>*)spinorC)[0] = ((complex<double>*)spinorY)[1] * ((complex<double>*)spinorZ)[2] - ((complex<double>*)spinorY)[2] * ((complex<double>*)spinorZ)[1];
-
   ((complex<double>*)spinorC)[1] = ((complex<double>*)spinorY)[2] * ((complex<double>*)spinorZ)[0] - ((complex<double>*)spinorY)[0] * ((complex<double>*)spinorZ)[2];
-
   ((complex<double>*)spinorC)[2] = ((complex<double>*)spinorY)[0] * ((complex<double>*)spinorZ)[1] - ((complex<double>*)spinorY)[1] * ((complex<double>*)spinorZ)[0];
   
-  printfQuda("elem 0 CPU - GPU: ");
+  printfQuda("color cross elem 0 CPU - GPU: ");
   for(int i=0; i<6; i++) printfQuda("%.16e ", ((double*)spinorC)[i] - ((double*)spinorT)[i]);
   printfQuda("\n");
   host_free(spinorC);
@@ -44,7 +42,7 @@ void laphColorContractCheck(void *spinorY, void *spinorZ, void *gpu_res) {
     ((complex<double>*)spinorY)[1] * ((complex<double>*)spinorZ)[1] + 
     ((complex<double>*)spinorY)[2] * ((complex<double>*)spinorZ)[2];
 
-  printfQuda("elem 0 CPU - GPU: ");
+  printfQuda("color contract elem 0 CPU - GPU: ");
   printfQuda("(%.16e %.16e)", 
 	     res.real() - ((complex<double>*)gpu_res)[0].real(), 
 	     res.imag() - ((complex<double>*)gpu_res)[0].imag());
@@ -130,8 +128,8 @@ int main(int argc, char **argv)
       // Eyeball the data.
       for(int t=0; t<X[3]; t++) {
 	for(int s=0; s<4; s++) {
-	  printfQuda("elem (%d,%d) = (%.16e,%.16e)\n", X[3] * comm_coord(3) + t,
-		     s, ((complex<double>*)d_result)[t*4 + s].real(), ((complex<double>*)d_result)[t*4 + s].imag());
+	  //printfQuda("elem (%d,%d) = (%.16e,%.16e)\n", X[3] * comm_coord(3) + t,
+	  //s, ((complex<double>*)d_result)[t*4 + s].real(), ((complex<double>*)d_result)[t*4 + s].imag());
 	}
       }
     }
