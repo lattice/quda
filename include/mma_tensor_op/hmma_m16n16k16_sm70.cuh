@@ -28,22 +28,25 @@ namespace quda
     struct WarpRegisterMapping {
 
       int warp_id;
-      int quad_id;
-      int quad_row;
+      // int quad_row;
+      int row_offset; // quad_row * 8 + quad_hilo * 4
+      int col_offset; // quad_col * 8 + quad_hilo * 4
       int quad_col;
-      int quad_hilo;   // quad higher or lower.
+      // int quad_hilo;   // quad higher or lower.
       int quad_thread; // 0,1,2,3
 
       __device__ inline WarpRegisterMapping(int thread_id)
       {
         warp_id = thread_id >> 5;
-        const int lane_id = thread_id & 31;
-        const int octl_id = lane_id >> 2;
-        quad_id = octl_id & 3;
-        quad_row = quad_id & 1;
+        int lane_id = thread_id & 31;
+        int octl_id = lane_id >> 2;
+        int quad_id = octl_id & 3;
+        int quad_row = quad_id & 1;
+        int quad_hilo = (octl_id >> 2) & 1;
         quad_col = quad_id >> 1;
-        quad_hilo = (octl_id >> 2) & 1;
         quad_thread = lane_id & 3;
+        row_offset = quad_row * 8 + quad_hilo * 4;
+        col_offset = quad_col * 8 + quad_hilo * 4;
       }
     };
 
@@ -56,10 +59,10 @@ namespace quda
       {
         const unsigned *A = reinterpret_cast<const unsigned *>(smem_obj.ptr);
         int idx_strided = k * 4 + wrm.quad_thread;
-        int idx_contiguous = warp_row * 16 + wrm.quad_row * 8 + wrm.quad_hilo * 4;
-        const int thread_offset_a = idx_strided * SmemObj::ldn + idx_contiguous;
-        reg[0] = A[thread_offset_a / 2 + 0];
-        reg[1] = A[thread_offset_a / 2 + 1];
+        int idx_contiguous = (warp_row * 16 + wrm.row_offset) / 2;
+        const int thread_offset_a = idx_strided * (SmemObj::ldn / 2) + idx_contiguous;
+        reg[0] = A[thread_offset_a];
+        reg[1] = A[thread_offset_a + 1];
 
         // XXX the following code is more concise, but CUDA spills the registers if we use it
         // smem_obj.vector_store(idx_contiguous + 0, idx_strided, reg[0]);
@@ -82,10 +85,10 @@ namespace quda
       {
         const unsigned *B = reinterpret_cast<const unsigned *>(smem_obj.ptr);
         int idx_strided = k * 4 + wrm.quad_thread;
-        int idx_contiguous = warp_col * 16 + wrm.quad_col * 8 + wrm.quad_hilo * 4;
-        const int thread_offset_b = idx_strided * SmemObj::ldn + idx_contiguous;
-        reg[0] = B[thread_offset_b / 2 + 0];
-        reg[1] = B[thread_offset_b / 2 + 1];
+        int idx_contiguous = (warp_col * 16 + wrm.col_offset) / 2;
+        const int thread_offset_b = idx_strided * (SmemObj::ldn / 2) + idx_contiguous;
+        reg[0] = B[thread_offset_b];
+        reg[1] = B[thread_offset_b + 1];
 
         // XXX the following code is more concise, but CUDA spills the registers if we use it
         // smem_obj.vector_store(idx_contiguous + 0, idx_strided, reg[0]);
@@ -124,7 +127,7 @@ namespace quda
       {
         reg_type *C = reinterpret_cast<reg_type *>(smem);
 
-        const int idx_strided = warp_row * 16 + wrm.quad_row * 8 + wrm.quad_hilo * 4 + wrm.quad_thread;
+        const int idx_strided = warp_row * 16 + wrm.row_offset + wrm.quad_thread;
         const int idx_contiguous = warp_col * 8 + wrm.quad_col * 4;
         const int thread_offset_c = idx_strided * (ldc / 2) + idx_contiguous;
 #pragma unroll
@@ -166,7 +169,7 @@ namespace quda
       {
         half2 *C = reinterpret_cast<half2 *>(smem);
 
-        const int idx_strided = warp_row * 16 + wrm.quad_row * 8 + wrm.quad_hilo * 4 + (wrm.quad_thread % 2);
+        const int idx_strided = warp_row * 16 + wrm.row_offset + (wrm.quad_thread % 2);
         const int idx_contiguous = warp_col * 8 + wrm.quad_col * 4 + (wrm.quad_thread / 2);
 
         int thread_offset_c = idx_strided * (ldc / 2) + idx_contiguous;
@@ -222,7 +225,7 @@ namespace quda
     {
       using store_type = typename GmemOperandC::store_type;
 
-      const int row = warp_row + wrm.quad_row * 8 + wrm.quad_hilo * 4 + wrm.quad_thread;
+      const int row = warp_row + wrm.row_offset + wrm.quad_thread;
       const int col = warp_col + wrm.quad_col * 8;
 
       constexpr bool fixed = GmemOperandC::fixed;
@@ -258,7 +261,7 @@ namespace quda
     {
       using store_type = typename GmemOperandC::store_type;
 
-      const int row = warp_row + wrm.quad_row * 8 + wrm.quad_hilo * 4 + (wrm.quad_thread % 2);
+      const int row = warp_row + wrm.row_offset + (wrm.quad_thread % 2);
       const int col = warp_col + wrm.quad_col * 8 + (wrm.quad_thread / 2) * 2;
 
       constexpr bool fixed = GmemOperandC::fixed;
@@ -291,7 +294,7 @@ namespace quda
     {
       using store_type = typename GmemOperandC::store_type;
 
-      const int row = warp_row + wrm.quad_row * 8 + wrm.quad_hilo * 4 + wrm.quad_thread;
+      const int row = warp_row + wrm.row_offset + wrm.quad_thread;
       const int col = warp_col + wrm.quad_col * 8;
 
       constexpr bool fixed = GmemOperandC::fixed;
@@ -347,7 +350,7 @@ namespace quda
     {
       using store_type = typename GmemOperandC::store_type;
 
-      const int row = warp_row + wrm.quad_row * 8 + wrm.quad_hilo * 4 + (wrm.quad_thread % 2);
+      const int row = warp_row + wrm.row_offset + (wrm.quad_thread % 2);
       const int col = warp_col + wrm.quad_col * 8 + (wrm.quad_thread / 2) * 2;
 
       constexpr bool fixed = GmemOperandC::fixed;

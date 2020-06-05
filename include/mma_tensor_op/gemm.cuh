@@ -3,7 +3,7 @@
 // XXX: Load different header for different archs.
 #include <mma_tensor_op/hmma_m16n16k16_sm70.cuh>
 
-// #define USE_GMEM_MMA_PIPELINING
+#define USE_GMEM_MMA_PIPELINING
 
 namespace quda
 {
@@ -52,7 +52,7 @@ namespace quda
       return SharedMemoryObject<T, M, N, ldm, ldn> {ptr_};
     }
 
-    template <int M, int N, int m_stride, int n_stride, bool dagger, class SmemAccessor> struct GlobalMemoryLoader {
+    template <int M, int N, int m_stride, int n_stride, bool transpose, class SmemAccessor> struct GlobalMemoryLoader {
 
       static constexpr int sM = SmemAccessor::M; // This is the block M (bM)
       static constexpr int sN = SmemAccessor::N;
@@ -72,7 +72,7 @@ namespace quda
       __device__ inline GlobalMemoryLoader() : y(threadIdx.y), z(threadIdx.z * 2) { }
 
 #ifdef USE_GMEM_MMA_PIPELINING
-      template <int ld, bool transpose, class GmemAccessor>
+      template <int ld, bool dagger, class GmemAccessor>
       __device__ inline void g2r(const GmemAccessor &gmem, int m_offset, int n_offset)
       {
         auto p = gmem.data();
@@ -146,7 +146,7 @@ namespace quda
         }
       }
 #else
-      template <int ld, bool transpose, class SmemObj, class GmemAccessor>
+      template <int ld, bool dagger, class SmemObj, class GmemAccessor>
       __device__ inline void g2s(SmemObj &smem_real, SmemObj &smem_imag, const GmemAccessor &gmem, int m_offset,
                                  int n_offset)
       {
@@ -257,7 +257,7 @@ namespace quda
           const int warp_row = logical_warp_index / tile_col_dim;
           const int warp_col = logical_warp_index - warp_row * tile_col_dim;
 
-#pragma unroll 1
+#pragma unroll
           for (int tile_k = 0; tile_k < tile_acc_dim; tile_k++) {
 
             MmaOperandA op_a_real;
@@ -323,8 +323,7 @@ namespace quda
       }
     };
 
-    template <int M_, int N_, int K_, int lda_, int ldb_, int ldc_, int bM_, int bN_, int bK_, int block_y, int block_z,
-              bool a_dag, bool b_dag>
+    template <int M_, int N_, int K_, int lda_, int ldb_, int ldc_, int bM_, int bN_, int bK_, int block_y, int block_z>
     struct MmaConfig {
 
       static constexpr int M = M_;
@@ -377,9 +376,9 @@ namespace quda
 
       MmaOp<MmaOperandC<accumuate_reg_type>, warp_cycle, tile_col_dim> mma_op; // (thread_id);
 
-      GlobalMemoryLoader<M, K, n_row, n_col, a_dag, SmemObjA> a_loader;
+      GlobalMemoryLoader<M, K, n_row, n_col, a_transpose, SmemObjA> a_loader;
 
-      GlobalMemoryLoader<N, K, n_row, n_col, b_dag, SmemObjB> b_loader;
+      GlobalMemoryLoader<N, K, n_row, n_col, b_transpose, SmemObjB> b_loader;
 
       __device__ inline MmaConfig(half *smem_ptr) :
         smem_obj_a_real(smem_ptr),
@@ -392,16 +391,16 @@ namespace quda
       {
       }
 
-      template <EpilogueType epilogue_type, class A, class B, class C>
+      template <bool a_dagger, bool b_dagger, bool compute_max_only, class A, class B, class C>
       __device__ inline float perform_mma(const A &a, const B &b, C &c, int m_offset, int n_offset)
       {
         float max = 0;
 
 #ifdef USE_GMEM_MMA_PIPELINING
-        a_loader.g2r<lda, a_transpose>(a, m_offset, 0);
+        a_loader.g2r<lda, a_dagger>(a, m_offset, 0);
         a_loader.r2s(smem_obj_a_real, smem_obj_a_imag);
 
-        b_loader.g2r<ldb, b_transpose>(b, n_offset, 0);
+        b_loader.g2r<ldb, b_dagger>(b, n_offset, 0);
         b_loader.r2s(smem_obj_b_real, smem_obj_b_imag);
 
         __syncthreads();
@@ -412,13 +411,13 @@ namespace quda
 
 #ifdef USE_GMEM_MMA_PIPELINING
           if (bk + bK < K) {
-            a_loader.g2r<lda, a_transpose>(a, m_offset, bk + bK);
-            b_loader.g2r<ldb, b_transpose>(b, n_offset, bk + bK);
+            a_loader.g2r<lda, a_dagger>(a, m_offset, bk + bK);
+            b_loader.g2r<ldb, b_dagger>(b, n_offset, bk + bK);
           }
 #else
           __syncthreads();
-          a_loader.g2s<lda, a_transpose>(smem_obj_a_real, smem_obj_a_imag, a, m_offset, bk);
-          b_loader.g2s<ldb, b_transpose>(smem_obj_b_real, smem_obj_b_imag, b, n_offset, bk);
+          a_loader.g2s<lda, a_dagger>(smem_obj_a_real, smem_obj_a_imag, a, m_offset, bk);
+          b_loader.g2s<ldb, b_dagger>(smem_obj_b_real, smem_obj_b_imag, b, n_offset, bk);
           __syncthreads();
 #endif
 
@@ -437,9 +436,9 @@ namespace quda
         }
 
         // wrap up!
-        if (epilogue_type == EpilogueType::COMPUTE_MAX_ONLY) {
+        if (compute_max_only) {
           mma_op.abs_max(max);
-        } else if (epilogue_type == EpilogueType::VECTOR_STORE) {
+        } else {
           mma_op.store<ldc>(c, m_offset, n_offset);
         }
 

@@ -220,11 +220,11 @@ namespace quda
               constexpr int ldb = N;
               constexpr int ldc = N;
 
-              using Config = MmaConfig<M, N, K, lda, ldb, ldc, bM, bN, bK, block_y, block_z, a_dagger, b_dagger>;
+              using Config = MmaConfig<M, N, K, lda, ldb, ldc, bM, bN, bK, block_y, block_z>;
               Config config(smem_ptr);
 
-              constexpr EpilogueType epilogue_type = EpilogueType::VECTOR_STORE;
-              config.perform_mma<epilogue_type>(a, b, c, 0, 0);
+              constexpr bool compute_max_only = false;
+              config.perform_mma<a_dagger, b_dagger, compute_max_only>(a, b, c, 0, 0);
             }
 #else
             for (int k = 0; k < tile.k; k += tile.K) { // Fine Color columns of gauge field
@@ -277,11 +277,11 @@ namespace quda
               constexpr int ldb = N;
               constexpr int ldc = N;
 
-              using Config = MmaConfig<M, N, K, lda, ldb, ldc, bM, bN, bK, block_y, block_z, a_dagger, b_dagger>;
+              using Config = MmaConfig<M, N, K, lda, ldb, ldc, bM, bN, bK, block_y, block_z>;
               Config config(smem_ptr);
 
-              constexpr EpilogueType epilogue_type = EpilogueType::VECTOR_STORE;
-              config.perform_mma<epilogue_type>(a, b, c, 0, 0);
+              constexpr bool compute_max_only = false;
+              config.perform_mma<a_dagger, b_dagger, compute_max_only>(a, b, c, 0, 0);
             }
 #else
             for (int k = 0; k < tile.k; k += tile.K) { // Fine Color columns of gauge field
@@ -432,7 +432,7 @@ namespace quda
 
           extern __shared__ half smem_ptr[];
 
-          using Config = MmaConfig<M, N, K, lda, ldb, ldc, bM, bN, bK, block_y, block_z, a_dagger, b_dagger>;
+          using Config = MmaConfig<M, N, K, lda, ldb, ldc, bM, bN, bK, block_y, block_z>;
           Config config(smem_ptr);
 
           constexpr int m_offset = 0;
@@ -449,11 +449,10 @@ namespace quda
 
             __syncthreads();
 #ifdef USE_GMEM_MMA_PIPELINING
-            config.a_loader.g2r<Config::lda, Config::a_transpose>(a, m_offset, 0);
+            config.a_loader.g2r<Config::lda, a_dagger>(a, m_offset, 0);
             config.a_loader.r2s(config.smem_obj_a_real, config.smem_obj_a_imag);
 #else
-            config.a_loader.g2s<Config::lda, Config::a_transpose>(config.smem_obj_a_real, config.smem_obj_a_imag, a,
-                                                                  m_offset, 0);
+            config.a_loader.g2s<Config::lda, a_dagger>(config.smem_obj_a_real, config.smem_obj_a_imag, a, m_offset, 0);
 #endif
             __syncthreads();
 
@@ -463,11 +462,10 @@ namespace quda
 
               __syncthreads();
 #ifdef USE_GMEM_MMA_PIPELINING
-              config.b_loader.g2r<Config::ldb, Config::b_transpose>(b, n_offset, 0);
+              config.b_loader.g2r<Config::ldb, b_dagger>(b, n_offset, 0);
               config.b_loader.r2s(config.smem_obj_b_real, config.smem_obj_b_imag);
 #else
-              config.b_loader.g2s<Config::ldb, Config::b_transpose>(config.smem_obj_b_real, config.smem_obj_b_imag, b,
-                                                                    n_offset, 0);
+              config.b_loader.g2s<Config::ldb, b_dagger>(config.smem_obj_b_real, config.smem_obj_b_imag, b, n_offset, 0);
 #endif
               __syncthreads();
 

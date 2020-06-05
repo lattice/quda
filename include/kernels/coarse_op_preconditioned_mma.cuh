@@ -41,7 +41,7 @@ namespace quda
       }
     };
 
-    template <bool compute_max_only, typename Arg, int bM, int bN, int bK, int block_y, int block_z>
+    template <int dir, bool compute_max_only, typename Arg, int bM, int bN, int bK, int block_y, int block_z>
     inline __device__ auto computeYhat(Arg &arg, int d, int x_cb, int parity, half *smem_ptr, int m, int n)
     {
       using real = typename Arg::Float;
@@ -52,17 +52,12 @@ namespace quda
 
       real yHatMax = 0.0;
 
-      constexpr EpilogueType epilogue_type
-        = compute_max_only ? EpilogueType::COMPUTE_MAX_ONLY : EpilogueType::VECTOR_STORE;
-
-      {
+      if (dir == 0) {
         // first do the backwards links Y^{+\mu} * X^{-\dagger}
-
         constexpr bool a_dagger = false;
         constexpr bool b_dagger = true;
 
-        using Config
-          = MmaConfig<Arg::M, Arg::N, Arg::K, Arg::M, Arg::N, Arg::K, bM, bN, bK, block_y, block_z, a_dagger, b_dagger>;
+        using Config = MmaConfig<Arg::M, Arg::N, Arg::K, Arg::M, Arg::N, Arg::K, bM, bN, bK, block_y, block_z>;
         Config config(smem_ptr);
 
         if (arg.comm_dim[d] && (coord[d] - arg.nFace < 0)) {
@@ -73,7 +68,7 @@ namespace quda
           auto b = arg.Xinv.wrap(0, parity, x_cb);
           auto c = arg.Yhat.wrap_ghost(d, 1 - parity, ghost_idx);
 
-          yHatMax = config.perform_mma<epilogue_type>(a, b, c, m, n);
+          yHatMax = config.perform_mma<a_dagger, b_dagger, compute_max_only>(a, b, c, m, n);
 
         } else {
 
@@ -83,11 +78,12 @@ namespace quda
           auto b = arg.Xinv.wrap(0, parity, x_cb);
           auto c = arg.Yhat.wrap(d, 1 - parity, back_idx);
 
-          yHatMax = config.perform_mma<epilogue_type>(a, b, c, m, n);
+          yHatMax = config.perform_mma<a_dagger, b_dagger, compute_max_only>(a, b, c, m, n);
         }
-      }
 
-      { // now do the forwards links X^{-1} * Y^{-\mu}
+        return yHatMax;
+
+      } else { // now do the forwards links X^{-1} * Y^{-\mu}
 
         auto a = arg.Xinv.wrap(0, parity, x_cb);
         auto b = arg.Y.wrap(d + 4, parity, x_cb);
@@ -95,14 +91,18 @@ namespace quda
 
         constexpr bool a_dagger = false;
         constexpr bool b_dagger = false;
-        using Config
-          = MmaConfig<Arg::M, Arg::N, Arg::K, Arg::M, Arg::N, Arg::K, bM, bN, bK, block_y, block_z, a_dagger, b_dagger>;
+
+        using Config = MmaConfig<Arg::M, Arg::N, Arg::K, Arg::M, Arg::N, Arg::K, bM, bN, bK, block_y, block_z>;
         Config config(smem_ptr);
-        real yHatMax_ = config.perform_mma<epilogue_type>(a, b, c, m, n);
-        yHatMax = fmax(yHatMax, yHatMax_);
+
+        yHatMax = config.template perform_mma<a_dagger, b_dagger, compute_max_only>(a, b, c, m, n);
+        // real yHatMax_ = config.template perform_mma<a_dagger, b_dagger, compute_max_only>(a, b, c, m, n);
+        // yHatMax = fmax(yHatMax, yHatMax_);
+
+        return yHatMax;
       }
 
-      return yHatMax;
+      // return yHatMax;
     }
 
     template <bool compute_max_only, typename Arg, int N, int bM, int bN, int bK, int block_y, int block_z>
@@ -112,8 +112,11 @@ namespace quda
 
       constexpr int t_m = Arg::M / bM;
       constexpr int t_n = Arg::N / bN;
-      int x_cb = index_x / (t_m * t_n);
-      int mn = index_x % (t_m * t_n);
+      int x_cb = index_x / (t_m * t_n * 2);
+      int mn_dir = index_x % (t_m * t_n * 2);
+
+      int dir = mn_dir % 2;
+      int mn = mn_dir / 2;
 
       int n = (mn % t_n) * bN;
       int m = (mn / t_n) * bM;
@@ -129,16 +132,24 @@ namespace quda
       typename Arg::Float max = 0.0;
       switch (d) {
       case 0:
-        max = computeYhat<compute_max_only, Arg, bM, bN, bK, block_y, block_z>(arg, 0, x_cb, parity, smem_ptr, m, n);
+        max = dir ?
+          computeYhat<1, compute_max_only, Arg, bM, bN, bK, block_y, block_z>(arg, 0, x_cb, parity, smem_ptr, m, n) :
+          computeYhat<0, compute_max_only, Arg, bM, bN, bK, block_y, block_z>(arg, 0, x_cb, parity, smem_ptr, m, n);
         break;
       case 1:
-        max = computeYhat<compute_max_only, Arg, bM, bN, bK, block_y, block_z>(arg, 1, x_cb, parity, smem_ptr, m, n);
+        max = dir ?
+          computeYhat<1, compute_max_only, Arg, bM, bN, bK, block_y, block_z>(arg, 1, x_cb, parity, smem_ptr, m, n) :
+          computeYhat<0, compute_max_only, Arg, bM, bN, bK, block_y, block_z>(arg, 1, x_cb, parity, smem_ptr, m, n);
         break;
       case 2:
-        max = computeYhat<compute_max_only, Arg, bM, bN, bK, block_y, block_z>(arg, 2, x_cb, parity, smem_ptr, m, n);
+        max = dir ?
+          computeYhat<1, compute_max_only, Arg, bM, bN, bK, block_y, block_z>(arg, 2, x_cb, parity, smem_ptr, m, n) :
+          computeYhat<0, compute_max_only, Arg, bM, bN, bK, block_y, block_z>(arg, 2, x_cb, parity, smem_ptr, m, n);
         break;
       case 3:
-        max = computeYhat<compute_max_only, Arg, bM, bN, bK, block_y, block_z>(arg, 3, x_cb, parity, smem_ptr, m, n);
+        max = dir ?
+          computeYhat<1, compute_max_only, Arg, bM, bN, bK, block_y, block_z>(arg, 3, x_cb, parity, smem_ptr, m, n) :
+          computeYhat<0, compute_max_only, Arg, bM, bN, bK, block_y, block_z>(arg, 3, x_cb, parity, smem_ptr, m, n);
         break;
       }
       if (compute_max_only) atomicAbsMax(arg.max_d, max);

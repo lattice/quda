@@ -26,8 +26,9 @@ namespace quda
       long long flops() const
       {
         return 2l * arg.Y.VolumeCB() * 8 * n * n * (8 * n - 2);
-      } // 8 from dir, 8 from complexity,
-      long long bytes() const { return 2l * (arg.Xinv.Bytes() + arg.Y.Bytes() + !compute_max_only * arg.Yhat.Bytes()); }
+      } // 8 from dir, 8 from complexity
+
+      long long bytes() const { return arg.Y.Bytes() * (compute_max_only ? 2 : 3); }
 
       unsigned int minThreads() const { return arg.Y.VolumeCB(); }
       bool tuneGridDim() const { return false; } // don't tune the grid dimension
@@ -76,7 +77,7 @@ namespace quda
         constexpr int t_m = Arg::M / bM;
         constexpr int t_n = Arg::N / bN;
 
-        tp.grid = dim3(minThreads() * t_m * t_n, 2, 4);
+        tp.grid = dim3(minThreads() * t_m * t_n * 2, 2, 4);
 
         // int shared_bytes = sharedBytesPerBlock(tp);
         if (compute_max_only) {
