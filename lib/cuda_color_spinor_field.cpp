@@ -567,7 +567,7 @@ namespace quda {
     cudaMemcpy(v, backup_h, bytes, cudaMemcpyHostToDevice);
     delete []backup_h;
     if (norm_bytes) {
-      cudaMemcpy(v, backup_norm_h, norm_bytes, cudaMemcpyHostToDevice);
+      cudaMemcpy(norm, backup_norm_h, norm_bytes, cudaMemcpyHostToDevice);
       delete []backup_norm_h;
     }
     checkCudaError();
