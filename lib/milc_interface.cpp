@@ -12,6 +12,7 @@
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
+#define BUILD_MILC_INTERFACE 1
 #ifdef BUILD_MILC_INTERFACE
 
 // code for NVTX taken from Jiri Kraus' blog post:
@@ -160,9 +161,9 @@ void *qudaAllocatePinned(size_t bytes) { return pool_pinned_malloc(bytes); }
 
 void qudaFreePinned(void *ptr) { pool_pinned_free(ptr); }
 
-void *qudaAllocateManaged(size_t bytes) { return managed_malloc(bytes); }
+void *qudaAllocateManaged(size_t bytes) { return use_managed_memory() ? device_malloc(bytes) : managed_malloc(bytes); }
 
-void qudaFreeManaged(void *ptr) { managed_free(ptr); }
+void qudaFreeManaged(void *ptr) { use_managed_memory()  ? device_free(ptr) :managed_free(ptr); }
 
 void qudaHisqParamsInit(QudaHisqParams_t params)
 {
