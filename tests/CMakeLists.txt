@@ -191,11 +191,10 @@ if(QUDA_COVDEV)
   install(TARGETS covdev_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
-add_executable(evec_project_test evec_project_test.cpp)
-target_link_libraries(evec_project_test ${TEST_LIBS})
-QUDA_CHECKBUILDTEST(evec_project_test QUDA_BUILD_ALL_TESTS)
-install(TARGETS evec_project_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
-
+add_executable(laph_programs_test laph_programs_test.cpp)
+target_link_libraries(laph_programs_test ${TEST_LIBS})
+QUDA_CHECKBUILDTEST(laph_programs_test QUDA_BUILD_ALL_TESTS)
+install(TARGETS laph_programs_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 if(QUDA_CONTRACT)
   add_executable(contract_test contract_test.cpp)

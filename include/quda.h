@@ -1406,11 +1406,21 @@ extern "C" {
   void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *param);
   
   /**
-   * @brief Hack for Callat
+   * @brief Hacks for Callat
    */
   void laphSinkProject(void *host_quark, void **host_evec, double_complex *host_sinks,
 		       QudaInvertParam inv_param, unsigned int nEv, const int X[4]);
 
+  void laphAccumulateEvecs(void *host_q1, double_complex *host_coeffs, void **host_evec, QudaInvertParam inv_param,
+			   unsigned int nEv, const int X[4]);
+
+  void laphColorCross(void *host_q1, void *host_q2, void *host_diq, QudaInvertParam inv_param,
+		      const int X[4]);
+
+  void laphColorContract(void *host_diq, void *host_q3, void *host_singlet, QudaInvertParam inv_param,
+			 const int X[4]);
+  
+  
   /**
    * @brief Flush the chronological history for the given index
    * @param[in] index Index for which we are flushing

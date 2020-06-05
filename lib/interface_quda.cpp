@@ -233,6 +233,15 @@ static TimeProfile profileContract("contractQuda");
 //!< Profiler for sink projection
 static TimeProfile profileSinkProject("sinkProjectQuda");
 
+//!< Profiler for accumulate evecs
+static TimeProfile profileAccumulateEvecs("accumulateEvecsQuda");
+
+//!< Profiler for color contract
+static TimeProfile profileColorContract("colorContractQuda");
+
+//!< Profiler for color cross
+static TimeProfile profileColorCross("colorCrossQuda");
+
 //!< Profiler for cublas
 static TimeProfile profileCuBLAS("cublasQuda");
 
@@ -1547,6 +1556,9 @@ void endQuda(void)
     profileHISQForce.Print();
     profileContract.Print();
     profileSinkProject.Print();
+    profileAccumulateEvecs.Print();
+    profileColorContract.Print();
+    profileColorCross.Print();
     profileCuBLAS.Print();
     profileCovDev.Print();
     profilePlaq.Print();
@@ -5808,89 +5820,6 @@ void gaugeObservablesQuda(QudaGaugeObservableParam *param)
   profileGaugeObs.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_sinks,
-		     QudaInvertParam inv_param, unsigned int nEv, const int X[4])
-{
-  profileSinkProject.TPSTART(QUDA_PROFILE_TOTAL);
-  profileSinkProject.TPSTART(QUDA_PROFILE_INIT);
-
-  // Parameter object describing the sources and smeared quarks
-  ColorSpinorParam cpu_quark_param(host_quark, inv_param, X, false, QUDA_CPU_FIELD_LOCATION);
-  cpu_quark_param.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
-  
-  // QUDA style wrapper around the host data
-  std::vector<ColorSpinorField*> quark;
-  cpu_quark_param.v = host_quark;
-  quark.push_back(ColorSpinorField::Create(cpu_quark_param));
-  
-  // Parameter object describing evecs
-  ColorSpinorParam cpu_evec_param(host_evec, inv_param, X, false, QUDA_CPU_FIELD_LOCATION);
-  // Switch to spin 1
-  cpu_evec_param.nSpin = 1;
-  // QUDA style wrapper around the host data
-  std::vector<ColorSpinorField*> evec;
-  evec.reserve(nEv);
-  for (unsigned int iEv=0; iEv<nEv; ++iEv) {
-    cpu_evec_param.v = host_evec[iEv];
-    evec.push_back(ColorSpinorField::Create(cpu_evec_param));
-  }
-  
-  // Create device vectors
-  ColorSpinorParam cuda_quark_param(cpu_quark_param);
-  cuda_quark_param.location = QUDA_CUDA_FIELD_LOCATION;
-  cuda_quark_param.create = QUDA_ZERO_FIELD_CREATE;
-  cuda_quark_param.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
-  std::vector<ColorSpinorField *> quda_quark;
-  quda_quark.push_back(ColorSpinorField::Create(cuda_quark_param));
-
-  // Create device vectors for evecs
-  ColorSpinorParam cuda_evec_param(cpu_evec_param);
-  cuda_evec_param.location = QUDA_CUDA_FIELD_LOCATION;
-  cuda_evec_param.create = QUDA_ZERO_FIELD_CREATE;
-  cuda_evec_param.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
-  cuda_evec_param.nSpin = 1;
-  std::vector<ColorSpinorField *> quda_evec;
-  quda_evec.push_back(ColorSpinorField::Create(cuda_evec_param));
-  profileSinkProject.TPSTOP(QUDA_PROFILE_INIT);  
-
-  // Copy quark field from host to device
-  profileSinkProject.TPSTART(QUDA_PROFILE_H2D);
-  *quda_quark[0] = *quark[0];
-  profileSinkProject.TPSTOP(QUDA_PROFILE_H2D);
-
-  // check we are safe to cast into a Complex (= std::complex<double>)
-  if (sizeof(Complex) != sizeof(double _Complex)) {
-    errorQuda("Irreconcilable difference between interface and internal complex number conventions");
-  }
-
-  std::complex<double>* hostSinkPtr = reinterpret_cast<std::complex<double>*>(host_sinks);
-
-  // Iterate over all EV and call 1x1 kernel for now
-  for (unsigned int iEv=0; iEv<nEv; ++iEv) {
-    profileSinkProject.TPSTART(QUDA_PROFILE_H2D);
-    *quda_evec[0] = *evec[iEv];
-    profileSinkProject.TPSTOP(QUDA_PROFILE_H2D);
-
-    // We now perfrom the projection onto the eigenspace. The data
-    // is placed in host_sinks in  T, spin order 
-    profileSinkProject.TPSTART(QUDA_PROFILE_COMPUTE);
-    evecProjectSumQuda(*quda_quark[0], *quda_evec[0], hostSinkPtr);
-    profileSinkProject.TPSTOP(QUDA_PROFILE_COMPUTE);
-
-    // Advance result pointer to next EV position
-    hostSinkPtr += 4*X[3];
-  }
-
-  // Clean up memory allocations
-  profileSinkProject.TPSTART(QUDA_PROFILE_FREE);
-  delete quark[0];
-  delete quda_quark[0];
-  for (unsigned int iEv=0; iEv<nEv; ++iEv) delete evec[iEv];
-  delete quda_evec[0];
-  profileSinkProject.TPSTOP(QUDA_PROFILE_FREE);
-  profileSinkProject.TPSTOP(QUDA_PROFILE_TOTAL);
-}
-
 void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *cublas_param)
 {
   profileCuBLAS.TPSTART(QUDA_PROFILE_TOTAL);
@@ -6032,3 +5961,316 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
   
   profileCuBLAS.TPSTOP(QUDA_PROFILE_TOTAL);
 }
+ 
+void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_sinks,
+		     QudaInvertParam inv_param, unsigned int nEv, const int X[4])
+{
+  profileSinkProject.TPSTART(QUDA_PROFILE_TOTAL);
+  profileSinkProject.TPSTART(QUDA_PROFILE_INIT);
+  
+  // Parameter object describing the sources and smeared quarks
+  ColorSpinorParam cpu_quark_param(host_quark, inv_param, X, false, QUDA_CPU_FIELD_LOCATION);
+  cpu_quark_param.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  
+  // QUDA style wrapper around the host data
+  std::vector<ColorSpinorField*> quark;
+  cpu_quark_param.v = host_quark;
+  quark.push_back(ColorSpinorField::Create(cpu_quark_param));
+  
+  // Parameter object describing evecs
+  ColorSpinorParam cpu_evec_param(host_evec, inv_param, X, false, QUDA_CPU_FIELD_LOCATION);
+  // Switch to spin 1
+  cpu_evec_param.nSpin = 1;
+  // QUDA style wrapper around the host data
+  std::vector<ColorSpinorField*> evec;
+  evec.reserve(nEv);
+  for (unsigned int iEv=0; iEv<nEv; ++iEv) {
+    cpu_evec_param.v = host_evec[iEv];
+    evec.push_back(ColorSpinorField::Create(cpu_evec_param));
+  }
+  
+  // Create device vectors
+  ColorSpinorParam cuda_quark_param(cpu_quark_param);
+  cuda_quark_param.location = QUDA_CUDA_FIELD_LOCATION;
+  cuda_quark_param.create = QUDA_ZERO_FIELD_CREATE;
+  cuda_quark_param.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
+  std::vector<ColorSpinorField *> quda_quark;
+  quda_quark.push_back(ColorSpinorField::Create(cuda_quark_param));
+  
+  // Create device vectors for evecs
+  ColorSpinorParam cuda_evec_param(cpu_evec_param);
+  cuda_evec_param.location = QUDA_CUDA_FIELD_LOCATION;
+  cuda_evec_param.create = QUDA_ZERO_FIELD_CREATE;
+  cuda_evec_param.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
+  cuda_evec_param.nSpin = 1;
+  std::vector<ColorSpinorField *> quda_evec;
+  quda_evec.push_back(ColorSpinorField::Create(cuda_evec_param));
+  profileSinkProject.TPSTOP(QUDA_PROFILE_INIT);  
+  
+  // Copy quark field from host to device
+  profileSinkProject.TPSTART(QUDA_PROFILE_H2D);
+  *quda_quark[0] = *quark[0];
+  profileSinkProject.TPSTOP(QUDA_PROFILE_H2D);
+  
+   // check we are safe to cast into a Complex (= std::complex<double>)
+  if (sizeof(Complex) != sizeof(double _Complex)) {
+    errorQuda("Irreconcilable difference between interface and internal complex number conventions");
+  }
+  
+  std::complex<double>* hostSinkPtr = reinterpret_cast<std::complex<double>*>(host_sinks);
+  
+  // Iterate over all EV and call 1x1 kernel for now
+  for (unsigned int iEv=0; iEv<nEv; ++iEv) {
+    profileSinkProject.TPSTART(QUDA_PROFILE_H2D);
+    *quda_evec[0] = *evec[iEv];
+    profileSinkProject.TPSTOP(QUDA_PROFILE_H2D);
+
+    // We now perfrom the projection onto the eigenspace. The data
+    // is placed in host_sinks in  T, spin order 
+    profileSinkProject.TPSTART(QUDA_PROFILE_COMPUTE);
+    evecProjectSumQuda(*quda_quark[0], *quda_evec[0], hostSinkPtr);
+    profileSinkProject.TPSTOP(QUDA_PROFILE_COMPUTE);
+    
+    // Advance result pointer to next EV position
+    hostSinkPtr += 4*X[3];
+  }
+  
+  // Clean up memory allocations
+  profileSinkProject.TPSTART(QUDA_PROFILE_FREE);
+  delete quark[0];
+  delete quda_quark[0];
+  for (unsigned int iEv=0; iEv<nEv; ++iEv) delete evec[iEv];
+  delete quda_evec[0];
+  profileSinkProject.TPSTOP(QUDA_PROFILE_FREE);
+  profileSinkProject.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+ 
+void laphAccumulateEvecs(void *host_q1, double _Complex *host_coeffs, void **host_evec, QudaInvertParam inv_param, 
+			 unsigned int nEv, const int X[4])
+{
+  profileAccumulateEvecs.TPSTART(QUDA_PROFILE_TOTAL);
+  profileAccumulateEvecs.TPSTART(QUDA_PROFILE_INIT);
+  
+  // Parameter object describing q1
+  ColorSpinorParam cpu_q1_param(host_q1, inv_param, X, false, QUDA_CPU_FIELD_LOCATION);
+  cpu_q1_param.nSpin = 1;  
+  cpu_q1_param.print();
+
+  // QUDA style wrapper around the host data
+  std::vector<ColorSpinorField*> q1;
+  cpu_q1_param.v = host_q1;
+  q1.push_back(ColorSpinorField::Create(cpu_q1_param));
+  
+  // Parameter object describing evecs
+  ColorSpinorParam cpu_evec_param(host_evec, inv_param, X, false, QUDA_CPU_FIELD_LOCATION);
+  cpu_evec_param.nSpin = 1;
+  cpu_evec_param.print();
+  
+  // QUDA style wrapper around the host data
+  std::vector<ColorSpinorField*> evec;
+  evec.reserve(nEv);
+  for (unsigned int iEv=0; iEv<nEv; ++iEv) {
+    cpu_evec_param.v = host_evec[iEv];
+    evec.push_back(ColorSpinorField::Create(cpu_evec_param));
+  }
+  
+  // Create device vectors
+  ColorSpinorParam cuda_q1_param(cpu_q1_param);
+  cuda_q1_param.location = QUDA_CUDA_FIELD_LOCATION;
+  cuda_q1_param.create = QUDA_ZERO_FIELD_CREATE;
+  cuda_q1_param.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
+  cuda_q1_param.print();
+  std::vector<ColorSpinorField *> quda_q1;
+  quda_q1.push_back(ColorSpinorField::Create(cuda_q1_param));
+  
+  // Create device vectors for evecs
+  ColorSpinorParam cuda_evec_param(cpu_evec_param);
+  cuda_evec_param.location = QUDA_CUDA_FIELD_LOCATION;
+  cuda_evec_param.create = QUDA_ZERO_FIELD_CREATE;
+  cuda_evec_param.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
+  cuda_evec_param.print();
+  std::vector<ColorSpinorField *> quda_evec;
+  quda_evec.push_back(ColorSpinorField::Create(cuda_evec_param));
+  profileAccumulateEvecs.TPSTOP(QUDA_PROFILE_INIT);  
+  
+  // Copy q1 field from host to device
+  profileAccumulateEvecs.TPSTART(QUDA_PROFILE_H2D);
+  *quda_q1[0] = *q1[0];
+  profileAccumulateEvecs.TPSTOP(QUDA_PROFILE_H2D);
+    
+  // check we are safe to cast into a Complex (= std::complex<double>)
+  if (sizeof(Complex) != sizeof(double _Complex)) {
+    errorQuda("Irreconcilable difference between interface and internal complex number conventions");
+  }
+  
+  std::complex<double>* hostCoeffsPtr = reinterpret_cast<std::complex<double>*>(host_coeffs);
+  
+  // Iterate over all EV and call 1x1 kernel for now
+  for (unsigned int iEv=0; iEv<nEv; ++iEv) {
+    profileAccumulateEvecs.TPSTART(QUDA_PROFILE_H2D);
+    *quda_evec[0] = *evec[iEv];
+    profileAccumulateEvecs.TPSTOP(QUDA_PROFILE_H2D);
+    
+    // We now perfrom the caxpy
+    profileAccumulateEvecs.TPSTART(QUDA_PROFILE_COMPUTE);
+    blas::caxpy((Complex)hostCoeffsPtr[iEv], *quda_evec[0], *quda_q1[0]);
+    profileAccumulateEvecs.TPSTOP(QUDA_PROFILE_COMPUTE);     
+  }
+  
+  // Clean up memory allocations
+  profileAccumulateEvecs.TPSTART(QUDA_PROFILE_FREE);
+  delete q1[0];
+  delete quda_q1[0];
+  for (unsigned int iEv=0; iEv<nEv; ++iEv) delete evec[iEv];
+  delete quda_evec[0];
+  profileAccumulateEvecs.TPSTOP(QUDA_PROFILE_FREE);
+  profileAccumulateEvecs.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
+void laphColorCross(void *host_q1, void *host_q2, void *host_diq, QudaInvertParam inv_param, const int X[4])
+{
+
+  profileColorCross.TPSTART(QUDA_PROFILE_TOTAL);
+  profileColorCross.TPSTART(QUDA_PROFILE_INIT);
+  
+  // Parameter object describing q1
+  ColorSpinorParam cpu_q1_param(host_q1, inv_param, X, false, QUDA_CPU_FIELD_LOCATION);
+  cpu_q1_param.nSpin = 1;    
+  // QUDA style wrapper around the host data
+  std::vector<ColorSpinorField*> q1;
+  cpu_q1_param.v = host_q1;
+  q1.push_back(ColorSpinorField::Create(cpu_q1_param));
+  
+  // Parameter object describing q2
+  ColorSpinorParam cpu_q2_param(host_q2, inv_param, X, false, QUDA_CPU_FIELD_LOCATION);
+  cpu_q2_param.nSpin = 1;
+  // QUDA style wrapper around the host data
+  std::vector<ColorSpinorField*> q2;
+  cpu_q2_param.v = host_q2;
+  q2.push_back(ColorSpinorField::Create(cpu_q2_param));
+  
+  // Parameter object describing diq
+  ColorSpinorParam cpu_diq_param(host_diq, inv_param, X, false, QUDA_CPU_FIELD_LOCATION);
+  cpu_diq_param.nSpin = 1;    
+  // QUDA style wrapper around the host data
+  std::vector<ColorSpinorField*> diq;
+  cpu_diq_param.v = host_diq;
+  diq.push_back(ColorSpinorField::Create(cpu_diq_param));
+
+
+  // Create device vectors
+  ColorSpinorParam cuda_q1_param(cpu_q1_param);
+  cuda_q1_param.location = QUDA_CUDA_FIELD_LOCATION;
+  cuda_q1_param.create = QUDA_ZERO_FIELD_CREATE;
+  cuda_q1_param.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
+  std::vector<ColorSpinorField *> quda_q1;
+  quda_q1.push_back(ColorSpinorField::Create(cuda_q1_param));
+
+  ColorSpinorParam cuda_q2_param(cpu_q2_param);
+  cuda_q2_param.location = QUDA_CUDA_FIELD_LOCATION;
+  cuda_q2_param.create = QUDA_ZERO_FIELD_CREATE;
+  cuda_q2_param.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
+  std::vector<ColorSpinorField *> quda_q2;
+  quda_q2.push_back(ColorSpinorField::Create(cuda_q2_param));
+
+  ColorSpinorParam cuda_diq_param(cpu_diq_param);
+  cuda_diq_param.location = QUDA_CUDA_FIELD_LOCATION;
+  cuda_diq_param.create = QUDA_ZERO_FIELD_CREATE;
+  cuda_diq_param.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
+  std::vector<ColorSpinorField *> quda_diq;
+  quda_diq.push_back(ColorSpinorField::Create(cuda_diq_param));
+
+  // Copy q1, q2 fields from host to device
+  profileColorCross.TPSTART(QUDA_PROFILE_H2D);
+  *quda_q1[0] = *q1[0];
+  *quda_q2[0] = *q2[0];
+  profileColorCross.TPSTOP(QUDA_PROFILE_H2D);
+    
+  // We now perfrom the color cross
+  profileColorCross.TPSTART(QUDA_PROFILE_COMPUTE);
+  colorCrossQuda(*quda_q1[0], *quda_q2[0], *quda_diq[0]);
+  profileColorCross.TPSTOP(QUDA_PROFILE_COMPUTE);     
+
+  // Copy diq field from device host
+  profileColorCross.TPSTART(QUDA_PROFILE_D2H);
+  *diq[0] = *quda_diq[0];
+  profileColorCross.TPSTOP(QUDA_PROFILE_D2H);
+
+  // Clean up memory allocations
+  profileColorCross.TPSTART(QUDA_PROFILE_FREE);
+  delete q1[0];
+  delete quda_q1[0];
+  delete q2[0];
+  delete quda_q2[0];
+  delete diq[0];
+  delete quda_diq[0];
+  profileColorCross.TPSTOP(QUDA_PROFILE_FREE);
+  profileColorCross.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+ 
+void laphColorContract(void *host_diq, void *host_q3, void *host_singlet, QudaInvertParam inv_param, const int X[4])
+{
+
+  profileColorContract.TPSTART(QUDA_PROFILE_TOTAL);
+  profileColorContract.TPSTART(QUDA_PROFILE_INIT);
+  
+  // Parameter object describing diq
+  ColorSpinorParam cpu_diq_param(host_diq, inv_param, X, false, QUDA_CPU_FIELD_LOCATION);
+  cpu_diq_param.nSpin = 1;    
+  // QUDA style wrapper around the host data
+  std::vector<ColorSpinorField*> diq;
+  cpu_diq_param.v = host_diq;
+  diq.push_back(ColorSpinorField::Create(cpu_diq_param));
+
+  // Parameter object describing q3
+  ColorSpinorParam cpu_q3_param(host_q3, inv_param, X, false, QUDA_CPU_FIELD_LOCATION);
+  cpu_q3_param.nSpin = 1;    
+  // QUDA style wrapper around the host data
+  std::vector<ColorSpinorField*> q3;
+  cpu_q3_param.v = host_q3;
+  q3.push_back(ColorSpinorField::Create(cpu_q3_param));
+    
+  // Create device vectors
+  ColorSpinorParam cuda_diq_param(cpu_diq_param);
+  cuda_diq_param.location = QUDA_CUDA_FIELD_LOCATION;
+  cuda_diq_param.create = QUDA_ZERO_FIELD_CREATE;
+  cuda_diq_param.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
+  std::vector<ColorSpinorField *> quda_diq;
+  quda_diq.push_back(ColorSpinorField::Create(cuda_diq_param));
+
+  ColorSpinorParam cuda_q3_param(cpu_q3_param);
+  cuda_q3_param.location = QUDA_CUDA_FIELD_LOCATION;
+  cuda_q3_param.create = QUDA_ZERO_FIELD_CREATE;
+  cuda_q3_param.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
+  std::vector<ColorSpinorField *> quda_q3;
+  quda_q3.push_back(ColorSpinorField::Create(cuda_q3_param));
+  
+  // Copy q1 field from host to device
+  profileColorContract.TPSTART(QUDA_PROFILE_H2D);
+  *quda_q3[0] = *q3[0];
+  *quda_diq[0] = *diq[0];
+  profileColorContract.TPSTOP(QUDA_PROFILE_H2D);
+    
+  // check we are safe to cast into a Complex (= std::complex<double>)
+  if (sizeof(Complex) != sizeof(double _Complex)) {
+    errorQuda("Irreconcilable difference between interface and internal complex number conventions");
+  }
+  
+  void* hostSingletPtr = reinterpret_cast<std::complex<double>*>(host_singlet);
+  
+  // We now perfrom the color contraction
+  profileColorContract.TPSTART(QUDA_PROFILE_COMPUTE);
+  colorContractQuda(*diq[0], *q3[0], hostSingletPtr);
+  profileColorContract.TPSTOP(QUDA_PROFILE_COMPUTE);     
+    
+  // Clean up memory allocations
+  profileColorContract.TPSTART(QUDA_PROFILE_FREE);
+  delete diq[0];
+  delete quda_diq[0];
+  delete q3[0];
+  delete quda_q3[0];
+  profileColorContract.TPSTOP(QUDA_PROFILE_FREE);
+  profileColorContract.TPSTOP(QUDA_PROFILE_TOTAL);
+  
+}
+ 

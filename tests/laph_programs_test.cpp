@@ -73,6 +73,9 @@ int main(int argc, char **argv)
   size_t data_size = cpu_prec;
   void *spinorX = pinned_malloc(V * 2 * 4 * 3 * data_size);
   void *spinorY = pinned_malloc(V * 2 * 1 * 3 * data_size);
+  void *spinorZ = pinned_malloc(V * 2 * 1 * 3 * data_size);
+  void *spinorT = pinned_malloc(V * 2 * 1 * 3 * data_size);
+
   double _Complex *d_result = (double _Complex*)malloc(4 * X[3] * sizeof(double _Complex));
   
   {
@@ -81,6 +84,8 @@ int main(int argc, char **argv)
 
     constructRandomSpinorSource(spinorX, 4, 3, inv_param.cpu_prec, X, rng);
     constructRandomSpinorSource(spinorY, 1, 3, inv_param.cpu_prec, X, rng);
+    constructRandomSpinorSource(spinorZ, 1, 3, inv_param.cpu_prec, X, rng);
+    constructRandomSpinorSource(spinorT, 1, 3, inv_param.cpu_prec, X, rng);
 
     rng.Release();
   }
@@ -99,8 +104,18 @@ int main(int argc, char **argv)
     }
   }
 
+  for (int i=0; i<niter; i++) {
+    laphColorCross(spinorY, spinorZ, spinorT, inv_param, X);
+    if (i==niter-1) {
+      // Eyeball the data.
+    }
+  }
+  
+
   host_free(spinorX);
   host_free(spinorY);
+  host_free(spinorZ);
+  host_free(spinorT);
   free(d_result);
 
   // finalize the QUDA library
