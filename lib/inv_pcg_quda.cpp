@@ -91,14 +91,17 @@ namespace quda
   void PreconCG::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
     profile.TPSTART(QUDA_PROFILE_INIT);
+
+    double b2 = blas::norm2(b);
+
     // Check to see that we're not trying to invert on a zero-field source
-    const double b2 = norm2(b);
-    if (b2 == 0) {
+    if (b2 == 0 && param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
       profile.TPSTOP(QUDA_PROFILE_INIT);
       printfQuda("Warning: inverting on zero-field source\n");
       x = b;
       param.true_res = 0.0;
       param.true_res_hq = 0.0;
+      return;
     }
 
     int k = 0;
@@ -109,9 +112,7 @@ namespace quda
       constructDeflationSpace(b, matPrecon);
       if (deflate_compute) {
         // compute the deflation space.
-        if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_INIT);
         (*eig_solve)(evecs, evals);
-        if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_INIT);
         deflate_compute = false;
       }
       if (recompute_evals) {
@@ -132,8 +133,20 @@ namespace quda
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     cudaColorSpinorField y(b, csParam);
 
-    mat(r, x, y); // => r = A*x;
-    double r2 = xmyNorm(b, r);
+    // compute initial residual
+    double r2 = 0.0;
+    if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+      // Compute r = b - A * x
+      mat(r, x);
+      r2 = blas::xmyNorm(b, r);
+      if (b2 == 0) b2 = r2;
+      // y contains the original guess.
+      blas::copy(y, x);
+    } else {
+      if (&r != &b) blas::copy(r, b);
+      r2 = b2;
+      blas::zero(y);
+    }
 
     if (param.deflate && param.maxiter > 1) {
       // Deflate and accumulate to solution vector
@@ -168,12 +181,8 @@ namespace quda
     cudaColorSpinorField &xSloppy = *x_sloppy;
     cudaColorSpinorField &rSloppy = *r_sloppy;
 
-    if (&x != &xSloppy) {
-      copy(y, x); // copy x to y
-      zero(xSloppy);
-    } else {
-      zero(y); // no reliable updates // NB: check this
-    }
+    blas::zero(x);
+    if (&x != &xSloppy) blas::zero(xSloppy);
 
     const bool use_heavy_quark_res = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
 
@@ -196,7 +205,6 @@ namespace quda
     }
 
     profile.TPSTOP(QUDA_PROFILE_INIT);
-
     profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
@@ -292,7 +300,7 @@ namespace quda
           eig_solve->deflate(y, r, evecs, evals, true);
 
           // Compute r_defl = RHS - A * LHS
-          mat(r, y);
+          mat(r, y, x);
           r2 = blas::xmyNorm(b, r);
 
           maxr_deflate = sqrt(r2);

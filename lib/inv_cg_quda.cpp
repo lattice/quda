@@ -240,7 +240,6 @@ namespace quda {
 
     if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_INIT);
 
-    // Check to see that we're not trying to invert on a zero-field source
     double b2 = blas::norm2(b);
 
     // Check to see that we're not trying to invert on a zero-field source
