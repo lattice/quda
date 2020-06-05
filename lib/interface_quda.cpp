@@ -6129,7 +6129,7 @@ void laphAccumulateEvecs(void *host_q1, double _Complex *host_coeffs, void **hos
 
 void laphColorCross(void *host_q1, void *host_q2, void *host_diq, QudaInvertParam inv_param, const int X[4])
 {
-
+  
   profileColorCross.TPSTART(QUDA_PROFILE_TOTAL);
   profileColorCross.TPSTART(QUDA_PROFILE_INIT);
   
@@ -6179,6 +6179,8 @@ void laphColorCross(void *host_q1, void *host_q2, void *host_diq, QudaInvertPara
   cuda_diq_param.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
   std::vector<ColorSpinorField *> quda_diq;
   quda_diq.push_back(ColorSpinorField::Create(cuda_diq_param));
+
+  profileColorCross.TPSTOP(QUDA_PROFILE_INIT);  
 
   // Copy q1, q2 fields from host to device
   profileColorCross.TPSTART(QUDA_PROFILE_H2D);
@@ -6235,6 +6237,7 @@ void laphColorContract(void *host_diq, void *host_q3, void *host_singlet, QudaIn
   cuda_diq_param.location = QUDA_CUDA_FIELD_LOCATION;
   cuda_diq_param.create = QUDA_ZERO_FIELD_CREATE;
   cuda_diq_param.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
+  cuda_diq_param.nSpin = 1;
   std::vector<ColorSpinorField *> quda_diq;
   quda_diq.push_back(ColorSpinorField::Create(cuda_diq_param));
 
@@ -6242,9 +6245,12 @@ void laphColorContract(void *host_diq, void *host_q3, void *host_singlet, QudaIn
   cuda_q3_param.location = QUDA_CUDA_FIELD_LOCATION;
   cuda_q3_param.create = QUDA_ZERO_FIELD_CREATE;
   cuda_q3_param.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
+  cuda_q3_param.nSpin = 1;
   std::vector<ColorSpinorField *> quda_q3;
   quda_q3.push_back(ColorSpinorField::Create(cuda_q3_param));
-  
+  profileColorContract.TPSTOP(QUDA_PROFILE_INIT);  
+
+
   // Copy q1 field from host to device
   profileColorContract.TPSTART(QUDA_PROFILE_H2D);
   *quda_q3[0] = *q3[0];
@@ -6256,11 +6262,12 @@ void laphColorContract(void *host_diq, void *host_q3, void *host_singlet, QudaIn
     errorQuda("Irreconcilable difference between interface and internal complex number conventions");
   }
   
-  void* hostSingletPtr = reinterpret_cast<std::complex<double>*>(host_singlet);
+  //void* hostSingletPtr = reinterpret_cast<std::complex<double>*>(host_singlet);
   
   // We now perfrom the color contraction
   profileColorContract.TPSTART(QUDA_PROFILE_COMPUTE);
-  colorContractQuda(*diq[0], *q3[0], hostSingletPtr);
+  //colorContractQuda(*quda_diq[0], *quda_q3[0], hostSingletPtr);
+  colorContractQuda(*quda_diq[0], *quda_q3[0], host_singlet);
   profileColorContract.TPSTOP(QUDA_PROFILE_COMPUTE);     
     
   // Clean up memory allocations

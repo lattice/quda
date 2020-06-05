@@ -55,7 +55,15 @@ namespace quda
     y = arg.y_vec(idx_cb, parity);
     
     // Compute the cross product
-    result_local = crossProduct(y, x, 0, 0);    
+    result_local = crossProduct(x, y, 0, 0);    
+    /*
+    if(idx_cb == 0 && parity == 0) {
+      printf("%.16e %.16e %.16e %.16e %.16e %.16e \n", 
+	     result_local(0,0).real(), result_local(0,0).imag(), 
+	     result_local(0,1).real(), result_local(0,1).imag(), 
+	     result_local(0,2).real(), result_local(0,2).imag());
+    } 
+    */
     arg.result(idx_cb, parity) = result_local;
   }
 }

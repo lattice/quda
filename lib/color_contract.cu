@@ -65,8 +65,8 @@ namespace quda
 
     long long flops() const
     {
-      // 4 prop spins, 1 evec spin, 3 color, 6 complex, lattice volume
-      return 4 * 3 * 6ll * x.Volume();
+      // 1 prop spins, 1 evec spin, 3 color, 6 complex, lattice volume
+      return 1 * 3 * 6ll * x.Volume();
     }
 
     long long bytes() const
@@ -89,7 +89,7 @@ namespace quda
     checkPrecision(x, y);
     
     if (x.Ncolor() != 3 || y.Ncolor() != 3) errorQuda("Unexpected number of colors x=%d y=%d", x.Ncolor(), y.Ncolor());
-    if (x.Nspin() != 4 || y.Nspin() != 1) errorQuda("Unexpected number of spins x=%d y=%d", x.Nspin(), y.Nspin());
+    if (x.Nspin() != 1 || y.Nspin() != 1) errorQuda("Unexpected number of spins x=%d y=%d", x.Nspin(), y.Nspin());
     
     if (x.Precision() == QUDA_SINGLE_PRECISION) {
       colorContract<float, 3>(x, y, (complex<float> *)result);
