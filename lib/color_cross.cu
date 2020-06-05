@@ -11,7 +11,7 @@
 namespace quda
 {
 
-  template <typename Float, typename Arg> class ColorCrossCompute : TunableVectorY
+  template <typename Float, typename Arg> class ColorCrossCompute : TunableLocalParity
   {
     Arg &arg;
     const ColorSpinorField &x;
@@ -24,7 +24,7 @@ namespace quda
     
   public:
     ColorCrossCompute(Arg &arg, const ColorSpinorField &x, const ColorSpinorField &y, ColorSpinorField &result) :
-      TunableVectorY(2),
+      TunableLocalParity(),
       arg(arg),
       x(x),
       y(y),
@@ -60,11 +60,12 @@ namespace quda
       }
     }
     
-    TuneKey tuneKey() const { return TuneKey(x.VolString(), typeid(*this).name(), aux); }
-
+    TuneKey tuneKey() const { return TuneKey(x.VolString(), typeid(*this).name(), aux); 
+    }
+    
     void preTune() {}
     void postTune() {}
-
+    
     long long flops() const
     {
       // 1 spin, 3 color, 6 complex, lattice volume

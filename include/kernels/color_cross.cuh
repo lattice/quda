@@ -40,30 +40,25 @@ namespace quda
   template <typename Float, typename Arg> __global__ void computeColorCross(Arg arg)
   {
     int idx_cb = threadIdx.x + blockIdx.x * blockDim.x;
-    int parity = threadIdx.y + blockIdx.y * blockDim.y;
+    int parity = threadIdx.y;
     
     constexpr int nSpin = Arg::nSpin;
     constexpr int nColor = Arg::nColor;
     typedef ColorSpinor<Float, nColor, nSpin> Vector;
 
-    Vector x;
-    Vector y;
-    Vector result_local;
-
-    // Get vector data for this spacetime point
-    x = arg.x_vec(idx_cb, parity);
-    y = arg.y_vec(idx_cb, parity);
-    
-    // Compute the cross product
-    result_local = crossProduct(x, y, 0, 0);    
-    /*
-    if(idx_cb == 0 && parity == 0) {
-      printf("%.16e %.16e %.16e %.16e %.16e %.16e \n", 
-	     result_local(0,0).real(), result_local(0,0).imag(), 
-	     result_local(0,1).real(), result_local(0,1).imag(), 
-	     result_local(0,2).real(), result_local(0,2).imag());
-    } 
-    */
-    arg.result(idx_cb, parity) = result_local;
+    while (idx_cb < arg.threads) {
+      Vector x;
+      Vector y;
+      Vector result_local;
+      
+      // Get vector data for this spacetime point
+      x = arg.x_vec(idx_cb, parity);
+      y = arg.y_vec(idx_cb, parity);
+      
+      // Compute the cross product
+      result_local = crossProduct(x, y, 0, 0);      
+      arg.result(idx_cb, parity) = result_local;
+      idx_cb += blockDim.x * gridDim.x;
+    }
   }
 }

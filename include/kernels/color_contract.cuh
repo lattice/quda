@@ -40,23 +40,26 @@ namespace quda
   template <typename Float, typename Arg> __global__ void computeColorContract(Arg arg)
   {
     int idx_cb = threadIdx.x + blockIdx.x * blockDim.x;
-    int parity = threadIdx.y + blockIdx.y * blockDim.y;
+    int parity = threadIdx.y;
 
     constexpr int nSpin = Arg::nSpin;
     constexpr int nColor = Arg::nColor;
     typedef ColorSpinor<Float, nColor, nSpin> Vector;
 
-    complex<Float> res;
-    Vector x;
-    Vector y;
-
-    // Get vector data for this spacetime point
-    x = arg.x_vec(idx_cb, parity);
-    y = arg.y_vec(idx_cb, parity);
-    
-    // Compute the inner product over color
-    res = colorContract(x, y, 0, 0);
-    
-    arg.s[idx_cb + parity*arg.threads] = res;    
+    while (idx_cb < arg.threads) {
+      complex<Float> res;
+      Vector x;
+      Vector y;
+      
+      // Get vector data for this spacetime point
+      x = arg.x_vec(idx_cb, parity);
+      y = arg.y_vec(idx_cb, parity);
+      
+      // Compute the inner product over color
+      res = colorContract(x, y, 0, 0);
+      //printf("parity = %d, idx_cb = %d\n", parity, idx_cb);
+      arg.s[idx_cb + parity*arg.threads] = res;
+      idx_cb += blockDim.x * gridDim.x;
+    }
   }
 }

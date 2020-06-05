@@ -6249,17 +6249,16 @@ void laphColorContract(void *host_diq, void *host_q3, void *host_singlet, QudaIn
   std::vector<ColorSpinorField *> quda_q3;
   quda_q3.push_back(ColorSpinorField::Create(cuda_q3_param));
 
-  size_t data_bytes = diq[0]->Volume() * diq[0]->Nspin() * 2 * diq[0]->Precision();
+  size_t data_bytes = diq[0]->Volume() * 2 * diq[0]->Precision();
   void *d_singlet = pool_device_malloc(data_bytes);
   profileColorContract.TPSTOP(QUDA_PROFILE_INIT);  
 
-
-  // Copy q1 field from host to device
+  // Copy q3 and diq fields from host to device
   profileColorContract.TPSTART(QUDA_PROFILE_H2D);
   *quda_q3[0] = *q3[0];
   *quda_diq[0] = *diq[0];
   profileColorContract.TPSTOP(QUDA_PROFILE_H2D);
-      
+  
   // We now perfrom the color contraction
   profileColorContract.TPSTART(QUDA_PROFILE_COMPUTE);
   colorContractQuda(*quda_diq[0], *quda_q3[0], d_singlet);

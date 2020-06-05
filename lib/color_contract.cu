@@ -11,20 +11,19 @@
 namespace quda
 {
 
-  template <typename Float, typename Arg> class ColorContractCompute : TunableVectorY
+  template <typename Float, typename Arg> class ColorContractCompute : TunableLocalParity
   {
     Arg &arg;
     const ColorSpinorField &x;
     const ColorSpinorField &y;
 
   private:
-    bool tuneSharedBytes() const { return false; }
-    bool tuneGridDim() const { return true; }
+    bool tuneGridDim() const { return false; }
     unsigned int minThreads() const { return arg.threads; }
     
   public:
     ColorContractCompute(Arg &arg, const ColorSpinorField &x, const ColorSpinorField &y) :
-      TunableVectorY(2),
+      TunableLocalParity(),
       arg(arg),
       x(x),
       y(y)
