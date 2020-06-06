@@ -377,6 +377,9 @@ void qudaUnitarizeSU3(int prec, double tol, QudaMILCSiteArg_t *arg)
   gaugeParam.gauge_offset = arg->link_offset;
   gaugeParam.site_size = arg->size;
   gaugeParam.gauge_order = arg->site ? QUDA_MILC_SITE_GAUGE_ORDER : QUDA_MILC_GAUGE_ORDER;
+  gaugeParam.staggered_phase_applied = 1;
+  gaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
+  gaugeParam.t_boundary    = QUDA_ANTI_PERIODIC_T;
 
   projectSU3Quda(gauge, tol, &gaugeParam);
   qudamilc_called<false>(__func__);
@@ -504,6 +507,9 @@ void qudaGaugeForce( int precision,
   qudaGaugeParam.mom_offset = arg->mom_offset;
   qudaGaugeParam.site_size = arg->size;
   qudaGaugeParam.gauge_order = arg->site ? QUDA_MILC_SITE_GAUGE_ORDER : QUDA_MILC_GAUGE_ORDER;
+  qudaGaugeParam.staggered_phase_applied = 1;
+  qudaGaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
+  qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
 
   double *loop_coeff = static_cast<double*>(safe_malloc(numPaths*sizeof(double)));
   int *length = static_cast<int*>(safe_malloc(numPaths*sizeof(int)));
