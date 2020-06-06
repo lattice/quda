@@ -286,10 +286,11 @@ namespace quda {
                       CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
                       CompositeColorSpinorField &w)
     {
+      QudaPrecision precision = checkPrecision(*x[0], *y[0], *z[0], *w[0]);
 
       if (checkLocation(*x[0], *y[0], *z[0], *w[0]) == QUDA_CUDA_FIELD_LOCATION) {
 
-        if (y[0]->Precision() == QUDA_DOUBLE_PRECISION && x[0]->Precision() == QUDA_DOUBLE_PRECISION) {
+        if (precision == QUDA_DOUBLE_PRECISION) {
 
 #if QUDA_PRECISION & 8
 #if defined(NSPIN4) || defined(NSPIN2) || defined(NSPIN1)
@@ -302,7 +303,7 @@ namespace quda {
           errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x[0]->Precision());
 #endif
 
-        } else if (y[0]->Precision() == QUDA_SINGLE_PRECISION && x[0]->Precision() == QUDA_SINGLE_PRECISION) {
+        } else if (precision == QUDA_SINGLE_PRECISION) {
 
 #if QUDA_PRECISION & 4
 #if defined(NSPIN4) || defined(NSPIN2) || defined(NSPIN1)
@@ -315,7 +316,7 @@ namespace quda {
           errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x[0]->Precision());
 #endif
 
-        } else if (y[0]->Precision() == QUDA_HALF_PRECISION && x[0]->Precision() == QUDA_HALF_PRECISION) {
+        } else if (precision == QUDA_HALF_PRECISION) {
 
 #if QUDA_PRECISION & 2
           if (x[0]->Ncolor() != 3) { errorQuda("nColor = %d is not supported", x[0]->Ncolor()); }
@@ -340,7 +341,7 @@ namespace quda {
           errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x[0]->Precision());
 #endif
 
-        } else if (y[0]->Precision() == QUDA_QUARTER_PRECISION && x[0]->Precision() == QUDA_QUARTER_PRECISION) {
+        } else if (precision == QUDA_QUARTER_PRECISION) {
 
 #if QUDA_PRECISION & 1
           if (x[0]->Ncolor() != 3) { errorQuda("nColor = %d is not supported", x[0]->Ncolor()); }
@@ -366,8 +367,7 @@ namespace quda {
 #endif
 
         } else {
-
-          errorQuda("Precision combination x=%d not supported\n", x[0]->Precision());
+          errorQuda("Precision x=%d not supported\n", precision);
         }
       } else { // fields on the cpu
         errorQuda("Not implemented");

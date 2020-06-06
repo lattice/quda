@@ -331,36 +331,22 @@ namespace quda {
     /**
        Driver for multi-reduce with up to four vectors
     */
-    template <int NXZ, template <int MXZ, typename ReducerType, typename real> class Reducer, bool siteUnroll, typename T>
+    template <int NXZ, template <int MXZ, typename ReducerType, typename real> class Reducer, typename T>
     void uniMultiReduce(T result[], const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
                         CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
                         CompositeColorSpinorField &w)
     {
-      int reduce_length = siteUnroll ? x[0]->RealLength() : x[0]->Length();
-
       QudaPrecision precision = checkPrecision(*x[0], *y[0], *z[0], *w[0]);
 
       if (precision == QUDA_DOUBLE_PRECISION) {
 
 #if QUDA_PRECISION & 8
-        if (x[0]->Nspin() == 4 || x[0]->Nspin() == 2) { // wilson
-#if defined(NSPIN4) || defined(NSPIN2)
-          const int M = siteUnroll ? 12 : 1; // determines how much work per thread to do
-          if (x[0]->Nspin() == 2 && siteUnroll) errorQuda("siteUnroll not supported for nSpin==2");
-          multiReduce<double2, double2, double2, M, NXZ, Reducer>(result, a, b, c, x, y, z, w, reduce_length / (2 * M));
+#if defined(NSPIN4) || defined(NSPIN2) || defined(NSPIN1)
+        const int M = 1; // determines how much work per thread to do
+        multiReduce<double2, double2, double2, M, NXZ, Reducer>(result, a, b, c, x, y, z, w, x[0]->Length() / (2 * M));
 #else
-          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
+        errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
-        } else if (x[0]->Nspin() == 1) {
-#if defined(NSPIN1)
-          const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
-          multiReduce<double2, double2, double2, M, NXZ, Reducer>(result, a, b, c, x, y, z, w, reduce_length / (2 * M));
-#else
-          errorQuda("blas has not been built for Nspin=%d field", x[0]->Nspin());
-#endif
-        } else {
-          errorQuda("nSpin=%d is not supported\n", x[0]->Nspin());
-        }
 #else
         errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, precision);
 #endif
@@ -368,24 +354,12 @@ namespace quda {
       } else if (precision == QUDA_SINGLE_PRECISION) {
 
 #if QUDA_PRECISION & 4
-        if (x[0]->Nspin() == 4) { // wilson
-#if defined(NSPIN4)
-          const int M = siteUnroll ? 6 : 1; // determines how much work per thread to do
-          multiReduce<float4, float4, float4, M, NXZ, Reducer>(result, a, b, c, x, y, z, w, reduce_length / (4 * M));
+#if defined(NSPIN4) || defined(NSPIN2) || defined(NSPIN1)
+        const int M = 1; // determines how much work per thread to do
+        multiReduce<float4, float4, float4, M, NXZ, Reducer>(result, a, b, c, x, y, z, w, x[0]->Length() / (4 * M));
 #else
-          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
+        errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
-        } else if (x[0]->Nspin() == 1 || x[0]->Nspin() == 2) { // staggered
-#if defined(NSPIN1) || defined(NSPIN2)
-          const int M = siteUnroll ? 3 : 1;
-          if (x[0]->Nspin() == 2 && siteUnroll) errorQuda("siteUnroll not supported for nSpin==2");
-          multiReduce<float2, float2, float2, M, NXZ, Reducer>(result, a, b, c, x, y, z, w, reduce_length / (2 * M));
-#else
-          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
-#endif
-        } else {
-          errorQuda("nSpin=%d is not supported\n", x[0]->Nspin());
-        }
 #else
         errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, precision);
 #endif
@@ -445,7 +419,7 @@ namespace quda {
     /**
        Driver for multi-reduce with up to five vectors
     */
-    template <int NXZ, template <int MXZ, typename ReducerType, typename real> class Reducer, bool siteUnroll, typename T>
+    template <int NXZ, template <int MXZ, typename ReducerType, typename real> class Reducer, typename T>
     void mixedMultiReduce(T result[], const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
                           CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
                           CompositeColorSpinorField &w)
@@ -453,22 +427,19 @@ namespace quda {
       checkPrecision(*x[0], *z[0]);
       checkPrecision(*y[0], *w[0]);
 
-      static_assert(siteUnroll == true, "site unrolling must be enabled for mixed precision");
-      int reduce_length = siteUnroll ? x[0]->RealLength() : x[0]->Length();
-
       if (y[0]->Precision() == QUDA_DOUBLE_PRECISION && x[0]->Precision() == QUDA_SINGLE_PRECISION) {
 
         if (x[0]->Nspin() == 4) { // wilson
 #if defined(NSPIN4)
           const int M = 12; // determines how much work per thread to do
-          multiReduce<double2, float4, double2, M, NXZ, Reducer>(result, a, b, c, x, y, z, w, reduce_length / (2 * M));
+          multiReduce<double2, float4, double2, M, NXZ, Reducer>(result, a, b, c, x, y, z, w, x[0]->Volume());
 #else
           errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
         } else if (x[0]->Nspin() == 1) {
 #if defined(NSPIN1)
           const int M = 3; // determines how much work per thread to do
-          multiReduce<double2, float2, double2, M, NXZ, Reducer>(result, a, b, c, x, y, z, w, reduce_length / (2 * M));
+          multiReduce<double2, float2, double2, M, NXZ, Reducer>(result, a, b, c, x, y, z, w, x[0]->Volume());
 #else
           errorQuda("blas has not been built for Nspin=%d field", x[0]->Nspin());
 #endif
@@ -481,14 +452,14 @@ namespace quda {
         if (x[0]->Nspin() == 4) { // wilson
 #if defined(NSPIN4)
           const int M = 6; // determines how much work per thread to do
-          multiReduce<double2, short4, double2, M, NXZ, Reducer>(result, a, b, c, x, y, z, w, reduce_length / (4 * M));
+          multiReduce<double2, short4, double2, M, NXZ, Reducer>(result, a, b, c, x, y, z, w, x[0]->Volume());
 #else
           errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
         } else if (x[0]->Nspin() == 1 || x[0]->Nspin() == 2) { // staggered
 #if defined(NSPIN1)
           const int M = 3;
-          multiReduce<double2, short2, double2, M, NXZ, Reducer>(result, a, b, c, x, y, z, w, reduce_length / (2 * M));
+          multiReduce<double2, short2, double2, M, NXZ, Reducer>(result, a, b, c, x, y, z, w, x[0]->Volume());
 #else
           errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
@@ -523,22 +494,22 @@ namespace quda {
 
     template <int NXZ,
               template <int MXZ, typename ReducerType, typename real> class ReducerDiagonal,
-              template <int MXZ, typename ReducerType, typename real> class ReducerOffDiagonal, bool siteUnroll, typename T>
+              template <int MXZ, typename ReducerType, typename real> class ReducerOffDiagonal, typename T>
     void multiReduce(T result[], const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
                      CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
                      CompositeColorSpinorField &w, int i, int j)
     {
       if (x[0]->Precision() == y[0]->Precision()) {
         if (i == j) { // we are on the diagonal so invoke the diagonal reducer
-          uniMultiReduce<NXZ, ReducerDiagonal, siteUnroll, T>(result, a, b, c, x, y, z, w);
+          uniMultiReduce<NXZ, ReducerDiagonal, T>(result, a, b, c, x, y, z, w);
         } else { // we are on the diagonal so invoke the off-diagonal reducer
-          uniMultiReduce<NXZ, ReducerOffDiagonal, siteUnroll, T>(result, a, b, c, x, y, z, w);
+          uniMultiReduce<NXZ, ReducerOffDiagonal, T>(result, a, b, c, x, y, z, w);
         }
       } else {
         if (i == j) { // we are on the diagonal so invoke the diagonal reducer
-          mixedMultiReduce<NXZ, ReducerDiagonal, true, T>(result, a, b, c, x, y, z, w);
+          mixedMultiReduce<NXZ, ReducerDiagonal, T>(result, a, b, c, x, y, z, w);
         } else { // we are on the diagonal so invoke the off-diagonal reducer
-          mixedMultiReduce<NXZ, ReducerOffDiagonal, true, T>(result, a, b, c, x, y, z, w);
+          mixedMultiReduce<NXZ, ReducerOffDiagonal, T>(result, a, b, c, x, y, z, w);
         }
       }
     }
@@ -551,7 +522,6 @@ namespace quda {
                              std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w, int i_idx,
                              int j_idx, bool hermitian, uint2 tile_size)
     {
-
       if (y.size() > tile_size.y) { // if greater than max single-kernel size, split and recurse
         // Do the recurse first.
         T* result0 = &result[0];
@@ -575,127 +545,127 @@ namespace quda {
         if (x.size() <= tile_size.x && is_valid_NXZ(x.size(), true)) {
           switch (x.size()) {
           case 1:
-            multiReduce<1, ReducerDiagonal, ReducerOffDiagonal, false>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+            multiReduce<1, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
             break;
           case 2:
-            multiReduce<2, ReducerDiagonal, ReducerOffDiagonal, false>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+            multiReduce<2, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
             break;
           case 4:
-            multiReduce<4, ReducerDiagonal, ReducerOffDiagonal, false>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+            multiReduce<4, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
             break;
           case 8:
-            multiReduce<8, ReducerDiagonal, ReducerOffDiagonal, false>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+            multiReduce<8, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
             break;
           case 16:
-            multiReduce<16, ReducerDiagonal, ReducerOffDiagonal, false>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+            multiReduce<16, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
             break;
 #if MAX_MULTI_BLAS_N >= 3
         case 3:
-          multiReduce<3, ReducerDiagonal, ReducerOffDiagonal, false>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<3, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 5
         case 5:
-          multiReduce<5, ReducerDiagonal, ReducerOffDiagonal, false>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<5, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 6
         case 6:
-          multiReduce<6, ReducerDiagonal, ReducerOffDiagonal, false>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<6, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 7
         case 7:
-          multiReduce<7, ReducerDiagonal, ReducerOffDiagonal, false>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<7, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 9
 	case 9:
-          multiReduce<9, ReducerDiagonal, ReducerOffDiagonal, false>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<9, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 10
         case 10:
-          multiReduce<10, ReducerDiagonal, ReducerOffDiagonal, false>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<10, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 11
         case 11:
-          multiReduce<11, ReducerDiagonal, ReducerOffDiagonal, false>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<11, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 12
         case 12:
-          multiReduce<12, ReducerDiagonal, ReducerOffDiagonal, false>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<12, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 13
         case 13:
-          multiReduce<13, ReducerDiagonal, ReducerOffDiagonal, false>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<13, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 14
         case 14:
-          multiReduce<14, ReducerDiagonal, ReducerOffDiagonal, false>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<14, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 15
         case 15:
-          multiReduce<15, ReducerDiagonal, ReducerOffDiagonal, false>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<15, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 17
         case 17:
-          multiReduce<17, ReducerDiagonal, ReducerOffDiagonal, false>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<17, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 18
         case 18:
-          multiReduce<18, ReducerDiagonal, ReducerOffDiagonal, false>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<18, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 19
         case 19:
-          multiReduce<19, ReducerDiagonal, ReducerOffDiagonal, false>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<19, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 20
         case 20:
-          multiReduce<20, ReducerDiagonal, ReducerOffDiagonal, false>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<20, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 21
         case 21:
-          multiReduce<21, ReducerDiagonal, ReducerOffDiagonal, false>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<21, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 22
         case 22:
-          multiReduce<22, ReducerDiagonal, ReducerOffDiagonal, false>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<22, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 23
         case 23:
-          multiReduce<23, ReducerDiagonal, ReducerOffDiagonal, false>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<23, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 24
         case 24:
-          multiReduce<24, ReducerDiagonal, ReducerOffDiagonal, false>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<24, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 25
         case 25:
-          multiReduce<25, ReducerDiagonal, ReducerOffDiagonal, false>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<25, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 26
         case 26:
-          multiReduce<26, ReducerDiagonal, ReducerOffDiagonal, false>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<26, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 27
         case 27:
-          multiReduce<27, ReducerDiagonal, ReducerOffDiagonal, false>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<27, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 28
         case 28:
-          multiReduce<28, ReducerDiagonal, ReducerOffDiagonal, false>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<28, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 29
         case 29:
-          multiReduce<29, ReducerDiagonal, ReducerOffDiagonal, false>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<29, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 30
         case 30:
-          multiReduce<30, ReducerDiagonal, ReducerOffDiagonal, false>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<30, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 31
         case 31:
-          multiReduce<31, ReducerDiagonal, ReducerOffDiagonal, false>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<31, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 32
         case 32:
-          multiReduce<32, ReducerDiagonal, ReducerOffDiagonal, false>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<32, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #endif // 32
 #endif // 31
