@@ -28,16 +28,8 @@ int Ncolor;
 
 void setPrec(ColorSpinorParam &param, QudaPrecision precision, int order = 0)
 {
-  param.setPrecision(precision);
-  if (order == 2) {
-    param.fieldOrder = QUDA_FLOAT8_FIELD_ORDER;
-  } else if (order == 1) {
-    param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-  } else if (Nspin == 1 || Nspin == 2 || precision == QUDA_DOUBLE_PRECISION) {
-    param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-  } else {
-    param.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
-  }
+  param.setPrecision(precision, precision, true);
+  if (order == 1) param.fieldOrder = QUDA_FLOAT8_FIELD_ORDER;
 }
 
 void display_test_info()
@@ -51,13 +43,12 @@ void display_test_info()
 	     dimPartitioned(1),
 	     dimPartitioned(2),
 	     dimPartitioned(3));
-  return;
 }
 
 int Nprec = 4;
 
 const char *prec_str[] = {"quarter", "half", "single", "double"};
-const char *order_str[] = {"default", "float2", "float8"};
+const char *order_str[] = {"default", "float8"};
 
 // For googletest names must be non-empty, unique, and may only contain ASCII
 // alphanumeric characters or underscore
@@ -136,27 +127,10 @@ bool skip_kernel(int precision, int kernel, int order)
     return true;
   }
 
-  if (order == 1) {
-#ifdef GPU_MULTIGRID
-    // order == 1 represents the case of multigrid testing for float-2
-    // ordered nspin-4 fields in single precision and less, skip all other cases
-    if (Nspin == 1 || Nspin == 2 || this_prec == QUDA_DOUBLE_PRECISION) {
-      return true;
-    } else if (Nspin == 4 && (this_prec != QUDA_DOUBLE_PRECISION && is_multi(kernel) ||
-                              this_prec == QUDA_SINGLE_PRECISION && is_site_unroll(kernel))) {
-      // we don't instantiate multi-blas kernels for float-2 nspin-4
-      // fields, so skip these
-      return true;
-    }
-#else
-    return true;
-#endif
-  }
-
   // this is for float-8 testing
-  if (order == 2) {
+  if (order == 1) {
 #ifdef FLOAT8
-    // order == 2 represents the case of float-8 nspin-4 fields
+    // order == 1 represents the case of float-8 nspin-4 fields
     // only run fixed-precision fields, skip all other cases
     if (Nspin == 1 || Nspin == 2 || this_prec >= QUDA_HALF_PRECISION) {
       return true;
@@ -1184,4 +1158,8 @@ std::string getblasname(testing::TestParamInfo<::testing::tuple<int, int, int>> 
 }
 
 // instantiate all test cases
-INSTANTIATE_TEST_SUITE_P(QUDA, BlasTest, Combine(Range(0, Nprec), Range(0, Nkernels), Range(0, 3)), getblasname);
+#ifdef FLOAT8
+INSTANTIATE_TEST_SUITE_P(QUDA, BlasTest, Combine(Range(0, Nprec), Range(0, Nkernels), Range(0, 2)), getblasname);
+#else
+INSTANTIATE_TEST_SUITE_P(QUDA, BlasTest, Combine(Range(0, Nprec), Range(0, Nkernels), Range(0, 1)), getblasname);
+#endif
