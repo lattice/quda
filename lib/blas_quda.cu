@@ -158,7 +158,7 @@ namespace quda {
 
       if (checkLocation(x, y, z, w, v) == QUDA_CUDA_FIELD_LOCATION) {
 
-        if (!x.isNative() && x.FieldOrder() != QUDA_FLOAT2_FIELD_ORDER && x.FieldOrder() != QUDA_FLOAT8_FIELD_ORDER) {
+        if (!x.isNative() && x.FieldOrder() != QUDA_FLOAT8_FIELD_ORDER) {
           warningQuda("Device blas on non-native fields is not supported (prec = %d, order = %d)", x.Precision(),
                       x.FieldOrder());
           return;
@@ -201,13 +201,6 @@ namespace quda {
 #else
             errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
-          } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) { // wilson
-#if defined(GPU_MULTIGRID) // FIXME eventually we should get rid of this and use float4 ordering
-            const int M = 12;
-            nativeBlas<float2, short2, short2, M, Functor>(a, b, c, x, y, z, w, v, x.Volume());
-#else
-            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
-#endif
           } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER) { // wilson
 #if defined(NSPIN4) && defined(FLOAT8)
             const int M = 3;
@@ -237,13 +230,6 @@ namespace quda {
 #if defined(NSPIN4)
             const int M = 6;
             nativeBlas<float4, char4, char4, M, Functor>(a, b, c, x, y, z, w, v, x.Volume());
-#else
-            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
-#endif
-          } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) { // wilson
-#if defined(GPU_MULTIGRID) // FIXME eventually we should get rid of this and use float4 ordering
-            const int M = 12;
-            nativeBlas<float2, char2, char2, M, Functor>(a, b, c, x, y, z, w, v, x.Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif

@@ -336,7 +336,7 @@ namespace quda {
 
       if (checkLocation(x, y, z, w, v) == QUDA_CUDA_FIELD_LOCATION) {
 
-        if (!x.isNative() && x.FieldOrder() != QUDA_FLOAT2_FIELD_ORDER && x.FieldOrder() != QUDA_FLOAT8_FIELD_ORDER) {
+        if (!x.isNative() && x.FieldOrder() != QUDA_FLOAT8_FIELD_ORDER) {
           warningQuda("Device reductions on non-native fields is not supported (prec = %d, order = %d)", x.Precision(),
                       x.FieldOrder());
           host_reduce_t value;
@@ -409,13 +409,6 @@ namespace quda {
 #else
             errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
-          } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) { // wilson
-#if defined(GPU_MULTIGRID)  // FIXME eventually we should get rid of this and use float4 ordering
-            const int M = 12; // determines how much work per thread to do
-            value = nativeReduce<float2, short2, short2, M, Reducer>(a, b, x, y, z, w, v, y.Volume());
-#else
-            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
-#endif
           } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER) { // wilson
 #if defined(NSPIN4) && defined(FLOAT8)
             const int M = 3; // determines how much work per thread to do
@@ -444,13 +437,6 @@ namespace quda {
 #if defined(NSPIN4)
             const int M = 6; // determines how much work per thread to do
             value = nativeReduce<float4, char4, char4, M, Reducer>(a, b, x, y, z, w, v, y.Volume());
-#else
-            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
-#endif
-          } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) { // wilson
-#if defined(GPU_MULTIGRID)  // FIXME eventually we should get rid of this and use float4 ordering
-            const int M = 12; // determines how much work per thread to do
-            value = nativeReduce<float2, char2, char2, M, Reducer>(a, b, x, y, z, w, v, y.Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
@@ -507,7 +493,7 @@ namespace quda {
 
       if (checkLocation(x, y, z, w, v) == QUDA_CUDA_FIELD_LOCATION) {
 
-        if (!x.isNative() && !(x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && x.Precision() == QUDA_SINGLE_PRECISION)) {
+        if (!x.isNative()) {
           warningQuda("Device reductions on non-native fields is not supported (prec = %d, order = %d)", x.Precision(),
                       x.FieldOrder());
           host_reduce_t value;
