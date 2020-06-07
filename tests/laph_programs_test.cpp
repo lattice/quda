@@ -159,7 +159,28 @@ int main(int argc, char **argv)
     if (n == niter-1) laphColorContractCheck(spinorY, spinorZ, dcc_result);
   }
 
+  double _Complex *c1 = (double _Complex*)malloc(48 * 384 * sizeof(double _Complex));
+  double _Complex *c2 = (double _Complex*)malloc(48 * 384 * sizeof(double _Complex));
+  double _Complex *c3 = (double _Complex*)malloc(48 * 384 * sizeof(double _Complex));
 
+  for (uint64_t i = 0; i < 2 * 48 * 384; i++) {
+    ((double *)c1)[i] = rand() / (double)RAND_MAX;
+    ((double *)c2)[i] = rand() / (double)RAND_MAX;
+    ((double *)c3)[i] = rand() / (double)RAND_MAX;
+  }
+
+  void *evecs[384];
+  for(int i=0; i<384; i++) {
+    evecs[i] = malloc(48 * 48 * 48 * 3 * 2 * data_size);
+    for (uint64_t j = 0; j < 2 * 3 * 48 * 48 * 48; j++) {
+      ((double *)evecs[i])[j] = rand() / (double)RAND_MAX;
+    }
+  }
+
+  double _Complex *momP = (double _Complex*)malloc(48 * 384 * sizeof(double _Complex));
+  void *ret = malloc(data_size);
+  laphBaryonKernel(48, 48, 48, 33, c1, c2, c3, momP, 384, evecs, ret, 10, inv_param, X);
+  
   host_free(spinorX);
   host_free(spinorY);
   host_free(spinorZ);

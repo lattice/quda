@@ -1313,7 +1313,7 @@ public:
   };
 
   using ColorSpinorFieldSet = ColorSpinorField;
-
+  
   //forward declaration
   class EigCGArgs;
 

@@ -233,7 +233,7 @@ namespace quda {
 			      cublas_param.n, cublas_param.k, &alpha,
 			      (Z*)A_d, cublas_param.lda,
 			      (Z*)B_d, cublas_param.ldb, &beta,
-			      (Z*)C_d, cublas_param.ldc);
+			      (Z*)C_d + cublas_param.c_offset, cublas_param.ldc);
 	}
 	
 	//flops += batch*FLOPS_CGETRF(n,n);

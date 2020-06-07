@@ -702,7 +702,7 @@ extern "C" {
     uint64_t lda; /**< leading dimension of two-dimensional array used to store the matrix A.*/
     uint64_t ldb; /**< leading dimension of two-dimensional array used to store matrix B.*/
     uint64_t ldc; /**< leading dimension of two-dimensional array used to store matrix C.*/
-
+    uint64_t c_offset; /**< position of the C array from which begin read/write. */   
     double_complex alpha; /**< scalar used for multiplication. */
     double_complex beta; /**< scalar used for multiplication. If beta==0, C does not have to be a valid input.*/
     
@@ -1411,7 +1411,7 @@ extern "C" {
   void laphSinkProject(void *host_quark, void **host_evec, double_complex *host_sinks,
 		       QudaInvertParam inv_param, unsigned int nEv, const int X[4]);
 
-  void laphAccumulateEvecs(void *host_q1, double_complex *host_coeffs, void **host_evec, QudaInvertParam inv_param,
+  void laphAccumulateEvecs(int dil1, void *host_q1, double_complex *host_coeffs, void **host_evec, QudaInvertParam inv_param,
 			   unsigned int nEv, const int X[4]);
 
   void laphColorCross(void *host_q1, void *host_q2, void *host_diq, QudaInvertParam inv_param,
@@ -1419,6 +1419,16 @@ extern "C" {
 
   void laphColorContract(void *host_diq, void *host_q3, void *host_singlet, QudaInvertParam inv_param,
 			 const int X[4]);
+  
+  void laphBaryonKernel(int n1, int n2, int n3, int nMom,
+			double _Complex *host_coeffs1, 
+			double _Complex *host_coeffs2, 
+			double _Complex *host_coeffs3,
+			double _Complex *momP, 
+			int nEv, void **evPtr, 
+			void *retArray,
+			int blockSizeMomProj,
+			QudaInvertParam inv_param, const int X[4]);
   
   
   /**

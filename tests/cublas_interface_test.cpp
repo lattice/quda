@@ -57,18 +57,45 @@ void cublasGEMMQudaVerify(void *arrayA, void *arrayB, void *arrayCcopy, void*arr
   int ldc = cublas_param->ldc;  
   complex<double> alpha = cublas_param->alpha;
   complex<double> beta = cublas_param->beta;
-
+  
   // Eigen objects to store data
   uint64_t A_r, A_c, B_r, B_c, C_r, C_c;
   if(cublas_param->data_order == QUDA_CUBLAS_DATAORDER_COL) {
-    A_r = lda; A_c = k;
-    B_r = ldb; B_c = n;
+    if(cublas_param->trans_a == QUDA_CUBLAS_OP_N) {
+      A_r = lda; A_c = k;
+    }
+    else {
+      A_r = m; A_c = lda; 
+    }
+
+    if(cublas_param->trans_b == QUDA_CUBLAS_OP_N) {
+      B_r = ldb; B_c = n;
+    }
+    else {
+      B_r = k; B_c = ldb; 
+    }
+
     C_r = ldc; C_c = n;
   } else {
-    A_r = m; A_c = lda;
-    B_r = k; B_c = ldb;
+    if(cublas_param->trans_a == QUDA_CUBLAS_OP_N) {
+      A_r = m; A_c = lda;
+    }
+    else {
+      A_r = k; A_c = lda;  
+    }
+
+    if(cublas_param->trans_b == QUDA_CUBLAS_OP_N) {
+      B_r = ldb; B_c = k;  
+    }
+    else {
+      B_r = n; B_c = ldb;
+    }
     C_r = m; C_c = ldc;
   }
+  
+  printfQuda("Constructed Eigen matrices a * A_{%lu,%lu} * B_{%lu,%lu} + b * C_{%lu,%lu} = C_{%lu,%lu}\n",
+	     A_r, A_c, B_r, B_c, C_r, C_c, C_r, C_c);
+  
   
   MatrixXcd A = MatrixXd::Zero(A_r, A_c);
   MatrixXcd B = MatrixXd::Zero(B_r, B_c);
@@ -112,11 +139,12 @@ void cublasGEMMQudaVerify(void *arrayA, void *arrayB, void *arrayCcopy, void*arr
   default :
     errorQuda("Unknown cuBLAS op type %d", cublas_param->trans_b);
   }
+
+  printfQuda("Eigen matrices populated\n");
+  printfQuda("Constructed Eigen matrices a * A_{%lu,%lu} * B_{%lu,%lu} + b * C_{%lu,%lu} = C_{%lu,%lu}\n",
+	     A.rows(), A.cols(), B.rows(), B.cols(), C_eigen.rows(), C_eigen.cols(), C_eigen.rows(), C_eigen.cols());
   
   // Perform GEMM using Eigen
-  printfQuda("a * A_{%lu,%lu} * B_{%lu,%lu} + b * C_{%lu,%lu} = C_{%lu,%lu}\n",
-	     A_r, A_c, B_r, B_c, C_r, C_c, C_r, C_c);
-
   C_eigen = alpha * A * B + beta * C_eigen;
   
   // Check Eigen result against cuBLAS
@@ -215,16 +243,34 @@ int main(int argc, char **argv)
   if(cublas_param.data_order == QUDA_CUBLAS_DATAORDER_COL) {
     // leading dimension is in terms of consecutive data
     // elements in a column, multiplied by number of rows
-    refA_size = cublas_param.lda * cublas_param.k; //A_mk
-    refB_size = cublas_param.ldb * cublas_param.n; //B_kn
+    if(cublas_param.trans_a == QUDA_CUBLAS_OP_N) {
+      refA_size = cublas_param.lda * cublas_param.k; //A_mk
+    } else {
+      refA_size = cublas_param.lda * cublas_param.m; //A_km
+    }
+
+    if(cublas_param.trans_b == QUDA_CUBLAS_OP_N) {
+      refB_size = cublas_param.ldb * cublas_param.n; //B_kn
+    } else {
+      refB_size = cublas_param.ldb * cublas_param.k; //B_nk
+    }
     refC_size = cublas_param.ldc * cublas_param.n; //C_mn
   } else {
     // leading dimension is in terms of consecutive data
-    // elements in a row, multiplied by number of columns
-    refA_size = cublas_param.m * cublas_param.lda; //A_mk
-    refB_size = cublas_param.k * cublas_param.ldb; //B_kn
-    refC_size = cublas_param.m * cublas_param.ldc; //C_mn
-  }
+    // elements in a row, multiplied by number of columns.
+    if(cublas_param.trans_a == QUDA_CUBLAS_OP_N) {
+      refA_size = cublas_param.lda * cublas_param.m; //A_mk
+    } else {
+      refA_size = cublas_param.lda * cublas_param.k; //A_km
+    }
+    if(cublas_param.trans_b == QUDA_CUBLAS_OP_N) {
+      refB_size = cublas_param.ldb * cublas_param.k; //B_nk
+    } else {
+      refB_size = cublas_param.ldb * cublas_param.n; //B_kn
+    }
+    refC_size = cublas_param.ldc * cublas_param.m; //C_mn
+  }    
+
   
   void *refA = malloc(refA_size * re_im * data_size);
   void *refB = malloc(refB_size * re_im * data_size);
