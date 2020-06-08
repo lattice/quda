@@ -169,10 +169,13 @@ namespace quda
         Calculates the matrix UV^{s,c'}_mu(x) = \sum_c U^{c}_mu(x) * V^{s,c}_mu(x+mu)
   Where: mu = dir, s = fine spin, c' = coarse color, c = fine color
        */
-      template <bool from_coarse, int dim, QudaDirection dir, int fineSpin, int coarseSpin, int bM, int bN, int bK,
-                int block_y, int block_z, typename Wtype, typename Arg>
+      template <bool from_coarse, int dim, QudaDirection dir, int bM, int bN, int bK, int block_y, int block_z,
+                typename Wtype, typename Arg>
       __device__ __host__ inline void computeUV(Arg &arg, const Wtype &Wacc, int parity, int x_cb)
       {
+        constexpr int fineSpin = Arg::fineSpin;
+        // constexpr int coarseSpin = Arg::coarseSpin;
+
         int coord[4];
         getCoords(coord, x_cb, arg.x_size, parity);
 
@@ -308,8 +311,7 @@ namespace quda
 
     } // namespace impl
 
-    template <bool from_coarse, typename Float, int dim, QudaDirection dir, int fineSpin, int coarseSpin, int bM,
-              int bN, int bK, int block_y, int block_z, typename Arg>
+    template <bool from_coarse, int dim, QudaDirection dir, int bM, int bN, int bK, int block_y, int block_z, typename Arg>
     __global__ void ComputeUVMMA(Arg arg)
     {
       int x_cb = blockDim.x * blockIdx.x + threadIdx.x;
@@ -318,20 +320,23 @@ namespace quda
       int parity = blockIdx.y;
 
       if (dir == QUDA_FORWARDS) // only for preconditioned clover is V != AV
-        impl::computeUV<from_coarse, dim, dir, fineSpin, coarseSpin, bM, bN, bK, block_y, block_z>(arg, arg.V, parity,
-                                                                                                   x_cb);
+        impl::computeUV<from_coarse, dim, dir, bM, bN, bK, block_y, block_z>(arg, arg.V, parity, x_cb);
       else
-        impl::computeUV<from_coarse, dim, dir, fineSpin, coarseSpin, bM, bN, bK, block_y, block_z>(arg, arg.AV, parity,
-                                                                                                   x_cb);
+        impl::computeUV<from_coarse, dim, dir, bM, bN, bK, block_y, block_z>(arg, arg.AV, parity, x_cb);
     }
 
     namespace impl
     {
 
-      template <bool from_coarse, typename Float, int dim, QudaDirection dir, int fineSpin, int coarseSpin, int bM,
-                int bN, int bK, int block_y, int block_z, typename Arg, typename Gamma>
+      template <bool from_coarse, int dim, QudaDirection dir, int bM, int bN, int bK, int block_y, int block_z,
+                typename Arg, typename Gamma>
       __device__ void computeVUV(Arg &arg, const Gamma &gamma, int parity, int x_cb)
       {
+        using Float = typename Arg::Float;
+
+        constexpr int fineSpin = Arg::fineSpin;
+        constexpr int coarseSpin = Arg::coarseSpin;
+
         constexpr int nDim = 4;
         int coord[QUDA_MAX_DIM];
         int coord_coarse[QUDA_MAX_DIM];
@@ -523,19 +528,17 @@ namespace quda
 
     } // namespace impl
 
-    template <bool from_coarse, typename Float, int dim, QudaDirection dir, int fineSpin, int coarseSpin, int bM,
-              int bN, int bK, int block_y, int block_z, typename Arg>
+    template <bool from_coarse, int dim, QudaDirection dir, int bM, int bN, int bK, int block_y, int block_z, typename Arg>
     __global__ void ComputeVUVMMA(Arg arg)
     {
-      Gamma<Float, QUDA_DEGRAND_ROSSI_GAMMA_BASIS, dim> gamma;
+      Gamma<typename Arg::Float, QUDA_DEGRAND_ROSSI_GAMMA_BASIS, dim> gamma;
 
       int parity = blockIdx.y;
 
       int x_cb = blockDim.x * blockIdx.x + threadIdx.x;
       if (x_cb >= arg.fineVolumeCB) return;
 
-      impl::computeVUV<from_coarse, Float, dim, dir, fineSpin, coarseSpin, bM, bN, bK, block_y, block_z>(arg, gamma,
-                                                                                                         parity, x_cb);
+      impl::computeVUV<from_coarse, dim, dir, bM, bN, bK, block_y, block_z>(arg, gamma, parity, x_cb);
     }
 
   } // namespace mma
