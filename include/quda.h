@@ -1408,18 +1408,10 @@ extern "C" {
   /**
    * @brief Hacks for Callat
    */
+
   void laphSinkProject(void *host_quark, void **host_evec, double_complex *host_sinks,
 		       QudaInvertParam inv_param, unsigned int nEv, const int X[4]);
 
-  void laphAccumulateEvecs(int dil1, void *host_q1, double_complex *host_coeffs, void **host_evec, QudaInvertParam inv_param,
-			   unsigned int nEv, const int X[4]);
-
-  void laphColorCross(void *host_q1, void *host_q2, void *host_diq, QudaInvertParam inv_param,
-		      const int X[4]);
-
-  void laphColorContract(void *host_diq, void *host_q3, void *host_singlet, QudaInvertParam inv_param,
-			 const int X[4]);
-  
   void laphBaryonKernel(int n1, int n2, int n3, int nMom,
 			double _Complex *host_coeffs1, 
 			double _Complex *host_coeffs2, 
@@ -1428,7 +1420,7 @@ extern "C" {
 			int nEv, void **evPtr, 
 			void *retArray,
 			int blockSizeMomProj,
-			QudaInvertParam inv_param, const int X[4]);
+			const int X[4]);
   
   
   /**

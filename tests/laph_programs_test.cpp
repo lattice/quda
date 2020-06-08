@@ -147,7 +147,7 @@ int main(int argc, char **argv)
       }
     }
   }
-
+  /*
   for (int n=0; n<niter; n++) {
     laphColorCross(spinorY, spinorZ, spinorT, inv_param, X);
     if (n == niter-1) laphColorCrossCheck(spinorY, spinorZ, spinorT);
@@ -158,6 +158,7 @@ int main(int argc, char **argv)
     laphColorContract(spinorY, spinorZ, (void*)dcc_result, inv_param, X);
     if (n == niter-1) laphColorContractCheck(spinorY, spinorZ, dcc_result);
   }
+  */
 
   double _Complex *c1 = (double _Complex*)malloc(48 * 384 * sizeof(double _Complex));
   double _Complex *c2 = (double _Complex*)malloc(48 * 384 * sizeof(double _Complex));
@@ -177,16 +178,17 @@ int main(int argc, char **argv)
     }
   }
 
-  double _Complex *momP = (double _Complex*)malloc(48 * 384 * sizeof(double _Complex));
-  void *ret = malloc(data_size);
-  laphBaryonKernel(48, 48, 48, 33, c1, c2, c3, momP, 384, evecs, ret, 10, inv_param, X);
+  double _Complex *momP = (double _Complex*)malloc(33 * 48 * 48 *  48 * sizeof(double _Complex));
+  
+  void *ret = malloc(48 * 48 * 48 * 33 * 2 * data_size);
+  laphBaryonKernel(48, 48, 48, 33, c1, c2, c3, momP, 384, evecs, ret, 1024, X);
   
   host_free(spinorX);
   host_free(spinorY);
   host_free(spinorZ);
   host_free(spinorT);
   free(dsp_result);
-  free(dcc_result);
+  //free(dcc_result);
   
   // finalize the QUDA library
   endQuda();

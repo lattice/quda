@@ -5966,7 +5966,7 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
   profileCuBLAS.TPSTOP(QUDA_PROFILE_TOTAL);
   saveTuneCache();
 }
- 
+
 void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_sinks,
 		     QudaInvertParam inv_param, unsigned int nEv, const int X[4])
 {
@@ -6049,241 +6049,6 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
   profileSinkProject.TPSTOP(QUDA_PROFILE_FREE);
   profileSinkProject.TPSTOP(QUDA_PROFILE_TOTAL);
 }
- 
- void laphAccumulateEvecs(int dil1, void *host_q1, double _Complex *host_coeffs, void **host_evec, QudaInvertParam inv_param, 
-			 unsigned int nEv, const int X[4])
-{
-  profileAccumulateEvecs.TPSTART(QUDA_PROFILE_TOTAL);
-  profileAccumulateEvecs.TPSTART(QUDA_PROFILE_INIT);
-  
-  // Parameter object describing q1
-  ColorSpinorParam cpu_q1_param(host_q1, inv_param, X, false, QUDA_CPU_FIELD_LOCATION);
-  cpu_q1_param.nSpin = 1;  
-
-  // QUDA style wrapper around the host data
-  std::vector<ColorSpinorField*> q1;
-  cpu_q1_param.v = host_q1;
-  q1.push_back(ColorSpinorField::Create(cpu_q1_param));
-  
-  // Parameter object describing evecs
-  ColorSpinorParam cpu_evec_param(host_evec, inv_param, X, false, QUDA_CPU_FIELD_LOCATION);
-  cpu_evec_param.nSpin = 1;
-  
-  // QUDA style wrapper around the host data
-  std::vector<ColorSpinorField*> evec;
-  evec.reserve(nEv);
-  for (unsigned int iEv=0; iEv<nEv; ++iEv) {
-    cpu_evec_param.v = host_evec[iEv];
-    evec.push_back(ColorSpinorField::Create(cpu_evec_param));
-  }
-  
-  // Create device vectors
-  ColorSpinorParam cuda_q1_param(cpu_q1_param);
-  cuda_q1_param.location = QUDA_CUDA_FIELD_LOCATION;
-  cuda_q1_param.create = QUDA_ZERO_FIELD_CREATE;
-  cuda_q1_param.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
-  std::vector<ColorSpinorField *> quda_q1;
-  quda_q1.push_back(ColorSpinorField::Create(cuda_q1_param));
-  
-  // Create device vectors for evecs
-  ColorSpinorParam cuda_evec_param(cpu_evec_param);
-  cuda_evec_param.location = QUDA_CUDA_FIELD_LOCATION;
-  cuda_evec_param.create = QUDA_ZERO_FIELD_CREATE;
-  cuda_evec_param.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
-  std::vector<ColorSpinorField *> quda_evec;
-  quda_evec.push_back(ColorSpinorField::Create(cuda_evec_param));
-  profileAccumulateEvecs.TPSTOP(QUDA_PROFILE_INIT);  
-  
-  // Copy q1 field from host to device
-  profileAccumulateEvecs.TPSTART(QUDA_PROFILE_H2D);
-  *quda_q1[0] = *q1[0];
-  profileAccumulateEvecs.TPSTOP(QUDA_PROFILE_H2D);
-    
-  // check we are safe to cast into a Complex (= std::complex<double>)
-  if (sizeof(Complex) != sizeof(double _Complex)) {
-    errorQuda("Irreconcilable difference between interface and internal complex number conventions");
-  }
-  
-  std::complex<double>* hostCoeffsPtr = reinterpret_cast<std::complex<double>*>(host_coeffs);
-  
-  // Iterate over all EV and call 1x1 kernel for now
-  for (unsigned int iEv=0; iEv<nEv; ++iEv) {
-    profileAccumulateEvecs.TPSTART(QUDA_PROFILE_H2D);
-    *quda_evec[0] = *evec[iEv];
-    profileAccumulateEvecs.TPSTOP(QUDA_PROFILE_H2D);
-    
-    // We now perfrom the caxpy
-    profileAccumulateEvecs.TPSTART(QUDA_PROFILE_COMPUTE);
-    blas::caxpy(hostCoeffsPtr[dil1*nEv + iEv], *quda_evec[0], *quda_q1[0]);
-    profileAccumulateEvecs.TPSTOP(QUDA_PROFILE_COMPUTE);     
-  }
-
-  // Copy q1 field from device to host
-  profileAccumulateEvecs.TPSTART(QUDA_PROFILE_D2H);
-  *q1[0] = *quda_q1[0]; 
-  profileAccumulateEvecs.TPSTOP(QUDA_PROFILE_D2H);
-  
-  // Clean up memory allocations
-  profileAccumulateEvecs.TPSTART(QUDA_PROFILE_FREE);
-  delete q1[0];
-  delete quda_q1[0];
-  for (unsigned int iEv=0; iEv<nEv; ++iEv) delete evec[iEv];
-  delete quda_evec[0];
-  profileAccumulateEvecs.TPSTOP(QUDA_PROFILE_FREE);
-  profileAccumulateEvecs.TPSTOP(QUDA_PROFILE_TOTAL);
-}
-
-void laphColorCross(void *host_q1, void *host_q2, void *host_diq, QudaInvertParam inv_param, const int X[4])
-{
-  
-  profileColorCross.TPSTART(QUDA_PROFILE_TOTAL);
-  profileColorCross.TPSTART(QUDA_PROFILE_INIT);
-  
-  // Parameter object describing q1
-  ColorSpinorParam cpu_q1_param(host_q1, inv_param, X, false, QUDA_CPU_FIELD_LOCATION);
-  cpu_q1_param.nSpin = 1;    
-  // QUDA style wrapper around the host data
-  std::vector<ColorSpinorField*> q1;
-  cpu_q1_param.v = host_q1;
-  q1.push_back(ColorSpinorField::Create(cpu_q1_param));
-  
-  // Parameter object describing q2
-  ColorSpinorParam cpu_q2_param(host_q2, inv_param, X, false, QUDA_CPU_FIELD_LOCATION);
-  cpu_q2_param.nSpin = 1;
-  // QUDA style wrapper around the host data
-  std::vector<ColorSpinorField*> q2;
-  cpu_q2_param.v = host_q2;
-  q2.push_back(ColorSpinorField::Create(cpu_q2_param));
-  
-  // Parameter object describing diq
-  ColorSpinorParam cpu_diq_param(host_diq, inv_param, X, false, QUDA_CPU_FIELD_LOCATION);
-  cpu_diq_param.nSpin = 1;    
-  // QUDA style wrapper around the host data
-  std::vector<ColorSpinorField*> diq;
-  cpu_diq_param.v = host_diq;
-  diq.push_back(ColorSpinorField::Create(cpu_diq_param));
-
-  // Create device vectors
-  ColorSpinorParam cuda_q1_param(cpu_q1_param);
-  cuda_q1_param.location = QUDA_CUDA_FIELD_LOCATION;
-  cuda_q1_param.create = QUDA_ZERO_FIELD_CREATE;
-  cuda_q1_param.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
-  std::vector<ColorSpinorField *> quda_q1;
-  quda_q1.push_back(ColorSpinorField::Create(cuda_q1_param));
-
-  ColorSpinorParam cuda_q2_param(cpu_q2_param);
-  cuda_q2_param.location = QUDA_CUDA_FIELD_LOCATION;
-  cuda_q2_param.create = QUDA_ZERO_FIELD_CREATE;
-  cuda_q2_param.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
-  std::vector<ColorSpinorField *> quda_q2;
-  quda_q2.push_back(ColorSpinorField::Create(cuda_q2_param));
-
-  ColorSpinorParam cuda_diq_param(cpu_diq_param);
-  cuda_diq_param.location = QUDA_CUDA_FIELD_LOCATION;
-  cuda_diq_param.create = QUDA_ZERO_FIELD_CREATE;
-  cuda_diq_param.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
-  std::vector<ColorSpinorField *> quda_diq;
-  quda_diq.push_back(ColorSpinorField::Create(cuda_diq_param));
-
-  profileColorCross.TPSTOP(QUDA_PROFILE_INIT);  
-
-  // Copy q1, q2 fields from host to device
-  profileColorCross.TPSTART(QUDA_PROFILE_H2D);
-  *quda_q1[0] = *q1[0];
-  *quda_q2[0] = *q2[0];
-  profileColorCross.TPSTOP(QUDA_PROFILE_H2D);
-    
-  // We now perfrom the color cross
-  profileColorCross.TPSTART(QUDA_PROFILE_COMPUTE);
-  colorCrossQuda(*quda_q1[0], *quda_q2[0], *quda_diq[0]);
-  profileColorCross.TPSTOP(QUDA_PROFILE_COMPUTE);     
-
-  // Copy diq field from device host
-  profileColorCross.TPSTART(QUDA_PROFILE_D2H);
-  *diq[0] = *quda_diq[0];
-  profileColorCross.TPSTOP(QUDA_PROFILE_D2H);
-
-  // Clean up memory allocations
-  profileColorCross.TPSTART(QUDA_PROFILE_FREE);
-  delete q1[0];
-  delete quda_q1[0];
-  delete q2[0];
-  delete quda_q2[0];
-  delete diq[0];
-  delete quda_diq[0];
-  profileColorCross.TPSTOP(QUDA_PROFILE_FREE);
-  profileColorCross.TPSTOP(QUDA_PROFILE_TOTAL);
-}
- 
-void laphColorContract(void *host_diq, void *host_q3, void *host_singlet, QudaInvertParam inv_param, const int X[4])
-{
-
-  profileColorContract.TPSTART(QUDA_PROFILE_TOTAL);
-  profileColorContract.TPSTART(QUDA_PROFILE_INIT);
-  
-  // Parameter object describing diq
-  ColorSpinorParam cpu_diq_param(host_diq, inv_param, X, false, QUDA_CPU_FIELD_LOCATION);
-  cpu_diq_param.nSpin = 1;    
-  // QUDA style wrapper around the host data
-  std::vector<ColorSpinorField*> diq;
-  cpu_diq_param.v = host_diq;
-  diq.push_back(ColorSpinorField::Create(cpu_diq_param));
-
-  // Parameter object describing q3
-  ColorSpinorParam cpu_q3_param(host_q3, inv_param, X, false, QUDA_CPU_FIELD_LOCATION);
-  cpu_q3_param.nSpin = 1;    
-  // QUDA style wrapper around the host data
-  std::vector<ColorSpinorField*> q3;
-  cpu_q3_param.v = host_q3;
-  q3.push_back(ColorSpinorField::Create(cpu_q3_param));
-    
-  // Create device vectors
-  ColorSpinorParam cuda_diq_param(cpu_diq_param);
-  cuda_diq_param.location = QUDA_CUDA_FIELD_LOCATION;
-  cuda_diq_param.create = QUDA_ZERO_FIELD_CREATE;
-  cuda_diq_param.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
-  cuda_diq_param.nSpin = 1;
-  std::vector<ColorSpinorField *> quda_diq;
-  quda_diq.push_back(ColorSpinorField::Create(cuda_diq_param));
-
-  ColorSpinorParam cuda_q3_param(cpu_q3_param);
-  cuda_q3_param.location = QUDA_CUDA_FIELD_LOCATION;
-  cuda_q3_param.create = QUDA_ZERO_FIELD_CREATE;
-  cuda_q3_param.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
-  cuda_q3_param.nSpin = 1;
-  std::vector<ColorSpinorField *> quda_q3;
-  quda_q3.push_back(ColorSpinorField::Create(cuda_q3_param));
-
-  size_t data_bytes = diq[0]->Volume() * 2 * diq[0]->Precision();
-  void *d_singlet = pool_device_malloc(data_bytes);
-  profileColorContract.TPSTOP(QUDA_PROFILE_INIT);  
-
-  // Copy q3 and diq fields from host to device
-  profileColorContract.TPSTART(QUDA_PROFILE_H2D);
-  *quda_q3[0] = *q3[0];
-  *quda_diq[0] = *diq[0];
-  profileColorContract.TPSTOP(QUDA_PROFILE_H2D);
-  
-  // We now perfrom the color contraction
-  profileColorContract.TPSTART(QUDA_PROFILE_COMPUTE);
-  colorContractQuda(*quda_diq[0], *quda_q3[0], d_singlet);
-  profileColorContract.TPSTOP(QUDA_PROFILE_COMPUTE);     
-
-  profileColorContract.TPSTART(QUDA_PROFILE_D2H);
-  qudaMemcpy(host_singlet, d_singlet, data_bytes, cudaMemcpyDeviceToHost);
-  profileColorContract.TPSTOP(QUDA_PROFILE_D2H);
-  
-  // Clean up memory allocations
-  profileColorContract.TPSTART(QUDA_PROFILE_FREE);
-  pool_device_free(d_singlet);
-  delete diq[0];
-  delete quda_diq[0];
-  delete q3[0];
-  delete quda_q3[0];
-  profileColorContract.TPSTOP(QUDA_PROFILE_FREE);
-  profileColorContract.TPSTOP(QUDA_PROFILE_TOTAL);
-  
-}
 
 void laphBaryonKernel(int n1, int n2, int n3, int nMom,
 		      double _Complex *host_coeffs1, 
@@ -6293,18 +6058,29 @@ void laphBaryonKernel(int n1, int n2, int n3, int nMom,
 		      int nEv, void **host_evec, 
 		      void *retArr,
 		      int blockSizeMomProj,
-		      QudaInvertParam inv_param, const int X[4]) {
+		      const int X[4]) {
   
   profileBaryonKernel.TPSTART(QUDA_PROFILE_TOTAL);
   profileBaryonKernel.TPSTART(QUDA_PROFILE_INIT);
 
-  for(int i=0; i<10; i++) {
-    //printfQuda("host_evec[%d][0] = %e %e\n", i, 
-    //reinterpret_cast<std::complex<double>*>(host_evec[i])[0].real(), 
-    //reinterpret_cast<std::complex<double>*>(host_evec[i])[0].imag());
-  }
-    
+  QudaInvertParam inv_param = newQudaInvertParam();
   
+  inv_param.dslash_type = QUDA_WILSON_DSLASH;
+  inv_param.solution_type = QUDA_MAT_SOLUTION;
+  inv_param.solve_type = QUDA_DIRECT_SOLVE;
+  
+  inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
+  inv_param.cuda_prec = QUDA_DOUBLE_PRECISION;
+  inv_param.dirac_order = QUDA_DIRAC_ORDER;
+  
+  // PADDING
+  inv_param.sp_pad = 0;
+  inv_param.cl_pad = 0;
+  
+  inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
+  inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
+
+
   // Create host pointers for the data device side objects.
   //--------------------------------------------------------------------------------
   // Parameter object describing evecs
@@ -6318,11 +6094,6 @@ void laphBaryonKernel(int n1, int n2, int n3, int nMom,
   for (int iEv=0; iEv<nEv; ++iEv) {
     cpu_evec_param.v = host_evec[iEv];
     evec.push_back(ColorSpinorField::Create(cpu_evec_param));
-  }
-
-  //eyeball
-  for(int i=0; i<5; i++) {
-    //evec[i]->PrintVector(0);
   }
 
   // Allocate device memory for evecs. This is done to ensure a contiguous
@@ -6433,17 +6204,6 @@ void laphBaryonKernel(int n1, int n2, int n3, int nMom,
   qudaMemcpy(d_mom, hostMomPtr, data_mom_bytes, cudaMemcpyHostToDevice);  
   profileBaryonKernel.TPSTOP(QUDA_PROFILE_H2D);
 
-  //eyeball
-  /*
-  for(int i=0; i<10; i++) {
-    printfQuda("coeff1[%d] = %e %e\n", i, hostCoeffs1Ptr[i].real(), hostCoeffs1Ptr[i].imag());
-    printfQuda("coeff2[%d] = %e %e\n", i, hostCoeffs2Ptr[i].real(), hostCoeffs3Ptr[i].imag());
-    printfQuda("coeff3[%d] = %e %e\n", i, hostCoeffs3Ptr[i].real(), hostCoeffs3Ptr[i].imag());
-    printfQuda("mom[%d] = %e %e\n", i, hostMomPtr[i].real(), hostMomPtr[i].imag());
-    quda_evec[i]->PrintVector(0);
-  }
-  */
-
   // Construct momenta
   __complex__ double alpha = 1.0;
   __complex__ double beta = 0.0;  
@@ -6483,34 +6243,7 @@ void laphBaryonKernel(int n1, int n2, int n3, int nMom,
   std::swap(cublas_param_init.lda, cublas_param_init.ldb);
   std::swap(cublas_param_init.trans_a, cublas_param_init.trans_b);
 
-  /*
-  void *host_1 = malloc(data_q2_bytes);
-  qudaMemcpy(host_1, d_evec, data_q2_bytes, cudaMemcpyDeviceToHost);  
-
-  void *host_2 = malloc(data_coeffs2_bytes);
-  qudaMemcpy(host_2, d_coeffs2, data_coeffs2_bytes, cudaMemcpyDeviceToHost);  
-  
-  for(int i=0; i<10; i++) {
-    printfQuda("evecs[%d] = (%e,%e)\n", i, 
-	       ((std::complex<double>*)host_1)[i].real(), 
-	       ((std::complex<double>*)host_1)[i].imag());
-
-    printfQuda("coeffs2[%d] = (%e,%e)\n", i, 
-	       ((std::complex<double>*)host_2)[i].real(), 
-	       ((std::complex<double>*)host_2)[i].imag());	       
-  }
-  */
   cublas::BatchGEMM(d_evec, d_coeffs2, d_q2, cublas_param_init, QUDA_CUDA_FIELD_LOCATION);
-  /*
-  void *host_q2 = malloc(data_q2_bytes);
-  qudaMemcpy(host_q2, d_q2, data_q2_bytes, cudaMemcpyDeviceToHost);  
-  for(int i=0; i<10; i++) {
-    printfQuda("host_q2[%d] = (%e,%e)\n", i, 
-	       ((std::complex<double>*)host_q2)[i].real(), 
-	       ((std::complex<double>*)host_q2)[i].imag());	       
-  }
-  exit(0);
-  */
 
   std::swap(cublas_param_init.m, cublas_param_init.n);
   std::swap(cublas_param_init.lda, cublas_param_init.ldb);
@@ -6520,7 +6253,9 @@ void laphBaryonKernel(int n1, int n2, int n3, int nMom,
   std::swap(cublas_param_init.m, cublas_param_init.n);
   std::swap(cublas_param_init.lda, cublas_param_init.ldb);
   std::swap(cublas_param_init.trans_a, cublas_param_init.trans_b);  
+
   cublas::BatchGEMM(d_evec, d_coeffs3, d_q3, cublas_param_init, QUDA_CUDA_FIELD_LOCATION);
+
   std::swap(cublas_param_init.m, cublas_param_init.n);
   std::swap(cublas_param_init.lda, cublas_param_init.ldb);
   std::swap(cublas_param_init.trans_a, cublas_param_init.trans_b);
@@ -6535,20 +6270,14 @@ void laphBaryonKernel(int n1, int n2, int n3, int nMom,
   for (int dil1=0; dil1<n1; dil1++) {
     for (int dil2=0; dil2<n2; dil2++) {
 
-      //printfQuda("Q1\n"); quda_q1[0]->PrintVector(0);
-      //printfQuda("Q2\n"); quda_q2[0]->PrintVector(0);
-      
       profileColorCross.TPSTART(QUDA_PROFILE_COMPUTE);
       colorCrossQuda(*quda_q1[dil1], *quda_q2[dil2], *quda_diq[0]);
       profileColorCross.TPSTOP(QUDA_PROFILE_COMPUTE);
-      //printfQuda("DIQ\n"); quda_diq[0]->PrintVector(0);
       for (int dil3=0; dil3<n3; dil3++) {
 	profileColorContract.TPSTART(QUDA_PROFILE_COMPUTE);	
 	colorContractQuda(*quda_diq[0], *quda_q3[dil3], 
 			  (std::complex<double>*)d_tmp + nSites*nInBlock);
 	profileColorContract.TPSTOP(QUDA_PROFILE_COMPUTE);
-	//printfQuda("q3\n"); quda_q3[dil3]->PrintVector(0);
-	//exit(0);
 	nInBlock++;
 
 	if (nInBlock == blockSizeMomProj || ((dil1+1 == n1) && (dil2+1 == n2) && (dil3+1 == n3))) {
@@ -6558,9 +6287,11 @@ void laphBaryonKernel(int n1, int n2, int n3, int nMom,
 	  std::swap(cublas_param_mom_sum.m, cublas_param_mom_sum.n);
 	  std::swap(cublas_param_mom_sum.lda, cublas_param_mom_sum.ldb);
 	  std::swap(cublas_param_mom_sum.trans_a, cublas_param_mom_sum.trans_b);
+
 	  profileCuBLAS.TPSTART(QUDA_PROFILE_COMPUTE);	  
 	  cublas::BatchGEMM(d_tmp, d_mom, d_ret, cublas_param_mom_sum, QUDA_CUDA_FIELD_LOCATION);
 	  profileCuBLAS.TPSTOP(QUDA_PROFILE_COMPUTE);	  
+
 	  std::swap(cublas_param_mom_sum.trans_a, cublas_param_mom_sum.trans_b);
 	  std::swap(cublas_param_mom_sum.m, cublas_param_mom_sum.n);
 	  std::swap(cublas_param_mom_sum.lda, cublas_param_mom_sum.ldb);
