@@ -205,26 +205,27 @@ namespace quda
 #endif
           } else {
 #if 1
+            // Here instead of fineColor x coarseColor x fineColor,
+            // we do (fineColor * fineSpin) x coarseColor x fineColor
+
+            constexpr int M = tile.m * fineSpin;
+            constexpr int N = tile.n;
+            constexpr int K = tile.k;
+
+            constexpr int lda = K * fineSpin;
+            constexpr int ldb = N;
+            constexpr int ldc = N;
+
+            using Config = MmaConfig<M, N, K, lda, ldb, ldc, bM, bN, bK, block_y, block_z>;
+
             for (int s_col = 0; s_col < fineSpin; s_col++) {
-              // here instead of fineColor x coarseColor x fineColor,
-              // we do (fineColor * fineSpin) x coarseColor x fineColor
+
               auto a = arg.U.wrap(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, 0, s_col);
               auto b = Wacc.wrap_ghost(dim, 1, (parity + 1) & 1, ghost_idx, s_col);
               auto c = arg.UV.wrap(parity, x_cb, s_col * fineSpin);
 
-              constexpr int M = tile.m * fineSpin;
-              constexpr int N = tile.n;
-              constexpr int K = tile.k;
-
-              constexpr int lda = K * fineSpin;
-              constexpr int ldb = N;
-              constexpr int ldc = N;
-
-              using Config = MmaConfig<M, N, K, lda, ldb, ldc, bM, bN, bK, block_y, block_z>;
-              Config config(smem_ptr);
-
               constexpr bool compute_max_only = false;
-              config.perform_mma<a_dagger, b_dagger, compute_max_only>(a, b, c, 0, 0);
+              Config::template perform_mma<a_dagger, b_dagger, compute_max_only>(a, b, c, 0, 0);
             }
 #else
             for (int k = 0; k < tile.k; k += tile.K) { // Fine Color columns of gauge field
@@ -261,27 +262,27 @@ namespace quda
 #endif
           } else {
 #if 1
+            // Here instead of fineColor x coarseColor x fineColor,
+            // we do (fineColor * fineSpin) x coarseColor x fineColor
+
+            constexpr int M = tile.m * fineSpin;
+            constexpr int N = tile.n;
+            constexpr int K = tile.k;
+
+            constexpr int lda = K * fineSpin;
+            constexpr int ldb = N;
+            constexpr int ldc = N;
+
+            using Config = MmaConfig<M, N, K, lda, ldb, ldc, bM, bN, bK, block_y, block_z>;
+
             for (int s_col = 0; s_col < fineSpin; s_col++) {
-              // here instead of fineColor x coarseColor x fineColor,
-              // we do (fineColor * fineSpin) x coarseColor x fineColor
-              // TODO: Need to have accessor methods in the corresponding color spinor fields.
+
               auto a = arg.U.wrap(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, 0, s_col);
               auto b = Wacc.wrap((parity + 1) & 1, y_cb, s_col);
               auto c = arg.UV.wrap(parity, x_cb, s_col * fineSpin);
 
-              constexpr int M = tile.m * fineSpin;
-              constexpr int N = tile.n;
-              constexpr int K = tile.k;
-
-              constexpr int lda = K * fineSpin;
-              constexpr int ldb = N;
-              constexpr int ldc = N;
-
-              using Config = MmaConfig<M, N, K, lda, ldb, ldc, bM, bN, bK, block_y, block_z>;
-              Config config(smem_ptr);
-
               constexpr bool compute_max_only = false;
-              config.perform_mma<a_dagger, b_dagger, compute_max_only>(a, b, c, 0, 0);
+              Config::template perform_mma<a_dagger, b_dagger, compute_max_only>(a, b, c, 0, 0);
             }
 #else
             for (int k = 0; k < tile.k; k += tile.K) { // Fine Color columns of gauge field
@@ -433,7 +434,6 @@ namespace quda
           extern __shared__ half smem_ptr[];
 
           using Config = MmaConfig<M, N, K, lda, ldb, ldc, bM, bN, bK, block_y, block_z>;
-          Config config(smem_ptr);
 
           constexpr int m_offset = 0;
           constexpr int n_offset = 0;
@@ -442,6 +442,16 @@ namespace quda
           static_assert(N == bN, "Dividing M/N has NOT been implemented yet.\n");
           static_assert(K == bK, "This implementation ONLY works for K == bK.\n");
 
+          typename Config::SmemObjA smem_obj_a_real(smem_ptr);
+          typename Config::SmemObjA smem_obj_a_imag(smem_obj_a_real.ptr + Config::smem_lda * bK);
+          typename Config::SmemObjB smem_obj_b_real(smem_obj_a_imag.ptr + Config::smem_lda * bK);
+          typename Config::SmemObjB smem_obj_b_imag(smem_obj_b_real.ptr + Config::smem_ldb * bK);
+
+          typename Config::Accumulator accumulator((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x);
+
+          typename Config::ALoader a_loader;
+          typename Config::BLoader b_loader;
+
           // Not unrolling to lift regiter pressure
           for (int s = 0; s < fineSpin; s++) {
 
@@ -449,10 +459,10 @@ namespace quda
 
             __syncthreads();
 #ifdef USE_GMEM_MMA_PIPELINING
-            config.a_loader.g2r<Config::lda, a_dagger>(a, m_offset, 0);
-            config.a_loader.r2s(config.smem_obj_a_real, config.smem_obj_a_imag);
+            a_loader.g2r<Config::lda, a_dagger>(a, m_offset, 0);
+            a_loader.r2s(smem_obj_a_real, smem_obj_a_imag);
 #else
-            config.a_loader.g2s<Config::lda, a_dagger>(config.smem_obj_a_real, config.smem_obj_a_imag, a, m_offset, 0);
+            a_loader.g2s<Config::lda, a_dagger>(smem_obj_a_real, smem_obj_a_imag, a, m_offset, 0);
 #endif
             __syncthreads();
 
@@ -462,47 +472,46 @@ namespace quda
 
               __syncthreads();
 #ifdef USE_GMEM_MMA_PIPELINING
-              config.b_loader.g2r<Config::ldb, b_dagger>(b, n_offset, 0);
-              config.b_loader.r2s(config.smem_obj_b_real, config.smem_obj_b_imag);
+              b_loader.g2r<Config::ldb, b_dagger>(b, n_offset, 0);
+              b_loader.r2s(smem_obj_b_real, smem_obj_b_imag);
 #else
-              config.b_loader.g2s<Config::ldb, b_dagger>(config.smem_obj_b_real, config.smem_obj_b_imag, b, n_offset, 0);
+              b_loader.g2s<Config::ldb, b_dagger>(smem_obj_b_real, smem_obj_b_imag, b, n_offset, 0);
 #endif
               __syncthreads();
 
-              config.mma_op.zero();
-              config.mma_op.mma<Config::tile_acc_dim>(config.smem_obj_a_real, config.smem_obj_a_imag,
-                                                      config.smem_obj_b_real, config.smem_obj_b_imag);
+              accumulator.zero();
+              accumulator.mma<Config::tile_acc_dim>(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
 
               if (!isDiagonal) {
                 const int dim_index = arg.dim_index % arg.Y_atomic.geometry;
                 auto cc = arg.Y_atomic.wrap(dim_index, coarse_parity, coarse_x_cb, s, s_col);
                 constexpr bool atomic_dagger = false;
-                config.mma_op.store_atomic<N * fineSpin, atomic_dagger>(cc, m_offset, n_offset);
+                accumulator.store_atomic<N * fineSpin, atomic_dagger>(cc, m_offset, n_offset);
                 // arg.Y_atomic.atomicAdd(dim_index, coarse_parity, coarse_x_cb, s_row, s_col, i0 + i, j0 + j,
                 //     vuv[s_row * coarseSpin + s_col](i, j));
               } else {
 
-                config.mma_op.ax(-arg.kappa);
+                accumulator.ax(-arg.kappa);
 
                 if (dir == QUDA_BACKWARDS) {
                   auto cc = arg.X_atomic.wrap(0, coarse_parity, coarse_x_cb, s_col, s);
                   constexpr bool atomic_dagger = true;
-                  config.mma_op.store_atomic<N * fineSpin, atomic_dagger>(cc, m_offset, n_offset);
+                  accumulator.store_atomic<N * fineSpin, atomic_dagger>(cc, m_offset, n_offset);
                   // arg.X_atomic.atomicAdd(0, coarse_parity, coarse_x_cb, s_col, s_row, j0 + j, i0 + i,
                   //     conj(vuv[s_row * coarseSpin + s_col](i, j)));
                 } else {
                   auto cc = arg.X_atomic.wrap(0, coarse_parity, coarse_x_cb, s, s_col);
                   constexpr bool atomic_dagger = false;
-                  config.mma_op.store_atomic<N * fineSpin, atomic_dagger>(cc, m_offset, n_offset);
+                  accumulator.store_atomic<N * fineSpin, atomic_dagger>(cc, m_offset, n_offset);
                   // arg.X_atomic.atomicAdd(0, coarse_parity, coarse_x_cb, s_row, s_col, i0 + i, j0 + j,
                   //     vuv[s_row * coarseSpin + s_col](i, j));
                 }
 
                 if (!arg.bidirectional) {
-                  if (s != s_col) { config.mma_op.ax(static_cast<float>(-1.0)); }
+                  if (s != s_col) { accumulator.ax(static_cast<float>(-1.0)); }
                   constexpr bool atomic_dagger = false;
                   auto cc = arg.X_atomic.wrap(0, coarse_parity, coarse_x_cb, s, s_col);
-                  config.mma_op.store_atomic<N * fineSpin, atomic_dagger>(cc, m_offset, n_offset);
+                  accumulator.store_atomic<N * fineSpin, atomic_dagger>(cc, m_offset, n_offset);
                   // arg.X_atomic.atomicAdd(0, coarse_parity, coarse_x_cb, s_row, s_col, i0 + i, j0 + j,
                   //     vuv[s_row * coarseSpin + s_col](i, j));
                 }

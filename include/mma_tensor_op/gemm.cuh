@@ -52,14 +52,17 @@ namespace quda
       return SharedMemoryObject<T, M, N, ldm, ldn> {ptr_};
     }
 
-    template <int M, int N, int m_stride, int n_stride, bool transpose, class SmemAccessor> struct GlobalMemoryLoader {
+    template <int M, int N, int bM, int bN, int m_stride, int n_stride, bool transpose> struct GlobalMemoryLoader {
 
-      static constexpr int sM = SmemAccessor::M; // This is the block M (bM)
-      static constexpr int sN = SmemAccessor::N;
+      static constexpr int sM = bM; // This is the block M (bM)
+      static constexpr int sN = bN;
 
       static constexpr int m_stride_pack = m_stride * 2;
       static constexpr int m_dim = (sM + m_stride_pack - 1) / m_stride_pack;
       static constexpr int n_dim = (sN + n_stride - 1) / n_stride;
+
+      static constexpr bool check_global_bound = !(M % bM == 0 && N % bN == 0);
+      static constexpr bool check_shared_bound = !(bM % m_stride_pack == 0 && bN % n_stride == 0);
 
 #ifdef USE_GMEM_MMA_PIPELINING
       half2 reg_real[m_dim * n_dim];
@@ -78,19 +81,22 @@ namespace quda
         auto p = gmem.data();
         auto scale_inv = gmem.scale_inv;
         constexpr bool fixed = GmemAccessor::fixed;
+
 #pragma unroll
         for (int n = 0; n < n_dim; n++) {
+
 #pragma unroll
           for (int m = 0; m < m_dim; m++) {
+
             const int n_idx_blk = n * n_stride + y;
             const int m_idx_blk = m * m_stride_pack + z;
 
-            if (m_idx_blk < sM && n_idx_blk < sN) {
+            if (!check_shared_bound || (m_idx_blk < sM && n_idx_blk < sN)) {
 
               int n_idx = n_idx_blk + n_offset;
               int m_idx = m_idx_blk + m_offset;
 
-              if (n_idx < N && m_idx < M) {
+              if (!check_global_bound || (n_idx < N && m_idx < M)) {
 
                 if (transpose == dagger) {
                   auto xx = p[(m_idx + 0) * ld + n_idx];
@@ -160,12 +166,12 @@ namespace quda
             const int n_idx_smem = n * n_stride + y;
             const int m_idx_smem = m * m_stride_pack + z;
 
-            if (m_idx_smem < sM && n_idx_smem < sN) {
+            if (!check_shared_bound || (m_idx_smem < sM && n_idx_smem < sN)) {
 
               const int n_idx = n_idx_smem + n_offset;
               const int m_idx = m_idx_smem + m_offset;
 
-              if (n_idx < N && m_idx < M) {
+              if (!check_global_bound || (n_idx < N && m_idx < M)) {
 
                 if (transpose == dagger) {
 
@@ -215,7 +221,7 @@ namespace quda
 #endif
     };
 
-    template <class OperandC, int warp_cycle, int tile_col_dim> struct MmaOp {
+    template <class OperandC, int warp_cycle, int tile_col_dim> struct MmaAccumulator {
 
       static constexpr int size = warp_cycle;
 
@@ -224,7 +230,7 @@ namespace quda
 
       WarpRegisterMapping wrm;
 
-      __device__ inline MmaOp(int thread_id) : wrm(thread_id) { }
+      __device__ inline MmaAccumulator(int thread_id) : wrm(thread_id) { }
 
       __device__ inline void zero()
       {
@@ -258,7 +264,7 @@ namespace quda
           const int warp_col = logical_warp_index - warp_row * tile_col_dim;
 
 #pragma unroll
-          for (int tile_k = 0; tile_k < tile_acc_dim; tile_k++) {
+          for (int tile_k = 0; tile_k < tile_acc_dim * WMMA_K; tile_k += WMMA_K) {
 
             MmaOperandA op_a_real;
             op_a_real.load(smem_obj_a_real, tile_k, warp_row, wrm);
@@ -369,32 +375,27 @@ namespace quda
       using SmemObjA = SharedMemoryObject<half, bM, bK, 1, smem_lda>;
       using SmemObjB = SharedMemoryObject<half, bN, bK, 1, smem_ldb>;
 
-      SmemObjA smem_obj_a_real;
-      SmemObjA smem_obj_a_imag;
-      SmemObjB smem_obj_b_real;
-      SmemObjB smem_obj_b_imag;
+      using Accumulator = MmaAccumulator<MmaOperandC<accumuate_reg_type>, warp_cycle, tile_col_dim>;
 
-      MmaOp<MmaOperandC<accumuate_reg_type>, warp_cycle, tile_col_dim> mma_op; // (thread_id);
-
-      GlobalMemoryLoader<M, K, n_row, n_col, a_transpose, SmemObjA> a_loader;
-
-      GlobalMemoryLoader<N, K, n_row, n_col, b_transpose, SmemObjB> b_loader;
-
-      __device__ inline MmaConfig(half *smem_ptr) :
-        smem_obj_a_real(smem_ptr),
-        smem_obj_a_imag(smem_obj_a_real.ptr + smem_lda * bK),
-        smem_obj_b_real(smem_obj_a_imag.ptr + smem_lda * bK),
-        smem_obj_b_imag(smem_obj_b_real.ptr + smem_ldb * bK),
-        mma_op((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x),
-        a_loader(),
-        b_loader()
-      {
-      }
+      using ALoader = GlobalMemoryLoader<M, K, bM, bK, n_row, n_col, a_transpose>;
+      using BLoader = GlobalMemoryLoader<N, K, bN, bK, n_row, n_col, b_transpose>;
 
       template <bool a_dagger, bool b_dagger, bool compute_max_only, class A, class B, class C>
-      __device__ inline float perform_mma(const A &a, const B &b, C &c, int m_offset, int n_offset)
+      static __device__ inline float perform_mma(const A &a, const B &b, C &c, int m_offset, int n_offset)
       {
         float max = 0;
+
+        extern __shared__ half smem_ptr[];
+
+        SmemObjA smem_obj_a_real(smem_ptr);
+        SmemObjA smem_obj_a_imag(smem_obj_a_real.ptr + smem_lda * bK);
+        SmemObjB smem_obj_b_real(smem_obj_a_imag.ptr + smem_lda * bK);
+        SmemObjB smem_obj_b_imag(smem_obj_b_real.ptr + smem_ldb * bK);
+
+        Accumulator accumulator((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x);
+
+        ALoader a_loader;
+        BLoader b_loader;
 
 #ifdef USE_GMEM_MMA_PIPELINING
         a_loader.g2r<lda, a_dagger>(a, m_offset, 0);
@@ -421,7 +422,7 @@ namespace quda
           __syncthreads();
 #endif
 
-          mma_op.mma<tile_acc_dim>(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
+          accumulator.mma<tile_acc_dim>(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
 
 #ifdef USE_GMEM_MMA_PIPELINING
           if (bk + bK < K) {
@@ -437,9 +438,9 @@ namespace quda
 
         // wrap up!
         if (compute_max_only) {
-          mma_op.abs_max(max);
+          accumulator.abs_max(max);
         } else {
-          mma_op.store<ldc>(c, m_offset, n_offset);
+          accumulator.store<ldc>(c, m_offset, n_offset);
         }
 
         return max;

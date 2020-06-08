@@ -58,7 +58,7 @@ namespace quda
       __device__ inline void load(const SmemObj &smem_obj, int k, int warp_row, const WarpRegisterMapping &wrm)
       {
         const unsigned *A = reinterpret_cast<const unsigned *>(smem_obj.ptr);
-        int idx_strided = k * 4 + wrm.quad_thread;
+        int idx_strided = k + wrm.quad_thread;
         int idx_contiguous = (warp_row * 16 + wrm.row_offset) / 2;
         const int thread_offset_a = idx_strided * (SmemObj::ldn / 2) + idx_contiguous;
         reg[0] = A[thread_offset_a];
@@ -84,7 +84,7 @@ namespace quda
       __device__ inline void load(const SmemObj &smem_obj, int k, int warp_col, const WarpRegisterMapping &wrm)
       {
         const unsigned *B = reinterpret_cast<const unsigned *>(smem_obj.ptr);
-        int idx_strided = k * 4 + wrm.quad_thread;
+        int idx_strided = k + wrm.quad_thread;
         int idx_contiguous = (warp_col * 16 + wrm.col_offset) / 2;
         const int thread_offset_b = idx_strided * (SmemObj::ldn / 2) + idx_contiguous;
         reg[0] = B[thread_offset_b];
@@ -196,20 +196,20 @@ namespace quda
     __device__ inline typename std::enable_if<std::is_same<typename TC::reg_type, unsigned>::value, void>::type
     gemm(const TA &op_a, const TB &op_b, TC &op_c)
     {
-      asm volatile("mma.sync.aligned.m8n8k4.col.row.f16.f16.f16.f16 {%0,%1,%2,%3}, {%4,%5}, {%6,%7}, {%0,%1,%2,%3};"
-                   : "+r"(op_c.reg[0]), "+r"(op_c.reg[1]), "+r"(op_c.reg[2]), "+r"(op_c.reg[3])
-                   : "r"(op_a.reg[0]), "r"(op_a.reg[1]), "r"(op_b.reg[0]), "r"(op_b.reg[1]));
+      asm("mma.sync.aligned.m8n8k4.col.row.f16.f16.f16.f16 {%0,%1,%2,%3}, {%4,%5}, {%6,%7}, {%0,%1,%2,%3};"
+          : "+r"(op_c.reg[0]), "+r"(op_c.reg[1]), "+r"(op_c.reg[2]), "+r"(op_c.reg[3])
+          : "r"(op_a.reg[0]), "r"(op_a.reg[1]), "r"(op_b.reg[0]), "r"(op_b.reg[1]));
     }
 
     template <class TA, class TB, class TC>
     __device__ inline typename std::enable_if<std::is_same<typename TC::reg_type, float>::value, void>::type
     gemm(const TA &op_a, const TB &op_b, TC &op_c)
     {
-      asm volatile("mma.sync.aligned.m8n8k4.col.row.f32.f16.f16.f32 {%0,%1,%2,%3,%4,%5,%6,%7}, {%8,%9}, {%10,%11}, "
-                   "{%0,%1,%2,%3,%4,%5,%6,%7};"
-                   : "+f"(op_c.reg[0]), "+f"(op_c.reg[1]), "+f"(op_c.reg[2]), "+f"(op_c.reg[3]), "+f"(op_c.reg[4]),
-                     "+f"(op_c.reg[5]), "+f"(op_c.reg[6]), "+f"(op_c.reg[7])
-                   : "r"(op_a.reg[0]), "r"(op_a.reg[1]), "r"(op_b.reg[0]), "r"(op_b.reg[1]));
+      asm("mma.sync.aligned.m8n8k4.col.row.f32.f16.f16.f32 {%0,%1,%2,%3,%4,%5,%6,%7}, {%8,%9}, {%10,%11}, "
+          "{%0,%1,%2,%3,%4,%5,%6,%7};"
+          : "+f"(op_c.reg[0]), "+f"(op_c.reg[1]), "+f"(op_c.reg[2]), "+f"(op_c.reg[3]), "+f"(op_c.reg[4]),
+            "+f"(op_c.reg[5]), "+f"(op_c.reg[6]), "+f"(op_c.reg[7])
+          : "r"(op_a.reg[0]), "r"(op_a.reg[1]), "r"(op_b.reg[0]), "r"(op_b.reg[1]));
     }
 
     template <typename real, int length> struct Structure {
