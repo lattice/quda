@@ -4081,6 +4081,57 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   return 0;
 }
 
+void momResidentQuda(void* mom, QudaGaugeParam* param)
+{
+  profileGaugeForce.TPSTART(QUDA_PROFILE_TOTAL);
+  profileGaugeForce.TPSTART(QUDA_PROFILE_INIT);
+
+  checkGaugeParam(param);
+
+  GaugeFieldParam gParamMom(mom, *param, QUDA_ASQTAD_MOM_LINKS);
+  if (gParamMom.order == QUDA_TIFR_GAUGE_ORDER || gParamMom.order == QUDA_TIFR_PADDED_GAUGE_ORDER)
+    gParamMom.reconstruct = QUDA_RECONSTRUCT_NO;
+  else gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
+  gParamMom.site_offset = param->mom_offset;
+  gParamMom.site_size = param->site_size;
+
+  cpuGaugeField cpuMom(gParamMom);
+
+  if (param->make_resident_mom && !param->return_result_mom) {
+    if (momResident) delete momResident;
+
+    gParamMom.create = QUDA_NULL_FIELD_CREATE;
+    gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
+    gParamMom.link_type = QUDA_ASQTAD_MOM_LINKS;
+    gParamMom.setPrecision(param->cuda_prec, true);
+    gParamMom.create = QUDA_ZERO_FIELD_CREATE;
+    momResident = new cudaGaugeField(gParamMom);
+  } else if (param->return_result_mom && !param->make_resident_mom) {
+    if (!momResident) errorQuda("No resident momentum to return");
+  } else {
+    errorQuda("Unexpected combination make_resident_mom = %d return_result_mom = %d",
+              param->make_resident_mom, param->return_result_mom);
+  }
+
+  profileGaugeForce.TPSTOP(QUDA_PROFILE_INIT);
+
+  if (param->make_resident_mom) {
+    // we are downloading the momentum from the host
+    profileGaugeForce.TPSTART(QUDA_PROFILE_H2D);
+    momResident->loadCPUField(cpuMom);
+    profileGaugeForce.TPSTOP(QUDA_PROFILE_H2D);
+  } else if (param->return_result_mom) {
+    // we are uploading the momentum to the host
+    profileGaugeForce.TPSTART(QUDA_PROFILE_D2H);
+    momResident->saveCPUField(cpuMom);
+    profileGaugeForce.TPSTOP(QUDA_PROFILE_D2H);
+  }
+
+  profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
+
+  checkCudaError();
+}
+
 void createCloverQuda(QudaInvertParam* invertParam)
 {
   profileClover.TPSTART(QUDA_PROFILE_TOTAL);
@@ -4976,6 +5027,8 @@ double momActionQuda(void* momentum, QudaGaugeParam* param)
   GaugeFieldParam gParam(momentum, *param, QUDA_ASQTAD_MOM_LINKS);
   gParam.reconstruct = (gParam.order == QUDA_TIFR_GAUGE_ORDER || gParam.order == QUDA_TIFR_PADDED_GAUGE_ORDER) ?
     QUDA_RECONSTRUCT_NO : QUDA_RECONSTRUCT_10;
+  gParam.site_offset = param->mom_offset;
+  gParam.site_size = param->site_size;
 
   cpuGaugeField *cpuMom = !param->use_resident_mom ? new cpuGaugeField(gParam) : nullptr;
 
