@@ -1,7 +1,14 @@
 #pragma once
 
-// XXX: Load different header for different archs.
+#if (__COMPUTE_CAPABILITY__ == 700)
+
 #include <mma_tensor_op/hmma_m16n16k16_sm70.cuh>
+
+#else
+
+#include <mma_tensor_op/hmma_m16n8k8_sm80.cuh>
+
+#endif
 
 #define USE_GMEM_MMA_PIPELINING
 

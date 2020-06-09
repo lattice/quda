@@ -12,10 +12,19 @@
 
 // The `mma.sync` PTX is only available with CUDA 10.1 or after
 #if ((__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ >= 1) || (__CUDACC_VER_MAJOR__ > 10))                         \
-  && (__COMPUTE_CAPABILITY__ == 700)
+  && (__COMPUTE_CAPABILITY__ >= 700)
 
 #define USE_MMA_SYNC // rather than using wmma
+
+#if (__COMPUTE_CAPABILITY__ == 700)
+
 #include <mma_tensor_op/hmma_m16n16k16_sm70.cuh>
+
+#else
+
+#include <mma_tensor_op/hmma_m16n8k8_sm80.cuh>
+
+#endif
 
 #else
 // if not we use wmma.
