@@ -382,34 +382,82 @@ void qudaUnitarizeSU3(int prec, double tol, QudaMILCSiteArg_t *arg)
   return;
 }
 
-double qudaMomAction(int prec, void *momentum)
+// download the momentum from MILC and place into the resident mom field
+void qudaMomLoad(int prec, QudaMILCSiteArg_t *arg)
 {
   qudamilc_called<true>(__func__);
 
-  QudaGaugeParam momParam = newMILCGaugeParam(localDim,
+  QudaGaugeParam param = newMILCGaugeParam(localDim,
       (prec==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
       QUDA_GENERAL_LINKS);
+
+  void *mom = arg->site ? arg->site : arg->mom;
+  param.mom_offset = arg->mom_offset;
+  param.site_size = arg->size;
+  param.gauge_order = arg->site ? QUDA_MILC_SITE_GAUGE_ORDER : QUDA_MILC_GAUGE_ORDER;
+  param.make_resident_mom = 1;
+  param.return_result_mom = 0;
+
+  momResidentQuda(mom, &param);
+
+  qudamilc_called<false>(__func__);
+}
+
+// upload the momentum to MILC
+void qudaMomSave(int prec, QudaMILCSiteArg_t *arg)
+{
+  qudamilc_called<true>(__func__);
+
+  QudaGaugeParam param = newMILCGaugeParam(localDim,
+      (prec==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
+      QUDA_GENERAL_LINKS);
+
+  void *mom = arg->site ? arg->site : arg->mom;
+  param.mom_offset = arg->mom_offset;
+  param.site_size = arg->size;
+  param.gauge_order = arg->site ? QUDA_MILC_SITE_GAUGE_ORDER : QUDA_MILC_GAUGE_ORDER;
+  param.make_resident_mom = 0;
+  param.return_result_mom = 1;
+
+  momResidentQuda(mom, &param);
+
+  qudamilc_called<false>(__func__);
+}
+
+double qudaMomAction(int prec, QudaMILCSiteArg_t *arg)
+{
+  qudamilc_called<true>(__func__);
+
+  QudaGaugeParam param = newMILCGaugeParam(localDim,
+      (prec==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
+      QUDA_GENERAL_LINKS);
+
+  void *mom = arg->site ? arg->site : arg->mom;
+  param.mom_offset = arg->mom_offset;
+  param.site_size = arg->size;
+  param.gauge_order = arg->site ? QUDA_MILC_SITE_GAUGE_ORDER : QUDA_MILC_GAUGE_ORDER;
+  param.make_resident_mom = 0;
 
   if (MOM_PIPE) {
     if (invalidate_quda_mom) {
       // beginning of trajectory so download the momentum and make
       // resident
-      momParam.use_resident_mom = false;
-      momParam.make_resident_mom = true;
+      param.use_resident_mom = false;
+      param.make_resident_mom = true;
       invalidate_quda_mom = false;
     } else {
       // end of trajectory so use resident and then invalidate
-      momParam.use_resident_mom = true;
-      momParam.make_resident_mom = false;
+      param.use_resident_mom = true;
+      param.make_resident_mom = false;
       invalidate_quda_mom = true;
     }
   } else { // no momentum residency
-    momParam.use_resident_mom = false;
-    momParam.make_resident_mom = false;
+    param.use_resident_mom = false;
+    param.make_resident_mom = false;
     invalidate_quda_mom = true;
   }
 
-  double action = momActionQuda(momentum, &momParam);
+  double action = momActionQuda(mom, &param);
 
   qudamilc_called<false>(__func__);
 
