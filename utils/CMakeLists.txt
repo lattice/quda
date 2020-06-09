@@ -25,7 +25,3 @@ if(QUDA_QMP
    AND NOT QMP_FOUND)
   add_dependencies(quda_utils QMP)
 endif()
-
-if(QUDA_MPI OR QUDA_QMP)
-  target_link_libraries(quda PUBLIC MPI::MPI_C)
-endif()
