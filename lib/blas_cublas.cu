@@ -338,6 +338,9 @@ namespace quda {
       double time = ds + 0.000001*dus;
       if (getVerbosity() >= QUDA_VERBOSE)
 	printfQuda("Batched matrix GEMM completed in %f seconds with GFLOPS = %f\n", time, 1e-9 * flops / time);
+
+#else
+      errorQuda("CUBLAS interface not built. Please rebuild with QUDA_MULTIGRID and QUDA_CUBLAS_INTERFACE enabled");
 #endif // CUBLAS_LIB
       
       return flops;
