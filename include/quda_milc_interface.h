@@ -658,17 +658,37 @@ extern "C" {
 		   QudaMILCSiteArg_t *arg);
 
   /**
-   * Evaluate the momentum contribution to the Hybrid Monte Carlo
-   * action.  The momentum field is assumed to be in MILC order.  MILC
-   * convention is applied, subtracting 4.0 from each momentum matrix
-   * to increased stability.
+   * Download the momentum from MILC and place into QUDA's resident
+   * momentum field.  The source momentum field can either be as part
+   * of a MILC site struct (QUDA_MILC_SITE_GAUGE_ORDER) or as a
+   * separate field (QUDA_MILC_GAUGE_ORDER).
    *
    * @param precision Precision of the field (2 - double, 1 - single)
-   * @param momentum The momentum field
+   * @param arg Metadata for MILC's internal site struct array
+   */
+  void qudaMomLoad(int precision, QudaMILCSiteArg_t *arg);
+
+  /**
+   * Upload the momentum to MILC from QUDA's resident momentum field.
+   * The destination momentum field can either be as part of a MILC site
+   * struct (QUDA_MILC_SITE_GAUGE_ORDER) or as a separate field
+   * (QUDA_MILC_GAUGE_ORDER).
+   *
+   * @param precision Precision of the field (2 - double, 1 - single)
+   * @param arg Metadata for MILC's internal site struct array
+   */
+  void qudaMomSave(int precision, QudaMILCSiteArg_t *arg);
+
+  /**
+   * Evaluate the momentum contribution to the Hybrid Monte Carlo
+   * action.  MILC convention is applied, subtracting 4.0 from each
+   * momentum matrix to increase stability.
+   *
+   * @param precision Precision of the field (2 - double, 1 - single)
+   * @param arg Metadata for MILC's internal site struct array
    * @return momentum action
    */
-  double qudaMomAction(int precision,
-		       void *momentum);
+  double qudaMomAction(int precision, QudaMILCSiteArg_t *arg);
 
   /**
    * Apply the staggered phase factors to the gauge field.  If the
