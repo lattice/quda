@@ -5,13 +5,22 @@
 #include <tune_quda.h>
 
 #include <jitify_helper.cuh>
+
+#if ((__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ >= 1) || (__CUDACC_VER_MAJOR__ > 10))                         \
+  && (__COMPUTE_CAPABILITY__ >= 700)
+
 #include <kernels/coarse_op_preconditioned_mma.cuh>
+
+#endif
 
 namespace quda
 {
 
   namespace mma
   {
+
+#if ((__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ >= 1) || (__CUDACC_VER_MAJOR__ > 10))                         \
+  && (__COMPUTE_CAPABILITY__ >= 700)
 
     template <typename F> inline void setMaxDynamicSharedBytesPerBlock(F *func)
     {
@@ -405,9 +414,15 @@ namespace quda
       }
     }
 
+#endif
+
     // Does the heavy lifting of creating the coarse color matrices Y
     void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X)
     {
+
+#if ((__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ >= 1) || (__CUDACC_VER_MAJOR__ > 10))                         \
+  && (__COMPUTE_CAPABILITY__ >= 700)
+
 #ifdef GPU_MULTIGRID
       if (Y.Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Unsupported field location %d\n", Y.Location());
 
@@ -442,6 +457,10 @@ namespace quda
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("....done computing Yhat field\n");
 #else
       errorQuda("Multigrid has not been built");
+#endif
+
+#else
+      errorQuda("MMA multigrid is not available for this setup.");
 #endif
     }
 

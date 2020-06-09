@@ -3,13 +3,22 @@
 #include <gauge_field.h>
 
 #define COARSECOARSE
+
+#if ((__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ >= 1) || (__CUDACC_VER_MAJOR__ > 10))                         \
+  && (__COMPUTE_CAPABILITY__ >= 700)
+
 #include <coarse_op_mma.cuh>
+
+#endif
 
 namespace quda
 {
 
   namespace mma
   {
+
+#if ((__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ >= 1) || (__CUDACC_VER_MAJOR__ > 10))                         \
+  && (__COMPUTE_CAPABILITY__ >= 700)
 
     /**
       @brief dummyClover is a helper function to allow us to create an
@@ -247,12 +256,18 @@ namespace quda
       }
     }
 
+#endif
+
     // Does the heavy lifting of creating the coarse color matrices Y
     void calculateYcoarse(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic, ColorSpinorField &uv,
                           const Transfer &T, const GaugeField &g, const GaugeField &clover, const GaugeField &cloverInv,
                           double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc,
                           bool need_bidirectional)
     {
+
+#if ((__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ >= 1) || (__CUDACC_VER_MAJOR__ > 10))                         \
+  && (__COMPUTE_CAPABILITY__ >= 700)
+
 #ifdef GPU_MULTIGRID
       checkPrecision(X, Y, g, clover, cloverInv, uv, T.Vectors(X.Location()));
       checkPrecision(Xatomic, Yatomic);
@@ -290,6 +305,10 @@ namespace quda
 #else
       errorQuda("Multigrid has not been built");
 #endif // GPU_MULTIGRID
+
+#else
+      errorQuda("MMA multigrid is not available for this setup.");
+#endif
     }
 
     // Calculates the coarse color matrix and puts the result in Y.
