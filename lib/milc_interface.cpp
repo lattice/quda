@@ -58,9 +58,6 @@ static bool invalidate_quda_mom = true;
 
 static void *df_preconditioner = nullptr;
 
-// set to 1 for GPU resident pipeline (not yet supported in mainline MILC)
-#define MOM_PIPE 0
-
 using namespace quda;
 using namespace quda::fermion_force;
 
@@ -399,11 +396,12 @@ void qudaMomLoad(int prec, QudaMILCSiteArg_t *arg)
   param.return_result_mom = 0;
 
   momResidentQuda(mom, &param);
+  invalidate_quda_mom = false;
 
   qudamilc_called<false>(__func__);
 }
 
-// upload the momentum to MILC
+// upload the momentum to MILC and invalidate the current resident momentum
 void qudaMomSave(int prec, QudaMILCSiteArg_t *arg)
 {
   qudamilc_called<true>(__func__);
@@ -420,6 +418,7 @@ void qudaMomSave(int prec, QudaMILCSiteArg_t *arg)
   param.return_result_mom = 1;
 
   momResidentQuda(mom, &param);
+  invalidate_quda_mom = true;
 
   qudamilc_called<false>(__func__);
 }
@@ -438,19 +437,10 @@ double qudaMomAction(int prec, QudaMILCSiteArg_t *arg)
   param.gauge_order = arg->site ? QUDA_MILC_SITE_GAUGE_ORDER : QUDA_MILC_GAUGE_ORDER;
   param.make_resident_mom = 0;
 
-  if (MOM_PIPE) {
-    if (invalidate_quda_mom) {
-      // beginning of trajectory so download the momentum and make
-      // resident
-      param.use_resident_mom = false;
-      param.make_resident_mom = true;
-      invalidate_quda_mom = false;
-    } else {
-      // end of trajectory so use resident and then invalidate
-      param.use_resident_mom = true;
-      param.make_resident_mom = false;
-      invalidate_quda_mom = true;
-    }
+  if (!invalidate_quda_mom) {
+    param.use_resident_mom = true;
+    param.make_resident_mom = true;
+    invalidate_quda_mom = false;
   } else { // no momentum residency
     param.use_resident_mom = false;
     param.make_resident_mom = false;

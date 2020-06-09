@@ -4125,6 +4125,11 @@ void momResidentQuda(void* mom, QudaGaugeParam* param)
     profileGaugeForce.TPSTART(QUDA_PROFILE_D2H);
     momResident->saveCPUField(cpuMom);
     profileGaugeForce.TPSTOP(QUDA_PROFILE_D2H);
+
+    profileGaugeForce.TPSTART(QUDA_PROFILE_FREE);
+    delete momResident;
+    momResident = nullptr;
+    profileGaugeForce.TPSTOP(QUDA_PROFILE_FREE);
   }
 
   profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
