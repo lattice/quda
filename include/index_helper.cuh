@@ -911,4 +911,132 @@ namespace quda {
     return sign;
   }
 
+  /*
+     Indexing functions used by the outer product kernels.  Should be
+     reconciled with the above at some point.  These have added
+     functionality that may be useful for dealing with odd-sized local
+     dimensions.
+   */
+  enum IndexType {
+    EVEN_X = 0,
+    EVEN_Y = 1,
+    EVEN_Z = 2,
+    EVEN_T = 3
+  };
+
+  template <IndexType idxType>
+  __device__ __host__ inline void coordsFromIndex(int &idx, int c[4], unsigned int cb_idx, int parity, const int X[4])
+  {
+    const int &LX = X[0];
+    const int &LY = X[1];
+    const int &LZ = X[2];
+    const int XYZ = X[2]*X[1]*X[0];
+    const int XY = X[1]*X[0];
+
+    idx = 2*cb_idx;
+
+    int x, y, z, t;
+
+    if (idxType == EVEN_X /*!(LX & 1)*/) { // X even
+      //   t = idx / XYZ;
+      //   z = (idx / XY) % Z;
+      //   y = (idx / X) % Y;
+      //   idx += (parity + t + z + y) & 1;
+      //   x = idx % X;
+      // equivalent to the above, but with fewer divisions/mods:
+      int aux1 = idx / LX;
+      x = idx - aux1 * LX;
+      int aux2 = aux1 / LY;
+      y = aux1 - aux2 * LY;
+      t = aux2 / LZ;
+      z = aux2 - t * LZ;
+      aux1 = (parity + t + z + y) & 1;
+      x += aux1;
+      idx += aux1;
+    } else if (idxType == EVEN_Y /*!(LY & 1)*/) { // Y even
+      t = idx / XYZ;
+      z = (idx / XY) % LZ;
+      idx += (parity + t + z) & 1;
+      y = (idx / LX) % LY;
+      x = idx % LX;
+    } else if (idxType == EVEN_Z /*!(LZ & 1)*/) { // Z even
+      t = idx / XYZ;
+      idx += (parity + t) & 1;
+      z = (idx / XY) % LZ;
+      y = (idx / LX) % LY;
+      x = idx % LX;
+    } else {
+      idx += parity;
+      t = idx / XYZ;
+      z = (idx / XY) % LZ;
+      y = (idx / LX) % LY;
+      x = idx % LX;
+    }
+
+    c[0] = x;
+    c[1] = y;
+    c[2] = z;
+    c[3] = t;
+  }
+
+  // Get the  coordinates for the exterior kernels
+  __device__ __host__ inline void coordsFromIndexExterior(int x[4], const unsigned int cb_idx, const int X[4],
+                                                          const unsigned int dir, const int displacement, const unsigned int parity)
+  {
+    int Xh[2] = {X[0] / 2, X[1] / 2};
+    switch (dir) {
+    case 0:
+      x[2] = cb_idx / Xh[1] % X[2];
+      x[3] = cb_idx / (Xh[1] * X[2]) % X[3];
+      x[0] = cb_idx / (Xh[1] * X[2] * X[3]);
+      x[0] += (X[0] - displacement);
+      x[1] = 2 * (cb_idx % Xh[1]) + ((x[0] + x[2] + x[3] + parity) & 1);
+      break;
+
+    case 1:
+      x[2] = cb_idx / Xh[0] % X[2];
+      x[3] = cb_idx / (Xh[0] * X[2]) % X[3];
+      x[1] = cb_idx / (Xh[0] * X[2] * X[3]);
+      x[1] += (X[1] - displacement);
+      x[0] = 2 * (cb_idx % Xh[0]) + ((x[1] + x[2] + x[3] + parity) & 1);
+      break;
+
+    case 2:
+      x[1] = cb_idx / Xh[0] % X[1];
+      x[3] = cb_idx / (Xh[0] * X[1]) % X[3];
+      x[2] = cb_idx / (Xh[0] * X[1] * X[3]);
+      x[2] += (X[2] - displacement);
+      x[0] = 2 * (cb_idx % Xh[0]) + ((x[1] + x[2] + x[3] + parity) & 1);
+      break;
+
+    case 3:
+      x[1] = cb_idx / Xh[0] % X[1];
+      x[2] = cb_idx / (Xh[0] * X[1]) % X[2];
+      x[3] = cb_idx / (Xh[0] * X[1] * X[2]);
+      x[3] += (X[3] - displacement);
+      x[0] = 2 * (cb_idx % Xh[0]) + ((x[1] + x[2] + x[3] + parity) & 1);
+      break;
+    }
+    return;
+  }
+
+  __device__ __host__ inline int neighborIndex(unsigned int cb_idx, const int shift[4], const bool partitioned[4], int parity,
+                                               const int X[4])
+  {
+    int full_idx;
+    int x[4];
+
+    coordsFromIndex<EVEN_X>(full_idx, x, cb_idx, parity, X);
+
+    for(int dim = 0; dim<4; ++dim){
+      if( partitioned[dim] )
+	if( (x[dim]+shift[dim])<0 || (x[dim]+shift[dim])>=X[dim]) return -1;
+    }
+
+    for(int dim=0; dim<4; ++dim){
+      x[dim] = shift[dim] ? (x[dim]+shift[dim] + X[dim]) % X[dim] : x[dim];
+    }
+    return (((x[3]*X[2] + x[2])*X[1] + x[1])*X[0] + x[0]) >> 1;
+  }
+
 } // namespace quda
