@@ -108,7 +108,7 @@ namespace quda
 
     template <typename reduce_t, typename T> __device__ __host__ reduce_t norm1_(const typename VectorType<T, 8>::type &a)
     {
-      return norm1_<reduce_t>(a.x) + norm1_<reduce_t>(a.y);
+      return norm1_<reduce_t, T>(a.x) + norm1_<reduce_t, T>(a.y);
     }
 
     template <typename reduce_t, typename real>
@@ -142,8 +142,8 @@ namespace quda
 
     template <typename reduce_t, typename T> __device__ __host__ void norm2_(reduce_t &sum, const typename VectorType<T, 8>::type &a)
     {
-      norm2_(sum, a.x);
-      norm2_(sum, a.y);
+      norm2_<reduce_t, T>(sum, a.x);
+      norm2_<reduce_t, T>(sum, a.y);
     }
 
     template <typename reduce_t, typename real>
@@ -180,8 +180,8 @@ namespace quda
     template <typename reduce_t, typename T>
     __device__ __host__ void dot_(reduce_t &sum, const typename VectorType<T, 8>::type &a, const typename VectorType<T, 8>::type &b)
     {
-      dot_(sum, a.x, b.x);
-      dot_(sum, a.y, b.y);
+      dot_<reduce_t, T>(sum, a.x, b.x);
+      dot_<reduce_t, T>(sum, a.y, b.y);
     }
 
     template <typename reduce_t, typename real>
@@ -357,8 +357,8 @@ namespace quda
     template <typename reduce_t, typename T>
     __device__ __host__ void cdot_(reduce_t &sum, const typename VectorType<T, 8>::type &a, const typename VectorType<T, 8>::type &b)
     {
-      cdot_(sum, a.x, b.x);
-      cdot_(sum, a.y, b.y);
+      cdot_<reduce_t, T>(sum, a.x, b.x);
+      cdot_<reduce_t, T>(sum, a.y, b.y);
     }
 
     template <typename real_reduce_t, typename real>

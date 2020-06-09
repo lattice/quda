@@ -183,8 +183,8 @@ namespace quda
     template <typename reduce_t, typename T>
     __device__ __host__ void dot_(reduce_t &sum, const typename VectorType<T, 8>::type &a, const typename VectorType<T, 8>::type &b)
     {
-      dot_(sum, a.x, b.x);
-      dot_(sum, a.y, b.y);
+      dot_<reduce_t, T>(sum, a.x, b.x);
+      dot_<reduce_t, T>(sum, a.y, b.y);
     }
 
     template <int NXZ, typename reduce_t, typename real>
