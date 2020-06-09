@@ -365,7 +365,7 @@ if(QUDA_MPI OR QUDA_QMP)
 endif()
 
 if(QUDA_MPI)
-  target_link_libraries(quda PUBLIC MPI::MPI_C)
+  target_link_libraries(quda PUBLIC MPI::MPI_CXX)
   target_compile_definitions(quda PUBLIC MPI_COMMS)
 endif()
 
@@ -379,7 +379,7 @@ if(QUDA_QMP)
   target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_QMPHOME}/include>)
   target_compile_definitions(quda PUBLIC QMP_COMMS)
   target_link_libraries(quda INTERFACE ${QUDA_QMP_LDFLAGS} ${QUDA_QMP_LIBS})
-  target_link_libraries(quda PUBLIC MPI::MPI_C)
+  target_link_libraries(quda PUBLIC MPI::MPI_CXX)
 endif()
 
 if(QUDA_QIO)
@@ -407,7 +407,7 @@ if(QUDA_QDPJIT)
               ${LIME_LIB}
               ${QUDA_QMP_LDFLAGS}
               ${QMP_LIB}
-              MPI::MPI_C)
+              MPI::MPI_CXX)
 endif()
 
 if(QUDA_ARPACK)
