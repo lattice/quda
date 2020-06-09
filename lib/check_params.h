@@ -191,12 +191,16 @@ void printQudaEigParam(QudaEigParam *param) {
   P(arpack_check, QUDA_BOOLEAN_INVALID);
   P(nk, INVALID_INT);
   P(np, INVALID_INT);
-  P(check_interval, INVALID_INT);
-  P(max_restarts, INVALID_INT);
   P(eig_type, QUDA_EIG_INVALID);
   P(extlib_type, QUDA_EXTLIB_INVALID);
   P(mem_type_ritz, QUDA_MEMORY_INVALID);
 #endif
+
+  // only need to enfore block size checking if doing a block eigen solve
+#ifdef CHECK__PARAM
+  if (param->eig_type == QUDA_EIG_BLK_TR_LANCZOS)
+#endif
+    P(block_size, INVALID_INT);
 
 #if defined INIT_PARAM
   P(location, QUDA_CUDA_FIELD_LOCATION);
@@ -478,7 +482,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(tol_precondition, INVALID_DOUBLE);
   P(maxiter_precondition, INVALID_INT);
   P(verbosity_precondition, QUDA_INVALID_VERBOSITY);
-  P(schwarz_type, QUDA_ADDITIVE_SCHWARZ); // defaults match previous interface behaviour
+  P(schwarz_type, QUDA_INVALID_SCHWARZ);
   P(precondition_cycle, 1);               // defaults match previous interface behaviour
 #else
   if (param->inv_type_precondition == QUDA_BICGSTAB_INVERTER || param->inv_type_precondition == QUDA_CG_INVERTER
@@ -486,7 +490,6 @@ void printQudaInvertParam(QudaInvertParam *param) {
     P(tol_precondition, INVALID_DOUBLE);
     P(maxiter_precondition, INVALID_INT);
     P(verbosity_precondition, QUDA_INVALID_VERBOSITY);
-    P(schwarz_type, QUDA_INVALID_SCHWARZ);
     P(precondition_cycle, 0);
   }
 #endif

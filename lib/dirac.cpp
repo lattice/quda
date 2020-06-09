@@ -113,11 +113,6 @@ namespace quda {
 		out.GammaBasis(), in.GammaBasis());
     }
 
-    if (in.Precision() != out.Precision()) {
-      errorQuda("Input precision %d and output spinor precision %d don't match in dslash_quda",
-		in.Precision(), out.Precision());
-    }
-
     if (in.SiteSubset() != QUDA_PARITY_SITE_SUBSET || out.SiteSubset() != QUDA_PARITY_SITE_SUBSET) {
       errorQuda("ColorSpinorFields are not single parity: in = %d, out = %d", 
 		in.SiteSubset(), out.SiteSubset());
@@ -191,6 +186,12 @@ namespace quda {
     } else if (param.type == QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracMobiusPC operator\n");
       return new DiracMobiusPC(param);
+    } else if (param.type == QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracMobiusEofa operator\n");
+      return new DiracMobiusEofa(param);
+    } else if (param.type == QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracMobiusEofaPC operator\n");
+      return new DiracMobiusEofaPC(param);
     } else if (param.type == QUDA_STAGGERED_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracStaggered operator\n");
       return new DiracStaggered(param);
@@ -295,7 +296,7 @@ namespace quda {
     return steps; 
   }
 
-  void Dirac::prefetch(QudaFieldLocation mem_space, cudaStream_t stream) const
+  void Dirac::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
   {
     if (gauge) gauge->prefetch(mem_space, stream);
     if (tmp1) tmp1->prefetch(mem_space, stream);

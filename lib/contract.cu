@@ -42,7 +42,7 @@ public:
     }
     virtual ~Contraction() {}
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       if (x.Location() == QUDA_CUDA_FIELD_LOCATION) {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());

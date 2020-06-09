@@ -110,6 +110,19 @@ extern "C" {
     double_complex b_5[QUDA_MAX_DWF_LS]; /**< Mobius coefficients - only real part used if regular Mobius */
     double_complex c_5[QUDA_MAX_DWF_LS]; /**< Mobius coefficients - only real part used if regular Mobius */
 
+    /**<
+     * The following specifies the EOFA parameters. Notation follows arXiv:1706.05843
+     * eofa_shift: the "\beta" in the paper
+     * eofa_pm: plus or minus for the EOFA operator
+     * mq1, mq2, mq3 are the three masses corresponds to Hasenbusch mass spliting.
+     * As far as I know mq1 is always the same as "mass" but it's here just for consistence.
+     * */
+    double eofa_shift;
+    int eofa_pm;
+    double mq1;
+    double mq2;
+    double mq3;
+
     double mu;    /**< Twisted mass parameter */
     double epsilon; /**< Twisted mass parameter */
 
@@ -442,6 +455,8 @@ extern "C" {
     int max_restarts;
     /** For the Ritz rotation, the maximal number of extra vectors the solver may allocate **/
     int batched_rotate;
+    /** For block method solvers, the block size **/
+    int block_size;
 
     /** In the test function, cross check the device result against ARPACK **/
     QudaBoolean arpack_check;

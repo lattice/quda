@@ -1,13 +1,11 @@
-#include <float.h>
+#pragma once
 
-#ifndef _SVD_QUDA_H_
-#define _SVD_QUDA_H_
+#include <float.h>
 
 #define DEVICEHOST __device__ __host__
 #define SVDPREC 1e-11
 #define LOG2 0.69314718055994530942
 #define INVALID_DOUBLE (-DBL_MAX)
-
 
 //namespace quda{
 
@@ -55,20 +53,20 @@ inline double getNorm(const Array<complex<double>,3>& a){
   return quadSum(temp1,temp3);
 }
 
-
-template<class T>
-inline DEVICEHOST 
-void constructHHMat(const T & tau, const Array<T,3> & v, Matrix<T,3> & hh)
+template <class T, class V> inline DEVICEHOST auto constructHHMat(const T &tau, const V &v)
 {
-  Matrix<T,3> temp1, temp2;
-  outerProd(v,v,&temp1);
+  Matrix<T, 3> hh, temp1, temp2;
+
+  ColorSpinor<decltype(tau.real()), 3, 1> v_;
+  for (int i = 0; i < 3; i++) v_(0, i) = v[i];
+  temp1 = outerProduct(v_, v_);
 
   temp2 = conj(tau)*temp1;
 
   setIdentity(&temp1);
 
-  hh =  temp1 - temp2; 
-  return;
+  hh = temp1 - temp2;
+  return hh;
 }
 
 
@@ -87,7 +85,6 @@ void getLambdaMax(const Matrix<Real,3> & b, Real & lambda_max){
   }else{
     lambda_max = m22 + (m12*m12)/(norm1 - dm);
   }
-  return;
 }
 
 
@@ -261,10 +258,8 @@ void getRealBidiagMatrix(const Matrix<complex<Float>,3> &mat, Matrix<complex<Flo
 {
   typedef complex<Float> Complex;
 
-  Matrix<Complex,3> p;
+  Matrix<Complex, 3> p, temp;
   Array<Complex,3> vec;
-  Matrix<Complex,3> temp;
-
 
   const Complex COMPLEX_UNITY(1.0,0.0);
   const Complex COMPLEX_ZERO = 0.0;
@@ -305,7 +300,7 @@ void getRealBidiagMatrix(const Matrix<complex<Float>,3> &mat, Matrix<complex<Flo
     tau.x =  (beta - mat(0,0).x)/beta;
     tau.y =  mat(0,0).y/beta;
     // construct the Householder matrix
-    constructHHMat(tau, vec, temp);
+    temp = constructHHMat(tau, vec);
     p = conj(temp)*mat;    
     u = temp;
   }
@@ -328,7 +323,7 @@ void getRealBidiagMatrix(const Matrix<complex<Float>,3> &mat, Matrix<complex<Flo
     tau.x = (beta - p(0,1).x)/beta; // work around for LLVM
     tau.y = (- p(0,1).y)/beta;
     // construct the Householder matrix
-    constructHHMat(tau, vec, temp);
+    temp = constructHHMat(tau, vec);
     p = p*temp;
     v = temp;
   }
@@ -356,7 +351,7 @@ void getRealBidiagMatrix(const Matrix<complex<Float>,3> &mat, Matrix<complex<Flo
     // so that we wouldn't need to call conj(temp) below.
     // I would have to be careful to make sure this change 
     // is consistent with the other parts of the code.
-    constructHHMat(tau, vec, temp);
+    temp = constructHHMat(tau, vec);
     p = conj(temp)*p;
     u = u*temp;
   }
@@ -639,5 +634,3 @@ DEVICEHOST void computeSVD(const Matrix<complex<Float>, 3> &m, Matrix<complex<Fl
 //} // end namespace quda
 
 #undef INVALID_DOUBLE
-
-#endif // _SVD_QUDA_H

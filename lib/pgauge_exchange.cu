@@ -143,7 +143,7 @@ namespace quda {
   static void *sendg_d[4];
   static void *recvg_d[4];
   static void *hostbuffer_h[4];
-  static cudaStream_t GFStream[2];
+  static qudaStream_t GFStream[2];
   static size_t offset[4];
   static size_t bytes[4];
   static size_t faceVolume[4];

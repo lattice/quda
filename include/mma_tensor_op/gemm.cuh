@@ -264,7 +264,7 @@ namespace quda
           const int warp_col = logical_warp_index - warp_row * tile_col_dim;
 
 #pragma unroll
-          for (int tile_k = 0; tile_k < tile_acc_dim * WMMA_K; tile_k += WMMA_K) {
+          for (int tile_k = 0; tile_k < tile_acc_dim; tile_k++) {
 
             MmaOperandA op_a_real;
             op_a_real.load(smem_obj_a_real, tile_k, warp_row, wrm);
@@ -295,8 +295,8 @@ namespace quda
           const int warp_row = logical_warp_index / tile_col_dim;
           const int warp_col = logical_warp_index - warp_row * tile_col_dim;
 
-          const int warp_m_offset = warp_row * WMMA_M + m_offset;
-          const int warp_n_offset = warp_col * WMMA_N + n_offset;
+          const int warp_m_offset = warp_row * MMA_M + m_offset;
+          const int warp_n_offset = warp_col * MMA_N + n_offset;
 
           store_complex<ldc>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real[c], op_c_imag[c]);
         }
@@ -312,8 +312,8 @@ namespace quda
           const int warp_row = logical_warp_index / tile_col_dim;
           const int warp_col = logical_warp_index - warp_row * tile_col_dim;
 
-          const int warp_m_offset = warp_row * WMMA_M + m_offset;
-          const int warp_n_offset = warp_col * WMMA_N + n_offset;
+          const int warp_m_offset = warp_row * MMA_M + m_offset;
+          const int warp_n_offset = warp_col * MMA_N + n_offset;
 
           store_complex_atomic<ldc, dagger>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real[c], op_c_imag[c]);
         }
@@ -342,9 +342,9 @@ namespace quda
       static constexpr int bN = bN_;
       static constexpr int bK = bK_;
 
-      static constexpr int tile_row_dim = bM / WMMA_M; // number of tiles in the column dimension
-      static constexpr int tile_col_dim = bN / WMMA_N; // number of tiles in the row dimension
-      static constexpr int tile_acc_dim = bK / WMMA_K; // number of tiles in the accumulate dimension
+      static constexpr int tile_row_dim = bM / MMA_M; // number of tiles in the column dimension
+      static constexpr int tile_col_dim = bN / MMA_N; // number of tiles in the row dimension
+      static constexpr int tile_acc_dim = bK / MMA_K; // number of tiles in the accumulate dimension
 
       static constexpr int smem_lda = bM + pad_size(bM);
       static constexpr int smem_ldb = bN + pad_size(bN);
@@ -365,9 +365,9 @@ namespace quda
 #else
       using accumuate_reg_type = float;
 #endif
-      static_assert(bM % WMMA_M == 0, "bM must be divisible by WMMA_M.");
-      static_assert(bN % WMMA_N == 0, "bN must be divisible by WMMA_N.");
-      static_assert(bK % WMMA_K == 0, "bK must be divisible by WMMA_K.");
+      static_assert(bM % MMA_M == 0, "bM must be divisible by MMA_M.");
+      static_assert(bN % MMA_N == 0, "bN must be divisible by MMA_N.");
+      static_assert(bK % MMA_K == 0, "bK must be divisible by MMA_K.");
 
       static_assert((tile_row_dim * tile_col_dim) % total_warp == 0,
                     "Total number of tiles should be divisible by the number of warps.");

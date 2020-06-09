@@ -7,7 +7,6 @@
 
 namespace quda
 {
-
   // Local enum for the LU axpy block type
   enum blockType { PENCIL, LOWER_TRI, UPPER_TRI };
 
@@ -36,6 +35,7 @@ protected:
     int max_restarts;
     int check_interval;
     int batched_rotate;
+    int block_size;
     int iter;
     int iter_converged;
     int iter_locked;
@@ -52,8 +52,6 @@ protected:
 
     ColorSpinorField *tmp1;
     ColorSpinorField *tmp2;
-
-    Complex *Qmat;
 
 public:
     /**
@@ -89,6 +87,46 @@ public:
     static EigenSolver *create(QudaEigParam *eig_param, const DiracMatrix &mat, TimeProfile &profile);
 
     /**
+       @brief Check for an initial guess. If none present, populate with rands, then
+       orthonormalise
+       @param[in] kSpace The Krylov space vectors
+    */
+    void prepareInitialGuess(std::vector<ColorSpinorField *> &kSpace);
+
+    /**
+       @brief Check for a maximum of the Chebyshev operator
+       @param[in] mat The problem operator
+       @param[in] kSpace The Krylov space vectors
+    */
+    void checkChebyOpMax(const DiracMatrix &mat, std::vector<ColorSpinorField *> &kSpace);
+
+    /**
+       @brief Extend the Krylov space
+       @param[in] kSpace The Krylov space vectors
+       @param[in] evals The eigenvalue array
+    */
+    void prepareKrylovSpace(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
+
+    /**
+       @brief Set the epsilon parameter
+       @param[in] prec Precision of the solver instance
+       @param[out] epsilon The deduced epsilon value
+    */
+    double setEpsilon(const QudaPrecision prec);
+
+    /**
+       @brief Dump the eigensolver parameters to stdout
+    */
+    void printEigensolverSetup();
+
+    /**
+       @brief Release memory, save eigenvectors, resize the Krylov space to its original dimension
+       @param[in] kSpace The Krylov space vectors
+       @param[in] evals The eigenvalue array
+    */
+    void cleanUpEigensolver(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
+
+    /**
        @brief Applies the specified matVec operation:
        M, Mdag, MMdag, MdagM
        @param[in] mat Matrix operator
@@ -116,14 +154,30 @@ public:
     double estimateChebyOpMax(const DiracMatrix &mat, ColorSpinorField &out, ColorSpinorField &in);
 
     /**
-       @brief Orthogonalise input vector r against
+       @brief Orthogonalise input vectors r against
        vector space v using block-BLAS
-       @param[out] Sum of inner products
        @param[in] v Vector space
-       @param[in] r Vector to be orthogonalised
-       @param[in] j Number of vectors in v to orthogonalise against
+       @param[in] r Vectors to be orthogonalised
+       @param[in] j Use vectors v[0:j]
+       @param[in] s array of
     */
-    Complex blockOrthogonalize(std::vector<ColorSpinorField *> v, std::vector<ColorSpinorField *> r, int j);
+    void blockOrthogonalize(std::vector<ColorSpinorField *> v, std::vector<ColorSpinorField *> &r, int j);
+
+    /**
+       @brief Orthonormalise input vector space v using Modified Gram-Schmidt
+       @param[in] v Vector space
+       @param[in] j Use vectors v[0:j-1]
+    */
+    void orthonormalizeMGS(std::vector<ColorSpinorField *> &v, int j);
+
+    /**
+       @brief Check orthonormality of input vector space v
+       @param[out] bool If all vectors are orthonormal to 1e-16 returns true,
+       else false.
+       @param[in] v Vector space
+       @param[in] j Use vectors v[0:j-1]
+    */
+    bool orthoCheck(std::vector<ColorSpinorField *> v, int j);
 
     /**
        @brief Permute the vector space using the permutation matrix.
@@ -136,23 +190,42 @@ public:
     /**
        @brief Rotate part of kSpace
        @param[in/out] kSpace The current Krylov space
-       @param[in] array The rotation matrix
+       @param[in] array The real rotation matrix
        @param[in] rank row rank of array
        @param[in] is Start of i index
        @param[in] ie End of i index
        @param[in] js Start of j index
        @param[in] je End of j index
        @param[in] blockType Type of caxpy(_U/L) to perform
+       @param[in] je End of j index
+       @param[in] offset Position of extra vectors in kSpace
     */
     void blockRotate(std::vector<ColorSpinorField *> &kSpace, double *array, int rank, const range &i, const range &j, blockType b_type);
+
+    /**
+       @brief Rotate part of kSpace
+       @param[in/out] kSpace The current Krylov space
+       @param[in] array The complex rotation matrix
+       @param[in] rank row rank of array
+       @param[in] is Start of i index
+       @param[in] ie End of i index
+       @param[in] js Start of j index
+       @param[in] je End of j index
+       @param[in] blockType Type of caxpy(_U/L) to perform
+       @param[in] offset Position of extra vectors in kSpace
+    */
+
+    void blockRotateComplex(std::vector<ColorSpinorField *> &kSpace, Complex *array, int rank, const range &i,
+                            const range &j, blockType b_type, int offset);
 
     /**
        @brief Copy temp part of kSpace, zero out for next use
        @param[in/out] kSpace The current Krylov space
        @param[in] js Start of j index
        @param[in] je End of j index
+       @param[in] offset Position of extra vectors in kSpace
     */
-    void blockReset(std::vector<ColorSpinorField *> &kSpace, int js, int je);
+    void blockReset(std::vector<ColorSpinorField *> &kSpace, int js, int je, int offset);
 
     /**
        @brief Deflate a set of source vectors with a given eigenspace
@@ -271,7 +344,7 @@ public:
   class TRLM : public EigenSolver
   {
 
-public:
+  public:
     /**
        @brief Constructor for Thick Restarted Eigensolver class
        @param eig_param The eigensolver parameters
@@ -293,9 +366,6 @@ public:
     // Tridiagonal/Arrow matrix, fixed size.
     double *alpha;
     double *beta;
-
-    // Used to clone vectors and resize arrays.
-    ColorSpinorParam csParam;
 
     /**
        @brief Compute eigenpairs
@@ -319,10 +389,8 @@ public:
 
     /**
        @brief Get the eigendecomposition from the arrow matrix
-       @param[in] nLocked Number of locked eigenvectors
-       @param[in] arrow_pos position of arrowhead
     */
-    void eigensolveFromArrowMat(int nLocked, int arror_pos);
+    void eigensolveFromArrowMat();
 
     /**
        @brief Rotate the Ritz vectors usinng the arrow matrix eigendecomposition
@@ -330,6 +398,74 @@ public:
     */
     void computeKeptRitz(std::vector<ColorSpinorField *> &kSpace);
 
+  };
+
+  /**
+     @brief Block Thick Restarted Lanczos Method.
+  */
+  class BLKTRLM : public TRLM
+  {
+  public:
+    /**
+       @brief Constructor for Thick Restarted Eigensolver class
+       @param eig_param The eigensolver parameters
+       @param mat The operator to solve
+       @param profile Time Profile
+    */
+    BLKTRLM(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile);
+
+    /**
+       @brief Destructor for Thick Restarted Eigensolver class
+    */
+    virtual ~BLKTRLM();
+
+    virtual bool hermitian() { return true; } /** (BLOCK)TRLM is only for Hermitian systems */
+
+    // Variable size matrix
+    std::vector<Complex> block_ritz_mat;
+
+    /** Block Tridiagonal/Arrow matrix, fixed size. */
+    Complex *block_alpha;
+    Complex *block_beta;
+
+    /** Temp storage used in blockLanczosStep, fixed size. */
+    Complex *jth_block;
+
+    /** Size of blocks of data in alpha/beta */
+    int block_data_length;
+
+    /**
+       @brief Compute eigenpairs
+       @param[in] kSpace Krylov vector space
+       @param[in] evals Computed eigenvalues
+    */
+    void operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
+
+    /**
+       @brief block lanczos step: extends the Kylov space in block step
+       @param[in] v Vector space
+       @param[in] j Index of block of vectors being computed
+    */
+    void blockLanczosStep(std::vector<ColorSpinorField *> v, int j);
+
+    /**
+       @brief Get the eigendecomposition from the current block arrow matrix
+    */
+    void eigensolveFromBlockArrowMat();
+
+    /**
+       @brief Accumulate the R products of QR into the block beta array
+       @param[in] k The QR iteration
+       @param[in] arrow_offset The current block position
+    */
+    void updateBlockBeta(int k, int arrow_offset);
+
+    /**
+       @brief Rotate the Ritz vectors usinng the arrow matrix eigendecomposition
+       Uses a complex ritz matrix
+       @param[in] nKspace current Krylov space
+    */
+    void computeBlockKeptRitz(std::vector<ColorSpinorField *> &kSpace);
   };
 
   /**

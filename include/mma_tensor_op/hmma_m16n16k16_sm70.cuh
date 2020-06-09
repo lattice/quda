@@ -19,9 +19,9 @@ namespace quda
   {
     __device__ __host__ constexpr int inline pad_size(int m) { return m == 48 ? 2 : 10; }
 
-    constexpr int WMMA_M = 16;
-    constexpr int WMMA_N = 16;
-    constexpr int WMMA_K = 4;
+    constexpr int MMA_M = 16;
+    constexpr int MMA_N = 16;
+    constexpr int MMA_K = 4;
 
     constexpr int warp_size = 32;
 
@@ -54,12 +54,22 @@ namespace quda
 
       unsigned reg[2];
 
+      template <int lda> __device__ inline void load(const void *smem, int k, int warp_row, const WarpRegisterMapping &wrm)
+      {
+        const unsigned *A = reinterpret_cast<const unsigned *>(smem);
+        int idx_strided = k * MMA_K + wrm.quad_thread;
+        int idx_contiguous = (warp_row * MMA_M + wrm.row_offset) / 2;
+        int thread_offset_a = idx_strided * (lda / 2) + idx_contiguous;
+        reg[0] = A[thread_offset_a + 0];
+        reg[1] = A[thread_offset_a + 1];
+      }
+
       template <class SmemObj>
       __device__ inline void load(const SmemObj &smem_obj, int k, int warp_row, const WarpRegisterMapping &wrm)
       {
         const unsigned *A = reinterpret_cast<const unsigned *>(smem_obj.ptr);
-        int idx_strided = k + wrm.quad_thread;
-        int idx_contiguous = (warp_row * 16 + wrm.row_offset) / 2;
+        int idx_strided = k * MMA_K + wrm.quad_thread;
+        int idx_contiguous = (warp_row * MMA_M + wrm.row_offset) / 2;
         const int thread_offset_a = idx_strided * (SmemObj::ldn / 2) + idx_contiguous;
         reg[0] = A[thread_offset_a];
         reg[1] = A[thread_offset_a + 1];
@@ -74,18 +84,29 @@ namespace quda
         asm volatile("neg.f16x2 %0, %0;" : "+r"(reg[0]));
         asm volatile("neg.f16x2 %0, %0;" : "+r"(reg[1]));
       }
+
     };
 
     struct MmaOperandB {
 
       unsigned reg[2];
 
+      template <int ldb> __device__ inline void load(const void *smem, int k, int warp_col, const WarpRegisterMapping &wrm)
+      {
+        const unsigned *B = reinterpret_cast<const unsigned *>(smem);
+        int idx_strided = k * MMA_K + wrm.quad_thread;
+        int idx_contiguous = (warp_col * MMA_N + wrm.col_offset) / 2;
+        int thread_offset_b = idx_strided * (ldb / 2) + idx_contiguous;
+        reg[0] = B[thread_offset_b + 0];
+        reg[1] = B[thread_offset_b + 1];
+      }
+
       template <class SmemObj>
       __device__ inline void load(const SmemObj &smem_obj, int k, int warp_col, const WarpRegisterMapping &wrm)
       {
         const unsigned *B = reinterpret_cast<const unsigned *>(smem_obj.ptr);
-        int idx_strided = k + wrm.quad_thread;
-        int idx_contiguous = (warp_col * 16 + wrm.col_offset) / 2;
+        int idx_strided = k * MMA_K + wrm.quad_thread;
+        int idx_contiguous = (warp_col * MMA_N + wrm.col_offset) / 2;
         const int thread_offset_b = idx_strided * (SmemObj::ldn / 2) + idx_contiguous;
         reg[0] = B[thread_offset_b];
         reg[1] = B[thread_offset_b + 1];
