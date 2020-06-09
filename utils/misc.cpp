@@ -275,8 +275,6 @@ const char *get_solver_str(QudaInverterType type)
   case QUDA_EIGCG_INVERTER: ret = "eigcg"; break;
   case QUDA_INC_EIGCG_INVERTER: ret = "inc-eigcg"; break;
   case QUDA_GMRESDR_INVERTER: ret = "gmresdr"; break;
-  case QUDA_GMRESDR_PROJ_INVERTER: ret = "gmresdr-proj"; break;
-  case QUDA_GMRESDR_SH_INVERTER: ret = "gmresdr-sh"; break;
   case QUDA_FGMRESDR_INVERTER: ret = "fgmresdr"; break;
   case QUDA_MG_INVERTER: ret = "mg"; break;
   case QUDA_BICGSTABL_INVERTER: ret = "bicgstab-l"; break;
