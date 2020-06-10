@@ -1568,6 +1568,36 @@ int strong_check_mom(void *momA, void *momB, int len, QudaPrecision prec)
   return ret;
 }
 
+// compute the magnitude squared anti-Hermitian matrix, including the
+// MILC convention of subtracting 4 from each site norm to improve
+// stability
+template <typename real> double mom_action(real *mom_, int len)
+{
+  double action = 0.0;
+  for (int i = 0; i < len; i++) {
+    real *mom = mom_ + i * mom_site_size;
+    double local = 0.0;
+    for (int j = 0; j < 6; j++) local += mom[j] * mom[j];
+    for (int j = 6; j < 9; j++) local += 0.5 * mom[j] * mom[j];
+    local -= 4.0;
+    action += local;
+  }
+
+  return action;
+}
+
+double mom_action(void *mom, QudaPrecision prec, int len)
+{
+  double action = 0.0;
+  if (prec == QUDA_DOUBLE_PRECISION) {
+    action = mom_action<double>((double *)mom, len);
+  } else if (prec == QUDA_SINGLE_PRECISION) {
+    action = mom_action<float>((float *)mom, len);
+  }
+  comm_allreduce(&action);
+  return action;
+}
+
 static struct timeval startTime;
 
 void stopwatchStart() { gettimeofday(&startTime, NULL); }
