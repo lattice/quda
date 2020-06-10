@@ -277,20 +277,17 @@ void gauge_force_test(void)
     }
   }
 
-  printfQuda("%d\n", __LINE__);
   quda::GaugeFieldParam param(0, gauge_param);
   param.create = QUDA_NULL_FIELD_CREATE;
   param.order = QUDA_QDP_GAUGE_ORDER;
   auto U_qdp = new quda::cpuGaugeField(param);
 
-  printfQuda("%d\n", __LINE__);
   // fills the gauge field with random numbers
   createSiteLinkCPU((void **)U_qdp->Gauge_p(), gauge_param.cpu_prec, 0);
 
   param.order = QUDA_MILC_GAUGE_ORDER;
   auto U_milc = new quda::cpuGaugeField(param);
-  if (gauge_param.gauge_order == QUDA_MILC_GAUGE_ORDER) U_milc->copy(*U_qdp);
-  printfQuda("%d\n", __LINE__);
+  if (gauge_order == QUDA_MILC_GAUGE_ORDER) U_milc->copy(*U_qdp);
   param.reconstruct = QUDA_RECONSTRUCT_10;
   param.create = QUDA_ZERO_FIELD_CREATE;
   param.link_type = QUDA_ASQTAD_MOM_LINKS;
@@ -302,34 +299,29 @@ void gauge_force_test(void)
 
   // initialize some data in cpuMom
   createMomCPU(Mom_ref_milc->Gauge_p(), gauge_param.cpu_prec);
-  printfQuda("%d\n", __LINE__);
-  Mom_milc->copy(*Mom_ref_milc);
-  Mom_qdp->copy(*Mom_ref_milc);
-  printfQuda("%d\n", __LINE__);
+  if (gauge_order == QUDA_MILC_GAUGE_ORDER) Mom_milc->copy(*Mom_ref_milc);
+  if (gauge_order == QUDA_QDP_GAUGE_ORDER) Mom_qdp->copy(*Mom_ref_milc);
   void *mom = nullptr;
   void *sitelink = nullptr;
 
-  if (gauge_param.gauge_order == QUDA_MILC_GAUGE_ORDER) {
+  if (gauge_order == QUDA_MILC_GAUGE_ORDER) {
     sitelink = U_milc->Gauge_p();
     mom = Mom_milc->Gauge_p();
-  } else if (gauge_param.gauge_order == QUDA_QDP_GAUGE_ORDER) {
+  } else if (gauge_order == QUDA_QDP_GAUGE_ORDER) {
     sitelink = U_qdp->Gauge_p();
     mom = Mom_qdp->Gauge_p();
   } else {
-    errorQuda("Unsupported gauge order %d", gauge_param.gauge_order);
+    errorQuda("Unsupported gauge order %d", gauge_order);
   }
 
-  if (getTuning() == QUDA_TUNE_YES) {
-    printfQuda("Tuning...\n");
+  if (getTuning() == QUDA_TUNE_YES)
     computeGaugeForceQuda(mom, sitelink, input_path_buf, length, loop_coeff_d, num_paths, max_length, eb3, &gauge_param);
-    printfQuda("...done\n");
-  }
 
   struct timeval t0, t1;
   double total_time = 0.0;
   // Multiple execution to exclude warmup time in the first run
 
-  auto &Mom_ = gauge_param.gauge_order == QUDA_MILC_GAUGE_ORDER ? Mom_milc : Mom_qdp;
+  auto &Mom_ = gauge_order == QUDA_MILC_GAUGE_ORDER ? Mom_milc : Mom_qdp;
   for (int i = 0; i < niter; i++) {
     Mom_->copy(*Mom_ref_milc); // restore initial momentum for correctness
     gettimeofday(&t0, NULL);
@@ -337,10 +329,10 @@ void gauge_force_test(void)
     gettimeofday(&t1, NULL);
     total_time += t1.tv_sec - t0.tv_sec + 0.000001*(t1.tv_usec - t0.tv_usec);
   }
-  if (gauge_param.gauge_order == QUDA_QDP_GAUGE_ORDER) Mom_milc->copy(*Mom_qdp);
+  if (gauge_order == QUDA_QDP_GAUGE_ORDER) Mom_milc->copy(*Mom_qdp);
 
   //The number comes from CPU implementation in MILC, gauge_force_imp.c
-  int flops=153004;
+  int flops = 153004;
 
   void *refmom = Mom_ref_milc->Gauge_p();
   if (verify_results) {
@@ -354,13 +346,15 @@ void gauge_force_test(void)
     printfQuda("Test %s\n", (1 == res) ? "PASSED" : "FAILED");
   }
 
-  printfQuda("Computing momentum action\n");
+  printfQuda("\nComputing momentum action\n");
   auto action_quda = momActionQuda(mom, &gauge_param);
   auto action_ref = mom_action(refmom, gauge_param.cpu_prec, 4 * V);
-  printfQuda("QUDA action = %e, reference = %e\n", action_quda, action_ref);
+  auto deviation = std::abs(action_quda - action_ref) / std::abs(action_ref);
+  printfQuda("QUDA action = %e, reference = %e relative deviation = %e\n", action_quda, action_ref, deviation);
+  printfQuda("Test %s\n", deviation < getTolerance(gauge_param.cuda_prec) ? "PASSED" : "FAILED");
 
   double perf = 1.0*niter*flops*V/(total_time*1e+9);
-  printfQuda("total time =%.2f ms\n", total_time*1e+3);
+  printfQuda("total time = %.2f ms\n", total_time*1e+3);
   printfQuda("overall performance : %.2f GFLOPS\n",perf);
 
   for(int dir = 0; dir < 4; dir++){
