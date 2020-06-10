@@ -24,7 +24,6 @@ namespace quda {
     static qudaStream_t *blasStream;
 
     static cudaStream_t *auxBlasStream;
-    static cudaEvent_t  auxBlasEvent;
     static bool         run_aux_blas_stream;
 
 
@@ -649,7 +648,8 @@ namespace quda {
     }
 
     void ax(double *a, std::vector<ColorSpinorField*> &x) {
-      for(int i = 0; i < x.size(); i++) ax(a[i], *x[i]);
+      int i = 0;	    
+      for(auto p : x) ax(a[i++], *p);
     }
 
     void caxpy(const Complex &a, ColorSpinorField &x, ColorSpinorField &y) {
