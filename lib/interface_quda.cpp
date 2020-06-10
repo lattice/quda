@@ -6232,6 +6232,7 @@ void laphBaryonKernel(int n1, int n2, int n3, int nMom,
   cublas_param_mom_sum.lda = nSites;
   cublas_param_mom_sum.ldb = nSites;
   cublas_param_mom_sum.ldc = n1*n2*n3;
+  cublas_param_mom_sum.c_offset = 0;
   cublas_param_mom_sum.batch_count = 1;
   cublas_param_mom_sum.alpha = (__complex__ double)alpha;  
   cublas_param_mom_sum.beta  = (__complex__ double)beta;
@@ -6239,6 +6240,7 @@ void laphBaryonKernel(int n1, int n2, int n3, int nMom,
   cublas_param_mom_sum.data_type = QUDA_CUBLAS_DATATYPE_Z;
 
   profileCuBLAS.TPSTART(QUDA_PROFILE_COMPUTE);
+  printfQuda("pre swap\n"); printQudaCublasParam(&cublas_param_init);
   std::swap(cublas_param_init.m, cublas_param_init.n);
   std::swap(cublas_param_init.lda, cublas_param_init.ldb);
   std::swap(cublas_param_init.trans_a, cublas_param_init.trans_b);

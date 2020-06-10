@@ -199,23 +199,23 @@ int main(int argc, char **argv)
     
     cudaDeviceProp deviceProp;      
     cudaGetDeviceProperties( &deviceProp, device );
-    printfQuda( "%d - name:                    %s\n" ,device ,deviceProp.name );
-    printfQuda( "%d - totalGlobalMem:          %d bytes ( %.2f Gbytes)\n" ,device ,deviceProp.totalGlobalMem , deviceProp.totalGlobalMem / (float)( 1024 * 1024 * 1024)  );
-    printfQuda( "%d - sharedMemPerBlock:       %d bytes ( %.2f Kbytes)\n" ,device ,deviceProp.sharedMemPerBlock ,deviceProp.sharedMemPerBlock / (float)1024  );
-    printfQuda( "%d - regsPerBlock:            %d\n" ,device ,deviceProp.regsPerBlock );
-    printfQuda( "%d - warpSize:                %d\n" ,device ,deviceProp.warpSize );
-    printfQuda( "%d - memPitch:                %d\n" ,device ,deviceProp.memPitch );
-    printfQuda( "%d - maxThreadsPerBlock:      %d\n" ,device ,deviceProp.maxThreadsPerBlock );
-    printfQuda( "%d - maxThreadsDim[0]:        %d\n" ,device ,deviceProp.maxThreadsDim[0] );
-    printfQuda( "%d - maxThreadsDim[1]:        %d\n" ,device ,deviceProp.maxThreadsDim[1] );
-    printfQuda( "%d - maxThreadsDim[2]:        %d\n" ,device ,deviceProp.maxThreadsDim[2] );
-    printfQuda( "%d - maxGridSize[0]:          %d\n" ,device ,deviceProp.maxGridSize[0] );
-    printfQuda( "%d - maxGridSize[1]:          %d\n" ,device ,deviceProp.maxGridSize[1] );
-    printfQuda( "%d - maxGridSize[2]:          %d\n" ,device ,deviceProp.maxGridSize[2] );
-    printfQuda( "%d - totalConstMem:           %d bytes ( %.2f Kbytes)\n" ,device ,deviceProp.totalConstMem ,deviceProp.totalConstMem / (float) 1024 );
-    printfQuda( "%d - compute capability:      %d.%d\n" ,device ,deviceProp.major ,deviceProp.minor);
-    printfQuda( "%d - clockRate                %d kilohertz\n" ,device ,deviceProp.clockRate );
-    printfQuda( "%d - textureAlignment         %d\n\n" ,device ,deviceProp.textureAlignment );
+    printfQuda( "%d - name:                    %s\n", device, deviceProp.name );
+    printfQuda( "%d - totalGlobalMem:          %lu bytes ( %.2f Gbytes)\n", device, deviceProp.totalGlobalMem,  deviceProp.totalGlobalMem / (float)( 1024 * 1024 * 1024)  );
+    printfQuda( "%d - sharedMemPerBlock:       %lu bytes ( %.2f Kbytes)\n", device, deviceProp.sharedMemPerBlock, deviceProp.sharedMemPerBlock / (float)1024  );
+    printfQuda( "%d - regsPerBlock:            %d\n", device, deviceProp.regsPerBlock );
+    printfQuda( "%d - warpSize:                %d\n", device, deviceProp.warpSize );
+    printfQuda( "%d - memPitch:                %lu\n", device, deviceProp.memPitch );
+    printfQuda( "%d - maxThreadsPerBlock:      %d\n", device, deviceProp.maxThreadsPerBlock );
+    printfQuda( "%d - maxThreadsDim[0]:        %d\n", device, deviceProp.maxThreadsDim[0] );
+    printfQuda( "%d - maxThreadsDim[1]:        %d\n", device, deviceProp.maxThreadsDim[1] );
+    printfQuda( "%d - maxThreadsDim[2]:        %d\n", device, deviceProp.maxThreadsDim[2] );
+    printfQuda( "%d - maxGridSize[0]:          %d\n", device, deviceProp.maxGridSize[0] );
+    printfQuda( "%d - maxGridSize[1]:          %d\n", device, deviceProp.maxGridSize[1] );
+    printfQuda( "%d - maxGridSize[2]:          %d\n", device, deviceProp.maxGridSize[2] );
+    printfQuda( "%d - totalConstMem:           %lu bytes ( %.2f Kbytes)\n", device, deviceProp.totalConstMem, deviceProp.totalConstMem / (float) 1024 );
+    printfQuda( "%d - compute capability:      %d.%d\n", device, deviceProp.major, deviceProp.minor);
+    printfQuda( "%d - clockRate                %d kilohertz\n", device, deviceProp.clockRate );
+    printfQuda( "%d - textureAlignment         %lu\n\n", device, deviceProp.textureAlignment );
   }
   
   
