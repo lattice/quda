@@ -21,8 +21,8 @@ namespace quda {
     if (reconstruct != QUDA_RECONSTRUCT_NO && reconstruct != QUDA_RECONSTRUCT_10) {
       errorQuda("Reconstruction type %d not supported", reconstruct);
     }
-    if (reconstruct == QUDA_RECONSTRUCT_10 && order != QUDA_MILC_GAUGE_ORDER && order != QUDA_MILC_SITE_GAUGE_ORDER) {
-      errorQuda("10-reconstruction only supported with MILC gauge order");
+    if (reconstruct == QUDA_RECONSTRUCT_10 && link_type != QUDA_ASQTAD_MOM_LINKS) {
+      errorQuda("10-reconstruction only supported with momentum links");
     }
 
     int siteDim=0;
