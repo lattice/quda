@@ -79,7 +79,7 @@ namespace quda
       __device__ inline void load(const void *smem, int k, int warp_col, const WarpRegisterMapping &wrm)
       {
         const unsigned *B = reinterpret_cast<const unsigned *>(smem);
-        int idx_strided = k * MMA_K + (wrm.lane_id & 15);
+        int idx_strided = k * MMA_K + (wrm.lane_id & 7);
         int idx_contiguous = warp_col * (MMA_N / 2);
         const unsigned *addr = &B[idx_strided * (ldb / 2) + idx_contiguous];
         asm volatile("ldmatrix.sync.aligned.m8n8.trans.x1.b16 {%0}, [%1];" : "=r"(reg[0]) : "l"(addr));
@@ -89,7 +89,7 @@ namespace quda
       __device__ inline void load(const SmemObj &smem_obj, int k, int warp_col, const WarpRegisterMapping &wrm)
       {
         const unsigned *B = reinterpret_cast<const unsigned *>(smem_obj.ptr);
-        int idx_strided = k * MMA_K + (wrm.lane_id & 15);
+        int idx_strided = k * MMA_K + (wrm.lane_id & 7);
         int idx_contiguous = warp_col * (MMA_N / 2);
         const unsigned *addr = &B[idx_strided * (SmemObj::ldn / 2) + idx_contiguous];
         asm volatile("ldmatrix.sync.aligned.m8n8.trans.x1.b16 {%0}, [%1];" : "=r"(reg[0]) : "l"(addr));
