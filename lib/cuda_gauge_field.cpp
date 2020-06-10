@@ -248,7 +248,7 @@ namespace quda {
 	recvStart(dim, dir); // prepost the receive
 	if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) {
 	  cudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][dim][dir], my_face_dim_dir_d[bufferIndex][dim][dir],
-			  ghost_face_bytes[dim], cudaMemcpyDefault, streams[2*dim+dir]);
+			  ghost_face_bytes[dim], cudaMemcpyDeviceToHost, streams[2*dim+dir]);
 	}
       }
 
@@ -268,7 +268,7 @@ namespace quda {
 	commsComplete(dim, dir);
 	if (!comm_peer2peer_enabled(1-dir,dim) && !comm_gdr_enabled()) {
 	  cudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][dim][1-dir], from_face_dim_dir_h[bufferIndex][dim][1-dir],
-			  ghost_face_bytes[dim], cudaMemcpyDefault, streams[2*dim+dir]);
+			  ghost_face_bytes[dim], cudaMemcpyHostToDevice, streams[2*dim+dir]);
 	}
       }
 
@@ -337,7 +337,7 @@ namespace quda {
 	recvStart(dim, dir); // prepost the receive
 	if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) {
 	  cudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][dim][dir], my_face_dim_dir_d[bufferIndex][dim][dir],
-			  ghost_face_bytes[dim], cudaMemcpyDefault, streams[2*dim+dir]);
+			  ghost_face_bytes[dim], cudaMemcpyDeviceToHost, streams[2*dim+dir]);
 	}
       }
 
@@ -357,7 +357,7 @@ namespace quda {
 	commsComplete(dim, dir);
 	if (!comm_peer2peer_enabled(1-dir,dim) && !comm_gdr_enabled()) {
 	  cudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][dim][1-dir], from_face_dim_dir_h[bufferIndex][dim][1-dir],
-			  ghost_face_bytes[dim], cudaMemcpyDefault, streams[2*dim+dir]);
+			  ghost_face_bytes[dim], cudaMemcpyHostToDevice, streams[2*dim+dir]);
 	}
       }
 
@@ -538,7 +538,7 @@ namespace quda {
 	  // issue host-to-device copies if needed
 	  if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) {
 	    cudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][dim][dir], my_face_dim_dir_d[bufferIndex][dim][dir],
-			    ghost_face_bytes[dim], cudaMemcpyDefault, streams[dir]);
+			    ghost_face_bytes[dim], cudaMemcpyDeviceToHost, streams[dir]);
 	  }
 	}
 
@@ -553,7 +553,7 @@ namespace quda {
 	  // issue host-to-device copies if needed
 	  if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) {
 	    cudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][dim][dir], from_face_dim_dir_h[bufferIndex][dim][dir],
-			    ghost_face_bytes[dim], cudaMemcpyDefault, streams[dir]);
+			    ghost_face_bytes[dim], cudaMemcpyHostToDevice, streams[dir]);
 	  }
 	}
 

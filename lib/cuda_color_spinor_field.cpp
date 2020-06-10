@@ -829,7 +829,7 @@ namespace quda {
     if (dim !=3 || getKernelPackT()) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
 
       void* gpu_buf = (dir == QUDA_BACKWARDS) ? my_face_dim_dir_d[bufferIndex][dim][0] : my_face_dim_dir_d[bufferIndex][dim][1];
-      qudaMemcpyAsync(ghost_spinor, gpu_buf, ghost_face_bytes[dim], cudaMemcpyDefault, *stream);
+      qudaMemcpyAsync(ghost_spinor, gpu_buf, ghost_face_bytes[dim], cudaMemcpyDeviceToHost, *stream);
 
     } else {
 
@@ -866,7 +866,7 @@ namespace quda {
         for (int s = 0; s < x4; s++) { // loop over multiple 4-d volumes (if they exist)
           void *dst = (char *)ghost_spinor + s * len + parity * nFace * Nint * ghostFaceCB[3] * ghost_precision;
           void *src = (char *)v + (offset + s * (volumeCB / x4)) * Nvec * ghost_precision + parity * bytes / 2;
-          qudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDefault, *stream);
+          qudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToHost, *stream);
 
           // we can probably issue this as a single cudaMemcpy2d along the fifth dimension
           if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) {
@@ -875,7 +875,7 @@ namespace quda {
             void *dst = (char *)ghost_spinor + nParity * nFace * Nint * ghostFaceCB[3] * ghost_precision + s * len
                 + parity * nFace * ghostFaceCB[3] * sizeof(float);
             void *src = (char *)norm + norm_offset + s * (volumeCB / x4) * sizeof(float) + parity * norm_bytes / 2;
-            qudaMemcpyAsync(dst, src, len, cudaMemcpyDefault, *stream);
+            qudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream);
           }
         } // fifth dimension
       }   // parity
@@ -896,7 +896,7 @@ namespace quda {
     int ghost_offset = (dir == QUDA_BACKWARDS) ? ghostOffset[dim][0] : ghostOffset[dim][1];
     void *ghost_dst = (char*)ghost_recv_buffer_d[bufferIndex] + ghost_precision*ghost_offset;
 
-    qudaMemcpyAsync(ghost_dst, src, ghost_face_bytes[dim], cudaMemcpyDefault, *stream);
+    qudaMemcpyAsync(ghost_dst, src, ghost_face_bytes[dim], cudaMemcpyHostToDevice, *stream);
   }
 
 
@@ -1384,17 +1384,17 @@ namespace quda {
 	  if (comm_dim_partitioned(i)) {
 	    if (pack_destination[2*i+0] == Device && !comm_peer2peer_enabled(0,i) && // fuse forwards and backwards if possible
 		pack_destination[2*i+1] == Device && !comm_peer2peer_enabled(1,i)) {
-	      cudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_d[bufferIndex][i][0], 2*ghost_face_bytes[i], cudaMemcpyDefault, 0);
+	      cudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_d[bufferIndex][i][0], 2*ghost_face_bytes[i], cudaMemcpyDeviceToHost, 0);
 	    } else {
 	      if (pack_destination[2*i+0] == Device && !comm_peer2peer_enabled(0,i))
-		cudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_d[bufferIndex][i][0], ghost_face_bytes[i], cudaMemcpyDefault, 0);
+		cudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_d[bufferIndex][i][0], ghost_face_bytes[i], cudaMemcpyDeviceToHost, 0);
 	      if (pack_destination[2*i+1] == Device && !comm_peer2peer_enabled(1,i))
-		cudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][1], my_face_dim_dir_d[bufferIndex][i][1], ghost_face_bytes[i], cudaMemcpyDefault, 0);
+		cudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][1], my_face_dim_dir_d[bufferIndex][i][1], ghost_face_bytes[i], cudaMemcpyDeviceToHost, 0);
 	    }
 	  }
 	}
       } else if (total_bytes && !pack_host) {
-	cudaMemcpyAsync(my_face_h[bufferIndex], ghost_send_buffer_d[bufferIndex], total_bytes, cudaMemcpyDefault, 0);
+	cudaMemcpyAsync(my_face_h[bufferIndex], ghost_send_buffer_d[bufferIndex], total_bytes, cudaMemcpyDeviceToHost, 0);
       }
     }
 
@@ -1438,17 +1438,17 @@ namespace quda {
 	  if (comm_dim_partitioned(i)) {
 	    if (halo_location[2*i+0] == Device && !comm_peer2peer_enabled(0,i) && // fuse forwards and backwards if possible
 		halo_location[2*i+1] == Device && !comm_peer2peer_enabled(1,i)) {
-	      cudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0], 2*ghost_face_bytes[i], cudaMemcpyDefault, 0);
+	      cudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0], 2*ghost_face_bytes[i], cudaMemcpyHostToDevice, 0);
 	    } else {
 	      if (halo_location[2*i+0] == Device && !comm_peer2peer_enabled(0,i))
-		cudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0], ghost_face_bytes[i], cudaMemcpyDefault, 0);
+		cudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0], ghost_face_bytes[i], cudaMemcpyHostToDevice, 0);
 	      if (halo_location[2*i+1] == Device && !comm_peer2peer_enabled(1,i))
-		cudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][1], from_face_dim_dir_h[bufferIndex][i][1], ghost_face_bytes[i], cudaMemcpyDefault, 0);
+		cudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][1], from_face_dim_dir_h[bufferIndex][i][1], ghost_face_bytes[i], cudaMemcpyHostToDevice, 0);
 	    }
 	  }
 	}
       } else if (total_bytes && !halo_host) {
-	cudaMemcpyAsync(ghost_recv_buffer_d[bufferIndex], from_face_h[bufferIndex], total_bytes, cudaMemcpyDefault, 0);
+	cudaMemcpyAsync(ghost_recv_buffer_d[bufferIndex], from_face_h[bufferIndex], total_bytes, cudaMemcpyHostToDevice, 0);
       }
     }
 
