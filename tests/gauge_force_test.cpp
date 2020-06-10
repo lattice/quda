@@ -11,8 +11,7 @@
 #include "gauge_force_quda.h"
 #include <sys/time.h>
 #include <dslash_quda.h>
-
-// extern int device;
+#include <gtest/gtest.h>
 
 static QudaGaugeFieldOrder gauge_order = QUDA_QDP_GAUGE_ORDER;
 
@@ -235,6 +234,9 @@ int path_dir_t[][5] = {
   { 2 ,1 ,4 ,5 ,6 }
 };
 
+static double force_check;
+static double deviation;
+
 void gauge_force_test(void)
 {
   int max_length = 6;
@@ -271,9 +273,9 @@ void gauge_force_test(void)
       input_path_buf[dir][i] = (int*)safe_malloc(length[i]*sizeof(int));
       if (dir == 0)
         memcpy(input_path_buf[dir][i], path_dir_x[i], length[i] * sizeof(int));
-      else if(dir ==1) memcpy(input_path_buf[dir][i], path_dir_y[i], length[i]*sizeof(int));
-      else if(dir ==2) memcpy(input_path_buf[dir][i], path_dir_z[i], length[i]*sizeof(int));
-      else if(dir ==3) memcpy(input_path_buf[dir][i], path_dir_t[i], length[i]*sizeof(int));
+      else if (dir ==1) memcpy(input_path_buf[dir][i], path_dir_y[i], length[i]*sizeof(int));
+      else if (dir ==2) memcpy(input_path_buf[dir][i], path_dir_z[i], length[i]*sizeof(int));
+      else if (dir ==3) memcpy(input_path_buf[dir][i], path_dir_t[i], length[i]*sizeof(int));
     }
   }
 
@@ -338,20 +340,15 @@ void gauge_force_test(void)
   if (verify_results) {
     gauge_force_reference(refmom, eb3, (void **)U_qdp->Gauge_p(), gauge_param.cpu_prec, input_path_buf, length,
                           loop_coeff, num_paths);
-
-    int res = compare_floats(Mom_milc->Gauge_p(), refmom, 4 * V * mom_site_size, 1e-3, gauge_param.cpu_prec);
-
+    force_check = compare_floats(Mom_milc->Gauge_p(), refmom, 4 * V * mom_site_size, getTolerance(cuda_prec), gauge_param.cpu_prec);
     strong_check_mom(Mom_milc->Gauge_p(), refmom, 4 * V, gauge_param.cpu_prec);
-
-    printfQuda("Test %s\n", (1 == res) ? "PASSED" : "FAILED");
   }
 
   printfQuda("\nComputing momentum action\n");
   auto action_quda = momActionQuda(mom, &gauge_param);
   auto action_ref = mom_action(refmom, gauge_param.cpu_prec, 4 * V);
-  auto deviation = std::abs(action_quda - action_ref) / std::abs(action_ref);
+  deviation = std::abs(action_quda - action_ref) / std::abs(action_ref);
   printfQuda("QUDA action = %e, reference = %e relative deviation = %e\n", action_quda, action_ref, deviation);
-  printfQuda("Test %s\n", deviation < getTolerance(gauge_param.cuda_prec) ? "PASSED" : "FAILED");
 
   double perf = 1.0*niter*flops*V/(total_time*1e+9);
   printfQuda("total time = %.2f ms\n", total_time*1e+3);
@@ -371,6 +368,16 @@ void gauge_force_test(void)
   endQuda();
 }
 
+TEST(force, verify)
+{
+  ASSERT_EQ(force_check, 1) << "CPU and QUDA implementations do not agree";
+}
+
+TEST(action, verify)
+{
+  ASSERT_LE(deviation, getTolerance(cuda_prec)) << "CPU and QUDA implementations do not agree";
+}
+
 static void display_test_info()
 {
   printfQuda("running the following test:\n");
@@ -384,6 +391,11 @@ static void display_test_info()
 
 int main(int argc, char **argv)
 {
+  // initalize google test
+  ::testing::InitGoogleTest(&argc, argv);
+  // return code for google test
+  int test_rc = 0;
+
   // command line options
   auto app = make_app();
   CLI::TransformPairs<QudaGaugeFieldOrder> gauge_order_map {{"milc", QUDA_MILC_GAUGE_ORDER},
@@ -401,5 +413,15 @@ int main(int argc, char **argv)
 
   gauge_force_test();
 
+  if (verify_results) {
+    // Ensure gtest prints only from rank 0
+    ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
+    if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
+
+    test_rc = RUN_ALL_TESTS();
+    if (test_rc != 0) warningQuda("Tests failed");
+  }
+
   finalizeComms();
+  return test_rc;
 }
