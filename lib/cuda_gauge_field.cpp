@@ -681,7 +681,7 @@ namespace quda {
 	  if (error != cudaSuccess) errorQuda("Failed to get device pointer for MILC site / BQCD array");
 
 	  if (src.GhostExchange() == QUDA_GHOST_EXCHANGE_NO) {
-	    copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge);
+	    copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, src_d);
 	  } else {
 	    errorQuda("Ghost copy not supported here");
 	  }
