@@ -54,7 +54,8 @@ namespace quda
 
       unsigned reg[2];
 
-      template <int lda> __device__ inline void load(const void *smem, int k, int warp_row, const WarpRegisterMapping &wrm)
+      template <int lda>
+      __device__ inline void load(const void *smem, int k, int warp_row, const WarpRegisterMapping &wrm)
       {
         const unsigned *A = reinterpret_cast<const unsigned *>(smem);
         int idx_strided = k * MMA_K + wrm.quad_thread;
@@ -84,14 +85,14 @@ namespace quda
         asm volatile("neg.f16x2 %0, %0;" : "+r"(reg[0]));
         asm volatile("neg.f16x2 %0, %0;" : "+r"(reg[1]));
       }
-
     };
 
     struct MmaOperandB {
 
       unsigned reg[2];
 
-      template <int ldb> __device__ inline void load(const void *smem, int k, int warp_col, const WarpRegisterMapping &wrm)
+      template <int ldb>
+      __device__ inline void load(const void *smem, int k, int warp_col, const WarpRegisterMapping &wrm)
       {
         const unsigned *B = reinterpret_cast<const unsigned *>(smem);
         int idx_strided = k * MMA_K + wrm.quad_thread;

@@ -33,37 +33,35 @@ namespace quda
       int thread_id_in_group;
 
       __device__ WarpRegisterMapping(int thread_id) :
-        warp_id(thread_id / warp_size),
-        lane_id(thread_id & 31),
-        group_id(lane_id >> 2),
-        thread_id_in_group(lane_id & 3) { }
+        warp_id(thread_id / warp_size), lane_id(thread_id & 31), group_id(lane_id >> 2), thread_id_in_group(lane_id & 3)
+      {
+      }
     };
 
     struct MmaOperandA {
 
       unsigned reg[2];
 
-      template <int lda> __device__ inline void load(const void *smem, int k, int warp_row, const WarpRegisterMapping &wrm)
+      template <int lda>
+      __device__ inline void load(const void *smem, int k, int warp_row, const WarpRegisterMapping &wrm)
       {
         const unsigned *A = reinterpret_cast<const unsigned *>(smem);
-        int idx_strided = k * MMA_K + (wrm.lane_id & 7) + (wrm.lane_id >> 4) * 8;
+        int idx_strided = k * MMA_K + (wrm.lane_id & 7);
         int idx_contiguous = warp_row * (MMA_M / 2) + ((wrm.lane_id >> 3) & 1) * 4;
         const unsigned *addr = &A[idx_strided * (lda / 2) + idx_contiguous];
-        
-        asm volatile("ldmatrix.sync.aligned.m8n8.trans.x2.b16 {%0,%1}, [%2];"
-                   : "=r"(reg[0]), "=r"(reg[1]) : "l"(addr));
+
+        asm volatile("ldmatrix.sync.aligned.m8n8.trans.x2.b16 {%0,%1}, [%2];" : "=r"(reg[0]), "=r"(reg[1]) : "l"(addr));
       }
 
       template <class SmemObj>
       __device__ inline void load(const SmemObj &smem_obj, int k, int warp_row, const WarpRegisterMapping &wrm)
       {
         const unsigned *A = reinterpret_cast<const unsigned *>(smem_obj.ptr);
-        int idx_strided = k * MMA_K + (wrm.lane_id & 7) + (wrm.lane_id >> 4) * 8;
+        int idx_strided = k * MMA_K + (wrm.lane_id & 7);
         int idx_contiguous = warp_row * (MMA_M / 2) + ((wrm.lane_id >> 3) & 1) * 4;
         const unsigned *addr = &A[idx_strided * (SmemObj::ldn / 2) + idx_contiguous];
-        
-        asm volatile("ldmatrix.sync.aligned.m8n8.trans.x2.b16 {%0,%1}, [%2];"
-                   : "=r"(reg[0]), "=r"(reg[1]) : "l"(addr));
+
+        asm volatile("ldmatrix.sync.aligned.m8n8.trans.x2.b16 {%0,%1}, [%2];" : "=r"(reg[0]), "=r"(reg[1]) : "l"(addr));
       }
 
       __device__ inline void negate()
@@ -71,21 +69,20 @@ namespace quda
         asm volatile("neg.f16x2 %0, %0;" : "+r"(reg[0]));
         asm volatile("neg.f16x2 %0, %0;" : "+r"(reg[1]));
       }
-
     };
 
     struct MmaOperandB {
 
       unsigned reg[1];
 
-      template <int ldb> __device__ inline void load(const void *smem, int k, int warp_col, const WarpRegisterMapping &wrm)
+      template <int ldb>
+      __device__ inline void load(const void *smem, int k, int warp_col, const WarpRegisterMapping &wrm)
       {
         const unsigned *B = reinterpret_cast<const unsigned *>(smem);
         int idx_strided = k * MMA_K + (wrm.lane_id & 15);
         int idx_contiguous = warp_col * (MMA_N / 2);
         const unsigned *addr = &B[idx_strided * (ldb / 2) + idx_contiguous];
-        asm volatile("ldmatrix.sync.aligned.m8n8.trans.x1.b16 {%0}, [%1];"
-                   : "=r"(reg[0]) : "l"(addr));
+        asm volatile("ldmatrix.sync.aligned.m8n8.trans.x1.b16 {%0}, [%1];" : "=r"(reg[0]) : "l"(addr));
       }
 
       template <class SmemObj>
@@ -95,8 +92,7 @@ namespace quda
         int idx_strided = k * MMA_K + (wrm.lane_id & 15);
         int idx_contiguous = warp_col * (MMA_N / 2);
         const unsigned *addr = &B[idx_strided * (SmemObj::ldn / 2) + idx_contiguous];
-        asm volatile("ldmatrix.sync.aligned.m8n8.trans.x1.b16 {%0}, [%1];"
-                   : "=r"(reg[0]) : "l"(addr));
+        asm volatile("ldmatrix.sync.aligned.m8n8.trans.x1.b16 {%0}, [%1];" : "=r"(reg[0]) : "l"(addr));
       }
     };
 
@@ -168,7 +164,7 @@ namespace quda
 #pragma unroll
         for (int i = 0; i < 4; i++) { reg[i] *= alpha; }
       }
-      
+
       template <int ldc>
       __device__ inline void store(void *smem, int warp_row, int warp_col, const WarpRegisterMapping &wrm)
       {
@@ -193,9 +189,9 @@ namespace quda
     __device__ inline typename std::enable_if<std::is_same<typename TC::reg_type, unsigned>::value, void>::type
     gemm(const TA &op_a, const TB &op_b, TC &op_c)
     {
-       asm volatile("mma.sync.aligned.m16n8k8.row.col.f16.f16.f16.f16 {%0,%1}, {%2,%3}, {%4}, {%0,%1};"
-                       : "+r"(op_c.reg[0]), "+r"(op_c.reg[1])
-                       : "r"(op_a.reg[0]), "r"(op_a.reg[1]), "r"(op_b.reg[0]));
+      asm volatile("mma.sync.aligned.m16n8k8.row.col.f16.f16.f16.f16 {%0,%1}, {%2,%3}, {%4}, {%0,%1};"
+                   : "+r"(op_c.reg[0]), "+r"(op_c.reg[1])
+                   : "r"(op_a.reg[0]), "r"(op_a.reg[1]), "r"(op_b.reg[0]));
     }
 
     template <class TA, class TB, class TC>
@@ -203,8 +199,8 @@ namespace quda
     gemm(const TA &op_a, const TB &op_b, TC &op_c)
     {
       asm volatile("mma.sync.aligned.m16n8k8.row.col.f32.f16.f16.f32 {%0,%1,%2,%3}, {%4,%5}, {%6}, {%0,%1,%2,%3};"
-                       : "+f"(op_c.reg[0]), "+f"(op_c.reg[1]),"+f"(op_c.reg[2]), "+f"(op_c.reg[3])
-                       : "r"(op_a.reg[0]), "r"(op_a.reg[1]), "r"(op_b.reg[0]));
+                   : "+f"(op_c.reg[0]), "+f"(op_c.reg[1]), "+f"(op_c.reg[2]), "+f"(op_c.reg[3])
+                   : "r"(op_a.reg[0]), "r"(op_a.reg[1]), "r"(op_b.reg[0]));
     }
 
     template <typename real, int length> struct Structure {
