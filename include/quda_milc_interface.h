@@ -12,6 +12,9 @@
  * The header file defines the milc interface to enable easy
  * interfacing between QUDA and the MILC software packed.
  */
+#if __COMPUTE_CAPABILITY__ >= 600
+#define USE_QUDA_MANAGED 1
+#endif
 
 #ifdef __cplusplus
 extern "C" {
