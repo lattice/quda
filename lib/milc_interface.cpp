@@ -384,9 +384,8 @@ void qudaMomLoad(int prec, QudaMILCSiteArg_t *arg)
 {
   qudamilc_called<true>(__func__);
 
-  QudaGaugeParam param = newMILCGaugeParam(localDim,
-      (prec==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
-      QUDA_GENERAL_LINKS);
+  QudaGaugeParam param
+    = newMILCGaugeParam(localDim, (prec == 1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION, QUDA_GENERAL_LINKS);
 
   void *mom = arg->site ? arg->site : arg->mom;
   param.mom_offset = arg->mom_offset;
@@ -406,9 +405,8 @@ void qudaMomSave(int prec, QudaMILCSiteArg_t *arg)
 {
   qudamilc_called<true>(__func__);
 
-  QudaGaugeParam param = newMILCGaugeParam(localDim,
-      (prec==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
-      QUDA_GENERAL_LINKS);
+  QudaGaugeParam param
+    = newMILCGaugeParam(localDim, (prec == 1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION, QUDA_GENERAL_LINKS);
 
   void *mom = arg->site ? arg->site : arg->mom;
   param.mom_offset = arg->mom_offset;
@@ -427,9 +425,8 @@ double qudaMomAction(int prec, QudaMILCSiteArg_t *arg)
 {
   qudamilc_called<true>(__func__);
 
-  QudaGaugeParam param = newMILCGaugeParam(localDim,
-      (prec==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
-      QUDA_GENERAL_LINKS);
+  QudaGaugeParam param
+    = newMILCGaugeParam(localDim, (prec == 1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION, QUDA_GENERAL_LINKS);
 
   void *mom = arg->site ? arg->site : arg->mom;
   param.mom_offset = arg->mom_offset;

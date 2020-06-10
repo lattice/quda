@@ -378,8 +378,8 @@ void gauge_force_reference_dir(void *refMom, int dir, double eb3, void **sitelin
   free(staple);
 }
 
-void gauge_force_reference(void *refMom, double eb3, void **sitelink, QudaPrecision prec,
-                           int ***path_dir, int *length, void *loop_coeff, int num_paths)
+void gauge_force_reference(void *refMom, double eb3, void **sitelink, QudaPrecision prec, int ***path_dir, int *length,
+                           void *loop_coeff, int num_paths)
 {
   // created extended field
   int R[] = {2, 2, 2, 2};
@@ -387,12 +387,12 @@ void gauge_force_reference(void *refMom, double eb3, void **sitelink, QudaPrecis
   setGaugeParam(param);
   param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   param.t_boundary = QUDA_PERIODIC_T;
-  
-  auto qdp_ex = quda::createExtendedGauge((void**)sitelink, param, R);
+
+  auto qdp_ex = quda::createExtendedGauge((void **)sitelink, param, R);
 
   for (int dir = 0; dir < 4; dir++) {
-    gauge_force_reference_dir(refMom, dir, eb3, sitelink, (void**)qdp_ex->Gauge_p(), prec, path_dir[dir],
-                              length, loop_coeff, num_paths);
+    gauge_force_reference_dir(refMom, dir, eb3, sitelink, (void **)qdp_ex->Gauge_p(), prec, path_dir[dir], length,
+                              loop_coeff, num_paths);
   }
 
   delete qdp_ex;

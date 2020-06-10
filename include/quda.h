@@ -1075,7 +1075,6 @@ extern "C" {
   void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
                          double *path_coeff, QudaGaugeParam *param);
 
-
   /**
    * Either downloads and sets the resident momentum field, or uploads
    * and returns the resident momentum field
@@ -1083,7 +1082,7 @@ extern "C" {
    * @param[in,out] mom The external momentum field
    * @param[in] param The parameters of the external field
    */
-  void momResidentQuda(void* mom, QudaGaugeParam* param);
+  void momResidentQuda(void *mom, QudaGaugeParam *param);
 
   /**
    * Compute the gauge force and update the mometum field

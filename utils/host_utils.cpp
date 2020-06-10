@@ -1574,7 +1574,7 @@ int strong_check_mom(void *momA, void *momB, int len, QudaPrecision prec)
 template <typename real> double mom_action(real *mom_, int len)
 {
   double action = 0.0;
-  for (int i=0; i<len; i++) {
+  for (int i = 0; i < len; i++) {
     real *mom = mom_ + i * mom_site_size;
     double local = 0.0;
     for (int j = 0; j < 6; j++) local += mom[j] * mom[j];
@@ -1590,9 +1590,9 @@ double mom_action(void *mom, QudaPrecision prec, int len)
 {
   double action = 0.0;
   if (prec == QUDA_DOUBLE_PRECISION) {
-    return mom_action<double>((double*)mom, len);
+    return mom_action<double>((double *)mom, len);
   } else if (prec == QUDA_SINGLE_PRECISION) {
-    return mom_action<float>((float*)mom, len);
+    return mom_action<float>((float *)mom, len);
   }
   return action;
 }

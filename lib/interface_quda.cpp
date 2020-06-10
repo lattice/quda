@@ -4081,7 +4081,7 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   return 0;
 }
 
-void momResidentQuda(void* mom, QudaGaugeParam* param)
+void momResidentQuda(void *mom, QudaGaugeParam *param)
 {
   profileGaugeForce.TPSTART(QUDA_PROFILE_TOTAL);
   profileGaugeForce.TPSTART(QUDA_PROFILE_INIT);
@@ -4091,7 +4091,8 @@ void momResidentQuda(void* mom, QudaGaugeParam* param)
   GaugeFieldParam gParamMom(mom, *param, QUDA_ASQTAD_MOM_LINKS);
   if (gParamMom.order == QUDA_TIFR_GAUGE_ORDER || gParamMom.order == QUDA_TIFR_PADDED_GAUGE_ORDER)
     gParamMom.reconstruct = QUDA_RECONSTRUCT_NO;
-  else gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
+  else
+    gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
   gParamMom.site_offset = param->mom_offset;
   gParamMom.site_size = param->site_size;
 
@@ -4109,8 +4110,8 @@ void momResidentQuda(void* mom, QudaGaugeParam* param)
   } else if (param->return_result_mom && !param->make_resident_mom) {
     if (!momResident) errorQuda("No resident momentum to return");
   } else {
-    errorQuda("Unexpected combination make_resident_mom = %d return_result_mom = %d",
-              param->make_resident_mom, param->return_result_mom);
+    errorQuda("Unexpected combination make_resident_mom = %d return_result_mom = %d", param->make_resident_mom,
+              param->return_result_mom);
   }
 
   profileGaugeForce.TPSTOP(QUDA_PROFILE_INIT);

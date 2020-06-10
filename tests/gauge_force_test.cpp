@@ -265,11 +265,12 @@ void gauge_force_test(void)
   int num_paths = sizeof(path_dir_x)/sizeof(path_dir_x[0]);
 
   int** input_path_buf[4];
-  for (int dir =0; dir < 4; dir++) {
+  for (int dir = 0; dir < 4; dir++) {
     input_path_buf[dir] = (int **)safe_malloc(num_paths * sizeof(int *));
-    for (int i=0;i < num_paths;i++) {
+    for (int i = 0; i < num_paths; i++) {
       input_path_buf[dir][i] = (int*)safe_malloc(length[i]*sizeof(int));
-      if (dir == 0) memcpy(input_path_buf[dir][i], path_dir_x[i], length[i]*sizeof(int));
+      if (dir == 0)
+        memcpy(input_path_buf[dir][i], path_dir_x[i], length[i] * sizeof(int));
       else if(dir ==1) memcpy(input_path_buf[dir][i], path_dir_y[i], length[i]*sizeof(int));
       else if(dir ==2) memcpy(input_path_buf[dir][i], path_dir_z[i], length[i]*sizeof(int));
       else if(dir ==3) memcpy(input_path_buf[dir][i], path_dir_t[i], length[i]*sizeof(int));
@@ -284,7 +285,7 @@ void gauge_force_test(void)
 
   printfQuda("%d\n", __LINE__);
   // fills the gauge field with random numbers
-  createSiteLinkCPU((void**)U_qdp->Gauge_p(), gauge_param.cpu_prec, 0);
+  createSiteLinkCPU((void **)U_qdp->Gauge_p(), gauge_param.cpu_prec, 0);
 
   param.order = QUDA_MILC_GAUGE_ORDER;
   auto U_milc = new quda::cpuGaugeField(param);
@@ -299,7 +300,7 @@ void gauge_force_test(void)
   param.order = QUDA_QDP_GAUGE_ORDER;
   auto Mom_qdp = new quda::cpuGaugeField(param);
 
-  //initialize some data in cpuMom
+  // initialize some data in cpuMom
   createMomCPU(Mom_ref_milc->Gauge_p(), gauge_param.cpu_prec);
   printfQuda("%d\n", __LINE__);
   Mom_milc->copy(*Mom_ref_milc);
@@ -320,9 +321,7 @@ void gauge_force_test(void)
 
   if (getTuning() == QUDA_TUNE_YES) {
     printfQuda("Tuning...\n");
-    computeGaugeForceQuda(mom, sitelink,  input_path_buf, length,
-    			  loop_coeff_d, num_paths, max_length, eb3,
-    			  &gauge_param);
+    computeGaugeForceQuda(mom, sitelink, input_path_buf, length, loop_coeff_d, num_paths, max_length, eb3, &gauge_param);
     printfQuda("...done\n");
   }
 
@@ -334,9 +333,7 @@ void gauge_force_test(void)
   for (int i = 0; i < niter; i++) {
     Mom_->copy(*Mom_ref_milc); // restore initial momentum for correctness
     gettimeofday(&t0, NULL);
-    computeGaugeForceQuda(mom, sitelink,  input_path_buf, length,
-    			  loop_coeff_d, num_paths, max_length, eb3,
-    			  &gauge_param);
+    computeGaugeForceQuda(mom, sitelink, input_path_buf, length, loop_coeff_d, num_paths, max_length, eb3, &gauge_param);
     gettimeofday(&t1, NULL);
     total_time += t1.tv_sec - t0.tv_sec + 0.000001*(t1.tv_usec - t0.tv_usec);
   }
@@ -347,19 +344,19 @@ void gauge_force_test(void)
 
   void *refmom = Mom_ref_milc->Gauge_p();
   if (verify_results) {
-    gauge_force_reference(refmom, eb3, (void**)U_qdp->Gauge_p(), gauge_param.cpu_prec,
-    			  input_path_buf, length, loop_coeff, num_paths);
+    gauge_force_reference(refmom, eb3, (void **)U_qdp->Gauge_p(), gauge_param.cpu_prec, input_path_buf, length,
+                          loop_coeff, num_paths);
 
     int res = compare_floats(Mom_milc->Gauge_p(), refmom, 4 * V * mom_site_size, 1e-3, gauge_param.cpu_prec);
 
-    strong_check_mom(Mom_milc->Gauge_p(), refmom, 4*V, gauge_param.cpu_prec);
+    strong_check_mom(Mom_milc->Gauge_p(), refmom, 4 * V, gauge_param.cpu_prec);
 
     printfQuda("Test %s\n", (1 == res) ? "PASSED" : "FAILED");
   }
 
   printfQuda("Computing momentum action\n");
   auto action_quda = momActionQuda(mom, &gauge_param);
-  auto action_ref = mom_action(refmom, gauge_param.cpu_prec, 4*V);
+  auto action_ref = mom_action(refmom, gauge_param.cpu_prec, 4 * V);
   printfQuda("QUDA action = %e, reference = %e\n", action_quda, action_ref);
 
   double perf = 1.0*niter*flops*V/(total_time*1e+9);
@@ -376,7 +373,7 @@ void gauge_force_test(void)
   delete Mom_qdp;
   delete Mom_milc;
   delete Mom_ref_milc;
-  
+
   endQuda();
 }
 
