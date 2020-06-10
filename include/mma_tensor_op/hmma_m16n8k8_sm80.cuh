@@ -17,7 +17,7 @@ namespace quda
 {
   namespace mma
   {
-    __device__ __host__ constexpr int inline pad_size(int m) { return m == 48 ? 2 : 10; }
+    __device__ __host__ constexpr int inline pad_size(int m) { return 8; }
 
     constexpr int MMA_M = 16;
     constexpr int MMA_N = 8;
@@ -59,7 +59,7 @@ namespace quda
       {
         const unsigned *A = reinterpret_cast<const unsigned *>(smem_obj.ptr);
         int idx_strided = k * MMA_K + (wrm.lane_id & 7) + (wrm.lane_id >> 4) * 8;
-        int idx_contiguous = warp_row * (MMA_M / 2) + (wrm.lane_id >> 3) & 1;
+        int idx_contiguous = warp_row * (MMA_M / 2) + ((wrm.lane_id >> 3) & 1) * 4;
         const unsigned *addr = &A[idx_strided * (SmemObj::ldn / 2) + idx_contiguous];
         
         asm volatile("ldmatrix.sync.aligned.m8n8.trans.x2.b16 {%0,%1}, [%2];"
@@ -84,7 +84,7 @@ namespace quda
         int idx_strided = k * MMA_K + (wrm.lane_id & 15);
         int idx_contiguous = warp_col * (MMA_N / 2);
         const unsigned *addr = &B[idx_strided * (ldb / 2) + idx_contiguous];
-        asm volatile("ldmatrix.sync.aligned.m8n8.trans.x1.b16 {%0}, [%2];"
+        asm volatile("ldmatrix.sync.aligned.m8n8.trans.x1.b16 {%0}, [%1];"
                    : "=r"(reg[0]) : "l"(addr));
       }
 
@@ -95,7 +95,7 @@ namespace quda
         int idx_strided = k * MMA_K + (wrm.lane_id & 15);
         int idx_contiguous = warp_col * (MMA_N / 2);
         const unsigned *addr = &B[idx_strided * (SmemObj::ldn / 2) + idx_contiguous];
-        asm volatile("ldmatrix.sync.aligned.m8n8.trans.x2.b16 {%0}, [%2];"
+        asm volatile("ldmatrix.sync.aligned.m8n8.trans.x1.b16 {%0}, [%1];"
                    : "=r"(reg[0]) : "l"(addr));
       }
     };
@@ -172,14 +172,14 @@ namespace quda
       template <int ldc>
       __device__ inline void store(void *smem, int warp_row, int warp_col, const WarpRegisterMapping &wrm)
       {
-        reg_type *C = reinterpret_cast<reg_type *>(smem);
+        half2 *C = reinterpret_cast<half2 *>(smem);
 
         int idx_strided = warp_row * MMA_M + wrm.group_id;
         int idx_contiguous = warp_col * (MMA_N / 2) + wrm.thread_id_in_group;
         int thread_offset_c = idx_strided * (ldc / 2) + idx_contiguous;
 
-        C[thread_offset_c] = __float2half2_rn(reg[0], reg[1]);
-        C[thread_offset_c + 8 * (ldc / 2)] = __float2half2_rn(reg[2], reg[3]);
+        C[thread_offset_c] = __floats2half2_rn(reg[0], reg[1]);
+        C[thread_offset_c + 8 * (ldc / 2)] = __floats2half2_rn(reg[2], reg[3]);
       }
 
       template <class F> __device__ inline void abs_max(F &max)
@@ -203,7 +203,7 @@ namespace quda
     gemm(const TA &op_a, const TB &op_b, TC &op_c)
     {
       asm volatile("mma.sync.aligned.m16n8k8.row.col.f32.f16.f16.f32 {%0,%1,%2,%3}, {%4,%5}, {%6}, {%0,%1,%2,%3};"
-                       : "+r"(op_c.reg[0]), "+r"(op_c.reg[1]),"+r"(op_c.reg[2]), "+r"(op_c.reg[3])
+                       : "+f"(op_c.reg[0]), "+f"(op_c.reg[1]),"+f"(op_c.reg[2]), "+f"(op_c.reg[3])
                        : "r"(op_a.reg[0]), "r"(op_a.reg[1]), "r"(op_b.reg[0]));
     }
 

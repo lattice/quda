@@ -11,7 +11,7 @@ namespace quda
     {
       switch (Ls) {
 #ifdef USE_MMA_SYNC
-      case 16: return 10; break;
+      case 16: return 8; break;
 #else
       case 16: return 16; break;
 #endif
@@ -22,7 +22,7 @@ namespace quda
     constexpr int sm_n_pad_size()
     {
 #ifdef USE_MMA_SYNC
-      return 10;
+      return 8;
 #else
       return 16;
 #endif
