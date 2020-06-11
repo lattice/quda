@@ -521,8 +521,8 @@ namespace quda {
     work_space(nullptr),
     r_pre(nullptr),
     p_pre(nullptr),
-    profile(profile),
     local_eigcg_args(nullptr),
+    profile(profile),
     init(false)
   {
 
@@ -639,16 +639,16 @@ namespace quda {
 
   void IncEigCG::Increment( ){
     EigCGArgs &args = *local_eigcg_args;
-    const int first_idx = param.eig_param.nConv;
+
+    const unsigned int first_idx = param.eig_param.nConv;
+    const unsigned int nEvec     = param.eig_param.nEv; 
+    const unsigned int k         = param.eig_param.nLockedMax;
 
     ColorSpinorFieldSet &vm = *args.Vm;
-    ColorSpinorFieldSet &vk = *args.V2k;
     ColorSpinorFieldSet &ws = *work_space;
 
-    const int k = param.eig_param.nLockedMax;
-
-    if(evecs.size() < (first_idx+k) ||param.eig_param.nEv < (first_idx+k)) {//!
-      warningQuda("\nNot enough space to add %d vectors. Keep deflation space unchanged.\n", k);
+    if(evecs.size() < (first_idx+k) || nEvec < (first_idx+k)) {//!
+      warningQuda("\nNot enough space to add %u vectors. Keep deflation space unchanged.\n", k);
       return;
     }
 
@@ -659,11 +659,11 @@ namespace quda {
     MatrixXcd T ( MatrixXcd::Identity(first_idx+k, first_idx+k) );
     RowMajorComplexMatrix L (first_idx+k-1, 2);
 
-    for (int j = 0; j < k; j++) {//extra step to include the last vector normalization
+    for (unsigned int j = 0; j < k; j++) {//extra step to include the last vector normalization
 
-      const int i = first_idx+j;
+      const unsigned int i = first_idx+j;
 
-      printfQuda("Working with vector  %d .\n", i);
+      printfQuda("Working with vector  %u .\n", i);
 
       *evecs[i] = vm[j];
       // skip the first vector
@@ -694,7 +694,7 @@ namespace quda {
       VectorXcd Rj( R.col(i).head(i) );
       std::vector<ColorSpinorField*> rvjp1{evecs[i]};
 
-      for(int l = 0; l < i; l++) Rj[l] = -Rj[l];
+      for(unsigned int l = 0; l < i; l++) Rj[l] = -Rj[l];
 
       blas::caxpy( Rj.data(), rvj, rvjp1);
     } // end for loop over j
@@ -708,24 +708,24 @@ namespace quda {
 
     // Block MGS orthogonalization
     // The degree to which we interpolate between modified GramSchmidt and GramSchmidt (performance vs stability)
-    constexpr int cdot_pipeline_length  = 4;
+    const unsigned int cdot_pipeline_length  = 4;
 
-    for(int j = 0; j < k; j++) {
+    for(unsigned int j = 0; j < k; j++) {
 
-      const int i = first_idx + j;
+      const unsigned int i = first_idx + j;
       *evecs[i] = vm[j];
 
       std::unique_ptr<Complex[] > alpha(new Complex[i]);
-      int offset = 0;
+      unsigned int offset = 0;
 
       while (offset < i) {
-        const int local_length = (i - offset) > cdot_pipeline_length  ? cdot_pipeline_length : (i - offset);
+        const unsigned int local_length = (i - offset) > cdot_pipeline_length  ? cdot_pipeline_length : (i - offset);
 
 	std::vector<ColorSpinorField*> vj_(evecs.begin() + offset, evecs.begin() + offset + local_length);
 	std::vector<ColorSpinorField*> vi_{evecs[i]};
 
 	blas::cDotProduct(alpha.get(), vj_, vi_);
-	for (int l = 0; l < local_length; l++) alpha[l] = -alpha[l];
+	for (unsigned int l = 0; l < local_length; l++) alpha[l] = -alpha[l];
 	blas::caxpy(alpha.get(), vj_, vi_);
 	offset += cdot_pipeline_length;
      }
@@ -739,7 +739,7 @@ namespace quda {
 #endif
    printfQuda("\nConstruct projection matrix..\n");
 
-   for(int i = first_idx; i < (first_idx + k); i++) {
+   for(unsigned int i = first_idx; i < (first_idx + k); i++) {
      std::unique_ptr<Complex[] > alpha(new Complex[i+1]);
 
      ColorSpinorField &vk0   = (*work_space)[0];
@@ -756,7 +756,7 @@ namespace quda {
 
      args.projMat[i*param.eig_param.nEv+i] = alpha[i];//!
 
-     for (int j = 0; j < i; j++) {args.projMat[i*param.eig_param.nEv+j] = alpha[j]; args.projMat[j*param.eig_param.nEv+i] = conj(alpha[j]);}//!
+     for (unsigned int j = 0; j < i; j++) {args.projMat[i*nEvec+j] = alpha[j]; args.projMat[j*nEvec+i] = conj(alpha[j]);}//!
    } //end for loop
 
    param.eig_param.nConv += k;
