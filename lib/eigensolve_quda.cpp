@@ -58,6 +58,8 @@ namespace quda
     num_locked = 0;
     num_keep = 0;
 
+    save_prec = eig_param->save_prec;
+    
     // Sanity checks
     if (nKr <= nEv) errorQuda("nKr = %d is less than or equal to nEv = %d", nKr, nEv);
     if (nEv < nConv) errorQuda("nConv=%d is greater than nEv=%d", nConv, nEv);
@@ -231,7 +233,7 @@ namespace quda
     for (unsigned int i = nConv; i < kSpace.size(); i++) { delete kSpace[i]; }
     kSpace.resize(nConv);
     evals.resize(nConv);
-
+    
     // Only save if outfile is defined
     if (strcmp(eig_param->vec_outfile, "") != 0) {
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("saving eigenvectors\n");
@@ -239,15 +241,32 @@ namespace quda
       std::vector<ColorSpinorField *> vecs_ptr;
       vecs_ptr.reserve(nConv);
       const QudaParity mat_parity = impliedParityFromMatPC(mat.getMatPCType());
-      for (int i = 0; i < nConv; i++) {
-        kSpace[i]->setSuggestedParity(mat_parity);
-        vecs_ptr.push_back(kSpace[i]);
+      // We may wish to compute vectors in high prec, but use in a lower
+      // prec. This allows the user to down copy the data for later use.
+      QudaPrecision prec = kSpace[0]->Precision();      
+      if(save_prec < prec) {
+	ColorSpinorParam csParamClone(*kSpace[0]);
+	csParamClone.create = QUDA_ZERO_FIELD_CREATE;
+	csParamClone.setPrecision(save_prec);	
+	for (unsigned int i =0; i < kSpace.size(); i++) {
+	  kSpace[i]->setSuggestedParity(mat_parity);
+	  vecs_ptr.push_back(kSpace[i]->CreateAlias(csParamClone));
+	}
+	if (getVerbosity() >= QUDA_SUMMARIZE) {
+	  printfQuda("kSpace successfully down copied from prec %d to prec %d\n", prec, kSpace[0]->Precision());
+	}	
+      } else {
+	for (int i = 0; i < nConv; i++) {
+	  kSpace[i]->setSuggestedParity(mat_parity);
+	  vecs_ptr.push_back(kSpace[i]);
+	}
       }
       // save the vectors
       VectorIO io(eig_param->vec_outfile, eig_param->io_parity_inflate == QUDA_BOOLEAN_TRUE);
       io.save(vecs_ptr);
+      for (unsigned int i=0; i < kSpace.size() && save_prec < prec; i++) delete vecs_ptr[i];
     }
-
+    
     // Save TRLM tuning
     saveTuneCache();
 
@@ -398,13 +417,13 @@ namespace quda
       for (int j = 0; j < size; j++) {
         auto cnorm = H[i*size + j];
         if (j != i) {
-          if (abs(cnorm) > epsilon) {
+          if (abs(cnorm) > 5.0*epsilon) {
             if (getVerbosity() >= QUDA_SUMMARIZE)
               printfQuda("Norm <%d|%d>^2 = (%e,%e): %e\n", i, j, cnorm.real(), cnorm.imag(), abs(cnorm));
             orthed = false;
           }
         } else {
-          if (abs(Unit - cnorm) > epsilon) {
+          if (abs(Unit - cnorm) > 5.0*epsilon) {
             if (getVerbosity() >= QUDA_SUMMARIZE)
               printfQuda("Norm <%d|%d>^2 = (%e,%e): %e\n", i, j, cnorm.real(), cnorm.imag(), abs(Unit - cnorm));
             orthed = false;

@@ -496,6 +496,9 @@ extern "C" {
     /** Filename prefix for where to save the null-space vectors */
     char vec_outfile[256];
 
+    /** The precision with which to save the vectors */
+    QudaPrecision save_prec;
+    
     /** Whether to inflate single-parity eigen-vector I/O to a full
         field (e.g., enabling this is required for compatability with
         MILC I/O) */

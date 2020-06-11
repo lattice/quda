@@ -54,6 +54,8 @@ protected:
     ColorSpinorField *tmp1;
     ColorSpinorField *tmp2;
 
+    QudaPrecision save_prec;
+    
 public:
     /**
        @brief Constructor for base Eigensolver class
