@@ -431,8 +431,7 @@ namespace quda {
             if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER && y.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER) {
 #if defined(NSPIN4)
               const int M = 3;
-              nativeBlas<float8, char8, short8, M, Functor, writeX, writeY, writeZ, writeW, writeV>(a, b, c, x, y, z, w,
-                                                                                                    v, x.Volume());
+              nativeBlas<float8, char8, short8, M, Functor>(a, b, c, x, y, z, w, v, x.Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
