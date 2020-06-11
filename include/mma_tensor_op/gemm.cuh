@@ -79,7 +79,7 @@ namespace quda
       const int y;
       const int z;
 
-      __device__ inline GlobalMemoryLoader() : y(threadIdx.y), z(threadIdx.z * 2) { }
+      __device__ inline GlobalMemoryLoader() : y(threadIdx.y * 2), z(threadIdx.z) { }
 
 #ifdef USE_GMEM_MMA_PIPELINING
       template <int ld, bool dagger, class GmemAccessor>
@@ -95,8 +95,8 @@ namespace quda
 #pragma unroll
           for (int m = 0; m < m_dim; m++) {
 
-            const int n_idx_blk = n * n_stride + y;
-            const int m_idx_blk = m * m_stride_pack + z;
+            const int n_idx_blk = n * n_stride + z;
+            const int m_idx_blk = m * m_stride_pack + y;
 
             if (!check_shared_bound || (m_idx_blk < sM && n_idx_blk < sN)) {
 
@@ -149,8 +149,8 @@ namespace quda
         for (int n = 0; n < n_dim; n++) {
 #pragma unroll
           for (int m = 0; m < m_dim; m++) {
-            const int n_idx = n * n_stride + y;
-            const int m_idx = m * m_stride_pack + z;
+            const int n_idx = n * n_stride + z;
+            const int m_idx = m * m_stride_pack + y;
             if (m_idx < sM && n_idx < sN) {
               smem_real.vector_load(m_idx, n_idx, reg_real[m * n_dim + n]);
               smem_imag.vector_load(m_idx, n_idx, reg_imag[m * n_dim + n]);
@@ -170,8 +170,8 @@ namespace quda
         for (int n = 0; n < n_dim; n++) {
 #pragma unroll
           for (int m = 0; m < m_dim; m++) {
-            const int n_idx_smem = n * n_stride + y;
-            const int m_idx_smem = m * m_stride_pack + z;
+            const int n_idx_smem = n * n_stride + z;
+            const int m_idx_smem = m * m_stride_pack + y;
 
             if (!check_shared_bound || (m_idx_smem < sM && n_idx_smem < sN)) {
 
@@ -356,8 +356,8 @@ namespace quda
       static constexpr int smem_lda = bM + pad_size(bM);
       static constexpr int smem_ldb = bN + pad_size(bN);
 
-      static constexpr int n_row = block_z;
-      static constexpr int n_col = block_y;
+      static constexpr int n_row = block_y;
+      static constexpr int n_col = block_z;
 
       static constexpr int total_warp = n_row * n_col / warp_size;
 

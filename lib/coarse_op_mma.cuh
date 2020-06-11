@@ -130,13 +130,13 @@ namespace quda
       // clang-format off
         switch (tp.aux.x) {
         case 0: launch_compute_uv_kernel<from_coarse,  48,  64,  24,   8,   8>(tp, arg, min_threads, stream); break;
-        case 1: launch_compute_uv_kernel<from_coarse,  48,  64,  24,  12,   8>(tp, arg, min_threads, stream); break;
-        case 2: launch_compute_uv_kernel<from_coarse,  48,  64,  24,  24,   8>(tp, arg, min_threads, stream); break;
-        case 3: launch_compute_uv_kernel<from_coarse,  48,  64,  24,   8,  16>(tp, arg, min_threads, stream); break;
-        case 4: launch_compute_uv_kernel<from_coarse,  48,  64,  24,  12,  16>(tp, arg, min_threads, stream); break;
-        case 5: launch_compute_uv_kernel<from_coarse,  48,  64,  24,  24,  16>(tp, arg, min_threads, stream); break;
-        case 6: launch_compute_uv_kernel<from_coarse,  48,  64,  24,  24,  16>(tp, arg, min_threads, stream); break;
-        case 7: launch_compute_uv_kernel<from_coarse,  48,  64,  24,  24,  16>(tp, arg, min_threads, stream); break;
+        case 1: launch_compute_uv_kernel<from_coarse,  48,  64,  24,   8,  12>(tp, arg, min_threads, stream); break;
+        case 2: launch_compute_uv_kernel<from_coarse,  48,  64,  24,   8,  24>(tp, arg, min_threads, stream); break;
+        case 3: launch_compute_uv_kernel<from_coarse,  48,  64,  24,  16,   8>(tp, arg, min_threads, stream); break;
+        case 4: launch_compute_uv_kernel<from_coarse,  48,  64,  24,  16,  12>(tp, arg, min_threads, stream); break;
+        case 5: launch_compute_uv_kernel<from_coarse,  48,  64,  24,  16,  24>(tp, arg, min_threads, stream); break;
+        case 6: launch_compute_uv_kernel<from_coarse,  48,  64,  24,  16,  24>(tp, arg, min_threads, stream); break;
+        case 7: launch_compute_uv_kernel<from_coarse,  48,  64,  24,  16,  24>(tp, arg, min_threads, stream); break;
         default: errorQuda("tp.aux.x(=%d) is NOT supported by (%d, %d, %d, %d).", tp.aux.x, Arg::fineSpin, Arg::coarseSpin, Arg::fineColor, Arg::coarseColor);
         }
       // clang-format on
@@ -149,12 +149,12 @@ namespace quda
     {
       // clang-format off
         switch (tp.aux.x) {
-        case 0: launch_compute_uv_kernel<from_coarse,  48,  96,  24,  12,   8>(tp, arg, min_threads, stream); break;
-        case 1: launch_compute_uv_kernel<from_coarse,  48,  96,  24,  24,   8>(tp, arg, min_threads, stream); break;
-        case 2: launch_compute_uv_kernel<from_coarse,  48,  96,  24,   6,  16>(tp, arg, min_threads, stream); break;
-        case 3: launch_compute_uv_kernel<from_coarse,  48,  96,  24,  12,  16>(tp, arg, min_threads, stream); break;
-        case 4: launch_compute_uv_kernel<from_coarse,  48,  96,  24,  12,  16>(tp, arg, min_threads, stream); break;
-        case 5: launch_compute_uv_kernel<from_coarse,  48,  96,  24,  12,  24>(tp, arg, min_threads, stream); break;
+        case 0: launch_compute_uv_kernel<from_coarse,  48,  96,  24,   8,  12>(tp, arg, min_threads, stream); break;
+        case 1: launch_compute_uv_kernel<from_coarse,  48,  96,  24,   8,  24>(tp, arg, min_threads, stream); break;
+        case 2: launch_compute_uv_kernel<from_coarse,  48,  96,  24,  16,   6>(tp, arg, min_threads, stream); break;
+        case 3: launch_compute_uv_kernel<from_coarse,  48,  96,  24,  16,  12>(tp, arg, min_threads, stream); break;
+        case 4: launch_compute_uv_kernel<from_coarse,  48,  96,  24,  16,  12>(tp, arg, min_threads, stream); break;
+        case 5: launch_compute_uv_kernel<from_coarse,  48,  96,  24,  24,  12>(tp, arg, min_threads, stream); break;
         case 6: launch_compute_uv_kernel<from_coarse,  48,  96,  24,  24,  24>(tp, arg, min_threads, stream); break;
         case 7: launch_compute_uv_kernel<from_coarse,  48,  96,  24,  24,  24>(tp, arg, min_threads, stream); break;
         default: errorQuda("tp.aux.x(=%d) is NOT supported by (%d, %d, %d, %d).", tp.aux.x, Arg::fineSpin, Arg::coarseSpin, Arg::fineColor, Arg::coarseColor);

@@ -57,9 +57,9 @@ namespace quda
     {
       // clang-format off
       switch (tp.aux.x) {
-      case   0: launch_kernel<compute_max_only,  48,  48,  48,  12,  24>(arg, min_threads, tp, stream); break;
-      case   1: launch_kernel<compute_max_only,  48,  48,  48,  48,   6>(arg, min_threads, tp, stream); break;
-      case   2: launch_kernel<compute_max_only,  48,  48,  48,  24,  12>(arg, min_threads, tp, stream); break;
+      case   0: launch_kernel<compute_max_only,  48,  48,  48,  24,  12>(arg, min_threads, tp, stream); break;
+      case   1: launch_kernel<compute_max_only,  48,  48,  48,   6,  48>(arg, min_threads, tp, stream); break;
+      case   2: launch_kernel<compute_max_only,  48,  48,  48,  12,  24>(arg, min_threads, tp, stream); break;
       default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 48", tp.aux.x);
       }
       // clang-format on
@@ -71,13 +71,13 @@ namespace quda
     {
       // clang-format off
       switch (tp.aux.x) {
-      case   0: launch_kernel<compute_max_only,  64,  64,  16,   8,  32>(arg, min_threads, tp, stream); break;
+      case   0: launch_kernel<compute_max_only,  64,  64,  16,  32,   8>(arg, min_threads, tp, stream); break;
       case   1: launch_kernel<compute_max_only,  64,  64,  16,  16,  16>(arg, min_threads, tp, stream); break;
-      case   2: launch_kernel<compute_max_only,  64,  64,  16,  16,  32>(arg, min_threads, tp, stream); break;
-      case   3: launch_kernel<compute_max_only,  64,  64,  32,  16,  32>(arg, min_threads, tp, stream); break;
-      case   4: launch_kernel<compute_max_only,  64,  64,  64,  64,   8>(arg, min_threads, tp, stream); break;
-      case   5: launch_kernel<compute_max_only,  64,  64,  64,  32,  16>(arg, min_threads, tp, stream); break;
-      case   6: launch_kernel<compute_max_only,  64,  64,  64,  16,  32>(arg, min_threads, tp, stream); break;
+      case   2: launch_kernel<compute_max_only,  64,  64,  16,  32,  16>(arg, min_threads, tp, stream); break;
+      case   3: launch_kernel<compute_max_only,  64,  64,  32,  32,  16>(arg, min_threads, tp, stream); break;
+      case   4: launch_kernel<compute_max_only,  64,  64,  64,   8,  64>(arg, min_threads, tp, stream); break;
+      case   5: launch_kernel<compute_max_only,  64,  64,  64,  16,  32>(arg, min_threads, tp, stream); break;
+      case   6: launch_kernel<compute_max_only,  64,  64,  64,  32,  16>(arg, min_threads, tp, stream); break;
       default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 64", tp.aux.x);
       }
       // clang-format on
@@ -89,14 +89,14 @@ namespace quda
     {
       // clang-format off
       switch (tp.aux.x) {
-      case   0: launch_kernel<compute_max_only,  64,  64,  16,  16,  32,  2>(arg, min_threads, tp, stream); break;
-      case   1: launch_kernel<compute_max_only, 128, 128,  16,   8,  64    >(arg, min_threads, tp, stream); break;
-      case   2: launch_kernel<compute_max_only, 128, 128,  16,  16,  32    >(arg, min_threads, tp, stream); break;
-      case   3: launch_kernel<compute_max_only, 128, 128,  32,  32,  16    >(arg, min_threads, tp, stream); break;
-      case   4: launch_kernel<compute_max_only, 128, 128,  32,   8,  64    >(arg, min_threads, tp, stream); break;
-      case   5: launch_kernel<compute_max_only, 128, 128,  32,  16,  32    >(arg, min_threads, tp, stream); break;
+      case   0: launch_kernel<compute_max_only,  64,  64,  16,  32,  16,  2>(arg, min_threads, tp, stream); break;
+      case   1: launch_kernel<compute_max_only, 128, 128,  16,  64,   8    >(arg, min_threads, tp, stream); break;
+      case   2: launch_kernel<compute_max_only, 128, 128,  16,  32,  16    >(arg, min_threads, tp, stream); break;
+      case   3: launch_kernel<compute_max_only, 128, 128,  32,  16,  32    >(arg, min_threads, tp, stream); break;
+      case   4: launch_kernel<compute_max_only, 128, 128,  32,  64,   8    >(arg, min_threads, tp, stream); break;
+      case   5: launch_kernel<compute_max_only, 128, 128,  32,  32,  16    >(arg, min_threads, tp, stream); break;
       case   6: launch_kernel<compute_max_only, 128, 128,  32,  32,  32    >(arg, min_threads, tp, stream); break;
-      case   7: launch_kernel<compute_max_only, 128, 128,   8,   8,  64    >(arg, min_threads, tp, stream); break;
+      case   7: launch_kernel<compute_max_only, 128, 128,   8,  64,   8    >(arg, min_threads, tp, stream); break;
       default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 128", tp.aux.x);
       }
       // clang-format on
@@ -108,11 +108,11 @@ namespace quda
     {
       // clang-format off
       switch (tp.aux.x) {
-      case   0: launch_kernel<compute_max_only,  64,  64,  16,  16,  32,  2>(arg, min_threads, tp, stream); break;
-      case   1: launch_kernel<compute_max_only,  64,  64,  32,  32,   8    >(arg, min_threads, tp, stream); break;
-      case   2: launch_kernel<compute_max_only,  64,  64,  32,   8,  32    >(arg, min_threads, tp, stream); break;
+      case   0: launch_kernel<compute_max_only,  64,  64,  16,  32,  16,  2>(arg, min_threads, tp, stream); break;
+      case   1: launch_kernel<compute_max_only,  64,  64,  32,   8,  32    >(arg, min_threads, tp, stream); break;
+      case   2: launch_kernel<compute_max_only,  64,  64,  32,  32,   8    >(arg, min_threads, tp, stream); break;
       case   3: launch_kernel<compute_max_only,  64,  64,  32,  16,  16    >(arg, min_threads, tp, stream); break;
-      case   4: launch_kernel<compute_max_only,  64,  64,  32,  16,  32    >(arg, min_threads, tp, stream); break;
+      case   4: launch_kernel<compute_max_only,  64,  64,  32,  32,  16    >(arg, min_threads, tp, stream); break;
       default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 192", tp.aux.x);
       }
       // clang-format on

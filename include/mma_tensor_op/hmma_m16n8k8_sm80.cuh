@@ -220,7 +220,7 @@ namespace quda
       int col = warp_col + wrm.thread_id_in_group * 2;
 
       constexpr bool fixed = GmemOperandC::fixed;
-      using structure = Structure<store_type, 4>;
+      using structure = typename VectorType<store_type, 4>::type;
       auto ptr = reinterpret_cast<structure *>(cc.data());
       structure s;
 
@@ -230,15 +230,15 @@ namespace quda
         const half2 i2 = *(reinterpret_cast<const half2 *>(&(op_c_imag.reg[i])));
         if (fixed) {
           auto scale = cc.scale;
-          s[0] = __half2short_rn(__half2float(r2.x) * scale);
-          s[1] = __half2short_rn(__half2float(i2.x) * scale);
-          s[2] = __half2short_rn(__half2float(r2.y) * scale);
-          s[3] = __half2short_rn(__half2float(i2.y) * scale);
+          s.x = __half2short_rn(__half2float(r2.x) * scale);
+          s.y = __half2short_rn(__half2float(i2.x) * scale);
+          s.z = __half2short_rn(__half2float(r2.y) * scale);
+          s.w = __half2short_rn(__half2float(i2.y) * scale);
         } else {
-          s[0] = __half2float(r2.x);
-          s[1] = __half2float(i2.x);
-          s[2] = __half2float(r2.y);
-          s[3] = __half2float(i2.y);
+          s.x = __half2float(r2.x);
+          s.y = __half2float(i2.x);
+          s.z = __half2float(r2.y);
+          s.w = __half2float(i2.y);
         }
         ptr[((row + i * 8) * ldc + col) / 2] = s;
       }
@@ -255,7 +255,7 @@ namespace quda
       int col = warp_col + wrm.thread_id_in_group * 2;
 
       constexpr bool fixed = GmemOperandC::fixed;
-      using structure = Structure<store_type, 4>;
+      using structure = typename VectorType<store_type, 4>::type;
       auto ptr = reinterpret_cast<structure *>(cc.data());
       structure s;
 
@@ -263,15 +263,15 @@ namespace quda
       for (int i = 0; i < 2; i++) {
         if (fixed) {
           auto scale = cc.scale;
-          s[0] = __half2short_rn(op_c_real.reg[i * 2 + 0] * scale);
-          s[1] = __half2short_rn(op_c_imag.reg[i * 2 + 0] * scale);
-          s[2] = __half2short_rn(op_c_real.reg[i * 2 + 1] * scale);
-          s[3] = __half2short_rn(op_c_imag.reg[i * 2 + 1] * scale);
+          s.x = __half2short_rn(op_c_real.reg[i * 2 + 0] * scale);
+          s.y = __half2short_rn(op_c_imag.reg[i * 2 + 0] * scale);
+          s.z = __half2short_rn(op_c_real.reg[i * 2 + 1] * scale);
+          s.w = __half2short_rn(op_c_imag.reg[i * 2 + 1] * scale);
         } else {
-          s[0] = op_c_real.reg[i * 2 + 0];
-          s[1] = op_c_imag.reg[i * 2 + 0];
-          s[2] = op_c_real.reg[i * 2 + 1];
-          s[3] = op_c_imag.reg[i * 2 + 1];
+          s.x = op_c_real.reg[i * 2 + 0];
+          s.y = op_c_imag.reg[i * 2 + 0];
+          s.z = op_c_real.reg[i * 2 + 1];
+          s.w = op_c_imag.reg[i * 2 + 1];
         }
         ptr[((row + i * 8) * ldc + col) / 2] = s;
       }
