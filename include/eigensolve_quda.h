@@ -21,12 +21,13 @@ protected:
 
     // Problem parameters
     //------------------
-    int nEv;          /** Size of initial factorisation */
-    int nKr;          /** Size of Krylov space after extension */
-    int nConv;        /** Number of converged eigenvalues requested */
-    double tol;       /** Tolerance on eigenvalues */
-    bool reverse;     /** True if using polynomial acceleration */
-    char spectrum[3]; /** Part of the spectrum to be computed */
+    int nEv;            /** Size of initial factorisation */
+    int nKr;            /** Size of Krylov space after extension */
+    int nConv;          /** Number of converged eigenvalues requested */
+    int deflation_vecs; /** Number of converged eigenvalues to use in deflation */
+    double tol;         /** Tolerance on eigenvalues */
+    bool reverse;       /** True if using polynomial acceleration */
+    char spectrum[3];   /** Part of the spectrum to be computed */
 
     // Algorithm variables
     //--------------------
