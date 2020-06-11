@@ -135,6 +135,7 @@ namespace quda {
     QUDA_PROFILE_MEMCPY_D2H_ASYNC,   /**< device to host async copy */
     QUDA_PROFILE_MEMCPY2D_D2H_ASYNC, /**< device to host 2-d memcpy async copy*/
     QUDA_PROFILE_MEMCPY_H2D_ASYNC,   /**< host to device async copy */
+    QUDA_PROFILE_MEMCPY_DEFAULT_ASYNC,   /**< default async copy */
 
     QUDA_PROFILE_COMMS_START, /**< initiating communication */
     QUDA_PROFILE_COMMS_QUERY, /**< querying communication */
@@ -146,8 +147,6 @@ namespace quda {
   };
 
 #ifdef INTERFACE_NVTX
-
-
 
 #define PUSH_RANGE(name,cid) { \
     int color_id = cid; \

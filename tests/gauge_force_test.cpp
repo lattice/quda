@@ -11,10 +11,8 @@
 #include "gauge_force_quda.h"
 #include <sys/time.h>
 #include <dslash_quda.h>
+#include <gtest/gtest.h>
 
-// extern int device;
-
-static QudaGaugeParam qudaGaugeParam;
 static QudaGaugeFieldOrder gauge_order = QUDA_QDP_GAUGE_ORDER;
 
 int length[] = {
@@ -236,6 +234,9 @@ int path_dir_t[][5] = {
   { 2 ,1 ,4 ,5 ,6 }
 };
 
+static double force_check;
+static double deviation;
+
 void gauge_force_test(void)
 {
   int max_length = 6;
@@ -243,113 +244,13 @@ void gauge_force_test(void)
   initQuda(device);
   setVerbosityQuda(QUDA_VERBOSE,"",stdout);
 
-  qudaGaugeParam = newQudaGaugeParam();
-  setGaugeParam(qudaGaugeParam);
+  QudaGaugeParam gauge_param = newQudaGaugeParam();
+  setGaugeParam(gauge_param);
 
-  qudaGaugeParam.gauge_order = gauge_order;
-  qudaGaugeParam.t_boundary = QUDA_PERIODIC_T;
+  gauge_param.gauge_order = gauge_order;
+  gauge_param.t_boundary = QUDA_PERIODIC_T;
 
-  setDims(qudaGaugeParam.X);
-
-  void* sitelink = nullptr;
-  void* sitelink_1d = nullptr;
-
-  sitelink_1d = pinned_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
-
-  // this is a hack to have site link generated in 2d
-  // then copied to 1d array in "MILC" format
-  void* sitelink_2d[4];
-  for (int i = 0; i < 4; i++) sitelink_2d[i] = pinned_malloc(V * gauge_site_size * qudaGaugeParam.cpu_prec);
-
-  // fills the gauge field with random numbers
-  createSiteLinkCPU(sitelink_2d, qudaGaugeParam.cpu_prec, 0);
-
-  // copy the 2d sitelink to 1d milc format
-
-  for(int dir = 0; dir < 4; dir++){
-    for(int i=0; i < V; i++){
-      char *src = ((char *)sitelink_2d[dir]) + i * gauge_site_size * qudaGaugeParam.cpu_prec;
-      char *dst = ((char *)sitelink_1d) + (4 * i + dir) * gauge_site_size * qudaGaugeParam.cpu_prec;
-      memcpy(dst, src, gauge_site_size * qudaGaugeParam.cpu_prec);
-    }
-  }
-  if (qudaGaugeParam.gauge_order == QUDA_MILC_GAUGE_ORDER) {
-    sitelink = sitelink_1d;
-  } else if (qudaGaugeParam.gauge_order == QUDA_QDP_GAUGE_ORDER) {
-    sitelink = (void**)sitelink_2d;
-  } else {
-    errorQuda("Unsupported gauge order %d", qudaGaugeParam.gauge_order);
-  }
-
-#ifdef MULTI_GPU
-  void* sitelink_ex_2d[4];
-  void* sitelink_ex_1d;
-
-  sitelink_ex_1d = pinned_malloc(4 * V_ex * gauge_site_size * host_gauge_data_type_size);
-  for (int i = 0; i < 4; i++) sitelink_ex_2d[i] = pinned_malloc(V_ex * gauge_site_size * host_gauge_data_type_size);
-
-  int X1= Z[0];
-  int X2= Z[1];
-  int X3= Z[2];
-  int X4= Z[3];
-
-  for(int i=0; i < V_ex; i++){
-    int sid = i;
-    int oddBit=0;
-    if(i >= Vh_ex){
-      sid = i - Vh_ex;
-      oddBit = 1;
-    }
-
-    int za = sid/E1h;
-    int x1h = sid - za*E1h;
-    int zb = za/E2;
-    int x2 = za - zb*E2;
-    int x4 = zb/E3;
-    int x3 = zb - x4*E3;
-    int x1odd = (x2 + x3 + x4 + oddBit) & 1;
-    int x1 = 2*x1h + x1odd;
-
-    if( x1< 2 || x1 >= X1 +2
-        || x2< 2 || x2 >= X2 +2
-        || x3< 2 || x3 >= X3 +2
-        || x4< 2 || x4 >= X4 +2){
-      continue;
-    }
-
-    x1 = (x1 - 2 + X1) % X1;
-    x2 = (x2 - 2 + X2) % X2;
-    x3 = (x3 - 2 + X3) % X3;
-    x4 = (x4 - 2 + X4) % X4;
-
-    int idx = (x4*X3*X2*X1+x3*X2*X1+x2*X1+x1)>>1;
-    if(oddBit){
-      idx += Vh;
-    }
-    for(int dir= 0; dir < 4; dir++){
-      char* src = (char*)sitelink_2d[dir];
-      char* dst = (char*)sitelink_ex_2d[dir];
-      memcpy(dst + i * gauge_site_size * host_gauge_data_type_size,
-             src + idx * gauge_site_size * host_gauge_data_type_size, gauge_site_size * host_gauge_data_type_size);
-    }//dir
-  }//i
-
-  for(int dir = 0; dir < 4; dir++){
-    for(int i=0; i < V_ex; i++){
-      char *src = ((char *)sitelink_ex_2d[dir]) + i * gauge_site_size * qudaGaugeParam.cpu_prec;
-      char *dst = ((char *)sitelink_ex_1d) + (4 * i + dir) * gauge_site_size * qudaGaugeParam.cpu_prec;
-      memcpy(dst, src, gauge_site_size * qudaGaugeParam.cpu_prec);
-    }
-  }
-
-#endif
-
-  void *mom = pinned_malloc(4 * V * mom_site_size * host_gauge_data_type_size);
-  void *refmom = safe_malloc(4 * V * mom_site_size * host_gauge_data_type_size);
-
-  memset(mom, 0, 4 * V * mom_site_size * host_gauge_data_type_size);
-  //initialize some data in cpuMom
-  createMomCPU(mom, qudaGaugeParam.cpu_prec);
+  setDims(gauge_param.X);
 
   double loop_coeff_d[sizeof(loop_coeff_f)/sizeof(float)];
   for(unsigned int i=0;i < sizeof(loop_coeff_f)/sizeof(float); i++){
@@ -357,7 +258,7 @@ void gauge_force_test(void)
   }
 
   void* loop_coeff;
-  if (qudaGaugeParam.cpu_prec == QUDA_SINGLE_PRECISION) {
+  if (gauge_param.cpu_prec == QUDA_SINGLE_PRECISION) {
     loop_coeff = (void*)&loop_coeff_f[0];
   } else {
     loop_coeff = loop_coeff_d;
@@ -366,65 +267,91 @@ void gauge_force_test(void)
   int num_paths = sizeof(path_dir_x)/sizeof(path_dir_x[0]);
 
   int** input_path_buf[4];
-  for(int dir =0; dir < 4; dir++){
+  for (int dir = 0; dir < 4; dir++) {
     input_path_buf[dir] = (int **)safe_malloc(num_paths * sizeof(int *));
-    for(int i=0;i < num_paths;i++){
+    for (int i = 0; i < num_paths; i++) {
       input_path_buf[dir][i] = (int*)safe_malloc(length[i]*sizeof(int));
-      if(dir == 0) memcpy(input_path_buf[dir][i], path_dir_x[i], length[i]*sizeof(int));
-      else if(dir ==1) memcpy(input_path_buf[dir][i], path_dir_y[i], length[i]*sizeof(int));
-      else if(dir ==2) memcpy(input_path_buf[dir][i], path_dir_z[i], length[i]*sizeof(int));
-      else if(dir ==3) memcpy(input_path_buf[dir][i], path_dir_t[i], length[i]*sizeof(int));
+      if (dir == 0)
+        memcpy(input_path_buf[dir][i], path_dir_x[i], length[i] * sizeof(int));
+      else if (dir ==1) memcpy(input_path_buf[dir][i], path_dir_y[i], length[i]*sizeof(int));
+      else if (dir ==2) memcpy(input_path_buf[dir][i], path_dir_z[i], length[i]*sizeof(int));
+      else if (dir ==3) memcpy(input_path_buf[dir][i], path_dir_t[i], length[i]*sizeof(int));
     }
   }
 
-  if (getTuning() == QUDA_TUNE_YES) {
-    printfQuda("Tuning...\n");
-    memcpy(refmom, mom, 4 * V * mom_site_size * host_gauge_data_type_size);
-    computeGaugeForceQuda(mom, sitelink,  input_path_buf, length,
-			  loop_coeff_d, num_paths, max_length, eb3,
-			  &qudaGaugeParam);
-    printfQuda("...done\n");
+  quda::GaugeFieldParam param(0, gauge_param);
+  param.create = QUDA_NULL_FIELD_CREATE;
+  param.order = QUDA_QDP_GAUGE_ORDER;
+  auto U_qdp = new quda::cpuGaugeField(param);
+
+  // fills the gauge field with random numbers
+  createSiteLinkCPU((void **)U_qdp->Gauge_p(), gauge_param.cpu_prec, 0);
+
+  param.order = QUDA_MILC_GAUGE_ORDER;
+  auto U_milc = new quda::cpuGaugeField(param);
+  if (gauge_order == QUDA_MILC_GAUGE_ORDER) U_milc->copy(*U_qdp);
+  param.reconstruct = QUDA_RECONSTRUCT_10;
+  param.create = QUDA_ZERO_FIELD_CREATE;
+  param.link_type = QUDA_ASQTAD_MOM_LINKS;
+  auto Mom_milc = new quda::cpuGaugeField(param);
+  auto Mom_ref_milc = new quda::cpuGaugeField(param);
+
+  param.order = QUDA_QDP_GAUGE_ORDER;
+  auto Mom_qdp = new quda::cpuGaugeField(param);
+
+  // initialize some data in cpuMom
+  createMomCPU(Mom_ref_milc->Gauge_p(), gauge_param.cpu_prec);
+  if (gauge_order == QUDA_MILC_GAUGE_ORDER) Mom_milc->copy(*Mom_ref_milc);
+  if (gauge_order == QUDA_QDP_GAUGE_ORDER) Mom_qdp->copy(*Mom_ref_milc);
+  void *mom = nullptr;
+  void *sitelink = nullptr;
+
+  if (gauge_order == QUDA_MILC_GAUGE_ORDER) {
+    sitelink = U_milc->Gauge_p();
+    mom = Mom_milc->Gauge_p();
+  } else if (gauge_order == QUDA_QDP_GAUGE_ORDER) {
+    sitelink = U_qdp->Gauge_p();
+    mom = Mom_qdp->Gauge_p();
+  } else {
+    errorQuda("Unsupported gauge order %d", gauge_order);
   }
+
+  if (getTuning() == QUDA_TUNE_YES)
+    computeGaugeForceQuda(mom, sitelink, input_path_buf, length, loop_coeff_d, num_paths, max_length, eb3, &gauge_param);
 
   struct timeval t0, t1;
   double total_time = 0.0;
-  /* Multiple execution to exclude warmup time in the first run*/
+  // Multiple execution to exclude warmup time in the first run
+
+  auto &Mom_ = gauge_order == QUDA_MILC_GAUGE_ORDER ? Mom_milc : Mom_qdp;
   for (int i = 0; i < niter; i++) {
-    memcpy(mom, refmom, 4 * V * mom_site_size * host_gauge_data_type_size); // restore initial momentum for correctness
+    Mom_->copy(*Mom_ref_milc); // restore initial momentum for correctness
     gettimeofday(&t0, NULL);
-    computeGaugeForceQuda(mom, sitelink,  input_path_buf, length,
-			  loop_coeff_d, num_paths, max_length, eb3,
-			  &qudaGaugeParam);
+    computeGaugeForceQuda(mom, sitelink, input_path_buf, length, loop_coeff_d, num_paths, max_length, eb3, &gauge_param);
     gettimeofday(&t1, NULL);
     total_time += t1.tv_sec - t0.tv_sec + 0.000001*(t1.tv_usec - t0.tv_usec);
   }
+  if (gauge_order == QUDA_QDP_GAUGE_ORDER) Mom_milc->copy(*Mom_qdp);
 
   //The number comes from CPU implementation in MILC, gauge_force_imp.c
-  int flops=153004;
+  int flops = 153004;
 
+  void *refmom = Mom_ref_milc->Gauge_p();
   if (verify_results) {
-#ifdef MULTI_GPU
-    //last arg=0 means no optimization for communication, i.e. exchange data in all directions
-    //even they are not partitioned
-    int R[4] = {2, 2, 2, 2};
-    exchange_cpu_sitelink_ex(qudaGaugeParam.X, R, (void**)sitelink_ex_2d,
-			     QUDA_QDP_GAUGE_ORDER, qudaGaugeParam.cpu_prec, 0, 4);
-    gauge_force_reference(refmom, eb3, sitelink_2d, sitelink_ex_2d, qudaGaugeParam.cpu_prec,
-			  input_path_buf, length, loop_coeff, num_paths);
-#else
-    gauge_force_reference(refmom, eb3, sitelink_2d, NULL, qudaGaugeParam.cpu_prec,
-			  input_path_buf, length, loop_coeff, num_paths);
-#endif
-
-    int res = compare_floats(mom, refmom, 4 * V * mom_site_size, 1e-3, qudaGaugeParam.cpu_prec);
-
-    strong_check_mom(mom, refmom, 4*V, qudaGaugeParam.cpu_prec);
-
-    printfQuda("Test %s\n",(1 == res) ? "PASSED" : "FAILED");
+    gauge_force_reference(refmom, eb3, (void **)U_qdp->Gauge_p(), gauge_param.cpu_prec, input_path_buf, length,
+                          loop_coeff, num_paths);
+    force_check = compare_floats(Mom_milc->Gauge_p(), refmom, 4 * V * mom_site_size, getTolerance(cuda_prec), gauge_param.cpu_prec);
+    strong_check_mom(Mom_milc->Gauge_p(), refmom, 4 * V, gauge_param.cpu_prec);
   }
 
+  printfQuda("\nComputing momentum action\n");
+  auto action_quda = momActionQuda(mom, &gauge_param);
+  auto action_ref = mom_action(refmom, gauge_param.cpu_prec, 4 * V);
+  deviation = std::abs(action_quda - action_ref) / std::abs(action_ref);
+  printfQuda("QUDA action = %e, reference = %e relative deviation = %e\n", action_quda, action_ref, deviation);
+
   double perf = 1.0*niter*flops*V/(total_time*1e+9);
-  printfQuda("total time =%.2f ms\n", total_time*1e+3);
+  printfQuda("total time = %.2f ms\n", total_time*1e+3);
   printfQuda("overall performance : %.2f GFLOPS\n",perf);
 
   for(int dir = 0; dir < 4; dir++){
@@ -432,17 +359,23 @@ void gauge_force_test(void)
     host_free(input_path_buf[dir]);
   }
 
-  host_free(sitelink_1d);
-  for(int dir=0;dir < 4;dir++) host_free(sitelink_2d[dir]);
+  delete U_qdp;
+  delete U_milc;
+  delete Mom_qdp;
+  delete Mom_milc;
+  delete Mom_ref_milc;
 
-#ifdef MULTI_GPU
-  host_free(sitelink_ex_1d);
-  for(int dir=0; dir < 4; dir++) host_free(sitelink_ex_2d[dir]);
-#endif
-
-  host_free(mom);
-  host_free(refmom);
   endQuda();
+}
+
+TEST(force, verify)
+{
+  ASSERT_EQ(force_check, 1) << "CPU and QUDA implementations do not agree";
+}
+
+TEST(action, verify)
+{
+  ASSERT_LE(deviation, getTolerance(cuda_prec)) << "CPU and QUDA implementations do not agree";
 }
 
 static void display_test_info()
@@ -458,11 +391,13 @@ static void display_test_info()
 
 int main(int argc, char **argv)
 {
+  // initalize google test
+  ::testing::InitGoogleTest(&argc, argv);
+  // return code for google test
+  int test_rc = 0;
+
   // command line options
   auto app = make_app();
-  // add_eigen_option_group(app);
-  // add_deflation_option_group(app);
-  // add_multigrid_option_group(app);
   CLI::TransformPairs<QudaGaugeFieldOrder> gauge_order_map {{"milc", QUDA_MILC_GAUGE_ORDER},
                                                             {"qdp", QUDA_QDP_GAUGE_ORDER}};
   app->add_option("--gauge-order", gauge_order, "")->transform(CLI::QUDACheckedTransformer(gauge_order_map));
@@ -478,5 +413,15 @@ int main(int argc, char **argv)
 
   gauge_force_test();
 
+  if (verify_results) {
+    // Ensure gtest prints only from rank 0
+    ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
+    if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
+
+    test_rc = RUN_ALL_TESTS();
+    if (test_rc != 0) warningQuda("Tests failed");
+  }
+
   finalizeComms();
+  return test_rc;
 }

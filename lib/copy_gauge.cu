@@ -29,6 +29,9 @@ namespace quda {
     } else if (u.Order() == QUDA_MILC_GAUGE_ORDER) {
       if (u.Reconstruct() != QUDA_RECONSTRUCT_10)
 	errorQuda("Unsuported order %d and reconstruct %d combination", u.Order(), u.Reconstruct());
+    } else if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
+      if (u.Reconstruct() != QUDA_RECONSTRUCT_10)
+	errorQuda("Unsuported order %d and reconstruct %d combination", u.Order(), u.Reconstruct());
     } else if (u.Order() == QUDA_MILC_SITE_GAUGE_ORDER) {
       if (u.Reconstruct() != QUDA_RECONSTRUCT_10)
 	errorQuda("Unsuported order %d and reconstruct %d combination", u.Order(), u.Reconstruct());
