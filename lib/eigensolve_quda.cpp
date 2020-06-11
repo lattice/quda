@@ -245,14 +245,14 @@ namespace quda
       QudaPrecision prec = kSpace[0]->Precision();
       if (save_prec < prec) {
         ColorSpinorParam csParamClone(*kSpace[0]);
-        csParamClone.create = QUDA_ZERO_FIELD_CREATE;
+        csParamClone.create = QUDA_REFERENCE_FIELD_CREATE;
         csParamClone.setPrecision(save_prec);
         for (unsigned int i = 0; i < kSpace.size(); i++) {
           kSpace[i]->setSuggestedParity(mat_parity);
           vecs_ptr.push_back(kSpace[i]->CreateAlias(csParamClone));
         }
         if (getVerbosity() >= QUDA_SUMMARIZE) {
-          printfQuda("kSpace successfully down copied from prec %d to prec %d\n", prec, kSpace[0]->Precision());
+          printfQuda("kSpace successfully down copied from prec %d to prec %d\n", kSpace[0]->Precision(), vecs_ptr[0]->Precision());
         }
       } else {
         for (int i = 0; i < nConv; i++) {
@@ -263,7 +263,7 @@ namespace quda
       // save the vectors
       VectorIO io(eig_param->vec_outfile, eig_param->io_parity_inflate == QUDA_BOOLEAN_TRUE);
       io.save(vecs_ptr);
-      for (unsigned int i = 0; i < kSpace.size() && save_prec < prec; i++) delete vecs_ptr[i];
+      for (unsigned int i=0; i < kSpace.size() && save_prec < prec; i++) delete vecs_ptr[i];
     }
 
     // Save TRLM tuning
