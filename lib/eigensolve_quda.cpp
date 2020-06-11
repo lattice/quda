@@ -635,6 +635,7 @@ namespace quda
                                bool accumulate) const
   {
     // number of evecs
+    if(deflation_vecs == 0) return;
     int n_defl = deflation_vecs;
     if (evecs.size() != (unsigned int)(2 * eig_param->nConv))
       errorQuda("Incorrect deflation space sized %d passed to computeSVD, expected %d", (int)(evecs.size()),
@@ -706,6 +707,7 @@ namespace quda
                             bool accumulate) const
   {
     // number of evecs
+    if(deflation_vecs == 0) return;
     int n_defl = deflation_vecs;
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Deflating %d vectors\n", n_defl);
