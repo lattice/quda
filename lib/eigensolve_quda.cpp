@@ -634,8 +634,8 @@ namespace quda
   {
     // number of evecs
     int n_defl = eig_param->deflation_vecs;
-    if (evecs.size() != (unsigned int)(2 * n_defl))
-      errorQuda("Incorrect deflation space sized %d passed to computeSVD, expected %d", (int)(evecs.size()), 2 * n_defl);
+    if (evecs.size() != (unsigned int)(2 * eig_param->nConv))
+      errorQuda("Incorrect deflation space sized %d passed to computeSVD, expected %d", (int)(evecs.size()), 2 * eig_param->nConv);
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Deflating %d left and right singular vectors\n", n_defl);
 
