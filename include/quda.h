@@ -447,6 +447,8 @@ extern "C" {
     int nLockedMax;
     /** Number of requested converged eigenvectors **/
     int nConv;
+    /** Number of requested converged eigenvectors to use in deflation **/
+    int deflation_vecs;
     /** Tolerance on the least well known eigenvalue's residual **/
     double tol;
     /** For IRLM/IRAM, check every nth restart **/
