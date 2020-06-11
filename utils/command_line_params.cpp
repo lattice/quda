@@ -610,12 +610,14 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--eig-save-vec", eig_vec_outfile, "Save eigenvectors to <file> (requires QIO)");
   opgroup->add_option("--eig-load-vec", eig_vec_infile, "Load eigenvectors to <file> (requires QIO)")
     ->check(CLI::ExistingFile);
-  opgroup->add_option("--eig-save-prec", eig_save_prec,
-		      "If saving eigenvectors, use this precision to save. No-op if eig-save-prec is greater than or equal to precision of eigensolver (default = double)")->transform(prec_transform);
-  
+  opgroup
+    ->add_option("--eig-save-prec", eig_save_prec,
+                 "If saving eigenvectors, use this precision to save. No-op if eig-save-prec is greater than or equal "
+                 "to precision of eigensolver (default = double)")
+    ->transform(prec_transform);
+
   opgroup->add_option("--eig-io-parity-inflate", eig_io_parity_inflate,
                       "Whether to inflate single-parity eigenvectors onto dual parity full fields for file I/O (default = false)");
-  
 
   opgroup
     ->add_option("--eig-spectrum", eig_spectrum,
@@ -761,9 +763,12 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   quda_app->add_mgoption(opgroup, "--mg-save-vec", mg_vec_outfile, CLI::Validator(),
                          "Save the generated null-space vectors <file> from the multigrid_test (requires QIO)");
 
-  quda_app->add_mgoption("--mg-eig-save-prec", mg_eig_save_prec, CLI::Validator(),
-			 "If saving eigenvectors, use this precision to save. No-op if mg-eig-save-prec is greater than or equal to precision of eigensolver (default = double)")->transform(prec_transform);
-  
+  quda_app
+    ->add_mgoption("--mg-eig-save-prec", mg_eig_save_prec, CLI::Validator(),
+                   "If saving eigenvectors, use this precision to save. No-op if mg-eig-save-prec is greater than or "
+                   "equal to precision of eigensolver (default = double)")
+    ->transform(prec_transform);
+
   opgroup->add_option(
     "--mg-low-mode-check", low_mode_check,
     "Measure how well the null vector subspace overlaps with the low eigenmode subspace (default false)");
@@ -823,8 +828,9 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   quda_app->add_mgoption(opgroup, "--mg-smoother", smoother_type, solver_trans,
                          "The smoother to use for multigrid (default mr)");
 
-  opgroup->add_option("--mg-smoother-halo-prec", smoother_halo_prec,
-		      "The smoother halo precision (applies to all levels - defaults to null_precision)")
+  opgroup
+    ->add_option("--mg-smoother-halo-prec", smoother_halo_prec,
+                 "The smoother halo precision (applies to all levels - defaults to null_precision)")
     ->transform(prec_transform);
 
   quda_app->add_mgoption(opgroup, "--mg-smoother-solve-type", smoother_solve_type, solve_type_transform,

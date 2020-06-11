@@ -40,7 +40,7 @@ namespace quda
     nKr = eig_param->nKr;
     nConv = eig_param->nConv;
     deflation_vecs = (eig_param->deflation_vecs == -1 ? nConv : eig_param->deflation_vecs);
-    tol = eig_param->tol;    
+    tol = eig_param->tol;
     reverse = false;
 
     // Algorithm variables
@@ -59,15 +59,14 @@ namespace quda
     num_keep = 0;
 
     save_prec = eig_param->save_prec;
-    
+
     // Sanity checks
     if (nKr <= nEv) errorQuda("nKr = %d is less than or equal to nEv = %d", nKr, nEv);
     if (nEv < nConv) errorQuda("nConv=%d is greater than nEv=%d", nConv, nEv);
     if (nEv == 0) errorQuda("nEv=0 passed to Eigensolver");
     if (nKr == 0) errorQuda("nKr=0 passed to Eigensolver");
     if (nConv == 0) errorQuda("nConv=0 passed to Eigensolver");
-    if (deflation_vecs > nConv)
-      errorQuda("deflation vecs = %d is greater than nConv = %d", deflation_vecs, nConv);
+    if (deflation_vecs > nConv) errorQuda("deflation vecs = %d is greater than nConv = %d", deflation_vecs, nConv);
 
     residua = (double *)safe_malloc(nKr * sizeof(double));
     for (int i = 0; i < nKr; i++) { residua[i] = 0.0; }
@@ -233,7 +232,7 @@ namespace quda
     for (unsigned int i = nConv; i < kSpace.size(); i++) { delete kSpace[i]; }
     kSpace.resize(nConv);
     evals.resize(nConv);
-    
+
     // Only save if outfile is defined
     if (strcmp(eig_param->vec_outfile, "") != 0) {
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("saving eigenvectors\n");
@@ -243,30 +242,30 @@ namespace quda
       const QudaParity mat_parity = impliedParityFromMatPC(mat.getMatPCType());
       // We may wish to compute vectors in high prec, but use in a lower
       // prec. This allows the user to down copy the data for later use.
-      QudaPrecision prec = kSpace[0]->Precision();      
-      if(save_prec < prec) {
-	ColorSpinorParam csParamClone(*kSpace[0]);
-	csParamClone.create = QUDA_ZERO_FIELD_CREATE;
-	csParamClone.setPrecision(save_prec);	
-	for (unsigned int i =0; i < kSpace.size(); i++) {
-	  kSpace[i]->setSuggestedParity(mat_parity);
-	  vecs_ptr.push_back(kSpace[i]->CreateAlias(csParamClone));
-	}
-	if (getVerbosity() >= QUDA_SUMMARIZE) {
-	  printfQuda("kSpace successfully down copied from prec %d to prec %d\n", prec, kSpace[0]->Precision());
-	}	
+      QudaPrecision prec = kSpace[0]->Precision();
+      if (save_prec < prec) {
+        ColorSpinorParam csParamClone(*kSpace[0]);
+        csParamClone.create = QUDA_ZERO_FIELD_CREATE;
+        csParamClone.setPrecision(save_prec);
+        for (unsigned int i = 0; i < kSpace.size(); i++) {
+          kSpace[i]->setSuggestedParity(mat_parity);
+          vecs_ptr.push_back(kSpace[i]->CreateAlias(csParamClone));
+        }
+        if (getVerbosity() >= QUDA_SUMMARIZE) {
+          printfQuda("kSpace successfully down copied from prec %d to prec %d\n", prec, kSpace[0]->Precision());
+        }
       } else {
-	for (int i = 0; i < nConv; i++) {
-	  kSpace[i]->setSuggestedParity(mat_parity);
-	  vecs_ptr.push_back(kSpace[i]);
-	}
+        for (int i = 0; i < nConv; i++) {
+          kSpace[i]->setSuggestedParity(mat_parity);
+          vecs_ptr.push_back(kSpace[i]);
+        }
       }
       // save the vectors
       VectorIO io(eig_param->vec_outfile, eig_param->io_parity_inflate == QUDA_BOOLEAN_TRUE);
       io.save(vecs_ptr);
-      for (unsigned int i=0; i < kSpace.size() && save_prec < prec; i++) delete vecs_ptr[i];
+      for (unsigned int i = 0; i < kSpace.size() && save_prec < prec; i++) delete vecs_ptr[i];
     }
-    
+
     // Save TRLM tuning
     saveTuneCache();
 
@@ -417,13 +416,13 @@ namespace quda
       for (int j = 0; j < size; j++) {
         auto cnorm = H[i*size + j];
         if (j != i) {
-          if (abs(cnorm) > 5.0*epsilon) {
+          if (abs(cnorm) > 5.0 * epsilon) {
             if (getVerbosity() >= QUDA_SUMMARIZE)
               printfQuda("Norm <%d|%d>^2 = (%e,%e): %e\n", i, j, cnorm.real(), cnorm.imag(), abs(cnorm));
             orthed = false;
           }
         } else {
-          if (abs(Unit - cnorm) > 5.0*epsilon) {
+          if (abs(Unit - cnorm) > 5.0 * epsilon) {
             if (getVerbosity() >= QUDA_SUMMARIZE)
               printfQuda("Norm <%d|%d>^2 = (%e,%e): %e\n", i, j, cnorm.real(), cnorm.imag(), abs(Unit - cnorm));
             orthed = false;
@@ -654,7 +653,7 @@ namespace quda
                                bool accumulate) const
   {
     // number of evecs
-    if(deflation_vecs == 0) return;
+    if (deflation_vecs == 0) return;
     int n_defl = deflation_vecs;
     if (evecs.size() != (unsigned int)(2 * eig_param->nConv))
       errorQuda("Incorrect deflation space sized %d passed to computeSVD, expected %d", (int)(evecs.size()),
@@ -726,7 +725,7 @@ namespace quda
                             bool accumulate) const
   {
     // number of evecs
-    if(deflation_vecs == 0) return;
+    if (deflation_vecs == 0) return;
     int n_defl = deflation_vecs;
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Deflating %d vectors\n", n_defl);

@@ -55,8 +55,8 @@ protected:
     ColorSpinorField *tmp2;
 
     QudaPrecision save_prec;
-    
-public:
+
+  public:
     /**
        @brief Constructor for base Eigensolver class
        @param eig_param MGParam struct that defines all meta data

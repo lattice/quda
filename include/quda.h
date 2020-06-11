@@ -498,7 +498,7 @@ extern "C" {
 
     /** The precision with which to save the vectors */
     QudaPrecision save_prec;
-    
+
     /** Whether to inflate single-parity eigen-vector I/O to a full
         field (e.g., enabling this is required for compatability with
         MILC I/O) */
