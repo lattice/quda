@@ -56,8 +56,6 @@ static bool create_quda_gauge = false;
 
 static bool invalidate_quda_mom = true;
 
-static void *df_preconditioner = nullptr;
-
 using namespace quda;
 using namespace quda::fermion_force;
 
