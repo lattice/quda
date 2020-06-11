@@ -39,7 +39,8 @@ namespace quda
     nEv = eig_param->nEv;
     nKr = eig_param->nKr;
     nConv = eig_param->nConv;
-    tol = eig_param->tol;
+    deflation_vecs = (eig_param->deflation_vecs == -1 ? nConv : eig_param->deflation_vecs);
+    tol = eig_param->tol;    
     reverse = false;
 
     // Algorithm variables
