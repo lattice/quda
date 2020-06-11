@@ -487,7 +487,7 @@ namespace quda
 #endif
         __syncthreads();
 
-#pragma unroll
+#pragma unroll 1
         for (int c = 0; c < warp_cycle; c++) {
 
           // The logical warp assigned to each part of the matrix.
@@ -498,7 +498,7 @@ namespace quda
           op_c_real.zero();
           op_c_imag.zero();
 
-#pragma unroll
+#pragma unroll 1
           for (int tile_k = 0; tile_k < tile_acc_dim; tile_k++) {
 
             MmaOperandA op_a_real;
