@@ -591,7 +591,9 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
                       "Solve the MdagM problem, use to compute SVD of M (default false)");
   opgroup->add_option("--eig-max-restarts", eig_max_restarts, "Perform n iterations of the restart in the eigensolver");
   opgroup->add_option("--eig-nConv", eig_nConv, "The number of converged eigenvalues requested (default eig_nEv)");
-  opgroup->add_option("--eig-deflation-vecs", eig_deflation_vecs, "The number of converged eigenpairs that will be used in the deflation routines (default eig_nConv)");
+  opgroup->add_option(
+    "--eig-deflation-vecs", eig_deflation_vecs,
+    "The number of converged eigenpairs that will be used in the deflation routines (default eig_nConv)");
   opgroup->add_option("--eig-block-size", eig_block_size, "The block size to use in the block variant eigensolver");
   opgroup->add_option("--eig-nEv", eig_nEv, "The size of eigenvector search space in the eigensolver");
   opgroup->add_option("--eig-nKr", eig_nKr, "The size of the Krylov subspace to use in the eigensolver");
@@ -712,10 +714,10 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   quda_app->add_mgoption(opgroup, "--mg-eig-nKr", mg_eig_nKr, CLI::Validator(),
                          "The size of the Krylov subspace to use in the eigensolver");
   quda_app->add_mgoption(opgroup, "--mg-eig-deflation-vecs", mg_eig_deflation_vecs, CLI::Validator(),
-			 "The number of converged eigenpairs that will be used in the deflation routines");  
+                         "The number of converged eigenpairs that will be used in the deflation routines");
   quda_app->add_mgoption(
-			 opgroup, "--mg-eig-batched-rotate", mg_eig_batched_rotate, CLI::Validator(),
-			 "The maximum number of extra eigenvectors the solver may allocate to perform a Ritz rotation.");
+    opgroup, "--mg-eig-batched-rotate", mg_eig_batched_rotate, CLI::Validator(),
+    "The maximum number of extra eigenvectors the solver may allocate to perform a Ritz rotation.");
   quda_app->add_mgoption(opgroup, "--mg-eig-poly-deg", mg_eig_poly_deg, CLI::PositiveNumber,
                          "Set the degree of the Chebyshev polynomial (default 100)");
   quda_app->add_mgoption(
