@@ -153,13 +153,13 @@ void qudaSetLayout(QudaLayout_t input)
   initQuda(device);
 }
 
-void* qudaAllocatePinned(size_t bytes) {
-  return pool_pinned_malloc(bytes);
-}
+void *qudaAllocatePinned(size_t bytes) { return pool_pinned_malloc(bytes); }
 
-void qudaFreePinned(void *ptr) {
-  pool_pinned_free(ptr);
-}
+void qudaFreePinned(void *ptr) { pool_pinned_free(ptr); }
+
+void *qudaAllocateManaged(size_t bytes) { return managed_malloc(bytes); }
+
+void qudaFreeManaged(void *ptr) { managed_free(ptr); }
 
 void qudaHisqParamsInit(QudaHisqParams_t params)
 {
