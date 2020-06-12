@@ -55,13 +55,14 @@ namespace quda
     };
 
 #ifdef WARP_MULTI_REDUCE
-    template <typename FloatN, int M, int NXZ, typename Arg>
+    template <typename real, int n, int NXZ, typename Arg>
 #else
-    template <int block_size, typename FloatN, int M, int NXZ, typename Arg>
+    template <int block_size, typename real, int n, int NXZ, typename Arg>
 #endif
-
     __global__ void multiReduceKernel(Arg arg)
     {
+      // n is real numbers per thread
+      using vec = vector_type<complex<real>, n/2>;
       unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
       unsigned int k = blockIdx.y * blockDim.y + threadIdx.y;
       unsigned int parity = blockIdx.z;
@@ -73,8 +74,7 @@ namespace quda
 
       while (idx < arg.length) {
 
-        FloatN x[M], y[M], z[M], w[M];
-
+        vec x, y, z, w;
         arg.Y[k].load(y, idx, parity);
         arg.W[k].load(w, idx, parity);
 
@@ -87,10 +87,7 @@ namespace quda
           arg.Z[l].load(z, idx, parity);
 
           arg.r.pre();
-
-#pragma unroll
-          for (int j = 0; j < M; j++) arg.r(sum[l], x[j], y[j], z[j], w[j], k, l);
-
+          arg.r(sum[l], x, y, z, w, k, l);
           arg.r.post(sum[l]);
         }
         if (arg.r.write.X) arg.Y[k].save(y, idx, parity);
@@ -171,22 +168,6 @@ namespace quda
       sum += (reduce_t)a.y * (reduce_t)b.y;
     }
 
-    template <typename reduce_t, typename T>
-    __device__ __host__ void dot_(reduce_t &sum, const typename VectorType<T, 4>::type &a, const typename VectorType<T, 4>::type &b)
-    {
-      sum += (reduce_t)a.x * (reduce_t)b.x;
-      sum += (reduce_t)a.y * (reduce_t)b.y;
-      sum += (reduce_t)a.z * (reduce_t)b.z;
-      sum += (reduce_t)a.w * (reduce_t)b.w;
-    }
-
-    template <typename reduce_t, typename T>
-    __device__ __host__ void dot_(reduce_t &sum, const typename VectorType<T, 8>::type &a, const typename VectorType<T, 8>::type &b)
-    {
-      dot_<reduce_t, T>(sum, a.x, b.x);
-      dot_<reduce_t, T>(sum, a.y, b.y);
-    }
-
     template <int NXZ, typename reduce_t, typename real>
     struct Dot : public MultiReduceFunctor<NXZ, reduce_t, real> {
       static constexpr write< > write { };
@@ -199,7 +180,8 @@ namespace quda
       }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, const int i, const int j)
       {
-        dot_<reduce_t, real>(sum, x, y);
+#pragma unroll
+        for (int k=0; k < x.size(); k++) dot_<reduce_t, real>(sum, x[k], y[k]);
       }
       static int streams() { return 2; } //! total number of input and output streams
       static int flops() { return 2; }   //! flops per element
@@ -218,27 +200,6 @@ namespace quda
       sum.y -= (scalar)a.y * (scalar)b.x;
     }
 
-    template <typename reduce_t, typename T>
-    __device__ __host__ void cdot_(reduce_t &sum, const typename VectorType<T, 4>::type &a, const typename VectorType<T, 4>::type &b)
-    {
-      typedef typename scalar<reduce_t>::type scalar;
-      sum.x += (scalar)a.x * (scalar)b.x;
-      sum.x += (scalar)a.y * (scalar)b.y;
-      sum.x += (scalar)a.z * (scalar)b.z;
-      sum.x += (scalar)a.w * (scalar)b.w;
-      sum.y += (scalar)a.x * (scalar)b.y;
-      sum.y -= (scalar)a.y * (scalar)b.x;
-      sum.y += (scalar)a.z * (scalar)b.w;
-      sum.y -= (scalar)a.w * (scalar)b.z;
-    }
-
-    template <typename reduce_t, typename T>
-    __device__ __host__ void cdot_(reduce_t &sum, const typename VectorType<T, 8>::type &a, const typename VectorType<T, 8>::type &b)
-    {
-      cdot_(sum, a.x, b.x);
-      cdot_(sum, a.y, b.y);
-    }
-
     template <int NXZ, typename real_reduce_t, typename real>
     struct Cdot : public MultiReduceFunctor<NXZ, complex<real_reduce_t>, complex<real>> {
       using reduce_t = complex<real_reduce_t>;
@@ -252,7 +213,8 @@ namespace quda
       }
       template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, const int i, const int j)
       {
-        cdot_<reduce_t, real>(sum, x, y);
+#pragma unroll
+        for (int k=0; k < x.size(); k++) cdot_<reduce_t, real>(sum, x[k], y[k]);
       }
       static int streams() { return 2; } //! total number of input and output streams
       static int flops() { return 4; }   //! flops per element
@@ -271,8 +233,11 @@ namespace quda
       }
       template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, const int i, const int j)
       {
-        cdot_<reduce_t, real>(sum, x, y);
-        if (i == j) w = y;
+#pragma unroll
+        for (int k = 0; k < x.size(); k++) {
+          cdot_<reduce_t, real>(sum, x[k], y[k]);
+          if (i == j) w[k] = y[k];
+        }
       }
       static int streams() { return 2; } //! total number of input and output streams
       static int flops() { return 4; }   //! flops per element

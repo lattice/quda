@@ -1,43 +1,13 @@
 #pragma once
 
-/**
-   Checks that the types are set correctly.  The precision used in the
-   RegType must match that of the InterType, and the ordering of the
-   InterType must match that of the StoreType.  The only exception is
-   when fixed precision is used, in which case, RegType can be a double
-   and InterType can be single (with StoreType short or char).
-
-   @param RegType Register type used in kernel
-   @param InterType Intermediate format - RegType precision with StoreType ordering
-   @param StoreType Type used to store field in memory
-*/
-template <typename RegType, typename InterType, typename StoreType> void checkTypes()
-{
-  const size_t reg_size = sizeof(((RegType *)0)->x);
-  const size_t inter_size = sizeof(((InterType *)0)->x);
-  const size_t store_size = sizeof(((StoreType *)0)->x);
-
-  if (reg_size != inter_size && store_size != 2 && store_size != 1 && inter_size != 4)
-    errorQuda("Precision of register (%lu) and intermediate (%lu) types must match\n", (unsigned long)reg_size,
-        (unsigned long)inter_size);
-
-  if (vec_length<InterType>::value != vec_length<StoreType>::value) {
-    errorQuda("Vector lengths intermediate and register types must match\n");
-  }
-
-  if (vec_length<RegType>::value == 0) errorQuda("Vector type not supported\n");
-  if (vec_length<InterType>::value == 0) errorQuda("Vector type not supported\n");
-  if (vec_length<StoreType>::value == 0) errorQuda("Vector type not supported\n");
-}
-
-template <typename RegType, typename StoreType, bool is_fixed> struct SpinorNorm {
-  using InterType = typename bridge_mapper<RegType, StoreType>::type;
-  float *norm;
+template <typename store_t, bool is_fixed> struct SpinorNorm {
+  using norm_t = float;
+  norm_t *norm;
   unsigned int cb_norm_offset;
 
   SpinorNorm() : norm(nullptr), cb_norm_offset(0) {}
 
-  SpinorNorm(const ColorSpinorField &x) : norm((float *)x.Norm()), cb_norm_offset(x.NormBytes() / (2 * sizeof(float)))
+  SpinorNorm(const ColorSpinorField &x) : norm((norm_t *)x.Norm()), cb_norm_offset(x.NormBytes() / (2 * sizeof(norm_t)))
   {
   }
 
@@ -54,38 +24,45 @@ template <typename RegType, typename StoreType, bool is_fixed> struct SpinorNorm
 
   void set(const ColorSpinorField &x)
   {
-    norm = (float *)x.Norm();
-    cb_norm_offset = x.NormBytes() / (2 * sizeof(float));
+    norm = (norm_t *)x.Norm();
+    cb_norm_offset = x.NormBytes() / (2 * sizeof(norm_t));
   }
 
-  __device__ inline float load_norm(const int i, const int parity = 0) const { return norm[cb_norm_offset * parity + i]; }
+  __device__ inline norm_t load_norm(const int i, const int parity = 0) const { return norm[cb_norm_offset * parity + i]; }
 
-  template <int M> __device__ inline float store_norm(InterType x[M], int i, int parity)
+  template <typename real, int n> __device__ inline norm_t store_norm(const vector_type<complex<real>, n> &v, int x, int parity)
   {
-    float c[M/2];
+    norm_t max_[n];
+    // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
 #pragma unroll
-    for (int j = 0; j < M/2; j++) c[j] = fmaxf(max_fabs(x[2*j+0]), max_fabs(x[2*j+1]));
+    for (int i = 0; i < n; i++) max_[i] = fmaxf(fabsf((norm_t)v[i].real()), fabsf((norm_t)v[i].imag()));
+      norm_t scale = 0.0;
 #pragma unroll
-    for (int j = 1; j < M/2; j++) c[0] = fmaxf(c[j], c[0]);
-    norm[cb_norm_offset * parity + i] = c[0];
-    return __fdividef(fixedMaxValue<StoreType>::value, c[0]);
+      for (int i = 0; i < n; i++) scale = fmaxf(max_[i], scale);
+      norm[x+parity*cb_norm_offset] = scale;
+
+#ifdef __CUDA_ARCH__
+      return __fdividef(fixedMaxValue<store_t>::value, scale);
+#else
+      return fixedMaxValue<store_t>::value / scale;
+#endif
   }
 
-  float *Norm() { return norm; }
+  norm_t *Norm() { return norm; }
 };
 
-template <typename RegType, typename StoreType> struct SpinorNorm<RegType, StoreType, false> {
-  typedef typename bridge_mapper<RegType, StoreType>::type InterType;
+template <typename store_type_t> struct SpinorNorm<store_type_t, false> {
+  using norm_t = float;
   SpinorNorm() {}
   SpinorNorm(const ColorSpinorField &x) {}
   SpinorNorm(const SpinorNorm &sn) {}
   SpinorNorm &operator=(const SpinorNorm &src) { return *this; }
   void set(const ColorSpinorField &x) {}
-  __device__ inline float load_norm(const int i, const int parity = 0) const { return 1.0; }
-  template <int M> __device__ inline float store_norm(InterType x[M], int i, int parity) { return 1.0; }
+  __device__ inline norm_t load_norm(const int i, const int parity = 0) const { return 1.0; }
+  template <typename real, int n> __device__ inline norm_t store_norm(const vector_type<real, n> &v, int x, int parity) { return 1.0; }
   void backup(char **norm_h, size_t norm_bytes) {}
   void restore(char **norm_h, size_t norm_bytes) {}
-  float *Norm() { return nullptr; }
+  norm_t *Norm() { return nullptr; }
 };
 
 /**
@@ -94,14 +71,11 @@ template <typename RegType, typename StoreType> struct SpinorNorm<RegType, Store
    @param StoreType Type used to store field in memory
    @param N Length of vector of RegType elements that this Spinor represents
 */
-template <typename RegType_, typename StoreType_, int N>
-struct Spinor : SpinorNorm<RegType_, StoreType_, isFixed<StoreType_>::value> {
-  typedef RegType_ RegType;
-  typedef StoreType_ StoreType;
-  typedef typename bridge_mapper<RegType,StoreType>::type InterType;
-  typedef SpinorNorm<RegType, StoreType_, isFixed<StoreType>::value> SN;
-
-  StoreType *spinor;
+template <typename store_t, int N>
+  struct Spinor : SpinorNorm<store_t, isFixed<store_t>::value> {
+  using SN = SpinorNorm<store_t, isFixed<store_t>::value>;
+  using Vector = typename VectorType<store_t, N>::type;
+  store_t *spinor;
   int stride;
   unsigned int cb_offset;
 
@@ -115,11 +89,10 @@ public:
 
  Spinor(const ColorSpinorField &x) :
     SN(x),
-    spinor(static_cast<StoreType*>(const_cast<ColorSpinorField &>(x).V())),
+    spinor(static_cast<store_t*>(const_cast<ColorSpinorField &>(x).V())),
     stride(x.Stride()),
-    cb_offset(x.Bytes() / (2 * sizeof(StoreType)))
+    cb_offset(x.Bytes() / (2 * sizeof(store_t) * N))
   {
-    checkTypes<RegType, InterType, StoreType>();
   }
 
   Spinor(const Spinor &st) :
@@ -144,45 +117,62 @@ public:
   void set(const ColorSpinorField &x)
   {
     SN::set(x);
-    spinor = static_cast<StoreType*>(const_cast<ColorSpinorField &>(x).V());
+    spinor = static_cast<store_t*>(const_cast<ColorSpinorField &>(x).V());
     stride = x.Stride();
-    cb_offset = x.Bytes() / (2 * sizeof(StoreType));
-    checkTypes<RegType, InterType, StoreType>();
+    cb_offset = x.Bytes() / (2 * sizeof(store_t) * N);
   }
 
-  __device__ inline void load(RegType x[], const int i, const int parity = 0) const
+  template <typename real, int n>
+  __device__ inline void load(vector_type<complex<real>, n> &v, int x, int parity = 0) const
   {
-    // load data into registers first using the storage order
-    constexpr int M = (N * vec_length<RegType>::value) / vec_length<InterType>::value;
-    InterType y[M];
+    constexpr int len = 2 * n; // real-valued length
+    float nrm = isFixed<store_t>::value ? SN::load_norm(x, parity) : 0.0;
 
-    // fixed precision
-    if (isFixed<StoreType>::value) {
-      const float xN = SN::load_norm(i, parity);
+    vector_type<real, len> v_;
+
+    constexpr int M = len / N;
 #pragma unroll
-      for (int j = 0; j < M; j++) copy_and_scale(y[j], spinor[cb_offset * parity + i + j * stride], xN);
-    } else { // other types
+    for (int i=0; i<M; i++) {
+      // first load from memory
+      Vector vecTmp = vector_load<Vector>(spinor, parity * cb_offset + x + stride * i);
+      // now copy into output and scale
 #pragma unroll
-      for (int j = 0; j < M; j++) copyFloatN(y[j], spinor[cb_offset * parity + i + j * stride]);
+      for (int j = 0; j < N; j++) copy_and_scale(v_[i * N + j], reinterpret_cast<store_t *>(&vecTmp)[j], nrm);
     }
 
-    // now convert into desired register order
-    convert<RegType, InterType>(x, y, N);
+    for (int i=0; i < n; i++) { v[i] = complex<real>(v_[2 * i + 0], v_[2 * i + 1]); }
   }
 
-  __device__ inline void save(RegType x[], int i, const int parity = 0)
+  template <typename real, int n>
+  __device__ __host__ inline void save(const vector_type<complex<real>, n> &v, int x, int parity = 0)
   {
-    constexpr int M = (N * vec_length<RegType>::value) / vec_length<InterType>::value;
-    InterType y[M];
-    convert<InterType, RegType>(y, x, M);
+    constexpr int len = 2 * n; // real-valued length
+    vector_type<real, len> v_;
 
-    if (isFixed<StoreType>::value) {
-      float C = SN::template store_norm<M>(y, i, parity);
+    if (isFixed<store_t>::value) {
+      real scale_inv = SN::template store_norm(v, x, parity);
 #pragma unroll
-      for (int j = 0; j < M; j++) copyFloatN(spinor[cb_offset * parity + i + j * stride], C * y[j]);
+      for (int i = 0; i < n; i++) {
+        v_[2 * i + 0] = scale_inv * v[i].real();
+        v_[2 * i + 1] = scale_inv * v[i].imag();
+      }
     } else {
 #pragma unroll
-      for (int j = 0; j < M; j++) copyFloatN(spinor[cb_offset * parity + i + j * stride], y[j]);
+      for (int i = 0; i < n; i++) {
+        v_[2 * i + 0] = v[i].real();
+        v_[2 * i + 1] = v[i].imag();
+      }
+    }
+
+    constexpr int M = len / N;
+#pragma unroll
+    for (int i=0; i<M; i++) {
+      Vector vecTmp;
+      // first do scalar copy converting into storage type
+#pragma unroll
+      for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<store_t *>(&vecTmp)[j], v_[i * N + j]);
+      // second do vectorized copy into memory
+      vector_store(spinor, parity * cb_offset + x + stride * i, vecTmp);
     }
   }
 

@@ -135,7 +135,7 @@ namespace quda {
     /**
        Generic reduction kernel launcher
     */
-    template <typename host_reduce_t, typename FloatN, int M, typename Arg>
+    template <typename host_reduce_t, typename real, int len, typename Arg>
     auto reduceLaunch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream, Tunable &tunable)
     {
       using device_reduce_t = typename Arg::Reducer::reduce_t;
@@ -148,11 +148,11 @@ namespace quda {
 #ifdef JITIFY
       using namespace jitify::reflection;
       tunable.jitifyError() = program->kernel("quda::blas::reduceKernel")
-                                  .instantiate((int)tp.block.x, Type<FloatN>(), M, Type<Arg>())
+                                  .instantiate((int)tp.block.x, Type<real>(), len, Type<Arg>())
                                   .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                                   .launch(arg);
 #else
-      LAUNCH_KERNEL(reduceKernel, tunable, tp, stream, arg, FloatN, M);
+      LAUNCH_KERNEL(reduceKernel, tunable, tp, stream, arg, real, len);
 #endif
 
       if (!commAsyncReduction()) {
@@ -176,9 +176,9 @@ namespace quda {
       return cpu_sum;
     }
 
-    template <typename host_reduce_t, typename FloatN, int M, typename SpinorX, typename SpinorY,
+    template <typename host_reduce_t, typename real, int len, typename SpinorX, typename SpinorY,
               typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
-    class ReduceCuda : public Tunable
+    class Reduce : public Tunable
     {
       const int nParity; // for composite fields this includes the number of composites
       mutable ReductionArg<SpinorX, SpinorY, SpinorZ, SpinorW, SpinorV, Reducer> arg;
@@ -201,8 +201,8 @@ namespace quda {
       }
 
   public:
-      ReduceCuda(host_reduce_t &result, SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, SpinorV &V, Reducer &r,
-                 ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v,
+      Reduce(host_reduce_t &result, SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, SpinorV &V, Reducer &r,
+             ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v,
           int length) :
           nParity((x.IsComposite() ? x.CompositeDim() : 1) * (x.SiteSubset())),
           arg(X, Y, Z, W, V, r, length / nParity),
@@ -224,14 +224,14 @@ namespace quda {
         ::quda::create_jitify_program("kernels/reduce_core.cuh");
 #endif
       }
-      virtual ~ReduceCuda() {}
+      virtual ~Reduce() {}
 
       inline TuneKey tuneKey() const { return TuneKey(x.VolString(), typeid(arg.r).name(), aux); }
 
       void apply(const qudaStream_t &stream)
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        result = reduceLaunch<host_reduce_t, FloatN, M>(arg, tp, stream, *this);
+        result = reduceLaunch<host_reduce_t, real, len>(arg, tp, stream, *this);
       }
 
       void preTune()
@@ -264,7 +264,7 @@ namespace quda {
         param.grid.y = nParity;
       }
 
-      long long flops() const { return arg.r.flops() * vec_length<FloatN>::value * arg.length * nParity * M; }
+      long long flops() const { return arg.r.flops() * x.Length(); }
 
       long long bytes() const
       {
@@ -276,8 +276,8 @@ namespace quda {
       int tuningIter() const { return 3; }
     };
 
-    template <typename RegType, typename StoreType, typename zType, int M,
-              template <typename ReducerType, typename real> class Reducer, typename coeff_t>
+    template <template <typename ReducerType, typename real> class Reducer, typename real,
+              typename store_t, int len, int N, typename z_store_t = store_t, int Nz = N, typename coeff_t>
     auto nativeReduce(const coeff_t &a, const coeff_t &b, ColorSpinorField &x, ColorSpinorField &y,
                       ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v, int length)
     {
@@ -286,24 +286,22 @@ namespace quda {
       checkLength(x, w);
       checkLength(x, v);
 
-      using real = typename scalar<RegType>::type;
       using host_reduce_t = typename Reducer<double, real>::reduce_t;
       Reducer<device_reduce_t, real> r(a, b);
 
-      Spinor<RegType, StoreType, M> X(x);
-      Spinor<RegType, StoreType, M> Y(y);
-      Spinor<RegType, zType, M> Z(z);
-      Spinor<RegType, StoreType, M> W(w);
-      Spinor<RegType, StoreType, M> V(v);
+      Spinor<store_t, N> X(x);
+      Spinor<store_t, N> Y(y);
+      Spinor<z_store_t, Nz> Z(z);
+      Spinor<store_t, N> W(w);
+      Spinor<store_t, N> V(v);
 
       host_reduce_t value;
-      ReduceCuda<host_reduce_t, RegType, M, decltype(X), decltype(Y), decltype(Z), decltype(W), decltype(V), decltype(r)>
+      Reduce<host_reduce_t, real, len, decltype(X), decltype(Y), decltype(Z), decltype(W), decltype(V), decltype(r)>
         reduce(value, X, Y, Z, W, V, r, x, y, z, w, v, length);
       reduce.apply(*(blas::getStream()));
 
       blas::bytes += reduce.bytes();
       blas::flops += reduce.flops();
-
       checkCudaError();
       return value;
     }
@@ -354,16 +352,16 @@ namespace quda {
 #if QUDA_PRECISION & 8
           if (x.Nspin() == 4 || x.Nspin() == 2) { // wilson
 #if defined(NSPIN4) || defined(NSPIN2)
-            const int M = siteUnroll ? 12 : 1; // determines how much work per thread to do
+            const int M = siteUnroll ? 24 : 2; // determines how much work per thread to do
             if (x.Nspin() == 2 && siteUnroll) errorQuda("siteUnroll not supported for nSpin==2");
-            value = nativeReduce<double2, double2, double2, M, Reducer>(a, b, x, y, z, w, v, reduce_length / (2 * M));
+            value = nativeReduce<Reducer, double, double, M, 2>(a, b, x, y, z, w, v, reduce_length / M);
 #else
             errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
           } else if (x.Nspin() == 1) { // staggered
 #if defined(NSPIN1)
-            const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
-            value = nativeReduce<double2, double2, double2, M, Reducer>(a, b, x, y, z, w, v, reduce_length / (2 * M));
+            const int M = siteUnroll ? 6 : 2; // determines how much work per thread to do
+            value = nativeReduce<Reducer, double, double, M, 2>(a, b, x, y, z, w, v, reduce_length / M);
 #else
             errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
@@ -379,16 +377,16 @@ namespace quda {
 #if QUDA_PRECISION & 4
           if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) { // wilson
 #if defined(NSPIN4)
-            const int M = siteUnroll ? 6 : 1; // determines how much work per thread to do
-            value = nativeReduce<float4, float4, float4, M, Reducer>(a, b, x, y, z, w, v, reduce_length / (4 * M));
+            const int M = siteUnroll ? 24 : 4; // determines how much work per thread to do
+            value = nativeReduce<Reducer, float, float, M, 4>(a, b, x, y, z, w, v, reduce_length / M);
 #else
             errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
           } else if (x.Nspin() == 1 || x.Nspin() == 2 || (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER)) {
 #if defined(NSPIN1) || defined(NSPIN2) || defined(GPU_MULTIGRID)
-            const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
+            const int M = siteUnroll ? 6 : 2; // determines how much work per thread to do
             if ((x.Nspin() == 2 || x.Nspin() == 4) && siteUnroll) errorQuda("siteUnroll not supported here for nSpin=%d", x.Nspin());
-            value = nativeReduce<float2, float2, float2, M, Reducer>(a, b, x, y, z, w, v, reduce_length / (2 * M));
+            value = nativeReduce<Reducer, float, float, M, 2>(a, b, x, y, z, w, v, reduce_length / M);
 #else
             errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
@@ -404,22 +402,22 @@ namespace quda {
 #if QUDA_PRECISION & 2
           if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) { // wilson
 #if defined(NSPIN4)
-            const int M = 6; // determines how much work per thread to do
-            value = nativeReduce<float4, short4, short4, M, Reducer>(a, b, x, y, z, w, v, y.Volume());
+            const int M = 24; // determines how much work per thread to do
+            value = nativeReduce<Reducer, float, short, M, 4>(a, b, x, y, z, w, v, y.Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
           } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER) { // wilson
 #if defined(NSPIN4) && defined(FLOAT8)
-            const int M = 3; // determines how much work per thread to do
-            value = nativeReduce<float8, short8, short8, M, Reducer>(a, b, x, y, z, w, v, y.Volume());
+            const int M = 24; // determines how much work per thread to do
+            value = nativeReduce<Reducer, float, short, M, 8>(a, b, x, y, z, w, v, y.Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
           } else if (x.Nspin() == 1) { // staggered
 #if defined(NSPIN1)
-            const int M = 3; // determines how much work per thread to do
-            value = nativeReduce<float2, short2, short2, M, Reducer>(a, b, x, y, z, w, v, y.Volume());
+            const int M = 6; // determines how much work per thread to do
+            value = nativeReduce<Reducer, float, short, M, 2>(a, b, x, y, z, w, v, y.Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
@@ -435,22 +433,22 @@ namespace quda {
 #if QUDA_PRECISION & 1
           if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) { // wilson
 #if defined(NSPIN4)
-            const int M = 6; // determines how much work per thread to do
-            value = nativeReduce<float4, char4, char4, M, Reducer>(a, b, x, y, z, w, v, y.Volume());
+            const int M = 24; // determines how much work per thread to do
+            value = nativeReduce<Reducer, float, char, M, 4>(a, b, x, y, z, w, v, y.Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
           } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER) { // wilson
 #if defined(NSPIN4) && defined(FLOAT8)
-            const int M = 3;
-            value = nativeReduce<float8, char8, char8, M, Reducer>(a, b, x, y, z, w, v, y.Volume());
+            const int M = 24;
+            value = nativeReduce<Reducer, float, char, M, 8>(a, b, x, y, z, w, v, y.Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
           } else if (x.Nspin() == 1) { // staggered
 #ifdef NSPIN1
             const int M = 3; // determines how much work per thread to do
-            value = nativeReduce<float2, char2, char2, M, Reducer>(a, b, x, y, z, w, v, y.Volume());
+            value = nativeReduce<Reducer, float, char, M, 2>(a, b, x, y, z, w, v, y.Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
@@ -512,17 +510,15 @@ namespace quda {
 #if QUDA_PRECISION & 4
             if (x.Nspin() == 4) { // wilson
 #if defined(NSPIN4)
-              const int M = 12; // determines how much work per thread to do
-              value = nativeReduce<double2, float4, double2, M, Reducer>(a, b, x, y, z, w, v, x.Volume());
+              const int M = 24; // determines how much work per thread to do
+              value = nativeReduce<Reducer, double, float, M, 4, double, 2>(a, b, x, y, z, w, v, x.Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
             } else if (x.Nspin() == 1) { // staggered
 #if defined(NSPIN1)
-              constexpr bool siteUnroll = Reducer<double, double>::site_unroll;
-              const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
-              const int reduce_length = siteUnroll ? x.RealLength() : x.Length();
-              value = nativeReduce<double2, float2, double2, M, Reducer>(a, b, x, y, z, w, v, reduce_length / (2 * M));
+              const int M = 6; // determines how much work per thread to do
+              value = nativeReduce<Reducer, double, float, M, 2, double, 2>(a, b, x, y, z, w, v, x.Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
@@ -538,15 +534,15 @@ namespace quda {
 #if QUDA_PRECISION & 2
             if (x.Nspin() == 4) { // wilson
 #if defined(NSPIN4)
-              const int M = 12; // determines how much work per thread to do
-              value = nativeReduce<double2, short4, double2, M, Reducer>(a, b, x, y, z, w, v, x.Volume());
+              const int M = 24; // determines how much work per thread to do
+              value = nativeReduce<Reducer, double, short, M, 4, double, 2>(a, b, x, y, z, w, v, x.Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
             } else if (x.Nspin() == 1) { // staggered
 #if defined(NSPIN1)
-              const int M = 3; // determines how much work per thread to do
-              value = nativeReduce<double2, short2, double2, M, Reducer>(a, b, x, y, z, w, v, x.Volume());
+              const int M = 6; // determines how much work per thread to do
+              value = nativeReduce<Reducer, double, short, M, 2, double, 2>(a, b, x, y, z, w, v, x.Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
@@ -562,15 +558,15 @@ namespace quda {
 #if QUDA_PRECISION & 1
             if (x.Nspin() == 4) { // wilson
 #if defined(NSPIN4)
-              const int M = 12; // determines how much work per thread to do
-              value = nativeReduce<double2, char4, double2, M, Reducer>(a, b, x, y, z, w, v, x.Volume());
+              const int M = 24; // determines how much work per thread to do
+              value = nativeReduce<Reducer, double, char, M, 4, double, 2>(a, b, x, y, z, w, v, x.Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
             } else if (x.Nspin() == 1) { // staggered
 #if defined(NSPIN1)
-              const int M = 3; // determines how much work per thread to do
-              value = nativeReduce<double2, char2, double2, M, Reducer>(a, b, x, y, z, w, v, x.Volume());
+              const int M = 6; // determines how much work per thread to do
+              value = nativeReduce<Reducer, double, char, M, 2, double, 2>(a, b, x, y, z, w, v, x.Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
@@ -596,15 +592,15 @@ namespace quda {
 #if QUDA_PRECISION & 2
             if (x.Nspin() == 4) { // wilson
 #if defined(NSPIN4)
-              const int M = 6;
-              value = nativeReduce<float4, short4, float4, M, Reducer>(a, b, x, y, z, w, v, x.Volume());
+              const int M = 24;
+              value = nativeReduce<Reducer, float, short, M, 4, float, 4>(a, b, x, y, z, w, v, x.Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
             } else if (x.Nspin() == 1) { // staggered
 #if defined(NSPIN1)
-              const int M = 3;
-              value = nativeReduce<float2, short2, float2, M, Reducer>(a, b, x, y, z, w, v, x.Volume());
+              const int M = 6;
+              value = nativeReduce<Reducer, float, short, M, 2, float, 2>(a, b, x, y, z, w, v, x.Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
@@ -619,15 +615,15 @@ namespace quda {
 #if QUDA_PRECISION & 1
             if (x.Nspin() == 4) { // wilson
 #if defined(NSPIN4)
-              const int M = 6;
-              value = nativeReduce<float4, char4, float4, M, Reducer>(a, b, x, y, z, w, v, x.Volume());
+              const int M = 24;
+              value = nativeReduce<Reducer, float, char, M, 4, float, 4>(a, b, x, y, z, w, v, x.Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
             } else if (x.Nspin() == 1) { // staggered
 #if defined(NSPIN1)
-              const int M = 3;
-              value = nativeReduce<float2, char2, float2, M, Reducer>(a, b, x, y, z, w, v, x.Volume());
+              const int M = 6;
+              value = nativeReduce<Reducer, float, char, M, 2, float, 2>(a, b, x, y, z, w, v, x.Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif

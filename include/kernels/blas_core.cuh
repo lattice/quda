@@ -37,24 +37,25 @@ namespace quda
     /**
        Generic blas kernel with four loads and up to four stores.
     */
-    template <typename FloatN, int M, typename Arg> __global__ void blasKernel(Arg arg)
+    template <typename real, int n, typename Arg> __global__ void blasKernel(Arg arg)
     {
-      unsigned int i = blockIdx.x * (blockDim.x) + threadIdx.x;
+      // n is real numbers per thread
+      using vec = vector_type<complex<real>, n/2>;
+      unsigned int i = blockIdx.x * blockDim.x + threadIdx.x;
       unsigned int parity = blockIdx.y;
       unsigned int gridSize = gridDim.x * blockDim.x;
 
       arg.f.init();
 
       while (i < arg.length) {
-        FloatN x[M], y[M], z[M], w[M], v[M];
+        vec x, y, z, w, v;
         arg.X.load(x, i, parity);
         arg.Y.load(y, i, parity);
         arg.Z.load(z, i, parity);
         arg.W.load(w, i, parity);
         arg.V.load(v, i, parity);
 
-#pragma unroll
-        for (int j = 0; j < M; j++) arg.f(x[j], y[j], z[j], w[j], v[j]);
+        arg.f(x, y, z, w, v);
 
         if (arg.f.write.X) arg.X.save(x, i, parity);
         if (arg.f.write.Y) arg.Y.save(y, i, parity);
@@ -83,7 +84,8 @@ namespace quda
       axpbyz_(const real &a, const real &b, const real &c) : a(a), b(b) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
       {
-        v = a * x + b * y;
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) v[i] = a * x[i] + b * y[i];
       }                                  // use v not z to ensure same precision as y
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 3; }   //! flops per element
@@ -98,50 +100,25 @@ namespace quda
       ax_(const real &a, const real &b, const real &c) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
       {
-        x *= a;
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) x[i] *= a;
       }
       static int streams() { return 2; } //! total number of input and output streams
       static int flops() { return 1; }   //! flops per element
     };
 
     /**
-       Functor to perform the operation y += a * x  (complex-valued)
+       Functor to perform the operator y += a*x (complex-valued)
     */
-
-    template <typename T>
-    __device__ __host__ void _caxpy(const complex<T> &a, const typename VectorType<T, 4>::type &x, typename VectorType<T, 4>::type &y)
-    {
-      y.x += a.x * x.x;
-      y.x -= a.y * x.y;
-      y.y += a.y * x.x;
-      y.y += a.x * x.y;
-      y.z += a.x * x.z;
-      y.z -= a.y * x.w;
-      y.w += a.y * x.z;
-      y.w += a.x * x.w;
-    }
-
-    template <typename T>
-    __device__ __host__ void _caxpy(const complex<T> &a, const typename VectorType<T, 2>::type &x, typename VectorType<T, 2>::type &y)
-    {
-      y.x += a.x * x.x;
-      y.x -= a.y * x.y;
-      y.y += a.y * x.x;
-      y.y += a.x * x.y;
-    }
-
-    template <typename T>
-    __device__ __host__ void _caxpy(const complex<T> &a, const typename VectorType<T, 8>::type &x, typename VectorType<T, 8>::type &y)
-    {
-      _caxpy(a, x.x, y.x);
-      _caxpy(a, x.y, y.y);
-    }
-
     template <typename real> struct caxpy_ : public BlasFunctor {
       static constexpr write<0, 1> write{ };
       const complex<real> a;
       caxpy_(const complex<real> &a, const complex<real> &b, const complex<real> &c) : a(a) { ; }
-      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v) { _caxpy(a, x, y); }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
+      {
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) y[i] = cmac(a, x[i], y[i]);
+      }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 4; }   //! flops per element
     };
@@ -149,31 +126,6 @@ namespace quda
     /**
        Functor to perform the operation y = a*x + b*y  (complex-valued)
     */
-
-    template <typename T>
-    __device__ __host__ void _caxpby(const complex<T> &a, const typename VectorType<T, 4>::type &x,
-                                     const complex<T> &b, typename VectorType<T, 4>::type &y)
-    {
-      typename VectorType<T, 4>::type yy;
-      yy.x = a.x * x.x;
-      yy.x -= a.y * x.y;
-      yy.x += b.x * y.x;
-      yy.x -= b.y * y.y;
-      yy.y = a.y * x.x;
-      yy.y += a.x * x.y;
-      yy.y += b.y * y.x;
-      yy.y += b.x * y.y;
-      yy.z = a.x * x.z;
-      yy.z -= a.y * x.w;
-      yy.z += b.x * y.z;
-      yy.z -= b.y * y.w;
-      yy.w = a.y * x.z;
-      yy.w += a.x * x.w;
-      yy.w += b.y * y.z;
-      yy.w += b.x * y.w;
-      y = yy;
-    }
-
     template <typename T>
     __device__ __host__ void _caxpby(const complex<T> &a, const typename VectorType<T, 2>::type &x,
                                      const complex<T> &b, typename VectorType<T, 2>::type &y)
@@ -190,14 +142,6 @@ namespace quda
       y = yy;
     }
 
-    template <typename T>
-    __device__ __host__ void _caxpby(const complex<T> &a, const typename VectorType<T, 8>::type &x,
-                                     const complex<T> &b, typename VectorType<T, 8>::type &y)
-    {
-      _caxpby(a, x.x, b, y.x);
-      _caxpby(a, x.y, b, y.y);
-    }
-
     template <typename real> struct caxpby_ : public BlasFunctor {
       static constexpr write<0, 1> write{ };
       const complex<real> a;
@@ -205,7 +149,8 @@ namespace quda
       caxpby_(const complex<real> &a, const complex<real> &b, const complex<real> &c) : a(a), b(b) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
       {
-        _caxpby(a, x, b, y);
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) _caxpby(a, x[i], b, y[i]);
       }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 7; }   //! flops per element
@@ -219,9 +164,12 @@ namespace quda
       caxpbypczw_(const complex<real> &a, const complex<real> &b, const complex<real> &c) : a(a), b(b), c(c) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
       {
-        w = y;
-        _caxpby(a, x, b, w);
-        _caxpy(c, z, w);
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+          w[i] = y[i];
+          _caxpby(a, x[i], b, w[i]);
+          w[i] = cmac(c, z[i], w[i]);
+        }
       }
       static int streams() { return 4; } //! total number of input and output streams
       static int flops() { return 8; }   //! flops per element
@@ -238,8 +186,11 @@ namespace quda
       axpyBzpcx_(const real &a, const real &b, const real &c) : a(a), b(b), c(c) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
       {
-        y += a * x;
-        x = b * z + c * x;
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+          y[i] += a * x[i];
+          x[i] = b * z[i] + c * x[i];
+        }
       }
       static int streams() { return 5; } //! total number of input and output streams
       static int flops() { return 5; }   //! flops per element
@@ -255,8 +206,11 @@ namespace quda
       axpyZpbx_(const real &a, const real &b, const real &c) : a(a), b(b) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
       {
-        y += a * x;
-        x = z + b * x;
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+          y[i] += a * x[i];
+          x[i] = z[i] + b * x[i];
+        }
       }
       static int streams() { return 5; } //! total number of input and output streams
       static int flops() { return 4; }   //! flops per element
@@ -272,8 +226,11 @@ namespace quda
       caxpyBzpx_(const complex<real> &a, const complex<real> &b, const complex<real> &c) : a(a), b(b) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
       {
-        _caxpy(a, x, y);
-        _caxpy(b, z, x);
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+          y[i] = cmac(a, x[i], y[i]);
+          x[i] = cmac(b, z[i], x[i]);
+        }
       }
 
       static int streams() { return 5; } //! total number of input and output streams
@@ -290,8 +247,11 @@ namespace quda
       caxpyBxpz_(const complex<real> &a, const complex<real> &b, const complex<real> &c) : a(a), b(b) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
       {
-        _caxpy(a, x, y);
-        _caxpy(b, x, z);
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+          y[i] = cmac(a, x[i], y[i]);
+          z[i] = cmac(b, x[i], z[i]);
+        }
       }
 
       static int streams() { return 5; } //! total number of input and output streams
@@ -308,9 +268,12 @@ namespace quda
       caxpbypzYmbw_(const complex<real> &a, const complex<real> &b, const complex<real> &c) : a(a), b(b) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
       {
-        _caxpy(a, x, z);
-        _caxpy(b, y, z);
-        _caxpy(-b, w, y);
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+          z[i] = cmac(a, x[i], z[i]);
+          z[i] = cmac(b, y[i], z[i]);
+          y[i] = cmac(-b, w[i], y[i]);
+        }
       }
 
       static int streams() { return 6; } //! total number of input and output streams
@@ -327,8 +290,11 @@ namespace quda
       cabxpyAx_(const complex<real> &a, const complex<real> &b, const complex<real> &c) : a(a.real()), b(b) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
       {
-        x *= a;
-        _caxpy(b, x, y);
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+          x[i] *= a;
+          y[i] = cmac(b, x[i], y[i]);
+        }
       }
       static int streams() { return 4; } //! total number of input and output streams
       static int flops() { return 5; }   //! flops per element
@@ -345,8 +311,11 @@ namespace quda
       caxpyxmaz_(const complex<real> &a, const complex<real> &b, const complex<real> &c) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
       {
-        _caxpy(a, x, y);
-        _caxpy(-a, z, x);
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+          y[i] = cmac(a, x[i], y[i]);
+          x[i] = cmac(-a, z[i], x[i]);
+        }
       }
       static int streams() { return 5; } //! total number of input and output streams
       static int flops() { return 8; }   //! flops per element
@@ -355,7 +324,7 @@ namespace quda
     /**
        double caxpyXmazMR(c a, V x, V y, V z){}
 
-       This is a special variant of caxpyxmaz where we source the scalar multiplier from device memory. 
+       This is a special variant of caxpyxmaz where we source the scalar multiplier from device memory.
 
        First performs the operation y[i] += a*x[i]
        Second performs the operator x[i] -= a*z[i]
@@ -377,8 +346,11 @@ namespace quda
 
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
       {
-        _caxpy(a, x, y);
-        _caxpy(-a, z, x);
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+          y[i] = cmac(a, x[i], y[i]);
+          x[i] = cmac(-a, z[i], x[i]);
+        }
       }
 
       static int streams() { return 5; } //! total number of input and output streams
@@ -398,9 +370,12 @@ namespace quda
       tripleCGUpdate_(const real &a, const real &b, const real &c) : a(a), b(b) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
       {
-        y += a * w;
-        z -= a * x;
-        w = z + b * w;
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+          y[i] += a * w[i];
+          z[i] -= a * x[i];
+          w[i] = z[i] + b * w[i];
+        }
       }
       static int streams() { return 7; } //! total number of input and output streams
       static int flops() { return 6; }   //! flops per element
@@ -417,8 +392,11 @@ namespace quda
       doubleCG3Init_(const real &a, const real &b, const real &c) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
       {
-        y = x;
-        x += a * z;
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+          y[i] = x[i];
+          x[i] += a * z[i];
+        }
       }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 3; }   //! flops per element
@@ -438,9 +416,12 @@ namespace quda
       doubleCG3Update_(const real &a, const real &b, const real &c) : a(a), b(b), c(c) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
       {
-        auto tmp = x;
-        x = b * (x + a * z) + c * y;
-        y = tmp;
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+          auto tmp = x[i];
+          x[i] = b * (x[i] + a * z[i]) + c * y[i];
+          y[i] = tmp;
+        }
       }
       static int streams() { return 4; } //! total number of input and output streams
       static int flops() { return 7; }   //! flops per element

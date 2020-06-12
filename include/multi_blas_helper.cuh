@@ -92,10 +92,10 @@ namespace quda
     template <int NXZ, typename xType, typename yType, typename Functor>
     inline constexpr int max_YW_size()
     {
-      using SpinorX = Spinor<typename mapper<xType>::type, xType, 6>;
-      using SpinorY = Spinor<typename mapper<yType>::type, yType, 6>;
+      using SpinorX = Spinor<xType, 4>;
+      using SpinorY = Spinor<yType, 4>;
       using SpinorZ = SpinorX;
-      using SpinorW = Spinor<typename mapper<xType>::type, xType, 6>;
+      using SpinorW = Spinor<xType, 4>;
       return max_YW_size<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Functor>();
     }
 
@@ -115,11 +115,11 @@ namespace quda
       bool y_fixed = y_prec < QUDA_SINGLE_PRECISION;
       size_t scalar_size = scalar_width * std::max(std::max(x_prec, y_prec), QUDA_SINGLE_PRECISION);
       NXZ = is_valid_NXZ(NXZ, reduce, x_fixed) ? NXZ : MAX_MULTI_BLAS_N; // ensure NXZ is a valid size
-      size_t spinor_x_size = x_fixed ? sizeof(Spinor<float4, short4, 6>) : sizeof(Spinor<float4, float4, 6>);
-      size_t spinor_y_size = y_fixed ? sizeof(Spinor<float4, short4, 6>) : sizeof(Spinor<float4, float4, 6>);
+      size_t spinor_x_size = x_fixed ? sizeof(Spinor<short, 4>) : sizeof(Spinor<float, 4>);
+      size_t spinor_y_size = y_fixed ? sizeof(Spinor<short, 4>) : sizeof(Spinor<float, 4>);
 
       size_t spinor_z_size = spinor_x_size;
-      size_t spinor_w_size = x_fixed ? sizeof(Spinor<float4, short4, 6>) : sizeof(Spinor<float4, float4, 6>);
+      size_t spinor_w_size = x_fixed ? sizeof(Spinor<short, 4>) : sizeof(Spinor<float, 4>);
 
       // compute the size remaining for the Y and W accessors
       int arg_size = (MAX_ARG_SIZE - sizeof(int)                       // NYW parameter

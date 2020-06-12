@@ -37,9 +37,11 @@ namespace quda
     /**
        Generic reduction kernel with up to four loads and three saves.
     */
-    template <int block_size, typename FloatN, int M, typename Arg>
+    template <int block_size, typename real, int n, typename Arg>
     __global__ void reduceKernel(Arg arg)
     {
+      // n is real numbers per thread
+      using vec = vector_type<complex<real>, n/2>;
       unsigned int i = blockIdx.x * blockDim.x + threadIdx.x;
       unsigned int parity = blockIdx.y;
       unsigned int gridSize = gridDim.x * blockDim.x;
@@ -49,7 +51,7 @@ namespace quda
       ::quda::zero(sum);
 
       while (i < arg.length) {
-        FloatN x[M], y[M], z[M], w[M], v[M];
+        vec x, y, z, w, v;
         arg.X.load(x, i, parity);
         arg.Y.load(y, i, parity);
         arg.Z.load(z, i, parity);
@@ -57,10 +59,7 @@ namespace quda
         arg.V.load(v, i, parity);
 
         arg.r.pre();
-
-#pragma unroll
-        for (int j = 0; j < M; j++) arg.r(sum, x[j], y[j], z[j], w[j], v[j]);
-
+        arg.r(sum, x, y, z, w, v);
         arg.r.post(sum);
 
         if (arg.r.write.X) arg.X.save(x, i, parity);
@@ -101,23 +100,14 @@ namespace quda
       return (reduce_t)sqrt(a.x * a.x + a.y * a.y);
     }
 
-    template <typename reduce_t, typename T> __device__ __host__ reduce_t norm1_(const typename VectorType<T, 4>::type &a)
-    {
-      return (reduce_t)sqrt(a.x * a.x + a.y * a.y) + (reduce_t)sqrt(a.z * a.z + a.w * a.w);
-    }
-
-    template <typename reduce_t, typename T> __device__ __host__ reduce_t norm1_(const typename VectorType<T, 8>::type &a)
-    {
-      return norm1_<reduce_t, T>(a.x) + norm1_<reduce_t, T>(a.y);
-    }
-
     template <typename reduce_t, typename real>
     struct Norm1 : public ReduceFunctor<reduce_t> {
       static constexpr write<> write{ };
       Norm1(const real &a, const real &b) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
-        sum += norm1_<reduce_t, real>(x);
+#pragma unroll
+        for (int i=0; i < x.size(); i++) sum += norm1_<reduce_t, real>(x[i]);
       }
       static int streams() { return 1; } //! total number of input and output streams
       static int flops() { return 2; }   //! flops per element
@@ -132,27 +122,14 @@ namespace quda
       sum += (reduce_t)a.y * (reduce_t)a.y;
     }
 
-    template <typename reduce_t, typename T> __device__ __host__ void norm2_(reduce_t &sum, const typename VectorType<T, 4>::type &a)
-    {
-      sum += (reduce_t)a.x * (reduce_t)a.x;
-      sum += (reduce_t)a.y * (reduce_t)a.y;
-      sum += (reduce_t)a.z * (reduce_t)a.z;
-      sum += (reduce_t)a.w * (reduce_t)a.w;
-    }
-
-    template <typename reduce_t, typename T> __device__ __host__ void norm2_(reduce_t &sum, const typename VectorType<T, 8>::type &a)
-    {
-      norm2_<reduce_t, T>(sum, a.x);
-      norm2_<reduce_t, T>(sum, a.y);
-    }
-
     template <typename reduce_t, typename real>
     struct Norm2 : public ReduceFunctor<reduce_t> {
       static constexpr write<> write{ };
       Norm2(const real &a, const real &b) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
-        norm2_<reduce_t,real>(sum, x);
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) norm2_<reduce_t,real>(sum, x[i]);
       }
       static int streams() { return 1; } //! total number of input and output streams
       static int flops() { return 2; }   //! flops per element
@@ -168,29 +145,14 @@ namespace quda
       sum += (reduce_t)a.y * (reduce_t)b.y;
     }
 
-    template <typename reduce_t, typename T>
-    __device__ __host__ void dot_(reduce_t &sum, const typename VectorType<T, 4>::type &a, const typename VectorType<T, 4>::type &b)
-    {
-      sum += (reduce_t)a.x * (reduce_t)b.x;
-      sum += (reduce_t)a.y * (reduce_t)b.y;
-      sum += (reduce_t)a.z * (reduce_t)b.z;
-      sum += (reduce_t)a.w * (reduce_t)b.w;
-    }
-
-    template <typename reduce_t, typename T>
-    __device__ __host__ void dot_(reduce_t &sum, const typename VectorType<T, 8>::type &a, const typename VectorType<T, 8>::type &b)
-    {
-      dot_<reduce_t, T>(sum, a.x, b.x);
-      dot_<reduce_t, T>(sum, a.y, b.y);
-    }
-
     template <typename reduce_t, typename real>
     struct Dot : public ReduceFunctor<reduce_t> {
       static constexpr write<> write{ };
       Dot(const real &a, const real &b) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
-        dot_<reduce_t, real>(sum, x, y);
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) dot_<reduce_t, real>(sum, x[i], y[i]);
       }
       static int streams() { return 2; } //! total number of input and output streams
       static int flops() { return 2; }   //! flops per element
@@ -208,8 +170,11 @@ namespace quda
       axpbyzNorm2(const real &a, const real &b) : a(a), b(b) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
-        z = a * x + b * y;
-        norm2_<reduce_t, real>(sum, z);
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+          z[i] = a * x[i] + b * y[i];
+          norm2_<reduce_t, real>(sum, z[i]);
+        }
       }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 4; }   //! flops per element
@@ -226,44 +191,15 @@ namespace quda
       AxpyReDot(const real &a, const real &b) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
-        y += a * x;
-        dot_<reduce_t, real>(sum, x, y);
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+          y[i] += a * x[i];
+          dot_<reduce_t, real>(sum, x[i], y[i]);
+        }
       }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 4; }   //! flops per element
     };
-
-    /**
-       Functor to perform the operation y += a * x  (complex-valued)
-    */
-    template <typename T>
-    __device__ __host__ void caxpy_(const complex<T> &a, const typename VectorType<T, 2>::type &x, typename VectorType<T, 2>::type &y)
-    {
-      y.x += a.x * x.x;
-      y.x -= a.y * x.y;
-      y.y += a.y * x.x;
-      y.y += a.x * x.y;
-    }
-
-    template <typename T>
-    __device__ __host__ void caxpy_(const complex<T> &a, const typename VectorType<T, 4>::type &x, typename VectorType<T, 4>::type &y)
-    {
-      y.x += a.x * x.x;
-      y.x -= a.y * x.y;
-      y.y += a.y * x.x;
-      y.y += a.x * x.y;
-      y.z += a.x * x.z;
-      y.z -= a.y * x.w;
-      y.w += a.y * x.z;
-      y.w += a.x * x.w;
-    }
-
-    template <typename T>
-    __device__ __host__ void caxpy_(const complex<T> &a, const typename VectorType<T, 8>::type &x, typename VectorType<T, 8>::type &y)
-    {
-      caxpy_(a, x.x, y.x);
-      caxpy_(a, x.y, y.y);
-    }
 
     /**
        First performs the operation y[i] = a*x[i] + y[i] (complex-valued)
@@ -276,8 +212,11 @@ namespace quda
       caxpyNorm2(const complex<real> &a, const complex<real> &b) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
-        caxpy_(a, x, y);
-        norm2_<reduce_t, real>(sum, y);
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+          y[i] = cmac(a, x[i], y[i]);
+          norm2_<reduce_t, real>(sum, y[i]);
+        }
       }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 6; }   //! flops per element
@@ -296,9 +235,12 @@ namespace quda
       caxpyxmaznormx(const complex<real> &a, const complex<real> &b) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
-        caxpy_(a, x, y);
-        caxpy_(-a, z, x);
-        norm2_<reduce_t, real>(sum, x);
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+          y[i] = cmac(a, x[i], y[i]);
+          x[i] = cmac(-a, z[i], x[i]);
+          norm2_<reduce_t, real>(sum, x[i]);
+        }
       }
       static int streams() { return 5; } //! total number of input and output streams
       static int flops() { return 10; }  //! flops per element
@@ -318,10 +260,12 @@ namespace quda
       cabxpyzaxnorm(const complex<real> &a, const complex<real> &b) : a(a.real()), b(b) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
-        x *= a;
-        z = y;
-        caxpy_(b, x, z);
-        norm2_<reduce_t, real>(sum, z);
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+          x[i] *= a;
+          z[i] = cmac(b, x[i], y[i]);
+          norm2_<reduce_t, real>(sum, z[i]);
+        }
       }
       static int streams() { return 4; } //! total number of input and output streams
       static int flops() { return 10; }  //! flops per element
@@ -340,27 +284,6 @@ namespace quda
       sum.y -= (scalar)a.y * (scalar)b.x;
     }
 
-    template <typename reduce_t, typename T>
-    __device__ __host__ void cdot_(reduce_t &sum, const typename VectorType<T, 4>::type &a, const typename VectorType<T, 4>::type &b)
-    {
-      typedef typename scalar<reduce_t>::type scalar;
-      sum.x += (scalar)a.x * (scalar)b.x;
-      sum.x += (scalar)a.y * (scalar)b.y;
-      sum.x += (scalar)a.z * (scalar)b.z;
-      sum.x += (scalar)a.w * (scalar)b.w;
-      sum.y += (scalar)a.x * (scalar)b.y;
-      sum.y -= (scalar)a.y * (scalar)b.x;
-      sum.y += (scalar)a.z * (scalar)b.w;
-      sum.y -= (scalar)a.w * (scalar)b.z;
-    }
-
-    template <typename reduce_t, typename T>
-    __device__ __host__ void cdot_(reduce_t &sum, const typename VectorType<T, 8>::type &a, const typename VectorType<T, 8>::type &b)
-    {
-      cdot_<reduce_t, T>(sum, a.x, b.x);
-      cdot_<reduce_t, T>(sum, a.y, b.y);
-    }
-
     template <typename real_reduce_t, typename real>
     struct Cdot : public ReduceFunctor<complex<real_reduce_t>> {
       using reduce_t = complex<real_reduce_t>;
@@ -368,7 +291,8 @@ namespace quda
       Cdot(const complex<real> &a, const complex<real> &b) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
-        cdot_<reduce_t, real>(sum, x, y);
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) cdot_<reduce_t, real>(sum, x[i], y[i]);
       }
       static int streams() { return 2; } //! total number of input and output streams
       static int flops() { return 4; }   //! flops per element
@@ -387,8 +311,11 @@ namespace quda
       caxpydotzy(const complex<real> &a, const complex<real> &b) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
-        caxpy_(a, x, y);
-        cdot_<reduce_t, real>(sum, z, y);
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+          y[i] = cmac(a, x[i], y[i]);
+          cdot_<reduce_t, real>(sum, z[i], y[i]);
+        }
       }
       static int streams() { return 4; } //! total number of input and output streams
       static int flops() { return 8; }   //! flops per element
@@ -427,7 +354,8 @@ namespace quda
       CdotNormA(const real &a, const real &b) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
-        cdotNormA_<reduce_t>(sum, x, y);
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) cdotNormA_<reduce_t>(sum, x[i], y[i]);
       }
       static int streams() { return 2; } //! total number of input and output streams
       static int flops() { return 6; }   //! flops per element
@@ -446,10 +374,13 @@ namespace quda
       caxpbypzYmbwcDotProductUYNormY_(const complex<real> &a, const complex<real> &b) : a(a), b(b) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
-        caxpy_(a, x, z);
-        caxpy_(b, y, z);
-        caxpy_(-b, w, y);
-        cdotNormB_<reduce_t>(sum, v, y);
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+          z[i] = cmac(a, x[i], z[i]);
+          z[i] = cmac(b, y[i], z[i]);
+          y[i] = cmac(-b, w[i], y[i]);
+          cdotNormB_<reduce_t>(sum, v[i], y[i]);
+        }
       }
       static int streams() { return 7; } //! total number of input and output streams
       static int flops() { return 18; }  //! flops per element
@@ -469,10 +400,13 @@ namespace quda
       axpyCGNorm2(const real &a, const real &b) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
-        auto z_new = z + a * x;
-        norm2_<real_reduce_t, real>(sum.x, z_new);
-        dot_<real_reduce_t, real>(sum.y, z_new, z_new - z);
-        z = z_new;
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+          auto z_new = z[i] + a * x[i];
+          norm2_<real_reduce_t, real>(sum.x, z_new);
+          dot_<real_reduce_t, real>(sum.y, z_new, z_new - z[i]);
+          z[i] = z_new;
+        }
       }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 6; }   //! flops per real element
@@ -504,8 +438,11 @@ namespace quda
 
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
-        norm2_<real_reduce_t, real>(aux.x, x);
-        norm2_<real_reduce_t, real>(aux.y, y);
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+          norm2_<real_reduce_t, real>(aux.x, x[i]);
+          norm2_<real_reduce_t, real>(aux.y, y[i]);
+        }
       }
 
       //! sum the solution and residual norms, and compute the heavy-quark norm
@@ -542,8 +479,11 @@ namespace quda
 
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
-        norm2_<real_reduce_t, real>(aux.x, x + y);
-        norm2_<real_reduce_t, real>(aux.y, z);
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+          norm2_<real_reduce_t, real>(aux.x, x[i] + y[i]);
+          norm2_<real_reduce_t, real>(aux.y, z[i]);
+        }
       }
 
       //! sum the solution and residual norms, and compute the heavy-quark norm
@@ -572,9 +512,12 @@ namespace quda
       tripleCGReduction_(const real &a, const real &b) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
-        norm2_<real_reduce_t, real>(sum.x, x);
-        norm2_<real_reduce_t, real>(sum.y, y);
-        dot_<real_reduce_t, real>(sum.z, y, z);
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+          norm2_<real_reduce_t, real>(sum.x, x[i]);
+          norm2_<real_reduce_t, real>(sum.y, y[i]);
+          dot_<real_reduce_t, real>(sum.z, y[i], z[i]);
+        }
       }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 6; }   //! flops per element
@@ -594,10 +537,13 @@ namespace quda
       quadrupleCGReduction_(const real &a, const real &b) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
-        norm2_<real_reduce_t, real>(sum.x, x);
-        norm2_<real_reduce_t, real>(sum.y, y);
-        dot_<real_reduce_t, real>(sum.z, y, z);
-        norm2_<real_reduce_t, real>(sum.w, w);
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+          norm2_<real_reduce_t, real>(sum.x, x[i]);
+          norm2_<real_reduce_t, real>(sum.y, y[i]);
+          dot_<real_reduce_t, real>(sum.z, y[i], z[i]);
+          norm2_<real_reduce_t, real>(sum.w, w[i]);
+        }
       }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 8; }   //! flops per element
@@ -618,11 +564,14 @@ namespace quda
       quadrupleCG3InitNorm_(const real &a, const real &b) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
-        z = x;
-        w = y;
-        x += a * y;
-        y -= a * v;
-        norm2_<reduce_t, real>(sum, y);
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+          z[i] = x[i];
+          w[i] = y[i];
+          x[i] += a * y[i];
+          y[i] -= a * v[i];
+          norm2_<reduce_t, real>(sum, y[i]);
+        }
       }
       static int streams() { return 6; } //! total number of input and output streams
       static int flops() { return 6; }   //! flops per element check if it's right
@@ -646,13 +595,16 @@ namespace quda
       quadrupleCG3UpdateNorm_(const real &a, const real &b) : a(a), b(b) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
-        auto tmpx = x;
-        auto tmpy = y;
-        x = b * (x + a * y) + ((real)1.0 - b) * z;
-        y = b * (y - a * v) + ((real)1.0 - b) * w;
-        z = tmpx;
-        w = tmpy;
-        norm2_<reduce_t, real>(sum, y);
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+          auto tmpx = x[i];
+          auto tmpy = y[i];
+          x[i] = b * (x[i] + a * y[i]) + ((real)1.0 - b) * z[i];
+          y[i] = b * (y[i] - a * v[i]) + ((real)1.0 - b) * w[i];
+          z[i] = tmpx;
+          w[i] = tmpy;
+          norm2_<reduce_t, real>(sum, y[i]);
+        }
       }
       static int streams() { return 7; } //! total number of input and output streams
       static int flops() { return 16; }  //! flops per element check if it's right
@@ -671,9 +623,12 @@ namespace quda
       doubleCG3InitNorm_(const real &a, const real &b) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
-        y = x;
-        x -= a * z;
-        norm2_<reduce_t, real>(sum, x);
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+          y[i] = x[i];
+          x[i] -= a * z[i];
+          norm2_<reduce_t, real>(sum, x[i]);
+        }
       }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 5; }   //! flops per element
@@ -694,10 +649,13 @@ namespace quda
       doubleCG3UpdateNorm_(const real &a, const real &b) : a(a), b(b) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
-        auto tmp = x;
-        x = b * (x - a * z) + ((real)1.0 - b) * y;
-        y = tmp;
-        norm2_<reduce_t, real>(sum, x);
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+          auto tmp = x[i];
+          x[i] = b * (x[i] - a * z[i]) + ((real)1.0 - b) * y[i];
+          y[i] = tmp;
+          norm2_<reduce_t, real>(sum, x[i]);
+        }
       }
       static int streams() { return 4; } //! total number of input and output streams
       static int flops() { return 9; }   //! flops per element

@@ -52,49 +52,49 @@ const char *order_str[] = {"default", "float8"};
 
 // For googletest names must be non-empty, unique, and may only contain ASCII
 // alphanumeric characters or underscore
-const char *names[] = {"copyHS",
-                       "copyMS",
-                       "copyLS",
-                       "axpby",
-                       "xpy",
-                       "axpy",
-                       "xpay",
-                       "mxpy",
-                       "ax",
-                       "caxpy",
-                       "caxpby",
-                       "cxpaypbz",
-                       "axpyBzpcx",
-                       "axpyZpbx",
-                       "caxpbypzYmbw",
-                       "cabxpyAx",
-                       "caxpyXmaz",
-                       "norm",
-                       "reDotProduct",
-                       "axpyNorm",
-                       "xmyNorm",
-                       "caxpyNorm",
-                       "caxpyXmazNormX",
-                       "cabxpyzAxNorm",
-                       "cDotProduct",
-                       "caxpyDotzy",
-                       "cDotProductNormA",
-                       "cDotProductNormB",
-                       "caxpbypzYmbwcDotProductUYNormY",
-                       "HeavyQuarkResidualNorm",
-                       "xpyHeavyQuarkResidualNorm",
-                       "tripleCGReduction",
-                       "tripleCGUpdate",
-                       "axpyReDot",
-                       "caxpy_block",
-                       "axpyBzpcx_block",
-                       "caxpyBxpz",
-                       "caxpyBzpx",
-                       "cDotProductNorm_block",
-                       "cDotProduct_block",
-                       "reDotProductNorm_block",
-                       "reDotProduct_block",
-                       "axpy_block"};
+const std::vector<std::string> names = {"copyHS",
+                                        "copyMS",
+                                        "copyLS",
+                                        "axpby",
+                                        "xpy",
+                                        "axpy",
+                                        "xpay",
+                                        "mxpy",
+                                        "ax",
+                                        "caxpy",
+                                        "caxpby",
+                                        "cxpaypbz",
+                                        "axpyBzpcx",
+                                        "axpyZpbx",
+                                        "caxpbypzYmbw",
+                                        "cabxpyAx",
+                                        "caxpyXmaz",
+                                        "norm",
+                                        "reDotProduct",
+                                        "axpyNorm",
+                                        "xmyNorm",
+                                        "caxpyNorm",
+                                        "caxpyXmazNormX",
+                                        "cabxpyzAxNorm",
+                                        "cDotProduct",
+                                        "caxpyDotzy",
+                                        "cDotProductNormA",
+                                        "cDotProductNormB",
+                                        "caxpbypzYmbwcDotProductUYNormY",
+                                        "HeavyQuarkResidualNorm",
+                                        "xpyHeavyQuarkResidualNorm",
+                                        "tripleCGReduction",
+                                        "tripleCGUpdate",
+                                        "axpyReDot",
+                                        "caxpy_block",
+                                        "axpyBzpcx_block",
+                                        "caxpyBxpz",
+                                        "caxpyBzpx",
+                                        "cDotProductNorm_block",
+                                        "cDotProduct_block",
+                                        "reDotProductNorm_block",
+                                        "reDotProduct_block",
+                                        "axpy_block"};
 
 // kernels that utilize multi-blas
 bool is_multi(int kernel) { return std::string(names[kernel]).find("_block") != std::string::npos ? true : false; }
@@ -132,7 +132,7 @@ bool skip_kernel(int precision, int kernel, int order)
 #ifdef FLOAT8
     // order == 1 represents the case of float-8 nspin-4 fields
     // only run fixed-precision fields, skip all other cases
-    if (Nspin == 1 || Nspin == 2 || this_prec >= QUDA_HALF_PRECISION) {
+    if (Nspin == 1 || Nspin == 2 || this_prec > QUDA_HALF_PRECISION) {
       return true;
     } else if (Nspin == 4 && is_multi(kernel)) {
       // we currently don't instantiate multi-blas kernels for float-8
@@ -1143,7 +1143,7 @@ TEST_P(BlasTest, benchmark) {
   double gbytes = quda::blas::bytes/(secs*1e9);
   RecordProperty("Gflops", std::to_string(gflops));
   RecordProperty("GBs", std::to_string(gbytes));
-  printfQuda("%-31s: Gflop/s = %6.1f, GB/s = %6.1f\n", names[kernel], gflops, gbytes);
+  printfQuda("%-31s: Gflop/s = %6.1f, GB/s = %6.1f\n", names[kernel].c_str(), gflops, gbytes);
 }
 
 std::string getblasname(testing::TestParamInfo<::testing::tuple<int, int, int>> param)

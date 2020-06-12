@@ -54,18 +54,18 @@ namespace quda
       }
     };
 
-    template <int M, int warp_split, typename FloatN> __device__ __host__ void warp_combine(FloatN x[M])
+    template <int warp_split, typename T> __device__ __host__ void warp_combine(T &x)
     {
 #ifdef WARP_SPLIT
       constexpr int warp_size = 32;
       if (warp_split > 1) {
 #pragma unroll
-        for (int j = 0; j < M; j++) {
+        for (int i = 0; i < x.size(); i++) {
           // reduce down to the first group of column-split threads
 #pragma unroll
           for (int offset = warp_size / 2; offset >= warp_size / warp_split; offset /= 2) {
 #define WARP_CONVERGED 0xffffffff // we know warp should be converged here
-            x[j] += __shfl_down_sync(WARP_CONVERGED, x[j], offset);
+            x[i] += __shfl_down_sync(WARP_CONVERGED, x[i], offset);
           }
         }
       }
@@ -78,8 +78,10 @@ namespace quda
        @param[in,out] arg Argument struct with required meta data
        (input/output fields, functor, etc.)
     */
-    template <typename FloatN, int M, int NXZ, int warp_split, typename Arg> __global__ void multiBlasKernel(Arg arg)
+    template <typename real, int n, int NXZ, int warp_split, typename Arg> __global__ void multiBlasKernel(Arg arg)
     {
+      // n is real numbers per thread
+      using vec = vector_type<complex<real>, n/2>;
       // use i to loop over elements in kernel
       const int k = blockIdx.y * blockDim.y + threadIdx.y;
       const int parity = blockIdx.z;
@@ -97,17 +99,13 @@ namespace quda
 
       while (idx < arg.length) {
 
-        FloatN x[M], y[M], z[M], w[M];
-
-#pragma unroll
-        for (int m = 0; m < M; m++) {
-          ::quda::zero(y[m]);
-          ::quda::zero(w[m]);
-        }
-
+        vec x, y, z, w;
         if (l_idx == 0 || warp_split == 1) {
           arg.Y[k].load(y, idx, parity);
           arg.W[k].load(w, idx, parity);
+        } else {
+          zero(y);
+          zero(w);
         }
 
 #pragma unroll
@@ -117,14 +115,13 @@ namespace quda
             arg.X[l].load(x, idx, parity);
             arg.Z[l].load(z, idx, parity);
 
-#pragma unroll
-            for (int j = 0; j < M; j++) arg.f(x[j], y[j], z[j], w[j], k, l);
+            arg.f(x, y, z, w, k, l);
           }
         }
 
         // now combine the results across the warp if needed
-        if (arg.f.write.Y) warp_combine<M, warp_split>(y);
-        if (arg.f.write.W) warp_combine<M, warp_split>(w);
+        if (arg.f.write.Y) warp_combine<warp_split>(y);
+        if (arg.f.write.W) warp_combine<warp_split>(w);
 
         if (l_idx == 0 || warp_split == 1) {
           if (arg.f.write.Y) arg.Y[k].save(y, idx, parity);
@@ -193,41 +190,13 @@ namespace quda
 
       template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &z, T &w, int i, int j)
       {
-        y += a(j, i) * x;
+#pragma unroll
+        for (int k = 0; k < x.size(); k++) y[k] += a(j, i) * x[k];
       }
 
       int streams() { return 2 * NYW + NXZ * NYW; } //! total number of input and output streams
       int flops() { return 2 * NXZ * NYW; }         //! flops per real element
     };
-
-    template <typename T>
-    __device__ __host__ void _caxpy(const complex<T> &a, const typename VectorType<T, 4>::type &x, typename VectorType<T, 4>::type &y)
-    {
-      y.x += a.x * x.x;
-      y.x -= a.y * x.y;
-      y.y += a.y * x.x;
-      y.y += a.x * x.y;
-      y.z += a.x * x.z;
-      y.z -= a.y * x.w;
-      y.w += a.y * x.z;
-      y.w += a.x * x.w;
-    }
-
-    template <typename T>
-    __device__ __host__ void _caxpy(const complex<T> &a, const typename VectorType<T, 2>::type &x, typename VectorType<T, 2>::type &y)
-    {
-      y.x += a.x * x.x;
-      y.x -= a.y * x.y;
-      y.y += a.y * x.x;
-      y.y += a.x * x.y;
-    }
-
-    template <typename T>
-    __device__ __host__ void _caxpy(const complex<T> &a, const typename VectorType<T, 8>::type &x, typename VectorType<T, 8>::type &y)
-    {
-      _caxpy(a, x.x, y.x);
-      _caxpy(a, x.y, y.y);
-    }
 
     /**
        Functor to perform the operation y += a * x  (complex-valued)
@@ -243,7 +212,8 @@ namespace quda
 
       template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &z, T &w, int i, int j)
       {
-        _caxpy(a(j, i), x, y);
+#pragma unroll
+        for (int k = 0; k < x.size(); k++) y[k] = cmac(a(j, i), x[k], y[k]);
       }
 
       int streams() { return 2 * NYW + NXZ * NYW; } //! total number of input and output streams
@@ -251,7 +221,7 @@ namespace quda
     };
 
     /**
-       Functor to perform the operation z = a * x + y  (complex-valued)
+       Functor to perform the operation w = a * x + y  (complex-valued)
     */
     template <int NXZ, typename real>
     struct multicaxpyz_ : public MultiBlasFunctor<complex<real>> {
@@ -264,8 +234,11 @@ namespace quda
 
       template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &z, T &w, int i, int j)
       {
-        if (j == 0) w = y;
-        _caxpy(a(j, i), x, w);
+#pragma unroll
+        for (int k = 0; k < x.size(); k++) {
+          if (j == 0) w[k] = y[k];
+          w[k] = cmac(a(j, i), x[k], w[k]);
+        }
       }
 
       int streams() { return 2 * NYW + NXZ * NYW; } //! total number of input and output streams
@@ -288,8 +261,11 @@ namespace quda
 
       template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &z, T &w, int i, int j)
       {
-        y += a(0, i) * w;
-        w = b(0, i) * x + c(0, i) * w;
+#pragma unroll
+        for (int k = 0; k < x.size(); k++) {
+          y[k] += a(0, i) * w[k];
+          w[k] = b(0, i) * x[k] + c(0, i) * w[k];
+        }
       }
 
       int streams() { return 4 * NYW + NXZ; } //! total number of input and output streams
@@ -297,7 +273,7 @@ namespace quda
     };
 
     /**
-       Functor performing the operations y[i] = a*x[i] + y[i] and z[i] = b*x[i] + z[i]
+       Functor performing the operations y[i] = a*x[i] + y[i] and w[i] = b*x[i] + w[i]
     */
     template <int NXZ, typename real>
     struct multi_caxpyBxpz_ : public MultiBlasFunctor<complex<real>> {
@@ -312,8 +288,11 @@ namespace quda
       // i loops over NYW, j loops over NXZ
       template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &z, T &w, int i, int j)
       {
-        _caxpy(a(0, j), x, y);
-        _caxpy(b(0, j), x, w); // b/c we swizzled z into w.
+#pragma unroll
+        for (int k = 0; k < x.size(); k++) {
+          y[k] = cmac(a(0, j), x[k], y[k]);
+          w[k] = cmac(b(0, j), x[k], w[k]);
+        }
       }
 
       int streams() { return 4 * NYW + NXZ; } //! total number of input and output streams

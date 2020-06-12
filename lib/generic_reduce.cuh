@@ -4,25 +4,27 @@
 template <typename reduce_t, typename Float, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
 auto genericReduce(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, SpinorV &V, Reducer r)
 {
+  using vec = vector_type<complex<Float>, 1>;
   reduce_t sum;
   ::quda::zero(sum);
 
+  vec X_, Y_, Z_, W_, V_;
   for (int parity = 0; parity < X.Nparity(); parity++) {
     for (int x = 0; x < X.VolumeCB(); x++) {
       r.pre();
       for (int s = 0; s < X.Nspin(); s++) {
         for (int c = 0; c < X.Ncolor(); c++) {
-          complex<Float> X_ = X(parity, x, s, c);
-          complex<Float> Y_ = Y(parity, x, s, c);
-          complex<Float> Z_ = Z(parity, x, s, c);
-          complex<Float> W_ = W(parity, x, s, c);
-          complex<Float> V_ = V(parity, x, s, c);
+          X_[0] = X(parity, x, s, c);
+          Y_[0] = Y(parity, x, s, c);
+          Z_[0] = Z(parity, x, s, c);
+          W_[0] = W(parity, x, s, c);
+          V_[0] = V(parity, x, s, c);
           r(sum, X_, Y_, Z_, W_, V_);
-          if (r.write.X) X(parity, x, s, c) = X_;
-          if (r.write.Y) Y(parity, x, s, c) = Y_;
-          if (r.write.Z) Z(parity, x, s, c) = Z_;
-          if (r.write.W) W(parity, x, s, c) = W_;
-          if (r.write.V) V(parity, x, s, c) = V_;
+          if (r.write.X) X(parity, x, s, c) = X_[0];
+          if (r.write.Y) Y(parity, x, s, c) = Y_[0];
+          if (r.write.Z) Z(parity, x, s, c) = Z_[0];
+          if (r.write.W) W(parity, x, s, c) = W_[0];
+          if (r.write.V) V(parity, x, s, c) = V_[0];
         }
       }
       r.post(sum);

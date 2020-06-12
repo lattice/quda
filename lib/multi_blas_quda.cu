@@ -15,25 +15,23 @@ namespace quda {
 
     qudaStream_t* getStream();
 
-    template <int NXZ, typename FloatN, int M, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW,
-        typename Functor, typename T>
+    template <int NXZ, typename real, int len, typename SpinorX, typename SpinorY, typename SpinorZ,
+              typename SpinorW, typename Functor, typename T>
     class MultiBlas : public TunableVectorY
     {
+      static constexpr int NYW_max = max_YW_size<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Functor>();
+      const int NYW;
+      int max_warp_split;
+      mutable int warp_split; // helper used to keep track of current warp splitting
+      const int nParity;
+      mutable MultiBlasArg<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Functor> arg;
+      const coeff_array<T> &a, &b, &c;
+      std::vector<ColorSpinorField *> &x, &y, &z, &w;
 
-  private:
-    static constexpr int NYW_max = max_YW_size<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Functor>();
-    const int NYW;
-    int max_warp_split;
-    mutable int warp_split; // helper used to keep track of current warp splitting
-    const int nParity;
-    mutable MultiBlasArg<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Functor> arg;
-    const coeff_array<T> &a, &b, &c;
-    std::vector<ColorSpinorField *> &x, &y, &z, &w;
+      bool tuneSharedBytes() const { return false; }
 
-    bool tuneSharedBytes() const { return false; }
-
-    // for these streaming kernels, there is no need to tune the grid size, just use max
-    unsigned int minGridSize() const { return maxGridSize(); }
+      // for these streaming kernels, there is no need to tune the grid size, just use max
+      unsigned int minGridSize() const { return maxGridSize(); }
 
   public:
     MultiBlas(SpinorX X[], SpinorY Y[], SpinorZ Z[], SpinorW W[], Functor &f, const coeff_array<T> &a,
@@ -94,14 +92,14 @@ namespace quda {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
         using coeff_t = typename decltype(arg.f)::coeff_t;
-        size_t len = MAX_MATRIX_SIZE / sizeof(coeff_t);
+        size_t n_coeff = MAX_MATRIX_SIZE / sizeof(coeff_t);
 #ifdef JITIFY
         using namespace jitify::reflection;
         auto instance = program->kernel("quda::blas::multiBlasKernel")
-                          .instantiate(Type<FloatN>(), M, NXZ, tp.aux.x, Type<decltype(arg)>());
+                          .instantiate(Type<real>(), len, NXZ, tp.aux.x, Type<decltype(arg)>());
 
         if (a.data) {
-          coeff_t A[len];
+          coeff_t A[n_coeff];
           for (int i = 0; i < NXZ; i++)
             for (int j = 0; j < NYW; j++) A[NYW * i + j] = coeff_t(a.data[NYW * i + j]);
 
@@ -110,7 +108,7 @@ namespace quda {
         }
 
         if (b.data) {
-          coeff_t B[len];
+          coeff_t B[n_coeff];
           for (int i = 0; i < NXZ; i++)
             for (int j = 0; j < NYW; j++) B[NYW * i + j] = coeff_t(b.data[NYW * i + j]);
 
@@ -119,7 +117,7 @@ namespace quda {
         }
 
         if (c.data) {
-          coeff_t C[len];
+          coeff_t C[n_coeff];
           for (int i = 0; i < NXZ; i++)
             for (int j = 0; j < NYW; j++) C[NYW * i + j] = coeff_t(Complex(c.data[NYW * i + j]);
           auto Cmatrix_d = instance.get_constant_ptr("quda::blas::Cmatrix_d");
@@ -131,21 +129,21 @@ namespace quda {
         tp.block.x /= tp.aux.x; // restore block size
 #else
         if (a.data) {
-          coeff_t A[len];
+          coeff_t A[n_coeff];
           for (int i = 0; i < NXZ; i++)
             for (int j = 0; j < NYW; j++) A[NYW * i + j] = coeff_t(a.data[NYW * i + j]);
           cudaMemcpyToSymbolAsync(Amatrix_d, A, NXZ * NYW * sizeof(decltype(A[0])), 0, cudaMemcpyHostToDevice, stream);
         }
 
         if (b.data) {
-          coeff_t B[len];
+          coeff_t B[n_coeff];
           for (int i = 0; i < NXZ; i++)
             for (int j = 0; j < NYW; j++) B[NYW * i + j] = coeff_t(b.data[NYW * i + j]);
           cudaMemcpyToSymbolAsync(Bmatrix_d, B, NXZ * NYW * sizeof(decltype(B[0])), 0, cudaMemcpyHostToDevice, stream);
         }
 
         if (c.data) {
-          coeff_t C[len];
+          coeff_t C[n_coeff];
           for (int i = 0; i < NXZ; i++)
             for (int j = 0; j < NYW; j++) C[NYW * i + j] = coeff_t(c.data[NYW * i + j]);
           cudaMemcpyToSymbolAsync(Cmatrix_d, C, NXZ * NYW * sizeof(decltype(C[0])), 0, cudaMemcpyHostToDevice, stream);
@@ -154,10 +152,10 @@ namespace quda {
         tp.block.x *= tp.aux.x; // include warp-split factor
 
         switch (tp.aux.x) {
-        case 1: multiBlasKernel<FloatN, M, NXZ, 1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+        case 1: multiBlasKernel<real, len, NXZ, 1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
 #ifdef WARP_SPLIT
-        case 2: multiBlasKernel<FloatN, M, NXZ, 2><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
-        case 4: multiBlasKernel<FloatN, M, NXZ, 4><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+        case 2: multiBlasKernel<real, len, NXZ, 2><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+        case 4: multiBlasKernel<real, len, NXZ, 4><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
 #endif
         default: errorQuda("warp-split factor %d not instantiated", tp.aux.x);
         }
@@ -219,7 +217,7 @@ namespace quda {
         param.aux = make_int4(1, 0, 0, 0); // warp-split parameter
       }
 
-      long long flops() const { return arg.f.flops() * vec_length<FloatN>::value * (long)arg.length * nParity * M; }
+      long long flops() const { return arg.f.flops() * x[0]->Length(); }
 
       long long bytes() const
       {
@@ -230,18 +228,17 @@ namespace quda {
       int tuningIter() const { return 3; }
     };
 
-    template <int NXZ_, typename RegType, typename StoreType, typename yType, int M, template <int, typename> class Functor, typename T>
+      template <int NXZ_, template <int, typename> class Functor, typename real, typename store_t,
+                int len, int N, typename y_store_t = store_t, int Ny = N, typename T>
     void multiBlas(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
                    std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
                    std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w, int length)
     {
-      using real = typename scalar<RegType>::type;
-
       const int NYW = y.size();
       // the below line enable NXZ = 128 for floating point types, which is invalid for fixed-point types
-      constexpr int NXZ = isFixed<StoreType>::value && NXZ_ == 128 ? 64 : NXZ_;
+      constexpr int NXZ = isFixed<store_t>::value && NXZ_ == 128 ? 64 : NXZ_;
       Functor<NXZ, real> f(NYW);
-      constexpr int NYW_max = max_YW_size<NXZ, StoreType, yType, decltype(f)>();
+      constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, decltype(f)>();
       constexpr int scalar_width = sizeof(typename decltype(f)::coeff_t) / sizeof(real);
       const int NYW_max_check = max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), f.use_z, f.use_w, scalar_width, false);
 
@@ -252,21 +249,21 @@ namespace quda {
       if (NXZ * NYW * scalar_width > MAX_MATRIX_SIZE)
         errorQuda("Coefficient matrix exceeds max size (%d > %d)", NXZ * NYW * scalar_width, MAX_MATRIX_SIZE);
 
-      Spinor<RegType, StoreType, M> X[NXZ];
-      Spinor<RegType, yType, M> Y[NYW_max];
-      Spinor<RegType, StoreType, M> Z[NXZ];
-      Spinor<RegType, StoreType, M> W[NYW_max];
+      Spinor<store_t, N> X[NXZ];
+      Spinor<y_store_t, Ny> Y[NYW_max];
+      Spinor<store_t, N> Z[NXZ];
+      Spinor<store_t, N> W[NYW_max];
 
       for (int i = 0; i < NXZ; i++) {
-        X[i].set(*dynamic_cast<cudaColorSpinorField *>(x[i]));
-        Z[i].set(*dynamic_cast<cudaColorSpinorField *>(z[i]));
+        X[i].set(*x[i]);
+        Z[i].set(*z[i]);
       }
       for (int i = 0; i < NYW; i++) {
-        Y[i].set(*dynamic_cast<cudaColorSpinorField *>(y[i]));
-        W[i].set(*dynamic_cast<cudaColorSpinorField *>(w[i]));
+        Y[i].set(*y[i]);
+        W[i].set(*w[i]);
       }
 
-      MultiBlas<NXZ, RegType, M, typename std::remove_reference<decltype(X[0])>::type,
+      MultiBlas<NXZ, real, len, typename std::remove_reference<decltype(X[0])>::type,
                 typename std::remove_reference<decltype(Y[0])>::type, typename std::remove_reference<decltype(Z[0])>::type,
                 typename std::remove_reference<decltype(W[0])>::type, decltype(f), T>
         blas(X, Y, Z, W, f, a, b, c, x, y, z, w, NYW, length);
@@ -274,7 +271,6 @@ namespace quda {
 
       blas::bytes += blas.bytes();
       blas::flops += blas.flops();
-
       checkCudaError();
     }
 
@@ -295,7 +291,7 @@ namespace quda {
 #if QUDA_PRECISION & 8
 #if defined(NSPIN4) || defined(NSPIN2) || defined(NSPIN1)
           const int M = 1;
-          multiBlas<NXZ, double2, double2, double2, M, Functor>(a, b, c, x, y, z, w, x[0]->Length() / (2 * M));
+          multiBlas<NXZ, Functor, double, double, 2, 2>(a, b, c, x, y, z, w, x[0]->Length() / (2 * M));
 #else
           errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
@@ -308,7 +304,7 @@ namespace quda {
 #if QUDA_PRECISION & 4
 #if defined(NSPIN4) || defined(NSPIN2) || defined(NSPIN1)
           const int M = 1;
-          multiBlas<NXZ, float4, float4, float4, M, Functor>(a, b, c, x, y, z, w, x[0]->Length() / (4 * M));
+          multiBlas<NXZ, Functor, float, float, 4, 4>(a, b, c, x, y, z, w, x[0]->Length() / (4 * M));
 #else
           errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
@@ -322,15 +318,13 @@ namespace quda {
           if (x[0]->Ncolor() != 3) { errorQuda("nColor = %d is not supported", x[0]->Ncolor()); }
           if (x[0]->Nspin() == 4) { // wilson
 #if defined(NSPIN4)
-            const int M = 6;
-            multiBlas<NXZ, float4, short4, short4, M, Functor>(a, b, c, x, y, z, w, x[0]->Volume());
+            multiBlas<NXZ, Functor, float, short, 24, 4>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
           } else if (x[0]->Nspin() == 1) { // staggered
 #if defined(NSPIN1)
-            const int M = 3;
-            multiBlas<NXZ, float2, short2, short2, M, Functor>(a, b, c, x, y, z, w, x[0]->Volume());
+            multiBlas<NXZ, Functor, float, short, 6, 2>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
@@ -347,15 +341,14 @@ namespace quda {
           if (x[0]->Ncolor() != 3) { errorQuda("nColor = %d is not supported", x[0]->Ncolor()); }
           if (x[0]->Nspin() == 4) { // wilson
 #if defined(NSPIN4)
-            const int M = 6;
-            multiBlas<NXZ, float4, char4, char4, M, Functor>(a, b, c, x, y, z, w, x[0]->Volume());
+            multiBlas<NXZ, Functor, float, char, 24, 4>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
           } else if (x[0]->Nspin() == 1) { // staggered
 #if defined(NSPIN1)
             const int M = 3;
-            multiBlas<NXZ, float2, char2, char2, M, Functor>(a, b, c, x, y, z, w, x[0]->Volume());
+            multiBlas<NXZ, Functor, float, char, 6, 2>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
@@ -392,16 +385,14 @@ namespace quda {
 #if QUDA_PRECISION & 4
             if (x[0]->Nspin() == 4) {
 #if defined(NSPIN4)
-              const int M = 12;
-              multiBlas<NXZ, double2, float4, double2, M, Functor>(a, b, c, x, y, z, w, x[0]->Volume());
+              multiBlas<NXZ, Functor, double, float, 24, 4, double, 2>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
             } else if (x[0]->Nspin() == 1) {
 
 #if defined(NSPIN1)
-              const int M = 3;
-              multiBlas<NXZ, double2, float2, double2, M, Functor>(a, b, c, x, y, z, w, x[0]->Volume());
+              multiBlas<NXZ, Functor, double, float, 6, 2, double, 2>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
@@ -416,8 +407,7 @@ namespace quda {
 #if QUDA_PRECISION & 2
             if (x[0]->Nspin() == 4) {
 #if defined(NSPIN4)
-              const int M = 12;
-              multiBlas<NXZ, double2, short4, double2, M, Functor>(a, b, c, x, y, z, w, x[0]->Volume());
+              multiBlas<NXZ, Functor, double, short, 24, 4, double, 2>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
@@ -426,7 +416,7 @@ namespace quda {
 
 #if defined(NSPIN1)
               const int M = 3;
-              multiBlas<NXZ, double2, short2, double2, M, Functor>(a, b, c, x, y, z, w, x[0]->Volume());
+              multiBlas<NXZ, Functor, double, short, 6, 2, double, 2>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
@@ -441,7 +431,7 @@ namespace quda {
             if (x[0]->Nspin() == 4) {
 #if defined(NSPIN4)
               const int M = 12;
-              multiBlas<NXZ, double2, char4, double2, M, Functor>(a, b, c, x, y, z, w, x[0]->Volume());
+              multiBlas<NXZ, Functor, double, char, 24, 4, double, 2>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
@@ -450,7 +440,7 @@ namespace quda {
 
 #if defined(NSPIN1)
               const int M = 3;
-              multiBlas<NXZ, double2, char2, double2, M, Functor>(a, b, c, x, y, z, w, x[0]->Volume());
+              multiBlas<NXZ, Functor, double, char, 6, 2, double, 2>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
@@ -474,8 +464,7 @@ namespace quda {
 #if (QUDA_PRECISION & 2)
             if (x[0]->Nspin() == 4) {
 #if defined(NSPIN4)
-              const int M = 6;
-              multiBlas<NXZ, float4, short4, float4, M, Functor>(a, b, c, x, y, z, w, x[0]->Volume());
+              multiBlas<NXZ, Functor, float, short, 24, 4>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
@@ -483,8 +472,7 @@ namespace quda {
             } else if (x[0]->Nspin() == 1) {
 
 #if defined(NSPIN1)
-              const int M = 3;
-              multiBlas<NXZ, float2, short2, float2, M, Functor>(a, b, c, x, y, z, w, x[0]->Volume());
+              multiBlas<NXZ, Functor, float, short, 6, 2, float, 2>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
@@ -501,8 +489,7 @@ namespace quda {
 #if (QUDA_PRECISION & 1)
             if (x[0]->Nspin() == 4) {
 #if defined(NSPIN4)
-              const int M = 6;
-              multiBlas<NXZ, float4, char4, float4, M, Functor>(a, b, c, x, y, z, w, x[0]->Volume());
+              multiBlas<NXZ, Functor, float, char, 24, 4, float, 4>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
@@ -511,7 +498,7 @@ namespace quda {
 
 #if defined(NSPIN1)
               const int M = 3;
-              multiBlas<NXZ, float2, char2, float2, M, Functor>(a, b, c, x, y, z, w, x[0]->Volume());
+              multiBlas<NXZ, Functor, float, char, 6, 2, float, 2>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif

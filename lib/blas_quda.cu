@@ -23,9 +23,9 @@ namespace quda {
 
     static qudaStream_t *blasStream;
 
-    template <typename FloatN, int M, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW,
+    template <typename real, int len, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW,
         typename SpinorV, typename Functor>
-    class BlasCuda : public Tunable
+    class Blas : public Tunable
     {
       const int nParity; // for composite fields this includes the number of composites
       mutable BlasArg<SpinorX, SpinorY, SpinorZ, SpinorW, SpinorV, Functor> arg;
@@ -41,8 +41,8 @@ namespace quda {
       unsigned int minGridSize() const { return maxGridSize(); }
 
     public:
-      BlasCuda(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, SpinorV &V, Functor &f, ColorSpinorField &x,
-               ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v, int length) :
+      Blas(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, SpinorV &V, Functor &f, ColorSpinorField &x,
+           ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v, int length) :
           nParity((x.IsComposite() ? x.CompositeDim() : 1) * x.SiteSubset()), // must be first
           arg(X, Y, Z, W, V, f, length / nParity),
           x(x),
@@ -62,7 +62,7 @@ namespace quda {
 #endif
       }
 
-      virtual ~BlasCuda() {}
+      virtual ~Blas() {}
 
       inline TuneKey tuneKey() const { return TuneKey(x.VolString(), typeid(arg.f).name(), aux); }
 
@@ -72,11 +72,11 @@ namespace quda {
 #ifdef JITIFY
         using namespace jitify::reflection;
         jitify_error = program->kernel("quda::blas::blasKernel")
-                           .instantiate(Type<FloatN>(), M, Type<decltype(arg)>())
+                           .instantiate(Type<real>(), len, Type<decltype(arg)>())
                            .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                            .launch(arg);
 #else
-        blasKernel<FloatN, M><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+        blasKernel<real, len><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 #endif
       }
 
@@ -110,7 +110,7 @@ namespace quda {
         param.grid.y = nParity;
       }
 
-      long long flops() const { return arg.f.flops() * vec_length<FloatN>::value * arg.length * nParity * M; }
+      long long flops() const { return arg.f.flops() * x.Length(); }
       long long bytes() const
       {
         // the factor two here assumes we are reading and writing to the high precision vector
@@ -120,7 +120,8 @@ namespace quda {
       int tuningIter() const { return 3; }
     };
 
-    template <typename RegType, typename StoreType, typename yType, int M, template <typename real> class Functor, typename coeff_t>
+    template <template <typename real> class Functor, typename real, typename store_t, int len, int N,
+              typename y_store_t = store_t, int Ny = N, typename coeff_t>
     void nativeBlas(const coeff_t &a, const coeff_t &b, const coeff_t &c, ColorSpinorField &x, ColorSpinorField &y,
                     ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v, int length)
     {
@@ -129,20 +130,19 @@ namespace quda {
       checkLength(x, w);
       checkLength(x, v);
 
-      using real = typename scalar<RegType>::type;
       Functor<real> f(a, b, c);
 
-      Spinor<RegType, StoreType, M> X(x);
-      Spinor<RegType, yType, M> Y(y);
-      Spinor<RegType, StoreType, M> Z(z);
-      Spinor<RegType, StoreType, M> W(w);
-      Spinor<RegType, yType, M> V(v);
+      Spinor<store_t, N> X(x);
+      Spinor<y_store_t, Ny> Y(y);
+      Spinor<store_t, N> Z(z);
+      Spinor<store_t, N> W(w);
+      Spinor<y_store_t, Ny> V(v);
 
-      BlasCuda<RegType, M, decltype(X), decltype(Y), decltype(Z), decltype(W), decltype(V), decltype(f)> blas(X, Y, Z, W, V, f, x, y, z, w, v, length);
+      Blas<real, len, decltype(X), decltype(Y), decltype(Z), decltype(W), decltype(V), decltype(f)> blas(X, Y, Z, W, V, f, x, y, z, w, v, length);
       blas.apply(*blasStream);
-
       blas::bytes += blas.bytes();
       blas::flops += blas.flops();
+
       checkCudaError();
     }
 
@@ -169,7 +169,7 @@ namespace quda {
 #if QUDA_PRECISION & 8
 #if defined(NSPIN4) || defined(NSPIN2) || defined(NSPIN1)
           const int M = 1;
-          nativeBlas<double2, double2, double2, M, Functor>(a, b, c, x, y, z, w, v, x.Length() / (2 * M));
+          nativeBlas<Functor, double, double, 2, 2>(a, b, c, x, y, z, w, v, x.Length() / (2 * M));
 #else
           errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
@@ -182,7 +182,7 @@ namespace quda {
 #if QUDA_PRECISION & 4
 #if defined(NSPIN4) || defined(NSPIN2) || defined(NSPIN1)
           const int M = 1;
-          nativeBlas<float4, float4, float4, M, Functor>(a, b, c, x, y, z, w, v, x.Length() / (4 * M));
+          nativeBlas<Functor, float, float, 4, 4>(a, b, c, x, y, z, w, v, x.Length() / (4 * M));
 #else
           errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
@@ -196,22 +196,19 @@ namespace quda {
           if (x.Ncolor() != 3) { errorQuda("nColor = %d is not supported", x.Ncolor()); }
           if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) { // wilson
 #if defined(NSPIN4)
-            const int M = 6;
-            nativeBlas<float4, short4, short4, M, Functor>(a, b, c, x, y, z, w, v, x.Volume());
+            nativeBlas<Functor, float, short, 24, 4>(a, b, c, x, y, z, w, v, x.Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
           } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER) { // wilson
 #if defined(NSPIN4) && defined(FLOAT8)
-            const int M = 3;
-            nativeBlas<float8, short8, short8, M, Functor>(a, b, c, x, y, z, w, v, x.Volume());
+            nativeBlas<Functor, float, short, 24, 8>(a, b, c, x, y, z, w, v, x.Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
           } else if (x.Nspin() == 1) { // staggered
 #if defined(NSPIN1)
-            const int M = 3;
-            nativeBlas<float2, short2, short2, M, Functor>(a, b, c, x, y, z, w, v, x.Volume());
+            nativeBlas<Functor, float, short, 6, 2>(a, b, c, x, y, z, w, v, x.Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
@@ -228,22 +225,19 @@ namespace quda {
           if (x.Ncolor() != 3) { errorQuda("nColor = %d is not supported", x.Ncolor()); }
           if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) { // wilson
 #if defined(NSPIN4)
-            const int M = 6;
-            nativeBlas<float4, char4, char4, M, Functor>(a, b, c, x, y, z, w, v, x.Volume());
+            nativeBlas<Functor, float, char, 24, 4>(a, b, c, x, y, z, w, v, x.Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
           } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER) { // wilson
 #if defined(NSPIN4) && defined(FLOAT8)
-            const int M = 3;
-            nativeBlas<float8, char8, char8, M, Functor>(a, b, c, x, y, z, w, v, x.Volume());
+            nativeBlas<Functor, float, char, 24, 8>(a, b, c, x, y, z, w, v, x.Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
           } else if (x.Nspin() == 1) { // staggered
 #if defined(NSPIN1)
-            const int M = 3;
-            nativeBlas<float2, char2, char2, M, Functor>(a, b, c, x, y, z, w, v, x.Volume());
+            nativeBlas<Functor, float, char, 6, 2>(a, b, c, x, y, z, w, v, x.Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
@@ -298,15 +292,13 @@ namespace quda {
 #if QUDA_PRECISION & 4
           if (x.Nspin() == 4) {
 #if defined(NSPIN4)
-            const int M = 12;
-            nativeBlas<double2, float4, double2, M, Functor>(a, b, c, x, y, z, w, v, x.Volume());
+            nativeBlas<Functor, double, float, 24, 4, double, 2>(a, b, c, x, y, z, w, v, x.Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
           } else if (x.Nspin() == 1) {
 #if defined(NSPIN1)
-            const int M = 3;
-            nativeBlas<double2, float2, double2, M, Functor>(a, b, c, x, y, z, w, v, x.Volume());
+            nativeBlas<Functor, double, float, 6, 2, double, 2>(a, b, c, x, y, z, w, v, x.Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
@@ -323,15 +315,13 @@ namespace quda {
 #if QUDA_PRECISION & 8
             if (x.Nspin() == 4) {
 #if defined(NSPIN4)
-              const int M = 12;
-              nativeBlas<double2, short4, double2, M, Functor>(a, b, c, x, y, z, w, v, x.Volume());
+              nativeBlas<Functor, double, short, 24, 4, double, 2>(a, b, c, x, y, z, w, v, x.Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
             } else if (x.Nspin() == 1) {
 #if defined(NSPIN1)
-              const int M = 3;
-              nativeBlas<double2, short2, double2, M, Functor>(a, b, c, x, y, z, w, v, x.Volume());
+              nativeBlas<Functor, double, short, 6, 2, double, 2>(a, b, c, x, y, z, w, v, x.Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
@@ -345,15 +335,13 @@ namespace quda {
 #if QUDA_PRECISION & 4
             if (x.Nspin() == 4) {
 #if defined(NSPIN4)
-              const int M = 6;
-              nativeBlas<float4, short4, float4, M, Functor>(a, b, c, x, y, z, w, v, x.Volume());
+              nativeBlas<Functor, float, short, 24, 4, float, 4>(a, b, c, x, y, z, w, v, x.Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
             } else if (x.Nspin() == 1) {
 #if defined(NSPIN1)
-              const int M = 3;
-              nativeBlas<float2, short2, float2, M, Functor>(a, b, c, x, y, z, w, v, x.Volume());
+              nativeBlas<Functor, float, short, 6, 2, float, 2>(a, b, c, x, y, z, w, v, x.Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
@@ -378,15 +366,13 @@ namespace quda {
 #if QUDA_PRECISION & 8
             if (x.Nspin() == 4) {
 #if defined(NSPIN4)
-              const int M = 12;
-              nativeBlas<double2, char4, double2, M, Functor>(a, b, c, x, y, z, w, v, x.Volume());
+              nativeBlas<Functor, double, char, 24, 4, double, 2>(a, b, c, x, y, z, w, v, x.Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
             } else if (x.Nspin() == 1) {
 #if defined(NSPIN1)
-              const int M = 3;
-              nativeBlas<double2, char2, double2, M, Functor>(a, b, c, x, y, z, w, v, x.Volume());
+              nativeBlas<Functor, double, char, 6, 2, double, 2>(a, b, c, x, y, z, w, v, x.Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
@@ -400,15 +386,13 @@ namespace quda {
 #if QUDA_PRECISION & 4
             if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) {
 #if defined(NSPIN4)
-              const int M = 6;
-              nativeBlas<float4, char4, float4, M, Functor>(a, b, c, x, y, z, w, v, x.Volume());
+              nativeBlas<Functor, float, char, 24, 4, float, 4>(a, b, c, x, y, z, w, v, x.Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
             } else if (x.Nspin() == 1) {
 #if defined(NSPIN1)
-              const int M = 3;
-              nativeBlas<float2, char2, float2, M, Functor>(a, b, c, x, y, z, w, v, x.Volume());
+              nativeBlas<Functor, float, char, 6, 2, float, 2>(a, b, c, x, y, z, w, v, x.Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
@@ -422,23 +406,20 @@ namespace quda {
 #if QUDA_PRECISION & 2
             if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) {
 #if defined(NSPIN4)
-              const int M = 6;
-              nativeBlas<float4, char4, short4, M, Functor>(a, b, c, x, y, z, w, v, x.Volume());
+              nativeBlas<Functor, float, char, 24, 4, short, 4>(a, b, c, x, y, z, w, v, x.Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
             }
             if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER && y.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER) {
 #if defined(NSPIN4)
-              const int M = 3;
-              nativeBlas<float8, char8, short8, M, Functor>(a, b, c, x, y, z, w, v, x.Volume());
+              nativeBlas<Functor, float, char, 24, 8, short, 8>(a, b, c, x, y, z, w, v, x.Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
             } else if (x.Nspin() == 1) {
 #if defined(NSPIN1)
-              const int M = 3;
-              nativeBlas<float2, char2, short2, M, Functor>(a, b, c, x, y, z, w, v, x.Volume());
+              nativeBlas<Functor, float, char, 6, 2, short, 2>(a, b, c, x, y, z, w, v, x.Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif

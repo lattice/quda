@@ -18,7 +18,7 @@ namespace quda {
     void initFastReduce(int words);
     void completeFastReduce(int32_t words);
 
-    template <typename FloatN, int M, int NXZ, typename Arg, typename T>
+    template <typename real, int len, int NXZ, typename Arg, typename T>
     void multiReduceLaunch(T result[], Arg &arg, const TuneParam &tp, const qudaStream_t &stream, Tunable &tunable)
     {
       using reduce_t = typename Arg::Reducer::reduce_t;
@@ -35,11 +35,11 @@ namespace quda {
 #ifdef JITIFY
       using namespace jitify::reflection;
       tunable.jitifyError() = program->kernel("quda::blas::multiReduceKernel")
-                                  .instantiate((int)tp.block.x, Type<FloatN>(), M, NXZ, Type<Arg>())
+                                  .instantiate((int)tp.block.x, Type<real>(), len, NXZ, Type<Arg>())
                                   .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                                   .launch(arg);
 #else
-      LAUNCH_KERNEL_REDUCE(multiReduceKernel, tunable, tp, stream, arg, FloatN, M, NXZ, Arg);
+      LAUNCH_KERNEL_REDUCE(multiReduceKernel, tunable, tp, stream, arg, real, len, NXZ, Arg);
 #endif
 #endif
 
@@ -70,11 +70,10 @@ namespace quda {
       }
     }
 
-    template <int NXZ, typename T, typename FloatN, int M, typename SpinorX,
+    template <int NXZ, typename T, typename real, int len, typename SpinorX,
               typename SpinorY, typename SpinorZ, typename SpinorW, typename Reducer>
     class MultiReduce : public Tunable
     {
-      typedef typename scalar<FloatN>::type Float;
       static constexpr int NYW_max = max_YW_size<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Reducer>();
       const int NYW;
       int nParity;
@@ -150,7 +149,7 @@ namespace quda {
       void apply(const qudaStream_t &stream)
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        multiReduceLaunch<FloatN, M, NXZ>(result, arg, tp, stream, *this);
+        multiReduceLaunch<real, len, NXZ>(result, arg, tp, stream, *this);
       }
 
       // Should these be NYW?
@@ -217,7 +216,7 @@ namespace quda {
 
       long long flops() const
       {
-        return NYW * NXZ * arg.r.flops() * vec_length<FloatN>::value * (long long)arg.length * nParity * M;
+        return NYW * NXZ * arg.r.flops() * x[0]->Length();
       }
 
       long long bytes() const
@@ -229,11 +228,11 @@ namespace quda {
       int tuningIter() const { return 3; }
     };
 
-    template <typename RegType, typename StoreType, typename yType, int M, int NXZ,
-              template <int MXZ, typename ReducerType, typename real> class Reducer, typename T>
+    template <int NXZ, template <int MXZ, typename reduce_t, typename real> class Reducer, typename real,
+              typename store_t, int len, int N, typename y_store_t = store_t, int Ny = N, typename T>
     void multiReduce(T result[], const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
-                     std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y, std::vector<ColorSpinorField *> &z,
-                     std::vector<ColorSpinorField *> &w, int length)
+                     std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
+                     std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w, int length)
     {
       const int NYW = y.size();
       const int N_MIN = NXZ < NYW ? NXZ : NYW;
@@ -247,10 +246,9 @@ namespace quda {
         }
       }
 
-      using real = typename scalar<RegType>::type;
       Reducer<NXZ, device_reduce_t, real> r(NYW);
 
-      constexpr int NYW_max = max_YW_size<NXZ, StoreType, yType, decltype(r)>();
+      constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, decltype(r)>();
 
       constexpr int scalar_width = decltype(r)::coeff_mul ? sizeof(typename decltype(r)::coeff_t) / sizeof(real) : 0;
       const int NYW_max_check
@@ -266,14 +264,14 @@ namespace quda {
         errorQuda("Coefficient matrix exceeds max size (%d > %d)", NXZ * NYW * scalar_width, MAX_MATRIX_SIZE);
 
       using coeff_t = typename decltype(r)::coeff_t;
-      size_t len = MAX_MATRIX_SIZE / sizeof(coeff_t);
+      size_t coeff_n = MAX_MATRIX_SIZE / sizeof(coeff_t);
 #ifdef JITIFY
       // need to get constants pointer from jitify instance
       if (a.data || b.data || c.data) errorQuda("Constant memory buffer support not enabled with jitify yet");
 #endif
 
       if (a.data) {
-        coeff_t A[len];
+        coeff_t A[coeff_n];
         for (int i = 0; i < NXZ; i++)
           for (int j = 0; j < NYW; j++) A[NYW * i + j] = coeff_t(a.data[NYW * i + j]);
 
@@ -283,7 +281,7 @@ namespace quda {
       }
 
       if (b.data) {
-        coeff_t B[len];
+        coeff_t B[coeff_n];
         for (int i = 0; i < NXZ; i++)
           for (int j = 0; j < NYW; j++) B[NYW * i + j] = coeff_t(b.data[NYW * i + j]);
 
@@ -293,7 +291,7 @@ namespace quda {
       }
 
       if (c.data) {
-        coeff_t C[len];
+        coeff_t C[coeff_n];
         for (int i = 0; i < NXZ; i++)
           for (int j = 0; j < NYW; j++) C[NYW * i + j] = coeff_t(c.data[NYW * i + j]);
 
@@ -302,21 +300,21 @@ namespace quda {
         Cmatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(c.data));
       }
 
-      Spinor<RegType, StoreType, M> X[NXZ];
-      Spinor<RegType, yType, M> Y[NYW_max];
-      Spinor<RegType, StoreType, M> Z[NXZ];
-      Spinor<RegType, StoreType, M> W[NYW_max];
+      Spinor<store_t, N> X[NXZ];
+      Spinor<y_store_t, Ny> Y[NYW_max];
+      Spinor<store_t, N> Z[NXZ];
+      Spinor<store_t, N> W[NYW_max];
 
       for (int i = 0; i < NXZ; i++) {
-        X[i].set(*dynamic_cast<cudaColorSpinorField *>(x[i]));
-        Z[i].set(*dynamic_cast<cudaColorSpinorField *>(z[i]));
+        X[i].set(*x[i]);
+        Z[i].set(*z[i]);
       }
       for (int i = 0; i < NYW; i++) {
-        Y[i].set(*dynamic_cast<cudaColorSpinorField *>(y[i]));
-        W[i].set(*dynamic_cast<cudaColorSpinorField *>(w[i]));
+        Y[i].set(*y[i]);
+        W[i].set(*w[i]);
       }
 
-      MultiReduce<NXZ, T, RegType, M, typename std::remove_reference<decltype(X[0])>::type,
+      MultiReduce<NXZ, T, real, len, typename std::remove_reference<decltype(X[0])>::type,
                   typename std::remove_reference<decltype(Y[0])>::type, typename std::remove_reference<decltype(Z[0])>::type,
                   typename std::remove_reference<decltype(W[0])>::type, decltype(r)>
         reduce(result, X, Y, Z, W, r, x, y, z, w, NYW, length);
@@ -324,7 +322,6 @@ namespace quda {
 
       blas::bytes += reduce.bytes();
       blas::flops += reduce.flops();
-
       checkCudaError();
     }
 
@@ -342,8 +339,8 @@ namespace quda {
 
 #if QUDA_PRECISION & 8
 #if defined(NSPIN4) || defined(NSPIN2) || defined(NSPIN1)
-        const int M = 1; // determines how much work per thread to do
-        multiReduce<double2, double2, double2, M, NXZ, Reducer>(result, a, b, c, x, y, z, w, x[0]->Length() / (2 * M));
+        const int M = 2; // determines how much work per thread to do
+        multiReduce<NXZ, Reducer, double, double, M, 2>(result, a, b, c, x, y, z, w, x[0]->Length() / M);
 #else
         errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
@@ -355,8 +352,8 @@ namespace quda {
 
 #if QUDA_PRECISION & 4
 #if defined(NSPIN4) || defined(NSPIN2) || defined(NSPIN1)
-        const int M = 1; // determines how much work per thread to do
-        multiReduce<float4, float4, float4, M, NXZ, Reducer>(result, a, b, c, x, y, z, w, x[0]->Length() / (4 * M));
+        const int M = 4; // determines how much work per thread to do
+        multiReduce<NXZ, Reducer, float, float, M, 4>(result, a, b, c, x, y, z, w, x[0]->Length() / M);
 #else
         errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
@@ -369,15 +366,13 @@ namespace quda {
 #if QUDA_PRECISION & 2
         if (x[0]->Nspin() == 4) { // wilson
 #if defined(NSPIN4)
-          const int M = 6;
-          multiReduce<float4, short4, short4, M, NXZ, Reducer>(result, a, b, c, x, y, z, w, x[0]->Volume());
+          multiReduce<NXZ, Reducer, float, short, 24, 4>(result, a, b, c, x, y, z, w, x[0]->Volume());
 #else
           errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
         } else if (x[0]->Nspin() == 1) { // staggered
 #if defined(NSPIN1)
-          const int M = 3;
-          multiReduce<float2, short2, short2, M, NXZ, Reducer>(result, a, b, c, x, y, z, w, x[0]->Volume());
+          multiReduce<NXZ, Reducer, float, short, 6, 2>(result, a, b, c, x, y, z, w, x[0]->Volume());
 #else
           errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
@@ -393,15 +388,13 @@ namespace quda {
 #if QUDA_PRECISION & 1
         if (x[0]->Nspin() == 4) { // wilson
 #if defined(NSPIN4)
-          const int M = 6;
-          multiReduce<float4, char4, char4, M, NXZ, Reducer>(result, a, b, c, x, y, z, w, x[0]->Volume());
+          multiReduce<NXZ, Reducer, float, char, 24, 4>(result, a, b, c, x, y, z, w, x[0]->Volume());
 #else
           errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
         } else if (x[0]->Nspin() == 1) { // staggered
 #if defined(NSPIN1)
-          const int M = 3;
-          multiReduce<float2, char2, char2, M, NXZ, Reducer>(result, a, b, c, x, y, z, w, x[0]->Volume());
+          multiReduce<NXZ, Reducer, float, char, 6, 2>(result, a, b, c, x, y, z, w, x[0]->Volume());
 #else
           errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
@@ -431,15 +424,14 @@ namespace quda {
 
         if (x[0]->Nspin() == 4) { // wilson
 #if defined(NSPIN4)
-          const int M = 12; // determines how much work per thread to do
-          multiReduce<double2, float4, double2, M, NXZ, Reducer>(result, a, b, c, x, y, z, w, x[0]->Volume());
+          multiReduce<NXZ, Reducer, double, float, 24, 4, double, 2>(result, a, b, c, x, y, z, w, x[0]->Volume());
 #else
           errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
         } else if (x[0]->Nspin() == 1) {
 #if defined(NSPIN1)
           const int M = 3; // determines how much work per thread to do
-          multiReduce<double2, float2, double2, M, NXZ, Reducer>(result, a, b, c, x, y, z, w, x[0]->Volume());
+          multiReduce<NXZ, Reducer, double, float, 6, 2, double, 2>(result, a, b, c, x, y, z, w, x[0]->Volume());
 #else
           errorQuda("blas has not been built for Nspin=%d field", x[0]->Nspin());
 #endif
@@ -451,15 +443,13 @@ namespace quda {
 
         if (x[0]->Nspin() == 4) { // wilson
 #if defined(NSPIN4)
-          const int M = 6; // determines how much work per thread to do
-          multiReduce<double2, short4, double2, M, NXZ, Reducer>(result, a, b, c, x, y, z, w, x[0]->Volume());
+          multiReduce<NXZ, Reducer, double, short, 24, 4, double, 2>(result, a, b, c, x, y, z, w, x[0]->Volume());
 #else
           errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
         } else if (x[0]->Nspin() == 1 || x[0]->Nspin() == 2) { // staggered
 #if defined(NSPIN1)
-          const int M = 3;
-          multiReduce<double2, short2, double2, M, NXZ, Reducer>(result, a, b, c, x, y, z, w, x[0]->Volume());
+          multiReduce<NXZ, Reducer, double, short, 6, 2, double, 2>(result, a, b, c, x, y, z, w, x[0]->Volume());
 #else
           errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
@@ -471,15 +461,13 @@ namespace quda {
 
         if (x[0]->Nspin() == 4) { // wilson
 #if defined(NSPIN4)
-          const int M = 6;
-          multiReduce<float4, short4, float4, M, NXZ, Reducer>(result, a, b, c, x, y, z, w, x[0]->Volume());
+          multiReduce<NXZ, Reducer, float, short, 24, 4, float, 4>(result, a, b, c, x, y, z, w, x[0]->Volume());
 #else
           errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
         } else if (x[0]->Nspin() == 1) { // staggered
 #if defined(NSPIN1)
-          const int M = 3;
-          multiReduce<float2, short2, float2, M, NXZ, Reducer>(result, a, b, c, x, y, z, w, x[0]->Volume());
+          multiReduce<NXZ, Reducer, float, short, 24, 2, float, 2>(result, a, b, c, x, y, z, w, x[0]->Volume());
 #else
           errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
