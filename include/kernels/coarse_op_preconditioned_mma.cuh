@@ -105,8 +105,10 @@ namespace quda
     {
       int index_x = blockDim.x * blockIdx.x + threadIdx.x;
 
-      constexpr int t_m = Arg::M / bM;
-      constexpr int t_n = Arg::N / bN;
+      constexpr bool divide_b_no = bM < Arg::M && bK == Arg::K && bN == Arg::N;
+      constexpr int t_m = divide_b_no ? 1 : Arg::M / bM;
+      constexpr int t_n = divide_b_no ? 1 : Arg::N / bN;
+
       int x_cb = index_x / (t_m * t_n);
       int mn = index_x % (t_m * t_n);
 

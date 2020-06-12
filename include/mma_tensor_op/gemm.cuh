@@ -537,13 +537,118 @@ namespace quda
       }
 
       template <bool a_dagger, bool b_dagger, bool compute_max_only, class A, class B, class C>
+      static __device__ inline float perform_mma_divide_b_no(const A &a, const B &b, C &c_accessor)
+      {
+        float max = 0;
+
+        extern __shared__ half smem_ptr[];
+
+        SmemObjA smem_obj_a_real(smem_ptr);
+        SmemObjA smem_obj_a_imag(smem_obj_a_real.ptr + smem_lda * bK);
+        SmemObjB smem_obj_b_real(smem_obj_a_imag.ptr + smem_lda * bK);
+        SmemObjB smem_obj_b_imag(smem_obj_b_real.ptr + smem_ldb * bK);
+
+        MmaOperandC<accumuate_reg_type> op_c_real;
+        MmaOperandC<accumuate_reg_type> op_c_imag;
+
+        WarpRegisterMapping wrm((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x);
+
+        ALoader a_loader;
+        BLoader b_loader;
+
+#ifdef USE_GMEM_MMA_PIPELINING
+        __syncthreads();
+        a_loader.g2r<lda, a_dagger>(a, 0, 0);
+        a_loader.r2s(smem_obj_a_real, smem_obj_a_imag);
+
+        b_loader.g2r<ldb, b_dagger>(b, 0, 0);
+        b_loader.r2s(smem_obj_b_real, smem_obj_b_imag);
+        __syncthreads();
+#else
+        b_loader.g2s<ldb, b_dagger>(smem_obj_b_real, smem_obj_b_imag, b, n_offset, 0);
+#endif
+
+#pragma unroll 1
+        for (int a_m = 0; a_m < M; a_m += bM) {
+
+#ifdef USE_GMEM_MMA_PIPELINING
+          if (a_m + bM < M) { a_loader.g2r<lda, a_dagger>(a, a_m + bM, 0); }
+#else
+          __syncthreads();
+          a_loader.g2s<lda, a_dagger>(smem_obj_a_real, smem_obj_a_imag, a, a_m, 0);
+          __syncthreads();
+#endif
+
+#pragma unroll 1
+          for (int c = 0; c < warp_cycle; c++) {
+
+            // The logical warp assigned to each part of the matrix.
+            int logical_warp_index = wrm.warp_id * warp_cycle + c;
+            int warp_row = logical_warp_index / tile_col_dim;
+            int warp_col = logical_warp_index - warp_row * tile_col_dim;
+
+            op_c_real.zero();
+            op_c_imag.zero();
+
+#pragma unroll 1
+            for (int tile_k = 0; tile_k < tile_acc_dim; tile_k++) {
+
+              MmaOperandA op_a_real;
+              op_a_real.load(smem_obj_a_real, tile_k, warp_row, wrm);
+              MmaOperandA op_a_imag;
+              op_a_imag.load(smem_obj_a_imag, tile_k, warp_row, wrm);
+
+              MmaOperandB op_b_real;
+              op_b_real.load(smem_obj_b_real, tile_k, warp_col, wrm);
+              MmaOperandB op_b_imag;
+              op_b_imag.load(smem_obj_b_imag, tile_k, warp_col, wrm);
+
+              gemm(op_a_real, op_b_real, op_c_real);
+              gemm(op_a_imag, op_b_real, op_c_imag);
+              gemm(op_a_real, op_b_imag, op_c_imag);
+              // negate op_imag
+              op_a_imag.negate();
+              gemm(op_a_imag, op_b_imag, op_c_real);
+            }
+
+            if (compute_max_only) {
+
+              op_c_real.abs_max(max);
+              op_c_imag.abs_max(max);
+
+            } else {
+
+              int warp_m_offset = warp_row * MMA_M + a_m;
+              int warp_n_offset = warp_col * MMA_N;
+
+              store_complex<ldc>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real, op_c_imag);
+            }
+
+#ifdef USE_GMEM_MMA_PIPELINING
+            if (a_m + bM < M) {
+              __syncthreads();
+              a_loader.r2s(smem_obj_a_real, smem_obj_a_imag);
+              __syncthreads();
+            }
+#endif
+          }
+        }
+
+        return max;
+      }
+
+      template <bool a_dagger, bool b_dagger, bool compute_max_only, class A, class B, class C>
       static __device__ inline float perform_mma(const A &a, const B &b, C &c, int m_offset, int n_offset)
       {
 
         if (bK < K) {
           return perform_mma_divide_k_yes<a_dagger, b_dagger, compute_max_only>(a, b, c, m_offset, n_offset);
         } else {
-          return perform_mma_divide_k_no<a_dagger, b_dagger, compute_max_only>(a, b, c, m_offset, n_offset);
+          if (bM < M && bN == N) {
+            return perform_mma_divide_b_no<a_dagger, b_dagger, compute_max_only>(a, b, c);
+          } else {
+            return perform_mma_divide_k_no<a_dagger, b_dagger, compute_max_only>(a, b, c, m_offset, n_offset);
+          }
         }
       }
     };
