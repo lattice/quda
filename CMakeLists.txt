@@ -242,11 +242,14 @@ endif()
 # If using a generic implementation, it is highly likely
 # that the user will want to enable OpenMP, but they must have
 # an option to turn it off.
-option(QUDA_BLAS_GENERIC_OPENMP "enable OpenMP and Eigen for generic BLAS" ON)
-if(${QUDA_BLAS_LAPACK_TYPE} STREQUAL "GENERIC" AND ${QUDA_BLAS_GENERIC_OPENMP} STREQUAL "ON")
-  set(QUDA_OPENMP ON)
+option(QUDA_BLAS_GENERIC_OPENMP "enable OpenMP for generic BLAS" ON)
+if(${QUDA_BLAS_LAPACK_TYPE} STREQUAL "GENERIC")
   set(QUDA_USE_EIGEN ON)
+  if(${QUDA_BLAS_GENERIC_OPENMP} STREQUAL "ON")
+    set(QUDA_OPENMP ON)
+  endif()
 endif()
+
 
 set(QUDA_MAX_MULTI_BLAS_N
     "4"
