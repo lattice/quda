@@ -7,6 +7,7 @@ namespace quda {
 
   namespace blas_lapack { 
 
+      
     static cublasHandle_t handle;
 
     void init() {
@@ -30,6 +31,8 @@ namespace quda {
     // FIXME do this in pipelined fashion to reduce memory overhead.
     long long BatchInvertMatrix(void *Ainv, void* A, const int n, const uint64_t batch, QudaPrecision prec, QudaFieldLocation location)
     {
+      if (getVerbosity() >= QUDA_SUMMARIZE)
+	printfQuda("BatchInvertMatrixNATIVE: Nc = %d, batch = %lu\n", n, batch);
       long long flops = 0;      
       timeval start, stop;
       gettimeofday(&start, NULL);
@@ -110,8 +113,6 @@ namespace quda {
       
       return flops;
     }
-
   } // namespace blas_lapack
-
 } // namespace quda
 #endif

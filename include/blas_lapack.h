@@ -2,12 +2,12 @@
 
 #pragma once
 
-#define FMULS_GETRF(m_, n_) ( ((m_) < (n_)) \
-    ? (0.5 * (m_) * ((m_) * ((n_) - (1./3.) * (m_) - 1. ) + (n_)) + (2. / 3.) * (m_)) \
-    : (0.5 * (n_) * ((n_) * ((m_) - (1./3.) * (n_) - 1. ) + (m_)) + (2. / 3.) * (n_)) )
-#define FADDS_GETRF(m_, n_) ( ((m_) < (n_)) \
-    ? (0.5 * (m_) * ((m_) * ((n_) - (1./3.) * (m_)      ) - (n_)) + (1. / 6.) * (m_)) \
-    : (0.5 * (n_) * ((n_) * ((m_) - (1./3.) * (n_)      ) - (m_)) + (1. / 6.) * (n_)) )
+#define FMULS_GETRF(m_, n_) ( ((m_) < (n_))				\
+			      ? (0.5 * (m_) * ((m_) * ((n_) - (1./3.) * (m_) - 1. ) + (n_)) + (2. / 3.) * (m_)) \
+			      : (0.5 * (n_) * ((n_) * ((m_) - (1./3.) * (n_) - 1. ) + (m_)) + (2. / 3.) * (n_)) )
+#define FADDS_GETRF(m_, n_) ( ((m_) < (n_))				\
+			      ? (0.5 * (m_) * ((m_) * ((n_) - (1./3.) * (m_)      ) - (n_)) + (1. / 6.) * (m_)) \
+			      : (0.5 * (n_) * ((n_) * ((m_) - (1./3.) * (n_)      ) - (m_)) + (1. / 6.) * (n_)) )
 
 #define FLOPS_ZGETRF(m_, n_) (6. * FMULS_GETRF((double)(m_), (double)(n_)) + 2.0 * FADDS_GETRF((double)(m_), (double)(n_)) )
 #define FLOPS_CGETRF(m_, n_) (6. * FMULS_GETRF((double)(m_), (double)(n_)) + 2.0 * FADDS_GETRF((double)(m_), (double)(n_)) )
@@ -18,17 +18,16 @@
 #define FLOPS_ZGETRI(n_) (6. * FMULS_GETRI((double)(n_)) + 2.0 * FADDS_GETRI((double)(n_)) )
 #define FLOPS_CGETRI(n_) (6. * FMULS_GETRI((double)(n_)) + 2.0 * FADDS_GETRI((double)(n_)) )
 
-
-namespace quda {
+namespace quda {  
   namespace blas_lapack {
-
+    
     /**
-       @brief Create the CUBLAS context
+       @brief Create the (cu)BLAS context
     */
     void init();
 
     /**
-       @brief Destroy the CUBLAS context
+       @brief Destroy the (cu)BLAS context
     */
     void destroy();
 
@@ -43,11 +42,7 @@ namespace quda {
        @return Number of flops done in this computation
     */
     long long BatchInvertMatrix(void *Ainv, void *A, const int n, const uint64_t batch, QudaPrecision precision,
-                                QudaFieldLocation location);
-
-    //long long BatchInvertMatrixGENERIC(void *Ainv, void* A, const int n, const uint64_t batch, QudaPrecision prec,
-    //QudaFieldLocation location);
+				QudaFieldLocation location);
     
-  } // namespace blas_lapack
-
+  } // namespace blas_lapack  
 } // namespace quda

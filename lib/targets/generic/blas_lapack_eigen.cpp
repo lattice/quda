@@ -3,9 +3,9 @@
 #include <Eigen/LU>
 
 namespace quda {
-
+  
   namespace blas_lapack {
-
+      
     void init() {}
 
     void destroy() {}
@@ -19,7 +19,7 @@ namespace quda {
       EigenMatrix inv;
       for(int j = 0; j<n; j++) {
 	for(int k = 0; k<n; k++) {
-	  res(j,k) = A_eig[batch*n*n + j*n + k];
+	  res(k,j) = A_eig[batch*n*n + j*n + k];
 	}
       }
       
@@ -27,17 +27,17 @@ namespace quda {
       
       for(int j=0; j<n; j++) {
 	for(int k=0; k<n; k++) {
-	  Ainv_eig[batch*n*n + j*n + k] = inv(j,k);
+	  Ainv_eig[batch*n*n + j*n + k] = inv(k,j);
 	}
       }
     }
     
     long long BatchInvertMatrix(void *Ainv, void* A, const int n, const uint64_t batch, QudaPrecision prec, QudaFieldLocation location)
     {
-      long long flops = 0;
-      printfQuda("BatchInvertMatrixGENERIC: Nc = %d, batch = %lu\n",
-		 n, batch);
+      if (getVerbosity() >= QUDA_SUMMARIZE)
+	printfQuda("BatchInvertMatrixGENERIC: Nc = %d, batch = %lu\n", n, batch);
       
+      long long flops = 0;
       timeval start, stop;
       gettimeofday(&start, NULL);
       

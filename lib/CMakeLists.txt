@@ -208,14 +208,12 @@ endif()
 if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
   #add_subdirectory(targets/hip)
 endif()
-if(${QUDA_TARGET_TYPE} STREQUAL "CPU")
-  #add_subdirectory(targets/cpu)
-endif()
 
 target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_target>)
 
 add_subdirectory(targets/generic)
 target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_generic>)
+
 
 # propagate CXX flags to CUDA host compiler
 if(${QUDA_PROPAGATE_CXX_FLAGS})
@@ -297,7 +295,7 @@ if(QUDA_DIRAC_NDEG_TWISTED_MASS)
   target_compile_definitions(quda PUBLIC GPU_NDEG_TWISTED_MASS_DIRAC)
 endif(QUDA_DIRAC_NDEG_TWISTED_MASS)
 
-if(QUDA_CUDA_LAPACK)
+if(${QUDA_BLAS_LAPACK_TYPE} STREQUAL "NATIVE")
   target_link_libraries(quda PUBLIC ${CUDA_cublas_LIBRARY})
   target_compile_definitions(quda PRIVATE CUBLAS_LIB)
 endif()
@@ -454,6 +452,7 @@ endif()
 if(QUDA_MAGMA)
   target_link_libraries(quda PUBLIC MAGMA::MAGMA)
 endif()
+
 
 # set which precisions to enable
 target_compile_definitions(quda PUBLIC QUDA_PRECISION=${QUDA_PRECISION})

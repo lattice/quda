@@ -57,9 +57,9 @@ if(BUILD_TYPE_VALID LESS 0)
 endif()
 
 # Target type
-set(VALID_TARGET_TYPES CUDA HIP CPU)
+set(VALID_TARGET_TYPES CUDA HIP)
 set(QUDA_TARGET_TYPE "${DEFTARGET}" CACHE STRING "Choose the type of target, options are: ${VALID_TARGET_TYPES}")
-set_property(CACHE QUDA_TARGET_TYPE PROPERTY STRINGS CUDA HIP CPU)
+set_property(CACHE QUDA_TARGET_TYPE PROPERTY STRINGS CUDA HIP)
 
 string(TOUPPER ${QUDA_TARGET_TYPE} CHECK_TARGET_TYPE)
 list(FIND VALID_TARGET_TYPES ${CHECK_TARGET_TYPE} TARGET_TYPE_VALID)
@@ -201,7 +201,7 @@ set(QUDA_MAGMA_LIBS
     CACHE STRING "additional linker flags required to link against magma")
 
 # ######################################################################################################################
-# QUDA ADVANCED OPTIONS that ususally should not be changed by users
+# QUDA ADVANCED OPTIONS that usually should not be changed by users
 # ######################################################################################################################
 option(QUDA_BUILD_ALL_TESTS "build tests by default" ON)
 option(QUDA_INSTALL_ALL_TESTS "install tests by default" ON)
@@ -217,7 +217,36 @@ option(QUDA_FLOAT8 "enable float-8 ordered fixed-point fields?" OFF)
 option(QUDA_NVML "use NVML to report CUDA graphics driver version" OFF)
 option(QUDA_NUMA_NVML "experimental use of NVML to set numa affinity" OFF)
 option(QUDA_VERBOSE_BUILD "display kernel register usage" OFF)
-option(QUDA_CUDA_LAPACK "use cuBLAS lapack" ON)
+option(QUDA_OPENMP "enable OpenMP" OFF)
+
+# QUDA BLAS lapack type. One can use the native implementation (CUDA)
+# or the generic implemtation if a native version is not availible.
+if(DEFINED ENV{QUDA_BLAS_LAPACK})
+  set(DEFBLAS_LAPACK $ENV{QUDA_BLAS_LAPACK})
+else()
+  set(DEFBLAS_LAPACK "NATIVE")
+endif()
+
+# Define valid types.
+set(VALID_BLAS_LAPACK_TYPES NATIVE GENERIC)
+set(QUDA_BLAS_LAPACK_TYPE "${DEFBLAS_LAPACK}" CACHE STRING "Choose the type of BLAS lapack, options are: ${VALID_BLAS_LAPACK_TYPES}")
+set_property(CACHE QUDA_BLAS_LAPACK_TYPE PROPERTY STRINGS NATIVE GENERIC)
+
+# Check that a valid type is set
+string(TOUPPER ${QUDA_BLAS_LAPACK_TYPE} CHECK_BLAS_LAPACK_TYPE)
+list(FIND VALID_BLAS_LAPACK_TYPES ${CHECK_BLAS_LAPACK_TYPE} BLAS_LAPACK_TYPE_VALID)
+if(BLAS_LAPACK_TYPE_VALID LESS 0)
+  message(SEND_ERROR "Please specify a valid QUDA_BLAS_LAPACK_TYPE type! Valid BLAS lapack types are:" "${VALID_BLAS_LAPACK_TYPES}")
+endif()
+
+# If using a generic implementation, it is highly likely
+# that the user will want to enable OpenMP, but they must have
+# an option to turn it off.
+option(QUDA_BLAS_GENERIC_OPENMP "enable OpenMP and Eigen for generic BLAS" ON)
+if(${QUDA_BLAS_LAPACK_TYPE} STREQUAL "GENERIC" AND ${QUDA_BLAS_GENERIC_OPENMP} STREQUAL "ON")
+  set(QUDA_OPENMP ON)
+  set(QUDA_USE_EIGEN ON)
+endif()
 
 set(QUDA_MAX_MULTI_BLAS_N
     "4"
@@ -236,7 +265,6 @@ option(QUDA_CTEST_SEP_DSLASH_POLICIES "Test Dslash policies separately in ctest 
 option(QUDA_FAST_COMPILE_REDUCE "enable fast compilation in blas and reduction kernels (single warp per reduction)" OFF)
 option(QUDA_FAST_COMPILE_DSLASH "enable fast compilation in dslash kernels (~20% perf impact)" OFF)
 
-option(QUDA_OPENMP "enable OpenMP" OFF)
 set(QUDA_CXX_STANDARD
     14
     CACHE STRING "set the CXX Standard (14 or 17)")
@@ -278,7 +306,6 @@ mark_as_advanced(QUDA_CTEST_SEP_DSLASH_POLICIES)
 mark_as_advanced(QUDA_CTEST_LAUNCH)
 mark_as_advanced(QUDA_CTEST_LAUNCH_ARGS)
 mark_as_advanced(QUDA_OPENMP)
-mark_as_advanced(QUDA_CUDA_LAPACK)
 
 mark_as_advanced(QUDA_BACKWARDS)
 
