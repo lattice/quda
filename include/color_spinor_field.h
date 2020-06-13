@@ -1127,6 +1127,38 @@ namespace quda {
 
 #define checkOrder(...) Order_(__func__, __FILE__, __LINE__, __VA_ARGS__)
 
+  /**
+     @brief Helper function for determining if the length of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @return If length is unique return the length
+   */
+  inline int Length_(const char *func, const char *file, int line, const ColorSpinorField &a,
+                     const ColorSpinorField &b)
+  {
+    int length = 0;
+    if (a.Length() == b.Length()) length = a.Length();
+    else
+      errorQuda("Lengths %lu %lu do not match  (%s:%d in %s())\n", a.Length(), b.Length(), file, line, func);
+    return length;
+  }
+
+  /**
+     @brief Helper function for determining if the length of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @param[in] args List of additional fields to check length on
+     @return If length is unique return the length
+   */
+  template <typename... Args>
+  inline int Length_(const char *func, const char *file, int line, const ColorSpinorField &a,
+                     const ColorSpinorField &b, const Args &... args)
+  {
+    return static_cast<int>(Length_(func, file, line, a, b) & Length_(func, file, line, a, args...));
+  }
+
+#define checkLength(...) Length_(__func__, __FILE__, __LINE__, __VA_ARGS__)
+
 } // namespace quda
 
 #endif // _COLOR_SPINOR_FIELD_H
