@@ -297,7 +297,7 @@ endif(QUDA_DIRAC_NDEG_TWISTED_MASS)
 
 if(${QUDA_BLAS_LAPACK_TYPE} STREQUAL "NATIVE")
   target_link_libraries(quda PUBLIC ${CUDA_cublas_LIBRARY})
-  target_compile_definitions(quda PRIVATE CUBLAS_LIB)
+  target_compile_definitions(quda PRIVATE NATIVE_BLAS_LIB)
 endif()
   
 if(QUDA_MULTIGRID)

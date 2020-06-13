@@ -159,23 +159,8 @@ namespace quda {
       cudaGaugeField Xinv_(param);
       X_.copy(X);
 
-#ifndef CUBLAS_LIB
-      // Put device to host memcpy here so that the blas_lapack implementation
-      // does not have a malloc dependency, which will be target specific.
-      size_t size = 2*n*n*X_.Volume()* X_.Precision();
-      void *A_h = pool_pinned_malloc(size);
-      void *Ainv_h = pool_pinned_malloc(size); 
-      qudaMemcpy(A_h, (void*)X_.Gauge_p(), size, cudaMemcpyDeviceToHost);
-     
-      blas::flops += blas_lapack::BatchInvertMatrix(Ainv_h, A_h, n, X_.Volume(), X_.Precision(), X.Location());
-      
-      qudaMemcpy((void*)Xinv_.Gauge_p(), Ainv_h, size, cudaMemcpyHostToDevice);
-      pool_pinned_free(Ainv_h);
-      pool_pinned_free(A_h);
-#else
       blas::flops += blas_lapack::BatchInvertMatrix((void*)Xinv_.Gauge_p(), (void*)X_.Gauge_p(), n, X_.Volume(), X_.Precision(), X.Location());
-#endif
-
+	
       if (Xinv.Precision() < QUDA_SINGLE_PRECISION) Xinv.Scale( Xinv_.abs_max() );
 
       Xinv.copy(Xinv_);

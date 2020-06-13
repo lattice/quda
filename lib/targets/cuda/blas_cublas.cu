@@ -1,4 +1,4 @@
-#ifdef CUBLAS_LIB
+#ifdef NATIVE_BLAS_LIB
 #include <blas_lapack.h>
 #include <cublas_v2.h>
 #include <malloc_quda.h>
@@ -115,4 +115,4 @@ namespace quda {
     }
   } // namespace blas_lapack
 } // namespace quda
-#endif
+#endif //NATIVE_BLAS_LIB
