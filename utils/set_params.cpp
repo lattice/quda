@@ -245,26 +245,26 @@ void setEigParam(QudaEigParam &eig_param)
     errorQuda("Only real spectrum type (LR or SR) can be passed to Lanczos type solver.");
   }
 
-  // The solver will exit when nConv extremal eigenpairs have converged
-  if (eig_nConv < 0) {
-    eig_param.nConv = eig_nEv;
-    eig_nConv = eig_nEv;
+  // The solver will exit when n_conv extremal eigenpairs have converged
+  if (eig_n_conv < 0) {
+    eig_param.n_conv = eig_n_ev;
+    eig_n_conv = eig_n_ev;
   } else {
-    eig_param.nConv = eig_nConv;
+    eig_param.n_conv = eig_n_conv;
   }
 
   // Inverters will deflate only this number of vectors.
-  if (eig_deflation_vecs < 0) {
-    eig_param.deflation_vecs = eig_nConv;
-    eig_deflation_vecs = eig_nConv;
+  if (eig_n_deflate < 0) {
+    eig_param.deflation_vecs = eig_n_conv;
+    eig_n_deflate = eig_n_conv;
   } else {
-    if (eig_deflation_vecs > eig_nConv) errorQuda("Can not deflate more that eig_nConv eigenvectors.");
-    eig_param.deflation_vecs = eig_deflation_vecs;
+    if (eig_n_deflate > eig_n_conv) errorQuda("Can not deflate more that eig_n_conv eigenvectors.");
+    eig_param.deflation_vecs = eig_n_deflate;
   }
 
   eig_param.block_size = eig_param.eig_type == QUDA_EIG_TR_LANCZOS ? 1 : eig_block_size;
-  eig_param.nEv = eig_nEv;
-  eig_param.nKr = eig_nKr;
+  eig_param.n_ev = eig_n_ev;
+  eig_param.n_kr = eig_n_kr;
   eig_param.tol = eig_tol;
   eig_param.batched_rotate = eig_batched_rotate;
   eig_param.require_convergence = eig_require_convergence ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -649,18 +649,18 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
   }
 
   mg_eig_param.block_size = mg_eig_param.eig_type == QUDA_EIG_TR_LANCZOS ? 1 : mg_eig_block_size[level];
-  mg_eig_param.nEv = mg_eig_nEv[level];
-  mg_eig_param.nKr = mg_eig_nKr[level];
-  mg_eig_param.nConv = nvec[level];
+  mg_eig_param.n_ev = mg_eig_n_ev[level];
+  mg_eig_param.n_kr = mg_eig_n_kr[level];
+  mg_eig_param.n_conv = nvec[level];
 
   // Inverters will deflate only this number of vectors.
-  if (mg_eig_deflation_vecs[level] < 0) {
-    mg_eig_param.deflation_vecs = mg_eig_param.nConv;
-    mg_eig_deflation_vecs[level] = mg_eig_param.nConv;
+  if (mg_eig_n_deflate[level] < 0) {
+    mg_eig_param.deflation_vecs = mg_eig_param.n_conv;
+    mg_eig_n_deflate[level] = mg_eig_param.n_conv;
   } else {
-    if (mg_eig_deflation_vecs[level] > mg_eig_param.nConv)
+    if (mg_eig_n_deflate[level] > mg_eig_param.n_conv)
       errorQuda("Can not deflate more than nvec[%d] eigenvectors.", nvec[level]);
-    mg_eig_param.deflation_vecs = mg_eig_deflation_vecs[level];
+    mg_eig_param.deflation_vecs = mg_eig_n_deflate[level];
   }
 
   mg_eig_param.batched_rotate = mg_eig_batched_rotate[level];
@@ -1149,7 +1149,7 @@ void setDeflatedInvertParam(QudaInvertParam &inv_param)
 
   inv_param.rhs_idx = 0;
 
-  inv_param.nev = nev;
+  inv_param.n_ev = n_ev;
   inv_param.max_search_dim = max_search_dim;
   inv_param.deflation_grid = deflation_grid;
   inv_param.tol_restart = tol_restart;
@@ -1201,8 +1201,8 @@ void setDeflationParam(QudaEigParam &df_param)
   df_param.import_vectors = QUDA_BOOLEAN_FALSE;
   df_param.run_verify = QUDA_BOOLEAN_FALSE;
 
-  df_param.nk = df_param.invert_param->nev;
-  df_param.np = df_param.invert_param->nev * df_param.invert_param->deflation_grid;
+  df_param.nk = df_param.invert_param->n_ev;
+  df_param.np = df_param.invert_param->n_ev * df_param.invert_param->deflation_grid;
   df_param.extlib_type = deflation_ext_lib;
 
   df_param.cuda_prec_ritz = prec_ritz;

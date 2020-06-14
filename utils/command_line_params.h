@@ -265,7 +265,7 @@ extern quda::mgarray<QudaSchwarzType> mg_schwarz_type;
 extern quda::mgarray<int> mg_schwarz_cycle;
 
 extern quda::mgarray<std::array<int, 4>> geo_block_size;
-extern int nev;
+extern int n_ev;
 extern int max_search_dim;
 extern int deflation_grid;
 extern double tol_restart;
@@ -282,10 +282,10 @@ extern QudaMemoryType mem_type_ritz;
 
 // Parameters for the stand alone eigensolver
 extern int eig_block_size;
-extern int eig_nEv;
-extern int eig_nKr;
-extern int eig_nConv; // If unchanged, will be set to nEv
-extern int eig_deflation_vecs; // If unchanged, will be set to nConv
+extern int eig_n_ev;
+extern int eig_n_kr;
+extern int eig_n_conv; // If unchanged, will be set to n_ev
+extern int eig_n_deflate; // If unchanged, will be set to n_conv
 extern int eig_batched_rotate; // If unchanged, will be set to maximum
 extern bool eig_require_convergence;
 extern int eig_check_interval;
@@ -313,9 +313,9 @@ extern QudaPrecision eig_save_prec;
 // all others are for PR vectors.
 extern quda::mgarray<bool> mg_eig;
 extern quda::mgarray<int> mg_eig_block_size;
-extern quda::mgarray<int> mg_eig_deflation_vecs;
-extern quda::mgarray<int> mg_eig_nEv;
-extern quda::mgarray<int> mg_eig_nKr;
+extern quda::mgarray<int> mg_eig_n_deflate;
+extern quda::mgarray<int> mg_eig_n_ev;
+extern quda::mgarray<int> mg_eig_n_kr;
 extern quda::mgarray<int> mg_eig_batched_rotate;
 extern quda::mgarray<bool> mg_eig_require_convergence;
 extern quda::mgarray<int> mg_eig_check_interval;

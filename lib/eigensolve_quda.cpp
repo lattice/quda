@@ -36,10 +36,10 @@ namespace quda
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaEigParam(eig_param);
 
     // Problem parameters
-    nEv = eig_param->nEv;
-    nKr = eig_param->nKr;
-    nConv = eig_param->nConv;
-    deflation_vecs = (eig_param->deflation_vecs == -1 ? nConv : eig_param->deflation_vecs);
+    n_ev = eig_param->n_ev;
+    n_kr = eig_param->n_kr;
+    n_conv = eig_param->n_conv;
+    deflation_vecs = (eig_param->deflation_vecs == -1 ? n_conv : eig_param->deflation_vecs);
     tol = eig_param->tol;
     reverse = false;
 
@@ -61,15 +61,15 @@ namespace quda
     save_prec = eig_param->save_prec;
 
     // Sanity checks
-    if (nKr <= nEv) errorQuda("nKr = %d is less than or equal to nEv = %d", nKr, nEv);
-    if (nEv < nConv) errorQuda("nConv=%d is greater than nEv=%d", nConv, nEv);
-    if (nEv == 0) errorQuda("nEv=0 passed to Eigensolver");
-    if (nKr == 0) errorQuda("nKr=0 passed to Eigensolver");
-    if (nConv == 0) errorQuda("nConv=0 passed to Eigensolver");
-    if (deflation_vecs > nConv) errorQuda("deflation vecs = %d is greater than nConv = %d", deflation_vecs, nConv);
+    if (n_kr <= n_ev) errorQuda("n_kr = %d is less than or equal to n_ev = %d", n_kr, n_ev);
+    if (n_ev < n_conv) errorQuda("n_conv=%d is greater than n_ev=%d", n_conv, n_ev);
+    if (n_ev == 0) errorQuda("n_ev=0 passed to Eigensolver");
+    if (n_kr == 0) errorQuda("n_kr=0 passed to Eigensolver");
+    if (n_conv == 0) errorQuda("n_conv=0 passed to Eigensolver");
+    if (deflation_vecs > n_conv) errorQuda("deflation vecs = %d is greater than n_conv = %d", deflation_vecs, n_conv);
 
-    residua = (double *)safe_malloc(nKr * sizeof(double));
-    for (int i = 0; i < nKr; i++) { residua[i] = 0.0; }
+    residua = (double *)safe_malloc(n_kr * sizeof(double));
+    for (int i = 0; i < n_kr; i++) { residua[i] = 0.0; }
 
     // Part of the spectrum to be computed.
     switch (eig_param->spectrum) {
@@ -165,14 +165,14 @@ namespace quda
   void EigenSolver::prepareKrylovSpace(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)
   {
     ColorSpinorParam csParamClone(*kSpace[0]);
-    // Increase Krylov space to nKr+block_size vectors, create residual
-    kSpace.reserve(nKr + block_size);
-    for (int i = nConv; i < nKr + block_size; i++) kSpace.push_back(ColorSpinorField::Create(csParamClone));
+    // Increase Krylov space to n_kr+block_size vectors, create residual
+    kSpace.reserve(n_kr + block_size);
+    for (int i = n_conv; i < n_kr + block_size; i++) kSpace.push_back(ColorSpinorField::Create(csParamClone));
     csParamClone.create = QUDA_ZERO_FIELD_CREATE;
     for (int b = 0; b < block_size; b++) { r.push_back(ColorSpinorField::Create(csParamClone)); }
-    // Increase evals space to nEv
-    evals.reserve(nEv);
-    for (int i = nConv; i < nEv; i++) evals.push_back(0.0);
+    // Increase evals space to n_ev
+    evals.reserve(n_ev);
+    for (int i = n_conv; i < n_ev; i++) evals.push_back(0.0);
   }
 
   void EigenSolver::printEigensolverSetup()
@@ -186,9 +186,9 @@ namespace quda
     if (getVerbosity() >= QUDA_VERBOSE) {
       printfQuda("spectrum %s\n", spectrum);
       printfQuda("tol %.4e\n", tol);
-      printfQuda("nConv %d\n", nConv);
-      printfQuda("nEv %d\n", nEv);
-      printfQuda("nKr %d\n", nKr);
+      printfQuda("n_conv %d\n", n_conv);
+      printfQuda("n_ev %d\n", n_ev);
+      printfQuda("n_kr %d\n", n_kr);
       if (block_size > 1) printfQuda("block size %d\n", block_size);
       if (eig_param->use_poly_acc) {
         printfQuda("polyDeg %d\n", eig_param->poly_deg);
@@ -229,16 +229,16 @@ namespace quda
     r.resize(0);
 
     // Resize Krylov Space
-    for (unsigned int i = nConv; i < kSpace.size(); i++) { delete kSpace[i]; }
-    kSpace.resize(nConv);
-    evals.resize(nConv);
+    for (unsigned int i = n_conv; i < kSpace.size(); i++) { delete kSpace[i]; }
+    kSpace.resize(n_conv);
+    evals.resize(n_conv);
 
     // Only save if outfile is defined
     if (strcmp(eig_param->vec_outfile, "") != 0) {
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("saving eigenvectors\n");
-      // Make an array of size nConv
+      // Make an array of size n_conv
       std::vector<ColorSpinorField *> vecs_ptr;
-      vecs_ptr.reserve(nConv);
+      vecs_ptr.reserve(n_conv);
       const QudaParity mat_parity = impliedParityFromMatPC(mat.getMatPCType());
       // We may wish to compute vectors in high prec, but use in a lower
       // prec. This allows the user to down copy the data for later use.
@@ -255,7 +255,7 @@ namespace quda
           printfQuda("kSpace successfully down copied from prec %d to prec %d\n", kSpace[0]->Precision(), vecs_ptr[0]->Precision());
         }
       } else {
-        for (int i = 0; i < nConv; i++) {
+        for (int i = 0; i < n_conv; i++) {
           kSpace[i]->setSuggestedParity(mat_parity);
           vecs_ptr.push_back(kSpace[i]);
         }
@@ -525,7 +525,7 @@ namespace quda
     // Alias the extra space vectors
     kSpace_ptr.reserve(block_j_rank);
     for (int j = j_range.first; j < j_range.second; j++) {
-      int k = nKr + 1 + j - j_range.first;
+      int k = n_kr + 1 + j - j_range.first;
       kSpace_ptr.push_back(kSpace[k]);
     }
 
@@ -605,13 +605,13 @@ namespace quda
   {
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing SVD of M\n");
 
-    int nConv = eig_param->nConv;
-    if (evecs.size() != (unsigned int)(2 * nConv))
-      errorQuda("Incorrect deflation space sized %d passed to computeSVD, expected %d", (int)(evecs.size()), 2 * nConv);
+    int n_conv = eig_param->n_conv;
+    if (evecs.size() != (unsigned int)(2 * n_conv))
+      errorQuda("Incorrect deflation space sized %d passed to computeSVD, expected %d", (int)(evecs.size()), 2 * n_conv);
 
-    std::vector<double> sigma_tmp(nConv);
+    std::vector<double> sigma_tmp(n_conv);
 
-    for (int i = 0; i < nConv; i++) {
+    for (int i = 0; i < n_conv; i++) {
 
       // This function assumes that you have computed the eigenvectors
       // of MdagM(MMdag), ie, the right(left) SVD of M. The ith eigen vector in the
@@ -627,13 +627,13 @@ namespace quda
       Complex lambda = evals[i];
 
       // M*Rev_i = M*Rsv_i = sigma_i Lsv_i
-      mat.Expose()->M(*evecs[nConv + i], *evecs[i]);
+      mat.Expose()->M(*evecs[n_conv + i], *evecs[i]);
 
       // sigma_i = sqrt(sigma_i (Lsv_i)^dag * sigma_i * Lsv_i )
-      sigma_tmp[i] = sqrt(blas::norm2(*evecs[nConv + i]));
+      sigma_tmp[i] = sqrt(blas::norm2(*evecs[n_conv + i]));
 
       // Normalise the Lsv: sigma_i Lsv_i -> Lsv_i
-      blas::ax(1.0 / sigma_tmp[i], *evecs[nConv + i]);
+      blas::ax(1.0 / sigma_tmp[i], *evecs[n_conv + i]);
 
       if (getVerbosity() >= QUDA_SUMMARIZE)
         printfQuda("Sval[%04d] = %+.16e sigma - sqrt(|lambda|) = %+.16e\n", i, sigma_tmp[i],
@@ -655,9 +655,9 @@ namespace quda
     // number of evecs
     if (deflation_vecs == 0) return;
     int n_defl = deflation_vecs;
-    if (evecs.size() != (unsigned int)(2 * eig_param->nConv))
+    if (evecs.size() != (unsigned int)(2 * eig_param->n_conv))
       errorQuda("Incorrect deflation space sized %d passed to computeSVD, expected %d", (int)(evecs.size()),
-                2 * eig_param->nConv);
+                2 * eig_param->n_conv);
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Deflating %d left and right singular vectors\n", n_defl);
 
@@ -761,12 +761,12 @@ namespace quda
   {
     // Set suggested parity of fields
     const QudaParity mat_parity = impliedParityFromMatPC(mat.getMatPCType());
-    for (int i = 0; i < nConv; i++) { kSpace[i]->setSuggestedParity(mat_parity); }
+    for (int i = 0; i < n_conv; i++) { kSpace[i]->setSuggestedParity(mat_parity); }
 
-    // Make an array of size nConv
+    // Make an array of size n_conv
     std::vector<ColorSpinorField *> vecs_ptr;
-    vecs_ptr.reserve(nConv);
-    for (int i = 0; i < nConv; i++) { vecs_ptr.push_back(kSpace[i]); }
+    vecs_ptr.reserve(n_conv);
+    for (int i = 0; i < n_conv; i++) { vecs_ptr.push_back(kSpace[i]); }
 
     {
       // load the vectors

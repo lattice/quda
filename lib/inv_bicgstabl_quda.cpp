@@ -16,7 +16,7 @@ namespace quda {
 
   
   // Utility functions for Gram-Schmidt. Based on GCR functions.
-  // Big change is we need to go from 1 to nKrylov, not 0 to nKrylov-1. 
+  // Big change is we need to go from 1 to n_krylov, not 0 to n_krylov-1. 
   
   void BiCGstabL::computeTau(Complex **tau, double* sigma, std::vector<ColorSpinorField*> r, int begin, int size, int j)
   {
@@ -105,11 +105,11 @@ namespace quda {
 
   }
   
-  void BiCGstabL::updateUend(Complex* gamma, std::vector<ColorSpinorField*> u, int nKrylov)
+  void BiCGstabL::updateUend(Complex* gamma, std::vector<ColorSpinorField*> u, int n_krylov)
   {
-    // for (j = 0; j <= nKrylov; j++) { caxpy(-gamma[j], *u[j], *u[0]); }
-    Complex *gamma_ = new Complex[nKrylov];
-    for (int i = 0; i < nKrylov; i++)
+    // for (j = 0; j <= n_krylov; j++) { caxpy(-gamma[j], *u[j], *u[0]); }
+    Complex *gamma_ = new Complex[n_krylov];
+    for (int i = 0; i < n_krylov; i++)
     {
         gamma_[i] = -gamma[i+1];
     }
@@ -123,29 +123,29 @@ namespace quda {
   }
   
   void BiCGstabL::updateXRend(Complex* gamma, Complex* gamma_prime, Complex* gamma_prime_prime,
-                            std::vector<ColorSpinorField*> r, ColorSpinorField& x, int nKrylov)
+                            std::vector<ColorSpinorField*> r, ColorSpinorField& x, int n_krylov)
   {
     /*
     blas::caxpy(gamma[1], *r[0], x_sloppy);
-    blas::caxpy(-gamma_prime[nKrylov], *r[nKrylov], *r[0]);
-    for (j = 1; j < nKrylov; j++)
+    blas::caxpy(-gamma_prime[n_krylov], *r[n_krylov], *r[0]);
+    for (j = 1; j < n_krylov; j++)
     {
       caxpy(gamma_prime_prime[j], *r[j], x);
       caxpy(-gamma_prime[j], *r[j], *r[0]);
     }
     */
     
-    // This does two "wasted" caxpys (so 2*nKrylov+2 instead of 2*nKrylov), but
+    // This does two "wasted" caxpys (so 2*n_krylov+2 instead of 2*n_krylov), but
     // the alternative way would be un-fusing some calls, which would require
     // loading and saving x twice. In a solve where the sloppy precision is lower than
     // the full precision, this can be a killer. 
-    Complex *gamma_prime_prime_ = new Complex[nKrylov+1];
-    Complex *gamma_prime_ = new Complex[nKrylov+1];
+    Complex *gamma_prime_prime_ = new Complex[n_krylov+1];
+    Complex *gamma_prime_ = new Complex[n_krylov+1];
     gamma_prime_prime_[0] = gamma[1];
-    gamma_prime_prime_[nKrylov] = 0.0; // x never gets updated with r[nKrylov]
+    gamma_prime_prime_[n_krylov] = 0.0; // x never gets updated with r[n_krylov]
     gamma_prime_[0] = 0.0; // r[0] never gets updated with r[0]... obvs.
-    gamma_prime_[nKrylov] = -gamma_prime[nKrylov];
-    for (int i = 1; i < nKrylov; i++)
+    gamma_prime_[n_krylov] = -gamma_prime[n_krylov];
+    for (int i = 1; i < n_krylov; i++)
     {
       gamma_prime_prime_[i] = gamma_prime_prime[i];
       gamma_prime_[i] = -gamma_prime[i];
@@ -252,21 +252,21 @@ namespace quda {
   } 
   
   BiCGstabL::BiCGstabL(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matSloppy, param, profile), nKrylov(param.Nkrylov), init(false)
+    Solver(mat, matSloppy, matSloppy, param, profile), n_krylov(param.Nkrylov), init(false)
   {
-    r.resize(nKrylov+1);
-    u.resize(nKrylov+1);
+    r.resize(n_krylov+1);
+    u.resize(n_krylov+1);
     
-    gamma = new Complex[nKrylov+1];
-    gamma_prime = new Complex[nKrylov+1];
-    gamma_prime_prime = new Complex[nKrylov+1];
-    sigma = new double[nKrylov+1];
+    gamma = new Complex[n_krylov+1];
+    gamma_prime = new Complex[n_krylov+1];
+    gamma_prime_prime = new Complex[n_krylov+1];
+    sigma = new double[n_krylov+1];
     
-    tau = new Complex*[nKrylov+1];
-    for (int i = 0; i < nKrylov+1; i++) { tau[i] = new Complex[nKrylov+1]; }
+    tau = new Complex*[n_krylov+1];
+    for (int i = 0; i < n_krylov+1; i++) { tau[i] = new Complex[n_krylov+1]; }
     
     std::stringstream ss;
-    ss << "BiCGstab-" << nKrylov;
+    ss << "BiCGstab-" << n_krylov;
     solver_name = ss.str();
   }
 
@@ -277,13 +277,13 @@ namespace quda {
     delete[] gamma_prime_prime;
     delete[] sigma;
     
-    for (int i = 0; i < nKrylov+1; i++) { delete[] tau[i]; }
+    for (int i = 0; i < n_krylov+1; i++) { delete[] tau[i]; }
     delete[] tau; 
     
     if (init) {
       delete r_sloppy_saved_p; 
       delete u[0];
-      for (int i = 1; i < nKrylov+1; i++) {
+      for (int i = 1; i < n_krylov+1; i++) {
         delete r[i];
         delete u[i];
       }
@@ -355,7 +355,7 @@ namespace quda {
       // Residual (+ extra residuals for BiCG steps), Search directions.
       // Remark: search directions are sloppy in GCR. I wonder if we can
       //           get away with that here.
-      for (int i = 0; i <= nKrylov; i++) {
+      for (int i = 0; i <= n_krylov; i++) {
         r[i] = ColorSpinorField::Create(csParam);
         u[i] = ColorSpinorField::Create(csParam);
       }
@@ -449,7 +449,7 @@ namespace quda {
     
 
     // Initialize values.
-    for (int i = 1; i <= nKrylov; i++)
+    for (int i = 1; i <= n_krylov; i++)
     {
       blas::zero(*r[i]);
     }
@@ -496,7 +496,7 @@ namespace quda {
       rho0 *= -omega;
       
       // BiCG part of calculation.
-      for (int j = 0; j < nKrylov; j++) {
+      for (int j = 0; j < n_krylov; j++) {
         // rho1 = <r0, r_j>, beta = alpha*rho1/rho0, rho0 = rho1;
         // Can fuse into updateXRend.
         rho1 = blas::cDotProduct(r0, *r[j]);
@@ -550,7 +550,7 @@ namespace quda {
       // The algorithm uses the byproducts of the Gram-Schmidt to update x
       //   and other such niceties. One day I'll read the paper more closely.
       // Can take this from 'orthoDir' in inv_gcr_quda.cpp, hard code pipelining up to l = 8.
-      for (int j = 1; j <= nKrylov; j++)
+      for (int j = 1; j <= n_krylov; j++)
       {
         
 
@@ -577,43 +577,43 @@ namespace quda {
         gamma_prime[j] = Complex(rjr.x, rjr.y)/sigma[j];
       }
       
-      // gamma[nKrylov] = gamma'[nKrylov], omega = gamma[nKrylov]
-      gamma[nKrylov] = gamma_prime[nKrylov];
-      omega = gamma[nKrylov];
+      // gamma[n_krylov] = gamma'[n_krylov], omega = gamma[n_krylov]
+      gamma[n_krylov] = gamma_prime[n_krylov];
+      omega = gamma[n_krylov];
       
       // gamma = T^(-1) gamma_prime. It's in the paper, I promise.
-      for (int j = nKrylov-1; j > 0; j--)
+      for (int j = n_krylov-1; j > 0; j--)
       {
-        // Internal def: gamma[j] = gamma'_j - \sum_{i = j+1 to nKrylov} tau_ji gamma_i
+        // Internal def: gamma[j] = gamma'_j - \sum_{i = j+1 to n_krylov} tau_ji gamma_i
         gamma[j] = gamma_prime[j];
-        for (int i = j+1; i <= nKrylov; i++)
+        for (int i = j+1; i <= n_krylov; i++)
         {
           gamma[j] = gamma[j] - tau[j][i]*gamma[i];
         }
       }
       
       // gamma'' = T S gamma. Check paper for defn of S.
-      for (int j = 1; j < nKrylov; j++)
+      for (int j = 1; j < n_krylov; j++)
       {
         gamma_prime_prime[j] = gamma[j+1];
-        for (int i = j+1; i < nKrylov; i++)
+        for (int i = j+1; i < n_krylov; i++)
         {
           gamma_prime_prime[j] = gamma_prime_prime[j] + tau[j][i]*gamma[i+1];
         }
       }
       
       // Update x, r, u.
-      // x = x+ gamma_1 r_0, r_0 = r_0 - gamma'_l r_l, u_0 = u_0 - gamma_l u_l, where l = nKrylov.
-      // for (j = 0; j < nKrylov; j++) { caxpy(-gamma[j], *u[j], *u[0]); }
-      updateUend(gamma, u, nKrylov);
+      // x = x+ gamma_1 r_0, r_0 = r_0 - gamma'_l r_l, u_0 = u_0 - gamma_l u_l, where l = n_krylov.
+      // for (j = 0; j < n_krylov; j++) { caxpy(-gamma[j], *u[j], *u[0]); }
+      updateUend(gamma, u, n_krylov);
       
       //blas::caxpy(gamma[1], *r[0], x_sloppy);
-      //blas::caxpy(-gamma_prime[nKrylov], *r[nKrylov], *r[0]);
-      //for (j = 1; j < nKrylov; j++) {
+      //blas::caxpy(-gamma_prime[n_krylov], *r[n_krylov], *r[0]);
+      //for (j = 1; j < n_krylov; j++) {
       //  blas::caxpy(gamma_gamma_prime[j], *r[j], x_sloppy);
       //  blas::caxpy(-gamma_prime[j], *r[j], *r[0]);
       //}
-      updateXRend(gamma, gamma_prime, gamma_prime_prime, r, x_sloppy, nKrylov);
+      updateXRend(gamma, gamma_prime, gamma_prime_prime, r, x_sloppy, n_krylov);
       
       // sigma[0] = r_0^2
       sigma[0] = blas::norm2(*r[0]);
@@ -674,7 +674,7 @@ namespace quda {
       }
       
       // Check convergence.
-      k += nKrylov;
+      k += n_krylov;
       PrintStats(solver_name.c_str(), k, r2, b2, heavy_quark_res);
     } // Done iterating.
     
@@ -694,7 +694,7 @@ namespace quda {
     param.gflops = gflops;
     param.iter += k;
     
-    if (k >= param.maxiter) // >= if nKrylov doesn't divide max iter.
+    if (k >= param.maxiter) // >= if n_krylov doesn't divide max iter.
       warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
     // Print number of reliable updates.

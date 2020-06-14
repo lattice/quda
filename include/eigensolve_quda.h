@@ -21,9 +21,9 @@ protected:
 
     // Problem parameters
     //------------------
-    int nEv;            /** Size of initial factorisation */
-    int nKr;            /** Size of Krylov space after extension */
-    int nConv;          /** Number of converged eigenvalues requested */
+    int n_ev;            /** Size of initial factorisation */
+    int n_kr;            /** Size of Krylov space after extension */
+    int n_conv;          /** Number of converged eigenvalues requested */
     int deflation_vecs; /** Number of converged eigenvalues to use in deflation */
     double tol;         /** Tolerance on eigenvalues */
     bool reverse;       /** True if using polynomial acceleration */
@@ -329,7 +329,7 @@ protected:
     */
     void computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals)
     {
-      computeEvals(mat, evecs, evals, nConv);
+      computeEvals(mat, evecs, evals, n_conv);
     }
 
     /**

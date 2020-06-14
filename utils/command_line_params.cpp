@@ -132,7 +132,7 @@ quda::mgarray<int> mg_schwarz_cycle = {};
 
 // we only actually support 4 here currently
 quda::mgarray<std::array<int, 4>> geo_block_size = {};
-int nev = 8;
+int n_ev = 8;
 int max_search_dim = 64;
 int deflation_grid = 16;
 double tol_restart = 5e+3 * tol;
@@ -149,10 +149,10 @@ QudaMemoryType mem_type_ritz = QUDA_MEMORY_DEVICE;
 
 // Parameters for the stand alone eigensolver
 int eig_block_size = 4;
-int eig_nEv = 16;
-int eig_nKr = 32;
-int eig_nConv = -1; // If unchanged, will be set to nEv
-int eig_deflation_vecs = -1; // If unchanged, will be set to nConv
+int eig_n_ev = 16;
+int eig_n_kr = 32;
+int eig_n_conv = -1; // If unchanged, will be set to n_ev
+int eig_n_deflate = -1; // If unchanged, will be set to n_conv
 int eig_batched_rotate = 0; // If unchanged, will be set to maximum
 bool eig_require_convergence = true;
 int eig_check_interval = 10;
@@ -180,9 +180,9 @@ QudaPrecision eig_save_prec = QUDA_DOUBLE_PRECISION;
 // all others are for PR vectors.
 quda::mgarray<bool> mg_eig = {};
 quda::mgarray<int> mg_eig_block_size = {};
-quda::mgarray<int> mg_eig_deflation_vecs = {};
-quda::mgarray<int> mg_eig_nEv = {};
-quda::mgarray<int> mg_eig_nKr = {};
+quda::mgarray<int> mg_eig_n_deflate = {};
+quda::mgarray<int> mg_eig_n_ev = {};
+quda::mgarray<int> mg_eig_n_kr = {};
 quda::mgarray<int> mg_eig_batched_rotate = {};
 quda::mgarray<bool> mg_eig_require_convergence = {};
 quda::mgarray<int> mg_eig_check_interval = {};
@@ -594,13 +594,13 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--eig-compute-svd", eig_compute_svd,
                       "Solve the MdagM problem, use to compute SVD of M (default false)");
   opgroup->add_option("--eig-max-restarts", eig_max_restarts, "Perform n iterations of the restart in the eigensolver");
-  opgroup->add_option("--eig-nConv", eig_nConv, "The number of converged eigenvalues requested (default eig_nEv)");
+  opgroup->add_option("--eig-n-conv", eig_n_conv, "The number of converged eigenvalues requested (default eig_n_ev)");
   opgroup->add_option(
-    "--eig-deflation-vecs", eig_deflation_vecs,
-    "The number of converged eigenpairs that will be used in the deflation routines (default eig_nConv)");
+    "--eig-n-deflate", eig_n_deflate,
+    "The number of converged eigenpairs that will be used in the deflation routines (default eig_n_conv)");
   opgroup->add_option("--eig-block-size", eig_block_size, "The block size to use in the block variant eigensolver");
-  opgroup->add_option("--eig-nEv", eig_nEv, "The size of eigenvector search space in the eigensolver");
-  opgroup->add_option("--eig-nKr", eig_nKr, "The size of the Krylov subspace to use in the eigensolver");
+  opgroup->add_option("--eig-n-ev", eig_n_ev, "The size of eigenvector search space in the eigensolver");
+  opgroup->add_option("--eig-n-kr", eig_n_kr, "The size of the Krylov subspace to use in the eigensolver");
   opgroup->add_option("--eig-batched-rotate", eig_batched_rotate,
                       "The maximum number of extra eigenvectors the solver may allocate to perform a Ritz rotation.");
   opgroup->add_option("--eig-poly-deg", eig_poly_deg, "TODO");
@@ -658,7 +658,7 @@ void add_deflation_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--df-max-search-dim", max_search_dim, "Set the size of eigenvector search space (default 64)");
   opgroup->add_option("--df-mem-type-ritz", mem_type_ritz,
                       "Set memory type for the ritz vectors  (default device memory type)");
-  opgroup->add_option("--df-nev", nev, "Set number of eigenvectors computed within a single solve cycle (default 8)");
+  opgroup->add_option("--df-n-ev", n_ev, "Set number of eigenvectors computed within a single solve cycle (default 8)");
   opgroup->add_option("--df-tol-eigenval", eigenval_tol, "Set maximum eigenvalue residual norm (default 1e-1)");
   opgroup->add_option("--df-tol-inc", inc_tol,
                       "Set tolerance for the subsequent restarts in the initCG solver  (default 1e-2)");
@@ -720,11 +720,11 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                          "Perform a maximun of n restarts in eigensolver (default 100)");
   quda_app->add_mgoption(opgroup, "--mg-eig-block-size", mg_eig_block_size, CLI::Validator(),
                          "The block size to use in the block variant eigensolver");
-  quda_app->add_mgoption(opgroup, "--mg-eig-nEv", mg_eig_nEv, CLI::Validator(),
+  quda_app->add_mgoption(opgroup, "--mg-eig-n_ev", mg_eig_n_ev, CLI::Validator(),
                          "The size of eigenvector search space in the eigensolver");
-  quda_app->add_mgoption(opgroup, "--mg-eig-nKr", mg_eig_nKr, CLI::Validator(),
+  quda_app->add_mgoption(opgroup, "--mg-eig-n_kr", mg_eig_n_kr, CLI::Validator(),
                          "The size of the Krylov subspace to use in the eigensolver");
-  quda_app->add_mgoption(opgroup, "--mg-eig-deflation-vecs", mg_eig_deflation_vecs, CLI::Validator(),
+  quda_app->add_mgoption(opgroup, "--mg-eig-n-deflate", mg_eig_n_deflate, CLI::Validator(),
                          "The number of converged eigenpairs that will be used in the deflation routines");
   quda_app->add_mgoption(
     opgroup, "--mg-eig-batched-rotate", mg_eig_batched_rotate, CLI::Validator(),
