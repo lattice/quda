@@ -27,8 +27,10 @@ namespace quda
 #if CUDA_VERSION >= 9000
       qudaFuncSetAttribute((const void *)func, cudaFuncAttributePreferredSharedMemoryCarveout,
                            (int)cudaSharedmemCarveoutMaxShared);
+      cudaFuncAttributes attr;
+      cudaFuncGetAttributes(&attr, (const void *)func);
       qudaFuncSetAttribute((const void *)func, cudaFuncAttributeMaxDynamicSharedMemorySize,
-                           deviceProp.sharedMemPerBlockOptin);
+                           deviceProp.sharedMemPerBlockOptin - attr.sharedSizeBytes);
 #endif
     }
 
@@ -136,7 +138,7 @@ namespace quda
         return 2l * arg.Y.VolumeCB() * 8 * n * n * (8 * n - 2);
       } // 8 from dir, 8 from complexity
 
-      long long bytes() const { return arg.Y.Bytes() * (compute_max_only ? 2 : 3); }
+      long long bytes() const { return arg.Y.VolumeCB() * 2l * n * n * 2l * (compute_max_only ? 2 : 3); }
 
       unsigned int minThreads() const { return arg.Y.VolumeCB(); }
       bool tuneGridDim() const { return false; } // don't tune the grid dimension

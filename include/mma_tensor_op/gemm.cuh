@@ -64,22 +64,26 @@ namespace quda
       static constexpr int sM = bM; // This is the block M (bM)
       static constexpr int sN = bN;
 
-      static constexpr int m_stride_pack = m_stride * 2;
+      static constexpr int m_pack = 2;
+      static constexpr int n_pack = 2;
+
+      static constexpr int m_stride_pack = m_stride * m_pack;
+      static constexpr int n_stride_pack = n_stride * n_pack;
       static constexpr int m_dim = (sM + m_stride_pack - 1) / m_stride_pack;
-      static constexpr int n_dim = (sN + n_stride - 1) / n_stride;
+      static constexpr int n_dim = (sN + n_stride_pack - 1) / n_stride_pack;
 
       static constexpr bool check_global_bound = !(M % bM == 0 && N % bN == 0);
-      static constexpr bool check_shared_bound = !(bM % m_stride_pack == 0 && bN % n_stride == 0);
+      static constexpr bool check_shared_bound = !(bM % m_stride_pack == 0 && bN % n_stride_pack == 0);
 
 #ifdef USE_GMEM_MMA_PIPELINING
-      half2 reg_real[m_dim * n_dim];
-      half2 reg_imag[m_dim * n_dim];
+      half2 reg_real[m_dim * n_dim * n_pack];
+      half2 reg_imag[m_dim * n_dim * n_pack];
 #endif
 
       const int y;
       const int z;
 
-      __device__ inline GlobalMemoryLoader() : y(threadIdx.y * 2), z(threadIdx.z) { }
+      __device__ inline GlobalMemoryLoader() : y(threadIdx.y * m_pack), z(threadIdx.z * n_pack) { }
 
 #ifdef USE_GMEM_MMA_PIPELINING
       template <int ld, bool dagger, class GmemAccessor>
@@ -95,7 +99,7 @@ namespace quda
 #pragma unroll
           for (int m = 0; m < m_dim; m++) {
 
-            const int n_idx_blk = n * n_stride + z;
+            const int n_idx_blk = n * n_stride_pack + z;
             const int m_idx_blk = m * m_stride_pack + y;
 
             if (!check_shared_bound || (m_idx_blk < sM && n_idx_blk < sN)) {
@@ -105,38 +109,52 @@ namespace quda
 
               if (!check_global_bound || (n_idx < N && m_idx < M)) {
 
+                using store_type = typename GmemAccessor::store_type;
+                using store_vector_type = typename VectorType<store_type, 4>::type;
+
                 if (transpose == dagger) {
-                  auto xx = p[(m_idx + 0) * ld + n_idx];
-                  auto yy = p[(m_idx + 1) * ld + n_idx];
+
+                  store_vector_type v_x = *reinterpret_cast<store_vector_type *>(&p[(m_idx + 0) * ld + n_idx]);
+                  store_vector_type v_y = *reinterpret_cast<store_vector_type *>(&p[(m_idx + 1) * ld + n_idx]);
 
                   if (fixed) {
-                    reg_real[m * n_dim + n] = __floats2half2_rn(scale_inv * xx.real(), scale_inv * yy.real());
                     auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
-                    reg_imag[m * n_dim + n] = __floats2half2_rn(scale_inv_conj * xx.imag(), scale_inv_conj * yy.imag());
+                    reg_real[m * n_dim * n_pack + (n * n_pack + 0)] = __floats2half2_rn(scale_inv * v_x.x, scale_inv * v_y.x);
+                    reg_imag[m * n_dim * n_pack + (n * n_pack + 0)] = __floats2half2_rn(scale_inv_conj * v_x.y, scale_inv_conj * v_y.y);
+                    reg_real[m * n_dim * n_pack + (n * n_pack + 1)] = __floats2half2_rn(scale_inv * v_x.z, scale_inv * v_y.z);
+                    reg_imag[m * n_dim * n_pack + (n * n_pack + 1)] = __floats2half2_rn(scale_inv_conj * v_x.w, scale_inv_conj * v_y.w);
                   } else {
-                    reg_real[m * n_dim + n] = __floats2half2_rn(+xx.real(), +yy.real());
-                    reg_imag[m * n_dim + n]
-                      = __floats2half2_rn(dagger ? -xx.imag() : +xx.imag(), dagger ? -yy.imag() : +yy.imag());
+                    reg_real[m * n_dim * n_pack + (n * n_pack + 0)] = __floats2half2_rn(v_x.x, v_y.x);
+                    reg_imag[m * n_dim * n_pack + (n * n_pack + 0)] = __floats2half2_rn(dagger ? -v_x.y : +v_x.y, dagger ? -v_y.y : +v_y.y);
+                    reg_real[m * n_dim * n_pack + (n * n_pack + 1)] = __floats2half2_rn(v_x.z, v_y.z);
+                    reg_imag[m * n_dim * n_pack + (n * n_pack + 1)] = __floats2half2_rn(dagger ? -v_x.w : +v_x.w, dagger ? -v_y.w : +v_y.w);
                   }
+
                 } else {
-                  using store_type = typename GmemAccessor::store_type;
-                  using store_vector_type = typename VectorType<store_type, 4>::type;
-                  store_vector_type v = *reinterpret_cast<store_vector_type *>(&p[n_idx * ld + m_idx]);
+
+                  store_vector_type v_x = *reinterpret_cast<store_vector_type *>(&p[(n_idx + 0) * ld + m_idx]);
+                  store_vector_type v_y = *reinterpret_cast<store_vector_type *>(&p[(n_idx + 1) * ld + m_idx]);
 
                   if (fixed) {
-                    reg_real[m * n_dim + n] = __floats2half2_rn(scale_inv * v.x, scale_inv * v.z);
                     auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
-                    reg_imag[m * n_dim + n] = __floats2half2_rn(scale_inv_conj * v.y, scale_inv_conj * v.w);
+                    reg_real[m * n_dim * n_pack + (n * n_pack + 0)] = __floats2half2_rn(scale_inv * v_x.x, scale_inv * v_x.z);
+                    reg_imag[m * n_dim * n_pack + (n * n_pack + 0)] = __floats2half2_rn(scale_inv_conj * v_x.y, scale_inv_conj * v_x.w);
+                    reg_real[m * n_dim * n_pack + (n * n_pack + 1)] = __floats2half2_rn(scale_inv * v_y.x, scale_inv * v_y.z);
+                    reg_imag[m * n_dim * n_pack + (n * n_pack + 1)] = __floats2half2_rn(scale_inv_conj * v_y.y, scale_inv_conj * v_y.w);
                   } else {
-                    reg_real[m * n_dim + n] = __floats2half2_rn(+v.x, +v.z);
-                    reg_imag[m * n_dim + n] = __floats2half2_rn(dagger ? -v.y : +v.y, dagger ? -v.w : +v.w);
+                    reg_real[m * n_dim * n_pack + (n * n_pack + 0)] = __floats2half2_rn(+v_x.x, +v_x.z);
+                    reg_imag[m * n_dim * n_pack + (n * n_pack + 0)] = __floats2half2_rn(dagger ? -v_x.y : +v_x.y, dagger ? -v_x.w : +v_x.w);
+                    reg_real[m * n_dim * n_pack + (n * n_pack + 1)] = __floats2half2_rn(+v_y.x, +v_y.z);
+                    reg_imag[m * n_dim * n_pack + (n * n_pack + 1)] = __floats2half2_rn(dagger ? -v_y.y : +v_y.y, dagger ? -v_y.w : +v_y.w);
                   }
                 }
 
               } else {
 
-                reg_real[m * n_dim + n] = __half2half2(0);
-                reg_imag[m * n_dim + n] = __half2half2(0);
+                reg_real[m * n_dim * n_pack + (n * n_pack + 0)] = __half2half2(0);
+                reg_imag[m * n_dim * n_pack + (n * n_pack + 0)] = __half2half2(0);
+                reg_real[m * n_dim * n_pack + (n * n_pack + 1)] = __half2half2(0);
+                reg_imag[m * n_dim * n_pack + (n * n_pack + 1)] = __half2half2(0);
               }
             }
           }
@@ -149,11 +167,13 @@ namespace quda
         for (int n = 0; n < n_dim; n++) {
 #pragma unroll
           for (int m = 0; m < m_dim; m++) {
-            const int n_idx = n * n_stride + z;
+            const int n_idx = n * n_stride_pack + z;
             const int m_idx = m * m_stride_pack + y;
             if (m_idx < sM && n_idx < sN) {
-              smem_real.vector_load(m_idx, n_idx, reg_real[m * n_dim + n]);
-              smem_imag.vector_load(m_idx, n_idx, reg_imag[m * n_dim + n]);
+              smem_real.vector_load(m_idx, n_idx + 0, reg_real[m * n_dim * n_pack + (n * n_pack + 0)]);
+              smem_imag.vector_load(m_idx, n_idx + 0, reg_imag[m * n_dim * n_pack + (n * n_pack + 0)]);
+              smem_real.vector_load(m_idx, n_idx + 1, reg_real[m * n_dim * n_pack + (n * n_pack + 1)]);
+              smem_imag.vector_load(m_idx, n_idx + 1, reg_imag[m * n_dim * n_pack + (n * n_pack + 1)]);
             }
           }
         }

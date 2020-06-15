@@ -7,6 +7,8 @@
 
 #include <type_traits>
 
+#include <cub/cub.cuh>
+
 namespace quda
 {
 
@@ -127,7 +129,12 @@ namespace quda
       case 2: max = computeYhat<compute_max_only, Arg, bM, bN, bK, block_y, block_z>(arg, 2, x_cb, parity, m, n); break;
       case 3: max = computeYhat<compute_max_only, Arg, bM, bN, bK, block_y, block_z>(arg, 3, x_cb, parity, m, n); break;
       }
-      if (compute_max_only) atomicAbsMax(arg.max_d, max);
+      if (compute_max_only) {
+        typedef cub::BlockReduce<unsigned, 1, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_y, block_z> BlockReduce;
+        __shared__ typename BlockReduce::TempStorage temp_storage;
+        unsigned aggregate = BlockReduce(temp_storage).Reduce(__float_as_uint(max), cub::Max());
+        if (threadIdx.y == 0 && threadIdx.z == 0) atomicAbsMax(arg.max_d, __uint_as_float(aggregate));
+      }
     }
 
   } // namespace mma
