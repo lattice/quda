@@ -321,26 +321,26 @@ void qudaComputeOprod(int prec, int num_terms, int num_naik_terms, double** coef
 void qudaUpdateU(int prec, double eps, QudaMILCSiteArg_t *arg)
 {
   qudamilc_called<true>(__func__);
-  QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim,
+  QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim,
       (prec==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
       QUDA_GENERAL_LINKS);
   void *gauge = arg->site ? arg->site : arg->link;
   void *mom = arg->site ? arg->site : arg->mom;
 
-  gaugeParam.gauge_offset = arg->link_offset;
-  gaugeParam.mom_offset = arg->mom_offset;
-  gaugeParam.site_size = arg->size;
-  gaugeParam.gauge_order = arg->site ? QUDA_MILC_SITE_GAUGE_ORDER : QUDA_MILC_GAUGE_ORDER;
+  qudaGaugeParam.gauge_offset = arg->link_offset;
+  qudaGaugeParam.mom_offset = arg->mom_offset;
+  qudaGaugeParam.site_size = arg->size;
+  qudaGaugeParam.gauge_order = arg->site ? QUDA_MILC_SITE_GAUGE_ORDER : QUDA_MILC_GAUGE_ORDER;
 
   if (!invalidate_quda_mom) {
-    gaugeParam.use_resident_mom = true;
-    gaugeParam.make_resident_mom = true;
+    qudaGaugeParam.use_resident_mom = true;
+    qudaGaugeParam.make_resident_mom = true;
   } else {
-    gaugeParam.use_resident_mom = false;
-    gaugeParam.make_resident_mom = false;
+    qudaGaugeParam.use_resident_mom = false;
+    qudaGaugeParam.make_resident_mom = false;
   }
 
-  updateGaugeFieldQuda(gauge, mom, eps, 0, 0, &gaugeParam);
+  updateGaugeFieldQuda(gauge, mom, eps, 0, 0, &qudaGaugeParam);
   qudamilc_called<false>(__func__);
   return;
 }
@@ -348,16 +348,16 @@ void qudaUpdateU(int prec, double eps, QudaMILCSiteArg_t *arg)
 void qudaRephase(int prec, void *gauge, int flag, double i_mu)
 {
   qudamilc_called<true>(__func__);
-  QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim,
+  QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim,
       (prec==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
 						QUDA_GENERAL_LINKS);
 
-  gaugeParam.staggered_phase_applied = 1-flag;
-  gaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
-  gaugeParam.i_mu = i_mu;
-  gaugeParam.t_boundary    = QUDA_ANTI_PERIODIC_T;
+  qudaGaugeParam.staggered_phase_applied = 1-flag;
+  qudaGaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
+  qudaGaugeParam.i_mu = i_mu;
+  qudaGaugeParam.t_boundary    = QUDA_ANTI_PERIODIC_T;
 
-  staggeredPhaseQuda(gauge, &gaugeParam);
+  staggeredPhaseQuda(gauge, &qudaGaugeParam);
   qudamilc_called<false>(__func__);
   return;
 }
@@ -365,16 +365,16 @@ void qudaRephase(int prec, void *gauge, int flag, double i_mu)
 void qudaUnitarizeSU3(int prec, double tol, QudaMILCSiteArg_t *arg)
 {
   qudamilc_called<true>(__func__);
-  QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim,
+  QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim,
       (prec==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
 						QUDA_GENERAL_LINKS);
 
   void *gauge = arg->site ? arg->site : arg->link;
-  gaugeParam.gauge_offset = arg->link_offset;
-  gaugeParam.site_size = arg->size;
-  gaugeParam.gauge_order = arg->site ? QUDA_MILC_SITE_GAUGE_ORDER : QUDA_MILC_GAUGE_ORDER;
+  qudaGaugeParam.gauge_offset = arg->link_offset;
+  qudaGaugeParam.site_size = arg->size;
+  qudaGaugeParam.gauge_order = arg->site ? QUDA_MILC_SITE_GAUGE_ORDER : QUDA_MILC_GAUGE_ORDER;
+    projectSU3Quda(gauge, tol, &qudaGaugeParam);
 
-  projectSU3Quda(gauge, tol, &gaugeParam);
   qudamilc_called<false>(__func__);
   return;
 }
@@ -1191,10 +1191,10 @@ void* qudaCreateGaugeField(void* gauge, int geometry, int precision)
 {
   qudamilc_called<true>(__func__);
   QudaPrecision qudaPrecision = (precision==2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
-  QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim, qudaPrecision,
+  QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim, qudaPrecision,
       (geometry==1) ? QUDA_GENERAL_LINKS : QUDA_SU3_LINKS);
   qudamilc_called<false>(__func__);
-  return createGaugeFieldQuda(gauge, geometry, &gaugeParam);
+  return createGaugeFieldQuda(gauge, geometry, &qudaGaugeParam);
 }
 
 
@@ -1202,8 +1202,8 @@ void qudaSaveGaugeField(void* gauge, void* inGauge)
 {
   qudamilc_called<true>(__func__);
   cudaGaugeField* cudaGauge = reinterpret_cast<cudaGaugeField*>(inGauge);
-  QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim, cudaGauge->Precision(), QUDA_GENERAL_LINKS);
-  saveGaugeFieldQuda(gauge, inGauge, &gaugeParam);
+  QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim, cudaGauge->Precision(), QUDA_GENERAL_LINKS);
+  saveGaugeFieldQuda(gauge, inGauge, &qudaGaugeParam);
   qudamilc_called<false>(__func__);
 }
 
@@ -1223,10 +1223,10 @@ void qudaCloverForce(void *mom, double dt, void **x, void **p, double *coeff, do
 		     int nvec, double multiplicity, void *gauge, int precision, QudaInvertArgs_t inv_args)
 {
   qudamilc_called<true>(__func__);
-  QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim,
+  QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim,
 						(precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
 						QUDA_GENERAL_LINKS);
-  gaugeParam.gauge_order = QUDA_MILC_GAUGE_ORDER; // refers to momentume gauge order
+  qudaGaugeParam.gauge_order = QUDA_MILC_GAUGE_ORDER; // refers to momentume gauge order
 
   QudaInvertParam invertParam = newQudaInvertParam();
   setInvertParam(invertParam, inv_args, precision, precision, kappa, 0);
@@ -1245,12 +1245,12 @@ void qudaCloverForce(void *mom, double dt, void **x, void **p, double *coeff, do
   invertParam.use_resident_solution = inv_args.use_resident_solution;
 
   computeCloverForceQuda(mom, dt, x, p, coeff, -kappa*kappa, ck, nvec, multiplicity,
-			 gauge, &gaugeParam, &invertParam);
+			 gauge, &qudaGaugeParam, &invertParam);
   qudamilc_called<false>(__func__);
 }
 
 
-void setGaugeParams(QudaGaugeParam &gaugeParam, const int dim[4], QudaInvertArgs_t &inv_args,
+void setGaugeParams(QudaGaugeParam &qudaGaugeParam, const int dim[4], QudaInvertArgs_t &inv_args,
                     int external_precision, int quda_precision) {
 
   const QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
@@ -1263,11 +1263,11 @@ void setGaugeParams(QudaGaugeParam &gaugeParam, const int dim[4], QudaInvertArgs
   default: device_precision_sloppy = device_precision;
   }
 
-  for(int dir=0; dir<4; ++dir) gaugeParam.X[dir] = dim[dir];
+  for(int dir=0; dir<4; ++dir) qudaGaugeParam.X[dir] = dim[dir];
 
-  gaugeParam.anisotropy               = 1.0;
-  gaugeParam.type                     = QUDA_WILSON_LINKS;
-  gaugeParam.gauge_order              = QUDA_MILC_GAUGE_ORDER;
+  qudaGaugeParam.anisotropy               = 1.0;
+  qudaGaugeParam.type                     = QUDA_WILSON_LINKS;
+  qudaGaugeParam.gauge_order              = QUDA_MILC_GAUGE_ORDER;
 
   // Check the boundary conditions
   // Can't have twisted or anti-periodic boundary conditions in the spatial
@@ -1279,21 +1279,21 @@ void setGaugeParams(QudaGaugeParam &gaugeParam, const int dim[4], QudaInvertArgs
   if(inv_args.boundary_phase[3] != 0 && inv_args.boundary_phase[3] != 1) trivial_phase = false;
 
   if(trivial_phase){
-    gaugeParam.t_boundary               = (inv_args.boundary_phase[3]) ? QUDA_ANTI_PERIODIC_T : QUDA_PERIODIC_T;
-    gaugeParam.reconstruct              = QUDA_RECONSTRUCT_12;
-    gaugeParam.reconstruct_sloppy       = QUDA_RECONSTRUCT_12;
+    qudaGaugeParam.t_boundary               = (inv_args.boundary_phase[3]) ? QUDA_ANTI_PERIODIC_T : QUDA_PERIODIC_T;
+    qudaGaugeParam.reconstruct              = QUDA_RECONSTRUCT_12;
+    qudaGaugeParam.reconstruct_sloppy       = QUDA_RECONSTRUCT_12;
   }else{
-    gaugeParam.t_boundary               = QUDA_PERIODIC_T;
-    gaugeParam.reconstruct              = QUDA_RECONSTRUCT_NO;
-    gaugeParam.reconstruct_sloppy       = QUDA_RECONSTRUCT_NO;
+    qudaGaugeParam.t_boundary               = QUDA_PERIODIC_T;
+    qudaGaugeParam.reconstruct              = QUDA_RECONSTRUCT_NO;
+    qudaGaugeParam.reconstruct_sloppy       = QUDA_RECONSTRUCT_NO;
   }
 
-  gaugeParam.cpu_prec                 = host_precision;
-  gaugeParam.cuda_prec                = device_precision;
-  gaugeParam.cuda_prec_sloppy         = device_precision_sloppy;
-  gaugeParam.cuda_prec_precondition   = device_precision_sloppy;
-  gaugeParam.gauge_fix                = QUDA_GAUGE_FIXED_NO;
-  gaugeParam.ga_pad                   = getLinkPadding(dim);
+  qudaGaugeParam.cpu_prec                 = host_precision;
+  qudaGaugeParam.cuda_prec                = device_precision;
+  qudaGaugeParam.cuda_prec_sloppy         = device_precision_sloppy;
+  qudaGaugeParam.cuda_prec_precondition   = device_precision_sloppy;
+  qudaGaugeParam.gauge_fix                = QUDA_GAUGE_FIXED_NO;
+  qudaGaugeParam.ga_pad                   = getLinkPadding(dim);
 }
 
 
@@ -1346,10 +1346,10 @@ void qudaLoadGaugeField(int external_precision,
     QudaInvertArgs_t inv_args,
     const void* milc_link) {
   qudamilc_called<true>(__func__);
-  QudaGaugeParam gaugeParam = newQudaGaugeParam();
-  setGaugeParams(gaugeParam, localDim,  inv_args, external_precision, quda_precision);
+  QudaGaugeParam qudaGaugeParam = newQudaGaugeParam();
+  setGaugeParams(qudaGaugeParam, localDim,  inv_args, external_precision, quda_precision);
 
-  loadGaugeQuda(const_cast<void*>(milc_link), &gaugeParam);
+  loadGaugeQuda(const_cast<void*>(milc_link), &qudaGaugeParam);
     qudamilc_called<false>(__func__);
 } // qudaLoadGaugeField
 
