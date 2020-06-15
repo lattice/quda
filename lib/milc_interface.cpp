@@ -318,7 +318,7 @@ void qudaComputeOprod(int prec, int num_terms, int num_naik_terms, double** coef
 }
 
 
-void qudaUpdateU(int prec, double eps, QudaMILCSiteArg_t *arg)
+void qudaUpdateUPhased(int prec, double eps, QudaMILCSiteArg_t *arg, int phase_in)
 {
   qudamilc_called<true>(__func__);
   QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim,
@@ -332,6 +332,9 @@ void qudaUpdateU(int prec, double eps, QudaMILCSiteArg_t *arg)
   qudaGaugeParam.site_size = arg->size;
   qudaGaugeParam.gauge_order = arg->site ? QUDA_MILC_SITE_GAUGE_ORDER : QUDA_MILC_GAUGE_ORDER;
 
+  qudaGaugeParam.staggered_phase_applied = phase_in;
+  qudaGaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
+  qudaGaugeParam.t_boundary    = QUDA_ANTI_PERIODIC_T;
   if (!invalidate_quda_mom) {
     qudaGaugeParam.use_resident_mom = true;
     qudaGaugeParam.make_resident_mom = true;
@@ -343,6 +346,11 @@ void qudaUpdateU(int prec, double eps, QudaMILCSiteArg_t *arg)
   updateGaugeFieldQuda(gauge, mom, eps, 0, 0, &qudaGaugeParam);
   qudamilc_called<false>(__func__);
   return;
+}
+
+void qudaUpdateU(int prec, double eps, QudaMILCSiteArg_t *arg)
+{
+  qudaUpdateUPhased(prec, eps, arg, 0);
 }
 
 void qudaRephase(int prec, void *gauge, int flag, double i_mu)
@@ -362,7 +370,7 @@ void qudaRephase(int prec, void *gauge, int flag, double i_mu)
   return;
 }
 
-void qudaUnitarizeSU3(int prec, double tol, QudaMILCSiteArg_t *arg)
+void qudaUnitarizeSU3Phased(int prec, double tol, QudaMILCSiteArg_t *arg, int phase_in)
 {
   qudamilc_called<true>(__func__);
   QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim,
@@ -373,10 +381,18 @@ void qudaUnitarizeSU3(int prec, double tol, QudaMILCSiteArg_t *arg)
   qudaGaugeParam.gauge_offset = arg->link_offset;
   qudaGaugeParam.site_size = arg->size;
   qudaGaugeParam.gauge_order = arg->site ? QUDA_MILC_SITE_GAUGE_ORDER : QUDA_MILC_GAUGE_ORDER;
-    projectSU3Quda(gauge, tol, &qudaGaugeParam);
-
+  qudaGaugeParam.staggered_phase_applied = phase_in;
+  qudaGaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
+  qudaGaugeParam.t_boundary    = QUDA_ANTI_PERIODIC_T;
+ 
+  projectSU3Quda(gauge, tol, &qudaGaugeParam);
+  
   qudamilc_called<false>(__func__);
   return;
+}
+
+void qudaUnitarizeSU3(int prec, double tol, QudaMILCSiteArg_t *arg){
+  qudaUnitarizeSU3Phased(prec, tol, arg, 0);
 }
 
 // download the momentum from MILC and place into the resident mom field
@@ -505,11 +521,11 @@ static void createGaugeForcePaths(int **paths, int dir, int num_loop_types){
 }
 
 
-void qudaGaugeForce( int precision,
+void qudaGaugeForcePhased( int precision,
 		     int num_loop_types,
 		     double milc_loop_coeff[3],
 		     double eb3,
-		     QudaMILCSiteArg_t *arg)
+		     QudaMILCSiteArg_t *arg, int phase_in)
 {
   qudamilc_called<true>(__func__);
 
@@ -538,6 +554,11 @@ void qudaGaugeForce( int precision,
   qudaGaugeParam.mom_offset = arg->mom_offset;
   qudaGaugeParam.site_size = arg->size;
   qudaGaugeParam.gauge_order = arg->site ? QUDA_MILC_SITE_GAUGE_ORDER : QUDA_MILC_GAUGE_ORDER;
+  qudaGaugeParam.staggered_phase_applied = phase_in;
+  qudaGaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
+  if(phase_in) qudaGaugeParam.t_boundary    = QUDA_ANTI_PERIODIC_T;
+  qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
+
 
   double *loop_coeff = static_cast<double*>(safe_malloc(numPaths*sizeof(double)));
   int *length = static_cast<int*>(safe_malloc(numPaths*sizeof(int)));
@@ -598,6 +619,15 @@ void qudaGaugeForce( int precision,
 
   qudamilc_called<false>(__func__);
   return;
+}
+
+void qudaGaugeForce( int precision,
+		     int num_loop_types,
+		     double milc_loop_coeff[3],
+		     double eb3,
+		     QudaMILCSiteArg_t *arg)
+{
+  qudaGaugeForcePhased(precision, num_loop_types, milc_loop_coeff, eb3, arg , 0);
 }
 
 
