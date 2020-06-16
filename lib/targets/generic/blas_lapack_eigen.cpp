@@ -36,10 +36,12 @@ namespace quda
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("BatchInvertMatrixGENERIC: Nc = %d, batch = %lu\n", n, batch);
 
       size_t size = 2 * n * n * batch * prec;
-      void *A_h = pool_pinned_malloc(size);
-      void *Ainv_h = pool_pinned_malloc(size);
-      qudaMemcpy(A_h, A, size, cudaMemcpyDeviceToHost);
-
+      void *A_h = (location == QUDA_CUDA_FIELD_LOCATION ? pool_pinned_malloc(size) : A);
+      void *Ainv_h = (location == QUDA_CUDA_FIELD_LOCATION ? pool_pinned_malloc(size) : Ainv);
+      if(location == QUDA_CUDA_FIELD_LOCATION) {
+	qudaMemcpy(A_h, A, size, cudaMemcpyDeviceToHost);
+      }
+      
       long long flops = 0;
       timeval start, stop;
       gettimeofday(&start, NULL);
@@ -68,14 +70,16 @@ namespace quda
       long dsh = stop.tv_sec - start.tv_sec;
       long dush = stop.tv_usec - start.tv_usec;
       double timeh = dsh + 0.000001 * dush;
-
+      
       if (getVerbosity() >= QUDA_SUMMARIZE)
         printfQuda("CPU: Batched matrix inversion completed in %f seconds using %d OMP threads with GFLOPS = %f\n",
                    timeh, omp_get_num_threads(), 1e-9 * flops / timeh);
-
-      qudaMemcpy((void *)Ainv, Ainv_h, size, cudaMemcpyHostToDevice);
-      pool_pinned_free(Ainv_h);
-      pool_pinned_free(A_h);
+      
+      if(location == QUDA_CUDA_FIELD_LOCATION) {
+	pool_pinned_free(Ainv_h);      
+	pool_pinned_free(A_h);	
+	qudaMemcpy((void *)Ainv, Ainv_h, size, cudaMemcpyHostToDevice);
+      }     
 
       return flops;
     }
