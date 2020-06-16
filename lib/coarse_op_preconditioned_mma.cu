@@ -94,14 +94,13 @@ namespace quda
       // clang-format off
       switch (tp.aux.x) {
       case   0: launch_kernel<compute_max_only,  64,  64,  16,  32,  16,  2>(arg, min_threads, tp, stream); break;
-      case   1: launch_kernel<compute_max_only,  32, 128, 128,  16,  32    >(arg, min_threads, tp, stream); break;
+      case   1: launch_kernel<compute_max_only,  32, 128, 128,  32,  16    >(arg, min_threads, tp, stream); break;
       case   2: launch_kernel<compute_max_only, 128, 128,  16,  64,   8    >(arg, min_threads, tp, stream); break;
       case   3: launch_kernel<compute_max_only, 128, 128,  16,  32,  16    >(arg, min_threads, tp, stream); break;
       case   4: launch_kernel<compute_max_only, 128, 128,  32,  16,  32    >(arg, min_threads, tp, stream); break;
       case   5: launch_kernel<compute_max_only, 128, 128,  32,  64,   8    >(arg, min_threads, tp, stream); break;
       case   6: launch_kernel<compute_max_only, 128, 128,  32,  32,  16    >(arg, min_threads, tp, stream); break;
       case   7: launch_kernel<compute_max_only, 128, 128,  32,  32,  32    >(arg, min_threads, tp, stream); break;
-      case   8: launch_kernel<compute_max_only, 128, 128,   8,  64,   8    >(arg, min_threads, tp, stream); break;
       default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 128", tp.aux.x);
       }
       // clang-format on
@@ -219,7 +218,7 @@ namespace quda
         switch (arg.M) {
         case  48: max_aux = 2; break;
         case  64: max_aux = 6; break;
-        case 128: max_aux = 8; break;
+        case 128: max_aux = 7; break;
         case 192: max_aux = 4; break;
         default: errorQuda("Unsupported number of coarse dof %d\n", arg.M);
         }

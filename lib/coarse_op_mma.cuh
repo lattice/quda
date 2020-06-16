@@ -235,14 +235,14 @@ namespace quda
     {
       // clang-format off
         switch (tp.aux.x) {
-        case 0: launch_compute_vuv_kernel<from_coarse,  64,  64,  24,    8,   8>(tp, arg, min_threads, stream); break;
-        case 1: launch_compute_vuv_kernel<from_coarse,  64,  64,  24,    8,  16>(tp, arg, min_threads, stream); break;
-        case 2: launch_compute_vuv_kernel<from_coarse,  64,  64,  24,    8,  32>(tp, arg, min_threads, stream); break;
-        case 3: launch_compute_vuv_kernel<from_coarse,  64,  64,  24,   16,   8>(tp, arg, min_threads, stream); break;
-        case 4: launch_compute_vuv_kernel<from_coarse,  64,  64,  24,   16,  16>(tp, arg, min_threads, stream); break;
-        case 5: launch_compute_vuv_kernel<from_coarse,  64,  64,  24,   16,  32>(tp, arg, min_threads, stream); break;
-        case 6: launch_compute_vuv_kernel<from_coarse,  64,  64,  24,   32,   8>(tp, arg, min_threads, stream); break;
-        case 7: launch_compute_vuv_kernel<from_coarse,  64,  64,  24,   32,  16>(tp, arg, min_threads, stream); break;
+        case 0: launch_compute_vuv_kernel<from_coarse,  64,  64,  24,   8,   8>(tp, arg, min_threads, stream); break;
+        case 1: launch_compute_vuv_kernel<from_coarse,  64,  64,  24,   8,  16>(tp, arg, min_threads, stream); break;
+        case 2: launch_compute_vuv_kernel<from_coarse,  64,  64,  24,   8,  32>(tp, arg, min_threads, stream); break;
+        case 3: launch_compute_vuv_kernel<from_coarse,  64,  64,  24,  16,   8>(tp, arg, min_threads, stream); break;
+        case 4: launch_compute_vuv_kernel<from_coarse,  64,  64,  24,  16,  16>(tp, arg, min_threads, stream); break;
+        case 5: launch_compute_vuv_kernel<from_coarse,  64,  64,  24,  16,  32>(tp, arg, min_threads, stream); break;
+        case 6: launch_compute_vuv_kernel<from_coarse,  64,  64,  24,  32,   8>(tp, arg, min_threads, stream); break;
+        case 7: launch_compute_vuv_kernel<from_coarse,  64,  64,  24,  32,  16>(tp, arg, min_threads, stream); break;
         default: errorQuda("tp.aux.x(=%d) is NOT supported by (%d, %d, %d, %d).", tp.aux.x, Arg::fineSpin, Arg::coarseSpin, Arg::fineColor, Arg::coarseColor);
         }
       // clang-format on

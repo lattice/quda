@@ -465,7 +465,7 @@ namespace quda
             __syncthreads();
 #ifdef USE_GMEM_MMA_PIPELINING
             a_loader.g2r<Config::lda, a_dagger>(a, m_offset, 0);
-            a_loader.r2s(smem_obj_a_real, smem_obj_a_imag);
+            a_loader.r2s<a_dagger>(smem_obj_a_real, smem_obj_a_imag);
 #else
             a_loader.g2s<Config::lda, a_dagger>(smem_obj_a_real, smem_obj_a_imag, a, m_offset, 0);
 #endif
@@ -478,7 +478,7 @@ namespace quda
               __syncthreads();
 #ifdef USE_GMEM_MMA_PIPELINING
               b_loader.g2r<Config::ldb, b_dagger>(b, n_offset, 0);
-              b_loader.r2s(smem_obj_b_real, smem_obj_b_imag);
+              b_loader.r2s<b_dagger>(smem_obj_b_real, smem_obj_b_imag);
 #else
               b_loader.g2s<Config::ldb, b_dagger>(smem_obj_b_real, smem_obj_b_imag, b, n_offset, 0);
 #endif
