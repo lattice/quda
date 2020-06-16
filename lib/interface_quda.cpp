@@ -1652,7 +1652,7 @@ namespace quda {
     diracParam.m5 = inv_param->m5;
     diracParam.mu = inv_param->mu;
     diracParam.native_lapack = inv_param->native_lapack;
-    
+
     for (int i=0; i<4; i++) diracParam.commDim[i] = 1;   // comms are always on
 
     if (diracParam.gauge->Precision() != inv_param->cuda_prec)
@@ -1670,7 +1670,7 @@ namespace quda {
     diracParam.longGauge = gaugeLongSloppy;
     diracParam.clover = cloverSloppy;
     diracParam.native_lapack = inv_param->native_lapack;
-    
+
     for (int i=0; i<4; i++) {
       diracParam.commDim[i] = 1;   // comms are always on
     }
@@ -1689,7 +1689,7 @@ namespace quda {
     diracParam.longGauge = gaugeLongRefinement;
     diracParam.clover = cloverRefinement;
     diracParam.native_lapack = inv_param->native_lapack;
-    
+
     for (int i=0; i<4; i++) {
       diracParam.commDim[i] = 1;   // comms are always on
     }
@@ -1715,7 +1715,7 @@ namespace quda {
     }
     diracParam.clover = cloverPrecondition;
     diracParam.native_lapack = inv_param->native_lapack;
-    
+
     for (int i=0; i<4; i++) {
       diracParam.commDim[i] = comms ? 1 : 0;
     }

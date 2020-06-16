@@ -55,13 +55,13 @@ namespace quda {
     int commDim[QUDA_MAX_DIM]; // whether to do comms or not
 
     QudaPrecision halo_precision; // only does something for DiracCoarse at present
-        
+
     // for multigrid only
     Transfer *transfer; 
     Dirac *dirac;
     bool need_bidirectional; // whether or not we need to force a bi-directional build
     bool native_lapack;
-    
+
     // Default constructor
     DiracParam() :
       type(QUDA_INVALID_DIRAC),
