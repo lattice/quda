@@ -18,17 +18,27 @@ namespace quda {
   /*
     Here we use traits to define the greater type used for mixing types of computation involving these types
   */
-  template<class T, class U> struct PromoteTypeId { typedef T Type; };
-  template<> struct PromoteTypeId<complex<float>, float> { typedef complex<float> Type; };
-  template<> struct PromoteTypeId<float, complex<float> > { typedef complex<float> Type; };
-  template<> struct PromoteTypeId<complex<double>, double> { typedef complex<double> Type; };
-  template<> struct PromoteTypeId<double, complex<double> > { typedef complex<double> Type; };
-  template<> struct PromoteTypeId<double,int> { typedef double Type; };
-  template<> struct PromoteTypeId<int,double> { typedef double Type; };
-  template<> struct PromoteTypeId<float,int> { typedef float Type; };
-  template<> struct PromoteTypeId<int,float> { typedef float Type; };
-  template<> struct PromoteTypeId<double,float> { typedef double Type; };
-  template<> struct PromoteTypeId<float,double> { typedef double Type; };
+  template<class T, class U> struct PromoteTypeId { typedef T type; };
+  template<> struct PromoteTypeId<complex<float>, float> { typedef complex<float> type; };
+  template<> struct PromoteTypeId<float, complex<float> > { typedef complex<float> type; };
+  template<> struct PromoteTypeId<complex<double>, double> { typedef complex<double> type; };
+  template<> struct PromoteTypeId<double, complex<double> > { typedef complex<double> type; };
+  template<> struct PromoteTypeId<double,int> { typedef double type; };
+  template<> struct PromoteTypeId<int,double> { typedef double type; };
+  template<> struct PromoteTypeId<float,int> { typedef float type; };
+  template<> struct PromoteTypeId<int,float> { typedef float type; };
+  template<> struct PromoteTypeId<double,float> { typedef double type; };
+  template<> struct PromoteTypeId<float,double> { typedef double type; };
+  template<> struct PromoteTypeId<double,short> { typedef double type; };
+  template<> struct PromoteTypeId<short,double> { typedef double type; };
+  template<> struct PromoteTypeId<double,char> { typedef double type; };
+  template<> struct PromoteTypeId<char,double> { typedef double type; };
+  template<> struct PromoteTypeId<float,short> { typedef float type; };
+  template<> struct PromoteTypeId<short,float> { typedef float type; };
+  template<> struct PromoteTypeId<float,char> { typedef float type; };
+  template<> struct PromoteTypeId<char,float> { typedef float type; };
+  template<> struct PromoteTypeId<short,char> { typedef short type; };
+  template<> struct PromoteTypeId<char,short> { typedef short type; };
 
   /*
     Here we use traits to define the mapping between storage type and

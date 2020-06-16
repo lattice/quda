@@ -560,9 +560,9 @@ namespace quda {
   // This is so that I can multiply real and complex matrice
   template<class T, class U, int N>
     __device__ __host__ inline
-    Matrix<typename PromoteTypeId<T,U>::Type,N> operator*(const Matrix<T,N> &a, const Matrix<U,N> &b)
+    Matrix<typename PromoteTypeId<T,U>::type,N> operator*(const Matrix<T,N> &a, const Matrix<U,N> &b)
     {
-      Matrix<typename PromoteTypeId<T,U>::Type,N> result;
+      Matrix<typename PromoteTypeId<T,U>::type,N> result;
 #pragma unroll
       for (int i=0; i<N; i++) {
 #pragma unroll

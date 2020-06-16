@@ -23,8 +23,8 @@ typename std::remove_reference<decltype(Cmplx::x)>::type cabs(const Cmplx & z)
 
 
 template<class T, class U> 
-inline DEVICEHOST typename PromoteTypeId<T,U>::Type quadSum(const T & a, const U & b){
-  typename PromoteTypeId<T,U>::Type ratio, square, max;
+inline DEVICEHOST typename PromoteTypeId<T,U>::type quadSum(const T & a, const U & b){
+  typename PromoteTypeId<T,U>::type ratio, square, max;
   if (fabs(a) > fabs(b)) { max = a; ratio = b/a; } else { max=b; ratio = a/b; }
   square = (max != 0.0) ? max*max*(1.0 + ratio*ratio) : 0.0;
   return sqrt(square);
