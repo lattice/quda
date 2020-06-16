@@ -1,7 +1,6 @@
 #pragma once
 
 #include <invert_quda.h>
-//#include <eigensolve_quda.h>
 #include <transfer.h>
 #include <vector>
 #include <complex_quda.h>
@@ -479,8 +478,9 @@ public:
      @param Xinv[out] Coarse clover inverse field
      @param Y[in] Coarse link field
      @param X[in] Coarse clover field
+     @param native_lapack[in] bool Whether to use native or generic blas
    */
-  void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X);
+  void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X, const bool native_lapack);
 
   /**
      This is an object that captures an entire MG preconditioner

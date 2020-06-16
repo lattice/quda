@@ -83,8 +83,6 @@ static int R[4] = {0, 0, 0, 0};
 // setting this to false prevents redundant halo exchange but isn't yet compatible with HISQ / ASQTAD kernels
 static bool redundant_comms = false;
 
-#include <blas_lapack.h>
-
 //for MAGMA lib:
 #include <blas_magma.h>
 
@@ -656,7 +654,6 @@ void initQudaMemory()
   checkCudaError();
   createDslashEvents();
   blas::init();
-  blas_lapack::init();
 
   // initalize the memory pool allocators
   pool::init();
@@ -1461,7 +1458,6 @@ void endQuda(void)
   LatticeField::freeGhostBuffer();
   cpuColorSpinorField::freeGhostBuffer();
 
-  blas_lapack::destroy();
   blas::end();
 
   pool::flush_pinned();
@@ -1655,7 +1651,8 @@ namespace quda {
     diracParam.mass = inv_param->mass;
     diracParam.m5 = inv_param->m5;
     diracParam.mu = inv_param->mu;
-
+    diracParam.native_lapack = inv_param->native_lapack;
+    
     for (int i=0; i<4; i++) diracParam.commDim[i] = 1;   // comms are always on
 
     if (diracParam.gauge->Precision() != inv_param->cuda_prec)
@@ -1672,7 +1669,8 @@ namespace quda {
     diracParam.fatGauge = gaugeFatSloppy;
     diracParam.longGauge = gaugeLongSloppy;
     diracParam.clover = cloverSloppy;
-
+    diracParam.native_lapack = inv_param->native_lapack;
+    
     for (int i=0; i<4; i++) {
       diracParam.commDim[i] = 1;   // comms are always on
     }
@@ -1690,7 +1688,8 @@ namespace quda {
     diracParam.fatGauge = gaugeFatRefinement;
     diracParam.longGauge = gaugeLongRefinement;
     diracParam.clover = cloverRefinement;
-
+    diracParam.native_lapack = inv_param->native_lapack;
+    
     for (int i=0; i<4; i++) {
       diracParam.commDim[i] = 1;   // comms are always on
     }
@@ -1715,7 +1714,8 @@ namespace quda {
       diracParam.longGauge = gaugeLongPrecondition;
     }
     diracParam.clover = cloverPrecondition;
-
+    diracParam.native_lapack = inv_param->native_lapack;
+    
     for (int i=0; i<4; i++) {
       diracParam.commDim[i] = comms ? 1 : 0;
     }

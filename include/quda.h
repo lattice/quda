@@ -382,7 +382,10 @@ extern "C" {
 
     /** Which external library to use in the linear solvers (MAGMA or Eigen) */
     QudaExtLibType extlib_type;
-
+    
+    /** Whether to use the native or generic BLAS */
+    QudaBoolean native_lapack;
+    
   } QudaInvertParam;
 
   // Parameter set for solving eigenvalue problems.
@@ -690,7 +693,7 @@ extern "C" {
 
     /** Boolean for if this is a staggered solve or not */
     QudaBoolean is_staggered;
-
+    
   } QudaMultigridParam;
 
   typedef struct QudaGaugeObservableParam_s {

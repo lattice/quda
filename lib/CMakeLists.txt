@@ -295,9 +295,9 @@ if(QUDA_DIRAC_NDEG_TWISTED_MASS)
   target_compile_definitions(quda PUBLIC GPU_NDEG_TWISTED_MASS_DIRAC)
 endif(QUDA_DIRAC_NDEG_TWISTED_MASS)
 
-if(${QUDA_BLAS_LAPACK_TYPE} STREQUAL "NATIVE")
+if(${QUDA_BUILD_NATIVE_LAPACK} STREQUAL "ON")
   target_link_libraries(quda PUBLIC ${CUDA_cublas_LIBRARY})
-  target_compile_definitions(quda PRIVATE NATIVE_BLAS_LIB)
+  target_compile_definitions(quda PRIVATE NATIVE_LAPACK_LIB)
 endif()
   
 if(QUDA_MULTIGRID)

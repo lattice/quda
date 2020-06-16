@@ -1,6 +1,7 @@
 #include <string.h>
 #include <multigrid.h>
 #include <algorithm>
+#include <blas_lapack.h>
 
 namespace quda {
 
@@ -25,11 +26,12 @@ namespace quda {
     gpu_setup(gpu_setup),
     init_gpu(gpu_setup),
     init_cpu(!gpu_setup),
-    mapped(mapped)
+    mapped(mapped),
+    native_lapack(param.native_lapack)
   {
     initializeCoarse();
   }
-
+  
   DiracCoarse::DiracCoarse(const DiracParam &param, cpuGaugeField *Y_h, cpuGaugeField *X_h, cpuGaugeField *Xinv_h,
                            cpuGaugeField *Yhat_h, // cpu link fields
                            cudaGaugeField *Y_d, cudaGaugeField *X_d, cudaGaugeField *Xinv_d,
@@ -55,9 +57,10 @@ namespace quda {
     gpu_setup(true),
     init_gpu(enable_gpu ? false : true),
     init_cpu(enable_cpu ? false : true),
-    mapped(Y_d->MemType() == QUDA_MEMORY_MAPPED)
+    mapped(Y_d->MemType() == QUDA_MEMORY_MAPPED),
+    native_lapack(param.native_lapack)
   {
-
+    if(native_lapack) native_lapack::init();
   }
 
   DiracCoarse::DiracCoarse(const DiracCoarse &dirac, const DiracParam &param) :
@@ -81,9 +84,10 @@ namespace quda {
     gpu_setup(dirac.gpu_setup),
     init_gpu(enable_gpu ? false : true),
     init_cpu(enable_cpu ? false : true),
-    mapped(dirac.mapped)
+    mapped(dirac.mapped),
+    native_lapack(dirac.native_lapack)
   {
-
+    if(native_lapack) native_lapack::init();
   }
 
   DiracCoarse::~DiracCoarse()
@@ -100,6 +104,7 @@ namespace quda {
       if (Xinv_d) delete Xinv_d;
       if (Yhat_d) delete Yhat_d;
     }
+    if(native_lapack) native_lapack::destroy();
   }
 
   void DiracCoarse::createY(bool gpu, bool mapped) const
@@ -189,11 +194,13 @@ namespace quda {
 
   void DiracCoarse::initializeCoarse()
   {
+    if(native_lapack) native_lapack::init();
+    
     createY(gpu_setup, mapped);
 
     if (gpu_setup) dirac->createCoarseOp(*Y_d,*X_d,*transfer,kappa,mass,Mu(),MuFactor());
     else dirac->createCoarseOp(*Y_h,*X_h,*transfer,kappa,mass,Mu(),MuFactor());
-
+    
     // save the intermediate tunecache after the UV and VUV tune
     saveTuneCache();
 
@@ -206,12 +213,12 @@ namespace quda {
 
     if (gpu_setup) createPreconditionedCoarseOp(*Yhat_d,*Xinv_d,*Y_d,*X_d);
     else createPreconditionedCoarseOp(*Yhat_h,*Xinv_h,*Y_h,*X_h);
-
+    
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Finished creating the preconditioned coarse op\n");
 
     // save the intermediate tunecache after the Yhat tune
     saveTuneCache();
-
+ 
     if (gpu_setup) {
       enable_gpu = true;
       init_gpu = true;
@@ -254,7 +261,7 @@ namespace quda {
   }
 
   void DiracCoarse::createPreconditionedCoarseOp(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X) {
-    calculateYhat(Yhat, Xinv, Y, X);
+    calculateYhat(Yhat, Xinv, Y, X, native_lapack);
   }
 
   void DiracCoarse::Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const

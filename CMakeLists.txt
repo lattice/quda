@@ -217,39 +217,8 @@ option(QUDA_FLOAT8 "enable float-8 ordered fixed-point fields?" OFF)
 option(QUDA_NVML "use NVML to report CUDA graphics driver version" OFF)
 option(QUDA_NUMA_NVML "experimental use of NVML to set numa affinity" OFF)
 option(QUDA_VERBOSE_BUILD "display kernel register usage" OFF)
-option(QUDA_OPENMP "enable OpenMP" OFF)
-
-# QUDA BLAS lapack type. One can use the native implementation (CUDA)
-# or the generic implemtation if a native version is not availible.
-if(DEFINED ENV{QUDA_BLAS_LAPACK})
-  set(DEFBLAS_LAPACK $ENV{QUDA_BLAS_LAPACK})
-else()
-  set(DEFBLAS_LAPACK "NATIVE")
-endif()
-
-# Define valid types.
-set(VALID_BLAS_LAPACK_TYPES NATIVE GENERIC)
-set(QUDA_BLAS_LAPACK_TYPE "${DEFBLAS_LAPACK}" CACHE STRING "Choose the type of BLAS lapack, options are: ${VALID_BLAS_LAPACK_TYPES}")
-set_property(CACHE QUDA_BLAS_LAPACK_TYPE PROPERTY STRINGS NATIVE GENERIC)
-
-# Check that a valid type is set
-string(TOUPPER ${QUDA_BLAS_LAPACK_TYPE} CHECK_BLAS_LAPACK_TYPE)
-list(FIND VALID_BLAS_LAPACK_TYPES ${CHECK_BLAS_LAPACK_TYPE} BLAS_LAPACK_TYPE_VALID)
-if(BLAS_LAPACK_TYPE_VALID LESS 0)
-  message(SEND_ERROR "Please specify a valid QUDA_BLAS_LAPACK_TYPE type! Valid BLAS lapack types are:" "${VALID_BLAS_LAPACK_TYPES}")
-endif()
-
-# If using a generic implementation, it is highly likely
-# that the user will want to enable OpenMP, but they must have
-# an option to turn it off.
-option(QUDA_BLAS_GENERIC_OPENMP "enable OpenMP for generic BLAS" ON)
-if(${QUDA_BLAS_LAPACK_TYPE} STREQUAL "GENERIC")
-  set(QUDA_USE_EIGEN ON)
-  if(${QUDA_BLAS_GENERIC_OPENMP} STREQUAL "ON")
-    set(QUDA_OPENMP ON)
-  endif()
-endif()
-
+option(QUDA_BUILD_NATIVE_LAPACK "build the native lapack library according to QUDA_TARGET" ON)
+option(QUDA_OPENMP "enable OpenMP" ON)
 
 set(QUDA_MAX_MULTI_BLAS_N
     "4"
@@ -283,7 +252,7 @@ option(QUDA_INTERFACE_NVTX "add NVTC markup to interface calls" OFF)
 option(QUDA_SSTEP "build s-step linear solvers" OFF)
 option(QUDA_MULTIGRID "build multigrid solvers" OFF)
 option(QUDA_BLOCKSOLVER "build block solvers" OFF)
-option(QUDA_USE_EIGEN "use EIGEN library (where optional)" OFF)
+option(QUDA_USE_EIGEN "use EIGEN library (where optional)" ON)
 option(QUDA_DOWNLOAD_EIGEN "Download Eigen" ON)
 option(QUDA_DOWNLOAD_USQCD "Download USQCD software as requested by QUDA_QMP / QUDA_QIO" OFF)
 option(QUDA_DOWNLOAD_ARPACK "Download ARPACK-NG software as requested by QUDA_ARPACK" OFF)
@@ -350,6 +319,7 @@ elseif(${CPU_ARCH} STREQUAL "ppc64le")
   set(CXX_OPT "-Ofast -mcpu=native -mtune=native")
 endif()
 
+
 set(CMAKE_CXX_STANDARD ${QUDA_CXX_STANDARD})
 # define CXX FLAGS
 set(CMAKE_CXX_FLAGS_DEVEL
@@ -371,7 +341,7 @@ set(CMAKE_CXX_FLAGS_DEBUG
     "-Wall -Wno-unknown-pragmas -g -fno-inline"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(CMAKE_CXX_FLAGS_SANITIZE
-    "$-Wall -Wno-unknown-pragmas -g -fno-inline -fsanitize=address,undefined"
+    "-Wall -Wno-unknown-pragmas -g -fno-inline -fsanitize=address,undefined"
     CACHE STRING "Flags used by the C++ compiler during santizer debug builds.")
 
 enable_language(CXX)

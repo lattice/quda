@@ -1,22 +1,21 @@
-#ifndef NATIVE_BLAS_LIB
 #include <blas_lapack.h>
 #include <Eigen/LU>
 
 namespace quda {
   
-  namespace blas_lapack {
-      
+  namespace generic_lapack {
+    
     void init() {}
 
     void destroy() {}
     
     using namespace Eigen;
-
+    
     template<typename EigenMatrix, typename Float>
     void invertEigen(std::complex<Float> *A_eig, std::complex<Float> *Ainv_eig, int n, uint64_t batch) {
       
       EigenMatrix res = EigenMatrix::Zero(n,n);
-      EigenMatrix inv;
+      EigenMatrix inv = EigenMatrix::Zero(n,n);
       for(int j = 0; j<n; j++) {
 	for(int k = 0; k<n; k++) {
 	  res(k,j) = A_eig[batch*n*n + j*n + k];
@@ -75,15 +74,15 @@ namespace quda {
       long dsh = stop.tv_sec - start.tv_sec;
       long dush = stop.tv_usec - start.tv_usec;
       double timeh = dsh + 0.000001*dush;
-
-      printfQuda("CPU: Batched matrix inversion completed in %f seconds with GFLOPS = %f\n", timeh, 1e-9 * flops / timeh);
-
+      
+      if (getVerbosity() >= QUDA_SUMMARIZE)
+	printfQuda("CPU: Batched matrix inversion completed in %f seconds using %d OMP threads with GFLOPS = %f\n", timeh, omp_get_num_threads(), 1e-9 * flops / timeh);
+      
       qudaMemcpy((void*)Ainv, Ainv_h, size, cudaMemcpyHostToDevice);
       pool_pinned_free(Ainv_h);
       pool_pinned_free(A_h);
       
       return flops;
     }
-  } // namespace blas_lapack
+  } // namespace generic_lapack
 } // namespace quda
-#endif // NATIVE_BLAS_LIB

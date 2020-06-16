@@ -1,23 +1,35 @@
-#ifdef NATIVE_BLAS_LIB
 #include <blas_lapack.h>
+#ifdef NATIVE_LAPACK_LIB
 #include <cublas_v2.h>
 #include <malloc_quda.h>
-
+#endif
 namespace quda {
 
-  namespace blas_lapack { 
-
-      
+  namespace native_lapack { 
+    
+#ifdef NATIVE_LAPACK_LIB
     static cublasHandle_t handle;
-
+#endif
+    static bool cublas_init = false;
+      
     void init() {
-      cublasStatus_t error = cublasCreate(&handle);
-      if (error != CUBLAS_STATUS_SUCCESS) errorQuda("cublasCreate failed with error %d", error);
+      if(!cublas_init) {
+#ifdef NATIVE_LAPACK_LIB
+	cublasStatus_t error = cublasCreate(&handle);
+	if (error != CUBLAS_STATUS_SUCCESS) errorQuda("cublasCreate failed with error %d", error);
+	cublas_init = true;
+#endif
+      }
     }
 
     void destroy() {
-      cublasStatus_t error = cublasDestroy(handle);
-      if (error != CUBLAS_STATUS_SUCCESS) errorQuda("\nError indestroying cublas context, error code = %d\n", error);
+      if(cublas_init) {
+#ifdef NATIVE_LAPACK_LIB
+	cublasStatus_t error = cublasDestroy(handle);
+	if (error != CUBLAS_STATUS_SUCCESS) errorQuda("\nError indestroying cublas context, error code = %d\n", error);
+	cublas_init = false;
+#endif
+      }
     }
 
     // mini kernel to set the array of pointers needed for batched cublas
@@ -31,6 +43,7 @@ namespace quda {
     // FIXME do this in pipelined fashion to reduce memory overhead.
     long long BatchInvertMatrix(void *Ainv, void* A, const int n, const uint64_t batch, QudaPrecision prec, QudaFieldLocation location)
     {
+#ifdef NATIVE_LAPACK_LIB
       if (getVerbosity() >= QUDA_SUMMARIZE)
 	printfQuda("BatchInvertMatrixNATIVE: Nc = %d, batch = %lu\n", n, batch);
       long long flops = 0;      
@@ -112,7 +125,10 @@ namespace quda {
 	printfQuda("Batched matrix inversion completed in %f seconds with GFLOPS = %f\n", time, 1e-9 * flops / time);
       
       return flops;
+#else
+      errorQuda("Native BLAS not built. Please build and use native BLAS or use generic BLAS");
+      return 0; // Stops a compiler warning
+#endif
     }
-  } // namespace blas_lapack
+  } // namespace native_lapack
 } // namespace quda
-#endif //NATIVE_BLAS_LIB
