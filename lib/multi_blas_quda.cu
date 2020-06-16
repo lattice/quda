@@ -244,7 +244,7 @@ namespace quda {
 
       if (!is_valid_NXZ(NXZ, false, x[0]->Precision() < QUDA_SINGLE_PRECISION))
         errorQuda("NXZ=%d is not a valid size ( MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
-      if (NYW_max != NYW_max_check) errorQuda("Runtime %d and compile time %d limits disagree", NYW_max, NYW_max_check);
+      if (NYW_max != NYW_max_check) errorQuda("Compile-time %d and run-time %d limits disagree", NYW_max, NYW_max_check);
       if (NYW > NYW_max) errorQuda("NYW exceeds max size (%d > %d)", NYW, NYW_max);
       if (NXZ * NYW * scalar_width > MAX_MATRIX_SIZE)
         errorQuda("Coefficient matrix exceeds max size (%d > %d)", NXZ * NYW * scalar_width, MAX_MATRIX_SIZE);
@@ -464,7 +464,7 @@ namespace quda {
 #if (QUDA_PRECISION & 2)
             if (x[0]->Nspin() == 4) {
 #if defined(NSPIN4)
-              multiBlas<NXZ, Functor, float, short, 24, 4>(a, b, c, x, y, z, w, x[0]->Volume());
+              multiBlas<NXZ, Functor, float, short, 24, 4, float, 4>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif

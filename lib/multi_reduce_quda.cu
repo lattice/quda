@@ -237,9 +237,7 @@ namespace quda {
       const int NYW = y.size();
       const int N_MIN = NXZ < NYW ? NXZ : NYW;
       for (int i = 0; i < N_MIN; i++) {
-        checkSpinor(*x[i], *y[i]);
-        checkSpinor(*x[i], *z[i]);
-        checkSpinor(*x[i], *w[i]);
+        checkLength(*x[i], *y[i], *z[i], *w[i]);
         if (!x[i]->isNative()) {
           warningQuda("Reductions on non-native fields are not supported\n");
           return;
@@ -256,7 +254,7 @@ namespace quda {
 
       if (!is_valid_NXZ(NXZ, true))
         errorQuda("NXZ=%d is not a valid size ( MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
-      if (NYW_max != NYW_max_check) errorQuda("Runtime %d and compile time %d limits disagree", NYW_max_check, NYW_max);
+      if (NYW_max != NYW_max_check) errorQuda("Compile-time %d and run-time %d limits disagree", NYW_max, NYW_max_check);
       if (NXZ * NYW > QUDA_MAX_MULTI_REDUCE)
         errorQuda("NXZ * NYW = %d exceeds maximum number of reductions %d", NXZ * NYW, QUDA_MAX_MULTI_REDUCE);
       if (NYW > NYW_max) errorQuda("NYW exceeds max size (%d > %d)", NYW, NYW_max);
