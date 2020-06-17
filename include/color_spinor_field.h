@@ -634,17 +634,6 @@ namespace quda {
     mutable bool ghostTexInit; // whether the ghost texture object has been created
     mutable QudaPrecision ghost_precision_tex; /** the precision allocated for the ghost texture */
 
-#ifdef USE_TEXTURE_OBJECTS
-    cudaTextureObject_t tex;
-    cudaTextureObject_t texNorm;
-    void createTexObject();
-    void destroyTexObject();
-    mutable cudaTextureObject_t ghostTex[4]; // these are double buffered and variants to host-mapped buffers
-    mutable cudaTextureObject_t ghostTexNorm[4];
-    void createGhostTexObject() const;
-    void destroyGhostTexObject() const;
-#endif
-
     bool reference; // whether the field is a reference or not
 
     mutable void *ghost_field_tex[4]; // instance pointer to GPU halo buffer (used to check if static allocation has changed)
@@ -883,13 +872,6 @@ namespace quda {
 		       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false,
 		       QudaPrecision ghost_precision=QUDA_INVALID_PRECISION) const;
 
-#ifdef USE_TEXTURE_OBJECTS
-    inline const cudaTextureObject_t& Tex() const { return tex; }
-    inline const cudaTextureObject_t& TexNorm() const { return texNorm; }
-    inline const cudaTextureObject_t& GhostTex() const { return ghostTex[bufferIndex]; }
-    inline const cudaTextureObject_t& GhostTexNorm() const { return ghostTexNorm[bufferIndex]; }
-#endif
-
     cudaColorSpinorField& Component(const int idx) const;
     CompositeColorSpinorField& Components() const;
     void CopySubset(cudaColorSpinorField& dst, const int range, const int first_element=0) const;
@@ -897,8 +879,6 @@ namespace quda {
     void zero();
 
     friend std::ostream& operator<<(std::ostream &out, const cudaColorSpinorField &);
-
-    void getTexObjectInfo() const;
 
     void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0);
 

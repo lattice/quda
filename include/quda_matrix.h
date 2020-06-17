@@ -34,8 +34,6 @@ namespace quda {
       return make_double2(0.,0.);
     }
 
-
-
   template<class T>
     struct Identity
     {
@@ -74,8 +72,7 @@ namespace quda {
         __device__ __host__ constexpr int size() const { return N; }
 
         __device__ __host__ inline Matrix() {
-#pragma unroll
-	  for (int i=0; i<N*N; i++) zero(data[i]);
+          setZero(this);
 	}
 
 	__device__ __host__ inline Matrix(const Matrix<T,N> &a) {
@@ -306,7 +303,7 @@ namespace quda {
 
       __device__ __host__ inline HMatrix() {
 #pragma unroll
-	for (int i=0; i<N*N; i++) zero(data[i]);
+	for (int i=0; i<N*N; i++) data[i] = (T)0.0;
       }
 
       __device__ __host__ inline HMatrix(const HMatrix<T,N> &a) {

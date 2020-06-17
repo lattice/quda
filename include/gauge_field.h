@@ -447,17 +447,6 @@ namespace quda {
      */
     void zeroPad();
 
-#ifdef USE_TEXTURE_OBJECTS
-    cudaTextureObject_t tex;
-    cudaTextureObject_t evenTex;
-    cudaTextureObject_t oddTex;
-    cudaTextureObject_t phaseTex;
-    cudaTextureObject_t evenPhaseTex;
-    cudaTextureObject_t oddPhaseTex;
-    void createTexObject(cudaTextureObject_t &tex, void *gauge, bool full, bool isPhase=false);
-    void destroyTexObject();
-#endif
-
   public:
     cudaGaugeField(const GaugeFieldParam &);
     virtual ~cudaGaugeField();
@@ -583,14 +572,6 @@ namespace quda {
     const void* Gauge_p() const { return gauge; }
     const void* Even_p() const { return even; }
     const void *Odd_p() const { return odd; }
-
-#ifdef USE_TEXTURE_OBJECTS
-    const cudaTextureObject_t& Tex() const { return tex; }
-    const cudaTextureObject_t& EvenTex() const { return evenTex; }
-    const cudaTextureObject_t& OddTex() const { return oddTex; }
-    const cudaTextureObject_t& EvenPhaseTex() const { return evenPhaseTex; }
-    const cudaTextureObject_t& OddPhaseTex() const { return oddPhaseTex; }
-#endif
 
     void setGauge(void* _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
 

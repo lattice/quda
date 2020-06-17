@@ -20,7 +20,6 @@
 #include <color_spinor.h>
 #include <color_spinor_field.h>
 #include <trove_helper.cuh>
-#include <texture_helper.cuh>
 #include <transform_reduce.h>
 
 namespace quda {
@@ -489,7 +488,7 @@ namespace quda {
 
 
     template <typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order,
-      typename storeFloat=Float, typename ghostFloat=storeFloat, bool disable_ghost=false, bool block_float=false, bool use_tex=false>
+      typename storeFloat=Float, typename ghostFloat=storeFloat, bool disable_ghost=false, bool block_float=false>
       class FieldOrderCB {
 
       typedef float norm_type;
@@ -628,10 +627,10 @@ namespace quda {
       {
 #ifdef __CUDA_ARCH__
         if (!fixed) {
-          return complex<Float>( use_tex ? __ldg(v + accessor.index(parity,x_cb,s,c,n)) : v[accessor.index(parity,x_cb,s,c,n)]);
+          return complex<Float>(__ldg(v + accessor.index(parity,x_cb,s,c,n)));
 	} else {
-	  complex<storeFloat> tmp = use_tex ? __ldg(v + accessor.index(parity,x_cb,s,c,n)) : v[accessor.index(parity,x_cb,s,c,n)];
-	  Float norm_ = block_float ? (use_tex ? __ldg(norm + parity*norm_offset+x_cb) : norm[parity*norm_offset+x_cb]) : scale_inv;
+	  complex<storeFloat> tmp = __ldg(v + accessor.index(parity,x_cb,s,c,n));
+	  Float norm_ = block_float ? __ldg(norm + parity*norm_offset+x_cb) : scale_inv;
 	  return norm_*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
         }
 #else
@@ -671,14 +670,11 @@ namespace quda {
       {
 #ifdef __CUDA_ARCH__
         if (!ghost_fixed) {
-          return complex<Float>( use_tex ? __ldg(ghost[2*dim+dir]+ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)) :
-				 ghost[2*dim+dir][ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)] );
+          return complex<Float>( __ldg(ghost[2*dim+dir]+ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)) );
         } else {
           Float scale = ghost_scale_inv;
-          if (block_float_ghost) scale *= (use_tex ? __ldg(ghost_norm[2*dim+dir]+parity*ghostAccessor.faceVolumeCB[dim] + x_cb) :
-					   ghost_norm[2*dim+dir][parity*ghostAccessor.faceVolumeCB[dim] + x_cb]);
-          complex<ghostFloat> tmp = (use_tex ? __ldg(ghost[2*dim+dir] + ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)) :
-				     ghost[2*dim+dir][ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)]);
+          if (block_float_ghost) scale *= __ldg(ghost_norm[2*dim+dir]+parity*ghostAccessor.faceVolumeCB[dim] + x_cb);
+          complex<ghostFloat> tmp = __ldg(ghost[2*dim+dir] + ghostAccessor.index(dim,dir,parity,x_cb,s,c,n));
           return scale*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
         }
 #else
@@ -854,11 +850,6 @@ namespace quda {
       norm_type *norm;
       const AllocInt offset; // offset can be 32-bit or 64-bit
       const AllocInt norm_offset;
-#ifdef USE_TEXTURE_OBJECTS
-      typedef typename TexVectorType<real, N>::type TexVector;
-      cudaTextureObject_t tex;
-      cudaTextureObject_t texNorm;
-#endif
       int volumeCB;
       int faceVolumeCB[4];
       int stride;
@@ -874,10 +865,6 @@ namespace quda {
         offset(a.Bytes() / (2 * sizeof(Float) * N)),
         norm(norm_ ? norm_ : (norm_type *)a.Norm()),
         norm_offset(a.NormBytes() / (2 * sizeof(norm_type))),
-#ifdef USE_TEXTURE_OBJECTS
-        tex(0),
-        texNorm(0),
-#endif
         volumeCB(a.VolumeCB()),
         stride(a.Stride()),
         nParity(a.SiteSubset()),
@@ -888,15 +875,6 @@ namespace quda {
       faceVolumeCB[i] = a.SurfaceCB(i)*nFace;
     }
     resetGhost(a, ghost_ ? (void **)ghost_ : a.Ghost());
-#ifdef USE_TEXTURE_OBJECTS
-    if (a.Location() == QUDA_CUDA_FIELD_LOCATION) {
-      tex = static_cast<const cudaColorSpinorField&>(a).Tex();
-      texNorm = static_cast<const cudaColorSpinorField&>(a).TexNorm();
-    }
-    if (!huge_alloc && (this->field != a.V() || (a.Precision() == QUDA_HALF_PRECISION && this->norm != a.Norm()) || (a.Precision() == QUDA_QUARTER_PRECISION && this->norm != a.Norm())) && !override) {
-      errorQuda("Cannot use texture read since data pointer does not equal field pointer - use with huge_alloc=true instead");
-    }
-#endif
   }
 
   void resetGhost(const ColorSpinorField &a, void *const *ghost_) const
@@ -917,36 +895,16 @@ namespace quda {
     real v[length];
     norm_type nrm;
     if (isFixed<Float>::value) {
-#if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
-      // use textures unless we have a large alloc
-      nrm = !huge_alloc ? tex1Dfetch_<float>(texNorm, x + parity * norm_offset) : norm[x + parity * norm_offset];
-#else
       nrm = vector_load<float>(norm, x + parity * norm_offset);
-#endif
     }
 
 #pragma unroll
     for (int i=0; i<M; i++) {
-#if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
-      if (!huge_alloc) { // use textures unless we have a huge alloc
-        // first do texture load from memory
-        TexVector vecTmp = tex1Dfetch_<TexVector>(tex, parity * offset + stride * i + x);
-        // now insert into output array
+      // first load from memory
+      Vector vecTmp = vector_load<Vector>(field, parity * offset + x + stride * i);
+      // now copy into output and scale
 #pragma unroll
-        for (int j = 0; j < N; j++) copy(v[i * N + j], reinterpret_cast<real *>(&vecTmp)[j]);
-        if (isFixed<Float>::value) {
-#pragma unroll
-          for (int j = 0; j < N; j++) v[i * N + j] *= nrm;
-        }
-      } else
-#endif
-      {
-        // first load from memory
-        Vector vecTmp = vector_load<Vector>(field, parity * offset + x + stride * i);
-        // now copy into output and scale
-#pragma unroll
-        for (int j = 0; j < N; j++) copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
-      }
+      for (int j = 0; j < N; j++) copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
     }
 
 #pragma unroll
