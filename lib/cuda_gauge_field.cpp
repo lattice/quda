@@ -668,7 +668,7 @@ namespace quda {
 	}
 
 	// this copies over both even and odd
-	qudaMemcpy(gauge, buffer, bytes, cudaMemcpyHostToDevice);
+	qudaMemcpy(gauge, buffer, bytes, cudaMemcpyDefault);
 	pool_pinned_free(buffer);
       } else { // else on the GPU
 
@@ -695,16 +695,16 @@ namespace quda {
 
 	  if (src.Order() == QUDA_QDP_GAUGE_ORDER) {
 	    for (int d=0; d<geometry; d++) {
-	      qudaMemcpy(((void**)buffer)[d], ((void**)src.Gauge_p())[d], src.Bytes()/geometry, cudaMemcpyHostToDevice);
+	      qudaMemcpy(((void**)buffer)[d], ((void**)src.Gauge_p())[d], src.Bytes()/geometry, cudaMemcpyDefault);
 	    }
 	  } else {
-	    qudaMemcpy(buffer, src.Gauge_p(), src.Bytes(), cudaMemcpyHostToDevice);
+	    qudaMemcpy(buffer, src.Gauge_p(), src.Bytes(), cudaMemcpyDefault);
 	  }
 
 	  if (src.Order() > 4 && GhostExchange() == QUDA_GHOST_EXCHANGE_PAD &&
 	      src.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
 	    for (int d=0; d<geometry; d++)
-	      qudaMemcpy(ghost_buffer[d], src.Ghost()[d], ghost_bytes[d], cudaMemcpyHostToDevice);
+	      qudaMemcpy(ghost_buffer[d], src.Ghost()[d], ghost_bytes[d], cudaMemcpyDefault);
 
 	  if (ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED && src.GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
 	    copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer, 0, ghost_buffer);
@@ -779,15 +779,15 @@ namespace quda {
 	}
 
 	if (cpu.Order() == QUDA_QDP_GAUGE_ORDER) {
-	  for (int d=0; d<geometry; d++) qudaMemcpy(((void**)cpu.gauge)[d], ((void**)buffer)[d], cpu.Bytes()/geometry, cudaMemcpyDeviceToHost);
+	  for (int d=0; d<geometry; d++) qudaMemcpy(((void**)cpu.gauge)[d], ((void**)buffer)[d], cpu.Bytes()/geometry, cudaMemcpyDefault);
 	} else {
-	  qudaMemcpy(cpu.gauge, buffer, cpu.Bytes(), cudaMemcpyDeviceToHost);
+	  qudaMemcpy(cpu.gauge, buffer, cpu.Bytes(), cudaMemcpyDefault);
 	}
 
 	if (cpu.Order() > 4 && GhostExchange() == QUDA_GHOST_EXCHANGE_PAD &&
 	    cpu.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
 	  for (int d=0; d<geometry; d++)
-	    qudaMemcpy(cpu.Ghost()[d], ghost_buffer[d], ghost_bytes[d], cudaMemcpyDeviceToHost);
+	    qudaMemcpy(cpu.Ghost()[d], ghost_buffer[d], ghost_bytes[d], cudaMemcpyDefault);
 
 	free_gauge_buffer(buffer, cpu.Order(), cpu.Geometry());
 	if (nFace > 0) free_ghost_buffer(ghost_buffer, cpu.Order(), geometry);
@@ -795,7 +795,7 @@ namespace quda {
     } else if (reorder_location() == QUDA_CPU_FIELD_LOCATION) { // do copy then host-side reorder
 
       void *buffer = pool_pinned_malloc(bytes);
-      qudaMemcpy(buffer, gauge, bytes, cudaMemcpyDeviceToHost);
+      qudaMemcpy(buffer, gauge, bytes, cudaMemcpyDefault);
 
       if (cpu.GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
 	copyGenericGauge(cpu, *this, QUDA_CPU_FIELD_LOCATION, cpu.gauge, buffer);
@@ -824,7 +824,7 @@ namespace quda {
   void cudaGaugeField::backup() const {
     if (backed_up) errorQuda("Gauge field already backed up");
     backup_h = new char[bytes];
-    cudaMemcpy(backup_h, gauge, bytes, cudaMemcpyDeviceToHost);
+    cudaMemcpy(backup_h, gauge, bytes, cudaMemcpyDefault);
     checkCudaError();
     backed_up = true;
   }
@@ -832,7 +832,7 @@ namespace quda {
   void cudaGaugeField::restore() const
   {
     if (!backed_up) errorQuda("Cannot restore since not backed up");
-    cudaMemcpy(gauge, backup_h, bytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(gauge, backup_h, bytes, cudaMemcpyDefault);
     delete []backup_h;
     checkCudaError();
     backed_up = false;
