@@ -28,9 +28,9 @@ template <typename store_t, bool is_fixed> struct SpinorNorm {
     cb_norm_offset = x.NormBytes() / (2 * sizeof(norm_t));
   }
 
-  __device__ inline norm_t load_norm(const int i, const int parity = 0) const { return norm[cb_norm_offset * parity + i]; }
+  __device__ __host__ inline norm_t load_norm(const int i, const int parity = 0) const { return norm[cb_norm_offset * parity + i]; }
 
-  template <typename real, int n> __device__ inline norm_t store_norm(const vector_type<complex<real>, n> &v, int x, int parity)
+  template <typename real, int n> __device__ __host__ inline norm_t store_norm(const vector_type<complex<real>, n> &v, int x, int parity)
   {
     norm_t max_[n];
     // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
@@ -58,8 +58,8 @@ template <typename store_type_t> struct SpinorNorm<store_type_t, false> {
   SpinorNorm(const SpinorNorm &sn) {}
   SpinorNorm &operator=(const SpinorNorm &src) { return *this; }
   void set(const ColorSpinorField &x) {}
-  __device__ inline norm_t load_norm(const int i, const int parity = 0) const { return 1.0; }
-  template <typename real, int n> __device__ inline norm_t store_norm(const vector_type<real, n> &v, int x, int parity) { return 1.0; }
+  __device__ __host__ inline norm_t load_norm(const int i, const int parity = 0) const { return 1.0; }
+  template <typename real, int n> __device__ __host__ inline norm_t store_norm(const vector_type<real, n> &v, int x, int parity) { return 1.0; }
   void backup(char **norm_h, size_t norm_bytes) {}
   void restore(char **norm_h, size_t norm_bytes) {}
   norm_t *Norm() { return nullptr; }
@@ -123,7 +123,7 @@ public:
   }
 
   template <typename real, int n>
-  __device__ inline void load(vector_type<complex<real>, n> &v, int x, int parity = 0) const
+  __device__ __host__ inline void load(vector_type<complex<real>, n> &v, int x, int parity = 0) const
   {
     constexpr int len = 2 * n; // real-valued length
     float nrm = isFixed<store_t>::value ? SN::load_norm(x, parity) : 0.0;

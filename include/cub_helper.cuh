@@ -32,6 +32,22 @@ struct __half { };
 
 namespace quda {
 
+  __device__ __host__ inline void zero(double &a) { a = 0.0; }
+  __device__ __host__ inline void zero(double2 &a) { a.x = 0.0; a.y = 0.0; }
+  __device__ __host__ inline void zero(double3 &a) { a.x = 0.0; a.y = 0.0; a.z = 0.0; }
+  __device__ __host__ inline void zero(double4 &a) { a.x = 0.0; a.y = 0.0; a.z = 0.0; a.w = 0.0; }
+
+  __device__ __host__ inline void zero(float &a) { a = 0.0; }
+  __device__ __host__ inline void zero(float2 &a) { a.x = 0.0; a.y = 0.0; }
+  __device__ __host__ inline void zero(float3 &a) { a.x = 0.0; a.y = 0.0; a.z = 0.0; }
+  __device__ __host__ inline void zero(float4 &a) { a.x = 0.0; a.y = 0.0; a.z = 0.0; a.w = 0.0; }
+
+#ifdef QUAD_SUM
+  __device__ __host__ inline void zero(doubledouble &x) { x.a.x = 0.0; x.a.y = 0.0; }
+  __device__ __host__ inline void zero(doubledouble2 &x) { zero(x.x); zero(x.y); }
+  __device__ __host__ inline void zero(doubledouble3 &x) { zero(x.x); zero(x.y); zero(x.z); }
+#endif
+
   /**
      struct which acts as a wrapper to a vector of data.
    */
@@ -85,12 +101,6 @@ namespace quda {
     }
 
   };
-
-#ifdef QUAD_SUM
-  __device__ __host__ inline void zero(doubledouble &x) { x.a.x = 0.0; x.a.y = 0.0; }
-  __device__ __host__ inline void zero(doubledouble2 &x) { zero(x.x); zero(x.y); }
-  __device__ __host__ inline void zero(doubledouble3 &x) { zero(x.x); zero(x.y); zero(x.z); }
-#endif
 
   __device__ unsigned int count[QUDA_MAX_MULTI_REDUCE] = { };
   __shared__ bool isLastBlockDone;

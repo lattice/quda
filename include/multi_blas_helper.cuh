@@ -69,7 +69,7 @@ namespace quda
       constexpr int arg_size = (MAX_ARG_SIZE - sizeof(int)                                    // NYW parameter
                                 - sizeof(SpinorX[NXZ])                                        // SpinorX array
                                 - (Functor::use_z ? sizeof(SpinorZ[NXZ]) : sizeof(SpinorZ *)) // SpinorZ array
-                                - sizeof(int)                                                 // functor NYW member
+                                - 2 * sizeof(int)                                             // functor NXZ/NYW members
                                 - sizeof(int)                                                 // length parameter
                                 - (!Functor::use_w ? sizeof(SpinorW *) : 0)   // subtract pointer if not using W
                                 - (Functor::reducer ? sizeof(ReduceArg<void*>) : 0) // reduction buffers
@@ -125,7 +125,7 @@ namespace quda
       int arg_size = (MAX_ARG_SIZE - sizeof(int)                       // NYW parameter
                       - NXZ * spinor_x_size                            // SpinorX array
                       - (use_z ? NXZ * spinor_z_size : sizeof(void *)) // SpinorZ array (else dummy pointer)
-                      - sizeof(int)                                    // functor NYW member
+                      - 2 * sizeof(int)                                    // functor NXZ/NYW members
                       - sizeof(int)                                    // length parameter
                       - (!use_w ? sizeof(void *) : 0)                  // subtract dummy pointer if not using W
                       - (reduce ? sizeof(ReduceArg<void*>) : 0)              // reduction buffers
@@ -138,26 +138,33 @@ namespace quda
       return std::min(arg_size, coeff_size);
     }
 
-    template <int NXZ, typename SpinorX, typename SpinorZ, bool> struct SpinorXZ {
-      SpinorX X[NXZ];
-      SpinorZ *Z;
-      SpinorXZ() : Z(reinterpret_cast<SpinorZ *>(X)) {}
+    template <int NXZ, typename store_t, int N, bool> struct SpinorXZ {
+      Spinor<store_t, N> X[NXZ];
+      Spinor<store_t, N> *Z;
+      SpinorXZ() : Z(X) {}
     };
 
-    template <int NXZ, typename SpinorX, typename SpinorZ> struct SpinorXZ<NXZ, SpinorX, SpinorZ, true> {
-      SpinorX X[NXZ];
-      SpinorZ Z[NXZ];
+    template <int NXZ, typename store_t, int N> struct SpinorXZ<NXZ, store_t, N, true> {
+      Spinor<store_t, N> X[NXZ];
+      Spinor<store_t, N> Z[NXZ];
     };
 
-    template <int NYW, typename SpinorY, typename SpinorW, bool> struct SpinorYW {
-      SpinorY Y[NYW];
-      SpinorW *W;
-      SpinorYW() : W(reinterpret_cast<SpinorW *>(Y)) {}
+    template <int NYW, typename store_t, int N, bool> struct SpinorYW {
+      Spinor<store_t, N> Y[NYW];
+      Spinor<store_t, N> *W;
+      SpinorYW() : W(Y) {}
     };
 
-    template <int NYW, typename SpinorY, typename SpinorW> struct SpinorYW<NYW, SpinorY, SpinorW, true> {
-      SpinorY Y[NYW];
-      SpinorW W[NYW];
+    template <int NYW, typename store_t, int N> struct SpinorYW<NYW, store_t, N, true> {
+      Spinor<store_t, N> Y[NYW];
+      Spinor<store_t, N> W[NYW];
+    };
+
+    template <typename T> struct coeff_array {
+      using type = T;
+      const T *data;
+      coeff_array() : data(nullptr) {}
+      coeff_array(const T *data) : data(data) {}
     };
 
     namespace detail

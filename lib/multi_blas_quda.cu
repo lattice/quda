@@ -15,18 +15,20 @@ namespace quda {
 
     qudaStream_t* getStream();
 
-    template <int NXZ, typename real, int len, typename SpinorX, typename SpinorY, typename SpinorZ,
-              typename SpinorW, typename Functor, typename T>
+    template <template <typename ...> class Functor, typename store_t, typename y_store_t,
+              int nSpin, typename T, int NXZ_ = 1>
     class MultiBlas : public TunableVectorY
     {
-      static constexpr int NYW_max = max_YW_size<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Functor>();
+      using real = typename mapper<y_store_t>::type;
+      static constexpr int NXZ = isFixed<store_t>::value && NXZ_ == 128 ? 64 : NXZ_;
       const int NYW;
+      Functor<real> f;
       int max_warp_split;
       mutable int warp_split; // helper used to keep track of current warp splitting
       const int nParity;
-      mutable MultiBlasArg<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Functor> arg;
-      const coeff_array<T> &a, &b, &c;
+      const T &a, &b, &c;
       std::vector<ColorSpinorField *> &x, &y, &z, &w;
+      const QudaFieldLocation location;
 
       bool tuneSharedBytes() const { return false; }
 
@@ -34,149 +36,160 @@ namespace quda {
       unsigned int minGridSize() const { return maxGridSize(); }
 
   public:
-    MultiBlas(SpinorX X[], SpinorY Y[], SpinorZ Z[], SpinorW W[], Functor &f, const coeff_array<T> &a,
-              const coeff_array<T> &b, const coeff_array<T> &c, std::vector<ColorSpinorField *> &x,
-              std::vector<ColorSpinorField *> &y, std::vector<ColorSpinorField *> &z,
-              std::vector<ColorSpinorField *> &w, int NYW, int length) :
-      TunableVectorY(NYW),
-      NYW(NYW),
-      warp_split(1),
-      nParity(x[0]->SiteSubset()),
-      arg(X, Y, Z, W, f, NYW, length / nParity),
-      a(a),
-      b(b),
-      c(c),
-      x(x),
-      y(y),
-      z(z),
-      w(w)
-    {
-      // heuristic for enabling if we need the warp-splitting optimization
-      const int gpu_size = 2 * deviceProp.maxThreadsPerBlock * deviceProp.multiProcessorCount;
-      switch (gpu_size / (x[0]->Length() * NYW)) {
-      case 0: max_warp_split = 1; break; // we have plenty of work, no need to split
-      case 1: max_warp_split = 2; break; // double the thread count
-      case 2:                            // quadruple the thread count
-      default: max_warp_split = 4;
-      }
-      max_warp_split = std::min(NXZ, max_warp_split); // ensure we only split if valid
+      MultiBlas(const T &a, const T &b, const T &c, const ColorSpinorField &x_meta, const ColorSpinorField &y_meta,
+                std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
+                std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w) :
+        TunableVectorY(y.size()),
+        NYW(y.size()),
+        f(NXZ, NYW),
+        warp_split(1),
+        nParity(x[0]->SiteSubset()),
+        a(a),
+        b(b),
+        c(c),
+        x(x),
+        y(y),
+        z(z),
+        w(w),
+        location(checkLocation(*x[0], *y[0], *z[0], *w[0]))
+      {
+        checkLength(*x[0], *y[0], *z[0], *w[0]);
+        auto x_prec = checkPrecision(*x[0], *z[0]);
+        auto y_prec = checkPrecision(*y[0], *w[0]);
+        auto x_order = checkOrder(*x[0], *z[0]);
+        auto y_order = checkOrder(*y[0], *w[0]);
+        if (x_prec == y_prec && x_order != y_order) errorQuda("Orders %d %d do not match", x_order, y_order);
 
-      Amatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(a.data));
-      Bmatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(b.data));
-      Cmatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(c.data));
+        // check sizes are valid
+        constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, decltype(f)>();
+        constexpr int scalar_width = sizeof(typename decltype(f)::coeff_t) / sizeof(real);
+        const int NYW_max_check = max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), f.use_z, f.use_w, scalar_width, false);
 
-      strcpy(aux, x[0]->AuxString());
-      if (x[0]->Precision() != y[0]->Precision()) {
-        strcat(aux, ",");
-        strcat(aux, y[0]->AuxString());
-      }
+        if (!is_valid_NXZ(NXZ, false, x[0]->Precision() < QUDA_SINGLE_PRECISION))
+          errorQuda("NXZ=%d is not a valid size ( MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
+        if (NYW_max != NYW_max_check) errorQuda("Compile-time %d and run-time %d limits disagree", NYW_max, NYW_max_check);
+        if (NYW > NYW_max) errorQuda("NYW exceeds max size (%d > %d)", NYW, NYW_max);
+        if (NXZ * NYW * scalar_width > MAX_MATRIX_SIZE)
+          errorQuda("Coefficient matrix exceeds max size (%d > %d)", NXZ * NYW * scalar_width, MAX_MATRIX_SIZE);
+
+        // heuristic for enabling if we need the warp-splitting optimization
+        const int gpu_size = 2 * deviceProp.maxThreadsPerBlock * deviceProp.multiProcessorCount;
+        switch (gpu_size / (x[0]->Length() * NYW)) {
+        case 0: max_warp_split = 1; break; // we have plenty of work, no need to split
+        case 1: max_warp_split = 2; break; // double the thread count
+        case 2:                            // quadruple the thread count
+        default: max_warp_split = 4;
+        }
+        max_warp_split = std::min(NXZ, max_warp_split); // ensure we only split if valid
+
+        Amatrix_h = reinterpret_cast<signed char *>(const_cast<typename T::type *>(a.data));
+        Bmatrix_h = reinterpret_cast<signed char *>(const_cast<typename T::type *>(b.data));
+        Cmatrix_h = reinterpret_cast<signed char *>(const_cast<typename T::type *>(c.data));
+
+        strcpy(aux, x[0]->AuxString());
+        if (x[0]->Precision() != y[0]->Precision()) {
+          strcat(aux, ",");
+          strcat(aux, y[0]->AuxString());
+        }
 
 #ifdef JITIFY
         ::quda::create_jitify_program("kernels/multi_blas_core.cuh");
 #endif
+
+        apply(*getStream());
+        checkCudaError();
+
+        blas::bytes += bytes();
+        blas::flops += flops();
       }
 
-      virtual ~MultiBlas() {}
-
-      inline TuneKey tuneKey() const
+      TuneKey tuneKey() const
       {
         char name[TuneKey::name_n];
         strcpy(name, num_to_string<NXZ>::value);
         strcat(name, std::to_string(NYW).c_str());
-        strcat(name, typeid(arg.f).name());
+        strcat(name, typeid(f).name());
         return TuneKey(x[0]->VolString(), name, aux);
       }
 
-      inline void apply(const qudaStream_t &stream)
+      template <typename buffer_t>
+      void set_param(buffer_t &d, const T &h, const qudaStream_t &stream)
       {
+        using coeff_t = typename decltype(f)::coeff_t;
+        constexpr size_t n_coeff = MAX_MATRIX_SIZE / sizeof(coeff_t);
+
+        coeff_t tmp[n_coeff];
+        for (int i = 0; i < NXZ; i++)
+          for (int j = 0; j < NYW; j++) tmp[NYW * i + j] = coeff_t(h.data[NYW * i + j]);
+        cudaMemcpyToSymbolAsync(d, tmp, NXZ * NYW * sizeof(decltype(tmp[0])), 0, cudaMemcpyHostToDevice, stream);
+        //cuMemcpyHtoDAsync(d, tmp, NXZ * NYW * sizeof(decltype(tmp[0])), stream);
+      }
+
+      void apply(const qudaStream_t &stream)
+      {
+        constexpr bool site_unroll = !std::is_same<store_t, y_store_t>::value || isFixed<store_t>::value;
+        if (site_unroll && (x[0]->Ncolor() != 3 || x[0]->Nspin() == 2))
+          errorQuda("site unroll not supported for nSpin = %d nColor = %d", x[0]->Nspin(), x[0]->Ncolor());
+
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-        using coeff_t = typename decltype(arg.f)::coeff_t;
-        size_t n_coeff = MAX_MATRIX_SIZE / sizeof(coeff_t);
+        if (location == QUDA_CUDA_FIELD_LOCATION) {
+          // need to add native check here
+          constexpr int N = n_vector<store_t, true, nSpin, site_unroll>();
+          constexpr int Ny = n_vector<y_store_t, true, nSpin, site_unroll>();
+          constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
+          const int length = x[0]->Length() / (nParity * M);
+
+          MultiBlasArg<NXZ, store_t, N, y_store_t, Ny, decltype(f)> arg(x, y, z, w, f, NYW, length);
+
 #ifdef JITIFY
-        using namespace jitify::reflection;
-        auto instance = program->kernel("quda::blas::multiBlasKernel")
-                          .instantiate(Type<real>(), len, NXZ, tp.aux.x, Type<decltype(arg)>());
+          using namespace jitify::reflection;
+          auto instance = program->kernel("quda::blas::multiBlasKernel")
+            .instantiate(Type<real>(), M, NXZ, tp.aux.x, Type<decltype(arg)>());
 
-        if (a.data) {
-          coeff_t A[n_coeff];
-          for (int i = 0; i < NXZ; i++)
-            for (int j = 0; j < NYW; j++) A[NYW * i + j] = coeff_t(a.data[NYW * i + j]);
+          set_param(instant.get_constant_ptr("quda::blas::Amatrix_d"), a);
+          set_param(instant.get_constant_ptr("quda::blas::Bmatrix_d"), b);
+          set_param(instant.get_constant_ptr("quda::blas::Cmatrix_d"), c);
 
-          auto Amatrix_d = instance.get_constant_ptr("quda::blas::Amatrix_d");
-          cuMemcpyHtoDAsync(Amatrix_d, A, NXZ * NYW * sizeof(decltype(A[0])), stream);
-        }
-
-        if (b.data) {
-          coeff_t B[n_coeff];
-          for (int i = 0; i < NXZ; i++)
-            for (int j = 0; j < NYW; j++) B[NYW * i + j] = coeff_t(b.data[NYW * i + j]);
-
-          auto Bmatrix_d = instance.get_constant_ptr("quda::blas::Bmatrix_d");
-          cuMemcpyHtoDAsync(Bmatrix_d, B, NXZ * NYW * sizeof(decltype(B[0])), stream);
-        }
-
-        if (c.data) {
-          coeff_t C[n_coeff];
-          for (int i = 0; i < NXZ; i++)
-            for (int j = 0; j < NYW; j++) C[NYW * i + j] = coeff_t(Complex(c.data[NYW * i + j]);
-          auto Cmatrix_d = instance.get_constant_ptr("quda::blas::Cmatrix_d");
-          cuMemcpyHtoDAsync(Cmatrix_d, C, NXZ * NYW * sizeof(decltype(C[0])), stream);
-        }
-
-        tp.block.x *= tp.aux.x; // include warp-split factor
-        jitify_error = instance.configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
-        tp.block.x /= tp.aux.x; // restore block size
+          tp.block.x *= tp.aux.x; // include warp-split factor
+          jitify_error = instance.configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
+          tp.block.x /= tp.aux.x; // restore block size
 #else
-        if (a.data) {
-          coeff_t A[n_coeff];
-          for (int i = 0; i < NXZ; i++)
-            for (int j = 0; j < NYW; j++) A[NYW * i + j] = coeff_t(a.data[NYW * i + j]);
-          cudaMemcpyToSymbolAsync(Amatrix_d, A, NXZ * NYW * sizeof(decltype(A[0])), 0, cudaMemcpyHostToDevice, stream);
-        }
+          if (a.data) { set_param(Amatrix_d, a, stream); }
+          if (b.data) { set_param(Bmatrix_d, b, stream); }
+          if (c.data) { set_param(Cmatrix_d, c, stream); }
 
-        if (b.data) {
-          coeff_t B[n_coeff];
-          for (int i = 0; i < NXZ; i++)
-            for (int j = 0; j < NYW; j++) B[NYW * i + j] = coeff_t(b.data[NYW * i + j]);
-          cudaMemcpyToSymbolAsync(Bmatrix_d, B, NXZ * NYW * sizeof(decltype(B[0])), 0, cudaMemcpyHostToDevice, stream);
-        }
+          tp.block.x *= tp.aux.x; // include warp-split factor
 
-        if (c.data) {
-          coeff_t C[n_coeff];
-          for (int i = 0; i < NXZ; i++)
-            for (int j = 0; j < NYW; j++) C[NYW * i + j] = coeff_t(c.data[NYW * i + j]);
-          cudaMemcpyToSymbolAsync(Cmatrix_d, C, NXZ * NYW * sizeof(decltype(C[0])), 0, cudaMemcpyHostToDevice, stream);
-        }
-
-        tp.block.x *= tp.aux.x; // include warp-split factor
-
-        switch (tp.aux.x) {
-        case 1: multiBlasKernel<real, len, NXZ, 1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+          switch (tp.aux.x) {
+          case 1: multiBlasKernel<real, M, NXZ, 1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
 #ifdef WARP_SPLIT
-        case 2: multiBlasKernel<real, len, NXZ, 2><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
-        case 4: multiBlasKernel<real, len, NXZ, 4><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+          case 2: multiBlasKernel<real, M, NXZ, 2><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+          case 4: multiBlasKernel<real, M, NXZ, 4><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
 #endif
-        default: errorQuda("warp-split factor %d not instantiated", tp.aux.x);
-        }
+          default: errorQuda("warp-split factor %d not instantiated", tp.aux.x);
+          }
 
-        tp.block.x /= tp.aux.x; // restore block size
+          tp.block.x /= tp.aux.x; // restore block size
 #endif
+        } else {
+          errorQuda("Only implemented for GPU fields");
+        }
       }
 
       void preTune()
       {
         for (int i = 0; i < NYW; ++i) {
-          if (arg.f.write.Y) y[i]->backup();
-          if (arg.f.write.W) w[i]->backup();
+          if (f.write.Y) y[i]->backup();
+          if (f.write.W) w[i]->backup();
         }
       }
 
       void postTune()
       {
         for (int i = 0; i < NYW; ++i) {
-          if (arg.f.write.Y) y[i]->restore();
-          if (arg.f.write.W) w[i]->restore();
+          if (f.write.Y) y[i]->restore();
+          if (f.write.W) w[i]->restore();
         }
       }
 
@@ -217,326 +230,49 @@ namespace quda {
         param.aux = make_int4(1, 0, 0, 0); // warp-split parameter
       }
 
-      long long flops() const { return arg.f.flops() * x[0]->Length(); }
+      long long flops() const { return f.flops() * x[0]->Length(); }
 
       long long bytes() const
       {
         // the factor two here assumes we are reading and writing to the high precision vector
-        return ((arg.f.streams() - 2) * x[0]->Bytes() + 2 * y[0]->Bytes());
+        return ((f.streams() - 2) * x[0]->Bytes() + 2 * y[0]->Bytes());
       }
 
       int tuningIter() const { return 3; }
     };
 
-      template <int NXZ_, template <int, typename> class Functor, typename real, typename store_t,
-                int len, int N, typename y_store_t = store_t, int Ny = N, typename T>
+    template <template <typename ...> class Functor, typename store_t, typename y_store_t,
+              int nSpin, typename T, int NXZ_>
+    constexpr int MultiBlas<Functor, store_t, y_store_t, nSpin, T, NXZ_>::NXZ;
+
+    template <int NXZ, template <typename ...> class Functor, typename T>
     void multiBlas(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
-                   std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
-                   std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w, int length)
+                   CompositeColorSpinorField &x, CompositeColorSpinorField &y,
+                   CompositeColorSpinorField &z, CompositeColorSpinorField &w)
     {
-      const int NYW = y.size();
-      // the below line enable NXZ = 128 for floating point types, which is invalid for fixed-point types
-      constexpr int NXZ = isFixed<store_t>::value && NXZ_ == 128 ? 64 : NXZ_;
-      Functor<NXZ, real> f(NYW);
-      constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, decltype(f)>();
-      constexpr int scalar_width = sizeof(typename decltype(f)::coeff_t) / sizeof(real);
-      const int NYW_max_check = max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), f.use_z, f.use_w, scalar_width, false);
-
-      if (!is_valid_NXZ(NXZ, false, x[0]->Precision() < QUDA_SINGLE_PRECISION))
-        errorQuda("NXZ=%d is not a valid size ( MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
-      if (NYW_max != NYW_max_check) errorQuda("Compile-time %d and run-time %d limits disagree", NYW_max, NYW_max_check);
-      if (NYW > NYW_max) errorQuda("NYW exceeds max size (%d > %d)", NYW, NYW_max);
-      if (NXZ * NYW * scalar_width > MAX_MATRIX_SIZE)
-        errorQuda("Coefficient matrix exceeds max size (%d > %d)", NXZ * NYW * scalar_width, MAX_MATRIX_SIZE);
-
-      Spinor<store_t, N> X[NXZ];
-      Spinor<y_store_t, Ny> Y[NYW_max];
-      Spinor<store_t, N> Z[NXZ];
-      Spinor<store_t, N> W[NYW_max];
-
-      for (int i = 0; i < NXZ; i++) {
-        X[i].set(*x[i]);
-        Z[i].set(*z[i]);
-      }
-      for (int i = 0; i < NYW; i++) {
-        Y[i].set(*y[i]);
-        W[i].set(*w[i]);
-      }
-
-      MultiBlas<NXZ, real, len, typename std::remove_reference<decltype(X[0])>::type,
-                typename std::remove_reference<decltype(Y[0])>::type, typename std::remove_reference<decltype(Z[0])>::type,
-                typename std::remove_reference<decltype(W[0])>::type, decltype(f), T>
-        blas(X, Y, Z, W, f, a, b, c, x, y, z, w, NYW, length);
-      blas.apply(*getStream());
-
-      blas::bytes += blas.bytes();
-      blas::flops += blas.flops();
-      checkCudaError();
+      instantiate<Functor, MultiBlas, true, NXZ>(a, b, c, *x[0], *y[0], x, y, z, w);
     }
 
-    /**
-       Driver for generic blas routine with four loads and two store.
-    */
-    template <int NXZ, template <int MXZ, typename Float> class Functor, typename T>
-    void uniMultiBlas(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
-                      CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
-                      CompositeColorSpinorField &w)
+    template <template <typename ...> class Functor, int n, typename T>
+      typename std::enable_if<n!=1, void>::type
+      multiBlas(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
+                CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
+                CompositeColorSpinorField &w)
     {
-      QudaPrecision precision = checkPrecision(*x[0], *y[0], *z[0], *w[0]);
-
-      if (checkLocation(*x[0], *y[0], *z[0], *w[0]) == QUDA_CUDA_FIELD_LOCATION) {
-
-        if (precision == QUDA_DOUBLE_PRECISION) {
-
-#if QUDA_PRECISION & 8
-#if defined(NSPIN4) || defined(NSPIN2) || defined(NSPIN1)
-          const int M = 1;
-          multiBlas<NXZ, Functor, double, double, 2, 2>(a, b, c, x, y, z, w, x[0]->Length() / (2 * M));
-#else
-          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
-#endif
-#else
-          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x[0]->Precision());
-#endif
-
-        } else if (precision == QUDA_SINGLE_PRECISION) {
-
-#if QUDA_PRECISION & 4
-#if defined(NSPIN4) || defined(NSPIN2) || defined(NSPIN1)
-          const int M = 1;
-          multiBlas<NXZ, Functor, float, float, 4, 4>(a, b, c, x, y, z, w, x[0]->Length() / (4 * M));
-#else
-          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
-#endif
-#else
-          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x[0]->Precision());
-#endif
-
-        } else if (precision == QUDA_HALF_PRECISION) {
-
-#if QUDA_PRECISION & 2
-          if (x[0]->Ncolor() != 3) { errorQuda("nColor = %d is not supported", x[0]->Ncolor()); }
-          if (x[0]->Nspin() == 4) { // wilson
-#if defined(NSPIN4)
-            multiBlas<NXZ, Functor, float, short, 24, 4>(a, b, c, x, y, z, w, x[0]->Volume());
-#else
-            errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
-#endif
-          } else if (x[0]->Nspin() == 1) { // staggered
-#if defined(NSPIN1)
-            multiBlas<NXZ, Functor, float, short, 6, 2>(a, b, c, x, y, z, w, x[0]->Volume());
-#else
-            errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
-#endif
-          } else {
-            errorQuda("nSpin=%d is not supported\n", x[0]->Nspin());
-          }
-#else
-          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x[0]->Precision());
-#endif
-
-        } else if (precision == QUDA_QUARTER_PRECISION) {
-
-#if QUDA_PRECISION & 1
-          if (x[0]->Ncolor() != 3) { errorQuda("nColor = %d is not supported", x[0]->Ncolor()); }
-          if (x[0]->Nspin() == 4) { // wilson
-#if defined(NSPIN4)
-            multiBlas<NXZ, Functor, float, char, 24, 4>(a, b, c, x, y, z, w, x[0]->Volume());
-#else
-            errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
-#endif
-          } else if (x[0]->Nspin() == 1) { // staggered
-#if defined(NSPIN1)
-            const int M = 3;
-            multiBlas<NXZ, Functor, float, char, 6, 2>(a, b, c, x, y, z, w, x[0]->Volume());
-#else
-            errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
-#endif
-          } else {
-            errorQuda("nSpin=%d is not supported\n", x[0]->Nspin());
-          }
-#else
-          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x[0]->Precision());
-#endif
-
-        } else {
-          errorQuda("Precision x=%d not supported\n", precision);
-        }
-      } else { // fields on the cpu
-        errorQuda("Not implemented");
-      }
+      if (x.size() == n) multiBlas<n, Functor>(a, b, c, x, y, z, w);
+      else multiBlas<Functor, n-1>(a, b, c, x, y, z, w);
     }
 
-    /**
-       Driver for generic blas routine with four loads and two store.
-    */
-    template <int NXZ, template <int MXZ, typename Float> class Functor, typename T>
-    void mixedMultiBlas(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
-        CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
-        CompositeColorSpinorField &w)
+    template <template <typename ...> class Functor, int n, typename T>
+      typename std::enable_if<n==1, void>::type
+      multiBlas(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
+                CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
+                CompositeColorSpinorField &w)
     {
-      if (checkLocation(*x[0], *y[0], *z[0], *w[0]) == QUDA_CUDA_FIELD_LOCATION) {
-
-        if (y[0]->Precision() == QUDA_DOUBLE_PRECISION) {
-
-#if QUDA_PRECISION & 8
-          if (x[0]->Precision() == QUDA_SINGLE_PRECISION) {
-
-#if QUDA_PRECISION & 4
-            if (x[0]->Nspin() == 4) {
-#if defined(NSPIN4)
-              multiBlas<NXZ, Functor, double, float, 24, 4, double, 2>(a, b, c, x, y, z, w, x[0]->Volume());
-#else
-              errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
-#endif
-            } else if (x[0]->Nspin() == 1) {
-
-#if defined(NSPIN1)
-              multiBlas<NXZ, Functor, double, float, 6, 2, double, 2>(a, b, c, x, y, z, w, x[0]->Volume());
-#else
-              errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
-#endif
-            }
-
-#else
-            errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x[0]->Precision());
-#endif
-
-          } else if (x[0]->Precision() == QUDA_HALF_PRECISION) {
-
-#if QUDA_PRECISION & 2
-            if (x[0]->Nspin() == 4) {
-#if defined(NSPIN4)
-              multiBlas<NXZ, Functor, double, short, 24, 4, double, 2>(a, b, c, x, y, z, w, x[0]->Volume());
-#else
-              errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
-#endif
-
-            } else if (x[0]->Nspin() == 1) {
-
-#if defined(NSPIN1)
-              const int M = 3;
-              multiBlas<NXZ, Functor, double, short, 6, 2, double, 2>(a, b, c, x, y, z, w, x[0]->Volume());
-#else
-              errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
-#endif
-            }
-#else
-            errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x[0]->Precision());
-#endif
-
-          } else if (x[0]->Precision() == QUDA_QUARTER_PRECISION) {
-
-#if QUDA_PRECISION & 1
-            if (x[0]->Nspin() == 4) {
-#if defined(NSPIN4)
-              const int M = 12;
-              multiBlas<NXZ, Functor, double, char, 24, 4, double, 2>(a, b, c, x, y, z, w, x[0]->Volume());
-#else
-              errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
-#endif
-
-            } else if (x[0]->Nspin() == 1) {
-
-#if defined(NSPIN1)
-              const int M = 3;
-              multiBlas<NXZ, Functor, double, char, 6, 2, double, 2>(a, b, c, x, y, z, w, x[0]->Volume());
-#else
-              errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
-#endif
-            }
-#else
-            errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x[0]->Precision());
-#endif
-
-          } else {
-            errorQuda("Not implemented for this precision combination %d %d", x[0]->Precision(), y[0]->Precision());
-          }
-#else
-          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, y[0]->Precision());
-#endif
-
-        } else if (y[0]->Precision() == QUDA_SINGLE_PRECISION) {
-
-#if (QUDA_PRECISION & 4)
-          if (x[0]->Precision() == QUDA_HALF_PRECISION) {
-
-#if (QUDA_PRECISION & 2)
-            if (x[0]->Nspin() == 4) {
-#if defined(NSPIN4)
-              multiBlas<NXZ, Functor, float, short, 24, 4, float, 4>(a, b, c, x, y, z, w, x[0]->Volume());
-#else
-              errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
-#endif
-
-            } else if (x[0]->Nspin() == 1) {
-
-#if defined(NSPIN1)
-              multiBlas<NXZ, Functor, float, short, 6, 2, float, 2>(a, b, c, x, y, z, w, x[0]->Volume());
-#else
-              errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
-#endif
-            } else {
-              errorQuda("nSpin=%d is not supported\n", x[0]->Nspin());
-            }
-
-#else
-            errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, y[0]->Precision());
-#endif
-
-          } else if (x[0]->Precision() == QUDA_QUARTER_PRECISION) {
-
-#if (QUDA_PRECISION & 1)
-            if (x[0]->Nspin() == 4) {
-#if defined(NSPIN4)
-              multiBlas<NXZ, Functor, float, char, 24, 4, float, 4>(a, b, c, x, y, z, w, x[0]->Volume());
-#else
-              errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
-#endif
-
-            } else if (x[0]->Nspin() == 1) {
-
-#if defined(NSPIN1)
-              const int M = 3;
-              multiBlas<NXZ, Functor, float, char, 6, 2, float, 2>(a, b, c, x, y, z, w, x[0]->Volume());
-#else
-              errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
-#endif
-            } else {
-              errorQuda("nSpin=%d is not supported\n", x[0]->Nspin());
-            }
-
-#else
-            errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, y[0]->Precision());
-#endif
-
-          } else {
-            errorQuda("Precision combination x=%d y=%d not supported\n", x[0]->Precision(), y[0]->Precision());
-          }
-#else
-          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, y[0]->Precision());
-#endif
-        } else {
-          errorQuda("Precision combination x=%d y=%d not supported\n", x[0]->Precision(), y[0]->Precision());
-        }
-      } else { // fields on the cpu
-        errorQuda("Not implemented");
-      }
+      multiBlas<n, Functor>(a, b, c, x, y, z, w);
     }
 
-    template <int NXZ, template <int MXZ, typename Float> class Functor, typename T>
-    void multiBlas(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
-                   CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
-                   CompositeColorSpinorField &w)
-    {
-      if (x[0]->Precision() != y[0]->Precision()) {
-        mixedMultiBlas<NXZ, Functor>(a, b, c, x, y, x, w);
-      } else {
-        uniMultiBlas<NXZ, Functor>(a, b, c, x, y, x, w);
-      }
-    }
-
-    template <template <int MXZ, typename Float> class Functor, typename T>
+    template <template <typename ...> class Functor, typename T>
     void multiBlas(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
                    CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
                    CompositeColorSpinorField &w)
@@ -544,99 +280,23 @@ namespace quda {
       // instantiate the loop unrolling template
       switch (x.size()) {
       // by default all powers of two <= 128 are instantiated
-      case 1: multiBlas<1, Functor>(a, b, c, x, y, x, w); break;
-      case 2: multiBlas<2, Functor>(a, b, c, x, y, x, w); break;
-      case 4: multiBlas<4, Functor>(a, b, c, x, y, x, w); break;
-      case 8: multiBlas<8, Functor>(a, b, c, x, y, x, w); break;
-      case 16: multiBlas<16, Functor>(a, b, c, x, y, x, w); break;
-      case 32: multiBlas<32, Functor>(a, b, c, x, y, x, w); break;
-      case 64: multiBlas<64, Functor>(a, b, c, x, y, x, w); break;
-      case 128: multiBlas<128, Functor>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 3
-      case 3: multiBlas<3, Functor>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 5
-      case 5: multiBlas<5, Functor>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 6
-      case 6: multiBlas<6, Functor>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 7
-      case 7: multiBlas<7, Functor>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 9
-      case 9: multiBlas<9, Functor>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 10
-      case 10: multiBlas<10, Functor>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 11
-      case 11: multiBlas<11, Functor>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 12
-      case 12: multiBlas<12, Functor>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 13
-      case 13: multiBlas<13, Functor>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 14
-      case 14: multiBlas<14, Functor>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 15
-      case 15: multiBlas<15, Functor>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 17
-      case 17: multiBlas<17, Functor>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 18
-      case 18: multiBlas<18, Functor>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 19
-      case 19: multiBlas<19, Functor>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 20
-      case 20: multiBlas<20, Functor>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 21
-      case 21: multiBlas<21, Functor>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 22
-      case 22: multiBlas<22, Functor>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 23
-      case 23: multiBlas<23, Functor>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 24
-      case 24: multiBlas<24, Functor>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 25
-      case 25: multiBlas<25, Functor>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 26
-      case 26: multiBlas<26, Functor>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 27
-      case 27: multiBlas<27, Functor>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 28
-      case 28: multiBlas<28, Functor>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 29
-      case 29: multiBlas<29, Functor>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 30
-      case 30: multiBlas<30, Functor>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 31
-      case 31: multiBlas<31, Functor>(a, b, c, x, y, x, w); break;
-#endif // 31
-#endif // 30
-#endif // 29
-#endif // 28
-#endif // 27
-#endif // 26
-#endif // 25
-#endif // 24
-#endif // 23
-#endif // 22
-#endif // 21
-#endif // 20
-#endif // 19
-#endif // 18
-#endif // 17
-#endif // 15
-#endif // 14
-#endif // 13
-#endif // 12
-#endif // 11
-#endif // 10
-#endif // 9
-#endif // 7
-#endif // 6
-#endif // 5
-#endif // 3
-      default: errorQuda("x.size %lu greater than MAX_MULTI_BLAS_N %d", x.size(), MAX_MULTI_BLAS_N);
+      case 1: multiBlas<1, Functor>(a, b, c, x, y, z, w); break;
+      case 2: multiBlas<2, Functor>(a, b, c, x, y, z, w); break;
+      case 4: multiBlas<4, Functor>(a, b, c, x, y, z, w); break;
+      case 8: multiBlas<8, Functor>(a, b, c, x, y, z, w); break;
+      case 16: multiBlas<16, Functor>(a, b, c, x, y, z, w); break;
+      case 32: multiBlas<32, Functor>(a, b, c, x, y, z, w); break;
+      case 64: multiBlas<64, Functor>(a, b, c, x, y, z, w); break;
+      case 128: multiBlas<128, Functor>(a, b, c, x, y, z, w); break;
+      default:
+        if (x.size() <= MAX_MULTI_BLAS_N) multiBlas<Functor, MAX_MULTI_BLAS_N>(a, b, c, x, y, z, w);
+        else errorQuda("x.size %lu greater than MAX_MULTI_BLAS_N %d", x.size(), MAX_MULTI_BLAS_N);
       }
     }
 
     using range = std::pair<size_t,size_t>;
 
-    template <template <int MXZ, typename Float> class Functor, typename T>
+    template <template <typename...> class Functor, typename T>
     void axpy_recurse(const T *a_, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
                       const range &range_x, const range &range_y, int upper, int coeff_width)
     {
@@ -876,7 +536,7 @@ namespace quda {
     void caxpyBxpz(const Complex *a_, std::vector<ColorSpinorField*> &x_, ColorSpinorField &y_,
 		   const Complex *b_, ColorSpinorField &z_)
     {
-      if (is_valid_NXZ(x_.size(), false, x_[0]->Precision() < QUDA_SINGLE_PRECISION)) // only swizzle if we have to.
+      if (is_valid_NXZ(x_.size(), false, x_[0]->Precision() < QUDA_SINGLE_PRECISION)) // only split if we have to.
       {
         // swizzle order since we are writing to y_ and z_, but the
         // multi-blas only allow writing to y and w, and moreover the
@@ -947,7 +607,6 @@ namespace quda {
     void axpy_U(const double *a, ColorSpinorField &x, ColorSpinorField &y) { axpy_U(a, x.Components(), y.Components()); }
 
     void axpy_L(const double *a, ColorSpinorField &x, ColorSpinorField &y) { axpy_L(a, x.Components(), y.Components()); }
-
 
   } // namespace blas
 

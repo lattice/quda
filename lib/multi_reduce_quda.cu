@@ -1,6 +1,5 @@
 #include <blas_quda.h>
 #include <tune_quda.h>
-#include <float_vector.h>
 #include <color_spinor_field_order.h>
 #include <uint_to_char.h>
 
@@ -18,7 +17,7 @@ namespace quda {
     void initFastReduce(int words);
     void completeFastReduce(int32_t words);
 
-    template <typename real, int len, int NXZ, typename Arg, typename T>
+    template <typename real, int M, int NXZ, typename Arg, typename T>
     void multiReduceLaunch(T result[], Arg &arg, const TuneParam &tp, const qudaStream_t &stream, Tunable &tunable)
     {
       using reduce_t = typename Arg::Reducer::reduce_t;
@@ -35,11 +34,11 @@ namespace quda {
 #ifdef JITIFY
       using namespace jitify::reflection;
       tunable.jitifyError() = program->kernel("quda::blas::multiReduceKernel")
-                                  .instantiate((int)tp.block.x, Type<real>(), len, NXZ, Type<Arg>())
+                                  .instantiate((int)tp.block.x, Type<real>(), M, NXZ, Type<Arg>())
                                   .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                                   .launch(arg);
 #else
-      LAUNCH_KERNEL_REDUCE(multiReduceKernel, tunable, tp, stream, arg, real, len, NXZ, Arg);
+      LAUNCH_KERNEL_REDUCE(multiReduceKernel, tunable, tp, stream, arg, real, M, NXZ, Arg);
 #endif
 #endif
 
@@ -70,17 +69,20 @@ namespace quda {
       }
     }
 
-    template <int NXZ, typename T, typename real, int len, typename SpinorX,
-              typename SpinorY, typename SpinorZ, typename SpinorW, typename Reducer>
+    template <template <typename ...> class Reducer, typename store_t, typename y_store_t,
+              int nSpin, typename T, int NXZ = 1>
     class MultiReduce : public Tunable
     {
-      static constexpr int NYW_max = max_YW_size<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Reducer>();
+      using real = typename mapper<y_store_t>::type;
+      using host_reduce_t = typename Reducer<double, real>::reduce_t;
       const int NYW;
-      int nParity;
-      MultiReduceArg<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Reducer> arg;
-      T *result;
-
+      Reducer<device_reduce_t, real> r;
+      static constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, decltype(r)>();
+      const int nParity;
+      const T &a, &b, &c;
       std::vector<ColorSpinorField *> &x, &y, &z, &w;
+      host_reduce_t *result;
+      QudaFieldLocation location;
 
       unsigned int sharedBytesPerThread() const { return 0; }
       unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
@@ -100,20 +102,44 @@ namespace quda {
       unsigned int maxBlockSize(const TuneParam &param) const { return 128; } // deviceProp.maxThreadsPerBlock / 2; }
 
     public:
-      MultiReduce(T result[], SpinorX X[], SpinorY Y[], SpinorZ Z[], SpinorW W[], Reducer &r,
+      MultiReduce(const T &a, const T &b, const T &c, const ColorSpinorField &x_meta, const ColorSpinorField &y_meta,
                   std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
-                  std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w, int NYW, int length) :
-        NYW(NYW),
+                  std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
+                  host_reduce_t *result) :
+        NYW(y.size()),
+        r(NXZ, NYW),
         nParity(x[0]->SiteSubset()),
-        arg(X, Y, Z, W, r, NYW, length / nParity),
+        a(a),
+        b(b),
+        c(c),
         x(x),
         y(y),
         z(z),
         w(w),
-        result(result)
+        result(result),
+        location(checkLocation(*x[0], *y[0], *z[0], *w[0]))
       {
-        if (sizeof(arg) > MAX_MATRIX_SIZE)
-          errorQuda("Kernel argument size %lu greater than maximum %d", sizeof(arg), MAX_MATRIX_SIZE);
+        checkLength(*x[0], *y[0], *z[0], *w[0]);
+        auto x_prec = checkPrecision(*x[0], *z[0]);
+        auto y_prec = checkPrecision(*y[0], *w[0]);
+        auto x_order = checkOrder(*x[0], *z[0]);
+        auto y_order = checkOrder(*y[0], *w[0]);
+        if (x_prec == y_prec && x_order != y_order) errorQuda("Orders %d %d do not match", x_order, y_order);
+
+        // check sizes are valid
+        constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, decltype(r)>();
+        constexpr int scalar_width = decltype(r)::coeff_mul ? sizeof(typename decltype(r)::coeff_t) / sizeof(real) : 0;
+        const int NYW_max_check = max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), r.use_z, r.use_w, scalar_width, true);
+
+        if (!is_valid_NXZ(NXZ, true))
+          errorQuda("NXZ=%d is not a valid size ( MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
+        if (NYW_max != NYW_max_check) errorQuda("Compile-time %d and run-time %d limits disagree", NYW_max, NYW_max_check);
+        if (NXZ * NYW > QUDA_MAX_MULTI_REDUCE)
+          errorQuda("NXZ * NYW = %d exceeds maximum number of reductions %d * %d > %d",
+                    NXZ * NYW, NXZ, NYW, QUDA_MAX_MULTI_REDUCE);
+        if (NYW > NYW_max) errorQuda("NYW exceeds max size (%d > %d)", NYW, NYW_max);
+        if (NXZ * NYW * scalar_width > MAX_MATRIX_SIZE)
+          errorQuda("Coefficient matrix exceeds max size (%d > %d)", NXZ * NYW * scalar_width, MAX_MATRIX_SIZE);
 
         strcpy(aux, "policy_kernel,");
         strcat(aux, x[0]->AuxString());
@@ -135,21 +161,65 @@ namespace quda {
 #ifdef JITIFY
         ::quda::create_jitify_program("kernels/multi_reduce_core.cuh");
 #endif
+
+        apply(*blas::getStream());
+        checkCudaError();
+
+        blas::bytes += bytes();
+        blas::flops += flops();
       }
 
-      inline TuneKey tuneKey() const
+      TuneKey tuneKey() const
       {
         char name[TuneKey::name_n];
         strcpy(name, num_to_string<NXZ>::value);
         strcat(name, std::to_string(NYW).c_str());
-        strcat(name, typeid(arg.r).name());
+        strcat(name, typeid(r).name());
         return TuneKey(x[0]->VolString(), name, aux);
+      }
+
+      template <typename buffer_t>
+      void set_param(buffer_t &d, const T &h, const qudaStream_t &stream)
+      {
+        using coeff_t = typename decltype(r)::coeff_t;
+        constexpr size_t n_coeff = MAX_MATRIX_SIZE / sizeof(coeff_t);
+
+        coeff_t tmp[n_coeff];
+        for (int i = 0; i < NXZ; i++)
+          for (int j = 0; j < NYW; j++) tmp[NYW * i + j] = coeff_t(h.data[NYW * i + j]);
+        cudaMemcpyToSymbolAsync(d, tmp, NXZ * NYW * sizeof(decltype(tmp[0])), 0, cudaMemcpyHostToDevice, stream);
+        //cuMemcpyHtoDAsync(d, tmp, NXZ * NYW * sizeof(decltype(tmp[0])), stream);
       }
 
       void apply(const qudaStream_t &stream)
       {
+        constexpr bool site_unroll = !std::is_same<store_t, y_store_t>::value || isFixed<store_t>::value;
+        if (site_unroll && (x[0]->Ncolor() != 3 || x[0]->Nspin() == 2))
+          errorQuda("site unroll not supported for nSpin = %d nColor = %d", x[0]->Nspin(), x[0]->Ncolor());
+
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        multiReduceLaunch<real, len, NXZ>(result, arg, tp, stream, *this);
+
+        if (location == QUDA_CUDA_FIELD_LOCATION) {
+          // need to add native check here
+          constexpr int N = n_vector<store_t, true, nSpin, site_unroll>();
+          constexpr int Ny = n_vector<y_store_t, true, nSpin, site_unroll>();
+          constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
+          const int length = x[0]->Length() / (nParity * M);
+
+          MultiReduceArg<NXZ, store_t, N, y_store_t, Ny, decltype(r)> arg(x, y, z, w, r, NYW, length);
+
+#ifdef JITIFY
+          // need to get constants pointer from jitify instance
+          if (a.data || b.data || c.data) errorQuda("Constant memory buffer support not enabled with jitify yet");
+#else
+          if (a.data) set_param(Amatrix_d, a, stream);
+          if (b.data) set_param(Bmatrix_d, b, stream);
+          if (c.data) set_param(Cmatrix_d, c, stream);
+#endif
+          multiReduceLaunch<real, M, NXZ>(result, arg, tp, stream, *this);
+        } else {
+          errorQuda("Only implemented for GPU fields");
+        }
       }
 
       // Should these be NYW?
@@ -201,309 +271,72 @@ namespace quda {
       void preTune()
       {
         for (int i = 0; i < NYW; ++i) {
-          if (arg.r.write.Y) y[i]->backup();
-          if (arg.r.write.W) w[i]->backup();
+          if (r.write.Y) y[i]->backup();
+          if (r.write.W) w[i]->backup();
         }
       }
 
       void postTune()
       {
         for (int i = 0; i < NYW; ++i) {
-          if (arg.r.write.Y) y[i]->restore();
-          if (arg.r.write.W) w[i]->restore();
+          if (r.write.Y) y[i]->restore();
+          if (r.write.W) w[i]->restore();
         }
       }
 
       long long flops() const
       {
-        return NYW * NXZ * arg.r.flops() * x[0]->Length();
+        return NYW * NXZ * r.flops() * x[0]->Length();
       }
 
       long long bytes() const
       {
         // this will be wrong when mixed precision is added
-        return NYW * NXZ * arg.r.streams() * x[0]->Bytes();
+        return NYW * NXZ * r.streams() * x[0]->Bytes();
       }
 
       int tuningIter() const { return 3; }
     };
 
-    template <int NXZ, template <int MXZ, typename reduce_t, typename real> class Reducer, typename real,
-              typename store_t, int len, int N, typename y_store_t = store_t, int Ny = N, typename T>
-    void multiReduce(T result[], const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
-                     std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
-                     std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w, int length)
-    {
-      const int NYW = y.size();
-      const int N_MIN = NXZ < NYW ? NXZ : NYW;
-      for (int i = 0; i < N_MIN; i++) {
-        checkLength(*x[i], *y[i], *z[i], *w[i]);
-        if (!x[i]->isNative()) {
-          warningQuda("Reductions on non-native fields are not supported\n");
-          return;
-        }
-      }
-
-      Reducer<NXZ, device_reduce_t, real> r(NYW);
-
-      constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, decltype(r)>();
-
-      constexpr int scalar_width = decltype(r)::coeff_mul ? sizeof(typename decltype(r)::coeff_t) / sizeof(real) : 0;
-      const int NYW_max_check
-        = max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), r.use_z, r.use_w, scalar_width, true);
-
-      if (!is_valid_NXZ(NXZ, true))
-        errorQuda("NXZ=%d is not a valid size ( MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
-      if (NYW_max != NYW_max_check) errorQuda("Compile-time %d and run-time %d limits disagree", NYW_max, NYW_max_check);
-      if (NXZ * NYW > QUDA_MAX_MULTI_REDUCE)
-        errorQuda("NXZ * NYW = %d exceeds maximum number of reductions %d", NXZ * NYW, QUDA_MAX_MULTI_REDUCE);
-      if (NYW > NYW_max) errorQuda("NYW exceeds max size (%d > %d)", NYW, NYW_max);
-      if (NXZ * NYW * scalar_width > MAX_MATRIX_SIZE)
-        errorQuda("Coefficient matrix exceeds max size (%d > %d)", NXZ * NYW * scalar_width, MAX_MATRIX_SIZE);
-
-      using coeff_t = typename decltype(r)::coeff_t;
-      size_t coeff_n = MAX_MATRIX_SIZE / sizeof(coeff_t);
-#ifdef JITIFY
-      // need to get constants pointer from jitify instance
-      if (a.data || b.data || c.data) errorQuda("Constant memory buffer support not enabled with jitify yet");
-#endif
-
-      if (a.data) {
-        coeff_t A[coeff_n];
-        for (int i = 0; i < NXZ; i++)
-          for (int j = 0; j < NYW; j++) A[NYW * i + j] = coeff_t(a.data[NYW * i + j]);
-
-        cudaMemcpyToSymbolAsync(Amatrix_d, A, NXZ * NYW * sizeof(decltype(A[0])), 0, cudaMemcpyHostToDevice,
-                                *getStream());
-        Amatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(a.data));
-      }
-
-      if (b.data) {
-        coeff_t B[coeff_n];
-        for (int i = 0; i < NXZ; i++)
-          for (int j = 0; j < NYW; j++) B[NYW * i + j] = coeff_t(b.data[NYW * i + j]);
-
-        cudaMemcpyToSymbolAsync(Bmatrix_d, B, NXZ * NYW * sizeof(decltype(B[0])), 0, cudaMemcpyHostToDevice,
-                                *getStream());
-        Bmatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(b.data));
-      }
-
-      if (c.data) {
-        coeff_t C[coeff_n];
-        for (int i = 0; i < NXZ; i++)
-          for (int j = 0; j < NYW; j++) C[NYW * i + j] = coeff_t(c.data[NYW * i + j]);
-
-        cudaMemcpyToSymbolAsync(Cmatrix_d, C, NXZ * NYW * sizeof(decltype(C[0])), 0, cudaMemcpyHostToDevice,
-                                *getStream());
-        Cmatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(c.data));
-      }
-
-      Spinor<store_t, N> X[NXZ];
-      Spinor<y_store_t, Ny> Y[NYW_max];
-      Spinor<store_t, N> Z[NXZ];
-      Spinor<store_t, N> W[NYW_max];
-
-      for (int i = 0; i < NXZ; i++) {
-        X[i].set(*x[i]);
-        Z[i].set(*z[i]);
-      }
-      for (int i = 0; i < NYW; i++) {
-        Y[i].set(*y[i]);
-        W[i].set(*w[i]);
-      }
-
-      MultiReduce<NXZ, T, real, len, typename std::remove_reference<decltype(X[0])>::type,
-                  typename std::remove_reference<decltype(Y[0])>::type, typename std::remove_reference<decltype(Z[0])>::type,
-                  typename std::remove_reference<decltype(W[0])>::type, decltype(r)>
-        reduce(result, X, Y, Z, W, r, x, y, z, w, NYW, length);
-      reduce.apply(*blas::getStream());
-
-      blas::bytes += reduce.bytes();
-      blas::flops += reduce.flops();
-      checkCudaError();
-    }
-
-    /**
-       Driver for multi-reduce with up to four vectors
-    */
-    template <int NXZ, template <int MXZ, typename ReducerType, typename real> class Reducer, typename T>
-    void uniMultiReduce(T result[], const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
-                        CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
-                        CompositeColorSpinorField &w)
-    {
-      QudaPrecision precision = checkPrecision(*x[0], *y[0], *z[0], *w[0]);
-
-      if (precision == QUDA_DOUBLE_PRECISION) {
-
-#if QUDA_PRECISION & 8
-#if defined(NSPIN4) || defined(NSPIN2) || defined(NSPIN1)
-        const int M = 2; // determines how much work per thread to do
-        multiReduce<NXZ, Reducer, double, double, M, 2>(result, a, b, c, x, y, z, w, x[0]->Length() / M);
-#else
-        errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
-#endif
-#else
-        errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, precision);
-#endif
-
-      } else if (precision == QUDA_SINGLE_PRECISION) {
-
-#if QUDA_PRECISION & 4
-#if defined(NSPIN4) || defined(NSPIN2) || defined(NSPIN1)
-        const int M = 4; // determines how much work per thread to do
-        multiReduce<NXZ, Reducer, float, float, M, 4>(result, a, b, c, x, y, z, w, x[0]->Length() / M);
-#else
-        errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
-#endif
-#else
-        errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, precision);
-#endif
-
-      } else if (precision == QUDA_HALF_PRECISION) { // half precision
-
-#if QUDA_PRECISION & 2
-        if (x[0]->Nspin() == 4) { // wilson
-#if defined(NSPIN4)
-          multiReduce<NXZ, Reducer, float, short, 24, 4>(result, a, b, c, x, y, z, w, x[0]->Volume());
-#else
-          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
-#endif
-        } else if (x[0]->Nspin() == 1) { // staggered
-#if defined(NSPIN1)
-          multiReduce<NXZ, Reducer, float, short, 6, 2>(result, a, b, c, x, y, z, w, x[0]->Volume());
-#else
-          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
-#endif
-        } else {
-          errorQuda("nSpin=%d is not supported\n", x[0]->Nspin());
-        }
-#else
-        errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, precision);
-#endif
-
-      } else if (precision == QUDA_QUARTER_PRECISION) { // quarter precision
-
-#if QUDA_PRECISION & 1
-        if (x[0]->Nspin() == 4) { // wilson
-#if defined(NSPIN4)
-          multiReduce<NXZ, Reducer, float, char, 24, 4>(result, a, b, c, x, y, z, w, x[0]->Volume());
-#else
-          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
-#endif
-        } else if (x[0]->Nspin() == 1) { // staggered
-#if defined(NSPIN1)
-          multiReduce<NXZ, Reducer, float, char, 6, 2>(result, a, b, c, x, y, z, w, x[0]->Volume());
-#else
-          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
-#endif
-        } else {
-          errorQuda("nSpin=%d is not supported\n", x[0]->Nspin());
-        }
-#else
-        errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, precision);
-#endif
-      } else {
-        errorQuda("Precision %d not supported\n", precision);
-      }
-    }
-
-    /**
-       Driver for multi-reduce with up to five vectors
-    */
-    template <int NXZ, template <int MXZ, typename ReducerType, typename real> class Reducer, typename T>
-    void mixedMultiReduce(T result[], const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
-                          CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
-                          CompositeColorSpinorField &w)
-    {
-      checkPrecision(*x[0], *z[0]);
-      checkPrecision(*y[0], *w[0]);
-
-      if (y[0]->Precision() == QUDA_DOUBLE_PRECISION && x[0]->Precision() == QUDA_SINGLE_PRECISION) {
-
-        if (x[0]->Nspin() == 4) { // wilson
-#if defined(NSPIN4)
-          multiReduce<NXZ, Reducer, double, float, 24, 4, double, 2>(result, a, b, c, x, y, z, w, x[0]->Volume());
-#else
-          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
-#endif
-        } else if (x[0]->Nspin() == 1) {
-#if defined(NSPIN1)
-          const int M = 3; // determines how much work per thread to do
-          multiReduce<NXZ, Reducer, double, float, 6, 2, double, 2>(result, a, b, c, x, y, z, w, x[0]->Volume());
-#else
-          errorQuda("blas has not been built for Nspin=%d field", x[0]->Nspin());
-#endif
-        } else {
-          errorQuda("nSpin=%d is not supported\n", x[0]->Nspin());
-        }
-
-      } else if (y[0]->Precision() == QUDA_DOUBLE_PRECISION && x[0]->Precision() == QUDA_HALF_PRECISION) {
-
-        if (x[0]->Nspin() == 4) { // wilson
-#if defined(NSPIN4)
-          multiReduce<NXZ, Reducer, double, short, 24, 4, double, 2>(result, a, b, c, x, y, z, w, x[0]->Volume());
-#else
-          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
-#endif
-        } else if (x[0]->Nspin() == 1 || x[0]->Nspin() == 2) { // staggered
-#if defined(NSPIN1)
-          multiReduce<NXZ, Reducer, double, short, 6, 2, double, 2>(result, a, b, c, x, y, z, w, x[0]->Volume());
-#else
-          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
-#endif
-        } else {
-          errorQuda("nSpin=%d is not supported\n", x[0]->Nspin());
-        }
-
-      } else if (y[0]->Precision() == QUDA_SINGLE_PRECISION && x[0]->Precision() == QUDA_HALF_PRECISION) {
-
-        if (x[0]->Nspin() == 4) { // wilson
-#if defined(NSPIN4)
-          multiReduce<NXZ, Reducer, float, short, 24, 4, float, 4>(result, a, b, c, x, y, z, w, x[0]->Volume());
-#else
-          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
-#endif
-        } else if (x[0]->Nspin() == 1) { // staggered
-#if defined(NSPIN1)
-          multiReduce<NXZ, Reducer, float, short, 24, 2, float, 2>(result, a, b, c, x, y, z, w, x[0]->Volume());
-#else
-          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
-#endif
-        } else {
-          errorQuda("nSpin=%d is not supported\n", x[0]->Nspin());
-        }
-
-      } else {
-        errorQuda("Precision combination x=%d y=%d not supported\n", x[0]->Precision(), y[0]->Precision());
-      }
-    }
-
-    template <int NXZ,
-              template <int MXZ, typename ReducerType, typename real> class ReducerDiagonal,
-              template <int MXZ, typename ReducerType, typename real> class ReducerOffDiagonal, typename T>
+    template <int NXZ, template <typename ...> class ReducerDiagonal, template <typename ...> class ReducerOffDiagonal, typename T>
     void multiReduce(T result[], const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
                      CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
                      CompositeColorSpinorField &w, int i, int j)
     {
-      if (x[0]->Precision() == y[0]->Precision()) {
-        if (i == j) { // we are on the diagonal so invoke the diagonal reducer
-          uniMultiReduce<NXZ, ReducerDiagonal, T>(result, a, b, c, x, y, z, w);
-        } else { // we are on the diagonal so invoke the off-diagonal reducer
-          uniMultiReduce<NXZ, ReducerOffDiagonal, T>(result, a, b, c, x, y, z, w);
-        }
-      } else {
-        if (i == j) { // we are on the diagonal so invoke the diagonal reducer
-          mixedMultiReduce<NXZ, ReducerDiagonal, T>(result, a, b, c, x, y, z, w);
-        } else { // we are on the diagonal so invoke the off-diagonal reducer
-          mixedMultiReduce<NXZ, ReducerOffDiagonal, T>(result, a, b, c, x, y, z, w);
-        }
+      if (i == j) { // we are on the diagonal so invoke the diagonal reducer
+        using host_reduce_t = typename ReducerDiagonal<double, double>::reduce_t;
+        instantiate<ReducerDiagonal, MultiReduce, true, NXZ>(a, b, c, *x[0], *y[0], x, y, z, w, (host_reduce_t*)result);
+      } else { // we are on the diagonal so invoke the off-diagonal reducer
+        using host_reduce_t = typename ReducerOffDiagonal<double, double>::reduce_t;
+        instantiate<ReducerOffDiagonal, MultiReduce, true, NXZ>(a, b, c, *x[0], *y[0], x, y, z, w, (host_reduce_t*)result);
       }
+    }
+
+    template <template <typename ...> class ReducerDiagonal, template <typename ...> class ReducerOffDiagonal,
+              int n, typename T>
+    typename std::enable_if<n!=1, void>::type
+    multiReduce(T result [], const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
+                CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
+                CompositeColorSpinorField &w, int i, int j)
+    {
+      if (x.size() == n) multiReduce<n, ReducerDiagonal, ReducerOffDiagonal>(result, a, b, c, x, y, z, w, i, j);
+      else multiReduce<ReducerDiagonal, ReducerOffDiagonal, n-1>(result, a, b, c, x, y, z, w, i, j);
+    }
+
+    template <template <typename ...> class ReducerDiagonal, template <typename ...> class ReducerOffDiagonal,
+              int n, typename T>
+      typename std::enable_if<n==1, void>::type
+    multiReduce(T result[], const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
+                CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
+                CompositeColorSpinorField &w, int i, int j)
+    {
+      multiReduce<n, ReducerDiagonal, ReducerOffDiagonal>(result, a, b, c, x, y, z, w, i, j);
     }
 
     // This function does the outer product of dot products... in column major.
     // There's a function below called 'cDotProduct' that flips it to row major.
-    template <template <int MXZ, typename ReducerType, typename real> class ReducerDiagonal,
-              template <int MXZ, typename ReducerType, typename real> class ReducerOffDiagonal, typename T>
+    template <template <typename ...> class ReducerDiagonal,
+              template <typename ...> class ReducerOffDiagonal, typename T>
     void multiReduce_recurse(T *result, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
                              std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w, int i_idx,
                              int j_idx, bool hermitian, uint2 tile_size)
@@ -530,6 +363,7 @@ namespace quda {
 
         if (x.size() <= tile_size.x && is_valid_NXZ(x.size(), true)) {
           switch (x.size()) {
+            // by default all powers of two <= 16 are instantiated
           case 1:
             multiReduce<1, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
             break;
@@ -545,143 +379,11 @@ namespace quda {
           case 16:
             multiReduce<16, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
             break;
-#if MAX_MULTI_BLAS_N >= 3
-        case 3:
-          multiReduce<3, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
-          break;
-#if MAX_MULTI_BLAS_N >= 5
-        case 5:
-          multiReduce<5, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
-          break;
-#if MAX_MULTI_BLAS_N >= 6
-        case 6:
-          multiReduce<6, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
-          break;
-#if MAX_MULTI_BLAS_N >= 7
-        case 7:
-          multiReduce<7, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
-          break;
-#if MAX_MULTI_BLAS_N >= 9
-	case 9:
-          multiReduce<9, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
-          break;
-#if MAX_MULTI_BLAS_N >= 10
-        case 10:
-          multiReduce<10, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
-          break;
-#if MAX_MULTI_BLAS_N >= 11
-        case 11:
-          multiReduce<11, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
-          break;
-#if MAX_MULTI_BLAS_N >= 12
-        case 12:
-          multiReduce<12, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
-          break;
-#if MAX_MULTI_BLAS_N >= 13
-        case 13:
-          multiReduce<13, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
-          break;
-#if MAX_MULTI_BLAS_N >= 14
-        case 14:
-          multiReduce<14, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
-          break;
-#if MAX_MULTI_BLAS_N >= 15
-        case 15:
-          multiReduce<15, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
-          break;
-#if MAX_MULTI_BLAS_N >= 17
-        case 17:
-          multiReduce<17, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
-          break;
-#if MAX_MULTI_BLAS_N >= 18
-        case 18:
-          multiReduce<18, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
-          break;
-#if MAX_MULTI_BLAS_N >= 19
-        case 19:
-          multiReduce<19, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
-          break;
-#if MAX_MULTI_BLAS_N >= 20
-        case 20:
-          multiReduce<20, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
-          break;
-#if MAX_MULTI_BLAS_N >= 21
-        case 21:
-          multiReduce<21, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
-          break;
-#if MAX_MULTI_BLAS_N >= 22
-        case 22:
-          multiReduce<22, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
-          break;
-#if MAX_MULTI_BLAS_N >= 23
-        case 23:
-          multiReduce<23, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
-          break;
-#if MAX_MULTI_BLAS_N >= 24
-        case 24:
-          multiReduce<24, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
-          break;
-#if MAX_MULTI_BLAS_N >= 25
-        case 25:
-          multiReduce<25, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
-          break;
-#if MAX_MULTI_BLAS_N >= 26
-        case 26:
-          multiReduce<26, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
-          break;
-#if MAX_MULTI_BLAS_N >= 27
-        case 27:
-          multiReduce<27, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
-          break;
-#if MAX_MULTI_BLAS_N >= 28
-        case 28:
-          multiReduce<28, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
-          break;
-#if MAX_MULTI_BLAS_N >= 29
-        case 29:
-          multiReduce<29, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
-          break;
-#if MAX_MULTI_BLAS_N >= 30
-        case 30:
-          multiReduce<30, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
-          break;
-#if MAX_MULTI_BLAS_N >= 31
-        case 31:
-          multiReduce<31, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
-          break;
-#if MAX_MULTI_BLAS_N >= 32
-        case 32:
-          multiReduce<32, ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
-          break;
-#endif // 32
-#endif // 31
-#endif // 30
-#endif // 29
-#endif // 28
-#endif // 27
-#endif // 26
-#endif // 25
-#endif // 24
-#endif // 23
-#endif // 22
-#endif // 21
-#endif // 20
-#endif // 19
-#endif // 18
-#endif // 17
-#endif //15
-#endif //14
-#endif //13
-#endif //12
-#endif //11
-#endif //10
-#endif // 9
-#endif // 7
-#endif // 6
-#endif // 5
-#endif // 3
-        default: errorQuda("x.size %lu invalid (MAX_MULTI_BLAS_N = %d)", x.size(), MAX_MULTI_BLAS_N);
-        }
+          default:
+            if (x.size() <= MAX_MULTI_BLAS_N)
+              multiReduce<ReducerDiagonal, ReducerOffDiagonal, MAX_MULTI_BLAS_N>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
+            else errorQuda("x.size %lu invalid (MAX_MULTI_BLAS_N = %d)", x.size(), MAX_MULTI_BLAS_N);
+          }
         } else {
           // split the problem and recurse. Splitting in x requires
           // memory reshuffling (unless y = 1).
@@ -727,8 +429,8 @@ namespace quda {
       }
     }
 
-    template <template <int MXZ, typename ReducerType, typename real> class ReducerDiagonal,
-              template <int MXZ, typename ReducerType, typename real> class ReducerOffDiagonal, typename T>
+    template <template <typename ...> class ReducerDiagonal,
+              template <typename ...> class ReducerOffDiagonal, typename T>
     class TileSizeTune : public Tunable
     {
       typedef std::vector<ColorSpinorField*> vec;
@@ -895,8 +597,8 @@ namespace quda {
       void postTune() { } // FIXME - use write to determine what needs to be saved
     };
 
-    template <template <int MXZ, typename ReducerType, typename real> class ReducerDiagonal,
-              template <int MXZ, typename ReducerType, typename real> class ReducerOffDiagonal, typename T>
+    template <template <typename ...> class ReducerDiagonal,
+              template <typename ...> class ReducerOffDiagonal, typename T>
     class TransposeTune : public Tunable
     {
       using TileTuner = TileSizeTune<ReducerDiagonal, ReducerOffDiagonal, T>;

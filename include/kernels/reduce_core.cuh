@@ -1,7 +1,6 @@
 #pragma once
 
 #include <color_spinor_field_order.h>
-
 #include <blas_helper.cuh>
 #include <cub_helper.cuh>
 
@@ -13,24 +12,28 @@ namespace quda
 
 #include <texture.h>
 
-    template <typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer_>
+    template <typename store_t, int N, typename y_store_t, int Ny, typename Reducer_>
     struct ReductionArg : public ReduceArg<typename Reducer_::reduce_t> {
       using Reducer = Reducer_;
-      SpinorX X;
-      SpinorY Y;
-      SpinorZ Z;
-      SpinorW W;
-      SpinorV V;
+      Spinor<store_t, N> X;
+      Spinor<y_store_t, Ny> Y;
+      Spinor<store_t, N> Z;
+      Spinor<store_t, N> W;
+      Spinor<y_store_t, Ny> V;
       Reducer r;
+
       const int length;
-      ReductionArg(SpinorX X, SpinorY Y, SpinorZ Z, SpinorW W, SpinorV V, Reducer r, int length) :
-          X(X),
-          Y(Y),
-          Z(Z),
-          W(W),
-          V(V),
-          r(r),
-          length(length)
+      const int nParity;
+      ReductionArg(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w,
+                   ColorSpinorField &v, Reducer r, int length, int nParity) :
+        X(x),
+        Y(y),
+        Z(z),
+        W(w),
+        V(v),
+        r(r),
+        length(length),
+        nParity(nParity)
       { ; }
     };
 
@@ -75,6 +78,42 @@ namespace quda
     }
 
     /**
+       Generic reduction kernel with up to four loads and three saves.
+    */
+    template <typename real, int n, typename Arg> auto reduceCPU(Arg &arg)
+    {
+      // n is real numbers per thread
+      using vec = vector_type<complex<real>, n/2>;
+
+      using reduce_t = typename Arg::Reducer::reduce_t;
+      reduce_t sum;
+      ::quda::zero(sum);
+
+      for (int parity = 0; parity < arg.nParity; parity++) {
+        for (int i = 0; i < arg.length; i++) {
+          vec x, y, z, w, v;
+          arg.X.load(x, i, parity);
+          arg.Y.load(y, i, parity);
+          arg.Z.load(z, i, parity);
+          arg.W.load(w, i, parity);
+          arg.V.load(v, i, parity);
+
+          arg.r.pre();
+          arg.r(sum, x, y, z, w, v);
+          arg.r.post(sum);
+
+          if (arg.r.write.X) arg.X.save(x, i, parity);
+          if (arg.r.write.Y) arg.Y.save(y, i, parity);
+          if (arg.r.write.Z) arg.Z.save(z, i, parity);
+          if (arg.r.write.W) arg.W.save(w, i, parity);
+          if (arg.r.write.V) arg.V.save(v, i, parity);
+        }
+      }
+
+      return sum;
+    }
+
+    /**
        Base class from which all reduction functors should derive.
 
        @tparam reduce_t The fundamental reduction type
@@ -109,8 +148,8 @@ namespace quda
 #pragma unroll
         for (int i=0; i < x.size(); i++) sum += norm1_<reduce_t, real>(x[i]);
       }
-      static int streams() { return 1; } //! total number of input and output streams
-      static int flops() { return 2; }   //! flops per element
+      int streams() const { return 1; } //! total number of input and output streams
+      int flops() const { return 2; }   //! flops per element
     };
 
     /**
@@ -131,8 +170,8 @@ namespace quda
 #pragma unroll
         for (int i = 0; i < x.size(); i++) norm2_<reduce_t,real>(sum, x[i]);
       }
-      static int streams() { return 1; } //! total number of input and output streams
-      static int flops() { return 2; }   //! flops per element
+      int streams() const { return 1; } //! total number of input and output streams
+      int flops() const { return 2; }   //! flops per element
     };
 
     /**
@@ -154,8 +193,8 @@ namespace quda
 #pragma unroll
         for (int i = 0; i < x.size(); i++) dot_<reduce_t, real>(sum, x[i], y[i]);
       }
-      static int streams() { return 2; } //! total number of input and output streams
-      static int flops() { return 2; }   //! flops per element
+      int streams() const { return 2; } //! total number of input and output streams
+      int flops() const { return 2; }   //! flops per element
     };
 
     /**
@@ -176,8 +215,8 @@ namespace quda
           norm2_<reduce_t, real>(sum, z[i]);
         }
       }
-      static int streams() { return 3; } //! total number of input and output streams
-      static int flops() { return 4; }   //! flops per element
+      int streams() const { return 3; } //! total number of input and output streams
+      int flops() const { return 4; }   //! flops per element
     };
 
     /**
@@ -197,8 +236,8 @@ namespace quda
           dot_<reduce_t, real>(sum, x[i], y[i]);
         }
       }
-      static int streams() { return 3; } //! total number of input and output streams
-      static int flops() { return 4; }   //! flops per element
+      int streams() const { return 3; } //! total number of input and output streams
+      int flops() const { return 4; }   //! flops per element
     };
 
     /**
@@ -218,8 +257,8 @@ namespace quda
           norm2_<reduce_t, real>(sum, y[i]);
         }
       }
-      static int streams() { return 3; } //! total number of input and output streams
-      static int flops() { return 6; }   //! flops per element
+      int streams() const { return 3; } //! total number of input and output streams
+      int flops() const { return 6; }   //! flops per element
     };
 
     /**
@@ -242,8 +281,8 @@ namespace quda
           norm2_<reduce_t, real>(sum, x[i]);
         }
       }
-      static int streams() { return 5; } //! total number of input and output streams
-      static int flops() { return 10; }  //! flops per element
+      int streams() const { return 5; } //! total number of input and output streams
+      int flops() const { return 10; }  //! flops per element
     };
 
     /**
@@ -267,8 +306,8 @@ namespace quda
           norm2_<reduce_t, real>(sum, z[i]);
         }
       }
-      static int streams() { return 4; } //! total number of input and output streams
-      static int flops() { return 10; }  //! flops per element
+      int streams() const { return 4; } //! total number of input and output streams
+      int flops() const { return 10; }  //! flops per element
     };
 
     /**
@@ -294,8 +333,8 @@ namespace quda
 #pragma unroll
         for (int i = 0; i < x.size(); i++) cdot_<reduce_t, real>(sum, x[i], y[i]);
       }
-      static int streams() { return 2; } //! total number of input and output streams
-      static int flops() { return 4; }   //! flops per element
+      int streams() const { return 2; } //! total number of input and output streams
+      int flops() const { return 4; }   //! flops per element
     };
 
     /**
@@ -317,8 +356,8 @@ namespace quda
           cdot_<reduce_t, real>(sum, z[i], y[i]);
         }
       }
-      static int streams() { return 4; } //! total number of input and output streams
-      static int flops() { return 8; }   //! flops per element
+      int streams() const { return 4; } //! total number of input and output streams
+      int flops() const { return 8; }   //! flops per element
     };
 
     /**
@@ -357,13 +396,13 @@ namespace quda
 #pragma unroll
         for (int i = 0; i < x.size(); i++) cdotNormA_<reduce_t>(sum, x[i], y[i]);
       }
-      static int streams() { return 2; } //! total number of input and output streams
-      static int flops() { return 6; }   //! flops per element
+      int streams() const { return 2; } //! total number of input and output streams
+      int flops() const { return 6; }   //! flops per element
     };
 
     /**
        This convoluted kernel does the following:
-       z += a*x + b*y, y -= b*w, norm = (y,y), dot = (u, y)
+       y += a*x + b*z, z -= b*w, norm = (z,z), dot = (u, z)
     */
     template <typename real_reduce_t, typename real>
     struct caxpbypzYmbwcDotProductUYNormY_ : public ReduceFunctor<typename VectorType<real_reduce_t, 3>::type> {
@@ -376,14 +415,14 @@ namespace quda
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
-          z[i] = cmac(a, x[i], z[i]);
-          z[i] = cmac(b, y[i], z[i]);
-          y[i] = cmac(-b, w[i], y[i]);
-          cdotNormB_<reduce_t>(sum, v[i], y[i]);
+          y[i] = cmac(a, x[i], y[i]);
+          y[i] = cmac(b, z[i], y[i]);
+          z[i] = cmac(-b, w[i], z[i]);
+          cdotNormB_<reduce_t>(sum, v[i], z[i]);
         }
       }
-      static int streams() { return 7; } //! total number of input and output streams
-      static int flops() { return 18; }  //! flops per element
+      int streams() const { return 7; } //! total number of input and output streams
+      int flops() const { return 18; }  //! flops per element
     };
 
     /**
@@ -395,21 +434,21 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct axpyCGNorm2 : public ReduceFunctor<complex<real_reduce_t>> {
       using reduce_t = complex<real_reduce_t>;
-      static constexpr write<0, 0, 1> write{ };
+      static constexpr write<0, 1> write{ };
       const real a;
       axpyCGNorm2(const real &a, const real &b) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
-          auto z_new = z[i] + a * x[i];
-          norm2_<real_reduce_t, real>(sum.x, z_new);
-          dot_<real_reduce_t, real>(sum.y, z_new, z_new - z[i]);
-          z[i] = z_new;
+          auto y_new = y[i] + a * x[i];
+          norm2_<real_reduce_t, real>(sum.x, y_new);
+          dot_<real_reduce_t, real>(sum.y, y_new, y_new - y[i]);
+          y[i] = y_new;
         }
       }
-      static int streams() { return 3; } //! total number of input and output streams
-      static int flops() { return 6; }   //! flops per real element
+      int streams() const { return 3; } //! total number of input and output streams
+      int flops() const { return 6; }   //! flops per real element
     };
 
     /**
@@ -453,8 +492,8 @@ namespace quda
         sum.z += (aux.x > 0.0) ? (aux.y / aux.x) : static_cast<real>(1.0);
       }
 
-      static int streams() { return 2; } //! total number of input and output streams
-      static int flops() { return 4; }   //! undercounts since it excludes the per-site division
+      int streams() const { return 2; } //! total number of input and output streams
+      int flops() const { return 4; }   //! undercounts since it excludes the per-site division
     };
 
     /**
@@ -494,8 +533,8 @@ namespace quda
         sum.z += (aux.x > 0.0) ? (aux.y / aux.x) : static_cast<real>(1.0);
       }
 
-      static int streams() { return 3; } //! total number of input and output streams
-      static int flops() { return 5; }
+      int streams() const { return 3; } //! total number of input and output streams
+      int flops() const { return 5; }
     };
 
     /**
@@ -519,8 +558,8 @@ namespace quda
           dot_<real_reduce_t, real>(sum.z, y[i], z[i]);
         }
       }
-      static int streams() { return 3; } //! total number of input and output streams
-      static int flops() { return 6; }   //! flops per element
+      int streams() const { return 3; } //! total number of input and output streams
+      int flops() const { return 6; }   //! flops per element
     };
 
     /**
@@ -545,8 +584,8 @@ namespace quda
           norm2_<real_reduce_t, real>(sum.w, w[i]);
         }
       }
-      static int streams() { return 3; } //! total number of input and output streams
-      static int flops() { return 8; }   //! flops per element
+      int streams() const { return 3; } //! total number of input and output streams
+      int flops() const { return 8; }   //! flops per element
     };
 
     /**
@@ -573,8 +612,8 @@ namespace quda
           norm2_<reduce_t, real>(sum, y[i]);
         }
       }
-      static int streams() { return 6; } //! total number of input and output streams
-      static int flops() { return 6; }   //! flops per element check if it's right
+      int streams() const { return 6; } //! total number of input and output streams
+      int flops() const { return 6; }   //! flops per element check if it's right
     };
 
     /**
@@ -606,8 +645,8 @@ namespace quda
           norm2_<reduce_t, real>(sum, y[i]);
         }
       }
-      static int streams() { return 7; } //! total number of input and output streams
-      static int flops() { return 16; }  //! flops per element check if it's right
+      int streams() const { return 7; } //! total number of input and output streams
+      int flops() const { return 16; }  //! flops per element check if it's right
     };
 
     /**
@@ -630,8 +669,8 @@ namespace quda
           norm2_<reduce_t, real>(sum, x[i]);
         }
       }
-      static int streams() { return 3; } //! total number of input and output streams
-      static int flops() { return 5; }   //! flops per element
+      int streams() const { return 3; } //! total number of input and output streams
+      int flops() const { return 5; }   //! flops per element
     };
 
     /**
@@ -657,8 +696,8 @@ namespace quda
           norm2_<reduce_t, real>(sum, x[i]);
         }
       }
-      static int streams() { return 4; } //! total number of input and output streams
-      static int flops() { return 9; }   //! flops per element
+      int streams() const { return 4; } //! total number of input and output streams
+      int flops() const { return 9; }   //! flops per element
     };
 
   } // namespace blas

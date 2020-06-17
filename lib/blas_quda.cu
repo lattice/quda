@@ -3,9 +3,7 @@
 #include <cstring> // needed for memset
 
 #include <tune_quda.h>
-
 #include <quda_internal.h>
-#include <float_vector.h>
 #include <blas_quda.h>
 #include <color_spinor_field.h>
 
@@ -16,21 +14,21 @@ namespace quda {
 
   namespace blas {
 
-#include <generic_blas.cuh>
-
     unsigned long long flops;
     unsigned long long bytes;
 
     static qudaStream_t *blasStream;
 
-    template <typename real, int len, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW,
-        typename SpinorV, typename Functor>
+    template <template <typename real> class Functor, typename store_t, typename y_store_t,
+              int nSpin, typename coeff_t, int dummy>
     class Blas : public Tunable
     {
+      using real = typename mapper<y_store_t>::type;
+      Functor<real> f;
       const int nParity; // for composite fields this includes the number of composites
-      mutable BlasArg<SpinorX, SpinorY, SpinorZ, SpinorW, SpinorV, Functor> arg;
 
-      const ColorSpinorField &x, &y, &z, &w, &v;
+      ColorSpinorField &x, &y, &z, &w, &v;
+      const QudaFieldLocation location;
 
       unsigned int sharedBytesPerThread() const { return 0; }
       unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
@@ -41,61 +39,106 @@ namespace quda {
       unsigned int minGridSize() const { return maxGridSize(); }
 
     public:
-      Blas(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, SpinorV &V, Functor &f, ColorSpinorField &x,
-           ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v, int length) :
-          nParity((x.IsComposite() ? x.CompositeDim() : 1) * x.SiteSubset()), // must be first
-          arg(X, Y, Z, W, V, f, length / nParity),
-          x(x),
-          y(y),
-          z(z),
-          w(w),
-          v(v)
+      Blas(const coeff_t &a, const coeff_t &b, const coeff_t &c, ColorSpinorField &x,
+           ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v) :
+        f(a, b, c),
+        nParity((x.IsComposite() ? x.CompositeDim() : 1) * x.SiteSubset()),
+        x(x),
+        y(y),
+        z(z),
+        w(w),
+        v(v),
+        location(checkLocation(x, y, z, w, v))
       {
+        checkLength(x, y, z, w, v);
+        auto x_prec = checkPrecision(x, z, w);
+        auto y_prec = checkPrecision(y, v);
+        auto x_order = checkOrder(x, z, w);
+        auto y_order = checkOrder(y, v);
+        if (x_prec == y_prec && x_order != y_order) errorQuda("Orders %d %d do not match", x_order, y_order);
+
         strcpy(aux, x.AuxString());
         if (x.Precision() != y.Precision()) {
           strcat(aux, ",");
           strcat(aux, y.AuxString());
         }
+        if (location == QUDA_CPU_FIELD_LOCATION) strcat(aux, ",CPU");
 
 #ifdef JITIFY
         ::quda::create_jitify_program("kernels/blas_core.cuh");
 #endif
+
+        apply(*blasStream);
+        checkCudaError();
+
+        blas::bytes += bytes();
+        blas::flops += flops();
       }
 
-      virtual ~Blas() {}
+      TuneKey tuneKey() const { return TuneKey(x.VolString(), typeid(f).name(), aux); }
 
-      inline TuneKey tuneKey() const { return TuneKey(x.VolString(), typeid(arg.f).name(), aux); }
-
-      inline void apply(const qudaStream_t &stream)
+      void apply(const qudaStream_t &stream)
       {
+        constexpr bool site_unroll = !std::is_same<store_t, y_store_t>::value || isFixed<store_t>::value;
+        if (site_unroll && (x.Ncolor() != 3 || x.Nspin() == 2))
+          errorQuda("site unroll not supported for nSpin = %d nColor = %d", x.Nspin(), x.Ncolor());
+
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        if (location == QUDA_CUDA_FIELD_LOCATION) {
+          // need to add native check here
+          constexpr int N = n_vector<store_t, true, nSpin, site_unroll>();
+          constexpr int Ny = n_vector<y_store_t, true, nSpin, site_unroll>();
+          constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
+          const int length = x.Length() / (nParity * M);
+
+          BlasArg<store_t, N, y_store_t, Ny, decltype(f)> arg(x, y, z, w, v, f, length, nParity);
 #ifdef JITIFY
-        using namespace jitify::reflection;
-        jitify_error = program->kernel("quda::blas::blasKernel")
-                           .instantiate(Type<real>(), len, Type<decltype(arg)>())
-                           .configure(tp.grid, tp.block, tp.shared_bytes, stream)
-                           .launch(arg);
+          using namespace jitify::reflection;
+          jitify_error = program->kernel("quda::blas::blasKernel")
+            .instantiate(Type<real>(), M, Type<decltype(arg)>())
+            .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+            .launch(arg);
 #else
-        blasKernel<real, len><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          blasKernel<real, M><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 #endif
+        } else {
+          // check field order here
+
+          // no point instantiating half/quarter for CPU, so just promote those to single
+          using store_t_ = typename mapper<store_t>::type;
+          using y_store_t_ = typename mapper<y_store_t>::type;
+
+          // if site unrolling then we need full AoS ordering
+          constexpr int N = site_unroll ? (nSpin == 4 ? 24 : 6) : n_vector<store_t, false, nSpin, site_unroll>();
+          constexpr int M = N;
+          const int length = x.Length() / (nParity * M);
+
+          BlasArg<store_t_, N, y_store_t_, N, decltype(f)> arg(x, y, z, w, v, f, length, nParity);
+          blasCPU<real, M>(arg);
+        }
       }
 
       void preTune()
       {
-        if (arg.f.write.X) x.backup();
-        if (arg.f.write.Y) y.backup();
-        if (arg.f.write.Z) z.backup();
-        if (arg.f.write.W) w.backup();
-        if (arg.f.write.V) v.backup();
+        if (f.write.X) x.backup();
+        if (f.write.Y) y.backup();
+        if (f.write.Z) z.backup();
+        if (f.write.W) w.backup();
+        if (f.write.V) v.backup();
       }
 
       void postTune()
       {
-        if (arg.f.write.X) x.restore();
-        if (arg.f.write.Y) y.restore();
-        if (arg.f.write.Z) z.restore();
-        if (arg.f.write.W) w.restore();
-        if (arg.f.write.V) v.restore();
+        if (f.write.X) x.restore();
+        if (f.write.Y) y.restore();
+        if (f.write.Z) z.restore();
+        if (f.write.W) w.restore();
+        if (f.write.V) v.restore();
+      }
+
+      bool advanceTuneParam(TuneParam &param) const
+      {
+        return location == QUDA_CPU_FIELD_LOCATION ? false : Tunable::advanceTuneParam(param);
       }
 
       void initTuneParam(TuneParam &param) const
@@ -110,345 +153,15 @@ namespace quda {
         param.grid.y = nParity;
       }
 
-      long long flops() const { return arg.f.flops() * x.Length(); }
+      long long flops() const { return f.flops() * x.Length(); }
       long long bytes() const
       {
         // the factor two here assumes we are reading and writing to the high precision vector
         // this will evaluate correctly for non-mixed kernels since the +2/-2 will cancel out
-        return (arg.f.streams() - 2) * x.Bytes() + 2 * y.Bytes();
+        return (f.streams() - 2) * x.Bytes() + 2 * y.Bytes();
       }
       int tuningIter() const { return 3; }
     };
-
-    template <template <typename real> class Functor, typename real, typename store_t, int len, int N,
-              typename y_store_t = store_t, int Ny = N, typename coeff_t>
-    void nativeBlas(const coeff_t &a, const coeff_t &b, const coeff_t &c, ColorSpinorField &x, ColorSpinorField &y,
-                    ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v, int length)
-    {
-      checkLength(x, y);
-      checkLength(x, z);
-      checkLength(x, w);
-      checkLength(x, v);
-
-      Functor<real> f(a, b, c);
-
-      Spinor<store_t, N> X(x);
-      Spinor<y_store_t, Ny> Y(y);
-      Spinor<store_t, N> Z(z);
-      Spinor<store_t, N> W(w);
-      Spinor<y_store_t, Ny> V(v);
-
-      Blas<real, len, decltype(X), decltype(Y), decltype(Z), decltype(W), decltype(V), decltype(f)> blas(X, Y, Z, W, V, f, x, y, z, w, v, length);
-      blas.apply(*blasStream);
-      blas::bytes += blas.bytes();
-      blas::flops += blas.flops();
-
-      checkCudaError();
-    }
-
-    /**
-       Driver for generic blas routine with four loads and two store.
-       All fields must have matching precisions.
-     */
-    template <template <typename real> class Functor, typename coeff_t>
-    void uni_blas(const coeff_t &a, const coeff_t &b, const coeff_t &c, ColorSpinorField &x, ColorSpinorField &y,
-                  ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v)
-    {
-      checkPrecision(x, y, z, w, v);
-
-      if (checkLocation(x, y, z, w, v) == QUDA_CUDA_FIELD_LOCATION) {
-
-        if (!x.isNative() && x.FieldOrder() != QUDA_FLOAT8_FIELD_ORDER) {
-          warningQuda("Device blas on non-native fields is not supported (prec = %d, order = %d)", x.Precision(),
-                      x.FieldOrder());
-          return;
-        }
-
-        if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-
-#if QUDA_PRECISION & 8
-#if defined(NSPIN4) || defined(NSPIN2) || defined(NSPIN1)
-          const int M = 1;
-          nativeBlas<Functor, double, double, 2, 2>(a, b, c, x, y, z, w, v, x.Length() / (2 * M));
-#else
-          errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
-#endif
-#else
-          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
-#endif
-
-        } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
-
-#if QUDA_PRECISION & 4
-#if defined(NSPIN4) || defined(NSPIN2) || defined(NSPIN1)
-          const int M = 1;
-          nativeBlas<Functor, float, float, 4, 4>(a, b, c, x, y, z, w, v, x.Length() / (4 * M));
-#else
-          errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
-#endif
-#else
-          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
-#endif
-
-        } else if (x.Precision() == QUDA_HALF_PRECISION) {
-
-#if QUDA_PRECISION & 2
-          if (x.Ncolor() != 3) { errorQuda("nColor = %d is not supported", x.Ncolor()); }
-          if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) { // wilson
-#if defined(NSPIN4)
-            nativeBlas<Functor, float, short, 24, 4>(a, b, c, x, y, z, w, v, x.Volume());
-#else
-            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
-#endif
-          } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER) { // wilson
-#if defined(NSPIN4) && defined(FLOAT8)
-            nativeBlas<Functor, float, short, 24, 8>(a, b, c, x, y, z, w, v, x.Volume());
-#else
-            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
-#endif
-          } else if (x.Nspin() == 1) { // staggered
-#if defined(NSPIN1)
-            nativeBlas<Functor, float, short, 6, 2>(a, b, c, x, y, z, w, v, x.Volume());
-#else
-            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
-#endif
-          } else {
-            errorQuda("nSpin=%d is not supported\n", x.Nspin());
-          }
-#else
-          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
-#endif
-
-        } else if (x.Precision() == QUDA_QUARTER_PRECISION) {
-
-#if QUDA_PRECISION & 1
-          if (x.Ncolor() != 3) { errorQuda("nColor = %d is not supported", x.Ncolor()); }
-          if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) { // wilson
-#if defined(NSPIN4)
-            nativeBlas<Functor, float, char, 24, 4>(a, b, c, x, y, z, w, v, x.Volume());
-#else
-            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
-#endif
-          } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER) { // wilson
-#if defined(NSPIN4) && defined(FLOAT8)
-            nativeBlas<Functor, float, char, 24, 8>(a, b, c, x, y, z, w, v, x.Volume());
-#else
-            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
-#endif
-          } else if (x.Nspin() == 1) { // staggered
-#if defined(NSPIN1)
-            nativeBlas<Functor, float, char, 6, 2>(a, b, c, x, y, z, w, v, x.Volume());
-#else
-            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
-#endif
-          } else {
-            errorQuda("nSpin=%d is not supported\n", x.Nspin());
-          }
-#else
-          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
-#endif
-
-        } else {
-          errorQuda("precision=%d is not supported\n", x.Precision());
-        }
-      } else { // fields on the cpu
-        if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-          Functor<double> f(a, b, c);
-          genericBlas<double, double>(x, y, z, w, v, f);
-        } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
-          Functor<float> f(a, b, c);
-          genericBlas<float, float>(x, y, z, w, v, f);
-        } else {
-          errorQuda("Not implemented");
-        }
-      }
-    }
-
-    /**
-       Driver for generic blas routine with four loads and two store.
-       This is the mixed-precision driver which supports a different
-       precision for (x,z,w) and (y,v), where the former is the low
-       precision and the latter is the high precision.
-    */
-    template <template <typename real> class Functor, typename coeff_t>
-    void mixed_blas(const coeff_t &a, const coeff_t &b, const coeff_t &c, ColorSpinorField &x, ColorSpinorField &y,
-                    ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v)
-    {
-      checkPrecision(x, z, w);
-      checkPrecision(y, v);
-
-      if (checkLocation(x, y, z, w, v) == QUDA_CUDA_FIELD_LOCATION) {
-
-        if (!x.isNative()
-            && !(x.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER && y.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER
-                 && x.Precision() == QUDA_QUARTER_PRECISION && y.Precision() == QUDA_HALF_PRECISION)) {
-          warningQuda("Device blas on non-native fields is not supported (prec = %d, order = %d)", x.Precision(),
-                      x.FieldOrder());
-          return;
-        }
-
-        if (x.Precision() == QUDA_SINGLE_PRECISION && y.Precision() == QUDA_DOUBLE_PRECISION) {
-
-#if QUDA_PRECISION & 4
-          if (x.Nspin() == 4) {
-#if defined(NSPIN4)
-            nativeBlas<Functor, double, float, 24, 4, double, 2>(a, b, c, x, y, z, w, v, x.Volume());
-#else
-            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
-#endif
-          } else if (x.Nspin() == 1) {
-#if defined(NSPIN1)
-            nativeBlas<Functor, double, float, 6, 2, double, 2>(a, b, c, x, y, z, w, v, x.Volume());
-#else
-            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
-#endif
-          }
-#else
-          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
-#endif
-
-        } else if (x.Precision() == QUDA_HALF_PRECISION) {
-
-#if QUDA_PRECISION & 2
-          if (y.Precision() == QUDA_DOUBLE_PRECISION) {
-
-#if QUDA_PRECISION & 8
-            if (x.Nspin() == 4) {
-#if defined(NSPIN4)
-              nativeBlas<Functor, double, short, 24, 4, double, 2>(a, b, c, x, y, z, w, v, x.Volume());
-#else
-              errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
-#endif
-            } else if (x.Nspin() == 1) {
-#if defined(NSPIN1)
-              nativeBlas<Functor, double, short, 6, 2, double, 2>(a, b, c, x, y, z, w, v, x.Volume());
-#else
-              errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
-#endif
-            }
-#else
-            errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, y.Precision());
-#endif
-
-          } else if (y.Precision() == QUDA_SINGLE_PRECISION) {
-
-#if QUDA_PRECISION & 4
-            if (x.Nspin() == 4) {
-#if defined(NSPIN4)
-              nativeBlas<Functor, float, short, 24, 4, float, 4>(a, b, c, x, y, z, w, v, x.Volume());
-#else
-              errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
-#endif
-            } else if (x.Nspin() == 1) {
-#if defined(NSPIN1)
-              nativeBlas<Functor, float, short, 6, 2, float, 2>(a, b, c, x, y, z, w, v, x.Volume());
-#else
-              errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
-#endif
-            }
-#else
-            errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, y.Precision());
-#endif
-
-          } else {
-            errorQuda("Not implemented for this precision combination %d %d", x.Precision(), y.Precision());
-          }
-#else
-          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
-#endif
-
-        } else if (x.Precision() == QUDA_QUARTER_PRECISION) {
-
-#if QUDA_PRECISION & 1
-
-          if (y.Precision() == QUDA_DOUBLE_PRECISION) {
-
-#if QUDA_PRECISION & 8
-            if (x.Nspin() == 4) {
-#if defined(NSPIN4)
-              nativeBlas<Functor, double, char, 24, 4, double, 2>(a, b, c, x, y, z, w, v, x.Volume());
-#else
-              errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
-#endif
-            } else if (x.Nspin() == 1) {
-#if defined(NSPIN1)
-              nativeBlas<Functor, double, char, 6, 2, double, 2>(a, b, c, x, y, z, w, v, x.Volume());
-#else
-              errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
-#endif
-            }
-#else
-            errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, y.Precision());
-#endif
-
-          } else if (y.Precision() == QUDA_SINGLE_PRECISION) {
-
-#if QUDA_PRECISION & 4
-            if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) {
-#if defined(NSPIN4)
-              nativeBlas<Functor, float, char, 24, 4, float, 4>(a, b, c, x, y, z, w, v, x.Volume());
-#else
-              errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
-#endif
-            } else if (x.Nspin() == 1) {
-#if defined(NSPIN1)
-              nativeBlas<Functor, float, char, 6, 2, float, 2>(a, b, c, x, y, z, w, v, x.Volume());
-#else
-              errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
-#endif
-            }
-#else
-            errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, y.Precision());
-#endif
-
-          } else if (y.Precision() == QUDA_HALF_PRECISION) {
-
-#if QUDA_PRECISION & 2
-            if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) {
-#if defined(NSPIN4)
-              nativeBlas<Functor, float, char, 24, 4, short, 4>(a, b, c, x, y, z, w, v, x.Volume());
-#else
-              errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
-#endif
-            }
-            if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER && y.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER) {
-#if defined(NSPIN4)
-              nativeBlas<Functor, float, char, 24, 8, short, 8>(a, b, c, x, y, z, w, v, x.Volume());
-#else
-              errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
-#endif
-            } else if (x.Nspin() == 1) {
-#if defined(NSPIN1)
-              nativeBlas<Functor, float, char, 6, 2, short, 2>(a, b, c, x, y, z, w, v, x.Volume());
-#else
-              errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
-#endif
-            }
-#else
-            errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, y.Precision());
-#endif
-
-          } else {
-            errorQuda("Not implemented for this precision combination %d %d", x.Precision(), y.Precision());
-          }
-#else
-          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
-#endif
-
-        } else {
-          errorQuda("Not implemented for this precision combination %d %d", x.Precision(), y.Precision());
-        }
-
-      } else { // fields on the cpu
-        using namespace quda::colorspinor;
-        if (x.Precision() == QUDA_SINGLE_PRECISION && y.Precision() == QUDA_DOUBLE_PRECISION) {
-          Functor<double> f(a, b, c);
-          genericBlas<float, double>(x, y, z, w, v, f);
-        } else {
-          errorQuda("Not implemented");
-        }
-      }
-    }
 
     void zero(ColorSpinorField &a) {
       if (typeid(a) == typeid(cudaColorSpinorField)) {
@@ -476,92 +189,68 @@ namespace quda {
 
     void axpbyz(double a, ColorSpinorField &x, double b, ColorSpinorField &y, ColorSpinorField &z)
     {
-      if (x.Precision() != y.Precision()) {
-        mixed_blas<axpbyz_>(a, b, 0.0, x, y, x, x, z);
-      } else {
-        uni_blas<axpbyz_>(a, b, 0.0, x, y, x, x, z);
-      }
+      instantiate<axpbyz_, Blas, true, 1>(a, b, 0.0, x, y, x, x, z);
     }
 
     void ax(double a, ColorSpinorField &x)
     {
-      uni_blas<ax_>(a, 0.0, 0.0, x, x, x, x, x);
+      instantiate<ax_, Blas, false>(a, 0.0, 0.0, x, x, x, x, x);
     }
 
     void caxpy(const Complex &a, ColorSpinorField &x, ColorSpinorField &y)
     {
-      if (x.Precision() != y.Precision()) {
-        mixed_blas<caxpy_>(a, Complex(0.0), Complex(0.0), x, y, x, x, y);
-      } else {
-        uni_blas<caxpy_>(a, Complex(0.0), Complex(0.0), x, y, x, x, y);
-      }
+      instantiate<caxpy_, Blas, true>(a, Complex(0.0), Complex(0.0), x, y, x, x, y);
     }
 
     void caxpby(const Complex &a, ColorSpinorField &x, const Complex &b, ColorSpinorField &y)
     {
-      uni_blas<caxpby_>(a, b, Complex(0.0), x, y, x, x, y);
+      instantiate<caxpby_, Blas, false>(a, b, Complex(0.0), x, y, x, x, y);
     }
 
     void caxpbypczw(const Complex &a, ColorSpinorField &x, const Complex &b, ColorSpinorField &y, const Complex &c,
                     ColorSpinorField &z, ColorSpinorField &w)
     {
-      uni_blas<caxpbypczw_>(a, b, c, x, y, z, w, y);
+      instantiate<caxpbypczw_, Blas, false>(a, b, c, x, y, z, w, y);
     }
 
     void cxpaypbz(ColorSpinorField &x, const Complex &a, ColorSpinorField &y, const Complex &b, ColorSpinorField &z)
     {
-      uni_blas<caxpbypczw_>(Complex(1.0), a, b, x, y, z, z, y);
+      instantiate<caxpbypczw_, Blas, false>(Complex(1.0), a, b, x, y, z, z, y);
     }
 
     void axpyBzpcx(double a, ColorSpinorField& x, ColorSpinorField& y, double b, ColorSpinorField& z, double c)
     {
-      if (x.Precision() != y.Precision()) {
-        mixed_blas<axpyBzpcx_>(a, b, c, x, y, z, x, y);
-      } else {
-        uni_blas<axpyBzpcx_>(a, b, c, x, y, z, x, y);
-      }
+      instantiate<axpyBzpcx_, Blas, true>(a, b, c, x, y, z, x, y);
     }
 
     void axpyZpbx(double a, ColorSpinorField& x, ColorSpinorField& y, ColorSpinorField& z, double b)
     {
-      if (x.Precision() != y.Precision()) {
-        mixed_blas<axpyZpbx_>(a, b, 0.0, x, y, z, x, y);
-      } else {
-        uni_blas<axpyZpbx_>(a, b, 0.0, x, y, z, x, y);
-      }
+      instantiate<axpyZpbx_, Blas, true>(a, b, 0.0, x, y, z, x, y);
     }
 
     void caxpyBzpx(const Complex &a, ColorSpinorField &x, ColorSpinorField &y, const Complex &b, ColorSpinorField &z)
     {
-      if (x.Precision() != y.Precision()) {
-        mixed_blas<caxpyBzpx_>(a, b, Complex(0.0), x, y, z, x, y);
-      } else {
-        uni_blas<caxpyBzpx_>(a, b, Complex(0.0), x, y, z, x, y);
-      }
+      instantiate<caxpyBzpx_, Blas, true>(a, b, Complex(0.0), x, y, z, x, y);
     }
 
     void caxpyBxpz(const Complex &a, ColorSpinorField &x, ColorSpinorField &y, const Complex &b, ColorSpinorField &z)
     {
-      if (x.Precision() != y.Precision()) {
-        mixed_blas<caxpyBxpz_>(a, b, Complex(0.0), x, y, z, x, y);
-      } else {
-        uni_blas<caxpyBxpz_>(a, b, Complex(0.0), x, y, z, x, y);
-      }
+      instantiate<caxpyBxpz_, Blas, true>(a, b, Complex(0.0), x, y, z, x, y);
     }
 
     void caxpbypzYmbw(const Complex &a, ColorSpinorField &x, const Complex &b, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w)
     {
-      uni_blas<caxpbypzYmbw_>(a, b, Complex(0.0),  x, y, z, w, y);
+      instantiate<caxpbypzYmbw_, Blas, false>(a, b, Complex(0.0), x, y, z, w, y);
     }
 
     void cabxpyAx(double a, const Complex &b, ColorSpinorField &x, ColorSpinorField &y)
     {
-      uni_blas<cabxpyAx_>(Complex(a), b, Complex(0.0), x, y, x, x, y);
+      instantiate<cabxpyAx_, Blas, false>(Complex(a), b, Complex(0.0), x, y, x, x, y);
     }
 
     void caxpyXmaz(const Complex &a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z)
     {
-      uni_blas<caxpyxmaz_>(a, Complex(0.0), Complex(0.0), x, y, z, x, y);
+      instantiate<caxpyxmaz_, Blas, false>(a, Complex(0.0), Complex(0.0), x, y, z, x, y);
     }
 
     void caxpyXmazMR(const double &a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z)
@@ -570,27 +259,22 @@ namespace quda {
 	errorQuda("This kernel requires asynchronous reductions to be set");
       if (x.Location() == QUDA_CPU_FIELD_LOCATION)
 	errorQuda("This kernel cannot be run on CPU fields");
-
-      uni_blas<caxpyxmazMR_>(a, 0.0, 0.0, x, y, z, y, y);
+      instantiate<caxpyxmazMR_, Blas, false>(a, 0.0, 0.0, x, y, z, y, y);
     }
 
     void tripleCGUpdate(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w)
     {
-      if (x.Precision() != y.Precision()) {
-        mixed_blas<tripleCGUpdate_>(a, b, 0.0, x, y, z, w, y);
-      } else {
-        uni_blas<tripleCGUpdate_>(a, b, 0.0, x, y, z, w, y);
-      }
+      instantiate<tripleCGUpdate_, Blas, true>(a, b, 0.0, x, y, z, w, y);
     }
 
     void doubleCG3Init(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z)
     {
-      uni_blas<doubleCG3Init_>(a, 0.0, 0.0, x, y, z, z, y);
+      instantiate<doubleCG3Init_, Blas, false>(a, 0.0, 0.0, x, y, z, z, y);
     }
 
     void doubleCG3Update(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z)
     {
-      uni_blas<doubleCG3Update_>(a, b, 1.0 - b, y, x, z, z, y);
+      instantiate<doubleCG3Update_, Blas, false>(a, b, 1.0 - b, y, x, z, z, y);
     }
 
   } // namespace blas

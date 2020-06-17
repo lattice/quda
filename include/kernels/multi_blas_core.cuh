@@ -27,29 +27,31 @@ namespace quda
        @tparam SpinorW Type of input spinor for w argument
        @tparam Functor Functor used to operate on data
     */
-    template <int NXZ, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW, typename Functor>
+    template <int NXZ, typename store_t, int N, typename y_store_t, int Ny, typename Functor>
     struct MultiBlasArg
-      : SpinorXZ<NXZ, SpinorX, SpinorZ, Functor::use_z>,
-        SpinorYW<max_YW_size<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Functor>(), SpinorY, SpinorW, Functor::use_w> {
-      static constexpr int NYW_max = max_YW_size<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Functor>();
+      : SpinorXZ<NXZ, store_t, N, Functor::use_z>,
+      SpinorYW<max_YW_size<NXZ, store_t, y_store_t, Functor>(), y_store_t, Ny, Functor::use_w> {
+      static constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, Functor>();
       const int NYW;
       Functor f;
       const int length;
 
-      MultiBlasArg(SpinorX X[NXZ], SpinorY Y[], SpinorZ Z[NXZ], SpinorW W[], Functor f, int NYW, int length) :
-          NYW(NYW),
-          f(f),
-          length(length)
+      MultiBlasArg(std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
+                   std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
+                   Functor f, int NYW, int length) :
+        NYW(NYW),
+        f(f),
+        length(length)
       {
         if (NYW > NYW_max) errorQuda("NYW = %d greater than maximum size of %d", NYW, NYW_max);
 
         for (int i = 0; i < NXZ; ++i) {
-          this->X[i] = X[i];
-          if (Functor::use_z) this->Z[i] = Z[i];
+          this->X[i].set(*x[i]);
+          if (Functor::use_z) this->Z[i].set(*z[i]);
         }
         for (int i = 0; i < NYW; ++i) {
-          this->Y[i] = Y[i];
-          if (Functor::use_w) this->W[i] = W[i];
+          this->Y[i].set(*y[i]);
+          if (Functor::use_w) this->W[i].set(*w[i]);
         }
       }
     };
@@ -132,21 +134,15 @@ namespace quda
       }
     }
 
-    template <typename T> struct coeff_array {
-      const T *data;
-      coeff_array() : data(nullptr) {}
-      coeff_array(const T *data) : data(data) {}
-    };
-
-
     template <typename coeff_t_>
     struct MultiBlasFunctor {
       using coeff_t = coeff_t_;
       static constexpr bool reducer = false;
       static constexpr bool coeff_mul  = true;
 
-      int NYW;
-      MultiBlasFunctor(int NYW) : NYW(NYW) {}
+      const int NXZ;
+      const int NYW;
+      MultiBlasFunctor(int NXZ, int NYW) : NXZ(NXZ), NYW(NYW) {}
 
       __device__ __host__ inline coeff_t a(int i, int j) const
       {
@@ -179,14 +175,15 @@ namespace quda
     /**
        Functor performing the operations: y[i] = a*x[i] + y[i]
     */
-    template <int NXZ, typename real>
+    template <typename real>
     struct multiaxpy_ : public MultiBlasFunctor<real> {
       static constexpr write<0, 1> write{ };
       static constexpr bool use_z = false;
       static constexpr bool use_w = false;
+      using MultiBlasFunctor<real>::NXZ;
       using MultiBlasFunctor<real>::NYW;
       using MultiBlasFunctor<real>::a;
-      multiaxpy_(int NYW) : MultiBlasFunctor<real>(NYW) {}
+      multiaxpy_(int NXZ, int NYW) : MultiBlasFunctor<real>(NXZ, NYW) {}
 
       template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &z, T &w, int i, int j)
       {
@@ -194,21 +191,22 @@ namespace quda
         for (int k = 0; k < x.size(); k++) y[k] += a(j, i) * x[k];
       }
 
-      int streams() { return 2 * NYW + NXZ * NYW; } //! total number of input and output streams
-      int flops() { return 2 * NXZ * NYW; }         //! flops per real element
+      int streams() const { return 2 * NYW + NXZ * NYW; } //! total number of input and output streams
+      int flops() const { return 2 * NXZ * NYW; }         //! flops per real element
     };
 
     /**
        Functor to perform the operation y += a * x  (complex-valued)
     */
-    template <int NXZ, typename real>
+    template <typename real>
     struct multicaxpy_ : public MultiBlasFunctor<complex<real>> {
       static constexpr write<0, 1> write{ };
       static constexpr bool use_z = false;
       static constexpr bool use_w = false;
+      using MultiBlasFunctor<complex<real>>::NXZ;
       using MultiBlasFunctor<complex<real>>::NYW;
       using MultiBlasFunctor<complex<real>>::a;
-      multicaxpy_(int NYW) : MultiBlasFunctor<complex<real>>(NYW) {}
+      multicaxpy_(int NXZ, int NYW) : MultiBlasFunctor<complex<real>>(NXZ, NYW) {}
 
       template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &z, T &w, int i, int j)
       {
@@ -216,21 +214,22 @@ namespace quda
         for (int k = 0; k < x.size(); k++) y[k] = cmac(a(j, i), x[k], y[k]);
       }
 
-      int streams() { return 2 * NYW + NXZ * NYW; } //! total number of input and output streams
-      int flops() { return 4 * NXZ * NYW; }         //! flops per real element
+      int streams() const { return 2 * NYW + NXZ * NYW; } //! total number of input and output streams
+      int flops() const { return 4 * NXZ * NYW; }         //! flops per real element
     };
 
     /**
        Functor to perform the operation w = a * x + y  (complex-valued)
     */
-    template <int NXZ, typename real>
+    template <typename real>
     struct multicaxpyz_ : public MultiBlasFunctor<complex<real>> {
       static constexpr write<0, 0, 0, 1> write{ };
       static constexpr bool use_z = false;
       static constexpr bool use_w = true;
+      using MultiBlasFunctor<complex<real>>::NXZ;
       using MultiBlasFunctor<complex<real>>::NYW;
       using MultiBlasFunctor<complex<real>>::a;
-      multicaxpyz_(int NYW) : MultiBlasFunctor<complex<real>>(NYW) {}
+      multicaxpyz_(int NXZ, int NYW) : MultiBlasFunctor<complex<real>>(NXZ, NYW) {}
 
       template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &z, T &w, int i, int j)
       {
@@ -241,23 +240,24 @@ namespace quda
         }
       }
 
-      int streams() { return 2 * NYW + NXZ * NYW; } //! total number of input and output streams
-      int flops() { return 4 * NXZ * NYW; }         //! flops per real element
+      int streams() const { return 2 * NYW + NXZ * NYW; } //! total number of input and output streams
+      int flops() const { return 4 * NXZ * NYW; }         //! flops per real element
     };
 
     /**
        Functor performing the operations: y[i] = a*x[i] + y[i]; x[i] = b*z[i] + c*x[i]
     */
-    template <int NXZ, typename real>
+    template <typename real>
     struct multi_axpyBzpcx_ : public MultiBlasFunctor<real> {
       static constexpr write<0, 1, 0, 1> write{ };
       static constexpr bool use_z = false;
       static constexpr bool use_w = true;
+      using MultiBlasFunctor<real>::NXZ;
       using MultiBlasFunctor<real>::NYW;
       using MultiBlasFunctor<real>::a;
       using MultiBlasFunctor<real>::b;
       using MultiBlasFunctor<real>::c;
-      multi_axpyBzpcx_(int NYW) : MultiBlasFunctor<real>(NYW) {}
+      multi_axpyBzpcx_(int NXZ, int NYW) : MultiBlasFunctor<real>(NXZ, NYW) {}
 
       template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &z, T &w, int i, int j)
       {
@@ -268,22 +268,23 @@ namespace quda
         }
       }
 
-      int streams() { return 4 * NYW + NXZ; } //! total number of input and output streams
-      int flops() { return 5 * NXZ * NYW; }   //! flops per real element
+      int streams() const { return 4 * NYW + NXZ; } //! total number of input and output streams
+      int flops() const { return 5 * NXZ * NYW; }   //! flops per real element
     };
 
     /**
        Functor performing the operations y[i] = a*x[i] + y[i] and w[i] = b*x[i] + w[i]
     */
-    template <int NXZ, typename real>
+    template <typename real>
     struct multi_caxpyBxpz_ : public MultiBlasFunctor<complex<real>> {
       static constexpr write<0, 1, 0, 1> write{ };
       static constexpr bool use_z = false;
       static constexpr bool use_w = true;
+      using MultiBlasFunctor<complex<real>>::NXZ;
       using MultiBlasFunctor<complex<real>>::NYW;
       using MultiBlasFunctor<complex<real>>::a;
       using MultiBlasFunctor<complex<real>>::b;
-      multi_caxpyBxpz_(int NYW) : MultiBlasFunctor<complex<real>>(NYW) {}
+      multi_caxpyBxpz_(int NXZ, int NYW) : MultiBlasFunctor<complex<real>>(NXZ, NYW) {}
 
       // i loops over NYW, j loops over NXZ
       template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &z, T &w, int i, int j)
@@ -295,8 +296,8 @@ namespace quda
         }
       }
 
-      int streams() { return 4 * NYW + NXZ; } //! total number of input and output streams
-      int flops() { return 8 * NXZ * NYW; }   //! flops per real element
+      int streams() const { return 4 * NYW + NXZ; } //! total number of input and output streams
+      int flops() const { return 8 * NXZ * NYW; }   //! flops per real element
     };
 
   } // namespace blas
