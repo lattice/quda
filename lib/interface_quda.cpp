@@ -707,12 +707,6 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   // Set the specific input parameters and create the cpu gauge field
   GaugeFieldParam gauge_param(h_gauge, *param);
 
-  // if we are using half precision then we need to compute the fat
-  // link maximum while still on the cpu
-  // FIXME get a kernel for this
-  if (param->type == QUDA_ASQTAD_FAT_LINKS)
-    gauge_param.compute_fat_link_max = true;
-
   if (gauge_param.order <= 4) gauge_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   GaugeField *in = (param->location == QUDA_CPU_FIELD_LOCATION) ?
     static_cast<GaugeField*>(new cpuGaugeField(gauge_param)) :
@@ -4007,10 +4001,10 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   }
 
   GaugeFieldParam gParamMom(mom, *qudaGaugeParam, QUDA_ASQTAD_MOM_LINKS);
-  // FIXME - test program always uses MILC for mom but can use QDP for gauge
-  if (gParamMom.order == QUDA_QDP_GAUGE_ORDER) gParamMom.order = QUDA_MILC_GAUGE_ORDER;
-  if (gParamMom.order == QUDA_TIFR_GAUGE_ORDER || gParamMom.order == QUDA_TIFR_PADDED_GAUGE_ORDER) gParamMom.reconstruct = QUDA_RECONSTRUCT_NO;
-  else gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
+  if (gParamMom.order == QUDA_TIFR_GAUGE_ORDER || gParamMom.order == QUDA_TIFR_PADDED_GAUGE_ORDER)
+    gParamMom.reconstruct = QUDA_RECONSTRUCT_NO;
+  else
+    gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
 
   gParamMom.site_offset = qudaGaugeParam->mom_offset;
   gParamMom.site_size = qudaGaugeParam->site_size;
@@ -4093,6 +4087,63 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   errorQuda("Gauge force has not been built");
 #endif // GPU_GAUGE_FORCE
   return 0;
+}
+
+void momResidentQuda(void *mom, QudaGaugeParam *param)
+{
+  profileGaugeForce.TPSTART(QUDA_PROFILE_TOTAL);
+  profileGaugeForce.TPSTART(QUDA_PROFILE_INIT);
+
+  checkGaugeParam(param);
+
+  GaugeFieldParam gParamMom(mom, *param, QUDA_ASQTAD_MOM_LINKS);
+  if (gParamMom.order == QUDA_TIFR_GAUGE_ORDER || gParamMom.order == QUDA_TIFR_PADDED_GAUGE_ORDER)
+    gParamMom.reconstruct = QUDA_RECONSTRUCT_NO;
+  else
+    gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
+  gParamMom.site_offset = param->mom_offset;
+  gParamMom.site_size = param->site_size;
+
+  cpuGaugeField cpuMom(gParamMom);
+
+  if (param->make_resident_mom && !param->return_result_mom) {
+    if (momResident) delete momResident;
+
+    gParamMom.create = QUDA_NULL_FIELD_CREATE;
+    gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
+    gParamMom.link_type = QUDA_ASQTAD_MOM_LINKS;
+    gParamMom.setPrecision(param->cuda_prec, true);
+    gParamMom.create = QUDA_ZERO_FIELD_CREATE;
+    momResident = new cudaGaugeField(gParamMom);
+  } else if (param->return_result_mom && !param->make_resident_mom) {
+    if (!momResident) errorQuda("No resident momentum to return");
+  } else {
+    errorQuda("Unexpected combination make_resident_mom = %d return_result_mom = %d", param->make_resident_mom,
+              param->return_result_mom);
+  }
+
+  profileGaugeForce.TPSTOP(QUDA_PROFILE_INIT);
+
+  if (param->make_resident_mom) {
+    // we are downloading the momentum from the host
+    profileGaugeForce.TPSTART(QUDA_PROFILE_H2D);
+    momResident->loadCPUField(cpuMom);
+    profileGaugeForce.TPSTOP(QUDA_PROFILE_H2D);
+  } else if (param->return_result_mom) {
+    // we are uploading the momentum to the host
+    profileGaugeForce.TPSTART(QUDA_PROFILE_D2H);
+    momResident->saveCPUField(cpuMom);
+    profileGaugeForce.TPSTOP(QUDA_PROFILE_D2H);
+
+    profileGaugeForce.TPSTART(QUDA_PROFILE_FREE);
+    delete momResident;
+    momResident = nullptr;
+    profileGaugeForce.TPSTOP(QUDA_PROFILE_FREE);
+  }
+
+  profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
+
+  checkCudaError();
 }
 
 void createCloverQuda(QudaInvertParam* invertParam)
@@ -4990,6 +5041,8 @@ double momActionQuda(void* momentum, QudaGaugeParam* param)
   GaugeFieldParam gParam(momentum, *param, QUDA_ASQTAD_MOM_LINKS);
   gParam.reconstruct = (gParam.order == QUDA_TIFR_GAUGE_ORDER || gParam.order == QUDA_TIFR_PADDED_GAUGE_ORDER) ?
     QUDA_RECONSTRUCT_NO : QUDA_RECONSTRUCT_10;
+  gParam.site_offset = param->mom_offset;
+  gParam.site_size = param->site_size;
 
   cpuGaugeField *cpuMom = !param->use_resident_mom ? new cpuGaugeField(gParam) : nullptr;
 

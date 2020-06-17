@@ -6,32 +6,33 @@
 namespace quda
 {
 
-#include <texture.h> // we need to convert this kernel to using colorspinor accessors
-
   // This is the maximum number of color spinors we can process in a single kernel
-#if (CUDA_VERSION < 8000)
-#define MAX_NVECTOR 1 // multi-vector code doesn't seem to work well with CUDA 7.x
-#else
-#define MAX_NVECTOR 9
-#endif
+  // FIXME - make this multi-RHS once we have the multi-RHS framework developed
+#define MAX_NVECTOR 1
 
-  template <typename Float, typename Output, typename InputA, typename InputB> struct CloverSigmaOprodArg {
-    Output oprod;
-    InputA inA[MAX_NVECTOR];
-    InputB inB[MAX_NVECTOR];
+  template <typename Float, int nColor_> struct CloverSigmaOprodArg {
+    typedef typename mapper<Float>::type real;
+    static constexpr int nColor = nColor_;
+    static constexpr int nSpin = 4;
+    using Oprod = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO, 18>::type;
+    using F = typename colorspinor_mapper<double, nSpin, nColor>::type;
+
+    Oprod oprod;
+    const F inA[MAX_NVECTOR];
+    const F inB[MAX_NVECTOR];
     Float coeff[MAX_NVECTOR][2];
     unsigned int length;
     int nvector;
 
-    CloverSigmaOprodArg(Output &oprod, InputA *inA_, InputB *inB_, const std::vector<std::vector<double>> &coeff_,
-        const GaugeField &meta, int nvector) :
-        oprod(oprod),
-        length(meta.VolumeCB()),
-        nvector(nvector)
+    CloverSigmaOprodArg(GaugeField &oprod, const std::vector<ColorSpinorField*> &inA, const std::vector<ColorSpinorField*> &inB,
+                        const std::vector<std::vector<double>> &coeff_, int nvector) :
+      oprod(oprod),
+      inA{*inA[0]},
+      inB{*inB[0]},
+      length(oprod.VolumeCB()),
+      nvector(nvector)
     {
       for (int i = 0; i < nvector; i++) {
-        inA[i] = inA_[i];
-        inB[i] = inB_[i];
         coeff[i][0] = coeff_[i][0];
         coeff[i][1] = coeff_[i][1];
       }
@@ -46,10 +47,8 @@ namespace quda
 
 #pragma unroll
     for (int i = 0; i < nvector; i++) {
-      ColorSpinor<real, 3, 4> A, B;
-
-      arg.inA[i].load(static_cast<Complex *>(A.data), idx, parity);
-      arg.inB[i].load(static_cast<Complex *>(B.data), idx, parity);
+      ColorSpinor<real, Arg::nColor, 4> A = arg.inA[i](idx, parity);
+      ColorSpinor<real, Arg::nColor, 4> B = arg.inB[i](idx, parity);
 
       // multiply by sigma_mu_nu
       ColorSpinor<real, 3, 4> C = A.sigma(nu, mu);
