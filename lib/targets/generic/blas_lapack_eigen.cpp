@@ -80,8 +80,8 @@ namespace quda
       double timeh = dsh + 0.000001 * dush;
            
       if (getVerbosity() >= QUDA_SUMMARIZE)
-        printfQuda("CPU: Batched matrix inversion completed in %f seconds using %d OMP threads with GFLOPS = %f\n",
-                   timeh, omp_get_num_threads(), 1e-9 * flops / timeh);
+        printfQuda("CPU: Batched matrix inversion completed in %f seconds using with GFLOPS = %f\n",
+                   timeh, 1e-9 * flops / timeh);
       
       if(location == QUDA_CUDA_FIELD_LOCATION) {
 	pool_pinned_free(Ainv_h);      
