@@ -54,6 +54,10 @@ static int localDim[4];
 static bool invalidate_quda_gauge = true;
 static bool create_quda_gauge = false;
 
+#define GAUGE_PIPE 1
+static bool have_resident_gauge = false;
+
+
 static bool invalidate_quda_mom = true;
 
 static void *df_preconditioner = nullptr;
@@ -297,6 +301,10 @@ void qudaHisqForce(int prec, int num_terms, int num_naik_terms, double dt, doubl
                        w_link, v_link, u_link,
                        quark_field, num_terms, num_naik_terms, coeff,
                        &gParam);
+  
+  #ifdef GAUGE_PIPE
+  have_resident_gauge = false;
+  #endif
   qudamilc_called<false>(__func__);
   return;
 }
@@ -333,6 +341,19 @@ void qudaUpdateUPhased(int prec, double eps, QudaMILCSiteArg_t *arg, int phase_i
   qudaGaugeParam.staggered_phase_applied = phase_in;
   qudaGaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
   if (phase_in) qudaGaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
+#ifdef GAUGE_PIPE
+  if(!have_resident_gauge) {
+    qudaGaugeParam.make_resident_gauge = true;
+    qudaGaugeParam.use_resident_gauge = false;
+    qudaGaugeParam.return_result_gauge = true;
+    have_resident_gauge = true;
+  } else {
+    qudaGaugeParam.use_resident_gauge = true;
+    qudaGaugeParam.make_resident_gauge = true;
+    qudaGaugeParam.return_result_gauge = true;
+  }
+#endif 
+
   if (!invalidate_quda_mom) {
     qudaGaugeParam.use_resident_mom = true;
     qudaGaugeParam.make_resident_mom = true;
@@ -378,9 +399,21 @@ void qudaUnitarizeSU3Phased(int prec, double tol, QudaMILCSiteArg_t *arg, int ph
   qudaGaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
   // when we take care of phases in QUDA we need to respect MILC boundary conditions.
   if (phase_in) qudaGaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
-
+  #ifdef GAUGE_PIPE
+  if(!have_resident_gauge) {
+    qudaGaugeParam.make_resident_gauge = false;
+    qudaGaugeParam.use_resident_gauge = false;
+    qudaGaugeParam.return_result_gauge = true;
+    have_resident_gauge = false;
+  } else {
+    qudaGaugeParam.use_resident_gauge = true;
+    qudaGaugeParam.make_resident_gauge = true;
+    qudaGaugeParam.return_result_gauge = true;
+    have_resident_gauge = false;
+  }
+  #endif
   projectSU3Quda(gauge, tol, &qudaGaugeParam);
-
+  invalidateGaugeQuda();
   qudamilc_called<false>(__func__);
   return;
 }
@@ -545,7 +578,17 @@ void qudaGaugeForcePhased(int precision, int num_loop_types, double milc_loop_co
   qudaGaugeParam.staggered_phase_applied = phase_in;
   qudaGaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
   if (phase_in) qudaGaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
-  qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  if (phase_in) qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
+#ifdef GAUGE_PIPE
+  if(!have_resident_gauge) {
+    qudaGaugeParam.make_resident_gauge = true;
+    qudaGaugeParam.use_resident_gauge = false;
+    have_resident_gauge = true;
+  } else {
+    qudaGaugeParam.use_resident_gauge = true;
+    qudaGaugeParam.make_resident_gauge = true;
+  }
+#endif 
 
   double *loop_coeff = static_cast<double*>(safe_malloc(numPaths*sizeof(double)));
   int *length = static_cast<int*>(safe_malloc(numPaths*sizeof(int)));
