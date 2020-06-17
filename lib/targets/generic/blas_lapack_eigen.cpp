@@ -28,8 +28,16 @@ namespace quda
       for (int j = 0; j < n; j++) {
         for (int k = 0; k < n; k++) { Ainv_eig[batch * n * n + j * n + k] = inv(k, j); }
       }
-    }
 
+      // Check result:
+#if 0      
+      EigenMatrix unit = EigenMatrix::Identity(n,n);
+      EigenMatrix prod = res * inv;
+      Float L2norm = ((prod - unit).norm()/(n*n));
+      printfQuda("Norm of (A * Ainv - I) batch %lu = %e\n", batch, L2norm);
+#endif
+    }
+    
     long long BatchInvertMatrix(void *Ainv, void *A, const int n, const uint64_t batch, QudaPrecision prec,
                                 QudaFieldLocation location)
     {
@@ -70,7 +78,7 @@ namespace quda
       long dsh = stop.tv_sec - start.tv_sec;
       long dush = stop.tv_usec - start.tv_usec;
       double timeh = dsh + 0.000001 * dush;
-      
+           
       if (getVerbosity() >= QUDA_SUMMARIZE)
         printfQuda("CPU: Batched matrix inversion completed in %f seconds using %d OMP threads with GFLOPS = %f\n",
                    timeh, omp_get_num_threads(), 1e-9 * flops / timeh);

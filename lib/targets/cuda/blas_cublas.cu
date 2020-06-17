@@ -98,9 +98,37 @@ namespace quda {
 	  }
 	}
 
+	qudaMemcpy(Ainv_test, Ainv_d, size, cudaMemcpyDeviceToHost);
+	qudaMemcpy(A_test, A_d, size, cudaMemcpyDeviceToHost);
+
+	
+	//#pragma omp parallel for	
+	double norm=0.0,residual=0.0, residual_max=0.0;
+	double residual2=0.0, residual2_max=0.0;
+	for(int i=0;i<batch;i++) {
+	  std::vector<std::complex<float>> unit(n*n);
+	  for(int j=0;j<n*n;j++)  unit[j]=0.0;
+	  for(int j=0;j<n;j++)
+	    for(int k=0;k<n;k++)
+	      for(int l=0;l<n;l++)
+		unit[j*n+k]+=A[i*n*n + j*n + l]*Ainv[i*n*n + l*n + k];
+	  
+	  for(int j=0;j<n;j++)
+	    for(int k=0;k<n;k++)
+	      {
+		if(j==k) unit[j*n+k]-=1.0;
+		double tmp=std::norm(unit[j*n+k]);
+		if(tmp>residual2) residual2_max=tmp;
+		residual2+=tmp;
+	      }	
+	}
+	//printf("Consistency Check: batch=%d n=%d aver diff=%15.7f, max diff=%15.7f\n",batch, n, sqrt(residual/norm),sqrt(residual_max*nsq*batch/norm));
+	printf("A*Ainv@GPU  Check: batch=%d n=%d aver diff=%15.7f, max diff=%15.7f\n",batch, n, sqrt(residual2/(nsq*batch)),sqrt(residual2_max));	
+	
+	
 	pool_device_free(Ainv_array);
 	pool_device_free(A_array);
-
+	
       } else {
 	errorQuda("%s not implemented for precision=%d", __func__, prec);
       }
@@ -132,3 +160,4 @@ namespace quda {
     }
   } // namespace native_lapack
 } // namespace quda
+

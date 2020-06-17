@@ -218,7 +218,8 @@ option(QUDA_NVML "use NVML to report CUDA graphics driver version" OFF)
 option(QUDA_NUMA_NVML "experimental use of NVML to set numa affinity" OFF)
 option(QUDA_VERBOSE_BUILD "display kernel register usage" OFF)
 option(QUDA_BUILD_NATIVE_LAPACK "build the native lapack library according to QUDA_TARGET" ON)
-option(QUDA_OPENMP "enable OpenMP" ON)
+# FIXME: Jenkins fails when default is ON
+option(QUDA_OPENMP "enable OpenMP" OFF)
 
 set(QUDA_MAX_MULTI_BLAS_N
     "4"
