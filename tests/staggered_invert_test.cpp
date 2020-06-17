@@ -193,7 +193,7 @@ int main(int argc, char **argv)
 
   QudaEigParam eig_param = newQudaEigParam();
   if (inv_deflate) {
-    setEigParam(eig_param);
+    setEigParam(eig_param, inv_type);
     inv_param.eig_param = &eig_param;
   } else {
     inv_param.eig_param = nullptr;

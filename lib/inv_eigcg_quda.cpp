@@ -20,19 +20,6 @@
 
 #include <mpi.h>
 
-#define EIGCG_MPI_CHECK_(mpi_call) do {                   		\
-  int status = comm_size() == 1 ? MPI_SUCCESS : mpi_call;	\
-  if (status != MPI_SUCCESS) {                      		\
-    char err_string[128];                           		\
-    int err_len;                                    		\
-    MPI_Error_string(status, err_string, &err_len); 		\
-    err_string[127] = '\0';                         		\
-    errorQuda("(MPI) %s", err_string);              		\
-  }                                                 		\
-} while (0)
-
-extern MPI_Comm MPI_COMM_HANDLE;
-
 /*
 Based on  eigCG(nev, m) algorithm:
 A. Stathopolous and K. Orginos, arXiv:0707.0131
@@ -62,8 +49,13 @@ namespace quda {
 
    std::shared_ptr<ColorSpinorField> MakeSharedPtr(const ColorSpinorParam &param)
    {
-     if (param.location == QUDA_CPU_FIELD_LOCATION )  return std::move(std::make_shared<cpuColorSpinorField>(param) );
-     else					      return std::move(std::make_shared<cudaColorSpinorField>(param));
+     if (param.location == QUDA_CPU_FIELD_LOCATION ) {
+        auto cpu_sptr = std::make_shared<cpuColorSpinorField>(param);
+	return cpu_sptr;
+     } else {					      
+	auto gpu_sptr = std::make_shared<cudaColorSpinorField>(param);
+	return gpu_sptr;
+     }
    }
 
    int Lm = 0;
@@ -1175,7 +1167,8 @@ namespace quda {
 
 //MPI specific:
     std::unique_ptr<double[]> recvbuff(new double[4]);
-    MPI_Request iallreduce_request_handle;
+    //MPI_Request iallreduce_request_handle;
+    MsgHandle* iallreduce_request_handle;
 
     double4 local_buffer;
 
@@ -1209,15 +1202,8 @@ namespace quda {
     mu     = blas::reDotProduct(p, s);
     commGlobalReductionSet(true);
 
-    if (comm_size() > 1) {
-
-      EIGCG_MPI_CHECK_(MPI_Iallreduce(reinterpret_cast<double*>(&local_buffer),
-			            recvbuff.get(),
-				    4,
-				    MPI_DOUBLE,
-			    	    MPI_SUM, MPI_COMM_HANDLE,
-				    &iallreduce_request_handle));
-    }
+    if (comm_size() > 1) 
+      comm_nonblocking_allreduce_array(iallreduce_request_handle, reinterpret_cast<double*>(&local_buffer), recvbuff.get(), 4);
 
     matSloppy(u, s, tmp, tmp2);
 
@@ -1244,7 +1230,7 @@ namespace quda {
     printfQuda("\nRunning CA eigCG with %d correction interval\n", prediction_correction_interval);
 
     if (comm_size() > 1){
-      EIGCG_MPI_CHECK_(MPI_Wait(&iallreduce_request_handle, MPI_STATUS_IGNORE));
+      comm_wait(iallreduce_request_handle);
       memcpy(reinterpret_cast<double*>(&local_buffer), recvbuff.get(), 4*sizeof(double));
     }
 
@@ -1275,14 +1261,8 @@ namespace quda {
       local_buffer = quadrupleEigCGUpdate(alpha, beta, r, s, u, w, p);
       commGlobalReductionSet(true);
 
-      if (comm_size() > 1){
-        EIGCG_MPI_CHECK_(MPI_Iallreduce(reinterpret_cast<double*>(&local_buffer),
-                                recvbuff.get(),
-                                4,
-                                MPI_DOUBLE,
-                                MPI_SUM, MPI_COMM_HANDLE,
-                                &iallreduce_request_handle));
-      }
+      if (comm_size() > 1)
+        comm_nonblocking_allreduce_array(iallreduce_request_handle, reinterpret_cast<double*>(&local_buffer), recvbuff.get(), 4);
 
       matSloppy(u, s, tmp, tmp2);
 
@@ -1292,7 +1272,7 @@ namespace quda {
       }
 
       if (comm_size() > 1){
-        EIGCG_MPI_CHECK_(MPI_Wait(&iallreduce_request_handle, MPI_STATUS_IGNORE));
+        comm_wait(iallreduce_request_handle);
         memcpy(reinterpret_cast<double*>(&local_buffer), recvbuff.get(), 4*sizeof(double));
       }
 

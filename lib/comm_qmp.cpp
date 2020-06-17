@@ -26,6 +26,10 @@
 struct MsgHandle_s {
   QMP_msgmem_t mem;
   QMP_msghandle_t handle;
+  /**
+     The persistant MPI communicator handle that is created with
+   */
+  MPI_Request request;
 };
 
 // While we can emulate an all-gather using QMP reductions, this
@@ -273,6 +277,15 @@ void comm_allreduce_array(double* data, size_t size)
     delete[] recv_trans;
   }
 }
+
+void comm_nonblocking_allreduce_array(MsgHandle *mh, double* outdata, double* indata, size_t size)
+{
+  // we need to break out of QMP for nonblocking all reduce
+  MPI_CHECK(MPI_Iallreduce(outdata, indata, size, MPI_DOUBLE, MPI_SUM, MPI_COMM_HANDLE, &mh->request));
+
+  return;
+}
+
 
 void comm_allreduce_max_array(double* data, size_t size)
 {
