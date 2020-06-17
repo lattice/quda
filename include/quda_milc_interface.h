@@ -12,6 +12,9 @@
  * The header file defines the milc interface to enable easy
  * interfacing between QUDA and the MILC software packed.
  */
+#if __COMPUTE_CAPABILITY__ >= 600
+#define USE_QUDA_MANAGED 1
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -145,12 +148,26 @@ extern "C" {
    * @return Pointer to allocated memory
   */
   void* qudaAllocatePinned(size_t bytes);
+ 
 
   /**
    * Free pinned memory
    * @param ptr Pointer to memory to be free
    */
   void qudaFreePinned(void *ptr);
+  
+    /**
+   * Allocate managed memory to reduce CPU-GPU transfers
+   * @param bytes The size of the requested allocation
+   * @return Pointer to allocated memory
+  */
+  void* qudaAllocateManaged(size_t bytes);
+  
+    /**
+   * Free managed memory
+   * @param ptr Pointer to memory to be free
+   */
+  void qudaFreeManaged(void *ptr);
   
   /**
    * Set the algorithms to use for HISQ fermion calculations, e.g.,
