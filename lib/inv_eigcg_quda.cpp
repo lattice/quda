@@ -1168,7 +1168,7 @@ namespace quda {
 //MPI specific:
     std::unique_ptr<double[]> recvbuff(new double[4]);
     //MPI_Request iallreduce_request_handle;
-    MsgHandle* iallreduce_request_handle;
+    MsgHandle* iallreduce_request_handle = nullptr;
 
     double4 local_buffer;
 
