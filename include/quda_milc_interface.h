@@ -674,12 +674,8 @@ extern "C" {
    * @param arg Metadata for MILC's internal site struct array
    * @param phase_in whether staggered phases are applied
    */
-  void qudaGaugeForcePhased(int precision,
-		      int num_loop_types,
-		      double milc_loop_coeff[3],
-		      double eb3,
-		      QudaMILCSiteArg_t *arg,
-          int phase_in);
+  void qudaGaugeForcePhased(int precision, int num_loop_types, double milc_loop_coeff[3], double eb3,
+                            QudaMILCSiteArg_t *arg, int phase_in);
 
   /**
    * Evolve the gauge field by step size dt, using the momentum field
@@ -702,11 +698,7 @@ extern "C" {
    * @param arg Metadata for MILC's internal site struct array
    * @param phase_in whether staggered phases are applied
    */
-  void qudaUpdateUPhased(int precision,
-		   double eps,
-		   QudaMILCSiteArg_t *arg,
-       int phase_in);
-
+  void qudaUpdateUPhased(int precision, double eps, QudaMILCSiteArg_t *arg, int phase_in);
 
   /**
    * Download the momentum from MILC and place into QUDA's resident

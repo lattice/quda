@@ -4024,9 +4024,9 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   }
 
   cudaGaugeField *cudaGauge = createExtendedGauge(*cudaSiteLink, R, profileGaugeForce);
- // apply / remove phase as appropriate
-   if (cudaGauge->StaggeredPhaseApplied()) cudaGauge->removeStaggeredPhase();
-  
+  // apply / remove phase as appropriate
+  if (cudaGauge->StaggeredPhaseApplied()) cudaGauge->removeStaggeredPhase();
+
   // actually do the computation
   profileGaugeForce.TPSTART(QUDA_PROFILE_COMPUTE);
   if (!forceMonitor()) {
@@ -4934,7 +4934,6 @@ void updateGaugeFieldQuda(void* gauge,
    if (param->use_resident_gauge) {
      if (!gaugePrecise) errorQuda("No resident gauge field to use");
      cudaGauge = gaugePrecise;
-     gaugePrecise = nullptr;
    } else {
      profileProject.TPSTART(QUDA_PROFILE_H2D);
      cudaGauge->loadCPUField(*cpuGauge);
