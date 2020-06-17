@@ -1,13 +1,12 @@
 #include <algorithm>
 #include <register_traits.h>
+#include <blas_helper.cuh>
 
 namespace quda
 {
 
   namespace blas
   {
-
-#include <texture.h>
 
     // storage for matrix coefficients
 #define MAX_MATRIX_SIZE 8192

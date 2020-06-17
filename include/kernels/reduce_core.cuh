@@ -10,8 +10,6 @@ namespace quda
   namespace blas
   {
 
-#include <texture.h>
-
     template <typename store_t, int N, typename y_store_t, int Ny, typename Reducer_>
     struct ReductionArg : public ReduceArg<typename Reducer_::reduce_t> {
       using Reducer = Reducer_;

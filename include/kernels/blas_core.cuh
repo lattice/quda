@@ -9,8 +9,6 @@ namespace quda
   namespace blas
   {
 
-#include <texture.h>
-
     /**
        Parameter struct for generic blas kernel
     */
