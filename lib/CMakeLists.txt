@@ -214,7 +214,6 @@ target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_target>)
 add_subdirectory(targets/generic)
 target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_generic>)
 
-
 # propagate CXX flags to CUDA host compiler
 if(${QUDA_PROPAGATE_CXX_FLAGS})
   target_compile_options(
@@ -533,6 +532,7 @@ endif()
 if(QUDA_DOWNLOAD_EIGEN)
   add_dependencies(quda_cpp Eigen)
   add_dependencies(quda Eigen)
+  add_dependencies(quda_generic_target Eigen)
 endif()
 
 configure_file(../include/quda_define.h.in ../include/quda_define.h @ONLY)
