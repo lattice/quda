@@ -18,8 +18,6 @@
 
 #include <Eigen/Dense>
 
-#include <mpi.h>
-
 /*
 Based on  eigCG(nev, m) algorithm:
 A. Stathopolous and K. Orginos, arXiv:0707.0131
@@ -1225,7 +1223,7 @@ namespace quda {
     bool converged = convergence(gamma, heavy_quark_res, args.global_stop, param.tol_hq);
 
     constexpr int prediction_correction_interval = 4;
-    int correction_count;
+    int correction_count = 0;
 
     printfQuda("\nRunning CA eigCG with %d correction interval\n", prediction_correction_interval);
 
