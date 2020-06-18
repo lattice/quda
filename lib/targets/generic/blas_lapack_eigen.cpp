@@ -59,7 +59,9 @@ namespace quda
         std::complex<float> *A_eig = (std::complex<float> *)A_h;
         std::complex<float> *Ainv_eig = (std::complex<float> *)Ainv_h;
 
+#ifdef _OPENMP
 #pragma omp parallel for
+#endif
         for (uint64_t i = 0; i < batch; i++) { invertEigen<MatrixXcf, float>(A_eig, Ainv_eig, n, i); }
         flops += batch * FLOPS_CGETRF(n, n);
       } else if (prec == QUDA_DOUBLE_PRECISION) {
@@ -67,7 +69,9 @@ namespace quda
         std::complex<double> *A_eig = (std::complex<double> *)A_h;
         std::complex<double> *Ainv_eig = (std::complex<double> *)Ainv_h;
 
+#ifdef _OPENMP
 #pragma omp parallel for
+#endif
         for (uint64_t i = 0; i < batch; i++) { invertEigen<MatrixXcd, double>(A_eig, Ainv_eig, n, i); }
         flops += batch * FLOPS_ZGETRF(n, n);
       } else {
@@ -79,16 +83,20 @@ namespace quda
       long dush = stop.tv_usec - start.tv_usec;
       double timeh = dsh + 0.000001 * dush;
            
-      if (getVerbosity() >= QUDA_SUMMARIZE)
-        printfQuda("CPU: Batched matrix inversion completed in %f seconds using with GFLOPS = %f\n",
-                   timeh, 1e-9 * flops / timeh);
-      
+      if (getVerbosity() >= QUDA_SUMMARIZE) {
+	int threads = 1;
+#ifdef _OPENMP
+	threads = omp_get_num_threads();
+#endif	
+        printfQuda("CPU: Batched matrix inversion completed in %f seconds using %d threads with GFLOPS = %f\n",
+                   timeh, threads, 1e-9 * flops / timeh);
+      }
       if(location == QUDA_CUDA_FIELD_LOCATION) {
 	pool_pinned_free(Ainv_h);      
 	pool_pinned_free(A_h);	
 	qudaMemcpy((void *)Ainv, Ainv_h, size, cudaMemcpyHostToDevice);
       }     
-
+      
       return flops;
     }
   } // namespace generic_lapack
