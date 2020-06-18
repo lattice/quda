@@ -58,6 +58,11 @@ if(QUDA_QDPJIT)
   set(QUDA_BUILD_ALL_TESTS OFF)
 endif()
 
+add_executable(comm_test comm_test.cpp)
+target_link_libraries(comm_test ${TEST_LIBS})
+quda_checkbuildtest(comm_test QUDA_BUILD_ALL_TESTS)
+install(TARGETS comm_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
 if(QUDA_DIRAC_WILSON
    OR QUDA_DIRAC_CLOVER
    OR QUDA_DIRAC_TWISTED_MASS
