@@ -53,8 +53,13 @@ namespace quda {
 
     std::shared_ptr<ColorSpinorField> MakeSharedPtr2(const ColorSpinorParam &param)
     {
-      if (param.location == QUDA_CPU_FIELD_LOCATION )  return std::move(std::make_shared<cpuColorSpinorField>(param) );
-      else					      return std::move(std::make_shared<cudaColorSpinorField>(param));
+      if (param.location == QUDA_CPU_FIELD_LOCATION ) {
+	auto cpu_sptr = std::make_shared<cpuColorSpinorField>(param);
+	return cpu_sptr;
+      }else{					      
+	auto gpu_sptr = std::make_shared<cudaColorSpinorField>(param);
+	return gpu_sptr;
+      }
     }
 
     class GMResDRArgs{

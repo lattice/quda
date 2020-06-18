@@ -23,15 +23,6 @@
     }                                                                                                                  \
   } while (0)
 
-struct MsgHandle_s {
-  QMP_msgmem_t mem;
-  QMP_msghandle_t handle;
-  /**
-     The persistant MPI communicator handle that is created with
-   */
-  MPI_Request request;
-};
-
 // While we can emulate an all-gather using QMP reductions, this
 // scales horribly as the number of nodes increases, so for
 // performance we just call MPI directly
@@ -40,6 +31,14 @@ struct MsgHandle_s {
 #ifdef USE_MPI_GATHER
 #include <mpi.h>
 #endif
+
+struct MsgHandle_s {
+  QMP_msgmem_t mem;
+  QMP_msghandle_t handle;
+#ifdef USE_MPI_GATHER
+  MPI_Request request;
+#endif
+};
 
 // There are more efficient ways to do the following,
 // but it doesn't really matter since this function should be
@@ -281,8 +280,9 @@ void comm_allreduce_array(double* data, size_t size)
 void comm_nonblocking_allreduce_array(MsgHandle *mh, double* outdata, double* indata, size_t size)
 {
   // we need to break out of QMP for nonblocking all reduce
+#ifdef USE_MPI_GATHER
   MPI_CHECK(MPI_Iallreduce(outdata, indata, size, MPI_DOUBLE, MPI_SUM, MPI_COMM_HANDLE, &mh->request));
-
+#endif
   return;
 }
 
