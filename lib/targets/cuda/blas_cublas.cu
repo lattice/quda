@@ -7,6 +7,8 @@
 #include <Eigen/LU>
 using namespace Eigen;
 
+#define LOCAL_DEBUG
+
 namespace quda {
 
   namespace native_lapack { 
@@ -62,7 +64,7 @@ namespace quda {
       EigenMatrix unit = EigenMatrix::Identity(n,n);
       EigenMatrix prod = A * Ainv;
       Float L2norm = ((prod - unit).norm()/(n*n));
-      printfQuda("Eigen: Norm of (A * Ainv - I) batch %lu = %e\n", batch, L2norm);
+      printfQuda("cuBLAS: Norm of (A * Ainv - I) batch %lu = %e\n", batch, L2norm);
     }    
     
     // FIXME do this in pipelined fashion to reduce memory overhead.
@@ -80,6 +82,12 @@ namespace quda {
       void *Ainv_d = location == QUDA_CUDA_FIELD_LOCATION ? Ainv : pool_device_malloc(size);
       if (location == QUDA_CPU_FIELD_LOCATION) qudaMemcpy(A_d, A, size, cudaMemcpyHostToDevice);
 
+#ifdef LOCAL_DEBUG
+      // Debug code: Copy original A matrix to host
+      std::complex<float> *A_h = (location == QUDA_CUDA_FIELD_LOCATION ? static_cast<std::complex<float>*>(pool_pinned_malloc(size)) : static_cast<std::complex<float>*>(A_d));
+      if (location == QUDA_CUDA_FIELD_LOCATION) qudaMemcpy((void*)A_h, A_d, size, cudaMemcpyDeviceToHost);      
+#endif
+      
       int *dipiv = static_cast<int*>(pool_device_malloc(batch*n*sizeof(int)));
       int *dinfo_array = static_cast<int*>(pool_device_malloc(batch*sizeof(int)));
       int *info_array = static_cast<int*>(pool_pinned_malloc(batch*sizeof(int)));
@@ -123,12 +131,9 @@ namespace quda {
 	  }
 	}
 
-#if 1
-	// Debug code
-	std::complex<float> *A_h = static_cast<std::complex<float>*>(pool_pinned_malloc(size));
-	std::complex<float> *Ainv_h = static_cast<std::complex<float>*>(pool_pinned_malloc(size));
-	
-	qudaMemcpy((void*)A_h, A_d, size, cudaMemcpyDeviceToHost);      
+#ifdef LOCAL_DEBUG
+	// Debug code: Copy computed Ainv to host
+	std::complex<float> *Ainv_h = static_cast<std::complex<float>*>(pool_pinned_malloc(size));       
 	qudaMemcpy((void*)Ainv_h, Ainv_d, size, cudaMemcpyDeviceToHost);
 	
         for (uint64_t i = 0; i < batch; i++) { checkEigen<MatrixXcf, float>(A_h, Ainv_h, n, i); }
@@ -155,7 +160,7 @@ namespace quda {
       long dus = stop.tv_usec - start.tv_usec;
       double time = ds + 0.000001*dus;
 
-      if (getVerbosity() >= QUDA_VERBOSE)
+      if (getVerbosity() >= QUDA_SUMMARIZE)
 	printfQuda("Batched matrix inversion completed in %f seconds with GFLOPS = %f\n", time, 1e-9 * flops / time);
       
       return flops;

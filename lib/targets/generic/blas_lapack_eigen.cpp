@@ -88,9 +88,10 @@ namespace quda
 #ifdef _OPENMP
 	threads = omp_get_num_threads();
 #endif	
-        printfQuda("CPU: Batched matrix inversion completed in %f seconds using %d threads with GFLOPS = %f\n",
-                   timeh, threads, 1e-9 * flops / timeh);
+	printfQuda("CPU: Batched matrix inversion completed in %f seconds using %d threads with GFLOPS = %f\n",
+		   timeh, threads, 1e-9 * flops / timeh);
       }
+      
       if(location == QUDA_CUDA_FIELD_LOCATION) {
 	pool_pinned_free(Ainv_h);      
 	pool_pinned_free(A_h);	
