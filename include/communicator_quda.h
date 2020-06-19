@@ -14,10 +14,11 @@
 
 #ifdef QUDA_BACKWARDSCPP
 #include "backward.hpp"
-namespace backward {
+namespace backward
+{
   static backward::SignalHandling sh;
 } // namespace backward
-#endif 
+#endif
 
 struct Topology_s {
   int ndim;
@@ -63,18 +64,15 @@ inline int lex_rank_from_coords_dim_x(const int *coords, void *fdata)
 static inline int index(int ndim, const int *dims, const int *x)
 {
   int idx = x[0];
-  for (int i = 1; i < ndim; i++) {
-    idx = dims[i]*idx + x[i];
-  }
+  for (int i = 1; i < ndim; i++) { idx = dims[i] * idx + x[i]; }
   return idx;
 }
-
 
 static inline bool advance_coords(int ndim, const int *dims, int *x)
 {
   bool valid = false;
-  for (int i = ndim-1; i >= 0; i--) {
-    if (x[i] < dims[i]-1) {
+  for (int i = ndim - 1; i >= 0; i--) {
+    if (x[i] < dims[i] - 1) {
       x[i]++;
       valid = true;
       break;
@@ -84,7 +82,6 @@ static inline bool advance_coords(int ndim, const int *dims, int *x)
   }
   return valid;
 }
-
 
 inline char *comm_hostname(void)
 {
@@ -99,7 +96,6 @@ inline char *comm_hostname(void)
 
   return hostname;
 }
-
 
 static unsigned long int rand_seed = 137;
 
@@ -118,28 +114,26 @@ inline double comm_drand(void)
   return (twoneg48 * rand_seed);
 }
 
-
 // QudaCommsMap is declared in quda.h:
 //   typedef int (*QudaCommsMap)(const int *coords, void *fdata);
 
-inline Topology *comm_create_topology(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data, int my_rank)
+inline Topology *comm_create_topology(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data,
+                                      int my_rank)
 {
-  if (ndim > QUDA_MAX_DIM) {
-    errorQuda("ndim exceeds QUDA_MAX_DIM");
-  }
+  if (ndim > QUDA_MAX_DIM) { errorQuda("ndim exceeds QUDA_MAX_DIM"); }
 
-  Topology *topo = (Topology *) safe_malloc(sizeof(Topology));
+  Topology *topo = (Topology *)safe_malloc(sizeof(Topology));
 
   topo->ndim = ndim;
 
   int nodes = 1;
-  for (int i=0; i<ndim; i++) {
+  for (int i = 0; i < ndim; i++) {
     topo->dims[i] = dims[i];
     nodes *= dims[i];
   }
 
-  topo->ranks = (int *) safe_malloc(nodes*sizeof(int));
-  topo->coords = (int (*)[QUDA_MAX_DIM]) safe_malloc(nodes*sizeof(int[QUDA_MAX_DIM]));
+  topo->ranks = (int *)safe_malloc(nodes * sizeof(int));
+  topo->coords = (int(*)[QUDA_MAX_DIM])safe_malloc(nodes * sizeof(int[QUDA_MAX_DIM]));
 
   int x[QUDA_MAX_DIM];
   for (int i = 0; i < QUDA_MAX_DIM; i++) x[i] = 0;
@@ -147,22 +141,17 @@ inline Topology *comm_create_topology(int ndim, const int *dims, QudaCommsMap ra
   do {
     int rank = rank_from_coords(x, map_data);
     topo->ranks[index(ndim, dims, x)] = rank;
-    for (int i=0; i<ndim; i++) {
-      topo->coords[rank][i] = x[i];
-    }
+    for (int i = 0; i < ndim; i++) { topo->coords[rank][i] = x[i]; }
   } while (advance_coords(ndim, dims, x));
 
   topo->my_rank = my_rank;
-  for (int i = 0; i < ndim; i++) {
-    topo->my_coords[i] = topo->coords[my_rank][i];
-  }
+  for (int i = 0; i < ndim; i++) { topo->my_coords[i] = topo->coords[my_rank][i]; }
 
   // initialize the random number generator with a rank-dependent seed
-  rand_seed = 17*my_rank + 137;
+  rand_seed = 17 * my_rank + 137;
 
   return topo;
 }
-
 
 inline void comm_destroy_topology(Topology *topo)
 {
@@ -170,54 +159,32 @@ inline void comm_destroy_topology(Topology *topo)
   host_free(topo->coords);
   host_free(topo);
 }
-  
-inline int comm_ndim(const Topology *topo)
-{
-  return topo->ndim;
-}
 
+inline int comm_ndim(const Topology *topo) { return topo->ndim; }
 
-inline const int *comm_dims(const Topology *topo)
-{
-  return topo->dims;
-}
+inline const int *comm_dims(const Topology *topo) { return topo->dims; }
 
+inline const int *comm_coords(const Topology *topo) { return topo->my_coords; }
 
-inline const int *comm_coords(const Topology *topo)
-{
-  return topo->my_coords;
-}
-
-
-inline const int *comm_coords_from_rank(const Topology *topo, int rank)
-{
-  return topo->coords[rank];
-}
-
+inline const int *comm_coords_from_rank(const Topology *topo, int rank) { return topo->coords[rank]; }
 
 inline int comm_rank_from_coords(const Topology *topo, const int *coords)
 {
   return topo->ranks[index(topo->ndim, topo->dims, coords)];
 }
 
-
-static inline int mod(int a, int b)
-{
-  return ((a % b) + b) % b;
-}
+static inline int mod(int a, int b) { return ((a % b) + b) % b; }
 
 inline int comm_rank_displaced(const Topology *topo, const int displacement[])
 {
   int coords[QUDA_MAX_DIM];
 
   for (int i = 0; i < QUDA_MAX_DIM; i++) {
-    coords[i] = (i < topo->ndim) ? 
-      mod(comm_coords(topo)[i] + displacement[i], comm_dims(topo)[i]) : 0;
+    coords[i] = (i < topo->ndim) ? mod(comm_coords(topo)[i] + displacement[i], comm_dims(topo)[i]) : 0;
   }
 
   return comm_rank_from_coords(topo, coords);
 }
-
 
 inline bool isHost(const void *buffer)
 {
@@ -241,12 +208,11 @@ inline bool isHost(const void *buffer)
   }
 }
 
-
 /**
  * Send to the "dir" direction in the "dim" dimension
  */
-inline MsgHandle *comm_declare_send_relative_(const char *func, const char *file, int line,
-				       void *buffer, int dim, int dir, size_t nbytes)
+inline MsgHandle *comm_declare_send_relative_(const char *func, const char *file, int line, void *buffer, int dim,
+                                              int dir, size_t nbytes)
 {
 #ifdef HOST_DEBUG
   checkCudaError(); // check and clear error state first
@@ -255,9 +221,10 @@ inline MsgHandle *comm_declare_send_relative_(const char *func, const char *file
     // test this memory allocation is ok by doing a memcpy from it
     void *tmp = safe_malloc(nbytes);
     try {
-      std::copy(static_cast<char*>(buffer), static_cast<char*>(buffer)+nbytes, static_cast<char*>(tmp));
-    } catch(std::exception &e) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir, nbytes);
+      std::copy(static_cast<char *>(buffer), static_cast<char *>(buffer) + nbytes, static_cast<char *>(tmp));
+    } catch (std::exception &e) {
+      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir,
+                 nbytes);
       errorQuda("aborting");
     }
     host_free(tmp);
@@ -266,7 +233,8 @@ inline MsgHandle *comm_declare_send_relative_(const char *func, const char *file
     void *tmp = device_malloc(nbytes);
     cudaError_t err = cudaMemcpy(tmp, buffer, nbytes, cudaMemcpyDeviceToDevice);
     if (err != cudaSuccess) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir, nbytes);
+      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir,
+                 nbytes);
       errorQuda("aborting with error %s", cudaGetErrorString(err));
     }
     device_free(tmp);
@@ -282,8 +250,8 @@ inline MsgHandle *comm_declare_send_relative_(const char *func, const char *file
 /**
  * Receive from the "dir" direction in the "dim" dimension
  */
-inline MsgHandle *comm_declare_receive_relative_(const char *func, const char *file, int line,
-					  void *buffer, int dim, int dir, size_t nbytes)
+inline MsgHandle *comm_declare_receive_relative_(const char *func, const char *file, int line, void *buffer, int dim,
+                                                 int dir, size_t nbytes)
 {
 #ifdef HOST_DEBUG
   checkCudaError(); // check and clear error state first
@@ -291,16 +259,18 @@ inline MsgHandle *comm_declare_receive_relative_(const char *func, const char *f
   if (isHost(buffer)) {
     // test this memory allocation is ok by filling it
     try {
-      std::fill(static_cast<char*>(buffer), static_cast<char*>(buffer)+nbytes, 0);
-    } catch(std::exception &e) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir, nbytes);
+      std::fill(static_cast<char *>(buffer), static_cast<char *>(buffer) + nbytes, 0);
+    } catch (std::exception &e) {
+      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir,
+                 nbytes);
       errorQuda("aborting");
     }
   } else {
     // test this memory allocation is ok by doing a memset
     cudaError_t err = cudaMemset(buffer, 0, nbytes);
     if (err != cudaSuccess) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir, nbytes);
+      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir,
+                 nbytes);
       errorQuda("aborting with error %s", cudaGetErrorString(err));
     }
   }
@@ -315,31 +285,32 @@ inline MsgHandle *comm_declare_receive_relative_(const char *func, const char *f
 /**
  * Strided send to the "dir" direction in the "dim" dimension
  */
-inline MsgHandle *comm_declare_strided_send_relative_(const char *func, const char *file, int line,
-					       void *buffer, int dim, int dir, size_t blksize, int nblocks, size_t stride)
+inline MsgHandle *comm_declare_strided_send_relative_(const char *func, const char *file, int line, void *buffer,
+                                                      int dim, int dir, size_t blksize, int nblocks, size_t stride)
 {
 #ifdef HOST_DEBUG
   checkCudaError(); // check and clear error state first
 
   if (isHost(buffer)) {
     // test this memory allocation is ok by doing a memcpy from it
-    void *tmp = safe_malloc(blksize*nblocks);
+    void *tmp = safe_malloc(blksize * nblocks);
     try {
-      for (int i=0; i<nblocks; i++)
-	std::copy(static_cast<char*>(buffer)+i*stride, static_cast<char*>(buffer)+i*stride+blksize, static_cast<char*>(tmp));
-    } catch(std::exception &e) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n",
-		 file, line, func, dim, dir, blksize, nblocks, stride);
+      for (int i = 0; i < nblocks; i++)
+        std::copy(static_cast<char *>(buffer) + i * stride, static_cast<char *>(buffer) + i * stride + blksize,
+                  static_cast<char *>(tmp));
+    } catch (std::exception &e) {
+      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n", file,
+                 line, func, dim, dir, blksize, nblocks, stride);
       errorQuda("aborting");
     }
     host_free(tmp);
   } else {
     // test this memory allocation is ok by doing a memcpy from it
-    void *tmp = device_malloc(blksize*nblocks);
+    void *tmp = device_malloc(blksize * nblocks);
     cudaError_t err = cudaMemcpy2D(tmp, blksize, buffer, stride, blksize, nblocks, cudaMemcpyDeviceToDevice);
     if (err != cudaSuccess) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n",
-		 file, line, func, dim, dir, blksize, nblocks, stride);
+      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n", file,
+                 line, func, dim, dir, blksize, nblocks, stride);
       errorQuda("aborting with error %s", cudaGetErrorString(err));
     }
     device_free(tmp);
@@ -352,12 +323,11 @@ inline MsgHandle *comm_declare_strided_send_relative_(const char *func, const ch
   return comm_declare_strided_send_displaced(buffer, disp, blksize, nblocks, stride);
 }
 
-
 /**
  * Strided receive from the "dir" direction in the "dim" dimension
  */
-inline MsgHandle *comm_declare_strided_receive_relative_(const char *func, const char *file, int line,
-						  void *buffer, int dim, int dir, size_t blksize, int nblocks, size_t stride)
+inline MsgHandle *comm_declare_strided_receive_relative_(const char *func, const char *file, int line, void *buffer,
+                                                         int dim, int dir, size_t blksize, int nblocks, size_t stride)
 {
 #ifdef HOST_DEBUG
   checkCudaError(); // check and clear error state first
@@ -365,19 +335,19 @@ inline MsgHandle *comm_declare_strided_receive_relative_(const char *func, const
   if (isHost(buffer)) {
     // test this memory allocation is ok by filling it
     try {
-      for (int i=0; i<nblocks; i++)
-	std::fill(static_cast<char*>(buffer)+i*stride, static_cast<char*>(buffer)+i*stride+blksize, 0);
-    } catch(std::exception &e) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n",
-		 file, line, func, dim, dir, blksize, nblocks, stride);
+      for (int i = 0; i < nblocks; i++)
+        std::fill(static_cast<char *>(buffer) + i * stride, static_cast<char *>(buffer) + i * stride + blksize, 0);
+    } catch (std::exception &e) {
+      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n", file,
+                 line, func, dim, dir, blksize, nblocks, stride);
       errorQuda("aborting");
     }
   } else {
     // test this memory allocation is ok by doing a memset
     cudaError_t err = cudaMemset2D(buffer, stride, 0, blksize, nblocks);
     if (err != cudaSuccess) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n",
-		 file, line, func, dim, dir, blksize, nblocks, stride);
+      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n", file,
+                 line, func, dim, dir, blksize, nblocks, stride);
       errorQuda("aborting with error %s", cudaGetErrorString(err));
     }
   }
@@ -409,149 +379,172 @@ struct MsgHandle_s {
   bool custom;
 };
 
-static void check_displacement(const int displacement[], int ndim) {
-  for (int i=0; i<ndim; i++) {
-    if (abs(displacement[i]) > max_displacement){
+static void check_displacement(const int displacement[], int ndim)
+{
+  for (int i = 0; i < ndim; i++) {
+    if (abs(displacement[i]) > max_displacement) {
       errorQuda("Requested displacement[%d] = %d is greater than maximum allowed", i, displacement[i]);
     }
   }
 }
 
-
-
 struct Communicator {
 
   int gpuid = -1;
 
-  bool peer2peer_enabled[2][4] = { {false,false,false,false},
-                                        {false,false,false,false} };
+  int comm_gpuid() { return gpuid; }
+
+  bool peer2peer_enabled[2][4] = {{false, false, false, false}, {false, false, false, false}};
   bool peer2peer_init = false;
 
-  bool intranode_enabled[2][4] = { {false,false,false,false},
-					{false,false,false,false} };
+  bool intranode_enabled[2][4] = {{false, false, false, false}, {false, false, false, false}};
 
-/** this records whether there is any peer-2-peer capability
-    (regardless whether it is enabled or not) */
+  /** this records whether there is any peer-2-peer capability
+      (regardless whether it is enabled or not) */
   bool peer2peer_present = false;
 
-/** by default enable both copy engines and load/store access */
-  int enable_peer_to_peer = 3; 
+  /** by default enable both copy engines and load/store access */
+  int enable_peer_to_peer = 3;
 
   // TODO: Check this.
-  void comm_peer2peer_init(const char* hostname_recv_buf)
+  void comm_peer2peer_init(const char *hostname_recv_buf)
   {
     if (peer2peer_init) return;
-  
+
     // set gdr enablement
     if (comm_gdr_enabled()) {
-      if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling GPU-Direct RDMA access\n");
+      if (getVerbosity() > QUDA_SILENT && rank == 0) printf("Enabling GPU-Direct RDMA access\n");
       comm_gdr_blacklist(); // set GDR blacklist
       // by default, if GDR is enabled we disable non-p2p policies to
       // prevent possible conflict between MPI and QUDA opening the same
       // IPC memory handles when using CUDA-aware MPI
       enable_peer_to_peer += 4;
     } else {
-      if (getVerbosity() > QUDA_SILENT) printfQuda("Disabling GPU-Direct RDMA access\n");
+      if (getVerbosity() > QUDA_SILENT && rank == 0) printf("Disabling GPU-Direct RDMA access\n");
     }
-  
+
     char *enable_peer_to_peer_env = getenv("QUDA_ENABLE_P2P");
-  
+
     // disable peer-to-peer comms in one direction if QUDA_ENABLE_P2P=-1
     // and comm_dim(dim) == 2 (used for perf benchmarking)
     bool disable_peer_to_peer_bidir = false;
-  
+
     if (enable_peer_to_peer_env) {
       enable_peer_to_peer = atoi(enable_peer_to_peer_env);
-  
-      switch ( std::abs(enable_peer_to_peer) ) {
-      case 0: if (getVerbosity() > QUDA_SILENT) printfQuda("Disabling peer-to-peer access\n"); break;
-      case 1: if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer copy engine access (disabling direct load/store)\n"); break;
-      case 2: if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer direct load/store access (disabling copy engines)\n"); break;
-      case 3: if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer copy engine and direct load/store access\n"); break;
-      case 5: if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer copy engine access (disabling direct load/store and non-p2p policies)\n"); break;
-      case 6: if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer direct load/store access (disabling copy engines and non-p2p policies)\n"); break;
-      case 7: if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer copy engine and direct load/store access (disabling non-p2p policies)\n"); break;
+
+      switch (std::abs(enable_peer_to_peer)) {
+      case 0:
+        if (getVerbosity() > QUDA_SILENT && rank == 0) printf("Disabling peer-to-peer access\n");
+        break;
+      case 1:
+        if (getVerbosity() > QUDA_SILENT && rank == 0)
+          printf("Enabling peer-to-peer copy engine access (disabling direct load/store)\n");
+        break;
+      case 2:
+        if (getVerbosity() > QUDA_SILENT && rank == 0)
+          printf("Enabling peer-to-peer direct load/store access (disabling copy engines)\n");
+        break;
+      case 3:
+        if (getVerbosity() > QUDA_SILENT && rank == 0)
+          printf("Enabling peer-to-peer copy engine and direct load/store access\n");
+        break;
+      case 5:
+        if (getVerbosity() > QUDA_SILENT && rank == 0)
+          printf("Enabling peer-to-peer copy engine access (disabling direct load/store and non-p2p policies)\n");
+        break;
+      case 6:
+        if (getVerbosity() > QUDA_SILENT && rank == 0)
+          printf("Enabling peer-to-peer direct load/store access (disabling copy engines and non-p2p policies)\n");
+        break;
+      case 7:
+        if (getVerbosity() > QUDA_SILENT && rank == 0)
+          printf("Enabling peer-to-peer copy engine and direct load/store access (disabling non-p2p policies)\n");
+        break;
       default: errorQuda("Unexpected value QUDA_ENABLE_P2P=%d\n", enable_peer_to_peer);
       }
-  
+
       if (enable_peer_to_peer < 0) { // only values -1, -2, -3 can make it here
-        if (getVerbosity() > QUDA_SILENT) printfQuda("Disabling bi-directional peer-to-peer access\n");
+        if (getVerbosity() > QUDA_SILENT && rank == 0) printf("Disabling bi-directional peer-to-peer access\n");
         disable_peer_to_peer_bidir = true;
       }
-  
+
       enable_peer_to_peer = abs(enable_peer_to_peer);
-  
+
     } else { // !enable_peer_to_peer_env
-      if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer copy engine and direct load/store access\n");
+      if (getVerbosity() > QUDA_SILENT && rank == 0)
+        printf("Enabling peer-to-peer copy engine and direct load/store access\n");
     }
-  
+
     if (!peer2peer_init && enable_peer_to_peer) {
-  
+
       // first check that the local GPU supports UVA
       const int gpuid = comm_gpuid();
       cudaDeviceProp prop;
       cudaGetDeviceProperties(&prop, gpuid);
-      if(!prop.unifiedAddressing) return;
-  
+      if (!prop.unifiedAddressing) return;
+
       comm_set_neighbor_ranks();
-  
+
       char *hostname = comm_hostname();
-      int *gpuid_recv_buf = (int *)safe_malloc(sizeof(int)*comm_size());
-  
+      int *gpuid_recv_buf = (int *)safe_malloc(sizeof(int) * comm_size());
+
       comm_gather_gpuid(gpuid_recv_buf);
-  
-      for(int dir=0; dir<2; ++dir){ // forward/backward directions
-        for(int dim=0; dim<4; ++dim){
-  	int neighbor_rank = comm_neighbor_rank(dir,dim);
-  	if(neighbor_rank == comm_rank()) continue;
-  
-  	// disable peer-to-peer comms in one direction
-  	if ( ((comm_rank() > neighbor_rank && dir == 0) || (comm_rank() < neighbor_rank && dir == 1)) &&
-  	     disable_peer_to_peer_bidir && comm_dim(dim) == 2 ) continue;
-  
-  	// if the neighbors are on the same
-  	if (!strncmp(hostname, &hostname_recv_buf[128*neighbor_rank], 128)) {
-  	  int neighbor_gpuid = gpuid_recv_buf[neighbor_rank];
-  	  int canAccessPeer[2];
-  	  cudaDeviceCanAccessPeer(&canAccessPeer[0], gpuid, neighbor_gpuid);
-  	  cudaDeviceCanAccessPeer(&canAccessPeer[1], neighbor_gpuid, gpuid);
-  
-  	  int accessRank[2] = { };
-  #if CUDA_VERSION >= 8000  // this was introduced with CUDA 8
-  	  if (canAccessPeer[0]*canAccessPeer[1] != 0) {
-  	    cudaDeviceGetP2PAttribute(&accessRank[0], cudaDevP2PAttrPerformanceRank, gpuid, neighbor_gpuid);
-  	    cudaDeviceGetP2PAttribute(&accessRank[1], cudaDevP2PAttrPerformanceRank, neighbor_gpuid, gpuid);
-  	  }
-  #endif
-  
-  	  // enable P2P if we can access the peer or if peer is self
-  	  if (canAccessPeer[0]*canAccessPeer[1] != 0 || gpuid == neighbor_gpuid) {
-  	    peer2peer_enabled[dir][dim] = true;
-  	    if (getVerbosity() > QUDA_SILENT) {
-  	      printf("Peer-to-peer enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d, performance rank = (%d, %d)\n",
-  		     comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim, accessRank[0], accessRank[1]);
-  	    }
-  	  } else {
-  	    intranode_enabled[dir][dim] = true;
-  	    if (getVerbosity() > QUDA_SILENT) {
-  	      printf("Intra-node (non peer-to-peer) enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d\n",
-  		     comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
-  	    }
-  	  }
-  
-  	} // on the same node
-        } // different dimensions - x, y, z, t
-      } // different directions - forward/backward
-  
+
+      for (int dir = 0; dir < 2; ++dir) { // forward/backward directions
+        for (int dim = 0; dim < 4; ++dim) {
+          int neighbor_rank = comm_neighbor_rank(dir, dim);
+          if (neighbor_rank == comm_rank()) continue;
+
+          // disable peer-to-peer comms in one direction
+          if (((comm_rank() > neighbor_rank && dir == 0) || (comm_rank() < neighbor_rank && dir == 1))
+              && disable_peer_to_peer_bidir && comm_dim(dim) == 2)
+            continue;
+
+          // if the neighbors are on the same
+          if (!strncmp(hostname, &hostname_recv_buf[128 * neighbor_rank], 128)) {
+            int neighbor_gpuid = gpuid_recv_buf[neighbor_rank];
+            int canAccessPeer[2];
+            cudaDeviceCanAccessPeer(&canAccessPeer[0], gpuid, neighbor_gpuid);
+            cudaDeviceCanAccessPeer(&canAccessPeer[1], neighbor_gpuid, gpuid);
+
+            int accessRank[2] = {};
+#if CUDA_VERSION >= 8000 // this was introduced with CUDA 8
+            if (canAccessPeer[0] * canAccessPeer[1] != 0) {
+              cudaDeviceGetP2PAttribute(&accessRank[0], cudaDevP2PAttrPerformanceRank, gpuid, neighbor_gpuid);
+              cudaDeviceGetP2PAttribute(&accessRank[1], cudaDevP2PAttrPerformanceRank, neighbor_gpuid, gpuid);
+            }
+#endif
+
+            // enable P2P if we can access the peer or if peer is self
+            if (canAccessPeer[0] * canAccessPeer[1] != 0 || gpuid == neighbor_gpuid) {
+              peer2peer_enabled[dir][dim] = true;
+              if (getVerbosity() > QUDA_SILENT) {
+                printf("Peer-to-peer enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d, "
+                       "performance rank = (%d, %d)\n",
+                       comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim, accessRank[0], accessRank[1]);
+              }
+            } else {
+              intranode_enabled[dir][dim] = true;
+              if (getVerbosity() > QUDA_SILENT) {
+                printf("Intra-node (non peer-to-peer) enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, "
+                       "dim=%d\n",
+                       comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
+              }
+            }
+
+          } // on the same node
+        }   // different dimensions - x, y, z, t
+      }     // different directions - forward/backward
+
       host_free(gpuid_recv_buf);
     }
-  
+
     peer2peer_init = true;
-  
+
     comm_barrier();
-  
+
     peer2peer_present = comm_peer2peer_enabled_global();
-  
+
     checkCudaErrorNoSync();
     return;
   }
@@ -560,82 +553,67 @@ struct Communicator {
 
   bool enable_p2p = true;
 
-  bool comm_peer2peer_enabled(int dir, int dim){
-    return enable_p2p ? peer2peer_enabled[dir][dim] : false;
-  }
-  
+  bool comm_peer2peer_enabled(int dir, int dim) { return enable_p2p ? peer2peer_enabled[dir][dim] : false; }
+
   bool init = false;
   bool p2p_global = false;
 
-  int comm_peer2peer_enabled_global() {
-    
+  int comm_peer2peer_enabled_global()
+  {
+
     if (!enable_p2p) return false;
-  
+
     if (!init) {
       int p2p = 0;
-      for (int dim=0; dim<4; dim++)
-        for (int dir=0; dir<2; dir++)
-  	      p2p += (int)comm_peer2peer_enabled(dir,dim);
-  
+      for (int dim = 0; dim < 4; dim++)
+        for (int dir = 0; dir < 2; dir++) p2p += (int)comm_peer2peer_enabled(dir, dim);
+
       comm_allreduce_int(&p2p);
       init = true;
       p2p_global = p2p > 0 ? true : false;
     }
     return p2p_global * enable_peer_to_peer;
-  
   }
 
-  void comm_enable_peer2peer(bool enable) {
-    enable_p2p = enable;
-  }
+  void comm_enable_peer2peer(bool enable) { enable_p2p = enable; }
 
   bool enable_intranode = true;
 
-  bool comm_intranode_enabled(int dir, int dim){
-    return enable_intranode ? intranode_enabled[dir][dim] : false;
-  }
+  bool comm_intranode_enabled(int dir, int dim) { return enable_intranode ? intranode_enabled[dir][dim] : false; }
 
-  void comm_enable_intranode(bool enable) {
-    enable_intranode = enable;
-  }
+  void comm_enable_intranode(bool enable) { enable_intranode = enable; }
 
   // FIXME: The following routines rely on a "default" topology.
   // They should probably be reworked or eliminated eventually.
-  
+
   Topology *default_topo = nullptr;
-  
-  void comm_set_default_topology(Topology *topo)
-  {
-    default_topo = topo;
-  }
-  
-  
+
+  void comm_set_default_topology(Topology *topo) { default_topo = topo; }
+
   Topology *comm_default_topology(void)
   {
-    if (!default_topo) {
-      errorQuda("Default topology has not been declared");
-    }
+    if (!default_topo) { errorQuda("Default topology has not been declared"); }
     return default_topo;
   }
 
-  int neighbor_rank[2][4] = { {-1,-1,-1,-1},
-                                          {-1,-1,-1,-1} };
+  int neighbor_rank[2][4] = {{-1, -1, -1, -1}, {-1, -1, -1, -1}};
 
   bool neighbors_cached = false;
 
-  void comm_set_neighbor_ranks(Topology *topo = nullptr){
-  
-    if(neighbors_cached) return;
-  
+  void comm_set_neighbor_ranks(Topology *topo = nullptr)
+  {
+
+    if (neighbors_cached) return;
+
     Topology *topology = topo ? topo : default_topo; // use default topology if topo is NULL
-    if(!topology){
+    if (!topology) {
       errorQuda("Topology not specified");
       return;
     }
-       
-    for(int d=0; d<4; ++d){
-      int pos_displacement[QUDA_MAX_DIM] = { };
-      int neg_displacement[QUDA_MAX_DIM] = { };
+
+    for (int d = 0; d < 4; ++d) {
+      int pos_displacement[QUDA_MAX_DIM] = {};
+      int neg_displacement[QUDA_MAX_DIM] = {};
       pos_displacement[d] = +1;
       neg_displacement[d] = -1;
       neighbor_rank[0][d] = comm_rank_displaced(topology, neg_displacement);
@@ -645,13 +623,11 @@ struct Communicator {
     return;
   }
 
-  int comm_neighbor_rank(int dir, int dim){
-    if(!neighbors_cached){
-      comm_set_neighbor_ranks();
-    }
+  int comm_neighbor_rank(int dir, int dim)
+  {
+    if (!neighbors_cached) { comm_set_neighbor_ranks(); }
     return neighbor_rank[dir][dim];
   }
-
 
   int comm_dim(int dim)
   {
@@ -659,13 +635,11 @@ struct Communicator {
     return comm_dims(topo)[dim];
   }
 
-
   int comm_coord(int dim)
   {
     Topology *topo = comm_default_topology();
     return comm_coords(topo)[dim];
   }
-
 
   void comm_finalize(void)
   {
@@ -681,33 +655,29 @@ struct Communicator {
   int manual_set_partition[QUDA_MAX_DIM] = {0};
 
   void comm_dim_partitioned_set(int dim)
-  { 
-  #ifdef MULTI_GPU
+  {
+#ifdef MULTI_GPU
     manual_set_partition[dim] = 1;
-  #endif
-  
-    snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0),
-             comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3));
+#endif
+
+    snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0), comm_dim_partitioned(1),
+             comm_dim_partitioned(2), comm_dim_partitioned(3));
   }
 
-  void comm_dim_partitioned_reset(){
-    for (int i = 0; i < QUDA_MAX_DIM; i++) manual_set_partition[i] = 0;
-  
-    snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0),
-             comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3));
-  }
-  
-  int comm_dim_partitioned(int dim)
+  void comm_dim_partitioned_reset()
   {
-    return (manual_set_partition[dim] || (default_topo && comm_dim(dim) > 1));
+    for (int i = 0; i < QUDA_MAX_DIM; i++) manual_set_partition[i] = 0;
+
+    snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0), comm_dim_partitioned(1),
+             comm_dim_partitioned(2), comm_dim_partitioned(3));
   }
+
+  int comm_dim_partitioned(int dim) { return (manual_set_partition[dim] || (default_topo && comm_dim(dim) > 1)); }
 
   int comm_partitioned()
   {
     int partitioned = 0;
-    for (int i=0; i<4; i++) {
-      partitioned = partitioned || comm_dim_partitioned(i);
-    }
+    for (int i = 0; i < 4; i++) { partitioned = partitioned || comm_dim_partitioned(i); }
     return partitioned;
   }
 
@@ -717,50 +687,50 @@ struct Communicator {
   bool gdr_init = false;
 #endif
 
-  bool comm_gdr_enabled() {
+  bool comm_gdr_enabled()
+  {
 #ifdef MULTI_GPU
-  
+
     if (!gdr_init) {
       char *enable_gdr_env = getenv("QUDA_ENABLE_GDR");
-      if (enable_gdr_env && strcmp(enable_gdr_env, "1") == 0) {
-        gdr_enabled = true;
-      }
+      if (enable_gdr_env && strcmp(enable_gdr_env, "1") == 0) { gdr_enabled = true; }
       gdr_init = true;
     }
 #endif
     return gdr_enabled;
   }
-  
+
   bool blacklist = false;
   bool blacklist_init = false;
 
-  bool comm_gdr_blacklist() {
+  bool comm_gdr_blacklist()
+  {
     if (!blacklist_init) {
       char *blacklist_env = getenv("QUDA_ENABLE_GDR_BLACKLIST");
-  
+
       if (blacklist_env) { // set the policies to tune for explicitly
         std::stringstream blacklist_list(blacklist_env);
-  
+
         int device_count;
         cudaGetDeviceCount(&device_count);
-  
+
         int excluded_device;
         while (blacklist_list >> excluded_device) {
-  	// check this is a valid device
-  	if ( excluded_device < 0 || excluded_device >= device_count ) {
-  	  errorQuda("Cannot blacklist invalid GPU device ordinal %d", excluded_device);
-  	}
-  
-  	if (blacklist_list.peek() == ',') blacklist_list.ignore();
-  	if (excluded_device == comm_gpuid()) blacklist = true;
+          // check this is a valid device
+          if (excluded_device < 0 || excluded_device >= device_count) {
+            errorQuda("Cannot blacklist invalid GPU device ordinal %d", excluded_device);
+          }
+
+          if (blacklist_list.peek() == ',') blacklist_list.ignore();
+          if (excluded_device == comm_gpuid()) blacklist = true;
         }
         comm_barrier();
-        if (getVerbosity() > QUDA_SILENT && blacklist) printf("Blacklisting GPU-Direct RDMA for rank %d (GPU %d)\n", comm_rank(), comm_gpuid());
+        if (getVerbosity() > QUDA_SILENT && blacklist)
+          printf("Blacklisting GPU-Direct RDMA for rank %d (GPU %d)\n", comm_rank(), comm_gpuid());
       }
       blacklist_init = true;
-  
     }
-  
+
     return blacklist;
   }
 
@@ -770,17 +740,16 @@ struct Communicator {
   {
     Topology *topo = comm_create_topology(ndim, dims, rank_from_coords, map_data, comm_rank());
     comm_set_default_topology(topo);
-  
+
     // determine which GPU this rank will use
     char *hostname_recv_buf = (char *)safe_malloc(128 * comm_size());
     comm_gather_hostname(hostname_recv_buf);
 
-#if 0
     gpuid = 0;
     for (int i = 0; i < comm_rank(); i++) {
       if (!strncmp(comm_hostname(), &hostname_recv_buf[128 * i], 128)) { gpuid++; }
     }
-  
+
     int device_count;
     cudaGetDeviceCount(&device_count);
     if (device_count == 0) { errorQuda("No CUDA devices found"); }
@@ -793,48 +762,46 @@ struct Communicator {
         errorQuda("Too few GPUs available on %s", comm_hostname());
       }
     }
-#else
-    gpuid = comm_gpuid();
-#endif
+
     comm_peer2peer_init(hostname_recv_buf);
-  
+
     host_free(hostname_recv_buf);
-  
+
     char *enable_reduce_env = getenv("QUDA_DETERMINISTIC_REDUCE");
     if (enable_reduce_env && strcmp(enable_reduce_env, "1") == 0) { use_deterministic_reduce = true; }
-  
+
     snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0), comm_dim_partitioned(1),
              comm_dim_partitioned(2), comm_dim_partitioned(3));
-  
+
     // if CUDA_VISIBLE_DEVICES is set, we include this information in the topology_string
     char *device_order_env = getenv("CUDA_VISIBLE_DEVICES");
     if (device_order_env) {
-  
+
       // to ensure we have process consistency define using rank 0
       if (comm_rank() == 0) {
         std::stringstream device_list_raw(device_order_env); // raw input
         std::stringstream device_list;                       // formatted (no commas)
-  
+
         int device;
         int deviceCount;
         cudaGetDeviceCount(&deviceCount);
         while (device_list_raw >> device) {
           // check this is a valid policy choice
           if (device < 0) { errorQuda("Invalid CUDA_VISIBLE_DEVICE ordinal %d", device); }
-  
+
           device_list << device;
           if (device_list_raw.peek() == ',') device_list_raw.ignore();
         }
         snprintf(topology_string, 128, ",topo=%d%d%d%d,order=%s", comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3),
                  device_list.str().c_str());
       }
-  
+
       comm_broadcast(topology_string, 128);
     } else {
       snprintf(topology_string, 128, ",topo=%d%d%d%d", comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3));
     }
   }
-  
+
   char config_string[16];
   bool config_init = false;
 
@@ -847,7 +814,7 @@ struct Communicator {
       strcat(config_string, std::to_string(comm_gdr_enabled()).c_str());
       config_init = true;
     }
-  
+
     return config_string;
   }
 
@@ -867,80 +834,84 @@ struct Communicator {
   }
 
   const char *comm_dim_topology_string() { return topology_string; }
-  
+
   bool comm_deterministic_reduce() { return use_deterministic_reduce; }
-  
+
   bool globalReduce = true;
   bool asyncReduce = false;
-  
+
   void reduceMaxDouble(double &max) { comm_allreduce_max(&max); }
-  
-  void reduceDouble(double &sum) { if (globalReduce) comm_allreduce(&sum); }
-  
+
+  void reduceDouble(double &sum)
+  {
+    if (globalReduce) comm_allreduce(&sum);
+  }
+
   void reduceDoubleArray(double *sum, const int len)
-  { if (globalReduce) comm_allreduce_array(sum, len); }
-  
+  {
+    if (globalReduce) comm_allreduce_array(sum, len);
+  }
+
   int commDim(int dir) { return comm_dim(dir); }
-  
+
   int commCoords(int dir) { return comm_coord(dir); }
-  
-  int commDimPartitioned(int dir){ return comm_dim_partitioned(dir);}
-  
-  void commDimPartitionedSet(int dir) { comm_dim_partitioned_set(dir);}
-  
-  void commDimPartitionedReset(){ comm_dim_partitioned_reset();}
-  
+
+  int commDimPartitioned(int dir) { return comm_dim_partitioned(dir); }
+
+  void commDimPartitionedSet(int dir) { comm_dim_partitioned_set(dir); }
+
+  void commDimPartitionedReset() { comm_dim_partitioned_reset(); }
+
   bool commGlobalReduction() { return globalReduce; }
-  
+
   void commGlobalReductionSet(bool global_reduction) { globalReduce = global_reduction; }
-  
+
   bool commAsyncReduction() { return asyncReduce; }
-  
+
   void commAsyncReductionSet(bool async_reduction) { asyncReduce = async_reduction; }
 
   void comm_abort(int status)
   {
-  #ifdef HOST_DEBUG
+#ifdef HOST_DEBUG
     raise(SIGABRT);
-  #endif
-  #ifdef QUDA_BACKWARDSCPP
-    backward::StackTrace st; 
+#endif
+#ifdef QUDA_BACKWARDSCPP
+    backward::StackTrace st;
     st.load_here(32);
-    backward::Printer p; 
+    backward::Printer p;
     p.print(st, getOutputFile());
-  #endif
+#endif
     comm_abort_(status);
   }
 
 #ifdef MPI_COMMS
 
-#define MPI_CHECK(mpi_call) do {                    \
-  int status = mpi_call;                            \
-  if (status != MPI_SUCCESS) {                      \
-    char err_string[128];                           \
-    int err_len;                                    \
-    MPI_Error_string(status, err_string, &err_len); \
-    err_string[127] = '\0';                         \
-    errorQuda("(MPI) %s", err_string);              \
-  }                                                 \
-} while (0)
+#define MPI_CHECK(mpi_call)                                                                                            \
+  do {                                                                                                                 \
+    int status = mpi_call;                                                                                             \
+    if (status != MPI_SUCCESS) {                                                                                       \
+      char err_string[128];                                                                                            \
+      int err_len;                                                                                                     \
+      MPI_Error_string(status, err_string, &err_len);                                                                  \
+      err_string[127] = '\0';                                                                                          \
+      errorQuda("(MPI) %s", err_string);                                                                               \
+    }                                                                                                                  \
+  } while (0)
 
   MPI_Comm MPI_COMM_HANDLE;
 
   int rank = -1;
   int size = -1;
-  
-  Communicator () {
-  }
-  
-  Communicator (int argc, char **argv, int *const commDims) {
-    
+
+  Communicator() { }
+
+  Communicator(int argc, char **argv, int *const commDims)
+  {
+
     int initialized;
-    MPI_CHECK( MPI_Initialized(&initialized) );
-    
-    if (!initialized) {
-      MPI_Init(&argc, &argv);
-    }
+    MPI_CHECK(MPI_Initialized(&initialized));
+
+    if (!initialized) { MPI_Init(&argc, &argv); }
 
     MPI_Comm_dup(MPI_COMM_WORLD, &MPI_COMM_HANDLE);
 
@@ -950,17 +921,32 @@ struct Communicator {
     comm_init(nDim, commDims, func, commDims);
 
     std::srand(17 * rank + 137);
-  
   }
-  
-  Communicator (Communicator &other, const int *comm_split) {
-    
+
+  Communicator(int nDim, const int *commDims, QudaCommsMap rank_from_coords, void *map_data)
+  {
+
+    int initialized;
+    MPI_CHECK(MPI_Initialized(&initialized));
+
+    if (!initialized) { assert(false); }
+
+    MPI_Comm_dup(MPI_COMM_WORLD, &MPI_COMM_HANDLE);
+
+    comm_init(nDim, commDims, rank_from_coords, map_data);
+
+    std::srand(17 * rank + 137);
+  }
+
+  Communicator(Communicator &other, const int *comm_split)
+  {
+
     constexpr int nDim = 4;
 
-    std::array<int, nDim> comm_dims_split; 
-    
-    std::array<int, nDim> comm_key_split; 
-    std::array<int, nDim> comm_color_split; 
+    std::array<int, nDim> comm_dims_split;
+
+    std::array<int, nDim> comm_key_split;
+    std::array<int, nDim> comm_color_split;
 
     for (int d = 0; d < nDim; d++) {
       assert(other.comm_dim(d) % comm_split[d] == 0);
@@ -971,7 +957,7 @@ struct Communicator {
 
     int key = index(nDim, comm_dims_split.data(), comm_key_split.data());
     int color = index(nDim, comm_split, comm_color_split.data());
-    
+
     MPI_CHECK(MPI_Comm_split(other.MPI_COMM_HANDLE, color, key, &MPI_COMM_HANDLE));
     int my_rank_;
     MPI_CHECK(MPI_Comm_rank(MPI_COMM_HANDLE, &my_rank_));
@@ -980,22 +966,22 @@ struct Communicator {
     comm_init(nDim, comm_dims_split.data(), func, comm_dims_split.data());
 
     std::srand(17 * rank + 137);
-    
-    printf("Creating split communicator, base_rank = %5d, key = %5d, color = %5d, split_rank = %5d, gpuid = %d\n", other.comm_rank(), key, color, my_rank_, comm_gpuid());
-  
+
+    printf("Creating split communicator, base_rank = %5d, key = %5d, color = %5d, split_rank = %5d, gpuid = %d\n",
+           other.comm_rank(), key, color, my_rank_, comm_gpuid());
   }
 
-  ~Communicator () {
-    comm_finalize();
-  }
+  ~Communicator() { comm_finalize(); }
 
-  void comm_gather_hostname(char *hostname_recv_buf) {
+  void comm_gather_hostname(char *hostname_recv_buf)
+  {
     // determine which GPU this rank will use
     char *hostname = comm_hostname();
     MPI_CHECK(MPI_Allgather(hostname, 128, MPI_CHAR, hostname_recv_buf, 128, MPI_CHAR, MPI_COMM_HANDLE));
   }
 
-  void comm_gather_gpuid(int *gpuid_recv_buf) {
+  void comm_gather_gpuid(int *gpuid_recv_buf)
+  {
     int gpuid = comm_gpuid();
     MPI_CHECK(MPI_Allgather(&gpuid, 1, MPI_INT, gpuid_recv_buf, 1, MPI_INT, MPI_COMM_HANDLE));
   }
@@ -1003,38 +989,27 @@ struct Communicator {
   void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
   {
     int initialized;
-    MPI_CHECK( MPI_Initialized(&initialized) );
-  
-    if (!initialized) {
-      errorQuda("MPI has not been initialized");
-    }
-  
+    MPI_CHECK(MPI_Initialized(&initialized));
+
+    if (!initialized) { errorQuda("MPI has not been initialized"); }
+
     MPI_CHECK(MPI_Comm_rank(MPI_COMM_HANDLE, &rank));
     MPI_CHECK(MPI_Comm_size(MPI_COMM_HANDLE, &size));
- 
+
     int grid_size = 1;
-    for (int i = 0; i < ndim; i++) {
-      grid_size *= dims[i];
-    }
+    for (int i = 0; i < ndim; i++) { grid_size *= dims[i]; }
     if (grid_size != size) {
       errorQuda("Communication grid size declared via initCommsGridQuda() does not match"
-                " total number of MPI ranks (%d != %d)", grid_size, size);
+                " total number of MPI ranks (%d != %d)",
+                grid_size, size);
     }
-  
+
     comm_init_common(ndim, dims, rank_from_coords, map_data);
   }
-  
-  int comm_rank(void)
-  {
-    return rank;
-  }
-  
-  
-  int comm_size(void)
-  {
-    return size;
-  }
 
+  int comm_rank(void) { return rank; }
+
+  int comm_size(void) { return size; }
 
   /**
    * Declare a message handle for sending to a node displaced in (x,y,z,t) according to "displacement"
@@ -1044,20 +1019,19 @@ struct Communicator {
     Topology *topo = comm_default_topology();
     int ndim = comm_ndim(topo);
     check_displacement(displacement, ndim);
-  
+
     int rank = comm_rank_displaced(topo, displacement);
-  
+
     int tag = 0;
-    for (int i=ndim-1; i>=0; i--) tag = tag * 4 * max_displacement + displacement[i] + max_displacement;
-    tag = tag >= 0 ? tag : 2*pow(4*max_displacement,ndim) + tag;
-  
+    for (int i = ndim - 1; i >= 0; i--) tag = tag * 4 * max_displacement + displacement[i] + max_displacement;
+    tag = tag >= 0 ? tag : 2 * pow(4 * max_displacement, ndim) + tag;
+
     MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
     MPI_CHECK(MPI_Send_init(buffer, nbytes, MPI_BYTE, rank, tag, MPI_COMM_HANDLE, &(mh->request)));
     mh->custom = false;
-  
+
     return mh;
   }
-
 
   /**
    * Declare a message handle for receiving from a node displaced in (x,y,z,t) according to "displacement"
@@ -1066,79 +1040,77 @@ struct Communicator {
   {
     Topology *topo = comm_default_topology();
     int ndim = comm_ndim(topo);
-    check_displacement(displacement,ndim);
-  
+    check_displacement(displacement, ndim);
+
     int rank = comm_rank_displaced(topo, displacement);
-  
+
     int tag = 0;
-    for (int i=ndim-1; i>=0; i--) tag = tag * 4 * max_displacement - displacement[i] + max_displacement;
-    tag = tag >= 0 ? tag : 2*pow(4*max_displacement,ndim) + tag;
-  
+    for (int i = ndim - 1; i >= 0; i--) tag = tag * 4 * max_displacement - displacement[i] + max_displacement;
+    tag = tag >= 0 ? tag : 2 * pow(4 * max_displacement, ndim) + tag;
+
     MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
     MPI_CHECK(MPI_Recv_init(buffer, nbytes, MPI_BYTE, rank, tag, MPI_COMM_HANDLE, &(mh->request)));
     mh->custom = false;
-  
+
     return mh;
   }
-  
-  
+
   /**
    * Declare a message handle for sending to a node displaced in (x,y,z,t) according to "displacement"
    */
-  MsgHandle *comm_declare_strided_send_displaced(void *buffer, const int displacement[],
-  					       size_t blksize, int nblocks, size_t stride)
+  MsgHandle *comm_declare_strided_send_displaced(void *buffer, const int displacement[], size_t blksize, int nblocks,
+                                                 size_t stride)
   {
     Topology *topo = comm_default_topology();
     int ndim = comm_ndim(topo);
     check_displacement(displacement, ndim);
-  
+
     int rank = comm_rank_displaced(topo, displacement);
-  
+
     int tag = 0;
-    for (int i=ndim-1; i>=0; i--) tag = tag * 4 * max_displacement + displacement[i] + max_displacement;
-    tag = tag >= 0 ? tag : 2*pow(4*max_displacement,ndim) + tag;
-  
+    for (int i = ndim - 1; i >= 0; i--) tag = tag * 4 * max_displacement + displacement[i] + max_displacement;
+    tag = tag >= 0 ? tag : 2 * pow(4 * max_displacement, ndim) + tag;
+
     MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
-  
+
     // create a new strided MPI type
-    MPI_CHECK( MPI_Type_vector(nblocks, blksize, stride, MPI_BYTE, &(mh->datatype)) );
-    MPI_CHECK( MPI_Type_commit(&(mh->datatype)) );
+    MPI_CHECK(MPI_Type_vector(nblocks, blksize, stride, MPI_BYTE, &(mh->datatype)));
+    MPI_CHECK(MPI_Type_commit(&(mh->datatype)));
     mh->custom = true;
-  
+
     MPI_CHECK(MPI_Send_init(buffer, 1, mh->datatype, rank, tag, MPI_COMM_HANDLE, &(mh->request)));
-  
+
     return mh;
   }
-  
-  
+
   /**
    * Declare a message handle for receiving from a node displaced in (x,y,z,t) according to "displacement"
    */
-  MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displacement[],
-  						  size_t blksize, int nblocks, size_t stride)
+  MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displacement[], size_t blksize, int nblocks,
+                                                    size_t stride)
   {
     Topology *topo = comm_default_topology();
     int ndim = comm_ndim(topo);
-    check_displacement(displacement,ndim);
-  
+    check_displacement(displacement, ndim);
+
     int rank = comm_rank_displaced(topo, displacement);
-  
+
     int tag = 0;
-    for (int i=ndim-1; i>=0; i--) tag = tag * 4 * max_displacement - displacement[i] + max_displacement;
-    tag = tag >= 0 ? tag : 2*pow(4*max_displacement,ndim) + tag;
-  
+    for (int i = ndim - 1; i >= 0; i--) tag = tag * 4 * max_displacement - displacement[i] + max_displacement;
+    tag = tag >= 0 ? tag : 2 * pow(4 * max_displacement, ndim) + tag;
+
     MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
-  
+
     // create a new strided MPI type
-    MPI_CHECK( MPI_Type_vector(nblocks, blksize, stride, MPI_BYTE, &(mh->datatype)) );
-    MPI_CHECK( MPI_Type_commit(&(mh->datatype)) );
+    MPI_CHECK(MPI_Type_vector(nblocks, blksize, stride, MPI_BYTE, &(mh->datatype)));
+    MPI_CHECK(MPI_Type_commit(&(mh->datatype)));
     mh->custom = true;
-  
+
     MPI_CHECK(MPI_Recv_init(buffer, 1, mh->datatype, rank, tag, MPI_COMM_HANDLE, &(mh->request)));
-  
+
     return mh;
   }
-  
+
   void comm_free(MsgHandle *&mh)
   {
     MPI_CHECK(MPI_Request_free(&(mh->request)));
@@ -1146,35 +1118,26 @@ struct Communicator {
     host_free(mh);
     mh = nullptr;
   }
-  
-  
-  void comm_start(MsgHandle *mh)
-  {
-    MPI_CHECK( MPI_Start(&(mh->request)) );
-  }
-  
-  
-  void comm_wait(MsgHandle *mh)
-  {
-    MPI_CHECK( MPI_Wait(&(mh->request), MPI_STATUS_IGNORE) );
-  }
-  
-  
+
+  void comm_start(MsgHandle *mh) { MPI_CHECK(MPI_Start(&(mh->request))); }
+
+  void comm_wait(MsgHandle *mh) { MPI_CHECK(MPI_Wait(&(mh->request), MPI_STATUS_IGNORE)); }
+
   int comm_query(MsgHandle *mh)
   {
     int query;
-    MPI_CHECK( MPI_Test(&(mh->request), &query, MPI_STATUS_IGNORE) );
-  
+    MPI_CHECK(MPI_Test(&(mh->request), &query, MPI_STATUS_IGNORE));
+
     return query;
   }
-  
+
   template <typename T> T deterministic_reduce(T *array, int n)
   {
     std::sort(array, array + n); // sort reduction into ascending order for deterministic reduction
     return std::accumulate(array, array + n, 0.0);
   }
-  
-  void comm_allreduce(double* data)
+
+  void comm_allreduce(double *data)
   {
     if (!comm_deterministic_reduce()) {
       double recvbuf;
@@ -1188,23 +1151,22 @@ struct Communicator {
       host_free(recv_buf);
     }
   }
-  
-  
-  void comm_allreduce_max(double* data)
+
+  void comm_allreduce_max(double *data)
   {
     double recvbuf;
     MPI_CHECK(MPI_Allreduce(data, &recvbuf, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_HANDLE));
     *data = recvbuf;
   }
-  
-  void comm_allreduce_min(double* data)
+
+  void comm_allreduce_min(double *data)
   {
     double recvbuf;
     MPI_CHECK(MPI_Allreduce(data, &recvbuf, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_HANDLE));
     *data = recvbuf;
   }
-  
-  void comm_allreduce_array(double* data, size_t size)
+
+  void comm_allreduce_array(double *data, size_t size)
   {
     if (!comm_deterministic_reduce()) {
       double *recvbuf = new double[size];
@@ -1215,28 +1177,28 @@ struct Communicator {
       size_t n = comm_size();
       double *recv_buf = new double[size * n];
       MPI_CHECK(MPI_Allgather(data, size, MPI_DOUBLE, recv_buf, size, MPI_DOUBLE, MPI_COMM_HANDLE));
-  
+
       double *recv_trans = new double[size * n];
       for (size_t i = 0; i < n; i++) {
         for (size_t j = 0; j < size; j++) { recv_trans[j * n + i] = recv_buf[i * size + j]; }
       }
-  
+
       for (size_t i = 0; i < size; i++) { data[i] = deterministic_reduce(recv_trans + i * n, n); }
-  
+
       delete[] recv_buf;
       delete[] recv_trans;
     }
   }
 
-  void comm_allreduce_max_array(double* data, size_t size)
+  void comm_allreduce_max_array(double *data, size_t size)
   {
     double *recvbuf = new double[size];
     MPI_CHECK(MPI_Allreduce(data, recvbuf, size, MPI_DOUBLE, MPI_MAX, MPI_COMM_HANDLE));
-    memcpy(data, recvbuf, size*sizeof(double));
-    delete []recvbuf;
+    memcpy(data, recvbuf, size * sizeof(double));
+    delete[] recvbuf;
   }
 
-  void comm_allreduce_int(int* data)
+  void comm_allreduce_int(int *data)
   {
     int recvbuf;
     MPI_CHECK(MPI_Allreduce(data, &recvbuf, 1, MPI_INT, MPI_SUM, MPI_COMM_HANDLE));
@@ -1251,22 +1213,17 @@ struct Communicator {
     *data = recvbuf;
   }
 
-
   /**  broadcast from rank 0 */
   void comm_broadcast(void *data, size_t nbytes)
   {
     MPI_CHECK(MPI_Bcast(data, (int)nbytes, MPI_BYTE, 0, MPI_COMM_HANDLE));
   }
-  
+
   void comm_barrier(void) { MPI_CHECK(MPI_Barrier(MPI_COMM_HANDLE)); }
-  
-  void comm_abort_(int status)
-  {
-    MPI_Abort(MPI_COMM_HANDLE, status);
-  }
+
+  void comm_abort_(int status) { MPI_Abort(MPI_COMM_HANDLE, status); }
 
 #endif
-
 };
 
 constexpr int nDim = 4;
@@ -1275,5 +1232,3 @@ using CommKey = std::array<int, nDim>;
 void init_communicator_stack(int argc, char **argv, int *const commDims);
 void finalize_communicator_stack();
 void push_to_current(const CommKey &split_key);
-
-

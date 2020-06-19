@@ -42,6 +42,7 @@ struct MsgHandle_s {
 static int rank = -1;
 static int size = -1;
 
+#if 0
 void comm_gather_hostname(char *hostname_recv_buf) {
   // determine which GPU this rank will use
   char *hostname = comm_hostname();
@@ -87,7 +88,7 @@ int comm_size(void)
 {
   return size;
 }
-
+#endif
 
 static const int max_displacement = 4;
 
@@ -98,6 +99,8 @@ static void check_displacement(const int displacement[], int ndim) {
     }
   }
 }
+
+#if 0
 
 /**
  * Declare a message handle for sending to a node displaced in (x,y,z,t) according to "displacement"
@@ -230,6 +233,7 @@ int comm_query(MsgHandle *mh)
 
   return query;
 }
+#endif
 
 template <typename T> T deterministic_reduce(T *array, int n)
 {
@@ -237,6 +241,7 @@ template <typename T> T deterministic_reduce(T *array, int n)
   return std::accumulate(array, array + n, 0.0);
 }
 
+#if 0
 void comm_allreduce(double* data)
 {
   if (!comm_deterministic_reduce()) {
@@ -327,3 +332,4 @@ void comm_abort_(int status)
 {
   MPI_Abort(MPI_COMM_HANDLE, status);
 }
+#endif

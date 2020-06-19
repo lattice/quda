@@ -121,11 +121,11 @@ int main(int argc, char **argv)
   // Initialize the QUDA library
   initQuda(device);
 
-  init_communicator_stack(argc, argv, gridsize_from_cmdline.data());
+  // init_communicator_stack(argc, argv, gridsize_from_cmdline.data());
   push_to_current({1, 1, 1, 2});
   // Communicator split_comm(comm, split);
   
-  finalize_communicator_stack();
+  // finalize_communicator_stack();
 
   // finalize the QUDA library
   endQuda();

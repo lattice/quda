@@ -148,9 +148,12 @@ void comm_destroy_topology(Topology *topo)
   host_free(topo);
 }
 
+#if 0
+
 static int gpuid = -1;
 
 int comm_gpuid(void) { return gpuid; }
+
 
 static bool peer2peer_enabled[2][4] = { {false,false,false,false},
                                         {false,false,false,false} };
@@ -165,7 +168,6 @@ static bool peer2peer_present = false;
 
 /** by default enable both copy engines and load/store access */
 static int enable_peer_to_peer = 3; 
-
 
 void comm_peer2peer_init(const char* hostname_recv_buf)
 {
@@ -326,6 +328,8 @@ void comm_enable_intranode(bool enable) {
   enable_intranode = enable;
 }
 
+#endif
+
 int comm_ndim(const Topology *topo)
 {
   return topo->ndim;
@@ -427,13 +431,12 @@ int comm_neighbor_rank(int dir, int dim){
   return neighbor_rank[dir][dim];
 }
 
-
+#if 0
 int comm_dim(int dim)
 {
   Topology *topo = comm_default_topology();
   return comm_dims(topo)[dim];
 }
-
 
 int comm_coord(int dim)
 {
@@ -462,6 +465,7 @@ inline bool isHost(const void *buffer)
     return true;
   }
 }
+#endif
 
 /**
  * Send to the "dir" direction in the "dim" dimension
@@ -610,12 +614,14 @@ MsgHandle *comm_declare_strided_receive_relative_(const char *func, const char *
   return comm_declare_strided_receive_displaced(buffer, disp, blksize, nblocks, stride);
 }
 
+#if 0
 void comm_finalize(void)
 {
   Topology *topo = comm_default_topology();
   comm_destroy_topology(topo);
   comm_set_default_topology(NULL);
 }
+#endif
 
 static char partition_string[16];          /** string that contains the job partitioning */
 static char topology_string[128];          /** string that contains the job topology */
@@ -623,6 +629,9 @@ static char partition_override_string[16]; /** string that contains any overridd
 
 static int manual_set_partition[QUDA_MAX_DIM] = {0};
 
+void comm_dim_partitioned_reset();
+
+#if 0
 void comm_dim_partitioned_set(int dim)
 { 
 #ifdef MULTI_GPU
@@ -770,6 +779,7 @@ void comm_init_common(int ndim, const int *dims, QudaCommsMap rank_from_coords, 
     snprintf(topology_string, 128, ",topo=%d%d%d%d", comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3));
   }
 }
+#endif
 
 const char *comm_config_string()
 {
@@ -802,9 +812,13 @@ const char *comm_dim_partitioned_string(const int *comm_dim_override)
   }
 }
 
+#if 0
 const char *comm_dim_topology_string() { return topology_string; }
 
 bool comm_deterministic_reduce() { return deterministic_reduce; }
+#endif
+
+#if 0
 
 static bool globalReduce = true;
 static bool asyncReduce = false;
@@ -833,6 +847,8 @@ void commGlobalReductionSet(bool global_reduction) { globalReduce = global_reduc
 bool commAsyncReduction() { return asyncReduce; }
 
 void commAsyncReductionSet(bool async_reduction) { asyncReduce = async_reduction; }
+
+#endif
 
 void comm_abort(int status)
 {
