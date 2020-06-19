@@ -30,11 +30,11 @@ namespace quda
       }
 
       // Check result:
-#if 0      
+#if 1
       EigenMatrix unit = EigenMatrix::Identity(n,n);
       EigenMatrix prod = res * inv;
       Float L2norm = ((prod - unit).norm()/(n*n));
-      printfQuda("Norm of (A * Ainv - I) batch %lu = %e\n", batch, L2norm);
+      printfQuda("Eigen: Norm of (A * Ainv - I) batch %lu = %e\n", batch, L2norm);
 #endif
     }
     

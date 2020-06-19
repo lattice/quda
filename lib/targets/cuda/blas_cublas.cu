@@ -3,9 +3,14 @@
 #include <cublas_v2.h>
 #include <malloc_quda.h>
 #endif
+
+#include <Eigen/LU>
+using namespace Eigen;
+
 namespace quda {
 
   namespace native_lapack { 
+
     
 #ifdef NATIVE_LAPACK_LIB
     static cublasHandle_t handle;
@@ -21,7 +26,7 @@ namespace quda {
 #endif
       }
     }
-
+    
     void destroy() {
       if(cublas_init) {
 #ifdef NATIVE_LAPACK_LIB
@@ -40,6 +45,26 @@ namespace quda {
       output_array_b[blockIdx.x] = input_b + blockIdx.x * batch_offset;
     }
 
+    template <typename EigenMatrix, typename Float>
+    __host__ void checkEigen(std::complex<Float> *A_h, std::complex<Float> *Ainv_h, int n, uint64_t batch)
+    {
+      
+      EigenMatrix A = EigenMatrix::Zero(n, n);
+      EigenMatrix Ainv = EigenMatrix::Zero(n, n);
+      for (int j = 0; j < n; j++) {
+        for (int k = 0; k < n; k++) {
+	  A(k, j) = A_h[batch * n * n + j * n + k];
+	  Ainv(k, j) = Ainv_h[batch * n * n + j * n + k];
+	}
+      }
+      
+      // Check result:
+      EigenMatrix unit = EigenMatrix::Identity(n,n);
+      EigenMatrix prod = A * Ainv;
+      Float L2norm = ((prod - unit).norm()/(n*n));
+      printfQuda("Eigen: Norm of (A * Ainv - I) batch %lu = %e\n", batch, L2norm);
+    }    
+    
     // FIXME do this in pipelined fashion to reduce memory overhead.
     long long BatchInvertMatrix(void *Ainv, void* A, const int n, const uint64_t batch, QudaPrecision prec, QudaFieldLocation location)
     {
@@ -97,50 +122,23 @@ namespace quda {
 	    errorQuda("%lu factorization completed but the factor U is exactly singular", i);
 	  }
 	}
+
+#if 1
+	// Debug code
+	std::complex<float> *A_h = static_cast<std::complex<float>*>(pool_pinned_malloc(size));
+	std::complex<float> *Ainv_h = static_cast<std::complex<float>*>(pool_pinned_malloc(size));
 	
-	pool_device_free(Ainv_array);
-	pool_device_free(A_array);
+	qudaMemcpy((void*)A_h, A_d, size, cudaMemcpyDeviceToHost);      
+	qudaMemcpy((void*)Ainv_h, Ainv_d, size, cudaMemcpyDeviceToHost);
 	
+        for (uint64_t i = 0; i < batch; i++) { checkEigen<MatrixXcf, float>(A_h, Ainv_h, n, i); }
+	pool_pinned_free(Ainv_h);
+	pool_pinned_free(A_h);
+#endif
       } else {
 	errorQuda("%s not implemented for precision=%d", __func__, prec);
       }
       
-#if 0
-      // Debug code
-      std::complex<float> *A_h = static_cast<std::complex<float>*>(pool_pinned_malloc(size));
-      std::complex<float> *Ainv_h = static_cast<std::complex<float>*>(pool_pinned_malloc(size));
-      
-      qudaMemcpy((void*)Ainv_h, Ainv_d, size, cudaMemcpyDeviceToHost);
-      qudaMemcpy((void*)A_h, A_d, size, cudaMemcpyDeviceToHost);
-      
-      double residual2 = 0.0, residual2_max = 0.0;
-      for(int i=0;i<batch;i++) {
-	std::vector<std::complex<float>> unit(n*n);
-	for(int j=0; j<n*n; j++)  unit[j]=0.0;
-	for(int j=0; j<n; j++)
-	  for(int k=0; k<n; k++)
-	    for(int l=0; l<n; l++) {
-	      //I_{k,j} = Ainv_{k,l} * A_{l,j}
-	      unit[j*n + k] += Ainv_h[i*n*n + l*n + k] * A_h[i*n*n + j*n + l];
-	    }
-	
-	for(int j=0;j<n;j++)
-	  for(int k=0;k<n;k++) {
-	    
-	    if(j==k) unit[j*n+k] -= 1.0;
-
-	    double tmp=std::norm(unit[j*n+k]);
-	    if(tmp>residual2) residual2_max = tmp;
-	    residual2 += tmp;
-	    
-	  }	
-      }
-      printf("Ainv*A GPU Check: batch=%lu n=%d average diff=%15.7f, max diff=%15.7f\n", batch, n, sqrt(residual2/(n*n*batch)), sqrt(residual2_max));	
-      
-      pool_pinned_free(Ainv_h);
-      pool_pinned_free(A_h);	     
-#endif
-  
       if (location == QUDA_CPU_FIELD_LOCATION) {
 	qudaMemcpy(Ainv, Ainv_d, size, cudaMemcpyDeviceToHost);
 	pool_device_free(Ainv_d);

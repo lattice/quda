@@ -204,12 +204,11 @@ target_compile_options(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,COMPILE_OPTIONS>)
 # add target specific files
 if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")
   add_subdirectory(targets/cuda)
+  target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_target>)
 endif()
 if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
   #add_subdirectory(targets/hip)
 endif()
-
-target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_target>)
 
 add_subdirectory(targets/generic)
 target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_generic>)
@@ -534,6 +533,7 @@ endif()
 if(QUDA_DOWNLOAD_EIGEN)
   add_dependencies(quda_cpp Eigen)
   add_dependencies(quda Eigen)
+  add_dependencies(quda_cuda_target Eigen)
   add_dependencies(quda_generic_target Eigen)
 endif()
 
