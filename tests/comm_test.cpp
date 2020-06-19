@@ -21,12 +21,13 @@
 void display_test_info()
 {
   printfQuda("running the following test:\n");
-  printfQuda("prec    prec_sloppy   multishift  matpc_type  recon  recon_sloppy solve_type S_dimension T_dimension Ls_dimension   dslash_type  normalization\n");
-  printfQuda("%6s   %6s          %d     %12s     %2s     %2s         %10s %3d/%3d/%3d     %3d         %2d       %14s  %8s\n",
-             get_prec_str(prec), get_prec_str(prec_sloppy), multishift, get_matpc_str(matpc_type),
-             get_recon_str(link_recon), get_recon_str(link_recon_sloppy),
-             get_solve_str(solve_type), xdim, ydim, zdim, tdim, Lsdim,
-             get_dslash_str(dslash_type), get_mass_normalization_str(normalization));
+  printfQuda("prec    prec_sloppy   multishift  matpc_type  recon  recon_sloppy solve_type S_dimension T_dimension "
+             "Ls_dimension   dslash_type  normalization\n");
+  printfQuda(
+    "%6s   %6s          %d     %12s     %2s     %2s         %10s %3d/%3d/%3d     %3d         %2d       %14s  %8s\n",
+    get_prec_str(prec), get_prec_str(prec_sloppy), multishift, get_matpc_str(matpc_type), get_recon_str(link_recon),
+    get_recon_str(link_recon_sloppy), get_solve_str(solve_type), xdim, ydim, zdim, tdim, Lsdim,
+    get_dslash_str(dslash_type), get_mass_normalization_str(normalization));
 
   if (inv_multigrid) {
     printfQuda("MG parameters\n");
@@ -121,11 +122,8 @@ int main(int argc, char **argv)
   // Initialize the QUDA library
   initQuda(device);
 
-  // init_communicator_stack(argc, argv, gridsize_from_cmdline.data());
+  // Create a communicator with the split {1, 1, 1, 2} and push to the top.
   push_to_current({1, 1, 1, 2});
-  // Communicator split_comm(comm, split);
-  
-  // finalize_communicator_stack();
 
   // finalize the QUDA library
   endQuda();
