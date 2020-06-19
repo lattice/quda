@@ -26,10 +26,9 @@ std::vector<cpuColorSpinorField*> zmH;
 int Nspin;
 int Ncolor;
 
-void setPrec(ColorSpinorParam &param, QudaPrecision precision, int order = 0)
+void setPrec(ColorSpinorParam &param, QudaPrecision precision)
 {
   param.setPrecision(precision, precision, true);
-  if (order == 1) param.fieldOrder = QUDA_FLOAT8_FIELD_ORDER;
 }
 
 void display_test_info()
@@ -48,7 +47,6 @@ void display_test_info()
 int Nprec = 4;
 
 const char *prec_str[] = {"quarter", "half", "single", "double"};
-const char *order_str[] = {"default", "float8"};
 
 // For googletest names must be non-empty, unique, and may only contain ASCII
 // alphanumeric characters or underscore
@@ -102,7 +100,7 @@ bool is_multi(int kernel) { return std::string(names[kernel]).find("_block") != 
 // kernels that require site unrolling
 bool is_site_unroll(int kernel) { return std::string(names[kernel]).find("HeavyQuark") != std::string::npos ? true : false; }
 
-bool skip_kernel(int precision, int kernel, int order)
+bool skip_kernel(int precision, int kernel)
 {
   if ((QUDA_PRECISION & getPrecision(precision)) == 0) return true;
 
@@ -127,27 +125,10 @@ bool skip_kernel(int precision, int kernel, int order)
     return true;
   }
 
-  // this is for float-8 testing
-  if (order == 1) {
-#ifdef FLOAT8
-    // order == 1 represents the case of float-8 nspin-4 fields
-    // only run fixed-precision fields, skip all other cases
-    if (Nspin == 1 || Nspin == 2 || this_prec > QUDA_HALF_PRECISION) {
-      return true;
-    } else if (Nspin == 4 && is_multi(kernel)) {
-      // we currently don't instantiate multi-blas kernels for float-8
-      // fields, so skip these
-      return true;
-    }
-#else
-    return true;
-#endif
-  }
-
   return false;
 }
 
-void initFields(int prec, int order)
+void initFields(int prec)
 {
   // precisions used for the source field in the copyCuda() benchmark
   QudaPrecision high_aux_prec = QUDA_INVALID_PRECISION;
@@ -225,25 +206,25 @@ void initFields(int prec, int order)
 
   switch(prec) {
   case 0:
-    setPrec(param, QUDA_QUARTER_PRECISION, order);
+    setPrec(param, QUDA_QUARTER_PRECISION);
     high_aux_prec = QUDA_DOUBLE_PRECISION;
     mid_aux_prec = QUDA_SINGLE_PRECISION;
     low_aux_prec = QUDA_HALF_PRECISION;
     break;
   case 1:
-    setPrec(param, QUDA_HALF_PRECISION, order);
+    setPrec(param, QUDA_HALF_PRECISION);
     high_aux_prec = QUDA_DOUBLE_PRECISION;
     mid_aux_prec = QUDA_SINGLE_PRECISION;
     low_aux_prec = QUDA_QUARTER_PRECISION;
     break;
   case 2:
-    setPrec(param, QUDA_SINGLE_PRECISION, order);
+    setPrec(param, QUDA_SINGLE_PRECISION);
     high_aux_prec = QUDA_DOUBLE_PRECISION;
     mid_aux_prec = QUDA_HALF_PRECISION;
     low_aux_prec = QUDA_QUARTER_PRECISION;
     break;
   case 3:
-    setPrec(param, QUDA_DOUBLE_PRECISION, order);
+    setPrec(param, QUDA_DOUBLE_PRECISION);
     high_aux_prec = QUDA_SINGLE_PRECISION;
     mid_aux_prec = QUDA_HALF_PRECISION;
     low_aux_prec = QUDA_QUARTER_PRECISION;
@@ -1082,28 +1063,26 @@ using ::testing::Values;
 using ::testing::Range;
 using ::testing::Combine;
 
-class BlasTest : public ::testing::TestWithParam<::testing::tuple<int, int, int>>
+class BlasTest : public ::testing::TestWithParam<::testing::tuple<int, int>>
 {
 protected:
-  ::testing::tuple<int, int, int> param;
+  ::testing::tuple<int, int> param;
   const int &prec;
   const int &kernel;
-  const int &order;
 
 public:
   BlasTest() :
     param(GetParam()),
     prec(::testing::get<0>(param)),
-    kernel(::testing::get<1>(param)),
-    order(::testing::get<2>(param))
+    kernel(::testing::get<1>(param))
   {
   }
   virtual void SetUp() {
-    if (!skip_kernel(prec, kernel, order)) initFields(prec, order);
+    if (!skip_kernel(prec, kernel)) initFields(prec);
   }
   virtual void TearDown()
   {
-    if (!skip_kernel(prec, kernel, order)) {
+    if (!skip_kernel(prec, kernel)) {
       freeFields();
     }
   }
@@ -1112,8 +1091,7 @@ public:
 TEST_P(BlasTest, verify) {
   int prec = ::testing::get<0>(GetParam());
   int kernel = ::testing::get<1>(GetParam());
-  int order = ::testing::get<2>(GetParam());
-  if (skip_kernel(prec, kernel, order)) GTEST_SKIP();
+  if (skip_kernel(prec, kernel)) GTEST_SKIP();
 
   // certain tests will fail to run for coarse grids so mark these as
   // failed without running
@@ -1127,8 +1105,7 @@ TEST_P(BlasTest, verify) {
 TEST_P(BlasTest, benchmark) {
   int prec = ::testing::get<0>(GetParam());
   int kernel = ::testing::get<1>(GetParam());
-  int order = ::testing::get<2>(GetParam());
-  if (skip_kernel(prec, kernel, order)) GTEST_SKIP();
+  if (skip_kernel(prec, kernel)) GTEST_SKIP();
 
   // do the initial tune
   benchmark(kernel, 1);
@@ -1146,20 +1123,14 @@ TEST_P(BlasTest, benchmark) {
   printfQuda("%-31s: Gflop/s = %6.1f, GB/s = %6.1f\n", names[kernel].c_str(), gflops, gbytes);
 }
 
-std::string getblasname(testing::TestParamInfo<::testing::tuple<int, int, int>> param)
+std::string getblasname(testing::TestParamInfo<::testing::tuple<int, int>> param)
 {
   int prec = ::testing::get<0>(param.param);
   int kernel = ::testing::get<1>(param.param);
-  int order = ::testing::get<2>(param.param);
   std::string str(names[kernel]);
   str += std::string("_") + std::string(prec_str[prec]);
-  str += std::string("_") + std::string(order_str[order]);
   return str;
 }
 
 // instantiate all test cases
-#ifdef FLOAT8
-INSTANTIATE_TEST_SUITE_P(QUDA, BlasTest, Combine(Range(0, Nprec), Range(0, Nkernels), Range(0, 2)), getblasname);
-#else
-INSTANTIATE_TEST_SUITE_P(QUDA, BlasTest, Combine(Range(0, Nprec), Range(0, Nkernels), Range(0, 1)), getblasname);
-#endif
+INSTANTIATE_TEST_SUITE_P(QUDA, BlasTest, Combine(Range(0, Nprec), Range(0, Nkernels)), getblasname);

@@ -36,6 +36,7 @@ namespace quda {
       }
       return false;
     }
+
   } // namespace gauge
 
   struct GaugeFieldParam : public LatticeFieldParam {
@@ -339,7 +340,7 @@ namespace quda {
        This function returns true if the field is stored in an
        internal field order for the given precision.
     */
-    bool isNative() const;
+    bool isNative() const { return gauge::isNative(order, precision, reconstruct); }
 
     size_t Bytes() const { return bytes; }
     size_t PhaseBytes() const { return phase_bytes; }

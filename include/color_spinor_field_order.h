@@ -1611,12 +1611,18 @@ namespace quda {
     typedef colorspinor::FloatNOrder<float, 1, Nc, 2, false, huge_alloc> type;
   };
 
+#ifdef FLOAT8
+#define N8 8
+#else
+#define N8 4
+#endif
+
   // half precision
   template <int Nc, bool huge_alloc> struct colorspinor_mapper<short, 4, Nc, false, huge_alloc> {
-    typedef colorspinor::FloatNOrder<short, 4, Nc, 4, false, huge_alloc> type;
+    typedef colorspinor::FloatNOrder<short, 4, Nc, N8, false, huge_alloc> type;
   };
   template <int Nc, bool huge_alloc> struct colorspinor_mapper<short, 4, Nc, true, huge_alloc> {
-    typedef colorspinor::FloatNOrder<short, 4, Nc, 4, true, huge_alloc> type;
+    typedef colorspinor::FloatNOrder<short, 4, Nc, N8, true, huge_alloc> type;
   };
   template <int Nc, bool huge_alloc> struct colorspinor_mapper<short, 2, Nc, false, huge_alloc> {
     typedef colorspinor::FloatNOrder<short, 2, Nc, 2, false, huge_alloc> type;
@@ -1627,10 +1633,10 @@ namespace quda {
 
   // quarter precision
   template <int Nc, bool huge_alloc> struct colorspinor_mapper<char, 4, Nc, false, huge_alloc> {
-    typedef colorspinor::FloatNOrder<char, 4, Nc, 4, false, huge_alloc> type;
+    typedef colorspinor::FloatNOrder<char, 4, Nc, N8, false, huge_alloc> type;
   };
   template <int Nc, bool huge_alloc> struct colorspinor_mapper<char, 4, Nc, true, huge_alloc> {
-    typedef colorspinor::FloatNOrder<char, 4, Nc, 4, true, huge_alloc> type;
+    typedef colorspinor::FloatNOrder<char, 4, Nc, N8, true, huge_alloc> type;
   };
   template <int Nc, bool huge_alloc> struct colorspinor_mapper<char, 2, Nc, false, huge_alloc> {
     typedef colorspinor::FloatNOrder<char, 2, Nc, 2, false, huge_alloc> type;
