@@ -10,7 +10,11 @@
 #include <color_spinor_field.h>
 
 #include <jitify_helper.cuh>
+#ifndef DPCPP_DEVELOP
 #include <kernels/blas_core.cuh>
+#else
+#include "blas_core.cuh"
+#endif
 
 namespace quda {
 
@@ -165,8 +169,9 @@ namespace quda {
 
       blas::bytes += blas.bytes();
       blas::flops += blas.flops();
-
+#ifndef DPCPP_DEVELOP
       checkCudaError();
+#endif
     }
 
     /**

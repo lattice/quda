@@ -1017,7 +1017,7 @@ void exchange_llfat_cleanup(void)
     }
 
   }
-  checkQudaError();
+  //checkQudaError();
 }
 
 #undef gauge_site_size

@@ -9,18 +9,6 @@
 // This contains the appropriate ifdef guards already
 #include <mpi_comm_handle.h>
 
-<<<<<<< HEAD:tests/test_util.cpp
-#include <wilson_dslash_reference.h>
-#include <test_util.h>
-#include <test_params.h>
-
-#ifdef DEVELOP_ONEAPI
-#include <dslash_quda.h>
-#else
-#include <color_spinor_field.h>
-#endif
-#include "misc.h"
-=======
 // QUDA headers
 #include <color_spinor_field.h>
 #include <unitarization_links.h>
@@ -36,7 +24,6 @@
 #include <qio_field.h>
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
->>>>>>> feature/cuda-backend-2:utils/host_utils.cpp
 
 using namespace std;
 

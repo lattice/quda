@@ -6,7 +6,11 @@
 
 #include <launch_kernel.cuh>
 #include <jitify_helper.cuh>
+#ifndef DPCPP_DEVELOP
 #include <kernels/reduce_core.cuh>
+#else
+#include "reduce_core.cuh"
+#endif
 
 // These are used for reduction kernels
 static QudaSumFloat *d_reduce=0;
@@ -151,7 +155,11 @@ namespace quda {
                                   .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                                   .launch(arg);
 #else
+#ifndef DPCPP_DEVELOP
       LAUNCH_KERNEL(reduceKernel, tunable, tp, stream, arg, ReduceType, FloatN, M);
+#else
+      reduceKernel<32,ReduceType, FloatN, M><<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
+#endif
 #endif
 
       if (!commAsyncReduction()) {

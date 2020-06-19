@@ -28,11 +28,10 @@ set (QUDA_OBJS
   vector_io.cpp
   timer.cpp
   interface_quda.cpp util_quda.cpp
-  color_spinor_field.cpp color_spinor_util.cu color_spinor_pack.cu
+  color_spinor_field.cpp color_spinor_util.cu
   cpu_color_spinor_field.cpp cuda_color_spinor_field.cpp
   lattice_field.cpp
-  blas_quda.cu multi_blas_quda.cu reduce_quda.cu
-  multi_reduce_quda.cu
+  blas_quda.cu reduce_quda.cu
   comm_common.cpp 
   copy_color_spinor.cu
   copy_color_spinor_dd.cu copy_color_spinor_ds.cu
@@ -43,12 +42,6 @@ set (QUDA_OBJS
   copy_color_spinor_hh.cu copy_color_spinor_hq.cu
   copy_color_spinor_qd.cu copy_color_spinor_qs.cu
   copy_color_spinor_qh.cu copy_color_spinor_qq.cu
-  copy_color_spinor_mg_dd.cu copy_color_spinor_mg_ds.cu
-  copy_color_spinor_mg_sd.cu copy_color_spinor_mg_ss.cu
-  copy_color_spinor_mg_sh.cu copy_color_spinor_mg_sq.cu
-  copy_color_spinor_mg_hs.cu copy_color_spinor_mg_hh.cu
-  copy_color_spinor_mg_hq.cu copy_color_spinor_mg_qs.cu
-  copy_color_spinor_mg_qh.cu copy_color_spinor_mg_qq.cu
   extended_color_spinor_utilities.cu
   random.cu
   quda_cuda_api.cpp checksum.cu

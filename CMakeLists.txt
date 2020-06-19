@@ -393,16 +393,16 @@ mark_as_advanced(CMAKE_CUDA_HOST_COMPILER)
 set(CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS
     "-Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field")
 set(CMAKE_CUDA_FLAGS_DEVEL
-    "-g -lineinfo -O3 -Xcompiler ${CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS}"
+    "-g -lineinfo -O3 --dont-use-profile -ldir /usr/local/cuda-10.1/nvvm/libdevice  -Xcompiler ${CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS}"
     CACHE STRING "Flags used by the CUDA compiler during regular development builds.")
 set(CMAKE_CUDA_FLAGS_STRICT
     "${CMAKE_CUDA_FLAGS_DEVEL}"
     CACHE STRING "Flags used by the CUDA compiler during strict jenkins builds.")
 set(CMAKE_CUDA_FLAGS_RELEASE
-    "-O3 -w"
+    "-O3 -w --dont-use-profile -ldir /usr/local/cuda-10.1/nvvm/libdevice"
     CACHE STRING "Flags used by the CUDA compiler during release builds.")
 set(CMAKE_CUDA_FLAGS_HOSTDEBUG
-    "-g -lineinfo"
+    "-g -lineinfo --dont-use-profile -ldir /usr/local/cuda-10.1/nvvm/libdevice"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
 set(CMAKE_CUDA_FLAGS_DEVICEDEBUG
     "-G"
@@ -411,7 +411,7 @@ set(CMAKE_CUDA_FLAGS_DEBUG
     "-g -G"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(CMAKE_CUDA_FLAGS_SANITIZE
-    "-g -lineinfo -Xcompiler -fsanitize=address,-fsanitize=undefined"
+    "-g -lineinfo --dont-use-profile -ldir /usr/local/cuda-10.1/nvvm/libdevice -Xcompiler -fsanitize=address,-fsanitize=undefined"
     CACHE STRING "Flags used by the C++ compiler during sanitizer debug builds.")
 
 # CUDA Wrapper for finding libs etc

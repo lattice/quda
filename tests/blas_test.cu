@@ -113,7 +113,7 @@ bool is_site_unroll(int kernel) { return std::string(names[kernel]).find("HeavyQ
 
 bool skip_kernel(int precision, int kernel, int order)
 {
-#ifndef DPCPP_DEVELOP	
+#ifdef DPCPP_DEVELOP	
 #else	
   if (prec == QUDA_HALF_PRECISION || prec == QUDA_QUARTER_PRECISION) return true;
 #endif
@@ -386,10 +386,10 @@ double benchmark(int kernel, const int niter) {
   quda::Complex * A2 = new quda::Complex[Nsrc*Nsrc]; // for the block cDotProductNorm test
   double *Ar = new double[Nsrc * Msrc];
 
-  qudaEvent_t start, end;
-  qudaEventCreate(&start);
-  qudaEventCreate(&end);
-  qudaEventRecord(start, 0);
+  cudaEvent_t start, end;
+  cudaEventCreate(&start);
+  cudaEventCreate(&end);
+  cudaEventRecord(start, 0);
 
   {
     switch (kernel) {
@@ -591,9 +591,9 @@ double benchmark(int kernel, const int niter) {
   qudaEventRecord(end, 0);
   qudaEventSynchronize(end);
   float runTime;
-  qudaEventElapsedTime(&runTime, start, end);
-  qudaEventDestroy(start);
-  qudaEventDestroy(end);
+  cudaEventElapsedTime(&runTime, start, end);
+  cudaEventDestroy(start);
+  cudaEventDestroy(end);
   delete[] A;
   delete[] B;
   delete[] C;
