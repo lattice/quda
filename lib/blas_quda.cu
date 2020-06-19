@@ -267,16 +267,6 @@ namespace quda {
       instantiate<tripleCGUpdate_, Blas, true>(a, b, 0.0, x, y, z, w, y);
     }
 
-    void doubleCG3Init(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z)
-    {
-      instantiate<doubleCG3Init_, Blas, false>(a, 0.0, 0.0, x, y, z, z, y);
-    }
-
-    void doubleCG3Update(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z)
-    {
-      instantiate<doubleCG3Update_, Blas, false>(a, b, 1.0 - b, y, x, z, z, y);
-    }
-
   } // namespace blas
 
 } // namespace quda

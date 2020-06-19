@@ -412,51 +412,5 @@ namespace quda
       int flops() const { return 6; }   //! flops per element
     };
 
-    /**
-       void doubleCG3Init(d a, V x, V y, V z){}
-        y = x;
-        x += a.x*z;
-    */
-    template <typename real> struct doubleCG3Init_ : public BlasFunctor {
-      static constexpr write<1, 1> write{ };
-      const real a;
-      doubleCG3Init_(const real &a, const real &b, const real &c) : a(a) { ; }
-      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
-      {
-#pragma unroll
-        for (int i = 0; i < x.size(); i++) {
-          y[i] = x[i];
-          x[i] += a * z[i];
-        }
-      }
-      int streams() const { return 3; } //! total number of input and output streams
-      int flops() const { return 3; }   //! flops per element
-    };
-
-    /**
-       void doubleCG3Update(d a, d b, V x, V y, V z){}
-        tmp = x;
-        x = b.x*(x+a.x*z) + b.y*y;
-        y = tmp;
-    */
-    template <typename real> struct doubleCG3Update_ : public BlasFunctor {
-      static constexpr write<1, 1> write{ };
-      const real a;
-      const real b;
-      const real c;
-      doubleCG3Update_(const real &a, const real &b, const real &c) : a(a), b(b), c(c) { ; }
-      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
-      {
-#pragma unroll
-        for (int i = 0; i < x.size(); i++) {
-          auto tmp = x[i];
-          x[i] = b * (x[i] + a * z[i]) + c * y[i];
-          y[i] = tmp;
-        }
-      }
-      int streams() const { return 4; } //! total number of input and output streams
-      int flops() const { return 7; }   //! flops per element
-    };
-
   } // namespace blas
 } // namespace quda

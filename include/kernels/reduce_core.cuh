@@ -647,57 +647,6 @@ namespace quda
       int flops() const { return 16; }  //! flops per element check if it's right
     };
 
-    /**
-       void doubleCG3InitNorm(d a, V x, V y, V z){}
-        y = x;
-        x -= a*z;
-        norm2(x);
-    */
-    template <typename reduce_t, typename real>
-    struct doubleCG3InitNorm_ : public ReduceFunctor<reduce_t> {
-      static constexpr write<1, 1> write{ };
-      const real a;
-      doubleCG3InitNorm_(const real &a, const real &b) : a(a) { ; }
-      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
-      {
-#pragma unroll
-        for (int i = 0; i < x.size(); i++) {
-          y[i] = x[i];
-          x[i] -= a * z[i];
-          norm2_<reduce_t, real>(sum, x[i]);
-        }
-      }
-      int streams() const { return 3; } //! total number of input and output streams
-      int flops() const { return 5; }   //! flops per element
-    };
-
-    /**
-       void doubleCG3UpdateNorm(d a, d b, V x, V y, V z){}
-        tmp = x;
-        x = b*(x-a*z) + (1-b)*y;
-        y = tmp;
-        norm2(x);
-    */
-    template <typename reduce_t, typename real>
-    struct doubleCG3UpdateNorm_ : public ReduceFunctor<reduce_t> {
-      static constexpr write<1, 1> write{ };
-      const real a;
-      const real b;
-      doubleCG3UpdateNorm_(const real &a, const real &b) : a(a), b(b) { ; }
-      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
-      {
-#pragma unroll
-        for (int i = 0; i < x.size(); i++) {
-          auto tmp = x[i];
-          x[i] = b * (x[i] - a * z[i]) + ((real)1.0 - b) * y[i];
-          y[i] = tmp;
-          norm2_<reduce_t, real>(sum, x[i]);
-        }
-      }
-      int streams() const { return 4; } //! total number of input and output streams
-      int flops() const { return 9; }   //! flops per element
-    };
-
   } // namespace blas
 
 } // namespace quda
