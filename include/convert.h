@@ -58,28 +58,49 @@ namespace quda
      integer range.  When converting from an integer type, we scale
      the output to be on the same range.
   */
-  template <typename T1, typename T2> __host__ __device__ inline void copy(T1 &a, const T2 &b) { a = b; }
-  template <> __host__ __device__ inline void copy(float &a, const short &b) { a = i2f(b) * fixedInvMaxValue<short>::value; }
-  template <> __host__ __device__ inline void copy(short &a, const float &b) { a = f2i(b * fixedMaxValue<short>::value); }
-  template <> __host__ __device__ inline void copy(float &a, const char &b) { a = i2f(b) * fixedInvMaxValue<char>::value; }
-  template <> __host__ __device__ inline void copy(char &a, const float &b) { a = f2i(b * fixedMaxValue<char>::value); }
+  template <typename T1, typename T2>  __host__ __device__ inline
+  typename std::enable_if<!isFixed<T1>::value && !isFixed<T2>::value, void>::type copy(T1 &a, const T2 &b)
+  {
+    a = b;
+  }
+
+  template <typename T1, typename T2>  __host__ __device__ inline
+  typename std::enable_if<!isFixed<T1>::value && isFixed<T2>::value, void>::type copy(T1 &a, const T2 &b)
+  {
+    a = i2f(b) * fixedInvMaxValue<T2>::value;
+  }
+
+  template <typename T1, typename T2>  __host__ __device__ inline
+  typename std::enable_if<isFixed<T1>::value && !isFixed<T2>::value, void>::type copy(T1 &a, const T2 &b)
+  {
+    a = f2i(b * fixedMaxValue<T1>::value);
+  }
 
   /**
      @brief Specialized variants of the copy function that assumes the
      scaling factor has already been done.
   */
-  template <typename T1, typename T2> __host__ __device__ inline void copy_scaled(T1 &a, const T2 &b) { copy(a, b); }
-  template <> __host__ __device__ inline void copy_scaled(short &a, const float &b) { a = f2i(b); }
-  template <> __host__ __device__ inline void copy_scaled(char &a, const float &b) { a = f2i(b); }
+  template <typename T1, typename T2> __host__ __device__ inline
+  typename std::enable_if<!isFixed<T1>::value, void>::type copy_scaled(T1 &a, const T2 &b) { copy(a, b); }
+
+  template <typename T1, typename T2> __host__ __device__ inline
+  typename std::enable_if<isFixed<T1>::value, void>::type copy_scaled(T1 &a, const T2 &b) { a = f2i(b); }
 
   /**
      @brief Specialized variants of the copy function that include an
      additional scale factor.  Note the scale factor is ignored unless
      the input type (b) is either a short or char vector.
   */
-  template <typename T1, typename T2, typename T3>
-    __host__ __device__ inline void copy_and_scale(T1 &a, const T2 &b, const T3 &c) { copy(a, b); }
-  template <> __host__ __device__ inline void copy_and_scale(float &a, const short &b, const float &c) { a = i2f(b) * (fixedInvMaxValue<short>::value * c); }
-  template <> __host__ __device__ inline void copy_and_scale(float &a, const char &b, const float &c) { a = i2f(b) * (fixedInvMaxValue<char>::value * c); }
+  template <typename T1, typename T2, typename T3> __host__ __device__ inline
+  typename std::enable_if<!isFixed<T2>::value, void>::type copy_and_scale(T1 &a, const T2 &b, const T3 &c)
+  {
+    copy(a, b);
+  }
+
+  template <typename T1, typename T2, typename T3> __host__ __device__ inline
+  typename std::enable_if<isFixed<T2>::value, void>::type copy_and_scale(T1 &a, const T2 &b, const T3 &c)
+  {
+    a = i2f(b) * fixedInvMaxValue<T2>::value * c;
+  }
 
 } // namespace quda
