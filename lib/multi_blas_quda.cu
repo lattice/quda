@@ -134,18 +134,23 @@ namespace quda {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
         if (location == QUDA_CUDA_FIELD_LOCATION) {
-          // need to add native check here
-          constexpr int N = n_vector<store_t, true, nSpin, site_unroll>();
-          constexpr int Ny = n_vector<y_store_t, true, nSpin, site_unroll>();
+          if (site_unroll) checkNative(*x[0], *y[0], *z[0], *w[0]); // require native order when using site_unroll
+          using device_store_t = typename device_type_mapper<store_t>::type;
+          using device_y_store_t = typename device_type_mapper<y_store_t>::type;
+          using device_real_t = typename mapper<device_y_store_t>::type;
+          Functor<device_real_t> f_(NXZ, NYW);
+
+          constexpr int N = n_vector<device_store_t, true, nSpin, site_unroll>();
+          constexpr int Ny = n_vector<device_y_store_t, true, nSpin, site_unroll>();
           constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
           const int length = x[0]->Length() / (nParity * M);
 
-          MultiBlasArg<NXZ, store_t, N, y_store_t, Ny, decltype(f)> arg(x, y, z, w, f, NYW, length);
+          MultiBlasArg<NXZ, device_store_t, N, device_y_store_t, Ny, decltype(f_)> arg(x, y, z, w, f_, NYW, length);
 
 #ifdef JITIFY
           using namespace jitify::reflection;
           auto instance = program->kernel("quda::blas::multiBlasKernel")
-            .instantiate(Type<real>(), M, NXZ, tp.aux.x, Type<decltype(arg)>());
+            .instantiate(Type<device_real_t>(), M, NXZ, tp.aux.x, Type<decltype(arg)>());
 
           set_param(instant.get_constant_ptr("quda::blas::Amatrix_d"), a);
           set_param(instant.get_constant_ptr("quda::blas::Bmatrix_d"), b);
@@ -162,10 +167,10 @@ namespace quda {
           tp.block.x *= tp.aux.x; // include warp-split factor
 
           switch (tp.aux.x) {
-          case 1: multiBlasKernel<real, M, NXZ, 1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+          case 1: multiBlasKernel<device_real_t, M, NXZ, 1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
 #ifdef WARP_SPLIT
-          case 2: multiBlasKernel<real, M, NXZ, 2><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
-          case 4: multiBlasKernel<real, M, NXZ, 4><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+          case 2: multiBlasKernel<device_real_t, M, NXZ, 2><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+          case 4: multiBlasKernel<device_real_t, M, NXZ, 4><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
 #endif
           default: errorQuda("warp-split factor %d not instantiated", tp.aux.x);
           }

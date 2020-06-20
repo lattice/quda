@@ -64,6 +64,7 @@ namespace quda
         if (arg.f.write.Z) arg.Z.save(z, i, parity);
         if (arg.f.write.W) arg.W.save(w, i, parity);
         if (arg.f.write.V) arg.V.save(v, i, parity);
+
         i += gridSize;
       }
     }

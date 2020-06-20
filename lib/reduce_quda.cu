@@ -184,6 +184,7 @@ namespace quda {
       const int nParity; // for composite fields this includes the number of composites
       host_reduce_t &result;
 
+      const coeff_t &a, &b;
       ColorSpinorField &x, &y, &z, &w, &v;
       QudaFieldLocation location;
 
@@ -206,6 +207,8 @@ namespace quda {
              ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v, host_reduce_t &result) :
         r(a, b),
         nParity((x.IsComposite() ? x.CompositeDim() : 1) * (x.SiteSubset())),
+        a(a),
+        b(b),
         x(x),
         y(y),
         z(z),
@@ -243,7 +246,7 @@ namespace quda {
         reduceDoubleArray((double *)&result, Nreduce);
       }
 
-      inline TuneKey tuneKey() const { return TuneKey(x.VolString(), typeid(r).name(), aux); }
+      TuneKey tuneKey() const { return TuneKey(x.VolString(), typeid(r).name(), aux); }
 
       void apply(const qudaStream_t &stream)
       {
@@ -253,26 +256,38 @@ namespace quda {
 
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         if (location == QUDA_CUDA_FIELD_LOCATION) {
-          // need to add native check here
-          constexpr int N = n_vector<store_t, true, nSpin, site_unroll>();
-          constexpr int Ny = n_vector<y_store_t, true, nSpin, site_unroll>();
+          if (site_unroll) checkNative(x, y, z, w, v); // require native order when using site_unroll
+          using device_store_t = typename device_type_mapper<store_t>::type;
+          using device_y_store_t = typename device_type_mapper<y_store_t>::type;
+          using device_real_t = typename mapper<device_y_store_t>::type;
+          Reducer<device_reduce_t, device_real_t> r_(a, b);
+
+          constexpr int N = n_vector<device_store_t, true, nSpin, site_unroll>();
+          constexpr int Ny = n_vector<device_y_store_t, true, nSpin, site_unroll>();
           constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
           const int length = x.Length() / (nParity * M);
 
-          ReductionArg<store_t, N, y_store_t, Ny, decltype(r)> arg(x, y, z, w, v, r, length, nParity);
-          result = reduceLaunch<host_reduce_t, real, M>(arg, tp, stream, *this);
+          ReductionArg<device_store_t, N, device_y_store_t, Ny, decltype(r_)> arg(x, y, z, w, v, r_, length, nParity);
+          //result = reduceLaunch<host_reduce_t, device_real_t, M>(arg, tp, stream, *this);
         } else {
-          // no point instantiating half/quarter for CPU, so just promote those to single
-          using store_t_ = typename mapper<store_t>::type;
-          using y_store_t_ = typename mapper<y_store_t>::type;
+          if (checkOrder(x, y, z, w, v) != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
+            warningQuda("CPU Blas functions expect AoS field order");
+            return;
+          }
+
+          using host_store_t = typename host_type_mapper<store_t>::type;
+          using host_y_store_t = typename host_type_mapper<y_store_t>::type;
+          using host_real_t = typename mapper<host_y_store_t>::type;
+          Reducer<double, host_real_t> r_(a, b);
 
           // if site unrolling then we need full AoS ordering
-          constexpr int N = site_unroll ? (nSpin == 4 ? 24 : 6) : n_vector<store_t, false, nSpin, site_unroll>();
+          constexpr int N = n_vector<host_store_t, false, nSpin, site_unroll>();
+          constexpr int Ny = n_vector<host_y_store_t, false, nSpin, site_unroll>();
           constexpr int M = N;
           const int length = x.Length() / (nParity * M);
 
-          ReductionArg<store_t_, N, y_store_t_, N, decltype(r)> arg(x, y, z, w, v, r, length, nParity);
-          result = reduceCPU<real, M>(arg);
+          ReductionArg<host_store_t, N, host_y_store_t, Ny, decltype(r_)> arg(x, y, z, w, v, r_, length, nParity);
+          result = reduceCPU<host_real_t, M>(arg);
         }
       }
 

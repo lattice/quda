@@ -27,6 +27,7 @@ namespace quda {
       Functor<real> f;
       const int nParity; // for composite fields this includes the number of composites
 
+      const coeff_t &a, &b, &c;
       ColorSpinorField &x, &y, &z, &w, &v;
       const QudaFieldLocation location;
 
@@ -43,6 +44,9 @@ namespace quda {
            ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v) :
         f(a, b, c),
         nParity((x.IsComposite() ? x.CompositeDim() : 1) * x.SiteSubset()),
+        a(a),
+        b(b),
+        c(c),
         x(x),
         y(y),
         z(z),
@@ -85,36 +89,44 @@ namespace quda {
 
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         if (location == QUDA_CUDA_FIELD_LOCATION) {
-          // need to add native check here
-          constexpr int N = n_vector<store_t, true, nSpin, site_unroll>();
-          constexpr int Ny = n_vector<y_store_t, true, nSpin, site_unroll>();
+          if (site_unroll) checkNative(x, y, z, w, v); // require native order when using site_unroll
+          using device_store_t = typename device_type_mapper<store_t>::type;
+          using device_y_store_t = typename device_type_mapper<y_store_t>::type;
+          using device_real_t = typename mapper<device_y_store_t>::type;
+          Functor<device_real_t> f_(a, b, c);
+
+          constexpr int N = n_vector<device_store_t, true, nSpin, site_unroll>();
+          constexpr int Ny = n_vector<device_y_store_t, true, nSpin, site_unroll>();
           constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
           const int length = x.Length() / (nParity * M);
 
-          BlasArg<store_t, N, y_store_t, Ny, decltype(f)> arg(x, y, z, w, v, f, length, nParity);
+          BlasArg<device_store_t, N, device_y_store_t, Ny, decltype(f_)> arg(x, y, z, w, v, f_, length, nParity);
 #ifdef JITIFY
           using namespace jitify::reflection;
           jitify_error = program->kernel("quda::blas::blasKernel")
-            .instantiate(Type<real>(), M, Type<decltype(arg)>())
+            .instantiate(Type<device_real_t>(), M, Type<decltype(arg)>())
             .configure(tp.grid, tp.block, tp.shared_bytes, stream)
             .launch(arg);
 #else
-          blasKernel<real, M><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          blasKernel<device_real_t, M><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 #endif
         } else {
-          // check field order here
+          if (checkOrder(x, y, z, w, v) != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER)
+            errorQuda("CPU Blas functions expect AoS field order");
 
-          // no point instantiating half/quarter for CPU, so just promote those to single
-          using store_t_ = typename mapper<store_t>::type;
-          using y_store_t_ = typename mapper<y_store_t>::type;
+          using host_store_t = typename host_type_mapper<store_t>::type;
+          using host_y_store_t = typename host_type_mapper<y_store_t>::type;
+          using host_real_t = typename mapper<host_y_store_t>::type;
+          Functor<host_real_t> f_(a, b, c);
 
           // if site unrolling then we need full AoS ordering
-          constexpr int N = site_unroll ? (nSpin == 4 ? 24 : 6) : n_vector<store_t, false, nSpin, site_unroll>();
+          constexpr int N = n_vector<host_store_t, false, nSpin, site_unroll>();
+          constexpr int Ny = n_vector<host_y_store_t, false, nSpin, site_unroll>();
           constexpr int M = N;
           const int length = x.Length() / (nParity * M);
 
-          BlasArg<store_t_, N, y_store_t_, N, decltype(f)> arg(x, y, z, w, v, f, length, nParity);
-          blasCPU<real, M>(arg);
+          BlasArg<host_store_t, N, host_y_store_t, Ny, decltype(f_)> arg(x, y, z, w, v, f_, length, nParity);
+          blasCPU<host_real_t, M>(arg);
         }
       }
 
@@ -189,7 +201,7 @@ namespace quda {
 
     void axpbyz(double a, ColorSpinorField &x, double b, ColorSpinorField &y, ColorSpinorField &z)
     {
-      instantiate<axpbyz_, Blas, true, 1>(a, b, 0.0, x, y, x, x, z);
+      instantiate<axpbyz_, Blas, true>(a, b, 0.0, x, y, x, x, z);
     }
 
     void ax(double a, ColorSpinorField &x)

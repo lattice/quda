@@ -200,13 +200,18 @@ namespace quda {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
         if (location == QUDA_CUDA_FIELD_LOCATION) {
-          // need to add native check here
-          constexpr int N = n_vector<store_t, true, nSpin, site_unroll>();
-          constexpr int Ny = n_vector<y_store_t, true, nSpin, site_unroll>();
+          if (site_unroll) checkNative(*x[0], *y[0], *z[0], *w[0]); // require native order when using site_unroll
+          using device_store_t = typename device_type_mapper<store_t>::type;
+          using device_y_store_t = typename device_type_mapper<y_store_t>::type;
+          using device_real_t = typename mapper<device_y_store_t>::type;
+          Reducer<device_reduce_t, device_real_t> r_(NXZ, NYW);
+
+          constexpr int N = n_vector<device_store_t, true, nSpin, site_unroll>();
+          constexpr int Ny = n_vector<device_y_store_t, true, nSpin, site_unroll>();
           constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
           const int length = x[0]->Length() / (nParity * M);
 
-          MultiReduceArg<NXZ, store_t, N, y_store_t, Ny, decltype(r)> arg(x, y, z, w, r, NYW, length);
+          MultiReduceArg<NXZ, device_store_t, N, device_y_store_t, Ny, decltype(r_)> arg(x, y, z, w, r_, NYW, length);
 
 #ifdef JITIFY
           // need to get constants pointer from jitify instance
@@ -216,7 +221,7 @@ namespace quda {
           if (b.data) set_param(Bmatrix_d, b, stream);
           if (c.data) set_param(Cmatrix_d, c, stream);
 #endif
-          multiReduceLaunch<real, M, NXZ>(result, arg, tp, stream, *this);
+          multiReduceLaunch<device_real_t, M, NXZ>(result, arg, tp, stream, *this);
         } else {
           errorQuda("Only implemented for GPU fields");
         }

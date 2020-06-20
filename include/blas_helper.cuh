@@ -88,11 +88,23 @@ namespace quda
   template <> struct VectorType<float, 24> {
     using type = vector_type<float, 24>;
   };
+  template <> struct VectorType<short, 24> {
+    using type = vector_type<short, 24>;
+  };
+  template <> struct VectorType<char, 24> {
+    using type = vector_type<char, 24>;
+  };
   template <> struct VectorType<double, 6> {
     using type = vector_type<double, 6>;
   };
   template <> struct VectorType<float, 6> {
     using type = vector_type<float, 6>;
+  };
+  template <> struct VectorType<short, 6> {
+    using type = vector_type<short, 6>;
+  };
+  template <> struct VectorType<char, 6> {
+    using type = vector_type<char, 6>;
   };
 
   namespace blas
@@ -303,12 +315,21 @@ namespace quda
 #endif
     template <> constexpr int n_vector<char, true, 1, true>() { return 2; }
 
-    // AoS ordering used on CPU uses when we are not site unrolling
+    // Just use float-2/float-4 ordering on CPU when not site unrolling
     template <> constexpr int n_vector<double, false, 4, false>() { return 2; }
     template <> constexpr int n_vector<double, false, 1, false>() { return 2; }
-
     template <> constexpr int n_vector<float, false, 4, false>() { return 4; }
     template <> constexpr int n_vector<float, false, 1, false>() { return 4; }
+
+    // AoS ordering is used on CPU uses when we are site unrolling
+    template <> constexpr int n_vector<double, false, 4, true>() { return 24; }
+    template <> constexpr int n_vector<double, false, 1, true>() { return 6; }
+    template <> constexpr int n_vector<float, false, 4, true>() { return 24; }
+    template <> constexpr int n_vector<float, false, 1, true>() { return 6; }
+    template <> constexpr int n_vector<short, false, 4, true>() { return 24; }
+    template <> constexpr int n_vector<short, false, 1, true>() { return 6; }
+    template <> constexpr int n_vector<char, false, 4, true>() { return 24; }
+    template <> constexpr int n_vector<char, false, 1, true>() { return 6; }
 
     template <template <typename...> class Functor,
               template <template <typename...> class, typename store_t, typename y_store_t, int, typename, int> class Blas,
@@ -353,11 +374,16 @@ namespace quda
 
       // use PromoteType to ensure we don't instantiate unwanted combinations (e.g., x > y)
       if (y.Precision() == QUDA_DOUBLE_PRECISION) {
-#if QUDA_PRECISION & 8
-        instantiate<Functor, Blas, T, x_store_t, double, NXZ>(a, b, c, x, y, args...);
-#else
-        errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
+
+#if !(QUDA_PRECISION & 8)
+        if (x.Location() == QUDA_CUDA_FIELD_LOCATION)
+          errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
 #endif
+        // always instantiate the double-precision template to allow CPU
+        // fields through, and prevent double-precision GPU
+        // instantiation using gpu_mapper
+        instantiate<Functor, Blas, T, x_store_t, double, NXZ>(a, b, c, x, y, args...);
+
       } else if (y.Precision() == QUDA_SINGLE_PRECISION) {
 #if QUDA_PRECISION & 4
         instantiate<Functor, Blas, T, x_store_t, typename PromoteTypeId<x_store_t, float>::type, NXZ>(a, b, c, x, y,
@@ -390,11 +416,14 @@ namespace quda
     constexpr void instantiate(const T &a, const T &b, const T &c, V &x, Args &&... args)
     {
       if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-#if QUDA_PRECISION & 8 || 1
-        instantiate<Functor, Blas, mixed, T, double, NXZ>(a, b, c, x, args...);
-#else
-        errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
+#if !(QUDA_PRECISION & 8)
+        if (x.Location() == QUDA_CUDA_FIELD_LOCATION)
+          errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
 #endif
+        // always instantiate the double-precision template to allow CPU
+        // fields through, and prevent double-precision GPU
+        // instantiation using double_mapper
+        instantiate<Functor, Blas, mixed, T, double, NXZ>(a, b, c, x, args...);
       } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
 #if QUDA_PRECISION & 4
         instantiate<Functor, Blas, mixed, T, float, NXZ>(a, b, c, x, args...);
@@ -417,6 +446,52 @@ namespace quda
         errorQuda("Unsupported precision %d\n", x.Precision());
       }
     }
+
+    /**
+       @brief device_type_mapper In general we want to enable double
+       precision blas always on the host, e.g., for running unit tests,
+       but may not want to build double precision on the device, e.g., if
+       we have a pure single precision build with QUDA_PRECISION=4.
+       Thus we do not prevent the double precision template from being
+       instantiated when the field precision is queried, but we can
+       use device_type_mapper to demote the type prior to any kernel
+       being instantiated.
+     */
+    template <typename T> struct device_type_mapper { using type = T; };
+    template <> struct device_type_mapper<double> {
+#if QUDA_PRECISION & 8
+      using type = double;
+#elif QUDA_PRECISION & 4
+      using type = float;
+#elif QUDA_PRECISION & 2
+      using type = short;
+#elif QUDA_PRECISION & 1
+      using type = char;
+#endif
+    };
+
+    /**
+      @brief host_type_mapper At present we do not support half or
+      quarter precision on the host target.  Thus we use
+      host_type_mapper to promote any half/quarter precision type to
+      double or single to prevent the kernel prior to any kernel being
+      instantiated to reduce template bloat.
+     */
+    template <typename T> struct host_type_mapper { using type = T; };
+    template <> struct host_type_mapper<short> {
+#if QUDA_PRECISION & 4
+      using type = float;
+#else
+      using type = double;
+#endif
+    };
+    template <> struct host_type_mapper<char> {
+#if QUDA_PRECISION & 4
+      using type = float;
+#else
+      using type = double;
+#endif
+    };
 
   } // namespace blas
 
