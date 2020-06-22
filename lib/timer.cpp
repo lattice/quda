@@ -64,6 +64,7 @@ namespace quda {
                                       "memcpy d2h async",
                                       "memcpy2d d2h async",
                                       "memcpy h2d async",
+                                      "memcpy default async",
                                       "comms start",
                                       "comms query",
                                       "constant",

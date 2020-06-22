@@ -38,6 +38,7 @@ namespace quda {
 
     inner.inv_type_precondition = QUDA_INVALID_INVERTER;
     inner.is_preconditioner = true; // tell inner solver it is a preconditioner
+    inner.pipeline = true;
 
     inner.schwarz_type = outer.schwarz_type;
     inner.global_reduction = inner.schwarz_type == QUDA_INVALID_SCHWARZ ? true : false;

@@ -139,7 +139,7 @@ namespace quda
       orthonormalizeMGS(kSpace, block_size);
       if (getVerbosity() >= QUDA_SUMMARIZE) {
         if (block_size > 1)
-          printfQuda("Orthonormalising initial guesses with Gram Schmidt, k=%d\n", k);
+          printfQuda("Orthonormalising initial guesses with Modified Gram Schmidt, iter k=%d/5\n", (k + 1));
         else
           printfQuda("Orthonormalising initial guess\n");
       }
@@ -389,18 +389,20 @@ namespace quda
     std::vector<Complex> H(size * size);
     blas::hDotProduct(H.data(), vecs_ptr, vecs_ptr);
 
+    double epsilon = setEpsilon(vecs[0]->Precision());
+
     for (int i = 0; i < size; i++) {
       for (int j = 0; j < size; j++) {
         auto cnorm = H[i*size + j];
         if (j != i) {
-          if (abs(cnorm) > 5e-16) {
-            if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
+          if (abs(cnorm) > epsilon) {
+            if (getVerbosity() >= QUDA_SUMMARIZE)
               printfQuda("Norm <%d|%d>^2 = (%e,%e): %e\n", i, j, cnorm.real(), cnorm.imag(), abs(cnorm));
             orthed = false;
           }
         } else {
-          if (abs(Unit - cnorm) > 5e-16) {
-            if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
+          if (abs(Unit - cnorm) > epsilon) {
+            if (getVerbosity() >= QUDA_SUMMARIZE)
               printfQuda("Norm <%d|%d>^2 = (%e,%e): %e\n", i, j, cnorm.real(), cnorm.imag(), abs(Unit - cnorm));
             orthed = false;
           }

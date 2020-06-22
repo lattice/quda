@@ -85,30 +85,33 @@ namespace quda {
       mom(mom) {}
   };
 
-  // calculate the momentum contribution to the action.  This
-  // presently is hard-coded for recon-10 (MILC style)
+  // calculate the momentum contribution to the action.  This uses the
+  // MILC convention where we subtract 4.0 from each matrix norm in
+  // order to increase stability
   template <int blockSize, typename Arg>
   __global__ void computeMomAction(Arg arg){
     int x = threadIdx.x + blockIdx.x*blockDim.x;
     int parity = threadIdx.y;
     double action = 0.0;
+    using matrix = Matrix<complex<typename Arg::Float>, Arg::nColor>;
 
     while (x < arg.threads) {
       // loop over direction
       for (int mu=0; mu<4; mu++) {
-        // FIXME should understand what this does exactly and cleanup (matches MILC)
-	complex<typename Arg::Float> v_[5];
-	arg.mom.load(v_, x, mu, parity);
-        typename Arg::Float v[10];
-        for (int i=0; i<5; i++) {
-          v[2*i+0] = v_[i].real();
-          v[2*i+1] = v_[i].imag();
-        }
+	const matrix mom = arg.mom(mu, x, parity);
 
-	double local_sum = 0.0;
-	for (int j=0; j<6; j++) local_sum += v[j]*v[j];
-	for (int j=6; j<9; j++) local_sum += 0.5*v[j]*v[j];
+        double local_sum = 0.0;
+        local_sum  = 0.5 * mom(0,0).imag() * mom(0,0).imag();
+        local_sum += 0.5 * mom(1,1).imag() * mom(1,1).imag();
+        local_sum += 0.5 * mom(2,2).imag() * mom(2,2).imag();
+        local_sum += mom(0,1).real() * mom(0,1).real();
+        local_sum += mom(0,1).imag() * mom(0,1).imag();
+        local_sum += mom(0,2).real() * mom(0,2).real();
+        local_sum += mom(0,2).imag() * mom(0,2).imag();
+        local_sum += mom(1,2).real() * mom(1,2).real();
+        local_sum += mom(1,2).imag() * mom(1,2).imag();
 	local_sum -= 4.0;
+
 	action += local_sum;
       }
 
@@ -136,7 +139,7 @@ namespace quda {
       action = arg.result_h[0];
     }
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       arg.result_h[0] = 0.0;
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -247,7 +250,7 @@ namespace quda {
       if (forceMonitor()) forceRecord(*((double2*)arg.result_h), arg.coeff, fname);
     }
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -329,7 +332,7 @@ namespace quda {
       apply(0);
     }
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       ApplyUKernel<<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);

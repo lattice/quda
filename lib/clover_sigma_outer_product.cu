@@ -15,8 +15,6 @@ namespace quda {
 
   template <typename Float, typename Arg> class CloverSigmaOprod : public TunableVectorYZ
   {
-
-private:
     Arg &arg;
     const GaugeField &meta;
 
@@ -29,7 +27,7 @@ private:
   public:
       CloverSigmaOprod(Arg &arg, const GaugeField &meta) : TunableVectorYZ(2, 6), arg(arg), meta(meta)
       {
-        writeAuxString("prec=%lu,stride=%d,nvector=%d", sizeof(Float), arg.inA[0].Stride(), arg.nvector);
+        writeAuxString("%s,nvector=%d", meta.AuxString(), arg.nvector);
         // this sets the communications pattern for the packing kernel
 #ifdef JITIFY
         create_jitify_program("kernels/clover_sigma_outer_product.cuh");
@@ -38,7 +36,7 @@ private:
 
       virtual ~CloverSigmaOprod() {}
 
-      void apply(const cudaStream_t &stream)
+      void apply(const qudaStream_t &stream)
       {
         if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
           TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -51,14 +49,7 @@ private:
 #else
           switch (arg.nvector) {
           case 1: sigmaOprodKernel<1, Float><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
-          case 2: sigmaOprodKernel<2, Float><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
-          case 3: sigmaOprodKernel<3, Float><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
-          case 4: sigmaOprodKernel<4, Float><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
-          case 5: sigmaOprodKernel<5, Float><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
-          case 6: sigmaOprodKernel<6, Float><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
-          case 7: sigmaOprodKernel<7, Float><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
-          case 8: sigmaOprodKernel<8, Float><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
-          case 9: sigmaOprodKernel<9, Float><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+          default: errorQuda("Unsupported nvector = %d\n", arg.nvector);
           }
 #endif
         } else { // run the CPU code
@@ -83,13 +74,13 @@ private:
       TuneKey tuneKey() const { return TuneKey(meta.VolString(), "CloverSigmaOprod", aux); }
   }; // CloverSigmaOprod
 
-  template<typename Float, typename Output, typename InputA, typename InputB>
-  void computeCloverSigmaOprod(Output oprod, const GaugeField& out, InputA *inA, InputB *inB,
-			       std::vector<std::vector<double> > &coeff, int nvector) {
+  template<typename Float>
+  void computeCloverSigmaOprod(GaugeField& oprod, const std::vector<ColorSpinorField*> &x,
+			       const std::vector<ColorSpinorField*> &p, const std::vector<std::vector<double> > &coeff, int nvector)
+  {
     // Create the arguments
-    typedef CloverSigmaOprodArg<Float, Output, InputA, InputB> Arg;
-    Arg arg(oprod, inA, inB, coeff, out, nvector);
-    CloverSigmaOprod<Float, Arg> sigma_oprod(arg, out);
+    CloverSigmaOprodArg<Float, 3> arg(oprod, x, p, coeff, nvector);
+    CloverSigmaOprod<Float, decltype(arg)> sigma_oprod(arg, oprod);
     sigma_oprod.apply(0);
   } // computeCloverSigmaOprod
 
@@ -125,22 +116,8 @@ private:
 
     if (oprod.Order() != QUDA_FLOAT2_GAUGE_ORDER) errorQuda("Unsupported output ordering: %d\n", oprod.Order());
 
-    if(x[0]->Precision() != oprod.Precision())
-      errorQuda("Mixed precision not supported: %d %d\n", x[0]->Precision(), oprod.Precision());
-
-    if(oprod.Precision() == QUDA_DOUBLE_PRECISION){
-
-      Spinor<double2, double2, 12, 0> spinorA[MAX_NVECTOR];
-      Spinor<double2, double2, 12, 0> spinorB[MAX_NVECTOR];
-
-      for (unsigned int i=0; i<x.size(); i++) {
-	spinorA[i].set(*dynamic_cast<cudaColorSpinorField*>(x[i]));
-	spinorB[i].set(*dynamic_cast<cudaColorSpinorField*>(p[i]));
-      }
-
-      computeCloverSigmaOprod<double>(gauge::FloatNOrder<double, 18, 2, 18>(oprod),
-				      oprod, spinorA, spinorB, coeff, x.size());
-
+    if (checkPrecision(*x[0], *p[0], oprod) == QUDA_DOUBLE_PRECISION) {
+      computeCloverSigmaOprod<double>(oprod, x, p, coeff, x.size());
     } else {
       errorQuda("Unsupported precision: %d\n", oprod.Precision());
     }
@@ -149,7 +126,6 @@ private:
 #endif
 
     checkCudaError();
-    return;
   } // computeCloverForce
 
 } // namespace quda

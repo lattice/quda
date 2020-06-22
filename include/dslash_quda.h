@@ -475,11 +475,35 @@ namespace quda {
      @param[in] comm_override Override for which dimensions are partitioned
      @param[in] profile The TimeProfile used for profiling the dslash
   */
+
   void ApplyDomainWall4D(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double m_5,
                          const Complex *b_5, const Complex *c_5, const ColorSpinorField &x, int parity, bool dagger,
                          const int *comm_override, TimeProfile &profile);
 
-  enum Dslash5Type { DSLASH5_DWF, DSLASH5_MOBIUS_PRE, DSLASH5_MOBIUS, M5_INV_DWF, M5_INV_MOBIUS, M5_INV_ZMOBIUS };
+  enum Dslash5Type {
+    DSLASH5_DWF,
+    DSLASH5_MOBIUS_PRE,
+    DSLASH5_MOBIUS,
+    M5_INV_DWF,
+    M5_INV_MOBIUS,
+    M5_INV_ZMOBIUS,
+    M5_EOFA,
+    M5INV_EOFA
+  };
+
+  /**
+    Applying the following five kernels in the order of 4-0-1-2-3 is equivalent to applying
+    the full even-odd preconditioned symmetric MdagM operator:
+    op = (1 - M5inv * D4 * D5pre * M5inv * D4 * D5pre)^dag
+        * (1 - M5inv * D4 * D5pre * M5inv * D4 * D5pre)
+  */
+  enum class MdwfFusedDslashType {
+    D4_D5INV_D5PRE,
+    D4_D5INV_D5INVDAG,
+    D4DAG_D5PREDAG_D5INVDAG,
+    D4DAG_D5PREDAG,
+    D5PRE,
+  };
 
   /**
      @brief Apply either the domain-wall / mobius Dslash5 operator or
@@ -497,7 +521,24 @@ namespace quda {
      @param[in] type Type of dslash we are applying
   */
   void ApplyDslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f,
-      double m_5, const Complex *b_5, const Complex *c_5, double a, bool dagger, Dslash5Type type);
+                    double m_5, const Complex *b_5, const Complex *c_5, double a, bool dagger, Dslash5Type type);
+
+  // Tensor core functions for Mobius DWF
+  namespace mobius_tensor_core
+  {
+    void apply_fused_dslash(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, ColorSpinorField &y,
+                            const ColorSpinorField &x, double m_f, double m_5, const Complex *b_5, const Complex *c_5,
+                            bool dagger, int parity, int shift[4], int halo_shift[4], MdwfFusedDslashType type);
+  }
+
+  // The EOFA stuff
+  namespace mobius_eofa
+  {
+    void apply_dslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f,
+                       double m_5, const Complex *b_5, const Complex *c_5, double a, int eofa_pm, double inv,
+                       double kappa, const double *eofa_u, const double *eofa_x, const double *eofa_y,
+                       double sherman_morrison, bool dagger, Dslash5Type type);
+  }
 
   /**
      @brief Driver for applying the Laplace stencil
@@ -630,7 +671,7 @@ namespace quda {
      @param[in] stream Which stream are we executing in
   */
   void PackGhost(void *ghost[2 * QUDA_MAX_DIM], const ColorSpinorField &field, MemoryLocation location, int nFace,
-                 bool dagger, int parity, bool spin_project, double a, double b, double c, const cudaStream_t &stream);
+                 bool dagger, int parity, bool spin_project, double a, double b, double c, const qudaStream_t &stream);
 
   /**
      @brief Applies a gamma5 matrix to a spinor (wrapper to ApplyGamma)

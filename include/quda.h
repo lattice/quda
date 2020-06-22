@@ -111,6 +111,19 @@ extern "C" {
     double_complex b_5[QUDA_MAX_DWF_LS]; /**< Mobius coefficients - only real part used if regular Mobius */
     double_complex c_5[QUDA_MAX_DWF_LS]; /**< Mobius coefficients - only real part used if regular Mobius */
 
+    /**<
+     * The following specifies the EOFA parameters. Notation follows arXiv:1706.05843
+     * eofa_shift: the "\beta" in the paper
+     * eofa_pm: plus or minus for the EOFA operator
+     * mq1, mq2, mq3 are the three masses corresponds to Hasenbusch mass spliting.
+     * As far as I know mq1 is always the same as "mass" but it's here just for consistence.
+     * */
+    double eofa_shift;
+    int eofa_pm;
+    double mq1;
+    double mq2;
+    double mq3;
+
     double mu;    /**< Twisted mass parameter */
     double epsilon; /**< Twisted mass parameter */
 
@@ -1108,7 +1121,14 @@ extern "C" {
   void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
                          double *path_coeff, QudaGaugeParam *param);
 
-
+  /**
+   * Either downloads and sets the resident momentum field, or uploads
+   * and returns the resident momentum field
+   *
+   * @param[in,out] mom The external momentum field
+   * @param[in] param The parameters of the external field
+   */
+  void momResidentQuda(void *mom, QudaGaugeParam *param);
 
   /**
    * Compute the gauge force and update the mometum field

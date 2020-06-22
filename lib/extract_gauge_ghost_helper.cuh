@@ -203,7 +203,7 @@ namespace quda {
 
     virtual ~ExtractGhost() { ; }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       if (location==QUDA_CPU_FIELD_LOCATION) {
 	if (extract) extractGhost<nDim,true>(arg);
 	else extractGhost<nDim,false>(arg);
