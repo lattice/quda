@@ -1,9 +1,0 @@
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-#include <algorithm>
-#include <numeric>
-#include <mpi.h>
-#include <quda_internal.h>
-#include <comm_quda.h>
-#include <mpi_comm_handle.h>

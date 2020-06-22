@@ -2,6 +2,8 @@
 #include <map>
 #include <array>
 
+int Communicator::gpuid = -1;
+
 std::map<CommKey, Communicator> communicator_stack;
 
 Communicator *current_communicator = nullptr;
@@ -12,10 +14,12 @@ constexpr CommKey default_key = {1, 1, 1, 1};
 
 CommKey current_key = {-1, -1, -1, -1};
 
-void init_communicator_stack(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data, bool user_set_comm_handle, void *user_comm)
+void init_communicator_stack(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data,
+                             bool user_set_comm_handle, void *user_comm)
 {
-  communicator_stack.emplace(std::piecewise_construct, std::forward_as_tuple(default_key),
-                             std::forward_as_tuple(ndim, dims, rank_from_coords, map_data, user_set_comm_handle, user_comm));
+  communicator_stack.emplace(
+    std::piecewise_construct, std::forward_as_tuple(default_key),
+    std::forward_as_tuple(ndim, dims, rank_from_coords, map_data, user_set_comm_handle, user_comm));
 
   current_key = default_key;
 }
@@ -64,15 +68,14 @@ void push_to_current(const CommKey &split_key)
   current_key = split_key;
 }
 
-int comm_neighbor_rank(int dir, int dim){
-  return get_default_communicator().comm_neighbor_rank(dir, dim);
-}
+int comm_neighbor_rank(int dir, int dim) { return get_default_communicator().comm_neighbor_rank(dir, dim); }
 
 int comm_dim(int dim) { return get_current_communicator().comm_dim(dim); }
 
 int comm_coord(int dim) { return get_current_communicator().comm_coord(dim); }
 
-void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data, bool user_set_comm_handle, void *user_comm)
+void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data, bool user_set_comm_handle,
+               void *user_comm)
 {
   init_communicator_stack(ndim, dims, rank_from_coords, map_data, user_set_comm_handle, user_comm);
 }
@@ -96,7 +99,7 @@ int comm_size(void) { return get_current_communicator().comm_size(); }
 // XXX:
 // Note here we are always using the **default** communicator.
 // We might need to have a better approach.
-int comm_gpuid(void) { return get_default_communicator().comm_gpuid(); }
+int comm_gpuid(void) { return Communicator::comm_gpuid(); }
 
 bool comm_deterministic_reduce() { return get_current_communicator().comm_deterministic_reduce(); }
 

@@ -1,15 +1,11 @@
-#include <qmp.h>
-#include <algorithm>
-#include <numeric>
-#include <quda_internal.h>
-#include <comm_quda.h>
+#include <communicator_quda.h>
 #include <mpi_comm_handle.h>
 
-#define QMP_CHECK(qmp_call) do {                     \
-  QMP_status_t status = qmp_call;                    \
-  if (status != QMP_SUCCESS)                         \
-    errorQuda("(QMP) %s", QMP_error_string(status)); \
-} while (0)
+#define QMP_CHECK(qmp_call)                                                                                            \
+  do {                                                                                                                 \
+    QMP_status_t status = qmp_call;                                                                                    \
+    if (status != QMP_SUCCESS) errorQuda("(QMP) %s", QMP_error_string(status));                                        \
+  } while (0)
 
 #define MPI_CHECK(mpi_call)                                                                                            \
   do {                                                                                                                 \
@@ -37,10 +33,71 @@ struct MsgHandle_s {
 #include <mpi.h>
 #endif
 
+Communicator::Communicator(int nDim, const int *commDims, QudaCommsMap rank_from_coords, void *map_data,
+                           bool user_set_comm_handle, void *user_comm)
+{
+
+  int initialized;
+  MPI_CHECK(MPI_Initialized(&initialized));
+
+  if (!initialized) { assert(false); }
+
+  if (user_set_comm_handle) {
+    QMP_COMM_HANDLE = QMP_comm_get_default();
+    MPI_COMM_HANDLE = *((MPI_Comm *)user_comm);
+  } else {
+    QMP_COMM_HANDLE = QMP_comm_get_default();
+    void *my_comm;
+    QMP_get_mpi_comm(QMP_COMM_HANDLE, &my_comm);
+    MPI_COMM_HANDLE = *((MPI_Comm *)my_comm);
+  }
+
+  comm_init(nDim, commDims, rank_from_coords, map_data);
+
+  std::srand(17 * rank + 137);
+}
+
+Communicator::Communicator(Communicator &other, const int *comm_split)
+{
+
+  constexpr int nDim = 4;
+
+  std::array<int, nDim> comm_dims_split;
+
+  std::array<int, nDim> comm_key_split;
+  std::array<int, nDim> comm_color_split;
+
+  for (int d = 0; d < nDim; d++) {
+    assert(other.comm_dim(d) % comm_split[d] == 0);
+    comm_dims_split[d] = other.comm_dim(d) / comm_split[d];
+    comm_key_split[d] = other.comm_coord(d) % comm_dims_split[d];
+    comm_color_split[d] = other.comm_coord(d) / comm_dims_split[d];
+  }
+
+  int key = index(nDim, comm_dims_split.data(), comm_key_split.data());
+  int color = index(nDim, comm_split, comm_color_split.data());
+
+  QMP_comm_split(other.QMP_COMM_HANDLE, color, key, &QMP_COMM_HANDLE);
+  void *my_comm;
+  QMP_get_mpi_comm(QMP_COMM_HANDLE, &my_comm);
+  MPI_COMM_HANDLE = *((MPI_Comm *)my_comm);
+
+  int my_rank_ = QMP_get_node_number();
+
+  QudaCommsMap func = lex_rank_from_coords_dim_t;
+  comm_init(nDim, comm_dims_split.data(), func, comm_dims_split.data());
+
+  std::srand(17 * rank + 137);
+
+  printf("Creating split communicator, base_rank = %5d, key = %5d, color = %5d, split_rank = %5d, gpuid = %d\n",
+         other.comm_rank(), key, color, my_rank_, comm_gpuid());
+}
+
 // There are more efficient ways to do the following,
 // but it doesn't really matter since this function should be
 // called just once.
-void comm_gather_hostname(char *hostname_recv_buf) {
+void Communicator::comm_gather_hostname(char *hostname_recv_buf)
+{
   // determine which GPU this rank will use
   char *hostname = comm_hostname();
 
@@ -50,23 +107,22 @@ void comm_gather_hostname(char *hostname_recv_buf) {
   // Abuse reductions to emulate all-gather.  We need to copy the
   // local hostname to all other nodes
   // this isn't very scalable though
-  for (int i=0; i<comm_size(); i++) {
+  for (int i = 0; i < comm_size(); i++) {
     int data[128];
-    for (int j=0; j<128; j++) {
+    for (int j = 0; j < 128; j++) {
       data[j] = (i == comm_rank()) ? hostname[j] : 0;
-      QMP_sum_int(data+j);
-      hostname_recv_buf[i*128 + j] = data[j];
+      QMP_comm_sum_int(QMP_COMM_HANDLE, data + j);
+      hostname_recv_buf[i * 128 + j] = data[j];
     }
   }
 #endif
-
 }
-
 
 // There are more efficient ways to do the following,
 // but it doesn't really matter since this function should be
 // called just once.
-void comm_gather_gpuid(int *gpuid_recv_buf) {
+void Communicator::comm_gather_gpuid(int *gpuid_recv_buf)
+{
 
 #ifdef USE_MPI_GATHER
   int gpuid = comm_gpuid();
@@ -74,49 +130,37 @@ void comm_gather_gpuid(int *gpuid_recv_buf) {
 #else
   // Abuse reductions to emulate all-gather.  We need to copy the
   // local gpu to all other nodes
-  for (int i=0; i<comm_size(); i++) {
+  for (int i = 0; i < comm_size(); i++) {
     int data = (i == comm_rank()) ? comm_gpuid() : 0;
-    QMP_sum_int(&data);
+    QMP_comm_sum_int(QMP_COMM_HANDLE, &data);
     gpuid_recv_buf[i] = data;
   }
 #endif
 }
 
-
-void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
+void Communicator::comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
 {
-  if ( QMP_is_initialized() != QMP_TRUE ) {
-    errorQuda("QMP has not been initialized");
-  }
+  if (QMP_is_initialized() != QMP_TRUE) { errorQuda("QMP has not been initialized"); }
 
   int grid_size = 1;
-  for (int i = 0; i < ndim; i++) {
-    grid_size *= dims[i];
-  }
-  if (grid_size != QMP_get_number_of_nodes()) {
+  for (int i = 0; i < ndim; i++) { grid_size *= dims[i]; }
+  if (grid_size != QMP_comm_get_number_of_nodes(QMP_COMM_HANDLE)) {
     errorQuda("Communication grid size declared via initCommsGridQuda() does not match"
-              " total number of QMP nodes (%d != %d)", grid_size, QMP_get_number_of_nodes());
+              " total number of QMP nodes (%d != %d)",
+              grid_size, QMP_comm_get_number_of_nodes(QMP_COMM_HANDLE));
   }
 
   comm_init_common(ndim, dims, rank_from_coords, map_data);
 }
 
-int comm_rank(void)
-{
-  return QMP_get_node_number();
-}
+int Communicator::comm_rank(void) { return QMP_comm_get_node_number(QMP_COMM_HANDLE); }
 
-
-int comm_size(void)
-{
-  return QMP_get_number_of_nodes();
-}
-
+int Communicator::comm_size(void) { return QMP_comm_get_number_of_nodes(QMP_COMM_HANDLE); }
 
 /**
  * Declare a message handle for sending to a node displaced in (x,y,z,t) according to "displacement"
  */
-MsgHandle *comm_declare_send_displaced(void *buffer, const int displacement[], size_t nbytes)
+MsgHandle *Communicator::comm_declare_send_displaced(void *buffer, const int displacement[], size_t nbytes)
 {
   Topology *topo = comm_default_topology();
 
@@ -126,7 +170,7 @@ MsgHandle *comm_declare_send_displaced(void *buffer, const int displacement[], s
   mh->mem = QMP_declare_msgmem(buffer, nbytes);
   if (mh->mem == NULL) errorQuda("Unable to allocate QMP message memory");
 
-  mh->handle = QMP_declare_send_to(mh->mem, rank, 0);
+  mh->handle = QMP_comm_declare_send_to(QMP_COMM_HANDLE, mh->mem, rank, 0);
   if (mh->handle == NULL) errorQuda("Unable to allocate QMP message handle");
 
   return mh;
@@ -135,7 +179,7 @@ MsgHandle *comm_declare_send_displaced(void *buffer, const int displacement[], s
 /**
  * Declare a message handle for receiving from a node displaced in (x,y,z,t) according to "displacement"
  */
-MsgHandle *comm_declare_receive_displaced(void *buffer, const int displacement[], size_t nbytes)
+MsgHandle *Communicator::comm_declare_receive_displaced(void *buffer, const int displacement[], size_t nbytes)
 {
   Topology *topo = comm_default_topology();
 
@@ -145,19 +189,18 @@ MsgHandle *comm_declare_receive_displaced(void *buffer, const int displacement[]
   mh->mem = QMP_declare_msgmem(buffer, nbytes);
   if (mh->mem == NULL) errorQuda("Unable to allocate QMP message memory");
 
-  mh->handle = QMP_declare_receive_from(mh->mem, rank, 0);
+  mh->handle = QMP_comm_declare_receive_from(QMP_COMM_HANDLE, mh->mem, rank, 0);
   if (mh->handle == NULL) errorQuda("Unable to allocate QMP message handle");
 
   return mh;
 }
 
-
 /**
  * Declare a message handle for strided sending to a node displaced in
  * (x,y,z,t) according to "displacement"
  */
-MsgHandle *comm_declare_strided_send_displaced(void *buffer, const int displacement[],
-					       size_t blksize, int nblocks, size_t stride)
+MsgHandle *Communicator::comm_declare_strided_send_displaced(void *buffer, const int displacement[], size_t blksize,
+                                                             int nblocks, size_t stride)
 {
   Topology *topo = comm_default_topology();
 
@@ -167,7 +210,7 @@ MsgHandle *comm_declare_strided_send_displaced(void *buffer, const int displacem
   mh->mem = QMP_declare_strided_msgmem(buffer, blksize, nblocks, stride);
   if (mh->mem == NULL) errorQuda("Unable to allocate QMP message memory");
 
-  mh->handle = QMP_declare_send_to(mh->mem, rank, 0);
+  mh->handle = QMP_comm_declare_send_to(QMP_COMM_HANDLE, mh->mem, rank, 0);
   if (mh->handle == NULL) errorQuda("Unable to allocate QMP message handle");
 
   return mh;
@@ -177,8 +220,8 @@ MsgHandle *comm_declare_strided_send_displaced(void *buffer, const int displacem
  * Declare a message handle for strided receiving from a node
  * displaced in (x,y,z,t) according to "displacement"
  */
-MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displacement[],
-						  size_t blksize, int nblocks, size_t stride)
+MsgHandle *Communicator::comm_declare_strided_receive_displaced(void *buffer, const int displacement[], size_t blksize,
+                                                                int nblocks, size_t stride)
 {
   Topology *topo = comm_default_topology();
 
@@ -188,13 +231,13 @@ MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displa
   mh->mem = QMP_declare_strided_msgmem(buffer, blksize, nblocks, stride);
   if (mh->mem == NULL) errorQuda("Unable to allocate QMP message memory");
 
-  mh->handle = QMP_declare_receive_from(mh->mem, rank, 0);
+  mh->handle = QMP_comm_declare_receive_from(QMP_COMM_HANDLE, mh->mem, rank, 0);
   if (mh->handle == NULL) errorQuda("Unable to allocate QMP message handle");
 
   return mh;
 }
 
-void comm_free(MsgHandle *&mh)
+void Communicator::comm_free(MsgHandle *&mh)
 {
   QMP_free_msghandle(mh->handle);
   QMP_free_msgmem(mh->mem);
@@ -202,34 +245,16 @@ void comm_free(MsgHandle *&mh)
   mh = nullptr;
 }
 
+void Communicator::comm_start(MsgHandle *mh) { QMP_CHECK(QMP_start(mh->handle)); }
 
-void comm_start(MsgHandle *mh)
-{
-  QMP_CHECK( QMP_start(mh->handle) );
-}
+void Communicator::comm_wait(MsgHandle *mh) { QMP_CHECK(QMP_wait(mh->handle)); }
 
+int Communicator::comm_query(MsgHandle *mh) { return (QMP_is_complete(mh->handle) == QMP_TRUE); }
 
-void comm_wait(MsgHandle *mh)
-{
-  QMP_CHECK( QMP_wait(mh->handle) );
-}
-
-
-int comm_query(MsgHandle *mh)
-{
-  return (QMP_is_complete(mh->handle) == QMP_TRUE);
-}
-
-template <typename T> T deterministic_reduce(T *array, int n)
-{
-  std::sort(array, array + n); // sort reduction into ascending order for deterministic reduction
-  return std::accumulate(array, array + n, 0.0);
-}
-
-void comm_allreduce(double* data)
+void Communicator::comm_allreduce(double *data)
 {
   if (!comm_deterministic_reduce()) {
-    QMP_CHECK(QMP_sum_double(data));
+    QMP_CHECK(QMP_comm_sum_double(QMP_COMM_HANDLE, data));
   } else {
     // we need to break out of QMP for the deterministic floating point reductions
     const size_t n = comm_size();
@@ -240,22 +265,14 @@ void comm_allreduce(double* data)
   }
 }
 
+void Communicator::comm_allreduce_max(double *data) { QMP_CHECK(QMP_comm_max_double(QMP_COMM_HANDLE, data)); }
 
-void comm_allreduce_max(double* data)
-{
-  QMP_CHECK( QMP_max_double(data) );
-}
+void Communicator::comm_allreduce_min(double *data) { QMP_CHECK(QMP_comm_min_double(QMP_COMM_HANDLE, data)); }
 
-void comm_allreduce_min(double* data)
-{
-  QMP_CHECK( QMP_min_double(data) );
-}
-
-
-void comm_allreduce_array(double* data, size_t size)
+void Communicator::comm_allreduce_array(double *data, size_t size)
 {
   if (!comm_deterministic_reduce()) {
-    QMP_CHECK(QMP_sum_double_array(data, size));
+    QMP_CHECK(QMP_comm_sum_double_array(QMP_COMM_HANDLE, data, size));
   } else {
     // we need to break out of QMP for the deterministic floating point reductions
     size_t n = comm_size();
@@ -274,36 +291,25 @@ void comm_allreduce_array(double* data, size_t size)
   }
 }
 
-void comm_allreduce_max_array(double* data, size_t size)
+void Communicator::comm_allreduce_max_array(double *data, size_t size)
 {
 
-  for (size_t i = 0; i < size; i++) { QMP_CHECK(QMP_max_double(data + i)); }
+  for (size_t i = 0; i < size; i++) { QMP_CHECK(QMP_comm_max_double(QMP_COMM_HANDLE, data + i)); }
 }
 
-void comm_allreduce_int(int* data)
-{
-  QMP_CHECK( QMP_sum_int(data) );
-}
+void Communicator::comm_allreduce_int(int *data) { QMP_CHECK(QMP_comm_sum_int(QMP_COMM_HANDLE, data)); }
 
-void comm_allreduce_xor(uint64_t *data)
+void Communicator::comm_allreduce_xor(uint64_t *data)
 {
   if (sizeof(uint64_t) != sizeof(unsigned long)) errorQuda("unsigned long is not 64-bit");
-  QMP_CHECK( QMP_xor_ulong( reinterpret_cast<unsigned long*>(data) ));
+  QMP_CHECK(QMP_comm_xor_ulong(QMP_COMM_HANDLE, reinterpret_cast<unsigned long *>(data)));
 }
 
-void comm_broadcast(void *data, size_t nbytes)
+void Communicator::comm_broadcast(void *data, size_t nbytes)
 {
-  QMP_CHECK( QMP_broadcast(data, nbytes) );
+  QMP_CHECK(QMP_comm_broadcast(QMP_COMM_HANDLE, data, nbytes));
 }
 
+void Communicator::comm_barrier(void) { QMP_CHECK(QMP_comm_barrier(QMP_COMM_HANDLE)); }
 
-void comm_barrier(void)
-{
-  QMP_CHECK( QMP_barrier() );
-}
-
-
-void comm_abort_(int status)
-{
-  QMP_abort(status);
-}
+void Communicator::comm_abort_(int status) { QMP_abort(status); }

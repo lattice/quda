@@ -10,7 +10,13 @@
 #include <algorithm>
 #include <numeric>
 
+#if defined(MPI_COMMS) || defined(QMP_COMMS)
 #include <mpi.h>
+#endif
+
+#if defined(QMP_COMMS)
+#include <qmp.h>
+#endif
 
 #ifdef QUDA_BACKWARDSCPP
 #include "backward.hpp"
@@ -339,9 +345,8 @@ inline void check_displacement(const int displacement[], int ndim)
 
 struct Communicator {
 
-  int gpuid = -1;
-
-  int comm_gpuid() { return gpuid; }
+  static int gpuid;
+  static int comm_gpuid() { return gpuid; }
 
   bool peer2peer_enabled[2][4] = {{false, false, false, false}, {false, false, false, false}};
   bool peer2peer_init = false;
@@ -694,21 +699,26 @@ struct Communicator {
     char *hostname_recv_buf = (char *)safe_malloc(128 * comm_size());
     comm_gather_hostname(hostname_recv_buf);
 
-    gpuid = 0;
-    for (int i = 0; i < comm_rank(); i++) {
-      if (!strncmp(comm_hostname(), &hostname_recv_buf[128 * i], 128)) { gpuid++; }
-    }
+    // We only want one (1) gpuid for all communicators, so gpuid is static.
+    // We initialize gpuid if it's still negative.
+    if (gpuid < 0) {
 
-    int device_count;
-    cudaGetDeviceCount(&device_count);
-    if (device_count == 0) { errorQuda("No CUDA devices found"); }
-    if (gpuid >= device_count) {
-      char *enable_mps_env = getenv("QUDA_ENABLE_MPS");
-      if (enable_mps_env && strcmp(enable_mps_env, "1") == 0) {
-        gpuid = gpuid % device_count;
-        printf("MPS enabled, rank=%d -> gpu=%d\n", comm_rank(), gpuid);
-      } else {
-        errorQuda("Too few GPUs available on %s", comm_hostname());
+      gpuid = 0;
+      for (int i = 0; i < comm_rank(); i++) {
+        if (!strncmp(comm_hostname(), &hostname_recv_buf[128 * i], 128)) { gpuid++; }
+      }
+
+      int device_count;
+      cudaGetDeviceCount(&device_count);
+      if (device_count == 0) { errorQuda("No CUDA devices found"); }
+      if (gpuid >= device_count) {
+        char *enable_mps_env = getenv("QUDA_ENABLE_MPS");
+        if (enable_mps_env && strcmp(enable_mps_env, "1") == 0) {
+          gpuid = gpuid % device_count;
+          printf("MPS enabled, rank=%d -> gpu=%d\n", comm_rank(), gpuid);
+        } else {
+          errorQuda("Too few GPUs available on %s", comm_hostname());
+        }
       }
     }
 
@@ -833,34 +843,12 @@ struct Communicator {
     comm_abort_(status);
   }
 
-#if defined(QMP_COMMS)
-
-#define QMP_CHECK(qmp_call)                                                                                            \
-  do {                                                                                                                 \
-    QMP_status_t status = qmp_call;                                                                                    \
-    if (status != QMP_SUCCESS) errorQuda("(QMP) %s", QMP_error_string(status));                                        \
-  } while (0)
-
-#endif
-
-#if defined(MPI_COMMS) || defined(QMP_COMMS)
-
-#define MPI_CHECK(mpi_call)                                                                                            \
-  do {                                                                                                                 \
-    int status = mpi_call;                                                                                             \
-    if (status != MPI_SUCCESS) {                                                                                       \
-      char err_string[128];                                                                                            \
-      int err_len;                                                                                                     \
-      MPI_Error_string(status, err_string, &err_len);                                                                  \
-      err_string[127] = '\0';                                                                                          \
-      errorQuda("(MPI) %s", err_string);                                                                               \
-    }                                                                                                                  \
-  } while (0)
-
-#endif
-
 #if defined(QMP_COMMS) || defined(MPI_COMMS)
   MPI_Comm MPI_COMM_HANDLE;
+#endif
+
+#if defined(QMP_COMMS)
+  QMP_comm_t QMP_COMM_HANDLE;
 #endif
 
   int rank = -1;
@@ -881,9 +869,9 @@ struct Communicator {
 
   void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data);
 
-  int comm_rank(void) { return rank; }
+  int comm_rank(void);
 
-  int comm_size(void) { return size; }
+  int comm_size(void);
 
   /**
    * Declare a message handle for sending to a node displaced in (x,y,z,t) according to "displacement"
@@ -942,6 +930,8 @@ struct Communicator {
 
   void comm_abort_(int status);
 };
+
+#include <array>
 
 constexpr int nDim = 4;
 using CommKey = std::array<int, nDim>;
