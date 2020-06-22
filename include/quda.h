@@ -909,7 +909,7 @@ extern "C" {
    * Print the device properties of each device on the node
    */
   void printDeviceProp();
-  
+
   /**
    * Print the members of QudaGaugeParam.
    * @param param The QudaGaugeParam whose elements we are to print.
@@ -945,8 +945,7 @@ extern "C" {
    * @param param The QudaCublasParam whose elements we are to print.
    */
   void printQudaCublasParam(QudaCublasParam *param);
-  
-  
+
   /**
    * Load the gauge field from the host.
    * @param h_gauge Base pointer to host gauge field (regardless of dimensionality)
@@ -1419,7 +1418,7 @@ extern "C" {
                                 double *timeinfo);
 
   void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *param);
-  
+
   /**
    * @brief Flush the chronological history for the given index
    * @param[in] index Index for which we are flushing

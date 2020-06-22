@@ -210,10 +210,10 @@ int main(int argc, char **argv)
 
   if (verify_results) {
     if (cublas_param.batch_count != 1) errorQuda("Testing with batched arrays not yet supported.");
-    cublasGEMMQudaVerify(arrayA, arrayB, arrayC, arrayCcopy, refA_size, refB_size, refC_size, re_im,
-			 data_size, &cublas_param);    
+    cublasGEMMQudaVerify(arrayA, arrayB, arrayC, arrayCcopy, refA_size, refB_size, refC_size, re_im, data_size,
+                         &cublas_param);
   }
-  
+
   host_free(refA);
   host_free(refB);
   host_free(refC);

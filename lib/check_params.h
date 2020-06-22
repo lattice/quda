@@ -928,7 +928,6 @@ void printQudaCublasParam(QudaCublasParam *param)
 #endif
 }
 
- 
 // clean up
 
 #undef INVALID_INT

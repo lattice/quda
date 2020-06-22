@@ -253,10 +253,12 @@ namespace
                                                          {"S", QUDA_CUBLAS_DATATYPE_S},
                                                          {"D", QUDA_CUBLAS_DATATYPE_D}};
 
-  CLI::TransformPairs<QudaCublasDataOrder> cublas_data_order_map {{"row", QUDA_CUBLAS_DATAORDER_ROW}, {"col", QUDA_CUBLAS_DATAORDER_COL}};
+  CLI::TransformPairs<QudaCublasDataOrder> cublas_data_order_map {{"row", QUDA_CUBLAS_DATAORDER_ROW},
+                                                                  {"col", QUDA_CUBLAS_DATAORDER_COL}};
 
-  CLI::TransformPairs<QudaCublasOperation> cublas_op_map {{"N", QUDA_CUBLAS_OP_N}, {"T", QUDA_CUBLAS_OP_T}, {"C", QUDA_CUBLAS_OP_C}};
-  
+  CLI::TransformPairs<QudaCublasOperation> cublas_op_map {
+    {"N", QUDA_CUBLAS_OP_N}, {"T", QUDA_CUBLAS_OP_T}, {"C", QUDA_CUBLAS_OP_C}};
+
   CLI::TransformPairs<QudaContractType> contract_type_map {{"open", QUDA_CONTRACT_TYPE_OPEN},
                                                            {"dr", QUDA_CONTRACT_TYPE_DR}};
 
@@ -432,12 +434,16 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     ->add_option("--cublas-mnk", cublas_mnk, "Set the dimensions of the A, B, and C matrices GEMM (default 128 128 128)")
     ->expected(3);
 
-  quda_app->add_option("--cublas-leading-dims", cublas_leading_dims, "Set the leading dimensions A, B, and C matrices GEMM (default 128 128 128) ")->expected(3);
+  quda_app
+    ->add_option("--cublas-leading-dims", cublas_leading_dims,
+                 "Set the leading dimensions A, B, and C matrices GEMM (default 128 128 128) ")
+    ->expected(3);
 
-  quda_app->add_option("--cublas-offsets", cublas_offsets, "Set the offsets for matrices A, B, and C (default 0 0 0)")->expected(3);
+  quda_app->add_option("--cublas-offsets", cublas_offsets, "Set the offsets for matrices A, B, and C (default 0 0 0)")
+    ->expected(3);
 
   quda_app->add_option("--cublas-batch", cublas_batch, "Set the number of batches for GEMM (default 1024)");
-  
+
   quda_app->add_flag("--dagger", dagger, "Set the dagger to 1 (default 0)");
   quda_app->add_option("--device", device, "Set the CUDA device to use (default 0, single GPU only)")
     ->check(CLI::Range(0, 16));
@@ -632,7 +638,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   auto gridsizeopt
     = quda_app
         ->add_option("--gridsize", gridsize_from_cmdline, "Set the grid size in all four dimension (default 1 1 1 1)")
-        ->expected(4);  
+        ->expected(4);
   quda_app->add_option("--xgridsize", grid_x, "Set grid size in X dimension (default 1)")->excludes(gridsizeopt);
   quda_app->add_option("--ygridsize", grid_y, "Set grid size in Y dimension (default 1)")->excludes(gridsizeopt);
   quda_app->add_option("--zgridsize", grid_z, "Set grid size in Z dimension (default 1)")->excludes(gridsizeopt);
