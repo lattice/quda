@@ -6013,7 +6013,7 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
     //
     // We must also swap around some parameters. The Row major indices,
     // A_{m, lda}, B_{k, ldb}, C_{m, ldc}
-    // becomes
+    // become
     // A^T_{lda, m}, B^T_{ldb, k}, C^T_{ldc, m}.
     // so the leading dimensions remain the same. However, we must change the actual
     // matrix dims m,n,k to reflect the change to column major.

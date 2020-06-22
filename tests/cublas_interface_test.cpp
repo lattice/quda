@@ -9,8 +9,7 @@
 #include <util_quda.h>
 #include <host_utils.h>
 #include <command_line_params.h>
-#include <dslash_reference.h>
-#include <contract_reference.h>
+#include "cublas_reference.h"
 #include "misc.h"
 
 // google test
@@ -22,105 +21,6 @@
 namespace quda
 {
   extern void setTransferGPU(bool);
-}
-
-#include <Eigen/Dense>
-using namespace Eigen;
-
-void fillEigenArrayColMaj(MatrixXcd &EigenArr, complex<double> *arr, int rows, int cols, int ld, int offset)
-{
-  int counter = offset;
-  for (int j = 0; j < cols; j++) {
-    for (int i = 0; i < rows; i++) {
-      EigenArr(i, j) = arr[counter];
-      counter++;
-    }
-    counter += (ld - rows);
-  }
-}
-
-void fillEigenArrayRowMaj(MatrixXcd &EigenArr, complex<double> *arr, int rows, int cols, int ld, int offset)
-{
-  int counter = offset;
-  for (int i = 0; i < rows; i++) {
-    for (int j = 0; j < cols; j++) {
-      EigenArr(i, j) = arr[counter];
-      counter++;
-    }
-    counter += (ld - cols);
-  }
-}
-
-void cublasGEMMQudaVerify(void *arrayA, void *arrayB, void *arrayCcopy, void *arrayC, QudaCublasParam *cublas_param)
-{
-
-  // Problem parameters
-  int m = cublas_param->m;
-  int n = cublas_param->n;
-  int k = cublas_param->k;
-  int lda = cublas_param->lda;
-  int ldb = cublas_param->ldb;
-  int ldc = cublas_param->ldc;
-  int a_offset = cublas_param->a_offset;
-  int b_offset = cublas_param->b_offset;
-  int c_offset = cublas_param->c_offset;
-  complex<double> alpha = cublas_param->alpha;
-  complex<double> beta = cublas_param->beta;
-
-  // Eigen objects to store data
-  MatrixXcd A = MatrixXd::Zero(m, k);
-  MatrixXcd B = MatrixXd::Zero(k, n);
-  MatrixXcd C_eigen = MatrixXd::Zero(m, n);
-  MatrixXcd C_gpu = MatrixXd::Zero(m, n);
-  MatrixXcd C_resid = MatrixXd::Zero(m, n);
-
-  // Pointers to data
-  complex<double> *A_ptr = (complex<double> *)(&arrayA)[0];
-  complex<double> *B_ptr = (complex<double> *)(&arrayB)[0];
-  complex<double> *C_ptr = (complex<double> *)(&arrayC)[0];
-  complex<double> *Ccopy_ptr = (complex<double> *)(&arrayCcopy)[0];
-
-  // Populate Eigen objects
-  if (cublas_param->data_order == QUDA_CUBLAS_DATAORDER_COL) {
-    fillEigenArrayColMaj(A, A_ptr, m, k, lda, a_offset);
-    fillEigenArrayColMaj(B, B_ptr, k, n, ldb, b_offset);
-    fillEigenArrayColMaj(C_eigen, Ccopy_ptr, m, n, ldc, c_offset);
-    fillEigenArrayColMaj(C_gpu, C_ptr, m, n, ldc, c_offset);
-  } else {
-    fillEigenArrayRowMaj(A, A_ptr, m, k, lda, a_offset);
-    fillEigenArrayRowMaj(B, B_ptr, k, n, ldb, b_offset);
-    fillEigenArrayRowMaj(C_eigen, Ccopy_ptr, m, n, ldc, c_offset);
-    fillEigenArrayRowMaj(C_gpu, C_ptr, m, n, ldc, c_offset);
-  }
-
-  printfQuda("Populated Eigen matrices\n");
-
-  // Apply op(A_) and op(B)
-  switch (cublas_param->trans_a) {
-  case QUDA_CUBLAS_OP_T: A.transposeInPlace(); break;
-  case QUDA_CUBLAS_OP_C: A.adjointInPlace(); break;
-  case QUDA_CUBLAS_OP_N: break;
-  default: errorQuda("Unknown cuBLAS op type %d", cublas_param->trans_a);
-  }
-
-  switch (cublas_param->trans_b) {
-  case QUDA_CUBLAS_OP_T: B.transposeInPlace(); break;
-  case QUDA_CUBLAS_OP_C: B.adjointInPlace(); break;
-  case QUDA_CUBLAS_OP_N: break;
-  default: errorQuda("Unknown cuBLAS op type %d", cublas_param->trans_b);
-  }
-
-  printfQuda("Computing Eigen matrix opertaion a * A_{%lu,%lu} * B_{%lu,%lu} + b * C_{%lu,%lu} = C_{%lu,%lu}\n",
-             A.rows(), A.cols(), B.rows(), B.cols(), C_eigen.rows(), C_eigen.cols(), C_eigen.rows(), C_eigen.cols());
-
-  // Perform GEMM using Eigen
-  C_eigen = alpha * A * B + beta * C_eigen;
-
-  // Check Eigen result against cuBLAS
-  C_resid = C_gpu - C_eigen;
-
-  printfQuda("(C_host - C_gpu) Frobenius norm = %e. Relative deviation = %e\n", C_resid.norm(),
-             C_resid.norm() / (C_resid.rows() * C_resid.cols()));
 }
 
 void display_test_info()
@@ -309,65 +209,11 @@ int main(int argc, char **argv)
   cublasGEMMQuda(arrayA, arrayB, arrayC, &cublas_param);
 
   if (verify_results) {
-
-    if (cublas_param.batch_count != 1) { errorQuda("Testing with batched arrays not yet supported."); }
-
-    // Copy data from problem sized array to reference sized array.
-    // Include A and B to ensure no data corruption occurred
-    void *checkA = pinned_malloc(refA_size * re_im * data_size);
-    void *checkB = pinned_malloc(refB_size * re_im * data_size);
-    void *checkC = pinned_malloc(refC_size * re_im * data_size);
-    void *checkCcopy = pinned_malloc(refC_size * re_im * data_size);
-
-    memset(checkA, 0, refA_size * re_im * data_size);
-    memset(checkB, 0, refB_size * re_im * data_size);
-    memset(checkC, 0, refC_size * re_im * data_size);
-    memset(checkCcopy, 0, refC_size * re_im * data_size);
-
-    switch (cublas_param.data_type) {
-    case QUDA_CUBLAS_DATATYPE_S:
-      for (uint64_t i = 0; i < 2 * refA_size; i += 2) { ((double *)checkA)[i] = ((float *)arrayA)[i / 2]; }
-      for (uint64_t i = 0; i < 2 * refB_size; i += 2) { ((double *)checkB)[i] = ((float *)arrayB)[i / 2]; }
-      for (uint64_t i = 0; i < 2 * refC_size; i += 2) {
-        ((double *)checkC)[i] = ((float *)arrayC)[i / 2];
-        ((double *)checkCcopy)[i] = ((float *)arrayCcopy)[i / 2];
-      }
-      break;
-    case QUDA_CUBLAS_DATATYPE_D:
-      for (uint64_t i = 0; i < 2 * refA_size; i += 2) { ((double *)checkA)[i] = ((double *)arrayA)[i / 2]; }
-      for (uint64_t i = 0; i < 2 * refB_size; i += 2) { ((double *)checkB)[i] = ((double *)arrayB)[i / 2]; }
-      for (uint64_t i = 0; i < 2 * refC_size; i += 2) {
-        ((double *)checkC)[i] = ((double *)arrayC)[i / 2];
-        ((double *)checkCcopy)[i] = ((double *)arrayCcopy)[i / 2];
-      }
-      break;
-    case QUDA_CUBLAS_DATATYPE_C:
-      for (uint64_t i = 0; i < 2 * refA_size; i++) { ((double *)checkA)[i] = ((float *)arrayA)[i]; }
-      for (uint64_t i = 0; i < 2 * refB_size; i++) { ((double *)checkB)[i] = ((float *)arrayB)[i]; }
-      for (uint64_t i = 0; i < 2 * refC_size; i++) {
-        ((double *)checkC)[i] = ((float *)arrayC)[i];
-        ((double *)checkCcopy)[i] = ((float *)arrayCcopy)[i];
-      }
-      break;
-    case QUDA_CUBLAS_DATATYPE_Z:
-      for (uint64_t i = 0; i < 2 * refA_size; i++) { ((double *)checkA)[i] = ((double *)arrayA)[i]; }
-      for (uint64_t i = 0; i < 2 * refB_size; i++) { ((double *)checkB)[i] = ((double *)arrayB)[i]; }
-      for (uint64_t i = 0; i < 2 * refC_size; i++) {
-        ((double *)checkC)[i] = ((double *)arrayC)[i];
-        ((double *)checkCcopy)[i] = ((double *)arrayCcopy)[i];
-      }
-      break;
-    default: errorQuda("Unrecognised data type %d\n", cublas_param.data_type);
-    }
-
-    cublasGEMMQudaVerify(checkA, checkB, checkCcopy, checkC, &cublas_param);
-
-    host_free(checkA);
-    host_free(checkB);
-    host_free(checkC);
-    host_free(checkCcopy);
+    if (cublas_param.batch_count != 1) errorQuda("Testing with batched arrays not yet supported.");
+    cublasGEMMQudaVerify(arrayA, arrayB, arrayC, arrayCcopy, refA_size, refB_size, refC_size, re_im,
+			 data_size, &cublas_param);    
   }
-
+  
   host_free(refA);
   host_free(refB);
   host_free(refC);
