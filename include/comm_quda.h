@@ -13,6 +13,8 @@ extern "C" {
 
   /* implemented in comm_common.cpp */
 
+  void set_rand_seed(unsigned long int seed);
+
   char *comm_hostname(void);
   double comm_drand(void);
   Topology *comm_create_topology(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data);
@@ -149,7 +151,8 @@ extern "C" {
   /**
      @brief Initialize the communications, implemented in comm_single.cpp, comm_qmp.cpp, and comm_mpi.cpp
   */
-  void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data);
+  void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data,
+    bool user_set_comm_handle = false, void *user_comm = nullptr);
 
   /**
      @brief Initialize the communications common to all communications abstractions

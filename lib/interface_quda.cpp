@@ -362,18 +362,19 @@ static int qmp_rank_from_coords(const int *coords, void *fdata)
 // Assumes an MPI implementation of QMP
 
 #if defined(QMP_COMMS) || defined(MPI_COMMS)
-MPI_Comm MPI_COMM_HANDLE;
-static int user_set_comm_handle = 0;
+MPI_Comm MPI_COMM_HANDLE_USER;
+static bool user_set_comm_handle = false;
 #endif
 
 void setMPICommHandleQuda(void *mycomm)
 {
 #if defined(QMP_COMMS) || defined(MPI_COMMS)
-  MPI_COMM_HANDLE = *((MPI_Comm *)mycomm);
-  user_set_comm_handle = 1;
+  MPI_COMM_HANDLE_USER = *((MPI_Comm *)mycomm);
+  user_set_comm_handle = true;
 #endif
 }
 
+/**
 #ifdef QMP_COMMS
 static void initQMPComms(void)
 {
@@ -396,6 +397,7 @@ static void initMPIComms(void)
   }
 }
 #endif
+*/
 
 static bool comms_initialized = false;
 
@@ -403,11 +405,13 @@ void initCommsGridQuda(int nDim, const int *dims, QudaCommsMap func, void *fdata
 {
   if (comms_initialized) return;
 
+/**
 #if QMP_COMMS
   initQMPComms();
 #elif defined(MPI_COMMS)
   initMPIComms();
 #endif
+*/
 
   if (nDim != 4) {
     errorQuda("Number of communication grid dimensions must be 4");
@@ -445,7 +449,13 @@ void initCommsGridQuda(int nDim, const int *dims, QudaCommsMap func, void *fdata
 #endif
 
   }
+
+#if defined(QMP_COMMS) || defined(MPI_COMMS)
+  comm_init(nDim, dims, func, fdata, user_set_comm_handle, (void *)&MPI_COMM_HANDLE_USER);
+#else
   comm_init(nDim, dims, func, fdata);
+#endif
+
   comms_initialized = true;
 }
 

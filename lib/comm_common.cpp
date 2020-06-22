@@ -42,6 +42,27 @@ char *comm_hostname(void)
   return hostname;
 }
 
+static unsigned long int rand_seed = 137;
+
+void set_rand_seed(unsigned long int seed){
+  rand_seed = seed;
+}
+
+/**
+ * We provide our own random number generator to avoid re-seeding
+ * rand(), which might also be used by the calling application.  This
+ * is a clone of rand48(), provided by stdlib.h on UNIX.
+ *
+ * @return a random double in the interval [0,1)
+ */
+double comm_drand(void)
+{
+  const double twoneg48 = 0.35527136788005009e-14;
+  const unsigned long int m = 25214903917, a = 11, mask = 281474976710655;
+  rand_seed = (m * rand_seed + a) & mask;
+  return (twoneg48 * rand_seed);
+}
+
 /**
  * Send to the "dir" direction in the "dim" dimension
  */

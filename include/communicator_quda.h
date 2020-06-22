@@ -83,37 +83,6 @@ static inline bool advance_coords(int ndim, const int *dims, int *x)
   return valid;
 }
 
-inline char *comm_hostname(void)
-{
-  static bool cached = false;
-  static char hostname[128];
-
-  if (!cached) {
-    gethostname(hostname, 128);
-    hostname[127] = '\0';
-    cached = true;
-  }
-
-  return hostname;
-}
-
-static unsigned long int rand_seed = 137;
-
-/**
- * We provide our own random number generator to avoid re-seeding
- * rand(), which might also be used by the calling application.  This
- * is a clone of rand48(), provided by stdlib.h on UNIX.
- *
- * @return a random double in the interval [0,1)
- */
-inline double comm_drand(void)
-{
-  const double twoneg48 = 0.35527136788005009e-14;
-  const unsigned long int m = 25214903917, a = 11, mask = 281474976710655;
-  rand_seed = (m * rand_seed + a) & mask;
-  return (twoneg48 * rand_seed);
-}
-
 // QudaCommsMap is declared in quda.h:
 //   typedef int (*QudaCommsMap)(const int *coords, void *fdata);
 
@@ -148,7 +117,7 @@ inline Topology *comm_create_topology(int ndim, const int *dims, QudaCommsMap ra
   for (int i = 0; i < ndim; i++) { topo->my_coords[i] = topo->coords[my_rank][i]; }
 
   // initialize the random number generator with a rank-dependent seed
-  rand_seed = 17 * my_rank + 137;
+  set_rand_seed(17 * my_rank + 137);
 
   return topo;
 }
@@ -359,27 +328,7 @@ inline MsgHandle *comm_declare_strided_receive_relative_(const char *func, const
   return comm_declare_strided_receive_displaced(buffer, disp, blksize, nblocks, stride);
 }
 
-struct MsgHandle_s {
-  /**
-     The persistant MPI communicator handle that is created with
-     MPI_Send_init / MPI_Recv_init.
-   */
-  MPI_Request request;
-
-  /**
-     To create a strided communicator, a MPI_Vector datatype has to be
-     created.  This is where it is stored.
-   */
-  MPI_Datatype datatype;
-
-  /**
-     Whether a custom datatype has been created or not.  Used to
-     determine whether we need to free the datatype or not.
-   */
-  bool custom;
-};
-
-static void check_displacement(const int displacement[], int ndim)
+inline void check_displacement(const int displacement[], int ndim)
 {
   for (int i = 0; i < ndim; i++) {
     if (abs(displacement[i]) > max_displacement) {
@@ -884,7 +833,17 @@ struct Communicator {
     comm_abort_(status);
   }
 
-#ifdef MPI_COMMS
+#if defined(QMP_COMMS)
+
+#define QMP_CHECK(qmp_call)                                                                                            \
+  do {                                                                                                                 \
+    QMP_status_t status = qmp_call;                                                                                    \
+    if (status != QMP_SUCCESS) errorQuda("(QMP) %s", QMP_error_string(status));                                        \
+  } while (0)
+
+#endif
+
+#if defined(MPI_COMMS) || defined(QMP_COMMS)
 
 #define MPI_CHECK(mpi_call)                                                                                            \
   do {                                                                                                                 \
@@ -898,114 +857,29 @@ struct Communicator {
     }                                                                                                                  \
   } while (0)
 
+#endif
+
+#if defined(QMP_COMMS) || defined(MPI_COMMS)
   MPI_Comm MPI_COMM_HANDLE;
+#endif
 
   int rank = -1;
   int size = -1;
 
   Communicator() { }
 
-  Communicator(int argc, char **argv, int *const commDims)
-  {
+  Communicator(Communicator &other, const int *comm_split);
 
-    int initialized;
-    MPI_CHECK(MPI_Initialized(&initialized));
-
-    if (!initialized) { MPI_Init(&argc, &argv); }
-
-    MPI_Comm_dup(MPI_COMM_WORLD, &MPI_COMM_HANDLE);
-
-    int nDim = 4;
-
-    QudaCommsMap func = lex_rank_from_coords_dim_t;
-    comm_init(nDim, commDims, func, commDims);
-
-    std::srand(17 * rank + 137);
-  }
-
-  Communicator(int nDim, const int *commDims, QudaCommsMap rank_from_coords, void *map_data)
-  {
-
-    int initialized;
-    MPI_CHECK(MPI_Initialized(&initialized));
-
-    if (!initialized) { assert(false); }
-
-    MPI_Comm_dup(MPI_COMM_WORLD, &MPI_COMM_HANDLE);
-
-    comm_init(nDim, commDims, rank_from_coords, map_data);
-
-    std::srand(17 * rank + 137);
-  }
-
-  Communicator(Communicator &other, const int *comm_split)
-  {
-
-    constexpr int nDim = 4;
-
-    std::array<int, nDim> comm_dims_split;
-
-    std::array<int, nDim> comm_key_split;
-    std::array<int, nDim> comm_color_split;
-
-    for (int d = 0; d < nDim; d++) {
-      assert(other.comm_dim(d) % comm_split[d] == 0);
-      comm_dims_split[d] = other.comm_dim(d) / comm_split[d];
-      comm_key_split[d] = other.comm_coord(d) % comm_dims_split[d];
-      comm_color_split[d] = other.comm_coord(d) / comm_dims_split[d];
-    }
-
-    int key = index(nDim, comm_dims_split.data(), comm_key_split.data());
-    int color = index(nDim, comm_split, comm_color_split.data());
-
-    MPI_CHECK(MPI_Comm_split(other.MPI_COMM_HANDLE, color, key, &MPI_COMM_HANDLE));
-    int my_rank_;
-    MPI_CHECK(MPI_Comm_rank(MPI_COMM_HANDLE, &my_rank_));
-
-    QudaCommsMap func = lex_rank_from_coords_dim_t;
-    comm_init(nDim, comm_dims_split.data(), func, comm_dims_split.data());
-
-    std::srand(17 * rank + 137);
-
-    printf("Creating split communicator, base_rank = %5d, key = %5d, color = %5d, split_rank = %5d, gpuid = %d\n",
-           other.comm_rank(), key, color, my_rank_, comm_gpuid());
-  }
+  Communicator(int nDim, const int *commDims, QudaCommsMap rank_from_coords, void *map_data,
+               bool user_set_comm_handle = false, void *user_comm = nullptr);
 
   ~Communicator() { comm_finalize(); }
 
-  void comm_gather_hostname(char *hostname_recv_buf)
-  {
-    // determine which GPU this rank will use
-    char *hostname = comm_hostname();
-    MPI_CHECK(MPI_Allgather(hostname, 128, MPI_CHAR, hostname_recv_buf, 128, MPI_CHAR, MPI_COMM_HANDLE));
-  }
+  void comm_gather_hostname(char *hostname_recv_buf);
 
-  void comm_gather_gpuid(int *gpuid_recv_buf)
-  {
-    int gpuid = comm_gpuid();
-    MPI_CHECK(MPI_Allgather(&gpuid, 1, MPI_INT, gpuid_recv_buf, 1, MPI_INT, MPI_COMM_HANDLE));
-  }
+  void comm_gather_gpuid(int *gpuid_recv_buf);
 
-  void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
-  {
-    int initialized;
-    MPI_CHECK(MPI_Initialized(&initialized));
-
-    if (!initialized) { errorQuda("MPI has not been initialized"); }
-
-    MPI_CHECK(MPI_Comm_rank(MPI_COMM_HANDLE, &rank));
-    MPI_CHECK(MPI_Comm_size(MPI_COMM_HANDLE, &size));
-
-    int grid_size = 1;
-    for (int i = 0; i < ndim; i++) { grid_size *= dims[i]; }
-    if (grid_size != size) {
-      errorQuda("Communication grid size declared via initCommsGridQuda() does not match"
-                " total number of MPI ranks (%d != %d)",
-                grid_size, size);
-    }
-
-    comm_init_common(ndim, dims, rank_from_coords, map_data);
-  }
+  void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data);
 
   int comm_rank(void) { return rank; }
 
@@ -1014,122 +888,32 @@ struct Communicator {
   /**
    * Declare a message handle for sending to a node displaced in (x,y,z,t) according to "displacement"
    */
-  MsgHandle *comm_declare_send_displaced(void *buffer, const int displacement[], size_t nbytes)
-  {
-    Topology *topo = comm_default_topology();
-    int ndim = comm_ndim(topo);
-    check_displacement(displacement, ndim);
-
-    int rank = comm_rank_displaced(topo, displacement);
-
-    int tag = 0;
-    for (int i = ndim - 1; i >= 0; i--) tag = tag * 4 * max_displacement + displacement[i] + max_displacement;
-    tag = tag >= 0 ? tag : 2 * pow(4 * max_displacement, ndim) + tag;
-
-    MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
-    MPI_CHECK(MPI_Send_init(buffer, nbytes, MPI_BYTE, rank, tag, MPI_COMM_HANDLE, &(mh->request)));
-    mh->custom = false;
-
-    return mh;
-  }
+  MsgHandle *comm_declare_send_displaced(void *buffer, const int displacement[], size_t nbytes);
 
   /**
    * Declare a message handle for receiving from a node displaced in (x,y,z,t) according to "displacement"
    */
-  MsgHandle *comm_declare_receive_displaced(void *buffer, const int displacement[], size_t nbytes)
-  {
-    Topology *topo = comm_default_topology();
-    int ndim = comm_ndim(topo);
-    check_displacement(displacement, ndim);
-
-    int rank = comm_rank_displaced(topo, displacement);
-
-    int tag = 0;
-    for (int i = ndim - 1; i >= 0; i--) tag = tag * 4 * max_displacement - displacement[i] + max_displacement;
-    tag = tag >= 0 ? tag : 2 * pow(4 * max_displacement, ndim) + tag;
-
-    MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
-    MPI_CHECK(MPI_Recv_init(buffer, nbytes, MPI_BYTE, rank, tag, MPI_COMM_HANDLE, &(mh->request)));
-    mh->custom = false;
-
-    return mh;
-  }
+  MsgHandle *comm_declare_receive_displaced(void *buffer, const int displacement[], size_t nbytes);
 
   /**
    * Declare a message handle for sending to a node displaced in (x,y,z,t) according to "displacement"
    */
   MsgHandle *comm_declare_strided_send_displaced(void *buffer, const int displacement[], size_t blksize, int nblocks,
-                                                 size_t stride)
-  {
-    Topology *topo = comm_default_topology();
-    int ndim = comm_ndim(topo);
-    check_displacement(displacement, ndim);
-
-    int rank = comm_rank_displaced(topo, displacement);
-
-    int tag = 0;
-    for (int i = ndim - 1; i >= 0; i--) tag = tag * 4 * max_displacement + displacement[i] + max_displacement;
-    tag = tag >= 0 ? tag : 2 * pow(4 * max_displacement, ndim) + tag;
-
-    MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
-
-    // create a new strided MPI type
-    MPI_CHECK(MPI_Type_vector(nblocks, blksize, stride, MPI_BYTE, &(mh->datatype)));
-    MPI_CHECK(MPI_Type_commit(&(mh->datatype)));
-    mh->custom = true;
-
-    MPI_CHECK(MPI_Send_init(buffer, 1, mh->datatype, rank, tag, MPI_COMM_HANDLE, &(mh->request)));
-
-    return mh;
-  }
+                                                 size_t stride);
 
   /**
    * Declare a message handle for receiving from a node displaced in (x,y,z,t) according to "displacement"
    */
   MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displacement[], size_t blksize, int nblocks,
-                                                    size_t stride)
-  {
-    Topology *topo = comm_default_topology();
-    int ndim = comm_ndim(topo);
-    check_displacement(displacement, ndim);
+                                                    size_t stride);
 
-    int rank = comm_rank_displaced(topo, displacement);
+  void comm_free(MsgHandle *&mh);
 
-    int tag = 0;
-    for (int i = ndim - 1; i >= 0; i--) tag = tag * 4 * max_displacement - displacement[i] + max_displacement;
-    tag = tag >= 0 ? tag : 2 * pow(4 * max_displacement, ndim) + tag;
+  void comm_start(MsgHandle *mh);
 
-    MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
+  void comm_wait(MsgHandle *mh);
 
-    // create a new strided MPI type
-    MPI_CHECK(MPI_Type_vector(nblocks, blksize, stride, MPI_BYTE, &(mh->datatype)));
-    MPI_CHECK(MPI_Type_commit(&(mh->datatype)));
-    mh->custom = true;
-
-    MPI_CHECK(MPI_Recv_init(buffer, 1, mh->datatype, rank, tag, MPI_COMM_HANDLE, &(mh->request)));
-
-    return mh;
-  }
-
-  void comm_free(MsgHandle *&mh)
-  {
-    MPI_CHECK(MPI_Request_free(&(mh->request)));
-    if (mh->custom) MPI_CHECK(MPI_Type_free(&(mh->datatype)));
-    host_free(mh);
-    mh = nullptr;
-  }
-
-  void comm_start(MsgHandle *mh) { MPI_CHECK(MPI_Start(&(mh->request))); }
-
-  void comm_wait(MsgHandle *mh) { MPI_CHECK(MPI_Wait(&(mh->request), MPI_STATUS_IGNORE)); }
-
-  int comm_query(MsgHandle *mh)
-  {
-    int query;
-    MPI_CHECK(MPI_Test(&(mh->request), &query, MPI_STATUS_IGNORE));
-
-    return query;
-  }
+  int comm_query(MsgHandle *mh);
 
   template <typename T> T deterministic_reduce(T *array, int n)
   {
@@ -1137,98 +921,29 @@ struct Communicator {
     return std::accumulate(array, array + n, 0.0);
   }
 
-  void comm_allreduce(double *data)
-  {
-    if (!comm_deterministic_reduce()) {
-      double recvbuf;
-      MPI_CHECK(MPI_Allreduce(data, &recvbuf, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_HANDLE));
-      *data = recvbuf;
-    } else {
-      const size_t n = comm_size();
-      double *recv_buf = (double *)safe_malloc(n * sizeof(double));
-      MPI_CHECK(MPI_Allgather(data, 1, MPI_DOUBLE, recv_buf, 1, MPI_DOUBLE, MPI_COMM_HANDLE));
-      *data = deterministic_reduce(recv_buf, n);
-      host_free(recv_buf);
-    }
-  }
+  void comm_allreduce(double *data);
 
-  void comm_allreduce_max(double *data)
-  {
-    double recvbuf;
-    MPI_CHECK(MPI_Allreduce(data, &recvbuf, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_HANDLE));
-    *data = recvbuf;
-  }
+  void comm_allreduce_max(double *data);
 
-  void comm_allreduce_min(double *data)
-  {
-    double recvbuf;
-    MPI_CHECK(MPI_Allreduce(data, &recvbuf, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_HANDLE));
-    *data = recvbuf;
-  }
+  void comm_allreduce_min(double *data);
 
-  void comm_allreduce_array(double *data, size_t size)
-  {
-    if (!comm_deterministic_reduce()) {
-      double *recvbuf = new double[size];
-      MPI_CHECK(MPI_Allreduce(data, recvbuf, size, MPI_DOUBLE, MPI_SUM, MPI_COMM_HANDLE));
-      memcpy(data, recvbuf, size * sizeof(double));
-      delete[] recvbuf;
-    } else {
-      size_t n = comm_size();
-      double *recv_buf = new double[size * n];
-      MPI_CHECK(MPI_Allgather(data, size, MPI_DOUBLE, recv_buf, size, MPI_DOUBLE, MPI_COMM_HANDLE));
+  void comm_allreduce_array(double *data, size_t size);
 
-      double *recv_trans = new double[size * n];
-      for (size_t i = 0; i < n; i++) {
-        for (size_t j = 0; j < size; j++) { recv_trans[j * n + i] = recv_buf[i * size + j]; }
-      }
+  void comm_allreduce_max_array(double *data, size_t size);
 
-      for (size_t i = 0; i < size; i++) { data[i] = deterministic_reduce(recv_trans + i * n, n); }
+  void comm_allreduce_int(int *data);
 
-      delete[] recv_buf;
-      delete[] recv_trans;
-    }
-  }
-
-  void comm_allreduce_max_array(double *data, size_t size)
-  {
-    double *recvbuf = new double[size];
-    MPI_CHECK(MPI_Allreduce(data, recvbuf, size, MPI_DOUBLE, MPI_MAX, MPI_COMM_HANDLE));
-    memcpy(data, recvbuf, size * sizeof(double));
-    delete[] recvbuf;
-  }
-
-  void comm_allreduce_int(int *data)
-  {
-    int recvbuf;
-    MPI_CHECK(MPI_Allreduce(data, &recvbuf, 1, MPI_INT, MPI_SUM, MPI_COMM_HANDLE));
-    *data = recvbuf;
-  }
-
-  void comm_allreduce_xor(uint64_t *data)
-  {
-    if (sizeof(uint64_t) != sizeof(unsigned long)) errorQuda("unsigned long is not 64-bit");
-    uint64_t recvbuf;
-    MPI_CHECK(MPI_Allreduce(data, &recvbuf, 1, MPI_UNSIGNED_LONG, MPI_BXOR, MPI_COMM_HANDLE));
-    *data = recvbuf;
-  }
+  void comm_allreduce_xor(uint64_t *data);
 
   /**  broadcast from rank 0 */
-  void comm_broadcast(void *data, size_t nbytes)
-  {
-    MPI_CHECK(MPI_Bcast(data, (int)nbytes, MPI_BYTE, 0, MPI_COMM_HANDLE));
-  }
+  void comm_broadcast(void *data, size_t nbytes);
 
-  void comm_barrier(void) { MPI_CHECK(MPI_Barrier(MPI_COMM_HANDLE)); }
+  void comm_barrier(void);
 
-  void comm_abort_(int status) { MPI_Abort(MPI_COMM_HANDLE, status); }
-
-#endif
+  void comm_abort_(int status);
 };
 
 constexpr int nDim = 4;
 using CommKey = std::array<int, nDim>;
 
-void init_communicator_stack(int argc, char **argv, int *const commDims);
-void finalize_communicator_stack();
 void push_to_current(const CommKey &split_key);

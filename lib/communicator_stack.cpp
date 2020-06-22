@@ -12,18 +12,10 @@ constexpr CommKey default_key = {1, 1, 1, 1};
 
 CommKey current_key = {-1, -1, -1, -1};
 
-void init_communicator_stack(int argc, char **argv, int *const commDims)
+void init_communicator_stack(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data, bool user_set_comm_handle, void *user_comm)
 {
   communicator_stack.emplace(std::piecewise_construct, std::forward_as_tuple(default_key),
-                             std::forward_as_tuple(argc, argv, commDims));
-
-  current_key = default_key;
-}
-
-void init_communicator_stack(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
-{
-  communicator_stack.emplace(std::piecewise_construct, std::forward_as_tuple(default_key),
-                             std::forward_as_tuple(ndim, dims, rank_from_coords, map_data));
+                             std::forward_as_tuple(ndim, dims, rank_from_coords, map_data, user_set_comm_handle, user_comm));
 
   current_key = default_key;
 }
@@ -72,34 +64,17 @@ void push_to_current(const CommKey &split_key)
   current_key = split_key;
 }
 
-#if 0
-
-  char *comm_hostname(void);
-  double comm_drand(void);
-  Topology *comm_create_topology(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data);
-  void comm_destroy_topology(Topology *topo);
-  int comm_ndim(const Topology *topo);
-  const int *comm_dims(const Topology *topo);
-  const int *comm_coords(const Topology *topo);
-  const int *comm_coords_from_rank(const Topology *topo, int rank);
-  int comm_rank_from_coords(const Topology *topo, const int *coords);
-  int comm_rank_displaced(const Topology *topo, const int displacement[]);
-  void comm_set_default_topology(Topology *topo);
-  Topology *comm_default_topology(void);
-
-  // routines related to direct peer-2-peer access
-  void comm_set_neighbor_ranks(Topology *topo);
-  int comm_neighbor_rank(int dir, int dim);
-
-#endif
+int comm_neighbor_rank(int dir, int dim){
+  return get_default_communicator().comm_neighbor_rank(dir, dim);
+}
 
 int comm_dim(int dim) { return get_current_communicator().comm_dim(dim); }
 
 int comm_coord(int dim) { return get_current_communicator().comm_coord(dim); }
 
-void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
+void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data, bool user_set_comm_handle, void *user_comm)
 {
-  init_communicator_stack(ndim, dims, rank_from_coords, map_data);
+  init_communicator_stack(ndim, dims, rank_from_coords, map_data, user_set_comm_handle, user_comm);
 }
 
 void comm_finalize() { finalize_communicator_stack(); }
