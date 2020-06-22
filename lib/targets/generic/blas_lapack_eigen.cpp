@@ -1,9 +1,10 @@
 #include <blas_lapack.h>
 #include <Eigen/LU>
 
+//#define LOCAL_DEBUG
+
 namespace quda
 {
-
   namespace generic_lapack
   {
 
@@ -30,7 +31,7 @@ namespace quda
       }
 
       // Check result:
-#if 1
+#ifdef LOCAL_DEBUG
       EigenMatrix unit = EigenMatrix::Identity(n,n);
       EigenMatrix prod = res * inv;
       Float L2norm = ((prod - unit).norm()/(n*n));

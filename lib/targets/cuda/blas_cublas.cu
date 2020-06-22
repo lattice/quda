@@ -4,10 +4,12 @@
 #include <malloc_quda.h>
 #endif
 
+//#define LOCAL_DEBUG
+
+#ifdef LOCAL_DEBUG
 #include <Eigen/LU>
 using namespace Eigen;
-
-#define LOCAL_DEBUG
+#endif
 
 namespace quda {
 
@@ -38,7 +40,7 @@ namespace quda {
 #endif
       }
     }
-
+    
     // mini kernel to set the array of pointers needed for batched cublas
     template<typename T>
     __global__ void set_pointer(T **output_array_a, T *input_a, T **output_array_b, T *input_b, int batch_offset)
@@ -47,6 +49,7 @@ namespace quda {
       output_array_b[blockIdx.x] = input_b + blockIdx.x * batch_offset;
     }
 
+#ifdef LOCAL_DEBUG    
     template <typename EigenMatrix, typename Float>
     __host__ void checkEigen(std::complex<Float> *A_h, std::complex<Float> *Ainv_h, int n, uint64_t batch)
     {
@@ -66,6 +69,7 @@ namespace quda {
       Float L2norm = ((prod - unit).norm()/(n*n));
       printfQuda("cuBLAS: Norm of (A * Ainv - I) batch %lu = %e\n", batch, L2norm);
     }    
+#endif
     
     // FIXME do this in pipelined fashion to reduce memory overhead.
     long long BatchInvertMatrix(void *Ainv, void* A, const int n, const uint64_t batch, QudaPrecision prec, QudaFieldLocation location)
