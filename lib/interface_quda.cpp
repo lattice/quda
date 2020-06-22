@@ -5801,7 +5801,6 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
     gaugePrecise = nullptr;
   } */
 
-
   GaugeFixFFTQuda.TPSTOP(QUDA_PROFILE_H2D);
 
   // perform the update
@@ -5829,7 +5828,7 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
     delete cudaInGauge;
   }
 
-  if(timeinfo){
+  if (timeinfo) {
     timeinfo[0] = GaugeFixFFTQuda.Last(QUDA_PROFILE_H2D);
     timeinfo[1] = GaugeFixFFTQuda.Last(QUDA_PROFILE_COMPUTE);
     timeinfo[2] = GaugeFixFFTQuda.Last(QUDA_PROFILE_D2H);
