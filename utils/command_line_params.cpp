@@ -225,6 +225,11 @@ auto &cublas_lda = cublas_leading_dims[0];
 auto &cublas_ldb = cublas_leading_dims[1];
 auto &cublas_ldc = cublas_leading_dims[2];
 
+std::array<int, 3> cublas_offsets = {0, 0, 0};
+auto &cublas_a_offset = cublas_offsets[0];
+auto &cublas_b_offset = cublas_offsets[1];
+auto &cublas_c_offset = cublas_offsets[2];
+
 std::array<double, 2> cublas_alpha_re_im = {1.0, 0.0};
 std::array<double, 2> cublas_beta_re_im = {1.0, 0.0};
 int cublas_batch = 1;
@@ -235,7 +240,7 @@ namespace
 
   CLI::TransformPairs<QudaCublasDataType> cublas_dt_map {{"C", QUDA_CUBLAS_DATATYPE_C}, {"Z", QUDA_CUBLAS_DATATYPE_Z}, {"S", QUDA_CUBLAS_DATATYPE_S}, {"D", QUDA_CUBLAS_DATATYPE_D}};
 
-  CLI::TransformPairs<QudaCublasDataOrder> cublas_do_map {{"row", QUDA_CUBLAS_DATAORDER_ROW}, {"col", QUDA_CUBLAS_DATAORDER_COL}};
+  CLI::TransformPairs<QudaCublasDataOrder> cublas_data_order_map {{"row", QUDA_CUBLAS_DATAORDER_ROW}, {"col", QUDA_CUBLAS_DATAORDER_COL}};
 
   CLI::TransformPairs<QudaCublasOperation> cublas_op_map {{"N", QUDA_CUBLAS_OP_N}, {"T", QUDA_CUBLAS_OP_T}, {"C", QUDA_CUBLAS_OP_C}};
   
@@ -375,7 +380,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
 
   quda_app->add_option("--cublas-data-type", cublas_data_type,"Whether to use single(S), double(D), and/or complex(C/Z) data types (default C)")->transform(CLI::QUDACheckedTransformer(cublas_dt_map));
   
-  quda_app->add_option("--cublas-data-order", cublas_data_order, "Whether data is in row major or column major order (default row)")->transform(CLI::QUDACheckedTransformer(cublas_do_map));
+  quda_app->add_option("--cublas-data-order", cublas_data_order, "Whether data is in row major or column major order (default row)")->transform(CLI::QUDACheckedTransformer(cublas_data_order_map));
   
   quda_app->add_option("--cublas-trans-a", cublas_trans_a,"Whether to leave the A GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")->transform(CLI::QUDACheckedTransformer(cublas_op_map));
   
@@ -385,9 +390,11 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
 
   quda_app->add_option("--cublas-beta", cublas_beta_re_im, "Set the complex value of beta for GEMM (default {1.0,0.0}")->expected(2);
 
-  quda_app->add_option("--cublas-mnk", cublas_mnk, "Set the dimensions of the A, B, and C matrices GEMM (default 128 128 128")->expected(3);
+  quda_app->add_option("--cublas-mnk", cublas_mnk, "Set the dimensions of the A, B, and C matrices GEMM (default 128 128 128)")->expected(3);
   
-  quda_app->add_option("--cublas-leading-dims", cublas_leading_dims, "Set the leading dimensions A, B, and C matrices GEMM (default 128 128 128 ")->expected(3);
+  quda_app->add_option("--cublas-leading-dims", cublas_leading_dims, "Set the leading dimensions A, B, and C matrices GEMM (default 128 128 128) ")->expected(3);
+
+  quda_app->add_option("--cublas-offsets", cublas_offsets, "Set the offsets for matrices A, B, and C (default 0 0 0)")->expected(3);
 
   quda_app->add_option("--cublas-batch", cublas_batch, "Set the number of batches for GEMM (default 1024)");
   

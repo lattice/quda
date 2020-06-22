@@ -702,7 +702,10 @@ extern "C" {
     uint64_t lda; /**< leading dimension of two-dimensional array used to store the matrix A.*/
     uint64_t ldb; /**< leading dimension of two-dimensional array used to store matrix B.*/
     uint64_t ldc; /**< leading dimension of two-dimensional array used to store matrix C.*/
-
+    uint64_t a_offset; /**< position of the A array from which begin read/write. */
+    uint64_t b_offset; /**< position of the B array from which begin read/write. */
+    uint64_t c_offset; /**< position of the C array from which begin read/write. */
+    
     double_complex alpha; /**< scalar used for multiplication. */
     double_complex beta; /**< scalar used for multiplication. If beta==0, C does not have to be a valid input.*/
     
@@ -889,6 +892,10 @@ extern "C" {
    */
   QudaCublasParam newQudaCublasParam(void);
 
+  /**
+   * Print the device properties of each device on the node
+   */
+  void printDeviceProp();
   
   /**
    * Print the members of QudaGaugeParam.
