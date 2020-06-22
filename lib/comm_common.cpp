@@ -20,12 +20,6 @@ struct Topology_s {
   int (*coords)[QUDA_MAX_DIM];
   int my_rank;
   int my_coords[QUDA_MAX_DIM];
-  // It might be worth adding communicators to allow for efficient reductions:
-  //   #if defined(MPI_COMMS)
-  //     MPI_Comm comm;
-  //   #elif defined(QMP_COMMS)
-  //     QMP_communicator_t comm; // currently only supported by qmp-2.4.0-alpha
-  //   #endif
 };
 
 char *comm_hostname(void)

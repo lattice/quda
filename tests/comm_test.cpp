@@ -123,7 +123,7 @@ int main(int argc, char **argv)
   initQuda(device);
 
   // Create a communicator with the split {1, 1, 1, 2} and push to the top.
-  push_to_current({1, 1, 1, 2});
+  if (gridsize_from_cmdline[3] % 2 == 0) push_to_current({1, 1, 1, 2});
 
   // finalize the QUDA library
   endQuda();
