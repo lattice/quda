@@ -1540,7 +1540,7 @@ void endQuda(void)
   freeGaugeQuda();
   freeCloverQuda();
 
-  for (int i=0; i<QUDA_MAX_CHRONO; i++) flushChronoQuda(i);
+  for (int i = 0; i < QUDA_MAX_CHRONO; i++) flushChronoQuda(i);
 
   for (auto v : solutionResident) if (v) delete v;
   solutionResident.clear();
@@ -5860,7 +5860,6 @@ void gaugeObservablesQuda(QudaGaugeObservableParam *param)
   profileGaugeObs.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-
 void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *cublas_param)
 {
   profileCuBLAS.TPSTART(QUDA_PROFILE_TOTAL);
@@ -5873,49 +5872,51 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
 
   // Extract data from the param struct for device malloc
   uint64_t arrayA_size = 0, arrayB_size = 0, arrayC_size = 0;
-  if(cublas_param->data_order == QUDA_CUBLAS_DATAORDER_COL) {
+  if (cublas_param->data_order == QUDA_CUBLAS_DATAORDER_COL) {
     // leading dimension is in terms of consecutive data
     // elements in a column, multiplied by number of rows
-    if(cublas_param->trans_a == QUDA_CUBLAS_OP_N) {
-      arrayA_size = cublas_param->lda * cublas_param->k; //A_mk
+    if (cublas_param->trans_a == QUDA_CUBLAS_OP_N) {
+      arrayA_size = cublas_param->lda * cublas_param->k; // A_mk
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%lu, %lu}\n", cublas_param->lda, cublas_param->k);
     } else {
-      arrayA_size = cublas_param->lda * cublas_param->m; //A_km
+      arrayA_size = cublas_param->lda * cublas_param->m; // A_km
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%lu, %lu}\n", cublas_param->lda, cublas_param->m);
     }
 
-    if(cublas_param->trans_b == QUDA_CUBLAS_OP_N) {
-      arrayB_size = cublas_param->ldb * cublas_param->n; //B_kn
+    if (cublas_param->trans_b == QUDA_CUBLAS_OP_N) {
+      arrayB_size = cublas_param->ldb * cublas_param->n; // B_kn
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%lu, %lu}\n", cublas_param->ldb, cublas_param->n);
     } else {
-      arrayB_size = cublas_param->ldb * cublas_param->k; //B_nk
+      arrayB_size = cublas_param->ldb * cublas_param->k; // B_nk
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%lu, %lu}\n", cublas_param->ldb, cublas_param->k);
     }
-    arrayC_size = cublas_param->ldc * cublas_param->n; //C_mn
+    arrayC_size = cublas_param->ldc * cublas_param->n; // C_mn
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array C_{%lu, %lu}\n", cublas_param->ldc, cublas_param->n);
   } else {
     // leading dimension is in terms of consecutive data
     // elements in a row, multiplied by number of columns.
-    if(cublas_param->trans_a == QUDA_CUBLAS_OP_N) {
-      arrayA_size = cublas_param->lda * cublas_param->m; //A_mk
+    if (cublas_param->trans_a == QUDA_CUBLAS_OP_N) {
+      arrayA_size = cublas_param->lda * cublas_param->m; // A_mk
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%lu, %lu}\n", cublas_param->m, cublas_param->lda);
     } else {
-      arrayA_size = cublas_param->lda * cublas_param->k; //A_km
+      arrayA_size = cublas_param->lda * cublas_param->k; // A_km
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%lu, %lu}\n", cublas_param->k, cublas_param->lda);
     }
-    if(cublas_param->trans_b == QUDA_CUBLAS_OP_N) {
-      arrayB_size = cublas_param->ldb * cublas_param->k; //B_nk
+    if (cublas_param->trans_b == QUDA_CUBLAS_OP_N) {
+      arrayB_size = cublas_param->ldb * cublas_param->k; // B_nk
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%lu, %lu}\n", cublas_param->k, cublas_param->ldb);
     } else {
-      arrayB_size = cublas_param->ldb * cublas_param->n; //B_kn
+      arrayB_size = cublas_param->ldb * cublas_param->n; // B_kn
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%lu, %lu}\n", cublas_param->n, cublas_param->ldb);
     }
-    arrayC_size = cublas_param->ldc * cublas_param->m; //C_mn
+    arrayC_size = cublas_param->ldc * cublas_param->m; // C_mn
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array C_{%lu, %lu}\n", cublas_param->m, cublas_param->ldc);
-  }    
+  }
 
-  size_t data_size = (cublas_param->data_type == QUDA_CUBLAS_DATATYPE_D ||
-		      cublas_param->data_type == QUDA_CUBLAS_DATATYPE_Z) ? sizeof(double) : sizeof(float);
+  size_t data_size
+    = (cublas_param->data_type == QUDA_CUBLAS_DATATYPE_D || cublas_param->data_type == QUDA_CUBLAS_DATATYPE_Z) ?
+    sizeof(double) :
+    sizeof(float);
   int re_im = 1;  
   if(cublas_param->data_type == QUDA_CUBLAS_DATATYPE_C || cublas_param->data_type == QUDA_CUBLAS_DATATYPE_Z) {
     re_im *= 2;    
@@ -6000,5 +6001,5 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
   profileCuBLAS.TPSTOP(QUDA_PROFILE_FREE);  
   
   profileCuBLAS.TPSTOP(QUDA_PROFILE_TOTAL);
-  saveTuneCache();  
+  saveTuneCache();
 }

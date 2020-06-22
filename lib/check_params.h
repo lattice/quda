@@ -909,7 +909,7 @@ void printQudaCublasParam(QudaCublasParam *param)
   P(trans_b, QUDA_CUBLAS_OP_INVALID);
   P(m, INVALID_INT);
   P(n, INVALID_INT);
-  P(k,INVALID_INT);
+  P(k, INVALID_INT);
   P(lda, INVALID_INT);
   P(ldb, INVALID_INT);
   P(ldc, INVALID_INT);
@@ -920,7 +920,6 @@ void printQudaCublasParam(QudaCublasParam *param)
   P(data_type, QUDA_CUBLAS_DATATYPE_INVALID);
   P(data_order, QUDA_CUBLAS_DATAORDER_INVALID);
 #endif
-
 
 #ifdef INIT_PARAM
   return ret;

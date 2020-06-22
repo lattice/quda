@@ -238,7 +238,10 @@ namespace
 {
   CLI::TransformPairs<QudaCABasis> ca_basis_map {{"power", QUDA_POWER_BASIS}, {"chebyshev", QUDA_CHEBYSHEV_BASIS}};
 
-  CLI::TransformPairs<QudaCublasDataType> cublas_dt_map {{"C", QUDA_CUBLAS_DATATYPE_C}, {"Z", QUDA_CUBLAS_DATATYPE_Z}, {"S", QUDA_CUBLAS_DATATYPE_S}, {"D", QUDA_CUBLAS_DATATYPE_D}};
+  CLI::TransformPairs<QudaCublasDataType> cublas_dt_map {{"C", QUDA_CUBLAS_DATATYPE_C},
+                                                         {"Z", QUDA_CUBLAS_DATATYPE_Z},
+                                                         {"S", QUDA_CUBLAS_DATATYPE_S},
+                                                         {"D", QUDA_CUBLAS_DATATYPE_D}};
 
   CLI::TransformPairs<QudaCublasDataOrder> cublas_data_order_map {{"row", QUDA_CUBLAS_DATAORDER_ROW}, {"col", QUDA_CUBLAS_DATAORDER_COL}};
 
@@ -374,24 +377,45 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--compute-fat-long", compute_fatlong,
                        "Compute the fat/long field or use random numbers (default false)");
 
-  quda_app->add_option("--contraction-type", contract_type,
-		       "Whether to leave spin elemental open, or use a gamma basis and contract on "
-		       "spin (default open)") ->transform(CLI::QUDACheckedTransformer(contract_type_map));
+  quda_app
+    ->add_option("--contraction-type", contract_type,
+                 "Whether to leave spin elemental open, or use a gamma basis and contract on "
+                 "spin (default open)")
+    ->transform(CLI::QUDACheckedTransformer(contract_type_map));
 
-  quda_app->add_option("--cublas-data-type", cublas_data_type,"Whether to use single(S), double(D), and/or complex(C/Z) data types (default C)")->transform(CLI::QUDACheckedTransformer(cublas_dt_map));
-  
-  quda_app->add_option("--cublas-data-order", cublas_data_order, "Whether data is in row major or column major order (default row)")->transform(CLI::QUDACheckedTransformer(cublas_data_order_map));
-  
-  quda_app->add_option("--cublas-trans-a", cublas_trans_a,"Whether to leave the A GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")->transform(CLI::QUDACheckedTransformer(cublas_op_map));
-  
-  quda_app->add_option("--cublas-trans-b", cublas_trans_b,"Whether to leave the B GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")->transform(CLI::QUDACheckedTransformer(cublas_op_map));
-  
-  quda_app->add_option("--cublas-alpha", cublas_alpha_re_im, "Set the complex value of alpha for GEMM (default {1.0,0.0}")->expected(2);
+  quda_app
+    ->add_option("--cublas-data-type", cublas_data_type,
+                 "Whether to use single(S), double(D), and/or complex(C/Z) data types (default C)")
+    ->transform(CLI::QUDACheckedTransformer(cublas_dt_map));
 
-  quda_app->add_option("--cublas-beta", cublas_beta_re_im, "Set the complex value of beta for GEMM (default {1.0,0.0}")->expected(2);
+  quda_app
+    ->add_option("--cublas-data-order", cublas_data_order,
+                 "Whether data is in row major or column major order (default row)")
+    ->transform(CLI::QUDACheckedTransformer(cublas_data_order_map));
 
-  quda_app->add_option("--cublas-mnk", cublas_mnk, "Set the dimensions of the A, B, and C matrices GEMM (default 128 128 128)")->expected(3);
-  
+  quda_app
+    ->add_option(
+      "--cublas-trans-a", cublas_trans_a,
+      "Whether to leave the A GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")
+    ->transform(CLI::QUDACheckedTransformer(cublas_op_map));
+
+  quda_app
+    ->add_option(
+      "--cublas-trans-b", cublas_trans_b,
+      "Whether to leave the B GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")
+    ->transform(CLI::QUDACheckedTransformer(cublas_op_map));
+
+  quda_app
+    ->add_option("--cublas-alpha", cublas_alpha_re_im, "Set the complex value of alpha for GEMM (default {1.0,0.0}")
+    ->expected(2);
+
+  quda_app->add_option("--cublas-beta", cublas_beta_re_im, "Set the complex value of beta for GEMM (default {1.0,0.0}")
+    ->expected(2);
+
+  quda_app
+    ->add_option("--cublas-mnk", cublas_mnk, "Set the dimensions of the A, B, and C matrices GEMM (default 128 128 128)")
+    ->expected(3);
+
   quda_app->add_option("--cublas-leading-dims", cublas_leading_dims, "Set the leading dimensions A, B, and C matrices GEMM (default 128 128 128) ")->expected(3);
 
   quda_app->add_option("--cublas-offsets", cublas_offsets, "Set the offsets for matrices A, B, and C (default 0 0 0)")->expected(3);
