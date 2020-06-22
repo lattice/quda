@@ -31,6 +31,18 @@ namespace quda
        we can just transpose the inner product for free, and a high
        NXZ unroll for multi-reductions lead to poor performance due to
        register spilling.
+       @tparam reducer Whether we using a reducer
+       @tparam fixed Whether we are using fixed point
+       @return Max power of two
+     */
+    template <bool reducer, bool fixed> constexpr int max_NXZ_power2() { return reducer ? 16 : (fixed ? 64 : 128); }
+
+    /**
+       @brief Return the maximum power of two enabled by default for
+       multi-blas.  We set a lower limit for multi-reductions, since
+       we can just transpose the inner product for free, and a high
+       NXZ unroll for multi-reductions lead to poor performance due to
+       register spilling.
        @param[in] reducer Whether we using a reducer
        @param[in] fixed Whether we are using fixed point
        @return Max power of two
@@ -135,6 +147,29 @@ namespace quda
       int coeff_size = scalar_width > 0 ? MAX_MATRIX_SIZE / (NXZ * scalar_size) : arg_size;
 
       return std::min(arg_size, coeff_size);
+    }
+
+    /**
+       @brief Helper function that we use ensure that the instantiated
+       sizes are valid, prior to launching the kernel.
+     */
+    template <int NXZ, typename store_t, typename y_store_t, typename Functor>
+    void staticCheck(const Functor &f, const std::vector<ColorSpinorField*> &x, const std::vector<ColorSpinorField*> &y)
+    {
+      using real = typename mapper<y_store_t>::type;
+      constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, Functor>();
+      constexpr int scalar_width = Functor::coeff_mul ? sizeof(typename Functor::coeff_t) / sizeof(real) : 0;
+      const int NYW_max_check = max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), f.use_z, f.use_w, scalar_width, f.reducer);
+
+      if (!is_valid_NXZ(NXZ, f.reducer, x[0]->Precision() < QUDA_SINGLE_PRECISION))
+        errorQuda("NXZ=%d is not a valid size ( MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
+      if (NYW_max != NYW_max_check) errorQuda("Compile-time %d and run-time %d limits disagree", NYW_max, NYW_max_check);
+      if (f.NYW > NYW_max) errorQuda("NYW exceeds max size (%d > %d)", f.NYW, NYW_max);
+      if (NXZ * f.NYW * scalar_width > MAX_MATRIX_SIZE)
+        errorQuda("Coefficient matrix exceeds max size (%d > %d)", NXZ * f.NYW * scalar_width, MAX_MATRIX_SIZE);
+      if (f.reducer && NXZ * f.NYW > QUDA_MAX_MULTI_REDUCE)
+        errorQuda("NXZ * NYW = %d exceeds maximum number of reductions %d * %d > %d",
+                  NXZ * f.NYW, NXZ, f.NYW, QUDA_MAX_MULTI_REDUCE);
     }
 
     template <int NXZ, typename store_t, int N, bool> struct SpinorXZ {

@@ -20,7 +20,7 @@ namespace quda {
     static qudaStream_t *blasStream;
 
     template <template <typename real> class Functor, typename store_t, typename y_store_t,
-              int nSpin, typename coeff_t, int dummy>
+              int nSpin, typename coeff_t>
     class Blas : public Tunable
     {
       using real = typename mapper<y_store_t>::type;

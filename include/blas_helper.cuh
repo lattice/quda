@@ -332,20 +332,20 @@ namespace quda
     template <> constexpr int n_vector<char, false, 1, true>() { return 6; }
 
     template <template <typename...> class Functor,
-              template <template <typename...> class, typename store_t, typename y_store_t, int, typename, int> class Blas,
-              typename T, typename store_t, typename y_store_t, int NXZ = 1, typename V, typename... Args>
+              template <template <typename...> class, typename store_t, typename y_store_t, int, typename> class Blas,
+              typename T, typename store_t, typename y_store_t, typename V, typename... Args>
     constexpr void instantiate(const T &a, const T &b, const T &c, V &x, Args &&... args)
     {
       if (x.Nspin() == 4 || x.Nspin() == 2) {
 #if defined(NSPIN4) || defined(NSPIN2)
         // Nspin-2 takes Nspin-4 path here, and we check for this later
-        Blas<Functor, store_t, y_store_t, 4, T, NXZ>(a, b, c, x, args...);
+        Blas<Functor, store_t, y_store_t, 4, T>(a, b, c, x, args...);
 #else
         errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
       } else {
 #if defined(NSPIN1)
-        Blas<Functor, store_t, y_store_t, 1, T, NXZ>(a, b, c, x, args...);
+        Blas<Functor, store_t, y_store_t, 1, T>(a, b, c, x, args...);
 #else
         errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
@@ -356,17 +356,17 @@ namespace quda
     // and spin for the blas and reduce kernels
 
     template <template <typename...> class Functor,
-              template <template <typename...> class, typename store_t, typename y_store_t, int, typename, int> class Blas,
-              bool mixed, typename T, typename store_t, int NXZ = 1, typename V, typename... Args>
+              template <template <typename...> class, typename store_t, typename y_store_t, int, typename> class Blas,
+              bool mixed, typename T, typename store_t, typename V, typename... Args>
     constexpr typename std::enable_if<!mixed, void>::type instantiate(const T &a, const T &b, const T &c, V &x,
                                                                       Args &&... args)
     {
-      return instantiate<Functor, Blas, T, store_t, store_t, NXZ>(a, b, c, x, args...);
+      return instantiate<Functor, Blas, T, store_t, store_t>(a, b, c, x, args...);
     }
 
     template <template <typename...> class Functor,
-              template <template <typename...> class, typename store_t, typename y_store_t, int, typename, int> class Blas,
-              bool mixed, typename T, typename x_store_t, int NXZ = 1, typename V, typename... Args>
+              template <template <typename...> class, typename store_t, typename y_store_t, int, typename> class Blas,
+              bool mixed, typename T, typename x_store_t, typename V, typename... Args>
     constexpr typename std::enable_if<mixed, void>::type instantiate(const T &a, const T &b, const T &c, V &x, V &y,
                                                                      Args &&... args)
     {
@@ -382,26 +382,26 @@ namespace quda
         // always instantiate the double-precision template to allow CPU
         // fields through, and prevent double-precision GPU
         // instantiation using gpu_mapper
-        instantiate<Functor, Blas, T, x_store_t, double, NXZ>(a, b, c, x, y, args...);
+        instantiate<Functor, Blas, T, x_store_t, double>(a, b, c, x, y, args...);
 
       } else if (y.Precision() == QUDA_SINGLE_PRECISION) {
 #if QUDA_PRECISION & 4
-        instantiate<Functor, Blas, T, x_store_t, typename PromoteTypeId<x_store_t, float>::type, NXZ>(a, b, c, x, y,
-                                                                                                      args...);
+        instantiate<Functor, Blas, T, x_store_t, typename PromoteTypeId<x_store_t, float>::type>(a, b, c, x, y,
+                                                                                                 args...);
 #else
         errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
 #endif
       } else if (y.Precision() == QUDA_HALF_PRECISION) {
 #if QUDA_PRECISION & 2
-        instantiate<Functor, Blas, T, x_store_t, typename PromoteTypeId<x_store_t, short>::type, NXZ>(a, b, c, x, y,
-                                                                                                      args...);
+        instantiate<Functor, Blas, T, x_store_t, typename PromoteTypeId<x_store_t, short>::type>(a, b, c, x, y,
+                                                                                                 args...);
 #else
         errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
 #endif
       } else if (y.Precision() == QUDA_QUARTER_PRECISION) {
 #if QUDA_PRECISION & 1
-        instantiate<Functor, Blas, T, x_store_t, typename PromoteTypeId<x_store_t, char>::type, NXZ>(a, b, c, x, y,
-                                                                                                     args...);
+        instantiate<Functor, Blas, T, x_store_t, typename PromoteTypeId<x_store_t, char>::type>(a, b, c, x, y,
+                                                                                                args...);
 #else
         errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
 #endif
@@ -411,8 +411,8 @@ namespace quda
     }
 
     template <template <typename...> class Functor,
-              template <template <typename...> class, typename store_t, typename y_store_t, int, typename, int> class Blas,
-              bool mixed, int NXZ = 1, typename T, typename V, typename... Args>
+              template <template <typename...> class, typename store_t, typename y_store_t, int, typename> class Blas,
+              bool mixed, typename T, typename V, typename... Args>
     constexpr void instantiate(const T &a, const T &b, const T &c, V &x, Args &&... args)
     {
       if (x.Precision() == QUDA_DOUBLE_PRECISION) {
@@ -423,22 +423,22 @@ namespace quda
         // always instantiate the double-precision template to allow CPU
         // fields through, and prevent double-precision GPU
         // instantiation using double_mapper
-        instantiate<Functor, Blas, mixed, T, double, NXZ>(a, b, c, x, args...);
+        instantiate<Functor, Blas, mixed, T, double>(a, b, c, x, args...);
       } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
 #if QUDA_PRECISION & 4
-        instantiate<Functor, Blas, mixed, T, float, NXZ>(a, b, c, x, args...);
+        instantiate<Functor, Blas, mixed, T, float>(a, b, c, x, args...);
 #else
         errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
 #endif
       } else if (x.Precision() == QUDA_HALF_PRECISION) {
 #if QUDA_PRECISION & 2
-        instantiate<Functor, Blas, mixed, T, short, NXZ>(a, b, c, x, args...);
+        instantiate<Functor, Blas, mixed, T, short>(a, b, c, x, args...);
 #else
         errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
 #endif
       } else if (x.Precision() == QUDA_QUARTER_PRECISION) {
 #if QUDA_PRECISION & 1
-        instantiate<Functor, Blas, mixed, T, char, NXZ>(a, b, c, x, args...);
+        instantiate<Functor, Blas, mixed, T, char>(a, b, c, x, args...);
 #else
         errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
 #endif

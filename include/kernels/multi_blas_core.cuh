@@ -138,7 +138,7 @@ namespace quda
     struct MultiBlasFunctor {
       using coeff_t = coeff_t_;
       static constexpr bool reducer = false;
-      static constexpr bool coeff_mul  = true;
+      static constexpr bool coeff_mul = true;
 
       const int NXZ;
       const int NYW;
@@ -180,6 +180,7 @@ namespace quda
       static constexpr write<0, 1> write{ };
       static constexpr bool use_z = false;
       static constexpr bool use_w = false;
+      static constexpr int NXZ_max = 0;
       using MultiBlasFunctor<real>::NXZ;
       using MultiBlasFunctor<real>::NYW;
       using MultiBlasFunctor<real>::a;
@@ -203,6 +204,7 @@ namespace quda
       static constexpr write<0, 1> write{ };
       static constexpr bool use_z = false;
       static constexpr bool use_w = false;
+      static constexpr int NXZ_max = 0;
       using MultiBlasFunctor<complex<real>>::NXZ;
       using MultiBlasFunctor<complex<real>>::NYW;
       using MultiBlasFunctor<complex<real>>::a;
@@ -226,6 +228,7 @@ namespace quda
       static constexpr write<0, 0, 0, 1> write{ };
       static constexpr bool use_z = false;
       static constexpr bool use_w = true;
+      static constexpr int NXZ_max = 0;
       using MultiBlasFunctor<complex<real>>::NXZ;
       using MultiBlasFunctor<complex<real>>::NYW;
       using MultiBlasFunctor<complex<real>>::a;
@@ -252,6 +255,7 @@ namespace quda
       static constexpr write<0, 1, 0, 1> write{ };
       static constexpr bool use_z = false;
       static constexpr bool use_w = true;
+      static constexpr int NXZ_max = 1; // we never have NXZ > 1 for this kernel
       using MultiBlasFunctor<real>::NXZ;
       using MultiBlasFunctor<real>::NYW;
       using MultiBlasFunctor<real>::a;
@@ -280,6 +284,7 @@ namespace quda
       static constexpr write<0, 1, 0, 1> write{ };
       static constexpr bool use_z = false;
       static constexpr bool use_w = true;
+      static constexpr int NXZ_max = 0;
       using MultiBlasFunctor<complex<real>>::NXZ;
       using MultiBlasFunctor<complex<real>>::NYW;
       using MultiBlasFunctor<complex<real>>::a;

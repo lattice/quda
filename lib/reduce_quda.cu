@@ -175,7 +175,7 @@ namespace quda {
     }
 
     template <template <typename ReducerType, typename real> class Reducer,
-              typename store_t, typename y_store_t, int nSpin, typename coeff_t, int dummy>
+              typename store_t, typename y_store_t, int nSpin, typename coeff_t>
     class Reduce : public Tunable
     {
       using real = typename mapper<y_store_t>::type;
@@ -268,7 +268,7 @@ namespace quda {
           const int length = x.Length() / (nParity * M);
 
           ReductionArg<device_store_t, N, device_y_store_t, Ny, decltype(r_)> arg(x, y, z, w, v, r_, length, nParity);
-          //result = reduceLaunch<host_reduce_t, device_real_t, M>(arg, tp, stream, *this);
+          result = reduceLaunch<host_reduce_t, device_real_t, M>(arg, tp, stream, *this);
         } else {
           if (checkOrder(x, y, z, w, v) != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
             warningQuda("CPU Blas functions expect AoS field order");

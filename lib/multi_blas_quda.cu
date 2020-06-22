@@ -15,12 +15,11 @@ namespace quda {
 
     qudaStream_t* getStream();
 
-    template <template <typename ...> class Functor, typename store_t, typename y_store_t,
-              int nSpin, typename T, int NXZ_ = 1>
+    template <template <typename ...> class Functor, typename store_t, typename y_store_t, int nSpin, typename T>
     class MultiBlas : public TunableVectorY
     {
       using real = typename mapper<y_store_t>::type;
-      static constexpr int NXZ = isFixed<store_t>::value && NXZ_ == 128 ? 64 : NXZ_;
+      const int NXZ;
       const int NYW;
       Functor<real> f;
       int max_warp_split;
@@ -40,6 +39,7 @@ namespace quda {
                 std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
                 std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w) :
         TunableVectorY(y.size()),
+        NXZ(x.size()),
         NYW(y.size()),
         f(NXZ, NYW),
         warp_split(1),
@@ -59,18 +59,6 @@ namespace quda {
         auto x_order = checkOrder(*x[0], *z[0]);
         auto y_order = checkOrder(*y[0], *w[0]);
         if (x_prec == y_prec && x_order != y_order) errorQuda("Orders %d %d do not match", x_order, y_order);
-
-        // check sizes are valid
-        constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, decltype(f)>();
-        constexpr int scalar_width = sizeof(typename decltype(f)::coeff_t) / sizeof(real);
-        const int NYW_max_check = max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), f.use_z, f.use_w, scalar_width, false);
-
-        if (!is_valid_NXZ(NXZ, false, x[0]->Precision() < QUDA_SINGLE_PRECISION))
-          errorQuda("NXZ=%d is not a valid size ( MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
-        if (NYW_max != NYW_max_check) errorQuda("Compile-time %d and run-time %d limits disagree", NYW_max, NYW_max_check);
-        if (NYW > NYW_max) errorQuda("NYW exceeds max size (%d > %d)", NYW, NYW_max);
-        if (NXZ * NYW * scalar_width > MAX_MATRIX_SIZE)
-          errorQuda("Coefficient matrix exceeds max size (%d > %d)", NXZ * NYW * scalar_width, MAX_MATRIX_SIZE);
 
         // heuristic for enabling if we need the warp-splitting optimization
         const int gpu_size = 2 * deviceProp.maxThreadsPerBlock * deviceProp.multiProcessorCount;
@@ -106,7 +94,7 @@ namespace quda {
       TuneKey tuneKey() const
       {
         char name[TuneKey::name_n];
-        strcpy(name, num_to_string<NXZ>::value);
+        strcpy(name, std::to_string(NXZ).c_str());
         strcat(name, std::to_string(NYW).c_str());
         strcat(name, typeid(f).name());
         return TuneKey(x[0]->VolString(), name, aux);
@@ -125,8 +113,10 @@ namespace quda {
         //cuMemcpyHtoDAsync(d, tmp, NXZ * NYW * sizeof(decltype(tmp[0])), stream);
       }
 
-      void apply(const qudaStream_t &stream)
+      template <int NXZ> void compute(const qudaStream_t &stream)
       {
+        staticCheck<NXZ, store_t, y_store_t, decltype(f)>(f, x, y);
+
         constexpr bool site_unroll = !std::is_same<store_t, y_store_t>::value || isFixed<store_t>::value;
         if (site_unroll && (x[0]->Ncolor() != 3 || x[0]->Nspin() == 2))
           errorQuda("site unroll not supported for nSpin = %d nColor = %d", x[0]->Nspin(), x[0]->Ncolor());
@@ -181,6 +171,44 @@ namespace quda {
           errorQuda("Only implemented for GPU fields");
         }
       }
+
+      template <int n> typename std::enable_if<n!=1, void>::type instantiateLinear(const qudaStream_t &stream)
+      {
+        if (NXZ == n) compute<n>(stream);
+        else instantiateLinear<n-1>(stream);
+      }
+
+      template <int n> typename std::enable_if<n==1, void>::type instantiateLinear(const qudaStream_t &stream)
+      {
+        compute<1>(stream);
+      }
+
+      template <int n> typename std::enable_if<n!=1, void>::type instantiatePow2(const qudaStream_t &stream)
+      {
+        if (NXZ == n) compute<n>(stream);
+        else instantiatePow2<n/2>(stream);
+      }
+
+      template <int n> typename std::enable_if<n==1, void>::type instantiatePow2(const qudaStream_t &stream)
+      {
+        compute<1>(stream);
+      }
+
+      // instantiate the loop unrolling template
+      template <int NXZ_max> typename std::enable_if<NXZ_max!=1, void>::type instantiate(const qudaStream_t &stream)
+      {
+        constexpr int pow2_max = max_NXZ_power2<false, isFixed<store_t>::value>();
+        if (NXZ <= pow2_max && NXZ % 2 == 0) instantiatePow2<pow2_max>(stream);
+        else if (NXZ <= MAX_MULTI_BLAS_N) instantiateLinear<MAX_MULTI_BLAS_N>(stream);
+        else errorQuda("x.size %lu greater than MAX_MULTI_BLAS_N %d", x.size(), MAX_MULTI_BLAS_N);
+      }
+
+      template <int NXZ_max> typename std::enable_if<NXZ_max==1, void>::type instantiate(const qudaStream_t &stream)
+      {
+        compute<1>(stream);
+      }
+
+      void apply(const qudaStream_t &stream) { instantiate<decltype(f)::NXZ_max>(stream); }
 
       void preTune()
       {
@@ -246,57 +274,17 @@ namespace quda {
       int tuningIter() const { return 3; }
     };
 
+    /*
     template <template <typename ...> class Functor, typename store_t, typename y_store_t,
               int nSpin, typename T, int NXZ_>
     constexpr int MultiBlas<Functor, store_t, y_store_t, nSpin, T, NXZ_>::NXZ;
-
-    template <int NXZ, template <typename ...> class Functor, typename T>
+    */
+    template <template <typename ...> class Functor, typename T>
     void multiBlas(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
                    CompositeColorSpinorField &x, CompositeColorSpinorField &y,
                    CompositeColorSpinorField &z, CompositeColorSpinorField &w)
     {
-      instantiate<Functor, MultiBlas, true, NXZ>(a, b, c, *x[0], *y[0], x, y, z, w);
-    }
-
-    template <template <typename ...> class Functor, int n, typename T>
-      typename std::enable_if<n!=1, void>::type
-      multiBlas(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
-                CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
-                CompositeColorSpinorField &w)
-    {
-      if (x.size() == n) multiBlas<n, Functor>(a, b, c, x, y, z, w);
-      else multiBlas<Functor, n-1>(a, b, c, x, y, z, w);
-    }
-
-    template <template <typename ...> class Functor, int n, typename T>
-      typename std::enable_if<n==1, void>::type
-      multiBlas(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
-                CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
-                CompositeColorSpinorField &w)
-    {
-      multiBlas<n, Functor>(a, b, c, x, y, z, w);
-    }
-
-    template <template <typename ...> class Functor, typename T>
-    void multiBlas(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
-                   CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
-                   CompositeColorSpinorField &w)
-    {
-      // instantiate the loop unrolling template
-      switch (x.size()) {
-      // by default all powers of two <= 128 are instantiated
-      case 1: multiBlas<1, Functor>(a, b, c, x, y, z, w); break;
-      case 2: multiBlas<2, Functor>(a, b, c, x, y, z, w); break;
-      case 4: multiBlas<4, Functor>(a, b, c, x, y, z, w); break;
-      case 8: multiBlas<8, Functor>(a, b, c, x, y, z, w); break;
-      case 16: multiBlas<16, Functor>(a, b, c, x, y, z, w); break;
-      case 32: multiBlas<32, Functor>(a, b, c, x, y, z, w); break;
-      case 64: multiBlas<64, Functor>(a, b, c, x, y, z, w); break;
-      case 128: multiBlas<128, Functor>(a, b, c, x, y, z, w); break;
-      default:
-        if (x.size() <= MAX_MULTI_BLAS_N) multiBlas<Functor, MAX_MULTI_BLAS_N>(a, b, c, x, y, z, w);
-        else errorQuda("x.size %lu greater than MAX_MULTI_BLAS_N %d", x.size(), MAX_MULTI_BLAS_N);
-      }
+      instantiate<Functor, MultiBlas, true>(a, b, c, *x[0], *y[0], x, y, z, w);
     }
 
     using range = std::pair<size_t,size_t>;
@@ -515,7 +503,7 @@ namespace quda {
 	x.push_back(&z_);
 
         coeff_array<double> a(a_), b(b_), c(c_);
-        multiBlas<1, multi_axpyBzpcx_>(a, b, c, x, y, x, w);
+        multiBlas<multi_axpyBzpcx_>(a, b, c, x, y, x, w);
       } else {
         // split the problem in half and recurse
 	const double *a0 = &a_[0];
