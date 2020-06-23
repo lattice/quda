@@ -486,6 +486,16 @@ namespace quda {
       }else{
         errorQuda("Unsupported Precision %d", src.Precision());
       }
+    } else if (dst.Precision() == QUDA_QUARTER_PRECISION){
+      if(src.Precision() == QUDA_DOUBLE_PRECISION){
+        CopyExtendedColorSpinor(dst, src, parity, location, static_cast<char*>(Dst), static_cast<double*>(Src), static_cast<float*>(dstNorm), 0);
+      }else if(src.Precision() == QUDA_SINGLE_PRECISION){
+        CopyExtendedColorSpinor(dst, src, parity, location, static_cast<char*>(Dst), static_cast<float*>(Src), static_cast<float*>(dstNorm), 0);
+      }else if(src.Precision() == QUDA_HALF_PRECISION){
+        CopyExtendedColorSpinor(dst, src, parity, location, static_cast<char*>(Dst), static_cast<short*>(Src), static_cast<float*>(dstNorm), static_cast<float*>(srcNorm));
+      }else{
+        errorQuda("Unsupported Precision %d", src.Precision());
+      }
     }else{
       errorQuda("Unsupported Precision %d", dst.Precision());
     }

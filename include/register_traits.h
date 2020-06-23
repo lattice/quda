@@ -18,17 +18,27 @@ namespace quda {
   /*
     Here we use traits to define the greater type used for mixing types of computation involving these types
   */
-  template<class T, class U> struct PromoteTypeId { typedef T Type; };
-  template<> struct PromoteTypeId<complex<float>, float> { typedef complex<float> Type; };
-  template<> struct PromoteTypeId<float, complex<float> > { typedef complex<float> Type; };
-  template<> struct PromoteTypeId<complex<double>, double> { typedef complex<double> Type; };
-  template<> struct PromoteTypeId<double, complex<double> > { typedef complex<double> Type; };
-  template<> struct PromoteTypeId<double,int> { typedef double Type; };
-  template<> struct PromoteTypeId<int,double> { typedef double Type; };
-  template<> struct PromoteTypeId<float,int> { typedef float Type; };
-  template<> struct PromoteTypeId<int,float> { typedef float Type; };
-  template<> struct PromoteTypeId<double,float> { typedef double Type; };
-  template<> struct PromoteTypeId<float,double> { typedef double Type; };
+  template<class T, class U> struct PromoteTypeId { typedef T type; };
+  template<> struct PromoteTypeId<complex<float>, float> { typedef complex<float> type; };
+  template<> struct PromoteTypeId<float, complex<float> > { typedef complex<float> type; };
+  template<> struct PromoteTypeId<complex<double>, double> { typedef complex<double> type; };
+  template<> struct PromoteTypeId<double, complex<double> > { typedef complex<double> type; };
+  template<> struct PromoteTypeId<double,int> { typedef double type; };
+  template<> struct PromoteTypeId<int,double> { typedef double type; };
+  template<> struct PromoteTypeId<float,int> { typedef float type; };
+  template<> struct PromoteTypeId<int,float> { typedef float type; };
+  template<> struct PromoteTypeId<double,float> { typedef double type; };
+  template<> struct PromoteTypeId<float,double> { typedef double type; };
+  template<> struct PromoteTypeId<double,short> { typedef double type; };
+  template<> struct PromoteTypeId<short,double> { typedef double type; };
+  template<> struct PromoteTypeId<double,char> { typedef double type; };
+  template<> struct PromoteTypeId<char,double> { typedef double type; };
+  template<> struct PromoteTypeId<float,short> { typedef float type; };
+  template<> struct PromoteTypeId<short,float> { typedef float type; };
+  template<> struct PromoteTypeId<float,char> { typedef float type; };
+  template<> struct PromoteTypeId<char,float> { typedef float type; };
+  template<> struct PromoteTypeId<short,char> { typedef short type; };
+  template<> struct PromoteTypeId<char,short> { typedef short type; };
 
   /*
     Here we use traits to define the mapping between storage type and
@@ -109,26 +119,36 @@ namespace quda {
     static const int value = 8;
   };
   template<> struct vec_length<double4> { static const int value = 4; };
+  template<> struct vec_length<double3> { static const int value = 3; };
   template<> struct vec_length<double2> { static const int value = 2; };
   template<> struct vec_length<double> { static const int value = 1; };
   template <> struct vec_length<float8> {
     static const int value = 8;
   };
   template<> struct vec_length<float4> { static const int value = 4; };
+  template<> struct vec_length<float3> { static const int value = 3; };
   template<> struct vec_length<float2> { static const int value = 2; };
   template<> struct vec_length<float> { static const int value = 1; };
   template <> struct vec_length<short8> {
     static const int value = 8;
   };
   template<> struct vec_length<short4> { static const int value = 4; };
+  template<> struct vec_length<short3> { static const int value = 3; };
   template<> struct vec_length<short2> { static const int value = 2; };
   template<> struct vec_length<short> { static const int value = 1; };
   template <> struct vec_length<char8> {
     static const int value = 8;
   };
   template<> struct vec_length<char4> { static const int value = 4; };
+  template<> struct vec_length<char3> { static const int value = 3; };
   template<> struct vec_length<char2> { static const int value = 2; };
   template<> struct vec_length<char> { static const int value = 1; };
+
+  template<> struct vec_length<Complex> { static const int value = 2; };
+  template<> struct vec_length<complex<double> > { static const int value = 2; };
+  template<> struct vec_length<complex<float> > { static const int value = 2; };
+  template<> struct vec_length<complex<short> > { static const int value = 2; };
+  template<> struct vec_length<complex<char> > { static const int value = 2; };
 
   template<typename, int N> struct vector { };
 
@@ -154,34 +174,29 @@ namespace quda {
   };
 
   template<typename> struct scalar { };
-  template <> struct scalar<double8> {
-    typedef double type;
-  };
-  template<> struct scalar<double4> { typedef double type; };
-  template<> struct scalar<double3> { typedef double type; };
-  template<> struct scalar<double2> { typedef double type; };
-  template<> struct scalar<double> { typedef double type; };
-  template <> struct scalar<float8> {
-    typedef float type;
-  };
-  template<> struct scalar<float4> { typedef float type; };
-  template<> struct scalar<float3> { typedef float type; };
-  template<> struct scalar<float2> { typedef float type; };
-  template<> struct scalar<float> { typedef float type; };
-  template <> struct scalar<short8> {
-    typedef short type;
-  };
-  template<> struct scalar<short4> { typedef short type; };
-  template<> struct scalar<short3> { typedef short type; };
-  template<> struct scalar<short2> { typedef short type; };
-  template<> struct scalar<short> { typedef short type; };
-  template <> struct scalar<char8> {
-    typedef char type;
-  };
-  template<> struct scalar<char4> { typedef char type; };
-  template<> struct scalar<char3> { typedef char type; };
-  template<> struct scalar<char2> { typedef char type; };
-  template<> struct scalar<char> { typedef char type; };
+  template <> struct scalar<double8> { typedef double type; };
+  template <> struct scalar<double4> { typedef double type; };
+  template <> struct scalar<double3> { typedef double type; };
+  template <> struct scalar<double2> { typedef double type; };
+  template <> struct scalar<double> { typedef double type; };
+  template <> struct scalar<float8> { typedef float type; };
+  template <> struct scalar<float4> { typedef float type; };
+  template <> struct scalar<float3> { typedef float type; };
+  template <> struct scalar<float2> { typedef float type; };
+  template <> struct scalar<float> { typedef float type; };
+  template <> struct scalar<short8> { typedef short type; };
+  template <> struct scalar<short4> { typedef short type; };
+  template <> struct scalar<short3> { typedef short type; };
+  template <> struct scalar<short2> { typedef short type; };
+  template <> struct scalar<short> { typedef short type; };
+  template <> struct scalar<char8> { typedef char type; };
+  template <> struct scalar<char4> { typedef char type; };
+  template <> struct scalar<char3> { typedef char type; };
+  template <> struct scalar<char2> { typedef char type; };
+  template <> struct scalar<char> { typedef char type; };
+
+  template <> struct scalar<complex<double>> { typedef double type; };
+  template <> struct scalar<complex<float>> { typedef float type; };
 
   /* Traits used to determine if a variable is half precision or not */
   template< typename T > struct isHalf{ static const bool value = false; };
@@ -299,6 +314,7 @@ namespace quda {
   // double precision
   template <> struct VectorType<double, 1>{typedef double type; };
   template <> struct VectorType<double, 2>{typedef double2 type; };
+  template <> struct VectorType<double, 3>{typedef double3 type; };
   template <> struct VectorType<double, 4>{typedef double4 type; };
   template <> struct VectorType<double, 8> {
     typedef double8 type;
@@ -307,6 +323,7 @@ namespace quda {
   // single precision
   template <> struct VectorType<float, 1>{typedef float type; };
   template <> struct VectorType<float, 2>{typedef float2 type; };
+  template <> struct VectorType<float, 3>{typedef float3 type; };
   template <> struct VectorType<float, 4>{typedef float4 type; };
   template <> struct VectorType<float, 8> {
     typedef float8 type;
@@ -315,6 +332,7 @@ namespace quda {
   // half precision
   template <> struct VectorType<short, 1>{typedef short type; };
   template <> struct VectorType<short, 2>{typedef short2 type; };
+  template <> struct VectorType<short, 3>{typedef short3 type; };
   template <> struct VectorType<short, 4>{typedef short4 type; };
   template <> struct VectorType<short, 8> {
     typedef short8 type;
@@ -323,6 +341,7 @@ namespace quda {
   // quarter precision
   template <> struct VectorType<char, 1>{typedef char type; };
   template <> struct VectorType<char, 2>{typedef char2 type; };
+  template <> struct VectorType<char, 3>{typedef char3 type; };
   template <> struct VectorType<char, 4>{typedef char4 type; };
   template <> struct VectorType<char, 8> {
     typedef char8 type;

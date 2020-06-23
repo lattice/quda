@@ -30,7 +30,7 @@ if(QUDA_DIRAC_WILSON
    OR QUDA_DIRAC_NDEG_TWISTED_MASS
    OR QUDA_DIRAC_DOMAIN_WALL
    OR QUDA_DIRAC_STAGGERED)
-  add_executable(blas_test blas_test.cu)
+  add_executable(blas_test blas_test.cpp)
   target_link_libraries(blas_test ${TEST_LIBS})
   quda_checkbuildtest(blas_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS blas_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})

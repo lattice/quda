@@ -119,7 +119,7 @@ message(STATUS "Backend type: ${QUDA_BACKEND_TYPE}")
 if(DEFINED ENV{QUDA_GPU_ARCH})
   set(QUDA_DEFAULT_GPU_ARCH $ENV{QUDA_GPU_ARCH})
 else()
-  set(QUDA_DEFAULT_GPU_ARCH sm_35)
+  set(QUDA_DEFAULT_GPU_ARCH sm_70)
 endif()
 if(NOT QUDA_GPU_ARCH)
   message(STATUS "Building QUDA for GPU ARCH " "${QUDA_DEFAULT_GPU_ARCH}")
@@ -214,7 +214,6 @@ else()
 endif()
 option(QUDA_BUILD_SHAREDLIB "build quda as a shared lib" ${DEFSHARED})
 option(QUDA_PROPAGATE_CXX_FLAGS "propagate CXX_FLAGS to CUDA host compiler (for cmake >= 3.8)" ON)
-option(QUDA_TEX "enable texture reads?" ON)
 option(QUDA_FLOAT8 "enable float-8 ordered fixed-point fields?" OFF)
 option(QUDA_NVML "use NVML to report CUDA graphics driver version" OFF)
 option(QUDA_NUMA_NVML "experimental use of NVML to set numa affinity" OFF)
@@ -222,7 +221,12 @@ option(QUDA_VERBOSE_BUILD "display kernel register useage" OFF)
 set(QUDA_MAX_MULTI_BLAS_N
     "4"
     CACHE STRING "maximum value to initialize template for multi-blas /-reduce")
-
+if(QUDA_MAX_MULTI_BLAS_N GREATER 32)
+  message(
+  SEND_ERROR
+  "Maximum QUDA_MAX_MULTI_BLAS_N is 32.")
+endif()
+  
 set(QUDA_PRECISION
     "14"
     CACHE STRING "which precisions to instantiate in QUDA (4-bit number - double, single, half, char)")
@@ -264,7 +268,6 @@ option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_INSTALL_ALL_TESTS)
 mark_as_advanced(QUDA_PROPAGATE_CXX_FLAGS)
-mark_as_advanced(QUDA_TEX)
 mark_as_advanced(QUDA_FLOAT8)
 mark_as_advanced(QUDA_FAST_COMPILE_REDUCE)
 mark_as_advanced(QUDA_FAST_COMPILE_DSLASH)
@@ -294,10 +297,6 @@ mark_as_advanced(QUDA_JITIFY)
 mark_as_advanced(QUDA_ARPACK_LOGGING)
 
 # some checks for invalid combinations
-
-if(QUDA_TEX AND QUDA_FLOAT8)
-  message(SEND_ERROR "Cannot simultanteously enable QUDA_TEX and QUDA_FLOAT8")
-endif()
 
 if(QUDA_MPI AND QUDA_QMP)
   message(
@@ -340,7 +339,7 @@ set(CMAKE_CXX_FLAGS_DEBUG
     "-Wall -Wno-unknown-pragmas -g -fno-inline"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(CMAKE_CXX_FLAGS_SANITIZE
-    "$-Wall -Wno-unknown-pragmas -g -fno-inline -fsanitize=address,undefined"
+    "-Wall -Wno-unknown-pragmas -g -fno-inline -fsanitize=address,undefined"
     CACHE STRING "Flags used by the C++ compiler during santizer debug builds.")
 
 enable_language(CXX)
@@ -393,16 +392,16 @@ mark_as_advanced(CMAKE_CUDA_HOST_COMPILER)
 set(CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS
     "-Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field")
 set(CMAKE_CUDA_FLAGS_DEVEL
-    "-g -lineinfo -O3 --dont-use-profile -ldir /usr/local/cuda-10.1/nvvm/libdevice  -Xcompiler ${CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS}"
+    "-g -lineinfo -O3 -Xcompiler ${CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS}"
     CACHE STRING "Flags used by the CUDA compiler during regular development builds.")
 set(CMAKE_CUDA_FLAGS_STRICT
     "${CMAKE_CUDA_FLAGS_DEVEL}"
     CACHE STRING "Flags used by the CUDA compiler during strict jenkins builds.")
 set(CMAKE_CUDA_FLAGS_RELEASE
-    "-O3 -w --dont-use-profile -ldir /usr/local/cuda-10.1/nvvm/libdevice"
+    "-O3 -w"
     CACHE STRING "Flags used by the CUDA compiler during release builds.")
 set(CMAKE_CUDA_FLAGS_HOSTDEBUG
-    "-g -lineinfo --dont-use-profile -ldir /usr/local/cuda-10.1/nvvm/libdevice"
+    "-g -lineinfo"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
 set(CMAKE_CUDA_FLAGS_DEVICEDEBUG
     "-G"
@@ -411,7 +410,7 @@ set(CMAKE_CUDA_FLAGS_DEBUG
     "-g -G"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(CMAKE_CUDA_FLAGS_SANITIZE
-    "-g -lineinfo --dont-use-profile -ldir /usr/local/cuda-10.1/nvvm/libdevice -Xcompiler -fsanitize=address,-fsanitize=undefined"
+    "-g -lineinfo -Xcompiler -fsanitize=address,-fsanitize=undefined"
     CACHE STRING "Flags used by the C++ compiler during sanitizer debug builds.")
 
 # CUDA Wrapper for finding libs etc

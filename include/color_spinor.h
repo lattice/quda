@@ -992,7 +992,6 @@ namespace quda {
   __device__ __host__ inline Matrix<complex<Float>, Nc> outerProdSpinTrace(const ColorSpinor<Float, Nc, Ns> &a,
                                                                            const ColorSpinor<Float, Nc, Ns> &b)
   {
-
     Matrix<complex<Float>, Nc> out;
 
     // outer product over color
@@ -1015,6 +1014,35 @@ namespace quda {
 	  out(j,i).imag( out(j,i).imag() - a(s,j).real() * b(s,i).imag() );
 	  // out(j,i) += a(s,j) * conj(b(s,i));
 	}
+      }
+    }
+    return out;
+  }
+
+  /**
+     Compute the outer product over color and take the spin trace
+     out(j,i) = \sum_s a(s,j) * conj (b(s,i))
+     @param a Left-hand side ColorSpinor
+     @param b Right-hand side ColorSpinor
+     @return The spin traced matrix
+  */
+  template <typename Float, int Nc>
+  __device__ __host__ inline Matrix<complex<Float>, Nc> outerProduct(const ColorSpinor<Float, Nc, 1> &a,
+                                                                     const ColorSpinor<Float, Nc, 1> &b)
+  {
+    Matrix<complex<Float>, Nc> out;
+
+    // outer product over color
+#pragma unroll
+    for (int i = 0; i < Nc; i++) {
+#pragma unroll
+      for (int j = 0; j < Nc; j++) {
+        // trace over spin (manual unroll for perf)
+        out(j, i).real(a(0, j).real() * b(0, i).real());
+        out(j, i).real(out(j, i).real() + a(0, j).imag() * b(0, i).imag());
+        out(j, i).imag(a(0, j).imag() * b(0, i).real());
+        out(j, i).imag(out(j, i).imag() - a(0, j).real() * b(0, i).imag());
+        // out(j,i) = a(0,j) * conj(b(0,i));
       }
     }
     return out;

@@ -104,6 +104,7 @@ int main(int argc, char **argv)
   auto app = make_app();
   add_eigen_option_group(app);
   add_deflation_option_group(app);
+  add_eofa_option_group(app);
   add_multigrid_option_group(app);
   try {
     app->parse(argc, argv);
@@ -129,11 +130,10 @@ int main(int argc, char **argv)
   // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
 
-  // Only these fermions are supported in this file
   if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH
-      && dslash_type != QUDA_TWISTED_MASS_DSLASH && dslash_type != QUDA_TWISTED_CLOVER_DSLASH
-      && dslash_type != QUDA_MOBIUS_DWF_DSLASH && dslash_type != QUDA_DOMAIN_WALL_4D_DSLASH
-      && dslash_type != QUDA_DOMAIN_WALL_DSLASH) {
+      && dslash_type != QUDA_TWISTED_MASS_DSLASH && dslash_type != QUDA_DOMAIN_WALL_4D_DSLASH
+      && dslash_type != QUDA_MOBIUS_DWF_DSLASH && dslash_type != QUDA_MOBIUS_DWF_EOFA_DSLASH
+      && dslash_type != QUDA_TWISTED_CLOVER_DSLASH && dslash_type != QUDA_DOMAIN_WALL_DSLASH) {
     printfQuda("dslash_type %d not supported\n", dslash_type);
     exit(0);
   }
@@ -162,6 +162,7 @@ int main(int argc, char **argv)
   QudaInvertParam mg_inv_param = newQudaInvertParam();
   QudaEigParam mg_eig_param[mg_levels];
   QudaEigParam eig_param = newQudaEigParam();
+
   if (inv_multigrid) {
 
     setQudaMgSolveTypes();
@@ -196,10 +197,9 @@ int main(int argc, char **argv)
   // Initialize the QUDA library
   initQuda(device);
 
-  // Set some dimension parameters for the host routines
-  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
-      dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-      dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+  // set parameters for the reference Dslash, and prepare fields to be loaded
+  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
+      || dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
     dw_setDims(gauge_param.X, inv_param.Ls);
   } else {
     setDims(gauge_param.X);

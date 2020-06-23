@@ -597,4 +597,35 @@ namespace quda
     }
   }
 
+  /**
+     @brief This instantiatePrecondtiioner function is used to
+     instantiate the precisions for a preconditioner.  This is the
+     same as the instantiate helper above, except it only handles half
+     and quarter precision.
+     @param[out] out Output result field
+     @param[in] in Input field
+     @param[in] U Gauge field
+     @param[in] args Additional arguments for different dslash kernels
+  */
+  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = WilsonReconstruct, typename... Args>
+  inline void instantiatePreconditioner(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                                        Args &&... args)
+  {
+    if (U.Precision() == QUDA_HALF_PRECISION) {
+#if QUDA_PRECISION & 2
+      instantiate<Apply, Recon, short>(out, in, U, args...);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#endif
+    } else if (U.Precision() == QUDA_QUARTER_PRECISION) {
+#if QUDA_PRECISION & 1
+      instantiate<Apply, Recon, char>(out, in, U, args...);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+#endif
+    } else {
+      errorQuda("Unsupported precision %d\n", U.Precision());
+    }
+  }
+
 } // namespace quda

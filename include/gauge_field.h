@@ -36,6 +36,7 @@ namespace quda {
       }
       return false;
     }
+
   } // namespace gauge
 
   struct GaugeFieldParam : public LatticeFieldParam {
@@ -339,7 +340,7 @@ namespace quda {
        This function returns true if the field is stored in an
        internal field order for the given precision.
     */
-    bool isNative() const;
+    bool isNative() const { return gauge::isNative(order, precision, reconstruct); }
 
     size_t Bytes() const { return bytes; }
     size_t PhaseBytes() const { return phase_bytes; }
@@ -446,17 +447,6 @@ namespace quda {
        @brief Initialize the padded region to 0
      */
     void zeroPad();
-
-#ifdef USE_TEXTURE_OBJECTS
-    cudaTextureObject_t tex;
-    cudaTextureObject_t evenTex;
-    cudaTextureObject_t oddTex;
-    cudaTextureObject_t phaseTex;
-    cudaTextureObject_t evenPhaseTex;
-    cudaTextureObject_t oddPhaseTex;
-    void createTexObject(cudaTextureObject_t &tex, void *gauge, bool full, bool isPhase=false);
-    void destroyTexObject();
-#endif
 
   public:
     cudaGaugeField(const GaugeFieldParam &);
@@ -583,14 +573,6 @@ namespace quda {
     const void* Gauge_p() const { return gauge; }
     const void* Even_p() const { return even; }
     const void *Odd_p() const { return odd; }
-
-#ifdef USE_TEXTURE_OBJECTS
-    const cudaTextureObject_t& Tex() const { return tex; }
-    const cudaTextureObject_t& EvenTex() const { return evenTex; }
-    const cudaTextureObject_t& OddTex() const { return oddTex; }
-    const cudaTextureObject_t& EvenPhaseTex() const { return evenPhaseTex; }
-    const cudaTextureObject_t& OddPhaseTex() const { return oddPhaseTex; }
-#endif
 
     void setGauge(void* _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
 
@@ -738,6 +720,7 @@ namespace quda {
   */
   void copyGenericGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location, void *Out = 0, void *In = 0,
                         void **ghostOut = 0, void **ghostIn = 0, int type = 0);
+
   /**
      This function is used for copying the gauge field into an
      extended gauge field.  Defined in copy_extended_gauge.cu.
@@ -749,6 +732,28 @@ namespace quda {
   */
   void copyExtendedGauge(GaugeField &out, const GaugeField &in,
 			 QudaFieldLocation location, void *Out=0, void *In=0);
+
+  /**
+     This function is used for creating an exteneded gauge field from the input,
+     and copying the gauge field into the extended gauge field.  Defined in lib/gauge_field.cpp.
+     @param in The input field from which we are extending
+     @param R By how many do we want to extend the gauge field in each direction
+     @param profile The `TimeProfile`
+     @param redundant_comms
+     @param recon The reconsturction type
+     @return the pointer to the extended gauge field
+  */
+  cudaGaugeField *createExtendedGauge(cudaGaugeField &in, const int *R, TimeProfile &profile,
+                                      bool redundant_comms = false, QudaReconstructType recon = QUDA_RECONSTRUCT_INVALID);
+
+  /**
+     This function is used for creating an exteneded (cpu) gauge field from the input,
+     and copying the gauge field into the extended gauge field.  Defined in lib/gauge_field.cpp.
+     @param in The input field from which we are extending
+     @param R By how many do we want to extend the gauge field in each direction
+     @return the pointer to the extended gauge field
+  */
+  cpuGaugeField *createExtendedGauge(void **gauge, QudaGaugeParam &gauge_param, const int *R);
 
   /**
      This function is used for  extracting the gauge ghost zone from a

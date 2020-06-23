@@ -57,6 +57,7 @@ CLI::TransformPairs<dslash_test_type> dtest_type_map {{"Dslash", dslash_test_typ
                                                       {"MatPC", dslash_test_type::MatPC},
                                                       {"Mat", dslash_test_type::Mat},
                                                       {"MatPCDagMatPC", dslash_test_type::MatPCDagMatPC},
+                                                      {"MatPCDagMatPCLocal", dslash_test_type::MatPCDagMatPCLocal},
                                                       {"MatDagMat", dslash_test_type::MatDagMat},
                                                       {"M5", dslash_test_type::M5},
                                                       {"M5inv", dslash_test_type::M5inv},
@@ -83,7 +84,8 @@ void init(int precision, QudaReconstructType link_recon)
   if (dslash_type == QUDA_ASQTAD_DSLASH || dslash_type == QUDA_STAGGERED_DSLASH) {
     errorQuda("Asqtad not supported.  Please try staggered_dslash_test instead");
   } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
-             || dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+             || dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
+    // for these we always use kernel packing
     dw_setDims(gauge_param.X, Lsdim);
   } else {
     setDims(gauge_param.X);
@@ -112,7 +114,7 @@ void init(int precision, QudaReconstructType link_recon)
     case dslash_test_type::MatDagMat: inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION; break;
     default: errorQuda("Test type %d not defined QUDA_DOMAIN_WALL_4D_DSLASH\n", static_cast<int>(dtest_type));
     }
-  } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+  } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
     switch (dtest_type) {
     case dslash_test_type::Dslash:
     case dslash_test_type::M5:
@@ -120,9 +122,10 @@ void init(int precision, QudaReconstructType link_recon)
     case dslash_test_type::M5inv:
     case dslash_test_type::MatPC: inv_param.solution_type = QUDA_MATPC_SOLUTION; break;
     case dslash_test_type::Mat: inv_param.solution_type = QUDA_MAT_SOLUTION; break;
+    case dslash_test_type::MatPCDagMatPCLocal:
     case dslash_test_type::MatPCDagMatPC: inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION; break;
     case dslash_test_type::MatDagMat: inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION; break;
-    default: errorQuda("Test type %d not defined on QUDA_MOBIUS_DWF_DSLASH\n", static_cast<int>(dtest_type));
+    default: errorQuda("Test type %d not defined on QUDA_MOBIUS_DWF_(EOFA_)DSLASH\n", static_cast<int>(dtest_type));
     }
   } else {
     switch (dtest_type) {
@@ -152,7 +155,7 @@ void init(int precision, QudaReconstructType link_recon)
   csParam.nDim = 4;
   for (int d=0; d<4; d++) csParam.x[d] = gauge_param.X[d];
   if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
-      || dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+      || dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
     csParam.nDim = 5;
     csParam.x[4] = Ls;
   }
@@ -172,7 +175,8 @@ void init(int precision, QudaReconstructType link_recon)
   csParam.setPrecision(inv_param.cpu_prec);
   csParam.pad = 0;
 
-  if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH || dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+  if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH || dslash_type == QUDA_MOBIUS_DWF_DSLASH
+      || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
     csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
     csParam.x[0] /= 2;
   } else {
@@ -416,7 +420,71 @@ DslashTime dslashCUDA(int niter)
           dirac->MdagM(*cudaSpinorOut, *cudaSpinor);
         }
         break;
+      case dslash_test_type::MatPCDagMatPCLocal:
+        if (transfer) {
+          errorQuda("(transfer == true) version NOT yet available!\n");
+        } else {
+          dirac->MdagMLocal(*cudaSpinorOut, *cudaSpinor);
+        }
+        break;
       default: errorQuda("Test type %s not support for current Dslash", get_string(dtest_type_map, dtest_type).c_str());
+      }
+    } else if (dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
+      switch (dtest_type) {
+      case dslash_test_type::Dslash:
+        if (transfer) {
+          errorQuda("(transfer == true) version NOT yet available!\n");
+        } else {
+          static_cast<DiracMobiusEofaPC *>(dirac)->Dslash4(*cudaSpinorOut, *cudaSpinor, parity);
+        }
+        break;
+      case dslash_test_type::M5:
+        if (transfer) {
+          errorQuda("(transfer == true) version NOT yet available!\n");
+        } else {
+          static_cast<DiracMobiusEofaPC *>(dirac)->m5_eofa(*cudaSpinorOut, *cudaSpinor);
+        }
+        break;
+      case dslash_test_type::Dslash4pre:
+        if (transfer) {
+          errorQuda("(transfer == true) version NOT yet available!\n");
+        } else {
+          static_cast<DiracMobiusEofaPC *>(dirac)->Dslash4pre(*cudaSpinorOut, *cudaSpinor, parity);
+        }
+        break;
+      case dslash_test_type::M5inv:
+        if (transfer) {
+          errorQuda("(transfer == true) version NOT yet available!\n");
+        } else {
+          static_cast<DiracMobiusEofaPC *>(dirac)->m5inv_eofa(*cudaSpinorOut, *cudaSpinor);
+        }
+        break;
+      case dslash_test_type::MatPC:
+      case dslash_test_type::Mat:
+        if (transfer) {
+          errorQuda("(transfer == true) version NOT yet available!\n");
+          // MatQuda(spinorOut->V(), spinor->V(), &inv_param);
+        } else {
+          dirac->M(*cudaSpinorOut, *cudaSpinor);
+        }
+        break;
+      case dslash_test_type::MatPCDagMatPC:
+      case dslash_test_type::MatDagMat:
+        if (transfer) {
+          errorQuda("(transfer == true) version NOT yet available!\n");
+          // MatDagMatQuda(spinorOut->V(), spinor->V(), &inv_param);
+        } else {
+          dirac->MdagM(*cudaSpinorOut, *cudaSpinor);
+        }
+        break;
+      case dslash_test_type::MatPCDagMatPCLocal:
+        if (transfer) {
+          errorQuda("(transfer == true) version NOT yet available!\n");
+        } else {
+          dirac->MdagMLocal(*cudaSpinorOut, *cudaSpinor);
+        }
+        break;
+      default: errorQuda("Undefined test type(=%d)\n", static_cast<int>(dtest_type));
       }
     } else {
       switch (dtest_type) {
@@ -835,7 +903,74 @@ void dslashRef() {
       mdw_mat(spinorRef->V(), hostGauge, spinorTmp->V(), kappa_b, kappa_c, not_dagger, gauge_param.cpu_prec,
               gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
       break;
-    default: printf("Test type not supported for domain wall\n"); exit(-1);
+    case dslash_test_type::MatPCDagMatPCLocal:
+      // reference for MdagM local operator
+      mdw_mdagm_local(spinorRef->V(), hostGauge, spinor->V(), kappa_b, kappa_c, inv_param.matpc_type,
+                      gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
+      break;
+    default: printf("Test type not supported for Mobius domain wall\n"); exit(-1);
+    }
+    free(kappa_b);
+    free(kappa_c);
+    free(kappa_5);
+    free(kappa_mdwf);
+  } else if (dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
+    double _Complex *kappa_b = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
+    double _Complex *kappa_c = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
+    double _Complex *kappa_5 = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
+    double _Complex *kappa_mdwf = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
+    for (int xs = 0; xs < Lsdim; xs++) {
+      kappa_b[xs] = 1.0 / (2 * (inv_param.b_5[xs] * (4.0 + inv_param.m5) + 1.0));
+      kappa_c[xs] = 1.0 / (2 * (inv_param.c_5[xs] * (4.0 + inv_param.m5) - 1.0));
+      kappa_5[xs] = 0.5 * kappa_b[xs] / kappa_c[xs];
+      kappa_mdwf[xs] = -kappa_5[xs];
+    }
+    switch (dtest_type) {
+    case dslash_test_type::Dslash:
+      dslash_4_4d(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param,
+                  inv_param.mass);
+      break;
+    case dslash_test_type::M5:
+      mdw_eofa_m5(spinorRef->V(), spinor->V(), parity, dagger, inv_param.mass, inv_param.m5,
+                  (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2, inv_param.mq3,
+                  inv_param.eofa_pm, inv_param.eofa_shift, gauge_param.cpu_prec);
+      break;
+    case dslash_test_type::Dslash4pre:
+      mdw_dslash_4_pre(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param,
+                       inv_param.mass, inv_param.b_5, inv_param.c_5, true);
+      break;
+    case dslash_test_type::M5inv:
+      mdw_eofa_m5inv(spinorRef->V(), spinor->V(), parity, dagger, inv_param.mass, inv_param.m5,
+                     (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2,
+                     inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift, gauge_param.cpu_prec);
+      break;
+    case dslash_test_type::Mat:
+      mdw_eofa_mat(spinorRef->V(), hostGauge, spinor->V(), dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass,
+                   inv_param.m5, (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2,
+                   inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift);
+      break;
+    case dslash_test_type::MatDagMat:
+      mdw_eofa_mat(spinorTmp->V(), hostGauge, spinor->V(), dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass,
+                   inv_param.m5, (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2,
+                   inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift);
+      mdw_eofa_mat(spinorRef->V(), hostGauge, spinorTmp->V(), not_dagger, gauge_param.cpu_prec, gauge_param,
+                   inv_param.mass, inv_param.m5, (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]),
+                   inv_param.mq1, inv_param.mq2, inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift);
+      break;
+    case dslash_test_type::MatPC:
+      mdw_eofa_matpc(spinorRef->V(), hostGauge, spinor->V(), inv_param.matpc_type, dagger, gauge_param.cpu_prec,
+                     gauge_param, inv_param.mass, inv_param.m5, (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]),
+                     inv_param.mq1, inv_param.mq2, inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift);
+      break;
+    case dslash_test_type::MatPCDagMatPC:
+      mdw_eofa_matpc(spinorTmp->V(), hostGauge, spinor->V(), inv_param.matpc_type, dagger, gauge_param.cpu_prec,
+                     gauge_param, inv_param.mass, inv_param.m5, (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]),
+                     inv_param.mq1, inv_param.mq2, inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift);
+      mdw_eofa_matpc(spinorRef->V(), hostGauge, spinorTmp->V(), inv_param.matpc_type, not_dagger, gauge_param.cpu_prec,
+                     gauge_param, inv_param.mass, inv_param.m5, (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]),
+                     inv_param.mq1, inv_param.mq2, inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift);
+      break;
+    default: printf("Test type not supported for Mobius domain wall EOFA\n"); exit(-1);
     }
     free(kappa_b);
     free(kappa_c);
@@ -885,10 +1020,18 @@ protected:
   bool skip()
   {
     QudaReconstructType recon = static_cast<QudaReconstructType>(::testing::get<1>(GetParam()));
+
     if ((QUDA_PRECISION & getPrecision(::testing::get<0>(GetParam()))) == 0
         || (QUDA_RECONSTRUCT & getReconstructNibble(recon)) == 0) {
       return true;
     }
+
+    if (dslash_type == QUDA_MOBIUS_DWF_DSLASH && dtest_type == dslash_test_type::MatPCDagMatPCLocal
+        && (::testing::get<0>(GetParam()) == 2 || ::testing::get<0>(GetParam()) == 3)) {
+      warningQuda("Only fixed precision supported for MatPCDagMatPCLocal operator, skipping...");
+      return true;
+    }
+
     return false;
   }
 
@@ -951,6 +1094,8 @@ TEST_P(DslashTest, verify)
   }
   double deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
   double tol = getTolerance(inv_param.cuda_prec);
+  // If we are using tensor core we tolerate a greater deviation
+  if (dslash_type == QUDA_MOBIUS_DWF_DSLASH && dtest_type == dslash_test_type::MatPCDagMatPCLocal) tol *= 10;
   if (gauge_param.reconstruct == QUDA_RECONSTRUCT_8 && inv_param.cuda_prec >= QUDA_HALF_PRECISION)
     tol *= 10; // if recon 8, we tolerate a greater deviation
 
