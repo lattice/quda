@@ -552,10 +552,10 @@ namespace quda {
   void cudaColorSpinorField::backup() const {
     if (backed_up) errorQuda("ColorSpinorField already backed up");
     backup_h = new char[bytes];
-    cudaMemcpy(backup_h, v, bytes, cudaMemcpyDeviceToHost);
+    cudaMemcpy(backup_h, v, bytes, cudaMemcpyDefault);
     if (norm_bytes) {
       backup_norm_h = new char[norm_bytes];
-      cudaMemcpy(backup_norm_h, norm, norm_bytes, cudaMemcpyDeviceToHost);
+      cudaMemcpy(backup_norm_h, norm, norm_bytes, cudaMemcpyDefault);
     }
     checkCudaError();
     backed_up = true;
@@ -564,10 +564,10 @@ namespace quda {
   void cudaColorSpinorField::restore() const
   {
     if (!backed_up) errorQuda("Cannot restore since not backed up");
-    cudaMemcpy(v, backup_h, bytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(v, backup_h, bytes, cudaMemcpyDefault);
     delete []backup_h;
     if (norm_bytes) {
-      cudaMemcpy(v, backup_norm_h, norm_bytes, cudaMemcpyHostToDevice);
+      cudaMemcpy(norm, backup_norm_h, norm_bytes, cudaMemcpyDefault);
       delete []backup_norm_h;
     }
     checkCudaError();
@@ -675,8 +675,8 @@ namespace quda {
 
       copyGenericColorSpinor(*this, src, QUDA_CPU_FIELD_LOCATION, buffer, 0, static_cast<char*>(buffer)+bytes, 0);
 
-      qudaMemcpy(v, buffer, bytes, cudaMemcpyHostToDevice);
-      qudaMemcpy(norm, static_cast<char*>(buffer)+bytes, norm_bytes, cudaMemcpyHostToDevice);
+      qudaMemcpy(v, buffer, bytes, cudaMemcpyDefault);
+      qudaMemcpy(norm, static_cast<char*>(buffer)+bytes, norm_bytes, cudaMemcpyDefault);
 
       pool_pinned_free(buffer);
     } else if (typeid(src) == typeid(cudaColorSpinorField)) {
@@ -695,8 +695,8 @@ namespace quda {
           buffer = pool_device_malloc(src.Bytes()+src.NormBytes());
           Src = buffer;
           srcNorm = static_cast<char*>(Src) + src.Bytes();
-          qudaMemcpy(Src, src.V(), src.Bytes(), cudaMemcpyHostToDevice);
-          qudaMemcpy(srcNorm, src.Norm(), src.NormBytes(), cudaMemcpyHostToDevice);
+          qudaMemcpy(Src, src.V(), src.Bytes(), cudaMemcpyDefault);
+          qudaMemcpy(srcNorm, src.Norm(), src.NormBytes(), cudaMemcpyDefault);
         } else {
           buffer = pool_pinned_malloc(src.Bytes()+src.NormBytes());
           memcpy(buffer, src.V(), src.Bytes());
@@ -723,8 +723,8 @@ namespace quda {
 
     if ( reorder_location() == QUDA_CPU_FIELD_LOCATION && typeid(dest) == typeid(cpuColorSpinorField)) {
       void *buffer = pool_pinned_malloc(bytes+norm_bytes);
-      qudaMemcpy(buffer, v, bytes, cudaMemcpyDeviceToHost);
-      qudaMemcpy(static_cast<char*>(buffer)+bytes, norm, norm_bytes, cudaMemcpyDeviceToHost);
+      qudaMemcpy(buffer, v, bytes, cudaMemcpyDefault);
+      qudaMemcpy(static_cast<char*>(buffer)+bytes, norm, norm_bytes, cudaMemcpyDefault);
 
       copyGenericColorSpinor(dest, *this, QUDA_CPU_FIELD_LOCATION, 0, buffer, 0, static_cast<char*>(buffer)+bytes);
       pool_pinned_free(buffer);
@@ -754,8 +754,8 @@ namespace quda {
         copyGenericColorSpinor(dest, *this, QUDA_CUDA_FIELD_LOCATION, dst, 0, dstNorm, 0);
 
         if (!zeroCopy) {
-          qudaMemcpy(dest.V(), dst, dest.Bytes(), cudaMemcpyDeviceToHost);
-          qudaMemcpy(dest.Norm(), dstNorm, dest.NormBytes(), cudaMemcpyDeviceToHost);
+          qudaMemcpy(dest.V(), dst, dest.Bytes(), cudaMemcpyDefault);
+          qudaMemcpy(dest.Norm(), dstNorm, dest.NormBytes(), cudaMemcpyDefault);
         } else {
           qudaDeviceSynchronize();
           memcpy(dest.V(), buffer, dest.Bytes());
@@ -1031,7 +1031,6 @@ namespace quda {
 
   void cudaColorSpinorField::sendStart(int nFace, int d, int dagger, qudaStream_t *stream_p, bool gdr, bool remote_write)
   {
-
     // note this is scatter centric, so dir=0 (1) is send backwards
     // (forwards) and receive from forwards (backwards)
 
@@ -1309,10 +1308,11 @@ namespace quda {
     if (!commDimPartitioned(dim)) return;
     unpackGhostExtended(from_face_dim_dir_h[bufferIndex][dim][dir], nFace, static_cast<QudaParity>(parity), dim, dir == 0 ? QUDA_BACKWARDS : QUDA_FORWARDS, dagger, &stream[2*dim/*+0*/], zero_copy);
   }
- 
-  void cudaColorSpinorField::exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *pack_destination_,
-					   const MemoryLocation *halo_location_, bool gdr_send, bool gdr_recv,
-					   QudaPrecision ghost_precision_)  const {
+
+  void cudaColorSpinorField::exchangeGhost(QudaParity parity, int nFace, int dagger,
+                                           const MemoryLocation *pack_destination_, const MemoryLocation *halo_location_,
+                                           bool gdr_send, bool gdr_recv, QudaPrecision ghost_precision_) const
+  {
 
     // we are overriding the ghost precision, and it doesn't match what has already been allocated
     if (ghost_precision_ != QUDA_INVALID_PRECISION && ghost_precision != ghost_precision_) {
@@ -1449,6 +1449,14 @@ namespace quda {
 	}
       } else if (total_bytes && !halo_host) {
 	cudaMemcpyAsync(ghost_recv_buffer_d[bufferIndex], from_face_h[bufferIndex], total_bytes, cudaMemcpyHostToDevice, 0);
+      }
+    }
+
+    // ensure that the p2p sending is completed before returning
+    for (int dim = 0; dim < nDimComms; dim++) {
+      if (!comm_dim_partitioned(dim)) continue;
+      for (int dir = 0; dir < 2; dir++) {
+        if (comm_peer2peer_enabled(dir, dim)) qudaStreamWaitEvent(0, ipcCopyEvent[bufferIndex][dir][dim], 0);
       }
     }
 

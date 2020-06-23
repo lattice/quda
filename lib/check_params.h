@@ -125,6 +125,9 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(make_resident_mom, INVALID_INT);
   P(return_result_gauge, INVALID_INT);
   P(return_result_mom, INVALID_INT);
+  P(gauge_offset, (size_t)INVALID_INT);
+  P(mom_offset, (size_t)INVALID_INT);
+  P(site_size, (size_t)INVALID_INT);
 #endif
 
 #ifdef INIT_PARAM

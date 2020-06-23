@@ -230,7 +230,12 @@ option(QUDA_VERBOSE_BUILD "display kernel register useage" OFF)
 set(QUDA_MAX_MULTI_BLAS_N
     "4"
     CACHE STRING "maximum value to initialize template for multi-blas /-reduce")
-
+if(QUDA_MAX_MULTI_BLAS_N GREATER 32)
+  message(
+  SEND_ERROR
+  "Maximum QUDA_MAX_MULTI_BLAS_N is 32.")
+endif()
+  
 set(QUDA_PRECISION
     "14"
     CACHE STRING "which precisions to instantiate in QUDA (4-bit number - double, single, half, char)")
@@ -348,7 +353,7 @@ set(CMAKE_CXX_FLAGS_DEBUG
     "-Wall -Wno-unknown-pragmas -g -fno-inline"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(CMAKE_CXX_FLAGS_SANITIZE
-    "$-Wall -Wno-unknown-pragmas -g -fno-inline -fsanitize=address,undefined"
+    "-Wall -Wno-unknown-pragmas -g -fno-inline -fsanitize=address,undefined"
     CACHE STRING "Flags used by the C++ compiler during santizer debug builds.")
 
 enable_language(CXX)

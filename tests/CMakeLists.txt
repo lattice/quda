@@ -581,6 +581,13 @@ foreach(pol IN LISTS DSLASH_POLICIES)
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:covdev_test> ${MPIEXEEC_POSTFLAGS}
                      --dim 6 8 10 12
                      --gtest_output=xml:covdev_test_pol${pol2}.xml)
-   endif()
+  endif()
 
 endforeach(pol)
+
+if(QUDA_FORCE_GAUGE)
+  add_test(NAME gauge_force
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_force_test> ${MPIEXEEC_POSTFLAGS}
+                   --dim 2 4 6 8
+                   --gtest_output=xml:gauge_force_test.xml)
+endif()
