@@ -33,13 +33,15 @@ else()
   set(DEFTARGET "CUDA")
 endif()
 
-if( CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA" )
- set(QUDA_NVCC_BUILD TRUE)
- set(XCOMPILER_STRING "-Xcompiler")
-elseif( CMAKE_CUDA_COMPILER_ID MATCHES "Clang")
+if( CMAKE_CUDA_COMPILER_ID MATCHES "Clang")
  set(QUDA_NVCC_BUILD FALSE)
+ message(STATUS "Clang Build")
+else()
+ set(QUDA_NVCC_BUILD TRUE) 
+ set(XCOMPILER_STRING "-Xcompiler")
+ message(STATUS "NVCC Build")
 endif()
-
+message(STATUS "XCompiler String " ${XCOMPILER_STRING})
  
 set(VALID_BUILD_TYPES
     DEVEL
