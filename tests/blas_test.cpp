@@ -26,10 +26,7 @@ std::vector<cpuColorSpinorField*> zmH;
 int Nspin;
 int Ncolor;
 
-void setPrec(ColorSpinorParam &param, QudaPrecision precision)
-{
-  param.setPrecision(precision, precision, true);
-}
+void setPrec(ColorSpinorParam &param, QudaPrecision precision) { param.setPrecision(precision, precision, true); }
 
 void display_test_info()
 {
@@ -1071,20 +1068,13 @@ protected:
   const int &kernel;
 
 public:
-  BlasTest() :
-    param(GetParam()),
-    prec(::testing::get<0>(param)),
-    kernel(::testing::get<1>(param))
-  {
-  }
+  BlasTest() : param(GetParam()), prec(::testing::get<0>(param)), kernel(::testing::get<1>(param)) {}
   virtual void SetUp() {
     if (!skip_kernel(prec, kernel)) initFields(prec);
   }
   virtual void TearDown()
   {
-    if (!skip_kernel(prec, kernel)) {
-      freeFields();
-    }
+    if (!skip_kernel(prec, kernel)) { freeFields(); }
   }
 };
 

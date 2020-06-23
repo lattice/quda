@@ -276,20 +276,23 @@ namespace quda {
     size_t norm_bytes; // sizeof each norm field (per parity)
     int stride; // stride (volume + pad)
     double rho; // rho additive factor
-    
-    FullClover(const cudaCloverField &clover, bool inverse=false) :
-      precision(clover.precision), bytes(clover.bytes), norm_bytes(clover.norm_bytes),
-      stride(clover.stride), rho(clover.rho)
-    { 
+
+    FullClover(const cudaCloverField &clover, bool inverse = false) :
+      precision(clover.precision),
+      bytes(clover.bytes),
+      norm_bytes(clover.norm_bytes),
+      stride(clover.stride),
+      rho(clover.rho)
+    {
       if (inverse) {
         even = clover.evenInv;
         evenNorm = clover.evenInvNorm;
-        odd = clover.oddInv;	
+        odd = clover.oddInv;
         oddNorm = clover.oddInvNorm;
       } else {
         even = clover.even;
         evenNorm = clover.evenNorm;
-        odd = clover.odd;	
+        odd = clover.odd;
         oddNorm = clover.oddNorm;
       }
     }

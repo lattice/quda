@@ -264,12 +264,13 @@ namespace quda {
       { return parity*ghostOffset[dim] + ((x_cb*nSpin+s)*nColor+c)*nVec+v; }
     };
 
-    template<int nSpin, int nColor, int nVec, int N> // note this will not work for N=1
-      __device__ __host__ inline int indexFloatN(int x_cb, int s, int c, int v, int stride) {
-      int k = (s*nColor+c)*nVec+v;
-      int j = k / (N/2);
-      int i = k % (N/2);
-      return (j*stride+x_cb)*(N/2)+i;
+    template <int nSpin, int nColor, int nVec, int N> // note this will not work for N=1
+    __device__ __host__ inline int indexFloatN(int x_cb, int s, int c, int v, int stride)
+    {
+      int k = (s * nColor + c) * nVec + v;
+      int j = k / (N / 2);
+      int i = k % (N / 2);
+      return (j * stride + x_cb) * (N / 2) + i;
     };
 
     template <typename Float, int nSpin, int nColor, int nVec>
@@ -281,23 +282,22 @@ namespace quda {
         offset_cb((field.Bytes() >> 1) / sizeof(complex<Float>))
       {
       }
-      AccessorCB(): stride(0), offset_cb(0) { }
+      AccessorCB() : stride(0), offset_cb(0) {}
       __device__ __host__ inline int index(int parity, int x_cb, int s, int c, int v) const
       {
         return parity * offset_cb + ((s * nColor + c) * nVec + v) * stride + x_cb;
       }
 
       template <int nSpinBlock>
-      __device__ __host__ inline void load(complex<Float> out[nSpinBlock * nColor * nVec],
-                                           complex<Float> *in, int parity, int x_cb, int chi) const
+      __device__ __host__ inline void load(complex<Float> out[nSpinBlock * nColor * nVec], complex<Float> *in,
+                                           int parity, int x_cb, int chi) const
       {
         using vec_t = typename VectorType<Float, 2>::type;
         int M = nSpinBlock * nColor * nVec;
         for (int i = 0; i < M; i++) {
-          ((vec_t*)out)[i] = vector_load<vec_t>((vec_t*)(in + parity * offset_cb), (chi*M + i) * stride + x_cb);
+          ((vec_t *)out)[i] = vector_load<vec_t>((vec_t *)(in + parity * offset_cb), (chi * M + i) * stride + x_cb);
         }
       }
-
     };
 
     template<typename Float, int nSpin, int nColor, int nVec>
@@ -324,21 +324,21 @@ namespace quda {
         offset_cb((field.Bytes() >> 1) / sizeof(complex<Float>))
       {
       }
-      AccessorCB() : stride(0), offset_cb(0) { }
+      AccessorCB() : stride(0), offset_cb(0) {}
       __device__ __host__ inline int index(int parity, int x_cb, int s, int c, int v) const
       {
         return parity * offset_cb + indexFloatN<nSpin, nColor, nVec, 4>(x_cb, s, c, v, stride);
       }
 
       template <int nSpinBlock>
-      __device__ __host__ inline void load(complex<Float> out[nSpinBlock * nColor * nVec],
-                                           complex<Float> *in, int parity, int x_cb, int chi) const
+      __device__ __host__ inline void load(complex<Float> out[nSpinBlock * nColor * nVec], complex<Float> *in,
+                                           int parity, int x_cb, int chi) const
       {
         using vec_t = typename VectorType<Float, 4>::type;
         int M = (nSpinBlock * nColor * nVec * 2) / 4;
 #pragma unroll
         for (int i = 0; i < M; i++) {
-          ((vec_t*)out)[i] = vector_load<vec_t>((vec_t*)(in + parity * offset_cb), (chi*M + i) * stride + x_cb);
+          ((vec_t *)out)[i] = vector_load<vec_t>((vec_t *)(in + parity * offset_cb), (chi * M + i) * stride + x_cb);
         }
       }
     };
@@ -486,25 +486,25 @@ namespace quda {
 
       };
 
+      template <typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order, typename storeFloat = Float,
+                typename ghostFloat = storeFloat, bool disable_ghost = false, bool block_float = false>
+      class FieldOrderCB
+      {
 
-    template <typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order,
-      typename storeFloat=Float, typename ghostFloat=storeFloat, bool disable_ghost=false, bool block_float=false>
-      class FieldOrderCB {
+        typedef float norm_type;
 
-      typedef float norm_type;
-
-  protected:
-      complex<storeFloat> *v;
-    const AccessorCB<storeFloat,nSpin,nColor,nVec,order> accessor;
-      // since these variables are mutually exclusive, we use a union to minimize the accessor footprint
-      union {
-        norm_type *norm;
-        Float scale;
-      };
-      union {
-        Float scale_inv;
-        int norm_offset;
-      };
+      protected:
+        complex<storeFloat> *v;
+        const AccessorCB<storeFloat, nSpin, nColor, nVec, order> accessor;
+        // since these variables are mutually exclusive, we use a union to minimize the accessor footprint
+        union {
+          norm_type *norm;
+          Float scale;
+        };
+        union {
+          Float scale_inv;
+          int norm_offset;
+        };
 #ifndef DISABLE_GHOST
       mutable complex<ghostFloat> *ghost[8];
       mutable norm_type *ghost_norm[8];
@@ -595,18 +595,19 @@ namespace quda {
        * @param v vector number
        */
       template <int nSpinBlock>
-      __device__ __host__ inline void load(complex<Float> out[nSpinBlock*nColor*nVec], int parity, int x_cb, int chi) const
+      __device__ __host__ inline void load(complex<Float> out[nSpinBlock * nColor * nVec], int parity, int x_cb,
+                                           int chi) const
       {
         if (!fixed) {
-          accessor.load<nSpinBlock>((complex<storeFloat>*)out, v, parity, x_cb, chi);
-	} else {
-	  complex<storeFloat> tmp[nSpinBlock * nColor * nVec];
+          accessor.load<nSpinBlock>((complex<storeFloat> *)out, v, parity, x_cb, chi);
+        } else {
+          complex<storeFloat> tmp[nSpinBlock * nColor * nVec];
           accessor.load<nSpinBlock>(tmp, v, parity, x_cb, chi);
-	  Float norm_ = block_float ? norm[parity*norm_offset+x_cb] : scale_inv;
+          Float norm_ = block_float ? norm[parity * norm_offset + x_cb] : scale_inv;
           for (int s = 0; s < nSpinBlock; s++) {
             for (int c = 0; c < nColor; c++) {
               for (int v = 0; v < nVec; v++) {
-                int k = (s * nColor + c)*nVec + v;
+                int k = (s * nColor + c) * nVec + v;
                 out[k] = norm_ * complex<Float>(static_cast<Float>(tmp[k].real()), static_cast<Float>(tmp[k].imag()));
               }
             }
@@ -627,11 +628,11 @@ namespace quda {
       {
 #ifdef __CUDA_ARCH__
         if (!fixed) {
-          return complex<Float>(__ldg(v + accessor.index(parity,x_cb,s,c,n)));
-	} else {
-	  complex<storeFloat> tmp = __ldg(v + accessor.index(parity,x_cb,s,c,n));
-	  Float norm_ = block_float ? __ldg(norm + parity*norm_offset+x_cb) : scale_inv;
-	  return norm_*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
+          return complex<Float>(__ldg(v + accessor.index(parity, x_cb, s, c, n)));
+        } else {
+          complex<storeFloat> tmp = __ldg(v + accessor.index(parity, x_cb, s, c, n));
+          Float norm_ = block_float ? __ldg(norm + parity * norm_offset + x_cb) : scale_inv;
+          return norm_*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
         }
 #else
         if (!fixed) {
@@ -670,11 +671,12 @@ namespace quda {
       {
 #ifdef __CUDA_ARCH__
         if (!ghost_fixed) {
-          return complex<Float>( __ldg(ghost[2*dim+dir]+ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)) );
+          return complex<Float>(__ldg(ghost[2 * dim + dir] + ghostAccessor.index(dim, dir, parity, x_cb, s, c, n)));
         } else {
           Float scale = ghost_scale_inv;
-          if (block_float_ghost) scale *= __ldg(ghost_norm[2*dim+dir]+parity*ghostAccessor.faceVolumeCB[dim] + x_cb);
-          complex<ghostFloat> tmp = __ldg(ghost[2*dim+dir] + ghostAccessor.index(dim,dir,parity,x_cb,s,c,n));
+          if (block_float_ghost)
+            scale *= __ldg(ghost_norm[2 * dim + dir] + parity * ghostAccessor.faceVolumeCB[dim] + x_cb);
+          complex<ghostFloat> tmp = __ldg(ghost[2 * dim + dir] + ghostAccessor.index(dim, dir, parity, x_cb, s, c, n));
           return scale*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
         }
 #else
@@ -816,7 +818,7 @@ namespace quda {
 
       size_t Bytes() const { return nParity * static_cast<size_t>(volumeCB) * nColor * nSpin * nVec * 2ll * sizeof(storeFloat); }
 #endif
-    };
+      };
 
     /**
        @brief Accessor routine for ColorSpinorFields in native field order.

@@ -18,7 +18,7 @@ namespace quda {
     inline bool isNative(QudaFieldOrder order, QudaPrecision precision, int nSpin, int nColor)
     {
       if (precision == QUDA_DOUBLE_PRECISION) {
-        if (order  == QUDA_FLOAT2_FIELD_ORDER) return true;
+        if (order == QUDA_FLOAT2_FIELD_ORDER) return true;
       } else if (precision == QUDA_SINGLE_PRECISION) {
         if (nSpin == 4) {
           if (order == QUDA_FLOAT4_FIELD_ORDER) return true;
@@ -167,7 +167,9 @@ namespace quda {
        @param precision_ New precision value
        @param ghost_precision_ New ghost precision value
      */
-    void setPrecision(QudaPrecision precision, QudaPrecision ghost_precision=QUDA_INVALID_PRECISION, bool force_native=false) {
+    void setPrecision(QudaPrecision precision, QudaPrecision ghost_precision = QUDA_INVALID_PRECISION,
+                      bool force_native = false)
+    {
       // is the current status in native field order?
       bool native = force_native ? true : colorspinor::isNative(fieldOrder, this->precision, nSpin, nColor);
       this->precision = precision;
@@ -175,8 +177,8 @@ namespace quda {
 
       // if this is a native field order, let's preserve that status, else keep the same field order
       if (native) {
-        fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1 || nSpin == 2) ?
-          QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
+        fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1 || nSpin == 2) ? QUDA_FLOAT2_FIELD_ORDER :
+                                                                                        QUDA_FLOAT4_FIELD_ORDER;
 #ifdef FLOAT8
         if (precision <= QUDA_HALF_PRECISION && nSpin == 4) fieldOrder = QUDA_FLOAT8_FIELD_ORDER;
 #endif
@@ -1145,11 +1147,11 @@ namespace quda {
      @param[in] b Input field
      @return If length is unique return the length
    */
-  inline int Length_(const char *func, const char *file, int line, const ColorSpinorField &a,
-                     const ColorSpinorField &b)
+  inline int Length_(const char *func, const char *file, int line, const ColorSpinorField &a, const ColorSpinorField &b)
   {
     int length = 0;
-    if (a.Length() == b.Length()) length = a.Length();
+    if (a.Length() == b.Length())
+      length = a.Length();
     else
       errorQuda("Lengths %lu %lu do not match  (%s:%d in %s())\n", a.Length(), b.Length(), file, line, func);
     return length;
@@ -1163,8 +1165,8 @@ namespace quda {
      @return If length is unique return the length
    */
   template <typename... Args>
-  inline int Length_(const char *func, const char *file, int line, const ColorSpinorField &a,
-                     const ColorSpinorField &b, const Args &... args)
+  inline int Length_(const char *func, const char *file, int line, const ColorSpinorField &a, const ColorSpinorField &b,
+                     const Args &... args)
   {
     return static_cast<int>(Length_(func, file, line, a, b) & Length_(func, file, line, a, args...));
   }
@@ -1189,8 +1191,7 @@ namespace quda {
      @return true if all fields are in native order
    */
   template <typename... Args>
-  inline bool Native_(const char *func, const char *file, int line, const ColorSpinorField &a,
-                      const Args &... args)
+  inline bool Native_(const char *func, const char *file, int line, const ColorSpinorField &a, const Args &... args)
   {
     return (Native_(func, file, line, a) & Native_(func, file, line, args...));
   }

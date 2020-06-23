@@ -615,7 +615,7 @@ namespace quda {
             // second do scalar copy converting into register type
 #pragma unroll
             for (int j = 0; j < N; j++) { copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm); }
-	  }
+          }
 
           if (add_rho) for (int i=0; i<6; i++) v[i] += rho;
         }

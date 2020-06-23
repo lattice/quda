@@ -37,7 +37,7 @@ namespace quda
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     csParam.location = param.location;
     csParam.mem_type = QUDA_MEMORY_DEVICE;
-    csParam.setPrecision(QUDA_DOUBLE_PRECISION, QUDA_DOUBLE_PRECISION, true);//accum fields always full precision
+    csParam.setPrecision(QUDA_DOUBLE_PRECISION, QUDA_DOUBLE_PRECISION, true); // accum fields always full precision
     if (csParam.nSpin != 1) csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 
     r  = ColorSpinorField::Create(csParam);
