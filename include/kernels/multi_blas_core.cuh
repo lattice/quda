@@ -134,11 +134,12 @@ namespace quda
       }
     }
 
-    template <typename coeff_t_>
+    template <typename coeff_t_, bool multi_1d_ = false>
     struct MultiBlasFunctor {
       using coeff_t = coeff_t_;
       static constexpr bool reducer = false;
       static constexpr bool coeff_mul = true;
+      static constexpr bool multi_1d = multi_1d_;
 
       const int NXZ;
       const int NYW;
@@ -251,24 +252,27 @@ namespace quda
        Functor performing the operations: y[i] = a*x[i] + y[i]; x[i] = b*z[i] + c*x[i]
     */
     template <typename real>
-    struct multi_axpyBzpcx_ : public MultiBlasFunctor<real> {
+    struct multi_axpyBzpcx_ : public MultiBlasFunctor<real, true> {
       static constexpr write<0, 1, 0, 1> write{ };
       static constexpr bool use_z = false;
       static constexpr bool use_w = true;
       static constexpr int NXZ_max = 1; // we never have NXZ > 1 for this kernel
-      using MultiBlasFunctor<real>::NXZ;
-      using MultiBlasFunctor<real>::NYW;
-      using MultiBlasFunctor<real>::a;
-      using MultiBlasFunctor<real>::b;
-      using MultiBlasFunctor<real>::c;
-      multi_axpyBzpcx_(int NXZ, int NYW) : MultiBlasFunctor<real>(NXZ, NYW) {}
+      using MultiBlasFunctor<real,true>::NXZ;
+      using MultiBlasFunctor<real,true>::NYW;
+      // this is a multi-1d functor so the coefficients are stored in the struct
+      // set max 1-d size equal to max power of two
+      static constexpr int N = max_N_multi_1d();
+      real a[N];
+      real b[N];
+      real c[N];
+      multi_axpyBzpcx_(int NXZ, int NYW) : MultiBlasFunctor<real, true>(NXZ, NYW) {}
 
       template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &z, T &w, int i, int j)
       {
 #pragma unroll
         for (int k = 0; k < x.size(); k++) {
-          y[k] += a(0, i) * w[k];
-          w[k] = b(0, i) * x[k] + c(0, i) * w[k];
+          y[k] += a[i] * w[k];
+          w[k] = b[i] * x[k] + c[i] * w[k];
         }
       }
 
@@ -280,24 +284,26 @@ namespace quda
        Functor performing the operations y[i] = a*x[i] + y[i] and w[i] = b*x[i] + w[i]
     */
     template <typename real>
-    struct multi_caxpyBxpz_ : public MultiBlasFunctor<complex<real>> {
+    struct multi_caxpyBxpz_ : public MultiBlasFunctor<complex<real>, true> {
       static constexpr write<0, 1, 0, 1> write{ };
       static constexpr bool use_z = false;
       static constexpr bool use_w = true;
       static constexpr int NXZ_max = 0;
-      using MultiBlasFunctor<complex<real>>::NXZ;
-      using MultiBlasFunctor<complex<real>>::NYW;
-      using MultiBlasFunctor<complex<real>>::a;
-      using MultiBlasFunctor<complex<real>>::b;
-      multi_caxpyBxpz_(int NXZ, int NYW) : MultiBlasFunctor<complex<real>>(NXZ, NYW) {}
+      using MultiBlasFunctor<complex<real>, true>::NXZ;
+      using MultiBlasFunctor<complex<real>, true>::NYW;
+      static constexpr int N = max_N_multi_1d();
+      complex<real> a[N];
+      complex<real> b[N];
+      complex<real> c[N];
+      multi_caxpyBxpz_(int NXZ, int NYW) : MultiBlasFunctor<complex<real>, true>(NXZ, NYW) {}
 
       // i loops over NYW, j loops over NXZ
       template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &z, T &w, int i, int j)
       {
 #pragma unroll
         for (int k = 0; k < x.size(); k++) {
-          y[k] = cmac(a(0, j), x[k], y[k]);
-          w[k] = cmac(b(0, j), x[k], w[k]);
+          y[k] = cmac(a[j], x[k], y[k]);
+          w[k] = cmac(b[j], x[k], w[k]);
         }
       }
 

@@ -26,6 +26,13 @@ namespace quda
     template <typename T> inline constexpr bool is_power2(T x) { return (x != 0) && ((x & (x - 1)) == 0); }
 
     /**
+       @brief Return the maximum size supported by multi-blas kernels
+       when we have a multi-1d kernel and the coefficients are stored
+       in the functor..
+    */
+    constexpr int max_N_multi_1d() { return 32; }
+
+    /**
        @brief Return the maximum power of two enabled by default for
        multi-blas.  We set a lower limit for multi-reductions, since
        we can just transpose the inner product for free, and a high
@@ -80,7 +87,7 @@ namespace quda
       constexpr int arg_size = (MAX_ARG_SIZE - sizeof(int)                                    // NYW parameter
                                 - sizeof(SpinorX[NXZ])                                        // SpinorX array
                                 - (Functor::use_z ? sizeof(SpinorZ[NXZ]) : sizeof(SpinorZ *)) // SpinorZ array
-                                - 2 * sizeof(int)                                             // functor NXZ/NYW members
+                                - sizeof(Functor)                                             // functor
                                 - sizeof(int)                                                 // length parameter
                                 - (!Functor::use_w ? sizeof(SpinorW *) : 0)   // subtract pointer if not using W
                                 - (Functor::reducer ? sizeof(ReduceArg<void*>) : 0) // reduction buffers
@@ -120,7 +127,7 @@ namespace quda
        @param[in] scalar_width Width of the scalar that we're
        multiplying by (1 = real, 2 = complex)
     */
-    inline int max_YW_size(int NXZ, QudaPrecision x_prec, QudaPrecision y_prec, bool use_z, bool use_w, int scalar_width, bool reduce)
+    inline int max_YW_size(int NXZ, QudaPrecision x_prec, QudaPrecision y_prec, bool use_z, bool use_w, int scalar_width, bool reduce, bool multi_1d = false)
     {
       bool x_fixed = x_prec < QUDA_SINGLE_PRECISION;
       bool y_fixed = y_prec < QUDA_SINGLE_PRECISION;
@@ -136,10 +143,11 @@ namespace quda
       int arg_size = (MAX_ARG_SIZE - sizeof(int)                       // NYW parameter
                       - NXZ * spinor_x_size                            // SpinorX array
                       - (use_z ? NXZ * spinor_z_size : sizeof(void *)) // SpinorZ array (else dummy pointer)
-                      - 2 * sizeof(int)                                    // functor NXZ/NYW members
+                      - 2 * sizeof(int)                                // functor NXZ/NYW members
                       - sizeof(int)                                    // length parameter
                       - (!use_w ? sizeof(void *) : 0)                  // subtract dummy pointer if not using W
-                      - (reduce ? sizeof(ReduceArg<void*>) : 0)              // reduction buffers
+                      - (reduce ? sizeof(ReduceArg<void*>) : 0)        // reduction buffers
+                      - (multi_1d ? scalar_size * 3 * max_N_multi_1d() : 0) // multi_1d coefficient arrays
                       - 16) // there seems to be 16 bytes other argument space we need
         / (spinor_y_size + (use_w ? spinor_w_size : 0));
 
@@ -159,7 +167,7 @@ namespace quda
       using real = typename mapper<y_store_t>::type;
       constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, Functor>();
       constexpr int scalar_width = Functor::coeff_mul ? sizeof(typename Functor::coeff_t) / sizeof(real) : 0;
-      const int NYW_max_check = max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), f.use_z, f.use_w, scalar_width, f.reducer);
+      const int NYW_max_check = max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), f.use_z, f.use_w, scalar_width, f.reducer, f.multi_1d);
 
       if (!is_valid_NXZ(NXZ, f.reducer, x[0]->Precision() < QUDA_SINGLE_PRECISION))
         errorQuda("NXZ=%d is not a valid size ( MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
@@ -170,6 +178,10 @@ namespace quda
       if (f.reducer && NXZ * f.NYW > QUDA_MAX_MULTI_REDUCE)
         errorQuda("NXZ * NYW = %d exceeds maximum number of reductions %d * %d > %d",
                   NXZ * f.NYW, NXZ, f.NYW, QUDA_MAX_MULTI_REDUCE);
+      if (Functor::multi_1d && std::min(NXZ, f.NYW) != 1)
+        errorQuda("Expected 1-d multi-blas but appears 2-d (NXZ = %d, NYW = %d)", NXZ, f.NYW);
+      if (Functor::multi_1d && std::max(NXZ, f.NYW) > max_N_multi_1d())
+        errorQuda("1-d size %d exceeds maximum %d", std::max(NXZ,f.NYW), max_N_multi_1d());
     }
 
     template <int NXZ, typename store_t, int N, bool> struct SpinorXZ {
@@ -199,24 +211,6 @@ namespace quda
       const T *data;
       coeff_array() : data(nullptr) {}
       coeff_array(const T *data) : data(data) {}
-    };
-
-    namespace detail
-    {
-      template <unsigned... digits> struct to_chars {
-        static const char value[];
-      };
-
-      template <unsigned... digits> const char to_chars<digits...>::value[] = {('0' + digits)..., 0};
-
-      template <unsigned rem, unsigned... digits> struct explode : explode<rem / 10, rem % 10, digits...> {
-      };
-
-      template <unsigned... digits> struct explode<0, digits...> : to_chars<digits...> {
-      };
-    } // namespace detail
-
-    template <unsigned num> struct num_to_string : detail::explode<num / 10, num % 10> {
     };
 
   } // namespace blas

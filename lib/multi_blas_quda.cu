@@ -100,17 +100,36 @@ namespace quda {
         return TuneKey(x[0]->VolString(), name, aux);
       }
 
-      template <typename buffer_t>
-      void set_param(buffer_t &d, const T &h, const qudaStream_t &stream)
+      template <bool multi_1d, typename device_buffer_t, typename Arg> typename std::enable_if<multi_1d, void>::type
+      set_param(device_buffer_t &&buf_d, Arg &arg, char select, const T &h, const qudaStream_t &stream)
       {
-        using coeff_t = typename decltype(f)::coeff_t;
+        using coeff_t = typename decltype(arg.f)::coeff_t;
+        coeff_t *buf_arg = nullptr;
+        switch (select) {
+        case 'a': buf_arg = arg.f.a; break;
+        case 'b': buf_arg = arg.f.b; break;
+        case 'c': buf_arg = arg.f.c; break;
+        default: errorQuda("Unknown buffer %c", select);
+        }
+        const auto N = std::max(NXZ,NYW);
+        for (int i = 0; i < N; i++) buf_arg[i] = coeff_t(h.data[i]);
+      }
+
+      template <bool multi_1d, typename device_buffer_t, typename Arg> typename std::enable_if<!multi_1d, void>::type
+      set_param(device_buffer_t &&buf_d, Arg &arg, char dummy, const T &h, const qudaStream_t &stream)
+      {
+        using coeff_t = typename decltype(arg.f)::coeff_t;
         constexpr size_t n_coeff = MAX_MATRIX_SIZE / sizeof(coeff_t);
 
         coeff_t tmp[n_coeff];
         for (int i = 0; i < NXZ; i++)
           for (int j = 0; j < NYW; j++) tmp[NYW * i + j] = coeff_t(h.data[NYW * i + j]);
-        cudaMemcpyToSymbolAsync(d, tmp, NXZ * NYW * sizeof(decltype(tmp[0])), 0, cudaMemcpyHostToDevice, stream);
-        //cuMemcpyHtoDAsync(d, tmp, NXZ * NYW * sizeof(decltype(tmp[0])), stream);
+
+#ifdef JITIFY
+        cuMemcpyHtoDAsync(buf_d, tmp, NXZ * NYW * sizeof(coeff_t), stream);
+#else
+        cudaMemcpyToSymbolAsync(buf_d, tmp, NXZ * NYW * sizeof(coeff_t), 0, cudaMemcpyHostToDevice, stream);
+#endif
       }
 
       template <int NXZ> void compute(const qudaStream_t &stream)
@@ -135,27 +154,23 @@ namespace quda {
           constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
           const int length = x[0]->Length() / (nParity * M);
 
-          MultiBlasArg<NXZ, device_store_t, N, device_y_store_t, Ny, decltype(f_)> arg(x, y, z, w, f_, NYW, length);
+          tp.block.x *= tp.aux.x; // include warp-split factor
 
+          MultiBlasArg<NXZ, device_store_t, N, device_y_store_t, Ny, decltype(f_)> arg(x, y, z, w, f_, NYW, length);
 #ifdef JITIFY
           using namespace jitify::reflection;
           auto instance = program->kernel("quda::blas::multiBlasKernel")
             .instantiate(Type<device_real_t>(), M, NXZ, tp.aux.x, Type<decltype(arg)>());
 
-          set_param(instant.get_constant_ptr("quda::blas::Amatrix_d"), a);
-          set_param(instant.get_constant_ptr("quda::blas::Bmatrix_d"), b);
-          set_param(instant.get_constant_ptr("quda::blas::Cmatrix_d"), c);
+          if (a.data) set_param<decltype(f_)::multi_1d>(instance.get_constant_ptr("quda::blas::Amatrix_d"), arg, 'a', a, stream);
+          if (b.data) set_param<decltype(f_)::multi_1d>(instance.get_constant_ptr("quda::blas::Bmatrix_d"), arg, 'b', b, stream);
+          if (c.data) set_param<decltype(f_)::multi_1d>(instance.get_constant_ptr("quda::blas::Cmatrix_d"), arg, 'c', c, stream);
 
-          tp.block.x *= tp.aux.x; // include warp-split factor
           jitify_error = instance.configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
-          tp.block.x /= tp.aux.x; // restore block size
 #else
-          if (a.data) { set_param(Amatrix_d, a, stream); }
-          if (b.data) { set_param(Bmatrix_d, b, stream); }
-          if (c.data) { set_param(Cmatrix_d, c, stream); }
-
-          tp.block.x *= tp.aux.x; // include warp-split factor
-
+          if (a.data) { set_param<decltype(f_)::multi_1d>(Amatrix_d, arg, 'a', a, stream); }
+          if (b.data) { set_param<decltype(f_)::multi_1d>(Bmatrix_d, arg, 'b', b, stream); }
+          if (c.data) { set_param<decltype(f_)::multi_1d>(Cmatrix_d, arg, 'c', c, stream); }
           switch (tp.aux.x) {
           case 1: multiBlasKernel<device_real_t, M, NXZ, 1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
 #ifdef WARP_SPLIT
@@ -164,9 +179,9 @@ namespace quda {
 #endif
           default: errorQuda("warp-split factor %d not instantiated", tp.aux.x);
           }
+#endif
 
           tp.block.x /= tp.aux.x; // restore block size
-#endif
         } else {
           errorQuda("Only implemented for GPU fields");
         }
@@ -491,7 +506,7 @@ namespace quda {
     void axpyBzpcx(const double *a_, std::vector<ColorSpinorField *> &x_, std::vector<ColorSpinorField *> &y_,
                    const double *b_, ColorSpinorField &z_, const double *c_)
     {
-      if (y_.size() <= (size_t)max_YW_size(1, z_.Precision(), y_[0]->Precision(), false, true, 1, false)) {
+      if (y_.size() <= (size_t)max_N_multi_1d()) {
         // swizzle order since we are writing to x_ and y_, but the
 	// multi-blas only allow writing to y and w, and moreover the
 	// block width of y and w must match, and x and z must match.
@@ -529,7 +544,8 @@ namespace quda {
     void caxpyBxpz(const Complex *a_, std::vector<ColorSpinorField*> &x_, ColorSpinorField &y_,
 		   const Complex *b_, ColorSpinorField &z_)
     {
-      if (is_valid_NXZ(x_.size(), false, x_[0]->Precision() < QUDA_SINGLE_PRECISION)) // only split if we have to.
+      if (x_.size() <= (size_t)max_N_multi_1d() &&
+          is_valid_NXZ(x_.size(), false, x_[0]->Precision() < QUDA_SINGLE_PRECISION)) // only split if we have to.
       {
         // swizzle order since we are writing to y_ and z_, but the
         // multi-blas only allow writing to y and w, and moreover the

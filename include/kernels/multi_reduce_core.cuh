@@ -118,6 +118,7 @@ namespace quda
       using coeff_t = coeff_t_;
       static constexpr bool reducer = true;
       static constexpr bool coeff_mul  = false;
+      static constexpr bool multi_1d = false;
       const int NXZ;
       const int NYW;
 
