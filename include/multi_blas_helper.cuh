@@ -28,7 +28,7 @@ namespace quda
     /**
        @brief Return the maximum size supported by multi-blas kernels
        when we have a multi-1d kernel and the coefficients are stored
-       in the functor..
+       in the functor.
     */
     constexpr int max_N_multi_1d() { return 32; }
 

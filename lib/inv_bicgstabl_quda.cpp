@@ -134,7 +134,6 @@ namespace quda {
       blas::caxpy(-gamma_prime[j], *r[j], *r[0]);
     }
 #else
-    
     // This does two "wasted" caxpys (so 2*nKrylov+2 instead of 2*nKrylov), but
     // the alternative way would be un-fusing some calls, which would require
     // loading and saving x twice. In a solve where the sloppy precision is lower than

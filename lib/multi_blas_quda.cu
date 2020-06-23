@@ -94,8 +94,12 @@ namespace quda {
       TuneKey tuneKey() const
       {
         char name[TuneKey::name_n];
-        strcpy(name, std::to_string(NXZ).c_str());
-        strcat(name, std::to_string(NYW).c_str());
+        char NXZ_str[8];
+        char NYW_str[8];
+        u32toa(NXZ_str, NXZ);
+        u32toa(NYW_str, NYW);
+        strcpy(name, NXZ_str);
+        strcat(name, NYW_str);
         strcat(name, typeid(f).name());
         return TuneKey(x[0]->VolString(), name, aux);
       }
