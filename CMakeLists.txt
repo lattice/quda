@@ -33,6 +33,14 @@ else()
   set(DEFTARGET "CUDA")
 endif()
 
+if( DEFTARGET STREQUAL "CUDA") 
+message(STATUS "CUDA Target")
+enable_language(CUDA)
+endif()
+
+message( STATUS "CUDA Compiler is" ${CMAKE_CUDA_COMPILER})
+
+message( STATUS "Compiler ID is " ${CMAKE_CUDA_COMPILER_ID})
 if( CMAKE_CUDA_COMPILER_ID MATCHES "Clang")
  set(QUDA_NVCC_BUILD FALSE)
  message(STATUS "Clang Build")
@@ -440,7 +448,6 @@ set(CMAKE_CUDA_FLAGS_SANITIZE
     CACHE STRING "Flags used by the C++ compiler during sanitizer debug builds.")
 
 # CUDA Wrapper for finding libs etc
-enable_language(CUDA)
 if(CMAKE_VERSION VERSION_LESS 3.17)
   find_package(CUDAWrapper)
 else()

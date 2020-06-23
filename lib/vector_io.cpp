@@ -7,8 +7,12 @@ namespace quda
 {
 
   VectorIO::VectorIO(const std::string &filename, bool parity_inflate) :
+#ifdef HAVE_QIO	
     filename(filename),
     parity_inflate(parity_inflate)
+#else 
+    filename(filename)
+#endif
   {
     if (strcmp(filename.c_str(), "") == 0) { errorQuda("No eigenspace input file defined."); }
   }
