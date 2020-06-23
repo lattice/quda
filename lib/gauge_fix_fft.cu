@@ -118,7 +118,7 @@ namespace quda {
       arg.tmp1 = data_out;
     }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if ( direction == 0 )
         fft_rotate_kernel_2D2D<0, Float > <<< tp.grid, tp.block, 0, stream >>> (arg);
@@ -230,7 +230,7 @@ namespace quda {
     }
     ~GaugeFixQuality () { }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       argQ.result_h[0] = make_double2(0.0,0.0);
       LAUNCH_KERNEL_LOCAL_PARITY(computeFix_quality, (*this), tp, stream, argQ, Elems, Float, Gauge, gauge_dir);
@@ -333,7 +333,7 @@ namespace quda {
     GaugeFixSETINVPSP(GaugeFixArg<Float> &arg) : arg(arg) { }
     ~GaugeFixSETINVPSP () { }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       kernel_gauge_set_invpsq<Float> <<< tp.grid, tp.block, 0, stream >>> (arg);
     }
@@ -392,7 +392,7 @@ namespace quda {
     ~GaugeFixINVPSP () {
     }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       kernel_gauge_mult_norm_2D<Float> <<< tp.grid, tp.block, 0, stream >>> (arg);
     }
@@ -556,7 +556,7 @@ namespace quda {
 
     void setAlpha(Float alpha){ half_alpha = alpha * 0.5; }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       kernel_gauge_fix_U_EO_NEW<Float, Gauge> <<< tp.grid, tp.block, 0, stream >>> (arg, dataOr, half_alpha);
     }
@@ -669,7 +669,7 @@ namespace quda {
     }
 
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       kernel_gauge_GX<Elems, Float> <<< tp.grid, tp.block, 0, stream >>> (arg, half_alpha);
     }
@@ -778,7 +778,7 @@ namespace quda {
     ~GaugeFix () { }
 
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       kernel_gauge_fix_U_EO<Elems, Float, Gauge> <<< tp.grid, tp.block, 0, stream >>> (arg, dataOr);
     }

@@ -151,7 +151,7 @@ static int *num_failures_h = nullptr;
 static int *num_failures_d = nullptr;
 
 cudaDeviceProp deviceProp;
-cudaStream_t *streams;
+qudaStream_t *streams;
 
 static bool initialized = false;
 
@@ -650,6 +650,68 @@ void initQudaDevice(int dev) {
   profileInit.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
+void printDeviceProp()
+{
+
+  int dev_count;
+  cudaGetDeviceCount(&dev_count);
+  int device;
+  for (device = 0; device < dev_count; device++) {
+
+    // cudaDeviceProp deviceProp;
+    cudaGetDeviceProperties(&deviceProp, device);
+    printfQuda("%d - name:                    %s\n", device, deviceProp.name);
+    printfQuda("%d - totalGlobalMem:          %lu bytes ( %.2f Gbytes)\n", device, deviceProp.totalGlobalMem,
+               deviceProp.totalGlobalMem / (float)(1024 * 1024 * 1024));
+    printfQuda("%d - sharedMemPerBlock:       %lu bytes ( %.2f Kbytes)\n", device, deviceProp.sharedMemPerBlock,
+               deviceProp.sharedMemPerBlock / (float)1024);
+    printfQuda("%d - regsPerBlock:            %d\n", device, deviceProp.regsPerBlock);
+    printfQuda("%d - warpSize:                %d\n", device, deviceProp.warpSize);
+    printfQuda("%d - memPitch:                %lu\n", device, deviceProp.memPitch);
+    printfQuda("%d - maxThreadsPerBlock:      %d\n", device, deviceProp.maxThreadsPerBlock);
+    printfQuda("%d - maxThreadsDim[0]:        %d\n", device, deviceProp.maxThreadsDim[0]);
+    printfQuda("%d - maxThreadsDim[1]:        %d\n", device, deviceProp.maxThreadsDim[1]);
+    printfQuda("%d - maxThreadsDim[2]:        %d\n", device, deviceProp.maxThreadsDim[2]);
+    printfQuda("%d - maxGridSize[0]:          %d\n", device, deviceProp.maxGridSize[0]);
+    printfQuda("%d - maxGridSize[1]:          %d\n", device, deviceProp.maxGridSize[1]);
+    printfQuda("%d - maxGridSize[2]:          %d\n", device, deviceProp.maxGridSize[2]);
+    printfQuda("%d - totalConstMem:           %lu bytes ( %.2f Kbytes)\n", device, deviceProp.totalConstMem,
+               deviceProp.totalConstMem / (float)1024);
+    printfQuda("%d - compute capability:      %d.%d\n", device, deviceProp.major, deviceProp.minor);
+    printfQuda("%d - deviceOverlap            %s\n", device, (deviceProp.deviceOverlap ? "true" : "false"));
+    printfQuda("%d - multiProcessorCount      %d\n", device, deviceProp.multiProcessorCount);
+    printfQuda("%d - kernelExecTimeoutEnabled %s\n", device, (deviceProp.kernelExecTimeoutEnabled ? "true" : "false"));
+    printfQuda("%d - integrated               %s\n", device, (deviceProp.integrated ? "true" : "false"));
+    printfQuda("%d - canMapHostMemory         %s\n", device, (deviceProp.canMapHostMemory ? "true" : "false"));
+    switch (deviceProp.computeMode) {
+    case 0: printfQuda("%d - computeMode              0: cudaComputeModeDefault\n", device); break;
+    case 1: printfQuda("%d - computeMode              1: cudaComputeModeExclusive\n", device); break;
+    case 2: printfQuda("%d - computeMode              2: cudaComputeModeProhibited\n", device); break;
+    case 3: printfQuda("%d - computeMode              3: cudaComputeModeExclusiveProcess\n", device); break;
+    default: errorQuda("Unknown deviceProp.computeMode.");
+    }
+
+    printfQuda("%d - surfaceAlignment         %lu\n", device, deviceProp.surfaceAlignment);
+    printfQuda("%d - concurrentKernels        %s\n", device, (deviceProp.concurrentKernels ? "true" : "false"));
+    printfQuda("%d - ECCEnabled               %s\n", device, (deviceProp.ECCEnabled ? "true" : "false"));
+    printfQuda("%d - pciBusID                 %d\n", device, deviceProp.pciBusID);
+    printfQuda("%d - pciDeviceID              %d\n", device, deviceProp.pciDeviceID);
+    printfQuda("%d - pciDomainID              %d\n", device, deviceProp.pciDomainID);
+    printfQuda("%d - tccDriver                %s\n", device, (deviceProp.tccDriver ? "true" : "false"));
+    switch (deviceProp.asyncEngineCount) {
+    case 0: printfQuda("%d - asyncEngineCount         1: host -> device only\n", device); break;
+    case 1: printfQuda("%d - asyncEngineCount         2: host <-> device\n", device); break;
+    case 2: printfQuda("%d - asyncEngineCount         0: not supported\n", device); break;
+    default: errorQuda("Unknown deviceProp.asyncEngineCount.");
+    }
+    printfQuda("%d - unifiedAddressing        %s\n", device, (deviceProp.unifiedAddressing ? "true" : "false"));
+    printfQuda("%d - memoryClockRate          %d kilohertz\n", device, deviceProp.memoryClockRate);
+    printfQuda("%d - memoryBusWidth           %d bits\n", device, deviceProp.memoryBusWidth);
+    printfQuda("%d - l2CacheSize              %d bytes\n", device, deviceProp.l2CacheSize);
+    printfQuda("%d - maxThreadsPerMultiProcessor          %d\n\n", device, deviceProp.maxThreadsPerMultiProcessor);
+  }
+}
+
 /*
  * Any persistent memory allocations that QUDA uses are done here.
  */
@@ -660,7 +722,7 @@ void initQudaMemory()
 
   if (!comms_initialized) init_default_comms();
 
-  streams = new cudaStream_t[Nstream];
+  streams = new qudaStream_t[Nstream];
 
   int greatestPriority;
   int leastPriority;
@@ -706,35 +768,6 @@ void initQuda(int dev)
   initQudaMemory();
 }
 
-// helper for creating extended gauge fields
-static cudaGaugeField* createExtendedGauge(cudaGaugeField &in, const int *R, TimeProfile &profile,
-					   bool redundant_comms=false, QudaReconstructType recon=QUDA_RECONSTRUCT_INVALID)
-{
-  profile.TPSTART(QUDA_PROFILE_INIT);
-  GaugeFieldParam gParamEx(in);
-  gParamEx.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
-  gParamEx.pad = 0;
-  gParamEx.nFace = 1;
-  gParamEx.tadpole = in.Tadpole();
-  gParamEx.anisotropy = in.Anisotropy();
-  for (int d = 0; d < 4; d++) {
-    gParamEx.x[d] += 2 * R[d];
-    gParamEx.r[d] = R[d];
-  }
-
-  auto *out = new cudaGaugeField(gParamEx);
-
-  // copy input field into the extended device gauge field
-  copyExtendedGauge(*out, in, QUDA_CUDA_FIELD_LOCATION);
-
-  profile.TPSTOP(QUDA_PROFILE_INIT);
-
-  // now fill up the halos
-  out->exchangeExtendedGhost(R,profile,redundant_comms);
-
-  return out;
-}
-
 // This is a flag used to signal when we have downloaded new gauge
 // field.  Set by loadGaugeQuda and consumed by loadCloverQuda as one
 // possible flag to indicate we need to recompute the clover field
@@ -752,12 +785,6 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   profileGauge.TPSTART(QUDA_PROFILE_INIT);
   // Set the specific input parameters and create the cpu gauge field
   GaugeFieldParam gauge_param(h_gauge, *param);
-
-  // if we are using half precision then we need to compute the fat
-  // link maximum while still on the cpu
-  // FIXME get a kernel for this
-  if (param->type == QUDA_ASQTAD_FAT_LINKS)
-    gauge_param.compute_fat_link_max = true;
 
   if (gauge_param.order <= 4) gauge_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   GaugeField *in = (param->location == QUDA_CPU_FIELD_LOCATION) ?
@@ -1500,7 +1527,7 @@ void endQuda(void)
   freeGaugeQuda();
   freeCloverQuda();
 
-  for (int i=0; i<QUDA_MAX_CHRONO; i++) flushChronoQuda(i);
+  for (int i = 0; i < QUDA_MAX_CHRONO; i++) flushChronoQuda(i);
 
   for (auto v : solutionResident) if (v) delete v;
   solutionResident.clear();
@@ -1624,6 +1651,23 @@ namespace quda {
     case QUDA_DOMAIN_WALL_4D_DSLASH:
       diracParam.type = pc ? QUDA_DOMAIN_WALL_4DPC_DIRAC : QUDA_DOMAIN_WALL_4D_DIRAC;
       diracParam.Ls = inv_param->Ls;
+      break;
+    case QUDA_MOBIUS_DWF_EOFA_DSLASH:
+      if (inv_param->Ls > QUDA_MAX_DWF_LS) {
+        errorQuda("Length of Ls dimension %d greater than QUDA_MAX_DWF_LS %d", inv_param->Ls, QUDA_MAX_DWF_LS);
+      }
+      diracParam.type = pc ? QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC : QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC;
+      diracParam.Ls = inv_param->Ls;
+      if (sizeof(Complex) != sizeof(double _Complex)) {
+        errorQuda("Irreconcilable difference between interface and internal complex number conventions");
+      }
+      memcpy(diracParam.b_5, inv_param->b_5, sizeof(Complex) * inv_param->Ls);
+      memcpy(diracParam.c_5, inv_param->c_5, sizeof(Complex) * inv_param->Ls);
+      diracParam.eofa_shift = inv_param->eofa_shift;
+      diracParam.eofa_pm = inv_param->eofa_pm;
+      diracParam.mq1 = inv_param->mq1;
+      diracParam.mq2 = inv_param->mq2;
+      diracParam.mq3 = inv_param->mq3;
       break;
     case QUDA_MOBIUS_DWF_DSLASH:
       if (inv_param->Ls > QUDA_MAX_DWF_LS)
@@ -1779,7 +1823,7 @@ namespace quda {
     setDiracParam(diracParam, &param, pc_solve);
     setDiracSloppyParam(diracSloppyParam, &param, pc_solve);
     // eigCG and deflation need 2 sloppy precisions and do not use Schwarz
-    bool comms_flag = (param.inv_type == QUDA_INC_EIGCG_INVERTER || param.eig_param) ? true : false;
+    bool comms_flag = (param.schwarz_type != QUDA_INVALID_SCHWARZ) ? false : true;
     setDiracPreParam(diracPreParam, &param, pc_solve, comms_flag);
 
     d = Dirac::create(diracParam); // create the Dirac operator
@@ -1812,9 +1856,10 @@ namespace quda {
   void massRescale(cudaColorSpinorField &b, QudaInvertParam &param) {
 
     double kappa5 = (0.5/(5.0 + param.m5));
-    double kappa = (param.dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
-		    param.dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-		    param.dslash_type == QUDA_MOBIUS_DWF_DSLASH) ? kappa5 : param.kappa;
+    double kappa = (param.dslash_type == QUDA_DOMAIN_WALL_DSLASH || param.dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
+                    || param.dslash_type == QUDA_MOBIUS_DWF_DSLASH || param.dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) ?
+      kappa5 :
+      param.kappa;
 
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("Mass rescale: Kappa is: %g\n", kappa);
@@ -1984,7 +2029,6 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   popVerbosity();
   profileDslash.TPSTOP(QUDA_PROFILE_TOTAL);
 }
-
 
 void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 {
@@ -2737,6 +2781,10 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {
   profilerStart(__func__);
 
+  if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH || param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
+      || param->dslash_type == QUDA_MOBIUS_DWF_DSLASH || param->dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH)
+    setKernelPackT(true);
+
   profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
 
   if (!initialized) errorQuda("QUDA not initialized");
@@ -3028,10 +3076,19 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       profileInvert.TPSTOP(QUDA_PROFILE_CHRONO);
     }
 
-    Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-    (*solve)(*out, *in);
-    delete solve;
-    solverParam.updateInvertParam(*param);
+    // if using a Schwarz preconditioner with a normal operator then we must use the DiracMdagMLocal operator
+    if (param->inv_type_precondition != QUDA_INVALID_INVERTER && param->schwarz_type != QUDA_INVALID_SCHWARZ) {
+      DiracMdagMLocal mPreLocal(diracPre);
+      Solver *solve = Solver::create(solverParam, m, mSloppy, mPreLocal, profileInvert);
+      (*solve)(*out, *in);
+      solverParam.updateInvertParam(*param);
+      delete solve;
+    } else {
+      Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+      (*solve)(*out, *in);
+      solverParam.updateInvertParam(*param);
+      delete solve;
+    }
   } else { // norm_error_solve
     DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
     cudaColorSpinorField tmp(*out);
@@ -3746,15 +3803,14 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
           mSloppy = new DiracMdagM(diracSloppy);
         }
 
-	// need to curry in the shift if we are not doing staggered
-	if (param->dslash_type != QUDA_ASQTAD_DSLASH &&
-	    param->dslash_type != QUDA_STAGGERED_DSLASH) {
-	  m->shift = param->offset[i];
-	  mSloppy->shift = param->offset[i];
-	}
+        // need to curry in the shift if we are not doing staggered
+        if (param->dslash_type != QUDA_ASQTAD_DSLASH && param->dslash_type != QUDA_STAGGERED_DSLASH) {
+          m->shift = param->offset[i];
+          mSloppy->shift = param->offset[i];
+        }
 
-	if (false) { // experimenting with Minimum residual extrapolation
-	  // only perform MRE using current and previously refined solutions
+        if (false) { // experimenting with Minimum residual extrapolation
+                     // only perform MRE using current and previously refined solutions
 #ifdef REFINE_INCREASING_MASS
 	  const int nRefine = i+1;
 #else
@@ -3791,13 +3847,13 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 	    delete q[j];
 	    delete z[j];
 	  }
-	}
+        }
 
-	SolverParam solverParam(refineparam);
-	solverParam.iter = 0;
-	solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
-	solverParam.tol = (param->tol_offset[i] > 0.0 ?  param->tol_offset[i] : iter_tol); // set L2 tolerance
-	solverParam.tol_hq = param->tol_hq_offset[i]; // set heavy quark tolerance
+        SolverParam solverParam(refineparam);
+        solverParam.iter = 0;
+        solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
+        solverParam.tol = (param->tol_offset[i] > 0.0 ? param->tol_offset[i] : iter_tol); // set L2 tolerance
+        solverParam.tol_hq = param->tol_hq_offset[i];                                     // set heavy quark tolerance
         solverParam.delta = param->reliable_delta_refinement;
 
         {
@@ -3820,7 +3876,6 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
         delete m;
         delete mSloppy;
-
       }
     }
   }
@@ -4025,10 +4080,10 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   }
 
   GaugeFieldParam gParamMom(mom, *qudaGaugeParam, QUDA_ASQTAD_MOM_LINKS);
-  // FIXME - test program always uses MILC for mom but can use QDP for gauge
-  if (gParamMom.order == QUDA_QDP_GAUGE_ORDER) gParamMom.order = QUDA_MILC_GAUGE_ORDER;
-  if (gParamMom.order == QUDA_TIFR_GAUGE_ORDER || gParamMom.order == QUDA_TIFR_PADDED_GAUGE_ORDER) gParamMom.reconstruct = QUDA_RECONSTRUCT_NO;
-  else gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
+  if (gParamMom.order == QUDA_TIFR_GAUGE_ORDER || gParamMom.order == QUDA_TIFR_PADDED_GAUGE_ORDER)
+    gParamMom.reconstruct = QUDA_RECONSTRUCT_NO;
+  else
+    gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
 
   gParamMom.site_offset = qudaGaugeParam->mom_offset;
   gParamMom.site_size = qudaGaugeParam->site_size;
@@ -4111,6 +4166,63 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   errorQuda("Gauge force has not been built");
 #endif // GPU_GAUGE_FORCE
   return 0;
+}
+
+void momResidentQuda(void *mom, QudaGaugeParam *param)
+{
+  profileGaugeForce.TPSTART(QUDA_PROFILE_TOTAL);
+  profileGaugeForce.TPSTART(QUDA_PROFILE_INIT);
+
+  checkGaugeParam(param);
+
+  GaugeFieldParam gParamMom(mom, *param, QUDA_ASQTAD_MOM_LINKS);
+  if (gParamMom.order == QUDA_TIFR_GAUGE_ORDER || gParamMom.order == QUDA_TIFR_PADDED_GAUGE_ORDER)
+    gParamMom.reconstruct = QUDA_RECONSTRUCT_NO;
+  else
+    gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
+  gParamMom.site_offset = param->mom_offset;
+  gParamMom.site_size = param->site_size;
+
+  cpuGaugeField cpuMom(gParamMom);
+
+  if (param->make_resident_mom && !param->return_result_mom) {
+    if (momResident) delete momResident;
+
+    gParamMom.create = QUDA_NULL_FIELD_CREATE;
+    gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
+    gParamMom.link_type = QUDA_ASQTAD_MOM_LINKS;
+    gParamMom.setPrecision(param->cuda_prec, true);
+    gParamMom.create = QUDA_ZERO_FIELD_CREATE;
+    momResident = new cudaGaugeField(gParamMom);
+  } else if (param->return_result_mom && !param->make_resident_mom) {
+    if (!momResident) errorQuda("No resident momentum to return");
+  } else {
+    errorQuda("Unexpected combination make_resident_mom = %d return_result_mom = %d", param->make_resident_mom,
+              param->return_result_mom);
+  }
+
+  profileGaugeForce.TPSTOP(QUDA_PROFILE_INIT);
+
+  if (param->make_resident_mom) {
+    // we are downloading the momentum from the host
+    profileGaugeForce.TPSTART(QUDA_PROFILE_H2D);
+    momResident->loadCPUField(cpuMom);
+    profileGaugeForce.TPSTOP(QUDA_PROFILE_H2D);
+  } else if (param->return_result_mom) {
+    // we are uploading the momentum to the host
+    profileGaugeForce.TPSTART(QUDA_PROFILE_D2H);
+    momResident->saveCPUField(cpuMom);
+    profileGaugeForce.TPSTOP(QUDA_PROFILE_D2H);
+
+    profileGaugeForce.TPSTART(QUDA_PROFILE_FREE);
+    delete momResident;
+    momResident = nullptr;
+    profileGaugeForce.TPSTOP(QUDA_PROFILE_FREE);
+  }
+
+  profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
+
+  checkCudaError();
 }
 
 void createCloverQuda(QudaInvertParam* invertParam)
@@ -5008,6 +5120,8 @@ double momActionQuda(void* momentum, QudaGaugeParam* param)
   GaugeFieldParam gParam(momentum, *param, QUDA_ASQTAD_MOM_LINKS);
   gParam.reconstruct = (gParam.order == QUDA_TIFR_GAUGE_ORDER || gParam.order == QUDA_TIFR_PADDED_GAUGE_ORDER) ?
     QUDA_RECONSTRUCT_NO : QUDA_RECONSTRUCT_10;
+  gParam.site_offset = param->mom_offset;
+  gParam.site_size = param->site_size;
 
   cpuGaugeField *cpuMom = !param->use_resident_mom ? new cpuGaugeField(gParam) : nullptr;
 
@@ -5713,7 +5827,6 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
     gaugePrecise = nullptr;
   } */
 
-
   GaugeFixFFTQuda.TPSTOP(QUDA_PROFILE_H2D);
 
   // perform the update
@@ -5741,7 +5854,7 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
     delete cudaInGauge;
   }
 
-  if(timeinfo){
+  if (timeinfo) {
     timeinfo[0] = GaugeFixFFTQuda.Last(QUDA_PROFILE_H2D);
     timeinfo[1] = GaugeFixFFTQuda.Last(QUDA_PROFILE_COMPUTE);
     timeinfo[2] = GaugeFixFFTQuda.Last(QUDA_PROFILE_D2H);
@@ -5836,59 +5949,62 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
 
   // Extract data from the param struct for device malloc
   uint64_t arrayA_size = 0, arrayB_size = 0, arrayC_size = 0;
-  if(cublas_param->data_order == QUDA_CUBLAS_DATAORDER_COL) {
+  if (cublas_param->data_order == QUDA_CUBLAS_DATAORDER_COL) {
     // leading dimension is in terms of consecutive data
     // elements in a column, multiplied by number of rows
-    if(cublas_param->trans_a == QUDA_CUBLAS_OP_N) {
-      arrayA_size = cublas_param->lda * cublas_param->k; //A_mk
+    if (cublas_param->trans_a == QUDA_CUBLAS_OP_N) {
+      arrayA_size = cublas_param->lda * cublas_param->k; // A_mk
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%lu, %lu}\n", cublas_param->lda, cublas_param->k);
     } else {
-      arrayA_size = cublas_param->lda * cublas_param->m; //A_km
+      arrayA_size = cublas_param->lda * cublas_param->m; // A_km
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%lu, %lu}\n", cublas_param->lda, cublas_param->m);
     }
 
-    if(cublas_param->trans_b == QUDA_CUBLAS_OP_N) {
-      arrayB_size = cublas_param->ldb * cublas_param->n; //B_kn
+    if (cublas_param->trans_b == QUDA_CUBLAS_OP_N) {
+      arrayB_size = cublas_param->ldb * cublas_param->n; // B_kn
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%lu, %lu}\n", cublas_param->ldb, cublas_param->n);
     } else {
-      arrayB_size = cublas_param->ldb * cublas_param->k; //B_nk
+      arrayB_size = cublas_param->ldb * cublas_param->k; // B_nk
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%lu, %lu}\n", cublas_param->ldb, cublas_param->k);
     }
-    arrayC_size = cublas_param->ldc * cublas_param->n; //C_mn
+    arrayC_size = cublas_param->ldc * cublas_param->n; // C_mn
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array C_{%lu, %lu}\n", cublas_param->ldc, cublas_param->n);
   } else {
     // leading dimension is in terms of consecutive data
     // elements in a row, multiplied by number of columns.
-    if(cublas_param->trans_a == QUDA_CUBLAS_OP_N) {
-      arrayA_size = cublas_param->lda * cublas_param->m; //A_mk
+    if (cublas_param->trans_a == QUDA_CUBLAS_OP_N) {
+      arrayA_size = cublas_param->lda * cublas_param->m; // A_mk
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%lu, %lu}\n", cublas_param->m, cublas_param->lda);
     } else {
-      arrayA_size = cublas_param->lda * cublas_param->k; //A_km
+      arrayA_size = cublas_param->lda * cublas_param->k; // A_km
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%lu, %lu}\n", cublas_param->k, cublas_param->lda);
     }
-    if(cublas_param->trans_b == QUDA_CUBLAS_OP_N) {
-      arrayB_size = cublas_param->ldb * cublas_param->k; //B_nk
+    if (cublas_param->trans_b == QUDA_CUBLAS_OP_N) {
+      arrayB_size = cublas_param->ldb * cublas_param->k; // B_nk
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%lu, %lu}\n", cublas_param->k, cublas_param->ldb);
     } else {
-      arrayB_size = cublas_param->ldb * cublas_param->n; //B_kn
+      arrayB_size = cublas_param->ldb * cublas_param->n; // B_kn
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%lu, %lu}\n", cublas_param->n, cublas_param->ldb);
     }
-    arrayC_size = cublas_param->ldc * cublas_param->m; //C_mn
+    arrayC_size = cublas_param->ldc * cublas_param->m; // C_mn
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array C_{%lu, %lu}\n", cublas_param->m, cublas_param->ldc);
-  }    
+  }
 
-  size_t data_size = (cublas_param->data_type == QUDA_CUBLAS_DATATYPE_D ||
-		      cublas_param->data_type == QUDA_CUBLAS_DATATYPE_Z) ? sizeof(double) : sizeof(float);
-  int re_im = 1;  
-  if(cublas_param->data_type == QUDA_CUBLAS_DATATYPE_C || cublas_param->data_type == QUDA_CUBLAS_DATATYPE_Z) {
-    re_im *= 2;    
+  size_t data_size
+    = (cublas_param->data_type == QUDA_CUBLAS_DATATYPE_D || cublas_param->data_type == QUDA_CUBLAS_DATATYPE_Z) ?
+    sizeof(double) :
+    sizeof(float);
+  int re_im = 1;
+  if (cublas_param->data_type == QUDA_CUBLAS_DATATYPE_C || cublas_param->data_type == QUDA_CUBLAS_DATATYPE_Z) {
+    re_im *= 2;
   }
 
   size_t A_bytes = arrayA_size * re_im * data_size;
   size_t B_bytes = arrayB_size * re_im * data_size;
   size_t C_bytes = arrayC_size * re_im * data_size;
-  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("A_Gbtyes = %f, B_Gbtyes = %f, C_Gbtyes = %f\n", 
-						   1.0*A_bytes/std::pow(1024,3), 1.0*B_bytes/std::pow(1024,3), 1.0*C_bytes/std::pow(1024,3));
+  if (getVerbosity() >= QUDA_VERBOSE)
+    printfQuda("A_Gbtyes = %f, B_Gbtyes = %f, C_Gbtyes = %f\n", 1.0 * A_bytes / std::pow(1024, 3),
+               1.0 * B_bytes / std::pow(1024, 3), 1.0 * C_bytes / std::pow(1024, 3));
   void *A_d = pool_device_malloc(A_bytes);
   void *B_d = pool_device_malloc(B_bytes);
   void *C_d = pool_device_malloc(C_bytes);
@@ -5896,16 +6012,16 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
   profileCuBLAS.TPSTOP(QUDA_PROFILE_INIT);
 
   // Transfer host data to device
-  profileCuBLAS.TPSTART(QUDA_PROFILE_H2D);  
+  profileCuBLAS.TPSTART(QUDA_PROFILE_H2D);
   qudaMemcpy(A_d, arrayA, A_bytes, cudaMemcpyHostToDevice);
   qudaMemcpy(B_d, arrayB, B_bytes, cudaMemcpyHostToDevice);
   qudaMemcpy(C_d, arrayC, C_bytes, cudaMemcpyHostToDevice);
   if (getVerbosity() >= QUDA_VERBOSE) printfQuda("QUDA: arrays copied sucsessfully.\n");
-  profileCuBLAS.TPSTOP(QUDA_PROFILE_H2D);  
-  
+  profileCuBLAS.TPSTOP(QUDA_PROFILE_H2D);
+
   // Compute Batched GEMM
   profileCuBLAS.TPSTART(QUDA_PROFILE_COMPUTE);
-  if(cublas_param->data_order == QUDA_CUBLAS_DATAORDER_ROW) {
+  if (cublas_param->data_order == QUDA_CUBLAS_DATAORDER_ROW) {
     // cuBLAS works exclusively in column major order. If the input data is in
     // row major order, we may treat the A and B and C arrays as A^T, B^T, and C^T.
     // We must now swap the order of the A * B multiplication and swap the
@@ -5924,7 +6040,7 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
     //
     // We must also swap around some parameters. The Row major indices,
     // A_{m, lda}, B_{k, ldb}, C_{m, ldc}
-    // becomes
+    // become
     // A^T_{lda, m}, B^T_{ldb, k}, C^T_{ldc, m}.
     // so the leading dimensions remain the same. However, we must change the actual
     // matrix dims m,n,k to reflect the change to column major.
@@ -5933,14 +6049,13 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
     // k_{col} = k_{row}
     // And because we are swapping the A and B arrays, we must also swap their
     // leading dim values.
-        
-    //printfQuda("pre swap\n"); printQudaCublasParam(cublas_param);
+
     std::swap(cublas_param->m, cublas_param->n);
     std::swap(cublas_param->lda, cublas_param->ldb);
     std::swap(cublas_param->trans_a, cublas_param->trans_b);
-    //printfQuda("post swap\n"); printQudaCublasParam(cublas_param);      
 
     cublas::BatchGEMM(B_d, A_d, C_d, *cublas_param, QUDA_CUDA_FIELD_LOCATION);
+
     std::swap(cublas_param->trans_a, cublas_param->trans_b);
     std::swap(cublas_param->m, cublas_param->n);
     std::swap(cublas_param->lda, cublas_param->ldb);
@@ -5952,17 +6067,17 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
   profileCuBLAS.TPSTOP(QUDA_PROFILE_COMPUTE);
   
   // Copy device C array back to host
-  profileCuBLAS.TPSTART(QUDA_PROFILE_D2H);  
+  profileCuBLAS.TPSTART(QUDA_PROFILE_D2H);
   qudaMemcpy(arrayC, C_d, C_bytes, cudaMemcpyDeviceToHost);
-  profileCuBLAS.TPSTOP(QUDA_PROFILE_D2H);  
+  profileCuBLAS.TPSTOP(QUDA_PROFILE_D2H);
 
   // Clean up
-  profileCuBLAS.TPSTART(QUDA_PROFILE_FREE);  
+  profileCuBLAS.TPSTART(QUDA_PROFILE_FREE);
   pool_device_free(A_d);
   pool_device_free(B_d);
   pool_device_free(C_d);
-  profileCuBLAS.TPSTOP(QUDA_PROFILE_FREE);  
-  
+  profileCuBLAS.TPSTOP(QUDA_PROFILE_FREE);
+
   profileCuBLAS.TPSTOP(QUDA_PROFILE_TOTAL);
   saveTuneCache();
 }

@@ -126,6 +126,9 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(make_resident_mom, INVALID_INT);
   P(return_result_gauge, INVALID_INT);
   P(return_result_mom, INVALID_INT);
+  P(gauge_offset, (size_t)INVALID_INT);
+  P(mom_offset, (size_t)INVALID_INT);
+  P(site_size, (size_t)INVALID_INT);
 #endif
 
 #ifdef INIT_PARAM
@@ -483,7 +486,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(tol_precondition, INVALID_DOUBLE);
   P(maxiter_precondition, INVALID_INT);
   P(verbosity_precondition, QUDA_INVALID_VERBOSITY);
-  P(schwarz_type, QUDA_ADDITIVE_SCHWARZ); // defaults match previous interface behaviour
+  P(schwarz_type, QUDA_INVALID_SCHWARZ);
   P(precondition_cycle, 1);               // defaults match previous interface behaviour
 #else
   if (param->inv_type_precondition == QUDA_BICGSTAB_INVERTER || param->inv_type_precondition == QUDA_CG_INVERTER
@@ -491,7 +494,6 @@ void printQudaInvertParam(QudaInvertParam *param) {
     P(tol_precondition, INVALID_DOUBLE);
     P(maxiter_precondition, INVALID_INT);
     P(verbosity_precondition, QUDA_INVALID_VERBOSITY);
-    P(schwarz_type, QUDA_INVALID_SCHWARZ);
     P(precondition_cycle, 0);
   }
 #endif
@@ -899,6 +901,8 @@ void printQudaCublasParam(QudaCublasParam *param)
   P(lda, 0);
   P(ldb, 0);
   P(ldc, 0);
+  P(a_offset, 0);
+  P(b_offset, 0);
   P(c_offset, 0);
   P(batch_count, 1);
   P(data_type, QUDA_CUBLAS_DATATYPE_S);
@@ -912,19 +916,19 @@ void printQudaCublasParam(QudaCublasParam *param)
   P(lda, INVALID_INT);
   P(ldb, INVALID_INT);
   P(ldc, INVALID_INT);
+  P(a_offset, INVALID_INT);
+  P(b_offset, INVALID_INT);
   P(c_offset, INVALID_INT);
   P(batch_count, INVALID_INT);
   P(data_type, QUDA_CUBLAS_DATATYPE_INVALID);
   P(data_order, QUDA_CUBLAS_DATAORDER_INVALID);
 #endif
 
-
 #ifdef INIT_PARAM
   return ret;
 #endif
 }
 
- 
 // clean up
 
 #undef INVALID_INT

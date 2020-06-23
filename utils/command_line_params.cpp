@@ -43,6 +43,7 @@ char gauge_outfile[256] = "";
 int Nsrc = 1;
 int Msrc = 1;
 int niter = 100;
+int maxiter_precondition = 10;
 int gcrNkrylov = 10;
 QudaCABasis ca_basis = QUDA_POWER_BASIS;
 double ca_lambda_min = 0.0;
@@ -57,6 +58,8 @@ QudaInverterType inv_type;
 bool inv_deflate = false;
 bool inv_multigrid = false;
 QudaInverterType precon_type = QUDA_INVALID_INVERTER;
+QudaSchwarzType precon_schwarz_type = QUDA_INVALID_SCHWARZ;
+int precon_schwarz_cycle = 1;
 int multishift = 1;
 bool verify_results = true;
 bool low_mode_check = false;
@@ -76,6 +79,7 @@ double clover_coeff = 0.1;
 bool compute_clover = false;
 bool compute_fatlong = false;
 double tol = 1e-7;
+double tol_precondition = 1e-1;
 double tol_hq = 0.;
 double reliable_delta = 0.1;
 bool alternative_reliable = false;
@@ -123,8 +127,8 @@ quda::mgarray<double> coarse_solver_ca_lambda_min = {};
 quda::mgarray<double> coarse_solver_ca_lambda_max = {};
 bool generate_nullspace = true;
 bool generate_all_levels = true;
-quda::mgarray<QudaSchwarzType> schwarz_type = {};
-quda::mgarray<int> schwarz_cycle = {};
+quda::mgarray<QudaSchwarzType> mg_schwarz_type = {};
+quda::mgarray<int> mg_schwarz_cycle = {};
 
 // we only actually support 4 here currently
 quda::mgarray<std::array<int, 4>> geo_block_size = {};
@@ -198,6 +202,12 @@ int heatbath_num_heatbath_per_step = 5;
 int heatbath_num_overrelax_per_step = 5;
 bool heatbath_coldstart = false;
 
+int eofa_pm = 1;
+double eofa_shift = -1.2345;
+double eofa_mq1 = 1.0;
+double eofa_mq2 = 0.085;
+double eofa_mq3 = 1.0;
+
 double stout_smear_rho = 0.1;
 double stout_smear_epsilon = -0.25;
 double ape_smear_rho = 0.6;
@@ -224,6 +234,11 @@ auto &cublas_lda = cublas_leading_dims[0];
 auto &cublas_ldb = cublas_leading_dims[1];
 auto &cublas_ldc = cublas_leading_dims[2];
 
+std::array<int, 3> cublas_offsets = {0, 0, 0};
+auto &cublas_a_offset = cublas_offsets[0];
+auto &cublas_b_offset = cublas_offsets[1];
+auto &cublas_c_offset = cublas_offsets[2];
+
 std::array<double, 2> cublas_alpha_re_im = {1.0, 0.0};
 std::array<double, 2> cublas_beta_re_im = {1.0, 0.0};
 int cublas_batch = 1;
@@ -232,12 +247,17 @@ namespace
 {
   CLI::TransformPairs<QudaCABasis> ca_basis_map {{"power", QUDA_POWER_BASIS}, {"chebyshev", QUDA_CHEBYSHEV_BASIS}};
 
-  CLI::TransformPairs<QudaCublasDataType> cublas_dt_map {{"C", QUDA_CUBLAS_DATATYPE_C}, {"Z", QUDA_CUBLAS_DATATYPE_Z}, {"S", QUDA_CUBLAS_DATATYPE_S}, {"D", QUDA_CUBLAS_DATATYPE_D}};
+  CLI::TransformPairs<QudaCublasDataType> cublas_dt_map {{"C", QUDA_CUBLAS_DATATYPE_C},
+                                                         {"Z", QUDA_CUBLAS_DATATYPE_Z},
+                                                         {"S", QUDA_CUBLAS_DATATYPE_S},
+                                                         {"D", QUDA_CUBLAS_DATATYPE_D}};
 
-  CLI::TransformPairs<QudaCublasDataOrder> cublas_do_map {{"row", QUDA_CUBLAS_DATAORDER_ROW}, {"col", QUDA_CUBLAS_DATAORDER_COL}};
+  CLI::TransformPairs<QudaCublasDataOrder> cublas_data_order_map {{"row", QUDA_CUBLAS_DATAORDER_ROW},
+                                                                  {"col", QUDA_CUBLAS_DATAORDER_COL}};
 
-  CLI::TransformPairs<QudaCublasOperation> cublas_op_map {{"N", QUDA_CUBLAS_OP_N}, {"T", QUDA_CUBLAS_OP_T}, {"C", QUDA_CUBLAS_OP_C}};
-  
+  CLI::TransformPairs<QudaCublasOperation> cublas_op_map {
+    {"N", QUDA_CUBLAS_OP_N}, {"T", QUDA_CUBLAS_OP_T}, {"C", QUDA_CUBLAS_OP_C}};
+
   CLI::TransformPairs<QudaContractType> contract_type_map {{"open", QUDA_CONTRACT_TYPE_OPEN},
                                                            {"dr", QUDA_CONTRACT_TYPE_DR}};
 
@@ -251,6 +271,7 @@ namespace
                                                        {"domain-wall", QUDA_DOMAIN_WALL_DSLASH},
                                                        {"domain-wall-4d", QUDA_DOMAIN_WALL_4D_DSLASH},
                                                        {"mobius", QUDA_MOBIUS_DWF_DSLASH},
+                                                       {"mobius-eofa", QUDA_MOBIUS_DWF_EOFA_DSLASH},
                                                        {"laplace", QUDA_LAPLACE_DSLASH}};
 
   CLI::TransformPairs<QudaTwistFlavorType> twist_flavor_type_map {{"singlet", QUDA_TWIST_SINGLET},
@@ -258,7 +279,8 @@ namespace
                                                                   {"nondeg-doublet", QUDA_TWIST_NONDEG_DOUBLET},
                                                                   {"no", QUDA_TWIST_NO}};
 
-  CLI::TransformPairs<QudaInverterType> inverter_type_map {{"cg", QUDA_CG_INVERTER},
+  CLI::TransformPairs<QudaInverterType> inverter_type_map {{"invalid", QUDA_INVALID_INVERTER},
+                                                           {"cg", QUDA_CG_INVERTER},
                                                            {"bicgstab", QUDA_BICGSTAB_INVERTER},
                                                            {"gcr", QUDA_GCR_INVERTER},
                                                            {"pcg", QUDA_PCG_INVERTER},
@@ -288,6 +310,10 @@ namespace
                                                     {"single", QUDA_SINGLE_PRECISION},
                                                     {"half", QUDA_HALF_PRECISION},
                                                     {"quarter", QUDA_QUARTER_PRECISION}};
+
+  CLI::TransformPairs<QudaSchwarzType> schwarz_type_map {{"invalid", QUDA_INVALID_SCHWARZ},
+                                                         {"additive", QUDA_ADDITIVE_SCHWARZ},
+                                                         {"multiplicative", QUDA_MULTIPLICATIVE_SCHWARZ}};
 
   CLI::TransformPairs<QudaSolutionType> solution_type_map {{"mat", QUDA_MAT_SOLUTION},
                                                            {"mat-dag-mat", QUDA_MATDAG_MAT_SOLUTION},
@@ -368,28 +394,55 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--compute-fat-long", compute_fatlong,
                        "Compute the fat/long field or use random numbers (default false)");
 
-  quda_app->add_option("--contraction-type", contract_type,
-		       "Whether to leave spin elemental open, or use a gamma basis and contract on "
-		       "spin (default open)") ->transform(CLI::QUDACheckedTransformer(contract_type_map));
+  quda_app
+    ->add_option("--contraction-type", contract_type,
+                 "Whether to leave spin elemental open, or use a gamma basis and contract on "
+                 "spin (default open)")
+    ->transform(CLI::QUDACheckedTransformer(contract_type_map));
 
-  quda_app->add_option("--cublas-data-type", cublas_data_type,"Whether to use single(S), double(D), and/or complex(C/Z) data types (default C)")->transform(CLI::QUDACheckedTransformer(cublas_dt_map));
-  
-  quda_app->add_option("--cublas-data-order", cublas_data_order, "Whether data is in row major or column major order (default row)")->transform(CLI::QUDACheckedTransformer(cublas_do_map));
-  
-  quda_app->add_option("--cublas-trans-a", cublas_trans_a,"Whether to leave the A GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")->transform(CLI::QUDACheckedTransformer(cublas_op_map));
-  
-  quda_app->add_option("--cublas-trans-b", cublas_trans_b,"Whether to leave the B GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")->transform(CLI::QUDACheckedTransformer(cublas_op_map));
-  
-  quda_app->add_option("--cublas-alpha", cublas_alpha_re_im, "Set the complex value of alpha for GEMM (default {1.0,0.0}")->expected(2);
+  quda_app
+    ->add_option("--cublas-data-type", cublas_data_type,
+                 "Whether to use single(S), double(D), and/or complex(C/Z) data types (default C)")
+    ->transform(CLI::QUDACheckedTransformer(cublas_dt_map));
 
-  quda_app->add_option("--cublas-beta", cublas_beta_re_im, "Set the complex value of beta for GEMM (default {1.0,0.0}")->expected(2);
+  quda_app
+    ->add_option("--cublas-data-order", cublas_data_order,
+                 "Whether data is in row major or column major order (default row)")
+    ->transform(CLI::QUDACheckedTransformer(cublas_data_order_map));
 
-  quda_app->add_option("--cublas-mnk", cublas_mnk, "Set the dimensions of the A, B, and C matrices GEMM (default 128 128 128")->expected(3);
-  
-  quda_app->add_option("--cublas-leading-dims", cublas_leading_dims, "Set the leading dimensions A, B, and C matrices GEMM (default 128 128 128 ")->expected(3);
+  quda_app
+    ->add_option(
+      "--cublas-trans-a", cublas_trans_a,
+      "Whether to leave the A GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")
+    ->transform(CLI::QUDACheckedTransformer(cublas_op_map));
+
+  quda_app
+    ->add_option(
+      "--cublas-trans-b", cublas_trans_b,
+      "Whether to leave the B GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")
+    ->transform(CLI::QUDACheckedTransformer(cublas_op_map));
+
+  quda_app
+    ->add_option("--cublas-alpha", cublas_alpha_re_im, "Set the complex value of alpha for GEMM (default {1.0,0.0})")
+    ->expected(2);
+
+  quda_app->add_option("--cublas-beta", cublas_beta_re_im, "Set the complex value of beta for GEMM (default {1.0,0.0})")
+    ->expected(2);
+
+  quda_app
+    ->add_option("--cublas-mnk", cublas_mnk, "Set the dimensions of the A, B, and C matrices GEMM (default 128 128 128)")
+    ->expected(3);
+
+  quda_app
+    ->add_option("--cublas-leading-dims", cublas_leading_dims,
+                 "Set the leading dimensions A, B, and C matrices GEMM (default 128 128 128) ")
+    ->expected(3);
+
+  quda_app->add_option("--cublas-offsets", cublas_offsets, "Set the offsets for matrices A, B, and C (default 0 0 0)")
+    ->expected(3);
 
   quda_app->add_option("--cublas-batch", cublas_batch, "Set the number of batches for GEMM (default 1024)");
-  
+
   quda_app->add_flag("--dagger", dagger, "Set the dagger to 1 (default 0)");
   quda_app->add_option("--device", device, "Set the CUDA device to use (default 0, single GPU only)")
     ->check(CLI::Range(0, 16));
@@ -450,7 +503,9 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     "If a value N > 1 is passed, heavier masses will be constructed and the multi-shift solver will be called");
   quda_app->add_option("--ngcrkrylov", gcrNkrylov,
                        "The number of inner iterations to use for GCR, BiCGstab-l, CA-CG (default 10)");
-  quda_app->add_option("--niter", niter, "The number of iterations to perform (default 10)");
+  quda_app->add_option("--niter", niter, "The number of iterations to perform (default 100)");
+  quda_app->add_option("--maxiter-precondition", maxiter_precondition,
+                       "The number of iterations to perform for any preconditioner (default 10)");
   quda_app->add_option("--nsrc", Nsrc,
                        "How many spinors to apply the dslash to simultaneusly (experimental for staggered only)");
 
@@ -475,6 +530,12 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
 
   quda_app->add_option("--precon-type", precon_type, "The type of solver to use (default none (=unspecified)).")
     ->transform(CLI::QUDACheckedTransformer(inverter_type_map));
+  quda_app
+    ->add_option("--precon-schwarz-type", precon_schwarz_type,
+                 "The type of Schwarz preconditioning to use (default=invalid)")
+    ->transform(CLI::QUDACheckedTransformer(schwarz_type_map));
+  quda_app->add_option("--precon-schwarz-cycle", precon_schwarz_cycle,
+                       "The number of Schwarz cycles to apply per smoother application (default=1)");
 
   CLI::TransformPairs<int> rank_order_map {{"col", 0}, {"row", 1}};
   quda_app
@@ -520,6 +581,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
 
   quda_app->add_option("--tol", tol, "Set L2 residual tolerance");
   quda_app->add_option("--tolhq", tol_hq, "Set heavy-quark residual tolerance");
+  quda_app->add_option("--tol-precondition", tol_precondition, "Set L2 residual tolerance for preconditioner");
   quda_app->add_option(
     "--unit-gauge", unit_gauge,
     "Generate a unit valued gauge field in the tests. If false, a random gauge is generated (default false)");
@@ -575,7 +637,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   auto gridsizeopt
     = quda_app
         ->add_option("--gridsize", gridsize_from_cmdline, "Set the grid size in all four dimension (default 1 1 1 1)")
-        ->expected(4);  
+        ->expected(4);
   quda_app->add_option("--xgridsize", grid_x, "Set grid size in X dimension (default 1)")->excludes(gridsizeopt);
   quda_app->add_option("--ygridsize", grid_y, "Set grid size in Y dimension (default 1)")->excludes(gridsizeopt);
   quda_app->add_option("--zgridsize", grid_z, "Set grid size in Z dimension (default 1)")->excludes(gridsizeopt);
@@ -781,11 +843,12 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--mg-pre-orth", pre_orthonormalize,
                       "If orthonormalize the vector before inverting in the setup of multigrid (default false)");
 
-  quda_app->add_mgoption(opgroup, "--mg-schwarz-cycle", schwarz_cycle, CLI::PositiveNumber,
+  quda_app
+    ->add_mgoption(opgroup, "--mg-schwarz-type", mg_schwarz_type, CLI::Validator(),
+                   "The type of preconditioning to use (requires MR smoother and GCR setup solver) (default=invalid)")
+    ->transform(CLI::QUDACheckedTransformer(schwarz_type_map));
+  quda_app->add_mgoption(opgroup, "--mg-schwarz-cycle", mg_schwarz_cycle, CLI::PositiveNumber,
                          "The number of Schwarz cycles to apply per smoother application (default=1)");
-  quda_app->add_mgoption(
-    opgroup, "--mg-schwarz-type", schwarz_type, CLI::Validator(),
-    "Whether to use Schwarz preconditioning (requires MR smoother and GCR setup solver) (default false)");
   quda_app->add_mgoption(opgroup, "--mg-setup-ca-basis-size", setup_ca_basis_size, CLI::PositiveNumber,
                          "The basis size to use for CA-CG setup of multigrid (default 4)");
   quda_app->add_mgoption(opgroup, "--mg-setup-ca-basis-type", setup_ca_basis, CLI::QUDACheckedTransformer(ca_basis_map),
@@ -832,6 +895,19 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   quda_app->add_mgoption(opgroup, "--mg-verbosity", mg_verbosity, CLI::QUDACheckedTransformer(verbosity_map),
                          "The verbosity to use on each level of the multigrid (default summarize)");
+}
+
+void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  auto opgroup = quda_app->add_option_group("EOFA", "Options controlling EOFA parameteres");
+
+  CLI::TransformPairs<int> eofa_pm_map {{"plus", 1}, {"minus", 0}};
+  opgroup->add_option("--eofa-pm", eofa_pm, "Set to evalute \"plus\" or \"minus\" EOFA operator (default plus)")
+    ->transform(CLI::QUDACheckedTransformer(eofa_pm_map));
+  opgroup->add_option("--eofa-shift", eofa_shift, "Set the shift for the EOFA operator (default -0.12345)");
+  opgroup->add_option("--eofa-mq1", eofa_mq1, "Set mq1 for EOFA operator (default 1.0)");
+  opgroup->add_option("--eofa-mq2", eofa_mq1, "Set mq2 for EOFA operator (default 0.085)");
+  opgroup->add_option("--eofa-mq3", eofa_mq1, "Set mq3 for EOFA operator (default 1.0)");
 }
 
 void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)

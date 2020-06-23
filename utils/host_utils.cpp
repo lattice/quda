@@ -97,8 +97,8 @@ void setQudaDefaultMgTestParams()
     mu_factor[i] = 1.;
     coarse_solve_type[i] = QUDA_INVALID_SOLVE;
     smoother_solve_type[i] = QUDA_INVALID_SOLVE;
-    schwarz_type[i] = QUDA_INVALID_SCHWARZ;
-    schwarz_cycle[i] = 1;
+    mg_schwarz_type[i] = QUDA_INVALID_SCHWARZ;
+    mg_schwarz_cycle[i] = 1;
     smoother_type[i] = QUDA_GCR_INVERTER;
     smoother_tol[i] = 0.25;
     coarse_solver[i] = QUDA_GCR_INVERTER;
@@ -210,7 +210,7 @@ void constructWilsonTestSpinorParam(quda::ColorSpinorParam *cs_param, const Quda
   cs_param->nColor = 3;
   cs_param->nSpin = 4;
   if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH || inv_param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
-      || inv_param->dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+      || inv_param->dslash_type == QUDA_MOBIUS_DWF_DSLASH || inv_param->dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
     cs_param->nDim = 5;
     cs_param->x[4] = inv_param->Ls;
   } else {
@@ -375,6 +375,31 @@ bool last_node_in_t()
 #else
   return true;
 #endif
+}
+
+int index_4d_cb_from_coordinate_4d(const int coordinate[4], const int dim[4])
+{
+  return (((coordinate[3] * dim[2] + coordinate[2]) * dim[1] + coordinate[1]) * dim[0] + coordinate[0]) >> 1;
+}
+
+void coordinate_from_shrinked_index(int coordinate[4], int shrinked_index, const int shrinked_dim[4],
+                                    const int shift[4], int parity)
+{
+  int aux[4];
+  aux[0] = shrinked_index * 2;
+
+  for (int i = 0; i < 3; i++) { aux[i + 1] = aux[i] / shrinked_dim[i]; }
+
+  coordinate[0] = aux[0] - aux[1] * shrinked_dim[0];
+  coordinate[1] = aux[1] - aux[2] * shrinked_dim[1];
+  coordinate[2] = aux[2] - aux[3] * shrinked_dim[2];
+  coordinate[3] = aux[3];
+
+  // Find the full coordinate in the shrinked volume.
+  coordinate[0] += (parity + coordinate[3] + coordinate[2] + coordinate[1]) & 1;
+
+  // if(shrinked_index == 3691) printfQuda("coordinate[0] = %d\n", coordinate[0]);
+  for (int d = 0; d < 4; d++) { coordinate[d] += shift[d]; }
 }
 
 // i represents a "half index" into an even or odd "half lattice".
@@ -1541,6 +1566,36 @@ int strong_check_mom(void *momA, void *momB, int len, QudaPrecision prec)
   }
 
   return ret;
+}
+
+// compute the magnitude squared anti-Hermitian matrix, including the
+// MILC convention of subtracting 4 from each site norm to improve
+// stability
+template <typename real> double mom_action(real *mom_, int len)
+{
+  double action = 0.0;
+  for (int i = 0; i < len; i++) {
+    real *mom = mom_ + i * mom_site_size;
+    double local = 0.0;
+    for (int j = 0; j < 6; j++) local += mom[j] * mom[j];
+    for (int j = 6; j < 9; j++) local += 0.5 * mom[j] * mom[j];
+    local -= 4.0;
+    action += local;
+  }
+
+  return action;
+}
+
+double mom_action(void *mom, QudaPrecision prec, int len)
+{
+  double action = 0.0;
+  if (prec == QUDA_DOUBLE_PRECISION) {
+    action = mom_action<double>((double *)mom, len);
+  } else if (prec == QUDA_SINGLE_PRECISION) {
+    action = mom_action<float>((float *)mom, len);
+  }
+  comm_allreduce(&action);
+  return action;
 }
 
 static struct timeval startTime;

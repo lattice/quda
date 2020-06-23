@@ -45,6 +45,8 @@ void display_test_info()
       if (low_mode_check || mg_eig[i]) {
         printfQuda(" - level %d solver mode %s\n", i + 1, get_eig_type_str(mg_eig_type[i]));
         printfQuda(" - level %d spectrum requested %s\n", i + 1, get_eig_spectrum_str(mg_eig_spectrum[i]));
+        if (mg_eig_type[i] == QUDA_EIG_BLK_TR_LANCZOS)
+          printfQuda(" - eigenvector block size %d\n", mg_eig_block_size[i]);
         printfQuda(" - level %d number of eigenvectors requested nConv %d\n", i + 1, nvec[i]);
         printfQuda(" - level %d size of eigenvector search space %d\n", i + 1, mg_eig_nEv[i]);
         printfQuda(" - level %d size of Krylov space %d\n", i + 1, mg_eig_nKr[i]);
@@ -69,6 +71,7 @@ void display_test_info()
     printfQuda("\n   Eigensolver parameters\n");
     printfQuda(" - solver mode %s\n", get_eig_type_str(eig_type));
     printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(eig_spectrum));
+    if (eig_type == QUDA_EIG_BLK_TR_LANCZOS) printfQuda(" - eigenvector block size %d\n", eig_block_size);
     printfQuda(" - number of eigenvectors requested %d\n", eig_nConv);
     printfQuda(" - size of eigenvector search space %d\n", eig_nEv);
     printfQuda(" - size of Krylov space %d\n", eig_nKr);
