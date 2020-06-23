@@ -8,6 +8,7 @@
  * arbitrary field and register ordering.
  */
 
+#include <type_traits>
 #include <quda_internal.h> // for maximum short, char traits.
 #include <register_traits.h>
 
