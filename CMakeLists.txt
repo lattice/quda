@@ -385,6 +385,7 @@ set(CMAKE_EXE_LINKER_FLAGS_SANITIZE
     "-fsanitize=address,undefined"
     CACHE STRING "Flags used by the linker during sanitizer debug builds.")
 
+
 # define CUDA flags
 set(CMAKE_CUDA_HOST_COMPILER
     "${CMAKE_CXX_COMPILER}"
@@ -393,10 +394,26 @@ set(CMAKE_CUDA_STANDARD ${QUDA_CXX_STANDARD})
 set(CMAKE_CUDA_STANDARD_REQUIRED True)
 mark_as_advanced(CMAKE_CUDA_HOST_COMPILER)
 
-set(CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS
+include(CheckLanguage)
+check_language(CUDA)
+
+if( ${CMAKE_CUDA_COMPILER} MATCHES "nvcc")
+  set(QUDA_CUDA_BUILD_TYPE "NVCC")
+  message(STATUS "CUDA Build Type: ${QUDA_CUDA_BUILD_TYPE}")
+endif()
+
+if( ${QUDA_CUDA_BUILD_TYPE} STREQUAL "NVCC" ) 
+  # CUDA Wrapper for finding libs etc
+  set(XCOMPILER_STRING "-Xcompiler")
+  set(LINEINFO_STIRNG "-lineinfo")
+  set(CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS
     "-Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field")
+  set(XCOMPILER_SANITIZE_OPTIONS "-fsanitize=address,-fsanitize=undefined")
+endif()
+
+ 
 set(CMAKE_CUDA_FLAGS_DEVEL
-    "-g -lineinfo -O3 -Xcompiler ${CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS}"
+	"-g ${LINEINFO_STRING} -O3 ${XCOMPILER_STRING} ${CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS}"
     CACHE STRING "Flags used by the CUDA compiler during regular development builds.")
 set(CMAKE_CUDA_FLAGS_STRICT
     "${CMAKE_CUDA_FLAGS_DEVEL}"
@@ -405,7 +422,7 @@ set(CMAKE_CUDA_FLAGS_RELEASE
     "-O3 -w"
     CACHE STRING "Flags used by the CUDA compiler during release builds.")
 set(CMAKE_CUDA_FLAGS_HOSTDEBUG
-    "-g -lineinfo"
+	"-g ${LINEINFO_STRING}"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
 set(CMAKE_CUDA_FLAGS_DEVICEDEBUG
     "-G"
@@ -414,7 +431,7 @@ set(CMAKE_CUDA_FLAGS_DEBUG
     "-g -G"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(CMAKE_CUDA_FLAGS_SANITIZE
-    "-g -lineinfo -Xcompiler -fsanitize=address,-fsanitize=undefined"
+	"-g ${LINEINFO_STRING} ${XCOMPILER_STRING} ${XCOMPILER_SANITIZE_OPTIONS}"
     CACHE STRING "Flags used by the C++ compiler during sanitizer debug builds.")
 
 # CUDA Wrapper for finding libs etc
@@ -422,7 +439,7 @@ enable_language(CUDA)
 if(CMAKE_VERSION VERSION_LESS 3.17)
   find_package(CUDAWrapper)
 else()
-  # for cmake 3.17+ we rely on
+# for cmake 3.17+ we rely on
   find_package(CUDAToolkit)
 endif()
 
@@ -825,6 +842,11 @@ mark_as_advanced(CMAKE_F_FLAGS)
 
 mark_as_advanced(CMAKE_EXE_LINKER_FLAGS_SANITIZE)
 
+message(STATUS "CUDA FLAGS: ${CMAKE_CUDA_FLAGS_STRICT}")
+message(STATUS "CXXFLAGS:   ${CMAKE_CXX_FLAGS_STRICT}")
+message(STATUS "C FLAGS:    ${CMAKE_C_FLAGS_STRICT}")
+message(STATUS "SHARED LINKER FLAGS: ${CMAKE_SHARED_LINKER_FLAGS}")
+message(STATUS "EXE_LINKER_FLAGS: ${CMAKE_EXE_LINKER_FLAGS}")
 # enable ctest
 include(CTest)
 
