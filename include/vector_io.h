@@ -12,7 +12,9 @@ namespace quda
   class VectorIO
   {
     const std::string filename;
+#ifdef HAVE_QIO
     bool parity_inflate;
+#endif
 
   public:
 
