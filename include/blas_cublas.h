@@ -37,8 +37,8 @@ namespace quda {
        @param[in] Location of the input/output data
        @return Number of flops done in this computation
     */
-    long long BatchGEMM(void *A, void* B, void* C, QudaCublasParam cublas_param, QudaFieldLocation location);
-    
+    long long BatchGEMM(void *A, void *B, void *C, QudaCublasParam cublas_param, QudaFieldLocation location);
+
   } // namespace cublas
 
 } // namespace quda

@@ -475,7 +475,7 @@ extern "C" {
     QUDA_CUBLAS_DATATYPE_S = 0,
     QUDA_CUBLAS_DATATYPE_D = 1,
     QUDA_CUBLAS_DATATYPE_C = 2,
-    QUDA_CUBLAS_DATATYPE_Z = 3, 
+    QUDA_CUBLAS_DATATYPE_Z = 3,
     QUDA_CUBLAS_DATATYPE_INVALID = QUDA_INVALID_ENUM
   } QudaCublasDataType;
 
@@ -485,7 +485,6 @@ extern "C" {
     QUDA_CUBLAS_DATAORDER_INVALID = QUDA_INVALID_ENUM
   } QudaCublasDataOrder;
 
-  
   // define these for backwards compatibility
 #define QUDA_BOOLEAN_NO QUDA_BOOLEAN_FALSE
 #define QUDA_BOOLEAN_YES QUDA_BOOLEAN_TRUE

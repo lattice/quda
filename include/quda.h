@@ -706,24 +706,27 @@ extern "C" {
   } QudaGaugeObservableParam;
 
   typedef struct QudaCublasParam_s {
-    
-    QudaCublasOperation trans_a; /**< operation op(A) that is non- or (conj.) transpose. */ 
-    QudaCublasOperation trans_b; /**< operation op(B) that is non- or (conj.) transpose. */ 
-    uint64_t m; /**< number of rows of matrix op(A) and C.*/
-    uint64_t n; /**< number of columns of matrix op(B) and C.*/
-    uint64_t k; /**< number of columns of op(A) and rows of op(B).*/
-    uint64_t lda; /**< leading dimension of two-dimensional array used to store the matrix A.*/
-    uint64_t ldb; /**< leading dimension of two-dimensional array used to store matrix B.*/
-    uint64_t ldc; /**< leading dimension of two-dimensional array used to store matrix C.*/
-    uint64_t c_offset; /**< position of the C array from which begin read/write. */   
+
+    QudaCublasOperation trans_a; /**< operation op(A) that is non- or (conj.) transpose. */
+    QudaCublasOperation trans_b; /**< operation op(B) that is non- or (conj.) transpose. */
+    uint64_t m;                  /**< number of rows of matrix op(A) and C.*/
+    uint64_t n;                  /**< number of columns of matrix op(B) and C.*/
+    uint64_t k;                  /**< number of columns of op(A) and rows of op(B).*/
+    uint64_t lda;                /**< leading dimension of two-dimensional array used to store the matrix A.*/
+    uint64_t ldb;                /**< leading dimension of two-dimensional array used to store matrix B.*/
+    uint64_t ldc;                /**< leading dimension of two-dimensional array used to store matrix C.*/
+    uint64_t a_offset;           /**< position of the A array from which begin read/write. */
+    uint64_t b_offset;           /**< position of the B array from which begin read/write. */
+    uint64_t c_offset;           /**< position of the C array from which begin read/write. */
+
     double_complex alpha; /**< scalar used for multiplication. */
-    double_complex beta; /**< scalar used for multiplication. If beta==0, C does not have to be a valid input.*/
-    
+    double_complex beta;  /**< scalar used for multiplication. If beta==0, C does not have to be a valid input.*/
+
     int batch_count; /**< number of pointers contained in arrayA, arrayB and arrayC. */
 
-    QudaCublasDataType data_type; /**< Specifies if using S(C) or D(Z) BLAS type */
+    QudaCublasDataType data_type;   /**< Specifies if using S(C) or D(Z) BLAS type */
     QudaCublasDataOrder data_order; /**< Specifies if using Row or Column major */
-    
+
   } QudaCublasParam;
 
   /*
@@ -902,7 +905,11 @@ extern "C" {
    */
   QudaCublasParam newQudaCublasParam(void);
 
-  
+  /**
+   * Print the device properties of each device on the node
+   */
+  void printDeviceProp();
+
   /**
    * Print the members of QudaGaugeParam.
    * @param param The QudaGaugeParam whose elements we are to print.
@@ -938,8 +945,7 @@ extern "C" {
    * @param param The QudaCublasParam whose elements we are to print.
    */
   void printQudaCublasParam(QudaCublasParam *param);
-  
-  
+
   /**
    * Load the gauge field from the host.
    * @param h_gauge Base pointer to host gauge field (regardless of dimensionality)
@@ -1389,16 +1395,10 @@ extern "C" {
    * @param[in] param The parameters of the external fields and the computation settings
    * @param[out] timeinfo
    */
-  int computeGaugeFixingOVRQuda(void* gauge,
-                      const unsigned int gauge_dir,
-                      const unsigned int Nsteps,
-                      const unsigned int verbose_interval,
-                      const double relax_boost,
-                      const double tolerance,
-                      const unsigned int reunit_interval,
-                      const unsigned int stopWtheta,
-                      QudaGaugeParam* param,
-                      double* timeinfo);
+  int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
+                                const unsigned int verbose_interval, const double relax_boost, const double tolerance,
+                                const unsigned int reunit_interval, const unsigned int stopWtheta,
+                                QudaGaugeParam *param, double *timeinfo);
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
    * @param[in,out] gauge, gauge field to be fixed
@@ -1412,19 +1412,13 @@ extern "C" {
    * @param[in] param The parameters of the external fields and the computation settings
    * @param[out] timeinfo
    */
-  int computeGaugeFixingFFTQuda(void* gauge,
-                      const unsigned int gauge_dir,
-                      const unsigned int Nsteps,
-                      const unsigned int verbose_interval,
-                      const double alpha,
-                      const unsigned int autotune,
-                      const double tolerance,
-                      const unsigned int stopWtheta,
-                      QudaGaugeParam* param,
-                      double* timeinfo);
+  int computeGaugeFixingFFTQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
+                                const unsigned int verbose_interval, const double alpha, const unsigned int autotune,
+                                const double tolerance, const unsigned int stopWtheta, QudaGaugeParam *param,
+                                double *timeinfo);
 
   void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *param);
-  
+
   /**
    * @brief Hacks for Callat
    */
