@@ -32,13 +32,13 @@ namespace quda
 
       // Check result:
 #ifdef LOCAL_DEBUG
-      EigenMatrix unit = EigenMatrix::Identity(n,n);
+      EigenMatrix unit = EigenMatrix::Identity(n, n);
       EigenMatrix prod = res * inv;
-      Float L2norm = ((prod - unit).norm()/(n*n));
+      Float L2norm = ((prod - unit).norm() / (n * n));
       printfQuda("Eigen: Norm of (A * Ainv - I) batch %lu = %e\n", batch, L2norm);
 #endif
     }
-    
+
     long long BatchInvertMatrix(void *Ainv, void *A, const int n, const uint64_t batch, QudaPrecision prec,
                                 QudaFieldLocation location)
     {
@@ -47,10 +47,8 @@ namespace quda
       size_t size = 2 * n * n * batch * prec;
       void *A_h = (location == QUDA_CUDA_FIELD_LOCATION ? pool_pinned_malloc(size) : A);
       void *Ainv_h = (location == QUDA_CUDA_FIELD_LOCATION ? pool_pinned_malloc(size) : Ainv);
-      if(location == QUDA_CUDA_FIELD_LOCATION) {
-	qudaMemcpy(A_h, A, size, cudaMemcpyDeviceToHost);
-      }
-      
+      if (location == QUDA_CUDA_FIELD_LOCATION) { qudaMemcpy(A_h, A, size, cudaMemcpyDeviceToHost); }
+
       long long flops = 0;
       timeval start, stop;
       gettimeofday(&start, NULL);
@@ -83,22 +81,22 @@ namespace quda
       long dsh = stop.tv_sec - start.tv_sec;
       long dush = stop.tv_usec - start.tv_usec;
       double timeh = dsh + 0.000001 * dush;
-           
+
       if (getVerbosity() >= QUDA_SUMMARIZE) {
-	int threads = 1;
+        int threads = 1;
 #ifdef _OPENMP
-	threads = omp_get_num_threads();
-#endif	
-	printfQuda("CPU: Batched matrix inversion completed in %f seconds using %d threads with GFLOPS = %f\n",
-		   timeh, threads, 1e-9 * flops / timeh);
+        threads = omp_get_num_threads();
+#endif
+        printfQuda("CPU: Batched matrix inversion completed in %f seconds using %d threads with GFLOPS = %f\n", timeh,
+                   threads, 1e-9 * flops / timeh);
       }
-      
-      if(location == QUDA_CUDA_FIELD_LOCATION) {
-	pool_pinned_free(Ainv_h);      
-	pool_pinned_free(A_h);	
-	qudaMemcpy((void *)Ainv, Ainv_h, size, cudaMemcpyHostToDevice);
-      }     
-      
+
+      if (location == QUDA_CUDA_FIELD_LOCATION) {
+        pool_pinned_free(Ainv_h);
+        pool_pinned_free(A_h);
+        qudaMemcpy((void *)Ainv, Ainv_h, size, cudaMemcpyHostToDevice);
+      }
+
       return flops;
     }
   } // namespace generic_lapack
