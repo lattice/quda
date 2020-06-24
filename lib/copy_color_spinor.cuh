@@ -180,7 +180,7 @@ namespace quda {
     }
     virtual ~CopyColorSpinor() { ; }
   
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       if (location == QUDA_CPU_FIELD_LOCATION) {
 	copyColorSpinor(arg, PreserveBasis<Arg>());
       } else {
@@ -229,7 +229,7 @@ namespace quda {
       }
     }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       if (location == QUDA_CPU_FIELD_LOCATION) {
 	if (out.GammaBasis()==in.GammaBasis()) {
           copyColorSpinor(arg, PreserveBasis<Arg>());

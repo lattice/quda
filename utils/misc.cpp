@@ -130,6 +130,7 @@ const char *get_dslash_str(QudaDslashType type)
   case QUDA_DOMAIN_WALL_DSLASH: ret = "domain-wall"; break;
   case QUDA_DOMAIN_WALL_4D_DSLASH: ret = "domain_wall_4d"; break;
   case QUDA_MOBIUS_DWF_DSLASH: ret = "mobius"; break;
+  case QUDA_MOBIUS_DWF_EOFA_DSLASH: ret = "mobius-eofa"; break;
   case QUDA_LAPLACE_DSLASH: ret = "laplace"; break;
   default: ret = "unknown"; break;
   }
@@ -205,6 +206,22 @@ const char *get_matpc_str(QudaMatPCType type)
   case QUDA_MATPC_EVEN_EVEN_ASYMMETRIC: ret = "even-even-asym"; break;
   case QUDA_MATPC_ODD_ODD_ASYMMETRIC: ret = "odd-odd-asym"; break;
   default: fprintf(stderr, "Error: invalid matpc type %d\n", type); exit(1);
+  }
+
+  return ret;
+}
+
+const char *get_solution_str(QudaSolutionType type)
+{
+  const char *ret;
+
+  switch (type) {
+  case QUDA_MAT_SOLUTION: ret = "mat"; break;
+  case QUDA_MATDAG_MAT_SOLUTION: ret = "mat-dag-mat"; break;
+  case QUDA_MATPC_SOLUTION: ret = "mat-pc"; break;
+  case QUDA_MATPCDAG_MATPC_SOLUTION: ret = "mat-pc-dag-mat-pc"; break;
+  case QUDA_MATPCDAG_MATPC_SHIFT_SOLUTION: ret = "mat-pc-dag-mat-pc-shift"; break;
+  default: fprintf(stderr, "Error: invalid solution type %d\n", type); exit(1);
   }
 
   return ret;

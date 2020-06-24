@@ -92,7 +92,7 @@ namespace quda {
     CoarseOp(Y, X, T, *gauge, &clover, kappa, a, mu_factor, QUDA_CLOVER_DIRAC, QUDA_MATPC_INVALID);
   }
 
-  void DiracClover::prefetch(QudaFieldLocation mem_space, cudaStream_t stream) const
+  void DiracClover::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
   {
     Dirac::prefetch(mem_space, stream);
     clover.prefetch(mem_space, stream, CloverPrefetchType::CLOVER_CLOVER_PREFETCH_TYPE);
@@ -297,7 +297,7 @@ namespace quda {
     CoarseOp(Y, X, T, *gauge, &clover, kappa, a, -mu_factor, QUDA_CLOVERPC_DIRAC, matpcType);
   }
 
-  void DiracCloverPC::prefetch(QudaFieldLocation mem_space, cudaStream_t stream) const
+  void DiracCloverPC::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
   {
     Dirac::prefetch(mem_space, stream);
 

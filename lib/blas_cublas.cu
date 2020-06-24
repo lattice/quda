@@ -1,7 +1,7 @@
 #ifdef CUBLAS_LIB
-#include <blas_cublas.h>
 #include <cublas_v2.h>
 #endif
+#include <blas_cublas.h>
 #include <malloc_quda.h>
 #include <quda.h>
 #include <complex.h>

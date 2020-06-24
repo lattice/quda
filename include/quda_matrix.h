@@ -660,7 +660,6 @@ namespace quda {
           (*m)(i,j) = (*m)(j,i) = 0;
         }
       }
-      return;
     }
 
 
@@ -676,7 +675,6 @@ namespace quda {
           (*m)(i,j) = (*m)(j,i) = make_float2(0.,0.);
         }
       }
-      return;
     }
 
 
@@ -692,7 +690,6 @@ namespace quda {
           (*m)(i,j) = (*m)(j,i) = make_double2(0.,0.);
         }
       }
-      return;
     }
 
 
@@ -708,7 +705,6 @@ namespace quda {
           (*m)(i,j) = 0;
         }
       }
-      return;
     }
 
 
@@ -723,7 +719,6 @@ namespace quda {
           (*m)(i,j) = make_float2(0.,0.);
         }
       }
-      return;
     }
 
 
@@ -738,7 +733,6 @@ namespace quda {
           (*m)(i,j) = make_double2(0.,0.);
         }
       }
-      return;
     }
 
 
@@ -811,35 +805,6 @@ namespace quda {
       for (int i=0; i<N; ++i){
         (*a)[i] = m(i,c); // c is the column index
       }
-      return;
-    }
-
-
-  template<class T, int N>
-    __device__ __host__ inline
-    void outerProd(const Array<T,N>& a, const Array<T,N> & b, Matrix<T,N>* m){
-#pragma unroll
-      for (int i=0; i<N; ++i){
-        const T conjb_i = conj(b[i]);
-        for (int j=0; j<N; ++j){
-          (*m)(j,i) = a[j]*conjb_i; // we reverse the ordering of indices because it cuts down on the number of function calls
-        }
-      }
-      return;
-    }
-
-  template<class T, int N>
-    __device__ __host__ inline
-    void outerProd(const T (&a)[N], const T (&b)[N], Matrix<T,N>* m){
-#pragma unroll
-      for (int i=0; i<N; ++i){
-        const T conjb_i = conj(b[i]);
-#pragma unroll
-        for (int j=0; j<N; ++j){
-          (*m)(j,i) = a[j]*conjb_i; // we reverse the ordering of indices because it cuts down on the number of function calls
-        }
-      }
-      return;
     }
 
 
@@ -866,178 +831,10 @@ namespace quda {
       return os;
     }
 
-
-  template<class T, class U>
-    __device__ inline
-    void loadLinkVariableFromArray(const T* const array, const int dir, const int idx, const int stride, Matrix<U,3> *link)
-    {
-#pragma unroll
-      for (int i=0; i<9; ++i){
-        link->data[i] = array[idx + (dir*9 + i)*stride];
-      }
-      return;
-    }
-
-
-  template<class T, class U, int N>
-    __device__ inline
-    void loadMatrixFromArray(const T* const array, const int idx, const int stride, Matrix<U,N> *mat)
-    {
-#pragma unroll
-      for (int i=0; i<(N*N); ++i){
-        mat->data[i] = array[idx + i*stride];
-      }
-    }
-
-
-  __device__ inline
-    void loadLinkVariableFromArray(const float2* const array, const int dir, const int idx, const int stride, Matrix<complex<double>,3> *link)
-    {
-      float2 single_temp;
-#pragma unroll
-      for (int i=0; i<9; ++i){
-        single_temp = array[idx + (dir*9 + i)*stride];
-        link->data[i].x = single_temp.x;
-        link->data[i].y = single_temp.y;
-      }
-      return;
-    }
-
-
-
-  template<class T, int N, class U>
-    __device__ inline
-    void writeMatrixToArray(const Matrix<T,N>& mat, const int idx, const int stride, U* const array)
-    {
-#pragma unroll
-      for (int i=0; i<(N*N); ++i){
-        array[idx + i*stride] = mat.data[i];
-      }
-    }
-
-  __device__ inline
-    void appendMatrixToArray(const Matrix<complex<double>,3>& mat, const int idx, const int stride, double2* const array)
-    {
-#pragma unroll
-      for (int i=0; i<9; ++i){
-        array[idx + i*stride].x += mat.data[i].x;
-        array[idx + i*stride].y += mat.data[i].y;
-      }
-    }
-
-  __device__ inline
-    void appendMatrixToArray(const Matrix<complex<float>,3>& mat, const int idx, const int stride, float2* const array)
-    {
-#pragma unroll
-      for (int i=0; i<9; ++i){
-        array[idx + i*stride].x += mat.data[i].x;
-        array[idx + i*stride].y += mat.data[i].y;
-      }
-    }
-
-
-  template<class T, class U>
-    __device__ inline
-    void writeLinkVariableToArray(const Matrix<T,3> & link, const int dir, const int idx, const int stride, U* const array)
-    {
-#pragma unroll
-      for (int i=0; i<9; ++i){
-        array[idx + (dir*9 + i)*stride] = link.data[i];
-      }
-      return;
-    }
-
-
-
-
-  __device__ inline
-    void writeLinkVariableToArray(const Matrix<complex<double>,3> & link, const int dir, const int idx, const int stride, float2* const array)
-    {
-      float2 single_temp;
-
-#pragma unroll
-      for (int i=0; i<9; ++i){
-        single_temp.x = link.data[i].x;
-        single_temp.y = link.data[i].y;
-        array[idx + (dir*9 + i)*stride] = single_temp;
-      }
-      return;
-    }
-
-
-  template<class T>
-    __device__ inline
-    void loadMomentumFromArray(const T* const array, const int dir, const int idx, const int stride, Matrix<T,3> *mom)
-    {
-      T temp2[5];
-      temp2[0] = array[idx + dir*stride*5];
-      temp2[1] = array[idx + dir*stride*5 + stride];
-      temp2[2] = array[idx + dir*stride*5 + 2*stride];
-      temp2[3] = array[idx + dir*stride*5 + 3*stride];
-      temp2[4] = array[idx + dir*stride*5 + 4*stride];
-
-      mom->data[0].x = 0.;
-      mom->data[0].y = temp2[3].x;
-      mom->data[1] = temp2[0];
-      mom->data[2] = temp2[1];
-
-      mom->data[3].x = -mom->data[1].x;
-      mom->data[3].y =  mom->data[1].y;
-      mom->data[4].x = 0.;
-      mom->data[4].y = temp2[3].y;
-      mom->data[5]   = temp2[2];
-
-      mom->data[6].x = -mom->data[2].x;
-      mom->data[6].y =  mom->data[2].y;
-
-      mom->data[7].x = -mom->data[5].x;
-      mom->data[7].y =  mom->data[5].y;
-
-      mom->data[8].x = 0.;
-      mom->data[8].y = temp2[4].x;
-
-      return;
-    }
-
-
-
-  template<class T, class U>
-    __device__  inline
-    void writeMomentumToArray(const Matrix<T,3> & mom, const int dir, const int idx, const U coeff, const int stride, T* const array)
-    {
-      typedef typename T::value_type real;
-      T temp2;
-      temp2.x = (mom.data[1].x - mom.data[3].x)*0.5*coeff;
-      temp2.y = (mom.data[1].y + mom.data[3].y)*0.5*coeff;
-      array[idx + dir*stride*5] = temp2;
-
-      temp2.x = (mom.data[2].x - mom.data[6].x)*0.5*coeff;
-      temp2.y = (mom.data[2].y + mom.data[6].y)*0.5*coeff;
-      array[idx + dir*stride*5 + stride] = temp2;
-
-      temp2.x = (mom.data[5].x - mom.data[7].x)*0.5*coeff;
-      temp2.y = (mom.data[5].y + mom.data[7].y)*0.5*coeff;
-      array[idx + dir*stride*5 + stride*2] = temp2;
-
-      const real temp = (mom.data[0].y + mom.data[4].y + mom.data[8].y)*0.3333333333333333333333333;
-      temp2.x =  (mom.data[0].y-temp)*coeff;
-      temp2.y =  (mom.data[4].y-temp)*coeff;
-      array[idx + dir*stride*5 + stride*3] = temp2;
-
-      temp2.x = (mom.data[8].y - temp)*coeff;
-      temp2.y = 0.0;
-      array[idx + dir*stride*5 + stride*4] = temp2;
-
-      return;
-    }
-
-
-
   template<class Cmplx>
     __device__  __host__ inline
     void computeLinkInverse(Matrix<Cmplx,3>* uinv, const Matrix<Cmplx,3>& u)
     {
-
       const Cmplx & det = getDeterminant(u);
       const Cmplx & det_inv = static_cast<typename Cmplx::value_type>(1.0)/det;
 
@@ -1069,8 +866,6 @@ namespace quda {
 
       temp = u(0,0)*u(1,1) - u(0,1)*u(1,0);
       (*uinv)(2,2) = (temp*det_inv);
-
-      return;
     }
   // template this!
   inline void copyArrayToLink(Matrix<float2,3>* link, float* array){
@@ -1082,7 +877,6 @@ namespace quda {
         (*link)(i,j).y = array[(i*3+j)*2 + 1];
       }
     }
-    return;
   }
 
   template<class Cmplx, class Real>
@@ -1095,7 +889,6 @@ namespace quda {
           (*link)(i,j).y = array[(i*3+j)*2 + 1];
         }
       }
-      return;
     }
 
 
@@ -1109,7 +902,6 @@ namespace quda {
         array[(i*3+j)*2 + 1] = link(i,j).y;
       }
     }
-    return;
   }
 
   // and this!
@@ -1123,7 +915,6 @@ namespace quda {
           array[(i*3+j)*2 + 1] = link(i,j).y;
         }
       }
-      return;
     }
 
   template<class T>
@@ -1155,8 +946,6 @@ namespace quda {
     sum += (double)(a(2,2).x * b(2,2).x  + a(2,2).y * b(2,2).y);
     return sum;
   }
-
-
 
   // and this!
   template<class Cmplx>

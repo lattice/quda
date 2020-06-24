@@ -125,6 +125,10 @@ int dimPartitioned(int dim);
 
 bool last_node_in_t();
 
+int index_4d_cb_from_coordinate_4d(const int coordinate[4], const int dim[4]);
+void coordinate_from_shrinked_index(int coordinate[4], int shrinked_index, const int shrinked_dim[4],
+                                    const int shift[4], int parity);
+
 int neighborIndex(int i, int oddBit, int dx4, int dx3, int dx2, int dx1);
 int neighborIndexFullLattice(int i, int dx4, int dx3, int dx2, int dx1);
 
@@ -155,6 +159,12 @@ void check_gauge(void **, void **, double epsilon, QudaPrecision precision);
 
 int strong_check_link(void **linkA, const char *msgA, void **linkB, const char *msgB, int len, QudaPrecision prec);
 int strong_check_mom(void *momA, void *momB, int len, QudaPrecision prec);
+
+/**
+   @brief Host reference implementation of the momentum action
+   contribution.
+ */
+double mom_action(void *mom, QudaPrecision prec, int len);
 
 void createMomCPU(void *mom, QudaPrecision precision);
 void createHwCPU(void *hw, QudaPrecision precision);
