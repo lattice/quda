@@ -174,16 +174,21 @@ target_compile_definitions(
   $<$<CONFIG:DEBUG>:HOST_DEBUGDEVICE_DEBUG>
   $<$<CONFIG:SANITIZE>:HOST_DEBUG>)
   
+target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>: -fcuda-flush-denormals-to-zero -fcuda-approx-transcendentals>)
+target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:-Wno-unknown-cuda-version>)
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -ftz=true -prec-div=false -prec-sqrt=false>)
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH}
                                     --expt-relaxed-constexpr>)
+
+
 if(QUDA_VERBOSE_BUILD)
   target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:--ptxas-options=-v>)
 endif(QUDA_VERBOSE_BUILD)
 
 # workaround for 10.2
-if(${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL "10.2" AND ${CMAKE_CUDA_COMPILER_VERSION} VERSION_LESS "10.3")
-  target_compile_options(quda PRIVATE "$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:SHELL: -Xcicc \"--Xllc -dag-vectorize-ops=1\" " >)
+if(CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA" AND ${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL "10.2" AND ${CMAKE_CUDA_COMPILER_VERSION} VERSION_LESS "10.3")
+  target_compile_options(quda PRIVATE "$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
+  SHELL: -Xcicc \"--Xllc -dag-vectorize-ops=1\" " >)
 endif()
 
 # include_directories
@@ -215,18 +220,18 @@ target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_target>)
 if(${QUDA_PROPAGATE_CXX_FLAGS})
   target_compile_options(
     quda
-    PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:
-           $<$<CONFIG:DEVEL>:-Xcompiler
+    PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
+    $<$<CONFIG:DEVEL>:${XCOMPILER_STRING}
            ${CMAKE_CXX_FLAGS_DEVEL}>
-           $<$<CONFIG:STRICT>:-Xcompiler
+	   $<$<CONFIG:STRICT>:${XCOMPILER_STRING}
            ${CMAKE_CXX_FLAGS_STRICT}>
-           $<$<CONFIG:RELEASE>:-Xcompiler
+	   $<$<CONFIG:RELEASE>:${XCOMPILER_STRING}
            ${CMAKE_CXX_FLAGS_RELEASE}>
-           $<$<CONFIG:DEBUG>:-Xcompiler
+	   $<$<CONFIG:DEBUG>:${XCOMPILER_STRING}
            ${CMAKE_CXX_FLAGS_DEBUG}>
-           $<$<CONFIG:HOSTDEBUG>:-Xcompiler
+	   $<$<CONFIG:HOSTDEBUG>:${XCOMPILER_STRING}
            ${CMAKE_CXX_FLAGS_HOSTDEBUG}>
-           $<$<CONFIG:DEVICEDEBUG>:-Xcompiler
+	   $<$<CONFIG:DEVICEDEBUG>:${XCOMPILER_STRING}
            ${CMAKE_CXX_FLAGS_DEVICEDEBUG}>
            >)
 endif()

@@ -33,6 +33,24 @@ else()
   set(DEFTARGET "CUDA")
 endif()
 
+if( DEFTARGET STREQUAL "CUDA") 
+message(STATUS "CUDA Target")
+enable_language(CUDA)
+endif()
+
+message( STATUS "CUDA Compiler is" ${CMAKE_CUDA_COMPILER})
+
+message( STATUS "Compiler ID is " ${CMAKE_CUDA_COMPILER_ID})
+if( CMAKE_CUDA_COMPILER_ID MATCHES "Clang")
+ set(QUDA_NVCC_BUILD FALSE)
+ message(STATUS "Clang Build")
+else()
+ set(QUDA_NVCC_BUILD TRUE) 
+ set(XCOMPILER_STRING "-Xcompiler")
+ message(STATUS "NVCC Build")
+endif()
+message(STATUS "XCompiler String " ${XCOMPILER_STRING})
+ 
 set(VALID_BUILD_TYPES
     DEVEL
     RELEASE
@@ -393,11 +411,22 @@ set(CMAKE_CUDA_STANDARD ${QUDA_CXX_STANDARD})
 set(CMAKE_CUDA_STANDARD_REQUIRED True)
 mark_as_advanced(CMAKE_CUDA_HOST_COMPILER)
 
+if( QUDA_NVCC_BUILD )
 set(CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS
     "-Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field")
+else()
+set(CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS
+    "-Wno-unknown-pragmas -Wno-unused-function -Wno-unused-local-typedef -Wno-unused-private-field")
+endif()
+
+if (QUDA_NVCC_BUILD)
+set(LINEINFO "-lineinfo")
+endif()
+
 set(CMAKE_CUDA_FLAGS_DEVEL
-    "-g -lineinfo -O3 -Xcompiler ${CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS}"
+	"-g ${LINEINFO} -O3 ${XCOMPILER_STRING} ${CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS}"
     CACHE STRING "Flags used by the CUDA compiler during regular development builds.")
+
 set(CMAKE_CUDA_FLAGS_STRICT
     "${CMAKE_CUDA_FLAGS_DEVEL}"
     CACHE STRING "Flags used by the CUDA compiler during strict jenkins builds.")
@@ -405,20 +434,20 @@ set(CMAKE_CUDA_FLAGS_RELEASE
     "-O3 -w"
     CACHE STRING "Flags used by the CUDA compiler during release builds.")
 set(CMAKE_CUDA_FLAGS_HOSTDEBUG
-    "-g -lineinfo"
+	"-g ${LINEINFO}"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
 set(CMAKE_CUDA_FLAGS_DEVICEDEBUG
-    "-G"
+	"-G ${LINEINFO}"
     CACHE STRING "Flags used by the C++ compiler during device-debug builds.")
 set(CMAKE_CUDA_FLAGS_DEBUG
     "-g -G"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
+
 set(CMAKE_CUDA_FLAGS_SANITIZE
-    "-g -lineinfo -Xcompiler -fsanitize=address,-fsanitize=undefined"
+	"-g -lineinfo ${XCOMPILER_STRING} -fsanitize=address,-fsanitize=undefined"
     CACHE STRING "Flags used by the C++ compiler during sanitizer debug builds.")
 
 # CUDA Wrapper for finding libs etc
-enable_language(CUDA)
 if(CMAKE_VERSION VERSION_LESS 3.17)
   find_package(CUDAWrapper)
 else()
