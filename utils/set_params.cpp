@@ -234,8 +234,8 @@ void setInvertParam(QudaInvertParam &inv_param)
 
   inv_param.extlib_type = solver_ext_lib;
 
-  // Whether or not to use native_lapack
-  inv_param.native_lapack = (native_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
+  // Whether or not to use native BLAS LAPACK
+  inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 }
 
 // Parameters defining the eigensolver
@@ -292,8 +292,8 @@ void setMultigridParam(QudaMultigridParam &mg_param)
 {
   QudaInvertParam &inv_param = *mg_param.invert_param; // this will be used to setup SolverParam parent in MGParam class
 
-  // Whether or not to use native_lapack
-  inv_param.native_lapack = (native_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
+  // Whether or not to use native BLAS LAPACK
+  inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 
   inv_param.Ls = 1;
 
@@ -633,8 +633,8 @@ void setMultigridInvertParam(QudaInvertParam &inv_param)
   inv_param.maxiter_precondition = 1;
   inv_param.omega = 1.0;
 
-  // Whether or not to use native_lapack
-  inv_param.native_lapack = (native_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
+  // Whether or not to use native BLAS LAPACK
+  inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 }
 
 // Parameters defining the eigensolver
@@ -844,8 +844,8 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
 
   inv_param.sp_pad = 0;
 
-  // Whether or not to use native_lapack
-  inv_param.native_lapack = (native_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
+  // Whether or not to use native BLAS LAPACK
+  inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 }
 
 void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
@@ -1185,8 +1185,8 @@ void setDeflatedInvertParam(QudaInvertParam &inv_param)
 
   inv_param.extlib_type = solver_ext_lib;
 
-  // Whether or not to use native_lapack
-  inv_param.native_lapack = (native_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
+  // Whether or not to use native BLAS LAPACK
+  inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 }
 
 void setDeflationParam(QudaEigParam &df_param)

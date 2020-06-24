@@ -384,7 +384,7 @@ extern "C" {
     QudaExtLibType extlib_type;
 
     /** Whether to use the native or generic BLAS */
-    QudaBoolean native_lapack;
+    QudaBoolean native_blas_lapack;
 
   } QudaInvertParam;
 

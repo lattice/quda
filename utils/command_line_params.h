@@ -149,7 +149,7 @@ template <typename T> std::string inline get_string(CLI::TransformPairs<T> &map,
 
 extern int device;
 extern int rank_order;
-extern bool native_lapack;
+extern bool native_blas_lapack;
 extern std::array<int, 4> gridsize_from_cmdline;
 extern std::array<int, 4> dim_partitioned;
 extern QudaReconstructType link_recon;

@@ -478,10 +478,10 @@ public:
      @param Xinv[out] Coarse clover inverse field
      @param Y[in] Coarse link field
      @param X[in] Coarse clover field
-     @param native_lapack[in] bool Whether to use native or generic blas
+     @param native_blas_lapack[in] bool Whether to use native or generic blas
    */
   void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X,
-                     const bool native_lapack);
+                     const bool native_blas_lapack);
 
   /**
      This is an object that captures an entire MG preconditioner

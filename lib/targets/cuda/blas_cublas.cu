@@ -13,7 +13,7 @@ using namespace Eigen;
 
 namespace quda {
 
-  namespace native_lapack { 
+  namespace native_blas_lapack { 
 
     
 #ifdef NATIVE_LAPACK_LIB
@@ -135,6 +135,9 @@ namespace quda {
 	  }
 	}
 
+	pool_device_free(A_array);
+	pool_device_free(Ainv_array);
+	
 #ifdef LOCAL_DEBUG
 	// Debug code: Copy computed Ainv to host
 	std::complex<float> *Ainv_h = static_cast<std::complex<float>*>(pool_pinned_malloc(size));       
@@ -173,6 +176,6 @@ namespace quda {
       return 0; // Stops a compiler warning
 #endif
     }
-  } // namespace native_lapack
+  } // namespace native_blas_lapack
 } // namespace quda
 

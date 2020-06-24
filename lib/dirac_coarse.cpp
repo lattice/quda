@@ -27,7 +27,7 @@ namespace quda {
     init_gpu(gpu_setup),
     init_cpu(!gpu_setup),
     mapped(mapped),
-    native_lapack(param.native_lapack)
+    native_blas_lapack(param.native_blas_lapack)
   {
     initializeCoarse();
   }
@@ -58,9 +58,9 @@ namespace quda {
     init_gpu(enable_gpu ? false : true),
     init_cpu(enable_cpu ? false : true),
     mapped(Y_d->MemType() == QUDA_MEMORY_MAPPED),
-    native_lapack(param.native_lapack)
+    native_blas_lapack(param.native_blas_lapack)
   {
-    if (native_lapack) native_lapack::init();
+    if (native_blas_lapack) native_blas_lapack::init();
   }
 
   DiracCoarse::DiracCoarse(const DiracCoarse &dirac, const DiracParam &param) :
@@ -85,9 +85,9 @@ namespace quda {
     init_gpu(enable_gpu ? false : true),
     init_cpu(enable_cpu ? false : true),
     mapped(dirac.mapped),
-    native_lapack(dirac.native_lapack)
+    native_blas_lapack(dirac.native_blas_lapack)
   {
-    if (native_lapack) native_lapack::init();
+    if (native_blas_lapack) native_blas_lapack::init();
   }
 
   DiracCoarse::~DiracCoarse()
@@ -104,7 +104,7 @@ namespace quda {
       if (Xinv_d) delete Xinv_d;
       if (Yhat_d) delete Yhat_d;
     }
-    if (native_lapack) native_lapack::destroy();
+    if (native_blas_lapack) native_blas_lapack::destroy();
   }
 
   void DiracCoarse::createY(bool gpu, bool mapped) const
@@ -194,7 +194,7 @@ namespace quda {
 
   void DiracCoarse::initializeCoarse()
   {
-    if (native_lapack) native_lapack::init();
+    if (native_blas_lapack) native_blas_lapack::init();
 
     createY(gpu_setup, mapped);
 
@@ -261,7 +261,7 @@ namespace quda {
   }
 
   void DiracCoarse::createPreconditionedCoarseOp(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X) {
-    calculateYhat(Yhat, Xinv, Y, X, native_lapack);
+    calculateYhat(Yhat, Xinv, Y, X, native_blas_lapack);
   }
 
   void DiracCoarse::Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
