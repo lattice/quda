@@ -1218,8 +1218,8 @@ struct mgInputStruct {
   bool mg_verbosity[QUDA_MAX_MG_LEVEL]; // all levels
 
   // Coarsest level deflation
-  int deflate_nEv;
-  int deflate_nKr;
+  int deflate_n_ev;
+  int deflate_n_kr;
   int deflate_max_restarts;
   double deflate_tol;
   bool deflate_use_poly_acc;
@@ -1230,8 +1230,8 @@ struct mgInputStruct {
   mgInputStruct() :
     mg_levels(4),
     verify_results(true),
-    deflate_nEv(66),
-    deflate_nKr(128),
+    deflate_n_ev(66),
+    deflate_n_kr(128),
     deflate_max_restarts(50),
     deflate_tol(1e-5),
     deflate_use_poly_acc(false),
@@ -1312,8 +1312,8 @@ struct mgInputStruct {
     nvec[3] = 0; // 64; // do not deflate
     mg_vec_infile[3][0] = 0;
     mg_vec_outfile[3][0] = 0;
-    deflate_nEv = 66;
-    deflate_nKr = 128;
+    deflate_n_ev = 66;
+    deflate_n_kr = 128;
     deflate_tol = 1e-3;
     deflate_max_restarts = 50;
     deflate_use_poly_acc = false;
@@ -1460,18 +1460,18 @@ struct mgInputStruct {
       }
 
     } else /* Begin Deflation */
-      if (strcmp(input_line[0].c_str(), "deflate_nEv") == 0) {
+      if (strcmp(input_line[0].c_str(), "deflate_n_ev") == 0) {
       if (input_line.size() < 2) {
         error_code = 1;
       } else {
-        deflate_nEv = atoi(input_line[1].c_str());
+        deflate_n_ev = atoi(input_line[1].c_str());
       }
 
-    } else if (strcmp(input_line[0].c_str(), "deflate_nKr") == 0) {
+    } else if (strcmp(input_line[0].c_str(), "deflate_n_kr") == 0) {
       if (input_line.size() < 2) {
         error_code = 1;
       } else {
-        deflate_nKr = atoi(input_line[1].c_str());
+        deflate_n_kr = atoi(input_line[1].c_str());
       }
 
     } else if (strcmp(input_line[0].c_str(), "deflate_max_restarts") == 0) {
@@ -1545,9 +1545,9 @@ void milcSetMultigridEigParam(QudaEigParam &mg_eig_param, mgInputStruct &input_s
     errorQuda("Only real spectrum type (LR or SR) can be passed to the a Lanczos type solver");
   }
 
-  mg_eig_param.nEv = input_struct.deflate_nEv; // mg_eig_nEv[level];
-  mg_eig_param.nKr = input_struct.deflate_nKr; // mg_eig_nKr[level];
-  mg_eig_param.nConv = input_struct.nvec[level];
+  mg_eig_param.n_ev = input_struct.deflate_n_ev; // mg_eig_n_ev[level];
+  mg_eig_param.n_kr = input_struct.deflate_n_kr; // mg_eig_n_kr[level];
+  mg_eig_param.n_conv = input_struct.nvec[level];
   mg_eig_param.batched_rotate = 0; // mg_eig_batched_rotate[level];
   mg_eig_param.require_convergence
     = QUDA_BOOLEAN_TRUE; // mg_eig_require_convergence[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
