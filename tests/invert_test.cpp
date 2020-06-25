@@ -40,9 +40,11 @@ void display_test_info()
       if (low_mode_check || mg_eig[i]) {
         printfQuda(" - level %d solver mode %s\n", i + 1, get_eig_type_str(mg_eig_type[i]));
         printfQuda(" - level %d spectrum requested %s\n", i + 1, get_eig_spectrum_str(mg_eig_spectrum[i]));
-        printfQuda(" - level %d number of eigenvectors requested nConv %d\n", i + 1, nvec[i]);
-        printfQuda(" - level %d size of eigenvector search space %d\n", i + 1, mg_eig_nEv[i]);
-        printfQuda(" - level %d size of Krylov space %d\n", i + 1, mg_eig_nKr[i]);
+        if (mg_eig_type[i] == QUDA_EIG_BLK_TR_LANCZOS)
+          printfQuda(" - eigenvector block size %d\n", mg_eig_block_size[i]);
+        printfQuda(" - level %d number of eigenvectors requested n_conv %d\n", i + 1, nvec[i]);
+        printfQuda(" - level %d size of eigenvector search space %d\n", i + 1, mg_eig_n_ev[i]);
+        printfQuda(" - level %d size of Krylov space %d\n", i + 1, mg_eig_n_kr[i]);
         printfQuda(" - level %d solver tolerance %e\n", i + 1, mg_eig_tol[i]);
         printfQuda(" - level %d convergence required (%s)\n", i + 1, mg_eig_require_convergence[i] ? "true" : "false");
         printfQuda(" - level %d Operator: daggered (%s) , norm-op (%s)\n", i + 1,
@@ -64,9 +66,10 @@ void display_test_info()
     printfQuda("\n   Eigensolver parameters\n");
     printfQuda(" - solver mode %s\n", get_eig_type_str(eig_type));
     printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(eig_spectrum));
-    printfQuda(" - number of eigenvectors requested %d\n", eig_nConv);
-    printfQuda(" - size of eigenvector search space %d\n", eig_nEv);
-    printfQuda(" - size of Krylov space %d\n", eig_nKr);
+    if (eig_type == QUDA_EIG_BLK_TR_LANCZOS) printfQuda(" - eigenvector block size %d\n", eig_block_size);
+    printfQuda(" - number of eigenvectors requested %d\n", eig_n_conv);
+    printfQuda(" - size of eigenvector search space %d\n", eig_n_ev);
+    printfQuda(" - size of Krylov space %d\n", eig_n_kr);
     printfQuda(" - solver tolerance %e\n", eig_tol);
     printfQuda(" - convergence required (%s)\n", eig_require_convergence ? "true" : "false");
     if (eig_compute_svd) {
@@ -101,6 +104,7 @@ int main(int argc, char **argv)
   auto app = make_app();
   add_eigen_option_group(app);
   add_deflation_option_group(app);
+  add_eofa_option_group(app);
   add_multigrid_option_group(app);
   try {
     app->parse(argc, argv);
@@ -126,11 +130,10 @@ int main(int argc, char **argv)
   // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
 
-  // Only these fermions are supported in this file
   if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH
-      && dslash_type != QUDA_TWISTED_MASS_DSLASH && dslash_type != QUDA_TWISTED_CLOVER_DSLASH
-      && dslash_type != QUDA_MOBIUS_DWF_DSLASH && dslash_type != QUDA_DOMAIN_WALL_4D_DSLASH
-      && dslash_type != QUDA_DOMAIN_WALL_DSLASH) {
+      && dslash_type != QUDA_TWISTED_MASS_DSLASH && dslash_type != QUDA_DOMAIN_WALL_4D_DSLASH
+      && dslash_type != QUDA_MOBIUS_DWF_DSLASH && dslash_type != QUDA_MOBIUS_DWF_EOFA_DSLASH
+      && dslash_type != QUDA_TWISTED_CLOVER_DSLASH && dslash_type != QUDA_DOMAIN_WALL_DSLASH) {
     printfQuda("dslash_type %d not supported\n", dslash_type);
     exit(0);
   }
@@ -159,6 +162,7 @@ int main(int argc, char **argv)
   QudaInvertParam mg_inv_param = newQudaInvertParam();
   QudaEigParam mg_eig_param[mg_levels];
   QudaEigParam eig_param = newQudaEigParam();
+
   if (inv_multigrid) {
 
     setQudaMgSolveTypes();
@@ -193,10 +197,9 @@ int main(int argc, char **argv)
   // Initialize the QUDA library
   initQuda(device);
 
-  // Set some dimension parameters for the host routines
-  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
-      dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-      dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+  // set parameters for the reference Dslash, and prepare fields to be loaded
+  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
+      || dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
     dw_setDims(gauge_param.X, inv_param.Ls);
   } else {
     setDims(gauge_param.X);

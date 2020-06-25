@@ -125,7 +125,7 @@ void setInvertParam(QudaInvertParam &inv_param)
     inv_param.twist_flavor = twist_flavor;
     inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
   } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
-             || dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+             || dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
     inv_param.m5 = m5;
     kappa5 = 0.5 / (5 + inv_param.m5);
     inv_param.Ls = Lsdim;
@@ -135,6 +135,11 @@ void setInvertParam(QudaInvertParam &inv_param)
       inv_param.b_5[k] = b5;
       inv_param.c_5[k] = c5;
     }
+    inv_param.eofa_pm = eofa_pm;
+    inv_param.eofa_shift = eofa_shift;
+    inv_param.mq1 = eofa_mq1;
+    inv_param.mq2 = eofa_mq2;
+    inv_param.mq3 = eofa_mq3;
   } else {
     inv_param.Ls = 1;
   }
@@ -202,10 +207,10 @@ void setInvertParam(QudaInvertParam &inv_param)
   // domain decomposition preconditioner parameters
   inv_param.inv_type_precondition = precon_type;
 
-  inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
-  inv_param.precondition_cycle = 1;
-  inv_param.tol_precondition = 1e-1;
-  inv_param.maxiter_precondition = 10;
+  inv_param.schwarz_type = precon_schwarz_type;
+  inv_param.precondition_cycle = precon_schwarz_cycle;
+  inv_param.tol_precondition = tol_precondition;
+  inv_param.maxiter_precondition = maxiter_precondition;
   inv_param.verbosity_precondition = mg_verbosity[0];
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
   inv_param.omega = 1.0;
@@ -237,20 +242,29 @@ void setEigParam(QudaEigParam &eig_param)
   eig_param.spectrum = eig_spectrum;
   if ((eig_type == QUDA_EIG_TR_LANCZOS || eig_type == QUDA_EIG_IR_LANCZOS)
       && !(eig_spectrum == QUDA_SPECTRUM_LR_EIG || eig_spectrum == QUDA_SPECTRUM_SR_EIG)) {
-    errorQuda("Only real spectrum type (LR or SR) can be passed to Lanczos type solver");
+    errorQuda("Only real spectrum type (LR or SR) can be passed to Lanczos type solver.");
   }
 
-  // The solver will exit when nConv extremal eigenpairs have converged
-  if (eig_nConv < 0) {
-    eig_param.nConv = eig_nEv;
-    eig_nConv = eig_nEv;
+  // The solver will exit when n_conv extremal eigenpairs have converged
+  if (eig_n_conv < 0) {
+    eig_param.n_conv = eig_n_ev;
+    eig_n_conv = eig_n_ev;
   } else {
-    eig_param.nConv = eig_nConv;
+    eig_param.n_conv = eig_n_conv;
   }
 
-  eig_param.block_size = eig_block_size;
-  eig_param.nEv = eig_nEv;
-  eig_param.nKr = eig_nKr;
+  // Inverters will deflate only this number of vectors.
+  if (eig_n_ev_deflate < 0) {
+    eig_param.n_ev_deflate = eig_n_conv;
+    eig_n_ev_deflate = eig_n_conv;
+  } else {
+    if (eig_n_ev_deflate > eig_n_conv) errorQuda("Can not deflate more that eig_n_conv eigenvectors.");
+    eig_param.n_ev_deflate = eig_n_ev_deflate;
+  }
+
+  eig_param.block_size = eig_param.eig_type == QUDA_EIG_TR_LANCZOS ? 1 : eig_block_size;
+  eig_param.n_ev = eig_n_ev;
+  eig_param.n_kr = eig_n_kr;
   eig_param.tol = eig_tol;
   eig_param.batched_rotate = eig_batched_rotate;
   eig_param.require_convergence = eig_require_convergence ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -277,6 +291,7 @@ void setEigParam(QudaEigParam &eig_param)
 
   strcpy(eig_param.vec_infile, eig_vec_infile);
   strcpy(eig_param.vec_outfile, eig_vec_outfile);
+  eig_param.save_prec = eig_save_prec;
   eig_param.io_parity_inflate = eig_io_parity_inflate ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 }
 
@@ -402,13 +417,13 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     mg_param.smoother_solve_type[i] = smoother_solve_type[i];
 
     // set to QUDA_ADDITIVE_SCHWARZ for Additive Schwarz precondioned smoother (presently only impelemented for MR)
-    mg_param.smoother_schwarz_type[i] = schwarz_type[i];
+    mg_param.smoother_schwarz_type[i] = mg_schwarz_type[i];
 
     // if using Schwarz preconditioning then use local reductions only
-    mg_param.global_reduction[i] = (schwarz_type[i] == QUDA_INVALID_SCHWARZ) ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+    mg_param.global_reduction[i] = (mg_schwarz_type[i] == QUDA_INVALID_SCHWARZ) ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
     // set number of Schwarz cycles to apply
-    mg_param.smoother_schwarz_cycle[i] = schwarz_cycle[i];
+    mg_param.smoother_schwarz_cycle[i] = mg_schwarz_cycle[i];
 
     // Set set coarse_grid_solution_type: this defines which linear
     // system we are solving on a given level
@@ -615,8 +630,8 @@ void setMultigridInvertParam(QudaInvertParam &inv_param)
   inv_param.maxiter = niter;
   inv_param.reliable_delta = reliable_delta;
 
-  // domain decomposition preconditioner parameters
-  inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
+  // domain decomposition preconditioner is disabled when using MG
+  inv_param.schwarz_type = QUDA_INVALID_SCHWARZ;
   inv_param.precondition_cycle = 1;
   inv_param.tol_precondition = 1e-1;
   inv_param.maxiter_precondition = 1;
@@ -633,10 +648,21 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
     errorQuda("Only real spectrum type (LR or SR) can be passed to the a Lanczos type solver");
   }
 
-  mg_eig_param.block_size = mg_eig_block_size[level];
-  mg_eig_param.nEv = mg_eig_nEv[level];
-  mg_eig_param.nKr = mg_eig_nKr[level];
-  mg_eig_param.nConv = nvec[level];
+  mg_eig_param.block_size = mg_eig_param.eig_type == QUDA_EIG_TR_LANCZOS ? 1 : mg_eig_block_size[level];
+  mg_eig_param.n_ev = mg_eig_n_ev[level];
+  mg_eig_param.n_kr = mg_eig_n_kr[level];
+  mg_eig_param.n_conv = nvec[level];
+
+  // Inverters will deflate only this number of vectors.
+  if (mg_eig_n_ev_deflate[level] < 0) {
+    mg_eig_param.n_ev_deflate = mg_eig_param.n_conv;
+    mg_eig_n_ev_deflate[level] = mg_eig_param.n_conv;
+  } else {
+    if (mg_eig_n_ev_deflate[level] > mg_eig_param.n_conv)
+      errorQuda("Can not deflate more than nvec[%d] eigenvectors.", nvec[level]);
+    mg_eig_param.n_ev_deflate = mg_eig_n_ev_deflate[level];
+  }
+
   mg_eig_param.batched_rotate = mg_eig_batched_rotate[level];
   mg_eig_param.require_convergence = mg_eig_require_convergence[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
@@ -658,6 +684,7 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
   // Give empty strings, Multigrid will handle IO.
   strcpy(mg_eig_param.vec_infile, "");
   strcpy(mg_eig_param.vec_outfile, "");
+  mg_eig_param.save_prec = mg_eig_save_prec[level];
   mg_eig_param.io_parity_inflate = QUDA_BOOLEAN_FALSE;
   strcpy(mg_eig_param.QUDA_logfile, eig_QUDA_logfile);
 }
@@ -746,8 +773,8 @@ void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
     inv_param.tol_hq_offset[i] = inv_param.tol_hq;
   }
 
-  // domain decomposition preconditioner parameters
-  inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
+  // domain decomposition preconditioner is disabled when using MG
+  inv_param.schwarz_type = QUDA_INVALID_SCHWARZ;
   inv_param.precondition_cycle = 1;
   inv_param.tol_precondition = 1e-1;
   inv_param.maxiter_precondition = 1;
@@ -795,8 +822,8 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
 
   // domain decomposition preconditioner parameters
   inv_param.inv_type_precondition = precon_type;
-  inv_param.tol_precondition = 1e-1;
-  inv_param.maxiter_precondition = 10;
+  inv_param.tol_precondition = tol_precondition;
+  inv_param.maxiter_precondition = maxiter_precondition;
   inv_param.verbosity_precondition = QUDA_SILENT;
   inv_param.cuda_prec_precondition = prec_precondition;
 
@@ -926,13 +953,13 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
     mg_param.smoother_solve_type[i] = smoother_solve_type[i];
 
     // set to QUDA_ADDITIVE_SCHWARZ for Additive Schwarz precondioned smoother (presently only impelemented for MR)
-    mg_param.smoother_schwarz_type[i] = schwarz_type[i];
+    mg_param.smoother_schwarz_type[i] = mg_schwarz_type[i];
 
     // if using Schwarz preconditioning then use local reductions only
-    mg_param.global_reduction[i] = (schwarz_type[i] == QUDA_INVALID_SCHWARZ) ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+    mg_param.global_reduction[i] = (mg_schwarz_type[i] == QUDA_INVALID_SCHWARZ) ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
     // set number of Schwarz cycles to apply
-    mg_param.smoother_schwarz_cycle[i] = schwarz_cycle[i];
+    mg_param.smoother_schwarz_cycle[i] = mg_schwarz_cycle[i];
 
     // Set set coarse_grid_solution_type: this defines which linear
     // system we are solving on a given level
@@ -1122,7 +1149,7 @@ void setDeflatedInvertParam(QudaInvertParam &inv_param)
 
   inv_param.rhs_idx = 0;
 
-  inv_param.nev = nev;
+  inv_param.n_ev = n_ev;
   inv_param.max_search_dim = max_search_dim;
   inv_param.deflation_grid = deflation_grid;
   inv_param.tol_restart = tol_restart;
@@ -1160,10 +1187,10 @@ void setDeflatedInvertParam(QudaInvertParam &inv_param)
   inv_param.reliable_delta = 1e-1;
 
   // domain decomposition preconditioner parameters
-  inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
-  inv_param.precondition_cycle = 1;
-  inv_param.tol_precondition = 1e-2;
-  inv_param.maxiter_precondition = 10;
+  inv_param.schwarz_type = precon_schwarz_type;
+  inv_param.precondition_cycle = precon_schwarz_cycle;
+  inv_param.tol_precondition = tol_precondition;
+  inv_param.maxiter_precondition = maxiter_precondition;
   inv_param.omega = 1.0;
 
   inv_param.extlib_type = solver_ext_lib;
@@ -1174,8 +1201,8 @@ void setDeflationParam(QudaEigParam &df_param)
   df_param.import_vectors = QUDA_BOOLEAN_FALSE;
   df_param.run_verify = QUDA_BOOLEAN_FALSE;
 
-  df_param.nk = df_param.invert_param->nev;
-  df_param.np = df_param.invert_param->nev * df_param.invert_param->deflation_grid;
+  df_param.nk = df_param.invert_param->n_ev;
+  df_param.np = df_param.invert_param->n_ev * df_param.invert_param->deflation_grid;
   df_param.extlib_type = deflation_ext_lib;
 
   df_param.cuda_prec_ritz = prec_ritz;

@@ -43,7 +43,9 @@ The library has been tested under Linux (CentOS 7 and Ubuntu 18.04)
 using releases 7.5 through 10.2 of the CUDA toolkit.  Earlier versions
 of the CUDA toolkit will not work, and we highly recommend the use of
 10.x.  QUDA has been tested in conjunction with x86-64, IBM
-POWER8/POWER9 and ARM CPUs.  CMake 3.11 or greater to required to build QUDA.
+POWER8/POWER9 and ARM CPUs.  Both GCC and Clang host compilers are
+supported, with the mininum version being 5.x and 3.6, respectively.
+CMake 3.14 or greater to required to build QUDA.
 
 See also Known Issues below.
 
@@ -69,13 +71,14 @@ See also "Known Issues" below.
 
 ## Installation:
 
-The recommended method for compiling QUDA is to use cmake, and build
-QUDA in a separate directory from the source directory.  For
-instructions on how to build QUDA using cmake see this page
-https://github.com/lattice/quda/wiki/Building-QUDA-with-cmake. Note that
-this requires cmake version 3.11 or later. You can obtain cmake from
-https://cmake.org/download/. On Linux the binary tar.gz archives unpack
-into a cmake directory and usually run fine from that directory.
+It is recommended to build QUDA in a separate directory from the
+source directory.  For instructions on how to build QUDA using cmake
+see this page
+https://github.com/lattice/quda/wiki/Building-QUDA-with-cmake. Note
+that this requires cmake version 3.14 or later. You can obtain cmake
+from https://cmake.org/download/. On Linux the binary tar.gz archives
+unpack into a cmake directory and usually run fine from that
+directory.
 
 The basic steps for building cmake are: 
 

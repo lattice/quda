@@ -110,6 +110,19 @@ extern "C" {
     double_complex b_5[QUDA_MAX_DWF_LS]; /**< Mobius coefficients - only real part used if regular Mobius */
     double_complex c_5[QUDA_MAX_DWF_LS]; /**< Mobius coefficients - only real part used if regular Mobius */
 
+    /**<
+     * The following specifies the EOFA parameters. Notation follows arXiv:1706.05843
+     * eofa_shift: the "\beta" in the paper
+     * eofa_pm: plus or minus for the EOFA operator
+     * mq1, mq2, mq3 are the three masses corresponds to Hasenbusch mass spliting.
+     * As far as I know mq1 is always the same as "mass" but it's here just for consistence.
+     * */
+    double eofa_shift;
+    int eofa_pm;
+    double mq1;
+    double mq2;
+    double mq3;
+
     double mu;    /**< Twisted mass parameter */
     double epsilon; /**< Twisted mass parameter */
 
@@ -325,14 +338,14 @@ extern "C" {
     /** How many vectors to compute after one solve
      *  for eigCG recommended values 8 or 16
     */
-    int nev;
+    int n_ev;
     /** EeigCG  : Search space dimension
      *  gmresdr : Krylov subspace dimension
     */
     int max_search_dim;
     /** For systems with many RHS: current RHS index */
     int rhs_idx;
-    /** Specifies deflation space volume: total number of eigenvectors is nev*deflation_grid */
+    /** Specifies deflation space volume: total number of eigenvectors is n_ev*deflation_grid */
     int deflation_grid;
     /** eigCG: selection criterion for the reduced eigenvector set */
     double eigenval_tol;
@@ -427,13 +440,15 @@ extern "C" {
     QudaEigSpectrumType spectrum;
 
     /** Size of the eigenvector search space **/
-    int nEv;
+    int n_ev;
     /** Total size of Krylov space **/
-    int nKr;
+    int n_kr;
     /** Max number of locked eigenpairs (deduced at runtime) **/
     int nLockedMax;
     /** Number of requested converged eigenvectors **/
-    int nConv;
+    int n_conv;
+    /** Number of requested converged eigenvectors to use in deflation **/
+    int n_ev_deflate;
     /** Tolerance on the least well known eigenvalue's residual **/
     double tol;
     /** For IRLM/IRAM, check every nth restart **/
@@ -480,6 +495,9 @@ extern "C" {
 
     /** Filename prefix for where to save the null-space vectors */
     char vec_outfile[256];
+
+    /** The precision with which to save the vectors */
+    QudaPrecision save_prec;
 
     /** Whether to inflate single-parity eigen-vector I/O to a full
         field (e.g., enabling this is required for compatability with
@@ -1062,7 +1080,14 @@ extern "C" {
   void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
                          double *path_coeff, QudaGaugeParam *param);
 
-
+  /**
+   * Either downloads and sets the resident momentum field, or uploads
+   * and returns the resident momentum field
+   *
+   * @param[in,out] mom The external momentum field
+   * @param[in] param The parameters of the external field
+   */
+  void momResidentQuda(void *mom, QudaGaugeParam *param);
 
   /**
    * Compute the gauge force and update the mometum field

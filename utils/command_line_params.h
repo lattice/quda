@@ -131,6 +131,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description = "QUDA internal t
 void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_deflation_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app);
+void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app);
 
 template <typename T> std::string inline get_string(CLI::TransformPairs<T> &map, T val)
@@ -176,6 +177,7 @@ extern char gauge_outfile[256];
 extern int Nsrc;
 extern int Msrc;
 extern int niter;
+extern int maxiter_precondition;
 extern int gcrNkrylov;
 extern QudaCABasis ca_basis;
 extern double ca_lambda_min;
@@ -190,6 +192,8 @@ extern QudaInverterType inv_type;
 extern bool inv_deflate;
 extern bool inv_multigrid;
 extern QudaInverterType precon_type;
+extern QudaSchwarzType precon_schwarz_type;
+extern int precon_schwarz_cycle;
 extern int multishift;
 extern bool verify_results;
 extern bool low_mode_check;
@@ -209,6 +213,7 @@ extern double clover_coeff;
 extern bool compute_clover;
 extern bool compute_fatlong;
 extern double tol;
+extern double tol_precondition;
 extern double tol_hq;
 extern double reliable_delta;
 extern bool alternative_reliable;
@@ -256,11 +261,11 @@ extern quda::mgarray<double> coarse_solver_ca_lambda_min;
 extern quda::mgarray<double> coarse_solver_ca_lambda_max;
 extern bool generate_nullspace;
 extern bool generate_all_levels;
-extern quda::mgarray<QudaSchwarzType> schwarz_type;
-extern quda::mgarray<int> schwarz_cycle;
+extern quda::mgarray<QudaSchwarzType> mg_schwarz_type;
+extern quda::mgarray<int> mg_schwarz_cycle;
 
 extern quda::mgarray<std::array<int, 4>> geo_block_size;
-extern int nev;
+extern int n_ev;
 extern int max_search_dim;
 extern int deflation_grid;
 extern double tol_restart;
@@ -277,9 +282,10 @@ extern QudaMemoryType mem_type_ritz;
 
 // Parameters for the stand alone eigensolver
 extern int eig_block_size;
-extern int eig_nEv;
-extern int eig_nKr;
-extern int eig_nConv; // If unchanged, will be set to nEv
+extern int eig_n_ev;
+extern int eig_n_kr;
+extern int eig_n_conv;         // If unchanged, will be set to n_ev
+extern int eig_n_ev_deflate;   // If unchanged, will be set to n_conv
 extern int eig_batched_rotate; // If unchanged, will be set to maximum
 extern bool eig_require_convergence;
 extern int eig_check_interval;
@@ -300,14 +306,16 @@ extern char eig_QUDA_logfile[256];
 extern char eig_vec_infile[256];
 extern char eig_vec_outfile[256];
 extern bool eig_io_parity_inflate;
+extern QudaPrecision eig_save_prec;
 
 // Parameters for the MG eigensolver.
 // The coarsest grid params are for deflation,
 // all others are for PR vectors.
 extern quda::mgarray<bool> mg_eig;
 extern quda::mgarray<int> mg_eig_block_size;
-extern quda::mgarray<int> mg_eig_nEv;
-extern quda::mgarray<int> mg_eig_nKr;
+extern quda::mgarray<int> mg_eig_n_ev_deflate;
+extern quda::mgarray<int> mg_eig_n_ev;
+extern quda::mgarray<int> mg_eig_n_kr;
 extern quda::mgarray<int> mg_eig_batched_rotate;
 extern quda::mgarray<bool> mg_eig_require_convergence;
 extern quda::mgarray<int> mg_eig_check_interval;
@@ -321,6 +329,8 @@ extern quda::mgarray<bool> mg_eig_use_normop;
 extern quda::mgarray<bool> mg_eig_use_dagger;
 extern quda::mgarray<QudaEigSpectrumType> mg_eig_spectrum;
 extern quda::mgarray<QudaEigType> mg_eig_type;
+extern quda::mgarray<QudaPrecision> mg_eig_save_prec;
+
 extern bool mg_eig_coarse_guess;
 extern bool mg_eig_preserve_deflation;
 
@@ -330,6 +340,12 @@ extern int heatbath_num_steps;
 extern int heatbath_num_heatbath_per_step;
 extern int heatbath_num_overrelax_per_step;
 extern bool heatbath_coldstart;
+
+extern int eofa_pm;
+extern double eofa_shift;
+extern double eofa_mq1;
+extern double eofa_mq2;
+extern double eofa_mq3;
 
 extern double stout_smear_rho;
 extern double stout_smear_epsilon;
