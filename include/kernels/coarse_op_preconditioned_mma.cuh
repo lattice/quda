@@ -7,6 +7,7 @@
 
 #include <type_traits>
 
+#define THRUST_IGNORE_CUB_VERSION_CHECK
 #include <cub/cub.cuh>
 
 namespace quda

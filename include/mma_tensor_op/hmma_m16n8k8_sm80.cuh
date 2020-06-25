@@ -17,7 +17,7 @@ namespace quda
 {
   namespace mma
   {
-    __device__ __host__ constexpr int inline pad_size(int m) { return 8; }
+    __device__ __host__ constexpr int inline pad_size(int m) { return m == 192 ? 0 : 8; }
 
     constexpr int MMA_M = 16;
     constexpr int MMA_N = 8;
