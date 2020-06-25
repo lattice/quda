@@ -119,8 +119,8 @@ namespace quda
 #pragma unroll
         for (int i = 0; i < x.size(); i++) v[i] = a * x[i] + b * y[i];
       }                                  // use v not z to ensure same precision as y
-      int streams() const { return 3; } //! total number of input and output streams
-      int flops() const { return 3; }   //! flops per element
+      constexpr int streams() const { return 3; } //! total number of input and output streams
+      constexpr int flops() const { return 3; }   //! flops per element
     };
 
     /**
@@ -135,8 +135,8 @@ namespace quda
 #pragma unroll
         for (int i = 0; i < x.size(); i++) x[i] *= a;
       }
-      int streams() const { return 2; } //! total number of input and output streams
-      int flops() const { return 1; }   //! flops per element
+      constexpr int streams() const { return 2; } //! total number of input and output streams
+      constexpr int flops() const { return 1; }   //! flops per element
     };
 
     /**
@@ -151,8 +151,8 @@ namespace quda
 #pragma unroll
         for (int i = 0; i < x.size(); i++) y[i] = cmac(a, x[i], y[i]);
       }
-      int streams() const { return 3; } //! total number of input and output streams
-      int flops() const { return 4; }   //! flops per element
+      constexpr int streams() const { return 3; } //! total number of input and output streams
+      constexpr int flops() const { return 4; }   //! flops per element
     };
 
     /**
@@ -184,8 +184,8 @@ namespace quda
 #pragma unroll
         for (int i = 0; i < x.size(); i++) _caxpby(a, x[i], b, y[i]);
       }
-      int streams() const { return 3; } //! total number of input and output streams
-      int flops() const { return 7; }   //! flops per element
+      constexpr int streams() const { return 3; } //! total number of input and output streams
+      constexpr int flops() const { return 7; }   //! flops per element
     };
 
     template <typename real> struct caxpbypczw_ : public BlasFunctor {
@@ -203,8 +203,8 @@ namespace quda
           w[i] = cmac(c, z[i], w[i]);
         }
       }
-      int streams() const { return 4; } //! total number of input and output streams
-      int flops() const { return 8; }   //! flops per element
+      constexpr int streams() const { return 4; } //! total number of input and output streams
+      constexpr int flops() const { return 8; }   //! flops per element
     };
 
     /**
@@ -224,8 +224,8 @@ namespace quda
           x[i] = b * z[i] + c * x[i];
         }
       }
-      int streams() const { return 5; } //! total number of input and output streams
-      int flops() const { return 5; }   //! flops per element
+      constexpr int streams() const { return 5; } //! total number of input and output streams
+      constexpr int flops() const { return 5; }   //! flops per element
     };
 
     /**
@@ -244,8 +244,8 @@ namespace quda
           x[i] = z[i] + b * x[i];
         }
       }
-      int streams() const { return 5; } //! total number of input and output streams
-      int flops() const { return 4; }   //! flops per element
+      constexpr int streams() const { return 5; } //! total number of input and output streams
+      constexpr int flops() const { return 4; }   //! flops per element
     };
 
     /**
@@ -265,8 +265,8 @@ namespace quda
         }
       }
 
-      int streams() const { return 5; } //! total number of input and output streams
-      int flops() const { return 8; }   //! flops per element
+      constexpr int streams() const { return 5; } //! total number of input and output streams
+      constexpr int flops() const { return 8; }   //! flops per element
     };
 
     /**
@@ -286,8 +286,8 @@ namespace quda
         }
       }
 
-      int streams() const { return 5; } //! total number of input and output streams
-      int flops() const { return 8; }   //! flops per element
+      constexpr int streams() const { return 5; } //! total number of input and output streams
+      constexpr int flops() const { return 8; }   //! flops per element
     };
 
     /**
@@ -308,8 +308,8 @@ namespace quda
         }
       }
 
-      int streams() const { return 6; } //! total number of input and output streams
-      int flops() const { return 12; }  //! flops per element
+      constexpr int streams() const { return 6; } //! total number of input and output streams
+      constexpr int flops() const { return 12; }  //! flops per element
     };
 
     /**
@@ -328,8 +328,8 @@ namespace quda
           y[i] = cmac(b, x[i], y[i]);
         }
       }
-      int streams() const { return 4; } //! total number of input and output streams
-      int flops() const { return 5; }   //! flops per element
+      constexpr int streams() const { return 4; } //! total number of input and output streams
+      constexpr int flops() const { return 5; }   //! flops per element
     };
 
     /**
@@ -349,8 +349,8 @@ namespace quda
           x[i] = cmac(-a, z[i], x[i]);
         }
       }
-      int streams() const { return 5; } //! total number of input and output streams
-      int flops() const { return 8; }   //! flops per element
+      constexpr int streams() const { return 5; } //! total number of input and output streams
+      constexpr int flops() const { return 8; }   //! flops per element
     };
 
     /**
@@ -385,8 +385,8 @@ namespace quda
         }
       }
 
-      int streams() const { return 5; } //! total number of input and output streams
-      int flops() const { return 8; }   //! flops per element
+      constexpr int streams() const { return 5; } //! total number of input and output streams
+      constexpr int flops() const { return 8; }   //! flops per element
     };
 
     /**
@@ -409,8 +409,8 @@ namespace quda
           w[i] = z[i] + b * w[i];
         }
       }
-      int streams() const { return 7; } //! total number of input and output streams
-      int flops() const { return 6; }   //! flops per element
+      constexpr int streams() const { return 7; } //! total number of input and output streams
+      constexpr int flops() const { return 6; }   //! flops per element
     };
 
   } // namespace blas

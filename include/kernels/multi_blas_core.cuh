@@ -193,8 +193,8 @@ namespace quda
         for (int k = 0; k < x.size(); k++) y[k] += a(j, i) * x[k];
       }
 
-      int streams() const { return 2 * NYW + NXZ * NYW; } //! total number of input and output streams
-      int flops() const { return 2 * NXZ * NYW; }         //! flops per real element
+      constexpr int streams() const { return 2 * NYW + NXZ * NYW; } //! total number of input and output streams
+      constexpr int flops() const { return 2 * NXZ * NYW; }         //! flops per real element
     };
 
     /**
@@ -217,8 +217,8 @@ namespace quda
         for (int k = 0; k < x.size(); k++) y[k] = cmac(a(j, i), x[k], y[k]);
       }
 
-      int streams() const { return 2 * NYW + NXZ * NYW; } //! total number of input and output streams
-      int flops() const { return 4 * NXZ * NYW; }         //! flops per real element
+      constexpr int streams() const { return 2 * NYW + NXZ * NYW; } //! total number of input and output streams
+      constexpr int flops() const { return 4 * NXZ * NYW; }         //! flops per real element
     };
 
     /**
@@ -244,8 +244,8 @@ namespace quda
         }
       }
 
-      int streams() const { return 2 * NYW + NXZ * NYW; } //! total number of input and output streams
-      int flops() const { return 4 * NXZ * NYW; }         //! flops per real element
+      constexpr int streams() const { return 2 * NYW + NXZ * NYW; } //! total number of input and output streams
+      constexpr int flops() const { return 4 * NXZ * NYW; }         //! flops per real element
     };
 
     /**
@@ -276,8 +276,8 @@ namespace quda
         }
       }
 
-      int streams() const { return 4 * NYW + NXZ; } //! total number of input and output streams
-      int flops() const { return 5 * NXZ * NYW; }   //! flops per real element
+      constexpr int streams() const { return 4 * NYW + NXZ; } //! total number of input and output streams
+      constexpr int flops() const { return 5 * NXZ * NYW; }   //! flops per real element
     };
 
     /**
@@ -307,8 +307,8 @@ namespace quda
         }
       }
 
-      int streams() const { return 4 * NYW + NXZ; } //! total number of input and output streams
-      int flops() const { return 8 * NXZ * NYW; }   //! flops per real element
+      constexpr int streams() const { return 4 * NYW + NXZ; } //! total number of input and output streams
+      constexpr int flops() const { return 8 * NXZ * NYW; }   //! flops per real element
     };
 
   } // namespace blas

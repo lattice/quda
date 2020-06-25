@@ -164,8 +164,8 @@ namespace quda
     template <typename reduce_t, typename T>
     __device__ __host__ void dot_(reduce_t &sum, const typename VectorType<T, 2>::type &a, const typename VectorType<T, 2>::type &b)
     {
-      sum += (reduce_t)a.x * (reduce_t)b.x;
-      sum += (reduce_t)a.y * (reduce_t)b.y;
+      sum += static_cast<reduce_t>(a.x) * static_cast<reduce_t>(b.x);
+      sum += static_cast<reduce_t>(a.y) * static_cast<reduce_t>(b.y);
     }
 
     template <typename reduce_t, typename real>
@@ -183,8 +183,8 @@ namespace quda
         for (int k=0; k < x.size(); k++) dot_<reduce_t, real>(sum, x[k], y[k]);
       }
 
-      int streams() const { return 2; } //! total number of input and output streams
-      int flops() const { return 2; }   //! flops per element
+      constexpr int streams() const { return 2; } //! total number of input and output streams
+      constexpr int flops() const { return 2; }   //! flops per element
     };
 
     /**
@@ -193,11 +193,11 @@ namespace quda
     template <typename reduce_t, typename T>
     __device__ __host__ void cdot_(reduce_t &sum, const typename VectorType<T, 2>::type &a, const typename VectorType<T, 2>::type &b)
     {
-      typedef typename scalar<reduce_t>::type scalar;
-      sum.x += (scalar)a.x * (scalar)b.x;
-      sum.x += (scalar)a.y * (scalar)b.y;
-      sum.y += (scalar)a.x * (scalar)b.y;
-      sum.y -= (scalar)a.y * (scalar)b.x;
+      using scalar = typename scalar<reduce_t>::type;
+      sum.x += static_cast<scalar>(a.x) * static_cast<scalar>(b.x);
+      sum.x += static_cast<scalar>(a.y) * static_cast<scalar>(b.y);
+      sum.y += static_cast<scalar>(a.x) * static_cast<scalar>(b.y);
+      sum.y -= static_cast<scalar>(a.y) * static_cast<scalar>(b.x);
     }
 
     template <typename real_reduce_t, typename real>
@@ -216,8 +216,8 @@ namespace quda
         for (int k=0; k < x.size(); k++) cdot_<reduce_t, real>(sum, x[k], y[k]);
       }
 
-      int streams() const { return 2; } //! total number of input and output streams
-      int flops() const { return 4; }   //! flops per element
+      constexpr int streams() const { return 2; } //! total number of input and output streams
+      constexpr int flops() const { return 4; }   //! flops per element
     };
 
     template <typename real_reduce_t, typename real>
@@ -240,8 +240,8 @@ namespace quda
         }
       }
 
-      int streams() const { return 2; } //! total number of input and output streams
-      int flops() const { return 4; }   //! flops per element
+      constexpr int streams() const { return 2; } //! total number of input and output streams
+      constexpr int flops() const { return 4; }   //! flops per element
     };
 
   } // namespace blas
