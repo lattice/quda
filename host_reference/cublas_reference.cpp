@@ -116,7 +116,6 @@ void cublasGEMMEigenVerify(void *arrayA, void *arrayB, void *arrayCcopy, void *a
     a_offset += refA_size;
     b_offset += refB_size;
     c_offset += refC_size;
-
   }
 }
 
