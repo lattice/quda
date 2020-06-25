@@ -73,9 +73,9 @@ void display_test_info()
       printfQuda(" - level %d solver mode %s\n", i + 1, get_eig_type_str(mg_eig_type[i]));
       printfQuda(" - level %d spectrum requested %s\n", i + 1, get_eig_spectrum_str(mg_eig_spectrum[i]));
       if (mg_eig_type[i] == QUDA_EIG_BLK_TR_LANCZOS) printfQuda(" - eigenvector block size %d\n", mg_eig_block_size[i]);
-      printfQuda(" - level %d number of eigenvectors requested nConv %d\n", i + 1, nvec[i]);
-      printfQuda(" - level %d size of eigenvector search space %d\n", i + 1, mg_eig_nEv[i]);
-      printfQuda(" - level %d size of Krylov space %d\n", i + 1, mg_eig_nKr[i]);
+      printfQuda(" - level %d number of eigenvectors requested n_conv %d\n", i + 1, nvec[i]);
+      printfQuda(" - level %d size of eigenvector search space %d\n", i + 1, mg_eig_n_ev[i]);
+      printfQuda(" - level %d size of Krylov space %d\n", i + 1, mg_eig_n_kr[i]);
       printfQuda(" - level %d solver tolerance %e\n", i + 1, mg_eig_tol[i]);
       printfQuda(" - level %d convergence required (%s)\n", i + 1, mg_eig_require_convergence[i] ? "true" : "false");
       printfQuda(" - level %d Operator: daggered (%s) , norm-op (%s)\n", i + 1, mg_eig_use_dagger[i] ? "true" : "false",
