@@ -163,7 +163,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(n_ev, 0);
   P(n_kr, 0);
   P(n_conv, 0);
-  P(deflation_vecs, -1);
+  P(n_ev_deflate, -1);
   P(batched_rotate, 0);
   P(tol, 0.0);
   P(check_interval, 0);
@@ -188,7 +188,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(n_ev, INVALID_INT);
   P(n_kr, INVALID_INT);
   P(n_conv, INVALID_INT);
-  P(deflation_vecs, INVALID_INT);
+  P(n_ev_deflate, INVALID_INT);
   P(batched_rotate, INVALID_INT);
   P(tol, INVALID_DOUBLE);
   P(check_interval, INVALID_INT);

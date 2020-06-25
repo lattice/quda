@@ -254,12 +254,12 @@ void setEigParam(QudaEigParam &eig_param)
   }
 
   // Inverters will deflate only this number of vectors.
-  if (eig_n_deflate < 0) {
-    eig_param.deflation_vecs = eig_n_conv;
-    eig_n_deflate = eig_n_conv;
+  if (eig_n_ev_deflate < 0) {
+    eig_param.n_ev_deflate = eig_n_conv;
+    eig_n_ev_deflate = eig_n_conv;
   } else {
-    if (eig_n_deflate > eig_n_conv) errorQuda("Can not deflate more that eig_n_conv eigenvectors.");
-    eig_param.deflation_vecs = eig_n_deflate;
+    if (eig_n_ev_deflate > eig_n_conv) errorQuda("Can not deflate more that eig_n_conv eigenvectors.");
+    eig_param.n_ev_deflate = eig_n_ev_deflate;
   }
 
   eig_param.block_size = eig_param.eig_type == QUDA_EIG_TR_LANCZOS ? 1 : eig_block_size;
@@ -654,13 +654,13 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
   mg_eig_param.n_conv = nvec[level];
 
   // Inverters will deflate only this number of vectors.
-  if (mg_eig_n_deflate[level] < 0) {
-    mg_eig_param.deflation_vecs = mg_eig_param.n_conv;
-    mg_eig_n_deflate[level] = mg_eig_param.n_conv;
+  if (mg_eig_n_ev_deflate[level] < 0) {
+    mg_eig_param.n_ev_deflate = mg_eig_param.n_conv;
+    mg_eig_n_ev_deflate[level] = mg_eig_param.n_conv;
   } else {
-    if (mg_eig_n_deflate[level] > mg_eig_param.n_conv)
+    if (mg_eig_n_ev_deflate[level] > mg_eig_param.n_conv)
       errorQuda("Can not deflate more than nvec[%d] eigenvectors.", nvec[level]);
-    mg_eig_param.deflation_vecs = mg_eig_n_deflate[level];
+    mg_eig_param.n_ev_deflate = mg_eig_n_ev_deflate[level];
   }
 
   mg_eig_param.batched_rotate = mg_eig_batched_rotate[level];

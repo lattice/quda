@@ -285,7 +285,7 @@ extern int eig_block_size;
 extern int eig_n_ev;
 extern int eig_n_kr;
 extern int eig_n_conv; // If unchanged, will be set to n_ev
-extern int eig_n_deflate; // If unchanged, will be set to n_conv
+extern int eig_n_ev_deflate; // If unchanged, will be set to n_conv
 extern int eig_batched_rotate; // If unchanged, will be set to maximum
 extern bool eig_require_convergence;
 extern int eig_check_interval;
@@ -313,7 +313,7 @@ extern QudaPrecision eig_save_prec;
 // all others are for PR vectors.
 extern quda::mgarray<bool> mg_eig;
 extern quda::mgarray<int> mg_eig_block_size;
-extern quda::mgarray<int> mg_eig_n_deflate;
+extern quda::mgarray<int> mg_eig_n_ev_deflate;
 extern quda::mgarray<int> mg_eig_n_ev;
 extern quda::mgarray<int> mg_eig_n_kr;
 extern quda::mgarray<int> mg_eig_batched_rotate;

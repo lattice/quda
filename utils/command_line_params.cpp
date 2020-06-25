@@ -152,7 +152,7 @@ int eig_block_size = 4;
 int eig_n_ev = 16;
 int eig_n_kr = 32;
 int eig_n_conv = -1; // If unchanged, will be set to n_ev
-int eig_n_deflate = -1; // If unchanged, will be set to n_conv
+int eig_n_ev_deflate = -1; // If unchanged, will be set to n_conv
 int eig_batched_rotate = 0; // If unchanged, will be set to maximum
 bool eig_require_convergence = true;
 int eig_check_interval = 10;
@@ -180,7 +180,7 @@ QudaPrecision eig_save_prec = QUDA_DOUBLE_PRECISION;
 // all others are for PR vectors.
 quda::mgarray<bool> mg_eig = {};
 quda::mgarray<int> mg_eig_block_size = {};
-quda::mgarray<int> mg_eig_n_deflate = {};
+quda::mgarray<int> mg_eig_n_ev_deflate = {};
 quda::mgarray<int> mg_eig_n_ev = {};
 quda::mgarray<int> mg_eig_n_kr = {};
 quda::mgarray<int> mg_eig_batched_rotate = {};
@@ -596,7 +596,7 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--eig-max-restarts", eig_max_restarts, "Perform n iterations of the restart in the eigensolver");
   opgroup->add_option("--eig-n-conv", eig_n_conv, "The number of converged eigenvalues requested (default eig_n_ev)");
   opgroup->add_option(
-    "--eig-n-deflate", eig_n_deflate,
+    "--eig-n-ev-deflate", eig_n_ev_deflate,
     "The number of converged eigenpairs that will be used in the deflation routines (default eig_n_conv)");
   opgroup->add_option("--eig-block-size", eig_block_size, "The block size to use in the block variant eigensolver");
   opgroup->add_option("--eig-n-ev", eig_n_ev, "The size of eigenvector search space in the eigensolver");
@@ -724,7 +724,7 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                          "The size of eigenvector search space in the eigensolver");
   quda_app->add_mgoption(opgroup, "--mg-eig-n_kr", mg_eig_n_kr, CLI::Validator(),
                          "The size of the Krylov subspace to use in the eigensolver");
-  quda_app->add_mgoption(opgroup, "--mg-eig-n-deflate", mg_eig_n_deflate, CLI::Validator(),
+  quda_app->add_mgoption(opgroup, "--mg-eig-n-ev-deflate", mg_eig_n_ev_deflate, CLI::Validator(),
                          "The number of converged eigenpairs that will be used in the deflation routines");
   quda_app->add_mgoption(
     opgroup, "--mg-eig-batched-rotate", mg_eig_batched_rotate, CLI::Validator(),

@@ -39,7 +39,7 @@ namespace quda
     n_ev = eig_param->n_ev;
     n_kr = eig_param->n_kr;
     n_conv = eig_param->n_conv;
-    deflation_vecs = (eig_param->deflation_vecs == -1 ? n_conv : eig_param->deflation_vecs);
+    n_ev_deflate = (eig_param->n_ev_deflate == -1 ? n_conv : eig_param->n_ev_deflate);
     tol = eig_param->tol;
     reverse = false;
 
@@ -66,7 +66,7 @@ namespace quda
     if (n_ev == 0) errorQuda("n_ev=0 passed to Eigensolver");
     if (n_kr == 0) errorQuda("n_kr=0 passed to Eigensolver");
     if (n_conv == 0) errorQuda("n_conv=0 passed to Eigensolver");
-    if (deflation_vecs > n_conv) errorQuda("deflation vecs = %d is greater than n_conv = %d", deflation_vecs, n_conv);
+    if (n_ev_deflate > n_conv) errorQuda("deflation vecs = %d is greater than n_conv = %d", n_ev_deflate, n_conv);
 
     residua = (double *)safe_malloc(n_kr * sizeof(double));
     for (int i = 0; i < n_kr; i++) { residua[i] = 0.0; }
@@ -653,8 +653,8 @@ namespace quda
                                bool accumulate) const
   {
     // number of evecs
-    if (deflation_vecs == 0) return;
-    int n_defl = deflation_vecs;
+    if (n_ev_deflate == 0) return;
+    int n_defl = n_ev_deflate;
     if (evecs.size() != (unsigned int)(2 * eig_param->n_conv))
       errorQuda("Incorrect deflation space sized %d passed to computeSVD, expected %d", (int)(evecs.size()),
                 2 * eig_param->n_conv);
@@ -725,8 +725,8 @@ namespace quda
                             bool accumulate) const
   {
     // number of evecs
-    if (deflation_vecs == 0) return;
-    int n_defl = deflation_vecs;
+    if (n_ev_deflate == 0) return;
+    int n_defl = n_ev_deflate;
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Deflating %d vectors\n", n_defl);
 

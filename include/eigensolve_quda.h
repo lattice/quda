@@ -24,7 +24,7 @@ protected:
     int n_ev;            /** Size of initial factorisation */
     int n_kr;            /** Size of Krylov space after extension */
     int n_conv;          /** Number of converged eigenvalues requested */
-    int deflation_vecs; /** Number of converged eigenvalues to use in deflation */
+    int n_ev_deflate; /** Number of converged eigenvalues to use in deflation */
     double tol;         /** Tolerance on eigenvalues */
     bool reverse;       /** True if using polynomial acceleration */
     char spectrum[3];   /** Part of the spectrum to be computed */
