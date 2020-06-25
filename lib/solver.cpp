@@ -231,7 +231,8 @@ namespace quda {
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Preserving deflation space of size %lu\n", evecs.size());
 
         if (param.eig_param.preserve_deflation_space) {
-          deflation_space *space = reinterpret_cast<deflation_space *>(param.eig_param.preserve_deflation_space);
+	  printfQuda("param.preserve_deflation_space hit\n");
+	  deflation_space *space = reinterpret_cast<deflation_space *>(param.eig_param.preserve_deflation_space);
           // first ensure that any existing space is freed
           for (auto &vec : space->evecs)
             if (vec) delete vec;
