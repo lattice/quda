@@ -83,6 +83,7 @@ int main(int argc, char **argv)
   // Reference data is always in complex double
   size_t data_size = sizeof(double);
   int re_im = 2;
+  int batches = cublas_param.batch_count;
   uint64_t refA_size = 0, refB_size = 0, refC_size = 0;
   if (cublas_param.data_order == QUDA_CUBLAS_DATAORDER_COL) {
     // leading dimension is in terms of consecutive data
@@ -115,29 +116,29 @@ int main(int argc, char **argv)
     refC_size = cublas_param.ldc * cublas_param.m; // C_mn
   }
 
-  void *refA = pinned_malloc(refA_size * re_im * data_size);
-  void *refB = pinned_malloc(refB_size * re_im * data_size);
-  void *refC = pinned_malloc(refC_size * re_im * data_size);
-  void *refCcopy = pinned_malloc(refC_size * re_im * data_size);
+  void *refA = pinned_malloc(batches * refA_size * re_im * data_size);
+  void *refB = pinned_malloc(batches * refB_size * re_im * data_size);
+  void *refC = pinned_malloc(batches * refC_size * re_im * data_size);
+  void *refCcopy = pinned_malloc(batches * refC_size * re_im * data_size);
 
-  memset(refA, 0, refA_size * re_im * data_size);
-  memset(refB, 0, refB_size * re_im * data_size);
-  memset(refC, 0, refC_size * re_im * data_size);
-  memset(refCcopy, 0, refC_size * re_im * data_size);
+  memset(refA, 0, batches * refA_size * re_im * data_size);
+  memset(refB, 0, batches * refB_size * re_im * data_size);
+  memset(refC, 0, batches * refC_size * re_im * data_size);
+  memset(refCcopy, 0, batches * refC_size * re_im * data_size);
 
   // Populate the real part with rands
-  for (uint64_t i = 0; i < 2 * refA_size; i += 2) { ((double *)refA)[i] = rand() / (double)RAND_MAX; }
-  for (uint64_t i = 0; i < 2 * refB_size; i += 2) { ((double *)refB)[i] = rand() / (double)RAND_MAX; }
-  for (uint64_t i = 0; i < 2 * refC_size; i += 2) {
+  for (uint64_t i = 0; i < 2 * refA_size * batches; i += 2) { ((double *)refA)[i] = rand() / (double)RAND_MAX; }
+  for (uint64_t i = 0; i < 2 * refB_size * batches; i += 2) { ((double *)refB)[i] = rand() / (double)RAND_MAX; }
+  for (uint64_t i = 0; i < 2 * refC_size * batches; i += 2) {
     ((double *)refC)[i] = rand() / (double)RAND_MAX;
     ((double *)refCcopy)[i] = ((double *)refC)[i];
   }
 
   // Populate the imaginary part with rands if needed
   if (cublas_param.data_type == QUDA_CUBLAS_DATATYPE_C || cublas_param.data_type == QUDA_CUBLAS_DATATYPE_Z) {
-    for (uint64_t i = 1; i < 2 * refA_size; i += 2) { ((double *)refA)[i] = rand() / (double)RAND_MAX; }
-    for (uint64_t i = 1; i < 2 * refB_size; i += 2) { ((double *)refB)[i] = rand() / (double)RAND_MAX; }
-    for (uint64_t i = 1; i < 2 * refC_size; i += 2) {
+    for (uint64_t i = 1; i < 2 * refA_size * batches; i += 2) { ((double *)refA)[i] = rand() / (double)RAND_MAX; }
+    for (uint64_t i = 1; i < 2 * refB_size * batches; i += 2) { ((double *)refB)[i] = rand() / (double)RAND_MAX; }
+    for (uint64_t i = 1; i < 2 * refC_size * batches; i += 2) {
       ((double *)refC)[i] = rand() / (double)RAND_MAX;
       ((double *)refCcopy)[i] = ((double *)refC)[i];
     }
@@ -151,53 +152,53 @@ int main(int argc, char **argv)
 
   switch (cublas_param.data_type) {
   case QUDA_CUBLAS_DATATYPE_S:
-    arrayA = pinned_malloc(refA_size * sizeof(float));
-    arrayB = pinned_malloc(refB_size * sizeof(float));
-    arrayC = pinned_malloc(refC_size * sizeof(float));
-    arrayCcopy = pinned_malloc(refC_size * sizeof(float));
+    arrayA = pinned_malloc(batches * refA_size * sizeof(float));
+    arrayB = pinned_malloc(batches * refB_size * sizeof(float));
+    arrayC = pinned_malloc(batches * refC_size * sizeof(float));
+    arrayCcopy = pinned_malloc(batches * refC_size * sizeof(float));
     // Populate
-    for (uint64_t i = 0; i < 2 * refA_size; i += 2) { ((float *)arrayA)[i / 2] = ((double *)refA)[i]; }
-    for (uint64_t i = 0; i < 2 * refB_size; i += 2) { ((float *)arrayB)[i / 2] = ((double *)refB)[i]; }
-    for (uint64_t i = 0; i < 2 * refC_size; i += 2) {
+    for (uint64_t i = 0; i < 2 * refA_size * batches; i += 2) { ((float *)arrayA)[i / 2] = ((double *)refA)[i]; }
+    for (uint64_t i = 0; i < 2 * refB_size * batches; i += 2) { ((float *)arrayB)[i / 2] = ((double *)refB)[i]; }
+    for (uint64_t i = 0; i < 2 * refC_size * batches; i += 2) {
       ((float *)arrayC)[i / 2] = ((double *)refC)[i];
       ((float *)arrayCcopy)[i / 2] = ((double *)refC)[i];
     }
     break;
   case QUDA_CUBLAS_DATATYPE_D:
-    arrayA = pinned_malloc(refA_size * sizeof(double));
-    arrayB = pinned_malloc(refB_size * sizeof(double));
-    arrayC = pinned_malloc(refC_size * sizeof(double));
-    arrayCcopy = pinned_malloc(refC_size * sizeof(double));
+    arrayA = pinned_malloc(batches * refA_size * sizeof(double));
+    arrayB = pinned_malloc(batches * refB_size * sizeof(double));
+    arrayC = pinned_malloc(batches * refC_size * sizeof(double));
+    arrayCcopy = pinned_malloc(batches * refC_size * sizeof(double));
     // Populate
-    for (uint64_t i = 0; i < 2 * refA_size; i += 2) { ((double *)arrayA)[i / 2] = ((double *)refA)[i]; }
-    for (uint64_t i = 0; i < 2 * refB_size; i += 2) { ((double *)arrayB)[i / 2] = ((double *)refB)[i]; }
-    for (uint64_t i = 0; i < 2 * refC_size; i += 2) {
+    for (uint64_t i = 0; i < 2 * refA_size * batches; i += 2) { ((double *)arrayA)[i / 2] = ((double *)refA)[i]; }
+    for (uint64_t i = 0; i < 2 * refB_size * batches; i += 2) { ((double *)arrayB)[i / 2] = ((double *)refB)[i]; }
+    for (uint64_t i = 0; i < 2 * refC_size * batches; i += 2) {
       ((double *)arrayC)[i / 2] = ((double *)refC)[i];
       ((double *)arrayCcopy)[i / 2] = ((double *)refC)[i];
     }
     break;
   case QUDA_CUBLAS_DATATYPE_C:
-    arrayA = pinned_malloc(refA_size * 2 * sizeof(float));
-    arrayB = pinned_malloc(refB_size * 2 * sizeof(float));
-    arrayC = pinned_malloc(refC_size * 2 * sizeof(float));
-    arrayCcopy = pinned_malloc(refC_size * 2 * sizeof(float));
+    arrayA = pinned_malloc(batches * refA_size * 2 * sizeof(float));
+    arrayB = pinned_malloc(batches * refB_size * 2 * sizeof(float));
+    arrayC = pinned_malloc(batches * refC_size * 2 * sizeof(float));
+    arrayCcopy = pinned_malloc(batches * refC_size * 2 * sizeof(float));
     // Populate
-    for (uint64_t i = 0; i < 2 * refA_size; i++) { ((float *)arrayA)[i] = ((double *)refA)[i]; }
-    for (uint64_t i = 0; i < 2 * refB_size; i++) { ((float *)arrayB)[i] = ((double *)refB)[i]; }
-    for (uint64_t i = 0; i < 2 * refC_size; i++) {
+    for (uint64_t i = 0; i < 2 * refA_size * batches; i++) { ((float *)arrayA)[i] = ((double *)refA)[i]; }
+    for (uint64_t i = 0; i < 2 * refB_size * batches; i++) { ((float *)arrayB)[i] = ((double *)refB)[i]; }
+    for (uint64_t i = 0; i < 2 * refC_size * batches; i++) {
       ((float *)arrayC)[i] = ((double *)refC)[i];
       ((float *)arrayCcopy)[i] = ((double *)refC)[i];
     }
     break;
   case QUDA_CUBLAS_DATATYPE_Z:
-    arrayA = pinned_malloc(refA_size * 2 * sizeof(double));
-    arrayB = pinned_malloc(refB_size * 2 * sizeof(double));
-    arrayC = pinned_malloc(refC_size * 2 * sizeof(double));
-    arrayCcopy = pinned_malloc(refC_size * 2 * sizeof(double));
+    arrayA = pinned_malloc(batches * refA_size * 2 * sizeof(double));
+    arrayB = pinned_malloc(batches * refB_size * 2 * sizeof(double));
+    arrayC = pinned_malloc(batches * refC_size * 2 * sizeof(double));
+    arrayCcopy = pinned_malloc(batches * refC_size * 2 * sizeof(double));
     // Populate
-    for (uint64_t i = 0; i < 2 * refA_size; i++) { ((double *)arrayA)[i] = ((double *)refA)[i]; }
-    for (uint64_t i = 0; i < 2 * refB_size; i++) { ((double *)arrayB)[i] = ((double *)refB)[i]; }
-    for (uint64_t i = 0; i < 2 * refC_size; i++) {
+    for (uint64_t i = 0; i < 2 * refA_size * batches; i++) { ((double *)arrayA)[i] = ((double *)refA)[i]; }
+    for (uint64_t i = 0; i < 2 * refB_size * batches; i++) { ((double *)arrayB)[i] = ((double *)refB)[i]; }
+    for (uint64_t i = 0; i < 2 * refC_size * batches; i++) {
       ((double *)arrayC)[i] = ((double *)refC)[i];
       ((double *)arrayCcopy)[i] = ((double *)refC)[i];
     }
@@ -209,11 +210,10 @@ int main(int argc, char **argv)
   cublasGEMMQuda(arrayA, arrayB, arrayC, &cublas_param);
 
   if (verify_results) {
-    if (cublas_param.batch_count != 1) errorQuda("Testing with batched arrays not yet supported.");
     cublasGEMMQudaVerify(arrayA, arrayB, arrayC, arrayCcopy, refA_size, refB_size, refC_size, re_im, data_size,
                          &cublas_param);
   }
-
+  
   host_free(refA);
   host_free(refB);
   host_free(refC);

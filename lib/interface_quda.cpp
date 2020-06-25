@@ -5977,9 +5977,10 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
     re_im *= 2;
   }
 
-  size_t A_bytes = arrayA_size * re_im * data_size;
-  size_t B_bytes = arrayB_size * re_im * data_size;
-  size_t C_bytes = arrayC_size * re_im * data_size;
+  int batches = cublas_param->batch_count;
+  size_t A_bytes = batches * arrayA_size * re_im * data_size;
+  size_t B_bytes = batches * arrayB_size * re_im * data_size;
+  size_t C_bytes = batches * arrayC_size * re_im * data_size;
   if (getVerbosity() >= QUDA_VERBOSE)
     printfQuda("A_Gbtyes = %f, B_Gbtyes = %f, C_Gbtyes = %f\n", 1.0 * A_bytes / std::pow(1024, 3),
                1.0 * B_bytes / std::pow(1024, 3), 1.0 * C_bytes / std::pow(1024, 3));
