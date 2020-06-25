@@ -225,7 +225,7 @@ QudaCublasOperation cublas_trans_b = QUDA_CUBLAS_OP_N;
 QudaCublasDataType cublas_data_type = QUDA_CUBLAS_DATATYPE_C;
 QudaCublasDataOrder cublas_data_order = QUDA_CUBLAS_DATAORDER_COL;
 
-std::array<int, 3> cublas_mnk = {128, 128, 128};
+std::array<int, 3> cublas_mnk = {64, 64, 64};
 auto &cublas_m = cublas_mnk[0];
 auto &cublas_n = cublas_mnk[1];
 auto &cublas_k = cublas_mnk[2];
