@@ -160,12 +160,7 @@ namespace quda {
 	 cublas_param.data_type == QUDA_CUBLAS_DATATYPE_Z) {
 	data_size *= 2;
       }
-      
-      // Number of data in one batch of the array
-      unsigned int A_size = cublas_param.m * cublas_param.k; 
-      unsigned int B_size = cublas_param.k * cublas_param.n; 
-      unsigned int C_size = cublas_param.m * cublas_param.n; 
-      
+            
       // Number of data between batches      
       unsigned int A_batch_size = cublas_param.lda * cublas_param.k;
       if (cublas_param.trans_a != QUDA_CUBLAS_OP_N)
@@ -176,9 +171,9 @@ namespace quda {
       unsigned int C_batch_size = cublas_param.ldc * cublas_param.n;       
       
       // Data size of the entire array 
-      size_t sizeAarr = A_size * data_size * batch;
-      size_t sizeBarr = B_size * data_size * batch;
-      size_t sizeCarr = C_size * data_size * batch;
+      size_t sizeAarr = A_batch_size * data_size * batch;
+      size_t sizeBarr = B_batch_size * data_size * batch;
+      size_t sizeCarr = C_batch_size * data_size * batch;
 
       // If already on the device, just use the given pointer. If the data is on
       // the host, allocate device memory and transfer
@@ -223,12 +218,15 @@ namespace quda {
 	  Z **B_ptr_array = static_cast<Z**>(pool_device_malloc(batch*sizeof(Z*)));
 	  Z **C_ptr_array = static_cast<Z**>(pool_device_malloc(batch*sizeof(Z*)));
 	  
-	  set_pointer_gemm<Z><<<batch,1>>>(A_ptr_array, (Z*)A_d, A_batch_size, B_ptr_array, (Z*)B_d, B_batch_size, C_ptr_array, (Z*)C_d, C_batch_size);	
+	  set_pointer_gemm<Z><<<batch,1>>>(A_ptr_array, (Z*)A_d + cublas_param.a_offset, A_batch_size,
+					   B_ptr_array, (Z*)B_d + cublas_param.b_offset, B_batch_size,
+					   C_ptr_array, (Z*)C_d + cublas_param.c_offset, C_batch_size);
+	  
 	  error = cublasZgemmBatched(handle, trans_a, trans_b, cublas_param.m,
 				     cublas_param.n, cublas_param.k, &alpha,
-				     A_ptr_array + cublas_param.a_offset, cublas_param.lda,
-				     B_ptr_array + cublas_param.b_offset, cublas_param.ldb, &beta,
-				     C_ptr_array + cublas_param.c_offset, cublas_param.ldc, batch);
+				     A_ptr_array, cublas_param.lda,
+				     B_ptr_array, cublas_param.ldb, &beta,
+				     C_ptr_array, cublas_param.ldc, batch);
 	  
 	  pool_device_free(A_ptr_array);
 	  pool_device_free(B_ptr_array);
@@ -262,14 +260,16 @@ namespace quda {
 	  C **B_ptr_array = static_cast<C**>(pool_device_malloc(batch*sizeof(C*)));
 	  C **C_ptr_array = static_cast<C**>(pool_device_malloc(batch*sizeof(C*)));
 	  
-	  set_pointer_gemm<C><<<batch,1>>>(A_ptr_array, (C*)A_d, A_batch_size, B_ptr_array, (C*)B_d, B_batch_size, C_ptr_array, (C*)C_d, C_batch_size);
+	  set_pointer_gemm<C><<<batch,1>>>(A_ptr_array, (C*)A_d + cublas_param.a_offset, A_batch_size,
+					   B_ptr_array, (C*)B_d + cublas_param.b_offset, B_batch_size,
+					   C_ptr_array, (C*)C_d + cublas_param.c_offset, C_batch_size);
 	  
 	  error = cublasCgemmBatched(handle, trans_a, trans_b, cublas_param.m,
 				     cublas_param.n, cublas_param.k, &alpha,
-				     A_ptr_array + cublas_param.a_offset, cublas_param.lda,
-				     B_ptr_array + cublas_param.b_offset, cublas_param.ldb, &beta,
-				     C_ptr_array + cublas_param.c_offset, cublas_param.ldc, batch);
-
+				     A_ptr_array, cublas_param.lda,
+				     B_ptr_array, cublas_param.ldb, &beta,
+				     C_ptr_array, cublas_param.ldc, batch);
+	  
 	  pool_device_free(A_ptr_array);
 	  pool_device_free(B_ptr_array);
 	  pool_device_free(C_ptr_array);
@@ -301,13 +301,15 @@ namespace quda {
 	  D **B_ptr_array = static_cast<D**>(pool_device_malloc(batch*sizeof(D*)));
 	  D **C_ptr_array = static_cast<D**>(pool_device_malloc(batch*sizeof(D*)));
 	  
-	  set_pointer_gemm<D><<<batch,1>>>(A_ptr_array, (D*)A_d, A_batch_size, B_ptr_array, (D*)B_d, B_batch_size, C_ptr_array, (D*)C_d, C_batch_size);
+	  set_pointer_gemm<D><<<batch,1>>>(A_ptr_array, (D*)A_d + cublas_param.a_offset, A_batch_size,
+					   B_ptr_array, (D*)B_d + cublas_param.b_offset, B_batch_size,
+					   C_ptr_array, (D*)C_d + cublas_param.c_offset, C_batch_size);
 	  
 	  error = cublasDgemmBatched(handle, trans_a, trans_b, cublas_param.m,
 				     cublas_param.n, cublas_param.k, &alpha,
-				     A_ptr_array + cublas_param.a_offset, cublas_param.lda,
-				     B_ptr_array + cublas_param.b_offset, cublas_param.ldb, &beta,
-				     C_ptr_array + cublas_param.c_offset, cublas_param.ldc, batch);
+				     A_ptr_array, cublas_param.lda,
+				     B_ptr_array, cublas_param.ldb, &beta,
+				     C_ptr_array, cublas_param.ldc, batch);
 
 	  pool_device_free(A_ptr_array);
 	  pool_device_free(B_ptr_array);
@@ -339,13 +341,15 @@ namespace quda {
 	  S **B_ptr_array = static_cast<S**>(pool_device_malloc(batch*sizeof(S*)));
 	  S **C_ptr_array = static_cast<S**>(pool_device_malloc(batch*sizeof(S*)));
 	  
-	  set_pointer_gemm<S><<<batch,1>>>(A_ptr_array, (S*)A_d, A_batch_size, B_ptr_array, (S*)B_d, B_batch_size, C_ptr_array, (S*)C_d, C_batch_size);
+	  set_pointer_gemm<S><<<batch,1>>>(A_ptr_array, (S*)A_d + cublas_param.a_offset, A_batch_size,
+					   B_ptr_array, (S*)B_d + cublas_param.b_offset, B_batch_size,
+					   C_ptr_array, (S*)C_d + cublas_param.c_offset, C_batch_size);
 	  
 	  error = cublasSgemmBatched(handle, trans_a, trans_b, cublas_param.m,
 				     cublas_param.n, cublas_param.k, &alpha,
-				     A_ptr_array + cublas_param.a_offset, cublas_param.lda,
-				     B_ptr_array + cublas_param.b_offset, cublas_param.ldb, &beta,
-				     C_ptr_array + cublas_param.c_offset, cublas_param.ldc, batch);
+				     A_ptr_array, cublas_param.lda,
+				     B_ptr_array, cublas_param.ldb, &beta,
+				     C_ptr_array, cublas_param.ldc, batch);
 
 	  pool_device_free(A_ptr_array);
 	  pool_device_free(B_ptr_array);

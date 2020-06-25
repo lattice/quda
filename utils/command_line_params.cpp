@@ -242,7 +242,7 @@ auto &cublas_c_offset = cublas_offsets[2];
 
 std::array<double, 2> cublas_alpha_re_im = {1.0, 0.0};
 std::array<double, 2> cublas_beta_re_im = {1.0, 0.0};
-int cublas_batch = 1;
+int cublas_batch = 16;
 
 namespace
 {
@@ -442,7 +442,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--cublas-offsets", cublas_offsets, "Set the offsets for matrices A, B, and C (default 0 0 0)")
     ->expected(3);
 
-  quda_app->add_option("--cublas-batch", cublas_batch, "Set the number of batches for GEMM (default 1024)");
+  quda_app->add_option("--cublas-batch", cublas_batch, "Set the number of batches for GEMM (default 16)");
 
   quda_app->add_flag("--dagger", dagger, "Set the dagger to 1 (default 0)");
   quda_app->add_option("--device", device, "Set the CUDA device to use (default 0, single GPU only)")

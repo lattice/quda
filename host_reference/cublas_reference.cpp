@@ -76,10 +76,6 @@ void cublasGEMMEigenVerify(void *arrayA, void *arrayB, void *arrayCcopy, void *a
 
   for (int batch = 0; batch < batches; batch++) {
 
-    a_offset = batch * refA_size;
-    b_offset = batch * refB_size;
-    c_offset = batch * refC_size;
-
     // Populate Eigen objects
     if (cublas_param->data_order == QUDA_CUBLAS_DATAORDER_COL) {
       fillEigenArrayColMaj(A, A_ptr, m, k, lda, a_offset);
@@ -116,6 +112,11 @@ void cublasGEMMEigenVerify(void *arrayA, void *arrayB, void *arrayCcopy, void *a
 
     printfQuda("batch %d: (C_host - C_gpu) Frobenius norm = %e. Relative deviation = %e\n", batch, C_resid.norm(),
                C_resid.norm() / (C_resid.rows() * C_resid.cols()));
+
+    a_offset += refA_size;
+    b_offset += refB_size;
+    c_offset += refC_size;
+
   }
 }
 
