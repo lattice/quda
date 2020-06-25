@@ -408,7 +408,7 @@ int main(int argc, char **argv)
       }
 
       // as needed to bake in mu
-      if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+      if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
         constructHostCloverField(clover, clover_inv, inv_param);
 
         if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE) {

@@ -1879,7 +1879,7 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
   inv_param.verbosity_precondition = verbosity;
 }
 
-void *qudaSetupMultigrid(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
+void *qudaMultigridCreate(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
                          const void *const fatlink, const void *const longlink, const char *const mg_param_file)
 {
   static const QudaVerbosity verbosity = getVerbosity();
@@ -1983,16 +1983,9 @@ void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaI
                   target_fermilab_residual, inv_args.max_iter, reliable_delta, local_parity, verbosity,
                   QUDA_GCR_INVERTER, &invertParam);
 
-  // Override a few things for WAR
-#if 0
-  invertParam.inv_type = QUDA_BICGSTAB_INVERTER;
-  invertParam.preconditioner = 0;
-  invertParam.inv_type_precondition = QUDA_INVALID_INVERTER;
-#else
   invertParam.inv_type = QUDA_GCR_INVERTER;
   invertParam.preconditioner = mg_pack->mg_preconditioner;
   invertParam.inv_type_precondition = QUDA_MG_INVERTER;
-#endif
   invertParam.solution_type = QUDA_MAT_SOLUTION;
   invertParam.solve_type = QUDA_DIRECT_SOLVE;
   invertParam.verbosity_precondition = QUDA_VERBOSE;
@@ -2067,7 +2060,7 @@ void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaI
   qudamilc_called<false>(__func__, verbosity);
 }
 
-void qudaCleanupMultigrid(void *mg_pack_ptr)
+void qudaMultigridDestroy(void *mg_pack_ptr)
 {
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);

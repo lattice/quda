@@ -324,7 +324,7 @@ extern "C" {
    * @param mg_param_file Path to an input text file describing the MG solve, to be documented on QUDA wiki
    * @return Void pointer wrapping a pack of multigrid-related structures
    */
-  void *qudaSetupMultigrid(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
+  void *qudaMultigridCreate(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
                            const void *const milc_fatlink, const void *const milc_longlink,
                            const char *const mg_param_file);
 
@@ -363,7 +363,7 @@ extern "C" {
    *
    * @param mg_pack_ptr Void pointer mapping to the multigrid structure returned by qudaSetupMultigrid
    */
-  void qudaCleanupMultigrid(void *mg_pack_ptr);
+  void qudaMultigridDestroy(void *mg_pack_ptr);
 
   /**
    * Solve Ax=b for an improved staggered operator with many right hand sides. 
