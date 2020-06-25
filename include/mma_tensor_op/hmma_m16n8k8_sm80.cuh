@@ -209,7 +209,7 @@ namespace quda
       __device__ inline real &operator[](int i) { return v[i]; }
     };
 
-    template <int ldc, class TC, class GmemOperandC>
+    template <int M, int N, int ldc, class TC, class GmemOperandC>
     inline __device__ typename std::enable_if<std::is_same<typename TC::reg_type, unsigned>::value, void>::type
     store_complex(int warp_row, int warp_col, const WarpRegisterMapping &wrm, GmemOperandC &cc, const TC &op_c_real,
                   const TC &op_c_imag)
@@ -223,6 +223,8 @@ namespace quda
       using structure = typename VectorType<store_type, 4>::type;
       auto ptr = reinterpret_cast<structure *>(cc.data());
       structure s;
+
+      constexpr bool check_bounds = !((M % MMA_M == 0) && (N % MMA_N == 0));
 
 #pragma unroll
       for (int i = 0; i < 2; i++) {
@@ -240,11 +242,11 @@ namespace quda
           s.z = __half2float(r2.y);
           s.w = __half2float(i2.y);
         }
-        ptr[((row + i * 8) * ldc + col) / 2] = s;
+        if (!check_bounds || (row + i * 8 < M && col < N)) { ptr[((row + i * 8) * ldc + col) / 2] = s; }
       }
     }
 
-    template <int ldc, class TC, class GmemOperandC>
+    template <int M, int N, int ldc, class TC, class GmemOperandC>
     inline __device__ typename std::enable_if<std::is_same<typename TC::reg_type, float>::value, void>::type
     store_complex(int warp_row, int warp_col, const WarpRegisterMapping &wrm, GmemOperandC &cc, const TC &op_c_real,
                   const TC &op_c_imag)
@@ -258,6 +260,8 @@ namespace quda
       using structure = typename VectorType<store_type, 4>::type;
       auto ptr = reinterpret_cast<structure *>(cc.data());
       structure s;
+
+      constexpr bool check_bounds = !((M % MMA_M == 0) && (N % MMA_N == 0));
 
 #pragma unroll
       for (int i = 0; i < 2; i++) {
@@ -273,11 +277,11 @@ namespace quda
           s.z = op_c_real.reg[i * 2 + 1];
           s.w = op_c_imag.reg[i * 2 + 1];
         }
-        ptr[((row + i * 8) * ldc + col) / 2] = s;
+        if (!check_bounds || (row + i * 8 < M && col < N)) { ptr[((row + i * 8) * ldc + col) / 2] = s; }
       }
     }
 
-    template <int ldc, bool dagger, class TC, class GmemOperandC>
+    template <int M, int N, int ldc, bool dagger, class TC, class GmemOperandC>
     inline __device__ typename std::enable_if<std::is_same<typename TC::reg_type, unsigned>::value, void>::type
     store_complex_atomic(int warp_row, int warp_col, const WarpRegisterMapping &wrm, GmemOperandC &cc,
                          const TC &op_c_real, const TC &op_c_imag)
@@ -292,18 +296,20 @@ namespace quda
       using vector_type = typename vector<store_type, 2>::type;
       auto ptr = reinterpret_cast<vector_type *>(cc.data());
 
+      constexpr bool check_bounds = !((M % MMA_M == 0) && (N % MMA_N == 0));
+
 #pragma unroll
       for (int i = 0; i < 2; i++) {
         const half2 r2 = *(reinterpret_cast<const half2 *>(&(op_c_real.reg[i])));
         const half2 i2 = *(reinterpret_cast<const half2 *>(&(op_c_imag.reg[i])));
-        if (fixed) {
-          auto scale = cc.scale;
+        auto scale = fixed ? cc.scale : 1.0f;
 
-          int m_index = row + 8 * i;
-          int n_index = col;
+        int m_index = row + 8 * i;
+        int n_index = col;
 
-          vector_type value;
-          if (dagger) {
+        vector_type value;
+        if (dagger) {
+          if (!check_bounds || (n_index < M && m_index < N)) {
             value.x = +static_cast<store_type>(__half2float(r2.x) * scale);
             value.y = -static_cast<store_type>(__half2float(i2.x) * scale);
             atomicAdd(&ptr[(n_index + 0) * ldc + m_index], value);
@@ -311,7 +317,9 @@ namespace quda
             value.x = +static_cast<store_type>(__half2float(r2.y) * scale);
             value.y = -static_cast<store_type>(__half2float(i2.y) * scale);
             atomicAdd(&ptr[(n_index + 1) * ldc + m_index], value);
-          } else {
+          }
+        } else {
+          if (!check_bounds || (m_index < M && n_index < N)) {
             value.x = +static_cast<store_type>(__half2float(r2.x) * scale);
             value.y = +static_cast<store_type>(__half2float(i2.x) * scale);
             atomicAdd(&ptr[m_index * ldc + (n_index + 0)], value);
@@ -320,20 +328,11 @@ namespace quda
             value.y = +static_cast<store_type>(__half2float(i2.y) * scale);
             atomicAdd(&ptr[m_index * ldc + (n_index + 1)], value);
           }
-
-        } else {
-          // TODO: Need to be added.
-#if 0
-          s[i * 4 + 0] = __half2float(r2.x);
-          s[i * 4 + 1] = __half2float(i2.x);
-          s[i * 4 + 2] = __half2float(r2.y);
-          s[i * 4 + 3] = __half2float(i2.y);
-#endif
         }
       }
     }
 
-    template <int ldc, bool dagger, class TC, class GmemOperandC>
+    template <int M, int N, int ldc, bool dagger, class TC, class GmemOperandC>
     inline __device__ typename std::enable_if<std::is_same<typename TC::reg_type, float>::value, void>::type
     store_complex_atomic(int warp_row, int warp_col, const WarpRegisterMapping &wrm, GmemOperandC &cc,
                          const TC &op_c_real, const TC &op_c_imag)
@@ -348,16 +347,18 @@ namespace quda
       using vector_type = typename vector<store_type, 2>::type;
       auto ptr = reinterpret_cast<vector_type *>(cc.data());
 
+      constexpr bool check_bounds = !((M % MMA_M == 0) && (N % MMA_N == 0));
+
 #pragma unroll
       for (int i = 0; i < 2; i++) {
-        if (fixed) {
-          auto scale = cc.scale;
+        auto scale = fixed ? cc.scale : 1.0f;
 
-          int m_index = row + i * 8;
-          int n_index = col;
+        int m_index = row + i * 8;
+        int n_index = col;
 
-          vector_type value;
-          if (dagger) {
+        vector_type value;
+        if (dagger) {
+          if (!check_bounds || (n_index < M && m_index < N)) {
             value.x = +static_cast<store_type>(op_c_real.reg[i * 2 + 0] * scale);
             value.y = -static_cast<store_type>(op_c_imag.reg[i * 2 + 0] * scale);
             atomicAdd(&ptr[(n_index + 0) * ldc + m_index], value);
@@ -365,7 +366,9 @@ namespace quda
             value.x = +static_cast<store_type>(op_c_real.reg[i * 2 + 1] * scale);
             value.y = -static_cast<store_type>(op_c_imag.reg[i * 2 + 1] * scale);
             atomicAdd(&ptr[(n_index + 1) * ldc + m_index], value);
-          } else {
+          }
+        } else {
+          if (!check_bounds || (m_index < M && n_index < N)) {
             value.x = +static_cast<store_type>(op_c_real.reg[i * 2 + 0] * scale);
             value.y = +static_cast<store_type>(op_c_imag.reg[i * 2 + 0] * scale);
             atomicAdd(&ptr[m_index * ldc + (n_index + 0)], value);
@@ -374,15 +377,6 @@ namespace quda
             value.y = +static_cast<store_type>(op_c_imag.reg[i * 2 + 1] * scale);
             atomicAdd(&ptr[m_index * ldc + (n_index + 1)], value);
           }
-
-        } else {
-          // TODO: Need to be added.
-#if 0
-          s[0] = op_c_real.reg[i * 2 + 0];
-          s[1] = op_c_imag.reg[i * 2 + 0];
-          s[2] = op_c_real.reg[i * 2 + 1];
-          s[3] = op_c_imag.reg[i * 2 + 1];
-#endif
         }
       }
     }

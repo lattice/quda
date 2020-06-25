@@ -309,7 +309,7 @@ namespace quda
         }
       }
 
-      template <int ldc, class C> __device__ inline void store(C &c_accessor, int m_offset, int n_offset)
+      template <int M, int N, int ldc, class C> __device__ inline void store(C &c_accessor, int m_offset, int n_offset)
       {
 #pragma unroll
         for (int c = 0; c < warp_cycle; c++) {
@@ -321,11 +321,11 @@ namespace quda
           const int warp_m_offset = warp_row * MMA_M + m_offset;
           const int warp_n_offset = warp_col * MMA_N + n_offset;
 
-          store_complex<ldc>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real[c], op_c_imag[c]);
+          store_complex<M, N, ldc>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real[c], op_c_imag[c]);
         }
       }
 
-      template <int ldc, bool dagger, class C>
+      template <int M, int N, int ldc, bool dagger, class C>
       __device__ inline void store_atomic(C &c_accessor, int m_offset, int n_offset)
       {
 #pragma unroll
@@ -338,7 +338,8 @@ namespace quda
           const int warp_m_offset = warp_row * MMA_M + m_offset;
           const int warp_n_offset = warp_col * MMA_N + n_offset;
 
-          store_complex_atomic<ldc, dagger>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real[c], op_c_imag[c]);
+          store_complex_atomic<M, N, ldc, dagger>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real[c],
+                                                  op_c_imag[c]);
         }
       }
 
@@ -463,7 +464,7 @@ namespace quda
         if (compute_max_only) {
           accumulator.abs_max(max);
         } else {
-          accumulator.store<ldc>(c, m_offset, n_offset);
+          accumulator.store<M, N, ldc>(c, m_offset, n_offset);
         }
 
         return max;
@@ -545,7 +546,7 @@ namespace quda
             int warp_m_offset = warp_row * MMA_M + m_offset;
             int warp_n_offset = warp_col * MMA_N + n_offset;
 
-            store_complex<ldc>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real, op_c_imag);
+            store_complex<M, N, ldc>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real, op_c_imag);
           }
         }
 
@@ -637,7 +638,7 @@ namespace quda
               int warp_m_offset = warp_row * MMA_M + a_m;
               int warp_n_offset = warp_col * MMA_N;
 
-              store_complex<ldc>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real, op_c_imag);
+              store_complex<M, N, ldc>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real, op_c_imag);
             }
 
 #ifdef USE_GMEM_MMA_PIPELINING

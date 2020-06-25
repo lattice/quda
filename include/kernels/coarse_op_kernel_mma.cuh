@@ -251,7 +251,29 @@ namespace quda
 
           if (!from_coarse) {
 #if 1
+/**
+            constexpr int M = tile.m * fineSpin;
+            constexpr int N = tile.n;
+            constexpr int K = tile.k;
 
+            constexpr int lda = K * fineSpin;
+            constexpr int ldb = N;
+            constexpr int ldc = N;
+
+            using Config = MmaConfig<M, N, K, lda, ldb, ldc, bM, bN, bK, block_y, block_z>;
+
+            auto a = arg.U.wrap(dim, parity, x_cb);
+
+            for (int s = 0; s < fineSpin; s++) {
+
+              auto b = Wacc.wrap((parity + 1) & 1, y_cb, s);
+              auto c = arg.UV.wrap(parity, x_cb, s);
+
+              constexpr bool compute_max_only = false;
+              Config::template perform_mma<a_dagger, b_dagger, compute_max_only>(a, b, c, 0, 0);
+
+            }
+*/
 #else
             for (int k = 0; k < tile.k; k += tile.K) { // Fine Color columns of gauge field
               auto U = make_tile_A<complex, false>(tile);
@@ -443,8 +465,8 @@ namespace quda
           constexpr int m_offset = 0;
           constexpr int n_offset = 0;
 
-          static_assert(M == bM, "Dividing M/N has NOT been implemented yet.\n");
-          static_assert(N == bN, "Dividing M/N has NOT been implemented yet.\n");
+          static_assert(M <= bM, "Dividing M/N has NOT been implemented yet.\n");
+          static_assert(N <= bN, "Dividing M/N has NOT been implemented yet.\n");
           static_assert(K == bK, "This implementation ONLY works for K == bK.\n");
 
           typename Config::SmemObjA smem_obj_a_real(smem_ptr);
@@ -491,7 +513,7 @@ namespace quda
                 const int dim_index = arg.dim_index % arg.Y_atomic.geometry;
                 auto cc = arg.Y_atomic.wrap(dim_index, coarse_parity, coarse_x_cb, s, s_col);
                 constexpr bool atomic_dagger = false;
-                accumulator.store_atomic<N * fineSpin, atomic_dagger>(cc, m_offset, n_offset);
+                accumulator.store_atomic<M, N, N * fineSpin, atomic_dagger>(cc, m_offset, n_offset);
                 // arg.Y_atomic.atomicAdd(dim_index, coarse_parity, coarse_x_cb, s_row, s_col, i0 + i, j0 + j,
                 //     vuv[s_row * coarseSpin + s_col](i, j));
               } else {
@@ -501,13 +523,13 @@ namespace quda
                 if (dir == QUDA_BACKWARDS) {
                   auto cc = arg.X_atomic.wrap(0, coarse_parity, coarse_x_cb, s_col, s);
                   constexpr bool atomic_dagger = true;
-                  accumulator.store_atomic<N * fineSpin, atomic_dagger>(cc, m_offset, n_offset);
+                  accumulator.store_atomic<M, N, N * fineSpin, atomic_dagger>(cc, m_offset, n_offset);
                   // arg.X_atomic.atomicAdd(0, coarse_parity, coarse_x_cb, s_col, s_row, j0 + j, i0 + i,
                   //     conj(vuv[s_row * coarseSpin + s_col](i, j)));
                 } else {
                   auto cc = arg.X_atomic.wrap(0, coarse_parity, coarse_x_cb, s, s_col);
                   constexpr bool atomic_dagger = false;
-                  accumulator.store_atomic<N * fineSpin, atomic_dagger>(cc, m_offset, n_offset);
+                  accumulator.store_atomic<M, N, N * fineSpin, atomic_dagger>(cc, m_offset, n_offset);
                   // arg.X_atomic.atomicAdd(0, coarse_parity, coarse_x_cb, s_row, s_col, i0 + i, j0 + j,
                   //     vuv[s_row * coarseSpin + s_col](i, j));
                 }
@@ -516,7 +538,7 @@ namespace quda
                   if (s != s_col) { accumulator.ax(static_cast<float>(-1.0)); }
                   constexpr bool atomic_dagger = false;
                   auto cc = arg.X_atomic.wrap(0, coarse_parity, coarse_x_cb, s, s_col);
-                  accumulator.store_atomic<N * fineSpin, atomic_dagger>(cc, m_offset, n_offset);
+                  accumulator.store_atomic<M, N, N * fineSpin, atomic_dagger>(cc, m_offset, n_offset);
                   // arg.X_atomic.atomicAdd(0, coarse_parity, coarse_x_cb, s_row, s_col, i0 + i, j0 + j,
                   //     vuv[s_row * coarseSpin + s_col](i, j));
                 }
