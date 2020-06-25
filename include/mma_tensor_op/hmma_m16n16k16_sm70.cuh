@@ -315,7 +315,7 @@ namespace quda
       }
     }
 
-    template <int ldc, bool dagger, class TC, class GmemOperandC>
+    template <int M, int N, int ldc, bool dagger, class TC, class GmemOperandC>
     inline __device__ typename std::enable_if<std::is_same<typename TC::reg_type, unsigned>::value, void>::type
     store_complex_atomic(int warp_row, int warp_col, const WarpRegisterMapping &wrm, GmemOperandC &cc,
                          const TC &op_c_real, const TC &op_c_imag)
