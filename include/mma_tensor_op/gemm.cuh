@@ -244,6 +244,30 @@ namespace quda
 #endif
     };
 
+    template <class A, class B, class C>
+    __device__ inline void zgemm(const A &smem_obj_a_real, const A &smem_obj_a_imag, const B &smem_obj_b_real,
+                                 const B &smem_obj_b_imag, C &op_c_real, C &op_c_imag, int m, int n, int k,
+                                 const WarpRegisterMapping &wrm)
+    {
+
+      MmaOperandA op_a_real;
+      op_a_real.load(smem_obj_a_real, k, m, wrm);
+      MmaOperandA op_a_imag;
+      op_a_imag.load(smem_obj_a_imag, k, m, wrm);
+
+      MmaOperandB op_b_real;
+      op_b_real.load(smem_obj_b_real, k, n, wrm);
+      MmaOperandB op_b_imag;
+      op_b_imag.load(smem_obj_b_imag, k, n, wrm);
+
+      gemm(op_a_real, op_b_real, op_c_real);
+      gemm(op_a_imag, op_b_real, op_c_imag);
+      gemm(op_a_real, op_b_imag, op_c_imag);
+      // negate op_imag
+      op_a_imag.negate();
+      gemm(op_a_imag, op_b_imag, op_c_real);
+    }
+
     template <class OperandC, int warp_cycle, int tile_col_dim> struct MmaAccumulator {
 
       static constexpr int size = warp_cycle;
@@ -288,23 +312,8 @@ namespace quda
 
 #pragma unroll
           for (int tile_k = 0; tile_k < tile_acc_dim; tile_k++) {
-
-            MmaOperandA op_a_real;
-            op_a_real.load(smem_obj_a_real, tile_k, warp_row, wrm);
-            MmaOperandA op_a_imag;
-            op_a_imag.load(smem_obj_a_imag, tile_k, warp_row, wrm);
-
-            MmaOperandB op_b_real;
-            op_b_real.load(smem_obj_b_real, tile_k, warp_col, wrm);
-            MmaOperandB op_b_imag;
-            op_b_imag.load(smem_obj_b_imag, tile_k, warp_col, wrm);
-
-            gemm(op_a_real, op_b_real, op_c_real[c]);
-            gemm(op_a_imag, op_b_real, op_c_imag[c]);
-            gemm(op_a_real, op_b_imag, op_c_imag[c]);
-            // negate op_imag
-            op_a_imag.negate();
-            gemm(op_a_imag, op_b_imag, op_c_real[c]);
+            zgemm(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag, op_c_real[c], op_c_imag[c],
+                  warp_row, warp_col, tile_k, wrm);
           }
         }
       }
@@ -399,7 +408,9 @@ namespace quda
       using SmemObjA = SharedMemoryObject<half, bM, bK, 1, smem_lda>;
       using SmemObjB = SharedMemoryObject<half, bN, bK, 1, smem_ldb>;
 
-      using Accumulator = MmaAccumulator<MmaOperandC<accumuate_reg_type>, warp_cycle, tile_col_dim>;
+      using OperandC = MmaOperandC<accumuate_reg_type>;
+
+      using Accumulator = MmaAccumulator<OperandC, warp_cycle, tile_col_dim>;
 
       using ALoader = GlobalMemoryLoader<M, K, bM, bK, n_row, n_col, a_transpose>;
       using BLoader = GlobalMemoryLoader<N, K, bN, bK, n_row, n_col, b_transpose>;
@@ -483,8 +494,8 @@ namespace quda
         SmemObjB smem_obj_b_real(smem_obj_a_imag.ptr + smem_lda * bK);
         SmemObjB smem_obj_b_imag(smem_obj_b_real.ptr + smem_ldb * bK);
 
-        MmaOperandC<accumuate_reg_type> op_c_real;
-        MmaOperandC<accumuate_reg_type> op_c_imag;
+        OperandC op_c_real;
+        OperandC op_c_imag;
 
         WarpRegisterMapping wrm((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x);
 
@@ -517,23 +528,8 @@ namespace quda
 
 #pragma unroll 1
           for (int tile_k = 0; tile_k < tile_acc_dim; tile_k++) {
-
-            MmaOperandA op_a_real;
-            op_a_real.load(smem_obj_a_real, tile_k, warp_row, wrm);
-            MmaOperandA op_a_imag;
-            op_a_imag.load(smem_obj_a_imag, tile_k, warp_row, wrm);
-
-            MmaOperandB op_b_real;
-            op_b_real.load(smem_obj_b_real, tile_k, warp_col, wrm);
-            MmaOperandB op_b_imag;
-            op_b_imag.load(smem_obj_b_imag, tile_k, warp_col, wrm);
-
-            gemm(op_a_real, op_b_real, op_c_real);
-            gemm(op_a_imag, op_b_real, op_c_imag);
-            gemm(op_a_real, op_b_imag, op_c_imag);
-            // negate op_imag
-            op_a_imag.negate();
-            gemm(op_a_imag, op_b_imag, op_c_real);
+            zgemm(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag, op_c_real, op_c_imag, warp_row,
+                  warp_col, tile_k, wrm);
           }
 
           if (compute_max_only) {
@@ -565,8 +561,8 @@ namespace quda
         SmemObjB smem_obj_b_real(smem_obj_a_imag.ptr + smem_lda * bK);
         SmemObjB smem_obj_b_imag(smem_obj_b_real.ptr + smem_ldb * bK);
 
-        MmaOperandC<accumuate_reg_type> op_c_real;
-        MmaOperandC<accumuate_reg_type> op_c_imag;
+        OperandC op_c_real;
+        OperandC op_c_imag;
 
         WarpRegisterMapping wrm((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x);
 
@@ -609,23 +605,8 @@ namespace quda
 
 #pragma unroll 1
             for (int tile_k = 0; tile_k < tile_acc_dim; tile_k++) {
-
-              MmaOperandA op_a_real;
-              op_a_real.load(smem_obj_a_real, tile_k, warp_row, wrm);
-              MmaOperandA op_a_imag;
-              op_a_imag.load(smem_obj_a_imag, tile_k, warp_row, wrm);
-
-              MmaOperandB op_b_real;
-              op_b_real.load(smem_obj_b_real, tile_k, warp_col, wrm);
-              MmaOperandB op_b_imag;
-              op_b_imag.load(smem_obj_b_imag, tile_k, warp_col, wrm);
-
-              gemm(op_a_real, op_b_real, op_c_real);
-              gemm(op_a_imag, op_b_real, op_c_imag);
-              gemm(op_a_real, op_b_imag, op_c_imag);
-              // negate op_imag
-              op_a_imag.negate();
-              gemm(op_a_imag, op_b_imag, op_c_real);
+              zgemm(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag, op_c_real, op_c_imag, warp_row,
+                    warp_col, tile_k, wrm);
             }
 
             if (compute_max_only) {

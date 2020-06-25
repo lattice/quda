@@ -474,7 +474,9 @@ namespace quda
           typename Config::SmemObjB smem_obj_b_real(smem_obj_a_imag.ptr + Config::smem_lda * bK);
           typename Config::SmemObjB smem_obj_b_imag(smem_obj_b_real.ptr + Config::smem_ldb * bK);
 
-          typename Config::Accumulator accumulator((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x);
+          WarpRegisterMapping wrm((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x);
+
+          using op_c_type = MmaOperandC<typename Config::accumuate_reg_type>;
 
           typename Config::ALoader a_loader;
           typename Config::BLoader b_loader;
@@ -506,41 +508,61 @@ namespace quda
 #endif
               __syncthreads();
 
-              accumulator.zero();
-              accumulator.mma<Config::tile_acc_dim>(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
+#pragma unroll 1
+              for (int c = 0; c < Config::warp_cycle; c++) {
 
-              if (!isDiagonal) {
-                const int dim_index = arg.dim_index % arg.Y_atomic.geometry;
-                auto cc = arg.Y_atomic.wrap(dim_index, coarse_parity, coarse_x_cb, s, s_col);
-                constexpr bool atomic_dagger = false;
-                accumulator.store_atomic<M, N, N * fineSpin, atomic_dagger>(cc, m_offset, n_offset);
-                // arg.Y_atomic.atomicAdd(dim_index, coarse_parity, coarse_x_cb, s_row, s_col, i0 + i, j0 + j,
-                //     vuv[s_row * coarseSpin + s_col](i, j));
-              } else {
+                // The logical warp assigned to each part of the matrix.
+                int logical_warp_index = wrm.warp_id * Config::warp_cycle + c;
+                int warp_row = logical_warp_index / Config::tile_col_dim;
+                int warp_col = logical_warp_index - warp_row * Config::tile_col_dim;
 
-                accumulator.ax(-arg.kappa);
+                op_c_type op_c_real;
+                op_c_type op_c_imag;
 
-                if (dir == QUDA_BACKWARDS) {
-                  auto cc = arg.X_atomic.wrap(0, coarse_parity, coarse_x_cb, s_col, s);
-                  constexpr bool atomic_dagger = true;
-                  accumulator.store_atomic<M, N, N * fineSpin, atomic_dagger>(cc, m_offset, n_offset);
-                  // arg.X_atomic.atomicAdd(0, coarse_parity, coarse_x_cb, s_col, s_row, j0 + j, i0 + i,
-                  //     conj(vuv[s_row * coarseSpin + s_col](i, j)));
-                } else {
-                  auto cc = arg.X_atomic.wrap(0, coarse_parity, coarse_x_cb, s, s_col);
-                  constexpr bool atomic_dagger = false;
-                  accumulator.store_atomic<M, N, N * fineSpin, atomic_dagger>(cc, m_offset, n_offset);
-                  // arg.X_atomic.atomicAdd(0, coarse_parity, coarse_x_cb, s_row, s_col, i0 + i, j0 + j,
-                  //     vuv[s_row * coarseSpin + s_col](i, j));
+#pragma unroll 1
+                for (int tile_k = 0; tile_k < Config::tile_acc_dim; tile_k++) {
+                  zgemm(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag, op_c_real, op_c_imag,
+                        warp_row, warp_col, tile_k, wrm);
                 }
 
-                if (!arg.bidirectional) {
-                  if (s != s_col) { accumulator.ax(static_cast<float>(-1.0)); }
+                int warp_m_offset = warp_row * MMA_M + m_offset;
+                int warp_n_offset = warp_col * MMA_N + n_offset;
+
+                if (!isDiagonal) {
+
+                  int dim_index = arg.dim_index % arg.Y_atomic.geometry;
+                  auto cc = arg.Y_atomic.wrap(dim_index, coarse_parity, coarse_x_cb, s, s_col);
                   constexpr bool atomic_dagger = false;
-                  auto cc = arg.X_atomic.wrap(0, coarse_parity, coarse_x_cb, s, s_col);
-                  accumulator.store_atomic<M, N, N * fineSpin, atomic_dagger>(cc, m_offset, n_offset);
-                  // arg.X_atomic.atomicAdd(0, coarse_parity, coarse_x_cb, s_row, s_col, i0 + i, j0 + j,
-                  //     vuv[s_row * coarseSpin + s_col](i, j));
+                  store_complex_atomic<M, N, N * fineSpin, atomic_dagger>(warp_m_offset, warp_n_offset, wrm, cc,
+                                                                          op_c_real, op_c_imag);
+
+                } else {
+
+                  op_c_real.ax(-arg.kappa);
+                  op_c_imag.ax(-arg.kappa);
+
+                  if (dir == QUDA_BACKWARDS) {
+                    auto cc = arg.X_atomic.wrap(0, coarse_parity, coarse_x_cb, s_col, s);
+                    constexpr bool atomic_dagger = true;
+                    store_complex_atomic<M, N, N * fineSpin, atomic_dagger>(warp_m_offset, warp_n_offset, wrm, cc,
+                                                                            op_c_real, op_c_imag);
+                  } else {
+                    auto cc = arg.X_atomic.wrap(0, coarse_parity, coarse_x_cb, s, s_col);
+                    constexpr bool atomic_dagger = false;
+                    store_complex_atomic<M, N, N * fineSpin, atomic_dagger>(warp_m_offset, warp_n_offset, wrm, cc,
+                                                                            op_c_real, op_c_imag);
+                  }
+
+                  if (!arg.bidirectional) {
+                    if (s != s_col) {
+                      op_c_real.ax(static_cast<float>(-1.0));
+                      op_c_imag.ax(static_cast<float>(-1.0));
+                    }
+                    constexpr bool atomic_dagger = false;
+                    auto cc = arg.X_atomic.wrap(0, coarse_parity, coarse_x_cb, s, s_col);
+                    store_complex_atomic<M, N, N * fineSpin, atomic_dagger>(warp_m_offset, warp_n_offset, wrm, cc,
+                                                                            op_c_real, op_c_imag);
+                  }
                 }
               }
             } // Fine color
