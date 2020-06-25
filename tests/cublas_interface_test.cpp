@@ -213,7 +213,7 @@ int main(int argc, char **argv)
     cublasGEMMQudaVerify(arrayA, arrayB, arrayC, arrayCcopy, refA_size, refB_size, refC_size, re_im, data_size,
                          &cublas_param);
   }
-  
+
   host_free(refA);
   host_free(refB);
   host_free(refC);

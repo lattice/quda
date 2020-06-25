@@ -19,11 +19,9 @@ using namespace std;
 void fillEigenArrayColMaj(MatrixXcd &EigenArr, complex<double> *arr, int rows, int cols, int ld, int offset);
 
 void fillEigenArrayRowMaj(MatrixXcd &EigenArr, complex<double> *arr, int rows, int cols, int ld, int offset);
-void cublasGEMMEigenVerify(void *arrayA, void *arrayB, void *arrayCcopy, void *arrayC,
-			   uint64_t refA_size, uint64_t refB_size, uint64_t refC_size,
-			   QudaCublasParam *cublas_param);
+void cublasGEMMEigenVerify(void *arrayA, void *arrayB, void *arrayCcopy, void *arrayC, uint64_t refA_size,
+                           uint64_t refB_size, uint64_t refC_size, QudaCublasParam *cublas_param);
 
-void cublasGEMMQudaVerify(void *arrayA, void *arrayB, void *arrayC, void *arrayCcopy,
-			  uint64_t refA_size, uint64_t refB_size, uint64_t refC_size,
-			  int re_im, size_t data_size,
-			  QudaCublasParam *cublas_param);
+void cublasGEMMQudaVerify(void *arrayA, void *arrayB, void *arrayC, void *arrayCcopy, uint64_t refA_size,
+                          uint64_t refB_size, uint64_t refC_size, int re_im, size_t data_size,
+                          QudaCublasParam *cublas_param);
