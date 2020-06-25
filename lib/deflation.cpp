@@ -84,8 +84,8 @@ namespace quda
   */
   void Deflation::verify()
   {
-    const int nevs_to_print = param.cur_dim;
-    if (nevs_to_print == 0) errorQuda("Incorrect size of current deflation space");
+    const int n_evs_to_print = param.cur_dim;
+    if (n_evs_to_print == 0) errorQuda("Incorrect size of current deflation space");
 
     std::unique_ptr<Complex, decltype(pinned_deleter) > projm( pinned_allocator(param.ld*param.cur_dim * sizeof(Complex)), pinned_deleter);
 
@@ -111,7 +111,7 @@ namespace quda
     std::vector<ColorSpinorField*> res;
     res.push_back(r);
 
-    for (int i = 0; i < nevs_to_print; i++) {
+    for (int i = 0; i < n_evs_to_print; i++) {
       zero(*r);
       blas::caxpy(&projm.get()[i * param.ld], rv, res); // multiblas
       *r_sloppy = *r;
@@ -178,22 +178,22 @@ namespace quda
     printfQuda("\nDeflated guess spinor norm (gpu): %1.15e\n", sqrt(check_nrm2));
   }
 
-  void Deflation::increment(ColorSpinorField &Vm, int nev)
+  void Deflation::increment(ColorSpinorField &Vm, int n_ev)
   {
     if (param.eig_global.invert_param->inv_type != QUDA_EIGCG_INVERTER
         && param.eig_global.invert_param->inv_type != QUDA_INC_EIGCG_INVERTER)
       errorQuda("Method is not implemented for %d inverter type", param.eig_global.invert_param->inv_type);
 
-    if( nev == 0 ) return; //nothing to do
+    if (n_ev == 0) return; // nothing to do
 
     const int first_idx = param.cur_dim;
 
-    if (param.RV->CompositeDim() < (first_idx + nev) || param.tot_dim < (first_idx + nev)) {
-      warningQuda("\nNot enough space to add %d vectors. Keep deflation space unchanged.\n", nev);
+    if (param.RV->CompositeDim() < (first_idx + n_ev) || param.tot_dim < (first_idx + n_ev)) {
+      warningQuda("\nNot enough space to add %d vectors. Keep deflation space unchanged.\n", n_ev);
       return;
     }
 
-    for(int i = 0; i < nev; i++) blas::copy(param.RV->Component(first_idx+i), Vm.Component(i));
+    for (int i = 0; i < n_ev; i++) blas::copy(param.RV->Component(first_idx + i), Vm.Component(i));
 
     printfQuda("\nConstruct projection matrix..\n");
 
@@ -201,7 +201,7 @@ namespace quda
     // The degree to which we interpolate between modified GramSchmidt and GramSchmidt (performance vs stability)
     const int cdot_pipeline_length  = 4;
 
-    for (int i = first_idx; i < (first_idx + nev); i++) {
+    for (int i = first_idx; i < (first_idx + n_ev); i++) {
       std::unique_ptr<Complex[]> alpha(new Complex[i]);
 
       ColorSpinorField *accum = param.eig_global.cuda_prec_ritz != QUDA_DOUBLE_PRECISION ? r : &param.RV->Component(i);
@@ -251,16 +251,16 @@ namespace quda
       }
     }
 
-    param.cur_dim += nev;
+    param.cur_dim += n_ev;
 
     printfQuda("\nNew curr deflation space dim = %d\n", param.cur_dim);
   }
 
-  void Deflation::reduce(double tol, int max_nev)
+  void Deflation::reduce(double tol, int max_n_ev)
   {
-    if (param.cur_dim < max_nev) {
+    if (param.cur_dim < max_n_ev) {
       printf("\nToo big number of eigenvectors was requested, switched to maximum available number %d\n", param.cur_dim);
-      max_nev = param.cur_dim;
+      max_n_ev = param.cur_dim;
     }
 
     std::unique_ptr<double[]> evals(new double[param.cur_dim]);
@@ -301,7 +301,7 @@ namespace quda
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     // csParam.setPrecision(search_space_prec);//eigCG internal search space precision: must be adjustable.
     csParam.is_composite = true;
-    csParam.composite_dim = max_nev;
+    csParam.composite_dim = max_n_ev;
 
     csParam.mem_type = QUDA_MEMORY_MAPPED;
     std::unique_ptr<ColorSpinorField> buff(ColorSpinorField::Create(csParam));
@@ -310,7 +310,7 @@ namespace quda
     double relerr = 0.0;
     bool do_residual_check = (tol != 0.0);
 
-    while ((relerr < tol) && (idx < max_nev)) {
+    while ((relerr < tol) && (idx < max_n_ev)) {
       std::vector<ColorSpinorField *> rv(param.RV->Components().begin(), param.RV->Components().begin() + param.cur_dim);
       std::vector<ColorSpinorField *> res;
       res.push_back(r);

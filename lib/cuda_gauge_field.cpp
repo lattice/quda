@@ -568,8 +568,8 @@ namespace quda {
 	}
 
 	// this copies over both even and odd
-	qudaMemcpy(gauge, buffer, bytes, cudaMemcpyDefault);
-	pool_pinned_free(buffer);
+        qudaMemcpy(gauge, buffer, bytes, cudaMemcpyDefault);
+        pool_pinned_free(buffer);
       } else { // else on the GPU
 
         if (src.Order() == QUDA_MILC_SITE_GAUGE_ORDER ||
@@ -595,18 +595,18 @@ namespace quda {
 
 	  if (src.Order() == QUDA_QDP_GAUGE_ORDER) {
 	    for (int d=0; d<geometry; d++) {
-	      qudaMemcpy(((void**)buffer)[d], ((void**)src.Gauge_p())[d], src.Bytes()/geometry, cudaMemcpyDefault);
-	    }
+              qudaMemcpy(((void **)buffer)[d], ((void **)src.Gauge_p())[d], src.Bytes() / geometry, cudaMemcpyDefault);
+            }
 	  } else {
-	    qudaMemcpy(buffer, src.Gauge_p(), src.Bytes(), cudaMemcpyDefault);
-	  }
+            qudaMemcpy(buffer, src.Gauge_p(), src.Bytes(), cudaMemcpyDefault);
+          }
 
 	  if (src.Order() > 4 && GhostExchange() == QUDA_GHOST_EXCHANGE_PAD &&
 	      src.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
 	    for (int d=0; d<geometry; d++)
-	      qudaMemcpy(ghost_buffer[d], src.Ghost()[d], ghost_bytes[d], cudaMemcpyDefault);
+              qudaMemcpy(ghost_buffer[d], src.Ghost()[d], ghost_bytes[d], cudaMemcpyDefault);
 
-	  if (ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED && src.GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
+          if (ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED && src.GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
 	    copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer, 0, ghost_buffer);
 	    if (geometry == QUDA_COARSE_GEOMETRY) copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer, 0, ghost_buffer, 3);
 	  } else {
@@ -679,17 +679,18 @@ namespace quda {
 	}
 
 	if (cpu.Order() == QUDA_QDP_GAUGE_ORDER) {
-	  for (int d=0; d<geometry; d++) qudaMemcpy(((void**)cpu.gauge)[d], ((void**)buffer)[d], cpu.Bytes()/geometry, cudaMemcpyDefault);
-	} else {
-	  qudaMemcpy(cpu.gauge, buffer, cpu.Bytes(), cudaMemcpyDefault);
-	}
+          for (int d = 0; d < geometry; d++)
+            qudaMemcpy(((void **)cpu.gauge)[d], ((void **)buffer)[d], cpu.Bytes() / geometry, cudaMemcpyDefault);
+        } else {
+          qudaMemcpy(cpu.gauge, buffer, cpu.Bytes(), cudaMemcpyDefault);
+        }
 
 	if (cpu.Order() > 4 && GhostExchange() == QUDA_GHOST_EXCHANGE_PAD &&
 	    cpu.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
 	  for (int d=0; d<geometry; d++)
-	    qudaMemcpy(cpu.Ghost()[d], ghost_buffer[d], ghost_bytes[d], cudaMemcpyDefault);
+            qudaMemcpy(cpu.Ghost()[d], ghost_buffer[d], ghost_bytes[d], cudaMemcpyDefault);
 
-	free_gauge_buffer(buffer, cpu.Order(), cpu.Geometry());
+        free_gauge_buffer(buffer, cpu.Order(), cpu.Geometry());
 	if (nFace > 0) free_ghost_buffer(ghost_buffer, cpu.Order(), geometry);
       }
     } else if (reorder_location() == QUDA_CPU_FIELD_LOCATION) { // do copy then host-side reorder

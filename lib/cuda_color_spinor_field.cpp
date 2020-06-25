@@ -420,7 +420,7 @@ namespace quda {
       copyGenericColorSpinor(*this, src, QUDA_CPU_FIELD_LOCATION, buffer, 0, static_cast<char*>(buffer)+bytes, 0);
 
       qudaMemcpy(v, buffer, bytes, cudaMemcpyDefault);
-      qudaMemcpy(norm, static_cast<char*>(buffer)+bytes, norm_bytes, cudaMemcpyDefault);
+      qudaMemcpy(norm, static_cast<char *>(buffer) + bytes, norm_bytes, cudaMemcpyDefault);
 
       pool_pinned_free(buffer);
     } else if (typeid(src) == typeid(cudaColorSpinorField)) {
@@ -468,7 +468,7 @@ namespace quda {
     if ( reorder_location() == QUDA_CPU_FIELD_LOCATION && typeid(dest) == typeid(cpuColorSpinorField)) {
       void *buffer = pool_pinned_malloc(bytes+norm_bytes);
       qudaMemcpy(buffer, v, bytes, cudaMemcpyDefault);
-      qudaMemcpy(static_cast<char*>(buffer)+bytes, norm, norm_bytes, cudaMemcpyDefault);
+      qudaMemcpy(static_cast<char *>(buffer) + bytes, norm, norm_bytes, cudaMemcpyDefault);
 
       copyGenericColorSpinor(dest, *this, QUDA_CPU_FIELD_LOCATION, 0, buffer, 0, static_cast<char*>(buffer)+bytes);
       pool_pinned_free(buffer);
