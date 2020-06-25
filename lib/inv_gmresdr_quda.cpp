@@ -488,8 +488,7 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
       Zm = K ? ColorSpinorFieldSet::Create(csParam) : Vm;
 
-
-      csParam.composite_dim = (param.n_ev+1);
+      csParam.composite_dim = (param.n_ev + 1);
       csParam.setPrecision(QUDA_DOUBLE_PRECISION);
 
       gmresdr_args->Vkp1 = ColorSpinorFieldSet::Create(csParam);

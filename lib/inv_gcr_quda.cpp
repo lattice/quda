@@ -161,7 +161,8 @@ namespace quda {
     delete []delta;
   }
 
-  GCR::GCR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
+  GCR::GCR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
+           TimeProfile &profile) :
     Solver(mat, matSloppy, matPrecon, param, profile),
     matMdagM(DiracMdagM(matPrecon.Expose())),
     K(0),
@@ -190,17 +191,17 @@ namespace quda {
     else 
       errorQuda("Unsupported preconditioner %d\n", param.inv_type_precondition);
 
-    p.resize(n_krylov+1);
+    p.resize(n_krylov + 1);
     Ap.resize(n_krylov);
 
     alpha = new Complex[n_krylov];
-    beta = new Complex*[n_krylov];
-    for (int i=0; i<n_krylov; i++) beta[i] = new Complex[n_krylov];
+    beta = new Complex *[n_krylov];
+    for (int i = 0; i < n_krylov; i++) beta[i] = new Complex[n_krylov];
     gamma = new double[n_krylov];
   }
 
-  GCR::GCR(const DiracMatrix &mat, Solver &K, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
-           TimeProfile &profile) :
+  GCR::GCR(const DiracMatrix &mat, Solver &K, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+           SolverParam &param, TimeProfile &profile) :
     Solver(mat, matSloppy, matPrecon, param, profile),
     matMdagM(matPrecon.Expose()),
     K(&K),
@@ -212,12 +213,12 @@ namespace quda {
     tmp_sloppy(nullptr),
     r_sloppy(nullptr)
   {
-    p.resize(n_krylov+1);
+    p.resize(n_krylov + 1);
     Ap.resize(n_krylov);
 
     alpha = new Complex[n_krylov];
-    beta = new Complex*[n_krylov];
-    for (int i=0; i<n_krylov; i++) beta[i] = new Complex[n_krylov];
+    beta = new Complex *[n_krylov];
+    for (int i = 0; i < n_krylov; i++) beta[i] = new Complex[n_krylov];
     gamma = new double[n_krylov];
   }
 
@@ -225,7 +226,7 @@ namespace quda {
     profile.TPSTART(QUDA_PROFILE_FREE);
 
     delete []alpha;
-    for (int i=0; i<n_krylov; i++) delete []beta[i];
+    for (int i = 0; i < n_krylov; i++) delete[] beta[i];
     delete []beta;
     delete []gamma;
 
@@ -235,8 +236,10 @@ namespace quda {
       if (r_sloppy && r_sloppy != rp) delete r_sloppy;
     }
 
-    for (int i=0; i<n_krylov+1; i++) if (p[i]) delete p[i];
-    for (int i=0; i<n_krylov; i++) if (Ap[i]) delete Ap[i];
+    for (int i = 0; i < n_krylov + 1; i++)
+      if (p[i]) delete p[i];
+    for (int i = 0; i < n_krylov; i++)
+      if (Ap[i]) delete Ap[i];
 
     if (tmp_sloppy != tmpp) delete tmp_sloppy;
     if (tmpp) delete tmpp;
@@ -269,7 +272,7 @@ namespace quda {
       // create sloppy fields used for orthogonalization
       csParam.setPrecision(param.precision_sloppy);
       for (int i = 0; i < n_krylov + 1; i++) p[i] = ColorSpinorField::Create(csParam);
-      for (int i=0; i<n_krylov; i++) Ap[i] = ColorSpinorField::Create(csParam);
+      for (int i = 0; i < n_krylov; i++) Ap[i] = ColorSpinorField::Create(csParam);
 
       csParam.setPrecision(param.precision_sloppy);
       if (param.precision_sloppy != x.Precision()) {
@@ -432,10 +435,10 @@ namespace quda {
       total_iter++;
 
       PrintStats("GCR", total_iter, r2, b2, heavy_quark_res);
-   
+
       // update since n_krylov or maxiter reached, converged or reliable update required
       // note that the heavy quark residual will by definition only be checked every n_krylov steps
-      if (k==n_krylov || total_iter==param.maxiter || (r2 < stop && !l2_converge) || sqrt(r2/r2_old) < param.delta) {
+      if (k == n_krylov || total_iter == param.maxiter || (r2 < stop && !l2_converge) || sqrt(r2 / r2_old) < param.delta) {
 
         // update the solution vector
         updateSolution(x, alpha, beta, gamma, k, p);
@@ -487,9 +490,7 @@ namespace quda {
         }
 
         r2_old = r2;
-
       }
-
     }
 
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);

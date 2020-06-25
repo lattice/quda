@@ -220,7 +220,7 @@ namespace quda {
     /**< The precision of the Ritz vectors */
     QudaPrecision precision_ritz;//also search space precision
 
-    int n_ev;//number of eigenvectors produced by EigCG
+    int n_ev; // number of eigenvectors produced by EigCG
     int m;//Dimension of the search space
     int deflation_grid;
     int rhs_idx;
@@ -874,9 +874,9 @@ namespace quda {
     void updateR(Complex **tau, std::vector<ColorSpinorField*> r, int begin, int size, int j);
     void orthoDir(Complex **tau, double* sigma, std::vector<ColorSpinorField*> r, int j, int pipeline);
 
-    void updateUend(Complex* gamma, std::vector<ColorSpinorField*> u, int n_krylov);
-    void updateXRend(Complex* gamma, Complex* gamma_prime, Complex* gamma_prime_prime,
-                                std::vector<ColorSpinorField*> r, ColorSpinorField& x, int n_krylov);
+    void updateUend(Complex *gamma, std::vector<ColorSpinorField *> u, int n_krylov);
+    void updateXRend(Complex *gamma, Complex *gamma_prime, Complex *gamma_prime_prime,
+                     std::vector<ColorSpinorField *> r, ColorSpinorField &x, int n_krylov);
 
     /**
        Solver uses lazy allocation: this flag determines whether we have allocated or not.

@@ -252,7 +252,8 @@ namespace quda
           vecs_ptr.push_back(kSpace[i]->CreateAlias(csParamClone));
         }
         if (getVerbosity() >= QUDA_SUMMARIZE) {
-          printfQuda("kSpace successfully down copied from prec %d to prec %d\n", kSpace[0]->Precision(), vecs_ptr[0]->Precision());
+          printfQuda("kSpace successfully down copied from prec %d to prec %d\n", kSpace[0]->Precision(),
+                     vecs_ptr[0]->Precision());
         }
       } else {
         for (int i = 0; i < n_conv; i++) {
@@ -263,7 +264,7 @@ namespace quda
       // save the vectors
       VectorIO io(eig_param->vec_outfile, eig_param->io_parity_inflate == QUDA_BOOLEAN_TRUE);
       io.save(vecs_ptr);
-      for (unsigned int i=0; i < kSpace.size() && save_prec < prec; i++) delete vecs_ptr[i];
+      for (unsigned int i = 0; i < kSpace.size() && save_prec < prec; i++) delete vecs_ptr[i];
     }
 
     // Save TRLM tuning

@@ -21,7 +21,6 @@
 
 #include <deflation.h>
 
-
 /*
 Based on  eigCG(n_ev, m) algorithm:
 A. Stathopolous and K. Orginos, arXiv:0707.0131
@@ -201,8 +200,8 @@ namespace quda {
      for(int l = 1; l <= m ; l++) evecm1[l*m-1] = 0.0 ;
      // Attach the first n_ev old evecs at the end of the n_ev latest ones:
      memcpy(&evecm[k*m], evecm1, k*m*sizeof(Complex));
-//?
-    // Orthogonalize the 2*n_ev (new+old) vectors evecm=QR:
+     //?
+     // Orthogonalize the 2*n_ev (new+old) vectors evecm=QR:
 
      MatrixXcd Q2k(MatrixXcd::Identity(m, 2*k));
      HouseholderQR<MatrixXcd> ritzVecs2k_qr( Map<MatrixXcd, Unaligned >(args.ritzVecs.data(), m, 2*k) );
@@ -418,7 +417,7 @@ namespace quda {
     ColorSpinorParam csParam(x);
 
     if (!init) {
-      eigcg_args = new EigCGArgs(param.m, param.n_ev);//need only deflation meta structure
+      eigcg_args = new EigCGArgs(param.m, param.n_ev); // need only deflation meta structure
 
       csParam.create = QUDA_COPY_FIELD_CREATE;
       rp = ColorSpinorField::Create(b, csParam);
@@ -738,7 +737,7 @@ namespace quda {
 
        bool update_ritz = !dcg_cycle && (eigcg_args->restarts > 1) && !defl.is_complete(); //too uglyyy
 
-       if( update_ritz ) { 
+       if( update_ritz ) {
 
          defl.increment(*Vm, param.n_ev);
          logical_rhs_id += 1;
@@ -787,7 +786,7 @@ namespace quda {
        if(Vm) delete Vm;//safe some space
        Vm = nullptr;
 
-       const int max_n_ev = defl.size();//param.m;
+       const int max_n_ev = defl.size(); // param.m;
        printfQuda("\nRequested to reserve %d eigenvectors with max tol %le.\n", max_n_ev, param.eigenval_tol);
        defl.reduce(param.eigenval_tol, max_n_ev);
      }

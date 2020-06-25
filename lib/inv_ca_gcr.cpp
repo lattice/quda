@@ -187,7 +187,7 @@ namespace quda {
     if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
     // compute b2, but only if we need to
-    bool fixed_iteration = param.sloppy_converge && n_krylov==param.maxiter && !param.compute_true_res;
+    bool fixed_iteration = param.sloppy_converge && n_krylov == param.maxiter && !param.compute_true_res;
     double b2 = !fixed_iteration ? blas::norm2(b) : 1.0;
     double r2 = 0.0; // if zero source then we will exit immediately doing no work
 
@@ -284,9 +284,9 @@ namespace quda {
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && total_iter < param.maxiter) {
 
       // build up a space of size n_krylov
-      for (int k=0; k<n_krylov; k++) {
+      for (int k = 0; k < n_krylov; k++) {
         matSloppy(*q[k], *p[k], tmpSloppy);
-        if (k<n_krylov-1 && basis != QUDA_POWER_BASIS) blas::copy(*p[k+1], *q[k]);
+        if (k < n_krylov - 1 && basis != QUDA_POWER_BASIS) blas::copy(*p[k + 1], *q[k]);
       }
 
       solve(alpha, q, *p[0]);
@@ -296,7 +296,7 @@ namespace quda {
       X.push_back(&x);
       // need to make sure P is only length n_krylov
       std::vector<ColorSpinorField*> P;
-      for (int i=0; i<n_krylov; i++) P.push_back(p[i]);
+      for (int i = 0; i < n_krylov; i++) P.push_back(p[i]);
       blas::caxpy(alpha, P, X);
 
       // no need to compute residual vector if not returning
@@ -305,11 +305,11 @@ namespace quda {
         // update the residual vector
         std::vector<ColorSpinorField*> R;
         R.push_back(&r);
-        for (int i=0; i<n_krylov; i++) alpha[i] = -alpha[i];
+        for (int i = 0; i < n_krylov; i++) alpha[i] = -alpha[i];
         blas::caxpy(alpha, q, R);
       }
 
-      total_iter+=n_krylov;
+      total_iter += n_krylov;
       if ( !fixed_iteration || getVerbosity() >= QUDA_DEBUG_VERBOSE) {
         // only compute the residual norm if we need to
         r2 = blas::norm2(r);

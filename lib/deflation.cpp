@@ -191,7 +191,7 @@ namespace quda
         && param.eig_global.invert_param->inv_type != QUDA_INC_EIGCG_INVERTER)
       errorQuda("Method is not implemented for %d inverter type", param.eig_global.invert_param->inv_type);
 
-    if( n_ev == 0 ) return; //nothing to do
+    if (n_ev == 0) return; // nothing to do
 
     const int first_idx = param.cur_dim;
 
@@ -200,7 +200,7 @@ namespace quda
       return;
     }
 
-    for(int i = 0; i < n_ev; i++) blas::copy(param.RV->Component(first_idx+i), Vm.Component(i));
+    for (int i = 0; i < n_ev; i++) blas::copy(param.RV->Component(first_idx + i), Vm.Component(i));
 
     printfQuda("\nConstruct projection matrix..\n");
 
