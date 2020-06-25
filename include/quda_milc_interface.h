@@ -325,8 +325,8 @@ extern "C" {
    * @return Void pointer wrapping a pack of multigrid-related structures
    */
   void *qudaMultigridCreate(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
-                           const void *const milc_fatlink, const void *const milc_longlink,
-                           const char *const mg_param_file);
+                            const void *const milc_fatlink, const void *const milc_longlink,
+                            const char *const mg_param_file);
 
   /**
    * Solve Ax=b for an improved staggered operator using MG.

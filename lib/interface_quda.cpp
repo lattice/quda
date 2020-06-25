@@ -2544,7 +2544,8 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
       if (param->overlap) {
         mg->dSmoothSloppy->updateFields(gaugeExtended, gaugeFatExtended, gaugeLongExtended, cloverPrecondition);
       } else {
-        mg->dSmoothSloppy->updateFields(gaugePrecondition, gaugeFatPrecondition, gaugeLongPrecondition, cloverPrecondition);
+        mg->dSmoothSloppy->updateFields(gaugePrecondition, gaugeFatPrecondition, gaugeLongPrecondition,
+                                        cloverPrecondition);
       }
       mg->dSmoothSloppy->setMass(param->mass);
     }
@@ -2553,8 +2554,7 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
 
   } else {
 
-    bool outer_pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
-      (param->solve_type == QUDA_NORMOP_PC_SOLVE);
+    bool outer_pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) || (param->solve_type == QUDA_NORMOP_PC_SOLVE);
 
     // free the previous dirac operators
     if (mg->m) delete mg->m;
@@ -2575,8 +2575,8 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
 
     // this is the Dirac operator we use for smoothing
     DiracParam diracSmoothParam;
-    bool fine_grid_pc_solve = (mg_param->smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE) ||
-      (mg_param->smoother_solve_type[0] == QUDA_NORMOP_PC_SOLVE);
+    bool fine_grid_pc_solve = (mg_param->smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE)
+      || (mg_param->smoother_solve_type[0] == QUDA_NORMOP_PC_SOLVE);
     setDiracSloppyParam(diracSmoothParam, param, fine_grid_pc_solve);
     mg->dSmooth = Dirac::create(diracSmoothParam);
     mg->mSmooth = new DiracM(*(mg->dSmooth));
@@ -2584,7 +2584,8 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
     // this is the Dirac operator we use for sloppy smoothing (we use the preconditioner fields for this)
     DiracParam diracSmoothSloppyParam;
     setDiracPreParam(diracSmoothSloppyParam, param, fine_grid_pc_solve, true);
-    mg->dSmoothSloppy = Dirac::create(diracSmoothSloppyParam);;
+    mg->dSmoothSloppy = Dirac::create(diracSmoothSloppyParam);
+    ;
     mg->mSmoothSloppy = new DiracM(*(mg->dSmoothSloppy));
 
     mg->mgParam->matResidual = mg->m;
@@ -2592,8 +2593,7 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
     mg->mgParam->matSmoothSloppy = mg->mSmoothSloppy;
 
     mg->mgParam->updateInvertParam(*param);
-    if(mg->mgParam->mg_global.invert_param != param)
-      mg->mgParam->mg_global.invert_param = param;
+    if (mg->mgParam->mg_global.invert_param != param) mg->mgParam->mg_global.invert_param = param;
 
     bool refresh = true;
     mg->mg->reset(refresh);
