@@ -1548,6 +1548,7 @@ void milcSetMultigridEigParam(QudaEigParam &mg_eig_param, mgInputStruct &input_s
   mg_eig_param.n_ev = input_struct.deflate_n_ev; // mg_eig_n_ev[level];
   mg_eig_param.n_kr = input_struct.deflate_n_kr; // mg_eig_n_kr[level];
   mg_eig_param.n_conv = input_struct.nvec[level];
+  mg_eig_param.n_ev_deflate = -1; // deflate everything that converged
   mg_eig_param.batched_rotate = 0; // mg_eig_batched_rotate[level];
   mg_eig_param.require_convergence
     = QUDA_BOOLEAN_TRUE; // mg_eig_require_convergence[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -1571,6 +1572,7 @@ void milcSetMultigridEigParam(QudaEigParam &mg_eig_param, mgInputStruct &input_s
   strcpy(mg_eig_param.vec_infile, "");
   strcpy(mg_eig_param.vec_outfile, "");
   mg_eig_param.io_parity_inflate = QUDA_BOOLEAN_FALSE; // do not inflate coarse vectors
+  mg_eig_param.save_prec = QUDA_SINGLE_PRECISION; // cannot save in fixed point
 
   strcpy(mg_eig_param.QUDA_logfile, "" /*eig_QUDA_logfile*/);
 }
