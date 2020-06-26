@@ -402,6 +402,11 @@ if( ${CMAKE_CUDA_COMPILER} MATCHES "nvcc")
   message(STATUS "CUDA Build Type: ${QUDA_CUDA_BUILD_TYPE}")
 endif()
 
+if( ${CMAKE_CUDA_COMPILER} MATCHES "clang")
+  set(QUDA_CUDA_BUILD_TYPE "Clang")
+  message(STATUS "CUDA Build Type: ${QUDA_CUDA_BUILD_TYPE}")
+endif()
+
 if( ${QUDA_CUDA_BUILD_TYPE} STREQUAL "NVCC" ) 
   # CUDA Wrapper for finding libs etc
   set(XCOMPILER_STRING "-Xcompiler")
@@ -411,7 +416,12 @@ if( ${QUDA_CUDA_BUILD_TYPE} STREQUAL "NVCC" )
   set(XCOMPILER_SANITIZE_OPTIONS "-fsanitize=address,-fsanitize=undefined")
 endif()
 
- 
+if( ${QUDA_CUDA_BUILD_TYPE} STREQUAL "Clang") 
+ set(CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS
+	     "-Wno-unknown-pragmas -Wno-unused-function -Wno-unused-local-typedef -Wno-unused-private-field")
+ set(XCOMPILER_SANITIZE_OPTIONS "-fsanitize=address,undefined")
+endif()
+
 set(CMAKE_CUDA_FLAGS_DEVEL
 	"-g ${LINEINFO_STRING} -O3 ${XCOMPILER_STRING} ${CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS}"
     CACHE STRING "Flags used by the CUDA compiler during regular development builds.")
@@ -842,6 +852,7 @@ mark_as_advanced(CMAKE_F_FLAGS)
 
 mark_as_advanced(CMAKE_EXE_LINKER_FLAGS_SANITIZE)
 
+message(STATUS "CUDA_DIR : ${CUDAToolkit_TARGET_DIR}")
 message(STATUS "CUDA FLAGS: ${CMAKE_CUDA_FLAGS_STRICT}")
 message(STATUS "CXXFLAGS:   ${CMAKE_CXX_FLAGS_STRICT}")
 message(STATUS "C FLAGS:    ${CMAKE_C_FLAGS_STRICT}")

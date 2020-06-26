@@ -174,11 +174,14 @@ target_compile_definitions(
   $<$<CONFIG:DEBUG>:HOST_DEBUGDEVICE_DEBUG>
   $<$<CONFIG:SANITIZE>:HOST_DEBUG>)
 
-target_compile_options(quda PRIVATE $<$<COMPILE_LANGUAGE:CUDA>: -ftz=true -prec-div=false -prec-sqrt=false>)
-target_compile_options(quda PRIVATE $<$<COMPILE_LANGUAGE:CUDA>: -Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH}
+target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -ftz=true -prec-div=false -prec-sqrt=false>)
+target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH}
                                     --expt-relaxed-constexpr>)
+target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>: --cuda-path=${CUDAToolkit_TARGET_DIR} --cuda-gpu-arch=${QUDA_GPU_ARCH}>)
+target_link_options(quda PUBLIC $<$<CUDA_COMPILER_ID:Clang>: --cuda-path=${CUDAToolkit_TARGET_DIR}>)
+
 if(QUDA_VERBOSE_BUILD)
-  target_compile_options(quda PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--ptxas-options=-v>)
+	target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:--ptxas-options=-v>)
 endif(QUDA_VERBOSE_BUILD)
 
 # workaround for 10.2
@@ -210,12 +213,11 @@ if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
 endif()
 
 target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_target>)
-
 # propagate CXX flags to CUDA host compiler
 if(${QUDA_PROPAGATE_CXX_FLAGS})
   target_compile_options(
     quda
-    PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:
+    PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
     $<$<CONFIG:DEVEL>:${XCOMPILER_STRING}
            ${CMAKE_CXX_FLAGS_DEVEL}>
 	   $<$<CONFIG:STRICT>:${XCOMPILER_STRING}
