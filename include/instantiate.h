@@ -150,6 +150,43 @@ namespace quda
     }
   }
 
+  /**
+     @brief This instantiate function is used to instantiate the clover precision
+     @param[in] c CloverField we wish to instantiate
+     @param[in,out] args Any additional arguments required for the computation at hand
+  */
+  template <template <typename> class Apply, typename C, typename... Args>
+  constexpr void instantiate(C &c, Args &&... args)
+  {
+    if (c.Precision() == QUDA_DOUBLE_PRECISION) {
+#if QUDA_PRECISION & 8
+      Apply<double>(c, args...);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
+#endif
+    } else if (c.Precision() == QUDA_SINGLE_PRECISION) {
+#if QUDA_PRECISION & 4
+      Apply<float>(c, args...);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+#endif
+    } else if (c.Precision() == QUDA_HALF_PRECISION) {
+#if QUDA_PRECISION & 2
+      Apply<short>(c, args...);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#endif
+    } else if (c.Precision() == QUDA_QUARTER_PRECISION) {
+#if QUDA_PRECISION & 1
+      Apply<char>(c, args...);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+#endif
+    } else {
+      errorQuda("Unsupported precision %d\n", c.Precision());
+    }
+  }
+
   // these are used in dslash.h
 
   struct WilsonReconstruct {

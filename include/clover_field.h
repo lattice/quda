@@ -298,9 +298,14 @@ namespace quda {
     }
   };
 
-
-  // driver for computing the clover field from the gauge field
-  void computeClover(CloverField &clover, const GaugeField &gauge, double coeff,  QudaFieldLocation location);
+  /**
+     @brief Driver for computing the clover field from the field
+     strength tensor.
+     @param[out] clover Compute clover field
+     @param[in] fmunu Field strength tensor
+     @param[in] coefft Clover coefficient
+  */
+  void computeClover(CloverField &clover, const GaugeField &fmunu, double coeff);
 
 
   /**

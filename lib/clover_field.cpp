@@ -325,13 +325,9 @@ namespace quda {
   /**
      Computes Fmunu given the gauge field U
   */
-  void cudaCloverField::compute(const cudaGaugeField &gauge) {
-
-    if (gauge.Precision() != precision) 
-      errorQuda("Gauge and clover precisions must match");
-
-    computeClover(*this, gauge, 1.0, QUDA_CUDA_FIELD_LOCATION);
-
+  void cudaCloverField::compute(const cudaGaugeField &gauge)
+  {
+    computeClover(*this, gauge, 1.0);
   }
 
   cpuCloverField::cpuCloverField(const CloverFieldParam &param) : CloverField(param) {
