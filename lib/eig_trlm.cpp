@@ -28,15 +28,15 @@ namespace quda
     if (!profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
 
     // Tridiagonal/Arrow matrix
-    alpha = (double *)safe_malloc(nKr * sizeof(double));
-    beta = (double *)safe_malloc(nKr * sizeof(double));
-    for (int i = 0; i < nKr; i++) {
+    alpha = (double *)safe_malloc(n_kr * sizeof(double));
+    beta = (double *)safe_malloc(n_kr * sizeof(double));
+    for (int i = 0; i < n_kr; i++) {
       alpha[i] = 0.0;
       beta[i] = 0.0;
     }
 
     // Thick restart specific checks
-    if (nKr < nEv + 6) errorQuda("nKr=%d must be greater than nEv+6=%d\n", nKr, nEv + 6);
+    if (n_kr < n_ev + 6) errorQuda("n_kr=%d must be greater than n_ev+6=%d\n", n_kr, n_ev + 6);
 
     if (!(eig_param->spectrum == QUDA_SPECTRUM_LR_EIG || eig_param->spectrum == QUDA_SPECTRUM_SR_EIG)) {
       errorQuda("Only real spectrum type (LR or SR) can be passed to the TR Lanczos solver");
@@ -88,8 +88,8 @@ namespace quda
     // Loop over restart iterations.
     while (restart_iter < max_restarts && !converged) {
 
-      for (int step = num_keep; step < nKr; step++) lanczosStep(kSpace, step);
-      iter += (nKr - num_keep);
+      for (int step = num_keep; step < n_kr; step++) lanczosStep(kSpace, step);
+      iter += (n_kr - num_keep);
 
       // The eigenvalues are returned in the alpha array
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -97,12 +97,12 @@ namespace quda
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
       // mat_norm is updated.
-      for (int i = num_locked; i < nKr; i++)
+      for (int i = num_locked; i < n_kr; i++)
         if (fabs(alpha[i]) > mat_norm) mat_norm = fabs(alpha[i]);
 
       // Locking check
       iter_locked = 0;
-      for (int i = 1; i < (nKr - num_locked); i++) {
+      for (int i = 1; i < (n_kr - num_locked); i++) {
         if (residua[i + num_locked] < epsilon * mat_norm) {
           if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
             printfQuda("**** Locking %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked],
@@ -116,7 +116,7 @@ namespace quda
 
       // Convergence check
       iter_converged = iter_locked;
-      for (int i = iter_locked + 1; i < nKr - num_locked; i++) {
+      for (int i = iter_locked + 1; i < n_kr - num_locked; i++) {
         if (residua[i + num_locked] < tol * mat_norm) {
           if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
             printfQuda("**** Converged %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked], tol * mat_norm);
@@ -127,7 +127,7 @@ namespace quda
         }
       }
 
-      iter_keep = std::min(iter_converged + (nKr - num_converged) / 2, nKr - num_locked - 12);
+      iter_keep = std::min(iter_converged + (n_kr - num_converged) / 2, n_kr - num_locked - 12);
 
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
       computeKeptRitz(kSpace);
@@ -148,13 +148,13 @@ namespace quda
         printfQuda("num_converged = %d\n", num_converged);
         printfQuda("num_keep = %d\n", num_keep);
         printfQuda("num_locked = %d\n", num_locked);
-        for (int i = 0; i < nKr; i++) {
+        for (int i = 0; i < n_kr; i++) {
           printfQuda("Ritz[%d] = %.16e residual[%d] = %.16e\n", i, alpha[i], i, residua[i]);
         }
       }
 
       // Check for convergence
-      if (num_converged >= nConv) {
+      if (num_converged >= n_conv) {
         reorder(kSpace);
         converged = true;
       }
@@ -170,19 +170,19 @@ namespace quda
       if (eig_param->require_convergence) {
         errorQuda("TRLM failed to compute the requested %d vectors with a %d search space and %d Krylov space in %d "
                   "restart steps. Exiting.",
-                  nConv, nEv, nKr, max_restarts);
+                  n_conv, n_ev, n_kr, max_restarts);
       } else {
         warningQuda("TRLM failed to compute the requested %d vectors with a %d search space and %d Krylov space in %d "
                     "restart steps. Continuing with current lanczos factorisation.",
-                    nConv, nEv, nKr, max_restarts);
+                    n_conv, n_ev, n_kr, max_restarts);
       }
     } else {
       if (getVerbosity() >= QUDA_SUMMARIZE) {
-        printfQuda("TRLM computed the requested %d vectors in %d restart steps and %d OP*x operations.\n", nConv,
+        printfQuda("TRLM computed the requested %d vectors in %d restart steps and %d OP*x operations.\n", n_conv,
                    restart_iter, iter);
 
         // Dump all Ritz values and residua
-        for (int i = 0; i < nConv; i++) {
+        for (int i = 0; i < n_conv; i++) {
           printfQuda("RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, alpha[i], 0.0, residua[i]);
         }
       }
@@ -255,7 +255,7 @@ namespace quda
     int i = 0;
 
     if (reverse) {
-      while (i < nKr) {
+      while (i < n_kr) {
         if ((i == 0) || (alpha[i - 1] >= alpha[i]))
           i++;
         else {
@@ -265,7 +265,7 @@ namespace quda
         }
       }
     } else {
-      while (i < nKr) {
+      while (i < n_kr) {
         if ((i == 0) || (alpha[i - 1] <= alpha[i]))
           i++;
         else {
@@ -280,7 +280,7 @@ namespace quda
   void TRLM::eigensolveFromArrowMat()
   {
     profile.TPSTART(QUDA_PROFILE_EIGEN);
-    int dim = nKr - num_locked;
+    int dim = n_kr - num_locked;
     // int arrow_pos = std::max(num_keep - num_locked + 1, 2);
     int arrow_pos = num_keep - num_locked;
 
@@ -291,11 +291,11 @@ namespace quda
 
     // Invert the spectrum due to chebyshev
     if (reverse) {
-      for (int i = num_locked; i < nKr - 1; i++) {
+      for (int i = num_locked; i < n_kr - 1; i++) {
         alpha[i] *= -1.0;
         beta[i] *= -1.0;
       }
-      alpha[nKr - 1] *= -1.0;
+      alpha[n_kr - 1] *= -1.0;
     }
 
     // Construct arrow mat A_{dim,dim}
@@ -328,14 +328,14 @@ namespace quda
       for (int j = 0; j < dim; j++) ritz_mat[dim * i + j] = eigensolver.eigenvectors().col(i)[j];
 
     for (int i = 0; i < dim; i++) {
-      residua[i + num_locked] = fabs(beta[nKr - 1] * eigensolver.eigenvectors().col(i)[dim - 1]);
+      residua[i + num_locked] = fabs(beta[n_kr - 1] * eigensolver.eigenvectors().col(i)[dim - 1]);
       // Update the alpha array
       alpha[i + num_locked] = eigensolver.eigenvalues()[i];
     }
 
     // Put spectrum back in order
     if (reverse) {
-      for (int i = num_locked; i < nKr; i++) { alpha[i] *= -1.0; }
+      for (int i = num_locked; i < n_kr; i++) { alpha[i] *= -1.0; }
     }
 
     profile.TPSTOP(QUDA_PROFILE_EIGEN);
@@ -343,8 +343,8 @@ namespace quda
 
   void TRLM::computeKeptRitz(std::vector<ColorSpinorField *> &kSpace)
   {
-    int offset = nKr + 1;
-    int dim = nKr - num_locked;
+    int offset = n_kr + 1;
+    int dim = n_kr - num_locked;
 
     // Multi-BLAS friendly array to store part of Ritz matrix we want
     double *ritz_mat_keep = (double *)safe_malloc((dim * iter_keep) * sizeof(double));
@@ -490,10 +490,10 @@ namespace quda
     }
 
     // Update residual vector
-    std::swap(kSpace[num_locked + iter_keep], kSpace[nKr]);
+    std::swap(kSpace[num_locked + iter_keep], kSpace[n_kr]);
 
     // Update sub arrow matrix
-    for (int i = 0; i < iter_keep; i++) beta[i + num_locked] = beta[nKr - 1] * ritz_mat[dim * (i + 1) - 1];
+    for (int i = 0; i < iter_keep; i++) beta[i + num_locked] = beta[n_kr - 1] * ritz_mat[dim * (i + 1) - 1];
 
     host_free(ritz_mat_keep);
 

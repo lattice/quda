@@ -168,12 +168,12 @@ namespace quda {
   */
   void CAGCR::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
-    const int nKrylov = param.Nkrylov;
+    const int n_krylov = param.Nkrylov;
 
     if (checkPrecision(x,b) != param.precision) errorQuda("Precision mismatch %d %d", checkPrecision(x,b), param.precision);
     if (param.return_residual && param.preserve_source == QUDA_PRESERVE_SOURCE_YES) errorQuda("Cannot preserve source and return the residual");
 
-    if (param.maxiter == 0 || nKrylov == 0) {
+    if (param.maxiter == 0 || n_krylov == 0) {
       if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
       return;
     }
@@ -187,7 +187,7 @@ namespace quda {
     if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
     // compute b2, but only if we need to
-    bool fixed_iteration = param.sloppy_converge && nKrylov==param.maxiter && !param.compute_true_res;
+    bool fixed_iteration = param.sloppy_converge && n_krylov == param.maxiter && !param.compute_true_res;
     double b2 = !fixed_iteration ? blas::norm2(b) : 1.0;
     double r2 = 0.0; // if zero source then we will exit immediately doing no work
 
@@ -283,10 +283,10 @@ namespace quda {
     PrintStats("CA-GCR", total_iter, r2, b2, heavy_quark_res);
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && total_iter < param.maxiter) {
 
-      // build up a space of size nKrylov
-      for (int k=0; k<nKrylov; k++) {
+      // build up a space of size n_krylov
+      for (int k = 0; k < n_krylov; k++) {
         matSloppy(*q[k], *p[k], tmpSloppy);
-        if (k<nKrylov-1 && basis != QUDA_POWER_BASIS) blas::copy(*p[k+1], *q[k]);
+        if (k < n_krylov - 1 && basis != QUDA_POWER_BASIS) blas::copy(*p[k + 1], *q[k]);
       }
 
       solve(alpha, q, *p[0]);
@@ -294,9 +294,9 @@ namespace quda {
       // update the solution vector
       std::vector<ColorSpinorField*> X;
       X.push_back(&x);
-      // need to make sure P is only length nKrylov
+      // need to make sure P is only length n_krylov
       std::vector<ColorSpinorField*> P;
-      for (int i=0; i<nKrylov; i++) P.push_back(p[i]);
+      for (int i = 0; i < n_krylov; i++) P.push_back(p[i]);
       blas::caxpy(alpha, P, X);
 
       // no need to compute residual vector if not returning
@@ -305,11 +305,11 @@ namespace quda {
         // update the residual vector
         std::vector<ColorSpinorField*> R;
         R.push_back(&r);
-        for (int i=0; i<nKrylov; i++) alpha[i] = -alpha[i];
+        for (int i = 0; i < n_krylov; i++) alpha[i] = -alpha[i];
         blas::caxpy(alpha, q, R);
       }
 
-      total_iter+=nKrylov;
+      total_iter += n_krylov;
       if ( !fixed_iteration || getVerbosity() >= QUDA_DEBUG_VERBOSE) {
         // only compute the residual norm if we need to
         r2 = blas::norm2(r);
@@ -317,8 +317,8 @@ namespace quda {
 
       PrintStats("CA-GCR", total_iter, r2, b2, heavy_quark_res);
 
-      // update since nKrylov or maxiter reached, converged or reliable update required
-      // note that the heavy quark residual will by definition only be checked every nKrylov steps
+      // update since n_krylov or maxiter reached, converged or reliable update required
+      // note that the heavy quark residual will by definition only be checked every n_krylov steps
       if (total_iter>=param.maxiter || (r2 < stop && !l2_converge) || sqrt(r2/r2_old) < param.delta) {
 
         if ( (r2 < stop || total_iter>=param.maxiter) && param.sloppy_converge) break;
