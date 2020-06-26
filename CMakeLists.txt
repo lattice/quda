@@ -1,5 +1,5 @@
 # basic setup for cmake
-cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.15 FATAL_ERROR)
 
 if(POLICY CMP0074)
   cmake_policy(SET CMP0074 NEW)
@@ -26,13 +26,7 @@ if(DEFINED ENV{QUDA_BUILD_TYPE})
 else()
   set(DEFBUILD "DEVEL")
 endif()
-
-if(DEFINED ENV{QUDA_TARGET})
-  set(DEFTARGET $ENV{QUDA_TARGET})
-else()
-  set(DEFTARGET "CUDA")
-endif()
-
+ 
 set(VALID_BUILD_TYPES
     DEVEL
     RELEASE
@@ -57,6 +51,12 @@ if(BUILD_TYPE_VALID LESS 0)
 endif()
 
 # Target type
+if(DEFINED ENV{QUDA_TARGET})
+  set(DEFTARGET $ENV{QUDA_TARGET})
+else()
+  set(DEFTARGET "CUDA")
+endif()
+
 set(VALID_TARGET_TYPES CUDA HIP)
 set(QUDA_TARGET_TYPE "${DEFTARGET}" CACHE STRING "Choose the type of target, options are: ${VALID_TARGET_TYPES}")
 set_property(CACHE QUDA_TARGET_TYPE PROPERTY STRINGS CUDA HIP)
@@ -110,6 +110,7 @@ message(STATUS "cmake version: ${CMAKE_VERSION}")
 message(STATUS "Source location: ${CMAKE_SOURCE_DIR}")
 message(STATUS "Build location: ${CMAKE_BINARY_DIR}")
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "QUDA target: ${QUDA_TARGET_TYPE}")
 
 # ######################################################################################################################
 # QUDA OPTIONS likely to be changed by users
@@ -122,7 +123,6 @@ endif()
 if(NOT QUDA_GPU_ARCH)
   message(STATUS "Building QUDA for GPU ARCH " "${QUDA_DEFAULT_GPU_ARCH}")
 endif()
-message(STATUS "")
 
 set(QUDA_GPU_ARCH
     ${QUDA_DEFAULT_GPU_ARCH}
@@ -407,51 +407,49 @@ if( ${CMAKE_CUDA_COMPILER} MATCHES "clang")
   message(STATUS "CUDA Build Type: ${QUDA_CUDA_BUILD_TYPE}")
 endif()
 
-if( ${QUDA_CUDA_BUILD_TYPE} STREQUAL "NVCC" ) 
-  # CUDA Wrapper for finding libs etc
-  set(XCOMPILER_STRING "-Xcompiler")
-  set(LINEINFO_STIRNG "-lineinfo")
-  set(CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS
-    "-Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field")
-  set(XCOMPILER_SANITIZE_OPTIONS "-fsanitize=address,-fsanitize=undefined")
-endif()
-
-if( ${QUDA_CUDA_BUILD_TYPE} STREQUAL "Clang") 
- set(CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS
-	     "-Wno-unknown-pragmas -Wno-unused-function -Wno-unused-local-typedef -Wno-unused-private-field")
- set(XCOMPILER_SANITIZE_OPTIONS "-fsanitize=address,undefined")
-endif()
-
 set(CMAKE_CUDA_FLAGS_DEVEL
-	"-g ${LINEINFO_STRING} -O3 ${XCOMPILER_STRING} ${CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS}"
+	"-g -O3 "
     CACHE STRING "Flags used by the CUDA compiler during regular development builds.")
 set(CMAKE_CUDA_FLAGS_STRICT
-    "${CMAKE_CUDA_FLAGS_DEVEL}"
+    "-g O3}"
     CACHE STRING "Flags used by the CUDA compiler during strict jenkins builds.")
 set(CMAKE_CUDA_FLAGS_RELEASE
     "-O3 -w"
     CACHE STRING "Flags used by the CUDA compiler during release builds.")
 set(CMAKE_CUDA_FLAGS_HOSTDEBUG
-	"-g ${LINEINFO_STRING}"
+	"-g"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
 set(CMAKE_CUDA_FLAGS_DEVICEDEBUG
-    "-G"
+	"-G"
     CACHE STRING "Flags used by the C++ compiler during device-debug builds.")
 set(CMAKE_CUDA_FLAGS_DEBUG
     "-g -G"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(CMAKE_CUDA_FLAGS_SANITIZE
-	"-g ${LINEINFO_STRING} ${XCOMPILER_STRING} ${XCOMPILER_SANITIZE_OPTIONS}"
+	"-g "
     CACHE STRING "Flags used by the C++ compiler during sanitizer debug builds.")
 
-# CUDA Wrapper for finding libs etc
+# This is needed now
+# GPU ARCH
+set(GITVERSION ${GITVERSION}-${QUDA_GPU_ARCH})
+string(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})
+set(CMAKE_CUDA_ARCHITECTURES ${COMP_CAP})
+set(COMP_CAP "${COMP_CAP}0")
+
 enable_language(CUDA)
+message( STATUS "CUDA Compiler is" ${CMAKE_CUDA_COMPILER})
+message( STATUS "Compiler ID is " ${CMAKE_CUDA_COMPILER_ID})
+
+
+
+# CUDA Wrapper for finding libs etc
 if(CMAKE_VERSION VERSION_LESS 3.17)
   find_package(CUDAWrapper)
 else()
 # for cmake 3.17+ we rely on
   find_package(CUDAToolkit)
 endif()
+
 
 # ######################################################################################################################
 # QUDA depends on Eigen this part makes sure we can download eigen if it is not found
@@ -483,8 +481,7 @@ if(QUDA_DOWNLOAD_EIGEN)
     URL_HASH SHA256=${EIGEN_SHA}
     PREFIX ${CMAKE_CURRENT_BINARY_DIR}/externals/eigen/
     CONFIGURE_COMMAND ""
-    BUILD_COMMAND
-    COMMAND ""
+    BUILD_COMMAND ""
     INSTALL_COMMAND "")
   ExternalProject_Get_Property(Eigen source_dir)
   set(EIGEN_INCLUDE_DIRS ${source_dir})
@@ -818,10 +815,6 @@ if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
   set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 endif()
 
-# GPU ARCH
-set(GITVERSION ${GITVERSION}-${QUDA_GPU_ARCH})
-string(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})
-set(COMP_CAP "${COMP_CAP}0")
 
 # make the compiler flags an advanced option for all user defined build types (cmake defined build types are advanced by
 # default )

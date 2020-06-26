@@ -15,7 +15,6 @@ namespace quda
 #ifdef HAVE_QIO
     bool parity_inflate;
 #endif
-
   public:
 
     /**
