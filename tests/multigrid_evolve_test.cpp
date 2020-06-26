@@ -423,8 +423,11 @@ int main(int argc, char **argv)
       printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n", step,
                  obs_param.plaquette[0], obs_param.qcharge, inv_param.mass, inv_param.kappa, inv_param.mu);
 
-      if (inv_multigrid)
+      if (inv_multigrid) {
+        // Will clean this up in next commit
+        //mg_param.thin_update_only = QUDA_BOOLEAN_TRUE;
         updateMultigridQuda(mg_preconditioner, &mg_param); // update the multigrid operator for new mass and mu values
+      }
       invertQuda(spinorOut, spinorIn, &inv_param);
 
       if (inv_multigrid && inv_param.iter == inv_param.maxiter) {

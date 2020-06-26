@@ -543,7 +543,7 @@ namespace quda {
     // Inherit these so I will comment them out
     /*
   protected:
-    cudaCloverField &clover;
+    cudaCloverField *clover;
     void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
     void initConstants();
     */
@@ -947,7 +947,7 @@ public:
   protected:
     double mu;
     double epsilon;
-    cudaCloverField &clover;
+    cudaCloverField *clover;
     void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
     void twistedCloverApply(ColorSpinorField &out, const ColorSpinorField &in, 
           const QudaTwistGamma5Type twistType, const int parity) const;
@@ -974,6 +974,22 @@ public:
            const QudaSolutionType) const;
 
     double Mu() const { return mu; }
+
+    /**
+     *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
+     *  These are pointers as opposed to references to support passing in `nullptr`.
+     *
+     *  @param gauge_in Updated gauge field
+     *  @param fat_gauge_in Updated fat links
+     *  @param long_gauge_in Updated long links
+     *  @param clover_in Updated clover field
+     */
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
+                              cudaCloverField *clover_in)
+    {
+      DiracWilson::updateFields(gauge_in, nullptr, nullptr, nullptr);
+      clover = clover_in;
+    }
 
     /**
      * @brief Create the coarse twisted-clover operator
