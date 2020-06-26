@@ -36,6 +36,7 @@ namespace quda {
         clover.TrLog()[0] = arg.result_h[0].x;
         clover.TrLog()[1] = arg.result_h[0].y;
       }
+      checkCudaError();
     }
 
     void apply(const qudaStream_t &stream) {
