@@ -129,6 +129,7 @@ bool generate_nullspace = true;
 bool generate_all_levels = true;
 quda::mgarray<QudaSchwarzType> mg_schwarz_type = {};
 quda::mgarray<int> mg_schwarz_cycle = {};
+bool mg_evolve_thin_updates = false;
 
 // we only actually support 4 here currently
 quda::mgarray<std::array<int, 4>> geo_block_size = {};
@@ -752,6 +753,7 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option(
     "--mg-generate-all-levels",
     generate_all_levels, "true=generate null-space on all levels, false=generate on level 0 and create other levels from that (default true)");
+  opgroup->add_option("--mg-evolve-thin-updates", mg_evolve_thin_updates, "Utilize thin updates for multigrid evolution tests (default false)");
   opgroup->add_option("--mg-generate-nullspace", generate_nullspace,
                       "Generate the null-space vector dynamically (default true, if set false and mg-load-vec isn't "
                       "set, creates free-field null vectors)");
