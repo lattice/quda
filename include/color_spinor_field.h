@@ -1173,31 +1173,6 @@ namespace quda {
 
 #define checkLength(...) Length_(__func__, __FILE__, __LINE__, __VA_ARGS__)
 
-  /**
-     @brief Helper function for determining if the field is in native order
-     @param[in] a Input field
-     @return true if field is in native order
-   */
-  inline bool Native_(const char *func, const char *file, int line, const ColorSpinorField &a)
-  {
-    if (!a.isNative()) errorQuda("Non-native field detected (%s:%d in %s())\n", file, line, func);
-    return true;
-  }
-
-  /**
-     @brief Helper function for determining if the fields are in native order
-     @param[in] a Input field
-     @param[in] args List of additional fields to check
-     @return true if all fields are in native order
-   */
-  template <typename... Args>
-  inline bool Native_(const char *func, const char *file, int line, const ColorSpinorField &a, const Args &... args)
-  {
-    return (Native_(func, file, line, a) & Native_(func, file, line, args...));
-  }
-
-#define checkNative(...) Native_(__func__, __FILE__, __LINE__, __VA_ARGS__)
-
 } // namespace quda
 
 #endif // _COLOR_SPINOR_FIELD_H
