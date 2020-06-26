@@ -174,12 +174,12 @@ target_compile_definitions(
   $<$<CONFIG:DEBUG>:HOST_DEBUGDEVICE_DEBUG>
   $<$<CONFIG:SANITIZE>:HOST_DEBUG>)
   
-target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>: -fcuda-flush-denormals-to-zero -fcuda-approx-transcendentals>)
-target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:-Wno-unknown-cuda-version>)
-target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -ftz=true -prec-div=false -prec-sqrt=false>)
-target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH}
-                                    --expt-relaxed-constexpr>)
-
+target_compile_options(quda PRIVATE 
+  $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -ftz=true -prec-div=false -prec-sqrt=false>
+  $<$<COMPILE_LANG_AND_ID:CUDA,Clang>: -fcuda-flush-denormals-to-zero -fcuda-approx-transcendentals>)
+target_compile_options(quda PRIVATE 
+  $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:-Wno-unknown-cuda-version>
+  $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH} --expt-relaxed-constexpr>)
 
 if(QUDA_VERBOSE_BUILD)
   target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:--ptxas-options=-v>)
@@ -187,9 +187,21 @@ endif(QUDA_VERBOSE_BUILD)
 
 # workaround for 10.2
 if(CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA" AND ${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL "10.2" AND ${CMAKE_CUDA_COMPILER_VERSION} VERSION_LESS "10.3")
-  target_compile_options(quda PRIVATE "$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
-  SHELL: -Xcicc \"--Xllc -dag-vectorize-ops=1\" " >)
+  target_compile_options(quda PRIVATE "$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:SHELL: -Xcicc \"--Xllc -dag-vectorize-ops=1\" " >)
 endif()
+
+target_compile_options(quda PRIVATE 
+  $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
+    $<$<CONFIG:DEVEL>:-lineinfo -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field>
+    $<$<CONFIG:STRICT>: -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field>
+    $<$<CONFIG:HOSTDEBUG>:-lineinfo>
+    $<$<CONFIG:SANITIZE>:-lineinfo -Xcompiler -fsanitize=address,-fsanitize=undefined>>
+  $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
+    $<$<CONFIG:DEVEL>:-Wno-unknown-pragmas -Wno-unused-function -Wno-unused-local-typedef -Wno-unused-private-field>
+    $<$<CONFIG:STRICT>:-Wno-unknown-pragmas -Wno-unused-function -Wno-unused-local-typedef -Wno-unused-private-field>
+    $<$<CONFIG:HOSTDEBUG>:>
+    $<$<CONFIG:SANITIZE>:-fsanitize=address,-fsanitize=undefined>>
+)
 
 # include_directories
 target_include_directories(quda SYSTEM PRIVATE ../include/externals)
@@ -217,31 +229,26 @@ endif()
 target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_target>)
 
 # propagate CXX flags to CUDA host compiler
+#TODO: Do we still need that? 
 if(${QUDA_PROPAGATE_CXX_FLAGS})
   target_compile_options(
     quda
-    PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
-    $<$<CONFIG:DEVEL>:${XCOMPILER_STRING}
-           ${CMAKE_CXX_FLAGS_DEVEL}>
-	   $<$<CONFIG:STRICT>:${XCOMPILER_STRING}
-           ${CMAKE_CXX_FLAGS_STRICT}>
-	   $<$<CONFIG:RELEASE>:${XCOMPILER_STRING}
-           ${CMAKE_CXX_FLAGS_RELEASE}>
-	   $<$<CONFIG:DEBUG>:${XCOMPILER_STRING}
-           ${CMAKE_CXX_FLAGS_DEBUG}>
-	   $<$<CONFIG:HOSTDEBUG>:${XCOMPILER_STRING}
-           ${CMAKE_CXX_FLAGS_HOSTDEBUG}>
-	   $<$<CONFIG:DEVICEDEBUG>:${XCOMPILER_STRING}
-           ${CMAKE_CXX_FLAGS_DEVICEDEBUG}>
-           >)
+    PRIVATE $<$<COMPILE_LANG:CUDA>:
+    $<$<CONFIG:DEVEL>:$<$<CUDA_COMPILER_ID:NVIDIA>-Xcompiler > ${CMAKE_CXX_FLAGS_DEVEL}>
+	  $<$<CONFIG:STRICT>:$<$<CUDA_COMPILER_ID:NVIDIA>-Xcompiler > ${CMAKE_CXX_FLAGS_STRICT}>
+	  $<$<CONFIG:RELEASE>:$<$<CUDA_COMPILER_ID:NVIDIA>-Xcompiler > ${CMAKE_CXX_FLAGS_RELEASE}>
+	  $<$<CONFIG:DEBUG>:$<$<CUDA_COMPILER_ID:NVIDIA>-Xcompiler > ${CMAKE_CXX_FLAGS_DEBUG}>
+	  $<$<CONFIG:HOSTDEBUG>:$<$<CUDA_COMPILER_ID:NVIDIA>-Xcompiler > ${CMAKE_CXX_FLAGS_HOSTDEBUG}>
+	  $<$<CONFIG:DEVICEDEBUG>:$<$<CUDA_COMPILER_ID:NVIDIA>-Xcompiler > ${CMAKE_CXX_FLAGS_DEVICEDEBUG}>
+    >)
 endif()
 
 # some clang warnings should be warning even when turning warnings into errors
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   target_compile_options(quda_cpp PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Wno-error=unused-private-field
                                          -Wno-error=unused-function>)
-  target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: "SHELL:-Xcompiler -Wno-error=unused-private-field"
-                                     "SHELL:-Xcompiler -Wno-error=unused-function" >)
+  #target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: "SHELL:-Xcompiler -Wno-error=unused-private-field"
+                                     #"SHELL:-Xcompiler -Wno-error=unused-function" >)
 
   # this is a hack to get colored diagnostics back when using Ninja and clang
   if(CMAKE_GENERATOR MATCHES "Ninja")
