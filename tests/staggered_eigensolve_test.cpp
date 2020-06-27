@@ -37,9 +37,9 @@ void display_test_info()
   printfQuda(" - solver mode %s\n", get_eig_type_str(eig_type));
   printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(eig_spectrum));
   if (eig_type == QUDA_EIG_BLK_TR_LANCZOS) printfQuda(" - eigenvector block size %d\n", eig_block_size);
-  printfQuda(" - number of eigenvectors requested %d\n", eig_nConv);
-  printfQuda(" - size of eigenvector search space %d\n", eig_nEv);
-  printfQuda(" - size of Krylov space %d\n", eig_nKr);
+  printfQuda(" - number of eigenvectors requested %d\n", eig_n_conv);
+  printfQuda(" - size of eigenvector search space %d\n", eig_n_ev);
+  printfQuda(" - size of Krylov space %d\n", eig_n_kr);
   printfQuda(" - solver tolerance %e\n", eig_tol);
   printfQuda(" - convergence required (%s)\n", eig_require_convergence ? "true" : "false");
   if (eig_compute_svd) {
@@ -168,11 +168,11 @@ int main(int argc, char **argv)
   //-----------------------------------------------------------------------------------
 
   // Host side arrays to store the eigenpairs computed by QUDA
-  void **host_evecs = (void **)malloc(eig_nConv * sizeof(void *));
-  for (int i = 0; i < eig_nConv; i++) {
+  void **host_evecs = (void **)malloc(eig_n_conv * sizeof(void *));
+  for (int i = 0; i < eig_n_conv; i++) {
     host_evecs[i] = (void *)malloc(V * my_spinor_site_size * eig_inv_param.cpu_prec);
   }
-  double _Complex *host_evals = (double _Complex *)malloc(eig_param.nEv * sizeof(double _Complex));
+  double _Complex *host_evals = (double _Complex *)malloc(eig_param.n_ev * sizeof(double _Complex));
 
   double time = 0.0;
 
@@ -200,7 +200,7 @@ int main(int argc, char **argv)
   } // switch
 
   // Deallocate host memory
-  for (int i = 0; i < eig_nConv; i++) free(host_evecs[i]);
+  for (int i = 0; i < eig_n_conv; i++) free(host_evecs[i]);
   free(host_evecs);
   free(host_evals);
 

@@ -468,12 +468,12 @@ namespace quda {
   */
   void CACG::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
-    const int nKrylov = param.Nkrylov;
+    const int n_krylov = param.Nkrylov;
 
     if (checkPrecision(x,b) != param.precision) errorQuda("Precision mismatch %d %d", checkPrecision(x,b), param.precision);
     if (param.return_residual && param.preserve_source == QUDA_PRESERVE_SOURCE_YES) errorQuda("Cannot preserve source and return the residual");
 
-    if (param.maxiter == 0 || nKrylov == 0) {
+    if (param.maxiter == 0 || n_krylov == 0) {
       if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
       return;
     }
@@ -489,7 +489,7 @@ namespace quda {
     if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
     // compute b2, but only if we need to
-    bool fixed_iteration = param.sloppy_converge && nKrylov==param.maxiter && !param.compute_true_res;
+    bool fixed_iteration = param.sloppy_converge && n_krylov == param.maxiter && !param.compute_true_res;
     double b2 = !fixed_iteration ? blas::norm2(b) : 1.0;
     double r2 = 0.0; // if zero source then we will exit immediately doing no work
 
@@ -623,16 +623,14 @@ namespace quda {
     PrintStats("CA-CG", total_iter, r2, b2, heavy_quark_res);
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && total_iter < param.maxiter) {
 
-      // build up a space of size nKrylov
+      // build up a space of size n_krylov
       if (basis == QUDA_POWER_BASIS) {
-        for (int k=0; k<nKrylov; k++) {
-          matSloppy(*AS[k], *S[k], tmpSloppy, tmpSloppy2);
-        }
+        for (int k = 0; k < n_krylov; k++) { matSloppy(*AS[k], *S[k], tmpSloppy, tmpSloppy2); }
       } else { // chebyshev basis
 
         matSloppy(*AS[0], *S[0], tmpSloppy, tmpSloppy2);
 
-        if (nKrylov > 1) {
+        if (n_krylov > 1) {
           // S_1 = m AS_0 + b S_0
           Complex facs1[] = { m_map, b_map };
           std::vector<ColorSpinorField*> recur1{AS[0],S[0]};
@@ -642,10 +640,10 @@ namespace quda {
           matSloppy(*AS[1], *S[1], tmpSloppy, tmpSloppy2);
 
           // Enter recursion relation
-          if (nKrylov > 2) {
+          if (n_krylov > 2) {
             // S_k = 2 m AS_{k-1} + 2 b S_{k-1} - S_{k-2}
             Complex factors[] = { 2.*m_map, 2.*b_map, -1 };
-            for (int k = 2; k < nKrylov; k++) {
+            for (int k = 2; k < n_krylov; k++) {
               std::vector<ColorSpinorField*> recur2{AS[k-1],S[k-1],S[k-2]};
               std::vector<ColorSpinorField*> Sk{S[k]};
               blas::zero(*S[k]);
@@ -654,14 +652,13 @@ namespace quda {
             }
           }
         }
-
       }
 
       // first iteration, copy S and AS into Q and AQ
       if (total_iter == 0) {
         // first iteration Q = S
-        for (int i=0; i<nKrylov; i++) *Q[i] = *S[i];
-        for (int i=0; i<nKrylov; i++) *AQ[i] = *AS[i];
+        for (int i = 0; i < n_krylov; i++) *Q[i] = *S[i];
+        for (int i = 0; i < n_krylov; i++) *AQ[i] = *AS[i];
 
       } else {
 
@@ -670,7 +667,7 @@ namespace quda {
         // 1. compute matrix Q_AS = -Q^\dagger AS
         // 2. Solve Q_AQ beta = Q_AS
         std::vector<ColorSpinorField*> R;
-        for (int i=0; i < nKrylov; i++) R.push_back(S[i]);
+        for (int i = 0; i < n_krylov; i++) R.push_back(S[i]);
         blas::cDotProduct(Q_AS, AQ, R);
         for (int i = 0; i < param.Nkrylov*param.Nkrylov; i++) { Q_AS[i] = real(Q_AS[i]); }
 
@@ -678,10 +675,10 @@ namespace quda {
 
         // update direction vectors
         blas::caxpyz(beta, Q, R, Qtmp);
-        for (int i=0; i<nKrylov; i++) std::swap(Q[i],Qtmp[i]);
+        for (int i = 0; i < n_krylov; i++) std::swap(Q[i], Qtmp[i]);
 
         blas::caxpyz(beta, AQ, AS, Qtmp);
-        for (int i=0; i<nKrylov; i++) std::swap(AQ[i],Qtmp[i]);
+        for (int i = 0; i < n_krylov; i++) std::swap(AQ[i], Qtmp[i]);
       }
 
       // compute the alpha coefficients
@@ -689,7 +686,7 @@ namespace quda {
       // 2. Solve Q_AQ alpha = g
       {
         std::vector<ColorSpinorField*> Q2;
-        for (int i=0; i<nKrylov; i++) Q2.push_back(AQ[i]);
+        for (int i = 0; i < n_krylov; i++) Q2.push_back(AQ[i]);
         Q2.push_back(S[0]);
         blas::cDotProduct(Q_AQandg, Q, Q2);
 
@@ -724,10 +721,10 @@ namespace quda {
         PrintStats("CA-CG", total_iter, r2, b2, heavy_quark_res);
       }
 
-      total_iter+=nKrylov;
+      total_iter += n_krylov;
 
-      // update since nKrylov or maxiter reached, converged or reliable update required
-      // note that the heavy quark residual will by definition only be checked every nKrylov steps
+      // update since n_krylov or maxiter reached, converged or reliable update required
+      // note that the heavy quark residual will by definition only be checked every n_krylov steps
       // Note: this won't reliable update when the norm _increases_.
       if (total_iter>=param.maxiter || (r2 < stop && !l2_converge) || reliable(rNorm, maxrr, rUpdate, r2, delta)) {
         if ( (r2 < stop || total_iter>=param.maxiter) && param.sloppy_converge) break;
