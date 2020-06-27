@@ -173,13 +173,30 @@ target_compile_definitions(
   $<$<CONFIG:DEVICEDEBUG>:DEVICE_DEBUG>
   $<$<CONFIG:DEBUG>:HOST_DEBUGDEVICE_DEBUG>
   $<$<CONFIG:SANITIZE>:HOST_DEBUG>)
-  
+ 
+# propagate CXX flags to CUDA host compiler
+#TODO: Do we still need that? 
+if(${QUDA_PROPAGATE_CXX_FLAGS})
+  target_compile_options(
+    quda
+    PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:
+    $<$<CONFIG:DEVEL>:$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:SHELL:-Xcompiler >SHELL:${CMAKE_CXX_FLAGS_DEVEL}>
+	  $<$<CONFIG:STRICT>:$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:SHELL:-Xcompiler >SHELL:${CMAKE_CXX_FLAGS_STRICT}>
+	  $<$<CONFIG:RELEASE>:$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:SHELL:-Xcompiler > SHELL:${CMAKE_CXX_FLAGS_RELEASE}>
+	  $<$<CONFIG:DEBUG>:$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:SHELL:-Xcompiler > SHELL:${CMAKE_CXX_FLAGS_DEBUG}>
+	  $<$<CONFIG:HOSTDEBUG>:$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:SHELL:-Xcompiler > SHELL:${CMAKE_CXX_FLAGS_HOSTDEBUG}>
+	  $<$<CONFIG:DEVICEDEBUG>:$$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:SHELL:-Xcompiler > SHELL:${CMAKE_CXX_FLAGS_DEVICEDEBUG}>
+    >)
+endif()
+
 target_compile_options(quda PRIVATE 
   $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -ftz=true -prec-div=false -prec-sqrt=false>
   $<$<COMPILE_LANG_AND_ID:CUDA,Clang>: -fcuda-flush-denormals-to-zero -fcuda-approx-transcendentals>)
 target_compile_options(quda PRIVATE 
   $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:-Wno-unknown-cuda-version>
   $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH} --expt-relaxed-constexpr>)
+
+
 
 if(QUDA_VERBOSE_BUILD)
   target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:--ptxas-options=-v>)
@@ -198,8 +215,8 @@ target_compile_options(quda PRIVATE
     $<$<CONFIG:STRICT>: -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field>
     $<$<CONFIG:HOSTDEBUG>:-lineinfo>
     $<$<CONFIG:SANITIZE>:-lineinfo -Xcompiler -fsanitize=address,-fsanitize=undefined>>
-  $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
-    $<$<CONFIG:DEVEL>:-Wno-unknown-pragmas -Wno-unused-function -Wno-unused-local-typedef -Wno-unused-private-field>
+  $<$<CUDA_COMPILER_ID:Clang>:
+    $<$<CONFIG:DEVEL>:-Wno-reorder-ctor -Wno-unknown-pragmas -Wno-unused-function -Wno-unused-local-typedef -Wno-unused-private-field>
     $<$<CONFIG:STRICT>:-Wno-unknown-pragmas -Wno-unused-function -Wno-unused-local-typedef -Wno-unused-private-field>
     $<$<CONFIG:HOSTDEBUG>:>
     $<$<CONFIG:SANITIZE>:-fsanitize=address,-fsanitize=undefined>>
@@ -230,20 +247,7 @@ endif()
  
 target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_target>)
  
-# propagate CXX flags to CUDA host compiler
-#TODO: Do we still need that? 
-if(${QUDA_PROPAGATE_CXX_FLAGS})
-  target_compile_options(
-    quda
-    PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:
-    $<$<CONFIG:DEVEL>:$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:SHELL:-Xcompiler >SHELL:${CMAKE_CXX_FLAGS_DEVEL}>
-	  $<$<CONFIG:STRICT>:$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:SHELL:-Xcompiler >SHELL:${CMAKE_CXX_FLAGS_STRICT}>
-	  $<$<CONFIG:RELEASE>:$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:SHELL:-Xcompiler > SHELL:${CMAKE_CXX_FLAGS_RELEASE}>
-	  $<$<CONFIG:DEBUG>:$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:SHELL:-Xcompiler > SHELL:${CMAKE_CXX_FLAGS_DEBUG}>
-	  $<$<CONFIG:HOSTDEBUG>:$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:SHELL:-Xcompiler > SHELL:${CMAKE_CXX_FLAGS_HOSTDEBUG}>
-	  $<$<CONFIG:DEVICEDEBUG>:$$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:SHELL:-Xcompiler > SHELL:${CMAKE_CXX_FLAGS_DEVICEDEBUG}>
-    >)
-endif()
+
 
 # some clang warnings should be warning even when turning warnings into errors
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
