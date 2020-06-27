@@ -801,8 +801,8 @@ void setDeflationParam(QudaPrecision ritz_prec, QudaFieldLocation location_ritz,
 
   df_param->run_verify     = QUDA_BOOLEAN_FALSE;
 
-  df_param->nk       = df_param->invert_param->nev;
-  df_param->np       = df_param->invert_param->nev*df_param->invert_param->deflation_grid;
+  df_param->nk = df_param->invert_param->n_ev;
+  df_param->np = df_param->invert_param->n_ev * df_param->invert_param->deflation_grid;
 
   // set file i/o parameters
   strcpy(df_param->vec_infile, vec_infile);
@@ -1131,7 +1131,7 @@ void qudaEigCGInvert(int external_precision, int quda_precision, double mass, Qu
   QudaEigParam  df_param = newQudaEigParam();
   df_param.invert_param = &invertParam;
 
-  invertParam.nev                = eig_args.nev;
+  invertParam.n_ev = eig_args.nev;
   invertParam.max_search_dim     = eig_args.max_search_dim;
   invertParam.deflation_grid     = eig_args.deflation_grid;
   invertParam.cuda_prec_ritz     = eig_args.prec_ritz;
@@ -1511,7 +1511,7 @@ void qudaEigCGCloverInvert(int external_precision, int quda_precision, double ka
   df_param.invert_param = &invertParam;
 
   invertParam.solve_type = QUDA_NORMOP_PC_SOLVE;
-  invertParam.nev                = eig_args.nev;
+  invertParam.n_ev = eig_args.nev;
   invertParam.max_search_dim     = eig_args.max_search_dim;
   invertParam.deflation_grid     = eig_args.deflation_grid;
   invertParam.cuda_prec_ritz     = eig_args.prec_ritz;

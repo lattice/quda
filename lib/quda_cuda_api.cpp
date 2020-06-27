@@ -121,7 +121,7 @@ namespace quda {
           case cudaMemcpyDeviceToHost: type = QUDA_PROFILE_MEMCPY_D2H_ASYNC; break;
           case cudaMemcpyHostToDevice: type = QUDA_PROFILE_MEMCPY_H2D_ASYNC; break;
           case cudaMemcpyDeviceToDevice: type = QUDA_PROFILE_MEMCPY_D2D_ASYNC; break;
-          case cudaMemcpyDefault:  type = QUDA_PROFILE_MEMCPY_DEFAULT_ASYNC; break;
+          case cudaMemcpyDefault: type = QUDA_PROFILE_MEMCPY_DEFAULT_ASYNC; break;
           default: errorQuda("Unsupported cudaMemcpyTypeAsync %d", kind);
           }
 
