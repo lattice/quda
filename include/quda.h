@@ -16,7 +16,6 @@
 
 #ifndef __CUDACC_RTC__
 #define double_complex double _Complex
-#define uint64_t __uint64_t
 #else // keep NVRTC happy since it can't handle C types
 #define double_complex double2
 #endif
@@ -342,7 +341,7 @@ extern "C" {
     int n_ev;
     /** EeigCG  : Search space dimension
      *  gmresdr : Krylov subspace dimension
-    */
+     */
     int max_search_dim;
     /** For systems with many RHS: current RHS index */
     int rhs_idx;
@@ -714,15 +713,15 @@ extern "C" {
 
     QudaCublasOperation trans_a; /**< operation op(A) that is non- or (conj.) transpose. */
     QudaCublasOperation trans_b; /**< operation op(B) that is non- or (conj.) transpose. */
-    uint64_t m;                  /**< number of rows of matrix op(A) and C.*/
-    uint64_t n;                  /**< number of columns of matrix op(B) and C.*/
-    uint64_t k;                  /**< number of columns of op(A) and rows of op(B).*/
-    uint64_t lda;                /**< leading dimension of two-dimensional array used to store the matrix A.*/
-    uint64_t ldb;                /**< leading dimension of two-dimensional array used to store matrix B.*/
-    uint64_t ldc;                /**< leading dimension of two-dimensional array used to store matrix C.*/
-    uint64_t a_offset;           /**< position of the A array from which begin read/write. */
-    uint64_t b_offset;           /**< position of the B array from which begin read/write. */
-    uint64_t c_offset;           /**< position of the C array from which begin read/write. */
+    int m;                       /**< number of rows of matrix op(A) and C.*/
+    int n;                       /**< number of columns of matrix op(B) and C.*/
+    int k;                       /**< number of columns of op(A) and rows of op(B).*/
+    int lda;                     /**< leading dimension of two-dimensional array used to store the matrix A.*/
+    int ldb;                     /**< leading dimension of two-dimensional array used to store matrix B.*/
+    int ldc;                     /**< leading dimension of two-dimensional array used to store matrix C.*/
+    int a_offset;                /**< position of the A array from which begin read/write. */
+    int b_offset;                /**< position of the B array from which begin read/write. */
+    int c_offset;                /**< position of the C array from which begin read/write. */
 
     double_complex alpha; /**< scalar used for multiplication. */
     double_complex beta;  /**< scalar used for multiplication. If beta==0, C does not have to be a valid input.*/
@@ -1412,7 +1411,8 @@ extern "C" {
    * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
    * @param[in] alpha, gauge fixing parameter of the method, most common value is 0.08
    * @param[in] autotune, 1 to autotune the method, i.e., if the Fg inverts its tendency we decrease the alpha value
-   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
+   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when
+   * iteration reachs the maximum number of steps defined by Nsteps
    * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
    * @param[in] param The parameters of the external fields and the computation settings
    * @param[out] timeinfo

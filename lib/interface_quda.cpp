@@ -5932,40 +5932,40 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
     // elements in a column, multiplied by number of rows
     if (cublas_param->trans_a == QUDA_CUBLAS_OP_N) {
       arrayA_size = cublas_param->lda * cublas_param->k; // A_mk
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%lu, %lu}\n", cublas_param->lda, cublas_param->k);
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%d, %d}\n", cublas_param->lda, cublas_param->k);
     } else {
       arrayA_size = cublas_param->lda * cublas_param->m; // A_km
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%lu, %lu}\n", cublas_param->lda, cublas_param->m);
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%d, %d}\n", cublas_param->lda, cublas_param->m);
     }
 
     if (cublas_param->trans_b == QUDA_CUBLAS_OP_N) {
       arrayB_size = cublas_param->ldb * cublas_param->n; // B_kn
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%lu, %lu}\n", cublas_param->ldb, cublas_param->n);
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%d, %d}\n", cublas_param->ldb, cublas_param->n);
     } else {
       arrayB_size = cublas_param->ldb * cublas_param->k; // B_nk
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%lu, %lu}\n", cublas_param->ldb, cublas_param->k);
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%d, %d}\n", cublas_param->ldb, cublas_param->k);
     }
     arrayC_size = cublas_param->ldc * cublas_param->n; // C_mn
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array C_{%lu, %lu}\n", cublas_param->ldc, cublas_param->n);
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array C_{%d, %d}\n", cublas_param->ldc, cublas_param->n);
   } else {
     // leading dimension is in terms of consecutive data
     // elements in a row, multiplied by number of columns.
     if (cublas_param->trans_a == QUDA_CUBLAS_OP_N) {
       arrayA_size = cublas_param->lda * cublas_param->m; // A_mk
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%lu, %lu}\n", cublas_param->m, cublas_param->lda);
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%d, %d}\n", cublas_param->m, cublas_param->lda);
     } else {
       arrayA_size = cublas_param->lda * cublas_param->k; // A_km
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%lu, %lu}\n", cublas_param->k, cublas_param->lda);
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%d, %d}\n", cublas_param->k, cublas_param->lda);
     }
     if (cublas_param->trans_b == QUDA_CUBLAS_OP_N) {
       arrayB_size = cublas_param->ldb * cublas_param->k; // B_nk
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%lu, %lu}\n", cublas_param->k, cublas_param->ldb);
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%d, %d}\n", cublas_param->k, cublas_param->ldb);
     } else {
       arrayB_size = cublas_param->ldb * cublas_param->n; // B_kn
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%lu, %lu}\n", cublas_param->n, cublas_param->ldb);
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%d, %d}\n", cublas_param->n, cublas_param->ldb);
     }
     arrayC_size = cublas_param->ldc * cublas_param->m; // C_mn
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array C_{%lu, %lu}\n", cublas_param->m, cublas_param->ldc);
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array C_{%d, %d}\n", cublas_param->m, cublas_param->ldc);
   }
 
   size_t data_size
