@@ -2,6 +2,7 @@
 #include <color_spinor_field_order.h>
 #include <dslash_quda.h>
 #include <index_helper.cuh>
+#include <instantiate.h>
 
 #include <kernels/dslash_mobius_eofa.cuh>
 
@@ -166,22 +167,6 @@ namespace quda
       TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
     };
 
-    // template on the number of colors
-    template <typename storage_type>
-    void ApplyDslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f,
-                      double m_5, const Complex *b_5, const Complex *c_5, double a, int eofa_pm, double inv,
-                      double kappa, const double *eofa_u, const double *eofa_x, const double *eofa_y,
-                      double sherman_morrison, bool dagger, Dslash5Type type)
-    {
-      switch (in.Ncolor()) {
-      case 3:
-        Dslash5<storage_type, 3>(out, in, x, m_f, m_5, b_5, c_5, a, eofa_pm, inv, kappa, eofa_u, eofa_x, eofa_y,
-                                 sherman_morrison, dagger, type);
-        break;
-      default: errorQuda("Unsupported number of colors %d\n", in.Ncolor());
-      }
-    }
-
     // Apply the 5th dimension dslash operator to a colorspinor field
     // out = Dslash5*in
     void apply_dslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f,
@@ -191,26 +176,8 @@ namespace quda
     {
 #ifdef GPU_DOMAIN_WALL_DIRAC
       checkLocation(out, in, x); // check all locations match
-
-      switch (checkPrecision(out, in, x)) {
-      case QUDA_DOUBLE_PRECISION:
-        ApplyDslash5<double>(out, in, x, m_f, m_5, b_5, c_5, a, eofa_pm, inv, kappa, eofa_u, eofa_x, eofa_y,
-                             sherman_morrison, dagger, type);
-        break;
-      case QUDA_SINGLE_PRECISION:
-        ApplyDslash5<float>(out, in, x, m_f, m_5, b_5, c_5, a, eofa_pm, inv, kappa, eofa_u, eofa_x, eofa_y,
-                            sherman_morrison, dagger, type);
-        break;
-      case QUDA_HALF_PRECISION:
-        ApplyDslash5<short>(out, in, x, m_f, m_5, b_5, c_5, a, eofa_pm, inv, kappa, eofa_u, eofa_x, eofa_y,
-                            sherman_morrison, dagger, type);
-        break;
-      case QUDA_QUARTER_PRECISION:
-        ApplyDslash5<char>(out, in, x, m_f, m_5, b_5, c_5, a, eofa_pm, inv, kappa, eofa_u, eofa_x, eofa_y,
+      instantiate<Dslash5>(out, in, x, m_f, m_5, b_5, c_5, a, eofa_pm, inv, kappa, eofa_u, eofa_x, eofa_y,
                            sherman_morrison, dagger, type);
-        break;
-      default: errorQuda("Unsupported precision %d\n", in.Precision());
-      }
 #else
       errorQuda("Mobius EOFA dslash has not been built");
 #endif

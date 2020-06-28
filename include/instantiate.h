@@ -187,6 +187,60 @@ namespace quda
     }
   }
 
+  /**
+     @brief This instantiate function is used to instantiate the colors
+     @param[in] field LatticeField we wish to instantiate
+     @param[in,out] args Additional arguments for kernels
+  */
+  template <template <typename, int> class Apply, typename store_t, typename F,
+            typename... Args>
+  constexpr void instantiate(F &field, Args &&... args)
+  {
+    if (field.Ncolor() == 3) {
+      Apply<store_t, 3>(field, args...);
+    } else {
+      errorQuda("Unsupported number of colors %d\n", field.Ncolor());
+    }
+  }
+
+  /**
+     @brief This instantiate function is used to instantiate the
+     precision and number of colors
+     @param[in] field LatticeField we wish to instantiate
+     @param[in,out] args Any additional arguments required for the computation at hand
+  */
+  template <template <typename, int> class Apply, typename F, typename... Args>
+  constexpr void instantiate(F &field, Args &&... args)
+  {
+    if (field.Precision() == QUDA_DOUBLE_PRECISION) {
+#if QUDA_PRECISION & 8
+      instantiate<Apply, double>(field, args...);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
+#endif
+    } else if (field.Precision() == QUDA_SINGLE_PRECISION) {
+#if QUDA_PRECISION & 4
+      instantiate<Apply, float>(field, args...);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+#endif
+    } else if (field.Precision() == QUDA_HALF_PRECISION) {
+#if QUDA_PRECISION & 2
+      instantiate<Apply, short>(field, args...);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#endif
+    } else if (field.Precision() == QUDA_QUARTER_PRECISION) {
+#if QUDA_PRECISION & 1
+      instantiate<Apply, char>(field, args...);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+#endif
+    } else {
+      errorQuda("Unsupported precision %d\n", field.Precision());
+    }
+  }
+
   // these are used in dslash.h
 
   struct WilsonReconstruct {
