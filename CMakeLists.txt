@@ -213,7 +213,6 @@ else()
 endif()
 option(QUDA_BUILD_SHAREDLIB "build quda as a shared lib" ${DEFSHARED})
 option(QUDA_PROPAGATE_CXX_FLAGS "propagate CXX_FLAGS to CUDA host compiler (for cmake >= 3.8)" ON)
-option(QUDA_TEX "enable texture reads?" ON)
 option(QUDA_FLOAT8 "enable float-8 ordered fixed-point fields?" OFF)
 option(QUDA_NVML "use NVML to report CUDA graphics driver version" OFF)
 option(QUDA_NUMA_NVML "experimental use of NVML to set numa affinity" OFF)
@@ -268,7 +267,6 @@ option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_INSTALL_ALL_TESTS)
 mark_as_advanced(QUDA_PROPAGATE_CXX_FLAGS)
-mark_as_advanced(QUDA_TEX)
 mark_as_advanced(QUDA_FLOAT8)
 mark_as_advanced(QUDA_FAST_COMPILE_REDUCE)
 mark_as_advanced(QUDA_FAST_COMPILE_DSLASH)
@@ -298,10 +296,6 @@ mark_as_advanced(QUDA_JITIFY)
 mark_as_advanced(QUDA_ARPACK_LOGGING)
 
 # some checks for invalid combinations
-
-if(QUDA_TEX AND QUDA_FLOAT8)
-  message(SEND_ERROR "Cannot simultanteously enable QUDA_TEX and QUDA_FLOAT8")
-endif()
 
 if(QUDA_MPI AND QUDA_QMP)
   message(
