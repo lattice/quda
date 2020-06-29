@@ -1422,7 +1422,6 @@ extern "C" {
   /**
    * @brief Hacks for Callat
    */
-
   void laphSinkProject(void *host_quark, void **host_evec, double_complex *host_sinks,
 		       QudaInvertParam inv_param, unsigned int nEv, const int X[4]);
 
@@ -1436,6 +1435,22 @@ extern "C" {
 			int blockSizeMomProj,
 			const int X[4]);
   
+  
+  void laphBaryonKernelComputeModeTripletA(int nMom, int nEv2, void **host_evec, 
+					   double _Complex *host_mom,
+					   void *retArr,
+					   int blockSizeMomProj,
+					   const int X[4]);  
+  
+  void laphBaryonKernelComputeModeTripletB(int n1, int n2, int n3, int nMom,
+					   double _Complex *host_coeffs1, 
+					   double _Complex *host_coeffs2, 
+					   double _Complex *host_coeffs3,
+					   double _Complex *host_mom, 
+					   double _Complex *host_mode_trip_buf, 
+					   int nEv, void **evPtr, 
+					   void *retArray,
+					   const int X[4]);
   
   /**
    * @brief Flush the chronological history for the given index
