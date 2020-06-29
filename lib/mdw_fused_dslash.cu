@@ -284,7 +284,7 @@ namespace quda
       coordinate[3] = aux[3];
 
       // Find the full coordinate in the shrinked volume.
-      coordinate[0] += (parity + coordinate[3] + coordinate[2] + coordinate[1]) & 1;
+      coordinate[0] += (shift[0] + shift[1] + shift[2] + shift[3] + parity + coordinate[3] + coordinate[2] + coordinate[1]) & 1;
 
 // Now go back to the extended volume.
 #pragma unroll
@@ -615,25 +615,30 @@ namespace quda
         char config[512];
         switch (arg.type) {
         case MdwfFusedDslashType::D4_D5INV_D5PRE:
-          sprintf(config, ",f0,shift%d,%d,%d,%d,halo%d,%d,%d,%d", arg.shift[0], arg.shift[1], arg.shift[2],
-                  arg.shift[3], arg.halo_shift[0], arg.halo_shift[1], arg.halo_shift[2], arg.halo_shift[3]);
+          sprintf(config, ",f0,shift%d,%d,%d,%d,halo%d,%d,%d,%d,comm%d,%d,%d,%d", arg.shift[0], arg.shift[1],
+                  arg.shift[2], arg.shift[3], arg.halo_shift[0], arg.halo_shift[1], arg.halo_shift[2],
+                  arg.halo_shift[3], arg.comm[0], arg.comm[1], arg.comm[2], arg.comm[3]);
           strcat(aux, config);
           break;
         case MdwfFusedDslashType::D4DAG_D5PREDAG_D5INVDAG:
-          sprintf(config, ",f2,shift%d,%d,%d,%d", arg.shift[0], arg.shift[1], arg.shift[2], arg.shift[3]);
+          sprintf(config, ",f2,shift%d,%d,%d,%d,halo2,2,2,2,comm%d,%d,%d,%d", arg.shift[0], arg.shift[1], arg.shift[2],
+                  arg.shift[3], arg.comm[0], arg.comm[1], arg.comm[2], arg.comm[3]);
           strcat(aux, config);
           break;
         case MdwfFusedDslashType::D4_D5INV_D5INVDAG:
-          sprintf(config, ",f1,shift%d,%d,%d,%d,halo%d,%d,%d,%d", arg.shift[0], arg.shift[1], arg.shift[2],
-                  arg.shift[3], arg.halo_shift[0], arg.halo_shift[1], arg.halo_shift[2], arg.halo_shift[3]);
+          sprintf(config, ",f1,shift%d,%d,%d,%d,halo%d,%d,%d,%d,comm%d,%d,%d,%d", arg.shift[0], arg.shift[1],
+                  arg.shift[2], arg.shift[3], arg.halo_shift[0], arg.halo_shift[1], arg.halo_shift[2],
+                  arg.halo_shift[3], arg.comm[0], arg.comm[1], arg.comm[2], arg.comm[3]);
           strcat(aux, config);
           break;
         case MdwfFusedDslashType::D4DAG_D5PREDAG:
-          sprintf(config, ",f3,shift%d,%d,%d,%d", arg.shift[0], arg.shift[1], arg.shift[2], arg.shift[3]);
+          sprintf(config, ",f3,shift%d,%d,%d,%d,halo2,2,2,2,comm%d,%d,%d,%d", arg.shift[0], arg.shift[1], arg.shift[2],
+                  arg.shift[3], arg.comm[0], arg.comm[1], arg.comm[2], arg.comm[3]);
           strcat(aux, config);
           break;
         case MdwfFusedDslashType::D5PRE:
-          sprintf(config, ",f4,shift%d,%d,%d,%d", arg.shift[0], arg.shift[1], arg.shift[2], arg.shift[3]);
+          sprintf(config, ",f4,shift%d,%d,%d,%d,halo2,2,2,2,comm%d,%d,%d,%d", arg.shift[0], arg.shift[1], arg.shift[2],
+                  arg.shift[3], arg.comm[0], arg.comm[1], arg.comm[2], arg.comm[3]);
           strcat(aux, config);
           break;
         default: errorQuda("Unknown MdwfFusedDslashType");
