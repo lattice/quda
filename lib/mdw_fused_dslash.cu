@@ -96,6 +96,8 @@ namespace quda
 
       bool small_kappa = false;
 
+      const bool comm[4];
+
       MdwfFusedDslashType type;
       FusedDslashArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, ColorSpinorField &y,
                      const ColorSpinorField &x, double m_f_, double m_5_, const Complex *b_5, const Complex *c_5,
@@ -119,7 +121,8 @@ namespace quda
              in.VolumeCB() > out.VolumeCB() ? in.X(3) : out.X(3)},
         shrinked_dim {dim[0] - 2 * shift[0], dim[1] - 2 * shift[1], dim[2] - 2 * shift[2], dim[3] - 2 * shift[3]},
         volume_4d_cb_shift(shrinked_dim[0] * shrinked_dim[1] * shrinked_dim[2] * shrinked_dim[3] / 2),
-        type(type_)
+        type(type_),
+        comm {comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)}
       {
         if (in.Nspin() != 4) { errorQuda("nSpin = %d NOT supported.\n", in.Nspin()); }
 
@@ -181,20 +184,28 @@ namespace quda
       return ret;
     }
 
-    __device__ inline int index_from_extended_coordinate(const int x[4], const int dim[4], const int y)
+    __device__ inline int index_from_extended_coordinate(const int x[4], const int dim[4], const bool comm[4], const int y)
     {
-
       constexpr int pad = 2;
+      int back_x[4];
+      int back_dim[4];
 
-      int back_x[4] = {x[0] - pad, x[1] - pad, x[2] - pad, x[3] - pad};
-      int back_dim[4] = {dim[0] - pad * 2, dim[1] - pad * 2, dim[2] - pad * 2, dim[3] - pad * 2};
-      if (back_x[0] >= 0 && back_x[0] < back_dim[0] && back_x[1] >= 0 && back_x[1] < back_dim[1] && back_x[2] >= 0
-          && back_x[2] < back_dim[2] && back_x[3] >= 0 && back_x[3] < back_dim[3]) {
+#pragma unroll
+      for (int d = 0; d < 4; d++) {
+        back_x[d] = comm[d] ? x[d] - pad : x[d];
+        back_dim[d] = comm[d] ? dim[d] - pad * 2 : dim[d];
+      }
+
+      bool is_center = true;
+#pragma unroll
+      for (int d = 0; d < 4; d++) { is_center = is_center && (back_x[d] >= 0 && back_x[d] < back_dim[d]); }
+
+      if (is_center) {
         int volume_4d_cb_back = back_dim[0] * back_dim[1] * back_dim[2] * back_dim[3] / 2;
         return y * volume_4d_cb_back
           + index_4d_cb_from_coordinate_4d(back_x, back_dim); // the input coordinate is in the center region
       } else {
-        return -1; // the input coordinate is not in the center region
+        return -1;
       }
     }
 
@@ -213,14 +224,16 @@ namespace quda
 #pragma unroll
       for (int d = 0; d < 4; d++) // loop over dimension
       {
-        coordinate[d]++;
-        if (!halo || !is_halo_4d(coordinate, arg.dim, arg.halo_shift)) {
+        int x[4] = {coordinate[0], coordinate[1], coordinate[2], coordinate[3]};
+        // coordinate[d]++;
+        x[d] = (coordinate[d] == arg.dim[d] - 1 && !arg.comm[d]) ? 0 : coordinate[d] + 1;
+        if (!halo || !is_halo_4d(x, arg.dim, arg.halo_shift)) {
           // Forward gather - compute fwd offset for vector fetch
           int fwd_idx;
           if (back) {
-            fwd_idx = index_from_extended_coordinate(coordinate, arg.dim, s);
+            fwd_idx = index_from_extended_coordinate(x, arg.dim, arg.comm, s);
           } else {
-            fwd_idx = s * arg.volume_4d_cb + index_4d_cb_from_coordinate_4d(coordinate, arg.dim);
+            fwd_idx = s * arg.volume_4d_cb + index_4d_cb_from_coordinate_4d(x, arg.dim);
           }
           constexpr int proj_dir = dagger ? +1 : -1;
 
@@ -228,14 +241,15 @@ namespace quda
           const Vector in = arg.in(fwd_idx, their_spinor_parity);
           out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         }
-        coordinate[d] -= 2;
-        if (!halo || !is_halo_4d(coordinate, arg.dim, arg.halo_shift)) {
+        // coordinate[d] -= 2;
+        x[d] = (coordinate[d] == 0 && !arg.comm[d]) ? arg.dim[d] - 1 : coordinate[d] - 1;
+        if (!halo || !is_halo_4d(x, arg.dim, arg.halo_shift)) {
           // Backward gather - compute back offset for spinor and gauge fetch
-          const int gauge_idx = index_4d_cb_from_coordinate_4d(coordinate, arg.dim);
+          const int gauge_idx = index_4d_cb_from_coordinate_4d(x, arg.dim);
 
           int back_idx;
           if (back) {
-            back_idx = index_from_extended_coordinate(coordinate, arg.dim, s);
+            back_idx = index_from_extended_coordinate(x, arg.dim, arg.comm, s);
           } else {
             back_idx = s * arg.volume_4d_cb + gauge_idx;
           }
@@ -245,7 +259,7 @@ namespace quda
           const Vector in = arg.in(back_idx, their_spinor_parity);
           out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         }
-        coordinate[d]++;
+        // coordinate[d]++;
       } // nDim
     }
 
@@ -450,7 +464,7 @@ namespace quda
           int sid_back;
           bool center = false;
           if (!idle) {
-            sid_back = index_from_extended_coordinate(x, arg.dim, threadIdx.y);
+            sid_back = index_from_extended_coordinate(x, arg.dim, arg.comm, threadIdx.y);
             if (sid_back >= 0) {
               center = true;
               aux_in_vec = arg.x(sid_back, explicit_parity);
@@ -705,6 +719,7 @@ namespace quda
         // Only mutiple of 4 are supported since tensor core MMA only supports multiple of 16 shapes and we get a
         // factor of 4 for free.
         switch (in.X(4)) {
+#if 0
         case 4: {
           FusedDslashArg<storage_type, recon, 4> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
                                                      halo_shift, type);
@@ -717,12 +732,14 @@ namespace quda
           FusedDslash<decltype(arg)> dslash(arg, in);
           dslash.apply(streams[Nstream - 1]);
         } break;
+#endif
         case 12: {
           FusedDslashArg<storage_type, recon, 12> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
                                                       halo_shift, type);
           FusedDslash<decltype(arg)> dslash(arg, in);
           dslash.apply(streams[Nstream - 1]);
         } break;
+#if 0
         case 16: {
           FusedDslashArg<storage_type, recon, 16> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
                                                       halo_shift, type);
@@ -735,6 +752,7 @@ namespace quda
           FusedDslash<decltype(arg)> dslash(arg, in);
           dslash.apply(streams[Nstream - 1]);
         } break;
+#endif
         default: errorQuda("Ls = %d is NOT supported.\n", in.X(4));
         }
       }
