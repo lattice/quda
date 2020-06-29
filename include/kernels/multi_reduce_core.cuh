@@ -169,13 +169,13 @@ namespace quda
     }
 
     template <typename reduce_t, typename real>
-    struct Dot : public MultiReduceFunctor<reduce_t, real> {
+    struct multiDot : public MultiReduceFunctor<reduce_t, real> {
       static constexpr write< > write { };
       static constexpr bool use_z = false;
       static constexpr bool use_w = false;
       using MultiReduceFunctor<reduce_t, real>::NXZ;
       using MultiReduceFunctor<reduce_t, real>::NYW;
-      Dot(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, real>(NXZ, NYW) { }
+      multiDot(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, real>(NXZ, NYW) { }
 
       template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, const int i, const int j)
       {
@@ -201,14 +201,14 @@ namespace quda
     }
 
     template <typename real_reduce_t, typename real>
-    struct Cdot : public MultiReduceFunctor<complex<real_reduce_t>, complex<real>> {
+    struct multiCdot : public MultiReduceFunctor<complex<real_reduce_t>, complex<real>> {
       using reduce_t = complex<real_reduce_t>;
       static constexpr write< > write { };
       static constexpr bool use_z = false;
       static constexpr bool use_w = false;
       using MultiReduceFunctor<reduce_t, complex<real>>::NXZ;
       using MultiReduceFunctor<reduce_t, complex<real>>::NYW;
-      Cdot(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, complex<real>>(NXZ, NYW) { }
+      multiCdot(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, complex<real>>(NXZ, NYW) { }
 
       template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, const int i, const int j)
       {
@@ -221,7 +221,7 @@ namespace quda
     };
 
     template <typename real_reduce_t, typename real>
-    struct CdotCopy : public MultiReduceFunctor<complex<real_reduce_t>, complex<real>> {
+    struct multiCdotCopy : public MultiReduceFunctor<complex<real_reduce_t>, complex<real>> {
       using reduce_t = complex<real_reduce_t>;
       static constexpr write<0, 0, 0, 1> write { };
       static constexpr bool use_z = false;
@@ -229,7 +229,7 @@ namespace quda
       using MultiReduceFunctor<reduce_t, complex<real>>::NXZ;
       using MultiReduceFunctor<reduce_t, complex<real>>::NYW;
 
-      CdotCopy(int NYW) : MultiReduceFunctor<reduce_t, complex<real>>(NXZ, NYW) { }
+      multiCdotCopy(int NYW) : MultiReduceFunctor<reduce_t, complex<real>>(NXZ, NYW) { }
 
       template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, const int i, const int j)
       {
