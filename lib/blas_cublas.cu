@@ -160,7 +160,16 @@ namespace quda {
 	 cublas_param.data_type == QUDA_CUBLAS_DATATYPE_Z) {
 	data_size *= 2;
       }
-            
+
+      // Swap A and B if in row order
+      if (cublas_param.data_order == QUDA_CUBLAS_DATAORDER_ROW) {
+	std::swap(cublas_param.m, cublas_param.n);
+	std::swap(cublas_param.lda, cublas_param.ldb);
+	std::swap(cublas_param.trans_a, cublas_param.trans_b);
+	std::swap(cublas_param.a_offset, cublas_param.b_offset);
+	std::swap(A_data, B_data);
+      }
+      
       // Number of data between batches      
       unsigned int A_batch_size = cublas_param.lda * cublas_param.k;
       if (cublas_param.trans_a != QUDA_CUBLAS_OP_N)
@@ -372,6 +381,15 @@ namespace quda {
 	errorQuda("cublasGEMM type %d not implemented\n", cublas_param.data_type);  	
       }
 
+      // Restore A and B if in row order
+      if (cublas_param.data_order == QUDA_CUBLAS_DATAORDER_ROW) {
+	std::swap(cublas_param.m, cublas_param.n);
+	std::swap(cublas_param.lda, cublas_param.ldb);
+	std::swap(cublas_param.trans_a, cublas_param.trans_b);
+	std::swap(cublas_param.a_offset, cublas_param.b_offset);
+	std::swap(A_data, B_data);
+      }
+      
       if (location == QUDA_CPU_FIELD_LOCATION) {
 	qudaMemcpy(C_data, C_d, sizeCarr, cudaMemcpyDeviceToHost);
 	pool_device_free(A_d);

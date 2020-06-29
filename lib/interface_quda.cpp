@@ -6000,48 +6000,40 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
 
   // Compute Batched GEMM
   profileCuBLAS.TPSTART(QUDA_PROFILE_COMPUTE);
-  if (cublas_param->data_order == QUDA_CUBLAS_DATAORDER_ROW) {
-    // cuBLAS works exclusively in column major order. If the input data is in
-    // row major order, we may treat the A and B and C arrays as A^T, B^T, and C^T.
-    // We must now swap the order of the A * B multiplication and swap the
-    // operation types to recover the the desired result in the desired order.
-    // E.g: in row major, the operation,
-    // C = a * A^T * B + b * C
-    //
-    // will become the column major operation
-    // C^T = a * B^T * A + b * C^T
-    //
-    // By inspection, one can see that transposition of the above column major
-    // operation will result in the desired row major answer:
-    //
-    // (C^T)^T = a * (B^T * A)^T + b * (C^T)^T
-    //  -->  C = a *  A^T * B    + b *  C
-    //
-    // We must also swap around some parameters. The Row major indices,
-    // A_{m, lda}, B_{k, ldb}, C_{m, ldc}
-    // become
-    // A^T_{lda, m}, B^T_{ldb, k}, C^T_{ldc, m}.
-    // so the leading dimensions remain the same. However, we must change the actual
-    // matrix dims m,n,k to reflect the change to column major.
-    // m_{col} = n_{row}
-    // n_{col} = m_{row}
-    // k_{col} = k_{row}
-    // And because we are swapping the A and B arrays, we must also swap their
-    // leading dim values.
-
-    std::swap(cublas_param->m, cublas_param->n);
-    std::swap(cublas_param->lda, cublas_param->ldb);
-    std::swap(cublas_param->trans_a, cublas_param->trans_b);
-
-    cublas::BatchGEMM(B_d, A_d, C_d, *cublas_param, QUDA_CUDA_FIELD_LOCATION);
-
-    std::swap(cublas_param->trans_a, cublas_param->trans_b);
-    std::swap(cublas_param->m, cublas_param->n);
-    std::swap(cublas_param->lda, cublas_param->ldb);
-  } else {
-    // Data is already in column major format, no need for changes.
-    cublas::BatchGEMM(A_d, B_d, C_d, *cublas_param, QUDA_CUDA_FIELD_LOCATION);
-  }
+  
+  // cuBLAS works exclusively in column major order. If the input data is in
+  // row major order, we may treat the A and B and C arrays as A^T, B^T, and C^T.
+  // We swap the order of the A * B multiplication and swap the
+  // operation types and other data to recover the the desired result in the
+  // desired order.
+  // E.g: in row major, the operation,
+  // C = a * A^T * B + b * C
+  //
+  // will become the column major operation
+  // C^T = a * B^T * A + b * C^T
+  //
+  // By inspection, one can see that transposition of the above column major
+  // operation will result in the desired row major answer:
+  //
+  // (C^T)^T = a * (B^T * A)^T + b * (C^T)^T
+  //  -->  C = a *  A^T * B    + b *  C
+  //
+  // We must also swap around some parameters. The Row major indices,
+  // A_{m, lda}, B_{k, ldb}, C_{m, ldc}
+  // become
+  // A^T_{lda, m}, B^T_{ldb, k}, C^T_{ldc, m}.
+  // so the leading dimensions remain the same. However, we must change the actual
+  // matrix dims m,n,k to reflect the change to column major.
+  // m_{col} = n_{row}
+  // n_{col} = m_{row}
+  // k_{col} = k_{row}
+  // And because we are swapping the A and B arrays, we must also swap their
+  // leading dim values and any offsets. All this is done behind the scenes in the
+  // BatchGEMM function, and before function exit all pointers and values are
+  // restored to the values they had on entry.
+  
+  cublas::BatchGEMM(A_d, B_d, C_d, *cublas_param, QUDA_CUDA_FIELD_LOCATION);
+  
   if (getVerbosity() >= QUDA_VERBOSE) printfQuda("BatchGEMM success!\n");
   profileCuBLAS.TPSTOP(QUDA_PROFILE_COMPUTE);
 
