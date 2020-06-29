@@ -2406,7 +2406,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
 
   // create wrappers around application vector set
   std::vector<ColorSpinorField *> host_evecs_;
-  for (int i = 0; i < eig_param->nConv; i++) {
+  for (int i = 0; i < eig_param->n_conv; i++) {
     cpuParam.v = host_evecs[i];
     host_evecs_.push_back(ColorSpinorField::Create(cpuParam));
   }
@@ -2416,9 +2416,9 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   cudaParam.create = QUDA_ZERO_FIELD_CREATE;
   cudaParam.setPrecision(eig_param->cuda_prec_ritz, eig_param->cuda_prec_ritz, true);
 
-  std::vector<Complex> evals(eig_param->nConv, 0.0);
+  std::vector<Complex> evals(eig_param->n_conv, 0.0);
   std::vector<ColorSpinorField *> kSpace;
-  for (int i = 0; i < eig_param->nConv; i++) { kSpace.push_back(ColorSpinorField::Create(cudaParam)); }
+  for (int i = 0; i < eig_param->n_conv; i++) { kSpace.push_back(ColorSpinorField::Create(cudaParam)); }
 
   // If you use polynomial acceleration on a non-symmetric matrix,
   // the solver will fail.
@@ -2472,21 +2472,21 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   }
 
   // Copy eigen values back
-  for (int i = 0; i < eig_param->nConv; i++) { host_evals[i] = real(evals[i]) + imag(evals[i]) * _Complex_I; }
+  for (int i = 0; i < eig_param->n_conv; i++) { host_evals[i] = real(evals[i]) + imag(evals[i]) * _Complex_I; }
 
   // Transfer Eigenpairs back to host if using GPU eigensolver
   if (!(eig_param->arpack_check)) {
     profileEigensolve.TPSTART(QUDA_PROFILE_D2H);
-    for (int i = 0; i < eig_param->nConv; i++) *host_evecs_[i] = *kSpace[i];
+    for (int i = 0; i < eig_param->n_conv; i++) *host_evecs_[i] = *kSpace[i];
     profileEigensolve.TPSTOP(QUDA_PROFILE_D2H);
   }
 
   profileEigensolve.TPSTART(QUDA_PROFILE_FREE);
-  for (int i = 0; i < eig_param->nConv; i++) delete host_evecs_[i];
+  for (int i = 0; i < eig_param->n_conv; i++) delete host_evecs_[i];
   delete d;
   delete dSloppy;
   delete dPre;
-  for (int i = 0; i < eig_param->nConv; i++) delete kSpace[i];
+  for (int i = 0; i < eig_param->n_conv; i++) delete kSpace[i];
   profileEigensolve.TPSTOP(QUDA_PROFILE_FREE);
 
   popVerbosity();
@@ -2730,7 +2730,7 @@ deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)
   ritzParam.create        = QUDA_ZERO_FIELD_CREATE;
   ritzParam.is_composite  = true;
   ritzParam.is_component  = false;
-  ritzParam.composite_dim = param->nev*param->deflation_grid;
+  ritzParam.composite_dim = param->n_ev * param->deflation_grid;
   ritzParam.setPrecision(param->cuda_prec_ritz);
 
   if (ritzParam.location==QUDA_CUDA_FIELD_LOCATION) {
@@ -3089,13 +3089,13 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       DiracMdagMLocal mPreLocal(diracPre);
       Solver *solve = Solver::create(solverParam, m, mSloppy, mPreLocal, profileInvert);
       (*solve)(*out, *in);
-      solverParam.updateInvertParam(*param);
       delete solve;
+      solverParam.updateInvertParam(*param);
     } else {
       Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
       (*solve)(*out, *in);
-      solverParam.updateInvertParam(*param);
       delete solve;
+      solverParam.updateInvertParam(*param);
     }
   } else { // norm_error_solve
     DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
@@ -5962,40 +5962,40 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
     // elements in a column, multiplied by number of rows
     if (cublas_param->trans_a == QUDA_CUBLAS_OP_N) {
       arrayA_size = cublas_param->lda * cublas_param->k; // A_mk
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%lu, %lu}\n", cublas_param->lda, cublas_param->k);
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%d, %d}\n", cublas_param->lda, cublas_param->k);
     } else {
       arrayA_size = cublas_param->lda * cublas_param->m; // A_km
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%lu, %lu}\n", cublas_param->lda, cublas_param->m);
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%d, %d}\n", cublas_param->lda, cublas_param->m);
     }
 
     if (cublas_param->trans_b == QUDA_CUBLAS_OP_N) {
       arrayB_size = cublas_param->ldb * cublas_param->n; // B_kn
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%lu, %lu}\n", cublas_param->ldb, cublas_param->n);
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%d, %d}\n", cublas_param->ldb, cublas_param->n);
     } else {
       arrayB_size = cublas_param->ldb * cublas_param->k; // B_nk
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%lu, %lu}\n", cublas_param->ldb, cublas_param->k);
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%d, %d}\n", cublas_param->ldb, cublas_param->k);
     }
     arrayC_size = cublas_param->ldc * cublas_param->n; // C_mn
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array C_{%lu, %lu}\n", cublas_param->ldc, cublas_param->n);
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array C_{%d, %d}\n", cublas_param->ldc, cublas_param->n);
   } else {
     // leading dimension is in terms of consecutive data
     // elements in a row, multiplied by number of columns.
     if (cublas_param->trans_a == QUDA_CUBLAS_OP_N) {
       arrayA_size = cublas_param->lda * cublas_param->m; // A_mk
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%lu, %lu}\n", cublas_param->m, cublas_param->lda);
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%d, %d}\n", cublas_param->m, cublas_param->lda);
     } else {
       arrayA_size = cublas_param->lda * cublas_param->k; // A_km
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%lu, %lu}\n", cublas_param->k, cublas_param->lda);
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%d, %d}\n", cublas_param->k, cublas_param->lda);
     }
     if (cublas_param->trans_b == QUDA_CUBLAS_OP_N) {
       arrayB_size = cublas_param->ldb * cublas_param->k; // B_nk
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%lu, %lu}\n", cublas_param->k, cublas_param->ldb);
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%d, %d}\n", cublas_param->k, cublas_param->ldb);
     } else {
       arrayB_size = cublas_param->ldb * cublas_param->n; // B_kn
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%lu, %lu}\n", cublas_param->n, cublas_param->ldb);
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%d, %d}\n", cublas_param->n, cublas_param->ldb);
     }
     arrayC_size = cublas_param->ldc * cublas_param->m; // C_mn
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array C_{%lu, %lu}\n", cublas_param->m, cublas_param->ldc);
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array C_{%d, %d}\n", cublas_param->m, cublas_param->ldc);
   }
 
   size_t data_size

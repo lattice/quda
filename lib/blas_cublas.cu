@@ -411,5 +411,5 @@ namespace quda {
     }
     
   } // namespace cublas
-
+  
 } // namespace quda
