@@ -8,6 +8,9 @@
 #include <math_helper.cuh>
 #include <shared_memory_cache_helper.cuh>
 
+#define THRUST_IGNORE_CUB_VERSION_CHECK
+#include <cub/cub.cuh>
+
 #if (__CUDACC_VER_MAJOR__ >= 9 && __COMPUTE_CAPABILITY__ >= 700)
 #include <mma.h>
 
@@ -265,7 +268,8 @@ namespace quda
 
   constexpr float target_scale = 2e3;
 
-  template <class Vector> __device__ inline void block_wise_reduce_vector(const Vector &v, float *smem_scale)
+  template <int block_x, int block_y, class Vector>
+  __device__ inline void block_wise_reduce_vector(const Vector &v, float *smem_scale)
   {
 
     __syncthreads();
@@ -283,23 +287,19 @@ namespace quda
         __float_max_abs_floats__(warp_max, v(spin, color).imag());
       }
     }
-    // Find the maximum absolute value in a warp across different lanes
-    warp_wise_reduce_float(warp_max);
-    // Now lane 0 of each warp holds the maximum value
-    if (lane_id == 0) { smem_scale[warp_id] = warp_max; }
-    __syncthreads();
-    if (warp_id == 0) {
-      warp_max = (lane_id < ((blockDim.x * blockDim.y) >> 5)) ? smem_scale[lane_id] : 0.0f;
-      warp_wise_reduce_float(warp_max);
-      if (lane_id == 0) { smem_scale[0] = warp_max / target_scale; }
-    }
+
+    typedef cub::BlockReduce<float, block_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_y, 1> BlockReduce;
+    __shared__ typename BlockReduce::TempStorage temp_storage;
+    float aggregate = BlockReduce(temp_storage).Reduce(warp_max, cub::Max());
+
+    if (warp_id == 0 && lane_id == 0) { smem_scale[0] = aggregate / target_scale; }
     __syncthreads();
   }
 
   // Actually does more than the function name suggests.
   // will find the maximum absolute value among the vector, scale that, and store
   // to sm_b
-  template <int N_sm_d2, bool accumulate, bool store = true, class Vector>
+  template <int block_x, int block_y, int N_sm_d2, bool accumulate, bool store = true, class Vector>
   __device__ inline void load_matrix_b_vector(Vector &v, half2 *sm_b, float *smem_scale, float m_scale = 1.0f)
   {
     if (accumulate) {
@@ -315,7 +315,7 @@ namespace quda
       }
     }
     if (store) {
-      block_wise_reduce_vector(v, smem_scale);
+      block_wise_reduce_vector<block_x, block_y>(v, smem_scale);
       // Now smem_scale[0] contains the maximum value
       float current_scale = smem_scale[0];
 #pragma unroll

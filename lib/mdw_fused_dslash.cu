@@ -30,6 +30,16 @@ namespace quda
 
 #if (__CUDACC_VER_MAJOR__ >= 9 && __COMPUTE_CAPABILITY__ >= 700)
 
+    template <typename F> inline void setMaxDynamicSharedBytesPerBlock(F *func)
+    {
+      qudaFuncSetAttribute((const void *)func, cudaFuncAttributePreferredSharedMemoryCarveout,
+                           (int)cudaSharedmemCarveoutMaxShared);
+      cudaFuncAttributes attr;
+      cudaFuncGetAttributes(&attr, (const void *)func);
+      qudaFuncSetAttribute((const void *)func, cudaFuncAttributeMaxDynamicSharedMemorySize,
+                           deviceProp.sharedMemPerBlockOptin - attr.sharedSizeBytes);
+    }
+
     /**
       @brief Parameter structure for applying the Dslash
     */
@@ -122,7 +132,8 @@ namespace quda
         shrinked_dim {dim[0] - 2 * shift[0], dim[1] - 2 * shift[1], dim[2] - 2 * shift[2], dim[3] - 2 * shift[3]},
         volume_4d_cb_shift(shrinked_dim[0] * shrinked_dim[1] * shrinked_dim[2] * shrinked_dim[3] / 2),
         type(type_),
-        comm {comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)}
+        comm {static_cast<bool>(comm_dim_partitioned(0)), static_cast<bool>(comm_dim_partitioned(1)),
+              static_cast<bool>(comm_dim_partitioned(2)), static_cast<bool>(comm_dim_partitioned(3))}
       {
         if (in.Nspin() != 4) { errorQuda("nSpin = %d NOT supported.\n", in.Nspin()); }
 
@@ -284,7 +295,8 @@ namespace quda
       coordinate[3] = aux[3];
 
       // Find the full coordinate in the shrinked volume.
-      coordinate[0] += (shift[0] + shift[1] + shift[2] + shift[3] + parity + coordinate[3] + coordinate[2] + coordinate[1]) & 1;
+      coordinate[0]
+        += (shift[0] + shift[1] + shift[2] + shift[3] + parity + coordinate[3] + coordinate[2] + coordinate[1]) & 1;
 
 // Now go back to the extended volume.
 #pragma unroll
@@ -449,7 +461,7 @@ namespace quda
           }
           // store result to shared memory
         }
-        load_matrix_b_vector<N_sm / 2, false>(in_vec, sm_b, smem_scale); // acc(accumulation) = false
+        load_matrix_b_vector<block_dim_x, Ls, N_sm / 2, false>(in_vec, sm_b, smem_scale); // acc(accumulation) = false
 
         __syncthreads();
 #ifdef USE_MMA_SYNC
@@ -470,7 +482,7 @@ namespace quda
               aux_in_vec = arg.x(sid_back, explicit_parity);
             }
           }
-          load_matrix_b_vector<N_sm / 2, true>(aux_in_vec, sm_b, smem_scale, arg.m_scale); // acc = true
+          load_matrix_b_vector<block_dim_x, Ls, N_sm / 2, true>(aux_in_vec, sm_b, smem_scale, arg.m_scale); // acc = true
           if (!idle && center) { store_matrix_c<storage_type, N_sm>(arg.y, sm_b, sid_back, smem_scale[0]); }
           __syncthreads();
 #ifdef USE_MMA_SYNC
@@ -484,7 +496,7 @@ namespace quda
           Vector aux_in_vec;
           int sid_shift = threadIdx.y * arg.volume_4d_cb_shift + s4_shift;
           if (!idle) { aux_in_vec = arg.x(sid_shift, explicit_parity); }
-          load_matrix_b_vector<N_sm / 2, true, false>(aux_in_vec, sm_b, smem_scale, arg.m_scale);
+          load_matrix_b_vector<block_dim_x, Ls, N_sm / 2, true, false>(aux_in_vec, sm_b, smem_scale, arg.m_scale);
           if (!idle) { arg.out(sid_shift, explicit_parity) = aux_in_vec; }
         }
 
@@ -647,7 +659,7 @@ namespace quda
 
       template <typename T> inline void launch(T *f, const TuneParam &tp, Arg &arg, const qudaStream_t &stream)
       {
-        setMaxDynamicSharedBytesPerBlock(f);
+        quda::mobius_tensor_core::setMaxDynamicSharedBytesPerBlock(f);
         void *args[] = {&arg};
         qudaLaunchKernel((const void *)f, tp.grid, tp.block, args, tp.shared_bytes, stream);
       }
@@ -724,7 +736,6 @@ namespace quda
         // Only mutiple of 4 are supported since tensor core MMA only supports multiple of 16 shapes and we get a
         // factor of 4 for free.
         switch (in.X(4)) {
-#if 0
         case 4: {
           FusedDslashArg<storage_type, recon, 4> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
                                                      halo_shift, type);
@@ -737,14 +748,12 @@ namespace quda
           FusedDslash<decltype(arg)> dslash(arg, in);
           dslash.apply(streams[Nstream - 1]);
         } break;
-#endif
         case 12: {
           FusedDslashArg<storage_type, recon, 12> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
                                                       halo_shift, type);
           FusedDslash<decltype(arg)> dslash(arg, in);
           dslash.apply(streams[Nstream - 1]);
         } break;
-#if 0
         case 16: {
           FusedDslashArg<storage_type, recon, 16> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
                                                       halo_shift, type);
@@ -757,7 +766,6 @@ namespace quda
           FusedDslash<decltype(arg)> dslash(arg, in);
           dslash.apply(streams[Nstream - 1]);
         } break;
-#endif
         default: errorQuda("Ls = %d is NOT supported.\n", in.X(4));
         }
       }
