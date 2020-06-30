@@ -57,15 +57,25 @@ if(BUILD_TYPE_VALID LESS 0)
 endif()
 
 # Target type
-set(VALID_TARGET_TYPES CUDA HIP)
+set(VALID_TARGET_TYPES CUDA HIP CPU)
 set(QUDA_TARGET_TYPE "${DEFTARGET}" CACHE STRING "Choose the type of target, options are: ${VALID_TARGET_TYPES}")
-set_property(CACHE QUDA_TARGET_TYPE PROPERTY STRINGS CUDA HIP)
+set_property(CACHE QUDA_TARGET_TYPE PROPERTY STRINGS CUDA HIP CPU)
 
 string(TOUPPER ${QUDA_TARGET_TYPE} CHECK_TARGET_TYPE)
 list(FIND VALID_TARGET_TYPES ${CHECK_TARGET_TYPE} TARGET_TYPE_VALID)
 
 if(TARGET_TYPE_VALID LESS 0)
   message(SEND_ERROR "Please specify a valid QUDA_TARGET_TYPE type! Valid target types are:" "${VALID_TARGET_TYPES}")
+endif()
+
+if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")
+  add_definitions(-DQUDA_TARGET_CUDA)
+endif()
+if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
+  add_definitions(-DQUDA_TARGET_HIP)
+endif()
+if(${QUDA_TARGET_TYPE} STREQUAL "CPU")
+  add_definitions(-DQUDA_TARGET_CPU)
 endif()
 
 #
@@ -224,7 +234,7 @@ if(QUDA_MAX_MULTI_BLAS_N GREATER 32)
   SEND_ERROR
   "Maximum QUDA_MAX_MULTI_BLAS_N is 32.")
 endif()
-  
+
 set(QUDA_PRECISION
     "14"
     CACHE STRING "which precisions to instantiate in QUDA (4-bit number - double, single, half, char)")
@@ -411,13 +421,15 @@ set(CMAKE_CUDA_FLAGS_SANITIZE
     "-g -lineinfo -Xcompiler -fsanitize=address,-fsanitize=undefined"
     CACHE STRING "Flags used by the C++ compiler during sanitizer debug builds.")
 
-# CUDA Wrapper for finding libs etc
-enable_language(CUDA)
-if(CMAKE_VERSION VERSION_LESS 3.17)
-  find_package(CUDAWrapper)
-else()
-  # for cmake 3.17+ we rely on
-  find_package(CUDAToolkit)
+if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")
+  # CUDA Wrapper for finding libs etc
+  enable_language(CUDA)
+  if(CMAKE_VERSION VERSION_LESS 3.17)
+    find_package(CUDAWrapper)
+  else()
+    # for cmake 3.17+ we rely on
+    find_package(CUDAToolkit)
+  endif()
 endif()
 
 # ######################################################################################################################

@@ -19,7 +19,9 @@
 #include <index_helper.cuh>
 #include <color_spinor.h>
 #include <color_spinor_field.h>
+#ifndef QUDA_TARGET_CPU
 #include <trove_helper.cuh>
+#endif
 #include <transform_reduce.h>
 
 namespace quda {
@@ -897,7 +899,7 @@ namespace quda {
       static constexpr int M_ghost = length_ghost / N_ghost;
       using Accessor = FloatNOrder<Float, Ns, Nc, N, spin_project, huge_alloc>;
       using real = typename mapper<Float>::type;
-      using complex = complex<real>;
+      using complexR = complex<real>;
       using Vector = typename VectorType<Float, N>::type;
       using GhostVector = typename VectorType<Float, N_ghost>::type;
       using AllocInt = typename AllocType<huge_alloc>::type;
@@ -946,7 +948,7 @@ namespace quda {
     }
   }
 
-  __device__ __host__ inline void load(complex out[length / 2], int x, int parity = 0) const
+  __device__ __host__ inline void load(complexR out[length / 2], int x, int parity = 0) const
   {
     real v[length];
     norm_type nrm;
@@ -964,10 +966,10 @@ namespace quda {
     }
 
 #pragma unroll
-    for (int i = 0; i < length / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
+    for (int i = 0; i < length / 2; i++) out[i] = complexR(v[2 * i + 0], v[2 * i + 1]);
   }
 
-  __device__ __host__ inline void save(const complex in[length / 2], int x, int parity = 0)
+  __device__ __host__ inline void save(const complexR in[length / 2], int x, int parity = 0)
   {
     real v[length];
 
@@ -1035,7 +1037,7 @@ namespace quda {
     return colorspinor_wrapper<real, Accessor>(const_cast<Accessor &>(*this), x_cb, parity);
   }
 
-  __device__ __host__ inline void loadGhost(complex out[length_ghost / 2], int x, int dim, int dir, int parity = 0) const
+  __device__ __host__ inline void loadGhost(complexR out[length_ghost / 2], int x, int dim, int dir, int parity = 0) const
   {
     real v[length_ghost];
     norm_type nrm;
@@ -1050,10 +1052,10 @@ namespace quda {
     }
 
 #pragma unroll
-    for (int i = 0; i < length_ghost / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
+    for (int i = 0; i < length_ghost / 2; i++) out[i] = complexR(v[2 * i + 0], v[2 * i + 1]);
   }
 
-  __device__ __host__ inline void saveGhost(const complex in[length_ghost / 2], int x, int dim, int dir,
+  __device__ __host__ inline void saveGhost(const complexR in[length_ghost / 2], int x, int dim, int dir,
                                             int parity = 0) const
   {
     real v[length_ghost];
@@ -1165,7 +1167,7 @@ namespace quda {
       struct SpaceColorSpinorOrder {
       using Accessor = SpaceColorSpinorOrder<Float, Ns, Nc>;
       using real = typename mapper<Float>::type;
-      using complex = complex<real>;
+      using complexR = complex<real>;
       static const int length = 2 * Ns * Nc;
       Float *field;
       size_t offset;
@@ -1186,26 +1188,26 @@ namespace quda {
     }
   }
 
-  __device__ __host__ inline void load(complex v[length / 2], int x, int parity = 0) const
+  __device__ __host__ inline void load(complexR v[length / 2], int x, int parity = 0) const
   {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
     typedef S<Float,length> structure;
     trove::coalesced_ptr<structure> field_((structure*)field);
     structure v_ = field_[parity*volumeCB + x];
     for (int s=0; s<Ns; s++) {
-      for (int c = 0; c < Nc; c++) { v[s * Nc + c] = complex(v_.v[(c * Ns + s) * 2 + 0], v_.v[(c * Ns + s) * 2 + 1]); }
+      for (int c = 0; c < Nc; c++) { v[s * Nc + c] = complexR(v_.v[(c * Ns + s) * 2 + 0], v_.v[(c * Ns + s) * 2 + 1]); }
     }
 #else
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
-        v[s * Nc + c] = complex(field[parity * offset + ((x * Nc + c) * Ns + s) * 2 + 0],
+        v[s * Nc + c] = complexR(field[parity * offset + ((x * Nc + c) * Ns + s) * 2 + 0],
                                 field[parity * offset + ((x * Nc + c) * Ns + s) * 2 + 1]);
       }
     }
 #endif
   }
 
-  __device__ __host__ inline void save(const complex v[length / 2], int x, int parity = 0)
+  __device__ __host__ inline void save(const complexR v[length / 2], int x, int parity = 0)
   {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
     typedef S<Float,length> structure;
@@ -1256,17 +1258,17 @@ namespace quda {
     return colorspinor_wrapper<real, Accessor>(const_cast<Accessor &>(*this), x_cb, parity);
   }
 
-  __device__ __host__ inline void loadGhost(complex v[length / 2], int x, int dim, int dir, int parity = 0) const
+  __device__ __host__ inline void loadGhost(complexR v[length / 2], int x, int dim, int dir, int parity = 0) const
   {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
-        v[s * Nc + c] = complex(ghost[2 * dim + dir][(((parity * faceVolumeCB[dim] + x) * Nc + c) * Ns + s) * 2 + 0],
+        v[s * Nc + c] = complexR(ghost[2 * dim + dir][(((parity * faceVolumeCB[dim] + x) * Nc + c) * Ns + s) * 2 + 0],
                                 ghost[2 * dim + dir][(((parity * faceVolumeCB[dim] + x) * Nc + c) * Ns + s) * 2 + 1]);
       }
     }
   }
 
-  __device__ __host__ inline void saveGhost(const complex v[length / 2], int x, int dim, int dir, int parity = 0)
+  __device__ __host__ inline void saveGhost(const complexR v[length / 2], int x, int dim, int dir, int parity = 0)
   {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
@@ -1283,7 +1285,7 @@ namespace quda {
       struct SpaceSpinorColorOrder {
       using Accessor = SpaceSpinorColorOrder<Float, Ns, Nc>;
       using real = typename mapper<Float>::type;
-      using complex = complex<real>;
+      using complexR = complex<real>;
       static const int length = 2 * Ns * Nc;
       Float *field;
       size_t offset;
@@ -1304,26 +1306,26 @@ namespace quda {
     }
   }
 
-  __device__ __host__ inline void load(complex v[length / 2], int x, int parity = 0) const
+  __device__ __host__ inline void load(complexR v[length / 2], int x, int parity = 0) const
   {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
     typedef S<Float,length> structure;
     trove::coalesced_ptr<structure> field_((structure*)field);
     structure v_ = field_[parity*volumeCB + x];
     for (int s=0; s<Ns; s++) {
-      for (int c = 0; c < Nc; c++) { v[s * Nc + c] = complex(v_.v[(s * Nc + c) * 2 + 0], v_.v[(s * Nc + c) * 2 + 1]); }
+      for (int c = 0; c < Nc; c++) { v[s * Nc + c] = complexR(v_.v[(s * Nc + c) * 2 + 0], v_.v[(s * Nc + c) * 2 + 1]); }
     }
 #else
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
-        v[s * Nc + c] = complex(field[parity * offset + ((x * Ns + s) * Nc + c) * 2 + 0],
+        v[s * Nc + c] = complexR(field[parity * offset + ((x * Ns + s) * Nc + c) * 2 + 0],
                                 field[parity * offset + ((x * Ns + s) * Nc + c) * 2 + 1]);
       }
     }
 #endif
   }
 
-  __device__ __host__ inline void save(const complex v[length / 2], int x, int parity = 0)
+  __device__ __host__ inline void save(const complexR v[length / 2], int x, int parity = 0)
   {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
     typedef S<Float,length> structure;
@@ -1374,17 +1376,17 @@ namespace quda {
     return colorspinor_wrapper<real, Accessor>(const_cast<Accessor &>(*this), x_cb, parity);
   }
 
-  __device__ __host__ inline void loadGhost(complex v[length / 2], int x, int dim, int dir, int parity = 0) const
+  __device__ __host__ inline void loadGhost(complexR v[length / 2], int x, int dim, int dir, int parity = 0) const
   {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
-        v[s * Nc + c] = complex(ghost[2 * dim + dir][(((parity * faceVolumeCB[dim] + x) * Ns + s) * Nc + c) * 2 + 0],
+        v[s * Nc + c] = complexR(ghost[2 * dim + dir][(((parity * faceVolumeCB[dim] + x) * Ns + s) * Nc + c) * 2 + 0],
                                 ghost[2 * dim + dir][(((parity * faceVolumeCB[dim] + x) * Ns + s) * Nc + c) * 2 + 1]);
       }
     }
   }
 
-  __device__ __host__ inline void saveGhost(const complex v[length / 2], int x, int dim, int dir, int parity = 0)
+  __device__ __host__ inline void saveGhost(const complexR v[length / 2], int x, int dim, int dir, int parity = 0)
   {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
@@ -1402,7 +1404,7 @@ namespace quda {
       struct PaddedSpaceSpinorColorOrder {
       using Accessor = PaddedSpaceSpinorColorOrder<Float, Ns, Nc>;
       using real = typename mapper<Float>::type;
-      using complex = complex<real>;
+      using complexR = complex<real>;
       static const int length = 2 * Ns * Nc;
       Float *field;
       size_t offset;
@@ -1447,7 +1449,7 @@ namespace quda {
     return linkIndex(coord, exDim);
   }
 
-  __device__ __host__ inline void load(complex v[length / 2], int x, int parity = 0) const
+  __device__ __host__ inline void load(complexR v[length / 2], int x, int parity = 0) const
   {
     int y = getPaddedIndex(x, parity);
 
@@ -1456,19 +1458,19 @@ namespace quda {
     trove::coalesced_ptr<structure> field_((structure*)field);
     structure v_ = field_[parity*exVolumeCB + y];
     for (int s=0; s<Ns; s++) {
-      for (int c = 0; c < Nc; c++) { v[s * Nc + c] = complex(v_.v[(s * Nc + c) * 2 + 0], v_.v[(s * Nc + c) * 2 + 1]); }
+      for (int c = 0; c < Nc; c++) { v[s * Nc + c] = complexR(v_.v[(s * Nc + c) * 2 + 0], v_.v[(s * Nc + c) * 2 + 1]); }
     }
 #else
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
-        v[s * Nc + c] = complex(field[parity * offset + ((y * Ns + s) * Nc + c) * 2 + 0],
+        v[s * Nc + c] = complexR(field[parity * offset + ((y * Ns + s) * Nc + c) * 2 + 0],
                                 field[parity * offset + ((y * Ns + s) * Nc + c) * 2 + 1]);
       }
     }
 #endif
   }
 
-  __device__ __host__ inline void save(const complex v[length / 2], int x, int parity = 0)
+  __device__ __host__ inline void save(const complexR v[length / 2], int x, int parity = 0)
   {
     int y = getPaddedIndex(x, parity);
 
@@ -1521,17 +1523,17 @@ namespace quda {
     return colorspinor_wrapper<real, Accessor>(const_cast<Accessor &>(*this), x_cb, parity);
   }
 
-  __device__ __host__ inline void loadGhost(complex v[length / 2], int x, int dim, int dir, int parity = 0) const
+  __device__ __host__ inline void loadGhost(complexR v[length / 2], int x, int dim, int dir, int parity = 0) const
   {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
-        v[s * Nc + c] = complex(ghost[2 * dim + dir][(((parity * faceVolumeCB[dim] + x) * Ns + s) * Nc + c) * 2 + 0],
+        v[s * Nc + c] = complexR(ghost[2 * dim + dir][(((parity * faceVolumeCB[dim] + x) * Ns + s) * Nc + c) * 2 + 0],
                                 ghost[2 * dim + dir][(((parity * faceVolumeCB[dim] + x) * Ns + s) * Nc + c) * 2 + 1]);
       }
     }
   }
 
-  __device__ __host__ inline void saveGhost(const complex v[length / 2], int x, int dim, int dir, int parity = 0)
+  __device__ __host__ inline void saveGhost(const complexR v[length / 2], int x, int dim, int dir, int parity = 0)
   {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
@@ -1549,7 +1551,7 @@ namespace quda {
       struct QDPJITDiracOrder {
       using Accessor = QDPJITDiracOrder<Float, Ns, Nc>;
       using real = typename mapper<Float>::type;
-      using complex = complex<real>;
+      using complexR = complex<real>;
       Float *field;
       int volumeCB;
       int stride;
@@ -1558,17 +1560,17 @@ namespace quda {
       : field(field_ ? field_ : (Float*)a.V()), volumeCB(a.VolumeCB()), stride(a.Stride()), nParity(a.SiteSubset())
   { if (volumeCB != stride) errorQuda("Stride must equal volume for this field order"); }
 
-  __device__ __host__ inline void load(complex v[Ns * Nc], int x, int parity = 0) const
+  __device__ __host__ inline void load(complexR v[Ns * Nc], int x, int parity = 0) const
   {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
-        v[s * Nc + c] = complex(field[(((0 * Nc + c) * Ns + s) * 2 + (1 - parity)) * volumeCB + x],
+        v[s * Nc + c] = complexR(field[(((0 * Nc + c) * Ns + s) * 2 + (1 - parity)) * volumeCB + x],
                                 field[(((1 * Nc + c) * Ns + s) * 2 + (1 - parity)) * volumeCB + x]);
       }
     }
   }
 
-  __device__ __host__ inline void save(const complex v[Ns * Nc], int x, int parity = 0)
+  __device__ __host__ inline void save(const complexR v[Ns * Nc], int x, int parity = 0)
   {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <quda.h>
-#include <random_quda.h>
+#include <quda_internal.h>
 #include <vector>
 #include <color_spinor_field.h>
 

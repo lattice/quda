@@ -1,7 +1,7 @@
 #include <gauge_field_order.h>
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
-#include <cub_helper.cuh> // for vector_type
+#include <reduce_helper.cuh> // for vector_type
 #if (__COMPUTE_CAPABILITY__ >= 300 || __CUDA_ARCH__ >= 300)
 #include <generics/shfl.h>
 #endif

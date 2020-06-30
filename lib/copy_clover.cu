@@ -1,5 +1,5 @@
 #include <clover_field_order.h>
-#include <tune_quda.h>
+#include <quda_internal.h>
 
 namespace quda {
 

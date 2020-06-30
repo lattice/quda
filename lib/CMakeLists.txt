@@ -64,8 +64,8 @@ set (QUDA_OBJS
   dslash_domain_wall_4d.cu  dslash_domain_wall_5d.cu
   mdw_fused_dslash.cu dslash5_mobius_eofa.cu
   dslash_pack2.cu
-  blas_quda.cu multi_blas_quda.cu reduce_quda.cu
-  multi_reduce_quda.cu contract.cu
+  blas_quda.cu multi_blas_quda.cu reduce_quda.cu multi_reduce_quda.cu
+  contract.cu
   comm_common.cpp 
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cu spinor_noise.cu
@@ -96,9 +96,51 @@ set (QUDA_OBJS
   gauge_fix_ovr_extra.cu gauge_fix_fft.cu gauge_fix_ovr.cu
   pgauge_det_trace.cu clover_outer_product.cu
   clover_sigma_outer_product.cu momentum.cu gauge_qcharge.cu
-  quda_cuda_api.cpp deflation.cpp checksum.cu
+  deflation.cpp checksum.cu
   instantiate.cpp version.cpp )
 # cmake-format: on
+
+if(${QUDA_TARGET_TYPE} STREQUAL "CPU")
+set (QUDA_OBJS
+  # cmake-format: sortable
+  dirac_coarse.cpp
+  eig_trlm.cpp eig_block_trlm.cpp vector_io.cpp
+  eigensolve_quda.cpp quda_arpack_interface.cpp
+  multigrid.cpp transfer.cpp inv_bicgstab_quda.cpp
+  timer.cpp
+  solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
+  inv_multi_cg_quda.cpp inv_eigcg_quda.cpp
+  gauge_laplace.cpp gauge_observable.cpp
+  inv_cg3_quda.cpp inv_ca_gcr.cpp inv_ca_cg.cpp
+  inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp inv_xsd_quda.cpp
+  inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
+  color_spinor_field.cpp gauge_covdev.cpp
+  cpu_color_spinor_field.cpp cuda_color_spinor_field.cpp dirac.cpp
+  clover_field.cpp lattice_field.cpp gauge_field.cpp
+  cpu_gauge_field.cpp cuda_gauge_field.cpp
+  dirac_clover.cpp dirac_wilson.cpp dirac_staggered.cpp
+  dirac_clover_hasenbusch_twist.cpp
+  dirac_improved_staggered.cpp dirac_domain_wall.cpp
+  dirac_domain_wall_4d.cpp dirac_mobius.cpp dirac_twisted_clover.cpp
+  dirac_twisted_mass.cpp 
+  blas_quda.cu multi_blas_quda.cu reduce_quda.cu multi_reduce_quda.cu
+  contract.cu
+  comm_common.cpp 
+  copy_color_spinor_dd.cu copy_color_spinor_ds.cu
+  copy_color_spinor_dh.cu copy_color_spinor_dq.cu
+  copy_color_spinor_ss.cu copy_color_spinor_sd.cu
+  copy_color_spinor_sh.cu copy_color_spinor_sq.cu
+  copy_color_spinor_hd.cu copy_color_spinor_hs.cu
+  copy_color_spinor_hh.cu copy_color_spinor_hq.cu
+  copy_color_spinor_qd.cu copy_color_spinor_qs.cu
+  copy_color_spinor_qh.cu copy_color_spinor_qq.cu
+  copy_gauge_double.cu copy_gauge_single.cu
+  copy_gauge_half.cu copy_gauge_quarter.cu
+  copy_gauge.cu copy_gauge_mg.cu copy_clover.cu
+  milc_interface.cpp
+  inv_mpcg_quda.cpp inv_mpbicgstab_quda.cpp inv_gmresdr_quda.cpp
+  deflation.cpp instantiate.cpp version.cpp )
+endif()
 
 # split source into cu and cpp files
 foreach(item ${QUDA_OBJS})
@@ -181,9 +223,11 @@ if(QUDA_VERBOSE_BUILD)
   target_compile_options(quda PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--ptxas-options=-v>)
 endif(QUDA_VERBOSE_BUILD)
 
-# workaround for 10.2
-if(${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL "10.2" AND ${CMAKE_CUDA_COMPILER_VERSION} VERSION_LESS "10.3")
-  target_compile_options(quda PRIVATE "$<$<COMPILE_LANGUAGE:CUDA>:SHELL: -Xcicc \"--Xllc -dag-vectorize-ops=1\" " >)
+if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")
+  # workaround for 10.2
+  if(${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL "10.2" AND ${CMAKE_CUDA_COMPILER_VERSION} VERSION_LESS "10.3")
+    target_compile_options(quda PRIVATE "$<$<COMPILE_LANGUAGE:CUDA>:SHELL: -Xcicc \"--Xllc -dag-vectorize-ops=1\" " >)
+  endif()
 endif()
 
 # include_directories
@@ -201,14 +245,20 @@ target_compile_definitions(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,COMPILE_DEFIN
 target_include_directories(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,INCLUDE_DIRECTORIES>)
 target_compile_options(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,COMPILE_OPTIONS>)
 
-# add target specific files		
-if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")		
-  add_subdirectory(targets/cuda)		
-endif()		
-if(${QUDA_TARGET_TYPE} STREQUAL "HIP")		
-  #set(QUDA_TARGET_DIR "hip")		
-endif()		
- 
+# add target specific files
+if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")
+  add_subdirectory(targets/cuda)
+endif()
+if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
+  #set(QUDA_TARGET_DIR "hip")
+  add_subdirectory(targets/hip)
+endif()
+if(${QUDA_TARGET_TYPE} STREQUAL "CPU")
+  add_subdirectory(targets/cpu)
+  set_source_files_properties(${QUDA_CU_OBJS} PROPERTIES LANGUAGE CXX)
+  set_source_files_properties(${QUDA_CU_OBJS} PROPERTIES COMPILE_FLAGS "-x c++")
+endif()
+
 target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_target>)
  
 # propagate CXX flags to CUDA host compiler
@@ -373,7 +423,7 @@ if(QUDA_QMP)
     add_dependencies(quda QMP)
     add_dependencies(quda_cpp QMP)
     #TODO: need to figure out how to propagate that cleanly
-    add_dependencies(quda_cuda_target QMP)
+    add_dependencies(quda_target QMP)
   endif()
   target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_QMPHOME}/include>)
   target_compile_definitions(quda PUBLIC QMP_COMMS)
@@ -387,6 +437,7 @@ if(QUDA_QIO)
     add_dependencies(quda_cpp QIO)
     #TODO: need to figure out how to propagate that cleanly
     add_dependencies(quda_cuda_target QIO)
+    #add_dependencies(quda_target QMP)
   endif()
   target_compile_definitions(quda PUBLIC HAVE_QIO)
   target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_QIOHOME}/include>)

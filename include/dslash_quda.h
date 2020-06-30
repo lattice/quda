@@ -2,7 +2,7 @@
 #define _DSLASH_QUDA_H
 
 #include <quda_internal.h>
-#include <tune_quda.h>
+//#include <tune_quda.h>
 #include <color_spinor_field.h>
 #include <gauge_field.h>
 #include <clover_field.h>

@@ -7,7 +7,6 @@
 #include <iostream>
 
 #include <lattice_field.h>
-#include <random_quda.h>
 #include <fast_intdiv.h>
 
 namespace quda {

@@ -1,4 +1,4 @@
-#include <tune_quda.h>
+#include <quda_internal.h>
 
 #include <jitify_helper.cuh>
 #include <kernels/copy_gauge.cuh>
@@ -95,11 +95,15 @@ public:
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
         if (!is_ghost) {
-          copyGaugeKernel<FloatOut, FloatIn, length, Arg>
-            <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          //copyGaugeKernel<FloatOut, FloatIn, length, Arg>
+          //  <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          qudaLaunch((copyGaugeKernel<FloatOut, FloatIn, length, Arg>),
+            (tp.grid, tp.block, tp.shared_bytes, stream),(arg));
         } else {
-          copyGhostKernel<FloatOut, FloatIn, length, Arg>
-            <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          //copyGhostKernel<FloatOut, FloatIn, length, Arg>
+          //  <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          qudaLaunch((copyGhostKernel<FloatOut, FloatIn, length, Arg>),
+            (tp.grid, tp.block, tp.shared_bytes, stream),(arg));
         }
 #endif
       } else {

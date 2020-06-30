@@ -1,4 +1,4 @@
-#include <tune_quda.h>
+#include <quda_internal.h>
 #include <jitify_helper.cuh>
 #include <kernels/coarse_op_kernel.cuh>
 #include <uint_to_char.h>
@@ -150,10 +150,16 @@ namespace quda {
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
         if (arg.dir == QUDA_BACKWARDS) {
+#if 0
           if      (arg.dim==0) ComputeUVGPU<from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
           else if (arg.dim==1) ComputeUVGPU<from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
           else if (arg.dim==2) ComputeUVGPU<from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
           else if (arg.dim==3) ComputeUVGPU<from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+#endif
+          if      (arg.dim==0) qudaLaunch(tp.grid,tp.block,tp.shared_bytes, ComputeUVGPU<from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,coarseSpin>, arg);
+          else if (arg.dim==1) qudaLaunch(tp.grid,tp.block,tp.shared_bytes,ComputeUVGPU<from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,coarseSpin>,arg);
+          else if (arg.dim==2) qudaLaunch(tp.grid,tp.block,tp.shared_bytes,ComputeUVGPU<from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,coarseSpin>,arg);
+          else if (arg.dim==3) qudaLaunch(tp.grid,tp.block,tp.shared_bytes,ComputeUVGPU<from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,coarseSpin>,arg);
         } else if (arg.dir == QUDA_FORWARDS) {
           if      (arg.dim==0) ComputeUVGPU<from_coarse,Float,0,QUDA_FORWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
           else if (arg.dim==1) ComputeUVGPU<from_coarse,Float,1,QUDA_FORWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);

@@ -1,7 +1,13 @@
 #ifndef _QUDA_INTERNAL_H
 #define _QUDA_INTERNAL_H
 
+#ifdef QUDA_TARGET_CUDA
 #include <quda_cuda_api.h>
+#endif
+#ifdef QUDA_TARGET_CPU
+#include <quda_cpu_api.h>
+#endif
+
 #include <string>
 #include <complex>
 #include <vector>
@@ -141,5 +147,13 @@ namespace quda {
 
 #include <timer.h>
 
+#ifdef QUDA_TARGET_CUDA
+#include <tune_quda.h>
+#include <random_quda.h>
+#endif
+#ifdef QUDA_TARGET_CPU
+#include <tune_quda_cpu.h>
+#include <random_quda_cpu.h>
+#endif
 
 #endif // _QUDA_INTERNAL_H

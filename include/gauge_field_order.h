@@ -24,7 +24,9 @@
 #include <atomic.cuh>
 #include <gauge_field.h>
 #include <index_helper.cuh>
+#ifndef QUDA_TARGET_CPU
 #include <trove_helper.cuh>
+#endif
 #include <transform_reduce.h>
 
 namespace quda {
@@ -1082,7 +1084,7 @@ namespace quda {
       template <int N, typename Float, QudaGhostExchange ghostExchange_, QudaStaggeredPhase = QUDA_STAGGERED_PHASE_NO>
       struct Reconstruct {
         using real = typename mapper<Float>::type;
-        using complex = complex<real>;
+        using complexR = complex<real>;
         real scale;
         real scale_inv;
         Reconstruct(const GaugeField &u) :
@@ -1095,7 +1097,7 @@ namespace quda {
         {
         }
 
-        __device__ __host__ inline void Pack(real out[N], const complex in[N / 2], int idx) const
+        __device__ __host__ inline void Pack(real out[N], const complexR in[N / 2], int idx) const
         {
           if (isFixed<Float>::value) {
 #pragma unroll
@@ -1113,18 +1115,18 @@ namespace quda {
         }
 
         template <typename I>
-        __device__ __host__ inline void Unpack(complex out[N / 2], const real in[N], int idx, int dir, real phase,
+        __device__ __host__ inline void Unpack(complexR out[N / 2], const real in[N], int idx, int dir, real phase,
                                                const I *X, const int *R) const
         {
           if (isFixed<Float>::value) {
 #pragma unroll
-            for (int i = 0; i < N / 2; i++) { out[i] = scale * complex(in[2 * i + 0], in[2 * i + 1]); }
+            for (int i = 0; i < N / 2; i++) { out[i] = scale * complexR(in[2 * i + 0], in[2 * i + 1]); }
           } else {
 #pragma unroll
-            for (int i = 0; i < N / 2; i++) { out[i] = complex(in[2 * i + 0], in[2 * i + 1]); }
+            for (int i = 0; i < N / 2; i++) { out[i] = complexR(in[2 * i + 0], in[2 * i + 1]); }
           }
         }
-        __device__ __host__ inline real getPhase(const complex in[N / 2]) const { return 0; }
+        __device__ __host__ inline real getPhase(const complexR in[N / 2]) const { return 0; }
       };
 
       /**
@@ -1192,7 +1194,7 @@ namespace quda {
       */
       template <typename Float, QudaGhostExchange ghostExchange_> struct Reconstruct<12, Float, ghostExchange_> {
         using real = typename mapper<Float>::type;
-        using complex = complex<real>;
+        using complexR = complex<real>;
         const real anisotropy;
         const real tBoundary;
         const int firstTimeSliceBound;
@@ -1223,7 +1225,7 @@ namespace quda {
         {
         }
 
-        __device__ __host__ inline void Pack(real out[12], const complex in[9], int idx) const
+        __device__ __host__ inline void Pack(real out[12], const complexR in[9], int idx) const
         {
 #pragma unroll
           for (int i = 0; i < 6; i++) {
@@ -1233,11 +1235,11 @@ namespace quda {
         }
 
         template <typename I>
-        __device__ __host__ inline void Unpack(complex out[9], const real in[12], int idx, int dir, real phase,
+        __device__ __host__ inline void Unpack(complexR out[9], const real in[12], int idx, int dir, real phase,
                                                const I *X, const int *R) const
         {
 #pragma unroll
-          for (int i = 0; i < 6; i++) out[i] = complex(in[2 * i + 0], in[2 * i + 1]);
+          for (int i = 0; i < 6; i++) out[i] = complexR(in[2 * i + 0], in[2 * i + 1]);
 
           const real u0 = dir < 3 ?
             anisotropy :
@@ -1260,7 +1262,7 @@ namespace quda {
           out[8] = u0 * conj(out[8]);
         }
 
-        __device__ __host__ inline real getPhase(const complex in[9]) { return 0; }
+        __device__ __host__ inline real getPhase(const complexR in[9]) { return 0; }
       };
 
       /**
@@ -1275,12 +1277,12 @@ namespace quda {
       */
       template <typename Float, QudaGhostExchange ghostExchange_> struct Reconstruct<11, Float, ghostExchange_> {
         using real = typename mapper<Float>::type;
-        using complex = complex<real>;
+        using complexR = complex<real>;
 
         Reconstruct(const GaugeField &u) { ; }
         Reconstruct(const Reconstruct<11, Float, ghostExchange_> &recon) {}
 
-        __device__ __host__ inline void Pack(real out[10], const complex in[9], int idx) const
+        __device__ __host__ inline void Pack(real out[10], const complexR in[9], int idx) const
         {
 #pragma unroll
           for (int i = 0; i < 2; i++) {
@@ -1296,21 +1298,21 @@ namespace quda {
         }
 
         template <typename I>
-        __device__ __host__ inline void Unpack(complex out[9], const real in[10], int idx, int dir, real phase,
+        __device__ __host__ inline void Unpack(complexR out[9], const real in[10], int idx, int dir, real phase,
                                                const I *X, const int *R) const
         {
-          out[0] = complex(0.0, in[6]);
-          out[1] = complex(in[0], in[1]);
-          out[2] = complex(in[2], in[3]);
-          out[3] = complex(-out[1].real(), out[1].imag());
-          out[4] = complex(0.0, in[7]);
-          out[5] = complex(in[4], in[5]);
-          out[6] = complex(-out[2].real(), out[2].imag());
-          out[7] = complex(-out[5].real(), out[5].imag());
-          out[8] = complex(0.0, in[8]);
+          out[0] = complexR(0.0, in[6]);
+          out[1] = complexR(in[0], in[1]);
+          out[2] = complexR(in[2], in[3]);
+          out[3] = complexR(-out[1].real(), out[1].imag());
+          out[4] = complexR(0.0, in[7]);
+          out[5] = complexR(in[4], in[5]);
+          out[6] = complexR(-out[2].real(), out[2].imag());
+          out[7] = complexR(-out[5].real(), out[5].imag());
+          out[8] = complexR(0.0, in[8]);
         }
 
-        __device__ __host__ inline real getPhase(const complex in[9]) { return 0; }
+        __device__ __host__ inline real getPhase(const complexR in[9]) { return 0; }
       };
 
       /**
@@ -1324,7 +1326,7 @@ namespace quda {
       template <typename Float, QudaGhostExchange ghostExchange_, QudaStaggeredPhase stag_phase>
       struct Reconstruct<13, Float, ghostExchange_, stag_phase> {
         using real = typename mapper<Float>::type;
-        using complex = complex<real>;
+        using complexR = complex<real>;
         const Reconstruct<12, Float, ghostExchange_> reconstruct_12;
         const real scale;
         const real scale_inv;
@@ -1337,17 +1339,17 @@ namespace quda {
         {
         }
 
-        __device__ __host__ inline void Pack(real out[12], const complex in[9], int idx) const
+        __device__ __host__ inline void Pack(real out[12], const complexR in[9], int idx) const
         {
           reconstruct_12.Pack(out, in, idx);
         }
 
         template <typename I>
-        __device__ __host__ inline void Unpack(complex out[9], const real in[12], int idx, int dir, real phase,
+        __device__ __host__ inline void Unpack(complexR out[9], const real in[12], int idx, int dir, real phase,
                                                const I *X, const int *R) const
         {
 #pragma unroll
-          for (int i = 0; i < 6; i++) out[i] = complex(in[2 * i + 0], in[2 * i + 1]);
+          for (int i = 0; i < 6; i++) out[i] = complexR(in[2 * i + 0], in[2 * i + 1]);
 
           out[6] = cmul(out[2], out[4]);
           out[6] = cmac(out[1], out[5], -out[6]);
@@ -1365,7 +1367,7 @@ namespace quda {
             // Multiply the third row by exp(I*3*phase), since the cross product will end up in a scale factor of exp(-I*2*phase)
             real cos_sin[2];
             Trig<isFixed<real>::value, real>::SinCos(static_cast<real>(3. * phase), &cos_sin[1], &cos_sin[0]);
-            complex A(cos_sin[0], cos_sin[1]);
+            complexR A(cos_sin[0], cos_sin[1]);
             out[6] = cmul(A, out[6]);
             out[7] = cmul(A, out[7]);
             out[8] = cmul(A, out[8]);
@@ -1376,12 +1378,12 @@ namespace quda {
           }
         }
 
-        __device__ __host__ inline real getPhase(const complex in[9]) const
+        __device__ __host__ inline real getPhase(const complexR in[9]) const
         {
 #if 1 // phase from cross product
           // denominator = (U[0][0]*U[1][1] - U[0][1]*U[1][0])*
-          complex denom = conj(in[0] * in[4] - in[1] * in[3]) * scale_inv;
-          complex expI3Phase = in[8] / denom; // numerator = U[2][2]
+          complexR denom = conj(in[0] * in[4] - in[1] * in[3]) * scale_inv;
+          complexR expI3Phase = in[8] / denom; // numerator = U[2][2]
 
           if (stag_phase == QUDA_STAGGERED_PHASE_NO) { // dynamic phasing
             return arg(expI3Phase) / static_cast<real>(3.0);
@@ -1389,10 +1391,10 @@ namespace quda {
             return expI3Phase.real() > 0 ? 1 : -1;
           }
 #else // phase from determinant
-          Matrix<complex, 3> a;
+          Matrix<complexR, 3> a;
 #pragma unroll
           for (int i = 0; i < 9; i++) a(i) = scale_inv * in[i];
-          const complex det = getDeterminant(a);
+          const complexR det = getDeterminant(a);
           return phase = arg(det) / 3;
 #endif
         }
@@ -1407,9 +1409,9 @@ namespace quda {
       */
       template <typename Float, QudaGhostExchange ghostExchange_> struct Reconstruct<8, Float, ghostExchange_> {
         using real = typename mapper<Float>::type;
-        using complex = complex<real>;
-        const complex anisotropy; // imaginary value stores inverse
-        const complex tBoundary;  // imaginary value stores inverse
+        using complexR = complex<real>;
+        const complexR anisotropy; // imaginary value stores inverse
+        const complexR tBoundary;  // imaginary value stores inverse
         const int firstTimeSliceBound;
         const int lastTimeSliceBound;
         const bool isFirstTimeSlice;
@@ -1439,7 +1441,7 @@ namespace quda {
         {
         }
 
-        __device__ __host__ inline void Pack(real out[8], const complex in[9], int idx) const
+        __device__ __host__ inline void Pack(real out[8], const complexR in[9], int idx) const
         {
           out[0] = Trig<isFixed<Float>::value, real>::Atan2(in[0].imag(), in[0].real());
           out[1] = Trig<isFixed<Float>::value, real>::Atan2(in[6].imag(), in[6].real());
@@ -1451,22 +1453,22 @@ namespace quda {
         }
 
         template <typename I>
-        __device__ __host__ inline void Unpack(complex out[9], const real in[8], int idx, int dir, real phase,
-                                               const I *X, const int *R, const complex scale, const complex u) const
+        __device__ __host__ inline void Unpack(complexR out[9], const real in[8], int idx, int dir, real phase,
+                                               const I *X, const int *R, const complexR scale, const complexR u) const
         {
           real u0 = u.real();
           real u0_inv = u.imag();
 
 #pragma unroll
           for (int i = 1; i <= 3; i++)
-            out[i] = complex(in[2 * i + 0], in[2 * i + 1]); // these elements are copied directly
+            out[i] = complexR(in[2 * i + 0], in[2 * i + 1]); // these elements are copied directly
 
           real tmp[2];
           Trig<isFixed<Float>::value, real>::SinCos(in[0], &tmp[1], &tmp[0]);
-          out[0] = complex(tmp[0], tmp[1]);
+          out[0] = complexR(tmp[0], tmp[1]);
 
           Trig<isFixed<Float>::value, real>::SinCos(in[1], &tmp[1], &tmp[0]);
-          out[6] = complex(tmp[0], tmp[1]);
+          out[6] = complexR(tmp[0], tmp[1]);
 
           // First, reconstruct first row
           real row_sum = out[1].real() * out[1].real();
@@ -1494,7 +1496,7 @@ namespace quda {
           // Finally, reconstruct last elements from SU(2) rotation
           real r_inv2 = u0_inv * row_sum_inv;
           {
-            complex A = cmul(conj(out[0]), out[3]);
+            complexR A = cmul(conj(out[0]), out[3]);
 
             // out[4] = -(conj(out[6])*conj(out[2]) + u0*A*out[1])*r_inv2; // U11
             out[4] = cmul(conj(out[6]), conj(out[2]));
@@ -1508,7 +1510,7 @@ namespace quda {
           }
 
           {
-            complex A = cmul(conj(out[0]), out[6]);
+            complexR A = cmul(conj(out[0]), out[6]);
 
             // out[7] = (conj(out[3])*conj(out[2]) - u0*A*out[1])*r_inv2;  // U21
             out[7] = cmul(conj(out[3]), conj(out[2]));
@@ -1524,17 +1526,17 @@ namespace quda {
 
         template <typename I>
         __device__ __host__ inline void
-        Unpack(complex out[9], const real in[8], int idx, int dir, real phase, const I *X, const int *R,
-               const complex scale = complex(static_cast<real>(1.0), static_cast<real>(1.0))) const
+        Unpack(complexR out[9], const real in[8], int idx, int dir, real phase, const I *X, const int *R,
+               const complexR scale = complexR(static_cast<real>(1.0), static_cast<real>(1.0))) const
         {
-          complex u = dir < 3 ?
+          complexR u = dir < 3 ?
             anisotropy :
             timeBoundary<ghostExchange_>(idx, X, R, tBoundary, scale, firstTimeSliceBound, lastTimeSliceBound,
                                          isFirstTimeSlice, isLastTimeSlice, ghostExchange);
           Unpack(out, in, idx, dir, phase, X, R, scale, u);
         }
 
-        __device__ __host__ inline real getPhase(const complex in[9]) { return 0; }
+        __device__ __host__ inline real getPhase(const complexR in[9]) { return 0; }
       };
 
       /**
@@ -1548,7 +1550,7 @@ namespace quda {
       template <typename Float, QudaGhostExchange ghostExchange_, QudaStaggeredPhase stag_phase>
       struct Reconstruct<9, Float, ghostExchange_, stag_phase> {
         using real = typename mapper<Float>::type;
-        using complex = complex<real>;
+        using complexR = complex<real>;
         const Reconstruct<8, Float, ghostExchange_> reconstruct_8;
         const real scale;
         const real scale_inv;
@@ -1562,37 +1564,37 @@ namespace quda {
         {
         }
 
-        __device__ __host__ inline real getPhase(const complex in[9]) const
+        __device__ __host__ inline real getPhase(const complexR in[9]) const
         {
 #if 1 // phase from cross product
           // denominator = (U[0][0]*U[1][1] - U[0][1]*U[1][0])*
-          complex denom = conj(in[0] * in[4] - in[1] * in[3]) * scale_inv;
-          complex expI3Phase = in[8] / denom; // numerator = U[2][2]
+          complexR denom = conj(in[0] * in[4] - in[1] * in[3]) * scale_inv;
+          complexR expI3Phase = in[8] / denom; // numerator = U[2][2]
           if (stag_phase == QUDA_STAGGERED_PHASE_NO) {
             return arg(expI3Phase) / static_cast<real>(3.0);
           } else {
             return expI3Phase.real() > 0 ? 1 : -1;
           }
 #else // phase from determinant
-          Matrix<complex, 3> a;
+          Matrix<complexR, 3> a;
 #pragma unroll
           for (int i = 0; i < 9; i++) a(i) = scale_inv * in[i];
-          const complex det = getDeterminant(a);
+          const complexR det = getDeterminant(a);
           real phase = arg(det) / 3;
           return phase;
 #endif
         }
 
         // Rescale the U3 input matrix by exp(-I*phase) to obtain an SU3 matrix multiplied by a real scale factor,
-        __device__ __host__ inline void Pack(real out[8], const complex in[9], int idx) const
+        __device__ __host__ inline void Pack(real out[8], const complexR in[9], int idx) const
         {
           real phase = getPhase(in);
-          complex su3[9];
+          complexR su3[9];
 
           if (stag_phase == QUDA_STAGGERED_PHASE_NO) {
             real cos_sin[2];
             Trig<isFixed<real>::value, real>::SinCos(static_cast<real>(-phase), &cos_sin[1], &cos_sin[0]);
-            complex z(cos_sin[0], cos_sin[1]);
+            complexR z(cos_sin[0], cos_sin[1]);
             z *= scale_inv;
 #pragma unroll
             for (int i = 0; i < 9; i++) su3[i] = cmul(z, in[i]);
@@ -1604,16 +1606,16 @@ namespace quda {
         }
 
         template <typename I>
-        __device__ __host__ inline void Unpack(complex out[9], const real in[8], int idx, int dir, real phase,
+        __device__ __host__ inline void Unpack(complexR out[9], const real in[8], int idx, int dir, real phase,
                                                const I *X, const int *R) const
         {
-          reconstruct_8.Unpack(out, in, idx, dir, phase, X, R, complex(static_cast<real>(1.0), static_cast<real>(1.0)),
-                               complex(static_cast<real>(1.0), static_cast<real>(1.0)));
+          reconstruct_8.Unpack(out, in, idx, dir, phase, X, R, complexR(static_cast<real>(1.0), static_cast<real>(1.0)),
+                               complexR(static_cast<real>(1.0), static_cast<real>(1.0)));
 
           if (stag_phase == QUDA_STAGGERED_PHASE_NO) { // dynamic phase
             real cos_sin[2];
             Trig<isFixed<real>::value, real>::SinCos(static_cast<real>(phase), &cos_sin[1], &cos_sin[0]);
-            complex z(cos_sin[0], cos_sin[1]);
+            complexR z(cos_sin[0], cos_sin[1]);
             z *= scale;
 #pragma unroll
             for (int i = 0; i < 9; i++) out[i] = cmul(z, out[i]);
@@ -1657,7 +1659,7 @@ namespace quda {
             = FloatNOrder<Float, length, N, reconLenParam, stag_phase, huge_alloc, ghostExchange_, use_inphase>;
 
         using real = typename mapper<Float>::type;
-        using complex = complex<real>;
+        using complexR = complex<real>;
         typedef typename VectorType<Float, N>::type Vector;
         typedef typename AllocType<huge_alloc>::type AllocInt;
         Reconstruct<reconLenParam, Float, ghostExchange_, stag_phase> reconstruct;
@@ -1723,7 +1725,7 @@ namespace quda {
 	}
       }
 
-      __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
+      __device__ __host__ inline void load(complexR v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
       {
         const int M = reconLen / N;
         real tmp[reconLen];
@@ -1750,7 +1752,7 @@ namespace quda {
         reconstruct.Unpack(v, tmp, x, dir, phase, X, R);
       }
 
-      __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity)
+      __device__ __host__ inline void save(const complexR v[length / 2], int x, int dir, int parity)
       {
         const int M = reconLen / N;
         real tmp[reconLen];
@@ -1802,7 +1804,7 @@ namespace quda {
         return gauge_wrapper<real, Accessor>(const_cast<Accessor &>(*this), dim, x_cb, parity, phase);
       }
 
-      __device__ __host__ inline void loadGhost(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
+      __device__ __host__ inline void loadGhost(complexR v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
       {
         if (!ghost[dir]) { // load from main field not separate array
           load(v, volumeCB + x, dir, parity, inphase); // an offset of size volumeCB puts us at the padded region
@@ -1835,7 +1837,7 @@ namespace quda {
         }
       }
 
-      __device__ __host__ inline void saveGhost(const complex v[length / 2], int x, int dir, int parity)
+      __device__ __host__ inline void saveGhost(const complexR v[length / 2], int x, int dir, int parity)
       {
         if (!ghost[dir]) { // store in main field not separate array
           save(v, volumeCB + x, dir, parity); // an offset of size volumeCB puts us at the padded region
@@ -1894,7 +1896,7 @@ namespace quda {
         return gauge_ghost_wrapper<real, Accessor>(const_cast<Accessor &>(*this), dim, ghost_idx, parity, phase);
       }
 
-      __device__ __host__ inline void loadGhostEx(complex v[length / 2], int buff_idx, int extended_idx, int dir,
+      __device__ __host__ inline void loadGhostEx(complexR v[length / 2], int buff_idx, int extended_idx, int dir,
                                                   int dim, int g, int parity, const int R[]) const
       {
         const int M = reconLen / N;
@@ -1919,7 +1921,7 @@ namespace quda {
         reconstruct.Unpack(v, tmp, extended_idx, g, 2. * M_PI * phase, X, R);
       }
 
-      __device__ __host__ inline void saveGhostEx(const complex v[length / 2], int buff_idx, int extended_idx, int dir,
+      __device__ __host__ inline void saveGhostEx(const complexR v[length / 2], int buff_idx, int extended_idx, int dir,
                                                   int dim, int g, int parity, const int R[])
       {
         const int M = reconLen / N;
@@ -1987,7 +1989,7 @@ namespace quda {
       template <typename Float, int length> struct LegacyOrder {
         using Accessor = LegacyOrder<Float, length>;
         using real = typename mapper<Float>::type;
-        using complex = complex<real>;
+        using complexR = complex<real>;
         Float *ghost[QUDA_MAX_DIM];
         int faceVolumeCB[QUDA_MAX_DIM];
         const int volumeCB;
@@ -2022,7 +2024,7 @@ namespace quda {
           }
         }
 
-        __device__ __host__ inline void loadGhost(complex v[length / 2], int x, int dir, int parity, real phase = 1.0) const
+        __device__ __host__ inline void loadGhost(complexR v[length / 2], int x, int dir, int parity, real phase = 1.0) const
         {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
           typedef S<Float, length> structure;
@@ -2031,10 +2033,10 @@ namespace quda {
 #else
           auto v_ = &ghost[dir][(parity * faceVolumeCB[dir] + x) * length];
 #endif
-          for (int i = 0; i < length / 2; i++) v[i] = complex(v_[2 * i + 0], v_[2 * i + 1]);
+          for (int i = 0; i < length / 2; i++) v[i] = complexR(v_[2 * i + 0], v_[2 * i + 1]);
         }
 
-        __device__ __host__ inline void saveGhost(const complex v[length / 2], int x, int dir, int parity)
+        __device__ __host__ inline void saveGhost(const complexR v[length / 2], int x, int dir, int parity)
         {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
           typedef S<Float, length> structure;
@@ -2086,7 +2088,7 @@ namespace quda {
           return gauge_ghost_wrapper<real, Accessor>(const_cast<Accessor &>(*this), dim, ghost_idx, parity, phase);
         }
 
-        __device__ __host__ inline void loadGhostEx(complex v[length / 2], int x, int dummy, int dir, int dim, int g,
+        __device__ __host__ inline void loadGhostEx(complexR v[length / 2], int x, int dummy, int dir, int dim, int g,
                                                     int parity, const int R[]) const
         {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
@@ -2096,10 +2098,10 @@ namespace quda {
 #else
           auto v_ = &ghost[dim][(((dir * 2 + parity) * R[dim] * faceVolumeCB[dim] + x) * geometry + g) * length];
 #endif
-        for (int i = 0; i < length / 2; i++) v[i] = complex(v_[2 * i + 0], v_[2 * i + 1]);
+        for (int i = 0; i < length / 2; i++) v[i] = complexR(v_[2 * i + 0], v_[2 * i + 1]);
         }
 
-        __device__ __host__ inline void saveGhostEx(const complex v[length / 2], int x, int dummy, int dir, int dim,
+        __device__ __host__ inline void saveGhostEx(const complexR v[length / 2], int x, int dummy, int dir, int dim,
                                                     int g, int parity, const int R[])
         {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
@@ -2128,7 +2130,7 @@ namespace quda {
     template <typename Float, int length> struct QDPOrder : public LegacyOrder<Float,length> {
       using Accessor = QDPOrder<Float, length>;
       using real = typename mapper<Float>::type;
-      using complex = complex<real>;
+      using complexR = complex<real>;
       Float *gauge[QUDA_MAX_DIM];
       const int volumeCB;
     QDPOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0)
@@ -2138,7 +2140,7 @@ namespace quda {
 	for(int i=0; i<4; i++) gauge[i] = order.gauge[i];
       }
 
-      __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
+      __device__ __host__ inline void load(complexR v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
       {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
 	typedef S<Float,length> structure;
@@ -2147,10 +2149,10 @@ namespace quda {
 #else
         auto v_ = &gauge[dir][(parity * volumeCB + x) * length];
 #endif
-        for (int i = 0; i < length / 2; i++) v[i] = complex(v_[2 * i + 0], v_[2 * i + 1]);
+        for (int i = 0; i < length / 2; i++) v[i] = complexR(v_[2 * i + 0], v_[2 * i + 1]);
       }
 
-      __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity)
+      __device__ __host__ inline void save(const complexR v[length / 2], int x, int dir, int parity)
       {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
 	typedef S<Float,length> structure;
@@ -2210,7 +2212,7 @@ namespace quda {
     template <typename Float, int length> struct QDPJITOrder : public LegacyOrder<Float,length> {
       using Accessor = QDPJITOrder<Float, length>;
       using real = typename mapper<Float>::type;
-      using complex = complex<real>;
+      using complexR = complex<real>;
       Float *gauge[QUDA_MAX_DIM];
       const int volumeCB;
     QDPJITOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0)
@@ -2220,7 +2222,7 @@ namespace quda {
 	for(int i=0; i<4; i++) gauge[i] = order.gauge[i];
       }
 
-      __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
+      __device__ __host__ inline void load(complexR v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
       {
         for (int i = 0; i < length / 2; i++) {
           v[i].real((real)gauge[dir][((0 * (length / 2) + i) * 2 + parity) * volumeCB + x]);
@@ -2228,7 +2230,7 @@ namespace quda {
         }
       }
 
-      __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity)
+      __device__ __host__ inline void save(const complexR v[length / 2], int x, int dir, int parity)
       {
         for (int i = 0; i < length / 2; i++) {
           gauge[dir][((0 * (length / 2) + i) * 2 + parity) * volumeCB + x] = v[i].real();
@@ -2276,7 +2278,7 @@ namespace quda {
   template <typename Float, int length> struct MILCOrder : public LegacyOrder<Float,length> {
     using Accessor = MILCOrder<Float, length>;
     using real = typename mapper<Float>::type;
-    using complex = complex<real>;
+    using complexR = complex<real>;
     Float *gauge;
     const int volumeCB;
     const int geometry;
@@ -2287,7 +2289,7 @@ namespace quda {
       gauge(order.gauge), volumeCB(order.volumeCB), geometry(order.geometry)
       { ; }
 
-      __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
+      __device__ __host__ inline void load(complexR v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
       {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
       typedef S<Float,length> structure;
@@ -2296,10 +2298,10 @@ namespace quda {
 #else
         auto v_ = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
 #endif
-      for (int i = 0; i < length / 2; i++) v[i] = complex(v_[2 * i + 0], v_[2 * i + 1]);
+      for (int i = 0; i < length / 2; i++) v[i] = complexR(v_[2 * i + 0], v_[2 * i + 1]);
     }
 
-    __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity)
+    __device__ __host__ inline void save(const complexR v[length / 2], int x, int dir, int parity)
     {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
       typedef S<Float,length> structure;
@@ -2370,7 +2372,7 @@ namespace quda {
   template <typename Float, int length> struct MILCSiteOrder : public LegacyOrder<Float,length> {
     using Accessor = MILCSiteOrder<Float, length>;
     using real = typename mapper<Float>::type;
-    using complex = complex<real>;
+    using complexR = complex<real>;
     Float *gauge;
     const int volumeCB;
     const int geometry;
@@ -2397,7 +2399,7 @@ namespace quda {
     {
     }
 
-    __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
+    __device__ __host__ inline void load(complexR v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
     {
       // get base pointer
       const Float *gauge0 = reinterpret_cast<const Float*>(reinterpret_cast<const char*>(gauge) + (parity*volumeCB+x)*size + offset);
@@ -2409,10 +2411,10 @@ namespace quda {
 #else
       auto v_ = &gauge0[dir * length];
 #endif
-      for (int i = 0; i < length / 2; i++) v[i] = complex(v_[2 * i + 0], v_[2 * i + 1]);
+      for (int i = 0; i < length / 2; i++) v[i] = complexR(v_[2 * i + 0], v_[2 * i + 1]);
     }
 
-    __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity)
+    __device__ __host__ inline void save(const complexR v[length / 2], int x, int dir, int parity)
     {
       // get base pointer
       Float *gauge0 = reinterpret_cast<Float*>(reinterpret_cast<char*>(gauge) + (parity*volumeCB+x)*size + offset);
@@ -2475,7 +2477,7 @@ namespace quda {
   template <typename Float, int length> struct CPSOrder : LegacyOrder<Float,length> {
     using Accessor = CPSOrder<Float, length>;
     using real = typename mapper<Float>::type;
-    using complex = complex<real>;
+    using complexR = complex<real>;
     Float *gauge;
     const int volumeCB;
     const real anisotropy;
@@ -2504,7 +2506,7 @@ namespace quda {
     }
 
     // we need to transpose and scale for CPS ordering
-    __device__ __host__ inline void load(complex v[9], int x, int dir, int parity, Float inphase = 1.0) const
+    __device__ __host__ inline void load(complexR v[9], int x, int dir, int parity, Float inphase = 1.0) const
     {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
       typedef S<Float,length> structure;
@@ -2515,12 +2517,12 @@ namespace quda {
 #endif
       for (int i=0; i<Nc; i++) {
 	for (int j=0; j<Nc; j++) {
-          v[i * Nc + j] = complex(v_[(j * Nc + i) * 2 + 0], v_[(j * Nc + i) * 2 + 1]) * anisotropy_inv;
+          v[i * Nc + j] = complexR(v_[(j * Nc + i) * 2 + 0], v_[(j * Nc + i) * 2 + 1]) * anisotropy_inv;
         }
       }
     }
 
-    __device__ __host__ inline void save(const complex v[9], int x, int dir, int parity)
+    __device__ __host__ inline void save(const complexR v[9], int x, int dir, int parity)
     {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
       typedef S<Float,length> structure;
@@ -2586,7 +2588,7 @@ namespace quda {
     template <typename Float, int length> struct BQCDOrder : LegacyOrder<Float,length> {
       using Accessor = BQCDOrder<Float, length>;
       using real = typename mapper<Float>::type;
-      using complex = complex<real>;
+      using complexR = complex<real>;
       Float *gauge;
       const int volumeCB;
       int exVolumeCB; // extended checkerboard volume
@@ -2611,7 +2613,7 @@ namespace quda {
       }
 
       // we need to transpose for BQCD ordering
-      __device__ __host__ inline void load(complex v[9], int x, int dir, int parity, real inphase = 1.0) const
+      __device__ __host__ inline void load(complexR v[9], int x, int dir, int parity, real inphase = 1.0) const
       {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
         typedef S<Float, length> structure;
@@ -2621,11 +2623,11 @@ namespace quda {
         auto v_ = &gauge[((dir * 2 + parity) * exVolumeCB + x) * length];
 #endif
         for (int i = 0; i < Nc; i++) {
-          for (int j = 0; j < Nc; j++) { v[i * Nc + j] = complex(v_[(j * Nc + i) * 2 + 0], v_[(j * Nc + i) * 2 + 1]); }
+          for (int j = 0; j < Nc; j++) { v[i * Nc + j] = complexR(v_[(j * Nc + i) * 2 + 0], v_[(j * Nc + i) * 2 + 1]); }
         }
       }
 
-      __device__ __host__ inline void save(const complex v[9], int x, int dir, int parity)
+      __device__ __host__ inline void save(const complexR v[9], int x, int dir, int parity)
       {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
 	typedef S<Float,length> structure;
@@ -2688,7 +2690,7 @@ namespace quda {
     template <typename Float, int length> struct TIFROrder : LegacyOrder<Float,length> {
       using Accessor = TIFROrder<Float, length>;
       using real = typename mapper<Float>::type;
-      using complex = complex<real>;
+      using complexR = complex<real>;
       Float *gauge;
       const int volumeCB;
       static constexpr int Nc = 3;
@@ -2714,7 +2716,7 @@ namespace quda {
       }
 
       // we need to transpose for TIFR ordering
-      __device__ __host__ inline void load(complex v[9], int x, int dir, int parity, real inphase = 1.0) const
+      __device__ __host__ inline void load(complexR v[9], int x, int dir, int parity, real inphase = 1.0) const
       {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
         typedef S<Float, length> structure;
@@ -2725,12 +2727,12 @@ namespace quda {
 #endif
         for (int i = 0; i < Nc; i++) {
           for (int j = 0; j < Nc; j++) {
-            v[i * Nc + j] = complex(v_[(j * Nc + i) * 2 + 0], v_[(j * Nc + i) * 2 + 1]) * scale_inv;
+            v[i * Nc + j] = complexR(v_[(j * Nc + i) * 2 + 0], v_[(j * Nc + i) * 2 + 1]) * scale_inv;
           }
         }
       }
 
-      __device__ __host__ inline void save(const complex v[9], int x, int dir, int parity)
+      __device__ __host__ inline void save(const complexR v[9], int x, int dir, int parity)
       {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
 	typedef S<Float,length> structure;
@@ -2793,7 +2795,7 @@ namespace quda {
     template <typename Float, int length> struct TIFRPaddedOrder : LegacyOrder<Float,length> {
       using Accessor = TIFRPaddedOrder<Float, length>;
       using real = typename mapper<Float>::type;
-      using complex = complex<real>;
+      using complexR = complex<real>;
       Float *gauge;
       const int volumeCB;
       int exVolumeCB;
@@ -2847,7 +2849,7 @@ namespace quda {
       }
 
       // we need to transpose for TIFR ordering
-      __device__ __host__ inline void load(complex v[9], int x, int dir, int parity, real inphase = 1.0) const
+      __device__ __host__ inline void load(complexR v[9], int x, int dir, int parity, real inphase = 1.0) const
       {
         int y = getPaddedIndex(x, parity);
 
@@ -2860,12 +2862,12 @@ namespace quda {
 #endif
         for (int i = 0; i < Nc; i++) {
           for (int j = 0; j < Nc; j++) {
-            v[i * Nc + j] = complex(v_[(j * Nc + i) * 2 + 0], v_[(j * Nc + i) * 2 + 1]) * scale_inv;
+            v[i * Nc + j] = complexR(v_[(j * Nc + i) * 2 + 0], v_[(j * Nc + i) * 2 + 1]) * scale_inv;
           }
         }
       }
 
-      __device__ __host__ inline void save(const complex v[9], int x, int dir, int parity)
+      __device__ __host__ inline void save(const complexR v[9], int x, int dir, int parity)
       {
         int y = getPaddedIndex(x, parity);
 

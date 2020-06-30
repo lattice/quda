@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <cstring> // needed for memset
 
-#include <tune_quda.h>
 #include <quda_internal.h>
 #include <blas_quda.h>
 #include <color_spinor_field.h>
@@ -112,7 +111,8 @@ namespace quda {
             .configure(tp.grid, tp.block, tp.shared_bytes, stream)
             .launch(arg);
 #else
-          blasKernel<device_real_t, M><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          //blasKernel<device_real_t, M><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          qudaLaunch((blasKernel<device_real_t, M>),(tp.grid, tp.block, tp.shared_bytes, stream),(arg));
 #endif
         } else {
           if (checkOrder(x, y, z, w, v) != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER)
