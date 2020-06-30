@@ -236,7 +236,6 @@ namespace quda
       for (int d = 0; d < 4; d++) // loop over dimension
       {
         int x[4] = {coordinate[0], coordinate[1], coordinate[2], coordinate[3]};
-        // coordinate[d]++;
         x[d] = (coordinate[d] == arg.dim[d] - 1 && !arg.comm[d]) ? 0 : coordinate[d] + 1;
         if (!halo || !is_halo_4d(x, arg.dim, arg.halo_shift)) {
           // Forward gather - compute fwd offset for vector fetch
@@ -252,7 +251,6 @@ namespace quda
           const Vector in = arg.in(fwd_idx, their_spinor_parity);
           out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         }
-        // coordinate[d] -= 2;
         x[d] = (coordinate[d] == 0 && !arg.comm[d]) ? arg.dim[d] - 1 : coordinate[d] - 1;
         if (!halo || !is_halo_4d(x, arg.dim, arg.halo_shift)) {
           // Backward gather - compute back offset for spinor and gauge fetch
@@ -270,7 +268,6 @@ namespace quda
           const Vector in = arg.in(back_idx, their_spinor_parity);
           out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         }
-        // coordinate[d]++;
       } // nDim
     }
 
@@ -623,38 +620,20 @@ namespace quda
       {
         strcpy(aux, meta.AuxString());
         if (arg.dagger) strcat(aux, ",Dagger");
-        //        if (arg.xpay) strcat(aux,",xpay");
         char config[512];
         switch (arg.type) {
-        case MdwfFusedDslashType::D4_D5INV_D5PRE:
-          sprintf(config, ",f0,shift%d,%d,%d,%d,halo%d,%d,%d,%d,comm%d,%d,%d,%d", arg.shift[0], arg.shift[1],
-                  arg.shift[2], arg.shift[3], arg.halo_shift[0], arg.halo_shift[1], arg.halo_shift[2],
-                  arg.halo_shift[3], arg.comm[0], arg.comm[1], arg.comm[2], arg.comm[3]);
-          strcat(aux, config);
-          break;
-        case MdwfFusedDslashType::D4DAG_D5PREDAG_D5INVDAG:
-          sprintf(config, ",f2,shift%d,%d,%d,%d,halo2,2,2,2,comm%d,%d,%d,%d", arg.shift[0], arg.shift[1], arg.shift[2],
-                  arg.shift[3], arg.comm[0], arg.comm[1], arg.comm[2], arg.comm[3]);
-          strcat(aux, config);
-          break;
-        case MdwfFusedDslashType::D4_D5INV_D5INVDAG:
-          sprintf(config, ",f1,shift%d,%d,%d,%d,halo%d,%d,%d,%d,comm%d,%d,%d,%d", arg.shift[0], arg.shift[1],
-                  arg.shift[2], arg.shift[3], arg.halo_shift[0], arg.halo_shift[1], arg.halo_shift[2],
-                  arg.halo_shift[3], arg.comm[0], arg.comm[1], arg.comm[2], arg.comm[3]);
-          strcat(aux, config);
-          break;
-        case MdwfFusedDslashType::D4DAG_D5PREDAG:
-          sprintf(config, ",f3,shift%d,%d,%d,%d,halo2,2,2,2,comm%d,%d,%d,%d", arg.shift[0], arg.shift[1], arg.shift[2],
-                  arg.shift[3], arg.comm[0], arg.comm[1], arg.comm[2], arg.comm[3]);
-          strcat(aux, config);
-          break;
-        case MdwfFusedDslashType::D5PRE:
-          sprintf(config, ",f4,shift%d,%d,%d,%d,halo2,2,2,2,comm%d,%d,%d,%d", arg.shift[0], arg.shift[1], arg.shift[2],
-                  arg.shift[3], arg.comm[0], arg.comm[1], arg.comm[2], arg.comm[3]);
-          strcat(aux, config);
-          break;
+        case MdwfFusedDslashType::D4_D5INV_D5PRE: sprintf(config, ",f0"); break;
+        case MdwfFusedDslashType::D4DAG_D5PREDAG_D5INVDAG: sprintf(config, ",f2"); break;
+        case MdwfFusedDslashType::D4_D5INV_D5INVDAG: sprintf(config, ",f1"); break;
+        case MdwfFusedDslashType::D4DAG_D5PREDAG: sprintf(config, ",f3"); break;
+        case MdwfFusedDslashType::D5PRE: sprintf(config, ",f4"); break;
         default: errorQuda("Unknown MdwfFusedDslashType");
         }
+        strcat(aux, config);
+        sprintf(config, "shift%d%d%d%d,halo%d%d%d%d,comm%d%d%d%d", arg.shift[0], arg.shift[1], arg.shift[2],
+                arg.shift[3], arg.halo_shift[0], arg.halo_shift[1], arg.halo_shift[2], arg.halo_shift[3], arg.comm[0],
+                arg.comm[1], arg.comm[2], arg.comm[3]);
+        strcat(aux, config);
       }
 
       template <typename T> inline void launch(T *f, const TuneParam &tp, Arg &arg, const qudaStream_t &stream)
