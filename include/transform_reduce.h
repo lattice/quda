@@ -1,9 +1,9 @@
 #pragma once
 #include <typeinfo>
 
-#include <cub_helper.cuh>
+#include <reduce_helper.cuh>
 #include <uint_to_char.h>
-#include <tune_quda.h>
+#include <quda_internal.h>
 
 /**
    @file transform_reduce.h
@@ -128,7 +128,9 @@ namespace quda
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
       if (location == QUDA_CUDA_FIELD_LOCATION) {
-        transform_reduce_kernel<<<tp.grid, tp.block>>>(arg);
+        //transform_reduce_kernel<<<tp.grid, tp.block>>>(arg);
+        //qudaLaunch(tp.grid,tp.block,transform_reduce_kernel,arg);
+        qudaLaunch(transform_reduce_kernel,(tp.grid,tp.block),(arg));
         qudaDeviceSynchronize();
         for (decltype(arg.n_batch) j = 0; j < arg.n_batch; j++) arg.result[j] = arg.result_h[j];
       } else {

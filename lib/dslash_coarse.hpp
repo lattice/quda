@@ -2,7 +2,7 @@
 #include <color_spinor_field.h>
 #include <uint_to_char.h>
 #include <worker.h>
-#include <tune_quda.h>
+#include <quda_internal.h>
 
 
 #include <jitify_helper.cuh>
@@ -243,17 +243,21 @@ namespace quda {
         case 1:
           switch (tp.aux.x) { // this is color_col_stride
           case 1:
-            coarseDslashKernel<Float,nDim,Ns,Nc,Mc,1,1,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            //coarseDslashKernel<Float,nDim,Ns,Nc,Mc,1,1,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            qudaLaunch(tp.grid,tp.block,tp.shared_bytes,stream,coarseDslashKernel<Float,nDim,Ns,Nc,Mc,1,1,dslash,clover,dagger,type>,arg);
             break;
 #ifdef DOT_PRODUCT_SPLIT
           case 2:
-            coarseDslashKernel<Float,nDim,Ns,Nc,Mc,2,1,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            //coarseDslashKernel<Float,nDim,Ns,Nc,Mc,2,1,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            qudaLaunch(tp.grid,tp.block,tp.shared_bytes,stream,coarseDslashKernel<Float,nDim,Ns,Nc,Mc,2,1,dslash,clover,dagger,type>,arg);
             break;
           case 4:
-            coarseDslashKernel<Float,nDim,Ns,Nc,Mc,4,1,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            //coarseDslashKernel<Float,nDim,Ns,Nc,Mc,4,1,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            qudaLaunck(tp.grid,tp.block,tp.shared_bytes,stream,coarseDslashKernel<Float,nDim,Ns,Nc,Mc,4,1,dslash,clover,dagger,type>,arg);
             break;
           case 8:
-            coarseDslashKernel<Float,nDim,Ns,Nc,Mc,8,1,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            //coarseDslashKernel<Float,nDim,Ns,Nc,Mc,8,1,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            qudaLaunch(tp.grid,tp.block,tp.shared_bytes,stream,coarseDslashKernel<Float,nDim,Ns,Nc,Mc,8,1,dslash,clover,dagger,type>,arg);
             break;
 #endif // DOT_PRODUCT_SPLIT
           default:

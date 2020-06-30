@@ -2,8 +2,6 @@
 #include <stdio.h>
 #include <cstring> // needed for memset
 
-#include <tune_quda.h>
-
 #include <quda_internal.h>
 #include <float_vector.h>
 #include <blas_quda.h>
@@ -93,7 +91,8 @@ namespace quda {
                            .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                            .launch(arg);
 #else
-        blasKernel<FloatN, M><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+        //blasKernel<FloatN, M><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+        qudaLaunch((blasKernel<FloatN, M>),(tp.grid, tp.block, tp.shared_bytes, stream),(arg));
 #endif
       }
 

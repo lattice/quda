@@ -106,7 +106,9 @@ void init(int argc, char **argv)
   GaugeFieldParam cpuParam(links, gauge_param);
   cpuParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuLink   = new cpuGaugeField(cpuParam);
+#ifdef MULTI_GPU
   ghostLink = cpuLink->Ghost();
+#endif
 
   printfQuda("Links sending...");
   loadGaugeQuda(links, &gauge_param);

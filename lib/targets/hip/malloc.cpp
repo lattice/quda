@@ -484,6 +484,7 @@ namespace quda
 
   QudaFieldLocation get_pointer_location(const void *ptr)
   {
+
     CUpointer_attribute attribute[] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE};
     CUmemorytype mem_type;
     void *data[] = {&mem_type};

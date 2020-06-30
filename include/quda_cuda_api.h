@@ -115,8 +115,29 @@ namespace quda {
      @param[in] sharedMem Shared memory requested per thread block
      @param[in] stream Stream identifier
   */
-  cudaError_t qudaLaunchKernel(const void *func, dim3 gridDim, dim3 blockDim, void **args, size_t sharedMem,
-                               qudaStream_t stream);
+  cudaError_t qudaLaunchKernel(const void *func, dim3 gridDim, dim3 blockDim,
+			       void **args, size_t sharedMem,
+			       qudaStream_t stream);
+
+  /**
+     @brief Wrapper around cudaLaunchKernel
+     @param[in] func Device function symbol
+     @param[in] gridDim Grid dimensions
+     @param[in] blockDim Block dimensions
+     @param[in] sharedMem Shared memory requested per thread block
+     @param[in] stream Stream identifier
+     @param[in] args Arguments
+  */
+  template <typename... Args>
+  cudaError_t qudaLaunch(dim3 gridDim, dim3 blockDim, size_t sharedMem,
+			 qudaStream_t stream, const void *func, Args... args)
+  {
+    constexpr int size = sizeof...(Args);
+    void *arga[size]{static_cast<void *>(args)...};
+    cudaError_t err;
+    err = qudaLaunchKernel(func, gridDim, blockDim, arga, sharedMem, stream);
+    return err;
+  }
 
   /**
      @brief Wrapper around cudaEventQuery or cuEventQuery

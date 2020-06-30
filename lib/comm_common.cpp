@@ -443,6 +443,7 @@ int comm_coord(int dim)
 
 inline bool isHost(const void *buffer)
 {
+#if 0
   CUmemorytype memType;
   void *attrdata[] = {(void *)&memType};
   CUpointer_attribute attributes[2] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE};
@@ -461,6 +462,8 @@ inline bool isHost(const void *buffer)
   default: // memory not allocated by CUDA allocaters will default to being host memory
     return true;
   }
+#endif
+  return quda::get_pointer_location(buffer) == QUDA_CPU_FIELD_LOCATION;
 }
 
 /**
