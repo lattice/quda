@@ -3,6 +3,8 @@
 #include <dslash.h>
 #include <mdw_dslash5_tensor_core.cuh>
 
+#include <unordered_set>
+
 namespace quda
 {
   namespace mobius_tensor_core
@@ -628,7 +630,12 @@ namespace quda
 
       template <typename T> inline void launch(T *f, const TuneParam &tp, Arg &arg, const qudaStream_t &stream)
       {
-        setMaxDynamicSharedBytesPerBlock(f);
+        static std::unordered_set<T *> cache;
+        auto search = cache.find(f);
+        if (search == cache.end()) {
+          cache.insert(f);
+          setMaxDynamicSharedBytesPerBlock(f);
+        }
         void *args[] = {&arg};
         qudaLaunchKernel((const void *)f, tp.grid, tp.block, args, tp.shared_bytes, stream);
       }
