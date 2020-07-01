@@ -140,19 +140,21 @@ namespace quda {
       {
         staticCheck<NXZ, store_t, y_store_t, decltype(f)>(f, x, y);
 
-        constexpr bool site_unroll = !std::is_same<store_t, y_store_t>::value || isFixed<store_t>::value;
-        if (site_unroll && (x[0]->Ncolor() != 3 || x[0]->Nspin() == 2))
+        constexpr bool site_unroll_check = !std::is_same<store_t, y_store_t>::value || isFixed<store_t>::value;
+        if (site_unroll_check && (x[0]->Ncolor() != 3 || x[0]->Nspin() == 2))
           errorQuda("site unroll not supported for nSpin = %d nColor = %d", x[0]->Nspin(), x[0]->Ncolor());
 
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
         if (location == QUDA_CUDA_FIELD_LOCATION) {
-          if (site_unroll) checkNative(*x[0], *y[0], *z[0], *w[0]); // require native order when using site_unroll
+          if (site_unroll_check) checkNative(*x[0], *y[0], *z[0], *w[0]); // require native order when using site_unroll
           using device_store_t = typename device_type_mapper<store_t>::type;
           using device_y_store_t = typename device_type_mapper<y_store_t>::type;
           using device_real_t = typename mapper<device_y_store_t>::type;
           Functor<device_real_t> f_(NXZ, NYW);
 
+          // redefine site_unroll with device_store types to ensure we have correct N/Ny/M values
+          constexpr bool site_unroll = !std::is_same<device_store_t, device_y_store_t>::value || isFixed<device_store_t>::value;
           constexpr int N = n_vector<device_store_t, true, nSpin, site_unroll>();
           constexpr int Ny = n_vector<device_y_store_t, true, nSpin, site_unroll>();
           constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread

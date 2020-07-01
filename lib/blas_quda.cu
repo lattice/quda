@@ -83,18 +83,20 @@ namespace quda {
 
       void apply(const qudaStream_t &stream)
       {
-        constexpr bool site_unroll = !std::is_same<store_t, y_store_t>::value || isFixed<store_t>::value;
-        if (site_unroll && (x.Ncolor() != 3 || x.Nspin() == 2))
+        constexpr bool site_unroll_check = !std::is_same<store_t, y_store_t>::value || isFixed<store_t>::value;
+        if (site_unroll_check && (x.Ncolor() != 3 || x.Nspin() == 2))
           errorQuda("site unroll not supported for nSpin = %d nColor = %d", x.Nspin(), x.Ncolor());
 
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         if (location == QUDA_CUDA_FIELD_LOCATION) {
-          if (site_unroll) checkNative(x, y, z, w, v); // require native order when using site_unroll
+          if (site_unroll_check) checkNative(x, y, z, w, v); // require native order when using site_unroll
           using device_store_t = typename device_type_mapper<store_t>::type;
           using device_y_store_t = typename device_type_mapper<y_store_t>::type;
           using device_real_t = typename mapper<device_y_store_t>::type;
           Functor<device_real_t> f_(a, b, c);
 
+          // redefine site_unroll with device_store types to ensure we have correct N/Ny/M values 
+          constexpr bool site_unroll = !std::is_same<device_store_t, device_y_store_t>::value || isFixed<device_store_t>::value;
           constexpr int N = n_vector<device_store_t, true, nSpin, site_unroll>();
           constexpr int Ny = n_vector<device_y_store_t, true, nSpin, site_unroll>();
           constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
@@ -119,10 +121,11 @@ namespace quda {
           using host_real_t = typename mapper<host_y_store_t>::type;
           Functor<host_real_t> f_(a, b, c);
 
-          // if site unrolling then we need full AoS ordering
+          // redefine site_unroll with host_store types to ensure we have correct N/Ny/M values 
+          constexpr bool site_unroll = !std::is_same<host_store_t, host_y_store_t>::value || isFixed<host_store_t>::value;
           constexpr int N = n_vector<host_store_t, false, nSpin, site_unroll>();
           constexpr int Ny = n_vector<host_y_store_t, false, nSpin, site_unroll>();
-          constexpr int M = N;
+          constexpr int M = N; // if site unrolling then M=N will be 24/6, e.g., full AoS
           const int length = x.Length() / (nParity * M);
 
           BlasArg<host_store_t, N, host_y_store_t, Ny, decltype(f_)> arg(x, y, z, w, v, f_, length, nParity);

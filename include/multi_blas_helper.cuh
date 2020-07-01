@@ -42,7 +42,13 @@ namespace quda
        @tparam fixed Whether we are using fixed point
        @return Max power of two
      */
+#if QUDA_PRECISION <= 3
+    // if we only have a fixed-point build then we need this WAR to avoid some invalid template instantiations
+    // this is temporary - can be removed once the norm and v pointers are fused
+    template <bool reducer, bool fixed> constexpr int max_NXZ_power2() { return reducer ? 16 : 64; }
+#else
     template <bool reducer, bool fixed> constexpr int max_NXZ_power2() { return reducer ? 16 : (fixed ? 64 : 128); }
+#endif
 
     /**
        @brief Return the maximum power of two enabled by default for
