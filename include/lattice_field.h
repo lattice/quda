@@ -23,11 +23,10 @@ namespace quda {
 
   // Forward declaration of all children
   class LatticeField;
-#ifndef DPCPP_DEVEL
   class ColorSpinorField;
   class cudaColorSpinorField;
   class cpuColorSpinorField;
-  
+#ifndef DPCPP_DEVELOP
   class EigValueSet;
   class cudaEigValueSet;
   class cpuEigValueSet;

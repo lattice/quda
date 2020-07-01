@@ -321,25 +321,25 @@ endif()
 set(CMAKE_CXX_STANDARD ${QUDA_CXX_STANDARD})
 # define CXX FLAGS
 set(CMAKE_CXX_FLAGS_DEVEL
-    "-g -O3 -Wall"
+	"-g -O3 -Wall -DDPCPP_DEVELOP"
     CACHE STRING "Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_CXX_FLAGS_STRICT
-    "-O3 -Wall -Werror"
+	"-O3 -Wall -Werror -DDPCPP_DEVELOP"
     CACHE STRING "Flags used by the C++ compiler during strict jenkins builds.")
 set(CMAKE_CXX_FLAGS_RELEASE
-    "-O3 -w ${CXX_OPT} "
+	"-O3 -w ${CXX_OPT} -DDPCPP_DEVELOP"
     CACHE STRING "Flags used by the C++ compiler during release builds.")
 set(CMAKE_CXX_FLAGS_HOSTDEBUG
-    "-Wall -Wno-unknown-pragmas -g -fno-inline"
+	"-Wall -Wno-unknown-pragmas -g -fno-inline -DDPCPP_DEVELOP"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
 set(CMAKE_CXX_FLAGS_DEVICEDEBUG
-    "-Wall -Wno-unknown-pragmas"
+	"-Wall -Wno-unknown-pragmas -DDPCPP_DEVELOP"
     CACHE STRING "Flags used by the C++ compiler during device-debug builds.")
 set(CMAKE_CXX_FLAGS_DEBUG
-    "-Wall -Wno-unknown-pragmas -g -fno-inline"
+	"-Wall -Wno-unknown-pragmas -g -fno-inline -DDPCPP_DEVELOP"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(CMAKE_CXX_FLAGS_SANITIZE
-    "-Wall -Wno-unknown-pragmas -g -fno-inline -fsanitize=address,undefined"
+	"-Wall -Wno-unknown-pragmas -g -fno-inline -fsanitize=address,undefined -DDPCPP_DEVELOP"
     CACHE STRING "Flags used by the C++ compiler during santizer debug builds.")
 
 enable_language(CXX)
@@ -398,19 +398,19 @@ set(CMAKE_CUDA_FLAGS_STRICT
     "${CMAKE_CUDA_FLAGS_DEVEL}"
     CACHE STRING "Flags used by the CUDA compiler during strict jenkins builds.")
 set(CMAKE_CUDA_FLAGS_RELEASE
-    "-O3 -w"
+	"-O3 -w -DDPCPP_DEVELOP"
     CACHE STRING "Flags used by the CUDA compiler during release builds.")
 set(CMAKE_CUDA_FLAGS_HOSTDEBUG
-    "-g -lineinfo"
+	"-g -lineinfo -DDPCPP_DEVELOP"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
 set(CMAKE_CUDA_FLAGS_DEVICEDEBUG
     "-G"
     CACHE STRING "Flags used by the C++ compiler during device-debug builds.")
 set(CMAKE_CUDA_FLAGS_DEBUG
-    "-g -G"
+	"-g -G -DDPCPP_DEVELOP"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(CMAKE_CUDA_FLAGS_SANITIZE
-    "-g -lineinfo -Xcompiler -fsanitize=address,-fsanitize=undefined"
+	"-g -lineinfo -Xcompiler -fsanitize=address,-fsanitize=undefined -DDPCPP_DEVELOP"
     CACHE STRING "Flags used by the C++ compiler during sanitizer debug builds.")
 
 # CUDA Wrapper for finding libs etc

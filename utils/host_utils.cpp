@@ -11,12 +11,14 @@
 
 // QUDA headers
 #include <color_spinor_field.h>
+#ifndef DPCPP_DEVELOP
 #include <unitarization_links.h>
 #include <dslash_quda.h>
 
 // External headers
 #include <llfat_utils.h>
 #include <staggered_gauge_utils.h>
+#endif //DPCPP
 #include <host_utils.h>
 #include <command_line_params.h>
 
@@ -144,6 +146,7 @@ void setQudaDefaultMgTestParams()
 
 void constructQudaGaugeField(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param)
 {
+#ifndef DPCPP_DEVELOP	
   if (type == 0) {
     if (precision == QUDA_DOUBLE_PRECISION)
       constructUnitGaugeField((double **)gauge, param);
@@ -160,11 +163,12 @@ void constructQudaGaugeField(void **gauge, int type, QudaPrecision precision, Qu
     else
       applyGaugeFieldScaling((float **)gauge, Vh, param);
   }
+#endif //DPCPP  
 }
 
 void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc, char **argv)
 {
-
+#ifndef DPCPP_DEVELOP
   // 0 = unit gauge
   // 1 = random SU(3)
   // 2 = supplied field
@@ -180,10 +184,12 @@ void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc
       construct_type = 1;
   }
   constructQudaGaugeField(gauge, construct_type, gauge_param.cpu_prec, &gauge_param);
+#endif //DPCPP  
 }
 
 void constructHostCloverField(void *clover, void *clover_inv, QudaInvertParam &inv_param)
 {
+#ifndef DPCPP_DEVELOP	
   double norm = 0.01; // clover components are random numbers in the range (-norm, norm)
   double diag = 1.0;  // constant added to the diagonal
 
@@ -193,14 +199,17 @@ void constructHostCloverField(void *clover, void *clover_inv, QudaInvertParam &i
   if (compute_clover) inv_param.return_clover = 1;
   inv_param.compute_clover_inverse = 1;
   inv_param.return_clover_inverse = 1;
+#endif //DPCPP  
 }
 
 void constructQudaCloverField(void *clover, double norm, double diag, QudaPrecision precision)
 {
+#ifndef DPCPP_DEVELOP	
   if (precision == QUDA_DOUBLE_PRECISION)
     constructCloverField((double *)clover, norm, diag);
   else
     constructCloverField((float *)clover, norm, diag);
+#endif //DPCPP  
 }
 
 void constructWilsonTestSpinorParam(quda::ColorSpinorParam *cs_param, const QudaInvertParam *inv_param,
@@ -247,7 +256,9 @@ void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision p
   param.location = QUDA_CPU_FIELD_LOCATION; // DMH FIXME so one can construct device noise
   for (int d = 0; d < 4; d++) param.x[d] = x[d];
   quda::cpuColorSpinorField spinor_in(param);
+#ifndef DPCPP_DEVELOP  
   quda::spinorNoise(spinor_in, rng, QUDA_NOISE_UNIFORM);
+#endif  
 }
 
 void initComms(int argc, char **argv, std::array<int, 4> &commDims) { initComms(argc, argv, commDims.data()); }
@@ -1084,9 +1095,13 @@ template <typename Float> void constructRandomGaugeField(Float **res, QudaGaugeP
   }
 
   if (param->type == QUDA_WILSON_LINKS) {
+#if 0
     applyGaugeFieldScaling(res, Vh, param);
+#endif
   } else if (param->type == QUDA_ASQTAD_LONG_LINKS) {
+#if 0
     applyGaugeFieldScaling_long(res, Vh, param, dslash_type);
+#endif
   } else if (param->type == QUDA_ASQTAD_FAT_LINKS) {
     for (int dir = 0; dir < 4; dir++) {
       for (int i = 0; i < Vh; i++) {

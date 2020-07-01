@@ -47,6 +47,7 @@ void setQudaStaggeredInvTestParams();
 
 // Staggered gauge field utils
 //------------------------------------------------------
+#if 0
 void constructStaggeredHostGhostGaugeField(quda::GaugeField *cpuFat, quda::GaugeField *cpuLong, void *milc_fatlink,
                                            void *milc_longlink, QudaGaugeParam &gauge_param);
 void constructStaggeredHostDeviceGaugeField(void **qdp_inlink, void **qdp_longlink_cpu, void **qdp_longlink_gpu,
@@ -72,7 +73,7 @@ template <typename Float> void applyStaggeredScaling(Float **res, QudaGaugeParam
 void constructStaggeredTestSpinorParam(quda::ColorSpinorParam *csParam, const QudaInvertParam *inv_param,
                                        const QudaGaugeParam *gauge_param);
 //------------------------------------------------------
-
+#endif
 // MILC Data reordering routines
 //------------------------------------------------------
 void reorderQDPtoMILC(void *milc_out, void **qdp_in, int V, int siteSize, QudaPrecision out_precision,
@@ -88,6 +89,7 @@ void setQudaDefaultMgTestParams();
 
 // Wilson type gauge and clover fields
 //------------------------------------------------------
+#if 0
 void constructQudaGaugeField(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param);
 void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc, char **argv);
 void constructHostCloverField(void *clover, void *clover_inv, QudaInvertParam &inv_param);
@@ -98,7 +100,7 @@ template <typename Float>
 void constructRandomGaugeField(Float **res, QudaGaugeParam *param, QudaDslashType dslash_type = QUDA_WILSON_DSLASH);
 template <typename Float> void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param);
 //------------------------------------------------------
-
+#endif
 // Spinor utils
 //------------------------------------------------------
 void constructWilsonTestSpinorParam(quda::ColorSpinorParam *csParam, const QudaInvertParam *inv_param,

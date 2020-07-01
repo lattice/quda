@@ -5,7 +5,7 @@ set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_FULL_LIBDIR})
 add_library(quda_test STATIC googletest/src/gtest-all.cc)
 target_include_directories(quda_test PUBLIC googletest/include googletest)
 
-set(TEST_LIBS quda quda_test quda_reference quda_utils)
+set(TEST_LIBS quda quda_test quda_utils)
 
 macro(QUDA_CHECKBUILDTEST mytarget qudabuildtests)
   # adding the linker language here as a workaround -- was not needed for cmake 3.16

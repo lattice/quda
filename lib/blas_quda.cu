@@ -11,8 +11,9 @@
 #ifndef DPCPP_DEVELOP
 #include <kernels/blas_core.cuh>
 #else
-#include "blas_core.cuh"
-#endif
+//#include "blas_core.cuh"
+#include <kernels/blas_core.cuh>
+#endif //DPCPP
 
 namespace quda {
 

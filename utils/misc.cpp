@@ -2,7 +2,9 @@
 #include <stdlib.h>
 #include "quda.h"
 #include <string.h>
+#ifndef DPCPP_DEVELOP
 #include "invert_quda.h"
+#endif //DPCPP
 #include "misc.h"
 #include <assert.h>
 #include "util_quda.h"

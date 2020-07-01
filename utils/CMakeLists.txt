@@ -2,14 +2,10 @@
 add_library(
   quda_utils STATIC
   command_line_params.cpp
-  face_gauge.cpp
   host_blas.cpp
   host_utils.cpp
-  llfat_utils.cpp
   misc.cpp
-  set_params.cpp
-  staggered_gauge_utils.cpp
-  staggered_host_utils.cpp)
+  set_params.cpp)
 
 target_include_directories(quda_utils PUBLIC .)
 target_link_libraries(quda_utils PRIVATE quda)

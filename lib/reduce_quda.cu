@@ -9,8 +9,9 @@
 #ifndef DPCPP_DEVELOP
 #include <kernels/reduce_core.cuh>
 #else
-#include "reduce_core.cuh"
-#endif
+//#include "reduce_core.cuh"
+#include <kernels/reduce_core.cuh>
+#endif //DPCPP
 
 // These are used for reduction kernels
 static device_reduce_t *d_reduce = nullptr;
@@ -157,8 +158,8 @@ namespace quda {
 #ifndef DPCPP_DEVELOP
       LAUNCH_KERNEL(reduceKernel, tunable, tp, stream, arg, real, len);      
 #else
-      reduceKernel<32,ReduceType, FloatN, M><<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-#endif
+      reduceKernel<32,real, len><<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
+#endif //DPCPP
 #endif
 
       if (!commAsyncReduction()) {

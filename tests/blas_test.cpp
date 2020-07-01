@@ -9,7 +9,9 @@
 #include <command_line_params.h>
 
 // include because of nasty globals used in the tests
+#ifndef DPCPP_DEVELOP
 #include <dslash_reference.h>
+#endif
 
 // google test
 #include <gtest/gtest.h>
@@ -526,13 +528,13 @@ double benchmark(int kernel, const int niter) {
 
     case 34:
 #ifndef DPCPP_DEVELOP      
-      for (int i=0; i < niter; ++i) blas::caxpy(A, *xmD,* ymD);
+      //for (int i=0; i < niter; ++i) blas::caxpy(A, *xmD,* ymD);
 #endif //DPCPP_DEVELOP     
       break;
 
     case 35:
 #ifndef DPCPP_DEVELOP      
-      for (int i=0; i < niter; ++i) blas::axpyBzpcx((double*)A, xmD->Components(), zmD->Components(), (double*)B, *yD, (double*)C);
+      //for (int i=0; i < niter; ++i) blas::axpyBzpcx((double*)A, xmD->Components(), zmD->Components(), (double*)B, *yD, (double*)C);
 #endif //DPCPP_DEVELOP      
       break;
 
@@ -546,31 +548,31 @@ double benchmark(int kernel, const int niter) {
 
     case 38:      
 #ifndef DPCPP_DEVELOP     
-      for (int i=0; i < niter; ++i) blas::cDotProduct(A2, xmD->Components(), xmD->Components());
+      //for (int i=0; i < niter; ++i) blas::cDotProduct(A2, xmD->Components(), xmD->Components());
  #endif //DPCPP_DEVELOP     
       break;
 
     case 39:
 #ifndef DPCPP_DEVELOP      
-      for (int i=0; i < niter; ++i) blas::cDotProduct(A, xmD->Components(), ymD->Components());
+      //for (int i=0; i < niter; ++i) blas::cDotProduct(A, xmD->Components(), ymD->Components());
  #endif //DPCPP_DEVELOP    
       break;
 
     case 40:
 #ifndef DPCPP_DEVELOP      
-      for (int i=0; i < niter; ++i) blas::reDotProduct((double*)A2, xmD->Components(), xmD->Components());
+      //for (int i=0; i < niter; ++i) blas::reDotProduct((double*)A2, xmD->Components(), xmD->Components());
  #endif //DPCPP_DEVELOP    
       break;
 
     case 41:
 #ifndef DPCPP_DEVELOP      
-      for (int i=0; i < niter; ++i) blas::reDotProduct((double*)A, xmD->Components(), ymD->Components());
+      //for (int i=0; i < niter; ++i) blas::reDotProduct((double*)A, xmD->Components(), ymD->Components());
  #endif //DPCPP_DEVELOP    
       break;
 
     case 42:
 #ifndef DPCPP_DEVELOP      
-      for (int i = 0; i < niter; ++i) blas::axpy(Ar, xmD->Components(), ymD->Components());
+      //for (int i = 0; i < niter; ++i) blas::axpy(Ar, xmD->Components(), ymD->Components());
  #endif //DPCPP_DEVELOP    
       break;
 
@@ -915,7 +917,7 @@ double test(int kernel) {
     for (int i=0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
     for (int i=0; i < Msrc; i++) ymD->Component(i) = *(ymH[i]);
 
-    blas::caxpy(A, *xmD, *ymD);
+    //blas::caxpy(A, *xmD, *ymD);
     for (int i=0; i < Nsrc; i++){
       for(int j=0; j < Msrc; j++){
 	blas::caxpy(A[Msrc*i+j], *(xmH[i]), *(ymH[j]));
@@ -937,7 +939,7 @@ double test(int kernel) {
     }
     *yD = *yH;
 
-    blas::axpyBzpcx((double*)A, xmD->Components(), zmD->Components(), (double*)B, *yD, (const double*)C);
+    //blas::axpyBzpcx((double*)A, xmD->Components(), zmD->Components(), (double*)B, *yD, (const double*)C);
 
     for (int i=0; i<Nsrc; i++) {
       blas::axpyBzpcx(((double*)A)[i], *xmH[i], *zmH[i], ((double*)B)[i], *yH, ((double*)C)[i]);
@@ -973,7 +975,7 @@ double test(int kernel) {
   case 38:
 #ifndef DPCPP_DEVELOP    
     for (int i=0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
-    blas::cDotProduct(A2, xmD->Components(), xmD->Components());
+    //blas::cDotProduct(A2, xmD->Components(), xmD->Components());
     error = 0.0;
     for (int i = 0; i < Nsrc; i++) {
       for (int j = 0; j < Nsrc; j++) {
@@ -989,7 +991,7 @@ double test(int kernel) {
 #ifndef DPCPP_DEVELOP    
     for (int i=0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
     for (int i=0; i < Msrc; i++) ymD->Component(i) = *(ymH[i]);
-    blas::cDotProduct(A, xmD->Components(), ymD->Components());
+    //blas::cDotProduct(A, xmD->Components(), ymD->Components());
     error = 0.0;
     for (int i = 0; i < Nsrc; i++) {
       for (int j = 0; j < Msrc; j++) {
@@ -1004,7 +1006,7 @@ double test(int kernel) {
   case 40:
 #ifndef DPCPP_DEVELOP    
     for (int i=0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
-    blas::reDotProduct((double*)A2, xmD->Components(), xmD->Components());
+    //blas::reDotProduct((double*)A2, xmD->Components(), xmD->Components());
     error = 0.0;
     for (int i = 0; i < Nsrc; i++) {
       for (int j = 0; j < Nsrc; j++) {
@@ -1020,7 +1022,7 @@ double test(int kernel) {
 #ifndef DPCPP_DEVELOP    
     for (int i=0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
     for (int i=0; i < Msrc; i++) ymD->Component(i) = *(ymH[i]);
-    blas::reDotProduct((double*)A, xmD->Components(), ymD->Components());
+    //blas::reDotProduct((double*)A, xmD->Components(), ymD->Components());
     error = 0.0;
     for (int i = 0; i < Nsrc; i++) {
       for (int j = 0; j < Msrc; j++) {
@@ -1037,7 +1039,7 @@ double test(int kernel) {
     for (int i = 0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
     for (int i = 0; i < Msrc; i++) ymD->Component(i) = *(ymH[i]);
 
-    blas::axpy(Ar, *xmD, *ymD);
+    //blas::axpy(Ar, *xmD, *ymD);
     for (int i = 0; i < Nsrc; i++) {
       for (int j = 0; j < Msrc; j++) { blas::axpy(Ar[Msrc * i + j], *(xmH[i]), *(ymH[j])); }
     }

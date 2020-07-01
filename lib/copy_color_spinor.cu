@@ -23,6 +23,7 @@ namespace quda {
   void copyGenericColorSpinorQQ(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
 
   // multigrid copying routines
+#ifndef DPCPP_DEVELOP  
   void copyGenericColorSpinorMGDD(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
   void copyGenericColorSpinorMGDS(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
   void copyGenericColorSpinorMGSD(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
@@ -35,6 +36,7 @@ namespace quda {
   void copyGenericColorSpinorMGQS(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
   void copyGenericColorSpinorMGQH(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
   void copyGenericColorSpinorMGQQ(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
+#endif //DPCPP  
   
 
   void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src, 
@@ -100,6 +102,7 @@ namespace quda {
         errorQuda("Unsupported Destination Precision %d", dst.Precision());
       }
     } else {
+#ifndef DPCPP_DEVELOP
       if (dst.Precision() == QUDA_DOUBLE_PRECISION) {
         if (src.Precision() == QUDA_DOUBLE_PRECISION) {
           copyGenericColorSpinorMGDD(dst, src, location, Dst, Src);
@@ -143,6 +146,7 @@ namespace quda {
       } else {
         errorQuda("Unsupported Destination Precision %d", dst.Precision());
       }
+#endif //DPCPP
     }
   }  
 

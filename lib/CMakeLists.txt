@@ -44,7 +44,7 @@ set (QUDA_OBJS
   copy_color_spinor_qh.cu copy_color_spinor_qq.cu
   extended_color_spinor_utilities.cu
   random.cu
-  quda_cuda_api.cpp checksum.cu
+  quda_cuda_api.cpp
   instantiate.cpp version.cpp )
 # cmake-format: on
 
