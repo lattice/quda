@@ -184,43 +184,11 @@ namespace quda {
     // computes the clover field given the input gauge field
     void compute(const cudaGaugeField &gauge);
 
-#ifdef USE_TEXTURE_OBJECTS
-    cudaTextureObject_t tex;
-    cudaTextureObject_t normTex;
-    cudaTextureObject_t invTex;
-    cudaTextureObject_t invNormTex;
-    cudaTextureObject_t evenTex;
-    cudaTextureObject_t evenNormTex;
-    cudaTextureObject_t oddTex;
-    cudaTextureObject_t oddNormTex;
-    cudaTextureObject_t evenInvTex;
-    cudaTextureObject_t evenInvNormTex;
-    cudaTextureObject_t oddInvTex;
-    cudaTextureObject_t oddInvNormTex;
-    void createTexObject(cudaTextureObject_t &tex, cudaTextureObject_t &texNorm, void *field, void *norm, bool full);
-    void destroyTexObject();
-#endif
-
   public:
     // create a cudaCloverField from a CloverFieldParam
     cudaCloverField(const CloverFieldParam &param);
 
     virtual ~cudaCloverField();
-
-#ifdef USE_TEXTURE_OBJECTS
-    const cudaTextureObject_t& Tex() const { return tex; }
-    const cudaTextureObject_t& NormTex() const { return normTex; }
-    const cudaTextureObject_t& InvTex() const { return invTex; }
-    const cudaTextureObject_t& InvNormTex() const { return invNormTex; }
-    const cudaTextureObject_t& EvenTex() const { return evenTex; }
-    const cudaTextureObject_t& EvenNormTex() const { return evenNormTex; }
-    const cudaTextureObject_t& OddTex() const { return oddTex; }
-    const cudaTextureObject_t& OddNormTex() const { return oddNormTex; }
-    const cudaTextureObject_t& EvenInvTex() const { return evenInvTex; }
-    const cudaTextureObject_t& EvenInvNormTex() const { return evenInvNormTex; }
-    const cudaTextureObject_t& OddInvTex() const { return oddInvTex; }
-    const cudaTextureObject_t& OddInvNormTex() const { return oddInvNormTex; }
-#endif
 
     /**
        @brief Copy into this CloverField from the generic CloverField src
@@ -309,44 +277,35 @@ namespace quda {
     int stride; // stride (volume + pad)
     double rho; // rho additive factor
 
-#ifdef USE_TEXTURE_OBJECTS
-    const cudaTextureObject_t &evenTex;
-    const cudaTextureObject_t &evenNormTex;
-    const cudaTextureObject_t &oddTex;
-    const cudaTextureObject_t &oddNormTex;
-    const cudaTextureObject_t& EvenTex() const { return evenTex; }
-    const cudaTextureObject_t& EvenNormTex() const { return evenNormTex; }
-    const cudaTextureObject_t& OddTex() const { return oddTex; }
-    const cudaTextureObject_t& OddNormTex() const { return oddNormTex; }    
-#endif
-
-    FullClover(const cudaCloverField &clover, bool inverse=false) :
-    precision(clover.precision), bytes(clover.bytes), norm_bytes(clover.norm_bytes),
-      stride(clover.stride), rho(clover.rho)
-#ifdef USE_TEXTURE_OBJECTS
-	, evenTex(inverse ? clover.evenInvTex : clover.evenTex)
-	, evenNormTex(inverse ? clover.evenInvNormTex : clover.evenNormTex)
-	, oddTex(inverse ? clover.oddInvTex : clover.oddTex)
-	, oddNormTex(inverse ? clover.oddInvNormTex : clover.oddNormTex)
-#endif
-      { 
-	if (inverse) {
-	  even = clover.evenInv;
-	  evenNorm = clover.evenInvNorm;
-	  odd = clover.oddInv;	
-	  oddNorm = clover.oddInvNorm;
-	} else {
-	  even = clover.even;
-	  evenNorm = clover.evenNorm;
-	  odd = clover.odd;	
-	  oddNorm = clover.oddNorm;
-	}
+    FullClover(const cudaCloverField &clover, bool inverse = false) :
+      precision(clover.precision),
+      bytes(clover.bytes),
+      norm_bytes(clover.norm_bytes),
+      stride(clover.stride),
+      rho(clover.rho)
+    {
+      if (inverse) {
+        even = clover.evenInv;
+        evenNorm = clover.evenInvNorm;
+        odd = clover.oddInv;
+        oddNorm = clover.oddInvNorm;
+      } else {
+        even = clover.even;
+        evenNorm = clover.evenNorm;
+        odd = clover.odd;
+        oddNorm = clover.oddNorm;
+      }
     }
   };
 
-
-  // driver for computing the clover field from the gauge field
-  void computeClover(CloverField &clover, const GaugeField &gauge, double coeff,  QudaFieldLocation location);
+  /**
+     @brief Driver for computing the clover field from the field
+     strength tensor.
+     @param[out] clover Compute clover field
+     @param[in] fmunu Field strength tensor
+     @param[in] coefft Clover coefficient
+  */
+  void computeClover(CloverField &clover, const GaugeField &fmunu, double coeff);
 
 
   /**
