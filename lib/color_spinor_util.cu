@@ -485,7 +485,6 @@ else if (a.Ncolor() == 96 && a.Nspin() == 2) {
     case QUDA_FLOAT_FIELD_ORDER: genericCudaPrintVector<Float, Ns, Nc, QUDA_FLOAT_FIELD_ORDER>(field, i); break;
     case QUDA_FLOAT2_FIELD_ORDER: genericCudaPrintVector<Float, Ns, Nc, QUDA_FLOAT2_FIELD_ORDER>(field, i); break;
     case QUDA_FLOAT4_FIELD_ORDER: genericCudaPrintVector<Float, Ns, Nc, QUDA_FLOAT4_FIELD_ORDER>(field, i); break;
-    case QUDA_FLOAT8_FIELD_ORDER: genericCudaPrintVector<Float, Ns, Nc, QUDA_FLOAT8_FIELD_ORDER>(field, i); break;
     case QUDA_SPACE_SPIN_COLOR_FIELD_ORDER:
       genericCudaPrintVector<Float, Ns, Nc, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(field, i);
       break;

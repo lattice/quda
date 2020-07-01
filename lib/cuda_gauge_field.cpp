@@ -71,6 +71,19 @@ namespace quda {
     even = gauge;
     odd = static_cast<char*>(gauge) + bytes/2;
     if (create != QUDA_ZERO_FIELD_CREATE && isNative() && ghostExchange == QUDA_GHOST_EXCHANGE_PAD) zeroPad();
+
+#ifdef USE_TEXTURE_OBJECTS
+    createTexObject(tex, gauge, true);
+    createTexObject(evenTex, even, false);
+    createTexObject(oddTex, odd, false);
+    if (reconstruct == QUDA_RECONSTRUCT_13 || reconstruct == QUDA_RECONSTRUCT_9) {
+      // Create texture objects for the phases
+      bool isPhase = true;
+      createTexObject(phaseTex, (char*)gauge + phase_offset, true, isPhase);
+      createTexObject(evenPhaseTex, (char*)even + phase_offset, false, isPhase);
+      createTexObject(oddPhaseTex, (char*)odd + phase_offset, false, isPhase);
+    }
+#endif
   }
 
   void cudaGaugeField::zeroPad() {
@@ -84,8 +97,95 @@ namespace quda {
     }
   }
 
+#ifdef USE_TEXTURE_OBJECTS
+  void cudaGaugeField::createTexObject(cudaTextureObject_t &tex, void *field, bool full, bool isPhase) {
+
+    if (isNative() && geometry != QUDA_COARSE_GEOMETRY) {
+      // create the texture for the field components
+      cudaChannelFormatDesc desc;
+      memset(&desc, 0, sizeof(cudaChannelFormatDesc));
+      if (precision == QUDA_SINGLE_PRECISION) desc.f = cudaChannelFormatKindFloat;
+      else desc.f = cudaChannelFormatKindSigned; // half is short, double is int2
+
+      int texel_size = 1;
+      if (isPhase) {
+        if (precision == QUDA_DOUBLE_PRECISION) {
+          desc.x = 8*sizeof(int);
+          desc.y = 8*sizeof(int);
+          desc.z = 0;
+          desc.w = 0;
+          texel_size = 2*sizeof(int);
+        } else {
+          desc.x = 8*precision;
+          desc.y = desc.z = desc.w = 0;
+          texel_size = precision;
+        }
+      } else {
+        // always four components regardless of precision
+        if (precision == QUDA_DOUBLE_PRECISION) {
+          desc.x = 8*sizeof(int);
+          desc.y = 8*sizeof(int);
+          desc.z = 8*sizeof(int);
+          desc.w = 8*sizeof(int);
+	  texel_size = 4*sizeof(int);
+        } else {
+          desc.x = 8*precision;
+          desc.y = 8*precision;
+          desc.z = (reconstruct == 18 || reconstruct == 10) ? 0 : 8*precision; // float2 or short2 for 18 reconstruct
+          desc.w = (reconstruct == 18 || reconstruct == 10) ? 0 : 8*precision;
+          texel_size = (reconstruct == 18 || reconstruct == 10 ? 2 : 4) * precision;
+        }
+      }
+
+      cudaResourceDesc resDesc;
+      memset(&resDesc, 0, sizeof(resDesc));
+      resDesc.resType = cudaResourceTypeLinear;
+      resDesc.res.linear.devPtr = field;
+      resDesc.res.linear.desc = desc;
+      resDesc.res.linear.sizeInBytes = (isPhase ? phase_bytes : bytes) / (!full ? 2 : 1);
+
+      if (resDesc.res.linear.sizeInBytes % deviceProp.textureAlignment != 0
+          || !is_aligned(resDesc.res.linear.devPtr, deviceProp.textureAlignment)) {
+        errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
+                  resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
+      }
+
+      unsigned long texels = resDesc.res.linear.sizeInBytes / texel_size;
+      if (texels > (unsigned)deviceProp.maxTexture1DLinear) {
+	errorQuda("Attempting to bind too large a texture %lu > %d", texels, deviceProp.maxTexture1DLinear);
+      }
+
+      cudaTextureDesc texDesc;
+      memset(&texDesc, 0, sizeof(texDesc));
+      if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
+      else texDesc.readMode = cudaReadModeElementType;
+
+      cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
+      checkCudaError();
+    }
+  }
+
+  void cudaGaugeField::destroyTexObject() {
+    if ( isNative() && geometry != QUDA_COARSE_GEOMETRY ) {
+      cudaDestroyTextureObject(tex);
+      cudaDestroyTextureObject(evenTex);
+      cudaDestroyTextureObject(oddTex);
+      if (reconstruct == QUDA_RECONSTRUCT_9 || reconstruct == QUDA_RECONSTRUCT_13) {
+        cudaDestroyTextureObject(phaseTex);
+        cudaDestroyTextureObject(evenPhaseTex);
+        cudaDestroyTextureObject(oddPhaseTex);
+      }
+      checkCudaError();
+    }
+  }
+#endif
+
   cudaGaugeField::~cudaGaugeField()
   {
+#ifdef USE_TEXTURE_OBJECTS
+    destroyTexObject();
+#endif
+
     destroyComms();
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {

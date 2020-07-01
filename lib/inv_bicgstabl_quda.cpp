@@ -121,16 +121,17 @@ namespace quda {
   void BiCGstabL::updateXRend(Complex *gamma, Complex *gamma_prime, Complex *gamma_prime_prime,
                               std::vector<ColorSpinorField *> r, ColorSpinorField &x, int n_krylov)
   {
-#if 0
-    blas::caxpy(gamma[1], *r[0], x);
+    /*
+    blas::caxpy(gamma[1], *r[0], x_sloppy);
     blas::caxpy(-gamma_prime[n_krylov], *r[n_krylov], *r[0]);
-    for (int j = 1; j < n_krylov; j++)
+    for (j = 1; j < n_krylov; j++)
     {
-      blas::caxpy(gamma_prime_prime[j], *r[j], x);
-      blas::caxpy(-gamma_prime[j], *r[j], *r[0]);
+      caxpy(gamma_prime_prime[j], *r[j], x);
+      caxpy(-gamma_prime[j], *r[j], *r[0]);
     }
-#else
-    // This does two "wasted" caxpys (so 2*n_krylov+2 instead of 2*n_kKrylov), but
+    */
+
+    // This does two "wasted" caxpys (so 2*n_krylov+2 instead of 2*n_krylov), but
     // the alternative way would be un-fusing some calls, which would require
     // loading and saving x twice. In a solve where the sloppy precision is lower than
     // the full precision, this can be a killer.
@@ -148,7 +149,6 @@ namespace quda {
     
     delete[] gamma_prime_prime_;
     delete[] gamma_prime_;
-#endif
   }
   
   /**

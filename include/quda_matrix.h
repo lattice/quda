@@ -34,6 +34,8 @@ namespace quda {
       return make_double2(0.,0.);
     }
 
+
+
   template<class T>
     struct Identity
     {
@@ -71,9 +73,12 @@ namespace quda {
 
         __device__ __host__ constexpr int size() const { return N; }
 
-        __device__ __host__ inline Matrix() { setZero(this); }
+        __device__ __host__ inline Matrix() {
+#pragma unroll
+	  for (int i=0; i<N*N; i++) zero(data[i]);
+	}
 
-        __device__ __host__ inline Matrix(const Matrix<T,N> &a) {
+	__device__ __host__ inline Matrix(const Matrix<T,N> &a) {
 #pragma unroll
 	  for (int i=0; i<N*N; i++) data[i] = a.data[i];
 	}
@@ -301,7 +306,7 @@ namespace quda {
 
       __device__ __host__ inline HMatrix() {
 #pragma unroll
-        for (int i = 0; i < N * N; i++) data[i] = (T)0.0;
+	for (int i=0; i<N*N; i++) zero(data[i]);
       }
 
       __device__ __host__ inline HMatrix(const HMatrix<T,N> &a) {
@@ -553,11 +558,11 @@ namespace quda {
 
 
   // This is so that I can multiply real and complex matrice
-  template <class T, class U, int N>
-  __device__ __host__ inline Matrix<typename PromoteTypeId<T, U>::type, N> operator*(const Matrix<T, N> &a,
-                                                                                     const Matrix<U, N> &b)
-  {
-    Matrix<typename PromoteTypeId<T, U>::type, N> result;
+  template<class T, class U, int N>
+    __device__ __host__ inline
+    Matrix<typename PromoteTypeId<T,U>::Type,N> operator*(const Matrix<T,N> &a, const Matrix<U,N> &b)
+    {
+      Matrix<typename PromoteTypeId<T,U>::Type,N> result;
 #pragma unroll
       for (int i=0; i<N; i++) {
 #pragma unroll

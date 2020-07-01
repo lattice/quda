@@ -3,7 +3,7 @@
 #ifndef __CUDACC_RTC__
 #include <cuda.h>
 #include <cuda_runtime.h>
-#endif
+#include <quda_cuda_api.h>
 
 using qudaStream_t = cudaStream_t;
 
@@ -170,3 +170,5 @@ namespace quda {
 
 #define qudaDeviceSynchronize() \
   ::quda::qudaDeviceSynchronize_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#endif

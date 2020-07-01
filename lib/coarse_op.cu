@@ -64,8 +64,9 @@ namespace quda {
       if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
       if (c.Order() != clOrder && c.Bytes()) errorQuda("Unsupported field order %d\n", c.Order());
 
-      typedef typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder,vFloat,vFloat,false,false> F;
-      typedef typename gauge::FieldOrder<Float,fineColor,1,gOrder,true,Float> gFine;
+      constexpr bool use_tex = __COMPUTE_CAPABILITY__ < 520 ? true : false; // on pre-Maxwell-2 use textures/ldg to get caching
+      typedef typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder,vFloat,vFloat,false,false,use_tex> F;
+      typedef typename gauge::FieldOrder<Float,fineColor,1,gOrder,true,Float,use_tex> gFine;
       typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat> gCoarse;
       typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,storeType> gCoarseAtomic;
       typedef typename clover::FieldOrder<Float,fineColor,fineSpin,clOrder> cFine;

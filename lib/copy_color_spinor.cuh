@@ -291,6 +291,16 @@ namespace quda {
       ColorSpinor outOrder(out, 1, Out, outNorm, nullptr, override);
       genericCopyColorSpinor<FloatOut,FloatIn,4,Nc>
 	(outOrder, inOrder, out, in, location);
+    } else if (out.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER && Ns == 4) {
+#ifdef FLOAT8
+      // this is needed for single-precision mg for changing basis in the transfer
+      typedef typename colorspinor::FloatNOrder<FloatOut, 4, Nc, 8> ColorSpinor;
+      ColorSpinor outOrder(out, 1, Out, outNorm, nullptr, override);
+      genericCopyColorSpinor<FloatOut,FloatIn,4,Nc>
+	(outOrder, inOrder, out, in, location);
+#else
+      errorQuda("QUDA_FLOAT8 support has not been enabled\n");
+#endif
     } else if (out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       SpaceSpinorColorOrder<FloatOut, Ns, Nc> outOrder(out, 1, Out);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
@@ -339,6 +349,15 @@ namespace quda {
       typedef typename colorspinor::FloatNOrder<FloatIn, 4, Nc, 2> ColorSpinor;
       ColorSpinor inOrder(in, 1, In, inNorm, nullptr, override);
       genericCopyColorSpinor<FloatOut,FloatIn,4,Nc>(inOrder, out, in, location, Out, outNorm);
+    } else if (in.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER && Ns == 4) {
+#ifdef FLOAT8
+      // experimental float-8 order
+      typedef typename colorspinor::FloatNOrder<FloatIn, 4, Nc, 8> ColorSpinor;
+      ColorSpinor inOrder(in, 1, In, inNorm, nullptr, override);
+      genericCopyColorSpinor<FloatOut,FloatIn,4,Nc>(inOrder, out, in, location, Out, outNorm);
+#else
+      errorQuda("QUDA_FLOAT8 support has not been enabled\n");
+#endif
     } else if (in.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       SpaceSpinorColorOrder<FloatIn, Ns, Nc> inOrder(in, 1, In);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in, location, Out, outNorm);

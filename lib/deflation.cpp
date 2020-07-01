@@ -37,14 +37,21 @@ namespace quda
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     csParam.location = param.location;
     csParam.mem_type = QUDA_MEMORY_DEVICE;
-    csParam.setPrecision(QUDA_DOUBLE_PRECISION, QUDA_DOUBLE_PRECISION, true); // accum fields always full precision
-    if (csParam.nSpin != 1) csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+    csParam.setPrecision(QUDA_DOUBLE_PRECISION);//accum fields always full precision
+
+    if (csParam.location==QUDA_CUDA_FIELD_LOCATION) {
+      // all coarse GPU vectors use FLOAT2 ordering
+      csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+      if(csParam.nSpin != 1) csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+    }
 
     r  = ColorSpinorField::Create(csParam);
     Av = ColorSpinorField::Create(csParam);
 
     if (param.eig_global.cuda_prec_ritz != QUDA_DOUBLE_PRECISION) { // allocate sloppy fields
-      csParam.setPrecision(param.eig_global.cuda_prec_ritz);
+      csParam.setPrecision(param.eig_global.cuda_prec_ritz);//accum fields always full precision
+      if (csParam.location==QUDA_CUDA_FIELD_LOCATION) csParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
+
       r_sloppy  = ColorSpinorField::Create(csParam);
       Av_sloppy = ColorSpinorField::Create(csParam);
     } else {

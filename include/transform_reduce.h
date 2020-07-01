@@ -34,7 +34,7 @@ namespace quda
   template <typename reduce_t, typename T, typename count_t, typename transformer, typename reducer>
   struct TransformReduceArg : public ReduceArg<reduce_t> {
     static constexpr int block_size = 512;
-    static constexpr int n_batch_max = 8;
+    static constexpr int n_batch_max = 4;
     const T *v[n_batch_max];
     count_t n_items;
     int n_batch;

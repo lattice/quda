@@ -169,6 +169,8 @@ namespace quda {
     staggeredPhaseApplied = false;
   }
 
+  bool GaugeField::isNative() const { return gauge::isNative(order, precision, reconstruct); }
+
   void GaugeField::exchange(void **ghost_link, void **link_sendbuf, QudaDirection dir) const {
     MsgHandle *mh_send[4];
     MsgHandle *mh_recv[4];
@@ -303,10 +305,12 @@ namespace quda {
     spinor_param.nSpin = 1;
     spinor_param.nDim = a.Ndim();
     for (int d=0; d<a.Ndim(); d++) spinor_param.x[d] = a.X()[d];
+    spinor_param.setPrecision(a.Precision());
     spinor_param.pad = a.Pad();
     spinor_param.siteSubset = QUDA_FULL_SITE_SUBSET;
     spinor_param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-    spinor_param.setPrecision(a.Precision(), a.Precision(), true);
+    spinor_param.fieldOrder = (a.Precision() == QUDA_DOUBLE_PRECISION || spinor_param.nSpin == 1) ?
+      QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
     spinor_param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
     spinor_param.create = QUDA_REFERENCE_FIELD_CREATE;
     spinor_param.v = (void*)a.Gauge_p();

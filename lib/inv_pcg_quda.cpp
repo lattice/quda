@@ -207,6 +207,11 @@ namespace quda
     if (K) {
       csParam.create = QUDA_COPY_FIELD_CREATE;
       csParam.setPrecision(Kparam.precision);
+#ifdef FLOAT8
+      warningQuda("Using experimental FLOAT8 ordering for the preconditioner: only supported by the "
+                  "DiracMobiusPC::MdagMLocal operator");
+      csParam.fieldOrder = QUDA_FLOAT8_FIELD_ORDER;
+#endif
       rPre = new cudaColorSpinorField(rSloppy, csParam);
       // Create minvrPre
       minvrPre = new cudaColorSpinorField(*rPre);
