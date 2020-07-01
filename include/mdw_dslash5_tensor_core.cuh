@@ -8,8 +8,7 @@
 #include <math_helper.cuh>
 #include <shared_memory_cache_helper.cuh>
 
-#define THRUST_IGNORE_CUB_VERSION_CHECK
-#include <cub/cub.cuh>
+#include <cub_helper.cuh>
 
 #if (__CUDACC_VER_MAJOR__ >= 9 && __COMPUTE_CAPABILITY__ >= 700)
 #include <mma.h>

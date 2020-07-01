@@ -30,16 +30,6 @@ namespace quda
 
 #if (__CUDACC_VER_MAJOR__ >= 9 && __COMPUTE_CAPABILITY__ >= 700)
 
-    template <typename F> inline void setMaxDynamicSharedBytesPerBlock(F *func)
-    {
-      qudaFuncSetAttribute((const void *)func, cudaFuncAttributePreferredSharedMemoryCarveout,
-                           (int)cudaSharedmemCarveoutMaxShared);
-      cudaFuncAttributes attr;
-      cudaFuncGetAttributes(&attr, (const void *)func);
-      qudaFuncSetAttribute((const void *)func, cudaFuncAttributeMaxDynamicSharedMemorySize,
-                           deviceProp.sharedMemPerBlockOptin - attr.sharedSizeBytes);
-    }
-
     /**
       @brief Parameter structure for applying the Dslash
     */
@@ -638,7 +628,7 @@ namespace quda
 
       template <typename T> inline void launch(T *f, const TuneParam &tp, Arg &arg, const qudaStream_t &stream)
       {
-        quda::mobius_tensor_core::setMaxDynamicSharedBytesPerBlock(f);
+        setMaxDynamicSharedBytesPerBlock(f);
         void *args[] = {&arg};
         qudaLaunchKernel((const void *)f, tp.grid, tp.block, args, tp.shared_bytes, stream);
       }
