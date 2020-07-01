@@ -297,7 +297,9 @@ namespace quda {
       void preTune()
       {
         for (int i = 0; i < NYW; ++i) {
+          if (r.write.X) x[i]->backup();
           if (r.write.Y) y[i]->backup();
+          if (r.write.Z) z[i]->backup();
           if (r.write.W) w[i]->backup();
         }
       }
@@ -305,7 +307,9 @@ namespace quda {
       void postTune()
       {
         for (int i = 0; i < NYW; ++i) {
+          if (r.write.X) x[i]->restore();
           if (r.write.Y) y[i]->restore();
+          if (r.write.Z) z[i]->restore();
           if (r.write.W) w[i]->restore();
         }
       }

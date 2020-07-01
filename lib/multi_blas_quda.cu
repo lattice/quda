@@ -54,10 +54,10 @@ namespace quda {
         location(checkLocation(*x[0], *y[0], *z[0], *w[0]))
       {
         checkLength(*x[0], *y[0], *z[0], *w[0]);
-        auto x_prec = checkPrecision(*x[0], *z[0]);
-        auto y_prec = checkPrecision(*y[0], *w[0]);
-        auto x_order = checkOrder(*x[0], *z[0]);
-        auto y_order = checkOrder(*y[0], *w[0]);
+        auto x_prec = checkPrecision(*x[0], *z[0], *w[0]);
+        auto y_prec = y[0]->Precision();
+        auto x_order = checkOrder(*x[0], *z[0], *w[0]);
+        auto y_order = y[0]->FieldOrder();
         if (x_prec == y_prec && x_order != y_order) errorQuda("Orders %d %d do not match", x_order, y_order);
 
         // heuristic for enabling if we need the warp-splitting optimization
@@ -232,7 +232,9 @@ namespace quda {
       void preTune()
       {
         for (int i = 0; i < NYW; ++i) {
+          if (f.write.X) x[i]->backup();
           if (f.write.Y) y[i]->backup();
+          if (f.write.Z) z[i]->backup();
           if (f.write.W) w[i]->backup();
         }
       }
@@ -240,7 +242,9 @@ namespace quda {
       void postTune()
       {
         for (int i = 0; i < NYW; ++i) {
+          if (f.write.X) x[i]->restore();
           if (f.write.Y) y[i]->restore();
+          if (f.write.Z) z[i]->restore();
           if (f.write.W) w[i]->restore();
         }
       }
@@ -293,19 +297,6 @@ namespace quda {
       int tuningIter() const { return 3; }
     };
 
-    /*
-    template <template <typename ...> class Functor, typename store_t, typename y_store_t,
-              int nSpin, typename T, int NXZ_>
-    constexpr int MultiBlas<Functor, store_t, y_store_t, nSpin, T, NXZ_>::NXZ;
-    */
-    template <template <typename ...> class Functor, typename T>
-    void multiBlas(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
-                   CompositeColorSpinorField &x, CompositeColorSpinorField &y,
-                   CompositeColorSpinorField &z, CompositeColorSpinorField &w)
-    {
-      instantiate<Functor, MultiBlas, true>(a, b, c, *x[0], *y[0], x, y, z, w);
-    }
-
     using range = std::pair<size_t,size_t>;
 
     template <template <typename...> class Functor, typename T>
@@ -349,7 +340,8 @@ namespace quda {
 
           // mark true since we will copy the "a" matrix into constant memory
           coeff_array<T> a(a_), b, c;
-          multiBlas<Functor>(a, b, c, x, y, x, y);
+          constexpr bool mixed = true;
+          instantiate<Functor, MultiBlas, mixed>(a, b, c, *x[0], *y[0], x, y, x, x);
         } else {
           // split the problem in half and recurse
           const T *a0 = &a_[0];
@@ -450,7 +442,8 @@ namespace quda {
           }
 
           coeff_array<Complex> a(a_), b, c;
-          multiBlas<multicaxpyz_>(a, b, c, x, y, x, z);
+          constexpr bool mixed = false;
+          instantiate<multicaxpyz_, MultiBlas, mixed>(a, b, c, *x[0], *y[0], x, y, x, z);
         } else {
           // split the problem in half and recurse
           const Complex *a0 = &a_[0];
@@ -522,7 +515,8 @@ namespace quda {
 	x.push_back(&z_);
 
         coeff_array<double> a(a_), b(b_), c(c_);
-        multiBlas<multi_axpyBzpcx_>(a, b, c, x, y, x, w);
+        constexpr bool mixed = true;
+        instantiate<multi_axpyBzpcx_, MultiBlas, mixed>(a, b, c, *x[0], *y[0], x, y, x, w);
       } else {
         // split the problem in half and recurse
 	const double *a0 = &a_[0];
@@ -564,7 +558,8 @@ namespace quda {
         std::vector<ColorSpinorField*> &x = x_;
 
         coeff_array<Complex> a(a_), b(b_), c;
-        multiBlas<multi_caxpyBxpz_>(a, b, c, x, y, x, w);
+        constexpr bool mixed = true;
+        instantiate<multi_caxpyBxpz_, MultiBlas, mixed>(a, b, c, *x[0], *y[0], x, y, x, w);
       } else {
         // split the problem in half and recurse
         const Complex *a0 = &a_[0];
