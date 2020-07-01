@@ -216,10 +216,14 @@ namespace quda {
       // instantiate the loop unrolling template
       template <int NXZ_max> typename std::enable_if<NXZ_max!=1, void>::type instantiate(const qudaStream_t &stream)
       {
-        constexpr int pow2_max = max_NXZ_power2<false, isFixed<store_t>::value>();
+        // if multi-1d then constrain the templates to no larger than max-1d size
+        constexpr int pow2_max = !decltype(f)::multi_1d ? max_NXZ_power2<false, isFixed<store_t>::value>() :
+          std::min(max_N_multi_1d(), max_NXZ_power2<false, isFixed<store_t>::value>());
+        constexpr int linear_max = !decltype(f)::multi_1d ? MAX_MULTI_BLAS_N : std::min(max_N_multi_1d(), MAX_MULTI_BLAS_N);
+
         if (NXZ <= pow2_max && NXZ % 2 == 0) instantiatePow2<pow2_max>(stream);
-        else if (NXZ <= MAX_MULTI_BLAS_N) instantiateLinear<MAX_MULTI_BLAS_N>(stream);
-        else errorQuda("x.size %lu greater than MAX_MULTI_BLAS_N %d", x.size(), MAX_MULTI_BLAS_N);
+        else if (NXZ <= linear_max) instantiateLinear<linear_max>(stream);
+        else errorQuda("x.size %lu greater than maximum supported size (pow2 = %d, linear = %d)", x.size(), pow2_max, linear_max);
       }
 
       template <int NXZ_max> typename std::enable_if<NXZ_max==1, void>::type instantiate(const qudaStream_t &stream)
