@@ -11,9 +11,9 @@ namespace quda
     {
       switch (Ls) {
 #ifdef USE_MMA_SYNC
-      case 16: return 10; break;
+      case 16: return 10;
 #else
-      case 16: return 16; break;
+      case 16: return 16;
 #endif
       default: return 0;
       }

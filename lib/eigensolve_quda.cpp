@@ -668,7 +668,7 @@ namespace quda
     // 1. Take block inner product: L_i^dag * vec = A_i
     std::vector<ColorSpinorField *> left_vecs;
     left_vecs.reserve(n_defl);
-    for (int i = n_defl; i < 2 * n_defl; i++) left_vecs.push_back(evecs[i]);
+    for (int i = eig_param->n_conv; i < eig_param->n_conv + n_defl; i++) left_vecs.push_back(evecs[i]);
 
     std::vector<Complex> s(n_defl * src.size());
     std::vector<ColorSpinorField *> src_ = const_cast<decltype(src) &>(src);
