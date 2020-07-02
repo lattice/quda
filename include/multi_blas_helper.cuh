@@ -42,7 +42,13 @@ namespace quda
        @tparam fixed Whether we are using fixed point
        @return Max power of two
      */
+#if QUDA_PRECISION <= 3
+    // if we only have a fixed-point build then we need this WAR to avoid some invalid template instantiations
+    // this is temporary - can be removed once the norm and v pointers are fused
+    template <bool reducer, bool fixed> constexpr int max_NXZ_power2() { return reducer ? 16 : 64; }
+#else
     template <bool reducer, bool fixed> constexpr int max_NXZ_power2() { return reducer ? 16 : (fixed ? 64 : 128); }
+#endif
 
     /**
        @brief Return the maximum power of two enabled by default for
@@ -80,9 +86,14 @@ namespace quda
        the maximum size of YW is and allocate this amount of space.  This
        allows for a much larger NXZ (NYW) when NYW (NXZ) is small.
     */
-    template <int NXZ, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW, typename Functor>
+    template <int NXZ, typename xType, typename yType, typename Functor>
     inline constexpr int max_YW_size()
     {
+      using SpinorX = Spinor<xType, 4>;
+      using SpinorY = Spinor<yType, 4>;
+      using SpinorZ = SpinorX;
+      using SpinorW = SpinorX;
+
       // compute the size remaining for the Y and W accessors
       constexpr int arg_size = (MAX_ARG_SIZE - sizeof(int)                                    // NYW parameter
                                 - sizeof(SpinorX[NXZ])                                        // SpinorX array
@@ -98,23 +109,6 @@ namespace quda
       constexpr int coeff_size = Functor::coeff_mul ? MAX_MATRIX_SIZE / (NXZ * sizeof(typename Functor::coeff_t)) : arg_size;
 
       return std::min(arg_size, coeff_size);
-    }
-
-    /**
-       @brief Helper function to compute the maximum YW size for the
-       multi-blas runctions.  Since the SpinorX and SpinorZ arrays are
-       statically allocated with length NXZ, we can statically compute how
-       the maximum size of YW is and allocate this amount of space.  This
-       allows for a much larger NXZ (NYW) when NYW (NXZ) is small.
-    */
-    template <int NXZ, typename xType, typename yType, typename Functor>
-    inline constexpr int max_YW_size()
-    {
-      using SpinorX = Spinor<xType, 4>;
-      using SpinorY = Spinor<yType, 4>;
-      using SpinorZ = SpinorX;
-      using SpinorW = Spinor<xType, 4>;
-      return max_YW_size<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Functor>();
     }
 
     /**
@@ -195,15 +189,16 @@ namespace quda
       Spinor<store_t, N> Z[NXZ];
     };
 
-    template <int NYW, typename store_t, int N, bool> struct SpinorYW {
-      Spinor<store_t, N> Y[NYW];
-      Spinor<store_t, N> *W;
+    template <int NYW, typename x_store_t, int Nx, typename y_store_t, int Ny, bool> struct SpinorYW {
+      Spinor<y_store_t, Ny> Y[NYW];
+      Spinor<y_store_t, Ny> *W;
       SpinorYW() : W(Y) {}
     };
 
-    template <int NYW, typename store_t, int N> struct SpinorYW<NYW, store_t, N, true> {
-      Spinor<store_t, N> Y[NYW];
-      Spinor<store_t, N> W[NYW];
+    template <int NYW, typename x_store_t, int Nx, typename y_store_t, int Ny>
+    struct SpinorYW<NYW, x_store_t, Nx, y_store_t, Ny, true> {
+      Spinor<y_store_t, Ny> Y[NYW];
+      Spinor<x_store_t, Nx> W[NYW];
     };
 
     template <typename T> struct coeff_array {
