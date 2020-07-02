@@ -120,14 +120,20 @@ namespace quda {
         location(checkLocation(*x[0], *y[0], *z[0], *w[0]))
       {
         checkLength(*x[0], *y[0], *z[0], *w[0]);
-        auto x_prec = checkPrecision(*x[0], *z[0]);
-        auto y_prec = checkPrecision(*y[0], *w[0]);
-        auto x_order = checkOrder(*x[0], *z[0]);
-        auto y_order = checkOrder(*y[0], *w[0]);
+        auto x_prec = checkPrecision(*x[0], *z[0], *w[0]);
+        auto y_prec = y[0]->Precision();
+        auto x_order = checkOrder(*x[0], *z[0], *w[0]);
+        auto y_order = y[0]->FieldOrder();
+        if (sizeof(store_t) != x_prec) errorQuda("Expected precision %lu but received %d", sizeof(store_t), x_prec);
+        if (sizeof(y_store_t) != y_prec) errorQuda("Expected precision %lu but received %d", sizeof(y_store_t), y_prec);
         if (x_prec == y_prec && x_order != y_order) errorQuda("Orders %d %d do not match", x_order, y_order);
 
         strcpy(aux, "policy_kernel,");
         strcat(aux, x[0]->AuxString());
+        if (x_prec != y_prec) {
+          strcat(aux, ",");
+          strcat(aux, y[0]->AuxString());
+        }
         if (getFastReduce()) strcat(aux, ",fast_reduce");
 
         // since block dot product and block norm use the same functors, we need to distinguish them
@@ -358,10 +364,8 @@ namespace quda {
         T* result1 = &result[x.size()*(y.size()/2)];
         std::vector<ColorSpinorField*> y0(y.begin(), y.begin() + y.size()/2);
         std::vector<ColorSpinorField*> y1(y.begin() + y.size()/2, y.end());
-        std::vector<ColorSpinorField*> w0(w.begin(), w.begin() + w.size()/2);
-        std::vector<ColorSpinorField*> w1(w.begin() + w.size()/2, w.end());
-        multiReduce_recurse<ReducerDiagonal,ReducerOffDiagonal>(result0, x, y0, z, w0, i_idx, 2*j_idx+0, hermitian, tile_size);
-        multiReduce_recurse<ReducerDiagonal,ReducerOffDiagonal>(result1, x, y1, z, w1, i_idx, 2*j_idx+1, hermitian, tile_size);
+        multiReduce_recurse<ReducerDiagonal,ReducerOffDiagonal>(result0, x, y0, z, w, i_idx, 2*j_idx+0, hermitian, tile_size);
+        multiReduce_recurse<ReducerDiagonal,ReducerOffDiagonal>(result1, x, y1, z, w, i_idx, 2*j_idx+1, hermitian, tile_size);
       } else {
         T* tmp_dot = new T[x.size()*y.size()];
 
@@ -387,9 +391,11 @@ namespace quda {
           std::vector<ColorSpinorField*> x1(x.begin() + x.size()/2, x.end());
           std::vector<ColorSpinorField*> z0(z.begin(), z.begin() + z.size()/2);
           std::vector<ColorSpinorField*> z1(z.begin() + z.size()/2, z.end());
+          std::vector<ColorSpinorField*> w0(w.begin(), w.begin() + w.size()/2);
+          std::vector<ColorSpinorField*> w1(w.begin() + w.size()/2, w.end());
 
-          multiReduce_recurse<ReducerDiagonal,ReducerOffDiagonal>(result0, x0, y, z0, w, 2*i_idx+0, j_idx, hermitian, tile_size);
-          multiReduce_recurse<ReducerDiagonal,ReducerOffDiagonal>(result1, x1, y, z1, w, 2*i_idx+1, j_idx, hermitian, tile_size);
+          multiReduce_recurse<ReducerDiagonal,ReducerOffDiagonal>(result0, x0, y, z0, w0, 2*i_idx+0, j_idx, hermitian, tile_size);
+          multiReduce_recurse<ReducerDiagonal,ReducerOffDiagonal>(result1, x1, y, z1, w1, 2*i_idx+1, j_idx, hermitian, tile_size);
 
           const unsigned int xlen0 = x.size()/2;
           const unsigned int xlen1 = x.size() - xlen0;
@@ -741,8 +747,8 @@ namespace quda {
         int NYW_max = max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), false, false, coeff_width, true);
         // if fine-grid then we set max tile size to 32 to avoid unnecessary tuning
         uint2 max_tile_size = make_uint2(1, std::min( {NYW_max, (int)y.size(), x[0]->Ncolor() == 3 ? 32 : NYW_max} ));
-        multiReduce_recurse<multiDot, multiDot>(result_tmp, x, y, x, y, 0, 0, false, max_tile_size);
-      } else if (y.size() == 1) {
+        multiReduce_recurse<multiDot, multiDot>(result_tmp, x, y, x, x, 0, 0, false, max_tile_size);
+      } else if (y.size() == 1 && x[0]->Precision() == y[0]->Precision()) {
 
         double *result_trans = new double[x.size() * y.size()];
 
@@ -750,7 +756,7 @@ namespace quda {
         int NXZ_max = max_YW_size(y.size(), y[0]->Precision(), x[0]->Precision(), false, false, coeff_width, true);
         // if fine-grid then we set max tile size to 32 to avoid unnecessary tuning
         uint2 max_tile_size = make_uint2(1, std::min( {NXZ_max, (int)x.size(), x[0]->Ncolor() == 3 ? 32 : NXZ_max} ));
-        multiReduce_recurse<multiDot, multiDot>(result_trans, y, x, y, x, 0, 0, false, max_tile_size);
+        multiReduce_recurse<multiDot, multiDot>(result_trans, y, x, y, y, 0, 0, false, max_tile_size);
 
         // transpose the result if we are doing the transpose calculation
         const auto xlen = x.size();
@@ -760,8 +766,11 @@ namespace quda {
 
         delete[] result_trans;
 
+      } else if (x[0]->Precision() == y[0]->Precision()) {
+        TransposeTune<multiDot, multiDot, double> trans(result_tmp, x, y, x, x, coeff_width, false);
+        trans.apply(0);
       } else {
-        TransposeTune<multiDot, multiDot, double> tile(result_tmp, x, y, x, y, coeff_width, false);
+        TileSizeTune<multiDot, multiDot, double> tile(result_tmp, x, y, x, x, coeff_width, false);
         tile.apply(0);
       }
 
@@ -791,8 +800,8 @@ namespace quda {
         int NYW_max = max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), false, false, coeff_width, true);
         // if fine-grid then we set max tile size to 32 to avoid unnecessary tuning
         uint2 max_tile_size = make_uint2(1, std::min( {NYW_max, (int)y.size(), x[0]->Ncolor() == 3 ? 32 : NYW_max} ));
-        multiReduce_recurse<multiCdot, multiCdot>(result_tmp, x, y, x, y, 0, 0, false, max_tile_size);
-      } else if (y.size() == 1) {
+        multiReduce_recurse<multiCdot, multiCdot>(result_tmp, x, y, x, x, 0, 0, false, max_tile_size);
+      } else if (y.size() == 1 && x[0]->Precision() == y[0]->Precision()) {
 
         Complex *result_trans = new Complex[x.size() * y.size()];
 
@@ -800,7 +809,7 @@ namespace quda {
         int NXZ_max = max_YW_size(y.size(), y[0]->Precision(), x[0]->Precision(), false, false, coeff_width, true);
         // if fine-grid then we set max tile size to 32 to avoid unnecessary tuning
         uint2 max_tile_size = make_uint2(1, std::min( {NXZ_max, (int)x.size(), x[0]->Ncolor() == 3 ? 32 : NXZ_max} ));
-        multiReduce_recurse<multiCdot, multiCdot>(result_trans, y, x, y, x, 0, 0, false, max_tile_size);
+        multiReduce_recurse<multiCdot, multiCdot>(result_trans, y, x, y, y, 0, 0, false, max_tile_size);
 
         // transpose the result if we are doing the transpose calculation
         const auto xlen = x.size();
@@ -810,9 +819,12 @@ namespace quda {
 
         delete[] result_trans;
 
-      } else {
-        TransposeTune<multiCdot, multiCdot, Complex> trans(result_tmp, x, y, x, y, coeff_width, false);
+      } else if (x[0]->Precision() == y[0]->Precision()) {
+        TransposeTune<multiCdot, multiCdot, Complex> trans(result_tmp, x, y, x, x, coeff_width, false);
         trans.apply(0);
+      } else {
+        TileSizeTune<multiCdot, multiCdot, Complex> tile(result_tmp, x, y, x, x, coeff_width, false);
+        tile.apply(0);
       }
 
       // do a single multi-node reduction only once we have computed all local dot products
@@ -840,7 +852,7 @@ namespace quda {
       for (unsigned int i = 0; i < x.size()*y.size(); i++) result_tmp[i] = 0.0;
 
       int coeff_width = 0;
-      TileSizeTune<multiCdot, multiCdot, Complex> tile(result_tmp, x, y, x, y, coeff_width, true, false); // last false is b/c L2 norm
+      TileSizeTune<multiCdot, multiCdot, Complex> tile(result_tmp, x, y, x, x, coeff_width, true, false); // last false is b/c L2 norm
       tile.apply(0);
 
       // do a single multi-node reduction only once we have computed all local dot products
@@ -869,7 +881,7 @@ namespace quda {
       for (unsigned int i = 0; i < x.size()*y.size(); i++) result_tmp[i] = 0.0;
 
       int coeff_width = 0;
-      TileSizeTune<multiCdot, multiCdot, Complex> tile(result_tmp, x, y, x, y, coeff_width, true, true); // last true is b/c A norm
+      TileSizeTune<multiCdot, multiCdot, Complex> tile(result_tmp, x, y, x, x, coeff_width, true, true); // last true is b/c A norm
       tile.apply(0);
 
       // do a single multi-node reduction only once we have computed all local dot products

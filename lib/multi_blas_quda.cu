@@ -58,6 +58,8 @@ namespace quda {
         auto y_prec = y[0]->Precision();
         auto x_order = checkOrder(*x[0], *z[0], *w[0]);
         auto y_order = y[0]->FieldOrder();
+        if (sizeof(store_t) != x_prec) errorQuda("Expected precision %lu but received %d", sizeof(store_t), x_prec);
+        if (sizeof(y_store_t) != y_prec) errorQuda("Expected precision %lu but received %d", sizeof(y_store_t), y_prec);
         if (x_prec == y_prec && x_order != y_order) errorQuda("Orders %d %d do not match", x_order, y_order);
 
         // heuristic for enabling if we need the warp-splitting optimization
@@ -75,7 +77,7 @@ namespace quda {
         Cmatrix_h = reinterpret_cast<signed char *>(const_cast<typename T::type *>(c.data));
 
         strcpy(aux, x[0]->AuxString());
-        if (x[0]->Precision() != y[0]->Precision()) {
+        if (x_prec != y_prec) {
           strcat(aux, ",");
           strcat(aux, y[0]->AuxString());
         }

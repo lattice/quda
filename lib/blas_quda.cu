@@ -59,10 +59,12 @@ namespace quda {
         auto y_prec = checkPrecision(y, v);
         auto x_order = checkOrder(x, z, w);
         auto y_order = checkOrder(y, v);
+        if (sizeof(store_t) != x_prec) errorQuda("Expected precision %lu but received %d", sizeof(store_t), x_prec);
+        if (sizeof(y_store_t) != y_prec) errorQuda("Expected precision %lu but received %d", sizeof(y_store_t), y_prec);
         if (x_prec == y_prec && x_order != y_order) errorQuda("Orders %d %d do not match", x_order, y_order);
 
         strcpy(aux, x.AuxString());
-        if (x.Precision() != y.Precision()) {
+        if (x_prec != y_prec) {
           strcat(aux, ",");
           strcat(aux, y.AuxString());
         }
