@@ -646,7 +646,7 @@ extern "C" {
 		     void* const milc_momentum);
 
   /**
-   * Compute the gauge force and update the mometum field.  All fields
+   * Compute the gauge force and update the momentum field.  All fields
    * here are CPU fields in MILC order, and their precisions should
    * match.
    *
@@ -663,7 +663,7 @@ extern "C" {
 		      QudaMILCSiteArg_t *arg);
 
   /**
-   * Compute the gauge force and update the mometum field.  All fields
+   * Compute the gauge force and update the momentum field.  All fields
    * here are CPU fields in MILC order, and their precisions should
    * match.
    *
