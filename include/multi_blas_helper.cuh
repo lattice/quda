@@ -92,7 +92,7 @@ namespace quda
       using SpinorX = Spinor<xType, 4>;
       using SpinorY = Spinor<yType, 4>;
       using SpinorZ = SpinorX;
-      using SpinorW = Spinor<xType, 4>;
+      using SpinorW = SpinorX;
 
       // compute the size remaining for the Y and W accessors
       constexpr int arg_size = (MAX_ARG_SIZE - sizeof(int)                                    // NYW parameter
