@@ -931,11 +931,11 @@ namespace quda {
 							  const ColorSpinor<Float, Nc, Ns> &b, int sa, int sb)
   {
     complex<Float> dot = 0;
-    for (int c = 0; c < Nc; c++) {
-      dot.x += a(sa, c).real() * b(sb, c).real();
-      dot.x -= a(sa, c).imag() * b(sb, c).imag();
-      dot.y += a(sa, c).real() * b(sb, c).imag();
-      dot.y += a(sa, c).imag() * b(sb, c).real();
+    for (int c = 0; c < Nc; c++) {      
+      dot.real(dot.real() + a(sa, c).real() * b(sb, c).real());
+      dot.real(dot.real() - a(sa, c).imag() * b(sb, c).imag());
+      dot.imag(dot.imag() + a(sa, c).real() * b(sb, c).imag());
+      dot.imag(dot.imag() + a(sa, c).imag() * b(sb, c).real());
     }
     
     return dot;
@@ -972,10 +972,10 @@ namespace quda {
     complex<Float> dot = 0;
 #pragma unroll
     for (int c = 0; c < Nc; c++) {
-      dot.x += a(sa, c).real() * b(sb, c).real();
-      dot.x += a(sa, c).imag() * b(sb, c).imag();
-      dot.y += a(sa, c).real() * b(sb, c).imag();
-      dot.y -= a(sa, c).imag() * b(sb, c).real();
+      dot.real(dot.real() + a(sa, c).real() * b(sb, c).real());
+      dot.real(dot.real() + a(sa, c).imag() * b(sb, c).imag());
+      dot.imag(dot.imag() + a(sa, c).real() * b(sb, c).imag());
+      dot.imag(dot.imag() - a(sa, c).imag() * b(sb, c).real());      
     }
     return dot;
   }
@@ -995,10 +995,10 @@ namespace quda {
     complex<Float> dot = 0;
 #pragma unroll
     for (int c = 0; c < Nc; c++) {
-      dot.x += a(sa, c).real() * b(sb, c).real();
-      dot.x += a(sa, c).imag() * b(sb, c).imag();
-      dot.y += a(sa, c).real() * b(sb, c).imag();
-      dot.y -= a(sa, c).imag() * b(sb, c).real();
+      dot.real(dot.real() + a(sa, c).real() * b(sb, c).real());
+      dot.real(dot.real() + a(sa, c).imag() * b(sb, c).imag());
+      dot.imag(dot.imag() + a(sa, c).real() * b(sb, c).imag());
+      dot.imag(dot.imag() - a(sa, c).imag() * b(sb, c).real());
     }
     return dot;
   }
