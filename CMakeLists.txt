@@ -217,9 +217,8 @@ option(QUDA_FLOAT8 "enable float-8 ordered fixed-point fields?" OFF)
 option(QUDA_NVML "use NVML to report CUDA graphics driver version" OFF)
 option(QUDA_NUMA_NVML "experimental use of NVML to set numa affinity" OFF)
 option(QUDA_VERBOSE_BUILD "display kernel register usage" OFF)
-option(QUDA_BUILD_NATIVE_LAPACK "build the native lapack library according to QUDA_TARGET" ON)
+option(QUDA_BUILD_NATIVE_LAPACK "build the native blas/lapack library according to QUDA_TARGET" ON)
 # FIXME: Jenkins fails when default is ON
-option(QUDA_OPENMP "enable OpenMP" OFF)
 
 set(QUDA_MAX_MULTI_BLAS_N
     "4"
@@ -238,6 +237,7 @@ option(QUDA_CTEST_SEP_DSLASH_POLICIES "Test Dslash policies separately in ctest 
 option(QUDA_FAST_COMPILE_REDUCE "enable fast compilation in blas and reduction kernels (single warp per reduction)" OFF)
 option(QUDA_FAST_COMPILE_DSLASH "enable fast compilation in dslash kernels (~20% perf impact)" OFF)
 
+option(QUDA_OPENMP "enable OpenMP" OFF)
 set(QUDA_CXX_STANDARD
     14
     CACHE STRING "set the CXX Standard (14 or 17)")
