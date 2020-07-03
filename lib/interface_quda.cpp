@@ -204,6 +204,9 @@ static TimeProfile profilePlaq("plaqQuda");
 //!< Profiler for wuppertalQuda
 static TimeProfile profileWuppertal("wuppertalQuda");
 
+//!< Profiler for gaussianSmearQuda
+static TimeProfile profileGaussianSmear("gaussianSmearQuda");
+
 //!<Profiler for gaussQuda
 static TimeProfile profileGauss("gaussQuda");
 
@@ -5471,6 +5474,93 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
 
   profileWuppertal.TPSTOP(QUDA_PROFILE_TOTAL);
 }
+
+void performGaussianSmearNStep(void *h_out, void *h_in, QudaInvertParam *inv_param, unsigned int n_steps, double omega)
+{
+  profileGaussianSmear.TPSTART(QUDA_PROFILE_TOTAL);
+
+  if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
+
+  pushVerbosity(inv_param->verbosity);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
+
+  cudaGaugeField *gauge_ptr = nullptr;
+
+  if (gaugeSmeared != nullptr) {
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Gaussian smearing done with gaugeSmeared\n");
+    GaugeFieldParam gParam(*gaugePrecise);
+    gParam.create = QUDA_NULL_FIELD_CREATE;
+    gauge_ptr = new cudaGaugeField(gParam);
+    copyExtendedGauge(*gauge_ptr, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
+    gauge_ptr->exchangeGhost();
+  } else {
+    if (getVerbosity() >= QUDA_VERBOSE)
+      printfQuda("Gaussian smearing done with gaugePrecise\n");
+    gauge_ptr = gaugePrecise;
+  }
+
+  // Create device side ColorSpinorField vectors and to pass to the
+  // compute function.
+  const int *X = gauge_ptr->X();
+  ColorSpinorParam cpuParam(h_in, *inv_param, X, false, inv_param->input_location);
+  // QUDA style pointer for host data.
+  ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
+
+  // Device side data.
+  ColorSpinorParam cudaParam(cpuParam);
+  cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
+  ColorSpinorField *in = ColorSpinorField::Create(cudaParam);
+  //Copy host data to device
+  in = in_h;
+  
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    double cpu = blas::norm2(*in_h);
+    double gpu = blas::norm2(*in);
+    printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
+  }
+
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
+  ColorSpinorField *out = ColorSpinorField::Create(cudaParam);
+  
+  // Computes out(x) = (in(x) + (\omega/(4N) * \sum_mu (U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))))
+  double coeff = omega/(4*n_steps);
+  
+  for (unsigned int i = 0; i < n_steps; i++) {
+    // If on an iteration greater that i=0, swap the `out` and `in` pointers.
+    // This will feed the previous iteration's result into the loop, and
+    // overwrite the previous `in`.    
+    if (i > 0) std::swap(in, out);
+    ApplyLaplace(*out, *in, *gauge_ptr, 3, coeff, 1.0, *in, 0, false, nullptr, profileGaussianSmear);
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+      double norm = blas::norm2(*out);
+      printfQuda("Step %d, vector norm %e\n", i, norm);
+    }
+  }
+
+  // QUDA style pointer for host data.
+  cpuParam.v = h_out;
+  cpuParam.location = inv_param->output_location;
+  ColorSpinorField *out_h = ColorSpinorField::Create(cpuParam);
+  //Copy device data to host.
+  out_h = out;
+  
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    double cpu = blas::norm2(*out_h);
+    double gpu = blas::norm2(*out);
+    printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
+  }
+
+  if (gaugeSmeared != nullptr)
+    delete gauge_ptr;
+  
+  delete out_h;
+  delete in_h;
+  
+  popVerbosity();
+  
+  profileGaussianSmear.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
 
 void performAPEnStep(unsigned int n_steps, double alpha, int meas_interval)
 {

@@ -1282,6 +1282,18 @@ extern "C" {
   void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param, unsigned int n_steps, double alpha);
 
   /**
+   * Performs Gaussian smearing on a given spinor using the gauge field
+   * gaugeSmeared, if it exist, or gaugePrecise if no smeared field is present.
+   * @param h_out  Result spinor field
+   * @param h_in   Input spinor field
+   * @param param  Contains all metadata regarding host and device
+   *               storage and operator which will be applied to the spinor
+   * @param n_steps Number of steps to apply.
+   * @param omega  Omega coefficient for Gaussian smearing.
+   */
+  void performGaussianSmearNStep(void *h_out, void *h_in, QudaInvertParam *param, unsigned int n_steps, double omega);
+
+  /**
    * Performs APE smearing on gaugePrecise and stores it in gaugeSmeared
    * @param n_steps Number of steps to apply.
    * @param alpha  Alpha coefficient for APE smearing.
