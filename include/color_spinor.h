@@ -1013,7 +1013,7 @@ namespace quda {
      @param sb k spin index
      @return The cross product
   */
-  template <typename Float, 3, int Ns>
+  template <typename Float, int Ns>
     __device__ __host__ inline ColorSpinor<Float, 3, 1> crossProduct(const ColorSpinor<Float, 3, Ns> &a,
 								      const ColorSpinor<Float, 3, Ns> &b, int sa, int sb)
     {
