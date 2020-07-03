@@ -201,16 +201,16 @@ target_compile_definitions(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,COMPILE_DEFIN
 target_include_directories(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,INCLUDE_DIRECTORIES>)
 target_compile_options(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,COMPILE_OPTIONS>)
 
-# add target specific files
-if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")
-  add_subdirectory(targets/cuda)
-endif()
-if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
-  #set(QUDA_TARGET_DIR "hip")
-endif()
-
+# add target specific files		
+if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")		
+  add_subdirectory(targets/cuda)		
+endif()		
+if(${QUDA_TARGET_TYPE} STREQUAL "HIP")		
+  #set(QUDA_TARGET_DIR "hip")		
+endif()		
+ 
 target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_target>)
-
+ 
 # propagate CXX flags to CUDA host compiler
 if(${QUDA_PROPAGATE_CXX_FLAGS})
   target_compile_options(
@@ -386,7 +386,7 @@ if(QUDA_QIO)
     add_dependencies(quda QIO)
     add_dependencies(quda_cpp QIO)
     #TODO: need to figure out how to propagate that cleanly
-    add_dependencies(quda_cuda_target QMP)
+    add_dependencies(quda_cuda_target QIO)
   endif()
   target_compile_definitions(quda PUBLIC HAVE_QIO)
   target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_QIOHOME}/include>)
