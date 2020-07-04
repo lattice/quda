@@ -931,13 +931,13 @@ namespace quda {
 							  const ColorSpinor<Float, Nc, Ns> &b, int sa, int sb)
   {
     complex<Float> dot = 0;
-    for (int c = 0; c < Nc; c++) {      
+    for (int c = 0; c < Nc; c++) {
       dot.real(dot.real() + a(sa, c).real() * b(sb, c).real());
       dot.real(dot.real() - a(sa, c).imag() * b(sb, c).imag());
       dot.imag(dot.imag() + a(sa, c).real() * b(sb, c).imag());
       dot.imag(dot.imag() + a(sa, c).imag() * b(sb, c).real());
     }
-    
+
     return dot;
   }
 
@@ -975,7 +975,7 @@ namespace quda {
       dot.real(dot.real() + a(sa, c).real() * b(sb, c).real());
       dot.real(dot.real() + a(sa, c).imag() * b(sb, c).imag());
       dot.imag(dot.imag() + a(sa, c).real() * b(sb, c).imag());
-      dot.imag(dot.imag() - a(sa, c).imag() * b(sb, c).real());      
+      dot.imag(dot.imag() - a(sa, c).imag() * b(sb, c).real());
     }
     return dot;
   }
@@ -1014,14 +1014,14 @@ namespace quda {
      @return The cross product
   */
   template <typename Float, int Ns>
-    __device__ __host__ inline ColorSpinor<Float, 3, 1> crossProduct(const ColorSpinor<Float, 3, Ns> &a,
-								      const ColorSpinor<Float, 3, Ns> &b, int sa, int sb)
-    {
-      ColorSpinor<Float, 3, 1> res;
-      res(0,0) = a(sa,1) * b(sb,2) - a(sa,2) * b(sb,1);
-      res(0,1) = a(sa,2) * b(sb,0) - a(sa,0) * b(sb,2);
-      res(0,2) = a(sa,0) * b(sb,1) - a(sa,1) * b(sb,0);      
-      return res;
+  __device__ __host__ inline ColorSpinor<Float, 3, 1> crossProduct(const ColorSpinor<Float, 3, Ns> &a,
+                                                                   const ColorSpinor<Float, 3, Ns> &b, int sa, int sb)
+  {
+    ColorSpinor<Float, 3, 1> res;
+    res(0, 0) = a(sa, 1) * b(sb, 2) - a(sa, 2) * b(sb, 1);
+    res(0, 1) = a(sa, 2) * b(sb, 0) - a(sa, 0) * b(sb, 2);
+    res(0, 2) = a(sa, 0) * b(sb, 1) - a(sa, 1) * b(sb, 0);
+    return res;
     }
   
   
