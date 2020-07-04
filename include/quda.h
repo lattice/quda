@@ -1289,14 +1289,13 @@ extern "C" {
   /**
    * Performs Gaussian smearing on a given spinor using the gauge field
    * gaugeSmeared, if it exist, or gaugePrecise if no smeared field is present.
-   * @param h_out  Result spinor field
-   * @param h_in   Input spinor field
+   * @param h_in   Input spinor field to smear
    * @param param  Contains all metadata regarding host and device
    *               storage and operator which will be applied to the spinor
    * @param n_steps Number of steps to apply.
    * @param omega  Omega coefficient for Gaussian smearing.
    */
-  void performGaussianSmearNStep(void *h_out, void *h_in, QudaInvertParam *param, unsigned int n_steps, double omega);
+  void performGaussianSmearNStep(void *h_in, QudaInvertParam *param, unsigned int n_steps, double omega);
 
   /**
    * Performs APE smearing on gaugePrecise and stores it in gaugeSmeared

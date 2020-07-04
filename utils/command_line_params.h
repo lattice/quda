@@ -347,6 +347,9 @@ extern double eofa_mq1;
 extern double eofa_mq2;
 extern double eofa_mq3;
 
+extern std::array<int, 4> source_positon;
+extern int source_smear_steps;
+extern double source_smear_coeff;
 extern double stout_smear_rho;
 extern double stout_smear_epsilon;
 extern double ape_smear_rho;

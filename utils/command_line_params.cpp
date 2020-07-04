@@ -214,6 +214,9 @@ double eofa_mq1 = 1.0;
 double eofa_mq2 = 0.085;
 double eofa_mq3 = 1.0;
 
+std::array<int, 4> source_pos = {0, 0, 0, 0};
+int source_smear_steps = 50;
+double source_smear_coeff = 0.2;
 double stout_smear_rho = 0.1;
 double stout_smear_epsilon = -0.25;
 double ape_smear_rho = 0.6;
@@ -490,6 +493,13 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
       "The solution we desire (mat (default), mat-dag-mat, mat-pc, mat-pc-dag-mat-pc (default for multi-shift))")
     ->transform(CLI::QUDACheckedTransformer(solution_type_map));
 
+  quda_app->add_option("--source-smear-coeff", source_smear_coeff, "Set the alpha(Wuppertal) or omega(Gaussian) source smearing value (default 0.2)");
+
+  quda_app->add_option("--source-smear-steps", source_smear_steps, "Set the number of source smearing steps (default 50)");
+
+  // source position
+  auto src_pos_opt = quda_app->add_option("--src-pos", source_position, "Set the position of a point source (X Y Z T) (default(0,0,0,0)")->check(CLI::Range(1, 512));
+  
   quda_app
     ->add_option("--fermion-t-boundary", fermion_t_boundary,
                  "The fermoinic temporal boundary conditions (anti-periodic (default), periodic")

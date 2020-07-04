@@ -1509,6 +1509,8 @@ void endQuda(void)
     profileCovDev.Print();
     profilePlaq.Print();
     profileGaugeObs.Print();
+    profileWuppertal.Print();
+    profileGaussianSmear.Print();
     profileAPE.Print();
     profileSTOUT.Print();
     profileOvrImpSTOUT.Print();
@@ -5475,7 +5477,7 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
   profileWuppertal.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-void performGaussianSmearNStep(void *h_out, void *h_in, QudaInvertParam *inv_param, unsigned int n_steps, double omega)
+void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned int n_steps, double omega)
 {
   profileGaussianSmear.TPSTART(QUDA_PROFILE_TOTAL);
 
@@ -5537,30 +5539,18 @@ void performGaussianSmearNStep(void *h_out, void *h_in, QudaInvertParam *inv_par
     }
   }
 
-  // QUDA style pointer for host data.
-  cpuParam.v = h_out;
-  cpuParam.location = inv_param->output_location;
-  ColorSpinorField *out_h = ColorSpinorField::Create(cpuParam);
   //Copy device data to host.
-  out_h = out;
+  in_h = out;
   
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(*out_h);
-    double gpu = blas::norm2(*out);
-    printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
-  }
-
   if (gaugeSmeared != nullptr)
     delete gauge_ptr;
   
-  delete out_h;
   delete in_h;
   
   popVerbosity();
   
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_TOTAL);
 }
-
 
 void performAPEnStep(unsigned int n_steps, double alpha, int meas_interval)
 {

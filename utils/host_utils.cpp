@@ -231,6 +231,26 @@ void constructWilsonTestSpinorParam(quda::ColorSpinorParam *cs_param, const Quda
   cs_param->location = QUDA_CPU_FIELD_LOCATION;
 }
 
+/*
+void smearSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x, const int omega, const int N)
+{
+  // Parameters for the lattice vector
+  quda::ColorSpinorParam param;
+  param.nColor = nColor;
+  param.nSpin = nSpin;
+  param.setPrecision(precision);
+  param.create = QUDA_REFERENCE_FIELD_CREATE;
+  param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+  param.nDim = 4;
+  param.siteSubset = QUDA_FULL_SITE_SUBSET;
+  param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+  param.location = QUDA_CPU_FIELD_LOCATION;
+  for (int d = 0; d < 4; d++) param.x[d] = x[d];
+  //quda::ColorSpinorField spinor_in = quda::ColorSpinorField::Create(param);
+  quda::cpuColorSpinorField spinor_in(param);  
+}
+*/
+
 void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x,
                                  quda::RNG &rng)
 {
