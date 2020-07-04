@@ -247,7 +247,7 @@ void smearSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, 
   param.location = QUDA_CPU_FIELD_LOCATION;
   for (int d = 0; d < 4; d++) param.x[d] = x[d];
   //quda::ColorSpinorField spinor_in = quda::ColorSpinorField::Create(param);
-  quda::cpuColorSpinorField spinor_in(param);  
+  quda::cpuColorSpinorField spinor_in(param);
 }
 */
 

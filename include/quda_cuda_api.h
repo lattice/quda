@@ -165,7 +165,7 @@ namespace quda {
      @param[in] attr the cudaFuncGetAttributes object to store the output
      @param[in] func Function for which we are setting the attribute
   */
-  cudaError_t qudaFuncGetAttributes(cudaFuncAttributes &attr, const void* func);
+  cudaError_t qudaFuncGetAttributes(cudaFuncAttributes &attr, const void *func);
 #endif
 
   /**

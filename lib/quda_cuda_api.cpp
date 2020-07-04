@@ -399,7 +399,7 @@ namespace quda {
     return error;
   }
 
-  cudaError_t qudaFuncGetAttributes(cudaFuncAttributes &attr, const void* func)
+  cudaError_t qudaFuncGetAttributes(cudaFuncAttributes &attr, const void *func)
   {
     // no driver API variant here since we have C++ functions
     PROFILE(cudaError_t error = cudaFuncGetAttributes(&attr, func), QUDA_PROFILE_FUNC_SET_ATTRIBUTE);

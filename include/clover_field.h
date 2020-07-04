@@ -307,7 +307,6 @@ namespace quda {
   */
   void computeClover(CloverField &clover, const GaugeField &fmunu, double coeff);
 
-
   /**
      @brief This generic function is used for copying the clover field where
      in the input and output can be in any order and location.

@@ -1333,9 +1333,7 @@ void mdw_mdagm_local(void *out, void **gauge, void *in, double _Complex *kappa_b
 
   int R[4];
 
-  for (int d = 0; d < 4; d++) {
-    R[d] = comm_dim_partitioned(d) ? 2 : 0;
-  }
+  for (int d = 0; d < 4; d++) { R[d] = comm_dim_partitioned(d) ? 2 : 0; }
 
   cpuGaugeField *padded_gauge = createExtendedGauge(gauge, gauge_param, R);
 

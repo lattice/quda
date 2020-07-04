@@ -498,18 +498,20 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     ->transform(CLI::QUDACheckedTransformer(solution_type_map));
 
   quda_app->add_option("--save-prop", prop_outfile, "Save propagators to <file> (requires QIO)");
-  quda_app->add_option("--load-prop", prop_infile, "Load propagators to <file> (requires QIO)")
-    ->check(CLI::ExistingFile);
+  quda_app->add_option("--load-prop", prop_infile, "Load propagators to <file> (requires QIO)")->check(CLI::ExistingFile);
   quda_app->add_option("--save-source", source_outfile, "Save source to <file> (requires QIO)");
   quda_app->add_option("--load-source", source_infile, "Load source to <file> (requires QIO)");
-  
-  quda_app->add_option("--source-smear-coeff", source_smear_coeff, "Set the alpha(Wuppertal) or omega(Gaussian) source smearing value (default 0.2)");
-  
-  quda_app->add_option("--source-smear-steps", source_smear_steps, "Set the number of source smearing steps (default 50)");
+
+  quda_app->add_option("--source-smear-coeff", source_smear_coeff,
+                       "Set the alpha(Wuppertal) or omega(Gaussian) source smearing value (default 0.2)");
+
+  quda_app->add_option("--source-smear-steps", source_smear_steps,
+                       "Set the number of source smearing steps (default 50)");
 
   // source position
-  quda_app->add_option("--src-pos", source_position, "Set the position of a point source (X Y Z T) (default(0,0,0,0)")->check(CLI::Range(0, 512));
-  
+  quda_app->add_option("--src-pos", source_position, "Set the position of a point source (X Y Z T) (default(0,0,0,0)")
+    ->check(CLI::Range(0, 512));
+
   quda_app
     ->add_option("--fermion-t-boundary", fermion_t_boundary,
                  "The fermoinic temporal boundary conditions (anti-periodic (default), periodic")

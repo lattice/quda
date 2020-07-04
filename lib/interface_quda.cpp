@@ -5481,7 +5481,7 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned 
 {
   profileGaussianSmear.TPSTART(QUDA_PROFILE_TOTAL);
   profileGaussianSmear.TPSTART(QUDA_PROFILE_INIT);
-  
+
   if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
 
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
@@ -5496,20 +5496,17 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned 
     copyExtendedGauge(*gauge_ptr, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
     gauge_ptr->exchangeGhost();
   } else {
-    if (getVerbosity() >= QUDA_VERBOSE)
-      printfQuda("Gaussian smearing done with gaugePrecise\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Gaussian smearing done with gaugePrecise\n");
     gauge_ptr = gaugePrecise;
   }
 
   if (!initialized) errorQuda("QUDA not initialized");
-  
+
   pushVerbosity(inv_param->verbosity);
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    printQudaInvertParam(inv_param);
-  }
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) { printQudaInvertParam(inv_param); }
 
   checkInvertParam(inv_param);
-  
+
   // Create device side ColorSpinorField vectors and to pass to the
   // compute function.
   const int *X = gauge_ptr->X();
@@ -5517,7 +5514,7 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned 
   cpuParam.nSpin = 4;
   // QUDA style pointer for host data.
   ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
-  
+
   // Device side data.
   ColorSpinorParam cudaParam(cpuParam);
   cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
@@ -5527,7 +5524,7 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned 
   ColorSpinorField *out = ColorSpinorField::Create(cudaParam);
   ColorSpinorField *temp1 = ColorSpinorField::Create(cudaParam);
   ColorSpinorField *temp2 = ColorSpinorField::Create(cudaParam);
-  
+
   // Create the laplace operator
   //------------------------------------------------------
   bool pc_solve = false;
@@ -5537,29 +5534,27 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned 
   Dirac *dPre = nullptr;
   createDirac(d, dSloppy, dPre, *inv_param, pc_solve);
   Dirac &dirac = *d;
-  DiracM laplace_op(dirac);  
+  DiracM laplace_op(dirac);
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_INIT);
-  
-  //Copy host data to device
+
+  // Copy host data to device
   profileGaussianSmear.TPSTART(QUDA_PROFILE_H2D);
   *in = *in_h;
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_H2D);
 
   // Scale up the source to prevent underflow
   profileGaussianSmear.TPSTART(QUDA_PROFILE_COMPUTE);
-  blas::ax(1e5, *in); 
+  blas::ax(1e5, *in);
 
   double cpu = blas::norm2(*in_h);
   double gpu = blas::norm2(*in);
-  if (getVerbosity() >= QUDA_VERBOSE) { 
-    printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
-  }
-  
+  if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("In CPU %e CUDA %e\n", cpu, gpu); }
+
   // Computes out(x) = (in(x) + (\omega/(4N) * \sum_mu (U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))))
   for (unsigned int i = 0; i < n_steps; i++) {
     // If on an iteration greater that i=0, swap the `out` and `in` pointers.
     // This will feed the previous iteration's result into the loop, and
-    // overwrite the previous `in`.    
+    // overwrite the previous `in`.
     if (i > 0) std::swap(in, out);
     laplace_op(*out, *in, *temp1, *temp2);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
@@ -5567,11 +5562,11 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned 
       printfQuda("Step %d, vector norm %e\n", i, norm);
     }
   }
-  
+
   // Rescale down
   blas::ax(1e-5, *out);
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_COMPUTE);
-  //Copy device data to host.
+  // Copy device data to host.
   profileGaussianSmear.TPSTART(QUDA_PROFILE_D2H);
   *in_h = *out;
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_D2H);
@@ -5586,7 +5581,7 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned 
   delete d;
   delete dSloppy;
   delete dPre;
-  
+
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_FREE);
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_TOTAL);
   saveTuneCache();

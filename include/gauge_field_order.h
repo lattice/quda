@@ -392,8 +392,7 @@ namespace quda {
         scale(a.scale),
         scale_inv(a.scale_inv)
       {
-        for (int d=0; d<QUDA_MAX_GEOMETRY; d++)
-	  u[d] = a.u[d];
+        for (int d = 0; d < QUDA_MAX_GEOMETRY; d++) u[d] = a.u[d];
       }
 
       void resetScale(Float max) {
@@ -490,10 +489,10 @@ namespace quda {
         scale(a.scale),
         scale_inv(a.scale_inv)
       {
-        for (int d=0; d<8; d++) {
-	  ghost[d] = a.ghost[d];
+        for (int d = 0; d < 8; d++) {
+          ghost[d] = a.ghost[d];
 	  ghostOffset[d] = a.ghostOffset[d];
-	}
+        }
       }
 
       void resetScale(Float max) {
@@ -633,10 +632,10 @@ namespace quda {
         scale(a.scale),
         scale_inv(a.scale_inv)
       {
-        for (int d=0; d<8; d++) {
-	  ghost[d] = a.ghost[d];
+        for (int d = 0; d < 8; d++) {
+          ghost[d] = a.ghost[d];
 	  ghostOffset[d] = a.ghostOffset[d];
-	}
+        }
       }
 
       void resetScale(Float max) {
@@ -1701,7 +1700,7 @@ namespace quda {
             ghost[i] = ghost_ ? ghost_[i] : 0;
             faceVolumeCB[i] = u.SurfaceCB(i) * u.Nface(); // face volume equals surface * depth
           }
-      }
+        }
 
       FloatNOrder(const FloatNOrder &order) :
         reconstruct(order.reconstruct),

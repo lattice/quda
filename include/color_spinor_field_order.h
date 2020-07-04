@@ -348,12 +348,12 @@ namespace quda {
       int faceVolumeCB[4];
       int ghostOffset[4];
       GhostAccessorCB(const ColorSpinorField &a, int nFace = 1) {
-        for (int d=0; d<4; d++) {
-          faceVolumeCB[d] = nFace*a.SurfaceCB(d);
-          ghostOffset[d] = faceVolumeCB[d]*nColor*nSpin*nVec;
+        for (int d = 0; d < 4; d++) {
+          faceVolumeCB[d] = nFace * a.SurfaceCB(d);
+          ghostOffset[d] = faceVolumeCB[d] * nColor * nSpin * nVec;
         }
       }
-      GhostAccessorCB() : faceVolumeCB{ }, ghostOffset{ } { }
+      GhostAccessorCB() : faceVolumeCB {}, ghostOffset {} {}
       __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const
       { return parity*ghostOffset[dim] + indexFloatN<nSpin,nColor,nVec,4>(x_cb, s, c, v, faceVolumeCB[dim]); }
     };
@@ -388,25 +388,29 @@ namespace quda {
         for (int i = 0; i < M; i++) {
           ((vec_t *)tmp)[i] = vector_load<vec_t>((vec_t *)(in + parity * offset_cb), i * stride + x_cb);
         }
-        constexpr int N_chi = N / (nSpin/nSpinBlock);
+        constexpr int N_chi = N / (nSpin / nSpinBlock);
 #pragma unroll
-        for (int i = 0; i < N_chi; i++) out[i] = complex<Float>(tmp[chi*N_chi + 2*i + 0], tmp[chi*N_chi + 2*i + 1]);
+        for (int i = 0; i < N_chi; i++)
+          out[i] = complex<Float>(tmp[chi * N_chi + 2 * i + 0], tmp[chi * N_chi + 2 * i + 1]);
       }
     };
 
-    template<typename Float, int nSpin, int nColor, int nVec>
-      struct GhostAccessorCB<Float,nSpin,nColor,nVec,QUDA_FLOAT8_FIELD_ORDER> {
+    template <typename Float, int nSpin, int nColor, int nVec>
+    struct GhostAccessorCB<Float, nSpin, nColor, nVec, QUDA_FLOAT8_FIELD_ORDER> {
       int faceVolumeCB[4];
       int ghostOffset[4];
-      GhostAccessorCB(const ColorSpinorField &a, int nFace = 1) {
-        for (int d=0; d<4; d++) {
-          faceVolumeCB[d] = nFace*a.SurfaceCB(d);
-          ghostOffset[d] = faceVolumeCB[d]*nColor*nSpin*nVec;
+      GhostAccessorCB(const ColorSpinorField &a, int nFace = 1)
+      {
+        for (int d = 0; d < 4; d++) {
+          faceVolumeCB[d] = nFace * a.SurfaceCB(d);
+          ghostOffset[d] = faceVolumeCB[d] * nColor * nSpin * nVec;
         }
       }
-      GhostAccessorCB() : faceVolumeCB{ }, ghostOffset{ } { }
+      GhostAccessorCB() : faceVolumeCB {}, ghostOffset {} {}
       __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const
-      { return parity*ghostOffset[dim] + indexFloatN<nSpin,nColor,nVec,8>(x_cb, s, c, v, faceVolumeCB[dim]); }
+      {
+        return parity * ghostOffset[dim] + indexFloatN<nSpin, nColor, nVec, 8>(x_cb, s, c, v, faceVolumeCB[dim]);
+      }
     };
 
     template <typename Float, typename storeFloat> __host__ __device__ inline constexpr bool fixed_point() { return false; }
@@ -682,7 +686,7 @@ namespace quda {
         } else {
           complex<storeFloat> tmp = __ldg(v + accessor.index(parity, x_cb, s, c, n));
           Float norm_ = block_float ? __ldg(norm + parity * norm_offset + x_cb) : scale_inv;
-          return norm_*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
+          return norm_ * complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
         }
 #else
         if (!fixed) {
