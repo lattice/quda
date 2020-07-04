@@ -1293,7 +1293,6 @@ extern "C" {
    * @param param  Contains all metadata regarding host and device
    *               storage and operator which will be applied to the spinor
    * @param n_steps Number of steps to apply.
-   * @param omega  Omega coefficient for Gaussian smearing.
    */
   void performGaussianSmearNStep(void *h_in, QudaInvertParam *param, unsigned int n_steps);
 
