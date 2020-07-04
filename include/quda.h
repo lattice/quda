@@ -1295,8 +1295,8 @@ extern "C" {
    * @param n_steps Number of steps to apply.
    * @param omega  Omega coefficient for Gaussian smearing.
    */
-  void performGaussianSmearNStep(void *h_in, QudaInvertParam *param, unsigned int n_steps, double omega);
-
+  void performGaussianSmearNStep(void *h_in, QudaInvertParam *param, unsigned int n_steps);
+  
   /**
    * Performs APE smearing on gaugePrecise and stores it in gaugeSmeared
    * @param n_steps Number of steps to apply.

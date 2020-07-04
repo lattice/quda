@@ -317,6 +317,7 @@ namespace quda {
       printfQuda("precision = %d\n", precision);
       printfQuda("ghost_precision = %d\n", ghost_precision);
       printfQuda("pad = %d\n", pad);
+      printfQuda("location = %d\n", location);
       printfQuda("siteSubset = %d\n", siteSubset);
       printfQuda("siteOrder = %d\n", siteOrder);
       printfQuda("fieldOrder = %d\n", fieldOrder);

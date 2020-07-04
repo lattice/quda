@@ -347,7 +347,11 @@ extern double eofa_mq1;
 extern double eofa_mq2;
 extern double eofa_mq3;
 
-extern std::array<int, 4> source_positon;
+extern char prop_infile[256];
+extern char prop_outfile[256];
+extern char source_infile[256];
+extern char source_outfile[256];
+extern std::array<int, 4> source_position;
 extern int source_smear_steps;
 extern double source_smear_coeff;
 extern double stout_smear_rho;
