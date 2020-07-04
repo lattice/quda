@@ -20,12 +20,13 @@
 void display_test_info()
 {
   printfQuda("running the following test:\n");
-  printfQuda("prec    prec_sloppy   multishift  matpc_type  recon  recon_sloppy solve_type S_dimension T_dimension Ls_dimension   dslash_type  normalization\n");
-  printfQuda("%6s   %6s          %d     %12s     %2s     %2s         %10s %3d/%3d/%3d     %3d         %2d       %14s  %8s\n",
-             get_prec_str(prec), get_prec_str(prec_sloppy), multishift, get_matpc_str(matpc_type),
-             get_recon_str(link_recon), get_recon_str(link_recon_sloppy),
-             get_solve_str(solve_type), xdim, ydim, zdim, tdim, Lsdim,
-             get_dslash_str(dslash_type), get_mass_normalization_str(normalization));
+  printfQuda("prec    prec_sloppy   multishift  matpc_type  recon  recon_sloppy solve_type S_dimension T_dimension "
+             "Ls_dimension   dslash_type  normalization\n");
+  printfQuda(
+    "%6s   %6s          %d     %12s     %2s     %2s         %10s %3d/%3d/%3d     %3d         %2d       %14s  %8s\n",
+    get_prec_str(prec), get_prec_str(prec_sloppy), multishift, get_matpc_str(matpc_type), get_recon_str(link_recon),
+    get_recon_str(link_recon_sloppy), get_solve_str(solve_type), xdim, ydim, zdim, tdim, Lsdim,
+    get_dslash_str(dslash_type), get_mass_normalization_str(normalization));
 
   if (inv_multigrid) {
     printfQuda("MG parameters\n");
@@ -267,45 +268,45 @@ int main(int argc, char **argv)
   // Vector construct END
   //-----------------------------------------------------------------------------------
 
-
   // QUDA propagator test BEGIN
   //----------------------------------------------------------------------------
-  
+
   double *time = new double[12];
   double *gflops = new double[12];
 
-  printfQuda("Source position: %d %d %d %d\n", source_position[0], source_position[1], source_position[2], source_position[3]);
+  printfQuda("Source position: %d %d %d %d\n", source_position[0], source_position[1], source_position[2],
+             source_position[3]);
 
   QudaInvertParam inv_param_smear = newQudaInvertParam();
-  // Borrow problem parameters, then adjust  
+  // Borrow problem parameters, then adjust
   setInvertParam(inv_param_smear);
-  double coeff = source_smear_coeff/(4*source_smear_steps);
+  double coeff = source_smear_coeff / (4 * source_smear_steps);
   inv_param_smear.dslash_type = QUDA_LAPLACE_DSLASH;
   inv_param_smear.kappa = coeff;
-  inv_param_smear.laplace3D = 3;  
-  
+  inv_param_smear.laplace3D = 3;
+
   for (int dil = 0; dil < 12; dil++) {
-    
+
     // Allocate memory and set pointers
     qudaOutProp[dil] = quda::ColorSpinorField::Create(cs_param);
-    outProp[dil] = qudaOutProp[dil]->V();    
+    outProp[dil] = qudaOutProp[dil]->V();
     in = quda::ColorSpinorField::Create(cs_param);
 
     if (strcmp(source_infile, "") != 0) {
 
-      std::string infile(source_infile);      
+      std::string infile(source_infile);
       infile += "_pos";
-      for(int i=0; i<4; i++) {
-	infile += "_";
-	infile += std::to_string(source_position[i]);
+      for (int i = 0; i < 4; i++) {
+        infile += "_";
+        infile += std::to_string(source_position[i]);
       }
       infile += "_dilution_";
       infile += std::to_string(dil);
-      
-      std::vector<quda::ColorSpinorField *>src_ptr;
+
+      std::vector<quda::ColorSpinorField *> src_ptr;
       src_ptr.reserve(1);
       src_ptr.push_back(in);
-      
+
       // loas the source
       quda::VectorIO io(infile, QUDA_BOOLEAN_TRUE);
       io.load(src_ptr);
@@ -314,53 +315,53 @@ int main(int argc, char **argv)
       int X[4] = {gauge_param.X[0], gauge_param.X[1], gauge_param.X[2], gauge_param.X[3]};
       // Get local index
       int src_local[4];
-      for(int d=0; d<4; d++) src_local[d] = source_position[d] - comm_coord(d) * X[d];
+      for (int d = 0; d < 4; d++) src_local[d] = source_position[d] - comm_coord(d) * X[d];
       // Get linear index
-      int local_idx = ((X[2] * src_local[3] +  src_local[2]) * X[1] + src_local[1]) * X[0] + src_local[0];
-      int local_idx_cb = local_idx/2;
+      int local_idx = ((X[2] * src_local[3] + src_local[2]) * X[1] + src_local[1]) * X[0] + src_local[0];
+      int local_idx_cb = local_idx / 2;
       int parity = local_idx % 2;
-      
+
       // Deduce where to place the point source. If the following is satisfied,
       // we have isolated the MPI rank that contains the point source posistion.
-      if( (comm_coord(0) * X[0] <= source_position[0] && source_position[0] < (comm_coord(0) + 1) * X[0]) &&
-	  (comm_coord(1) * X[1] <= source_position[1] && source_position[1] < (comm_coord(1) + 1) * X[1]) &&
-	  (comm_coord(2) * X[2] <= source_position[2] && source_position[2] < (comm_coord(2) + 1) * X[2]) &&
-	  (comm_coord(3) * X[3] <= source_position[3] && source_position[3] < (comm_coord(3) + 1) * X[3])) {
-	
-	if(prec == QUDA_DOUBLE_PRECISION) {
-	  ((double*)in->V())[my_spinor_site_size * (parity*Vh + local_idx_cb) + 2*dil] = 1.0;
-	} else {
-	  ((float*)in->V())[my_spinor_site_size * (parity*Vh + local_idx_cb) + 2*dil] = 1.0;
-	}
-      }      
-    
+      if ((comm_coord(0) * X[0] <= source_position[0] && source_position[0] < (comm_coord(0) + 1) * X[0])
+          && (comm_coord(1) * X[1] <= source_position[1] && source_position[1] < (comm_coord(1) + 1) * X[1])
+          && (comm_coord(2) * X[2] <= source_position[2] && source_position[2] < (comm_coord(2) + 1) * X[2])
+          && (comm_coord(3) * X[3] <= source_position[3] && source_position[3] < (comm_coord(3) + 1) * X[3])) {
+
+        if (prec == QUDA_DOUBLE_PRECISION) {
+          ((double *)in->V())[my_spinor_site_size * (parity * Vh + local_idx_cb) + 2 * dil] = 1.0;
+        } else {
+          ((float *)in->V())[my_spinor_site_size * (parity * Vh + local_idx_cb) + 2 * dil] = 1.0;
+        }
+      }
+
       // Gaussian smear the point source.
       performGaussianSmearNStep(in->V(), &inv_param_smear, source_smear_steps);
       if (strcmp(source_outfile, "") != 0) {
-	
-	std::string outfile(source_outfile);
-	outfile += "_pos";
-	for(int i=0; i<4; i++) {
-	  outfile += "_";
-	  outfile += std::to_string(source_position[i]);
-	}
-	outfile += "_dilution_";
-	outfile += std::to_string(dil);
-	
-	std::vector<quda::ColorSpinorField *>src_ptr;
-	src_ptr.push_back(in);
-	
-	// save the source
-	quda::VectorIO io(outfile, QUDA_BOOLEAN_TRUE);
-	io.save(src_ptr);
+
+        std::string outfile(source_outfile);
+        outfile += "_pos";
+        for (int i = 0; i < 4; i++) {
+          outfile += "_";
+          outfile += std::to_string(source_position[i]);
+        }
+        outfile += "_dilution_";
+        outfile += std::to_string(dil);
+
+        std::vector<quda::ColorSpinorField *> src_ptr;
+        src_ptr.push_back(in);
+
+        // save the source
+        quda::VectorIO io(outfile, QUDA_BOOLEAN_TRUE);
+        io.save(src_ptr);
       }
     }
-    
+
     // If deflating, preserve the deflation space between solves
     if (inv_deflate) eig_param.preserve_deflation = dil < 12 - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     // Perform QUDA inversions
     invertQuda(qudaOutProp[dil]->V(), in->V(), &inv_param);
-    
+
     time[dil] = inv_param.secs;
     gflops[dil] = inv_param.gflops / inv_param.secs;
     printfQuda("Prop %d done: %d iter / %g secs = %g Gflops\n\n", dil, inv_param.iter, inv_param.secs,
@@ -370,7 +371,7 @@ int main(int argc, char **argv)
     if (verify_results) {
       verifyInversion(out->V(), in->V(), check->V(), gauge_param, inv_param, gauge, clover, clover_inv);
     }
-    
+
     delete in;
   }
   // QUDA propagator test COMPLETE
@@ -384,23 +385,23 @@ int main(int argc, char **argv)
   performanceStats(time, gflops);
   delete[] time;
   delete[] gflops;
-  
+
   if (strcmp(prop_outfile, "") != 0) {
     // Make an array of size 12
     std::vector<quda::ColorSpinorField *> prop_ptr;
-    prop_ptr.reserve(12);    
+    prop_ptr.reserve(12);
     for (int i = 0; i < 12; i++) prop_ptr.push_back(qudaOutProp[i]);
-    
+
     // save the propagators
     quda::VectorIO io(prop_outfile, QUDA_BOOLEAN_TRUE);
     io.save(prop_ptr);
   }
-  
+
   // Clean up memory allocations
   delete out;
   delete check;
   free(outProp);
-  for (int i = 0; i < 12; i++) delete qudaOutProp[i];  
+  for (int i = 0; i < 12; i++) delete qudaOutProp[i];
 
   freeGaugeQuda();
   for (int dir = 0; dir < 4; dir++) free(gauge[dir]);
@@ -410,7 +411,7 @@ int main(int argc, char **argv)
     if (clover) free(clover);
     if (clover_inv) free(clover_inv);
   }
-  
+
   // finalize the QUDA library
   endQuda();
   finalizeComms();

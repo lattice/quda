@@ -491,7 +491,7 @@ namespace quda {
       {
         for (int d = 0; d < 8; d++) {
           ghost[d] = a.ghost[d];
-	  ghostOffset[d] = a.ghostOffset[d];
+          ghostOffset[d] = a.ghostOffset[d];
         }
       }
 
@@ -634,7 +634,7 @@ namespace quda {
       {
         for (int d = 0; d < 8; d++) {
           ghost[d] = a.ghost[d];
-	  ghostOffset[d] = a.ghostOffset[d];
+          ghostOffset[d] = a.ghostOffset[d];
         }
       }
 
