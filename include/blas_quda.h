@@ -14,14 +14,8 @@ namespace quda {
     void init();
     void end(void);
 
-    // creates and destroys additional copy stream
-    void createAuxBlasStream();
-    void destroyAuxBlasStream();
-    // Activate/deactivate (and synchronize) aux stream handle
-    void registerAuxBlasStream();
-    void unregisterAuxBlasStream(bool sync = true);
-    // Synchronize aux blas stream
-    void synchronizeAuxBlasStream();
+    /** returns the reduce buffer size allocated */
+    size_t reduceBufferSize();
 
     void* getDeviceReduceBuffer();
     void* getMappedHostReduceBuffer();
@@ -75,14 +69,10 @@ namespace quda {
     void cabxpyAx(double a, const Complex &b, ColorSpinorField &x, ColorSpinorField &y);
     void caxpyXmaz(const Complex &a, ColorSpinorField &x,
 		   ColorSpinorField &y, ColorSpinorField &z);
-    void caxpyXmazMR(const Complex &a, ColorSpinorField &x,
-		     ColorSpinorField &y, ColorSpinorField &z);
+    void caxpyXmazMR(const double &a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
 
     void tripleCGUpdate(double alpha, double beta, ColorSpinorField &q,
 			ColorSpinorField &r, ColorSpinorField &x, ColorSpinorField &p);
-    void doubleCG3Init(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
-    void doubleCG3Update(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
-
 
     // reduction kernels - defined in reduce_quda.cu
 
@@ -128,19 +118,14 @@ namespace quda {
     double quadrupleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v);
     double quadrupleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v);
 
-    double doubleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
-    double doubleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
-
-    double4 quadrupleEigCGUpdate(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v);
-
     // multi-blas kernels - defined in multi_blas.cu
     /**
        @brief Compute the block "axpy" with over the set of
-              ColorSpinorFields.  E.g., it computes y = x * a + y
-              The dimensions of a can be rectangular, e.g., the width of x and y need not be same.
+       ColorSpinorFields.  E.g., it computes y = x * a + y
+       The dimensions of a can be rectangular, e.g., the width of x and y need not be same.
        @param a[in] Matrix of real coefficients
        @param x[in] vector of input ColorSpinorFields
-      @param y[in,out] vector of input/output ColorSpinorFields
+       @param y[in,out] vector of input/output ColorSpinorFields
     */
     void axpy(const double *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y);
 

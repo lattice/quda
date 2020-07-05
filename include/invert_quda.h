@@ -823,7 +823,7 @@ namespace quda {
     /**
        The size of the Krylov space that BiCGstabL uses.
      */
-    int nKrylov; // in the language of BiCGstabL, this is L.
+    int n_krylov; // in the language of BiCGstabL, this is L.
 
     // Various coefficients and params needed on each iteration.
     Complex rho0, rho1, alpha, omega, beta; // Various coefficients for the BiCG part of BiCGstab-L.
@@ -857,16 +857,16 @@ namespace quda {
     void updateR(Complex **tau, std::vector<ColorSpinorField*> r, int begin, int size, int j);
     void orthoDir(Complex **tau, double* sigma, std::vector<ColorSpinorField*> r, int j, int pipeline);
 
-    void updateUend(Complex* gamma, std::vector<ColorSpinorField*> u, int nKrylov);
-    void updateXRend(Complex* gamma, Complex* gamma_prime, Complex* gamma_prime_prime,
-                                std::vector<ColorSpinorField*> r, ColorSpinorField& x, int nKrylov);
+    void updateUend(Complex *gamma, std::vector<ColorSpinorField *> u, int n_krylov);
+    void updateXRend(Complex *gamma, Complex *gamma_prime, Complex *gamma_prime_prime,
+                     std::vector<ColorSpinorField *> r, ColorSpinorField &x, int n_krylov);
 
     /**
        Solver uses lazy allocation: this flag determines whether we have allocated or not.
      */
     bool init;
 
-    std::string solver_name; // holds BiCGstab-l, where 'l' literally equals nKrylov.
+    std::string solver_name; // holds BiCGstab-l, where 'l' literally equals n_krylov.
 
   public:
     BiCGstabL(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
@@ -888,7 +888,7 @@ namespace quda {
     /**
        The size of the Krylov space that GCR uses
      */
-    int nKrylov;
+    int n_krylov;
 
     Complex *alpha;
     Complex **beta;
@@ -945,8 +945,8 @@ namespace quda {
 
   /**
      @brief Communication-avoiding CG solver.  This solver does
-     un-preconditioned CG, running in steps of nKrylov, build up a
-     polynomial in the linear operator of length nKrylov, and then
+     un-preconditioned CG, running in steps of n_krylov, build up a
+     polynomial in the linear operator of length n_krylov, and then
      performs a steepest descent minimization on the resulting basis
      vectors.  For now only implemented using the power basis so is
      only useful as a preconditioner.
@@ -1052,7 +1052,7 @@ namespace quda {
   /**
      @brief Communication-avoiding GCR solver.  This solver does
      un-preconditioned GCR, first building up a polynomial in the
-     linear operator of length nKrylov, and then performs a minimum
+     linear operator of length n_krylov, and then performs a minimum
      residual extrapolation on the resulting basis vectors.  For use as
      a multigrid smoother with minimum global synchronization.
    */

@@ -19,7 +19,7 @@
 #include <Eigen/Dense>
 
 /*
-Based on  eigCG(nev, m) algorithm:
+Based on  eigCG(n_ev, m) algorithm:
 A. Stathopolous and K. Orginos, arXiv:0707.0131
 */
 
@@ -965,7 +965,7 @@ namespace quda {
 
       param.true_res = 0.0;
       param.true_res_hq = 0.0;
-
+      
       return 0;
     }
 
@@ -1501,6 +1501,7 @@ namespace quda {
 
        if( update_ritz ) {
 	 Increment();
+
          logical_rhs_id += 1;
 
          dcg_cycle = (logical_rhs_id >= max_eigcg_cycles);

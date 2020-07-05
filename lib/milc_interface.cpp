@@ -1116,7 +1116,7 @@ void qudaEigCGInvert(int external_precision, int quda_precision, double mass, Qu
   QudaEigParam  df_param = newQudaEigParam();
   df_param.invert_param = &invertParam;
 
-  invertParam.nev                = eig_args.nev;
+  invertParam.n_ev = eig_args.nev;
   invertParam.max_search_dim     = eig_args.max_search_dim;
   invertParam.deflation_grid     = eig_args.deflation_grid;
   invertParam.cuda_prec_ritz     = eig_args.prec_ritz;
@@ -1498,7 +1498,7 @@ void qudaEigCGCloverInvert(int external_precision, int quda_precision, double ka
   df_param.invert_param = &invertParam;
 
   invertParam.solve_type = QUDA_NORMOP_PC_SOLVE;
-  invertParam.nev                = eig_args.nev;
+  invertParam.n_ev = eig_args.nev;
   invertParam.max_search_dim     = eig_args.max_search_dim;
   invertParam.deflation_grid     = eig_args.deflation_grid;
   invertParam.cuda_prec_ritz     = eig_args.prec_ritz;

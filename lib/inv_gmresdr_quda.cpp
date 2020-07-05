@@ -567,8 +567,8 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
       Zm = K ? MakeSharedPtr2(csParam) : Vm;
 
-
       csParam.composite_dim = (param.eig_param.nEv+1);
+
       csParam.setPrecision(QUDA_DOUBLE_PRECISION);
 
       gmresdr_args = std::make_shared< GMResDRArgs> (*Vm, nKrylov, param.eig_param.nEv);
