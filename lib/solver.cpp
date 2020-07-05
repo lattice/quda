@@ -38,8 +38,8 @@ namespace quda {
   }
 
   // solver factory
-  Solver* Solver::create(SolverParam &param, const DiracMatrix &mat, const DiracMatrix &matSloppy,
-			 const DiracMatrix &matPrecon, const DiracMatrix &matEig, TimeProfile &profile)
+  Solver *Solver::create(SolverParam &param, const DiracMatrix &mat, const DiracMatrix &matSloppy,
+                         const DiracMatrix &matPrecon, const DiracMatrix &matEig, TimeProfile &profile)
   {
     Solver *solver = nullptr;
 
@@ -64,9 +64,9 @@ namespace quda {
 	Solver *mg = param.mg_instance ? static_cast<MG*>(param.preconditioner) : static_cast<multigrid_solver*>(param.preconditioner)->mg;
 	// FIXME dirty hack to ensure that preconditioner precision set in interface isn't used in the outer GCR-MG solver
 	if (!param.mg_instance) param.precision_precondition = param.precision_sloppy;
-	solver = new GCR(mat, *(mg), matSloppy, matPrecon, matEig, param, profile);
+        solver = new GCR(mat, *(mg), matSloppy, matPrecon, matEig, param, profile);
       } else {
-	solver = new GCR(mat, matSloppy, matPrecon, matEig, param, profile);
+        solver = new GCR(mat, matSloppy, matPrecon, matEig, param, profile);
       }
       break;
     case QUDA_CA_CG_INVERTER:

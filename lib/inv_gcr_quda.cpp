@@ -161,8 +161,8 @@ namespace quda {
     delete []delta;
   }
 
-  GCR::GCR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig, SolverParam &param,
-           TimeProfile &profile) :
+  GCR::GCR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+           const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
     Solver(mat, matSloppy, matPrecon, matEig, param, profile),
     matMdagM(DiracMdagM(matEig.Expose())),
     K(0),

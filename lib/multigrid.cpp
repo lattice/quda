@@ -316,9 +316,11 @@ namespace quda
     // inner solver should recompute the true residual after each cycle if using Schwarz preconditioning
     param_presmooth->compute_true_res = (param_presmooth->schwarz_type != QUDA_INVALID_SCHWARZ) ? true : false;
 
-    presmoother = ( (param.level < param.Nlevel-1 || param_presmooth->schwarz_type != QUDA_INVALID_SCHWARZ) &&
-                    param_presmooth->inv_type != QUDA_INVALID_INVERTER && param_presmooth->maxiter > 0) ?
-      Solver::create(*param_presmooth, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, *param.matSmoothSloppy, profile) : nullptr;
+    presmoother = ((param.level < param.Nlevel - 1 || param_presmooth->schwarz_type != QUDA_INVALID_SCHWARZ)
+                   && param_presmooth->inv_type != QUDA_INVALID_INVERTER && param_presmooth->maxiter > 0) ?
+      Solver::create(*param_presmooth, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy,
+                     *param.matSmoothSloppy, profile) :
+      nullptr;
     // DMH
     if (param.level < param.Nlevel-1) { //Create the post smoother
       param_postsmooth = new SolverParam(*param_presmooth);
@@ -333,7 +335,9 @@ namespace quda
       param_postsmooth->compute_true_res = false;
 
       postsmoother = (param_postsmooth->inv_type != QUDA_INVALID_INVERTER && param_postsmooth->maxiter > 0) ?
-	Solver::create(*param_postsmooth, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, *param.matSmoothSloppy, profile) : nullptr;
+        Solver::create(*param_postsmooth, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy,
+                       *param.matSmoothSloppy, profile) :
+        nullptr;
     }
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Smoother done\n");
 
@@ -546,15 +550,15 @@ namespace quda
       param_coarse_solver->precision_precondition = param_coarse_solver->precision_sloppy;
 
       if (param.mg_global.coarse_grid_solution_type[param.level + 1] == QUDA_MATPC_SOLUTION) {
-        Solver *solver
-          = Solver::create(*param_coarse_solver, *matCoarseSmoother, *matCoarseSmoother, *matCoarseSmoother, *matCoarseSmoother, profile);
+        Solver *solver = Solver::create(*param_coarse_solver, *matCoarseSmoother, *matCoarseSmoother,
+                                        *matCoarseSmoother, *matCoarseSmoother, profile);
         sprintf(coarse_prefix, "MG level %d (%s): ", param.level + 1,
                 param.mg_global.location[param.level + 1] == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
         coarse_solver = new PreconditionedSolver(*solver, *matCoarseSmoother->Expose(), *param_coarse_solver, profile,
                                                  coarse_prefix);
       } else {
-        Solver *solver
-          = Solver::create(*param_coarse_solver, *matCoarseResidual, *matCoarseResidual, *matCoarseResidual, *matCoarseResidual, profile);
+        Solver *solver = Solver::create(*param_coarse_solver, *matCoarseResidual, *matCoarseResidual,
+                                        *matCoarseResidual, *matCoarseResidual, profile);
         sprintf(coarse_prefix, "MG level %d (%s): ", param.level + 1,
                 param.mg_global.location[param.level + 1] == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
         coarse_solver = new PreconditionedSolver(*solver, *matCoarseResidual->Expose(), *param_coarse_solver, profile, coarse_prefix);
@@ -1270,10 +1274,12 @@ namespace quda
       solverParam.preconditioner = this;
 
       solverParam.inv_type = QUDA_GCR_INVERTER;
-      solve = Solver::create(solverParam, *param.matSmooth, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
+      solve = Solver::create(solverParam, *param.matSmooth, *param.matSmooth, *param.matSmoothSloppy,
+                             *param.matSmoothSloppy, profile);
       solverParam.inv_type = QUDA_MG_INVERTER;
     } else {
-      solve = Solver::create(solverParam, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
+      solve = Solver::create(solverParam, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy,
+                             *param.matSmoothSloppy, profile);
     }
 
     for (int si = 0; si < param.mg_global.num_setup_iter[param.level]; si++) {

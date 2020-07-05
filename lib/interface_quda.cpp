@@ -734,33 +734,33 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   // free any current gauge field before new allocations to reduce memory overhead
   switch (param->type) {
     case QUDA_WILSON_LINKS:
-      if (gaugeRefinement != gaugeSloppy &&
-	  gaugeRefinement != gaugeEigensolver && gaugeRefinement) delete gaugeRefinement;
+      if (gaugeRefinement != gaugeSloppy && gaugeRefinement != gaugeEigensolver && gaugeRefinement)
+        delete gaugeRefinement;
 
-      if (gaugePrecondition != gaugeSloppy &&
-	  gaugePrecondition != gaugeEigensolver &&
-	  gaugePrecondition != gaugePrecise && gaugePrecondition) delete gaugePrecondition;
+      if (gaugePrecondition != gaugeSloppy && gaugePrecondition != gaugeEigensolver && gaugePrecondition != gaugePrecise
+          && gaugePrecondition)
+        delete gaugePrecondition;
 
-      if (gaugeEigensolver != gaugeSloppy &&
-	  gaugeEigensolver != gaugePrecise &&
-	  gaugeEigensolver != gaugePrecondition && gaugeEigensolver ) delete gaugeEigensolver;
+      if (gaugeEigensolver != gaugeSloppy && gaugeEigensolver != gaugePrecise && gaugeEigensolver != gaugePrecondition
+          && gaugeEigensolver)
+        delete gaugeEigensolver;
 
       if (gaugePrecise != gaugeSloppy && gaugeSloppy) delete gaugeSloppy;
 
       if (gaugePrecise && !param->use_resident_gauge) delete gaugePrecise;
-      
+
       break;
     case QUDA_ASQTAD_FAT_LINKS:
-      if (gaugeFatRefinement != gaugeFatSloppy &&
-	  gaugeFatRefinement != gaugeFatEigensolver && gaugeFatRefinement) delete gaugeFatRefinement;
+      if (gaugeFatRefinement != gaugeFatSloppy && gaugeFatRefinement != gaugeFatEigensolver && gaugeFatRefinement)
+        delete gaugeFatRefinement;
 
-      if (gaugeFatPrecondition != gaugeFatSloppy &&
-	  gaugeFatPrecondition != gaugeFatEigensolver &&
-	  gaugeFatPrecondition != gaugeFatPrecise && gaugeFatPrecondition) delete gaugeFatPrecondition;
-      
-      if (gaugeFatEigensolver != gaugeFatSloppy &&
-	  gaugeFatEigensolver != gaugeFatPrecise &&
-	  gaugeFatEigensolver != gaugeFatPrecondition && gaugeFatEigensolver ) delete gaugeFatEigensolver;
+      if (gaugeFatPrecondition != gaugeFatSloppy && gaugeFatPrecondition != gaugeFatEigensolver
+          && gaugeFatPrecondition != gaugeFatPrecise && gaugeFatPrecondition)
+        delete gaugeFatPrecondition;
+
+      if (gaugeFatEigensolver != gaugeFatSloppy && gaugeFatEigensolver != gaugeFatPrecise
+          && gaugeFatEigensolver != gaugeFatPrecondition && gaugeFatEigensolver)
+        delete gaugeFatEigensolver;
 
       if (gaugeFatPrecise != gaugeFatSloppy && gaugeFatSloppy) delete gaugeFatSloppy;
 
@@ -769,16 +769,16 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       break;
     case QUDA_ASQTAD_LONG_LINKS:
 
-      if (gaugeLongRefinement != gaugeLongSloppy &&
-	  gaugeLongRefinement != gaugeLongEigensolver && gaugeLongRefinement) delete gaugeLongRefinement;
+      if (gaugeLongRefinement != gaugeLongSloppy && gaugeLongRefinement != gaugeLongEigensolver && gaugeLongRefinement)
+        delete gaugeLongRefinement;
 
-      if (gaugeLongPrecondition != gaugeLongSloppy &&
-	  gaugeLongPrecondition != gaugeLongEigensolver &&
-	  gaugeLongPrecondition != gaugeLongPrecise && gaugeLongPrecondition) delete gaugeLongPrecondition;
-      
-      if (gaugeLongEigensolver != gaugeLongSloppy &&
-	  gaugeLongEigensolver != gaugeLongPrecise &&
-	  gaugeLongEigensolver != gaugeLongPrecondition && gaugeLongEigensolver ) delete gaugeLongEigensolver;
+      if (gaugeLongPrecondition != gaugeLongSloppy && gaugeLongPrecondition != gaugeLongEigensolver
+          && gaugeLongPrecondition != gaugeLongPrecise && gaugeLongPrecondition)
+        delete gaugeLongPrecondition;
+
+      if (gaugeLongEigensolver != gaugeLongSloppy && gaugeLongEigensolver != gaugeLongPrecise
+          && gaugeLongEigensolver != gaugeLongPrecondition && gaugeLongEigensolver)
+        delete gaugeLongEigensolver;
 
       if (gaugeLongPrecise != gaugeLongSloppy && gaugeLongSloppy) delete gaugeLongSloppy;
 
@@ -834,7 +834,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
   // creating sloppy fields isn't really compute, but it is work done on the gpu
   profileGauge.TPSTART(QUDA_PROFILE_COMPUTE);
-  
+
   // switch the parameters for creating the mirror sloppy cuda gauge field
   gauge_param.reconstruct = param->reconstruct_sloppy;
   gauge_param.setPrecision(param->cuda_prec_sloppy, true);
@@ -876,20 +876,19 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   gauge_param.reconstruct = param->reconstruct_eigensolver;
   gauge_param.setPrecision(param->cuda_prec_eigensolver, true);
   cudaGaugeField *eigensolver = nullptr;
-  if (param->cuda_prec == param->cuda_prec_eigensolver
-      && param->reconstruct == param->reconstruct_eigensolver) {
+  if (param->cuda_prec == param->cuda_prec_eigensolver && param->reconstruct == param->reconstruct_eigensolver) {
     eigensolver = precise;
   } else if (param->cuda_prec_precondition == param->cuda_prec_eigensolver
-	     && param->reconstruct_precondition == param->reconstruct_eigensolver) {
+             && param->reconstruct_precondition == param->reconstruct_eigensolver) {
     eigensolver = precondition;
   } else if (param->cuda_prec_sloppy == param->cuda_prec_eigensolver
-	     && param->reconstruct_sloppy == param->reconstruct_eigensolver) {
+             && param->reconstruct_sloppy == param->reconstruct_eigensolver) {
     eigensolver = sloppy;
   } else {
     eigensolver = new cudaGaugeField(gauge_param);
     eigensolver->copy(*precise);
   }
-  
+
   profileGauge.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   // create an extended preconditioning field
@@ -916,7 +915,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       gaugeFatPrecondition = precondition;
       gaugeFatRefinement = refinement;
       gaugeFatEigensolver = eigensolver;
-      
+
       if(param->overlap){
         if(gaugeFatExtended) errorQuda("Extended gauge fat field already allocated");
 	gaugeFatExtended = extended;
@@ -928,7 +927,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       gaugeLongPrecondition = precondition;
       gaugeLongRefinement = refinement;
       gaugeLongEigensolver = eigensolver;
-      
+
       if(param->overlap){
         if(gaugeLongExtended) errorQuda("Extended gauge long field already allocated");
    	gaugeLongExtended = extended;
@@ -1257,7 +1256,6 @@ void loadSloppyCloverQuda(const QudaPrecision *prec)
       cloverPrecondition = new cudaCloverField(clover_param);
       cloverPrecondition->copy(*cloverPrecise, clover_param.inverse);
     }
-
   }
 
 }
@@ -1268,58 +1266,51 @@ void freeSloppyGaugeQuda()
   if (!initialized) errorQuda("QUDA not initialized");
 
   if (gaugeSloppy != gaugeRefinement && gaugeRefinement) delete gaugeRefinement;
-  
-  if (gaugePrecondition != gaugeSloppy &&
-      gaugePrecondition != gaugePrecise &&
-      gaugePrecondition != gaugeEigensolver && gaugePrecondition) delete gaugePrecondition;
 
-  if (gaugeEigensolver != gaugeSloppy &&
-      gaugeEigensolver != gaugePrecise && gaugeEigensolver) delete gaugeEigensolver;
-  
-  if (gaugeSloppy != gaugePrecise &&
-      gaugeSloppy != gaugeEigensolver ) delete gaugeSloppy;
+  if (gaugePrecondition != gaugeSloppy && gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeEigensolver
+      && gaugePrecondition)
+    delete gaugePrecondition;
+
+  if (gaugeEigensolver != gaugeSloppy && gaugeEigensolver != gaugePrecise && gaugeEigensolver) delete gaugeEigensolver;
+
+  if (gaugeSloppy != gaugePrecise && gaugeSloppy != gaugeEigensolver) delete gaugeSloppy;
 
   gaugeEigensolver = nullptr;
   gaugeRefinement = nullptr;
   gaugePrecondition = nullptr;
   gaugeSloppy = nullptr;
 
-
   if (gaugeLongSloppy != gaugeLongRefinement && gaugeLongRefinement) delete gaugeLongRefinement;
-  
-  if (gaugeLongPrecondition != gaugeLongSloppy &&
-      gaugeLongPrecondition != gaugeLongPrecise &&
-      gaugeLongPrecondition != gaugeLongEigensolver && gaugeLongPrecondition) delete gaugeLongPrecondition;
 
-  if (gaugeLongEigensolver != gaugeLongSloppy &&
-      gaugeLongEigensolver != gaugeLongPrecise && gaugeLongEigensolver) delete gaugeLongEigensolver;
-  
-  if (gaugeLongSloppy != gaugeLongPrecise &&
-      gaugeLongSloppy != gaugeLongEigensolver ) delete gaugeLongSloppy;
+  if (gaugeLongPrecondition != gaugeLongSloppy && gaugeLongPrecondition != gaugeLongPrecise
+      && gaugeLongPrecondition != gaugeLongEigensolver && gaugeLongPrecondition)
+    delete gaugeLongPrecondition;
+
+  if (gaugeLongEigensolver != gaugeLongSloppy && gaugeLongEigensolver != gaugeLongPrecise && gaugeLongEigensolver)
+    delete gaugeLongEigensolver;
+
+  if (gaugeLongSloppy != gaugeLongPrecise && gaugeLongSloppy != gaugeLongEigensolver) delete gaugeLongSloppy;
 
   gaugeLongEigensolver = nullptr;
   gaugeLongRefinement = nullptr;
   gaugeLongPrecondition = nullptr;
   gaugeLongSloppy = nullptr;
 
-  
   if (gaugeFatSloppy != gaugeFatRefinement && gaugeFatRefinement) delete gaugeFatRefinement;
-  
-  if (gaugeFatPrecondition != gaugeFatSloppy &&
-      gaugeFatPrecondition != gaugeFatPrecise &&
-      gaugeFatPrecondition != gaugeFatEigensolver && gaugeFatPrecondition) delete gaugeFatPrecondition;
 
-  if (gaugeFatEigensolver != gaugeFatSloppy &&
-      gaugeFatEigensolver != gaugeFatPrecise && gaugeFatEigensolver) delete gaugeFatEigensolver;
-  
-  if (gaugeFatSloppy != gaugeFatPrecise &&
-      gaugeFatSloppy != gaugeFatEigensolver ) delete gaugeFatSloppy;
+  if (gaugeFatPrecondition != gaugeFatSloppy && gaugeFatPrecondition != gaugeFatPrecise
+      && gaugeFatPrecondition != gaugeFatEigensolver && gaugeFatPrecondition)
+    delete gaugeFatPrecondition;
+
+  if (gaugeFatEigensolver != gaugeFatSloppy && gaugeFatEigensolver != gaugeFatPrecise && gaugeFatEigensolver)
+    delete gaugeFatEigensolver;
+
+  if (gaugeFatSloppy != gaugeFatPrecise && gaugeFatSloppy != gaugeFatEigensolver) delete gaugeFatSloppy;
 
   gaugeFatEigensolver = nullptr;
   gaugeFatRefinement = nullptr;
   gaugeFatPrecondition = nullptr;
   gaugeFatSloppy = nullptr;
-
 }
 
 void freeGaugeQuda(void)
@@ -1474,7 +1465,8 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
 
     if (gaugeFatEigensolver) errorQuda("gaugePrecondition already exists");
 
-    if (gauge_param.Precision() == gaugeFatPrecise->Precision() && gauge_param.reconstruct == gaugeFatPrecise->Reconstruct()) {
+    if (gauge_param.Precision() == gaugeFatPrecise->Precision()
+        && gauge_param.reconstruct == gaugeFatPrecise->Reconstruct()) {
       gaugeFatEigensolver = gaugeFatPrecise;
     } else if (gauge_param.Precision() == gaugeFatSloppy->Precision()
                && gauge_param.reconstruct == gaugeFatSloppy->Reconstruct()) {
@@ -1486,7 +1478,6 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
       gaugeFatEigensolver = new cudaGaugeField(gauge_param);
       gaugeFatEigensolver->copy(*gaugeFatPrecise);
     }
-
   }
 
   // long links (if they exist)
@@ -1543,7 +1534,8 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
 
     if (gaugeLongEigensolver) errorQuda("gaugePrecondition already exists");
 
-    if (gauge_param.Precision() == gaugeLongPrecise->Precision() && gauge_param.reconstruct == gaugeLongPrecise->Reconstruct()) {
+    if (gauge_param.Precision() == gaugeLongPrecise->Precision()
+        && gauge_param.reconstruct == gaugeLongPrecise->Reconstruct()) {
       gaugeLongEigensolver = gaugeLongPrecise;
     } else if (gauge_param.Precision() == gaugeLongSloppy->Precision()
                && gauge_param.reconstruct == gaugeLongSloppy->Reconstruct()) {
@@ -1555,7 +1547,6 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
       gaugeLongEigensolver = new cudaGaugeField(gauge_param);
       gaugeLongEigensolver->copy(*gaugeLongPrecise);
     }
-
   }
 }
 
@@ -1899,15 +1890,13 @@ namespace quda {
     }
     diracParam.clover = cloverEigensolver;
 
-    for (int i=0; i<4; i++) {
-      diracParam.commDim[i] = comms ? 1 : 0;
-    }
+    for (int i = 0; i < 4; i++) { diracParam.commDim[i] = comms ? 1 : 0; }
 
     // In the deflated staggered CG allow a different dslash type
-    if(inv_param->inv_type == QUDA_PCG_INVERTER && inv_param->dslash_type == QUDA_ASQTAD_DSLASH
-       && inv_param->dslash_type_precondition == QUDA_STAGGERED_DSLASH) {
-       diracParam.type = pc ? QUDA_STAGGEREDPC_DIRAC : QUDA_STAGGERED_DIRAC;
-       diracParam.gauge = gaugeFatEigensolver;
+    if (inv_param->inv_type == QUDA_PCG_INVERTER && inv_param->dslash_type == QUDA_ASQTAD_DSLASH
+        && inv_param->dslash_type_precondition == QUDA_STAGGERED_DSLASH) {
+      diracParam.type = pc ? QUDA_STAGGEREDPC_DIRAC : QUDA_STAGGERED_DIRAC;
+      diracParam.gauge = gaugeFatEigensolver;
     }
 
     if (diracParam.gauge->Precision() != inv_param->cuda_prec_eigensolver)
@@ -1915,7 +1904,6 @@ namespace quda {
                 inv_param->cuda_prec_eigensolver);
   }
 
-  
   void createDirac(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, QudaInvertParam &param, const bool pc_solve)
   {
     DiracParam diracParam;
@@ -1933,7 +1921,8 @@ namespace quda {
     dPre = Dirac::create(diracPreParam);
   }
 
-  void createDiracWithRefine(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dRef, QudaInvertParam &param, const bool pc_solve)
+  void createDiracWithRefine(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dRef, QudaInvertParam &param,
+                             const bool pc_solve)
   {
     DiracParam diracParam;
     DiracParam diracSloppyParam;
@@ -1953,7 +1942,8 @@ namespace quda {
     dRef = Dirac::create(diracRefParam);
   }
 
-  void createDiracWithEig(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dEig, QudaInvertParam &param, const bool pc_solve)
+  void createDiracWithEig(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dEig, QudaInvertParam &param,
+                          const bool pc_solve)
   {
     DiracParam diracParam;
     DiracParam diracSloppyParam;
@@ -1973,7 +1963,6 @@ namespace quda {
     dEig = Dirac::create(diracEigParam);
   }
 
-  
   static double unscaled_shifts[QUDA_MAX_MULTI_SHIFT];
 
   void massRescale(cudaColorSpinorField &b, QudaInvertParam &param) {
@@ -2344,13 +2333,11 @@ quda::cudaGaugeField *checkGauge(QudaInvertParam *param)
     if (param->cuda_prec_sloppy != gaugeSloppy->Precision()
         || param->cuda_prec_precondition != gaugePrecondition->Precision()
         || param->cuda_prec_refinement_sloppy != gaugeRefinement->Precision()
-	|| param->cuda_prec_eigensolver != gaugeEigensolver->Precision()) {
-      QudaPrecision precision[4]
-          = {param->cuda_prec_sloppy, param->cuda_prec_precondition,
-	     param->cuda_prec_refinement_sloppy, param->cuda_prec_eigensolver};
-      QudaReconstructType recon[4]
-	= {gaugeSloppy->Reconstruct(), gaugePrecondition->Reconstruct(),
-	   gaugeRefinement->Reconstruct(), gaugeEigensolver->Reconstruct()};
+        || param->cuda_prec_eigensolver != gaugeEigensolver->Precision()) {
+      QudaPrecision precision[4] = {param->cuda_prec_sloppy, param->cuda_prec_precondition,
+                                    param->cuda_prec_refinement_sloppy, param->cuda_prec_eigensolver};
+      QudaReconstructType recon[4] = {gaugeSloppy->Reconstruct(), gaugePrecondition->Reconstruct(),
+                                      gaugeRefinement->Reconstruct(), gaugeEigensolver->Reconstruct()};
       freeSloppyGaugeQuda();
       loadSloppyGaugeQuda(precision, recon);
     }
@@ -2374,19 +2361,17 @@ quda::cudaGaugeField *checkGauge(QudaInvertParam *param)
     if (param->cuda_prec_sloppy != gaugeFatSloppy->Precision()
         || param->cuda_prec_precondition != gaugeFatPrecondition->Precision()
         || param->cuda_prec_refinement_sloppy != gaugeFatRefinement->Precision()
-	|| param->cuda_prec_eigensolver != gaugeFatEigensolver->Precision()
+        || param->cuda_prec_eigensolver != gaugeFatEigensolver->Precision()
         || param->cuda_prec_sloppy != gaugeLongSloppy->Precision()
         || param->cuda_prec_precondition != gaugeLongPrecondition->Precision()
         || param->cuda_prec_refinement_sloppy != gaugeLongRefinement->Precision()
-	|| param->cuda_prec_eigensolver != gaugeLongEigensolver->Precision()) {
-      
-      QudaPrecision precision[4]
-        = {param->cuda_prec_sloppy, param->cuda_prec_precondition,
-	   param->cuda_prec_refinement_sloppy, param->cuda_prec_eigensolver};
+        || param->cuda_prec_eigensolver != gaugeLongEigensolver->Precision()) {
+
+      QudaPrecision precision[4] = {param->cuda_prec_sloppy, param->cuda_prec_precondition,
+                                    param->cuda_prec_refinement_sloppy, param->cuda_prec_eigensolver};
       // recon is always no for fat links, so just use long reconstructs here
-      QudaReconstructType recon[4]
-        = {gaugeLongSloppy->Reconstruct(), gaugeLongPrecondition->Reconstruct(),
-	   gaugeLongRefinement->Reconstruct(), gaugeLongEigensolver->Reconstruct()};
+      QudaReconstructType recon[4] = {gaugeLongSloppy->Reconstruct(), gaugeLongPrecondition->Reconstruct(),
+                                      gaugeLongRefinement->Reconstruct(), gaugeLongEigensolver->Reconstruct()};
       freeSloppyGaugeQuda();
       loadSloppyGaugeQuda(precision, recon);
     }
@@ -2408,7 +2393,7 @@ quda::cudaGaugeField *checkGauge(QudaInvertParam *param)
     }
     cudaGauge = gaugeFatPrecise;
   }
-  
+
   checkClover(param);
 
   return cudaGauge;
@@ -2954,7 +2939,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   Dirac *dSloppy = nullptr;
   Dirac *dPre = nullptr;
   Dirac *dEig = nullptr;
-  
+
   // Create the dirac operator and operators for sloppy, precondition,
   // and an eigensolver
   createDiracWithEig(d, dSloppy, dPre, dEig, *param, pc_solve);
@@ -3212,7 +3197,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
       profileInvert.TPSTOP(QUDA_PROFILE_CHRONO);
     }
-    
+
     // if using a Schwarz preconditioner with a normal operator then we must use the DiracMdagMLocal operator
     if (param->inv_type_precondition != QUDA_INVALID_INVERTER && param->schwarz_type != QUDA_INVALID_SCHWARZ) {
       DiracMdagMLocal mPreLocal(diracPre);
@@ -3319,7 +3304,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   delete dSloppy;
   delete dPre;
   delete dEig;
-  
+
   profileInvert.TPSTOP(QUDA_PROFILE_FREE);
 
   popVerbosity();

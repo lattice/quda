@@ -265,9 +265,17 @@ namespace quda {
     inner.use_sloppy_partial_accumulator= false;//outer.use_sloppy_partial_accumulator;
   }
 
-
-  IncEigCG::IncEigCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, matPrecon, param, profile), K(nullptr), Kparam(param), Vm(nullptr), r_pre(nullptr), p_pre(nullptr), eigcg_args(nullptr), profile(profile), init(false)
+  IncEigCG::IncEigCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+                     SolverParam &param, TimeProfile &profile) :
+    Solver(mat, matSloppy, matPrecon, matPrecon, param, profile),
+    K(nullptr),
+    Kparam(param),
+    Vm(nullptr),
+    r_pre(nullptr),
+    p_pre(nullptr),
+    eigcg_args(nullptr),
+    profile(profile),
+    init(false)
   {
 
     if (2 * param.n_ev >= param.m)

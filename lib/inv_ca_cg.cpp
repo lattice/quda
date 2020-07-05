@@ -12,7 +12,8 @@
 
 namespace quda {
 
-  CACG::CACG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
+  CACG::CACG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+             const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
     Solver(mat, matSloppy, matPrecon, matEig, param, profile),
     init(false),
     lambda_init(false),
@@ -64,8 +65,8 @@ namespace quda {
     if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
-  CACGNE::CACGNE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig, SolverParam &param,
-                 TimeProfile &profile) :
+  CACGNE::CACGNE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+                 const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
     CACG(mmdag, mmdagSloppy, mmdagPrecon, mmdagEig, param, profile),
     mmdag(mat.Expose()),
     mmdagSloppy(matSloppy.Expose()),
@@ -154,8 +155,8 @@ namespace quda {
 
   }
 
-  CACGNR::CACGNR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig, SolverParam &param,
-                 TimeProfile &profile) :
+  CACGNR::CACGNR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+                 const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
     CACG(mdagm, mdagmSloppy, mdagmPrecon, mdagmEig, param, profile),
     mdagm(mat.Expose()),
     mdagmSloppy(matSloppy.Expose()),

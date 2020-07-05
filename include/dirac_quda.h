@@ -1817,13 +1817,14 @@ public:
    * @param[in] param        Invert param container
    * @param[in] pc_solve     Whether or not to perform an even/odd preconditioned solve
    */
-  void createDiracWithRefine(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dRef, QudaInvertParam &param, const bool pc_solve);
+  void createDiracWithRefine(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dRef, QudaInvertParam &param,
+                             const bool pc_solve);
 
   /**
    * Create the Dirac operator. By default, we also create operators with possibly different
    * precisions: Sloppy, and Preconditioner. This function also creates a dirac operator for
-   * an eigensolver that creates a deflation space, dEig. We may not use dPrecon for this 
-   * as, for example, the MSPCG solver uses dPrecon for a different purpose. 
+   * an eigensolver that creates a deflation space, dEig. We may not use dPrecon for this
+   * as, for example, the MSPCG solver uses dPrecon for a different purpose.
    * @param[in/out] d        User prec
    * @param[in/out] dSloppy  Sloppy prec
    * @param[in/out] dPre     Preconditioner prec
@@ -1831,8 +1832,8 @@ public:
    * @param[in] param        Invert param container
    * @param[in] pc_solve     Whether or not to perform an even/odd preconditioned solve
    */
-  void createDiracWithEig(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dRef, QudaInvertParam &param, const bool pc_solve);
-  
+  void createDiracWithEig(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dRef, QudaInvertParam &param,
+                          const bool pc_solve);
 
 } // namespace quda
 

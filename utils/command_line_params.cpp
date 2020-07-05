@@ -448,7 +448,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--prec-precondition", prec_precondition, "Preconditioner precision in GPU")->transform(prec_transform);
 
   quda_app->add_option("--prec-eigensolver", prec_eigensolver, "Eigensolver precision in GPU")->transform(prec_transform);
-  
+
   quda_app->add_option("--prec-refine", prec_refinement_sloppy, "Sloppy precision for refinement in GPU")
     ->transform(prec_transform);
 
@@ -457,7 +457,6 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--prec-sloppy", prec_sloppy, "Sloppy precision in GPU")->transform(prec_transform);
 
   quda_app->add_option("--prec-null", prec_null, "Precison TODO")->transform(prec_transform);
-
 
   quda_app->add_option("--precon-type", precon_type, "The type of solver to use (default none (=unspecified)).")
     ->transform(CLI::QUDACheckedTransformer(inverter_type_map));

@@ -57,7 +57,7 @@ extern "C" {
     QudaPrecision cuda_prec_precondition; /**< The precision of the preconditioner gauge field */
     QudaReconstructType reconstruct_precondition; /**< The recontruction type of the preconditioner gauge field */
 
-    QudaPrecision cuda_prec_eigensolver; /**< The precision of the eigensolver gauge field */
+    QudaPrecision cuda_prec_eigensolver;         /**< The precision of the eigensolver gauge field */
     QudaReconstructType reconstruct_eigensolver; /**< The recontruction type of the eigensolver gauge field */
 
     QudaGaugeFixed gauge_fix; /**< Whether the input gauge field is in the axial gauge or not */
