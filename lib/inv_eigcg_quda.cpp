@@ -267,7 +267,7 @@ namespace quda {
 
 
   IncEigCG::IncEigCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, param, profile), K(nullptr), Kparam(param), Vm(nullptr), r_pre(nullptr), p_pre(nullptr), eigcg_args(nullptr), profile(profile), init(false)
+    Solver(mat, matSloppy, matPrecon, matPrecon, param, profile), K(nullptr), Kparam(param), Vm(nullptr), r_pre(nullptr), p_pre(nullptr), eigcg_args(nullptr), profile(profile), init(false)
   {
 
     if (2 * param.n_ev >= param.m)
@@ -293,7 +293,7 @@ namespace quda {
     }
 
     if(param.inv_type_precondition == QUDA_CG_INVERTER){
-      K = new CG(matPrecon, matPrecon, matPrecon, Kparam, profile);
+      K = new CG(matPrecon, matPrecon, matPrecon, matPrecon, Kparam, profile);
     }else if(param.inv_type_precondition == QUDA_MR_INVERTER){
       K = new MR(matPrecon, matPrecon, Kparam, profile);
     }else if(param.inv_type_precondition == QUDA_SD_INVERTER){
@@ -634,7 +634,7 @@ namespace quda {
       defl(xProj, rProj);
       x = xProj;
 
-      K = new CG(mat, matPrecon, matPrecon, Kparam, profile);
+      K = new CG(mat, matPrecon, matPrecon, matPrecon, Kparam, profile);
       (*K)(x, b);
       delete K;
 
@@ -726,7 +726,7 @@ namespace quda {
          if(!K) {
            Kparam.precision   = param.precision_sloppy;
            Kparam.tol         = 5*param.inc_tol;//former cg_iterref_tol param
-           K = new CG(matSloppy, matPrecon, matPrecon, Kparam, profile);
+           K = new CG(matSloppy, matPrecon, matPrecon, matPrecon, Kparam, profile);
          }
 
          eigcg_args->run_residual_correction = true;      

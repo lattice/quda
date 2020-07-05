@@ -19,8 +19,8 @@
 
 namespace quda {
 
-  CG::CG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, param, profile),
+  CG::CG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
+    Solver(mat, matSloppy, matPrecon, matEig, param, profile),
     yp(nullptr),
     rp(nullptr),
     rnewp(nullptr),
@@ -61,11 +61,12 @@ namespace quda {
     if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
-  CGNE::CGNE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
-    CG(mmdag, mmdagSloppy, mmdagPrecon, param, profile),
+  CGNE::CGNE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
+    CG(mmdag, mmdagSloppy, mmdagPrecon, mmdagEig, param, profile),
     mmdag(mat.Expose()),
     mmdagSloppy(matSloppy.Expose()),
     mmdagPrecon(matPrecon.Expose()),
+    mmdagEig(matEig.Expose()),
     xp(nullptr),
     yp(nullptr),
     init(false)
@@ -149,11 +150,12 @@ namespace quda {
 
   }
 
-  CGNR::CGNR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
-    CG(mdagm, mdagmSloppy, mdagmPrecon, param, profile),
+  CGNR::CGNR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
+    CG(mdagm, mdagmSloppy, mdagmPrecon, mdagmEig, param, profile),
     mdagm(mat.Expose()),
     mdagmSloppy(matSloppy.Expose()),
     mdagmPrecon(matPrecon.Expose()),
+    mdagmEig(matEig.Expose()),
     bp(nullptr),
     init(false)
   {

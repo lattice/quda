@@ -16,10 +16,12 @@ void setGaugeParam(QudaGaugeParam &gauge_param)
   gauge_param.cuda_prec = cuda_prec;
   gauge_param.cuda_prec_sloppy = cuda_prec;
   gauge_param.cuda_prec_precondition = cuda_prec;
+  gauge_param.cuda_prec_eigensolver = cuda_prec;
 
   gauge_param.reconstruct = link_recon;
   gauge_param.reconstruct_sloppy = link_recon;
   gauge_param.reconstruct_precondition = link_recon;
+  gauge_param.reconstruct_eigensolver = link_recon;
   gauge_param.reconstruct_refinement_sloppy = link_recon;
 
   gauge_param.anisotropy = 1.0;
