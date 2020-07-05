@@ -218,7 +218,9 @@ namespace quda {
        Eigen::initParallel();
      }
 
-     virtual ~EigCGArgs() { host_free(projMat); }
+     virtual ~EigCGArgs() {
+       host_free(projMat);
+     }
 
      template <bool is_pipelined = false> inline void UpdateLanczosMatrix(double diag_val, double offdiag_val)
      {
@@ -590,8 +592,9 @@ namespace quda {
       local_eigcg_args.reset(); // deallocate resources manually
     else
       IncEigCG::persistant_eigcg_args.swap(local_eigcg_args);
+    destroyDeflationSpace();
   }
-
+  
   void IncEigCG::EigenSolve() { local_eigcg_args->RayleighRitz(); }
 
   void IncEigCG::LegacySearchSpaceUpdate(const double &lanczos_diag, const double &lanczos_offdiag, const double &beta,
@@ -744,29 +747,36 @@ namespace quda {
       const unsigned int i = first_idx + j;
       *evecs[i] = vm[j];
 
-      std::unique_ptr<Complex[]> alpha(new Complex[i]);
-      unsigned int offset = 0;
-
-      while (offset < i) {
-        const unsigned int local_length = (i - offset) > cdot_pipeline_length ? cdot_pipeline_length : (i - offset);
-
-        std::vector<ColorSpinorField *> vj_(evecs.begin() + offset, evecs.begin() + offset + local_length);
-        std::vector<ColorSpinorField *> vi_ {evecs[i]};
-
-        blas::cDotProduct(alpha.get(), vj_, vi_);
-        for (unsigned int l = 0; l < local_length; l++) alpha[l] = -alpha[l];
-        blas::caxpy(alpha.get(), vj_, vi_);
-        offset += cdot_pipeline_length;
+      if(i>0) {
+	//std::unique_ptr<Complex[]> alpha(new Complex[i]);
+	//printfQuda("i = %d\n", i);
+	std::vector<Complex> alpha(i);// = new Complex[i];
+	unsigned int offset = 0;
+	
+	while (offset < i) {
+	  const unsigned int local_length = (i - offset) > cdot_pipeline_length ? cdot_pipeline_length : (i - offset);
+	  
+	  std::vector<ColorSpinorField *> vj_(evecs.begin() + offset, evecs.begin() + offset + local_length);
+	  std::vector<ColorSpinorField *> vi_ {evecs[i]};
+	  
+	  //blas::cDotProduct(alpha.get(), vj_, vi_);
+	  blas::cDotProduct(alpha.data(), vj_, vi_);
+	  for (unsigned int l = 0; l < local_length; l++) alpha[l] = -alpha[l];
+	  //blas::caxpy(alpha.get(), vj_, vi_);
+	  blas::caxpy(alpha.data(), vj_, vi_);
+	  offset += cdot_pipeline_length;
+	}
+	
+	alpha[0].real(blas::norm2(*evecs[i]));
+	alpha[0].imag(0.0);
+	
+	if (alpha[0].real() > 1e-16)
+	  blas::ax(1.0 / sqrt(alpha[0].real()), *evecs[i]);
+	else
+	  errorQuda("\nCannot orthogonalize %dth vector\n", i);
       }
-
-      alpha[0] = blas::norm2(*evecs[i]);
-
-      if (alpha[0].real() > 1e-16)
-        blas::ax(1.0 / sqrt(alpha[0].real()), *evecs[i]);
-      else
-        errorQuda("\nCannot orthogonalize %dth vector\n", i);
     }
-
+    
 #endif
     printfQuda("\nConstruct projection matrix..\n");
 
@@ -779,10 +789,10 @@ namespace quda {
       std::vector<ColorSpinorField *> vj_(evecs.begin(), evecs.begin() + i + 1);
       // std::vector<ColorSpinorField*> av_(vk(0));
       std::vector<ColorSpinorField *> av_(ws(0));
-
+      
       swp = *evecs[i];
       matDefl(vk0, *evecs[i]);
-
+      
       blas::cDotProduct(alpha.get(), vj_, av_);
 
       args.projMat[i * param.eig_param.n_ev + i] = alpha[i]; //!
@@ -919,9 +929,10 @@ namespace quda {
 
     // reset current dimension:
     param.eig_param.n_conv = idx;
-
+    param.eig_param.n_ev_deflate = param.eig_param.n_conv;
+    
     printfQuda("\nReserved eigenvectors: %d\n", param.eig_param.n_conv);
-
+    
     deflation_space *reserved_space = reinterpret_cast<deflation_space *>(param.eig_param.preserve_deflation_space);
 
     reserved_space->evals.resize(param.eig_param.n_conv);
