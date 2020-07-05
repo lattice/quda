@@ -205,6 +205,7 @@ set(QUDA_MAGMA_LIBS
 # ######################################################################################################################
 option(QUDA_BUILD_ALL_TESTS "build tests by default" ON)
 option(QUDA_INSTALL_ALL_TESTS "install tests by default" ON)
+option(QUDA_BUILD_ALL_PROGRAMS "do not build programs by default" OFF)
 if(DEFINED ENV{QUDA_BUILD_SHAREDLIB})
   set(DEFSHARED $ENV{QUDA_BUILD_SHAREDLIB})
 else()

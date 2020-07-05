@@ -25,6 +25,7 @@ endif()
 
 set (QUDA_OBJS
   # cmake-format: sortable
+  check_params.cpp
   dirac_coarse.cpp dslash_coarse.cu dslash_coarse_dagger.cu
   coarse_op.cu coarsecoarse_op.cu
   coarse_op_preconditioned.cu staggered_coarse_op.cu
@@ -211,6 +212,13 @@ endif()
  
 target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_target>)
  
+# add programs
+if(${QUDA_BUILD_ALL_PROGRAMS})		
+  add_subdirectory(programs)
+endif()		
+
+target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_programs>)
+
 # propagate CXX flags to CUDA host compiler
 if(${QUDA_PROPAGATE_CXX_FLAGS})
   target_compile_options(
