@@ -54,10 +54,12 @@ namespace quda {
         location(checkLocation(*x[0], *y[0], *z[0], *w[0]))
       {
         checkLength(*x[0], *y[0], *z[0], *w[0]);
-        auto x_prec = checkPrecision(*x[0], *z[0]);
-        auto y_prec = checkPrecision(*y[0], *w[0]);
-        auto x_order = checkOrder(*x[0], *z[0]);
-        auto y_order = checkOrder(*y[0], *w[0]);
+        auto x_prec = checkPrecision(*x[0], *z[0], *w[0]);
+        auto y_prec = y[0]->Precision();
+        auto x_order = checkOrder(*x[0], *z[0], *w[0]);
+        auto y_order = y[0]->FieldOrder();
+        if (sizeof(store_t) != x_prec) errorQuda("Expected precision %lu but received %d", sizeof(store_t), x_prec);
+        if (sizeof(y_store_t) != y_prec) errorQuda("Expected precision %lu but received %d", sizeof(y_store_t), y_prec);
         if (x_prec == y_prec && x_order != y_order) errorQuda("Orders %d %d do not match", x_order, y_order);
 
         // heuristic for enabling if we need the warp-splitting optimization
@@ -75,7 +77,7 @@ namespace quda {
         Cmatrix_h = reinterpret_cast<signed char *>(const_cast<typename T::type *>(c.data));
 
         strcpy(aux, x[0]->AuxString());
-        if (x[0]->Precision() != y[0]->Precision()) {
+        if (x_prec != y_prec) {
           strcat(aux, ",");
           strcat(aux, y[0]->AuxString());
         }
@@ -140,19 +142,21 @@ namespace quda {
       {
         staticCheck<NXZ, store_t, y_store_t, decltype(f)>(f, x, y);
 
-        constexpr bool site_unroll = !std::is_same<store_t, y_store_t>::value || isFixed<store_t>::value;
-        if (site_unroll && (x[0]->Ncolor() != 3 || x[0]->Nspin() == 2))
+        constexpr bool site_unroll_check = !std::is_same<store_t, y_store_t>::value || isFixed<store_t>::value;
+        if (site_unroll_check && (x[0]->Ncolor() != 3 || x[0]->Nspin() == 2))
           errorQuda("site unroll not supported for nSpin = %d nColor = %d", x[0]->Nspin(), x[0]->Ncolor());
 
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
         if (location == QUDA_CUDA_FIELD_LOCATION) {
-          if (site_unroll) checkNative(*x[0], *y[0], *z[0], *w[0]); // require native order when using site_unroll
+          if (site_unroll_check) checkNative(*x[0], *y[0], *z[0], *w[0]); // require native order when using site_unroll
           using device_store_t = typename device_type_mapper<store_t>::type;
           using device_y_store_t = typename device_type_mapper<y_store_t>::type;
           using device_real_t = typename mapper<device_y_store_t>::type;
           Functor<device_real_t> f_(NXZ, NYW);
 
+          // redefine site_unroll with device_store types to ensure we have correct N/Ny/M values
+          constexpr bool site_unroll = !std::is_same<device_store_t, device_y_store_t>::value || isFixed<device_store_t>::value;
           constexpr int N = n_vector<device_store_t, true, nSpin, site_unroll>();
           constexpr int Ny = n_vector<device_y_store_t, true, nSpin, site_unroll>();
           constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
@@ -216,10 +220,14 @@ namespace quda {
       // instantiate the loop unrolling template
       template <int NXZ_max> typename std::enable_if<NXZ_max!=1, void>::type instantiate(const qudaStream_t &stream)
       {
-        constexpr int pow2_max = max_NXZ_power2<false, isFixed<store_t>::value>();
+        // if multi-1d then constrain the templates to no larger than max-1d size
+        constexpr int pow2_max = !decltype(f)::multi_1d ? max_NXZ_power2<false, isFixed<store_t>::value>() :
+          std::min(max_N_multi_1d(), max_NXZ_power2<false, isFixed<store_t>::value>());
+        constexpr int linear_max = !decltype(f)::multi_1d ? MAX_MULTI_BLAS_N : std::min(max_N_multi_1d(), MAX_MULTI_BLAS_N);
+
         if (NXZ <= pow2_max && NXZ % 2 == 0) instantiatePow2<pow2_max>(stream);
-        else if (NXZ <= MAX_MULTI_BLAS_N) instantiateLinear<MAX_MULTI_BLAS_N>(stream);
-        else errorQuda("x.size %lu greater than MAX_MULTI_BLAS_N %d", x.size(), MAX_MULTI_BLAS_N);
+        else if (NXZ <= linear_max) instantiateLinear<linear_max>(stream);
+        else errorQuda("x.size %lu greater than maximum supported size (pow2 = %d, linear = %d)", x.size(), pow2_max, linear_max);
       }
 
       template <int NXZ_max> typename std::enable_if<NXZ_max==1, void>::type instantiate(const qudaStream_t &stream)
@@ -232,7 +240,9 @@ namespace quda {
       void preTune()
       {
         for (int i = 0; i < NYW; ++i) {
+          if (f.write.X) x[i]->backup();
           if (f.write.Y) y[i]->backup();
+          if (f.write.Z) z[i]->backup();
           if (f.write.W) w[i]->backup();
         }
       }
@@ -240,7 +250,9 @@ namespace quda {
       void postTune()
       {
         for (int i = 0; i < NYW; ++i) {
+          if (f.write.X) x[i]->restore();
           if (f.write.Y) y[i]->restore();
+          if (f.write.Z) z[i]->restore();
           if (f.write.W) w[i]->restore();
         }
       }
@@ -293,19 +305,6 @@ namespace quda {
       int tuningIter() const { return 3; }
     };
 
-    /*
-    template <template <typename ...> class Functor, typename store_t, typename y_store_t,
-              int nSpin, typename T, int NXZ_>
-    constexpr int MultiBlas<Functor, store_t, y_store_t, nSpin, T, NXZ_>::NXZ;
-    */
-    template <template <typename ...> class Functor, typename T>
-    void multiBlas(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
-                   CompositeColorSpinorField &x, CompositeColorSpinorField &y,
-                   CompositeColorSpinorField &z, CompositeColorSpinorField &w)
-    {
-      instantiate<Functor, MultiBlas, true>(a, b, c, *x[0], *y[0], x, y, z, w);
-    }
-
     using range = std::pair<size_t,size_t>;
 
     template <template <typename...> class Functor, typename T>
@@ -349,7 +348,8 @@ namespace quda {
 
           // mark true since we will copy the "a" matrix into constant memory
           coeff_array<T> a(a_), b, c;
-          multiBlas<Functor>(a, b, c, x, y, x, y);
+          constexpr bool mixed = true;
+          instantiate<Functor, MultiBlas, mixed>(a, b, c, *x[0], *y[0], x, y, x, x);
         } else {
           // split the problem in half and recurse
           const T *a0 = &a_[0];
@@ -450,7 +450,8 @@ namespace quda {
           }
 
           coeff_array<Complex> a(a_), b, c;
-          multiBlas<multicaxpyz_>(a, b, c, x, y, x, z);
+          constexpr bool mixed = false;
+          instantiate<multicaxpyz_, MultiBlas, mixed>(a, b, c, *x[0], *y[0], x, y, x, z);
         } else {
           // split the problem in half and recurse
           const Complex *a0 = &a_[0];
@@ -522,7 +523,8 @@ namespace quda {
 	x.push_back(&z_);
 
         coeff_array<double> a(a_), b(b_), c(c_);
-        multiBlas<multi_axpyBzpcx_>(a, b, c, x, y, x, w);
+        constexpr bool mixed = true;
+        instantiate<multi_axpyBzpcx_, MultiBlas, mixed>(a, b, c, *x[0], *y[0], x, y, x, w);
       } else {
         // split the problem in half and recurse
 	const double *a0 = &a_[0];
@@ -564,7 +566,8 @@ namespace quda {
         std::vector<ColorSpinorField*> &x = x_;
 
         coeff_array<Complex> a(a_), b(b_), c;
-        multiBlas<multi_caxpyBxpz_>(a, b, c, x, y, x, w);
+        constexpr bool mixed = true;
+        instantiate<multi_caxpyBxpz_, MultiBlas, mixed>(a, b, c, *x[0], *y[0], x, y, x, w);
       } else {
         // split the problem in half and recurse
         const Complex *a0 = &a_[0];
