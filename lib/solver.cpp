@@ -177,8 +177,8 @@ namespace quda {
     // Clone from an existing vector
     ColorSpinorParam csParam(meta);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
-    // This is the vector precision used by matPrecon
-    csParam.setPrecision(param.precision_precondition, QUDA_INVALID_PRECISION, true);
+    // This is the vector precision used by matEig
+    csParam.setPrecision(param.precision_eigensolver, QUDA_INVALID_PRECISION, true);
 
     if (deflate_compute) {
       evecs.reserve(param.eig_param.n_conv);
@@ -291,7 +291,7 @@ namespace quda {
     ColorSpinorParam csParam(*evecs[0]);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     // This is the vector precision used by matResidual
-    csParam.setPrecision(param.precision_precondition, QUDA_INVALID_PRECISION, true);
+    csParam.setPrecision(param.precision_eigensolver, QUDA_INVALID_PRECISION, true);
     for (int i = param.eig_param.n_conv; i < 2 * param.eig_param.n_conv; i++) {
       evecs.push_back(ColorSpinorField::Create(csParam));
     }

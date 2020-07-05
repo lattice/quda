@@ -834,7 +834,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
   // creating sloppy fields isn't really compute, but it is work done on the gpu
   profileGauge.TPSTART(QUDA_PROFILE_COMPUTE);
-
+  
   // switch the parameters for creating the mirror sloppy cuda gauge field
   gauge_param.reconstruct = param->reconstruct_sloppy;
   gauge_param.setPrecision(param->cuda_prec_sloppy, true);
@@ -860,22 +860,6 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     precondition->copy(*precise);
   }
 
-  // switch the parameters for creating the eigensolver cuda gauge field
-  gauge_param.reconstruct = param->reconstruct_eigensolver;
-  gauge_param.setPrecision(param->cuda_prec_eigensolver, true);
-  cudaGaugeField *eigensolver = nullptr;
-  if (param->cuda_prec_sloppy == param->cuda_prec_eigensolver
-      && param->reconstruct_sloppy == param->reconstruct_eigensolver) {
-    eigensolver = sloppy;
-  } else if (param->cuda_prec_precondition == param->cuda_prec_eigensolver
-	     && param->reconstruct_precondition == param->reconstruct_eigensolver) {
-    eigensolver = precondition;
-    
-  } else {
-    eigensolver = new cudaGaugeField(gauge_param);
-    eigensolver->copy(*precise);
-  }
-  
   // switch the parameters for creating the refinement cuda gauge field
   gauge_param.reconstruct = param->reconstruct_refinement_sloppy;
   gauge_param.setPrecision(param->cuda_prec_refinement_sloppy, true);
@@ -888,6 +872,24 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     refinement->copy(*sloppy);
   }
 
+  // switch the parameters for creating the eigensolver cuda gauge field
+  gauge_param.reconstruct = param->reconstruct_eigensolver;
+  gauge_param.setPrecision(param->cuda_prec_eigensolver, true);
+  cudaGaugeField *eigensolver = nullptr;
+  if (param->cuda_prec == param->cuda_prec_eigensolver
+      && param->reconstruct == param->reconstruct_eigensolver) {
+    eigensolver = precise;
+  } else if (param->cuda_prec_precondition == param->cuda_prec_eigensolver
+	     && param->reconstruct_precondition == param->reconstruct_eigensolver) {
+    eigensolver = precondition;
+  } else if (param->cuda_prec_sloppy == param->cuda_prec_eigensolver
+	     && param->reconstruct_sloppy == param->reconstruct_eigensolver) {
+    eigensolver = sloppy;
+  } else {
+    eigensolver = new cudaGaugeField(gauge_param);
+    eigensolver->copy(*precise);
+  }
+  
   profileGauge.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   // create an extended preconditioning field
@@ -3316,7 +3318,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   delete d;
   delete dSloppy;
   delete dPre;
-
+  delete dEig;
+  
   profileInvert.TPSTOP(QUDA_PROFILE_FREE);
 
   popVerbosity();

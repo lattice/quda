@@ -60,6 +60,7 @@ QudaPrecision &cuda_prec = prec;
 QudaPrecision &cuda_prec_sloppy = prec_sloppy;
 QudaPrecision &cuda_prec_refinement_sloppy = prec_refinement_sloppy;
 QudaPrecision &cuda_prec_precondition = prec_precondition;
+QudaPrecision &cuda_prec_eigensolver = prec_eigensolver;
 QudaPrecision &cuda_prec_ritz = prec_ritz;
 
 size_t host_gauge_data_type_size = (cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
@@ -70,10 +71,12 @@ void setQudaPrecisions()
 {
   if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
   if (prec_precondition == QUDA_INVALID_PRECISION) prec_precondition = prec_sloppy;
+  if (prec_eigensolver == QUDA_INVALID_PRECISION) prec_eigensolver = prec;
   if (prec_null == QUDA_INVALID_PRECISION) prec_null = prec_precondition;
   if (smoother_halo_prec == QUDA_INVALID_PRECISION) smoother_halo_prec = prec_null;
   if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
   if (link_recon_precondition == QUDA_RECONSTRUCT_INVALID) link_recon_precondition = link_recon_sloppy;
+  if (link_recon_eigensolver == QUDA_RECONSTRUCT_INVALID) link_recon_eigensolver = link_recon_sloppy;
 }
 
 void setQudaMgSolveTypes()

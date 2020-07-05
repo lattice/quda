@@ -144,6 +144,9 @@ namespace quda {
     /**< The precision used by the QUDA preconditioner */
     QudaPrecision precision_precondition;
 
+    /**< The precision used by the QUDA eigensolver */
+    QudaPrecision precision_eigensolver;
+
     /**< Preserve the source or not in the linear solver (deprecated?) */
     QudaPreserveSource preserve_source;
 
@@ -294,6 +297,7 @@ namespace quda {
       precision_sloppy(param.cuda_prec_sloppy),
       precision_refinement_sloppy(param.cuda_prec_refinement_sloppy),
       precision_precondition(param.cuda_prec_precondition),
+      precision_eigensolver(param.cuda_prec_eigensolver),
       preserve_source(param.preserve_source),
       return_residual(preserve_source == QUDA_PRESERVE_SOURCE_NO ? true : false),
       num_src(param.num_src),
@@ -369,6 +373,7 @@ namespace quda {
       precision_sloppy(param.precision_sloppy),
       precision_refinement_sloppy(param.precision_refinement_sloppy),
       precision_precondition(param.precision_precondition),
+      precision_eigensolver(param.precision_eigensolver),
       preserve_source(param.preserve_source),
       return_residual(param.return_residual),
       num_offset(param.num_offset),

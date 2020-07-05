@@ -289,7 +289,7 @@ namespace quda {
 
     if (param.deflate) {
       // Construct the eigensolver and deflation space if requested.
-      constructDeflationSpace(b, matPrecon);
+      constructDeflationSpace(b, matEig);
       if (deflate_compute) {
         // compute the deflation space.
         if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_INIT);
@@ -298,7 +298,7 @@ namespace quda {
         deflate_compute = false;
       }
       if (recompute_evals) {
-        eig_solve->computeEvals(matPrecon, evecs, evals);
+        eig_solve->computeEvals(matEig, evecs, evals);
         recompute_evals = false;
       }
     }
@@ -745,7 +745,7 @@ namespace quda {
       profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
       param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-      double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops()) * 1e-9;
+      double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops() + matEig.flops()) * 1e-9;
       param.gflops = gflops;
       param.iter += k;
 
