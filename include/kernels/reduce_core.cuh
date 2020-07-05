@@ -645,8 +645,7 @@ namespace quda
       constexpr int streams() const { return 7; } //! total number of input and output streams
       constexpr int flops() const { return 16; }  //! flops per element check if it's right
     };
-
-
+    
     /**
        double4 quadrupleCGReduction(V x, V y, V z){}
        First performs the operation norm2(x)
@@ -654,21 +653,26 @@ namespace quda
        Third performs the operation dotPropduct(y,z)
        Fourth performs the operation norm(z)
     */
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct quadrupleEigCGUpdate_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Float2 a, b;
-      quadrupleEigCGUpdate_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
+    template <typename real_reduce_t, typename real>
+    struct quadrupleEigCGUpdate_ : ReduceFunctor<typename VectorType<real_reduce_t, 4>::type> {
+      using reduce_t = typename VectorType<real_reduce_t, 4>::type;
+      static constexpr write<> write{ };
+      const real a;
+      const real b;
+      quadrupleEigCGUpdate_(const real &a, const real &b) : a(a), b(b) { ; }
+      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
-        typedef typename scalar<ReduceType>::type scalar;
-        x -= a.x*y;
-        norm2_<scalar>(sum.x, x);
-        w -= a.x*z;
-        y = w + b.x*y;
-        norm2_<scalar>(sum.y, y);
-        dot_<scalar>(sum.z, x, y);
-        v = x + b.x*v;
-        dot_<scalar>(sum.w, v, y);
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+	  x[i] -= a*y[i];
+	  norm2_<real_reduce_t, real>(sum.x, x[i]);
+	  w[i] -= a*z[i];
+	  y[i] = w[i] + b*y[i];
+	  norm2_<real_reduce_t, real>(sum.y, y[i]);
+	  dot_<real_reduce_t, real>(sum.z, x[i], y[i]);
+	  v[i] = x[i] + b*v[i];
+	  dot_<real_reduce_t, real>(sum.w, v[i], y[i]);
+	}
       }
       static int streams() { return 9; } //! total number of input and output streams
       static int flops() { return 16; }  //! flops per element

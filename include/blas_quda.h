@@ -1,6 +1,4 @@
-#ifndef _QUDA_BLAS_H
-#define _QUDA_BLAS_H
-
+#pragma once
 #include <quda_internal.h>
 #include <color_spinor_field.h>
 
@@ -14,6 +12,15 @@ namespace quda {
     void init();
     void end(void);
 
+    // creates and destroys additional copy stream
+    void createAuxBlasStream();
+    void destroyAuxBlasStream();
+    // Activate/deactivate (and synchronize) aux stream handle
+    void registerAuxBlasStream();
+    void unregisterAuxBlasStream(bool sync = true);
+    // Synchronize aux blas stream
+    void synchronizeAuxBlasStream();
+    
     /** returns the reduce buffer size allocated */
     size_t reduceBufferSize();
 
@@ -117,7 +124,9 @@ namespace quda {
 
     double quadrupleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v);
     double quadrupleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v);
-
+    
+    double4 quadrupleEigCGUpdate(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v);
+    
     // multi-blas kernels - defined in multi_blas.cu
     /**
        @brief Compute the block "axpy" with over the set of
@@ -451,5 +460,3 @@ namespace quda {
   } // namespace blas
 
 } // namespace quda
-
-#endif // _QUDA_BLAS_H

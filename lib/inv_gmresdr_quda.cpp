@@ -582,11 +582,11 @@ namespace quda {
 
      Zm = K ? MakeSharedPtr2(csParam) : Vm;
 
-     csParam.composite_dim = (param.eig_param.nEv + 1);
+     csParam.composite_dim = (param.eig_param.n_ev + 1);
 
      csParam.setPrecision(QUDA_DOUBLE_PRECISION);
 
-     gmresdr_args = std::make_shared<GMResDRArgs>(*Vm, nKrylov, param.eig_param.nEv);
+     gmresdr_args = std::make_shared<GMResDRArgs>(*Vm, nKrylov, param.eig_param.n_ev);
      // gmresdr_args->Vkp1 = ColorSpinorFieldSet::Create(csParam);
 
      init = true;
@@ -641,7 +641,7 @@ namespace quda {
 
     int restart_idx = 0, j = 0, check_interval = 8;
 
-    DenseMatrix Gm = DenseMatrix::Zero(param.eig_param.nEv + 1, param.eig_param.nEv + 1);
+    DenseMatrix Gm = DenseMatrix::Zero(param.eig_param.n_ev + 1, param.eig_param.n_ev + 1);
 
     while (restart_idx < param.max_restart_num
            && !(convergence(r2, heavy_quark_res, stop, param.tol_hq) || !(r2 > stop))) {
@@ -658,12 +658,12 @@ namespace quda {
         ext_r2 = xmyNorm(r, y);
 
 	// can this be done as a single 2-d reduction?
-        for (int l = 0; l < param.eig_param.nEv + 1; l++) {
+        for (int l = 0; l < param.eig_param.n_ev + 1; l++) {
 
           Complex *col = Gm.col(l).data();
 
           std::vector<ColorSpinorField *> v1_(Vm->Components().begin(),
-                                              Vm->Components().begin() + param.eig_param.nEv + 1);
+                                              Vm->Components().begin() + param.eig_param.n_ev + 1);
           std::vector<ColorSpinorField*> v2_;
 	  v2_.push_back(static_cast<ColorSpinorField*>(&Vm->Component(l)));
 

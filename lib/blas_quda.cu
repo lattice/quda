@@ -19,6 +19,9 @@ namespace quda {
 
     static qudaStream_t *blasStream;
 
+    static cudaStream_t *auxBlasStream;
+    static bool         run_aux_blas_stream;
+    
     template <template <typename real> class Functor, typename store_t, typename y_store_t,
               int nSpin, typename coeff_t>
     class Blas : public Tunable

@@ -267,9 +267,9 @@ void setEigParam(QudaEigParam &eig_param, QudaInverterType inv_type)
   }
 
   if (inv_type == QUDA_EIGCG_INVERTER || inv_type == QUDA_INC_EIGCG_INVERTER) {
-    if (eig_nConv < 0) errorQuda("Invalid value for parameter eig_nConv (= %d)", eig_nConv);
-    eig_param.nLockedMax = eig_nConv;
-    eig_param.nConv = 0;
+    if (eig_n_conv < 0) errorQuda("Invalid value for parameter eig_n_conv (= %d)", eig_n_conv);
+    eig_param.nLockedMax = eig_n_conv;
+    eig_param.n_conv = 0;
   }
 
   eig_param.block_size = eig_param.eig_type == QUDA_EIG_TR_LANCZOS ? 1 : eig_block_size;
