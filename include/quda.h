@@ -341,7 +341,7 @@ extern "C" {
     int n_ev;
     /** EeigCG  : Search space dimension
      *  gmresdr : Krylov subspace dimension
-    */
+     */
     int max_search_dim;
     /** For systems with many RHS: current RHS index */
     int rhs_idx;
@@ -709,6 +709,30 @@ extern "C" {
     void *qcharge_density; /**< Pointer to host array of length volume where the q-charge density will be copied */
   } QudaGaugeObservableParam;
 
+  typedef struct QudaCublasParam_s {
+
+    QudaCublasOperation trans_a; /**< operation op(A) that is non- or (conj.) transpose. */
+    QudaCublasOperation trans_b; /**< operation op(B) that is non- or (conj.) transpose. */
+    int m;                       /**< number of rows of matrix op(A) and C.*/
+    int n;                       /**< number of columns of matrix op(B) and C.*/
+    int k;                       /**< number of columns of op(A) and rows of op(B).*/
+    int lda;                     /**< leading dimension of two-dimensional array used to store the matrix A.*/
+    int ldb;                     /**< leading dimension of two-dimensional array used to store matrix B.*/
+    int ldc;                     /**< leading dimension of two-dimensional array used to store matrix C.*/
+    int a_offset;                /**< position of the A array from which begin read/write. */
+    int b_offset;                /**< position of the B array from which begin read/write. */
+    int c_offset;                /**< position of the C array from which begin read/write. */
+
+    double_complex alpha; /**< scalar used for multiplication. */
+    double_complex beta;  /**< scalar used for multiplication. If beta==0, C does not have to be a valid input.*/
+
+    int batch_count; /**< number of pointers contained in arrayA, arrayB and arrayC. */
+
+    QudaCublasDataType data_type;   /**< Specifies if using S(C) or D(Z) BLAS type */
+    QudaCublasDataOrder data_order; /**< Specifies if using Row or Column major */
+
+  } QudaCublasParam;
+
   /*
    * Interface functions, found in interface_quda.cpp
    */
@@ -877,6 +901,20 @@ extern "C" {
   QudaGaugeObservableParam newQudaGaugeObservableParam(void);
 
   /**
+   * A new QudaCublasParam should always be initialized immediately
+   * after it's defined (and prior to explicitly setting its members)
+   * using this function.  Typical usage is as follows:
+   *
+   *   QudaCublasParam cublas_param = newQudaCublasParam();
+   */
+  QudaCublasParam newQudaCublasParam(void);
+
+  /**
+   * Print the device properties of each device on the node
+   */
+  void printDeviceProp();
+
+  /**
    * Print the members of QudaGaugeParam.
    * @param param The QudaGaugeParam whose elements we are to print.
    */
@@ -905,6 +943,12 @@ extern "C" {
    * @param param The QudaGaugeObservableParam whose elements we are to print.
    */
   void printQudaGaugeObservableParam(QudaGaugeObservableParam *param);
+
+  /**
+   * Print the members of QudaCublasParam.
+   * @param param The QudaCublasParam whose elements we are to print.
+   */
+  void printQudaCublasParam(QudaCublasParam *param);
 
   /**
    * Load the gauge field from the host.
@@ -1355,16 +1399,10 @@ extern "C" {
    * @param[in] param The parameters of the external fields and the computation settings
    * @param[out] timeinfo
    */
-  int computeGaugeFixingOVRQuda(void* gauge,
-                      const unsigned int gauge_dir,
-                      const unsigned int Nsteps,
-                      const unsigned int verbose_interval,
-                      const double relax_boost,
-                      const double tolerance,
-                      const unsigned int reunit_interval,
-                      const unsigned int stopWtheta,
-                      QudaGaugeParam* param,
-                      double* timeinfo);
+  int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
+                                const unsigned int verbose_interval, const double relax_boost, const double tolerance,
+                                const unsigned int reunit_interval, const unsigned int stopWtheta,
+                                QudaGaugeParam *param, double *timeinfo);
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
    * @param[in,out] gauge, gauge field to be fixed
@@ -1373,21 +1411,18 @@ extern "C" {
    * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
    * @param[in] alpha, gauge fixing parameter of the method, most common value is 0.08
    * @param[in] autotune, 1 to autotune the method, i.e., if the Fg inverts its tendency we decrease the alpha value
-   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
+   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when
+   * iteration reachs the maximum number of steps defined by Nsteps
    * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
    * @param[in] param The parameters of the external fields and the computation settings
    * @param[out] timeinfo
    */
-  int computeGaugeFixingFFTQuda(void* gauge,
-                      const unsigned int gauge_dir,
-                      const unsigned int Nsteps,
-                      const unsigned int verbose_interval,
-                      const double alpha,
-                      const unsigned int autotune,
-                      const double tolerance,
-                      const unsigned int stopWtheta,
-                      QudaGaugeParam* param,
-                      double* timeinfo);
+  int computeGaugeFixingFFTQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
+                                const unsigned int verbose_interval, const double alpha, const unsigned int autotune,
+                                const double tolerance, const unsigned int stopWtheta, QudaGaugeParam *param,
+                                double *timeinfo);
+
+  void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *param);
 
   /**
    * @brief Flush the chronological history for the given index

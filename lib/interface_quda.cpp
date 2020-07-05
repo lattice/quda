@@ -71,7 +71,6 @@
 
 #include <gauge_tools.h>
 #include <contract_quda.h>
-
 #include <momentum.h>
 
 
@@ -230,6 +229,9 @@ static TimeProfile profilePhase("staggeredPhaseQuda");
 
 //!< Profiler for contractions
 static TimeProfile profileContract("contractQuda");
+
+//!< Profiler for contractions
+static TimeProfile profileCuBLAS("cublasQuda");
 
 //!< Profiler for covariant derivative
 static TimeProfile profileCovDev("covDevQuda");
@@ -631,6 +633,68 @@ void initQudaDevice(int dev) {
 
   profileInit.TPSTOP(QUDA_PROFILE_INIT);
   profileInit.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
+void printDeviceProp()
+{
+
+  int dev_count;
+  cudaGetDeviceCount(&dev_count);
+  int device;
+  for (device = 0; device < dev_count; device++) {
+
+    // cudaDeviceProp deviceProp;
+    cudaGetDeviceProperties(&deviceProp, device);
+    printfQuda("%d - name:                    %s\n", device, deviceProp.name);
+    printfQuda("%d - totalGlobalMem:          %lu bytes ( %.2f Gbytes)\n", device, deviceProp.totalGlobalMem,
+               deviceProp.totalGlobalMem / (float)(1024 * 1024 * 1024));
+    printfQuda("%d - sharedMemPerBlock:       %lu bytes ( %.2f Kbytes)\n", device, deviceProp.sharedMemPerBlock,
+               deviceProp.sharedMemPerBlock / (float)1024);
+    printfQuda("%d - regsPerBlock:            %d\n", device, deviceProp.regsPerBlock);
+    printfQuda("%d - warpSize:                %d\n", device, deviceProp.warpSize);
+    printfQuda("%d - memPitch:                %lu\n", device, deviceProp.memPitch);
+    printfQuda("%d - maxThreadsPerBlock:      %d\n", device, deviceProp.maxThreadsPerBlock);
+    printfQuda("%d - maxThreadsDim[0]:        %d\n", device, deviceProp.maxThreadsDim[0]);
+    printfQuda("%d - maxThreadsDim[1]:        %d\n", device, deviceProp.maxThreadsDim[1]);
+    printfQuda("%d - maxThreadsDim[2]:        %d\n", device, deviceProp.maxThreadsDim[2]);
+    printfQuda("%d - maxGridSize[0]:          %d\n", device, deviceProp.maxGridSize[0]);
+    printfQuda("%d - maxGridSize[1]:          %d\n", device, deviceProp.maxGridSize[1]);
+    printfQuda("%d - maxGridSize[2]:          %d\n", device, deviceProp.maxGridSize[2]);
+    printfQuda("%d - totalConstMem:           %lu bytes ( %.2f Kbytes)\n", device, deviceProp.totalConstMem,
+               deviceProp.totalConstMem / (float)1024);
+    printfQuda("%d - compute capability:      %d.%d\n", device, deviceProp.major, deviceProp.minor);
+    printfQuda("%d - deviceOverlap            %s\n", device, (deviceProp.deviceOverlap ? "true" : "false"));
+    printfQuda("%d - multiProcessorCount      %d\n", device, deviceProp.multiProcessorCount);
+    printfQuda("%d - kernelExecTimeoutEnabled %s\n", device, (deviceProp.kernelExecTimeoutEnabled ? "true" : "false"));
+    printfQuda("%d - integrated               %s\n", device, (deviceProp.integrated ? "true" : "false"));
+    printfQuda("%d - canMapHostMemory         %s\n", device, (deviceProp.canMapHostMemory ? "true" : "false"));
+    switch (deviceProp.computeMode) {
+    case 0: printfQuda("%d - computeMode              0: cudaComputeModeDefault\n", device); break;
+    case 1: printfQuda("%d - computeMode              1: cudaComputeModeExclusive\n", device); break;
+    case 2: printfQuda("%d - computeMode              2: cudaComputeModeProhibited\n", device); break;
+    case 3: printfQuda("%d - computeMode              3: cudaComputeModeExclusiveProcess\n", device); break;
+    default: errorQuda("Unknown deviceProp.computeMode.");
+    }
+
+    printfQuda("%d - surfaceAlignment         %lu\n", device, deviceProp.surfaceAlignment);
+    printfQuda("%d - concurrentKernels        %s\n", device, (deviceProp.concurrentKernels ? "true" : "false"));
+    printfQuda("%d - ECCEnabled               %s\n", device, (deviceProp.ECCEnabled ? "true" : "false"));
+    printfQuda("%d - pciBusID                 %d\n", device, deviceProp.pciBusID);
+    printfQuda("%d - pciDeviceID              %d\n", device, deviceProp.pciDeviceID);
+    printfQuda("%d - pciDomainID              %d\n", device, deviceProp.pciDomainID);
+    printfQuda("%d - tccDriver                %s\n", device, (deviceProp.tccDriver ? "true" : "false"));
+    switch (deviceProp.asyncEngineCount) {
+    case 0: printfQuda("%d - asyncEngineCount         1: host -> device only\n", device); break;
+    case 1: printfQuda("%d - asyncEngineCount         2: host <-> device\n", device); break;
+    case 2: printfQuda("%d - asyncEngineCount         0: not supported\n", device); break;
+    default: errorQuda("Unknown deviceProp.asyncEngineCount.");
+    }
+    printfQuda("%d - unifiedAddressing        %s\n", device, (deviceProp.unifiedAddressing ? "true" : "false"));
+    printfQuda("%d - memoryClockRate          %d kilohertz\n", device, deviceProp.memoryClockRate);
+    printfQuda("%d - memoryBusWidth           %d bits\n", device, deviceProp.memoryBusWidth);
+    printfQuda("%d - l2CacheSize              %d bytes\n", device, deviceProp.l2CacheSize);
+    printfQuda("%d - maxThreadsPerMultiProcessor          %d\n\n", device, deviceProp.maxThreadsPerMultiProcessor);
+  }
 }
 
 /*
@@ -1445,7 +1509,7 @@ void endQuda(void)
   freeGaugeQuda();
   freeCloverQuda();
 
-  for (int i=0; i<QUDA_MAX_CHRONO; i++) flushChronoQuda(i);
+  for (int i = 0; i < QUDA_MAX_CHRONO; i++) flushChronoQuda(i);
 
   for (auto v : solutionResident) if (v) delete v;
   solutionResident.clear();
@@ -1503,6 +1567,7 @@ void endQuda(void)
     profileStaggeredForce.Print();
     profileHISQForce.Print();
     profileContract.Print();
+    profileCuBLAS.Print();
     profileCovDev.Print();
     profilePlaq.Print();
     profileGaugeObs.Print();
@@ -5740,7 +5805,6 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
     gaugePrecise = nullptr;
   } */
 
-
   GaugeFixFFTQuda.TPSTOP(QUDA_PROFILE_H2D);
 
   // perform the update
@@ -5768,7 +5832,7 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
     delete cudaInGauge;
   }
 
-  if(timeinfo){
+  if (timeinfo) {
     timeinfo[0] = GaugeFixFFTQuda.Last(QUDA_PROFILE_H2D);
     timeinfo[1] = GaugeFixFFTQuda.Last(QUDA_PROFILE_COMPUTE);
     timeinfo[2] = GaugeFixFFTQuda.Last(QUDA_PROFILE_D2H);
@@ -5849,4 +5913,142 @@ void gaugeObservablesQuda(QudaGaugeObservableParam *param)
 
   gaugeObservables(*gauge, *param, profileGaugeObs);
   profileGaugeObs.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
+void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *cublas_param)
+{
+  profileCuBLAS.TPSTART(QUDA_PROFILE_TOTAL);
+  profileCuBLAS.TPSTART(QUDA_PROFILE_INIT);
+  checkCublasParam(cublas_param);
+
+  // The data in the arrays is on the host. We transfer the data to the device here
+  // for timing purposes. One can pass host pointers to the BatchGEMM function
+  // and it will handle the data movement for the user.
+
+  // Extract data from the param struct for device malloc
+  uint64_t arrayA_size = 0, arrayB_size = 0, arrayC_size = 0;
+  if (cublas_param->data_order == QUDA_CUBLAS_DATAORDER_COL) {
+    // leading dimension is in terms of consecutive data
+    // elements in a column, multiplied by number of rows
+    if (cublas_param->trans_a == QUDA_CUBLAS_OP_N) {
+      arrayA_size = cublas_param->lda * cublas_param->k; // A_mk
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%d, %d}\n", cublas_param->lda, cublas_param->k);
+    } else {
+      arrayA_size = cublas_param->lda * cublas_param->m; // A_km
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%d, %d}\n", cublas_param->lda, cublas_param->m);
+    }
+
+    if (cublas_param->trans_b == QUDA_CUBLAS_OP_N) {
+      arrayB_size = cublas_param->ldb * cublas_param->n; // B_kn
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%d, %d}\n", cublas_param->ldb, cublas_param->n);
+    } else {
+      arrayB_size = cublas_param->ldb * cublas_param->k; // B_nk
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%d, %d}\n", cublas_param->ldb, cublas_param->k);
+    }
+    arrayC_size = cublas_param->ldc * cublas_param->n; // C_mn
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array C_{%d, %d}\n", cublas_param->ldc, cublas_param->n);
+  } else {
+    // leading dimension is in terms of consecutive data
+    // elements in a row, multiplied by number of columns.
+    if (cublas_param->trans_a == QUDA_CUBLAS_OP_N) {
+      arrayA_size = cublas_param->lda * cublas_param->m; // A_mk
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%d, %d}\n", cublas_param->m, cublas_param->lda);
+    } else {
+      arrayA_size = cublas_param->lda * cublas_param->k; // A_km
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%d, %d}\n", cublas_param->k, cublas_param->lda);
+    }
+    if (cublas_param->trans_b == QUDA_CUBLAS_OP_N) {
+      arrayB_size = cublas_param->ldb * cublas_param->k; // B_nk
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%d, %d}\n", cublas_param->k, cublas_param->ldb);
+    } else {
+      arrayB_size = cublas_param->ldb * cublas_param->n; // B_kn
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%d, %d}\n", cublas_param->n, cublas_param->ldb);
+    }
+    arrayC_size = cublas_param->ldc * cublas_param->m; // C_mn
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array C_{%d, %d}\n", cublas_param->m, cublas_param->ldc);
+  }
+
+  size_t data_size
+    = (cublas_param->data_type == QUDA_CUBLAS_DATATYPE_D || cublas_param->data_type == QUDA_CUBLAS_DATATYPE_Z) ?
+    sizeof(double) :
+    sizeof(float);
+  int re_im = 1;
+  if (cublas_param->data_type == QUDA_CUBLAS_DATATYPE_C || cublas_param->data_type == QUDA_CUBLAS_DATATYPE_Z) {
+    re_im *= 2;
+  }
+
+  int batches = cublas_param->batch_count;
+  size_t A_bytes = batches * arrayA_size * re_im * data_size;
+  size_t B_bytes = batches * arrayB_size * re_im * data_size;
+  size_t C_bytes = batches * arrayC_size * re_im * data_size;
+  if (getVerbosity() >= QUDA_VERBOSE)
+    printfQuda("A_Gbtyes = %f, B_Gbtyes = %f, C_Gbtyes = %f\n", 1.0 * A_bytes / std::pow(1024, 3),
+               1.0 * B_bytes / std::pow(1024, 3), 1.0 * C_bytes / std::pow(1024, 3));
+  void *A_d = pool_device_malloc(A_bytes);
+  void *B_d = pool_device_malloc(B_bytes);
+  void *C_d = pool_device_malloc(C_bytes);
+  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("QUDA: arrays allocated sucsessfully.\n");
+  profileCuBLAS.TPSTOP(QUDA_PROFILE_INIT);
+
+  // Transfer host data to device
+  profileCuBLAS.TPSTART(QUDA_PROFILE_H2D);
+  qudaMemcpy(A_d, arrayA, A_bytes, cudaMemcpyHostToDevice);
+  qudaMemcpy(B_d, arrayB, B_bytes, cudaMemcpyHostToDevice);
+  qudaMemcpy(C_d, arrayC, C_bytes, cudaMemcpyHostToDevice);
+  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("QUDA: arrays copied sucsessfully.\n");
+  profileCuBLAS.TPSTOP(QUDA_PROFILE_H2D);
+
+  // Compute Batched GEMM
+  profileCuBLAS.TPSTART(QUDA_PROFILE_COMPUTE);
+  
+  // cuBLAS works exclusively in column major order. If the input data is in
+  // row major order, we may treat the A and B and C arrays as A^T, B^T, and C^T.
+  // We swap the order of the A * B multiplication and swap the
+  // operation types and other data to recover the the desired result in the
+  // desired order.
+  // E.g: in row major, the operation,
+  // C = a * A^T * B + b * C
+  //
+  // will become the column major operation
+  // C^T = a * B^T * A + b * C^T
+  //
+  // By inspection, one can see that transposition of the above column major
+  // operation will result in the desired row major answer:
+  //
+  // (C^T)^T = a * (B^T * A)^T + b * (C^T)^T
+  //  -->  C = a *  A^T * B    + b *  C
+  //
+  // We must also swap around some parameters. The Row major indices,
+  // A_{m, lda}, B_{k, ldb}, C_{m, ldc}
+  // become
+  // A^T_{lda, m}, B^T_{ldb, k}, C^T_{ldc, m}.
+  // so the leading dimensions remain the same. However, we must change the actual
+  // matrix dims m,n,k to reflect the change to column major.
+  // m_{col} = n_{row}
+  // n_{col} = m_{row}
+  // k_{col} = k_{row}
+  // And because we are swapping the A and B arrays, we must also swap their
+  // leading dim values and any offsets. All this is done behind the scenes in the
+  // BatchGEMM function, and before function exit all pointers and values are
+  // restored to the values they had on entry.
+  
+  cublas::BatchGEMM(A_d, B_d, C_d, *cublas_param, QUDA_CUDA_FIELD_LOCATION);
+  
+  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("BatchGEMM success!\n");
+  profileCuBLAS.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  // Copy device C array back to host
+  profileCuBLAS.TPSTART(QUDA_PROFILE_D2H);
+  qudaMemcpy(arrayC, C_d, C_bytes, cudaMemcpyDeviceToHost);
+  profileCuBLAS.TPSTOP(QUDA_PROFILE_D2H);
+
+  // Clean up
+  profileCuBLAS.TPSTART(QUDA_PROFILE_FREE);
+  pool_device_free(A_d);
+  pool_device_free(B_d);
+  pool_device_free(C_d);
+  profileCuBLAS.TPSTOP(QUDA_PROFILE_FREE);
+
+  profileCuBLAS.TPSTOP(QUDA_PROFILE_TOTAL);
+  saveTuneCache();
 }

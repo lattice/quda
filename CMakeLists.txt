@@ -150,6 +150,7 @@ option(QUDA_FORCE_HISQ "build code for hisq fermion force" OFF)
 option(QUDA_GAUGE_TOOLS "build auxiliary gauge-field tools" OFF)
 option(QUDA_GAUGE_ALG "build gauge-fixing and pure-gauge algorithms" OFF)
 option(QUDA_CONTRACT "build code for bilinear contraction" OFF)
+option(QUDA_CUBLAS_INTERFACE "build code for host interface with cuBLAS" OFF)
 option(QUDA_COVDEV "build code for covariant derivative" OFF)
 # Dynamic inversion saves memory but decreases the flops
 option(QUDA_DYNAMIC_CLOVER "Dynamically invert the clover term for twisted-clover" OFF)

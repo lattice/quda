@@ -357,3 +357,15 @@ extern QudaWFlowType wflow_type;
 extern int measurement_interval;
 
 extern QudaContractType contract_type;
+
+extern QudaCublasOperation cublas_trans_a;
+extern QudaCublasOperation cublas_trans_b;
+extern QudaCublasDataType cublas_data_type;
+extern QudaCublasDataOrder cublas_data_order;
+
+extern std::array<int, 3> cublas_mnk;
+extern std::array<int, 3> cublas_leading_dims;
+extern std::array<int, 3> cublas_offsets;
+extern std::array<double, 2> cublas_alpha_re_im;
+extern std::array<double, 2> cublas_beta_re_im;
+extern int cublas_batch;

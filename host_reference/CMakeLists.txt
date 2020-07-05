@@ -3,6 +3,7 @@ add_library(
   quda_reference STATIC
   clover_reference.cpp
   covdev_reference.cpp
+  cublas_reference.cpp
   domain_wall_dslash_reference.cpp
   dslash_reference.cpp
   dslash_test_helpers.cpp
@@ -13,16 +14,16 @@ add_library(
   wilson_dslash_reference.cpp)
 
 target_include_directories(quda_reference PUBLIC .)
-target_include_directories(quda_reference PRIVATE ../utils)
+target_include_directories(quda_reference PRIVATE ../utils ${CMAKE_BINARY_DIR}/externals/eigen/src/Eigen)
 target_link_libraries(quda_reference PRIVATE quda)
 
 if(QUDA_QIO
-   AND QUDA_DOWNLOAD_USQCD
-   AND NOT QIO_FOUND)
+    AND QUDA_DOWNLOAD_USQCD
+    AND NOT QIO_FOUND)
   add_dependencies(quda_reference QIO)
 endif()
 if(QUDA_QMP
-   AND QUDA_DOWNLOAD_USQCD
-   AND NOT QMP_FOUND)
+    AND QUDA_DOWNLOAD_USQCD
+    AND NOT QMP_FOUND)
   add_dependencies(quda_reference QMP)
 endif()

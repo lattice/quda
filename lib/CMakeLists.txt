@@ -299,9 +299,16 @@ if(QUDA_DIRAC_NDEG_TWISTED_MASS)
   target_compile_definitions(quda PUBLIC GPU_NDEG_TWISTED_MASS_DIRAC)
 endif(QUDA_DIRAC_NDEG_TWISTED_MASS)
 
-if(QUDA_MULTIGRID)
+if(QUDA_CUBLAS_INTERFACE)
   target_link_libraries(quda PUBLIC ${CUDA_cublas_LIBRARY})
   target_compile_definitions(quda PRIVATE CUBLAS_LIB)
+endif()
+
+if(QUDA_MULTIGRID)
+  if(NOT QUDA_CUBLAS_INTERFACE)
+    target_link_libraries(quda PUBLIC ${CUDA_cublas_LIBRARY})
+    target_compile_definitions(quda PRIVATE CUBLAS_LIB)
+  endif()
   target_compile_definitions(quda PRIVATE GPU_MULTIGRID)
 endif(QUDA_MULTIGRID)
 

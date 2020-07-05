@@ -3,7 +3,7 @@ set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_FULL_LIBDIR})
 
 # enable tests build a common library for all test utilities
 add_library(quda_test STATIC googletest/src/gtest-all.cc)
-target_include_directories(quda_test PUBLIC googletest/include googletest)
+target_include_directories(quda_test PUBLIC googletest/include googletest ${CMAKE_BINARY_DIR}/externals/eigen/src/Eigen)
 
 if(QUDA_QIO
    AND QUDA_DOWNLOAD_USQCD
@@ -158,6 +158,13 @@ if(QUDA_MULTIGRID)
     install(TARGETS multigrid_evolve_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
   endif()
 
+endif()
+
+if(QUDA_CUBLAS_INTERFACE)
+  add_executable(cublas_interface_test cublas_interface_test.cpp)
+  target_link_libraries(cublas_interface_test ${TEST_LIBS})
+  quda_checkbuildtest(cublas_interface_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS cublas_interface_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 add_executable(plaq_test plaq_test.cpp)
