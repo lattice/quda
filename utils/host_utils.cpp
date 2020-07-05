@@ -451,9 +451,9 @@ int neighborIndex_mg(int i, int oddBit, int dx4, int dx3, int dx2, int dx1)
   int ret;
 
   int Y = fullLatticeIndex(i, oddBit);
-  int x4 = Y/(Z[2]*Z[1]*Z[0]);
-  int x3 = (Y/(Z[1]*Z[0])) % Z[2];
-  int x2 = (Y/Z[0]) % Z[1];
+  int x4 = Y / (Z[2] * Z[1] * Z[0]);
+  int x3 = (Y / (Z[1] * Z[0])) % Z[2];
+  int x2 = (Y / Z[0]) % Z[1];
   int x1 = Y % Z[0];
 
   int ghost_x4 = x4 + dx4;

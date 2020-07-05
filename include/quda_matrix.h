@@ -73,10 +73,11 @@ namespace quda {
 
         __device__ __host__ inline Matrix() { setZero(this); }
 
-        __device__ __host__ inline Matrix(const Matrix<T,N> &a) {
+        __device__ __host__ inline Matrix(const Matrix<T, N> &a)
+        {
 #pragma unroll
 	  for (int i=0; i<N*N; i++) data[i] = a.data[i];
-	}
+        }
 
         template <class U> __device__ __host__ inline Matrix(const Matrix<U, N> &a)
         {
@@ -206,33 +207,28 @@ namespace quda {
           const auto identity = conj(*this) * *this;
 
 #pragma unroll
-          for (int i=0; i<N; ++i){
-            if( fabs(identity(i,i).real() - 1.0) > max_error ||
-                fabs(identity(i,i).imag()) > max_error) return false;
+          for (int i = 0; i < N; ++i) {
+            if (fabs(identity(i, i).real() - 1.0) > max_error || fabs(identity(i, i).imag()) > max_error) return false;
 
 #pragma unroll
-            for (int j=i+1; j<N; ++j){
-              if( fabs(identity(i,j).real()) > max_error ||
-                  fabs(identity(i,j).imag()) > max_error ||
-                  fabs(identity(j,i).real()) > max_error ||
-                  fabs(identity(j,i).imag()) > max_error ){
+            for (int j = i + 1; j < N; ++j) {
+              if (fabs(identity(i, j).real()) > max_error || fabs(identity(i, j).imag()) > max_error
+                  || fabs(identity(j, i).real()) > max_error || fabs(identity(j, i).imag()) > max_error) {
                 return false;
               }
             }
           }
 
 #pragma unroll
-          for (int i=0; i<N; i++) {
+          for (int i = 0; i < N; i++) {
 #pragma unroll
-            for (int j=0; j<N; j++) {
-              if (std::isnan((*this)(i,j).real()) ||
-                  std::isnan((*this)(i,j).imag())) return false;
+            for (int j = 0; j < N; j++) {
+              if (std::isnan((*this)(i, j).real()) || std::isnan((*this)(i, j).imag())) return false;
             }
           }
 
           return true;
         }
-
     };
 
   /**
@@ -570,8 +566,7 @@ namespace quda {
 	}
       }
       return result;
-    }
-
+  }
 
   template<class T>
     __device__ __host__ inline

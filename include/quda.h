@@ -492,7 +492,7 @@ extern "C" {
     QudaExtLibType extlib_type;
     //-------------------------------------------------
     /** Whether deflation space is complete */
-    QudaBoolean is_complete;    
+    QudaBoolean is_complete;
 
   } QudaEigParam;
 

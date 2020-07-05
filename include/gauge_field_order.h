@@ -392,15 +392,14 @@ namespace quda {
         scale(a.scale),
         scale_inv(a.scale_inv)
       {
-        for (int d=0; d<QUDA_MAX_GEOMETRY; d++)
-	  u[d] = a.u[d];
+        for (int d = 0; d < QUDA_MAX_GEOMETRY; d++) u[d] = a.u[d];
       }
 
       void resetScale(Float max) {
 	if (fixed) {
-	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
-	  scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
-	}
+          scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
+          scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
+        }
       }
 
       __device__ __host__ inline complex<Float> operator()(int d, int parity, int x, int row, int col) const
@@ -490,17 +489,17 @@ namespace quda {
         scale(a.scale),
         scale_inv(a.scale_inv)
       {
-        for (int d=0; d<8; d++) {
-	  ghost[d] = a.ghost[d];
+        for (int d = 0; d < 8; d++) {
+          ghost[d] = a.ghost[d];
 	  ghostOffset[d] = a.ghostOffset[d];
-	}
+        }
       }
 
       void resetScale(Float max) {
 	if (fixed) {
-	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
-	  scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
-	}
+          scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
+          scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
+        }
       }
 
       __device__ __host__ inline complex<Float> operator()(int d, int parity, int x, int row, int col) const
@@ -545,9 +544,9 @@ namespace quda {
 
       void resetScale(Float max) {
 	if (fixed) {
-	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
-	  scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
-	}
+          scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
+          scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
+        }
       }
 
       __device__ __host__ inline complex<Float> operator()(int d, int parity, int x, int row, int col) const
@@ -633,17 +632,17 @@ namespace quda {
         scale(a.scale),
         scale_inv(a.scale_inv)
       {
-        for (int d=0; d<8; d++) {
-	  ghost[d] = a.ghost[d];
+        for (int d = 0; d < 8; d++) {
+          ghost[d] = a.ghost[d];
 	  ghostOffset[d] = a.ghostOffset[d];
-	}
+        }
       }
 
       void resetScale(Float max) {
 	if (fixed) {
-	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
-	  scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
-	}
+          scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
+          scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
+        }
       }
 
       __device__ __host__ inline complex<Float> operator()(int d, int parity, int x, int row, int col) const
@@ -707,9 +706,9 @@ namespace quda {
       void resetScale(Float max_) {
 	if (fixed) {
 	  max = max_;
-	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
-	  scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
-	}
+          scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
+          scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
+        }
       }
 
       __device__ __host__ inline const complex<Float> operator()(int dim, int parity, int x_cb, int row, int col) const
@@ -808,9 +807,9 @@ namespace quda {
       void resetScale(Float max) {
 	accessor.resetScale(max);
 	if (fixed) {
-	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
-	  scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
-	}
+          scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
+          scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
+        }
       }
 
       __device__ __host__ inline const complex<Float> operator()(int d, int parity, int x_cb, int row, int col) const
@@ -1032,11 +1031,11 @@ namespace quda {
         }
 
         /**
-	 * @brief Returns the L2 norm squared of the field in a given dimension
-	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
-	 * @return L2 norm squared
-	 */
-	__host__ double norm2(int dim=-1, bool global=true) const {
+         * @brief Returns the L2 norm squared of the field in a given dimension
+         * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
+         * @return L2 norm squared
+         */
+        __host__ double norm2(int dim=-1, bool global=true) const {
           double nrm2 = accessor.transform_reduce(location, dim, square_<double, storeFloat>(accessor.scale_inv), 0.0,
                                                   plus<double>());
           if (global) comm_allreduce(&nrm2);
@@ -1044,11 +1043,11 @@ namespace quda {
         }
 
         /**
-	 * @brief Returns the Linfinity norm of the field in a given dimension
-	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
-	 * @return Linfinity norm
-	 */
-	__host__ double abs_max(int dim=-1, bool global=true) const {
+         * @brief Returns the Linfinity norm of the field in a given dimension
+         * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
+         * @return Linfinity norm
+         */
+        __host__ double abs_max(int dim=-1, bool global=true) const {
           double absmax = accessor.transform_reduce(location, dim, abs_<Float, storeFloat>(accessor.scale_inv), 0.0,
                                                     maximum<Float>());
           if (global) comm_allreduce_max(&absmax);
@@ -1056,11 +1055,11 @@ namespace quda {
         }
 
         /**
-	 * @brief Returns the minimum absolute value of the field
-	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
-	 * @return Minimum norm
-	 */
-	__host__ double abs_min(int dim=-1, bool global=true) const {
+         * @brief Returns the minimum absolute value of the field
+         * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
+         * @return Minimum norm
+         */
+        __host__ double abs_min(int dim=-1, bool global=true) const {
           double absmin = accessor.transform_reduce(location, dim, abs_<Float, storeFloat>(accessor.scale_inv),
                                                     std::numeric_limits<double>::max(), minimum<Float>());
           if (global) comm_allreduce_min(&absmin);
@@ -1068,7 +1067,7 @@ namespace quda {
         }
 
         /** Return the size of the allocation (geometry and parity left out and added as needed in Tunable::bytes) */
-	size_t Bytes() const { return static_cast<size_t>(volumeCB) * nColor * nColor * 2ll * sizeof(storeFloat); }
+        size_t Bytes() const { return static_cast<size_t>(volumeCB) * nColor * nColor * 2ll * sizeof(storeFloat); }
     };
 
       /**
@@ -1701,26 +1700,26 @@ namespace quda {
             ghost[i] = ghost_ ? ghost_[i] : 0;
             faceVolumeCB[i] = u.SurfaceCB(i) * u.Nface(); // face volume equals surface * depth
           }
-      }
+        }
 
-      FloatNOrder(const FloatNOrder &order) :
-        reconstruct(order.reconstruct),
-        gauge(order.gauge),
-        offset(order.offset),
-        ghostExchange(order.ghostExchange),
-        volumeCB(order.volumeCB),
-        stride(order.stride),
-        geometry(order.geometry),
-        phaseOffset(order.phaseOffset),
-        backup_h(nullptr),
-        bytes(order.bytes)
-      {
-	for (int i=0; i<4; i++) {
-	  X[i] = order.X[i];
-	  R[i] = order.R[i];
-	  ghost[i] = order.ghost[i];
-	  faceVolumeCB[i] = order.faceVolumeCB[i];
-	}
+        FloatNOrder(const FloatNOrder &order) :
+          reconstruct(order.reconstruct),
+          gauge(order.gauge),
+          offset(order.offset),
+          ghostExchange(order.ghostExchange),
+          volumeCB(order.volumeCB),
+          stride(order.stride),
+          geometry(order.geometry),
+          phaseOffset(order.phaseOffset),
+          backup_h(nullptr),
+          bytes(order.bytes)
+        {
+          for (int i = 0; i < 4; i++) {
+            X[i] = order.X[i];
+            R[i] = order.R[i];
+            ghost[i] = order.ghost[i];
+            faceVolumeCB[i] = order.faceVolumeCB[i];
+          }
       }
 
       __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
@@ -2297,10 +2296,10 @@ namespace quda {
         auto v_ = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
 #endif
       for (int i = 0; i < length / 2; i++) v[i] = complex(v_[2 * i + 0], v_[2 * i + 1]);
-    }
+      }
 
-    __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity)
-    {
+      __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity)
+      {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
       typedef S<Float,length> structure;
       trove::coalesced_ptr<structure> gauge_((structure*)gauge);
@@ -2311,13 +2310,13 @@ namespace quda {
       }
       gauge_[(parity*volumeCB+x)*geometry + dir] = v_;
 #else
-      auto v_ = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
-      for (int i = 0; i < length / 2; i++) {
-        v_[2 * i + 0] = v[i].real();
-        v_[2 * i + 1] = v[i].imag();
-      }
+        auto v_ = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
+        for (int i = 0; i < length / 2; i++) {
+          v_[2 * i + 0] = v[i].real();
+          v_[2 * i + 1] = v[i].imag();
+        }
 #endif
-    }
+      }
 
     /**
        @brief This accessor routine returns a gauge_wrapper to this object,
@@ -2329,9 +2328,9 @@ namespace quda {
        @return Instance of a gauge_wrapper that curries in access to
        this field at the above coordinates.
     */
-    __device__ __host__ inline gauge_wrapper<real, Accessor> operator()(int dim, int x_cb, int parity)
-    {
-      return gauge_wrapper<real, Accessor>(*this, dim, x_cb, parity);
+      __device__ __host__ inline gauge_wrapper<real, Accessor> operator()(int dim, int x_cb, int parity)
+      {
+        return gauge_wrapper<real, Accessor>(*this, dim, x_cb, parity);
     }
 
     /**
@@ -2598,8 +2597,8 @@ namespace quda {
       {
         if (length != 18) errorQuda("Gauge length %d not supported", length);
         // compute volumeCB + halo region
-        exVolumeCB = u.X()[0]/2 + 2;
-	for (int i=1; i<4; i++) exVolumeCB *= u.X()[i] + 2;
+        exVolumeCB = u.X()[0] / 2 + 2;
+        for (int i=1; i<4; i++) exVolumeCB *= u.X()[i] + 2;
       }
       BQCDOrder(const BQCDOrder &order) :
         LegacyOrder<Float, length>(order),
@@ -2815,8 +2814,8 @@ namespace quda {
         if (length != 18) errorQuda("Gauge length %d not supported", length);
 
         // exVolumeCB is the padded checkboard volume
-        for (int i=0; i<4; i++) exVolumeCB *= exDim[i];
-	exVolumeCB /= 2;
+        for (int i = 0; i < 4; i++) exVolumeCB *= exDim[i];
+        exVolumeCB /= 2;
       }
 
       TIFRPaddedOrder(const TIFRPaddedOrder &order) :

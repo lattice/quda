@@ -301,7 +301,7 @@ extern "C" {
   void comm_allreduce_max(double* data);
   void comm_allreduce_min(double* data);
   void comm_allreduce_array(double* data, size_t size);
-  void comm_nonblocking_allreduce_array(MsgHandle *mh, double *outdata, double* indata, size_t size);
+  void comm_nonblocking_allreduce_array(MsgHandle *mh, double *outdata, double *indata, size_t size);
   void comm_allreduce_max_array(double* data, size_t size);
   void comm_allreduce_int(int* data);
   void comm_allreduce_xor(uint64_t *data);

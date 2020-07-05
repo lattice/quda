@@ -198,7 +198,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(eig_type, QUDA_EIG_INVALID);
   P(extlib_type, QUDA_EXTLIB_INVALID);
   P(mem_type_ritz, QUDA_MEMORY_INVALID);
-  P(is_complete, QUDA_BOOLEAN_INVALID);  
+  P(is_complete, QUDA_BOOLEAN_INVALID);
 #endif
 
   // only need to enfore block size checking if doing a block eigen solve
@@ -502,7 +502,8 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #if defined(INIT_PARAM)
   P(eig_param, 0);
 #elif defined(CHECK_PARAM)
-  if (param->eig_param && param->inv_type_precondition != QUDA_INVALID_INVERTER && param->inv_type != QUDA_GMRESDR_INVERTER) {
+  if (param->eig_param && param->inv_type_precondition != QUDA_INVALID_INVERTER
+      && param->inv_type != QUDA_GMRESDR_INVERTER) {
     errorQuda("At present cannot combine deflation with Schwarz preconditioner");
   }
 #endif

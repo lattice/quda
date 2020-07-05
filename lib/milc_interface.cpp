@@ -1167,7 +1167,7 @@ void qudaEigCGInvert(int external_precision, int quda_precision, double mass, Qu
   if (!create_quda_gauge && last_rhs_flag) invalidateGaugeQuda();
 
   qudamilc_called<false>(__func__, verbosity);
-#endif  
+#endif
 } // qudaEigCGInvert
 
 
@@ -1531,7 +1531,7 @@ void qudaEigCGCloverInvert(int external_precision, int quda_precision, double ka
   if ( (clover || cloverInverse) && last_rhs_flag) qudaFreeCloverField();
   if (link && last_rhs_flag) qudaFreeGaugeField();
   qudamilc_called<false>(__func__);
-#endif  
+#endif
 } // qudaEigCGCloverInvert
 
 

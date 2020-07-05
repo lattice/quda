@@ -79,13 +79,13 @@ namespace quda {
 
      bool is_composite; //set to 'false' for a regular spinor field
      bool is_component; //set to 'true' if we want to work with an individual component (otherwise will work with the whole set)
-     bool is_subset;    //set to 'true' if we want to work with a subset of the composite field
+     bool is_subset;    // set to 'true' if we want to work with a subset of the composite field
 
      int  dim;//individual component has dim = 0
      int  id;
 
-     int  subset_begin; //id of the first element in the subset.
-     int  subset_range; //total number of the components in the subset.
+     int subset_begin; // id of the first element in the subset.
+     int subset_range; // total number of the components in the subset.
 
      size_t volume;       // volume of a single eigenvector
      size_t volumeCB;     // CB volume of a single eigenvector
@@ -96,13 +96,37 @@ namespace quda {
      size_t bytes;      // size in bytes of spinor field
      size_t norm_bytes; // makes no sense but let's keep it...
 
-     CompositeColorSpinorFieldDescriptor()
-     : is_composite(false), is_component(false), is_subset(false), dim(0), id(0), subset_begin(0), subset_range(0), volume(0), volumeCB(0),
-       stride(0), real_length(0), length(0), bytes(0), norm_bytes(0)  {};
+     CompositeColorSpinorFieldDescriptor() :
+       is_composite(false),
+       is_component(false),
+       is_subset(false),
+       dim(0),
+       id(0),
+       subset_begin(0),
+       subset_range(0),
+       volume(0),
+       volumeCB(0),
+       stride(0),
+       real_length(0),
+       length(0),
+       bytes(0),
+       norm_bytes(0) {};
 
-     CompositeColorSpinorFieldDescriptor(bool is_composite, int dim, bool is_component = false, int id = 0)
-     : is_composite(is_composite), is_component(is_component), is_subset(false), dim(dim), id(id), subset_begin(id), subset_range(dim), volume(0), volumeCB(0),
-       stride(0), real_length(0), length(0), bytes(0), norm_bytes(0)
+     CompositeColorSpinorFieldDescriptor(bool is_composite, int dim, bool is_component = false, int id = 0) :
+       is_composite(is_composite),
+       is_component(is_component),
+       is_subset(false),
+       dim(dim),
+       id(id),
+       subset_begin(id),
+       subset_range(dim),
+       volume(0),
+       volumeCB(0),
+       stride(0),
+       real_length(0),
+       length(0),
+       bytes(0),
+       norm_bytes(0)
      {
         if(is_composite && is_component) errorQuda("\nComposite type is not implemented.\n");
         else if(is_composite && dim == 0) is_composite = false;
@@ -112,7 +136,7 @@ namespace quda {
      {
        is_composite = descr.is_composite;
        is_component = descr.is_component;
-       is_subset    = false;
+       is_subset = false;
 
        if(is_composite && is_component) errorQuda("\nComposite type is not implemented.\n");
 
@@ -166,7 +190,7 @@ namespace quda {
     bool is_composite;
     int composite_dim;    //e.g., number of eigenvectors in the set
     bool is_component;
-    int component_id;     //e.g., eigenvector index
+    int component_id; // e.g., eigenvector index
 
     /**
        If using CUDA native fields, this function will ensure that the
@@ -559,10 +583,10 @@ namespace quda {
     size_t ComponentBytes() const { return composite_descr.bytes; }
     size_t ComponentNormBytes() const { return composite_descr.norm_bytes; }
 
-    size_t CompositeSubsetLength() const { return composite_descr.subset_range*composite_descr.length; }
-    size_t CompositeSubsetRealLength() const { return composite_descr.subset_range*composite_descr.real_length; }
-    size_t CompositeSubsetBytes() const { return composite_descr.subset_range*composite_descr.bytes; }
-    size_t CompositeSubsetNormBytes() const { return composite_descr.subset_range*composite_descr.norm_bytes; }
+    size_t CompositeSubsetLength() const { return composite_descr.subset_range * composite_descr.length; }
+    size_t CompositeSubsetRealLength() const { return composite_descr.subset_range * composite_descr.real_length; }
+    size_t CompositeSubsetBytes() const { return composite_descr.subset_range * composite_descr.bytes; }
+    size_t CompositeSubsetNormBytes() const { return composite_descr.subset_range * composite_descr.norm_bytes; }
 
     /*
        This function allows to identify a subset of components for a given component field.
@@ -572,7 +596,7 @@ namespace quda {
     /*
        Flush subset parameters
     */
-    void FlushCompositeSubset() {composite_descr.is_subset = false; };
+    void FlushCompositeSubset() { composite_descr.is_subset = false; };
 
     QudaPCType PCType() const { return pc_type; }
     QudaParity SuggestedParity() const { return suggested_parity; }
@@ -618,22 +642,26 @@ namespace quda {
       return components;
     };
 
-    ColorSpinorField& operator[](const int idx) const {return Component(idx);}
-    ColorSpinorField& operator[](const int idx) {return Component(idx);}
+    ColorSpinorField &operator[](const int idx) const { return Component(idx); }
+    ColorSpinorField &operator[](const int idx) { return Component(idx); }
 
-    CompositeColorSpinorField Components(const int first_element, const int last_element){
-       return CompositeColorSpinorField(components.begin()+first_element, components.begin()+last_element) ;
+    CompositeColorSpinorField Components(const int first_element, const int last_element)
+    {
+      return CompositeColorSpinorField(components.begin() + first_element, components.begin() + last_element);
     };
 
     /**
        @brief Return (subset of) vector container based on provided agruments:
     */
-    CompositeColorSpinorField& operator()(void) {return components;}
-    CompositeColorSpinorField operator()(const int first_idx, const int second_idx) {return Components(first_idx, second_idx);}
-    CompositeColorSpinorField operator()(const int idx) {return Components(idx, idx+1);}
+    CompositeColorSpinorField &operator()(void) { return components; }
+    CompositeColorSpinorField operator()(const int first_idx, const int second_idx)
+    {
+      return Components(first_idx, second_idx);
+    }
+    CompositeColorSpinorField operator()(const int idx) { return Components(idx, idx + 1); }
 
-    ColorSpinorField &CompositeSubsetBegin() const {return Component(composite_descr.subset_begin);}
-    ColorSpinorField &CompositeSubsetBegin()       {return Component(composite_descr.subset_begin);}
+    ColorSpinorField &CompositeSubsetBegin() const { return Component(composite_descr.subset_begin); }
+    ColorSpinorField &CompositeSubsetBegin() { return Component(composite_descr.subset_begin); }
 
     virtual void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0) = 0;
 
@@ -694,8 +722,10 @@ namespace quda {
 				 QudaFieldLocation location=QUDA_INVALID_FIELD_LOCATION,
                                  QudaMemoryType mem_type=QUDA_MEMORY_INVALID);
 
-    virtual void CopySubset(ColorSpinorField& src, const int range, const int first_element) = 0;
-    virtual void CopySubset(ColorSpinorField& src, const int range, const int first_element_dst, const int first_element_src) = 0;
+    virtual void CopySubset(ColorSpinorField &src, const int range, const int first_element) = 0;
+    virtual void CopySubset(ColorSpinorField &src, const int range, const int first_element_dst,
+                            const int first_element_src)
+      = 0;
 
     friend std::ostream& operator<<(std::ostream &out, const ColorSpinorField &);
     friend class ColorSpinorParam;
@@ -956,8 +986,8 @@ namespace quda {
     CompositeColorSpinorField& Components() const;
     CompositeColorSpinorField Components(const int first_element, const int last_element) const;
 
-    void CopySubset(ColorSpinorField& src, const int range, const int first_element);
-    void CopySubset(ColorSpinorField& src, const int range, const int first_element_dst, const int first_element_src);
+    void CopySubset(ColorSpinorField &src, const int range, const int first_element);
+    void CopySubset(ColorSpinorField &src, const int range, const int first_element_dst, const int first_element_src);
 
     void zero();
 
@@ -1079,9 +1109,14 @@ namespace quda {
     */
     void restore() const;
 
-    void CopySubset(ColorSpinorField& src, const int range, const int first_element) {errorQuda("Not implemented yet..\n"); }
-    void CopySubset(ColorSpinorField& src, const int range, const int first_element_dst, const int first_element_src) {errorQuda("Not implemented yet..\n"); }
-
+    void CopySubset(ColorSpinorField &src, const int range, const int first_element)
+    {
+      errorQuda("Not implemented yet..\n");
+    }
+    void CopySubset(ColorSpinorField &src, const int range, const int first_element_dst, const int first_element_src)
+    {
+      errorQuda("Not implemented yet..\n");
+    }
   };
 
   void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,

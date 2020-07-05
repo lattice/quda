@@ -299,12 +299,12 @@ namespace quda {
         this->composite_descr.dim          = src.composite_descr.dim;
         this->composite_descr.is_component = false;
         this->composite_descr.id           = 0;
-        this->composite_descr.is_subset    = false;
+        this->composite_descr.is_subset = false;
       }
       else if(src.composite_descr.is_component){
         this->composite_descr.is_composite = false;
         this->composite_descr.dim          = 0;
-        this->composite_descr.is_subset    = false;
+        this->composite_descr.is_subset = false;
         //this->composite_descr.is_component = false;
         //this->composite_descr.id           = 0;
       }
@@ -332,11 +332,11 @@ namespace quda {
 
     composite_descr.is_composite     = param.is_composite;
     composite_descr.is_component     = param.is_component;
-    composite_descr.is_subset        = false;
+    composite_descr.is_subset = false;
     composite_descr.dim              = param.is_composite ? param.composite_dim : 0;
     composite_descr.id               = param.component_id;
-    composite_descr.subset_begin     = 0;
-    composite_descr.subset_range     = 0;
+    composite_descr.subset_begin = 0;
+    composite_descr.subset_range = 0;
 
     volume = 1;
     for (int d=0; d<nDim; d++) {
@@ -880,26 +880,26 @@ namespace quda {
     return fine;
   }
 
-  void ColorSpinorField::CompositeSubset(const int id, const int range){
+  void ColorSpinorField::CompositeSubset(const int id, const int range)
+  {
 
     if (id < 0 || range < 1) errorQuda("Invalid paramer.");
 
     if (this->IsComposite()) {
-      if(this->IsCompositeSubset()) errorQuda("Cannot create a subset from the subset.");
-      if(id < this->CompositeDim()) {
-        this->composite_descr.is_subset    = true;
-	this->composite_descr.subset_begin = id;
+      if (this->IsCompositeSubset()) errorQuda("Cannot create a subset from the subset.");
+      if (id < this->CompositeDim()) {
+        this->composite_descr.is_subset = true;
+        this->composite_descr.subset_begin = id;
 
-	const int leftover_components = this->CompositeDim() - id;
-	this->composite_descr.subset_range = (range > leftover_components || range == 0) ? leftover_components : range ;
-	
+        const int leftover_components = this->CompositeDim() - id;
+        this->composite_descr.subset_range = (range > leftover_components || range == 0) ? leftover_components : range;
+
       } else {
-	errorQuda("Subset begin id cannot exceed the composit dimension %d", this->CompositeDim() );
+        errorQuda("Subset begin id cannot exceed the composit dimension %d", this->CompositeDim());
       }
     } else {
-	errorQuda("Cannot create a subset for a regular field.");
+      errorQuda("Cannot create a subset for a regular field.");
     }
-
   }
 
   std::ostream& operator<<(std::ostream &out, const ColorSpinorField &a) {

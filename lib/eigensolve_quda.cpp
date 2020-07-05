@@ -116,7 +116,8 @@ namespace quda
     default: errorQuda("Invalid eig solver type");
     }
 
-    if (!mat.hermitian() && eig_solver->hermitian()) errorQuda("Cannot solve non-Hermitian system with Hermitian eigensolver");
+    if (!mat.hermitian() && eig_solver->hermitian())
+      errorQuda("Cannot solve non-Hermitian system with Hermitian eigensolver");
     return eig_solver;
   }
 
@@ -415,7 +416,7 @@ namespace quda
 
     for (int i = 0; i < size; i++) {
       for (int j = 0; j < size; j++) {
-        auto cnorm = H[i*size + j];
+        auto cnorm = H[i * size + j];
         if (j != i) {
           if (abs(cnorm) > 5.0 * epsilon) {
             if (getVerbosity() >= QUDA_SUMMARIZE)

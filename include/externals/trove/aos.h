@@ -111,7 +111,7 @@ __device__ typename detail::dismember_type<T>::type*
 compute_address(T* src, int div, int mod) {
     typedef typename detail::dismember_type<T>::type U;
 #if (__CUDACC_VER_MAJOR__ >= 9 || CUDA_VERSION >= 9000)
-// we have already asserted that we have warp convergence here so just use full warp mask
+    // we have already asserted that we have warp convergence here so just use full warp mask
     T* base_ptr = __shfl_sync(WARP_CONVERGED, src, div);
 #else
     T* base_ptr = __shfl(src, div);

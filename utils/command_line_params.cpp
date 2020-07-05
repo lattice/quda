@@ -611,8 +611,9 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
                  "to precision of eigensolver (default = double)")
     ->transform(prec_transform);
 
-  opgroup->add_option("--eig-io-parity-inflate", eig_io_parity_inflate,
-                      "Whether to inflate single-parity eigenvectors onto dual parity full fields for file I/O (default = false)");
+  opgroup->add_option(
+    "--eig-io-parity-inflate", eig_io_parity_inflate,
+    "Whether to inflate single-parity eigenvectors onto dual parity full fields for file I/O (default = false)");
 
   opgroup
     ->add_option("--eig-spectrum", eig_spectrum,

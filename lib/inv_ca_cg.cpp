@@ -12,7 +12,8 @@
 
 namespace quda {
 
-  CACG::CACG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
+  CACG::CACG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
+             TimeProfile &profile) :
     Solver(mat, matSloppy, matPrecon, param, profile),
     init(false),
     lambda_init(false),

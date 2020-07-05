@@ -348,12 +348,12 @@ namespace quda {
       int faceVolumeCB[4];
       int ghostOffset[4];
       GhostAccessorCB(const ColorSpinorField &a, int nFace = 1) {
-        for (int d=0; d<4; d++) {
-          faceVolumeCB[d] = nFace*a.SurfaceCB(d);
-          ghostOffset[d] = faceVolumeCB[d]*nColor*nSpin*nVec;
+        for (int d = 0; d < 4; d++) {
+          faceVolumeCB[d] = nFace * a.SurfaceCB(d);
+          ghostOffset[d] = faceVolumeCB[d] * nColor * nSpin * nVec;
         }
       }
-      GhostAccessorCB() : faceVolumeCB{ }, ghostOffset{ } { }
+      GhostAccessorCB() : faceVolumeCB {}, ghostOffset {} {}
       __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const
       { return parity*ghostOffset[dim] + indexFloatN<nSpin,nColor,nVec,4>(x_cb, s, c, v, faceVolumeCB[dim]); }
     };
@@ -388,25 +388,29 @@ namespace quda {
         for (int i = 0; i < M; i++) {
           ((vec_t *)tmp)[i] = vector_load<vec_t>((vec_t *)(in + parity * offset_cb), i * stride + x_cb);
         }
-        constexpr int N_chi = N / (nSpin/nSpinBlock);
+        constexpr int N_chi = N / (nSpin / nSpinBlock);
 #pragma unroll
-        for (int i = 0; i < N_chi; i++) out[i] = complex<Float>(tmp[chi*N_chi + 2*i + 0], tmp[chi*N_chi + 2*i + 1]);
+        for (int i = 0; i < N_chi; i++)
+          out[i] = complex<Float>(tmp[chi * N_chi + 2 * i + 0], tmp[chi * N_chi + 2 * i + 1]);
       }
     };
 
-    template<typename Float, int nSpin, int nColor, int nVec>
-      struct GhostAccessorCB<Float,nSpin,nColor,nVec,QUDA_FLOAT8_FIELD_ORDER> {
+    template <typename Float, int nSpin, int nColor, int nVec>
+    struct GhostAccessorCB<Float, nSpin, nColor, nVec, QUDA_FLOAT8_FIELD_ORDER> {
       int faceVolumeCB[4];
       int ghostOffset[4];
-      GhostAccessorCB(const ColorSpinorField &a, int nFace = 1) {
-        for (int d=0; d<4; d++) {
-          faceVolumeCB[d] = nFace*a.SurfaceCB(d);
-          ghostOffset[d] = faceVolumeCB[d]*nColor*nSpin*nVec;
+      GhostAccessorCB(const ColorSpinorField &a, int nFace = 1)
+      {
+        for (int d = 0; d < 4; d++) {
+          faceVolumeCB[d] = nFace * a.SurfaceCB(d);
+          ghostOffset[d] = faceVolumeCB[d] * nColor * nSpin * nVec;
         }
       }
-      GhostAccessorCB() : faceVolumeCB{ }, ghostOffset{ } { }
+      GhostAccessorCB() : faceVolumeCB {}, ghostOffset {} {}
       __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const
-      { return parity*ghostOffset[dim] + indexFloatN<nSpin,nColor,nVec,8>(x_cb, s, c, v, faceVolumeCB[dim]); }
+      {
+        return parity * ghostOffset[dim] + indexFloatN<nSpin, nColor, nVec, 8>(x_cb, s, c, v, faceVolumeCB[dim]);
+      }
     };
 
     template <typename Float, typename storeFloat> __host__ __device__ inline constexpr bool fixed_point() { return false; }
@@ -612,8 +616,10 @@ namespace quda {
         for (int dim=0; dim<4; dim++) {
           for (int dir=0; dir<2; dir++) {
           ghost[2*dim+dir] = static_cast<complex<ghostFloat>*>(ghost_[2*dim+dir]);
-          ghost_norm[2 * dim + dir] = !block_float_ghost ? nullptr :
-            reinterpret_cast<norm_type *>(static_cast<char *>(ghost_[2 * dim + dir]) + a.GhostNormOffset(dim, dir) * sizeof(norm_type)
+          ghost_norm[2 * dim + dir] = !block_float_ghost ?
+            nullptr :
+            reinterpret_cast<norm_type *>(static_cast<char *>(ghost_[2 * dim + dir])
+                                          + a.GhostNormOffset(dim, dir) * sizeof(norm_type)
                                           - a.GhostOffset(dim, dir) * sizeof(ghostFloat));
           }
         }
@@ -682,7 +688,7 @@ namespace quda {
         } else {
           complex<storeFloat> tmp = __ldg(v + accessor.index(parity, x_cb, s, c, n));
           Float norm_ = block_float ? __ldg(norm + parity * norm_offset + x_cb) : scale_inv;
-          return norm_*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
+          return norm_ * complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
         }
 #else
         if (!fixed) {
@@ -881,74 +887,70 @@ namespace quda {
        pointer arithmetic for huge allocations (e.g., packed set of
        vectors).  Default is to use 32-bit pointer arithmetic.
      */
-    template <typename Float, int Ns, int Nc, int N_, bool spin_project = false, bool huge_alloc = false>
-    struct FloatNOrder {
-      static_assert((2 * Ns * Nc) % N_ == 0, "Internal degrees of freedom not divisible by short-vector length");
-      static constexpr int length = 2 * Ns * Nc;
-      static constexpr int length_ghost = spin_project ? length / 2 : length;
-      static constexpr int N = N_;
-      static constexpr int M = length / N;
-      // if spin projecting, check that short vector length is compatible, if not halve the vector length
-      static constexpr int N_ghost = !spin_project ? N : (Ns * Nc) % N == 0 ? N : N / 2;
-      static constexpr int M_ghost = length_ghost / N_ghost;
-      using Accessor = FloatNOrder<Float, Ns, Nc, N, spin_project, huge_alloc>;
-      using real = typename mapper<Float>::type;
-      using complex = complex<real>;
-      using Vector = typename VectorType<Float, N>::type;
-      using GhostVector = typename VectorType<Float, N_ghost>::type;
-      using AllocInt = typename AllocType<huge_alloc>::type;
-      using norm_type = float;
-      Float *field;
-      norm_type *norm;
-      const AllocInt offset; // offset can be 32-bit or 64-bit
-      const AllocInt norm_offset;
-      int volumeCB;
-      int faceVolumeCB[4];
-      int stride;
-      mutable Float *ghost[8];
-      mutable norm_type *ghost_norm[8];
-      int nParity;
-      void *backup_h; //! host memory for backing up the field when tuning
-      size_t bytes;
+      template <typename Float, int Ns, int Nc, int N_, bool spin_project = false, bool huge_alloc = false>
+      struct FloatNOrder {
+        static_assert((2 * Ns * Nc) % N_ == 0, "Internal degrees of freedom not divisible by short-vector length");
+        static constexpr int length = 2 * Ns * Nc;
+        static constexpr int length_ghost = spin_project ? length / 2 : length;
+        static constexpr int N = N_;
+        static constexpr int M = length / N;
+        // if spin projecting, check that short vector length is compatible, if not halve the vector length
+        static constexpr int N_ghost = !spin_project ? N : (Ns * Nc) % N == 0 ? N : N / 2;
+        static constexpr int M_ghost = length_ghost / N_ghost;
+        using Accessor = FloatNOrder<Float, Ns, Nc, N, spin_project, huge_alloc>;
+        using real = typename mapper<Float>::type;
+        using complex = complex<real>;
+        using Vector = typename VectorType<Float, N>::type;
+        using GhostVector = typename VectorType<Float, N_ghost>::type;
+        using AllocInt = typename AllocType<huge_alloc>::type;
+        using norm_type = float;
+        Float *field;
+        norm_type *norm;
+        const AllocInt offset; // offset can be 32-bit or 64-bit
+        const AllocInt norm_offset;
+        int volumeCB;
+        int faceVolumeCB[4];
+        int stride;
+        mutable Float *ghost[8];
+        mutable norm_type *ghost_norm[8];
+        int nParity;
+        void *backup_h; //! host memory for backing up the field when tuning
+        size_t bytes;
 
-      FloatNOrder(const ColorSpinorField &a, int nFace = 1, Float *field_ = 0, norm_type *norm_ = 0, Float **ghost_ = 0,
-                  bool override = false) :
-        field(field_ ? field_ : (Float *)a.V()),
-        offset(a.Bytes() / (2 * sizeof(Float) * N)),
-        norm(norm_ ? norm_ : (norm_type *)a.Norm()),
-        norm_offset(a.NormBytes() / (2 * sizeof(norm_type))),
-        volumeCB(a.VolumeCB()),
-        stride(a.Stride()),
-        nParity(a.SiteSubset()),
-        backup_h(nullptr),
-        bytes(a.Bytes())
-  {
-    for (int i=0; i<4; i++) {
-      faceVolumeCB[i] = a.SurfaceCB(i)*nFace;
-    }
-    resetGhost(a, ghost_ ? (void **)ghost_ : a.Ghost());
-  }
+        FloatNOrder(const ColorSpinorField &a, int nFace = 1, Float *field_ = 0, norm_type *norm_ = 0,
+                    Float **ghost_ = 0, bool override = false) :
+          field(field_ ? field_ : (Float *)a.V()),
+          offset(a.Bytes() / (2 * sizeof(Float) * N)),
+          norm(norm_ ? norm_ : (norm_type *)a.Norm()),
+          norm_offset(a.NormBytes() / (2 * sizeof(norm_type))),
+          volumeCB(a.VolumeCB()),
+          stride(a.Stride()),
+          nParity(a.SiteSubset()),
+          backup_h(nullptr),
+          bytes(a.Bytes())
+        {
+          for (int i = 0; i < 4; i++) { faceVolumeCB[i] = a.SurfaceCB(i) * nFace; }
+          resetGhost(a, ghost_ ? (void **)ghost_ : a.Ghost());
+        }
 
-  void resetGhost(const ColorSpinorField &a, void *const *ghost_) const
-  {
-    for (int dim = 0; dim < 4; dim++) {
-      for (int dir = 0; dir < 2; dir++) {
-        ghost[2 * dim + dir] = comm_dim_partitioned(dim) ? static_cast<Float *>(ghost_[2 * dim + dir]) : nullptr;
-        ghost_norm[2 * dim + dir] = !comm_dim_partitioned(dim) ?
-          nullptr :
-          reinterpret_cast<norm_type *>(static_cast<char *>(ghost_[2 * dim + dir])
-                                        + nParity * length_ghost * faceVolumeCB[dim] * sizeof(Float));
-      }
-    }
-  }
+        void resetGhost(const ColorSpinorField &a, void *const *ghost_) const
+        {
+          for (int dim = 0; dim < 4; dim++) {
+            for (int dir = 0; dir < 2; dir++) {
+              ghost[2 * dim + dir] = comm_dim_partitioned(dim) ? static_cast<Float *>(ghost_[2 * dim + dir]) : nullptr;
+              ghost_norm[2 * dim + dir] = !comm_dim_partitioned(dim) ?
+                nullptr :
+                reinterpret_cast<norm_type *>(static_cast<char *>(ghost_[2 * dim + dir])
+                                              + nParity * length_ghost * faceVolumeCB[dim] * sizeof(Float));
+            }
+          }
+        }
 
-  __device__ __host__ inline void load(complex out[length / 2], int x, int parity = 0) const
-  {
-    real v[length];
-    norm_type nrm;
-    if (isFixed<Float>::value) {
-      nrm = vector_load<float>(norm, x + parity * norm_offset);
-    }
+        __device__ __host__ inline void load(complex out[length / 2], int x, int parity = 0) const
+        {
+          real v[length];
+          norm_type nrm;
+          if (isFixed<Float>::value) { nrm = vector_load<float>(norm, x + parity * norm_offset); }
 
 #pragma unroll
     for (int i=0; i<M; i++) {
@@ -961,21 +963,21 @@ namespace quda {
 
 #pragma unroll
     for (int i = 0; i < length / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
-  }
+        }
 
-  __device__ __host__ inline void save(const complex in[length / 2], int x, int parity = 0)
-  {
-    real v[length];
+        __device__ __host__ inline void save(const complex in[length / 2], int x, int parity = 0)
+        {
+          real v[length];
 
 #pragma unroll
-    for (int i = 0; i < length / 2; i++) {
-      v[2 * i + 0] = in[i].real();
-      v[2 * i + 1] = in[i].imag();
-    }
+          for (int i = 0; i < length / 2; i++) {
+            v[2 * i + 0] = in[i].real();
+            v[2 * i + 1] = in[i].imag();
+          }
 
-    if (isFixed<Float>::value) {
-      norm_type max_[length / 2];
-      // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
+          if (isFixed<Float>::value) {
+            norm_type max_[length / 2];
+            // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
 #pragma unroll
       for (int i = 0; i < length / 2; i++) max_[i] = fmaxf(fabsf((norm_type)v[i]), fabsf((norm_type)v[i + length / 2]));
       norm_type scale = 0.0;
@@ -1001,7 +1003,7 @@ namespace quda {
       // second do vectorized copy into memory
       vector_store(field, parity * offset + x + stride * i, vecTmp);
     }
-  }
+        }
 
   /**
      @brief This accessor routine returns a colorspinor_wrapper to this object,
@@ -1064,8 +1066,7 @@ namespace quda {
       // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
 #pragma unroll
       for (int i = 0; i < length_ghost / 2; i++)
-        max_[i] = fmaxf( (norm_type)fabsf( (norm_type)v[i] ),
-                         (norm_type)fabsf( (norm_type)v[i + length_ghost / 2] ) );
+        max_[i] = fmaxf((norm_type)fabsf((norm_type)v[i]), (norm_type)fabsf((norm_type)v[i + length_ghost / 2]));
       norm_type scale = 0.0;
 #pragma unroll
       for (int i = 0; i < length_ghost / 2; i++) scale = fmaxf(max_[i], scale);
@@ -1147,7 +1148,7 @@ namespace quda {
   {
     return nParity * volumeCB * (Nc * Ns * 2 * sizeof(Float) + (isFixed<Float>::value ? sizeof(norm_type) : 0));
   }
-    };
+      };
 
     /**
        @brief This is just a dummy structure we use for trove to define the
@@ -1209,16 +1210,16 @@ namespace quda {
     structure v_;
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
-        v_.v[(c*Ns + s)*2 + 0] = (Float)v[s*Nc+c].real();
-        v_.v[(c*Ns + s)*2 + 1] = (Float)v[s*Nc+c].imag();
+        v_.v[(c * Ns + s) * 2 + 0] = (Float)v[s * Nc + c].real();
+        v_.v[(c * Ns + s) * 2 + 1] = (Float)v[s * Nc + c].imag();
       }
     }
     field_[parity*volumeCB + x] = v_;
 #else
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
-        field[parity*offset + ((x*Nc + c)*Ns + s)*2 + 0] = v[s*Nc+c].real();
-        field[parity*offset + ((x*Nc + c)*Ns + s)*2 + 1] = v[s*Nc+c].imag();
+        field[parity * offset + ((x * Nc + c) * Ns + s) * 2 + 0] = v[s * Nc + c].real();
+        field[parity * offset + ((x * Nc + c) * Ns + s) * 2 + 1] = v[s * Nc + c].imag();
       }
     }
 #endif
@@ -1552,27 +1553,29 @@ namespace quda {
       int nParity;
       QDPJITDiracOrder(const ColorSpinorField &a, int nFace=1, Float *field_=0)
       : field(field_ ? field_ : (Float*)a.V()), volumeCB(a.VolumeCB()), stride(a.Stride()), nParity(a.SiteSubset())
-  { if (volumeCB != stride) errorQuda("Stride must equal volume for this field order"); }
-
-  __device__ __host__ inline void load(complex v[Ns * Nc], int x, int parity = 0) const
-  {
-    for (int s=0; s<Ns; s++) {
-      for (int c=0; c<Nc; c++) {
-        v[s * Nc + c] = complex(field[(((0 * Nc + c) * Ns + s) * 2 + (1 - parity)) * volumeCB + x],
-                                field[(((1 * Nc + c) * Ns + s) * 2 + (1 - parity)) * volumeCB + x]);
+      {
+        if (volumeCB != stride) errorQuda("Stride must equal volume for this field order");
       }
-    }
-  }
 
-  __device__ __host__ inline void save(const complex v[Ns * Nc], int x, int parity = 0)
-  {
-    for (int s=0; s<Ns; s++) {
-      for (int c=0; c<Nc; c++) {
-        field[(((0 * Nc + c) * Ns + s) * 2 + (1 - parity)) * volumeCB + x] = v[s * Nc + c].real();
-        field[(((1 * Nc + c) * Ns + s) * 2 + (1 - parity)) * volumeCB + x] = v[s * Nc + c].imag();
+      __device__ __host__ inline void load(complex v[Ns * Nc], int x, int parity = 0) const
+      {
+        for (int s = 0; s < Ns; s++) {
+          for (int c = 0; c < Nc; c++) {
+            v[s * Nc + c] = complex(field[(((0 * Nc + c) * Ns + s) * 2 + (1 - parity)) * volumeCB + x],
+                                    field[(((1 * Nc + c) * Ns + s) * 2 + (1 - parity)) * volumeCB + x]);
+          }
+        }
       }
-    }
-  }
+
+      __device__ __host__ inline void save(const complex v[Ns * Nc], int x, int parity = 0)
+      {
+        for (int s = 0; s < Ns; s++) {
+          for (int c = 0; c < Nc; c++) {
+            field[(((0 * Nc + c) * Ns + s) * 2 + (1 - parity)) * volumeCB + x] = v[s * Nc + c].real();
+            field[(((1 * Nc + c) * Ns + s) * 2 + (1 - parity)) * volumeCB + x] = v[s * Nc + c].imag();
+          }
+        }
+      }
 
   /**
      @brief This accessor routine returns a colorspinor_wrapper to this object,
@@ -1583,10 +1586,10 @@ namespace quda {
      @return Instance of a colorspinor_wrapper that curries in access to
      this field at the above coordinates.
   */
-  __device__ __host__ inline colorspinor_wrapper<real, Accessor> operator()(int x_cb, int parity)
-  {
-    return colorspinor_wrapper<real, Accessor>(*this, x_cb, parity);
-  }
+      __device__ __host__ inline colorspinor_wrapper<real, Accessor> operator()(int x_cb, int parity)
+      {
+        return colorspinor_wrapper<real, Accessor>(*this, x_cb, parity);
+      }
 
   /**
      @brief This accessor routine returns a const colorspinor_wrapper to this object,
@@ -1597,10 +1600,10 @@ namespace quda {
      @return Instance of a colorspinor_wrapper that curries in access to
      this field at the above coordinates.
   */
-  __device__ __host__ inline const colorspinor_wrapper<real, Accessor> operator()(int x_cb, int parity) const
-  {
-    return colorspinor_wrapper<real, Accessor>(const_cast<Accessor &>(*this), x_cb, parity);
-  }
+      __device__ __host__ inline const colorspinor_wrapper<real, Accessor> operator()(int x_cb, int parity) const
+      {
+        return colorspinor_wrapper<real, Accessor>(const_cast<Accessor &>(*this), x_cb, parity);
+      }
 
   size_t Bytes() const { return nParity * volumeCB * Nc * Ns * 2 * sizeof(Float); }
       };

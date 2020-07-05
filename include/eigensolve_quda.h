@@ -14,7 +14,7 @@ namespace quda
   {
     using range = std::pair<int, int>;
 
-protected:
+  protected:
     const DiracMatrix &mat;
     QudaEigParam *eig_param;
     TimeProfile &profile;

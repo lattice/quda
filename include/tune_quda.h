@@ -152,8 +152,7 @@ namespace quda {
         ret = true;
       }
 
-      if (!tuneGridDim())
-	param.grid = dim3((minThreads()+param.block.x-1)/param.block.x, 1, 1);
+      if (!tuneGridDim()) param.grid = dim3((minThreads() + param.block.x - 1) / param.block.x, 1, 1);
 
       return ret;
     }
@@ -168,7 +167,8 @@ namespace quda {
     {
 #if CUDA_VERSION >= 11000
       static int max_blocks_per_sm = 0;
-      if (!max_blocks_per_sm) cudaDeviceGetAttribute(&max_blocks_per_sm, cudaDevAttrMaxBlocksPerMultiprocessor, comm_gpuid());
+      if (!max_blocks_per_sm)
+        cudaDeviceGetAttribute(&max_blocks_per_sm, cudaDevAttrMaxBlocksPerMultiprocessor, comm_gpuid());
       return max_blocks_per_sm;
 #else
       // these variables are taken from Table 14 of the CUDA 10.2 prgramming guide
@@ -186,8 +186,8 @@ namespace quda {
         case 5: return 16;
         }
       default:
-        warningQuda("Unknown SM architecture %d.%d - assuming limit of 32 blocks per SM\n",
-                    deviceProp.major, deviceProp.minor);
+        warningQuda("Unknown SM architecture %d.%d - assuming limit of 32 blocks per SM\n", deviceProp.major,
+                    deviceProp.minor);
         return 32;
       }
 #endif
@@ -219,7 +219,8 @@ namespace quda {
     {
 #if CUDA_VERSION >= 9000
       static int max_shared_bytes = 0;
-      if (!max_shared_bytes) cudaDeviceGetAttribute(&max_shared_bytes, cudaDevAttrMaxSharedMemoryPerBlockOptin, comm_gpuid());
+      if (!max_shared_bytes)
+        cudaDeviceGetAttribute(&max_shared_bytes, cudaDevAttrMaxSharedMemoryPerBlockOptin, comm_gpuid());
       return max_shared_bytes;
 #else
       // these variables are taken from Table 14 of the CUDA 10.2 prgramming guide
@@ -229,8 +230,8 @@ namespace quda {
       case 5:
       case 6: return 48 * 1024;
       default:
-        warningQuda("Unknown SM architecture %d.%d - assuming limit of 48 KiB per SM\n",
-                    deviceProp.major, deviceProp.minor);
+        warningQuda("Unknown SM architecture %d.%d - assuming limit of 48 KiB per SM\n", deviceProp.major,
+                    deviceProp.minor);
         return 48 * 1024;
       }
 #endif
@@ -393,34 +394,33 @@ namespace quda {
                   param.block.x, param.block.y, param.block.z, param.block.x*param.block.y*param.block.z, deviceProp.maxThreadsPerBlock);
 
       if (param.block.x > (unsigned int)deviceProp.maxThreadsDim[0])
-	errorQuda("Requested X-dimension block size %d greater than hardware limit %d",
-		  param.block.x, deviceProp.maxThreadsDim[0]);
+        errorQuda("Requested X-dimension block size %d greater than hardware limit %d", param.block.x,
+                  deviceProp.maxThreadsDim[0]);
 
       if (param.block.y > (unsigned int)deviceProp.maxThreadsDim[1])
-	errorQuda("Requested Y-dimension block size %d greater than hardware limit %d",
-		  param.block.y, deviceProp.maxThreadsDim[1]);
+        errorQuda("Requested Y-dimension block size %d greater than hardware limit %d", param.block.y,
+                  deviceProp.maxThreadsDim[1]);
 
       if (param.block.z > (unsigned int)deviceProp.maxThreadsDim[2])
-	errorQuda("Requested Z-dimension block size %d greater than hardware limit %d",
-		  param.block.z, deviceProp.maxThreadsDim[2]);
+        errorQuda("Requested Z-dimension block size %d greater than hardware limit %d", param.block.z,
+                  deviceProp.maxThreadsDim[2]);
 
       if (param.grid.x > (unsigned int)deviceProp.maxGridSize[0])
-	errorQuda("Requested X-dimension grid size %d greater than hardware limit %d",
-		  param.grid.x, deviceProp.maxGridSize[0]);
+        errorQuda("Requested X-dimension grid size %d greater than hardware limit %d", param.grid.x,
+                  deviceProp.maxGridSize[0]);
 
       if (param.grid.y > (unsigned int)deviceProp.maxGridSize[1])
-	errorQuda("Requested Y-dimension grid size %d greater than hardware limit %d",
-		  param.grid.y, deviceProp.maxGridSize[1]);
+        errorQuda("Requested Y-dimension grid size %d greater than hardware limit %d", param.grid.y,
+                  deviceProp.maxGridSize[1]);
 
       if (param.grid.z > (unsigned int)deviceProp.maxGridSize[2])
-	errorQuda("Requested Z-dimension grid size %d greater than hardware limit %d",
-		  param.grid.z, deviceProp.maxGridSize[2]);
+        errorQuda("Requested Z-dimension grid size %d greater than hardware limit %d", param.grid.z,
+                  deviceProp.maxGridSize[2]);
     }
 
     CUresult jitifyError() const { return jitify_error; }
     CUresult& jitifyError() { return jitify_error; }
   };
-
 
   /**
      This derived class is for algorithms that deploy parity across

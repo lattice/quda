@@ -95,11 +95,15 @@ namespace quda {
   template<> struct fixedMaxValue<short>{ static constexpr float value = 32767.0f; };
   template<> struct fixedMaxValue<short2>{ static constexpr float value = 32767.0f; };
   template<> struct fixedMaxValue<short4>{ static constexpr float value = 32767.0f; };
-  template<> struct fixedMaxValue<short8>{ static constexpr float value = 32767.0f; };
+  template <> struct fixedMaxValue<short8> {
+    static constexpr float value = 32767.0f;
+  };
   template<> struct fixedMaxValue<char>{ static constexpr float value = 127.0f; };
   template<> struct fixedMaxValue<char2>{ static constexpr float value = 127.0f; };
   template<> struct fixedMaxValue<char4>{ static constexpr float value = 127.0f; };
-  template<> struct fixedMaxValue<char8>{ static constexpr float value = 127.0f; };
+  template <> struct fixedMaxValue<char8> {
+    static constexpr float value = 127.0f;
+  };
 
   template <typename T> struct fixedInvMaxValue {
     static constexpr float value = 3.402823e+38f;
