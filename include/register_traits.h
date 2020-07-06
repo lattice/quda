@@ -482,16 +482,16 @@ namespace quda {
   template <> struct TexVectorType<char, 4>{typedef char4 type; };
 
   template <typename VectorType>
-    __device__ __host__ inline VectorType vector_load(void *ptr, int idx) {
-#define USE_LDG
-#if defined(__CUDA_ARCH__) && defined(USE_LDG)
+    __device__ __host__ inline VectorType vector_load(const void * __restrict__ ptr, int idx)
+  {
+#if (__CUDA_ARCH__ >= 320 && __CUDA_ARCH__ < 520)
     return __ldg(reinterpret_cast< VectorType* >(ptr) + idx);
 #else
-    return reinterpret_cast< VectorType* >(ptr)[idx];
+    return reinterpret_cast< const VectorType __restrict__ * >(ptr)[idx];
 #endif
   }
 
-  template <> __device__ __host__ inline short8 vector_load(void *ptr, int idx)
+  template <> __device__ __host__ inline short8 vector_load(const void * __restrict__ ptr, int idx)
   {
     float4 tmp = vector_load<float4>(ptr, idx);
     short8 recast;
@@ -499,7 +499,7 @@ namespace quda {
     return recast;
   }
 
-  template <> __device__ __host__ inline char8 vector_load(void *ptr, int idx)
+  template <> __device__ __host__ inline char8 vector_load(const void * __restrict__ ptr, int idx)
   {
     float2 tmp = vector_load<float2>(ptr, idx);
     char8 recast;
