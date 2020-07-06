@@ -6,110 +6,8 @@
 #include <sys/time.h>
 #include <complex.h>
 
-#include <quda.h>
-#include <quda_fortran.h>
-#include <quda_internal.h>
-#include <comm_quda.h>
-#include <tune_quda.h>
-#include <blas_quda.h>
-#include <gauge_field.h>
-#include <dirac_quda.h>
-#include <dslash_quda.h>
-#include <invert_quda.h>
-#include <eigensolve_quda.h>
-#include <color_spinor_field.h>
-#include <clover_field.h>
-#include <llfat_quda.h>
-#include <unitarization_links.h>
-#include <algorithm>
-#include <staggered_oprod.h>
-#include <ks_improved_force.h>
-#include <ks_force_quda.h>
-#include <random_quda.h>
-#include <mpi_comm_handle.h>
-
-#include <multigrid.h>
-
-#include <deflation.h>
-
-#ifdef NUMA_NVML
-#include <numa_affinity.h>
-#endif
-
-#ifdef QUDA_NVML
-#include <nvml.h>
-#endif
-
-#include <cuda.h>
-
-#include <ks_force_quda.h>
-
-#ifdef GPU_GAUGE_FORCE
-#include <gauge_force_quda.h>
-#endif
-#include <gauge_update_quda.h>
-
-#define MAX(a,b) ((a)>(b)? (a):(b))
-#define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))
-
-#define MAX_GPU_NUM_PER_NODE 16
-
-// define newQudaGaugeParam() and newQudaInvertParam()
-#define INIT_PARAM
-#include "check_params.h"
-#undef INIT_PARAM
-
-// define (static) checkGaugeParam() and checkInvertParam()
-#define CHECK_PARAM
-#include "check_params.h"
-#undef CHECK_PARAM
-
-// define printQudaGaugeParam() and printQudaInvertParam()
-#define PRINT_PARAM
-#include "check_params.h"
-#undef PRINT_PARAM
-
-#include <gauge_tools.h>
-#include <contract_quda.h>
-#include <momentum.h>
-
-
-#include <cuda_profiler_api.h>
-
+#include <interface_quda.h>
 using namespace quda;
-
-static int R[4] = {0, 0, 0, 0};
-// setting this to false prevents redundant halo exchange but isn't yet compatible with HISQ / ASQTAD kernels
-static bool redundant_comms = false;
-
-#include <blas_cublas.h>
-
-//for MAGMA lib:
-#include <blas_magma.h>
-
-static bool InitMagma = false;
-
-void openMagma() {
-
-  if (!InitMagma) {
-    OpenMagma();
-    InitMagma = true;
-  } else {
-    printfQuda("\nMAGMA library was already initialized..\n");
-  }
-
-}
-
-void closeMagma(){
-
-  if (InitMagma) {
-    CloseMagma();
-    InitMagma = false;
-  } else {
-    printfQuda("\nMAGMA library was not initialized..\n");
-  }
-
-}
 
 cudaGaugeField *gaugePrecise = nullptr;
 cudaGaugeField *gaugeSloppy = nullptr;
@@ -142,120 +40,145 @@ cudaGaugeField *extendedGaugeResident = nullptr;
 std::vector<cudaColorSpinorField*> solutionResident;
 
 // vector of spinors used for forecasting solutions in HMC
-#define QUDA_MAX_CHRONO 12
 // each entry is one p
 std::vector< std::vector<ColorSpinorField*> > chronoResident(QUDA_MAX_CHRONO);
 
-// Mapped memory buffer used to hold unitarization failures
-static int *num_failures_h = nullptr;
-static int *num_failures_d = nullptr;
-
-cudaDeviceProp deviceProp;
-qudaStream_t *streams;
-
-static bool initialized = false;
-
 //!< Profiler for initQuda
-static TimeProfile profileInit("initQuda");
+TimeProfile profileInit("initQuda");
 
 //!< Profile for loadGaugeQuda / saveGaugeQuda
-static TimeProfile profileGauge("loadGaugeQuda");
+TimeProfile profileGauge("loadGaugeQuda");
 
 //!< Profile for loadCloverQuda
-static TimeProfile profileClover("loadCloverQuda");
+TimeProfile profileClover("loadCloverQuda");
 
 //!< Profiler for dslashQuda
-static TimeProfile profileDslash("dslashQuda");
+TimeProfile profileDslash("dslashQuda");
 
 //!< Profiler for invertQuda
-static TimeProfile profileInvert("invertQuda");
+TimeProfile profileInvert("invertQuda");
 
 //!< Profiler for invertMultiShiftQuda
-static TimeProfile profileMulti("invertMultiShiftQuda");
+TimeProfile profileMulti("invertMultiShiftQuda");
 
 //!< Profiler for eigensolveQuda
-static TimeProfile profileEigensolve("eigensolveQuda");
+TimeProfile profileEigensolve("eigensolveQuda");
 
 //!< Profiler for computeFatLinkQuda
-static TimeProfile profileFatLink("computeKSLinkQuda");
+TimeProfile profileFatLink("computeKSLinkQuda");
 
 //!< Profiler for computeGaugeForceQuda
-static TimeProfile profileGaugeForce("computeGaugeForceQuda");
+TimeProfile profileGaugeForce("computeGaugeForceQuda");
 
 //!<Profiler for updateGaugeFieldQuda
-static TimeProfile profileGaugeUpdate("updateGaugeFieldQuda");
+TimeProfile profileGaugeUpdate("updateGaugeFieldQuda");
 
 //!<Profiler for createExtendedGaugeField
-static TimeProfile profileExtendedGauge("createExtendedGaugeField");
+TimeProfile profileExtendedGauge("createExtendedGaugeField");
 
 //!<Profiler for computeCloverForceQuda
-static TimeProfile profileCloverForce("computeCloverForceQuda");
+TimeProfile profileCloverForce("computeCloverForceQuda");
 
 //!<Profiler for computeStaggeredForceQuda
-static TimeProfile profileStaggeredForce("computeStaggeredForceQuda");
+TimeProfile profileStaggeredForce("computeStaggeredForceQuda");
 
 //!<Profiler for computeHISQForceQuda
-static TimeProfile profileHISQForce("computeHISQForceQuda");
+TimeProfile profileHISQForce("computeHISQForceQuda");
 
 //!<Profiler for plaqQuda
-static TimeProfile profilePlaq("plaqQuda");
+TimeProfile profilePlaq("plaqQuda");
 
 //!< Profiler for wuppertalQuda
-static TimeProfile profileWuppertal("wuppertalQuda");
+TimeProfile profileWuppertal("wuppertalQuda");
 
 //!<Profiler for gaussQuda
-static TimeProfile profileGauss("gaussQuda");
+TimeProfile profileGauss("gaussQuda");
 
 //!< Profiler for gaugeObservableQuda
-static TimeProfile profileGaugeObs("gaugeObservablesQuda");
+TimeProfile profileGaugeObs("gaugeObservablesQuda");
 
 //!< Profiler for APEQuda
-static TimeProfile profileAPE("APEQuda");
+TimeProfile profileAPE("APEQuda");
 
 //!< Profiler for STOUTQuda
-static TimeProfile profileSTOUT("STOUTQuda");
+TimeProfile profileSTOUT("STOUTQuda");
 
 //!< Profiler for OvrImpSTOUTQuda
-static TimeProfile profileOvrImpSTOUT("OvrImpSTOUTQuda");
+TimeProfile profileOvrImpSTOUT("OvrImpSTOUTQuda");
 
 //!< Profiler for wFlowQuda
-static TimeProfile profileWFlow("wFlowQuda");
+TimeProfile profileWFlow("wFlowQuda");
 
 //!< Profiler for projectSU3Quda
-static TimeProfile profileProject("projectSU3Quda");
+TimeProfile profileProject("projectSU3Quda");
 
 //!< Profiler for staggeredPhaseQuda
-static TimeProfile profilePhase("staggeredPhaseQuda");
+TimeProfile profilePhase("staggeredPhaseQuda");
 
 //!< Profiler for contractions
-static TimeProfile profileContract("contractQuda");
+TimeProfile profileContract("contractQuda");
 
 //!< Profiler for contractions
-static TimeProfile profileCuBLAS("cublasQuda");
+TimeProfile profileCuBLAS("cublasQuda");
 
 //!< Profiler for covariant derivative
-static TimeProfile profileCovDev("covDevQuda");
+TimeProfile profileCovDev("covDevQuda");
 
 //!< Profiler for momentum action
-static TimeProfile profileMomAction("momActionQuda");
+TimeProfile profileMomAction("momActionQuda");
 
 //!< Profiler for endQuda
-static TimeProfile profileEnd("endQuda");
+TimeProfile profileEnd("endQuda");
 
 //!< Profiler for GaugeFixing
-static TimeProfile GaugeFixFFTQuda("GaugeFixFFTQuda");
-static TimeProfile GaugeFixOVRQuda("GaugeFixOVRQuda");
+TimeProfile GaugeFixFFTQuda("GaugeFixFFTQuda");
+TimeProfile GaugeFixOVRQuda("GaugeFixOVRQuda");
 
 //!< Profiler for toal time spend between init and end
-static TimeProfile profileInit2End("initQuda-endQuda",false);
+TimeProfile profileInit2End("initQuda-endQuda",false);
 
 static bool enable_profiler = false;
 static bool do_not_profile_quda = false;
 
-static void profilerStart(const char *f) {
+static int R[4] = {0, 0, 0, 0};
+// setting this to false prevents redundant halo exchange but isn't yet compatible with HISQ / ASQTAD kernels
+static bool redundant_comms = false;
+// Mapped memory buffer used to hold unitarization failures
+static int *num_failures_h = nullptr;
+static int *num_failures_d = nullptr;
+static bool initialized = false;
+
+cudaDeviceProp deviceProp;
+qudaStream_t *streams;
+
+static bool InitMagma = false;
+//for MAGMA lib:
+#include <blas_magma.h>
+
+void openMagma() 
+{
+  if (!InitMagma) {
+    OpenMagma();
+    InitMagma = true;
+  } else {
+    printfQuda("\nMAGMA library was already initialized..\n");
+  }
+}
+
+void closeMagma()
+{
+  if (InitMagma) {
+    CloseMagma();
+    InitMagma = false;
+  } else {
+    printfQuda("\nMAGMA library was not initialized..\n");
+  }
+}
 
 
 
+static void profilerStart(const char *f) 
+{
   static std::vector<int> target_list;
   static bool enable = false;
   static bool init = false;

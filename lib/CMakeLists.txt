@@ -215,9 +215,8 @@ target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_target>)
 # add programs
 if(${QUDA_BUILD_ALL_PROGRAMS})		
   add_subdirectory(programs)
+  target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_programs>)
 endif()		
-
-target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_programs>)
 
 # propagate CXX flags to CUDA host compiler
 if(${QUDA_PROPAGATE_CXX_FLAGS})
@@ -389,6 +388,7 @@ if(QUDA_QMP)
     add_dependencies(quda_cpp QMP)
     #TODO: need to figure out how to propagate that cleanly
     add_dependencies(quda_cuda_target QMP)
+    add_dependencies(quda_cuda_programs QMP)
   endif()
   target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_QMPHOME}/include>)
   target_compile_definitions(quda PUBLIC QMP_COMMS)
@@ -402,6 +402,7 @@ if(QUDA_QIO)
     add_dependencies(quda_cpp QIO)
     #TODO: need to figure out how to propagate that cleanly
     add_dependencies(quda_cuda_target QIO)
+    add_dependencies(quda_cuda_programs QIO)
   endif()
   target_compile_definitions(quda PUBLIC HAVE_QIO)
   target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_QIOHOME}/include>)

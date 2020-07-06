@@ -4,7 +4,7 @@ if(QUDA_BUILD_SHAREDLIB)
   set_target_properties(quda_cuda_programs PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
 endif()
 
-target_include_directories(quda_cuda_programs PUBLIC include/kernels)
+target_include_directories(quda_cuda_programs PUBLIC ./include)
 
 # this part needs cleanup, thinking about what is needed here
 target_compile_definitions(quda_cuda_programs PRIVATE $<TARGET_PROPERTY:quda_cpp,COMPILE_DEFINITIONS>)
