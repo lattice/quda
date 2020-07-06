@@ -325,10 +325,10 @@ int main(int argc, char **argv)
       quda::spinorNoise(*in, *rng, QUDA_NOISE_UNIFORM);
       if (inv_deflate) eig_param.preserve_deflation = k < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
-      if (inv_type == QUDA_INC_EIGCG_INVERTER && eig_param.is_complete == QUDA_BOOLEAN_TRUE) {
+      if (inv_param.inv_type == QUDA_INC_EIGCG_INVERTER && eig_param.is_complete == QUDA_BOOLEAN_TRUE) {
         inv_param.inv_type = QUDA_CG_INVERTER;
       }
-
+      
       invertQuda(out->V(), in->V(), &inv_param);
 
       time[k] = inv_param.secs;

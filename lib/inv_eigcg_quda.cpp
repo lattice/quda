@@ -586,13 +586,12 @@ namespace quda {
 
     return;
   }
-
+  
   IncEigCG::~IncEigCG() {
     if (param.eig_param.n_conv == param.eig_param.n_ev)
       local_eigcg_args.reset(); // deallocate resources manually
     else
       IncEigCG::persistant_eigcg_args.swap(local_eigcg_args);
-    destroyDeflationSpace();
   }
   
   void IncEigCG::EigenSolve() { local_eigcg_args->RayleighRitz(); }
@@ -1450,6 +1449,7 @@ namespace quda {
         K = std::make_shared<CG>(mat, matPrecon, matPrecon, Kparam, profile);
       else
         K.reset(new CG(mat, matPrecon, matPrecon, Kparam, profile));
+      
       (*K)(x, b);
 
       mat(r, x, tmp2);
@@ -1628,6 +1628,13 @@ namespace quda {
       printfQuda("\nRequested to reserve %d eigenvectors with max tol %le.\n", param.eig_param.n_ev, param.eig_param.tol);
       Reduce(param.eig_param.tol, param.eig_param.n_ev);
       param.eig_param.is_complete = QUDA_BOOLEAN_TRUE;
+      
+      if(param.eig_param.n_conv == 0) {
+	// No eigenvectors found!
+	destroyDeflationSpace();
+	param.eig_param.preserve_deflation = QUDA_BOOLEAN_FALSE;
+      }
+      
       if (getVerbosity() == QUDA_DEBUG_VERBOSE) {
         blas::zero(out);
         initCGsolve(out, in);

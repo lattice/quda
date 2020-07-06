@@ -167,6 +167,17 @@ namespace quda {
   {
     if (deflate_init) return;
 
+    if (param.eig_param.n_conv == 0) {
+      // This is a check required by EigCG. If the EigCG solver
+      // cannot find any eigenvectors, we must prevent
+      // the CG solver from attempting to use the non-existant
+      // deflation space.
+      deflate_init = true;
+      deflate_compute = false;
+      param.deflate = false;
+      return;
+    }
+    
     // Deflation requested + first instance of solver
     bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
     if (!param.is_preconditioner && !profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
@@ -309,7 +320,7 @@ namespace quda {
       deflate_init = false;
     }
   }
-
+  
   void Solver::injectDeflationSpace(std::vector<ColorSpinorField *> &defl_space, const bool destroy_defl_space)
   {
     if (!evecs.empty()) errorQuda("Solver deflation space should be empty, instead size=%lu\n", defl_space.size());
