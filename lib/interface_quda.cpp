@@ -1249,12 +1249,12 @@ void loadSloppyCloverQuda(const QudaPrecision *prec)
     if (clover_param.Precision() == cloverPrecise->Precision()) {
       cloverEigensolver = cloverPrecise;
     } else if (clover_param.Precision() == cloverSloppy->Precision()) {
-      cloverPrecondition = cloverSloppy;
+      cloverEigensolver = cloverSloppy;
     } else if (clover_param.Precision() == cloverPrecondition->Precision()) {
-      cloverPrecondition = cloverPrecondition;
+      cloverEigensolver = cloverPrecondition;
     } else {
-      cloverPrecondition = new cudaCloverField(clover_param);
-      cloverPrecondition->copy(*cloverPrecise, clover_param.inverse);
+      cloverEigensolver = new cudaCloverField(clover_param);
+      cloverEigensolver->copy(*cloverPrecise, clover_param.inverse);
     }
   }
 
