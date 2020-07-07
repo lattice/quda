@@ -645,7 +645,7 @@ extern "C" {
 		     void* const milc_momentum);
 
   /**
-   * Compute the gauge force and update the mometum field.  All fields
+   * Compute the gauge force and update the momentum field.  All fields
    * here are CPU fields in MILC order, and their precisions should
    * match.
    *
@@ -662,6 +662,21 @@ extern "C" {
 		      QudaMILCSiteArg_t *arg);
 
   /**
+   * Compute the gauge force and update the momentum field.  All fields
+   * here are CPU fields in MILC order, and their precisions should
+   * match.
+   *
+   * @param precision The precision of the field (2 - double, 1 - single)
+   * @param num_loop_types 1, 2 or 3
+   * @param milc_loop_coeff Coefficients of the different loops in the Symanzik action
+   * @param eb3 The integration step size (for MILC this is dt*beta/3)
+   * @param arg Metadata for MILC's internal site struct array
+   * @param phase_in whether staggered phases are applied
+   */
+  void qudaGaugeForcePhased(int precision, int num_loop_types, double milc_loop_coeff[3], double eb3,
+                            QudaMILCSiteArg_t *arg, int phase_in);
+
+  /**
    * Evolve the gauge field by step size dt, using the momentum field
    * I.e., Evalulate U(t+dt) = e(dt pi) U(t).  All fields are CPU fields in MILC order.
    *
@@ -672,6 +687,17 @@ extern "C" {
   void qudaUpdateU(int precision,
 		   double eps,
 		   QudaMILCSiteArg_t *arg);
+
+  /**
+   * Evolve the gauge field by step size dt, using the momentum field
+   * I.e., Evalulate U(t+dt) = e(dt pi) U(t).  All fields are CPU fields in MILC order.
+   *
+   * @param precision Precision of the field (2 - double, 1 - single)
+   * @param dt The integration step size step
+   * @param arg Metadata for MILC's internal site struct array
+   * @param phase_in whether staggered phases are applied
+   */
+  void qudaUpdateUPhased(int precision, double eps, QudaMILCSiteArg_t *arg, int phase_in);
 
   /**
    * Download the momentum from MILC and place into QUDA's resident
@@ -728,6 +754,17 @@ extern "C" {
    * @param arg Metadata for MILC's internal site struct array
    */
   void qudaUnitarizeSU3(int prec, double tol, QudaMILCSiteArg_t *arg);
+
+  /**
+   * Project the input field on the SU(3) group.  If the target
+   * tolerance is not met, this routine will give a runtime error.
+   *
+   * @param prec Precision of the gauge field
+   * @param tol The tolerance to which we iterate
+   * @param arg Metadata for MILC's internal site struct array
+   * @param phase_in whether staggered phases are applied
+   */
+  void qudaUnitarizeSU3Phased(int prec, double tol, QudaMILCSiteArg_t *arg, int phase_in);
 
   /**
    * Compute the clover force contributions in each dimension mu given

@@ -134,7 +134,7 @@ namespace quda {
       gaugePhaseKernel<Arg> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
     }
 
-    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
 
     void preTune() { arg.u.save(); }
     void postTune() { arg.u.load(); }
