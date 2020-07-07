@@ -21,8 +21,8 @@ namespace quda {
     if (reconstruct != QUDA_RECONSTRUCT_NO && reconstruct != QUDA_RECONSTRUCT_10) {
       errorQuda("Reconstruction type %d not supported", reconstruct);
     }
-    if (reconstruct == QUDA_RECONSTRUCT_10 && order != QUDA_MILC_GAUGE_ORDER && order != QUDA_MILC_SITE_GAUGE_ORDER) {
-      errorQuda("10-reconstruction only supported with MILC gauge order");
+    if (reconstruct == QUDA_RECONSTRUCT_10 && link_type != QUDA_ASQTAD_MOM_LINKS) {
+      errorQuda("10-reconstruction only supported with momentum links");
     }
 
     int siteDim=0;
@@ -265,8 +265,7 @@ namespace quda {
 
     if (link_type == QUDA_ASQTAD_FAT_LINKS) {
       fat_link_max = src.LinkMax();
-      if ((precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) && fat_link_max == 0.0)
-        errorQuda("fat_link_max has not been computed");
+      if (fat_link_max == 0.0 && precision < QUDA_SINGLE_PRECISION) fat_link_max = src.abs_max();
     } else {
       fat_link_max = 1.0;
     }

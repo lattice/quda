@@ -2,17 +2,16 @@
 #include <color_spinor_field_order.h>
 #include <dslash_quda.h>
 #include <index_helper.cuh>
+#include <instantiate.h>
 
 #include <kernels/dslash_domain_wall_m5.cuh>
 
 namespace quda
 {
 
-  template <typename Float, int nColor, typename Arg> class Dslash5 : public TunableVectorYZ
+  template <typename Float, int nColor> class Dslash5 : public TunableVectorYZ
   {
-
-protected:
-    Arg &arg;
+    Dslash5Arg<Float, nColor> arg;
     const ColorSpinorField &meta;
     static constexpr bool shared = true; // whether to use shared memory cache blocking for M5inv
 
@@ -87,7 +86,11 @@ protected:
     }
 
 public:
-    Dslash5(Arg &arg, const ColorSpinorField &meta) : TunableVectorYZ(arg.Ls, arg.nParity), arg(arg), meta(meta)
+    Dslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f,
+            double m_5, const Complex *b_5, const Complex *c_5, double a, bool dagger, Dslash5Type type) :
+      TunableVectorYZ(in.X(4), in.SiteSubset()),
+      arg(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type),
+      meta(in)
     {
       strcpy(aux, meta.AuxString());
       if (arg.dagger) strcat(aux, ",Dagger");
@@ -101,10 +104,11 @@ public:
       case M5_INV_ZMOBIUS: strcat(aux, ",M5_INV_ZMOBIUS"); break;
       default: errorQuda("Unknown Dslash5Type %d", arg.type);
       }
-    }
-    virtual ~Dslash5() {}
 
-    template <typename T> inline void launch(T *f, const TuneParam &tp, Arg &arg, const qudaStream_t &stream)
+      apply(streams[Nstream - 1]);
+    }
+
+    template <typename T, typename Arg> inline void launch(T *f, const TuneParam &tp, Arg &arg, const qudaStream_t &stream)
     {
       if (shared && (arg.type == M5_INV_DWF || arg.type == M5_INV_MOBIUS || arg.type == M5_INV_ZMOBIUS)) {
         // if inverse kernel uses shared memory then maximize total shared memory pool
@@ -116,6 +120,7 @@ public:
 
     void apply(const qudaStream_t &stream)
     {
+      using Arg = decltype(arg);
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
         errorQuda("CPU variant not instantiated");
       } else {
@@ -199,42 +204,15 @@ public:
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
   };
 
-  template <typename Float, int nColor>
-  void ApplyDslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f,
-      double m_5, const Complex *b_5, const Complex *c_5, double a, bool dagger, Dslash5Type type)
-  {
-    Dslash5Arg<Float, nColor> arg(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type);
-    Dslash5<Float, nColor, Dslash5Arg<Float, nColor>> dslash(arg, in);
-    dslash.apply(streams[Nstream - 1]);
-  }
-
-  // template on the number of colors
-  template <typename Float>
-  void ApplyDslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f,
-      double m_5, const Complex *b_5, const Complex *c_5, double a, bool dagger, Dslash5Type type)
-  {
-    switch (in.Ncolor()) {
-    case 3: ApplyDslash5<Float, 3>(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type); break;
-    default: errorQuda("Unsupported number of colors %d\n", in.Ncolor());
-    }
-  }
-
   // Apply the 5th dimension dslash operator to a colorspinor field
   // out = Dslash5*in
   void ApplyDslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f,
-      double m_5, const Complex *b_5, const Complex *c_5, double a, bool dagger, Dslash5Type type)
+                    double m_5, const Complex *b_5, const Complex *c_5, double a, bool dagger, Dslash5Type type)
   {
 #ifdef GPU_DOMAIN_WALL_DIRAC
     if (in.PCType() != QUDA_4D_PC) errorQuda("Only 4-d preconditioned fields are supported");
-    checkLocation(out, in); // check all locations match
-
-    switch (checkPrecision(out, in)) {
-    case QUDA_DOUBLE_PRECISION: ApplyDslash5<double>(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type); break;
-    case QUDA_SINGLE_PRECISION: ApplyDslash5<float>(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type); break;
-    case QUDA_HALF_PRECISION: ApplyDslash5<short>(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type); break;
-    case QUDA_QUARTER_PRECISION: ApplyDslash5<char>(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type); break;
-    default: errorQuda("Unsupported precision %d\n", in.Precision());
-    }
+    checkLocation(out, in, x); // check all locations match
+    instantiate<Dslash5>(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type);
 #else
     errorQuda("Domain wall dslash has not been built");
 #endif
