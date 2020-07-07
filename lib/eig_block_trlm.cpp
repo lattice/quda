@@ -463,7 +463,7 @@ namespace quda
     for (int i = 0; i < blocks; i++) {
       for (int b = 0; b < block_size; b++) {
         idx = b * (block_size + 1);
-        residua[i * block_size + b + num_locked] = fabs(block_beta[n_kr * block_size - block_data_length + idx]
+        residua[i * block_size + b + num_locked] = abs(block_beta[n_kr * block_size - block_data_length + idx]
                                                         * block_ritz_mat[dim * (i * block_size + b + 1) - 1]);
       }
     }
