@@ -601,7 +601,7 @@ namespace quda {
       using TileTuner = TileSizeTune<ReducerDiagonal, ReducerOffDiagonal, T>;
       using vec = std::vector<ColorSpinorField *>;
       T *result;
-      vec &x, &y, &z, &w;
+      vec &x, &y;
       int coeff_width;
       bool hermitian;
       bool Anorm;
@@ -610,12 +610,10 @@ namespace quda {
       unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
     public:
-      TransposeTune(T *result, vec &x, vec &y, vec &z, vec &w, int coeff_width, bool hermitian, bool Anorm = false) :
+      TransposeTune(T *result, vec &x, vec &y, int coeff_width, bool hermitian, bool Anorm = false) :
         result(result),
         x(x),
         y(y),
-        z(z),
-        w(w),
         coeff_width(coeff_width),
         hermitian(hermitian),
         Anorm(Anorm)
@@ -646,20 +644,20 @@ namespace quda {
           // multiReduce_recurse directly now for 1-d multi
           // reductions, but I'll keep this code here for now
           if (x.size() == 1) {
-            TileTuner tile(result, x, y, z, w, coeff_width, hermitian, Anorm, true);
+            TileTuner tile(result, x, y, x, x, coeff_width, hermitian, Anorm, true);
             tile.apply(0);
           } else if (y.size() == 1) {
-            TileTuner tile(result, y, z, w, z, coeff_width, hermitian, Anorm, true);
+            TileTuner tile(result, y, x, y, y, coeff_width, hermitian, Anorm, true);
             tile.apply(0);
           } else {
 
             { // tune regular inner product
-              TileTuner tile(result, x, y, z, w, coeff_width, hermitian, Anorm, true);
+              TileTuner tile(result, x, y, x, x, coeff_width, hermitian, Anorm, true);
               tile.apply(0);
             }
 
             { // tune transpose inner product
-              TileTuner tile(result, y, z, w, z, coeff_width, hermitian, Anorm, true);
+              TileTuner tile(result, y, x, y, y, coeff_width, hermitian, Anorm, true);
               tile.apply(0);
             }
           }
@@ -676,13 +674,13 @@ namespace quda {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
         if (tp.aux.x == 0) {
-          TileTuner tile(result, x, y, z, w, coeff_width, hermitian, Anorm, true);
+          TileTuner tile(result, x, y, x, x, coeff_width, hermitian, Anorm, true);
           tile.apply(stream);
         } else if (tp.aux.x == 1) {
           T *result_trans = new T[x.size() * y.size()];
 
           // swap (x<->y and w<-z> when doing transpose calculation)
-          TileTuner tile(result_trans, y, x, w, z, coeff_width, hermitian, Anorm, true);
+          TileTuner tile(result_trans, y, x, y, y, coeff_width, hermitian, Anorm, true);
           tile.apply(stream);
 
           // tranpose the result if we are doing the transpose calculation
@@ -767,7 +765,7 @@ namespace quda {
         delete[] result_trans;
 
       } else if (x[0]->Precision() == y[0]->Precision()) {
-        TransposeTune<multiDot, multiDot, double> trans(result_tmp, x, y, x, x, coeff_width, false);
+        TransposeTune<multiDot, multiDot, double> trans(result_tmp, x, y, coeff_width, false);
         trans.apply(0);
       } else {
         TileSizeTune<multiDot, multiDot, double> tile(result_tmp, x, y, x, x, coeff_width, false);
@@ -820,7 +818,7 @@ namespace quda {
         delete[] result_trans;
 
       } else if (x[0]->Precision() == y[0]->Precision()) {
-        TransposeTune<multiCdot, multiCdot, Complex> trans(result_tmp, x, y, x, x, coeff_width, false);
+        TransposeTune<multiCdot, multiCdot, Complex> trans(result_tmp, x, y, coeff_width, false);
         trans.apply(0);
       } else {
         TileSizeTune<multiCdot, multiCdot, Complex> tile(result_tmp, x, y, x, x, coeff_width, false);

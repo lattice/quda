@@ -4050,6 +4050,8 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   }
 
   cudaGaugeField *cudaGauge = createExtendedGauge(*cudaSiteLink, R, profileGaugeForce);
+  // apply / remove phase as appropriate
+  if (cudaGauge->StaggeredPhaseApplied()) cudaGauge->removeStaggeredPhase();
 
   // actually do the computation
   profileGaugeForce.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -4968,7 +4970,9 @@ void updateGaugeFieldQuda(void* gauge,
    *num_failures_h = 0;
 
    // project onto SU(3)
+   if (cudaGauge->StaggeredPhaseApplied()) cudaGauge->removeStaggeredPhase();
    projectSU3(*cudaGauge, tol, num_failures_d);
+   if (!cudaGauge->StaggeredPhaseApplied() && param->staggered_phase_applied) cudaGauge->applyStaggeredPhase();
 
    profileProject.TPSTOP(QUDA_PROFILE_COMPUTE);
 

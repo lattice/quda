@@ -88,21 +88,27 @@ namespace quda {
     return c;
   }
 
-
   template <typename T>
   struct ReduceArg {
     T *partial;
     T *result_d;
     T *result_h;
-    ReduceArg() :
+    ReduceArg(int reduce_count = 0) :
       partial(static_cast<T*>(blas::getDeviceReduceBuffer())),
       result_d(static_cast<T*>(blas::getMappedHostReduceBuffer())),
       result_h(static_cast<T*>(blas::getHostReduceBuffer()))
     {
       //  write reduction to GPU memory if asynchronous
       if (commAsyncReduction()) result_d = partial;
-    }
 
+      // check reduction buffers are large enough if requested
+      if (reduce_count > 0) {
+        auto max_reduce_blocks = 2 * deviceProp.multiProcessorCount;
+        auto reduce_size = max_reduce_blocks * reduce_count * sizeof(T);
+        if (reduce_size > blas::reduceBufferSize())
+          errorQuda("Requested reduction requires a larger buffer %lu than allocated %lu", reduce_size, blas::reduceBufferSize());
+      }
+    }
   };
 
   __device__ unsigned int count[QUDA_MAX_MULTI_REDUCE] = { };
