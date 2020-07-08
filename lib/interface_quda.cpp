@@ -6357,9 +6357,9 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
   cublas_param_mom_sum.data_type = QUDA_CUBLAS_DATATYPE_Z;
 
   profileCuBLAS.TPSTART(QUDA_PROFILE_COMPUTE);
-  cublas::BatchGEMM(d_evec, d_coeffs2, d_q2, cublas_param_init, QUDA_CUDA_FIELD_LOCATION);
+  cublas::BatchGEMM(d_coeffs2, d_evec, d_q2, cublas_param_init, QUDA_CUDA_FIELD_LOCATION);
   cublas_param_init.m = n3;
-  cublas::BatchGEMM(d_evec, d_coeffs3, d_q3, cublas_param_init, QUDA_CUDA_FIELD_LOCATION);
+  cublas::BatchGEMM(d_coeffs3, d_evec, d_q3, cublas_param_init, QUDA_CUDA_FIELD_LOCATION);
   profileCuBLAS.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   
@@ -6588,15 +6588,13 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
 			  (std::complex<double>*)d_tmp + nSites*nInBlock);
 	profileColorContract.TPSTOP(QUDA_PROFILE_COMPUTE);
 	nInBlock++;
-	//printfQuda("aEv = %d bEv = %d cEv = %d\n", aEv, bEv, cEv); 
-	if (nInBlock == blockSizeMomProj) {
 
+	if (nInBlock == blockSizeMomProj) {
+	  //printfQuda("aEv = %d bEv = %d cEv = %d\n", aEv, bEv, cEv); 
 	  cublas_param_mom_sum.n = nInBlock;
 	  cublas_param_mom_sum.c_offset = blockStart;
 	  profileCuBLAS.TPSTART(QUDA_PROFILE_COMPUTE);	  
-	  printfQuda("cuBLAS start\n"); 
-	  cublas::BatchGEMM(d_tmp, d_mom, d_ret, cublas_param_mom_sum, QUDA_CUDA_FIELD_LOCATION);
-	  printfQuda("cuBLAS end\n"); 
+	  cublas::BatchGEMM(d_mom, d_tmp, d_ret, cublas_param_mom_sum, QUDA_CUDA_FIELD_LOCATION);
 	  profileCuBLAS.TPSTOP(QUDA_PROFILE_COMPUTE);	  
 	  blockStart += nInBlock;
 	  nInBlock = 0;
@@ -6611,7 +6609,7 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
     cublas_param_mom_sum.n = nInBlock;
     cublas_param_mom_sum.c_offset = blockStart;
     profileCuBLAS.TPSTART(QUDA_PROFILE_COMPUTE);	  
-    cublas::BatchGEMM(d_tmp, d_mom, d_ret, cublas_param_mom_sum, QUDA_CUDA_FIELD_LOCATION);
+    cublas::BatchGEMM(d_mom, d_tmp, d_ret, cublas_param_mom_sum, QUDA_CUDA_FIELD_LOCATION);
     profileCuBLAS.TPSTOP(QUDA_PROFILE_COMPUTE);	  
     blockStart = 0;
     nInBlock = 0;
@@ -6731,15 +6729,10 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
   void *d_coeffs3 = pool_device_malloc(data_coeffs3_bytes);
   
   size_t data_mtb_bytes = (size_t)(nMom * nSubEv * nEv * nEv * 2 * quda_evec[0]->Precision());
-  data_mtb_bytes /= 1024;
-  data_mtb_bytes /= 1024;
-  data_mtb_bytes /= 28512;
   
   printfQuda("nMom = %d, nSubEv = %d, nEv = %d, nEv = %d, 2*prec = %d, bytes = %zu\n", nMom, nSubEv, nEv, nEv, 2 * quda_evec[0]->Precision(), data_mtb_bytes); 
-  //fflush(stdout);
-  //exit(0);
+
   void *d_mtb = pool_device_malloc(data_mtb_bytes);
-  //void *d_mtb = pool_device_malloc(8);
   
   size_t data_tmp_bytes = nSubEv * n2 * n3 * 2 * quda_evec[0]->Precision();
   void *d_tmp = pool_device_malloc(data_tmp_bytes);
