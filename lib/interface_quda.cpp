@@ -6386,7 +6386,7 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
 	  cublas_param_mom_sum.n = nInBlock;
 	  cublas_param_mom_sum.c_offset = (dil1*n2 + dil2)*n3 + dil3 - nInBlock + 1;;
 	  profileCuBLAS.TPSTART(QUDA_PROFILE_COMPUTE);	  
-	  cublas::BatchGEMM(d_tmp, d_mom, d_ret, cublas_param_mom_sum, QUDA_CUDA_FIELD_LOCATION);
+	  cublas::BatchGEMM(d_mom, d_tmp, d_ret, cublas_param_mom_sum, QUDA_CUDA_FIELD_LOCATION);
 	  profileCuBLAS.TPSTOP(QUDA_PROFILE_COMPUTE);	  
 	  nInBlock = 0;
 	}
@@ -6495,21 +6495,26 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
   if (sizeof(Complex) != sizeof(double _Complex)) {
     errorQuda("Irreconcilable difference between interface and internal complex number conventions");
   }  
-
+  size_t total_bytes = 0;
   // Device side temp array (complBuf in chroma_laph)
   size_t data_tmp_bytes = blockSizeMomProj * X[0] * X[1] * X[2] * 2 * quda_evec[0]->Precision();
   void *d_tmp = pool_device_malloc(data_tmp_bytes);
-  
+  total_bytes += data_tmp_bytes;
+  printfQuda("d_tmp bytes = %lu total_bytes = %lu\n", data_tmp_bytes, total_bytes); 
   // A second temp array (tmpBuf in chroma_laph) This will be returned for a
   // globalChunkedSumArray (QDP)
   size_t nEvChoose3 = nEv*(nEv-1)/2*(nEv-2)/3;
   size_t data_ret_bytes = nEvChoose3 * nMom * 2 * quda_evec[0]->Precision();
   void *d_ret = pool_device_malloc(data_ret_bytes);
+  total_bytes += data_ret_bytes;
+  printfQuda("d_ret bytes = %lu total_bytes = %lu\n", data_ret_bytes, total_bytes); 
   
   // Array of momenta
   std::complex<double>* hostMomPtr = reinterpret_cast<std::complex<double>*>(host_mom); 
   size_t data_mom_bytes = nMom * nSites * 2 * quda_evec[0]->Precision();
   void *d_mom = pool_device_malloc(data_mom_bytes);
+  total_bytes += data_mom_bytes;
+  printfQuda("d_mom bytes = %lu total_bytes = %lu\n", data_mom_bytes, total_bytes); 
 
   profileBaryonKernelModeTripletsA.TPSTOP(QUDA_PROFILE_INIT);  
   //--------------------------------------------------------------------------------
@@ -6520,8 +6525,38 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
   qudaMemcpy(d_mom, hostMomPtr, data_mom_bytes, cudaMemcpyHostToDevice);  
   profileBaryonKernelModeTripletsA.TPSTOP(QUDA_PROFILE_H2D);
 
+  // Perform a simple test to see if cuBLAS can handle the 3D MPI
   __complex__ double alpha = 1.0;
   __complex__ double beta = 0.0;    
+  QudaCublasParam cublas_param_test = newQudaCublasParam();
+  cublas_param_test.trans_a = QUDA_CUBLAS_OP_N;
+  cublas_param_test.trans_b = QUDA_CUBLAS_OP_N;
+  cublas_param_test.m = 4;
+  cublas_param_test.n = 4;
+  cublas_param_test.k = 4;
+  cublas_param_test.lda = 4;
+  cublas_param_test.ldb = 4;
+  cublas_param_test.ldc = 4;
+  cublas_param_test.batch_count = 1;
+  cublas_param_test.alpha = (__complex__ double)alpha;  
+  cublas_param_test.beta  = (__complex__ double)beta;
+  cublas_param_test.data_order = QUDA_CUBLAS_DATAORDER_ROW;
+  cublas_param_test.data_type = QUDA_CUBLAS_DATATYPE_Z;
+
+  size_t data_test_bytes = 4 * 4 * 2 * quda_evec[0]->Precision();
+  void *d_a = pool_device_malloc(data_test_bytes);
+  void *d_b = pool_device_malloc(data_test_bytes);
+  void *d_c = pool_device_malloc(data_test_bytes);
+  
+  cudaMemset(d_a, 1, data_test_bytes);
+  cudaMemset(d_b, 2, data_test_bytes);
+  cudaMemset(d_c, 3, data_test_bytes);
+
+  cublas::BatchGEMM(d_a, d_b, d_c, cublas_param_test, QUDA_CUDA_FIELD_LOCATION);
+  printfQuda("GEMM Success!\n");
+
+  //__complex__ double alpha = 1.0;
+  //__complex__ double beta = 0.0;    
   QudaCublasParam cublas_param_mom_sum = newQudaCublasParam();
   cublas_param_mom_sum.trans_a = QUDA_CUBLAS_OP_N;
   cublas_param_mom_sum.trans_b = QUDA_CUBLAS_OP_T;
@@ -6559,9 +6594,9 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
 	  cublas_param_mom_sum.n = nInBlock;
 	  cublas_param_mom_sum.c_offset = blockStart;
 	  profileCuBLAS.TPSTART(QUDA_PROFILE_COMPUTE);	  
-	  //printfQuda("cuBLAS start\n"); 
+	  printfQuda("cuBLAS start\n"); 
 	  cublas::BatchGEMM(d_tmp, d_mom, d_ret, cublas_param_mom_sum, QUDA_CUDA_FIELD_LOCATION);
-	  //printfQuda("cuBLAS end\n"); 
+	  printfQuda("cuBLAS end\n"); 
 	  profileCuBLAS.TPSTOP(QUDA_PROFILE_COMPUTE);	  
 	  blockStart += nInBlock;
 	  nInBlock = 0;
@@ -6603,65 +6638,7 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
 
   profileBaryonKernelModeTripletsA.TPSTOP(QUDA_PROFILE_FREE);
   profileBaryonKernelModeTripletsA.TPSTOP(QUDA_PROFILE_TOTAL);
-  
-
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
  void laphBaryonKernelComputeModeTripletB(int n1, int n2, int n3, int nMom,
 					  double _Complex *host_coeffs1, 

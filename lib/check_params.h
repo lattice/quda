@@ -14,21 +14,19 @@
 #define INVALID_INT QUDA_INVALID_ENUM
 #define INVALID_DOUBLE DBL_MIN
 
-
 // define macro to carry out the appropriate action for a given parameter
 
 #if defined INIT_PARAM
 #define P(x, val) ret.x = val
 #elif defined CHECK_PARAM
-#define P(x, val) if (param->x == val && param->x != 0) errorQuda("Parameter " #x " undefined")
+#define P(x, val) if (param->x == val) errorQuda("Parameter " #x " undefined")
 #elif defined PRINT_PARAM
-#define P(x, val)							\
+#define P(x, val)\
   { if (val == INVALID_DOUBLE) printfQuda(#x " = %g\n", (double)param->x); \
-    else if (val == INVALID_INT) printfQuda(#x " = %d\n", (int)param->x); }
+    else printfQuda(#x " = %d\n", (int)param->x); }
 #else
 #error INIT_PARAM, CHECK_PARAM, and PRINT_PARAM all undefined in check_params.h
 #endif
-
 
 // define the appropriate function for GaugeParam
 
