@@ -16,7 +16,7 @@ auto &grid_y = gridsize_from_cmdline[1];
 auto &grid_z = gridsize_from_cmdline[2];
 auto &grid_t = gridsize_from_cmdline[3];
 
-bool native_blas_lapack = false;
+bool native_blas_lapack = true;
 
 std::array<int, 4> dim_partitioned = {0, 0, 0, 0};
 QudaReconstructType link_recon = QUDA_RECONSTRUCT_NO;

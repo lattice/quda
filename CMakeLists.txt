@@ -217,7 +217,6 @@ option(QUDA_NVML "use NVML to report CUDA graphics driver version" OFF)
 option(QUDA_NUMA_NVML "experimental use of NVML to set numa affinity" OFF)
 option(QUDA_VERBOSE_BUILD "display kernel register usage" OFF)
 option(QUDA_BUILD_NATIVE_LAPACK "build the native blas/lapack library according to QUDA_TARGET" ON)
-# FIXME: Jenkins fails when default is ON
 
 set(QUDA_MAX_MULTI_BLAS_N
     "4"
@@ -257,7 +256,7 @@ option(QUDA_INTERFACE_NVTX "add NVTC markup to interface calls" OFF)
 option(QUDA_SSTEP "build s-step linear solvers" OFF)
 option(QUDA_MULTIGRID "build multigrid solvers" OFF)
 option(QUDA_BLOCKSOLVER "build block solvers" OFF)
-option(QUDA_USE_EIGEN "use EIGEN library (where optional)" ON)
+option(QUDA_USE_EIGEN "use EIGEN library (where optional)" OFF)
 option(QUDA_DOWNLOAD_EIGEN "Download Eigen" ON)
 option(QUDA_DOWNLOAD_USQCD "Download USQCD software as requested by QUDA_QMP / QUDA_QIO" OFF)
 option(QUDA_DOWNLOAD_ARPACK "Download ARPACK-NG software as requested by QUDA_ARPACK" OFF)
@@ -318,7 +317,6 @@ if(${CPU_ARCH} STREQUAL "x86_64")
 elseif(${CPU_ARCH} STREQUAL "ppc64le")
   set(CXX_OPT "-Ofast -mcpu=native -mtune=native")
 endif()
-
 
 set(CMAKE_CXX_STANDARD ${QUDA_CXX_STANDARD})
 # define CXX FLAGS
