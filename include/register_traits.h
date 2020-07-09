@@ -411,7 +411,6 @@ namespace quda {
 #endif
     }
   };
-
   
   template <typename Float, int number> struct VectorType;
 
@@ -458,28 +457,6 @@ namespace quda {
   template <> struct VectorType<char, 8> {
     typedef char8 type;
   };
-
-  // This trait returns the matching texture type (needed for double precision)
-  template <typename Float, int number> struct TexVectorType;
-
-  // double precision
-  template <> struct TexVectorType<double, 1>{typedef int2 type; };
-  template <> struct TexVectorType<double, 2>{typedef int4 type; };
-
-  // single precision
-  template <> struct TexVectorType<float, 1>{typedef float type; };
-  template <> struct TexVectorType<float, 2>{typedef float2 type; };
-  template <> struct TexVectorType<float, 4>{typedef float4 type; };
-
-  // half precision
-  template <> struct TexVectorType<short, 1>{typedef short type; };
-  template <> struct TexVectorType<short, 2>{typedef short2 type; };
-  template <> struct TexVectorType<short, 4>{typedef short4 type; };
-
-  // quarter precision
-  template <> struct TexVectorType<char, 1>{typedef char type; };
-  template <> struct TexVectorType<char, 2>{typedef char2 type; };
-  template <> struct TexVectorType<char, 4>{typedef char4 type; };
 
   template <typename VectorType>
     __device__ __host__ inline VectorType vector_load(const void *ptr, int idx)
