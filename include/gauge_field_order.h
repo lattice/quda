@@ -1658,8 +1658,9 @@ namespace quda {
 
         using real = typename mapper<Float>::type;
         using complex = complex<real>;
-        typedef typename VectorType<Float, N>::type Vector;
-        typedef typename AllocType<huge_alloc>::type AllocInt;
+        using Vector = typename VectorType<Float, N>::type;
+        static_assert(sizeof(Vector) == sizeof(Float[N]), "vector size and array size do not match");
+        using AllocInt = typename AllocType<huge_alloc>::type;
         Reconstruct<reconLenParam, Float, ghostExchange_, stag_phase> reconstruct;
         static constexpr int reconLen = (reconLenParam == 11) ? 10 : reconLenParam;
         static constexpr int hasPhase = (reconLen == 9 || reconLen == 13) ? 1 : 0;
@@ -1733,8 +1734,10 @@ namespace quda {
           // first load from memory
           Vector vecTmp = vector_load<Vector>(gauge, parity * offset + (dir * M + i) * stride + x);
           // second do copy converting into register type
+          Float arrayTmp[N];
+          memcpy(arrayTmp, &vecTmp, sizeof(vecTmp));
 #pragma unroll
-          for (int j = 0; j < N; j++) copy(tmp[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j]);
+          for (int j = 0; j < N; j++) copy(tmp[i * N + j], arrayTmp[j]);
         }
 
         real phase = 0.;
@@ -1758,10 +1761,12 @@ namespace quda {
 
 #pragma unroll
         for (int i=0; i<M; i++){
-	  Vector vecTmp;
 	  // first do copy converting into storage type
+          Float arrayTmp[N];
 #pragma unroll
-	  for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
+	  for (int j=0; j<N; j++) copy(arrayTmp[j], tmp[i*N+j]);
+	  Vector vecTmp;
+          memcpy(&vecTmp, arrayTmp, sizeof(vecTmp));
 	  // second do vectorized copy into memory
           vector_store(gauge, parity * offset + x + (dir * M + i) * stride, vecTmp);
         }
@@ -1817,8 +1822,10 @@ namespace quda {
             Vector vecTmp = vector_load<Vector>(
                 ghost[dir] + parity * faceVolumeCB[dir] * (M * N + hasPhase), i * faceVolumeCB[dir] + x);
             // second do copy converting into register type
+            Float arrayTmp[N];
+            memcpy(arrayTmp, &vecTmp, sizeof(vecTmp));
 #pragma unroll
-            for (int j = 0; j < N; j++) copy(tmp[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j]);
+            for (int j = 0; j < N; j++) copy(tmp[i * N + j], arrayTmp[j]);
           }
           real phase = 0.;
 
@@ -1846,10 +1853,12 @@ namespace quda {
 
 #pragma unroll
           for (int i=0; i<M; i++) {
-	    Vector vecTmp;
 	    // first do copy converting into storage type
+            Float arrayTmp[N];
 #pragma unroll
-	    for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
+	    for (int j=0; j<N; j++) copy(arrayTmp[j], tmp[i*N+j]);
+	    Vector vecTmp;
+            memcpy(&vecTmp, arrayTmp, sizeof(vecTmp));
 	    // second do vectorized copy into memory
 	    vector_store(ghost[dir]+parity*faceVolumeCB[dir]*(M*N + hasPhase), i*faceVolumeCB[dir]+x, vecTmp);
           }
@@ -1906,8 +1915,10 @@ namespace quda {
 	  Vector vecTmp = vector_load<Vector>(ghost[dim] + ((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + hasPhase),
 					      +i*R[dim]*faceVolumeCB[dim]+buff_idx);
 	  // second do copy converting into register type
+          Float arrayTmp[N];
+          memcpy(arrayTmp, &vecTmp, sizeof(vecTmp));
 #pragma unroll
-	  for (int j=0; j<N; j++) copy(tmp[i*N+j], reinterpret_cast<Float*>(&vecTmp)[j]);
+	  for (int j=0; j<N; j++) copy(tmp[i*N+j], arrayTmp[j]);
 	}
         real phase = 0.;
         if (hasPhase)
@@ -1929,10 +1940,12 @@ namespace quda {
 
 #pragma unroll
 	  for (int i=0; i<M; i++) {
-	    Vector vecTmp;
+            Float arrayTmp[N];
 	    // first do copy converting into storage type
 #pragma unroll
-	    for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
+	    for (int j=0; j<N; j++) copy(arrayTmp[j], tmp[i*N+j]);
+	    Vector vecTmp;
+            memcpy(&vecTmp, arrayTmp, sizeof(vecTmp));
 	    // second do vectorized copy to memory
 	    vector_store(ghost[dim] + ((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + hasPhase),
 			 i*R[dim]*faceVolumeCB[dim]+buff_idx, vecTmp);

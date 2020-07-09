@@ -959,8 +959,10 @@ namespace quda {
       // first load from memory
       Vector vecTmp = vector_load<Vector>(field, parity * offset + x + stride * i);
       // now copy into output and scale
+      Float arrayTmp[N];
+      memcpy(arrayTmp, &vecTmp, sizeof(vecTmp));
 #pragma unroll
-      for (int j = 0; j < N; j++) copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
+      for (int j = 0; j < N; j++) copy_and_scale(v[i * N + j], arrayTmp[j], nrm);
     }
 
 #pragma unroll
@@ -998,10 +1000,12 @@ namespace quda {
 
 #pragma unroll
     for (int i=0; i<M; i++) {
-      Vector vecTmp;
       // first do scalar copy converting into storage type
+      Float arrayTmp[N];
 #pragma unroll
-      for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], v[i * N + j]);
+      for (int j = 0; j < N; j++) copy_scaled(arrayTmp[j], v[i * N + j]);
+      Vector vecTmp;
+      memcpy(&vecTmp, arrayTmp, sizeof(vecTmp));
       // second do vectorized copy into memory
       vector_store(field, parity * offset + x + stride * i, vecTmp);
     }
@@ -1045,8 +1049,10 @@ namespace quda {
     for (int i = 0; i < M_ghost; i++) {
       GhostVector vecTmp = vector_load<GhostVector>(ghost[2 * dim + dir],
                                                     parity * faceVolumeCB[dim] * M_ghost + i * faceVolumeCB[dim] + x);
+      Float arrayTmp[N];
+      memcpy(arrayTmp, &vecTmp, sizeof(vecTmp));
 #pragma unroll
-      for (int j = 0; j < N_ghost; j++) copy_and_scale(v[i * N_ghost + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
+      for (int j = 0; j < N_ghost; j++) copy_and_scale(v[i * N_ghost + j], arrayTmp[j], nrm);
     }
 
 #pragma unroll
@@ -1086,10 +1092,12 @@ namespace quda {
 
 #pragma unroll
     for (int i = 0; i < M_ghost; i++) {
-      GhostVector vecTmp;
       // first do scalar copy converting into storage type
+      Float arrayTmp[N];
 #pragma unroll
-      for (int j = 0; j < N_ghost; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], v[i * N_ghost + j]);
+      for (int j = 0; j < N_ghost; j++) copy_scaled(arrayTmp[j], v[i * N_ghost + j]);
+      GhostVector vecTmp;
+      memcpy(&vecTmp, arrayTmp, sizeof(vecTmp));
       // second do vectorized copy into memory
       vector_store(ghost[2 * dim + dir], parity * faceVolumeCB[dim] * M_ghost + i * faceVolumeCB[dim] + x, vecTmp);
     }

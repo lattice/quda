@@ -613,8 +613,10 @@ namespace quda {
             // first load from memory
             Vector vecTmp = vector_load<Vector>(clover, parity * offset + x + stride * (chirality * M + i));
             // second do scalar copy converting into register type
+            Float arrayTmp[N];
+            memcpy(arrayTmp, &vecTmp, sizeof(vecTmp));
 #pragma unroll
-            for (int j = 0; j < N; j++) { copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm); }
+            for (int j = 0; j < N; j++) { copy_and_scale(v[i * N + j], arrayTmp[j], nrm); }
           }
 
           if (add_rho) for (int i=0; i<6; i++) v[i] += rho;
@@ -652,9 +654,11 @@ namespace quda {
 
 #pragma unroll
           for (int i = 0; i < M; i++) {
-            Vector vecTmp;
             // first do scalar copy converting into storage type
-            for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp[i * N + j]);
+            Float arrayTmp[N];
+            for (int j = 0; j < N; j++) copy_scaled(arrayTmp[j], tmp[i * N + j]);
+            Vector vecTmp;
+            memcpy(&vecTmp, arrayTmp, sizeof(vecTmp));
             // second do vectorized copy into memory
             vector_store(clover, parity * offset + x + stride * (chirality * M + i), vecTmp);
           }
