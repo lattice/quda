@@ -1,5 +1,5 @@
 # generate an object library for all target specific files 
-add_library(quda_cuda_target OBJECT malloc.cpp tune.cpp blas_cublas.cu)
+add_library(quda_cuda_target OBJECT malloc.cpp tune.cpp blas_lapack_cublas.cpp)
 if(QUDA_BUILD_SHAREDLIB)
   set_target_properties(quda_cuda_target PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
 endif()
