@@ -788,6 +788,9 @@ void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
   inv_param.tol_precondition = 1e-1;
   inv_param.maxiter_precondition = 1;
   inv_param.omega = 1.0;
+
+  // Whether or not to use native BLAS LAPACK
+  inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 }
 
 void setStaggeredInvertParam(QudaInvertParam &inv_param)
@@ -873,6 +876,9 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
 void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 {
   QudaInvertParam &inv_param = *mg_param.invert_param; // this will be used to setup SolverParam parent in MGParam class
+
+  // Whether or not to use native BLAS LAPACK
+  inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 
   inv_param.Ls = 1;
 
