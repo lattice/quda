@@ -31,15 +31,17 @@ namespace quda
       qudaFuncSetAttribute((const void *)func, cudaFuncAttributeMaxDynamicSharedMemorySize,
                            deviceProp.sharedMemPerBlockOptin - attr.sharedSizeBytes);
     }
-    
+
     template <bool compute_max_only, int bM, int bN, int bK, int block_y, int block_z, int min_block_cta = 1, class Arg>
-    typename std::enable_if<!Arg::is_aos, void>::type launch_kernel(Arg &arg, int min_threads, TuneParam &tp, const cudaStream_t &stream)
+    typename std::enable_if<!Arg::is_aos, void>::type launch_kernel(Arg &arg, int min_threads, TuneParam &tp,
+                                                                    const cudaStream_t &stream)
     {
       errorQuda("MMA implementation is ONLY built for AoS order.");
     }
 
     template <bool compute_max_only, int bM, int bN, int bK, int block_y, int block_z, int min_block_cta = 1, class Arg>
-    typename std::enable_if<Arg::is_aos, void>::type launch_kernel(Arg &arg, int min_threads, TuneParam &tp, const cudaStream_t &stream)
+    typename std::enable_if<Arg::is_aos, void>::type launch_kernel(Arg &arg, int min_threads, TuneParam &tp,
+                                                                   const cudaStream_t &stream)
     {
       tp.block.x = 1;
       tp.block.y = block_y;
@@ -135,7 +137,7 @@ namespace quda
     }
 
 #else
-    
+
     template <bool compute_max_only, class Arg>
     void launch_yhat_kernel(Arg &arg, int min_threads, TuneParam &tp, const cudaStream_t &stream)
     {

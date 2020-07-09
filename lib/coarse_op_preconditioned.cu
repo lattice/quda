@@ -9,7 +9,8 @@
 
 #include <coarse_op_preconditioned_mma.cuh>
 
-namespace quda {
+namespace quda
+{
 
   /**
      @brief Launcher for CPU instantiations of preconditioned coarse-link construction
@@ -43,9 +44,9 @@ namespace quda {
       } else {
         using namespace jitify::reflection;
         error = program->kernel("quda::CalculateYhatGPU")
-          .instantiate(compute_max_only, Type<Arg>())
-          .configure(tp.grid, tp.block, tp.shared_bytes, stream)
-          .launch(arg);
+                  .instantiate(compute_max_only, Type<Arg>())
+                  .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+                  .launch(arg);
       }
 #else
       if (use_mma) {
@@ -136,7 +137,7 @@ namespace quda {
 
     bool advanceTuneParam(TuneParam &param) const {
       if (use_mma) {
-        
+
         int max_aux;
         // clang-format off
         switch (arg.M) {
@@ -152,10 +153,12 @@ namespace quda {
           return true;
         }
         return false;
-      
+
       } else {
-      if (meta.Location() == QUDA_CUDA_FIELD_LOCATION && meta.MemType() == QUDA_MEMORY_DEVICE) return Tunable::advanceTuneParam(param);
-      else return false;
+        if (meta.Location() == QUDA_CUDA_FIELD_LOCATION && meta.MemType() == QUDA_MEMORY_DEVICE)
+          return Tunable::advanceTuneParam(param);
+        else
+          return false;
       }
     }
 
@@ -169,9 +172,7 @@ namespace quda {
         strcat(Aux, ",CPU");
         strcat(Aux, getOmpThreadStr());
       }
-      if (use_mma) {
-        strcat(Aux, ",MMA");
-      }
+      if (use_mma) { strcat(Aux, ",MMA"); }
       return TuneKey(meta.VolString(), typeid(*this).name(), Aux);
     }
   };
@@ -184,7 +185,7 @@ namespace quda {
      @param Y[out] Coarse link field
      @param X[out] Coarse clover field
    */
-  template<QudaFieldLocation location, typename storeFloat, typename Float, int N, QudaGaugeFieldOrder gOrder>
+  template <QudaFieldLocation location, typename storeFloat, typename Float, int N, QudaGaugeFieldOrder gOrder>
   void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X, bool use_mma)
   {
     // invert the clover matrix field
@@ -224,7 +225,7 @@ namespace quda {
 
       // TODO: use field order as the predicate.
       if (use_mma) {
-      
+
         GaugeFieldParam param_Y(Y);
         GaugeFieldParam param_Yhat(Yhat);
         GaugeFieldParam param_Xinv(Xinv);
@@ -284,15 +285,15 @@ namespace quda {
       } else {
 
         // use spin-ignorant accessor to make multiplication simpler
-        typedef typename gauge::FieldOrder<Float,N,1,gOrder,true,storeFloat> gCoarse;
-        typedef typename gauge::FieldOrder<Float,N,1,gOrder,true,storeFloat> gPreconditionedCoarse;
-        gCoarse yAccessor(const_cast<GaugeField&>(Y));
-        gPreconditionedCoarse yHatAccessor(const_cast<GaugeField&>(Yhat));
-        gCoarse xInvAccessor(const_cast<GaugeField&>(Xinv));
+        typedef typename gauge::FieldOrder<Float, N, 1, gOrder, true, storeFloat> gCoarse;
+        typedef typename gauge::FieldOrder<Float, N, 1, gOrder, true, storeFloat> gPreconditionedCoarse;
+        gCoarse yAccessor(const_cast<GaugeField &>(Y));
+        gPreconditionedCoarse yHatAccessor(const_cast<GaugeField &>(Yhat));
+        gCoarse xInvAccessor(const_cast<GaugeField &>(Xinv));
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Xinv = %e\n", Xinv.norm2(0));
 
         int comm_dim[4];
-        for (int i=0; i<4; i++) comm_dim[i] = comm_dim_partitioned(i);
+        for (int i = 0; i < 4; i++) comm_dim[i] = comm_dim_partitioned(i);
         typedef CalculateYhatArg<Float, gPreconditionedCoarse, gCoarse, N, 4, 2> yHatArg;
         yHatArg arg(yHatAccessor, yAccessor, xInvAccessor, xc_size, comm_dim, 1);
 
@@ -312,14 +313,12 @@ namespace quda {
         }
         yHat.setComputeMaxOnly(false);
         yHat.apply(0);
-
       }
 
       if (getVerbosity() >= QUDA_VERBOSE)
         for (int d = 0; d < 8; d++)
           printfQuda("Yhat[%d] = %e (%e %e = %e x %e)\n", d, Yhat.norm2(d), Yhat.abs_max(d),
-              Y.abs_max(d) * Xinv.abs_max(0), Y.abs_max(d), Xinv.abs_max(0));
-
+                     Y.abs_max(d) * Xinv.abs_max(0), Y.abs_max(d), Xinv.abs_max(0));
     }
 
     // fill back in the bulk of Yhat so that the backward link is updated on the previous node
@@ -339,33 +338,35 @@ namespace quda {
     if (Y.Location() == QUDA_CPU_FIELD_LOCATION) {
       constexpr QudaGaugeFieldOrder gOrder = QUDA_QDP_GAUGE_ORDER;
       if (Y.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", Y.FieldOrder());
-      calculateYhat<QUDA_CPU_FIELD_LOCATION,storeFloat,Float,N,gOrder>(Yhat, Xinv, Y, X, use_mma);
+      calculateYhat<QUDA_CPU_FIELD_LOCATION, storeFloat, Float, N, gOrder>(Yhat, Xinv, Y, X, use_mma);
     } else {
       constexpr QudaGaugeFieldOrder gOrder = QUDA_FLOAT2_GAUGE_ORDER;
       if (Y.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", Y.FieldOrder());
-      calculateYhat<QUDA_CUDA_FIELD_LOCATION,storeFloat,Float,N,gOrder>(Yhat, Xinv, Y, X, use_mma);
+      calculateYhat<QUDA_CUDA_FIELD_LOCATION, storeFloat, Float, N, gOrder>(Yhat, Xinv, Y, X, use_mma);
     }
   }
 
   // template on the number of coarse degrees of freedom
   template <typename storeFloat, typename Float>
-  void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X, bool use_mma) {
+  void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X, bool use_mma)
+  {
     switch (Y.Ncolor()) {
-    case 48: calculateYhat<storeFloat,Float,48>(Yhat, Xinv, Y, X, use_mma); break;
+    case 48: calculateYhat<storeFloat, Float, 48>(Yhat, Xinv, Y, X, use_mma); break;
 #ifdef NSPIN4
     // case 12: calculateYhat<storeFloat,Float,12>(Yhat, Xinv, Y, X, use_mma); break;
-    case 64: calculateYhat<storeFloat,Float,64>(Yhat, Xinv, Y, X, use_mma); break;
+    case 64: calculateYhat<storeFloat, Float, 64>(Yhat, Xinv, Y, X, use_mma); break;
 #endif // NSPIN4
 #ifdef NSPIN1
-    case 128: calculateYhat<storeFloat,Float,128>(Yhat, Xinv, Y, X, use_mma); break;
-    case 192: calculateYhat<storeFloat,Float,192>(Yhat, Xinv, Y, X, use_mma); break;
+    case 128: calculateYhat<storeFloat, Float, 128>(Yhat, Xinv, Y, X, use_mma); break;
+    case 192: calculateYhat<storeFloat, Float, 192>(Yhat, Xinv, Y, X, use_mma); break;
 #endif // NSPIN1
     default: errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor()); break;
     }
   }
 
   //Does the heavy lifting of creating the coarse color matrices Y
-  void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X, bool use_mma) {
+  void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X, bool use_mma)
+  {
 
 #ifdef GPU_MULTIGRID
     QudaPrecision precision = checkPrecision(Xinv, Y, X);
@@ -374,7 +375,7 @@ namespace quda {
     if (precision == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
       if (Yhat.Precision() != QUDA_DOUBLE_PRECISION) errorQuda("Unsupported precision %d\n", Yhat.Precision());
-      calculateYhat<double,double>(Yhat, Xinv, Y, X, use_mma);
+      calculateYhat<double, double>(Yhat, Xinv, Y, X, use_mma);
 #else
       errorQuda("Double precision multigrid has not been enabled");
 #endif
@@ -400,5 +401,4 @@ namespace quda {
 #endif
   }
 
-} //namespace quda
-
+} // namespace quda

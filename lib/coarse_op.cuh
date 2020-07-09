@@ -150,12 +150,12 @@ namespace quda {
 #endif
       if (type == COMPUTE_UV) {
         if (use_mma) {
-          
+
           mma::launch_compute_uv_kernel<from_coarse>(tp, arg, arg.fineVolumeCB, stream);
-        
+
         } else {
 
-        if (arg.dir != QUDA_BACKWARDS && arg.dir != QUDA_FORWARDS) errorQuda("Undefined direction %d", arg.dir);
+          if (arg.dir != QUDA_BACKWARDS && arg.dir != QUDA_FORWARDS) errorQuda("Undefined direction %d", arg.dir);
 #ifdef JITIFY
         error = program->kernel("quda::ComputeUVGPU")
           .instantiate(from_coarse,Type<Float>(),arg.dim,arg.dir,fineSpin,coarseSpin,Type<Arg>())
@@ -274,40 +274,40 @@ namespace quda {
       } else if (type == COMPUTE_VUV) {
 
         if (use_mma) {
-          
+
           mma::launch_compute_vuv_kernel<from_coarse>(tp, arg, arg.fineVolumeCB, stream);
-        
+
         } else {
 
-        // need to resize the grid since we don't tune over the entire coarseColor dimension
-        // factor of two comes from parity onto different blocks (e.g. in the grid)
-        tp.grid.y = (2*arg.vuvTile.M_tiles + tp.block.y - 1) / tp.block.y;
-        tp.grid.z = (arg.vuvTile.N_tiles + tp.block.z - 1) / tp.block.z;
+          // need to resize the grid since we don't tune over the entire coarseColor dimension
+          // factor of two comes from parity onto different blocks (e.g. in the grid)
+          tp.grid.y = (2 * arg.vuvTile.M_tiles + tp.block.y - 1) / tp.block.y;
+          tp.grid.z = (arg.vuvTile.N_tiles + tp.block.z - 1) / tp.block.z;
 
-        arg.shared_atomic = tp.aux.y;
-        arg.parity_flip = tp.aux.z;
+          arg.shared_atomic = tp.aux.y;
+          arg.parity_flip = tp.aux.z;
 
-        if (arg.shared_atomic) {
-          // check we have a valid problem size for shared atomics
-          // constraint is due to how shared memory initialization and global store are done
-          int block_size = arg.fineVolumeCB/arg.coarseVolumeCB;
-          if (block_size/2 < coarseSpin*coarseSpin)
-            errorQuda("Block size %d not supported in shared-memory atomic coarsening", block_size);
+          if (arg.shared_atomic) {
+            // check we have a valid problem size for shared atomics
+            // constraint is due to how shared memory initialization and global store are done
+            int block_size = arg.fineVolumeCB / arg.coarseVolumeCB;
+            if (block_size / 2 < coarseSpin * coarseSpin)
+              errorQuda("Block size %d not supported in shared-memory atomic coarsening", block_size);
 
-          arg.aggregates_per_block = tp.aux.x;
-          tp.block.x *= tp.aux.x;
-          tp.grid.x /= tp.aux.x;
-        }
+            arg.aggregates_per_block = tp.aux.x;
+            tp.block.x *= tp.aux.x;
+            tp.grid.x /= tp.aux.x;
+          }
 
-        if (arg.coarse_color_wave) {
-          // swap x and y grids
-          std::swap(tp.grid.y,tp.grid.x);
-          // augment x grid with coarseColor row grid (z grid)
-          arg.grid_z = tp.grid.z;
-          arg.coarse_color_grid_z = arg.vuvTile.M_tiles*tp.grid.z;
-          tp.grid.x *= tp.grid.z;
-          tp.grid.z = 1;
-        }
+          if (arg.coarse_color_wave) {
+            // swap x and y grids
+            std::swap(tp.grid.y, tp.grid.x);
+            // augment x grid with coarseColor row grid (z grid)
+            arg.grid_z = tp.grid.z;
+            arg.coarse_color_grid_z = arg.vuvTile.M_tiles * tp.grid.z;
+            tp.grid.x *= tp.grid.z;
+            tp.grid.z = 1;
+          }
 
 #ifdef JITIFY
         error = program->kernel("quda::ComputeVUVGPU")
@@ -362,9 +362,9 @@ namespace quda {
           tp.block.x /= tp.aux.x;
           tp.grid.x *= tp.aux.x;
         }
-        
+
         } // if use_mma
-      
+
       } else if (type == COMPUTE_COARSE_CLOVER) {
 
 #ifdef JITIFY
@@ -581,9 +581,19 @@ namespace quda {
     }
 
   public:
-    CalculateY(Arg &arg, const ColorSpinorField &meta, GaugeField &Y, GaugeField &X, GaugeField &Y_atomic, GaugeField &X_atomic, bool use_mma)
-      : TunableVectorYZ(2,1), arg(arg), type(COMPUTE_INVALID),
-	meta(meta), Y(Y), X(X), Y_atomic(Y_atomic), X_atomic(X_atomic), dim(0), dir(QUDA_BACKWARDS), use_mma(use_mma)
+    CalculateY(Arg &arg, const ColorSpinorField &meta, GaugeField &Y, GaugeField &X, GaugeField &Y_atomic,
+               GaugeField &X_atomic, bool use_mma) :
+      TunableVectorYZ(2, 1),
+      arg(arg),
+      type(COMPUTE_INVALID),
+      meta(meta),
+      Y(Y),
+      X(X),
+      Y_atomic(Y_atomic),
+      X_atomic(X_atomic),
+      dim(0),
+      dir(QUDA_BACKWARDS),
+      use_mma(use_mma)
     {
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
 #ifdef JITIFY
@@ -604,7 +614,8 @@ namespace quda {
       if (type == COMPUTE_VUV || type == COMPUTE_CONVERT || type == COMPUTE_RESCALE) arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
 
       if (type == COMPUTE_VUV) tp.shared_bytes -= sharedBytesPerBlock(tp); // shared memory is static so don't include it in launch
-      Launch<location, from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg>(arg, jitify_error, tp, type, use_mma, stream);
+      Launch<location, from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg>(arg, jitify_error, tp,
+                                                                                              type, use_mma, stream);
       if (type == COMPUTE_VUV) tp.shared_bytes += sharedBytesPerBlock(tp); // restore shared memory
     };
 
@@ -755,22 +766,22 @@ namespace quda {
       char Aux[TuneKey::aux_n];
       strcpy(Aux,aux);
 
-      if      (type == COMPUTE_UV) {
-                                                   strcat(Aux,",computeUV");
+      if (type == COMPUTE_UV) {
+        strcat(Aux, ",computeUV");
         if (use_mma) strcat(Aux, ",MMA");
-      }
-      else if (type == COMPUTE_AV)                 strcat(Aux,",computeAV");
+      } else if (type == COMPUTE_AV)
+        strcat(Aux, ",computeAV");
       else if (type == COMPUTE_TMAV)               strcat(Aux,",computeTmAV");
       else if (type == COMPUTE_TMCAV)              strcat(Aux,",computeTmcAV");
       else if (type == COMPUTE_CLOVER_INV_MAX)
         strcat(Aux, ",computeCloverInverseMax");
       else if (type == COMPUTE_TWISTED_CLOVER_INV_MAX)
         strcat(Aux, ",computeTwistedCloverInverseMax");
-      else if (type == COMPUTE_VUV) {              
-                                                   strcat(Aux,",computeVUV");
+      else if (type == COMPUTE_VUV) {
+        strcat(Aux, ",computeVUV");
         if (use_mma) strcat(Aux, ",MMA");
-      }
-      else if (type == COMPUTE_COARSE_CLOVER)      strcat(Aux,",computeCoarseClover");
+      } else if (type == COMPUTE_COARSE_CLOVER)
+        strcat(Aux, ",computeCoarseClover");
       else if (type == COMPUTE_REVERSE_Y)          strcat(Aux,",computeYreverse");
       else if (type == COMPUTE_DIAGONAL)           strcat(Aux,",computeCoarseDiagonal");
       else if (type == COMPUTE_TMDIAGONAL)         strcat(Aux,",computeCoarseTmDiagonal");
@@ -904,16 +915,16 @@ namespace quda {
      @param need_bidirectional[in] If we need to force bi-directional build or not. Required
      if some previous level was preconditioned, even if this one isn't
    */
-  template<QudaFieldLocation location, bool from_coarse, typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename F,
-	   typename Ftmp, typename Vt, typename coarseGauge, typename coarseGaugeAtomic, typename fineGauge, typename fineClover>
-  void calculateY(coarseGauge &Y, coarseGauge &X,
-		  coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic,
-		  Ftmp &UV, F &AV, Vt &V, fineGauge &G, fineClover &C, fineClover &Cinv,
-		  GaugeField &Y_, GaugeField &X_, GaugeField &Y_atomic_, GaugeField &X_atomic_,
-                  ColorSpinorField &uv, ColorSpinorField &av, const ColorSpinorField &v,
-		  const GaugeField &G_, const CloverField &C_,
-                  double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc,
-		  bool need_bidirectional, const int *fine_to_coarse, const int *coarse_to_fine, bool use_mma = false) {
+  template <QudaFieldLocation location, bool from_coarse, typename Float, int fineSpin, int fineColor, int coarseSpin,
+            int coarseColor, typename F, typename Ftmp, typename Vt, typename coarseGauge, typename coarseGaugeAtomic,
+            typename fineGauge, typename fineClover>
+  void calculateY(coarseGauge &Y, coarseGauge &X, coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic, Ftmp &UV,
+                  F &AV, Vt &V, fineGauge &G, fineClover &C, fineClover &Cinv, GaugeField &Y_, GaugeField &X_,
+                  GaugeField &Y_atomic_, GaugeField &X_atomic_, ColorSpinorField &uv, ColorSpinorField &av,
+                  const ColorSpinorField &v, const GaugeField &G_, const CloverField &C_, double kappa, double mu,
+                  double mu_factor, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional,
+                  const int *fine_to_coarse, const int *coarse_to_fine, bool use_mma = false)
+  {
 
     // sanity checks
     if (matpc == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpc == QUDA_MATPC_ODD_ODD_ASYMMETRIC)
@@ -957,7 +968,8 @@ namespace quda {
     typedef CalculateYArg<Float,fineSpin,coarseSpin,fineColor,coarseColor,coarseGauge,coarseGaugeAtomic,fineGauge,F,Ftmp,Vt,fineClover> Arg;
     Arg arg(Y, X, Y_atomic, X_atomic, UV, AV, G, V, C, Cinv, kappa,
 	    mu, mu_factor, x_size, xc_size, geo_bs, spin_bs, fine_to_coarse, coarse_to_fine, bidirectional_links);
-    CalculateY<location, from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> y(arg, v, Y_, X_, Y_atomic_, X_atomic_, use_mma);
+    CalculateY<location, from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> y(
+      arg, v, Y_, X_, Y_atomic_, X_atomic_, use_mma);
 
     QudaFieldLocation location_ = checkLocation(Y_, X_, av, v);
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Running link coarsening on the %s\n", location_ == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");

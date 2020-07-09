@@ -233,20 +233,21 @@ namespace quda {
     */
     template <typename Float, typename storeFloat>
       struct fieldorder_wrapper {
-        using type = Float;
-        using store_type = storeFloat;
-	complex<storeFloat> *v;
-	const int idx;
-	const Float scale;
-	const Float scale_inv;
-	static constexpr bool fixed = fixed_point<Float,storeFloat>();
+      using type = Float;
+      using store_type = storeFloat;
+      complex<storeFloat> *v;
+      const int idx;
+      const Float scale;
+      const Float scale_inv;
+      static constexpr bool fixed = fixed_point<Float, storeFloat>();
 
-	/**
-	   @brief fieldorder_wrapper constructor
-	   @param idx Field index
-	*/
-        __device__ __host__ inline fieldorder_wrapper(complex<storeFloat> *v, int idx, Float scale, Float scale_inv)
-	  : v(v), idx(idx), scale(scale), scale_inv(scale_inv) {}
+      /**
+         @brief fieldorder_wrapper constructor
+         @param idx Field index
+      */
+      __device__ __host__ inline fieldorder_wrapper(complex<storeFloat> *v, int idx, Float scale, Float scale_inv) :
+        v(v), idx(idx), scale(scale), scale_inv(scale_inv)
+      {}
 
 	__device__ __host__ inline Float real() const {
           if (!fixed) {
@@ -272,11 +273,12 @@ namespace quda {
            @brief negation operator
            @return negation of this complex number
         */
-        __device__ __host__ inline complex<Float> operator-() const {
-	  return fixed ? -scale_inv*static_cast<complex<Float> >(v[idx]) : -static_cast<complex<Float> >(v[idx]);
-	}
+        __device__ __host__ inline complex<Float> operator-() const
+        {
+          return fixed ? -scale_inv*static_cast<complex<Float> >(v[idx]) : -static_cast<complex<Float> >(v[idx]);
+        }
 
-	/**
+        /**
 	   @brief Assignment operator with fieldorder_wrapper instance as input
 	   @param a fieldorder_wrapper we are copying from
 	*/
@@ -570,17 +572,16 @@ namespace quda {
       }
 
       __device__ __host__ inline const auto wrap(int d, int parity, int x, int row, int col) const
-	    {
-        return fieldorder_wrapper<Float,storeFloat>
-	        (u, (((parity * volumeCB + x) * geometry + d) * nColor + row) * nColor + col, scale, scale_inv);
+      {
+        return fieldorder_wrapper<Float, storeFloat>(
+          u, (((parity * volumeCB + x) * geometry + d) * nColor + row) * nColor + col, scale, scale_inv);
       }
 
       __device__ __host__ inline auto wrap(int d, int parity, int x, int row, int col)
-	    {
-        return fieldorder_wrapper<Float,storeFloat>
-	        (u, (((parity * volumeCB + x) * geometry + d) * nColor + row) * nColor + col, scale, scale_inv);
+      {
+        return fieldorder_wrapper<Float, storeFloat>(
+          u, (((parity * volumeCB + x) * geometry + d) * nColor + row) * nColor + col, scale, scale_inv);
       }
-
 
       __device__ __host__ inline fieldorder_wrapper<Float,storeFloat> operator()(int d, int parity, int x, int row, int col)
 	{ return fieldorder_wrapper<Float,storeFloat>
@@ -680,12 +681,14 @@ namespace quda {
 
       __device__ __host__ inline const auto wrap(int d, int parity, int x, int row, int col) const
       {
-        return fieldorder_wrapper<Float,storeFloat>(ghost[d], parity * ghostOffset[d] + (x * nColor + row) * nColor + col, scale, scale_inv);
+        return fieldorder_wrapper<Float, storeFloat>(
+          ghost[d], parity * ghostOffset[d] + (x * nColor + row) * nColor + col, scale, scale_inv);
       }
 
       __device__ __host__ inline auto wrap(int d, int parity, int x, int row, int col)
       {
-        return fieldorder_wrapper<Float,storeFloat>(ghost[d], parity * ghostOffset[d] + (x * nColor + row) * nColor + col, scale, scale_inv);
+        return fieldorder_wrapper<Float, storeFloat>(
+          ghost[d], parity * ghostOffset[d] + (x * nColor + row) * nColor + col, scale, scale_inv);
       }
 
       __device__ __host__ inline fieldorder_wrapper<Float,storeFloat> operator()(int d, int parity, int x, int row, int col)
@@ -941,10 +944,7 @@ namespace quda {
           return accessor.wrap(d, parity, x, 0, 0);
         }
 
-        __device__ __host__ auto wrap(int d, int parity, int x)
-        {
-          return accessor.wrap(d, parity, x, 0, 0);
-        }
+        __device__ __host__ auto wrap(int d, int parity, int x) { return accessor.wrap(d, parity, x, 0, 0); }
 
         /**
          * Writable complex-member accessor function
@@ -960,14 +960,14 @@ namespace quda {
         }
 
         /**
-	 * Read-only complex-member accessor function for the ghost zone
-	 * @param d dimension index
-	 * @param parity Parity index
-	 * @param x 1-d site index
-	 * @param row row index
-	 * @param c column index
-	 */
-	__device__ __host__ complex<Float> Ghost(int d, int parity, int x, int row, int col) const
+         * Read-only complex-member accessor function for the ghost zone
+         * @param d dimension index
+         * @param parity Parity index
+         * @param x 1-d site index
+         * @param row row index
+         * @param c column index
+         */
+        __device__ __host__ complex<Float> Ghost(int d, int parity, int x, int row, int col) const
         {
           return ghostAccessor(d, parity, x, row, col);
         }
@@ -992,22 +992,19 @@ namespace quda {
           return ghostAccessor.wrap(d, parity, x, 0, 0);
         }
 
-        __device__ __host__ auto wrap_ghost(int d, int parity, int x)
-        {
-          return ghostAccessor.wrap(d, parity, x, 0, 0);
-        }
+        __device__ __host__ auto wrap_ghost(int d, int parity, int x) { return ghostAccessor.wrap(d, parity, x, 0, 0); }
 
         /**
-	 * Specialized read-only complex-member accessor function (for coarse gauge field)
-	 * @param d dimension index
-	 * @param parity Parity index
-	 * @param x 1-d site index
-	 * @param s_row row spin index
-	 * @param c_row row color index
-	 * @param s_col col spin index
-	 * @param c_col col color index
-	 */
-	__device__ __host__ inline const complex<Float> operator()(int d, int parity, int x, int s_row,
+         * Specialized read-only complex-member accessor function (for coarse gauge field)
+         * @param d dimension index
+         * @param parity Parity index
+         * @param x 1-d site index
+         * @param s_row row spin index
+         * @param c_row row color index
+         * @param s_col col spin index
+         * @param c_col col color index
+         */
+        __device__ __host__ inline const complex<Float> operator()(int d, int parity, int x, int s_row,
 								   int s_col, int c_row, int c_col) const {
 	  return (*this)(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
 	}
@@ -1022,22 +1019,23 @@ namespace quda {
 	 * @param s_col col spin index
 	 * @param c_col col color index
 	 */
-	__device__ __host__ inline fieldorder_wrapper<Float,storeFloat> operator()
-    (int d, int parity, int x, int s_row, int s_col, int c_row, int c_col) {
-    return (*this)(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
-  }
+        __device__ __host__ inline fieldorder_wrapper<Float, storeFloat> operator()(int d, int parity, int x, int s_row,
+                                                                                    int s_col, int c_row, int c_col)
+        {
+          return (*this)(d, parity, x, s_row * nColorCoarse + c_row, s_col * nColorCoarse + c_col);
+        }
 
-  __device__ __host__ inline const auto wrap(int d, int parity, int x, int s_row, int s_col) const
-  {
-	  return accessor.wrap(d, parity, x, s_row * nColorCoarse, s_col * nColorCoarse);
-	}
+        __device__ __host__ inline const auto wrap(int d, int parity, int x, int s_row, int s_col) const
+        {
+          return accessor.wrap(d, parity, x, s_row * nColorCoarse, s_col * nColorCoarse);
+        }
 
-  __device__ __host__ inline auto wrap(int d, int parity, int x, int s_row, int s_col)
-  {
-	  return accessor.wrap(d, parity, x, s_row * nColorCoarse, s_col * nColorCoarse);
-	}
+        __device__ __host__ inline auto wrap(int d, int parity, int x, int s_row, int s_col)
+        {
+          return accessor.wrap(d, parity, x, s_row * nColorCoarse, s_col * nColorCoarse);
+        }
 
-    	/**
+        /**
 	 * Specialized read-only complex-member accessor function (for coarse gauge field ghost zone)
 	 * @param d dimension index
 	 * @param parity Parity index
@@ -1067,15 +1065,15 @@ namespace quda {
 	  return Ghost(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
 	}
 
-  __device__ __host__ inline const auto wrap_ghost(int d, int parity, int x, int s_row, int s_col) const
-  {
-	  return ghostAccessor.wrap(d, parity, x, s_row * nColorCoarse, s_col * nColorCoarse);
-	}
+        __device__ __host__ inline const auto wrap_ghost(int d, int parity, int x, int s_row, int s_col) const
+        {
+          return ghostAccessor.wrap(d, parity, x, s_row * nColorCoarse, s_col * nColorCoarse);
+        }
 
-  __device__ __host__ inline auto wrap_ghost(int d, int parity, int x, int s_row, int s_col)
-  {
-	  return ghostAccessor.wrap(d, parity, x, s_row * nColorCoarse, s_col * nColorCoarse);
-	}
+        __device__ __host__ inline auto wrap_ghost(int d, int parity, int x, int s_row, int s_col)
+        {
+          return ghostAccessor.wrap(d, parity, x, s_row * nColorCoarse, s_col * nColorCoarse);
+        }
 
         template <typename theirFloat>
 	__device__ __host__ inline void atomicAdd(int d, int parity, int x, int s_row, int s_col,

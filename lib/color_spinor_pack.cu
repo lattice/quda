@@ -386,9 +386,8 @@ namespace quda {
                        typename non_native_precision_mapper<ghostFloat>::type,
                        QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(ghost, a, parity, nFace, dagger, destination);
 #else // The following works
-      genericPackGhost<Float,
-                       ghostFloat,
-                       QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(ghost, a, parity, nFace, dagger, destination);
+      genericPackGhost<Float, ghostFloat, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(ghost, a, parity, nFace, dagger,
+                                                                             destination);
 #endif
     } else {
       errorQuda("Unsupported field order = %d", a.FieldOrder());

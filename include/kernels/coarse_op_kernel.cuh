@@ -15,12 +15,12 @@ namespace quda {
   // by using integers we have deterministic atomics
   typedef int storeType;
 
-  template <typename Float_, int fineSpin_, int coarseSpin_, int fineColor_, int coarseColor_,
-	    typename coarseGauge, typename coarseGaugeAtomic, typename fineGauge, typename fineSpinor,
-	    typename fineSpinorTmp, typename fineSpinorV, typename fineClover>
+  template <typename Float_, int fineSpin_, int coarseSpin_, int fineColor_, int coarseColor_, typename coarseGauge,
+            typename coarseGaugeAtomic, typename fineGauge, typename fineSpinor, typename fineSpinorTmp,
+            typename fineSpinorV, typename fineClover>
   struct CalculateYArg {
     using Float = Float_;
-      
+
     static constexpr int fineSpin = fineSpin_;
     static constexpr int coarseSpin = coarseSpin_;
 
@@ -136,7 +136,6 @@ namespace quda {
 	comm_dim[i] = comm_dim_partitioned(i);
       }
     }
-
   };
 
   /**

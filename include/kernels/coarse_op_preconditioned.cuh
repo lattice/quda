@@ -9,7 +9,7 @@ namespace quda {
   template <typename Float_, typename PreconditionedGauge, typename Gauge, int n_, int M_, int N_> struct CalculateYhatArg {
     using Float = Float_;
     TileSize<n_, n_, n_, M_, N_, 1> tile;
-  
+
     static constexpr int M = n_;
     static constexpr int N = n_;
     static constexpr int K = n_;

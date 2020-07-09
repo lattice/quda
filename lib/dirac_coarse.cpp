@@ -257,7 +257,7 @@ namespace quda {
   }
 
   void DiracCoarse::createPreconditionedCoarseOp(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X) {
-      calculateYhat(Yhat, Xinv, Y, X, use_mma);
+    calculateYhat(Yhat, Xinv, Y, X, use_mma);
   }
 
   void DiracCoarse::Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
@@ -372,7 +372,7 @@ namespace quda {
     } else {
       initializeLazy(QUDA_CUDA_FIELD_LOCATION);
       CoarseCoarseOp(Y, X, T, *(this->Y_d), *(this->X_d), *(this->Xinv_d), kappa, a, mu_factor, QUDA_COARSE_DIRAC,
-                   QUDA_MATPC_INVALID, need_bidirectional, use_mma);
+                     QUDA_MATPC_INVALID, need_bidirectional, use_mma);
     }
   }
 
