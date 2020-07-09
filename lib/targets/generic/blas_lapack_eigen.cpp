@@ -11,9 +11,10 @@ namespace quda
     // whether we are using the native blas-lapack library
     static bool native_blas_lapack = true;
     bool use_native() { return native_blas_lapack; }
-    void set_native(bool native) { native_blas_lapack = native; } 
+    void set_native(bool native) { native_blas_lapack = native; }
 
-    namespace generic {
+    namespace generic
+    {
 
       void init() {}
 
@@ -48,7 +49,8 @@ namespace quda
       long long BatchInvertMatrix(void *Ainv, void *A, const int n, const uint64_t batch, QudaPrecision prec,
                                   QudaFieldLocation location)
       {
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("BatchInvertMatrix (generic - Eigen): Nc = %d, batch = %lu\n", n, batch);
+        if (getVerbosity() >= QUDA_VERBOSE)
+          printfQuda("BatchInvertMatrix (generic - Eigen): Nc = %d, batch = %lu\n", n, batch);
 
         size_t size = 2 * n * n * batch * prec;
         void *A_h = (location == QUDA_CUDA_FIELD_LOCATION ? pool_pinned_malloc(size) : A);
@@ -105,5 +107,5 @@ namespace quda
       }
 
     } // namespace generic
-  } // namespace blas_lapack
+  }   // namespace blas_lapack
 } // namespace quda

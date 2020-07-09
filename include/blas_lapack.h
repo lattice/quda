@@ -23,7 +23,8 @@
 namespace quda
 {
 
-  namespace blas_lapack {
+  namespace blas_lapack
+  {
 
     bool use_native();
     void set_native(bool native);
@@ -93,5 +94,5 @@ namespace quda
                                   QudaFieldLocation location);
 
     } // namespace generic
-  } // namespace blas_lapack
+  }   // namespace blas_lapack
 } // namespace quda
