@@ -1,7 +1,7 @@
 #include <blas_lapack.h>
 #include <Eigen/LU>
 
-//#define LOCAL_DEBUG
+//#define _DEBUG
 
 namespace quda
 {
@@ -31,7 +31,7 @@ namespace quda
       }
 
       // Check result:
-#ifdef LOCAL_DEBUG
+#ifdef _DEBUG
       EigenMatrix unit = EigenMatrix::Identity(n, n);
       EigenMatrix prod = res * inv;
       Float L2norm = ((prod - unit).norm() / (n * n));
@@ -42,7 +42,7 @@ namespace quda
     long long BatchInvertMatrix(void *Ainv, void *A, const int n, const uint64_t batch, QudaPrecision prec,
                                 QudaFieldLocation location)
     {
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("BatchInvertMatrixGENERIC: Nc = %d, batch = %lu\n", n, batch);
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("BatchInvertMatrix (generic - Eigen): Nc = %d, batch = %lu\n", n, batch);
 
       size_t size = 2 * n * n * batch * prec;
       void *A_h = (location == QUDA_CUDA_FIELD_LOCATION ? pool_pinned_malloc(size) : A);
@@ -82,7 +82,7 @@ namespace quda
       long dush = stop.tv_usec - start.tv_usec;
       double timeh = dsh + 0.000001 * dush;
 
-      if (getVerbosity() >= QUDA_SUMMARIZE) {
+      if (getVerbosity() >= QUDA_VERBOSE) {
         int threads = 1;
 #ifdef _OPENMP
         threads = omp_get_num_threads();
