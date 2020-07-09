@@ -5,6 +5,8 @@
 #include <kernels/coarse_op_kernel.cuh>
 #include <uint_to_char.h>
 
+#include <coarse_op_mma.cuh>
+
 namespace quda {
 
   // For coarsening un-preconditioned operators we use uni-directional
@@ -34,8 +36,11 @@ namespace quda {
    */
   template <QudaFieldLocation location, bool from_coarse, typename Float, int fineSpin,
             int fineColor, int coarseSpin, int coarseColor, typename Arg> struct Launch {
-    Launch(Arg &arg, CUresult &error, TuneParam &tp, ComputeType type, const qudaStream_t &stream)
+    Launch(Arg &arg, CUresult &error, TuneParam &tp, ComputeType type, bool use_mma, const qudaStream_t &stream)
     {
+
+      if (use_mma) { errorQuda("MMA intructions are not supported on the host."); }
+
       if (type == COMPUTE_UV) {
         if (arg.dir == QUDA_BACKWARDS) {
           if      (arg.dim==0) ComputeUVCPU<from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,coarseSpin>(arg);
@@ -138,12 +143,17 @@ namespace quda {
   */
   template <bool from_coarse, typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
   struct Launch<QUDA_CUDA_FIELD_LOCATION, from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> {
-    Launch(Arg &arg, CUresult &error, TuneParam &tp, ComputeType type, const qudaStream_t &stream)
+    Launch(Arg &arg, CUresult &error, TuneParam &tp, ComputeType type, bool use_mma, const qudaStream_t &stream)
     {
 #ifdef JITIFY
       using namespace jitify::reflection;
 #endif
       if (type == COMPUTE_UV) {
+        if (use_mma) {
+          
+          mma::launch_compute_uv_kernel<from_coarse>(tp, arg, arg.fineVolumeCB, stream);
+        
+        } else {
 
         if (arg.dir != QUDA_BACKWARDS && arg.dir != QUDA_FORWARDS) errorQuda("Undefined direction %d", arg.dir);
 #ifdef JITIFY
@@ -163,7 +173,7 @@ namespace quda {
           else if (arg.dim==3) ComputeUVGPU<from_coarse,Float,3,QUDA_FORWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
         }
 #endif
-
+        }
       } else if (type == COMPUTE_AV) {
 
         if (from_coarse) errorQuda("ComputeAV should only be called from the fine grid");
@@ -263,6 +273,12 @@ namespace quda {
 
       } else if (type == COMPUTE_VUV) {
 
+        if (use_mma) {
+          
+          mma::launch_compute_vuv_kernel<from_coarse>(tp, arg, arg.fineVolumeCB, stream);
+        
+        } else {
+
         // need to resize the grid since we don't tune over the entire coarseColor dimension
         // factor of two comes from parity onto different blocks (e.g. in the grid)
         tp.grid.y = (2*arg.vuvTile.M_tiles + tp.block.y - 1) / tp.block.y;
@@ -346,7 +362,9 @@ namespace quda {
           tp.block.x /= tp.aux.x;
           tp.grid.x *= tp.aux.x;
         }
-
+        
+        } // if use_mma
+      
       } else if (type == COMPUTE_COARSE_CLOVER) {
 
 #ifdef JITIFY
@@ -426,6 +444,8 @@ namespace quda {
     int dim;
     QudaDirection dir;
     ComputeType type;
+
+    bool use_mma;
 
     long long flops() const
     {
@@ -561,9 +581,9 @@ namespace quda {
     }
 
   public:
-    CalculateY(Arg &arg, const ColorSpinorField &meta, GaugeField &Y, GaugeField &X, GaugeField &Y_atomic, GaugeField &X_atomic)
+    CalculateY(Arg &arg, const ColorSpinorField &meta, GaugeField &Y, GaugeField &X, GaugeField &Y_atomic, GaugeField &X_atomic, bool use_mma)
       : TunableVectorYZ(2,1), arg(arg), type(COMPUTE_INVALID),
-	meta(meta), Y(Y), X(X), Y_atomic(Y_atomic), X_atomic(X_atomic), dim(0), dir(QUDA_BACKWARDS)
+	meta(meta), Y(Y), X(X), Y_atomic(Y_atomic), X_atomic(X_atomic), dim(0), dir(QUDA_BACKWARDS), use_mma(use_mma)
     {
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
 #ifdef JITIFY
@@ -584,7 +604,7 @@ namespace quda {
       if (type == COMPUTE_VUV || type == COMPUTE_CONVERT || type == COMPUTE_RESCALE) arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
 
       if (type == COMPUTE_VUV) tp.shared_bytes -= sharedBytesPerBlock(tp); // shared memory is static so don't include it in launch
-      Launch<location, from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg>(arg, jitify_error, tp, type, stream);
+      Launch<location, from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg>(arg, jitify_error, tp, type, use_mma, stream);
       if (type == COMPUTE_VUV) tp.shared_bytes += sharedBytesPerBlock(tp); // restore shared memory
     };
 
@@ -687,6 +707,16 @@ namespace quda {
     }
 
     bool advanceTuneParam(TuneParam &param) const {
+
+      if (use_mma && (type == COMPUTE_UV || type == COMPUTE_VUV)) {
+        if (param.aux.x < 7) {
+          param.aux.x++;
+          return true;
+        } else {
+          return false;
+        }
+      }
+
       // only do autotuning if we have device fields
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION && Y.MemType() == QUDA_MEMORY_DEVICE) return Tunable::advanceTuneParam(param);
       else return false;
@@ -725,7 +755,10 @@ namespace quda {
       char Aux[TuneKey::aux_n];
       strcpy(Aux,aux);
 
-      if      (type == COMPUTE_UV)                 strcat(Aux,",computeUV");
+      if      (type == COMPUTE_UV) {
+                                                   strcat(Aux,",computeUV");
+        if (use_mma) strcat(Aux, ",MMA");
+      }
       else if (type == COMPUTE_AV)                 strcat(Aux,",computeAV");
       else if (type == COMPUTE_TMAV)               strcat(Aux,",computeTmAV");
       else if (type == COMPUTE_TMCAV)              strcat(Aux,",computeTmcAV");
@@ -733,7 +766,10 @@ namespace quda {
         strcat(Aux, ",computeCloverInverseMax");
       else if (type == COMPUTE_TWISTED_CLOVER_INV_MAX)
         strcat(Aux, ",computeTwistedCloverInverseMax");
-      else if (type == COMPUTE_VUV)                strcat(Aux,",computeVUV");
+      else if (type == COMPUTE_VUV) {              
+                                                   strcat(Aux,",computeVUV");
+        if (use_mma) strcat(Aux, ",MMA");
+      }
       else if (type == COMPUTE_COARSE_CLOVER)      strcat(Aux,",computeCoarseClover");
       else if (type == COMPUTE_REVERSE_Y)          strcat(Aux,",computeYreverse");
       else if (type == COMPUTE_DIAGONAL)           strcat(Aux,",computeCoarseDiagonal");
@@ -877,7 +913,7 @@ namespace quda {
                   ColorSpinorField &uv, ColorSpinorField &av, const ColorSpinorField &v,
 		  const GaugeField &G_, const CloverField &C_,
                   double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc,
-		  bool need_bidirectional, const int *fine_to_coarse, const int *coarse_to_fine) {
+		  bool need_bidirectional, const int *fine_to_coarse, const int *coarse_to_fine, bool use_mma = false) {
 
     // sanity checks
     if (matpc == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpc == QUDA_MATPC_ODD_ODD_ASYMMETRIC)
@@ -921,7 +957,7 @@ namespace quda {
     typedef CalculateYArg<Float,fineSpin,coarseSpin,fineColor,coarseColor,coarseGauge,coarseGaugeAtomic,fineGauge,F,Ftmp,Vt,fineClover> Arg;
     Arg arg(Y, X, Y_atomic, X_atomic, UV, AV, G, V, C, Cinv, kappa,
 	    mu, mu_factor, x_size, xc_size, geo_bs, spin_bs, fine_to_coarse, coarse_to_fine, bidirectional_links);
-    CalculateY<location, from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> y(arg, v, Y_, X_, Y_atomic_, X_atomic_);
+    CalculateY<location, from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> y(arg, v, Y_, X_, Y_atomic_, X_atomic_, use_mma);
 
     QudaFieldLocation location_ = checkLocation(Y_, X_, av, v);
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Running link coarsening on the %s\n", location_ == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");

@@ -347,6 +347,7 @@ namespace quda {
 
     template<typename Float, int nColor, QudaGaugeFieldOrder order, typename storeFloat, bool use_tex>
     struct Accessor {
+      static constexpr bool is_aos = false;
       mutable complex<Float> dummy;
       Accessor(const GaugeField &, void *gauge_=0, void **ghost_=0) {
 	errorQuda("Not implemented for order=%d", order);
@@ -375,6 +376,7 @@ namespace quda {
 
     template<typename Float, int nColor, typename storeFloat, bool use_tex>
       struct Accessor<Float,nColor,QUDA_QDP_GAUGE_ORDER,storeFloat,use_tex> {
+      static constexpr bool is_aos = false;
       complex <storeFloat> *u[QUDA_MAX_GEOMETRY];
       const int volumeCB;
       const int geometry;
@@ -521,6 +523,7 @@ namespace quda {
 
     template<typename Float, int nColor, typename storeFloat, bool use_tex>
       struct Accessor<Float,nColor,QUDA_MILC_GAUGE_ORDER,storeFloat,use_tex> {
+      static constexpr bool is_aos = true;
       complex<storeFloat> *u;
       const int volumeCB;
       const int geometry;
@@ -691,6 +694,7 @@ namespace quda {
 
     template<typename Float, int nColor, typename storeFloat, bool use_tex>
       struct Accessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER, storeFloat, use_tex> {
+      static constexpr bool is_aos = false;
       complex<storeFloat> *u;
       const int offset_cb;
 #ifdef USE_TEXTURE_OBJECTS
@@ -897,7 +901,9 @@ namespace quda {
 	const QudaFieldLocation location;
 	static constexpr int nColorCoarse = nColor / nSpinCoarse;
 
-	Accessor<Float,nColor,order,storeFloat,use_tex> accessor;
+  using accessor_type = Accessor<Float,nColor,order,storeFloat,use_tex>;
+  static constexpr bool is_aos = accessor_type::is_aos;
+	accessor_type accessor;
 	GhostAccessor<Float,nColor,order,native_ghost,storeFloat,use_tex> ghostAccessor;
 
 	/**
