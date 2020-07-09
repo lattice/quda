@@ -383,6 +383,8 @@ namespace quda
 
       constexpr bool check_bounds = !((M % MMA_M == 0) && (N % MMA_N == 0));
 
+      static_assert(std::is_same<vector_type, int2>::value);
+
 #pragma unroll
       for (int i = 0; i < 4; i++) {
         int m_index = row + (i % 2) * 2;
@@ -393,22 +395,23 @@ namespace quda
         auto scale = fixed ? cc.scale : 1.0f;
         if (dagger) {
           if (!check_bounds || (n_index < M && m_index < N)) {
-            value.x = +static_cast<store_type>(op_c_real.reg[i * 2 + 0] * scale);
-            value.y = -static_cast<store_type>(op_c_imag.reg[i * 2 + 0] * scale);
+            value.x = +static_cast<store_type>(round(op_c_real.reg[i * 2 + 0] * scale));
+            value.y = -static_cast<store_type>(round(op_c_imag.reg[i * 2 + 0] * scale));
+            // if (threadIdx.y == 7 && threadIdx.z == 7 && blockIdx.x == 0 && i == 0) printf("value.x = %10d\n", value.x);
             atomicAdd(&ptr[(n_index + 0) * ldc + m_index], value);
 
-            value.x = +static_cast<store_type>(op_c_real.reg[i * 2 + 1] * scale);
-            value.y = -static_cast<store_type>(op_c_imag.reg[i * 2 + 1] * scale);
+            value.x = +static_cast<store_type>(round(op_c_real.reg[i * 2 + 1] * scale));
+            value.y = -static_cast<store_type>(round(op_c_imag.reg[i * 2 + 1] * scale));
             atomicAdd(&ptr[(n_index + 1) * ldc + m_index], value);
           }
         } else {
           if (!check_bounds || (m_index < M && n_index < N)) {
-            value.x = +static_cast<store_type>(op_c_real.reg[i * 2 + 0] * scale);
-            value.y = +static_cast<store_type>(op_c_imag.reg[i * 2 + 0] * scale);
+            value.x = +static_cast<store_type>(round(op_c_real.reg[i * 2 + 0] * scale));
+            value.y = +static_cast<store_type>(round(op_c_imag.reg[i * 2 + 0] * scale));
             atomicAdd(&ptr[m_index * ldc + (n_index + 0)], value);
 
-            value.x = +static_cast<store_type>(op_c_real.reg[i * 2 + 1] * scale);
-            value.y = +static_cast<store_type>(op_c_imag.reg[i * 2 + 1] * scale);
+            value.x = +static_cast<store_type>(round(op_c_real.reg[i * 2 + 1] * scale));
+            value.y = +static_cast<store_type>(round(op_c_imag.reg[i * 2 + 1] * scale));
             atomicAdd(&ptr[m_index * ldc + (n_index + 1)], value);
           }
         }

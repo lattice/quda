@@ -24,14 +24,12 @@ namespace quda
 
     template <typename F> inline void setMaxDynamicSharedBytesPerBlock(F *func)
     {
-#if CUDA_VERSION >= 9000
       qudaFuncSetAttribute((const void *)func, cudaFuncAttributePreferredSharedMemoryCarveout,
                            (int)cudaSharedmemCarveoutMaxShared);
       cudaFuncAttributes attr;
       cudaFuncGetAttributes(&attr, (const void *)func);
       qudaFuncSetAttribute((const void *)func, cudaFuncAttributeMaxDynamicSharedMemorySize,
                            deviceProp.sharedMemPerBlockOptin - attr.sharedSizeBytes);
-#endif
     }
 
     template <bool compute_max_only, int bM, int bN, int bK, int block_y, int block_z, int min_block_cta = 1, class Arg>
@@ -145,7 +143,7 @@ namespace quda
         return 2l * arg.Y.VolumeCB() * 8 * n * n * (8 * n - 2);
       } // 8 from dir, 8 from complexity
 
-      long long bytes() const { return arg.Y.VolumeCB() * 2l * n * n * 2l * (compute_max_only ? 2 : 3); }
+      long long bytes() const { return arg.Y.VolumeCB() * 2l * n * n * 2l * (compute_max_only ? 2l : 3l); }
 
       unsigned int minThreads() const { return arg.Y.VolumeCB(); }
       bool tuneGridDim() const { return false; } // don't tune the grid dimension
@@ -161,7 +159,7 @@ namespace quda
       {
         if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
 #ifdef JITIFY
-          create_jitify_program("kernels/coarse_op_preconditioned.cuh");
+          errorQuda("MMA kernels haven't been jitify'ed.");
 #endif
           arg.max_d = static_cast<Float *>(pool_device_malloc(sizeof(Float)));
         }
@@ -186,11 +184,7 @@ namespace quda
         }
 
 #ifdef JITIFY
-        using namespace jitify::reflection;
-        jitify_error = program->kernel("quda::CalculateYhatGPU")
-                         .instantiate(compute_max_only, Type<Arg>())
-                         .configure(tp.grid, tp.block, tp.shared_bytes, stream)
-                         .launch(arg);
+        errorQuda("MMA kernels haven't been jitify'ed.");
 #else
         if (compute_max_only) {
           launch_yhat_kernel<true>(arg, minThreads(), tp, stream);
@@ -248,10 +242,8 @@ namespace quda
 
       void initTuneParam(TuneParam &param) const
       {
-        // Tunable::initTuneParam(param);
-        param.block = dim3(1, 1, 1); // Ls must be contained in the block
+        param.block = dim3(1, 1, 1);
         param.grid = dim3(minThreads(), 2, 4);
-        // param.shared_bytes = sharedBytesPerBlock(param);
         param.aux.x = 0;
       }
 
@@ -445,13 +437,11 @@ namespace quda
         errorQuda("Double precision multigrid has not been enabled");
 #endif
       } else if (precision == QUDA_SINGLE_PRECISION) {
-#if 0
         if (Yhat.Precision() == QUDA_SINGLE_PRECISION) {
           calculateYhat<float, float>(Yhat, Xinv, Y, X);
         } else {
           errorQuda("Unsupported precision %d\n", precision);
         }
-#endif
       } else if (precision == QUDA_HALF_PRECISION) {
         if (Yhat.Precision() == QUDA_HALF_PRECISION) {
           calculateYhat<short, float>(Yhat, Xinv, Y, X);

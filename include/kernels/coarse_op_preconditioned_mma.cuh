@@ -7,8 +7,7 @@
 
 #include <type_traits>
 
-#define THRUST_IGNORE_CUB_VERSION_CHECK
-#include <cub/cub.cuh>
+#include <cub_helper.cuh>
 
 namespace quda
 {
@@ -85,10 +84,6 @@ namespace quda
       }
 
       { // now do the forwards links X^{-1} * Y^{-\mu}
-
-        // using Config = MmaConfig<Arg::M, Arg::N, Arg::K, Arg::M, Arg::N, Arg::K, bM, bN, bK, block_y, block_z>;
-        // Config config(smem_ptr);
-
         auto a = arg.Xinv.wrap(0, parity, x_cb);
         auto b = arg.Y.wrap(d + 4, parity, x_cb);
         auto c = arg.Yhat.wrap(d + 4, parity, x_cb);
@@ -123,7 +118,8 @@ namespace quda
       int parity = blockIdx.y;
       int d = blockIdx.z;
 
-      typename Arg::Float max = 0.0;
+      using real = typename Arg::Float;
+      real max = 0.0;
       switch (d) {
       case 0: max = computeYhat<compute_max_only, Arg, bM, bN, bK, block_y, block_z>(arg, 0, x_cb, parity, m, n); break;
       case 1: max = computeYhat<compute_max_only, Arg, bM, bN, bK, block_y, block_z>(arg, 1, x_cb, parity, m, n); break;
@@ -131,7 +127,7 @@ namespace quda
       case 3: max = computeYhat<compute_max_only, Arg, bM, bN, bK, block_y, block_z>(arg, 3, x_cb, parity, m, n); break;
       }
       if (compute_max_only) {
-        typedef cub::BlockReduce<unsigned, 1, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_y, block_z> BlockReduce;
+        using BlockReduce = cub::BlockReduce<unsigned, 1, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_y, block_z>;
         __shared__ typename BlockReduce::TempStorage temp_storage;
         unsigned aggregate = BlockReduce(temp_storage).Reduce(__float_as_uint(max), cub::Max());
         if (threadIdx.y == 0 && threadIdx.z == 0) atomicAbsMax(arg.max_d, __uint_as_float(aggregate));

@@ -105,8 +105,21 @@ namespace quda
 
         cudaGaugeField X_(param_X);
         cudaGaugeField Y_(param_Y);
-        cudaGaugeField Xatomic_(param_Xatomic);
-        cudaGaugeField Yatomic_(param_Yatomic);
+        // cudaGaugeField Xatomic_(param_Xatomic);
+        // cudaGaugeField Yatomic_(param_Yatomic);
+
+        GaugeField *Yatomic_; // = &Y_;
+        GaugeField *Xatomic_; // = &X_;
+
+        if (Y.Precision() < QUDA_SINGLE_PRECISION) {
+          // we need to coarsen into single precision fields (float or int), so we allocate temporaries for this purpose
+          // else we can just coarsen directly into the original fields
+          Yatomic_ = GaugeField::Create(param_Yatomic);
+          Xatomic_ = GaugeField::Create(param_Xatomic);
+        } else {
+          Yatomic_ = &Y_;
+          Xatomic_ = &X_;
+        }
 
         cudaColorSpinorField uv_(param_uv);
 
@@ -143,20 +156,24 @@ namespace quda
         cFine cInvAccessor(const_cast<cudaGaugeField &>(cloverInv_));
         gCoarse yAccessor(const_cast<cudaGaugeField &>(Y_));
         gCoarse xAccessor(const_cast<cudaGaugeField &>(X_));
-        gCoarseAtomic yAccessorAtomic(const_cast<cudaGaugeField &>(Yatomic_));
-        gCoarseAtomic xAccessorAtomic(const_cast<cudaGaugeField &>(Xatomic_));
+        gCoarseAtomic yAccessorAtomic(reinterpret_cast<cudaGaugeField &>(*Yatomic_));
+        gCoarseAtomic xAccessorAtomic(reinterpret_cast<cudaGaugeField &>(*Xatomic_));
 
         // create a dummy clover field to allow us to call the external clover reduction routines elsewhere
         mma::calculateY<QUDA_CUDA_FIELD_LOCATION, true, Float, fineSpin, fineColor, coarseSpin, coarseColor>(
           yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, vAccessor, vAccessor, gAccessor,
-          cAccessor, cInvAccessor, Y_, X_, Yatomic_, Xatomic_, uv_, const_cast<cudaColorSpinorField &>(v_), v_, g_,
+          cAccessor, cInvAccessor, Y_, X_, *Yatomic_, *Xatomic_, uv_, const_cast<cudaColorSpinorField &>(v_), v_, g_,
           *dummyClover(), kappa, mu, mu_factor, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()),
           T.coarseToFine(Y.Location()));
 
         X.copy(X_);
         Y.copy(Y_);
-        Xatomic.copy(Xatomic_);
-        Yatomic.copy(Yatomic_);
+        if (Y.Precision() < QUDA_SINGLE_PRECISION) {
+          Xatomic.copy(*Xatomic_);
+          Yatomic.copy(*Yatomic_);
+          delete Xatomic_;
+          delete Yatomic_;
+        }
 
         reinterpret_cast<cudaColorSpinorField &>(uv).copy(uv_);
       }

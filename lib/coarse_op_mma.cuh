@@ -1289,6 +1289,7 @@ namespace quda
       X_atomic_.zero();
 
       bool set_scale = false; // records where the scale has been set already or not
+      printfQuda("fixed = %s\n", coarseGaugeAtomic::fixedPoint() ? "true" : "false");
 
       // First compute the coarse forward links if needed
       if (bidirectional_links) {
