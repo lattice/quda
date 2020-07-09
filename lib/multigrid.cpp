@@ -378,7 +378,6 @@ namespace quda
     diracParam.tmp1 = tmp_coarse;
     diracParam.tmp2 = tmp2_coarse;
     diracParam.halo_precision = param.mg_global.precision_null[param.level];
-    diracParam.native_blas_lapack = param.mg_global.invert_param->native_blas_lapack;
 
     // use even-odd preconditioning for the coarse grid solver
     if (diracCoarseResidual) delete diracCoarseResidual;

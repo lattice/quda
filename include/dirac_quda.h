@@ -60,7 +60,6 @@ namespace quda {
     Transfer *transfer; 
     Dirac *dirac;
     bool need_bidirectional; // whether or not we need to force a bi-directional build
-    bool native_blas_lapack;
 
     // Default constructor
     DiracParam() :
@@ -96,7 +95,6 @@ namespace quda {
       printfQuda("mu = %g\n", mu);
       printfQuda("epsilon = %g\n", epsilon);
       printfQuda("halo_precision = %d\n", halo_precision);
-      printfQuda("native_blas_lapack = %s\n", native_blas_lapack ? "true" : "false");
       for (int i=0; i<QUDA_MAX_DIM; i++) printfQuda("commDim[%d] = %d\n", i, commDim[i]);
       for (int i = 0; i < Ls; i++)
         printfQuda(
@@ -1234,7 +1232,6 @@ public:
     mutable bool init_gpu; /** Whether this instance did the GPU allocation or not */
     mutable bool init_cpu; /** Whether this instance did the CPU allocation or not */
     const bool mapped; /** Whether we allocate Y and X GPU fields in mapped memory or not */
-    mutable bool native_blas_lapack; /** Whether we use native or generic BLAS */
 
     /**
        @brief Allocate the Y and X fields

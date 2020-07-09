@@ -22,59 +22,76 @@
 
 namespace quda
 {
-  namespace native_blas_lapack
-  {
+
+  namespace blas_lapack {
+
+    bool use_native();
+    void set_native(bool native);
 
     /**
-       @brief Create the (cu)BLAS context
-    */
-    void init();
+       The native namespace is where we can deploy target specific
+       blas/lapack operations, using vendor-specific libraries.  In
+       the case of CUDA, this corresponds to the use of cuBLAS.
+     */
+    namespace native
+    {
+
+      /**
+         @brief Create the BLAS context
+      */
+      void init();
+
+      /**
+         @brief Destroy the BLAS context
+      */
+      void destroy();
+
+      /**
+         Batch inversion the matrix field using an LU decomposition method.
+         @param[out] Ainv Matrix field containing the inverse matrices
+         @param[in] A Matrix field containing the input matrices
+         @param[in] n Dimension each matrix
+         @param[in] batch Problem batch size
+         @param[in] precision Precision of the input/output data
+         @param[in] Location of the input/output data
+         @return Number of flops done in this computation
+      */
+      long long BatchInvertMatrix(void *Ainv, void *A, const int n, const uint64_t batch, QudaPrecision precision,
+                                  QudaFieldLocation location);
+
+    } // namespace native
 
     /**
-       @brief Destroy the (cu)BLAS context
-    */
-    void destroy();
+       The generic namespace is where we can deploy any
+       target-independent blas/lapack operations that are not supported
+       on the native target.  To this end, we use Eigen on the host.
+     */
+    namespace generic
+    {
 
-    /**
-       Batch inversion the matrix field using an LU decomposition method.
-       @param[out] Ainv Matrix field containing the inverse matrices
-       @param[in] A Matrix field containing the input matrices
-       @param[in] n Dimension each matrix
-       @param[in] batch Problem batch size
-       @param[in] precision Precision of the input/output data
-       @param[in] Location of the input/output data
-       @return Number of flops done in this computation
-    */
-    long long BatchInvertMatrix(void *Ainv, void *A, const int n, const uint64_t batch, QudaPrecision precision,
-                                QudaFieldLocation location);
+      /**
+         @brief Create the BLAS context
+      */
+      void init();
 
-  } // namespace native_blas_lapack
+      /**
+         @brief Destroy the BLAS context
+      */
+      void destroy();
 
-  namespace generic_lapack
-  {
+      /**
+         Batch inversion the matrix field using an LU decomposition method.
+         @param[out] Ainv Matrix field containing the inverse matrices
+         @param[in] A Matrix field containing the input matrices
+         @param[in] n Dimension each matrix
+         @param[in] batch Problem batch size
+         @param[in] precision Precision of the input/output data
+         @param[in] Location of the input/output data
+         @return Number of flops done in this computation
+      */
+      long long BatchInvertMatrix(void *Ainv, void *A, const int n, const uint64_t batch, QudaPrecision precision,
+                                  QudaFieldLocation location);
 
-    /**
-       @brief Create the (cu)BLAS context
-    */
-    void init();
-
-    /**
-       @brief Destroy the (cu)BLAS context
-    */
-    void destroy();
-
-    /**
-       Batch inversion the matrix field using an LU decomposition method.
-       @param[out] Ainv Matrix field containing the inverse matrices
-       @param[in] A Matrix field containing the input matrices
-       @param[in] n Dimension each matrix
-       @param[in] batch Problem batch size
-       @param[in] precision Precision of the input/output data
-       @param[in] Location of the input/output data
-       @return Number of flops done in this computation
-    */
-    long long BatchInvertMatrix(void *Ainv, void *A, const int n, const uint64_t batch, QudaPrecision precision,
-                                QudaFieldLocation location);
-
-  } // namespace generic_lapack
+    } // namespace generic
+  } // namespace blas_lapack
 } // namespace quda

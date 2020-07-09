@@ -145,8 +145,11 @@ namespace quda {
      @param X[out] Coarse clover field
    */
   template<QudaFieldLocation location, typename storeFloat, typename Float, int N, QudaGaugeFieldOrder gOrder>
-  void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X, const bool native_blas_lapack)
+  void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X)
   {
+    using namespace blas_lapack;
+    auto invert = use_native() ? native::BatchInvertMatrix : generic::BatchInvertMatrix;
+
     // invert the clover matrix field
     const int n = X.Ncolor();
     if (X.Location() == QUDA_CUDA_FIELD_LOCATION && X.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
@@ -158,9 +161,7 @@ namespace quda {
       cudaGaugeField Xinv_(param);
       X_.copy(X);
 
-      blas::flops += (native_blas_lapack ?
-		      native_blas_lapack::BatchInvertMatrix((void*)Xinv_.Gauge_p(), (void*)X_.Gauge_p(), n, X_.Volume(), X_.Precision(), X.Location()) :
-		      generic_lapack::BatchInvertMatrix((void*)Xinv_.Gauge_p(), (void*)X_.Gauge_p(), n, X_.Volume(), X_.Precision(), X.Location()));
+      blas::flops += invert((void*)Xinv_.Gauge_p(), (void*)X_.Gauge_p(), n, X_.Volume(), X_.Precision(), X.Location());
       
       if (Xinv.Precision() < QUDA_SINGLE_PRECISION) Xinv.Scale( Xinv_.abs_max() );
       
@@ -169,9 +170,7 @@ namespace quda {
     } else if (X.Location() == QUDA_CPU_FIELD_LOCATION && X.Order() == QUDA_QDP_GAUGE_ORDER) {
       const cpuGaugeField *X_h = static_cast<const cpuGaugeField*>(&X);
       cpuGaugeField *Xinv_h = static_cast<cpuGaugeField*>(&Xinv);
-      blas::flops += (native_blas_lapack ?
-		      native_blas_lapack::BatchInvertMatrix((void*)Xinv_h->Gauge_p(), (void*)X_h->Gauge_p(), n, X_h->Volume(), X.Precision(), QUDA_CPU_FIELD_LOCATION) :
-		      generic_lapack::BatchInvertMatrix((void*)Xinv_h->Gauge_p(), (void*)X_h->Gauge_p(), n, X_h->Volume(), X.Precision(), QUDA_CPU_FIELD_LOCATION));
+      blas::flops += invert((void*)Xinv_h->Gauge_p(), (void*)X_h->Gauge_p(), n, X_h->Volume(), X.Precision(), X.Location());
     } else {
       errorQuda("Unsupported location=%d and order=%d", X.Location(), X.Order());
     }
@@ -235,31 +234,32 @@ namespace quda {
   }
 
   template <typename storeFloat, typename Float, int N>
-  void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X, const bool native_blas_lapack)
+  void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X)
   {
     if (Y.Location() == QUDA_CPU_FIELD_LOCATION) {
       constexpr QudaGaugeFieldOrder gOrder = QUDA_QDP_GAUGE_ORDER;
       if (Y.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", Y.FieldOrder());
-      calculateYhat<QUDA_CPU_FIELD_LOCATION,storeFloat,Float,N,gOrder>(Yhat, Xinv, Y, X, native_blas_lapack);
+      calculateYhat<QUDA_CPU_FIELD_LOCATION,storeFloat,Float,N,gOrder>(Yhat, Xinv, Y, X);
     } else {
       constexpr QudaGaugeFieldOrder gOrder = QUDA_FLOAT2_GAUGE_ORDER;
       if (Y.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", Y.FieldOrder());
-      calculateYhat<QUDA_CUDA_FIELD_LOCATION,storeFloat,Float,N,gOrder>(Yhat, Xinv, Y, X, native_blas_lapack);
+      calculateYhat<QUDA_CUDA_FIELD_LOCATION,storeFloat,Float,N,gOrder>(Yhat, Xinv, Y, X);
     }
   }
 
   // template on the number of coarse degrees of freedom
   template <typename storeFloat, typename Float>
-  void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X, const bool native_blas_lapack) {
+  void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X)
+  {
     switch (Y.Ncolor()) {
-    case 48: calculateYhat<storeFloat,Float,48>(Yhat, Xinv, Y, X, native_blas_lapack); break;
+    case 48: calculateYhat<storeFloat,Float,48>(Yhat, Xinv, Y, X); break;
 #ifdef NSPIN4
-    case 12: calculateYhat<storeFloat,Float,12>(Yhat, Xinv, Y, X, native_blas_lapack); break;
-    case 64: calculateYhat<storeFloat,Float,64>(Yhat, Xinv, Y, X, native_blas_lapack); break;
+    case 12: calculateYhat<storeFloat,Float,12>(Yhat, Xinv, Y, X); break;
+    case 64: calculateYhat<storeFloat,Float,64>(Yhat, Xinv, Y, X); break;
 #endif // NSPIN4
 #ifdef NSPIN1
-    case 128: calculateYhat<storeFloat,Float,128>(Yhat, Xinv, Y, X, native_blas_lapack); break;
-    case 192: calculateYhat<storeFloat,Float,192>(Yhat, Xinv, Y, X, native_blas_lapack); break;
+    case 128: calculateYhat<storeFloat,Float,128>(Yhat, Xinv, Y, X); break;
+    case 192: calculateYhat<storeFloat,Float,192>(Yhat, Xinv, Y, X); break;
 #endif // NSPIN1
     default: errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor()); break;
     }
@@ -268,8 +268,8 @@ namespace quda {
 #endif
 
   //Does the heavy lifting of creating the coarse color matrices Y
-  void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X, const bool native_blas_lapack) {
-
+  void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X)
+  {
 #ifdef GPU_MULTIGRID
     QudaPrecision precision = checkPrecision(Xinv, Y, X);
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing Yhat field......\n");
@@ -277,19 +277,19 @@ namespace quda {
     if (precision == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
       if (Yhat.Precision() != QUDA_DOUBLE_PRECISION) errorQuda("Unsupported precision %d\n", Yhat.Precision());
-      calculateYhat<double,double>(Yhat, Xinv, Y, X, native_blas_lapack);
+      calculateYhat<double,double>(Yhat, Xinv, Y, X);
 #else
       errorQuda("Double precision multigrid has not been enabled");
 #endif
     } else if (precision == QUDA_SINGLE_PRECISION) {
       if (Yhat.Precision() == QUDA_SINGLE_PRECISION) {
-        calculateYhat<float, float>(Yhat, Xinv, Y, X, native_blas_lapack);
+        calculateYhat<float, float>(Yhat, Xinv, Y, X);
       } else {
         errorQuda("Unsupported precision %d\n", precision);
       }
     } else if (precision == QUDA_HALF_PRECISION) {
       if (Yhat.Precision() == QUDA_HALF_PRECISION) {
-        calculateYhat<short, float>(Yhat, Xinv, Y, X, native_blas_lapack);
+        calculateYhat<short, float>(Yhat, Xinv, Y, X);
       } else {
         errorQuda("Unsupported precision %d\n", precision);
       }
