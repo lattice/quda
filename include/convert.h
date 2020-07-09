@@ -35,12 +35,15 @@ namespace quda
   {
 #ifdef __CUDA_ARCH__
     f += 12582912.0f;
-    return reinterpret_cast<int &>(f);
+    int i;
+    memcpy(&i, &f, sizeof(float));
+    return i;
 #else
     return static_cast<int>(f);
 #endif
   }
 
+#if 0 // this code is UB
   // Fast double to integer round
   __device__ __host__ inline int d2i(double d)
   {
@@ -51,6 +54,7 @@ namespace quda
     return static_cast<int>(d);
 #endif
   }
+#endif
 
   /**
      @brief Copy function which is trival between floating point
