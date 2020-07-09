@@ -139,7 +139,7 @@ if(QUDA_DIRAC_WILSON
    OR QUDA_DIRAC_NDEG_TWISTED_MASS
    OR QUDA_DIRAC_DOMAIN_WALL
    OR QUDA_DIRAC_STAGGERED)
-  add_executable(blas_test blas_test.cu)
+  add_executable(blas_test blas_test.cpp)
   target_link_libraries(blas_test ${TEST_LIBS})
   quda_checkbuildtest(blas_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS blas_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
@@ -581,6 +581,13 @@ foreach(pol IN LISTS DSLASH_POLICIES)
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:covdev_test> ${MPIEXEEC_POSTFLAGS}
                      --dim 6 8 10 12
                      --gtest_output=xml:covdev_test_pol${pol2}.xml)
-   endif()
+  endif()
 
 endforeach(pol)
+
+if(QUDA_FORCE_GAUGE)
+  add_test(NAME gauge_force
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_force_test> ${MPIEXEEC_POSTFLAGS}
+                   --dim 2 4 6 8
+                   --gtest_output=xml:gauge_force_test.xml)
+endif()

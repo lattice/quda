@@ -3,7 +3,7 @@
 #ifndef __CUDACC_RTC__
 #include <cuda.h>
 #include <cuda_runtime.h>
-#include <quda_cuda_api.h>
+#endif
 
 using qudaStream_t = cudaStream_t;
 
@@ -159,6 +159,13 @@ namespace quda {
      @param[in] value Value to set
   */
   cudaError_t qudaFuncSetAttribute(const void* func, cudaFuncAttribute attr, int value);
+
+  /**
+     @brief Wrapper around cudaFuncGetAttributes
+     @param[in] attr the cudaFuncGetAttributes object to store the output
+     @param[in] func Function for which we are setting the attribute
+  */
+  cudaError_t qudaFuncGetAttributes(cudaFuncAttributes &attr, const void* func);
 #endif
 
   /**
@@ -170,5 +177,3 @@ namespace quda {
 
 #define qudaDeviceSynchronize() \
   ::quda::qudaDeviceSynchronize_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#endif

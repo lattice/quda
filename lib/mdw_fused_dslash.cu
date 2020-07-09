@@ -3,26 +3,25 @@
 #include <dslash.h>
 #include <mdw_dslash5_tensor_core.cuh>
 
+#include <unordered_set>
+
 namespace quda
 {
   namespace mobius_tensor_core
   {
-    constexpr int sm_m_pad_size(const int Ls)
+    constexpr int sm_m_pad_size(int m)
     {
-      switch (Ls) {
 #ifdef USE_MMA_SYNC
-      case 16: return 8; break;
+      return quda::mma::pad_size(m);
 #else
-      case 16: return 16; break;
+      return m == 64 ? 16 : 0;
 #endif
-      default: return 0;
-      }
-    };
+    }
 
-    constexpr int sm_n_pad_size()
+    constexpr int sm_n_pad_size(int n)
     {
 #ifdef USE_MMA_SYNC
-      return 8;
+      return quda::mma::pad_size(n);
 #else
       return 16;
 #endif
@@ -96,6 +95,8 @@ namespace quda
 
       bool small_kappa = false;
 
+      const bool comm[4];
+
       MdwfFusedDslashType type;
       FusedDslashArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, ColorSpinorField &y,
                      const ColorSpinorField &x, double m_f_, double m_5_, const Complex *b_5, const Complex *c_5,
@@ -119,7 +120,9 @@ namespace quda
              in.VolumeCB() > out.VolumeCB() ? in.X(3) : out.X(3)},
         shrinked_dim {dim[0] - 2 * shift[0], dim[1] - 2 * shift[1], dim[2] - 2 * shift[2], dim[3] - 2 * shift[3]},
         volume_4d_cb_shift(shrinked_dim[0] * shrinked_dim[1] * shrinked_dim[2] * shrinked_dim[3] / 2),
-        type(type_)
+        type(type_),
+        comm {static_cast<bool>(comm_dim_partitioned(0)), static_cast<bool>(comm_dim_partitioned(1)),
+              static_cast<bool>(comm_dim_partitioned(2)), static_cast<bool>(comm_dim_partitioned(3))}
       {
         if (in.Nspin() != 4) { errorQuda("nSpin = %d NOT supported.\n", in.Nspin()); }
 
@@ -181,20 +184,28 @@ namespace quda
       return ret;
     }
 
-    __device__ inline int index_from_extended_coordinate(const int x[4], const int dim[4], const int y)
+    __device__ inline int index_from_extended_coordinate(const int x[4], const int dim[4], const bool comm[4], const int y)
     {
-
       constexpr int pad = 2;
+      int back_x[4];
+      int back_dim[4];
 
-      int back_x[4] = {x[0] - pad, x[1] - pad, x[2] - pad, x[3] - pad};
-      int back_dim[4] = {dim[0] - pad * 2, dim[1] - pad * 2, dim[2] - pad * 2, dim[3] - pad * 2};
-      if (back_x[0] >= 0 && back_x[0] < back_dim[0] && back_x[1] >= 0 && back_x[1] < back_dim[1] && back_x[2] >= 0
-          && back_x[2] < back_dim[2] && back_x[3] >= 0 && back_x[3] < back_dim[3]) {
+#pragma unroll
+      for (int d = 0; d < 4; d++) {
+        back_x[d] = comm[d] ? x[d] - pad : x[d];
+        back_dim[d] = comm[d] ? dim[d] - pad * 2 : dim[d];
+      }
+
+      bool is_center = true;
+#pragma unroll
+      for (int d = 0; d < 4; d++) { is_center = is_center && (back_x[d] >= 0 && back_x[d] < back_dim[d]); }
+
+      if (is_center) {
         int volume_4d_cb_back = back_dim[0] * back_dim[1] * back_dim[2] * back_dim[3] / 2;
         return y * volume_4d_cb_back
           + index_4d_cb_from_coordinate_4d(back_x, back_dim); // the input coordinate is in the center region
       } else {
-        return -1; // the input coordinate is not in the center region
+        return -1;
       }
     }
 
@@ -213,14 +224,15 @@ namespace quda
 #pragma unroll
       for (int d = 0; d < 4; d++) // loop over dimension
       {
-        coordinate[d]++;
-        if (!halo || !is_halo_4d(coordinate, arg.dim, arg.halo_shift)) {
+        int x[4] = {coordinate[0], coordinate[1], coordinate[2], coordinate[3]};
+        x[d] = (coordinate[d] == arg.dim[d] - 1 && !arg.comm[d]) ? 0 : coordinate[d] + 1;
+        if (!halo || !is_halo_4d(x, arg.dim, arg.halo_shift)) {
           // Forward gather - compute fwd offset for vector fetch
           int fwd_idx;
           if (back) {
-            fwd_idx = index_from_extended_coordinate(coordinate, arg.dim, s);
+            fwd_idx = index_from_extended_coordinate(x, arg.dim, arg.comm, s);
           } else {
-            fwd_idx = s * arg.volume_4d_cb + index_4d_cb_from_coordinate_4d(coordinate, arg.dim);
+            fwd_idx = s * arg.volume_4d_cb + index_4d_cb_from_coordinate_4d(x, arg.dim);
           }
           constexpr int proj_dir = dagger ? +1 : -1;
 
@@ -228,14 +240,14 @@ namespace quda
           const Vector in = arg.in(fwd_idx, their_spinor_parity);
           out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         }
-        coordinate[d] -= 2;
-        if (!halo || !is_halo_4d(coordinate, arg.dim, arg.halo_shift)) {
+        x[d] = (coordinate[d] == 0 && !arg.comm[d]) ? arg.dim[d] - 1 : coordinate[d] - 1;
+        if (!halo || !is_halo_4d(x, arg.dim, arg.halo_shift)) {
           // Backward gather - compute back offset for spinor and gauge fetch
-          const int gauge_idx = index_4d_cb_from_coordinate_4d(coordinate, arg.dim);
+          const int gauge_idx = index_4d_cb_from_coordinate_4d(x, arg.dim);
 
           int back_idx;
           if (back) {
-            back_idx = index_from_extended_coordinate(coordinate, arg.dim, s);
+            back_idx = index_from_extended_coordinate(x, arg.dim, arg.comm, s);
           } else {
             back_idx = s * arg.volume_4d_cb + gauge_idx;
           }
@@ -245,7 +257,6 @@ namespace quda
           const Vector in = arg.in(back_idx, their_spinor_parity);
           out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         }
-        coordinate[d]++;
       } // nDim
     }
 
@@ -270,7 +281,8 @@ namespace quda
       coordinate[3] = aux[3];
 
       // Find the full coordinate in the shrinked volume.
-      coordinate[0] += (parity + coordinate[3] + coordinate[2] + coordinate[1]) & 1;
+      coordinate[0]
+        += (shift[0] + shift[1] + shift[2] + shift[3] + parity + coordinate[3] + coordinate[2] + coordinate[1]) & 1;
 
 // Now go back to the extended volume.
 #pragma unroll
@@ -297,8 +309,8 @@ namespace quda
       constexpr int M = 4 * Ls;
       constexpr int N = 6 * block_dim_x;
 
-      constexpr int N_sm = N + sm_n_pad_size();
-      constexpr int M_sm = M + sm_m_pad_size(Ls);
+      constexpr int N_sm = N + sm_n_pad_size(N);
+      constexpr int M_sm = M + sm_m_pad_size(M);
 
       float *smem_scale = shared_memory_data;
 
@@ -438,7 +450,7 @@ namespace quda
           }
           // store result to shared memory
         }
-        load_matrix_b_vector<N_sm / 2, false>(in_vec, sm_b, smem_scale); // acc(accumulation) = false
+        load_matrix_b_vector<block_dim_x, Ls, N_sm / 2, false>(in_vec, sm_b, smem_scale); // acc(accumulation) = false
 
         __syncthreads();
 #ifdef USE_MMA_SYNC
@@ -453,13 +465,13 @@ namespace quda
           int sid_back;
           bool center = false;
           if (!idle) {
-            sid_back = index_from_extended_coordinate(x, arg.dim, threadIdx.y);
+            sid_back = index_from_extended_coordinate(x, arg.dim, arg.comm, threadIdx.y);
             if (sid_back >= 0) {
               center = true;
               aux_in_vec = arg.x(sid_back, explicit_parity);
             }
           }
-          load_matrix_b_vector<N_sm / 2, true>(aux_in_vec, sm_b, smem_scale, arg.m_scale); // acc = true
+          load_matrix_b_vector<block_dim_x, Ls, N_sm / 2, true>(aux_in_vec, sm_b, smem_scale, arg.m_scale); // acc = true
           if (!idle && center) { store_matrix_c<storage_type, N_sm>(arg.y, sm_b, sid_back, smem_scale[0]); }
           __syncthreads();
 #ifdef USE_MMA_SYNC
@@ -473,7 +485,7 @@ namespace quda
           Vector aux_in_vec;
           int sid_shift = threadIdx.y * arg.volume_4d_cb_shift + s4_shift;
           if (!idle) { aux_in_vec = arg.x(sid_shift, explicit_parity); }
-          load_matrix_b_vector<N_sm / 2, true, false>(aux_in_vec, sm_b, smem_scale, arg.m_scale);
+          load_matrix_b_vector<block_dim_x, Ls, N_sm / 2, true, false>(aux_in_vec, sm_b, smem_scale, arg.m_scale);
           if (!idle) { arg.out(sid_shift, explicit_parity) = aux_in_vec; }
         }
 
@@ -558,8 +570,8 @@ namespace quda
 
       unsigned int sharedBytesPerBlock(const TuneParam &param) const
       {
-        const int a_size = (param.block.y * 4) * (param.block.y * 4 + sm_m_pad_size(arg.Ls));
-        const int b_size = (param.block.y * 4) * (param.block.x * 6 + sm_n_pad_size());
+        const int a_size = (param.block.y * 4) * (param.block.y * 4 + sm_m_pad_size(param.block.y * 4));
+        const int b_size = (param.block.y * 4) * (param.block.x * 6 + sm_n_pad_size(param.block.x * 6));
         // (Ls*4) by (Ls*4), (Ls*4) by (volume_4d*6 + 16)
         if (param.aux.x == 1) { // aux.x == 1 --> reload == true
           if (arg.type == MdwfFusedDslashType::D4_D5INV_D5INVDAG) {
@@ -600,38 +612,30 @@ namespace quda
       {
         strcpy(aux, meta.AuxString());
         if (arg.dagger) strcat(aux, ",Dagger");
-        //        if (arg.xpay) strcat(aux,",xpay");
         char config[512];
         switch (arg.type) {
-        case MdwfFusedDslashType::D4_D5INV_D5PRE:
-          sprintf(config, ",f0,shift%d,%d,%d,%d,halo%d,%d,%d,%d", arg.shift[0], arg.shift[1], arg.shift[2],
-                  arg.shift[3], arg.halo_shift[0], arg.halo_shift[1], arg.halo_shift[2], arg.halo_shift[3]);
-          strcat(aux, config);
-          break;
-        case MdwfFusedDslashType::D4DAG_D5PREDAG_D5INVDAG:
-          sprintf(config, ",f2,shift%d,%d,%d,%d", arg.shift[0], arg.shift[1], arg.shift[2], arg.shift[3]);
-          strcat(aux, config);
-          break;
-        case MdwfFusedDslashType::D4_D5INV_D5INVDAG:
-          sprintf(config, ",f1,shift%d,%d,%d,%d,halo%d,%d,%d,%d", arg.shift[0], arg.shift[1], arg.shift[2],
-                  arg.shift[3], arg.halo_shift[0], arg.halo_shift[1], arg.halo_shift[2], arg.halo_shift[3]);
-          strcat(aux, config);
-          break;
-        case MdwfFusedDslashType::D4DAG_D5PREDAG:
-          sprintf(config, ",f3,shift%d,%d,%d,%d", arg.shift[0], arg.shift[1], arg.shift[2], arg.shift[3]);
-          strcat(aux, config);
-          break;
-        case MdwfFusedDslashType::D5PRE:
-          sprintf(config, ",f4,shift%d,%d,%d,%d", arg.shift[0], arg.shift[1], arg.shift[2], arg.shift[3]);
-          strcat(aux, config);
-          break;
+        case MdwfFusedDslashType::D4_D5INV_D5PRE: sprintf(config, ",f0"); break;
+        case MdwfFusedDslashType::D4DAG_D5PREDAG_D5INVDAG: sprintf(config, ",f2"); break;
+        case MdwfFusedDslashType::D4_D5INV_D5INVDAG: sprintf(config, ",f1"); break;
+        case MdwfFusedDslashType::D4DAG_D5PREDAG: sprintf(config, ",f3"); break;
+        case MdwfFusedDslashType::D5PRE: sprintf(config, ",f4"); break;
         default: errorQuda("Unknown MdwfFusedDslashType");
         }
+        strcat(aux, config);
+        sprintf(config, "shift%d%d%d%d,halo%d%d%d%d,comm%d%d%d%d", arg.shift[0], arg.shift[1], arg.shift[2],
+                arg.shift[3], arg.halo_shift[0], arg.halo_shift[1], arg.halo_shift[2], arg.halo_shift[3], arg.comm[0],
+                arg.comm[1], arg.comm[2], arg.comm[3]);
+        strcat(aux, config);
       }
 
       template <typename T> inline void launch(T *f, const TuneParam &tp, Arg &arg, const qudaStream_t &stream)
       {
-        setMaxDynamicSharedBytesPerBlock(f);
+        static std::unordered_set<T *> cache;
+        auto search = cache.find(f);
+        if (search == cache.end()) {
+          cache.insert(f);
+          setMaxDynamicSharedBytesPerBlock(f);
+        }
         void *args[] = {&arg};
         qudaLaunchKernel((const void *)f, tp.grid, tp.block, args, tp.shared_bytes, stream);
       }

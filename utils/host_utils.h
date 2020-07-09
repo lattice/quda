@@ -160,6 +160,12 @@ void check_gauge(void **, void **, double epsilon, QudaPrecision precision);
 int strong_check_link(void **linkA, const char *msgA, void **linkB, const char *msgB, int len, QudaPrecision prec);
 int strong_check_mom(void *momA, void *momB, int len, QudaPrecision prec);
 
+/**
+   @brief Host reference implementation of the momentum action
+   contribution.
+ */
+double mom_action(void *mom, QudaPrecision prec, int len);
+
 void createMomCPU(void *mom, QudaPrecision precision);
 void createHwCPU(void *hw, QudaPrecision precision);
 

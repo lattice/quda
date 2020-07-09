@@ -28,7 +28,6 @@ namespace quda {
 
   class QudaMem : public Tunable
   {
-
     void *dst;
     const void *src;
     const size_t count;
@@ -111,11 +110,22 @@ namespace quda {
           case cudaMemcpyDeviceToDevice:
             PROFILE(cuMemcpyDtoDAsync((CUdeviceptr)dst, (CUdeviceptr)src, count, stream), QUDA_PROFILE_MEMCPY_D2D_ASYNC);
             break;
+          case cudaMemcpyDefault:
+            PROFILE(cuMemcpyAsync((CUdeviceptr)dst, (CUdeviceptr)src, count, stream), QUDA_PROFILE_MEMCPY_DEFAULT_ASYNC);
+            break;
           default: errorQuda("Unsupported cuMemcpyTypeAsync %d", kind);
           }
 #else
-          PROFILE(cudaMemcpyAsync(dst, src, count, kind, stream),
-                  kind == cudaMemcpyDeviceToHost ? QUDA_PROFILE_MEMCPY_D2H_ASYNC : QUDA_PROFILE_MEMCPY_H2D_ASYNC);
+          QudaProfileType type;
+          switch (kind) {
+          case cudaMemcpyDeviceToHost: type = QUDA_PROFILE_MEMCPY_D2H_ASYNC; break;
+          case cudaMemcpyHostToDevice: type = QUDA_PROFILE_MEMCPY_H2D_ASYNC; break;
+          case cudaMemcpyDeviceToDevice: type = QUDA_PROFILE_MEMCPY_D2D_ASYNC; break;
+          case cudaMemcpyDefault: type = QUDA_PROFILE_MEMCPY_DEFAULT_ASYNC; break;
+          default: errorQuda("Unsupported cudaMemcpyTypeAsync %d", kind);
+          }
+
+          PROFILE(cudaMemcpyAsync(dst, src, count, kind, stream), type);
 #endif
         } else {
 #ifdef USE_DRIVER_API
@@ -188,6 +198,9 @@ namespace quda {
         break;
       case cudaMemcpyDeviceToDevice:
         PROFILE(cuMemcpyDtoDAsync((CUdeviceptr)dst, (CUdeviceptr)src, count, stream), QUDA_PROFILE_MEMCPY_D2D_ASYNC);
+        break;
+      case cudaMemcpyDefault:
+        PROFILE(cuMemcpyAsync((CUdeviceptr)dst, (CUdeviceptr)src, count, stream), QUDA_PROFILE_MEMCPY_DEFAULT_ASYNC);
         break;
       default:
         errorQuda("Unsupported cuMemcpyTypeAsync %d", kind);
@@ -383,6 +396,13 @@ namespace quda {
   {
     // no driver API variant here since we have C++ functions
     PROFILE(cudaError_t error = cudaFuncSetAttribute(func, attr, value), QUDA_PROFILE_FUNC_SET_ATTRIBUTE);
+    return error;
+  }
+
+  cudaError_t qudaFuncGetAttributes(cudaFuncAttributes &attr, const void* func)
+  {
+    // no driver API variant here since we have C++ functions
+    PROFILE(cudaError_t error = cudaFuncGetAttributes(&attr, func), QUDA_PROFILE_FUNC_SET_ATTRIBUTE);
     return error;
   }
 #endif

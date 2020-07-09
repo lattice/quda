@@ -113,8 +113,8 @@ void setQudaDefaultMgTestParams()
     // Default eigensolver params
     mg_eig[i] = false;
     mg_eig_tol[i] = 1e-3;
-    mg_eig_nEv[i] = nvec[i];
-    mg_eig_nKr[i] = 3 * nvec[i];
+    mg_eig_n_ev[i] = nvec[i];
+    mg_eig_n_kr[i] = 3 * nvec[i];
     mg_eig_require_convergence[i] = QUDA_BOOLEAN_TRUE;
     mg_eig_type[i] = QUDA_EIG_TR_LANCZOS;
     mg_eig_spectrum[i] = QUDA_SPECTRUM_SR_EIG;
@@ -1566,6 +1566,36 @@ int strong_check_mom(void *momA, void *momB, int len, QudaPrecision prec)
   }
 
   return ret;
+}
+
+// compute the magnitude squared anti-Hermitian matrix, including the
+// MILC convention of subtracting 4 from each site norm to improve
+// stability
+template <typename real> double mom_action(real *mom_, int len)
+{
+  double action = 0.0;
+  for (int i = 0; i < len; i++) {
+    real *mom = mom_ + i * mom_site_size;
+    double local = 0.0;
+    for (int j = 0; j < 6; j++) local += mom[j] * mom[j];
+    for (int j = 6; j < 9; j++) local += 0.5 * mom[j] * mom[j];
+    local -= 4.0;
+    action += local;
+  }
+
+  return action;
+}
+
+double mom_action(void *mom, QudaPrecision prec, int len)
+{
+  double action = 0.0;
+  if (prec == QUDA_DOUBLE_PRECISION) {
+    action = mom_action<double>((double *)mom, len);
+  } else if (prec == QUDA_SINGLE_PRECISION) {
+    action = mom_action<float>((float *)mom, len);
+  }
+  comm_allreduce(&action);
+  return action;
 }
 
 static struct timeval startTime;

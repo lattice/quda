@@ -315,6 +315,15 @@ namespace quda {
 	    typedef FloatNOrder<FloatIn,10,2,10> momIn;
 	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out, 0, override), momIn(in, In, 0, override), in);
 	    copyMom<FloatOut,FloatIn,10,momOut,momIn>(arg,out,in,location);
+	  } else if (in.Order() == QUDA_QDP_GAUGE_ORDER) {
+#ifdef BUILD_QDP_INTERFACE
+	    typedef FloatNOrder<FloatOut,10,2,10> momOut;
+	    typedef QDPOrder<FloatIn,10> momIn;
+	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out, 0, override), momIn(in, In), in);
+	    copyMom<FloatOut,FloatIn,10,momOut,momIn>(arg,out,in,location);
+#else
+	    errorQuda("QDP interface has not been built\n");
+#endif
 	  } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
 #ifdef BUILD_MILC_INTERFACE
 	    typedef FloatNOrder<FloatOut,10,2,10> momOut;
@@ -354,6 +363,23 @@ namespace quda {
 	  } else {
 	    errorQuda("Gauge field orders %d not supported", in.Order());
 	  }
+	} else if (out.Order() == QUDA_QDP_GAUGE_ORDER) {
+	  typedef QDPOrder<FloatOut,10> momOut;
+#ifdef BUILD_QDP_INTERFACE
+	  if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
+	    typedef FloatNOrder<FloatIn,10,2,10> momIn;
+	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out), momIn(in, In, 0, override), in);
+	    copyMom<FloatOut,FloatIn,10,momOut,momIn>(arg,out,in,location);
+	  } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
+	    typedef MILCOrder<FloatIn,10> momIn;
+	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out), momIn(in, In), in);
+	    copyMom<FloatOut,FloatIn,10,momOut,momIn>(arg,out,in,location);
+	  } else {
+	    errorQuda("Gauge field orders %d not supported", in.Order());
+	  }
+#else
+	  errorQuda("QDP interface has not been built\n");
+#endif
 	} else if (out.Order() == QUDA_MILC_GAUGE_ORDER) {
 	  typedef MILCOrder<FloatOut,10> momOut;
 #ifdef BUILD_MILC_INTERFACE
@@ -363,6 +389,10 @@ namespace quda {
 	    copyMom<FloatOut,FloatIn,10,momOut,momIn>(arg,out,in,location);
 	  } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
 	    typedef MILCOrder<FloatIn,10> momIn;
+	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out), momIn(in, In), in);
+	    copyMom<FloatOut,FloatIn,10,momOut,momIn>(arg,out,in,location);
+          } else if (in.Order() == QUDA_QDP_GAUGE_ORDER) {
+	    typedef QDPOrder<FloatIn,10> momIn;
 	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out), momIn(in, In), in);
 	    copyMom<FloatOut,FloatIn,10,momOut,momIn>(arg,out,in,location);
 	  } else {

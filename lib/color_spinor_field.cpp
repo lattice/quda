@@ -278,8 +278,8 @@ namespace quda {
     {
       int aux_string_n = TuneKey::aux_n / 2;
       char aux_tmp[aux_string_n];
-      int check = snprintf(aux_string, aux_string_n, "vol=%lu,stride=%lu,precision=%d,Ns=%d,Nc=%d", volume, stride,
-                           precision, nSpin, nColor);
+      int check = snprintf(aux_string, aux_string_n, "vol=%lu,stride=%lu,precision=%d,order=%d,Ns=%d,Nc=%d", volume,
+                           stride, precision, fieldOrder, nSpin, nColor);
       if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
       if (twistFlavor != QUDA_TWIST_NO && twistFlavor != QUDA_TWIST_INVALID) {
         strcpy(aux_tmp, aux_string);
@@ -571,23 +571,6 @@ namespace quda {
     }
   }
 
-  bool ColorSpinorField::isNative() const {
-    if (precision == QUDA_DOUBLE_PRECISION) {
-      if (fieldOrder  == QUDA_FLOAT2_FIELD_ORDER) return true;
-    } else if (precision == QUDA_SINGLE_PRECISION ||
-	       (precision == QUDA_HALF_PRECISION && nColor == 3) ||
-         (precision == QUDA_QUARTER_PRECISION && nColor == 3)) {
-      if (nSpin == 4) {
-	if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) return true;
-      } else if (nSpin == 2) {
-	if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) return true;
-      } else if (nSpin == 1) {
-	if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) return true;
-      }
-    }
-    return false;
-  }
-
   // For kernels with precision conversion built in
   void ColorSpinorField::checkField(const ColorSpinorField &a, const ColorSpinorField &b) {
     if (a.Length() != b.Length()) {
@@ -872,13 +855,11 @@ namespace quda {
 
     // for GPU fields, always use native ordering to ensure coalescing
     if (new_location == QUDA_CUDA_FIELD_LOCATION) {
-      fineParam.fieldOrder = (fineParam.nSpin==4 && fineParam.Precision()!= QUDA_DOUBLE_PRECISION) ?
-	QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER;
+      fineParam.setPrecision(new_precision, new_precision, true);
     } else {
       fineParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+      fineParam.setPrecision(new_precision);
     }
-
-    fineParam.setPrecision(new_precision);
 
     // set where we allocate the field
     fineParam.mem_type = (new_mem_type != QUDA_MEMORY_INVALID) ? new_mem_type :
