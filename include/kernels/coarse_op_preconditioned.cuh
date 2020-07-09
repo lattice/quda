@@ -1,3 +1,5 @@
+#pragma once
+
 #include <gauge_field_order.h>
 #include <index_helper.cuh>
 #include <matrix_tile.cuh>
@@ -7,6 +9,12 @@ namespace quda {
   template <typename Float_, typename PreconditionedGauge, typename Gauge, int n_, int M_, int N_> struct CalculateYhatArg {
     using Float = Float_;
     TileSize<n_, n_, n_, M_, N_, 1> tile;
+  
+    static constexpr int M = n_;
+    static constexpr int N = n_;
+    static constexpr int K = n_;
+
+    static constexpr bool is_aos = PreconditionedGauge::is_aos;
 
     PreconditionedGauge Yhat;
     const Gauge Y;

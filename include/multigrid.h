@@ -485,14 +485,8 @@ public:
      @param Y[in] Coarse link field
      @param X[in] Coarse clover field
    */
-  void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X);
+  void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X, bool use_mma = false);
 
-  namespace mma
-  {
-
-    void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X);
-
-  }
   /**
      This is an object that captures an entire MG preconditioner
      state.  A bit of a hack at the moment, this is used to allow us

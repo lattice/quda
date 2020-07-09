@@ -3,8 +3,14 @@
 #include <tune_quda.h>
 #include <jitify_helper.cuh>
 #include <kernels/coarse_op_kernel.cuh>
-#include <kernels/coarse_op_kernel_mma.cuh>
 #include <uint_to_char.h>
+
+#if ((__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ >= 1) || (__CUDACC_VER_MAJOR__ > 10))                         \
+  && (__COMPUTE_CAPABILITY__ >= 700)
+
+#include <kernels/coarse_op_kernel_mma.cuh>
+
+#endif
 
 namespace quda
 {
@@ -12,50 +18,17 @@ namespace quda
   namespace mma
   {
 
-    // For coarsening un-preconditioned operators we use uni-directional
-    // coarsening to reduce the set up code.  For debugging we can force
-    // bi-directional coarsening.
-    static bool bidirectional_debug = false;
-
-    enum ComputeType {
-      COMPUTE_UV,
-      COMPUTE_AV,
-      COMPUTE_TMAV,
-      COMPUTE_TMCAV,
-      COMPUTE_CLOVER_INV_MAX,
-      COMPUTE_TWISTED_CLOVER_INV_MAX,
-      COMPUTE_VUV,
-      COMPUTE_COARSE_CLOVER,
-      COMPUTE_REVERSE_Y,
-      COMPUTE_DIAGONAL,
-      COMPUTE_TMDIAGONAL,
-      COMPUTE_CONVERT,
-      COMPUTE_RESCALE,
-      COMPUTE_INVALID
-    };
+#if ((__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ >= 1) || (__CUDACC_VER_MAJOR__ > 10))                         \
+  && (__COMPUTE_CAPABILITY__ >= 700)
 
     template <typename F> inline void setMaxDynamicSharedBytesPerBlock(F *func)
     {
-#if CUDA_VERSION >= 9000
       qudaFuncSetAttribute((const void *)func, cudaFuncAttributePreferredSharedMemoryCarveout,
                            (int)cudaSharedmemCarveoutMaxShared);
       qudaFuncSetAttribute((const void *)func, cudaFuncAttributeMaxDynamicSharedMemorySize,
                            deviceProp.sharedMemPerBlockOptin);
-#endif
     }
 
-    /**
-      @brief Launcher for CPU instantiations of coarse-link construction
-     */
-    template <QudaFieldLocation location, bool from_coarse, typename Float, int fineSpin, int fineColor, int coarseSpin,
-              int coarseColor, typename Arg>
-    struct Launch {
-      Launch(Arg &arg, CUresult &error, TuneParam &tp, ComputeType type, const cudaStream_t &stream)
-      {
-        errorQuda("MMA implementation is NOT intended for CPU.");
-      }
-    };
-    
     template <bool from_coarse, int dim, QudaDirection dir, int bM, int bN, int bK, int block_y, int block_z, class Arg>
     typename std::enable_if<!Arg::is_aos, void>::type launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
     {
@@ -533,6 +506,16 @@ namespace quda
       }
       // clang-format on
     }
+
+#else
+    
+    template <bool from_coarse, class Arg>
+    void launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    {
+      errorQuda("MMA multigrid is not available for this setup.");
+    }
+
+#endif
 
   } // namespace mma
 

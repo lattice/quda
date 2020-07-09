@@ -15,35 +15,6 @@ namespace quda
   namespace mma
   {
 
-    template <typename Float_, typename PreconditionedGauge, typename Gauge, int n> struct CalculateYhatArg {
-
-      using Float = Float_;
-
-      static constexpr int M = n;
-      static constexpr int N = n;
-      static constexpr int K = n;
-
-      PreconditionedGauge Yhat;
-      const Gauge Y;
-      const Gauge Xinv;
-      int dim[QUDA_MAX_DIM];
-      int comm_dim[QUDA_MAX_DIM];
-      int nFace;
-
-      Float *max_h; // host scalar that stores the maximum element of Yhat. Pointer b/c pinned.
-      Float *max_d; // device scalar that stores the maximum element of Yhat
-
-      CalculateYhatArg(const PreconditionedGauge &Yhat, const Gauge Y, const Gauge Xinv, const int *dim,
-                       const int *comm_dim, int nFace) :
-        Yhat(Yhat), Y(Y), Xinv(Xinv), nFace(nFace), max_h(nullptr), max_d(nullptr)
-      {
-        for (int i = 0; i < 4; i++) {
-          this->comm_dim[i] = comm_dim[i];
-          this->dim[i] = dim[i];
-        }
-      }
-    };
-
     template <bool compute_max_only, typename Arg, int bM, int bN, int bK, int block_y, int block_z>
     inline __device__ auto computeYhat(Arg &arg, int d, int x_cb, int parity, int m, int n)
     {
