@@ -6625,23 +6625,6 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
    
   profileBaryonKernelModeTripletsB.TPSTART(QUDA_PROFILE_TOTAL);
   profileBaryonKernelModeTripletsB.TPSTART(QUDA_PROFILE_INIT);
-  
-  QudaInvertParam inv_param = newQudaInvertParam();
-  
-  inv_param.dslash_type = QUDA_WILSON_DSLASH;
-  inv_param.solution_type = QUDA_MAT_SOLUTION;
-  inv_param.solve_type = QUDA_DIRECT_SOLVE;
-  
-  inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  inv_param.cuda_prec = QUDA_DOUBLE_PRECISION;
-  inv_param.dirac_order = QUDA_DIRAC_ORDER;
-  
-  // PADDING
-  inv_param.sp_pad = 0;
-  inv_param.cl_pad = 0;
-  
-  inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
-  inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 
   // number of EV indices (in first position) that this rank deals with
   int nRanks = comm_size();  
@@ -6652,100 +6635,61 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
   fflush(stdout);  
   int iRank = comm_rank();
 
-  // Create host pointers for the data device side objects.
-  //--------------------------------------------------------------------------------
-  // Parameter object describing evecs
-  ColorSpinorParam cpu_evec_param(host_evec, inv_param, X, false, QUDA_CPU_FIELD_LOCATION);
-  cpu_evec_param.nSpin = 1;
-  
-  // QUDA style wrapper around the host evecs
-  std::vector<ColorSpinorField*> evec;
-  cpu_evec_param.create = QUDA_REFERENCE_FIELD_CREATE;
-  evec.reserve(nEv);
-  for (int iEv=0; iEv<nEv; ++iEv) {
-    cpu_evec_param.v = host_evec[iEv];
-    evec.push_back(ColorSpinorField::Create(cpu_evec_param));
-  }
-  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("QUDA: Eigenvectors wrapped\n");
-  // Allocate device memory for evecs. This is done to ensure a contiguous
-  // chunk of memory is used.
-  int nSites = X[0] * X[1] * X[2];
-  size_t data_evec_bytes = nEv * 3 * nSites * 2 * evec[0]->Precision();
-  void *d_evec = pool_device_malloc(data_evec_bytes);
-
-  // Create device vectors for evecs
-  ColorSpinorParam cuda_evec_param(cpu_evec_param);
-  cuda_evec_param.location = QUDA_CUDA_FIELD_LOCATION;
-  cuda_evec_param.create = QUDA_REFERENCE_FIELD_CREATE;
-  cuda_evec_param.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
-  std::vector<ColorSpinorField *> quda_evec;
-  for (int i=0; i<nEv; i++) {
-    cuda_evec_param.v = (std::complex<double>*)d_evec + 3*nSites*i;
-    quda_evec.push_back(ColorSpinorField::Create(cuda_evec_param));
-  }
-  printfQuda("QUDA: Device Eigenvectors allocated\n");
   std::complex<double>* hostCoeffs1Ptr = reinterpret_cast<std::complex<double>*>(host_coeffs2);
   std::complex<double>* hostCoeffs2Ptr = reinterpret_cast<std::complex<double>*>(host_coeffs2);
   std::complex<double>* hostCoeffs3Ptr = reinterpret_cast<std::complex<double>*>(host_coeffs3);
-  std::complex<double>* hostMomPtr = reinterpret_cast<std::complex<double>*>(host_mom);
   std::complex<double>* hostModeTripBufPtr = reinterpret_cast<std::complex<double>*>(host_mode_trip_buf);
   
+  // Device side arrays
+  //-------------------------------------------------------
+  // We will define all the array sizes here, then malloc and free
+  // at optimal points in the workflow.
+  size_t total_bytes = 0;
   size_t OneGB = 1024;
   OneGB *= 1024;
   OneGB *= 1024;
 
-  // Device side arrays
-  size_t data_coeffs1_bytes = n1 * nEv * 2 * quda_evec[0]->Precision();
-  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("n1 = %d, nEv = %d, 2*prec = %d, bytes = %fGB\n", n1, nEv, 2 * quda_evec[0]->Precision(), (double)data_coeffs1_bytes/(OneGB)); 
-  void *d_coeffs1 = pool_device_malloc(data_coeffs1_bytes);
-
-  size_t data_coeffs2_bytes = n2 * nEv * 2 * quda_evec[0]->Precision();
-  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("n2 = %d, nEv = %d, 2*prec = %d, bytes = %fGB\n", n2, nEv, 2 * quda_evec[0]->Precision(), (double)data_coeffs2_bytes/(OneGB)); 
-  void *d_coeffs2 = pool_device_malloc(data_coeffs2_bytes);
-
-  size_t data_coeffs3_bytes = n3 * nEv * 2 * quda_evec[0]->Precision();
-  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("n3 = %d, nEv = %d, 2*prec = %d, bytes = %fGB\n", n3, nEv, 2 * quda_evec[0]->Precision(), (double)data_coeffs3_bytes/(OneGB)); 
-  void *d_coeffs3 = pool_device_malloc(data_coeffs3_bytes);
+  size_t data_coeffs1_bytes = n1 * nEv * 2 * QUDA_DOUBLE_PRECISION;
+  size_t data_coeffs2_bytes = n2 * nEv * 2 * QUDA_DOUBLE_PRECISION;
+  size_t data_coeffs3_bytes = n3 * nEv * 2 * QUDA_DOUBLE_PRECISION;
   
   size_t data_mtb_bytes = nMom;
   data_mtb_bytes *= nSubEv;
   data_mtb_bytes *= nEv;
   data_mtb_bytes *= nEv;
-  data_mtb_bytes *= 2 * quda_evec[0]->Precision();
-  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("nMom = %d, nSubEv = %d, nEv = %d, nEv = %d, 2*prec = %d, bytes = %fGB\n", nMom, nSubEv, nEv, nEv, 2 * quda_evec[0]->Precision(), (double)data_mtb_bytes/(OneGB));
-  void *d_mtb = pool_device_malloc(data_mtb_bytes);
-  
-  size_t data_tmp_bytes = nSubEv * n2 * n3 * 2 * quda_evec[0]->Precision();
-  void *d_tmp = pool_device_malloc(data_tmp_bytes);
+  data_mtb_bytes *= 2 * QUDA_DOUBLE_PRECISION;
 
   size_t data_q3_bytes = nMom;
   data_q3_bytes *= nSubEv;
   data_q3_bytes *= nEv;
   data_q3_bytes *= n3;
-  data_q3_bytes *= 2 * quda_evec[0]->Precision();
+  data_q3_bytes *= 2 * QUDA_DOUBLE_PRECISION;
   
-  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("nMom = %d, nSubEv = %d, nEv = %d, n3 = %d, 2*prec = %d, bytes = %fGB\n", nMom, nSubEv, nEv, n3, 2 * quda_evec[0]->Precision(), (double)data_q3_bytes/(OneGB));  
-  void *d_q3 = pool_device_malloc(data_q3_bytes);
-  
-  size_t data_ret_bytes = nMom * n1 * n2 * n3 * 2 * quda_evec[0]->Precision();
-  void *d_ret = pool_device_malloc(data_ret_bytes);
-
-  size_t data_mom_bytes = nMom * nSites * 2 * quda_evec[0]->Precision();
-  void *d_mom = pool_device_malloc(data_mom_bytes);
+  size_t data_tmp_bytes = nSubEv * n2 * n3 * 2 * QUDA_DOUBLE_PRECISION;
+  size_t data_ret_bytes = nMom * n1 * n2 * n3 * 2 * QUDA_DOUBLE_PRECISION;
 
   profileBaryonKernelModeTripletsB.TPSTOP(QUDA_PROFILE_INIT);  
   //--------------------------------------------------------------------------------
 
-  // Copy host data to device
+  // Allocate required memory
+  total_bytes += data_mtb_bytes;
+  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("mtb bytes = %fGB, total = %fGB\n", (double)data_mtb_bytes/(OneGB), (double)total_bytes/(OneGB));
+  void *d_mtb = pool_device_malloc(data_mtb_bytes);
+
+  total_bytes += data_q3_bytes;  
+  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("q3 bytes = %fGB, total = %fGB\n", (double)data_q3_bytes/(OneGB), (double)total_bytes/(OneGB));  
+  void *d_q3 = pool_device_malloc(data_q3_bytes);
+
+  total_bytes += data_coeffs3_bytes;
+  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("coeffs3 bytes = %fGB, total = %fGB\n", (double)data_coeffs3_bytes/(OneGB), (double)total_bytes/(OneGB)); 
+  void *d_coeffs3 = pool_device_malloc(data_coeffs3_bytes);
+
+  // Copy required host data to device
   profileBaryonKernelModeTripletsB.TPSTART(QUDA_PROFILE_H2D);  
-  for (int i=0; i<nEv; i++) *quda_evec[i] = *evec[i];
-  qudaMemcpy(d_coeffs1, hostCoeffs1Ptr, data_coeffs1_bytes, cudaMemcpyHostToDevice);  
-  qudaMemcpy(d_coeffs2, hostCoeffs2Ptr, data_coeffs2_bytes, cudaMemcpyHostToDevice);  
   qudaMemcpy(d_coeffs3, hostCoeffs3Ptr, data_coeffs3_bytes, cudaMemcpyHostToDevice);  
   qudaMemcpy(d_mtb, hostModeTripBufPtr, data_mtb_bytes, cudaMemcpyHostToDevice);  
-  qudaMemcpy(d_mom, hostMomPtr, data_mom_bytes, cudaMemcpyHostToDevice);  
   profileBaryonKernelModeTripletsB.TPSTOP(QUDA_PROFILE_H2D);
-
+  
   // All cuBLAS use these alpha and beta values
   __complex__ double alpha = 1.0;
   __complex__ double beta = 0.0;
@@ -6770,6 +6714,35 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
   cublas::BatchGEMM(d_mtb, d_coeffs3, d_q3, cublas_param_1, QUDA_CUDA_FIELD_LOCATION);
   if (getVerbosity() >= QUDA_VERBOSE) printfQuda("GEMM 1 Success!\n");
   profileCuBLAS.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  // d_coeffs3, d_mtb no longer needed.
+  pool_device_free(d_coeffs3);
+  total_bytes -= data_coeffs3_bytes;
+  pool_device_free(d_mtb);
+  total_bytes -= data_mtb_bytes;
+
+  // Allocate required memory
+  total_bytes += data_coeffs1_bytes;
+  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("coeffs1 bytes = %fGB, total = %fGB\n", (double)data_coeffs1_bytes/(OneGB), (double)total_bytes/(OneGB));   
+  void *d_coeffs1 = pool_device_malloc(data_coeffs1_bytes);
+
+  total_bytes += data_coeffs2_bytes;
+  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("coeffs2 bytes = %fGB, total = %fGB\n", (double)data_coeffs2_bytes/(OneGB), (double)total_bytes/(OneGB));   
+  void *d_coeffs2 = pool_device_malloc(data_coeffs2_bytes);
+
+  total_bytes += data_tmp_bytes;
+  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("tmp bytes = %fGB, total = %fGB\n", (double)data_tmp_bytes/(OneGB), (double)total_bytes/(OneGB));   
+  void *d_tmp = pool_device_malloc(data_tmp_bytes);
+
+  total_bytes += data_ret_bytes;
+  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("ret bytes = %fGB, total = %fGB\n", (double)data_ret_bytes/(OneGB), (double)total_bytes/(OneGB));  
+  void *d_ret = pool_device_malloc(data_ret_bytes);
+  
+  // Copy host data to device
+  profileBaryonKernelModeTripletsB.TPSTART(QUDA_PROFILE_H2D);  
+  qudaMemcpy(d_coeffs1, hostCoeffs1Ptr, data_coeffs1_bytes, cudaMemcpyHostToDevice);  
+  qudaMemcpy(d_coeffs2, hostCoeffs2Ptr, data_coeffs2_bytes, cudaMemcpyHostToDevice);  
+  profileBaryonKernelModeTripletsB.TPSTOP(QUDA_PROFILE_H2D);
   
   QudaCublasParam cublas_param_2 = newQudaCublasParam();
   cublas_param_2.trans_a = QUDA_CUBLAS_OP_N;
@@ -6816,31 +6789,22 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
     cublas_param_3.c_offset = i * n1 * n2 * n3;
     cublas::BatchGEMM(d_coeffs1, d_tmp, d_ret, cublas_param_3, QUDA_CUDA_FIELD_LOCATION);
   }
-  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("GEMM 2+3 Success!\n");
-  
+  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("GEMM 2+3 Success!\n");  
   profileCuBLAS.TPSTOP(QUDA_PROFILE_COMPUTE);
-  
 
-  // Copy return array back to host
+  // Copy return array to host
   profileBaryonKernelModeTripletsB.TPSTART(QUDA_PROFILE_D2H);
   qudaMemcpy(retArr, d_ret, data_ret_bytes, cudaMemcpyDeviceToHost);  
   profileBaryonKernelModeTripletsB.TPSTOP(QUDA_PROFILE_D2H);
-  
-  // Clean up memory allocations
+
+  // Clean up all remaining memory allocations
   profileBaryonKernelModeTripletsB.TPSTART(QUDA_PROFILE_FREE);
-  for (int i=0; i<nEv; i++) {
-    delete evec[i];
-    delete quda_evec[i];
-  }
-  
-  pool_device_free(d_evec);
-  pool_device_free(d_mtb);
+  pool_device_free(d_coeffs1);
+  pool_device_free(d_coeffs2);
   pool_device_free(d_tmp);
-  pool_device_free(d_mom);
-  pool_device_free(d_ret);
   pool_device_free(d_q3);
-  
+  pool_device_free(d_ret);  
   profileBaryonKernelModeTripletsB.TPSTOP(QUDA_PROFILE_FREE);
-  profileBaryonKernelModeTripletsB.TPSTOP(QUDA_PROFILE_TOTAL);
   
+  profileBaryonKernelModeTripletsB.TPSTOP(QUDA_PROFILE_TOTAL);  
 }
