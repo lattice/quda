@@ -501,10 +501,6 @@ void printQudaInvertParam(QudaInvertParam *param) {
 
 #if defined(INIT_PARAM)
   P(eig_param, 0);
-#elif defined(CHECK_PARAM)
-  if (param->eig_param && param->inv_type_precondition != QUDA_INVALID_INVERTER) {
-    errorQuda("At present cannot combine deflation with Schwarz preconditioner");
-  }
 #endif
 
 #ifdef INIT_PARAM
