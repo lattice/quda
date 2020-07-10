@@ -613,6 +613,12 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(extlib_type, QUDA_EXTLIB_INVALID);
 #endif
 
+#if defined INIT_PARAM
+  P(native_blas_lapack, QUDA_BOOLEAN_TRUE);
+#else
+  P(native_blas_lapack, QUDA_BOOLEAN_INVALID);
+#endif
+
 #ifdef INIT_PARAM
   return ret;
 #endif

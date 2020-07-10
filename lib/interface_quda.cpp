@@ -83,7 +83,7 @@ static int R[4] = {0, 0, 0, 0};
 // setting this to false prevents redundant halo exchange but isn't yet compatible with HISQ / ASQTAD kernels
 static bool redundant_comms = false;
 
-#include <blas_cublas.h>
+#include <blas_lapack.h>
 
 //for MAGMA lib:
 #include <blas_magma.h>
@@ -656,7 +656,6 @@ void initQudaMemory()
   checkCudaError();
   createDslashEvents();
   blas::init();
-  cublas::init();
 
   // initalize the memory pool allocators
   pool::init();
@@ -1455,7 +1454,8 @@ void endQuda(void)
   LatticeField::freeGhostBuffer();
   cpuColorSpinorField::freeGhostBuffer();
 
-  cublas::destroy();
+  blas_lapack::generic::destroy();
+  blas_lapack::native::destroy();
   blas::end();
 
   pool::flush_pinned();
@@ -2405,6 +2405,8 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   : profile(profile) {
   profile.TPSTART(QUDA_PROFILE_INIT);
   QudaInvertParam *param = mg_param.invert_param;
+  // set whether we are going use native or generic blas
+  blas_lapack::set_native(param->native_blas_lapack);
 
   checkMultigridParam(&mg_param);
   cudaGaugeField *cudaGauge = checkGauge(param);

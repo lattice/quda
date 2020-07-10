@@ -383,6 +383,9 @@ extern "C" {
     /** Which external library to use in the linear solvers (MAGMA or Eigen) */
     QudaExtLibType extlib_type;
 
+    /** Whether to use the platform native or generic BLAS / LAPACK */
+    QudaBoolean native_blas_lapack;
+
   } QudaInvertParam;
 
   // Parameter set for solving eigenvalue problems.
