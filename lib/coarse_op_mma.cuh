@@ -1,9 +1,6 @@
 #pragma once
 
 #include <tune_quda.h>
-#include <jitify_helper.cuh>
-#include <kernels/coarse_op_kernel.cuh>
-#include <uint_to_char.h>
 
 #if ((__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ >= 1) || (__CUDACC_VER_MAJOR__ > 10))                         \
   && (__COMPUTE_CAPABILITY__ >= 700)

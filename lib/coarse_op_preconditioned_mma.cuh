@@ -1,10 +1,7 @@
+#pragma once
 
 #include <gauge_field.h>
-#include <blas_cublas.h>
-#include <blas_quda.h>
 #include <tune_quda.h>
-
-#include <jitify_helper.cuh>
 
 #if ((__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ >= 1) || (__CUDACC_VER_MAJOR__ > 10))                         \
   && (__COMPUTE_CAPABILITY__ >= 700)
