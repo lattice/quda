@@ -514,6 +514,12 @@ namespace quda
 #else
 
     template <bool from_coarse, class Arg>
+    void launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    {
+      errorQuda("MMA multigrid is not available for this setup.");
+    }
+
+    template <bool from_coarse, class Arg>
     void launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
     {
       errorQuda("MMA multigrid is not available for this setup.");

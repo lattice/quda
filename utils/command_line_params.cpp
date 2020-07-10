@@ -16,6 +16,8 @@ auto &grid_y = gridsize_from_cmdline[1];
 auto &grid_z = gridsize_from_cmdline[2];
 auto &grid_t = gridsize_from_cmdline[3];
 
+bool native_blas_lapack = true;
+
 std::array<int, 4> dim_partitioned = {0, 0, 0, 0};
 QudaReconstructType link_recon = QUDA_RECONSTRUCT_NO;
 QudaReconstructType link_recon_sloppy = QUDA_RECONSTRUCT_INVALID;
@@ -433,6 +435,8 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--ngcrkrylov", gcrNkrylov,
                        "The number of inner iterations to use for GCR, BiCGstab-l, CA-CG (default 10)");
   quda_app->add_option("--niter", niter, "The number of iterations to perform (default 100)");
+  quda_app->add_option("--native-blas-lapack", native_blas_lapack,
+                       "Use the native or generic BLAS LAPACK implementation (default true)");
   quda_app->add_option("--maxiter-precondition", maxiter_precondition,
                        "The number of iterations to perform for any preconditioner (default 10)");
   quda_app->add_option("--nsrc", Nsrc,
