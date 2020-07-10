@@ -241,6 +241,9 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.verbosity = verbosity;
 
   inv_param.extlib_type = solver_ext_lib;
+
+  // Whether or not to use native BLAS LAPACK
+  inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 }
 
 // Parameters defining the eigensolver
@@ -306,6 +309,9 @@ void setEigParam(QudaEigParam &eig_param)
 void setMultigridParam(QudaMultigridParam &mg_param)
 {
   QudaInvertParam &inv_param = *mg_param.invert_param; // this will be used to setup SolverParam parent in MGParam class
+
+  // Whether or not to use native BLAS LAPACK
+  inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 
   inv_param.Ls = 1;
 
@@ -530,6 +536,9 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   // Is NOT a staggered solve
   mg_param.is_staggered = QUDA_BOOLEAN_FALSE;
 
+  // Whether or not to use thin restarts in the evolve tests
+  mg_param.thin_update_only = mg_evolve_thin_updates ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
   // set file i/o parameters
   for (int i = 0; i < mg_param.n_level; i++) {
     strcpy(mg_param.vec_infile[i], mg_vec_infile[i]);
@@ -648,6 +657,9 @@ void setMultigridInvertParam(QudaInvertParam &inv_param)
   inv_param.tol_precondition = 1e-1;
   inv_param.maxiter_precondition = 1;
   inv_param.omega = 1.0;
+
+  // Whether or not to use native BLAS LAPACK
+  inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 }
 
 // Parameters defining the eigensolver
@@ -793,6 +805,9 @@ void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
   inv_param.tol_precondition = 1e-1;
   inv_param.maxiter_precondition = 1;
   inv_param.omega = 1.0;
+
+  // Whether or not to use native BLAS LAPACK
+  inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 }
 
 void setStaggeredInvertParam(QudaInvertParam &inv_param)
@@ -871,11 +886,17 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 
   inv_param.sp_pad = 0;
+
+  // Whether or not to use native BLAS LAPACK
+  inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 }
 
 void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 {
   QudaInvertParam &inv_param = *mg_param.invert_param; // this will be used to setup SolverParam parent in MGParam class
+
+  // Whether or not to use native BLAS LAPACK
+  inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 
   inv_param.Ls = 1;
 
@@ -1211,6 +1232,9 @@ void setDeflatedInvertParam(QudaInvertParam &inv_param)
   inv_param.omega = 1.0;
 
   inv_param.extlib_type = solver_ext_lib;
+
+  // Whether or not to use native BLAS LAPACK
+  inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 }
 
 void setDeflationParam(QudaEigParam &df_param)

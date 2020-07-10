@@ -214,6 +214,12 @@ void printQudaEigParam(QudaEigParam *param) {
 #endif
 
 #if defined INIT_PARAM
+  P(save_prec, QUDA_DOUBLE_PRECISION);
+#else
+  P(save_prec, QUDA_INVALID_PRECISION);
+#endif
+
+#if defined INIT_PARAM
   P(io_parity_inflate, QUDA_BOOLEAN_FALSE);
 #else
   P(io_parity_inflate, QUDA_BOOLEAN_INVALID);
@@ -609,6 +615,12 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(extlib_type, QUDA_EXTLIB_INVALID);
 #endif
 
+#if defined INIT_PARAM
+  P(native_blas_lapack, QUDA_BOOLEAN_TRUE);
+#else
+  P(native_blas_lapack, QUDA_BOOLEAN_INVALID);
+#endif
+
 #ifdef INIT_PARAM
   return ret;
 #endif
@@ -837,6 +849,12 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
   P(is_staggered, QUDA_BOOLEAN_FALSE);
 #else
   P(is_staggered, QUDA_BOOLEAN_INVALID);
+#endif
+
+#ifdef INIT_PARAM
+  P(thin_update_only, QUDA_BOOLEAN_FALSE);
+#else
+  P(thin_update_only, QUDA_BOOLEAN_INVALID);
 #endif
 
 #ifdef INIT_PARAM

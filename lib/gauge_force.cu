@@ -1,7 +1,6 @@
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
 #include <index_helper.cuh>
-#include <generics/ldg.h>
 #include <tune_quda.h>
 #include <instantiate.h>
 

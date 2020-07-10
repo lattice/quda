@@ -83,7 +83,7 @@ static int R[4] = {0, 0, 0, 0};
 // setting this to false prevents redundant halo exchange but isn't yet compatible with HISQ / ASQTAD kernels
 static bool redundant_comms = false;
 
-#include <blas_cublas.h>
+#include <blas_lapack.h>
 
 //for MAGMA lib:
 #include <blas_magma.h>
@@ -660,7 +660,6 @@ void initQudaMemory()
   checkCudaError();
   createDslashEvents();
   blas::init();
-  cublas::init();
 
   // initalize the memory pool allocators
   pool::init();
@@ -1603,7 +1602,8 @@ void endQuda(void)
   LatticeField::freeGhostBuffer();
   cpuColorSpinorField::freeGhostBuffer();
 
-  cublas::destroy();
+  blas_lapack::generic::destroy();
+  blas_lapack::native::destroy();
   blas::end();
 
   pool::flush_pinned();
@@ -2611,6 +2611,8 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   : profile(profile) {
   profile.TPSTART(QUDA_PROFILE_INIT);
   QudaInvertParam *param = mg_param.invert_param;
+  // set whether we are going use native or generic blas
+  blas_lapack::set_native(param->native_blas_lapack);
 
   checkMultigridParam(&mg_param);
   cudaGaugeField *cudaGauge = checkGauge(param);
@@ -2734,50 +2736,76 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
   // setOutputPrefix(prefix);
   setOutputPrefix("MG level 1 (GPU): "); //fix me
 
-  bool outer_pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
-    (param->solve_type == QUDA_NORMOP_PC_SOLVE);
+  // Check if we're doing a thin update only
+  if (mg_param->thin_update_only) {
+    // FIXME: add support for updating kappa, mu as appropriate
 
-  // free the previous dirac operators
-  if (mg->m) delete mg->m;
-  if (mg->mSmooth) delete mg->mSmooth;
-  if (mg->mSmoothSloppy) delete mg->mSmoothSloppy;
+    // FIXME: assumes gauge parameters haven't changed.
+    // These routines will set gauge = gaugeFat for DiracImprovedStaggered
+    mg->d->updateFields(gaugeSloppy, gaugeFatSloppy, gaugeLongSloppy, cloverSloppy);
+    mg->d->setMass(param->mass);
 
-  if (mg->d) delete mg->d;
-  if (mg->dSmooth) delete mg->dSmooth;
-  if (mg->dSmoothSloppy && mg->dSmoothSloppy != mg->dSmooth) delete mg->dSmoothSloppy;
+    mg->dSmooth->updateFields(gaugeSloppy, gaugeFatSloppy, gaugeLongSloppy, cloverSloppy);
+    mg->dSmooth->setMass(param->mass);
 
-  // create new fine dirac operators
+    if (mg->dSmoothSloppy != mg->dSmooth) {
+      if (param->overlap) {
+        mg->dSmoothSloppy->updateFields(gaugeExtended, gaugeFatExtended, gaugeLongExtended, cloverPrecondition);
+      } else {
+        mg->dSmoothSloppy->updateFields(gaugePrecondition, gaugeFatPrecondition, gaugeLongPrecondition,
+                                        cloverPrecondition);
+      }
+      mg->dSmoothSloppy->setMass(param->mass);
+    }
+    // The above changes are propagated internally by use of references, pointers, etc, so
+    // no further updates are needed.
 
-  // this is the Dirac operator we use for inter-grid residual computation
-  DiracParam diracParam;
-  setDiracSloppyParam(diracParam, param, outer_pc_solve);
-  mg->d = Dirac::create(diracParam);
-  mg->m = new DiracM(*(mg->d));
+  } else {
 
-  // this is the Dirac operator we use for smoothing
-  DiracParam diracSmoothParam;
-  bool fine_grid_pc_solve = (mg_param->smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE) ||
-    (mg_param->smoother_solve_type[0] == QUDA_NORMOP_PC_SOLVE);
-  setDiracSloppyParam(diracSmoothParam, param, fine_grid_pc_solve);
-  mg->dSmooth = Dirac::create(diracSmoothParam);
-  mg->mSmooth = new DiracM(*(mg->dSmooth));
+    bool outer_pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) || (param->solve_type == QUDA_NORMOP_PC_SOLVE);
 
-  // this is the Dirac operator we use for sloppy smoothing (we use the preconditioner fields for this)
-  DiracParam diracSmoothSloppyParam;
-  setDiracPreParam(diracSmoothSloppyParam, param, fine_grid_pc_solve, true);
-  mg->dSmoothSloppy = Dirac::create(diracSmoothSloppyParam);;
-  mg->mSmoothSloppy = new DiracM(*(mg->dSmoothSloppy));
+    // free the previous dirac operators
+    if (mg->m) delete mg->m;
+    if (mg->mSmooth) delete mg->mSmooth;
+    if (mg->mSmoothSloppy) delete mg->mSmoothSloppy;
 
-  mg->mgParam->matResidual = mg->m;
-  mg->mgParam->matSmooth = mg->mSmooth;
-  mg->mgParam->matSmoothSloppy = mg->mSmoothSloppy;
+    if (mg->d) delete mg->d;
+    if (mg->dSmooth) delete mg->dSmooth;
+    if (mg->dSmoothSloppy && mg->dSmoothSloppy != mg->dSmooth) delete mg->dSmoothSloppy;
 
-  mg->mgParam->updateInvertParam(*param);
-  if(mg->mgParam->mg_global.invert_param != param)
-    mg->mgParam->mg_global.invert_param = param;
+    // create new fine dirac operators
 
-  bool refresh = true;
-  mg->mg->reset(refresh);
+    // this is the Dirac operator we use for inter-grid residual computation
+    DiracParam diracParam;
+    setDiracSloppyParam(diracParam, param, outer_pc_solve);
+    mg->d = Dirac::create(diracParam);
+    mg->m = new DiracM(*(mg->d));
+
+    // this is the Dirac operator we use for smoothing
+    DiracParam diracSmoothParam;
+    bool fine_grid_pc_solve = (mg_param->smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE)
+      || (mg_param->smoother_solve_type[0] == QUDA_NORMOP_PC_SOLVE);
+    setDiracSloppyParam(diracSmoothParam, param, fine_grid_pc_solve);
+    mg->dSmooth = Dirac::create(diracSmoothParam);
+    mg->mSmooth = new DiracM(*(mg->dSmooth));
+
+    // this is the Dirac operator we use for sloppy smoothing (we use the preconditioner fields for this)
+    DiracParam diracSmoothSloppyParam;
+    setDiracPreParam(diracSmoothSloppyParam, param, fine_grid_pc_solve, true);
+    mg->dSmoothSloppy = Dirac::create(diracSmoothSloppyParam);
+    ;
+    mg->mSmoothSloppy = new DiracM(*(mg->dSmoothSloppy));
+
+    mg->mgParam->matResidual = mg->m;
+    mg->mgParam->matSmooth = mg->mSmooth;
+    mg->mgParam->matSmoothSloppy = mg->mSmoothSloppy;
+
+    mg->mgParam->updateInvertParam(*param);
+    if (mg->mgParam->mg_global.invert_param != param) mg->mgParam->mg_global.invert_param = param;
+
+    bool refresh = true;
+    mg->mg->reset(refresh);
+  }
 
   setOutputPrefix("");
 
@@ -4234,6 +4262,8 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   }
 
   cudaGaugeField *cudaGauge = createExtendedGauge(*cudaSiteLink, R, profileGaugeForce);
+  // apply / remove phase as appropriate
+  if (cudaGauge->StaggeredPhaseApplied()) cudaGauge->removeStaggeredPhase();
 
   // actually do the computation
   profileGaugeForce.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -5152,7 +5182,9 @@ void updateGaugeFieldQuda(void* gauge,
    *num_failures_h = 0;
 
    // project onto SU(3)
+   if (cudaGauge->StaggeredPhaseApplied()) cudaGauge->removeStaggeredPhase();
    projectSU3(*cudaGauge, tol, num_failures_d);
+   if (!cudaGauge->StaggeredPhaseApplied() && param->staggered_phase_applied) cudaGauge->applyStaggeredPhase();
 
    profileProject.TPSTOP(QUDA_PROFILE_COMPUTE);
 
