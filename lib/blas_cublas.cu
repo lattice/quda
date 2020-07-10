@@ -402,7 +402,7 @@ namespace quda {
       long ds = stop.tv_sec - start.tv_sec;
       long dus = stop.tv_usec - start.tv_usec;
       double time = ds + 0.000001*dus;
-      if (getVerbosity() >= QUDA_VERBOSE)
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
 	printfQuda("Batched matrix GEMM completed in %f seconds with GFLOPS = %f\n", time, 1e-9 * flops / time);
       
 #endif // CUBLAS_LIB
