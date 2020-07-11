@@ -6353,13 +6353,10 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
   cublas_param_mom_sum.data_type = QUDA_CUBLAS_DATATYPE_Z;
 
   profileCuBLAS.TPSTART(QUDA_PROFILE_COMPUTE);
-  //printQudaCublasParam(&cublas_param_init);
   cublas::BatchGEMM(d_coeffs2, d_evec, d_q2, cublas_param_init, QUDA_CUDA_FIELD_LOCATION);
   cublas_param_init.m = n3;
-  //printQudaCublasParam(&cublas_param_init);
   cublas::BatchGEMM(d_coeffs3, d_evec, d_q3, cublas_param_init, QUDA_CUDA_FIELD_LOCATION);
   profileCuBLAS.TPSTOP(QUDA_PROFILE_COMPUTE);
-
   
   // Perfrom the caxpy to compute all q1 vectors
   profileAccumulateEvecs.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -6449,6 +6446,7 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 
+  size_t nEvChoose3 = nEv*(nEv-1)/2*(nEv-2)/3;
 
   // Create host pointers for the data device side objects.
   //--------------------------------------------------------------------------------
@@ -6494,11 +6492,15 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
     errorQuda("Irreconcilable difference between interface and internal complex number conventions");
   }  
 
+  std::complex<double>* hostMomPtr = reinterpret_cast<std::complex<double>*>(host_mom); 
+
+  // Device side arrays
+  //-------------------------------------------------------
+  size_t total_bytes = 0;
   size_t OneGB = 1024;
   OneGB *= 1024;
   OneGB *= 1024;
 
-  size_t total_bytes = 0;
   // Device side temp array (complBuf in chroma_laph)
   size_t data_tmp_bytes = blockSizeMomProj * X[0] * X[1] * X[2] * 2 * quda_evec[0]->Precision();
   void *d_tmp = pool_device_malloc(data_tmp_bytes);
@@ -6507,14 +6509,11 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
 
   // A second temp array (tmpBuf in chroma_laph) This will be returned for a
   // globalChunkedSumArray (QDP)
-  size_t nEvChoose3 = nEv*(nEv-1)/2*(nEv-2)/3;
   size_t data_ret_bytes = nEvChoose3 * nMom * 2 * quda_evec[0]->Precision();
   void *d_ret = pool_device_malloc(data_ret_bytes);
   total_bytes += data_ret_bytes;
   printfQuda("d_ret bytes = %fGB total_bytes = %fGB\n", (double)data_ret_bytes/(OneGB), (double)total_bytes/(OneGB)); 
   
-  // Array of momenta
-  std::complex<double>* hostMomPtr = reinterpret_cast<std::complex<double>*>(host_mom); 
   size_t data_mom_bytes = nMom * nSites * 2 * quda_evec[0]->Precision();
   void *d_mom = pool_device_malloc(data_mom_bytes);
   total_bytes += data_mom_bytes;
@@ -6730,6 +6729,10 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
   if (getVerbosity() >= QUDA_VERBOSE) printfQuda("coeffs2 bytes = %fGB, total = %fGB\n", (double)data_coeffs2_bytes/(OneGB), (double)total_bytes/(OneGB));   
   void *d_coeffs2 = pool_device_malloc(data_coeffs2_bytes);
 
+  total_bytes += (nSubEv * data_coeffs2_bytes);
+  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("coeffs2_arr bytes = %fGB, total = %fGB\n", (nSubEv)*((double)data_coeffs2_bytes/(OneGB)), (double)total_bytes/(OneGB));   
+  void *d_coeffs2_arr = pool_device_malloc(nSubEv * data_coeffs2_bytes);
+
   total_bytes += data_tmp_bytes;
   if (getVerbosity() >= QUDA_VERBOSE) printfQuda("tmp bytes = %fGB, total = %fGB\n", (double)data_tmp_bytes/(OneGB), (double)total_bytes/(OneGB));   
   void *d_tmp = pool_device_malloc(data_tmp_bytes);
@@ -6755,7 +6758,7 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
   cublas_param_2.ldc = n3;
   cublas_param_2.b_offset = 0;
   cublas_param_2.c_offset = 0;
-  cublas_param_2.batch_count = 1;
+  cublas_param_2.batch_count = nSubEv;
   cublas_param_2.alpha = (__complex__ double)alpha;  
   cublas_param_2.beta  = (__complex__ double)beta;
   cublas_param_2.data_order = QUDA_CUBLAS_DATAORDER_ROW;
@@ -6779,16 +6782,27 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
   cublas_param_3.data_type = QUDA_CUBLAS_DATATYPE_Z;
 
   profileCuBLAS.TPSTART(QUDA_PROFILE_COMPUTE);
-  for(int i=0; i<nMom; i++) {
-    for(int k=0; k<nSubEv; k++) {
-      cublas_param_2.b_offset = (i * nSubEv + k) * nEv * n3;
-      cublas_param_2.c_offset = k * n2 * n3;
-      cublas::BatchGEMM(d_coeffs2, d_q3, d_tmp, cublas_param_2, QUDA_CUDA_FIELD_LOCATION);
+
+  qudaMemcpy((void*)((std::complex<double>*)d_coeffs2_arr + n2 * nEv), d_coeffs2, data_coeffs2_bytes, cudaMemcpyDeviceToDevice);
+  
+  for(int i=0; i<nMom; i++) {    
+    if(cublas_param_2.batch_count != nSubEv) {
+      for(int k=0; k<nSubEv; k++) {
+	cublas_param_2.b_offset = (i * nSubEv + k) * nEv * n3;
+	cublas_param_2.c_offset = k * n2 * n3; 
+	cublas::BatchGEMM(d_coeffs2, d_q3, d_tmp, cublas_param_2, QUDA_CUDA_FIELD_LOCATION);
+      }
+    } else {
+      cublas_param_2.b_offset = i * nSubEv * nEv * n3;
+      cublas::BatchGEMM(d_coeffs2_arr, d_q3, d_tmp, cublas_param_2, QUDA_CUDA_FIELD_LOCATION);
     }
+    
     cublas_param_3.a_offset = iRank * nSubEv;
     cublas_param_3.c_offset = i * n1 * n2 * n3;
     cublas::BatchGEMM(d_coeffs1, d_tmp, d_ret, cublas_param_3, QUDA_CUDA_FIELD_LOCATION);
   }
+
+
   if (getVerbosity() >= QUDA_VERBOSE) printfQuda("GEMM 2+3 Success!\n");  
   profileCuBLAS.TPSTOP(QUDA_PROFILE_COMPUTE);
 
@@ -6801,6 +6815,7 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
   profileBaryonKernelModeTripletsB.TPSTART(QUDA_PROFILE_FREE);
   pool_device_free(d_coeffs1);
   pool_device_free(d_coeffs2);
+  pool_device_free(d_coeffs2_arr);
   pool_device_free(d_tmp);
   pool_device_free(d_q3);
   pool_device_free(d_ret);  
