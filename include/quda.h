@@ -1451,10 +1451,8 @@ extern "C" {
 					   double _Complex *host_coeffs1, 
 					   double _Complex *host_coeffs2, 
 					   double _Complex *host_coeffs3,
-					   double _Complex *host_mom, 
 					   double _Complex *host_mode_trip_buf, 
-					   int nEv, void **evPtr, 
-					   void *retArray,
+					   int nEv, void *retArray,
 					   const int X[4]);
   
   /**
