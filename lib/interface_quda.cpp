@@ -6683,8 +6683,8 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
  }
  */
 
- void *d_mtb = nullptr;
- bool mtb_loaded = false;
+ //void *d_mtb = nullptr;
+ //bool mtb_loaded = false;
 
  void laphBaryonKernelComputeModeTripletB(int n1, int n2, int n3, int nMom, int nEv,
 					  double _Complex *host_coeffs1, 
@@ -6747,12 +6747,10 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
    //--------------------------------------------------------------------------------
 
    // Allocate required memory
-   if(!mtb_loaded) {
-     total_bytes += data_mtb_bytes;
-     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("mtb bytes = %fGB, total = %fGB\n", (double)data_mtb_bytes/(OneGB), (double)total_bytes/(OneGB));
-     d_mtb = pool_device_malloc(data_mtb_bytes);
-   }
-
+   total_bytes += data_mtb_bytes;
+   if (getVerbosity() >= QUDA_VERBOSE) printfQuda("mtb bytes = %fGB, total = %fGB\n", (double)data_mtb_bytes/(OneGB), (double)total_bytes/(OneGB));
+   void *d_mtb = pool_device_malloc(data_mtb_bytes);
+   
    total_bytes += data_q3_bytes;  
    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("q3 bytes = %fGB, total = %fGB\n", (double)data_q3_bytes/(OneGB), (double)total_bytes/(OneGB));  
    void *d_q3 = pool_device_malloc(data_q3_bytes);
@@ -6790,9 +6788,8 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
    // Copy required host data to device
    profileBaryonKernelModeTripletsB.TPSTART(QUDA_PROFILE_H2D);  
    qudaMemcpyAsync(d_coeffs3, hostCoeffs3Ptr, data_coeffs3_bytes, cudaMemcpyHostToDevice, stream[1]);  
-   //if(!mtb_loaded) qudaMemcpyAsync(d_mtb, hostModeTripBufPtr, data_mtb_bytes, cudaMemcpyHostToDevice, stream[2]);  
    qudaMemcpyAsync(d_mtb, hostModeTripBufPtr, data_mtb_bytes, cudaMemcpyHostToDevice, stream[2]);  
-   //qudaDeviceSynchronize();
+   qudaDeviceSynchronize();
    profileBaryonKernelModeTripletsB.TPSTOP(QUDA_PROFILE_H2D);
 
    profileBaryonKernelModeTripletsB.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -6806,14 +6803,7 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
    total_bytes -= data_coeffs3_bytes;
    pool_device_free(d_mtb);
    total_bytes -= data_mtb_bytes;
-
-   /*
-   if(!mtb_loaded) {
-     pool_device_free(d_mtb);
-     total_bytes -= data_mtb_bytes;
-     mtb_loaded = true;
-   }
-   */
+   
    profileBaryonKernelModeTripletsB.TPSTOP(QUDA_PROFILE_FREE);
 
    //profileBaryonKernelModeTripletsB.TPSTART(QUDA_PROFILE_INIT);
@@ -6848,20 +6838,9 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
    profileBaryonKernelModeTripletsB.TPSTART(QUDA_PROFILE_H2D);  
    qudaMemcpyAsync(d_coeffs1_arr, hostCoeffs1Ptr, data_coeffs1_bytes, cudaMemcpyHostToDevice, stream[1]);  
    qudaMemcpyAsync(d_coeffs2_arr, hostCoeffs2Ptr, data_coeffs2_bytes, cudaMemcpyHostToDevice, stream[2]);  
+   qudaDeviceSynchronize();
    profileBaryonKernelModeTripletsB.TPSTOP(QUDA_PROFILE_H2D);
-   qudaDeviceSynchronize();   
-   // d_coeffs2 is duplicated nSubEv * momBatch times along d_coeffs2_arr
-   profileBaryonKernelModeTripletsB.TPSTART(QUDA_PROFILE_MEMCPY_D2D_ASYNC);  
-   for(int i=0; i<nSubEv * momBatchSize; i++) {
-     //qudaMemcpyAsync((void*)((std::complex<double>*)d_coeffs2_arr + i * (n2 * nEv)), d_coeffs2_arr, data_coeffs2_bytes, cudaMemcpyDeviceToDevice, stream[i+1]);
-   }
-   //qudaDeviceSynchronize();
-   for(int i=0; i<momBatchSize; i++) {
-     //qudaMemcpyAsync((void*)((std::complex<double>*)d_coeffs1_arr + i * (n1 * nEv)), d_coeffs1_arr, data_coeffs1_bytes, cudaMemcpyDeviceToDevice, stream[i+1]);
-   }
    
-   profileBaryonKernelModeTripletsB.TPSTOP(QUDA_PROFILE_MEMCPY_D2D_ASYNC);
-
    profileBaryonKernelModeTripletsB.TPSTART(QUDA_PROFILE_INIT);
    QudaCublasParam cublas_param_2 = newQudaCublasParam();
    cublas_param_2.trans_a = QUDA_CUBLAS_OP_N;
@@ -6875,7 +6854,8 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
    cublas_param_2.b_offset = 0;
    cublas_param_2.c_offset = 0;
    cublas_param_2.strideA = 0;
-   cublas_param_2.batch_count = nSubEv * momBatchSize;
+   //cublas_param_2.batch_count = nSubEv * momBatchSize;
+   cublas_param_2.batch_count = 1;
    cublas_param_2.alpha = (__complex__ double)alpha;  
    cublas_param_2.beta  = (__complex__ double)beta;
    cublas_param_2.data_order = QUDA_CUBLAS_DATAORDER_ROW;
@@ -6893,7 +6873,8 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
    cublas_param_3.b_offset = 0;
    cublas_param_3.c_offset = 0;
    cublas_param_3.strideA = 0;
-   cublas_param_3.batch_count = momBatchSize;
+   //cublas_param_3.batch_count = momBatchSize;
+   cublas_param_3.batch_count = 1;
    cublas_param_3.alpha = (__complex__ double)alpha;  
    cublas_param_3.beta  = (__complex__ double)beta;
    cublas_param_3.data_order = QUDA_CUBLAS_DATAORDER_ROW;
