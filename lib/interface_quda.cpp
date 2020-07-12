@@ -111,6 +111,18 @@ void closeMagma(){
 
 }
 
+// Convenience function for checking CUDA runtime API results
+// can be wrapped around any runtime API call. No-op in release builds.
+inline cudaError_t checkCuda(cudaError_t result)
+{
+  if (result != cudaSuccess) {
+    printfQuda("CUDA Runtime Error: %s\n", cudaGetErrorString(result));
+    //std::assert(result == cudaSuccess);
+  }
+  return result;
+}
+
+
 cudaGaugeField *gaugePrecise = nullptr;
 cudaGaugeField *gaugeSloppy = nullptr;
 cudaGaugeField *gaugePrecondition = nullptr;
@@ -6372,7 +6384,7 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
       for (int dil3=0; dil3<n3; dil3++) {
 	profileColorContract.TPSTART(QUDA_PROFILE_COMPUTE);	
 	colorContractQuda(*quda_diq[0], *quda_q3[dil3], 
-			  (std::complex<double>*)d_tmp + nSites*nInBlock);
+			  (std::complex<double>*)d_tmp + nSites*nInBlock, 0);
 	profileColorContract.TPSTOP(QUDA_PROFILE_COMPUTE);
 	nInBlock++;
 
@@ -6420,10 +6432,10 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
   profileBaryonKernel.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
- void laphBaryonKernelComputeModeTripletA(int nMom, int nEv, void **host_evec, 
+ void laphBaryonKernelComputeModeTripletA(int nMom, int nEv, int blockSizeMomProj,
+					  void **host_evec, 
 					  double _Complex *host_mom,
-					  void *retArr,
-					  int blockSizeMomProj,
+					  double _Complex *return_arr,
 					  const int X[4]) {
   
    // set to 0 to skip this part and test the B kernel
@@ -6488,13 +6500,14 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
   cuda_diq_param.create = QUDA_ZERO_FIELD_CREATE;
   std::vector<ColorSpinorField *> quda_diq;
   quda_diq.push_back(ColorSpinorField::Create(cuda_diq_param));
-
+  
   // check we are safe to cast into a Complex (= std::complex<double>)
   if (sizeof(Complex) != sizeof(double _Complex)) {
     errorQuda("Irreconcilable difference between interface and internal complex number conventions");
   }  
-
+  
   std::complex<double>* hostMomPtr = reinterpret_cast<std::complex<double>*>(host_mom); 
+  std::complex<double>* retArrPtr = reinterpret_cast<std::complex<double>*>(return_arr); 
 
   // Device side arrays
   //-------------------------------------------------------
@@ -6502,7 +6515,7 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
   size_t OneGB = 1024;
   OneGB *= 1024;
   OneGB *= 1024;
-
+  
   // Device side temp array (complBuf in chroma_laph)
   size_t data_tmp_bytes = blockSizeMomProj * X[0] * X[1] * X[2] * 2 * quda_evec[0]->Precision();
   void *d_tmp = pool_device_malloc(data_tmp_bytes);
@@ -6548,6 +6561,50 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
   cublas_param_mom_sum.data_order = QUDA_CUBLAS_DATAORDER_ROW;
   cublas_param_mom_sum.data_type = QUDA_CUBLAS_DATATYPE_Z;
 
+  /*
+  cudaStream_t stream[64+1];
+  for (int i = 0; i < 64 + 1; i++) {
+    checkCuda(cudaStreamCreate(&stream[i]));
+  }
+  
+  int nInBlock = 0;  
+  int blockStart = 0;
+  for (int aEv=0; aEv<nEv; aEv++) {
+    for (int bEv=aEv+1; bEv<nEv; bEv++) {
+      
+      profileBaryonKernelModeTripletsA.TPSTART(QUDA_PROFILE_COMPUTE);
+      colorCrossQuda(*quda_evec[aEv], *quda_evec[bEv], *quda_diq[0]);
+      profileBaryonKernelModeTripletsA.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+      for (int cEv=bEv+1; cEv<nEv; cEv++) {
+
+	nInBlock++;
+	
+	if (nInBlock == blockSizeMomProj) {
+	  profileBaryonKernelModeTripletsA.TPSTART(QUDA_PROFILE_COMPUTE);
+	  
+	  for(int b=0; b<nInBlock; b+=64) {
+	    for(int s=0; s<64; s++) {
+	      colorContractQuda(*quda_diq[0], *quda_evec[cEv], 
+				(std::complex<double>*)d_tmp + nSites*(b + s), stream[s+1]);
+	    }
+	  }
+	  cublas_param_mom_sum.n = nInBlock;
+	  cublas_param_mom_sum.c_offset = blockStart;
+	  cublas::BatchGEMM(d_mom, d_tmp, d_ret, cublas_param_mom_sum, QUDA_CUDA_FIELD_LOCATION);
+	  profileBaryonKernelModeTripletsA.TPSTOP(QUDA_PROFILE_COMPUTE);	  
+	  blockStart += nInBlock;
+	  nInBlock = 0;
+	}
+      }
+    }
+  }
+
+  for (int i = 0; i < 64 + 1; i++) {
+    checkCuda(cudaStreamDestroy(stream[i]));
+  }
+  */
+
   int nInBlock = 0;  
   int blockStart = 0;
   for (int aEv=0; aEv<nEv; aEv++) {
@@ -6559,7 +6616,7 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
 
       for (int cEv=bEv+1; cEv<nEv; cEv++) {
 
-	profileColorContract.TPSTART(QUDA_PROFILE_COMPUTE);	
+	profileColorContract.TPSTART(QUDA_PROFILE_COMPUTE);
 	colorContractQuda(*quda_diq[0], *quda_evec[cEv], 
 			  (std::complex<double>*)d_tmp + nSites*nInBlock);
 	profileColorContract.TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -6570,15 +6627,16 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
 	  //printfQuda("aEv = %d, bEv = %d, cEv = %d, nInBlock = %d\n", aEv, bEv, cEv, nInBlock);
 	  cublas_param_mom_sum.n = nInBlock;
 	  cublas_param_mom_sum.c_offset = blockStart;
-	  profileCuBLAS.TPSTART(QUDA_PROFILE_COMPUTE);	  
+	  profileCuBLAS.TPSTART(QUDA_PROFILE_COMPUTE);  
 	  cublas::BatchGEMM(d_mom, d_tmp, d_ret, cublas_param_mom_sum, QUDA_CUDA_FIELD_LOCATION);
-	  profileCuBLAS.TPSTOP(QUDA_PROFILE_COMPUTE);	  
+	  profileCuBLAS.TPSTOP(QUDA_PROFILE_COMPUTE);  
 	  blockStart += nInBlock;
 	  nInBlock = 0;
 	}
       }
     }
   }
+
 
   // leftover momentum projection
   if (nInBlock > 0) {
@@ -6593,7 +6651,7 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
 
   // Copy return array back to host
   profileBaryonKernelModeTripletsA.TPSTART(QUDA_PROFILE_D2H);
-  qudaMemcpy(retArr, d_ret, data_ret_bytes, cudaMemcpyDeviceToHost);  
+  qudaMemcpy(retArrPtr, d_ret, data_ret_bytes, cudaMemcpyDeviceToHost);  
   profileBaryonKernelModeTripletsA.TPSTOP(QUDA_PROFILE_D2H);
   
   // Clean up memory allocations
@@ -6613,24 +6671,27 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
   profileBaryonKernelModeTripletsA.TPSTOP(QUDA_PROFILE_TOTAL);
 #endif
 }
+ 
+ /*
+ void laphBaryonKernelComputeModeTripletMid(int nMom, int nEv, 
+					    double _Complex *temp_buf,
+					    double _Complex *host_mode_trip_buf,
+					    const int X[4]) { 
+   profileBaryonKernelModeTripletsMib.TPSTART(QUDA_PROFILE_TOTAL);
+   profileBaryonKernelModeTripletsB.TPSTART(QUDA_PROFILE_INIT);
 
- // Convenience function for checking CUDA runtime API results
- // can be wrapped around any runtime API call. No-op in release builds.
- inline cudaError_t checkCuda(cudaError_t result)
- {
-   if (result != cudaSuccess) {
-     printfQuda("CUDA Runtime Error: %s\n", cudaGetErrorString(result));
-     //std::assert(result == cudaSuccess);
-   }
-   return result;
  }
+ */
 
- void laphBaryonKernelComputeModeTripletB(int n1, int n2, int n3, int nMom,
+ void *d_mtb = nullptr;
+ bool mtb_loaded = false;
+
+ void laphBaryonKernelComputeModeTripletB(int n1, int n2, int n3, int nMom, int nEv,
 					  double _Complex *host_coeffs1, 
 					  double _Complex *host_coeffs2, 
 					  double _Complex *host_coeffs3,
 					  double _Complex *host_mode_trip_buf,
-					  int nEv, void *retArr,
+					  double _Complex *retArr,
 					  const int X[4]) {
    
    
@@ -6645,7 +6706,7 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("nSubEv = %d\n", nSubEv);
    fflush(stdout);  
    int iRank = comm_rank();
-
+   
    int momBatch = 33;
    if(nMom % momBatch != 0) errorQuda("Momentum batches %d must evenly divide %d\n", momBatch, nMom);
    int momBatchSize = nMom / momBatch;
@@ -6686,9 +6747,11 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
    //--------------------------------------------------------------------------------
 
    // Allocate required memory
-   total_bytes += data_mtb_bytes;
-   if (getVerbosity() >= QUDA_VERBOSE) printfQuda("mtb bytes = %fGB, total = %fGB\n", (double)data_mtb_bytes/(OneGB), (double)total_bytes/(OneGB));
-   void *d_mtb = pool_device_malloc(data_mtb_bytes);
+   if(!mtb_loaded) {
+     total_bytes += data_mtb_bytes;
+     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("mtb bytes = %fGB, total = %fGB\n", (double)data_mtb_bytes/(OneGB), (double)total_bytes/(OneGB));
+     d_mtb = pool_device_malloc(data_mtb_bytes);
+   }
 
    total_bytes += data_q3_bytes;  
    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("q3 bytes = %fGB, total = %fGB\n", (double)data_q3_bytes/(OneGB), (double)total_bytes/(OneGB));  
@@ -6718,8 +6781,8 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
    cublas_param_1.data_order = QUDA_CUBLAS_DATAORDER_ROW;
    cublas_param_1.data_type = QUDA_CUBLAS_DATATYPE_Z;
 
-   cudaStream_t stream[nSubEv * momBatchSize+1];
-   for (int i = 0; i < nSubEv * momBatchSize+1; i++) {
+   cudaStream_t stream[momBatchSize+2];
+   for (int i = 0; i < momBatchSize+2; i++) {
      checkCuda(cudaStreamCreate(&stream[i]));
    }
    profileBaryonKernelModeTripletsB.TPSTOP(QUDA_PROFILE_INIT);
@@ -6727,8 +6790,9 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
    // Copy required host data to device
    profileBaryonKernelModeTripletsB.TPSTART(QUDA_PROFILE_H2D);  
    qudaMemcpyAsync(d_coeffs3, hostCoeffs3Ptr, data_coeffs3_bytes, cudaMemcpyHostToDevice, stream[1]);  
+   //if(!mtb_loaded) qudaMemcpyAsync(d_mtb, hostModeTripBufPtr, data_mtb_bytes, cudaMemcpyHostToDevice, stream[2]);  
    qudaMemcpyAsync(d_mtb, hostModeTripBufPtr, data_mtb_bytes, cudaMemcpyHostToDevice, stream[2]);  
-   qudaDeviceSynchronize();
+   //qudaDeviceSynchronize();
    profileBaryonKernelModeTripletsB.TPSTOP(QUDA_PROFILE_H2D);
 
    profileBaryonKernelModeTripletsB.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -6742,16 +6806,33 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
    total_bytes -= data_coeffs3_bytes;
    pool_device_free(d_mtb);
    total_bytes -= data_mtb_bytes;
+
+   /*
+   if(!mtb_loaded) {
+     pool_device_free(d_mtb);
+     total_bytes -= data_mtb_bytes;
+     mtb_loaded = true;
+   }
+   */
    profileBaryonKernelModeTripletsB.TPSTOP(QUDA_PROFILE_FREE);
 
+   //profileBaryonKernelModeTripletsB.TPSTART(QUDA_PROFILE_INIT);
+   //total_bytes += (momBatchSize * data_coeffs1_bytes);
+   //if (getVerbosity() >= QUDA_VERBOSE) printfQuda("coeffs1_arr bytes = %fGB, total = %fGB\n", momBatchSize * ((double)data_coeffs1_bytes)/(OneGB), (double)total_bytes/(OneGB));  
+   //void *d_coeffs1_arr = pool_device_malloc(momBatchSize * data_coeffs1_bytes);
+
    profileBaryonKernelModeTripletsB.TPSTART(QUDA_PROFILE_INIT);
-   total_bytes += (momBatchSize * data_coeffs1_bytes);
-   if (getVerbosity() >= QUDA_VERBOSE) printfQuda("coeffs1_arr bytes = %fGB, total = %fGB\n", momBatchSize * ((double)data_coeffs1_bytes)/(OneGB), (double)total_bytes/(OneGB));  
-   void *d_coeffs1_arr = pool_device_malloc(momBatchSize * data_coeffs1_bytes);
+   total_bytes += (data_coeffs1_bytes);
+   if (getVerbosity() >= QUDA_VERBOSE) printfQuda("coeffs1_arr bytes = %fGB, total = %fGB\n", ((double)data_coeffs1_bytes)/(OneGB), (double)total_bytes/(OneGB));  
+   void *d_coeffs1_arr = pool_device_malloc(data_coeffs1_bytes);
    
-   total_bytes += (nSubEv * momBatchSize * data_coeffs2_bytes);
-   if (getVerbosity() >= QUDA_VERBOSE) printfQuda("coeffs2_arr bytes = %fGB, total = %fGB\n", (nSubEv * momBatchSize)*((double)data_coeffs2_bytes/(OneGB)), (double)total_bytes/(OneGB));   
-   void *d_coeffs2_arr = pool_device_malloc(nSubEv * momBatchSize * data_coeffs2_bytes);
+   //total_bytes += (nSubEv * momBatchSize * data_coeffs2_bytes);
+   //if (getVerbosity() >= QUDA_VERBOSE) printfQuda("coeffs2_arr bytes = %fGB, total = %fGB\n", (nSubEv * momBatchSize)*((double)data_coeffs2_bytes/(OneGB)), (double)total_bytes/(OneGB));   
+   //void *d_coeffs2_arr = pool_device_malloc(nSubEv * momBatchSize * data_coeffs2_bytes);
+
+   total_bytes += (data_coeffs2_bytes);
+   if (getVerbosity() >= QUDA_VERBOSE) printfQuda("coeffs2_arr bytes = %fGB, total = %fGB\n", ((double)data_coeffs2_bytes/(OneGB)), (double)total_bytes/(OneGB));   
+   void *d_coeffs2_arr = pool_device_malloc(data_coeffs2_bytes);
 
    total_bytes += (momBatchSize * data_tmp_bytes);
    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("tmp bytes = %fGB, total = %fGB\n", (momBatchSize)*((double)data_tmp_bytes)/(OneGB), (double)total_bytes/(OneGB));   
@@ -6768,21 +6849,17 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
    qudaMemcpyAsync(d_coeffs1_arr, hostCoeffs1Ptr, data_coeffs1_bytes, cudaMemcpyHostToDevice, stream[1]);  
    qudaMemcpyAsync(d_coeffs2_arr, hostCoeffs2Ptr, data_coeffs2_bytes, cudaMemcpyHostToDevice, stream[2]);  
    profileBaryonKernelModeTripletsB.TPSTOP(QUDA_PROFILE_H2D);
-   
+   qudaDeviceSynchronize();   
    // d_coeffs2 is duplicated nSubEv * momBatch times along d_coeffs2_arr
    profileBaryonKernelModeTripletsB.TPSTART(QUDA_PROFILE_MEMCPY_D2D_ASYNC);  
    for(int i=0; i<nSubEv * momBatchSize; i++) {
-     qudaMemcpyAsync((void*)((std::complex<double>*)d_coeffs2_arr + i * (n2 * nEv)), d_coeffs2_arr, data_coeffs2_bytes, cudaMemcpyDeviceToDevice, stream[i+1]);
+     //qudaMemcpyAsync((void*)((std::complex<double>*)d_coeffs2_arr + i * (n2 * nEv)), d_coeffs2_arr, data_coeffs2_bytes, cudaMemcpyDeviceToDevice, stream[i+1]);
    }
-   qudaDeviceSynchronize();
+   //qudaDeviceSynchronize();
    for(int i=0; i<momBatchSize; i++) {
-     qudaMemcpyAsync((void*)((std::complex<double>*)d_coeffs1_arr + i * (n1 * nEv)), d_coeffs1_arr, data_coeffs1_bytes, cudaMemcpyDeviceToDevice, stream[i+1]);
+     //qudaMemcpyAsync((void*)((std::complex<double>*)d_coeffs1_arr + i * (n1 * nEv)), d_coeffs1_arr, data_coeffs1_bytes, cudaMemcpyDeviceToDevice, stream[i+1]);
    }
-   qudaDeviceSynchronize();
    
-   for (int i = 0; i < nSubEv * momBatchSize+1; i++) {
-     checkCuda(cudaStreamDestroy(stream[i]));
-   }
    profileBaryonKernelModeTripletsB.TPSTOP(QUDA_PROFILE_MEMCPY_D2D_ASYNC);
 
    profileBaryonKernelModeTripletsB.TPSTART(QUDA_PROFILE_INIT);
@@ -6797,6 +6874,7 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
    cublas_param_2.ldc = n3;
    cublas_param_2.b_offset = 0;
    cublas_param_2.c_offset = 0;
+   cublas_param_2.strideA = 0;
    cublas_param_2.batch_count = nSubEv * momBatchSize;
    cublas_param_2.alpha = (__complex__ double)alpha;  
    cublas_param_2.beta  = (__complex__ double)beta;
@@ -6814,6 +6892,7 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
    cublas_param_3.ldc = n2*n3;
    cublas_param_3.b_offset = 0;
    cublas_param_3.c_offset = 0;
+   cublas_param_3.strideA = 0;
    cublas_param_3.batch_count = momBatchSize;
    cublas_param_3.alpha = (__complex__ double)alpha;  
    cublas_param_3.beta  = (__complex__ double)beta;
@@ -6826,14 +6905,14 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
    /*
    for(int i=0; i<nMom; i+=momBatchSize) {    
      cublas_param_2.b_offset = i * nSubEv * nEv * n3;
-     cublas::BatchGEMM(d_coeffs2_arr, d_q3, d_tmp, cublas_param_2, QUDA_CUDA_FIELD_LOCATION);
-    
-     cublas_param_3.a_offset = i * nEv * n1 + iRank * nSubEv;
+     cublas::stridedBatchGEMM(d_coeffs2_arr, d_q3, d_tmp, cublas_param_2, QUDA_CUDA_FIELD_LOCATION);
+     cublas_param_3.a_offset = iRank * nSubEv;
      cublas_param_3.c_offset = i * n1 * n2 * n3;
-     cublas::BatchGEMM(d_coeffs1_arr, d_tmp, d_ret, cublas_param_3, QUDA_CUDA_FIELD_LOCATION);
+     cublas::stridedBatchGEMM(d_coeffs1_arr, d_tmp, d_ret, cublas_param_3, QUDA_CUDA_FIELD_LOCATION);
    }
    */
 
+   
    //non mom Batched route   
    for(int i=0; i<nMom; i++) {    
      if(cublas_param_2.batch_count != nSubEv) {
@@ -6844,22 +6923,24 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
        }
      } else {
        cublas_param_2.b_offset = i * nSubEv * nEv * n3;
-       cublas::BatchGEMM(d_coeffs2_arr, d_q3, d_tmp, cublas_param_2, QUDA_CUDA_FIELD_LOCATION);
+       cublas::stridedBatchGEMM(d_coeffs2_arr, d_q3, d_tmp, cublas_param_2, QUDA_CUDA_FIELD_LOCATION);
      }
      
      cublas_param_3.a_offset = iRank * nSubEv;
      cublas_param_3.c_offset = i * n1 * n2 * n3;
      cublas::BatchGEMM(d_coeffs1_arr, d_tmp, d_ret, cublas_param_3, QUDA_CUDA_FIELD_LOCATION);
    }
-     
+   
 
    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("GEMM 2+3 Success!\n");  
    profileBaryonKernelModeTripletsB.TPSTOP(QUDA_PROFILE_COMPUTE);
 
    // Copy return array to host
    profileBaryonKernelModeTripletsB.TPSTART(QUDA_PROFILE_D2H);
-   qudaMemcpy(retArr, d_ret, data_ret_bytes, cudaMemcpyDeviceToHost);  
+   qudaMemcpyAsync(retArr, d_ret, data_ret_bytes, cudaMemcpyDeviceToHost, stream[1]);  
+   qudaDeviceSynchronize();
    profileBaryonKernelModeTripletsB.TPSTOP(QUDA_PROFILE_D2H);
+
 
    // Clean up all remaining memory allocations
    profileBaryonKernelModeTripletsB.TPSTART(QUDA_PROFILE_FREE);
@@ -6869,6 +6950,10 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
    pool_device_free(d_q3);
    pool_device_free(d_ret);  
    profileBaryonKernelModeTripletsB.TPSTOP(QUDA_PROFILE_FREE);
+
+   for (int i = 0; i < momBatchSize + 2; i++) {
+     checkCuda(cudaStreamDestroy(stream[i]));
+   }
   
    profileBaryonKernelModeTripletsB.TPSTOP(QUDA_PROFILE_TOTAL);  
  }

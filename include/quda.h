@@ -722,6 +722,9 @@ extern "C" {
     int a_offset;                /**< position of the A array from which begin read/write. */
     int b_offset;                /**< position of the B array from which begin read/write. */
     int c_offset;                /**< position of the C array from which begin read/write. */
+    int strideA;                 /**< stride of the A array in strided(batched) mode */
+    int strideB;                 /**< stride of the B array in strided(batched) mode */
+    int strideC;                 /**< stride of the C array in strided(batched) mode */
 
     double_complex alpha; /**< scalar used for multiplication. */
     double_complex beta;  /**< scalar used for multiplication. If beta==0, C does not have to be a valid input.*/
@@ -1441,18 +1444,18 @@ extern "C" {
 			const int X[4]);
   
   
-  void laphBaryonKernelComputeModeTripletA(int nMom, int nEv2, void **host_evec, 
+  void laphBaryonKernelComputeModeTripletA(int nMom, int nEv, int blockSizeMomProj,
+					   void **host_evec, 
 					   double _Complex *host_mom,
-					   void *retArr,
-					   int blockSizeMomProj,
+					   double _Complex *return_array,
 					   const int X[4]);  
   
-  void laphBaryonKernelComputeModeTripletB(int n1, int n2, int n3, int nMom,
+  void laphBaryonKernelComputeModeTripletB(int n1, int n2, int n3, int nMom, int nEv, 
 					   double _Complex *host_coeffs1, 
 					   double _Complex *host_coeffs2, 
 					   double _Complex *host_coeffs3,
 					   double _Complex *host_mode_trip_buf, 
-					   int nEv, void *retArray,
+					   double _Complex *return_array,
 					   const int X[4]);
   
   /**

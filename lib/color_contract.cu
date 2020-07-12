@@ -76,15 +76,15 @@ namespace quda
   };
   
   template <typename Float, int nColor>
-  void colorContract(const ColorSpinorField &x, const ColorSpinorField &y, complex<Float> *result)
+  void colorContract(const ColorSpinorField &x, const ColorSpinorField &y, complex<Float> *result, cudaStream_t stream)
   {
     ColorContractArg<Float, nColor> arg(x, y, result);
     ColorContractCompute<Float, ColorContractArg<Float, nColor>> color_contract(arg, x, y);
-    color_contract.apply(0);
-    qudaDeviceSynchronize();
+    color_contract.apply(stream);
+    //qudaDeviceSynchronize();
   }
   
-  void colorContractQuda(const ColorSpinorField &x, const ColorSpinorField &y, void *result)
+  void colorContractQuda(const ColorSpinorField &x, const ColorSpinorField &y, void *result, cudaStream_t stream)
   {
     checkPrecision(x, y);
     
@@ -92,9 +92,9 @@ namespace quda
     if (x.Nspin() != 1 || y.Nspin() != 1) errorQuda("Unexpected number of spins x=%d y=%d", x.Nspin(), y.Nspin());
     
     if (x.Precision() == QUDA_SINGLE_PRECISION) {
-      colorContract<float, 3>(x, y, (complex<float> *)result);
+      colorContract<float, 3>(x, y, (complex<float> *)result, stream);
     } else if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-      colorContract<double, 3>(x, y, (complex<double> *)result);
+      colorContract<double, 3>(x, y, (complex<double> *)result, stream);
     } else {
       errorQuda("Precision %d not supported", x.Precision());
     }

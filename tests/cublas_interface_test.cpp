@@ -74,6 +74,9 @@ int main(int argc, char **argv)
   cublas_param.a_offset = cublas_offsets[0];
   cublas_param.b_offset = cublas_offsets[1];
   cublas_param.c_offset = cublas_offsets[2];
+  cublas_param.strideA = cublas_strides[0];
+  cublas_param.strideB = cublas_strides[1];
+  cublas_param.strideC = cublas_strides[2];
   cublas_param.alpha = (__complex__ double)cublas_alpha_re_im[0];
   cublas_param.beta = (__complex__ double)cublas_beta_re_im[0];
   cublas_param.data_order = cublas_data_order;
