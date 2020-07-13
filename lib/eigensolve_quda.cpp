@@ -251,7 +251,7 @@ namespace quda
           kSpace[i]->setSuggestedParity(mat_parity);
           vecs_ptr.push_back(kSpace[i]->CreateAlias(csParamClone));
         }
-        if (getVerbosity() >= QUDA_SUMMARIZE) {
+        if (getVerbosity() >= QUDA_VERBOSE) {
           printfQuda("kSpace successfully down copied from prec %d to prec %d\n", kSpace[0]->Precision(),
                      vecs_ptr[0]->Precision());
         }
@@ -267,6 +267,15 @@ namespace quda
       for (unsigned int i = 0; i < kSpace.size() && save_prec < prec; i++) delete vecs_ptr[i];
     }
 
+    // Trim the eigenspace down to the size that is needed
+    // if being used as a deflation space
+    if (getVerbosity() >= QUDA_SUMMARIZE) {
+      printfQuda("kSpace being trimmed from size n_conv = %d to n_ev_deflate = %d\n", n_conv, n_ev_deflate);
+    }
+    for (unsigned int i = n_ev_deflate; i < kSpace.size(); i++) { delete kSpace[i]; }
+    kSpace.resize(n_ev_deflate);
+    evals.resize(n_ev_deflate);
+    
     // Save TRLM tuning
     saveTuneCache();
 
@@ -656,10 +665,10 @@ namespace quda
     // number of evecs
     if (n_ev_deflate == 0) return;
     int n_defl = n_ev_deflate;
-    if (evecs.size() != (unsigned int)(2 * eig_param->n_conv))
-      errorQuda("Incorrect deflation space sized %d passed to computeSVD, expected %d", (int)(evecs.size()),
-                2 * eig_param->n_conv);
-
+    if (evecs.size() != (unsigned int)(2 * n_defl))
+      errorQuda("Incorrect deflation space sized %d passed to deflateSVD, expected %d", (int)(evecs.size()),
+		2 * n_defl);
+    
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Deflating %d left and right singular vectors\n", n_defl);
 
     // Perform Sum_i R_i * (\sigma_i)^{-1} * L_i^dag * vec = vec_defl
@@ -668,7 +677,7 @@ namespace quda
     // 1. Take block inner product: L_i^dag * vec = A_i
     std::vector<ColorSpinorField *> left_vecs;
     left_vecs.reserve(n_defl);
-    for (int i = eig_param->n_conv; i < eig_param->n_conv + n_defl; i++) left_vecs.push_back(evecs[i]);
+    for (int i = eig_param->n_ev_deflate; i < eig_param->n_ev_deflate + n_defl; i++) left_vecs.push_back(evecs[i]);
 
     std::vector<Complex> s(n_defl * src.size());
     std::vector<ColorSpinorField *> src_ = const_cast<decltype(src) &>(src);

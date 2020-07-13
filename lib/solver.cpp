@@ -181,23 +181,23 @@ namespace quda {
     csParam.setPrecision(param.precision_eigensolver, QUDA_INVALID_PRECISION, true);
 
     if (deflate_compute) {
-      evecs.reserve(param.eig_param.n_conv);
-      evals.reserve(param.eig_param.n_conv);
+      evecs.reserve(param.eig_param.n_ev_deflate);
+      evals.reserve(param.eig_param.n_ev_deflate);
 
       deflation_space *space = reinterpret_cast<deflation_space *>(param.eig_param.preserve_deflation_space);
 
       if (space && space->evecs.size() != 0) {
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Restoring deflation space of size %lu\n", space->evecs.size());
 
-        if ((!space->svd && param.eig_param.n_conv != (int)space->evecs.size())
-            || (space->svd && 2 * param.eig_param.n_conv != (int)space->evecs.size()))
+        if ((!space->svd && param.eig_param.n_ev_deflate != (int)space->evecs.size())
+            || (space->svd && 2 * param.eig_param.n_ev_deflate != (int)space->evecs.size()))
           errorQuda("Preserved deflation space size %lu does not match expected %d", space->evecs.size(),
-                    param.eig_param.n_conv);
+                    param.eig_param.n_ev_deflate);
 
         // move vectors from preserved space to local space
         for (auto &vec : space->evecs) evecs.push_back(vec);
 
-        if (param.eig_param.n_conv != (int)space->evals.size())
+        if (param.eig_param.n_ev_deflate != (int)space->evals.size())
           errorQuda("Preserved eigenvalues %lu does not match expected %lu", space->evals.size(), evals.size());
 
         // move vectors from preserved space to local space
@@ -292,7 +292,7 @@ namespace quda {
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     // This is the vector precision used by matResidual
     csParam.setPrecision(param.precision_eigensolver, QUDA_INVALID_PRECISION, true);
-    for (int i = param.eig_param.n_conv; i < 2 * param.eig_param.n_conv; i++) {
+    for (int i = param.eig_param.n_ev_deflate; i < 2 * param.eig_param.n_ev_deflate; i++) {
       evecs.push_back(ColorSpinorField::Create(csParam));
     }
   }
