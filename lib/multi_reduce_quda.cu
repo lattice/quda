@@ -12,10 +12,7 @@ namespace quda {
   namespace blas {
 
     qudaStream_t* getStream();
-    cudaEvent_t* getReduceEvent();
-    bool getFastReduce();
-    void initFastReduce(int words);
-    void completeFastReduce(int32_t words);
+    void completeReduce(const qudaStream_t &stream);
 
     template <typename real, int M, int NXZ, typename Arg, typename T>
     void multiReduceLaunch(T result[], Arg &arg, const TuneParam &tp, const qudaStream_t &stream, Tunable &tunable)
@@ -23,9 +20,6 @@ namespace quda {
       using reduce_t = typename Arg::Reducer::reduce_t;
       if (tp.grid.x > (unsigned int)deviceProp.maxGridSize[0])
         errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, deviceProp.maxGridSize[0]);
-
-      const int32_t words = tp.grid.z * NXZ * arg.NYW * sizeof(reduce_t) / sizeof(int32_t);
-      if (getFastReduce() && !commAsyncReduction()) initFastReduce(words);
 
 #ifdef WARP_MULTI_REDUCE
 #error "Untested - should be reverified"
@@ -45,12 +39,7 @@ namespace quda {
       if (!commAsyncReduction()) {
 #if (defined(_MSC_VER) && defined(_WIN64) || defined(__LP64__))
         if (deviceProp.canMapHostMemory) {
-          if (getFastReduce()) {
-            completeFastReduce(words);
-          } else {
-            qudaEventRecord(*getReduceEvent(), stream);
-            while (cudaSuccess != qudaEventQuery(*getReduceEvent())) {}
-          }
+          if (tunable.jitifyError() != CUDA_ERROR_INVALID_VALUE) completeReduce(stream);
         } else
 #endif
         {
@@ -134,7 +123,9 @@ namespace quda {
           strcat(aux, ",");
           strcat(aux, y[0]->AuxString());
         }
-        if (getFastReduce()) strcat(aux, ",fast_reduce");
+#ifdef FAST_REDUCE
+        strcat(aux, ",fast_reduce");
+#endif
 
         // since block dot product and block norm use the same functors, we need to distinguish them
         bool is_norm = false;

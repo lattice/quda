@@ -12,8 +12,15 @@
 static device_reduce_t *d_reduce = nullptr;
 static device_reduce_t *h_reduce = nullptr;
 static device_reduce_t *hd_reduce = nullptr;
+
+#ifdef FAST_REDUCE
+using count_t = cuda::atomic<unsigned int, cuda::thread_scope_device>;
+using signal_t = cuda::atomic<unsigned int, cuda::thread_scope_system>;
+static count_t *reduce_count = nullptr;
+static signal_t *reduce_signal = nullptr;
+#else
 static cudaEvent_t reduceEnd;
-static bool fast_reduce_enabled = false;
+#endif
 
 namespace quda {
 
@@ -24,40 +31,13 @@ namespace quda {
     void* getDeviceReduceBuffer() { return d_reduce; }
     void* getMappedHostReduceBuffer() { return hd_reduce; }
     void* getHostReduceBuffer() { return h_reduce; }
+
+#ifdef FAST_REDUCE
+    count_t *getReduceCount() { return reduce_count; }
+    signal_t *getReduceSignal() { return reduce_signal; }
+#else
     cudaEvent_t* getReduceEvent() { return &reduceEnd; }
-    bool getFastReduce() { return fast_reduce_enabled; }
-
-    void initFastReduce(int32_t words)
-    {
-      // initialize the reduction values in 32-bit increments to INT_MIN
-      for (int32_t i = 0; i < words; i++) {
-        reinterpret_cast<int32_t *>(h_reduce)[i] = std::numeric_limits<int32_t>::min();
-      }
-
-      // ensure that the host memory write is complete before we launch the kernel
-      atomic_thread_fence(std::memory_order_release);
-    }
-
-    void completeFastReduce(int32_t words)
-    {
-      volatile int32_t *check = reinterpret_cast<int32_t *>(h_reduce);
-      int count = 0;
-      int complete = 0;
-      while (complete < words) {
-        // ensure visiblity to any changes in memory
-        atomic_thread_fence(std::memory_order_acquire);
-
-        complete = 0;
-        for (int32_t i = 0; i < words; i++) {
-          // spin-wait until all values have been updated
-          if (check[i] != std::numeric_limits<int32_t>::min()) complete++;
-        }
-        if (count++ % 10000 == 0) { // check error every 10000 iterations
-          // if there is an error in the kernel then we need to exit the spin-wait
-          if (cudaSuccess != cudaPeekAtLastError()) break;
-        }
-      }
-    }
+#endif
 
     size_t reduceBufferSize()
     {
@@ -84,6 +64,12 @@ namespace quda {
       return bytes;
     }
 
+    // need to placement new constructor to initialize the atomic counters
+    template <typename T> __global__ void init_count(T *counter, int n)
+    {
+      for (int i = 0; i < n; i++) new (counter + i) T{0};
+    }
+
     void initReduce()
     {
       auto bytes = reduceBufferSize();
@@ -107,20 +93,36 @@ namespace quda {
 	memset(h_reduce, 0, bytes); // added to ensure that valgrind doesn't report h_reduce is unitialised
       }
 
+#ifdef FAST_REDUCE
+      warningQuda("Experimental fast reductions enabled");
+      // fast reductions use heterogeneous atomics to synchronize CPU and GPU as opposed to using CUDA events
+      reduce_count = static_cast<count_t*>(device_malloc( (QUDA_MAX_MULTI_REDUCE + 1) * sizeof(decltype(*reduce_count))));
+      init_count<<<1, 1>>>(reduce_count, QUDA_MAX_MULTI_REDUCE + 1);
+      reduce_signal = static_cast<signal_t*>(mapped_malloc(sizeof(signal_t)));
+      *reduce_signal = 0;
+#else
       cudaEventCreateWithFlags(&reduceEnd, cudaEventDisableTiming);
-
-      // enable fast reductions with CPU spin waiting as opposed to using CUDA events
-      char *fast_reduce_env = getenv("QUDA_ENABLE_FAST_REDUCE");
-      if (fast_reduce_env && strcmp(fast_reduce_env,"1") == 0) {
-        warningQuda("Experimental fast reductions enabled");
-        fast_reduce_enabled = true;
-      }
+#endif
 
       checkCudaError();
     }
 
     void endReduce(void)
     {
+#ifdef FAST_REDUCE
+      if (reduce_count) {
+        device_free(reduce_count);
+        reduce_count = nullptr;
+      }
+
+      if (reduce_signal) {
+        host_free(reduce_signal);
+        reduce_signal = nullptr;
+      }
+#else
+      cudaEventDestroy(reduceEnd);
+#endif
+
       if (d_reduce) {
 	device_free(d_reduce);
 	d_reduce = 0;
@@ -130,8 +132,17 @@ namespace quda {
 	h_reduce = 0;
       }
       hd_reduce = 0;
+    }
 
-      cudaEventDestroy(reduceEnd);
+    void completeReduce(const qudaStream_t &stream)
+    {
+#ifdef FAST_REDUCE
+      while (!reduce_signal->load(cuda::memory_order_acquire)) { }
+      reduce_signal->store(0, cuda::std::memory_order_relaxed);
+#else
+      qudaEventRecord(*getReduceEvent(), stream);
+      while (cudaSuccess != qudaEventQuery(*getReduceEvent())) {}
+#endif
     }
 
     /**
@@ -144,9 +155,6 @@ namespace quda {
       if (tp.grid.x > (unsigned int)deviceProp.maxGridSize[0])
         errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, deviceProp.maxGridSize[0]);
 
-      const int32_t words = tp.grid.y * sizeof(device_reduce_t) / sizeof(int32_t);
-      if (getFastReduce() && !commAsyncReduction()) initFastReduce(words);
-
 #ifdef JITIFY
       using namespace jitify::reflection;
       tunable.jitifyError() = program->kernel("quda::blas::reduceKernel")
@@ -155,17 +163,16 @@ namespace quda {
                                   .launch(arg);
 #else
       LAUNCH_KERNEL(reduceKernel, tunable, tp, stream, arg, real, len);
+      if (activeTuning()) {
+        auto error = cudaGetLastError();
+        if (error != cudaSuccess) tunable.jitifyError() = CUDA_ERROR_INVALID_VALUE;
+      }
 #endif
 
       if (!commAsyncReduction()) {
 #if (defined(_MSC_VER) && defined(_WIN64)) || defined(__LP64__)
         if (deviceProp.canMapHostMemory) {
-          if (getFastReduce()) {
-            completeFastReduce(words);
-          } else {
-            qudaEventRecord(reduceEnd, stream);
-            while (cudaSuccess != qudaEventQuery(reduceEnd)) { ; }
-          }
+          if (tunable.jitifyError() != CUDA_ERROR_INVALID_VALUE) completeReduce(stream);
         } else
 #endif
         {
@@ -236,7 +243,9 @@ namespace quda {
           strcat(aux, y.AuxString());
         }
         if (location == QUDA_CPU_FIELD_LOCATION) strcat(aux, ",CPU");
-        else if (getFastReduce()) strcat(aux, ",fast_reduce");
+#ifdef FAST_REDUCE
+        if (location == QUDA_CUDA_FIELD_LOCATION) strcat(aux, ",fast_reduce");
+#endif
 
 #ifdef JITIFY
         ::quda::create_jitify_program("kernels/reduce_core.cuh");

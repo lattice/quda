@@ -3,6 +3,7 @@
 #include <float_vector.h>
 #include <comm_quda.h>
 #include <blas_quda.h>
+#include <fast_reduce.h>
 
 using namespace quda;
 
@@ -93,10 +94,21 @@ namespace quda {
     T *partial;
     T *result_d;
     T *result_h;
+#ifdef FAST_REDUCE
+    using count_t = cuda::atomic<unsigned int, cuda::thread_scope_device>;
+    using signal_t = cuda::atomic<unsigned int, cuda::thread_scope_system>;
+    count_t *count;
+    signal_t *signal;
+#endif
+
     ReduceArg(int reduce_count = 0) :
       partial(static_cast<T*>(blas::getDeviceReduceBuffer())),
       result_d(static_cast<T*>(blas::getMappedHostReduceBuffer())),
       result_h(static_cast<T*>(blas::getHostReduceBuffer()))
+#ifdef FAST_REDUCE
+      ,count{blas::getReduceCount()},
+      signal{blas::getReduceSignal()}
+#endif
     {
       //  write reduction to GPU memory if asynchronous
       if (commAsyncReduction()) result_d = partial;
@@ -111,17 +123,74 @@ namespace quda {
     }
   };
 
-  __device__ unsigned int count[QUDA_MAX_MULTI_REDUCE] = { };
-  __shared__ bool isLastBlockDone;
-
+#ifdef FAST_REDUCE
   template <int block_size_x, int block_size_y, typename T, bool do_sum=true, typename Reducer=cub::Sum>
-  __device__ inline void reduce2d(ReduceArg<T> arg, const T &in, const int idx=0) {
-
-    typedef cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y> BlockReduce;
+  __device__ inline void reduce2d(ReduceArg<T> &arg, const T &in, const int idx=0)
+  {
+    using BlockReduce = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y>;
     __shared__ typename BlockReduce::TempStorage cub_tmp;
+    __shared__ bool isLastBlockDone;
 
     Reducer r;
-    T aggregate = (do_sum ? BlockReduce(cub_tmp).Sum(in) : BlockReduce(cub_tmp).Reduce(in, r));
+    T aggregate = do_sum ? BlockReduce(cub_tmp).Sum(in) : BlockReduce(cub_tmp).Reduce(in, r);
+
+    if (threadIdx.x == 0 && threadIdx.y == 0) {
+      arg.partial[idx*gridDim.x + blockIdx.x] = aggregate;
+
+      // increment global block counter for this reduction
+      auto value = arg.count[idx].fetch_add(1, cuda::std::memory_order_release);
+
+      // determine if last block
+      isLastBlockDone = (value == (gridDim.x-1));
+    }
+
+    __syncthreads();
+
+    // finish the reduction if last block
+    if (isLastBlockDone) {
+      unsigned int i = threadIdx.y*block_size_x + threadIdx.x;
+      T sum;
+      zero(sum);
+      while (i<gridDim.x) {
+        sum = r(sum, arg.partial[idx*gridDim.x + i]);
+	i += block_size_x*block_size_y;
+      }
+
+      sum = (do_sum ? BlockReduce(cub_tmp).Sum(sum) : BlockReduce(cub_tmp).Reduce(sum,r));
+
+      // write out the final reduced value
+      if (threadIdx.y*block_size_x + threadIdx.x == 0) {
+	arg.result_d[idx] = sum;
+
+        if (gridDim.x == 1 && gridDim.z == 1) {
+          // doing a single reduction so just signal and we're done
+          arg.signal->store(1, cuda::std::memory_order_release);
+        } else {
+          // increment global counter for all reductions (across y/z)
+          auto value = arg.count[QUDA_MAX_MULTI_REDUCE].fetch_add(1, cuda::std::memory_order_relaxed);
+
+          // if this is the very last block, then signal to the host that we are finished
+          if (value == gridDim.y * gridDim.z - 1) {
+            arg.signal->store(1, cuda::std::memory_order_release);
+            arg.count[QUDA_MAX_MULTI_REDUCE].store(0, cuda::std::memory_order_relaxed); // set to zero for next time
+          }
+        }
+        arg.count[idx].store(0, cuda::std::memory_order_relaxed); // set to zero for next time
+      }
+    }
+  }
+#else
+  __device__ unsigned int count[QUDA_MAX_MULTI_REDUCE] = { };
+
+  template <int block_size_x, int block_size_y, typename T, bool do_sum=true, typename Reducer=cub::Sum>
+  __device__ inline void reduce2d(ReduceArg<T> &arg, const T &in, const int idx=0)
+  {
+    using BlockReduce = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y>;
+    __shared__ typename BlockReduce::TempStorage cub_tmp;
+    __shared__ bool isLastBlockDone;
+
+    Reducer r;
+    T aggregate = do_sum ? BlockReduce(cub_tmp).Sum(in) : BlockReduce(cub_tmp).Reduce(in, r);
 
     if (threadIdx.x == 0 && threadIdx.y == 0) {
       arg.partial[idx*gridDim.x + blockIdx.x] = aggregate;
@@ -143,7 +212,6 @@ namespace quda {
       zero(sum);
       while (i<gridDim.x) {
         sum = r(sum, arg.partial[idx*gridDim.x + i]);
-	//sum += arg.partial[idx*gridDim.x + i];
 	i += block_size_x*block_size_y;
       }
 
@@ -156,14 +224,15 @@ namespace quda {
       }
     }
   }
+#endif
 
   template <int block_size, typename T, bool do_sum = true, typename Reducer = cub::Sum>
-  __device__ inline void reduce(ReduceArg<T> arg, const T &in, const int idx=0) { reduce2d<block_size, 1, T, do_sum, Reducer>(arg, in, idx); }
+  __device__ inline void reduce(ReduceArg<T> &arg, const T &in, const int idx=0) { reduce2d<block_size, 1, T, do_sum, Reducer>(arg, in, idx); }
 
 
   __shared__ volatile bool isLastWarpDone[16];
 
-#if __COMPUTE_CAPABILITY__ >= 300
+#if __COMPUTE_CAPABILITY__ >= 300 && 0
 
   /**
      @brief Do a warp reduction, followed by a global reduction to the
@@ -215,6 +284,7 @@ namespace quda {
   }
 #endif // __COMPUTE_CAPABILITY__ >= 300
 
+#if 0
   /**
      functor that defines how to do a row-wise vector reduction
    */
@@ -295,5 +365,6 @@ namespace quda {
       }
     }
   }
+#endif
 
 } // namespace quda
