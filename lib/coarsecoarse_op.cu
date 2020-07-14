@@ -76,11 +76,8 @@ namespace quda {
         cInvAccessor, Y, X, Yatomic, Xatomic, uv, const_cast<ColorSpinorField &>(v), v, g, *dummyClover(), kappa, mu,
         mu_factor, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()), T.coarseToFine(Y.Location()), use_mma);
     } else {
-
-      // TODO: Change the !use_mma predicate to the field order one.
+      
       if (!use_mma) {
-
-        if (use_mma) { errorQuda("MMA intructions are not supported on for the AoS orders."); }
 
         constexpr QudaFieldOrder csOrder = QUDA_FLOAT2_FIELD_ORDER;
         constexpr QudaGaugeFieldOrder gOrder = QUDA_FLOAT2_GAUGE_ORDER;
@@ -97,7 +94,7 @@ namespace quda {
         typedef typename gauge::FieldOrder<Float, coarseColor * coarseSpin, coarseSpin, gOrder, true, storeType> gCoarseAtomic;
 
         const ColorSpinorField &v = T.Vectors(Y.Location());
-
+        
         V vAccessor(const_cast<ColorSpinorField &>(v));
         F uvAccessor(const_cast<ColorSpinorField &>(uv));
         gFine gAccessor(const_cast<GaugeField &>(g));
@@ -107,7 +104,7 @@ namespace quda {
         gCoarse xAccessor(const_cast<GaugeField &>(X));
         gCoarseAtomic yAccessorAtomic(const_cast<GaugeField &>(Yatomic));
         gCoarseAtomic xAccessorAtomic(const_cast<GaugeField &>(Xatomic));
-
+        
         // create a dummy clover field to allow us to call the external clover reduction routines elsewhere
         calculateY<QUDA_CUDA_FIELD_LOCATION, true, Float, fineSpin, fineColor, coarseSpin, coarseColor>(
           yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, vAccessor, vAccessor, gAccessor,
@@ -120,76 +117,13 @@ namespace quda {
         constexpr QudaFieldOrder csOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
         constexpr QudaGaugeFieldOrder gOrder = QUDA_MILC_GAUGE_ORDER;
 
-        // XXX: This doesn't work for single precision since X/Yatomic are just references to X/Y.
-        GaugeFieldParam param_Y(Y);
-        GaugeFieldParam param_X(X);
-        GaugeFieldParam param_Xatomic(Xatomic);
-        GaugeFieldParam param_Yatomic(Yatomic);
-
-        ColorSpinorParam param_uv(uv);
-
-        GaugeFieldParam param_g(g);
-        GaugeFieldParam param_clover(clover);
-        GaugeFieldParam param_cloverInv(cloverInv);
-
-        param_Y.order = gOrder;
-        param_X.order = gOrder;
-        param_Xatomic.order = gOrder;
-        param_Yatomic.order = gOrder;
-
-        param_uv.fieldOrder = csOrder;
-
-        param_g.order = gOrder;
-        param_clover.order = gOrder;
-        param_cloverInv.order = gOrder;
-
-        param_Y.setPrecision(X.Precision());
-        param_X.setPrecision(Y.Precision());
-        param_Xatomic.setPrecision(Xatomic.Precision());
-        param_Yatomic.setPrecision(Yatomic.Precision());
-
-        param_uv.setPrecision(uv.Precision());
-
-        param_g.setPrecision(g.Precision());
-        param_clover.setPrecision(clover.Precision());
-        param_cloverInv.setPrecision(cloverInv.Precision());
-
-        cudaGaugeField X_(param_X);
-        cudaGaugeField Y_(param_Y);
-        // cudaGaugeField Xatomic_(param_Xatomic);
-        // cudaGaugeField Yatomic_(param_Yatomic);
-
-        GaugeField *Yatomic_; // = &Y_;
-        GaugeField *Xatomic_; // = &X_;
-
-        if (Y.Precision() < QUDA_SINGLE_PRECISION) {
-          // we need to coarsen into single precision fields (float or int), so we allocate temporaries for this purpose
-          // else we can just coarsen directly into the original fields
-          Yatomic_ = GaugeField::Create(param_Yatomic);
-          Xatomic_ = GaugeField::Create(param_Xatomic);
-        } else {
-          Yatomic_ = &Y_;
-          Xatomic_ = &X_;
-        }
-
-        cudaColorSpinorField uv_(param_uv);
-
-        cudaGaugeField g_(param_g);
-        cudaGaugeField clover_(param_clover);
-        cudaGaugeField cloverInv_(param_cloverInv);
-
-        g_.copy(g);
-        clover_.copy(clover);
-        cloverInv_.copy(cloverInv);
-
-        uv_.copy(uv);
         typedef typename colorspinor::FieldOrderCB<Float, fineSpin, fineColor, coarseColor, csOrder, vFloat> V;
         typedef typename colorspinor::FieldOrderCB<Float, 2 * fineSpin, fineColor, coarseColor, csOrder, vFloat> F;
         typedef typename gauge::FieldOrder<Float, fineColor * fineSpin, fineSpin, gOrder, true, vFloat> gFine;
         typedef typename gauge::FieldOrder<Float, fineColor * fineSpin, fineSpin, gOrder, true, vFloat> cFine;
         typedef typename gauge::FieldOrder<Float, coarseColor * coarseSpin, coarseSpin, gOrder, true, vFloat> gCoarse;
         typedef typename gauge::FieldOrder<Float, coarseColor * coarseSpin, coarseSpin, gOrder, true, storeType> gCoarseAtomic;
-
+        
         const ColorSpinorField &v = T.Vectors(Y.Location());
 
         ColorSpinorParam param_v(v);
@@ -200,33 +134,23 @@ namespace quda {
 
         v_.copy(v);
 
-        V vAccessor(const_cast<cudaColorSpinorField &>(v_));
-        F uvAccessor(const_cast<cudaColorSpinorField &>(uv_));
-        gFine gAccessor(const_cast<cudaGaugeField &>(g_));
-        cFine cAccessor(const_cast<cudaGaugeField &>(clover_));
-        cFine cInvAccessor(const_cast<cudaGaugeField &>(cloverInv_));
-        gCoarse yAccessor(const_cast<cudaGaugeField &>(Y_));
-        gCoarse xAccessor(const_cast<cudaGaugeField &>(X_));
-        gCoarseAtomic yAccessorAtomic(reinterpret_cast<cudaGaugeField &>(*Yatomic_));
-        gCoarseAtomic xAccessorAtomic(reinterpret_cast<cudaGaugeField &>(*Xatomic_));
+        V vAccessor(v_);
+        F uvAccessor(const_cast<ColorSpinorField &>(uv));
+        gFine gAccessor(const_cast<GaugeField &>(g));
+        cFine cAccessor(const_cast<GaugeField &>(clover));
+        cFine cInvAccessor(const_cast<GaugeField &>(cloverInv));
+        
+        gCoarse yAccessor(const_cast<GaugeField &>(Y));
+        gCoarse xAccessor(const_cast<GaugeField &>(X));
+        gCoarseAtomic yAccessorAtomic(const_cast<GaugeField &>(Yatomic));
+        gCoarseAtomic xAccessorAtomic(const_cast<GaugeField &>(Xatomic));
 
         // create a dummy clover field to allow us to call the external clover reduction routines elsewhere
         calculateY<QUDA_CUDA_FIELD_LOCATION, true, Float, fineSpin, fineColor, coarseSpin, coarseColor>(
           yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, vAccessor, vAccessor, gAccessor,
-          cAccessor, cInvAccessor, Y_, X_, *Yatomic_, *Xatomic_, uv_, const_cast<cudaColorSpinorField &>(v_), v_, g_,
+          cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, const_cast<cudaColorSpinorField &>(v_), v_, g,
           *dummyClover(), kappa, mu, mu_factor, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()),
           T.coarseToFine(Y.Location()), use_mma);
-
-        X.copy(X_);
-        Y.copy(Y_);
-        if (Y.Precision() < QUDA_SINGLE_PRECISION) {
-          Xatomic.copy(*Xatomic_);
-          Yatomic.copy(*Yatomic_);
-          delete Xatomic_;
-          delete Yatomic_;
-        }
-
-        reinterpret_cast<cudaColorSpinorField &>(uv).copy(uv_);
       }
     }
   }
@@ -256,9 +180,9 @@ namespace quda {
 #endif
     if (fineColor == 24) { // coarsened Wilson or free field staggered
       if (coarseColor == 24) {
-        calculateYcoarse<Float, vFloat, 24, fineSpin, 24, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
-                                                                      cloverInv, kappa, mu, mu_factor, dirac, matpc,
-                                                                      need_bidirectional, use_mma);
+        // calculateYcoarse<Float, vFloat, 24, fineSpin, 24, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
+        //                                                               cloverInv, kappa, mu, mu_factor, dirac, matpc,
+        //                                                               need_bidirectional, use_mma);
       } else
 #ifdef NSPIN4
       if (coarseColor == 32) {
@@ -269,13 +193,13 @@ namespace quda {
 #endif // NSPIN4
 #ifdef NSPIN1
       if (coarseColor == 64) {
-        calculateYcoarse<Float, vFloat, 24, fineSpin, 64, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
-                                                                      cloverInv, kappa, mu, mu_factor, dirac, matpc,
-                                                                      need_bidirectional, use_mma);
+        // calculateYcoarse<Float, vFloat, 24, fineSpin, 64, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
+        //                                                               cloverInv, kappa, mu, mu_factor, dirac, matpc,
+        //                                                               need_bidirectional, use_mma);
       } else if (coarseColor == 96) {
-        calculateYcoarse<Float, vFloat, 24, fineSpin, 96, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
-                                                                      cloverInv, kappa, mu, mu_factor, dirac, matpc,
-                                                                      need_bidirectional, use_mma);
+        // calculateYcoarse<Float, vFloat, 24, fineSpin, 96, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
+        //                                                               cloverInv, kappa, mu, mu_factor, dirac, matpc,
+        //                                                               need_bidirectional, use_mma);
       } else
 #endif
       {
@@ -284,9 +208,9 @@ namespace quda {
 #ifdef NSPIN4
     } else if (fineColor == 32) {
       if (coarseColor == 32) {
-        calculateYcoarse<Float, vFloat, 32, fineSpin, 32, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
-                                                                      cloverInv, kappa, mu, mu_factor, dirac, matpc,
-                                                                      need_bidirectional, use_mma);
+        // calculateYcoarse<Float, vFloat, 32, fineSpin, 32, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
+        //                                                               cloverInv, kappa, mu, mu_factor, dirac, matpc,
+        //                                                               need_bidirectional, use_mma);
       } else {
         errorQuda("Unsupported fineColor = %d coarseColor = %d\n", fineColor, coarseColor);
       }
@@ -294,21 +218,21 @@ namespace quda {
 #ifdef NSPIN1
     } else if (fineColor == 64) {
       if (coarseColor == 64) {
-        calculateYcoarse<Float, vFloat, 64, fineSpin, 64, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
-                                                                      cloverInv, kappa, mu, mu_factor, dirac, matpc,
-                                                                      need_bidirectional, use_mma);
+        // calculateYcoarse<Float, vFloat, 64, fineSpin, 64, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
+        //                                                               cloverInv, kappa, mu, mu_factor, dirac, matpc,
+        //                                                               need_bidirectional, use_mma);
       } else if (coarseColor == 96) {
-        calculateYcoarse<Float, vFloat, 64, fineSpin, 96, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
-                                                                      cloverInv, kappa, mu, mu_factor, dirac, matpc,
-                                                                      need_bidirectional, use_mma);
+        // calculateYcoarse<Float, vFloat, 64, fineSpin, 96, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
+        //                                                               cloverInv, kappa, mu, mu_factor, dirac, matpc,
+        //                                                               need_bidirectional, use_mma);
       } else {
         errorQuda("Unsupported fineColor = %d coarseColor = %d\n", fineColor, coarseColor);
       }
     } else if (fineColor == 96) {
       if (coarseColor == 96) {
-        calculateYcoarse<Float, vFloat, 96, fineSpin, 96, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
-                                                                      cloverInv, kappa, mu, mu_factor, dirac, matpc,
-                                                                      need_bidirectional, use_mma);
+        // calculateYcoarse<Float, vFloat, 96, fineSpin, 96, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
+        //                                                               cloverInv, kappa, mu, mu_factor, dirac, matpc,
+        //                                                               need_bidirectional, use_mma);
       } else {
         errorQuda("Unsupported fineColor = %d coarseColor = %d\n", fineColor, coarseColor);
       }
@@ -346,6 +270,7 @@ namespace quda {
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing Y field......\n");
     if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
+      if (use_mma) errorQuda("MG-MMA does not support double precision, yet.");
       if (T.Vectors(X.Location()).Precision() == QUDA_DOUBLE_PRECISION) {
         calculateYcoarse<double, double>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor,
                                          dirac, matpc, need_bidirectional, use_mma);
@@ -386,7 +311,7 @@ namespace quda {
   {
     QudaPrecision precision = Y.Precision();
     QudaFieldLocation location = checkLocation(X, Y, gauge, clover, cloverInv);
-
+      
     //Create a field UV which holds U*V.  Has the same similar
     //structure to V but double the number of spins so we can store
     //the four distinct block chiral multiplications in a single UV
@@ -400,26 +325,96 @@ namespace quda {
 
     ColorSpinorField *uv = ColorSpinorField::Create(UVparam);
 
-    GaugeField *Yatomic = &Y;
-    GaugeField *Xatomic = &X;
-    if (Y.Precision() < QUDA_SINGLE_PRECISION) {
-      // we need to coarsen into single precision fields (float or int), so we allocate temporaries for this purpose
-      // else we can just coarsen directly into the original fields
-      GaugeFieldParam param(X); // use X since we want scalar geometry
-      param.location = location;
-      param.setPrecision(QUDA_SINGLE_PRECISION, location == QUDA_CUDA_FIELD_LOCATION ? true : false);
+    if (!use_mma) {
 
-      Yatomic = GaugeField::Create(param);
-      Xatomic = GaugeField::Create(param);
+      GaugeField *Yatomic = &Y;
+      GaugeField *Xatomic = &X;
+      if (Y.Precision() < QUDA_SINGLE_PRECISION) {
+        // we need to coarsen into single precision fields (float or int), so we allocate temporaries for this purpose
+        // else we can just coarsen directly into the original fields
+        GaugeFieldParam param(X); // use X since we want scalar geometry
+        param.location = location;
+        param.setPrecision(QUDA_SINGLE_PRECISION, location == QUDA_CUDA_FIELD_LOCATION ? true : false);
+
+        Yatomic = GaugeField::Create(param);
+        Xatomic = GaugeField::Create(param);
+      }
+
+      calculateYcoarse(Y, X, *Yatomic, *Xatomic, *uv, T, gauge, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc,
+          need_bidirectional, use_mma);
+
+      if (Yatomic != &Y) delete Yatomic;
+      if (Xatomic != &X) delete Xatomic;
+
+    } else {
+
+      if(location == QUDA_CPU_FIELD_LOCATION) { errorQuda("use_mma = true does not go with QUDA_CPU_FIELD_LOCATION."); }
+
+      // The MMA implementation requires fields to be in AoS order: we check each gauge field, and create a copy if not.
+      // The UV field is an intermediate field, its order doesn't matter; The AoS copy of the V field will be created
+      // later in the code path.
+      constexpr QudaGaugeFieldOrder gOrder = QUDA_MILC_GAUGE_ORDER;
+
+      auto create_gauge_copy = [](const GaugeField &X, QudaGaugeFieldOrder order, bool copy_content) -> auto {
+        GaugeField *output = nullptr;
+        if (X.Order() == order) {
+          output = const_cast<GaugeField *>(&X);
+        } else {
+          GaugeFieldParam param(X);
+          param.order = order;
+          output = cudaGaugeField::Create(param);
+          if (copy_content) output->copy(X);
+        }
+        return static_cast<cudaGaugeField *>(output);
+      };
+
+      auto Y_order = create_gauge_copy(Y, gOrder, false);
+      auto X_order = create_gauge_copy(X, gOrder, false);
+      auto G_order = create_gauge_copy(gauge, gOrder, true);
+      auto C_order = create_gauge_copy(clover, gOrder, true);
+      auto I_order = create_gauge_copy(cloverInv, gOrder, false); // We don't copy the cloverInv field since it's never used.
+      
+      GaugeField *Yatomic = nullptr;
+      GaugeField *Xatomic = nullptr;
+ 
+      if (Y.Precision() < QUDA_SINGLE_PRECISION) {
+        // we need to coarsen into single precision fields (float or int), so we allocate temporaries for this purpose
+        // else we can just coarsen directly into the original fields
+        GaugeFieldParam param(*X_order); // use X since we want scalar geometry
+        param.location = location;
+        param.order = gOrder;
+        param.setPrecision(QUDA_SINGLE_PRECISION);
+
+        Yatomic = GaugeField::Create(param);
+        Xatomic = GaugeField::Create(param);
+      } else {
+        Yatomic = Y_order;
+        Xatomic = X_order;
+      }
+      
+      calculateYcoarse(*Y_order, *X_order, *Yatomic, *Xatomic, *uv, T, *G_order, *C_order, *I_order, kappa, mu, mu_factor, dirac, matpc,
+          need_bidirectional, use_mma);
+
+      if (Yatomic != Y_order) delete Yatomic;
+      if (Xatomic != X_order) delete Xatomic;
+
+      if (&Y != Y_order) {
+        Y.copy(*Y_order);
+        delete Y_order;
+      }
+
+      if (&X != X_order) {
+        X.copy(*X_order);
+        delete X_order;
+      }
+
+      if (&gauge != G_order) { delete G_order; }
+      if (&clover != C_order) { delete C_order; }
+      if (&cloverInv != I_order) { delete I_order; }
+
     }
-
-    calculateYcoarse(Y, X, *Yatomic, *Xatomic, *uv, T, gauge, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc,
-                     need_bidirectional, use_mma);
-
-    if (Yatomic != &Y) delete Yatomic;
-    if (Xatomic != &X) delete Xatomic;
-
+    
     delete uv;
-  }
   
+  }
 } //namespace quda

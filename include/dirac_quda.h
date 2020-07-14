@@ -170,6 +170,13 @@ namespace quda {
     }
 
     /**
+      @brief Whether the Dirac object is the DiracCoarse.
+    */
+    virtual bool isCoarse() const {
+      return false;
+    }
+
+    /**
         @brief Check parity spinors are usable (check geometry ?)
     */
     virtual void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
@@ -1284,6 +1291,10 @@ public:
     DiracCoarse(const DiracCoarse &dirac, const DiracParam &param);
     virtual ~DiracCoarse();
 
+    virtual bool isCoarse() const {
+      return true;
+    }
+    
     /**
        @brief Apply the coarse clover operator
        @param[out] out Output field

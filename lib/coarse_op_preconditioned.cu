@@ -137,28 +137,22 @@ namespace quda
 
     bool advanceTuneParam(TuneParam &param) const {
       if (use_mma) {
-
-        int max_aux;
-        // clang-format off
-        switch (arg.M) {
-        case  48: max_aux = 2; break;
-        case  64: max_aux = 6; break;
-        case 128: max_aux = 7; break;
-        case 192: max_aux = 4; break;
-        default: errorQuda("Unsupported number of coarse dof %d\n", arg.M);
-        }
-        // clang-format on
-        if (param.aux.x < max_aux) {
+        
+        constexpr bool compute_max_only_dummy = true;
+        constexpr bool query_max = true;
+        if (param.aux.x < mma::launch_yhat_kernel<compute_max_only_dummy, query_max>(arg, 1, param, 0)) {
           param.aux.x++;
           return true;
         }
         return false;
 
       } else {
+        
         if (meta.Location() == QUDA_CUDA_FIELD_LOCATION && meta.MemType() == QUDA_MEMORY_DEVICE)
           return Tunable::advanceTuneParam(param);
         else
           return false;
+      
       }
     }
 
@@ -190,22 +184,40 @@ namespace quda
     using namespace blas_lapack;
     auto invert = use_native() ? native::BatchInvertMatrix : generic::BatchInvertMatrix;
 
+    constexpr QudaGaugeFieldOrder gOrder_milc = QUDA_MILC_GAUGE_ORDER;
+    GaugeField *Xinv_aos = nullptr;
+    
     // invert the clover matrix field
     const int n = X.Ncolor();
-    if (X.Location() == QUDA_CUDA_FIELD_LOCATION && X.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
-      GaugeFieldParam param(X);
-      // need to copy into AoS format for CUBLAS
-      param.order = QUDA_MILC_GAUGE_ORDER;
-      param.setPrecision( X.Precision() < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION : X.Precision() );
-      cudaGaugeField X_(param);
-      cudaGaugeField Xinv_(param);
-      X_.copy(X);
+    
+    if (X.Location() == QUDA_CUDA_FIELD_LOCATION) {
+      
+      auto create_gauge_copy = [](const GaugeField &X, bool copy_content) -> auto {
+        GaugeField *output = nullptr;
+        if (X.Order() == gOrder_milc && X.Precision() >= QUDA_SINGLE_PRECISION) {
+          output = const_cast<GaugeField *>(&X);
+        } else {
+          GaugeFieldParam param(X);
+          param.order = gOrder_milc;
+          param.setPrecision( X.Precision() < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION : X.Precision() );
+          output = cudaGaugeField::Create(param);
+          if (copy_content) output->copy(X);
+        }
+        return output;
+      };
 
-      blas::flops += invert((void*)Xinv_.Gauge_p(), (void*)X_.Gauge_p(), n, X_.Volume(), X_.Precision(), X.Location());
-      
-      if (Xinv.Precision() < QUDA_SINGLE_PRECISION) Xinv.Scale( Xinv_.abs_max() );
-      
-      Xinv.copy(Xinv_);
+      GaugeField *X_aos = create_gauge_copy(X, true);
+      Xinv_aos = create_gauge_copy(Xinv, false);
+
+      blas::flops += invert((void*)Xinv_aos->Gauge_p(), (void*)X_aos->Gauge_p(), n, X_aos->Volume(), X_aos->Precision(), X.Location());
+
+      if (&Xinv != Xinv_aos) {
+        if (Xinv.Precision() < QUDA_SINGLE_PRECISION) Xinv.Scale( Xinv_aos->abs_max() );
+        Xinv.copy(*Xinv_aos);
+      }
+      if (&X != X_aos) { delete X_aos; }
+
+      if (!use_mma) { delete Xinv_aos; }
 
     } else if (X.Location() == QUDA_CPU_FIELD_LOCATION && X.Order() == QUDA_QDP_GAUGE_ORDER) {
       const cpuGaugeField *X_h = static_cast<const cpuGaugeField*>(&X);
@@ -226,47 +238,43 @@ namespace quda
       for (int i=0; i<4; i++) xc_size[i] = X.X()[i];
       xc_size[4] = 1;
 
-      // TODO: use field order as the predicate.
       if (use_mma) {
 
-        GaugeFieldParam param_Y(Y);
-        GaugeFieldParam param_Yhat(Yhat);
-        GaugeFieldParam param_Xinv(Xinv);
+        auto create_gauge_copy = [](const GaugeField &X, QudaGaugeFieldOrder order, bool copy_content) -> auto {
+          GaugeField *output = nullptr;
+          if (X.Order() == order) {
+            output = const_cast<GaugeField *>(&X);
+          } else {
+            GaugeFieldParam param(X);
+            param.order = order;
+            output = cudaGaugeField::Create(param);
+            if (copy_content) output->copy(X);
+          }
+          return output;
+        };
 
-        constexpr QudaGaugeFieldOrder gOrder_milc = QUDA_MILC_GAUGE_ORDER;
-
-        param_Y.order = gOrder_milc;
-        param_Yhat.order = gOrder_milc;
-        param_Xinv.order = gOrder_milc;
-
-        // need to copy into AoS format for CUBLAS
-        param_Y.setPrecision(X.Precision());
-        param_Yhat.setPrecision(X.Precision());
-        param_Xinv.setPrecision(X.Precision());
-
-        cudaGaugeField Y_(param_Y);
-        cudaGaugeField Yhat_(param_Yhat);
-        cudaGaugeField Xinv_(param_Xinv);
-
-        Xinv_.copy(Xinv);
-        Y_.copy(Y);
+        GaugeField *Y_aos = create_gauge_copy(Y, gOrder_milc, true);
+        GaugeField *Yhat_aos = create_gauge_copy(Yhat, gOrder_milc, false);
 
         constexpr bool use_native_ghosts = true;
         // use spin-ignorant accessor to make multiplication simpler
         typedef typename gauge::FieldOrder<Float, N, 1, gOrder_milc, use_native_ghosts, storeFloat> gCoarse;
         typedef typename gauge::FieldOrder<Float, N, 1, gOrder_milc, use_native_ghosts, storeFloat> gPreconditionedCoarse;
-        gCoarse yAccessor(Y_);
-        gPreconditionedCoarse yHatAccessor(Yhat_);
-        gCoarse xInvAccessor(Xinv_);
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Xinv = %e\n", Xinv_.norm2(0));
+        gCoarse yAccessor(*Y_aos);
+        gPreconditionedCoarse yHatAccessor(*Yhat_aos);
+        
+        // XXX: This doesn't work for double precision.
+        using gCoarseInv = gauge::FieldOrder<float, N, 1, gOrder_milc, use_native_ghosts, float>;
+        gCoarseInv xInvAccessor(*Xinv_aos);
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Xinv = %e\n", Xinv_aos->norm2(0));
 
         int comm_dim[4];
         for (int i = 0; i < 4; i++) comm_dim[i] = comm_dim_partitioned(i);
 
-        using yHatArg = CalculateYhatArg<Float, gPreconditionedCoarse, gCoarse, N, 4, 2>;
+        using yHatArg = CalculateYhatArg<Float, gPreconditionedCoarse, gCoarse, gCoarseInv, N, 4, 2>;
         yHatArg arg(yHatAccessor, yAccessor, xInvAccessor, xc_size, comm_dim, 1);
 
-        CalculateYhat<location, yHatArg> yHat(arg, Y_, use_mma);
+        CalculateYhat<location, yHatArg> yHat(arg, Y, use_mma);
         if (Yhat.Precision() == QUDA_HALF_PRECISION || Yhat.Precision() == QUDA_QUARTER_PRECISION) {
           yHat.setComputeMaxOnly(true);
           yHat.apply(0);
@@ -277,13 +285,24 @@ namespace quda
 
           if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Yhat Max = %e\n", *arg.max_h);
 
-          Yhat_.Scale(*arg.max_h);
+          Yhat_aos->Scale(*arg.max_h);
           arg.Yhat.resetScale(*arg.max_h);
         }
         yHat.setComputeMaxOnly(false);
         yHat.apply(0);
 
-        Yhat.copy(Yhat_);
+        if (&Y != Y_aos) {
+          delete Y_aos;
+        }
+        
+        if (&Yhat != Yhat_aos) {
+          Yhat.copy(*Yhat_aos);
+          delete Yhat_aos;
+        }
+
+        if (Xinv_aos != &Xinv) {
+          delete Xinv_aos;
+        }
 
       } else {
 
@@ -297,7 +316,7 @@ namespace quda
 
         int comm_dim[4];
         for (int i = 0; i < 4; i++) comm_dim[i] = comm_dim_partitioned(i);
-        typedef CalculateYhatArg<Float, gPreconditionedCoarse, gCoarse, N, 4, 2> yHatArg;
+        typedef CalculateYhatArg<Float, gPreconditionedCoarse, gCoarse, gCoarse, N, 4, 2> yHatArg;
         yHatArg arg(yHatAccessor, yAccessor, xInvAccessor, xc_size, comm_dim, 1);
 
         CalculateYhat<location, yHatArg> yHat(arg, Y, use_mma);
@@ -316,12 +335,14 @@ namespace quda
         }
         yHat.setComputeMaxOnly(false);
         yHat.apply(0);
+      
       }
 
       if (getVerbosity() >= QUDA_VERBOSE)
         for (int d = 0; d < 8; d++)
           printfQuda("Yhat[%d] = %e (%e %e = %e x %e)\n", d, Yhat.norm2(d), Yhat.abs_max(d),
                      Y.abs_max(d) * Xinv.abs_max(0), Y.abs_max(d), Xinv.abs_max(0));
+    
     }
 
     // fill back in the bulk of Yhat so that the backward link is updated on the previous node
@@ -344,7 +365,7 @@ namespace quda
       calculateYhat<QUDA_CPU_FIELD_LOCATION, storeFloat, Float, N, gOrder>(Yhat, Xinv, Y, X, use_mma);
     } else {
       constexpr QudaGaugeFieldOrder gOrder = QUDA_FLOAT2_GAUGE_ORDER;
-      if (Y.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", Y.FieldOrder());
+      // if (Y.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", Y.FieldOrder());
       calculateYhat<QUDA_CUDA_FIELD_LOCATION, storeFloat, Float, N, gOrder>(Yhat, Xinv, Y, X, use_mma);
     }
   }
@@ -356,7 +377,7 @@ namespace quda
     switch (Y.Ncolor()) {
     case 48: calculateYhat<storeFloat, Float, 48>(Yhat, Xinv, Y, X, use_mma); break;
 #ifdef NSPIN4
-    // case 12: calculateYhat<storeFloat,Float,12>(Yhat, Xinv, Y, X, use_mma); break;
+    case 12: calculateYhat<storeFloat, Float, 12>(Yhat, Xinv, Y, X, use_mma); break;
     case 64: calculateYhat<storeFloat, Float, 64>(Yhat, Xinv, Y, X, use_mma); break;
 #endif // NSPIN4
 #ifdef NSPIN1
@@ -378,6 +399,7 @@ namespace quda
     if (precision == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
       if (Yhat.Precision() != QUDA_DOUBLE_PRECISION) errorQuda("Unsupported precision %d\n", Yhat.Precision());
+      if (use_mma) errorQuda("MG-MMA does not support double precision, yet.");
       calculateYhat<double, double>(Yhat, Xinv, Y, X, use_mma);
 #else
       errorQuda("Double precision multigrid has not been enabled");

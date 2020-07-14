@@ -21,7 +21,7 @@ namespace quda
 
       /**
         Calculates the matrix UV^{s,c'}_mu(x) = \sum_c U^{c}_mu(x) * V^{s,c}_mu(x+mu)
-  Where: mu = dir, s = fine spin, c' = coarse color, c = fine color
+        Where: mu = dir, s = fine spin, c' = coarse color, c = fine color
        */
       template <int dim, QudaDirection dir, int bM, int bN, int bK, int block_y, int block_z, typename Wtype, typename Arg>
       __device__ __host__ inline void computeUV(Arg &arg, const Wtype &Wacc, int parity, int x_cb)
@@ -165,9 +165,9 @@ namespace quda
         constexpr int m_offset = 0;
         constexpr int n_offset = 0;
 
-        static_assert(M <= bM, "Dividing M/N has NOT been implemented yet.\n");
-        static_assert(N <= bN, "Dividing M/N has NOT been implemented yet.\n");
-        static_assert(K == bK, "This implementation ONLY works for K == bK.\n");
+        static_assert(M <= bM, "Dividing M has NOT been implemented yet.\n");
+        static_assert(N <= bN, "Dividing N has NOT been implemented yet.\n");
+        static_assert(K <= bK, "Dividing K has NOT been implemented yet.\n");
 
         typename Config::SmemObjA smem_obj_a_real(smem_ptr);
         typename Config::SmemObjA smem_obj_a_imag(smem_obj_a_real.ptr + Config::smem_lda * bK);
@@ -266,7 +266,7 @@ namespace quda
     template <bool from_coarse, int dim, QudaDirection dir, int bM, int bN, int bK, int block_y, int block_z, typename Arg>
     __global__ void ComputeVUVMMA(Arg arg)
     {
-      static_assert(from_coarse);
+      static_assert(from_coarse, "The MMA implementation is only for from_coarse == true.");
 
       int parity = blockIdx.y;
 

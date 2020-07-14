@@ -6,7 +6,7 @@
 
 namespace quda {
 
-  template <typename Float_, typename PreconditionedGauge, typename Gauge, int n_, int M_, int N_> struct CalculateYhatArg {
+  template <typename Float_, typename PreconditionedGauge, typename Gauge, typename GaugeInv, int n_, int M_, int N_> struct CalculateYhatArg {
     using Float = Float_;
     TileSize<n_, n_, n_, M_, N_, 1> tile;
 
@@ -18,7 +18,7 @@ namespace quda {
 
     PreconditionedGauge Yhat;
     const Gauge Y;
-    const Gauge Xinv;
+    const GaugeInv Xinv;
     int dim[QUDA_MAX_DIM];
     int comm_dim[QUDA_MAX_DIM];
     int nFace;
@@ -26,7 +26,7 @@ namespace quda {
     Float *max_h;  // host scalar that stores the maximum element of Yhat. Pointer b/c pinned.
     Float *max_d; // device scalar that stores the maximum element of Yhat
 
-    CalculateYhatArg(const PreconditionedGauge &Yhat, const Gauge Y, const Gauge Xinv, const int *dim,
+    CalculateYhatArg(const PreconditionedGauge &Yhat, const Gauge Y, const GaugeInv Xinv, const int *dim,
                      const int *comm_dim, int nFace) :
       Yhat(Yhat),
       Y(Y),

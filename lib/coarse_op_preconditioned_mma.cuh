@@ -58,10 +58,11 @@ namespace quda
       kernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
     }
 
-    template <bool compute_max_only, class Arg>
-    typename std::enable_if<Arg::N == 48, void>::type launch_yhat_kernel(Arg &arg, int min_threads, TuneParam &tp,
+    template <bool compute_max_only, bool query_max = false, class Arg>
+    typename std::enable_if<Arg::N == 48, int>::type launch_yhat_kernel(Arg &arg, int min_threads, TuneParam &tp,
                                                                          const cudaStream_t &stream)
     {
+      if (query_max) return 2;
       // clang-format off
       switch (tp.aux.x) {
       case   0: launch_kernel<compute_max_only,  48,  48,  48,  24,  12>(arg, min_threads, tp, stream); break;
@@ -70,12 +71,29 @@ namespace quda
       default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 48", tp.aux.x);
       }
       // clang-format on
+      return -1;
     }
 
-    template <bool compute_max_only, class Arg>
-    typename std::enable_if<Arg::N == 64, void>::type launch_yhat_kernel(Arg &arg, int min_threads, TuneParam &tp,
+    template <bool compute_max_only, bool query_max = false, class Arg>
+    typename std::enable_if<Arg::N == 12, int>::type launch_yhat_kernel(Arg &arg, int min_threads, TuneParam &tp,
                                                                          const cudaStream_t &stream)
     {
+      if (query_max) return 1;
+      // clang-format off
+      switch (tp.aux.x) {
+      case   0: launch_kernel<compute_max_only,  16,  16,  16,   4,   8>(arg, min_threads, tp, stream); break;
+      case   1: launch_kernel<compute_max_only,  16,  16,  16,   8,   4>(arg, min_threads, tp, stream); break;
+      default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 12", tp.aux.x);
+      }
+      // clang-format on
+      return -1;
+    }
+
+    template <bool compute_max_only, bool query_max = false, class Arg>
+    typename std::enable_if<Arg::N == 64, int>::type launch_yhat_kernel(Arg &arg, int min_threads, TuneParam &tp,
+                                                                         const cudaStream_t &stream)
+    {
+      if (query_max) return 6;
       // clang-format off
       switch (tp.aux.x) {
       case   0: launch_kernel<compute_max_only,  64,  64,  16,  32,   8>(arg, min_threads, tp, stream); break;
@@ -88,12 +106,14 @@ namespace quda
       default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 64", tp.aux.x);
       }
       // clang-format on
+      return -1;
     }
 
-    template <bool compute_max_only, class Arg>
-    typename std::enable_if<Arg::N == 128, void>::type launch_yhat_kernel(Arg &arg, int min_threads, TuneParam &tp,
+    template <bool compute_max_only, bool query_max = false, class Arg>
+    typename std::enable_if<Arg::N == 128, int>::type launch_yhat_kernel(Arg &arg, int min_threads, TuneParam &tp,
                                                                           const cudaStream_t &stream)
     {
+      if (query_max) return 7;
       // clang-format off
       switch (tp.aux.x) {
       case   0: launch_kernel<compute_max_only,  64,  64,  16,  32,  16,  2>(arg, min_threads, tp, stream); break;
@@ -111,12 +131,14 @@ namespace quda
       default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 128", tp.aux.x);
       }
       // clang-format on
+      return -1;
     }
 
-    template <bool compute_max_only, class Arg>
-    typename std::enable_if<Arg::N == 192, void>::type launch_yhat_kernel(Arg &arg, int min_threads, TuneParam &tp,
+    template <bool compute_max_only, bool query_max = false, class Arg>
+    typename std::enable_if<Arg::N == 192, int>::type launch_yhat_kernel(Arg &arg, int min_threads, TuneParam &tp,
                                                                           const cudaStream_t &stream)
     {
+      if (query_max) return 4;
       // clang-format off
       switch (tp.aux.x) {
       case   0: launch_kernel<compute_max_only,  64,  64,  16,  16,  16,  2>(arg, min_threads, tp, stream); break;
@@ -131,11 +153,12 @@ namespace quda
       default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 192", tp.aux.x);
       }
       // clang-format on
+      return -1;
     }
 
 #else
 
-    template <bool compute_max_only, class Arg>
+    template <bool compute_max_only, bool query_max = false, class Arg>
     void launch_yhat_kernel(Arg &arg, int min_threads, TuneParam &tp, const cudaStream_t &stream)
     {
       errorQuda("MMA multigrid is not available for this setup.");

@@ -100,80 +100,95 @@ namespace quda
       }
     }
 
-    template <bool from_coarse, class Arg>
-    typename std::enable_if<!from_coarse>::type launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads,
+    template <bool from_coarse, bool query_max = false, class Arg>
+    typename std::enable_if<!from_coarse, int>::type launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads,
                                                                          const cudaStream_t &stream)
     {
       errorQuda("MMA implementation is ONLY built for !from_coarse.");
+      return -1;
     }
-
-    template <bool from_coarse, class Arg>
-    typename std::enable_if<Arg::fineColor == 24 && Arg::coarseColor == 24 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
-                            void>::type
+    
+    template <bool from_coarse, bool query_max = false, class Arg>
+    typename std::enable_if<Arg::fineColor == 6 && Arg::coarseColor == 6 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
+                            int>::type
     launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
     {
-      // clang-format off
+      if (query_max) return 1;
       switch (tp.aux.x) {
+      // clang-format off
+      case 0: launch_compute_uv_kernel<from_coarse,  16,  16,   8,   4,   8>(tp, arg, min_threads, stream); break;
+      case 1: launch_compute_uv_kernel<from_coarse,  16,  16,   8,   8,   4>(tp, arg, min_threads, stream); break;
+      // clang-format on
+      default: errorQuda("tp.aux.x(=%d) is NOT supported by (%d, %d, %d, %d).", tp.aux.x, Arg::fineSpin, Arg::coarseSpin, Arg::fineColor, Arg::coarseColor);
+      }
+      return -1;
+    }
+
+    template <bool from_coarse, bool query_max = false, class Arg>
+    typename std::enable_if<Arg::fineColor == 24 && Arg::coarseColor == 24 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
+                            int>::type
+    launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    {
+      if (query_max) return 4;
+      switch (tp.aux.x) {
+      // clang-format off
       case 0: launch_compute_uv_kernel<from_coarse,  48,  32,  24,   8,   8>(tp, arg, min_threads, stream); break;
       case 1: launch_compute_uv_kernel<from_coarse,  48,  32,  24,   8,  12>(tp, arg, min_threads, stream); break;
       case 2: launch_compute_uv_kernel<from_coarse,  48,  32,  24,   8,  24>(tp, arg, min_threads, stream); break;
       case 3: launch_compute_uv_kernel<from_coarse,  48,  32,  24,  16,   4>(tp, arg, min_threads, stream); break;
       case 4: launch_compute_uv_kernel<from_coarse,  48,  32,  24,  16,  12>(tp, arg, min_threads, stream); break;
-      case 5: launch_compute_uv_kernel<from_coarse,  48,  32,  24,  16,  12>(tp, arg, min_threads, stream); break;
-      case 6: launch_compute_uv_kernel<from_coarse,  48,  32,  24,  16,  12>(tp, arg, min_threads, stream); break;
-      case 7: launch_compute_uv_kernel<from_coarse,  48,  32,  24,  16,  12>(tp, arg, min_threads, stream); break;
+      // clang-format on
       default: errorQuda("tp.aux.x(=%d) is NOT supported by (%d, %d, %d, %d).", tp.aux.x, Arg::fineSpin, Arg::coarseSpin, Arg::fineColor, Arg::coarseColor);
       }
-      // clang-format on
+      return -1;
     }
 
-    template <bool from_coarse, class Arg>
+    template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 24 && Arg::coarseColor == 32 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
-                            void>::type
+                            int>::type
     launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
     {
-      // clang-format off
+      if (query_max) return 3;
       switch (tp.aux.x) {
+      // clang-format off
       case 0: launch_compute_uv_kernel<from_coarse,  48,  32,  24,   8,  12>(tp, arg, min_threads, stream); break;
       case 1: launch_compute_uv_kernel<from_coarse,  48,  32,  24,   8,  12>(tp, arg, min_threads, stream); break;
       case 2: launch_compute_uv_kernel<from_coarse,  48,  32,  24,   8,  24>(tp, arg, min_threads, stream); break;
       case 3: launch_compute_uv_kernel<from_coarse,  48,  32,  24,  16,  12>(tp, arg, min_threads, stream); break;
-      case 4: launch_compute_uv_kernel<from_coarse,  48,  32,  24,  16,  12>(tp, arg, min_threads, stream); break;
-      case 5: launch_compute_uv_kernel<from_coarse,  48,  32,  24,  16,  12>(tp, arg, min_threads, stream); break;
-      case 6: launch_compute_uv_kernel<from_coarse,  48,  32,  24,  16,  12>(tp, arg, min_threads, stream); break;
-      case 7: launch_compute_uv_kernel<from_coarse,  48,  32,  24,  16,  12>(tp, arg, min_threads, stream); break;
+      // clang-format on
       default: errorQuda("tp.aux.x(=%d) is NOT supported by (%d, %d, %d, %d).", tp.aux.x, Arg::fineSpin, Arg::coarseSpin, Arg::fineColor, Arg::coarseColor);
       }
-      // clang-format on
+      return -1;
     }
 
-    template <bool from_coarse, class Arg>
+    template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 24 && Arg::coarseColor == 64 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
-                            void>::type
+                            int>::type
     launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
     {
-      // clang-format off
+      if (query_max) return 5;
       switch (tp.aux.x) {
+      // clang-format off
       case 0: launch_compute_uv_kernel<from_coarse,  48,  64,  24,   8,  12>(tp, arg, min_threads, stream); break;
       case 1: launch_compute_uv_kernel<from_coarse,  48,  64,  24,   8,  12>(tp, arg, min_threads, stream); break;
       case 2: launch_compute_uv_kernel<from_coarse,  48,  64,  24,   8,  24>(tp, arg, min_threads, stream); break;
       case 3: launch_compute_uv_kernel<from_coarse,  48,  64,  24,  16,  12>(tp, arg, min_threads, stream); break;
       case 4: launch_compute_uv_kernel<from_coarse,  48,  64,  24,  32,  12>(tp, arg, min_threads, stream); break;
       case 5: launch_compute_uv_kernel<from_coarse,  48,  64,  24,  16,  24>(tp, arg, min_threads, stream); break;
-      case 6: launch_compute_uv_kernel<from_coarse,  48,  64,  24,  16,  24>(tp, arg, min_threads, stream); break;
-      case 7: launch_compute_uv_kernel<from_coarse,  48,  64,  24,  16,  24>(tp, arg, min_threads, stream); break;
+      // clang-format on
       default: errorQuda("tp.aux.x(=%d) is NOT supported by (%d, %d, %d, %d).", tp.aux.x, Arg::fineSpin, Arg::coarseSpin, Arg::fineColor, Arg::coarseColor);
       }
-      // clang-format on
+      return -1;
     }
 
-    template <bool from_coarse, class Arg>
+    template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 24 && Arg::coarseColor == 96 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
-                            void>::type
+                            int>::type
     launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
     {
-      // clang-format off
+      if (query_max) return 6;
       switch (tp.aux.x) {
+      // clang-format off
       case 0: launch_compute_uv_kernel<from_coarse,  48,  96,  24,   8,  12>(tp, arg, min_threads, stream); break;
       case 1: launch_compute_uv_kernel<from_coarse,  48,  96,  24,   8,  24>(tp, arg, min_threads, stream); break;
       case 2: launch_compute_uv_kernel<from_coarse,  48,  96,  24,  16,   6>(tp, arg, min_threads, stream); break;
@@ -181,39 +196,37 @@ namespace quda
       case 4: launch_compute_uv_kernel<from_coarse,  48,  96,  24,  16,  12>(tp, arg, min_threads, stream); break;
       case 5: launch_compute_uv_kernel<from_coarse,  48,  96,  24,  24,  12>(tp, arg, min_threads, stream); break;
       case 6: launch_compute_uv_kernel<from_coarse,  48,  96,  24,  24,  24>(tp, arg, min_threads, stream); break;
-      case 7: launch_compute_uv_kernel<from_coarse,  48,  96,  24,  24,  24>(tp, arg, min_threads, stream); break;
+      // clang-format on
       default: errorQuda("tp.aux.x(=%d) is NOT supported by (%d, %d, %d, %d).", tp.aux.x, Arg::fineSpin, Arg::coarseSpin, Arg::fineColor, Arg::coarseColor);
       }
-      // clang-format on
+      return -1;
     }
 
-    template <bool from_coarse, class Arg>
+    template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 32 && Arg::coarseColor == 32 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
-                            void>::type
+                            int>::type
     launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
     {
-      // clang-format off
+      if (query_max) return 2;
       switch (tp.aux.x) {
+      // clang-format off
       case 0: launch_compute_uv_kernel<from_coarse,  64,  32,  32,   8,  16>(tp, arg, min_threads, stream); break;
       case 1: launch_compute_uv_kernel<from_coarse,  64,  32,  32,   8,  32>(tp, arg, min_threads, stream); break;
       case 2: launch_compute_uv_kernel<from_coarse,  64,  32,  32,  16,  16>(tp, arg, min_threads, stream); break;
-      case 3: launch_compute_uv_kernel<from_coarse,  64,  32,  32,  16,  16>(tp, arg, min_threads, stream); break;
-      case 4: launch_compute_uv_kernel<from_coarse,  64,  32,  32,  16,  16>(tp, arg, min_threads, stream); break;
-      case 5: launch_compute_uv_kernel<from_coarse,  64,  32,  32,  16,  16>(tp, arg, min_threads, stream); break;
-      case 6: launch_compute_uv_kernel<from_coarse,  64,  32,  32,  16,  16>(tp, arg, min_threads, stream); break;
-      case 7: launch_compute_uv_kernel<from_coarse,  64,  32,  32,  16,  16>(tp, arg, min_threads, stream); break;
+      // clang-format on
       default: errorQuda("tp.aux.x(=%d) is NOT supported by (%d, %d, %d, %d).", tp.aux.x, Arg::fineSpin, Arg::coarseSpin, Arg::fineColor, Arg::coarseColor);
       }
-      // clang-format on
+      return -1;
     }
 
-    template <bool from_coarse, class Arg>
+    template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 64 && Arg::coarseColor == 64 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
-                            void>::type
+                            int>::type
     launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
     {
-      // clang-format off
+      if (query_max) return 6;
       switch (tp.aux.x) {
+      // clang-format off
       case 0: launch_compute_uv_kernel<from_coarse, 128,  64,  64,   8,  16>(tp, arg, min_threads, stream); break;
       case 1: launch_compute_uv_kernel<from_coarse, 128,  64,  64,   8,  32>(tp, arg, min_threads, stream); break;
       case 2: launch_compute_uv_kernel<from_coarse, 128,  64,  64,  16,   8>(tp, arg, min_threads, stream); break;
@@ -221,19 +234,20 @@ namespace quda
       case 4: launch_compute_uv_kernel<from_coarse, 128,  64,  64,  16,  32>(tp, arg, min_threads, stream); break;
       case 5: launch_compute_uv_kernel<from_coarse, 128,  64,  64,  32,   8>(tp, arg, min_threads, stream); break;
       case 6: launch_compute_uv_kernel<from_coarse, 128,  64,  64,  32,  16>(tp, arg, min_threads, stream); break;
-      case 7: launch_compute_uv_kernel<from_coarse, 128,  64,  64,  32,  16>(tp, arg, min_threads, stream); break;
+      // clang-format on
       default: errorQuda("tp.aux.x(=%d) is NOT supported by (%d, %d, %d, %d).", tp.aux.x, Arg::fineSpin, Arg::coarseSpin, Arg::fineColor, Arg::coarseColor);
       }
-      // clang-format on
+      return -1;
     }
 
-    template <bool from_coarse, class Arg>
+    template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 64 && Arg::coarseColor == 96 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
-                            void>::type
+                            int>::type
     launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
     {
-      // clang-format off
+      if (query_max) return 7;
       switch (tp.aux.x) {
+      // clang-format off
       case 0: launch_compute_uv_kernel<from_coarse, 128,  96,  64,   8,  12>(tp, arg, min_threads, stream); break;
       case 1: launch_compute_uv_kernel<from_coarse, 128,  96,  64,   8,  16>(tp, arg, min_threads, stream); break;
       case 2: launch_compute_uv_kernel<from_coarse, 128,  96,  64,   8,  32>(tp, arg, min_threads, stream); break;
@@ -242,29 +256,30 @@ namespace quda
       case 5: launch_compute_uv_kernel<from_coarse, 128,  96,  64,  32,   6>(tp, arg, min_threads, stream); break;
       case 6: launch_compute_uv_kernel<from_coarse, 128,  96,  64,  32,   8>(tp, arg, min_threads, stream); break;
       case 7: launch_compute_uv_kernel<from_coarse, 128,  96,  64,  32,  12>(tp, arg, min_threads, stream); break;
+      // clang-format on
       default: errorQuda("tp.aux.x(=%d) is NOT supported by (%d, %d, %d, %d).", tp.aux.x, Arg::fineSpin, Arg::coarseSpin, Arg::fineColor, Arg::coarseColor);
       }
-      // clang-format on
+      return -1;
     }
 
-    template <bool from_coarse, class Arg>
+    template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 96 && Arg::coarseColor == 96 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
-                            void>::type
+                            int>::type
     launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
     {
-      // clang-format off
+      if (query_max) return 5;
       switch (tp.aux.x) {
+      // clang-format off
       case 0: launch_compute_uv_kernel<from_coarse, 192,  96,  96,   8,  12>(tp, arg, min_threads, stream); break;
       case 1: launch_compute_uv_kernel<from_coarse, 192,  96,  96,   8,  24>(tp, arg, min_threads, stream); break;
       case 2: launch_compute_uv_kernel<from_coarse, 192,  96,  96,  16,   6>(tp, arg, min_threads, stream); break;
       case 3: launch_compute_uv_kernel<from_coarse, 192,  96,  96,  16,  12>(tp, arg, min_threads, stream); break;
-      case 4: launch_compute_uv_kernel<from_coarse, 192,  96,  96,  16,  12>(tp, arg, min_threads, stream); break;
-      case 5: launch_compute_uv_kernel<from_coarse, 192,  96,  96,  24,  12>(tp, arg, min_threads, stream); break;
-      case 6: launch_compute_uv_kernel<from_coarse, 192,  96,  96,  24,  24>(tp, arg, min_threads, stream); break;
-      case 7: launch_compute_uv_kernel<from_coarse, 192,  96,  96,  24,  24>(tp, arg, min_threads, stream); break;
+      case 4: launch_compute_uv_kernel<from_coarse, 192,  96,  96,  24,  12>(tp, arg, min_threads, stream); break;
+      case 5: launch_compute_uv_kernel<from_coarse, 192,  96,  96,  24,  24>(tp, arg, min_threads, stream); break;
+      // clang-format on
       default: errorQuda("tp.aux.x(=%d) is NOT supported by (%d, %d, %d, %d).", tp.aux.x, Arg::fineSpin, Arg::coarseSpin, Arg::fineColor, Arg::coarseColor);
       }
-      // clang-format on
+      return -1;
     }
 
     template <bool from_coarse, int dim, QudaDirection dir, int bM, int bN, int bK, int block_y, int block_z, class Arg>
@@ -341,60 +356,77 @@ namespace quda
       }
     }
 
-    template <bool from_coarse, class Arg>
-    typename std::enable_if<!from_coarse, void>::type
+    template <bool from_coarse, bool query_max = false, class Arg>
+    typename std::enable_if<!from_coarse, int>::type
     launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
     {
       errorQuda("MMA implementation is ONLY built for !from_coarse.");
+      return -1;
+    }
+    
+    template <bool from_coarse, bool query_max = false, class Arg>
+    typename std::enable_if<Arg::fineColor == 6 && Arg::coarseColor == 6 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
+                            int>::type
+    launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    {
+      if (query_max) return 2;
+      switch (tp.aux.x) {
+      // clang-format off
+      case 0: launch_compute_vuv_kernel<from_coarse,  16,  16,   8,   8,   4>(tp, arg, min_threads, stream); break;
+      case 1: launch_compute_vuv_kernel<from_coarse,  16,  16,   8,   4,   8>(tp, arg, min_threads, stream); break;
+      // clang-format on
+      default: errorQuda("tp.aux.x(=%d) is NOT supported by (%d, %d, %d, %d).", tp.aux.x, Arg::fineSpin, Arg::coarseSpin, Arg::fineColor, Arg::coarseColor);
+      }
+      return -1;
     }
 
-    template <bool from_coarse, class Arg>
+
+    template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 24 && Arg::coarseColor == 24 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
-                            void>::type
+                            int>::type
     launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
     {
-      // clang-format off
+      if (query_max) return 4;
       switch (tp.aux.x) {
+      // clang-format off
       case 0: launch_compute_vuv_kernel<from_coarse,  32,  32,  24,   8,   8>(tp, arg, min_threads, stream); break;
       case 1: launch_compute_vuv_kernel<from_coarse,  32,  32,  24,   8,  16>(tp, arg, min_threads, stream); break;
       case 2: launch_compute_vuv_kernel<from_coarse,  32,  32,  24,   8,  16>(tp, arg, min_threads, stream); break;
       case 3: launch_compute_vuv_kernel<from_coarse,  32,  32,  24,  16,   8>(tp, arg, min_threads, stream); break;
       case 4: launch_compute_vuv_kernel<from_coarse,  32,  32,  24,  32,   4>(tp, arg, min_threads, stream); break;
-      case 5: launch_compute_vuv_kernel<from_coarse,  32,  32,  24,  32,   4>(tp, arg, min_threads, stream); break;
-      case 6: launch_compute_vuv_kernel<from_coarse,  32,  32,  24,  32,   4>(tp, arg, min_threads, stream); break;
-      case 7: launch_compute_vuv_kernel<from_coarse,  32,  32,  24,  32,   4>(tp, arg, min_threads, stream); break;
+      // clang-format on
       default: errorQuda("tp.aux.x(=%d) is NOT supported by (%d, %d, %d, %d).", tp.aux.x, Arg::fineSpin, Arg::coarseSpin, Arg::fineColor, Arg::coarseColor);
       }
-      // clang-format on
+      return -1;
     }
 
-    template <bool from_coarse, class Arg>
+    template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 24 && Arg::coarseColor == 32 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
-                            void>::type
+                            int>::type
     launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
     {
-      // clang-format off
+      if (query_max) return 4;
       switch (tp.aux.x) {
+      // clang-format off
       case 0: launch_compute_vuv_kernel<from_coarse,  32,  32,  24,   8,   8>(tp, arg, min_threads, stream); break;
       case 1: launch_compute_vuv_kernel<from_coarse,  32,  32,  24,   8,  16>(tp, arg, min_threads, stream); break;
       case 2: launch_compute_vuv_kernel<from_coarse,  32,  32,  24,   8,  16>(tp, arg, min_threads, stream); break;
       case 3: launch_compute_vuv_kernel<from_coarse,  32,  32,  24,  16,   8>(tp, arg, min_threads, stream); break;
       case 4: launch_compute_vuv_kernel<from_coarse,  32,  32,  24,  32,   4>(tp, arg, min_threads, stream); break;
-      case 5: launch_compute_vuv_kernel<from_coarse,  32,  32,  24,  32,   4>(tp, arg, min_threads, stream); break;
-      case 6: launch_compute_vuv_kernel<from_coarse,  32,  32,  24,  32,   4>(tp, arg, min_threads, stream); break;
-      case 7: launch_compute_vuv_kernel<from_coarse,  32,  32,  24,  32,   4>(tp, arg, min_threads, stream); break;
+      // clang-format on
       default: errorQuda("tp.aux.x(=%d) is NOT supported by (%d, %d, %d, %d).", tp.aux.x, Arg::fineSpin, Arg::coarseSpin, Arg::fineColor, Arg::coarseColor);
       }
-      // clang-format on
+      return -1;
     }
 
-    template <bool from_coarse, class Arg>
+    template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 24 && Arg::coarseColor == 64 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
-                            void>::type
+                            int>::type
     launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
     {
-      // clang-format off
+      if (query_max) return 7;
       switch (tp.aux.x) {
+      // clang-format off
       case 0: launch_compute_vuv_kernel<from_coarse,  64,  64,  24,   8,   8>(tp, arg, min_threads, stream); break;
       case 1: launch_compute_vuv_kernel<from_coarse,  64,  64,  24,   8,  16>(tp, arg, min_threads, stream); break;
       case 2: launch_compute_vuv_kernel<from_coarse,  64,  64,  24,   8,  32>(tp, arg, min_threads, stream); break;
@@ -403,16 +435,18 @@ namespace quda
       case 5: launch_compute_vuv_kernel<from_coarse,  64,  64,  24,  16,  32>(tp, arg, min_threads, stream); break;
       case 6: launch_compute_vuv_kernel<from_coarse,  64,  64,  24,  32,   8>(tp, arg, min_threads, stream); break;
       case 7: launch_compute_vuv_kernel<from_coarse,  64,  64,  24,  32,  16>(tp, arg, min_threads, stream); break;
+      // clang-format on
       default: errorQuda("tp.aux.x(=%d) is NOT supported by (%d, %d, %d, %d).", tp.aux.x, Arg::fineSpin, Arg::coarseSpin, Arg::fineColor, Arg::coarseColor);
       }
-      // clang-format on
+      return -1;
     }
 
-    template <bool from_coarse, class Arg>
+    template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 24 && Arg::coarseColor == 96 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
-                            void>::type
+                            int>::type
     launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
     {
+      if (query_max) return 6;
       // clang-format off
       switch (tp.aux.x) {
       case 0: launch_compute_vuv_kernel<from_coarse,  96,  96,  24,  12,   8>(tp, arg, min_threads, stream); break;
@@ -422,37 +456,36 @@ namespace quda
       case 4: launch_compute_vuv_kernel<from_coarse,  96,  96,  24,  24,  16>(tp, arg, min_threads, stream); break;
       case 5: launch_compute_vuv_kernel<from_coarse,  96,  96,  24,  12,  24>(tp, arg, min_threads, stream); break;
       case 6: launch_compute_vuv_kernel<from_coarse,  96,  96,  24,  24,  24>(tp, arg, min_threads, stream); break;
-      case 7: launch_compute_vuv_kernel<from_coarse,  96,  96,  24,  24,  24>(tp, arg, min_threads, stream); break;
       default: errorQuda("tp.aux.x(=%d) is NOT supported by (%d, %d, %d, %d).", tp.aux.x, Arg::fineSpin, Arg::coarseSpin, Arg::fineColor, Arg::coarseColor);
       }
       // clang-format on
+      return -1;
     }
 
-    template <bool from_coarse, class Arg>
+    template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 32 && Arg::coarseColor == 32 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
-                            void>::type
+                            int>::type
     launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
     {
+      if (query_max) return 3;
       // clang-format off
       switch (tp.aux.x) {
       case 0: launch_compute_vuv_kernel<from_coarse,  32,  32,  32,   8,   8>(tp, arg, min_threads, stream); break;
       case 1: launch_compute_vuv_kernel<from_coarse,  32,  32,  32,   8,  16>(tp, arg, min_threads, stream); break;
       case 2: launch_compute_vuv_kernel<from_coarse,  32,  32,  32,  16,   8>(tp, arg, min_threads, stream); break;
       case 3: launch_compute_vuv_kernel<from_coarse,  32,  32,  32,  32,   4>(tp, arg, min_threads, stream); break;
-      case 4: launch_compute_vuv_kernel<from_coarse,  32,  32,  32,  32,   4>(tp, arg, min_threads, stream); break;
-      case 5: launch_compute_vuv_kernel<from_coarse,  32,  32,  32,  32,   4>(tp, arg, min_threads, stream); break;
-      case 6: launch_compute_vuv_kernel<from_coarse,  32,  32,  32,  32,   4>(tp, arg, min_threads, stream); break;
-      case 7: launch_compute_vuv_kernel<from_coarse,  32,  32,  32,  32,   4>(tp, arg, min_threads, stream); break;
       default: errorQuda("tp.aux.x(=%d) is NOT supported by (%d, %d, %d, %d).", tp.aux.x, Arg::fineSpin, Arg::coarseSpin, Arg::fineColor, Arg::coarseColor);
       }
       // clang-format on
+      return -1;
     }
 
-    template <bool from_coarse, class Arg>
+    template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 64 && Arg::coarseColor == 64 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
-                            void>::type
+                            int>::type
     launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
     {
+      if (query_max) return 7;
       // clang-format off
       switch (tp.aux.x) {
       case 0: launch_compute_vuv_kernel<from_coarse,  64,  64,  64,   8,   8>(tp, arg, min_threads, stream); break;
@@ -466,15 +499,17 @@ namespace quda
       default: errorQuda("tp.aux.x(=%d) is NOT supported by (%d, %d, %d, %d).", tp.aux.x, Arg::fineSpin, Arg::coarseSpin, Arg::fineColor, Arg::coarseColor);
       }
       // clang-format on
+      return -1;
     }
 
-    template <bool from_coarse, class Arg>
+    template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 64 && Arg::coarseColor == 96 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
-                            void>::type
+                            int>::type
     launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
     {
-      // clang-format off
+      if (query_max) return 6;
       switch (tp.aux.x) {
+      // clang-format off
       case 0: launch_compute_vuv_kernel<from_coarse,  96,  96,  64,   8,   8>(tp, arg, min_threads, stream); break;
       case 1: launch_compute_vuv_kernel<from_coarse,  96,  96,  64,   8,  12>(tp, arg, min_threads, stream); break;
       case 2: launch_compute_vuv_kernel<from_coarse,  96,  96,  64,  16,   6>(tp, arg, min_threads, stream); break;
@@ -482,19 +517,20 @@ namespace quda
       case 4: launch_compute_vuv_kernel<from_coarse,  96,  96,  64,  16,  12>(tp, arg, min_threads, stream); break;
       case 5: launch_compute_vuv_kernel<from_coarse,  96,  96,  64,  32,   4>(tp, arg, min_threads, stream); break;
       case 6: launch_compute_vuv_kernel<from_coarse,  96,  96,  64,  32,   6>(tp, arg, min_threads, stream); break;
-      case 7: launch_compute_vuv_kernel<from_coarse,  96,  96,  64,  32,   6>(tp, arg, min_threads, stream); break;
+      // clang-format on
       default: errorQuda("tp.aux.x(=%d) is NOT supported by (%d, %d, %d, %d).", tp.aux.x, Arg::fineSpin, Arg::coarseSpin, Arg::fineColor, Arg::coarseColor);
       }
-      // clang-format on
+      return -1;
     }
 
-    template <bool from_coarse, class Arg>
+    template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 96 && Arg::coarseColor == 96 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
-                            void>::type
+                            int>::type
     launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
     {
-      // clang-format off
+      if (query_max) return 6;
       switch (tp.aux.x) {
+      // clang-format off
       case 0: launch_compute_vuv_kernel<from_coarse,  96,  96,  96,  12,   8>(tp, arg, min_threads, stream); break;
       case 1: launch_compute_vuv_kernel<from_coarse,  96,  96,  96,  24,   8>(tp, arg, min_threads, stream); break;
       case 2: launch_compute_vuv_kernel<from_coarse,  96,  96,  96,   6,  16>(tp, arg, min_threads, stream); break;
@@ -502,24 +538,26 @@ namespace quda
       case 4: launch_compute_vuv_kernel<from_coarse,  96,  96,  96,  24,  16>(tp, arg, min_threads, stream); break;
       case 5: launch_compute_vuv_kernel<from_coarse,  96,  96,  96,  12,  24>(tp, arg, min_threads, stream); break;
       case 6: launch_compute_vuv_kernel<from_coarse,  96,  96,  96,  24,  24>(tp, arg, min_threads, stream); break;
-      case 7: launch_compute_vuv_kernel<from_coarse,  96,  96,  96,  24,  24>(tp, arg, min_threads, stream); break;
+      // clang-format on
       default: errorQuda("tp.aux.x(=%d) is NOT supported by (%d, %d, %d, %d).", tp.aux.x, Arg::fineSpin, Arg::coarseSpin, Arg::fineColor, Arg::coarseColor);
       }
-      // clang-format on
+      return -1;
     }
 
 #else
 
-    template <bool from_coarse, class Arg>
-    void launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    template <bool from_coarse, bool query_max = false, class Arg>
+    int launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
     {
       errorQuda("MMA multigrid is not available for this setup.");
+      return -1;
     }
 
-    template <bool from_coarse, class Arg>
-    void launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    template <bool from_coarse, bool query_max = false, class Arg>
+    int launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
     {
       errorQuda("MMA multigrid is not available for this setup.");
+      return -1;
     }
 
 #endif
