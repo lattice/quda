@@ -8,6 +8,7 @@
 #include <quda.h>
 #include <color_spinor_field.h> // convenient quark field container
 #include <vector_io.h>
+#include <blas_quda.h>
 
 // External headers
 #include <misc.h>
@@ -108,6 +109,7 @@ int main(int argc, char **argv)
   add_deflation_option_group(app);
   add_eofa_option_group(app);
   add_multigrid_option_group(app);
+  add_propagator_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -262,101 +264,84 @@ int main(int argc, char **argv)
   out = quda::ColorSpinorField::Create(cs_param);
   check = quda::ColorSpinorField::Create(cs_param);
   // Host array for solutions
-  void **outProp = (void **)malloc(12 * sizeof(void *));
+  void **outProp = (void **)malloc(prop_n_sources * sizeof(void *));
   // QUDA host array for internal checks and malloc
-  std::vector<quda::ColorSpinorField *> qudaOutProp(12);
+  std::vector<quda::ColorSpinorField *> qudaOutProp(prop_n_sources);
   // Vector construct END
   //-----------------------------------------------------------------------------------
 
   // QUDA propagator test BEGIN
   //----------------------------------------------------------------------------
 
-  double *time = new double[12];
-  double *gflops = new double[12];
+  double *time = new double[prop_n_sources];
+  double *gflops = new double[prop_n_sources];
 
-  printfQuda("Source position: %d %d %d %d\n", source_position[0], source_position[1], source_position[2],
-             source_position[3]);
+  printfQuda("Source position: %d %d %d %d\n", prop_source_position[0], prop_source_position[1], prop_source_position[2],
+             prop_source_position[3]);
 
   QudaInvertParam inv_param_smear = newQudaInvertParam();
   // Borrow problem parameters, then adjust
   setInvertParam(inv_param_smear);
-  double coeff = source_smear_coeff / (4 * source_smear_steps);
+  double coeff = prop_source_smear_coeff / (4 * prop_source_smear_steps);
   inv_param_smear.dslash_type = QUDA_LAPLACE_DSLASH;
   inv_param_smear.kappa = coeff;
   inv_param_smear.laplace3D = 3;
 
-  for (int dil = 0; dil < 12; dil++) {
+  auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
+  rng->Init();
+
+  for (int dil = 0; dil < prop_n_sources; dil++) {
 
     // Allocate memory and set pointers
     qudaOutProp[dil] = quda::ColorSpinorField::Create(cs_param);
     outProp[dil] = qudaOutProp[dil]->V();
     in = quda::ColorSpinorField::Create(cs_param);
+    
+    if (strcmp(prop_source_infile[dil], "") != 0) {
 
-    if (strcmp(source_infile, "") != 0) {
-
-      std::string infile(source_infile);
+      std::string infile(prop_source_infile[dil]);
+      /*
       infile += "_pos";
       for (int i = 0; i < 4; i++) {
         infile += "_";
-        infile += std::to_string(source_position[i]);
+        infile += std::to_string(prop_source_position[i]);
       }
       infile += "_dilution_";
       infile += std::to_string(dil);
-
+      */
+      
       std::vector<quda::ColorSpinorField *> src_ptr;
       src_ptr.reserve(1);
       src_ptr.push_back(in);
 
-      // loas the source
+      // load the source
       quda::VectorIO io(infile, QUDA_BOOLEAN_TRUE);
       io.load(src_ptr);
     } else {
-
-      int X[4] = {gauge_param.X[0], gauge_param.X[1], gauge_param.X[2], gauge_param.X[3]};
-      // Get local index
-      int src_local[4];
-      for (int d = 0; d < 4; d++) src_local[d] = source_position[d] - comm_coord(d) * X[d];
-      // Get linear index
-      int local_idx = ((X[2] * src_local[3] + src_local[2]) * X[1] + src_local[1]) * X[0] + src_local[0];
-      int local_idx_cb = local_idx / 2;
-      int parity = local_idx % 2;
-
-      // Deduce where to place the point source. If the following is satisfied,
-      // we have isolated the MPI rank that contains the point source posistion.
-      if ((comm_coord(0) * X[0] <= source_position[0] && source_position[0] < (comm_coord(0) + 1) * X[0])
-          && (comm_coord(1) * X[1] <= source_position[1] && source_position[1] < (comm_coord(1) + 1) * X[1])
-          && (comm_coord(2) * X[2] <= source_position[2] && source_position[2] < (comm_coord(2) + 1) * X[2])
-          && (comm_coord(3) * X[3] <= source_position[3] && source_position[3] < (comm_coord(3) + 1) * X[3])) {
-
-        if (prec == QUDA_DOUBLE_PRECISION) {
-          ((double *)in->V())[my_spinor_site_size * (parity * Vh + local_idx_cb) + 2 * dil] = 1.0;
-        } else {
-          ((float *)in->V())[my_spinor_site_size * (parity * Vh + local_idx_cb) + 2 * dil] = 1.0;
-        }
-      }
-
+      constructPointSpinorSource(in->V(), 4, 3, inv_param.cpu_prec, gauge_param.X, dil);
+        
       // Gaussian smear the point source.
-      performGaussianSmearNStep(in->V(), &inv_param_smear, source_smear_steps);
-      if (strcmp(source_outfile, "") != 0) {
-
-        std::string outfile(source_outfile);
+      performGaussianSmearNStep(in->V(), &inv_param_smear, prop_source_smear_steps);
+      if (strcmp(prop_source_outfile[0], "") != 0) {
+	
+        std::string outfile(prop_source_outfile[0]);
         outfile += "_pos";
         for (int i = 0; i < 4; i++) {
           outfile += "_";
-          outfile += std::to_string(source_position[i]);
+          outfile += std::to_string(prop_source_position[i]);
         }
         outfile += "_dilution_";
         outfile += std::to_string(dil);
 
         std::vector<quda::ColorSpinorField *> src_ptr;
         src_ptr.push_back(in);
-
+	
         // save the source
         quda::VectorIO io(outfile, QUDA_BOOLEAN_TRUE);
         io.save(src_ptr);
       }
     }
-
+    
     // If deflating, preserve the deflation space between solves
     if (inv_deflate) eig_param.preserve_deflation = dil < 12 - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     // Perform QUDA inversions
@@ -377,7 +362,7 @@ int main(int argc, char **argv)
   // QUDA propagator test COMPLETE
   //----------------------------------------------------------------------------
 
-  // free the multigrid solver
+  // Free the multigrid solver
   if (inv_multigrid) destroyMultigridQuda(mg_preconditioner);
 
   // Compute performance statistics
@@ -386,18 +371,21 @@ int main(int argc, char **argv)
   delete[] time;
   delete[] gflops;
 
-  if (strcmp(prop_outfile, "") != 0) {
+  if (strcmp(prop_sink_outfile[0], "") != 0) {
     // Make an array of size 12
     std::vector<quda::ColorSpinorField *> prop_ptr;
     prop_ptr.reserve(12);
     for (int i = 0; i < 12; i++) prop_ptr.push_back(qudaOutProp[i]);
 
     // save the propagators
-    quda::VectorIO io(prop_outfile, QUDA_BOOLEAN_TRUE);
+    quda::VectorIO io(prop_sink_outfile[0], QUDA_BOOLEAN_TRUE);
     io.save(prop_ptr);
   }
 
   // Clean up memory allocations
+  rng->Release();
+  delete rng;
+  
   delete out;
   delete check;
   free(outProp);

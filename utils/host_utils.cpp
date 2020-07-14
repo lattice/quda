@@ -250,6 +250,34 @@ void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision p
   quda::spinorNoise(spinor_in, rng, QUDA_NOISE_UNIFORM);
 }
 
+void constructPointSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x,
+				const int dil)
+{
+  int X[4] = {x[0], x[1], x[2], x[3]};
+  // Get local index
+  int src_local[4];
+  for (int d = 0; d < 4; d++) src_local[d] = prop_source_position[d] - comm_coord(d) * X[d];
+  // Get linear index
+  int local_idx = ((X[2] * src_local[3] + src_local[2]) * X[1] + src_local[1]) * X[0] + src_local[0];
+  int local_idx_cb = local_idx / 2;
+  int parity = local_idx % 2;
+  
+  // Deduce where to place the point source. If the following is satisfied,
+  // we have isolated the MPI rank that contains the point source posistion.
+  if ((comm_coord(0) * X[0] <= prop_source_position[0] && prop_source_position[0] < (comm_coord(0) + 1) * X[0])
+      && (comm_coord(1) * X[1] <= prop_source_position[1] && prop_source_position[1] < (comm_coord(1) + 1) * X[1])
+      && (comm_coord(2) * X[2] <= prop_source_position[2] && prop_source_position[2] < (comm_coord(2) + 1) * X[2])
+      && (comm_coord(3) * X[3] <= prop_source_position[3] && prop_source_position[3] < (comm_coord(3) + 1) * X[3])) {
+    
+    if(precision == QUDA_DOUBLE_PRECISION) {
+      ((double*)v)[my_spinor_site_size * (parity*Vh + local_idx_cb) + 2*dil] = 1.0;
+    } else {
+      ((float*)v)[my_spinor_site_size * (parity*Vh + local_idx_cb) + 2*dil] = 1.0;
+    }
+  }  
+}
+
+
 void initComms(int argc, char **argv, std::array<int, 4> &commDims) { initComms(argc, argv, commDims.data()); }
 
 void initComms(int argc, char **argv, int *const commDims)

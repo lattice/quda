@@ -535,6 +535,19 @@ extern "C" {
     QUDA_WFLOW_TYPE_INVALID = QUDA_INVALID_ENUM
   } QudaWFlowType;
 
+  typedef enum QudaGaugeSmearType_s {
+    QUDA_GAUGE_SMEAR_TYPE_APE,
+    QUDA_GAUGE_SMEAR_TYPE_STOUT,
+    QUDA_GAUGE_SMEAR_TYPE_OVR_IMP_STOUT,
+    QUDA_GAUGE_SMEAR_TYPE_INVALID = QUDA_INVALID_ENUM
+  } QudaGaugeSmearType;
+  
+  typedef enum QudaFermionSmearType_s {
+    QUDA_FERMION_SMEAR_TYPE_GAUSSIAN,
+    QUDA_FERMION_SMEAR_TYPE_WUPPERTAL,
+    QUDA_FERMION_SMEAR_TYPE_INVALID = QUDA_INVALID_ENUM
+  } QudaFermionSmearType;
+  
   // Allows to choose an appropriate external library
   typedef enum QudaExtLibType_s {
     QUDA_CUSOLVE_EXTLIB,
