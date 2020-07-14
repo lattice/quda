@@ -712,7 +712,6 @@ namespace quda
         // Only mutiple of 4 are supported since tensor core MMA only supports multiple of 16 shapes and we get a
         // factor of 4 for free.
         switch (in.X(4)) {
-#if 0
         case 4: {
           FusedDslashArg<storage_type, recon, 4> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
                                                      halo_shift, type);
@@ -725,14 +724,12 @@ namespace quda
           FusedDslash<decltype(arg)> dslash(arg, in);
           dslash.apply(streams[Nstream - 1]);
         } break;
-#endif
         case 12: {
           FusedDslashArg<storage_type, recon, 12> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
                                                       halo_shift, type);
           FusedDslash<decltype(arg)> dslash(arg, in);
           dslash.apply(streams[Nstream - 1]);
         } break;
-#if 0
         case 16: {
           FusedDslashArg<storage_type, recon, 16> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
                                                       halo_shift, type);
@@ -745,7 +742,6 @@ namespace quda
           FusedDslash<decltype(arg)> dslash(arg, in);
           dslash.apply(streams[Nstream - 1]);
         } break;
-#endif
         default: errorQuda("Ls = %d is NOT supported.\n", in.X(4));
         }
       }
