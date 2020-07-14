@@ -60,7 +60,7 @@ namespace quda
 
     template <bool compute_max_only, bool query_max = false, class Arg>
     typename std::enable_if<Arg::N == 48, int>::type launch_yhat_kernel(Arg &arg, int min_threads, TuneParam &tp,
-                                                                         const cudaStream_t &stream)
+                                                                        const cudaStream_t &stream)
     {
       if (query_max) return 2;
       // clang-format off
@@ -76,7 +76,7 @@ namespace quda
 
     template <bool compute_max_only, bool query_max = false, class Arg>
     typename std::enable_if<Arg::N == 12, int>::type launch_yhat_kernel(Arg &arg, int min_threads, TuneParam &tp,
-                                                                         const cudaStream_t &stream)
+                                                                        const cudaStream_t &stream)
     {
       if (query_max) return 1;
       // clang-format off
@@ -91,7 +91,7 @@ namespace quda
 
     template <bool compute_max_only, bool query_max = false, class Arg>
     typename std::enable_if<Arg::N == 64, int>::type launch_yhat_kernel(Arg &arg, int min_threads, TuneParam &tp,
-                                                                         const cudaStream_t &stream)
+                                                                        const cudaStream_t &stream)
     {
       if (query_max) return 6;
       // clang-format off
@@ -111,7 +111,7 @@ namespace quda
 
     template <bool compute_max_only, bool query_max = false, class Arg>
     typename std::enable_if<Arg::N == 128, int>::type launch_yhat_kernel(Arg &arg, int min_threads, TuneParam &tp,
-                                                                          const cudaStream_t &stream)
+                                                                         const cudaStream_t &stream)
     {
       if (query_max) return 7;
       // clang-format off
@@ -136,7 +136,7 @@ namespace quda
 
     template <bool compute_max_only, bool query_max = false, class Arg>
     typename std::enable_if<Arg::N == 192, int>::type launch_yhat_kernel(Arg &arg, int min_threads, TuneParam &tp,
-                                                                          const cudaStream_t &stream)
+                                                                         const cudaStream_t &stream)
     {
       if (query_max) return 4;
       // clang-format off

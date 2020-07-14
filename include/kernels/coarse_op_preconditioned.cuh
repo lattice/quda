@@ -6,7 +6,8 @@
 
 namespace quda {
 
-  template <typename Float_, typename PreconditionedGauge, typename Gauge, typename GaugeInv, int n_, int M_, int N_> struct CalculateYhatArg {
+  template <typename Float_, typename PreconditionedGauge, typename Gauge, typename GaugeInv, int n_, int M_, int N_>
+  struct CalculateYhatArg {
     using Float = Float_;
     TileSize<n_, n_, n_, M_, N_, 1> tile;
 
@@ -28,12 +29,7 @@ namespace quda {
 
     CalculateYhatArg(const PreconditionedGauge &Yhat, const Gauge Y, const GaugeInv Xinv, const int *dim,
                      const int *comm_dim, int nFace) :
-      Yhat(Yhat),
-      Y(Y),
-      Xinv(Xinv),
-      nFace(nFace),
-      max_h(nullptr),
-      max_d(nullptr)
+      Yhat(Yhat), Y(Y), Xinv(Xinv), nFace(nFace), max_h(nullptr), max_d(nullptr)
     {
       for (int i=0; i<4; i++) {
         this->comm_dim[i] = comm_dim[i];

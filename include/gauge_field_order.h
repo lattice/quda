@@ -247,9 +247,10 @@ namespace quda {
       */
       __device__ __host__ inline fieldorder_wrapper(complex<storeFloat> *v, int idx, Float scale, Float scale_inv) :
         v(v), idx(idx), scale(scale), scale_inv(scale_inv)
-      {}
+      {
+      }
 
-	__device__ __host__ inline Float real() const {
+        __device__ __host__ inline Float real() const {
           if (!fixed) {
             return v[idx].real();
           } else {
@@ -275,14 +276,14 @@ namespace quda {
         */
         __device__ __host__ inline complex<Float> operator-() const
         {
-          return fixed ? -scale_inv*static_cast<complex<Float> >(v[idx]) : -static_cast<complex<Float> >(v[idx]);
+          return fixed ? -scale_inv * static_cast<complex<Float>>(v[idx]) : -static_cast<complex<Float>>(v[idx]);
         }
 
         /**
-	   @brief Assignment operator with fieldorder_wrapper instance as input
-	   @param a fieldorder_wrapper we are copying from
-	*/
-	__device__ __host__ inline void operator=(const fieldorder_wrapper<Float,storeFloat> &a) {
+           @brief Assignment operator with fieldorder_wrapper instance as input
+           @param a fieldorder_wrapper we are copying from
+        */
+        __device__ __host__ inline void operator=(const fieldorder_wrapper<Float,storeFloat> &a) {
 	  v[idx] = fixed ? complex<storeFloat>(round(scale * a.real()), round(scale * a.imag())) : a.v[a.idx];
 	}
 
@@ -1004,12 +1005,13 @@ namespace quda {
          * @param s_col col spin index
          * @param c_col col color index
          */
-        __device__ __host__ inline const complex<Float> operator()(int d, int parity, int x, int s_row,
-								   int s_col, int c_row, int c_col) const {
-	  return (*this)(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
-	}
+        __device__ __host__ inline const complex<Float> operator()(int d, int parity, int x, int s_row, int s_col,
+                                                                   int c_row, int c_col) const
+        {
+          return (*this)(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
+        }
 
-	/**
+        /**
 	 * Specialized read-only complex-member accessor function (for coarse gauge field)
 	 * @param d dimension index
 	 * @param parity Parity index
@@ -1036,16 +1038,16 @@ namespace quda {
         }
 
         /**
-	 * Specialized read-only complex-member accessor function (for coarse gauge field ghost zone)
-	 * @param d dimension index
-	 * @param parity Parity index
-	 * @param x 1-d site index
-	 * @param s_row row spin index
-	 * @param c_row row color index
-	 * @param s_col col spin index
-	 * @param c_col col color index
-	 */
-	__device__ __host__ inline complex<Float> Ghost(int d, int parity, int x, int s_row,
+         * Specialized read-only complex-member accessor function (for coarse gauge field ghost zone)
+         * @param d dimension index
+         * @param parity Parity index
+         * @param x 1-d site index
+         * @param s_row row spin index
+         * @param c_row row color index
+         * @param s_col col spin index
+         * @param c_col col color index
+         */
+        __device__ __host__ inline complex<Float> Ghost(int d, int parity, int x, int s_row,
 							int s_col, int c_row, int c_col) const {
 	  return Ghost(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
 	}

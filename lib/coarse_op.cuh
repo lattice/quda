@@ -724,7 +724,7 @@ namespace quda {
         int max;
         if (type == COMPUTE_UV) {
           max = mma::launch_compute_uv_kernel<from_coarse, query_max>(param, arg, 1, 0);
-        } else if(type == COMPUTE_VUV) {
+        } else if (type == COMPUTE_VUV) {
           max = mma::launch_compute_vuv_kernel<from_coarse, query_max>(param, arg, 1, 0);
         }
 

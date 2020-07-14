@@ -46,14 +46,14 @@ namespace quda {
     } else if (u.Order() == QUDA_MILC_GAUGE_ORDER) {
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 #ifdef FINE_GRAINED_ACCESS
-	      typedef typename gauge::FieldOrder<Float,Nc,1,QUDA_MILC_GAUGE_ORDER,true,storeFloat> G;
-	      extractGhost<Float,length>(G(const_cast<GaugeField&>(u), 0, (void**)Ghost), u, location, extract, offset);
+        typedef typename gauge::FieldOrder<Float, Nc, 1, QUDA_MILC_GAUGE_ORDER, true, storeFloat> G;
+        extractGhost<Float, length>(G(const_cast<GaugeField &>(u), 0, (void **)Ghost), u, location, extract, offset);
 #else
-	      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO,length>::type G;
-	      extractGhost<Float,length>(MILCOrder<Float, length>(u, 0, Ghost), u, location, extract, offset);
+        typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO, length>::type G;
+        extractGhost<Float, length>(MILCOrder<Float, length>(u, 0, Ghost), u, location, extract, offset);
 #endif
       }
-     
+
     } else {
       errorQuda("Gauge field %d order not supported", u.Order());
     }

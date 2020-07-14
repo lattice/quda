@@ -137,7 +137,7 @@ namespace quda
 
     bool advanceTuneParam(TuneParam &param) const {
       if (use_mma) {
-        
+
         constexpr bool compute_max_only_dummy = true;
         constexpr bool query_max = true;
         if (param.aux.x < mma::launch_yhat_kernel<compute_max_only_dummy, query_max>(arg, 1, param, 0)) {
@@ -147,12 +147,11 @@ namespace quda
         return false;
 
       } else {
-        
+
         if (meta.Location() == QUDA_CUDA_FIELD_LOCATION && meta.MemType() == QUDA_MEMORY_DEVICE)
           return Tunable::advanceTuneParam(param);
         else
           return false;
-      
       }
     }
 
@@ -186,20 +185,21 @@ namespace quda
 
     constexpr QudaGaugeFieldOrder gOrder_milc = QUDA_MILC_GAUGE_ORDER;
     GaugeField *Xinv_aos = nullptr;
-    
+
     // invert the clover matrix field
     const int n = X.Ncolor();
-    
+
     if (X.Location() == QUDA_CUDA_FIELD_LOCATION) {
-      
-      auto create_gauge_copy = [](const GaugeField &X, bool copy_content) -> auto {
+
+      auto create_gauge_copy = [](const GaugeField &X, bool copy_content) -> auto
+      {
         GaugeField *output = nullptr;
         if (X.Order() == gOrder_milc && X.Precision() >= QUDA_SINGLE_PRECISION) {
           output = const_cast<GaugeField *>(&X);
         } else {
           GaugeFieldParam param(X);
           param.order = gOrder_milc;
-          param.setPrecision( X.Precision() < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION : X.Precision() );
+          param.setPrecision(X.Precision() < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION : X.Precision());
           output = cudaGaugeField::Create(param);
           if (copy_content) output->copy(X);
         }
@@ -209,10 +209,11 @@ namespace quda
       GaugeField *X_aos = create_gauge_copy(X, true);
       Xinv_aos = create_gauge_copy(Xinv, false);
 
-      blas::flops += invert((void*)Xinv_aos->Gauge_p(), (void*)X_aos->Gauge_p(), n, X_aos->Volume(), X_aos->Precision(), X.Location());
+      blas::flops += invert((void *)Xinv_aos->Gauge_p(), (void *)X_aos->Gauge_p(), n, X_aos->Volume(),
+                            X_aos->Precision(), X.Location());
 
       if (&Xinv != Xinv_aos) {
-        if (Xinv.Precision() < QUDA_SINGLE_PRECISION) Xinv.Scale( Xinv_aos->abs_max() );
+        if (Xinv.Precision() < QUDA_SINGLE_PRECISION) Xinv.Scale(Xinv_aos->abs_max());
         Xinv.copy(*Xinv_aos);
       }
       if (&X != X_aos) { delete X_aos; }
@@ -240,7 +241,8 @@ namespace quda
 
       if (use_mma) {
 
-        auto create_gauge_copy = [](const GaugeField &X, QudaGaugeFieldOrder order, bool copy_content) -> auto {
+        auto create_gauge_copy = [](const GaugeField &X, QudaGaugeFieldOrder order, bool copy_content) -> auto
+        {
           GaugeField *output = nullptr;
           if (X.Order() == order) {
             output = const_cast<GaugeField *>(&X);
@@ -262,7 +264,7 @@ namespace quda
         typedef typename gauge::FieldOrder<Float, N, 1, gOrder_milc, use_native_ghosts, storeFloat> gPreconditionedCoarse;
         gCoarse yAccessor(*Y_aos);
         gPreconditionedCoarse yHatAccessor(*Yhat_aos);
-        
+
         // XXX: This doesn't work for double precision.
         using gCoarseInv = gauge::FieldOrder<float, N, 1, gOrder_milc, use_native_ghosts, float>;
         gCoarseInv xInvAccessor(*Xinv_aos);
@@ -291,18 +293,14 @@ namespace quda
         yHat.setComputeMaxOnly(false);
         yHat.apply(0);
 
-        if (&Y != Y_aos) {
-          delete Y_aos;
-        }
-        
+        if (&Y != Y_aos) { delete Y_aos; }
+
         if (&Yhat != Yhat_aos) {
           Yhat.copy(*Yhat_aos);
           delete Yhat_aos;
         }
 
-        if (Xinv_aos != &Xinv) {
-          delete Xinv_aos;
-        }
+        if (Xinv_aos != &Xinv) { delete Xinv_aos; }
 
       } else {
 
@@ -335,14 +333,12 @@ namespace quda
         }
         yHat.setComputeMaxOnly(false);
         yHat.apply(0);
-      
       }
 
       if (getVerbosity() >= QUDA_VERBOSE)
         for (int d = 0; d < 8; d++)
           printfQuda("Yhat[%d] = %e (%e %e = %e x %e)\n", d, Yhat.norm2(d), Yhat.abs_max(d),
                      Y.abs_max(d) * Xinv.abs_max(0), Y.abs_max(d), Xinv.abs_max(0));
-    
     }
 
     // fill back in the bulk of Yhat so that the backward link is updated on the previous node
@@ -427,4 +423,3 @@ namespace quda
   }
 
 } // namespace quda
-

@@ -452,7 +452,8 @@ namespace quda {
       */
       __device__ __host__ inline fieldorder_wrapper(complex<storeFloat> *v, int idx, Float scale, Float scale_inv) :
         v(v), idx(idx), scale(scale), scale_inv(scale_inv)
-      {}
+      {
+      }
 
   __device__ __host__ inline Float real() const {
     if (!fixed) {
