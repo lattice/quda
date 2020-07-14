@@ -2267,6 +2267,7 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   popVerbosity();
 }
 
+
 void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam *eig_param)
 {
   profileEigensolve.TPSTART(QUDA_PROFILE_TOTAL);

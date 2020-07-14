@@ -274,10 +274,7 @@ namespace quda {
 	gammaCPU<Float,nColor>(arg);
       } else {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	switch (arg.d) {
-	case 4: gammaGPU<Float,nColor,4> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
-	default: errorQuda("%d not instantiated", arg.d);
-	}
+	gammaGPU<Float,nColor,4> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
       }
     }
 

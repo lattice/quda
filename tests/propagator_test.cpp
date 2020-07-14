@@ -271,8 +271,7 @@ int main(int argc, char **argv)
   //-----------------------------------------------------------------------------------
 
   // QUDA propagator test BEGIN
-  //----------------------------------------------------------------------------
-
+  //-----------------------------------------------------------------------------------
   double *time = new double[prop_n_sources];
   double *gflops = new double[prop_n_sources];
 
@@ -322,6 +321,7 @@ int main(int argc, char **argv)
         
       // Gaussian smear the point source.
       performGaussianSmearNStep(in->V(), &inv_param_smear, prop_source_smear_steps);
+      
       if (strcmp(prop_source_outfile[0], "") != 0) {
 	
         std::string outfile(prop_source_outfile[0]);
@@ -352,6 +352,9 @@ int main(int argc, char **argv)
     printfQuda("Prop %d done: %d iter / %g secs = %g Gflops\n\n", dil, inv_param.iter, inv_param.secs,
                inv_param.gflops / inv_param.secs);
 
+    // Gaussian smear the point sink.
+    performGaussianSmearNStep(qudaOutProp[dil]->V(), &inv_param_smear, prop_sink_smear_steps);
+    
     // Perform host side verification of inversion if requested
     if (verify_results) {
       verifyInversion(out->V(), in->V(), check->V(), gauge_param, inv_param, gauge, clover, clover_inv);
