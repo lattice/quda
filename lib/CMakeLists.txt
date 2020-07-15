@@ -1,6 +1,9 @@
 # all files for quda -- needs some cleanup
 # cmake-format: off
 
+
+
+
 # QUDA_HASH for tunecache
 if(NOT GITVERSION)
   set(GITVERSION ${PROJECT_VERSION})
@@ -241,16 +244,32 @@ target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_generic>)
 # propagate CXX flags to CUDA host compiler
 #TODO: Do we still need that? 
 if(${QUDA_PROPAGATE_CXX_FLAGS})
-  target_compile_options(
-    quda
-    PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:
-    $<$<CONFIG:DEVEL>:$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:SHELL:-Xcompiler >SHELL:${CMAKE_CXX_FLAGS_DEVEL}>
-	  $<$<CONFIG:STRICT>:$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:SHELL:-Xcompiler >SHELL:${CMAKE_CXX_FLAGS_STRICT}>
-	  $<$<CONFIG:RELEASE>:$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:SHELL:-Xcompiler > SHELL:${CMAKE_CXX_FLAGS_RELEASE}>
-	  $<$<CONFIG:DEBUG>:$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:SHELL:-Xcompiler > SHELL:${CMAKE_CXX_FLAGS_DEBUG}>
-	  $<$<CONFIG:HOSTDEBUG>:$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:SHELL:-Xcompiler > SHELL:${CMAKE_CXX_FLAGS_HOSTDEBUG}>
-	  $<$<CONFIG:DEVICEDEBUG>:$$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:SHELL:-Xcompiler > SHELL:${CMAKE_CXX_FLAGS_DEVICEDEBUG}>
-    >)
+
+  # Pick the right set of flags
+  # Apparently I cannot do this with generator expressions
+  if( CMAKE_BUILD_TYPE STREQUAL "DEVEL")
+   set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_DEVEL}")
+  elseif( CMAKE_BUILD_TYPE STREQUAL "STRICT")
+   set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_STRICT}")
+  elseif( CMAKE_BUILD_TYPE STREQUAL "RELEASE") 
+   set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_RELEASE}")
+  elseif( CMAKE_BUILD_TYPE STREQUAL "DEBUG")
+   set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_DEBUG}")
+  elseif( CMAKE_BUILD_TYPE STREQUAL "HOSTDEBUG")
+   set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_HOSTDEBUG}")
+  elseif( CMAKE_BUILD_TYPE STREQUAL "DEVICEDEBUG")
+   set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_DEVICEDEBUG}")
+  endif()
+
+  # Turne the flags into a CMAKE list  
+  string(REPLACE " " ";" PROPAGATED_FLAG_LIST ${PROPAGATED_FLAGS})
+ 
+  # Rather than adding all the list, do it element y element
+  # Then there is no weird quoting  problem seemingly 
+  foreach( FLAG ${PROPAGATED_FLAG_LIST} )
+	  target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -Xcompiler=${FLAG}> 
+		                              $<$<COMPILE_LANG_AND_ID:CUDA,Clang>: ${FLAG}>)
+  endforeach()
 endif()
 
 # some clang warnings should be warning even when turning warnings into errors
