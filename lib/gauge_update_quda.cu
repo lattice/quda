@@ -1,7 +1,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <quda_internal.h>
-#include <tune_quda.h>
+//#include <tune_quda.h>
 #include <gauge_field.h>
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
@@ -95,7 +95,8 @@ namespace quda {
 
     void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      updateGaugeFieldKernel<conj_mom,exact><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+      //updateGaugeFieldKernel<conj_mom,exact><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+      qudaLaunch((updateGaugeFieldKernel<conj_mom,exact>),(tp.grid,tp.block,tp.shared_bytes),(arg));
     } // apply
 
     long long flops() const {

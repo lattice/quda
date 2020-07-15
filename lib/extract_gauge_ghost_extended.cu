@@ -1,5 +1,5 @@
 #include <quda_internal.h>
-#include <tune_quda.h>
+//#include <tune_quda.h>
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
 
@@ -223,8 +223,10 @@ namespace quda {
 	  TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	  tp.grid.y = 2;
 	  tp.grid.z = 2;
-	  extractGhostExKernel<Float,length,nDim,dim,Order,true> 
-	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  //extractGhostExKernel<Float,length,nDim,dim,Order,true> 
+	  //  <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  qudaLaunch((extractGhostExKernel<Float,length,nDim,dim,Order,true>),
+		(tp.grid, tp.block, tp.shared_bytes, stream),(arg));
 	}
       } else { // we are injecting
 	if (location==QUDA_CPU_FIELD_LOCATION) {
@@ -233,8 +235,10 @@ namespace quda {
 	  TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	  tp.grid.y = 2;
 	  tp.grid.z = 2;
-	  extractGhostExKernel<Float,length,nDim,dim,Order,false> 
-	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  //extractGhostExKernel<Float,length,nDim,dim,Order,false> 
+	  //  <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  qudaLaunch((extractGhostExKernel<Float,length,nDim,dim,Order,false>),
+	   (tp.grid, tp.block, tp.shared_bytes, stream),(arg));
 	}
       }
     }

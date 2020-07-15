@@ -1,4 +1,4 @@
-#include <tune_quda.h>
+#include <quda_internal.h>
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
 
@@ -134,10 +134,8 @@ namespace quda {
 	if(arg.regularToextended) copyGaugeEx<FloatOut, FloatIn, length, OutOrder, InOrder, true>(arg);
 	else copyGaugeEx<FloatOut, FloatIn, length, OutOrder, InOrder, false>(arg);
       } else if (location == QUDA_CUDA_FIELD_LOCATION) {
-	if(arg.regularToextended) copyGaugeExKernel<FloatOut, FloatIn, length, OutOrder, InOrder, true>
-				    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	else copyGaugeExKernel<FloatOut, FloatIn, length, OutOrder, InOrder, false>
-	       <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	if(arg.regularToextended) qudaLaunch((copyGaugeExKernel<FloatOut, FloatIn, length, OutOrder, InOrder, true>),(tp,stream),(arg));
+	else qudaLaunch((copyGaugeExKernel<FloatOut, FloatIn, length, OutOrder, InOrder, false>),(tp,stream),(arg));
       }
     }
 

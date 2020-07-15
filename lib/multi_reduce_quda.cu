@@ -1,5 +1,5 @@
 #include <blas_quda.h>
-#include <tune_quda.h>
+#include <quda_internal.h>
 #include <color_spinor_field_order.h>
 #include <uint_to_char.h>
 

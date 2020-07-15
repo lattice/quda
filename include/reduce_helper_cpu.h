@@ -49,14 +49,14 @@ namespace quda {
   inline void zero(doubledouble3 &x) { zero(x.x); zero(x.y); zero(x.z); }
 #endif
 
-  unsigned int count[QUDA_MAX_MULTI_REDUCE] = { };
-  bool isLastBlockDone;
+  //unsigned int count[QUDA_MAX_MULTI_REDUCE] = { };
+  //bool isLastBlockDone;
 
   template <int block_size_x, int block_size_y, typename T, bool do_sum=true, typename Reducer=Sum<T>>
   inline void reduce2d(ReduceArg<T> arg, const T &in, const int idx=0) {
 
+#if 0
     Reducer r;
-    #if 0
     T aggregate = (do_sum ? BlockReduce(cub_tmp).Sum(in) : BlockReduce(cub_tmp).Reduce(in, r));
 
     if (threadIdx.x == 0 && threadIdx.y == 0) {
@@ -91,7 +91,7 @@ namespace quda {
 	count[idx] = 0; // set to zero for next time
       }
     }
-    #endif
+#endif
     arg.result_h[idx] = in;
   }
 

@@ -3,7 +3,7 @@
 
 #include <gauge_field.h>
 #include <gauge_field_order.h>
-#include <tune_quda.h>
+#include <quda_internal.h>
 #include <quda_matrix.h>
 #include <unitarization_links.h>
 #include <su3_project.cuh>
@@ -352,7 +352,8 @@ namespace {
 
     void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      DoUnitarizedLink<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+      //DoUnitarizedLink<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+      qudaLaunch((DoUnitarizedLink),(tp.grid, tp.block, tp.shared_bytes, stream),(arg));
     }
 
     void preTune() { if (arg.in.gauge == arg.out.gauge) arg.out.save(); }
@@ -442,7 +443,8 @@ namespace {
 
     void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      ProjectSU3kernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+      //ProjectSU3kernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+      qudaLaunch((ProjectSU3kernel),(tp.grid, tp.block, tp.shared_bytes, stream),(arg));
     }
 
     void preTune() { arg.u.save(); }

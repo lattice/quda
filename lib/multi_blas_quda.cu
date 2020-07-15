@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <cstring> // needed for memset
 
-#include <tune_quda.h>
+#include <quda_internal.h>
 #include <blas_quda.h>
 #include <color_spinor_field.h>
 
@@ -180,10 +180,19 @@ namespace quda {
           if (b.data) { set_param<decltype(f_)::multi_1d>(Bmatrix_d, arg, 'b', b, stream); }
           if (c.data) { set_param<decltype(f_)::multi_1d>(Cmatrix_d, arg, 'c', c, stream); }
           switch (tp.aux.x) {
-          case 1: multiBlasKernel<device_real_t, M, NXZ, 1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+          case 1:
+	    //multiBlasKernel<device_real_t, M, NXZ, 1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	    qudaLaunch((multiBlasKernel<device_real_t, M, NXZ, 1>),(tp.grid, tp.block, tp.shared_bytes, stream),(arg));
+	    break;
 #ifdef WARP_SPLIT
-          case 2: multiBlasKernel<device_real_t, M, NXZ, 2><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
-          case 4: multiBlasKernel<device_real_t, M, NXZ, 4><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+          case 2:
+	    //multiBlasKernel<device_real_t, M, NXZ, 2><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	    qudaLaunch((multiBlasKernel<device_real_t, M, NXZ, 2>),(tp.grid, tp.block, tp.shared_bytes, stream),(arg));
+	    break;
+          case 4:
+	    //multiBlasKernel<device_real_t, M, NXZ, 4><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	    qudaLaunch(multiBlasKernel<device_real_t, M, NXZ, 4>),(tp.grid, tp.block, tp.shared_bytes, stream),(arg));
+	    break;
 #endif
           default: errorQuda("warp-split factor %d not instantiated", tp.aux.x);
           }

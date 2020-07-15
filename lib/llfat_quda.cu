@@ -6,7 +6,7 @@
 #include <index_helper.cuh>
 #include <gauge_field_order.h>
 #include <fast_intdiv.h>
-#include <tune_quda.h>
+//#include <tune_quda.h>
 #include <instantiate.h>
 
 #define MIN_COEFF 1e-7
@@ -112,7 +112,8 @@ namespace quda {
 
     void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      computeLongLink<Float><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+      //computeLongLink<Float><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+      qudaLaunch((computeLongLink<Float>),(tp),(arg));
     }
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
@@ -169,7 +170,8 @@ namespace quda {
 
     void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      computeOneLink<Float><<<tp.grid,tp.block>>>(arg);
+      //computeOneLink<Float><<<tp.grid,tp.block>>>(arg);
+      qudaLaunch((computeOneLink<Float>),(tp),(arg));
     }
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
@@ -380,9 +382,11 @@ namespace quda {
     void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (save_staple)
-	computeStaple<Float,true><<<tp.grid,tp.block>>>(arg, nu);
+        //computeStaple<Float,true><<<tp.grid,tp.block>>>(arg, nu);
+	qudaLaunch((computeStaple<Float,true>),(tp),(arg, nu));
       else
-	computeStaple<Float,false><<<tp.grid,tp.block>>>(arg, nu);
+	//computeStaple<Float,false><<<tp.grid,tp.block>>>(arg, nu);
+	qudaLaunch((computeStaple<Float,false>),(tp),(arg, nu));
     }
 
     TuneKey tuneKey() const {

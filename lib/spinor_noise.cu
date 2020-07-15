@@ -10,9 +10,9 @@
 
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
-#include <tune_quda.h>
+#include <quda_internal.h>
 #include <utility> // for std::swap
-#include <random_quda.h>
+//#include <random_quda.h>
 
 namespace quda {
 
@@ -103,7 +103,8 @@ namespace quda {
 
     void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      SpinorNoiseGPU<real, Ns, Nc, type><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+      //SpinorNoiseGPU<real, Ns, Nc, type><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+      qudaLaunch((SpinorNoiseGPU<real, Ns, Nc, type>),(tp.grid, tp.block, tp.shared_bytes, stream),(arg));
     }
 
     bool advanceTuneParam(TuneParam &param) const {

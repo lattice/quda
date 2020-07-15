@@ -107,25 +107,29 @@ set (QUDA_OBJS
   eig_trlm.cpp eig_block_trlm.cpp vector_io.cpp
   eigensolve_quda.cpp quda_arpack_interface.cpp
   multigrid.cpp transfer.cpp inv_bicgstab_quda.cpp
-  timer.cpp
+  gauge_phase.cu timer.cpp
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
   inv_multi_cg_quda.cpp inv_eigcg_quda.cpp
+  gauge_plaq.cu
   gauge_laplace.cpp gauge_observable.cpp
   inv_cg3_quda.cpp inv_ca_gcr.cpp inv_ca_cg.cpp
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp inv_xsd_quda.cpp
   inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
-  color_spinor_field.cpp gauge_covdev.cpp
+  color_spinor_field.cpp
+  color_spinor_util.cu color_spinor_pack.cu
+  covDev.cu gauge_covdev.cpp
   cpu_color_spinor_field.cpp cuda_color_spinor_field.cpp dirac.cpp
   clover_field.cpp lattice_field.cpp gauge_field.cpp
-  cpu_gauge_field.cpp cuda_gauge_field.cpp
-  dirac_clover.cpp dirac_wilson.cpp dirac_staggered.cpp
-  dirac_clover_hasenbusch_twist.cpp
-  dirac_improved_staggered.cpp dirac_domain_wall.cpp
-  dirac_domain_wall_4d.cpp dirac_mobius.cpp dirac_twisted_clover.cpp
-  dirac_twisted_mass.cpp 
+  cpu_gauge_field.cpp cuda_gauge_field.cpp extract_gauge_ghost.cu
+  extract_gauge_ghost_mg.cu max_gauge.cu gauge_update_quda.cu
+  llfat_quda.cu
+  clover_quda.cu dslash_quda.cu
+  dslash_pack2.cu
   blas_quda.cu multi_blas_quda.cu reduce_quda.cu multi_reduce_quda.cu
   contract.cu
   comm_common.cpp 
+  copy_gauge_extended.cu
+  extract_gauge_ghost_extended.cu copy_color_spinor.cu spinor_noise.cu
   copy_color_spinor_dd.cu copy_color_spinor_ds.cu
   copy_color_spinor_dh.cu copy_color_spinor_dq.cu
   copy_color_spinor_ss.cu copy_color_spinor_sd.cu
@@ -134,12 +138,21 @@ set (QUDA_OBJS
   copy_color_spinor_hh.cu copy_color_spinor_hq.cu
   copy_color_spinor_qd.cu copy_color_spinor_qs.cu
   copy_color_spinor_qh.cu copy_color_spinor_qq.cu
+  copy_color_spinor_mg_dd.cu copy_color_spinor_mg_ds.cu
+  copy_color_spinor_mg_sd.cu copy_color_spinor_mg_ss.cu
+  copy_color_spinor_mg_sh.cu copy_color_spinor_mg_sq.cu
+  copy_color_spinor_mg_hs.cu copy_color_spinor_mg_hh.cu
+  copy_color_spinor_mg_hq.cu copy_color_spinor_mg_qs.cu
+  copy_color_spinor_mg_qh.cu copy_color_spinor_mg_qq.cu
   copy_gauge_double.cu copy_gauge_single.cu
   copy_gauge_half.cu copy_gauge_quarter.cu
   copy_gauge.cu copy_gauge_mg.cu copy_clover.cu
-  milc_interface.cpp
+  unitarize_links_quda.cu milc_interface.cpp
   inv_mpcg_quda.cpp inv_mpbicgstab_quda.cpp inv_gmresdr_quda.cpp
-  deflation.cpp instantiate.cpp version.cpp )
+  random.cu
+  momentum.cu
+  deflation.cpp checksum.cu
+  instantiate.cpp version.cpp )
 endif()
 
 # split source into cu and cpp files

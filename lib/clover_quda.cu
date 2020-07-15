@@ -1,5 +1,5 @@
 #include <quda_matrix.h>
-#include <tune_quda.h>
+#include <quda_internal.h>
 #include <clover_field.h>
 #include <gauge_field.h>
 #include <gauge_field_order.h>
@@ -166,7 +166,8 @@ namespace quda {
     {
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        cloverComputeKernel<<<tp.grid,tp.block,tp.shared_bytes>>>(arg);  
+        //cloverComputeKernel<<<tp.grid,tp.block,tp.shared_bytes>>>(arg);  
+        qudaLaunch((cloverComputeKernel),(tp),(arg));
       } else { // run the CPU code
         errorQuda("Not implemented");
       }

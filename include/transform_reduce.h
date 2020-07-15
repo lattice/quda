@@ -3,7 +3,7 @@
 
 #include <reduce_helper.cuh>
 #include <uint_to_char.h>
-#include <quda_internal.h>
+#include <tune_quda.h>
 
 /**
    @file transform_reduce.h
@@ -33,7 +33,7 @@ namespace quda
 
   template <typename reduce_t, typename T, typename count_t, typename transformer, typename reducer>
   struct TransformReduceArg : public ReduceArg<reduce_t> {
-    static constexpr int block_size = 512;
+    static constexpr int block_size = REDUCE_BLOCK_SIZE;
     static constexpr int n_batch_max = 8;
     const T *v[n_batch_max];
     count_t n_items;
@@ -130,7 +130,7 @@ namespace quda
       if (location == QUDA_CUDA_FIELD_LOCATION) {
         //transform_reduce_kernel<<<tp.grid, tp.block>>>(arg);
         //qudaLaunch(tp.grid,tp.block,transform_reduce_kernel,arg);
-        qudaLaunch(transform_reduce_kernel,(tp.grid,tp.block),(arg));
+        qudaLaunch((transform_reduce_kernel),(tp),(arg));
         qudaDeviceSynchronize();
         for (decltype(arg.n_batch) j = 0; j < arg.n_batch; j++) arg.result[j] = arg.result_h[j];
       } else {

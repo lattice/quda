@@ -2,11 +2,6 @@
 
 #include <lattice_field.h>
 
-#ifdef __CUDACC_RTC__
-#define RNG int
-#else
-#include <curand_kernel.h>
-
 namespace quda {
 
 #if defined(XORWOW)
@@ -147,5 +142,3 @@ struct normal<double> {
 
 
 }
-
-#endif

@@ -1,9 +1,9 @@
 #include <quda_internal.h>
 #include <quda_matrix.h>
-#include <tune_quda.h>
+//#include <tune_quda.h>
 #include <gauge_field_order.h>
 #include <launch_kernel.cuh>
-#include <cub_helper.cuh>
+#include <reduce_helper.cuh>
 #include <instantiate.h>
 #include <fstream>
 
@@ -335,7 +335,8 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      ApplyUKernel<<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+      //ApplyUKernel<<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+      qudaLaunch((ApplyUKernel),(tp.grid,tp.block,tp.shared_bytes,stream),(arg));
     }
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }

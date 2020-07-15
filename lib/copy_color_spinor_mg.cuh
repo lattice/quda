@@ -10,7 +10,7 @@
 
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
-#include <tune_quda.h>
+#include <quda_internal.h>
 #include <utility> // for std::swap
 
 namespace quda {
@@ -67,9 +67,12 @@ namespace quda {
 	packSpinor<FloatOut, FloatIn, Ns, Nc>(out, in, meta.VolumeCB());
       } else {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	packSpinorKernel<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder>
-	  <<<tp.grid, tp.block, tp.shared_bytes, stream>>>
-	  (out, in, meta.VolumeCB());
+	//packSpinorKernel<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder>
+	//  <<<tp.grid, tp.block, tp.shared_bytes, stream>>>
+	//  (out, in, meta.VolumeCB());
+	qudaLaunch((packSpinorKernel<FloatOut,FloatIn,Ns,Nc,OutOrder,InOrder>),
+	  (tp.grid, tp.block, tp.shared_bytes, stream),
+	  (out, in, meta.VolumeCB()));
       }
     }
 

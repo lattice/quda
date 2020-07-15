@@ -1,5 +1,5 @@
 #include <gauge_field_order.h>
-#include <cub_helper.cuh>
+#include <reduce_helper.cuh>
 
 namespace quda {
 

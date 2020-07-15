@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef QUDA_TARGET_CPU
+#include <tune_quda_cpu.h>
+#else
+
 #include <string>
 #include <iostream>
 #include <iomanip>
@@ -634,3 +638,5 @@ namespace quda {
 #endif
 
 #define postTrace() quda::postTrace_(__func__, quda::file_name(__FILE__), __LINE__)
+
+#endif // not QUDA_TARGET_CPU

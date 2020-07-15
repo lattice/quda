@@ -1,4 +1,4 @@
-#include <tune_quda.h>
+#include <quda_internal.h>
 #include <quda_matrix.h>
 
 #pragma once
@@ -210,9 +210,11 @@ namespace quda {
       } else {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	if (extract) {
-	  extractGhostKernel<nDim, true> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  //extractGhostKernel<nDim, true> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  qudaLaunch((extractGhostKernel<nDim, true>),(tp.grid, tp.block, tp.shared_bytes, stream),(arg));
 	} else {
-	  extractGhostKernel<nDim, false> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  //extractGhostKernel<nDim, false> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  qudaLaunch((extractGhostKernel<nDim, false>),(tp.grid, tp.block, tp.shared_bytes, stream),(arg));
 	}
       }
     }

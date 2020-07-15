@@ -1,4 +1,4 @@
-#include <quda_internal.h>
+#include <tune_quda.h>
 #include <jitify_helper.cuh>
 #include <kernels/coarse_op_kernel.cuh>
 #include <uint_to_char.h>

@@ -151,6 +151,7 @@ namespace quda
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1; // packing blocks per direction
     }
 
+#ifndef QUDA_TARGET_CPU
     template <typename T> inline void launch(T *f, const TuneParam &tp, const qudaStream_t &stream)
     {
       if (deviceProp.major >= 7) { // should test whether this is always optimal on Volta
@@ -159,6 +160,7 @@ namespace quda
       void *args[] = {&arg};
       qudaLaunchKernel((const void *)f, tp.grid, tp.block, args, tp.shared_bytes, stream);
     }
+#endif
 
     /**
        @brief This is a helper class that is used to instantiate the
@@ -169,7 +171,11 @@ namespace quda
     template <template <bool, QudaPCType, typename> class P, int nParity, bool dagger, bool xpay, KernelType kernel_type>
     inline void Launch(TuneParam &tp, const qudaStream_t &stream)
     {
+#ifdef QUDA_TARGET_CPU
+      qudaLaunch((dslashGPU<D, P, nParity, dagger, xpay, kernel_type, Arg>),(tp.grid,tp.block,tp.shared_bytes,stream),(arg));
+#else
       launch(dslashGPU<D, P, nParity, dagger, xpay, kernel_type, Arg>, tp, stream);
+#endif
     }
 
 #ifdef JITIFY

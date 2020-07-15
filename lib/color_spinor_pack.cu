@@ -1,5 +1,5 @@
 #include <color_spinor_field.h>
-#include <tune_quda.h>
+#include <quda_internal.h>
 
 #include <jitify_helper.cuh>
 #include <kernels/color_spinor_pack.cuh>
@@ -102,16 +102,16 @@ namespace quda {
 #else
         switch(tp.aux.x) {
         case 1:
-	  if (arg.nDim == 5) GenericPackGhostKernel<Float,block_float,Ns,Ms,Nc,Mc,5,1,Arg> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
-	  else GenericPackGhostKernel<Float,block_float,Ns,Ms,Nc,Mc,4,1,Arg> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+	  if (arg.nDim == 5) qudaLaunch((GenericPackGhostKernel<Float,block_float,Ns,Ms,Nc,Mc,5,1,Arg>),(tp.grid,tp.block,tp.shared_bytes,stream),(arg));
+	  else qudaLaunch((GenericPackGhostKernel<Float,block_float,Ns,Ms,Nc,Mc,4,1,Arg>),(tp.grid,tp.block,tp.shared_bytes,stream),(arg));
 	  break;
 	case 2:
-	  if (arg.nDim == 5) GenericPackGhostKernel<Float,block_float,Ns,Ms,Nc,Mc,5,2,Arg> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
-	  else GenericPackGhostKernel<Float,block_float,Ns,Ms,Nc,Mc,4,2,Arg> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+	  if (arg.nDim == 5) qudaLaunch((GenericPackGhostKernel<Float,block_float,Ns,Ms,Nc,Mc,5,2,Arg>),(tp.grid,tp.block,tp.shared_bytes,stream),(arg));
+	  else qudaLaunch((GenericPackGhostKernel<Float,block_float,Ns,Ms,Nc,Mc,4,2,Arg>),(tp.grid,tp.block,tp.shared_bytes,stream),(arg));
 	  break;
 	case 4:
-	  if (arg.nDim == 5) GenericPackGhostKernel<Float,block_float,Ns,Ms,Nc,Mc,5,4,Arg> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
-	  else GenericPackGhostKernel<Float,block_float,Ns,Ms,Nc,Mc,4,4,Arg> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+	  if (arg.nDim == 5) qudaLaunch((GenericPackGhostKernel<Float,block_float,Ns,Ms,Nc,Mc,5,4,Arg>),(tp.grid,tp.block,tp.shared_bytes,stream),(arg));
+	  else qudaLaunch((GenericPackGhostKernel<Float,block_float,Ns,Ms,Nc,Mc,4,4,Arg>),(tp.grid,tp.block,tp.shared_bytes,stream),(arg));
 	  break;
         }
 #endif

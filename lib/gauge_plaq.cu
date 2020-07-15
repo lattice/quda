@@ -1,4 +1,4 @@
-#include <tune_quda.h>
+#include <quda_internal.h>
 #include <gauge_field.h>
 #include <jitify_helper.cuh>
 #include <kernels/gauge_plaq.cuh>

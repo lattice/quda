@@ -1,9 +1,8 @@
-#include <tune_quda.h>
 #include <quda_internal.h>
 #include <color_spinor_field.h>
 #include <blas_quda.h>
 
-#include <contract_quda.h>
+#include <tune_quda.h>
 #include <jitify_helper.cuh>
 #include <kernels/contraction.cuh>
 

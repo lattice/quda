@@ -530,7 +530,6 @@ void initQudaMemory()
   checkCudaError();
   createDslashEvents();
   blas::init();
-  cublas::init();
 
   // initalize the memory pool allocators
   pool::init();
@@ -562,6 +561,7 @@ void initQuda(int dev)
   // set the persistant memory allocations that QUDA uses (Blas, streams, etc.)
   initQudaMemory();
 }
+
 
 // This is a flag used to signal when we have downloaded new gauge
 // field.  Set by loadGaugeQuda and consumed by loadCloverQuda as one
@@ -804,7 +804,7 @@ void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       gauge_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
       gauge_param.pad = param->ga_pad;
       cudaGauge = new cudaGaugeField(gauge_param);
-      copyExtendedGauge(*cudaGauge, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
+      ////copyExtendedGauge(*cudaGauge, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
       break;
     default:
       errorQuda("Invalid gauge type");
@@ -824,6 +824,7 @@ void freeSloppyCloverQuda();
 
 void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 {
+#if 0
   profileClover.TPSTART(QUDA_PROFILE_TOTAL);
   profileClover.TPSTART(QUDA_PROFILE_INIT);
 
@@ -927,7 +928,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
       profileClover.TPSTOP(QUDA_PROFILE_H2D);
     } else {
       profileClover.TPSTOP(QUDA_PROFILE_TOTAL);
-      createCloverQuda(inv_param);
+      ////createCloverQuda(inv_param);
       profileClover.TPSTART(QUDA_PROFILE_TOTAL);
     }
 
@@ -935,7 +936,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     if ((!h_clovinv || inv_param->compute_clover_inverse) && pc_solve) {
       profileClover.TPSTART(QUDA_PROFILE_COMPUTE);
       if (!dynamic_clover_inverse()) {
-	cloverInvert(*cloverPrecise, inv_param->compute_clover_trlog);
+	////cloverInvert(*cloverPrecise, inv_param->compute_clover_trlog);
 	if (inv_param->compute_clover_trlog) {
 	  inv_param->trlogA[0] = cloverPrecise->TrLog()[0];
 	  inv_param->trlogA[1] = cloverPrecise->TrLog()[1];
@@ -1009,12 +1010,14 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   popVerbosity();
 
   profileClover.TPSTOP(QUDA_PROFILE_TOTAL);
+#endif
 }
 
 void freeSloppyCloverQuda();
 
 void loadSloppyCloverQuda(const QudaPrecision *prec)
 {
+#if 0
   freeSloppyCloverQuda();
 
   if (cloverPrecise) {
@@ -1062,7 +1065,7 @@ void loadSloppyCloverQuda(const QudaPrecision *prec)
       cloverRefinement = cloverSloppy;
     }
   }
-
+#endif
 }
 
 // just free the sloppy fields used in mixed-precision solvers
@@ -1329,7 +1332,9 @@ void endQuda(void)
   LatticeField::freeGhostBuffer();
   cpuColorSpinorField::freeGhostBuffer();
 
+#ifndef QUDA_TARGET_CPU
   cublas::destroy();
+#endif
   blas::end();
 
   pool::flush_pinned();
@@ -1409,6 +1414,9 @@ void endQuda(void)
   }
 
 }
+
+/// XXXXXXXXXXXXXXXXXXXXXXX
+#if 0
 
 
 namespace quda {
@@ -3733,6 +3741,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   profilerStop(__func__);
 }
 
+#endif  /////
+
 void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink, double *path_coeff, QudaGaugeParam *param) {
 
 #ifdef GPU_FATLINK
@@ -3819,6 +3829,8 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
   errorQuda("Fat-link has not been built");
 #endif // GPU_FATLINK
 }
+
+#if 0 ////
 
 int getGaugePadding(GaugeFieldParam& param){
   int pad = 0;
@@ -5237,6 +5249,8 @@ void plaq_quda_(double plaq[3]) {
   plaqQuda(plaq);
 }
 
+#endif /////
+
 void plaqQuda(double plaq[3])
 {
   profilePlaq.TPSTART(QUDA_PROFILE_TOTAL);
@@ -5255,6 +5269,8 @@ void plaqQuda(double plaq[3])
 
   profilePlaq.TPSTOP(QUDA_PROFILE_TOTAL);
 }
+
+#if 0 /////
 
 /*
  * Performs a deep copy from the internal extendedGaugeResident field.
@@ -5728,3 +5744,5 @@ void gaugeObservablesQuda(QudaGaugeObservableParam *param)
   gaugeObservables(*gauge, *param, profileGaugeObs);
   profileGaugeObs.TPSTOP(QUDA_PROFILE_TOTAL);
 }
+
+#endif

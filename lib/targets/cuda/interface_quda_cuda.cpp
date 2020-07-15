@@ -1,3 +1,8 @@
+#include <quda.h>
+#include <quda_fortran.h>
+#include <quda_internal.h>
+#include <comm_quda.h>
+
 /*
  * Set the device that QUDA uses.
  */
@@ -132,4 +137,5 @@ void initQudaDeviceTarget(int dev) {
     }
   }
 
+  cublas::init();
 }

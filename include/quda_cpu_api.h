@@ -3,6 +3,9 @@
 #include <cstddef>
 #include <cmath>
 #include <algorithm>
+#include <functional>
+
+#define REDUCE_BLOCK_SIZE 4
 
 template <typename T>
 struct vec1 {
@@ -21,8 +24,8 @@ inline vec2<T> make_vec2(T a, T b) { return vec2<T>{a,b}; }
 template <typename T>
 struct vec3 {
   T x,y,z;
-  vec3();
-  vec3(T a, T b, T c): x(a),y(b),z(c) {}
+  inline vec3() {}
+  inline vec3(T a, T b, T c): x(a),y(b),z(c) {}
 };
 template <typename T, typename A1, typename A2, typename A3>
 inline vec3<T> make_vec3(A1 a, A2 b, A3 c) { return vec3<T>{a,b,c}; }
@@ -64,6 +67,15 @@ typedef vec4<int> int4;
 #define make_int3(a,b,c) make_vec3<int>(a,b,c)
 #define make_int4(a,b,c,d) make_vec4<int>(a,b,c,d)
 
+typedef vec1<unsigned int> uint1;
+typedef vec2<unsigned int> uint2;
+typedef vec3<unsigned int> uint3;
+typedef vec4<unsigned int> uint4;
+#define make_uint1(a) make_vec1<uint>(a)
+#define make_uint2(a,b) make_vec2<uint>(a,b)
+#define make_uint3(a,b,c) make_vec3<uint>(a,b,c)
+#define make_uint4(a,b,c,d) make_vec4<uint>(a,b,c,d)
+
 typedef vec1<float> float1;
 typedef vec2<float> float2;
 typedef vec3<float> float3;
@@ -90,12 +102,14 @@ extern dim3 blockIdx;
 extern dim3 threadIdx;
 
 using qudaStream_t = int;
-using qudaEvent_t = int;
+using qudaEvent_t = double;
+
 #define __host__
 #define __device__
 #define __global__
 #define __shared__
-#define __forceinline__
+#define __constant__ const
+#define __forceinline__ __attribute__((always_inline)) inline
 #define __launch_bounds__(x)
 #define __fdivdef(x,y) ((x)/(y))
 
@@ -162,21 +176,29 @@ typedef struct {
 typedef qudaDeviceProp cudaDeviceProp;
 
 enum cudaMemcpyKind {
-  cudaMemcpyHostToHost = 0,
-  cudaMemcpyHostToDevice = 1,
-  cudaMemcpyDeviceToHost = 2,
-  cudaMemcpyDeviceToDevice =3,
-  cudaMemcpyDefault = 4
+  qudaMemcpyHostToHost = 0,
+  qudaMemcpyHostToDevice = 1,
+  qudaMemcpyDeviceToHost = 2,
+  qudaMemcpyDeviceToDevice =3,
+  qudaMemcpyDefault = 4
 };
 typedef cudaMemcpyKind qudaMemcpyKind;
+#define cudaMemcpyHostToHost qudaMemcpyHostToHost
+#define cudaMemcpyHostToDevice qudaMemcpyHostToDevice
+#define cudaMemcpyDeviceToHost qudaMemcpyDeviceToHost
+#define cudaMemcpyDeviceToDevice qudaMemcpyDeviceToDevice
+#define cudaMemcpyDefault qudaMemcpyDefault
 
 enum qudaError_t {
   qudaSuccess,
-  cudaErrorNotReady
+  qudaErrorInvalidDevice,
+  qudaErrorNotReady,
+  qudaErrorUnknown
 };
 
 typedef qudaError_t cudaError_t;
 #define cudaSuccess qudaSuccess
+#define cudaErrorNotReady qudaErrorNotReady
 
 typedef int cudaTextureObject_t;
 template <typename T>
@@ -185,12 +207,16 @@ struct tex1Dfetch {
   int i;
 };
 
-//qudaError_t qudaEventCreate(qudaEvent_t *event);
+qudaError_t qudaEventCreate(qudaEvent_t *event);
 qudaError_t qudaEventCreate(qudaEvent_t *event, unsigned int flags);
+qudaError_t qudaEventCreateWithFlags(qudaEvent_t *event, unsigned int flags);
 qudaError_t qudaEventDestroy(qudaEvent_t event);
 qudaError_t qudaEventQuery(qudaEvent_t event);
+qudaError_t qudaEventElapsedTime(float *ms, qudaEvent_t start, qudaEvent_t end);
+qudaError_t qudaEventRecord(qudaEvent_t &event, qudaStream_t stream);
 
 qudaError_t qudaGetLastError(void);
+qudaError_t qudaPeekAtLastError(void);
 const char* qudaGetErrorString(qudaError_t err);
 
 qudaError_t qudaHostRegister(void *hostPtr, size_t sizeBytes,
@@ -210,6 +236,7 @@ qudaError_t qudaStreamDestroy(qudaStream_t stream);
 
 qudaError_t qudaGetDeviceCount(int *count);
 qudaError_t qudaDeviceReset(void);
+
 
 qudaError_t qudaMemcpy2DAsync(void *dst, size_t dpitch, const void *src,
 			      size_t spitch, size_t width, size_t height,
@@ -239,16 +266,32 @@ qudaError_t qudaGetDeviceProperties(qudaDeviceProp *prop, int device);
 qudaError_t qudaDeviceCanAccessPeer(int *canAccessPeer, int device,
 				    int peerDevice);
 
+struct curandStateXORWOW {
+  int state;
+};
+struct curandStateMRG32k3a {
+  int state;
+};
+void curand_init(unsigned long long seed, unsigned long long sequence,
+		 unsigned long long offset, curandStateMRG32k3a *state);
+float curand_uniform(curandStateMRG32k3a *state);
+double curand_uniform_double(curandStateMRG32k3a *state);
+float curand_normal(curandStateMRG32k3a *state);
+double curand_normal_double(curandStateMRG32k3a *state);
 
 #define cudaEvent_t qudaEvent_t
 #define cudaEventCreate qudaEventCreate
+#define cudaEventCreateWithFlags qudaEventCreateWithFlags
 #define cudaEventDestroy qudaEventDestroy
 #define cudaEventQuery qudaEventQuery
 #define cudaEventSynchronize qudaEventSynchronize
+#define cudaEventRecord qudaEventRecord
+#define cudaEventElapsedTime qudaEventElapsedTime
 #define cudaEventDisableTiming 0
 #define cudaEventInterprocess 1
 
 #define cudaGetLastError qudaGetLastError
+#define cudaPeekAtLastError qudaPeekAtLastError
 #define cudaGetErrorString qudaGetErrorString
 
 #define cudaHostRegister qudaHostRegister
@@ -274,6 +317,7 @@ qudaError_t qudaDeviceCanAccessPeer(int *canAccessPeer, int device,
 #define cudaMemset qudaMemset
 #define cudaMemset2D qudaMemset2D
 #define cudaMemset2DAsync qudaMemset2DAsync
+#define cudaMemcpyToSymbolAsync qudaMemcpyToSymbolAsync
 #define cudaMemPrefetchAsync qudaMemPrefetchAsync
 
 typedef qudaIpcMemHandle_t cudaIpcMemHandle_t;
@@ -287,6 +331,8 @@ typedef qudaIpcEventHandle_t cudaIpcEventHandle_t;
 
 #define cudaGetDeviceProperties qudaGetDeviceProperties
 #define cudaDeviceCanAccessPeer qudaDeviceCanAccessPeer
+
+#define cudaDeviceSynchronize qudaDeviceSynchronize
 
 /**
    @file quda_cpu_api.h
@@ -365,6 +411,8 @@ namespace quda {
                           cudaMemcpyKind kind, const qudaStream_t &stream, const char *func, const char *file,
                           const char *line);
 
+  qudaError_t qudaMemcpyToSymbolAsync(const void* symbol, const void* src, size_t count, size_t offset, qudaMemcpyKind kind, qudaStream_t stream);
+
   /**
      @brief Wrapper around cudaMemset or driver API equivalent.
      Adds auto-profiling support.
@@ -386,109 +434,18 @@ namespace quda {
                         const char *file, const char *line);
 
   /**
-     @brief Wrapper around cudaLaunchKernel
-     @param[in] func Device function symbol
-     @param[in] gridDim Grid dimensions
-     @param[in] blockDim Block dimensions
-     @param[in] args Arguments
-     @param[in] sharedMem Shared memory requested per thread block
-     @param[in] stream Stream identifier
-  */
-  qudaError_t qudaLaunchKernel(const void *func, dim3 gridDim, dim3 blockDim,
-			       void **args, size_t sharedMem,
-                               qudaStream_t stream);
-
-  /**
-     @brief Wrapper around cudaLaunchKernel
-     @param[in] func Device function symbol
-     @param[in] gridDim Grid dimensions
-     @param[in] blockDim Block dimensions
-     @param[in] sharedMem Shared memory requested per thread block
-     @param[in] stream Stream identifier
-     @param[in] args Arguments
-  */
-  template <typename... Args>
-  qudaError_t qudaLaunchX(dim3 gridDim, dim3 blockDim, size_t sharedMem,
-			  qudaStream_t stream, const void *func, const Args&...args)
-  {
-    constexpr int size = sizeof...(Args);
-    void *arga[size]{const_cast<void *>(static_cast<const void *>(&args))...};
-    cudaError_t err;
-    err = qudaLaunchKernel(func, gridDim, blockDim, arga, sharedMem, stream);
-    return err;
-  }
-
-  qudaError_t qudaLaunch_(dim3 gridDim, dim3 blockDim, size_t sharedMem,
-			  qudaStream_t stream, const void *func, void **args)
-  {
-    cudaError_t err;
-    err = qudaLaunchKernel(func, gridDim, blockDim, args, sharedMem, stream);
-    return err;
-  }
-
-#if 0
-  template <template<typename> typename F, typename A1>
-  qudaError_t qudaLaunch(dim3 gridDim, dim3 blockDim, size_t sharedMem,
-			 qudaStream_t stream, F<A1> func, A1 arg1)
-  {
-    //constexpr int size = sizeof...(Args);
-    //void *arga[size]{static_cast<void *>(args)...};
-    void *arga[1]{arg1};
-    cudaError_t err;
-    err = qudaLaunchKernel(func, gridDim, blockDim, arga, sharedMem, stream);
-    return err;
-  }
-
-  template <template<typename,typename> typename F, typename A1, typename A2>
-  qudaError_t qudaLaunch(dim3 gridDim, dim3 blockDim, size_t sharedMem,
-			  qudaStream_t stream, F<A1,A2> func, A1 arg1, A2 arg2)
-  {
-    //constexpr int size = sizeof...(Args);
-    //void *arga[size]{static_cast<void *>(args)...};
-    void *arga[2]{arg1,arg2};
-    cudaError_t err;
-    err = qudaLaunchKernel(func, gridDim, blockDim, arga, sharedMem, stream);
-    return err;
-  }
-#endif
-
-#if 0
-#define qudaLaunch(gridDim, blockDim, sharedMem, stream, func0, ...) \
-  ::quda::qudaLaunch_(gridDim, blockDim, sharedMem, stream,  __func__, \
-                      quda::file_name(__FILE__), __STRINGIFY__(__LINE__), \
-                      [=](){                                            \
-                        func0(__VA_ARGS__);                             \
-                      })
-#endif
-
-#if 0
-#define funcPtr(f,a) \
-  (([&](auto... args) -> decltype(auto) {		\
-      return (void (*)(decltype(args)...))(f); })a)
-#endif
-#define funcPtr(f,a)					\
-  (([&](auto... args) -> void * {		\
-      return reinterpret_cast<void *>((void (*)(decltype(args)...))(f)); })a)
-#define unwrap(...) __VA_ARGS__
-//#define toDecltype(a,...) decltype(a)
-//#define toDecltype(a,b) decltype(a),decltype(b)
-//#define funcPtr(f,a) ((void *)(toDecltype a))(f)
-#define qudaLaunch(kernelName_, launchParams_, kernelArgs_) \
- qudaLaunchX(unwrap launchParams_,funcPtr(kernelName_,kernelArgs_),unwrap kernelArgs_)
-
-  /**
      @brief Wrapper around cudaEventQuery or cuEventQuery
      @param[in] event Event we are querying
      @return Status of event query
    */
-  qudaError_t qudaEventQuery(cudaEvent_t &event);
+  qudaError_t qudaEventQuery(qudaEvent_t &event);
 
   /**
      @brief Wrapper around cudaEventRecord or cuEventRecord
      @param[in,out] event Event we are recording
      @param[in,out] stream Stream where to record the event
    */
-  cudaError_t qudaEventRecord(cudaEvent_t &event, qudaStream_t stream = 0);
+  //qudaError_t qudaEventRecord(qudaEvent_t &event, qudaStream_t stream = 0);
 
   /**
      @brief Wrapper around cudaEventRecord or cuEventRecord
@@ -518,4 +475,5 @@ namespace quda {
 
 #define qudaDeviceSynchronize() \
   ::quda::qudaDeviceSynchronize_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
 

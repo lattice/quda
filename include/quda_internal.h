@@ -149,11 +149,19 @@ namespace quda {
 
 #ifdef QUDA_TARGET_CUDA
 #include <tune_quda.h>
-#include <random_quda.h>
+#ifdef __CUDACC_RTC__
+#  define RNG int
+#else
+#  include <curand_kernel.h>
+#  include <random_quda.h>
+#endif
 #endif
 #ifdef QUDA_TARGET_CPU
 #include <tune_quda_cpu.h>
-#include <random_quda_cpu.h>
+//#include <random_quda_cpu.h>
+#include <random_quda.h>
+#include <launch_quda_cpu.h>
 #endif
+
 
 #endif // _QUDA_INTERNAL_H

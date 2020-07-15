@@ -1,7 +1,3 @@
-#ifdef QUDA_TARGET_CPU
-#include "launch_kernel_cpu.cuh"
-#else
-
 #define LAUNCH_KERNEL_IMPL(kernel, tunable, tp, stream, arg, blk, ...) \
   qudaLaunch((kernel<blk,__VA_ARGS__>),(tp.grid,tp.block,tp.shared_bytes,stream),(arg))
 
@@ -9,8 +5,29 @@
 // only compile block size with a single warp
 #define LAUNCH_KERNEL(kernel, tunable, tp, stream, arg, ...)            \
   switch (tp.block.x) {							\
-  case 32:								\
-    LAUNCH_KERNEL_IMPL(kernel,tunable,tp,stream,arg,32,__VA_ARGS__);    \
+  case 1:								\
+    LAUNCH_KERNEL_IMPL(kernel,tunable,tp,stream,arg,1,__VA_ARGS__);     \
+    break;								\
+  case 2:								\
+    LAUNCH_KERNEL_IMPL(kernel,tunable,tp,stream,arg,2,__VA_ARGS__);     \
+    break;								\
+  case 3:								\
+    LAUNCH_KERNEL_IMPL(kernel,tunable,tp,stream,arg,3,__VA_ARGS__);     \
+    break;								\
+  case 4:								\
+    LAUNCH_KERNEL_IMPL(kernel,tunable,tp,stream,arg,4,__VA_ARGS__);     \
+    break;								\
+  case 5:								\
+    LAUNCH_KERNEL_IMPL(kernel,tunable,tp,stream,arg,5,__VA_ARGS__);     \
+    break;								\
+  case 6:								\
+    LAUNCH_KERNEL_IMPL(kernel,tunable,tp,stream,arg,6,__VA_ARGS__);     \
+    break;								\
+  case 7:								\
+    LAUNCH_KERNEL_IMPL(kernel,tunable,tp,stream,arg,7,__VA_ARGS__);     \
+    break;								\
+  case 8:								\
+    LAUNCH_KERNEL_IMPL(kernel,tunable,tp,stream,arg,8,__VA_ARGS__);     \
     break;								\
   case 64:								\
   case 96:								\
@@ -160,8 +177,29 @@ default:								\
 // only compile block size with a single warp
 #define LAUNCH_KERNEL_LOCAL_PARITY(kernel, tunable, tp, stream, arg, ...) \
   switch (tp.block.x) {							\
-  case 32:								\
-    LAUNCH_KERNEL_IMPL(kernel,tunable,tp,stream,arg,32,__VA_ARGS__);    \
+  case 1:								\
+    LAUNCH_KERNEL_IMPL(kernel,tunable,tp,stream,arg,1,__VA_ARGS__);     \
+    break;								\
+  case 2:								\
+    LAUNCH_KERNEL_IMPL(kernel,tunable,tp,stream,arg,2,__VA_ARGS__);     \
+    break;								\
+  case 3:								\
+    LAUNCH_KERNEL_IMPL(kernel,tunable,tp,stream,arg,3,__VA_ARGS__);     \
+    break;								\
+  case 4:								\
+    LAUNCH_KERNEL_IMPL(kernel,tunable,tp,stream,arg,4,__VA_ARGS__);     \
+    break;								\
+  case 5:								\
+    LAUNCH_KERNEL_IMPL(kernel,tunable,tp,stream,arg,5,__VA_ARGS__);     \
+    break;								\
+  case 6:								\
+    LAUNCH_KERNEL_IMPL(kernel,tunable,tp,stream,arg,6,__VA_ARGS__);     \
+    break;								\
+  case 7:								\
+    LAUNCH_KERNEL_IMPL(kernel,tunable,tp,stream,arg,7,__VA_ARGS__);     \
+    break;								\
+  case 8:								\
+    LAUNCH_KERNEL_IMPL(kernel,tunable,tp,stream,arg,8,__VA_ARGS__);     \
     break;								\
   case 64:								\
   case 96:								\
@@ -314,7 +352,5 @@ default:								\
   case 128: LAUNCH_KERNEL_IMPL(kernel,tunable,tp,stream,arg,128,__VA_ARGS__); break;				       \
   default: errorQuda("%s block size %d not instantiated", #kernel, tp.block.x);                                        \
   }
-
-#endif
 
 #endif

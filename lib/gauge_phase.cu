@@ -2,7 +2,7 @@
 #include <comm_quda.h>
 #include <complex_quda.h>
 #include <index_helper.cuh>
-#include <tune_quda.h>
+#include <quda_internal.h>
 #include <instantiate.h>
 
 /**
@@ -131,7 +131,8 @@ namespace quda {
 
     void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      gaugePhaseKernel<Arg> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+      //gaugePhaseKernel<Arg> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+      qudaLaunch((gaugePhaseKernel<Arg>),(tp.grid, tp.block, tp.shared_bytes, stream),(arg));
     }
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }

@@ -218,7 +218,7 @@ namespace quda
   {
     MemAlloc a(func, file, line);
     void *ptr = aligned_malloc(a, size);
-    track_malloc(DEVICE, a, ptr);
+    track_malloc(DEVICE_PINNED, a, ptr);
 #ifdef HOST_DEBUG
     memset(ptr, 0xff, size);
 #endif
