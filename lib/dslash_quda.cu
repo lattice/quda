@@ -112,7 +112,7 @@ namespace quda {
 #if CUDA_VERSION >= 8000
     commsEnd_h = static_cast<cuuint32_t*>(mapped_malloc(Nstream*sizeof(int)));
     for (int i=0; i<Nstream; i++) {
-      cudaHostGetDevicePointer((void**)&commsEnd_d[i], commsEnd_h+i, 0);
+      commsEnd_d[i] = (CUdeviceptr)get_mapped_device_pointer(commsEnd_h+i);
       commsEnd_h[i] = 0;
     }
 #endif

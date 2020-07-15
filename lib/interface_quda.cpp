@@ -525,7 +525,7 @@ void initQudaMemory()
   pool::init();
 
   num_failures_h = static_cast<int*>(mapped_malloc(sizeof(int)));
-  cudaHostGetDevicePointer(&num_failures_d, num_failures_h, 0);
+  num_failures_d = static_cast<int*>(get_mapped_device_pointer(num_failures_h));
 
   loadTuneCache();
 
