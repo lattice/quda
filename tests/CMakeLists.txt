@@ -139,7 +139,7 @@ if(QUDA_DIRAC_WILSON
    OR QUDA_DIRAC_NDEG_TWISTED_MASS
    OR QUDA_DIRAC_DOMAIN_WALL
    OR QUDA_DIRAC_STAGGERED)
-  add_executable(blas_test blas_test.cu)
+  add_executable(blas_test blas_test.cpp)
   target_link_libraries(blas_test ${TEST_LIBS})
   target_compile_options(blas_test PRIVATE $<$<CUDA_COMPILER_ID:Clang>: --cuda-path=${CUDAToolkit_TARGET_DIR} --cuda-gpu-arch=${QUDA_GPU_ARCH}>)
 

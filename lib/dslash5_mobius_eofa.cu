@@ -2,6 +2,7 @@
 #include <color_spinor_field_order.h>
 #include <dslash_quda.h>
 #include <index_helper.cuh>
+#include <instantiate.h>
 
 #include <kernels/dslash_mobius_eofa.cuh>
 
@@ -9,10 +10,9 @@ namespace quda
 {
   namespace mobius_eofa
   {
-    template <typename storage_type, int nColor, typename Arg> class Dslash5 : public TunableVectorYZ
+    template <typename storage_type, int nColor> class Dslash5 : public TunableVectorYZ
     {
-    protected:
-      Arg &arg;
+      Dslash5Arg<storage_type, nColor> arg;
       const ColorSpinorField &meta;
       static constexpr bool shared = true; // whether to use shared memory cache blocking for M5inv
 
@@ -70,7 +70,13 @@ namespace quda
       }
 
     public:
-      Dslash5(Arg &arg, const ColorSpinorField &meta) : TunableVectorYZ(arg.Ls, arg.nParity), arg(arg), meta(meta)
+      Dslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const double m_f,
+              const double m_5, const Complex *b_5, const Complex *c_5, double a, int eofa_pm, double inv,
+              double kappa, const double *eofa_u, const double *eofa_x, const double *eofa_y,
+              double sherman_morrison, bool dagger, Dslash5Type type) :
+        TunableVectorYZ(in.X(4), in.SiteSubset()),
+        arg(out, in, x, m_f, m_5, b_5, c_5, a, eofa_pm, inv, kappa, eofa_u, eofa_x, eofa_y, sherman_morrison, dagger, type),
+        meta(in)
       {
         TunableVectorY::resizeStep(arg.Ls);
         strcpy(aux, meta.AuxString());
@@ -86,10 +92,11 @@ namespace quda
         case M5INV_EOFA: strcat(aux, ",mobius_M5INV_EOFA"); break;
         default: errorQuda("Unknown Dslash5Type %d", arg.type);
         }
-      }
-      virtual ~Dslash5() { }
 
-      template <typename T> inline void launch(T *f, const TuneParam &tp, Arg &arg, const qudaStream_t &stream)
+        apply(streams[Nstream - 1]);
+      }
+
+      template <typename T, typename Arg> inline void launch(T *f, const TuneParam &tp, Arg &arg, const qudaStream_t &stream)
       {
         if (shared && (arg.type == M5_EOFA || arg.type == M5INV_EOFA)) {
           // if inverse kernel uses shared memory then maximize total shared memory
@@ -101,6 +108,7 @@ namespace quda
 
       void apply(const qudaStream_t &stream)
       {
+        using Arg = decltype(arg);
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         if (arg.type == M5_EOFA) {
           if (arg.eofa_pm) {
@@ -159,34 +167,6 @@ namespace quda
       TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
     };
 
-    template <typename storage_type, int nColor>
-    void ApplyDslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f,
-                      double m_5, const Complex *b_5, const Complex *c_5, double a, int eofa_pm, double inv,
-                      double kappa, const double *eofa_u, const double *eofa_x, const double *eofa_y,
-                      double sherman_morrison, bool dagger, Dslash5Type type)
-    {
-      Dslash5Arg<storage_type, nColor> arg(out, in, x, m_f, m_5, b_5, c_5, a, eofa_pm, inv, kappa, eofa_u, eofa_x,
-                                           eofa_y, sherman_morrison, dagger, type);
-      Dslash5<storage_type, nColor, Dslash5Arg<storage_type, nColor>> dslash(arg, in);
-      dslash.apply(streams[Nstream - 1]);
-    }
-
-    // template on the number of colors
-    template <typename storage_type>
-    void ApplyDslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f,
-                      double m_5, const Complex *b_5, const Complex *c_5, double a, int eofa_pm, double inv,
-                      double kappa, const double *eofa_u, const double *eofa_x, const double *eofa_y,
-                      double sherman_morrison, bool dagger, Dslash5Type type)
-    {
-      switch (in.Ncolor()) {
-      case 3:
-        ApplyDslash5<storage_type, 3>(out, in, x, m_f, m_5, b_5, c_5, a, eofa_pm, inv, kappa, eofa_u, eofa_x, eofa_y,
-                                      sherman_morrison, dagger, type);
-        break;
-      default: errorQuda("Unsupported number of colors %d\n", in.Ncolor());
-      }
-    }
-
     // Apply the 5th dimension dslash operator to a colorspinor field
     // out = Dslash5*in
     void apply_dslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f,
@@ -195,23 +175,9 @@ namespace quda
                        double sherman_morrison, bool dagger, Dslash5Type type)
     {
 #ifdef GPU_DOMAIN_WALL_DIRAC
-      checkLocation(out, in); // check all locations match
-
-      switch (checkPrecision(out, in)) {
-      case QUDA_DOUBLE_PRECISION:
-        ApplyDslash5<double>(out, in, x, m_f, m_5, b_5, c_5, a, eofa_pm, inv, kappa, eofa_u, eofa_x, eofa_y,
-                             sherman_morrison, dagger, type);
-        break;
-      case QUDA_SINGLE_PRECISION:
-        ApplyDslash5<float>(out, in, x, m_f, m_5, b_5, c_5, a, eofa_pm, inv, kappa, eofa_u, eofa_x, eofa_y,
-                            sherman_morrison, dagger, type);
-        break;
-      case QUDA_HALF_PRECISION:
-        ApplyDslash5<short>(out, in, x, m_f, m_5, b_5, c_5, a, eofa_pm, inv, kappa, eofa_u, eofa_x, eofa_y,
-                            sherman_morrison, dagger, type);
-        break;
-      default: errorQuda("Unsupported precision %d\n", in.Precision());
-      }
+      checkLocation(out, in, x); // check all locations match
+      instantiate<Dslash5>(out, in, x, m_f, m_5, b_5, c_5, a, eofa_pm, inv, kappa, eofa_u, eofa_x, eofa_y,
+                           sherman_morrison, dagger, type);
 #else
       errorQuda("Mobius EOFA dslash has not been built");
 #endif
