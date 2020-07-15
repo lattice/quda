@@ -292,6 +292,21 @@ namespace quda {
     virtual bool hermitian() const { return false; }
 
     /**
+     *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
+     *  These are pointers as opposed to references to support passing in `nullptr`.
+     *
+     *  @param gauge_in Updated gauge field
+     *  @param fat_gauge_in Updated fat links
+     *  @param long_gauge_in Updated long links
+     *  @param clover_in Updated clover field
+     */
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
+                              cudaCloverField *clover_in)
+    {
+      gauge = gauge_in;
+    }
+
+    /**
      * @brief Create the coarse operator (virtual parent)
      *
      * @param Y[out] Coarse link field
@@ -391,7 +406,7 @@ namespace quda {
   class DiracClover : public DiracWilson {
 
   protected:
-    cudaCloverField &clover;
+    cudaCloverField *clover;
     void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
     void initConstants();
 
@@ -415,6 +430,22 @@ namespace quda {
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
+
+    /**
+     *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
+     *  These are pointers as opposed to references to support passing in `nullptr`.
+     *
+     *  @param gauge_in Updated gauge field
+     *  @param fat_gauge_in Updated fat links
+     *  @param long_gauge_in Updated long links
+     *  @param clover_in Updated clover field
+     */
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
+                              cudaCloverField *clover_in)
+    {
+      DiracWilson::updateFields(gauge_in, nullptr, nullptr, nullptr);
+      clover = clover_in;
+    }
 
     /**
      * @brief Create the coarse clover operator
@@ -520,7 +551,7 @@ namespace quda {
     // Inherit these so I will comment them out
     /*
   protected:
-    cudaCloverField &clover;
+    cudaCloverField *clover;
     void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
     void initConstants();
     */
@@ -924,7 +955,7 @@ public:
   protected:
     double mu;
     double epsilon;
-    cudaCloverField &clover;
+    cudaCloverField *clover;
     void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
     void twistedCloverApply(ColorSpinorField &out, const ColorSpinorField &in, 
           const QudaTwistGamma5Type twistType, const int parity) const;
@@ -951,6 +982,22 @@ public:
            const QudaSolutionType) const;
 
     double Mu() const { return mu; }
+
+    /**
+     *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
+     *  These are pointers as opposed to references to support passing in `nullptr`.
+     *
+     *  @param gauge_in Updated gauge field
+     *  @param fat_gauge_in Updated fat links
+     *  @param long_gauge_in Updated long links
+     *  @param clover_in Updated clover field
+     */
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
+                              cudaCloverField *clover_in)
+    {
+      DiracWilson::updateFields(gauge_in, nullptr, nullptr, nullptr);
+      clover = clover_in;
+    }
 
     /**
      * @brief Create the coarse twisted-clover operator
@@ -1116,8 +1163,8 @@ public:
   class DiracImprovedStaggered : public Dirac {
 
   protected:
-    cudaGaugeField &fatGauge;
-    cudaGaugeField &longGauge;
+    cudaGaugeField *fatGauge;
+    cudaGaugeField *longGauge;
 
   public:
     DiracImprovedStaggered(const DiracParam &param);
@@ -1139,6 +1186,14 @@ public:
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
+
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
+                              cudaCloverField *clover_in)
+    {
+      Dirac::updateFields(fat_gauge_in, nullptr, nullptr, nullptr);
+      fatGauge = fat_gauge_in;
+      longGauge = long_gauge_in;
+    }
 
     /**
      * @brief Create the coarse staggered operator.
@@ -1338,6 +1393,13 @@ public:
 			 const QudaSolutionType) const;
 
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
+
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
+                              cudaCloverField *clover_in)
+    {
+      Dirac::updateFields(gauge_in, nullptr, nullptr, nullptr);
+      warningQuda("Coarse gauge links cannot be trivially updated for DiracCoarse(PC). Perform an MG update instead.");
+    }
 
     /**
      * @brief Create the coarse operator from this coarse operator

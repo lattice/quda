@@ -165,7 +165,7 @@ static bool intranode_enabled[2][4] = { {false,false,false,false},
 static bool peer2peer_present = false;
 
 /** by default enable both copy engines and load/store access */
-static int enable_peer_to_peer = 3; 
+static int enable_peer_to_peer = 3;
 
 /** sets whether we cap which peers can use peer-to-peer */
 static int enable_p2p_max_access_rank = std::numeric_limits<int>::max();
@@ -223,8 +223,12 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
     char *enable_p2p_max_access_rank_env = getenv("QUDA_ENABLE_P2P_MAX_ACCESS_RANK");
     if (enable_p2p_max_access_rank_env) {
       enable_p2p_max_access_rank = atoi(enable_p2p_max_access_rank_env);
-      if (enable_p2p_max_access_rank < 0) errorQuda("Invalid QUDA_ENABLE_P2P_MAX_ACCESS_RANK=%d\n", enable_p2p_max_access_rank);
-      if (getVerbosity() > QUDA_SILENT) printfQuda("Limiting peer-to-peer communication to a maximum access rank of %d (lower ranks have higher bandwidth)\n", enable_p2p_max_access_rank);
+      if (enable_p2p_max_access_rank < 0)
+        errorQuda("Invalid QUDA_ENABLE_P2P_MAX_ACCESS_RANK=%d\n", enable_p2p_max_access_rank);
+      if (getVerbosity() > QUDA_SILENT)
+        printfQuda(
+          "Limiting peer-to-peer communication to a maximum access rank of %d (lower ranks have higher bandwidth)\n",
+          enable_p2p_max_access_rank);
     }
 
     // first check that the local GPU supports UVA
@@ -265,22 +269,24 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
 #endif
 
 	  // enable P2P if we can access the peer or if peer is self
-	  if ( (canAccessPeer[0]*canAccessPeer[1] != 0 && accessRank[0] <= enable_p2p_max_access_rank && accessRank[1] <= enable_p2p_max_access_rank)
-               || gpuid == neighbor_gpuid) {
-	    peer2peer_enabled[dir][dim] = true;
-	    if (getVerbosity() > QUDA_SILENT) {
-	      printf("Peer-to-peer enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d, access rank = (%d, %d)\n",
-		     comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim, accessRank[0], accessRank[1]);
-	    }
-	  } else {
-	    intranode_enabled[dir][dim] = true;
-	    if (getVerbosity() > QUDA_SILENT) {
+          if ((canAccessPeer[0] * canAccessPeer[1] != 0 && accessRank[0] <= enable_p2p_max_access_rank
+               && accessRank[1] <= enable_p2p_max_access_rank)
+              || gpuid == neighbor_gpuid) {
+            peer2peer_enabled[dir][dim] = true;
+            if (getVerbosity() > QUDA_SILENT) {
+              printf("Peer-to-peer enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d, access rank "
+                     "= (%d, %d)\n",
+                     comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim, accessRank[0], accessRank[1]);
+            }
+          } else {
+            intranode_enabled[dir][dim] = true;
+            if (getVerbosity() > QUDA_SILENT) {
 	      printf("Intra-node (non peer-to-peer) enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d\n",
 		     comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
 	    }
-	  }
+          }
 
-	} // on the same node
+        } // on the same node
       } // different dimensions - x, y, z, t
     } // different directions - forward/backward
 

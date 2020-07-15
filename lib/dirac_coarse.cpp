@@ -215,6 +215,7 @@ namespace quda {
 
         GaugeFieldParam Y_param(*Y_d);
         GaugeFieldParam X_param(*X_d);
+
         Y_param.order = gOrder;
         X_param.order = gOrder;
 
@@ -222,9 +223,6 @@ namespace quda {
         GaugeField *X_order = cudaGaugeField::Create(X_param);
 
         dirac->createCoarseOp(*Y_order, *X_order, *transfer, kappa, mass, Mu(), MuFactor());
-
-        Y_d->copy(*Y_order);
-        X_d->copy(*X_order);
 
         // save the intermediate tunecache after the UV and VUV tune
         saveTuneCache();
@@ -237,6 +235,9 @@ namespace quda {
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("About to create the preconditioned coarse op\n");
 
         calculateYhat(*Yhat_d, *Xinv_d, *Y_order, *X_order, use_mma);
+
+        Y_d->copy(*Y_order);
+        X_d->copy(*X_order);
 
         delete Y_order;
         delete X_order;

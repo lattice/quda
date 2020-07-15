@@ -376,8 +376,7 @@ namespace quda {
       auto X_order = create_gauge_copy(X, gOrder, false);
       auto G_order = create_gauge_copy(gauge, gOrder, true);
       auto C_order = create_gauge_copy(clover, gOrder, true);
-      auto I_order
-        = create_gauge_copy(cloverInv, gOrder, false); // We don't copy the cloverInv field since it's never used.
+      auto I_order = create_gauge_copy(cloverInv, gOrder, true);
 
       GaugeField *Yatomic = nullptr;
       GaugeField *Xatomic = nullptr;
