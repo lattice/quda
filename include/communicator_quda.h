@@ -874,6 +874,16 @@ struct Communicator {
   int comm_size(void);
 
   /**
+   * Declare a message handle for sending `nbytes` to the `rank` with `tag`.
+   */
+  MsgHandle *comm_declare_send_rank(void *buffer, int rank, int tag, size_t nbytes);
+
+  /**
+   * Declare a message handle for receiving `nbytes` from the `rank` with `tag`.
+   */
+  MsgHandle *comm_declare_recv_rank(void *buffer, int rank, int tag, size_t nbytes);
+
+  /**
    * Declare a message handle for sending to a node displaced in (x,y,z,t) according to "displacement"
    */
   MsgHandle *comm_declare_send_displaced(void *buffer, const int displacement[], size_t nbytes);

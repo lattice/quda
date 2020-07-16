@@ -47,6 +47,16 @@ extern "C" {
   int comm_coord(int dim);
 
   /**
+   * Declare a message handle for sending `nbytes` to the `rank` with `tag`.
+   */
+  MsgHandle *comm_declare_send_rank(void *buffer, int rank, int tag, size_t nbytes);
+
+  /**
+   * Declare a message handle for receiving `nbytes` from the `rank` with `tag`.
+   */
+  MsgHandle *comm_declare_recv_rank(void *buffer, int rank, int tag, size_t nbytes);
+
+  /**
      Create a persistent message handler for a relative send.  This
      should not be called directly, and instead the helper macro
      (without the trailing underscore) should be called instead.

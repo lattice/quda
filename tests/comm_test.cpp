@@ -16,6 +16,16 @@
 
 #include <communicator_quda.h>
 
+#include <gauge_field.h>
+
+#include <timer.h>
+
+#include <gauge_tools.h>
+
+static quda::TimeProfile profileExtendedGauge("createExtendedGaugeFieldCommTest");
+
+extern quda::cudaGaugeField *gaugePrecise;
+
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 void display_test_info()
@@ -100,6 +110,63 @@ void display_test_info()
              dimPartitioned(3));
 }
 
+void plaquette_gauge(quda::GaugeField &g)
+{
+  int R[4] = {2 * comm_dim_partitioned(0), 2 * comm_dim_partitioned(1), 2 * comm_dim_partitioned(2),
+              2 * comm_dim_partitioned(3)};
+
+  quda::cudaGaugeField *data
+    = quda::createExtendedGauge(*reinterpret_cast<quda::cudaGaugeField *>(&g), R, profileExtendedGauge);
+  double3 plaq3 = quda::plaquette(*data);
+  printf("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq3.x, plaq3.y, plaq3.z);
+
+  delete data;
+}
+
+namespace quda
+{
+  void copyOffsetGauge(GaugeField &out, const GaugeField &in, const int offset[4]);
+
+  void send_field(GaugeField &send_field, int dst_rank, int tag)
+  {
+    // TODO: For now only the cpu-gpu communication is implemented.
+    printf("rank %d sending to %d: tag = %d\n", comm_rank(), dst_rank, tag);
+
+    size_t bytes = send_field.Bytes();
+
+    void *send_buffer_h = pinned_malloc(bytes);
+
+    cudaMemcpy(send_buffer_h, send_field.Gauge_p(), bytes, cudaMemcpyDeviceToHost);
+
+    auto mh_send = comm_declare_send_rank(send_buffer_h, dst_rank, tag, bytes);
+
+    comm_start(mh_send);
+
+    // comm_free(mh_send);
+  }
+
+  void recv_field(GaugeField &recv_field, int src_rank, int tag)
+  {
+    // TODO: For now only the cpu-gpu communication is implemented.
+    printf("rank %d receiving from %d: tag = %d\n", comm_rank(), src_rank, tag);
+
+    size_t bytes = recv_field.Bytes();
+
+    void *recv_buffer_h = pinned_malloc(bytes);
+
+    auto mh_recv = comm_declare_recv_rank(recv_buffer_h, src_rank, tag, bytes);
+
+    comm_start(mh_recv);
+    comm_wait(mh_recv);
+
+    cudaMemcpy(recv_field.Gauge_p(), recv_buffer_h, bytes, cudaMemcpyHostToDevice);
+
+    comm_free(mh_recv);
+    host_free(recv_buffer_h);
+  }
+
+} // namespace quda
+
 int main(int argc, char **argv)
 {
   // Parse command line options
@@ -122,8 +189,67 @@ int main(int argc, char **argv)
   // Initialize the QUDA library
   initQuda(device);
 
+  QudaGaugeParam gauge_param = newQudaGaugeParam();
+  setWilsonGaugeParam(gauge_param);
+  QudaInvertParam inv_param = newQudaInvertParam();
+
+  setInvertParam(inv_param);
+
+  // set parameters for the reference Dslash, and prepare fields to be loaded
+  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
+      || dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
+    dw_setDims(gauge_param.X, inv_param.Ls);
+  } else {
+    setDims(gauge_param.X);
+  }
+  setSpinorSiteSize(24);
+
+  // Allocate host side memory for the gauge field.
+  //----------------------------------------------------------------------------
+  void *gauge[4];
+  // Allocate space on the host (always best to allocate and free in the same scope)
+  for (int dir = 0; dir < 4; dir++) gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
+  constructHostGaugeField(gauge, gauge_param, argc, argv);
+  // Load the gauge field to the device
+  loadGaugeQuda((void *)gauge, &gauge_param);
+
+  // Compute plaquette as a sanity check
+  double plaq[3];
+  plaqQuda(plaq);
+  printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+
+  quda::GaugeFieldParam param(*gaugePrecise);
+  quda::GaugeField *buffer_gauge = quda::GaugeField::Create(param);
+
+  param.x[3] *= 2;
+  param.pad *= 2;
+  quda::GaugeField *collected_gauge = quda::GaugeField::Create(param);
+
+  int rank = comm_rank();
+
+  for (int i = 0; i < 2; i++) {
+    send_field(*gaugePrecise, 0, rank * 2 + 0); // 0 -> 0; 1 -> 0
+    send_field(*gaugePrecise, 1, rank * 2 + 1); // 0 -> 1; 1 -> 1
+    {
+      recv_field(*buffer_gauge, 0, 0 * 2 + rank);
+      int offset[4] = {0, 0, 0, 0 * param.x[3] / 2};
+      quda::copyOffsetGauge(*collected_gauge, *buffer_gauge, offset);
+    }
+
+    {
+      recv_field(*buffer_gauge, 1, 1 * 2 + rank);
+      int offset[4] = {0, 0, 0, 1 * param.x[3] / 2};
+      quda::copyOffsetGauge(*collected_gauge, *buffer_gauge, offset);
+    }
+  }
+
   // Create a communicator with the split {1, 1, 1, 2} and push to the top.
   if (gridsize_from_cmdline[3] % 2 == 0) push_to_current({1, 1, 1, 2});
+
+  plaquette_gauge(*collected_gauge);
+
+  delete buffer_gauge;
+  delete collected_gauge;
 
   // finalize the QUDA library
   endQuda();

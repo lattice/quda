@@ -158,6 +158,38 @@ int Communicator::comm_rank(void) { return QMP_comm_get_node_number(QMP_COMM_HAN
 int Communicator::comm_size(void) { return QMP_comm_get_number_of_nodes(QMP_COMM_HANDLE); }
 
 /**
+ * Declare a message handle for sending `nbytes` to the `rank` with `tag`.
+ */
+MsgHandle *Communicator::comm_declare_send_rank(void *buffer, int rank, int tag, size_t nbytes)
+{
+  MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
+
+  mh->mem = QMP_declare_msgmem(buffer, nbytes);
+  if (mh->mem == NULL) errorQuda("Unable to allocate QMP message memory");
+
+  mh->handle = QMP_comm_declare_send_to(QMP_COMM_HANDLE, mh->mem, rank, 0);
+  if (mh->handle == NULL) errorQuda("Unable to allocate QMP message handle");
+
+  return mh;
+}
+
+/**
+ * Declare a message handle for receiving `nbytes` from the `rank` with `tag`.
+ */
+MsgHandle *Communicator::comm_declare_recv_rank(void *buffer, int rank, int tag, size_t nbytes)
+{
+  MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
+
+  mh->mem = QMP_declare_msgmem(buffer, nbytes);
+  if (mh->mem == NULL) errorQuda("Unable to allocate QMP message memory");
+
+  mh->handle = QMP_comm_declare_receive_from(QMP_COMM_HANDLE, mh->mem, rank, 0);
+  if (mh->handle == NULL) errorQuda("Unable to allocate QMP message handle");
+
+  return mh;
+}
+
+/**
  * Declare a message handle for sending to a node displaced in (x,y,z,t) according to "displacement"
  */
 MsgHandle *Communicator::comm_declare_send_displaced(void *buffer, const int displacement[], size_t nbytes)

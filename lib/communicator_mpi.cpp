@@ -124,6 +124,30 @@ int Communicator::comm_rank(void) { return rank; }
 int Communicator::comm_size(void) { return size; }
 
 /**
+ * Declare a message handle for sending `nbytes` to the `rank` with `tag`.
+ */
+MsgHandle *Communicator::comm_declare_send_rank(void *buffer, int rank, int tag, size_t nbytes)
+{
+  MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
+  MPI_CHECK(MPI_Send_init(buffer, nbytes, MPI_BYTE, rank, tag, MPI_COMM_HANDLE, &(mh->request)));
+  mh->custom = false;
+
+  return mh;
+}
+
+/**
+ * Declare a message handle for receiving `nbytes` from the `rank` with `tag`.
+ */
+MsgHandle *Communicator::comm_declare_recv_rank(void *buffer, int rank, int tag, size_t nbytes)
+{
+  MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
+  MPI_CHECK(MPI_Recv_init(buffer, nbytes, MPI_BYTE, rank, tag, MPI_COMM_HANDLE, &(mh->request)));
+  mh->custom = false;
+
+  return mh;
+}
+
+/**
  * Declare a message handle for sending to a node displaced in (x,y,z,t) according to "displacement"
  */
 MsgHandle *Communicator::comm_declare_send_displaced(void *buffer, const int displacement[], size_t nbytes)

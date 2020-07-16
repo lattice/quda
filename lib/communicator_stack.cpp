@@ -136,6 +136,16 @@ bool comm_gdr_enabled() { return get_current_communicator().comm_gdr_enabled(); 
 
 bool comm_gdr_blacklist() { return get_current_communicator().comm_gdr_blacklist(); }
 
+MsgHandle *comm_declare_send_rank(void *buffer, int rank, int tag, size_t nbytes)
+{
+  return get_current_communicator().comm_declare_send_rank(buffer, rank, tag, nbytes);
+}
+
+MsgHandle *comm_declare_recv_rank(void *buffer, int rank, int tag, size_t nbytes)
+{
+  return get_current_communicator().comm_declare_recv_rank(buffer, rank, tag, nbytes);
+}
+
 MsgHandle *comm_declare_send_displaced(void *buffer, const int displacement[], size_t nbytes)
 {
   return get_current_communicator().comm_declare_send_displaced(buffer, displacement, nbytes);
