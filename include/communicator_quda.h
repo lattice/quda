@@ -873,6 +873,12 @@ struct Communicator {
 
   int comm_size(void);
 
+  int comm_rank_from_coords(const int *coords)
+  {
+    Topology *topo = comm_default_topology();
+    return ::comm_rank_from_coords(topo, coords);
+  }
+
   /**
    * Declare a message handle for sending `nbytes` to the `rank` with `tag`.
    */

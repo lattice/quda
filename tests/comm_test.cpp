@@ -22,6 +22,8 @@
 
 #include <gauge_tools.h>
 
+#include <gtest/gtest.h>
+
 static quda::TimeProfile profileExtendedGauge("createExtendedGaugeFieldCommTest");
 
 extern quda::cudaGaugeField *gaugePrecise;
@@ -110,7 +112,7 @@ void display_test_info()
              dimPartitioned(3));
 }
 
-void plaquette_gauge(quda::GaugeField &g)
+auto plaquette_gauge(quda::GaugeField &g)
 {
   int R[4] = {2 * comm_dim_partitioned(0), 2 * comm_dim_partitioned(1), 2 * comm_dim_partitioned(2),
               2 * comm_dim_partitioned(3)};
@@ -118,37 +120,22 @@ void plaquette_gauge(quda::GaugeField &g)
   quda::cudaGaugeField *data
     = quda::createExtendedGauge(*reinterpret_cast<quda::cudaGaugeField *>(&g), R, profileExtendedGauge);
   double3 plaq3 = quda::plaquette(*data);
-  printf("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq3.x, plaq3.y, plaq3.z);
 
   delete data;
+
+  return plaq3;
 }
+
+int comm_rank_from_coords(const int *coords);
 
 namespace quda
 {
   void copyOffsetGauge(GaugeField &out, const GaugeField &in, const int offset[4]);
 
-  void send_field(GaugeField &send_field, int dst_rank, int tag)
-  {
-    // TODO: For now only the cpu-gpu communication is implemented.
-    printf("rank %d sending to %d: tag = %d\n", comm_rank(), dst_rank, tag);
-
-    size_t bytes = send_field.Bytes();
-
-    void *send_buffer_h = pinned_malloc(bytes);
-
-    cudaMemcpy(send_buffer_h, send_field.Gauge_p(), bytes, cudaMemcpyDeviceToHost);
-
-    auto mh_send = comm_declare_send_rank(send_buffer_h, dst_rank, tag, bytes);
-
-    comm_start(mh_send);
-
-    // comm_free(mh_send);
-  }
-
   void recv_field(GaugeField &recv_field, int src_rank, int tag)
   {
     // TODO: For now only the cpu-gpu communication is implemented.
-    printf("rank %d receiving from %d: tag = %d\n", comm_rank(), src_rank, tag);
+    printf("rank %4d <- rank %4d: tag = %4d\n", comm_rank(), src_rank, tag);
 
     size_t bytes = recv_field.Bytes();
 
@@ -165,10 +152,168 @@ namespace quda
     host_free(recv_buffer_h);
   }
 
+  auto product(const CommKey &input) { return input[0] * input[1] * input[2] * input[3]; }
+
+  CommKey operator+(const CommKey &lhs, const CommKey &rhs)
+  {
+    CommKey sum;
+    for (int d = 0; d < nDim; d++) { sum[d] = lhs[d] + rhs[d]; }
+    return sum;
+  }
+
+  CommKey operator*(const CommKey &lhs, const CommKey &rhs)
+  {
+    CommKey product;
+    for (int d = 0; d < nDim; d++) { product[d] = lhs[d] * rhs[d]; }
+    return product;
+  }
+
+  CommKey operator/(const CommKey &lhs, const CommKey &rhs)
+  {
+    CommKey quotient;
+    for (int d = 0; d < nDim; d++) { quotient[d] = lhs[d] / rhs[d]; }
+    return quotient;
+  }
+
+  CommKey operator%(const CommKey &lhs, const CommKey &rhs)
+  {
+    CommKey mod;
+    for (int d = 0; d < nDim; d++) { mod[d] = lhs[d] % rhs[d]; }
+    return mod;
+  }
+
+  CommKey coordinate_from_index(int index, CommKey dim)
+  {
+    CommKey coord;
+    for (int d = 0; d < nDim; d++) {
+      coord[d] = index % dim[d];
+      index /= dim[d];
+    }
+    return coord;
+  }
+
+  int index_from_coordinate(CommKey coord, CommKey dim)
+  {
+    return ((coord[3] * dim[2] + coord[2]) * dim[1] + coord[1]) * dim[0] + coord[0];
+  }
+
+  void print(const CommKey &comm_key)
+  {
+    printf("(%3d,%3d,%3d,%3d)", comm_key[0], comm_key[1], comm_key[2], comm_key[3]);
+  }
+
+  void split_gauge_field(GaugeField &collect_field, GaugeField &base_field, const CommKey &comm_key)
+  // void split_gauge_field(const CommKey &comm_key)
+  {
+    CommKey full_dim = {comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3)};
+    CommKey full_idx = {comm_coord(0), comm_coord(1), comm_coord(2), comm_coord(3)};
+
+    int rank = comm_rank();
+    int total_rank = product(full_dim);
+
+    auto grid_dim = full_dim / comm_key;  // Communicator grid.
+    auto block_dim = full_dim / grid_dim; // The full field needs to be partitioned according to the communicator grid.
+
+    // print(full_idx);
+    // printf(".\n");
+
+    int n_replicates = product(comm_key);
+    std::vector<void *> v_send_buffer_h(n_replicates, nullptr);
+    std::vector<MsgHandle *> v_mh_send(n_replicates, nullptr);
+
+    // Send cycles
+    for (int i = 0; i < n_replicates; i++) {
+      auto grid_idx = coordinate_from_index(i, comm_key);
+      auto block_idx = full_idx / block_dim;
+      // auto thread_idx = full_idx % block_dim;
+
+      auto dst_idx = grid_idx * grid_dim + block_idx;
+
+      // printf("index %3d, destination_idx = ", i);
+      // print(full_idx);
+      // printf("->");
+      // print(dst_idx);
+      // printf(", thread_idx = ");
+      // print(thread_idx);
+      // printf(".\n");
+
+      int dst_rank = comm_rank_from_coords(dst_idx.data());
+      int tag = rank * total_rank + dst_rank; // tag = src_rank * total_rank + dst_rank
+
+      // printf("rank %d sending to %d\n", rank, dst_rank);
+
+      // TODO: For now only the cpu-gpu communication is implemented.
+      printf("rank %4d -> rank %4d: tag = %4d\n", comm_rank(), dst_rank, tag);
+
+      size_t bytes = base_field.Bytes();
+
+      v_send_buffer_h[i] = pinned_malloc(bytes);
+      cudaMemcpy(v_send_buffer_h[i], base_field.Gauge_p(), bytes, cudaMemcpyDeviceToHost);
+
+      v_mh_send[i] = comm_declare_send_rank(v_send_buffer_h[i], dst_rank, tag, bytes);
+      comm_start(v_mh_send[i]);
+    }
+
+    quda::GaugeFieldParam param(base_field);
+    quda::GaugeField *buffer_field = quda::GaugeField::Create(param);
+
+    CommKey thread_dim = {base_field.X()[0], base_field.X()[1], base_field.X()[2], base_field.X()[3]};
+
+    // Receive cycles
+    for (int i = 0; i < n_replicates; i++) {
+      auto thread_idx = coordinate_from_index(i, comm_key);
+      auto src_idx = (full_idx % grid_dim) * block_dim + thread_idx;
+
+      int src_rank = comm_rank_from_coords(src_idx.data());
+      int tag = src_rank * total_rank + rank;
+
+      // printf("rank %d receiving from %d\n", rank, src_rank);
+      recv_field(*buffer_field, src_rank, tag);
+
+      // print(src_idx);
+      // printf("<-");
+      // print(full_idx);
+      // printf(", %3d.\n", i);
+
+      auto offset = thread_idx * thread_dim;
+
+      quda::copyOffsetGauge(collect_field, *buffer_field, offset.data());
+
+      /**
+        auto i_d = index_from_coordinate(destination_idx / grid_dim, comm_key);
+        auto full_idx_d = (destination_idx % grid_dim) * block_dim + thread_idx;
+
+        print(full_idx_d);
+        printf(", %3d.\n", i_d);
+       */
+    }
+
+    delete buffer_field;
+
+    comm_barrier();
+
+    for (auto &p : v_send_buffer_h) { host_free(p); };
+    for (auto &p : v_mh_send) { comm_free(p); };
+  }
+
 } // namespace quda
+
+double plaq_ref;
+double plaq_split;
+
+TEST(split, verify)
+{
+  double tol = getTolerance(cuda_prec);
+  double deviation = abs(plaq_split - plaq_ref);
+
+  ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
+}
 
 int main(int argc, char **argv)
 {
+  // initalize google test, includes command line options
+  ::testing::InitGoogleTest(&argc, argv);
+
   // Parse command line options
   auto app = make_app();
   try {
@@ -216,40 +361,50 @@ int main(int argc, char **argv)
   // Compute plaquette as a sanity check
   double plaq[3];
   plaqQuda(plaq);
-  printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+  printfQuda("Computed plaquette is %12.8e: (spatial = %12.8e, temporal = %12.8e)\n", plaq[0], plaq[1], plaq[2]);
+
+  plaq_ref = plaq[0];
+
+  CommKey split_key = {1, 2, 2, 2};
 
   quda::GaugeFieldParam param(*gaugePrecise);
-  quda::GaugeField *buffer_gauge = quda::GaugeField::Create(param);
 
-  param.x[3] *= 2;
-  param.pad *= 2;
-  quda::GaugeField *collected_gauge = quda::GaugeField::Create(param);
-
-  int rank = comm_rank();
-
-  for (int i = 0; i < 2; i++) {
-    send_field(*gaugePrecise, 0, rank * 2 + 0); // 0 -> 0; 1 -> 0
-    send_field(*gaugePrecise, 1, rank * 2 + 1); // 0 -> 1; 1 -> 1
-    {
-      recv_field(*buffer_gauge, 0, 0 * 2 + rank);
-      int offset[4] = {0, 0, 0, 0 * param.x[3] / 2};
-      quda::copyOffsetGauge(*collected_gauge, *buffer_gauge, offset);
+  for (int d = 0; d < nDim; d++) {
+    if (comm_dim(d) % split_key[d] != 0) {
+      errorQuda("Split not possible: (%d,%d,%d,%d) / (%d,%d,%d,%d).", comm_dim(0), comm_dim(1), comm_dim(2),
+                comm_dim(3), split_key[0], split_key[1], split_key[2], split_key[3]);
     }
 
-    {
-      recv_field(*buffer_gauge, 1, 1 * 2 + rank);
-      int offset[4] = {0, 0, 0, 1 * param.x[3] / 2};
-      quda::copyOffsetGauge(*collected_gauge, *buffer_gauge, offset);
-    }
+    param.x[d] *= split_key[d];
+    param.pad *= split_key[d];
   }
+  quda::GaugeField *collect_gauge = quda::GaugeField::Create(param);
+
+  quda::split_gauge_field(*collect_gauge, *gaugePrecise, split_key);
+
+  comm_barrier();
 
   // Create a communicator with the split {1, 1, 1, 2} and push to the top.
-  if (gridsize_from_cmdline[3] % 2 == 0) push_to_current({1, 1, 1, 2});
+  if (gridsize_from_cmdline[3] % 2 == 0) push_to_current(split_key);
 
-  plaquette_gauge(*collected_gauge);
+  comm_barrier();
 
-  delete buffer_gauge;
-  delete collected_gauge;
+  auto plaq_split3 = plaquette_gauge(*collect_gauge);
+  plaq_split = plaq_split3.x;
+
+  if (gridsize_from_cmdline[3] % 2 == 0) push_to_current({1, 1, 1, 1});
+
+  delete collect_gauge;
+
+  printf("Computed plaquette is %12.8e: (%12.8e %12.8e, splitted on rank %4d)\n", plaq_split3.x, plaq_split3.y,
+         plaq_split3.z, comm_rank());
+
+  comm_barrier();
+
+  if (verify_results) {
+    int test_rc = RUN_ALL_TESTS();
+    if (test_rc != 0) warningQuda("Tests failed on rank %4d", comm_rank());
+  }
 
   // finalize the QUDA library
   endQuda();
