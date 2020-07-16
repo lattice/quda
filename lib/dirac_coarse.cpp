@@ -83,7 +83,6 @@ namespace quda {
     init_cpu(enable_cpu ? false : true),
     mapped(dirac.mapped)
   {
-
   }
 
   DiracCoarse::~DiracCoarse()

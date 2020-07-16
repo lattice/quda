@@ -34,7 +34,7 @@ namespace quda {
       // for these streaming kernels, there is no need to tune the grid size, just use max
       unsigned int minGridSize() const { return maxGridSize(); }
 
-  public:
+    public:
       MultiBlas(const T &a, const T &b, const T &c, const ColorSpinorField &x_meta, const ColorSpinorField &y_meta,
                 std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
                 std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w) :
@@ -225,7 +225,7 @@ namespace quda {
           std::min(max_N_multi_1d(), max_NXZ_power2<false, isFixed<store_t>::value>());
         constexpr int linear_max = !decltype(f)::multi_1d ? MAX_MULTI_BLAS_N : std::min(max_N_multi_1d(), MAX_MULTI_BLAS_N);
 
-        if (NXZ <= pow2_max && NXZ % 2 == 0) instantiatePow2<pow2_max>(stream);
+        if (NXZ <= pow2_max && is_power2(NXZ)) instantiatePow2<pow2_max>(stream);
         else if (NXZ <= linear_max) instantiateLinear<linear_max>(stream);
         else errorQuda("x.size %lu greater than maximum supported size (pow2 = %d, linear = %d)", x.size(), pow2_max, linear_max);
       }

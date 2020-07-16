@@ -682,11 +682,13 @@ namespace quda {
        */
       __device__ __host__ inline const complex<Float> operator()(int parity, int x_cb, int s, int c, int n=0) const
       {
-#ifdef __CUDA_ARCH__
+#if (__CUDA_ARCH__ >= 320 && __CUDA_ARCH__ < 520)
         if (!fixed) {
-          return complex<Float>(__ldg(v + accessor.index(parity, x_cb, s, c, n)));
+          auto v_ = __ldg(v + accessor.index(parity, x_cb, s, c, n));
+          return complex<Float>(v_.x, v_.y);
         } else {
-          complex<storeFloat> tmp = __ldg(v + accessor.index(parity, x_cb, s, c, n));
+          auto v_ = __ldg(v + accessor.index(parity, x_cb, s, c, n));
+          complex<storeFloat> tmp(v_.x, v_.y);
           Float norm_ = block_float ? __ldg(norm + parity * norm_offset + x_cb) : scale_inv;
           return norm_ * complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
         }
@@ -725,14 +727,16 @@ namespace quda {
        */
       __device__ __host__ inline const complex<Float> Ghost(int dim, int dir, int parity, int x_cb, int s, int c, int n=0) const
       {
-#ifdef __CUDA_ARCH__
+#if (__CUDA_ARCH__ >= 320 && __CUDA_ARCH__ < 520)
         if (!ghost_fixed) {
-          return complex<Float>(__ldg(ghost[2 * dim + dir] + ghostAccessor.index(dim, dir, parity, x_cb, s, c, n)));
+          auto v_ = __ldg(ghost[2 * dim + dir] + ghostAccessor.index(dim, dir, parity, x_cb, s, c, n));
+          return complex<Float>(v_.x, v_.y);
         } else {
           Float scale = ghost_scale_inv;
           if (block_float_ghost)
             scale *= __ldg(ghost_norm[2 * dim + dir] + parity * ghostAccessor.faceVolumeCB[dim] + x_cb);
-          complex<ghostFloat> tmp = __ldg(ghost[2 * dim + dir] + ghostAccessor.index(dim, dir, parity, x_cb, s, c, n));
+          auto v_ = __ldg(ghost[2 * dim + dir] + ghostAccessor.index(dim, dir, parity, x_cb, s, c, n));
+          complex<ghostFloat> tmp(v_.x, v_.y);
           return scale*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
         }
 #else
