@@ -49,26 +49,30 @@ void Communicator::comm_gather_hostname(char *hostname_recv_buf) { strncpy(hostn
 
 void Communicator::comm_gather_gpuid(int *gpuid_recv_buf) { gpuid_recv_buf[0] = comm_gpuid(); }
 
+MsgHandle *Communicator::comm_declare_send_rank(void *buffer, int rank, int tag, size_t nbytes) { return nullptr; }
+
+MsgHandle *Communicator::comm_declare_recv_rank(void *buffer, int rank, int tag, size_t nbytes) { return nullptr; }
+
 MsgHandle *Communicator::comm_declare_send_displaced(void *buffer, const int displacement[], size_t nbytes)
 {
-  return NULL;
+  return nullptr;
 }
 
 MsgHandle *Communicator::comm_declare_receive_displaced(void *buffer, const int displacement[], size_t nbytes)
 {
-  return NULL;
+  return nullptr;
 }
 
 MsgHandle *Communicator::comm_declare_strided_send_displaced(void *buffer, const int displacement[], size_t blksize,
                                                              int nblocks, size_t stride)
 {
-  return NULL;
+  return nullptr;
 }
 
 MsgHandle *Communicator::comm_declare_strided_receive_displaced(void *buffer, const int displacement[], size_t blksize,
                                                                 int nblocks, size_t stride)
 {
-  return NULL;
+  return nullptr;
 }
 
 void Communicator::comm_free(MsgHandle *&mh) { }

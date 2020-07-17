@@ -23,6 +23,7 @@
 #include <gauge_tools.h>
 
 #include <gtest/gtest.h>
+#include <blas_quda.h>
 
 static quda::TimeProfile profileExtendedGauge("createExtendedGaugeFieldCommTest");
 
@@ -132,25 +133,7 @@ namespace quda
 {
   void copyOffsetGauge(GaugeField &out, const GaugeField &in, const int offset[4]);
 
-  void recv_field(GaugeField &recv_field, int src_rank, int tag)
-  {
-    // TODO: For now only the cpu-gpu communication is implemented.
-    printf("rank %4d <- rank %4d: tag = %4d\n", comm_rank(), src_rank, tag);
-
-    size_t bytes = recv_field.Bytes();
-
-    void *recv_buffer_h = pinned_malloc(bytes);
-
-    auto mh_recv = comm_declare_recv_rank(recv_buffer_h, src_rank, tag, bytes);
-
-    comm_start(mh_recv);
-    comm_wait(mh_recv);
-
-    cudaMemcpy(recv_field.Gauge_p(), recv_buffer_h, bytes, cudaMemcpyHostToDevice);
-
-    comm_free(mh_recv);
-    host_free(recv_buffer_h);
-  }
+  void copy_color_spinor_offset(ColorSpinorField &out, const ColorSpinorField &in, const int offset[4]);
 
   auto product(const CommKey &input) { return input[0] * input[1] * input[2] * input[3]; }
 
@@ -203,7 +186,6 @@ namespace quda
   }
 
   void split_gauge_field(GaugeField &collect_field, GaugeField &base_field, const CommKey &comm_key)
-  // void split_gauge_field(const CommKey &comm_key)
   {
     CommKey full_dim = {comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3)};
     CommKey full_idx = {comm_coord(0), comm_coord(1), comm_coord(2), comm_coord(3)};
@@ -213,9 +195,6 @@ namespace quda
 
     auto grid_dim = full_dim / comm_key;  // Communicator grid.
     auto block_dim = full_dim / grid_dim; // The full field needs to be partitioned according to the communicator grid.
-
-    // print(full_idx);
-    // printf(".\n");
 
     int n_replicates = product(comm_key);
     std::vector<void *> v_send_buffer_h(n_replicates, nullptr);
@@ -229,18 +208,8 @@ namespace quda
 
       auto dst_idx = grid_idx * grid_dim + block_idx;
 
-      // printf("index %3d, destination_idx = ", i);
-      // print(full_idx);
-      // printf("->");
-      // print(dst_idx);
-      // printf(", thread_idx = ");
-      // print(thread_idx);
-      // printf(".\n");
-
       int dst_rank = comm_rank_from_coords(dst_idx.data());
       int tag = rank * total_rank + dst_rank; // tag = src_rank * total_rank + dst_rank
-
-      // printf("rank %d sending to %d\n", rank, dst_rank);
 
       // TODO: For now only the cpu-gpu communication is implemented.
       printf("rank %4d -> rank %4d: tag = %4d\n", comm_rank(), dst_rank, tag);
@@ -267,25 +236,26 @@ namespace quda
       int src_rank = comm_rank_from_coords(src_idx.data());
       int tag = src_rank * total_rank + rank;
 
-      // printf("rank %d receiving from %d\n", rank, src_rank);
-      recv_field(*buffer_field, src_rank, tag);
+      // TODO: For now only the cpu-gpu communication is implemented.
+      printf("rank %4d <- rank %4d: tag = %4d\n", comm_rank(), src_rank, tag);
 
-      // print(src_idx);
-      // printf("<-");
-      // print(full_idx);
-      // printf(", %3d.\n", i);
+      size_t bytes = buffer_field->Bytes();
+
+      void *recv_buffer_h = pinned_malloc(bytes);
+
+      auto mh_recv = comm_declare_recv_rank(recv_buffer_h, src_rank, tag, bytes);
+
+      comm_start(mh_recv);
+      comm_wait(mh_recv);
+
+      cudaMemcpy(buffer_field->Gauge_p(), recv_buffer_h, bytes, cudaMemcpyHostToDevice);
+
+      comm_free(mh_recv);
+      host_free(recv_buffer_h);
 
       auto offset = thread_idx * thread_dim;
 
       quda::copyOffsetGauge(collect_field, *buffer_field, offset.data());
-
-      /**
-        auto i_d = index_from_coordinate(destination_idx / grid_dim, comm_key);
-        auto full_idx_d = (destination_idx % grid_dim) * block_dim + thread_idx;
-
-        print(full_idx_d);
-        printf(", %3d.\n", i_d);
-       */
     }
 
     delete buffer_field;
@@ -400,6 +370,46 @@ int main(int argc, char **argv)
          plaq_split3.z, comm_rank());
 
   comm_barrier();
+
+  /**
+    quda::ColorSpinorParam cpu_cs_param;
+    constructWilsonTestSpinorParam(&cpu_cs_param, &inv_param, &gauge_param);
+    quda::cpuColorSpinorField *in_h = new quda::cpuColorSpinorField(cpu_cs_param);
+
+    auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234 * comm_rank());
+    rng->Init();
+
+    // Populate the host spinor with random numbers.
+    constructRandomSpinorSource(in_h->V(), 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
+
+    quda::ColorSpinorParam cuda_cs_param(cpu_cs_param, inv_param);
+    cuda_cs_param.create = QUDA_NULL_FIELD_CREATE;
+    quda::cudaColorSpinorField *in_d = new quda::cudaColorSpinorField(cuda_cs_param);
+
+    *in_d = *in_h;
+
+
+    cuda_cs_param.x[3] *= 2;
+    cuda_cs_param.pad *= 2;
+    cuda_cs_param.create = QUDA_ZERO_FIELD_CREATE;
+    quda::cudaColorSpinorField *collect_d = new quda::cudaColorSpinorField(cuda_cs_param);
+
+    for (int i = 0; i < 2; i++) {
+      int offset_cs[4] = {0, 0, 0, i * cuda_cs_param.x[3] / 2};
+      copy_color_spinor_offset(*collect_d, *in_d, offset_cs);
+      copy_color_spinor_offset(*in_d, *collect_d, offset_cs);
+    }
+
+    printf("in_h norm = %12.8e, in_d norm = %12.8e, collect_d = %12.8e.\n",
+      quda::blas::norm2(*in_h), quda::blas::norm2(*in_d), quda::blas::norm2(*collect_d));
+
+    delete in_h;
+    delete in_d;
+    delete collect_d;
+
+    rng->Release();
+    delete rng;
+  */
 
   if (verify_results) {
     int test_rc = RUN_ALL_TESTS();
