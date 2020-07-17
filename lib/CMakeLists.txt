@@ -267,8 +267,7 @@ if(${QUDA_PROPAGATE_CXX_FLAGS})
   # Rather than adding all the list, do it element y element
   # Then there is no weird quoting  problem seemingly 
   foreach( FLAG ${PROPAGATED_FLAG_LIST} )
-	  target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -Xcompiler=${FLAG}> 
-		                              $<$<COMPILE_LANG_AND_ID:CUDA,Clang>: ${FLAG}>)
+	  target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -Xcompiler=${FLAG}>)
   endforeach()
 endif()
 
