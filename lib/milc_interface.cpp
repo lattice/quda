@@ -977,8 +977,8 @@ void qudaInvert(int external_precision, int quda_precision, double mass, QudaInv
 
   // override fine precision to double, switch to mixed as necessary
   if (!do_not_force_double && device_precision == QUDA_SINGLE_PRECISION) {
+    // force outer double
     device_precision = QUDA_DOUBLE_PRECISION;
-    // invalidateGaugeQuda();
   }
 
   QudaGaugeParam fat_param = newQudaGaugeParam();
