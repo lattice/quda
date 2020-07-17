@@ -858,17 +858,19 @@ void qudaMultishiftInvert(int external_precision, int quda_precision, int num_of
   static bool force_double_queried = false;
   static bool do_not_force_double = false;
   if (!force_double_queried) {
-    char* donotusedouble_env = getenv("QUDA_MILC_OVERRIDE_DOUBLE_MULTISHIFT"); // disable forcing outer double precision
-    if (donotusedouble_env && (!(strcmp(donotusedouble_env, "0") == 0)))  {
-      do_not_force_double=true;
+    char *donotusedouble_env = getenv("QUDA_MILC_OVERRIDE_DOUBLE_MULTISHIFT"); // disable forcing outer double precision
+    if (donotusedouble_env && (!(strcmp(donotusedouble_env, "0") == 0))) {
+      do_not_force_double = true;
       printfQuda("Disabling always using double as fine precision for MILC multishift\n");
     }
     force_double_queried = true;
   }
 
   QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
-  bool use_mixed_precision = (((quda_precision==2) && inv_args.mixed_precision) ||
-                          ((quda_precision==1) && (inv_args.mixed_precision==2)) ) ? true : false;
+  bool use_mixed_precision = (((quda_precision == 2) && inv_args.mixed_precision)
+                              || ((quda_precision == 1) && (inv_args.mixed_precision == 2))) ?
+    true :
+    false;
 
   QudaPrecision device_precision_sloppy;
   switch(inv_args.mixed_precision) {
@@ -956,9 +958,9 @@ void qudaInvert(int external_precision, int quda_precision, double mass, QudaInv
   static bool force_double_queried = false;
   static bool do_not_force_double = false;
   if (!force_double_queried) {
-    char* donotusedouble_env = getenv("QUDA_MILC_OVERRIDE_DOUBLE_MULTISHIFT"); // disable forcing outer double precision
-    if (donotusedouble_env && (!(strcmp(donotusedouble_env, "0") == 0)))  {
-      do_not_force_double=true;
+    char *donotusedouble_env = getenv("QUDA_MILC_OVERRIDE_DOUBLE_MULTISHIFT"); // disable forcing outer double precision
+    if (donotusedouble_env && (!(strcmp(donotusedouble_env, "0") == 0))) {
+      do_not_force_double = true;
       printfQuda("Disabling always using double as fine precision for MILC multishift\n");
     }
     force_double_queried = true;
@@ -976,7 +978,7 @@ void qudaInvert(int external_precision, int quda_precision, double mass, QudaInv
   // override fine precision to double, switch to mixed as necessary
   if (!do_not_force_double && device_precision == QUDA_SINGLE_PRECISION) {
     device_precision = QUDA_DOUBLE_PRECISION;
-    //invalidateGaugeQuda();
+    // invalidateGaugeQuda();
   }
 
   QudaGaugeParam fat_param = newQudaGaugeParam();
