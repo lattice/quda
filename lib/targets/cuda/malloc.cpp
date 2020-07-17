@@ -505,6 +505,18 @@ namespace quda
     }
   }
 
+  void *get_mapped_device_pointer_(const char *func, const char *file, int line, const void *host)
+  {
+    void *device;
+    auto error = cudaHostGetDevicePointer(&device, const_cast<void *>(host), 0);
+    if (error != cudaSuccess) {
+      errorQuda("cudaHostGetDevicePointer failed with error %s (%s:%d in %s()",
+                cudaGetErrorString(error), file, line, func);
+    }
+    return device;
+  }
+
+
   namespace pool
   {
 

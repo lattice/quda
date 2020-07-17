@@ -97,7 +97,7 @@ namespace quda {
 #if (defined(_MSC_VER) && defined(_WIN64)) || defined(__LP64__)
 	if(deviceProp.canMapHostMemory) {
 	  h_reduce = (device_reduce_t *) mapped_malloc(bytes);
-	  cudaHostGetDevicePointer(&hd_reduce, h_reduce, 0); // set the matching device pointer
+	  hd_reduce = (device_reduce_t *)get_mapped_device_pointer(h_reduce); // set the matching device pointer
 	} else
 #endif
 	  {
