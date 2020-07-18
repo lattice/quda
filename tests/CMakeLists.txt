@@ -141,7 +141,7 @@ if(QUDA_DIRAC_WILSON
    OR QUDA_DIRAC_STAGGERED)
   add_executable(blas_test blas_test.cpp)
   target_link_libraries(blas_test ${TEST_LIBS})
-  target_compile_options(blas_test PRIVATE $<$<CUDA_COMPILER_ID:Clang>: --cuda-path=${CUDAToolkit_TARGET_DIR} --cuda-gpu-arch=${QUDA_GPU_ARCH}>)
+  target_compile_options(blas_test PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>: --cuda-path=${CUDAToolkit_TARGET_DIR} --cuda-gpu-arch=${QUDA_GPU_ARCH}>)
 
   quda_checkbuildtest(blas_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS blas_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
