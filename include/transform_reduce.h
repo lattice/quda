@@ -43,6 +43,7 @@ namespace quda
     transformer h;
     reducer r;
     TransformReduceArg(const std::vector<T *> &v, count_t n_items, transformer h, reduce_t init, reducer r) :
+      ReduceArg<reduce_t>(v.size()),
       n_items(n_items),
       n_batch(v.size()),
       init(init),

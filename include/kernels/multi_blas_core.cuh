@@ -140,9 +140,9 @@ namespace quda
       static constexpr bool reducer = false;
       static constexpr bool coeff_mul = true;
       static constexpr bool multi_1d = multi_1d_;
-
       const int NXZ;
       const int NYW;
+
       MultiBlasFunctor(int NXZ, int NYW) : NXZ(NXZ), NYW(NYW) {}
 
       __device__ __host__ inline coeff_t a(int i, int j) const
