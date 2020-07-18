@@ -4738,16 +4738,16 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
     } else {
       x.Even() = *(solutionResident[i]);
     }
-
+    
     dirac->Dslash(x.Odd(), x.Even(), QUDA_ODD_PARITY);
     dirac->M(p.Even(), x.Even());
     dirac->Dagger(QUDA_DAG_YES);
     dirac->Dslash(p.Odd(), p.Even(), QUDA_ODD_PARITY);
     dirac->Dagger(QUDA_DAG_NO);
-
+    
     gamma5(x, x);
     gamma5(p, p);
-
+    
     force_coeff[i] = 2.0*dt*coeff[i]*kappa2;
   }
 
@@ -5503,7 +5503,7 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned 
 
   if (!initialized) errorQuda("QUDA not initialized");
 
-  pushVerbosity(inv_param->verbosity);
+  //pushVerbosity(inv_param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) { printQudaInvertParam(inv_param); }
 
   checkInvertParam(inv_param);
@@ -5965,4 +5965,72 @@ void gaugeObservablesQuda(QudaGaugeObservableParam *param)
 
   gaugeObservables(*gauge, *param, profileGaugeObs);
   profileGaugeObs.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
+void make4DMidPointProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_param5D, QudaInvertParam *inv_param4D, const int *X)
+{
+  // wrap CPU host side pointers
+  ColorSpinorParam cpuParam5D((void *)in5D_ptr, *inv_param5D, X, false, inv_param5D->input_location);
+  ColorSpinorField *h_in5D = ColorSpinorField::Create(cpuParam5D);
+
+  ColorSpinorParam cpuParam4D((void *)out4D_ptr, *inv_param4D, X, false, inv_param4D->input_location);
+  ColorSpinorField *h_out4D = ColorSpinorField::Create(cpuParam4D);
+
+  // Create device vectors
+  ColorSpinorParam cudaParam5D(cpuParam5D);
+  cudaParam5D.location = QUDA_CUDA_FIELD_LOCATION;
+  cudaParam5D.create = QUDA_NULL_FIELD_CREATE;
+  cudaParam5D.setPrecision(cpuParam5D.Precision(), cpuParam5D.Precision(), true);
+  std::vector<ColorSpinorField *> in5D;
+  in5D.push_back(ColorSpinorField::Create(cudaParam5D));
+  in5D[0] = h_in5D;
+  
+  ColorSpinorParam cudaParam4D(cpuParam4D);
+  cudaParam4D.location = QUDA_CUDA_FIELD_LOCATION;
+  cudaParam4D.create = QUDA_NULL_FIELD_CREATE;
+  cudaParam4D.setPrecision(cpuParam4D.Precision(), cpuParam4D.Precision(), true);
+  std::vector<ColorSpinorField *> out4D;
+  out4D.push_back(ColorSpinorField::Create(cudaParam4D));
+  
+  make4DMidPointProp(*out4D[0], *in5D[0]);
+
+  out4D[0] = h_out4D;
+}
+
+void make4DQuarkProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_param5D, QudaInvertParam *inv_param4D, const int *X)
+{
+  // wrap CPU host side pointers
+  ColorSpinorParam cpuParam5D((void *)in5D_ptr, *inv_param5D, X, false, inv_param5D->input_location);
+  std::vector<ColorSpinorField *> h_in5D;
+  h_in5D.push_back(ColorSpinorField::Create(cpuParam5D));
+  
+  ColorSpinorParam cpuParam4D((void *)out4D_ptr, *inv_param4D, X, false, inv_param4D->input_location);
+  std::vector<ColorSpinorField* >h_out4D;
+  h_out4D.push_back(ColorSpinorField::Create(cpuParam4D));
+  
+  // Create device vectors
+  ColorSpinorParam cudaParam5D(cpuParam5D);
+  cudaParam5D.location = QUDA_CUDA_FIELD_LOCATION;
+  cudaParam5D.create = QUDA_NULL_FIELD_CREATE;
+  cudaParam5D.setPrecision(cpuParam5D.Precision(), cpuParam5D.Precision(), true);
+  std::vector<ColorSpinorField *> in5D;
+  in5D.push_back(ColorSpinorField::Create(cudaParam5D));
+  *in5D[0] = *h_in5D[0];
+  //*h_in5D[0] = *in5D[0];  
+  
+  ColorSpinorParam cudaParam4D(cpuParam4D);
+  cudaParam4D.location = QUDA_CUDA_FIELD_LOCATION;
+  cudaParam4D.create = QUDA_ZERO_FIELD_CREATE;
+  cudaParam4D.setPrecision(cpuParam4D.Precision(), cpuParam4D.Precision(), true);
+  std::vector<ColorSpinorField *> out4D;
+  out4D.push_back(ColorSpinorField::Create(cudaParam4D));
+
+  make4DQuarkProp(*out4D[0], *in5D[0]);
+  *h_out4D[0] = *out4D[0];
+  
+  delete out4D[0];
+  delete in5D[0];
+  
+  delete h_in5D[0];
+  delete h_out4D[0];  
 }

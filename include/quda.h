@@ -1399,12 +1399,16 @@ extern "C" {
                       QudaGaugeParam* param,
                       double* timeinfo);
 
+  void make4DQuarkProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_param5D, QudaInvertParam *inv_param4D, const int *X);
+
+  void make4DMidPointProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_param5D, QudaInvertParam *inv_param4D, const int *X);
+  
+  
   /**
    * @brief Flush the chronological history for the given index
    * @param[in] index Index for which we are flushing
    */
   void flushChronoQuda(int index);
-
 
   /**
   * Open/Close MAGMA library

@@ -47,13 +47,13 @@ namespace quda
     if (vecs[0]->Ndim() == 4 || vecs[0]->Ndim() == 5) {
       // since QIO routines presently assume we have 4-d fields, we need to convert to array of 4-d fields
       auto Ls = vecs[0]->Ndim() == 5 ? tmp[0]->X(4) : 1;
-      auto V4 = tmp[0]->Volume() / Ls;
+      int V4 = (1.0 * tmp[0]->Volume()) / Ls;
       auto stride = V4 * tmp[0]->Ncolor() * tmp[0]->Nspin() * 2 * tmp[0]->Precision();
       void **V = static_cast<void **>(safe_malloc(Nvec * Ls * sizeof(void *)));
       for (int i = 0; i < Nvec; i++) {
         for (int j = 0; j < Ls; j++) { V[i * Ls + j] = static_cast<char *>(tmp[i]->V()) + j * stride; }
       }
-
+      
       read_spinor_field(filename.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), tmp[0]->SiteSubset(), spinor_parity,
                         tmp[0]->Ncolor(), tmp[0]->Nspin(), Nvec * Ls, 0, (char **)0);
 
@@ -183,7 +183,7 @@ namespace quda
     if (vecs[0]->Ndim() == 4 || vecs[0]->Ndim() == 5) {
       // since QIO routines presently assume we have 4-d fields, we need to convert to array of 4-d fields
       auto Ls = vecs[0]->Ndim() == 5 ? tmp[0]->X(4) : 1;
-      auto V4 = tmp[0]->Volume() / Ls;
+      int V4 = (1.0 * tmp[0]->Volume()) / Ls;
       auto stride = V4 * tmp[0]->Ncolor() * tmp[0]->Nspin() * 2 * tmp[0]->Precision();
       void **V = static_cast<void **>(safe_malloc(Nvec * Ls * sizeof(void *)));
       for (int i = 0; i < Nvec; i++) {

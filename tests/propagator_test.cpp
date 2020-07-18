@@ -9,6 +9,7 @@
 #include <color_spinor_field.h> // convenient quark field container
 #include <vector_io.h>
 #include <blas_quda.h>
+#include <dslash_quda.h>
 
 // External headers
 #include <misc.h>
@@ -258,11 +259,28 @@ int main(int argc, char **argv)
   //-----------------------------------------------------------------------------------
   quda::ColorSpinorField *in;
   quda::ColorSpinorField *out;
+  quda::ColorSpinorField *quark4D;
+  quda::ColorSpinorField *midPoint4D;
   quda::ColorSpinorField *check;
   quda::ColorSpinorParam cs_param;
   constructWilsonTestSpinorParam(&cs_param, &inv_param, &gauge_param);
+  quda::ColorSpinorParam cs_param4D;
+  // Make 4D params
+  QudaInvertParam inv_param4D;
+  QudaDslashType dslash_type_orig = dslash_type;
+  dslash_type = QUDA_WILSON_DSLASH;
+  setInvertParam(inv_param4D);  
+  constructWilsonTestSpinorParam(&cs_param4D, &inv_param, &gauge_param);
+  
+  // Restore dslash type
+  dslash_type = dslash_type_orig;
+  
+  quark4D = quda::ColorSpinorField::Create(cs_param4D);
+  midPoint4D = quda::ColorSpinorField::Create(cs_param4D);
+  
   out = quda::ColorSpinorField::Create(cs_param);
   check = quda::ColorSpinorField::Create(cs_param);
+  
   // Host array for solutions
   void **outProp = (void **)malloc(prop_n_sources * sizeof(void *));
   // QUDA host array for internal checks and malloc
@@ -354,12 +372,18 @@ int main(int argc, char **argv)
 
     // Gaussian smear the point sink.
     performGaussianSmearNStep(qudaOutProp[dil]->V(), &inv_param_smear, prop_sink_smear_steps);
-    
+
     // Perform host side verification of inversion if requested
     if (verify_results) {
       verifyInversion(out->V(), in->V(), check->V(), gauge_param, inv_param, gauge, clover, clover_inv);
     }
 
+    // Make 4D props
+    //make4DMidPointProp(midPoint4D->V(), qudaOutProp[dil]->V(), &inv_param, &inv_param4D, gauge_param.X);
+    //qudaOutProp[dil]->PrintVector(0);
+    make4DQuarkProp(quark4D->V(), qudaOutProp[dil]->V(), &inv_param, &inv_param4D, gauge_param.X);
+    //qudaOutProp[dil]->PrintVector(0);
+    
     delete in;
   }
   // QUDA propagator test COMPLETE
@@ -391,6 +415,9 @@ int main(int argc, char **argv)
   
   delete out;
   delete check;
+  delete midPoint4D;
+  delete quark4D;
+  
   free(outProp);
   for (int i = 0; i < 12; i++) delete qudaOutProp[i];
 
