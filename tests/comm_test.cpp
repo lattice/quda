@@ -238,14 +238,18 @@ namespace quda
       int tag = rank * total_rank + dst_rank; // tag = src_rank * total_rank + dst_rank
 
       // TODO: For now only the cpu-gpu communication is implemented.
-      printf("rank %4d -> rank %4d: tag = %4d\n", comm_rank(), dst_rank, tag);
+      // printf("rank %4d -> rank %4d: tag = %4d\n", comm_rank(), dst_rank, tag);
 
       size_t bytes = meta.Bytes();
 
       v_send_buffer_h[i] = pinned_malloc(bytes);
-      cudaMemcpy(v_send_buffer_h[i], get_data(*v_base_field[i % n_fields]), bytes, cudaMemcpyDeviceToHost);
-
+      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
+        std::memcpy(v_send_buffer_h[i], get_data(*v_base_field[i % n_fields]), bytes);
+      } else {
+        cudaMemcpy(v_send_buffer_h[i], get_data(*v_base_field[i % n_fields]), bytes, cudaMemcpyDeviceToHost);
+      }
       v_mh_send[i] = comm_declare_send_rank(v_send_buffer_h[i], dst_rank, tag, bytes);
+
       comm_start(v_mh_send[i]);
     }
 
@@ -266,7 +270,7 @@ namespace quda
       int tag = src_rank * total_rank + rank;
 
       // TODO: For now only the cpu-gpu communication is implemented.
-      printf("rank %4d <- rank %4d: tag = %4d\n", comm_rank(), src_rank, tag);
+      // printf("rank %4d <- rank %4d: tag = %4d\n", comm_rank(), src_rank, tag);
 
       size_t bytes = buffer_field->Bytes();
 
@@ -277,7 +281,11 @@ namespace quda
       comm_start(mh_recv);
       comm_wait(mh_recv);
 
-      cudaMemcpy(get_data(*buffer_field), recv_buffer_h, bytes, cudaMemcpyHostToDevice);
+      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
+        std::memcpy(get_data(*buffer_field), recv_buffer_h, bytes);
+      } else {
+        cudaMemcpy(get_data(*buffer_field), recv_buffer_h, bytes, cudaMemcpyHostToDevice);
+      }
 
       comm_free(mh_recv);
       host_free(recv_buffer_h);
@@ -285,6 +293,120 @@ namespace quda
       auto offset = thread_idx * thread_dim;
 
       quda::copyOffsetGauge(collect_field, *buffer_field, offset.data());
+    }
+
+    delete buffer_field;
+
+    comm_barrier();
+
+    for (auto &p : v_send_buffer_h) { host_free(p); };
+    for (auto &p : v_mh_send) { comm_free(p); };
+  }
+
+  template <class Field>
+  void join_field(std::vector<Field *> &v_base_field, const Field &collect_field, const CommKey &comm_key)
+  {
+    CommKey full_dim = {comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3)};
+    CommKey full_idx = {comm_coord(0), comm_coord(1), comm_coord(2), comm_coord(3)};
+
+    int rank = comm_rank();
+    int total_rank = product(full_dim);
+
+    auto grid_dim = full_dim / comm_key;  // Communicator grid.
+    auto block_dim = full_dim / grid_dim; // The full field needs to be partitioned according to the communicator grid.
+
+    int n_replicates = product(comm_key);
+    std::vector<void *> v_send_buffer_h(n_replicates, nullptr);
+    std::vector<MsgHandle *> v_mh_send(n_replicates, nullptr);
+
+    int n_fields = v_base_field.size();
+    if (n_fields == 0) { errorQuda("Empty vector!"); }
+
+    const auto &meta = *(v_base_field[0]);
+
+    using param_type = typename param_mapper<Field>::type;
+
+    param_type param(meta);
+    Field *buffer_field = Field::Create(param);
+
+    const int *X = meta.X();
+    CommKey thread_dim = {X[0], X[1], X[2], X[3]};
+
+    // Send cycles
+    for (int i = 0; i < n_replicates; i++) {
+#if 0
+      auto grid_idx = coordinate_from_index(i, comm_key);
+      auto block_idx = full_idx / block_dim;
+      // auto thread_idx = full_idx % block_dim;
+
+      auto dst_idx = grid_idx * grid_dim + block_idx;
+
+      int dst_rank = comm_rank_from_coords(dst_idx.data());
+      int tag = rank * total_rank + dst_rank; // tag = src_rank * total_rank + dst_rank
+#else
+      auto thread_idx = coordinate_from_index(i, comm_key);
+      auto dst_idx = (full_idx % grid_dim) * block_dim + thread_idx;
+
+      int dst_rank = comm_rank_from_coords(dst_idx.data());
+      int tag = rank * total_rank + dst_rank;
+#endif
+      // TODO: For now only the cpu-gpu communication is implemented.
+      // printf("rank %4d -> rank %4d: tag = %4d\n", comm_rank(), dst_rank, tag);
+
+      size_t bytes = meta.Bytes();
+
+      auto offset = thread_idx * thread_dim;
+      quda::copyOffsetGauge(*buffer_field, collect_field, offset.data());
+
+      v_send_buffer_h[i] = pinned_malloc(bytes);
+      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
+        std::memcpy(v_send_buffer_h[i], get_data(*buffer_field), bytes);
+      } else {
+        cudaMemcpy(v_send_buffer_h[i], get_data(*buffer_field), bytes, cudaMemcpyDeviceToHost);
+      }
+      v_mh_send[i] = comm_declare_send_rank(v_send_buffer_h[i], dst_rank, tag, bytes);
+
+      comm_start(v_mh_send[i]);
+    }
+
+    // Receive cycles
+    for (int i = 0; i < n_replicates; i++) {
+#if 0
+      auto thread_idx = coordinate_from_index(i, comm_key);
+      auto src_idx = (full_idx % grid_dim) * block_dim + thread_idx;
+
+      int src_rank = comm_rank_from_coords(src_idx.data());
+      int tag = src_rank * total_rank + rank;
+#else
+      auto grid_idx = coordinate_from_index(i, comm_key);
+      auto block_idx = full_idx / block_dim;
+      // auto thread_idx = full_idx % block_dim;
+
+      auto src_idx = grid_idx * grid_dim + block_idx;
+
+      int src_rank = comm_rank_from_coords(src_idx.data());
+      int tag = src_rank * total_rank + rank; // tag = src_rank * total_rank + dst_rank
+#endif
+      // TODO: For now only the cpu-gpu communication is implemented.
+      // printf("rank %4d <- rank %4d: tag = %4d\n", comm_rank(), src_rank, tag);
+
+      size_t bytes = buffer_field->Bytes();
+
+      void *recv_buffer_h = pinned_malloc(bytes);
+
+      auto mh_recv = comm_declare_recv_rank(recv_buffer_h, src_rank, tag, bytes);
+
+      comm_start(mh_recv);
+      comm_wait(mh_recv);
+
+      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
+        std::memcpy(get_data(*v_base_field[i % n_fields]), recv_buffer_h, bytes);
+      } else {
+        cudaMemcpy(get_data(*v_base_field[i % n_fields]), recv_buffer_h, bytes, cudaMemcpyHostToDevice);
+      }
+
+      comm_free(mh_recv);
+      host_free(recv_buffer_h);
     }
 
     delete buffer_field;
@@ -413,22 +535,33 @@ int main(int argc, char **argv)
 
   std::vector<quda::ColorSpinorField *> v_h(8, nullptr);
   for (auto &p : v_h) {
+#if 0
     // Populate the host spinor with random numbers.
     constructRandomSpinorSource(in_h->V(), 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
-
     cuda_cs_param.create = QUDA_NULL_FIELD_CREATE;
     p = new quda::cudaColorSpinorField(cuda_cs_param);
     *p = *in_h;
-
-    printfQuda("in_h norm = %12.8e, in_d norm = %12.8e\n", quda::blas::norm2(*in_h), quda::blas::norm2(*p));
+#else
+    p = new quda::cpuColorSpinorField(cpu_cs_param);
+    constructRandomSpinorSource(p->V(), 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
+#endif
+    printfQuda("in_d norm = %12.8e (before split)\n", quda::blas::norm2(*p));
   }
-
+#if 0
   for (int d = 0; d < 4; d++) {
     cuda_cs_param.x[d] *= split_key[d];
     cuda_cs_param.pad *= split_key[d];
   }
   cuda_cs_param.create = QUDA_ZERO_FIELD_CREATE;
   quda::ColorSpinorField *collect_d = new quda::cudaColorSpinorField(cuda_cs_param);
+#else
+  for (int d = 0; d < 4; d++) {
+    cpu_cs_param.x[d] *= split_key[d];
+    cpu_cs_param.pad *= split_key[d];
+  }
+  cuda_cs_param.create = QUDA_ZERO_FIELD_CREATE;
+  quda::ColorSpinorField *collect_d = new quda::cpuColorSpinorField(cpu_cs_param);
+#endif
 
   split_field(*collect_d, v_h, split_key);
 
@@ -444,6 +577,10 @@ int main(int argc, char **argv)
   if (gridsize_from_cmdline[3] % 2 == 0) push_to_current({1, 1, 1, 1});
 
   printf("collect_d = %12.8e (splitted on rank %4d).\n", r2_split, comm_rank());
+
+  join_field(v_h, *collect_d, split_key);
+
+  for (const auto &p : v_h) { printfQuda("in_d norm = %12.8e (after join)\n", quda::blas::norm2(*p)); }
 
   delete in_h;
   delete collect_d;

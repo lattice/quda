@@ -43,9 +43,9 @@ namespace quda
       out(out), in(in), nParity(in.SiteSubset())
     {
       if (in.Nspin() != 4) { errorQuda("nSpin = %d not support", in.Nspin()); }
-      if (!in.isNative() || !out.isNative()) {
-        errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
-      }
+      // if (!in.isNative() || !out.isNative()) {
+      //   errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
+      // }
 
       Ls = (in.Ndim() == 4 ? 1 : in.X(4));
 
@@ -74,16 +74,9 @@ namespace quda
     }
   };
 
-  template <bool collect_disperse, class Arg> __global__ void copy_color_spinor_offset_kernel(Arg arg)
+  template <bool collect_disperse, class Arg>
+  __device__ __host__ void copy_color_spinor_offset(int x_cb, int s, int parity, Arg &arg)
   {
-    int x_cb = blockIdx.x * blockDim.x + threadIdx.x;
-    int s = blockIdx.y * blockDim.y + threadIdx.y;
-    int parity = blockIdx.z * blockDim.z + threadIdx.z;
-
-    if (x_cb >= arg.volume_4d_cb) return;
-    if (s >= arg.Ls) return;
-    if (parity >= arg.nParity) return;
-
     using Vector = typename Arg::Vector;
 
     int coordinate[4];
@@ -105,12 +98,37 @@ namespace quda
     arg.out(s * arg.volume_4d_cb_out + x_out, parity) = v;
   }
 
+  template <bool collect_disperse, class Arg> __global__ void copy_color_spinor_offset_kernel(Arg arg)
+  {
+    int x_cb = blockIdx.x * blockDim.x + threadIdx.x;
+    int s = blockIdx.y * blockDim.y + threadIdx.y;
+    int parity = blockIdx.z * blockDim.z + threadIdx.z;
+
+    if (x_cb >= arg.volume_4d_cb) return;
+    if (s >= arg.Ls) return;
+    if (parity >= arg.nParity) return;
+
+    copy_color_spinor_offset<collect_disperse>(x_cb, s, parity, arg);
+  }
+
+  template <bool collect_disperse, class Arg> __host__ void copy_color_spinor_offset_cpu(Arg arg)
+  {
+    for (int parity = 0; parity < arg.nParity; parity++) {
+      for (int s = 0; s < arg.Ls; s++) {
+        for (int x_cb = 0; x_cb < arg.volume_4d_cb; x_cb++) {
+          copy_color_spinor_offset<collect_disperse>(x_cb, s, parity, arg);
+        }
+      }
+    }
+  }
+
   template <class Float, int nColor, class Arg> class CopyColorSpinorOffset : public TunableVectorYZ
   {
 
   protected:
     Arg &arg;
     const ColorSpinorField &meta;
+    QudaFieldLocation location;
 
     long long flops() const { return 0; }
     long long bytes() const { return 2ll * (arg.collect_disperse ? arg.in.Bytes() : arg.out.Bytes()); }
@@ -123,12 +141,12 @@ namespace quda
 
   public:
     CopyColorSpinorOffset(Arg &arg, const ColorSpinorField &meta) :
-      TunableVectorYZ(arg.Ls, arg.nParity), arg(arg), meta(meta)
+      TunableVectorYZ(arg.Ls, arg.nParity), arg(arg), meta(meta), location(meta.Location())
     {
-      writeAuxString("(%d,%d,%d,%d)->(%d,%d,%d,%d),Ls=%d,%s,offset=%d%d%d%d", arg.Xin[0], arg.Xin[1], arg.Xin[2],
-                     arg.Xin[3], arg.Xout[0], arg.Xout[1], arg.Xout[2], arg.Xout[3], arg.Ls,
+      writeAuxString("(%d,%d,%d,%d)->(%d,%d,%d,%d),Ls=%d,%s,offset=%d%d%d%d,location=%s", arg.Xin[0], arg.Xin[1],
+                     arg.Xin[2], arg.Xin[3], arg.Xout[0], arg.Xout[1], arg.Xout[2], arg.Xout[3], arg.Ls,
                      arg.collect_disperse ? "collect" : "disperse", arg.offset[0], arg.offset[1], arg.offset[2],
-                     arg.offset[3]);
+                     arg.offset[3], location == QUDA_CPU_FIELD_LOCATION ? "cpu" : "gpu");
       apply(0);
     }
     virtual ~CopyColorSpinorOffset() { }
@@ -136,9 +154,17 @@ namespace quda
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      auto kernel = arg.collect_disperse ? copy_color_spinor_offset_kernel<true, Arg> :
-                                           copy_color_spinor_offset_kernel<false, Arg>;
-      kernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+      if (location == QUDA_CPU_FIELD_LOCATION) {
+        if (arg.collect_disperse) {
+          copy_color_spinor_offset_cpu<true>(arg);
+        } else {
+          copy_color_spinor_offset_cpu<false>(arg);
+        }
+      } else {
+        auto kernel = arg.collect_disperse ? copy_color_spinor_offset_kernel<true, Arg> :
+                                             copy_color_spinor_offset_kernel<false, Arg>;
+        kernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+      }
     }
 
     void initTuneParam(TuneParam &param) const { TunableVectorYZ::initTuneParam(param); }
@@ -146,6 +172,15 @@ namespace quda
     void defaultTuneParam(TuneParam &param) const { TunableVectorYZ::defaultTuneParam(param); }
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
+
+    virtual bool advanceTuneParam(TuneParam &param) const
+    {
+      if (location == QUDA_CPU_FIELD_LOCATION) {
+        return false;
+      } else {
+        return TunableVectorYZ::advanceTuneParam(param);
+      }
+    }
   };
 
   template <typename Float, int nColor>
