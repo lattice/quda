@@ -248,6 +248,14 @@ namespace quda {
       return parity * offset_cb + ((x_cb * nSpin + s) * nColor + c) * nVec + v;
     }
 
+    /**
+     * @brief This and the following `wrap_index` method returns the index for the pointer that points to
+     * the start of the memory chunk corresponds to the matrix at parity, x_cb, s. Only available for the
+     * QUDA_SPACE_SPIN_COLOR_FIELD_ORDER order.
+     * @param parity Parity index
+     * @param x_cb 1-d checkboarding site index
+     * @param s spin index
+     */
     __device__ __host__ inline int wrap_index(int parity, int x_cb, int s) const
     {
       return parity * offset_cb + (x_cb * nSpin + s) * nColor * nVec;
@@ -268,6 +276,9 @@ namespace quda {
       __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const
       { return parity*ghostOffset[dim] + ((x_cb*nSpin+s)*nColor+c)*nVec+v; }
 
+      /**
+       * @brief This `wrap_index` method for ghost.
+       */
       __device__ __host__ inline int wrap_index(int dim, int dir, int parity, int x_cb, int s) const
       {
         return parity * ghostOffset[dim] + (x_cb * nSpin + s) * nColor * nVec;
@@ -438,6 +449,9 @@ namespace quda {
     */
     template <typename Float, typename storeFloat>
       struct fieldorder_wrapper {
+      /**
+       * computing type and storage types that can be inferred from this object.
+       */
       using type = Float;
       using store_type = storeFloat;
       complex<storeFloat> *v;
@@ -486,6 +500,9 @@ namespace quda {
     }
   }
 
+  /**
+   * @brief returns the pointor of this wrapper object
+   */
   __device__ __host__ inline auto data() { return &v[idx]; }
 
   __device__ __host__ inline const auto data() const { return &v[idx]; }
@@ -728,19 +745,21 @@ namespace quda {
   { return fieldorder_wrapper<Float,storeFloat>(v, accessor.index(parity,x_cb,s,c,n), scale, scale_inv); }
 
   /**
-   * Writable complex-member accessor function.  The last
-   * parameter n is only used for indexed into the packed
-   * null-space vectors.
-   * @param x 1-d checkerboard site index
+   * @brief This and the following method (eventually) creates a fieldorder_wrapper object whose pointer points to
+   * the start of the memory chunk corresponds to the matrix at parity, x_cb, s. Only available for the
+   * QUDA_SPACE_SPIN_COLOR_FIELD_ORDER order.
+   * @param parity Parity index
+   * @param x_cb 1-d checkboarding site index
    * @param s spin index
-   * @param c color index
-   * @param v vector number
    */
   __device__ __host__ inline const auto wrap(int parity, int x_cb, int s) const
   {
     return fieldorder_wrapper<Float, storeFloat>(v, accessor.wrap_index(parity, x_cb, s), scale, scale_inv);
   }
 
+  /**
+   * The non-const `wrap` method.
+   */
   __device__ __host__ inline auto wrap(int parity, int x_cb, int s)
   {
     return fieldorder_wrapper<Float, storeFloat>(v, accessor.wrap_index(parity, x_cb, s), scale, scale_inv);

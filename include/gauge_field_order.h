@@ -233,6 +233,10 @@ namespace quda {
     */
     template <typename Float, typename storeFloat>
       struct fieldorder_wrapper {
+
+      /**
+       * Computing type and storage types that can be inferred from this object.
+       */
       using type = Float;
       using store_type = storeFloat;
       complex<storeFloat> *v;
@@ -266,6 +270,9 @@ namespace quda {
           }
         }
 
+        /**
+         * @brief returns the pointor of this wrapper object
+         */
         __device__ __host__ inline auto data() { return &v[idx]; }
 
         __device__ __host__ inline const auto data() const { return &v[idx]; }
@@ -572,12 +579,21 @@ namespace quda {
 	}
       }
 
+      /**
+       * @brief This and the following method creates a fieldorder_wrapper object whose pointer points to the start of
+       * the memory chunk corresponds to the matrix at d, parity, x, row, col. These methods (as well as other `wrap`,
+       * `wrap_ghost`, `wrap_index`) are only available for the AoS orders, such as the QUDA_MILC_GAUGE_ORDER order, for
+       * the reason that the concept of memory chunk only applyies to these orders.
+       */
       __device__ __host__ inline const auto wrap(int d, int parity, int x, int row, int col) const
       {
         return fieldorder_wrapper<Float, storeFloat>(
           u, (((parity * volumeCB + x) * geometry + d) * nColor + row) * nColor + col, scale, scale_inv);
       }
 
+      /**
+       * bried The non-const `wrap` method.
+       */
       __device__ __host__ inline auto wrap(int d, int parity, int x, int row, int col)
       {
         return fieldorder_wrapper<Float, storeFloat>(
@@ -680,12 +696,19 @@ namespace quda {
 	}
       }
 
+      /**
+       * @brief The method similar to Accessor<Float, nColor, QUDA_MILC_GAUGE_ORDER, storeFloat>::wrap: this method and the following
+       * creates a fieldorder_wrapper object with the pointer that points to the memory chunk at d, parity, x, row, col
+       */
       __device__ __host__ inline const auto wrap(int d, int parity, int x, int row, int col) const
       {
         return fieldorder_wrapper<Float, storeFloat>(
           ghost[d], parity * ghostOffset[d] + (x * nColor + row) * nColor + col, scale, scale_inv);
       }
 
+      /**
+       * @brief the non-const `wrap` method.
+       */
       __device__ __host__ inline auto wrap(int d, int parity, int x, int row, int col)
       {
         return fieldorder_wrapper<Float, storeFloat>(
@@ -940,11 +963,23 @@ namespace quda {
           return accessor(d, parity, x, row, col);
         }
 
+        /**
+         * @brief This and the following method (eventually) creates a fieldorder_wrapper object whose pointer points to
+         *   the start of the memory chunk corresponds to the matrix at d, parity, x. Only available for the
+         *   QUDA_MILC_GAUGE_ORDER order.
+
+         * @param d dimension index
+         * @param parity Parity index
+         * @param x 1-d site index
+         */
         __device__ __host__ const auto wrap(int d, int parity, int x) const
         {
           return accessor.wrap(d, parity, x, 0, 0);
         }
 
+        /**
+         * @brief the non-const `wrap` method.
+         */
         __device__ __host__ auto wrap(int d, int parity, int x) { return accessor.wrap(d, parity, x, 0, 0); }
 
         /**
@@ -987,12 +1022,24 @@ namespace quda {
         {
           return ghostAccessor(d, parity, x, row, col);
         }
+        /**
+         * @brief This and the following method (eventually) creates a fieldorder_wrapper object whose pointer points to
+         * the start of the memory chunk corresponds to the matrix at d, parity, x. Only available for the
+         * QUDA_MILC_GAUGE_ORDER order.
+
+         * @param d dimension index
+         * @param parity Parity index
+         * @param x 1-d site index
+         */
 
         __device__ __host__ const auto wrap_ghost(int d, int parity, int x) const
         {
           return ghostAccessor.wrap(d, parity, x, 0, 0);
         }
 
+        /**
+         * @brief the non-const `wrap_ghost` method.
+         */
         __device__ __host__ auto wrap_ghost(int d, int parity, int x) { return ghostAccessor.wrap(d, parity, x, 0, 0); }
 
         /**
@@ -1027,11 +1074,24 @@ namespace quda {
           return (*this)(d, parity, x, s_row * nColorCoarse + c_row, s_col * nColorCoarse + c_col);
         }
 
+        /**
+         * @brief This and the following method (eventually) creates a fieldorder_wrapper object whose pointer points to
+         * the start of the memory chunk corresponds to the matrix at d, parity, x, s_row, s_col. Only available for the
+         * QUDA_MILC_GAUGE_ORDER order.
+         * @param d dimension index
+         * @param parity Parity index
+         * @param x 1-d site index
+         * @param s_row row spin index
+         * @param s_col col spin index
+         */
         __device__ __host__ inline const auto wrap(int d, int parity, int x, int s_row, int s_col) const
         {
           return accessor.wrap(d, parity, x, s_row * nColorCoarse, s_col * nColorCoarse);
         }
 
+        /**
+         * @brief the non-const `wrap` method.
+         */
         __device__ __host__ inline auto wrap(int d, int parity, int x, int s_row, int s_col)
         {
           return accessor.wrap(d, parity, x, s_row * nColorCoarse, s_col * nColorCoarse);
@@ -1066,12 +1126,24 @@ namespace quda {
 	  Ghost(int d, int parity, int x, int s_row, int s_col, int c_row, int c_col) {
 	  return Ghost(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
 	}
-
+        /**
+         * @brief This and the following method (eventually) creates a fieldorder_wrapper object whose pointer points to
+         * the start of the memory chunk corresponds to the matrix at d, parity, x, s_row, s_col. Only available for the
+         * QUDA_MILC_GAUGE_ORDER order.
+         * @param d dimension index
+         * @param parity Parity index
+         * @param x 1-d site index
+         * @param s_row row spin index
+         * @param s_col col spin index
+         */
         __device__ __host__ inline const auto wrap_ghost(int d, int parity, int x, int s_row, int s_col) const
         {
           return ghostAccessor.wrap(d, parity, x, s_row * nColorCoarse, s_col * nColorCoarse);
         }
 
+        /**
+         * @brief the non-const `wrap_ghost` method.
+         */
         __device__ __host__ inline auto wrap_ghost(int d, int parity, int x, int s_row, int s_col)
         {
           return ghostAccessor.wrap(d, parity, x, s_row * nColorCoarse, s_col * nColorCoarse);
