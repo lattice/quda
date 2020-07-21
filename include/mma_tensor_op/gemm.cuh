@@ -525,17 +525,33 @@ namespace quda
 
         return max;
       }
-
+      /**
+       * The general interface for performance MMA:
+       * @param a_dagger is A daggered
+       * @param b_dagger is B daggered
+       * @param compute_max_only do we actually store to global memory or we just want to find the maximum
+       * @param a wrapper for operand A: the object needs to have the following methods:
+       *        - .data() that returns the (global memory) address to which we are loading/storing
+       *        - ::type the type for the computing type
+       *        - ::store_type the type for the storage type
+       *        - ::fixed a bool indicates if the object ueses fix point format
+       *        - .scale/scale_inv the scales for the fixed point format objects
+       * @param b similar to a
+       * @param c similar to a
+       */
       template <bool a_dagger, bool b_dagger, bool compute_max_only, class A, class B, class C>
       static __device__ inline float perform_mma(const A &a, const B &b, C &c, int m_offset, int n_offset)
       {
 
+        // The typical streaming K MMA type: needs registers to hold all accumulates.
         if (bK < K) {
           return perform_mma_divide_k_yes<a_dagger, b_dagger, compute_max_only>(a, b, c, m_offset, n_offset);
         } else {
+          // Shared memory can hold the whole of operand B: we don't need to store all accumulates: save registers.
           if (bM < M && bN == N) {
             return perform_mma_divide_b_no<a_dagger, b_dagger, compute_max_only>(a, b, c);
           } else {
+            // Shared memory can hold everything in the K direction: we don't need to store all accumulates: save registers.
             return perform_mma_divide_k_no<a_dagger, b_dagger, compute_max_only>(a, b, c, m_offset, n_offset);
           }
         }

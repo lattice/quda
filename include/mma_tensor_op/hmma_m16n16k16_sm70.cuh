@@ -397,7 +397,6 @@ namespace quda
           if (!check_bounds || (n_index < M && m_index < N)) {
             value.x = +static_cast<store_type>(round(op_c_real.reg[i * 2 + 0] * scale));
             value.y = -static_cast<store_type>(round(op_c_imag.reg[i * 2 + 0] * scale));
-            // if (threadIdx.y == 7 && threadIdx.z == 7 && blockIdx.x == 0 && i == 0) printf("value.x = %10d\n", value.x);
             atomicAdd(&ptr[(n_index + 0) * ldc + m_index], value);
 
             value.x = +static_cast<store_type>(round(op_c_real.reg[i * 2 + 1] * scale));
