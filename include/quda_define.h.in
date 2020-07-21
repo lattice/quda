@@ -51,6 +51,19 @@
 #undef QUDA_FLOAT8
 #endif
 
+#cmakedefine QUDA_QIOLARGEFILE
+#ifdef QUDA_QIOLARGEFILE
+/**
+ * @def qio_size_t
+ * @brief This typedef sets the type qio_size_t to int or size_t
+ * depending on if the QIO largefile branch is used or not
+ */
+typedef size_t qio_size_t;
+#undef QUDA_QIOLARGEFILE
+#else
+typedef int qio_size_t;
+#endif
+
 #if defined(USE_TEXTURE_OBJECTS) && defined(FLOAT8)
 #error "Cannot simultanteously enable QUDA_TEX and QUDA_FLOAT8"
 #endif

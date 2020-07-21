@@ -248,6 +248,9 @@ set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 14 17)
 
 option(QUDA_BACKWARDS "Enable stacktrace generation using backwards-cpp")
 
+# QIO largefile support
+option(QUDA_QIOLARGEFILE "use feature/largefile branch of QIO" OFF)
+
 # NVTX options
 option(QUDA_MPI_NVTX "add NVTX markup to MPI API calls" OFF)
 option(QUDA_INTERFACE_NVTX "add NVTC markup to interface calls" OFF)
@@ -283,6 +286,8 @@ mark_as_advanced(QUDA_CTEST_LAUNCH_ARGS)
 mark_as_advanced(QUDA_OPENMP)
 
 mark_as_advanced(QUDA_BACKWARDS)
+
+mark_as_advanced(QUDA_QIOLARGEFILE)
 
 mark_as_advanced(QUDA_MPI_NVTX)
 mark_as_advanced(QUDA_INTERFACE_NVTX)
@@ -607,10 +612,16 @@ if(QUDA_QIO)
     APPEND
     PROPERTY CMAKE_CONFIGURE_DEPENDS ${QIO_FOUND})
   if(QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
+    set(QIO_BRANCH
+        "qio2-5-0")
+    if(QUDA_QIOLARGEFILE)
+      set(QIO_BRANCH
+          "feature/largefile")
+    endif()
     ExternalProject_Add(
       QIO
       GIT_REPOSITORY https://github.com/usqcd-software/qio.git
-      GIT_TAG qio2-5-0
+      GIT_TAG "${QIO_BRANCH}"
       GIT_SHALLOW YES
       PREFIX usqcd
       CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure "INSTALL=${INSTALL_EXE} -C"
