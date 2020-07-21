@@ -20,8 +20,8 @@
 static int *squaresize = nullptr; /* dimensions of hypercubes */
 static int *nsquares = nullptr;   /* number of hypercubes in each direction */
 static int ndim;
-static int *size1[2] = {nullptr, nullptr}, *size2 = nullptr;
-static int sites_on_node;
+static qio_size_t *size1[2] = {nullptr, nullptr}, *size2 = nullptr;
+static qio_size_t sites_on_node;
 static int *mcoord = nullptr;
 static bool single_parity = false;
 
@@ -54,11 +54,11 @@ int quda_setup_layout(int len[], int nd, int numnodes, int single_parity_)
   for (int i = 0; i < ndim; ++i) { sites_on_node *= squaresize[i]; }
 
   if (size1[0]) free(size1[0]);
-  size1[0] = (int *)malloc(2 * (ndim + 1) * sizeof(int));
+  size1[0] = (qio_size_t *)malloc(2 * (ndim + 1) * sizeof(qio_size_t));
   size1[1] = size1[0] + ndim + 1;
 
   if (size2) free(size2);
-  size2 = (int *)malloc((ndim + 1) * sizeof(int));
+  size2 = (qio_size_t *)malloc((ndim + 1) * sizeof(qio_size_t));
 
   size1[0][0] = 1;
   size1[1][0] = 0;
@@ -78,9 +78,9 @@ int quda_node_number(const int x[])
   return QMP_get_node_number_from(mcoord);
 }
 
-int quda_node_index(const int x[])
+qio_size_t quda_node_index(const int x[])
 {
-  int r = 0, p = 0;
+  qio_size_t r = 0, p = 0;
 
   for (int i = ndim - 1; i >= 0; --i) {
     r = r * squaresize[i] + (x[i] % squaresize[i]);
@@ -98,12 +98,12 @@ int quda_node_index(const int x[])
   return r;
 }
 
-void quda_get_coords(int x[], int node, int index)
+void quda_get_coords(int x[], int node, qio_size_t index)
 {
-  int si = index;
+  qio_size_t si = index;
   int *m = QMP_get_logical_coordinates_from(node);
 
-  int s = 0;
+  qio_size_t s = 0;
   for (int i = 0; i < ndim; ++i) {
     x[i] = m[i] * squaresize[i];
     s += x[i];
@@ -142,8 +142,8 @@ void quda_get_coords(int x[], int node, int index)
   if (quda_node_index(x) != si) {
     if (quda_this_node == 0) {
       fprintf(stderr, "get_coords: error in layout!\n");
-      for (int i = 0; i < ndim; i++) { fprintf(stderr, "%i\t%i\t%i\n", size1[0][i], size1[1][i], size2[i]); }
-      fprintf(stderr, "%i\tindex=%i\tx=(", node, si);
+      for (int i = 0; i < ndim; i++) { fprintf(stderr, "%lu\t%lu\t%lu\n", (size_t)size1[0][i], (size_t)size1[1][i], (size_t)size2[i]); }
+      fprintf(stderr, "%i\tindex=%lu\tx=(", node, (size_t)si);
       for (int i = 0; i < ndim; i++) fprintf(stderr, i < ndim - 1 ? "%i, " : "%i)\n", x[i]);
     }
     QMP_abort(1);
@@ -152,4 +152,4 @@ void quda_get_coords(int x[], int node, int index)
 }
 
 /* The number of sites on the specified node */
-int quda_num_sites(int node) { return sites_on_node; }
+qio_size_t quda_num_sites(int node) { return sites_on_node; }
