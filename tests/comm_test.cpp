@@ -484,11 +484,20 @@ int main(int argc, char **argv)
   plaqQuda(plaq);
   printfQuda("Computed plaquette is %12.8e: (spatial = %12.8e, temporal = %12.8e)\n", plaq[0], plaq[1], plaq[2]);
 
+  // Split gauge field
+
   plaq_ref = plaq[0];
 
-  CommKey split_key = {1, 2, 2, 2};
+  CommKey split_key
+    = {gridsize_from_cmdline[0], gridsize_from_cmdline[1], gridsize_from_cmdline[2], gridsize_from_cmdline[3]};
 
   quda::GaugeFieldParam param(*gaugePrecise);
+
+  quda::GaugeField *gauge_backup = quda::GaugeField::Create(param);
+  *gauge_backup = *gaugePrecise;
+
+  quda::ColorSpinorParam cpu_cs_param;
+  constructWilsonTestSpinorParam(&cpu_cs_param, &inv_param, &gauge_param);
 
   for (int d = 0; d < nDim; d++) {
     if (comm_dim(d) % split_key[d] != 0) {
@@ -498,6 +507,8 @@ int main(int argc, char **argv)
 
     param.x[d] *= split_key[d];
     param.pad *= split_key[d];
+    gauge_param.X[d] *= split_key[d];
+    gauge_param.ga_pad *= split_key[d];
   }
   quda::GaugeField *collect_gauge = quda::GaugeField::Create(param);
 
@@ -507,93 +518,81 @@ int main(int argc, char **argv)
 
   comm_barrier();
 
-  // Create a communicator with the split {1, 1, 1, 2} and push to the top.
-  if (gridsize_from_cmdline[3] % 2 == 0) push_to_current(split_key);
-
-  comm_barrier();
-
-  auto plaq_split3 = plaquette_gauge(*collect_gauge);
-  plaq_split = plaq_split3.x;
-
-  if (gridsize_from_cmdline[3] % 2 == 0) push_to_current({1, 1, 1, 1});
-
-  delete collect_gauge;
-
-  printf("Computed plaquette is %12.8e: (%12.8e %12.8e, splitted on rank %4d)\n", plaq_split3.x, plaq_split3.y,
-         plaq_split3.z, comm_rank());
-
-  comm_barrier();
-
-  quda::ColorSpinorParam cpu_cs_param;
-  constructWilsonTestSpinorParam(&cpu_cs_param, &inv_param, &gauge_param);
+  // Split input fermion field
   quda::cpuColorSpinorField *in_h = new quda::cpuColorSpinorField(cpu_cs_param);
 
   auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234 * comm_rank());
   rng->Init();
 
-  quda::ColorSpinorParam cuda_cs_param(cpu_cs_param, inv_param);
-
-  std::vector<quda::ColorSpinorField *> v_h(8, nullptr);
+  std::vector<quda::ColorSpinorField *> v_h(quda::product(split_key), nullptr);
   for (auto &p : v_h) {
-#if 0
-    // Populate the host spinor with random numbers.
-    constructRandomSpinorSource(in_h->V(), 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
-    cuda_cs_param.create = QUDA_NULL_FIELD_CREATE;
-    p = new quda::cudaColorSpinorField(cuda_cs_param);
-    *p = *in_h;
-#else
     p = new quda::cpuColorSpinorField(cpu_cs_param);
     constructRandomSpinorSource(p->V(), 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
-#endif
     printfQuda("in_d norm = %12.8e (before split)\n", quda::blas::norm2(*p));
   }
-#if 0
-  for (int d = 0; d < 4; d++) {
-    cuda_cs_param.x[d] *= split_key[d];
-    cuda_cs_param.pad *= split_key[d];
-  }
-  cuda_cs_param.create = QUDA_ZERO_FIELD_CREATE;
-  quda::ColorSpinorField *collect_d = new quda::cudaColorSpinorField(cuda_cs_param);
-#else
-  for (int d = 0; d < 4; d++) {
-    cpu_cs_param.x[d] *= split_key[d];
-    cpu_cs_param.pad *= split_key[d];
-  }
-  cuda_cs_param.create = QUDA_ZERO_FIELD_CREATE;
-  quda::ColorSpinorField *collect_d = new quda::cpuColorSpinorField(cpu_cs_param);
-#endif
+  std::vector<quda::ColorSpinorField *> v_x(quda::product(split_key), nullptr);
+  for (auto &p : v_x) { p = new quda::cpuColorSpinorField(cpu_cs_param); }
+
+  quda::ColorSpinorParam cpu_cs_param_split;
+  constructWilsonTestSpinorParam(&cpu_cs_param_split, &inv_param, &gauge_param);
+
+  quda::ColorSpinorField *collect_d = new quda::cpuColorSpinorField(cpu_cs_param_split);
+  quda::ColorSpinorField *collect_x = new quda::cpuColorSpinorField(cpu_cs_param_split);
 
   split_field(*collect_d, v_h, split_key);
 
   comm_barrier();
 
-  // Create a communicator with the split {1, 1, 1, 2} and push to the top.
-  if (gridsize_from_cmdline[3] % 2 == 0) push_to_current(split_key);
-
-  double r2_split = quda::blas::norm2(*collect_d);
-
+  push_to_current(split_key);
+  updateR();
   comm_barrier();
 
-  if (gridsize_from_cmdline[3] % 2 == 0) push_to_current({1, 1, 1, 1});
+  quda::loadGaugeField(collect_gauge, &gauge_param);
+  plaqQuda(plaq);
 
-  printf("collect_d = %12.8e (splitted on rank %4d).\n", r2_split, comm_rank());
+  invertQuda(collect_x->V(), collect_d->V(), &inv_param);
 
-  join_field(v_h, *collect_d, split_key);
+  push_to_current({1, 1, 1, 1});
+  updateR();
 
-  for (const auto &p : v_h) { printfQuda("in_d norm = %12.8e (after join)\n", quda::blas::norm2(*p)); }
+  for (int d = 0; d < nDim; d++) {
+    gauge_param.X[d] /= split_key[d];
+    gauge_param.ga_pad /= split_key[d];
+  }
 
-  delete in_h;
+  loadGaugeQuda(gauge, &gauge_param);
+  plaqQuda(plaq);
+
+  printf("Split plaquette rank %d is %12.8e: (spatial = %12.8e, temporal = %12.8e)\n", comm_rank(), plaq[0], plaq[1],
+         plaq[2]);
+
+  join_field(v_x, *collect_x, split_key);
+
+  for (const auto &p : v_x) { printfQuda("v_x norm = %12.8e (after join)\n", quda::blas::norm2(*p)); }
+
   delete collect_d;
-
-  for (auto p : v_h) { delete p; }
+  delete collect_x;
 
   rng->Release();
   delete rng;
 
+  void **outMulti = (void **)malloc(multishift * sizeof(void *));
+  void *clover = nullptr;
+  void *clover_inv = nullptr;
+
   if (verify_results) {
-    int test_rc = RUN_ALL_TESTS();
-    if (test_rc != 0) warningQuda("Tests failed on rank %4d", comm_rank());
+    for (size_t i = 0; i < v_h.size(); i++) {
+      verifyInversion(v_x[i]->V(), (void **)outMulti, v_h[i]->V(), in_h->V(), gauge_param, inv_param, gauge, clover,
+                      clover_inv);
+    }
   }
+
+  delete outMulti;
+  delete in_h;
+  for (auto p : v_h) { delete p; }
+  for (auto p : v_x) { delete p; }
+
+  freeGaugeQuda();
 
   // finalize the QUDA library
   endQuda();

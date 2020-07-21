@@ -50,7 +50,7 @@ namespace quda
      Copy a regular/extended gauge field into an extended/regular gauge field
   */
   template <class Float, int nColor, bool collect_disperse, class Arg>
-  __device__ void copyGaugeOffset(Arg &arg, int x_cb, int parity)
+  __device__ __host__ void copyGaugeOffset(Arg &arg, int x_cb, int parity)
   {
     using real = typename mapper<Float>::type;
     using Matrix = Matrix<complex<real>, nColor>;
@@ -75,6 +75,15 @@ namespace quda
       Matrix mat = arg.in(d, x_in, parity);
       arg.out(d, x_out, parity) = mat;
     } // dir
+  }
+
+  template <class Float, int nColor, bool collect_disperse, class Arg> void copyGaugeOffsetCpu(Arg arg)
+  {
+    for (int x_cb = 0; x_cb < arg.volume_cb; x_cb++) {
+      for (int parity = 0; parity < 2; parity++) {
+        copyGaugeOffset<Float, nColor, collect_disperse>(arg, x_cb, parity);
+      }
+    }
   }
 
   template <class Float, int nColor, bool collect_disperse, class Arg> __global__ void copyGaugeOffsetKernel(Arg arg)
@@ -107,9 +116,9 @@ namespace quda
       arg(out, in, offset), meta(in), location(out.Location())
     {
 
-      writeAuxString("volumn_out=%d,volume_in=%d,%s,offset=%d%d%d%d", out.VolumeCB(), in.VolumeCB(),
+      writeAuxString("volumn_out=%d,volume_in=%d,%s,offset=%d%d%d%d,location=%s", out.VolumeCB(), in.VolumeCB(),
                      arg.collect_disperse ? "collect" : "disperse", arg.offset[0], arg.offset[1], arg.offset[2],
-                     arg.offset[3]);
+                     arg.offset[3], location == QUDA_CPU_FIELD_LOCATION ? "cpu" : "gpu");
       apply(0);
     }
 
@@ -117,7 +126,11 @@ namespace quda
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (location == QUDA_CPU_FIELD_LOCATION) {
-        errorQuda("CPU verison not yet available.");
+        if (arg.collect_disperse) {
+          copyGaugeOffsetCpu<Float, nColor, true>(arg);
+        } else {
+          copyGaugeOffsetCpu<Float, nColor, false>(arg);
+        }
       } else if (location == QUDA_CUDA_FIELD_LOCATION) {
         if (arg.collect_disperse) {
           copyGaugeOffsetKernel<Float, nColor, true><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
@@ -137,8 +150,8 @@ namespace quda
   {
     checkPrecision(out, in);
     checkReconstruct(out, in);
-    if (!out.isNative()) errorQuda("Order %d with %d reconstruct not supported", in.Order(), in.Reconstruct());
-    if (!in.isNative()) errorQuda("Order %d with %d reconstruct not supported", out.Order(), out.Reconstruct());
+    // if (!out.isNative()) errorQuda("Order %d with %d reconstruct not supported", in.Order(), in.Reconstruct());
+    // if (!in.isNative()) errorQuda("Order %d with %d reconstruct not supported", out.Order(), out.Reconstruct());
 
     instantiate<CopyGaugeOffset, WilsonReconstruct>(out, in, offset);
   }

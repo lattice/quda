@@ -689,6 +689,21 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     static_cast<GaugeField*>(new cpuGaugeField(gauge_param)) :
     static_cast<GaugeField*>(new cudaGaugeField(gauge_param));
 
+  profileGauge.TPSTOP(QUDA_PROFILE_TOTAL);
+  profileGauge.TPSTOP(QUDA_PROFILE_INIT);
+
+  loadGaugeField(in, param);
+}
+
+namespace quda {
+
+void loadGaugeField(const GaugeField *in, QudaGaugeParam *param)
+{
+  profileGauge.TPSTART(QUDA_PROFILE_TOTAL);
+  profileGauge.TPSTART(QUDA_PROFILE_INIT);
+
+  GaugeFieldParam gauge_param(*in);
+
   if (in->Order() == QUDA_BQCD_GAUGE_ORDER) {
     static size_t checksum = SIZE_MAX;
     size_t in_checksum = in->checksum(true);
@@ -865,8 +880,11 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
   if (extendedGaugeResident) {
     // updated the resident gauge field if needed
+#if 0
     const int *R_ = extendedGaugeResident->R();
-    const int R[] = { R_[0], R_[1], R_[2], R_[3] };
+#else
+    const int R[] = { commDimPartitioned(0), commDimPartitioned(1), commDimPartitioned(2), commDimPartitioned(3) };
+#endif
     QudaReconstructType recon = extendedGaugeResident->Reconstruct();
     delete extendedGaugeResident;
 
@@ -874,6 +892,8 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   }
 
   profileGauge.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
 }
 
 void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
