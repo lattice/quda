@@ -179,7 +179,7 @@ enum cudaMemcpyKind {
   qudaMemcpyHostToHost = 0,
   qudaMemcpyHostToDevice = 1,
   qudaMemcpyDeviceToHost = 2,
-  qudaMemcpyDeviceToDevice =3,
+  qudaMemcpyDeviceToDevice = 3,
   qudaMemcpyDefault = 4
 };
 typedef cudaMemcpyKind qudaMemcpyKind;
@@ -270,7 +270,8 @@ struct curandStateXORWOW {
   int state;
 };
 struct curandStateMRG32k3a {
-  int state;
+  int64_t s10,s11,s12;
+  int64_t s20,s21,s22;
 };
 void curand_init(unsigned long long seed, unsigned long long sequence,
 		 unsigned long long offset, curandStateMRG32k3a *state);
@@ -305,7 +306,6 @@ double curand_normal_double(curandStateMRG32k3a *state);
 #define cudaDeviceGetStreamPriorityRange qudaDeviceGetStreamPriorityRange
 #define cudaStreamCreateWithPriority qudaStreamCreateWithPriority
 #define cudaStreamDestroy qudaStreamDestroy
-#define cudaStreamDefault 0
 
 #define cudaGetDeviceCount qudaGetDeviceCount
 #define cudaDeviceReset qudaDeviceReset

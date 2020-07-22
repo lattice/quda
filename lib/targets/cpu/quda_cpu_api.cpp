@@ -245,27 +245,74 @@ void
 curand_init(unsigned long long seed, unsigned long long sequence,
 	    unsigned long long offset, curandStateMRG32k3a *state)
 {
+  // FIXME: sequence, offset
+  int64_t seed0 = seed;
+  state->s10 = seed0;
+  state->s11 = seed0;
+  state->s12 = seed0;
+  state->s20 = seed0;
+  state->s21 = seed0;
+  state->s22 = seed0;
+}
+
+int64_t next(curandStateMRG32k3a *state)
+{
+  const int64_t m1 = 4294967087;
+  const int64_t m2 = 4294944443;
+  const int32_t a12 = 1403580;
+  const int32_t a13 = 810728;
+  const int32_t a21 = 527612;
+  const int32_t a23 = 1370589;
+  const int64_t corr1 = m1 * a13;
+  const int64_t corr2 = m2 * a23;
+  /* Combination */
+  int64_t r = state->s12 - state->s22;
+  r -= m1 * ((r - 1) >> 63);
+  /* Component 1 */
+  int64_t p1 = (a12 * state->s11 - a13 * state->s10 + corr1) % m1;
+  state->s10 = state->s11;
+  state->s11 = state->s12;
+  state->s12 = p1;
+  /* Component 2 */
+  int64_t p2 = (a21 * state->s22 - a23 * state->s20 + corr2) % m2;
+  state->s20 = state->s21;
+  state->s21 = state->s22;
+  state->s22 = p2;
+  return r;
 }
 
 float curand_uniform(curandStateMRG32k3a *state)
 {
-  // TODO
-  return 0;
+  auto r = next(state);
+  const float norm = 0x1fp-32;
+  return norm*r;
 }
+
 double curand_uniform_double(curandStateMRG32k3a *state)
 {
-  // TODO
-  return 0;
+  auto r = next(state);
+  const double norm = 0x1dp-32;
+  return norm*r;
 }
+
 float curand_normal(curandStateMRG32k3a *state)
 {
-  // TODO
-  return 0;
+  const float TINY = 9.999999999999999e-38;
+  const float TAU = 6.28318531;
+  float v = curand_uniform(state);
+  float p = curand_uniform(state) * TAU;
+  float r = sqrt(-2.0 * log(v + TINY));
+  return r * cos(p);
 }
+
 double curand_normal_double(curandStateMRG32k3a *state)
 {
-  // TODO
-  return 0;
+  const double TINY = 9.999999999999999e-308;
+  const double TAU = 6.28318530717958648;
+  double v = curand_uniform_double(state);
+  double p = curand_uniform_double(state) * TAU;
+  double r = sqrt(-2.0 * log(v + TINY));
+  return r * cos(p);
 }
 
 namespace quda {
@@ -299,6 +346,7 @@ namespace quda {
 			  const char *func, const char *file, const char *line)
   {
     // TODO
+    errorQuda("qudaMemcpy2DAsync_ %s %s %s\n", func, file, line);
   }
 
   void qudaMemset_(void *ptr, int value, size_t count, const char *func,
@@ -319,6 +367,9 @@ namespace quda {
   qudaLaunchKernel(const void *func, dim3 gridDim0, dim3 blockDim0,
 		   void **args, size_t sharedMem, qudaStream_t stream)
   {
+    if(gridDim0.z>0 || blockDim0.z>0) {
+      errorQuda("qudaLaunchKernel gz: %i  bz: %i\n", gridDim0.z, blockDim0.z);
+    }
     qudaError_t error = qudaSuccess;
     void (*f)(void *) = func; // must assume single pointer arg
     gridDim = gridDim0;
@@ -354,18 +405,26 @@ namespace quda {
     blockDim = blockDim0;
     int ngx = gridDim0.x;
     int ngy = gridDim0.y;
+    int ngz = gridDim0.z;
     int nbx = blockDim0.x;
     int nby = blockDim0.y;
+    int nbz = blockDim0.z;
     //printf("ngx: %i  ngy: %i  nbx: %i  nby: %i\n", ngx, ngy, nbx, nby);
     for(int igx=0; igx<ngx; igx++) {
       blockIdx.x = igx;
       for(int igy=0; igy<ngy; igy++) {
 	blockIdx.y = igy;
-	for(int ibx=0; ibx<nbx; ibx++) {
-	  threadIdx.x = ibx;
-	  for(int iby=0; iby<nby; iby++) {
-	    threadIdx.y = iby;
-	    f();
+	for(int igz=0; igz<ngz; igz++) {
+	  blockIdx.z = igz;
+	  for(int ibx=0; ibx<nbx; ibx++) {
+	    threadIdx.x = ibx;
+	    for(int iby=0; iby<nby; iby++) {
+	      threadIdx.y = iby;
+	      for(int ibz=0; ibz<nbz; ibz++) {
+		threadIdx.z = ibz;
+		f();
+	      }
+	    }
 	  }
 	}
       }

@@ -50,7 +50,11 @@ namespace quda {
     dx[nu]--;
     Link U4 = arg.U(nu, linkIndexShift(x,dx,arg.E), parity);
 
-    return getTrace( U1 * U2 * conj(U3) * conj(U4) ).real();
+    //return getTrace( U1 * U2 * conj(U3) * conj(U4) ).real();
+    auto t = getTrace( U1 * U2 * conj(U3) * conj(U4) ).real();
+    //printf("U: %g\t%g\t%g\t%g\n", U1(0,0).real(), U2(0,0).real(), U3(0,0).real(), U4(0,0).real());
+    //printf("t: %g\n", t);
+    return t;
 #else
     int dx[4] = {0, 0, 0, 0};
     Link U1 = arg.U(mu, linkIndexShift(x,dx,arg.E), parity);
@@ -103,26 +107,43 @@ namespace quda {
     double2 plaq = make_double2(0.0,0.0);
 
     while (idx < arg.threads) {
-      //int x[4];
-      //getCoords(x, idx, arg.X, parity);
-//#pragma unroll
-      //for (int dr=0; dr<4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
+      int x[4];
+      getCoords(x, idx, arg.X, parity);
+#pragma unroll
+      for (int dr=0; dr<4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
 
 //#pragma unroll
       for (int mu = 0; mu < 3; mu++) {
 //#pragma unroll
 	for (int nu = 0; nu < 3; nu++) {
-	  //if (nu >= mu + 1) plaq.x += plaquette(arg, x, parity, mu, nu);
-	  if (nu >= mu + 1) plaq.x += plaquette2(arg, idx, parity, mu, nu);
+	  if (nu >= mu + 1) plaq.x += plaquette(arg, x, parity, mu, nu);
+	  //if (nu >= mu + 1) plaq.x += plaquette2(arg, idx, parity, mu, nu);
 	}
 
-	//plaq.y += plaquette(arg, x, parity, mu, 3);
-	plaq.y += plaquette2(arg, idx, parity, mu, 3);
+	plaq.y += plaquette(arg, x, parity, mu, 3);
+	//plaq.y += plaquette2(arg, idx, parity, mu, 3);
       }
 
       idx += blockDim.x*gridDim.x;
     }
 
+#if 0
+    {
+      typedef Matrix<complex<typename Arg::Float>,3> Link;
+      int x[4];
+      getCoords(x, 0, arg.X, parity);
+      int dx[4] = {0, 0, 0, 0};
+      Link U0 = arg.U(0, linkIndexShift(x,dx,arg.E), parity);
+      Link U1 = arg.U(1, linkIndexShift(x,dx,arg.E), parity);
+      Link U2 = arg.U(2, linkIndexShift(x,dx,arg.E), parity);
+      Link U3 = arg.U(3, linkIndexShift(x,dx,arg.E), parity);
+      printf("link0: %g\n", U0(0,0).real());
+      printf("link1: %g\n", U1(0,0).real());
+      printf("link2: %g\n", U2(0,0).real());
+      printf("link3: %g\n", U3(0,0).real());
+      printf("plaq: %g\n", plaq.x);
+    }
+#endif
     // perform final inter-block reduction and write out result
     reduce2d<blockSize,2>(arg, plaq);
   }

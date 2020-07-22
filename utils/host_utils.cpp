@@ -144,6 +144,7 @@ void setQudaDefaultMgTestParams()
 
 void constructQudaGaugeField(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param)
 {
+  printf("type: %i\n", type);
   if (type == 0) {
     if (precision == QUDA_DOUBLE_PRECISION)
       constructUnitGaugeField((double **)gauge, param);
@@ -1101,6 +1102,10 @@ template <typename Float> void constructRandomGaugeField(Float **res, QudaGaugeP
       }
     }
   }
+  printf("res[0][0]: %g\n", res[0][0]);
+  printf("res[1][0]: %g\n", res[1][0]);
+  printf("res[2][0]: %g\n", res[2][0]);
+  printf("res[3][0]: %g\n", res[3][0]);
 }
 
 template <typename Float> void constructUnitaryGaugeField(Float **res)

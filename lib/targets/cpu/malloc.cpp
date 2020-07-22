@@ -403,6 +403,12 @@ namespace quda
     return QUDA_CUDA_FIELD_LOCATION;
   }
 
+  void *get_mapped_device_pointer_(const char *func, const char *file, int line, const void *host)
+  {
+    void *device = const_cast<void *>(host);
+    return device;
+  }
+
   namespace pool
   {
 

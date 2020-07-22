@@ -1,5 +1,5 @@
 # generate an object library for all target specific files 
-add_library(quda_cpu_target OBJECT malloc.cpp tune.cpp interface_quda_cpu.cpp quda_cpu_api.cpp)
+add_library(quda_cpu_target OBJECT device.cpp malloc.cpp tune.cpp blas_lapack_cpu.cpp quda_cpu_api.cpp)
 if(QUDA_BUILD_SHAREDLIB)
   set_target_properties(quda_cpu_target PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
 endif()
