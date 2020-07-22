@@ -70,7 +70,7 @@ namespace quda
       // if the device supports host-mapped memory then use a host-mapped array for the reduction
       if (!h_reduce) {
         h_reduce = (device_reduce_t *)mapped_malloc(bytes);
-        cudaHostGetDevicePointer(&hd_reduce, h_reduce, 0); // set the matching device pointer
+        hd_reduce = (device_reduce_t *)get_mapped_device_pointer(h_reduce); // set the matching device pointer
 
 #ifdef FAST_REDUCE
         using system_atomic_t = device_reduce_t;

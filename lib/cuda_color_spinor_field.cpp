@@ -158,10 +158,10 @@ namespace quda {
 	break;
       case QUDA_MEMORY_MAPPED:
 	v_h = mapped_malloc(bytes);
-	cudaHostGetDevicePointer(&v, v_h, 0); // set the matching device pointer
+	v = get_mapped_device_pointer(v_h);
 	if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
 	  norm_h = mapped_malloc(norm_bytes);
-	  cudaHostGetDevicePointer(&norm, norm_h, 0); // set the matching device pointer
+	  norm = get_mapped_device_pointer(norm_h); // set the matching device pointer
 	}
 	break;
       default:
@@ -429,9 +429,7 @@ namespace quda {
 
       if (src.FieldOrder() == QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
         // special case where we use mapped memory to read/write directly from application's array
-        void *src_d;
-        cudaError_t error = cudaHostGetDevicePointer(&src_d, const_cast<void*>(src.V()), 0);
-        if (error != cudaSuccess) errorQuda("Failed to get device pointer for ColorSpinorField field");
+        void *src_d = get_mapped_device_pointer(src.V());
         copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, v, src_d);
       } else {
         void *Src=nullptr, *srcNorm=nullptr, *buffer=nullptr;
@@ -445,8 +443,7 @@ namespace quda {
           buffer = pool_pinned_malloc(src.Bytes()+src.NormBytes());
           memcpy(buffer, src.V(), src.Bytes());
           memcpy(static_cast<char*>(buffer)+src.Bytes(), src.Norm(), src.NormBytes());
-          cudaError_t error = cudaHostGetDevicePointer(&Src, buffer, 0);
-          if (error != cudaSuccess) errorQuda("Failed to get device pointer for ColorSpinorField field");
+          Src = get_mapped_device_pointer(buffer);
           srcNorm = static_cast<char*>(Src) + src.Bytes();
         }
 
@@ -478,9 +475,7 @@ namespace quda {
 
       if (dest.FieldOrder() == QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
 	// special case where we use zero-copy memory to read/write directly from application's array
-	void *dest_d;
-	cudaError_t error = cudaHostGetDevicePointer(&dest_d, const_cast<void*>(dest.V()), 0);
-        if (error != cudaSuccess) errorQuda("Failed to get device pointer for ColorSpinorField field");
+	void *dest_d = get_mapped_device_pointer(dest.V());
         copyGenericColorSpinor(dest, *this, QUDA_CUDA_FIELD_LOCATION, dest_d, v);
       } else {
         void *dst = nullptr, *dstNorm = nullptr, *buffer = nullptr;
@@ -490,8 +485,7 @@ namespace quda {
           dstNorm = static_cast<char*>(dst) + dest.Bytes();
         } else {
           buffer = pool_pinned_malloc(dest.Bytes()+dest.NormBytes());
-          cudaError_t error = cudaHostGetDevicePointer(&dst, buffer, 0);
-          if (error != cudaSuccess) errorQuda("Failed to get device pointer for ColorSpinorField");
+          dst = get_mapped_device_pointer(buffer);
           dstNorm = static_cast<char*>(dst)+dest.Bytes();
         }
 

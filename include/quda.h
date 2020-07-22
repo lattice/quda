@@ -699,6 +699,9 @@ extern "C" {
     /** Boolean for if this is a staggered solve or not */
     QudaBoolean is_staggered;
 
+    /** Whether to do a full (false) or thin (true) update in the context of updateMultigridQuda */
+    QudaBoolean thin_update_only;
+
   } QudaMultigridParam;
 
   typedef struct QudaGaugeObservableParam_s {
@@ -1017,7 +1020,8 @@ extern "C" {
    * @brief Updates the multigrid preconditioner for the new gauge / clover field
    * @param mg_instance Pointer to instance of multigrid_solver
    * @param param Contains all metadata regarding host and device
-   * storage and solver parameters
+   * storage and solver parameters, of note contains a flag specifying whether
+   * to do a full update or a thin update.
    */
   void updateMultigridQuda(void *mg_instance, QudaMultigridParam *param);
 
