@@ -946,7 +946,7 @@ namespace quda {
 
     extractDeflationSpace(reserved_space->evecs);
 
-    args.V2k.reset();
+    blas::zero(*args.V2k);
 
     return;
   }
