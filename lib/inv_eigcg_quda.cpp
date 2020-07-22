@@ -60,7 +60,7 @@ namespace quda {
    int L2kE = 0;
    int L2kO = 0;
 
-   std::shared_ptr<EigCGArgs> IncEigCG::persistant_eigcg_args = nullptr;
+   EigCGArgs *IncEigCG::eigcg_args = nullptr;
 
    class EigCGArgs
    {
@@ -99,12 +99,12 @@ namespace quda {
      // C++ task-based object for the (asynchron.) RayleighRitz computations
      std::future<void> rr_task;
 
-     std::shared_ptr<ColorSpinorField> Az;     // mat * conjugate vector from the previous iteration
-     std::shared_ptr<ColorSpinorFieldSet> Vm;  // eigCG search vectors  (spinor matrix of size eigen_vector_length x m)
-     std::shared_ptr<ColorSpinorFieldSet> V2k; // temp vector set
+     ColorSpinorField *Az;     // mat * conjugate vector from the previous iteration
+     ColorSpinorFieldSet *Vm;  // eigCG search vectors  (spinor matrix of size eigen_vector_length x m)
+     ColorSpinorFieldSet *V2k; // temp vector set
 
-     std::shared_ptr<ColorSpinorField> hAz;    // mat * conjugate vector from the previous iteration
-     std::shared_ptr<ColorSpinorFieldSet> hVm; // eigCG search vectors  (spinor matrix of size eigen_vector_length x m)
+     ColorSpinorField *hAz;    // mat * conjugate vector from the previous iteration
+     ColorSpinorFieldSet *hVm; // eigCG search vectors  (spinor matrix of size eigen_vector_length x m)
 
      SolverParam &solver_param;
 
@@ -143,7 +143,7 @@ namespace quda {
        // csParam.setPrecision(solver_param.precision_sloppy);
        csParam.setPrecision(solver_param.precision);
        //
-       Az = MakeSharedPtr(csParam);
+       Az = ColorSpinorField::Create(csParam);
 
        csParam.is_composite = true;
        csParam.composite_dim = is_host_location ?
@@ -155,7 +155,7 @@ namespace quda {
            .cuda_prec_ritz); // eigCG internal search space precision may not coincide with the solver precision!
 
        // Create a search vector set:
-       Vm = MakeSharedPtr(csParam);
+       Vm = ColorSpinorField::Create(csParam);
 
        if (is_host_location) printfQuda("Running eigenvalue computations on the host.\n");
 
@@ -172,7 +172,7 @@ namespace quda {
        csParam.setPrecision(!is_host_location ? solver_param.precision : solver_param.precision_sloppy);
        csParam.composite_dim = (2 * k);
        // Create a search vector set:
-       V2k = MakeSharedPtr(csParam);
+       V2k = ColorSpinorField::Create(csParam);
 
        if (solver_param.pipeline != 0 && is_host_location) {
          // set up pipelined shifts:
@@ -207,12 +207,12 @@ namespace quda {
          csParam.setPrecision(
            solver_param.precision_sloppy); // eigCG internal search space precision may not coincide with the solver precision!
          // Create a search vector set:
-         hVm = MakeSharedPtr(csParam);
+         hVm = ColorSpinorField::Create(csParam);
          //
          csParam.is_composite = false;
          csParam.composite_dim = 1;
          // csParam.setPrecision(solver_param.precision);
-         hAz = MakeSharedPtr(csParam);
+         hAz = ColorSpinorField::Create(csParam);
        }
 
        Eigen::initParallel();
@@ -220,6 +220,11 @@ namespace quda {
 
      virtual ~EigCGArgs() {
        host_free(projMat);
+       if(Az) {delete Az; Az=nullptr;}
+       if(Vm) {delete Vm; Vm=nullptr;}
+       if(V2k){delete V2k; V2k=nullptr;}
+       if(hVm){delete hVm; hVm=nullptr;}
+       if(hAz){delete hAz; hAz=nullptr;}
      }
 
      template <bool is_pipelined = false> inline void UpdateLanczosMatrix(double diag_val, double offdiag_val)
@@ -544,7 +549,6 @@ namespace quda {
     work_space(nullptr),
     r_pre(nullptr),
     p_pre(nullptr),
-    local_eigcg_args(nullptr),
     profile(profile),
     init(false)
   {
@@ -587,20 +591,15 @@ namespace quda {
     return;
   }
   
-  IncEigCG::~IncEigCG() {
-    if (param.eig_param.n_conv == param.eig_param.n_ev)
-      local_eigcg_args.reset(); // deallocate resources manually
-    else
-      IncEigCG::persistant_eigcg_args.swap(local_eigcg_args);
-  }
+  IncEigCG::~IncEigCG() { }
   
-  void IncEigCG::EigenSolve() { local_eigcg_args->RayleighRitz(); }
+  void IncEigCG::EigenSolve() { eigcg_args->RayleighRitz(); }
 
   void IncEigCG::LegacySearchSpaceUpdate(const double &lanczos_diag, const double &lanczos_offdiag, const double &beta,
                                          const double &rnorm)
   {
 
-    EigCGArgs &args = *local_eigcg_args;
+    EigCGArgs &args = *eigcg_args;
 
     ColorSpinorField &Ap = (*work_space)[0];
     // whether we want preconditiond (id = 5) or unpreconditioned (id = 2) residual:
@@ -631,7 +630,7 @@ namespace quda {
   {
     constexpr bool is_pipelined = true;
 
-    EigCGArgs &args = *local_eigcg_args;
+    EigCGArgs &args = *eigcg_args;
 
     if (args.run_residual_correction) return;
 
@@ -669,7 +668,7 @@ namespace quda {
 
   void IncEigCG::Increment()
   {
-    EigCGArgs &args = *local_eigcg_args;
+    EigCGArgs &args = *eigcg_args;
 
     const unsigned int first_idx = param.eig_param.n_conv;
     const unsigned int n_evec = param.eig_param.n_ev;
@@ -809,7 +808,7 @@ namespace quda {
 
   void IncEigCG::Deflate(ColorSpinorField &x, ColorSpinorField &b)
   {
-    EigCGArgs &args = *local_eigcg_args;
+    EigCGArgs &args = *eigcg_args;
 
     if (param.eig_param.n_conv == 0) return; // nothing to do
 
@@ -841,7 +840,7 @@ namespace quda {
 
   void IncEigCG::Reduce(double tol, int max_nev)
   {
-    EigCGArgs &args = *local_eigcg_args;
+    EigCGArgs &args = *eigcg_args;
 
     args.Vm.reset();
     args.hVm.reset();
@@ -954,7 +953,7 @@ namespace quda {
 
   void IncEigCG::Verify()
   {
-    EigCGArgs &args = *local_eigcg_args;
+    EigCGArgs &args = *eigcg_args;
 
     const int nevs_to_print = param.eig_param.n_conv;
     if (nevs_to_print == 0) errorQuda("\nIncorrect size of current deflation space. \n");
@@ -1036,7 +1035,7 @@ namespace quda {
 
     double local_stop = x.Precision() == QUDA_DOUBLE_PRECISION ? b2*param.tol*param.tol :  b2*1e-11;
 
-    EigCGArgs &args = *local_eigcg_args;
+    EigCGArgs &args = *eigcg_args;
 
     if (args.run_residual_correction) {
       profile.TPSTOP(QUDA_PROFILE_INIT);
@@ -1205,7 +1204,7 @@ namespace quda {
       return 0;
     }
 
-    EigCGArgs &args = *local_eigcg_args;
+    EigCGArgs &args = *eigcg_args;
 
     if (args.run_residual_correction) {
       profile.TPSTOP(QUDA_PROFILE_INIT);
@@ -1527,12 +1526,9 @@ namespace quda {
 
       constructDeflationSpace(in, param.eig_param.n_ev);
 
-      if (!IncEigCG::persistant_eigcg_args)
-        local_eigcg_args = std::make_shared<EigCGArgs>(in, param, host_computing);
-      else
-        local_eigcg_args.swap(IncEigCG::persistant_eigcg_args);
+      if (eigcg_args == nullptr) eigcg_args = new EigCGArgs(in, param, host_computing);
 
-      local_eigcg_args->global_stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
+      eigcg_args->global_stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
 
       init = true;
     }
@@ -1569,13 +1565,13 @@ namespace quda {
           K.reset(new CG(matSloppy, matPrecon, matPrecon, Kparam, profile));
         }
 
-        local_eigcg_args->run_residual_correction = true;
+        eigcg_args->run_residual_correction = true;
         printfQuda("Running CG correction cycle.\n");
       }
 
       int iters = param.pipeline == 0 ? EigCGsolve(eSloppy, rSloppy) : CAEigCGsolve(eSloppy, rSloppy);
 
-      bool update_ritz = !dcg_cycle && (local_eigcg_args->restarts >= 1) && (param.eig_param.n_conv < param.eig_param.n_ev);
+      bool update_ritz = !dcg_cycle && (eigcg_args->restarts >= 1) && (param.eig_param.n_conv < param.eig_param.n_ev);
 
       if (update_ritz) {
         Increment();
@@ -1602,7 +1598,7 @@ namespace quda {
       PrintSummary(!dcg_cycle ? "EigCG:" : "DCG (correction cycle):", iters, r2, b2, stop, param.tol_hq);
 
       if (/*getVerbosity() >= QUDA_VERBOSE*/ false) { // disable intermediate checks
-        if (!dcg_cycle && (local_eigcg_args->restarts >= 1) && (param.eig_param.n_conv < param.eig_param.n_ev)) Verify();
+        if (!dcg_cycle && (eigcg_args->restarts >= 1) && (param.eig_param.n_conv < param.eig_param.n_ev)) Verify();
       }
 
     } while ((r2 > stop && logical_rhs_id < max_eigcg_cycles) /*&& mixed_prec*/);
@@ -1639,6 +1635,9 @@ namespace quda {
         blas::zero(out);
         initCGsolve(out, in);
       }
+
+      delete eigcg_args; 
+      eigcg_args = nullptr;
     }
 
      return;

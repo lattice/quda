@@ -1343,7 +1343,7 @@ public:
     bool init;
 
   public:
-    static EigCGArgs *eigcg_args;
+    static std::shared_ptr<EigCGArgs> persistant_eigcg_args;
 
     IncEigCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
              TimeProfile &profile);
