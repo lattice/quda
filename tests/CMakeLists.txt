@@ -148,7 +148,7 @@ if(QUDA_DIRAC_WILSON
 endif()
 
 if(QUDA_MULTIGRID)
-  add_executable(multigrid_benchmark_test multigrid_benchmark_test.cu)
+  add_executable(multigrid_benchmark_test multigrid_benchmark_test.cpp)
   target_link_libraries(multigrid_benchmark_test ${TEST_LIBS})
   target_compile_options(multigrid_benchmark_test PRIVATE $<$<CUDA_COMPILER_ID:Clang>: --cuda-path=${CUDAToolkit_TARGET_DIR} --cuda-gpu-arch=${QUDA_GPU_ARCH}>)
 
