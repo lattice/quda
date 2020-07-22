@@ -232,18 +232,13 @@ void setInvertParam(QudaInvertParam &inv_param)
 
   inv_param.verbosity = verbosity;
 
-<<<<<<< HEAD
   if (inv_param.inv_type == QUDA_EIGCG_INVERTER || inv_param.inv_type == QUDA_INC_EIGCG_INVERTER) {
     inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
   } else if (inv_param.inv_type == QUDA_GMRESDR_INVERTER) {
     inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
   }
-=======
-  inv_param.extlib_type = solver_ext_lib;
-
   // Whether or not to use native BLAS LAPACK
   inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
->>>>>>> develop
 }
 
 // Parameters defining the eigensolver
