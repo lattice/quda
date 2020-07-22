@@ -409,7 +409,7 @@ namespace quda {
 
          std::vector<ColorSpinorField *> Az_;
 
-         Az_.push_back(Az.get());
+         Az_.push_back(Az);
 
          blas::reDotProduct(s.data(), Az_, v2k_);
        }
@@ -437,7 +437,7 @@ namespace quda {
        const int d = (cid - ref_pnt) % solver_param.pipeline;
 
        if (last_stage) {
-         blas::copy(*Az.get(), w0);         // using a regular stream
+         blas::copy(*Az, w0);         // using a regular stream
          if (ref_pnt == 0) ref_pnt = 2 * k; // redefine the reference point...
        }
 
@@ -469,7 +469,7 @@ namespace quda {
          // hvm.CopySubset(vm, elements, dst_offset, src_offset);
          for (int i = 0; i < elements; i++) blas::copy(hvm[dst_offset + i], vm[src_offset + i]);
 
-         if (last_stage) blas::copy(*hAz.get(), *Az.get());
+         if (last_stage) blas::copy(*hAz, *Az);
          blas::unregisterAuxBlasStream();
          //
        }
@@ -842,8 +842,8 @@ namespace quda {
   {
     EigCGArgs &args = *eigcg_args;
 
-    args.Vm.reset();
-    args.hVm.reset();
+    blas::zero(*args.Vm);
+    blas::zero(*args.hVm);
 
     if (max_nev == 0 || param.eig_param.n_conv == 0) {
       printfQuda("Deflation space is empty.\n");
@@ -1360,7 +1360,7 @@ namespace quda {
 
     // blas::zero(*args.V2k);
     if (args.is_host_location) {
-      for (int i = 0; i < param.eig_param.nLockedMax; i++) blas::copy((*args.Vm.get())[i], (*args.hVm.get())[i]);
+      for (int i = 0; i < param.eig_param.nLockedMax; i++) blas::copy((*args.Vm)[i], (*args.hVm)[i]);
     }
 
     blas::destroyAuxBlasStream();
