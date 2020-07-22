@@ -1,9 +1,9 @@
 #pragma once
 
 #include <color_spinor_field_order.h>
+#include <reduce_helper.h>
 #include <blas_helper.cuh>
 #include <multi_blas_helper.cuh>
-#include <cub_helper.cuh>
 
 namespace quda
 {
@@ -37,6 +37,8 @@ namespace quda
       MultiReduceArg(std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
                      std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
                      Reducer r, int NYW, int length) :
+        // we have NYW * nParity reductions each of length NXZ
+        ReduceArg<vector_type<typename Reducer_::reduce_t, NXZ>>(NYW * x[0]->SiteSubset()),
         NYW(NYW),
         r(r),
         length(length)
@@ -87,9 +89,7 @@ namespace quda
           arg.X[l].load(x, idx, parity);
           arg.Z[l].load(z, idx, parity);
 
-          arg.r.pre();
           arg.r(sum[l], x, y, z, w, k, l);
-          arg.r.post(sum[l]);
         }
         if (arg.r.write.X) arg.Y[k].save(y, idx, parity);
         if (arg.r.write.X) arg.W[k].save(w, idx, parity);
@@ -148,12 +148,6 @@ namespace quda
         return reinterpret_cast<coeff_t *>(Cmatrix_h)[i * NYW + j];
 #endif
       }
-
-      //! pre-computation routine called before the "M-loop"
-      virtual __device__ __host__ void pre() { ; }
-
-      //! post-computation routine called after the "M-loop"
-      virtual __device__ __host__ void post(reduce_t &sum) { ; }
     };
 
     /**
@@ -171,8 +165,6 @@ namespace quda
       static constexpr write< > write { };
       static constexpr bool use_z = false;
       static constexpr bool use_w = false;
-      using MultiReduceFunctor<reduce_t, real>::NXZ;
-      using MultiReduceFunctor<reduce_t, real>::NYW;
       multiDot(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, real>(NXZ, NYW) { }
 
       template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, const int i, const int j)
@@ -199,13 +191,11 @@ namespace quda
     }
 
     template <typename real_reduce_t, typename real>
-    struct multiCdot : public MultiReduceFunctor<complex<real_reduce_t>, complex<real>> {
-      using reduce_t = complex<real_reduce_t>;
+    struct multiCdot : public MultiReduceFunctor<typename VectorType<real_reduce_t, 2>::type, complex<real>> {
+      using reduce_t = typename VectorType<real_reduce_t, 2>::type;
       static constexpr write< > write { };
       static constexpr bool use_z = false;
       static constexpr bool use_w = false;
-      using MultiReduceFunctor<reduce_t, complex<real>>::NXZ;
-      using MultiReduceFunctor<reduce_t, complex<real>>::NYW;
       multiCdot(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, complex<real>>(NXZ, NYW) { }
 
       template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, const int i, const int j)
@@ -219,15 +209,12 @@ namespace quda
     };
 
     template <typename real_reduce_t, typename real>
-    struct multiCdotCopy : public MultiReduceFunctor<complex<real_reduce_t>, complex<real>> {
-      using reduce_t = complex<real_reduce_t>;
+    struct multiCdotCopy : public MultiReduceFunctor<typename VectorType<real_reduce_t, 2>::type, complex<real>> {
+      using reduce_t = typename VectorType<real_reduce_t, 2>::type;
       static constexpr write<0, 0, 0, 1> write { };
       static constexpr bool use_z = false;
       static constexpr bool use_w = true;
-      using MultiReduceFunctor<reduce_t, complex<real>>::NXZ;
-      using MultiReduceFunctor<reduce_t, complex<real>>::NYW;
-
-      multiCdotCopy(int NYW) : MultiReduceFunctor<reduce_t, complex<real>>(NXZ, NYW) { }
+      multiCdotCopy(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, complex<real>>(NXZ, NYW) { }
 
       template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, const int i, const int j)
       {

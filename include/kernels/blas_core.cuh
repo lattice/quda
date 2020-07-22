@@ -367,7 +367,7 @@ namespace quda
       double3 *Ar3;
       caxpyxmazMR_(const real &a, const real &b, const real &c) :
         a(a),
-        Ar3(static_cast<double3 *>(blas::getDeviceReduceBuffer()))
+        Ar3(static_cast<double3 *>(reducer::get_device_buffer()))
       { ; }
 
       __device__ __host__ void init()

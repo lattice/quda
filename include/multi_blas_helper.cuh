@@ -101,7 +101,7 @@ namespace quda
                                 - sizeof(Functor)                                             // functor
                                 - sizeof(int)                                                 // length parameter
                                 - (!Functor::use_w ? sizeof(SpinorW *) : 0)   // subtract pointer if not using W
-                                - (Functor::reducer ? sizeof(ReduceArg<void*>) : 0) // reduction buffers
+                                - (Functor::reducer ? sizeof(ReduceArg<device_reduce_t>) : 0) // reduction buffers
                                 - 16) // there seems to be 16 bytes other argument space we need
         / (sizeof(SpinorY) + (Functor::use_w ? sizeof(SpinorW) : 0));
 
@@ -138,10 +138,10 @@ namespace quda
                       - NXZ * spinor_x_size                            // SpinorX array
                       - (use_z ? NXZ * spinor_z_size : sizeof(void *)) // SpinorZ array (else dummy pointer)
                       - 2 * sizeof(int)                                // functor NXZ/NYW members
+                      - (multi_1d ? scalar_size * 3 * max_N_multi_1d() : 0) // multi_1d coefficient arrays
                       - sizeof(int)                                    // length parameter
                       - (!use_w ? sizeof(void *) : 0)                  // subtract dummy pointer if not using W
-                      - (reduce ? sizeof(ReduceArg<void*>) : 0)        // reduction buffers
-                      - (multi_1d ? scalar_size * 3 * max_N_multi_1d() : 0) // multi_1d coefficient arrays
+                      - (reduce ? sizeof(ReduceArg<device_reduce_t>) : 0)        // reduction buffers
                       - 16) // there seems to be 16 bytes other argument space we need
         / (spinor_y_size + (use_w ? spinor_w_size : 0));
 
@@ -162,7 +162,7 @@ namespace quda
       constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, Functor>();
       constexpr int scalar_width = Functor::coeff_mul ? sizeof(typename Functor::coeff_t) / sizeof(real) : 0;
       const int NYW_max_check = max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), f.use_z, f.use_w, scalar_width, f.reducer, f.multi_1d);
-
+      
       if (!is_valid_NXZ(NXZ, f.reducer, x[0]->Precision() < QUDA_SINGLE_PRECISION))
         errorQuda("NXZ=%d is not a valid size ( MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
       if (NYW_max != NYW_max_check) errorQuda("Compile-time %d and run-time %d limits disagree", NYW_max, NYW_max_check);

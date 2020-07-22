@@ -65,8 +65,8 @@ set (QUDA_OBJS
   mdw_fused_dslash.cu dslash5_mobius_eofa.cu
   dslash_pack2.cu
   blas_quda.cu multi_blas_quda.cu reduce_quda.cu
-  multi_reduce_quda.cu contract.cu
-  comm_common.cpp 
+  multi_reduce_quda.cu reduce_helper.cu
+  contract.cu comm_common.cpp
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cu spinor_noise.cu
   copy_color_spinor_dd.cu copy_color_spinor_ds.cu

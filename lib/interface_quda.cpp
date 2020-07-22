@@ -1456,7 +1456,7 @@ void endQuda(void)
 
   blas_lapack::generic::destroy();
   blas_lapack::native::destroy();
-  blas::end();
+  blas::destroy();
 
   pool::flush_pinned();
   pool::flush_device();

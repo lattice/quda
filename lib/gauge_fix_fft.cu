@@ -6,7 +6,7 @@
 #include <launch_kernel.cuh>
 #include <unitarization_links.h>
 #include <atomic.cuh>
-#include <cub_helper.cuh>
+#include <reduce_helper.h>
 #include <index_helper.cuh>
 
 #include <cufft.h>

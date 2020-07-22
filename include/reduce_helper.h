@@ -1,0 +1,195 @@
+#pragma once
+
+#include <cub_helper.cuh>
+
+#ifdef QUAD_SUM
+using device_reduce_t = doubledouble;
+#else
+using device_reduce_t = double;
+#endif
+
+#if CUDA_VERSION >= 11000
+#define FAST_REDUCE
+#include <cuda/std/atomic>
+using count_t = cuda::atomic<unsigned int, cuda::thread_scope_device>;
+#else
+using count_t = unsigned int;
+#endif
+
+namespace quda {
+
+  namespace reducer {
+    /** returns the reduce buffer size allocated */
+    size_t buffer_size();
+
+    void* get_device_buffer();
+    void* get_mapped_buffer();
+    void* get_host_buffer();
+    count_t* get_count();
+    cudaEvent_t& get_event();
+  }
+
+  /**
+     @brief The initialization value we used to check for completion
+   */
+  template <typename T> constexpr T init_value() { return -std::numeric_limits<T>::infinity(); }
+  template <typename T> struct atomic_type { using type = device_reduce_t; };
+  template <> struct atomic_type<float> { using type = float; };
+
+  template <typename T>
+  struct ReduceArg {
+    const int n_reduce; // number of reductions of length n_item
+#ifdef FAST_REDUCE
+    using system_atomic_t = typename atomic_type<T>::type;
+    static constexpr int n_item = sizeof(T) / sizeof(system_atomic_t);
+    cuda::atomic<T, cuda::thread_scope_device> *partial;
+    // for heterogeneous atomics we need to use lock-free atomics -> operate on scalars
+    cuda::atomic<system_atomic_t, cuda::thread_scope_system> *result_d;
+#else
+    T *partial;
+    T *result_d;
+#endif
+    T *result_h;
+    count_t *count;
+
+    ReduceArg(int n_reduce = 1) :
+      n_reduce(n_reduce),
+      partial(static_cast<decltype(partial)>(reducer::get_device_buffer())),
+      result_d(static_cast<decltype(result_d)>(reducer::get_mapped_buffer())),
+      result_h(static_cast<decltype(result_h)>(reducer::get_host_buffer())),
+      count{reducer::get_count()}
+    {
+      // write reduction to GPU memory if asynchronous
+      // do we need to call the placement new constructor in this case?
+      if (commAsyncReduction()) result_d = static_cast<decltype(result_d)>(reducer::get_device_buffer());
+
+      // check reduction buffers are large enough if requested
+      auto max_reduce_blocks = 2 * deviceProp.multiProcessorCount;
+      auto reduce_size = max_reduce_blocks * n_reduce * sizeof(*partial);
+      if (reduce_size > reducer::buffer_size())
+        errorQuda("Requested reduction requires a larger buffer %lu than allocated %lu", reduce_size, reducer::buffer_size());
+
+#ifdef FAST_REDUCE
+      // initialize the result buffer so we can test for completion
+      for (int i = 0; i < n_reduce * n_item; i++) {
+        new (result_d + i) cuda::atomic<system_atomic_t, cuda::thread_scope_system>{ };
+        result_d[i].store(init_value<system_atomic_t>(), cuda::std::memory_order_release);
+      }
+#endif
+    }
+
+    void complete(const qudaStream_t &stream)
+    {
+#ifdef FAST_REDUCE
+      for (int i = 0; i < n_reduce * n_item; i++) {
+        while ( result_d[i].load(cuda::std::memory_order_acquire) == init_value<system_atomic_t>() ) { }
+      }
+#else
+      auto event = reducer::get_event();
+      qudaEventRecord(event, stream);
+      while (cudaSuccess != qudaEventQuery(event)) {}
+#endif
+    }
+
+  };
+
+#ifdef FAST_REDUCE
+  template <int block_size_x, int block_size_y, typename T, bool do_sum=true, typename Reducer=cub::Sum, typename Arg>
+  __device__ inline void reduce2d(Arg &arg, const T &in, const int idx=0)
+  {
+    using BlockReduce = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y>;
+    __shared__ typename BlockReduce::TempStorage cub_tmp;
+    __shared__ bool isLastBlockDone;
+
+    Reducer r;
+    T aggregate = do_sum ? BlockReduce(cub_tmp).Sum(in) : BlockReduce(cub_tmp).Reduce(in, r);
+
+    if (threadIdx.x == 0 && threadIdx.y == 0) {
+      // need to call placement new constructor since arg.partial is not necessarily constructed
+      new (arg.partial + idx * gridDim.x + blockIdx.x) cuda::atomic<T, cuda::thread_scope_device>{ aggregate };
+
+      // increment global block counter for this reduction
+      auto value = arg.count[idx].fetch_add(1, cuda::std::memory_order_release);
+
+      // determine if last block
+      isLastBlockDone = (value == (gridDim.x-1));
+    }
+
+    __syncthreads();
+
+    // finish the reduction if last block
+    if (isLastBlockDone) {
+      unsigned int i = threadIdx.y*block_size_x + threadIdx.x;
+      T sum;
+      zero(sum);
+      while (i<gridDim.x) {
+        sum = r(sum, arg.partial[idx*gridDim.x + i].load(cuda::std::memory_order_relaxed));
+	i += block_size_x*block_size_y;
+      }
+
+      sum = (do_sum ? BlockReduce(cub_tmp).Sum(sum) : BlockReduce(cub_tmp).Reduce(sum,r));
+
+      // write out the final reduced value
+      if (threadIdx.y*block_size_x + threadIdx.x == 0) {
+        using atomic_t = typename atomic_type<T>::type;
+        constexpr size_t n = sizeof(T) / sizeof(atomic_t);
+        atomic_t sum_tmp[n];
+        memcpy(sum_tmp, &sum, sizeof(sum));
+#pragma unroll
+        for (int i = 0; i < n; i++) {
+          arg.result_d[n*idx + i].store(sum_tmp[i], cuda::std::memory_order_relaxed);
+        }
+        arg.count[idx].store(0, cuda::std::memory_order_relaxed); // set to zero for next time
+      }
+    }
+  }
+#else
+  template <int block_size_x, int block_size_y, typename T, bool do_sum=true, typename Reducer=cub::Sum, typename Arg>
+  __device__ inline void reduce2d(Arg &arg, const T &in, const int idx=0)
+  {
+    using BlockReduce = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y>;
+    __shared__ typename BlockReduce::TempStorage cub_tmp;
+    __shared__ bool isLastBlockDone;
+
+    Reducer r;
+    T aggregate = do_sum ? BlockReduce(cub_tmp).Sum(in) : BlockReduce(cub_tmp).Reduce(in, r);
+
+    if (threadIdx.x == 0 && threadIdx.y == 0) {
+      arg.partial[idx*gridDim.x + blockIdx.x] = aggregate;
+      __threadfence(); // flush result
+
+      // increment global block counter
+      unsigned int value = atomicInc(&arg.count[idx], gridDim.x);
+
+      // determine if last block
+      isLastBlockDone = (value == (gridDim.x-1));
+    }
+
+    __syncthreads();
+
+    // finish the reduction if last block
+    if (isLastBlockDone) {
+      unsigned int i = threadIdx.y*block_size_x + threadIdx.x;
+      T sum;
+      zero(sum);
+      while (i<gridDim.x) {
+        auto partial = const_cast<T&>(static_cast<volatile T*>(arg.partial)[idx*gridDim.x + i]);
+        sum = r(sum, partial);
+	i += block_size_x*block_size_y;
+      }
+
+      sum = (do_sum ? BlockReduce(cub_tmp).Sum(sum) : BlockReduce(cub_tmp).Reduce(sum,r));
+
+      // write out the final reduced value
+      if (threadIdx.y*block_size_x + threadIdx.x == 0) {
+	arg.result_d[idx] = sum;
+	arg.count[idx] = 0; // set to zero for next time
+      }
+    }
+  }
+#endif
+
+  template <int block_size, typename T, bool do_sum = true, typename Reducer = cub::Sum, typename Arg>
+  __device__ inline void reduce(Arg &arg, const T &in, const int idx=0) { reduce2d<block_size, 1, T, do_sum, Reducer>(arg, in, idx); }
+
+}

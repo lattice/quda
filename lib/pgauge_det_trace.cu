@@ -7,7 +7,7 @@
 #include <comm_quda.h>
 #include <pgauge_monte.h> 
 #include <atomic.cuh>
-#include <cub_helper.cuh> 
+#include <reduce_helper.h> 
 #include <index_helper.cuh> 
 
 namespace quda {

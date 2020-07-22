@@ -18,27 +18,6 @@ namespace quda
     static constexpr bool V = V_;
   };
 
-#ifdef QUAD_SUM
-  using device_reduce_t = doubledouble;
-  template <> struct scalar<doubledouble> {
-    typedef doubledouble type;
-  };
-  template <> struct scalar<doubledouble2> {
-    typedef doubledouble type;
-  };
-  template <> struct scalar<doubledouble3> {
-    typedef doubledouble type;
-  };
-  template <> struct scalar<doubledouble4> {
-    typedef doubledouble type;
-  };
-  template <> struct vector<doubledouble, 2> {
-    typedef doubledouble2 type;
-  };
-#else
-  using device_reduce_t = double;
-#endif
-
   __host__ __device__ inline double set(double &x) { return x; }
   __host__ __device__ inline double2 set(double2 &x) { return x; }
   __host__ __device__ inline double3 set(double3 &x) { return x; }

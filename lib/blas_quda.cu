@@ -12,6 +12,11 @@
 
 namespace quda {
 
+  namespace reducer {
+    void init();
+    void destroy();
+  }
+  
   namespace blas {
 
     unsigned long long flops;
@@ -188,18 +193,15 @@ namespace quda {
       }
     }
 
-    void initReduce();
-    void endReduce();
-
     void init()
     {
       blasStream = &streams[Nstream-1];
-      initReduce();
+      reducer::init();
     }
 
-    void end(void)
+    void destroy(void)
     {
-      endReduce();
+      reducer::destroy();
     }
 
     qudaStream_t* getStream() { return blasStream; }

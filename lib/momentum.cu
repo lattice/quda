@@ -3,7 +3,7 @@
 #include <tune_quda.h>
 #include <gauge_field_order.h>
 #include <launch_kernel.cuh>
-#include <cub_helper.cuh>
+#include <reduce_helper.h>
 #include <instantiate.h>
 #include <fstream>
 

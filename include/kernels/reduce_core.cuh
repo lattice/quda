@@ -2,7 +2,7 @@
 
 #include <color_spinor_field_order.h>
 #include <blas_helper.cuh>
-#include <cub_helper.cuh>
+#include <reduce_helper.h>
 
 namespace quda
 {
@@ -24,6 +24,7 @@ namespace quda
       const int nParity;
       ReductionArg(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w,
                    ColorSpinorField &v, Reducer r, int length, int nParity) :
+        ReduceArg<typename Reducer_::reduce_t>(nParity),
         X(x),
         Y(y),
         Z(z),
@@ -322,8 +323,8 @@ namespace quda
     }
 
     template <typename real_reduce_t, typename real>
-    struct Cdot : public ReduceFunctor<complex<real_reduce_t>> {
-      using reduce_t = complex<real_reduce_t>;
+    struct Cdot : public ReduceFunctor<typename VectorType<real_reduce_t, 2>::type> {
+      using reduce_t = typename VectorType<real_reduce_t, 2>::type;
       static constexpr write<> write{ };
       Cdot(const complex<real> &a, const complex<real> &b) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
@@ -341,8 +342,8 @@ namespace quda
        Second returns the dot product (z,y)
     */
     template <typename real_reduce_t, typename real>
-    struct caxpydotzy : public ReduceFunctor<complex<real_reduce_t>> {
-      using reduce_t = complex<real_reduce_t>;
+    struct caxpydotzy : public ReduceFunctor<typename VectorType<real_reduce_t, 2>::type> {
+      using reduce_t = typename VectorType<real_reduce_t, 2>::type;
       static constexpr write<0, 1> write{ };
       const complex<real> a;
       caxpydotzy(const complex<real> &a, const complex<real> &b) : a(a) { ; }
@@ -430,8 +431,8 @@ namespace quda
        input and out y vector.
     */
     template <typename real_reduce_t, typename real>
-    struct axpyCGNorm2 : public ReduceFunctor<complex<real_reduce_t>> {
-      using reduce_t = complex<real_reduce_t>;
+    struct axpyCGNorm2 : public ReduceFunctor<typename VectorType<real_reduce_t, 2>::type> {
+      using reduce_t = typename VectorType<real_reduce_t, 2>::type;
       static constexpr write<0, 1> write{ };
       const real a;
       axpyCGNorm2(const real &a, const real &b) : a(a) { ; }

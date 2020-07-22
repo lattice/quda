@@ -12,44 +12,60 @@ namespace quda {
   namespace blas {
 
     qudaStream_t* getStream();
-    void completeReduce(const qudaStream_t &stream);
 
-    template <typename real, int M, int NXZ, typename Arg, typename T>
+    template <int block_size, typename real, int len, int NXZ, typename Arg>
+    typename std::enable_if<block_size!=32, cudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+    {
+      void *args[] = {&arg};
+      if (tp.block.x == block_size)
+        return qudaLaunchKernel((const void*)multiReduceKernel<block_size, real, len, NXZ, Arg>, tp.grid, tp.block, args, tp.shared_bytes, stream);
+      else
+        return launch<block_size - 32, real, len, NXZ>(arg, tp, stream);
+    }
+
+    template <int block_size, typename real, int len, int NXZ, typename Arg>
+    typename std::enable_if<block_size==32, cudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+    {
+      void *args[] = {&arg};
+      return qudaLaunchKernel((const void*)multiReduceKernel<block_size, real, len, NXZ, Arg>, tp.grid, tp.block, args, tp.shared_bytes, stream);
+    }
+
+#ifdef QUDA_FAST_COMPILE_REDUCE
+    constexpr int max_block_size() { return 32; }
+#else
+    constexpr int max_block_size() { return 128; }
+#endif
+
+    template <typename real, int len, int NXZ, typename Arg, typename T>
     void multiReduceLaunch(T result[], Arg &arg, const TuneParam &tp, const qudaStream_t &stream, Tunable &tunable)
     {
       using reduce_t = typename Arg::Reducer::reduce_t;
       if (tp.grid.x > (unsigned int)deviceProp.maxGridSize[0])
         errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, deviceProp.maxGridSize[0]);
 
-#ifdef WARP_MULTI_REDUCE
-#error "Untested - should be reverified"
-      // multiReduceKernel<FloatN,M,NXZ><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-#else
 #ifdef JITIFY
       using namespace jitify::reflection;
       tunable.jitifyError() = program->kernel("quda::blas::multiReduceKernel")
-                                  .instantiate((int)tp.block.x, Type<real>(), M, NXZ, Type<Arg>())
+                                  .instantiate((int)tp.block.x, Type<real>(), len, NXZ, Type<Arg>())
                                   .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                                   .launch(arg);
 #else
-      LAUNCH_KERNEL_REDUCE(multiReduceKernel, tunable, tp, stream, arg, real, M, NXZ, Arg);
-#endif
+      if (tp.block.x <= max_block_size()) {
+        auto error = launch<max_block_size(), real, len, NXZ>(arg, tp, stream);
+        // flag any failures when tuning so we don't try and complete which could hang
+        if (activeTuning() && error != cudaSuccess) tunable.jitifyError() = CUDA_ERROR_INVALID_VALUE;
+      } else {
+        tunable.jitifyError() = CUDA_ERROR_INVALID_VALUE;
+        if (!activeTuning()) errorQuda("block size %d not instantiated", tp.block.x);
+      }
 #endif
 
       if (!commAsyncReduction()) {
-#if (defined(_MSC_VER) && defined(_WIN64) || defined(__LP64__))
-        if (deviceProp.canMapHostMemory) {
-          if (tunable.jitifyError() != CUDA_ERROR_INVALID_VALUE) completeReduce(stream);
-        } else
-#endif
-        {
-          qudaMemcpy(getHostReduceBuffer(), getMappedHostReduceBuffer(), tp.grid.z * sizeof(reduce_t) * NXZ * arg.NYW,
-                     cudaMemcpyDeviceToHost);
-        }
+        if (tunable.jitifyError() != CUDA_ERROR_INVALID_VALUE) arg.complete(stream);
       }
 
       // need to transpose for same order with vector thread reduction
-      auto buffer = (reduce_t *)getHostReduceBuffer();
+      auto buffer = (reduce_t *)reducer::get_host_buffer();
       for (int i = 0; i < NXZ; i++) {
         for (int j = 0; j < arg.NYW; j++) {
           result[i * arg.NYW + j] = static_cast<T>(buffer[j * NXZ + i]);

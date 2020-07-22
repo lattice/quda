@@ -10,9 +10,6 @@
 #include <random_quda.h>
 #include <index_helper.cuh>
 #include <atomic.cuh>
-#include <cub_helper.cuh>
-
-
 
 #ifndef PI
 #define PI    3.1415926535897932384626433832795    // pi

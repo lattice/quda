@@ -1,26 +1,8 @@
-#include <atomic>
-
 #include <blas_quda.h>
 #include <tune_quda.h>
 #include <color_spinor_field_order.h>
-
-#include <launch_kernel.cuh>
 #include <jitify_helper.cuh>
 #include <kernels/reduce_core.cuh>
-
-// These are used for reduction kernels
-static device_reduce_t *d_reduce = nullptr;
-static device_reduce_t *h_reduce = nullptr;
-static device_reduce_t *hd_reduce = nullptr;
-
-#ifdef FAST_REDUCE
-using count_t = cuda::atomic<unsigned int, cuda::thread_scope_device>;
-using signal_t = cuda::atomic<unsigned int, cuda::thread_scope_system>;
-static count_t *reduce_count = nullptr;
-static signal_t *reduce_signal = nullptr;
-#else
-static cudaEvent_t reduceEnd;
-#endif
 
 namespace quda {
 
@@ -28,124 +10,30 @@ namespace quda {
 
     qudaStream_t* getStream();
 
-    void* getDeviceReduceBuffer() { return d_reduce; }
-    void* getMappedHostReduceBuffer() { return hd_reduce; }
-    void* getHostReduceBuffer() { return h_reduce; }
+    template <int block_size, typename real, int len, typename Arg>
+    typename std::enable_if<block_size!=32, cudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+    {
+      void *args[] = {&arg};
+      if (tp.block.x == block_size)
+        return qudaLaunchKernel((const void*)reduceKernel<block_size, real, len, Arg>, tp.grid, tp.block, args, tp.shared_bytes, stream);
+      else
+        return launch<block_size - 32, real, len>(arg, tp, stream);
+    }
 
-#ifdef FAST_REDUCE
-    count_t *getReduceCount() { return reduce_count; }
-    signal_t *getReduceSignal() { return reduce_signal; }
+    template <int block_size, typename real, int len, typename Arg>
+    typename std::enable_if<block_size==32, cudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+    {
+      void *args[] = {&arg};
+      return qudaLaunchKernel((const void*)reduceKernel<block_size, real, len, Arg>, tp.grid, tp.block, args, tp.shared_bytes, stream);
+    }
+
+#ifdef QUDA_FAST_COMPILE_REDUCE
+    constexpr int max_block_size() { return 32; }
 #else
-    cudaEvent_t* getReduceEvent() { return &reduceEnd; }
+    constexpr int max_block_size() { return 1024; }
 #endif
 
-    size_t reduceBufferSize()
-    {
-      /* we have these different reductions to cater for:
-
-         - regular reductions (reduce_quda.cu) where are reducing to a
-           single vector type (max length 4 presently), with possibly
-           parity dimension, and a grid-stride loop with max number of
-           blocks = 2 x SM count
-
-         - multi-reductions where we are reducing to a matrix of size
-           of size QUDA_MAX_MULTI_REDUCE of vectors (max length 4), with
-           possible parity dimension, and a grid-stride loop with
-           maximum number of blocks = 2 x SM count
-      */
-
-      int reduce_size = 4 * sizeof(device_reduce_t);
-      int max_reduce = 2 * reduce_size;
-      int max_multi_reduce = 2 * QUDA_MAX_MULTI_REDUCE * reduce_size;
-      int max_reduce_blocks = 2 * deviceProp.multiProcessorCount;
-
-      // reduction buffer size
-      size_t bytes = max_reduce_blocks * std::max(max_reduce, max_multi_reduce);
-      return bytes;
-    }
-
-    // need to placement new constructor to initialize the atomic counters
-    template <typename T> __global__ void init_count(T *counter, int n)
-    {
-      for (int i = 0; i < n; i++) new (counter + i) T{0};
-    }
-
-    void initReduce()
-    {
-      auto bytes = reduceBufferSize();
-      if (!d_reduce) d_reduce = (device_reduce_t *) device_malloc(bytes);
-
-      // these arrays are actually oversized currently (only needs to be device_reduce_t x 3)
-
-      // if the device supports host-mapped memory then use a host-mapped array for the reduction
-      if (!h_reduce) {
-	// only use zero copy reductions when using 64-bit
-#if (defined(_MSC_VER) && defined(_WIN64)) || defined(__LP64__)
-	if(deviceProp.canMapHostMemory) {
-	  h_reduce = (device_reduce_t *) mapped_malloc(bytes);
-	  cudaHostGetDevicePointer(&hd_reduce, h_reduce, 0); // set the matching device pointer
-	} else
-#endif
-	  {
-	    h_reduce = (device_reduce_t *) pinned_malloc(bytes);
-	    hd_reduce = d_reduce;
-	  }
-	memset(h_reduce, 0, bytes); // added to ensure that valgrind doesn't report h_reduce is unitialised
-      }
-
-#ifdef FAST_REDUCE
-      warningQuda("Experimental fast reductions enabled");
-      // fast reductions use heterogeneous atomics to synchronize CPU and GPU as opposed to using CUDA events
-      reduce_count = static_cast<count_t*>(device_malloc( (QUDA_MAX_MULTI_REDUCE + 1) * sizeof(decltype(*reduce_count))));
-      init_count<<<1, 1>>>(reduce_count, QUDA_MAX_MULTI_REDUCE + 1);
-      reduce_signal = static_cast<signal_t*>(mapped_malloc(sizeof(signal_t)));
-      *reduce_signal = 0;
-#else
-      cudaEventCreateWithFlags(&reduceEnd, cudaEventDisableTiming);
-#endif
-
-      checkCudaError();
-    }
-
-    void endReduce(void)
-    {
-#ifdef FAST_REDUCE
-      if (reduce_count) {
-        device_free(reduce_count);
-        reduce_count = nullptr;
-      }
-
-      if (reduce_signal) {
-        host_free(reduce_signal);
-        reduce_signal = nullptr;
-      }
-#else
-      cudaEventDestroy(reduceEnd);
-#endif
-
-      if (d_reduce) {
-	device_free(d_reduce);
-	d_reduce = 0;
-      }
-      if (h_reduce) {
-	host_free(h_reduce);
-	h_reduce = 0;
-      }
-      hd_reduce = 0;
-    }
-
-    void completeReduce(const qudaStream_t &stream)
-    {
-#ifdef FAST_REDUCE
-      while (!reduce_signal->load(cuda::memory_order_acquire)) { }
-      reduce_signal->store(0, cuda::std::memory_order_relaxed);
-#else
-      qudaEventRecord(*getReduceEvent(), stream);
-      while (cudaSuccess != qudaEventQuery(*getReduceEvent())) {}
-#endif
-    }
-
-    /**
+   /**
        Generic reduction kernel launcher
     */
     template <typename host_reduce_t, typename real, int len, typename Arg>
@@ -162,26 +50,22 @@ namespace quda {
                                   .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                                   .launch(arg);
 #else
-      LAUNCH_KERNEL(reduceKernel, tunable, tp, stream, arg, real, len);
-      if (activeTuning()) {
-        auto error = cudaGetLastError();
-        if (error != cudaSuccess) tunable.jitifyError() = CUDA_ERROR_INVALID_VALUE;
+      if (tp.block.x <= max_block_size()) {
+        auto error = launch<max_block_size(), real, len>(arg, tp, stream);
+        // flag any failures when tuning so we don't try and complete which could hang
+        if (activeTuning() && error != cudaSuccess) tunable.jitifyError() = CUDA_ERROR_INVALID_VALUE;
+      } else {
+        tunable.jitifyError() = CUDA_ERROR_INVALID_VALUE;
+        if (!activeTuning()) errorQuda("block size %d not instantiated", tp.block.x);
       }
 #endif
 
       if (!commAsyncReduction()) {
-#if (defined(_MSC_VER) && defined(_WIN64)) || defined(__LP64__)
-        if (deviceProp.canMapHostMemory) {
-          if (tunable.jitifyError() != CUDA_ERROR_INVALID_VALUE) completeReduce(stream);
-        } else
-#endif
-        {
-          qudaMemcpy(h_reduce, hd_reduce, sizeof(device_reduce_t), cudaMemcpyDeviceToHost);
-        }
+        if (tunable.jitifyError() != CUDA_ERROR_INVALID_VALUE) arg.complete(stream);
       }
 
-      host_reduce_t cpu_sum = set(((device_reduce_t *)h_reduce)[0]);
-      if (tp.grid.y == 2) sum(cpu_sum, ((device_reduce_t *)h_reduce)[1]); // add other parity if needed
+      host_reduce_t cpu_sum = set(((device_reduce_t *)reducer::get_host_buffer())[0]);
+      if (tp.grid.y == 2) sum(cpu_sum, ((device_reduce_t *)reducer::get_host_buffer())[1]); // add other parity if needed
       return cpu_sum;
     }
 

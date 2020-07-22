@@ -8,7 +8,7 @@
 #include <comm_quda.h>
 #include <gauge_fix_ovr_extra.h>
 #include <gauge_fix_ovr_hit_devf.cuh>
-#include <cub_helper.cuh>
+#include <reduce_helper.h>
 #include <index_helper.cuh>
 
 namespace quda {
