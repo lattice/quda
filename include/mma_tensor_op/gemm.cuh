@@ -375,12 +375,12 @@ namespace quda
         ALoader a_loader;
         BLoader b_loader;
 
+        __syncthreads();
         a_loader.g2r<lda, a_dagger>(a, m_offset, 0); // bk = 0
         a_loader.r2s<a_dagger>(smem_obj_a_real, smem_obj_a_imag);
 
         b_loader.g2r<ldb, b_dagger>(b, n_offset, 0); // bk = 0
         b_loader.r2s<b_dagger>(smem_obj_b_real, smem_obj_b_imag);
-
         __syncthreads();
 
 #pragma unroll 1
