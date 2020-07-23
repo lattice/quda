@@ -296,6 +296,26 @@ void comm_broadcast(void *data, size_t nbytes)
   QMP_CHECK( QMP_broadcast(data, nbytes) );
 }
 
+void comm_gather_array(double* data, size_t size)
+{
+  size_t n = comm_size();
+  // Collect all the data
+  double *recv_buf = nullptr;
+  if(comm_rank() == 0) {
+    recv_buf = new double[size * n];
+  }
+
+  MPI_CHECK(MPI_Gather(data + size*comm_rank(), size, MPI_DOUBLE, recv_buf, size, MPI_DOUBLE, 0, MPI_COMM_HANDLE));
+  
+  // Populate the data array with gatherd data
+  if(comm_rank() == 0) {
+    for (size_t j = 0; j < size * n; j++) { data[j] = recv_buf[j]; }
+  }
+  
+  delete[] recv_buf;
+}
+
+
 
 void comm_barrier(void)
 {

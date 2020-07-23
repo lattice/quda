@@ -105,7 +105,9 @@ void constructWilsonTestSpinorParam(quda::ColorSpinorParam *csParam, const QudaI
                                     const QudaGaugeParam *gauge_param);
 void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x,
                                  quda::RNG &rng);
-void constructPointSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x, const int dil);
+void constructPointSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x, const int dil, const int *const src);
+
+void constructWallSpinorSource(void *v, QudaPrecision precision, const int dil);
 //------------------------------------------------------
 
 void performanceStats(double *time, double *gflops);

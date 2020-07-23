@@ -214,19 +214,20 @@ double eofa_mq1 = 1.0;
 double eofa_mq2 = 0.085;
 double eofa_mq3 = 1.0;
 
-// Propagator option
+// Propagator options
 quda::file_array<char[256]> prop_source_infile;
 quda::file_array<char[256]> prop_source_outfile;
 quda::file_array<char[256]> prop_sink_infile;
 quda::file_array<char[256]> prop_sink_outfile;
+quda::source_array<std::array<int, 4>> prop_source_position = {0, 0, 0, 0};
 
-std::array<int, 4> prop_source_position = {0, 0, 0, 0};
 int prop_source_smear_steps = 50;
 int prop_sink_smear_steps = 50;
 double prop_source_smear_coeff = 0.2;
 double prop_sink_smear_coeff = 0.2;
 bool prop_read_sources = false;
 int prop_n_sources = 12;
+QudaPrecision prop_save_prec = QUDA_SINGLE_PRECISION;
 
 // SU(3) smearing options
 double stout_smear_rho = 0.1;
@@ -241,15 +242,18 @@ QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_TYPE_STOUT;
 
 QudaFermionSmearType prop_smear_type = QUDA_FERMION_SMEAR_TYPE_GAUSSIAN;
 
-QudaContractType contract_type = QUDA_CONTRACT_TYPE_OPEN;
+QudaContractType contract_type = QUDA_CONTRACT_TYPE_DR_SUM;
 
 namespace
 {
   CLI::TransformPairs<QudaCABasis> ca_basis_map {{"power", QUDA_POWER_BASIS}, {"chebyshev", QUDA_CHEBYSHEV_BASIS}};
 
-  CLI::TransformPairs<QudaContractType> contract_type_map {{"open", QUDA_CONTRACT_TYPE_OPEN},
-                                                           {"dr", QUDA_CONTRACT_TYPE_DR}};
-
+  CLI::TransformPairs<QudaContractType> contract_type_map {
+    {"open", QUDA_CONTRACT_TYPE_OPEN},
+      {"open-sum", QUDA_CONTRACT_TYPE_OPEN_SUM},
+	{"dr", QUDA_CONTRACT_TYPE_DR},
+	  {"dr-sum", QUDA_CONTRACT_TYPE_DR_SUM}};
+  
   CLI::TransformPairs<QudaDslashType> dslash_type_map {{"wilson", QUDA_WILSON_DSLASH},
                                                        {"clover", QUDA_CLOVER_WILSON_DSLASH},
                                                        {"twisted-mass", QUDA_TWISTED_MASS_DSLASH},
@@ -392,7 +396,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
 
   quda_app
     ->add_option("--contraction-type", contract_type,
-                 "Whether to leave spin elemental open, or use a gamma basis and contract on spin (default open)")
+                 "Whether to leave spin elemental open, or use a gamma basis and contract on spin (default dr-sum)")
     ->transform(CLI::QUDACheckedTransformer(contract_type_map));
   ;
   quda_app->add_flag("--dagger", dagger, "Set the dagger to 1 (default 0)");
@@ -924,8 +928,8 @@ void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   opgroup->add_option("--prop-read-sources", prop_read_sources, "Read all sources from file. There will be one propagator for each source (default false)");
   
-  opgroup->add_option("--prop-n-sources", prop_n_sources, "This option serves two purposes. If one is reading sources, it is the number of sources to be read. If creating sources, it is the number of point sources required. (default 1)");
-
+  opgroup->add_option("--prop-n-sources", prop_n_sources, "The number of point sources to construct (default 1)");
+  
   quda_app->add_fileoption(opgroup, "--prop-save-sink-file", prop_sink_outfile, CLI::Validator(), "Save propagators to <file> (requires QIO)");
   
   quda_app->add_fileoption(opgroup, "--prop-load-sink-file", prop_sink_infile, CLI::Validator(), "Load propagators from <file> (requires QIO)")->check(CLI::ExistingFile);
@@ -946,6 +950,9 @@ void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
   
   opgroup->add_option("--prop-smear-type", prop_smear_type, "Type of fermion smearing to employ (default gaussian)")->transform(CLI::QUDACheckedTransformer(fermion_smear_type_map));
 
-  opgroup->add_option("--prop-source-position", prop_source_position, "Set the position of a point source (X Y Z T) (default(0,0,0,0)")
-    ->check(CLI::Range(0, 512));
+  quda_app->add_psoption(opgroup, "--prop-source-position", prop_source_position, CLI::Validator(), "Set the position of the nth point source <Nth source> (X Y Z T) (default(0,0,0,0))");
+
+  CLI::QUDACheckedTransformer prec_transform(precision_map);  
+  opgroup->add_option("--prop-save-prec", prop_save_prec, "Precision with which to save propagators (default single)")->transform(prec_transform);
+  
 }

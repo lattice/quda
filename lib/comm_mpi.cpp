@@ -252,7 +252,6 @@ void comm_allreduce(double* data)
   }
 }
 
-
 void comm_allreduce_max(double* data)
 {
   double recvbuf;
@@ -290,6 +289,26 @@ void comm_allreduce_array(double* data, size_t size)
     delete[] recv_trans;
   }
 }
+
+void comm_gather_array(double* data, size_t size)
+{
+  size_t n = comm_size();
+  // Collect all the data
+  double *recv_buf = nullptr;
+  if(comm_rank() == 0) {
+    recv_buf = new double[size * n];
+  }
+
+  MPI_CHECK(MPI_Gather(data + size*comm_rank(), size, MPI_DOUBLE, recv_buf, size, MPI_DOUBLE, 0, MPI_COMM_HANDLE));
+  
+  // Populate the data array with gatherd data
+  if(comm_rank() == 0) {
+    for (size_t j = 0; j < size * n; j++) { data[j] = recv_buf[j]; }
+  }
+  
+  delete[] recv_buf;
+}
+
 
 void comm_allreduce_max_array(double* data, size_t size)
 {
