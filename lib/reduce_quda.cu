@@ -28,9 +28,9 @@ namespace quda {
     }
 
 #ifdef QUDA_FAST_COMPILE_REDUCE
-    constexpr int max_block_size() { return 32; }
+    constexpr unsigned int max_block_size() { return 32; }
 #else
-    constexpr int max_block_size() { return 1024; }
+    constexpr unsigned int max_block_size() { return 1024; }
 #endif
 
    /**
