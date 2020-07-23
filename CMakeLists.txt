@@ -26,7 +26,7 @@ if(DEFINED ENV{QUDA_BUILD_TYPE})
 else()
   set(DEFBUILD "DEVEL")
 endif()
- 
+
 set(VALID_BUILD_TYPES
     DEVEL
     RELEASE
@@ -38,10 +38,7 @@ set(VALID_BUILD_TYPES
 set(CMAKE_BUILD_TYPE
     "${DEFBUILD}"
     CACHE STRING "Choose the type of build, options are: ${VALID_BUILD_TYPES}")
-set_property(
-  CACHE CMAKE_BUILD_TYPE
-  PROPERTY STRINGS ${VALID_BUILD_TYPES}
- )
+set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS ${VALID_BUILD_TYPES})
 
 string(TOUPPER ${CMAKE_BUILD_TYPE} CHECK_BUILD_TYPE)
 list(FIND VALID_BUILD_TYPES ${CHECK_BUILD_TYPE} BUILD_TYPE_VALID)
@@ -58,7 +55,9 @@ else()
 endif()
 
 set(VALID_TARGET_TYPES CUDA HIP)
-set(QUDA_TARGET_TYPE "${DEFTARGET}" CACHE STRING "Choose the type of target, options are: ${VALID_TARGET_TYPES}")
+set(QUDA_TARGET_TYPE
+    "${DEFTARGET}"
+    CACHE STRING "Choose the type of target, options are: ${VALID_TARGET_TYPES}")
 set_property(CACHE QUDA_TARGET_TYPE PROPERTY STRINGS CUDA HIP)
 
 string(TOUPPER ${QUDA_TARGET_TYPE} CHECK_TARGET_TYPE)
@@ -81,21 +80,18 @@ if(GIT_FOUND)
     execute_process(
       COMMAND ${GIT_EXECUTABLE} describe --abbrev=0
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-      OUTPUT_VARIABLE GITTAG
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
+      OUTPUT_VARIABLE GITTAG OUTPUT_STRIP_TRAILING_WHITESPACE)
     # we use git rev-list and pipe that through wc here. Newer git versions support --count as option to rev-list but
     # that might not always be available
     execute_process(
       COMMAND ${GIT_EXECUTABLE} rev-list ${GITTAG}..HEAD
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
       COMMAND wc -l
-      OUTPUT_VARIABLE GITCOUNT
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
+      OUTPUT_VARIABLE GITCOUNT OUTPUT_STRIP_TRAILING_WHITESPACE)
     execute_process(
       COMMAND ${GIT_EXECUTABLE} describe --long --dirty
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-      OUTPUT_VARIABLE GITVERSION
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
+      OUTPUT_VARIABLE GITVERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
   endif()
 endif(GIT_FOUND)
 
@@ -222,11 +218,9 @@ set(QUDA_MAX_MULTI_BLAS_N
     "4"
     CACHE STRING "maximum value to initialize template for multi-blas /-reduce")
 if(QUDA_MAX_MULTI_BLAS_N GREATER 32)
-  message(
-  SEND_ERROR
-  "Maximum QUDA_MAX_MULTI_BLAS_N is 32.")
+  message(SEND_ERROR "Maximum QUDA_MAX_MULTI_BLAS_N is 32.")
 endif()
-  
+
 set(QUDA_PRECISION
     "14"
     CACHE STRING "which precisions to instantiate in QUDA (4-bit number - double, single, half, char)")
@@ -381,7 +375,6 @@ set(CMAKE_EXE_LINKER_FLAGS_SANITIZE
     "-fsanitize=address,undefined"
     CACHE STRING "Flags used by the linker during sanitizer debug builds.")
 
-
 # define CUDA flags
 set(CMAKE_CUDA_HOST_COMPILER
     "${CMAKE_CXX_COMPILER}"
@@ -393,18 +386,21 @@ mark_as_advanced(CMAKE_CUDA_HOST_COMPILER)
 include(CheckLanguage)
 check_language(CUDA)
 
-if( ${CMAKE_CUDA_COMPILER} MATCHES "nvcc")
+if(${CMAKE_CUDA_COMPILER} MATCHES "nvcc")
   set(QUDA_CUDA_BUILD_TYPE "NVCC")
   message(STATUS "CUDA Build Type: ${QUDA_CUDA_BUILD_TYPE}")
 endif()
 
-if( ${CMAKE_CUDA_COMPILER} MATCHES "clang")
+if(${CMAKE_CUDA_COMPILER} MATCHES "clang")
+  if(CMAKE_VERSION VERSION_LESS 3.18)
+    message(ERROR "Building QUDA with clang as CMAKE_CUDA_COMPILER requires CMake 3.18+")
+  endif()
   set(QUDA_CUDA_BUILD_TYPE "Clang")
   message(STATUS "CUDA Build Type: ${QUDA_CUDA_BUILD_TYPE}")
 endif()
 
 set(CMAKE_CUDA_FLAGS_DEVEL
-	"-g -O3 "
+    "-g -O3 "
     CACHE STRING "Flags used by the CUDA compiler during regular development builds.")
 set(CMAKE_CUDA_FLAGS_STRICT
     "-g -O3"
@@ -413,39 +409,35 @@ set(CMAKE_CUDA_FLAGS_RELEASE
     "-O3 -w"
     CACHE STRING "Flags used by the CUDA compiler during release builds.")
 set(CMAKE_CUDA_FLAGS_HOSTDEBUG
-	"-g"
+    "-g"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
 set(CMAKE_CUDA_FLAGS_DEVICEDEBUG
-	"-G"
+    "-G"
     CACHE STRING "Flags used by the C++ compiler during device-debug builds.")
 set(CMAKE_CUDA_FLAGS_DEBUG
     "-g -G"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(CMAKE_CUDA_FLAGS_SANITIZE
-	"-g "
+    "-g "
     CACHE STRING "Flags used by the C++ compiler during sanitizer debug builds.")
 
-# This is needed now
-# GPU ARCH
+# This is needed now GPU ARCH
 set(GITVERSION ${GITVERSION}-${QUDA_GPU_ARCH})
 string(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})
 set(CMAKE_CUDA_ARCHITECTURES ${COMP_CAP})
 set(COMP_CAP "${COMP_CAP}0")
 
 enable_language(CUDA)
-message( STATUS "CUDA Compiler is" ${CMAKE_CUDA_COMPILER})
-message( STATUS "Compiler ID is " ${CMAKE_CUDA_COMPILER_ID})
-
-
+message(STATUS "CUDA Compiler is" ${CMAKE_CUDA_COMPILER})
+message(STATUS "Compiler ID is " ${CMAKE_CUDA_COMPILER_ID})
 
 # CUDA Wrapper for finding libs etc
 if(CMAKE_VERSION VERSION_LESS 3.17)
   find_package(CUDAWrapper)
 else()
-# for cmake 3.17+ we rely on
+  # for cmake 3.17+ we rely on
   find_package(CUDAToolkit)
 endif()
-
 
 # ######################################################################################################################
 # QUDA depends on Eigen this part makes sure we can download eigen if it is not found
@@ -533,29 +525,19 @@ if(QUDA_QDPJIT)
   if(NOT QUDA_QMP)
     message(WARNING "Specifying QUDA_QDPJIT requires use of QUDA_QMP. Please set QUDA_QMP=ON and set QUDA_QMPHOME.")
   endif()
-  execute_process(
-    COMMAND ${QUDA_QDPJITHOME}/bin/qdp \+\+-config --ldflags
-    OUTPUT_VARIABLE QDP_LDFLAGS
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(
-    COMMAND ${QUDA_QDPJITHOME}/bin/qdp \+\+-config --libs
-    OUTPUT_VARIABLE QDP_LIBS
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND ${QUDA_QDPJITHOME}/bin/qdp \+\+-config --ldflags
+                  OUTPUT_VARIABLE QDP_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND ${QUDA_QDPJITHOME}/bin/qdp \+\+-config --libs
+                  OUTPUT_VARIABLE QDP_LIBS OUTPUT_STRIP_TRAILING_WHITESPACE)
   find_library(QDP_LIB qdp PATH ${QUDA_QDPJITHOME}/lib)
   find_library(QIO_LIB qio ${QUDA_QDPJITHOME}/lib/)
   find_library(LIME_LIB lime ${QUDA_QDPJITHOME}/lib/)
 endif()
 
 if(QUDA_QMP)
-  find_library(
-    QMP_FOUND qmp
-    HINTS ${QUDA_QMPHOME}/lib
-    NO_DEFAULT_PATH)
+  find_library(QMP_FOUND qmp HINTS ${QUDA_QMPHOME}/lib NO_DEFAULT_PATH)
   mark_as_advanced(QMP_FOUND)
-  set_property(
-    DIRECTORY
-    APPEND
-    PROPERTY CMAKE_CONFIGURE_DEPENDS ${QMP_FOUND})
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${QMP_FOUND})
   if(QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
     ExternalProject_Add(
       QMP
@@ -572,10 +554,7 @@ if(QUDA_QMP)
       LOG_DOWNLOAD ON)
 
     ExternalProject_Get_Property(QMP INSTALL_DIR)
-    set_property(
-      DIRECTORY
-      APPEND
-      PROPERTY CMAKE_CONFIGURE_DEPENDS ${INSTALL_DIR})
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${INSTALL_DIR})
     set(QUDA_QMPHOME
         ${INSTALL_DIR}
         CACHE PATH "path to QMP" FORCE)
@@ -596,18 +575,12 @@ if(QUDA_QMP)
     if("${QUDA_QMPHOME}" STREQUAL "")
       message(FATAL_ERROR "QUDA_QMPHOME must be defined if QUDA_QMP is ON and QUDA_DOWNLOAD_USQCD is OFF")
     endif()
-    execute_process(
-      COMMAND ${QUDA_QMPHOME}/bin/qmp-config --cflags
-      OUTPUT_VARIABLE QUDA_QMP_CFLAGS
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
-    execute_process(
-      COMMAND ${QUDA_QMPHOME}/bin/qmp-config --ldflags
-      OUTPUT_VARIABLE QUDA_QMP_LDFLAGS_INTERNAL
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
-    execute_process(
-      COMMAND ${QUDA_QMPHOME}/bin/qmp-config --libs
-      OUTPUT_VARIABLE QUDA_QMP_LIBS_INTERNAL
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --cflags OUTPUT_VARIABLE QUDA_QMP_CFLAGS
+                                                                                    OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --ldflags OUTPUT_VARIABLE QUDA_QMP_LDFLAGS_INTERNAL
+                                                                                     OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --libs OUTPUT_VARIABLE QUDA_QMP_LIBS_INTERNAL
+                                                                                  OUTPUT_STRIP_TRAILING_WHITESPACE)
     set(QUDA_QMP_LDFLAGS
         ${QUDA_QMP_LDFLAGS_INTERNAL}
         CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
@@ -621,15 +594,9 @@ if(QUDA_QIO)
   if(NOT QUDA_QMP)
     message(FATAL_ERROR "Use of QIO (via QUDA_QIO=ON) requires QMP. Please set QUDA_QMP=ON.")
   endif()
-  find_library(
-    QIO_FOUND qio
-    HINTS ${QUDA_QIOHOME}/lib
-    NO_DEFAULT_PATH)
+  find_library(QIO_FOUND qio HINTS ${QUDA_QIOHOME}/lib NO_DEFAULT_PATH)
   mark_as_advanced(QIO_FOUND)
-  set_property(
-    DIRECTORY
-    APPEND
-    PROPERTY CMAKE_CONFIGURE_DEPENDS ${QIO_FOUND})
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${QIO_FOUND})
   if(QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
     ExternalProject_Add(
       QIO
@@ -646,10 +613,7 @@ if(QUDA_QIO)
       LOG_BUILD ON
       LOG_DOWNLOAD ON)
     ExternalProject_Get_Property(QIO INSTALL_DIR)
-    set_property(
-      DIRECTORY
-      APPEND
-      PROPERTY CMAKE_CONFIGURE_DEPENDS ${INSTALL_DIR})
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${INSTALL_DIR})
     set(QUDA_QIOHOME
         ${INSTALL_DIR}
         CACHE PATH "path to QIO" FORCE)
@@ -674,18 +638,12 @@ if(QUDA_QIO)
       message(
         FATAL_ERROR "QUDA_QIOHOME and QUDA_LIMEHOME must be defined when QUDA_QIO is ON and QUDA_DOWNLOAD_USQCD is OFF")
     endif()
-    execute_process(
-      COMMAND ${QUDA_QIOHOME}/bin/qio-config --cflags
-      OUTPUT_VARIABLE QUDA_QIO_CFLAGS
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
-    execute_process(
-      COMMAND ${QUDA_QIOHOME}/bin/qio-config --ldflags
-      OUTPUT_VARIABLE QUDA_QIO_LDFLAGS_INTERNAL
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
-    execute_process(
-      COMMAND ${QUDA_QIOHOME}/bin/qio-config --libs
-      OUTPUT_VARIABLE QUDA_QIO_LIBS_INTERNAL
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(COMMAND ${QUDA_QIOHOME}/bin/qio-config --cflags OUTPUT_VARIABLE QUDA_QIO_CFLAGS
+                                                                                    OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(COMMAND ${QUDA_QIOHOME}/bin/qio-config --ldflags OUTPUT_VARIABLE QUDA_QIO_LDFLAGS_INTERNAL
+                                                                                     OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(COMMAND ${QUDA_QIOHOME}/bin/qio-config --libs OUTPUT_VARIABLE QUDA_QIO_LIBS_INTERNAL
+                                                                                  OUTPUT_STRIP_TRAILING_WHITESPACE)
     set(QUDA_QIO_LDFLAGS
         ${QUDA_QIO_LDFLAGS_INTERNAL}
         CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
@@ -701,14 +659,7 @@ endif()
 
 if(QUDA_MAGMA)
   add_library(MAGMA::MAGMA INTERFACE IMPORTED)
-  target_compile_definitions(
-    MAGMA::MAGMA
-    INTERFACE
-    MAGMA_LIB
-    ADD_
-    MAGMA_SETAFFINITY
-    GPUSHMEM=300
-    HAVE_CUBLAS)
+  target_compile_definitions(MAGMA::MAGMA INTERFACE MAGMA_LIB ADD_ MAGMA_SETAFFINITY GPUSHMEM=300 HAVE_CUBLAS)
   if("${QUDA_MAGMAHOME}" STREQUAL "")
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(MAGMA magma)
@@ -810,7 +761,6 @@ endif()
 if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
   set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 endif()
-
 
 # make the compiler flags an advanced option for all user defined build types (cmake defined build types are advanced by
 # default )

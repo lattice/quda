@@ -141,7 +141,8 @@ if(QUDA_DIRAC_WILSON
    OR QUDA_DIRAC_STAGGERED)
   add_executable(blas_test blas_test.cpp)
   target_link_libraries(blas_test ${TEST_LIBS})
-  target_compile_options(blas_test PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>: --cuda-path=${CUDAToolkit_TARGET_DIR} --cuda-gpu-arch=${QUDA_GPU_ARCH}>)
+  # target_compile_options(blas_test PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>: --cuda-path=${CUDAToolkit_TARGET_DIR}
+  # --cuda-gpu-arch=${QUDA_GPU_ARCH}>)
 
   quda_checkbuildtest(blas_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS blas_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
@@ -150,7 +151,8 @@ endif()
 if(QUDA_MULTIGRID)
   add_executable(multigrid_benchmark_test multigrid_benchmark_test.cpp)
   target_link_libraries(multigrid_benchmark_test ${TEST_LIBS})
-  target_compile_options(multigrid_benchmark_test PRIVATE $<$<CUDA_COMPILER_ID:Clang>: --cuda-path=${CUDAToolkit_TARGET_DIR} --cuda-gpu-arch=${QUDA_GPU_ARCH}>)
+  # target_compile_options(multigrid_benchmark_test PRIVATE $<$<CUDA_COMPILER_ID:Clang>:
+  # --cuda-path=${CUDAToolkit_TARGET_DIR} --cuda-gpu-arch=${QUDA_GPU_ARCH}>)
 
   quda_checkbuildtest(multigrid_benchmark_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS multigrid_benchmark_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
@@ -346,7 +348,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     endif()
   endif()
 
- if(QUDA_DIRAC_CLOVER_HASENBUSCH_TWIST)
+  if(QUDA_DIRAC_CLOVER_HASENBUSCH_TWIST)
     # symmetric preconditioning
     add_test(NAME dslash_clover_hasenbusch_twist-sym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
@@ -408,7 +410,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                      --matpc even-even
                      --flavor nondeg-doublet
                      --dim 2 4 6 8
-                     --gtest_output=xml:dslash_ndeg-twisted-mass_test_pol${pol2}.xml)
+        --gtest_output=xml:dslash_ndeg-twisted-mass_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_ndeg-twisted-mass-sym-policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
@@ -422,7 +424,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                      --matpc even-even-asym
                      --flavor nondeg-doublet
                      --dim 2 4 6 8
-                     --gtest_output=xml:dslash_ndeg-twisted-mass_test_pol${pol2}.xml)
+        --gtest_output=xml:dslash_ndeg-twisted-mass_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_ndeg-twisted-mass-asym-policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
@@ -465,7 +467,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                      --matpc even-even
                      --dim 2 4 6 8
                      --Lsdim 4
-                     --gtest_output=xml:dslash_domain-wall_test_pol${pol2}.xml)
+        --gtest_output=xml:dslash_domain-wall_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_domain-wall-sym-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
@@ -478,7 +480,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                      --matpc even-even
                      --dim 2 4 6 8
                      --Lsdim 4
-                     --gtest_output=xml:dslash_domain-wall-4d_test_pol${pol2}.xml)
+        --gtest_output=xml:dslash_domain-wall-4d_test_pol${pol2}.xml)
     add_test(NAME dslash_mobius-sym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type mobius
@@ -494,7 +496,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                      --matpc even-even
                      --dim 2 4 6 8
                      --Lsdim 4
-                     --gtest_output=xml:dslash_mobius_eofa_test_pol${pol2}.xml)
+        --gtest_output=xml:dslash_mobius_eofa_test_pol${pol2}.xml)
 
     if(polenv)
       set_tests_properties(dslash_domain-wall-4d-sym-policy${pol2}
@@ -510,7 +512,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                      --matpc even-even-asym
                      --dim 2 4 6 8
                      --Lsdim 4
-                     --gtest_output=xml:dslash_domain-wall-4d_test_pol${pol2}.xml)
+        --gtest_output=xml:dslash_domain-wall-4d_test_pol${pol2}.xml)
     add_test(NAME dslash_mobius-asym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type mobius
@@ -526,7 +528,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                      --matpc even-even-asym
                      --dim 2 4 6 8
                      --Lsdim 4
-                     --gtest_output=xml:dslash_mobius_eofa_test_pol${pol2}.xml)
+        --gtest_output=xml:dslash_mobius_eofa_test_pol${pol2}.xml)
 
     # MdagM local operator
     add_test(NAME dslash_mobius_local-policy${pol2}
@@ -538,7 +540,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                      --Lsdim 4
                      --gtest_output=xml:dslash_mobius_local{pol2}.xml)
 
-     if(polenv)
+    if(polenv)
       set_tests_properties(dslash_domain-wall-4d-asym-policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
       set_tests_properties(dslash_mobius-asym-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
@@ -573,7 +575,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                      --compute-fat-long true
                      --epsilon-naik -0.01
                      --tadpole-coeff 0.9
-                     --gtest_output=xml:dslash_improved_staggered_build_test_pol${pol2}.xml)
+        --gtest_output=xml:dslash_improved_staggered_build_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_improved_staggered_build-policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
