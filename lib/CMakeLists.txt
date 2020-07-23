@@ -183,7 +183,7 @@ target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -Wno-d
                                     -arch=${QUDA_GPU_ARCH} --expt-relaxed-constexpr>)
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>: --cuda-path=${CUDAToolkit_TARGET_DIR}
                                     --cuda-gpu-arch=${QUDA_GPU_ARCH}>)
-target_link_options(quda PUBLIC $<$<CXX_COMPILER_ID:Clang>: --cuda-path=${CUDAToolkit_TARGET_DIR}>)
+target_link_options(quda PUBLIC $<$<CUDA_COMPILER_ID:Clang>: --cuda-path=${CUDAToolkit_TARGET_DIR}>)
 
 if(QUDA_VERBOSE_BUILD)
   target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:--ptxas-options=-v>)
