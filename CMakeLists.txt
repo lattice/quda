@@ -545,7 +545,7 @@ if(QUDA_QMP)
       GIT_SHALLOW YES
       PREFIX usqcd
       CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure "INSTALL=${INSTALL_EXE} -C"
-                        --with-qmp-comms-type=MPI --prefix=<INSTALL_DIR>
+                        "CFLAGS=-Wall -O3 -std=c99 -g" --with-qmp-comms-type=MPI --prefix=<INSTALL_DIR>
       BUILD_COMMAND ${MAKE_EXE}
       INSTALL_COMMAND ${MAKE_EXE} install
       LOG_INSTALL ON
@@ -625,7 +625,8 @@ if(QUDA_QIO)
       GIT_SHALLOW YES
       PREFIX usqcd
       CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure "INSTALL=${INSTALL_EXE} -C"
-                        --with-qmp=${QUDA_QMPHOME} --prefix=<INSTALL_DIR>
+                        "CFLAGS=-Wall -O3 -std=c99 -DHAVE_BGL -g" --with-qmp=${QUDA_QMPHOME} --prefix=<INSTALL_DIR>
+                        --enable-largefile --disable-qmp-route --enable-dml-output-buffering
       BUILD_COMMAND make
       INSTALL_COMMAND make install
       DEPENDS QMP
