@@ -200,21 +200,6 @@ if(CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA" AND ${CMAKE_CUDA_COMPILER_VERSION} VE
 endif()
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:--cuda-path=${CUDAToolkit_TARGET_DIR}>)
 
-
-target_compile_options(quda PRIVATE 
-  $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
-    $<$<CONFIG:DEVEL>:-lineinfo -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field>
-    $<$<CONFIG:STRICT>: -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field>
-    $<$<CONFIG:HOSTDEBUG>:-lineinfo>
-    $<$<CONFIG:SANITIZE>:-lineinfo -Xcompiler -fsanitize=address,-fsanitize=undefined>>
-  $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
-    $<$<CONFIG:DEVEL>:-Wno-unknown-pragmas -Wno-unused-function -Wno-unused-local-typedef -Wno-unused-private-field>
-    $<$<CONFIG:STRICT>:-Wno-unknown-pragmas -Wno-unused-function -Wno-unused-local-typedef -Wno-unused-private-field>
-    $<$<CONFIG:HOSTDEBUG>:>
-    $<$<CONFIG:SANITIZE>:-fsanitize=address,-fsanitize=undefined>>
-)
-
-# include_directories
 target_include_directories(quda SYSTEM PRIVATE ../include/externals)
 target_include_directories(quda PRIVATE .)
 target_include_directories(quda PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
@@ -264,12 +249,25 @@ if(${QUDA_PROPAGATE_CXX_FLAGS})
   # Turne the flags into a CMAKE list  
   string(REPLACE " " ";" PROPAGATED_FLAG_LIST ${PROPAGATED_FLAGS})
  
-  # Rather than adding all the list, do it element y element
-  # Then there is no weird quoting  problem seemingly 
   foreach( FLAG ${PROPAGATED_FLAG_LIST} )
 	  target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -Xcompiler=${FLAG}>)
   endforeach()
 endif()
+
+#Specific comnfig dependent warning suppressions and lineinfo forwarding
+target_compile_options(quda PRIVATE
+  $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
+    $<$<CONFIG:DEVEL>:-lineinfo -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field>
+    $<$<CONFIG:STRICT>: -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field>
+    $<$<CONFIG:HOSTDEBUG>:-lineinfo>
+    $<$<CONFIG:SANITIZE>:-lineinfo -Xcompiler -fsanitize=address,-fsanitize=undefined>>
+    $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
+    $<$<CONFIG:DEVEL>:-Wno-unknown-pragmas -Wno-unused-function -Wno-unused-local-typedef -Wno-unused-private-field>
+    $<$<CONFIG:STRICT>:-Wno-unknown-pragmas -Wno-unused-function -Wno-unused-local-typedef -Wno-unused-private-field>
+    $<$<CONFIG:HOSTDEBUG>:>
+    $<$<CONFIG:SANITIZE>:-fsanitize=address,-fsanitize=undefined>
+  >
+)
 
 # some clang warnings should be warning even when turning warnings into errors
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
