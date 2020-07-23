@@ -821,12 +821,25 @@ namespace quda {
 
       }
 
+      /**
+       * @brief This and the following method (eventually) creates a fieldorder_wrapper object whose pointer points to
+       * the start of the memory chunk corresponds to the matrix at dim, dir, parity, x_cb, s. Only available for the
+       * QUDA_SPACE_SPIN_COLOR_FIELD_ORDER order.
+       * @param dim
+       * @param dir
+       * @param parity Parity index
+       * @param x_cb 1-d checkboarding site index
+       * @param s spin index
+       */
       __device__ __host__ inline const auto wrap_ghost(int dim, int dir, int parity, int x_cb, int s) const
       {
         const int idx = ghostAccessor.wrap_index(dim, dir, parity, x_cb, s);
         return fieldorder_wrapper<Float, ghostFloat>(ghost[2 * dim + dir], idx, ghost_scale, ghost_scale_inv);
       }
 
+      /**
+       * @brief the non-const `wrap_ghost` method
+       */
       __device__ __host__ inline auto wrap_ghost(int dim, int dir, int parity, int x_cb, int s)
       {
         const int idx = ghostAccessor.wrap_index(dim, dir, parity, x_cb, s);

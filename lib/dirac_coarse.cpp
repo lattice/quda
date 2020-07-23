@@ -227,6 +227,8 @@ namespace quda {
         // save the intermediate tunecache after the UV and VUV tune
         saveTuneCache();
 
+        X_d->copy(*X_order);
+
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("About to build the preconditioned coarse clover\n");
 
         createYhat(gpu_setup);
@@ -237,7 +239,6 @@ namespace quda {
         calculateYhat(*Yhat_d, *Xinv_d, *Y_order, *X_order, use_mma);
 
         Y_d->copy(*Y_order);
-        X_d->copy(*X_order);
 
         delete Y_order;
         delete X_order;

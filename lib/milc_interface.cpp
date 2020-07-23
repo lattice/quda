@@ -1692,6 +1692,8 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
   mg_param.invert_param = &inv_param;
   mg_param.n_level = mg_levels; // set from file
 
+  mg_param.use_mma = QUDA_BOOLEAN_FALSE; // TODO: set to false, for now.
+
   for (int i = 0; i < mg_param.n_level; i++) {
 
     if (i == 0) {

@@ -16,11 +16,13 @@ namespace quda
 {
   namespace mma
   {
+    // return the size of the shared memory needed for MMA with block shape bM, bN, bK.
     constexpr int shared_memory_bytes(int bM, int bN, int bK)
     {
       return (bM + pad_size(bM) + bN + pad_size(bN)) * bK * 2 * sizeof(half);
     }
 
+    // A shared memory object that bakes with it a 2-d index access method.
     template <class T, int M_, int N_, int ldm_, int ldn_> struct SharedMemoryObject {
 
       static constexpr int M = M_;
@@ -49,6 +51,14 @@ namespace quda
       return SharedMemoryObject<T, M, N, ldm, ldn> {ptr_};
     }
 
+    /**
+     * A loader object that loads data from global memory to registers (g2r), and then to shared memory (r2s)
+     * M, N: the global memory matrix size, for bound check only
+     * bM, bN: the shared memory matrix size
+     * block_y, block_z: CTA dimension in the y and z directions
+     * transpose: the global memory always assumes a column-major order, transpose = true if the destination
+          shared memory is row-major.
+     */
     template <int M, int N, int bM, int bN, int block_y, int block_z, bool transpose> struct GlobalMemoryLoader {
 
       static constexpr int m_stride_n = block_y * 2;
@@ -63,6 +73,10 @@ namespace quda
       half2 reg_real[register_count];
       half2 reg_imag[register_count];
 
+      /**
+       * ld: leading dimension of global memory
+       * dagger: if we need to store daggered (tranpose and hermision conjugate)
+       */
       template <int ld, bool dagger, class GmemAccessor>
       __device__ inline void g2r(const GmemAccessor &gmem, int m_offset, int n_offset)
       {
@@ -163,6 +177,10 @@ namespace quda
       }
     };
 
+    /**
+     * Perform the complex GEMM
+     * @param m, n, k the corresponding offset in the M, N, and K direction
+     */
     template <class A, class B, class C>
     __device__ inline void zgemm(const A &smem_obj_a_real, const A &smem_obj_a_imag, const B &smem_obj_b_real,
                                  const B &smem_obj_b_imag, C &op_c_real, C &op_c_imag, int m, int n, int k,
@@ -187,6 +205,7 @@ namespace quda
       gemm(op_a_imag, op_b_imag, op_c_real);
     }
 
+    // A wrapper that wraps the OperandC objects, together with the various methods to loop over it
     template <class OperandC, int warp_cycle, int tile_col_dim> struct MmaAccumulator {
 
       static constexpr int size = warp_cycle;
@@ -281,16 +300,17 @@ namespace quda
       }
     };
 
+    // A conceptual class that stores all the static MMA sizes.
     template <int M_, int N_, int K_, int lda_, int ldb_, int ldc_, int bM_, int bN_, int bK_, int block_y, int block_z>
     struct MmaConfig {
 
-      static constexpr int M = M_;
+      static constexpr int M = M_; // the global matrix sizes
       static constexpr int N = N_;
       static constexpr int K = K_;
-      static constexpr int lda = lda_;
+      static constexpr int lda = lda_; // the leading dimensions of A, B, and C in global memory
       static constexpr int ldb = ldb_;
       static constexpr int ldc = ldc_;
-      static constexpr int bM = bM_;
+      static constexpr int bM = bM_; // The tile size for a CTA
       static constexpr int bN = bN_;
       static constexpr int bK = bK_;
 
@@ -298,20 +318,22 @@ namespace quda
       static constexpr int tile_col_dim = bN / MMA_N; // number of tiles in the row dimension
       static constexpr int tile_acc_dim = bK / MMA_K; // number of tiles in the accumulate dimension
 
-      static constexpr int smem_lda = bM + pad_size(bM);
+      static constexpr int smem_lda = bM + pad_size(bM); // shared memory leading dimensions
       static constexpr int smem_ldb = bN + pad_size(bN);
 
       static constexpr int n_row = block_y;
       static constexpr int n_col = block_z;
 
-      static constexpr int total_warp = n_row * n_col / warp_size;
+      static constexpr int total_warp = n_row * n_col / warp_size; // Total number of warps in the CTA
 
-      static constexpr int total_tile = tile_row_dim * tile_col_dim;
-      static constexpr int warp_cycle = total_tile / total_warp;
+      static constexpr int total_tile = tile_row_dim * tile_col_dim; // Total number of tiles dividing operand C
+      static constexpr int warp_cycle = total_tile / total_warp;     // Number of tiles each warp needs to calculate
 
-      static constexpr bool a_transpose = false;
+      static constexpr bool a_transpose
+        = false; // In our setup, specifically in the arch-dependent code, A is always column-major, while B is always row-major
       static constexpr bool b_transpose = true;
 
+      // What accumulation type we are using for the MMA, fp16 (half) or fp32 (float)
 #ifdef USE_FP16_HMMA_ACCUMULATE
       using accumuate_reg_type = half;
 #else
@@ -334,6 +356,8 @@ namespace quda
       using ALoader = GlobalMemoryLoader<M, K, bM, bK, n_row, n_col, a_transpose>;
       using BLoader = GlobalMemoryLoader<N, K, bN, bK, n_row, n_col, b_transpose>;
 
+      // This is the most general MMA code: bM < M, bN < N, bK < K.
+      // We divide M and N, and we stream over K, which means we need to store the accumulate register for ALL tiles.
       template <bool a_dagger, bool b_dagger, bool compute_max_only, class A, class B, class C>
       static __device__ inline float perform_mma_divide_k_yes(const A &a, const B &b, C &c, int m_offset, int n_offset)
       {
@@ -351,10 +375,10 @@ namespace quda
         ALoader a_loader;
         BLoader b_loader;
 
-        a_loader.g2r<lda, a_dagger>(a, m_offset, 0);
+        a_loader.g2r<lda, a_dagger>(a, m_offset, 0); // bk = 0
         a_loader.r2s<a_dagger>(smem_obj_a_real, smem_obj_a_imag);
 
-        b_loader.g2r<ldb, b_dagger>(b, n_offset, 0);
+        b_loader.g2r<ldb, b_dagger>(b, n_offset, 0); // bk = 0
         b_loader.r2s<b_dagger>(smem_obj_b_real, smem_obj_b_imag);
 
         __syncthreads();
@@ -362,14 +386,15 @@ namespace quda
 #pragma unroll 1
         for (int bk = 0; bk < K; bk += bK) {
 
-          if (bk + bK < K) {
+          if (bk + bK < K) { // Pipelining: retrieve data for the next K-stage and storage in the registers.
             a_loader.g2r<lda, a_dagger>(a, m_offset, bk + bK);
             b_loader.g2r<ldb, b_dagger>(b, n_offset, bk + bK);
           }
 
           accumulator.mma<tile_acc_dim>(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
 
-          if (bk + bK < K) {
+          if (bk + bK < K) { // We have used all data in smem for this K-stage: move the data for the next K-stage
+                             // to smem.
             __syncthreads();
 
             a_loader.r2s<a_dagger>(smem_obj_a_real, smem_obj_a_imag);
@@ -389,6 +414,9 @@ namespace quda
         return max;
       }
 
+      // This is version of the MMA code: bM < M, bN < N, bK >= K.
+      // We divide M and N, but we have all K-stages, which means we do NOT need to store the accumulate register
+      // for ALL tiles. This saves register usage.
       template <bool a_dagger, bool b_dagger, bool compute_max_only, class A, class B, class C>
       static __device__ inline float perform_mma_divide_k_no(const A &a, const B &b, C &c_accessor, int m_offset,
                                                              int n_offset)
@@ -452,6 +480,10 @@ namespace quda
         return max;
       }
 
+      // This is version of the MMA code: bM < M, bN >= N, bK >= K.
+      // We divide M, have the whole of N, but we have all K-stages, i.e. we have all of operand B in smem.
+      // This means we do NOT need to store the accumulate register for ALL tiles. This saves register usage.
+      // We loop over different sub-paritions of operand A.
       template <bool a_dagger, bool b_dagger, bool compute_max_only, class A, class B, class C>
       static __device__ inline float perform_mma_divide_b_no(const A &a, const B &b, C &c_accessor)
       {
