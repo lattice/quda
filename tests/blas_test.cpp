@@ -462,7 +462,7 @@ double benchmark(Kernel kernel, const int niter)
       break;
 
     case Kernel::caxpbypzYmbwcDotProductUYNormY:
-      for (int i = 0; i < niter; ++i) blas::caxpbypzYmbwcDotProductUYNormY(a2, *xD, b2, *yD, *zoD, *wD, *voD);
+      for (int i = 0; i < niter; ++i) blas::caxpbypzYmbwcDotProductUYNormY(a2, *xD, b2, *yD, *zoD, *wD, *vD);
       break;
 
     case Kernel::HeavyQuarkResidualNorm:

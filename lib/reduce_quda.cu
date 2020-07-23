@@ -113,10 +113,10 @@ namespace quda {
         location(checkLocation(x, y, z, w, v))
       {
         checkLength(x, y, z, w, v);
-        auto x_prec = checkPrecision(x, z, w);
-        auto y_prec = checkPrecision(y, v);
-        auto x_order = checkOrder(x, z, w);
-        auto y_order = checkOrder(y, v);
+        auto x_prec = checkPrecision(x, z, w, v);
+        auto y_prec = y.Precision();
+        auto x_order = checkOrder(x, z, w, v);
+        auto y_order = y.FieldOrder();
         if (sizeof(store_t) != x_prec) errorQuda("Expected precision %lu but received %d", sizeof(store_t), x_prec);
         if (sizeof(y_store_t) != y_prec) errorQuda("Expected precision %lu but received %d", sizeof(y_store_t), y_prec);
         if (x_prec == y_prec && x_order != y_order) errorQuda("Orders %d %d do not match", x_order, y_order);
@@ -317,7 +317,7 @@ namespace quda {
 
     Complex axpyCGNorm(double a, ColorSpinorField &x, ColorSpinorField &y)
     {
-      double2 cg_norm = instantiateReduce<axpyCGNorm2, true>(a, 0.0, 0.0, x, y, x, x, y);
+      double2 cg_norm = instantiateReduce<axpyCGNorm2, true>(a, 0.0, 0.0, x, y, x, x, x);
       return Complex(cg_norm.x, cg_norm.y);
     }
 

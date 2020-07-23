@@ -17,7 +17,7 @@ namespace quda
       Spinor<y_store_t, Ny> Y;
       Spinor<store_t, N> Z;
       Spinor<store_t, N> W;
-      Spinor<y_store_t, Ny> V;
+      Spinor<store_t, N> V;
       Reducer r;
 
       const int length;
