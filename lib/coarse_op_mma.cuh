@@ -9,6 +9,12 @@
 
 #endif
 
+/**
+  Here we detail how the MMA kernels for computeUV and computeVUV should be launched. Specifically:
+  - bM, bN, bK: the CTA-local MMA shape sizes.
+  - block_y, block_z: number of threads in each direction. (blockDim.x has nothing to do with the MMA shape)
+ */
+
 namespace quda
 {
 
@@ -107,6 +113,12 @@ namespace quda
       errorQuda("MMA implementation is ONLY built for !from_coarse.");
       return -1;
     }
+
+    /**
+        The following functions have switch's that list computeUV and computeVUV MMA kernels instantiations.
+        if query_max = true, it will simply return how many instantiations there are; if query_max = false,
+        the MMA kernel is launched with the corresponding configuration.
+     */
 
     template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 6 && Arg::coarseColor == 6 && Arg::fineSpin == 2 && Arg::coarseSpin == 2, int>::type
@@ -587,7 +599,7 @@ namespace quda
       return -1;
     }
 
-#endif
+#endif // compute capability >= 700, CUDA >= 10.1
 
   } // namespace mma
 

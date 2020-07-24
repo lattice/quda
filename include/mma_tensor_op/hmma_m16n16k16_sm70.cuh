@@ -2,6 +2,7 @@
 
 #include <type_traits>
 
+// This macro determines whether or not we are using the fp16 accumulation of the MMA instruction.
 // #define USE_FP16_HMMA_ACCUMULATE
 
 constexpr QudaPrecision accumulate_precision()
@@ -12,6 +13,8 @@ constexpr QudaPrecision accumulate_precision()
   return QUDA_SINGLE_PRECISION;
 #endif
 }
+
+// Here we implement the architecture dependent part of MMA for Volta (sm70, the mma.sync.m8n8k4 instruction).
 
 namespace quda
 {
@@ -28,11 +31,9 @@ namespace quda
     struct WarpRegisterMapping {
 
       int warp_id;
-      // int quad_row;
       int row_offset; // quad_row * 8 + quad_hilo * 4
       int col_offset; // quad_col * 8 + quad_hilo * 4
       int quad_col;
-      // int quad_hilo;   // quad higher or lower.
       int quad_thread; // 0,1,2,3
 
       __device__ inline WarpRegisterMapping(int thread_id)
@@ -74,10 +75,6 @@ namespace quda
         const int thread_offset_a = idx_strided * (SmemObj::ldn / 2) + idx_contiguous;
         reg[0] = A[thread_offset_a];
         reg[1] = A[thread_offset_a + 1];
-
-        // XXX the following code is more concise, but CUDA spills the registers if we use it
-        // smem_obj.vector_store(idx_contiguous + 0, idx_strided, reg[0]);
-        // smem_obj.vector_store(idx_contiguous + 2, idx_strided, reg[1]);
       }
 
       __device__ inline void negate()
@@ -111,10 +108,6 @@ namespace quda
         const int thread_offset_b = idx_strided * (SmemObj::ldn / 2) + idx_contiguous;
         reg[0] = B[thread_offset_b];
         reg[1] = B[thread_offset_b + 1];
-
-        // XXX the following code is more concise, but CUDA spills the registers if we use it
-        // smem_obj.vector_store(idx_contiguous + 0, idx_strided, reg[0]);
-        // smem_obj.vector_store(idx_contiguous + 2, idx_strided, reg[1]);
       }
     };
 

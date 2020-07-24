@@ -10,6 +10,11 @@
 
 #endif
 
+/**
+  Here we detail how the MMA kernels for computeYhat should be launched. Specifically:
+  - bM, bN, bK: the CTA-local MMA shape sizes.
+  - block_y, block_z: number of threads in each direction. (blockDim.x has nothing to do with the MMA shape)
+ */
 namespace quda
 {
 
@@ -58,6 +63,11 @@ namespace quda
       kernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
     }
 
+    /**
+        The following functions have switch's that list computeYhat MMA kernels instantiations.
+        if query_max = true, it will simply return how many instantiations there are; if query_max = false,
+        the MMA kernel is launched with the corresponding configuration.
+     */
     template <bool compute_max_only, bool query_max = false, class Arg>
     typename std::enable_if<Arg::N == 48, int>::type launch_yhat_kernel(Arg &arg, int min_threads, TuneParam &tp,
                                                                         const cudaStream_t &stream)
@@ -164,7 +174,7 @@ namespace quda
       errorQuda("MMA multigrid is not available for this setup.");
     }
 
-#endif
+#endif // compute capability >= 700, CUDA >= 10.1
 
   } // namespace mma
 

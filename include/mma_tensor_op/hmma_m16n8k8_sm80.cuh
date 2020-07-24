@@ -2,6 +2,7 @@
 
 #include <type_traits>
 
+// This macro determines whether or not we are using the fp16 accumulation of the MMA instruction.
 // #define USE_FP16_HMMA_ACCUMULATE
 
 constexpr QudaPrecision accumulate_precision()
@@ -12,6 +13,8 @@ constexpr QudaPrecision accumulate_precision()
   return QUDA_SINGLE_PRECISION;
 #endif
 }
+
+// Here we implement the architecture dependent part of MMA for Turing/Ampere (sm75/sm80, the mma.sync.m16n8k8 instruction).
 
 namespace quda
 {

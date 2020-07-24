@@ -15,6 +15,8 @@ namespace quda
   namespace mma
   {
 
+    // This is MMA implementation of the computeYhat kernels.
+
     template <bool compute_max_only, typename Arg, int bM, int bN, int bK, int block_y, int block_z>
     inline __device__ auto computeYhat(Arg &arg, int d, int x_cb, int parity, int m, int n)
     {
