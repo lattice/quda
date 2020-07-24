@@ -16,6 +16,8 @@ namespace quda
   namespace mma
   {
 
+    // This is the MMA implementation of the computeUV and computeVUV kernels for from_coarse == true.
+
     namespace impl
     {
 
@@ -27,7 +29,6 @@ namespace quda
       __device__ __host__ inline void computeUV(Arg &arg, const Wtype &Wacc, int parity, int x_cb)
       {
         constexpr int fineSpin = Arg::fineSpin;
-        // constexpr int coarseSpin = Arg::coarseSpin;
 
         int coord[4];
         getCoords(coord, x_cb, arg.x_size, parity);
@@ -38,23 +39,24 @@ namespace quda
 
         constexpr bool a_dagger = false;
         constexpr bool b_dagger = false;
+        constexpr bool compute_max_only = false;
+
+        // Here instead of fineColor x coarseColor x fineColor,
+        // we do (fineColor * fineSpin) x coarseColor x fineColor
+
+        constexpr int M = tile.m * fineSpin;
+        constexpr int N = tile.n;
+        constexpr int K = tile.k;
+
+        constexpr int lda = K * fineSpin;
+        constexpr int ldb = N;
+        constexpr int ldc = N;
+
+        using Config = MmaConfig<M, N, K, lda, ldb, ldc, bM, bN, bK, block_y, block_z>;
 
         if (arg.comm_dim[dim] && (coord[dim] + nFace >= arg.x_size[dim])) {
 
           int ghost_idx = ghostFaceIndex<1>(coord, arg.x_size, dim, nFace);
-
-          // Here instead of fineColor x coarseColor x fineColor,
-          // we do (fineColor * fineSpin) x coarseColor x fineColor
-
-          constexpr int M = tile.m * fineSpin;
-          constexpr int N = tile.n;
-          constexpr int K = tile.k;
-
-          constexpr int lda = K * fineSpin;
-          constexpr int ldb = N;
-          constexpr int ldc = N;
-
-          using Config = MmaConfig<M, N, K, lda, ldb, ldc, bM, bN, bK, block_y, block_z>;
 
           for (int s_col = 0; s_col < fineSpin; s_col++) {
 
@@ -62,7 +64,6 @@ namespace quda
             auto b = Wacc.wrap_ghost(dim, 1, (parity + 1) & 1, ghost_idx, s_col);
             auto c = arg.UV.wrap(parity, x_cb, s_col * fineSpin);
 
-            constexpr bool compute_max_only = false;
             Config::template perform_mma<a_dagger, b_dagger, compute_max_only>(a, b, c, 0, 0);
           }
 
@@ -70,26 +71,12 @@ namespace quda
 
           int y_cb = linkIndexP1(coord, arg.x_size, dim);
 
-          // Here instead of fineColor x coarseColor x fineColor,
-          // we do (fineColor * fineSpin) x coarseColor x fineColor
-
-          constexpr int M = tile.m * fineSpin;
-          constexpr int N = tile.n;
-          constexpr int K = tile.k;
-
-          constexpr int lda = K * fineSpin;
-          constexpr int ldb = N;
-          constexpr int ldc = N;
-
-          using Config = MmaConfig<M, N, K, lda, ldb, ldc, bM, bN, bK, block_y, block_z>;
-
           for (int s_col = 0; s_col < fineSpin; s_col++) {
 
             auto a = arg.U.wrap(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, 0, s_col);
             auto b = Wacc.wrap((parity + 1) & 1, y_cb, s_col);
             auto c = arg.UV.wrap(parity, x_cb, s_col * fineSpin);
 
-            constexpr bool compute_max_only = false;
             Config::template perform_mma<a_dagger, b_dagger, compute_max_only>(a, b, c, 0, 0);
           }
         }
@@ -180,6 +167,12 @@ namespace quda
 
         typename Config::ALoader a_loader;
         typename Config::BLoader b_loader;
+
+        /**
+          Here we directly put the implementation of the MMA kernel here because computeVUV uses more
+          atomic for storing output data, and the shared memory loaded for operand A can be reused for
+          various spin compoents
+        */
 
         // Not unrolling to lift regiter pressure
         for (int s = 0; s < fineSpin; s++) {
