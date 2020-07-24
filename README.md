@@ -261,6 +261,7 @@ http://lattice.github.com/quda .
 *  Andre Walker-Loud (Lawrence Berkley Laboratory)
 *  Evan Weinberg (NVIDIA)
 *  Frank Winter (Jlab)
+*  Yi-Bo Yang (Chinese Academy of Sciences)
 
 
 Portions of this software were developed at the Innovative Systems Lab,

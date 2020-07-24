@@ -230,6 +230,7 @@ template <typename T> std::string inline get_string(CLI::TransformPairs<T> &map,
 
 extern int device;
 extern int rank_order;
+extern bool native_blas_lapack;
 extern std::array<int, 4> gridsize_from_cmdline;
 extern std::array<int, 4> dim_partitioned;
 extern QudaReconstructType link_recon;
@@ -344,6 +345,7 @@ extern bool generate_nullspace;
 extern bool generate_all_levels;
 extern quda::mgarray<QudaSchwarzType> mg_schwarz_type;
 extern quda::mgarray<int> mg_schwarz_cycle;
+extern bool mg_evolve_thin_updates;
 
 extern quda::mgarray<std::array<int, 4>> geo_block_size;
 extern int n_ev;

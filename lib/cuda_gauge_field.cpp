@@ -46,7 +46,7 @@ namespace quda {
 	break;
       case QUDA_MEMORY_MAPPED:
         gauge_h = mapped_malloc(bytes);
-	cudaHostGetDevicePointer(&gauge, gauge_h, 0); // set the matching device pointer
+	gauge = get_mapped_device_pointer(gauge_h); // set the matching device pointer
 	break;
       default:
 	errorQuda("Unsupported memory type %d", mem_type);
@@ -576,9 +576,7 @@ namespace quda {
             src.Order() == QUDA_BQCD_GAUGE_ORDER      ||
             src.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
 	  // special case where we use zero-copy memory to read/write directly from application's array
-	  void *src_d;
-	  cudaError_t error = cudaHostGetDevicePointer(&src_d, const_cast<void*>(src.Gauge_p()), 0);
-	  if (error != cudaSuccess) errorQuda("Failed to get device pointer for MILC site / BQCD array");
+	  void *src_d = get_mapped_device_pointer(src.Gauge_p());
 
 	  if (src.GhostExchange() == QUDA_GHOST_EXCHANGE_NO) {
 	    copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, src_d);
@@ -654,9 +652,7 @@ namespace quda {
           cpu.Order() == QUDA_BQCD_GAUGE_ORDER      ||
           cpu.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
 	// special case where we use zero-copy memory to read/write directly from application's array
-	void *cpu_d;
-	cudaError_t error = cudaHostGetDevicePointer(&cpu_d, const_cast<void*>(cpu.Gauge_p()), 0);
-	if (error != cudaSuccess) errorQuda("Failed to get device pointer for MILC site / BQCD array");
+	void *cpu_d = get_mapped_device_pointer(cpu.Gauge_p());
 	if (cpu.GhostExchange() == QUDA_GHOST_EXCHANGE_NO) {
 	  copyGenericGauge(cpu, *this, QUDA_CUDA_FIELD_LOCATION, cpu_d, gauge);
 	} else {

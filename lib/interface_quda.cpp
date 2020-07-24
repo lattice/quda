@@ -9,6 +9,7 @@
 #include <quda.h>
 #include <quda_fortran.h>
 #include <quda_internal.h>
+#include <device.h>
 #include <comm_quda.h>
 #include <tune_quda.h>
 #include <blas_quda.h>
@@ -29,19 +30,7 @@
 #include <mpi_comm_handle.h>
 
 #include <multigrid.h>
-
 #include <deflation.h>
-
-#ifdef NUMA_NVML
-#include <numa_affinity.h>
-#endif
-
-#ifdef QUDA_NVML
-#include <nvml.h>
-#endif
-
-#include <cuda.h>
-
 #include <ks_force_quda.h>
 
 #ifdef GPU_GAUGE_FORCE
@@ -51,8 +40,6 @@
 
 #define MAX(a,b) ((a)>(b)? (a):(b))
 #define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))
-
-#define MAX_GPU_NUM_PER_NODE 16
 
 // define newQudaGaugeParam() and newQudaInvertParam()
 #define INIT_PARAM
@@ -74,16 +61,13 @@
 
 #include <momentum.h>
 
-
-#include <cuda_profiler_api.h>
-
 using namespace quda;
 
 static int R[4] = {0, 0, 0, 0};
 // setting this to false prevents redundant halo exchange but isn't yet compatible with HISQ / ASQTAD kernels
 static bool redundant_comms = false;
 
-#include <blas_cublas.h>
+#include <blas_lapack.h>
 
 //for MAGMA lib:
 #include <blas_magma.h>
@@ -150,9 +134,6 @@ std::vector< std::vector<ColorSpinorField*> > chronoResident(QUDA_MAX_CHRONO);
 // Mapped memory buffer used to hold unitarization failures
 static int *num_failures_h = nullptr;
 static int *num_failures_d = nullptr;
-
-cudaDeviceProp deviceProp;
-qudaStream_t *streams;
 
 static bool initialized = false;
 
@@ -256,10 +237,8 @@ static TimeProfile profileInit2End("initQuda-endQuda",false);
 static bool enable_profiler = false;
 static bool do_not_profile_quda = false;
 
-static void profilerStart(const char *f) {
-
-
-
+static void profilerStart(const char *f)
+{
   static std::vector<int> target_list;
   static bool enable = false;
   static bool init = false;
@@ -283,7 +262,6 @@ static void profilerStart(const char *f) {
      }
    }
 
-
     char* donotprofile_env = getenv("QUDA_DO_NOT_PROFILE"); // disable profiling of QUDA parts
     if (donotprofile_env && (!(strcmp(donotprofile_env, "0") == 0)))  {
       do_not_profile_quda=true;
@@ -295,14 +273,14 @@ static void profilerStart(const char *f) {
   static int target_count = 0;
   static unsigned int i = 0;
   if (do_not_profile_quda){
-    cudaProfilerStop();
+    device::profile::stop();
     printfQuda("Stopping profiling in QUDA\n");
   } else {
     if (enable) {
       if (i < target_list.size() && target_count++ == target_list[i]) {
         enable_profiler = true;
         printfQuda("Starting profiling for %s\n", f);
-        cudaProfilerStart();
+        device::profile::start();
       i++; // advance to next target
     }
   }
@@ -310,13 +288,13 @@ static void profilerStart(const char *f) {
 }
 
 static void profilerStop(const char *f) {
-  if(do_not_profile_quda){
-    cudaProfilerStart();
+  if (do_not_profile_quda){
+    device::profile::start();
   } else {
 
     if (enable_profiler) {
       printfQuda("Stopping profiling for %s\n", f);
-      cudaProfilerStop();
+      device::profile::stop();
       enable_profiler = false;
     }
   }
@@ -487,8 +465,8 @@ extern char* gitversion;
 /*
  * Set the device that QUDA uses.
  */
-void initQudaDevice(int dev) {
-
+void initQudaDevice(int dev)
+{
   //static bool initialized = false;
   if (initialized) return;
   initialized = true;
@@ -505,123 +483,18 @@ void initQudaDevice(int dev) {
 #endif
   }
 
-  int driver_version;
-  cudaDriverGetVersion(&driver_version);
-  printfQuda("CUDA Driver version = %d\n", driver_version);
-
-  int runtime_version;
-  cudaRuntimeGetVersion(&runtime_version);
-  printfQuda("CUDA Runtime version = %d\n", runtime_version);
-
-#ifdef QUDA_NVML
-  nvmlReturn_t result = nvmlInit();
-  if (NVML_SUCCESS != result) errorQuda("NVML Init failed with error %d", result);
-  const int length = 80;
-  char graphics_version[length];
-  result = nvmlSystemGetDriverVersion(graphics_version, length);
-  if (NVML_SUCCESS != result) errorQuda("nvmlSystemGetDriverVersion failed with error %d", result);
-  printfQuda("Graphic driver version = %s\n", graphics_version);
-  result = nvmlShutdown();
-  if (NVML_SUCCESS != result) errorQuda("NVML Shutdown failed with error %d", result);
-#endif
-
-#if defined(MULTI_GPU) && (CUDA_VERSION == 4000)
-  //check if CUDA_NIC_INTEROP is set to 1 in the enviroment
-  // not needed for CUDA >= 4.1
-  char* cni_str = getenv("CUDA_NIC_INTEROP");
-  if(cni_str == nullptr){
-    errorQuda("Environment variable CUDA_NIC_INTEROP is not set");
-  }
-  int cni_int = atoi(cni_str);
-  if (cni_int != 1){
-    errorQuda("Environment variable CUDA_NIC_INTEROP is not set to 1");
-  }
-#endif
-
-  int deviceCount;
-  cudaGetDeviceCount(&deviceCount);
-  if (deviceCount == 0) {
-    errorQuda("No CUDA devices found");
-  }
-
-  for(int i=0; i<deviceCount; i++) {
-    cudaGetDeviceProperties(&deviceProp, i);
-    checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
-    if (getVerbosity() >= QUDA_SUMMARIZE) {
-      printfQuda("Found device %d: %s\n", i, deviceProp.name);
-    }
-  }
-
 #ifdef MULTI_GPU
   if (dev < 0) {
     if (!comms_initialized) {
       errorQuda("initDeviceQuda() called with a negative device ordinal, but comms have not been initialized");
-    }
+        }
     dev = comm_gpuid();
   }
 #else
   if (dev < 0 || dev >= 16) errorQuda("Invalid device number %d", dev);
 #endif
 
-  cudaGetDeviceProperties(&deviceProp, dev);
-  checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
-  if (deviceProp.major < 1) {
-    errorQuda("Device %d does not support CUDA", dev);
-  }
-
-
-// Check GPU and QUDA build compatibiliy
-// 4 cases:
-// a) QUDA and GPU match: great
-// b) QUDA built for higher compute capability: error
-// c) QUDA built for lower major compute capability: warn if QUDA_ALLOW_JIT, else error
-// d) QUDA built for same major compute capability but lower minor: warn
-
-  const int my_major = __COMPUTE_CAPABILITY__ / 100;
-  const int my_minor = (__COMPUTE_CAPABILITY__  - my_major * 100) / 10;
-// b) UDA was compiled for a higher compute capability
-  if (deviceProp.major * 100 + deviceProp.minor * 10 < __COMPUTE_CAPABILITY__)
-    errorQuda("** Running on a device with compute capability %i.%i but QUDA was compiled for %i.%i. ** \n --- Please set the correct QUDA_GPU_ARCH when running cmake.\n", deviceProp.major, deviceProp.minor, my_major, my_minor);
-
-
-// c) QUDA was compiled for a lower compute capability
-  if (deviceProp.major < my_major) {
-    char *allow_jit_env = getenv("QUDA_ALLOW_JIT");
-    if (allow_jit_env && strcmp(allow_jit_env, "1") == 0) {
-      if (getVerbosity() > QUDA_SILENT) warningQuda("** Running on a device with compute capability %i.%i but QUDA was compiled for %i.%i. **\n -- Jitting the PTX since QUDA_ALLOW_JIT=1 was set. Note that this will take some time.\n", deviceProp.major, deviceProp.minor, my_major, my_minor);
-    } else {
-      errorQuda("** Running on a device with compute capability %i.%i but QUDA was compiled for %i.%i. **\n --- Please set the correct QUDA_GPU_ARCH when running cmake.\n If you want the PTX to be jitted for your current GPU arch please set the enviroment variable QUDA_ALLOW_JIT=1.", deviceProp.major, deviceProp.minor, my_major, my_minor);
-    }
-  }
-// d) QUDA built for same major compute capability but lower minor
-  if (deviceProp.major == my_major and deviceProp.minor > my_minor) {
-    warningQuda("** Running on a device with compute capability %i.%i but QUDA was compiled for %i.%i. **\n -- This might result in a lower performance. Please consider adjusting QUDA_GPU_ARCH when running cmake.\n", deviceProp.major, deviceProp.minor, my_major, my_minor);
-  }
-
-  if (getVerbosity() >= QUDA_SUMMARIZE) {
-    printfQuda("Using device %d: %s\n", dev, deviceProp.name);
-  }
-#ifndef USE_QDPJIT
-  cudaSetDevice(dev);
-  checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
-#endif
-
-
-#if ((CUDA_VERSION >= 6000) && defined NUMA_NVML)
-  char *enable_numa_env = getenv("QUDA_ENABLE_NUMA");
-  if (enable_numa_env && strcmp(enable_numa_env, "0") == 0) {
-    if (getVerbosity() > QUDA_SILENT) printfQuda("Disabling numa_affinity\n");
-  }
-  else{
-    setNumaAffinityNVML(dev);
-  }
-#endif
-
-
-
-  cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
-  //cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
-  // cudaGetDeviceProperties(&deviceProp, dev);
+  device::init(dev);
 
   { // determine if we will do CPU or GPU data reordering (default is GPU)
     char *reorder_str = getenv("QUDA_REORDER_LOCATION");
@@ -649,26 +522,16 @@ void initQudaMemory()
 
   if (!comms_initialized) init_default_comms();
 
-  streams = new qudaStream_t[Nstream];
-
-  int greatestPriority;
-  int leastPriority;
-  cudaDeviceGetStreamPriorityRange(&leastPriority, &greatestPriority);
-  for (int i=0; i<Nstream-1; i++) {
-    cudaStreamCreateWithPriority(&streams[i], cudaStreamDefault, greatestPriority);
-  }
-  cudaStreamCreateWithPriority(&streams[Nstream-1], cudaStreamDefault, leastPriority);
-
-  checkCudaError();
+  device::create_context();
   createDslashEvents();
+
   blas::init();
-  cublas::init();
 
   // initalize the memory pool allocators
   pool::init();
 
   num_failures_h = static_cast<int*>(mapped_malloc(sizeof(int)));
-  cudaHostGetDevicePointer(&num_failures_d, num_failures_h, 0);
+  num_failures_d = static_cast<int*>(get_mapped_device_pointer(num_failures_h));
 
   loadTuneCache();
 
@@ -1461,7 +1324,8 @@ void endQuda(void)
   LatticeField::freeGhostBuffer();
   cpuColorSpinorField::freeGhostBuffer();
 
-  cublas::destroy();
+  blas_lapack::generic::destroy();
+  blas_lapack::native::destroy();
   blas::end();
 
   pool::flush_pinned();
@@ -1471,11 +1335,6 @@ void endQuda(void)
   num_failures_h = nullptr;
   num_failures_d = nullptr;
 
-  if (streams) {
-    for (int i=0; i<Nstream; i++) cudaStreamDestroy(streams[i]);
-    delete []streams;
-    streams = nullptr;
-  }
   destroyDslashEvents();
 
   saveTuneCache();
@@ -1537,12 +1396,7 @@ void endQuda(void)
 
   assertAllMemFree();
 
-  char *device_reset_env = getenv("QUDA_DEVICE_RESET");
-  if (device_reset_env && strcmp(device_reset_env,"1") == 0) {
-    // end this CUDA context
-    cudaDeviceReset();
-  }
-
+  device::destroy();
 }
 
 
@@ -2415,6 +2269,8 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   : profile(profile) {
   profile.TPSTART(QUDA_PROFILE_INIT);
   QudaInvertParam *param = mg_param.invert_param;
+  // set whether we are going use native or generic blas
+  blas_lapack::set_native(param->native_blas_lapack);
 
   checkMultigridParam(&mg_param);
   cudaGaugeField *cudaGauge = checkGauge(param);
@@ -2538,50 +2394,76 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
   // setOutputPrefix(prefix);
   setOutputPrefix("MG level 1 (GPU): "); //fix me
 
-  bool outer_pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
-    (param->solve_type == QUDA_NORMOP_PC_SOLVE);
+  // Check if we're doing a thin update only
+  if (mg_param->thin_update_only) {
+    // FIXME: add support for updating kappa, mu as appropriate
 
-  // free the previous dirac operators
-  if (mg->m) delete mg->m;
-  if (mg->mSmooth) delete mg->mSmooth;
-  if (mg->mSmoothSloppy) delete mg->mSmoothSloppy;
+    // FIXME: assumes gauge parameters haven't changed.
+    // These routines will set gauge = gaugeFat for DiracImprovedStaggered
+    mg->d->updateFields(gaugeSloppy, gaugeFatSloppy, gaugeLongSloppy, cloverSloppy);
+    mg->d->setMass(param->mass);
 
-  if (mg->d) delete mg->d;
-  if (mg->dSmooth) delete mg->dSmooth;
-  if (mg->dSmoothSloppy && mg->dSmoothSloppy != mg->dSmooth) delete mg->dSmoothSloppy;
+    mg->dSmooth->updateFields(gaugeSloppy, gaugeFatSloppy, gaugeLongSloppy, cloverSloppy);
+    mg->dSmooth->setMass(param->mass);
 
-  // create new fine dirac operators
+    if (mg->dSmoothSloppy != mg->dSmooth) {
+      if (param->overlap) {
+        mg->dSmoothSloppy->updateFields(gaugeExtended, gaugeFatExtended, gaugeLongExtended, cloverPrecondition);
+      } else {
+        mg->dSmoothSloppy->updateFields(gaugePrecondition, gaugeFatPrecondition, gaugeLongPrecondition,
+                                        cloverPrecondition);
+      }
+      mg->dSmoothSloppy->setMass(param->mass);
+    }
+    // The above changes are propagated internally by use of references, pointers, etc, so
+    // no further updates are needed.
 
-  // this is the Dirac operator we use for inter-grid residual computation
-  DiracParam diracParam;
-  setDiracSloppyParam(diracParam, param, outer_pc_solve);
-  mg->d = Dirac::create(diracParam);
-  mg->m = new DiracM(*(mg->d));
+  } else {
 
-  // this is the Dirac operator we use for smoothing
-  DiracParam diracSmoothParam;
-  bool fine_grid_pc_solve = (mg_param->smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE) ||
-    (mg_param->smoother_solve_type[0] == QUDA_NORMOP_PC_SOLVE);
-  setDiracSloppyParam(diracSmoothParam, param, fine_grid_pc_solve);
-  mg->dSmooth = Dirac::create(diracSmoothParam);
-  mg->mSmooth = new DiracM(*(mg->dSmooth));
+    bool outer_pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) || (param->solve_type == QUDA_NORMOP_PC_SOLVE);
 
-  // this is the Dirac operator we use for sloppy smoothing (we use the preconditioner fields for this)
-  DiracParam diracSmoothSloppyParam;
-  setDiracPreParam(diracSmoothSloppyParam, param, fine_grid_pc_solve, true);
-  mg->dSmoothSloppy = Dirac::create(diracSmoothSloppyParam);;
-  mg->mSmoothSloppy = new DiracM(*(mg->dSmoothSloppy));
+    // free the previous dirac operators
+    if (mg->m) delete mg->m;
+    if (mg->mSmooth) delete mg->mSmooth;
+    if (mg->mSmoothSloppy) delete mg->mSmoothSloppy;
 
-  mg->mgParam->matResidual = mg->m;
-  mg->mgParam->matSmooth = mg->mSmooth;
-  mg->mgParam->matSmoothSloppy = mg->mSmoothSloppy;
+    if (mg->d) delete mg->d;
+    if (mg->dSmooth) delete mg->dSmooth;
+    if (mg->dSmoothSloppy && mg->dSmoothSloppy != mg->dSmooth) delete mg->dSmoothSloppy;
 
-  mg->mgParam->updateInvertParam(*param);
-  if(mg->mgParam->mg_global.invert_param != param)
-    mg->mgParam->mg_global.invert_param = param;
+    // create new fine dirac operators
 
-  bool refresh = true;
-  mg->mg->reset(refresh);
+    // this is the Dirac operator we use for inter-grid residual computation
+    DiracParam diracParam;
+    setDiracSloppyParam(diracParam, param, outer_pc_solve);
+    mg->d = Dirac::create(diracParam);
+    mg->m = new DiracM(*(mg->d));
+
+    // this is the Dirac operator we use for smoothing
+    DiracParam diracSmoothParam;
+    bool fine_grid_pc_solve = (mg_param->smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE)
+      || (mg_param->smoother_solve_type[0] == QUDA_NORMOP_PC_SOLVE);
+    setDiracSloppyParam(diracSmoothParam, param, fine_grid_pc_solve);
+    mg->dSmooth = Dirac::create(diracSmoothParam);
+    mg->mSmooth = new DiracM(*(mg->dSmooth));
+
+    // this is the Dirac operator we use for sloppy smoothing (we use the preconditioner fields for this)
+    DiracParam diracSmoothSloppyParam;
+    setDiracPreParam(diracSmoothSloppyParam, param, fine_grid_pc_solve, true);
+    mg->dSmoothSloppy = Dirac::create(diracSmoothSloppyParam);
+    ;
+    mg->mSmoothSloppy = new DiracM(*(mg->dSmoothSloppy));
+
+    mg->mgParam->matResidual = mg->m;
+    mg->mgParam->matSmooth = mg->mSmooth;
+    mg->mgParam->matSmoothSloppy = mg->mSmoothSloppy;
+
+    mg->mgParam->updateInvertParam(*param);
+    if (mg->mgParam->mg_global.invert_param != param) mg->mgParam->mg_global.invert_param = param;
+
+    bool refresh = true;
+    mg->mg->reset(refresh);
+  }
 
   setOutputPrefix("");
 
@@ -4034,6 +3916,8 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   }
 
   cudaGaugeField *cudaGauge = createExtendedGauge(*cudaSiteLink, R, profileGaugeForce);
+  // apply / remove phase as appropriate
+  if (cudaGauge->StaggeredPhaseApplied()) cudaGauge->removeStaggeredPhase();
 
   // actually do the computation
   profileGaugeForce.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -4952,7 +4836,9 @@ void updateGaugeFieldQuda(void* gauge,
    *num_failures_h = 0;
 
    // project onto SU(3)
+   if (cudaGauge->StaggeredPhaseApplied()) cudaGauge->removeStaggeredPhase();
    projectSU3(*cudaGauge, tol, num_failures_d);
+   if (!cudaGauge->StaggeredPhaseApplied() && param->staggered_phase_applied) cudaGauge->applyStaggeredPhase();
 
    profileProject.TPSTOP(QUDA_PROFILE_COMPUTE);
 
