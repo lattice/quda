@@ -8,8 +8,7 @@ using device_reduce_t = doubledouble;
 using device_reduce_t = double;
 #endif
 
-#if CUDA_VERSION >= 11000
-#define FAST_REDUCE
+#ifdef HETEROGENEOUS_ATOMIC
 #include <cuda/std/atomic>
 using count_t = cuda::atomic<unsigned int, cuda::thread_scope_device>;
 #else
@@ -44,7 +43,7 @@ namespace quda
 
   template <typename T> struct ReduceArg {
     const int n_reduce; // number of reductions of length n_item
-#ifdef FAST_REDUCE
+#ifdef HETEROGENEOUS_ATOMIC
     using system_atomic_t = typename atomic_type<T>::type;
     static constexpr int n_item = sizeof(T) / sizeof(system_atomic_t);
     cuda::atomic<T, cuda::thread_scope_device> *partial;
@@ -75,7 +74,7 @@ namespace quda
         errorQuda("Requested reduction requires a larger buffer %lu than allocated %lu", reduce_size,
                   reducer::buffer_size());
 
-#ifdef FAST_REDUCE
+#ifdef HETEROGENEOUS_ATOMIC
       // initialize the result buffer so we can test for completion
       for (int i = 0; i < n_reduce * n_item; i++) {
         new (result_d + i) cuda::atomic<system_atomic_t, cuda::thread_scope_system> {};
@@ -86,7 +85,7 @@ namespace quda
 
     void complete(const qudaStream_t &stream)
     {
-#ifdef FAST_REDUCE
+#ifdef HETEROGENEOUS_ATOMIC
       for (int i = 0; i < n_reduce * n_item; i++) {
         while (result_d[i].load(cuda::std::memory_order_acquire) == init_value<system_atomic_t>()) {}
       }
@@ -98,7 +97,19 @@ namespace quda
     }
   };
 
-#ifdef FAST_REDUCE
+#ifdef HETEROGENEOUS_ATOMIC
+  /**
+     @brief Generic reduction function that reduces block-distributed
+     data "in" per thread to a single value.  This is the
+     heterogeneous-atomic version which uses std::atomic to signal the
+     completion of the reduction to the host.
+     
+     @param arg The argument struct that must be derived from ReduceArg
+     @param in The input per-thread data to be reduced
+     @param idx In the case of multiple reductions, idx identifies
+     which reduction this thread block corresponds to.  Typically idx
+     will be constant along constant blockIdx.y and blockIdx.z.
+  */
   template <int block_size_x, int block_size_y, typename T, bool do_sum = true, typename Reducer = cub::Sum, typename Arg>
   __device__ inline void reduce2d(Arg &arg, const T &in, const int idx = 0)
   {
@@ -146,7 +157,20 @@ namespace quda
       }
     }
   }
+
 #else
+  /**
+     @brief Generic reduction function that reduces block-distributed
+     data "in" per thread to a single value.  This is the legacy
+     variant which require explicit host-device synchronization to
+     signal the completion of the reduction to the host.
+     
+     @param arg The argument struct that must be derived from ReduceArg
+     @param in The input per-thread data to be reduced
+     @param idx In the case of multiple reductions, idx identifies
+     which reduction this thread block corresponds to.  Typically idx
+     will be constant along constant blockIdx.y and blockIdx.z.
+  */
   template <int block_size_x, int block_size_y, typename T, bool do_sum = true, typename Reducer = cub::Sum, typename Arg>
   __device__ inline void reduce2d(Arg &arg, const T &in, const int idx = 0)
   {

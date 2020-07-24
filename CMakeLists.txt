@@ -218,6 +218,13 @@ option(QUDA_NUMA_NVML "experimental use of NVML to set numa affinity" OFF)
 option(QUDA_VERBOSE_BUILD "display kernel register usage" OFF)
 option(QUDA_BUILD_NATIVE_LAPACK "build the native blas/lapack library according to QUDA_TARGET" ON)
 
+option(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support (CUDA >= 11.0)?" OFF)
+if(QUDA_HETEROGENEOUS_ATOMIC AND CUDA_VERSION LESS 11.0)
+  message(
+  SEND_ERROR
+  "Heterogeneous atomic support require CUDA >= 11.0")
+endif()
+
 set(QUDA_MAX_MULTI_BLAS_N
     "4"
     CACHE STRING "maximum value to initialize template for multi-blas /-reduce")
@@ -268,6 +275,7 @@ option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_INSTALL_ALL_TESTS)
 mark_as_advanced(QUDA_PROPAGATE_CXX_FLAGS)
+mark_as_advanced(QUDA_HETEROGENEOUS_ATOMIC)
 mark_as_advanced(QUDA_FLOAT8)
 mark_as_advanced(QUDA_FAST_COMPILE_REDUCE)
 mark_as_advanced(QUDA_FAST_COMPILE_DSLASH)

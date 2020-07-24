@@ -127,9 +127,6 @@ namespace quda {
           strcat(aux, y.AuxString());
         }
         if (location == QUDA_CPU_FIELD_LOCATION) strcat(aux, ",CPU");
-#ifdef FAST_REDUCE
-        if (location == QUDA_CUDA_FIELD_LOCATION) strcat(aux, ",fast_reduce");
-#endif
 
 #ifdef JITIFY
         ::quda::create_jitify_program("kernels/reduce_core.cuh");

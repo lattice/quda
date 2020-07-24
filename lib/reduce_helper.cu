@@ -57,9 +57,9 @@ namespace quda
 
     void init()
     {
-#ifdef FAST_REDUCE
+#ifdef HETEROGENEOUS_ATOMIC
       // fast reductions use heterogeneous std::atomic to synchronize CPU and GPU as opposed to using CUDA events
-      warningQuda("Experimental fast reductions enabled");
+      warningQuda("Experimental heterogeneous-atomic reductions enabled");
 #endif
 
       auto bytes = buffer_size();
@@ -72,7 +72,7 @@ namespace quda
         h_reduce = (device_reduce_t *)mapped_malloc(bytes);
         hd_reduce = (device_reduce_t *)get_mapped_device_pointer(h_reduce); // set the matching device pointer
 
-#ifdef FAST_REDUCE
+#ifdef HETEROGENEOUS_ATOMIC
         using system_atomic_t = device_reduce_t;
         size_t n_reduce = bytes / sizeof(system_atomic_t);
         auto *atomic_buf = reinterpret_cast<system_atomic_t *>(h_reduce);               // FIXME

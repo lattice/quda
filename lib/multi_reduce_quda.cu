@@ -31,9 +31,9 @@ namespace quda {
     }
 
 #ifdef QUDA_FAST_COMPILE_REDUCE
-    constexpr int max_block_size() { return 32; }
+    constexpr unsigned int max_block_size() { return 32; }
 #else
-    constexpr int max_block_size() { return 128; }
+    constexpr unsigned int max_block_size() { return 128; }
 #endif
 
     template <typename real, int len, int NXZ, typename Arg, typename T>
@@ -139,9 +139,6 @@ namespace quda {
           strcat(aux, ",");
           strcat(aux, y[0]->AuxString());
         }
-#ifdef FAST_REDUCE
-        strcat(aux, ",fast_reduce");
-#endif
 
         // since block dot product and block norm use the same functors, we need to distinguish them
         bool is_norm = false;
