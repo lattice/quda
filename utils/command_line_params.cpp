@@ -135,7 +135,13 @@ bool mg_evolve_thin_updates = false;
 
 // we only actually support 4 here currently
 quda::mgarray<std::array<int, 4>> geo_block_size = {};
+
+#if ((__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ >= 1) || (__CUDACC_VER_MAJOR__ > 10))                         \
+  && (__COMPUTE_CAPABILITY__ >= 700)
 bool mg_use_mma = true;
+#else
+bool mg_use_mma = false;
+#endif
 
 int n_ev = 8;
 int max_search_dim = 64;
@@ -851,7 +857,9 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   quda_app->add_mgoption(opgroup, "--mg-verbosity", mg_verbosity, CLI::QUDACheckedTransformer(verbosity_map),
                          "The verbosity to use on each level of the multigrid (default summarize)");
 
-  opgroup->add_option("--mg-use-mma", mg_use_mma, "Use tensor-core to accelerate multigrid (default = true)");
+  opgroup->add_option(
+    "--mg-use-mma", mg_use_mma,
+    "Use tensor-core to accelerate multigrid (default = true on Volta or later with CUDA >=10.1, otherwise false)");
 }
 
 void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app)

@@ -472,6 +472,7 @@ public:
      @param need_bidirectional[in] Whether or not we need to force a bi-directional
      build, even if the given level isn't preconditioned---if any previous level is
      preconditioned, we've violated that symmetry.
+     @param use_mma[in] Whether or not use MMA (tensor core) to do the calculation, default to false
    */
   void CoarseCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
                       const GaugeField &clover, const GaugeField &cloverInv, double kappa, double mu, double mu_factor,
@@ -483,6 +484,7 @@ public:
      @param Xinv[out] Coarse clover inverse field
      @param Y[in] Coarse link field
      @param X[in] Coarse clover field
+     @param use_mma[in] Whether or not use MMA (tensor core) to do the calculation, default to false
    */
   void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X, bool use_mma = false);
 

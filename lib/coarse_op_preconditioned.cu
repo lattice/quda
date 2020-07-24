@@ -176,6 +176,7 @@ namespace quda
      @param Xinv[out] Coarse clover inverse field
      @param Y[out] Coarse link field
      @param X[out] Coarse clover field
+     @param use_mma[in] Whether or not use MMA (tensor core) to do the calculation
    */
   template <QudaFieldLocation location, typename storeFloat, typename Float, int N, QudaGaugeFieldOrder gOrder>
   void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X, bool use_mma)
