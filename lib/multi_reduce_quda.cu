@@ -60,18 +60,20 @@ namespace quda {
       }
 #endif
 
+      T *result_ = new T[NXZ * arg.NYW * tp.grid.z];
       if (!commAsyncReduction()) {
-        if (tunable.jitifyError() != CUDA_ERROR_INVALID_VALUE) arg.complete(stream);
+        if (tunable.jitifyError() != CUDA_ERROR_INVALID_VALUE) arg.complete(result_, stream);
       }
 
       // need to transpose for same order with vector thread reduction
-      auto buffer = (reduce_t *)reducer::get_host_buffer();
       for (int i = 0; i < NXZ; i++) {
         for (int j = 0; j < arg.NYW; j++) {
-          result[i * arg.NYW + j] = static_cast<T>(buffer[j * NXZ + i]);
-          if (tp.grid.z == 2) result[i * arg.NYW + j] += static_cast<T>(buffer[NXZ * arg.NYW + j * NXZ + i]);
+          result[i * arg.NYW + j] = result_[j * NXZ + i];
+          if (tp.grid.z == 2) result[i * arg.NYW + j] += result_[NXZ * arg.NYW + j * NXZ + i];
         }
       }
+
+      delete result_;
     }
 
     template <template <typename ...> class Reducer, typename store_t, typename y_store_t, int nSpin, typename T>

@@ -60,13 +60,11 @@ namespace quda {
       }
 #endif
 
+      host_reduce_t result[2];
       if (!commAsyncReduction()) {
-        if (tunable.jitifyError() != CUDA_ERROR_INVALID_VALUE) arg.complete(stream);
+        if (tunable.jitifyError() != CUDA_ERROR_INVALID_VALUE) arg.complete(result, stream);
       }
-
-      host_reduce_t cpu_sum = set(((device_reduce_t *)reducer::get_host_buffer())[0]);
-      if (tp.grid.y == 2) sum(cpu_sum, ((device_reduce_t *)reducer::get_host_buffer())[1]); // add other parity if needed
-      return cpu_sum;
+      return tp.grid.y == 2 ? result[0] + result[1] : result[0];
     }
 
     template <template <typename ReducerType, typename real> class Reducer,

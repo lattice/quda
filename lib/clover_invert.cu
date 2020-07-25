@@ -31,17 +31,14 @@ namespace quda {
 
       apply(0);
       if (compute_tr_log) {
-        qudaDeviceSynchronize();
-        comm_allreduce_array((double*)arg.result_h, 2);
-        clover.TrLog()[0] = arg.result_h[0].x;
-        clover.TrLog()[1] = arg.result_h[0].y;
+        arg.complete(clover.TrLog());
+        comm_allreduce_array(clover.TrLog(), 2);
       }
       checkCudaError();
     }
 
     void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      arg.result_h[0] = make_double2(0.,0.);
       using Arg = decltype(arg);
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
 #ifdef JITIFY

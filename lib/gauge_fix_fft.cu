@@ -33,7 +33,6 @@ namespace quda {
 #endif
 #endif
 
-
 #ifndef FL_UNITARIZE_PI
 #define FL_UNITARIZE_PI 3.14159265358979323846
 #endif
@@ -148,21 +147,22 @@ namespace quda {
 
   };
 
-
   template <typename Float, typename Gauge>
   struct GaugeFixQualityArg : public ReduceArg<double2> {
     int threads;     // number of active threads required
     int X[4];     // grid dimensions
     Gauge dataOr;
     complex<Float> *delta;
+    double2 result;
 
     GaugeFixQualityArg(const Gauge &dataOr, const cudaGaugeField &data, complex<Float> * delta)
-      : ReduceArg<double2>(), dataOr(dataOr), delta(delta) {
+      : ReduceArg<double2>(), dataOr(dataOr), delta(delta)
+    {
       for ( int dir = 0; dir < 4; ++dir ) X[dir] = data.X()[dir];
       threads = data.VolumeCB();
     }
-    double getAction(){ return result_h[0].x; }
-    double getTheta(){ return result_h[0].y; }
+    double getAction(){ return result.x; }
+    double getTheta(){ return result.y; }
   };
 
   template<int blockSize, int Elems, typename Float, typename Gauge, int gauge_dir>
@@ -214,29 +214,24 @@ namespace quda {
     reduce2d<blockSize,2>(argQ, data);
   }
 
-
-
   template<int Elems, typename Float, typename Gauge, int gauge_dir>
   class GaugeFixQuality : TunableLocalParity {
     GaugeFixQualityArg<Float, Gauge> argQ;
     mutable char aux_string[128];     // used as a label in the autotuner
-
-  private:
     bool tuneGridDim() const { return true; }
 
   public:
     GaugeFixQuality(GaugeFixQualityArg<Float, Gauge> &argQ)
       : argQ(argQ) {
     }
-    ~GaugeFixQuality () { }
 
-    void apply(const qudaStream_t &stream){
+    void apply(const qudaStream_t &stream)
+    {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      argQ.result_h[0] = make_double2(0.0,0.0);
       LAUNCH_KERNEL_LOCAL_PARITY(computeFix_quality, (*this), tp, stream, argQ, Elems, Float, Gauge, gauge_dir);
-      qudaDeviceSynchronize();
-      argQ.result_h[0].x  /= (double)(3 * gauge_dir * 2 * argQ.threads);
-      argQ.result_h[0].y  /= (double)(3 * 2 * argQ.threads);
+      argQ.complete(&argQ.result, stream);
+      argQ.result.x /= (double)(3 * gauge_dir * 2 * argQ.threads);
+      argQ.result.y /= (double)(3 * 2 * argQ.threads);
     }
 
     TuneKey tuneKey() const {
@@ -254,8 +249,6 @@ namespace quda {
     }                                                                                                    //Not accounting the reduction!!!
 
   };
-
-
 
   template <typename Float>
   struct GaugeFixArg {
@@ -283,9 +276,6 @@ namespace quda {
       device_free(gx);
     }
   };
-
-
-
 
   template <typename Float>
   __global__ void kernel_gauge_set_invpsq(GaugeFixArg<Float> arg){

@@ -83,7 +83,8 @@ namespace quda
 #endif
     }
 
-    void complete(const qudaStream_t &stream)
+    template <typename host_t, typename device_t = host_t>
+    void complete(host_t *result, const qudaStream_t stream = 0)
     {
 #ifdef HETEROGENEOUS_ATOMIC
       for (int i = 0; i < n_reduce * n_item; i++) {
@@ -94,6 +95,10 @@ namespace quda
       qudaEventRecord(event, stream);
       while (cudaSuccess != qudaEventQuery(event)) {}
 #endif
+      // copy back result element by element and convert if necessary to host reduce type
+      // unit size here may differ from system_atomic_t size, e.g., if doing double-double
+      const int n_element = n_reduce * sizeof(T) / sizeof(device_t);
+      for (int i = 0; i < n_element; i++) result[i] = reinterpret_cast<device_t*>(result_h)[i];
     }
   };
 

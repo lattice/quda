@@ -130,8 +130,7 @@ namespace quda
 
       if (location == QUDA_CUDA_FIELD_LOCATION) {
         transform_reduce_kernel<<<tp.grid, tp.block>>>(arg);
-        qudaDeviceSynchronize();
-        for (decltype(arg.n_batch) j = 0; j < arg.n_batch; j++) arg.result[j] = arg.result_h[j];
+        arg.complete(arg.result, stream);
       } else {
         transform_reduce(arg);
       }

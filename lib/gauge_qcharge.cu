@@ -71,27 +71,23 @@ namespace quda
     {
       if (!Fmunu.isNative()) errorQuda("Topological charge computation only supported on native ordered fields");
 
+      double result[3];
       if (density) {
         QChargeArg<Float, nColor, recon, true> arg(Fmunu, (Float*)qdensity);
         QChargeCompute<decltype(arg)> qChargeCompute(arg, Fmunu);
         qChargeCompute.apply(0);
-        qudaDeviceSynchronize();
-
-        comm_allreduce_array((double *)arg.result_h, 3);
-        for (int i=0; i<2; i++) energy[i+1] = ((double*)arg.result_h)[i] / (2.0*arg.threads*comm_size());
-        qcharge = ((double*)arg.result_h)[2];
+        arg.complete(result);
       } else {
         QChargeArg<Float, nColor, recon, false> arg(Fmunu, (Float*)qdensity);
         QChargeCompute<decltype(arg)> qChargeCompute(arg, Fmunu);
         qChargeCompute.apply(0);
-        qudaDeviceSynchronize();
-
-        comm_allreduce_array((double *)arg.result_h, 3);
-        for (int i=0; i<2; i++) energy[i+1] = ((double*)arg.result_h)[i] / (2.0*arg.threads*comm_size());
-        qcharge = ((double*)arg.result_h)[2];
+        arg.complete(result);
       }
 
+      comm_allreduce_array(result, 3);
+      for (int i=0; i<2; i++) energy[i+1] = result[i] / (Fmunu.Volume() * comm_size());
       energy[0] = energy[1] + energy[2];
+      qcharge = result[2];
     }
   };
 
