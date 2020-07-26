@@ -111,7 +111,8 @@ enum class Kernel {
   reDotProductNorm_block,
   reDotProduct_block,
   cDotProductNorm_block,
-  cDotProduct_block
+  cDotProduct_block,
+  caxpyXmazMR
 };
 
 // For googletest names must be non-empty, unique, and may only contain ASCII
@@ -153,7 +154,8 @@ const std::map<Kernel, std::string> kernel_map
      {Kernel::reDotProductNorm_block, "reDotProductNorm_block"},
      {Kernel::reDotProduct_block, "reDotProduct_block"},
      {Kernel::cDotProductNorm_block, "cDotProductNorm_block"},
-     {Kernel::cDotProduct_block, "cDotProduct_block"}};
+     {Kernel::cDotProduct_block, "cDotProduct_block"},
+     {Kernel::caxpyXmazMR, "caxpyXmazMR"}};
 
 const int Nkernels = kernel_map.size();
 
@@ -520,6 +522,12 @@ double benchmark(Kernel kernel, const int niter)
 
     case Kernel::cDotProduct_block:
       for (int i = 0; i < niter; ++i) blas::cDotProduct(A, xmD->Components(), ymoD->Components());
+      break;
+
+    case Kernel::caxpyXmazMR:
+      commAsyncReductionSet(true);
+      for (int i = 0; i < niter; ++i) blas::caxpyXmazMR(a, *xD, *yD, *zD);
+      commAsyncReductionSet(false);
       break;
 
     default: errorQuda("Undefined blas kernel %s\n", kernel_map.at(kernel).c_str());
@@ -944,6 +952,33 @@ double test(Kernel kernel)
       }
     }
     error /= Nsrc*Msrc;
+    break;
+
+  case Kernel::caxpyXmazMR:
+    *xD = *xH;
+    *yD = *yH;
+    *zD = *zH;
+
+    commGlobalReductionSet(false); // switch off global reductions for this test
+    commAsyncReductionSet(true);
+    blas::cDotProductNormA(*zD, *xD);
+    blas::caxpyXmazMR(a, *xD, *yD, *zD);;
+    commAsyncReductionSet(false);
+
+    *vD = *xH;
+    *wD = *yH;
+    *zD = *zH;
+    {
+      double3 Ar3 = blas::cDotProductNormA(*zD, *vD);
+      auto alpha = Complex(Ar3.x, Ar3.y) / Ar3.z;
+      blas::caxpyXmaz(a * alpha, *vD, *wD, *zD);
+    }
+    *xH = *vD;
+    *yH = *wD;
+
+    commGlobalReductionSet(true); // restore global reductions
+
+    error = ERROR(x) + ERROR(y);
     break;
 
   default: errorQuda("Undefined blas kernel %s\n", kernel_map.at(kernel).c_str());

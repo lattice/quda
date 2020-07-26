@@ -64,7 +64,6 @@ namespace quda
       count {reducer::get_count()}
     {
       // write reduction to GPU memory if asynchronous
-      // do we need to call the placement new constructor in this case?
       if (commAsyncReduction()) result_d = static_cast<decltype(result_d)>(reducer::get_device_buffer());
 
       // check reduction buffers are large enough if requested
