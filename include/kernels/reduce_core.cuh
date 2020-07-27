@@ -134,7 +134,7 @@ namespace quda
     */
     template <typename reduce_t, typename T> __device__ __host__ reduce_t norm1_(const typename VectorType<T, 2>::type &a)
     {
-      return (reduce_t)sqrt(a.x * a.x + a.y * a.y);
+      return static_cast<reduce_t>(sqrt(a.x * a.x + a.y * a.y));
     }
 
     template <typename reduce_t, typename real>
@@ -146,8 +146,8 @@ namespace quda
 #pragma unroll
         for (int i=0; i < x.size(); i++) sum += norm1_<reduce_t, real>(x[i]);
       }
-      int streams() const { return 1; } //! total number of input and output streams
-      int flops() const { return 2; }   //! flops per element
+      constexpr int streams() const { return 1; } //! total number of input and output streams
+      constexpr int flops() const { return 2; }   //! flops per element
     };
 
     /**
@@ -155,8 +155,8 @@ namespace quda
     */
     template <typename reduce_t, typename T> __device__ __host__ void norm2_(reduce_t &sum, const typename VectorType<T, 2>::type &a)
     {
-      sum += (reduce_t)a.x * (reduce_t)a.x;
-      sum += (reduce_t)a.y * (reduce_t)a.y;
+      sum += static_cast<reduce_t>(a.x) * static_cast<reduce_t>(a.x);
+      sum += static_cast<reduce_t>(a.y) * static_cast<reduce_t>(a.y);
     }
 
     template <typename reduce_t, typename real>
@@ -168,8 +168,8 @@ namespace quda
 #pragma unroll
         for (int i = 0; i < x.size(); i++) norm2_<reduce_t,real>(sum, x[i]);
       }
-      int streams() const { return 1; } //! total number of input and output streams
-      int flops() const { return 2; }   //! flops per element
+      constexpr int streams() const { return 1; } //! total number of input and output streams
+      constexpr int flops() const { return 2; }   //! flops per element
     };
 
     /**
@@ -178,8 +178,8 @@ namespace quda
     template <typename reduce_t, typename T>
     __device__ __host__ void dot_(reduce_t &sum, const typename VectorType<T, 2>::type &a, const typename VectorType<T, 2>::type &b)
     {
-      sum += (reduce_t)a.x * (reduce_t)b.x;
-      sum += (reduce_t)a.y * (reduce_t)b.y;
+      sum += static_cast<reduce_t>(a.x) * static_cast<reduce_t>(b.x);
+      sum += static_cast<reduce_t>(a.y) * static_cast<reduce_t>(b.y);
     }
 
     template <typename reduce_t, typename real>
@@ -191,8 +191,8 @@ namespace quda
 #pragma unroll
         for (int i = 0; i < x.size(); i++) dot_<reduce_t, real>(sum, x[i], y[i]);
       }
-      int streams() const { return 2; } //! total number of input and output streams
-      int flops() const { return 2; }   //! flops per element
+      constexpr int streams() const { return 2; } //! total number of input and output streams
+      constexpr int flops() const { return 2; }   //! flops per element
     };
 
     /**
@@ -213,8 +213,8 @@ namespace quda
           norm2_<reduce_t, real>(sum, z[i]);
         }
       }
-      int streams() const { return 3; } //! total number of input and output streams
-      int flops() const { return 4; }   //! flops per element
+      constexpr int streams() const { return 3; } //! total number of input and output streams
+      constexpr int flops() const { return 4; }   //! flops per element
     };
 
     /**
@@ -234,8 +234,8 @@ namespace quda
           dot_<reduce_t, real>(sum, x[i], y[i]);
         }
       }
-      int streams() const { return 3; } //! total number of input and output streams
-      int flops() const { return 4; }   //! flops per element
+      constexpr int streams() const { return 3; } //! total number of input and output streams
+      constexpr int flops() const { return 4; }   //! flops per element
     };
 
     /**
@@ -255,8 +255,8 @@ namespace quda
           norm2_<reduce_t, real>(sum, y[i]);
         }
       }
-      int streams() const { return 3; } //! total number of input and output streams
-      int flops() const { return 6; }   //! flops per element
+      constexpr int streams() const { return 3; } //! total number of input and output streams
+      constexpr int flops() const { return 6; }   //! flops per element
     };
 
     /**
@@ -279,8 +279,8 @@ namespace quda
           norm2_<reduce_t, real>(sum, x[i]);
         }
       }
-      int streams() const { return 5; } //! total number of input and output streams
-      int flops() const { return 10; }  //! flops per element
+      constexpr int streams() const { return 5; } //! total number of input and output streams
+      constexpr int flops() const { return 10; }  //! flops per element
     };
 
     /**
@@ -304,8 +304,8 @@ namespace quda
           norm2_<reduce_t, real>(sum, z[i]);
         }
       }
-      int streams() const { return 4; } //! total number of input and output streams
-      int flops() const { return 10; }  //! flops per element
+      constexpr int streams() const { return 4; } //! total number of input and output streams
+      constexpr int flops() const { return 10; }  //! flops per element
     };
 
     /**
@@ -314,11 +314,11 @@ namespace quda
     template <typename reduce_t, typename T>
     __device__ __host__ void cdot_(reduce_t &sum, const typename VectorType<T, 2>::type &a, const typename VectorType<T, 2>::type &b)
     {
-      typedef typename scalar<reduce_t>::type scalar;
-      sum.x += (scalar)a.x * (scalar)b.x;
-      sum.x += (scalar)a.y * (scalar)b.y;
-      sum.y += (scalar)a.x * (scalar)b.y;
-      sum.y -= (scalar)a.y * (scalar)b.x;
+      using scalar = typename scalar<reduce_t>::type;
+      sum.x += static_cast<scalar>(a.x) * static_cast<scalar>(b.x);
+      sum.x += static_cast<scalar>(a.y) * static_cast<scalar>(b.y);
+      sum.y += static_cast<scalar>(a.x) * static_cast<scalar>(b.y);
+      sum.y -= static_cast<scalar>(a.y) * static_cast<scalar>(b.x);
     }
 
     template <typename real_reduce_t, typename real>
@@ -331,8 +331,8 @@ namespace quda
 #pragma unroll
         for (int i = 0; i < x.size(); i++) cdot_<reduce_t, real>(sum, x[i], y[i]);
       }
-      int streams() const { return 2; } //! total number of input and output streams
-      int flops() const { return 4; }   //! flops per element
+      constexpr int streams() const { return 2; } //! total number of input and output streams
+      constexpr int flops() const { return 4; }   //! flops per element
     };
 
     /**
@@ -354,8 +354,8 @@ namespace quda
           cdot_<reduce_t, real>(sum, z[i], y[i]);
         }
       }
-      int streams() const { return 4; } //! total number of input and output streams
-      int flops() const { return 8; }   //! flops per element
+      constexpr int streams() const { return 4; } //! total number of input and output streams
+      constexpr int flops() const { return 8; }   //! flops per element
     };
 
     /**
@@ -394,8 +394,8 @@ namespace quda
 #pragma unroll
         for (int i = 0; i < x.size(); i++) cdotNormA_<reduce_t>(sum, x[i], y[i]);
       }
-      int streams() const { return 2; } //! total number of input and output streams
-      int flops() const { return 6; }   //! flops per element
+      constexpr int streams() const { return 2; } //! total number of input and output streams
+      constexpr int flops() const { return 6; }   //! flops per element
     };
 
     /**
@@ -419,8 +419,8 @@ namespace quda
           cdotNormB_<reduce_t>(sum, v[i], z[i]);
         }
       }
-      int streams() const { return 7; } //! total number of input and output streams
-      int flops() const { return 18; }  //! flops per element
+      constexpr int streams() const { return 7; } //! total number of input and output streams
+      constexpr int flops() const { return 18; }  //! flops per element
     };
 
     /**
@@ -445,20 +445,17 @@ namespace quda
           y[i] = y_new;
         }
       }
-      int streams() const { return 3; } //! total number of input and output streams
-      int flops() const { return 6; }   //! flops per real element
+      constexpr int streams() const { return 3; } //! total number of input and output streams
+      constexpr int flops() const { return 6; }   //! flops per real element
     };
 
     /**
-       This kernel returns (x, x) and (r,r) and also returns the so-called
-       heavy quark norm as used by MILC: 1 / N * \sum_i (r, r)_i / (x, x)_i, where
-       i is site index and N is the number of sites.
-       When this kernel is launched, we must enforce that the parameter M
-       in the launcher corresponds to the number of FloatN fields used to
-       represent the spinor, e.g., M=6 for Wilson and M=3 for staggered.
-       This is only the case for half-precision kernels by default.  To
-       enable this, the siteUnroll template parameter must be set true
-       when reduceCuda is instantiated.
+       This kernel returns (x, x) and (r,r) and also returns the
+       so-called heavy quark norm as used by MILC: 1 / N * \sum_i (r,
+       r)_i / (x, x)_i, where i is site index and N is the number of
+       sites.  We must enforce that each thread updates an entire
+       lattice hence the site_unroll template parameter must be set
+       true.
     */
     template <typename real_reduce_t, typename real>
     struct HeavyQuarkResidualNorm_ : public ReduceFunctor<typename VectorType<real_reduce_t, 3>::type, true> {
@@ -490,16 +487,18 @@ namespace quda
         sum.z += (aux.x > 0.0) ? (aux.y / aux.x) : static_cast<real>(1.0);
       }
 
-      int streams() const { return 2; } //! total number of input and output streams
-      int flops() const { return 4; }   //! undercounts since it excludes the per-site division
+      constexpr int streams() const { return 2; } //! total number of input and output streams
+      constexpr int flops() const { return 4; }   //! undercounts since it excludes the per-site division
     };
 
     /**
       Variant of the HeavyQuarkResidualNorm kernel: this takes three
       arguments, the first two are summed together to form the
-      solution, with the third being the residual vector.  This removes
-      the need an additional xpy call in the solvers, improving
-      performance.
+      solution, with the third being the residual vector.  This
+      removes the need an additional xpy call in the solvers,
+      improving performance.  We must enforce that each thread updates
+      an entire lattice hence the site_unroll template parameter must
+      be set true.
     */
     template <typename real_reduce_t, typename real>
     struct xpyHeavyQuarkResidualNorm_ : public ReduceFunctor<typename VectorType<real_reduce_t, 3>::type, true> {
@@ -531,8 +530,8 @@ namespace quda
         sum.z += (aux.x > 0.0) ? (aux.y / aux.x) : static_cast<real>(1.0);
       }
 
-      int streams() const { return 3; } //! total number of input and output streams
-      int flops() const { return 5; }
+      constexpr int streams() const { return 3; } //! total number of input and output streams
+      constexpr int flops() const { return 5; }
     };
 
     /**
@@ -556,8 +555,8 @@ namespace quda
           dot_<real_reduce_t, real>(sum.z, y[i], z[i]);
         }
       }
-      int streams() const { return 3; } //! total number of input and output streams
-      int flops() const { return 6; }   //! flops per element
+      constexpr int streams() const { return 3; } //! total number of input and output streams
+      constexpr int flops() const { return 6; }   //! flops per element
     };
 
     /**
@@ -582,8 +581,8 @@ namespace quda
           norm2_<real_reduce_t, real>(sum.w, w[i]);
         }
       }
-      int streams() const { return 3; } //! total number of input and output streams
-      int flops() const { return 8; }   //! flops per element
+      constexpr int streams() const { return 3; } //! total number of input and output streams
+      constexpr int flops() const { return 8; }   //! flops per element
     };
 
     /**
@@ -610,8 +609,8 @@ namespace quda
           norm2_<reduce_t, real>(sum, y[i]);
         }
       }
-      int streams() const { return 6; } //! total number of input and output streams
-      int flops() const { return 6; }   //! flops per element check if it's right
+      constexpr int streams() const { return 6; } //! total number of input and output streams
+      constexpr int flops() const { return 6; }   //! flops per element check if it's right
     };
 
     /**
@@ -643,8 +642,8 @@ namespace quda
           norm2_<reduce_t, real>(sum, y[i]);
         }
       }
-      int streams() const { return 7; } //! total number of input and output streams
-      int flops() const { return 16; }  //! flops per element check if it's right
+      constexpr int streams() const { return 7; } //! total number of input and output streams
+      constexpr int flops() const { return 16; }  //! flops per element check if it's right
     };
 
   } // namespace blas

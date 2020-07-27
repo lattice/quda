@@ -176,7 +176,7 @@ namespace quda
       void set(const ColorSpinorField &x) {}
       __device__ __host__ inline norm_t load_norm(const int i, const int parity = 0) const { return 1.0; }
       template <typename real, int n>
-      __device__ __host__ inline norm_t store_norm(const vector_type<real, n> &v, int x, int parity)
+      __device__ __host__ inline norm_t store_norm(const vector_type<complex<real>, n> &v, int x, int parity)
       {
         return 1.0;
       }
@@ -257,7 +257,7 @@ namespace quda
         vector_type<real, len> v_;
 
         if (isFixed<store_t>::value) {
-          real scale_inv = SN::template store_norm(v, x, parity);
+          real scale_inv = SN::template store_norm<real, n>(v, x, parity);
 #pragma unroll
           for (int i = 0; i < n; i++) {
             v_[2 * i + 0] = scale_inv * v[i].real();

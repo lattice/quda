@@ -115,8 +115,8 @@ void setQudaDefaultMgTestParams()
     // Default eigensolver params
     mg_eig[i] = false;
     mg_eig_tol[i] = 1e-3;
-    mg_eig_nEv[i] = nvec[i];
-    mg_eig_nKr[i] = 3 * nvec[i];
+    mg_eig_n_ev[i] = nvec[i];
+    mg_eig_n_kr[i] = 3 * nvec[i];
     mg_eig_require_convergence[i] = QUDA_BOOLEAN_TRUE;
     mg_eig_type[i] = QUDA_EIG_TR_LANCZOS;
     mg_eig_spectrum[i] = QUDA_SPECTRUM_SR_EIG;

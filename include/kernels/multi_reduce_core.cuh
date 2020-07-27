@@ -5,8 +5,6 @@
 #include <multi_blas_helper.cuh>
 #include <cub_helper.cuh>
 
-//#define WARP_MULTI_REDUCE
-
 namespace quda
 {
 
@@ -28,7 +26,7 @@ namespace quda
     struct MultiReduceArg :
       public ReduceArg<vector_type<typename Reducer_::reduce_t, NXZ>>,
       SpinorXZ<NXZ, store_t, N, Reducer_::use_z>,
-      SpinorYW<max_YW_size<NXZ, store_t, y_store_t, Reducer_>(), y_store_t, Ny, Reducer_::use_w>
+      SpinorYW<max_YW_size<NXZ, store_t, y_store_t, Reducer_>(), store_t, N, y_store_t, Ny, Reducer_::use_w>
     {
       using Reducer = Reducer_;
       static constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, Reducer>();
@@ -118,6 +116,7 @@ namespace quda
       using coeff_t = coeff_t_;
       static constexpr bool reducer = true;
       static constexpr bool coeff_mul  = false;
+      static constexpr bool multi_1d = false;
       const int NXZ;
       const int NYW;
 
@@ -163,18 +162,18 @@ namespace quda
     template <typename reduce_t, typename T>
     __device__ __host__ void dot_(reduce_t &sum, const typename VectorType<T, 2>::type &a, const typename VectorType<T, 2>::type &b)
     {
-      sum += (reduce_t)a.x * (reduce_t)b.x;
-      sum += (reduce_t)a.y * (reduce_t)b.y;
+      sum += static_cast<reduce_t>(a.x) * static_cast<reduce_t>(b.x);
+      sum += static_cast<reduce_t>(a.y) * static_cast<reduce_t>(b.y);
     }
 
     template <typename reduce_t, typename real>
-    struct Dot : public MultiReduceFunctor<reduce_t, real> {
+    struct multiDot : public MultiReduceFunctor<reduce_t, real> {
       static constexpr write< > write { };
       static constexpr bool use_z = false;
       static constexpr bool use_w = false;
       using MultiReduceFunctor<reduce_t, real>::NXZ;
       using MultiReduceFunctor<reduce_t, real>::NYW;
-      Dot(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, real>(NXZ, NYW) { }
+      multiDot(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, real>(NXZ, NYW) { }
 
       template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, const int i, const int j)
       {
@@ -182,8 +181,8 @@ namespace quda
         for (int k=0; k < x.size(); k++) dot_<reduce_t, real>(sum, x[k], y[k]);
       }
 
-      int streams() const { return 2; } //! total number of input and output streams
-      int flops() const { return 2; }   //! flops per element
+      constexpr int streams() const { return 2; } //! total number of input and output streams
+      constexpr int flops() const { return 2; }   //! flops per element
     };
 
     /**
@@ -192,22 +191,22 @@ namespace quda
     template <typename reduce_t, typename T>
     __device__ __host__ void cdot_(reduce_t &sum, const typename VectorType<T, 2>::type &a, const typename VectorType<T, 2>::type &b)
     {
-      typedef typename scalar<reduce_t>::type scalar;
-      sum.x += (scalar)a.x * (scalar)b.x;
-      sum.x += (scalar)a.y * (scalar)b.y;
-      sum.y += (scalar)a.x * (scalar)b.y;
-      sum.y -= (scalar)a.y * (scalar)b.x;
+      using scalar = typename scalar<reduce_t>::type;
+      sum.x += static_cast<scalar>(a.x) * static_cast<scalar>(b.x);
+      sum.x += static_cast<scalar>(a.y) * static_cast<scalar>(b.y);
+      sum.y += static_cast<scalar>(a.x) * static_cast<scalar>(b.y);
+      sum.y -= static_cast<scalar>(a.y) * static_cast<scalar>(b.x);
     }
 
     template <typename real_reduce_t, typename real>
-    struct Cdot : public MultiReduceFunctor<complex<real_reduce_t>, complex<real>> {
+    struct multiCdot : public MultiReduceFunctor<complex<real_reduce_t>, complex<real>> {
       using reduce_t = complex<real_reduce_t>;
       static constexpr write< > write { };
       static constexpr bool use_z = false;
       static constexpr bool use_w = false;
       using MultiReduceFunctor<reduce_t, complex<real>>::NXZ;
       using MultiReduceFunctor<reduce_t, complex<real>>::NYW;
-      Cdot(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, complex<real>>(NXZ, NYW) { }
+      multiCdot(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, complex<real>>(NXZ, NYW) { }
 
       template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, const int i, const int j)
       {
@@ -215,12 +214,12 @@ namespace quda
         for (int k=0; k < x.size(); k++) cdot_<reduce_t, real>(sum, x[k], y[k]);
       }
 
-      int streams() const { return 2; } //! total number of input and output streams
-      int flops() const { return 4; }   //! flops per element
+      constexpr int streams() const { return 2; } //! total number of input and output streams
+      constexpr int flops() const { return 4; }   //! flops per element
     };
 
     template <typename real_reduce_t, typename real>
-    struct CdotCopy : public MultiReduceFunctor<complex<real_reduce_t>, complex<real>> {
+    struct multiCdotCopy : public MultiReduceFunctor<complex<real_reduce_t>, complex<real>> {
       using reduce_t = complex<real_reduce_t>;
       static constexpr write<0, 0, 0, 1> write { };
       static constexpr bool use_z = false;
@@ -228,7 +227,7 @@ namespace quda
       using MultiReduceFunctor<reduce_t, complex<real>>::NXZ;
       using MultiReduceFunctor<reduce_t, complex<real>>::NYW;
 
-      CdotCopy(int NYW) : MultiReduceFunctor<reduce_t, complex<real>>(NXZ, NYW) { }
+      multiCdotCopy(int NYW) : MultiReduceFunctor<reduce_t, complex<real>>(NXZ, NYW) { }
 
       template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, const int i, const int j)
       {
@@ -239,8 +238,8 @@ namespace quda
         }
       }
 
-      int streams() const { return 2; } //! total number of input and output streams
-      int flops() const { return 4; }   //! flops per element
+      constexpr int streams() const { return 2; } //! total number of input and output streams
+      constexpr int flops() const { return 4; }   //! flops per element
     };
 
   } // namespace blas

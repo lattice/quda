@@ -203,7 +203,7 @@ set(QUDA_MAGMA_LIBS
     CACHE STRING "additional linker flags required to link against magma")
 
 # ######################################################################################################################
-# QUDA ADVANCED OPTIONS that ususally should not be changed by users
+# QUDA ADVANCED OPTIONS that usually should not be changed by users
 # ######################################################################################################################
 option(QUDA_BUILD_ALL_TESTS "build tests by default" ON)
 option(QUDA_INSTALL_ALL_TESTS "install tests by default" ON)
@@ -217,7 +217,9 @@ option(QUDA_PROPAGATE_CXX_FLAGS "propagate CXX_FLAGS to CUDA host compiler (for 
 option(QUDA_FLOAT8 "enable float-8 ordered fixed-point fields?" OFF)
 option(QUDA_NVML "use NVML to report CUDA graphics driver version" OFF)
 option(QUDA_NUMA_NVML "experimental use of NVML to set numa affinity" OFF)
-option(QUDA_VERBOSE_BUILD "display kernel register useage" OFF)
+option(QUDA_VERBOSE_BUILD "display kernel register usage" OFF)
+option(QUDA_BUILD_NATIVE_LAPACK "build the native blas/lapack library according to QUDA_TARGET" ON)
+
 set(QUDA_MAX_MULTI_BLAS_N
     "4"
     CACHE STRING "maximum value to initialize template for multi-blas /-reduce")

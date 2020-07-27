@@ -161,12 +161,13 @@ namespace quda {
     delete []delta;
   }
 
-  GCR::GCR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
+  GCR::GCR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
+           TimeProfile &profile) :
     Solver(mat, matSloppy, matPrecon, param, profile),
     matMdagM(DiracMdagM(matPrecon.Expose())),
     K(0),
     Kparam(param),
-    nKrylov(param.Nkrylov),
+    n_krylov(param.Nkrylov),
     init(false),
     rp(nullptr),
     tmpp(nullptr),
@@ -190,42 +191,42 @@ namespace quda {
     else 
       errorQuda("Unsupported preconditioner %d\n", param.inv_type_precondition);
 
-    p.resize(nKrylov+1);
-    Ap.resize(nKrylov);
+    p.resize(n_krylov + 1);
+    Ap.resize(n_krylov);
 
-    alpha = new Complex[nKrylov];
-    beta = new Complex*[nKrylov];
-    for (int i=0; i<nKrylov; i++) beta[i] = new Complex[nKrylov];
-    gamma = new double[nKrylov];
+    alpha = new Complex[n_krylov];
+    beta = new Complex *[n_krylov];
+    for (int i = 0; i < n_krylov; i++) beta[i] = new Complex[n_krylov];
+    gamma = new double[n_krylov];
   }
 
-  GCR::GCR(const DiracMatrix &mat, Solver &K, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
-           TimeProfile &profile) :
+  GCR::GCR(const DiracMatrix &mat, Solver &K, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+           SolverParam &param, TimeProfile &profile) :
     Solver(mat, matSloppy, matPrecon, param, profile),
     matMdagM(matPrecon.Expose()),
     K(&K),
     Kparam(param),
-    nKrylov(param.Nkrylov),
+    n_krylov(param.Nkrylov),
     init(false),
     rp(nullptr),
     tmpp(nullptr),
     tmp_sloppy(nullptr),
     r_sloppy(nullptr)
   {
-    p.resize(nKrylov+1);
-    Ap.resize(nKrylov);
+    p.resize(n_krylov + 1);
+    Ap.resize(n_krylov);
 
-    alpha = new Complex[nKrylov];
-    beta = new Complex*[nKrylov];
-    for (int i=0; i<nKrylov; i++) beta[i] = new Complex[nKrylov];
-    gamma = new double[nKrylov];
+    alpha = new Complex[n_krylov];
+    beta = new Complex *[n_krylov];
+    for (int i = 0; i < n_krylov; i++) beta[i] = new Complex[n_krylov];
+    gamma = new double[n_krylov];
   }
 
   GCR::~GCR() {
     profile.TPSTART(QUDA_PROFILE_FREE);
 
     delete []alpha;
-    for (int i=0; i<nKrylov; i++) delete []beta[i];
+    for (int i = 0; i < n_krylov; i++) delete[] beta[i];
     delete []beta;
     delete []gamma;
 
@@ -235,8 +236,10 @@ namespace quda {
       if (r_sloppy && r_sloppy != rp) delete r_sloppy;
     }
 
-    for (int i=0; i<nKrylov+1; i++) if (p[i]) delete p[i];
-    for (int i=0; i<nKrylov; i++) if (Ap[i]) delete Ap[i];
+    for (int i = 0; i < n_krylov + 1; i++)
+      if (p[i]) delete p[i];
+    for (int i = 0; i < n_krylov; i++)
+      if (Ap[i]) delete Ap[i];
 
     if (tmp_sloppy != tmpp) delete tmp_sloppy;
     if (tmpp) delete tmpp;
@@ -249,7 +252,7 @@ namespace quda {
 
   void GCR::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
-    if (nKrylov == 0) {
+    if (n_krylov == 0) {
       // Krylov space is zero-dimensional so return doing no work
       if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
       return;
@@ -268,8 +271,8 @@ namespace quda {
 
       // create sloppy fields used for orthogonalization
       csParam.setPrecision(param.precision_sloppy);
-      for (int i = 0; i < nKrylov + 1; i++) p[i] = ColorSpinorField::Create(csParam);
-      for (int i=0; i<nKrylov; i++) Ap[i] = ColorSpinorField::Create(csParam);
+      for (int i = 0; i < n_krylov + 1; i++) p[i] = ColorSpinorField::Create(csParam);
+      for (int i = 0; i < n_krylov; i++) Ap[i] = ColorSpinorField::Create(csParam);
 
       csParam.setPrecision(param.precision_sloppy);
       if (param.precision_sloppy != x.Precision()) {
@@ -384,7 +387,7 @@ namespace quda {
     int pipeline = param.pipeline;
     // Vectorized dot product only has limited support so work around
     if (Ap[0]->Location() == QUDA_CPU_FIELD_LOCATION || pipeline == 0) pipeline = 1;
-    if (pipeline > nKrylov) pipeline = nKrylov;
+    if (pipeline > n_krylov) pipeline = n_krylov;
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -432,10 +435,10 @@ namespace quda {
       total_iter++;
 
       PrintStats("GCR", total_iter, r2, b2, heavy_quark_res);
-   
-      // update since nKrylov or maxiter reached, converged or reliable update required
-      // note that the heavy quark residual will by definition only be checked every nKrylov steps
-      if (k==nKrylov || total_iter==param.maxiter || (r2 < stop && !l2_converge) || sqrt(r2/r2_old) < param.delta) {
+
+      // update since n_krylov or maxiter reached, converged or reliable update required
+      // note that the heavy quark residual will by definition only be checked every n_krylov steps
+      if (k == n_krylov || total_iter == param.maxiter || (r2 < stop && !l2_converge) || sqrt(r2 / r2_old) < param.delta) {
 
         // update the solution vector
         updateSolution(x, alpha, beta, gamma, k, p);
@@ -487,9 +490,7 @@ namespace quda {
         }
 
         r2_old = r2;
-
       }
-
     }
 
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);

@@ -160,9 +160,10 @@ void printQudaEigParam(QudaEigParam *param) {
   P(compute_svd, QUDA_BOOLEAN_FALSE);
   P(require_convergence, QUDA_BOOLEAN_TRUE);
   P(spectrum, QUDA_SPECTRUM_LR_EIG);
-  P(nEv, 0);
-  P(nKr, 0);
-  P(nConv, 0);
+  P(n_ev, 0);
+  P(n_kr, 0);
+  P(n_conv, 0);
+  P(n_ev_deflate, -1);
   P(batched_rotate, 0);
   P(tol, 0.0);
   P(check_interval, 0);
@@ -184,9 +185,10 @@ void printQudaEigParam(QudaEigParam *param) {
   P(use_norm_op, QUDA_BOOLEAN_INVALID);
   P(compute_svd, QUDA_BOOLEAN_INVALID);
   P(require_convergence, QUDA_BOOLEAN_INVALID);
-  P(nEv, INVALID_INT);
-  P(nKr, INVALID_INT);
-  P(nConv, INVALID_INT);
+  P(n_ev, INVALID_INT);
+  P(n_kr, INVALID_INT);
+  P(n_conv, INVALID_INT);
+  P(n_ev_deflate, INVALID_INT);
   P(batched_rotate, INVALID_INT);
   P(tol, INVALID_DOUBLE);
   P(check_interval, INVALID_INT);
@@ -209,6 +211,12 @@ void printQudaEigParam(QudaEigParam *param) {
   P(location, QUDA_CUDA_FIELD_LOCATION);
 #else
   P(location, QUDA_INVALID_FIELD_LOCATION);
+#endif
+
+#if defined INIT_PARAM
+  P(save_prec, QUDA_DOUBLE_PRECISION);
+#else
+  P(save_prec, QUDA_INVALID_PRECISION);
 #endif
 
 #if defined INIT_PARAM
@@ -552,7 +560,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
 
 #if defined INIT_PARAM
   P(cuda_prec_ritz, QUDA_SINGLE_PRECISION);
-  P(nev, 8);
+  P(n_ev, 8);
   P(max_search_dim, 64);
   P(rhs_idx, 0);
   P(deflation_grid, 1);
@@ -564,7 +572,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(eigenval_tol, 1e-1);
 #else
   P(cuda_prec_ritz, QUDA_INVALID_PRECISION);
-  P(nev, INVALID_INT);
+  P(n_ev, INVALID_INT);
   P(max_search_dim, INVALID_INT);
   P(rhs_idx, INVALID_INT);
   P(deflation_grid, INVALID_INT);
@@ -609,6 +617,12 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(extlib_type, QUDA_EIGEN_EXTLIB);
 #else
   P(extlib_type, QUDA_EXTLIB_INVALID);
+#endif
+
+#if defined INIT_PARAM
+  P(native_blas_lapack, QUDA_BOOLEAN_TRUE);
+#else
+  P(native_blas_lapack, QUDA_BOOLEAN_INVALID);
 #endif
 
 #ifdef INIT_PARAM
@@ -839,6 +853,12 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
   P(is_staggered, QUDA_BOOLEAN_FALSE);
 #else
   P(is_staggered, QUDA_BOOLEAN_INVALID);
+#endif
+
+#ifdef INIT_PARAM
+  P(thin_update_only, QUDA_BOOLEAN_FALSE);
+#else
+  P(thin_update_only, QUDA_BOOLEAN_INVALID);
 #endif
 
 #ifdef INIT_PARAM

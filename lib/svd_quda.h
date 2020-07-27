@@ -21,15 +21,13 @@ typename std::remove_reference<decltype(Cmplx::x)>::type cabs(const Cmplx & z)
   return sqrt(square);
 }
 
-
-template<class T, class U> 
-inline DEVICEHOST typename PromoteTypeId<T,U>::type quadSum(const T & a, const U & b){
-  typename PromoteTypeId<T,U>::type ratio, square, max;
+template <class T, class U> inline DEVICEHOST typename PromoteTypeId<T, U>::type quadSum(const T &a, const U &b)
+{
+  typename PromoteTypeId<T, U>::type ratio, square, max;
   if (fabs(a) > fabs(b)) { max = a; ratio = b/a; } else { max=b; ratio = a/b; }
   square = (max != 0.0) ? max*max*(1.0 + ratio*ratio) : 0.0;
   return sqrt(square);
 }
-
 
 // In future iterations of the code, I would like to use templates to compute the norm
 DEVICEHOST

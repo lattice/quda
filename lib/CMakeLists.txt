@@ -149,16 +149,18 @@ target_compile_definitions(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,COMPILE_DEFIN
 target_include_directories(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,INCLUDE_DIRECTORIES>)
 target_compile_options(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,COMPILE_OPTIONS>)
 
-# add target specific files
-if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")
-  add_subdirectory(targets/cuda)
-endif()
-if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
-  #set(QUDA_TARGET_DIR "hip")
-endif()
-
+# add target specific files		
+if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")		
+  add_subdirectory(targets/cuda)		
+endif()		
+if(${QUDA_TARGET_TYPE} STREQUAL "HIP")		
+  #add_subdirectory(targets/hip)
+endif()		
 target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_target>)
-
+ 
+add_subdirectory(targets/generic)
+target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_generic>)
+ 
 # propagate CXX flags to CUDA host compiler
 if(${QUDA_PROPAGATE_CXX_FLAGS})
   target_compile_options(
@@ -239,9 +241,12 @@ if(QUDA_DIRAC_NDEG_TWISTED_MASS)
   target_compile_definitions(quda PUBLIC GPU_NDEG_TWISTED_MASS_DIRAC)
 endif(QUDA_DIRAC_NDEG_TWISTED_MASS)
 
-if(QUDA_MULTIGRID)
+if(${QUDA_BUILD_NATIVE_LAPACK} STREQUAL "ON")
   target_link_libraries(quda PUBLIC ${CUDA_cublas_LIBRARY})
-  target_compile_definitions(quda PRIVATE CUBLAS_LIB)
+  target_compile_definitions(quda PRIVATE NATIVE_LAPACK_LIB)
+endif()
+  
+if(QUDA_MULTIGRID)
   target_compile_definitions(quda PRIVATE GPU_MULTIGRID)
 endif(QUDA_MULTIGRID)
 
@@ -322,6 +327,7 @@ if(QUDA_QMP)
     add_dependencies(quda_cpp QMP)
     #TODO: need to figure out how to propagate that cleanly
     add_dependencies(quda_cuda_target QMP)
+    add_dependencies(quda_generic_target QMP)
   endif()
   target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_QMPHOME}/include>)
   target_compile_definitions(quda PUBLIC QMP_COMMS)
@@ -334,7 +340,8 @@ if(QUDA_QIO)
     add_dependencies(quda QIO)
     add_dependencies(quda_cpp QIO)
     #TODO: need to figure out how to propagate that cleanly
-    add_dependencies(quda_cuda_target QMP)
+    add_dependencies(quda_cuda_target QIO)
+    add_dependencies(quda_generic_target QIO)
   endif()
   target_compile_definitions(quda PUBLIC HAVE_QIO)
   target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_QIOHOME}/include>)
@@ -393,6 +400,7 @@ endif()
 if(QUDA_MAGMA)
   target_link_libraries(quda PUBLIC MAGMA::MAGMA)
 endif()
+
 
 # set which precisions to enable
 target_compile_definitions(quda PUBLIC QUDA_PRECISION=${QUDA_PRECISION})
@@ -473,6 +481,8 @@ endif()
 if(QUDA_DOWNLOAD_EIGEN)
   add_dependencies(quda_cpp Eigen)
   add_dependencies(quda Eigen)
+  add_dependencies(quda_cuda_target Eigen)
+  add_dependencies(quda_generic_target Eigen)
 endif()
 
 configure_file(../include/quda_define.h.in ../include/quda_define.h @ONLY)

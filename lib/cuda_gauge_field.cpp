@@ -46,7 +46,7 @@ namespace quda {
 	break;
       case QUDA_MEMORY_MAPPED:
         gauge_h = mapped_malloc(bytes);
-	cudaHostGetDevicePointer(&gauge, gauge_h, 0); // set the matching device pointer
+	gauge = get_mapped_device_pointer(gauge_h); // set the matching device pointer
 	break;
       default:
 	errorQuda("Unsupported memory type %d", mem_type);
@@ -568,17 +568,15 @@ namespace quda {
 	}
 
 	// this copies over both even and odd
-	qudaMemcpy(gauge, buffer, bytes, cudaMemcpyDefault);
-	pool_pinned_free(buffer);
+        qudaMemcpy(gauge, buffer, bytes, cudaMemcpyDefault);
+        pool_pinned_free(buffer);
       } else { // else on the GPU
 
         if (src.Order() == QUDA_MILC_SITE_GAUGE_ORDER ||
             src.Order() == QUDA_BQCD_GAUGE_ORDER      ||
             src.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
 	  // special case where we use zero-copy memory to read/write directly from application's array
-	  void *src_d;
-	  cudaError_t error = cudaHostGetDevicePointer(&src_d, const_cast<void*>(src.Gauge_p()), 0);
-	  if (error != cudaSuccess) errorQuda("Failed to get device pointer for MILC site / BQCD array");
+	  void *src_d = get_mapped_device_pointer(src.Gauge_p());
 
 	  if (src.GhostExchange() == QUDA_GHOST_EXCHANGE_NO) {
 	    copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, src_d);
@@ -595,18 +593,18 @@ namespace quda {
 
 	  if (src.Order() == QUDA_QDP_GAUGE_ORDER) {
 	    for (int d=0; d<geometry; d++) {
-	      qudaMemcpy(((void**)buffer)[d], ((void**)src.Gauge_p())[d], src.Bytes()/geometry, cudaMemcpyDefault);
-	    }
+              qudaMemcpy(((void **)buffer)[d], ((void **)src.Gauge_p())[d], src.Bytes() / geometry, cudaMemcpyDefault);
+            }
 	  } else {
-	    qudaMemcpy(buffer, src.Gauge_p(), src.Bytes(), cudaMemcpyDefault);
-	  }
+            qudaMemcpy(buffer, src.Gauge_p(), src.Bytes(), cudaMemcpyDefault);
+          }
 
 	  if (src.Order() > 4 && GhostExchange() == QUDA_GHOST_EXCHANGE_PAD &&
 	      src.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
 	    for (int d=0; d<geometry; d++)
-	      qudaMemcpy(ghost_buffer[d], src.Ghost()[d], ghost_bytes[d], cudaMemcpyDefault);
+              qudaMemcpy(ghost_buffer[d], src.Ghost()[d], ghost_bytes[d], cudaMemcpyDefault);
 
-	  if (ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED && src.GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
+          if (ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED && src.GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
 	    copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer, 0, ghost_buffer);
 	    if (geometry == QUDA_COARSE_GEOMETRY) copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer, 0, ghost_buffer, 3);
 	  } else {
@@ -654,9 +652,7 @@ namespace quda {
           cpu.Order() == QUDA_BQCD_GAUGE_ORDER      ||
           cpu.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
 	// special case where we use zero-copy memory to read/write directly from application's array
-	void *cpu_d;
-	cudaError_t error = cudaHostGetDevicePointer(&cpu_d, const_cast<void*>(cpu.Gauge_p()), 0);
-	if (error != cudaSuccess) errorQuda("Failed to get device pointer for MILC site / BQCD array");
+	void *cpu_d = get_mapped_device_pointer(cpu.Gauge_p());
 	if (cpu.GhostExchange() == QUDA_GHOST_EXCHANGE_NO) {
 	  copyGenericGauge(cpu, *this, QUDA_CUDA_FIELD_LOCATION, cpu_d, gauge);
 	} else {
@@ -679,17 +675,18 @@ namespace quda {
 	}
 
 	if (cpu.Order() == QUDA_QDP_GAUGE_ORDER) {
-	  for (int d=0; d<geometry; d++) qudaMemcpy(((void**)cpu.gauge)[d], ((void**)buffer)[d], cpu.Bytes()/geometry, cudaMemcpyDefault);
-	} else {
-	  qudaMemcpy(cpu.gauge, buffer, cpu.Bytes(), cudaMemcpyDefault);
-	}
+          for (int d = 0; d < geometry; d++)
+            qudaMemcpy(((void **)cpu.gauge)[d], ((void **)buffer)[d], cpu.Bytes() / geometry, cudaMemcpyDefault);
+        } else {
+          qudaMemcpy(cpu.gauge, buffer, cpu.Bytes(), cudaMemcpyDefault);
+        }
 
 	if (cpu.Order() > 4 && GhostExchange() == QUDA_GHOST_EXCHANGE_PAD &&
 	    cpu.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
 	  for (int d=0; d<geometry; d++)
-	    qudaMemcpy(cpu.Ghost()[d], ghost_buffer[d], ghost_bytes[d], cudaMemcpyDefault);
+            qudaMemcpy(cpu.Ghost()[d], ghost_buffer[d], ghost_bytes[d], cudaMemcpyDefault);
 
-	free_gauge_buffer(buffer, cpu.Order(), cpu.Geometry());
+        free_gauge_buffer(buffer, cpu.Order(), cpu.Geometry());
 	if (nFace > 0) free_ghost_buffer(ghost_buffer, cpu.Order(), geometry);
       }
     } else if (reorder_location() == QUDA_CPU_FIELD_LOCATION) { // do copy then host-side reorder
