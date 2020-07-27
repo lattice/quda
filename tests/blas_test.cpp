@@ -960,6 +960,7 @@ double test(Kernel kernel)
     *zD = *zH;
 
     commGlobalReductionSet(false); // switch off global reductions for this test
+
     commAsyncReductionSet(true);
     blas::cDotProductNormA(*zD, *xD);
     blas::caxpyXmazMR(a, *xD, *yD, *zD);;

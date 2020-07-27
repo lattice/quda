@@ -49,11 +49,12 @@ namespace quda
     cuda::atomic<T, cuda::thread_scope_device> *partial;
     // for heterogeneous atomics we need to use lock-free atomics -> operate on scalars
     cuda::atomic<system_atomic_t, cuda::thread_scope_system> *result_d;
+    cuda::atomic<system_atomic_t, cuda::thread_scope_system> *result_h;
 #else
     T *partial;
     T *result_d;
-#endif
     T *result_h;
+#endif
     count_t *count;
 
     ReduceArg(int n_reduce = 1) :
@@ -63,9 +64,6 @@ namespace quda
       result_h(static_cast<decltype(result_h)>(reducer::get_host_buffer())),
       count {reducer::get_count()}
     {
-      // write reduction to GPU memory if asynchronous
-      if (commAsyncReduction()) result_d = static_cast<decltype(result_d)>(reducer::get_device_buffer());
-
       // check reduction buffers are large enough if requested
       auto max_reduce_blocks = 2 * deviceProp.multiProcessorCount;
       auto reduce_size = max_reduce_blocks * n_reduce * sizeof(*partial);
@@ -74,11 +72,18 @@ namespace quda
                   reducer::buffer_size());
 
 #ifdef HETEROGENEOUS_ATOMIC
-      // initialize the result buffer so we can test for completion
-      for (int i = 0; i < n_reduce * n_item; i++) {
-        new (result_d + i) cuda::atomic<system_atomic_t, cuda::thread_scope_system> {};
-        result_d[i].store(init_value<system_atomic_t>(), cuda::std::memory_order_release);
+      if (!commAsyncReduction()) {
+        // initialize the result buffer so we can test for completion
+        for (int i = 0; i < n_reduce * n_item; i++) {
+          new (result_h + i) cuda::atomic<system_atomic_t, cuda::thread_scope_system> {};
+          result_h[i].store(init_value<system_atomic_t>(), cuda::std::memory_order_release);
+        }
+      } else {
+        // write reduction to GPU memory if asynchronous (reuse partial)
+        result_d = nullptr;
       }
+#else
+      if (commAsyncReduction()) result_d = partial;
 #endif
     }
 
@@ -87,7 +92,7 @@ namespace quda
     {
 #ifdef HETEROGENEOUS_ATOMIC
       for (int i = 0; i < n_reduce * n_item; i++) {
-        while (result_d[i].load(cuda::std::memory_order_acquire) == init_value<system_atomic_t>()) {}
+        while (result_h[i].load(cuda::std::memory_order_acquire) == init_value<system_atomic_t>()) {}
       }
 #else
       auto event = reducer::get_event();
@@ -151,12 +156,16 @@ namespace quda
 
       // write out the final reduced value
       if (threadIdx.y * block_size_x + threadIdx.x == 0) {
-        using atomic_t = typename atomic_type<T>::type;
-        constexpr size_t n = sizeof(T) / sizeof(atomic_t);
-        atomic_t sum_tmp[n];
-        memcpy(sum_tmp, &sum, sizeof(sum));
+        if (arg.result_d) { // write to host mapped memory
+          using atomic_t = typename atomic_type<T>::type;
+          constexpr size_t n = sizeof(T) / sizeof(atomic_t);
+          atomic_t sum_tmp[n];
+          memcpy(sum_tmp, &sum, sizeof(sum));
 #pragma unroll
-        for (int i = 0; i < n; i++) { arg.result_d[n * idx + i].store(sum_tmp[i], cuda::std::memory_order_relaxed); }
+          for (int i = 0; i < n; i++) { arg.result_d[n * idx + i].store(sum_tmp[i], cuda::std::memory_order_relaxed); }
+        } else { // write to device memory
+          arg.partial[idx].store(sum, cuda::std::memory_order_relaxed);
+        }
         arg.count[idx].store(0, cuda::std::memory_order_relaxed); // set to zero for next time
       }
     }
