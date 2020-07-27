@@ -33,14 +33,14 @@ namespace quda
     }
 
     template <bool from_coarse, int dim, QudaDirection dir, int bM, int bN, int bK, int block_y, int block_z, class Arg>
-    typename std::enable_if<!Arg::is_aos, void>::type
+    typename std::enable_if<!Arg::is_mma_compatible, void>::type
     launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
     {
       errorQuda("MMA implementation is ONLY built for AoS order.");
     }
 
     template <bool from_coarse, int dim, QudaDirection dir, int bM, int bN, int bK, int block_y, int block_z, class Arg>
-    typename std::enable_if<Arg::is_aos, void>::type
+    typename std::enable_if<Arg::is_mma_compatible, void>::type
     launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
     {
       tp.block.x = 1;
@@ -312,14 +312,14 @@ namespace quda
     }
 
     template <bool from_coarse, int dim, QudaDirection dir, int bM, int bN, int bK, int block_y, int block_z, class Arg>
-    typename std::enable_if<!Arg::is_aos, void>::type
+    typename std::enable_if<!Arg::is_mma_compatible, void>::type
     launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
     {
       errorQuda("MMA implementation is ONLY built for AoS order.");
     }
 
     template <bool from_coarse, int dim, QudaDirection dir, int bM, int bN, int bK, int block_y, int block_z, class Arg>
-    typename std::enable_if<Arg::is_aos, void>::type
+    typename std::enable_if<Arg::is_mma_compatible, void>::type
     launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
     {
       tp.block.x = 1;

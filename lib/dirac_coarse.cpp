@@ -209,6 +209,10 @@ namespace quda {
 
     } else {
 
+      // TODO: The following fancy copies reduce the number of gauge field copies (from and to QUDA_MILC_GAUGE_ORDER) by 2:
+      // one for X and one for Y, both to QUDA_MILC_GAUGE_ORDER.
+      // We haven't figure out the way to correctly use these fancy copies. :(
+#if 0
       if (use_mma && dirac->isCoarse()) {
 
         constexpr QudaGaugeFieldOrder gOrder = QUDA_MILC_GAUGE_ORDER;
@@ -244,7 +248,7 @@ namespace quda {
         delete X_order;
 
       } else {
-
+#endif
         dirac->createCoarseOp(*Y_d, *X_d, *transfer, kappa, mass, Mu(), MuFactor());
 
         // save the intermediate tunecache after the UV and VUV tune
@@ -258,7 +262,9 @@ namespace quda {
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("About to create the preconditioned coarse op\n");
 
         calculateYhat(*Yhat_d, *Xinv_d, *Y_d, *X_d, use_mma);
+#if 0
       }
+#endif
     }
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Finished creating the preconditioned coarse op\n");

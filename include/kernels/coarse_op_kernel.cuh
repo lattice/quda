@@ -27,7 +27,7 @@ namespace quda {
     static constexpr int fineColor = fineColor_;
     static constexpr int coarseColor = coarseColor_;
 
-    static constexpr bool is_aos = coarseGauge::is_aos;
+    static constexpr bool is_mma_compatible = coarseGauge::is_mma_compatible;
 
     coarseGauge Y;           /** Computed coarse link field */
     coarseGauge X;           /** Computed coarse clover field */

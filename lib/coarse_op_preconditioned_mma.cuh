@@ -35,14 +35,14 @@ namespace quda
     }
 
     template <bool compute_max_only, int bM, int bN, int bK, int block_y, int block_z, int min_block_cta = 1, class Arg>
-    typename std::enable_if<!Arg::is_aos, void>::type launch_kernel(Arg &arg, int min_threads, TuneParam &tp,
+    typename std::enable_if<!Arg::is_mma_compatible, void>::type launch_kernel(Arg &arg, int min_threads, TuneParam &tp,
                                                                     const cudaStream_t &stream)
     {
       errorQuda("MMA implementation is ONLY built for AoS order.");
     }
 
     template <bool compute_max_only, int bM, int bN, int bK, int block_y, int block_z, int min_block_cta = 1, class Arg>
-    typename std::enable_if<Arg::is_aos, void>::type launch_kernel(Arg &arg, int min_threads, TuneParam &tp,
+    typename std::enable_if<Arg::is_mma_compatible, void>::type launch_kernel(Arg &arg, int min_threads, TuneParam &tp,
                                                                    const cudaStream_t &stream)
     {
       tp.block.x = 1;

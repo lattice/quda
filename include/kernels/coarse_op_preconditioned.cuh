@@ -15,7 +15,7 @@ namespace quda {
     static constexpr int N = n_;
     static constexpr int K = n_;
 
-    static constexpr bool is_aos = PreconditionedGauge::is_aos;
+    static constexpr bool is_mma_compatible = PreconditionedGauge::is_mma_compatible;
 
     PreconditionedGauge Yhat;
     const Gauge Y;
