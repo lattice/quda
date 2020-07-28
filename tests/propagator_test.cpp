@@ -321,8 +321,8 @@ int main(int argc, char **argv)
   //-----------------------------------------------------------------------------------
   size_t data_size = (prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   size_t array_size = (contract_type == QUDA_CONTRACT_TYPE_OPEN || contract_type == QUDA_CONTRACT_TYPE_DR) ? V : tdim; 
-  void *correlation_function = (double*)pinned_malloc(2 * 16 * comm_dim(3) * array_size * data_size);
-  void *correlation_function_sum = (double*)pinned_malloc(2 * 16 * comm_dim(3) * array_size * data_size);
+  void *correlation_function = (double*)malloc(2 * 16 * comm_dim(3) * array_size * data_size);
+  void *correlation_function_sum = (double*)malloc(2 * 16 * comm_dim(3) * array_size * data_size);
   memset(correlation_function_sum, 0, 2 * 16 * comm_dim(3) * array_size * data_size);
   int gamma_mat = 0;
   // Contraction construct END
@@ -481,7 +481,15 @@ int main(int argc, char **argv)
   delete out;
   delete check;
   
-  for (int i = 0; i < 12; i++) delete qudaQuark4D[i];
+  for (int i = 0; i < 12; i++) {
+    delete qudaQuark4D[i];
+    delete qudaIn4D[i];
+  }
+  free(correlation_function);
+  free(correlation_function_sum);
+  free(in_array);
+  free(out_array);
+
 
   freeGaugeQuda();
   for (int dir = 0; dir < 4; dir++) free(gauge[dir]);

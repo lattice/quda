@@ -373,8 +373,6 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
   }
   xml_record += "\n\n";
 
-  printfQuda("here 1\n");
-
   int status;
 
   // Create the record info for the field
@@ -391,12 +389,10 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
   QIO_RecordInfo *rec_info = QIO_create_record_info(QIO_FIELD, lower, upper, nDim, const_cast<char *>(type),
                                                     const_cast<char *>(precision), nColor, nSpin, file_prec * len, count);
 
-  printfQuda("here 2\n");
-
   // Create the record XML for the field
   QIO_String *xml_record_out = QIO_string_create();
   QIO_string_set(xml_record_out, xml_record.c_str());
-  printfQuda("here 3\n");
+
   /* Write the field record converting to desired file precision*/
   size_t rec_size = file_prec*count*len;
   if (cpu_prec == QUDA_DOUBLE_PRECISION) {
@@ -416,7 +412,7 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
                          field_out);
     }
   }
-  printfQuda("here 4\n");
+
   printfQuda("%s: QIO_write_record_data returns status %d\n", __func__, status);
   QIO_destroy_record_info(rec_info);
   QIO_string_destroy(xml_record_out);
