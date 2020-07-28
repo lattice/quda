@@ -218,11 +218,18 @@ option(QUDA_NUMA_NVML "experimental use of NVML to set numa affinity" OFF)
 option(QUDA_VERBOSE_BUILD "display kernel register usage" OFF)
 option(QUDA_BUILD_NATIVE_LAPACK "build the native blas/lapack library according to QUDA_TARGET" ON)
 
-option(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support (CUDA >= 11.0)?" OFF)
+option(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support (CUDA >= 11.0)?" ON)
 if(QUDA_HETEROGENEOUS_ATOMIC AND CUDA_VERSION LESS 11.0)
   message(
-  SEND_ERROR
-  "Heterogeneous atomic support require CUDA >= 11.0")
+  NOTICE
+  "Disabling heterogeneous atomic support (requires CUDA >= 11.0)")
+  set(QUDA_HETEROGENEOUS_ATOMIC OFF)
+endif()
+if(QUDA_HETEROGENEOUS_ATOMIC AND ${CMAKE_BUILD_TYPE} STREQUAL "SANITIZE")
+  message(
+  NOTICE
+  "Disabling heterogeneous atomic support (does not support SANITIZE build)")
+  set(QUDA_HETEROGENEOUS_ATOMIC OFF)
 endif()
 
 set(QUDA_MAX_MULTI_BLAS_N
@@ -236,7 +243,7 @@ endif()
   
 set(QUDA_PRECISION
     "14"
-    CACHE STRING "which precisions to instantiate in QUDA (4-bit number - double, single, half, char)")
+    CACHE STRING "which precisions to instantiate in QUDA (4-bit number - double, single, half, quarter)")
 set(QUDA_RECONSTRUCT
     "7"
     CACHE STRING "which reconstructs to instantiate in QUDA (3-bit number - 18, 13/12, 9/8)")
