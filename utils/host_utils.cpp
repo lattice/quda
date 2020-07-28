@@ -277,12 +277,6 @@ void constructPointSpinorSource(void *v, int nSpin, int nColor, QudaPrecision pr
     } else {
       ((float*)v)[my_spinor_site_size * (parity*Vh + local_idx_cb) + 2*dil] = 1.0;
     }
-  } else {
-    if(precision == QUDA_DOUBLE_PRECISION) {
-      ((double*)v)[my_spinor_site_size * (parity*Vh + local_idx_cb) + 2*dil] = 0.0;
-    } else {
-      ((float*)v)[my_spinor_site_size * (parity*Vh + local_idx_cb) + 2*dil] = 0.0;
-    }
   }
 }
 

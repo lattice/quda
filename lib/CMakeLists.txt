@@ -90,7 +90,7 @@ set (QUDA_OBJS
   hisq_paths_force_quda.cu
   unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp
   extended_color_spinor_utilities.cu
-  blas_cublas.cu blas_magma.cu make_4d_prop_quda.cpp
+  blas_magma.cu make_4d_prop_quda.cpp
   blas_magma.cu
   inv_mpcg_quda.cpp inv_mpbicgstab_quda.cpp inv_gmresdr_quda.cpp
   pgauge_exchange.cu pgauge_init.cu pgauge_heatbath.cu random.cu

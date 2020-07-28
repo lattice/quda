@@ -5393,7 +5393,6 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned 
 
   if (!initialized) errorQuda("QUDA not initialized");
 
-  //pushVerbosity(inv_param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) { printQudaInvertParam(inv_param); }
 
   checkInvertParam(inv_param);
@@ -5435,7 +5434,7 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned 
 
   // Scale up the source to prevent underflow
   profileGaussianSmear.TPSTART(QUDA_PROFILE_COMPUTE);
-  //blas::ax(1e6, *in);
+  blas::ax(1e6, *in);
 
   double cpu = blas::norm2(*in_h);
   double gpu = blas::norm2(*in);
@@ -5451,6 +5450,7 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned 
     //ApplyLaplace(*out, *in, *gauge_ptr, 3, inv_param->kappa, 1.0, *in, QUDA_INVALID_PARITY, false, nullptr, profileGaussianSmear);
     //laplace_op.Expose()->M(*out, *in, *temp1, *temp2);
     laplace_op.Expose()->M(*out, *in);
+    blas::ax(1.0/inv_param->mass, *out);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       double norm = blas::norm2(*out);
       printfQuda("Step %d, vector norm %e\n", i, norm);
@@ -5458,7 +5458,10 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned 
   }
 
   // Rescale down
-  //blas::ax(1e-6, *out);
+  blas::ax(1e-6, *out);  
+  // Scale by factor
+
+
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_COMPUTE);
   // Copy device data to host.
   profileGaussianSmear.TPSTART(QUDA_PROFILE_D2H);

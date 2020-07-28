@@ -135,6 +135,11 @@ int main(int argc, char **argv)
   // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
 
+  // Initialize the QUDA library
+  initQuda(device);
+
+  setVerbosity(verbosity);
+  
   if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH
       && dslash_type != QUDA_TWISTED_MASS_DSLASH && dslash_type != QUDA_DOMAIN_WALL_4D_DSLASH
       && dslash_type != QUDA_MOBIUS_DWF_DSLASH && dslash_type != QUDA_MOBIUS_DWF_EOFA_DSLASH
@@ -198,9 +203,6 @@ int main(int argc, char **argv)
 
   // All parameters have been set. Display the parameters via stdout
   display_test_info();
-
-  // Initialize the QUDA library
-  initQuda(device);
 
   // set parameters for the reference Dslash, and prepare fields to be loaded
   if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
@@ -296,16 +298,22 @@ int main(int argc, char **argv)
   // Borrow problem 4D parameters, then adjust
   QudaInvertParam inv_param_smear = newQudaInvertParam();
   dslash_type = QUDA_LAPLACE_DSLASH;  
+  double coeff = -(prop_source_smear_coeff * prop_source_smear_coeff) / (4 * prop_source_smear_steps);
+  double kappa_orig = kappa;
+  double mass_orig = mass;
+  mass = 1.0/coeff;
+  kappa = -1.0;
   setInvertParam(inv_param_smear);
-  double coeff = (prop_source_smear_coeff * prop_source_smear_coeff) / (4 * prop_source_smear_steps);
-  inv_param_smear.kappa = coeff;
-  inv_param_smear.mass_normalization = QUDA_KAPPA_NORMALIZATION;  
+  //inv_param_smear.kappa = coeff;
+  inv_param_smear.mass_normalization = QUDA_MASS_NORMALIZATION;  
   inv_param_smear.laplace3D = 3; // Omit t-dim
   inv_param_smear.solution_type = QUDA_MAT_SOLUTION;
   inv_param_smear.solve_type = QUDA_DIRECT_SOLVE;
   
   // Restore dslash type
   dslash_type = dslash_type_orig;  
+  mass = mass_orig;
+  kappa = kappa_orig;
   // Vector construct END
   //-----------------------------------------------------------------------------------
 
@@ -314,6 +322,9 @@ int main(int argc, char **argv)
   size_t data_size = (prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   size_t array_size = (contract_type == QUDA_CONTRACT_TYPE_OPEN || contract_type == QUDA_CONTRACT_TYPE_DR) ? V : tdim; 
   void *correlation_function = (double*)pinned_malloc(2 * 16 * comm_dim(3) * array_size * data_size);
+  void *correlation_function_sum = (double*)pinned_malloc(2 * 16 * comm_dim(3) * array_size * data_size);
+  memset(correlation_function_sum, 0, 2 * 16 * comm_dim(3) * array_size * data_size);
+  int gamma_mat = 0;
   // Contraction construct END
   //-----------------------------------------------------------------------------------
 
@@ -373,6 +384,7 @@ int main(int argc, char **argv)
       // If deflating, preserve the deflation space between solves
       if (inv_deflate) eig_param.preserve_deflation = dil < 12 - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
       // Perform QUDA inversions
+      inv_param.solver_normalization = QUDA_SOURCE_NORMALIZATION;
       invertQuda(out->V(), in->V(), &inv_param);
       
       time[dil] = inv_param.secs;
@@ -398,9 +410,9 @@ int main(int argc, char **argv)
       performGaussianSmearNStep(qudaQuark4D[dil]->V(), &inv_param_smear, prop_sink_smear_steps);
 
       for(int i=0; i<5; i++) {
-	qudaQuark4D[dil]->PrintVector(i);
+	//qudaQuark4D[dil]->PrintVector(i);
       }
-
+      
       // Perform GPU contraction.
       // Host side spinor data and contraction_result passed to QUDA.
       // QUDA will allocate GPU memory, transfer the data,
@@ -409,13 +421,23 @@ int main(int argc, char **argv)
       contractQuda(qudaQuark4D[dil]->V(), qudaQuark4D[dil]->V(), 
 		   ((double*)correlation_function) + 2*16*tdim*comm_coord(3), contract_type, &inv_param, gauge_param.X);
 
-      int gamma_mat = 15;
       comm_gather_array((double*)correlation_function, 2*16*tdim);
       for(int t=0; t<comm_dim(3) * tdim; t++) {
-	printfQuda("t=%d %e %e\n", t, ((double*)correlation_function)[2*(16*t + gamma_mat)], ((double*)correlation_function)[2*(16*t + gamma_mat) + 1]);
+	//printfQuda("t=%d %e %e\n", t, ((double*)correlation_function)[2*(16*t + gamma_mat)], ((double*)correlation_function)[2*(16*t + gamma_mat) + 1]);
+	((double*)correlation_function_sum)[2*(16*t + gamma_mat)] += ((double*)correlation_function)[2*(16*t + gamma_mat)];
+	((double*)correlation_function_sum)[2*(16*t + gamma_mat)+1] += ((double*)correlation_function)[2*(16*t + gamma_mat)+1];
       }
     }
+
+    for(int t=0; t<comm_dim(3) * tdim; t++) {
+      printfQuda("sum t=%d %e %e\n", t, ((double*)correlation_function_sum)[2*(16*t + gamma_mat)], ((double*)correlation_function_sum)[2*(16*t + gamma_mat) + 1]);
+    }
     
+    for(int t=0; t<comm_dim(3) * tdim; t++) {
+      printfQuda("ratio t=%d %e\n", t, (((double*)correlation_function_sum)[2*(16*t + gamma_mat)])/(((double*)correlation_function_sum)[2*(16*(t+1) + gamma_mat)]));
+    }
+
+
     // Compute performance statistics
     Nsrc = 12;
     performanceStats(time, gflops);
