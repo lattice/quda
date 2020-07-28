@@ -843,7 +843,7 @@ namespace quda {
     EigCGArgs &args = *eigcg_args;
 
     blas::zero(*args.Vm);
-    blas::zero(*args.hVm);
+    if(args.is_host_location) blas::zero(*args.hVm);
 
     if (max_nev == 0 || param.eig_param.n_conv == 0) {
       printfQuda("Deflation space is empty.\n");
