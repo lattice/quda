@@ -73,7 +73,7 @@ namespace quda {
         }
       }
 
-      delete result_;
+      delete[] result_;
     }
 
     template <template <typename ...> class Reducer, typename store_t, typename y_store_t, int nSpin, typename T>
