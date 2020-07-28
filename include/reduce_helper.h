@@ -75,9 +75,9 @@ namespace quda
       if (!commAsyncReduction()) {
         // initialize the result buffer so we can test for completion
         for (int i = 0; i < n_reduce * n_item; i++) {
-          new (result_h + i) cuda::atomic<system_atomic_t, cuda::thread_scope_system> {};
-          result_h[i].store(init_value<system_atomic_t>(), cuda::std::memory_order_release);
+          new (result_h + i) cuda::atomic<system_atomic_t, cuda::thread_scope_system> {init_value<system_atomic_t>()};
         }
+        std::atomic_thread_fence(std::memory_order_release);
       } else {
         // write reduction to GPU memory if asynchronous (reuse partial)
         result_d = nullptr;
@@ -91,7 +91,7 @@ namespace quda
     {
 #ifdef HETEROGENEOUS_ATOMIC
       for (int i = 0; i < n_reduce * n_item; i++) {
-        while (result_h[i].load(cuda::std::memory_order_acquire) == init_value<system_atomic_t>()) {}
+        while (result_h[i].load(cuda::std::memory_order_relaxed) == init_value<system_atomic_t>()) {}
       }
 #else
       auto event = reducer::get_event();
