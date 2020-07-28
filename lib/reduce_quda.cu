@@ -228,9 +228,8 @@ namespace quda {
 
       long long bytes() const
       {
-        // the factor two here assumes we are reading and writing to the high precision vector
-        // this will evaluate correctly for non-mixed kernels since the +2/-2 will cancel out
-        return (r.streams() - 2) * x.Bytes() + 2 * z.Bytes();
+        return (r.read.X + r.write.X) * x.Bytes() + (r.read.Y + r.write.Y) * y.Bytes() +
+          (r.read.Z + r.write.Z) * z.Bytes() + (r.read.W + r.write.W) * w.Bytes() + (r.read.V + r.write.V) * v.Bytes();
       }
 
       int tuningIter() const { return 3; }

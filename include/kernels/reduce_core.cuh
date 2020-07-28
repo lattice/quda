@@ -54,11 +54,11 @@ namespace quda
 
       while (i < arg.length) {
         vec x, y, z, w, v;
-        arg.X.load(x, i, parity);
-        arg.Y.load(y, i, parity);
-        arg.Z.load(z, i, parity);
-        arg.W.load(w, i, parity);
-        arg.V.load(v, i, parity);
+        if (arg.r.read.X) arg.X.load(x, i, parity);
+        if (arg.r.read.Y) arg.Y.load(y, i, parity);
+        if (arg.r.read.Z) arg.Z.load(z, i, parity);
+        if (arg.r.read.W) arg.W.load(w, i, parity);
+        if (arg.r.read.V) arg.V.load(v, i, parity);
 
         arg.r.pre();
         arg.r(sum, x, y, z, w, v);
@@ -91,11 +91,11 @@ namespace quda
       for (int parity = 0; parity < arg.nParity; parity++) {
         for (int i = 0; i < arg.length; i++) {
           vec x, y, z, w, v;
-          arg.X.load(x, i, parity);
-          arg.Y.load(y, i, parity);
-          arg.Z.load(z, i, parity);
-          arg.W.load(w, i, parity);
-          arg.V.load(v, i, parity);
+          if (arg.r.read.X) arg.X.load(x, i, parity);
+          if (arg.r.read.Y) arg.Y.load(y, i, parity);
+          if (arg.r.read.Z) arg.Z.load(z, i, parity);
+          if (arg.r.read.W) arg.W.load(w, i, parity);
+          if (arg.r.read.V) arg.V.load(v, i, parity);
 
           arg.r.pre();
           arg.r(sum, x, y, z, w, v);
@@ -140,14 +140,14 @@ namespace quda
 
     template <typename reduce_t, typename real>
     struct Norm1 : public ReduceFunctor<reduce_t> {
-      static constexpr write<> write{ };
+      static constexpr stream<1> read{ };
+      static constexpr stream<> write{ };
       Norm1(const real &a, const real &b) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
 #pragma unroll
         for (int i=0; i < x.size(); i++) sum += norm1_<reduce_t, real>(x[i]);
       }
-      constexpr int streams() const { return 1; } //! total number of input and output streams
       constexpr int flops() const { return 2; }   //! flops per element
     };
 
@@ -162,14 +162,14 @@ namespace quda
 
     template <typename reduce_t, typename real>
     struct Norm2 : public ReduceFunctor<reduce_t> {
-      static constexpr write<> write{ };
+      static constexpr stream<1> read{ };
+      static constexpr stream<> write{ };
       Norm2(const real &a, const real &b) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) norm2_<reduce_t,real>(sum, x[i]);
       }
-      constexpr int streams() const { return 1; } //! total number of input and output streams
       constexpr int flops() const { return 2; }   //! flops per element
     };
 
@@ -185,14 +185,14 @@ namespace quda
 
     template <typename reduce_t, typename real>
     struct Dot : public ReduceFunctor<reduce_t> {
-      static constexpr write<> write{ };
+      static constexpr stream<1,1> read{ };
+      static constexpr stream<> write{ };
       Dot(const real &a, const real &b) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) dot_<reduce_t, real>(sum, x[i], y[i]);
       }
-      constexpr int streams() const { return 2; } //! total number of input and output streams
       constexpr int flops() const { return 2; }   //! flops per element
     };
 
@@ -202,7 +202,8 @@ namespace quda
     */
     template <typename reduce_t, typename real>
     struct axpbyzNorm2 : public ReduceFunctor<reduce_t> {
-      static constexpr write<0, 0, 1> write{ };
+      static constexpr stream<1, 1, 0> read{ };
+      static constexpr stream<0, 0, 1> write{ };
       const real a;
       const real b;
       axpbyzNorm2(const real &a, const real &b) : a(a), b(b) { ; }
@@ -214,7 +215,6 @@ namespace quda
           norm2_<reduce_t, real>(sum, z[i]);
         }
       }
-      constexpr int streams() const { return 3; } //! total number of input and output streams
       constexpr int flops() const { return 4; }   //! flops per element
     };
 
@@ -224,7 +224,8 @@ namespace quda
     */
     template <typename reduce_t, typename real>
     struct AxpyReDot : public ReduceFunctor<reduce_t> {
-      static constexpr write<0, 1> write{ };
+      static constexpr stream<1, 1> read{ };
+      static constexpr stream<0, 1> write{ };
       const real a;
       AxpyReDot(const real &a, const real &b) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
@@ -235,7 +236,6 @@ namespace quda
           dot_<reduce_t, real>(sum, x[i], y[i]);
         }
       }
-      constexpr int streams() const { return 3; } //! total number of input and output streams
       constexpr int flops() const { return 4; }   //! flops per element
     };
 
@@ -245,7 +245,8 @@ namespace quda
     */
     template <typename reduce_t, typename real>
     struct caxpyNorm2 : public ReduceFunctor<reduce_t> {
-      static constexpr write<0, 1> write{ };
+      static constexpr stream<1, 1> read{ };
+      static constexpr stream<0, 1> write{ };
       const complex<real> a;
       caxpyNorm2(const complex<real> &a, const complex<real> &b) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
@@ -256,7 +257,6 @@ namespace quda
           norm2_<reduce_t, real>(sum, y[i]);
         }
       }
-      constexpr int streams() const { return 3; } //! total number of input and output streams
       constexpr int flops() const { return 6; }   //! flops per element
     };
 
@@ -268,7 +268,8 @@ namespace quda
     */
     template <typename reduce_t, typename real>
     struct caxpyxmaznormx : public ReduceFunctor<reduce_t> {
-      static constexpr write<1, 1> write{ };
+      static constexpr stream<1, 1, 1> read{ };
+      static constexpr stream<1, 1> write{ };
       const complex<real> a;
       caxpyxmaznormx(const complex<real> &a, const complex<real> &b) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
@@ -280,7 +281,6 @@ namespace quda
           norm2_<reduce_t, real>(sum, x[i]);
         }
       }
-      constexpr int streams() const { return 5; } //! total number of input and output streams
       constexpr int flops() const { return 10; }  //! flops per element
     };
 
@@ -292,7 +292,8 @@ namespace quda
     */
     template <typename reduce_t, typename real>
     struct cabxpyzaxnorm : public ReduceFunctor<reduce_t> {
-      static constexpr write<1, 0, 1> write{ };
+      static constexpr stream<1, 1, 0> read{ };
+      static constexpr stream<1, 0, 1> write{ };
       const real a;
       const complex<real> b;
       cabxpyzaxnorm(const complex<real> &a, const complex<real> &b) : a(a.real()), b(b) { ; }
@@ -305,7 +306,6 @@ namespace quda
           norm2_<reduce_t, real>(sum, z[i]);
         }
       }
-      constexpr int streams() const { return 4; } //! total number of input and output streams
       constexpr int flops() const { return 10; }  //! flops per element
     };
 
@@ -325,14 +325,14 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct Cdot : public ReduceFunctor<typename VectorType<real_reduce_t, 2>::type> {
       using reduce_t = typename VectorType<real_reduce_t, 2>::type;
-      static constexpr write<> write{ };
+      static constexpr stream<1, 1> read{ };
+      static constexpr stream<> write{ };
       Cdot(const complex<real> &a, const complex<real> &b) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) cdot_<reduce_t, real>(sum, x[i], y[i]);
       }
-      constexpr int streams() const { return 2; } //! total number of input and output streams
       constexpr int flops() const { return 4; }   //! flops per element
     };
 
@@ -344,7 +344,8 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct caxpydotzy : public ReduceFunctor<typename VectorType<real_reduce_t, 2>::type> {
       using reduce_t = typename VectorType<real_reduce_t, 2>::type;
-      static constexpr write<0, 1> write{ };
+      static constexpr stream<1, 1, 1> read{ };
+      static constexpr stream<0, 1> write{ };
       const complex<real> a;
       caxpydotzy(const complex<real> &a, const complex<real> &b) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
@@ -355,7 +356,6 @@ namespace quda
           cdot_<reduce_t, real>(sum, z[i], y[i]);
         }
       }
-      constexpr int streams() const { return 4; } //! total number of input and output streams
       constexpr int flops() const { return 8; }   //! flops per element
     };
 
@@ -388,14 +388,14 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct CdotNormA : public ReduceFunctor<typename VectorType<real_reduce_t, 3>::type> {
       using reduce_t = typename VectorType<real_reduce_t, 3>::type;
-      static constexpr write<> write{ };
+      static constexpr stream<1, 1> read{ };
+      static constexpr stream<> write{ };
       CdotNormA(const real &a, const real &b) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) cdotNormA_<reduce_t>(sum, x[i], y[i]);
       }
-      constexpr int streams() const { return 2; } //! total number of input and output streams
       constexpr int flops() const { return 6; }   //! flops per element
     };
 
@@ -406,7 +406,8 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct caxpbypzYmbwcDotProductUYNormY_ : public ReduceFunctor<typename VectorType<real_reduce_t, 3>::type> {
       using reduce_t = typename VectorType<real_reduce_t, 3>::type;
-      static constexpr write<0, 1, 1> write{ };
+      static constexpr stream<1, 1, 1, 1, 1> read{ };
+      static constexpr stream<0, 1, 1> write{ };
       const complex<real> a;
       const complex<real> b;
       caxpbypzYmbwcDotProductUYNormY_(const complex<real> &a, const complex<real> &b) : a(a), b(b) { ; }
@@ -420,7 +421,6 @@ namespace quda
           cdotNormB_<reduce_t>(sum, v[i], z[i]);
         }
       }
-      constexpr int streams() const { return 7; } //! total number of input and output streams
       constexpr int flops() const { return 18; }  //! flops per element
     };
 
@@ -433,7 +433,8 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct axpyCGNorm2 : public ReduceFunctor<typename VectorType<real_reduce_t, 2>::type> {
       using reduce_t = typename VectorType<real_reduce_t, 2>::type;
-      static constexpr write<0, 1> write{ };
+      static constexpr stream<1, 1> read{ };
+      static constexpr stream<0, 1> write{ };
       const real a;
       axpyCGNorm2(const real &a, const real &b) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
@@ -446,7 +447,6 @@ namespace quda
           y[i] = y_new;
         }
       }
-      constexpr int streams() const { return 3; } //! total number of input and output streams
       constexpr int flops() const { return 6; }   //! flops per real element
     };
 
@@ -461,7 +461,8 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct HeavyQuarkResidualNorm_ : public ReduceFunctor<typename VectorType<real_reduce_t, 3>::type, true> {
       using reduce_t = typename VectorType<real_reduce_t, 3>::type;
-      static constexpr write<> write{ };
+      static constexpr stream<1, 1> read{ };
+      static constexpr stream<> write{ };
       reduce_t aux;
       HeavyQuarkResidualNorm_(const real &a, const real &b) : aux {} { ; }
 
@@ -488,7 +489,6 @@ namespace quda
         sum.z += (aux.x > 0.0) ? (aux.y / aux.x) : static_cast<real>(1.0);
       }
 
-      constexpr int streams() const { return 2; } //! total number of input and output streams
       constexpr int flops() const { return 4; }   //! undercounts since it excludes the per-site division
     };
 
@@ -504,7 +504,8 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct xpyHeavyQuarkResidualNorm_ : public ReduceFunctor<typename VectorType<real_reduce_t, 3>::type, true> {
       using reduce_t = typename VectorType<real_reduce_t, 3>::type;
-      static constexpr write<> write{ };
+      static constexpr stream<1, 1, 1> read{ };
+      static constexpr stream<> write{ };
       reduce_t aux;
       xpyHeavyQuarkResidualNorm_(const real &a, const real &b) : aux {} { ; }
 
@@ -531,7 +532,6 @@ namespace quda
         sum.z += (aux.x > 0.0) ? (aux.y / aux.x) : static_cast<real>(1.0);
       }
 
-      constexpr int streams() const { return 3; } //! total number of input and output streams
       constexpr int flops() const { return 5; }
     };
 
@@ -544,7 +544,8 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct tripleCGReduction_ : public ReduceFunctor<typename VectorType<real_reduce_t, 3>::type> {
       using reduce_t = typename VectorType<real_reduce_t, 3>::type;
-      static constexpr write<> write{ };
+      static constexpr stream<1, 1, 1> read{ };
+      static constexpr stream<> write{ };
       using scalar = typename scalar<reduce_t>::type;
       tripleCGReduction_(const real &a, const real &b) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
@@ -556,7 +557,6 @@ namespace quda
           dot_<real_reduce_t, real>(sum.z, y[i], z[i]);
         }
       }
-      constexpr int streams() const { return 3; } //! total number of input and output streams
       constexpr int flops() const { return 6; }   //! flops per element
     };
 
@@ -570,7 +570,8 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct quadrupleCGReduction_ : public ReduceFunctor<typename VectorType<real_reduce_t, 4>::type> {
       using reduce_t = typename VectorType<real_reduce_t, 4>::type;
-      static constexpr write<> write{ };
+      static constexpr stream<1, 1, 1, 1> read{ };
+      static constexpr stream<> write{ };
       quadrupleCGReduction_(const real &a, const real &b) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
@@ -582,7 +583,6 @@ namespace quda
           norm2_<real_reduce_t, real>(sum.w, w[i]);
         }
       }
-      constexpr int streams() const { return 3; } //! total number of input and output streams
       constexpr int flops() const { return 8; }   //! flops per element
     };
 
@@ -596,7 +596,8 @@ namespace quda
     */
     template <typename reduce_t, typename real>
     struct quadrupleCG3InitNorm_ : public ReduceFunctor<reduce_t> {
-      static constexpr write<1, 1, 1, 1> write{ };
+      static constexpr stream<1, 1, 0, 0, 1> read{ };
+      static constexpr stream<1, 1, 1, 1> write{ };
       const real a;
       quadrupleCG3InitNorm_(const real &a, const real &b) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
@@ -610,7 +611,6 @@ namespace quda
           norm2_<reduce_t, real>(sum, y[i]);
         }
       }
-      constexpr int streams() const { return 6; } //! total number of input and output streams
       constexpr int flops() const { return 6; }   //! flops per element check if it's right
     };
 
@@ -626,7 +626,8 @@ namespace quda
     */
     template <typename reduce_t, typename real>
     struct quadrupleCG3UpdateNorm_ : public ReduceFunctor<reduce_t> {
-      static constexpr write<1, 1, 1, 1> write{ };
+      static constexpr stream<1, 1, 1, 1, 1> read{ };
+      static constexpr stream<1, 1, 1, 1> write{ };
       const real a;
       const real b;
       quadrupleCG3UpdateNorm_(const real &a, const real &b) : a(a), b(b) { ; }
@@ -643,7 +644,6 @@ namespace quda
           norm2_<reduce_t, real>(sum, y[i]);
         }
       }
-      constexpr int streams() const { return 7; } //! total number of input and output streams
       constexpr int flops() const { return 16; }  //! flops per element check if it's right
     };
 

@@ -103,8 +103,8 @@ namespace quda
 
         vec x, y, z, w;
         if (l_idx == 0 || warp_split == 1) {
-          arg.Y[k].load(y, idx, parity);
-          arg.W[k].load(w, idx, parity);
+          if (arg.f.read.Y) arg.Y[k].load(y, idx, parity);
+          if (arg.f.read.W) arg.W[k].load(w, idx, parity);
         } else {
           zero(y);
           zero(w);
@@ -114,8 +114,8 @@ namespace quda
         for (int l_ = 0; l_ < NXZ; l_ += warp_split) {
           const int l = l_ + l_idx;
           if (l < NXZ || warp_split == 1) {
-            arg.X[l].load(x, idx, parity);
-            arg.Z[l].load(z, idx, parity);
+            if (arg.f.read.X) arg.X[l].load(x, idx, parity);
+            if (arg.f.read.Z) arg.Z[l].load(z, idx, parity);
 
             arg.f(x, y, z, w, k, l);
           }
@@ -140,9 +140,9 @@ namespace quda
       static constexpr bool reducer = false;
       static constexpr bool coeff_mul = true;
       static constexpr bool multi_1d = multi_1d_;
+
       const int NXZ;
       const int NYW;
-
       MultiBlasFunctor(int NXZ, int NYW) : NXZ(NXZ), NYW(NYW) {}
 
       __device__ __host__ inline coeff_t a(int i, int j) const
@@ -178,12 +178,11 @@ namespace quda
     */
     template <typename real>
     struct multiaxpy_ : public MultiBlasFunctor<real> {
-      static constexpr write<0, 1> write{ };
+      static constexpr stream<1, 1> read{ };
+      static constexpr stream<0, 1> write{ };
       static constexpr bool use_z = false;
       static constexpr bool use_w = false;
       static constexpr int NXZ_max = 0;
-      using MultiBlasFunctor<real>::NXZ;
-      using MultiBlasFunctor<real>::NYW;
       using MultiBlasFunctor<real>::a;
       multiaxpy_(int NXZ, int NYW) : MultiBlasFunctor<real>(NXZ, NYW) {}
 
@@ -193,8 +192,7 @@ namespace quda
         for (int k = 0; k < x.size(); k++) y[k] += a(j, i) * x[k];
       }
 
-      constexpr int streams() const { return 2 * NYW + NXZ * NYW; } //! total number of input and output streams
-      constexpr int flops() const { return 2 * NXZ * NYW; }         //! flops per real element
+      constexpr int flops() const { return 2; }         //! flops per real element
     };
 
     /**
@@ -202,12 +200,11 @@ namespace quda
     */
     template <typename real>
     struct multicaxpy_ : public MultiBlasFunctor<complex<real>> {
-      static constexpr write<0, 1> write{ };
+      static constexpr stream<1, 1> read{ };
+      static constexpr stream<0, 1> write{ };
       static constexpr bool use_z = false;
       static constexpr bool use_w = false;
       static constexpr int NXZ_max = 0;
-      using MultiBlasFunctor<complex<real>>::NXZ;
-      using MultiBlasFunctor<complex<real>>::NYW;
       using MultiBlasFunctor<complex<real>>::a;
       multicaxpy_(int NXZ, int NYW) : MultiBlasFunctor<complex<real>>(NXZ, NYW) {}
 
@@ -217,8 +214,7 @@ namespace quda
         for (int k = 0; k < x.size(); k++) y[k] = cmac(a(j, i), x[k], y[k]);
       }
 
-      constexpr int streams() const { return 2 * NYW + NXZ * NYW; } //! total number of input and output streams
-      constexpr int flops() const { return 4 * NXZ * NYW; }         //! flops per real element
+      constexpr int flops() const { return 4; }         //! flops per real element
     };
 
     /**
@@ -226,12 +222,11 @@ namespace quda
     */
     template <typename real>
     struct multicaxpyz_ : public MultiBlasFunctor<complex<real>> {
-      static constexpr write<0, 0, 0, 1> write{ };
+      static constexpr stream<1, 0, 0, 1> read{ };
+      static constexpr stream<0, 0, 0, 1> write{ };
       static constexpr bool use_z = false;
       static constexpr bool use_w = true;
       static constexpr int NXZ_max = 0;
-      using MultiBlasFunctor<complex<real>>::NXZ;
-      using MultiBlasFunctor<complex<real>>::NYW;
       using MultiBlasFunctor<complex<real>>::a;
       multicaxpyz_(int NXZ, int NYW) : MultiBlasFunctor<complex<real>>(NXZ, NYW) {}
 
@@ -244,8 +239,7 @@ namespace quda
         }
       }
 
-      constexpr int streams() const { return 2 * NYW + NXZ * NYW; } //! total number of input and output streams
-      constexpr int flops() const { return 4 * NXZ * NYW; }         //! flops per real element
+      constexpr int flops() const { return 4; }         //! flops per real element
     };
 
     /**
@@ -253,12 +247,11 @@ namespace quda
     */
     template <typename real>
     struct multi_axpyBzpcx_ : public MultiBlasFunctor<real, true> {
-      static constexpr write<0, 1, 0, 1> write{ };
+      static constexpr stream<1, 1, 0, 1> read{ };
+      static constexpr stream<0, 1, 0, 1> write{ };
       static constexpr bool use_z = false;
       static constexpr bool use_w = true;
       static constexpr int NXZ_max = 1; // we never have NXZ > 1 for this kernel
-      using MultiBlasFunctor<real,true>::NXZ;
-      using MultiBlasFunctor<real,true>::NYW;
       // this is a multi-1d functor so the coefficients are stored in the struct
       // set max 1-d size equal to max power of two
       static constexpr int N = max_N_multi_1d();
@@ -276,8 +269,7 @@ namespace quda
         }
       }
 
-      constexpr int streams() const { return 4 * NYW + NXZ; } //! total number of input and output streams
-      constexpr int flops() const { return 5 * NXZ * NYW; }   //! flops per real element
+      constexpr int flops() const { return 5; }   //! flops per real element
     };
 
     /**
@@ -285,12 +277,11 @@ namespace quda
     */
     template <typename real>
     struct multi_caxpyBxpz_ : public MultiBlasFunctor<complex<real>, true> {
-      static constexpr write<0, 1, 0, 1> write{ };
+      static constexpr stream<1, 1, 0, 1> read{ };
+      static constexpr stream<0, 1, 0, 1> write{ };
       static constexpr bool use_z = false;
       static constexpr bool use_w = true;
       static constexpr int NXZ_max = 0;
-      using MultiBlasFunctor<complex<real>, true>::NXZ;
-      using MultiBlasFunctor<complex<real>, true>::NYW;
       static constexpr int N = max_N_multi_1d();
       complex<real> a[N];
       complex<real> b[N];
@@ -307,8 +298,7 @@ namespace quda
         }
       }
 
-      constexpr int streams() const { return 4 * NYW + NXZ; } //! total number of input and output streams
-      constexpr int flops() const { return 8 * NXZ * NYW; }   //! flops per real element
+      constexpr int flops() const { return 8; }   //! flops per real element
     };
 
   } // namespace blas

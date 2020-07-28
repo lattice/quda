@@ -10,7 +10,7 @@
 namespace quda
 {
 
-  template <bool X_ = false, bool Y_ = false, bool Z_ = false, bool W_ = false, bool V_ = false> struct write {
+  template <bool X_ = false, bool Y_ = false, bool Z_ = false, bool W_ = false, bool V_ = false> struct stream {
     static constexpr bool X = X_;
     static constexpr bool Y = Y_;
     static constexpr bool Z = Z_;

@@ -78,21 +78,21 @@ namespace quda
       while (idx < arg.length) {
 
         vec x, y, z, w;
-        arg.Y[k].load(y, idx, parity);
-        arg.W[k].load(w, idx, parity);
+        if (arg.r.read.Y) arg.Y[k].load(y, idx, parity);
+        if (arg.r.read.W) arg.W[k].load(w, idx, parity);
 
         // Each NYW owns its own thread.
         // The NXZ's are all in the same thread block,
         // so they can share the same memory.
 #pragma unroll
         for (int l = 0; l < NXZ; l++) {
-          arg.X[l].load(x, idx, parity);
-          arg.Z[l].load(z, idx, parity);
+          if (arg.r.read.X) arg.X[l].load(x, idx, parity);
+          if (arg.r.read.Z) arg.Z[l].load(z, idx, parity);
 
           arg.r(sum[l], x, y, z, w, k, l);
         }
-        if (arg.r.write.X) arg.Y[k].save(y, idx, parity);
-        if (arg.r.write.X) arg.W[k].save(w, idx, parity);
+        if (arg.r.write.Y) arg.Y[k].save(y, idx, parity);
+        if (arg.r.write.W) arg.W[k].save(w, idx, parity);
 
         idx += gridDim.x * blockDim.x;
       }
@@ -162,7 +162,8 @@ namespace quda
 
     template <typename reduce_t, typename real>
     struct multiDot : public MultiReduceFunctor<reduce_t, real> {
-      static constexpr write< > write { };
+      static constexpr stream<1, 1> read { };
+      static constexpr stream< > write { };
       static constexpr bool use_z = false;
       static constexpr bool use_w = false;
       multiDot(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, real>(NXZ, NYW) { }
@@ -173,7 +174,6 @@ namespace quda
         for (int k=0; k < x.size(); k++) dot_<reduce_t, real>(sum, x[k], y[k]);
       }
 
-      constexpr int streams() const { return 2; } //! total number of input and output streams
       constexpr int flops() const { return 2; }   //! flops per element
     };
 
@@ -193,7 +193,8 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct multiCdot : public MultiReduceFunctor<typename VectorType<real_reduce_t, 2>::type, complex<real>> {
       using reduce_t = typename VectorType<real_reduce_t, 2>::type;
-      static constexpr write< > write { };
+      static constexpr stream<1, 1> read { };
+      static constexpr stream< > write { };
       static constexpr bool use_z = false;
       static constexpr bool use_w = false;
       multiCdot(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, complex<real>>(NXZ, NYW) { }
@@ -204,14 +205,14 @@ namespace quda
         for (int k=0; k < x.size(); k++) cdot_<reduce_t, real>(sum, x[k], y[k]);
       }
 
-      constexpr int streams() const { return 2; } //! total number of input and output streams
       constexpr int flops() const { return 4; }   //! flops per element
     };
 
     template <typename real_reduce_t, typename real>
     struct multiCdotCopy : public MultiReduceFunctor<typename VectorType<real_reduce_t, 2>::type, complex<real>> {
       using reduce_t = typename VectorType<real_reduce_t, 2>::type;
-      static constexpr write<0, 0, 0, 1> write { };
+      static constexpr stream<1, 1> read { };
+      static constexpr stream<0, 0, 0, 1> write { };
       static constexpr bool use_z = false;
       static constexpr bool use_w = true;
       multiCdotCopy(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, complex<real>>(NXZ, NYW) { }
@@ -225,7 +226,6 @@ namespace quda
         }
       }
 
-      constexpr int streams() const { return 2; } //! total number of input and output streams
       constexpr int flops() const { return 4; }   //! flops per element
     };
 

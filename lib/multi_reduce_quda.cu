@@ -335,8 +335,12 @@ namespace quda {
 
       long long bytes() const
       {
-        // this will be wrong when mixed precision is added
-        return NYW * NXZ * r.streams() * x[0]->Bytes();
+        // X and Z reads are repeated (and hopefully cached) across NYW
+        // each Y and W read/write is done once
+        return NYW * NXZ * (r.read.X + r.write.X) * x[0]->Bytes() +
+          NYW * (r.read.Y + r.write.Y) * y[0]->Bytes() +
+          NYW * NXZ * (r.read.Z + r.write.Z) * z[0]->Bytes() +
+          NYW * (r.read.W + r.write.W) * w[0]->Bytes();
       }
 
       int tuningIter() const { return 3; }
