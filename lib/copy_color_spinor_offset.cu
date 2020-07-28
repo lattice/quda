@@ -8,11 +8,10 @@
 namespace quda
 {
 
-  template <typename Float, int nColor> struct CopyColorSpinorOffsetArg {
+  template <typename Float, int nColor, class F> struct CopyColorSpinorOffsetArg {
 
     static constexpr int nDim = 4;
 
-    using F = typename colorspinor_mapper<Float, 4, nColor>::type;
     using real = typename mapper<Float>::type;
     using Vector = ColorSpinor<real, nColor, 4>;
 
@@ -146,7 +145,7 @@ namespace quda
       writeAuxString("(%d,%d,%d,%d)->(%d,%d,%d,%d),Ls=%d,%s,offset=%d%d%d%d,location=%s", arg.Xin[0], arg.Xin[1],
                      arg.Xin[2], arg.Xin[3], arg.Xout[0], arg.Xout[1], arg.Xout[2], arg.Xout[3], arg.Ls,
                      arg.collect_disperse ? "collect" : "disperse", arg.offset[0], arg.offset[1], arg.offset[2],
-                     arg.offset[3], location == QUDA_CPU_FIELD_LOCATION ? "cpu" : "gpu");
+                     arg.offset[3], location == QUDA_CPU_FIELD_LOCATION ? "CPU" : "GPU");
       apply(0);
     }
     virtual ~CopyColorSpinorOffset() { }
@@ -186,8 +185,34 @@ namespace quda
   template <typename Float, int nColor>
   void copy_color_spinor_offset(ColorSpinorField &out, const ColorSpinorField &in, const int offset[4])
   {
-    CopyColorSpinorOffsetArg<Float, nColor> arg(out, in, offset);
-    CopyColorSpinorOffset<Float, nColor, decltype(arg)> dummy(arg, in);
+    if (in.Location() == QUDA_CPU_FIELD_LOCATION) {
+      if (in.FieldOrder() == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
+
+        using F = typename colorspinor_order_mapper<Float, QUDA_SPACE_COLOR_SPIN_FIELD_ORDER, 4, nColor>::type;
+
+        CopyColorSpinorOffsetArg<Float, nColor, F> arg(out, in, offset);
+        CopyColorSpinorOffset<Float, nColor, decltype(arg)> dummy(arg, in);
+
+      } else if (in.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
+
+        using F = typename colorspinor_order_mapper<Float, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER, 4, nColor>::type;
+
+        CopyColorSpinorOffsetArg<Float, nColor, F> arg(out, in, offset);
+        CopyColorSpinorOffset<Float, nColor, decltype(arg)> dummy(arg, in);
+
+      } else {
+
+        errorQuda("Unsupported field order = %d.", in.FieldOrder());
+      }
+
+    } else {
+
+      if (!in.isNative() || !out.isNative()) { errorQuda("CUDA field has be in native order."); }
+
+      using F = typename colorspinor_mapper<Float, 4, nColor>::type;
+      CopyColorSpinorOffsetArg<Float, nColor, F> arg(out, in, offset);
+      CopyColorSpinorOffset<Float, nColor, decltype(arg)> dummy(arg, in);
+    }
   }
 
   // template on the number of colors

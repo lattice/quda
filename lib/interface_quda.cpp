@@ -3116,8 +3116,6 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, Qud
   int num_src = quda::product(split_key);
   if (!gaugePrecise) { errorQuda("Guage field not loaded."); }
   quda::GaugeFieldParam gf_param(*gaugePrecise);
-  quda::GaugeField *gauge_backup = quda::GaugeField::Create(gf_param);
-  *gauge_backup = *gaugePrecise;
 
   // It was probably a bad design decision to encode whether the system is even/odd preconditioned (PC) in
   // solve_type and solution_type, rather than in separate members of QudaInvertParam.  We're stuck with it
@@ -3203,9 +3201,6 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, Qud
     gauge_param->ga_pad /= split_key[d];
   }
 
-  // loadGaugeField(gauge_backup, gauge_param);
-  // plaqQuda(plaq);
-
   printf("Split plaquette rank %d is %12.8e: (spatial = %12.8e, temporal = %12.8e)\n", comm_rank(), plaq[0], plaq[1],
          plaq[2]);
 
@@ -3216,6 +3211,7 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, Qud
   delete collect_b;
   delete collect_x;
 
+  freeGaugeQuda();
 }
 
 /*!
@@ -3320,7 +3316,6 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
     cpuParam.v = hp_x[i]; //MW seems wird in the loop
     h_x[i] = ColorSpinorField::Create(cpuParam);
   }
-
 
   // MW currently checked until here
 

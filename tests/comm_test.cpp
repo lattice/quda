@@ -16,7 +16,6 @@
 #include <command_line_params.h>
 #include <dslash_reference.h>
 
-
 #include <gauge_field.h>
 
 #include <timer.h>
@@ -203,44 +202,36 @@ int main(int argc, char **argv)
 
   CommKey split_key
     = {gridsize_from_cmdline[0], gridsize_from_cmdline[1], gridsize_from_cmdline[2], gridsize_from_cmdline[3]};
-  
-  constructWilsonTestSpinorParam(&cpu_cs_param, &inv_param, &gauge_param);
-  
-  comm_barrier();
 
-  // Split input fermion field
-  quda::cpuColorSpinorField *in_h = new quda::cpuColorSpinorField(cpu_cs_param);
+  quda::ColorSpinorParam cpu_cs_param;
+  constructWilsonTestSpinorParam(&cpu_cs_param, &inv_param, &gauge_param);
+
+  quda::cpuColorSpinorField *meta = new quda::cpuColorSpinorField(cpu_cs_param);
 
   auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234 * comm_rank());
   rng->Init();
-  
+
   int n_src = quda::product(split_key);
-  
-  std::vector<quda::ColorSpinorField *> v_h(n_src, nullptr);
-  for (auto &p : v_h) {
+
+  std::vector<quda::ColorSpinorField *> _h_b(n_src, nullptr);
+  for (auto &p : _h_b) {
     p = new quda::cpuColorSpinorField(cpu_cs_param);
     constructRandomSpinorSource(p->V(), 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
     printfQuda("in_d norm = %12.8e (before split)\n", quda::blas::norm2(*p));
   }
-  std::vector<quda::ColorSpinorField *> v_x(n_src, nullptr);
-  for (auto &p : v_x) { p = new quda::cpuColorSpinorField(cpu_cs_param); }
-  
-  // Host arrays for solutions, sources, and check
-  void **outMulti = (void **)malloc(n_src * sizeof(void *));
-  void **inMulti = (void **)malloc(n_src * sizeof(void *));
+  std::vector<quda::ColorSpinorField *> _h_x(n_src, nullptr);
+  for (auto &p : _h_x) { p = new quda::cpuColorSpinorField(cpu_cs_param); }
 
+  // Host arrays for solutions, sources, and check
+  void **_hp_x = (void **)malloc(n_src * sizeof(void *));
+  void **_hp_b = (void **)malloc(n_src * sizeof(void *));
   for (int i = 0; i < n_src; i++) {
-    // Allocate memory and set pointers
-    outMulti[i] = v_x[i]->V();
-    inMulti[i] = v_h[i]->V();
+    _hp_x[i] = _h_x[i]->V();
+    _hp_b[i] = _h_b[i]->V();
   }
 
-  invertSplitGridQuda(outMulti, inMulti, &inv_param, &gauge_param, split_key.data());
-
-  // for (const auto &p : v_x) { printfQuda("v_x norm = %12.8e (after join)\n", quda::blas::norm2(*p)); }
-
-  rng->Release();
-  delete rng;
+  // Call the split grid solver
+  invertSplitGridQuda(_hp_x, _hp_b, &inv_param, &gauge_param, split_key.data());
 
   loadGaugeQuda(gauge, &gauge_param);
   plaqQuda(plaq);
@@ -250,19 +241,21 @@ int main(int argc, char **argv)
   void *clover_inv = nullptr;
 
   if (verify_results) {
-    for (size_t i = 0; i < v_h.size(); i++) {
-    printfQuda("in_d norm = %12.8e (before split)\n", quda::blas::norm2(*v_x[i]));
-      invertQuda(v_x[i]->V(), v_h[i]->V(), &inv_param);
-    printfQuda("in_d norm = %12.8e (before split)\n", quda::blas::norm2(*v_x[i]));
-      verifyInversion(v_x[i]->V(), nullptr, v_h[i]->V(), in_h->V(), gauge_param, inv_param, gauge, clover,
-                      clover_inv);
+    for (size_t i = 0; i < n_src; i++) {
+      verifyInversion(_h_x[i]->V(), nullptr, _h_b[i]->V(), meta->V(), gauge_param, inv_param, gauge, clover, clover_inv);
     }
   }
 
-  delete outMulti;
-  delete in_h;
-  for (auto p : v_h) { delete p; }
-  for (auto p : v_x) { delete p; }
+  rng->Release();
+  delete rng;
+
+  free(_hp_x);
+  free(_hp_b);
+
+  delete meta;
+
+  for (auto p : _h_b) { delete p; }
+  for (auto p : _h_x) { delete p; }
 
   freeGaugeQuda();
 
