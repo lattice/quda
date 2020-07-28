@@ -4,6 +4,8 @@
 #include <math.h>
 #include <string.h>
 
+#include <communicator_quda.h>
+
 // QUDA headers
 #include <quda.h>
 #include <color_spinor_field.h> // convenient quark field container
@@ -14,7 +16,6 @@
 #include <command_line_params.h>
 #include <dslash_reference.h>
 
-#include <communicator_quda.h>
 
 #include <gauge_field.h>
 
@@ -24,6 +25,8 @@
 
 #include <gtest/gtest.h>
 #include <blas_quda.h>
+
+#include <split_grid.h>
 
 static quda::TimeProfile profileExtendedGauge("createExtendedGaugeFieldCommTest");
 
@@ -129,296 +132,6 @@ auto plaquette_gauge(quda::GaugeField &g)
 
 int comm_rank_from_coords(const int *coords);
 
-namespace quda
-{
-  void copyOffsetGauge(GaugeField &out, const GaugeField &in, const int offset[4]);
-
-  void copy_color_spinor_offset(ColorSpinorField &out, const ColorSpinorField &in, const int offset[4]);
-
-  void copyOffsetGauge(ColorSpinorField &out, const ColorSpinorField &in, const int offset[4])
-  {
-    copy_color_spinor_offset(out, in, offset);
-  }
-
-  auto product(const CommKey &input) { return input[0] * input[1] * input[2] * input[3]; }
-
-  CommKey operator+(const CommKey &lhs, const CommKey &rhs)
-  {
-    CommKey sum;
-    for (int d = 0; d < nDim; d++) { sum[d] = lhs[d] + rhs[d]; }
-    return sum;
-  }
-
-  CommKey operator*(const CommKey &lhs, const CommKey &rhs)
-  {
-    CommKey product;
-    for (int d = 0; d < nDim; d++) { product[d] = lhs[d] * rhs[d]; }
-    return product;
-  }
-
-  CommKey operator/(const CommKey &lhs, const CommKey &rhs)
-  {
-    CommKey quotient;
-    for (int d = 0; d < nDim; d++) { quotient[d] = lhs[d] / rhs[d]; }
-    return quotient;
-  }
-
-  CommKey operator%(const CommKey &lhs, const CommKey &rhs)
-  {
-    CommKey mod;
-    for (int d = 0; d < nDim; d++) { mod[d] = lhs[d] % rhs[d]; }
-    return mod;
-  }
-
-  CommKey coordinate_from_index(int index, CommKey dim)
-  {
-    CommKey coord;
-    for (int d = 0; d < nDim; d++) {
-      coord[d] = index % dim[d];
-      index /= dim[d];
-    }
-    return coord;
-  }
-
-  int index_from_coordinate(CommKey coord, CommKey dim)
-  {
-    return ((coord[3] * dim[2] + coord[2]) * dim[1] + coord[1]) * dim[0] + coord[0];
-  }
-
-  void print(const CommKey &comm_key)
-  {
-    printf("(%3d,%3d,%3d,%3d)", comm_key[0], comm_key[1], comm_key[2], comm_key[3]);
-  }
-
-  auto get_data(GaugeField &f) { return f.Gauge_p(); }
-
-  auto get_data(ColorSpinorField &f) { return f.V(); }
-
-  template <class F> struct param_mapper {
-  };
-
-  template <> struct param_mapper<GaugeField> {
-    using type = GaugeFieldParam;
-  };
-
-  template <> struct param_mapper<ColorSpinorField> {
-    using type = ColorSpinorParam;
-  };
-
-  template <class Field>
-  void split_field(Field &collect_field, std::vector<Field *> &v_base_field, const CommKey &comm_key)
-  {
-    CommKey full_dim = {comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3)};
-    CommKey full_idx = {comm_coord(0), comm_coord(1), comm_coord(2), comm_coord(3)};
-
-    int rank = comm_rank();
-    int total_rank = product(full_dim);
-
-    auto grid_dim = full_dim / comm_key;  // Communicator grid.
-    auto block_dim = full_dim / grid_dim; // The full field needs to be partitioned according to the communicator grid.
-
-    int n_replicates = product(comm_key);
-    std::vector<void *> v_send_buffer_h(n_replicates, nullptr);
-    std::vector<MsgHandle *> v_mh_send(n_replicates, nullptr);
-
-    int n_fields = v_base_field.size();
-    if (n_fields == 0) { errorQuda("Empty vector!"); }
-
-    const auto &meta = *(v_base_field[0]);
-
-    // Send cycles
-    for (int i = 0; i < n_replicates; i++) {
-      auto grid_idx = coordinate_from_index(i, comm_key);
-      auto block_idx = full_idx / block_dim;
-      // auto thread_idx = full_idx % block_dim;
-
-      auto dst_idx = grid_idx * grid_dim + block_idx;
-
-      int dst_rank = comm_rank_from_coords(dst_idx.data());
-      int tag = rank * total_rank + dst_rank; // tag = src_rank * total_rank + dst_rank
-
-      // TODO: For now only the cpu-gpu communication is implemented.
-      // printf("rank %4d -> rank %4d: tag = %4d\n", comm_rank(), dst_rank, tag);
-
-      size_t bytes = meta.Bytes();
-
-      v_send_buffer_h[i] = pinned_malloc(bytes);
-      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-        std::memcpy(v_send_buffer_h[i], get_data(*v_base_field[i % n_fields]), bytes);
-      } else {
-        cudaMemcpy(v_send_buffer_h[i], get_data(*v_base_field[i % n_fields]), bytes, cudaMemcpyDeviceToHost);
-      }
-      v_mh_send[i] = comm_declare_send_rank(v_send_buffer_h[i], dst_rank, tag, bytes);
-
-      comm_start(v_mh_send[i]);
-    }
-
-    using param_type = typename param_mapper<Field>::type;
-
-    param_type param(meta);
-    Field *buffer_field = Field::Create(param);
-
-    const int *X = meta.X();
-    CommKey thread_dim = {X[0], X[1], X[2], X[3]};
-
-    // Receive cycles
-    for (int i = 0; i < n_replicates; i++) {
-      auto thread_idx = coordinate_from_index(i, comm_key);
-      auto src_idx = (full_idx % grid_dim) * block_dim + thread_idx;
-
-      int src_rank = comm_rank_from_coords(src_idx.data());
-      int tag = src_rank * total_rank + rank;
-
-      // TODO: For now only the cpu-gpu communication is implemented.
-      // printf("rank %4d <- rank %4d: tag = %4d\n", comm_rank(), src_rank, tag);
-
-      size_t bytes = buffer_field->Bytes();
-
-      void *recv_buffer_h = pinned_malloc(bytes);
-
-      auto mh_recv = comm_declare_recv_rank(recv_buffer_h, src_rank, tag, bytes);
-
-      comm_start(mh_recv);
-      comm_wait(mh_recv);
-
-      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-        std::memcpy(get_data(*buffer_field), recv_buffer_h, bytes);
-      } else {
-        cudaMemcpy(get_data(*buffer_field), recv_buffer_h, bytes, cudaMemcpyHostToDevice);
-      }
-
-      comm_free(mh_recv);
-      host_free(recv_buffer_h);
-
-      auto offset = thread_idx * thread_dim;
-
-      quda::copyOffsetGauge(collect_field, *buffer_field, offset.data());
-    }
-
-    delete buffer_field;
-
-    comm_barrier();
-
-    for (auto &p : v_send_buffer_h) { host_free(p); };
-    for (auto &p : v_mh_send) { comm_free(p); };
-  }
-
-  template <class Field>
-  void join_field(std::vector<Field *> &v_base_field, const Field &collect_field, const CommKey &comm_key)
-  {
-    CommKey full_dim = {comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3)};
-    CommKey full_idx = {comm_coord(0), comm_coord(1), comm_coord(2), comm_coord(3)};
-
-    int rank = comm_rank();
-    int total_rank = product(full_dim);
-
-    auto grid_dim = full_dim / comm_key;  // Communicator grid.
-    auto block_dim = full_dim / grid_dim; // The full field needs to be partitioned according to the communicator grid.
-
-    int n_replicates = product(comm_key);
-    std::vector<void *> v_send_buffer_h(n_replicates, nullptr);
-    std::vector<MsgHandle *> v_mh_send(n_replicates, nullptr);
-
-    int n_fields = v_base_field.size();
-    if (n_fields == 0) { errorQuda("Empty vector!"); }
-
-    const auto &meta = *(v_base_field[0]);
-
-    using param_type = typename param_mapper<Field>::type;
-
-    param_type param(meta);
-    Field *buffer_field = Field::Create(param);
-
-    const int *X = meta.X();
-    CommKey thread_dim = {X[0], X[1], X[2], X[3]};
-
-    // Send cycles
-    for (int i = 0; i < n_replicates; i++) {
-#if 0
-      auto grid_idx = coordinate_from_index(i, comm_key);
-      auto block_idx = full_idx / block_dim;
-      // auto thread_idx = full_idx % block_dim;
-
-      auto dst_idx = grid_idx * grid_dim + block_idx;
-
-      int dst_rank = comm_rank_from_coords(dst_idx.data());
-      int tag = rank * total_rank + dst_rank; // tag = src_rank * total_rank + dst_rank
-#else
-      auto thread_idx = coordinate_from_index(i, comm_key);
-      auto dst_idx = (full_idx % grid_dim) * block_dim + thread_idx;
-
-      int dst_rank = comm_rank_from_coords(dst_idx.data());
-      int tag = rank * total_rank + dst_rank;
-#endif
-      // TODO: For now only the cpu-gpu communication is implemented.
-      // printf("rank %4d -> rank %4d: tag = %4d\n", comm_rank(), dst_rank, tag);
-
-      size_t bytes = meta.Bytes();
-
-      auto offset = thread_idx * thread_dim;
-      quda::copyOffsetGauge(*buffer_field, collect_field, offset.data());
-
-      v_send_buffer_h[i] = pinned_malloc(bytes);
-      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-        std::memcpy(v_send_buffer_h[i], get_data(*buffer_field), bytes);
-      } else {
-        cudaMemcpy(v_send_buffer_h[i], get_data(*buffer_field), bytes, cudaMemcpyDeviceToHost);
-      }
-      v_mh_send[i] = comm_declare_send_rank(v_send_buffer_h[i], dst_rank, tag, bytes);
-
-      comm_start(v_mh_send[i]);
-    }
-
-    // Receive cycles
-    for (int i = 0; i < n_replicates; i++) {
-#if 0
-      auto thread_idx = coordinate_from_index(i, comm_key);
-      auto src_idx = (full_idx % grid_dim) * block_dim + thread_idx;
-
-      int src_rank = comm_rank_from_coords(src_idx.data());
-      int tag = src_rank * total_rank + rank;
-#else
-      auto grid_idx = coordinate_from_index(i, comm_key);
-      auto block_idx = full_idx / block_dim;
-      // auto thread_idx = full_idx % block_dim;
-
-      auto src_idx = grid_idx * grid_dim + block_idx;
-
-      int src_rank = comm_rank_from_coords(src_idx.data());
-      int tag = src_rank * total_rank + rank; // tag = src_rank * total_rank + dst_rank
-#endif
-      // TODO: For now only the cpu-gpu communication is implemented.
-      // printf("rank %4d <- rank %4d: tag = %4d\n", comm_rank(), src_rank, tag);
-
-      size_t bytes = buffer_field->Bytes();
-
-      void *recv_buffer_h = pinned_malloc(bytes);
-
-      auto mh_recv = comm_declare_recv_rank(recv_buffer_h, src_rank, tag, bytes);
-
-      comm_start(mh_recv);
-      comm_wait(mh_recv);
-
-      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-        std::memcpy(get_data(*v_base_field[i % n_fields]), recv_buffer_h, bytes);
-      } else {
-        cudaMemcpy(get_data(*v_base_field[i % n_fields]), recv_buffer_h, bytes, cudaMemcpyHostToDevice);
-      }
-
-      comm_free(mh_recv);
-      host_free(recv_buffer_h);
-    }
-
-    delete buffer_field;
-
-    comm_barrier();
-
-    for (auto &p : v_send_buffer_h) { host_free(p); };
-    for (auto &p : v_mh_send) { comm_free(p); };
-  }
-
-} // namespace quda
-
 double plaq_ref;
 double plaq_split;
 
@@ -490,32 +203,9 @@ int main(int argc, char **argv)
 
   CommKey split_key
     = {gridsize_from_cmdline[0], gridsize_from_cmdline[1], gridsize_from_cmdline[2], gridsize_from_cmdline[3]};
-
-  quda::GaugeFieldParam param(*gaugePrecise);
-
-  quda::GaugeField *gauge_backup = quda::GaugeField::Create(param);
-  *gauge_backup = *gaugePrecise;
-
-  quda::ColorSpinorParam cpu_cs_param;
+  
   constructWilsonTestSpinorParam(&cpu_cs_param, &inv_param, &gauge_param);
-
-  for (int d = 0; d < nDim; d++) {
-    if (comm_dim(d) % split_key[d] != 0) {
-      errorQuda("Split not possible: (%d,%d,%d,%d) / (%d,%d,%d,%d).", comm_dim(0), comm_dim(1), comm_dim(2),
-                comm_dim(3), split_key[0], split_key[1], split_key[2], split_key[3]);
-    }
-
-    param.x[d] *= split_key[d];
-    param.pad *= split_key[d];
-    gauge_param.X[d] *= split_key[d];
-    gauge_param.ga_pad *= split_key[d];
-  }
-  quda::GaugeField *collect_gauge = quda::GaugeField::Create(param);
-
-  std::vector<quda::GaugeField *> v_g(1);
-  v_g[0] = gaugePrecise;
-  quda::split_field(*collect_gauge, v_g, split_key);
-
+  
   comm_barrier();
 
   // Split input fermion field
@@ -523,66 +213,48 @@ int main(int argc, char **argv)
 
   auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234 * comm_rank());
   rng->Init();
-
-  std::vector<quda::ColorSpinorField *> v_h(quda::product(split_key), nullptr);
+  
+  int n_src = quda::product(split_key);
+  
+  std::vector<quda::ColorSpinorField *> v_h(n_src, nullptr);
   for (auto &p : v_h) {
     p = new quda::cpuColorSpinorField(cpu_cs_param);
     constructRandomSpinorSource(p->V(), 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
     printfQuda("in_d norm = %12.8e (before split)\n", quda::blas::norm2(*p));
   }
-  std::vector<quda::ColorSpinorField *> v_x(quda::product(split_key), nullptr);
+  std::vector<quda::ColorSpinorField *> v_x(n_src, nullptr);
   for (auto &p : v_x) { p = new quda::cpuColorSpinorField(cpu_cs_param); }
+  
+  // Host arrays for solutions, sources, and check
+  void **outMulti = (void **)malloc(n_src * sizeof(void *));
+  void **inMulti = (void **)malloc(n_src * sizeof(void *));
 
-  quda::ColorSpinorParam cpu_cs_param_split;
-  constructWilsonTestSpinorParam(&cpu_cs_param_split, &inv_param, &gauge_param);
-
-  quda::ColorSpinorField *collect_d = new quda::cpuColorSpinorField(cpu_cs_param_split);
-  quda::ColorSpinorField *collect_x = new quda::cpuColorSpinorField(cpu_cs_param_split);
-
-  split_field(*collect_d, v_h, split_key);
-
-  comm_barrier();
-
-  push_to_current(split_key);
-  updateR();
-  comm_barrier();
-
-  quda::loadGaugeField(collect_gauge, &gauge_param);
-  plaqQuda(plaq);
-
-  invertQuda(collect_x->V(), collect_d->V(), &inv_param);
-
-  push_to_current({1, 1, 1, 1});
-  updateR();
-
-  for (int d = 0; d < nDim; d++) {
-    gauge_param.X[d] /= split_key[d];
-    gauge_param.ga_pad /= split_key[d];
+  for (int i = 0; i < n_src; i++) {
+    // Allocate memory and set pointers
+    outMulti[i] = v_x[i]->V();
+    inMulti[i] = v_h[i]->V();
   }
 
-  loadGaugeQuda(gauge, &gauge_param);
-  plaqQuda(plaq);
+  invertSplitGridQuda(outMulti, inMulti, &inv_param, &gauge_param, split_key.data());
 
-  printf("Split plaquette rank %d is %12.8e: (spatial = %12.8e, temporal = %12.8e)\n", comm_rank(), plaq[0], plaq[1],
-         plaq[2]);
-
-  join_field(v_x, *collect_x, split_key);
-
-  for (const auto &p : v_x) { printfQuda("v_x norm = %12.8e (after join)\n", quda::blas::norm2(*p)); }
-
-  delete collect_d;
-  delete collect_x;
+  // for (const auto &p : v_x) { printfQuda("v_x norm = %12.8e (after join)\n", quda::blas::norm2(*p)); }
 
   rng->Release();
   delete rng;
 
-  void **outMulti = (void **)malloc(multishift * sizeof(void *));
+  loadGaugeQuda(gauge, &gauge_param);
+  plaqQuda(plaq);
+  printfQuda("Computed plaquette is %12.8e: (spatial = %12.8e, temporal = %12.8e)\n", plaq[0], plaq[1], plaq[2]);
+
   void *clover = nullptr;
   void *clover_inv = nullptr;
 
   if (verify_results) {
     for (size_t i = 0; i < v_h.size(); i++) {
-      verifyInversion(v_x[i]->V(), (void **)outMulti, v_h[i]->V(), in_h->V(), gauge_param, inv_param, gauge, clover,
+    printfQuda("in_d norm = %12.8e (before split)\n", quda::blas::norm2(*v_x[i]));
+      invertQuda(v_x[i]->V(), v_h[i]->V(), &inv_param);
+    printfQuda("in_d norm = %12.8e (before split)\n", quda::blas::norm2(*v_x[i]));
+      verifyInversion(v_x[i]->V(), nullptr, v_h[i]->V(), in_h->V(), gauge_param, inv_param, gauge, clover,
                       clover_inv);
     }
   }
