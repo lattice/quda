@@ -963,7 +963,7 @@ double test(Kernel kernel)
 
     commAsyncReductionSet(true);
     blas::cDotProductNormA(*zD, *xD);
-    blas::caxpyXmazMR(a, *xD, *yD, *zD);;
+    blas::caxpyXmazMR(a, *xD, *yD, *zD);
     commAsyncReductionSet(false);
 
     *vD = *xH;
