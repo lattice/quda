@@ -5787,9 +5787,9 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
 
 
 /*
-void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const QudaContractType cType,
-                  QudaInvertParam *param, const int *X)
-{
+  void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const QudaContractType cType,
+  QudaInvertParam *param, const int *X)
+  {
   // DMH: Easiest way to construct ColorSpinorField? Do we require the user
   //     to declare and fill and invert_param, or can it just be hacked?.
 
@@ -5819,14 +5819,14 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
   size_t data_bytes = array_size * x[0]->Nspin() * x[0]->Nspin() * 2 * x[0]->Precision();
   void *d_result;
   if(QUDA_CONTRACT_TYPE_OPEN || QUDA_CONTRACT_TYPE_DR) {
-    d_result = pool_device_malloc(data_bytes);
-    printfQuda("device malloc of size %lu * %lu\n", array_size, data_bytes/array_size);
-    } else { 
-    d_result = malloc(data_bytes);
-    printfQuda("host malloc\n");
+  d_result = pool_device_malloc(data_bytes);
+  printfQuda("device malloc of size %lu * %lu\n", array_size, data_bytes/array_size);
+  } else { 
+  d_result = malloc(data_bytes);
+  printfQuda("host malloc\n");
   }
   profileContract.TPSTOP(QUDA_PROFILE_INIT);
-
+  
   profileContract.TPSTART(QUDA_PROFILE_H2D);
   *x[0] = *h_x;
   *y[0] = *h_y;
@@ -5837,17 +5837,17 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
   profileContract.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   if (QUDA_CONTRACT_TYPE_OPEN || QUDA_CONTRACT_TYPE_DR) {
-    profileContract.TPSTART(QUDA_PROFILE_D2H);
-    qudaMemcpy(h_result, d_result, data_bytes, cudaMemcpyDeviceToHost);
-    printfQuda("device copy\n");
-    profileContract.TPSTOP(QUDA_PROFILE_D2H);
+  profileContract.TPSTART(QUDA_PROFILE_D2H);
+  qudaMemcpy(h_result, d_result, data_bytes, cudaMemcpyDeviceToHost);
+  printfQuda("device copy\n");
+  profileContract.TPSTOP(QUDA_PROFILE_D2H);
   }
 
   profileContract.TPSTART(QUDA_PROFILE_FREE);
   if (QUDA_CONTRACT_TYPE_OPEN || QUDA_CONTRACT_TYPE_DR) {
-    pool_device_free(d_result);
+  pool_device_free(d_result);
   } else {
-    free(d_result);
+  free(d_result);
   }
 
   delete x[0];
@@ -5857,7 +5857,7 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
   profileContract.TPSTOP(QUDA_PROFILE_FREE);
 
   profileContract.TPSTOP(QUDA_PROFILE_TOTAL);
-}
+  }
 */
 
  void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const QudaContractType cType,
@@ -5888,43 +5888,21 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
    x.push_back(ColorSpinorField::Create(cudaParam));
    y.push_back(ColorSpinorField::Create(cudaParam));
 
-   /*
-   size_t data_bytes = x[0]->Volume() * x[0]->Nspin() * x[0]->Nspin() * 2 * x[0]->Precision();
-   void *d_result = pool_device_malloc(data_bytes);
-   profileContract.TPSTOP(QUDA_PROFILE_INIT);
-
-   profileContract.TPSTART(QUDA_PROFILE_H2D);
-   *x[0] = *h_x;
-   *y[0] = *h_y;
-   profileContract.TPSTOP(QUDA_PROFILE_H2D);
-
-   profileContract.TPSTART(QUDA_PROFILE_COMPUTE);
-   contractQuda(*x[0], *y[0], d_result, cType);
-   profileContract.TPSTOP(QUDA_PROFILE_COMPUTE);
-
-   profileContract.TPSTART(QUDA_PROFILE_D2H);
-   qudaMemcpy(h_result, d_result, data_bytes, cudaMemcpyDeviceToHost);
-   profileContract.TPSTOP(QUDA_PROFILE_D2H);
-
-   profileContract.TPSTART(QUDA_PROFILE_FREE);
-   pool_device_free(d_result);
-   delete x[0];
-   delete y[0];
-   delete h_y;
-   delete h_x;
-   profileContract.TPSTOP(QUDA_PROFILE_FREE);
-   */
-   
-   size_t array_size = cType == (QUDA_CONTRACT_TYPE_OPEN || QUDA_CONTRACT_TYPE_DR) ? x[0]->Volume() : x[0]->X(3); 
+   size_t array_size = (cType == QUDA_CONTRACT_TYPE_OPEN || cType == QUDA_CONTRACT_TYPE_DR) ? x[0]->Volume() : x[0]->X(3); 
    size_t data_bytes = array_size * x[0]->Nspin() * x[0]->Nspin() * 2 * x[0]->Precision();
-   void *d_result;
+   void *dev_result;
+   // The location of the array passed to the kernel depends on the type of 
+   // contrcation we want.
    if(cType == QUDA_CONTRACT_TYPE_OPEN || cType == QUDA_CONTRACT_TYPE_DR) {
-     d_result = pool_device_malloc(data_bytes);
+     dev_result = device_pinned_malloc(data_bytes);
      printfQuda("device malloc of size %lu * %lu\n", array_size, data_bytes/array_size);
    } else { 
-     d_result = h_result;
-     printfQuda("host malloc\n");
+     dev_result = pinned_malloc(data_bytes);
+     printfQuda("host malloc of size %lu * %lu\n", array_size, data_bytes/array_size);
    }
+   // The host array will hold the data in teh computed precision so 
+   // that we can pass data back to the user in double
+   void *prec_result = pinned_malloc(data_bytes);
 
    profileContract.TPSTOP(QUDA_PROFILE_INIT);
 
@@ -5934,22 +5912,37 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
    profileContract.TPSTOP(QUDA_PROFILE_H2D);
 
    profileContract.TPSTART(QUDA_PROFILE_COMPUTE);
-   contractQuda(*x[0], *y[0], d_result, cType);
-   printfQuda("clear 1\n");
+   contractQuda(*x[0], *y[0], dev_result, cType);
    profileContract.TPSTOP(QUDA_PROFILE_COMPUTE);
 
+   // If we did not timeslice sum, we must to a device to host transfer
    if(cType == QUDA_CONTRACT_TYPE_OPEN || cType == QUDA_CONTRACT_TYPE_DR) {
      profileContract.TPSTART(QUDA_PROFILE_D2H);
-     qudaMemcpy(h_result, d_result, data_bytes, cudaMemcpyDeviceToHost);
-     printfQuda("clear 2\n");
+     qudaMemcpy(prec_result, dev_result, data_bytes, cudaMemcpyDeviceToHost);
      profileContract.TPSTOP(QUDA_PROFILE_D2H);
+   } else {
+     memcpy(prec_result, dev_result, data_bytes);
+   }
+   
+   //Copy the data back to the user's array
+   if(x[0]->Precision() == QUDA_SINGLE_PRECISION) {
+     for(unsigned int i=0; i<(array_size * x[0]->Nspin() * x[0]->Nspin() * 2); i++) {
+       ((double*)h_result)[i] = ((float*)prec_result)[i];
+     }
+   } else {
+     for(unsigned int i=0; i<(array_size * x[0]->Nspin() * x[0]->Nspin() * 2); i++) {
+       ((double*)h_result)[i] = ((double*)prec_result)[i];
+     }
    }
    
    profileContract.TPSTART(QUDA_PROFILE_FREE);
    if(cType == QUDA_CONTRACT_TYPE_OPEN || cType == QUDA_CONTRACT_TYPE_DR) {
-     pool_device_free(d_result);
+     device_pinned_free(dev_result);
+   } else {
+     host_free(dev_result);
    }
-   
+   host_free(prec_result);
+
    delete x[0];
    delete y[0];
    delete h_y;

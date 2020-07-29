@@ -321,10 +321,15 @@ int main(int argc, char **argv)
   
   // Contraction construct START
   //-----------------------------------------------------------------------------------
-  size_t data_size = (prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
+  // All host arrays are double. The QUDA routine wil compute in the specified prec
+  // the cast the results to double
+  size_t data_size = sizeof(double);
+  // If we timeslice sum, there will be tdim * 16 complex elements returned by the 
+  // function, where tdim is teh local t length. If we do not sum, there will be 
+  // V * 16 complex elements, where V is the local 4D volume  
   size_t array_size = (contract_type == QUDA_CONTRACT_TYPE_OPEN || contract_type == QUDA_CONTRACT_TYPE_DR) ? V : tdim; 
-  void *correlation_function = (double*)malloc(2 * 16 * comm_dim(3) * array_size * data_size);
-  void *correlation_function_sum = (double*)malloc(2 * 16 * comm_dim(3) * array_size * data_size);
+  void *correlation_function = (double*)malloc(2 * 16 * comm_dim(3) * array_size * sizeof(double));
+  void *correlation_function_sum = (double*)malloc(2 * 16 * comm_dim(3) * array_size * sizeof(double));
   memset(correlation_function_sum, 0, 2 * 16 * comm_dim(3) * array_size * data_size);
   int gamma_mat = 0;
   // Contraction construct END
@@ -419,11 +424,13 @@ int main(int argc, char **argv)
       // Host side spinor data and contraction_result passed to QUDA.
       // QUDA will allocate GPU memory, transfer the data,
       // perform the requested contraction, and return the
-      // result in the array contraction_result     
+      // result in the array contraction_result           
       contractQuda(qudaQuark4D[dil]->V(), qudaQuark4D[dil]->V(), 
 		   ((double*)correlation_function) + 2*16*tdim*comm_coord(3), contract_type, &inv_param, gauge_param.X);
 
+      // Collect all the data from all MPI nodes to the 0 MPI node
       comm_gather_array((double*)correlation_function, 2*16*tdim);
+      
       for(int t=0; t<comm_dim(3) * tdim; t++) {
 	//printfQuda("t=%d %e %e\n", t, ((double*)correlation_function)[2*(16*t + gamma_mat)], ((double*)correlation_function)[2*(16*t + gamma_mat) + 1]);
 	((double*)correlation_function_sum)[2*(16*t + gamma_mat)] += ((double*)correlation_function)[2*(16*t + gamma_mat)];
@@ -434,12 +441,11 @@ int main(int argc, char **argv)
     for(int t=0; t<comm_dim(3) * tdim; t++) {
       printfQuda("sum t=%d %e %e\n", t, ((double*)correlation_function_sum)[2*(16*t + gamma_mat)], ((double*)correlation_function_sum)[2*(16*t + gamma_mat) + 1]);
     }
-    
+
     for(int t=0; t<comm_dim(3) * tdim; t++) {
       printfQuda("ratio t=%d %e\n", t, (((double*)correlation_function_sum)[2*(16*t + gamma_mat)])/(((double*)correlation_function_sum)[2*(16*((t+1)%(comm_dim(3) * tdim)) + gamma_mat)]));
     }
-    
-    
+        
     // Compute performance statistics
     Nsrc = 12;
     performanceStats(time, gflops);

@@ -161,7 +161,7 @@ template <typename Float> void contractDegrandRossi(Float *h_result_)
   }
 }
 
-template <typename Float> void contractColor(Float *spinorX, Float *spinorY, Float *h_result)
+template <typename Float> void contractColor(Float *spinorX, Float *spinorY, double *h_result)
 {
 
   Float re = 0.0, im = 0.0;
@@ -180,32 +180,32 @@ template <typename Float> void contractColor(Float *spinorX, Float *spinorY, Flo
                  - ((Float *)spinorX)[24 * i + 6 * s1 + 2 * c + 1] * ((Float *)spinorY)[24 * i + 6 * s2 + 2 * c + 0]);
         }
 
-        ((Float *)h_result)[2 * (i * 16 + 4 * s1 + s2) + 0] = re;
-        ((Float *)h_result)[2 * (i * 16 + 4 * s1 + s2) + 1] = im;
+        ((double *)h_result)[2 * (i * 16 + 4 * s1 + s2) + 0] = re;
+        ((double *)h_result)[2 * (i * 16 + 4 * s1 + s2) + 1] = im;
       }
     }
   }
 }
 
 template <typename Float>
-int contraction_reference(Float *spinorX, Float *spinorY, Float *d_result, QudaContractType cType, int X[])
+int contraction_reference(Float *spinorX, Float *spinorY, double *d_result, QudaContractType cType, int X[])
 {
 
   int faults = 0;
   Float tol = (sizeof(Float) == sizeof(double) ? 1e-9 : 2e-5);
-  void *h_result = malloc(V * 2 * 16 * sizeof(Float));
-
+  void *h_result = malloc(V * 2 * 16 * sizeof(double));
+  
   // compute spin elementals
-  contractColor(spinorX, spinorY, (Float *)h_result);
+  contractColor(spinorX, spinorY, (double *)h_result);
 
   // Apply gamma insertion on host spin elementals
-  if (cType == QUDA_CONTRACT_TYPE_DR) contractDegrandRossi((Float *)h_result);
+  if (cType == QUDA_CONTRACT_TYPE_DR) contractDegrandRossi((double *)h_result);
 
   // compare each contraction
   for (int j = 0; j < 16; j++) {
     bool pass = true;
     for (int i = 0; i < V; i++) {
-      if (abs(((Float *)h_result)[32 * i + 2 * j] - ((Float *)d_result)[32 * i + 2 * j]) > tol) {
+      if (abs(((double *)h_result)[32 * i + 2 * j] - ((double *)d_result)[32 * i + 2 * j]) > tol) {
         faults++;
         pass = false;
         // printfQuda("Contraction %d %d failed\n", i, j);
@@ -213,7 +213,7 @@ int contraction_reference(Float *spinorX, Float *spinorY, Float *d_result, QudaC
         // printfQuda("Contraction %d %d passed\n", i, j);
       }
       // printfQuda("%.16f %.16f\n", ((Float*)h_result)[32*i + 2*j],((Float*)d_result)[32*i + 2*j]);
-      if (abs(((Float *)h_result)[32 * i + 2 * j + 1] - ((Float *)d_result)[32 * i + 2 * j + 1]) > tol) {
+      if (abs(((double *)h_result)[32 * i + 2 * j + 1] - ((double *)d_result)[32 * i + 2 * j + 1]) > tol) {
         faults++;
         pass = false;
         // printfQuda("Contraction %d %d failed\n", i, j);

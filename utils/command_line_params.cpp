@@ -224,12 +224,12 @@ quda::file_array<char[256]> prop_sink_infile;
 quda::file_array<char[256]> prop_sink_outfile;
 quda::source_array<std::array<int, 4>> prop_source_position = {0, 0, 0, 0};
 
-int prop_source_smear_steps = 50;
-int prop_sink_smear_steps = 50;
-double prop_source_smear_coeff = 0.2;
-double prop_sink_smear_coeff = 0.2;
+int prop_source_smear_steps = 20;
+int prop_sink_smear_steps = 20;
+double prop_source_smear_coeff = 2.0;
+double prop_sink_smear_coeff = 2.0;
 bool prop_read_sources = false;
-int prop_n_sources = 12;
+int prop_n_sources = 1;
 QudaPrecision prop_save_prec = QUDA_SINGLE_PRECISION;
 
 // SU(3) smearing options
