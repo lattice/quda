@@ -231,6 +231,12 @@ if(QUDA_HETEROGENEOUS_ATOMIC AND ${CMAKE_BUILD_TYPE} STREQUAL "SANITIZE")
   "Disabling heterogeneous atomic support (does not support SANITIZE build)")
   set(QUDA_HETEROGENEOUS_ATOMIC OFF)
 endif()
+if(QUDA_HETEROGENEOUS_ATOMIC AND QUDA_JITIFY)
+  message(
+  NOTICE
+  "Disabling heterogeneous atomic support (does not support JITIFY build)")
+  set(QUDA_HETEROGENEOUS_ATOMIC OFF)
+endif()
 
 set(QUDA_MAX_MULTI_BLAS_N
     "4"
