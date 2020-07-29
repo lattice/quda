@@ -17,9 +17,9 @@ namespace quda {
     int threads; // number of active threads required
     int E[4]; // extended grid dimensions
     int X[4]; // true grid dimensions
-    int border[4]; 
+    int border[4];
     Gauge U;
-    
+
     GaugePlaqArg(const GaugeField &U_) :
       ReduceArg<double2>(),
       U(U_)
@@ -39,7 +39,6 @@ namespace quda {
   __device__ inline double plaquette(Arg &arg, int x[], int parity, int mu, int nu) {
     typedef Matrix<complex<typename Arg::Float>,3> Link;
 
-#if 1
     int dx[4] = {0, 0, 0, 0};
     Link U1 = arg.U(mu, linkIndexShift(x,dx,arg.E), parity);
     dx[mu]++;
@@ -52,51 +51,13 @@ namespace quda {
 
     //return getTrace( U1 * U2 * conj(U3) * conj(U4) ).real();
     auto t = getTrace( U1 * U2 * conj(U3) * conj(U4) ).real();
-    //printf("U: %g\t%g\t%g\t%g\n", U1(0,0).real(), U2(0,0).real(), U3(0,0).real(), U4(0,0).real());
-    //printf("t: %g\n", t);
+    //double t = 0.0;
+    int i = linkIndexShift(x,dx,arg.E);
+    //if(i==0) {
+      //printf("U: %g\t%g\t%g\t%g\n", U1(0,0).real(), U2(0,0).real(), U3(0,0).real(), U4(0,0).real());
+      printf("plaq %i: %g\n", i, t);
+    //}
     return t;
-#else
-    int dx[4] = {0, 0, 0, 0};
-    Link U1 = arg.U(mu, linkIndexShift(x,dx,arg.E), parity);
-
-    dx[mu]++;
-    Link U2 = arg.U(nu, linkIndexShift(x,dx,arg.E), 1-parity);
-    dx[mu]--;
-
-    Link U12 = U1 * U2;
-
-    dx[nu]++;
-    Link U3 = arg.U(mu, linkIndexShift(x,dx,arg.E), 1-parity);
-    dx[nu]--;
-
-    Link U123 = U12 * conj(U3);
-    Link U4 = arg.U(nu, linkIndexShift(x,dx,arg.E), parity);
-
-    return getTrace( U123 * conj(U4) ).real();
-#endif
-  }
-
-  template<typename Arg>
-  __device__ inline double plaquette2(Arg &arg, int idx, int parity, int mu, int nu) {
-    typedef Matrix<complex<typename Arg::Float>,3> Link;
-
-    //int x[4];
-    //getCoords(x, idx, arg.X, parity);
-#pragma unroll
-    //for (int dr=0; dr<4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
-    //int dx[4] = {0, 0, 0, 0};
-    //dx[mu]++;
-    //int idxmu = linkIndexShift(x,dx,arg.E);
-    //dx[mu]--;
-    //dx[nu]++;
-    //int idxnu = linkIndexShift(x,dx,arg.E);
-
-    Link U1 = arg.U(mu, idx, parity);
-    Link U2 = arg.U(nu, idx, 1-parity);
-    Link U3 = arg.U(mu, idx, 1-parity);
-    Link U4 = arg.U(nu, idx, parity);
-
-    return getTrace( U1 * U2 * conj(U3) * conj(U4) ).real();
   }
 
   template<int blockSize, typename Arg>
@@ -105,6 +66,7 @@ namespace quda {
     int parity = threadIdx.y;
 
     double2 plaq = make_double2(0.0,0.0);
+    printf("plaq: %g %g\n", plaq.x, plaq.y);
 
     while (idx < arg.threads) {
       int x[4];
@@ -112,20 +74,19 @@ namespace quda {
 #pragma unroll
       for (int dr=0; dr<4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
 
-//#pragma unroll
+#pragma unroll
       for (int mu = 0; mu < 3; mu++) {
-//#pragma unroll
+#pragma unroll
 	for (int nu = 0; nu < 3; nu++) {
 	  if (nu >= mu + 1) plaq.x += plaquette(arg, x, parity, mu, nu);
-	  //if (nu >= mu + 1) plaq.x += plaquette2(arg, idx, parity, mu, nu);
 	}
 
 	plaq.y += plaquette(arg, x, parity, mu, 3);
-	//plaq.y += plaquette2(arg, idx, parity, mu, 3);
       }
 
       idx += blockDim.x*gridDim.x;
     }
+    printf("plaq: %g %g\n", plaq.x, plaq.y);
 
 #if 0
     {
@@ -146,6 +107,7 @@ namespace quda {
 #endif
     // perform final inter-block reduction and write out result
     reduce2d<blockSize,2>(arg, plaq);
+    printf("plaq: %g %g\n", plaq.x, plaq.y);
   }
 
 } // namespace quda

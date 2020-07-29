@@ -7,6 +7,7 @@ add_library(
   dslash_reference.cpp
   dslash_test_helpers.cpp
   gauge_force_reference.cpp
+  plaq_reference.cpp
   hisq_force_reference.cpp
   hisq_force_reference2.cpp
   staggered_dslash_reference.cpp

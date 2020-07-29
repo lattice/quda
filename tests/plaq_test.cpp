@@ -8,6 +8,7 @@
 #include <host_utils.h>
 #include <command_line_params.h>
 #include <dslash_reference.h>
+#include "plaq_reference.h"
 
 #include <qio_field.h>
 
@@ -90,8 +91,11 @@ int main(int argc, char **argv)
 
   double plaq[3];
   plaqQuda(plaq);
-  printfQuda("Computed plaquette gauge precise is %16.15e (spatial = %16.15e, temporal = %16.15e)\n", plaq[0], plaq[1],
-             plaq[2]);
+  printfQuda("Computed plaquette gauge precise is %16.15e (spatial = %16.15e, temporal = %16.15e)\n", plaq[0], plaq[1], plaq[2]);
+
+  double plaqr[3];
+  plaq_reference(plaqr, (void **)gauge, gauge_param.cpu_prec);
+  printfQuda("Reference plaquette gauge precise is %16.15e (spatial = %16.15e, temporal = %16.15e)\n", plaqr[0], plaqr[1], plaqr[2]);
 
   freeGaugeQuda();
   endQuda();
