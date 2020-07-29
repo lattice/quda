@@ -331,7 +331,6 @@ int main(int argc, char **argv)
   void *correlation_function = (double*)malloc(2 * 16 * comm_dim(3) * array_size * sizeof(double));
   void *correlation_function_sum = (double*)malloc(2 * 16 * comm_dim(3) * array_size * sizeof(double));
   memset(correlation_function_sum, 0, 2 * 16 * comm_dim(3) * array_size * data_size);
-  int gamma_mat = 0;
   // Contraction construct END
   //-----------------------------------------------------------------------------------
 
@@ -430,22 +429,28 @@ int main(int argc, char **argv)
 
       // Collect all the data from all MPI nodes to the 0 MPI node
       comm_gather_array((double*)correlation_function, 2*16*tdim);
-      
+
+      for(int gamma_mat=0; gamma_mat<16; gamma_mat++) {
+	for(int t=0; t<comm_dim(3) * tdim; t++) {
+	  //printfQuda("t=%d %e %e\n", t, ((double*)correlation_function)[2*(16*t + gamma_mat)], ((double*)correlation_function)[2*(16*t + gamma_mat) + 1]);
+	  ((double*)correlation_function_sum)[2*(16*t + gamma_mat)] += ((double*)correlation_function)[2*(16*t + gamma_mat)];
+	  ((double*)correlation_function_sum)[2*(16*t + gamma_mat)+1] += ((double*)correlation_function)[2*(16*t + gamma_mat)+1];
+	}
+      }
+    }
+    
+    for(int gamma_mat=0; gamma_mat<16; gamma_mat++) {
       for(int t=0; t<comm_dim(3) * tdim; t++) {
-	//printfQuda("t=%d %e %e\n", t, ((double*)correlation_function)[2*(16*t + gamma_mat)], ((double*)correlation_function)[2*(16*t + gamma_mat) + 1]);
-	((double*)correlation_function_sum)[2*(16*t + gamma_mat)] += ((double*)correlation_function)[2*(16*t + gamma_mat)];
-	((double*)correlation_function_sum)[2*(16*t + gamma_mat)+1] += ((double*)correlation_function)[2*(16*t + gamma_mat)+1];
+	printfQuda("sum: g=%d t=%d %e %e\n", gamma_mat, t, ((double*)correlation_function_sum)[2*(16*t + gamma_mat)], ((double*)correlation_function_sum)[2*(16*t + gamma_mat) + 1]);
       }
     }
 
-    for(int t=0; t<comm_dim(3) * tdim; t++) {
-      printfQuda("sum t=%d %e %e\n", t, ((double*)correlation_function_sum)[2*(16*t + gamma_mat)], ((double*)correlation_function_sum)[2*(16*t + gamma_mat) + 1]);
-    }
+    for(int gamma_mat=0; gamma_mat<16; gamma_mat++) {
+      for(int t=0; t<comm_dim(3) * tdim; t++) {
+	printfQuda("ratio: g=%d t=%d %e\n", gamma_mat, t, (((double*)correlation_function_sum)[2*(16*t + gamma_mat)])/(((double*)correlation_function_sum)[2*(16*((t+1)%(comm_dim(3) * tdim)) + gamma_mat)]));
+      }
+    } 
 
-    for(int t=0; t<comm_dim(3) * tdim; t++) {
-      printfQuda("ratio t=%d %e\n", t, (((double*)correlation_function_sum)[2*(16*t + gamma_mat)])/(((double*)correlation_function_sum)[2*(16*((t+1)%(comm_dim(3) * tdim)) + gamma_mat)]));
-    }
-        
     // Compute performance statistics
     Nsrc = 12;
     performanceStats(time, gflops);
