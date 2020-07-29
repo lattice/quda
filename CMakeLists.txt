@@ -201,12 +201,7 @@ set(QUDA_MAGMA_LIBS
 # ######################################################################################################################
 option(QUDA_BUILD_ALL_TESTS "build tests by default" ON)
 option(QUDA_INSTALL_ALL_TESTS "install tests by default" ON)
-if(DEFINED ENV{QUDA_BUILD_SHAREDLIB})
-  set(DEFSHARED $ENV{QUDA_BUILD_SHAREDLIB})
-else()
-  set(DEFSHARED "OFF")
-endif()
-option(QUDA_BUILD_SHAREDLIB "build quda as a shared lib" ${DEFSHARED})
+option(QUDA_BUILD_SHAREDLIB "build quda as a shared lib" ON)
 option(QUDA_PROPAGATE_CXX_FLAGS "propagate CXX_FLAGS to CUDA host compiler (for cmake >= 3.8)" ON)
 option(QUDA_FLOAT8 "enable float-8 ordered fixed-point fields?" OFF)
 option(QUDA_NVML "use NVML to report CUDA graphics driver version" OFF)
