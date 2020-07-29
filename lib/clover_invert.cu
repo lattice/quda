@@ -44,7 +44,7 @@ namespace quda {
 #ifdef JITIFY
         using namespace jitify::reflection;
         jitify_error = program->kernel("quda::cloverInvertKernel")
-                           .instantiate((int)tp.block.x, Type<Arg>(), arg.computeTraceLog, arg.twist)
+                           .instantiate((int)tp.block.x, Type<Arg>(), arg.compute_tr_log, arg.twist)
                            .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                            .launch(arg);
 #else

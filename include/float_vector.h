@@ -258,6 +258,7 @@ namespace quda {
   template<> struct RealType<complex<char> > { typedef char type; };
   template<> struct RealType<char4> { typedef char type; };
 
+#ifndef __CUDACC_RTC__
   inline std::ostream &operator<<(std::ostream &output, const double2 &a)
   {
     output << "(" << a.x << ", " << a.y << ")";
@@ -275,6 +276,7 @@ namespace quda {
     output << "(" << a.x << ", " << a.y << ", " << a.z << ", " << a.w << ")";
     return output;
   }
+#endif
 
   __device__ __host__ inline void zero(double &a) { a = 0.0; }
   __device__ __host__ inline void zero(double2 &a)
