@@ -60,7 +60,7 @@ namespace quda {
       }
 #endif
 
-      T *result_ = new T[NXZ * arg.NYW * tp.grid.z];
+      T *result_ = new T[NXZ * arg.NYW];
       if (!commAsyncReduction()) {
         if (tunable.jitifyError() != CUDA_ERROR_INVALID_VALUE) arg.complete(result_, stream);
       }
@@ -69,7 +69,6 @@ namespace quda {
       for (int i = 0; i < NXZ; i++) {
         for (int j = 0; j < arg.NYW; j++) {
           result[i * arg.NYW + j] = result_[j * NXZ + i];
-          if (tp.grid.z == 2) result[i * arg.NYW + j] += result_[NXZ * arg.NYW + j * NXZ + i];
         }
       }
 
@@ -141,6 +140,7 @@ namespace quda {
           strcat(aux, ",");
           strcat(aux, y[0]->AuxString());
         }
+        strcat(aux, nParity == 2 ? ",nParity=2" : ",nParity=1");
 
         // since block dot product and block norm use the same functors, we need to distinguish them
         bool is_norm = false;
@@ -216,7 +216,7 @@ namespace quda {
           constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
           const int length = x[0]->Length() / (nParity * M);
 
-          MultiReduceArg<NXZ, device_store_t, N, device_y_store_t, Ny, decltype(r_)> arg(x, y, z, w, r_, NYW, length);
+          MultiReduceArg<NXZ, device_store_t, N, device_y_store_t, Ny, decltype(r_)> arg(x, y, z, w, r_, NYW, length, nParity, tp);
 
 #ifdef JITIFY
           // need to get constants pointer from jitify instance
@@ -262,29 +262,6 @@ namespace quda {
         else errorQuda("x.size %lu greater than MAX_MULTI_BLAS_N %d", x.size(), MAX_MULTI_BLAS_N);
       }
 
-      // Should these be NYW?
-#ifdef WARP_MULTI_REDUCE
-      /**
-         @brief This is a specialized variant of the reducer that only
-         assigns an individial warp within a thread block to a given row
-         of the reduction.  It's typically slower than CTA-wide reductions
-         and spreading the y dimension across blocks rather then within
-         the blocks so left disabled.
-      */
-      bool advanceBlockDim(TuneParam &param) const
-      {
-        if (param.block.y < NYW) {
-          param.block.y++;
-          param.grid.y = (NYW + param.block.y - 1) / param.block.y;
-          return true;
-        } else {
-          param.block.y = 1;
-          param.grid.y = NYW;
-          return false;
-        }
-      }
-#endif
-
       bool advanceGridDim(TuneParam &param) const
       {
         bool rtn = Tunable::advanceGridDim(param);
@@ -297,7 +274,6 @@ namespace quda {
         Tunable::initTuneParam(param);
         param.block.y = 1;
         param.grid.y = NYW;
-        param.grid.z = nParity;
       }
 
       void defaultTuneParam(TuneParam &param) const
@@ -305,7 +281,6 @@ namespace quda {
         Tunable::defaultTuneParam(param);
         param.block.y = 1;
         param.grid.y = NYW;
-        param.grid.z = nParity;
       }
 
       void preTune()

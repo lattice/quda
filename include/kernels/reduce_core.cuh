@@ -3,6 +3,7 @@
 #include <color_spinor_field_order.h>
 #include <blas_helper.cuh>
 #include <reduce_helper.h>
+#include <fast_intdiv.h>
 
 namespace quda
 {
@@ -22,9 +23,11 @@ namespace quda
 
       const int length;
       const int nParity;
+      const int_fastdiv gridSize;
+
       ReductionArg(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w,
-                   ColorSpinorField &v, Reducer r, int length, int nParity) :
-        ReduceArg<typename Reducer_::reduce_t>(nParity),
+                   ColorSpinorField &v, Reducer r, int length, int nParity, TuneParam &tp) :
+        ReduceArg<typename Reducer_::reduce_t>(),
         X(x),
         Y(y),
         Z(z),
@@ -32,21 +35,22 @@ namespace quda
         V(v),
         r(r),
         length(length),
-        nParity(nParity)
+        nParity(nParity),
+        gridSize(tp.grid.x * tp.block.x / nParity)
       { ; }
     };
 
     /**
-       Generic reduction kernel with up to four loads and three saves.
+       Generic reduction kernel with up to five loads and saves.
     */
     template <int block_size, typename real, int n, typename Arg>
     __global__ void reduceKernel(Arg arg)
     {
       // n is real numbers per thread
       using vec = vector_type<complex<real>, n/2>;
-      unsigned int i = blockIdx.x * blockDim.x + threadIdx.x;
-      unsigned int parity = blockIdx.y;
-      unsigned int gridSize = gridDim.x * blockDim.x;
+      unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
+      unsigned int i = tid % arg.gridSize;
+      unsigned int parity = tid / arg.gridSize;
 
       using reduce_t = typename Arg::Reducer::reduce_t;
       reduce_t sum;
@@ -70,10 +74,10 @@ namespace quda
         if (arg.r.write.W) arg.W.save(w, i, parity);
         if (arg.r.write.V) arg.V.save(v, i, parity);
 
-        i += gridSize;
+        i += arg.gridSize;
       }
 
-      ::quda::reduce<block_size, reduce_t>(arg, sum, parity);
+      ::quda::reduce<block_size, reduce_t>(arg, sum);
     }
 
     /**

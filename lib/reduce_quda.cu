@@ -60,11 +60,11 @@ namespace quda {
       }
 #endif
 
-      host_reduce_t result[2];
+      host_reduce_t result;
       if (!commAsyncReduction()) {
-        if (tunable.jitifyError() != CUDA_ERROR_INVALID_VALUE) arg.complete(result, stream);
+        if (tunable.jitifyError() != CUDA_ERROR_INVALID_VALUE) arg.complete(&result, stream);
       }
-      return tp.grid.y == 2 ? result[0] + result[1] : result[0];
+      return result;
     }
 
     template <template <typename ReducerType, typename real> class Reducer,
@@ -124,6 +124,7 @@ namespace quda {
           strcat(aux, ",");
           strcat(aux, y.AuxString());
         }
+        strcat(aux, nParity == 2 ? ",nParity=2" : ",nParity=1");
         if (location == QUDA_CPU_FIELD_LOCATION) strcat(aux, ",CPU");
         if (commAsyncReduction()) strcat(aux, ",async");
 
@@ -164,7 +165,7 @@ namespace quda {
           constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
           const int length = x.Length() / (nParity * M);
 
-          ReductionArg<device_store_t, N, device_y_store_t, Ny, decltype(r_)> arg(x, y, z, w, v, r_, length, nParity);
+          ReductionArg<device_store_t, N, device_y_store_t, Ny, decltype(r_)> arg(x, y, z, w, v, r_, length, nParity, tp);
           result = reduceLaunch<host_reduce_t, device_real_t, M>(arg, tp, stream, *this);
         } else {
           if (checkOrder(x, y, z, w, v) != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
@@ -184,7 +185,7 @@ namespace quda {
           constexpr int M = N; // if site unrolling then M=N will be 24/6, e.g., full AoS
           const int length = x.Length() / (nParity * M);
 
-          ReductionArg<host_store_t, N, host_y_store_t, Ny, decltype(r_)> arg(x, y, z, w, v, r_, length, nParity);
+          ReductionArg<host_store_t, N, host_y_store_t, Ny, decltype(r_)> arg(x, y, z, w, v, r_, length, nParity, tp);
           result = reduceCPU<host_real_t, M>(arg);
         }
       }
@@ -215,13 +216,11 @@ namespace quda {
       void initTuneParam(TuneParam &param) const
       {
         Tunable::initTuneParam(param);
-        param.grid.y = nParity;
       }
 
       void defaultTuneParam(TuneParam &param) const
       {
         Tunable::defaultTuneParam(param);
-        param.grid.y = nParity;
       }
 
       long long flops() const { return r.flops() * x.Length(); }

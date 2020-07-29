@@ -4,6 +4,7 @@
 #include <reduce_helper.h>
 #include <blas_helper.cuh>
 #include <multi_blas_helper.cuh>
+#include <fast_intdiv.h>
 
 namespace quda
 {
@@ -33,15 +34,17 @@ namespace quda
       const int NYW;
       Reducer r;
       const int length;
+      const int_fastdiv gridSize;
 
       MultiReduceArg(std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
                      std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
-                     Reducer r, int NYW, int length) :
+                     Reducer r, int NYW, int length, int nParity, TuneParam &tp) :
         // we have NYW * nParity reductions each of length NXZ
-        ReduceArg<vector_type<typename Reducer_::reduce_t, NXZ>>(NYW * x[0]->SiteSubset()),
+        ReduceArg<vector_type<typename Reducer_::reduce_t, NXZ>>(NYW),
         NYW(NYW),
         r(r),
-        length(length)
+        length(length),
+        gridSize(tp.grid.x * tp.block.x / nParity)
       {
         if (NYW > NYW_max) errorQuda("NYW = %d greater than maximum size of %d", NYW, NYW_max);
 
@@ -57,18 +60,16 @@ namespace quda
       }
     };
 
-#ifdef WARP_MULTI_REDUCE
-    template <typename real, int n, int NXZ, typename Arg>
-#else
     template <int block_size, typename real, int n, int NXZ, typename Arg>
-#endif
     __global__ void multiReduceKernel(Arg arg)
     {
       // n is real numbers per thread
       using vec = vector_type<complex<real>, n/2>;
-      unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
+      unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
+      unsigned int idx = tid % arg.gridSize;
+      unsigned int parity = tid / arg.gridSize;
+
       const int k = blockIdx.y * blockDim.y + threadIdx.y;
-      const int parity = blockIdx.z;
 
       if (k >= arg.NYW) return; // safe since k are different thread blocks
 
@@ -94,14 +95,10 @@ namespace quda
         if (arg.r.write.Y) arg.Y[k].save(y, idx, parity);
         if (arg.r.write.W) arg.W[k].save(w, idx, parity);
 
-        idx += gridDim.x * blockDim.x;
+        idx += arg.gridSize;
       }
 
-#ifdef WARP_MULTI_REDUCE
-      ::quda::warp_reduce<block_reduce_t>(arg, sum, arg.NYW * parity + k);
-#else
-      ::quda::reduce<block_size, block_reduce_t>(arg, sum, arg.NYW * parity + k);
-#endif
+      ::quda::reduce<block_size, block_reduce_t>(arg, sum, k);
     } // multiReduceKernel
 
     /**
