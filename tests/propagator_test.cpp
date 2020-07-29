@@ -298,15 +298,16 @@ int main(int argc, char **argv)
   // Borrow problem 4D parameters, then adjust
   QudaInvertParam inv_param_smear = newQudaInvertParam();
   dslash_type = QUDA_LAPLACE_DSLASH;  
-  double coeff = -(prop_source_smear_coeff * prop_source_smear_coeff) / (4 * prop_source_smear_steps);
+  double coeff = - (prop_source_smear_coeff * prop_source_smear_coeff) / (4 * prop_source_smear_steps);
   double kappa_orig = kappa;
   double mass_orig = mass;
+  int laplace3D_orig = laplace3D;
   mass = 1.0/coeff;
   kappa = -1.0;
+  laplace3D = 3; // Omit t-dim
   setInvertParam(inv_param_smear);
-  //inv_param_smear.kappa = coeff;
-  inv_param_smear.mass_normalization = QUDA_MASS_NORMALIZATION;  
-  inv_param_smear.laplace3D = 3; // Omit t-dim
+
+  inv_param_smear.mass_normalization = QUDA_KAPPA_NORMALIZATION;  
   inv_param_smear.solution_type = QUDA_MAT_SOLUTION;
   inv_param_smear.solve_type = QUDA_DIRECT_SOLVE;
   
@@ -314,9 +315,10 @@ int main(int argc, char **argv)
   dslash_type = dslash_type_orig;  
   mass = mass_orig;
   kappa = kappa_orig;
+  laplace3D = laplace3D_orig; // Omit t-dim
   // Vector construct END
   //-----------------------------------------------------------------------------------
-
+  
   // Contraction construct START
   //-----------------------------------------------------------------------------------
   size_t data_size = (prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
@@ -434,10 +436,10 @@ int main(int argc, char **argv)
     }
     
     for(int t=0; t<comm_dim(3) * tdim; t++) {
-      printfQuda("ratio t=%d %e\n", t, (((double*)correlation_function_sum)[2*(16*t + gamma_mat)])/(((double*)correlation_function_sum)[2*(16*(t+1) + gamma_mat)]));
+      printfQuda("ratio t=%d %e\n", t, (((double*)correlation_function_sum)[2*(16*t + gamma_mat)])/(((double*)correlation_function_sum)[2*(16*((t+1)%(comm_dim(3) * tdim)) + gamma_mat)]));
     }
-
-
+    
+    
     // Compute performance statistics
     Nsrc = 12;
     performanceStats(time, gflops);

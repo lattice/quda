@@ -5427,6 +5427,8 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned 
   DiracM laplace_op(dirac);
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_INIT);
 
+  //massRescale(*static_cast<cudaColorSpinorField*>(in_h), *inv_param);
+
   // Copy host data to device
   profileGaussianSmear.TPSTART(QUDA_PROFILE_H2D);
   *in = *in_h;
@@ -5436,19 +5438,13 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned 
   profileGaussianSmear.TPSTART(QUDA_PROFILE_COMPUTE);
   blas::ax(1e6, *in);
 
-  double cpu = blas::norm2(*in_h);
-  double gpu = blas::norm2(*in);
-  if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("In CPU %e CUDA %e\n", cpu, gpu); }
-
   // Computes out(x) = (in(x) + (\omega/(4N) * \sum_mu (U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))))
   if (n_steps == 0) std::swap(in, out);
   for (unsigned int i = 0; i < n_steps; i++) {
-    // If on an iteration greater that i=0, swap the `out` and `in` pointers.
+    // If performing an iteration greater that i=0, swap the `out` and `in` pointers.
     // This will feed the previous iteration's result into the loop, and
     // overwrite the previous `in`.
     if (i > 0) std::swap(in, out);
-    //ApplyLaplace(*out, *in, *gauge_ptr, 3, inv_param->kappa, 1.0, *in, QUDA_INVALID_PARITY, false, nullptr, profileGaussianSmear);
-    //laplace_op.Expose()->M(*out, *in, *temp1, *temp2);
     laplace_op.Expose()->M(*out, *in);
     blas::ax(1.0/inv_param->mass, *out);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
@@ -5456,13 +5452,12 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned 
       printfQuda("Step %d, vector norm %e\n", i, norm);
     }
   }
-
-  // Rescale down
-  blas::ax(1e-6, *out);  
-  // Scale by factor
-
-
+  
+  // Normalise the source
+  double nout = blas::norm2(*out);
+  blas::ax(1.0/sqrt(nout), *out);    
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_COMPUTE);
+
   // Copy device data to host.
   profileGaussianSmear.TPSTART(QUDA_PROFILE_D2H);
   *in_h = *out;
