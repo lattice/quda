@@ -61,6 +61,7 @@ namespace quda {
 #endif
 
       host_reduce_t result;
+      ::quda::zero(result);
       if (!commAsyncReduction()) {
         if (tunable.jitifyError() != CUDA_ERROR_INVALID_VALUE) arg.complete(&result, stream);
       }
