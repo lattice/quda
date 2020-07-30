@@ -19,6 +19,7 @@
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
+// This is a simple dump to stdout for the test type and parameters.
 void display_test_info()
 {
   printfQuda("running the following test:\n");
@@ -103,6 +104,9 @@ void display_test_info()
 
 int main(int argc, char **argv)
 {
+  // QUDA requires that some parameters be set, else the computation
+  // will error out. This function sets default values to the 
+  // MG parameter struct
   setQudaDefaultMgTestParams();
   // Parse command line options
   auto app = make_app();
@@ -138,8 +142,10 @@ int main(int argc, char **argv)
   // Initialize the QUDA library
   initQuda(device);
 
+  // Set verbosity
   setVerbosity(verbosity);
   
+  // We exclude staggered fermions for now
   if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH
       && dslash_type != QUDA_TWISTED_MASS_DSLASH && dslash_type != QUDA_DOMAIN_WALL_4D_DSLASH
       && dslash_type != QUDA_MOBIUS_DWF_DSLASH && dslash_type != QUDA_MOBIUS_DWF_EOFA_DSLASH
@@ -205,8 +211,10 @@ int main(int argc, char **argv)
   display_test_info();
 
   // set parameters for the reference Dslash, and prepare fields to be loaded
-  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
-      || dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
+  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || 
+      dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH || 
+      dslash_type == QUDA_MOBIUS_DWF_DSLASH || 
+      dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
     dw_setDims(gauge_param.X, inv_param.Ls);
   } else {
     setDims(gauge_param.X);
@@ -259,7 +267,7 @@ int main(int argc, char **argv)
 
   // Vector construct START
   //-----------------------------------------------------------------------------------
-  // Source/Sink params
+  // Source, sink, and check vectors. These vectors reside on the host.
   quda::ColorSpinorField *in;
   quda::ColorSpinorField *out;
   quda::ColorSpinorField *check;
@@ -269,29 +277,40 @@ int main(int argc, char **argv)
   out = quda::ColorSpinorField::Create(cs_param);
   check = quda::ColorSpinorField::Create(cs_param);
   
-  // Make Propagator params
+  // Make 4D Propagator params. If using a DWF type action, we must set
+  // the 4D prop type to the underlying operator type. Hardcoded to Wilson
+  // for QUDA at the present time.
   QudaDslashType dslash_type_orig = dslash_type;
-  dslash_type = QUDA_WILSON_DSLASH;  
+  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || 
+      dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH || 
+      dslash_type == QUDA_MOBIUS_DWF_DSLASH || 
+      dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {    
+    dslash_type = QUDA_WILSON_DSLASH;  
+  }
   QudaInvertParam inv_param4D;
   setInvertParam(inv_param4D);  
   quda::ColorSpinorParam cs_param4D;
   constructWilsonTestSpinorParam(&cs_param4D, &inv_param4D, &gauge_param);  
-
-  // Host array for Propagators and 4D sources
-  std::vector<quda::ColorSpinorField *> qudaQuark4D(12);
-  std::vector<quda::ColorSpinorField *> qudaIn4D(12);
+  // Reset dslash_type
+  dslash_type = dslash_type_orig;
+  
+  // Host arrays for 4D propagators and 4D sources
+  std::vector<quda::ColorSpinorField *> qudaProp4D(12);
+  std::vector<quda::ColorSpinorField *> qudaSource4D(12);
   // Allocate contiguous host memory
   void *out_array = (void*)malloc(12*V*3*4*2*sizeof(double));
   void *in_array = (void*)malloc(12*V*3*4*2*sizeof(double));
 
-  // This flag instructs QUDA to use pre-allocated memory.
+  // This flag instructs QUDA to use the pre-allocated memory.
   cs_param4D.create = QUDA_REFERENCE_FIELD_CREATE;
   for (int dil = 0; dil < 12; dil++) {
+    // The .v member of the parameter struct is a pointer
+    // to where we want the colour spinor data to be
     cs_param4D.v = (double*)in_array + dil*V*3*4*2;
-    qudaIn4D[dil] = quda::ColorSpinorField::Create(cs_param4D);
+    qudaSource4D[dil] = quda::ColorSpinorField::Create(cs_param4D);
     
     cs_param4D.v = (double*)out_array + dil*V*3*4*2;
-    qudaQuark4D[dil] = quda::ColorSpinorField::Create(cs_param4D);
+    qudaProp4D[dil] = quda::ColorSpinorField::Create(cs_param4D);
   }  
 
   // Construct 4D smearing parameters.
@@ -311,7 +330,7 @@ int main(int argc, char **argv)
   inv_param_smear.solution_type = QUDA_MAT_SOLUTION;
   inv_param_smear.solve_type = QUDA_DIRECT_SOLVE;
   
-  // Restore dslash type
+  // Restore dslash, mass, kappa, and laplace3D
   dslash_type = dslash_type_orig;  
   mass = mass_orig;
   kappa = kappa_orig;
@@ -321,11 +340,12 @@ int main(int argc, char **argv)
   
   // Contraction construct START
   //-----------------------------------------------------------------------------------
-  // All host arrays are double. The QUDA routine wil compute in the specified prec
-  // the cast the results to double
+  // All host arrays are double. The QUDA routine wil compute in the specified 
+  // precision then cast the results to double
   size_t data_size = sizeof(double);
+
   // If we timeslice sum, there will be tdim * 16 complex elements returned by the 
-  // function, where tdim is teh local t length. If we do not sum, there will be 
+  // function, where tdim is the local time length. If we do not sum, there will be 
   // V * 16 complex elements, where V is the local 4D volume  
   size_t array_size = (contract_type == QUDA_CONTRACT_TYPE_OPEN || contract_type == QUDA_CONTRACT_TYPE_DR) ? V : tdim; 
   void *correlation_function = (double*)malloc(2 * 16 * comm_dim(3) * array_size * sizeof(double));
@@ -342,57 +362,66 @@ int main(int argc, char **argv)
   double *time = new double[12];
   double *gflops = new double[12];
 
+  // Loop over the number of sources to use.
   for(int n=0; n<prop_n_sources; n++) {
-    
+
     if (strcmp(prop_source_infile[n], "") != 0) {
-      
+
+      // If the `--prop-load-source-file <n>` flag is passed,
+      // we load the source from disk.
       std::string infile(prop_source_infile[n]);
       std::vector<quda::ColorSpinorField *> src_ptr;
       src_ptr.reserve(12);
-      for (int dil = 0; dil < 12; dil++) src_ptr.push_back(qudaIn4D[dil]);
+      for (int dil = 0; dil < 12; dil++) src_ptr.push_back(qudaSource4D[dil]);
       
       // load the source
       quda::VectorIO io(infile, QUDA_BOOLEAN_TRUE);
       io.load(src_ptr);
 
     } else {
+      // We will construct a point source.
       printfQuda("Source position: %d %d %d %d\n", prop_source_position[n][0], prop_source_position[n][1], prop_source_position[n][2], prop_source_position[n][3]);
     }
 
     for (int dil = 0; dil < 12; dil++) {
       
+      // Zero out source and sink
       size_t vol_bytes = V * my_spinor_site_size * host_spinor_data_type_size;
-
-      memset(in->V(), Ls * vol_bytes, 0.0);
-      memset(out->V(), Ls * vol_bytes, 0.0);
+      memset(in->V(), inv_param.Ls * vol_bytes, 0.0);
+      memset(out->V(), inv_param.Ls * vol_bytes, 0.0);
       
       if (strcmp(prop_source_infile[n], "") != 0) {
-	memcpy(in->V(), qudaIn4D[dil]->V(), vol_bytes);
+	// If we loaded a source, copy it in
+	memcpy(in->V(), qudaSource4D[dil]->V(), vol_bytes);
       } else {
+	// Construct a point source
 	const int source[4] = {prop_source_position[n][0], 
 			       prop_source_position[n][1], 
 			       prop_source_position[n][2],
-			       prop_source_position[n][3]};
-	
-	constructPointSpinorSource(qudaIn4D[dil]->V(), 4, 3, inv_param.cpu_prec, gauge_param.X, dil, source);
-	//constructWallSpinorSource(qudaIn4D[dil]->V(), inv_param.cpu_prec, dil);
+			       prop_source_position[n][3]};	
+	constructPointSpinorSource(qudaSource4D[dil]->V(), 4, 3, inv_param.cpu_prec, gauge_param.X, dil, source);
+	//constructWallSpinorSource(qudaSource4D[dil]->V(), inv_param.cpu_prec, dil);
 	
 	// Gaussian smear the point source.
-	performGaussianSmearNStep(qudaIn4D[dil]->V(), &inv_param_smear, prop_source_smear_steps);
+	performGaussianSmearNStep(qudaSource4D[dil]->V(), &inv_param_smear, prop_source_smear_steps);
 	
+	// Debugging...
 	for(int i=0; i<5; i++) {
-	  //qudaIn4D[dil]->PrintVector(i);
+	  //qudaSource4D[dil]->PrintVector(i);
 	}
-
-	memcpy(in->V(), qudaIn4D[dil]->V(), vol_bytes);
+	
+	// Copy the smeared source into the input vector
+	memcpy(in->V(), qudaSource4D[dil]->V(), vol_bytes);
       }
       
-      // If deflating, preserve the deflation space between solves
+      // If deflating, preserve the deflation space between solves, destroy on the last solve
       if (inv_deflate) eig_param.preserve_deflation = dil < 12 - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
       // Perform QUDA inversions
-      inv_param.solver_normalization = QUDA_SOURCE_NORMALIZATION;
+      inv_param.solver_normalization = QUDA_SOURCE_NORMALIZATION; // Make explicit for now.
       invertQuda(out->V(), in->V(), &inv_param);
-      
+
+      // Performance states
       time[dil] = inv_param.secs;
       gflops[dil] = inv_param.gflops / inv_param.secs;
       printfQuda("Prop %d done: %d iter / %g secs = %g Gflops\n\n", dil, inv_param.iter, inv_param.secs,
@@ -401,10 +430,12 @@ int main(int argc, char **argv)
       if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH || 
 	  dslash_type == QUDA_MOBIUS_DWF_DSLASH || 
 	  dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
+	// If using a DWF type, we construct the 4D prop
 	printfQuda("Constructing 4D prop from DWF prop\n");
-	make4DQuarkProp(qudaQuark4D[dil]->V(), out->V(), &inv_param, &inv_param4D, gauge_param.X);
+	make4DQuarkProp(qudaProp4D[dil]->V(), out->V(), &inv_param, &inv_param4D, gauge_param.X);
       } else {
-	memcpy(qudaQuark4D[dil]->V(), out->V(), vol_bytes);
+	// Just copy the solution in to the propagator array
+	memcpy(qudaProp4D[dil]->V(), out->V(), vol_bytes);
       }
       
       // Perform host side verification of inversion if requested
@@ -413,27 +444,29 @@ int main(int argc, char **argv)
       }
 
       // Gaussian smear the sink.
-      performGaussianSmearNStep(qudaQuark4D[dil]->V(), &inv_param_smear, prop_sink_smear_steps);
+      performGaussianSmearNStep(qudaProp4D[dil]->V(), &inv_param_smear, prop_sink_smear_steps);
 
+      // Debugging...
       for(int i=0; i<5; i++) {
-	//qudaQuark4D[dil]->PrintVector(i);
+	//qudaProp4D[dil]->PrintVector(i);
       }
       
       // Perform GPU contraction.
-      // Host side spinor data and contraction_result passed to QUDA.
+      // Host side spinor data and correlation_function passed to QUDA.
       // QUDA will allocate GPU memory, transfer the data,
       // perform the requested contraction, and return the
-      // result in the array contraction_result           
-      contractQuda(qudaQuark4D[dil]->V(), qudaQuark4D[dil]->V(), 
+      // result in the array correlation_function           
+      contractQuda(qudaProp4D[dil]->V(), qudaProp4D[dil]->V(), 
 		   ((double*)correlation_function) + 2*16*tdim*comm_coord(3), contract_type, &inv_param, gauge_param.X);
 
       // Collect all the data from all MPI nodes to the 0 MPI node
       comm_gather_array((double*)correlation_function, 2*16*tdim);
 
+      // Dump data to stdout. This needs some elegance.
       for(int gamma_mat=0; gamma_mat<16; gamma_mat++) {
 	for(int t=0; t<comm_dim(3) * tdim; t++) {
 	  //printfQuda("t=%d %e %e\n", t, ((double*)correlation_function)[2*(16*t + gamma_mat)], ((double*)correlation_function)[2*(16*t + gamma_mat) + 1]);
-	  ((double*)correlation_function_sum)[2*(16*t + gamma_mat)] += ((double*)correlation_function)[2*(16*t + gamma_mat)];
+	  ((double*)correlation_function_sum)[2*(16*t + gamma_mat)  ] += ((double*)correlation_function)[2*(16*t + gamma_mat)  ];
 	  ((double*)correlation_function_sum)[2*(16*t + gamma_mat)+1] += ((double*)correlation_function)[2*(16*t + gamma_mat)+1];
 	}
       }
@@ -451,31 +484,30 @@ int main(int argc, char **argv)
       }
     } 
 
-    // Compute performance statistics
+    // Compute performance statistics for this propagator
     Nsrc = 12;
     performanceStats(time, gflops);
 
     if (strcmp(prop_sink_outfile[n], "") != 0) {
-
-      quda::VectorIO io(prop_sink_outfile[n], QUDA_BOOLEAN_TRUE);
-      
-      // Make an array of size qudaQuark4D.size()
+      // Save the propagator if requested
+      quda::VectorIO io(prop_sink_outfile[n], QUDA_BOOLEAN_TRUE);      
+      // Make an array of size qudaProp4D.size()
       std::vector<quda::ColorSpinorField *> prop_ptr;
-      prop_ptr.reserve(qudaQuark4D.size());
+      prop_ptr.reserve(qudaProp4D.size());
       
-      // Down prec the props if requested, or just save
+      // Down prec the propagator if requested
       if (prop_save_prec < prec) {
-	io.downPrec(qudaQuark4D, prop_ptr, prop_save_prec);
+	io.downPrec(qudaProp4D, prop_ptr, prop_save_prec);
 	// save the vectors      
 	io.save(prop_ptr);
-	for (unsigned int i = 0; i < qudaQuark4D.size() && prop_save_prec < prec; i++) delete prop_ptr[i];	
+	for (unsigned int i = 0; i < qudaProp4D.size() && prop_save_prec < prec; i++) delete prop_ptr[i];	
       } else {
-	for (unsigned int i = 0; i < qudaQuark4D.size(); i++) prop_ptr.push_back(qudaQuark4D[i]);
+	for (unsigned int i = 0; i < qudaProp4D.size(); i++) prop_ptr.push_back(qudaProp4D[i]);
 	// save the vectors
 	io.save(prop_ptr);
       }
     }
-  }    
+  }
     
   // QUDA propagator test COMPLETE
   //----------------------------------------------------------------------------
@@ -495,8 +527,8 @@ int main(int argc, char **argv)
   delete check;
   
   for (int i = 0; i < 12; i++) {
-    delete qudaQuark4D[i];
-    delete qudaIn4D[i];
+    delete qudaProp4D[i];
+    delete qudaSource4D[i];
   }
   free(correlation_function);
   free(correlation_function_sum);
