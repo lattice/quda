@@ -574,6 +574,7 @@ struct Communicator {
       neighbor_rank[1][d] = comm_rank_displaced(topology, pos_displacement);
     }
     neighbors_cached = true;
+
     return;
   }
 
@@ -780,10 +781,19 @@ struct Communicator {
   const char *comm_dim_partitioned_string(const int *comm_dim_override)
   {
     if (comm_dim_override) {
-      char comm[5] = {(!comm_dim_partitioned(0) ? '0' : comm_dim_override[0] ? '1' : '0'),
-                      (!comm_dim_partitioned(1) ? '0' : comm_dim_override[1] ? '1' : '0'),
-                      (!comm_dim_partitioned(2) ? '0' : comm_dim_override[2] ? '1' : '0'),
-                      (!comm_dim_partitioned(3) ? '0' : comm_dim_override[3] ? '1' : '0'), '\0'};
+      char comm[5] = {(!comm_dim_partitioned(0) ? '0' :
+                         comm_dim_override[0]   ? '1' :
+                                                  '0'),
+                      (!comm_dim_partitioned(1) ? '0' :
+                         comm_dim_override[1]   ? '1' :
+                                                  '0'),
+                      (!comm_dim_partitioned(2) ? '0' :
+                         comm_dim_override[2]   ? '1' :
+                                                  '0'),
+                      (!comm_dim_partitioned(3) ? '0' :
+                         comm_dim_override[3]   ? '1' :
+                                                  '0'),
+                      '\0'};
       strcpy(partition_override_string, ",comm=");
       strcat(partition_override_string, comm);
       return partition_override_string;

@@ -2827,6 +2827,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   massRescale(*static_cast<cudaColorSpinorField*>(b), *param);
 
+  printfQuda("Unprepared source = %12.8e.\n", blas::norm2(*b));
   dirac.prepare(in, out, *x, *b, param->solution_type);
 
   if (getVerbosity() >= QUDA_VERBOSE) {
@@ -2840,6 +2841,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     double nin = blas::norm2(*in);
     printfQuda("Prepared source post mass rescale = %g\n", nin);
   }
+
+  printfQuda("  Prepared source = %12.8e.\n", blas::norm2(*in));
 
   // solution_type specifies *what* system is to be solved.
   // solve_type specifies *how* the system is to be solved.
@@ -2887,6 +2890,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   if (mat_solution && !direct_solve && !norm_error_solve) { // prepare source: b' = A^dag b
     cudaColorSpinorField tmp(*in);
     dirac.Mdag(*in, tmp);
+    printfQuda(" Pprepared source = %12.8e.\n", blas::norm2(*in));
   } else if (!mat_solution && direct_solve) { // perform the first of two solves: A^dag y = b
     DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
     SolverParam solverParam(*param);
@@ -3110,43 +3114,39 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 void constructWilsonTestSpinorParam(quda::ColorSpinorParam *cs_param, const QudaInvertParam *inv_param,
                                     const QudaGaugeParam *gauge_param);
 
-void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaGaugeParam *gauge_param, int *_split_key)
+void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge, QudaGaugeParam *gauge_param, int *_split_key)
 {
   CommKey split_key = {_split_key[0], _split_key[1], _split_key[2], _split_key[3]};
   int num_src = quda::product(split_key);
-  if (!gaugePrecise) { errorQuda("Guage field not loaded."); }
-  quda::GaugeFieldParam gf_param(*gaugePrecise);
 
-  // It was probably a bad design decision to encode whether the system is even/odd preconditioned (PC) in
-  // solve_type and solution_type, rather than in separate members of QudaInvertParam.  We're stuck with it
-  // for now, though, so here we factorize everything for convenience.
+  GaugeFieldParam gf_param(h_gauge, *gauge_param);
+  if (gf_param.order <= 4) { gf_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO; }
+  GaugeField *in = GaugeField::Create(gf_param);
+  loadGaugeQuda(in->Gauge_p(), gauge_param);
+
+  double plaq[3];
+  plaqQuda(plaq);
+  printfQuda("Computed plaquette is %12.8e: (spatial = %12.8e, temporal = %12.8e)\n", plaq[0], plaq[1], plaq[2]);
+
   bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION) ||
     (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
-  bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
-    (param->solve_type == QUDA_NORMOP_PC_SOLVE) || (param->solve_type == QUDA_NORMERR_PC_SOLVE);
-  bool mat_solution = (param->solution_type == QUDA_MAT_SOLUTION) ||
-    (param->solution_type ==  QUDA_MATPC_SOLUTION);
-  bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) ||
-    (param->solve_type == QUDA_DIRECT_PC_SOLVE);
-  bool norm_error_solve = (param->solve_type == QUDA_NORMERR_SOLVE) ||
-    (param->solve_type == QUDA_NORMERR_PC_SOLVE);
 
-  const int *X = gaugePrecise->X();
-  // ColorSpinorParam cpuParam;
-  // constructWilsonTestSpinorParam(&cpuParam, param, gauge_param);
+  const int *X = gauge_param->X;
   ColorSpinorParam cpuParam(_hp_b[0], *param, X, pc_solution, param->input_location);
   std::vector<ColorSpinorField *> _h_b(num_src);
   for(int i = 0; i < num_src; i++) {
-    cpuParam.v = _hp_b[i]; //MW seems wird in the loop
+    cpuParam.v = _hp_b[i];
     _h_b[i] = ColorSpinorField::Create(cpuParam);
   }
- 
+
   cpuParam.location = param->output_location;
   std::vector<ColorSpinorField*> _h_x(num_src);
   for(int i=0; i < num_src; i++) {
-    cpuParam.v = _hp_x[i]; //MW seems wird in the loop
+    cpuParam.v = _hp_x[i];
     _h_x[i] = ColorSpinorField::Create(cpuParam);
   }
+  printfQuda("Spliting the grid: (%d,%d,%d,%d) / (%d,%d,%d,%d).\n", comm_dim(0), comm_dim(1), comm_dim(2),
+            comm_dim(3), split_key[0], split_key[1], split_key[2], split_key[3]);
 
   for (int d = 0; d < nDim; d++) {
     if (comm_dim(d) % split_key[d] != 0) {
@@ -3159,18 +3159,23 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, Qud
     gauge_param->X[d] *= split_key[d];
     gauge_param->ga_pad *= split_key[d];
   }
-  quda::GaugeField *collected_gauge = quda::GaugeField::Create(gf_param);
 
+  gf_param.create = QUDA_NULL_FIELD_CREATE;
+  quda::GaugeField *collected_gauge = new quda::cpuGaugeField(gf_param); // quda::GaugeField::Create(gf_param);
   std::vector<quda::GaugeField *> v_g(1);
-  v_g[0] = gaugePrecise;
+  v_g[0] = in;
+
+  printf("in norm = %f\n", in->norm2(-1));
+  printf("co norm = %f\n", collected_gauge->norm2(-1));
   quda::split_field(*collected_gauge, v_g, split_key);
+  loadGaugeQuda(collected_gauge->Gauge_p(), gauge_param);
+
+  printf("co norm = %f\n", collected_gauge->norm2(-1));
 
   comm_barrier();
 
   // Split input fermion field
   quda::ColorSpinorParam cpu_cs_param_split(*_h_x[0]);
-  // quda::ColorSpinorParam cpu_cs_param_split;
-  // constructWilsonTestSpinorParam(&cpu_cs_param_split, param, gauge_param);
   for (int d = 0; d < nDim; d++) {
     cpu_cs_param_split.x[d] *= split_key[d];
   }
@@ -3184,11 +3189,9 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, Qud
   push_to_current(split_key);
   updateR();
   comm_barrier();
-  
-  { printf("collect_b norm = %12.8e (after join)\n", quda::blas::norm2(*collect_b)); }
 
-  quda::loadGaugeField(collected_gauge, gauge_param);
-  double plaq[3];
+  printf("collect_b = %12.8e.\n", quda::blas::norm2(*collect_b));
+
   plaqQuda(plaq);
 
   invertQuda(collect_x->V(), collect_b->V(), param);
@@ -3206,10 +3209,14 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, Qud
 
   join_field(_h_x, *collect_x, split_key);
 
-  for (const auto &p : _h_x) { printfQuda("v_x norm = %12.8e (after join)\n", quda::blas::norm2(*p)); }
-
   delete collect_b;
   delete collect_x;
+
+  for (auto p : _h_x) { delete p; }
+  for (auto p : _h_b) { delete p; }
+
+  delete in;
+  delete collected_gauge;
 
   freeGaugeQuda();
 }

@@ -12,12 +12,11 @@
 
 #include <communicator_quda.h>
 
-
 int comm_rank_from_coords(const int *coords);
 
 namespace quda
 {
-  
+
   void copyOffsetGauge(GaugeField &out, const GaugeField &in, const int offset[4]);
 
   void copy_color_spinor_offset(ColorSpinorField &out, const ColorSpinorField &in, const int offset[4]);
@@ -77,9 +76,55 @@ namespace quda
     printf("(%3d,%3d,%3d,%3d)", comm_key[0], comm_key[1], comm_key[2], comm_key[3]);
   }
 
-  auto inline get_data(GaugeField &f) { return f.Gauge_p(); }
+  auto inline get_data(GaugeField *f) { return f->Gauge_p(); }
 
-  auto inline get_data(ColorSpinorField &f) { return f.V(); }
+  auto inline get_data(ColorSpinorField *f) { return f->V(); }
+
+  void inline cpu_field_to_buffer(void *buffer, GaugeField &f)
+  {
+    if (f.Order() == QUDA_QDP_GAUGE_ORDER) {
+      void **p = static_cast<void **>(f.Gauge_p());
+      int dbytes = f.Bytes() / 4;
+      static_assert(sizeof(char) == 1, "Assuming sizeof(char) == 1");
+      char *dst_buffer = reinterpret_cast<char *>(buffer);
+      for (int d = 0; d < 4; d++) { std::memcpy(&dst_buffer[d * dbytes], p[d], dbytes); }
+    } else if (f.Order() == QUDA_MILC_GAUGE_ORDER) {
+      void *p = f.Gauge_p();
+      int bytes = f.Bytes();
+      std::memcpy(buffer, p, bytes);
+    } else {
+      errorQuda("Unsupported order = %d\n", f.Order());
+    }
+  }
+
+  void inline cpu_buffer_to_field(GaugeField &f, const void *buffer)
+  {
+    if (f.Order() == QUDA_QDP_GAUGE_ORDER) {
+      void **p = static_cast<void **>(f.Gauge_p());
+      int dbytes = f.Bytes() / 4;
+      static_assert(sizeof(char) == 1, "Assuming sizeof(char) == 1");
+      const char *dst_buffer = reinterpret_cast<const char *>(buffer);
+      for (int d = 0; d < 4; d++) { std::memcpy(p[d], &dst_buffer[d * dbytes], dbytes); }
+    } else if (f.Order() == QUDA_MILC_GAUGE_ORDER) {
+      void *p = f.Gauge_p();
+      int bytes = f.Bytes();
+      std::memcpy(p, buffer, bytes);
+    } else {
+      errorQuda("Unsupported order = %d\n", f.Order());
+    }
+  }
+
+  void inline cpu_field_to_buffer(void *buffer, const ColorSpinorField &f)
+  {
+    int bytes = f.Bytes();
+    std::memcpy(buffer, f.V(), bytes);
+  }
+
+  void inline cpu_buffer_to_field(ColorSpinorField &f, const void *buffer)
+  {
+    int bytes = f.Bytes();
+    std::memcpy(f.V(), buffer, bytes);
+  }
 
   template <class F> struct param_mapper {
   };
@@ -111,7 +156,7 @@ namespace quda
     int n_fields = v_base_field.size();
     if (n_fields == 0) { errorQuda("Empty vector!"); }
 
-    const auto &meta = *(v_base_field[0]);
+    const auto meta = v_base_field[0];
 
     // Send cycles
     for (int i = 0; i < n_replicates; i++) {
@@ -127,13 +172,14 @@ namespace quda
       // TODO: For now only the cpu-gpu communication is implemented.
       // printf("rank %4d -> rank %4d: tag = %4d\n", comm_rank(), dst_rank, tag);
 
-      size_t bytes = meta.Bytes();
+      size_t bytes = meta->Bytes();
 
       v_send_buffer_h[i] = pinned_malloc(bytes);
-      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-        std::memcpy(v_send_buffer_h[i], get_data(*v_base_field[i % n_fields]), bytes);
+      if (meta->Location() == QUDA_CPU_FIELD_LOCATION) {
+        cpu_field_to_buffer(v_send_buffer_h[i], *v_base_field[i % n_fields]);
+        // std::memcpy(v_send_buffer_h[i], get_data(v_base_field[i % n_fields]), bytes);
       } else {
-        cudaMemcpy(v_send_buffer_h[i], get_data(*v_base_field[i % n_fields]), bytes, cudaMemcpyDeviceToHost);
+        cudaMemcpy(v_send_buffer_h[i], get_data(v_base_field[i % n_fields]), bytes, cudaMemcpyDeviceToHost);
       }
       v_mh_send[i] = comm_declare_send_rank(v_send_buffer_h[i], dst_rank, tag, bytes);
 
@@ -142,10 +188,10 @@ namespace quda
 
     using param_type = typename param_mapper<Field>::type;
 
-    param_type param(meta);
+    param_type param(*meta);
     Field *buffer_field = Field::Create(param);
 
-    const int *X = meta.X();
+    const int *X = meta->X();
     CommKey thread_dim = {X[0], X[1], X[2], X[3]};
 
     // Receive cycles
@@ -168,10 +214,11 @@ namespace quda
       comm_start(mh_recv);
       comm_wait(mh_recv);
 
-      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-        std::memcpy(get_data(*buffer_field), recv_buffer_h, bytes);
+      if (meta->Location() == QUDA_CPU_FIELD_LOCATION) {
+        cpu_buffer_to_field(*buffer_field, recv_buffer_h);
+        // std::memcpy(get_data(buffer_field), recv_buffer_h, bytes);
       } else {
-        cudaMemcpy(get_data(*buffer_field), recv_buffer_h, bytes, cudaMemcpyHostToDevice);
+        cudaMemcpy(get_data(buffer_field), recv_buffer_h, bytes, cudaMemcpyHostToDevice);
       }
 
       comm_free(mh_recv);
@@ -247,9 +294,9 @@ namespace quda
 
       v_send_buffer_h[i] = pinned_malloc(bytes);
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-        std::memcpy(v_send_buffer_h[i], get_data(*buffer_field), bytes);
+        std::memcpy(v_send_buffer_h[i], get_data(buffer_field), bytes);
       } else {
-        cudaMemcpy(v_send_buffer_h[i], get_data(*buffer_field), bytes, cudaMemcpyDeviceToHost);
+        cudaMemcpy(v_send_buffer_h[i], get_data(buffer_field), bytes, cudaMemcpyDeviceToHost);
       }
       v_mh_send[i] = comm_declare_send_rank(v_send_buffer_h[i], dst_rank, tag, bytes);
 
@@ -287,9 +334,9 @@ namespace quda
       comm_wait(mh_recv);
 
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-        std::memcpy(get_data(*v_base_field[i % n_fields]), recv_buffer_h, bytes);
+        std::memcpy(get_data(v_base_field[i % n_fields]), recv_buffer_h, bytes);
       } else {
-        cudaMemcpy(get_data(*v_base_field[i % n_fields]), recv_buffer_h, bytes, cudaMemcpyHostToDevice);
+        cudaMemcpy(get_data(v_base_field[i % n_fields]), recv_buffer_h, bytes, cudaMemcpyHostToDevice);
       }
 
       comm_free(mh_recv);
@@ -305,5 +352,3 @@ namespace quda
   }
 
 } // namespace quda
-
-

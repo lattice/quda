@@ -184,9 +184,11 @@ int main(int argc, char **argv)
 
   // Allocate host side memory for the gauge field.
   //----------------------------------------------------------------------------
+  // void *gauge;
   void *gauge[4];
   // Allocate space on the host (always best to allocate and free in the same scope)
   for (int dir = 0; dir < 4; dir++) gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
+  // gauge = malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
   constructHostGaugeField(gauge, gauge_param, argc, argv);
   // Load the gauge field to the device
   loadGaugeQuda((void *)gauge, &gauge_param);
@@ -196,12 +198,12 @@ int main(int argc, char **argv)
   plaqQuda(plaq);
   printfQuda("Computed plaquette is %12.8e: (spatial = %12.8e, temporal = %12.8e)\n", plaq[0], plaq[1], plaq[2]);
 
-  // Split gauge field
-
   plaq_ref = plaq[0];
 
-  CommKey split_key
-    = {gridsize_from_cmdline[0], gridsize_from_cmdline[1], gridsize_from_cmdline[2], gridsize_from_cmdline[3]};
+  // CommKey split_key
+  //   = {gridsize_from_cmdline[0], gridsize_from_cmdline[1], gridsize_from_cmdline[2], gridsize_from_cmdline[3]};
+
+  CommKey split_key = {1, 1, 1, 2};
 
   quda::ColorSpinorParam cpu_cs_param;
   constructWilsonTestSpinorParam(&cpu_cs_param, &inv_param, &gauge_param);
@@ -217,7 +219,7 @@ int main(int argc, char **argv)
   for (auto &p : _h_b) {
     p = new quda::cpuColorSpinorField(cpu_cs_param);
     constructRandomSpinorSource(p->V(), 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
-    printfQuda("in_d norm = %12.8e (before split)\n", quda::blas::norm2(*p));
+    printfQuda("_h_b norm = %12.8e (no split)\n", quda::blas::norm2(*p));
   }
   std::vector<quda::ColorSpinorField *> _h_x(n_src, nullptr);
   for (auto &p : _h_x) { p = new quda::cpuColorSpinorField(cpu_cs_param); }
@@ -231,18 +233,15 @@ int main(int argc, char **argv)
   }
 
   // Call the split grid solver
-  invertSplitGridQuda(_hp_x, _hp_b, &inv_param, &gauge_param, split_key.data());
+  invertSplitGridQuda(_hp_x, _hp_b, &inv_param, (void *)gauge, &gauge_param, split_key.data());
 
   loadGaugeQuda(gauge, &gauge_param);
   plaqQuda(plaq);
   printfQuda("Computed plaquette is %12.8e: (spatial = %12.8e, temporal = %12.8e)\n", plaq[0], plaq[1], plaq[2]);
 
-  void *clover = nullptr;
-  void *clover_inv = nullptr;
-
   if (verify_results) {
-    for (size_t i = 0; i < n_src; i++) {
-      verifyInversion(_h_x[i]->V(), nullptr, _h_b[i]->V(), meta->V(), gauge_param, inv_param, gauge, clover, clover_inv);
+    for (int i = 0; i < n_src; i++) {
+      verifyInversion(_h_x[i]->V(), nullptr, _h_b[i]->V(), meta->V(), gauge_param, inv_param, gauge, nullptr, nullptr);
     }
   }
 
