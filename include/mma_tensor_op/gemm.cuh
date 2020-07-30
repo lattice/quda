@@ -546,13 +546,14 @@ namespace quda
 
               store_complex<M, N, ldc>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real, op_c_imag);
             }
-
-            if (a_m + bM < M) {
-              __syncthreads();
-              a_loader.r2s<a_dagger>(smem_obj_a_real, smem_obj_a_imag);
-              __syncthreads();
-            }
           }
+
+          if (a_m + bM < M) {
+            __syncthreads();
+            a_loader.r2s<a_dagger>(smem_obj_a_real, smem_obj_a_imag);
+            __syncthreads();
+          }
+
         }
 
         return max;

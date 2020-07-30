@@ -744,7 +744,7 @@ namespace quda {
     void initTuneParam(TuneParam &param) const
     {
       TunableVectorYZ::initTuneParam(param);
-      param.aux.x = 1; // aggregates per block
+      param.aux.x = ((type == COMPUTE_VUV || type == COMPUTE_UV) && use_mma) ? 0 : 1; // aggregates per block
       param.aux.y = arg.shared_atomic;
       param.aux.z = arg.parity_flip; // not actually tuned over at present
 
@@ -759,7 +759,8 @@ namespace quda {
     void defaultTuneParam(TuneParam &param) const
     {
       TunableVectorYZ::defaultTuneParam(param);
-      param.aux.x = 1; // aggregates per block
+      param.aux.x = ((type == COMPUTE_VUV || type == COMPUTE_UV) && use_mma) ? 0 : 1; // aggregates per block
+      // param.aux.x = 1; // aggregates per block
       param.aux.y = arg.shared_atomic;
       param.aux.z = arg.parity_flip; // not actually tuned over at present
 
