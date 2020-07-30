@@ -503,7 +503,7 @@ namespace quda {
     __device__ __host__ inline VectorType vector_load(const void *ptr, int idx)
   {
 #if (__CUDA_ARCH__ >= 320 && __CUDA_ARCH__ < 520)
-    return __ldg(reinterpret_cast< VectorType* >(ptr) + idx);
+    return __ldg(reinterpret_cast< const VectorType* >(ptr) + idx);
 #else
     return reinterpret_cast< const VectorType * >(ptr)[idx];
 #endif

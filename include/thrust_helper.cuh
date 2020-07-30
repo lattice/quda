@@ -13,6 +13,11 @@
 #define CUB_USE_COOPERATIVE_GROUPS
 #endif
 
+// hack required to silence a thrust complaint with clang-11
+#if defined(__clang__) && defined(__CUDA__)
+#define _CubLog(...)
+#endif
+
 #include <thrust/system/cuda/vector.h>
 #include <thrust/system/cuda/execution_policy.h>
 #include <thrust/transform_reduce.h>
