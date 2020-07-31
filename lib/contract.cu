@@ -221,9 +221,7 @@ public:
 	  .configure(tp.grid, tp.block, tp.shared_bytes, stream)
 	  .launch(arg);
 #else
-	//- Here we now, at long last, see the familiar triple chevron <<<...>>> syntax of a 
-	//- CUDA kernel! Two in fact, one for each type of contraction. Each of these kernels 
-	//- contracts the fermions in slightly different ways. computeColorContractionSum 
+	//- Here are are at the calling of teh compute kernels, albeit wrapped in Macros! computeColorContractionSum 
 	//- will contract only the colour indices, leaving the 16 complex numbers per open spin 
 	//- index per lattice site (one for each \mu, and \nu combination) and then sum each one
 	//- of those 16 elements with its counterparts on the same timeslice.
