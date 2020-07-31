@@ -126,6 +126,7 @@
   case 144: kernel<144, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                      \
   case 192: kernel<192, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                      \
   case 200: kernel<200, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                      \
+  case 250: kernel<250, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                      \
   case 256: kernel<256, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                      \
   case 288: kernel<288, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                      \
   case 432: kernel<432, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                      \
