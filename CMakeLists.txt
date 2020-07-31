@@ -211,22 +211,13 @@ option(QUDA_BUILD_NATIVE_LAPACK "build the native blas/lapack library according 
 
 option(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support (CUDA >= 11.0)?" ON)
 if(QUDA_HETEROGENEOUS_ATOMIC AND CUDA_VERSION LESS 11.0)
-  message(
-  NOTICE
-  "Disabling heterogeneous atomic support (requires CUDA >= 11.0)")
-  set(QUDA_HETEROGENEOUS_ATOMIC OFF)
+  message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON requires CUDA >= 11.0")
 endif()
 if(QUDA_HETEROGENEOUS_ATOMIC AND ${CMAKE_BUILD_TYPE} STREQUAL "SANITIZE")
-  message(
-  NOTICE
-  "Disabling heterogeneous atomic support (does not support SANITIZE build)")
-  set(QUDA_HETEROGENEOUS_ATOMIC OFF)
+  message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON does not support SANITIZE build)")
 endif()
 if(QUDA_HETEROGENEOUS_ATOMIC AND QUDA_JITIFY)
-  message(
-  NOTICE
-  "Disabling heterogeneous atomic support (does not support JITIFY build)")
-  set(QUDA_HETEROGENEOUS_ATOMIC OFF)
+  message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON does not support JITIFY)")
 endif()
 
 set(QUDA_MAX_MULTI_BLAS_N
