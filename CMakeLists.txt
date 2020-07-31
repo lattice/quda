@@ -368,7 +368,7 @@ endif()
 # define LINKER FLAGS
 set(CMAKE_EXE_LINKER_FLAGS_SANITIZE
     "-fsanitize=address,undefined"
-    CACHE STRING "Flags used by the linker during sanitizer debug builds.")
+    CACHE STRING "Flags used by the linker during sanitizer debug builds." FORCE)
 
 # define CUDA flags
 set(CMAKE_CUDA_HOST_COMPILER
