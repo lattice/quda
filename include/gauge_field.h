@@ -846,8 +846,6 @@ namespace quda {
                                             & Reconstruct_(func, file, line, a, args...));
   }
 
-  void loadGaugeField(const GaugeField *in, QudaGaugeParam *param);
-
 #define checkReconstruct(...) Reconstruct_(__func__, __FILE__, __LINE__, __VA_ARGS__)
 
 } // namespace quda

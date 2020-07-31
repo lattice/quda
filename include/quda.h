@@ -968,8 +968,9 @@ extern "C" {
    */
   void invertQuda(void *h_x, void *h_b, QudaInvertParam *param);
 
-  void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge, QudaGaugeParam *gauge_param, int *split_key);
-  
+  void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge,
+                           QudaGaugeParam *gauge_param, int *split_key);
+
   /**
    * Perform the solve like @invertQuda but for multiples right hand sides.
    *
@@ -979,7 +980,7 @@ extern "C" {
    * @param param  Contains all metadata regarding host and device
    *               storage and solver parameters
    */
-  
+
   void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param);
 
   /**

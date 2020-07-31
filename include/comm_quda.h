@@ -162,7 +162,7 @@ extern "C" {
      @brief Initialize the communications, implemented in comm_single.cpp, comm_qmp.cpp, and comm_mpi.cpp
   */
   void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data,
-    bool user_set_comm_handle = false, void *user_comm = nullptr);
+                 bool user_set_comm_handle = false, void *user_comm = nullptr);
 
   /**
      @brief Initialize the communications common to all communications abstractions

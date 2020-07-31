@@ -184,11 +184,9 @@ int main(int argc, char **argv)
 
   // Allocate host side memory for the gauge field.
   //----------------------------------------------------------------------------
-  // void *gauge;
   void *gauge[4];
   // Allocate space on the host (always best to allocate and free in the same scope)
   for (int dir = 0; dir < 4; dir++) gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
-  // gauge = malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
   constructHostGaugeField(gauge, gauge_param, argc, argv);
   // Load the gauge field to the device
   loadGaugeQuda((void *)gauge, &gauge_param);
@@ -219,7 +217,6 @@ int main(int argc, char **argv)
   for (auto &p : _h_b) {
     p = new quda::cpuColorSpinorField(cpu_cs_param);
     constructRandomSpinorSource(p->V(), 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
-    printfQuda("_h_b norm = %12.8e (no split)\n", quda::blas::norm2(*p));
   }
   std::vector<quda::ColorSpinorField *> _h_x(n_src, nullptr);
   for (auto &p : _h_x) { p = new quda::cpuColorSpinorField(cpu_cs_param); }

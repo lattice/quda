@@ -161,7 +161,6 @@ MsgHandle *Communicator::comm_declare_send_displaced(void *buffer, const int dis
   int tag = 0;
   for (int i = ndim - 1; i >= 0; i--) tag = tag * 4 * max_displacement + displacement[i] + max_displacement;
   tag = tag >= 0 ? tag : 2 * pow(4 * max_displacement, ndim) + tag;
-  // printf("rank = %d, displacement = {%d, %d, %d, %d}, dst rank = %d, tag = %10d.\n", comm_rank(), displacement[0], displacement[1], displacement[2], displacement[3], rank, tag);
 
   MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
   MPI_CHECK(MPI_Send_init(buffer, nbytes, MPI_BYTE, rank, tag, MPI_COMM_HANDLE, &(mh->request)));

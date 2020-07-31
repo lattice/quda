@@ -691,26 +691,12 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     static_cast<GaugeField*>(new cpuGaugeField(gauge_param)) :
     static_cast<GaugeField*>(new cudaGaugeField(gauge_param));
 
-  profileGauge.TPSTOP(QUDA_PROFILE_TOTAL);
-  profileGauge.TPSTOP(QUDA_PROFILE_INIT);
-
-  loadGaugeField(in, param);
-}
-
-namespace quda {
-
-void loadGaugeField(const GaugeField *in, QudaGaugeParam *param)
-{
-  profileGauge.TPSTART(QUDA_PROFILE_TOTAL);
-  profileGauge.TPSTART(QUDA_PROFILE_INIT);
-
-  GaugeFieldParam gauge_param(*in);
-
   if (in->Order() == QUDA_BQCD_GAUGE_ORDER) {
     static size_t checksum = SIZE_MAX;
     size_t in_checksum = in->checksum(true);
     if (in_checksum == checksum) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Gauge field unchanged - using cached gauge field %lu\n", checksum);
+      if (getVerbosity() >= QUDA_VERBOSE)
+        printfQuda("Gauge field unchanged - using cached gauge field %lu\n", checksum);
       profileGauge.TPSTOP(QUDA_PROFILE_INIT);
       profileGauge.TPSTOP(QUDA_PROFILE_TOTAL);
       delete in;
@@ -896,14 +882,11 @@ void loadGaugeField(const GaugeField *in, QudaGaugeParam *param)
   profileGauge.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-}
-
 void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
   profileGauge.TPSTART(QUDA_PROFILE_TOTAL);
 
-  if (param->location != QUDA_CPU_FIELD_LOCATION)
-    errorQuda("Non-cpu output location not yet supported");
+  if (param->location != QUDA_CPU_FIELD_LOCATION) errorQuda("Non-cpu output location not yet supported");
 
   if (!initialized) errorQuda("QUDA not initialized");
   checkGaugeParam(param);
@@ -913,26 +896,19 @@ void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   cpuGaugeField cpuGauge(gauge_param);
   cudaGaugeField *cudaGauge = nullptr;
   switch (param->type) {
-    case QUDA_WILSON_LINKS:
-      cudaGauge = gaugePrecise;
-      break;
-    case QUDA_ASQTAD_FAT_LINKS:
-      cudaGauge = gaugeFatPrecise;
-      break;
-    case QUDA_ASQTAD_LONG_LINKS:
-      cudaGauge = gaugeLongPrecise;
-      break;
-    case QUDA_SMEARED_LINKS:
-      gauge_param.create = QUDA_NULL_FIELD_CREATE;
-      gauge_param.reconstruct = param->reconstruct;
-      gauge_param.setPrecision(param->cuda_prec, true);
-      gauge_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-      gauge_param.pad = param->ga_pad;
-      cudaGauge = new cudaGaugeField(gauge_param);
-      copyExtendedGauge(*cudaGauge, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
-      break;
-    default:
-      errorQuda("Invalid gauge type");
+  case QUDA_WILSON_LINKS: cudaGauge = gaugePrecise; break;
+  case QUDA_ASQTAD_FAT_LINKS: cudaGauge = gaugeFatPrecise; break;
+  case QUDA_ASQTAD_LONG_LINKS: cudaGauge = gaugeLongPrecise; break;
+  case QUDA_SMEARED_LINKS:
+    gauge_param.create = QUDA_NULL_FIELD_CREATE;
+    gauge_param.reconstruct = param->reconstruct;
+    gauge_param.setPrecision(param->cuda_prec, true);
+    gauge_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+    gauge_param.pad = param->ga_pad;
+    cudaGauge = new cudaGaugeField(gauge_param);
+    copyExtendedGauge(*cudaGauge, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
+    break;
+  default: errorQuda("Invalid gauge type");
   }
 
   profileGauge.TPSTART(QUDA_PROFILE_D2H);
@@ -2827,7 +2803,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   massRescale(*static_cast<cudaColorSpinorField*>(b), *param);
 
-  printfQuda("Unprepared source = %12.8e.\n", blas::norm2(*b));
   dirac.prepare(in, out, *x, *b, param->solution_type);
 
   if (getVerbosity() >= QUDA_VERBOSE) {
@@ -2841,8 +2816,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     double nin = blas::norm2(*in);
     printfQuda("Prepared source post mass rescale = %g\n", nin);
   }
-
-  printfQuda("  Prepared source = %12.8e.\n", blas::norm2(*in));
 
   // solution_type specifies *what* system is to be solved.
   // solve_type specifies *how* the system is to be solved.
@@ -2890,7 +2863,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   if (mat_solution && !direct_solve && !norm_error_solve) { // prepare source: b' = A^dag b
     cudaColorSpinorField tmp(*in);
     dirac.Mdag(*in, tmp);
-    printfQuda(" Pprepared source = %12.8e.\n", blas::norm2(*in));
   } else if (!mat_solution && direct_solve) { // perform the first of two solves: A^dag y = b
     DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
     SolverParam solverParam(*param);
@@ -3111,9 +3083,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 }
 
 
-void constructWilsonTestSpinorParam(quda::ColorSpinorParam *cs_param, const QudaInvertParam *inv_param,
-                                    const QudaGaugeParam *gauge_param);
-
 void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge, QudaGaugeParam *gauge_param, int *_split_key)
 {
   CommKey split_key = {_split_key[0], _split_key[1], _split_key[2], _split_key[3]};
@@ -3137,23 +3106,20 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, voi
   for(int i = 0; i < num_src; i++) {
     cpuParam.v = _hp_b[i];
     _h_b[i] = ColorSpinorField::Create(cpuParam);
+    printfQuda("_h_b[%2d] norm = %12.8e (no split)\n", i, quda::blas::norm2(*_h_b[i]));
   }
 
   cpuParam.location = param->output_location;
-  std::vector<ColorSpinorField*> _h_x(num_src);
-  for(int i=0; i < num_src; i++) {
+  std::vector<ColorSpinorField *> _h_x(num_src);
+  for (int i = 0; i < num_src; i++) {
     cpuParam.v = _hp_x[i];
     _h_x[i] = ColorSpinorField::Create(cpuParam);
   }
-  printfQuda("Spliting the grid: (%d,%d,%d,%d) / (%d,%d,%d,%d).\n", comm_dim(0), comm_dim(1), comm_dim(2),
-            comm_dim(3), split_key[0], split_key[1], split_key[2], split_key[3]);
 
+  printfQuda("Spliting the grid into sub-partitions: (%2d,%2d,%2d,%2d) / (%2d,%2d,%2d,%2d).\n", comm_dim(0),
+             comm_dim(1), comm_dim(2), comm_dim(3), split_key[0], split_key[1], split_key[2], split_key[3]);
   for (int d = 0; d < nDim; d++) {
-    if (comm_dim(d) % split_key[d] != 0) {
-      errorQuda("Split not possible: (%d,%d,%d,%d) / (%d,%d,%d,%d).", comm_dim(0), comm_dim(1), comm_dim(2),
-                comm_dim(3), split_key[0], split_key[1], split_key[2], split_key[3]);
-    }
-
+    if (comm_dim(d) % split_key[d] != 0) { errorQuda("Split not possible."); }
     gf_param.x[d] *= split_key[d];
     gf_param.pad *= split_key[d];
     gauge_param->X[d] *= split_key[d];
@@ -3164,21 +3130,14 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, voi
   quda::GaugeField *collected_gauge = new quda::cpuGaugeField(gf_param); // quda::GaugeField::Create(gf_param);
   std::vector<quda::GaugeField *> v_g(1);
   v_g[0] = in;
-
-  printf("in norm = %f\n", in->norm2(-1));
-  printf("co norm = %f\n", collected_gauge->norm2(-1));
   quda::split_field(*collected_gauge, v_g, split_key);
   loadGaugeQuda(collected_gauge->Gauge_p(), gauge_param);
-
-  printf("co norm = %f\n", collected_gauge->norm2(-1));
 
   comm_barrier();
 
   // Split input fermion field
   quda::ColorSpinorParam cpu_cs_param_split(*_h_x[0]);
-  for (int d = 0; d < nDim; d++) {
-    cpu_cs_param_split.x[d] *= split_key[d];
-  }
+  for (int d = 0; d < nDim; d++) { cpu_cs_param_split.x[d] *= split_key[d]; }
   quda::ColorSpinorField *collect_b = new quda::cpuColorSpinorField(cpu_cs_param_split);
   quda::ColorSpinorField *collect_x = new quda::cpuColorSpinorField(cpu_cs_param_split);
 
@@ -3190,7 +3149,7 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, voi
   updateR();
   comm_barrier();
 
-  printf("collect_b = %12.8e.\n", quda::blas::norm2(*collect_b));
+  // printf("collect_b = %12.8e.\n", quda::blas::norm2(*collect_b));
 
   plaqQuda(plaq);
 
@@ -3208,6 +3167,9 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, voi
          plaq[2]);
 
   join_field(_h_x, *collect_x, split_key);
+  for (int i = 0; i < num_src; i++) {
+    printfQuda("_h_x[%2d] norm = %12.8e (no split)\n", i, quda::blas::norm2(*_h_x[i]));
+  }
 
   delete collect_b;
   delete collect_x;
@@ -3248,8 +3210,8 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
   // solve_type and solution_type, rather than in separate members of QudaInvertParam.  We're stuck with it
   // for now, though, so here we factorize everything for convenience.
 
-  bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION) ||
-    (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+  bool pc_solution
+    = (param->solution_type == QUDA_MATPC_SOLUTION) || (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
   bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
     (param->solve_type == QUDA_NORMOP_PC_SOLVE) || (param->solve_type == QUDA_NORMERR_PC_SOLVE);
   bool mat_solution = (param->solution_type == QUDA_MAT_SOLUTION) ||
