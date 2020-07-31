@@ -171,8 +171,8 @@ namespace quda
   //- Welcome! This function will take the open spinor contractions, insert gamma matrices, and
   //- return the gamma matrix contracation. If you've made it this far, you should be brave enough 
   //- to negotiate all the lines on your own.
-  template <typename real, typename Arg>
-  __host__ __device__ inline void computeDRGammaContraction(Arg &arg, const complex<real> spin_elem[][4], complex<real> *A)
+  template <typename real>
+  __host__ __device__ inline void computeDRGammaContraction(const complex<real> spin_elem[][4], complex<real> *A)
   {
     complex<real> I(0.0, 1.0);    
     complex<real> result_local(0.0, 0.0);
@@ -346,7 +346,7 @@ namespace quda
     }
 
     // Compute all gamma matrix insertions
-    computeDRGammaContraction(arg, spin_elem, A);
+    computeDRGammaContraction(spin_elem, A);
     
     // Save data to return array
     arg.s.save(A, x_cb, parity);
@@ -429,7 +429,7 @@ namespace quda
      
       //- Next, we use that spin_elem array to compute all gamma matrix insertions. Let's take a 
       //- quick look, it is defined in this file.
-      computeDRGammaContraction(arg, spin_elem, A);
+      computeDRGammaContraction(spin_elem, A);
       
       //- Now that the gamma matrix contractions are done, we load result into res array.
       //- This is the array on which we perform the final reduction. Because it's a double2 
