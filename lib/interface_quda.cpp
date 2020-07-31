@@ -5873,11 +5873,13 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
    //- must take place, and it is done automatically for the user. 
    //- We next perform the GPU computation which is located and explained in contract.cu
    profileContract.TPSTART(QUDA_PROFILE_COMPUTE);
+   //- Ok, this is it... this is where the real adventure begins. See you on the other side.
    contractQuda(*x[0], *y[0], dev_result, cType);
    profileContract.TPSTOP(QUDA_PROFILE_COMPUTE);
 
-   //- and finally we transfer the result to the original host pointer.
-   // If we did not timeslice sum, we must to a device to host transfer
+   //- Welcome back! We did it! Finally we transfer the result to the original host pointer.
+   //- If we did not timeslice sum, we must to a device to host transfer, else the data
+   //- is already on a host pointer.
    if(cType == QUDA_CONTRACT_TYPE_OPEN || cType == QUDA_CONTRACT_TYPE_DR) {
      profileContract.TPSTART(QUDA_PROFILE_D2H);
      qudaMemcpy(prec_result, dev_result, data_bytes, cudaMemcpyDeviceToHost);
@@ -5886,7 +5888,7 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
      memcpy(prec_result, dev_result, data_bytes);
    }
    
-   //Copy the data back to the user's array
+   //- Copy the data back to the user's array
    if(x[0]->Precision() == QUDA_SINGLE_PRECISION) {
      for(unsigned int i=0; i<(array_size * x[0]->Nspin() * x[0]->Nspin() * 2); i++) {
        ((double*)h_result)[i] = ((float*)prec_result)[i];
@@ -5915,6 +5917,7 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
    //- This completes the 2 fermion contraction. We save the tune data and exit.
    saveTuneCache();
    profileContract.TPSTOP(QUDA_PROFILE_TOTAL);
+   //- Well done! You made it! Did you learn everything you wanted to learn? Don't be afraid to ask questions.
  }
 
  void gaugeObservablesQuda(QudaGaugeObservableParam *param)
