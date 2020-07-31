@@ -57,11 +57,6 @@ namespace quda
 
     void init()
     {
-#ifdef HETEROGENEOUS_ATOMIC
-      // fast reductions use heterogeneous std::atomic to synchronize CPU and GPU as opposed to using CUDA events
-      warningQuda("Experimental heterogeneous-atomic reductions enabled");
-#endif
-
       auto bytes = buffer_size();
       if (!d_reduce) d_reduce = (device_reduce_t *)device_malloc(bytes);
 
