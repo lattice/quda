@@ -209,17 +209,6 @@ option(QUDA_NUMA_NVML "experimental use of NVML to set numa affinity" OFF)
 option(QUDA_VERBOSE_BUILD "display kernel register usage" OFF)
 option(QUDA_BUILD_NATIVE_LAPACK "build the native blas/lapack library according to QUDA_TARGET" ON)
 
-option(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support (CUDA >= 11.0)?" ON)
-if(QUDA_HETEROGENEOUS_ATOMIC AND CUDA_VERSION LESS 11.0)
-  message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON requires CUDA >= 11.0")
-endif()
-if(QUDA_HETEROGENEOUS_ATOMIC AND ${CMAKE_BUILD_TYPE} STREQUAL "SANITIZE")
-  message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON does not support SANITIZE build)")
-endif()
-if(QUDA_HETEROGENEOUS_ATOMIC AND QUDA_JITIFY)
-  message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON does not support JITIFY)")
-endif()
-
 set(QUDA_MAX_MULTI_BLAS_N
     "4"
     CACHE STRING "maximum value to initialize template for multi-blas /-reduce")
@@ -445,6 +434,28 @@ else()
   # for cmake 3.17+ we rely on
   find_package(CUDAToolkit)
 endif()
+
+include(CMakeDependentOption)
+
+if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL "11.0" AND CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA" AND NOT QUDA_JITIFY)
+  option(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support (CUDA >= 11.0)?" ON)
+else()
+  option(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support (CUDA >= 11.0)?" OFF)
+endif()
+
+# hard error with a QUDA_HETEROGENEOUS_ATOMIC and JITIFY build (temporary)
+if(QUDA_HETEROGENEOUS_ATOMIC AND QUDA_JITIFY)
+  message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON does not support QUDA_JITIFY")
+endif()
+# hard error with a QUDA_HETEROGENEOUS_ATOMIC and clang cuda build
+if(QUDA_HETEROGENEOUS_ATOMIC AND ${CMAKE_CUDA_COMPILER} MATCHES "clang")
+  message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON does not support clang as the device compiler")
+endif()
+# hard error with a QUDA_HETEROGENEOUS_ATOMIC and SANITIZE build
+if(QUDA_HETEROGENEOUS_ATOMIC AND ${CMAKE_BUILD_TYPE} STREQUAL "SANITIZE")
+  message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON does not support SANITIZE build")
+endif()
+
 
 # ######################################################################################################################
 # QUDA depends on Eigen this part makes sure we can download eigen if it is not found
