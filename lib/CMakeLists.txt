@@ -173,7 +173,8 @@ target_compile_options(
           -prec-sqrt=false>
           $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
           -fcuda-flush-denormals-to-zero
-          -fcuda-approx-transcendentals>)
+          -fcuda-approx-transcendentals
+          -Xclang -fcuda-allow-variadic-functions>)
 target_compile_options(
   quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:-Wno-unknown-cuda-version> $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
                -Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH} --expt-relaxed-constexpr>)
