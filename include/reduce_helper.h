@@ -91,7 +91,7 @@ namespace quda
     {
 #ifdef HETEROGENEOUS_ATOMIC
       for (int i = 0; i < n_reduce * n_item; i++) {
-        while (result_h[i].load(cuda::std::memory_order_relaxed) == init_value<system_atomic_t>()) {}
+        result_h[i].wait(init_value<system_atomic_t>(), cuda::std::memory_order_relaxed);
       }
 #else
       auto event = reducer::get_event();
