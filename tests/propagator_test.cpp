@@ -459,8 +459,8 @@ int main(int argc, char **argv)
       contractQuda(qudaProp4D[dil]->V(), qudaProp4D[dil]->V(), 
 		   ((double*)correlation_function) + 2*16*tdim*comm_coord(3), contract_type, &inv_param, gauge_param.X);
 
-      // Collect all the data from all MPI nodes to the 0 MPI node
-      comm_gather_array((double*)correlation_function, 2*16*tdim);
+      // Collect all the data from all MPI nodes to the 0 MPI node if there is splitting int the T dim:
+      if(comm_dim(3) > 1) comm_gather_array((double*)correlation_function, 2*16*tdim);
 
       // Dump data to stdout. This needs some elegance.
       for(int gamma_mat=0; gamma_mat<16; gamma_mat++) {
