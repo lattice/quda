@@ -599,6 +599,18 @@ void dslashReference_5th_inv(sFloat *res, sFloat *spinorField, int oddBit, int d
   free(Ftr);
 }
 
+template <typename sComplex>
+sComplex cpow(const sComplex &x, int y)
+{
+  static_assert(sizeof(sComplex) == sizeof(Complex), "C and C++ complex type sizes do not match");
+  Complex x_;
+  memcpy(&x_, &x, sizeof(Complex));
+  Complex z_ = std::pow(x_, y);
+  sComplex z;
+  memcpy(&z, &z_, sizeof(Complex));
+  return z;
+}
+
 // Currently we consider only spacetime decomposition (not in 5th dim), so this operator is local
 template <typename sFloat, typename sComplex>
 void mdslashReference_5th_inv(sFloat *res, sFloat *spinorField, int oddBit, int daggerBit, sFloat mferm, sComplex *kappa)
