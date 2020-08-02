@@ -376,9 +376,17 @@ namespace quda {
   {
     if (zMobius) { errorQuda("DiracMobiusPC::MdagMLocal doesn't currently support zMobius.\n"); }
 
+    int shift0[4] = {0, 0, 0, 0};
+    int shift1[4];
+    int shift2[4];
+
+    for (int d = 0; d < 4; d++) {
+      shift1[d] = comm_dim_partitioned(d) ? 1 : 0;
+      shift2[d] = comm_dim_partitioned(d) ? 2 : 0;
+    }
+
     if (extended_gauge == nullptr) {
-      const int R[] = {2, 2, 2, 2};
-      extended_gauge = createExtendedGauge(*gauge, R, profile, true);
+      extended_gauge = createExtendedGauge(*gauge, shift2, profile, true);
     }
 
     checkDWF(in, out);
@@ -391,14 +399,10 @@ namespace quda {
     ColorSpinorField *unextended_tmp1 = ColorSpinorField::Create(csParam);
     ColorSpinorField *unextended_tmp2 = ColorSpinorField::Create(csParam);
 
-    csParam.x[0] += 2; // x direction is checkerboarded
-    for (int i = 1; i < 4; ++i) { csParam.x[i] += 4; }
+    csParam.x[0] += shift2[0]; // x direction is checkerboarded
+    for (int d = 1; d < 4; ++d) { csParam.x[d] += shift2[d] * 2; }
     ColorSpinorField *extended_tmp1 = ColorSpinorField::Create(csParam);
     ColorSpinorField *extended_tmp2 = ColorSpinorField::Create(csParam);
-
-    int shift0[4] = {0, 0, 0, 0};
-    int shift1[4] = {1, 1, 1, 1};
-    int shift2[4] = {2, 2, 2, 2};
 
     int odd_bit = (getMatPCType() == QUDA_MATPC_ODD_ODD) ? 1 : 0;
     QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};

@@ -202,8 +202,10 @@ namespace quda {
 #if CUDA_VERSION >= 9000
       qudaFuncSetAttribute(
           (const void *)func, cudaFuncAttributePreferredSharedMemoryCarveout, (int)cudaSharedmemCarveoutMaxShared);
-      qudaFuncSetAttribute(
-          (const void *)func, cudaFuncAttributeMaxDynamicSharedMemorySize, maxDynamicSharedBytesPerBlock());
+      cudaFuncAttributes attributes;
+      qudaFuncGetAttributes(attributes, (const void *)func);
+      qudaFuncSetAttribute((const void *)func, cudaFuncAttributeMaxDynamicSharedMemorySize,
+                           maxDynamicSharedBytesPerBlock() - attributes.sharedSizeBytes);
 #endif
     }
 

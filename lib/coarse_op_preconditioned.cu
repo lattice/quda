@@ -1,6 +1,6 @@
 #include <typeinfo>
 #include <gauge_field.h>
-#include <blas_cublas.h>
+#include <blas_lapack.h>
 #include <blas_quda.h>
 #include <tune_quda.h>
 
@@ -139,7 +139,6 @@ namespace quda {
 
   /**
      @brief Calculate the preconditioned coarse-link field and the clover inverse.
-
      @param Yhat[out] Preconditioned coarse link field
      @param Xinv[out] Coarse clover inverse field
      @param Y[out] Coarse link field
@@ -148,6 +147,9 @@ namespace quda {
   template<QudaFieldLocation location, typename storeFloat, typename Float, int N, QudaGaugeFieldOrder gOrder>
   void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X)
   {
+    using namespace blas_lapack;
+    auto invert = use_native() ? native::BatchInvertMatrix : generic::BatchInvertMatrix;
+
     // invert the clover matrix field
     const int n = X.Ncolor();
     if (X.Location() == QUDA_CUDA_FIELD_LOCATION && X.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
@@ -158,16 +160,17 @@ namespace quda {
       cudaGaugeField X_(param);
       cudaGaugeField Xinv_(param);
       X_.copy(X);
-      blas::flops += cublas::BatchInvertMatrix((void*)Xinv_.Gauge_p(), (void*)X_.Gauge_p(), n, X_.Volume(), X_.Precision(), X.Location());
 
+      blas::flops += invert((void*)Xinv_.Gauge_p(), (void*)X_.Gauge_p(), n, X_.Volume(), X_.Precision(), X.Location());
+      
       if (Xinv.Precision() < QUDA_SINGLE_PRECISION) Xinv.Scale( Xinv_.abs_max() );
-
+      
       Xinv.copy(Xinv_);
 
     } else if (X.Location() == QUDA_CPU_FIELD_LOCATION && X.Order() == QUDA_QDP_GAUGE_ORDER) {
       const cpuGaugeField *X_h = static_cast<const cpuGaugeField*>(&X);
       cpuGaugeField *Xinv_h = static_cast<cpuGaugeField*>(&Xinv);
-      blas::flops += cublas::BatchInvertMatrix(((void**)Xinv_h->Gauge_p())[0], ((void**)X_h->Gauge_p())[0], n, X_h->Volume(), X.Precision(), QUDA_CPU_FIELD_LOCATION);
+      blas::flops += invert((void*)Xinv_h->Gauge_p(), (void*)X_h->Gauge_p(), n, X_h->Volume(), X.Precision(), X.Location());
     } else {
       errorQuda("Unsupported location=%d and order=%d", X.Location(), X.Order());
     }
@@ -246,7 +249,8 @@ namespace quda {
 
   // template on the number of coarse degrees of freedom
   template <typename storeFloat, typename Float>
-  void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X) {
+  void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X)
+  {
     switch (Y.Ncolor()) {
     case 48: calculateYhat<storeFloat,Float,48>(Yhat, Xinv, Y, X); break;
 #ifdef NSPIN4
@@ -264,8 +268,8 @@ namespace quda {
 #endif
 
   //Does the heavy lifting of creating the coarse color matrices Y
-  void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X) {
-
+  void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X)
+  {
 #ifdef GPU_MULTIGRID
     QudaPrecision precision = checkPrecision(Xinv, Y, X);
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing Yhat field......\n");
@@ -298,6 +302,4 @@ namespace quda {
     errorQuda("Multigrid has not been built");
 #endif
   }
-
 } //namespace quda
-

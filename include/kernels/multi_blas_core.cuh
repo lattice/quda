@@ -28,9 +28,9 @@ namespace quda
        @tparam Functor Functor used to operate on data
     */
     template <int NXZ, typename store_t, int N, typename y_store_t, int Ny, typename Functor>
-    struct MultiBlasArg
-      : SpinorXZ<NXZ, store_t, N, Functor::use_z>,
-      SpinorYW<max_YW_size<NXZ, store_t, y_store_t, Functor>(), y_store_t, Ny, Functor::use_w> {
+    struct MultiBlasArg :
+      SpinorXZ<NXZ, store_t, N, Functor::use_z>,
+      SpinorYW<max_YW_size<NXZ, store_t, y_store_t, Functor>(), store_t, N, y_store_t, Ny, Functor::use_w> {
       static constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, Functor>();
       const int NYW;
       Functor f;
@@ -249,7 +249,7 @@ namespace quda
     };
 
     /**
-       Functor performing the operations: y[i] = a*x[i] + y[i]; x[i] = b*z[i] + c*x[i]
+       Functor performing the operations: y[i] = a*w[i] + y[i]; w[i] = b*x[i] + c*w[i]
     */
     template <typename real>
     struct multi_axpyBzpcx_ : public MultiBlasFunctor<real, true> {

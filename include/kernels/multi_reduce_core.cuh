@@ -5,8 +5,6 @@
 #include <multi_blas_helper.cuh>
 #include <cub_helper.cuh>
 
-//#define WARP_MULTI_REDUCE
-
 namespace quda
 {
 
@@ -28,7 +26,7 @@ namespace quda
     struct MultiReduceArg :
       public ReduceArg<vector_type<typename Reducer_::reduce_t, NXZ>>,
       SpinorXZ<NXZ, store_t, N, Reducer_::use_z>,
-      SpinorYW<max_YW_size<NXZ, store_t, y_store_t, Reducer_>(), y_store_t, Ny, Reducer_::use_w>
+      SpinorYW<max_YW_size<NXZ, store_t, y_store_t, Reducer_>(), store_t, N, y_store_t, Ny, Reducer_::use_w>
     {
       using Reducer = Reducer_;
       static constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, Reducer>();

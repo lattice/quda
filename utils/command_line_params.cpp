@@ -16,6 +16,8 @@ auto &grid_y = gridsize_from_cmdline[1];
 auto &grid_z = gridsize_from_cmdline[2];
 auto &grid_t = gridsize_from_cmdline[3];
 
+bool native_blas_lapack = true;
+
 std::array<int, 4> dim_partitioned = {0, 0, 0, 0};
 QudaReconstructType link_recon = QUDA_RECONSTRUCT_NO;
 QudaReconstructType link_recon_sloppy = QUDA_RECONSTRUCT_INVALID;
@@ -129,6 +131,7 @@ bool generate_nullspace = true;
 bool generate_all_levels = true;
 quda::mgarray<QudaSchwarzType> mg_schwarz_type = {};
 quda::mgarray<int> mg_schwarz_cycle = {};
+bool mg_evolve_thin_updates = false;
 
 // we only actually support 4 here currently
 quda::mgarray<std::array<int, 4>> geo_block_size = {};
@@ -518,6 +521,8 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--ngcrkrylov", gcrNkrylov,
                        "The number of inner iterations to use for GCR, BiCGstab-l, CA-CG (default 10)");
   quda_app->add_option("--niter", niter, "The number of iterations to perform (default 100)");
+  quda_app->add_option("--native-blas-lapack", native_blas_lapack,
+                       "Use the native or generic BLAS LAPACK implementation (default true)");
   quda_app->add_option("--maxiter-precondition", maxiter_precondition,
                        "The number of iterations to perform for any preconditioner (default 10)");
   quda_app->add_option("--nsrc", Nsrc,
@@ -840,6 +845,7 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option(
     "--mg-generate-all-levels",
     generate_all_levels, "true=generate null-space on all levels, false=generate on level 0 and create other levels from that (default true)");
+  opgroup->add_option("--mg-evolve-thin-updates", mg_evolve_thin_updates, "Utilize thin updates for multigrid evolution tests (default false)");
   opgroup->add_option("--mg-generate-nullspace", generate_nullspace,
                       "Generate the null-space vector dynamically (default true, if set false and mg-load-vec isn't "
                       "set, creates free-field null vectors)");
