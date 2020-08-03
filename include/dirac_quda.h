@@ -196,7 +196,7 @@ namespace quda {
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const = 0;
 
     /**
-        @brief Apply Mdag (daggered operator of M
+        @brief Apply Mdag (daggered operator of M)
     */
     void Mdag(ColorSpinorField &out, const ColorSpinorField &in) const;
 
@@ -204,7 +204,7 @@ namespace quda {
        @brief Apply Normal Operator
     */
     void MMdag(ColorSpinorField &out, const ColorSpinorField &in) const;
-
+    
     // required methods to use e-o preconditioning for solving full system
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
 			 ColorSpinorField &x, ColorSpinorField &b,
@@ -770,6 +770,7 @@ public:
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
 
+    void H(ColorSpinorField &out, const ColorSpinorField &in) const;
   };
 
   // Even-odd preconditioned OverlapWilson

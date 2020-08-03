@@ -100,10 +100,10 @@ namespace quda
 
           out += (U * in).reconstruct(d, proj_dir);
         } else if (doBulk<kernel_type>() && !ghost) {
-
+	  
           Link U = arg.U(d, gauge_idx, gauge_parity);
           Vector in = arg.in(fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
-
+	  
           out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         }
       }
@@ -130,7 +130,7 @@ namespace quda
 
           Link U = arg.U(d, gauge_idx, 1 - gauge_parity);
           Vector in = arg.in(back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
-
+	  
           out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         }
       }

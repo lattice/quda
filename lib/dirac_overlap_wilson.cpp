@@ -28,7 +28,6 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    //ApplyOverlapWilson(out, in, *gauge, 0.0, in, parity, dagger, commDim, profile);
     ApplyWilson(out, in, *gauge, 0.0, in, parity, dagger, commDim, profile);
     flops += 1320ll*in.Volume();
   }
@@ -40,7 +39,6 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    //ApplyOverlapWilson(out, in, *gauge, k, x, parity, dagger, commDim, profile);
     ApplyWilson(out, in, *gauge, k, x, parity, dagger, commDim, profile);
     flops += 1368ll*in.Volume();
   }
@@ -48,10 +46,21 @@ namespace quda {
   void DiracOverlapWilson::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     checkFullSpinor(out, in);
-
-    //ApplyOverlapWilson(out, in, *gauge, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+    
     ApplyWilson(out, in, *gauge, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
     flops += 1368ll * in.Volume();
+  }
+
+  void DiracOverlapWilson::H(ColorSpinorField &out, const ColorSpinorField &in) const
+  {
+    checkFullSpinor(out, in);
+    
+    bool reset = newTmp(&tmp1, in);
+    checkFullSpinor(*tmp1, in);
+    
+    M(*tmp1, in);
+    gamma5(out, *tmp1);
+    deleteTmp(&tmp1, reset);
   }
 
   void DiracOverlapWilson::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -67,9 +76,9 @@ namespace quda {
     deleteTmp(&tmp1, reset);
   }
 
-  void DiracOverlapWilson::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			    ColorSpinorField &x, ColorSpinorField &b, 
-			    const QudaSolutionType solType) const
+  void DiracOverlapWilson::Hprepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+				    ColorSpinorField &x, ColorSpinorField &b, 
+				    const QudaSolutionType solType) const
   {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
       errorQuda("Preconditioned solution requires a preconditioned solve_type");
@@ -79,8 +88,8 @@ namespace quda {
     sol = &x;
   }
 
-  void DiracOverlapWilson::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-				const QudaSolutionType solType) const
+  void DiracOverlapWilson::Hreconstruct(ColorSpinorField &x, const ColorSpinorField &b,
+					const QudaSolutionType solType) const
   {
     // do nothing
   }
