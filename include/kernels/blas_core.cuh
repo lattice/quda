@@ -110,8 +110,8 @@ namespace quda
        Functor to perform the operation z = a*x + b*y
     */
     template <typename real> struct axpbyz_ : public BlasFunctor {
-      static constexpr stream<1, 1, 0, 0, 0> read{ };
-      static constexpr stream<0, 0, 0, 0, 1> write{ };
+      static constexpr memory_access<1, 1, 0, 0, 0> read{ };
+      static constexpr memory_access<0, 0, 0, 0, 1> write{ };
       const real a;
       const real b;
       axpbyz_(const real &a, const real &b, const real &c) : a(a), b(b) { ; }
@@ -127,8 +127,8 @@ namespace quda
        Functor to perform the operation x *= a
     */
     template <typename real> struct ax_ : public BlasFunctor {
-      static constexpr stream<1> read{ };
-      static constexpr stream<1> write{ };
+      static constexpr memory_access<1> read{ };
+      static constexpr memory_access<1> write{ };
       const real a;
       ax_(const real &a, const real &b, const real &c) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
@@ -143,8 +143,8 @@ namespace quda
        Functor to perform the operator y += a*x (complex-valued)
     */
     template <typename real> struct caxpy_ : public BlasFunctor {
-      static constexpr stream<1, 1> read{ };
-      static constexpr stream<0, 1> write{ };
+      static constexpr memory_access<1, 1> read{ };
+      static constexpr memory_access<0, 1> write{ };
       const complex<real> a;
       caxpy_(const complex<real> &a, const complex<real> &b, const complex<real> &c) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
@@ -175,8 +175,8 @@ namespace quda
     }
 
     template <typename real> struct caxpby_ : public BlasFunctor {
-      static constexpr stream<1, 1> read{ };
-      static constexpr stream<0, 1> write{ };
+      static constexpr memory_access<1, 1> read{ };
+      static constexpr memory_access<0, 1> write{ };
       const complex<real> a;
       const complex<real> b;
       caxpby_(const complex<real> &a, const complex<real> &b, const complex<real> &c) : a(a), b(b) { ; }
@@ -189,8 +189,8 @@ namespace quda
     };
 
     template <typename real> struct caxpbypczw_ : public BlasFunctor {
-      static constexpr stream<1, 1, 1, 1> read{ };
-      static constexpr stream<0, 0, 0, 1> write{ };
+      static constexpr memory_access<1, 1, 1, 1> read{ };
+      static constexpr memory_access<0, 0, 0, 1> write{ };
       const complex<real> a;
       const complex<real> b;
       const complex<real> c;
@@ -211,8 +211,8 @@ namespace quda
        Functor performing the operations: y[i] = a*x[i] + y[i]; x[i] = b*z[i] + c*x[i]
     */
     template <typename real> struct axpyBzpcx_ : public BlasFunctor {
-      static constexpr stream<1, 1, 1> read{ };
-      static constexpr stream<1, 1> write{ };
+      static constexpr memory_access<1, 1, 1> read{ };
+      static constexpr memory_access<1, 1> write{ };
       const real a;
       const real b;
       const real c;
@@ -232,8 +232,8 @@ namespace quda
        Functor performing the operations: y[i] = a*x[i] + y[i]; x[i] = z[i] + b*x[i]
     */
     template <typename real> struct axpyZpbx_ : public BlasFunctor {
-      static constexpr stream<1, 1, 1> read{ };
-      static constexpr stream<1, 1> write{ };
+      static constexpr memory_access<1, 1, 1> read{ };
+      static constexpr memory_access<1, 1> write{ };
       const real a;
       const real b;
       axpyZpbx_(const real &a, const real &b, const real &c) : a(a), b(b) { ; }
@@ -252,8 +252,8 @@ namespace quda
        Functor performing the operations y[i] = a*x[i] + y[i] and x[i] = b*z[i] + x[i]
     */
     template <typename real> struct caxpyBzpx_ : public BlasFunctor {
-      static constexpr stream<1, 1, 1> read{ };
-      static constexpr stream<1, 1> write{ };
+      static constexpr memory_access<1, 1, 1> read{ };
+      static constexpr memory_access<1, 1> write{ };
       const complex<real> a;
       const complex<real> b;
       caxpyBzpx_(const complex<real> &a, const complex<real> &b, const complex<real> &c) : a(a), b(b) { ; }
@@ -272,8 +272,8 @@ namespace quda
        Functor performing the operations y[i] = a*x[i] + y[i] and z[i] = b*x[i] + z[i]
     */
     template <typename real> struct caxpyBxpz_ : public BlasFunctor {
-      static constexpr stream<1, 1, 1> read{ };
-      static constexpr stream<0, 1, 1> write{ };
+      static constexpr memory_access<1, 1, 1> read{ };
+      static constexpr memory_access<0, 1, 1> write{ };
       const complex<real> a;
       const complex<real> b;
       caxpyBxpz_(const complex<real> &a, const complex<real> &b, const complex<real> &c) : a(a), b(b) { ; }
@@ -292,8 +292,8 @@ namespace quda
        Functor performing the operations z[i] = a*x[i] + b*y[i] + z[i] and y[i] -= b*w[i]
     */
     template <typename real> struct caxpbypzYmbw_ : public BlasFunctor {
-      static constexpr stream<1, 1, 1, 1> read{ };
-      static constexpr stream<0, 1, 1> write{ };
+      static constexpr memory_access<1, 1, 1, 1> read{ };
+      static constexpr memory_access<0, 1, 1> write{ };
       const complex<real> a;
       const complex<real> b;
       caxpbypzYmbw_(const complex<real> &a, const complex<real> &b, const complex<real> &c) : a(a), b(b) { ; }
@@ -313,8 +313,8 @@ namespace quda
        Functor performing the operation y[i] += a*b*x[i], x[i] *= a
     */
     template <typename real> struct cabxpyAx_ : public BlasFunctor {
-      static constexpr stream<1, 1> read{ };
-      static constexpr stream<1, 1> write{ };
+      static constexpr memory_access<1, 1> read{ };
+      static constexpr memory_access<1, 1> write{ };
       const real a;
       const complex<real> b;
       cabxpyAx_(const complex<real> &a, const complex<real> &b, const complex<real> &c) : a(a.real()), b(b) { ; }
@@ -335,8 +335,8 @@ namespace quda
        Second performs the operator x[i] -= a*z[i]
     */
     template <typename real> struct caxpyxmaz_ : public BlasFunctor {
-      static constexpr stream<1, 1, 1> read{ };
-      static constexpr stream<1, 1> write{ };
+      static constexpr memory_access<1, 1, 1> read{ };
+      static constexpr memory_access<1, 1> write{ };
       const complex<real> a;
       caxpyxmaz_(const complex<real> &a, const complex<real> &b, const complex<real> &c) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
@@ -359,8 +359,8 @@ namespace quda
        Second performs the operator x[i] -= a*z[i]
     */
     template <typename real> struct caxpyxmazMR_ : public BlasFunctor {
-      static constexpr stream<1, 1, 1> read{ };
-      static constexpr stream<1, 1> write{ };
+      static constexpr memory_access<1, 1, 1> read{ };
+      static constexpr memory_access<1, 1> write{ };
       complex<real> a;
       double3 *Ar3;
       caxpyxmazMR_(const real &a, const real &b, const real &c) :
@@ -393,8 +393,8 @@ namespace quda
        Third performs the operation w[i] = z[i] + b*w[i]
     */
     template <typename real> struct tripleCGUpdate_ : public BlasFunctor {
-      static constexpr stream<1, 1, 1, 1> read{ };
-      static constexpr stream<0, 1, 1, 1> write{ };
+      static constexpr memory_access<1, 1, 1, 1> read{ };
+      static constexpr memory_access<0, 1, 1, 1> write{ };
       const real a;
       const real b;
       tripleCGUpdate_(const real &a, const real &b, const real &c) : a(a), b(b) { ; }

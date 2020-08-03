@@ -159,8 +159,8 @@ namespace quda
 
     template <typename reduce_t, typename real>
     struct multiDot : public MultiReduceFunctor<reduce_t, real> {
-      static constexpr stream<1, 1> read { };
-      static constexpr stream< > write { };
+      static constexpr memory_access<1, 1> read { };
+      static constexpr memory_access< > write { };
       static constexpr bool use_z = false;
       static constexpr bool use_w = false;
       multiDot(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, real>(NXZ, NYW) { }
@@ -190,8 +190,8 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct multiCdot : public MultiReduceFunctor<typename VectorType<real_reduce_t, 2>::type, complex<real>> {
       using reduce_t = typename VectorType<real_reduce_t, 2>::type;
-      static constexpr stream<1, 1> read { };
-      static constexpr stream< > write { };
+      static constexpr memory_access<1, 1> read { };
+      static constexpr memory_access< > write { };
       static constexpr bool use_z = false;
       static constexpr bool use_w = false;
       multiCdot(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, complex<real>>(NXZ, NYW) { }
@@ -208,8 +208,8 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct multiCdotCopy : public MultiReduceFunctor<typename VectorType<real_reduce_t, 2>::type, complex<real>> {
       using reduce_t = typename VectorType<real_reduce_t, 2>::type;
-      static constexpr stream<1, 1> read { };
-      static constexpr stream<0, 0, 0, 1> write { };
+      static constexpr memory_access<1, 1> read { };
+      static constexpr memory_access<0, 0, 0, 1> write { };
       static constexpr bool use_z = false;
       static constexpr bool use_w = true;
       multiCdotCopy(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, complex<real>>(NXZ, NYW) { }

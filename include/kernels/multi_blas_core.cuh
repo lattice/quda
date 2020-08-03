@@ -178,8 +178,8 @@ namespace quda
     */
     template <typename real>
     struct multiaxpy_ : public MultiBlasFunctor<real> {
-      static constexpr stream<1, 1> read{ };
-      static constexpr stream<0, 1> write{ };
+      static constexpr memory_access<1, 1> read{ };
+      static constexpr memory_access<0, 1> write{ };
       static constexpr bool use_z = false;
       static constexpr bool use_w = false;
       static constexpr int NXZ_max = 0;
@@ -200,8 +200,8 @@ namespace quda
     */
     template <typename real>
     struct multicaxpy_ : public MultiBlasFunctor<complex<real>> {
-      static constexpr stream<1, 1> read{ };
-      static constexpr stream<0, 1> write{ };
+      static constexpr memory_access<1, 1> read{ };
+      static constexpr memory_access<0, 1> write{ };
       static constexpr bool use_z = false;
       static constexpr bool use_w = false;
       static constexpr int NXZ_max = 0;
@@ -222,8 +222,8 @@ namespace quda
     */
     template <typename real>
     struct multicaxpyz_ : public MultiBlasFunctor<complex<real>> {
-      static constexpr stream<1, 0, 0, 1> read{ };
-      static constexpr stream<0, 0, 0, 1> write{ };
+      static constexpr memory_access<1, 0, 0, 1> read{ };
+      static constexpr memory_access<0, 0, 0, 1> write{ };
       static constexpr bool use_z = false;
       static constexpr bool use_w = true;
       static constexpr int NXZ_max = 0;
@@ -247,8 +247,8 @@ namespace quda
     */
     template <typename real>
     struct multi_axpyBzpcx_ : public MultiBlasFunctor<real, true> {
-      static constexpr stream<1, 1, 0, 1> read{ };
-      static constexpr stream<0, 1, 0, 1> write{ };
+      static constexpr memory_access<1, 1, 0, 1> read{ };
+      static constexpr memory_access<0, 1, 0, 1> write{ };
       static constexpr bool use_z = false;
       static constexpr bool use_w = true;
       static constexpr int NXZ_max = 1; // we never have NXZ > 1 for this kernel
@@ -277,8 +277,8 @@ namespace quda
     */
     template <typename real>
     struct multi_caxpyBxpz_ : public MultiBlasFunctor<complex<real>, true> {
-      static constexpr stream<1, 1, 0, 1> read{ };
-      static constexpr stream<0, 1, 0, 1> write{ };
+      static constexpr memory_access<1, 1, 0, 1> read{ };
+      static constexpr memory_access<0, 1, 0, 1> write{ };
       static constexpr bool use_z = false;
       static constexpr bool use_w = true;
       static constexpr int NXZ_max = 0;

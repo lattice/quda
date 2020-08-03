@@ -144,8 +144,8 @@ namespace quda
 
     template <typename reduce_t, typename real>
     struct Norm1 : public ReduceFunctor<reduce_t> {
-      static constexpr stream<1> read{ };
-      static constexpr stream<> write{ };
+      static constexpr memory_access<1> read{ };
+      static constexpr memory_access<> write{ };
       Norm1(const real &a, const real &b) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
@@ -166,8 +166,8 @@ namespace quda
 
     template <typename reduce_t, typename real>
     struct Norm2 : public ReduceFunctor<reduce_t> {
-      static constexpr stream<1> read{ };
-      static constexpr stream<> write{ };
+      static constexpr memory_access<1> read{ };
+      static constexpr memory_access<> write{ };
       Norm2(const real &a, const real &b) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
@@ -189,8 +189,8 @@ namespace quda
 
     template <typename reduce_t, typename real>
     struct Dot : public ReduceFunctor<reduce_t> {
-      static constexpr stream<1,1> read{ };
-      static constexpr stream<> write{ };
+      static constexpr memory_access<1,1> read{ };
+      static constexpr memory_access<> write{ };
       Dot(const real &a, const real &b) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
@@ -206,8 +206,8 @@ namespace quda
     */
     template <typename reduce_t, typename real>
     struct axpbyzNorm2 : public ReduceFunctor<reduce_t> {
-      static constexpr stream<1, 1, 0> read{ };
-      static constexpr stream<0, 0, 1> write{ };
+      static constexpr memory_access<1, 1, 0> read{ };
+      static constexpr memory_access<0, 0, 1> write{ };
       const real a;
       const real b;
       axpbyzNorm2(const real &a, const real &b) : a(a), b(b) { ; }
@@ -228,8 +228,8 @@ namespace quda
     */
     template <typename reduce_t, typename real>
     struct AxpyReDot : public ReduceFunctor<reduce_t> {
-      static constexpr stream<1, 1> read{ };
-      static constexpr stream<0, 1> write{ };
+      static constexpr memory_access<1, 1> read{ };
+      static constexpr memory_access<0, 1> write{ };
       const real a;
       AxpyReDot(const real &a, const real &b) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
@@ -249,8 +249,8 @@ namespace quda
     */
     template <typename reduce_t, typename real>
     struct caxpyNorm2 : public ReduceFunctor<reduce_t> {
-      static constexpr stream<1, 1> read{ };
-      static constexpr stream<0, 1> write{ };
+      static constexpr memory_access<1, 1> read{ };
+      static constexpr memory_access<0, 1> write{ };
       const complex<real> a;
       caxpyNorm2(const complex<real> &a, const complex<real> &b) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
@@ -272,8 +272,8 @@ namespace quda
     */
     template <typename reduce_t, typename real>
     struct caxpyxmaznormx : public ReduceFunctor<reduce_t> {
-      static constexpr stream<1, 1, 1> read{ };
-      static constexpr stream<1, 1> write{ };
+      static constexpr memory_access<1, 1, 1> read{ };
+      static constexpr memory_access<1, 1> write{ };
       const complex<real> a;
       caxpyxmaznormx(const complex<real> &a, const complex<real> &b) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
@@ -296,8 +296,8 @@ namespace quda
     */
     template <typename reduce_t, typename real>
     struct cabxpyzaxnorm : public ReduceFunctor<reduce_t> {
-      static constexpr stream<1, 1, 0> read{ };
-      static constexpr stream<1, 0, 1> write{ };
+      static constexpr memory_access<1, 1, 0> read{ };
+      static constexpr memory_access<1, 0, 1> write{ };
       const real a;
       const complex<real> b;
       cabxpyzaxnorm(const complex<real> &a, const complex<real> &b) : a(a.real()), b(b) { ; }
@@ -329,8 +329,8 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct Cdot : public ReduceFunctor<typename VectorType<real_reduce_t, 2>::type> {
       using reduce_t = typename VectorType<real_reduce_t, 2>::type;
-      static constexpr stream<1, 1> read{ };
-      static constexpr stream<> write{ };
+      static constexpr memory_access<1, 1> read{ };
+      static constexpr memory_access<> write{ };
       Cdot(const complex<real> &a, const complex<real> &b) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
@@ -348,8 +348,8 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct caxpydotzy : public ReduceFunctor<typename VectorType<real_reduce_t, 2>::type> {
       using reduce_t = typename VectorType<real_reduce_t, 2>::type;
-      static constexpr stream<1, 1, 1> read{ };
-      static constexpr stream<0, 1> write{ };
+      static constexpr memory_access<1, 1, 1> read{ };
+      static constexpr memory_access<0, 1> write{ };
       const complex<real> a;
       caxpydotzy(const complex<real> &a, const complex<real> &b) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
@@ -392,8 +392,8 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct CdotNormA : public ReduceFunctor<typename VectorType<real_reduce_t, 3>::type> {
       using reduce_t = typename VectorType<real_reduce_t, 3>::type;
-      static constexpr stream<1, 1> read{ };
-      static constexpr stream<> write{ };
+      static constexpr memory_access<1, 1> read{ };
+      static constexpr memory_access<> write{ };
       CdotNormA(const real &a, const real &b) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
@@ -410,8 +410,8 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct caxpbypzYmbwcDotProductUYNormY_ : public ReduceFunctor<typename VectorType<real_reduce_t, 3>::type> {
       using reduce_t = typename VectorType<real_reduce_t, 3>::type;
-      static constexpr stream<1, 1, 1, 1, 1> read{ };
-      static constexpr stream<0, 1, 1> write{ };
+      static constexpr memory_access<1, 1, 1, 1, 1> read{ };
+      static constexpr memory_access<0, 1, 1> write{ };
       const complex<real> a;
       const complex<real> b;
       caxpbypzYmbwcDotProductUYNormY_(const complex<real> &a, const complex<real> &b) : a(a), b(b) { ; }
@@ -437,8 +437,8 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct axpyCGNorm2 : public ReduceFunctor<typename VectorType<real_reduce_t, 2>::type> {
       using reduce_t = typename VectorType<real_reduce_t, 2>::type;
-      static constexpr stream<1, 1> read{ };
-      static constexpr stream<0, 1> write{ };
+      static constexpr memory_access<1, 1> read{ };
+      static constexpr memory_access<0, 1> write{ };
       const real a;
       axpyCGNorm2(const real &a, const real &b) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
@@ -465,8 +465,8 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct HeavyQuarkResidualNorm_ : public ReduceFunctor<typename VectorType<real_reduce_t, 3>::type, true> {
       using reduce_t = typename VectorType<real_reduce_t, 3>::type;
-      static constexpr stream<1, 1> read{ };
-      static constexpr stream<> write{ };
+      static constexpr memory_access<1, 1> read{ };
+      static constexpr memory_access<> write{ };
       reduce_t aux;
       HeavyQuarkResidualNorm_(const real &a, const real &b) : aux {} { ; }
 
@@ -508,8 +508,8 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct xpyHeavyQuarkResidualNorm_ : public ReduceFunctor<typename VectorType<real_reduce_t, 3>::type, true> {
       using reduce_t = typename VectorType<real_reduce_t, 3>::type;
-      static constexpr stream<1, 1, 1> read{ };
-      static constexpr stream<> write{ };
+      static constexpr memory_access<1, 1, 1> read{ };
+      static constexpr memory_access<> write{ };
       reduce_t aux;
       xpyHeavyQuarkResidualNorm_(const real &a, const real &b) : aux {} { ; }
 
@@ -548,8 +548,8 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct tripleCGReduction_ : public ReduceFunctor<typename VectorType<real_reduce_t, 3>::type> {
       using reduce_t = typename VectorType<real_reduce_t, 3>::type;
-      static constexpr stream<1, 1, 1> read{ };
-      static constexpr stream<> write{ };
+      static constexpr memory_access<1, 1, 1> read{ };
+      static constexpr memory_access<> write{ };
       using scalar = typename scalar<reduce_t>::type;
       tripleCGReduction_(const real &a, const real &b) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
@@ -574,8 +574,8 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct quadrupleCGReduction_ : public ReduceFunctor<typename VectorType<real_reduce_t, 4>::type> {
       using reduce_t = typename VectorType<real_reduce_t, 4>::type;
-      static constexpr stream<1, 1, 1, 1> read{ };
-      static constexpr stream<> write{ };
+      static constexpr memory_access<1, 1, 1, 1> read{ };
+      static constexpr memory_access<> write{ };
       quadrupleCGReduction_(const real &a, const real &b) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
@@ -600,8 +600,8 @@ namespace quda
     */
     template <typename reduce_t, typename real>
     struct quadrupleCG3InitNorm_ : public ReduceFunctor<reduce_t> {
-      static constexpr stream<1, 1, 0, 0, 1> read{ };
-      static constexpr stream<1, 1, 1, 1> write{ };
+      static constexpr memory_access<1, 1, 0, 0, 1> read{ };
+      static constexpr memory_access<1, 1, 1, 1> write{ };
       const real a;
       quadrupleCG3InitNorm_(const real &a, const real &b) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
@@ -630,8 +630,8 @@ namespace quda
     */
     template <typename reduce_t, typename real>
     struct quadrupleCG3UpdateNorm_ : public ReduceFunctor<reduce_t> {
-      static constexpr stream<1, 1, 1, 1, 1> read{ };
-      static constexpr stream<1, 1, 1, 1> write{ };
+      static constexpr memory_access<1, 1, 1, 1, 1> read{ };
+      static constexpr memory_access<1, 1, 1, 1> write{ };
       const real a;
       const real b;
       quadrupleCG3UpdateNorm_(const real &a, const real &b) : a(a), b(b) { ; }
