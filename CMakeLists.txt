@@ -11,6 +11,7 @@ set(CMAKE_COLOR_MAKEFILE ON)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 # disable gnu exentions
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CUDA_EXTENSIONS OFF)
 
 # disable in source builds this is only a temporary fix, but for now we need it as cmake will otherwise overwrite the
 # existing makefiles
