@@ -603,11 +603,10 @@ template <typename sComplex>
 sComplex cpow(const sComplex &x, int y)
 {
   static_assert(sizeof(sComplex) == sizeof(Complex), "C and C++ complex type sizes do not match");
-  Complex x_;
-  memcpy(&x_, &x, sizeof(Complex));
+  // note that C++ standard explicitly calls out that casting between C and C++ complex is legal
+  const Complex x_ = reinterpret_cast<const Complex&>(x);
   Complex z_ = std::pow(x_, y);
-  sComplex z;
-  memcpy(&z, &z_, sizeof(Complex));
+  sComplex z = reinterpret_cast<sComplex &>(z_);
   return z;
 }
 

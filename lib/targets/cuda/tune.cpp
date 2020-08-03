@@ -225,8 +225,8 @@ namespace quda
       TuneKey key = entry->first;
       TuneParam param = entry->second;
 
-      char tmp[14] = {};
-      strncpy(tmp, key.aux, 13);
+      char tmp[TuneKey::aux_n] = {};
+      strncpy(tmp, key.aux, TuneKey::aux_n);
       bool is_policy_kernel = strncmp(tmp, "policy_kernel", 13) == 0 ? true : false;
       bool is_policy = (strncmp(tmp, "policy", 6) == 0 && !is_policy_kernel) ? true : false;
       if (param.n_calls > 0 && !is_policy) total_time += param.n_calls * param.time;
