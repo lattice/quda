@@ -439,10 +439,10 @@ endif()
 
 if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL "11.0" AND CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA" AND NOT QUDA_JITIFY)
   option(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support (CUDA >= 11.0)?" ON)
-  message(NOTICE "-- Heterogeneous atomics supported: enabling")
+  message(STATUS "Heterogeneous atomics supported: enabling")
 else()
   option(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support (CUDA >= 11.0)?" OFF)
-  message(NOTICE "-- Heterogeneous atomics not supported: disabling")
+  message(STATUS "Heterogeneous atomics not supported: disabling")
 endif()
 
 # hard error with a QUDA_HETEROGENEOUS_ATOMIC and JITIFY build (temporary)
