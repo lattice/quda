@@ -437,25 +437,19 @@ else()
   find_package(CUDAToolkit)
 endif()
 
-if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL "11.0" AND CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA" AND NOT QUDA_JITIFY)
-  option(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support (CUDA >= 11.0)?" ON)
-  message(STATUS "Heterogeneous atomics supported: enabling")
-else()
-  option(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support (CUDA >= 11.0)?" OFF)
-  message(STATUS "Heterogeneous atomics not supported: disabling")
-endif()
 
-# hard error with a QUDA_HETEROGENEOUS_ATOMIC and JITIFY build (temporary)
-if(QUDA_HETEROGENEOUS_ATOMIC AND QUDA_JITIFY)
-  message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON does not support QUDA_JITIFY")
+if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL "11.0" AND CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA")
+  set(QUDA_HETEROGENEOUS_ATOMIC_SUPPORT ON)
+  message(STATUS "Heterogeneous atomics supported: ${QUDA_HETEROGENEOUS_ATOMIC_SUPPORT}")
 endif()
-# hard error with a QUDA_HETEROGENEOUS_ATOMIC and clang cuda build
-if(QUDA_HETEROGENEOUS_ATOMIC AND ${CMAKE_CUDA_COMPILER} MATCHES "clang")
-  message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON does not support clang as the device compiler")
-endif()
-# hard error with a QUDA_HETEROGENEOUS_ATOMIC and SANITIZE build
+include(CMakeDependentOption)
+CMAKE_DEPENDENT_OPTION(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support (CUDA >= 11.0)?" ON "QUDA_HETEROGENEOUS_ATOMIC_SUPPORT" OFF)
+
 if(QUDA_HETEROGENEOUS_ATOMIC AND ${CMAKE_BUILD_TYPE} STREQUAL "SANITIZE")
-  message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON does not support SANITIZE build")
+  message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON does not support SANITIZE build)")
+endif()
+if(QUDA_HETEROGENEOUS_ATOMIC AND QUDA_JITIFY)
+  message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON does not support JITIFY)")
 endif()
 
 
