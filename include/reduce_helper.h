@@ -34,6 +34,18 @@ namespace quda
      @brief The initialization value we used to check for completion
    */
   template <typename T> constexpr T init_value() { return -std::numeric_limits<T>::infinity(); }
+
+  /**
+     @brief The termination value we use to prevent a possible hang in
+     case the computed reduction is equal to the initialization
+  */
+  template <typename T> constexpr T terminate_value() { return std::numeric_limits<T>::infinity(); }
+
+  /**
+     @brief The atomic word size we use for a given reduction type.
+     This type should be lock-free to guarantee correct behaviour on
+     platforms that are not coherent with respect to the host
+   */
   template <typename T> struct atomic_type {
     using type = device_reduce_t;
   };
@@ -161,7 +173,11 @@ namespace quda
           atomic_t sum_tmp[n];
           memcpy(sum_tmp, &sum, sizeof(sum));
 #pragma unroll
-          for (int i = 0; i < n; i++) { arg.result_d[n * idx + i].store(sum_tmp[i], cuda::std::memory_order_relaxed); }
+          for (int i = 0; i < n; i++) {
+            // catch the case where the computed value is equal to the init_value
+            sum_tmp[i] = sum_tmp[i] == init_value<atomic_t>() ? terminate_value<atomic_t>() : sum_tmp[i];
+            arg.result_d[n * idx + i].store(sum_tmp[i], cuda::std::memory_order_relaxed);
+          }
         } else { // write to device memory
           arg.partial[idx].store(sum, cuda::std::memory_order_relaxed);
         }
