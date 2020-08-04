@@ -129,7 +129,7 @@ namespace quda {
             errorQuda("Unsupported hipMemcpy %d", kind);
           }
 #else
-          cudaMemcpy(dst, src, count, kind);
+          hipMemcpy(dst, src, count, kind);
 #endif
         }
       } else {
