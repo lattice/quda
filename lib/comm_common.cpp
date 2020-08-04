@@ -214,6 +214,8 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
     if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer copy engine and direct load/store access\n");
   }
 
+  enable_peer_to_peer=0;
+
   if (!peer2peer_init && enable_peer_to_peer) {
 
     // first check that the local GPU supports UVA

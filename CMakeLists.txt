@@ -479,7 +479,7 @@ if(QUDA_QMP)
 
   include_directories(SYSTEM ${QUDA_QMPHOME}/include)
   include_directories(SYSTEM ${MPI_CXX_INCLUDE_PATH})
-  include_directories(SYSTEM /public/software/mpi/openmpi/3.1.3/gnu/include)
+  include_directories(SYSTEM /opt/software/mpi/openmpi-4.0.1/include)
   set(COMM_OBJS comm_qmp.cpp)
 endif()
 
@@ -857,7 +857,7 @@ set(CMAKE_CUDA_FLAGS_SANITIZE
 
 # CUDA Wrapper for finding libs etc
 #find_package(CUDAWrapper)
-find_package(AMDDeviceLibs REQUIRED CONFIG)
+#find_package(AMDDeviceLibs REQUIRED CONFIG)
 
 # We need threads
 find_package(Threads REQUIRED)

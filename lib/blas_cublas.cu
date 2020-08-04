@@ -1,7 +1,7 @@
 #include "hip/hip_runtime.h"
 #ifdef CUBLAS_LIB
 #include <blas_cublas.h>
-#include <hipblas.h>
+//#include <hipblas.h>
 #endif
 #include <malloc_quda.h>
 
@@ -27,9 +27,11 @@ namespace quda {
 
   namespace cublas { 
 
+/*
 #ifdef CUBLAS_LIB
     static hipblasHandle_t handle;
 #endif
+*/
 
     void init() {
 /*
