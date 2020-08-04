@@ -191,6 +191,9 @@ namespace quda {
     } else if (param.type == QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracMobiusPC operator\n");
       return new DiracMobiusPC(param);
+    } else if (param.type == QUDA_OVERLAP_WILSON_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracOverlapWilson operator\n");
+      return new DiracOverlapWilson(param);
     } else if (param.type == QUDA_STAGGERED_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracStaggered operator\n");
       return new DiracStaggered(param);
@@ -270,6 +273,7 @@ namespace quda {
       case QUDA_ASQTAD_DIRAC:
       case QUDA_TWISTED_CLOVER_DIRAC:
       case QUDA_TWISTED_MASS_DIRAC:
+      case QUDA_OVERLAP_WILSON_DIRAC:
         steps = 2; // For D_{eo} and D_{oe} piece.
         break;
       case QUDA_WILSONPC_DIRAC:

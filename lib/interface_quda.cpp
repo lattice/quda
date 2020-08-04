@@ -1657,6 +1657,9 @@ namespace quda {
 	diracParam.epsilon = inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET ? inv_param->epsilon : 0.0;
       }
       break;
+    case QUDA_OVERLAP_WILSON_DSLASH:
+      diracParam.type = QUDA_OVERLAP_WILSON_DIRAC;
+      break;      
     case QUDA_LAPLACE_DSLASH:
       diracParam.type = pc ? QUDA_GAUGE_LAPLACEPC_DIRAC : QUDA_GAUGE_LAPLACE_DIRAC;
       diracParam.laplace3D = inv_param->laplace3D;

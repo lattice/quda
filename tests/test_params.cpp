@@ -212,6 +212,7 @@ namespace
                                                        {"domain-wall", QUDA_DOMAIN_WALL_DSLASH},
                                                        {"domain-wall-4d", QUDA_DOMAIN_WALL_4D_DSLASH},
                                                        {"mobius", QUDA_MOBIUS_DWF_DSLASH},
+                                                       {"overlap-wilson", QUDA_OVERLAP_WILSON_DSLASH},
                                                        {"laplace", QUDA_LAPLACE_DSLASH}};
 
   CLI::TransformPairs<QudaTwistFlavorType> twist_flavor_type_map {{"singlet", QUDA_TWIST_SINGLET},

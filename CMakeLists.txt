@@ -102,6 +102,7 @@ set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_20 sm_21 sm_30 sm_35 sm_37 
 set(QUDA_DIRAC_WILSON ON CACHE BOOL "build Wilson Dirac operators")
 set(QUDA_DIRAC_CLOVER ON CACHE BOOL "build clover Dirac operators")
 set(QUDA_DIRAC_DOMAIN_WALL ON CACHE BOOL "build domain wall Dirac operators")
+set(QUDA_DIRAC_OVERLAP_WILSON ON CACHE BOOL "build overlap Dirac operators with Wilson kernel")
 set(QUDA_DIRAC_STAGGERED ON CACHE BOOL "build staggered Dirac operators")
 set(QUDA_DIRAC_TWISTED_MASS ON CACHE BOOL "build twisted mass Dirac operators")
 set(QUDA_DIRAC_TWISTED_CLOVER ON CACHE BOOL "build twisted clover Dirac operators")
@@ -694,6 +695,10 @@ endif(QUDA_DIRAC_WILSON)
 if(QUDA_DIRAC_DOMAIN_WALL)
   add_definitions(-DGPU_DOMAIN_WALL_DIRAC)
 endif(QUDA_DIRAC_DOMAIN_WALL)
+
+if(QUDA_DIRAC_OVERLAP_WILSON)
+  add_definitions(-DGPU_WILSON_DIRAC -DGPU_OVERLAP_WILSON_DIRAC)
+endif(QUDA_DIRAC_OVERLAP_WILSON)
 
 if(QUDA_DIRAC_STAGGERED)
   add_definitions(-DGPU_STAGGERED_DIRAC)
