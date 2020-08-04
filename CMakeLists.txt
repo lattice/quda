@@ -67,6 +67,13 @@ if(TARGET_TYPE_VALID LESS 0)
   message(SEND_ERROR "Please specify a valid QUDA_TARGET_TYPE type! Valid target types are:" "${VALID_TARGET_TYPES}")
 endif()
 
+if( ${CHECK_TARGET_TYPE} STREQUAL "CUDA") 
+  set(QUDA_TARGET_LIBRARY quda_cuda_target)
+endif()
+
+if( ${CHECK_TARGET_TYPE} STREQUAL "HIP")
+  set(QUDA_TARGET_LIBRARY quda_hip_target)
+endif()
 #
 # PROJECT is QUDA
 #
