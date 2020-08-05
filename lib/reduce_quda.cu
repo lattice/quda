@@ -11,20 +11,20 @@ namespace quda {
     qudaStream_t* getStream();
 
     template <int block_size, typename real, int len, typename Arg>
-    typename std::enable_if<block_size!=32, cudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+    typename std::enable_if<block_size!=32, qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
       void *args[] = {&arg};
       if (tp.block.x == block_size)
-        return qudaLaunchKernel((const void*)reduceKernel<block_size, real, len, Arg>, tp.grid, tp.block, args, tp.shared_bytes, stream);
+        return qudaLaunchKernel((const void*)reduceKernel<block_size, real, len, Arg>, tp, args, stream);
       else
         return launch<block_size - 32, real, len>(arg, tp, stream);
     }
 
     template <int block_size, typename real, int len, typename Arg>
-    typename std::enable_if<block_size==32, cudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+    typename std::enable_if<block_size==32, qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
       void *args[] = {&arg};
-      return qudaLaunchKernel((const void*)reduceKernel<block_size, real, len, Arg>, tp.grid, tp.block, args, tp.shared_bytes, stream);
+      return qudaLaunchKernel((const void*)reduceKernel<block_size, real, len, Arg>, tp, args, stream);
     }
 
 #ifdef QUDA_FAST_COMPILE_REDUCE
@@ -53,7 +53,7 @@ namespace quda {
       if (tp.block.x <= max_block_size()) {
         auto error = launch<max_block_size(), real, len>(arg, tp, stream);
         // flag any failures when tuning so we don't try and complete which could hang
-        if (activeTuning() && error != cudaSuccess) tunable.jitifyError() = CUDA_ERROR_INVALID_VALUE;
+        if (activeTuning() && error != qudaSuccess) tunable.jitifyError() = CUDA_ERROR_INVALID_VALUE;
       } else {
         tunable.jitifyError() = CUDA_ERROR_INVALID_VALUE;
         if (!activeTuning()) errorQuda("block size %d not instantiated", tp.block.x);

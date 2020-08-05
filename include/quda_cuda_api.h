@@ -16,17 +16,21 @@ using qudaStream_t = cudaStream_t;
 
 namespace quda {
 
+  class TuneParam;
+
+  enum qudaError_t {
+    qudaSuccess = 0,
+    qudaError   = 1
+  };
+
   /**
      @brief Wrapper around cudaLaunchKernel
      @param[in] func Device function symbol
-     @param[in] gridDim Grid dimensions
-     @param[in] blockDim Block dimensions
+     @param[in] tp TuneParam containing the launch parameters
      @param[in] args Arguments
-     @param[in] sharedMem Shared memory requested per thread block
      @param[in] stream Stream identifier
   */
-  cudaError_t qudaLaunchKernel(const void *func, dim3 gridDim, dim3 blockDim, void **args, size_t sharedMem,
-                               qudaStream_t stream);
+  qudaError_t qudaLaunchKernel(const void *func, const TuneParam &tp, void **args, qudaStream_t stream);
 
   /**
      @brief Wrapper around cudaMemcpy used for auto-profiling.  Do not

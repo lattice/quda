@@ -26,6 +26,14 @@ namespace quda {
   static TimeProfile apiTimer("CUDA API calls (runtime)");
 #endif
 
+  qudaError_t qudaLaunchKernel(const void *func, const TuneParam &tp, void **args, qudaStream_t stream)
+  {
+    // no driver API variant here since we have C++ functions
+    PROFILE(cudaError_t error = cudaLaunchKernel(func, tp.grid, tp.block, args, tp.shared_bytes, stream), QUDA_PROFILE_LAUNCH_KERNEL);
+    if (error != cudaSuccess && !activeTuning()) errorQuda("(CUDA) %s", cudaGetErrorString(error));
+    return error == cudaSuccess ? qudaSuccess : qudaError;
+  }
+
   class QudaMem : public Tunable
   {
     void *dst;
@@ -260,15 +268,6 @@ namespace quda {
     copy.apply(0);
     cudaError_t error = cudaGetLastError();
     if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
-  }
-
-  cudaError_t qudaLaunchKernel(const void *func, dim3 gridDim, dim3 blockDim, void **args, size_t sharedMem,
-                               qudaStream_t stream)
-  {
-    // no driver API variant here since we have C++ functions
-    PROFILE(cudaError_t error = cudaLaunchKernel(func, gridDim, blockDim, args, sharedMem, stream), QUDA_PROFILE_LAUNCH_KERNEL);
-    if (error != cudaSuccess && !activeTuning()) errorQuda("(CUDA) %s", cudaGetErrorString(error));
-    return error;
   }
 
   bool qudaEventQuery_(cudaEvent_t &event, const char *func, const char *file, const char *line)

@@ -115,7 +115,7 @@ public:
         setMaxDynamicSharedBytesPerBlock(f);
       }
       void *args[] = {&arg};
-      qudaLaunchKernel((const void *)f, tp.grid, tp.block, args, tp.shared_bytes, stream);
+      qudaLaunchKernel((const void *)f, tp, args, stream);
     }
 
     void apply(const qudaStream_t &stream)
