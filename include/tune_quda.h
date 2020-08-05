@@ -201,14 +201,12 @@ namespace quda {
      */
     template <typename F> inline void setMaxDynamicSharedBytesPerBlock(F *func) const
     {
-#if CUDA_VERSION >= 9000
       qudaFuncSetAttribute(
           (const void *)func, cudaFuncAttributePreferredSharedMemoryCarveout, (int)cudaSharedmemCarveoutMaxShared);
       cudaFuncAttributes attributes;
       qudaFuncGetAttributes(attributes, (const void *)func);
       qudaFuncSetAttribute((const void *)func, cudaFuncAttributeMaxDynamicSharedMemorySize,
                            maxDynamicSharedBytesPerBlock() - attributes.sharedSizeBytes);
-#endif
     }
 
     /**
@@ -217,23 +215,9 @@ namespace quda {
      */
     unsigned int maxDynamicSharedBytesPerBlock() const
     {
-#if CUDA_VERSION >= 9000
       static int max_shared_bytes = 0;
       if (!max_shared_bytes) cudaDeviceGetAttribute(&max_shared_bytes, cudaDevAttrMaxSharedMemoryPerBlockOptin, comm_gpuid());
       return max_shared_bytes;
-#else
-      // these variables are taken from Table 14 of the CUDA 10.2 prgramming guide
-      switch (deviceProp.major) {
-      case 2:
-      case 3:
-      case 5:
-      case 6: return 48 * 1024;
-      default:
-        warningQuda("Unknown SM architecture %d.%d - assuming limit of 48 KiB per SM\n",
-                    deviceProp.major, deviceProp.minor);
-        return 48 * 1024;
-      }
-#endif
     }
 
     /**

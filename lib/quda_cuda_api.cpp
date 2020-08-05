@@ -212,27 +212,6 @@ namespace quda {
     }
   }
 
-  cudaError_t qudaStreamSynchronize_(qudaStream_t &stream, const char *func, const char *file, const char *line)
-  {
-#ifdef USE_DRIVER_API
-    PROFILE(CUresult error = cuStreamSynchronize(stream), QUDA_PROFILE_STREAM_SYNCHRONIZE);
-    switch (error) {
-    case CUDA_SUCCESS: return cudaSuccess;
-    default: // should always return successful
-      const char *str;
-      cuGetErrorName(error, &str);
-      errorQuda("(CUDA) cuStreamSynchronize returned error %s\n (%s:%s in %s())\n", str, file, line, func);
-    }
-    return cudaErrorUnknown;
-#else
-    PROFILE(cudaError_t error = cudaStreamSynchronize(stream), QUDA_PROFILE_STREAM_SYNCHRONIZE);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
-    return error;
-
-#endif
-  }
-
   void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
                           cudaMemcpyKind kind, const qudaStream_t &stream, const char *func, const char *file,
                           const char *line)
@@ -292,120 +271,131 @@ namespace quda {
     return error;
   }
 
-  cudaError_t qudaEventQuery(cudaEvent_t &event)
+  bool qudaEventQuery_(cudaEvent_t &event, const char *func, const char *file, const char *line)
   {
 #ifdef USE_DRIVER_API
     PROFILE(CUresult error = cuEventQuery(event), QUDA_PROFILE_EVENT_QUERY);
     switch (error) {
-    case CUDA_SUCCESS:
-      return cudaSuccess;
-    case CUDA_ERROR_NOT_READY: // this is the only return value care about
-      return cudaErrorNotReady;
+    case CUDA_SUCCESS:         return true;
+    case CUDA_ERROR_NOT_READY: return false;
     default:
-      const char *str;
-      cuGetErrorName(error, &str);
-      errorQuda("cuEventQuery returned error %s", str);
+      {
+        const char *str;
+        cuGetErrorName(error, &str);
+        errorQuda("cuEventQuery returned error %s", str);
+      }
     }
-    return cudaErrorUnknown;
 #else
     PROFILE(cudaError_t error = cudaEventQuery(event), QUDA_PROFILE_EVENT_QUERY);
-    return error;
+    switch (error) {
+    case cudaSuccess:       return true;
+    case cudaErrorNotReady: return false;
+    default:
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    }
 #endif
+    return false;
   }
 
-  cudaError_t qudaEventRecord(cudaEvent_t &event, qudaStream_t stream)
+  void qudaEventRecord_(cudaEvent_t &event, qudaStream_t stream,
+                        const char *func, const char *file, const char *line)
   {
 #ifdef USE_DRIVER_API
     PROFILE(CUresult error = cuEventRecord(event, stream), QUDA_PROFILE_EVENT_RECORD);
-    switch (error) {
-    case CUDA_SUCCESS:
-      return cudaSuccess;
-    default: // should always return successful
+    if (error != CUDA_SUCCESS) {
       const char *str;
       cuGetErrorName(error, &str);
       errorQuda("cuEventRecord returned error %s", str);
     }
-    return cudaErrorUnknown;
 #else
     PROFILE(cudaError_t error = cudaEventRecord(event, stream), QUDA_PROFILE_EVENT_RECORD);
-    return error;
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
 #endif
   }
 
-  cudaError_t qudaStreamWaitEvent(qudaStream_t stream, cudaEvent_t event, unsigned int flags)
+  void qudaStreamWaitEvent_(qudaStream_t stream, cudaEvent_t event, unsigned int flags,
+                            const char *func, const char *file, const char *line)
   {
 #ifdef USE_DRIVER_API
     PROFILE(CUresult error = cuStreamWaitEvent(stream, event, flags), QUDA_PROFILE_STREAM_WAIT_EVENT);
-    switch (error) {
-    case CUDA_SUCCESS:
-      return cudaSuccess;
-    default: // should always return successful
+    if (error != CUDA_SUCCESS) {
       const char *str;
       cuGetErrorName(error, &str);
       errorQuda("cuStreamWaitEvent returned error %s", str);
     }
-    return cudaErrorUnknown;
 #else
     PROFILE(cudaError_t error = cudaStreamWaitEvent(stream, event, flags), QUDA_PROFILE_STREAM_WAIT_EVENT);
-    return error;
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
 #endif
   }
 
-  cudaError_t qudaEventSynchronize(cudaEvent_t &event)
+  void qudaEventSynchronize_(cudaEvent_t &event, const char *func, const char *file, const char *line)
   {
 #ifdef USE_DRIVER_API
     PROFILE(CUresult error = cuEventSynchronize(event), QUDA_PROFILE_EVENT_SYNCHRONIZE);
-    switch (error) {
-    case CUDA_SUCCESS:
-      return cudaSuccess;
-    default: // should always return successful
+    if (error != CUDA_SUCCESS) {
       const char *str;
       cuGetErrorName(error, &str);
       errorQuda("cuEventSynchronize returned error %s", str);
     }
-    return cudaErrorUnknown;
 #else
     PROFILE(cudaError_t error = cudaEventSynchronize(event), QUDA_PROFILE_EVENT_SYNCHRONIZE);
-    return error;
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
 #endif
   }
 
-  cudaError_t qudaDeviceSynchronize_(const char *func, const char *file, const char *line)
+  void qudaStreamSynchronize_(qudaStream_t &stream, const char *func, const char *file, const char *line)
+  {
+#ifdef USE_DRIVER_API
+    PROFILE(CUresult error = cuStreamSynchronize(stream), QUDA_PROFILE_STREAM_SYNCHRONIZE);
+    if (error != CUDA_SUCCESS) {
+      const char *str;
+      cuGetErrorName(error, &str);
+      errorQuda("(CUDA) cuStreamSynchronize returned error %s\n (%s:%s in %s())\n", str, file, line, func);
+    }
+#else
+    PROFILE(cudaError_t error = cudaStreamSynchronize(stream), QUDA_PROFILE_STREAM_SYNCHRONIZE);
+    if (error != cudaSuccess && !activeTuning())
+      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
+#endif
+  }
+
+  void qudaDeviceSynchronize_(const char *func, const char *file, const char *line)
   {
 #ifdef USE_DRIVER_API
     PROFILE(CUresult error = cuCtxSynchronize(), QUDA_PROFILE_DEVICE_SYNCHRONIZE);
-    switch (error) {
-    case CUDA_SUCCESS:
-      return cudaSuccess;
-    default: // should always return successful
+    if (error != CUDA_SUCCESS) {
       const char *str;
       cuGetErrorName(error, &str);
       errorQuda("cuCtxSynchronize returned error %s (%s:%s in %s())\n", str, file, line, func);
     }
-    return cudaErrorUnknown;
 #else
     PROFILE(cudaError_t error = cudaDeviceSynchronize(), QUDA_PROFILE_DEVICE_SYNCHRONIZE);
     if (error != cudaSuccess)
       errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
-    return error;
 #endif
   }
 
-#if (CUDA_VERSION >= 9000)
-  cudaError_t qudaFuncSetAttribute(const void* func, cudaFuncAttribute attr, int value)
+  void qudaFuncSetAttribute_(const void* kernel, cudaFuncAttribute attr, int value,
+                             const char *func, const char *file, const char *line)
   {
     // no driver API variant here since we have C++ functions
-    PROFILE(cudaError_t error = cudaFuncSetAttribute(func, attr, value), QUDA_PROFILE_FUNC_SET_ATTRIBUTE);
-    return error;
+    PROFILE(cudaError_t error = cudaFuncSetAttribute(kernel, attr, value), QUDA_PROFILE_FUNC_SET_ATTRIBUTE);
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
-  cudaError_t qudaFuncGetAttributes(cudaFuncAttributes &attr, const void* func)
+  void qudaFuncGetAttributes_(cudaFuncAttributes &attr, const void* kernel,
+                              const char *func, const char *file, const char *line)
   {
     // no driver API variant here since we have C++ functions
-    PROFILE(cudaError_t error = cudaFuncGetAttributes(&attr, func), QUDA_PROFILE_FUNC_SET_ATTRIBUTE);
-    return error;
+    PROFILE(cudaError_t error = cudaFuncGetAttributes(&attr, kernel), QUDA_PROFILE_FUNC_SET_ATTRIBUTE);
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
-#endif
 
   void printAPIProfile() {
 #ifdef API_PROFILE

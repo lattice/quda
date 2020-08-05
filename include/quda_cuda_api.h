@@ -17,6 +17,18 @@ using qudaStream_t = cudaStream_t;
 namespace quda {
 
   /**
+     @brief Wrapper around cudaLaunchKernel
+     @param[in] func Device function symbol
+     @param[in] gridDim Grid dimensions
+     @param[in] blockDim Block dimensions
+     @param[in] args Arguments
+     @param[in] sharedMem Shared memory requested per thread block
+     @param[in] stream Stream identifier
+  */
+  cudaError_t qudaLaunchKernel(const void *func, dim3 gridDim, dim3 blockDim, void **args, size_t sharedMem,
+                               qudaStream_t stream);
+
+  /**
      @brief Wrapper around cudaMemcpy used for auto-profiling.  Do not
      call directly, rather call macro below which will grab the
      location of the call.
@@ -27,36 +39,6 @@ namespace quda {
   */
   void qudaMemcpy_(void *dst, const void *src, size_t count, cudaMemcpyKind kind,
 		   const char *func, const char *file, const char *line);
-
-  /**
-     @brief Wrapper around cudaStreamSynchronize or cuStreamSynchronize
-     @param[in] stream Stream which we are synchronizing
-  */
-  cudaError_t qudaStreamSynchronize_(qudaStream_t &stream, const char *func, const char *file, const char *line);
-}
-
-#define STRINGIFY__(x) #x
-#define __STRINGIFY__(x) STRINGIFY__(x)
-
-#define qudaStreamSynchronize(stream)                                                                                  \
-  ::quda::qudaStreamSynchronize_(stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#define qudaMemcpy(dst, src, count, kind) \
-  ::quda::qudaMemcpy_(dst, src, count, kind, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#define qudaMemcpyAsync(dst, src, count, kind, stream) \
-  ::quda::qudaMemcpyAsync_(dst, src, count, kind, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#define qudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream) \
-  ::quda::qudaMemcpy2DAsync_(dst, dpitch, src, spitch, width, height, kind, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#define qudaMemset(ptr, value, count)                                                                                  \
-  ::quda::qudaMemset_(ptr, value, count, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#define qudaMemsetAsync(ptr, value, count, stream)                                                                     \
-  ::quda::qudaMemsetAsync_(ptr, value, count, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-namespace quda {
 
   /**
      @brief Wrapper around cudaMemcpyAsync or driver API equivalent
@@ -107,66 +89,67 @@ namespace quda {
                         const char *file, const char *line);
 
   /**
-     @brief Wrapper around cudaLaunchKernel
-     @param[in] func Device function symbol
-     @param[in] gridDim Grid dimensions
-     @param[in] blockDim Block dimensions
-     @param[in] args Arguments
-     @param[in] sharedMem Shared memory requested per thread block
-     @param[in] stream Stream identifier
-  */
-  cudaError_t qudaLaunchKernel(const void *func, dim3 gridDim, dim3 blockDim, void **args, size_t sharedMem,
-                               qudaStream_t stream);
-
-  /**
-     @brief Wrapper around cudaEventQuery or cuEventQuery
+     @brief Wrapper around cudaEventQuery or cuEventQuery with built-in error checking
      @param[in] event Event we are querying
-     @return Status of event query
+     @return true if event has been reached
    */
-  cudaError_t qudaEventQuery(cudaEvent_t &event);
+  bool qudaEventQuery_(cudaEvent_t &event, const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around cudaEventRecord or cuEventRecord
+     @brief Wrapper around cudaEventRecord or cuEventRecord with
+     built-in error checking
      @param[in,out] event Event we are recording
      @param[in,out] stream Stream where to record the event
    */
-  cudaError_t qudaEventRecord(cudaEvent_t &event, qudaStream_t stream = 0);
+  void qudaEventRecord_(cudaEvent_t &event, qudaStream_t stream,
+                        const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around cudaEventRecord or cuEventRecord
-     @param[in,out] stream Stream which we are instructing to waitç∂
+     @brief Wrapper around cudaStreamWaitEvent or cuStreamWaitEvent
+     with built-in error checking
+     @param[in,out] stream Stream which we are instructing to wait
      @param[in] event Event we are waiting on
      @param[in] flags Flags to pass to function
    */
-  cudaError_t qudaStreamWaitEvent(qudaStream_t stream, cudaEvent_t event, unsigned int flags);
+  void qudaStreamWaitEvent_(qudaStream_t stream, cudaEvent_t event, unsigned int flags,
+                            const char *func, const char *file, const char *line);
 
   /**
      @brief Wrapper around cudaEventSynchronize or cuEventSynchronize
+     with built-in error checking
      @param[in] event Event which we are synchronizing with respect to
    */
-  cudaError_t qudaEventSynchronize(cudaEvent_t &event);
+  void qudaEventSynchronize_(cudaEvent_t &event, const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around cudaDeviceSynchronize or cuDeviceSynchronize
+     @brief Wrapper around cudaStreamSynchronize or
+     cuStreamSynchronize with built-in error checking
+     @param[in] stream Stream which we are synchronizing
+  */
+  void qudaStreamSynchronize_(qudaStream_t &stream, const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaDeviceSynchronize or
+     cuDeviceSynchronize with built-in error checking
    */
-  cudaError_t qudaDeviceSynchronize_(const char *func, const char *file, const char *line);
+  void qudaDeviceSynchronize_(const char *func, const char *file, const char *line);
 
-#if CUDA_VERSION >= 9000
   /**
-     @brief Wrapper around cudaFuncSetAttribute
-     @param[in] func Function for which we are setting the attribute
+     @brief Wrapper around cudaFuncSetAttribute with built-in error checking
+     @param[in] kernel Kernel function for which we are setting the attribute
      @param[in] attr Attribute to set
      @param[in] value Value to set
   */
-  cudaError_t qudaFuncSetAttribute(const void* func, cudaFuncAttribute attr, int value);
+  void qudaFuncSetAttribute_(const void* kernel, cudaFuncAttribute attr, int value,
+                             const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around cudaFuncGetAttributes
+     @brief Wrapper around cudaFuncGetAttributes with built-in error checking
      @param[in] attr the cudaFuncGetAttributes object to store the output
-     @param[in] func Function for which we are setting the attribute
+     @param[in] kernel Kernel function for which we are setting the attribute
   */
-  cudaError_t qudaFuncGetAttributes(cudaFuncAttributes &attr, const void* func);
-#endif
+  void qudaFuncGetAttributes_(cudaFuncAttributes &attr, const void* kernel,
+                              const char *func, const char *file, const char *line);
 
   /**
      @brief Print out the timer profile for CUDA API calls
@@ -175,5 +158,44 @@ namespace quda {
 
 } // namespace quda
 
+#define STRINGIFY__(x) #x
+#define __STRINGIFY__(x) STRINGIFY__(x)
+
+#define qudaMemcpy(dst, src, count, kind)                               \
+  ::quda::qudaMemcpy_(dst, src, count, kind, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
+#define qudaMemcpyAsync(dst, src, count, kind, stream)                  \
+  ::quda::qudaMemcpyAsync_(dst, src, count, kind, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
+#define qudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream) \
+  ::quda::qudaMemcpy2DAsync_(dst, dpitch, src, spitch, width, height, kind, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
+#define qudaMemset(ptr, value, count)                                                                                  \
+  ::quda::qudaMemset_(ptr, value, count, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
+#define qudaMemsetAsync(ptr, value, count, stream)                                                                     \
+  ::quda::qudaMemsetAsync_(ptr, value, count, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
+#define qudaEventQuery(event)                                           \
+  ::quda::qudaEventQuery_(event, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
+#define qudaEventRecord(event, stream)                                  \
+  ::quda::qudaEventRecord_(event, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
+#define qudaStreamWaitEvent(stream, event, flags) \
+  ::quda::qudaStreamWaitEvent_(stream, event, flags, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
+#define qudaEventSynchronize(event)                                                                                  \
+  ::quda::qudaEventSynchronize_(event, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
+#define qudaStreamSynchronize(stream)                                                                                  \
+  ::quda::qudaStreamSynchronize_(stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
 #define qudaDeviceSynchronize() \
-  ::quda::qudaDeviceSynchronize_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+  ::quda::qudaDeviceSynchronize_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
+#define qudaFuncSetAttribute(kernel, attr, value)                       \
+  ::quda::qudaFuncSetAttribute_(kernel, attr, value, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
+#define qudaFuncGetAttributes(attr, kernel)                             \
+  ::quda::qudaFuncGetAttributes_(attr, kernel, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
