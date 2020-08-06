@@ -186,7 +186,6 @@ class GaugeAlgTest : public ::testing::Test {
     delete randstates;
   }
 
-
   QudaGaugeParam param;
 
   Timer a0,a1;
@@ -202,45 +201,44 @@ class GaugeAlgTest : public ::testing::Test {
 
 };
 
-
-TEST_F(GaugeAlgTest,Generation){
+TEST_F(GaugeAlgTest,Generation) {
   detu = getLinkDeterminant(*cudaInGauge);
   plaq = plaquette(*cudaInGauge);
   bool testgen = false;
   //check plaquette value for beta = 6.2
-  if(plaq.x < 0.614 && plaq.x > 0.611 && plaq.y < 0.614 && plaq.y > 0.611) testgen = true;
+  if (plaq.x < 0.614 && plaq.x > 0.611 && plaq.y < 0.614 && plaq.y > 0.611) testgen = true;
 
-  if(testgen){
+  if (testgen) {
     ASSERT_TRUE(CheckDeterminant(detu));
   }
 }
 
-TEST_F(GaugeAlgTest,Landau_Overrelaxation){
+TEST_F(GaugeAlgTest,Landau_Overrelaxation) {
   const int reunit_interval = 10;
   printfQuda("Landau gauge fixing with overrelaxation\n");
-  gaugefixingOVR(*cudaInGauge, 4, 100, 10, 1.5, 0, reunit_interval, 1);
+  gaugeFixingOVR(*cudaInGauge, 4, 100, 10, 1.5, 0, reunit_interval, 1);
   ASSERT_TRUE(comparePlaquette(plaq, plaquette(*cudaInGauge)));
 }
 
-TEST_F(GaugeAlgTest,Coulomb_Overrelaxation){
+TEST_F(GaugeAlgTest,Coulomb_Overrelaxation) {
   const int reunit_interval = 10;
   printfQuda("Coulomb gauge fixing with overrelaxation\n");
-  gaugefixingOVR(*cudaInGauge, 3, 100, 10, 1.5, 0, reunit_interval, 1);
+  gaugeFixingOVR(*cudaInGauge, 3, 100, 10, 1.5, 0, reunit_interval, 1);
   ASSERT_TRUE(comparePlaquette(plaq, plaquette(*cudaInGauge)));
 }
 
-TEST_F(GaugeAlgTest,Landau_FFT){
-  if(!checkDimsPartitioned()){
+TEST_F(GaugeAlgTest,Landau_FFT) {
+  if (!checkDimsPartitioned()) {
     printfQuda("Landau gauge fixing with steepest descent method with FFTs\n");
-    gaugefixingFFT(*cudaInGauge, 4, 100, 10, 0.08, 0, 0, 1);
+    gaugeFixingFFT(*cudaInGauge, 4, 100, 10, 0.08, 0, 0, 1);
     ASSERT_TRUE(comparePlaquette(plaq, plaquette(*cudaInGauge)));
   }
 }
 
-TEST_F(GaugeAlgTest,Coulomb_FFT){
-  if(!checkDimsPartitioned()){
+TEST_F(GaugeAlgTest,Coulomb_FFT) {
+  if (!checkDimsPartitioned()) {
     printfQuda("Coulomb gauge fixing with steepest descent method with FFTs\n");
-    gaugefixingFFT(*cudaInGauge, 3, 100, 10, 0.08, 0, 0, 1);
+    gaugeFixingFFT(*cudaInGauge, 3, 100, 10, 0.08, 0, 0, 1);
     ASSERT_TRUE(comparePlaquette(plaq, plaquette(*cudaInGauge)));
   }
 }

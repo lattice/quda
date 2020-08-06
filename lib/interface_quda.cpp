@@ -5551,7 +5551,7 @@ int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const u
   if (comm_size() == 1) {
     // perform the update
     GaugeFixOVRQuda.TPSTART(QUDA_PROFILE_COMPUTE);
-    gaugefixingOVR(*cudaInGauge, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, \
+    gaugeFixingOVR(*cudaInGauge, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, \
       reunit_interval, stopWtheta);
     GaugeFixOVRQuda.TPSTOP(QUDA_PROFILE_COMPUTE);
   } else {
@@ -5559,7 +5559,7 @@ int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const u
 
     // perform the update
     GaugeFixOVRQuda.TPSTART(QUDA_PROFILE_COMPUTE);
-    gaugefixingOVR(*cudaInGaugeEx, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, \
+    gaugeFixingOVR(*cudaInGaugeEx, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, \
       reunit_interval, stopWtheta);
     GaugeFixOVRQuda.TPSTOP(QUDA_PROFILE_COMPUTE);
 
@@ -5596,7 +5596,6 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
   const unsigned int verbose_interval, const double alpha, const unsigned int autotune, const double tolerance, \
   const unsigned int  stopWtheta, QudaGaugeParam* param , double* timeinfo)
 {
-
   GaugeFixFFTQuda.TPSTART(QUDA_PROFILE_TOTAL);
 
   checkGaugeParam(param);
@@ -5626,14 +5625,13 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
     gaugePrecise = nullptr;
   } */
 
-
   GaugeFixFFTQuda.TPSTOP(QUDA_PROFILE_H2D);
 
   // perform the update
   GaugeFixFFTQuda.TPSTART(QUDA_PROFILE_COMPUTE);
   checkCudaError();
 
-  gaugefixingFFT(*cudaInGauge, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
+  gaugeFixingFFT(*cudaInGauge, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
 
   GaugeFixFFTQuda.TPSTOP(QUDA_PROFILE_COMPUTE);
 
