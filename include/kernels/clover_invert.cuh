@@ -1,7 +1,7 @@
 #include <clover_field_order.h>
 #include <quda_matrix.h>
 #include <linalg.cuh>
-#include <cub_helper.cuh>
+#include <reduce_helper.h>
 
 namespace quda
 {

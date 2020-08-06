@@ -34,7 +34,7 @@ namespace quda {
       // for these streaming kernels, there is no need to tune the grid size, just use max
       unsigned int minGridSize() const { return maxGridSize(); }
 
-  public:
+    public:
       MultiBlas(const T &a, const T &b, const T &c, const ColorSpinorField &x_meta, const ColorSpinorField &y_meta,
                 std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
                 std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w) :
@@ -225,7 +225,7 @@ namespace quda {
           std::min(max_N_multi_1d(), max_NXZ_power2<false, isFixed<store_t>::value>());
         constexpr int linear_max = !decltype(f)::multi_1d ? MAX_MULTI_BLAS_N : std::min(max_N_multi_1d(), MAX_MULTI_BLAS_N);
 
-        if (NXZ <= pow2_max && NXZ % 2 == 0) instantiatePow2<pow2_max>(stream);
+        if (NXZ <= pow2_max && is_power2(NXZ)) instantiatePow2<pow2_max>(stream);
         else if (NXZ <= linear_max) instantiateLinear<linear_max>(stream);
         else errorQuda("x.size %lu greater than maximum supported size (pow2 = %d, linear = %d)", x.size(), pow2_max, linear_max);
       }
@@ -294,12 +294,19 @@ namespace quda {
         param.aux = make_int4(1, 0, 0, 0); // warp-split parameter
       }
 
-      long long flops() const { return f.flops() * x[0]->Length(); }
+      long long flops() const
+      {
+        return NYW * NXZ * f.flops() * x[0]->Length();
+      }
 
       long long bytes() const
       {
-        // the factor two here assumes we are reading and writing to the high precision vector
-        return ((f.streams() - 2) * x[0]->Bytes() + 2 * y[0]->Bytes());
+        // X and Z reads are repeated (and hopefully cached) across NYW
+        // each Y and W read/write is done once
+        return NYW * NXZ * (f.read.X + f.write.X) * x[0]->Bytes() +
+          NYW * (f.read.Y + f.write.Y) * y[0]->Bytes() +
+          NYW * NXZ * (f.read.Z + f.write.Z) * z[0]->Bytes() +
+          NYW * (f.read.W + f.write.W) * w[0]->Bytes();
       }
 
       int tuningIter() const { return 3; }

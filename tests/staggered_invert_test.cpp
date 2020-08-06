@@ -248,8 +248,6 @@ int main(int argc, char **argv)
   }
 
   // Create ghost gauge fields in case of multi GPU builds.
-#ifdef MULTI_GPU
-
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
   gauge_param.location = QUDA_CPU_FIELD_LOCATION;
 
@@ -261,8 +259,6 @@ int main(int argc, char **argv)
   GaugeFieldParam cpuLongParam(milc_longlink, gauge_param);
   cpuLongParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuLong = GaugeField::Create(cpuLongParam);
-  // constructStaggeredHostGhostGaugeField(cpuFat, cpuLong, milc_fatlink, milc_longlink, gauge_param);
-#endif
 
   loadFatLongGaugeQuda(milc_fatlink, milc_longlink, gauge_param);
 
@@ -408,10 +404,8 @@ int main(int argc, char **argv)
   if (milc_fatlink != nullptr) { free(milc_fatlink); milc_fatlink = nullptr; }
   if (milc_longlink != nullptr) { free(milc_longlink); milc_longlink = nullptr; }
 
-#ifdef MULTI_GPU
   if (cpuFat != nullptr) { delete cpuFat; cpuFat = nullptr; }
   if (cpuLong != nullptr) { delete cpuLong; cpuLong = nullptr; }
-#endif
 
   delete in;
   delete out;
