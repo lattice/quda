@@ -3,10 +3,9 @@
 #include <tune_quda.h>
 #include <gauge_field.h>
 #include <gauge_field_order.h>
-#include <cub_helper.cuh>
+#include <reduce_helper.h>
 #include <launch_kernel.cuh>
 #include <comm_quda.h>
-
 
 namespace quda {
 

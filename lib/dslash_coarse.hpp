@@ -4,7 +4,6 @@
 #include <worker.h>
 #include <tune_quda.h>
 
-
 #include <jitify_helper.cuh>
 #include <kernels/dslash_coarse.cuh>
 

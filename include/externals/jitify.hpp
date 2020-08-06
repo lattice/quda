@@ -806,7 +806,7 @@ struct type_reflection {
     // WAR for typeid discarding cv qualifiers on value-types
     // We use a pointer type to maintain cv qualifiers, then strip out the '*'
     std::string no_cv_name = demangle(typeid(T).name());
-    std::string ptr_name = demangle(typeid(T*).name());
+    std::string ptr_name = demangle(typeid(typename std::remove_reference<T>::type *).name());
     // Find the right '*' by diffing the type name and ptr name
     // Note that the '*' will also be prefixed with the cv qualifiers
     size_t diff_begin =
@@ -947,7 +947,7 @@ inline Type<T const> type_of(T const& value) {
 
 // Multiple value reflections one call, returning list of strings
 template <typename... Args>
-inline std::vector<std::string> reflect_all(Args... args) {
+inline std::vector<std::string> reflect_all(Args&... args) {
   return {reflect(args)...};
 }
 
@@ -2830,7 +2830,7 @@ class KernelLauncher {
    *  \see launch
    */
   template <typename... ArgTypes>
-  inline CUresult operator()(ArgTypes... args) const {
+  inline CUresult operator()(ArgTypes&... args) const {
     return this->launch(args...);
   }
   /*! Launch the kernel.
@@ -2838,7 +2838,7 @@ class KernelLauncher {
    *  \param args Function arguments for the kernel.
    */
   template <typename... ArgTypes>
-  inline CUresult launch(ArgTypes... args) const {
+  inline CUresult launch(ArgTypes&... args) const {
     return this->launch(std::vector<void*>({(void*)&args...}),
                         {reflection::reflect<ArgTypes>()...});
   }
@@ -4011,7 +4011,7 @@ class KernelLauncher {
    *  \param args Function arguments for the kernel.
    */
   template <typename... ArgTypes>
-  CUresult launch(ArgTypes... args) const {
+  CUresult launch(ArgTypes&... args) const {
     return this->launch(std::vector<void*>({(void*)&args...}),
                         {reflection::reflect<ArgTypes>()...});
   }
