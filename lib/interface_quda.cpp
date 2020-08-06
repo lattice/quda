@@ -616,8 +616,9 @@ void initQudaMemory()
   device::create_context();
   createDslashEvents();
 
+  blas_lapack::native::init();
   blas::init();
-
+  
   // initalize the memory pool allocators
   pool::init();
 
