@@ -1421,7 +1421,7 @@ void endQuda(void)
 
   blas_lapack::generic::destroy();
   blas_lapack::native::destroy();
-  blas::end();
+  blas::destroy();
 
   pool::flush_pinned();
   pool::flush_device();
@@ -2339,7 +2339,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   }
 
   // Copy eigen values back
-  for (int i = 0; i < eig_param->n_conv; i++) { host_evals[i] = real(evals[i]) + imag(evals[i]) * _Complex_I; }
+  for (int i = 0; i < eig_param->n_conv; i++) { memcpy(host_evals + i, &evals[i], sizeof(Complex)); }
 
   // Transfer Eigenpairs back to host if using GPU eigensolver
   if (!(eig_param->arpack_check)) {
