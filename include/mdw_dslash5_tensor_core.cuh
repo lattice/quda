@@ -10,12 +10,11 @@
 
 #include <cub_helper.cuh>
 
-#if (__CUDACC_VER_MAJOR__ >= 9 && __COMPUTE_CAPABILITY__ >= 700)
+#if (CUDA_VERSION >= 9000 && __COMPUTE_CAPABILITY__ >= 700)
 #include <mma.h>
 
 // The `mma.sync` PTX is only available with CUDA 10.1 or after
-#if ((__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ >= 1) || (__CUDACC_VER_MAJOR__ > 10))                         \
-  && (__COMPUTE_CAPABILITY__ == 700)
+#if (CUDA_VERSION >= 10100 && __COMPUTE_CAPABILITY__ == 700)
 #define USE_MMA_SYNC // rather than using wmma
 #include <mma_tensor_op/mma_m16n16k16_sm70.cuh>
 #endif
@@ -234,7 +233,7 @@ namespace quda
 
   __device__ inline void __half_max_abs_half2__(half &max, const half2 &input)
   {
-#if ((__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ == 2) || __CUDACC_VER_MAJOR__ >= 11)
+#if CUDA_VERSION >= 10200
     // For CUDA >= 10.2
     half2 lh = __habs2(input);
 #else
@@ -477,4 +476,4 @@ namespace quda
 
 } // namespace quda
 
-#endif // #if (__CUDACC_VER_MAJOR__ >= 9 && __COMPUTE_CAPABILITY__ >= 700)
+#endif // #if (CUDA_VERSION >= 9000 && __COMPUTE_CAPABILITY__ >= 700)
