@@ -255,7 +255,8 @@ namespace
     {"open", QUDA_CONTRACT_TYPE_OPEN},
       {"open-sum", QUDA_CONTRACT_TYPE_OPEN_SUM},
 	{"dr", QUDA_CONTRACT_TYPE_DR},
-	  {"dr-sum", QUDA_CONTRACT_TYPE_DR_SUM}};
+	  {"dr-sum", QUDA_CONTRACT_TYPE_DR_SUM},
+            {"dr-sum-spatial", QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL}};
   
   CLI::TransformPairs<QudaDslashType> dslash_type_map {{"wilson", QUDA_WILSON_DSLASH},
                                                        {"clover", QUDA_CLOVER_WILSON_DSLASH},

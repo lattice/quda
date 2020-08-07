@@ -508,6 +508,7 @@ extern "C" {
     QUDA_CONTRACT_TYPE_DR,       // DegrandRossi, no spatial summation
     QUDA_CONTRACT_TYPE_OPEN_SUM, // Open spin elementals, spatially summed
     QUDA_CONTRACT_TYPE_DR_SUM,   // DegrandRossi, spatially summed
+    QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL, // DegrandRossi, summed over all but zdim
     QUDA_CONTRACT_TYPE_INVALID = QUDA_INVALID_ENUM
   } QudaContractType;
   

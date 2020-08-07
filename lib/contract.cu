@@ -271,10 +271,110 @@ public:
       return x.Bytes() + y.Bytes();
     }
   };
+  template <typename Arg> class ContractionSumSpatialCompute : TunableLocalParity
+  {
+  protected:
+    Arg &arg;
+    const ColorSpinorField &x;
+    const ColorSpinorField &y;
+    const QudaContractType cType;
 
+   private:
+    bool staticGridDim() const { return true; } // Maintain grid dims set in this class.
+    unsigned int minThreads() const { return arg.threads; }
+    bool tuneSharedBytes() const { return false; }
+
+    void initTuneParam(TuneParam &param) const {
+      TunableLocalParity::initTuneParam(param);
+      param.block.y = 2;
+      param.grid.z = x.X(2); // T dimension is mapped to different blocks in the Z dimension
+    }
+
+    void defaultTuneParam(TuneParam &param) const {
+      TunableLocalParity::defaultTuneParam(param);
+      param.block.y = 2;
+      param.grid.z = x.X(2); // T dimension is mapped to different blocks in the Z dimension
+    }
+
+  public:
+    ContractionSumSpatialCompute(Arg &arg, const ColorSpinorField &x, const ColorSpinorField &y, const QudaContractType cType) :
+      TunableLocalParity(),
+      arg(arg),
+      x(x),
+      y(y),
+      cType(cType)
+    {
+      switch (cType) {
+      case QUDA_CONTRACT_TYPE_OPEN_SUM: strcat(aux, "open-summed,"); break;
+      case QUDA_CONTRACT_TYPE_DR_SUM: strcat(aux, "degrand-rossi-summed,"); break;
+      case QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL: strcat(aux, "degrand-rossi-summed-spacial,"); break;
+      default: errorQuda("Unexpected contraction type %d", cType);
+      }
+      strcat(aux, x.AuxString());
+#ifdef JITIFY
+      create_jitify_program("kernels/contraction.cuh");
+#endif
+    }
+    virtual ~ContractionSumSpatialCompute() {}
+    void apply(const qudaStream_t &stream)
+    {
+      if (x.Location() == QUDA_CUDA_FIELD_LOCATION) {
+        for (int i=0; i<2*x.Nspin()*x.Nspin()*x.X(2); i++) ((double*)arg.result_h)[i] = 0.0;
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+#ifdef JITIFY
+        std::string function_name;
+        switch (cType) {
+	case QUDA_CONTRACT_TYPE_OPEN_SUM: function_name = "quda::computeColorContractionSum"; break;
+        case QUDA_CONTRACT_TYPE_DR_SUM: function_name = "quda::computeDegrandRossiContractionSum"; break;
+        case QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL: function_name = "quda::computeDegrandRossiContractionSumSpatial"; break;
+        default: errorQuda("Unexpected contraction type %d", cType);
+        }
+
+        using namespace jitify::reflection;
+        jitify_error = program->kernel(function_name)
+	  .instantiate(Type<real>(), Type<Arg>())
+	  .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+	  .launch(arg);
+#else
+        switch (cType) {
+        case QUDA_CONTRACT_TYPE_OPEN_SUM:
+          LAUNCH_KERNEL_LOCAL_PARITY(computeColorContractionSum, (*this), tp, stream, arg, Arg);
+          break;
+        case QUDA_CONTRACT_TYPE_DR_SUM:
+          LAUNCH_KERNEL_LOCAL_PARITY(computeDegrandRossiContractionSum, (*this), tp, stream, arg, Arg);
+          break;
+        case QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL:
+          LAUNCH_KERNEL_LOCAL_PARITY(computeDegrandRossiContractionSum, (*this), tp, stream, arg, Arg);
+          break;
+        default: errorQuda("Unexpected contraction type %d", cType);
+        }
+#endif
+      } else {
+        errorQuda("CPU not supported yet\n");
+      }
+    }
+
+    TuneKey tuneKey() const { return TuneKey(x.VolString(), typeid(*this).name(), aux); }
+
+    void preTune() {}
+    void postTune() {}
+
+    long long flops() const
+    {
+      if (cType == QUDA_CONTRACT_TYPE_OPEN_SUM || cType == QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL)
+        return x.Nspin() * x.Nspin() * 3 * 6ll * x.Volume();
+      else
+        return ((x.Nspin() * x.Nspin() * 3 * 6ll) + (x.Nspin() * x.Nspin() * (4 + 12))) * x.Volume();
+    }
+
+    long long bytes() const
+    {
+      return x.Bytes() + y.Bytes();
+    }
+  };
 
   //- This deceptively simple function executes the contraction kernel.
-  //- We must study it line by line. You are STRONGLY advised to follow the 
+  //- We must study it line by line. You are STRONGLY advised to follow the
   //- directives in the comments and go to the specified point when instructed.
   //- Think of it as a kind `choose your own adventure` story book where you don't
   //- choose, but it's still an adventure.
@@ -285,24 +385,24 @@ public:
     //- First, note that there are two ways one can contract data: just color contraction,
     //- or color contrcation with timeslice summation. This boolean is the latter.
     if(cType == QUDA_CONTRACT_TYPE_OPEN_SUM || cType == QUDA_CONTRACT_TYPE_DR_SUM) {
-      
-      //- This line is little more than an object that will store the pointers to data on 
-      //- which we will work. You can see that it accepts the x and y fields 
+
+      //- This line is little more than an object that will store the pointers to data on
+      //- which we will work. You can see that it accepts the x and y fields
       //- (the two fermions to be contracted) but NOT the and the result. That is because
-      //- the object `ContractionSumArg` inherits from a QUDA class called `ReduceArg` that 
+      //- the object `ContractionSumArg` inherits from a QUDA class called `ReduceArg` that
       //- has its own arrays. It is templated on precision only and defined in
-      //- quda/include/kernels/contraction.cuh. Please go to the struct `ContractionSumArg` 
+      //- quda/include/kernels/contraction.cuh. Please go to the struct `ContractionSumArg`
       //- and return here when instructed.
       ContractionSumArg<real> arg(x, y);
 
-      //- Now that all the parameters and pointers have been established, we construct the 
-      //- kernel that will perform the computation. This is a very subtle but powerful step. 
-      //- As you can see, the function named `contraction_with_sum` is a ContractionSumCompute 
-      //- type object, templetised on the specialised object ContractionSumArg. (We used 
-      //- `decltype(arg)` just to be slick.) This templetisation on the complicated `arg` 
+      //- Now that all the parameters and pointers have been established, we construct the
+      //- kernel that will perform the computation. This is a very subtle but powerful step.
+      //- As you can see, the function named `contraction_with_sum` is a ContractionSumCompute
+      //- type object, templetised on the specialised object ContractionSumArg. (We used
+      //- `decltype(arg)` just to be slick.) This templetisation on the complicated `arg`
       //- object allows us to `Bake-In` data types such as the number of colors, spins, etc
-      //- and not suffer from template explosion. 
-      //- Head on up to the definition of `ContractionSumCompute` and follow it through 
+      //- and not suffer from template explosion.
+      //- Head on up to the definition of `ContractionSumCompute` and follow it through
       //- until it instructs you to come back here.
       ContractionSumCompute<decltype(arg)> contraction_with_sum(arg, x, y, cType);
 
@@ -312,10 +412,10 @@ public:
       //- What is left to do now is apply that computation. It is therefore pleasing to see
       //- that the object we created `contraction_with_sum` with the arguments `arg` has
       //- a method called `apply` which will do just that. Head on up to the member function
-      //- `apply` to see it all come togther. 
+      //- `apply` to see it all come togther.
       contraction_with_sum.apply(0);
 
-      //- Welcome back! We did it! Now we just make sure that all the GPU work is done 
+      //- Welcome back! We did it! Now we just make sure that all the GPU work is done
       //- before moving on...
       qudaDeviceSynchronize();
       //- ... and copy the data we just computed back to the return array.
@@ -323,6 +423,13 @@ public:
       double *res = (double*)arg.result_h;
       for (int i=0; i<x.Nspin()*x.Nspin()*x.X(3); i++) result[i] = complex<real>(res[2*i], res[2*i+1]);
       // Head on back to your place in contractQuda to finish up.
+    } else if (cType == QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL){
+      ContractionSumSpatialArg<real> arg(x, y);
+      ContractionSumSpatialCompute<decltype(arg)> contraction_with_sum_spatial(arg, x, y, cType);
+      contraction_with_sum_spatial.apply(0);
+      qudaDeviceSynchronize();
+      double *res = (double*)arg.result_h;
+      for (int i=0; i<x.Nspin()*x.Nspin()*x.X(2); i++) result[i] = complex<real>(res[2*i], res[2*i+1]);
     } else {
       ContractionArg<real> arg(x, y, result);
       Contraction<real, ContractionArg<real>> contraction(arg, x, y, cType);
@@ -333,11 +440,11 @@ public:
 
 #endif
 
-  //- The interface function has called the GPU function contractQuda. The first thing to 
-  //- notice is that the body of the code is encapsulated in a preprocessor definition, 
-  //- which one can adjust at CMake configure time. If the QUDA_CONTRACT CMake option 
-  //- is not set, none of the following code will be compiled. This is an important 
-  //- feature to include as it keeps compile time to a minimum. 
+  //- The interface function has called the GPU function contractQuda. The first thing to
+  //- notice is that the body of the code is encapsulated in a preprocessor definition,
+  //- which one can adjust at CMake configure time. If the QUDA_CONTRACT CMake option
+  //- is not set, none of the following code will be compiled. This is an important
+  //- feature to include as it keeps compile time to a minimum.
   void contractQuda(const ColorSpinorField &x, const ColorSpinorField &y, void *result, const QudaContractType cType)
   {
 #ifdef GPU_CONTRACT

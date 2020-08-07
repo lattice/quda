@@ -69,11 +69,11 @@ int main(int argc, char **argv)
     qudaProp4D[dil] = quda::ColorSpinorField::Create(cs_param);
   }
 
-//  // temporal or spatial correlator?
+  // temporal or spatial correlator?
   size_t corr_dim = 3;
-//  if (contract_type == QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL) {
-//    corr_dim = 2;
-//  }
+  if (contract_type == QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL) {
+    corr_dim = 2;
+  }
   size_t array_length = gauge_param.X[corr_dim];
 
 

@@ -99,7 +99,34 @@ namespace quda
     //- And that the argument struct done. Please go back to `quda/lib/contract.cu` so see
     //- the computation.
   };
-  
+
+  template <typename Float_> struct ContractionSumSpatialArg :
+    public ReduceArg<spinor_array>
+  {
+    int threads; // number of active threads required
+    int X[4];    // grid dimensions
+
+    using Float = Float_;
+    static constexpr int nColor = 3;
+    static constexpr int nSpin = 4;
+    static constexpr bool spin_project = true;
+    static constexpr bool spinor_direct_load = false; // false means texture load
+
+    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
+
+    F x;
+    F y;
+
+    ContractionSumSpatialArg(const ColorSpinorField &x, const ColorSpinorField &y) :
+      ReduceArg<spinor_array>(),
+      threads(x.VolumeCB() / x.X(2)),
+      x(x),
+      y(y)
+    {
+      for (int dir = 0; dir < 4; dir++)
+        X[dir] = x.X()[dir];
+    }
+  };
   
   template <typename real, typename Arg> __global__ void computeColorContraction(Arg arg)
   {
@@ -456,6 +483,5 @@ namespace quda
     //- quda/lib/contract.cu, and the line:
     //- LAUNCH_KERNEL_LOCAL_PARITY(computeDegrandRossiContractionSum, (*this), tp, stream, arg, Arg);
   }
-
   
 } // namespace quda

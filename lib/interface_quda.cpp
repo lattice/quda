@@ -5844,7 +5844,13 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
    y.push_back(ColorSpinorField::Create(cudaParam));
 
    //- We next create some device memory to store the result of the contraction.
-   size_t array_size = (cType == QUDA_CONTRACT_TYPE_OPEN || cType == QUDA_CONTRACT_TYPE_DR) ? x[0]->Volume() : x[0]->X(3); 
+   size_t array_size = x[0]->X(3);
+   if (cType == QUDA_CONTRACT_TYPE_OPEN || cType == QUDA_CONTRACT_TYPE_DR){
+     array_size = x[0]->Volume();
+   } else if (cType == QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL){
+     array_size = x[0]->X(2);
+   }
+   //size_t array_size = (cType == QUDA_CONTRACT_TYPE_OPEN || cType == QUDA_CONTRACT_TYPE_DR) ? x[0]->Volume() : x[0]->X(3);
    size_t data_bytes = array_size * x[0]->Nspin() * x[0]->Nspin() * 2 * x[0]->Precision();
    void *dev_result;
    // The location of the array passed to the kernel depends on the type of 
