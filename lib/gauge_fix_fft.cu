@@ -185,27 +185,29 @@ namespace quda {
 
   template<int Elems, typename Float, typename Gauge, int gauge_dir>
   class GaugeFixQuality : TunableLocalParity {
-    GaugeFixQualityArg<Float, Gauge> &argQ;
+    GaugeFixQualityArg<Float, Gauge> &arg;
     const GaugeField &meta;
     bool tuneGridDim() const { return true; }
 
   public:
-    GaugeFixQuality(GaugeFixQualityArg<Float, Gauge> &argQ, const GaugeField &meta) :
-      argQ(argQ),
+    GaugeFixQuality(GaugeFixQualityArg<Float, Gauge> &arg, const GaugeField &meta) :
+      arg(arg),
       meta(meta) { }
 
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      LAUNCH_KERNEL_LOCAL_PARITY(computeFix_quality, (*this), tp, stream, argQ, Elems, Float, Gauge, gauge_dir);
-      argQ.complete(&argQ.result, stream);
-      argQ.result.x /= (double)(3 * gauge_dir * 2 * argQ.threads);
-      argQ.result.y /= (double)(3 * 2 * argQ.threads);
+      LAUNCH_KERNEL_LOCAL_PARITY(computeFix_quality, (*this), tp, stream, arg, Elems, Float, Gauge, gauge_dir);
+      auto reset = true; // apply is called multiple times with the same arg instance so we need to reset
+      if (!activeTuning()) {
+        arg.result.x /= (double)(3 * gauge_dir * 2 * arg.threads);
+        arg.result.y /= (double)(3 * 2 * arg.threads);
+      }
     }
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
-    long long flops() const { return (36LL * gauge_dir + 65LL) * 2 * argQ.threads; }
-    long long bytes() const { return (2LL * gauge_dir + 2LL) * Elems * 2 * argQ.threads * sizeof(Float); }
+    long long flops() const { return (36LL * gauge_dir + 65LL) * 2 * arg.threads; }
+    long long bytes() const { return (2LL * gauge_dir + 2LL) * Elems * 2 * arg.threads * sizeof(Float); }
   };
 
   template <typename Float>

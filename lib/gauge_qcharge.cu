@@ -33,7 +33,6 @@ namespace quda
     void apply(const qudaStream_t &stream)
     {
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
-	for (int i=0; i<4; i++) ((double*)arg.result_h)[i] = 0.0;
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 #ifdef JITIFY
         using namespace jitify::reflection;

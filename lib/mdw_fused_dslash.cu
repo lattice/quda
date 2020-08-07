@@ -636,8 +636,7 @@ namespace quda
           cache.insert(f);
           setMaxDynamicSharedBytesPerBlock(f);
         }
-        void *args[] = {&arg};
-        qudaLaunchKernel((const void *)f, tp, args, stream);
+        qudaLaunchKernel(f, tp, stream, arg);
       }
 
       // The following apply<...> functions are used to turn the tune parameters into template arguments.

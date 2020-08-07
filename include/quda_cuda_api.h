@@ -20,7 +20,8 @@ namespace quda {
 
   enum qudaError_t {
     qudaSuccess = 0,
-    qudaError   = 1
+    qudaError   = 1,
+    qudaUninitialized = 2
   };
 
   /**
@@ -31,6 +32,20 @@ namespace quda {
      @param[in] stream Stream identifier
   */
   qudaError_t qudaLaunchKernel(const void *func, const TuneParam &tp, void **args, qudaStream_t stream);
+
+  /**
+     @brief Templated wrapper around qudaLaunchKernel which can accept
+     a templated kernel, and expects a kernel with a single Arg argument
+     @param[in] func Device function symbol
+     @param[in] tp TuneParam containing the launch parameters
+     @param[in] args Arguments
+     @param[in] stream Stream identifier
+  */
+  template <typename T, typename Arg> qudaError_t qudaLaunchKernel(T *func, const TuneParam &tp, qudaStream_t stream, Arg &arg)
+  {
+    void *args[] = {&arg};
+    return qudaLaunchKernel((const void*)func, tp, args, stream);
+  }
 
   /**
      @brief Wrapper around cudaMemcpy used for auto-profiling.  Do not

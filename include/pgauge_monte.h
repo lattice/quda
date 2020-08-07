@@ -42,10 +42,10 @@ namespace quda {
    * don't update at 0 and X[d-1] faces.
    *
    * @param[in,out] data Gauge field
-   * @param[in] dir Direcion to exchange
+   * @param[in] n_dim Number of dimensions to exchange
    * @param[in] parity Field parity
    */
-  void PGaugeExchange(GaugeField& data, const int dir, const int parity);
+  void PGaugeExchange(GaugeField& data, const int n_dim, const int parity);
 
   /**
    * @brief Release all allocated memory used to exchange data between nodes

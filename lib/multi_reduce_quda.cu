@@ -16,9 +16,8 @@ namespace quda {
     template <int block_size, typename real, int len, int NXZ, typename Arg>
     typename std::enable_if<block_size!=32, qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
-      void *args[] = {&arg};
       if (tp.block.x == block_size)
-        return qudaLaunchKernel((const void*)multiReduceKernel<block_size, real, len, NXZ, Arg>, tp, args, stream);
+        return qudaLaunchKernel(multiReduceKernel<block_size, real, len, NXZ, Arg>, tp, stream, arg);
       else
         return launch<block_size - 32, real, len, NXZ>(arg, tp, stream);
     }
@@ -26,8 +25,7 @@ namespace quda {
     template <int block_size, typename real, int len, int NXZ, typename Arg>
     typename std::enable_if<block_size==32, qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
-      void *args[] = {&arg};
-      return qudaLaunchKernel((const void*)multiReduceKernel<block_size, real, len, NXZ, Arg>, tp, args, stream);
+      return qudaLaunchKernel(multiReduceKernel<block_size, real, len, NXZ, Arg>, tp, stream, arg);
     }
 
 #ifdef QUDA_FAST_COMPILE_REDUCE
@@ -49,21 +47,17 @@ namespace quda {
                                   .instantiate((int)tp.block.x, Type<real>(), len, NXZ, Type<Arg>())
                                   .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                                   .launch(arg);
+      arg.launch_error = tunable.jitifyError() == CUDA_SUCCESS ? qudaSuccess : qudaError;
 #else
       if (tp.block.x <= max_block_size()) {
-        auto error = launch<max_block_size(), real, len, NXZ>(arg, tp, stream);
-        // flag any failures when tuning so we don't try and complete which could hang
-        if (activeTuning() && error != qudaSuccess) tunable.jitifyError() = CUDA_ERROR_INVALID_VALUE;
+        arg.launch_error = launch<max_block_size(), real, len, NXZ>(arg, tp, stream);
       } else {
-        tunable.jitifyError() = CUDA_ERROR_INVALID_VALUE;
-        if (!activeTuning()) errorQuda("block size %d not instantiated", tp.block.x);
+        errorQuda("block size %d not instantiated", tp.block.x);
       }
 #endif
 
       T *result_ = new T[NXZ * arg.NYW];
-      if (!commAsyncReduction()) {
-        if (tunable.jitifyError() != CUDA_ERROR_INVALID_VALUE) arg.complete(result_, stream);
-      }
+      if (!commAsyncReduction()) arg.complete(result_, stream);
 
       // need to transpose for same order with vector thread reduction
       for (int i = 0; i < NXZ; i++) {

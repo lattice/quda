@@ -165,32 +165,33 @@ namespace quda {
    */
   template<typename Float, typename Gauge, int gauge_dir>
   class GaugeFixQuality : TunableLocalParity {
-    GaugeFixQualityArg<Gauge> &argQ;
+    GaugeFixQualityArg<Gauge> &arg;
     const GaugeField &meta;
     bool tuneGridDim() const { return true; }
 
   public:
-    GaugeFixQuality(GaugeFixQualityArg<Gauge> &argQ, const GaugeField &meta) :
-      argQ(argQ),
+    GaugeFixQuality(GaugeFixQualityArg<Gauge> &arg, const GaugeField &meta) :
+      arg(arg),
       meta(meta)
     { }
 
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      LAUNCH_KERNEL_LOCAL_PARITY(computeFix_quality, (*this), tp, stream, argQ, Float, Gauge, gauge_dir);
-      argQ.complete(&argQ.result, stream);
+      LAUNCH_KERNEL_LOCAL_PARITY(computeFix_quality, (*this), tp, stream, arg, Float, Gauge, gauge_dir);
+      auto reset = true; // apply is called multiple times with the same arg instance so we need to reset
+      arg.complete(&arg.result, stream, true);
       if (!activeTuning()) {
-        comm_allreduce_array((double*)&argQ.result, 2);
-        argQ.result.x /= (double)(3 * gauge_dir * 2 * argQ.threads * comm_size());
-        argQ.result.y /= (double)(3 * 2 * argQ.threads * comm_size());
+        comm_allreduce_array((double*)&arg.result, 2);
+        arg.result.x /= (double)(3 * gauge_dir * 2 * arg.threads * comm_size());
+        arg.result.y /= (double)(3 * 2 * arg.threads * comm_size());
       }
     }
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
-    long long flops() const { return (36LL * gauge_dir + 65LL) * 2 * argQ.threads; }
-    //long long bytes() const { return (1)*2*gauge_dir*argQ.Bytes(); }//no accounting the reduction!!!! argQ.dataOr.Bytes() return 0....
-    long long bytes() const { return 2LL * gauge_dir * 2 * argQ.threads * meta.Reconstruct() * sizeof(Float); }
+    long long flops() const { return (36LL * gauge_dir + 65LL) * meta.Volume(); }
+    //long long bytes() const { return (1)*2*gauge_dir*arg.Bytes(); }
+    long long bytes() const { return 2LL * gauge_dir * meta.Volume() * meta.Reconstruct() * sizeof(Float); }
   };
 
   /**

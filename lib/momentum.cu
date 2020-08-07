@@ -150,6 +150,7 @@ namespace quda {
   };
 
   double computeMomAction(const GaugeField& mom) {
+    if (!mom.isNative()) errorQuda("Unsupported output ordering: %d\n", mom.Order());
     double action = 0.0;
 #ifdef GPU_GAUGE_TOOLS
     instantiate<MomAction, Reconstruct10>(mom, action);
@@ -159,9 +160,10 @@ namespace quda {
     return action;
   }
 
-  template<typename Float, int nColor, QudaReconstructType recon>
-  struct UpdateMomArg : ReduceArg<double2>, BaseArg<Float, nColor, recon>
+  template<typename Float_, int nColor, QudaReconstructType recon>
+  struct UpdateMomArg : ReduceArg<double2>, BaseArg<Float_, nColor, recon>
   {
+    using Float = Float_;
     typename gauge_mapper<Float, QUDA_RECONSTRUCT_10>::type mom;
     typename gauge_mapper<Float, recon>::type force;
     Float coeff;
@@ -192,7 +194,7 @@ namespace quda {
     }
   };
 
-  template <int blockSize, typename Float, typename Arg>
+  template <int blockSize, typename Arg>
   __global__ void UpdateMomKernel(Arg arg) {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     int parity = threadIdx.y;
@@ -207,8 +209,8 @@ namespace quda {
 
 #pragma unroll
       for (int d=0; d<4; d++) {
-	Matrix<complex<Float>,3> m = arg.mom(d, x_cb, parity);
-        Matrix<complex<Float>,3> f = arg.force(d, e_cb, parity);
+	Matrix<complex<typename Arg::Float>,3> m = arg.mom(d, x_cb, parity);
+        Matrix<complex<typename Arg::Float>,3> f = arg.force(d, e_cb, parity);
 
         // project to traceless anti-hermitian prior to taking norm
 	makeAntiHerm(f);
@@ -229,7 +231,7 @@ namespace quda {
     }
 
     // perform final inter-block reduction and write out result
-    reduce2d<blockSize,2,double2,false,max_reducer2>(arg, norm2, 0);
+    reduce2d<blockSize,2,double2,false,max_reducer2>(arg, norm2);
   } // UpdateMom
 
   template <typename Float, int nColor, QudaReconstructType recon>
@@ -244,15 +246,19 @@ namespace quda {
       arg(mom, coeff, force),
       meta(force)
     {
+      double2 force_max;
       apply(0);
-      if (forceMonitor()) forceRecord(*((double2*)arg.result_h), arg.coeff, fname);
+      if (forceMonitor()) {
+        arg.complete(&force_max);
+        forceRecord(force_max, arg.coeff, fname);
+      }
     }
 
     void apply(const qudaStream_t &stream)
     {
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	LAUNCH_KERNEL_LOCAL_PARITY(UpdateMomKernel, (*this), tp, stream, arg, Float);
+        LAUNCH_KERNEL_LOCAL_PARITY(UpdateMomKernel, (*this), tp, stream, arg, decltype(arg));
       } else {
 	errorQuda("CPU not supported yet\n");
       }
