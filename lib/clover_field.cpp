@@ -148,124 +148,12 @@ namespace quda {
       oddInvNorm = oddNorm;
     }
 
-#ifdef USE_TEXTURE_OBJECTS
-    createTexObject(tex, normTex, clover, norm, true);
-    createTexObject(invTex, invNormTex, cloverInv, invNorm, true);
-
-    createTexObject(evenTex, evenNormTex, even, evenNorm, false);
-    createTexObject(oddTex, oddNormTex, odd, oddNorm, false);
-
-    createTexObject(evenInvTex, evenInvNormTex, evenInv, evenInvNorm, false);
-    createTexObject(oddInvTex, oddInvNormTex, oddInv, oddInvNorm, false);
-#endif
     twisted = param.twisted;
     mu2 = param.mu2;
-
   }
-
-#ifdef USE_TEXTURE_OBJECTS
-  void cudaCloverField::createTexObject(cudaTextureObject_t &tex, cudaTextureObject_t &texNorm,
-					void *field, void *norm, bool full) {
-    if (isNative()) {
-      // create the texture for the field components
-      
-      cudaChannelFormatDesc desc;
-      memset(&desc, 0, sizeof(cudaChannelFormatDesc));
-      if (precision == QUDA_SINGLE_PRECISION) desc.f = cudaChannelFormatKindFloat;
-      else desc.f = cudaChannelFormatKindSigned; // half is short, double is int2
-      
-      // always four components regardless of precision
-      desc.x = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
-      desc.y = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
-      desc.z = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
-      desc.w = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
-      int texel_size = 4 * (precision == QUDA_DOUBLE_PRECISION ? sizeof(int) : precision);
-
-      cudaResourceDesc resDesc;
-      memset(&resDesc, 0, sizeof(resDesc));
-      resDesc.resType = cudaResourceTypeLinear;
-      resDesc.res.linear.devPtr = field;
-      resDesc.res.linear.desc = desc;
-      resDesc.res.linear.sizeInBytes = bytes/(!full ? 2 : 1);
-
-      if (resDesc.res.linear.sizeInBytes % deviceProp.textureAlignment != 0
-          || !is_aligned(resDesc.res.linear.devPtr, deviceProp.textureAlignment)) {
-        errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
-                  resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
-      }
-
-      unsigned long texels = resDesc.res.linear.sizeInBytes / texel_size;
-      if (texels > (unsigned)deviceProp.maxTexture1DLinear) {
-	errorQuda("Attempting to bind too large a texture %lu > %d", texels, deviceProp.maxTexture1DLinear);
-      }
-
-      cudaTextureDesc texDesc;
-      memset(&texDesc, 0, sizeof(texDesc));
-      if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
-        texDesc.readMode = cudaReadModeNormalizedFloat;
-      else
-        texDesc.readMode = cudaReadModeElementType;
-
-      cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
-      checkCudaError();
-      
-      // create the texture for the norm components
-      if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
-        cudaChannelFormatDesc desc;
-	memset(&desc, 0, sizeof(cudaChannelFormatDesc));
-	desc.f = cudaChannelFormatKindFloat;
-	desc.x = 8*QUDA_SINGLE_PRECISION; desc.y = 0; desc.z = 0; desc.w = 0;
-	
-	cudaResourceDesc resDesc;
-	memset(&resDesc, 0, sizeof(resDesc));
-	resDesc.resType = cudaResourceTypeLinear;
-	resDesc.res.linear.devPtr = norm;
-	resDesc.res.linear.desc = desc;
-	resDesc.res.linear.sizeInBytes = norm_bytes/(!full ? 2 : 1);
-
-        if (!is_aligned(resDesc.res.linear.devPtr, deviceProp.textureAlignment)) {
-          errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
-                    resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
-        }
-
-        cudaTextureDesc texDesc;
-        memset(&texDesc, 0, sizeof(texDesc));
-        texDesc.readMode = cudaReadModeElementType;
-
-        cudaCreateTextureObject(&texNorm, &resDesc, &texDesc, NULL);
-	checkCudaError();
-      }
-    }
-
-  }
-
-  void cudaCloverField::destroyTexObject() {
-    if (isNative()) {
-      cudaDestroyTextureObject(tex);
-      cudaDestroyTextureObject(invTex);
-      cudaDestroyTextureObject(evenTex);
-      cudaDestroyTextureObject(oddTex);
-      cudaDestroyTextureObject(evenInvTex);
-      cudaDestroyTextureObject(oddInvTex);
-      if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
-        cudaDestroyTextureObject(normTex);
-	cudaDestroyTextureObject(invNormTex);
-	cudaDestroyTextureObject(evenNormTex);
-	cudaDestroyTextureObject(oddNormTex);
-	cudaDestroyTextureObject(evenInvNormTex);
-	cudaDestroyTextureObject(oddInvNormTex);
-      }
-      checkCudaError();
-    }
-  }
-#endif
 
   cudaCloverField::~cudaCloverField()
   {
-#ifdef USE_TEXTURE_OBJECTS
-    destroyTexObject();
-#endif
-
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
       if (clover != cloverInv) {
 	if (clover) pool_device_free(clover);
@@ -373,12 +261,12 @@ namespace quda {
     checkCudaError();
   }
 
-  void cudaCloverField::prefetch(QudaFieldLocation mem_space, cudaStream_t stream) const
+  void cudaCloverField::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
   {
     prefetch(mem_space, stream, CloverPrefetchType::BOTH_CLOVER_PREFETCH_TYPE);
   }
 
-  void cudaCloverField::prefetch(QudaFieldLocation mem_space, cudaStream_t stream, CloverPrefetchType type,
+  void cudaCloverField::prefetch(QudaFieldLocation mem_space, qudaStream_t stream, CloverPrefetchType type,
                                  QudaParity parity) const
   {
     if (is_prefetch_enabled()) {
@@ -437,13 +325,9 @@ namespace quda {
   /**
      Computes Fmunu given the gauge field U
   */
-  void cudaCloverField::compute(const cudaGaugeField &gauge) {
-
-    if (gauge.Precision() != precision) 
-      errorQuda("Gauge and clover precisions must match");
-
-    computeClover(*this, gauge, 1.0, QUDA_CUDA_FIELD_LOCATION);
-
+  void cudaCloverField::compute(const cudaGaugeField &gauge)
+  {
+    computeClover(*this, gauge, 1.0);
   }
 
   cpuCloverField::cpuCloverField(const CloverFieldParam &param) : CloverField(param) {

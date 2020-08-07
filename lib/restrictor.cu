@@ -1,6 +1,5 @@
 #include <color_spinor_field.h>
 #include <tune_quda.h>
-#include <typeinfo>
 #include <launch_kernel.cuh>
 
 #include <jitify_helper.cuh>
@@ -50,7 +49,7 @@ namespace quda {
       strcat(vol, in.VolString());
     } // block size is checkerboard fine length / full coarse length
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       if (location == QUDA_CPU_FIELD_LOCATION) {
         if (out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
           RestrictArg<Float,vFloat,fineSpin,fineColor,coarseSpin,coarseColor,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>
@@ -286,7 +285,7 @@ namespace quda {
                 int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int * const * spin_map, int parity)
   {
 #ifdef GPU_MULTIGRID
-    if (out.FieldOrder() != in.FieldOrder() ||        out.FieldOrder() != v.FieldOrder())
+    if (out.FieldOrder() != in.FieldOrder() || out.FieldOrder() != v.FieldOrder())
       errorQuda("Field orders do not match (out=%d, in=%d, v=%d)",
                 out.FieldOrder(), in.FieldOrder(), v.FieldOrder());
 

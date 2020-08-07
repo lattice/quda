@@ -129,12 +129,12 @@ namespace quda {
     GaugePhase(Arg &arg, const GaugeField &meta)
       : TunableVectorY(2), arg(arg), meta(meta) { }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       gaugePhaseKernel<Arg> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
     }
 
-    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
 
     void preTune() { arg.u.save(); }
     void postTune() { arg.u.load(); }

@@ -11,7 +11,7 @@ namespace quda {
     DiracWilson(param, nDim),
     mu(param.mu),
     epsilon(param.epsilon),
-    clover(*(param.clover))
+    clover(param.clover)
   {
   }
 
@@ -40,15 +40,15 @@ namespace quda {
   {
     Dirac::checkParitySpinor(out, in);
 
-    if (out.Volume() != clover.VolumeCB())
-      errorQuda("Parity spinor volume %lu doesn't match clover checkboard volume %lu", out.Volume(), clover.VolumeCB());
+    if (out.Volume() != clover->VolumeCB())
+      errorQuda("Parity spinor volume %lu doesn't match clover checkboard volume %lu", out.Volume(), clover->VolumeCB());
   }
 
   // Protected method for applying twist
   void DiracTwistedClover::twistedCloverApply(ColorSpinorField &out, const ColorSpinorField &in, const QudaTwistGamma5Type twistType, const int parity) const
   {
     checkParitySpinor(out, in);
-    ApplyTwistClover(out, in, clover, kappa, mu, 0.0, parity, dagger, twistType);
+    ApplyTwistClover(out, in, *clover, kappa, mu, 0.0, parity, dagger, twistType);
 
     if (twistType == QUDA_TWIST_GAMMA5_INVERSE) flops += 1056ll*in.Volume();
     else flops += 552ll*in.Volume();
@@ -73,7 +73,7 @@ namespace quda {
 
     if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
       // k * D * in + (1 + i*2*mu*kappa*gamma_5) *x
-      ApplyTwistedClover(out, in, *gauge, clover, k, 2 * mu * kappa, x, parity, dagger, commDim, profile);
+      ApplyTwistedClover(out, in, *gauge, *clover, k, 2 * mu * kappa, x, parity, dagger, commDim, profile);
       flops += (1320ll + 552ll) * in.Volume();
 
     } else {
@@ -92,7 +92,7 @@ namespace quda {
     }
 
     ApplyTwistedClover(
-        out, in, *gauge, clover, -kappa, 2.0 * kappa * mu, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+        out, in, *gauge, *clover, -kappa, 2.0 * kappa * mu, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
     flops += (1320ll + 552ll) * in.Volume();
   }
 
@@ -124,16 +124,16 @@ namespace quda {
     // do nothing
   }
 
-  void DiracTwistedClover::prefetch(QudaFieldLocation mem_space, cudaStream_t stream) const
+  void DiracTwistedClover::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
   {
     Dirac::prefetch(mem_space, stream);
-    clover.prefetch(mem_space, stream, CloverPrefetchType::CLOVER_CLOVER_PREFETCH_TYPE);
+    clover->prefetch(mem_space, stream, CloverPrefetchType::CLOVER_CLOVER_PREFETCH_TYPE);
   }
 
   void DiracTwistedClover::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
 					  double kappa, double mass, double mu, double mu_factor) const {
     double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
-    CoarseOp(Y, X, T, *gauge, &clover, kappa, a, mu_factor, QUDA_TWISTED_CLOVER_DIRAC, QUDA_MATPC_INVALID);
+    CoarseOp(Y, X, T, *gauge, clover, kappa, a, mu_factor, QUDA_TWISTED_CLOVER_DIRAC, QUDA_MATPC_INVALID);
   }
 
   DiracTwistedCloverPC::DiracTwistedCloverPC(const DiracTwistedCloverPC &dirac) :
@@ -186,7 +186,7 @@ namespace quda {
       DiracWilson::Dslash(out, *tmp2, parity);
       deleteTmp(&tmp2, reset);
     } else {
-      ApplyTwistedCloverPreconditioned(out, in, *gauge, clover, 1.0, -2.0 * kappa * mu, false, in, parity, dagger,
+      ApplyTwistedCloverPreconditioned(out, in, *gauge, *clover, 1.0, -2.0 * kappa * mu, false, in, parity, dagger,
                                        commDim, profile);
       flops += (1320ll + 552ll) * in.Volume();
     }
@@ -211,7 +211,7 @@ namespace quda {
       deleteTmp(&tmp2, reset);
     } else {
       ApplyTwistedCloverPreconditioned(
-          out, in, *gauge, clover, k, -2.0 * kappa * mu, true, x, parity, dagger, commDim, profile);
+          out, in, *gauge, *clover, k, -2.0 * kappa * mu, true, x, parity, dagger, commDim, profile);
       flops += (1320ll + 552ll) * in.Volume();
     }
   }
@@ -337,10 +337,10 @@ namespace quda {
   void DiracTwistedCloverPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
 					    double kappa, double mass, double mu, double mu_factor) const {
     double a = -2.0 * kappa * mu * T.Vectors().TwistFlavor();
-    CoarseOp(Y, X, T, *gauge, &clover, kappa, a, -mu_factor, QUDA_TWISTED_CLOVERPC_DIRAC, matpcType);
+    CoarseOp(Y, X, T, *gauge, clover, kappa, a, -mu_factor, QUDA_TWISTED_CLOVERPC_DIRAC, matpcType);
   }
 
-  void DiracTwistedCloverPC::prefetch(QudaFieldLocation mem_space, cudaStream_t stream) const
+  void DiracTwistedCloverPC::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
   {
     Dirac::prefetch(mem_space, stream);
 
@@ -349,10 +349,10 @@ namespace quda {
     QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
 
     if (symmetric) {
-      clover.prefetch(mem_space, stream, CloverPrefetchType::INVERSE_CLOVER_PREFETCH_TYPE);
+      clover->prefetch(mem_space, stream, CloverPrefetchType::INVERSE_CLOVER_PREFETCH_TYPE);
     } else {
-      clover.prefetch(mem_space, stream, CloverPrefetchType::INVERSE_CLOVER_PREFETCH_TYPE, parity[0]);
-      clover.prefetch(mem_space, stream, CloverPrefetchType::CLOVER_CLOVER_PREFETCH_TYPE, parity[1]);
+      clover->prefetch(mem_space, stream, CloverPrefetchType::INVERSE_CLOVER_PREFETCH_TYPE, parity[0]);
+      clover->prefetch(mem_space, stream, CloverPrefetchType::CLOVER_CLOVER_PREFETCH_TYPE, parity[1]);
     }
   }
 } // namespace quda

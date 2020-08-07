@@ -1,8 +1,7 @@
-#include <multigrid.h>
-#include <qio_field.h>
-#include <string.h>
+#include <cstring>
 
-#include <eigensolve_quda.h>
+#include <multigrid.h>
+#include <vector_io.h>
 
 namespace quda
 {
@@ -89,8 +88,9 @@ namespace quda
             }
           }
           if (param.mg_global.num_setup_iter[param.level] > 0) {
-            if (strcmp(param.mg_global.vec_infile[param.level], "")
-                != 0) { // only load if infile is defined and not computing
+            if (param.mg_global.vec_load[param.level] == QUDA_BOOLEAN_TRUE
+                && strcmp(param.mg_global.vec_infile[param.level], "")
+                  != 0) { // only load if infile is defined and not computing
               loadVectors(param.B);
             } else if (param.mg_global.use_eig_solver[param.level]) {
               generateEigenVectors(); // Run the eigensolver
@@ -1151,7 +1151,8 @@ namespace quda
       vec_infile += std::to_string(param.level);
       vec_infile += "_nvec_";
       vec_infile += std::to_string(param.mg_global.n_vec[param.level]);
-      EigenSolver::loadVectors(B, vec_infile);
+      VectorIO io(vec_infile);
+      io.load(B);
       popLevel(param.level);
       profile_global.TPSTOP(QUDA_PROFILE_IO);
       if (is_running) profile_global.TPSTART(QUDA_PROFILE_INIT);
@@ -1172,7 +1173,8 @@ namespace quda
       vec_outfile += std::to_string(param.level);
       vec_outfile += "_nvec_";
       vec_outfile += std::to_string(param.mg_global.n_vec[param.level]);
-      EigenSolver::saveVectors(B, vec_outfile);
+      VectorIO io(vec_outfile);
+      io.save(B);
       popLevel(param.level);
       profile_global.TPSTOP(QUDA_PROFILE_IO);
       if (is_running) profile_global.TPSTART(QUDA_PROFILE_INIT);
@@ -1559,12 +1561,12 @@ namespace quda
     pushLevel(param.level);
 
     // Extract eigensolver params
-    int nConv = param.mg_global.eig_param[param.level]->nConv;
+    int n_conv = param.mg_global.eig_param[param.level]->n_conv;
     bool dagger = param.mg_global.eig_param[param.level]->use_dagger;
     bool normop = param.mg_global.eig_param[param.level]->use_norm_op;
 
     // Dummy array to keep the eigensolver happy.
-    std::vector<Complex> evals(nConv, 0.0);
+    std::vector<Complex> evals(n_conv, 0.0);
 
     std::vector<ColorSpinorField *> B_evecs;
     ColorSpinorParam csParam(*param.B[0]);
@@ -1573,7 +1575,7 @@ namespace quda
     // This is the vector precision used by matResidual
     csParam.setPrecision(param.mg_global.invert_param->cuda_prec_sloppy, QUDA_INVALID_PRECISION, true);
 
-    for (int i = 0; i < nConv; i++) B_evecs.push_back(ColorSpinorField::Create(csParam));
+    for (int i = 0; i < n_conv; i++) B_evecs.push_back(ColorSpinorField::Create(csParam));
 
     // before entering the eigen solver, lets free the B vectors to save some memory
     ColorSpinorParam bParam(*param.B[0]);

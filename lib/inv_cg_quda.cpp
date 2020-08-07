@@ -220,6 +220,8 @@ namespace quda {
 
   void CG::operator()(ColorSpinorField &x, ColorSpinorField &b, ColorSpinorField *p_init, double r2_old_init)
   {
+    if (param.is_preconditioner && param.global_reduction == false) commGlobalReductionSet(false);
+
     if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
       errorQuda("Not supported");
     if (checkPrecision(x, b) != param.precision)
@@ -238,7 +240,6 @@ namespace quda {
 
     if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_INIT);
 
-    // Check to see that we're not trying to invert on a zero-field source
     double b2 = blas::norm2(b);
 
     // Check to see that we're not trying to invert on a zero-field source
@@ -344,7 +345,7 @@ namespace quda {
     double beta = 0.0;
 
     // for alternative reliable updates
-    if(alternative_reliable){
+    if (alternative_reliable) {
       // estimate norm for reliable updates
       mat(r, b, y, tmp3);
       Anorm = sqrt(blas::norm2(r)/b2);
@@ -541,7 +542,6 @@ namespace quda {
       if ( !(updateR || updateX )) {
         beta = sigma / r2_old;  // use the alternative beta computation
 
-
         if (param.pipeline && !breakdown) {
 
 	  if (Np == 1) {
@@ -556,30 +556,27 @@ namespace quda {
 	  } else {
 
 	    if ( (j+1)%Np == 0 ) {
-	      const auto alpha_ = std::unique_ptr<Complex[]>(new Complex[Np]);
-	      for (int i=0; i<Np; i++) alpha_[i] = alpha[i];
 	      std::vector<ColorSpinorField*> x_;
 	      x_.push_back(&xSloppy);
-	      blas::caxpy(alpha_.get(), p, x_);
-	      blas::flops -= 4*j*xSloppy.RealLength(); // correct for over flop count since using caxpy
-	    }
+              blas::axpy(alpha, p, x_);
+            }
 
-	    //p[(k+1)%Np] = r + beta * p[k%Np]
-	    blas::xpayz(rSloppy, beta, *p[j], *p[(j+1)%Np]);
-	  }
-	}
+            // p[(k+1)%Np] = r + beta * p[k%Np]
+            blas::xpayz(rSloppy, beta, *p[j], *p[(j + 1) % Np]);
+          }
+        }
 
-	if (use_heavy_quark_res && k%heavy_quark_check==0) {
-	  if (&x != &xSloppy) {
+        if (use_heavy_quark_res && k % heavy_quark_check == 0) {
+          if (&x != &xSloppy) {
 	    blas::copy(tmp,y);
 	    heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy, tmp, rSloppy).z);
 	  } else {
 	    blas::copy(r, rSloppy);
 	    heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x, y, r).z);
 	  }
-	}
+        }
 
-	// alternative reliable updates
+        // alternative reliable updates
 	if (alternative_reliable) {
 	  d = d_new;
 	  pnorm = pnorm + alpha[j] * alpha[j]* (ppnorm);
@@ -593,15 +590,12 @@ namespace quda {
       } else {
 
 	{
-	  const auto alpha_ = std::unique_ptr<Complex[]>(new Complex[Np]);
-	  for (int i=0; i<=j; i++) alpha_[i] = alpha[i];
 	  std::vector<ColorSpinorField*> x_;
 	  x_.push_back(&xSloppy);
 	  std::vector<ColorSpinorField*> p_;
 	  for (int i=0; i<=j; i++) p_.push_back(p[i]);
-	  blas::caxpy(alpha_.get(), p_, x_);
-	  blas::flops -= 4*j*xSloppy.RealLength(); // correct for over flop count since using caxpy
-	}
+          blas::axpy(alpha, p_, x_);
+        }
 
         blas::copy(x, xSloppy); // nop when these pointers alias
 
@@ -731,14 +725,11 @@ namespace quda {
 
       // if we have converged and need to update any trailing solutions
       if (converged && steps_since_reliable > 0 && (j+1)%Np != 0 ) {
-	const auto alpha_ = std::unique_ptr<Complex[]>(new Complex[Np]);
-	for (int i=0; i<=j; i++) alpha_[i] = alpha[i];
 	std::vector<ColorSpinorField*> x_;
 	x_.push_back(&xSloppy);
 	std::vector<ColorSpinorField*> p_;
 	for (int i=0; i<=j; i++) p_.push_back(p[i]);
-	blas::caxpy(alpha_.get(), p_, x_);
-	blas::flops -= 4*j*xSloppy.RealLength(); // correct for over flop count since using caxpy
+        blas::axpy(alpha, p_, x_);
       }
 
       j = steps_since_reliable == 0 ? 0 : (j+1)%Np; // if just done a reliable update then reset j
@@ -780,6 +771,8 @@ namespace quda {
 
       profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     }
+
+    if (param.is_preconditioner && param.global_reduction == false) commGlobalReductionSet(true);
   }
 
 // use BlockCGrQ algortithm or BlockCG (with / without GS, see BLOCKCG_GS option)

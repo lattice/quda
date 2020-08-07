@@ -214,9 +214,8 @@ namespace quda {
       writeAuxString("prec=%lu,stride=%d,extract=%d,dimension=%d,geometry=%d",
 		     sizeof(Float),arg.order.stride, extract, dim, arg.order.geometry);
     }
-    virtual ~ExtractGhostEx() { ; }
   
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       if (extract) {
 	if (location==QUDA_CPU_FIELD_LOCATION) {
 	  extractGhostEx<Float,length,nDim,dim,Order,true>(arg);
@@ -435,11 +434,7 @@ namespace quda {
 				 void **ghost, bool extract) {
 
     if (u.Precision() == QUDA_DOUBLE_PRECISION) {
-#if QUDA_PRECISION & 8
       extractGhostEx(u, dim, R, (double**)ghost, extract);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
-#endif
     } else if (u.Precision() == QUDA_SINGLE_PRECISION) {
 #if QUDA_PRECISION & 4
       extractGhostEx(u, dim, R, (float**)ghost, extract);
@@ -448,14 +443,19 @@ namespace quda {
 #endif
     } else if (u.Precision() == QUDA_HALF_PRECISION) {
 #if QUDA_PRECISION & 2
-      extractGhostEx(u, dim, R, (short**)ghost, extract);      
+      extractGhostEx(u, dim, R, (short **)ghost, extract);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#endif
+    } else if (u.Precision() == QUDA_QUARTER_PRECISION) {
+#if QUDA_PRECISION & 1
+      extractGhostEx(u, dim, R, (char **)ghost, extract);
 #else
       errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
 #endif
     } else {
       errorQuda("Unknown precision type %d", u.Precision());
     }
-
   }
 
 } // namespace quda

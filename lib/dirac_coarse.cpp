@@ -83,7 +83,6 @@ namespace quda {
     init_cpu(enable_cpu ? false : true),
     mapped(dirac.mapped)
   {
-
   }
 
   DiracCoarse::~DiracCoarse()
@@ -373,7 +372,7 @@ namespace quda {
     }
   }
 
-  void DiracCoarse::prefetch(QudaFieldLocation mem_space, cudaStream_t stream) const
+  void DiracCoarse::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
   {
     Dirac::prefetch(mem_space, stream);
     if (Y_d) Y_d->prefetch(mem_space, stream);
@@ -592,7 +591,7 @@ namespace quda {
     }
   }
 
-  void DiracCoarsePC::prefetch(QudaFieldLocation mem_space, cudaStream_t stream) const
+  void DiracCoarsePC::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
   {
     Dirac::prefetch(mem_space, stream);
     if (Xinv_d) Xinv_d->prefetch(mem_space, stream);

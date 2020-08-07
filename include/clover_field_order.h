@@ -14,7 +14,6 @@
 #include <quda_matrix.h>
 #include <color_spinor.h>
 #include <trove_helper.cuh>
-#include <texture_helper.cuh>
 #include <transform_reduce.h>
 
 namespace quda {
@@ -468,10 +467,10 @@ namespace quda {
 	__host__ double norm1(int dim=-1, bool global=true) const {
           double nrm1 = accessor.transform_reduce(location, abs_<double, Float>(), 0.0, plus<double>());
           if (global) comm_allreduce(&nrm1);
-	  return nrm1;
-	}
+          return nrm1;
+        }
 
-	/**
+        /**
 	 * @brief Returns the L2 norm suared of the field
 	 * @param[in] dim Which dimension we are taking the norm of (dummy for clover)
 	 * @return L1 norm
@@ -479,10 +478,10 @@ namespace quda {
 	__host__ double norm2(int dim=-1, bool global=true) const {
           double nrm2 = accessor.transform_reduce(location, square_<double, Float>(), 0.0, plus<double>());
           if (global) comm_allreduce(&nrm2);
-	  return nrm2;
-	}
+          return nrm2;
+        }
 
-	/**
+        /**
 	 * @brief Returns the Linfinity norm of the field
 	 * @param[in] dim Which dimension we are taking the Linfinity norm of (dummy for clover)
 	 * @return Linfinity norm
@@ -490,10 +489,10 @@ namespace quda {
 	__host__ double abs_max(int dim=-1, bool global=true) const {
           double absmax = accessor.transform_reduce(location, abs_<Float, Float>(), 0.0, maximum<Float>());
           if (global) comm_allreduce_max(&absmax);
-	  return absmax;
-	}
+          return absmax;
+        }
 
-	/**
+        /**
 	 * @brief Returns the minimum absolute value of the field
 	 * @param[in] dim Which dimension we are taking the minimum abs of (dummy for clover)
 	 * @return Minimum norm
@@ -502,9 +501,8 @@ namespace quda {
           double absmax = accessor.transform_reduce(location, abs_<Float, Float>(), std::numeric_limits<double>::max(),
                                                     minimum<Float>());
           if (global) comm_allreduce_min(&absmax);
-	  return absmax;
-	}
-
+          return absmax;
+        }
       };
 
     /**
@@ -532,11 +530,6 @@ namespace quda {
       norm_type *norm;
       const AllocInt offset; // offset can be 32-bit or 64-bit
       const AllocInt norm_offset;
-#ifdef USE_TEXTURE_OBJECTS
-	typedef typename TexVectorType<real, N>::type TexVector;
-	cudaTextureObject_t tex;
-	cudaTextureObject_t normTex;
-#endif
 	const int volumeCB;
 	const int stride;
 
@@ -553,10 +546,6 @@ namespace quda {
                     bool override = false) :
           offset(clover.Bytes() / (2 * sizeof(Float) * N)),
           norm_offset(clover.NormBytes() / (2 * sizeof(norm_type))),
-#ifdef USE_TEXTURE_OBJECTS
-          tex(0),
-          normTex(0),
-#endif
           volumeCB(clover.VolumeCB()),
           stride(clover.Stride()),
           twisted(clover.Twisted()),
@@ -569,21 +558,6 @@ namespace quda {
 	{
 	  this->clover = clover_ ? clover_ : (Float*)(clover.V(is_inverse));
           this->norm = norm_ ? norm_ : (norm_type *)(clover.Norm(is_inverse));
-#ifdef USE_TEXTURE_OBJECTS
-	  if (clover.Location() == QUDA_CUDA_FIELD_LOCATION) {
-	    if (is_inverse) {
-	      tex = static_cast<const cudaCloverField&>(clover).InvTex();
-	      normTex = static_cast<const cudaCloverField&>(clover).InvNormTex();
-	    } else {
-	      tex = static_cast<const cudaCloverField&>(clover).Tex();
-	      normTex = static_cast<const cudaCloverField&>(clover).NormTex();
-	    }
-	    if (!huge_alloc && (this->clover != clover.V(is_inverse) ||
-				((clover.Precision() == QUDA_HALF_PRECISION || clover.Precision() == QUDA_QUARTER_PRECISION) && this->norm != clover.Norm(is_inverse)) ) && !override) {
-	      errorQuda("Cannot use texture read since data pointer does not equal field pointer - use with huge_alloc=true instead");
-	    }
-	  }
-#endif
 	}
 
 	bool Twisted() const { return twisted; }
@@ -631,36 +605,17 @@ namespace quda {
         {
           norm_type nrm;
           if (isFixed<Float>::value) {
-#if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
-            nrm = !huge_alloc ? tex1Dfetch_<float>(normTex, parity * norm_offset + chirality * stride + x) :
-                                norm[parity * norm_offset + chirality * stride + x];
-#else
             nrm = vector_load<float>(norm, parity * norm_offset + chirality * stride + x);
-#endif
           }
 
 #pragma unroll
 	  for (int i=0; i<M; i++) {
-#if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
-	    if (!huge_alloc) { // use textures unless we have a huge alloc
-                               // first do texture load from memory
-              TexVector vecTmp = tex1Dfetch_<TexVector>(tex, parity * offset + stride * (chirality * M + i) + x);
-              // now insert into output array
+            // first load from memory
+            Vector vecTmp = vector_load<Vector>(clover, parity * offset + x + stride * (chirality * M + i));
+            // second do scalar copy converting into register type
 #pragma unroll
-              for (int j = 0; j < N; j++) {
-                copy(v[i * N + j], reinterpret_cast<real *>(&vecTmp)[j]);
-                if (isFixed<Float>::value) v[i * N + j] *= nrm;
-              }
-            } else
-#endif
-	    {
-              // first load from memory
-              Vector vecTmp = vector_load<Vector>(clover, parity * offset + x + stride * (chirality * M + i));
-              // second do scalar copy converting into register type
-#pragma unroll
-              for (int j = 0; j < N; j++) { copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm); }
-            }
-	  }
+            for (int j = 0; j < N; j++) { copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm); }
+          }
 
           if (add_rho) for (int i=0; i<6; i++) v[i] += rho;
         }

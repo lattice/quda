@@ -145,16 +145,15 @@ namespace quda {
       break;
     case QUDA_CG3_INVERTER:
       report("CG3");
-      solver = new CG3(mat, matSloppy, param, profile);
+      solver = new CG3(mat, matSloppy, matPrecon, param, profile);
       break;
     case QUDA_CG3NE_INVERTER:
       report("CG3NE");
-      solver = new CG3NE(mat, matSloppy, param, profile);
+      solver = new CG3NE(mat, matSloppy, matPrecon, param, profile);
       break;
     case QUDA_CG3NR_INVERTER:
       report("CG3NR");
-      // CG3NR is included in CG3NE
-      solver = new CG3NE(mat, matSloppy, param, profile);
+      solver = new CG3NR(mat, matSloppy, matPrecon, param, profile);
       break;
     default:
       errorQuda("Invalid solver type %d", param.inv_type);
@@ -181,23 +180,23 @@ namespace quda {
     csParam.setPrecision(param.precision_precondition, QUDA_INVALID_PRECISION, true);
 
     if (deflate_compute) {
-      evecs.reserve(param.eig_param.nConv);
-      evals.reserve(param.eig_param.nConv);
+      evecs.reserve(param.eig_param.n_conv);
+      evals.reserve(param.eig_param.n_conv);
 
       deflation_space *space = reinterpret_cast<deflation_space *>(param.eig_param.preserve_deflation_space);
 
       if (space && space->evecs.size() != 0) {
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Restoring deflation space of size %lu\n", space->evecs.size());
 
-        if ((!space->svd && param.eig_param.nConv != (int)space->evecs.size())
-            || (space->svd && 2 * param.eig_param.nConv != (int)space->evecs.size()))
+        if ((!space->svd && param.eig_param.n_conv != (int)space->evecs.size())
+            || (space->svd && 2 * param.eig_param.n_conv != (int)space->evecs.size()))
           errorQuda("Preserved deflation space size %lu does not match expected %d", space->evecs.size(),
-                    param.eig_param.nConv);
+                    param.eig_param.n_conv);
 
         // move vectors from preserved space to local space
         for (auto &vec : space->evecs) evecs.push_back(vec);
 
-        if (param.eig_param.nConv != (int)space->evals.size())
+        if (param.eig_param.n_conv != (int)space->evals.size())
           errorQuda("Preserved eigenvalues %lu does not match expected %lu", space->evals.size(), evals.size());
 
         // move vectors from preserved space to local space
@@ -213,10 +212,10 @@ namespace quda {
         deflate_compute = false;
       } else {
         // Computing the deflation space, rather than transferring, so we create space.
-        for (int i = 0; i < param.eig_param.nConv; i++) evecs.push_back(ColorSpinorField::Create(csParam));
+        for (int i = 0; i < param.eig_param.n_conv; i++) evecs.push_back(ColorSpinorField::Create(csParam));
 
-        evals.resize(param.eig_param.nConv);
-        for (int i = 0; i < param.eig_param.nConv; i++) evals[i] = 0.0;
+        evals.resize(param.eig_param.n_conv);
+        for (int i = 0; i < param.eig_param.n_conv; i++) evals[i] = 0.0;
       }
     }
 
@@ -292,7 +291,7 @@ namespace quda {
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     // This is the vector precision used by matResidual
     csParam.setPrecision(param.precision_precondition, QUDA_INVALID_PRECISION, true);
-    for (int i = param.eig_param.nConv; i < 2 * param.eig_param.nConv; i++) {
+    for (int i = param.eig_param.n_conv; i < 2 * param.eig_param.n_conv; i++) {
       evecs.push_back(ColorSpinorField::Create(csParam));
     }
   }

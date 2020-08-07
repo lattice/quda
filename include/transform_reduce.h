@@ -1,11 +1,12 @@
 #pragma once
+#include <typeinfo>
 
 #include <cub_helper.cuh>
 #include <uint_to_char.h>
 #include <tune_quda.h>
 
 /**
-   @file transform_reandom.h
+   @file transform_reduce.h
 
    @brief QUDA reimplementation of thrust::transform_reduce as well as
    wrappers also implementing thrust::reduce.
@@ -33,7 +34,7 @@ namespace quda
   template <typename reduce_t, typename T, typename count_t, typename transformer, typename reducer>
   struct TransformReduceArg : public ReduceArg<reduce_t> {
     static constexpr int block_size = 512;
-    static constexpr int n_batch_max = 4;
+    static constexpr int n_batch_max = 8;
     const T *v[n_batch_max];
     count_t n_items;
     int n_batch;
@@ -122,7 +123,7 @@ namespace quda
       if (location == QUDA_CPU_FIELD_LOCATION) strcat(aux, ",cpu");
     }
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 

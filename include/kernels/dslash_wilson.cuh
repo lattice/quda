@@ -33,7 +33,7 @@ namespace quda
     const F in;   /** input vector field */
     const F x;    /** input vector when doing xpay */
     const G U;    /** the gauge field */
-    const real a; /** xpay scale facotor - can be -kappa or -kappa^2 */
+    const real a; /** xpay scale factor - can be -kappa or -kappa^2 */
 
     WilsonArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
               const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :

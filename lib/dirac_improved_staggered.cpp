@@ -4,8 +4,12 @@
 
 namespace quda {
 
-  DiracImprovedStaggered::DiracImprovedStaggered(const DiracParam &param)
-    : Dirac(param), fatGauge(*(param.fatGauge)), longGauge(*(param.longGauge)) { }
+  DiracImprovedStaggered::DiracImprovedStaggered(const DiracParam &param) :
+    Dirac(param),
+    fatGauge(param.fatGauge),
+    longGauge(param.longGauge)
+  {
+  }
 
   DiracImprovedStaggered::DiracImprovedStaggered(const DiracImprovedStaggered &dirac)
     : Dirac(dirac), fatGauge(dirac.fatGauge), longGauge(dirac.longGauge) { }
@@ -37,9 +41,9 @@ namespace quda {
 		in.SiteSubset(), out.SiteSubset());
     }
 
-    if ((out.Volume()/out.X(4) != 2*fatGauge.VolumeCB() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
-	(out.Volume()/out.X(4) != fatGauge.VolumeCB() && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
-      errorQuda("Spinor volume %lu doesn't match gauge volume %lu", out.Volume(), fatGauge.VolumeCB());
+    if ((out.Volume() / out.X(4) != 2 * fatGauge->VolumeCB() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET)
+        || (out.Volume() / out.X(4) != fatGauge->VolumeCB() && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET)) {
+      errorQuda("Spinor volume %lu doesn't match gauge volume %lu", out.Volume(), fatGauge->VolumeCB());
     }
   }
 
@@ -47,7 +51,7 @@ namespace quda {
   {
     checkParitySpinor(in, out);
 
-    ApplyImprovedStaggered(out, in, fatGauge, longGauge, 0., in, parity, dagger, commDim, profile);
+    ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, 0., in, parity, dagger, commDim, profile);
     flops += 1146ll*in.Volume();
   }
 
@@ -61,13 +65,13 @@ namespace quda {
       // There's a sign convention difference for Dslash vs DslashXpay, which is
       // triggered by looking for k == 0. We need to hack around this.
       if (dagger == QUDA_DAG_YES) {
-        ApplyImprovedStaggered(out, in, fatGauge, longGauge, 0., x, parity, QUDA_DAG_NO, commDim, profile);
+        ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, 0., x, parity, QUDA_DAG_NO, commDim, profile);
       } else {
-        ApplyImprovedStaggered(out, in, fatGauge, longGauge, 0., x, parity, QUDA_DAG_YES, commDim, profile);
+        ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, 0., x, parity, QUDA_DAG_YES, commDim, profile);
       }
       flops += 1146ll * in.Volume();
     } else {
-      ApplyImprovedStaggered(out, in, fatGauge, longGauge, k, x, parity, dagger, commDim, profile);
+      ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, k, x, parity, dagger, commDim, profile);
       flops += 1158ll * in.Volume();
     }
   }
@@ -79,13 +83,16 @@ namespace quda {
     // Need to flip sign via dagger convention if mass == 0.
     if (mass == 0.0) {
       if (dagger == QUDA_DAG_YES) {
-        ApplyImprovedStaggered(out, in, fatGauge, longGauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_NO, commDim, profile);
+        ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_NO, commDim,
+                               profile);
       } else {
-        ApplyImprovedStaggered(out, in, fatGauge, longGauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim, profile);
+        ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim,
+                               profile);
       }
       flops += 1146ll * in.Volume();
     } else {
-      ApplyImprovedStaggered(out, in, fatGauge, longGauge, 2. * mass, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+      ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, 2. * mass, in, QUDA_INVALID_PARITY, dagger, commDim,
+                             profile);
       flops += 1158ll * in.Volume();
     }
   }
@@ -126,14 +133,14 @@ namespace quda {
   void DiracImprovedStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa,
                                               double mass, double mu, double mu_factor) const
   {
-    StaggeredCoarseOp(Y, X, T, fatGauge, mass, QUDA_ASQTAD_DIRAC, QUDA_MATPC_INVALID);
+    StaggeredCoarseOp(Y, X, T, *fatGauge, mass, QUDA_ASQTAD_DIRAC, QUDA_MATPC_INVALID);
   }
 
-  void DiracImprovedStaggered::prefetch(QudaFieldLocation mem_space, cudaStream_t stream) const
+  void DiracImprovedStaggered::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
   {
     Dirac::prefetch(mem_space, stream);
-    fatGauge.prefetch(mem_space, stream);
-    longGauge.prefetch(mem_space, stream);
+    fatGauge->prefetch(mem_space, stream);
+    longGauge->prefetch(mem_space, stream);
   }
 
   DiracImprovedStaggeredPC::DiracImprovedStaggeredPC(const DiracParam &param)

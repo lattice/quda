@@ -1,10 +1,8 @@
 #include <cstdio>
 #include <cstdlib>
-#include <cuda.h>
+
 #include <tune_quda.h>
 #include <gauge_field.h>
-#include <cassert>
-
 #include <jitify_helper.cuh>
 #include <kernels/clover_deriv.cuh>
 
@@ -72,7 +70,7 @@ namespace quda {
     }
     virtual ~CloverDerivative() {}
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 #ifdef JITIFY
       using namespace jitify::reflection;

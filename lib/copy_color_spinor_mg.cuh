@@ -62,7 +62,7 @@ namespace quda {
       : out(out), in(in), meta(meta), location(location) { }
     virtual ~CopySpinor() { ; }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       if (location == QUDA_CPU_FIELD_LOCATION) {
 	packSpinor<FloatOut, FloatIn, Ns, Nc>(out, in, meta.VolumeCB());
       } else {
