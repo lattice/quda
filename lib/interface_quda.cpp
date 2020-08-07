@@ -4926,8 +4926,8 @@ double momActionQuda(void* momentum, QudaGaugeParam* param)
 
   // create the device fields
   gParam.create = QUDA_NULL_FIELD_CREATE;
-  gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   gParam.reconstruct = QUDA_RECONSTRUCT_10;
+  gParam.setPrecision(param->cuda_prec, true);
 
   cudaGaugeField *cudaMom = !param->use_resident_mom ? new cudaGaugeField(gParam) : nullptr;
 
