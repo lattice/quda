@@ -93,7 +93,26 @@ namespace quda {
   {
     // do nothing
   }
+  
+  void DiracOverlapWilson::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+				   ColorSpinorField &x, ColorSpinorField &b, 
+				   const QudaSolutionType solType) const
+  {
+    if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
+      errorQuda("Preconditioned solution requires a preconditioned solve_type");
+    }
+    
+    src = &b;
+    sol = &x;
+  }
+  
+  void DiracOverlapWilson::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
+				       const QudaSolutionType solType) const
+  {
+    // do nothing
+  }
 
+  
   DiracOverlapWilsonPC::DiracOverlapWilsonPC(const DiracParam &param)
     : DiracOverlapWilson(param)
   {
