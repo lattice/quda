@@ -246,7 +246,7 @@ http://lattice.github.com/quda .
 *  Steven Gottlieb (Indiana University) 
 *  Kyriakos Hadjiyiannakou (Cyprus)
 *  Dean Howarth (Boston University)
-*  Balint Joo (Jefferson Laboratory)
+*  Balint Joo (OLCF, Oak Ridge National Laboratory, formerly Jefferson Laboratory)
 *  Hyung-Jin Kim (Samsung Advanced Institute of Technology)
 *  Bartek Kostrzewa (Bonn)
 *  Eloy Romero (William and Mary)
