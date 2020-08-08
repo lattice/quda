@@ -530,6 +530,84 @@ namespace quda {
     virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
   };
 
+  // Full exponential clover
+  class DiracCloverExp : public DiracClover {
+
+  protected:
+    cudaCloverField cloverOrigin;
+
+  public:
+    DiracCloverExp(const DiracParam &param);
+    DiracCloverExp(const DiracCloverExp &dirac);
+    virtual ~DiracCloverExp();
+    DiracCloverExp& operator=(const DiracCloverExp &dirac);
+
+    // Everything except for consturct function is inherited from parent
+  };
+
+  
+  // Even-odd preconditioned exponential clover
+  class DiracCloverExpPC : public DiracCloverExp {
+
+  public:
+    DiracCloverExpPC(const DiracParam &param);
+    DiracCloverExpPC(const DiracCloverExpPC &dirac);
+    virtual ~DiracCloverPC();
+    DiracCloverExpPC& operator=(const DiracCloverExpPC &dirac);
+
+    // Clover is inherited from parent
+
+    // Clover Inv is new
+    void CloverInv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+
+    // Dslash is redefined as A_pp^{-1} D_p\bar{p}
+    void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
+		const QudaParity parity) const;
+
+    // out = x + k A_pp^{-1} D_p\bar{p}
+    void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
+		    const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+
+    // Can implement: M as e.g. :  i) tmp_e = A^{-1}_ee D_eo in_o  (Dslash)
+    //                            ii) out_o = in_o + A_oo^{-1} D_oe tmp_e (AXPY)
+    void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    // squared op
+    void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+		 ColorSpinorField &x, ColorSpinorField &b,
+		 const QudaSolutionType) const;
+    void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
+		     const QudaSolutionType) const;
+
+    /**
+     * @brief Create the coarse even-odd preconditioned clover
+     * operator.  Unlike the Wilson operator, the coarsening of the
+     * preconditioned clover operator differs from that of the
+     * unpreconditioned clover operator, so we need to specialize it.
+     *
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param kappa Kappa parameter for the coarse operator
+     * @param mass Mass parameter for the coarse operator (set to zero)
+     */
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
+			double kappa, double mass=0., double mu=0., double mu_factor=0.) const;
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      all relevant memory fields (gauge, clover, temporary spinors).
+      Will only grab the inverse clover unless the clover field
+      is needed for asymmetric preconditioning
+      to the CPU or GPU as requested
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
+    */
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
+  };
+
   // Full clover with Hasenbusch Twist
   //
   //    [ A_ee                      -k D_eo ]
