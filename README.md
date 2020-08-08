@@ -260,7 +260,7 @@ http://lattice.github.com/quda .
 *  Mathias Wagner (NVIDIA)
 *  Andre Walker-Loud (Lawrence Berkley Laboratory)
 *  Evan Weinberg (NVIDIA)
-*  Frank Winter (Jlab)
+*  Frank Winter (Jefferson Lab)
 *  Yi-Bo Yang (Chinese Academy of Sciences)
 
 
