@@ -6,7 +6,7 @@ namespace quda {
 
   DiracCloverExp::DiracCloverExp(const DiracParam &param) : DiracClover(param), cloverOrigin(param.clover) 
   {
-    std::cout << "DiracCloverExp struct success." << std::endl;
+    printfQuda("DiracCloverExp struct success.\n");
   }
 
   DiracCloverExp::DiracCloverExp(const DiracCloverExp &dirac) : DiracClover(dirac), cloverOrigin(dirac.cloverOrigin) {}
