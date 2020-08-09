@@ -1240,6 +1240,32 @@ extern "C" {
         void *s_q, void *s_qbar);
 
   /**
+   * Performs HWilson on a given spinor using the gauge field
+   * @param h_out  Result spinor field
+   * @param h_in   Input spinor field
+   * @param param  Contains all metadata regarding host and device
+   *               storage and operator which will be applied to the spinor
+   */ 
+  void ApplyHWilsonQUDA(void *h_out, void *h_in, QudaInvertParam *inv_param);
+
+  /**
+   * Performs HWilson on a given spinor using the gauge field
+   * @param h_out  Result spinor field
+   * @param h_in   Input spinor field
+   * @param param  Contains all metadata regarding host and device
+   *               storage and operator which will be applied to the spinor
+   * @param k0	   scale factor on x 
+   * @param k1	   scale factor on eps5
+   * @param k2     scale factor on eps
+   * @param prec   precision
+   * @param_ov_param Hwilson eigensystem and chebychev informations.
+   */ 
+
+
+  void ApplyOverlapQUDA(void *h_out, void *h_in, QudaInvertParam *inv_param, double k0, double k1,double k2, double prec,
+       void *_ov_param);
+
+  /**
    * Performs Wuppertal smearing on a given spinor using the gauge field
    * gaugeSmeared, if it exist, or gaugePrecise if no smeared field is present.
    * @param h_out  Result spinor field

@@ -616,6 +616,32 @@ namespace quda {
 			double kappa, double mu, double epsilon, int parity, int dagger, QudaTwistGamma5Type twist);
 
   /**
+     @brief Apply Hwilson matrix field to a color-spinor field
+     @param[out] out Result color-spinor field
+     @param[in] in Input color-spinor field
+     @param[in] U Gauge-Link (1-link or fat-link)
+     @param[in] kappa kappa parameter
+     @param[in] x Vector field we accumulate onto to
+     @param[in] Field parity (if color-spinor field is single parity)
+     @param[in] dagger Whether we are applying the dagger or not
+  */
+
+  void ApplyHWilson(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+      double kappa, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile);
+
+
+ /**
+     @brief Apply Hwilson matrix field to a color-spinor field
+     @param[out] out Result color-spinor field
+     @param[in] in Input color-spinor field
+     @param[in] k0 scale factor on x 
+     @param[in] k1 scale factor on 1+aD
+     @param[in] k2 scale factor on g5(1+aD)
+  */
+
+  void ApplyOverlapLinop(ColorSpinorField &out, const ColorSpinorField &in, double k0, double k1, double k2);
+
+  /**
      @brief Dslash face packing routine
      @param[out] ghost_buf Array of packed halos, order is [2*dim+dir]
      @param[in] field ColorSpinorField to be packed
