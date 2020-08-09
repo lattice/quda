@@ -27,7 +27,6 @@ namespace quda {
 #ifdef JITIFY
         create_jitify_program("kernels/clover_exponential.cuh");
 #endif
-        for 
         apply(0);
         checkCudaError();
       }
@@ -55,9 +54,7 @@ namespace quda {
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
     long long flops() const { return 0; } 
-    long long bytes() const { return 2*arg.clover.volumeCB*(arg.inverse.Bytes() + arg.clover.Bytes()); } 
-    void preTune() { if (arg.clover.clover == arg.inverse.clover) arg.inverse.save(); }
-    void postTune() { if (arg.clover.clover == arg.inverse.clover) arg.inverse.load(); }
+    long long bytes() const { return 2*arg.clover.volumeCB*(arg.clover.Bytes()); } 
   };
 
   // this is the function that is actually called, from here on down we instantiate all required templates

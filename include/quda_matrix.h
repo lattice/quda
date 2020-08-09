@@ -412,6 +412,15 @@ namespace quda {
       return a(0,0) + a(1,1) + a(2,2);
     }
 
+  template <typename T, int N>
+    __device__ __host__ inline T getTrace(const HMatrix<T,N>& a)
+    {
+      T trace = static_cast<T>(0.0);
+#pragma unroll
+      for (int i=0; i<N; i++) trace+=a.data[i];
+      return trace;
+    }
+
 
   template< template<typename,int> class Mat, class T>
     __device__ __host__ inline  T getDeterminant(const Mat<T,3> & a){

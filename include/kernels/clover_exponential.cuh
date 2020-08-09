@@ -31,15 +31,6 @@ namespace quda
     }
   };
 
-  template <class T, int N>
-  __device__ __host__ inline T getTrace(HMatrix<T, N> &a)
-  {
-    T trace = static_cast<T>(0.0);
-#pragma unroll
-    for (int i=0; i<N; i++) trace+=a.data[i];
-    return trace;
-  }
-
   /**
      Make exponential clover term based on normal one.
    */
@@ -52,7 +43,7 @@ namespace quda
 
     real mass = static_cast<real>(arg.mass);
     real invMass = static_cast<real>(1.0) / mass;
-    constexpr int order = arg.order;
+    int order = arg.order;
     real *c = arg.c;
 
     c[0] = static_cast<real>(1.0);
@@ -71,7 +62,7 @@ namespace quda
       A *= static_cast<real>(2.0); // factor of two is inherent to QUDA clover storage
 
       A *= invMass;
-      A -= static_cast<real>(1.0);
+      A += static_cast<real>(-1.0);
 
       Mat A2 = A * A;
       Mat A3 = A2 * A;
@@ -109,10 +100,12 @@ namespace quda
       for (int i=0; i<6; i++)
         q[i] *= static_cast<real>(mass);
       
-      Mat A_exp = q[3] + q[4] * A + q[5] * A2;
+      Mat A_exp = q[5] * A2 + q[4] * A;
+      A_exp += q[3];
       A_exp *= A3;
-      A_exp += q[0] + q[1] * A + q[2] * A2;
-      A_exp *= static_cast<real>(0.5)
+      A_exp += q[2] * A2 + q[1] * A;
+      A_exp += q[0];
+      A_exp *= static_cast<real>(0.5);
 
       arg.clover(x_cb, parity, ch) = A_exp;
     }
