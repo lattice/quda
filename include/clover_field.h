@@ -235,6 +235,8 @@ namespace quda {
     friend class DiracCloverPC;
     friend class DiracTwistedClover;
     friend class DiracTwistedCloverPC;
+    friend class DiracCloverExp;
+    friend class DiracCloverExpPC;
     friend struct FullClover;
   };
 
@@ -334,6 +336,17 @@ namespace quda {
      @param computeTraceLog Whether to compute the trace logarithm of the clover term
   */
   void cloverInvert(CloverField &clover, bool computeTraceLog);
+
+  /**
+     @brief This function compute and stores the exponential matrix of each clover matrix
+     (only calculate the direct field)
+
+     @param clover The clover field to store the exponential matrix (also as an input)
+     @param N Calculate the exponential approximately by evaluating the Taylor expansion up to order N
+     @param mass Mass in dirac.
+     @param inverse Whether to make the inversed exponential clover field
+  */
+  void cloverExponential(CloverField &clover, int N, double mass, bool inverse);
 
   /**
      @brief This function adds a real scalar onto the clover diagonal (only to the direct field not the inverse)

@@ -534,7 +534,7 @@ namespace quda {
   class DiracCloverExp : public DiracClover {
 
   protected:
-    cudaCloverField cloverOrigin;
+    double mass;
 
   public:
     DiracCloverExp(const DiracParam &param);
