@@ -4,11 +4,13 @@
 
 namespace quda {
 
-  DiracCloverExp::DiracCloverExp(const DiracParam &param) : DiracClover(param){
-     printfQuda("DiracCloverExp struct success.\n");
+  DiracCloverExp::DiracCloverExp(const DiracParam &param) : DiracClover(param), mass(param.mass)
+  {
+    printfQuda("DiracCloverExp struct success.\n");
+    cloverExponential(*clover, 18, mass, false);
   }
 
-  DiracCloverExp::DiracCloverExp(const DiracCloverExp &dirac) : DiracClover(dirac){}
+  DiracCloverExp::DiracCloverExp(const DiracCloverExp &dirac) : DiracClover(dirac), mass(dirac.mass) {}
 
   DiracCloverExp::~DiracCloverExp() { }
 
@@ -16,6 +18,7 @@ namespace quda {
   {
     if (&dirac != this) {
       DiracClover::operator=(dirac);
+      mass = dirac.mass;
     }
     return *this;
   }
@@ -28,6 +31,7 @@ namespace quda {
   {
     // For the preconditioned operator, we need to check that the inverse of the clover term is present
     if (!clover->cloverInv) errorQuda("Clover inverse required for DiracCloverExpPC");
+    cloverInvert(*clover, false);
   }
 
   DiracCloverExpPC::DiracCloverExpPC(const DiracCloverExpPC &dirac) : DiracCloverExp(dirac) { }
@@ -37,7 +41,7 @@ namespace quda {
   DiracCloverExpPC& DiracCloverExpPC::operator=(const DiracCloverExpPC &dirac)
   {
     if (&dirac != this) {
-      DiracClover::operator=(dirac);
+      DiracCloverExp::operator=(dirac);
     }
     return *this;
   }

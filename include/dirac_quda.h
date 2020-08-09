@@ -533,6 +533,9 @@ namespace quda {
   // Full exponential clover
   class DiracCloverExp : public DiracClover {
 
+  protected:
+    double mass;
+
   public:
     DiracCloverExp(const DiracParam &param);
     DiracCloverExp(const DiracCloverExp &dirac);

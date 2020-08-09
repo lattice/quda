@@ -66,7 +66,8 @@ set (QUDA_OBJS
   blas_quda.cu multi_blas_quda.cu reduce_quda.cu
   multi_reduce_quda.cu reduce_helper.cu
   contract.cu comm_common.cpp
-  clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
+  clover_deriv_quda.cu clover_invert.cu
+  clover_exponential.cu copy_gauge_extended.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cu spinor_noise.cu
   copy_color_spinor_dd.cu copy_color_spinor_ds.cu
   copy_color_spinor_dh.cu copy_color_spinor_dq.cu
