@@ -45,7 +45,7 @@ set (QUDA_OBJS
   clover_field.cpp lattice_field.cpp gauge_field.cpp
   cpu_gauge_field.cpp cuda_gauge_field.cpp extract_gauge_ghost.cu
   extract_gauge_ghost_mg.cu max_gauge.cu gauge_update_quda.cu
-  max_clover.cu dirac_clover.cpp dirac_wilson.cpp dirac_staggered.cpp
+  max_clover.cu dirac_clover.cpp dirac_clover_exp.cpp dirac_wilson.cpp dirac_staggered.cpp
   dirac_clover_hasenbusch_twist.cpp
   dirac_improved_staggered.cpp dirac_domain_wall.cpp
   dirac_domain_wall_4d.cpp dirac_mobius.cpp dirac_twisted_clover.cpp

@@ -4,12 +4,11 @@
 
 namespace quda {
 
-  DiracCloverExp::DiracCloverExp(const DiracParam &param) : DiracClover(param), cloverOrigin(param.clover) 
-  {
-    printfQuda("DiracCloverExp struct success.\n");
+  DiracCloverExp::DiracCloverExp(const DiracParam &param) : DiracClover(param){
+     printfQuda("DiracCloverExp struct success.\n");
   }
 
-  DiracCloverExp::DiracCloverExp(const DiracCloverExp &dirac) : DiracClover(dirac), cloverOrigin(dirac.cloverOrigin) {}
+  DiracCloverExp::DiracCloverExp(const DiracCloverExp &dirac) : DiracClover(dirac){}
 
   DiracCloverExp::~DiracCloverExp() { }
 
@@ -17,7 +16,6 @@ namespace quda {
   {
     if (&dirac != this) {
       DiracClover::operator=(dirac);
-      clover = dirac.clover;
     }
     return *this;
   }

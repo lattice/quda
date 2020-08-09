@@ -533,9 +533,6 @@ namespace quda {
   // Full exponential clover
   class DiracCloverExp : public DiracClover {
 
-  protected:
-    cudaCloverField cloverOrigin;
-
   public:
     DiracCloverExp(const DiracParam &param);
     DiracCloverExp(const DiracCloverExp &dirac);
@@ -552,7 +549,7 @@ namespace quda {
   public:
     DiracCloverExpPC(const DiracParam &param);
     DiracCloverExpPC(const DiracCloverExpPC &dirac);
-    virtual ~DiracCloverPC();
+    virtual ~DiracCloverExpPC();
     DiracCloverExpPC& operator=(const DiracCloverExpPC &dirac);
 
     // Clover is inherited from parent

@@ -233,6 +233,8 @@ namespace quda {
 
     friend class DiracClover;
     friend class DiracCloverPC;
+    friend class DiracCloverExp;
+    friend class DiracCloverExpPC;
     friend class DiracTwistedClover;
     friend class DiracTwistedCloverPC;
     friend struct FullClover;
