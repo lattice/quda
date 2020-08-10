@@ -302,6 +302,24 @@ namespace quda {
     typedef float type;
   };
 
+#ifdef QUAD_SUM
+  template <> struct scalar<doubledouble> {
+    typedef doubledouble type;
+  };
+  template <> struct scalar<doubledouble2> {
+    typedef doubledouble type;
+  };
+  template <> struct scalar<doubledouble3> {
+    typedef doubledouble type;
+  };
+  template <> struct scalar<doubledouble4> {
+    typedef doubledouble type;
+  };
+  template <> struct vector<doubledouble, 2> {
+    typedef doubledouble2 type;
+  };
+#endif
+
   /* Traits used to determine if a variable is half precision or not */
   template< typename T > struct isHalf{ static const bool value = false; };
   template<> struct isHalf<short>{ static const bool value = true; };
@@ -485,7 +503,7 @@ namespace quda {
     __device__ __host__ inline VectorType vector_load(const void *ptr, int idx)
   {
 #if (__CUDA_ARCH__ >= 320 && __CUDA_ARCH__ < 520)
-    return __ldg(reinterpret_cast< VectorType* >(ptr) + idx);
+    return __ldg(reinterpret_cast< const VectorType* >(ptr) + idx);
 #else
     return reinterpret_cast< const VectorType * >(ptr)[idx];
 #endif

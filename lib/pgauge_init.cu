@@ -8,7 +8,6 @@
 #include <unitarization_links.h>
 #include <pgauge_monte.h>
 #include <random_quda.h>
-#include <cub_helper.cuh>
 #include <index_helper.cuh>
 
 #ifndef PI
@@ -108,8 +107,6 @@ namespace quda {
     init.apply(0);
     checkCudaError();
   }
-
-
 
   template<typename Float>
   void InitGaugeField( cudaGaugeField& data) {
