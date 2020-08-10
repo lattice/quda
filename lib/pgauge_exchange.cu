@@ -14,6 +14,12 @@ namespace quda {
     int X[4]; // grid dimensions
     using Gauge = typename gauge_mapper<Float, recon>::type;
     Gauge dataOr;
+    int size;
+    complex<Float> *array;
+    int parity;
+    int face;
+    int dir;
+    int borderid;
     GaugeFixUnPackArg(GaugeField & data)
       : dataOr(data)
     {
@@ -21,46 +27,46 @@ namespace quda {
     }
   };
 
-  template<int NElems, typename Float, bool pack, typename Arg>
-  __global__ void Kernel_UnPack(int size, Arg arg, complex<Float> *array, int parity, int face, int dir, int borderid)
+  template <int NElems, typename Float, bool pack, typename Arg>
+  __global__ void Kernel_UnPack(Arg arg)
   {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if ( idx >= size ) return;
+    if ( idx >= arg.size ) return;
     int X[4];
     for ( int dr = 0; dr < 4; ++dr ) X[dr] = arg.X[dr];
     int x[4];
     int za, xodd;
-    switch ( face ) {
+    switch ( arg.face ) {
     case 0: //X FACE
       za = idx / ( X[1] / 2);
       x[3] = za / X[2];
       x[2] = za - x[3] * X[2];
-      x[0] = borderid;
-      xodd = (borderid + x[2] + x[3] + parity) & 1;
+      x[0] = arg.borderid;
+      xodd = (arg.borderid + x[2] + x[3] + arg.parity) & 1;
       x[1] = (2 * idx + xodd)  - za * X[1];
       break;
     case 1: //Y FACE
       za = idx / ( X[0] / 2);
       x[3] = za / X[2];
       x[2] = za - x[3] * X[2];
-      x[1] = borderid;
-      xodd = (borderid  + x[2] + x[3] + parity) & 1;
+      x[1] = arg.borderid;
+      xodd = (arg.borderid  + x[2] + x[3] + arg.parity) & 1;
       x[0] = (2 * idx + xodd)  - za * X[0];
       break;
     case 2: //Z FACE
       za = idx / ( X[0] / 2);
       x[3] = za / X[1];
       x[1] = za - x[3] * X[1];
-      x[2] = borderid;
-      xodd = (borderid  + x[1] + x[3] + parity) & 1;
+      x[2] = arg.borderid;
+      xodd = (arg.borderid  + x[1] + x[3] + arg.parity) & 1;
       x[0] = (2 * idx + xodd)  - za * X[0];
       break;
     case 3: //T FACE
       za = idx / ( X[0] / 2);
       x[2] = za / X[1];
       x[1] = za - x[2] * X[1];
-      x[3] = borderid;
-      xodd = (borderid  + x[1] + x[2] + parity) & 1;
+      x[3] = arg.borderid;
+      xodd = (arg.borderid  + x[1] + x[2] + arg.parity) & 1;
       x[0] = (2 * idx + xodd)  - za * X[0];
       break;
     }
@@ -72,16 +78,16 @@ namespace quda {
     Complex data[9];
 
     if (pack) {
-      arg.dataOr.load(data, id, dir, parity);
+      arg.dataOr.load(data, id, arg.dir, arg.parity);
       arg.dataOr.reconstruct.Pack(tmp, data, id);
-      for ( int i = 0; i < NElems / 2; ++i ) array[idx + size * i] = Complex(tmp[2*i+0], tmp[2*i+1]);
+      for ( int i = 0; i < NElems / 2; ++i ) arg.array[idx + arg.size * i] = Complex(tmp[2*i+0], tmp[2*i+1]);
     } else {
       for ( int i = 0; i < NElems / 2; ++i ) {
-        tmp[2*i+0] = array[idx + size * i].real();
-        tmp[2*i+1] = array[idx + size * i].imag();
+        tmp[2*i+0] = arg.array[idx + arg.size * i].real();
+        tmp[2*i+1] = arg.array[idx + arg.size * i].imag();
       }
-      arg.dataOr.reconstruct.Unpack(data, tmp, id, dir, 0, arg.dataOr.X, arg.dataOr.R);
-      arg.dataOr.save(data, id, dir, parity);
+      arg.dataOr.reconstruct.Unpack(data, tmp, id, arg.dir, 0, arg.dataOr.X, arg.dataOr.R);
+      arg.dataOr.save(data, id, arg.dir, arg.parity);
     }
   }
 
@@ -184,22 +190,31 @@ namespace quda {
         }
       }
 
-      GaugeFixUnPackArg<Float, recon> dataexarg(data);
+      GaugeFixUnPackArg<Float, recon> arg(data);
 
       for (int d = 0; d < 4; d++) {
         if ( !commDimPartitioned(d)) continue;
         comm_start(mh_recv_back[d]);
         comm_start(mh_recv_fwd[d]);
 
-        dim3 block = make_uint3(128, 1, 1);
-        dim3 grid = make_uint3((data.SurfaceCB(d) + block.x - 1) / block.x, 1, 1);
+        TuneParam tp;
+        tp.block = make_uint3(128, 1, 1);
+        tp.grid = make_uint3((data.SurfaceCB(d) + tp.block.x - 1) / tp.block.x, 1, 1);
+
+        arg.size = data.SurfaceCB(d);
+        arg.parity = parity;
+        arg.face = d;
+        arg.dir = dir;
 
         //extract top face
-        Kernel_UnPack<recon, Float, true> <<< grid, block, 0, GFStream[0] >>>
-          (data.SurfaceCB(d), dataexarg, reinterpret_cast<complex<Float>*>(send_d[d]), parity, d, dir, X[d] -  data.R()[d] - 1);
+        arg.array = reinterpret_cast<complex<Float>*>(send_d[d]); 
+        arg.borderid = X[d] - data.R()[d] - 1;
+        qudaLaunchKernel(Kernel_UnPack<recon, Float, true, decltype(arg)>, tp, GFStream[0], arg);
+
         //extract bottom
-        Kernel_UnPack<recon, Float, true> <<< grid, block, 0, GFStream[1] >>>
-          (data.SurfaceCB(d), dataexarg, reinterpret_cast<complex<Float>*>(sendg_d[d]), parity, d, dir, data.R()[d]);
+        arg.array = reinterpret_cast<complex<Float>*>(sendg_d[d]);
+        arg.borderid = data.R()[d];
+        qudaLaunchKernel(Kernel_UnPack<recon, Float, true, decltype(arg)>, tp, GFStream[1], arg);
 
         cudaMemcpyAsync(send[d], send_d[d], bytes[d], cudaMemcpyDeviceToHost, GFStream[0]);
         cudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], cudaMemcpyDeviceToHost, GFStream[1]);
@@ -213,14 +228,16 @@ namespace quda {
         comm_wait(mh_recv_back[d]);
         cudaMemcpyAsync(recv_d[d], recv[d], bytes[d], cudaMemcpyHostToDevice, GFStream[0]);
 
-        Kernel_UnPack<recon, Float, false> <<< grid, block, 0, GFStream[0] >>>
-          (data.SurfaceCB(d), dataexarg, reinterpret_cast<complex<Float>*>(recv_d[d]), parity, d, dir, data.R()[d] - 1);
+        arg.array = reinterpret_cast<complex<Float>*>(recv_d[d]);
+        arg.borderid = data.R()[d] - 1;
+        qudaLaunchKernel(Kernel_UnPack<recon, Float, false, decltype(arg)>, tp, GFStream[0], arg);
 
         comm_wait(mh_recv_fwd[d]);
         cudaMemcpyAsync(recvg_d[d], recvg[d], bytes[d], cudaMemcpyHostToDevice, GFStream[1]);
 
-        Kernel_UnPack<recon, Float, false> <<< grid, block, 0, GFStream[1] >>>
-          (data.SurfaceCB(d), dataexarg, reinterpret_cast<complex<Float>*>(recvg_d[d]), parity, d, dir, X[d] - data.R()[d]);
+        arg.array = reinterpret_cast<complex<Float>*>(recvg_d[d]);
+        arg.borderid = X[d] - data.R()[d];
+        qudaLaunchKernel(Kernel_UnPack<recon, Float, false, decltype(arg)>, tp, GFStream[1], arg);
 
         comm_wait(mh_send_back[d]);
         comm_wait(mh_send_fwd[d]);

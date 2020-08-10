@@ -47,8 +47,8 @@ namespace quda {
     }
   };
 
-  template <int direction, typename Float>
-  __global__ void fft_rotate_kernel_2D2D(GaugeFixFFTRotateArg<Float> arg){ //Cmplx *data_in, Cmplx *data_out){
+  template <int direction, typename Arg>
+  __global__ void fft_rotate_kernel_2D2D(Arg arg){ //Cmplx *data_in, Cmplx *data_out){
     int id = blockIdx.x * blockDim.x + threadIdx.x;
     if ( id >= arg.threads ) return;
     if ( direction == 0 ) {
@@ -76,9 +76,9 @@ namespace quda {
     }
   }
 
-  template<typename Float>
+  template <typename Float, typename Arg>
   class GaugeFixFFTRotate : Tunable {
-    GaugeFixFFTRotateArg<Float> &arg;
+    Arg &arg;
     const GaugeField &meta;
     int direction;
     unsigned int sharedBytesPerThread() const { return 0; }
@@ -87,7 +87,7 @@ namespace quda {
     unsigned int minThreads() const { return arg.threads; }
 
     public:
-    GaugeFixFFTRotate(GaugeFixFFTRotateArg<Float> &arg, const GaugeField &meta) :
+    GaugeFixFFTRotate(Arg &arg, const GaugeField &meta) :
       arg(arg),
       meta(meta)
     {
@@ -102,12 +102,9 @@ namespace quda {
 
     void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      if ( direction == 0 )
-        fft_rotate_kernel_2D2D<0, Float > <<< tp.grid, tp.block, 0, stream >>> (arg);
-      else if ( direction == 1 )
-        fft_rotate_kernel_2D2D<1, Float > <<< tp.grid, tp.block, 0, stream >>> (arg);
-      else
-        errorQuda("Error in GaugeFixFFTRotate option.\n");
+      if ( direction == 0 )      qudaLaunchKernel(fft_rotate_kernel_2D2D<0, Arg>, tp, stream, arg);
+      else if ( direction == 1 ) qudaLaunchKernel(fft_rotate_kernel_2D2D<1, Arg>, tp, stream, arg);
+      else                       errorQuda("Error in GaugeFixFFTRotate option.\n");
     }
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
@@ -199,6 +196,7 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       LAUNCH_KERNEL_LOCAL_PARITY(computeFix_quality, (*this), tp, stream, arg, Elems, Float, Gauge, gauge_dir);
       auto reset = true; // apply is called multiple times with the same arg instance so we need to reset
+      arg.complete(&arg.result, stream, reset);
       if (!activeTuning()) {
         arg.result.x /= (double)(3 * gauge_dir * 2 * arg.threads);
         arg.result.y /= (double)(3 * 2 * arg.threads);
@@ -274,7 +272,7 @@ namespace quda {
 
     void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      kernel_gauge_set_invpsq<Float> <<< tp.grid, tp.block, 0, stream >>> (arg);
+      qudaLaunchKernel(kernel_gauge_set_invpsq<Float>, tp, stream, arg);
     }
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
@@ -307,7 +305,7 @@ namespace quda {
 
     void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      kernel_gauge_mult_norm_2D<Float> <<< tp.grid, tp.block, 0, stream >>> (arg);
+      qudaLaunchKernel(kernel_gauge_mult_norm_2D<Float>, tp, stream, arg);
     }
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
@@ -455,7 +453,7 @@ namespace quda {
 
     void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      kernel_gauge_fix_U_EO_NEW<Float, Gauge> <<< tp.grid, tp.block, 0, stream >>> (arg, dataOr, half_alpha);
+      qudaLaunchKernel(kernel_gauge_fix_U_EO_NEW<Float, Gauge>, tp, stream, arg, dataOr, half_alpha);
     }
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
@@ -531,7 +529,7 @@ namespace quda {
 
     void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      kernel_gauge_GX<Elems, Float> <<< tp.grid, tp.block, 0, stream >>> (arg, half_alpha);
+      qudaLaunchKernel(kernel_gauge_GX<Elems, Float>, tp, stream, arg, half_alpha);
     }
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
@@ -617,7 +615,7 @@ namespace quda {
 
     void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      kernel_gauge_fix_U_EO<Elems, Float, Gauge> <<< tp.grid, tp.block, 0, stream >>> (arg, dataOr);
+      qudaLaunchKernel(kernel_gauge_fix_U_EO<Elems, Float, Gauge>, tp, stream, arg, dataOr);
     }
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
@@ -662,7 +660,7 @@ namespace quda {
     SetPlanFFT2DMany( plan_xy, size, 1, arg.delta);    //with space only XY
 
     GaugeFixFFTRotateArg<Float> arg_rotate(data);
-    GaugeFixFFTRotate<Float> GFRotate(arg_rotate, data);
+    GaugeFixFFTRotate<Float, decltype(arg_rotate)> GFRotate(arg_rotate, data);
 
     GaugeFixSETINVPSP<Float> setinvpsp(arg, data);
     setinvpsp.apply(0);

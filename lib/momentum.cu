@@ -339,7 +339,7 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      ApplyUKernel<<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+      qudaLaunchKernel(ApplyUKernel<decltype(arg)>, tp, stream, arg);
     }
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }

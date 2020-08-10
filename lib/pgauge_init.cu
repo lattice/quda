@@ -71,7 +71,7 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      compute_InitGauge_ColdStart<<< tp.grid,tp.block >>> (arg);
+      qudaLaunchKernel(compute_InitGauge_ColdStart<decltype(arg)>, tp, stream, arg);
     }
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
@@ -278,7 +278,7 @@ namespace quda {
 
     void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      compute_InitGauge_HotStart<<<tp.grid,tp.block>>>(arg);
+      qudaLaunchKernel(compute_InitGauge_HotStart<decltype(arg)>, tp, stream, arg);
     }
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }

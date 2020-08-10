@@ -17,62 +17,62 @@ namespace quda {
 #define LAUNCH_KERNEL_GAUGEFIX(kernel, tp, stream, arg, parity, ...)                                                   \
   if (tp.aux.x == 0) {                                                                                                 \
     switch (tp.block.x) {                                                                                              \
-    case 256: kernel<0, 32, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 512: kernel<0, 64, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 768: kernel<0, 96, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 1024: kernel<0, 128, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;    \
+    case 256: qudaLaunchKernel(kernel<0, 32, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 512: qudaLaunchKernel(kernel<0, 64, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 768: qudaLaunchKernel(kernel<0, 96, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 1024: qudaLaunchKernel(kernel<0, 128, __VA_ARGS__>, tp, stream, arg, parity); break;    \
     default: errorQuda("%s not implemented for %d threads", #kernel, tp.block.x);                                      \
     }                                                                                                                  \
   } else if (tp.aux.x == 1) {                                                                                          \
     switch (tp.block.x) {                                                                                              \
-    case 256: kernel<1, 32, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 512: kernel<1, 64, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 768: kernel<1, 96, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 1024: kernel<1, 128, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;    \
+    case 256: qudaLaunchKernel(kernel<1, 32, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 512: qudaLaunchKernel(kernel<1, 64, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 768: qudaLaunchKernel(kernel<1, 96, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 1024: qudaLaunchKernel(kernel<1, 128, __VA_ARGS__>, tp, stream, arg, parity); break;    \
     default: errorQuda("%s not implemented for %d threads", #kernel, tp.block.x);                                      \
     }                                                                                                                  \
   } else if (tp.aux.x == 2) {                                                                                          \
     switch (tp.block.x) {                                                                                              \
-    case 256: kernel<2, 32, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 512: kernel<2, 64, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 768: kernel<2, 96, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 1024: kernel<2, 128, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;    \
+    case 256: qudaLaunchKernel(kernel<2, 32, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 512: qudaLaunchKernel(kernel<2, 64, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 768: qudaLaunchKernel(kernel<2, 96, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 1024: qudaLaunchKernel(kernel<2, 128, __VA_ARGS__>, tp, stream, arg, parity); break;    \
     default: errorQuda("%s not implemented for %d threads", #kernel, tp.block.x);                                      \
     }                                                                                                                  \
   } else if (tp.aux.x == 3) {                                                                                          \
     switch (tp.block.x) {                                                                                              \
-    case 128: kernel<3, 32, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 256: kernel<3, 64, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 384: kernel<3, 96, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 512: kernel<3, 128, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;     \
-    case 640: kernel<3, 160, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;     \
-    case 768: kernel<3, 192, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;     \
-    case 896: kernel<3, 224, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;     \
-    case 1024: kernel<3, 256, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;    \
+    case 128: qudaLaunchKernel(kernel<3, 32, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 256: qudaLaunchKernel(kernel<3, 64, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 384: qudaLaunchKernel(kernel<3, 96, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 512: qudaLaunchKernel(kernel<3, 128, __VA_ARGS__>, tp, stream, arg, parity); break;     \
+    case 640: qudaLaunchKernel(kernel<3, 160, __VA_ARGS__>, tp, stream, arg, parity); break;     \
+    case 768: qudaLaunchKernel(kernel<3, 192, __VA_ARGS__>, tp, stream, arg, parity); break;     \
+    case 896: qudaLaunchKernel(kernel<3, 224, __VA_ARGS__>, tp, stream, arg, parity); break;     \
+    case 1024: qudaLaunchKernel(kernel<3, 256, __VA_ARGS__>, tp, stream, arg, parity); break;    \
     default: errorQuda("%s not implemented for %d threads", #kernel, tp.block.x);                                      \
     }                                                                                                                  \
   } else if (tp.aux.x == 4) {                                                                                          \
     switch (tp.block.x) {                                                                                              \
-    case 128: kernel<4, 32, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 256: kernel<4, 64, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 384: kernel<4, 96, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 512: kernel<4, 128, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;     \
-    case 640: kernel<4, 160, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;     \
-    case 768: kernel<4, 192, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;     \
-    case 896: kernel<4, 224, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;     \
-    case 1024: kernel<4, 256, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;    \
+    case 128: qudaLaunchKernel(kernel<4, 32, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 256: qudaLaunchKernel(kernel<4, 64, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 384: qudaLaunchKernel(kernel<4, 96, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 512: qudaLaunchKernel(kernel<4, 128, __VA_ARGS__>, tp, stream, arg, parity); break;     \
+    case 640: qudaLaunchKernel(kernel<4, 160, __VA_ARGS__>, tp, stream, arg, parity); break;     \
+    case 768: qudaLaunchKernel(kernel<4, 192, __VA_ARGS__>, tp, stream, arg, parity); break;     \
+    case 896: qudaLaunchKernel(kernel<4, 224, __VA_ARGS__>, tp, stream, arg, parity); break;     \
+    case 1024: qudaLaunchKernel(kernel<4, 256, __VA_ARGS__>, tp, stream, arg, parity); break;    \
     default: errorQuda("%s not implemented for %d threads", #kernel, tp.block.x);                                      \
     }                                                                                                                  \
   } else if (tp.aux.x == 5) {                                                                                          \
     switch (tp.block.x) {                                                                                              \
-    case 128: kernel<5, 32, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 256: kernel<5, 64, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 384: kernel<5, 96, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 512: kernel<5, 128, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;     \
-    case 640: kernel<5, 160, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;     \
-    case 768: kernel<5, 192, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;     \
-    case 896: kernel<5, 224, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;     \
-    case 1024: kernel<5, 256, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;    \
+    case 128: qudaLaunchKernel(kernel<5, 32, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 256: qudaLaunchKernel(kernel<5, 64, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 384: qudaLaunchKernel(kernel<5, 96, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 512: qudaLaunchKernel(kernel<5, 128, __VA_ARGS__>, tp, stream, arg, parity); break;     \
+    case 640: qudaLaunchKernel(kernel<5, 160, __VA_ARGS__>, tp, stream, arg, parity); break;     \
+    case 768: qudaLaunchKernel(kernel<5, 192, __VA_ARGS__>, tp, stream, arg, parity); break;     \
+    case 896: qudaLaunchKernel(kernel<5, 224, __VA_ARGS__>, tp, stream, arg, parity); break;     \
+    case 1024: qudaLaunchKernel(kernel<5, 256, __VA_ARGS__>, tp, stream, arg, parity); break;    \
     default: errorQuda("%s not implemented for %d threads", #kernel, tp.block.x);                                      \
     }                                                                                                                  \
   } else {                                                                                                             \
@@ -180,7 +180,7 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       LAUNCH_KERNEL_LOCAL_PARITY(computeFix_quality, (*this), tp, stream, arg, Float, Gauge, gauge_dir);
       auto reset = true; // apply is called multiple times with the same arg instance so we need to reset
-      arg.complete(&arg.result, stream, true);
+      arg.complete(&arg.result, stream, reset);
       if (!activeTuning()) {
         comm_allreduce_array((double*)&arg.result, 2);
         arg.result.x /= (double)(3 * gauge_dir * 2 * arg.threads * comm_size());
@@ -898,8 +898,9 @@ public:
     long long bytes() const { return 8LL * 2 * arg.threads * meta.Reconstruct() * sizeof(Float); }
   };
 
-  template <typename Gauge>
+  template <int NElems_, typename Gauge>
   struct GaugeFixUnPackArg {
+    static constexpr int NElems = NElems_;
     int X[4]; // grid dimensions
 #ifdef MULTI_GPU
     int border[4];
@@ -916,8 +917,9 @@ public:
     }
   };
 
-  template<int NElems, typename Float, typename Gauge, bool pack>
-  __global__ void Kernel_UnPackGhost(int size, GaugeFixUnPackArg<Gauge> arg, complex<Float> *array, int parity, int face, int dir){
+  template <typename Float, bool pack, typename Arg>
+  __global__ void Kernel_UnPackGhost(int size, Arg arg, complex<Float> *array, int parity, int face, int dir)
+  {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if ( idx >= size ) return;
     int X[4];
@@ -969,16 +971,16 @@ public:
     int id = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
     typedef complex<Float> Cmplx;
     typedef typename mapper<Float>::type RegType;
-    RegType tmp[NElems];
+    RegType tmp[Arg::NElems];
     Cmplx data[9];
     if ( pack ) {
       arg.dataOr.load(data, id, dir, parity);
       arg.dataOr.reconstruct.Pack(tmp, data, id);
-      for ( int i = 0; i < NElems / 2; ++i ) {
+      for ( int i = 0; i < Arg::NElems / 2; ++i ) {
         array[idx + size * i] = Cmplx(tmp[2*i+0], tmp[2*i+1]);
       }
     } else {
-      for ( int i = 0; i < NElems / 2; ++i ) {
+      for ( int i = 0; i < Arg::NElems / 2; ++i ) {
         tmp[2*i+0] = array[idx + size * i].real();
         tmp[2*i+1] = array[idx + size * i].imag();
       }
@@ -987,9 +989,9 @@ public:
     }
   }
 
-
-  template<int NElems, typename Float, typename Gauge, bool pack>
-  __global__ void Kernel_UnPackTop(int size, GaugeFixUnPackArg<Gauge> arg, complex<Float> *array, int parity, int face, int dir){
+  template <typename Float, bool pack, typename Arg>
+  __global__ void Kernel_UnPackTop(int size, Arg arg, complex<Float> *array, int parity, int face, int dir)
+  {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if ( idx >= size ) return;
     int X[4];
@@ -1038,15 +1040,15 @@ public:
     int id = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
     typedef complex<Float> Cmplx;
     typedef typename mapper<Float>::type RegType;
-    RegType tmp[NElems];
+    RegType tmp[Arg::NElems];
     Cmplx data[9];
     if ( pack ) {
       arg.dataOr.load(data, id, dir, parity);
       arg.dataOr.reconstruct.Pack(tmp, data, id);
-      for ( int i = 0; i < NElems / 2; ++i ) array[idx + size * i] = Cmplx(tmp[2*i+0], tmp[2*i+1]);
+      for ( int i = 0; i < Arg::NElems / 2; ++i ) array[idx + size * i] = Cmplx(tmp[2*i+0], tmp[2*i+1]);
     }
     else{
-      for ( int i = 0; i < NElems / 2; ++i ) {
+      for ( int i = 0; i < Arg::NElems / 2; ++i ) {
         tmp[2*i+0] = array[idx + size * i].real();
         tmp[2*i+1] = array[idx + size * i].imag();
       }
@@ -1117,14 +1119,13 @@ public:
     MsgHandle *mh_send_fwd[4];
     MsgHandle *mh_send_back[4];
     int X[4];
-    dim3 block[4];
-    dim3 grid[4];
+    TuneParam tp[4];
 
     if ( comm_partitioned() ) {
 
       for ( int dir = 0; dir < 4; ++dir ) {
         X[dir] = data.X()[dir] - data.R()[dir] * 2;
-        if ( !commDimPartitioned(dir) && data.R()[dir] != 0 ) errorQuda("Not supported!\n");
+        if ( !commDimPartitioned(dir) && data.R()[dir] != 0 ) errorQuda("Not supported!");
       }
       for ( int i = 0; i < 4; i++ ) {
         faceVolume[i] = 1;
@@ -1148,8 +1149,8 @@ public:
       #ifndef GPU_COMMS
         hostbuffer_h[d] = (void*)pinned_malloc(4 * bytes[d]);
       #endif
-        block[d] = make_uint3(128, 1, 1);
-        grid[d] = make_uint3((faceVolumeCB[d] + block[d].x - 1) / block[d].x, 1, 1);
+        tp[d].block = make_uint3(128, 1, 1);
+        tp[d].grid = make_uint3((faceVolumeCB[d] + tp[d].block.x - 1) / tp[d].block.x, 1, 1);
       }
       cudaStreamCreate(&GFStream[8]);
       for ( int d = 0; d < 4; d++ ) {
@@ -1171,7 +1172,7 @@ public:
         mh_send_fwd[d]  = comm_declare_send_relative(send[d], d, +1, bytes[d]);
       }
     }
-    GaugeFixUnPackArg<Gauge> dataexarg(dataOr, data);
+    GaugeFixUnPackArg<NElems,Gauge> dataexarg(dataOr, data);
     GaugeFixBorderPointsArg<Float, Gauge> argBorder(dataOr, data, relax_boost, faceVolume, faceVolumeCB);
     GaugeFixBorderPoints<Float,Gauge, gauge_dir> gfixBorderPoints(argBorder, data);
     GaugeFixInteriorPointsArg<Float, Gauge> argInt(dataOr, data, relax_boost);
@@ -1183,7 +1184,6 @@ public:
     byte += (double)GaugeFixQuality.bytes();
     double action0 = argQ.getAction();
     printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\n", 0, argQ.getAction(), argQ.getTheta());
-
 
     unitarizeLinks(data, data, num_failures_dev);
     qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
@@ -1227,9 +1227,11 @@ public:
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
             //extract top face
-            Kernel_UnPackTop<NElems, Float, Gauge, true> <<< grid[d], block[d], 0, GFStream[d] >>> (faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(send_d[d]), p, d, d);
+            qudaLaunchKernel(Kernel_UnPackTop<Float, true, decltype(dataexarg)>, tp[d], GFStream[d],
+                             faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(send_d[d]), p, d, d);
             //extract bottom ghost
-            Kernel_UnPackGhost<NElems, Float, Gauge, true> <<< grid[d], block[d], 0, GFStream[4 + d] >>> (faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(sendg_d[d]), 1 - p, d, d);
+            qudaLaunchKernel(Kernel_UnPackGhost<Float, true, decltype(dataexarg)>, tp[d], GFStream[4 + d],
+                             faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(sendg_d[d]), 1 - p, d, d);
           }
         #ifdef GPU_COMMS
           for ( int d = 0; d < 4; d++ ) {
@@ -1276,14 +1278,16 @@ public:
           #ifdef GPU_COMMS
             comm_wait(mh_recv_back[d]);
           #endif
-            Kernel_UnPackGhost<NElems, Float, Gauge, false> <<< grid[d], block[d], 0, GFStream[d] >>> (faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recv_d[d]), p, d, d);
+            qudaLaunchKernel(Kernel_UnPackGhost<Float, false, decltype(dataexarg)>, tp[d], GFStream[d],
+                             faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recv_d[d]), p, d, d);
           }
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
           #ifdef GPU_COMMS
             comm_wait(mh_recv_fwd[d]);
           #endif
-            Kernel_UnPackTop<NElems, Float, Gauge, false> <<< grid[d], block[d], 0, GFStream[4 + d] >>> (faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recvg_d[d]), 1 - p, d, d);
+            qudaLaunchKernel(Kernel_UnPackTop<Float, false, decltype(dataexarg)>, tp[d], GFStream[4 + d],
+                             faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recvg_d[d]), 1 - p, d, d);
           }
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
@@ -1295,51 +1299,6 @@ public:
           qudaStreamSynchronize(GFStream[8]);
         }
       #endif
-        /*gaugeFix.setParity(p);
-           gaugeFix.apply(0);
-           flop += (double)gaugeFix.flops();
-           byte += (double)gaugeFix.bytes();
-           #ifdef MULTI_GPU
-           if(comm_partitioned()){//exchange updated top face links in current parity
-           for (int d=0; d<4; d++) {
-            if (!commDimPartitioned(d)) continue;
-            comm_start(mh_recv_back[d]);
-            //extract top face
-            Kernel_UnPackTop<NElems, Float, Gauge><<<grid[d], block[d]>>>(faceVolumeCB[d], dataexarg, reinterpret_cast<Float*>(send_d[d]), p, d, d, true);
-           #ifndef GPU_COMMS
-            cudaMemcpy(send[d], send_d[d], bytes[d], cudaMemcpyDeviceToHost);
-           #else
-            qudaDeviceSynchronize();
-           #endif
-            comm_start(mh_send_fwd[d]);
-            comm_wait(mh_recv_back[d]);
-            comm_wait(mh_send_fwd[d]);
-           #ifndef GPU_COMMS
-            cudaMemcpy(recv_d[d], recv[d], bytes[d], cudaMemcpyHostToDevice);
-           #endif
-            //inject top face in ghost
-            Kernel_UnPackGhost<NElems, Float, Gauge><<<grid[d], block[d]>>>(faceVolumeCB[d], dataexarg, reinterpret_cast<Float*>(recv_d[d]), p, d, d, false);
-           }
-           //exchange updated ghost links in opposite parity
-           for (int d=0; d<4; d++) {
-            if (!commDimPartitioned(d)) continue;
-            comm_start(mh_recv_fwd[d]);
-            Kernel_UnPackGhost<NElems, Float, Gauge><<<grid[d], block[d]>>>(faceVolumeCB[d], dataexarg, reinterpret_cast<Float*>(sendg_d[d]), 1-p, d, d, true);
-           #ifndef GPU_COMMS
-            cudaMemcpy(sendg[d], sendg_d[d], bytes[d], cudaMemcpyDeviceToHost);
-           #else
-            qudaDeviceSynchronize();
-           #endif
-            comm_start(mh_send_back[d]);
-            comm_wait(mh_recv_fwd[d]);
-            comm_wait(mh_send_back[d]);
-           #ifndef GPU_COMMS
-            cudaMemcpy(recvg_d[d], recvg[d], bytes[d], cudaMemcpyHostToDevice);
-           #endif
-            Kernel_UnPackTop<NElems, Float, Gauge><<<grid[d], block[d]>>>(faceVolumeCB[d], dataexarg, reinterpret_cast<Float*>(recvg_d[d]), 1-p, d, d, false);
-           }
-           }
-         #endif*/
       }
       if ((iter % reunit_interval) == (reunit_interval - 1)) {
         unitarizeLinks(data, data, num_failures_dev);

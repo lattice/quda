@@ -56,9 +56,9 @@ namespace quda {
 	  }
         } else {
           if (arg.twist) {
-            cloverInvertKernel<1,Arg,false,true> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            qudaLaunchKernel(cloverInvertKernel<1,Arg,false,true>, tp, stream, arg);
           } else {
-            cloverInvertKernel<1,Arg,false,false> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            qudaLaunchKernel(cloverInvertKernel<1,Arg,false,false>, tp, stream, arg);
           }
         }
 #endif
