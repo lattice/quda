@@ -968,20 +968,33 @@ extern "C" {
    */
   void invertQuda(void *h_x, void *h_b, QudaInvertParam *param);
 
-  void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge,
-                           QudaGaugeParam *gauge_param, int *split_key);
-
   /**
    * Perform the solve like @invertQuda but for multiples right hand sides.
    *
    * @param _hp_x    Array of solution spinor fields
    * @param _hp_b    Array of source spinor fields
-   * @param param  Contains all metadata regarding
    * @param param  Contains all metadata regarding host and device
    *               storage and solver parameters
    */
 
   void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param);
+
+  /**
+   * Perform the solve like @invertQuda but for multiple rhs by spliting the comm grid into
+   * sub-partitions: each sub-partition invert one rhs.
+   * The QudaInvertParam object specifies how the solve should be performed on each sub-partition.
+   * Unlike @invertQuda and @invertMultiSrcQuda, the interface also takes the host side gauge as
+   * input - gauge field is not required to be loaded beforehand.
+   * @param _hp_x       Array of solution spinor fields
+   * @param _hp_b       Array of source spinor fields
+   * @param param       Contains all metadata regarding host and device storage and solver parameters
+   * @param h_gauge     Base pointer to host gauge field (regardless of dimensionality)
+   * @param gauge_param Contains all metadata regarding host and device storage for gauge field
+   * @param split_key   How the comm grid should be partitioned, e.g. (1,1,2,2) means
+   *                    spliting into 4 sub-partitions - 2 in the z direction and 2 in the t direction
+   */
+  void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge,
+                           QudaGaugeParam *gauge_param, int *split_key);
 
   /**
    * Solve for multiple shifts (e.g., masses).

@@ -3082,11 +3082,12 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   profilerStop(__func__);
 }
 
-
 void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge, QudaGaugeParam *gauge_param, int *_split_key)
 {
   CommKey split_key = {_split_key[0], _split_key[1], _split_key[2], _split_key[3]};
   int num_src = quda::product(split_key);
+
+  if (param->num_src != num_src) { errorQuda("Number of rhs should be equal to the number of sub-partitions"); }
 
   GaugeFieldParam gf_param(h_gauge, *gauge_param);
   if (gf_param.order <= 4) { gf_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO; }

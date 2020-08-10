@@ -724,6 +724,7 @@ namespace quda {
    */
   void ax(const double &a, GaugeField &u);
 
+
   /**
      This function is used for  extracting the gauge ghost zone from a
      gauge field array.  Defined in copy_gauge.cu.
@@ -738,6 +739,15 @@ namespace quda {
   */
   void copyGenericGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location, void *Out = 0, void *In = 0,
                         void **ghostOut = 0, void **ghostIn = 0, int type = 0);
+
+   /**
+     This function is used for copying from a source gauge field to a destination gauge field
+       with an offset.
+     @param out The output field to which we are copying
+     @param in The input field from which we are copying
+     @param offset The offset for the larger field between out and in.
+  */
+  void copyOffsetGauge(GaugeField &out, const GaugeField &in, const int offset[4]);
 
   /**
      This function is used for copying the gauge field into an

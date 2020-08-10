@@ -191,7 +191,7 @@ namespace quda
       } else {
         errorQuda("Reconstruction %d and order %d not supported", in.Reconstruct(), in.Order());
       }
-    } else if (in.Order() == QUDA_QDP_GAUGE_ORDER) {
+    } else if (in.Order() == QUDA_QDP_GAUGE_ORDER) { // TODO: Add other gauge field orders.
 #ifdef BUILD_QDP_INTERFACE
       using G = typename gauge_order_mapper<Float, QUDA_QDP_GAUGE_ORDER, nColor>::type;
       using Arg = CopyGaugeOffsetArg<Float, nColor, G>;

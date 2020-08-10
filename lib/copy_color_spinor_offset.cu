@@ -227,7 +227,7 @@ namespace quda
 
   // Apply the 5th dimension dslash operator to a colorspinor field
   // out = Dslash5*in
-  void copy_color_spinor_offset(ColorSpinorField &out, const ColorSpinorField &in, const int offset[4])
+  void copyOffsetColorSpinor(ColorSpinorField &out, const ColorSpinorField &in, const int offset[4])
   {
     checkLocation(out, in); // check all locations match
 

@@ -1023,6 +1023,8 @@ namespace quda {
   void genericSource(cpuColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c);
   int genericCompare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, int tol);
 
+  void copyOffsetColorSpinor(ColorSpinorField &out, const ColorSpinorField &in, const int offset[4]);
+
   void genericPrintVector(const cpuColorSpinorField &a, unsigned int x);
   void genericCudaPrintVector(const cudaColorSpinorField &a, unsigned x);
 

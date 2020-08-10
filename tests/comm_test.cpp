@@ -212,6 +212,7 @@ int main(int argc, char **argv)
   rng->Init();
 
   int n_src = quda::product(split_key);
+  inv_param.num_src = n_src;
 
   std::vector<quda::ColorSpinorField *> _h_b(n_src, nullptr);
   for (auto &p : _h_b) {
