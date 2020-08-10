@@ -6,6 +6,7 @@
 #include <dslash_quda.h>
 #include <blas_quda.h>
 
+
 #include <typeinfo>
 
 namespace quda {
@@ -42,6 +43,13 @@ namespace quda {
     cudaGaugeField *longGauge; // used by staggered only
     int laplace3D;
     cudaCloverField *clover;
+    
+    // used by overlap-wilson only
+    bool build_hw;
+    std::vector<ColorSpinorField*> hw_evec;
+    std::vector<double> hw_eval;
+    std::vector<std::vector<double> > coef;
+    std::vector<int> hw_size;
   
     double mu; // used by twisted mass only
     double mu_factor; // used by multigrid only
@@ -74,7 +82,8 @@ namespace quda {
       tmp1(0),
       tmp2(0),
       halo_precision(QUDA_INVALID_PRECISION),
-      need_bidirectional(false)
+      need_bidirectional(false),
+      build_hw(false)
     {
       for (int i=0; i<QUDA_MAX_DIM; i++) commDim[i] = 1;
     }
@@ -1301,6 +1310,59 @@ public:
 
     virtual bool hermitian() const { return true; }
   };
+
+  class DiracOverlapWilson : public DiracWilson {
+  
+  protected:
+    void initConstants();
+    //double kappa /*defined in Dirac*/
+    double rho;
+    double prec0;
+    std::vector<ColorSpinorField*> hw_evec;
+    std::vector<double> hw_eval;
+    std::vector<std::vector<double> > coef;
+    std::vector<int> hw_size;
+    
+  public:
+  
+    std::vector<double> &Coef(int i) {return coef[i];};
+    ColorSpinorField &Hw_evec(int i) {return *hw_evec[i];}
+    double Hw_eval(int i) {return hw_eval[i];}
+    double Rho() { return rho;}
+    void set_prec(double prec) {prec0=prec;}
+    
+    DiracOverlapWilson(const DiracParam &param);
+    DiracOverlapWilson(const DiracOverlapWilson &dirac);
+ 
+    virtual ~DiracOverlapWilson();
+    DiracOverlapWilson& operator=(const DiracOverlapWilson &dirac);
+ 
+    virtual void Kernel(ColorSpinorField &out, const ColorSpinorField &in) const;
+    virtual void KernelSq_scaled(ColorSpinorField &out, ColorSpinorField &in,double cut) const;
+    virtual void general_dov(ColorSpinorField &out, const ColorSpinorField &in,
+         double k0, double k1,double k2,double prec, const QudaParity parity) const;
+    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
+                           double prec, const QudaParity parity=QUDA_INVALID_PARITY) const;
+    virtual void M(ColorSpinorField &out, const ColorSpinorField &in, double mass,double prec) const;
+    virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in,double mass,int chirality,double prec) const;
+ 
+    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
+                       const QudaParity parity) const {Dslash(out,in,prec0,parity);}
+    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
+                           const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const {M(out,in,mass,prec0);}
+    virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+    
+ 
+    virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+                        ColorSpinorField &x, ColorSpinorField &b,
+                        const QudaSolutionType) const;
+    virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
+                            const QudaSolutionType) const;
+ 
+  };
+
+
 
   /**
      This class serves as a front-end to the coarse Dslash operator,
