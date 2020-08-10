@@ -61,23 +61,22 @@ int main(int argc, char **argv)
   int spinor_dim = cs_param.nColor*cs_param.nSpin;
   setSpinorSiteSize(spinor_dim *2); //this sets the global variable my_spinor_site_size
 
-  std::vector<quda::ColorSpinorField *> qudaProp4D(
-    spinor_dim); // qudaProp4D is a vector that contains 12 pointers to colorspinorfields.
+  std::vector<quda::ColorSpinorField *> qudaProp4D(spinor_dim); // qudaProp4D is a vector that contains 12 pointers to colorspinorfields.
   std::vector<quda::ColorSpinorField *> qudaSource4D(spinor_dim);
 
   size_t bytes_per_float = sizeof(double);
   // Allocate memory on host for one source (0,0,0,0) for each of the 12x12 color+spinor combinations
-  auto *out_array = (double*)malloc(12*12*V*2* bytes_per_float);
-  auto *in_array = (double*)malloc(12*12*V*2* bytes_per_float);
+  auto *out_array = (double*)malloc(spinor_dim*spinor_dim*V*2* bytes_per_float);
+  auto *in_array = (double*)malloc(spinor_dim*spinor_dim*V*2* bytes_per_float);
 
   //Actually create ColorSpinorField objects and tell them to use the memory from above
   cs_param.create = QUDA_REFERENCE_FIELD_CREATE;
-  for (int dil = 0; dil < 12; dil++) {
-    int offset = dil*V* spinor_dim *2;
+  for (int i = 0; i < spinor_dim; i++) {
+    int offset = i *V* spinor_dim *2;
     cs_param.v = in_array + offset;
-    qudaSource4D[dil] = quda::ColorSpinorField::Create(cs_param);
+    qudaSource4D[i] = quda::ColorSpinorField::Create(cs_param);
     cs_param.v = out_array + offset;
-    qudaProp4D[dil] = quda::ColorSpinorField::Create(cs_param);
+    qudaProp4D[i] = quda::ColorSpinorField::Create(cs_param);
   }
 
   // temporal or spatial correlator?
@@ -99,16 +98,16 @@ int main(int argc, char **argv)
   // Loop over the number of sources to use. Default is prop_n_sources=1. Default source position = 0 0 0 0
   for(int n=0; n<prop_n_sources; n++) {
       printfQuda("Source position: %d %d %d %d\n", prop_source_position[n][0], prop_source_position[n][1], prop_source_position[n][2], prop_source_position[n][3]);
-    for (int dil = 0; dil < 12; dil++) {
+    for (int i = 0; i < spinor_dim; i++) {
       const int source[4] = {prop_source_position[n][0],
                                prop_source_position[n][1],
                                prop_source_position[n][2],
                                prop_source_position[n][3]};
-      constructPointSpinorSource(qudaSource4D[dil]->V(), cs_param.nSpin, cs_param.nColor, inv_param.cpu_prec, gauge_param.X, dil, source);
+      constructPointSpinorSource(qudaSource4D[i]->V(), cs_param.nSpin, cs_param.nColor, inv_param.cpu_prec, gauge_param.X, i, source);
       inv_param.solver_normalization = QUDA_SOURCE_NORMALIZATION; // Make explicit for now.
 
-      invertQuda(qudaProp4D[dil]->V(), qudaSource4D[dil]->V(), &inv_param);
-      contractQuda(qudaProp4D[dil]->V(), qudaProp4D[dil]->V(),
+      invertQuda(qudaProp4D[i]->V(), qudaSource4D[i]->V(), &inv_param);
+      contractQuda(qudaProp4D[i]->V(), qudaProp4D[i]->V(),
                    correlation_function+ n_numbers_per_slice * local_corr_offset, contract_type, &inv_param, gauge_param.X);
 
       if(comm_dim(corr_dim) > 1) comm_gather_array(correlation_function, n_numbers_per_slice * local_corr_length);
