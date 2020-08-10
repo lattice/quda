@@ -323,7 +323,7 @@ namespace quda {
     default: // should always return successful
       const char *str;
       cuGetErrorName(error, &str);
-      errorQuda("cuEventrecord returned error %s", str);
+      errorQuda("cuEventRecord returned error %s", str);
     }
     return cudaErrorUnknown;
 #else
