@@ -1,5 +1,6 @@
 #include <unistd.h> // for gethostname()
 #include <assert.h>
+#include <limits>
 
 #include <quda_internal.h>
 #include <comm_quda.h>
@@ -211,14 +212,20 @@ static char partition_override_string[16]; /** string that contains any overridd
 
 void comm_dim_partitioned_reset();
 
+int get_enable_p2p_max_access_rank();
+
 const char *comm_config_string()
 {
-  static char config_string[16];
+  static char config_string[64];
   static bool config_init = false;
 
   if (!config_init) {
     strcpy(config_string, ",p2p=");
     strcat(config_string, std::to_string(comm_peer2peer_enabled_global()).c_str());
+    if (get_enable_p2p_max_access_rank() != std::numeric_limits<int>::max()) {
+      strcat(config_string, ",p2p_max_access_rank=");
+      strcat(config_string, std::to_string(get_enable_p2p_max_access_rank()).c_str());
+    }
     strcat(config_string, ",gdr=");
     strcat(config_string, std::to_string(comm_gdr_enabled()).c_str());
     config_init = true;

@@ -149,6 +149,7 @@ template <typename T> std::string inline get_string(CLI::TransformPairs<T> &map,
 
 extern int device;
 extern int rank_order;
+extern bool native_blas_lapack;
 extern std::array<int, 4> gridsize_from_cmdline;
 extern std::array<int, 4> dim_partitioned;
 extern QudaReconstructType link_recon;
@@ -263,9 +264,10 @@ extern bool generate_nullspace;
 extern bool generate_all_levels;
 extern quda::mgarray<QudaSchwarzType> mg_schwarz_type;
 extern quda::mgarray<int> mg_schwarz_cycle;
+extern bool mg_evolve_thin_updates;
 
 extern quda::mgarray<std::array<int, 4>> geo_block_size;
-extern int nev;
+extern int n_ev;
 extern int max_search_dim;
 extern int deflation_grid;
 extern double tol_restart;
@@ -282,9 +284,10 @@ extern QudaMemoryType mem_type_ritz;
 
 // Parameters for the stand alone eigensolver
 extern int eig_block_size;
-extern int eig_nEv;
-extern int eig_nKr;
-extern int eig_nConv; // If unchanged, will be set to nEv
+extern int eig_n_ev;
+extern int eig_n_kr;
+extern int eig_n_conv;         // If unchanged, will be set to n_ev
+extern int eig_n_ev_deflate;   // If unchanged, will be set to n_conv
 extern int eig_batched_rotate; // If unchanged, will be set to maximum
 extern bool eig_require_convergence;
 extern int eig_check_interval;
@@ -305,14 +308,16 @@ extern char eig_QUDA_logfile[256];
 extern char eig_vec_infile[256];
 extern char eig_vec_outfile[256];
 extern bool eig_io_parity_inflate;
+extern QudaPrecision eig_save_prec;
 
 // Parameters for the MG eigensolver.
 // The coarsest grid params are for deflation,
 // all others are for PR vectors.
 extern quda::mgarray<bool> mg_eig;
 extern quda::mgarray<int> mg_eig_block_size;
-extern quda::mgarray<int> mg_eig_nEv;
-extern quda::mgarray<int> mg_eig_nKr;
+extern quda::mgarray<int> mg_eig_n_ev_deflate;
+extern quda::mgarray<int> mg_eig_n_ev;
+extern quda::mgarray<int> mg_eig_n_kr;
 extern quda::mgarray<int> mg_eig_batched_rotate;
 extern quda::mgarray<bool> mg_eig_require_convergence;
 extern quda::mgarray<int> mg_eig_check_interval;
@@ -326,6 +331,8 @@ extern quda::mgarray<bool> mg_eig_use_normop;
 extern quda::mgarray<bool> mg_eig_use_dagger;
 extern quda::mgarray<QudaEigSpectrumType> mg_eig_spectrum;
 extern quda::mgarray<QudaEigType> mg_eig_type;
+extern quda::mgarray<QudaPrecision> mg_eig_save_prec;
+
 extern bool mg_eig_coarse_guess;
 extern bool mg_eig_preserve_deflation;
 

@@ -225,3 +225,5 @@ void commGlobalReductionSet(bool global_reduce) { get_current_communicator().com
 bool commAsyncReduction() { return get_current_communicator().commAsyncReduction(); }
 
 void commAsyncReductionSet(bool global_reduce) { get_current_communicator().commAsyncReductionSet(global_reduce); }
+
+int get_enable_p2p_max_access_rank() { return get_current_communicator().enable_p2p_max_access_rank; }

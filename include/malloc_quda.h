@@ -62,6 +62,11 @@ namespace quda {
 
   QudaFieldLocation get_pointer_location(const void *ptr);
 
+  /*
+    @brief Get device view of a host-mapped pointer
+   */
+  void *get_mapped_device_pointer_(const char *func, const char *file, int line, const void *ptr);
+
   /**
    * @return whether the pointer is aligned
    */
@@ -82,7 +87,7 @@ namespace quda {
 #define device_pinned_free(ptr) quda::device_pinned_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 #define managed_free(ptr) quda::managed_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 #define host_free(ptr) quda::host_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
-
+#define get_mapped_device_pointer(ptr) quda::get_mapped_device_pointer_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 
 namespace quda {
 

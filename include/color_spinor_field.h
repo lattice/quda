@@ -12,6 +12,39 @@
 
 namespace quda {
 
+  namespace colorspinor
+  {
+
+    inline bool isNative(QudaFieldOrder order, QudaPrecision precision, int nSpin, int nColor)
+    {
+      if (precision == QUDA_DOUBLE_PRECISION) {
+        if (order == QUDA_FLOAT2_FIELD_ORDER) return true;
+      } else if (precision == QUDA_SINGLE_PRECISION) {
+        if (nSpin == 4) {
+          if (order == QUDA_FLOAT4_FIELD_ORDER) return true;
+        } else if (nSpin == 2) {
+          if (order == QUDA_FLOAT2_FIELD_ORDER) return true;
+        } else if (nSpin == 1) {
+          if (order == QUDA_FLOAT2_FIELD_ORDER) return true;
+        }
+      } else if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
+        if (nSpin == 4) {
+#ifdef FLOAT8
+          if (order == QUDA_FLOAT8_FIELD_ORDER) return true;
+#else
+          if (order == QUDA_FLOAT4_FIELD_ORDER) return true;
+#endif
+        } else if (nSpin == 2) {
+          if (order == QUDA_FLOAT2_FIELD_ORDER) return true;
+        } else if (nSpin == 1) {
+          if (order == QUDA_FLOAT2_FIELD_ORDER) return true;
+        }
+      }
+      return false;
+    }
+
+  } // namespace colorspinor
+
   enum MemoryLocation { Device = 1, Host = 2, Remote = 4 };
 
   struct FullClover;
@@ -127,6 +160,31 @@ namespace quda {
     bool is_component;
     int component_id;          //eigenvector index
 
+    /**
+       If using CUDA native fields, this function will ensure that the
+       field ordering is appropriate for the new precision setting to
+       maintain this status
+       @param precision_ New precision value
+       @param ghost_precision_ New ghost precision value
+     */
+    void setPrecision(QudaPrecision precision, QudaPrecision ghost_precision = QUDA_INVALID_PRECISION,
+                      bool force_native = false)
+    {
+      // is the current status in native field order?
+      bool native = force_native ? true : colorspinor::isNative(fieldOrder, this->precision, nSpin, nColor);
+      this->precision = precision;
+      this->ghost_precision = (ghost_precision == QUDA_INVALID_PRECISION) ? precision : ghost_precision;
+
+      // if this is a native field order, let's preserve that status, else keep the same field order
+      if (native) {
+        fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1 || nSpin == 2) ? QUDA_FLOAT2_FIELD_ORDER :
+                                                                                        QUDA_FLOAT4_FIELD_ORDER;
+#ifdef FLOAT8
+        if (precision <= QUDA_HALF_PRECISION && nSpin == 4) fieldOrder = QUDA_FLOAT8_FIELD_ORDER;
+#endif
+      }
+    }
+
     ColorSpinorParam(const ColorSpinorField &a);
 
     ColorSpinorParam() :
@@ -202,8 +260,7 @@ namespace quda {
       }
 
       if (inv_param.dirac_order == QUDA_INTERNAL_DIRAC_ORDER) {
-        fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1 || nSpin == 2) ? QUDA_FLOAT2_FIELD_ORDER :
-                                                                                        QUDA_FLOAT4_FIELD_ORDER;
+        setPrecision(precision, precision, true);
         siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
       } else if (inv_param.dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
         fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
@@ -247,31 +304,8 @@ namespace quda {
       component_id(0)
     {
       siteSubset = cpuParam.siteSubset;
-      fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1 || nSpin == 2) ? QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
+      setPrecision(precision, precision, true);
       for (int d = 0; d < QUDA_MAX_DIM; d++) x[d] = cpuParam.x[d];
-    }
-
-    /**
-       If using CUDA native fields, this function will ensure that the
-       field ordering is appropriate for the new precision setting to
-       maintain this status
-       @param precision_ New precision value
-       @param ghost_precision_ New ghost precision value
-     */
-    void setPrecision(QudaPrecision precision, QudaPrecision ghost_precision=QUDA_INVALID_PRECISION, bool force_native=false) {
-      // is the current status in native field order?
-      bool native = force_native ? true : false;
-      if ( ((this->precision == QUDA_DOUBLE_PRECISION || nSpin==1 || nSpin==2) &&
-	    (fieldOrder == QUDA_FLOAT2_FIELD_ORDER)) ||
-	   ((this->precision == QUDA_SINGLE_PRECISION || this->precision == QUDA_HALF_PRECISION || this->precision == QUDA_QUARTER_PRECISION) &&
-	    (nSpin==4) && fieldOrder == QUDA_FLOAT4_FIELD_ORDER) ) { native = true; }
-
-      this->precision = precision;
-      this->ghost_precision = (ghost_precision == QUDA_INVALID_PRECISION) ? precision : ghost_precision;
-
-      // if this is a native field order, let's preserve that status, else keep the same field order
-      if (native) fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1 || nSpin == 2) ?
-	QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
     }
 
     void print() {
@@ -498,7 +532,7 @@ namespace quda {
       field order, given the precision and the length of the spin
       dimension.
       */
-    bool isNative() const;
+    bool isNative() const { return colorspinor::isNative(fieldOrder, precision, nSpin, nColor); }
 
     bool IsComposite() const { return composite_descr.is_composite; }
     bool IsComponent() const { return composite_descr.is_component; }
@@ -633,17 +667,6 @@ namespace quda {
     bool texInit; // whether a texture object has been created or not
     mutable bool ghostTexInit; // whether the ghost texture object has been created
     mutable QudaPrecision ghost_precision_tex; /** the precision allocated for the ghost texture */
-
-#ifdef USE_TEXTURE_OBJECTS
-    cudaTextureObject_t tex;
-    cudaTextureObject_t texNorm;
-    void createTexObject();
-    void destroyTexObject();
-    mutable cudaTextureObject_t ghostTex[4]; // these are double buffered and variants to host-mapped buffers
-    mutable cudaTextureObject_t ghostTexNorm[4];
-    void createGhostTexObject() const;
-    void destroyGhostTexObject() const;
-#endif
 
     bool reference; // whether the field is a reference or not
 
@@ -883,13 +906,6 @@ namespace quda {
 		       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false,
 		       QudaPrecision ghost_precision=QUDA_INVALID_PRECISION) const;
 
-#ifdef USE_TEXTURE_OBJECTS
-    inline const cudaTextureObject_t& Tex() const { return tex; }
-    inline const cudaTextureObject_t& TexNorm() const { return texNorm; }
-    inline const cudaTextureObject_t& GhostTex() const { return ghostTex[bufferIndex]; }
-    inline const cudaTextureObject_t& GhostTexNorm() const { return ghostTexNorm[bufferIndex]; }
-#endif
-
     cudaColorSpinorField& Component(const int idx) const;
     CompositeColorSpinorField& Components() const;
     void CopySubset(cudaColorSpinorField& dst, const int range, const int first_element=0) const;
@@ -897,8 +913,6 @@ namespace quda {
     void zero();
 
     friend std::ostream& operator<<(std::ostream &out, const cudaColorSpinorField &);
-
-    void getTexObjectInfo() const;
 
     void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0);
 
@@ -1128,6 +1142,38 @@ namespace quda {
   }
 
 #define checkOrder(...) Order_(__func__, __FILE__, __LINE__, __VA_ARGS__)
+
+  /**
+     @brief Helper function for determining if the length of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @return If length is unique return the length
+   */
+  inline int Length_(const char *func, const char *file, int line, const ColorSpinorField &a, const ColorSpinorField &b)
+  {
+    int length = 0;
+    if (a.Length() == b.Length())
+      length = a.Length();
+    else
+      errorQuda("Lengths %lu %lu do not match  (%s:%d in %s())\n", a.Length(), b.Length(), file, line, func);
+    return length;
+  }
+
+  /**
+     @brief Helper function for determining if the length of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @param[in] args List of additional fields to check length on
+     @return If length is unique return the length
+   */
+  template <typename... Args>
+  inline int Length_(const char *func, const char *file, int line, const ColorSpinorField &a, const ColorSpinorField &b,
+                     const Args &... args)
+  {
+    return static_cast<int>(Length_(func, file, line, a, b) & Length_(func, file, line, a, args...));
+  }
+
+#define checkLength(...) Length_(__func__, __FILE__, __LINE__, __VA_ARGS__)
 
 } // namespace quda
 
