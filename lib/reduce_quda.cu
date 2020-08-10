@@ -49,11 +49,7 @@ namespace quda {
                                   .launch(arg);
       arg.launch_error = tunable.jitifyError() == CUDA_SUCCESS ? qudaSuccess : qudaError;
 #else
-      if (tp.block.x <= max_block_size()) {
-        arg.launch_error = launch<max_block_size(), real, len>(arg, tp, stream);
-      } else {
-        errorQuda("block size %d not instantiated", tp.block.x);
-      }
+      arg.launch_error = launch<max_block_size(), real, len>(arg, tp, stream);
 #endif
 
       host_reduce_t result;
@@ -89,6 +85,8 @@ namespace quda {
             sharedBytesPerBlock(param);
         return false;
       }
+
+      unsigned int maxBlockSize(const TuneParam &param) const { return max_block_size(); }
 
     public:
       Reduce(const coeff_t &a, const coeff_t &b, const coeff_t &c, ColorSpinorField &x, ColorSpinorField &y,

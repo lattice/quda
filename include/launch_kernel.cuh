@@ -3,9 +3,9 @@
 #ifdef QUDA_FAST_COMPILE_REDUCE
 
 // only compile block size with a single warp
-#define LAUNCH_REDUCTION_LOCAL_PARITY(result, kernel, tunable, tp, stream, arg, ...) \
+#define LAUNCH_KERNEL_LOCAL_PARITY(kernel, tunable, tp, stream, arg, ...) \
   switch (tp.block.x) {							\
-  case 32: qudaLaunchKernel(kernel<32,__VA_ARGS__>, tp, stream, arg); break; \
+  case 32: arg.launch_error = qudaLaunchKernel(kernel<32,__VA_ARGS__>, tp, stream, arg); break; \
   case 64:								\
   case 96:								\
   case 128:								\
@@ -21,6 +21,7 @@
   case 448:								\
   case 480:								\
   case 512:								\
+    arg.launch_error = qudaError;                                       \
     tunable.jitifyError() = CUDA_ERROR_INVALID_VALUE;                   \
     break;                                                              \
   default:								\
@@ -49,7 +50,6 @@
   case 512: arg.launch_error = qudaLaunchKernel(kernel<512,__VA_ARGS__>, tp, stream, arg); break; \
   default:								\
     errorQuda("%s not implemented for %d threads", #kernel, tp.block.x); \
-    arg.launch_error = qudaError;                                           \
   }
 
 #endif

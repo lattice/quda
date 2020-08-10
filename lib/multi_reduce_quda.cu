@@ -49,11 +49,7 @@ namespace quda {
                                   .launch(arg);
       arg.launch_error = tunable.jitifyError() == CUDA_SUCCESS ? qudaSuccess : qudaError;
 #else
-      if (tp.block.x <= max_block_size()) {
-        arg.launch_error = launch<max_block_size(), real, len, NXZ>(arg, tp, stream);
-      } else {
-        errorQuda("block size %d not instantiated", tp.block.x);
-      }
+      arg.launch_error = launch<max_block_size(), real, len, NXZ>(arg, tp, stream);
 #endif
 
       T *result_ = new T[NXZ * arg.NYW];
@@ -96,9 +92,7 @@ namespace quda {
         return false;
       }
 
-      // we only launch thread blocks up to size 512 since the autotuner
-      // tuner favours smaller blocks and this helps with compile time
-      unsigned int maxBlockSize(const TuneParam &param) const { return 128; } // deviceProp.maxThreadsPerBlock / 2; }
+      unsigned int maxBlockSize(const TuneParam &param) const { return max_block_size(); }
 
     public:
       MultiReduce(const T &a, const T &b, const T &c, const ColorSpinorField &x_meta, const ColorSpinorField &y_meta,
