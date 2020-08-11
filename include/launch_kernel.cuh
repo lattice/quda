@@ -21,7 +21,7 @@
   case 448:								\
   case 480:								\
   case 512:								\
-    arg.launch_error = qudaError;                                       \
+    arg.launch_error = QUDA_ERROR;                                      \
     tunable.jitifyError() = CUDA_ERROR_INVALID_VALUE;                   \
     break;                                                              \
   default:								\

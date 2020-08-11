@@ -20,12 +20,6 @@ namespace quda {
 
   class TuneParam;
 
-  enum qudaError_t {
-    qudaSuccess = 0,
-    qudaError   = 1,
-    qudaUninitialized = 2
-  };
-
   /**
      @brief Wrapper around cudaLaunchKernel
      @param[in] func Device function symbol

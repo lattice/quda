@@ -47,7 +47,7 @@ namespace quda {
                                   .instantiate((int)tp.block.x, Type<real>(), len, NXZ, Type<Arg>())
                                   .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                                   .launch(arg);
-      arg.launch_error = tunable.jitifyError() == CUDA_SUCCESS ? qudaSuccess : qudaError;
+      arg.launch_error = tunable.jitifyError() == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
 #else
       arg.launch_error = launch<max_block_size(), real, len, NXZ>(arg, tp, stream);
 #endif

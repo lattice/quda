@@ -32,7 +32,7 @@ namespace quda {
         jitify_error = program->kernel("quda::computePlaq")
           .instantiate((int)tp.block.x,type_of(arg))
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
-        arg.launch_error = jitify_error == CUDA_SUCCESS ? qudaSuccess : qudaError;
+        arg.launch_error = jitify_error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
 #else
 	LAUNCH_KERNEL_LOCAL_PARITY(computePlaq, (*this), tp, stream, arg, decltype(arg));
 #endif

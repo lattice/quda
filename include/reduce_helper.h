@@ -78,7 +78,7 @@ namespace quda
 
   public:
     ReduceArg(int n_reduce = 1) :
-      launch_error(qudaUninitialized),
+      launch_error(QUDA_ERROR_UNINITIALIZED),
       n_reduce(n_reduce),
       partial(static_cast<decltype(partial)>(reducer::get_device_buffer())),
       result_d(static_cast<decltype(result_d)>(reducer::get_mapped_buffer())),
@@ -111,8 +111,8 @@ namespace quda
 
     template <typename host_t, typename device_t = host_t> void complete(host_t *result, const qudaStream_t stream = 0, bool reset = false)
     {
-      if (launch_error == qudaError) return; // kernel launch failed so return
-      if (launch_error == qudaUninitialized) errorQuda("No reduction kernel appears to have been launched");
+      if (launch_error == QUDA_ERROR) return; // kernel launch failed so return
+      if (launch_error == QUDA_ERROR_UNINITIALIZED) errorQuda("No reduction kernel appears to have been launched");
 #ifdef HETEROGENEOUS_ATOMIC
       if (consumed) errorQuda("Cannot call complete more than once for each construction");
 

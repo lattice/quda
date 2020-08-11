@@ -31,7 +31,7 @@ namespace quda {
     // no driver API variant here since we have C++ functions
     PROFILE(cudaError_t error = cudaLaunchKernel(func, tp.grid, tp.block, args, tp.shared_bytes, stream), QUDA_PROFILE_LAUNCH_KERNEL);
     if (error != cudaSuccess && !activeTuning()) errorQuda("(CUDA) %s", cudaGetErrorString(error));
-    return error == cudaSuccess ? qudaSuccess : qudaError;
+    return error == cudaSuccess ? QUDA_SUCCESS : QUDA_ERROR;
   }
 
   class QudaMem : public Tunable
