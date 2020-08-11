@@ -161,7 +161,7 @@ class GaugeAlgTest : public ::testing::Test {
 
     printfQuda("Time Monte -> %.6f s\n", a1.Last());
     plaq = plaquette(*cudaInGauge);
-    printfQuda("Plaq: %.16e , %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
+    printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
   }
 
   virtual void TearDown() {
@@ -213,7 +213,7 @@ TEST_F(GaugeAlgTest,Landau_Overrelaxation) {
   printfQuda("Landau gauge fixing with overrelaxation\n");
   gaugeFixingOVR(*cudaInGauge, 4, 100, 10, 1.5, 0, reunit_interval, 1);
   auto plaq_gf = plaquette(*cudaInGauge);
-  printfQuda("Plaq: %.16e , %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+  printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
   ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
 }
 
@@ -222,7 +222,7 @@ TEST_F(GaugeAlgTest,Coulomb_Overrelaxation) {
   printfQuda("Coulomb gauge fixing with overrelaxation\n");
   gaugeFixingOVR(*cudaInGauge, 3, 100, 10, 1.5, 0, reunit_interval, 1);
   auto plaq_gf = plaquette(*cudaInGauge);
-  printfQuda("Plaq: %.16e , %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+  printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
   ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
 }
 
@@ -231,7 +231,7 @@ TEST_F(GaugeAlgTest,Landau_FFT) {
     printfQuda("Landau gauge fixing with steepest descent method with FFTs\n");
     gaugeFixingFFT(*cudaInGauge, 4, 100, 10, 0.08, 0, 0, 1);
     auto plaq_gf = plaquette(*cudaInGauge);
-    printfQuda("Plaq: %.16e , %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+    printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
     ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
   }
 }
@@ -241,7 +241,7 @@ TEST_F(GaugeAlgTest,Coulomb_FFT) {
     printfQuda("Coulomb gauge fixing with steepest descent method with FFTs\n");
     gaugeFixingFFT(*cudaInGauge, 3, 100, 10, 0.08, 0, 0, 1);
     auto plaq_gf = plaquette(*cudaInGauge);
-    printfQuda("Plaq: %.16e , %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+    printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
     ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
   }
 }

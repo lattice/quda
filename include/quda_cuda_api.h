@@ -5,6 +5,8 @@
 #include <cuda_runtime.h>
 #endif
 
+#include <enum_quda.h>
+
 using qudaStream_t = cudaStream_t;
 
 /**
@@ -49,9 +51,7 @@ namespace quda {
   }
 
   /**
-     @brief Wrapper around cudaMemcpy used for auto-profiling.  Do not
-     call directly, rather call macro below which will grab the
-     location of the call.
+     @brief Wrapper around cudaMemcpy or driver API equivalent
      @param[out] dst Destination pointer
      @param[in] src Source pointer
      @param[in] count Size of transfer
@@ -62,7 +62,6 @@ namespace quda {
 
   /**
      @brief Wrapper around cudaMemcpyAsync or driver API equivalent
-     Adds auto-profiling support.
      @param[out] dst Destination pointer
      @param[in] src Source pointer
      @param[in] count Size of transfer
@@ -74,7 +73,6 @@ namespace quda {
 
   /**
      @brief Wrapper around cudaMemcpy2DAsync or driver API equivalent
-     Adds auto-profiling support.
      @param[out] dst Destination pointer
      @param[in] dpitch Destination pitch
      @param[in] src Source pointer
@@ -89,8 +87,7 @@ namespace quda {
                           const char *line);
 
   /**
-     @brief Wrapper around cudaMemset or driver API equivalent.
-     Adds auto-profiling support.
+     @brief Wrapper around cudaMemset or driver API equivalent
      @param[out] ptr Starting address pointer
      @param[in] value Value to set for each byte of specified memory
      @param[in] count Size in bytes to set
@@ -98,8 +95,7 @@ namespace quda {
   void qudaMemset_(void *ptr, int value, size_t count, const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around cudaMemsetAsync or driver API equivalent.
-     Adds auto-profiling support.
+     @brief Wrapper around cudaMemsetAsync or driver API equivalent
      @param[out] ptr Starting address pointer
      @param[in] value Value to set for each byte of specified memory
      @param[in] count Size in bytes to set
@@ -107,6 +103,16 @@ namespace quda {
    */
   void qudaMemsetAsync_(void *ptr, int value, size_t count, const qudaStream_t &stream, const char *func,
                         const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaMemPrefetchAsync or driver API equivalent
+     @param[out] ptr Starting address pointer to be prefetched
+     @param[in] count Size in bytes to prefetch
+     @param[in] mem_space Memory space to prefetch to
+     @param[in] stream Stream to issue prefetch
+   */
+  void qudaMemPrefetchAsync_(void *ptr, size_t count, QudaFieldLocation mem_space, const qudaStream_t &stream,
+                             const char *func, const char *file, const char *line);  
 
   /**
      @brief Wrapper around cudaEventQuery or cuEventQuery with built-in error checking
@@ -195,6 +201,9 @@ namespace quda {
 
 #define qudaMemsetAsync(ptr, value, count, stream)                                                                     \
   ::quda::qudaMemsetAsync_(ptr, value, count, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
+#define qudaMemPrefetchAsync(ptr, count, mem_space, stream)             \
+  ::quda::qudaMemPrefetchAsync_(ptr, count, mem_space, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
 
 #define qudaEventQuery(event)                                           \
   ::quda::qudaEventQuery_(event, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))

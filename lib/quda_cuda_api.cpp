@@ -270,6 +270,22 @@ namespace quda {
     if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
+  void qudaMemPrefetchAsync_(void *ptr, size_t count, QudaFieldLocation mem_space, const qudaStream_t &stream, const char *func,
+                             const char *file, const char *line)
+  {
+    int dev_id = 0;
+    if (mem_space == QUDA_CUDA_FIELD_LOCATION)
+      dev_id = comm_gpuid();
+    else if (mem_space == QUDA_CPU_FIELD_LOCATION)
+      dev_id = cudaCpuDeviceId;
+    else
+      errorQuda("Invalid QudaFieldLocation.");
+
+    cudaError_t error = cudaMemPrefetchAsync(ptr, count, dev_id, stream);
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+  }
+
   bool qudaEventQuery_(cudaEvent_t &event, const char *func, const char *file, const char *line)
   {
 #ifdef USE_DRIVER_API
