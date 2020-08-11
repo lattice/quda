@@ -52,11 +52,13 @@ namespace quda
   template <typename Float_> struct ContractionSumArg :    
     public ReduceArg<spinor_array>  
   {
+    static constexpr int reduction_dim = 3;
+
     //- Welcome back! We first define the variables in the argument structure: 
     //- Naturally, this is the number of threads in the block
     int threads; // number of active threads required
     //- This is the number of lattice sites on the MPI node
-    int X[4];    // grid dimensions
+    int_fastdiv X[4];    // grid dimensions
 
     //- These vales are hardcoded to prevent template explosion. This particular kernel will 
     //- only work for spin=4, color=3 fermion fields. The spin_project boolean is a neat 
@@ -80,6 +82,8 @@ namespace quda
     F x;
     F y;
 
+    int t_offset;
+
     //- We now come to the constructor of this argument structure. This is what was called 
     //- by the ContractionArgSum<real> arg(x, y); line back in quda/lib/contract.cu. 
     //- `threads` is initialised with the checkerboarded sub-volume of a fermion field, 
@@ -89,13 +93,15 @@ namespace quda
     //- locate data, and the parameters it needs to perform it's computation.
     ContractionSumArg(const ColorSpinorField &x, const ColorSpinorField &y) :
       ReduceArg<spinor_array>(),
-      threads(x.VolumeCB() / x.X(3)),
+      threads(x.VolumeCB() / x.X(reduction_dim)),
       x(x),
-      y(y)
+      y(y),
+      t_offset(comm_coord(reduction_dim) * x.X(reduction_dim)) // offset of the slice we are doing reduction on
     {
       for (int dir = 0; dir < 4; dir++) 
 	X[dir] = x.X()[dir];
     }
+
     //- And that the argument struct done. Please go back to `quda/lib/contract.cu` so see
     //- the computation.
   };
@@ -103,8 +109,10 @@ namespace quda
   template <typename Float_> struct ContractionSumSpatialArg :
     public ReduceArg<spinor_array>
   {
+    static constexpr int reduction_dim = 2;
+
     int threads; // number of active threads required
-    int X[4];    // grid dimensions
+    int_fastdiv X[4];    // grid dimensions
 
     using Float = Float_;
     static constexpr int nColor = 3;
@@ -117,17 +125,21 @@ namespace quda
     F x;
     F y;
 
+    int t_offset;
+
+    // TODO: Note that the z direction (2) is only a special case. Needs fix in the future.
     ContractionSumSpatialArg(const ColorSpinorField &x, const ColorSpinorField &y) :
       ReduceArg<spinor_array>(),
-      threads(x.VolumeCB() / x.X(2)),
+      threads(x.VolumeCB() / x.X(reduction_dim)),
       x(x),
-      y(y)
+      y(y),
+      t_offset(comm_coord(reduction_dim) * x.X(reduction_dim)) // offset of the slice we are doing reduction on
     {
       for (int dir = 0; dir < 4; dir++)
         X[dir] = x.X()[dir];
     }
   };
-  
+
   template <typename real, typename Arg> __global__ void computeColorContraction(Arg arg)
   {
     int x_cb = threadIdx.x + blockIdx.x * blockDim.x;
@@ -168,7 +180,7 @@ namespace quda
 
     spinor_array res;
     Matrix<complex<real>, nSpin> A;
-    
+
     // the while loop is restricted to the same time slice
     while (xyz < arg.threads) {
 
@@ -189,7 +201,7 @@ namespace quda
 	  res[mu * nSpin + nu].y = A(mu, nu).imag();
 	}
       }
-      
+
       xyz += blockDim.x * gridDim.x;
     }
     reduce2d<blockSize, 2>(arg, res, t);
@@ -203,7 +215,7 @@ namespace quda
   {
     complex<real> I(0.0, 1.0);    
     complex<real> result_local(0.0, 0.0);
-    
+
     // Spin contract: <\phi(x)_{\mu} \Gamma_{mu,nu}^{rho,tau} \phi(y)_{\nu}>
     // The rho index runs slowest.
     // Layout is defined in enum_quda.h: G_idx = 4*rho + tau
@@ -374,11 +386,37 @@ namespace quda
 
     // Compute all gamma matrix insertions
     computeDRGammaContraction(spin_elem, A);
-    
+
     // Save data to return array
     arg.s.save(A, x_cb, parity);
   }
-  
+
+  template <int t_d, class T>
+  __device__ int x_cb_from_t_xyz_d(int t, int xyz_cb, T X[4], int parity){
+
+    int x[4];
+    int xyz = xyz_cb * 2;
+
+#pragma unroll
+    for (int d = 0; d < 4; d++) {
+      if (d != t_d) {
+        x[d] = xyz % X[d];
+        xyz /= X[d];
+      }
+    }
+
+    x[t_d] = t;
+
+    if (t_d > 0) {
+      x[0] += (x[0] + x[1] + x[2] + x[3] + parity) & 1;
+    } else {
+      x[1] += (x[0] + x[1] + x[2] + x[3] + parity) & 1;
+    }
+
+    return (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) / 2;
+
+  }
+
   //- Hello traveller! I am very pleased you have made it this far. None but the bravest dare venture
   //- this deep into QUDA! What You are about to see is what an individual thread in QUDA
   //- executes. This is the very core of the computation we set out to do way back in 
@@ -429,8 +467,13 @@ namespace quda
             
       //- arg.threads is the checkerboard volume of a timeslice. We set it in the argument struct.
       //- We use it to define a global checkerboard index.
-      int idx_cb = t * arg.threads + xyz;
 
+      // Jiqun Tu: the following trick does not work for spatial slice `t`. Needs fix.
+#if 0
+      // int idx_cb = t * arg.threads + xyz;
+#else
+      int idx_cb = x_cb_from_t_xyz_d<Arg::reduction_dim>(t, xyz, arg.X, parity);
+#endif
       //- Now, a litle QUDA magic. We declare two colorSpinor LOCAL field objects x,y, 
       //- and we populate them using a sepecial accessor defined in the ARG STRUCTURE objects x,y.
       //- It was that long `F` typedef we made. The `F` type has these built in accessors that 
@@ -477,7 +520,7 @@ namespace quda
     //- the data in res, accoring to the timeslice t, and place the result in an array which is
     //- defined in the arg structure. Remember, the argument structure iherits from ReduceArg, 
     //- which is why the reduced array already exists.
-    reduce2d<blockSize, 2>(arg, res, t);
+    reduce2d<blockSize, 2>(arg, res, t + arg.t_offset);
 
     //- We have computed the contraction! We finally done. Let the Eagles of Manwe take us back to 
     //- quda/lib/contract.cu, and the line:
