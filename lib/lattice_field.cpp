@@ -58,6 +58,7 @@ namespace quda {
 
   LatticeField::LatticeField(const LatticeFieldParam &param) :
       volume(1),
+      localVolume(1),
       pad(param.pad),
       total_bytes(0),
       nDim(param.nDim),
@@ -115,6 +116,7 @@ namespace quda {
       x[i] = param.x[i];
       r[i] = ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED ? param.r[i] : 0;
       volume *= param.x[i];
+      localVolume *= (x[i] - 2 * r[i]);
       surface[i] = 1;
       for (int j=0; j<nDim; j++) {
 	if (i==j) continue;
@@ -124,6 +126,7 @@ namespace quda {
 
     if (siteSubset == QUDA_INVALID_SITE_SUBSET) errorQuda("siteSubset is not set");
     volumeCB = (siteSubset == QUDA_FULL_SITE_SUBSET) ? volume / 2 : volume;
+    localVolumeCB = (siteSubset == QUDA_FULL_SITE_SUBSET) ? localVolume / 2 : localVolume;
     stride = volumeCB + pad;
 
     // for parity fields the factor of half is present for all surfaces dimensions except x, so add it manually
@@ -148,6 +151,7 @@ namespace quda {
 
   LatticeField::LatticeField(const LatticeField &field) :
       volume(1),
+      localVolume(1),
       pad(field.pad),
       total_bytes(0),
       nDim(field.nDim),
@@ -194,6 +198,7 @@ namespace quda {
       x[i] = field.x[i];
       r[i] = ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED ? field.r[i] : 0;
       volume *= field.x[i];
+      localVolume *= (x[i] - 2 * r[i]);
       surface[i] = 1;
       for (int j=0; j<nDim; j++) {
 	if (i==j) continue;
@@ -203,6 +208,7 @@ namespace quda {
 
     if (siteSubset == QUDA_INVALID_SITE_SUBSET) errorQuda("siteSubset is not set");
     volumeCB = (siteSubset == QUDA_FULL_SITE_SUBSET) ? volume / 2 : volume;
+    localVolumeCB = (siteSubset == QUDA_FULL_SITE_SUBSET) ? localVolume / 2 : localVolume;
     stride = volumeCB + pad;
   
     // for parity fields the factor of half is present for all surfaces dimensions except x, so add it manually
