@@ -5,9 +5,10 @@
 #include <cuda_runtime.h>
 #endif
 
-#include <enum_quda.h>
-
+extern cudaDeviceProp deviceProp;
 using qudaStream_t = cudaStream_t;
+
+#include <enum_quda.h>
 
 /**
    @file quda_api.h
