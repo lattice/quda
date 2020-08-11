@@ -60,16 +60,6 @@ namespace quda {
   
   CloverField::~CloverField() { }
 
-  bool CloverField::isNative() const {
-    if (precision == QUDA_DOUBLE_PRECISION) {
-      if (order  == QUDA_FLOAT2_CLOVER_ORDER) return true;
-    } else if (precision == QUDA_SINGLE_PRECISION || precision == QUDA_HALF_PRECISION
-        || precision == QUDA_QUARTER_PRECISION) {
-      if (order == QUDA_FLOAT4_CLOVER_ORDER) return true;
-    }
-    return false;
-  }
-
   void CloverField::setRho(double rho_)
   {
     rho = rho_;
