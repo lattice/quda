@@ -445,8 +445,10 @@ namespace quda {
 
   public:
     bool advanceBlockDim(TuneParam &param) const {
+      int grid_dim_z = param.grid.z;
       bool rtn = Tunable::advanceBlockDim(param);
       param.block.y = 2;
+      param.grid.z = grid_dim_z;
       return rtn;
     }
 
