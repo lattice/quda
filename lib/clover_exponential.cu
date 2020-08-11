@@ -15,14 +15,16 @@ namespace quda {
     CloverExponentialArg<store_t> arg;
     const CloverField &meta; // used for meta data only
     bool tuneGridDim() const { return true; }
+    bool inverse;
 
   public:
-    CloverExponential(CloverField &clover, int order, double mass, double *c, bool inverse) :
-      arg(clover, order, mass, c, inverse),
-      meta(clover)
+    CloverExponential(CloverField &clover, int order, double mass, bool inverse) :
+      arg(clover, order, mass),
+      meta(clover),
+      inverse(inverse)
     {
       writeAuxString("stride=%d,prec=%lu,order=%d,mass=%f,inverse=%s", arg.clover.stride, sizeof(store_t),
-		     order, mass, arg.inverse ? "true" : "false");
+		     order, mass, inverse ? "true" : "false");
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
 #ifdef JITIFY
         create_jitify_program("kernels/clover_exponential.cuh");
@@ -39,15 +41,17 @@ namespace quda {
 #ifdef JITIFY
         using namespace jitify::reflection;
         jitify_error = program->kernel("quda::cloverExponentialKernel")
-                           .instantiate((int)tp.block.x, Type<Arg>(), arg.inverse)
+                           .instantiate((int)tp.block.x, Type<Arg>(), inverse)
                            .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                            .launch(arg);
 #else
-        if (arg.inverse) {
+        arg.c = static_cast<double *>(pool_device_malloc((arg.order+1) * sizeof(double)));
+        if (inverse) {
           cloverExponentialKernel<Arg,true> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
         } else {
           cloverExponentialKernel<Arg,false> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
         }
+        pool_device_free(arg.c);
 #endif
       }
     }
@@ -60,13 +64,11 @@ namespace quda {
   // this is the function that is actually called, from here on down we instantiate all required templates
   void cloverExponential(CloverField &clover, int order, double mass, bool inverse)
   {
-    double *c = static_cast<double *>(pool_device_malloc((order+1) * sizeof(double)));
 #ifdef GPU_CLOVER_DIRAC
-    instantiate<CloverExponential>(clover, order, mass, c, inverse);
+    instantiate<CloverExponential>(clover, order, mass, inverse);
 #else
     errorQuda("Clover has not been built");
 #endif
-    pool_device_free(c);
   }
 
 } // namespace quda

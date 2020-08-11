@@ -17,15 +17,12 @@ namespace quda
     int order;
     real mass;
     double *c;
-    bool inverse;
 
-    CloverExponentialArg(CloverField &field, int order, double mass, double *c, bool inverse = false) :
+    CloverExponentialArg(CloverField &field, int order, double mass) :
       ReduceArg<double2>(),
       clover(field, false),
       order(order),
-      mass(static_cast<real>(mass)),
-      inverse(inverse),
-      c(c)
+      mass(static_cast<real>(mass))
     {
       if (!field.isNative()) errorQuda("Clover field %d order not supported", field.Order());
     }
@@ -41,23 +38,10 @@ namespace quda
     constexpr int N = Arg::nColor * Arg::nSpin / 2;
     using Mat = HMatrix<real, N>;
 
-    real mass = static_cast<real>(arg.mass);
+    real mass = arg.mass;
     real invMass = static_cast<real>(1.0) / mass;
     int order = arg.order;
     double *c = arg.c;
-
-    c[0] = 1.0;
-    if (inverse) {
-#pragma unroll
-      for (int i=1; i<=order; i++) {
-        c[i] = c[i-1] / static_cast<double>(-i);
-      }
-    } else {
-#pragma unroll
-      for (int i=1; i<=order; i++) {
-        c[i] = c[i-1] / static_cast<double>(i);
-      }
-    }
 
     for (int ch = 0; ch < 2; ch++) {
       Mat A = arg.clover(x_cb, parity, ch);
@@ -68,17 +52,17 @@ namespace quda
 
       Mat A2 = A * A;
       Mat A3 = A2 * A;
-      real tr[5] = {getTrace(A2), getTrace(A3), getTrace(A2*A2), getTrace(A2*A3), getTrace(A3*A3)};
-      real psv[5];
-      psv[0] = (1.0 / 144.0) * (8.0 * tr[1] * tr[1] - 24.0 * tr[4] + tr[0] * (18.0 * tr[2] - 3.0 * tr[0] * tr[0]));
-      psv[1] = (1.0 / 30.0) * (5.0 * tr[0] * tr[1] - 6.0 * tr[3]);
-      psv[2] = (1.0 / 8.0) * (tr[0] * tr[0] - 2.0 * tr[2]);
-      psv[3] = (-1.0 / 3.0) * tr[1];
-      psv[4] = -0.5 * tr[0];
 
       real q5;
       real q[6] = {static_cast<real>(0.0)};
       if (order > 5) {
+        real tr[5] = {getTrace(A2), getTrace(A3), getTrace(A2*A2), getTrace(A2*A3), getTrace(A3*A3)};
+        real psv[5];
+        psv[0] = (1.0 / 144.0) * (8.0 * tr[1] * tr[1] - 24.0 * tr[4] + tr[0] * (18.0 * tr[2] - 3.0 * tr[0] * tr[0]));
+        psv[1] = (1.0 / 30.0) * (5.0 * tr[0] * tr[1] - 6.0 * tr[3]);
+        psv[2] = (1.0 / 8.0) * (tr[0] * tr[0] - 2.0 * tr[2]);
+        psv[3] = (-1.0 / 3.0) * tr[1];
+        psv[4] = -0.5 * tr[0];
 #pragma unroll
         for (int i=0; i<6; i++)
           q[i] = static_cast<real>(c[order - 5 + i]);
@@ -90,17 +74,17 @@ namespace quda
           q[3] = q[2] - q5 * psv[3];
           q[2] = q[1] - q5 * psv[2];
           q[1] = q[0] - q5 * psv[1];
-          q[0] = static_cast<real>(c[0]) - q5 * psv[0];
-         }
+          q[0] = static_cast<real>(c[i]) - q5 * psv[0];
+        }
       } else {
 #pragma unroll
-          for (int i=0 ; i<=order ; i++)
-            q[i] = static_cast<real>(c[i]);
+        for (int i=0; i<=order; i++)
+          q[i] = static_cast<real>(c[i]);
       }
 
 #pragma unroll
       for (int i=0; i<N; i++)
-        q[i] *= static_cast<real>(mass);
+        q[i] *= mass;
       
       Mat A_exp = q[5] * A2 + q[4] * A;
       A_exp += q[3];
@@ -126,6 +110,20 @@ namespace quda
   template <typename Arg, bool inverse>
   __global__ void cloverExponentialKernel(Arg arg)
   {
+    const int order = arg.order;
+    double *c = arg.c;
+    c[0] = 1.0;
+    if (inverse) {
+#pragma unroll
+      for (int i=1; i<=order; i++) {
+        c[i] = c[i-1] / static_cast<double>(-i);
+      }
+    } else {
+#pragma unroll
+      for (int i=1; i<=order; i++) {
+        c[i] = c[i-1] / static_cast<double>(i);
+      }
+    }
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     int parity = threadIdx.y;
     while (idx < arg.clover.volumeCB) {

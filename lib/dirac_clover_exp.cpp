@@ -6,8 +6,7 @@ namespace quda {
 
   DiracCloverExp::DiracCloverExp(const DiracParam &param) : DiracClover(param), mass(param.mass)
   {
-    printfQuda("DiracCloverExp struct success.\n");
-    cloverExponential(*clover, 1, mass, false);
+      printfQuda("Constructing DiracCloverExp\n");
   }
 
   DiracCloverExp::DiracCloverExp(const DiracCloverExp &dirac) : DiracClover(dirac), mass(dirac.mass) {}
@@ -31,7 +30,6 @@ namespace quda {
   {
     // For the preconditioned operator, we need to check that the inverse of the clover term is present
     if (!clover->cloverInv) errorQuda("Clover inverse required for DiracCloverExpPC");
-    cloverInvert(*clover, false);
   }
 
   DiracCloverExpPC::DiracCloverExpPC(const DiracCloverExpPC &dirac) : DiracCloverExp(dirac) { }

@@ -920,8 +920,13 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
       profileClover.TPSTART(QUDA_PROFILE_TOTAL);
     }
 
+    bool do_exp = (inv_param->dslash_type == QUDA_CLOVER_EXP_WILSON_DSLASH) ? true : false;
+    if (do_exp) {
+        cloverExponential(*cloverPrecise, 2, inv_param->mass, false);
+    }
+
     // inverted clover term is required when applying preconditioned operator
-    if ((!h_clovinv || inv_param->compute_clover_inverse) && pc_solve) {
+    if ((!h_clovinv || inv_param->compute_clover_inverse || do_exp) && pc_solve) {
       profileClover.TPSTART(QUDA_PROFILE_COMPUTE);
       if (!dynamic_clover_inverse()) {
 	cloverInvert(*cloverPrecise, inv_param->compute_clover_trlog);
@@ -2620,9 +2625,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   // create the dirac operator
   createDirac(d, dSloppy, dPre, *param, pc_solve);
-
-//   void *return_ptr = pool_pinned_malloc(cloverPrecise->Bytes());
-//   qudaMemcpy((char *)(return_ptr), (char *)(cloverPrecise->V(false)), cloverPrecise->Bytes(), cudaMemcpyDeviceToHost);
 
   Dirac &dirac = *d;
   Dirac &diracSloppy = *dSloppy;
