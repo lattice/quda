@@ -1,5 +1,4 @@
-#ifndef _LATTICE_FIELD_H
-#define _LATTICE_FIELD_H
+#pragma once
 
 #include <map>
 #include <quda.h>
@@ -7,7 +6,7 @@
 #include <comm_quda.h>
 #include <util_quda.h>
 #include <object.h>
-#include <quda_cuda_api.h>
+#include <quda_api.h>
 
 /**
  * @file lattice_field.h
@@ -815,5 +814,3 @@ namespace quda {
   }
 
 } // namespace quda
-
-#endif // _LATTICE_FIELD_H

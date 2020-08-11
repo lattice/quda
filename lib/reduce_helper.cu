@@ -1,5 +1,4 @@
 #include <quda_internal.h>
-#include <quda_cuda_api.h>
 #include <malloc_quda.h>
 #include <reduce_helper.h>
 #include <tune_quda.h>

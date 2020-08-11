@@ -10,7 +10,7 @@
 using qudaStream_t = cudaStream_t;
 
 /**
-   @file quda_cuda_api.h
+   @file quda_api.h
 
    Wrappers around CUDA API function calls allowing us to easily
    profile and switch between using the CUDA runtime and driver APIs.

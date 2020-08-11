@@ -1,4 +1,4 @@
-#include <quda_cuda_api.h>
+#include <quda_api.h>
 
 #ifdef QUDA_FAST_COMPILE_REDUCE
 

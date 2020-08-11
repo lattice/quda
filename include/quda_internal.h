@@ -1,7 +1,7 @@
 #ifndef _QUDA_INTERNAL_H
 #define _QUDA_INTERNAL_H
 
-#include <quda_cuda_api.h>
+#include <quda_api.h>
 #include <string>
 #include <complex>
 #include <vector>
