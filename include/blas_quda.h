@@ -10,7 +10,7 @@ namespace quda {
 
     // creates and destroys reduction buffers
     void init();
-    void end(void);
+    void destroy();
 
     // creates and destroys additional copy stream
     void createAuxBlasStream();
@@ -21,13 +21,6 @@ namespace quda {
     // Synchronize aux blas stream
     void synchronizeAuxBlasStream();
     
-    /** returns the reduce buffer size allocated */
-    size_t reduceBufferSize();
-
-    void* getDeviceReduceBuffer();
-    void* getMappedHostReduceBuffer();
-    void* getHostReduceBuffer();
-
     void setParam(int kernel, int prec, int threads, int blocks);
 
     extern unsigned long long flops;

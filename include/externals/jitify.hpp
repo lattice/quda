@@ -781,55 +781,125 @@ inline std::string demangle(const char* mangled_name) {
   }
   return demangled_name;
 }
-#endif // not MSVC
-      //#endif // CUDA_VERSION < 8000
+#endif  // not MSVC
+//#endif // CUDA_VERSION < 8000
 
-      template <typename T> struct type_reflection {
-        inline static std::string name()
-        {
-          //#if CUDA_VERSION < 8000
-          // WAR for typeid discarding cv qualifiers on value-types
-          // We use a pointer type to maintain cv qualifiers, then strip out the '*'
-          std::string no_cv_name = demangle(typeid(T).name());
-          std::string ptr_name = demangle(typeid(T *).name());
-          // Find the right '*' by diffing the type name and ptr name
-          // Note that the '*' will also be prefixed with the cv qualifiers
-          size_t diff_begin
-            = std::mismatch(no_cv_name.begin(), no_cv_name.end(), ptr_name.begin()).first - no_cv_name.begin();
-          size_t star_begin = ptr_name.find("*", diff_begin);
-          if (star_begin == std::string::npos) { throw std::runtime_error("Type reflection failed: " + ptr_name); }
-          std::string name = ptr_name.substr(0, star_begin) + ptr_name.substr(star_begin + 1);
-          return name;
-          //#else
-          //         std::string ret;
-          //         nvrtcResult status = nvrtcGetTypeName<T>(&ret);
-          //         if( status != NVRTC_SUCCESS ) {
-          //                 throw std::runtime_error(std::string("nvrtcGetTypeName
-          // failed:
-          //")+ nvrtcGetErrorString(status));
-          //         }
-          //         return ret;
-          //#endif
-        }
-      }; // namespace detail
-      template <typename T, T VALUE> struct type_reflection<NonType<T, VALUE>> {
-        inline static std::string name() { return jitify::reflection::reflect(VALUE); }
-      };
+template <typename T>
+struct type_reflection {
+  inline static std::string name() {
+    //#if CUDA_VERSION < 8000
+    // WAR for typeid discarding cv qualifiers on value-types
+    // We use a pointer type to maintain cv qualifiers, then strip out the '*'
+    std::string no_cv_name = demangle(typeid(T).name());
+    std::string ptr_name = demangle(typeid(typename std::remove_reference<T>::type *).name());
+    // Find the right '*' by diffing the type name and ptr name
+    // Note that the '*' will also be prefixed with the cv qualifiers
+    size_t diff_begin =
+        std::mismatch(no_cv_name.begin(), no_cv_name.end(), ptr_name.begin())
+            .first -
+        no_cv_name.begin();
+    size_t star_begin = ptr_name.find("*", diff_begin);
+    if (star_begin == std::string::npos) {
+      throw std::runtime_error("Type reflection failed: " + ptr_name);
+    }
+    std::string name =
+        ptr_name.substr(0, star_begin) + ptr_name.substr(star_begin + 1);
+    return name;
+    //#else
+    //         std::string ret;
+    //         nvrtcResult status = nvrtcGetTypeName<T>(&ret);
+    //         if( status != NVRTC_SUCCESS ) {
+    //                 throw std::runtime_error(std::string("nvrtcGetTypeName
+    // failed:
+    //")+ nvrtcGetErrorString(status));
+    //         }
+    //         return ret;
+    //#endif
+  }
+};  // namespace detail
+template <typename T, T VALUE>
+struct type_reflection<NonType<T, VALUE> > {
+  inline static std::string name() {
+    return jitify::reflection::reflect(VALUE);
+  }
+};
 
-    } // namespace detail
+}  // namespace detail
 
-    //! \endcond
+//! \endcond
 
-    /*! Create an Instance object that contains a const reference to the
-     *  value.  We use this to wrap abstract objects from which we want to extract
-     *  their type at runtime (e.g., derived type).  This is used to facilitate
-     *  templating on derived type when all we know at compile time is abstract
-     * type.
-     */
-    template <typename T> struct Instance {
-      const T &value;
-      Instance(const T &value) : value(value) {}
-    };
+/*! Create an Instance object that contains a const reference to the
+ *  value.  We use this to wrap abstract objects from which we want to extract
+ *  their type at runtime (e.g., derived type).  This is used to facilitate
+ *  templating on derived type when all we know at compile time is abstract
+ * type.
+ */
+template <typename T>
+struct Instance {
+  const T& value;
+  Instance(const T& value) : value(value) {}
+};
+
+/*! Create an Instance object from which we can extract the value's run-time
+ * type.
+ *  \param value The const value to be captured.
+ */
+template <typename T>
+inline Instance<T const> instance_of(T const& value) {
+  return Instance<T const>(value);
+}
+
+/*! A wrapper used for representing types as values.
+ */
+template <typename T>
+struct Type {};
+
+// Type reflection
+// E.g., reflect<float>() -> "float"
+// Note: This strips trailing const and volatile qualifiers
+/*! Generate a code-string for a type.
+ *  \code{.cpp}reflect<float>() --> "float"\endcode
+ */
+template <typename T>
+inline std::string reflect() {
+  return detail::type_reflection<T>::name();
+}
+// Value reflection
+// E.g., reflect(3.14f) -> "(float)3.14"
+/*! Generate a code-string for a value.
+ *  \code{.cpp}reflect(3.14f) --> "(float)3.14"\endcode
+ */
+template <typename T>
+inline std::string reflect(T const& value) {
+  return "(" + reflect<T>() + ")" + detail::value_string(value);
+}
+// Non-type template arg reflection (implicit conversion to int64_t)
+// E.g., reflect<7>() -> "(int64_t)7"
+/*! Generate a code-string for an integer non-type template argument.
+ *  \code{.cpp}reflect<7>() --> "(int64_t)7"\endcode
+ */
+template <int64_t N>
+inline std::string reflect() {
+  return reflect<NonType<int64_t, N> >();
+}
+// Non-type template arg reflection (explicit type)
+// E.g., reflect<int,7>() -> "(int)7"
+/*! Generate a code-string for a generic non-type template argument.
+ *  \code{.cpp} reflect<int,7>() --> "(int)7" \endcode
+ */
+template <typename T, T N>
+inline std::string reflect() {
+  return reflect<NonType<T, N> >();
+}
+// Type reflection via value
+// E.g., reflect(Type<float>()) -> "float"
+/*! Generate a code-string for a type wrapped as a Type instance.
+ *  \code{.cpp}reflect(Type<float>()) --> "float"\endcode
+ */
+template <typename T>
+inline std::string reflect(jitify::reflection::Type<T>) {
+  return reflect<T>();
+}
 
     /*! Create an Instance object from which we can extract the value's run-time
      * type.
@@ -842,52 +912,11 @@ inline std::string demangle(const char* mangled_name) {
     template <typename T> struct Type {
     };
 
-    // Type reflection
-    // E.g., reflect<float>() -> "float"
-    // Note: This strips trailing const and volatile qualifiers
-    /*! Generate a code-string for a type.
-     *  \code{.cpp}reflect<float>() --> "float"\endcode
-     */
-    template <typename T> inline std::string reflect() { return detail::type_reflection<T>::name(); }
-    // Value reflection
-    // E.g., reflect(3.14f) -> "(float)3.14"
-    /*! Generate a code-string for a value.
-     *  \code{.cpp}reflect(3.14f) --> "(float)3.14"\endcode
-     */
-    template <typename T> inline std::string reflect(T const &value)
-    {
-      return "(" + reflect<T>() + ")" + detail::value_string(value);
-    }
-    // Non-type template arg reflection (implicit conversion to int64_t)
-    // E.g., reflect<7>() -> "(int64_t)7"
-    /*! Generate a code-string for an integer non-type template argument.
-     *  \code{.cpp}reflect<7>() --> "(int64_t)7"\endcode
-     */
-    template <int64_t N> inline std::string reflect() { return reflect<NonType<int64_t, N>>(); }
-    // Non-type template arg reflection (explicit type)
-    // E.g., reflect<int,7>() -> "(int)7"
-    /*! Generate a code-string for a generic non-type template argument.
-     *  \code{.cpp} reflect<int,7>() --> "(int)7" \endcode
-     */
-    template <typename T, T N> inline std::string reflect() { return reflect<NonType<T, N>>(); }
-    // Type reflection via value
-    // E.g., reflect(Type<float>()) -> "float"
-    /*! Generate a code-string for a type wrapped as a Type instance.
-     *  \code{.cpp}reflect(Type<float>()) --> "float"\endcode
-     */
-    template <typename T> inline std::string reflect(jitify::reflection::Type<T>) { return reflect<T>(); }
-
-    /*! Generate a code-string for a type wrapped as an Instance instance.
-     *  \code{.cpp}reflect(Instance<float>(3.1f)) --> "float"\endcode
-     *  or more simply when passed to a instance_of helper
-     *  \code{.cpp}reflect(instance_of(3.1f)) --> "float"\endcodei
-     *  This is specifically for the case where we want to extract the run-time
-     * type, e.g., derived type, of an object pointer.
-     */
-    template <typename T> inline std::string reflect(jitify::reflection::Instance<T> &value)
-    {
-      return detail::demangle(typeid(value.value).name());
-    }
+// Multiple value reflections one call, returning list of strings
+template <typename... Args>
+inline std::vector<std::string> reflect_all(Args&... args) {
+  return {reflect(args)...};
+}
 
     // Type from value
     // E.g., type_of(3.14f) -> Type<float>()
@@ -2682,7 +2711,7 @@ public:
    *  \see launch
    */
   template <typename... ArgTypes>
-  inline CUresult operator()(ArgTypes... args) const {
+  inline CUresult operator()(ArgTypes&... args) const {
     return this->launch(args...);
   }
   /*! Launch the kernel.
@@ -2690,7 +2719,7 @@ public:
    *  \param args Function arguments for the kernel.
    */
   template <typename... ArgTypes>
-  inline CUresult launch(ArgTypes... args) const {
+  inline CUresult launch(ArgTypes&... args) const {
     return this->launch(std::vector<void*>({(void*)&args...}),
                         {reflection::reflect<ArgTypes>()...});
   }
@@ -3866,15 +3895,14 @@ namespace experimental
     return KernelLauncher(this, grid, block, smem, stream);
   }
 
-  inline KernelLauncher KernelInstantiation::configure_1d_max_occupancy(int max_block_size, unsigned int smem,
-                                                                        CUoccupancyB2DSize smem_callback,
-                                                                        cudaStream_t stream, unsigned int flags) const
-  {
-    int grid;
-    int block;
-    CUfunction func = *_cuda_kernel;
-    detail::get_1d_max_occupancy(func, smem_callback, &smem, max_block_size, flags, &grid, &block);
-    return this->configure(grid, block, smem, stream);
+  /*! Launch the kernel.
+   *
+   *  \param args Function arguments for the kernel.
+   */
+  template <typename... ArgTypes>
+  CUresult launch(ArgTypes&... args) const {
+    return this->launch(std::vector<void*>({(void*)&args...}),
+                        {reflection::reflect<ArgTypes>()...});
   }
 
 } // namespace experimental

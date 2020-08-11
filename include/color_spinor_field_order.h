@@ -655,10 +655,10 @@ namespace quda {
                                            int chi) const
       {
         if (!fixed) {
-          accessor.load<nSpinBlock>((complex<storeFloat> *)out, v, parity, x_cb, chi);
+          accessor.template load<nSpinBlock>((complex<storeFloat> *)out, v, parity, x_cb, chi);
         } else {
           complex<storeFloat> tmp[nSpinBlock * nColor * nVec];
-          accessor.load<nSpinBlock>(tmp, v, parity, x_cb, chi);
+          accessor.template load<nSpinBlock>(tmp, v, parity, x_cb, chi);
           Float norm_ = block_float ? norm[parity * norm_offset + x_cb] : scale_inv;
           for (int s = 0; s < nSpinBlock; s++) {
             for (int c = 0; c < nColor; c++) {

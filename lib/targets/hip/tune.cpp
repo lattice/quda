@@ -225,8 +225,8 @@ namespace quda
       TuneKey key = entry->first;
       TuneParam param = entry->second;
 
-      char tmp[TuneKey::aux_n] = {};
-      strncpy(tmp, key.aux, TuneKey::aux_n);
+      char tmp[14] = {};
+      strncpy(tmp, key.aux, 13);
       bool is_policy_kernel = strncmp(tmp, "policy_kernel", 13) == 0 ? true : false;
       bool is_policy = (strncmp(tmp, "policy", 6) == 0 && !is_policy_kernel) ? true : false;
       if (param.n_calls > 0 && !is_policy) total_time += param.n_calls * param.time;
@@ -393,10 +393,10 @@ namespace quda
                     "QUDA_RESOURCE_PATH environment variable to point to a new path.",
                     cache_path.c_str());
 #else
-        if (version_check && token.compare(quda_version))
-          errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the "
-                    "QUDA_RESOURCE_PATH environment variable to point to a new path.",
-                    cache_path.c_str());
+      if (version_check && token.compare(quda_version))
+        errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the "
+                  "QUDA_RESOURCE_PATH environment variable to point to a new path.",
+                  cache_path.c_str());
 #endif
         ls >> token;
         if (version_check && token.compare(quda_hash))
@@ -481,7 +481,7 @@ namespace quda
 #ifdef GITVERSION
       cache_file << "\t" << gitversion;
 #else
-      cache_file << "\t" << quda_version;
+    cache_file << "\t" << quda_version;
 #endif
       cache_file << "\t" << quda_hash << "\t# Last updated " << ctime(&now) << std::endl;
       cache_file << std::setw(16) << "volume"
@@ -603,7 +603,7 @@ namespace quda
 #ifdef GITVERSION
       profile_file << "\t" << gitversion;
 #else
-      profile_file << "\t" << quda_version;
+    profile_file << "\t" << quda_version;
 #endif
       profile_file << "\t" << quda_hash << "\t# Last updated " << ctime(&now) << std::endl;
       profile_file << std::setw(12) << "total time"
@@ -617,7 +617,7 @@ namespace quda
 #ifdef GITVERSION
       async_profile_file << "\t" << gitversion;
 #else
-      async_profile_file << "\t" << quda_version;
+    async_profile_file << "\t" << quda_version;
 #endif
       async_profile_file << "\t" << quda_hash << "\t# Last updated " << ctime(&now) << std::endl;
       async_profile_file << std::setw(12) << "total time"
@@ -638,7 +638,7 @@ namespace quda
 #ifdef GITVERSION
         trace_file << "\t" << gitversion;
 #else
-        trace_file << "\t" << quda_version;
+      trace_file << "\t" << quda_version;
 #endif
         trace_file << "\t" << quda_hash << "\t# Last updated " << ctime(&now) << std::endl;
 
@@ -772,12 +772,12 @@ namespace quda
           cudaDeviceSynchronize();
           cudaGetLastError(); // clear error counter
           tunable.checkLaunchParam(param);
+          tunable.apply(0); // do initial call in case we need to jit compile for these parameters or if policy tuning
           if (verbosity >= QUDA_DEBUG_VERBOSE) {
             printfQuda("About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d)\n",
                        param.block.x, param.block.y, param.block.z, param.grid.x, param.grid.y, param.grid.z,
                        param.shared_bytes, param.aux.x, param.aux.y, param.aux.z);
           }
-          tunable.apply(0); // do initial call in case we need to jit compile for these parameters or if policy tuning
 
           cudaEventRecord(start, 0);
           for (int i = 0; i < tunable.tuningIter(); i++) {

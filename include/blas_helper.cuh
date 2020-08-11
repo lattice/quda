@@ -10,34 +10,13 @@
 namespace quda
 {
 
-  template <bool X_ = false, bool Y_ = false, bool Z_ = false, bool W_ = false, bool V_ = false> struct write {
+  template <bool X_ = false, bool Y_ = false, bool Z_ = false, bool W_ = false, bool V_ = false> struct memory_access {
     static constexpr bool X = X_;
     static constexpr bool Y = Y_;
     static constexpr bool Z = Z_;
     static constexpr bool W = W_;
     static constexpr bool V = V_;
   };
-
-#ifdef QUAD_SUM
-  using device_reduce_t = doubledouble;
-  template <> struct scalar<doubledouble> {
-    typedef doubledouble type;
-  };
-  template <> struct scalar<doubledouble2> {
-    typedef doubledouble type;
-  };
-  template <> struct scalar<doubledouble3> {
-    typedef doubledouble type;
-  };
-  template <> struct scalar<doubledouble4> {
-    typedef doubledouble type;
-  };
-  template <> struct vector<doubledouble, 2> {
-    typedef doubledouble2 type;
-  };
-#else
-  using device_reduce_t = double;
-#endif
 
   __host__ __device__ inline double set(double &x) { return x; }
   __host__ __device__ inline double2 set(double2 &x) { return x; }

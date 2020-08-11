@@ -12,6 +12,11 @@
 
 namespace quda {
 
+  namespace reducer {
+    void init();
+    void destroy();
+  }
+  
   namespace blas {
 
     unsigned long long flops;
@@ -19,7 +24,7 @@ namespace quda {
 
     static qudaStream_t *blasStream;
 
-    static cudaStream_t *auxBlasStream;
+    static qudaStream_t *auxBlasStream;
     static bool         run_aux_blas_stream;
     
     template <template <typename real> class Functor, typename store_t, typename y_store_t,
@@ -176,9 +181,8 @@ namespace quda {
       long long flops() const { return f.flops() * x.Length(); }
       long long bytes() const
       {
-        // the factor two here assumes we are reading and writing to the high precision vector
-        // this will evaluate correctly for non-mixed kernels since the +2/-2 will cancel out
-        return (f.streams() - 2) * x.Bytes() + 2 * y.Bytes();
+        return (f.read.X + f.write.X) * x.Bytes() + (f.read.Y + f.write.Y) * y.Bytes() +
+          (f.read.Z + f.write.Z) * z.Bytes() + (f.read.W + f.write.W) * w.Bytes() + (f.read.V + f.write.V) * v.Bytes();
       }
       int tuningIter() const { return 3; }
     };
@@ -190,9 +194,6 @@ namespace quda {
 	static_cast<cpuColorSpinorField&>(a).zero();
       }
     }
-
-    void initReduce();
-    void endReduce();
 
     void createAuxBlasStream()
     {
@@ -247,17 +248,17 @@ namespace quda {
     void init()
     {
       blasStream = &streams[Nstream-1];
-      initReduce();
       // by default no extra concurrent streams, everything is using the legacy blasSream
       run_aux_blas_stream = false;
       auxBlasStream = nullptr;
+      reducer::init();
     }
 
-    void end(void)
+    void destroy(void)
     {
-      endReduce();
       //delete extra concurrent streams
       if(auxBlasStream) destroyAuxBlasStream();
+      reducer::destroy();
     }
 
     qudaStream_t* getStream() { return !run_aux_blas_stream ? blasStream : auxBlasStream; }
