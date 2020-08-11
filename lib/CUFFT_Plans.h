@@ -34,7 +34,7 @@ inline void ApplyFFT(cufftHandle &plan, float2 *data_in, float2 *data_out, int d
 }
 
 /**
- * @brief Call CUFFT to perform a double-precision complex-to-complex transform plan in the transform direction 
+ * @brief Call CUFFT to perform a double-precision complex-to-complex transform plan in the transform direction
 as specified by direction parameter
  * @param[in] CUFFT plan
  * @param[in] data_in, pointer to the complex input data (in GPU memory) to transform

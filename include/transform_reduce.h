@@ -120,8 +120,8 @@ namespace quda
     }
 
   public:
-    TransformReduce(QudaFieldLocation location, std::vector<reduce_t> &result, const std::vector<T *> &v,
-                    I n_items, transformer &h, reduce_t init, reducer &r) :
+    TransformReduce(QudaFieldLocation location, std::vector<reduce_t> &result, const std::vector<T *> &v, I n_items,
+                    transformer &h, reduce_t init, reducer &r) :
       location(location),
       result(result),
       v(v),
@@ -178,7 +178,8 @@ namespace quda
   void transform_reduce(QudaFieldLocation location, std::vector<reduce_t> &result, const std::vector<T *> &v, I n_items,
                         transformer h, reduce_t init, reducer r)
   {
-    if (result.size() != v.size()) errorQuda("result %lu and input %lu set sizes do not match", result.size(), v.size());
+    if (result.size() != v.size())
+      errorQuda("result %lu and input %lu set sizes do not match", result.size(), v.size());
     TransformReduce<reduce_t, T, I, transformer, reducer> reduce(location, result, v, n_items, h, init, r);
   }
 

@@ -17,8 +17,8 @@
 
 #define QudaLinkType integer(4)
 
-#define QUDA_SUCCESS             0
-#define QUDA_ERROR               1
+#define QUDA_SUCCESS 0
+#define QUDA_ERROR 1
 #define QUDA_ERROR_UNINITIALIZED 2
 
 #define QUDA_MEMORY_DEVICE 0

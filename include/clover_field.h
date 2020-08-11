@@ -6,12 +6,13 @@
 
 namespace quda {
 
-  namespace clover {
+  namespace clover
+  {
 
     inline bool isNative(QudaCloverFieldOrder order, QudaPrecision precision)
     {
       if (precision == QUDA_DOUBLE_PRECISION) {
-        if (order  == QUDA_FLOAT2_CLOVER_ORDER) return true;
+        if (order == QUDA_FLOAT2_CLOVER_ORDER) return true;
       } else if (precision == QUDA_SINGLE_PRECISION || precision == QUDA_HALF_PRECISION
                  || precision == QUDA_QUARTER_PRECISION) {
         if (order == QUDA_FLOAT4_CLOVER_ORDER) return true;
@@ -58,8 +59,7 @@ namespace quda {
       this->ghost_precision = precision;
 
       if (native) {
-        order = (precision == QUDA_DOUBLE_PRECISION) ? 
-          QUDA_FLOAT2_CLOVER_ORDER : QUDA_FLOAT4_CLOVER_ORDER;
+        order = (precision == QUDA_DOUBLE_PRECISION) ? QUDA_FLOAT2_CLOVER_ORDER : QUDA_FLOAT4_CLOVER_ORDER;
       }
     }
 

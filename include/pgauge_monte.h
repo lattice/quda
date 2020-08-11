@@ -14,7 +14,7 @@ namespace quda {
    * @param[in] nhb number of heatbath steps
    * @param[in] nover number of overrelaxation steps
    */
-  void Monte(GaugeField& data, RNG &rngstate, double Beta, int nhb, int nover);
+  void Monte(GaugeField &data, RNG &rngstate, double Beta, int nhb, int nover);
 
   /**
    * @brief Perform a cold start to the gauge field, identity SU(3)
@@ -23,7 +23,7 @@ namespace quda {
    *
    * @param[in,out] data Gauge field
    */
-  void InitGaugeField(GaugeField& data);
+  void InitGaugeField(GaugeField &data);
 
   /**
    * @brief Perform a hot start to the gauge field, random SU(3)
@@ -33,7 +33,7 @@ namespace quda {
    * @param[in,out] data Gauge field
    * @param[in,out] rngstate state of the CURAND random number generator
    */
-  void InitGaugeField(GaugeField& data, RNG &rngstate);
+  void InitGaugeField(GaugeField &data, RNG &rngstate);
 
   /**
    * @brief Exchange "borders" between nodes. Although the radius
@@ -45,7 +45,7 @@ namespace quda {
    * @param[in] n_dim Number of dimensions to exchange
    * @param[in] parity Field parity
    */
-  void PGaugeExchange(GaugeField& data, const int n_dim, const int parity);
+  void PGaugeExchange(GaugeField &data, const int n_dim, const int parity);
 
   /**
    * @brief Release all allocated memory used to exchange data between nodes
@@ -58,7 +58,7 @@ namespace quda {
    * @param[in] data Gauge field
    * @returns double2 complex Determinant value
    */
-  double2 getLinkDeterminant(GaugeField& data);
+  double2 getLinkDeterminant(GaugeField &data);
 
   /**
    * @brief Calculate the Trace
@@ -66,6 +66,5 @@ namespace quda {
    * @param[in] data Gauge field
    * @returns double2 complex trace value
    */
-  double2 getLinkTrace(GaugeField& data);
-
+  double2 getLinkTrace(GaugeField &data);
 }

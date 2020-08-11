@@ -109,7 +109,8 @@ namespace quda
 #endif
     }
 
-    template <typename host_t, typename device_t = host_t> void complete(host_t *result, const qudaStream_t stream = 0, bool reset = false)
+    template <typename host_t, typename device_t = host_t>
+    void complete(host_t *result, const qudaStream_t stream = 0, bool reset = false)
     {
       if (launch_error == QUDA_ERROR) return; // kernel launch failed so return
       if (launch_error == QUDA_ERROR_UNINITIALIZED) errorQuda("No reduction kernel appears to have been launched");

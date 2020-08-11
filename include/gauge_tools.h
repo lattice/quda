@@ -122,14 +122,8 @@ namespace quda
    * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
    * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
    */
-  void gaugeFixingOVR(GaugeField& data,
-                      const int gauge_dir,
-                      const int Nsteps,
-                      const int verbose_interval,
-                      const double relax_boost,
-                      const double tolerance,
-                      const int reunit_interval,
-                      const int stopWtheta);
+  void gaugeFixingOVR(GaugeField &data, const int gauge_dir, const int Nsteps, const int verbose_interval,
+                      const double relax_boost, const double tolerance, const int reunit_interval, const int stopWtheta);
 
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
@@ -144,13 +138,8 @@ namespace quda
    * maximum number of steps defined by Nsteps
    * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
    */
-  void gaugeFixingFFT(GaugeField& data, const int gauge_dir,
-		      const int Nsteps,
-                      const int verbose_interval,
-                      const double alpha,
-                      const int autotune,
-                      const double tolerance,
-                      const int stopWtheta);
+  void gaugeFixingFFT(GaugeField &data, const int gauge_dir, const int Nsteps, const int verbose_interval,
+                      const double alpha, const int autotune, const double tolerance, const int stopWtheta);
 
   /**
      @brief Compute the Fmunu tensor

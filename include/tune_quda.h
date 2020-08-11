@@ -412,7 +412,8 @@ namespace quda {
      The x threads will typically correspond to the checkboarded
      volume.
    */
-  class TunableLocalParityReduction : public Tunable {
+  class TunableLocalParityReduction : public Tunable
+  {
 
   protected:
     unsigned int sharedBytesPerThread() const { return 0; }
@@ -452,7 +453,6 @@ namespace quda {
       Tunable::defaultTuneParam(param);
       param.block.y = 2;
     }
-
   };
 
   /**
