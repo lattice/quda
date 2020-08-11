@@ -16,16 +16,16 @@ namespace quda
     Clover clover;
     int order;
     real mass;
-    real *c;
+    double *c;
     bool inverse;
 
-    CloverExponentialArg(CloverField &field, int order, double mass, bool inverse = false) :
+    CloverExponentialArg(CloverField &field, int order, double mass, double *c, bool inverse = false) :
       ReduceArg<double2>(),
       clover(field, false),
       order(order),
       mass(static_cast<real>(mass)),
       inverse(inverse),
-      c(static_cast<real *>(pool_device_malloc((order+1) * sizeof(real))))
+      c(c)
     {
       if (!field.isNative()) errorQuda("Clover field %d order not supported", field.Order());
     }
@@ -44,16 +44,18 @@ namespace quda
     real mass = static_cast<real>(arg.mass);
     real invMass = static_cast<real>(1.0) / mass;
     int order = arg.order;
-    real *c = arg.c;
+    double *c = arg.c;
 
-    c[0] = static_cast<real>(1.0);
+    c[0] = 1.0;
     if (inverse) {
-      for (int i=1; i<order; i++) {
-        c[i] = c[i-1] / static_cast<real>(i);
+#pragma unroll
+      for (int i=1; i<=order; i++) {
+        c[i] = c[i-1] / static_cast<double>(-i);
       }
     } else {
-      for (int i=1; i<order; i++) {
-        c[i] = c[i-1] / static_cast<real>(-i);
+#pragma unroll
+      for (int i=1; i<=order; i++) {
+        c[i] = c[i-1] / static_cast<double>(i);
       }
     }
 
@@ -79,7 +81,7 @@ namespace quda
       if (order > 5) {
 #pragma unroll
         for (int i=0; i<6; i++)
-          q[i] = c[order - 5 + i];
+          q[i] = static_cast<real>(c[order - 5 + i]);
 #pragma unroll
         for (int i=order-6; i>=0; i--) {
           q5 = q[5];
@@ -88,16 +90,16 @@ namespace quda
           q[3] = q[2] - q5 * psv[3];
           q[2] = q[1] - q5 * psv[2];
           q[1] = q[0] - q5 * psv[1];
-          q[0] = c[0] - q5 * psv[0];
+          q[0] = static_cast<real>(c[0]) - q5 * psv[0];
          }
       } else {
 #pragma unroll
           for (int i=0 ; i<=order ; i++)
-            q[i] = c[i];
+            q[i] = static_cast<real>(c[i]);
       }
 
 #pragma unroll
-      for (int i=0; i<6; i++)
+      for (int i=0; i<N; i++)
         q[i] *= static_cast<real>(mass);
       
       Mat A_exp = q[5] * A2 + q[4] * A;

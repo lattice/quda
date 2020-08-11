@@ -7,7 +7,7 @@ namespace quda {
   DiracCloverExp::DiracCloverExp(const DiracParam &param) : DiracClover(param), mass(param.mass)
   {
     printfQuda("DiracCloverExp struct success.\n");
-    cloverExponential(*clover, 18, mass, false);
+    cloverExponential(*clover, 1, mass, false);
   }
 
   DiracCloverExp::DiracCloverExp(const DiracCloverExp &dirac) : DiracClover(dirac), mass(dirac.mass) {}

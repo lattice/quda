@@ -17,8 +17,8 @@ namespace quda {
     bool tuneGridDim() const { return true; }
 
   public:
-    CloverExponential(CloverField &clover, int order, double mass, bool inverse) :
-      arg(clover, order, mass, inverse),
+    CloverExponential(CloverField &clover, int order, double mass, double *c, bool inverse) :
+      arg(clover, order, mass, c, inverse),
       meta(clover)
     {
       writeAuxString("stride=%d,prec=%lu,order=%d,mass=%f,inverse=%s", arg.clover.stride, sizeof(store_t),
@@ -60,11 +60,13 @@ namespace quda {
   // this is the function that is actually called, from here on down we instantiate all required templates
   void cloverExponential(CloverField &clover, int order, double mass, bool inverse)
   {
+    double *c = static_cast<double *>(pool_device_malloc((order+1) * sizeof(double)));
 #ifdef GPU_CLOVER_DIRAC
-    instantiate<CloverExponential>(clover, order, mass, inverse);
+    instantiate<CloverExponential>(clover, order, mass, c, inverse);
 #else
     errorQuda("Clover has not been built");
 #endif
+    pool_device_free(c);
   }
 
 } // namespace quda

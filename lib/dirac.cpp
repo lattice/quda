@@ -158,7 +158,13 @@ namespace quda {
       return new DiracWilsonPC(param);
     } else if (param.type == QUDA_CLOVER_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracClover operator\n");
+      return new DiracClover(param);
+    } else if (param.type == QUDA_CLOVER_EXP_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCloverExp operator\n");
       return new DiracCloverExp(param);
+    } else if (param.type == QUDA_CLOVER_EXPPC_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCloverExpPC operator\n");
+      return new DiracCloverExpPC(param);
     } else if (param.type == QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCloverHasenbuschTwist operator\n");
       return new DiracCloverHasenbuschTwist(param);
@@ -167,7 +173,7 @@ namespace quda {
       return new DiracCloverHasenbuschTwistPC(param);
     } else if (param.type == QUDA_CLOVERPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCloverPC operator\n");
-      return new DiracCloverExpPC(param);
+      return new DiracCloverPC(param);
     } else if (param.type == QUDA_DOMAIN_WALL_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracDomainWall operator\n");
       return new DiracDomainWall(param);
