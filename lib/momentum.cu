@@ -123,10 +123,9 @@ namespace quda {
   }
 
   template <typename Float, int nColor, QudaReconstructType recon>
-  class MomAction : TunableLocalParity {
+  class MomAction : TunableLocalParityReduction {
     MomActionArg<Float, nColor, recon> arg;
     const GaugeField &meta;
-    bool tuneGridDim() const { return true; }
 
   public:
     MomAction(const GaugeField &mom, double &action) :
@@ -235,11 +234,9 @@ namespace quda {
   } // UpdateMom
 
   template <typename Float, int nColor, QudaReconstructType recon>
-  class UpdateMom : TunableLocalParity {
+  class UpdateMom : TunableLocalParityReduction {
     UpdateMomArg<Float, nColor, recon> arg;
     const GaugeField &meta;
-
-    bool tuneGridDim() const { return true; }
 
   public:
     UpdateMom(GaugeField &force, GaugeField &mom, double coeff, const char *fname) :
@@ -293,7 +290,7 @@ namespace quda {
     F force;
     const G U;
     int X[4]; // grid dimensions
-    ApplyUArg(GaugeField  &force, const GaugeField &U) :
+    ApplyUArg(GaugeField &force, const GaugeField &U) :
       BaseArg<Float, nColor, recon>(U),
       force(force),
       U(U)
@@ -306,30 +303,31 @@ namespace quda {
   __global__ void ApplyUKernel(Arg arg)
   {
     int x = blockIdx.x*blockDim.x + threadIdx.x;
-    int parity = threadIdx.y;
+    if (x >= arg.threads) return;
+    int parity = threadIdx.y + blockIdx.y * blockDim.y;
     using mat = Matrix<complex<typename Arg::Float>,Arg::nColor>;
 
-    while (x<arg.threads) {
-      for (int d=0; d<4; d++) {
-	mat f = arg.force(d, x, parity);
-	mat u = arg.U(d, x, parity);
+    for (int d=0; d<4; d++) {
+      mat f = arg.force(d, x, parity);
+      mat u = arg.U(d, x, parity);
 
-	f = u * f;
+      f = u * f;
 
-	arg.force(d, x, parity) = f;
-      }
-
-      x += gridDim.x*blockDim.x;
+      arg.force(d, x, parity) = f;
     }
   } // ApplyU
 
   template <typename Float, int nColor, QudaReconstructType recon>
-  class ApplyU : TunableLocalParity {
+  class ApplyU : TunableVectorY {
     ApplyUArg<Float, nColor, recon> arg;
     const GaugeField &meta;
 
+    bool tuneGridDim() const { return false; }
+    unsigned int minThreads() const { return arg.threads; }
+
   public:
     ApplyU(const GaugeField &U, GaugeField &force) :
+      TunableVectorY(2),
       arg(force, U),
       meta(U)
     {

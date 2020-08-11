@@ -11,10 +11,9 @@ namespace quda {
   using namespace clover;
 
   template <typename store_t>
-  class CloverInvert : TunableLocalParity {
+  class CloverInvert : TunableLocalParityReduction {
     CloverInvertArg<store_t> arg;
     const CloverField &meta; // used for meta data only
-    bool tuneGridDim() const { return true; }
 
   public:
     CloverInvert(CloverField &clover, bool compute_tr_log) :

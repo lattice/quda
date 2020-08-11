@@ -7,16 +7,12 @@
 namespace quda {
 
   template<typename Float, int nColor, QudaReconstructType recon>
-  class GaugePlaq : TunableLocalParity {
+  class GaugePlaq : TunableLocalParityReduction {
     const GaugeField &u;
     double2 &plq;
-    bool tuneGridDim() const { return true; }
-    unsigned int minGridSize() const { return maxGridSize() / 8; }
-    int gridStep() const { return minGridSize(); }
 
   public:
     GaugePlaq(const GaugeField &u, double2 &plq) :
-      TunableLocalParity(),
       u(u),
       plq(plq)
     {

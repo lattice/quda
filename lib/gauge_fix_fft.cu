@@ -181,10 +181,9 @@ namespace quda {
   }
 
   template<int Elems, typename Float, typename Gauge, int gauge_dir>
-  class GaugeFixQuality : TunableLocalParity {
+  class GaugeFixQuality : TunableLocalParityReduction {
     GaugeFixQualityArg<Float, Gauge> &arg;
     const GaugeField &meta;
-    bool tuneGridDim() const { return true; }
 
   public:
     GaugeFixQuality(GaugeFixQualityArg<Float, Gauge> &arg, const GaugeField &meta) :
@@ -366,10 +365,10 @@ namespace quda {
 #ifdef GAUGEFIXING_DONT_USE_GX
 
   template <typename Float, typename Gauge>
-  __global__ void kernel_gauge_fix_U_EO_NEW( GaugeFixArg<Float> arg, Gauge dataOr, Float half_alpha)
+  __global__ void kernel_gauge_fix_U_EO_NEW(GaugeFixArg<Float> arg, Gauge dataOr, Float half_alpha)
   {
     int id = threadIdx.x + blockIdx.x * blockDim.x;
-    int parity = threadIdx.y;
+    int parity = threadIdx.y + blockIdx.y * blockDim.y;
     if (id >= arg.threads/2) return;
 
     using complex = complex<Float>;
@@ -428,19 +427,21 @@ namespace quda {
   }
 
   template<typename Float, typename Gauge>
-  class GaugeFixNEW : TunableLocalParity {
+  class GaugeFixNEW : TunableVectorY {
     GaugeFixArg<Float> arg;
     const GaugeField &meta;
     Float half_alpha;
     Gauge dataOr;
 
-    // since GaugeFixArg is used by other kernels that don't use
-    // tunableLocalParity, arg.threads stores Volume and not VolumeCB
-    // so we need to divide by two
+    bool tuneGridDim() const { return false; }
+    // since GaugeFixArg is used by other kernels that don't keep
+    // parity separate, arg.threads stores Volume and not VolumeCB so
+    // we need to divide by two
     unsigned int minThreads() const { return arg.threads/2; }
 
   public:
     GaugeFixNEW(Gauge & dataOr, GaugeFixArg<Float> &arg, Float alpha, const GaugeField &meta) :
+      TunableVectorY(2),
       dataOr(dataOr),
       arg(arg),
       meta(meta)

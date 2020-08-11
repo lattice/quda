@@ -412,18 +412,27 @@ namespace quda {
      The x threads will typically correspond to the checkboarded
      volume.
    */
-  class TunableLocalParity : public Tunable {
+  class TunableLocalParityReduction : public Tunable {
 
   protected:
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
-    // don't tune the grid dimension
-    virtual bool tuneGridDim() const { return false; }
+    /**
+       Reduction kernels require grid-size tuning, so enable this and
+       make it non-virtual so that if user accidentally disables it,
+       compiler will complain
+    */
+    bool tuneGridDim() const { return true; }
+
+    unsigned int minGridSize() const { return maxGridSize() / 8; }
+    int gridStep() const { return minGridSize(); }
 
     /**
        The maximum block size in the x dimension is the total number
-       of threads divided by the size of the y dimension
+       of threads divided by the size of the y dimension.  Since
+       parity is local to the thread block in the y dimension, half
+       the max threads in the x dimension.
      */
     unsigned int maxBlockSize(const TuneParam &param) const { return deviceProp.maxThreadsPerBlock / 2; }
 

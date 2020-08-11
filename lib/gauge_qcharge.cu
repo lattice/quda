@@ -9,19 +9,13 @@
 namespace quda
 {
 
-  template <typename Arg> class QChargeCompute : TunableLocalParity
+  template <typename Arg> class QChargeCompute : TunableLocalParityReduction
   {
     Arg &arg;
     const GaugeField &meta;
 
-  private:
-    bool tuneSharedBytes() const { return false; }
-    bool tuneGridDim() const { return true; }
-    unsigned int minThreads() const { return arg.threads; }
-
   public:
     QChargeCompute(Arg &arg, const GaugeField &meta) :
-      TunableLocalParity(),
       arg(arg),
       meta(meta)
     {

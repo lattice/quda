@@ -164,10 +164,9 @@ namespace quda {
    * @brief Tunable object for the gauge fixing quality kernel
    */
   template<typename Float, typename Gauge, int gauge_dir>
-  class GaugeFixQuality : TunableLocalParity {
+  class GaugeFixQuality : TunableLocalParityReduction {
     GaugeFixQualityArg<Gauge> &arg;
     const GaugeField &meta;
-    bool tuneGridDim() const { return true; }
 
   public:
     GaugeFixQuality(GaugeFixQualityArg<Gauge> &arg, const GaugeField &meta) :

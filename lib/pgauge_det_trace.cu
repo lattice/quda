@@ -5,7 +5,6 @@
 #include <gauge_field_order.h>
 #include <launch_kernel.cuh>
 #include <comm_quda.h>
-#include <pgauge_monte.h>
 #include <reduce_helper.h>
 #include <index_helper.cuh>
 #include <instantiate.h>
@@ -25,13 +24,13 @@ namespace quda {
 
     KernelArg(const GaugeField &data) :
       ReduceArg<double2>(),
-      dataOr(data)
+      dataOr(data),
+      threads(data.LocalVolumeCB())
     {
       for (int dir=0; dir<4; ++dir) {
         border[dir] = data.R()[dir];
         X[dir] = data.X()[dir] - border[dir]*2;
       }
-      threads = X[0]*X[1]*X[2]*X[3]/2;
     }
   };
 
@@ -65,56 +64,40 @@ namespace quda {
       idx += blockDim.x*gridDim.x;
     }
 
-    double2 sum = make_double2(val.real(), val.imag());
-    reduce2d<blockSize,2>(arg, sum);
+    reduce2d<blockSize,2>(arg, val);
   }
 
   template <typename Float, int nColor, QudaReconstructType recon, int type>
-  class CalcFunc : TunableLocalParity {
+  class CalcFunc : TunableLocalParityReduction {
     double2 &result;
     const GaugeField &u;
-    TuneParam tp;
-    bool tuneGridDim() const { return true; }
 
   public:
     CalcFunc(double2 &result, const GaugeField &u) :
       result(result),
       u(u)
     {
-      TimeProfile profileGenericFunc("GenericFunc", false);
-      if (getVerbosity() >= QUDA_SUMMARIZE) profileGenericFunc.TPSTART(QUDA_PROFILE_COMPUTE);
-
       apply(0);
-
-      if (getVerbosity() >= QUDA_SUMMARIZE){
-        profileGenericFunc.TPSTOP(QUDA_PROFILE_COMPUTE);
-        double secs = profileGenericFunc.Last(QUDA_PROFILE_COMPUTE);
-        double gflops = flops()*1e-9/secs;
-        double gbytes = bytes()/(secs*1e9);
-        printfQuda("%s: %.16e, %.16e\n", type == 0 ? "Determinant" : "Trace", result.x, result.y);
-        printfQuda("%s: Time = %6.6f s, Gflop/s = %6.1f, GB/s = %6.1f\n",
-                   type == 0 ? "Determinant" : "Trace", secs, gflops*comm_size(), gbytes*comm_size());
-      }
     }
 
     void apply(const qudaStream_t &stream)
     {
-      tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       KernelArg<Float, nColor, recon> arg(u);
       LAUNCH_KERNEL_LOCAL_PARITY(compute_Value, (*this), tp, stream, arg, type, decltype(arg));
       arg.complete(&result, stream);
       if (!activeTuning()) {
         comm_allreduce_array((double*)&result, 2);
-        result.x /= (double)(4*2*arg.threads*comm_size());
-        result.y /= (double)(4*2*arg.threads*comm_size());
+        result.x /= (double)(4*u.LocalVolume()*comm_size());
+        result.y /= (double)(4*u.LocalVolume()*comm_size());
       }
     }
 
     TuneKey tuneKey() const { return TuneKey(u.VolString(), typeid(*this).name(), u.AuxString()); }
 
     long long flops() const {
-      if (u.Ncolor()==3 && type == 0) return 264LL*u.Volume();
-      else if (type == 1) return 2*u.Geometry()*u.Ncolor()*u.Volume();
+      if (u.Ncolor()==3 && type == 0) return 264LL*u.LocalVolume();
+      else if (type == 1) return 2*u.Geometry()*u.Ncolor()*u.LocalVolume();
       else return 0;
     }
 
