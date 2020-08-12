@@ -18,18 +18,18 @@ namespace quda {
     bool tuneGridDim() const { return true; }
 
   public:
-    CloverExponential(CloverField &clover, int order, double mass, bool inverse) :
-      arg(clover, order, mass),
+    CloverExponential(CloverField &clover, int degree, double mass, bool inverse) :
+      arg(clover, degree, mass),
       meta(clover),
       inverse(inverse)
     {
-      writeAuxString("stride=%d,prec=%lu,order=%d,mass=%f,inverse=%s", arg.clover.stride, sizeof(store_t),
-		     order, mass, inverse ? "true" : "false");
+      writeAuxString("stride=%d,prec=%lu,degree=%d,mass=%f,inverse=%s", arg.clover.stride, sizeof(store_t),
+		     degree, mass, inverse ? "true" : "false");
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
 #ifdef JITIFY
         create_jitify_program("kernels/clover_exponential.cuh");
 #endif
-        arg.c = static_cast<double *>(pool_device_malloc((arg.order+1) * sizeof(double)));
+        arg.c = static_cast<double *>(pool_device_malloc((arg.degree+1) * sizeof(double)));
         apply(0);
         pool_device_free(arg.c);
         checkCudaError();
@@ -64,10 +64,10 @@ namespace quda {
   };
 
   // this is the function that is actually called, from here on down we instantiate all required templates
-  void cloverExponential(CloverField &clover, int order, double mass, bool inverse)
+  void cloverExponential(CloverField &clover, int degree, double mass, bool inverse)
   {
 #ifdef GPU_CLOVER_DIRAC
-    instantiate<CloverExponential>(clover, order, mass, inverse);
+    instantiate<CloverExponential>(clover, degree, mass, inverse);
 #else
     errorQuda("Clover has not been built");
 #endif

@@ -25,6 +25,7 @@ namespace quda {
     bool twisted; // whether to create twisted mass clover
     double mu2;
     double rho;
+    int degreeExp; // Degree of Taylor polynomial of exponential function
 
     QudaCloverFieldOrder order;
     QudaFieldCreate create;
@@ -36,14 +37,15 @@ namespace quda {
     }
 
     CloverFieldParam() :  LatticeFieldParam(),
-      direct(true), inverse(true), clover(nullptr), norm(nullptr),
-      cloverInv(nullptr), invNorm(nullptr), twisted(false), mu2(0.0), rho(0.0) { }
+      direct(true), inverse(true), clover(nullptr), norm(nullptr), cloverInv(nullptr),
+      invNorm(nullptr), twisted(false), mu2(0.0), rho(0.0), degreeExp(1) { }
 
     CloverFieldParam(const CloverFieldParam &param) :  LatticeFieldParam(param),
       direct(param.direct), inverse(param.inverse),
       clover(param.clover), norm(param.norm),
       cloverInv(param.cloverInv), invNorm(param.invNorm),
-      twisted(param.twisted), mu2(param.mu2), rho(param.rho) { }
+      twisted(param.twisted), mu2(param.mu2), rho(param.rho),
+      degreeExp(param.degreeExp) { }
 
     CloverFieldParam(const CloverField &field);
   };
@@ -69,6 +71,8 @@ namespace quda {
     bool twisted; 
     double mu2;
     double rho;
+
+    int degreeExp; // Degree of Taylor polynomial of exponential function
 
     QudaCloverFieldOrder order;
     QudaFieldCreate create;
@@ -146,6 +150,12 @@ namespace quda {
        diagonal additive Hasenbusch), e.g., A + rho
     */
     void setRho(double rho);
+
+    /**
+       @return Degree of Taylor polynomial of exponential
+       function to the clover term (for exponential clover)
+    */
+    double DegreeExp() const { return degreeExp; }
 
     /**
        @brief Compute the L1 norm of the field
@@ -344,11 +354,11 @@ namespace quda {
      (only calculate the direct field)
 
      @param clover The clover field to store the exponential matrix (also as an input)
-     @param N Calculate the exponential approximately by evaluating the Taylor expansion up to order N
+     @param degree Degree of Taylor polynomial of exponential function
      @param mass Mass in dirac.
      @param inverse Whether to make the inversed exponential clover field
   */
-  void cloverExponential(CloverField &clover, int N, double mass, bool inverse);
+  void cloverExponential(CloverField &clover, int degree, double mass, bool inverse);
 
   /**
      @brief This function adds a real scalar onto the clover diagonal (only to the direct field not the inverse)

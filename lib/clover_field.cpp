@@ -24,6 +24,7 @@ namespace quda {
       twisted(a.Twisted()),
       mu2(a.Mu2()),
       rho(a.Rho()),
+      degreeExp(a.DegreeExp()),
       order(a.Order()),
       create(QUDA_NULL_FIELD_CREATE)
   {
@@ -37,7 +38,7 @@ namespace quda {
   CloverField::CloverField(const CloverFieldParam &param) :
     LatticeField(param), bytes(0), norm_bytes(0), nColor(3), nSpin(4), 
     clover(0), norm(0), cloverInv(0), invNorm(0), csw(param.csw), rho(param.rho),
-    order(param.order), create(param.create), trlog{0, 0}
+    degreeExp(param.degreeExp), order(param.order), create(param.create), trlog{0, 0}
   {
     if (nDim != 4) errorQuda("Number of dimensions must be 4, not %d", nDim);
 
@@ -382,6 +383,7 @@ namespace quda {
     output << "twisted = "   << param.twisted << std::endl;
     output << "mu2 = "       << param.mu2 << std::endl;
     output << "rho = "       << param.rho << std::endl;
+    output << "degreeExp = " << param.degreeExp << std::endl; 
     output << "order = "     << param.order << std::endl;
     output << "create = "    << param.create << std::endl;
     return output;  // for multiple << operators.

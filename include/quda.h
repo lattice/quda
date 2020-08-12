@@ -244,6 +244,8 @@ extern "C" {
 
     double clover_coeff;                   /**< Coefficient of the clover term */
     double clover_rho;                     /**< Real number added to the clover diagonal (not to inverse) */
+    int clover_degree;                     /**< Degree of exponential expansion for clover term */
+    int clover_degree_in;                  /**< Degree of exponential expansion for input clover term */
 
     int compute_clover_trlog;              /**< Whether to compute the trace log of the clover term */
     double trlogA[2];                      /**< The trace log of the clover term (even/odd computed separately) */

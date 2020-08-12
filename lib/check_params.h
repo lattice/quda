@@ -318,6 +318,8 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(mu, INVALID_DOUBLE);
   P(twist_flavor, QUDA_TWIST_INVALID);
   P(laplace3D, INVALID_INT);
+  P(clover_degree, INVALID_INT);
+  P(clover_degree_in, INVALID_INT);
 #else
   // asqtad and domain wall use mass parameterization
   if (param->dslash_type == QUDA_STAGGERED_DSLASH || param->dslash_type == QUDA_ASQTAD_DSLASH
@@ -336,6 +338,12 @@ void printQudaInvertParam(QudaInvertParam *param) {
   if (param->dslash_type == QUDA_TWISTED_MASS_DSLASH) {
     P(mu, INVALID_DOUBLE);
     P(twist_flavor, QUDA_TWIST_INVALID);
+  }
+  // exponential clover also uses mass
+  if (param->dslash_type == QUDA_CLOVER_EXP_WILSON_DSLASH) {
+    P(mass, INVALID_DOUBLE);
+    P(clover_degree, INVALID_INT);
+    P(clover_degree_in, INVALID_INT);
   }
 #endif
 

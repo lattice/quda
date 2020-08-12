@@ -14,14 +14,14 @@ namespace quda
     using Clover = typename clover_mapper<store_t>::type;
 
     Clover clover;
-    int order;
+    int degree;
     real mass;
     double *c;
 
-    CloverExponentialArg(CloverField &field, int order, double mass) :
+    CloverExponentialArg(CloverField &field, int degree, double mass) :
       ReduceArg<double2>(),
       clover(field, false),
-      order(order),
+      degree(degree),
       mass(static_cast<real>(mass))
     {
       if (!field.isNative()) errorQuda("Clover field %d order not supported", field.Order());
@@ -40,7 +40,7 @@ namespace quda
 
     real mass = arg.mass;
     real invMass = static_cast<real>(1.0) / mass;
-    int order = arg.order;
+    int degree = arg.degree;
     double *c = arg.c;
 
     for (int ch = 0; ch < 2; ch++) {
@@ -66,7 +66,7 @@ namespace quda
 
       real q5;
       real q[6] = {static_cast<real>(0.0)};
-      if (order > 5) {
+      if (degree > 5) {
         real tr[5] = {A2.trace(), A3.trace(), A4.trace(), A5.trace(), A6.trace()};
         real psv[5];
         psv[0] = (1.0 / 144.0) * (8.0 * tr[1] * tr[1] - 24.0 * tr[4] + tr[0] * (18.0 * tr[2] - 3.0 * tr[0] * tr[0]));
@@ -76,9 +76,9 @@ namespace quda
         psv[4] = -0.5 * tr[0];
 #pragma unroll
         for (int i=0; i<6; i++)
-          q[i] = static_cast<real>(c[order - 5 + i]);
+          q[i] = static_cast<real>(c[degree - 5 + i]);
 #pragma unroll
-        for (int i=order-6; i>=0; i--) {
+        for (int i=degree-6; i>=0; i--) {
           q5 = q[5];
           q[5] = q[4];
           q[4] = q[3] - q5 * psv[4];
@@ -89,7 +89,7 @@ namespace quda
         }
       } else {
 #pragma unroll
-        for (int i=0; i<=order; i++)
+        for (int i=0; i<=degree; i++)
           q[i] = static_cast<real>(c[i]);
       }
 
@@ -128,17 +128,17 @@ namespace quda
   template <typename Arg, bool inverse>
   __global__ void cloverExponentialKernel(Arg arg)
   {
-    const int order = arg.order;
+    const int degree = arg.degree;
     double *c = arg.c;
     c[0] = 1.0;
     if (inverse) {
 #pragma unroll
-      for (int i=1; i<=order; i++) {
+      for (int i=1; i<=degree; i++) {
         c[i] = c[i-1] / static_cast<double>(-i);
       }
     } else {
 #pragma unroll
-      for (int i=1; i<=order; i++) {
+      for (int i=1; i<=degree; i++) {
         c[i] = c[i-1] / static_cast<double>(i);
       }
     }

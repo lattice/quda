@@ -44,6 +44,7 @@ namespace quda {
     cudaGaugeField *longGauge; // used by staggered only
     int laplace3D;
     cudaCloverField *clover;
+    int degreeExp; // used by exponential clover only
   
     double mu; // used by twisted mass only
     double mu_factor; // used by multigrid only
@@ -70,6 +71,7 @@ namespace quda {
       dagger(QUDA_DAG_INVALID),
       gauge(0),
       clover(0),
+      degreeExp(1),
       mu(0.0),
       mu_factor(0.0),
       epsilon(0.0),
@@ -535,6 +537,7 @@ namespace quda {
 
   protected:
     double mass;
+    int degree;
 
   public:
     DiracCloverExp(const DiracParam &param);
