@@ -66,10 +66,7 @@ namespace quda
     Kparam(param)
   {
     fillInnerSolverParam(Kparam, param);
-    // Preconditioners do not need a deflation space,
-    // so we explicily set this here.
-    Kparam.deflate = false;
-    
+
     if (param.inv_type_precondition == QUDA_CG_INVERTER) {
       K = new CG(matPrecon, matPrecon, matPrecon, matEig, Kparam, profile);
     } else if (param.inv_type_precondition == QUDA_MR_INVERTER) {
@@ -109,7 +106,7 @@ namespace quda
 
     int k = 0;
     int rUpdate = 0;
-    
+
     if (param.deflate) {
       // Construct the eigensolver and deflation space if requested.
       constructDeflationSpace(b, matEig);
@@ -123,7 +120,7 @@ namespace quda
         recompute_evals = false;
       }
     }
-    
+
     cudaColorSpinorField *minvrPre = NULL;
     cudaColorSpinorField *rPre = NULL;
     cudaColorSpinorField *minvr = NULL;
@@ -171,14 +168,13 @@ namespace quda
       blas::zero(y);
     }
 
-    
     if (param.deflate && param.maxiter > 1) {
       // Deflate and accumulate to solution vector
       eig_solve->deflate(y, r, evecs, evals, true);
       mat(r, y, x, tmp3);
       r2 = blas::xmyNorm(b, r);
     }
-    
+
     cudaColorSpinorField Ap(x, csParam);
 
     cudaColorSpinorField *r_sloppy;
@@ -311,7 +307,7 @@ namespace quda
         // Now compute r
         mat(r, y, x, tmp3); // x is just a temporary here
         r2 = xmyNorm(b, r);
-	
+
         if (param.deflate && sqrt(r2) < maxr_deflate * param.tol_restart) {
           // Deflate and accumulate to solution vector
           eig_solve->deflate(y, r, evecs, evals, true);
