@@ -85,11 +85,6 @@ namespace quda {
     // FIX this is a hack from hell
     // Auxiliary work that can be done while waiting on comms to finis
     Worker *aux_worker;
-
-#if CUDA_VERSION >= 8000
-    cuuint32_t *commsEnd_h;
-    CUdeviceptr commsEnd_d[Nstream];
-#endif
   }
 
   void createDslashEvents()
@@ -108,14 +103,6 @@ namespace quda {
     }
 
     aux_worker = NULL;
-
-#if CUDA_VERSION >= 8000
-    commsEnd_h = static_cast<cuuint32_t*>(mapped_malloc(Nstream*sizeof(int)));
-    for (int i=0; i<Nstream; i++) {
-      cudaHostGetDevicePointer((void**)&commsEnd_d[i], commsEnd_h+i, 0);
-      commsEnd_h[i] = 0;
-    }
-#endif
 
     checkCudaError();
 
@@ -144,11 +131,6 @@ namespace quda {
   void destroyDslashEvents()
   {
     using namespace dslash;
-
-#if CUDA_VERSION >= 8000
-    host_free(commsEnd_h);
-    commsEnd_h = 0;
-#endif
 
     for (int i=0; i<Nstream; i++) {
       cudaEventDestroy(gatherStart[i]);

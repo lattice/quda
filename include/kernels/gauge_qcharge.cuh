@@ -1,6 +1,6 @@
 #include <gauge_field_order.h>
 #include <index_helper.cuh>
-#include <cub_helper.cuh>
+#include <reduce_helper.h>
 
 namespace quda
 {

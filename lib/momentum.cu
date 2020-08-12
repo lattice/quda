@@ -3,7 +3,7 @@
 #include <tune_quda.h>
 #include <gauge_field_order.h>
 #include <launch_kernel.cuh>
-#include <cub_helper.cuh>
+#include <reduce_helper.h>
 #include <instantiate.h>
 #include <fstream>
 
@@ -134,14 +134,12 @@ namespace quda {
       meta(mom)
     {
       apply(0);
-      qudaDeviceSynchronize();
-      comm_allreduce((double*)arg.result_h);
-      action = arg.result_h[0];
+      arg.complete(&action);
+      comm_allreduce(&action);
     }
 
     void apply(const qudaStream_t &stream)
     {
-      arg.result_h[0] = 0.0;
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       LAUNCH_KERNEL_LOCAL_PARITY(computeMomAction, (*this), tp, stream, arg, decltype(arg));
     }

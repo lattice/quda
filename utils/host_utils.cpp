@@ -129,6 +129,7 @@ void setQudaDefaultMgTestParams()
     mg_eig_poly_deg[i] = 100;
     mg_eig_amin[i] = 1.0;
     mg_eig_amax[i] = -1.0; // use power iterations
+    mg_eig_save_prec[i] = QUDA_DOUBLE_PRECISION;
 
     setup_ca_basis[i] = QUDA_POWER_BASIS;
     setup_ca_basis_size[i] = 4;

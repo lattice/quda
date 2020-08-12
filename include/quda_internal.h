@@ -1,5 +1,4 @@
-#ifndef _QUDA_INTERNAL_H
-#define _QUDA_INTERNAL_H
+#pragma once
 
 #include <quda_cuda_api.h>
 #include <string>
@@ -55,7 +54,7 @@ extern "C" {
     void *field; /**< Pointer to a ColorSpinorField */
   };
 
-  extern cudaDeviceProp deviceProp;
+  //extern cudaDeviceProp deviceProp;
   extern qudaStream_t *streams;
 
 #ifdef __cplusplus
@@ -141,5 +140,3 @@ namespace quda {
 
 #include <timer.h>
 
-
-#endif // _QUDA_INTERNAL_H
