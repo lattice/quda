@@ -64,8 +64,8 @@ set (QUDA_OBJS
   mdw_fused_dslash.cu dslash5_mobius_eofa.cu
   dslash_pack2.cu
   blas_quda.cu multi_blas_quda.cu reduce_quda.cu
-  multi_reduce_quda.cu contract.cu
-  comm_common.cpp 
+  multi_reduce_quda.cu reduce_helper.cu
+  contract.cu comm_common.cpp
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cu spinor_noise.cu
   copy_color_spinor_dd.cu copy_color_spinor_ds.cu
@@ -174,7 +174,8 @@ target_compile_options(
           -prec-sqrt=false>
           $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
           -fcuda-flush-denormals-to-zero
-          -fcuda-approx-transcendentals>)
+          -fcuda-approx-transcendentals
+          -Xclang -fcuda-allow-variadic-functions>)
 target_compile_options(
   quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:-Wno-unknown-cuda-version> $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
                -Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH} --expt-relaxed-constexpr>)
@@ -218,7 +219,7 @@ if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")
   add_subdirectory(targets/cuda)
 endif()
 if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
-  # add_subdirectory(targets/hip)
+  add_subdirectory(targets/hip)
 endif()
 target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_target>)
 
@@ -412,7 +413,7 @@ if(QUDA_QMP)
     add_dependencies(quda QMP)
     add_dependencies(quda_cpp QMP)
     # TODO: need to figure out how to propagate that cleanly
-    add_dependencies(quda_cuda_target QMP)
+    add_dependencies(${QUDA_TARGET_LIBRARY} QMP)
     add_dependencies(quda_generic_target QMP)
   endif()
   target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_QMPHOME}/include>)
@@ -426,7 +427,7 @@ if(QUDA_QIO)
     add_dependencies(quda QIO)
     add_dependencies(quda_cpp QIO)
     # TODO: need to figure out how to propagate that cleanly
-    add_dependencies(quda_cuda_target QIO)
+    add_dependencies(${QUDA_TARGET_LIBRARY} QIO)
     add_dependencies(quda_generic_target QIO)
   endif()
   target_compile_definitions(quda PUBLIC HAVE_QIO)
@@ -554,7 +555,7 @@ endif()
 if(QUDA_DOWNLOAD_EIGEN)
   add_dependencies(quda_cpp Eigen)
   add_dependencies(quda Eigen)
-  add_dependencies(quda_cuda_target Eigen)
+  add_dependencies(${QUDA_TARGET_LIBRARY} Eigen)
   add_dependencies(quda_generic_target Eigen)
 endif()
 
