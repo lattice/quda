@@ -342,6 +342,17 @@ namespace quda {
 	__device__ __host__ inline void operator=(const clover_wrapper<T, S> &s);
 
       /**
+	 @brief Hermitian matrix trace
+	 @return Matrix trace
+      */
+      __device__ __host__ inline T trace() const {
+        T result = data[0];
+#pragma unroll
+        for (int i=1; i<N; i++) result += data[i];
+        return result;
+      }
+
+      /**
 	 @brief Hermitian matrix square
 	 @return Matrix square
       */
@@ -362,6 +373,43 @@ namespace quda {
 	      tmp.x -= (*this)(i,j).imag() * (*this)(j,k).imag();
 	      tmp.y += (*this)(i,j).real() * (*this)(j,k).imag();
 	      tmp.y += (*this)(i,j).imag() * (*this)(j,k).real();
+	    }
+	    result(i,k) = tmp;
+	  }
+	}
+	return result;
+      }
+
+      /**
+         @brief Hermitian matrix cube
+         @return Matrix cube
+      */
+      __device__ __host__ inline HMatrix<T,N> cube() const {
+        HMatrix<T,N> square = this->square();
+        return this->multiply(square);
+      }
+
+      /**
+         @brief Multiply a Hermitian matrix to another, you need to confirm the commutability
+         @return The matrix multiplied by the input
+      */
+      __device__ __host__ inline HMatrix<T,N> multiply(const HMatrix<T,N> &a) const {
+        HMatrix<T,N> result;
+        complex<T> tmp;
+#pragma unroll
+	for (int i=0; i<N; i++) {
+#pragma unroll
+	  for (int k=0; k<N; k++) if (i<=k) { // else compiler can't handle triangular unroll
+	    tmp.x  = (*this)(i,0).real() * a(0,k).real();
+	    tmp.x -= (*this)(i,0).imag() * a(0,k).imag();
+	    tmp.y  = (*this)(i,0).real() * a(0,k).imag();
+	    tmp.y += (*this)(i,0).imag() * a(0,k).real();
+#pragma unroll
+	    for (int j=1; j<N; j++) {
+	      tmp.x += (*this)(i,j).real() * a(j,k).real();
+	      tmp.x -= (*this)(i,j).imag() * a(j,k).imag();
+	      tmp.y += (*this)(i,j).real() * a(j,k).imag();
+	      tmp.y += (*this)(i,j).imag() * a(j,k).real();
 	    }
 	    result(i,k) = tmp;
 	  }
@@ -411,16 +459,6 @@ namespace quda {
     {
       return a(0,0) + a(1,1) + a(2,2);
     }
-
-  template <typename T, int N>
-    __device__ __host__ inline T getTrace(const HMatrix<T,N>& a)
-    {
-      T trace = static_cast<T>(0.0);
-#pragma unroll
-      for (int i=0; i<N; i++) trace+=a.data[i];
-      return trace;
-    }
-
 
   template< template<typename,int> class Mat, class T>
     __device__ __host__ inline  T getDeterminant(const Mat<T,3> & a){

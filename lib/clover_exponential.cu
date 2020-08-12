@@ -14,8 +14,8 @@ namespace quda {
   class CloverExponential : TunableLocalParity {
     CloverExponentialArg<store_t> arg;
     const CloverField &meta; // used for meta data only
-    bool tuneGridDim() const { return true; }
     bool inverse;
+    bool tuneGridDim() const { return true; }
 
   public:
     CloverExponential(CloverField &clover, int order, double mass, bool inverse) :
@@ -29,7 +29,9 @@ namespace quda {
 #ifdef JITIFY
         create_jitify_program("kernels/clover_exponential.cuh");
 #endif
+        arg.c = static_cast<double *>(pool_device_malloc((arg.order+1) * sizeof(double)));
         apply(0);
+        pool_device_free(arg.c);
         checkCudaError();
       }
     }
@@ -45,13 +47,11 @@ namespace quda {
                            .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                            .launch(arg);
 #else
-        arg.c = static_cast<double *>(pool_device_malloc((arg.order+1) * sizeof(double)));
         if (inverse) {
           cloverExponentialKernel<Arg,true> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
         } else {
           cloverExponentialKernel<Arg,false> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
         }
-        pool_device_free(arg.c);
 #endif
       }
     }
@@ -59,6 +59,8 @@ namespace quda {
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
     long long flops() const { return 0; } 
     long long bytes() const { return 2*arg.clover.volumeCB*(arg.clover.Bytes()); } 
+    void preTune() { arg.clover.save(); }
+    void postTune() { arg.clover.load(); }
   };
 
   // this is the function that is actually called, from here on down we instantiate all required templates

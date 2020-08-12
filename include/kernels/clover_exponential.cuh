@@ -50,13 +50,24 @@ namespace quda
       A *= invMass;
       A += static_cast<real>(-1.0);
 
-      Mat A2 = A * A;
-      Mat A3 = A2 * A;
+      Mat A1 = A;
+      Mat A2 = A.square();
+      Mat A3 = A.cube();
+      Mat A4 = A2.multiply(A2);
+      Mat A5 = A2.multiply(A3);
+      Mat A6 = A3.multiply(A3);
+
+      // Mat A1 = A;
+      // Mat A2 = A * A;
+      // Mat A3 = A * A2;
+      // Mat A4 = A2 * A2;
+      // Mat A5 = A2 * A3;
+      // Mat A6 = A3 * A3;
 
       real q5;
       real q[6] = {static_cast<real>(0.0)};
       if (order > 5) {
-        real tr[5] = {getTrace(A2), getTrace(A3), getTrace(A2*A2), getTrace(A2*A3), getTrace(A3*A3)};
+        real tr[5] = {A2.trace(), A3.trace(), A4.trace(), A5.trace(), A6.trace()};
         real psv[5];
         psv[0] = (1.0 / 144.0) * (8.0 * tr[1] * tr[1] - 24.0 * tr[4] + tr[0] * (18.0 * tr[2] - 3.0 * tr[0] * tr[0]));
         psv[1] = (1.0 / 30.0) * (5.0 * tr[0] * tr[1] - 6.0 * tr[3]);
@@ -83,17 +94,24 @@ namespace quda
       }
 
 #pragma unroll
-      for (int i=0; i<N; i++)
+      for (int i=0; i<N; i++) {
         q[i] *= mass;
-      
-      Mat A_exp = q[5] * A2 + q[4] * A;
-      A_exp += q[3];
-      A_exp *= A3;
-      A_exp += q[2] * A2 + q[1] * A;
-      A_exp += q[0];
-      A_exp *= static_cast<real>(0.5);
+      }
+      A1 *= q[1];
+      A2 *= q[2];
+      A3 *= q[3];
+      A4 *= q[4];
+      A5 *= q[5];
 
-      arg.clover(x_cb, parity, ch) = A_exp;
+      Mat Aexp = A5;
+      Aexp += A4;
+      Aexp += A3;
+      Aexp += A2;
+      Aexp += A1;
+      Aexp += q[0];
+
+      Aexp *= static_cast<real>(0.5);
+      arg.clover(x_cb, parity, ch) = Aexp;
     }
   }
 

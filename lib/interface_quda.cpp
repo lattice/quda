@@ -922,7 +922,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 
     bool do_exp = (inv_param->dslash_type == QUDA_CLOVER_EXP_WILSON_DSLASH) ? true : false;
     if (do_exp) {
-        cloverExponential(*cloverPrecise, 2, inv_param->mass, false);
+        cloverExponential(*cloverPrecise, 18, inv_param->mass, false);
     }
 
     // inverted clover term is required when applying preconditioned operator
