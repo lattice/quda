@@ -986,7 +986,6 @@ template <typename Float> void applyGaugeFieldScaling(Float **gauge, int Vh, Qud
   }
 }
 
-// static void constructUnitGaugeField(Float **res, QudaGaugeParam *param) {
 template <typename Float> void constructUnitGaugeField(Float **res, QudaGaugeParam *param)
 {
   Float *resOdd[4], *resEven[4];
@@ -1010,6 +1009,9 @@ template <typename Float> void constructUnitGaugeField(Float **res, QudaGaugePar
 
   applyGaugeFieldScaling(res, Vh, param);
 }
+
+template void constructUnitGaugeField(float **res, QudaGaugeParam *param);
+template void constructUnitGaugeField(double **res, QudaGaugeParam *param);
 
 // normalize the vector a
 template <typename Float>
@@ -1107,6 +1109,9 @@ template <typename Float> void constructRandomGaugeField(Float **res, QudaGaugeP
   printf("res[2][0]: %g\n", res[2][0]);
   printf("res[3][0]: %g\n", res[3][0]);
 }
+
+template void constructRandomGaugeField(float **res, QudaGaugeParam *param, QudaDslashType dslash_type);
+template void constructRandomGaugeField(double **res, QudaGaugeParam *param, QudaDslashType dslash_type);
 
 template <typename Float> void constructUnitaryGaugeField(Float **res)
 {

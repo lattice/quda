@@ -140,8 +140,8 @@ namespace quda {
      Generic CPU gauge ghost extraction and packing
      NB This routines is specialized to four dimensions
   */
-  template <typename Float, int length, int nDim, int dim, typename Order, bool extract>
-  __global__ void extractGhostExKernel(ExtractGhostExArg<Order,nDim,dim> arg)
+  template <typename Float, int length, int nDim, int dim, typename Order, bool extract, typename... Env_>
+  __global__ void extractGhostExKernel(ExtractGhostExArg<Order,nDim,dim> arg, Env_... env_)
   {
     // parallelize over parity and dir using block or grid 
     /*for (int parity=0; parity<2; parity++) {*/

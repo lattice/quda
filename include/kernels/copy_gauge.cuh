@@ -92,8 +92,8 @@ namespace quda {
       Generic CUDA gauge reordering and packing.  Adopts a similar form as
       the CPU version, using the same inlined functions.
   */
-  template <typename FloatOut, typename FloatIn, int length, typename Arg>
-  __global__ void copyGaugeKernel(Arg arg) {
+  template <typename FloatOut, typename FloatIn, int length, typename Arg, typename... Env_>
+  __global__ void copyGaugeKernel(Arg arg, Env_... env_) {
     typedef typename mapper<FloatIn>::type RegTypeIn;
     typedef typename mapper<FloatOut>::type RegTypeOut;
     constexpr int nColor = Ncolor(length);
@@ -153,8 +153,8 @@ namespace quda {
      Generic CUDA kernel for copying the ghost zone.  Adopts a similar form as
      the CPU version, using the same inlined functions.
   */
-  template <typename FloatOut, typename FloatIn, int length, typename Arg>
-  __global__ void copyGhostKernel(Arg arg) {
+  template <typename FloatOut, typename FloatIn, int length, typename Arg, typename... Env_>
+  __global__ void copyGhostKernel(Arg arg, Env_... env_) {
     typedef typename mapper<FloatIn>::type RegTypeIn;
     typedef typename mapper<FloatOut>::type RegTypeOut;
     constexpr int nColor = Ncolor(length);

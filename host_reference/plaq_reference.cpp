@@ -285,7 +285,7 @@ static double compute_loop(su3_matrix **sitelink, su3_matrix **sitelink_ex_2d, i
       double t2 = U[2].e[0][0].real;
       double t3 = U[3].e[0][0].real;
       //printf("U: %g\t%g\t%g\t%g\n", t0, t1, t2, t3);
-      printf("plaqr %i: %g\n", i, rtr);
+      //printf("plaqr %i: %g\n", i, rtr);
       //}
     sum += rtr;
   } // i

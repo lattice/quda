@@ -70,7 +70,8 @@ namespace quda
     }
   }
 
-  template <typename Arg> __launch_bounds__(Arg::block_size) __global__ void transform_reduce_kernel(Arg arg)
+  template <typename Arg, typename... Env_> __launch_bounds__(Arg::block_size)
+  __global__ void transform_reduce_kernel(Arg arg, Env_... env_)
   {
     using count_t = decltype(arg.n_items);
     using reduce_t = decltype(arg.init);

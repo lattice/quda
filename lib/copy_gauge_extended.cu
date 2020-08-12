@@ -98,8 +98,8 @@ namespace quda {
     }
   }
 
-  template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder, bool regularToextended>
-  __global__ void copyGaugeExKernel(CopyGaugeExArg<OutOrder,InOrder> arg) {
+  template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder, bool regularToextended, typename... Env_>
+  __global__ void copyGaugeExKernel(CopyGaugeExArg<OutOrder,InOrder> arg, Env_... env_) {
     for (int parity=0; parity<2; parity++) {
       int X = blockIdx.x * blockDim.x + threadIdx.x;
       if (X >= arg.volume/2) return;

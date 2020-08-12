@@ -100,7 +100,7 @@ set (QUDA_OBJS
   instantiate.cpp version.cpp )
 # cmake-format: on
 
-if(${QUDA_TARGET_TYPE} STREQUAL "CPU")
+if(${QUDA_TARGET_TYPE} STREQUAL "CPU" OR ${QUDA_TARGET_TYPE} STREQUAL "SYCL")
 set (QUDA_OBJS
   # cmake-format: sortable
   dirac_coarse.cpp
@@ -270,11 +270,16 @@ if(${QUDA_TARGET_TYPE} STREQUAL "CPU")
   set_source_files_properties(${QUDA_CU_OBJS} PROPERTIES LANGUAGE CXX)
   set_source_files_properties(${QUDA_CU_OBJS} PROPERTIES COMPILE_FLAGS "-x c++")
 endif()
+if(${QUDA_TARGET_TYPE} STREQUAL "SYCL")
+  add_subdirectory(targets/sycl)
+  set_source_files_properties(${QUDA_CU_OBJS} PROPERTIES LANGUAGE CXX)
+  set_source_files_properties(${QUDA_CU_OBJS} PROPERTIES COMPILE_FLAGS "-x c++")
+endif()
 target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_target>)
- 
+
 add_subdirectory(targets/generic)
 target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_generic>)
- 
+
 # propagate CXX flags to CUDA host compiler
 if(${QUDA_PROPAGATE_CXX_FLAGS})
   target_compile_options(
@@ -440,7 +445,7 @@ if(QUDA_QMP)
     add_dependencies(quda QMP)
     add_dependencies(quda_cpp QMP)
     #TODO: need to figure out how to propagate that cleanly
-    add_dependencies(quda_cuda_target QMP)
+    add_dependencies(quda_target QMP)
     add_dependencies(quda_generic_target QMP)
   endif()
   target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_QMPHOME}/include>)
@@ -454,7 +459,7 @@ if(QUDA_QIO)
     add_dependencies(quda QIO)
     add_dependencies(quda_cpp QIO)
     #TODO: need to figure out how to propagate that cleanly
-    add_dependencies(quda_cuda_target QIO)
+    add_dependencies(quda_target QIO)
     add_dependencies(quda_generic_target QIO)
   endif()
   target_compile_definitions(quda PUBLIC HAVE_QIO)
@@ -595,7 +600,9 @@ endif()
 if(QUDA_DOWNLOAD_EIGEN)
   add_dependencies(quda_cpp Eigen)
   add_dependencies(quda Eigen)
-  add_dependencies(quda_cuda_target Eigen)
+  #add_dependencies(quda_cuda_target Eigen)
+  #add_dependencies(quda_cpu_target Eigen)
+  #add_dependencies(quda_sycl_target Eigen)
   add_dependencies(quda_generic_target Eigen)
 endif()
 

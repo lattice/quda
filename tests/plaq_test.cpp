@@ -53,9 +53,11 @@ void setGaugeParam(QudaGaugeParam &gauge_param)
 #endif
 }
 
+#define check printf("%s %i errno: %i\n", __FILE__, __LINE__, errno)
+
 int main(int argc, char **argv)
 {
-
+  errno = 0;
   auto app = make_app();
   try {
     app->parse(argc, argv);

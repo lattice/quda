@@ -39,7 +39,8 @@ namespace quda
     /**
        Generic blas kernel with four loads and up to four stores.
     */
-    template <typename real, int n, typename Arg> __global__ void blasKernel(Arg arg)
+    template <typename real, int n, typename Arg, typename... Env_>
+    __global__ void blasKernel(Arg arg, Env_... env_)
     {
       // n is real numbers per thread
       using vec = vector_type<complex<real>, n/2>;

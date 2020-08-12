@@ -1,10 +1,10 @@
 #include <quda_internal.h>
-#include <omp.h>
+#include <sys/time.h>
 
-dim3 gridDim;
-dim3 blockDim;
-dim3 blockIdx;
-dim3 threadIdx;
+//dim3 gridDim;
+//dim3 blockDim;
+//dim3 blockIdx;
+//dim3 threadIdx;
 
 // if this macro is defined then we profile the API calls
 //#define API_PROFILE
@@ -21,8 +21,11 @@ dim3 threadIdx;
 qudaError_t
 qudaGetLastError(void) {
   qudaError_t error = qudaSuccess;
-  int e = errno;
-  if(e!=0) error = qudaErrorUnknown;
+  //int e = errno;
+  //if(e!=0) {
+  //  printf("errno: %i\n", errno);
+  //  error = qudaErrorUnknown;
+  //}
   return error;
 }
 
@@ -128,7 +131,10 @@ qudaEventQuery(qudaEvent_t event)
 qudaError_t
 qudaEventRecord(qudaEvent_t &event, qudaStream_t stream)
 {
-  event = omp_get_wtime();
+  //event = omp_get_wtime();
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  event = tv.tv_sec + 1e-6*tv.tv_usec;
   return qudaSuccess;
 }
 
@@ -252,80 +258,6 @@ qudaDeviceCanAccessPeer(int *canAccessPeer, int device, int peerDevice)
   return qudaSuccess;
 }
 
-void
-curand_init(unsigned long long seed, unsigned long long sequence,
-	    unsigned long long offset, curandStateMRG32k3a *state)
-{
-  // FIXME: sequence, offset
-  int64_t seed0 = seed;
-  state->s10 = seed0;
-  state->s11 = seed0;
-  state->s12 = seed0;
-  state->s20 = seed0;
-  state->s21 = seed0;
-  state->s22 = seed0;
-}
-
-int64_t next(curandStateMRG32k3a *state)
-{
-  const int64_t m1 = 4294967087;
-  const int64_t m2 = 4294944443;
-  const int32_t a12 = 1403580;
-  const int32_t a13 = 810728;
-  const int32_t a21 = 527612;
-  const int32_t a23 = 1370589;
-  const int64_t corr1 = m1 * a13;
-  const int64_t corr2 = m2 * a23;
-  /* Combination */
-  int64_t r = state->s12 - state->s22;
-  r -= m1 * ((r - 1) >> 63);
-  /* Component 1 */
-  int64_t p1 = (a12 * state->s11 - a13 * state->s10 + corr1) % m1;
-  state->s10 = state->s11;
-  state->s11 = state->s12;
-  state->s12 = p1;
-  /* Component 2 */
-  int64_t p2 = (a21 * state->s22 - a23 * state->s20 + corr2) % m2;
-  state->s20 = state->s21;
-  state->s21 = state->s22;
-  state->s22 = p2;
-  return r;
-}
-
-float curand_uniform(curandStateMRG32k3a *state)
-{
-  auto r = next(state);
-  const float norm = 0x1fp-32;
-  return norm*r;
-}
-
-double curand_uniform_double(curandStateMRG32k3a *state)
-{
-  auto r = next(state);
-  const double norm = 0x1dp-32;
-  return norm*r;
-}
-
-float curand_normal(curandStateMRG32k3a *state)
-{
-  const float TINY = 9.999999999999999e-38;
-  const float TAU = 6.28318531;
-  float v = curand_uniform(state);
-  float p = curand_uniform(state) * TAU;
-  float r = sqrt(-2.0 * log(v + TINY));
-  return r * cos(p);
-}
-
-double curand_normal_double(curandStateMRG32k3a *state)
-{
-  const double TINY = 9.999999999999999e-308;
-  const double TAU = 6.28318530717958648;
-  double v = curand_uniform_double(state);
-  double p = curand_uniform_double(state) * TAU;
-  double r = sqrt(-2.0 * log(v + TINY));
-  return r * cos(p);
-}
-
 namespace quda {
 
   static TimeProfile apiTimer("API calls");
@@ -378,11 +310,28 @@ namespace quda {
   qudaLaunchKernel(const void *func, dim3 gridDim0, dim3 blockDim0,
 		   void **args, size_t sharedMem, qudaStream_t stream)
   {
+    qudaError_t error = qudaSuccess;
+    errorQuda("qudaLaunchKernel\n");
+#if 0
     if(gridDim0.z>0 || blockDim0.z>0) {
       errorQuda("qudaLaunchKernel gz: %i  bz: %i\n", gridDim0.z, blockDim0.z);
     }
-    qudaError_t error = qudaSuccess;
-    void (*f)(void *) = func; // must assume single pointer arg
+    auto cf = const_cast<void *>(func);
+    typedef void (*fp)(void *);
+    fp f = reinterpret_cast<fp>(cf); // must assume single pointer arg
+#if 0
+    sycl::range<3> globalSize{gridDim0.x*blockDim0.x, gridDim0.y*blockDim0.y, gridDim0.z*blockDim0.z};
+    sycl::range<3> localSize{blockDim0.x, blockDim0.y, blockDim0.z};
+    defaultQueue.submit([&] (sycl::handler &h)
+			{ h.parallel_for<class test>(
+						     (globalSize, localSize), [=](sycl::nd_item<3> ndi)
+						    {
+						      f(args[0]);
+						    });
+			    });
+#endif
+    //(globalSize, localSize), [=](nd_item<1> ndi) {
+    //func(, ndi);
     gridDim = gridDim0;
     blockDim = blockDim0;
     int ngx = gridDim0.x;
@@ -403,9 +352,11 @@ namespace quda {
 	}
       }
     }
+#endif
     return error;
   }
 
+#if 0
   qudaError_t
   qudaLaunch_(dim3 gridDim0, dim3 blockDim0, size_t sharedMem0,
 	      qudaStream_t stream0, const char *func, const char *file,
@@ -442,6 +393,7 @@ namespace quda {
     }
     return error;
   }
+#endif
 
   qudaError_t qudaEventQuery(qudaEvent_t &event)
   {

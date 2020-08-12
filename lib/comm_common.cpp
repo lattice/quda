@@ -173,6 +173,7 @@ static int enable_p2p_max_access_rank = std::numeric_limits<int>::max();
 void comm_peer2peer_init(const char* hostname_recv_buf)
 {
   if (peer2peer_init) return;
+  checkCudaErrorNoSync();
 
   // set gdr enablement
   if (comm_gdr_enabled()) {

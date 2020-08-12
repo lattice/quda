@@ -70,8 +70,8 @@ namespace quda {
     } // dir
   }
 
-  template <bool conj_mom, bool exact, typename Arg>
-  __global__ void updateGaugeFieldKernel(Arg arg)
+  template <bool conj_mom, bool exact, typename Arg, typename... Env_>
+  __global__ void updateGaugeFieldKernel(Arg arg, Env_... env_)
   {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     if (x_cb >= arg.out.volumeCB) return;

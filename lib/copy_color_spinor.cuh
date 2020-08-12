@@ -146,7 +146,8 @@ namespace quda {
   }
 
   /** CUDA kernel to reorder spinor fields.  Adopts a similar form as the CPU version, using the same inlined functions. */
-  template <typename Arg, typename Basis> __global__ void copyColorSpinorKernel(Arg arg, Basis basis)
+  template <typename Arg, typename Basis, typename... Env_>
+  __global__ void copyColorSpinorKernel(Arg arg, Basis basis, Env_... env_)
   {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     if (x >= arg.volumeCB) return;

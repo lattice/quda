@@ -121,7 +121,8 @@ namespace quda {
     // 84 floating-point ops
   }
 
-  template <typename Arg> __global__ void cloverComputeKernel(Arg arg)
+  template <typename Arg, typename... Env_>
+  __global__ void cloverComputeKernel(Arg arg, Env_... env_)
   {
     int x_cb = threadIdx.x + blockIdx.x*blockDim.x;
     int parity = threadIdx.y + blockIdx.y*blockDim.y;

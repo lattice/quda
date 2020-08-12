@@ -73,8 +73,8 @@ namespace quda {
     arg.link(dir, idx, parity) = arg.coeff * a * b * c;
   }
 
-  template <typename Float, typename Arg>
-  __global__ void computeLongLink(Arg arg) {
+  template <typename Float, typename Arg, typename... Env_>
+  __global__ void computeLongLink(Arg arg, Env_... env_) {
 
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
     int parity = blockIdx.y*blockDim.y + threadIdx.y;
@@ -127,8 +127,8 @@ namespace quda {
     instantiate<LongLink, ReconstructNo12>(u, lng, coeff); // u first arg so we pick its recon
   }
 
-  template <typename Float, typename Arg>
-  __global__ void computeOneLink(Arg arg)
+  template <typename Float, typename Arg, typename... Env_>
+  __global__ void computeOneLink(Arg arg, Env_... env_)
   {
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
     int parity = blockIdx.y * blockDim.y + threadIdx.y;
@@ -214,9 +214,9 @@ namespace quda {
 
     StapleArg(Fat fat, Staple staple, Mulink mulink, Gauge u, Float coeff,
 	      const GaugeField &fat_meta, const GaugeField &u_meta) :
-      threads(1), fat(fat), staple(staple), mulink(mulink), u(u), coeff(coeff),
-      odd_bit( (commDimPartitioned(0)+commDimPartitioned(1) +
-                commDimPartitioned(2)+commDimPartitioned(3))%2 )
+      threads(1), odd_bit((commDimPartitioned(0)+commDimPartitioned(1)+
+                           commDimPartitioned(2)+commDimPartitioned(3))%2),
+      u(u), fat(fat), staple(staple), mulink(mulink), coeff(coeff)
     {
       for (int d=0; d<4; d++) {
         X[d] = (fat_meta.X()[d] + u_meta.X()[d]) / 2;
@@ -285,8 +285,8 @@ namespace quda {
     }
   }
 
-  template<typename Float, bool save_staple, typename Arg>
-  __global__ void computeStaple(Arg arg, int nu)
+  template<typename Float, bool save_staple, typename Arg, typename... Env_>
+  __global__ void computeStaple(Arg arg, int nu, Env_... env_)
   {
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
     int parity = blockIdx.y*blockDim.y + threadIdx.y;

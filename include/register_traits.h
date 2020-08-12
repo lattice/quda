@@ -11,7 +11,9 @@
 #include <quda_internal.h>
 #include <generics/ldg.h>
 #include <complex_quda.h>
+#ifdef QUDA_TARGET_CUDA
 #include <inline_ptx.h>
+#endif
 
 namespace quda {
 
@@ -343,9 +345,10 @@ namespace quda {
       __device__ __host__ static T Atan2( const T &a, const T &b) { return atan2(a,b); }
       __device__ __host__ static T Sin( const T &a ) { return sin(a); }
       __device__ __host__ static T Cos( const T &a ) { return cos(a); }
-      __device__ __host__ static void SinCos(const T &a, T *s, T *c) { sincos(a, s, c); }
+    //__device__ __host__ static void SinCos(const T &a, T *s, T *c) { sincos(a, s, c); }
+      __device__ __host__ static void SinCos(const T &a, T *s, T *c) { sincos_(a, s, c); }
     };
-  
+
   /**
      Specialization of Trig functions using floats
    */
@@ -355,7 +358,7 @@ namespace quda {
     __device__ __host__ static float Sin(const float &a)
     {
 #ifdef __CUDA_ARCH__
-      return __sinf(a); 
+      return __sinf(a);
 #else
       return sinf(a);
 #endif
@@ -374,7 +377,8 @@ namespace quda {
 #ifdef __CUDA_ARCH__
        __sincosf(a, s, c);
 #else
-       sincosf(a, s, c);
+       //       sincosf(a, s, c);
+       sincos_(a, s, c);
 #endif
     }
   };
@@ -407,7 +411,7 @@ namespace quda {
 #ifdef __CUDA_ARCH__
       __sincosf(a * static_cast<float>(M_PI), s, c);
 #else
-      sincosf(a * static_cast<float>(M_PI), s, c);
+      sincos_(a * static_cast<float>(M_PI), s, c);
 #endif
     }
   };

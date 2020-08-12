@@ -218,8 +218,8 @@ namespace quda {
   }
 
   // GPU Kernel for applying the gamma matrix to a colorspinor
-  template <typename Float, int nColor, int d, typename Arg>
-  __global__ void gammaGPU(Arg arg)
+  template <typename Float, int nColor, int d, typename Arg, typename... Env_>
+  __global__ void gammaGPU(Arg arg, Env_... env_)
   {
     typedef typename mapper<Float>::type RegType;
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
@@ -334,8 +334,8 @@ namespace quda {
   }
 
   // GPU Kernel for applying the gamma matrix to a colorspinor
-  template <bool doublet, typename Float, int nColor, int d, typename Arg>
-  __global__ void twistGammaGPU(Arg arg)
+  template <bool doublet, typename Float, int nColor, int d, typename Arg, typename... Env_>
+  __global__ void twistGammaGPU(Arg arg, Env_... env_)
   {
     typedef typename mapper<Float>::type RegType;
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
@@ -547,8 +547,8 @@ namespace quda {
     }
   }
 
-  template <typename Float, int nSpin, int nColor, typename Arg>
-  __global__ void cloverGPU(Arg arg) {
+  template <typename Float, int nSpin, int nColor, typename Arg, typename... Env_>
+  __global__ void cloverGPU(Arg arg, Env_... env_) {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     int parity = (arg.nParity == 2) ? blockDim.y*blockIdx.y + threadIdx.y : arg.parity;
     if (x_cb >= arg.volumeCB) return;
@@ -700,8 +700,8 @@ namespace quda {
     }
   }
 
-  template <bool inverse, typename Float, int nSpin, int nColor, typename Arg>
-  __global__ void twistCloverGPU(Arg arg) {
+  template <bool inverse, typename Float, int nSpin, int nColor, typename Arg, typename... Env_>
+  __global__ void twistCloverGPU(Arg arg, Env_... env_) {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     int parity = (arg.nParity == 2) ? blockDim.y*blockIdx.y + threadIdx.y : arg.parity;
     if (x_cb >= arg.volumeCB) return;

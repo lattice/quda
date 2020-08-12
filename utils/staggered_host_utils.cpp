@@ -144,6 +144,7 @@ void constructFatLongGaugeField(void **fatlink, void **longlink, int type, QudaP
     if (precision == QUDA_DOUBLE_PRECISION) {
       // if doing naive staggered then set to long links so that the staggered phase is applied
       param->type = dslash_type == QUDA_ASQTAD_DSLASH ? QUDA_ASQTAD_FAT_LINKS : QUDA_ASQTAD_LONG_LINKS;
+      //dslash_type = QUDA_WILSON_DSLASH;
       if (type != 3)
         constructRandomGaugeField((double **)fatlink, param, dslash_type);
       else

@@ -30,8 +30,8 @@ namespace quda {
   }
 
   /** CUDA kernel to reorder spinor fields.  Adopts a similar form as the CPU version, using the same inlined functions. */
-  template <typename FloatOut, typename FloatIn, int Ns, int Nc, typename OutOrder, typename InOrder>
-    __global__ void packSpinorKernel(OutOrder outOrder, const InOrder inOrder, int volume) {
+  template <typename FloatOut, typename FloatIn, int Ns, int Nc, typename OutOrder, typename InOrder, typename... Env_>
+    __global__ void packSpinorKernel(OutOrder outOrder, const InOrder inOrder, int volume, Env_... env_) {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     if (x >= volume) return;
 

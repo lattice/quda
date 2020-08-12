@@ -104,6 +104,9 @@ namespace quda {
 	    h_reduce = (device_reduce_t *) pinned_malloc(bytes);
 	    hd_reduce = d_reduce;
 	  }
+	  printf("h_reduce: %p\n", h_reduce); fflush(stdout);
+          printf("h_reduce[0]: %i\n", h_reduce[0]);
+   	  //h_reduce[0] = 1;
 	memset(h_reduce, 0, bytes); // added to ensure that valgrind doesn't report h_reduce is unitialised
       }
 

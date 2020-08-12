@@ -35,8 +35,8 @@ namespace quda {
     }
   };
 
-  template<typename Arg>
-  __device__ inline double plaquette(Arg &arg, int x[], int parity, int mu, int nu) {
+  template<typename Arg, typename... Env_>
+  __device__ inline double plaquette(Arg &arg, int x[], int parity, int mu, int nu, Env_... env_) {
     typedef Matrix<complex<typename Arg::Float>,3> Link;
 
     int dx[4] = {0, 0, 0, 0};
@@ -55,18 +55,18 @@ namespace quda {
     int i = linkIndexShift(x,dx,arg.E);
     //if(i==0) {
       //printf("U: %g\t%g\t%g\t%g\n", U1(0,0).real(), U2(0,0).real(), U3(0,0).real(), U4(0,0).real());
-      printf("plaq %i: %g\n", i, t);
+      //printf("plaq %i: %g\n", i, t);
     //}
     return t;
   }
 
-  template<int blockSize, typename Arg>
-  __global__ void computePlaq(Arg arg){
+  template<int blockSize, typename Arg, typename... Env_>
+  __global__ void computePlaq(Arg arg, Env_... env_){
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     int parity = threadIdx.y;
 
     double2 plaq = make_double2(0.0,0.0);
-    printf("plaq: %g %g\n", plaq.x, plaq.y);
+    //printf("plaq: %g %g\n", plaq.x, plaq.y);
 
     while (idx < arg.threads) {
       int x[4];
@@ -86,7 +86,7 @@ namespace quda {
 
       idx += blockDim.x*gridDim.x;
     }
-    printf("plaq: %g %g\n", plaq.x, plaq.y);
+    //printf("plaq: %g %g\n", plaq.x, plaq.y);
 
 #if 0
     {
@@ -107,7 +107,7 @@ namespace quda {
 #endif
     // perform final inter-block reduction and write out result
     reduce2d<blockSize,2>(arg, plaq);
-    printf("plaq: %g %g\n", plaq.x, plaq.y);
+    //printf("plaq: %g %g\n", plaq.x, plaq.y);
   }
 
 } // namespace quda

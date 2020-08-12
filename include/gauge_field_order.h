@@ -24,7 +24,7 @@
 #include <atomic.cuh>
 #include <gauge_field.h>
 #include <index_helper.cuh>
-#ifndef QUDA_TARGET_CPU
+#if not (defined(QUDA_TARGET_CPU) || defined(QUDA_TARGET_SYCL))
 #include <trove_helper.cuh>
 #endif
 #include <transform_reduce.h>
@@ -58,11 +58,11 @@ namespace quda {
 	 @param[in] parity Parity we are accessing
        */
       __device__ __host__ inline gauge_wrapper<Float, T>(T &gauge, int dim, int x_cb, int parity, Float phase = 1.0) :
-          gauge(gauge),
           dim(dim),
           x_cb(x_cb),
           parity(parity),
-          phase(phase)
+          phase(phase),
+          gauge(gauge)
       {
       }
 
@@ -124,11 +124,11 @@ namespace quda {
        */
       __device__ __host__ inline gauge_ghost_wrapper<Float, T>(
           T &gauge, int dim, int ghost_idx, int parity, Float phase = 1.0) :
-          gauge(gauge),
           dim(dim),
           ghost_idx(ghost_idx),
           parity(parity),
-          phase(phase)
+          phase(phase),
+          gauge(gauge)
       {
       }
 
@@ -782,8 +782,8 @@ namespace quda {
       Accessor<Float, nColor, QUDA_FLOAT2_GAUGE_ORDER, storeFloat> accessor;
 
       GhostAccessor(const GaugeField &U, void *gauge_, void **ghost_=0)
-	: volumeCB(U.VolumeCB()), accessor(U, gauge_, ghost_),
-	  scale(static_cast<Float>(1.0)), scale_inv(static_cast<Float>(1.0))
+	: volumeCB(U.VolumeCB()), scale(static_cast<Float>(1.0)),
+	  scale_inv(static_cast<Float>(1.0)), accessor(U, gauge_, ghost_)
       {
 	if (!native_ghost) assert(ghost_ != nullptr);
 	for (int d=0; d<4; d++) {
@@ -1636,7 +1636,13 @@ namespace quda {
          @param[in] length Number of real numbers per link
          @return Number of colors (=sqrt(length/2))
        */
-      __host__ __device__ constexpr int Ncolor(int length) { return ct_sqrt(length / 2); }
+      //__host__ __device__ constexpr int Ncolor(int length) { return ct_sqrt(length / 2); }
+      __host__ __device__ constexpr int Ncolor(int length) {
+	int n = length / 2;
+	int i = 1;
+	while(i*i<n) i++;
+	return i;
+      }
 
       // we default to huge allocations for gauge field (for now)
       constexpr bool default_huge_alloc = true;

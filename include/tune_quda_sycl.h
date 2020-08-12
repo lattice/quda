@@ -1,11 +1,5 @@
 #pragma once
 
-#ifdef QUDA_TARGET_CPU
-#include <tune_quda_cpu.h>
-#elif defined QUDA_TARGET_SYCL
-#include <tune_quda_sycl.h>
-#else
-
 #include <string>
 #include <iostream>
 #include <iomanip>
@@ -18,12 +12,6 @@
 
 #include <tune_key.h>
 #include <quda_internal.h>
-
-// this file has some workarounds to allow compilation using nvrtc of kernels that include this file
-#ifdef __CUDACC_RTC__
-#define CUresult bool
-#define CUDA_SUCCESS true
-#endif
 
 namespace quda {
 
@@ -59,7 +47,6 @@ namespace quda {
       return *this;
     }
 
-#ifndef __CUDACC_RTC__
     friend std::ostream& operator<<(std::ostream& output, const TuneParam& param) {
       output << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
       output << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
@@ -67,16 +54,13 @@ namespace quda {
       output << ", aux=(" << param.aux.x << "," << param.aux.y << "," << param.aux.z << "," << param.aux.w << ")";
       return output;
     }
-#endif
   };
 
-#ifndef __CUDACC_RTC__
   /**
    * @brief Returns a reference to the tunecache map
    * @return tunecache reference
    */
   const std::map<TuneKey, TuneParam> &getTuneCache();
-#endif
 
   class Tunable {
 
@@ -210,10 +194,8 @@ namespace quda {
 #if CUDA_VERSION >= 9000
       qudaFuncSetAttribute(
           (const void *)func, cudaFuncAttributePreferredSharedMemoryCarveout, (int)cudaSharedmemCarveoutMaxShared);
-      cudaFuncAttributes attributes;
-      qudaFuncGetAttributes(attributes, (const void *)func);
-      qudaFuncSetAttribute((const void *)func, cudaFuncAttributeMaxDynamicSharedMemorySize,
-                           maxDynamicSharedBytesPerBlock() - attributes.sharedSizeBytes);
+      qudaFuncSetAttribute(
+          (const void *)func, cudaFuncAttributeMaxDynamicSharedMemorySize, maxDynamicSharedBytesPerBlock());
 #endif
     }
 
@@ -293,17 +275,15 @@ namespace quda {
 
     int writeAuxString(const char *format, ...) {
       int n = 0;
-#ifndef __CUDACC_RTC__
       va_list arguments;
       va_start(arguments, format);
       n = vsnprintf(aux, TuneKey::aux_n, format, arguments);
       if (n < 0 || n >= TuneKey::aux_n) errorQuda("Error writing auxiliary string");
-#endif
       return n;
     }
 
     /** This is the return result from kernels launched using jitify */
-    CUresult jitify_error;
+    int jitify_error;
 
     /**
        @brief Whether the present instance has already been tuned or not
@@ -311,7 +291,6 @@ namespace quda {
     */
     bool tuned()
     {
-#ifndef __CUDACC_RTC__
       // not tuning is equivalent to already tuned
       if (!getTuning()) return true;
 
@@ -319,13 +298,10 @@ namespace quda {
       if (use_managed_memory()) strcat(key.aux, ",managed");
       // if key is present in cache then already tuned
       return getTuneCache().find(key) != getTuneCache().end();
-#else
-      return true;
-#endif
     }
 
   public:
-    Tunable() : jitify_error(CUDA_SUCCESS) { aux[0] = '\0'; }
+    Tunable() { aux[0] = '\0'; }
     virtual ~Tunable() { }
     virtual TuneKey tuneKey() const = 0;
     virtual void apply(const qudaStream_t &stream) = 0;
@@ -333,7 +309,6 @@ namespace quda {
     virtual void postTune() { }
     virtual int tuningIter() const { return 1; }
 
-#ifndef __CUDACC_RTC__
     virtual std::string paramString(const TuneParam &param) const
     {
       std::stringstream ps;
@@ -350,7 +325,6 @@ namespace quda {
       ss << gbytes << " GB/s";
       return ss.str();
     }
-#endif
 
     virtual void initTuneParam(TuneParam &param) const
     {
@@ -365,8 +339,11 @@ namespace quda {
 	param.grid = dim3(min_grid_size,1,1);
       } else {
 	// find the minimum valid blockDim
+	fprintf(stderr,"max_blocks: %i\n", max_blocks);
 	param.block = dim3((minThreads()+max_blocks-1)/max_blocks, 1, 1);
+	fprintf(stderr,"min_block_size: %i\n", min_block_size);
 	param.block.x = ((param.block.x+min_block_size-1) / min_block_size) * min_block_size; // round up to the nearest multiple of desired minimum block size
+	fprintf(stderr,"param.block.x: %i\n", param.block.x);
 	if (param.block.x > max_threads) errorQuda("Local lattice volume is too large for device");
 
 	param.grid = dim3((minThreads()+param.block.x-1)/param.block.x, 1, 1);
@@ -423,8 +400,6 @@ namespace quda {
 		  param.grid.z, deviceProp.maxGridSize[2]);
     }
 
-    CUresult jitifyError() const { return jitify_error; }
-    CUresult& jitifyError() { return jitify_error; }
   };
 
 
@@ -640,5 +615,3 @@ namespace quda {
 #endif
 
 #define postTrace() quda::postTrace_(__func__, quda::file_name(__FILE__), __LINE__)
-
-#endif // not QUDA_TARGET_CPU

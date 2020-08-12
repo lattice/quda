@@ -414,8 +414,8 @@ namespace quda
    */
   template <template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> class D,
             template <bool dagger, QudaPCType pc, typename Arg> class P, int nParity, bool dagger, bool xpay,
-            KernelType kernel_type, typename Arg>
-  __global__ void dslashGPU(Arg arg)
+            KernelType kernel_type, typename Arg, typename... Env_>
+  __global__ void dslashGPU(Arg arg, Env_... env_)
   {
     D<nParity, dagger, xpay, kernel_type, Arg> dslash(arg);
 

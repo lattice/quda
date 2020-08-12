@@ -7,6 +7,9 @@
 #ifdef QUDA_TARGET_CPU
 #include <quda_cpu_api.h>
 #endif
+#ifdef QUDA_TARGET_SYCL
+#include <quda_sycl_api.h>
+#endif
 
 #include <string>
 #include <complex>
@@ -161,6 +164,12 @@ namespace quda {
 //#include <random_quda_cpu.h>
 #include <random_quda.h>
 #include <launch_quda_cpu.h>
+#endif
+#ifdef QUDA_TARGET_SYCL
+#include <tune_quda_sycl.h>
+//#include <random_quda_cpu.h>
+#include <random_quda.h>
+#include <launch_quda_sycl.h>
 #endif
 
 

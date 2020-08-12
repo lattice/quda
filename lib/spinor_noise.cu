@@ -64,8 +64,8 @@ namespace quda {
   }
 
   /** CUDA kernel to reorder spinor fields.  Adopts a similar form as the CPU version, using the same inlined functions. */
-  template <typename real, int Ns, int Nc, QudaNoiseType type, typename Arg>
-    __global__ void SpinorNoiseGPU(Arg arg) {
+  template <typename real, int Ns, int Nc, QudaNoiseType type, typename Arg, typename... Env_>
+    __global__ void SpinorNoiseGPU(Arg arg, Env_... env_) {
 
     int x_cb = blockIdx.x * blockDim.x + threadIdx.x;
     if (x_cb >= arg.volumeCB) return;

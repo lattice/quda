@@ -80,7 +80,8 @@ namespace quda
        @param[in,out] arg Argument struct with required meta data
        (input/output fields, functor, etc.)
     */
-    template <typename real, int n, int NXZ, int warp_split, typename Arg> __global__ void multiBlasKernel(Arg arg)
+    template <typename real, int n, int NXZ, int warp_split, typename Arg, typename... Env_>
+    __global__ void multiBlasKernel(Arg arg, Env_... env_)
     {
       // n is real numbers per thread
       using vec = vector_type<complex<real>, n/2>;

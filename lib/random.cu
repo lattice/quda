@@ -48,7 +48,8 @@ namespace quda {
      @param size size of the CURAND RNG state array
      @param arg Metadata needed for computing multi-gpu offsets
   */
-  __global__ void kernel_random(cuRNGState *state, unsigned long long seed, int size_cb, rngArg arg)
+  template <typename... Env_>
+  __global__ void kernel_random(cuRNGState *state, unsigned long long seed, int size_cb, rngArg arg, Env_... env_)
   {
     int id = blockIdx.x * blockDim.x + threadIdx.x;
     int parity = blockIdx.y * blockDim.y + threadIdx.y;

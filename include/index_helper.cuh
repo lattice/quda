@@ -846,7 +846,8 @@ namespace quda {
      @return Swizzled block index
   */
   //#define SWIZZLE
-  template <typename T> __device__ inline int block_idx(const T &swizzle)
+  template <typename T, typename... Env_>
+  __device__ inline int block_idx(const T &swizzle, Env_... env_)
   {
 #ifdef SWIZZLE
     // the portion of the grid that is exactly divisible by the number of SMs

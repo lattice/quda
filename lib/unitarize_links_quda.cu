@@ -308,7 +308,8 @@ namespace {
   } // is unitary
 
 
-  template <typename Arg> __global__ void DoUnitarizedLink(Arg arg)
+  template <typename Arg, typename... Env_>
+  __global__ void DoUnitarizedLink(Arg arg, Env_... env_)
   {
     int idx = threadIdx.x + blockIdx.x*blockDim.x;
     int parity = threadIdx.y + blockIdx.y*blockDim.y;
@@ -401,8 +402,8 @@ namespace {
       fails(fails) { }
   };
 
-  template<typename Arg>
-  __global__ void ProjectSU3kernel(Arg arg){
+  template<typename Arg, typename... Env_>
+  __global__ void ProjectSU3kernel(Arg arg, Env_... env_) {
     using real = typename Arg::Float;
     int idx = threadIdx.x + blockIdx.x*blockDim.x;
     int parity = threadIdx.y + blockIdx.y*blockDim.y;

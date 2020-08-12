@@ -110,8 +110,8 @@ namespace quda {
      NB This routines is specialized to four dimensions
      FIXME this implementation will have two-way warp divergence
   */
-  template <int nDim, bool extract, typename Arg>
-  __global__ void extractGhostKernel(Arg arg)
+  template <int nDim, bool extract, typename Arg, typename... Env_>
+  __global__ void extractGhostKernel(Arg arg, Env_... env_)
   {
     using real = typename Arg::real;
     constexpr int nColor = Arg::nColor;

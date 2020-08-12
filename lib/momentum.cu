@@ -88,8 +88,8 @@ namespace quda {
   // calculate the momentum contribution to the action.  This uses the
   // MILC convention where we subtract 4.0 from each matrix norm in
   // order to increase stability
-  template <int blockSize, typename Arg>
-  __global__ void computeMomAction(Arg arg){
+  template <int blockSize, typename Arg, typename... Env_>
+  __global__ void computeMomAction(Arg arg, Env_... env_){
     int x = threadIdx.x + blockIdx.x*blockDim.x;
     int parity = threadIdx.y;
     double action = 0.0;
@@ -194,8 +194,8 @@ namespace quda {
     }
   };
 
-  template <int blockSize, typename Float, typename Arg>
-  __global__ void UpdateMomKernel(Arg arg) {
+  template <int blockSize, typename Float, typename Arg, typename... Env_>
+  __global__ void UpdateMomKernel(Arg arg, Env_... env_) {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     int parity = threadIdx.y;
     double2 norm2 = make_double2(0.0,0.0);
@@ -298,8 +298,8 @@ namespace quda {
     }
   };
 
-  template <typename Arg>
-  __global__ void ApplyUKernel(Arg arg)
+  template <typename Arg, typename... Env_>
+  __global__ void ApplyUKernel(Arg arg, Env_... env_)
   {
     int x = blockIdx.x*blockDim.x + threadIdx.x;
     int parity = threadIdx.y;

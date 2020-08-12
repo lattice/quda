@@ -35,7 +35,8 @@ namespace quda
     }
   };
 
-  template <typename real, typename Arg> __global__ void computeColorContraction(Arg arg)
+  template <typename real, typename Arg, typename... Env_>
+  __global__ void computeColorContraction(Arg arg, Env_... env_)
   {
     int x_cb = threadIdx.x + blockIdx.x * blockDim.x;
     int parity = threadIdx.y + blockIdx.y * blockDim.y;
@@ -62,7 +63,8 @@ namespace quda
     arg.s.save(A, x_cb, parity);
   }
 
-  template <typename real, typename Arg> __global__ void computeDegrandRossiContraction(Arg arg)
+  template <typename real, typename Arg, typename... Env_>
+  __global__ void computeDegrandRossiContraction(Arg arg, Env_... env_)
   {
     int x_cb = threadIdx.x + blockIdx.x * blockDim.x;
     int parity = threadIdx.y + blockIdx.y * blockDim.y;

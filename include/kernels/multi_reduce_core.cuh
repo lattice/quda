@@ -56,11 +56,11 @@ namespace quda
     };
 
 #ifdef WARP_MULTI_REDUCE
-    template <typename real, int n, int NXZ, typename Arg>
+    template <typename real, int n, int NXZ, typename Arg, typename... Env_>
 #else
-    template <int block_size, typename real, int n, int NXZ, typename Arg>
+    template <int block_size, typename real, int n, int NXZ, typename Arg, typename... Env_>
 #endif
-    __global__ void multiReduceKernel(Arg arg)
+    __global__ void multiReduceKernel(Arg arg, Env_... env_)
     {
       // n is real numbers per thread
       using vec = vector_type<complex<real>, n/2>;

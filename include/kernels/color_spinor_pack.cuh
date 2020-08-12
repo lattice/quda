@@ -161,8 +161,8 @@ namespace quda {
     }
   }
 
-  template <typename Float, bool block_float, int Ns, int Ms, int Nc, int Mc, int nDim, int dim_threads, typename Arg>
-  __global__ void GenericPackGhostKernel(Arg arg) {
+  template <typename Float, bool block_float, int Ns, int Ms, int Nc, int Mc, int nDim, int dim_threads, typename Arg, typename... Env_>
+  __global__ void GenericPackGhostKernel(Arg arg, Env_... env_) {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     int spin_color_block = blockDim.y*blockIdx.y + threadIdx.y;
     int parity_dim_dir = blockDim.z*blockIdx.z + threadIdx.z;

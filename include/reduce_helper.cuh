@@ -66,3 +66,6 @@ namespace quda {
 #ifdef QUDA_TARGET_CPU
 #include <reduce_helper_cpu.h>
 #endif
+#ifdef QUDA_TARGET_SYCL
+#include <reduce_helper_sycl.h>
+#endif

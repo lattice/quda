@@ -106,8 +106,8 @@ namespace quda {
   /**
      Generic GPU staggered phase application
   */
-  template <typename Arg>
-  __global__ void gaugePhaseKernel(Arg arg) {
+  template <typename Arg, typename... Env_>
+  __global__ void gaugePhaseKernel(Arg arg, Env_... env_) {
     int indexCB = blockIdx.x * blockDim.x + threadIdx.x;
     if (indexCB >= arg.threads) return;
     int parity = blockIdx.y * blockDim.y + threadIdx.y;

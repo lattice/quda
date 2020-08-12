@@ -38,8 +38,8 @@ namespace quda
     /**
        Generic reduction kernel with up to four loads and three saves.
     */
-    template <int block_size, typename real, int n, typename Arg>
-    __global__ void reduceKernel(Arg arg)
+    template <int block_size, typename real, int n, typename Arg, typename... Env_>
+    __global__ void reduceKernel(Arg arg, Env_... env_)
     {
       // n is real numbers per thread
       using vec = vector_type<complex<real>, n/2>;

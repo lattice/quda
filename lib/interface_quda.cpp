@@ -381,6 +381,7 @@ static bool comms_initialized = false;
 void initCommsGridQuda(int nDim, const int *dims, QudaCommsMap func, void *fdata)
 {
   if (comms_initialized) return;
+  checkCudaErrorNoSync();
 
 #if QMP_COMMS
   initQMPComms();
@@ -424,17 +425,24 @@ void initCommsGridQuda(int nDim, const int *dims, QudaCommsMap func, void *fdata
 #endif
 
   }
+  checkCudaErrorNoSync();
   comm_init(nDim, dims, func, fdata);
+  checkCudaErrorNoSync();
   comms_initialized = true;
 }
 
 
 static void init_default_comms()
 {
+  printf("init_default_comms 1\n"); fflush(stdout);
+  checkCudaErrorNoSync();
 #if defined(QMP_COMMS)
   if (QMP_logical_topology_is_declared()) {
+    checkCudaErrorNoSync();
     int ndim = QMP_get_logical_number_of_dimensions();
+    checkCudaErrorNoSync();
     const int *dims = QMP_get_logical_dimensions();
+    checkCudaErrorNoSync();
     initCommsGridQuda(ndim, dims, nullptr, nullptr);
   } else {
     errorQuda("initQuda() called without prior call to initCommsGridQuda(),"
@@ -444,8 +452,11 @@ static void init_default_comms()
   errorQuda("When using MPI for communications, initCommsGridQuda() must be called before initQuda()");
 #else // single-GPU
   const int dims[4] = {1, 1, 1, 1};
+  printf("init_default_comms 2\n"); fflush(stdout);
+  checkCudaErrorNoSync();
   initCommsGridQuda(4, dims, nullptr, nullptr);
 #endif
+  checkCudaErrorNoSync();
 }
 
 
@@ -514,10 +525,13 @@ void initQudaDevice(int dev)
  */
 void initQudaMemory()
 {
+  checkCudaErrorNoSync();
   profileInit.TPSTART(QUDA_PROFILE_TOTAL);
   profileInit.TPSTART(QUDA_PROFILE_INIT);
+  checkCudaErrorNoSync();
 
   if (!comms_initialized) init_default_comms();
+  checkCudaErrorNoSync();
 
   device::create_context();
   createDslashEvents();
@@ -545,14 +559,18 @@ void updateR()
 
 void initQuda(int dev)
 {
+  checkCudaErrorNoSync();
   // initialize communications topology, if not already done explicitly via initCommsGridQuda()
   if (!comms_initialized) init_default_comms();
+  checkCudaErrorNoSync();
 
   // set the device that QUDA uses
   initQudaDevice(dev);
+  checkCudaErrorNoSync();
 
   // set the persistant memory allocations that QUDA uses (Blas, streams, etc.)
   initQudaMemory();
+  checkCudaErrorNoSync();
 }
 
 
