@@ -22,6 +22,7 @@ using qudaDeviceProp = hipDeviceProp;
 #define qudaMemset hipMemset
 #define qudaSuccess hipSuccess
 #define qudaErrorNotReady hipErrorNotReady
+#define qudaErrorUnknown hipErrorUnknown
 #define qudaSuccessjit hipSuccess
 #define qudaEventElapsedTime hipEventElapsedTime
 #define qudaEventDestroy hipEventDestroy
@@ -40,6 +41,7 @@ using qudaDeviceProp = hipDeviceProp;
 #define qudaMemcpyDeviceToHost hipMemcpyDeviceToHost
 #define qudaFuncSetCacheConfig hipFuncSetCacheConfig
 #define qudaFuncCachePreferL1 hipFuncCachePreferL1
+#define qudaGetErrorName hipGetErrorName
 #define qudarand hiprand
 #define qudaFree hipFree
 
@@ -69,6 +71,7 @@ using qudaDeviceProp = cudaDeviceProp;
 #define qudaMemset cudaMemset
 #define qudaSuccess cudaSuccess
 #define qudaErrorNotReady cudaErrorNotReady
+#define qudaErrorUnknown cudaErrorUnknown
 #define qudaSuccessjit CUDA_SUCCESS
 #define qudaEventElapsedTime cudaEventElapsedTime
 #define qudaEventDestroy cudaEventDestroy
@@ -87,6 +90,7 @@ using qudaDeviceProp = cudaDeviceProp;
 #define qudaMemcpyDeviceToHost cudaMemcpyDeviceToHost
 #define qudaFuncSetCacheConfig cudaFuncSetCacheConfig
 #define qudaFuncCachePreferL1 cudaFuncCachePreferL1
+#define qudaGetErrorName cudaGetErrorName
 #define qudarand curand
 #define qudaFree cudaFree
 
