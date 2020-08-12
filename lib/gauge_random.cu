@@ -5,7 +5,6 @@
 #include <gauge_field_order.h>
 #include <launch_kernel.cuh>
 #include <atomic.cuh>
-#include <cub_helper.cuh>
 #include <index_helper.cuh>
 #include <random_quda.h>
 #include <instantiate.h>

@@ -8,7 +8,7 @@
 #include <comm_quda.h>
 #include <gauge_fix_ovr_extra.h>
 #include <gauge_fix_ovr_hit_devf.cuh>
-#include <cub_helper.cuh>
+#include <reduce_helper.h>
 #include <index_helper.cuh>
 
 namespace quda {
@@ -93,6 +93,7 @@ namespace quda {
     int border[4];
 #endif
     Gauge dataOr;
+    double2 result;
     GaugeFixQualityArg(const Gauge &dataOr, const cudaGaugeField &data)
       : ReduceArg<double2>(), dataOr(dataOr) {
 
@@ -104,8 +105,8 @@ namespace quda {
       }
       threads = X[0]*X[1]*X[2]*X[3]/2;
     }
-    double getAction(){ return result_h[0].x; }
-    double getTheta(){ return result_h[0].y; }
+    double getAction(){ return result.x; }
+    double getTheta(){ return result.y; }
   };
 
 
@@ -163,7 +164,6 @@ namespace quda {
     reduce2d<blockSize,2>(argQ, data);
   }
 
-
   /**
    * @brief Tunable object for the gauge fixing quality kernel
    */
@@ -171,22 +171,19 @@ namespace quda {
   class GaugeFixQuality : TunableLocalParity {
     GaugeFixQualityArg<Gauge> argQ;
     mutable char aux_string[128]; // used as a label in the autotuner
-
-  private:
     bool tuneGridDim() const { return true; }
 
   public:
     GaugeFixQuality(GaugeFixQualityArg<Gauge> &argQ) : argQ(argQ) { }
-    ~GaugeFixQuality () { }
 
-    void apply(const qudaStream_t &stream){
+    void apply(const qudaStream_t &stream)
+    {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      argQ.result_h[0] = make_double2(0.0,0.0);
       LAUNCH_KERNEL_LOCAL_PARITY(computeFix_quality, (*this), tp, stream, argQ, Float, Gauge, gauge_dir);
-      qudaDeviceSynchronize();
-      if ( comm_size() != 1 ) comm_allreduce_array((double*)argQ.result_h, 2);
-      argQ.result_h[0].x  /= (double)(3 * gauge_dir * 2 * argQ.threads * comm_size());
-      argQ.result_h[0].y  /= (double)(3 * 2 * argQ.threads * comm_size());
+      argQ.complete(&argQ.result, stream);
+      comm_allreduce_array((double*)&argQ.result, 2);
+      argQ.result.x /= (double)(3 * gauge_dir * 2 * argQ.threads * comm_size());
+      argQ.result.y /= (double)(3 * 2 * argQ.threads * comm_size());
     }
 
     TuneKey tuneKey() const {
@@ -197,7 +194,6 @@ namespace quda {
       vol << argQ.X[3];
       sprintf(aux_string,"threads=%d,prec=%lu,gaugedir=%d",argQ.threads, sizeof(Float),gauge_dir);
       return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
-
     }
 
     long long flops() const {
@@ -209,7 +205,6 @@ namespace quda {
     }                                                                                   //no accounting the reduction!!!!
 
   };
-
 
   /**
    * @brief container to pass parameters for the gauge fixing kernel

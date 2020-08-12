@@ -268,7 +268,7 @@ namespace quda {
         complex<Float> v[spinBlock][nColor];
         if (n == 0) { // load from B on first Gram-Schmidt, otherwise V.
           complex<Float> v_[spinBlock * nColor];
-          B[j].load<spinBlock>(v_, parity, x_cb, chirality);
+          B[j].template load<spinBlock>(v_, parity, x_cb, chirality);
 #pragma unroll
           for (int s = 0; s < spinBlock; s++)
 #pragma unroll
