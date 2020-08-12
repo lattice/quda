@@ -6,6 +6,14 @@
 
 namespace quda {
 
+  // Prefetch type
+  enum class CloverPrefetchType {
+    BOTH_CLOVER_PREFETCH_TYPE,    // clover and inverse
+    CLOVER_CLOVER_PREFETCH_TYPE,  // clover only
+    INVERSE_CLOVER_PREFETCH_TYPE, // inverse clover only
+    INVALID_CLOVER_PREFETCH_TYPE = QUDA_INVALID_ENUM
+  };
+
   struct CloverFieldParam : public LatticeFieldParam {
     bool direct; // whether to create the direct clover 
     bool inverse; // whether to create the inverse clover
@@ -176,43 +184,11 @@ namespace quda {
     // computes the clover field given the input gauge field
     void compute(const cudaGaugeField &gauge);
 
-#ifdef USE_TEXTURE_OBJECTS
-    hipTextureObject_t tex;
-    hipTextureObject_t normTex;
-    hipTextureObject_t invTex;
-    hipTextureObject_t invNormTex;
-    hipTextureObject_t evenTex;
-    hipTextureObject_t evenNormTex;
-    hipTextureObject_t oddTex;
-    hipTextureObject_t oddNormTex;
-    hipTextureObject_t evenInvTex;
-    hipTextureObject_t evenInvNormTex;
-    hipTextureObject_t oddInvTex;
-    hipTextureObject_t oddInvNormTex;
-    void createTexObject(hipTextureObject_t &tex, hipTextureObject_t &texNorm, void *field, void *norm, bool full);
-    void destroyTexObject();
-#endif
-
   public:
     // create a cudaCloverField from a CloverFieldParam
     cudaCloverField(const CloverFieldParam &param);
 
     virtual ~cudaCloverField();
-
-#ifdef USE_TEXTURE_OBJECTS
-    const hipTextureObject_t& Tex() const { return tex; }
-    const hipTextureObject_t& NormTex() const { return normTex; }
-    const hipTextureObject_t& InvTex() const { return invTex; }
-    const hipTextureObject_t& InvNormTex() const { return invNormTex; }
-    const hipTextureObject_t& EvenTex() const { return evenTex; }
-    const hipTextureObject_t& EvenNormTex() const { return evenNormTex; }
-    const hipTextureObject_t& OddTex() const { return oddTex; }
-    const hipTextureObject_t& OddNormTex() const { return oddNormTex; }
-    const hipTextureObject_t& EvenInvTex() const { return evenInvTex; }
-    const hipTextureObject_t& EvenInvNormTex() const { return evenInvNormTex; }
-    const hipTextureObject_t& OddInvTex() const { return oddInvTex; }
-    const hipTextureObject_t& OddInvNormTex() const { return oddInvNormTex; }
-#endif
 
     /**
        @brief Copy into this CloverField from the generic CloverField src
@@ -234,8 +210,31 @@ namespace quda {
     */
     void saveCPUField(cpuCloverField &cpu) const;
 
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      the clover, the norm field (as appropriate), and the inverse
+      fields (as appropriate) to the CPU or the GPU.
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
+    */
+    void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      the clover, norm field and/or the inverse
+      fields as specified to the CPU or the GPU.
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in
+      @param[in] type Whether to grab the clover, inverse, or both
+      @param[in] parity Whether to grab the full clover or just the even/odd parity
+    */
+    void prefetch(QudaFieldLocation mem_space, qudaStream_t stream, CloverPrefetchType type,
+                  QudaParity parity = QUDA_INVALID_PARITY) const;
+
     friend class DiracClover;
     friend class DiracCloverPC;
+    friend class DiracTwistedClover;
+    friend class DiracTwistedCloverPC;
     friend struct FullClover;
   };
 
@@ -278,44 +277,35 @@ namespace quda {
     int stride; // stride (volume + pad)
     double rho; // rho additive factor
 
-#ifdef USE_TEXTURE_OBJECTS
-    const hipTextureObject_t &evenTex;
-    const hipTextureObject_t &evenNormTex;
-    const hipTextureObject_t &oddTex;
-    const hipTextureObject_t &oddNormTex;
-    const hipTextureObject_t& EvenTex() const { return evenTex; }
-    const hipTextureObject_t& EvenNormTex() const { return evenNormTex; }
-    const hipTextureObject_t& OddTex() const { return oddTex; }
-    const hipTextureObject_t& OddNormTex() const { return oddNormTex; }    
-#endif
-
-    FullClover(const cudaCloverField &clover, bool inverse=false) :
-    precision(clover.precision), bytes(clover.bytes), norm_bytes(clover.norm_bytes),
-      stride(clover.stride), rho(clover.rho)
-#ifdef USE_TEXTURE_OBJECTS
-	, evenTex(inverse ? clover.evenInvTex : clover.evenTex)
-	, evenNormTex(inverse ? clover.evenInvNormTex : clover.evenNormTex)
-	, oddTex(inverse ? clover.oddInvTex : clover.oddTex)
-	, oddNormTex(inverse ? clover.oddInvNormTex : clover.oddNormTex)
-#endif
-      { 
-	if (inverse) {
-	  even = clover.evenInv;
-	  evenNorm = clover.evenInvNorm;
-	  odd = clover.oddInv;	
-	  oddNorm = clover.oddInvNorm;
-	} else {
-	  even = clover.even;
-	  evenNorm = clover.evenNorm;
-	  odd = clover.odd;	
-	  oddNorm = clover.oddNorm;
-	}
+    FullClover(const cudaCloverField &clover, bool inverse = false) :
+      precision(clover.precision),
+      bytes(clover.bytes),
+      norm_bytes(clover.norm_bytes),
+      stride(clover.stride),
+      rho(clover.rho)
+    {
+      if (inverse) {
+        even = clover.evenInv;
+        evenNorm = clover.evenInvNorm;
+        odd = clover.oddInv;
+        oddNorm = clover.oddInvNorm;
+      } else {
+        even = clover.even;
+        evenNorm = clover.evenNorm;
+        odd = clover.odd;
+        oddNorm = clover.oddNorm;
+      }
     }
   };
 
-
-  // driver for computing the clover field from the gauge field
-  void computeClover(CloverField &clover, const GaugeField &gauge, double coeff,  QudaFieldLocation location);
+  /**
+     @brief Driver for computing the clover field from the field
+     strength tensor.
+     @param[out] clover Compute clover field
+     @param[in] fmunu Field strength tensor
+     @param[in] coefft Clover coefficient
+  */
+  void computeClover(CloverField &clover, const GaugeField &fmunu, double coeff);
 
 
   /**

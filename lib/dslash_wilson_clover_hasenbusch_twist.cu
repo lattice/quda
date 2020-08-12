@@ -26,7 +26,7 @@ namespace quda
     WilsonCloverHasenbuschTwist(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
       Dslash(arg, out, in) {}
 
-    void apply(const hipStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
@@ -97,16 +97,6 @@ namespace quda
                                         bool dagger, const int *comm_override, TimeProfile &profile)
   {
 #ifdef GPU_CLOVER_HASENBUSCH_TWIST
-    if (in.V() == out.V()) errorQuda("Aliasing pointers");
-    if (in.FieldOrder() != out.FieldOrder())
-      errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
-
-    // check all precisions match
-    checkPrecision(out, in, U, A);
-
-    // check all locations match
-    checkLocation(out, in, U, A);
-
     instantiate<WilsonCloverHasenbuschTwistApply>(out, in, U, A, a, b, x, parity, dagger, comm_override, profile);
 #else
     errorQuda("Clover Hasensbuch Twist dslash has not been built");

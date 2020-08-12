@@ -1,8 +1,7 @@
-#include <multigrid.h>
-#include <qio_field.h>
-#include <string.h>
+#include <cstring>
 
-#include <eigensolve_quda.h>
+#include <multigrid.h>
+#include <vector_io.h>
 
 namespace quda
 {
@@ -12,7 +11,7 @@ namespace quda
   static bool debug = false;
 
   MG::MG(MGParam &param, TimeProfile &profile_global) :
-    Solver(param, profile),
+    Solver(*param.matResidual, *param.matSmooth, *param.matSmoothSloppy, param, profile),
     param(param),
     transfer(0),
     resetTransfer(false),
@@ -89,8 +88,9 @@ namespace quda
             }
           }
           if (param.mg_global.num_setup_iter[param.level] > 0) {
-            if (strcmp(param.mg_global.vec_infile[param.level], "")
-                != 0) { // only load if infile is defined and not computing
+            if (param.mg_global.vec_load[param.level] == QUDA_BOOLEAN_TRUE
+                && strcmp(param.mg_global.vec_infile[param.level], "")
+                  != 0) { // only load if infile is defined and not computing
               loadVectors(param.B);
             } else if (param.mg_global.use_eig_solver[param.level]) {
               generateEigenVectors(); // Run the eigensolver
@@ -153,18 +153,25 @@ namespace quda
                                 param.mg_global.precision_null[param.level], profile);
         for (int i=0; i<QUDA_MAX_MG_LEVEL; i++) param.mg_global.geo_block_size[param.level][i] = param.geoBlockSize[i];
 
-        // create coarse temporary vector
-        tmp_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(), param.mg_global.location[param.level+1]);
+        // create coarse temporary vector if not already created in verify()
+        if (!tmp_coarse)
+          tmp_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(),
+                                                param.mg_global.location[param.level + 1]);
 
-        // create coarse temporary vector
-        tmp2_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(),
-                                               param.mg_global.location[param.level + 1]);
+        // create coarse temporary vector if not already created in verify()
+        if (!tmp2_coarse)
+          tmp2_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(),
+                                                 param.mg_global.location[param.level + 1]);
 
-        // create coarse residual vector
-        r_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(), param.mg_global.location[param.level+1]);
+        // create coarse residual vector if not already created in verify()
+        if (!r_coarse)
+          r_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(),
+                                              param.mg_global.location[param.level + 1]);
 
-        // create coarse solution vector
-        x_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(), param.mg_global.location[param.level+1]);
+        // create coarse solution vector if not already created in verify()
+        if (!x_coarse)
+          x_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(),
+                                              param.mg_global.location[param.level + 1]);
 
         B_coarse = new std::vector<ColorSpinorField*>();
         int nVec_coarse = std::max(param.Nvec, param.mg_global.n_vec[param.level + 1]);
@@ -186,6 +193,10 @@ namespace quda
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer operator done\n");
       }
 
+      // we no longer need the B fields for this level, can evict them to host memory
+      // (only if using managed memory and prefetching is enabled, otherwise no-op)
+      for (int i = 0; i < param.Nvec; i++) { param.B[i]->prefetch(QUDA_CPU_FIELD_LOCATION); }
+
       createCoarseDirac();
     }
 
@@ -193,7 +204,10 @@ namespace quda
     createSmoother();
 
     if (param.level < param.Nlevel-1) {
-      // creating or resetting the coarse level
+      // If enabled, verify the coarse links and fine solvers were correctly built
+      if (param.mg_global.run_verify) verify();
+
+      // creating or resetting the coarse level temporaries and solvers
       if (coarse) {
         coarse->param.updateInvertParam(*param.mg_global.invert_param);
         coarse->param.delta = 1e-20;
@@ -217,10 +231,11 @@ namespace quda
       createCoarseSolver();
     }
 
-    if (param.level == 0) {
-      // now we can run the verification if requested
-      if (param.mg_global.run_verify) verify();
-    }
+    // We're going back up the coarse construct stack now, prefetch the gauge fields on
+    // this level back to device memory.
+    diracResidual->prefetch(QUDA_CUDA_FIELD_LOCATION);
+    diracSmoother->prefetch(QUDA_CUDA_FIELD_LOCATION);
+    diracSmootherSloppy->prefetch(QUDA_CUDA_FIELD_LOCATION);
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Setup of level %d done\n", param.level);
 
@@ -663,7 +678,8 @@ namespace quda
   /**
      Verification that the constructed multigrid operator is valid
   */
-  void MG::verify() {
+  void MG::verify(bool recursively)
+  {
     pushLevel(param.level);
 
     // temporary fields used for verification
@@ -750,9 +766,31 @@ namespace quda
     }
 #endif
 
+    // We need to create temporary coarse vectors here for various verifications
+    // Otherwise these get created in the coarse `reset()` routine later
+
+    if (!tmp_coarse)
+      tmp_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(),
+                                            param.mg_global.location[param.level + 1]);
+
+    // create coarse temporary vector if not already created in verify()
+    if (!tmp2_coarse)
+      tmp2_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(),
+                                             param.mg_global.location[param.level + 1]);
+
+    // create coarse residual vector if not already created in verify()
+    if (!r_coarse)
+      r_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(),
+                                          param.mg_global.location[param.level + 1]);
+
+    // create coarse solution vector if not already created in verify()
+    if (!x_coarse)
+      x_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(),
+                                          param.mg_global.location[param.level + 1]);
+
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Checking 0 = (1 - P^\\dagger P) eta_c\n");
 
-    spinorNoise(*x_coarse, *coarse->rng, QUDA_NOISE_UNIFORM);
+    spinorNoise(*x_coarse, *rng, QUDA_NOISE_UNIFORM);
 
     transfer->P(*tmp2, *x_coarse);
     transfer->R(*r_coarse, *tmp2);
@@ -768,7 +806,7 @@ namespace quda
     zero(*tmp_coarse);
     zero(*r_coarse);
 
-    spinorNoise(*tmp_coarse, *coarse->rng, QUDA_NOISE_UNIFORM);
+    spinorNoise(*tmp_coarse, *rng, QUDA_NOISE_UNIFORM);
     transfer->P(*tmp1, *tmp_coarse);
 
     if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
@@ -796,7 +834,7 @@ namespace quda
     }
 
     transfer->R(*x_coarse, *tmp2);
-    (*param_coarse->matResidual)(*r_coarse, *tmp_coarse);
+    static_cast<DiracCoarse *>(diracCoarseResidual)->M(*r_coarse, *tmp_coarse);
 
 #if 0 // enable to print out emulated and actual coarse-grid operator vectors for debugging
     setOutputPrefix("");
@@ -958,7 +996,7 @@ namespace quda
     delete tmp2;
     delete tmp_coarse;
 
-    if (param.level < param.Nlevel - 2) coarse->verify();
+    if (recursively && param.level < param.Nlevel - 2) coarse->verify(true);
 
     popLevel(param.level);
   }
@@ -1113,7 +1151,8 @@ namespace quda
       vec_infile += std::to_string(param.level);
       vec_infile += "_nvec_";
       vec_infile += std::to_string(param.mg_global.n_vec[param.level]);
-      EigenSolver::loadVectors(B, vec_infile);
+      VectorIO io(vec_infile);
+      io.load(B);
       popLevel(param.level);
       profile_global.TPSTOP(QUDA_PROFILE_IO);
       if (is_running) profile_global.TPSTART(QUDA_PROFILE_INIT);
@@ -1134,7 +1173,8 @@ namespace quda
       vec_outfile += std::to_string(param.level);
       vec_outfile += "_nvec_";
       vec_outfile += std::to_string(param.mg_global.n_vec[param.level]);
-      EigenSolver::saveVectors(B, vec_outfile);
+      VectorIO io(vec_outfile);
+      io.save(B);
       popLevel(param.level);
       profile_global.TPSTOP(QUDA_PROFILE_IO);
       if (is_running) profile_global.TPSTART(QUDA_PROFILE_INIT);
@@ -1521,12 +1561,12 @@ namespace quda
     pushLevel(param.level);
 
     // Extract eigensolver params
-    int nConv = param.mg_global.eig_param[param.level]->nConv;
+    int n_conv = param.mg_global.eig_param[param.level]->n_conv;
     bool dagger = param.mg_global.eig_param[param.level]->use_dagger;
     bool normop = param.mg_global.eig_param[param.level]->use_norm_op;
 
     // Dummy array to keep the eigensolver happy.
-    std::vector<Complex> evals(nConv, 0.0);
+    std::vector<Complex> evals(n_conv, 0.0);
 
     std::vector<ColorSpinorField *> B_evecs;
     ColorSpinorParam csParam(*param.B[0]);
@@ -1535,7 +1575,7 @@ namespace quda
     // This is the vector precision used by matResidual
     csParam.setPrecision(param.mg_global.invert_param->cuda_prec_sloppy, QUDA_INVALID_PRECISION, true);
 
-    for (int i = 0; i < nConv; i++) B_evecs.push_back(ColorSpinorField::Create(csParam));
+    for (int i = 0; i < n_conv; i++) B_evecs.push_back(ColorSpinorField::Create(csParam));
 
     // before entering the eigen solver, lets free the B vectors to save some memory
     ColorSpinorParam bParam(*param.B[0]);

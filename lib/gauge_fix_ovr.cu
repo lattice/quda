@@ -1,4 +1,3 @@
-#include "hip/hip_runtime.h"
 #include <quda_internal.h>
 #include <quda_matrix.h>
 #include <tune_quda.h>
@@ -9,7 +8,7 @@
 #include <comm_quda.h>
 #include <gauge_fix_ovr_extra.h>
 #include <gauge_fix_ovr_hit_devf.cuh>
-#include <cub_helper.cuh>
+#include <reduce_helper.h>
 #include <index_helper.cuh>
 
 namespace quda {
@@ -94,6 +93,7 @@ namespace quda {
     int border[4];
 #endif
     Gauge dataOr;
+    double2 result;
     GaugeFixQualityArg(const Gauge &dataOr, const cudaGaugeField &data)
       : ReduceArg<double2>(), dataOr(dataOr) {
 
@@ -105,8 +105,8 @@ namespace quda {
       }
       threads = X[0]*X[1]*X[2]*X[3]/2;
     }
-    double getAction(){ return result_h[0].x; }
-    double getTheta(){ return result_h[0].y; }
+    double getAction(){ return result.x; }
+    double getTheta(){ return result.y; }
   };
 
 
@@ -164,7 +164,6 @@ namespace quda {
     reduce2d<blockSize,2>(argQ, data);
   }
 
-
   /**
    * @brief Tunable object for the gauge fixing quality kernel
    */
@@ -172,22 +171,19 @@ namespace quda {
   class GaugeFixQuality : TunableLocalParity {
     GaugeFixQualityArg<Gauge> argQ;
     mutable char aux_string[128]; // used as a label in the autotuner
-
-  private:
     bool tuneGridDim() const { return true; }
 
   public:
     GaugeFixQuality(GaugeFixQualityArg<Gauge> &argQ) : argQ(argQ) { }
-    ~GaugeFixQuality () { }
 
-    void apply(const hipStream_t &stream){
+    void apply(const qudaStream_t &stream)
+    {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      argQ.result_h[0] = make_double2(0.0,0.0);
       LAUNCH_KERNEL_LOCAL_PARITY(computeFix_quality, (*this), tp, stream, argQ, Float, Gauge, gauge_dir);
-      qudaDeviceSynchronize();
-      if ( comm_size() != 1 ) comm_allreduce_array((double*)argQ.result_h, 2);
-      argQ.result_h[0].x  /= (double)(3 * gauge_dir * 2 * argQ.threads * comm_size());
-      argQ.result_h[0].y  /= (double)(3 * 2 * argQ.threads * comm_size());
+      argQ.complete(&argQ.result, stream);
+      comm_allreduce_array((double*)&argQ.result, 2);
+      argQ.result.x /= (double)(3 * gauge_dir * 2 * argQ.threads * comm_size());
+      argQ.result.y /= (double)(3 * 2 * argQ.threads * comm_size());
     }
 
     TuneKey tuneKey() const {
@@ -198,7 +194,6 @@ namespace quda {
       vol << argQ.X[3];
       sprintf(aux_string,"threads=%d,prec=%lu,gaugedir=%d",argQ.threads, sizeof(Float),gauge_dir);
       return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
-
     }
 
     long long flops() const {
@@ -210,7 +205,6 @@ namespace quda {
     }                                                                                   //no accounting the reduction!!!!
 
   };
-
 
   /**
    * @brief container to pass parameters for the gauge fixing kernel
@@ -435,7 +429,7 @@ public:
       parity = par;
     }
 
-    void apply(const hipStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       LAUNCH_KERNEL_GAUGEFIX(computeFix, tp, stream, arg, parity, Float, Gauge, gauge_dir);
     }
@@ -699,7 +693,7 @@ public:
 
     void setParity(const int par) { parity = par; }
 
-    void apply(const hipStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       LAUNCH_KERNEL_GAUGEFIX(computeFixInteriorPoints, tp, stream, arg, parity, Float, Gauge, gauge_dir);
@@ -959,7 +953,7 @@ public:
       parity = par;
     }
 
-    void apply(const hipStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       LAUNCH_KERNEL_GAUGEFIX(computeFixBorderPoints, tp, stream, arg, parity, Float, Gauge, gauge_dir);
     }
@@ -1215,7 +1209,7 @@ public:
                                svd_rel_error, svd_abs_error);
     int num_failures = 0;
     int* num_failures_dev = static_cast<int*>(pool_device_malloc(sizeof(int)));
-    hipMemset(num_failures_dev, 0, sizeof(int));
+    qudaMemset(num_failures_dev, 0, sizeof(int));
 
     GaugeFixQualityArg<Gauge> argQ(dataOr, data);
     GaugeFixQuality<Float,Gauge, gauge_dir> GaugeFixQuality(argQ);
@@ -1233,7 +1227,7 @@ public:
     void *sendg_d[4];
     void *recvg_d[4];
     void *hostbuffer_h[4];
-    hipStream_t GFStream[9];
+    qudaStream_t GFStream[9];
     size_t offset[4];
     size_t bytes[4];
     size_t faceVolume[4];
@@ -1270,15 +1264,15 @@ public:
         recv_d[d] = device_malloc(bytes[d]);
         sendg_d[d] = device_malloc(bytes[d]);
         recvg_d[d] = device_malloc(bytes[d]);
-        hipStreamCreate(&GFStream[d]);
-        hipStreamCreate(&GFStream[4 + d]);
+        qudaStreamCreate(&GFStream[d]);
+        qudaStreamCreate(&GFStream[4 + d]);
       #ifndef GPU_COMMS
         hostbuffer_h[d] = (void*)pinned_malloc(4 * bytes[d]);
       #endif
         block[d] = dim3(128, 1, 1);
         grid[d] = dim3((faceVolumeCB[d] + block[d].x - 1) / block[d].x, 1, 1);
       }
-      hipStreamCreate(&GFStream[8]);
+      qudaStreamCreate(&GFStream[8]);
       for ( int d = 0; d < 4; d++ ) {
         if ( !commDimPartitioned(d)) continue;
       #ifdef GPU_COMMS
@@ -1313,13 +1307,13 @@ public:
 
 
     unitarizeLinks(data, data, num_failures_dev);
-    qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), hipMemcpyDeviceToHost);
+    qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), qudaMemcpyDeviceToHost);
     if ( num_failures > 0 ) {
       pool_device_free(num_failures_dev);
       errorQuda("Error in the unitarization\n");
       exit(1);
     }
-    hipMemset(num_failures_dev, 0, sizeof(int));
+    qudaMemset(num_failures_dev, 0, sizeof(int));
 
     int iter = 0;
     for ( iter = 0; iter < Nsteps; iter++ ) {
@@ -1369,11 +1363,11 @@ public:
         #else
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
-            hipMemcpyAsync(send[d], send_d[d], bytes[d], hipMemcpyDeviceToHost, GFStream[d]);
+            qudaMemcpyAsync(send[d], send_d[d], bytes[d], qudaMemcpyDeviceToHost, GFStream[d]);
           }
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
-            hipMemcpyAsync(sendg[d], sendg_d[d], bytes[d], hipMemcpyDeviceToHost, GFStream[4 + d]);
+            qudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], qudaMemcpyDeviceToHost, GFStream[4 + d]);
           }
         #endif
           //compute interior points
@@ -1390,12 +1384,12 @@ public:
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
             comm_wait(mh_recv_back[d]);
-            hipMemcpyAsync(recv_d[d], recv[d], bytes[d], hipMemcpyHostToDevice, GFStream[d]);
+            qudaMemcpyAsync(recv_d[d], recv[d], bytes[d], qudaMemcpyHostToDevice, GFStream[d]);
           }
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
             comm_wait(mh_recv_fwd[d]);
-            hipMemcpyAsync(recvg_d[d], recvg[d], bytes[d], hipMemcpyHostToDevice, GFStream[4 + d]);
+            qudaMemcpyAsync(recvg_d[d], recvg[d], bytes[d], qudaMemcpyHostToDevice, GFStream[4 + d]);
           }
         #endif
           for ( int d = 0; d < 4; d++ ) {
@@ -1434,7 +1428,7 @@ public:
             //extract top face
             Kernel_UnPackTop<NElems, Float, Gauge><<<grid[d], block[d]>>>(faceVolumeCB[d], dataexarg, reinterpret_cast<Float*>(send_d[d]), p, d, d, true);
            #ifndef GPU_COMMS
-            hipMemcpy(send[d], send_d[d], bytes[d], hipMemcpyDeviceToHost);
+            qudaMemcpy(send[d], send_d[d], bytes[d], qudaMemcpyDeviceToHost);
            #else
             qudaDeviceSynchronize();
            #endif
@@ -1442,7 +1436,7 @@ public:
             comm_wait(mh_recv_back[d]);
             comm_wait(mh_send_fwd[d]);
            #ifndef GPU_COMMS
-            hipMemcpy(recv_d[d], recv[d], bytes[d], hipMemcpyHostToDevice);
+            qudaMemcpy(recv_d[d], recv[d], bytes[d], qudaMemcpyHostToDevice);
            #endif
             //inject top face in ghost
             Kernel_UnPackGhost<NElems, Float, Gauge><<<grid[d], block[d]>>>(faceVolumeCB[d], dataexarg, reinterpret_cast<Float*>(recv_d[d]), p, d, d, false);
@@ -1453,7 +1447,7 @@ public:
             comm_start(mh_recv_fwd[d]);
             Kernel_UnPackGhost<NElems, Float, Gauge><<<grid[d], block[d]>>>(faceVolumeCB[d], dataexarg, reinterpret_cast<Float*>(sendg_d[d]), 1-p, d, d, true);
            #ifndef GPU_COMMS
-            hipMemcpy(sendg[d], sendg_d[d], bytes[d], hipMemcpyDeviceToHost);
+            qudaMemcpy(sendg[d], sendg_d[d], bytes[d], qudaMemcpyDeviceToHost);
            #else
             qudaDeviceSynchronize();
            #endif
@@ -1461,7 +1455,7 @@ public:
             comm_wait(mh_recv_fwd[d]);
             comm_wait(mh_send_back[d]);
            #ifndef GPU_COMMS
-            hipMemcpy(recvg_d[d], recvg[d], bytes[d], hipMemcpyHostToDevice);
+            qudaMemcpy(recvg_d[d], recvg[d], bytes[d], qudaMemcpyHostToDevice);
            #endif
             Kernel_UnPackTop<NElems, Float, Gauge><<<grid[d], block[d]>>>(faceVolumeCB[d], dataexarg, reinterpret_cast<Float*>(recvg_d[d]), 1-p, d, d, false);
            }
@@ -1470,9 +1464,9 @@ public:
       }
       if ((iter % reunit_interval) == (reunit_interval - 1)) {
         unitarizeLinks(data, data, num_failures_dev);
-        qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), hipMemcpyDeviceToHost);
+        qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), qudaMemcpyDeviceToHost);
         if ( num_failures > 0 ) errorQuda("Error in the unitarization\n");
-        hipMemset(num_failures_dev, 0, sizeof(int));
+        qudaMemset(num_failures_dev, 0, sizeof(int));
         flop += 4588.0 * data.X()[0]*data.X()[1]*data.X()[2]*data.X()[3];
         byte += 8.0 * data.X()[0]*data.X()[1]*data.X()[2]*data.X()[3] * dataOr.Bytes();
       }
@@ -1493,9 +1487,9 @@ public:
     }
     if ((iter % reunit_interval) != 0 )  {
       unitarizeLinks(data, data, num_failures_dev);
-      qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), hipMemcpyDeviceToHost);
+      qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), qudaMemcpyDeviceToHost);
       if ( num_failures > 0 ) errorQuda("Error in the unitarization\n");
-      hipMemset(num_failures_dev, 0, sizeof(int));
+      qudaMemset(num_failures_dev, 0, sizeof(int));
       flop += 4588.0 * data.X()[0]*data.X()[1]*data.X()[2]*data.X()[3];
       byte += 8.0 * data.X()[0]*data.X()[1]*data.X()[2]*data.X()[3] * dataOr.Bytes();
     }
@@ -1521,14 +1515,14 @@ public:
           device_free(recv_d[d]);
           device_free(sendg_d[d]);
           device_free(recvg_d[d]);
-          hipStreamDestroy(GFStream[d]);
-          hipStreamDestroy(GFStream[4 + d]);
+          qudaStreamDestroy(GFStream[d]);
+          qudaStreamDestroy(GFStream[4 + d]);
         #ifndef GPU_COMMS
           host_free(hostbuffer_h[d]);
         #endif
         }
       }
-      hipStreamDestroy(GFStream[8]);
+      qudaStreamDestroy(GFStream[8]);
     }
   #endif
     checkCudaError();

@@ -1,4 +1,3 @@
-#include "hip/hip_runtime.h"
 #include <quda_internal.h>
 #include <quda_matrix.h>
 #include <tune_quda.h>
@@ -6,7 +5,6 @@
 #include <gauge_field_order.h>
 #include <launch_kernel.cuh>
 #include <atomic.cuh>
-#include <cub_helper.cuh>
 #include <index_helper.cuh>
 #include <random_quda.h>
 #include <instantiate.h>
@@ -123,7 +121,7 @@ namespace quda {
       arg(arg),
       meta(meta) {}
 
-    void apply(const hipStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       computeGenGauss<<<tp.grid, tp.block, tp.shared_bytes>>>(arg);

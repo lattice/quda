@@ -1,6 +1,5 @@
 #include <tune_quda.h>
 #include <gauge_field.h>
-
 #include <jitify_helper.cuh>
 #include <kernels/field_strength_tensor.cuh>
 #include <instantiate.h>
@@ -20,7 +19,7 @@ public:
     Fmunu(const GaugeField &u, GaugeField &f) :
       TunableVectorYZ(2, 6),
       arg(f, u),
-      meta(f)
+      meta(u)
     {
       strcpy(aux, meta.AuxString());
       strcat(aux, comm_dim_partitioned_string());
@@ -34,7 +33,7 @@ public:
       checkCudaError();
     }
 
-    void apply(const hipStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 #ifdef JITIFY

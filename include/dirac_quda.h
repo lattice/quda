@@ -1,6 +1,4 @@
-#ifndef _DIRAC_QUDA_H
-#define _DIRAC_QUDA_H
-
+#pragma once
 #include <quda_internal.h>
 #include <color_spinor_field.h>
 #include <gauge_field.h>
@@ -16,7 +14,7 @@ namespace quda {
   // Forward declare: MG Transfer Class
   class Transfer;
 
-  // Forward declar: Dirac Op Base Class
+  // Forward declare: Dirac Op Base Class
   class Dirac;
 
   // Params for Dirac operator
@@ -30,6 +28,14 @@ namespace quda {
     int Ls;    // used by domain wall and twisted mass
     Complex b_5[QUDA_MAX_DWF_LS]; // used by mobius domain wall only
     Complex c_5[QUDA_MAX_DWF_LS]; // used by mobius domain wall only
+
+    // The EOFA parameters. See the description in InvertParam
+    double eofa_shift;
+    int eofa_pm;
+    double mq1;
+    double mq2;
+    double mq3;
+
     QudaMatPCType matpcType;
     QudaDagType dagger;
     cudaGaugeField *gauge;
@@ -101,7 +107,6 @@ namespace quda {
         printfQuda(
             "b_5[%d] = %e %e \t c_5[%d] = %e %e\n", i, b_5[i].real(), b_5[i].imag(), i, c_5[i].real(), c_5[i].imag());
     }
-
   };
 
   // This is a free function:
@@ -117,6 +122,7 @@ namespace quda {
   class DiracMatrix; // What are the differences in these classes?
   class DiracM;
   class DiracMdagM;
+  class DiracMdagMLocal;
   class DiracMMdag;
   class DiracMdag;
   //Forward declaration of multigrid Transfer class
@@ -128,6 +134,7 @@ namespace quda {
     friend class DiracMatrix;
     friend class DiracM;
     friend class DiracMdagM;
+    friend class DiracMdagMLocal;
     friend class DiracMMdag;
     friend class DiracMdag;
 
@@ -205,6 +212,17 @@ namespace quda {
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const = 0;
 
     /**
+       @brief Apply the local MdagM operator: equivalent to applying zero Dirichlet
+              boundary condition to MdagM on each rank. Depending on the number of
+              stencil steps of the fermion type, this may require additional effort
+              to include the terms that hop out of the boundary and then hop back.
+    */
+    virtual void MdagMLocal(ColorSpinorField &out, const ColorSpinorField &in) const
+    {
+      errorQuda("Not implemented!\n");
+    }
+
+    /**
         @brief Apply Mdag (daggered operator of M
     */
     void Mdag(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -213,7 +231,7 @@ namespace quda {
        @brief Apply Normal Operator
     */
     void MMdag(ColorSpinorField &out, const ColorSpinorField &in) const;
-
+    
     // required methods to use e-o preconditioning for solving full system
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
 			 ColorSpinorField &x, ColorSpinorField &b,
@@ -269,6 +287,24 @@ namespace quda {
     /** Flips value of daggered */
     void flipDagger() const { dagger = (dagger == QUDA_DAG_YES) ? QUDA_DAG_NO : QUDA_DAG_YES; }
 
+    /** @return is operator hermitian */
+    virtual bool hermitian() const { return false; }
+
+    /**
+     *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
+     *  These are pointers as opposed to references to support passing in `nullptr`.
+     *
+     *  @param gauge_in Updated gauge field
+     *  @param fat_gauge_in Updated fat links
+     *  @param long_gauge_in Updated long links
+     *  @param clover_in Updated clover field
+     */
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
+                              cudaCloverField *clover_in)
+    {
+      gauge = gauge_in;
+    }
+
     /**
      * @brief Create the coarse operator (virtual parent)
      *
@@ -286,6 +322,15 @@ namespace quda {
 
     QudaPrecision HaloPrecision() const { return halo_precision; }
     void setHaloPrecision(QudaPrecision halo_precision_) const { halo_precision = halo_precision_; }
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      the gauge field and temporary spinors to the CPU or GPU
+      as requested. Overloads may also grab a clover term
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
+    */
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
   };
 
   // Full Wilson
@@ -360,7 +405,7 @@ namespace quda {
   class DiracClover : public DiracWilson {
 
   protected:
-    cudaCloverField &clover;
+    cudaCloverField *clover;
     void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
     void initConstants();
 
@@ -386,6 +431,22 @@ namespace quda {
 			     const QudaSolutionType) const;
 
     /**
+     *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
+     *  These are pointers as opposed to references to support passing in `nullptr`.
+     *
+     *  @param gauge_in Updated gauge field
+     *  @param fat_gauge_in Updated fat links
+     *  @param long_gauge_in Updated long links
+     *  @param clover_in Updated clover field
+     */
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
+                              cudaCloverField *clover_in)
+    {
+      DiracWilson::updateFields(gauge_in, nullptr, nullptr, nullptr);
+      clover = clover_in;
+    }
+
+    /**
      * @brief Create the coarse clover operator
      *
      * @details Takes the multigrid transfer class, which knows
@@ -403,6 +464,15 @@ namespace quda {
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
 			double kappa, double mass=0., double mu=0., double mu_factor=0.) const;
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      all relevant memory fields (gauge, clover, temporary spinors)
+      to the CPU or GPU as requested
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
+    */
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
   };
 
   // Even-odd preconditioned clover
@@ -454,6 +524,17 @@ namespace quda {
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
 			double kappa, double mass=0., double mu=0., double mu_factor=0.) const;
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      all relevant memory fields (gauge, clover, temporary spinors).
+      Will only grab the inverse clover unless the clover field
+      is needed for asymmetric preconditioning
+      to the CPU or GPU as requested
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
+    */
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
   };
 
   // Full clover with Hasenbusch Twist
@@ -469,7 +550,7 @@ namespace quda {
     // Inherit these so I will comment them out
     /*
   protected:
-    cudaCloverField &clover;
+    cudaCloverField *clover;
     void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
     void initConstants();
     */
@@ -667,23 +748,80 @@ public:
       */
       bool zMobius;
 
+      double mobius_kappa_b;
+      double mobius_kappa_c;
+      double mobius_kappa;
+
+    public:
+      DiracMobius(const DiracParam &param);
+      // DiracMobius(const DiracMobius &dirac);
+      // virtual ~DiracMobius();
+      // DiracMobius& operator=(const DiracMobius &dirac);
+
+      void Dslash4(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+      void Dslash4pre(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+      void Dslash5(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+
+      void Dslash4Xpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                       const ColorSpinorField &x, const double &k) const;
+      void Dslash4preXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                          const ColorSpinorField &x, const double &k) const;
+      void Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                       const ColorSpinorField &x, const double &k) const;
+
+      virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+      virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+      virtual void prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x, ColorSpinorField &b,
+                           const QudaSolutionType) const;
+      virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
+  };
+
+  // 4d even-odd preconditioned Mobius domain wall
+  class DiracMobiusPC : public DiracMobius {
+
+  protected:
+    mutable cudaGaugeField *extended_gauge;
+
+  private:
   public:
-    DiracMobius(const DiracParam &param);
-    DiracMobius(const DiracMobius &dirac);
-    virtual ~DiracMobius();
-    DiracMobius& operator=(const DiracMobius &dirac);
+    DiracMobiusPC(const DiracParam &param);
+    DiracMobiusPC(const DiracMobiusPC &dirac);
+    virtual ~DiracMobiusPC();
+    DiracMobiusPC& operator=(const DiracMobiusPC &dirac);
 
-    void Dslash4(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-    void Dslash4pre(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-    void Dslash5(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+    void Dslash5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+    void Dslash5invXpay(ColorSpinorField &out, const ColorSpinorField &in,
+			const QudaParity parity, const ColorSpinorField &x, const double &k) const;
 
-    void Dslash4Xpay(ColorSpinorField &out, const ColorSpinorField &in,
-		     const QudaParity parity, const ColorSpinorField &x, const double &k) const;
-    void Dslash4preXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-			const ColorSpinorField &x, const double &k) const;
-    void Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in,
-		     const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    void MdagMLocal(ColorSpinorField &out, const ColorSpinorField &in) const;
 
+    void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+    void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+    void prepare(ColorSpinorField* &src, ColorSpinorField* &sol, ColorSpinorField &x, 
+		 ColorSpinorField &b, const QudaSolutionType) const;
+    void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
+  };
+
+
+  // Full OverlapWilson
+  class DiracOverlapWilson : public DiracWilson {
+
+  protected:
+    void initConstants();
+
+  public:
+    DiracOverlapWilson(const DiracParam &param);
+    DiracOverlapWilson(const DiracOverlapWilson &dirac);
+    DiracOverlapWilson(const DiracParam &param, const int nDims);//to correctly adjust face for DW and non-deg twisted mass   
+  
+    virtual ~DiracOverlapWilson();
+    DiracOverlapWilson& operator=(const DiracOverlapWilson &dirac);
+
+    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
+			const QudaParity parity) const;
+    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
+			    const QudaParity parity, const ColorSpinorField &x, const double &k) const;
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
@@ -692,31 +830,89 @@ public:
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
+
+    void H(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    void Hprepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+		  ColorSpinorField &x, ColorSpinorField &b,
+		  const QudaSolutionType) const;
+    void Hreconstruct(ColorSpinorField &x, const ColorSpinorField &b,
+		      const QudaSolutionType) const;
+    
   };
 
-  // 4d Even-odd preconditioned Mobius domain wall
-  class DiracMobiusPC : public DiracMobius {
-
-  protected:
+  // Even-odd preconditioned OverlapWilson
+  class DiracOverlapWilsonPC : public DiracOverlapWilson {
 
   private:
 
   public:
-    DiracMobiusPC(const DiracParam &param);
-    DiracMobiusPC(const DiracMobiusPC &dirac);
-    virtual ~DiracMobiusPC();
-    DiracMobiusPC& operator=(const DiracMobiusPC &dirac);
+    DiracOverlapWilsonPC(const DiracParam &param);
+    DiracOverlapWilsonPC(const DiracOverlapWilsonPC &dirac);
+    virtual ~DiracOverlapWilsonPC();
+    DiracOverlapWilsonPC& operator=(const DiracOverlapWilsonPC &dirac);
 
-    void Dslash5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+    void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+    void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
-    void Dslash5invXpay(ColorSpinorField &out, const ColorSpinorField &in,
-			const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+		 ColorSpinorField &x, ColorSpinorField &b,
+		 const QudaSolutionType) const;
+    void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
+		     const QudaSolutionType) const;
+  };
+
+  // Full Mobius EOFA
+  class DiracMobiusEofa : public DiracMobius
+  {
+
+  protected:
+    // The EOFA parameters
+    double m5inv_fac = 0.;
+    double sherman_morrison_fac = 0.;
+    double eofa_shift;
+    int eofa_pm;
+    double mq1;
+    double mq2;
+    double mq3;
+    double eofa_u[QUDA_MAX_DWF_LS];
+    double eofa_x[QUDA_MAX_DWF_LS];
+    double eofa_y[QUDA_MAX_DWF_LS];
+
+  public:
+    DiracMobiusEofa(const DiracParam &param);
+
+    void m5_eofa(ColorSpinorField &out, const ColorSpinorField &in) const;
+    void m5_eofa_xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double a = -1.) const;
+
+    virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+    virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    virtual void prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x, ColorSpinorField &b,
+                         const QudaSolutionType) const;
+    virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
+  };
+
+  // 4d Even-odd preconditioned Mobius domain wall with EOFA
+  class DiracMobiusEofaPC : public DiracMobiusEofa
+  {
+
+  public:
+    DiracMobiusEofaPC(const DiracParam &param);
+
+    void m5inv_eofa(ColorSpinorField &out, const ColorSpinorField &in) const;
+    void m5inv_eofa_xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
+                         double a = -1.) const;
 
 
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
-    void prepare(ColorSpinorField* &src, ColorSpinorField* &sol, ColorSpinorField &x, 
-		 ColorSpinorField &b, const QudaSolutionType) const;
+
+    void full_dslash(ColorSpinorField &out,
+                     const ColorSpinorField &in) const; // ye = Mee * xe + Meo * xo, yo = Moo * xo + Moe * xe
+
+    void prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x, ColorSpinorField &b,
+                 const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
   };
 
@@ -818,7 +1014,7 @@ public:
   protected:
     double mu;
     double epsilon;
-    cudaCloverField &clover;
+    cudaCloverField *clover;
     void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
     void twistedCloverApply(ColorSpinorField &out, const ColorSpinorField &in, 
           const QudaTwistGamma5Type twistType, const int parity) const;
@@ -847,6 +1043,22 @@ public:
     double Mu() const { return mu; }
 
     /**
+     *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
+     *  These are pointers as opposed to references to support passing in `nullptr`.
+     *
+     *  @param gauge_in Updated gauge field
+     *  @param fat_gauge_in Updated fat links
+     *  @param long_gauge_in Updated long links
+     *  @param clover_in Updated clover field
+     */
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
+                              cudaCloverField *clover_in)
+    {
+      DiracWilson::updateFields(gauge_in, nullptr, nullptr, nullptr);
+      clover = clover_in;
+    }
+
+    /**
      * @brief Create the coarse twisted-clover operator
      *
      * @details Takes the multigrid transfer class, which knows
@@ -867,6 +1079,15 @@ public:
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
 			double kappa, double mass, double mu, double mu_factor=0.) const;
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      all relevant memory fields (gauge, clover, temporary spinors)
+      to the CPU or GPU as requested
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
+    */
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
   };
 
   // Even-odd preconditioned twisted mass with a clover term
@@ -911,6 +1132,17 @@ public:
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
 			double kappa, double mass, double mu, double mu_factor=0.) const;
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      all relevant memory fields (gauge, clover, temporary spinors).
+      Will only grab the inverse clover unless the clover field
+      is needed for asymmetric preconditioning
+      to the CPU or GPU as requested
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
+    */
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
   };
 
   // Full staggered
@@ -982,14 +1214,16 @@ public:
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
+
+    virtual bool hermitian() const { return true; }
   };
 
   // Full staggered
   class DiracImprovedStaggered : public Dirac {
 
   protected:
-    cudaGaugeField &fatGauge;
-    cudaGaugeField &longGauge;
+    cudaGaugeField *fatGauge;
+    cudaGaugeField *longGauge;
 
   public:
     DiracImprovedStaggered(const DiracParam &param);
@@ -1011,6 +1245,14 @@ public:
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
+
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
+                              cudaCloverField *clover_in)
+    {
+      Dirac::updateFields(fat_gauge_in, nullptr, nullptr, nullptr);
+      fatGauge = fat_gauge_in;
+      longGauge = long_gauge_in;
+    }
 
     /**
      * @brief Create the coarse staggered operator.
@@ -1035,6 +1277,15 @@ public:
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu = 0.,
                         double mu_factor = 0.) const;
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      all relevant memory fields (fat+long links, temporary spinors)
+      to the CPU or GPU as requested
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
+    */
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
   };
 
   // Even-odd preconditioned staggered
@@ -1056,7 +1307,62 @@ public:
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
+
+    virtual bool hermitian() const { return true; }
   };
+
+  class DiracOverlapWilson : public DiracWilson {
+  
+  protected:
+    void initConstants();
+    //double kappa /*defined in Dirac*/
+    double rho;
+    double prec0;
+    std::vector<ColorSpinorField*> hw_evec;
+    std::vector<double> hw_eval;
+    std::vector<std::vector<double> > coef;
+    std::vector<int> hw_size;
+    
+  public:
+  
+    std::vector<double> &Coef(int i) {return coef[i];};
+    ColorSpinorField &Hw_evec(int i) {return *hw_evec[i];}
+    double Hw_eval(int i) {return hw_eval[i];}
+    double Rho() { return rho;}
+    void set_prec(double prec) {prec0=prec;}
+    
+    DiracOverlapWilson(const DiracParam &param);
+    DiracOverlapWilson(const DiracOverlapWilson &dirac);
+ 
+    virtual ~DiracOverlapWilson();
+    DiracOverlapWilson& operator=(const DiracOverlapWilson &dirac);
+ 
+    virtual void Kernel(ColorSpinorField &out, const ColorSpinorField &in) const;
+    virtual void KernelSq_scaled(ColorSpinorField &out, ColorSpinorField &in,double cut) const;
+    virtual void general_dov(ColorSpinorField &out, const ColorSpinorField &in,
+         double k0, double k1,double k2,double prec, const QudaParity parity) const;
+    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
+                           double prec, const QudaParity parity=QUDA_INVALID_PARITY) const;
+    virtual void M(ColorSpinorField &out, const ColorSpinorField &in, double mass,double prec) const;
+    virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in,double mass,int chirality,double prec) const;
+ 
+    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
+                       const QudaParity parity) const {Dslash(out,in,prec0,parity);}
+    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
+                           const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const {M(out,in,mass,prec0);}
+    virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+    
+ 
+    virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+                        ColorSpinorField &x, ColorSpinorField &b,
+                        const QudaSolutionType) const;
+    virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
+                            const QudaSolutionType) const;
+ 
+  };
+
+
 
   /**
      This class serves as a front-end to the coarse Dslash operator,
@@ -1197,6 +1503,13 @@ public:
 
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
 
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
+                              cudaCloverField *clover_in)
+    {
+      Dirac::updateFields(gauge_in, nullptr, nullptr, nullptr);
+      warningQuda("Coarse gauge links cannot be trivially updated for DiracCoarse(PC). Perform an MG update instead.");
+    }
+
     /**
      * @brief Create the coarse operator from this coarse operator
      *
@@ -1222,6 +1535,14 @@ public:
      */
     void createPreconditionedCoarseOp(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X);
 
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      all relevant memory fields (X, Y)
+      to the CPU or GPU as requested
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
+    */
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
   };
 
   /**
@@ -1269,6 +1590,15 @@ public:
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
 			double kappa, double mass, double mu, double mu_factor=0.) const;
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      all relevant memory fields (Xhat, Y)
+      to the CPU or GPU as requested
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
+    */
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
   };
 
 
@@ -1297,6 +1627,7 @@ public:
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
+    virtual bool hermitian() const { return true; }
   };
 
   /**
@@ -1317,6 +1648,7 @@ public:
 		 ColorSpinorField &x, ColorSpinorField &b,
 		 const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
+    virtual bool hermitian() const { return true; }
   };
 
   /**
@@ -1393,6 +1725,8 @@ public:
 	      Type() == typeid(DiracImprovedStaggered).name()) ? true : false;
     }
 
+    virtual bool hermitian() const { return dirac->hermitian(); }
+
     const Dirac *Expose() const { return dirac; }
 
     //! Shift term added onto operator (M/M^dag M/M M^dag + shift)
@@ -1459,8 +1793,6 @@ public:
     DiracMdagM(const Dirac &d) : DiracMatrix(d) { }
     DiracMdagM(const Dirac *d) : DiracMatrix(d) { }
 
-    
-
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
     {
       dirac->MdagM(out, in);
@@ -1490,10 +1822,47 @@ public:
     {
       return 2*dirac->getStencilSteps(); // 2 for M and M dagger
     }
+
+    virtual bool hermitian() const { return true; } // normal op is always Hermitian
+  };
+
+  /* Gloms onto a DiracOp and provides an operator() which applies its MdagMLocal */
+  class DiracMdagMLocal : public DiracMatrix
+  {
+
+  public:
+    DiracMdagMLocal(const Dirac &d) : DiracMatrix(d) { }
+    DiracMdagMLocal(const Dirac *d) : DiracMatrix(d) { }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in) const { dirac->MdagMLocal(out, in); }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
+    {
+      dirac->tmp1 = &tmp;
+      dirac->MdagMLocal(out, in);
+      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
+      dirac->tmp1 = NULL;
+    }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
+    {
+      dirac->tmp1 = &Tmp1;
+      dirac->tmp2 = &Tmp2;
+      dirac->MdagMLocal(out, in);
+      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
+      dirac->tmp2 = NULL;
+      dirac->tmp1 = NULL;
+    }
+
+    int getStencilSteps() const
+    {
+      return 2 * dirac->getStencilSteps(); // 2 for M and M dagger
+    }
   };
 
   /* Gloms onto a DiracMatrix and provides an operator() forward to its MMdag method */
-  class DiracMMdag : public DiracMatrix {
+  class DiracMMdag : public DiracMatrix
+  {
 
   public:
     DiracMMdag(const Dirac &d) : DiracMatrix(d) { }
@@ -1528,6 +1897,8 @@ public:
     {
       return 2*dirac->getStencilSteps(); // 2 for M and M dagger
     }
+
+    virtual bool hermitian() const { return true; } // normal op is always Hermitian
   };
 
   /* Gloms onto a DiracMatrix and provides an  operator() for its Mdag method */
@@ -1607,57 +1978,26 @@ public:
     }
   };
 
- class DiracOverlapWilson : public DiracWilson {
+  /**
+   * Create the Dirac operator
+   * @param[in/out] d        User prec
+   * @param[in/out] dSloppy  Sloppy prec
+   * @param[in/out] dPre     Preconditioner prec
+   * @param[in] param        Invert param container
+   * @param[in] pc_solve     Whether or not to perform an even/odd preconditioned solve
+   */
+  void createDirac(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, QudaInvertParam &param, const bool pc_solve);
 
-  protected:
-    void initConstants();
-    //double kappa /*defined in Dirac*/
-    double rho;
-    double prec0;
-    std::vector<ColorSpinorField*> hw_evec;
-    std::vector<double> hw_eval;
-    std::vector<std::vector<double> > coef;
-    std::vector<int> hw_size;
-    
-  public:
-  
-    std::vector<double> &Coef(int i) {return coef[i];};
-    ColorSpinorField &Hw_evec(int i) {return *hw_evec[i];}
-    double Hw_eval(int i) {return hw_eval[i];}
-    double Rho() { return rho;}
-    void set_prec(double prec) {prec0=prec;}
-    
-    DiracOverlapWilson(const DiracParam &param);
-    DiracOverlapWilson(const DiracOverlapWilson &dirac);
-
-    virtual ~DiracOverlapWilson();
-    DiracOverlapWilson& operator=(const DiracOverlapWilson &dirac);
-
-    virtual void Kernel(ColorSpinorField &out, const ColorSpinorField &in) const;
-    virtual void KernelSq_scaled(ColorSpinorField &out, ColorSpinorField &in,double cut) const;
-    virtual void general_dov(ColorSpinorField &out, const ColorSpinorField &in,
-         double k0, double k1,double k2,double prec, const QudaParity parity) const;
-    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
-                           double prec, const QudaParity parity=QUDA_INVALID_PARITY) const;
-    virtual void M(ColorSpinorField &out, const ColorSpinorField &in, double mass,double prec) const;
-    virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in,double mass,int chirality,double prec) const;
-
-    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
-			const QudaParity parity) const {Dslash(out,in,prec0,parity);}
-    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
-			    const QudaParity parity, const ColorSpinorField &x, const double &k) const;
-    virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const {M(out,in,mass,prec0);}
-    virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
-    
-
-    virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			 ColorSpinorField &x, ColorSpinorField &b,
-			 const QudaSolutionType) const;
-    virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-			     const QudaSolutionType) const;
-
-  };
+  /**
+   * Create the Dirac operator
+   * @param[in/out] d        User prec
+   * @param[in/out] dSloppy  Sloppy prec
+   * @param[in/out] dPre     Preconditioner prec
+   * @param[in] dRef         Refine prec (EigCG and deflation)
+   * @param[in] param        Invert param container
+   * @param[in] pc_solve     Whether or not to perform an even/odd preconditioned solve
+   */
+  void createDirac(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dRef, QudaInvertParam &param, const bool pc_solve);
 
 } // namespace quda
 
-#endif // _DIRAC_QUDA_H

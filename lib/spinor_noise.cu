@@ -1,4 +1,3 @@
-#include "hip/hip_runtime.h"
 /*
   Spinor reordering and copying routines.  These are implemented to
   un on both CPU and GPU.  Here we are templating on the following:
@@ -102,7 +101,7 @@ namespace quda {
       strcat(aux, meta.Location()==QUDA_CUDA_FIELD_LOCATION ? ",GPU" : ",CPU");
     }
 
-    void apply(const hipStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       SpinorNoiseGPU<real, Ns, Nc, type><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
     }

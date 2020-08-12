@@ -44,7 +44,7 @@ namespace quda
       if (shared) TunableVectorY::resizeStep(2); // this will force flavor to be contained in the block
     }
 
-    void apply(const hipStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
@@ -128,16 +128,6 @@ namespace quda
       const int *comm_override, TimeProfile &profile)
   {
 #ifdef GPU_NDEG_TWISTED_MASS_DIRAC
-    if (in.V() == out.V()) errorQuda("Aliasing pointers");
-    if (in.FieldOrder() != out.FieldOrder())
-      errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
-
-    // check all precisions match
-    checkPrecision(out, in, x, U);
-
-    // check all locations match
-    checkLocation(out, in, x, U);
-
     // with symmetric dagger operator we must use kernel packing
     if (dagger && !asymmetric) pushKernelPackT(true);
 

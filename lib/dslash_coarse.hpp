@@ -4,7 +4,6 @@
 #include <worker.h>
 #include <tune_quda.h>
 
-
 #include <jitify_helper.cuh>
 #include <kernels/dslash_coarse.cuh>
 
@@ -214,7 +213,7 @@ namespace quda {
       }
     }
 
-    inline void apply(const hipStream_t &stream)
+    inline void apply(const qudaStream_t &stream)
     {
       if (out.Location() == QUDA_CPU_FIELD_LOCATION) {
 
@@ -313,12 +312,12 @@ namespace quda {
 
     void preTune() {
       saveOut = new char[out.Bytes()];
-      hipMemcpy(saveOut, out.V(), out.Bytes(), hipMemcpyDeviceToHost);
+      qudaMemcpy(saveOut, out.V(), out.Bytes(), qudaMemcpyDeviceToHost);
     }
 
     void postTune()
     {
-      hipMemcpy(out.V(), saveOut, out.Bytes(), hipMemcpyHostToDevice);
+      qudaMemcpy(out.V(), saveOut, out.Bytes(), qudaMemcpyHostToDevice);
       delete[] saveOut;
     }
 
@@ -654,7 +653,8 @@ namespace quda {
 
    virtual ~DslashCoarsePolicyTune() { setPolicyTuning(false); }
 
-   inline void apply(const hipStream_t &stream) {
+   inline void apply(const qudaStream_t &stream)
+   {
      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
      if (tp.aux.x >= (int)policies.size()) errorQuda("Requested policy that is outside of range");

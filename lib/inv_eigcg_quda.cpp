@@ -21,9 +21,8 @@
 
 #include <deflation.h>
 
-
 /*
-Based on  eigCG(nev, m) algorithm:
+Based on  eigCG(n_ev, m) algorithm:
 A. Stathopolous and K. Orginos, arXiv:0707.0131
 */
 
@@ -170,7 +169,7 @@ namespace quda {
      //2. Construct H = QH*Tm*Q :
      args.H2k = Q2k.adjoint()*args.Tm*Q2k;
 
-     /* solve the small evecm1 2nev x 2nev eigenproblem */
+     /* solve the small evecm1 2n_ev x 2n_ev eigenproblem */
      SelfAdjointEigenSolver<MatrixXcd> es_h2k(args.H2k);
      Block<MatrixXcd>(args.ritzVecs.derived(), 0, 0, m, 2*k) = Q2k * es_h2k.eigenvectors();
      args.Tmvals.segment(0,2*k) = es_h2k.eigenvalues();//this is ok
@@ -199,10 +198,10 @@ namespace quda {
      magma_Xheev(evecm1, (m-1), m, evalm, sizeof(Complex));
      // fill 0s in mth element of old evecs:
      for(int l = 1; l <= m ; l++) evecm1[l*m-1] = 0.0 ;
-     // Attach the first nev old evecs at the end of the nev latest ones:
+     // Attach the first n_ev old evecs at the end of the n_ev latest ones:
      memcpy(&evecm[k*m], evecm1, k*m*sizeof(Complex));
-//?
-    // Orthogonalize the 2*nev (new+old) vectors evecm=QR:
+     //?
+     // Orthogonalize the 2*n_ev (new+old) vectors evecm=QR:
 
      MatrixXcd Q2k(MatrixXcd::Identity(m, 2*k));
      HouseholderQR<MatrixXcd> ritzVecs2k_qr( Map<MatrixXcd, Unaligned >(args.ritzVecs.data(), m, 2*k) );
@@ -211,7 +210,7 @@ namespace quda {
      //2. Construct H = QH*Tm*Q :
      args.H2k = Q2k.adjoint()*args.Tm*Q2k;
 
-     /* solve the small evecm1 2nev x 2nev eigenproblem */
+     /* solve the small evecm1 2n_ev x 2n_ev eigenproblem */
      SelfAdjointEigenSolver<MatrixXcd> es_h2k(args.H2k);
      Block<MatrixXcd>(args.ritzVecs.derived(), 0, 0, m, 2*k) = Q2k * es_h2k.eigenvectors();
      args.Tmvals.segment(0,2*k) = es_h2k.eigenvalues();//this is ok
@@ -267,17 +266,17 @@ namespace quda {
   }
 
 
-  IncEigCG::IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(nullptr), Kparam(param), Vm(nullptr), r_pre(nullptr), p_pre(nullptr), eigcg_args(nullptr), profile(profile), init(false)
+  IncEigCG::IncEigCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
+    Solver(mat, matSloppy, matPrecon, param, profile), K(nullptr), Kparam(param), Vm(nullptr), r_pre(nullptr), p_pre(nullptr), eigcg_args(nullptr), profile(profile), init(false)
   {
 
-    if (2 * param.nev >= param.m)
+    if (2 * param.n_ev >= param.m)
       errorQuda(
-        "Incorrect number of the requested low modes: m= %d while nev=%d (note that 2*nev must be less then m).",
-        param.m, param.nev);
+        "Incorrect number of the requested low modes: m= %d while n_ev=%d (note that 2*n_ev must be less then m).",
+        param.m, param.n_ev);
 
     if (param.rhs_idx < param.deflation_grid)
-      printfQuda("\nInitialize eigCG(m=%d, nev=%d) solver.", param.m, param.nev);
+      printfQuda("\nInitialize eigCG(m=%d, n_ev=%d) solver.", param.m, param.n_ev);
     else {
       printfQuda("\nDeflation space is complete, running initCG solver.");
       fillInitCGSolverParam(Kparam, param);
@@ -418,7 +417,7 @@ namespace quda {
     ColorSpinorParam csParam(x);
 
     if (!init) {
-      eigcg_args = new EigCGArgs(param.m, param.nev);//need only deflation meta structure
+      eigcg_args = new EigCGArgs(param.m, param.n_ev); // need only deflation meta structure
 
       csParam.create = QUDA_COPY_FIELD_CREATE;
       rp = ColorSpinorField::Create(b, csParam);
@@ -738,9 +737,9 @@ namespace quda {
 
        bool update_ritz = !dcg_cycle && (eigcg_args->restarts > 1) && !defl.is_complete(); //too uglyyy
 
-       if( update_ritz ) { 
+       if( update_ritz ) {
 
-         defl.increment(*Vm, param.nev);
+         defl.increment(*Vm, param.n_ev);
          logical_rhs_id += 1;
 
          dcg_cycle = (logical_rhs_id >= max_eigcg_cycles);
@@ -787,9 +786,9 @@ namespace quda {
        if(Vm) delete Vm;//safe some space
        Vm = nullptr;
 
-       const int max_nev = defl.size();//param.m;
-       printfQuda("\nRequested to reserve %d eigenvectors with max tol %le.\n", max_nev, param.eigenval_tol);
-       defl.reduce(param.eigenval_tol, max_nev);
+       const int max_n_ev = defl.size(); // param.m;
+       printfQuda("\nRequested to reserve %d eigenvectors with max tol %le.\n", max_n_ev, param.eigenval_tol);
+       defl.reduce(param.eigenval_tol, max_n_ev);
      }
      return;
   }

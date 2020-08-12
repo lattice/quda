@@ -1,4 +1,3 @@
-#include "hip/hip_runtime.h"
 #include <gauge_field_order.h>
 #include <comm_quda.h>
 #include <complex_quda.h>
@@ -130,12 +129,12 @@ namespace quda {
     GaugePhase(Arg &arg, const GaugeField &meta)
       : TunableVectorY(2), arg(arg), meta(meta) { }
 
-    void apply(const hipStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       gaugePhaseKernel<Arg> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
     }
 
-    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
 
     void preTune() { arg.u.save(); }
     void postTune() { arg.u.load(); }

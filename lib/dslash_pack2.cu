@@ -193,7 +193,7 @@ public:
     virtual ~Pack() {}
 
     template <typename T, typename Arg>
-    inline void launch(T *f, const TuneParam &tp, Arg &arg, const hipStream_t &stream)
+    inline void launch(T *f, const TuneParam &tp, Arg &arg, const qudaStream_t &stream)
     {
       if (deviceProp.major >= 7) { // enable max shared memory mode on GPUs that support it
         this->setMaxDynamicSharedBytesPerBlock(f);
@@ -202,10 +202,10 @@ public:
 //      void *args[] = {&arg};
 //      qudaLaunchKernel((const void *)f, tp.grid, tp.block, args, tp.shared_bytes, stream);
        f<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-       hipDeviceSynchronize();
+       qudaDeviceSynchronize();
     }
 
-    void apply(const hipStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
@@ -346,7 +346,7 @@ public:
 
   template <typename Float, int nColor>
   void PackGhost(void *ghost[], const ColorSpinorField &in, MemoryLocation location, int nFace, bool dagger, int parity,
-                 bool spin_project, double a, double b, double c, const hipStream_t &stream)
+                 bool spin_project, double a, double b, double c, const qudaStream_t &stream)
   {
     if (spin_project) {
       Pack<Float, nColor, true> pack(ghost, in, location, nFace, dagger, parity, a, b, c);
@@ -360,7 +360,7 @@ public:
   // template on the number of colors
   template <typename Float>
   void PackGhost(void *ghost[], const ColorSpinorField &in, MemoryLocation location, int nFace, bool dagger, int parity,
-                 bool spin_project, double a, double b, double c, const hipStream_t &stream)
+                 bool spin_project, double a, double b, double c, const qudaStream_t &stream)
   {
     if (in.Ncolor() == 3) {
       PackGhost<Float, 3>(ghost, in, location, nFace, dagger, parity, spin_project, a, b, c, stream);
@@ -371,7 +371,7 @@ public:
 
   // Pack the ghost for the Dslash operator
   void PackGhost(void *ghost[2 * QUDA_MAX_DIM], const ColorSpinorField &in, MemoryLocation location, int nFace,
-                 bool dagger, int parity, bool spin_project, double a, double b, double c, const hipStream_t &stream)
+                 bool dagger, int parity, bool spin_project, double a, double b, double c, const qudaStream_t &stream)
   {
     int nDimPack = 0;
     for (int d = 0; d < 4; d++) {

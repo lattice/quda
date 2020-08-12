@@ -1,4 +1,3 @@
-#include "hip/hip_runtime.h"
 #include <quda_internal.h>
 #include <quda_matrix.h>
 #include <tune_quda.h>
@@ -186,7 +185,7 @@ namespace quda {
       }
       virtual ~CloverSigmaTrace() {;}
 
-      void apply(const hipStream_t &stream){
+      void apply(const qudaStream_t &stream){
         if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
 	  TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
           cloverSigmaTraceKernel<Float,Arg><<<tp.grid,tp.block,0>>>(arg);

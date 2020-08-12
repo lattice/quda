@@ -11,9 +11,9 @@ namespace quda {
 
     Arg &arg;
     const GaugeField &meta;
-
-  private:
     bool tuneGridDim() const { return true; }
+    unsigned int minGridSize() const { return maxGridSize() / 8; }
+    int gridStep() const { return minGridSize(); }
 
   public:
     GaugePlaq(Arg &arg, const GaugeField &meta) :
@@ -27,7 +27,7 @@ namespace quda {
       strcpy(aux,compile_type_str(meta));
     }
 
-    void apply(const hipStream_t &stream){
+    void apply(const qudaStream_t &stream){
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION){
 	for (int i=0; i<2; i++) ((double*)arg.result_h)[i] = 0.0;
         int maxThreadsPerBlock_tmp=deviceProp.maxThreadsPerBlock;
@@ -58,9 +58,9 @@ namespace quda {
       GaugePlaqArg<Float, nColor, recon> arg(U);
       GaugePlaq<decltype(arg)> gaugePlaq(arg, U);
       gaugePlaq.apply(0);
-      qudaDeviceSynchronize();
-      comm_allreduce_array((double*)arg.result_h, 2);
-      for (int i=0; i<2; i++) ((double*)&plq)[i] = ((double*)arg.result_h)[i] / (9.*2*arg.threads*comm_size());
+      arg.complete(&plq);
+      comm_allreduce_array((double*)&plq, 2);
+      for (int i = 0; i < 2; i++) ((double*)&plq)[i] /= 9.*2*arg.threads*comm_size();
     }
   };
 

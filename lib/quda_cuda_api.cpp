@@ -28,7 +28,6 @@ namespace quda {
 
   class QudaMem : public Tunable
   {
-
     void *dst;
     const void *src;
     const size_t count;
@@ -95,10 +94,12 @@ namespace quda {
       strcat(aux, line);
     }
 
-    inline void apply(const hipStream_t &stream) {
+    inline void apply(const qudaStream_t &stream)
+    {
       tuneLaunch(*this, getTuning(), getVerbosity());
       if (copy) {
         if (async) {
+#if defined(__HIP__)
 #ifdef USE_DRIVER_API
         switch (kind) {
         case hipMemcpyDeviceToHost:
@@ -114,8 +115,45 @@ namespace quda {
           errorQuda("Unsupported cuMemcpyTypeAsync %d", kind);
         }
 #else
-        PROFILE(hipMemcpyAsync(dst, src, count, kind, stream),
-                kind == hipMemcpyDeviceToHost ? QUDA_PROFILE_MEMCPY_D2H_ASYNC : QUDA_PROFILE_MEMCPY_H2D_ASYNC);
+          QudaProfileType type;
+          switch (kind) {
+          case hipMemcpyDeviceToHost: type = QUDA_PROFILE_MEMCPY_D2H_ASYNC; break;
+          case hipMemcpyHostToDevice: type = QUDA_PROFILE_MEMCPY_H2D_ASYNC; break;
+          case hipMemcpyDeviceToDevice: type = QUDA_PROFILE_MEMCPY_D2D_ASYNC; break;
+          default: errorQuda("Unsupported cudaMemcpyTypeAsync %d", kind);
+          }
+
+          PROFILE(hipMemcpyAsync(dst, src, count, kind, stream), type);
+#endif
+#else
+#ifdef USE_DRIVER_API
+          switch (kind) {
+          case cudaMemcpyDeviceToHost:
+            PROFILE(cuMemcpyDtoHAsync(dst, (CUdeviceptr)src, count, stream), QUDA_PROFILE_MEMCPY_D2H_ASYNC);
+            break;
+          case cudaMemcpyHostToDevice:
+            PROFILE(cuMemcpyHtoDAsync((CUdeviceptr)dst, src, count, stream), QUDA_PROFILE_MEMCPY_H2D_ASYNC);
+            break;
+          case cudaMemcpyDeviceToDevice:
+            PROFILE(cuMemcpyDtoDAsync((CUdeviceptr)dst, (CUdeviceptr)src, count, stream), QUDA_PROFILE_MEMCPY_D2D_ASYNC);
+            break;
+          case cudaMemcpyDefault:
+            PROFILE(cuMemcpyAsync((CUdeviceptr)dst, (CUdeviceptr)src, count, stream), QUDA_PROFILE_MEMCPY_DEFAULT_ASYNC);
+            break;
+          default: errorQuda("Unsupported cuMemcpyTypeAsync %d", kind);
+          }
+#else
+          QudaProfileType type;
+          switch (kind) {
+          case cudaMemcpyDeviceToHost: type = QUDA_PROFILE_MEMCPY_D2H_ASYNC; break;
+          case cudaMemcpyHostToDevice: type = QUDA_PROFILE_MEMCPY_H2D_ASYNC; break;
+          case cudaMemcpyDeviceToDevice: type = QUDA_PROFILE_MEMCPY_D2D_ASYNC; break;
+          case cudaMemcpyDefault: type = QUDA_PROFILE_MEMCPY_DEFAULT_ASYNC; break;
+          default: errorQuda("Unsupported cudaMemcpyTypeAsync %d", kind);
+          }
+
+          PROFILE(cudaMemcpyAsync(dst, src, count, kind, stream), type);
+#endif
 #endif
         } else {
 #ifdef USE_DRIVER_API
@@ -171,7 +209,7 @@ namespace quda {
       errorQuda("(CUDA) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
   }
 
-  void qudaMemcpyAsync_(void *dst, const void *src, size_t count, hipMemcpyKind kind, const hipStream_t &stream,
+  void qudaMemcpyAsync_(void *dst, const void *src, size_t count, cudaMemcpyKind kind, const qudaStream_t &stream,
                         const char *func, const char *file, const char *line)
   {
     if (count == 0) return;
@@ -191,6 +229,9 @@ namespace quda {
       case hipMemcpyDeviceToDevice:
         PROFILE(hipMemcpyDtoDAsync((hipDeviceptr_t)dst, (hipDeviceptr_t)src, count, stream), QUDA_PROFILE_MEMCPY_D2D_ASYNC);
         break;
+      case cudaMemcpyDefault:
+        PROFILE(cuMemcpyAsync((CUdeviceptr)dst, (CUdeviceptr)src, count, stream), QUDA_PROFILE_MEMCPY_DEFAULT_ASYNC);
+        break;
       default:
         errorQuda("Unsupported cuMemcpyTypeAsync %d", kind);
       }
@@ -201,9 +242,30 @@ namespace quda {
     }
   }
 
-  void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch,
-                          size_t width, size_t height, hipMemcpyKind kind, const hipStream_t &stream,
-                          const char *func, const char *file, const char *line)
+  cudaError_t qudaStreamSynchronize_(qudaStream_t &stream, const char *func, const char *file, const char *line)
+  {
+#ifdef USE_DRIVER_API
+    PROFILE(CUresult error = cuStreamSynchronize(stream), QUDA_PROFILE_STREAM_SYNCHRONIZE);
+    switch (error) {
+    case CUDA_SUCCESS: return cudaSuccess;
+    default: // should always return successful
+      const char *str;
+      cuGetErrorName(error, &str);
+      errorQuda("(CUDA) cuStreamSynchronize returned error %s\n (%s:%s in %s())\n", str, file, line, func);
+    }
+    return cudaErrorUnknown;
+#else
+    PROFILE(qudaError_t error = qudaStreamSynchronize(stream), QUDA_PROFILE_STREAM_SYNCHRONIZE);
+    if (error != qudaSuccess && !activeTuning())
+      errorQuda("(CUDA) %s\n (%s:%s in %s())", qudaGetErrorString(error), file, line, func);
+    return error;
+
+#endif
+  }
+
+  void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
+                          cudaMemcpyKind kind, const qudaStream_t &stream, const char *func, const char *file,
+                          const char *line)
   {
 #ifdef USE_DRIVER_API
     hip_Memcpy2D param;
@@ -243,143 +305,125 @@ namespace quda {
     if (count == 0) return;
     QudaMem set(ptr, value, count, false, func, file, line);
     set.apply(0);
-    hipError_t error = hipGetLastError();
-    if (error != hipSuccess) errorQuda("(HIP) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
+    qudaError_t error = qudaGetLastError();
+    if (error != qudaSuccess) errorQuda("(HIP) %s\n (%s:%s in %s())\n", qudaGetErrorString(error), file, line, func);
   }
 
-  void qudaMemsetAsync_(void *ptr, int value, size_t count, const hipStream_t &stream, const char *func,
+  void qudaMemsetAsync_(void *ptr, int value, size_t count, const qudaStream_t &stream, const char *func,
                         const char *file, const char *line)
   {
     if (count == 0) return;
     QudaMem copy(ptr, value, count, true, func, file, line);
     copy.apply(0);
-    hipError_t error = hipGetLastError();
-    if (error != hipSuccess) errorQuda("(HIP) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
+    qudaError_t error = qudaGetLastError();
+    if (error != qudaSuccess) errorQuda("(HIP) %s\n (%s:%s in %s())\n", qudaGetErrorString(error), file, line, func);
   }
 
-  hipError_t qudaLaunchKernel(const void* func, dim3 gridDim, dim3 blockDim, void** args, size_t sharedMem, hipStream_t stream)
+  qudaError_t qudaLaunchKernel(const void *func, dim3 gridDim, dim3 blockDim, void **args, size_t sharedMem,
+                               qudaStream_t stream)
   {
     // no driver API variant here since we have C++ functions
-    printfQuda("this kernel can not be used in HIP\n");hipError_t error = hipErrorUnknown;
+    printfQuda("this kernel can not be used in HIP\n");qudaError_t error = qudaErrorUnknown;
 //    PROFILE(hipError_t error = hipLaunchKernel(func, gridDim, blockDim, args, sharedMem, stream), QUDA_PROFILE_LAUNCH_KERNEL);
-    if (error != hipSuccess && !activeTuning()) errorQuda("(CUDA) %s", hipGetErrorString(error));
+    if (error != qudaSuccess && !activeTuning()) errorQuda("(CUDA) %s", qudaGetErrorString(error));
     return error;
   }
 
-  hipError_t qudaEventQuery(hipEvent_t &event)
+  qudaError_t qudaEventQuery(qudaEvent_t &event)
   {
 #ifdef USE_DRIVER_API
-    PROFILE(hipError_t error = hipEventQuery(event), QUDA_PROFILE_EVENT_QUERY);
+    PROFILE(qudaError_t error = qudaEventQuery(event), QUDA_PROFILE_EVENT_QUERY);
     switch (error) {
-    case hipSuccess:
-      return hipSuccess;
-    case hipErrorNotReady: // this is the only return value care about
-      return hipErrorNotReady;
+    case qudaSuccess:
+      return qudaSuccess;
+    case qudaErrorNotReady: // this is the only return value care about
+      return qudaErrorNotReady;
     default:
       const char *str;
-      str=hipGetErrorName(error);
-      errorQuda("hipEventQuery returned error %s", str);
+      str=qudaGetErrorName(error);
+      errorQuda("qudaEventQuery returned error %s", str);
     }
-    return hipErrorUnknown;
+    return qudaErrorUnknown;
 #else
-    PROFILE(hipError_t error = hipEventQuery(event), QUDA_PROFILE_EVENT_QUERY);
+    PROFILE(qudaError_t error = qudaEventQuery(event), QUDA_PROFILE_EVENT_QUERY);
     return error;
 #endif
   }
 
-  hipError_t qudaEventRecord(hipEvent_t &event, hipStream_t stream)
+  qudaError_t qudaEventRecord(cudaEvent_t &event, qudaStream_t stream)
   {
 #ifdef USE_DRIVER_API
-    PROFILE(hipError_t error = hipEventRecord(event, stream), QUDA_PROFILE_EVENT_RECORD);
+    PROFILE(qudaError_t error = qudaEventRecord(event, stream), QUDA_PROFILE_EVENT_RECORD);
     switch (error) {
-    case hipSuccess:
-      return hipSuccess;
+    case qudaSuccess:
+      return qudaSuccess;
     default: // should always return successful
       const char *str;
-      str=hipGetErrorName(error);
+      str=qudaGetErrorName(error);
       errorQuda("cuEventrecord returned error %s", str);
     }
-    return hipErrorUnknown;
+    return qudaErrorUnknown;
 #else
-    PROFILE(hipError_t error = hipEventRecord(event, stream), QUDA_PROFILE_EVENT_RECORD);
+    PROFILE(qudaError_t error = qudaEventRecord(event, stream), QUDA_PROFILE_EVENT_RECORD);
     return error;
 #endif
   }
 
-  hipError_t qudaStreamWaitEvent(hipStream_t stream, hipEvent_t event, unsigned int flags)
+  qudaError_t qudaStreamWaitEvent(qudaStream_t stream, cudaEvent_t event, unsigned int flags)
   {
 #ifdef USE_DRIVER_API
-    PROFILE(hipError_t error = hipStreamWaitEvent(stream, event, flags), QUDA_PROFILE_STREAM_WAIT_EVENT);
+    PROFILE(qudaError_t error = qudaStreamWaitEvent(stream, event, flags), QUDA_PROFILE_STREAM_WAIT_EVENT);
     switch (error) {
-    case hipSuccess:
-      return hipSuccess;
+    case qudaSuccess:
+      return qudaSuccess;
     default: // should always return successful
       const char *str;
-      str=hipGetErrorName(error);
-      errorQuda("hipStreamWaitEvent returned error %s", str);
+      str=qudaGetErrorName(error);
+      errorQuda("qudaStreamWaitEvent returned error %s", str);
     }
-    return hipErrorUnknown;
+    return qudaErrorUnknown;
 #else
-    PROFILE(hipError_t error = hipStreamWaitEvent(stream, event, flags), QUDA_PROFILE_STREAM_WAIT_EVENT);
+    PROFILE(qudaError_t error = qudaStreamWaitEvent(stream, event, flags), QUDA_PROFILE_STREAM_WAIT_EVENT);
     return error;
 #endif
   }
 
-  hipError_t qudaStreamSynchronize(hipStream_t &stream)
+  qudaError_t qudaEventSynchronize(qudaEvent_t &event)
   {
 #ifdef USE_DRIVER_API
-    PROFILE(hipError_t error = hipStreamSynchronize(stream), QUDA_PROFILE_STREAM_SYNCHRONIZE);
+    PROFILE(qudaError_t error = qudaEventSynchronize(event), QUDA_PROFILE_EVENT_SYNCHRONIZE);
     switch (error) {
-    case hipSuccess:
-      return hipSuccess;
+    case qudaSuccess:
+      return qudaSuccess;
     default: // should always return successful
       const char *str;
-      str=hipGetErrorName(error);
-      errorQuda("hipStreamSynchronize returned error %s", str);
+      str=qudaGetErrorName(error);
+      errorQuda("qudaEventSynchronize returned error %s", str);
     }
-    return hipErrorUnknown;
+    return qudaErrorUnknown;
 #else
-    PROFILE(hipError_t error = hipStreamSynchronize(stream), QUDA_PROFILE_STREAM_SYNCHRONIZE);
+    PROFILE(qudaError_t error = qudaEventSynchronize(event), QUDA_PROFILE_EVENT_SYNCHRONIZE);
     return error;
 #endif
   }
 
-  hipError_t qudaEventSynchronize(hipEvent_t &event)
+  qudaError_t qudaDeviceSynchronize_(const char *func, const char *file, const char *line)
   {
 #ifdef USE_DRIVER_API
-    PROFILE(hipError_t error = hipEventSynchronize(event), QUDA_PROFILE_EVENT_SYNCHRONIZE);
+    PROFILE(qudaError_t error = qudaCtxSynchronize(), QUDA_PROFILE_DEVICE_SYNCHRONIZE);
     switch (error) {
-    case hipSuccess:
-      return hipSuccess;
+    case qudaSuccess:
+      return qudaSuccess;
     default: // should always return successful
       const char *str;
-      str=hipGetErrorName(error);
-      errorQuda("hipEventSynchronize returned error %s", str);
+      str=qudaGetErrorName(error);
+      errorQuda("qudaCtxSynchronize returned error %s (%s:%s in %s())\n", str, file, line, func);
     }
-    return hipErrorUnknown;
+    return qudaErrorUnknown;
 #else
-    PROFILE(hipError_t error = hipEventSynchronize(event), QUDA_PROFILE_EVENT_SYNCHRONIZE);
-    return error;
-#endif
-  }
-
-  hipError_t qudaDeviceSynchronize_(const char *func, const char *file, const char *line)
-  {
-#ifdef USE_DRIVER_API
-    PROFILE(hipError_t error = hipCtxSynchronize(), QUDA_PROFILE_DEVICE_SYNCHRONIZE);
-    switch (error) {
-    case hipSuccess:
-      return hipSuccess;
-    default: // should always return successful
-      const char *str;
-      str=hipGetErrorName(error);
-      errorQuda("hipCtxSynchronize returned error %s (%s:%s in %s())\n", str, file, line, func);
-    }
-    return hipErrorUnknown;
-#else
-    PROFILE(hipError_t error = hipDeviceSynchronize(), QUDA_PROFILE_DEVICE_SYNCHRONIZE);
-    if (error != hipSuccess)
-      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
+    PROFILE(qudaError_t error = qudaDeviceSynchronize(), QUDA_PROFILE_DEVICE_SYNCHRONIZE);
+    if (error != qudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", qudaGetErrorString(error), file, line, func);
     return error;
 #endif
   }
@@ -389,6 +433,13 @@ namespace quda {
   {
     // no driver API variant here since we have C++ functions
     PROFILE(cudaError_t error = cudaFuncSetAttribute(func, attr, value), QUDA_PROFILE_FUNC_SET_ATTRIBUTE);
+    return error;
+  }
+
+  cudaError_t qudaFuncGetAttributes(cudaFuncAttributes &attr, const void* func)
+  {
+    // no driver API variant here since we have C++ functions
+    PROFILE(cudaError_t error = cudaFuncGetAttributes(&attr, func), QUDA_PROFILE_FUNC_SET_ATTRIBUTE);
     return error;
   }
 #endif

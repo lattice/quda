@@ -1,7 +1,6 @@
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
 #include <tune_quda.h>
-#include <typeinfo>
 #include <multigrid_helper.cuh>
 #include <index_helper.cuh>
 
@@ -9,36 +8,36 @@ namespace quda {
 
 #if defined(GPU_MULTIGRID) && defined(GPU_STAGGERED_DIRAC)
 
-  enum QudaStaggeredTransferType {
-    QUDA_STAGGERED_TRANSFER_PROLONG,
-    QUDA_STAGGERED_TRANSFER_RESTRICT,
-    QUDA_STAGGERED_TRANSFER_INVALID = QUDA_INVALID_ENUM
+  enum class StaggeredTransferType {
+    STAGGERED_TRANSFER_PROLONG,
+    STAGGERED_TRANSFER_RESTRICT,
+    STAGGERED_TRANSFER_INVALID = QUDA_INVALID_ENUM
   };
 
   using namespace quda::colorspinor;
 
   // Use a trait to define whether the "out" spin is the fine or coarse spin
-  template<int fineSpin, int coarseSpin, QudaStaggeredTransferType transferType> struct StaggeredTransferOutSpin { static constexpr int outSpin = -1; };
-  template<int fineSpin, int coarseSpin> struct StaggeredTransferOutSpin<fineSpin,coarseSpin,QUDA_STAGGERED_TRANSFER_PROLONG> { static constexpr int outSpin = fineSpin; };
-  template<int fineSpin, int coarseSpin> struct StaggeredTransferOutSpin<fineSpin,coarseSpin,QUDA_STAGGERED_TRANSFER_RESTRICT> { static constexpr int outSpin = coarseSpin; };
+  template<int fineSpin, int coarseSpin, StaggeredTransferType transferType> struct StaggeredTransferOutSpin { static constexpr int outSpin = -1; };
+  template<int fineSpin, int coarseSpin> struct StaggeredTransferOutSpin<fineSpin,coarseSpin,StaggeredTransferType::STAGGERED_TRANSFER_PROLONG> { static constexpr int outSpin = fineSpin; };
+  template<int fineSpin, int coarseSpin> struct StaggeredTransferOutSpin<fineSpin,coarseSpin,StaggeredTransferType::STAGGERED_TRANSFER_RESTRICT> { static constexpr int outSpin = coarseSpin; };
 
   // Use a trait to define whether the "in" spin is the fine or coarse spin
-  template<int fineSpin, int coarseSpin, QudaStaggeredTransferType transferType> struct StaggeredTransferInSpin { static constexpr int inSpin = -1; };
-  template<int fineSpin, int coarseSpin> struct StaggeredTransferInSpin<fineSpin,coarseSpin,QUDA_STAGGERED_TRANSFER_PROLONG> { static constexpr int inSpin = coarseSpin; };
-  template<int fineSpin, int coarseSpin> struct StaggeredTransferInSpin<fineSpin,coarseSpin,QUDA_STAGGERED_TRANSFER_RESTRICT> { static constexpr int inSpin = fineSpin; };
+  template<int fineSpin, int coarseSpin, StaggeredTransferType transferType> struct StaggeredTransferInSpin { static constexpr int inSpin = -1; };
+  template<int fineSpin, int coarseSpin> struct StaggeredTransferInSpin<fineSpin,coarseSpin,StaggeredTransferType::STAGGERED_TRANSFER_PROLONG> { static constexpr int inSpin = coarseSpin; };
+  template<int fineSpin, int coarseSpin> struct StaggeredTransferInSpin<fineSpin,coarseSpin,StaggeredTransferType::STAGGERED_TRANSFER_RESTRICT> { static constexpr int inSpin = fineSpin; };
 
   // Use a trait to define whether the "out" color is the fine or coarse color
-  template<int fineColor, int coarseColor, QudaStaggeredTransferType transferType> struct StaggeredTransferOutColor { static constexpr int outColor = -1; };
-  template<int fineColor, int coarseColor> struct StaggeredTransferOutColor<fineColor,coarseColor,QUDA_STAGGERED_TRANSFER_PROLONG> { static constexpr int outColor = fineColor; };
-  template<int fineColor, int coarseColor> struct StaggeredTransferOutColor<fineColor,coarseColor,QUDA_STAGGERED_TRANSFER_RESTRICT> { static constexpr int outColor = coarseColor; };
+  template<int fineColor, int coarseColor, StaggeredTransferType transferType> struct StaggeredTransferOutColor { static constexpr int outColor = -1; };
+  template<int fineColor, int coarseColor> struct StaggeredTransferOutColor<fineColor,coarseColor,StaggeredTransferType::STAGGERED_TRANSFER_PROLONG> { static constexpr int outColor = fineColor; };
+  template<int fineColor, int coarseColor> struct StaggeredTransferOutColor<fineColor,coarseColor,StaggeredTransferType::STAGGERED_TRANSFER_RESTRICT> { static constexpr int outColor = coarseColor; };
 
   // Use a trait to define whether the "in" color is the fine or coarse color
-  template<int fineColor, int coarseColor, QudaStaggeredTransferType transferType> struct StaggeredTransferInColor { static constexpr int inColor = -1; };
-  template<int fineColor, int coarseColor> struct StaggeredTransferInColor<fineColor,coarseColor,QUDA_STAGGERED_TRANSFER_PROLONG> { static constexpr int inColor = coarseColor; };
-  template<int fineColor, int coarseColor> struct StaggeredTransferInColor<fineColor,coarseColor,QUDA_STAGGERED_TRANSFER_RESTRICT> { static constexpr int inColor = fineColor; };
+  template<int fineColor, int coarseColor, StaggeredTransferType transferType> struct StaggeredTransferInColor { static constexpr int inColor = -1; };
+  template<int fineColor, int coarseColor> struct StaggeredTransferInColor<fineColor,coarseColor,StaggeredTransferType::STAGGERED_TRANSFER_PROLONG> { static constexpr int inColor = coarseColor; };
+  template<int fineColor, int coarseColor> struct StaggeredTransferInColor<fineColor,coarseColor,StaggeredTransferType::STAGGERED_TRANSFER_RESTRICT> { static constexpr int inColor = fineColor; };
 
   // Function to return the fine ColorSpinorField
-  template<QudaStaggeredTransferType transferType>
+  template<StaggeredTransferType transferType>
   inline const ColorSpinorField& fineColorSpinorField(const ColorSpinorField& quoteIn, const ColorSpinorField& quoteOut) {
     errorQuda("Invalid transfer type %d for fineColorSpinorField", (int)transferType);
     return quoteIn; 
@@ -46,18 +45,18 @@ namespace quda {
 
   // on prolong, the out vector is the fine vector
   template<>
-  inline const ColorSpinorField& fineColorSpinorField<QUDA_STAGGERED_TRANSFER_PROLONG>(const ColorSpinorField& quoteIn, const ColorSpinorField& quoteOut) {
+  inline const ColorSpinorField& fineColorSpinorField<StaggeredTransferType::STAGGERED_TRANSFER_PROLONG>(const ColorSpinorField& quoteIn, const ColorSpinorField& quoteOut) {
     return quoteOut;
   }
 
   // on restrict, the in vector is the fine vector
   template<>
-  inline const ColorSpinorField& fineColorSpinorField<QUDA_STAGGERED_TRANSFER_RESTRICT>(const ColorSpinorField& quoteIn, const ColorSpinorField& quoteOut) {
+  inline const ColorSpinorField& fineColorSpinorField<StaggeredTransferType::STAGGERED_TRANSFER_RESTRICT>(const ColorSpinorField& quoteIn, const ColorSpinorField& quoteOut) {
     return quoteIn;
   }
 
   // Function to return the coarse ColorSpinorField
-  template<QudaStaggeredTransferType transferType>
+  template<StaggeredTransferType transferType>
   inline const ColorSpinorField& coarseColorSpinorField(const ColorSpinorField& quoteIn, const ColorSpinorField& quoteOut) {
     errorQuda("Invalid transfer type %d for coarseColorSpinorField", (int)transferType);
     return quoteIn; 
@@ -65,19 +64,19 @@ namespace quda {
 
   // on prolong, the out vector is the fine vector
   template<>
-  inline const ColorSpinorField& coarseColorSpinorField<QUDA_STAGGERED_TRANSFER_PROLONG>(const ColorSpinorField& quoteIn, const ColorSpinorField& quoteOut) {
+  inline const ColorSpinorField& coarseColorSpinorField<StaggeredTransferType::STAGGERED_TRANSFER_PROLONG>(const ColorSpinorField& quoteIn, const ColorSpinorField& quoteOut) {
     return quoteIn;
   }
 
   // on restrict, the in vector is the fine vector
   template<>
-  inline const ColorSpinorField& coarseColorSpinorField<QUDA_STAGGERED_TRANSFER_RESTRICT>(const ColorSpinorField& quoteIn, const ColorSpinorField& quoteOut) {
+  inline const ColorSpinorField& coarseColorSpinorField<StaggeredTransferType::STAGGERED_TRANSFER_RESTRICT>(const ColorSpinorField& quoteIn, const ColorSpinorField& quoteOut) {
     return quoteOut;
   }
   /** 
       Kernel argument struct
   */
-  template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, QudaFieldOrder order, QudaStaggeredTransferType theTransferType>
+  template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, QudaFieldOrder order, StaggeredTransferType theTransferType>
   struct StaggeredProlongRestrictArg {
     FieldOrderCB<Float, StaggeredTransferOutSpin<fineSpin,coarseSpin,theTransferType>::outSpin, StaggeredTransferOutColor<fineColor,coarseColor,theTransferType>::outColor,1,order> out;
     const FieldOrderCB<Float, StaggeredTransferInSpin<fineSpin,coarseSpin,theTransferType>::inSpin, StaggeredTransferInColor<fineColor,coarseColor,theTransferType>::inColor,1,order> in;
@@ -88,7 +87,7 @@ namespace quda {
     const int fineX[4]; // fine spatial volume
     const int fineVolumeCB; // fine spatial volume
     const int coarseVolumeCB; // coarse spatial volume
-    static constexpr QudaStaggeredTransferType transferType = theTransferType;
+    static constexpr StaggeredTransferType transferType = theTransferType;
 
     StaggeredProlongRestrictArg(ColorSpinorField &out, const ColorSpinorField &in,
                   const int *geo_map, const int parity)
@@ -113,7 +112,7 @@ namespace quda {
      Performs the permutation from a coarse degree of freedom to a 
      fine degree of freedom
   */
-  template <QudaStaggeredTransferType transferType, class OutAccessor, class InAccessor, typename S>
+  template <StaggeredTransferType transferType, class OutAccessor, class InAccessor, typename S>
   __device__ __host__ inline void staggeredProlongRestrict(OutAccessor& out, const InAccessor &in,
                                             int parity, int x_cb, int c, const int *geo_map, const S& spin_map, const int fineVolumeCB, const int coarseVolumeCB, const int X[]) {
     int x = parity*fineVolumeCB + x_cb;
@@ -127,7 +126,7 @@ namespace quda {
     getCoords(fineCoords,x_cb,X,parity);
     int hyperCorner = 4*(fineCoords[3]%2)+2*(fineCoords[2]%2)+(fineCoords[1]%2);
 
-    if (transferType == QUDA_STAGGERED_TRANSFER_PROLONG) {
+    if (transferType == StaggeredTransferType::STAGGERED_TRANSFER_PROLONG) {
       out(parity,x_cb,0,c) = in(parity_coarse, x_coarse_cb, spin_map(0,parity), 8*c+hyperCorner);
     } else { 
       out(parity_coarse, x_coarse_cb, spin_map(0,parity), 8*c+hyperCorner) = in(parity,x_cb,0,c);
@@ -160,7 +159,7 @@ namespace quda {
     staggeredProlongRestrict<Arg::transferType>(arg.out, arg.in, parity, x_cb, c, arg.geo_map, arg.spin_map, arg.fineVolumeCB, arg.coarseVolumeCB, arg.fineX);
   }
   
-  template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, QudaStaggeredTransferType transferType>
+  template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, StaggeredTransferType transferType>
   class StaggeredProlongRestrictLaunch : public TunableVectorYZ {
 
   protected:
@@ -191,7 +190,7 @@ namespace quda {
 
     virtual ~StaggeredProlongRestrictLaunch() { }
 
-    void apply(const hipStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       if (location == QUDA_CPU_FIELD_LOCATION) {
         if (out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
           StaggeredProlongRestrictArg<Float,fineSpin,fineColor,coarseSpin,coarseColor,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,transferType>
@@ -224,7 +223,7 @@ namespace quda {
 
   };
 
-  template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, QudaStaggeredTransferType transferType>
+  template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, StaggeredTransferType transferType>
   void StaggeredProlongRestrict(ColorSpinorField &out, const ColorSpinorField &in,
                   const int *fine_to_coarse, int parity) {
 
@@ -235,7 +234,7 @@ namespace quda {
     if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
   }
 
-  template <int fineSpin, int fineColor, int coarseSpin, int coarseColor, QudaStaggeredTransferType transferType>
+  template <int fineSpin, int fineColor, int coarseSpin, int coarseColor, StaggeredTransferType transferType>
   void StaggeredProlongRestrict(ColorSpinorField &out, const ColorSpinorField &in,
                   const int *fine_to_coarse, int parity) {
     // check precision
@@ -255,7 +254,7 @@ namespace quda {
 
   }
 
-  template <QudaStaggeredTransferType transferType>
+  template <StaggeredTransferType transferType>
   void StaggeredProlongRestrict(ColorSpinorField &out, const ColorSpinorField &in,
                   const int *fine_to_coarse, const int * const * spin_map, int parity) {
 
@@ -290,7 +289,7 @@ namespace quda {
                   const int *fine_to_coarse, const int * const * spin_map, int parity) {
 #if defined(GPU_MULTIGRID) && defined(GPU_STAGGERED_DIRAC)
 
-    StaggeredProlongRestrict<QUDA_STAGGERED_TRANSFER_PROLONG>(out, in, fine_to_coarse, spin_map, parity);
+    StaggeredProlongRestrict<StaggeredTransferType::STAGGERED_TRANSFER_PROLONG>(out, in, fine_to_coarse, spin_map, parity);
 
 #else
     errorQuda("Staggered multigrid has not been build");
@@ -302,7 +301,7 @@ namespace quda {
 #if defined(GPU_MULTIGRID) && defined(GPU_STAGGERED_DIRAC)
  
 
-    StaggeredProlongRestrict<QUDA_STAGGERED_TRANSFER_RESTRICT>(out, in, fine_to_coarse, spin_map, parity);
+    StaggeredProlongRestrict<StaggeredTransferType::STAGGERED_TRANSFER_RESTRICT>(out, in, fine_to_coarse, spin_map, parity);
 
 #else
     errorQuda("Staggered multigrid has not been build");

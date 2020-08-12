@@ -142,9 +142,10 @@ namespace quda {
 
 
 #define checkCudaErrorNoSync() do {                    \
-  hipError_t error = hipGetLastError();              \
-  if (error != hipSuccess)                            \
-    errorQuda("(CUDA) %s", hipGetErrorString(error)); \
+  qudaError_t error = qudaGetLastError();              \
+  if (error != qudaSuccess)                            \
+    errorQuda("(CUDA) %s", qudaGetErrorString(error))  \
+    ;\
 } while (0)
 
 

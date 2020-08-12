@@ -151,7 +151,7 @@ namespace quda
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1; // packing blocks per direction
     }
 
-    template <typename T> inline void launch(T *f, const TuneParam &tp, const hipStream_t &stream)
+    template <typename T> inline void launch(T *f, const TuneParam &tp, const qudaStream_t &stream)
     {
       if (deviceProp.major >= 7) { // should test whether this is always optimal on Volta
         this->setMaxDynamicSharedBytesPerBlock(f);
@@ -168,7 +168,7 @@ namespace quda
        compilation time.
     */
     template <template <bool, QudaPCType, typename> class P, int nParity, bool dagger, bool xpay, KernelType kernel_type>
-    inline void Launch(TuneParam &tp, const hipStream_t &stream)
+    inline void Launch(TuneParam &tp, const qudaStream_t &stream)
     {
       launch(dslashGPU<D, P, nParity, dagger, xpay, kernel_type, Arg>, tp, stream);
     }
@@ -205,10 +205,10 @@ namespace quda
        @brief This instantiate function is used to instantiate the
        the KernelType template required for the multi-GPU dslash kernels.
        @param[in] tp The tuning parameters to use for this kernel
-       @param[in] stream The hipStream_t where the kernel will run
+       @param[in] stream The qudaStream_t where the kernel will run
      */
     template <template <bool, QudaPCType, typename> class P, int nParity, bool dagger, bool xpay>
-    inline void instantiate(TuneParam &tp, const hipStream_t &stream)
+    inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
     {
       if (in.Location() == QUDA_CPU_FIELD_LOCATION) {
         errorQuda("Not implemented");
@@ -237,10 +237,10 @@ namespace quda
        @brief This instantiate function is used to instantiate the
        the dagger template
        @param[in] tp The tuning parameters to use for this kernel
-       @param[in] stream The hipStream_t where the kernel will run
+       @param[in] stream The qudaStream_t where the kernel will run
      */
     template <template <bool, QudaPCType, typename> class P, int nParity, bool xpay>
-    inline void instantiate(TuneParam &tp, const hipStream_t &stream)
+    inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
     {
 #ifdef JITIFY
       Tunable::jitify_error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
@@ -256,10 +256,10 @@ namespace quda
        @brief This instantiate function is used to instantiate the
        the nParity template
        @param[in] tp The tuning parameters to use for this kernel
-       @param[in] stream The hipStream_t where the kernel will run
+       @param[in] stream The qudaStream_t where the kernel will run
      */
     template <template <bool, QudaPCType, typename> class P, bool xpay>
-    inline void instantiate(TuneParam &tp, const hipStream_t &stream)
+    inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
     {
 #ifdef JITIFY
       Tunable::jitify_error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
@@ -276,10 +276,10 @@ namespace quda
        @brief This instantiate function is used to instantiate the
        the xpay template
        @param[in] tp The tuning parameters to use for this kernel
-       @param[in] stream The hipStream_t where the kernel will run
+       @param[in] stream The qudaStream_t where the kernel will run
      */
     template <template <bool, QudaPCType, typename> class P>
-    inline void instantiate(TuneParam &tp, const hipStream_t &stream)
+    inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
     {
 #ifdef JITIFY
       Tunable::jitify_error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
@@ -582,6 +582,37 @@ namespace quda
       errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
 #endif
     } else if (U.Precision() == QUDA_HALF_PRECISION) {
+#if QUDA_PRECISION & 2
+      instantiate<Apply, Recon, short>(out, in, U, args...);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#endif
+    } else if (U.Precision() == QUDA_QUARTER_PRECISION) {
+#if QUDA_PRECISION & 1
+      instantiate<Apply, Recon, char>(out, in, U, args...);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+#endif
+    } else {
+      errorQuda("Unsupported precision %d\n", U.Precision());
+    }
+  }
+
+  /**
+     @brief This instantiatePrecondtiioner function is used to
+     instantiate the precisions for a preconditioner.  This is the
+     same as the instantiate helper above, except it only handles half
+     and quarter precision.
+     @param[out] out Output result field
+     @param[in] in Input field
+     @param[in] U Gauge field
+     @param[in] args Additional arguments for different dslash kernels
+  */
+  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = WilsonReconstruct, typename... Args>
+  inline void instantiatePreconditioner(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                                        Args &&... args)
+  {
+    if (U.Precision() == QUDA_HALF_PRECISION) {
 #if QUDA_PRECISION & 2
       instantiate<Apply, Recon, short>(out, in, U, args...);
 #else

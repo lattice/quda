@@ -14,6 +14,7 @@
 #include <type_traits>
 
 #include <register_traits.h>
+#include <convert.h>
 #include <complex_quda.h>
 #include <quda_matrix.h>
 #include <index_helper.cuh>
@@ -21,11 +22,10 @@
 #include <type_traits>
 #include <limits>
 #include <atomic.cuh>
-#include <thrust_helper.cuh>
 #include <gauge_field.h>
 #include <index_helper.cuh>
 #include <trove_helper.cuh>
-#include <texture_helper.cuh>
+#include <transform_reduce.h>
 
 namespace quda {
 
@@ -338,8 +338,7 @@ namespace quda {
       else return a + complex<Float>(b.v[b.idx].real(),b.v[b.idx].imag());;
     }
 
-    template<typename Float, int nColor, QudaGaugeFieldOrder order, typename storeFloat, bool use_tex>
-    struct Accessor {
+    template <typename Float, int nColor, QudaGaugeFieldOrder order, typename storeFloat> struct Accessor {
       mutable complex<Float> dummy;
       Accessor(const GaugeField &, void *gauge_=0, void **ghost_=0) {
 	errorQuda("Not implemented for order=%d", order);
@@ -352,7 +351,7 @@ namespace quda {
       }
     };
 
-    template<typename Float, int nColor, QudaGaugeFieldOrder order, bool native_ghost, typename storeFloat, bool use_tex>
+    template <typename Float, int nColor, QudaGaugeFieldOrder order, bool native_ghost, typename storeFloat>
     struct GhostAccessor {
       mutable complex<Float> dummy;
       GhostAccessor(const GaugeField &, void *gauge_=0, void **ghost_=0) {
@@ -366,8 +365,8 @@ namespace quda {
       }
     };
 
-    template<typename Float, int nColor, typename storeFloat, bool use_tex>
-      struct Accessor<Float,nColor,QUDA_QDP_GAUGE_ORDER,storeFloat,use_tex> {
+    template <typename Float, int nColor, typename storeFloat>
+    struct Accessor<Float, nColor, QUDA_QDP_GAUGE_ORDER, storeFloat> {
       complex <storeFloat> *u[QUDA_MAX_GEOMETRY];
       const int volumeCB;
       const int geometry;
@@ -386,9 +385,14 @@ namespace quda {
 	resetScale(U.Scale());
       }
 
-    Accessor(const Accessor<Float,nColor,QUDA_QDP_GAUGE_ORDER,storeFloat,use_tex> &a)
-      : volumeCB(a.volumeCB), geometry(a.geometry), cb_offset(a.cb_offset), scale(a.scale), scale_inv(a.scale_inv) {
-	for (int d=0; d<QUDA_MAX_GEOMETRY; d++)
+      Accessor(const Accessor<Float, nColor, QUDA_QDP_GAUGE_ORDER, storeFloat> &a) :
+        volumeCB(a.volumeCB),
+        geometry(a.geometry),
+        cb_offset(a.cb_offset),
+        scale(a.scale),
+        scale_inv(a.scale_inv)
+      {
+        for (int d=0; d<QUDA_MAX_GEOMETRY; d++)
 	  u[d] = a.u[d];
       }
 
@@ -442,30 +446,24 @@ namespace quda {
 #endif
       }
 
-      template<typename helper, typename reducer>
-        __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h, reducer r, double init) const {
-	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
+      template <typename helper, typename reducer>
+      __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h, double init, reducer r) const
+      {
+        if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
         int lower = (dim == -1) ? 0 : dim;
-        int upper = (dim == -1) ? geometry : dim+1;
-        double result = init;
-        if (location == QUDA_CUDA_FIELD_LOCATION) {
-          thrust_allocator alloc;
-          for (int d=lower; d<upper; d++) {
-            thrust::device_ptr<complex<storeFloat> > ptr(u[d]);
-            result = thrust::transform_reduce(thrust_par(alloc), ptr, ptr+2*volumeCB*nColor*nColor, h, result, r);
-          }
-        } else {
-          for (int d=lower; d<upper; d++) {
-            result = thrust::transform_reduce(thrust::seq, u[d], u[d]+2*volumeCB*nColor*nColor, h, result, r);
-          }
-        }
-        return result;
+        int ndim = (dim == -1 ? geometry : 1);
+        std::vector<double> result(ndim);
+        std::vector<complex<storeFloat> *> v(ndim);
+        for (int d = 0; d < ndim; d++) v[d] = u[d + lower];
+        ::quda::transform_reduce(location, result, v, 2 * volumeCB * nColor * nColor, h, init, r);
+        double total = init;
+        for (auto &res : result) total = r(total, res);
+        return total;
       }
-
     };
 
-    template<typename Float, int nColor, bool native_ghost, typename storeFloat, bool use_tex>
-      struct GhostAccessor<Float,nColor,QUDA_QDP_GAUGE_ORDER,native_ghost,storeFloat,use_tex> {
+    template <typename Float, int nColor, bool native_ghost, typename storeFloat>
+    struct GhostAccessor<Float, nColor, QUDA_QDP_GAUGE_ORDER, native_ghost, storeFloat> {
       complex<storeFloat> *ghost[8];
       int ghostOffset[8];
       Float scale;
@@ -488,9 +486,11 @@ namespace quda {
 	resetScale(U.Scale());
       }
 
-    GhostAccessor(const GhostAccessor<Float,nColor,QUDA_QDP_GAUGE_ORDER,native_ghost,storeFloat,use_tex> &a)
-	: scale(a.scale), scale_inv(a.scale_inv) {
-	for (int d=0; d<8; d++) {
+      GhostAccessor(const GhostAccessor<Float, nColor, QUDA_QDP_GAUGE_ORDER, native_ghost, storeFloat> &a) :
+        scale(a.scale),
+        scale_inv(a.scale_inv)
+      {
+        for (int d=0; d<8; d++) {
 	  ghost[d] = a.ghost[d];
 	  ghostOffset[d] = a.ghostOffset[d];
 	}
@@ -518,8 +518,8 @@ namespace quda {
 						      scale, scale_inv); }
     };
 
-    template<typename Float, int nColor, typename storeFloat, bool use_tex>
-      struct Accessor<Float,nColor,QUDA_MILC_GAUGE_ORDER,storeFloat,use_tex> {
+    template <typename Float, int nColor, typename storeFloat>
+    struct Accessor<Float, nColor, QUDA_MILC_GAUGE_ORDER, storeFloat> {
       complex<storeFloat> *u;
       const int volumeCB;
       const int geometry;
@@ -535,8 +535,12 @@ namespace quda {
 	resetScale(U.Scale());
       }
 
-    Accessor(const Accessor<Float,nColor,QUDA_MILC_GAUGE_ORDER,storeFloat,use_tex> &a)
-	: u(a.u), volumeCB(a.volumeCB), geometry(a.geometry), scale(a.scale), scale_inv(a.scale_inv)
+      Accessor(const Accessor<Float, nColor, QUDA_MILC_GAUGE_ORDER, storeFloat> &a) :
+        u(a.u),
+        volumeCB(a.volumeCB),
+        geometry(a.geometry),
+        scale(a.scale),
+        scale_inv(a.scale_inv)
       { }
 
       void resetScale(Float max) {
@@ -587,36 +591,22 @@ namespace quda {
 #endif
       }
 
-      template<typename helper, typename reducer>
-      __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h, reducer r, double init) const {
-	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
-        int lower = (dim == -1) ? 0 : dim;
-        int upper = (dim == -1) ? geometry : dim+1;
-        double result = init;
-        if (location == QUDA_CUDA_FIELD_LOCATION) {
-          thrust_allocator alloc;
-          thrust::device_ptr<complex<storeFloat> > ptr(u);
-          result = thrust::transform_reduce(thrust_par(alloc),
-                                            ptr+(0*geometry+lower)*volumeCB*nColor*nColor,
-                                            ptr+(0*geometry+upper)*volumeCB*nColor*nColor, h, result, r);
-          result = thrust::transform_reduce(thrust_par(alloc),
-                                            ptr+(1*geometry+lower)*volumeCB*nColor*nColor,
-                                            ptr+(1*geometry+upper)*volumeCB*nColor*nColor, h, result, r);
-        } else {
-          result = thrust::transform_reduce(thrust::seq,
-                                            u+(0*geometry+lower)*volumeCB*nColor*nColor,
-                                            u+(0*geometry+upper)*volumeCB*nColor*nColor, h, result, r);
-          result  = thrust::transform_reduce(thrust::seq,
-                                             u+(1*geometry+lower)*volumeCB*nColor*nColor,
-                                             u+(1*geometry+upper)*volumeCB*nColor*nColor, h, result, r);
-        }
-        return result;
+      template <typename helper, typename reducer>
+      __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h, double init, reducer r) const
+      {
+        if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
+        int start = dim == -1 ? 0 : dim;
+        int count = (dim == -1 ? geometry : 1) * volumeCB * nColor * nColor; // items per parity
+        std::vector<double> result = {init, init};
+        std::vector<decltype(u)> v = {u + (0 * geometry + start) * volumeCB * nColor * nColor,
+                                      u + (1 * geometry + start) * volumeCB * nColor * nColor};
+        ::quda::transform_reduce(location, result, v, count, h, init, r);
+        return r(result[0], result[1]);
       }
-
     };
 
-    template<typename Float, int nColor, bool native_ghost, typename storeFloat, bool use_tex>
-      struct GhostAccessor<Float,nColor,QUDA_MILC_GAUGE_ORDER,native_ghost,storeFloat,use_tex> {
+    template <typename Float, int nColor, bool native_ghost, typename storeFloat>
+    struct GhostAccessor<Float, nColor, QUDA_MILC_GAUGE_ORDER, native_ghost, storeFloat> {
       complex<storeFloat> *ghost[8];
       int ghostOffset[8];
       Float scale;
@@ -639,9 +629,11 @@ namespace quda {
 	resetScale(U.Scale());
       }
 
-    GhostAccessor(const GhostAccessor<Float,nColor,QUDA_MILC_GAUGE_ORDER,native_ghost,storeFloat,use_tex> &a)
-	: scale(a.scale), scale_inv(a.scale_inv) {
-	for (int d=0; d<8; d++) {
+      GhostAccessor(const GhostAccessor<Float, nColor, QUDA_MILC_GAUGE_ORDER, native_ghost, storeFloat> &a) :
+        scale(a.scale),
+        scale_inv(a.scale_inv)
+      {
+        for (int d=0; d<8; d++) {
 	  ghost[d] = a.ghost[d];
 	  ghostOffset[d] = a.ghostOffset[d];
 	}
@@ -679,14 +671,10 @@ namespace quda {
       return index;
     };
 
-    template<typename Float, int nColor, typename storeFloat, bool use_tex>
-      struct Accessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER, storeFloat, use_tex> {
+    template <typename Float, int nColor, typename storeFloat>
+    struct Accessor<Float, nColor, QUDA_FLOAT2_GAUGE_ORDER, storeFloat> {
       complex<storeFloat> *u;
       const int offset_cb;
-#ifdef USE_TEXTURE_OBJECTS
-      typedef typename TexVectorType<Float,2>::type TexVector;
-      hipTextureObject_t tex;
-#endif
       const int volumeCB;
       const int stride;
       const int geometry;
@@ -699,28 +687,22 @@ namespace quda {
       : u(gauge_ ? static_cast<complex<storeFloat>*>(gauge_) :
 	  static_cast<complex<storeFloat>*>(const_cast<void*>(U.Gauge_p()))),
 	offset_cb( (U.Bytes()>>1) / sizeof(complex<storeFloat>)),
-#ifdef USE_TEXTURE_OBJECTS
-        tex(0),
-#endif
         volumeCB(U.VolumeCB()), stride(U.Stride()), geometry(U.Geometry()),
         max(static_cast<Float>(1.0)), scale(static_cast<Float>(1.0)), scale_inv(static_cast<Float>(1.0))
       {
 	resetScale(U.Scale());
-#ifdef USE_TEXTURE_OBJECTS
-	if (U.Location() == QUDA_CUDA_FIELD_LOCATION) tex = static_cast<const cudaGaugeField&>(U).Tex();
-	if (use_tex && this->u != U.Gauge_p() && !override) {
-	  errorQuda("Cannot use texture read since data pointer does not equal field pointer - use with use_tex=false instead");
-	}
-#endif
       }
 
-    Accessor(const Accessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER,storeFloat,use_tex> &a)
-      : u(a.u), offset_cb(a.offset_cb),
-#ifdef USE_TEXTURE_OBJECTS
-        tex(a.tex),
-#endif
-        volumeCB(a.volumeCB), stride(a.stride), geometry(a.geometry),
-	scale(a.scale), scale_inv(a.scale_inv) {  }
+      Accessor(const Accessor<Float, nColor, QUDA_FLOAT2_GAUGE_ORDER, storeFloat> &a) :
+        u(a.u),
+        offset_cb(a.offset_cb),
+        volumeCB(a.volumeCB),
+        stride(a.stride),
+        geometry(a.geometry),
+        scale(a.scale),
+        scale_inv(a.scale_inv)
+      {
+      }
 
       void resetScale(Float max_) {
 	if (fixed) {
@@ -732,24 +714,13 @@ namespace quda {
 
       __device__ __host__ inline const complex<Float> operator()(int dim, int parity, int x_cb, int row, int col) const
       {
-#if defined(USE_TEXTURE_OBJECTS) && defined(__HIP_DEVICE_COMPILE__)
-	if (use_tex) {
-	  TexVector vecTmp = tex1Dfetch_<TexVector>(tex, parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb);
-	  if (fixed) {
-	    return max*complex<Float>(vecTmp.x, vecTmp.y);
-	  } else {
-	    return complex<Float>(vecTmp.x, vecTmp.y);
-	  }
-	} else
-#endif
-	{
-	  complex<storeFloat> tmp = u[parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb];
-	  if (fixed) {
-	    return scale_inv*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
-	  } else {
-	    return complex<Float>(tmp.x, tmp.y);
-	  }
-	}
+        complex<storeFloat> tmp
+          = u[parity * offset_cb + dim * stride * nColor * nColor + (row * nColor + col) * stride + x_cb];
+        if (fixed) {
+          return scale_inv * complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
+        } else {
+          return complex<Float>(tmp.x, tmp.y);
+        }
       }
 
       __device__ __host__ inline fieldorder_wrapper<Float,storeFloat> operator()(int dim, int parity, int x_cb, int row, int col)
@@ -785,47 +756,32 @@ namespace quda {
 #endif
       }
 
-      template<typename helper, typename reducer>
-        __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h, reducer r, double init) const {
-	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
-        int lower = (dim == -1) ? 0 : dim;
-        int upper = (dim == -1) ? geometry : dim+1;
-        double result = init;
-        if (location == QUDA_CUDA_FIELD_LOCATION) {
-          thrust_allocator alloc;
-          thrust::device_ptr<complex<storeFloat> > ptr(u);
-          result = thrust::transform_reduce(thrust_par(alloc),
-                                            ptr+0*offset_cb+lower*stride*nColor*nColor,
-                                            ptr+0*offset_cb+upper*stride*nColor*nColor, h, result, r);
-          result = thrust::transform_reduce(thrust_par(alloc),
-                                            ptr+1*offset_cb+lower*stride*nColor*nColor,
-                                            ptr+1*offset_cb+upper*stride*nColor*nColor, h, result, r);
-        } else {
-          result = thrust::transform_reduce(thrust::seq,
-                                            u+0*offset_cb+lower*stride*nColor*nColor,
-                                            u+0*offset_cb+upper*stride*nColor*nColor, h, result, r);
-          result = thrust::transform_reduce(thrust::seq,
-                                            u+1*offset_cb+lower*stride*nColor*nColor,
-                                            u+1*offset_cb+upper*stride*nColor*nColor, h, result, r);
-        }
-        return result;
+      template <typename helper, typename reducer>
+      __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h, double init, reducer r) const
+      {
+        if (dim >= geometry) errorQuda("Requested dimension %d exceeds dimensionality of the field %d", dim, geometry);
+        int start = (dim == -1) ? 0 : dim;
+        int count = (dim == -1 ? geometry : 1) * stride * nColor * nColor;
+        std::vector<double> result = {init, init};
+        std::vector<decltype(u)> v = {u + 0 * offset_cb + start * count, u + 1 * offset_cb + start * count};
+        ::quda::transform_reduce(location, result, v, count, h, init, r);
+        return r(result[0], result[1]);
       }
-
     };
 
-    template<typename Float, int nColor, bool native_ghost, typename storeFloat, bool use_tex>
-      struct GhostAccessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER,native_ghost,storeFloat,use_tex> {
+    template <typename Float, int nColor, bool native_ghost, typename storeFloat>
+    struct GhostAccessor<Float, nColor, QUDA_FLOAT2_GAUGE_ORDER, native_ghost, storeFloat> {
       complex<storeFloat> *ghost[8];
       const int volumeCB;
       int ghostVolumeCB[8];
       Float scale;
       Float scale_inv;
       static constexpr bool fixed = fixed_point<Float,storeFloat>();
-      Accessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER,storeFloat,use_tex> accessor;
+      Accessor<Float, nColor, QUDA_FLOAT2_GAUGE_ORDER, storeFloat> accessor;
 
       GhostAccessor(const GaugeField &U, void *gauge_, void **ghost_=0)
-	: volumeCB(U.VolumeCB()), accessor(U, gauge_, ghost_),
-	  scale(static_cast<Float>(1.0)), scale_inv(static_cast<Float>(1.0))
+	: volumeCB(U.VolumeCB()), scale(static_cast<Float>(1.0)), 
+	  scale_inv(static_cast<Float>(1.0)), accessor(U, gauge_, ghost_)
       {
 	if (!native_ghost) assert(ghost_ != nullptr);
 	for (int d=0; d<4; d++) {
@@ -837,8 +793,11 @@ namespace quda {
 	resetScale(U.Scale());
       }
 
-    GhostAccessor(const GhostAccessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER,native_ghost,storeFloat,use_tex> &a)
-	: volumeCB(a.volumeCB), scale(a.scale), scale_inv(a.scale_inv), accessor(a.accessor)
+      GhostAccessor(const GhostAccessor<Float, nColor, QUDA_FLOAT2_GAUGE_ORDER, native_ghost, storeFloat> &a) :
+        volumeCB(a.volumeCB),
+        scale(a.scale),
+        scale_inv(a.scale_inv),
+        accessor(a.accessor)
       {
 	for (int d=0; d<8; d++) {
 	  ghost[d] = a.ghost[d];
@@ -878,7 +837,6 @@ namespace quda {
       }
     };
 
-
     /**
        This is a template driven generic gauge field accessor.  To
        deploy for a specifc field ordering, the two operator()
@@ -891,24 +849,24 @@ namespace quda {
        @tparam native_ghost Whether to use native ghosts (inlined into
        the padded area for internal-order fields or use a separate array if false)
      */
-  template <typename Float, int nColor, int nSpinCoarse, QudaGaugeFieldOrder order,
-    bool native_ghost=true, typename storeFloat=Float, bool use_tex=false>
-      struct FieldOrder {
+    template <typename Float, int nColor, int nSpinCoarse, QudaGaugeFieldOrder order, bool native_ghost = true,
+              typename storeFloat = Float>
+    struct FieldOrder {
 
-	/** An internal reference to the actual field we are accessing */
-	const int volumeCB;
-	const int nDim;
-	const int_fastdiv geometry;
-	const QudaFieldLocation location;
-	static constexpr int nColorCoarse = nColor / nSpinCoarse;
+      /** An internal reference to the actual field we are accessing */
+      const int volumeCB;
+      const int nDim;
+      const int_fastdiv geometry;
+      const QudaFieldLocation location;
+      static constexpr int nColorCoarse = nColor / nSpinCoarse;
 
-	Accessor<Float,nColor,order,storeFloat,use_tex> accessor;
-	GhostAccessor<Float,nColor,order,native_ghost,storeFloat,use_tex> ghostAccessor;
+      Accessor<Float, nColor, order, storeFloat> accessor;
+      GhostAccessor<Float, nColor, order, native_ghost, storeFloat> ghostAccessor;
 
-	/**
-	 * Constructor for the FieldOrder class
-	 * @param field The field that we are accessing
-	 */
+      /**
+       * Constructor for the FieldOrder class
+       * @param field The field that we are accessing
+       */
       FieldOrder(GaugeField &U, void *gauge_=0, void **ghost_=0)
       : volumeCB(U.VolumeCB()), nDim(U.Ndim()), geometry(U.Geometry()),
 	  location(U.Location()),
@@ -1067,51 +1025,51 @@ namespace quda {
 	 * @return L1 norm
 	 */
 	__host__ double norm1(int dim=-1, bool global=true) const {
-	  double nrm1 = accessor.transform_reduce(location, dim, abs_<double,storeFloat>(accessor.scale_inv),
-                                                  thrust::plus<double>(), 0.0);
-	  if (global) comm_allreduce(&nrm1);
-	  return nrm1;
-	}
+          double nrm1 = accessor.transform_reduce(location, dim, abs_<double, storeFloat>(accessor.scale_inv), 0.0,
+                                                  plus<double>());
+          if (global) comm_allreduce(&nrm1);
+          return nrm1;
+        }
 
-	/**
+        /**
 	 * @brief Returns the L2 norm squared of the field in a given dimension
 	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
 	 * @return L2 norm squared
 	 */
 	__host__ double norm2(int dim=-1, bool global=true) const {
-	  double nrm2 = accessor.transform_reduce(location, dim, square_<double,storeFloat>(accessor.scale_inv),
-                                                  thrust::plus<double>(), 0.0);
-	  if (global) comm_allreduce(&nrm2);
-	  return nrm2;
-	}
+          double nrm2 = accessor.transform_reduce(location, dim, square_<double, storeFloat>(accessor.scale_inv), 0.0,
+                                                  plus<double>());
+          if (global) comm_allreduce(&nrm2);
+          return nrm2;
+        }
 
-	/**
+        /**
 	 * @brief Returns the Linfinity norm of the field in a given dimension
 	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
 	 * @return Linfinity norm
 	 */
 	__host__ double abs_max(int dim=-1, bool global=true) const {
-	  double absmax = accessor.transform_reduce(location, dim, abs_<Float,storeFloat>(accessor.scale_inv),
-                                                    thrust::maximum<Float>(), 0.0);
-	  if (global) comm_allreduce_max(&absmax);
-	  return absmax;
-	}
+          double absmax = accessor.transform_reduce(location, dim, abs_<Float, storeFloat>(accessor.scale_inv), 0.0,
+                                                    maximum<Float>());
+          if (global) comm_allreduce_max(&absmax);
+          return absmax;
+        }
 
-	/**
+        /**
 	 * @brief Returns the minimum absolute value of the field
 	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
 	 * @return Minimum norm
 	 */
 	__host__ double abs_min(int dim=-1, bool global=true) const {
-	  double absmin = accessor.transform_reduce(location, dim, abs_<Float,storeFloat>(accessor.scale_inv),
-                                                    thrust::minimum<Float>(), std::numeric_limits<double>::max());
-	  if (global) comm_allreduce_min(&absmin);
-	  return absmin;
-	}
+          double absmin = accessor.transform_reduce(location, dim, abs_<Float, storeFloat>(accessor.scale_inv),
+                                                    std::numeric_limits<double>::max(), minimum<Float>());
+          if (global) comm_allreduce_min(&absmin);
+          return absmin;
+        }
 
-	/** Return the size of the allocation (geometry and parity left out and added as needed in Tunable::bytes) */
+        /** Return the size of the allocation (geometry and parity left out and added as needed in Tunable::bytes) */
 	size_t Bytes() const { return static_cast<size_t>(volumeCB) * nColor * nColor * 2ll * sizeof(storeFloat); }
-      };
+    };
 
       /**
          @brief Generic reconstruction helper with no reconstruction
@@ -1703,65 +1661,59 @@ namespace quda {
         typedef typename VectorType<Float, N>::type Vector;
         typedef typename AllocType<huge_alloc>::type AllocInt;
         Reconstruct<reconLenParam, Float, ghostExchange_, stag_phase> reconstruct;
-        static const int reconLen = (reconLenParam == 11) ? 10 : reconLenParam;
-        static const int hasPhase = (reconLen == 9 || reconLen == 13) ? 1 : 0;
+        static constexpr int reconLen = (reconLenParam == 11) ? 10 : reconLenParam;
+        static constexpr int hasPhase = (reconLen == 9 || reconLen == 13) ? 1 : 0;
         Float *gauge;
         const AllocInt offset;
-#ifdef USE_TEXTURE_OBJECTS
-      typedef typename TexVectorType<real,N>::type TexVector;
-      hipTextureObject_t tex;
-      const int tex_offset;
-#endif
-      Float *ghost[4];
-      QudaGhostExchange ghostExchange;
-      int coords[QUDA_MAX_DIM];
-      int_fastdiv X[QUDA_MAX_DIM];
-      int R[QUDA_MAX_DIM];
-      const int volumeCB;
-      int faceVolumeCB[4];
-      const int stride;
-      const int geometry;
-      const AllocInt phaseOffset;
-      void *backup_h; //! host memory for backing up the field when tuning
-      size_t bytes;
+        Float *ghost[4];
+        QudaGhostExchange ghostExchange;
+        int coords[QUDA_MAX_DIM];
+        int_fastdiv X[QUDA_MAX_DIM];
+        int R[QUDA_MAX_DIM];
+        const int volumeCB;
+        int faceVolumeCB[4];
+        const int stride;
+        const int geometry;
+        const AllocInt phaseOffset;
+        void *backup_h; //! host memory for backing up the field when tuning
+        size_t bytes;
 
-    FloatNOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0, bool override=false)
-      : reconstruct(u), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()),
-	offset(u.Bytes()/(2*sizeof(Float))),
-#ifdef USE_TEXTURE_OBJECTS
-	tex(0), tex_offset(offset/N),
-#endif
-	ghostExchange(u.GhostExchange()),
-	volumeCB(u.VolumeCB()), stride(u.Stride()), geometry(u.Geometry()),
-	phaseOffset(u.PhaseOffset()), backup_h(nullptr), bytes(u.Bytes())
-      {
-	if (geometry == QUDA_COARSE_GEOMETRY)
-	  errorQuda("This accessor does not support coarse-link fields (lacks support for bidirectional ghost zone");
+        FloatNOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0, bool override = false) :
+          reconstruct(u),
+          gauge(gauge_ ? gauge_ : (Float *)u.Gauge_p()),
+          offset(u.Bytes() / (2 * sizeof(Float) * N)),
+          ghostExchange(u.GhostExchange()),
+          volumeCB(u.VolumeCB()),
+          stride(u.Stride()),
+          geometry(u.Geometry()),
+          phaseOffset(u.PhaseOffset() / sizeof(Float)),
+          backup_h(nullptr),
+          bytes(u.Bytes())
+        {
+          if (geometry == QUDA_COARSE_GEOMETRY)
+            errorQuda("This accessor does not support coarse-link fields (lacks support for bidirectional ghost zone");
 
-        // static_assert( !(stag_phase!=QUDA_STAGGERED_PHASE_NO && reconLenParam != 18 && reconLenParam != 12),
-        // 	       "staggered phase only presently supported for 18 and 12 reconstruct");
-        for (int i = 0; i < 4; i++) {
-          X[i] = u.X()[i];
-          R[i] = u.R()[i];
-	  ghost[i] = ghost_ ? ghost_[i] : 0;
-	  faceVolumeCB[i] = u.SurfaceCB(i)*u.Nface(); // face volume equals surface * depth
-        }
-#ifdef USE_TEXTURE_OBJECTS
-	if (u.Location() == QUDA_CUDA_FIELD_LOCATION) tex = static_cast<const cudaGaugeField&>(u).Tex();
-	if (!huge_alloc && this->gauge != u.Gauge_p() && !override) {
-	  errorQuda("Cannot use texture read since data pointer does not equal field pointer - use with huge_alloc=true instead");
-	}
-#endif
+          // static_assert( !(stag_phase!=QUDA_STAGGERED_PHASE_NO && reconLenParam != 18 && reconLenParam != 12),
+          // 	       "staggered phase only presently supported for 18 and 12 reconstruct");
+          for (int i = 0; i < 4; i++) {
+            X[i] = u.X()[i];
+            R[i] = u.R()[i];
+            ghost[i] = ghost_ ? ghost_[i] : 0;
+            faceVolumeCB[i] = u.SurfaceCB(i) * u.Nface(); // face volume equals surface * depth
+          }
       }
 
-    FloatNOrder(const FloatNOrder &order)
-      : reconstruct(order.reconstruct), gauge(order.gauge), offset(order.offset),
-#ifdef USE_TEXTURE_OBJECTS
-	tex(order.tex), tex_offset(order.tex_offset),
-#endif
-	ghostExchange(order.ghostExchange),
-        volumeCB(order.volumeCB), stride(order.stride), geometry(order.geometry),
-	phaseOffset(order.phaseOffset), backup_h(nullptr), bytes(order.bytes)
+      FloatNOrder(const FloatNOrder &order) :
+        reconstruct(order.reconstruct),
+        gauge(order.gauge),
+        offset(order.offset),
+        ghostExchange(order.ghostExchange),
+        volumeCB(order.volumeCB),
+        stride(order.stride),
+        geometry(order.geometry),
+        phaseOffset(order.phaseOffset),
+        backup_h(nullptr),
+        bytes(order.bytes)
       {
 	for (int i=0; i<4; i++) {
 	  X[i] = order.X[i];
@@ -1778,31 +1730,19 @@ namespace quda {
 
 #pragma unroll
         for (int i=0; i<M; i++){
-          // first do texture load from memory
-#if defined(USE_TEXTURE_OBJECTS) && defined(__HIP_DEVICE_COMPILE__)
-	  if (!huge_alloc) { // use textures unless we have a huge alloc
-            TexVector vecTmp = tex1Dfetch_<TexVector>(tex, parity * tex_offset + (dir * M + i) * stride + x);
-            // now insert into output array
+          // first load from memory
+          Vector vecTmp = vector_load<Vector>(gauge, parity * offset + (dir * M + i) * stride + x);
+          // second do copy converting into register type
 #pragma unroll
-            for (int j = 0; j < N; j++) copy(tmp[i * N + j], reinterpret_cast<real *>(&vecTmp)[j]);
-          } else
-#endif
-          {
-            // first load from memory
-            Vector vecTmp = vector_load<Vector>(gauge + parity * offset, (dir * M + i) * stride + x);
-            // second do copy converting into register type
-#pragma unroll
-	    for (int j=0; j<N; j++) copy(tmp[i*N+j], reinterpret_cast<Float*>(&vecTmp)[j]);
-          }
+          for (int j = 0; j < N; j++) copy(tmp[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j]);
         }
 
-        real phase = 0.; // TODO - add texture support for phases
-
+        real phase = 0.;
         if (hasPhase) {
           if (static_phase<stag_phase>() && (reconLen == 13 || use_inphase)) {
             phase = inphase;
           } else {
-            copy(phase, (gauge + parity * offset)[phaseOffset / sizeof(Float) + stride * dir + x]);
+            copy(phase, gauge[parity * offset * N + phaseOffset + stride * dir + x]);
             phase *= static_cast<real>(2.0) * static_cast<real>(M_PI);
           }
         }
@@ -1823,12 +1763,11 @@ namespace quda {
 #pragma unroll
 	  for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
 	  // second do vectorized copy into memory
-          vector_store(gauge + parity * offset, x + (dir * M + i) * stride, vecTmp);
+          vector_store(gauge, parity * offset + x + (dir * M + i) * stride, vecTmp);
         }
         if (hasPhase) {
           real phase = reconstruct.getPhase(v);
-          copy((gauge + parity * offset)[phaseOffset / sizeof(Float) + dir * stride + x],
-               static_cast<real>(phase / (2. * M_PI)));
+          copy(gauge[parity * offset * N + phaseOffset + dir * stride + x], static_cast<real>(phase / (2. * M_PI)));
         }
       }
 
@@ -3069,6 +3008,12 @@ namespace quda {
     typedef gauge::FloatNOrder<float, N, 4, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
 
+#ifdef FLOAT8
+#define N8 8
+#else
+#define N8 4
+#endif
+
   // half precision
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<short, QUDA_RECONSTRUCT_NO, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
@@ -3088,11 +3033,11 @@ namespace quda {
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<short, QUDA_RECONSTRUCT_9, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<short, N, 4, 9, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<short, N, N8, 9, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<short, QUDA_RECONSTRUCT_8, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<short, N, 4, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<short, N, N8, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
 
   // quarter precision
@@ -3114,11 +3059,11 @@ namespace quda {
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<char, QUDA_RECONSTRUCT_9, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<char, N, 4, 9, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<char, N, N8, 9, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<char, QUDA_RECONSTRUCT_8, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<char, N, 4, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<char, N, N8, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
 
   template <typename T, QudaReconstructType recon, int N, QudaStaggeredPhase stag, bool huge_alloc,

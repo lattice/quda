@@ -1,4 +1,3 @@
-#include "hip/hip_runtime.h"
 #include <clover_field_order.h>
 #include <tune_quda.h>
 
@@ -79,7 +78,7 @@ namespace quda {
     }
     virtual ~CopyClover() { ; }
   
-    void apply(const hipStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       int maxThreadsPerBlock_tmp=deviceProp.maxThreadsPerBlock;
       deviceProp.maxThreadsPerBlock=256;
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());

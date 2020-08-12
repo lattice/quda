@@ -1,4 +1,3 @@
-#include "hip/hip_runtime.h"
 #include <cstdlib>
 #include <cstdio>
 #include <string>
@@ -23,7 +22,7 @@ namespace quda {
 
   using namespace colorspinor;
   
-  void exchangeExtendedGhost(cudaColorSpinorField* spinor, int R[], int parity, hipStream_t *stream_p)
+  void exchangeExtendedGhost(cudaColorSpinorField* spinor, int R[], int parity, qudaStream_t *stream_p)
   {
 #ifdef MULTI_GPU
     int nFace = 0;
@@ -36,8 +35,8 @@ namespace quda {
     int gatherCompleted[2] = {0,0};
     int commsCompleted[2] = {0,0};
 
-    hipEvent_t gatherEnd[2];
-    for(int dir=0; dir<2; dir++) hipEventCreateWithFlags(&gatherEnd[dir], hipEventDisableTiming);
+    qudaEvent_t gatherEnd[2];
+    for(int dir=0; dir<2; dir++) qudaEventCreateWithFlags(&gatherEnd[dir], qudaEventDisableTiming);
 
     for(int dim=3; dim<=0; dim--){
       if(!commDim(dim)) continue;
@@ -77,7 +76,7 @@ namespace quda {
       qudaDeviceSynchronize(); // Wait for scatters to complete before next iteration
     } // loop over dim
 
-    for(int dir=0; dir<2; dir++) hipEventDestroy(gatherEnd[dir]);
+    for(int dir=0; dir<2; dir++) qudaEventDestroy(gatherEnd[dir]);
 #endif
     return;
   }
@@ -246,7 +245,7 @@ namespace quda {
       }
       virtual ~CopySpinorEx() {}
 
-      void apply(const hipStream_t &stream){
+      void apply(const qudaStream_t &stream){
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
         if(location == QUDA_CPU_FIELD_LOCATION){
@@ -484,6 +483,16 @@ namespace quda {
         CopyExtendedColorSpinor(dst, src, parity, location, static_cast<short*>(Dst), static_cast<float*>(Src), static_cast<float*>(dstNorm), 0);
       }else if(src.Precision() == QUDA_HALF_PRECISION){
         CopyExtendedColorSpinor(dst, src, parity, location, static_cast<short*>(Dst), static_cast<short*>(Src), static_cast<float*>(dstNorm), static_cast<float*>(srcNorm));
+      }else{
+        errorQuda("Unsupported Precision %d", src.Precision());
+      }
+    } else if (dst.Precision() == QUDA_QUARTER_PRECISION){
+      if(src.Precision() == QUDA_DOUBLE_PRECISION){
+        CopyExtendedColorSpinor(dst, src, parity, location, static_cast<char*>(Dst), static_cast<double*>(Src), static_cast<float*>(dstNorm), 0);
+      }else if(src.Precision() == QUDA_SINGLE_PRECISION){
+        CopyExtendedColorSpinor(dst, src, parity, location, static_cast<char*>(Dst), static_cast<float*>(Src), static_cast<float*>(dstNorm), 0);
+      }else if(src.Precision() == QUDA_HALF_PRECISION){
+        CopyExtendedColorSpinor(dst, src, parity, location, static_cast<char*>(Dst), static_cast<short*>(Src), static_cast<float*>(dstNorm), static_cast<float*>(srcNorm));
       }else{
         errorQuda("Unsupported Precision %d", src.Precision());
       }

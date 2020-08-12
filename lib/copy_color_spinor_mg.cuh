@@ -1,4 +1,3 @@
-#include "hip/hip_runtime.h"
 /*
   Spinor reordering and copying routines.  These are implemented to
   un on both CPU and GPU.  Here we are templating on the following:
@@ -63,7 +62,7 @@ namespace quda {
       : out(out), in(in), meta(meta), location(location) { }
     virtual ~CopySpinor() { ; }
 
-    void apply(const hipStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       if (location == QUDA_CPU_FIELD_LOCATION) {
 	packSpinor<FloatOut, FloatIn, Ns, Nc>(out, in, meta.VolumeCB());
       } else {

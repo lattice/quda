@@ -1,13 +1,11 @@
-#include "hip/hip_runtime.h"
 #include <quda_internal.h>
 #include <quda_matrix.h>
 #include <tune_quda.h>
 #include <gauge_field.h>
 #include <gauge_field_order.h>
-#include <cub_helper.cuh>
+#include <reduce_helper.h>
 #include <launch_kernel.cuh>
 #include <comm_quda.h>
-
 
 namespace quda {
 
@@ -144,7 +142,7 @@ namespace quda {
   static void *sendg_d[4];
   static void *recvg_d[4];
   static void *hostbuffer_h[4];
-  static hipStream_t GFStream[2];
+  static qudaStream_t GFStream[2];
   static size_t offset[4];
   static size_t bytes[4];
   static size_t faceVolume[4];
@@ -166,8 +164,8 @@ namespace quda {
   void PGaugeExchangeFree(){
 #ifdef MULTI_GPU
     if ( comm_dim_partitioned(0) || comm_dim_partitioned(1) || comm_dim_partitioned(2) || comm_dim_partitioned(3) ) {
-      hipStreamDestroy(GFStream[0]);
-      hipStreamDestroy(GFStream[1]);
+      qudaStreamDestroy(GFStream[0]);
+      qudaStreamDestroy(GFStream[1]);
       for ( int d = 0; d < 4; d++ ) {
         if ( commDimPartitioned(d)) {
           comm_free(mh_send_fwd[d]);
@@ -217,8 +215,8 @@ namespace quda {
         faceVolumeCB[i] = faceVolume[i] / 2;
       }
 
-      hipStreamCreate(&GFStream[0]);
-      hipStreamCreate(&GFStream[1]);
+      qudaStreamCreate(&GFStream[0]);
+      qudaStreamCreate(&GFStream[1]);
       for ( int d = 0; d < 4; d++ ) {
         if ( !commDimPartitioned(d)) continue;
         // store both parities and directions in each
@@ -272,8 +270,8 @@ namespace quda {
 	(faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(sendg_d[d]), parity, d, dir, data.R()[d]);
 
     #ifndef GPU_COMMS
-      hipMemcpyAsync(send[d], send_d[d], bytes[d], hipMemcpyDeviceToHost, GFStream[0]);
-      hipMemcpyAsync(sendg[d], sendg_d[d], bytes[d], hipMemcpyDeviceToHost, GFStream[1]);
+      qudaMemcpyAsync(send[d], send_d[d], bytes[d], hipMemcpyDeviceToHost, GFStream[0]);
+      qudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], hipMemcpyDeviceToHost, GFStream[1]);
     #endif
       qudaStreamSynchronize(GFStream[0]);
       comm_start(mh_send_fwd[d]);
@@ -283,7 +281,7 @@ namespace quda {
 
     #ifndef GPU_COMMS
       comm_wait(mh_recv_back[d]);
-      hipMemcpyAsync(recv_d[d], recv[d], bytes[d], hipMemcpyHostToDevice, GFStream[0]);
+      qudaMemcpyAsync(recv_d[d], recv[d], bytes[d], hipMemcpyHostToDevice, GFStream[0]);
     #endif
       #ifdef GPU_COMMS
       comm_wait(mh_recv_back[d]);
@@ -293,7 +291,7 @@ namespace quda {
 
     #ifndef GPU_COMMS
       comm_wait(mh_recv_fwd[d]);
-      hipMemcpyAsync(recvg_d[d], recvg[d], bytes[d], hipMemcpyHostToDevice, GFStream[1]);
+      qudaMemcpyAsync(recvg_d[d], recvg[d], bytes[d], hipMemcpyHostToDevice, GFStream[1]);
     #endif
 
       #ifdef GPU_COMMS

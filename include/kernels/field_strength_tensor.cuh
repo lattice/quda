@@ -6,7 +6,7 @@
 namespace quda
 {
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_> struct FmunuArg
+  template <typename Float_, int nColor_, QudaReconstructType recon_ > struct FmunuArg
   {
     using Float = Float_;
     static constexpr int nColor = nColor_;
@@ -166,9 +166,9 @@ namespace quda
     {
       F -= conj(F);                   // 18 real subtractions + one matrix conjugation
       F *= static_cast<typename Arg::Float>(0.125); // 18 real multiplications
-                                      // 36 floating point operations here
+      // 36 floating point operations here
     }
-
+    
     constexpr int munu_idx = (mu * (mu - 1)) / 2 + nu; // lower-triangular indexing
     arg.f(munu_idx, idx, parity) = F;
   }

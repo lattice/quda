@@ -3,7 +3,7 @@
 #include <gauge_field_order.h>
 #include <launch_kernel.cuh>
 #include <index_helper.cuh>
-#include <cub_helper.cuh>
+#include <reduce_helper.h>
 
 namespace quda {
 
@@ -50,12 +50,12 @@ namespace quda {
     dx[nu]--;
     Link U4 = arg.U(nu, linkIndexShift(x,dx,arg.E), parity);
 
-    return getTrace( U1 * U2 * conj(U3) * conj(U4) ).x;
+    return getTrace( U1 * U2 * conj(U3) * conj(U4) ).real();
   }
 
   template<int blockSize, typename Arg>
   __global__ void computePlaq(Arg arg){
-    int idx = threadIdx.x + blockIdx.x*blockDim.x;
+    int idx = threadIdx.x + blockIdx.x * blockDim.x;
     int parity = threadIdx.y;
 
     double2 plaq = make_double2(0.0,0.0);
@@ -63,11 +63,14 @@ namespace quda {
     while (idx < arg.threads) {
       int x[4];
       getCoords(x, idx, arg.X, parity);
+#pragma unroll
       for (int dr=0; dr<4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
 
+#pragma unroll
       for (int mu = 0; mu < 3; mu++) {
-	for (int nu = (mu+1); nu < 3; nu++) {
-	  plaq.x += plaquette(arg, x, parity, mu, nu);
+#pragma unroll
+	for (int nu = 0; nu < 3; nu++) {
+	  if (nu >= mu + 1) plaq.x += plaquette(arg, x, parity, mu, nu);
 	}
 
 	plaq.y += plaquette(arg, x, parity, mu, 3);

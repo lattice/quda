@@ -1,7 +1,6 @@
 #include <color_spinor_field.h>
 #include <tune_quda.h>
 #include <uint_to_char.h>
-#include <typeinfo>
 #include <vector>
 #include <assert.h>
 #include <utility>
@@ -13,6 +12,15 @@
 namespace quda {
 
   using namespace quda::colorspinor;
+
+  // B fields in general use float2 ordering except for fine-grid Wilson
+  template <typename store_t, int nSpin, int nColor> struct BOrder { static constexpr QudaFieldOrder order = QUDA_FLOAT2_FIELD_ORDER; };
+  template<> struct BOrder<float, 4, 3> { static constexpr QudaFieldOrder order = QUDA_FLOAT4_FIELD_ORDER; };
+#ifdef FLOAT8
+  template<> struct BOrder<short, 4, 3> { static constexpr QudaFieldOrder order = QUDA_FLOAT8_FIELD_ORDER; };
+#else
+  template<> struct BOrder<short, 4, 3> { static constexpr QudaFieldOrder order = QUDA_FLOAT4_FIELD_ORDER; };
+#endif
 
   template <typename sumType, typename vFloat, typename bFloat, int nSpin, int spinBlockSize, int nColor_, int coarseSpin, int nVec>
   class BlockOrtho : public Tunable {
@@ -49,7 +57,7 @@ namespace quda {
 
         if (V.Location() == QUDA_CUDA_FIELD_LOCATION) {
 #ifdef JITIFY
-        create_jitify_program("kernels/block_orthogonalize.cuh");
+          create_jitify_program("kernels/block_orthogonalize.cuh");
 #endif
         }
       strcat(aux, compile_type_str(V));
@@ -96,28 +104,28 @@ namespace quda {
        orthogonalization.
      */
     template <typename Rotator, typename Vector, std::size_t... S>
-    void GPU(const TuneParam &tp, const hipStream_t &stream, const std::vector<ColorSpinorField*> &B, std::index_sequence<S...>) {
+    void GPU(const TuneParam &tp, const qudaStream_t &stream, const std::vector<ColorSpinorField*> &B, std::index_sequence<S...>) {
       typedef typename mapper<vFloat>::type RegType; // need to redeclare typedef (WAR for CUDA 7 and 8)
       typedef BlockOrthoArg<Rotator,Vector,nSpin,spinBlockSize,coarseSpin,nVec> Arg;
       Arg arg(V, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V, B[S]...);
       arg.swizzle = tp.aux.x;
-      hipMalloc(&arg.B_array_d, sizeof(signed char)*MAX_MATRIX_SIZE);
+      qudaMalloc(&arg.B_array_d, sizeof(signed char)*MAX_MATRIX_SIZE);
       
 #ifdef JITIFY
       using namespace jitify::reflection;
       auto instance = program->kernel("quda::blockOrthoGPU")
         .instantiate((int)tp.block.x,Type<sumType>(),Type<RegType>(),nSpin,spinBlockSize,nColor,coarseSpin,nVec,Type<Arg>());
-      hipMemcpyHtoDAsync(instance.get_constant_ptr("quda::B_array_d"), B_array_h, MAX_MATRIX_SIZE, stream);
+      qudaMemcpyHtoDAsync(instance.get_constant_ptr("quda::B_array_d"), B_array_h, MAX_MATRIX_SIZE, stream);
       jitify_error = instance.configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
-      hipMemcpy(arg.B_array_d,B_array_h,MAX_MATRIX_SIZE,hipMemcpyHostToDevice);
+      qudaMemcpy(arg.B_array_d,B_array_h,MAX_MATRIX_SIZE,qudaMemcpyHostToDevice);
       LAUNCH_KERNEL_MG_BLOCK_SIZE(blockOrthoGPU,tp,stream,arg,sumType,RegType,nSpin,spinBlockSize,nColor,coarseSpin,nVec,Arg);
-      hipDeviceSynchronize();
-      hipFree(arg.B_array_d);
+      qudaDeviceSynchronize();
+      qudaFree(arg.B_array_d);
 #endif
     }
 
-    void apply(const hipStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (V.Location() == QUDA_CPU_FIELD_LOCATION) {
         if (V.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER && B[0]->FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
@@ -127,11 +135,11 @@ namespace quda {
         } else {
           errorQuda("Unsupported field order %d\n", V.FieldOrder());
         }
-            } else {
-        if (V.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && B[0]->FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
+      } else {
+        if (V.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && B[0]->FieldOrder() == BOrder<bFloat,nSpin,nColor>::order) {
           typedef FieldOrderCB<RegType,nSpin,nColor,nVec,QUDA_FLOAT2_FIELD_ORDER,vFloat,vFloat,DISABLE_GHOST> Rotator;
-          typedef FieldOrderCB<RegType,nSpin,nColor,1,QUDA_FLOAT2_FIELD_ORDER,bFloat,bFloat,DISABLE_GHOST,isFixed<bFloat>::value> Vector;
-                GPU<Rotator,Vector>(tp,stream,B,std::make_index_sequence<nVec>());
+          typedef FieldOrderCB<RegType,nSpin,nColor,1,BOrder<bFloat,nSpin,nColor>::order,bFloat,bFloat,DISABLE_GHOST,isFixed<bFloat>::value> Vector;
+          GPU<Rotator,Vector>(tp,stream,B,std::make_index_sequence<nVec>());
         } else {
           errorQuda("Unsupported field order V=%d B=%d\n", V.FieldOrder(), B[0]->FieldOrder());
         }

@@ -7,7 +7,11 @@
 #include <comm_quda.h>
 #include <util_quda.h>
 #include <object.h>
+#if defined(__HIP__)
 #include <hip/hip_runtime.h>
+#else
+#include <quda_cuda_api.h>
+#endif
 
 /**
  * @file lattice_field.h
@@ -642,16 +646,18 @@ namespace quda {
     */
     void *remoteFace_d(int dir, int dim) const { return ghost_remote_send_buffer_d[bufferIndex][dim][dir]; }
 
-    virtual void gather(int nFace, int dagger, int dir, hipStream_t *stream_p=NULL)
+    virtual void gather(int nFace, int dagger, int dir, qudaStream_t *stream_p = NULL) { errorQuda("Not implemented"); }
+
+    virtual void commsStart(int nFace, int dir, int dagger = 0, qudaStream_t *stream_p = NULL, bool gdr_send = false,
+                            bool gdr_recv = true)
     { errorQuda("Not implemented"); }
 
-    virtual void commsStart(int nFace, int dir, int dagger=0, hipStream_t *stream_p=NULL, bool gdr_send=false, bool gdr_recv=true)
-    { errorQuda("Not implemented"); }
-
-    virtual int commsQuery(int nFace, int dir, int dagger=0, hipStream_t *stream_p=NULL, bool gdr_send=false, bool gdr_recv=true)
+    virtual int commsQuery(int nFace, int dir, int dagger = 0, qudaStream_t *stream_p = NULL, bool gdr_send = false,
+                           bool gdr_recv = true)
     { errorQuda("Not implemented"); return 0; }
 
-    virtual void commsWait(int nFace, int dir, int dagger=0, hipStream_t *stream_p=NULL, bool gdr_send=false, bool gdr_recv=true)
+    virtual void commsWait(int nFace, int dir, int dagger = 0, qudaStream_t *stream_p = NULL, bool gdr_send = false,
+                           bool gdr_recv = true)
     { errorQuda("Not implemented"); }
 
     virtual void scatter(int nFace, int dagger, int dir)
@@ -668,6 +674,15 @@ namespace quda {
 
     /** @brief Restores the LatticeField */
     virtual void restore() const { errorQuda("Not implemented"); }
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      all relevant memory fields to the current device or to the CPU.
+      @param[in] mem_space Memory space we are prefetching to
+    */
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const { ; }
+
+    virtual bool isNative() const = 0;
   };
   
   /**
@@ -698,7 +713,7 @@ namespace quda {
     return static_cast<QudaFieldLocation>(Location_(func,file,line,a,b) & Location_(func,file,line,a,args...));
   }
 
-#define checkLocation(...)Location_(__func__, __FILE__, __LINE__, __VA_ARGS__)
+#define checkLocation(...) Location_(__func__, __FILE__, __LINE__, __VA_ARGS__)
 
   /**
      @brief Helper function for determining if the precision of the fields is the same.
@@ -730,6 +745,31 @@ namespace quda {
   }
 
 #define checkPrecision(...) Precision_(__func__, __FILE__, __LINE__, __VA_ARGS__)
+
+  /**
+     @brief Helper function for determining if the field is in native order
+     @param[in] a Input field
+     @return true if field is in native order
+   */
+  inline bool Native_(const char *func, const char *file, int line, const LatticeField &a)
+  {
+    if (!a.isNative()) errorQuda("Non-native field detected (%s:%d in %s())\n", file, line, func);
+    return true;
+  }
+
+  /**
+     @brief Helper function for determining if the fields are in native order
+     @param[in] a Input field
+     @param[in] args List of additional fields to check
+     @return true if all fields are in native order
+   */
+  template <typename... Args>
+  inline bool Native_(const char *func, const char *file, int line, const LatticeField &a, const Args &... args)
+  {
+    return (Native_(func, file, line, a) & Native_(func, file, line, args...));
+  }
+
+#define checkNative(...) Native_(__func__, __FILE__, __LINE__, __VA_ARGS__)
 
   /**
      @brief Return whether data is reordered on the CPU or GPU.  This can set

@@ -1,4 +1,3 @@
-#include "hip/hip_runtime.h"
 #include <cstdlib>
 #include <cstdio>
 #include <string>
@@ -19,7 +18,7 @@ namespace quda {
 
   // these should not be namespaced!!
   // determines whether the temporal ghost zones are packed with a gather kernel,
-  // as opposed to multiple calls to hipMemcpy()
+  // as opposed to multiple calls to qudaMemcpy()
   static bool kernelPackT = false;
 
   void setKernelPackT(bool packT) { kernelPackT = packT; }
@@ -53,12 +52,12 @@ namespace quda {
   namespace dslash {
     int it = 0;
 
-    hipEvent_t packEnd[2];
-    hipEvent_t gatherStart[Nstream];
-    hipEvent_t gatherEnd[Nstream];
-    hipEvent_t scatterStart[Nstream];
-    hipEvent_t scatterEnd[Nstream];
-    hipEvent_t dslashStart[2];
+    qudaEvent_t packEnd[2];
+    qudaEvent_t gatherStart[Nstream];
+    qudaEvent_t gatherEnd[Nstream];
+    qudaEvent_t scatterStart[Nstream];
+    qudaEvent_t scatterEnd[Nstream];
+    qudaEvent_t dslashStart[2];
 
     // these variables are used for benchmarking the dslash components in isolation
     bool dslash_pack_compute;
@@ -86,11 +85,6 @@ namespace quda {
     // FIX this is a hack from hell
     // Auxiliary work that can be done while waiting on comms to finis
     Worker *aux_worker;
-
-#if CUDA_VERSION >= 8000
-    cuuint32_t *commsEnd_h;
-    hipDeviceptr_t commsEnd_d[Nstream];
-#endif
   }
 
   void createDslashEvents()
@@ -109,14 +103,6 @@ namespace quda {
     }
 
     aux_worker = NULL;
-
-#if CUDA_VERSION >= 8000
-    commsEnd_h = static_cast<cuuint32_t*>(mapped_malloc(Nstream*sizeof(int)));
-    for (int i=0; i<Nstream; i++) {
-      hipHostGetDevicePointer((void**)&commsEnd_d[i], commsEnd_h+i, 0);
-      commsEnd_h[i] = 0;
-    }
-#endif
 
     checkCudaError();
 
@@ -146,21 +132,16 @@ namespace quda {
   {
     using namespace dslash;
 
-#if CUDA_VERSION >= 8000
-    host_free(commsEnd_h);
-    commsEnd_h = 0;
-#endif
-
     for (int i=0; i<Nstream; i++) {
-      hipEventDestroy(gatherStart[i]);
-      hipEventDestroy(gatherEnd[i]);
-      hipEventDestroy(scatterStart[i]);
-      hipEventDestroy(scatterEnd[i]);
+      qudaEventDestroy(gatherStart[i]);
+      qudaEventDestroy(gatherEnd[i]);
+      qudaEventDestroy(scatterStart[i]);
+      qudaEventDestroy(scatterEnd[i]);
     }
 
     for (int i=0; i<2; i++) {
-      hipEventDestroy(packEnd[i]);
-      hipEventDestroy(dslashStart[i]);
+      qudaEventDestroy(packEnd[i]);
+      qudaEventDestroy(dslashStart[i]);
     }
 
     checkCudaError();
@@ -270,7 +251,7 @@ namespace quda {
     }
     virtual ~Gamma() { }
 
-    void apply(const hipStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
 	gammaCPU<Float,nColor>(arg);
       } else {
@@ -388,7 +369,7 @@ namespace quda {
     }
     virtual ~TwistGamma() { }
 
-    void apply(const hipStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
 	if (arg.doublet) twistGammaCPU<true,Float,nColor>(arg);
 	twistGammaCPU<false,Float,nColor>(arg);
@@ -585,7 +566,7 @@ namespace quda {
     }
     virtual ~Clover() { }
 
-    void apply(const hipStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
@@ -743,7 +724,7 @@ namespace quda {
     }
     virtual ~TwistClover() { }
 
-    void apply(const hipStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {

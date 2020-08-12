@@ -5,6 +5,9 @@
 #undef device_malloc
 #undef device_free
 
+// this is temporary addition until we remove CUB from QUDA and rely on the CUDA toolkit version
+#define THRUST_IGNORE_CUB_VERSION_CHECK
+
 // ensures we use shfl_sync and not shfl when compiling with clang
 #if defined(__clang__) && defined(__CUDA__) && CUDA_VERSION >= 9000
 #define CUB_USE_COOPERATIVE_GROUPS
@@ -17,6 +20,11 @@
 #include <thrust/system/hip/execution_policy.h>
 #define thrust_par(alloc) thrust::hip::par(alloc)
 #else
+// hack required to silence a thrust complaint with clang-11
+#if defined(__clang__) && defined(__CUDA__)
+#define _CubLog(...)
+#endif
+
 #include <thrust/system/cuda/vector.h>
 #include <thrust/system/cuda/execution_policy.h>
 #define thrust_par(alloc) thrust::cuda::par(alloc)

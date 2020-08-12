@@ -1,4 +1,3 @@
-#include "hip/hip_runtime.h"
 #include <multigrid_helper.cuh>
 #include <fast_intdiv.h>
 
@@ -14,7 +13,7 @@
 namespace quda {
 
 #define MAX_MATRIX_SIZE 4096
-//  static __constant__ signed char B_array_d[MAX_MATRIX_SIZE];
+//  __constant__ signed char B_array_d[MAX_MATRIX_SIZE];
 
   // to avoid overflowing the parameter space we put the B array into a separate constant memory buffer
   static signed char B_array_h[MAX_MATRIX_SIZE];
@@ -105,11 +104,27 @@ namespace quda {
 
 #ifndef __CUDACC_RTC___
   template <typename sumFloat, typename Float, int nSpin, int spinBlockSize, int nColor, int coarseSpin, int nVec, typename Arg>
-  void blockOrthoCPU(Arg &arg) {
-
+  void blockOrthoCPU(Arg &arg)
+  {
     // loop over geometric blocks
 #pragma omp parallel for
     for (int x_coarse=0; x_coarse<arg.coarseVolume; x_coarse++) {
+
+      // first copy over raw components into the container
+      for (int j = 0; j < nVec; j++) {
+        for (int parity = 0; parity < arg.nParity; parity++) {
+          parity = (arg.nParity == 2) ? parity : arg.parity;
+          for (int b = 0; b < arg.geoBlockSizeCB; b++) {
+            int x = arg.coarse_to_fine[(x_coarse * 2 + parity) * arg.geoBlockSizeCB + b];
+            int x_cb = x - parity * arg.fineVolumeCB;
+            for (int s = 0; s < nSpin; s++) {
+              for (int c = 0; c < nColor; c++) {
+                arg.V(parity, x_cb, s, c, j) = arg.B[j](parity, x_cb, s, c);
+              }
+            }
+          }
+        }
+      }
 
       // loop over number of block orthos
       for (int n = 0; n < arg.nBlockOrtho; n++) {
@@ -130,14 +145,8 @@ namespace quda {
                 int x_cb = x - parity * arg.fineVolumeCB;
 
                 complex<Float> v[nSpin][nColor];
-
-                if (n == 0) { // load from B on first Gram-Schmidt, otherwise V.
-                  for (int s = 0; s < nSpin; s++)
-                    for (int c = 0; c < nColor; c++) v[s][c] = arg.B[j](parity, x_cb, s, c);
-                } else {
-                  for (int s = 0; s < nSpin; s++)
-                    for (int c = 0; c < nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
-                }
+                for (int s = 0; s < nSpin; s++)
+                  for (int c = 0; c < nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
 
                 for (int s = 0; s < nSpin; s++) {
                   complex<Float> vis[nColor];
@@ -157,12 +166,8 @@ namespace quda {
                 int x_cb = x - parity * arg.fineVolumeCB;
 
                 complex<Float> v[nSpin][nColor];
-                if (i == 0)
-                  for (int s = 0; s < nSpin; s++)
-                    for (int c = 0; c < nColor; c++) v[s][c] = arg.B[j](parity, x_cb, s, c);
-                else
-                  for (int s = 0; s < nSpin; s++)
-                    for (int c = 0; c < nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
+                for (int s = 0; s < nSpin; s++)
+                  for (int c = 0; c < nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
 
                 for (int s = 0; s < nSpin; s++) {
                   complex<Float> vis[nColor];
@@ -187,12 +192,8 @@ namespace quda {
               int x_cb = x - parity * arg.fineVolumeCB;
 
               complex<Float> v[nSpin][nColor];
-              if (j == 0)
-                for (int s = 0; s < nSpin; s++)
-                  for (int c = 0; c < nColor; c++) v[s][c] = arg.B[j](parity, x_cb, s, c);
-              else
-                for (int s = 0; s < nSpin; s++)
-                  for (int c = 0; c < nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
+              for (int s = 0; s < nSpin; s++)
+                for (int c = 0; c < nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
               for (int s = 0; s < nSpin; s++) { colorNorm<nColor>(nrm[arg.spin_map(s, parity)], v[s]); }
             }
           }
@@ -208,12 +209,8 @@ namespace quda {
               int x_cb = x - parity * arg.fineVolumeCB;
 
               complex<Float> v[nSpin][nColor];
-              if (j == 0)
-                for (int s = 0; s < nSpin; s++)
-                  for (int c = 0; c < nColor; c++) v[s][c] = arg.B[j](parity, x_cb, s, c);
-              else
-                for (int s = 0; s < nSpin; s++)
-                  for (int c = 0; c < nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
+              for (int s = 0; s < nSpin; s++)
+                for (int c = 0; c < nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
 
               for (int s = 0; s < nSpin; s++) { colorScale<Float, nColor>(v[s], nrm[arg.spin_map(s, parity)]); }
 
@@ -234,7 +231,6 @@ namespace quda {
             int nVec, typename Arg>
   __launch_bounds__(2 * block_size) __global__ void blockOrthoGPU(Arg arg)
   {
-
     int x_coarse = blockIdx.x;
 #ifdef SWIZZLE
     // the portion of the grid that is exactly divisible by the number of SMs
@@ -265,8 +261,7 @@ namespace quda {
     sumFloat *nrm_ = (sumFloat *)&dot_storage;
 
     // cast the constant memory buffer to a Vector array
-    typedef typename std::remove_reference<decltype(*arg.B)>::type Vector;
-    const Vector *B = reinterpret_cast<const Vector *>(arg.B_array_d);
+    const auto *B = reinterpret_cast<decltype(arg.B)>(arg.B_array_d);
 
     // loop over number of block orthos
     for (int n = 0; n < arg.nBlockOrtho; n++) {
@@ -274,10 +269,12 @@ namespace quda {
 
         complex<Float> v[spinBlock][nColor];
         if (n == 0) { // load from B on first Gram-Schmidt, otherwise V.
+          complex<Float> v_[spinBlock * nColor];
+          B[j].template load<spinBlock>(v_, parity, x_cb, chirality);
 #pragma unroll
           for (int s = 0; s < spinBlock; s++)
 #pragma unroll
-            for (int c = 0; c < nColor; c++) v[s][c] = B[j](parity, x_cb, chirality * spinBlock + s, c);
+            for (int c = 0; c < nColor; c++) v[s][c] = v_[s * nColor + c];
         } else {
 #pragma unroll
           for (int s = 0; s < spinBlock; s++)

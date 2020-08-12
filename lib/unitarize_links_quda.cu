@@ -1,19 +1,14 @@
-#include "hip/hip_runtime.h"
 #include <cstdlib>
 #include <cstdio>
-#include <iostream>
-#include <iomanip>
-#include <hip/hip_runtime.h>
 #include <gauge_field.h>
 #include <gauge_field_order.h>
-
 #include <tune_quda.h>
 #include <quda_matrix.h>
 #include <unitarization_links.h>
-
 #include <su3_project.cuh>
 #include <index_helper.cuh>
 #include <instantiate.h>
+#include <color_spinor.h>
 
 namespace quda {
 
@@ -28,15 +23,18 @@ namespace {
 #define FL_UNITARIZE_PI23 FL_UNITARIZE_PI*0.66666666666666666666
 #endif
 
-  static const int max_iter_newton = 20;
-  static const int max_iter = 20;
+    
+  // supress compiler warnings about unused variables when GPU_UNITARIZE is not set
+  // when we switch to C++17 consider [[maybe_unused]]
+  __attribute__((unused)) static const int max_iter_newton = 20;
+  __attribute__((unused))static const int max_iter = 20;
 
-  static double unitarize_eps = 1e-14;
-  static double max_error = 1e-10;
-  static int reunit_allow_svd = 1;
-  static int reunit_svd_only  = 0;
-  static double svd_rel_error = 1e-6;
-  static double svd_abs_error = 1e-6;
+  __attribute__((unused)) static double unitarize_eps = 1e-14;
+  __attribute__((unused)) static double max_error = 1e-10;
+  __attribute__((unused)) static int reunit_allow_svd = 1;
+  __attribute__((unused)) static int reunit_svd_only  = 0;
+  __attribute__((unused)) static double svd_rel_error = 1e-6;
+  __attribute__((unused)) static double svd_abs_error = 1e-6;
 
   template <typename Float_, int nColor_, QudaReconstructType recon_>
   struct UnitarizeLinksArg {
@@ -351,7 +349,7 @@ namespace {
       checkCudaError();
     }
 
-    void apply(const hipStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       DoUnitarizedLink<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
     }
@@ -359,7 +357,7 @@ namespace {
     void preTune() { if (arg.in.gauge == arg.out.gauge) arg.out.save(); }
     void postTune() {
       if (arg.in.gauge == arg.out.gauge) arg.out.load();
-      hipMemset(arg.fails, 0, sizeof(int)); // reset fails counter
+      qudaMemset(arg.fails, 0, sizeof(int)); // reset fails counter
     }
 
     long long flops() const {
@@ -441,7 +439,7 @@ namespace {
       checkCudaError();
     }
 
-    void apply(const hipStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       ProjectSU3kernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
     }
@@ -449,7 +447,7 @@ namespace {
     void preTune() { arg.u.save(); }
     void postTune() {
       arg.u.load();
-      hipMemset(arg.fails, 0, sizeof(int)); // reset fails counter
+      qudaMemset(arg.fails, 0, sizeof(int)); // reset fails counter
     }
 
     long long flops() const { return 0; } // depends on number of iterations
@@ -458,14 +456,14 @@ namespace {
   };
 
   void projectSU3(GaugeField &u, double tol, int *fails) {
-#ifdef GPU_UNITARIZE
+#ifdef GPU_GAUGE_TOOLS
     // check the the field doesn't have staggered phases applied
     if (u.StaggeredPhaseApplied())
       errorQuda("Cannot project gauge field with staggered phases applied");
 
-    instantiate<ProjectSU3, ReconstructNone>(u, tol, fails);
+    instantiate<ProjectSU3, ReconstructWilson>(u, tol, fails);
 #else
-    errorQuda("Unitarization has not been built");
+    errorQuda("Gauge tools have not been built");
 #endif
   }
 

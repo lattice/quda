@@ -1,4 +1,3 @@
-#include "hip/hip_runtime.h"
 #include <quda_internal.h>
 #include <quda_matrix.h>
 #include <tune_quda.h>
@@ -11,9 +10,6 @@
 #include <random_quda.h>
 #include <index_helper.cuh>
 #include <atomic.cuh>
-#include <cub_helper.cuh>
-
-
 
 #ifndef PI
 #define PI    3.1415926535897932384626433832795    // pi
@@ -690,7 +686,7 @@ namespace quda {
       mu = _mu;
       parity = _parity;
     }
-    void apply(const hipStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       compute_heatBath<Float, Gauge, NCOLORS, HeatbathOrRelax > <<< tp.grid,tp.block, tp.shared_bytes, stream >>> (arg, mu, parity);
     }

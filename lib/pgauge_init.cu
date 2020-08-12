@@ -1,4 +1,3 @@
-#include "hip/hip_runtime.h"
 #include <quda_internal.h>
 #include <quda_matrix.h>
 #include <tune_quda.h>
@@ -9,9 +8,7 @@
 #include <unitarization_links.h>
 #include <pgauge_monte.h>
 #include <random_quda.h>
-#include <cub_helper.cuh>
 #include <index_helper.cuh>
-
 
 #ifndef PI
 #define PI    3.1415926535897932384626433832795    // pi
@@ -77,10 +74,9 @@ namespace quda {
     ~InitGaugeCold () {
     }
 
-    void apply(const hipStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       compute_InitGauge_ColdStart<Float, Gauge, NCOLORS> <<< tp.grid,tp.block >>> (arg);
-      //hipDeviceSynchronize();
     }
 
     TuneKey tuneKey() const {
@@ -110,8 +106,6 @@ namespace quda {
     init.apply(0);
     checkCudaError();
   }
-
-
 
   template<typename Float>
   void InitGaugeField( cudaGaugeField& data) {
@@ -242,7 +236,7 @@ namespace quda {
     aabs = sqrt( 1.0 - a(0,0) * a(0,0));
     ctheta = Random<T>(localState, (T)-1.0, (T)1.0);
     phi = PII * Random<T>(localState);
-    stheta = ( hiprand(&localState) & 1 ? 1 : -1 ) * sqrt( (T)1.0 - ctheta * ctheta );
+    stheta = ( qudarand(&localState) & 1 ? 1 : -1 ) * sqrt( (T)1.0 - ctheta * ctheta );
     a(0,1) = aabs * stheta * cos( phi );
     a(1,0) = aabs * stheta * sin( phi );
     a(1,1) = aabs * ctheta;
@@ -381,10 +375,9 @@ namespace quda {
     ~InitGaugeHot () {
     }
 
-    void apply(const hipStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       compute_InitGauge_HotStart<Float, Gauge, NCOLORS> <<< tp.grid,tp.block >>> (arg);
-      //hipDeviceSynchronize();
     }
 
     TuneKey tuneKey() const {

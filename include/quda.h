@@ -1,5 +1,4 @@
-#ifndef _QUDA_H
-#define _QUDA_H
+#pragma once
 
 /**
  * @file  quda.h
@@ -112,6 +111,19 @@ extern "C" {
 
     double_complex b_5[QUDA_MAX_DWF_LS]; /**< Mobius coefficients - only real part used if regular Mobius */
     double_complex c_5[QUDA_MAX_DWF_LS]; /**< Mobius coefficients - only real part used if regular Mobius */
+
+    /**<
+     * The following specifies the EOFA parameters. Notation follows arXiv:1706.05843
+     * eofa_shift: the "\beta" in the paper
+     * eofa_pm: plus or minus for the EOFA operator
+     * mq1, mq2, mq3 are the three masses corresponds to Hasenbusch mass spliting.
+     * As far as I know mq1 is always the same as "mass" but it's here just for consistence.
+     * */
+    double eofa_shift;
+    int eofa_pm;
+    double mq1;
+    double mq2;
+    double mq3;
 
     double mu;    /**< Twisted mass parameter */
     double epsilon; /**< Twisted mass parameter */
@@ -328,14 +340,14 @@ extern "C" {
     /** How many vectors to compute after one solve
      *  for eigCG recommended values 8 or 16
     */
-    int nev;
+    int n_ev;
     /** EeigCG  : Search space dimension
      *  gmresdr : Krylov subspace dimension
     */
     int max_search_dim;
     /** For systems with many RHS: current RHS index */
     int rhs_idx;
-    /** Specifies deflation space volume: total number of eigenvectors is nev*deflation_grid */
+    /** Specifies deflation space volume: total number of eigenvectors is n_ev*deflation_grid */
     int deflation_grid;
     /** eigCG: selection criterion for the reduced eigenvector set */
     double eigenval_tol;
@@ -372,6 +384,9 @@ extern "C" {
 
     /** Which external library to use in the linear solvers (MAGMA or Eigen) */
     QudaExtLibType extlib_type;
+
+    /** Whether to use the platform native or generic BLAS / LAPACK */
+    QudaBoolean native_blas_lapack;
 
   } QudaInvertParam;
 
@@ -430,13 +445,15 @@ extern "C" {
     QudaEigSpectrumType spectrum;
 
     /** Size of the eigenvector search space **/
-    int nEv;
+    int n_ev;
     /** Total size of Krylov space **/
-    int nKr;
+    int n_kr;
     /** Max number of locked eigenpairs (deduced at runtime) **/
     int nLockedMax;
     /** Number of requested converged eigenvectors **/
-    int nConv;
+    int n_conv;
+    /** Number of requested converged eigenvectors to use in deflation **/
+    int n_ev_deflate;
     /** Tolerance on the least well known eigenvalue's residual **/
     double tol;
     /** For IRLM/IRAM, check every nth restart **/
@@ -445,6 +462,8 @@ extern "C" {
     int max_restarts;
     /** For the Ritz rotation, the maximal number of extra vectors the solver may allocate **/
     int batched_rotate;
+    /** For block method solvers, the block size **/
+    int block_size;
 
     /** In the test function, cross check the device result against ARPACK **/
     QudaBoolean arpack_check;
@@ -481,6 +500,14 @@ extern "C" {
 
     /** Filename prefix for where to save the null-space vectors */
     char vec_outfile[256];
+
+    /** The precision with which to save the vectors */
+    QudaPrecision save_prec;
+
+    /** Whether to inflate single-parity eigen-vector I/O to a full
+        field (e.g., enabling this is required for compatability with
+        MILC I/O) */
+    QudaBoolean io_parity_inflate;
 
     /** The Gflops rate of the eigensolver setup */
     double gflops;
@@ -674,9 +701,21 @@ extern "C" {
     /** Boolean for if this is a staggered solve or not */
     QudaBoolean is_staggered;
 
+    /** Whether to do a full (false) or thin (true) update in the context of updateMultigridQuda */
+    QudaBoolean thin_update_only;
+
   } QudaMultigridParam;
 
-
+  typedef struct QudaGaugeObservableParam_s {
+    QudaBoolean su_project;              /**< Whether to porject onto the manifold prior to measurement */
+    QudaBoolean compute_plaquette;       /**< Whether to compute the plaquette */
+    double plaquette[3];                 /**< Total, spatial and temporal field energies, respectively */
+    QudaBoolean compute_qcharge;         /**< Whether to compute the topological charge and field energy */
+    double qcharge;                      /**< Computed topological charge */
+    double energy[3];                    /**< Total, spatial and temporal field energies, respectively */
+    QudaBoolean compute_qcharge_density; /**< Whether to compute the topological charge density */
+    void *qcharge_density; /**< Pointer to host array of length volume where the q-charge density will be copied */
+  } QudaGaugeObservableParam;
 
   /*
    * Interface functions, found in interface_quda.cpp
@@ -837,6 +876,15 @@ extern "C" {
   QudaEigParam newQudaEigParam(void);
 
   /**
+   * A new QudaGaugeObservableParam should always be initialized
+   * immediately after it's defined (and prior to explicitly setting
+   * its members) using this function.  Typical usage is as follows:
+   *
+   *   QudaGaugeParam obs_param = newQudaGaugeObservableParam();
+   */
+  QudaGaugeObservableParam newQudaGaugeObservableParam(void);
+
+  /**
    * Print the members of QudaGaugeParam.
    * @param param The QudaGaugeParam whose elements we are to print.
    */
@@ -859,6 +907,12 @@ extern "C" {
    * @param param The QudaEigParam whose elements we are to print.
    */
   void printQudaEigParam(QudaEigParam *param);
+
+  /**
+   * Print the members of QudaGaugeObservableParam.
+   * @param param The QudaGaugeObservableParam whose elements we are to print.
+   */
+  void printQudaGaugeObservableParam(QudaGaugeObservableParam *param);
 
   /**
    * Load the gauge field from the host.
@@ -968,7 +1022,8 @@ extern "C" {
    * @brief Updates the multigrid preconditioner for the new gauge / clover field
    * @param mg_instance Pointer to instance of multigrid_solver
    * @param param Contains all metadata regarding host and device
-   * storage and solver parameters
+   * storage and solver parameters, of note contains a flag specifying whether
+   * to do a full update or a thin update.
    */
   void updateMultigridQuda(void *mg_instance, QudaMultigridParam *param);
 
@@ -989,8 +1044,7 @@ extern "C" {
    *               storage
    * @param parity The destination parity of the field
    */
-  void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param,
-      QudaParity parity);
+  void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity);
 
   /**
    * Apply the clover operator or its inverse.
@@ -1035,7 +1089,14 @@ extern "C" {
   void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
                          double *path_coeff, QudaGaugeParam *param);
 
-
+  /**
+   * Either downloads and sets the resident momentum field, or uploads
+   * and returns the resident momentum field
+   *
+   * @param[in,out] mom The external momentum field
+   * @param[in] param The parameters of the external field
+   */
+  void momResidentQuda(void *mom, QudaGaugeParam *param);
 
   /**
    * Compute the gauge force and update the mometum field
@@ -1215,16 +1276,13 @@ extern "C" {
    */
   void plaqQuda(double plaq[3]);
 
-  /*
+  /**
    * Performs a deep copy from the internal extendedGaugeResident field.
    * @param Pointer to externalGaugeResident cudaGaugeField
    * @param Location of gauge field
    */
   void copyExtendedResidentGaugeQuda(void* resident_gauge, QudaFieldLocation loc);
 
-
-  void copyExtendedResidentGaugeQuda(void* resident_gauge, QudaFieldLocation loc);
-  
   /**
    * Calculate the LaMET objects with two spinor fields using the gauge field.
    * @param h_out  Result correlator, contracted by gamma matrices with two spinor fields;
@@ -1272,37 +1330,54 @@ extern "C" {
    * @param h_in   Input spinor field
    * @param param  Contains all metadata regarding host and device
    *               storage and operator which will be applied to the spinor
-   * @param nSteps Number of steps to apply.
+   * @param n_steps Number of steps to apply.
    * @param alpha  Alpha coefficient for Wuppertal smearing.
    */
-  void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param, unsigned int nSteps, double alpha);
+  void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param, unsigned int n_steps, double alpha);
 
   /**
    * Performs APE smearing on gaugePrecise and stores it in gaugeSmeared
-   * @param nSteps Number of steps to apply.
+   * @param n_steps Number of steps to apply.
    * @param alpha  Alpha coefficient for APE smearing.
+   * @param meas_interval Measure the Q charge every Nth step
    */
-  void performAPEnStep(unsigned int nSteps, double alpha);
+  void performAPEnStep(unsigned int n_steps, double alpha, int meas_interval);
 
   /**
    * Performs STOUT smearing on gaugePrecise and stores it in gaugeSmeared
-   * @param nSteps Number of steps to apply.
+   * @param n_steps Number of steps to apply.
    * @param rho    Rho coefficient for STOUT smearing.
+   * @param meas_interval Measure the Q charge every Nth step
    */
-  void performSTOUTnStep(unsigned int nSteps, double rho);
+  void performSTOUTnStep(unsigned int n_steps, double rho, int meas_interval);
 
   /**
    * Performs Over Imroved STOUT smearing on gaugePrecise and stores it in gaugeSmeared
-   * @param nSteps Number of steps to apply.
+   * @param n_steps Number of steps to apply.
    * @param rho    Rho coefficient for STOUT smearing.
    * @param epsilon Epsilon coefficient for Over Improved STOUT smearing.
+   * @param meas_interval Measure the Q charge every Nth step
    */
-  void performOvrImpSTOUTnStep(unsigned int nSteps, double rho, double epsilon);
+  void performOvrImpSTOUTnStep(unsigned int n_steps, double rho, double epsilon, int meas_interval);
 
   /**
-   * Calculates the topological charge from gaugeSmeared, if it exist, or from gaugePrecise if no smeared fields are present.
+   * Performs Wilson Flow on gaugePrecise and stores it in gaugeSmeared
+   * @param n_steps Number of steps to apply.
+   * @param step_size Size of Wilson Flow step
+   * @param meas_interval Measure the Q charge and field energy every Nth step
+   * @param wflow_type 1x1 Wilson or 2x1 Symanzik flow type
    */
-  double qChargeQuda();
+  void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval, QudaWFlowType wflow_type);
+
+  /**
+   * @brief Calculates a variety of gauge-field observables.  If a
+   * smeared gauge field is presently loaded (in gaugeSmeared) the
+   * observables are computed on this, else the resident gauge field
+   * will be used.
+   * @param[in,out] param Parameter struct that defines which
+   * observables we are making and the resulting observables.
+   */
+  void gaugeObservablesQuda(QudaGaugeObservableParam *param);
 
   /**
    * Public function to perform color contractions of the host spinors x and y.
@@ -1315,13 +1390,6 @@ extern "C" {
    */
   void contractQuda(const void *x, const void *y, void *result, const QudaContractType cType, QudaInvertParam *param,
                     const int *X);
-
-  /**
-     @brief Calculates the topological charge from gaugeSmeared, if it exist,
-     or from gaugePrecise if no smeared fields are present.
-     @param[out] qDensity array holding Q charge density
-  */
-  double qChargeDensityQuda(void *qDensity);
 
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
@@ -1408,4 +1476,3 @@ extern "C" {
 
 /* #include <quda_new_interface.h> */
 
-#endif /* _QUDA_H */

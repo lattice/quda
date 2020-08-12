@@ -26,7 +26,7 @@ namespace quda
     {
     }
 
-    void apply(const hipStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
@@ -135,16 +135,6 @@ namespace quda
       const int *comm_override, TimeProfile &profile)
   {
 #ifdef GPU_TWISTED_CLOVER_DIRAC
-    if (in.V() == out.V()) errorQuda("Aliasing pointers");
-    if (in.FieldOrder() != out.FieldOrder())
-      errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
-
-    // check all precisions match
-    checkPrecision(out, in, U, C);
-
-    // check all locations match
-    checkLocation(out, in, U, C);
-
     instantiate<TwistedCloverPreconditionedApply>(out, in, U, C, a, b, xpay, x, parity, dagger, comm_override, profile);
 #else
     errorQuda("Twisted-clover dslash has not been built");

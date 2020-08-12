@@ -22,7 +22,7 @@ namespace quda
   public:
     TwistedMass(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
 
-    void apply(const hipStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
@@ -73,16 +73,6 @@ namespace quda
                         TimeProfile &profile)
   {
 #ifdef GPU_TWISTED_MASS_DIRAC
-    if (in.V() == out.V()) errorQuda("Aliasing pointers");
-    if (in.FieldOrder() != out.FieldOrder())
-      errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
-
-    // check all precisions match
-    checkPrecision(out, in, U);
-
-    // check all locations match
-    checkLocation(out, in, U);
-
     instantiate<TwistedMassApply>(out, in, U, a, b, x, parity, dagger, comm_override, profile);
 #else
     errorQuda("Twisted-mass dslash has not been built");
