@@ -66,7 +66,10 @@ namespace quda
     Kparam(param)
   {
     fillInnerSolverParam(Kparam, param);
-
+    // Preconditioners do not need a deflation space,
+    // so we explicily set this here.
+    Kparam.deflate = false;
+    
     if (param.inv_type_precondition == QUDA_CG_INVERTER) {
       K = new CG(matPrecon, matPrecon, matPrecon, matEig, Kparam, profile);
     } else if (param.inv_type_precondition == QUDA_MR_INVERTER) {
