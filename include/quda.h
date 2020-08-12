@@ -1347,7 +1347,11 @@ extern "C" {
    */
   void gaugeObservablesQuda(QudaGaugeObservableParam *param);
 
-  /**
+  //FIXME we need to change this according to what we call in correlator_test.cpp! But quda.h doesn't know any of the types :(
+
+  //    std::vector<ColorSpinorField *> h_prop_array_flavor_1, std::vector<ColorSpinorField *> h_prop_array_flavor_2, void *h_result, const QudaContractType cType,
+  //		   QudaInvertParam *param, ColorSpinorParam *cs_param, const int *X)
+/**
    * Public function to perform color contractions of the host spinors x and y.
    * @param[in] x pointer to host data
    * @param[in] y pointer to host data
@@ -1356,8 +1360,9 @@ extern "C" {
    * @param[in] param meta data for construction of ColorSpinorFields.
    * @param[in] X spacetime data for construction of ColorSpinorFields.
    */
-  void contractQuda(const void *x, const void *y, void *result, const QudaContractType cType, QudaInvertParam *param,
+void contractQuda(const void *x, const void *y, void *result, const QudaContractType cType, QudaInvertParam *param,
                     const int *X);
+
 
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.

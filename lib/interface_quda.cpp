@@ -5785,146 +5785,91 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
   return 0;
 }
 
-//- This is a generic interface to QUDA for a two fermion contraction routine. We will, for the sake 
-//- instruction, reproduce the comments loacted at `https://github.com/lattice/quda/wiki/Writing-QUDA-Kernels`
-//- which use this routine as an example. 
+void contractQuda(std::vector<ColorSpinorField *> h_prop_array_flavor_1, std::vector<ColorSpinorField *> h_prop_array_flavor_2, void *h_result, const QudaContractType cType,
+		   QudaInvertParam *param, ColorSpinorParam *cs_param, const int *X){
 
-//- The contractQuda routine in defined lib/interface_quda.cpp and declared in include/quda.h 
-//- accepts three pointers and some meta data. The pointers are the two fermion fields to be 
-//- contracted and an array that will store the result of the contraction, which is the 
-//- 16 \mu \nu contractions associated with the operation \Sum_{a} \phi_{a,\mu, X} \psi_{a,\nu, X} per lattice site.
- void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const QudaContractType cType,
-		   QudaInvertParam *param, const int *X)
- {
-   //- This is a host function. It is passed pointers to arrays defined on the host. 
-   //- Its function is to move the data from the host to the device, call the GPU functions 
-   //- that will perform a contraction, then move the results from the device back to the host. 
-   //- We will go through it line my line so as to leave no stone unturned.
+  //create parameters for device spinor fields
+  ColorSpinorParam cudaParam(*cs_param);
+  cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
+  cudaParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  cudaParam.setPrecision(cs_param->Precision(), cs_param->Precision(), true);
 
-   //- These objects are defined in the interface_quda.cpp file. They will collect timing 
-   //- data for the various aspects of the function, such as time spent computing, moving data, etc. 
-   //- We start the profiling with TPSTART(QUDA_PROFILE_TOTAL) and then measure specific 
-   //- aspects with TPSTART(QUDA_PROFILE_<aspect>). This is the initialisation.
-   profileContract.TPSTART(QUDA_PROFILE_TOTAL);
-   profileContract.TPSTART(QUDA_PROFILE_INIT);
+  //temporal or spatial correlator?
+  size_t local_corr_length;
+  size_t corr_dim;
+  if (cType == QUDA_CONTRACT_TYPE_OPEN || cType == QUDA_CONTRACT_TYPE_DR){
+  local_corr_length = h_prop_array_flavor_1[0]->Volume();
+  corr_dim = 3;
+  } else if (cType == QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL){
+   corr_dim = 2;
+  } else {
+  //default: temporal correlator, summed, i.e. QUDA_CONTRACT_TYPE_OPEN_SUM or QUDA_CONTRACT_TYPE_DR_SUM
+  corr_dim = 3;
+  }
 
-   //- We begin by creating a QUDA object ColorSpinorParam that will collect the data it needs 
-   //- to make a ColorSpinorField object. It is given, as one of its arguments, a pointer to 
-   //- the host data hp_x. Thus, the resulting ColorSpinorField pointer *h_x points to the data 
-   //- associated with hp_x.
-   // Wrap CPU host side pointers
-   ColorSpinorParam cpuParam((void *)hp_x, *param, X, false, param->input_location);
-   ColorSpinorField *h_x = ColorSpinorField::Create(cpuParam);
-   
-   //- We change the ColorSpinorParam pointer to the other host pointer in order to create a 
-   //- ColorSpinorField wrapper for hp_y. This is just done so that we may wrap the host 
-   //- lattice data in a convenient QUDA object.
-   cpuParam.v = (void *)hp_y;
-   ColorSpinorField *h_y = ColorSpinorField::Create(cpuParam);
+  //calculate some parameters
+  local_corr_length = h_prop_array_flavor_1[0]->X(corr_dim);
+  size_t local_corr_offset = local_corr_length * comm_coord(corr_dim);
+  size_t global_corr_length = local_corr_length * comm_dim(corr_dim);
 
-   //- Next, we create a ColorSpinorParam object that will describe ColorSpinorField objects on the GPU.
-   //- Notice some important aspects are changed. After cloning the cpuParam object, we change the 
-   //- location to QUDA_CUDA_FIELD_LOCATION. This means that ColorSpinorField objects created using 
-   //- cudaParam will live on device memory. 
-   //- cudaParam.create = QUDA_NULL_FIELD_CREATE; simply means that the data does not need to be initialised. 
-   //- We declare that the GPU data should be in QUDA_DEGRAND_ROSSI_GAMMA_BASIS order, and then 
-   //- we choose the GPU precision. Finally, we create the GPU ColorSpinorField objects.
-   // Create device parameter
-   ColorSpinorParam cudaParam(cpuParam);
-   cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
-   cudaParam.create = QUDA_NULL_FIELD_CREATE;
-   // Quda uses Degrand-Rossi gamma basis for contractions and will
-   // automatically reorder data if necessary.
-   cudaParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
-   cudaParam.setPrecision(cpuParam.Precision(), cpuParam.Precision(), true);
+  size_t n_numbers_per_slice = 2 * 16;
+  size_t corr_size_in_bytes = n_numbers_per_slice * global_corr_length * cs_param->Precision();
 
-   //- We use std::vector so that future developers may more easily extend this code to handle multiple vectors.
-   std::vector<ColorSpinorField *> x, y;
-   x.push_back(ColorSpinorField::Create(cudaParam));
-   y.push_back(ColorSpinorField::Create(cudaParam));
+  //reserve memory for local result array on host and device
+  auto *h_result_global = (double*)malloc(corr_size_in_bytes);  //array that holds sum of all timeslices and channels
+  memset(h_result_global, 0., corr_size_in_bytes);
+  auto *h_result_tmp_global = (double*)malloc(corr_size_in_bytes); //array that fits all timeslices and channels but is reset after reach computation
+  void* h_result_tmp_local = (void*)(h_result_tmp_global+local_corr_offset); //this points to the local part of the global array
 
-   //- We next create some device memory to store the result of the contraction.
-   size_t array_size = x[0]->X(3);
-   if (cType == QUDA_CONTRACT_TYPE_OPEN || cType == QUDA_CONTRACT_TYPE_DR){
-     array_size = x[0]->Volume();
-   } else if (cType == QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL){
-     array_size = x[0]->X(2);
-   }
-   //size_t array_size = (cType == QUDA_CONTRACT_TYPE_OPEN || cType == QUDA_CONTRACT_TYPE_DR) ? x[0]->Volume() : x[0]->X(3);
-   size_t data_bytes = array_size * x[0]->Nspin() * x[0]->Nspin() * 2 * x[0]->Precision();
-   void *dev_result;
-   // The location of the array passed to the kernel depends on the type of 
-   // contraction we want.
-   if(cType == QUDA_CONTRACT_TYPE_OPEN || cType == QUDA_CONTRACT_TYPE_DR) {
-     dev_result = device_pinned_malloc(data_bytes);
-     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("device malloc of size %lu * %lu\n", array_size, data_bytes/array_size);
-   } else { 
-     dev_result = pinned_malloc(data_bytes);
-     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("host malloc of size %lu * %lu\n", array_size, data_bytes/array_size);
-   }
-   // The host array will hold the data in the computed precision so 
-   // that we can pass data back to the user in double
-   void *prec_result = pinned_malloc(data_bytes);
-   profileContract.TPSTOP(QUDA_PROFILE_INIT);
+  ColorSpinorField *h_single_prop_flavor_1 = ColorSpinorField::Create(*cs_param);
+  ColorSpinorField *h_single_prop_flavor_2 = ColorSpinorField::Create(*cs_param);
+  ColorSpinorField *d_single_prop_flavor_1 = ColorSpinorField::Create(cudaParam);
+  ColorSpinorField *d_single_prop_flavor_2 = ColorSpinorField::Create(cudaParam);
 
-   //- This competes the initialisation. Next, we transfer the host lattice data to the device.
-   profileContract.TPSTART(QUDA_PROFILE_H2D);
-   *x[0] = *h_x;
-   *y[0] = *h_y;
-   profileContract.TPSTOP(QUDA_PROFILE_H2D);
-   //- Yes... that's right. No... I didn't miss out any code. QUDA's ColorSpinorField objects 
-   //- are very smart indeed! The objects on the right are on the host. The objects on the 
-   //- left are on the device. If the = operator is used for ColorSpinorField objects 
-   //- that are located on different memory spaces, it is implied that that a data transfer 
-   //- must take place, and it is done automatically for the user. 
-   //- We next perform the GPU computation which is located and explained in contract.cu
-   profileContract.TPSTART(QUDA_PROFILE_COMPUTE);
-   //- Ok, this is it... this is where the real adventure begins. See you on the other side.
-   contractQuda(*x[0], *y[0], dev_result, cType);
-   profileContract.TPSTOP(QUDA_PROFILE_COMPUTE);
+  size_t nSpin = cs_param->nSpin;
+  size_t nColor = cs_param->nColor;
+  for (size_t s1 = 0; s1 < nSpin; s1++) {
+     for (size_t c1 = 0; c1 < nColor; c1++) {
+       for (size_t s2 = 0; s2 < nSpin; s2++) {
+         for (size_t c2 = 0; c2 < nColor; c2++) {
+           //load single prop from array
+           *h_single_prop_flavor_1 = *h_prop_array_flavor_1[s1*cs_param->nColor + c1];
+           *h_single_prop_flavor_2 = *h_prop_array_flavor_2[s2*cs_param->nColor + c2];
 
-   //- Welcome back! We did it! Finally we transfer the result to the original host pointer.
-   //- If we did not timeslice sum, we must to a device to host transfer, else the data
-   //- is already on a host pointer.
-   if(cType == QUDA_CONTRACT_TYPE_OPEN || cType == QUDA_CONTRACT_TYPE_DR) {
-     profileContract.TPSTART(QUDA_PROFILE_D2H);
-     qudaMemcpy(prec_result, dev_result, data_bytes, cudaMemcpyDeviceToHost);
-     profileContract.TPSTOP(QUDA_PROFILE_D2H);
-   } else {
-     memcpy(prec_result, dev_result, data_bytes);
-   }
-   
-   //- Copy the data back to the user's array
-   if(x[0]->Precision() == QUDA_SINGLE_PRECISION) {
-     for(unsigned int i=0; i<(array_size * x[0]->Nspin() * x[0]->Nspin() * 2); i++) {
-       ((double*)h_result)[i] = ((float*)prec_result)[i];
-     }
-   } else {
-     for(unsigned int i=0; i<(array_size * x[0]->Nspin() * x[0]->Nspin() * 2); i++) {
-       ((double*)h_result)[i] = ((double*)prec_result)[i];
-     }
-   }
- 
-   //- Last, we be good programmers and clean up memory.
-   profileContract.TPSTART(QUDA_PROFILE_FREE);
-   if(cType == QUDA_CONTRACT_TYPE_OPEN || cType == QUDA_CONTRACT_TYPE_DR) {
-     device_pinned_free(dev_result);
-   } else {
-     host_free(dev_result);
-   }
-   host_free(prec_result);
+           // copy single prop from host to device
+           *d_single_prop_flavor_1 = *h_single_prop_flavor_1;
+           *d_single_prop_flavor_2 = *h_single_prop_flavor_2;
 
-   delete x[0];
-   delete y[0];
-   delete h_y;
-   delete h_x;
-   profileContract.TPSTOP(QUDA_PROFILE_FREE);   
+           memset(h_result_tmp_global, 0, corr_size_in_bytes);
 
-   //- This completes the 2 fermion contraction. We save the tune data and exit.
-   saveTuneCache();
-   profileContract.TPSTOP(QUDA_PROFILE_TOTAL);
-   //- Well done! You made it! Did you learn everything you wanted to learn? Don't be afraid to ask questions.
- }
+           contractQuda(*d_single_prop_flavor_1, *d_single_prop_flavor_2, s1, c1, s2, c2, h_result_tmp_local, cType);
+           //contractQuda spits out corr_dim*16* complex numbers, one for each channel and corr slice. this if for a set of fixed color+spin indices.
+
+           if(comm_dim(corr_dim) > 1) comm_gather_array(h_result_tmp_global, n_numbers_per_slice * local_corr_length);
+
+           for(int G_idx =0; G_idx < 16; G_idx++) {
+             for(size_t t=0; t< global_corr_length; t++) {
+               h_result_global[n_numbers_per_slice*t + 2*G_idx  ] += h_result_tmp_global[n_numbers_per_slice*t + 2*G_idx  ];
+               h_result_global[n_numbers_per_slice*t + 2*G_idx+1] += h_result_tmp_global[n_numbers_per_slice*t + 2*G_idx+1];
+             }
+           }
+        }
+      }
+    }
+  }
+
+  //copy result from inside function to outside
+  memcpy(h_result_global, h_result, corr_size_in_bytes);
+
+  delete h_result_global;
+  delete h_result_tmp_global;
+  delete d_single_prop_flavor_1;
+  delete d_single_prop_flavor_2;
+  delete h_single_prop_flavor_1;
+  delete h_single_prop_flavor_2;
+
+}
 
  void gaugeObservablesQuda(QudaGaugeObservableParam *param)
 {

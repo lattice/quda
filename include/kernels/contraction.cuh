@@ -8,12 +8,190 @@
 
 namespace quda
 {
+  template <typename real>
+  class DRGammaMatrix{
 
-  //- Object used in blas_helper.cuh to define a local array of 16 complex valued numbers.
-  //- vector_type is somthing QUDA understands as a vector. The template arg `double2` is QUDA's 
-  //- way of saying `two doubles` which we use for complex data, and `16` means `there are 16 of 
-  //- these ``double2`` data types. These arguments reflect the fact that we will do a timeslice
-  //- reduction on separate 16 comlex elements. Ok, back you go to `ContractionSumArg`
+  public:
+    int gm_i[16][4]{}; //stores gamma matrix column index for non-zero complex value
+    complex<real> gm_z[16][4]; //stores gamma matrix non-zero complex value for the corresponding gm_i
+    //! Constructor
+    DRGammaMatrix(){
+
+      const complex<real> i(0.,1.);
+
+      // SCALAR
+      // G_idx = 0: I
+      gm_i[0][0]=0;
+      gm_i[0][1]=1;
+      gm_i[0][2]=2;
+      gm_i[0][3]=3;
+      gm_z[0][0]=1.;
+      gm_z[0][1]=1.;
+      gm_z[0][2]=1.;
+      gm_z[0][3]=1.;
+
+      // VECTORS
+      // G_idx = 1: \gamma_1
+      gm_i[1][0]=3;
+      gm_i[1][1]=2;
+      gm_i[1][2]=1;
+      gm_i[1][3]=0;
+      gm_z[1][0]=i;
+      gm_z[1][1]=i;
+      gm_z[1][2]=-i;
+      gm_z[1][3]=-i;
+
+      // G_idx = 2: \gamma_2
+      gm_i[2][0]=3;
+      gm_i[2][1]=2;
+      gm_i[2][2]=1;
+      gm_i[2][3]=0;
+      gm_z[2][0]=-1;
+      gm_z[2][1]=1;
+      gm_z[2][2]=1;
+      gm_z[2][3]=-1;
+
+      // G_idx = 3: \gamma_3
+      gm_i[3][0]=2;
+      gm_i[3][1]=3;
+      gm_i[3][2]=0;
+      gm_i[3][3]=1;
+      gm_z[3][0]=i;
+      gm_z[3][1]=-i;
+      gm_z[3][2]=-i;
+      gm_z[3][3]=i;
+
+      // G_idx = 4: \gamma_4
+      gm_i[3][0]=2;
+      gm_i[3][1]=3;
+      gm_i[3][2]=0;
+      gm_i[3][3]=1;
+      gm_z[3][0]=1;
+      gm_z[3][1]=1;
+      gm_z[3][2]=1;
+      gm_z[3][3]=1;
+
+
+      // PSEUDO-SCALAR
+      // G_idx = 5: \gamma_5
+      gm_i[5][0]=0;
+      gm_i[5][1]=1;
+      gm_i[5][2]=2;
+      gm_i[5][3]=3;
+      gm_z[5][0]=1.;
+      gm_z[5][1]=1.;
+      gm_z[5][2]=-1.;
+      gm_z[5][3]=-1.;
+
+      // PSEUDO-VECTORS
+      // DMH: Careful here... we may wish to use  \gamma_1,2,3,4\gamma_5 for pseudovectors
+      // G_idx = 6: \gamma_5\gamma_1
+      gm_i[6][0]=3;
+      gm_i[6][1]=2;
+      gm_i[6][2]=1;
+      gm_i[6][3]=0;
+      gm_z[6][0]=i;
+      gm_z[6][1]=i;
+      gm_z[6][2]=i;
+      gm_z[6][3]=i;
+
+      // G_idx = 7: \gamma_5\gamma_2
+      gm_i[7][0]=3;
+      gm_i[7][1]=2;
+      gm_i[7][2]=1;
+      gm_i[7][3]=0;
+      gm_z[7][0]=-1.;
+      gm_z[7][1]=1.;
+      gm_z[7][2]=-1.;
+      gm_z[7][3]=1.;
+
+      // G_idx = 8: \gamma_5\gamma_3
+      gm_i[8][0]=2;
+      gm_i[8][1]=3;
+      gm_i[8][2]=0;
+      gm_i[8][3]=1;
+      gm_z[8][0]=i;
+      gm_z[8][1]=-i;
+      gm_z[8][2]=i;
+      gm_z[8][3]=-i;
+
+      // G_idx = 9: \gamma_5\gamma_4
+      gm_i[9][0]=2;
+      gm_i[9][1]=3;
+      gm_i[9][2]=0;
+      gm_i[9][3]=1;
+      gm_z[9][0]=1.;
+      gm_z[9][1]=1.;
+      gm_z[9][2]=-1.;
+      gm_z[9][3]=-1.;
+
+      // TENSORS
+      // G_idx = 10: (i/2) * [\gamma_1, \gamma_2]
+      gm_i[10][0]=0;
+      gm_i[10][1]=1;
+      gm_i[10][2]=2;
+      gm_i[10][3]=3;
+      gm_z[10][0]=1.;
+      gm_z[10][1]=-1.;
+      gm_z[10][2]=1.;
+      gm_z[10][3]=-1.;
+
+      // G_idx = 11: (i/2) * [\gamma_1, \gamma_3]
+      gm_i[11][0]=2;
+      gm_i[11][1]=3;
+      gm_i[11][2]=0;
+      gm_i[11][3]=1;
+      gm_z[11][0]=-i;
+      gm_z[11][1]=-i;
+      gm_z[11][2]=i;
+      gm_z[11][3]=i;
+
+      // G_idx = 12: (i/2) * [\gamma_1, \gamma_4]
+      gm_i[12][0]=1;
+      gm_i[12][1]=0;
+      gm_i[12][2]=3;
+      gm_i[12][3]=2;
+      gm_z[12][0]=-1.;
+      gm_z[12][1]=-1.;
+      gm_z[12][2]=1.;
+      gm_z[12][3]=1.;
+
+      // G_idx = 13: (i/2) * [\gamma_2, \gamma_3]
+      gm_i[13][0]=1;
+      gm_i[13][1]=0;
+      gm_i[13][2]=3;
+      gm_i[13][3]=2;
+      gm_z[13][0]=1.;
+      gm_z[13][1]=1.;
+      gm_z[13][2]=1.;
+      gm_z[13][3]=1.;
+
+      // G_idx = 14: (i/2) * [\gamma_2, \gamma_4]
+      gm_i[14][0]=1;
+      gm_i[14][1]=0;
+      gm_i[14][2]=3;
+      gm_i[14][3]=2;
+      gm_z[14][0]=-i;
+      gm_z[14][1]=i;
+      gm_z[14][2]=i;
+      gm_z[14][3]=-i;
+
+      // G_idx = 15: (i/2) * [\gamma_3, \gamma_4]
+      gm_i[15][0]=0;
+      gm_i[15][1]=1;
+      gm_i[15][2]=2;
+      gm_i[15][3]=3;
+      gm_z[15][0]=-1.;
+      gm_z[15][1]=-1.;
+      gm_z[15][2]=1.;
+      gm_z[15][3]=1.;
+    };
+
+//     inline int get_gm_i(const int G_idx, const int row_idx) const {return gm_i[G_idx][row_idx];};
+//     inline complex<real> get_gm_z(const int G_idx, const int col_idx) const {return gm_z[G_idx][col_idx];};
+
+  };
+
   using spinor_array = vector_type<double2,16>;
 
   template <typename real> struct ContractionArg {
@@ -42,13 +220,7 @@ namespace quda
     }
   };
 
-  //- Welcome from contract_quda in quda/lib/contract.cu!
-  //- We will now create the `arg` object that will use the input spinors to extract meta data.
-  //- This structure is fairly complex, but none of the elements are beyond the comprehension 
-  //- of a student of lattice gauge theory with a rudimentary knowledge of GPU computing. 
-  //- As advertised, this stuct is templated on precision, and inherits from a reduction. The
-  //- The reduction itself is templated on `spinor_array` which is a custom data type for this
-  //- struct. It is at the top of the file, go take a look and return here.
+
   template <typename Float_> struct ContractionSumArg :    
     public ReduceArg<spinor_array>  
   {
@@ -58,46 +230,31 @@ namespace quda
     //- This is the number of lattice sites on the MPI node
     int X[4];    // grid dimensions
 
-    //- These vales are hardcoded to prevent template explosion. This particular kernel will 
-    //- only work for spin=4, color=3 fermion fields. The spin_project boolean is a neat 
-    //- feature of QUDA that will automatically convert any fermion into the desired 
-    //- gamma matrix order (defined in the ColorSpinorField object) as it is loaded into the 
-    //- kernel. QUDA uses some very esotric ordering behind the scenes! 
     using Float = Float_;    
     static constexpr int nColor = 3;
     static constexpr int nSpin = 4;
     static constexpr bool spin_project = true;
     static constexpr bool spinor_direct_load = false; // false means texture load
 
-    //- This object is a QUDA data type that will handle the way in which fermions are passed 
-    //- to the kernel. As you can see, it needs to know the precision, color, and spin of the 
-    //- fermion, as well as any operations (such as spin_project) that need to be performed 
-    //- during the load. We give it a name F...
-    // Create a typename F for the ColorSpinorField (F for fermion)
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
+    int s1, s2, c1, c2;
 
-    //- ...and declare two such objects, one for eack color spinor
+    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
     F x;
     F y;
 
-    //- We now come to the constructor of this argument structure. This is what was called 
-    //- by the ContractionArgSum<real> arg(x, y); line back in quda/lib/contract.cu. 
-    //- `threads` is initialised with the checkerboarded sub-volume of a fermion field, 
-    //- the two fermion fields are, naturally, x, and y. The actual body of the argument 
-    //- structure is to then populate the X array with the MPI lattice dimensions. 
-    //- This argument structure provides the kernel with the pointers it needs to 
-    //- locate data, and the parameters it needs to perform it's computation.
-    ContractionSumArg(const ColorSpinorField &x, const ColorSpinorField &y) :
+    DRGammaMatrix<Float_> Gamma;
+
+    ContractionSumArg(const ColorSpinorField &x, const ColorSpinorField &y,
+                      const int s1, const int s2, const int c1, const int c2) :
       ReduceArg<spinor_array>(),
       threads(x.VolumeCB() / x.X(3)),
       x(x),
-      y(y)
+      y(y),s1(s1),s2(s2),c1(c1),c2(c2), Gamma()
     {
       for (int dir = 0; dir < 4; dir++) 
 	X[dir] = x.X()[dir];
     }
-    //- And that the argument struct done. Please go back to `quda/lib/contract.cu` so see
-    //- the computation.
+
   };
 
   template <typename Float_> struct ContractionSumSpatialArg :
@@ -481,7 +638,58 @@ namespace quda
 
     //- We have computed the contraction! We finally done. Let the Eagles of Manwe take us back to 
     //- quda/lib/contract.cu, and the line:
-    //- LAUNCH_KERNEL_LOCAL_PARITY(computeDegrandRossiContractionSum, (*this), tp, stream, arg, Arg);
+    //- LAUNCH_KERNEL_LOCAL_PARITY(computeDegrandRossiContractionSumSingle, (*this), tp, stream, arg, Arg);
+  }
+
+  template <int blockSize, typename Arg> __global__ void computeDegrandRossiContractionSumSingle(Arg arg)
+  {
+    int t = blockIdx.z; // map t to z block index
+    int xyz = threadIdx.x + blockIdx.x * blockDim.x;
+    int parity = threadIdx.y;
+
+    int s1 = arg.s1;
+    int s2 = arg.s2;
+    int c1 = arg.c1;
+    int c2 = arg.c2;
+
+    using real = typename Arg::Float;
+    constexpr int nSpin = Arg::nSpin;
+    constexpr int nColor = Arg::nColor;
+
+    typedef ColorSpinor<real, nColor, nSpin> Vector;
+
+    complex<real> propagator_product;
+
+    //result array needs to be a spinor_array type object because of the reduce function at the end
+    spinor_array result_all_channels;
+
+    while (xyz < arg.threads) { //loop over all space-coordinates of one time slice
+      //extract current ColorSpinor at xyzt from ColorSpinorField
+      int idx_cb = t * arg.threads + xyz;
+      Vector x = arg.x(idx_cb, parity);
+      Vector y = arg.y(idx_cb, parity);
+
+      //loop over channels
+      for (int G_idx = 0; G_idx < 16; G_idx++) {
+
+        // get gamma matrix column indices for the non-zero values from the row indices of the outer loop
+        int p2 = arg.Gamma.gm_i[G_idx][s2];
+        int p1 = arg.Gamma.gm_i[G_idx][s1];
+
+        // get rid of color indices by performing innerProduct
+        propagator_product = innerProduct(x, y, p2, p1, c2, c1);
+
+        // apply Gamma Matrices
+        auto tmp = arg.Gamma.gm_z[G_idx][p2] * arg.Gamma.gm_z[G_idx][p1] * propagator_product;
+        result_all_channels[G_idx].x = tmp.real();
+        result_all_channels[G_idx].y = tmp.imag();
+      }
+
+      xyz += blockDim.x * gridDim.x;
+    }
+  //FIXME what happens to result_all_channels?
+    reduce2d<blockSize, 2>(arg, result_all_channels, t); //what does this function do? second template argument is number of blocks in y-dim, which is 2 for even-odd
+
   }
   
 } // namespace quda

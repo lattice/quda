@@ -93,10 +93,6 @@ public:
     }
   };
 
-  //- Welcome! The first thing to notice is that this class inherits from TunableVectorY. 
-  //- In fact, all of QUDA's kernel classes inherit from some form of Tunable class. This 
-  //- allows QUDA to automagically experiment with block and thread dimensions to discover 
-  //- the optimal set-up for a given problem. 
   template <typename Arg> class ContractionSumCompute : TunableLocalParity
   {
     //- The protected members of the class are the argument structure we have already seen, 
@@ -211,7 +207,7 @@ public:
         std::string function_name;
         switch (cType) {
 	case QUDA_CONTRACT_TYPE_OPEN_SUM: function_name = "quda::computeColorContractionSum"; break;
-        case QUDA_CONTRACT_TYPE_DR_SUM: function_name = "quda::computeDegrandRossiContractionSum"; break;
+        case QUDA_CONTRACT_TYPE_DR_SUM: function_name = "quda::computeDegrandRossiContractionSumSingle"; break;
         default: errorQuda("Unexpected contraction type %d", cType);
         }
 
@@ -225,7 +221,7 @@ public:
 	//- will contract only the colour indices, leaving the 16 complex numbers per open spin 
 	//- index per lattice site (one for each \mu, and \nu combination) and then sum each one
 	//- of those 16 elements with its counterparts on the same timeslice.
-	//- computeDegrandRossiContractionSum will insert all 16 Gamma matrices into the 
+	//- computeDegrandRossiContractionSumSingle will insert all 16 Gamma matrices into the
 	//- contraction, also giving 16 complex numbers, one for each unique gamma matrix 
 	//- combination. It will then do the same timeslice sum. Here we also see how the 
 	//- autotuner works. The standard CUDA kernel arguments of blocks, threads, and 
@@ -241,8 +237,8 @@ public:
 	  //- hunting the veritable Balrog that is QUDA's tuning class! Rather we will cheat
 	  //- slighly and look only at the compute code. Please navigate to 
 	  //- quda/include/kernels/contraction.cuh and the function
-	  //- `computeDegrandRossiContractionSum` then return here.
-	  LAUNCH_KERNEL_LOCAL_PARITY(computeDegrandRossiContractionSum, (*this), tp, stream, arg, Arg); 
+	  //- `computeDegrandRossiContractionSumSingle` then return here.
+	  LAUNCH_KERNEL_LOCAL_PARITY(computeDegrandRossiContractionSumSingle, (*this), tp, stream, arg, Arg);
 	  //- Welcome back! We're almost done! Back you go to `contraction_with_sum.apply(0);`
           break;
         default: errorQuda("Unexpected contraction type %d", cType);
@@ -325,7 +321,7 @@ public:
         std::string function_name;
         switch (cType) {
 	case QUDA_CONTRACT_TYPE_OPEN_SUM: function_name = "quda::computeColorContractionSum"; break;
-        case QUDA_CONTRACT_TYPE_DR_SUM: function_name = "quda::computeDegrandRossiContractionSum"; break;
+        case QUDA_CONTRACT_TYPE_DR_SUM: function_name = "quda::computeDegrandRossiContractionSumSingle"; break;
         case QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL: function_name = "quda::computeDegrandRossiContractionSumSpatial"; break;
         default: errorQuda("Unexpected contraction type %d", cType);
         }
@@ -373,62 +369,27 @@ public:
     }
   };
 
-  //- This deceptively simple function executes the contraction kernel.
-  //- We must study it line by line. You are STRONGLY advised to follow the
-  //- directives in the comments and go to the specified point when instructed.
-  //- Think of it as a kind `choose your own adventure` story book where you don't
-  //- choose, but it's still an adventure.
   template <typename real>
-  void contract_quda(const ColorSpinorField &x, const ColorSpinorField &y, complex<real> *result,
-                     const QudaContractType cType)
+  void contract_quda(const ColorSpinorField &x, const ColorSpinorField &y, const size_t s1, const size_t c1,
+                     const size_t s2, const size_t c2, complex<real> *result, const QudaContractType cType)
   {
-    //- First, note that there are two ways one can contract data: just color contraction,
-    //- or color contrcation with timeslice summation. This boolean is the latter.
     if(cType == QUDA_CONTRACT_TYPE_OPEN_SUM || cType == QUDA_CONTRACT_TYPE_DR_SUM) {
-
-      //- This line is little more than an object that will store the pointers to data on
-      //- which we will work. You can see that it accepts the x and y fields
-      //- (the two fermions to be contracted) but NOT the and the result. That is because
-      //- the object `ContractionSumArg` inherits from a QUDA class called `ReduceArg` that
-      //- has its own arrays. It is templated on precision only and defined in
-      //- quda/include/kernels/contraction.cuh. Please go to the struct `ContractionSumArg`
-      //- and return here when instructed.
-      ContractionSumArg<real> arg(x, y);
-
-      //- Now that all the parameters and pointers have been established, we construct the
-      //- kernel that will perform the computation. This is a very subtle but powerful step.
-      //- As you can see, the function named `contraction_with_sum` is a ContractionSumCompute
-      //- type object, templetised on the specialised object ContractionSumArg. (We used
-      //- `decltype(arg)` just to be slick.) This templetisation on the complicated `arg`
-      //- object allows us to `Bake-In` data types such as the number of colors, spins, etc
-      //- and not suffer from template explosion.
-      //- Head on up to the definition of `ContractionSumCompute` and follow it through
-      //- until it instructs you to come back here.
+      ContractionSumArg<real> arg(x, y, s1, s2, c1, c2);
       ContractionSumCompute<decltype(arg)> contraction_with_sum(arg, x, y, cType);
-
-      //- OK, nearly there. Before we press on, let us recapitulate breifly on what we have seen.
-      //- 1. We created an argument structure that captures all the input we need to compute.
-      //- 2. We created a oject templated on those arguments that will do our computation.
-      //- What is left to do now is apply that computation. It is therefore pleasing to see
-      //- that the object we created `contraction_with_sum` with the arguments `arg` has
-      //- a method called `apply` which will do just that. Head on up to the member function
-      //- `apply` to see it all come togther.
       contraction_with_sum.apply(0);
-
-      //- Welcome back! We did it! Now we just make sure that all the GPU work is done
-      //- before moving on...
       qudaDeviceSynchronize();
-      //- ... and copy the data we just computed back to the return array.
+
       // Copy timeslice sums back to device
-      double *res = (double*)arg.result_h;
+      auto *res = (double*)arg.result_h;
       for (int i=0; i<x.Nspin()*x.Nspin()*x.X(3); i++) result[i] = complex<real>(res[2*i], res[2*i+1]);
       // Head on back to your place in contractQuda to finish up.
+
     } else if (cType == QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL){
       ContractionSumSpatialArg<real> arg(x, y);
       ContractionSumSpatialCompute<decltype(arg)> contraction_with_sum_spatial(arg, x, y, cType);
       contraction_with_sum_spatial.apply(0);
       qudaDeviceSynchronize();
-      double *res = (double*)arg.result_h;
+      auto *res = (double*)arg.result_h;
       for (int i=0; i<x.Nspin()*x.Nspin()*x.X(2); i++) result[i] = complex<real>(res[2*i], res[2*i+1]);
     } else {
       ContractionArg<real> arg(x, y, result);
@@ -445,7 +406,7 @@ public:
   //- which one can adjust at CMake configure time. If the QUDA_CONTRACT CMake option
   //- is not set, none of the following code will be compiled. This is an important
   //- feature to include as it keeps compile time to a minimum.
-  void contractQuda(const ColorSpinorField &x, const ColorSpinorField &y, void *result, const QudaContractType cType)
+  void contractQuda(const ColorSpinorField &x, const ColorSpinorField &y, const size_t s1, const size_t c1, const size_t s2, const size_t c2, void *result, const QudaContractType cType)
   {
 #ifdef GPU_CONTRACT
     //- After some checks, 
@@ -459,9 +420,9 @@ public:
     //- we see that the contract_quda function is instantiated on the desired precision. Go to
     //- the `contract_quda` and then return here.
     if (x.Precision() == QUDA_SINGLE_PRECISION) {
-      contract_quda<float>(x, y, (complex<float> *)result, cType);
+      contract_quda<float>(x, y, s1, c1, s2, c2, (complex<float> *)result, cType);
     } else if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-      contract_quda<double>(x, y, (complex<double> *)result, cType);
+      contract_quda<double>(x, y, s1, c1, s2, c2, (complex<double> *)result, cType);
     } else {
       errorQuda("Precision %d not supported", x.Precision());
     }
