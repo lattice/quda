@@ -53,10 +53,13 @@ namespace quda
     using type = float;
   };
 
+  template <int block_size_x, int block_size_y, typename T, bool do_sum, typename Reducer, typename Arg>
+  __device__ void reduce2d(Arg &, const T &, const int idx = 0);
+
   template <typename T> struct ReduceArg {
 
     template <int, int, typename U, bool, typename Reducer, typename Arg>
-    friend void reduce2d(Arg &arg, const U &in, const int idx);
+    friend __device__ void reduce2d(Arg &arg, const U &in, const int idx);
     qudaError_t launch_error; // only do complete if no launch error to avoid hang
 
   private:
@@ -158,7 +161,7 @@ namespace quda
      will be constant along constant blockIdx.y and blockIdx.z.
   */
   template <int block_size_x, int block_size_y, typename T, bool do_sum = true, typename Reducer = cub::Sum, typename Arg>
-  __device__ inline void reduce2d(Arg &arg, const T &in, const int idx = 0)
+  __device__ inline void reduce2d(Arg &arg, const T &in, const int idx)
   {
     using BlockReduce = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y>;
     __shared__ typename BlockReduce::TempStorage cub_tmp;
@@ -227,7 +230,7 @@ namespace quda
      will be constant along constant blockIdx.y and blockIdx.z.
   */
   template <int block_size_x, int block_size_y, typename T, bool do_sum = true, typename Reducer = cub::Sum, typename Arg>
-  __device__ inline void reduce2d(Arg &arg, const T &in, const int idx = 0)
+  __device__ inline void reduce2d(Arg &arg, const T &in, const int idx)
   {
     using BlockReduce = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y>;
     __shared__ typename BlockReduce::TempStorage cub_tmp;
