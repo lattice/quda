@@ -867,6 +867,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   clover_param.csw = inv_param->clover_coeff;
   clover_param.twisted = twisted;
   clover_param.mu2 = twisted ? 4.*inv_param->kappa*inv_param->kappa*inv_param->mu*inv_param->mu : 0.0;
+  clover_param.degreeExp = (inv_param->clover_degree_in == QUDA_INVALID_ENUM) ? 1 : inv_param->clover_degree_in;
   clover_param.siteSubset = QUDA_FULL_SITE_SUBSET;
   for (int i=0; i<4; i++) clover_param.x[i] = gaugePrecise->X()[i];
   clover_param.pad = inv_param->cl_pad;
@@ -920,13 +921,8 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
       profileClover.TPSTART(QUDA_PROFILE_TOTAL);
     }
 
-    bool do_exp = (inv_param->dslash_type == QUDA_CLOVER_EXP_WILSON_DSLASH) ? true : false;
-    if (do_exp) {
-        cloverExponential(*cloverPrecise, 18, inv_param->mass, false);
-    }
-
     // inverted clover term is required when applying preconditioned operator
-    if ((!h_clovinv || inv_param->compute_clover_inverse || do_exp) && pc_solve) {
+    if ((!h_clovinv || inv_param->compute_clover_inverse) && pc_solve) {
       profileClover.TPSTART(QUDA_PROFILE_COMPUTE);
       if (!dynamic_clover_inverse()) {
 	cloverInvert(*cloverPrecise, inv_param->compute_clover_trlog);
@@ -1414,6 +1410,7 @@ namespace quda {
       break;
     case QUDA_CLOVER_EXP_WILSON_DSLASH:
       diracParam.type = pc ? QUDA_CLOVER_EXPPC_DIRAC : QUDA_CLOVER_EXP_DIRAC;
+      diracParam.degreeExp = inv_param->clover_degree;
       break;
     case QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH:
       diracParam.type = pc ? QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC : QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC;
