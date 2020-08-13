@@ -61,19 +61,6 @@ namespace quda
                                   QudaFieldLocation location);
 
       /**
-         Batch GEMM. This function performs N GEMM type operations in a batched
-         fashion. It constructs arrays of pointers to the data for the Nth operation
-         before calling <T>gemmBatched(). Pointers may not alias data.
-         @param[in] A Matrix field containing the A input matrices
-	 @param[in] B Matrix field containing the A input matrices
-         @param[in/out] C Matrix field containing the result, and matrix to be added
-         @param[in] cublas_param Parameter structure defining the batched GEMM type
-         @param[in] Location of the input/output data
-         @return Number of flops done in this computation
-      */
-      long long BatchGEMM(void *A, void *B, void *C, QudaCublasParam cublas_param, QudaFieldLocation location);
-
-      /**
 	 Strided Batch GEMM. This function performs N GEMM type operations in a 
 	 strided batched fashion. If the user passes 
 	 
