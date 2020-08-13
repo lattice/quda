@@ -58,7 +58,7 @@ int main(int argc, char **argv)
   // ColorSpinors (Wilson)
   //FIXME what about this parameter class? should it be part of quda.h like invertparam etc?
   quda::ColorSpinorParam cs_param;
-  quda::ColorSpinorParam* tmp = &cs_param;
+  quda::ColorSpinorParam*cs_param_ptr = &cs_param;
   constructWilsonTestSpinorParam(&cs_param, &inv_param, &gauge_param); //FIXME remove Test from this function name?
   int spinor_dim = cs_param.nColor * cs_param.nSpin;
   setSpinorSiteSize(spinor_dim * 2); // this sets the global variable my_spinor_site_size
@@ -102,9 +102,11 @@ int main(int argc, char **argv)
       constructPointSpinorSource(CSF_V_ptr_arr_source[i], cs_param.nSpin, cs_param.nColor, inv_param.cpu_prec,
                                  gauge_param.X, i, source);
       inv_param.solver_normalization = QUDA_SOURCE_NORMALIZATION; // Make explicit for now.
+
       invertQuda(CSF_V_ptr_arr_prop[i], CSF_V_ptr_arr_source[i], &inv_param);
     }
-    contractQuda(CSF_V_ptr_arr_prop, CSF_V_ptr_arr_prop, correlation_function_sum, contract_type, &inv_param, (void*)tmp, gauge_param.X);
+
+    contractQuda(CSF_V_ptr_arr_prop, CSF_V_ptr_arr_prop, correlation_function_sum, contract_type, &inv_param, (void*)cs_param_ptr, gauge_param.X);
   }
 
   // print correlators

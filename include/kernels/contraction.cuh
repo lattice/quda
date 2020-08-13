@@ -691,6 +691,7 @@ namespace quda
     int s2 = arg.s2;
     int c1 = arg.c1;
     int c2 = arg.c2;
+    int p1, p2;
 
     using real = typename Arg::Float;
     constexpr int nSpin = Arg::nSpin;
@@ -698,7 +699,12 @@ namespace quda
 
     typedef ColorSpinor<real, nColor, nSpin> Vector;
 
-    complex<real> propagator_product;
+    //FIXME
+//    complex<real> propagator_product;
+
+    //FIXME
+    complex<real> spin_elem[nSpin][nSpin];
+    complex<real> A;
 
     //result array needs to be a spinor_array type object because of the reduce function at the end
     spinor_array result_all_channels;
@@ -712,24 +718,36 @@ namespace quda
       //loop over channels
       for (int G_idx = 0; G_idx < 16; G_idx++) {
 
+        //FIXME our changes: don't work
+        //-------------------------------------------------------------------
         // get gamma matrix column indices for the non-zero values from the row indices of the outer loop
-        int p2 = arg.Gamma.gm_i[G_idx][s2];
-        int p1 = arg.Gamma.gm_i[G_idx][s1];
+//        p2 = arg.Gamma.gm_i[G_idx][s2];
+//        p1 = arg.Gamma.gm_i[G_idx][s1];
+//
+//        propagator_product = innerProduct(x,y,p2,p1,c2,c1) * arg.Gamma.gm_z[G_idx][p2] * arg.Gamma.gm_z[G_idx][p1];
+//
+//        result_all_channels[G_idx].x = propagator_product.real();
+//        result_all_channels[G_idx].y = propagator_product.imag();
+      //-------------------------------------------------------------------
 
-        // get rid of color indices by performing innerProduct
-        propagator_product = innerProduct(x, y, p2, p1, c2, c1);
-
-        // apply Gamma Matrices
-        complex<real> tmp = arg.Gamma.gm_z[G_idx][p2] * arg.Gamma.gm_z[G_idx][p1] * propagator_product;
-        result_all_channels[G_idx].x = tmp.real();
-        result_all_channels[G_idx].y = tmp.imag();
-
+        //FIXME reproduce propagator_test results:
+        for (int mu=0; mu<4; mu++){
+          for (int nu=0; nu<4; nu++){
+            spin_elem[mu][nu] = innerProduct(x, y, mu, nu);
+          }
+        }
+        for (int mu =0; mu<4; mu++){
+          int nu = arg.Gamma.gm_i[G_idx][mu];
+          A = arg.Gamma.gm_z[G_idx][nu] * spin_elem[mu][nu];
+          result_all_channels[G_idx].x += A.real();
+          result_all_channels[G_idx].y += A.imag();
+        }
 
       }
 
       xyz += blockDim.x * gridDim.x;
     }
-  //FIXME what happens to result_all_channels?
+
     reduce2d<blockSize, 2>(arg, result_all_channels, t); //what does this function do? second template argument is number of blocks in y-dim, which is 2 for even-odd
 
   }

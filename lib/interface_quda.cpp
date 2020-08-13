@@ -5798,17 +5798,9 @@ void contractQuda(void** h_prop_array_flavor_1, void** h_prop_array_flavor_2, vo
   for (int i = 0; i < spinor_dim ; i++) {
     cs_param->v = h_prop_array_flavor_1[i];
     CSF_ptr_container_flavor_1[i] = quda::ColorSpinorField::Create(*cs_param);
-
     cs_param->v = h_prop_array_flavor_2;
     CSF_ptr_container_flavor_2[i] = quda::ColorSpinorField::Create(*cs_param);
   }
-  cs_param->create = QUDA_NULL_FIELD_CREATE;
-
-  //create parameters for device spinor fields
-  ColorSpinorParam cudaParam(*cs_param);
-  cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
-  cudaParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
-  cudaParam.setPrecision(cs_param->Precision(), cs_param->Precision(), true);
 
   //temporal or spatial correlator?
   size_t local_corr_length;
@@ -5836,28 +5828,35 @@ void contractQuda(void** h_prop_array_flavor_1, void** h_prop_array_flavor_2, vo
   auto *h_result_tmp_global = (double*)malloc(corr_size_in_bytes); //array that fits all timeslices and channels but is reset after reach computation
   void* h_result_tmp_local = (void*)(h_result_tmp_global+local_corr_offset); //this points to the local part of the global array
 
-  ColorSpinorField *h_single_prop_flavor_1 = ColorSpinorField::Create(*cs_param);
-  ColorSpinorField *h_single_prop_flavor_2 = ColorSpinorField::Create(*cs_param);
+  //create device spinor fields
+  ColorSpinorParam cudaParam(*cs_param);
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
+  cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
+  cudaParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  cudaParam.setPrecision(cs_param->Precision(), cs_param->Precision(), true);
   ColorSpinorField *d_single_prop_flavor_1 = ColorSpinorField::Create(cudaParam);
   ColorSpinorField *d_single_prop_flavor_2 = ColorSpinorField::Create(cudaParam);
 
   size_t nSpin = cs_param->nSpin;
   size_t nColor = cs_param->nColor;
-  for (size_t s1 = 0; s1 < nSpin; s1++) {
-     for (size_t c1 = 0; c1 < nColor; c1++) {
-       for (size_t s2 = 0; s2 < nSpin; s2++) {
-         for (size_t c2 = 0; c2 < nColor; c2++) {
-           //load single prop from array
-           *h_single_prop_flavor_1 = *CSF_ptr_container_flavor_1[s1* cs_param->nColor + c1];
-           *h_single_prop_flavor_2 = *CSF_ptr_container_flavor_2[s2* cs_param->nColor + c2];
+
+  //FIXME
+  int s2, c2;
+  for (size_t s1 = 0; s1 < 4; s1++) {
+     for (size_t c1 = 0; c1 < 3; c1++) {
+       //FIXME for now, reproduce propagator_test result
+//       for (size_t s2 = 0; s2 < 4; s2++) {
+//         for (size_t c2 = 0; c2 < 3; c2++) {
+           s2 = s1;
+           c2 = c1;
 
            // copy single prop from host to device
-           *d_single_prop_flavor_1 = *h_single_prop_flavor_1;
-           *d_single_prop_flavor_2 = *h_single_prop_flavor_2;
+           *d_single_prop_flavor_1 = *CSF_ptr_container_flavor_1[s1* cs_param->nColor + c1];
+           *d_single_prop_flavor_2 = *CSF_ptr_container_flavor_2[s2* cs_param->nColor + c2];
 
            memset(h_result_tmp_global, 0, corr_size_in_bytes);
 
-           contractQuda(*d_single_prop_flavor_1, *d_single_prop_flavor_2, s1, c1, s2, c2, h_result_tmp_local, cType);
+           contractQuda(*d_single_prop_flavor_1, *d_single_prop_flavor_1, s1, c1, s2, c2, h_result_tmp_local, cType);
            //contractQuda spits out corr_dim*16* complex numbers, one for each channel and corr slice. this if for a set of fixed color+spin indices.
 
 
@@ -5880,19 +5879,18 @@ void contractQuda(void** h_prop_array_flavor_1, void** h_prop_array_flavor_2, vo
            }
            printfQuda("--------------------------------------------\n");
         }
-      }
-    }
+//FIXME see above
+//      }
+//    }
   }
 
+  delete d_single_prop_flavor_1;
+  delete d_single_prop_flavor_2;
   for (int i=0; i<spinor_dim; i++){
     delete CSF_ptr_container_flavor_1[i];
     delete CSF_ptr_container_flavor_2[i];
   }
   delete h_result_tmp_global;
-  delete d_single_prop_flavor_1;
-  delete d_single_prop_flavor_2;
-  delete h_single_prop_flavor_1;
-  delete h_single_prop_flavor_2;
 
 }
 
