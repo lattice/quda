@@ -221,16 +221,16 @@ namespace quda
   };
 
 
-  template <typename Float_> struct ContractionSumArg :    
+  template <typename Float_, int reduction_dim_ = 3> struct ContractionSumArg :
     public ReduceArg<spinor_array>  
   {
-    static constexpr int reduction_dim = 3;
+    static constexpr int reduction_dim = reduction_dim_; // This the direction we are performing reduction on. default to 3.
 
     //- Welcome back! We first define the variables in the argument structure: 
     //- Naturally, this is the number of threads in the block
     int threads; // number of active threads required
     //- This is the number of lattice sites on the MPI node
-    int_fastdiv X[4];    // grid dimensions
+    int_fastdiv X[4];    // grid dimensions - using int_fastdiv to reduce division overhead on device
 
     using Float = Float_;    
     static constexpr int nColor = 3;
@@ -247,51 +247,16 @@ namespace quda
     DRGammaMatrix<Float_> Gamma;
     int t_offset;
     ContractionSumArg(const ColorSpinorField &x, const ColorSpinorField &y,
-                      const int s1, const int b1, const int c1) :
-      ReduceArg<spinor_array>(),
+        const int s1, const int b1, const int c1) :
+      ReduceArg<spinor_array>(comm_dim(reduction_dim) * x.X(reduction_dim)), // n_reduce = global_dim_t
       threads(x.VolumeCB() / x.X(reduction_dim)),
       x(x),
       y(y),s1(s1),b1(b1),c1(c1), Gamma(),
       t_offset(comm_coord(reduction_dim) * x.X(reduction_dim)) // offset of the slice we are doing reduction on
     {
-      for (int dir = 0; dir < 4; dir++) 
-	X[dir] = x.X()[dir];
+      for (int dir = 0; dir < 4; dir++) { X[dir] = x.X()[dir]; }
     }
 
-  };
-
-  template <typename Float_> struct ContractionSumSpatialArg :
-    public ReduceArg<spinor_array>
-  {
-    static constexpr int reduction_dim = 2;
-
-    int threads; // number of active threads required
-    int_fastdiv X[4];    // grid dimensions
-
-    using Float = Float_;
-    static constexpr int nColor = 3;
-    static constexpr int nSpin = 4;
-    static constexpr bool spin_project = true;
-    static constexpr bool spinor_direct_load = false; // false means texture load
-
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
-
-    F x;
-    F y;
-
-    int t_offset;
-
-    // TODO: Note that the z direction (2) is only a special case. Needs fix in the future.
-    ContractionSumSpatialArg(const ColorSpinorField &x, const ColorSpinorField &y) :
-      ReduceArg<spinor_array>(),
-      threads(x.VolumeCB() / x.X(reduction_dim)),
-      x(x),
-      y(y),
-      t_offset(comm_coord(reduction_dim) * x.X(reduction_dim)) // offset of the slice we are doing reduction on
-    {
-      for (int dir = 0; dir < 4; dir++)
-        X[dir] = x.X()[dir];
-    }
   };
 
   template <typename real, typename Arg> __global__ void computeColorContraction(Arg arg)
@@ -689,8 +654,8 @@ namespace quda
 
     int s1 = arg.s1;
     int b1 = arg.b1;
-    int c1 = arg.c1;
-    int p1, p2;
+    // int c1 = arg.c1;
+    // int p1, p2;
 
     using real = typename Arg::Float;
     constexpr int nSpin = Arg::nSpin;
@@ -710,7 +675,12 @@ namespace quda
 
     while (xyz < arg.threads) { //loop over all space-coordinates of one time slice
       //extract current ColorSpinor at xyzt from ColorSpinorField
-      int idx_cb = t * arg.threads + xyz;
+      // int idx_cb = t * arg.threads + xyz;
+
+      // This function calculates the index_cb assuming t is the coordinate in direction reduction_dim,
+      // and xyz is the linearized index_cb excluding reduction_dim. So this will work for reduction_dim < 3 as well.
+      int idx_cb = x_cb_from_t_xyz_d<Arg::reduction_dim>(t, xyz, arg.X, parity);
+
       Vector x = arg.x(idx_cb, parity);
       Vector y = arg.y(idx_cb, parity);
 
@@ -744,7 +714,9 @@ namespace quda
       xyz += blockDim.x * gridDim.x;
     }
 
-    reduce2d<blockSize, 2>(arg, result_all_channels, t); //what does this function do? second template argument is number of blocks in y-dim, which is 2 for even-odd
+    // This function reduces the data in result_all_channels in all threads - different threads reduce result to different
+    // index t + arg.t_offset
+    reduce2d<blockSize, 2>(arg, result_all_channels, t + arg.t_offset);
 
   }
   

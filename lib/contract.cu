@@ -130,14 +130,14 @@ public:
     void initTuneParam(TuneParam &param) const {
       TunableLocalParity::initTuneParam(param);
       param.block.y = 2;
-      param.grid.z = x.X(3); // T dimension is mapped to different blocks in the Z dimension
+      param.grid.z = x.X(Arg::reduction_dim); // T dimension is mapped to different blocks in the Z dimension
     }
 
     //- This is just making sure the Tunable class defaults to the same params.
     void defaultTuneParam(TuneParam &param) const {
       TunableLocalParity::defaultTuneParam(param);
       param.block.y = 2;
-      param.grid.z = x.X(3); // T dimension is mapped to different blocks in the Z dimension
+      param.grid.z = x.X(Arg::reduction_dim); // T dimension is mapped to different blocks in the Z dimension
     }
 
     //- Next is the all important public interface of the class. The first method is the 
@@ -197,8 +197,7 @@ public:
       if (x.Location() == QUDA_CUDA_FIELD_LOCATION) {
 	//- Ensure the reduce array is zeroed out. This is the array that comes baked in to the
 	//- `ReduceArg` class from which the `arg` structure inherited.
-	for (int i=0; i<2*x.Nspin()*x.Nspin()*x.X(3); i++) ((double*)arg.result_h)[i] = 0.0;
-	//- We next define a TuneParam object that is used by the Tunable class. It takes 
+  //- We next define a TuneParam object that is used by the Tunable class. It takes 
 	//- `this` class (see now what *this means?) and some other dat
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	//- This, again, is for when Just In Time compilation is used. You can skip over this for 
@@ -267,107 +266,6 @@ public:
       return x.Bytes() + y.Bytes();
     }
   };
-  template <typename Arg> class ContractionSumSpatialCompute : TunableLocalParity
-  {
-  protected:
-    Arg &arg;
-    const ColorSpinorField &x;
-    const ColorSpinorField &y;
-    const QudaContractType cType;
-
-   private:
-    bool staticGridDim() const { return true; } // Maintain grid dims set in this class.
-    unsigned int minThreads() const { return arg.threads; }
-    bool tuneSharedBytes() const { return false; }
-
-    void initTuneParam(TuneParam &param) const {
-      TunableLocalParity::initTuneParam(param);
-      param.block.y = 2;
-      param.grid.z = x.X(2); // T dimension is mapped to different blocks in the Z dimension
-    }
-
-    void defaultTuneParam(TuneParam &param) const {
-      TunableLocalParity::defaultTuneParam(param);
-      param.block.y = 2;
-      param.grid.z = x.X(2); // T dimension is mapped to different blocks in the Z dimension
-    }
-
-  public:
-    ContractionSumSpatialCompute(Arg &arg, const ColorSpinorField &x, const ColorSpinorField &y, const QudaContractType cType) :
-      TunableLocalParity(),
-      arg(arg),
-      x(x),
-      y(y),
-      cType(cType)
-    {
-      switch (cType) {
-      case QUDA_CONTRACT_TYPE_OPEN_SUM: strcat(aux, "open-summed,"); break;
-      case QUDA_CONTRACT_TYPE_DR_SUM: strcat(aux, "degrand-rossi-summed,"); break;
-      case QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL: strcat(aux, "degrand-rossi-summed-spacial,"); break;
-      default: errorQuda("Unexpected contraction type %d", cType);
-      }
-      strcat(aux, x.AuxString());
-#ifdef JITIFY
-      create_jitify_program("kernels/contraction.cuh");
-#endif
-    }
-    virtual ~ContractionSumSpatialCompute() {}
-    void apply(const qudaStream_t &stream)
-    {
-      if (x.Location() == QUDA_CUDA_FIELD_LOCATION) {
-        for (int i=0; i<2*x.Nspin()*x.Nspin()*x.X(2); i++) ((double*)arg.result_h)[i] = 0.0;
-        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-#ifdef JITIFY
-        std::string function_name;
-        switch (cType) {
-	case QUDA_CONTRACT_TYPE_OPEN_SUM: function_name = "quda::computeColorContractionSum"; break;
-        case QUDA_CONTRACT_TYPE_DR_SUM: function_name = "quda::computeDegrandRossiContractionSumSingle"; break;
-        case QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL: function_name = "quda::computeDegrandRossiContractionSumSpatial"; break;
-        default: errorQuda("Unexpected contraction type %d", cType);
-        }
-
-        using namespace jitify::reflection;
-        jitify_error = program->kernel(function_name)
-	  .instantiate(Type<real>(), Type<Arg>())
-	  .configure(tp.grid, tp.block, tp.shared_bytes, stream)
-	  .launch(arg);
-#else
-        switch (cType) {
-        case QUDA_CONTRACT_TYPE_OPEN_SUM:
-          LAUNCH_KERNEL_LOCAL_PARITY(computeColorContractionSum, (*this), tp, stream, arg, Arg);
-          break;
-        case QUDA_CONTRACT_TYPE_DR_SUM:
-          LAUNCH_KERNEL_LOCAL_PARITY(computeDegrandRossiContractionSum, (*this), tp, stream, arg, Arg);
-          break;
-        case QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL:
-          LAUNCH_KERNEL_LOCAL_PARITY(computeDegrandRossiContractionSum, (*this), tp, stream, arg, Arg);
-          break;
-        default: errorQuda("Unexpected contraction type %d", cType);
-        }
-#endif
-      } else {
-        errorQuda("CPU not supported yet\n");
-      }
-    }
-
-    TuneKey tuneKey() const { return TuneKey(x.VolString(), typeid(*this).name(), aux); }
-
-    void preTune() {}
-    void postTune() {}
-
-    long long flops() const
-    {
-      if (cType == QUDA_CONTRACT_TYPE_OPEN_SUM || cType == QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL)
-        return x.Nspin() * x.Nspin() * 3 * 6ll * x.Volume();
-      else
-        return ((x.Nspin() * x.Nspin() * 3 * 6ll) + (x.Nspin() * x.Nspin() * (4 + 12))) * x.Volume();
-    }
-
-    long long bytes() const
-    {
-      return x.Bytes() + y.Bytes();
-    }
-  };
 
   template <typename real>
   void contract_quda(const ColorSpinorField &x, const ColorSpinorField &y, const size_t s1, const size_t c1,
@@ -377,20 +275,12 @@ public:
       ContractionSumArg<real> arg(x, y, s1, b1, c1);
       ContractionSumCompute<decltype(arg)> contraction_with_sum(arg, x, y, cType);
       contraction_with_sum.apply(0);
-      qudaDeviceSynchronize();
-
-      // Copy timeslice sums back to device
-      auto *res = (double*)arg.result_h;
-      for (int i=0; i<x.Nspin()*x.Nspin()*x.X(3); i++) result[i] = complex<real>(res[2*i], res[2*i+1]);
-      // Head on back to your place in contractQuda to finish up.
-
+      arg.complete(result);
     } else if (cType == QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL){
-      ContractionSumSpatialArg<real> arg(x, y);
-      ContractionSumSpatialCompute<decltype(arg)> contraction_with_sum_spatial(arg, x, y, cType);
+      ContractionSumArg<real, 2> arg(x, y, s1, b1, c1); // reduce in the z direction
+      ContractionSumCompute<decltype(arg)> contraction_with_sum_spatial(arg, x, y, cType);
       contraction_with_sum_spatial.apply(0);
-      qudaDeviceSynchronize();
-      auto *res = (double*)arg.result_h;
-      for (int i=0; i<x.Nspin()*x.Nspin()*x.X(2); i++) result[i] = complex<real>(res[2*i], res[2*i+1]);
+      arg.complete(result);
     } else {
       ContractionArg<real> arg(x, y, result);
       Contraction<real, ContractionArg<real>> contraction(arg, x, y, cType);
