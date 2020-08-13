@@ -455,7 +455,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--cublas-offsets", cublas_offsets, "Set the offsets for matrices A, B, and C (default 0 0 0)")
     ->expected(3);
 
-  quda_app->add_option("--cublas-offsets", cublas_offsets, "Set the offsets for matrices A, B, and C (default 0 0 0)")
+  quda_app->add_option("--cublas-strides", cublas_strides, "Set the strides for matrices A, B, and C (default -1 -1 -1)")
     ->expected(3);
   
   quda_app->add_option("--cublas-batch", cublas_batch, "Set the number of batches for GEMM (default 16)");
