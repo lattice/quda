@@ -204,7 +204,7 @@ public:
       qudaLaunchKernel((const void *)f, tp.grid, tp.block, args, tp.shared_bytes, stream);
     }
 #endif
-#define launch(kern,tp,arg,str) qudaLaunch(kern, (tp,str), (arg))
+//#define launch(kern,tp,arg,str) qudaLaunch(kern, (tp,str), (arg))
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -220,22 +220,22 @@ public:
         if (in.PCType() == QUDA_4D_PC) {
           if (arg.dagger) {
             switch (arg.twist) {
-            case 0: launch((packKernel<true, 0, QUDA_4D_PC, Arg>), tp, arg, stream); break;
-            case 1: launch((packKernel<true, 1, QUDA_4D_PC, Arg>), tp, arg, stream); break;
-            case 2: launch((packKernel<true, 2, QUDA_4D_PC, Arg>), tp, arg, stream); break;
+            case 0: launchPack<true, 0, QUDA_4D_PC>(tp, stream, arg); break;
+            case 1: launchPack<true, 1, QUDA_4D_PC>(tp, stream, arg); break;
+            case 2: launchPack<true, 2, QUDA_4D_PC>(tp, stream, arg); break;
             }
           } else {
             switch (arg.twist) {
-            case 0: launch((packKernel<false, 0, QUDA_4D_PC, Arg>), tp, arg, stream); break;
+            case 0: launchPack<false, 0, QUDA_4D_PC>(tp, stream, arg); break;
             default: errorQuda("Twisted packing only for dagger");
             }
           }
         } else if (arg.pc_type == QUDA_5D_PC) {
           if (arg.twist) errorQuda("Twist packing not defined");
           if (arg.dagger) {
-            launch((packKernel<true, 0, QUDA_5D_PC, Arg>), tp, arg, stream);
+            launchPack<true, 0, QUDA_5D_PC>(tp, stream, arg);
           } else {
-            launch((packKernel<false, 0, QUDA_5D_PC, Arg>), tp, arg, stream);
+            launchPack<false, 0, QUDA_5D_PC>(tp, stream, arg);
           }
         } else {
           errorQuda("Unexpected preconditioning type %d", in.PCType());
@@ -245,23 +245,31 @@ public:
           if (arg.dagger) {
             switch (arg.twist) {
             case 0:
-              launch((location & Host ? packShmemKernel<true, 0, QUDA_4D_PC, Arg> : packKernel<true, 0, QUDA_4D_PC, Arg>),
-                  tp, arg, stream);
+              if(location & Host)
+	        launchPackShmem<true, 0, QUDA_4D_PC>(tp, stream, arg);
+	      else
+	        launchPack<true, 0, QUDA_4D_PC>(tp, stream, arg);
               break;
             case 1:
-              launch((location & Host ? packShmemKernel<true, 1, QUDA_4D_PC, Arg> : packKernel<true, 0, QUDA_4D_PC, Arg>),
-                  tp, arg, stream);
+              if(location & Host)
+	        launchPackShmem<true, 1, QUDA_4D_PC>(tp, stream, arg);
+	      else
+	        launchPack<true, 1, QUDA_4D_PC>(tp, stream, arg);
               break;
             case 2:
-              launch((location & Host ? packShmemKernel<true, 2, QUDA_4D_PC, Arg> : packKernel<true, 2, QUDA_4D_PC, Arg>),
-                  tp, arg, stream);
+              if(location & Host)
+	        launchPackShmem<true, 1, QUDA_4D_PC>(tp, stream, arg);
+	      else
+	        launchPack<true, 1, QUDA_4D_PC>(tp, stream, arg);
               break;
             }
           } else {
             switch (arg.twist) {
             case 0:
-              launch((location & Host ? packShmemKernel<false, 0, QUDA_4D_PC, Arg> : packKernel<false, 0, QUDA_4D_PC, Arg>),
-                  tp, arg, stream);
+              if(location & Host)
+	        launchPackShmem<false, 0, QUDA_4D_PC>(tp, stream, arg);
+	      else
+	        launchPack<false, 0, QUDA_4D_PC>(tp, stream, arg);
               break;
             default: errorQuda("Twisted packing only for dagger");
             }
@@ -269,9 +277,9 @@ public:
         } else if (arg.pc_type == QUDA_5D_PC) {
           if (arg.twist) errorQuda("Twist packing not defined");
           if (arg.dagger) {
-            launch((packKernel<true, 0, QUDA_5D_PC, Arg>), tp, arg, stream);
+            launchPack<true, 0, QUDA_5D_PC>(tp, stream, arg);
           } else {
-            launch((packKernel<false, 0, QUDA_5D_PC, Arg>), tp, arg, stream);
+            launchPack<false, 0, QUDA_5D_PC>(tp, stream, arg);
           }
         }
 #endif
@@ -283,9 +291,10 @@ public:
         arg.blocks_per_dir = tp.grid.x / (2 * arg.active_dims); // set number of blocks per direction
 
 #ifdef STRIPED
-        launch((packStaggeredKernel<Arg>), tp, arg, stream);
+	launchPackStaggered(tp, stream, arg);
 #else
-        launch((location & Host ? packStaggeredShmemKernel<Arg> : packStaggeredKernel<Arg>), tp, arg, stream);
+        if(location & Host) launchPackStaggered(tp, stream, arg);
+	else launchPackStaggered(tp, stream, arg);
 #endif
       } else {
         errorQuda("Unsupported nSpin = %d\n", in.Nspin());

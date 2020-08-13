@@ -25,7 +25,8 @@ namespace quda
 
     void create_context()
     {
-      cl::sycl::default_selector my_selector;
+      //cl::sycl::default_selector my_selector;
+      cl::sycl::host_selector my_selector;
       defaultQueue = cl::sycl::queue(my_selector);
 
       streams = new qudaStream_t[Nstream];

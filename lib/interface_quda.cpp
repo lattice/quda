@@ -4,11 +4,11 @@
 #include <cstring>
 #include <iostream>
 #include <sys/time.h>
-#include <complex.h>
 
 #include <quda.h>
 #include <quda_fortran.h>
 #include <quda_internal.h>
+
 #include <device.h>
 #include <comm_quda.h>
 #include <blas_quda.h>
@@ -31,6 +31,7 @@
 #include <multigrid.h>
 #include <deflation.h>
 #include <ks_force_quda.h>
+#include <complex.h>
 
 #ifdef GPU_GAUGE_FORCE
 #include <gauge_force_quda.h>

@@ -5,9 +5,11 @@
 #include <algorithm>
 #include <functional>
 
+#ifdef I
 #undef I
+#endif
 #include <CL/sycl.hpp>
-#include <CL/__spirv/spirv_vars.hpp>
+//#include <CL/__spirv/spirv_vars.hpp>
 //using namespace cl::sycl;
 
 #include "quda_cpu_vec.h"

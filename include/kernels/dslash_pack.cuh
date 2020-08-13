@@ -54,9 +54,9 @@ namespace quda
       dagger(dagger),
       parity(parity),
       nParity(in.SiteSubset()),
-      threads(threads),
       pc_type(in.PCType()),
       dc(in.getDslashConstant()),
+      threads(threads),
       twist_a(a),
       twist_b(b),
       twist_c(c),
@@ -219,6 +219,12 @@ namespace quda
     } // while tid
   }
 
+  template <bool dagger, int twist, QudaPCType pc, typename Arg>
+  void launchPack(TuneParam tp, qudaStream_t str, Arg arg)
+  {
+    qudaLaunch((packKernel<dagger,twist,pc>), (tp,str), (arg));
+  }
+
   template <bool dagger, QudaPCType pc, typename Arg> struct packShmem {
 
     template <int twist, typename... Env_> __device__ inline void operator()(Arg &arg, int s, int parity, Env_... env_)
@@ -305,6 +311,12 @@ namespace quda
     pack<twist>(arg, s, parity);
   }
 
+  template <bool dagger, int twist, QudaPCType pc, typename Arg>
+  void launchPackShmem(TuneParam tp, qudaStream_t str, Arg arg)
+  {
+    qudaLaunch((packShmemKernel<dagger,twist,pc>), (tp,str), (arg));
+  }
+
   template <typename Arg, typename... Env_> __global__ void packStaggeredKernel(Arg arg, Env_... env_)
   {
     const int sites_per_block = arg.sites_per_block;
@@ -340,6 +352,12 @@ namespace quda
       local_tid += blockDim.x;
       tid += blockDim.x;
     } // while tid
+  }
+
+  template <typename Arg>
+  void launchPackStaggered(TuneParam tp, qudaStream_t str, Arg arg)
+  {
+    qudaLaunch((packStaggeredKernel), (tp,str), (arg));
   }
 
   template <bool dagger, QudaPCType pc, typename Arg> struct packStaggeredShmem {
@@ -418,6 +436,12 @@ namespace quda
 
     packStaggeredShmem<0, QUDA_4D_PC, Arg> pack;
     pack(arg, s, parity);
+  }
+
+  template <typename Arg>
+  void launchPackStaggeredShmem(TuneParam tp, qudaStream_t str, Arg arg)
+  {
+    qudaLaunch((packStaggeredShmemKernel), (tp,str), (arg));
   }
 
 } // namespace quda

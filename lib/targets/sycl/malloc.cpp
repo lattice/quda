@@ -261,6 +261,7 @@ namespace quda
    */
   void *pinned_malloc_(const char *func, const char *file, int line, size_t size)
   {
+    printf("pinned_malloc_\n"); fflush(stdout);
     MemAlloc a(func, file, line);
     //void *ptr = aligned_malloc(a, size);
     auto dev = defaultQueue.get_device();
@@ -285,11 +286,13 @@ namespace quda
    */
   void *mapped_malloc_(const char *func, const char *file, int line, size_t size)
   {
+    printf("mapped_malloc_\n"); fflush(stdout);
     MemAlloc a(func, file, line);
     //void *ptr = aligned_malloc(a, size);
     auto dev = defaultQueue.get_device();
     auto ctx = defaultQueue.get_context();
     void *ptr = cl::sycl::malloc_shared(size, dev, ctx);
+    printf("ptr: %p\n", ptr);
     track_malloc(MAPPED, a, ptr);
 #ifdef HOST_DEBUG
     memset(ptr, 0xff, a.base_size);
