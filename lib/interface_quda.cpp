@@ -5786,8 +5786,8 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
 }
 
 void contractQuda(void** h_prop_array_flavor_1, void** h_prop_array_flavor_2, void *h_result, const QudaContractType cType,
-		   QudaInvertParam *param, void *colorspinorparam, const int *X){
-
+		  QudaInvertParam *param, void *colorspinorparam, const int *X){
+  
   //create ColorSpinorFields from void** and parameter
   auto cs_param = (ColorSpinorParam*)colorspinorparam;
   const int spinor_dim = cs_param->nSpin * cs_param->nColor;
@@ -5798,7 +5798,7 @@ void contractQuda(void** h_prop_array_flavor_1, void** h_prop_array_flavor_2, vo
   for (int i = 0; i < spinor_dim ; i++) {
     cs_param->v = h_prop_array_flavor_1[i];
     CSF_ptr_container_flavor_1[i] = quda::ColorSpinorField::Create(*cs_param);
-    cs_param->v = h_prop_array_flavor_2;
+    cs_param->v = h_prop_array_flavor_2[i];
     CSF_ptr_container_flavor_2[i] = quda::ColorSpinorField::Create(*cs_param);
   }
 
@@ -5806,15 +5806,15 @@ void contractQuda(void** h_prop_array_flavor_1, void** h_prop_array_flavor_2, vo
   size_t local_corr_length;
   size_t corr_dim;
   if (cType == QUDA_CONTRACT_TYPE_OPEN || cType == QUDA_CONTRACT_TYPE_DR){
-  local_corr_length = CSF_ptr_container_flavor_2[0]->Volume(); //FIXME use better way to get this
-  corr_dim = 3;
+    local_corr_length = CSF_ptr_container_flavor_2[0]->Volume(); //FIXME use better way to get this
+    corr_dim = 3;
   } else if (cType == QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL){
-   corr_dim = 2;
+    corr_dim = 2;
   } else {
-  //default: temporal correlator, summed, i.e. QUDA_CONTRACT_TYPE_OPEN_SUM or QUDA_CONTRACT_TYPE_DR_SUM
-  corr_dim = 3;
+    //default: temporal correlator, summed, i.e. QUDA_CONTRACT_TYPE_OPEN_SUM or QUDA_CONTRACT_TYPE_DR_SUM
+    corr_dim = 3;
   }
-
+  
   //calculate some parameters
   local_corr_length = CSF_ptr_container_flavor_2[0]->X(corr_dim); //FIXME use better way to get this
   size_t local_corr_offset = local_corr_length * comm_coord(corr_dim);
@@ -5827,7 +5827,7 @@ void contractQuda(void** h_prop_array_flavor_1, void** h_prop_array_flavor_2, vo
   memset(h_result, 0, corr_size_in_bytes);
   auto *h_result_tmp_global = (double*)malloc(corr_size_in_bytes); //array that fits all timeslices and channels but is reset after reach computation
   void* h_result_tmp_local = (void*)(h_result_tmp_global+local_corr_offset); //this points to the local part of the global array
-
+  
   //create device spinor fields
   ColorSpinorParam cudaParam(*cs_param);
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
@@ -5836,52 +5836,44 @@ void contractQuda(void** h_prop_array_flavor_1, void** h_prop_array_flavor_2, vo
   cudaParam.setPrecision(cs_param->Precision(), cs_param->Precision(), true);
   ColorSpinorField *d_single_prop_flavor_1 = ColorSpinorField::Create(cudaParam);
   ColorSpinorField *d_single_prop_flavor_2 = ColorSpinorField::Create(cudaParam);
-
+  
   size_t nSpin = cs_param->nSpin;
   size_t nColor = cs_param->nColor;
-
-  //FIXME
-  int s2, c2;
+  
   for (size_t s1 = 0; s1 < 4; s1++) {
     for (size_t c1 = 0; c1 < 3; c1++) {
-      //FIXME for now, reproduce propagator_test result
-      //       for (size_t s2 = 0; s2 < 4; s2++) {
-      //         for (size_t c2 = 0; c2 < 3; c2++) {
-      s2 = s1;
-      c2 = c1;
-      
-      // copy single prop from host to device
-      *d_single_prop_flavor_1 = *CSF_ptr_container_flavor_1[s1* cs_param->nColor + c1];
-      *d_single_prop_flavor_2 = *CSF_ptr_container_flavor_2[s2* cs_param->nColor + c2];
-      
-      memset(h_result_tmp_global, 0, corr_size_in_bytes);
-      
-      contractQuda(*d_single_prop_flavor_1, *d_single_prop_flavor_1, s1, c1, s2, c2, h_result_tmp_local, cType);
-      //contractQuda spits out corr_dim*16* complex numbers, one for each channel and corr slice. this if for a set of fixed color+spin indices.
-      
-      
-      if(comm_dim(corr_dim) > 1) comm_gather_array(h_result_tmp_global, n_numbers_per_slice * local_corr_length);
-      
-      for(int G_idx =0; G_idx < 16; G_idx++) {
-	for(size_t t=0; t< global_corr_length; t++) {
-	  ((double*)h_result)[n_numbers_per_slice*t + 2*G_idx  ] += h_result_tmp_global[n_numbers_per_slice*t + 2*G_idx  ];
-	  ((double*)h_result)[n_numbers_per_slice*t + 2*G_idx+1] += h_result_tmp_global[n_numbers_per_slice*t + 2*G_idx+1];
+      for (size_t b1 = 0; b1 < 4; b1++) {
+	
+	// copy single prop from host to device
+	*d_single_prop_flavor_1 = *CSF_ptr_container_flavor_1[s1* cs_param->nColor + c1];
+	*d_single_prop_flavor_2 = *CSF_ptr_container_flavor_2[b1* cs_param->nColor + c1];
+	
+	memset(h_result_tmp_global, 0, corr_size_in_bytes);
+	
+	contractQuda(*d_single_prop_flavor_1, *d_single_prop_flavor_2, s1, c1, b1, h_result_tmp_local, cType);
+	//contractQuda spits out corr_dim*16* complex numbers, one for each channel and corr slice. this if for a set of fixed color+spin indices.
+	
+	
+	if(comm_dim(corr_dim) > 1) comm_gather_array(h_result_tmp_global, n_numbers_per_slice * local_corr_length);
+	
+	for(int G_idx =0; G_idx < 16; G_idx++) {
+	  for(size_t t=0; t< global_corr_length; t++) {
+	    ((double*)h_result)[n_numbers_per_slice*t + 2*G_idx  ] += h_result_tmp_global[n_numbers_per_slice*t + 2*G_idx  ];
+	    ((double*)h_result)[n_numbers_per_slice*t + 2*G_idx+1] += h_result_tmp_global[n_numbers_per_slice*t + 2*G_idx+1];
+	  }
 	}
-      }
-      
-      printfQuda("--------------------------------------------\n");
-      printfQuda("%lu %lu %d %d \n", s1, c1, s2, c2);
-      for (int G_idx = 0; G_idx < 16; G_idx++) {
-	for (size_t t = 0; t < global_corr_length; t++) {
-	  printfQuda("sum: g=%d t=%lu %e %e\n", G_idx, t, ((double*)h_result)[n_numbers_per_slice * t + 2 * G_idx],
-		     ((double*)h_result)[n_numbers_per_slice * t + 2 * G_idx + 1]);
+	
+	printfQuda("--------------------------------------------\n");
+	printfQuda("%lu %lu %lu\n", s1, c1, b1);
+	for (int G_idx = 0; G_idx < 16; G_idx++) {
+	  for (size_t t = 0; t < global_corr_length; t++) {
+	    printfQuda("sum: g=%d t=%lu %e %e\n", G_idx, t, ((double*)h_result)[n_numbers_per_slice * t + 2 * G_idx],
+		       ((double*)h_result)[n_numbers_per_slice * t + 2 * G_idx + 1]);
+	  }
 	}
+	printfQuda("--------------------------------------------\n");
       }
-      printfQuda("--------------------------------------------\n");
     }
-    //FIXME see above
-    //      }
-    //    }
   }
   
   delete d_single_prop_flavor_1;

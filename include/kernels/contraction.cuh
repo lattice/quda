@@ -238,7 +238,7 @@ namespace quda
     static constexpr bool spin_project = true;
     static constexpr bool spinor_direct_load = false; // false means texture load
 
-    int s1, s2, c1, c2;
+    int s1, b1, c1;
 
     typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
     F x;
@@ -247,11 +247,11 @@ namespace quda
     DRGammaMatrix<Float_> Gamma;
     int t_offset;
     ContractionSumArg(const ColorSpinorField &x, const ColorSpinorField &y,
-                      const int s1, const int s2, const int c1, const int c2) :
+                      const int s1, const int b1, const int c1) :
       ReduceArg<spinor_array>(),
       threads(x.VolumeCB() / x.X(reduction_dim)),
       x(x),
-      y(y),s1(s1),s2(s2),c1(c1),c2(c2), Gamma(),
+      y(y),s1(s1),b1(b1),c1(c1), Gamma(),
       t_offset(comm_coord(reduction_dim) * x.X(reduction_dim)) // offset of the slice we are doing reduction on
     {
       for (int dir = 0; dir < 4; dir++) 
@@ -688,9 +688,8 @@ namespace quda
     int parity = threadIdx.y;
 
     int s1 = arg.s1;
-    int s2 = arg.s2;
+    int b1 = arg.b1;
     int c1 = arg.c1;
-    int c2 = arg.c2;
     int p1, p2;
 
     using real = typename Arg::Float;
@@ -721,28 +720,25 @@ namespace quda
         //FIXME our changes: don't work
         //-------------------------------------------------------------------
         // get gamma matrix column indices for the non-zero values from the row indices of the outer loop
-//        p2 = arg.Gamma.gm_i[G_idx][s2];
-//        p1 = arg.Gamma.gm_i[G_idx][s1];
-//
-//        propagator_product = innerProduct(x,y,p2,p1,c2,c1) * arg.Gamma.gm_z[G_idx][p2] * arg.Gamma.gm_z[G_idx][p1];
-//
-//        result_all_channels[G_idx].x = propagator_product.real();
-//        result_all_channels[G_idx].y = propagator_product.imag();
-      //-------------------------------------------------------------------
-
+	//        p2 = arg.Gamma.gm_i[G_idx][s2];
+	//        p1 = arg.Gamma.gm_i[G_idx][s1];
+	//
+	//        propagator_product = innerProduct(x,y,p2,p1,c2,c1) * arg.Gamma.gm_z[G_idx][p2] * arg.Gamma.gm_z[G_idx][p1];
+	//
+	//        result_all_channels[G_idx].x = propagator_product.real();
+	//        result_all_channels[G_idx].y = propagator_product.imag();
+	//-------------------------------------------------------------------
+	
         //FIXME reproduce propagator_test results:
-        for (int mu=0; mu<4; mu++){
-          for (int nu=0; nu<4; nu++){
-            spin_elem[mu][nu] = innerProduct(x, y, mu, nu);
-          }
+        for (int s2=0; s2<4; s2++){
+            int b2= arg.Gamma.gm_i[G_idx][s2];
+            int b1_tmp =arg.Gamma.gm_i[G_idx][s1];
+            if ( b1_tmp == b1) {
+              A = arg.Gamma.gm_z[G_idx][b2] * innerProduct(x, y, b2, s2) * arg.Gamma.gm_z[G_idx][b1];
+              result_all_channels[G_idx].x += A.real();
+              result_all_channels[G_idx].y += A.imag();
+            }
         }
-        for (int mu =0; mu<4; mu++){
-          int nu = arg.Gamma.gm_i[G_idx][mu];
-          A = arg.Gamma.gm_z[G_idx][nu] * spin_elem[mu][nu];
-          result_all_channels[G_idx].x += A.real();
-          result_all_channels[G_idx].y += A.imag();
-        }
-
       }
 
       xyz += blockDim.x * gridDim.x;

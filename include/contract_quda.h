@@ -10,5 +10,5 @@ namespace quda
                     QudaInvertParam *param, ColorSpinorParam *cs_param, const int *X);
 
   //called in contract.cu
-  void contractQuda(const ColorSpinorField &x, const ColorSpinorField &y, size_t s1, size_t c1, size_t s2, size_t c2, void *result, QudaContractType cType);
+  void contractQuda(const ColorSpinorField &x, const ColorSpinorField &y, size_t s1, size_t c1, size_t b1, void *result, QudaContractType cType);
 } // namespace quda
