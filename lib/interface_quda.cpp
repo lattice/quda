@@ -5785,13 +5785,28 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
   return 0;
 }
 
-void contractQuda(std::vector<ColorSpinorField *> h_prop_array_flavor_1, std::vector<ColorSpinorField *> h_prop_array_flavor_2, void *h_result, const QudaContractType cType,
-		   QudaInvertParam *param, ColorSpinorParam *cs_param, const int *X){
+void contractQuda(void** h_prop_array_flavor_1, void** h_prop_array_flavor_2, void *h_result, const QudaContractType cType,
+		   QudaInvertParam *param, void *colorspinorparam, const int *X){
+
+  //create ColorSpinorFields from void** and parameter
+  auto cs_param = (ColorSpinorParam*)colorspinorparam;
+  const int spinor_dim = cs_param->nSpin * cs_param->nColor;
+  std::vector<quda::ColorSpinorField*> CSF_ptr_container_flavor_1(spinor_dim);
+  std::vector<quda::ColorSpinorField*> CSF_ptr_container_flavor_2(spinor_dim);
+
+  cs_param->create = QUDA_REFERENCE_FIELD_CREATE;
+  for (int i = 0; i < spinor_dim ; i++) {
+    cs_param->v = h_prop_array_flavor_1[i];
+    CSF_ptr_container_flavor_1[i] = quda::ColorSpinorField::Create(*cs_param);
+
+    cs_param->v = h_prop_array_flavor_2;
+    CSF_ptr_container_flavor_2[i] = quda::ColorSpinorField::Create(*cs_param);
+  }
+  cs_param->create = QUDA_NULL_FIELD_CREATE;
 
   //create parameters for device spinor fields
   ColorSpinorParam cudaParam(*cs_param);
   cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
-  cudaParam.create = QUDA_NULL_FIELD_CREATE;
   cudaParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   cudaParam.setPrecision(cs_param->Precision(), cs_param->Precision(), true);
 
@@ -5799,7 +5814,7 @@ void contractQuda(std::vector<ColorSpinorField *> h_prop_array_flavor_1, std::ve
   size_t local_corr_length;
   size_t corr_dim;
   if (cType == QUDA_CONTRACT_TYPE_OPEN || cType == QUDA_CONTRACT_TYPE_DR){
-  local_corr_length = h_prop_array_flavor_1[0]->Volume();
+  local_corr_length = CSF_ptr_container_flavor_2[0]->Volume(); //FIXME use better way to get this
   corr_dim = 3;
   } else if (cType == QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL){
    corr_dim = 2;
@@ -5809,16 +5824,15 @@ void contractQuda(std::vector<ColorSpinorField *> h_prop_array_flavor_1, std::ve
   }
 
   //calculate some parameters
-  local_corr_length = h_prop_array_flavor_1[0]->X(corr_dim);
+  local_corr_length = CSF_ptr_container_flavor_2[0]->X(corr_dim); //FIXME use better way to get this
   size_t local_corr_offset = local_corr_length * comm_coord(corr_dim);
   size_t global_corr_length = local_corr_length * comm_dim(corr_dim);
 
   size_t n_numbers_per_slice = 2 * 16;
   size_t corr_size_in_bytes = n_numbers_per_slice * global_corr_length * cs_param->Precision();
 
-  //reserve memory for local result array on host and device
-  auto *h_result_global = (double*)malloc(corr_size_in_bytes);  //array that holds sum of all timeslices and channels
-  memset(h_result_global, 0., corr_size_in_bytes);
+  //reserve memory for local result array on host and device //array that holds sum of all timeslices and channels
+  memset(h_result, 0, corr_size_in_bytes);
   auto *h_result_tmp_global = (double*)malloc(corr_size_in_bytes); //array that fits all timeslices and channels but is reset after reach computation
   void* h_result_tmp_local = (void*)(h_result_tmp_global+local_corr_offset); //this points to the local part of the global array
 
@@ -5834,8 +5848,8 @@ void contractQuda(std::vector<ColorSpinorField *> h_prop_array_flavor_1, std::ve
        for (size_t s2 = 0; s2 < nSpin; s2++) {
          for (size_t c2 = 0; c2 < nColor; c2++) {
            //load single prop from array
-           *h_single_prop_flavor_1 = *h_prop_array_flavor_1[s1*cs_param->nColor + c1];
-           *h_single_prop_flavor_2 = *h_prop_array_flavor_2[s2*cs_param->nColor + c2];
+           *h_single_prop_flavor_1 = *CSF_ptr_container_flavor_1[s1* cs_param->nColor + c1];
+           *h_single_prop_flavor_2 = *CSF_ptr_container_flavor_2[s2* cs_param->nColor + c2];
 
            // copy single prop from host to device
            *d_single_prop_flavor_1 = *h_single_prop_flavor_1;
@@ -5846,23 +5860,34 @@ void contractQuda(std::vector<ColorSpinorField *> h_prop_array_flavor_1, std::ve
            contractQuda(*d_single_prop_flavor_1, *d_single_prop_flavor_2, s1, c1, s2, c2, h_result_tmp_local, cType);
            //contractQuda spits out corr_dim*16* complex numbers, one for each channel and corr slice. this if for a set of fixed color+spin indices.
 
+
            if(comm_dim(corr_dim) > 1) comm_gather_array(h_result_tmp_global, n_numbers_per_slice * local_corr_length);
 
            for(int G_idx =0; G_idx < 16; G_idx++) {
              for(size_t t=0; t< global_corr_length; t++) {
-               h_result_global[n_numbers_per_slice*t + 2*G_idx  ] += h_result_tmp_global[n_numbers_per_slice*t + 2*G_idx  ];
-               h_result_global[n_numbers_per_slice*t + 2*G_idx+1] += h_result_tmp_global[n_numbers_per_slice*t + 2*G_idx+1];
+               ((double*)h_result)[n_numbers_per_slice*t + 2*G_idx  ] += h_result_tmp_global[n_numbers_per_slice*t + 2*G_idx  ];
+               ((double*)h_result)[n_numbers_per_slice*t + 2*G_idx+1] += h_result_tmp_global[n_numbers_per_slice*t + 2*G_idx+1];
              }
            }
+
+           printfQuda("--------------------------------------------\n");
+           printfQuda("%d %d %d %d \n", s1, c1, s2, c2);
+           for (int G_idx = 0; G_idx < 16; G_idx++) {
+             for (size_t t = 0; t < global_corr_length; t++) {
+               printfQuda("sum: g=%d t=%lu %e %e\n", G_idx, t, ((double*)h_result)[n_numbers_per_slice * t + 2 * G_idx],
+                          ((double*)h_result)[n_numbers_per_slice * t + 2 * G_idx + 1]);
+             }
+           }
+           printfQuda("--------------------------------------------\n");
         }
       }
     }
   }
 
-  //copy result from inside function to outside
-  memcpy(h_result_global, h_result, corr_size_in_bytes);
-
-  delete h_result_global;
+  for (int i=0; i<spinor_dim; i++){
+    delete CSF_ptr_container_flavor_1[i];
+    delete CSF_ptr_container_flavor_2[i];
+  }
   delete h_result_tmp_global;
   delete d_single_prop_flavor_1;
   delete d_single_prop_flavor_2;

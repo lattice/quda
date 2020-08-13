@@ -56,41 +56,40 @@ int main(int argc, char **argv)
     loadCloverQuda(clover, clover_inv, &inv_param);
   }
   // ColorSpinors (Wilson)
+  //FIXME what about this parameter class? should it be part of quda.h like invertparam etc?
   quda::ColorSpinorParam cs_param;
-  constructWilsonTestSpinorParam(&cs_param, &inv_param, &gauge_param);
+  quda::ColorSpinorParam* tmp = &cs_param;
+  constructWilsonTestSpinorParam(&cs_param, &inv_param, &gauge_param); //FIXME remove Test from this function name?
   int spinor_dim = cs_param.nColor * cs_param.nSpin;
   setSpinorSiteSize(spinor_dim * 2); // this sets the global variable my_spinor_site_size
 
-  std::vector<quda::ColorSpinorField *> qudaProp4D(
-    spinor_dim); // qudaProp4D is a vector that contains 12 pointers to colorspinorfields.
-  std::vector<quda::ColorSpinorField *> qudaSource4D(spinor_dim);
-
   size_t bytes_per_float = sizeof(double);
   // Allocate memory on host for one source (0,0,0,0) for each of the 12x12 color+spinor combinations
-  auto *out_array = (double *)malloc(spinor_dim * spinor_dim * V * 2 * bytes_per_float);
-  auto *in_array = (double *)malloc(spinor_dim * spinor_dim * V * 2 * bytes_per_float);
+  auto *source_array = (double *)malloc(spinor_dim * spinor_dim * V * 2 * bytes_per_float);
+  auto *prop_array = (double *)malloc(spinor_dim * spinor_dim * V * 2 * bytes_per_float);
+
+  //this will be a C array of pointers to the memory (CSF->V()) of the spinor_dim colorspinorfields. functions declared in quda.h
+  // can only accept C code for backwards compatibility reasons
+  void **CSF_V_ptr_arr_source = new void*[spinor_dim];
+  void **CSF_V_ptr_arr_prop = new void*[spinor_dim];
 
   // Actually create ColorSpinorField objects and tell them to use the memory from above
-  cs_param.create = QUDA_REFERENCE_FIELD_CREATE;
   for (int i = 0; i < spinor_dim; i++) {
     int offset = i * V * spinor_dim * 2;
-    cs_param.v = in_array + offset;
-    qudaSource4D[i] = quda::ColorSpinorField::Create(cs_param);
-    cs_param.v = out_array + offset;
-    qudaProp4D[i] = quda::ColorSpinorField::Create(cs_param);
+    CSF_V_ptr_arr_source[i] = source_array + offset;
+    CSF_V_ptr_arr_prop[i] = prop_array + offset;
   }
 
-  // temporal or spatial correlator?
+  // temporal or spatial correlator? //FIXME put this as a parameter of contractQuda!
   size_t corr_dim = 3;
   if (contract_type == QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL) { corr_dim = 2; }
   size_t local_corr_length = gauge_param.X[corr_dim];
-  size_t local_corr_offset = local_corr_length * comm_coord(corr_dim);
   size_t global_corr_length = local_corr_length * comm_dim(corr_dim);
 
   // host memory for correlator results. comm_dim(corr_dim)*array_length is global Ntau or Nz
-  size_t n_numbers_per_slice = 2 * cs_param.nSpin * cs_param.nSpin;
+  size_t n_numbers_per_slice = 2 * 16;
   size_t corr_size_in_bytes = n_numbers_per_slice * global_corr_length * bytes_per_float;
-  auto *correlation_function_sum = (double *)malloc(corr_size_in_bytes);
+  void *correlation_function_sum = malloc(corr_size_in_bytes);
   memset(correlation_function_sum, 0, corr_size_in_bytes);
 
   // Loop over the number of sources to use. Default is prop_n_sources=1. Default source position = 0 0 0 0
@@ -100,33 +99,26 @@ int main(int argc, char **argv)
     for (int i = 0; i < spinor_dim; i++) {
       const int source[4] = {prop_source_position[n][0], prop_source_position[n][1], prop_source_position[n][2],
                              prop_source_position[n][3]};
-      constructPointSpinorSource(qudaSource4D[i]->V(), cs_param.nSpin, cs_param.nColor, inv_param.cpu_prec,
+      constructPointSpinorSource(CSF_V_ptr_arr_source[i], cs_param.nSpin, cs_param.nColor, inv_param.cpu_prec,
                                  gauge_param.X, i, source);
       inv_param.solver_normalization = QUDA_SOURCE_NORMALIZATION; // Make explicit for now.
-
-      invertQuda(qudaProp4D[i]->V(), qudaSource4D[i]->V(), &inv_param);
+      invertQuda(CSF_V_ptr_arr_prop[i], CSF_V_ptr_arr_source[i], &inv_param);
     }
-
-    //FIXME fix the declaration in quda.h
-    contractQuda(qudaProp4D, qudaProp4D, correlation_function_sum, contract_type, &inv_param, &cs_param, gauge_param.X);
+    contractQuda(CSF_V_ptr_arr_prop, CSF_V_ptr_arr_prop, correlation_function_sum, contract_type, &inv_param, (void*)tmp, gauge_param.X);
   }
 
   // print correlators
   for (int G_idx = 0; G_idx < 16; G_idx++) {
     for (size_t t = 0; t < global_corr_length; t++) {
-      printfQuda("sum: g=%d t=%lu %e %e\n", G_idx, t, correlation_function_sum[n_numbers_per_slice * t + 2 * G_idx],
-                 correlation_function_sum[n_numbers_per_slice * t + 2 * G_idx + 1]);
+      printfQuda("sum: g=%d t=%lu %e %e\n", G_idx, t, ((double*)correlation_function_sum)[n_numbers_per_slice * t + 2 * G_idx],
+                 ((double*)correlation_function_sum)[n_numbers_per_slice * t + 2 * G_idx + 1]);
     }
   }
 
   // free memory
-  for (int i = 0; i < spinor_dim; i++) {
-    delete qudaProp4D[i];
-    delete qudaSource4D[i];
-  }
   free(correlation_function_sum);
-  free(in_array);
-  free(out_array);
+  free(source_array);
+  free(prop_array);
   freeGaugeQuda();
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     freeCloverQuda();

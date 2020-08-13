@@ -46,10 +46,10 @@ namespace quda
       gm_i[2][1]=2;
       gm_i[2][2]=1;
       gm_i[2][3]=0;
-      gm_z[2][0]=-1;
-      gm_z[2][1]=1;
-      gm_z[2][2]=1;
-      gm_z[2][3]=-1;
+      gm_z[2][0]=-1.;
+      gm_z[2][1]=1.;
+      gm_z[2][2]=1.;
+      gm_z[2][3]=-1.;
 
       // G_idx = 3: \gamma_3
       gm_i[3][0]=2;
@@ -62,14 +62,14 @@ namespace quda
       gm_z[3][3]=i;
 
       // G_idx = 4: \gamma_4
-      gm_i[3][0]=2;
-      gm_i[3][1]=3;
-      gm_i[3][2]=0;
-      gm_i[3][3]=1;
-      gm_z[3][0]=1;
-      gm_z[3][1]=1;
-      gm_z[3][2]=1;
-      gm_z[3][3]=1;
+      gm_i[4][0]=2;
+      gm_i[4][1]=3;
+      gm_i[4][2]=0;
+      gm_i[4][3]=1;
+      gm_z[4][0]=1.;
+      gm_z[4][1]=1.;
+      gm_z[4][2]=1.;
+      gm_z[4][3]=1.;
 
 
       // PSEUDO-SCALAR
@@ -720,9 +720,11 @@ namespace quda
         propagator_product = innerProduct(x, y, p2, p1, c2, c1);
 
         // apply Gamma Matrices
-        auto tmp = arg.Gamma.gm_z[G_idx][p2] * arg.Gamma.gm_z[G_idx][p1] * propagator_product;
+        complex<real> tmp = arg.Gamma.gm_z[G_idx][p2] * arg.Gamma.gm_z[G_idx][p1] * propagator_product;
         result_all_channels[G_idx].x = tmp.real();
         result_all_channels[G_idx].y = tmp.imag();
+
+
       }
 
       xyz += blockDim.x * gridDim.x;
