@@ -370,11 +370,11 @@ public:
   };
 
   template <typename real>
-  void contract_quda(const ColorSpinorField &x, const ColorSpinorField &y, const size_t s1, const size_t c1,
+  void contract_quda(const ColorSpinorField &x, const ColorSpinorField &y, const size_t s1,
                      const size_t b1, complex<real> *result, const QudaContractType cType)
   {
     if(cType == QUDA_CONTRACT_TYPE_OPEN_SUM || cType == QUDA_CONTRACT_TYPE_DR_SUM) {
-      ContractionSumArg<real> arg(x, y, s1, b1, c1);
+      ContractionSumArg<real> arg(x, y, s1, b1);
       ContractionSumCompute<decltype(arg)> contraction_with_sum(arg, x, y, cType);
       contraction_with_sum.apply(0);
       qudaDeviceSynchronize();
@@ -406,7 +406,7 @@ public:
   //- which one can adjust at CMake configure time. If the QUDA_CONTRACT CMake option
   //- is not set, none of the following code will be compiled. This is an important
   //- feature to include as it keeps compile time to a minimum.
-  void contractQuda(const ColorSpinorField &x, const ColorSpinorField &y, const size_t s1, const size_t c1, const size_t b1, void *result, const QudaContractType cType)
+  void contractQuda(const ColorSpinorField &x, const ColorSpinorField &y, const size_t s1, const size_t b1, void *result, const QudaContractType cType)
   {
 #ifdef GPU_CONTRACT
     //- After some checks, 
@@ -420,9 +420,9 @@ public:
     //- we see that the contract_quda function is instantiated on the desired precision. Go to
     //- the `contract_quda` and then return here.
     if (x.Precision() == QUDA_SINGLE_PRECISION) {
-      contract_quda<float>(x, y, s1, c1, b1, (complex<float> *)result, cType);
+      contract_quda<float>(x, y, s1, b1, (complex<float> *)result, cType);
     } else if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-      contract_quda<double>(x, y, s1, c1, b1, (complex<double> *)result, cType);
+      contract_quda<double>(x, y, s1, b1, (complex<double> *)result, cType);
     } else {
       errorQuda("Precision %d not supported", x.Precision());
     }
