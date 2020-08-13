@@ -1347,17 +1347,18 @@ extern "C" {
    */
   void gaugeObservablesQuda(QudaGaugeObservableParam *param);
 
-//FIXME doxygen
+
 /**
-   * Public function to perform color contractions of the host spinors x and y.
-   * @param[in] x pointer to host data
-   * @param[in] y pointer to host data
-   * @param[out] result pointer to the 16 spin projections per lattice site
+   * Public function to perform color contractions of the host spinorfields contained inside first two arguments.
+   * @param[in] h_prop_array_flavor_1 pointer to pointers of ColorSpinorField host data
+   * @param[in] h_prop_array_flavor_2 pointer to pointers of ColorSpinorField host data
+   * @param[out] h_result pointer to the 16*corr_dim complex numbers of the result correlators
    * @param[in] cType Which type of contraction (open, degrand-rossi, etc)
    * @param[in] param meta data for construction of ColorSpinorFields.
-   * @param[in] X spacetime data for construction of ColorSpinorFields.
+   * @param[in] colorspinorparam pointer to a ColorSpinorParam meta data for construction of ColorSpinorFields
+   * @param[in] X spacetime data for construction of ColorSpinorFields
    */
-void contractQuda(void** h_prop_array_flavor_1, void** h_prop_array_flavor_2, void *h_result, const QudaContractType cType,
+void contractQuda(void** h_prop_array_flavor_1, void** h_prop_array_flavor_2, void *h_result, QudaContractType cType,
                   QudaInvertParam *param, void *colorspinorparam, const int *X);
 
 
