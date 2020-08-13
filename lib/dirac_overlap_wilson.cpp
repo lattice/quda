@@ -1,7 +1,6 @@
 #include <dirac_quda.h>
 #include <blas_quda.h>
 #include <iostream>
-#include <chebyshev_coeff.h> 
 
 namespace quda {
 
@@ -198,24 +197,6 @@ DiracOverlapWilson *OvW;
     deleteTmp(&tmp1, reset);
   }
 
-  void DiracOverlapWilson::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			    ColorSpinorField &x, ColorSpinorField &b, 
-			    const QudaSolutionType solType) const
-  {
-    if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      errorQuda("Preconditioned solution requires a preconditioned solve_type");
-    }
-
-    src = &b;
-    sol = &x;
-  }
-
-  void DiracOverlapWilson::Hreconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-					const QudaSolutionType solType) const
-  {
-    // do nothing
-  }
-  
   void DiracOverlapWilson::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
 				   ColorSpinorField &x, ColorSpinorField &b, 
 				   const QudaSolutionType solType) const

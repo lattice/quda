@@ -8,20 +8,10 @@ namespace quda {
 
   namespace blas {
 
-<<<<<<< HEAD
-#include <generic_reduce.cuh>
-
-    qudaStream_t* getStream();
-
-    void* getDeviceReduceBuffer() { return d_reduce; }
-    void* getMappedHostReduceBuffer() { return hd_reduce; }
-    void* getHostReduceBuffer() { return h_reduce; }
-    qudaEvent_t* getReduceEvent() { return &reduceEnd; }
-    bool getFastReduce() { return fast_reduce_enabled; }
     qudaStream_t* getStream();
 
     template <int block_size, typename real, int len, typename Arg>
-    typename std::enable_if<block_size!=32, cudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+    typename std::enable_if<block_size!=32, qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
       void *args[] = {&arg};
       if (tp.block.x == block_size)
@@ -31,7 +21,7 @@ namespace quda {
     }
 
     template <int block_size, typename real, int len, typename Arg>
-    typename std::enable_if<block_size==32, cudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+    typename std::enable_if<block_size==32, qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
       void *args[] = {&arg};
       return qudaLaunchKernel((const void*)reduceKernel<block_size, real, len, Arg>, tp.grid, tp.block, args, tp.shared_bytes, stream);

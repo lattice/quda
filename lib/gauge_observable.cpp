@@ -65,7 +65,7 @@ namespace quda
 
       if (param.compute_qcharge_density) {
         profile.TPSTART(QUDA_PROFILE_D2H);
-        qudaMemcpy(param.qcharge_density, d_qDensity, size, cudaMemcpyDeviceToHost);
+        qudaMemcpy(param.qcharge_density, d_qDensity, size, qudaMemcpyDeviceToHost);
         profile.TPSTOP(QUDA_PROFILE_D2H);
 
         profile.TPSTART(QUDA_PROFILE_FREE);

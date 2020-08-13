@@ -317,7 +317,7 @@ endif()
 set(CMAKE_CXX_STANDARD ${QUDA_CXX_STANDARD})
 # define CXX FLAGS
 set(CMAKE_CXX_FLAGS_DEVEL
-    "${OpenMP_CXX_FLAGS} -D__STRICT_ANSI__ -O3 -Wall -arch=${QUDA_GPU_ARCH} ${CLANG_FORCE_COLOR}"
+    "${OpenMP_CXX_FLAGS} -D__STRICT_ANSI__ -O3 -D__HIP__ -Wall -arch=${QUDA_GPU_ARCH} ${CLANG_FORCE_COLOR}"
     CACHE STRING "Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_CXX_FLAGS_STRICT
     "-O3 -Wall -Werror"
@@ -437,9 +437,9 @@ string(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})
 set(CMAKE_CUDA_ARCHITECTURES ${COMP_CAP})
 set(COMP_CAP "${COMP_CAP}0")
 
-enable_language(CUDA)
-message(STATUS "CUDA Compiler is" ${CMAKE_CUDA_COMPILER})
-message(STATUS "Compiler ID is " ${CMAKE_CUDA_COMPILER_ID})
+#enable_language(CUDA)
+#message(STATUS "CUDA Compiler is" ${CMAKE_CUDA_COMPILER})
+#message(STATUS "Compiler ID is " ${CMAKE_CUDA_COMPILER_ID})
 
 # CUDA Wrapper for finding libs etc
 if(CMAKE_VERSION VERSION_LESS 3.17)

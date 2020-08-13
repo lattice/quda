@@ -94,5 +94,6 @@ namespace quda
                                   QudaFieldLocation location);
 
     } // namespace generic
+
   }   // namespace blas_lapack
 } // namespace quda

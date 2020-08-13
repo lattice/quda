@@ -41,25 +41,24 @@ namespace quda
       bool active
         = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
-      int coord[Arg::nDim];
-      int x_cb = getCoords<QUDA_4D_PC, kernel_type>(coord, arg, idx, parity, thread_dim);
+      auto coord = getCoords<QUDA_4D_PC, kernel_type>(arg, idx, 0, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
 
       // defined in dslash_wilson.cuh
-      applyWilson<nParity, dagger, kernel_type>(out, arg, coord, x_cb, 0, parity, idx, thread_dim, active);
+      applyWilson<nParity, dagger, kernel_type>(out, arg, coord, parity, idx, thread_dim, active);
 
       if (kernel_type == INTERIOR_KERNEL) {
-	Vector tmp = arg.x(x_cb, my_spinor_parity);
+	Vector tmp = arg.x(coord.x_cb, my_spinor_parity);
 	tmp = tmp + arg.a * out;
 	out = tmp.gamma(4);
       } else if (active) {
-        Vector x = arg.out(x_cb, my_spinor_parity);
+        Vector x = arg.out(coord.x_cb, my_spinor_parity);
         out = x + arg.a * out.gamma(4);
       }
 
-      if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;
+      if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(coord.x_cb, my_spinor_parity) = out;
     }
   };
 

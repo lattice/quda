@@ -1,3 +1,4 @@
+#include <hip/hip_runtime.h>
 #include <cstdlib>
 #include <cstdio>
 #include <string>
@@ -243,7 +244,7 @@ namespace quda
 
     a.size = a.base_size = size;
 
-    hipError_t err = hipMemAlloc((hipDeviceptr_t *)&ptr, size);
+    hipError_t err = hipMalloc(&ptr, size);
     if (err != HIP_SUCCESS) {
       errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
@@ -384,7 +385,7 @@ namespace quda
     if (!alloc[DEVICE_PINNED].count(ptr)) {
       errorQuda("Attempt to free invalid device pointer (%s:%d in %s())\n", file, line, func);
     }
-    hipError_t err = hipMemFree((hipDeviceptr_t)ptr);
+    hipError_t err = hipFree(ptr);
     if (err != HIP_SUCCESS) { printfQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func); }
     track_free(DEVICE_PINNED, ptr);
   }
@@ -467,7 +468,7 @@ namespace quda
 
   QudaFieldLocation get_pointer_location(const void *ptr)
   {
-
+    hipMemoryType mem_type;
     hipPointerAttribute_t attribute;//[] = { CU_POINTER_ATTRIBUTE_MEMORY_TYPE };
     hipError_t error = hipPointerGetAttributes(&attribute,ptr);mem_type=attribute.memoryType;
     if (error != hipSuccess) {

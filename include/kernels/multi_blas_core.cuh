@@ -152,7 +152,7 @@ namespace quda
       __device__ __host__ inline coeff_t a(int i, int j) const
       {
 #ifdef __HIP_DEVICE_COMPILE__
-        return reinterpret_cast<Float2 *>(Amatrix_d)[i * NYW + j];
+        return reinterpret_cast<coeff_t *>(Amatrix_d)[i * NYW + j];
 #else
         return reinterpret_cast<coeff_t *>(Amatrix_h)[i * NYW + j];
 #endif
@@ -161,7 +161,7 @@ namespace quda
       __device__ __host__ inline coeff_t b(int i, int j) const
       {
 #ifdef __HIP_DEVICE_COMPILE__
-        return reinterpret_cast<Float2 *>(Bmatrix_d)[i * NYW + j];
+        return reinterpret_cast<coeff_t *>(Bmatrix_d)[i * NYW + j];
 #else
         return reinterpret_cast<coeff_t *>(Bmatrix_h)[i * NYW + j];
 #endif
@@ -170,7 +170,7 @@ namespace quda
       __device__ __host__ inline coeff_t c(int i, int j) const
       {
 #ifdef __HIP_DEVICE_COMPILE__
-        return reinterpret_cast<Float2 *>(Cmatrix_d)[i * NYW + j];
+        return reinterpret_cast<coeff_t *>(Cmatrix_d)[i * NYW + j];
 #else
         return reinterpret_cast<coeff_t *>(Cmatrix_h)[i * NYW + j];
 #endif

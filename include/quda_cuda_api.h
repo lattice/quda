@@ -9,23 +9,19 @@ using qudaError_t = hipError_t;
 using qudaEvent_t = hipEvent_t;
 using qudaMemoryType = hipMemoryType;
 using qudaIpcMemHandle_t = hipIpcMemHandle_t;
-using qudaDeviceProp = hipDeviceProp;
+using qudaDeviceProp = hipDeviceProp_t;
 #define qudaHostGetDevicePointer hipHostGetDevicePointer
 #define qudaStreamCreate hipStreamCreate
 #define qudaStreamDestroy hipStreamDestroy
-#define qudaEventCreate hipEvenCreate
-#define qudaEventRecord hipEvenRecord
-#define qudaEventSynchronize hipEventSynchronize
+#define qudaEventCreate hipEventCreate
+#define qudaEventCreateWithFlags hipEventCreateWithFlags
 #define qudaEventDisableTiming hipEventDisableTiming
 #define qudaEventDestroy hipEventDestroy
-#define qudaDeviceSynchronize hipDeviceSynchronize
-#define qudaMemset hipMemset
+#define qudaEventElapsedTime hipEventElapsedTime
 #define qudaSuccess hipSuccess
 #define qudaErrorNotReady hipErrorNotReady
 #define qudaErrorUnknown hipErrorUnknown
 #define qudaSuccessjit hipSuccess
-#define qudaEventElapsedTime hipEventElapsedTime
-#define qudaEventDestroy hipEventDestroy
 #define qudaGetLastError hipGetLastError
 #define qudaGetErrorString hipGetErrorString
 #define qudaHostRegister hipHostRegister
@@ -35,13 +31,19 @@ using qudaDeviceProp = hipDeviceProp;
 #define QUDA_ERROR_INVALID_VALUE hipErrorInvalidValue
 #define qudaIpcGetMemHandle hipIpcGetMemHandle
 #define qudaIpcMemLazyEnablePeerAccess hipIpcMemLazyEnablePeerAccess
+#define qudaIpcOpenMemHandle hipIpcOpenMemHandle
 #define qudaIpcCloseMemHandle hipIpcCloseMemHandle
-#define qudaEventQuery hipEventQuery
+#define qudaIpcEventHandle_t hipIpcEventHandle_t
 #define qudaMemcpyHostToDevice hipMemcpyHostToDevice
 #define qudaMemcpyDeviceToHost hipMemcpyDeviceToHost
+#define qudaMemcpyDeviceToDevice hipMemcpyDeviceToDevice
 #define qudaFuncSetCacheConfig hipFuncSetCacheConfig
 #define qudaFuncCachePreferL1 hipFuncCachePreferL1
 #define qudaGetErrorName hipGetErrorName
+#define qudaMemset2D hipMemset2D
+#define qudaMemset2DAsync hipMemset2DAsync
+#define qudaCtxSynchronize hipCtxSynchronize
+#define qudaMalloc hipMalloc
 #define qudarand hiprand
 #define qudaFree hipFree
 
@@ -62,18 +64,15 @@ using qudaDeviceProp = cudaDeviceProp;
 #define qudaHostGetDevicePointer cudaHostGetDevicePointer
 #define qudaStreamCreate cudaStreamCreate
 #define qudaStreamDestroy cudaStreamDestroy
-#define qudaEventCreate cudaEvenCreate
-#define qudaEventRecord cudaEvenRecord
-#define qudaEventSynchronize cudaEventSynchronize
+#define qudaEventCreate cudaEventCreate
+#define qudaEventCreateWithFlags hipEventCreateWithFlags
 #define qudaEventDisableTiming cudaEventDisableTiming
 #define qudaEventDestroy cudaEventDestroy
-#define qudaDeviceSynchronize cudaDeviceSynchronize
-#define qudaMemset cudaMemset
+#define qudaEventElapsedTime cudaEventElapsedTime
 #define qudaSuccess cudaSuccess
 #define qudaErrorNotReady cudaErrorNotReady
 #define qudaErrorUnknown cudaErrorUnknown
 #define qudaSuccessjit CUDA_SUCCESS
-#define qudaEventElapsedTime cudaEventElapsedTime
 #define qudaEventDestroy cudaEventDestroy
 #define qudaGetLastError cudaGetLastError
 #define qudaGetErrorString cudaGetErrorString
@@ -84,13 +83,19 @@ using qudaDeviceProp = cudaDeviceProp;
 #define QUDA_ERROR_INVALID_VALUE CUDA_ERROR_INVALID_VALUE
 #define qudaIpcGetMemHandle cudaIpcGetMemHandle
 #define qudaIpcMemLazyEnablePeerAccess cudaIpcMemLazyEnablePeerAccess
+#define qudaIpcOpenMemHandle cudaIpcOpenMemHandle
 #define qudaIpcCloseMemHandle cudaIpcCloseMemHandle
-#define qudaEventQuery cudaEventQuery
+#define qudaIpcEventHandle_t cudaIpcEventHandle_t
 #define qudaMemcpyHostToDevice cudaMemcpyHostToDevice
 #define qudaMemcpyDeviceToHost cudaMemcpyDeviceToHost
+#define qudaMemcpyDeviceToDevice cudaMemcpyDeviceToDevice
 #define qudaFuncSetCacheConfig cudaFuncSetCacheConfig
 #define qudaFuncCachePreferL1 cudaFuncCachePreferL1
 #define qudaGetErrorName cudaGetErrorName
+#define qudaMemset2D cudaMemset2D
+#define qudaMemset2DAsync cudaMemset2DAsync
+#define qudaCtxSynchronize cudaCtxSynchronize
+#define qudaMalloc cudaMalloc
 #define qudarand curand
 #define qudaFree cudaFree
 

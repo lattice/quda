@@ -1,5 +1,6 @@
+#include <typeinfo>
 #include <gauge_field.h>
-#include <blas_cublas.h>
+#include <blas_lapack.h>
 #include <blas_quda.h>
 #include <tune_quda.h>
 
@@ -71,26 +72,30 @@ namespace quda {
   class CalculateYhat : public TunableVectorYZ {
 
     using Float = typename Arg::Float;
-    static constexpr int n = Arg::n;
+    const int n;
     Arg &arg;
     const LatticeField &meta;
 
     bool compute_max_only;
 
-    long long flops() const { return 2l * arg.coarseVolumeCB * 8 * n * n * (8*n-2); } // 8 from dir, 8 from complexity,
-    long long bytes() const { return 2l * (arg.Xinv.Bytes() + 8*arg.Y.Bytes() + 8*arg.Yhat.Bytes()) * n; }
+    long long flops() const { return 2l * arg.Y.VolumeCB() * 8 * n * n * (8*n-2); } // 8 from dir, 8 from complexity,
+    long long bytes() const { return 2l * (arg.Xinv.Bytes() + 8*arg.Y.Bytes() + !compute_max_only * 8*arg.Yhat.Bytes()) * n; }
 
-    unsigned int minThreads() const { return arg.coarseVolumeCB; }
+    unsigned int minThreads() const { return arg.Y.VolumeCB(); }
 
     bool tuneGridDim() const { return false; } // don't tune the grid dimension
 
-    unsigned int maxBlockSize(const TuneParam &param) const { return std::min(TunableVectorYZ::maxBlockSize(param), 128u); }
+    // all the tuning done is only in matrix tile size (Y/Z block.grid)
+    int blockMin() const { return 8; }
+    int blockStep() const { return 8; }
+    unsigned int maxBlockSize(const TuneParam &param) const { return 8u; }
 
   public:
       CalculateYhat(Arg &arg, const LatticeField &meta) :
-        TunableVectorYZ(2 * n, 4 * n),
+        TunableVectorYZ(2 * arg.tile.M_tiles, 4 * arg.tile.N_tiles),
         arg(arg),
         meta(meta),
+	n(arg.tile.n),
         compute_max_only(false)
       {
         if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
@@ -156,6 +161,9 @@ namespace quda {
   template<QudaFieldLocation location, typename storeFloat, typename Float, int N, QudaGaugeFieldOrder gOrder>
   void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X)
   {
+    using namespace blas_lapack;
+    auto invert = use_native() ? native::BatchInvertMatrix : generic::BatchInvertMatrix;
+
     // invert the clover matrix field
     const int n = X.Ncolor();
     if (X.Location() == QUDA_CUDA_FIELD_LOCATION && X.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
@@ -166,7 +174,7 @@ namespace quda {
       cudaGaugeField X_(param);
       cudaGaugeField Xinv_(param);
       X_.copy(X);
-      blas::flops += cublas::BatchInvertMatrix((void*)Xinv_.Gauge_p(), (void*)X_.Gauge_p(), n, X_.Volume(), X_.Precision(), X.Location());
+      blas::flops += invert((void*)Xinv_.Gauge_p(), (void*)X_.Gauge_p(), n, X_.Volume(), X_.Precision(), X.Location());
 
       if (Xinv.Precision() < QUDA_SINGLE_PRECISION) Xinv.Scale( Xinv_.abs_max() );
 
@@ -175,7 +183,7 @@ namespace quda {
     } else if (X.Location() == QUDA_CPU_FIELD_LOCATION && X.Order() == QUDA_QDP_GAUGE_ORDER) {
       const cpuGaugeField *X_h = static_cast<const cpuGaugeField*>(&X);
       cpuGaugeField *Xinv_h = static_cast<cpuGaugeField*>(&Xinv);
-      blas::flops += cublas::BatchInvertMatrix(((void**)Xinv_h->Gauge_p())[0], ((void**)X_h->Gauge_p())[0], n, X_h->Volume(), X.Precision(), QUDA_CPU_FIELD_LOCATION);
+      blas::flops += invert((void*)Xinv_h->Gauge_p(), (void*)X_h->Gauge_p(), n, X_h->Volume(), X.Precision(), X.Location());
     } else {
       errorQuda("Unsupported location=%d and order=%d", X.Location(), X.Order());
     }
@@ -201,7 +209,7 @@ namespace quda {
 
       int comm_dim[4];
       for (int i=0; i<4; i++) comm_dim[i] = comm_dim_partitioned(i);
-      typedef CalculateYhatArg<Float, gPreconditionedCoarse, gCoarse, N> yHatArg;
+      typedef CalculateYhatArg<Float, gPreconditionedCoarse, gCoarse, N, 4, 2> yHatArg;
       yHatArg arg(yHatAccessor, yAccessor, xInvAccessor, xc_size, comm_dim, 1);
 
       CalculateYhat<location, yHatArg> yHat(arg, Y);

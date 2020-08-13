@@ -16,7 +16,7 @@
 #ifdef GPU_GAUGE_ALG
 #include <HIPFFT_Plans.h>
 #endif
-using qudafftHandle hipfftHandle
+using qudafftHandle = hipfftHandle;
 #define qudafftDestroy(_x) HIPFFT_SAFE_CALL(hipfftDestroy(_x));
 
 #else
@@ -26,7 +26,7 @@ using qudafftHandle hipfftHandle
 #ifdef GPU_GAUGE_ALG
 #include <CUFFT_Plans.h>
 #endif
-using qudafftHandle cufftHandle
+using qudafftHandle = cufftHandle;
 #define qudafftDestroy(_x) CUFFT_SAFE_CALL(cufftDestroy(_x));
 
 #endif

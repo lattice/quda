@@ -16,7 +16,7 @@ namespace quda {
     qudaStream_t* getStream();
 
     template <int block_size, typename real, int len, int NXZ, typename Arg>
-    typename std::enable_if<block_size!=32, cudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+    typename std::enable_if<block_size!=32, qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
       void *args[] = {&arg};
       if (tp.block.x == block_size)
@@ -26,7 +26,7 @@ namespace quda {
     }
 
     template <int block_size, typename real, int len, int NXZ, typename Arg>
-    typename std::enable_if<block_size==32, cudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+    typename std::enable_if<block_size==32, qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
       void *args[] = {&arg};
       return qudaLaunchKernel((const void*)multiReduceKernel<block_size, real, len, NXZ, Arg>, tp.grid, tp.block, args, tp.shared_bytes, stream);
@@ -55,7 +55,7 @@ namespace quda {
       if (tp.block.x <= max_block_size()) {
         auto error = launch<max_block_size(), real, len, NXZ>(arg, tp, stream);
         // flag any failures when tuning so we don't try and complete which could hang
-        if (activeTuning() && error != cudaSuccess) tunable.jitifyError() = QUDA_ERROR_INVALID_VALUE;
+        if (activeTuning() && error != qudaSuccess) tunable.jitifyError() = QUDA_ERROR_INVALID_VALUE;
       } else {
         tunable.jitifyError() = QUDA_ERROR_INVALID_VALUE;
         if (!activeTuning()) errorQuda("block size %d not instantiated", tp.block.x);
@@ -64,7 +64,7 @@ namespace quda {
 
       T *result_ = new T[NXZ * arg.NYW];
       if (!commAsyncReduction()) {
-        if (tunable.jitifyError() != CUDA_ERROR_INVALID_VALUE) arg.complete(result_, stream);
+        if (tunable.jitifyError() != QUDA_ERROR_INVALID_VALUE) arg.complete(result_, stream);
       }
 
       // need to transpose for same order with vector thread reduction
@@ -225,10 +225,15 @@ namespace quda {
           if (a.data || b.data || c.data) errorQuda("Constant memory buffer support not enabled with jitify yet");
 #else
 #if defined(__HIP__)
-	
-        signed char *A_d;
+
+	using coeff_t = typename decltype(r)::coeff_t;
+	signed char *A_d;
 	if(a.data)
 	{
+          coeff_t A[MAX_MATRIX_SIZE / sizeof(coeff_t)];
+          for (int i = 0; i < NXZ; i++)
+            for (int j = 0; j < NYW; j++) A[NYW * i + j] = coeff_t(a.data[NYW * i + j]);
+	
 		hipMalloc(&A_d, MAX_MATRIX_SIZE);hipMemcpy(A_d,A,MAX_MATRIX_SIZE,hipMemcpyHostToDevice);
         	set_AmatixR<<<256,MAX_MATRIX_SIZE/256>>>(A_d);
         	hipDeviceSynchronize();hipFree(A_d);
@@ -236,14 +241,22 @@ namespace quda {
 
 	if(b.data)
 	{
-        	hipMalloc(&A_d, MAX_MATRIX_SIZE);hipMemcpy(A_d,B,MAX_MATRIX_SIZE,hipMemcpyHostToDevice);
+          coeff_t A[MAX_MATRIX_SIZE / sizeof(coeff_t)];
+          for (int i = 0; i < NXZ; i++)
+            for (int j = 0; j < NYW; j++) A[NYW * i + j] = coeff_t(b.data[NYW * i + j]);
+
+        	hipMalloc(&A_d, MAX_MATRIX_SIZE);hipMemcpy(A_d,A,MAX_MATRIX_SIZE,hipMemcpyHostToDevice);
         	set_BmatixR<<<256,MAX_MATRIX_SIZE/256>>>(A_d);
         	hipDeviceSynchronize();hipFree(A_d);
 	}
 
 	if(c.data)
 	{
-        	hipMalloc(&A_d, MAX_MATRIX_SIZE);hipMemcpy(A_d,C,MAX_MATRIX_SIZE,hipMemcpyHostToDevice);
+          coeff_t A[MAX_MATRIX_SIZE / sizeof(coeff_t)];
+          for (int i = 0; i < NXZ; i++)
+            for (int j = 0; j < NYW; j++) A[NYW * i + j] = coeff_t(c.data[NYW * i + j]);
+
+        	hipMalloc(&A_d, MAX_MATRIX_SIZE);hipMemcpy(A_d,A,MAX_MATRIX_SIZE,hipMemcpyHostToDevice);
         	set_CmatixR<<<256,MAX_MATRIX_SIZE/256>>>(A_d);
         	hipDeviceSynchronize();hipFree(A_d);
 	}

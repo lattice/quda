@@ -263,7 +263,7 @@ namespace quda {
   template<> struct RealType<complex<char> > { typedef char type; };
   template<> struct RealType<char4> { typedef char type; };
 
-#if defined(__HIP__)
+#if defined(__HIP_PLATFORM_HCC__)
 
   // The following added by Yujiang Bi
      template<typename T> __host__ __device__ inline T rsqrt(T a){

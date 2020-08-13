@@ -178,10 +178,11 @@ namespace quda {
 #else
 
 #if defined(__HIP__)
+	using coeff_t = typename decltype(arg.f)::coeff_t;
         if (a.data) {
-          Float2 A[MAX_MATRIX_SIZE / sizeof(Float2)];
+          coeff_t A[MAX_MATRIX_SIZE / sizeof(coeff_t)];
           for (int i = 0; i < NXZ; i++)
-            for (int j = 0; j < NYW; j++) A[NYW * i + j] = make_Float2<Float2>(Complex(a.data[NYW * i + j]));
+            for (int j = 0; j < NYW; j++) A[NYW * i + j] = coeff_t(a.data[NYW * i + j]);
 
 	  signed char *A_d;hipMalloc(&A_d, MAX_MATRIX_SIZE);hipMemcpy(A_d,A,MAX_MATRIX_SIZE,hipMemcpyHostToDevice);
           set_Amatix<<<256,MAX_MATRIX_SIZE/256>>>(A_d);
@@ -190,9 +191,9 @@ namespace quda {
         }
 
         if (b.data) {
-          Float2 B[MAX_MATRIX_SIZE / sizeof(Float2)];
+          coeff_t B[MAX_MATRIX_SIZE / sizeof(coeff_t)];
           for (int i = 0; i < NXZ; i++)
-            for (int j = 0; j < NYW; j++) B[NYW * i + j] = make_Float2<Float2>(Complex(b.data[NYW * i + j]));
+            for (int j = 0; j < NYW; j++) B[NYW * i + j] = coeff_t(b.data[NYW * i + j]);
 
           signed char *B_d;hipMalloc(&B_d, MAX_MATRIX_SIZE);hipMemcpy(B_d,B,MAX_MATRIX_SIZE,hipMemcpyHostToDevice);
           set_Bmatix<<<256,MAX_MATRIX_SIZE/256>>>(B_d);
@@ -201,9 +202,9 @@ namespace quda {
         }
 
         if (c.data) {
-          Float2 C[MAX_MATRIX_SIZE / sizeof(Float2)];
+          coeff_t C[MAX_MATRIX_SIZE / sizeof(coeff_t)];
           for (int i = 0; i < NXZ; i++)
-            for (int j = 0; j < NYW; j++) C[NYW * i + j] = make_Float2<Float2>(Complex(c.data[NYW * i + j]));
+            for (int j = 0; j < NYW; j++) C[NYW * i + j] = coeff_t(c.data[NYW * i + j]);
 
           signed char *C_d;hipMalloc(&C_d, MAX_MATRIX_SIZE);hipMemcpy(C_d,C,MAX_MATRIX_SIZE,hipMemcpyHostToDevice);
           set_Cmatix<<<256,MAX_MATRIX_SIZE/256>>>(C_d);
@@ -211,13 +212,15 @@ namespace quda {
 
         }
 
-        typedef MultiBlasArg<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Functor> Arg;
+        typedef MultiBlasArg<NXZ, device_store_t, N, device_y_store_t, Ny, decltype(f_)> Arg;
         Arg *arg_d;hipMalloc(&arg_d, sizeof(Arg));hipMemcpy(arg_d,&arg,sizeof(Arg),hipMemcpyHostToDevice);
 
         switch (tp.aux.x) {
-        case 1: multiBlasKernel<FloatN, M, NXZ, 1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(*arg_d); break;
-        case 2: multiBlasKernel<FloatN, M, NXZ, 2><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(*arg_d); break;
-        case 4: multiBlasKernel<FloatN, M, NXZ, 4><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(*arg_d); break;
+        case 1: multiBlasKernel<device_real_t, M, NXZ, 1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(*arg_d); break;
+#ifdef WARP_SPLIT
+        case 2: multiBlasKernel<device_real_t, M, NXZ, 2><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(*arg_d); break;
+        case 4: multiBlasKernel<device_real_t, M, NXZ, 4><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(*arg_d); break;
+#endif
         default: errorQuda("warp-split factor %d not instantiated", tp.aux.x);
         }
 

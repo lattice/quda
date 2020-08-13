@@ -149,7 +149,6 @@ endif()
 # make one library
 if(QUDA_BUILD_SHAREDLIB)
   set_target_properties(quda_cpp PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
-#  add_library(quda SHARED $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
   hip_add_library(quda SHARED $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
   if(CUDAToolkit_FOUND)
     target_link_libraries(quda INTERFACE CUDA::cudart_static)
@@ -194,19 +193,18 @@ if(QUDA_VERBOSE_BUILD)
 endif(QUDA_VERBOSE_BUILD)
 
 # workaround for 10.2
-if(CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA"
-   AND ${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL "10.2"
-   AND ${CMAKE_CUDA_COMPILER_VERSION} VERSION_LESS "10.3")
-  target_compile_options(
-    quda PRIVATE "$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:SHELL: -Xcicc \"--Xllc -dag-vectorize-ops=1\" " >)
->>>>>>> feature/overlap_wilson
-endif()
+#if(CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA"
+#   AND ${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL "10.2"
+#   AND ${CMAKE_CUDA_COMPILER_VERSION} VERSION_LESS "10.3")
+#  target_compile_options(
+#    quda PRIVATE "$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:SHELL: -Xcicc \"--Xllc -dag-vectorize-ops=1\" " >)
+#endif()
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:--cuda-path=${CUDAToolkit_TARGET_DIR}>)
 
 target_include_directories(quda SYSTEM PRIVATE ../include/externals)
 target_include_directories(quda PRIVATE .)
 target_include_directories(quda PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_include_directories(quda SYSTEM PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
+#target_include_directories(quda SYSTEM PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/>
                                        $<INSTALL_INTERFACE:include/>)
 
@@ -222,7 +220,7 @@ if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")
   add_subdirectory(targets/cuda)
 endif()
 if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
-  # add_subdirectory(targets/hip)
+  add_subdirectory(targets/hip)
 endif()
 target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_target>)
 

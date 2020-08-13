@@ -1,4 +1,4 @@
-#include <hip_runtime.h>
+#include <hip/hip_runtime.h>
 #include <util_quda.h>
 #include <quda_internal.h>
 
@@ -10,7 +10,7 @@
 #include <numa_affinity.h>
 #endif
 
-hipDeviceProp deviceProp;
+qudaDeviceProp deviceProp;
 qudaStream_t *streams;
 
 namespace quda

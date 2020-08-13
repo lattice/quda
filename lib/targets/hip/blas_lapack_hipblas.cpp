@@ -8,12 +8,7 @@ namespace quda
   namespace blas_lapack
   {
 
-    // whether we are using the native blas-lapack library
-    static bool native_blas_lapack = true;
-    bool use_native() { return native_blas_lapack; }
-    void set_native(bool native) { native_blas_lapack = native; }
-
-    namespace generic
+    namespace native
     {
 
       void init() {}
@@ -55,7 +50,7 @@ namespace quda
         size_t size = 2 * n * n * batch * prec;
         void *A_h = (location == QUDA_CUDA_FIELD_LOCATION ? pool_pinned_malloc(size) : A);
         void *Ainv_h = (location == QUDA_CUDA_FIELD_LOCATION ? pool_pinned_malloc(size) : Ainv);
-        if (location == QUDA_CUDA_FIELD_LOCATION) { qudaMemcpy(A_h, A, size, cudaMemcpyDeviceToHost); }
+        if (location == QUDA_CUDA_FIELD_LOCATION) { hipMemcpy(A_h, A, size, hipMemcpyDeviceToHost); }
 
         long long flops = 0;
         timeval start, stop;
@@ -100,12 +95,12 @@ namespace quda
         if (location == QUDA_CUDA_FIELD_LOCATION) {
           pool_pinned_free(Ainv_h);
           pool_pinned_free(A_h);
-          qudaMemcpy((void *)Ainv, Ainv_h, size, cudaMemcpyHostToDevice);
+          hipMemcpy((void *)Ainv, Ainv_h, size, hipMemcpyHostToDevice);
         }
 
         return flops;
       }
 
-    } // namespace generic
+    } // namespace native
   }   // namespace blas_lapack
 } // namespace quda

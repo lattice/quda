@@ -10,13 +10,13 @@ using namespace quda;
    correct compilation with clang and nvrtc
  */
 
-#if defined(__HIP__)
+#if defined(__HIP_PLATFORM_HCC__)
 #include <hipcub/hipcub.hpp>
 namespace cub=hipcub;
 #include <hipcub/rocprim/block/block_reduce.hpp>
 #endif
 
-#if defined(__NVCC__)
+#if defined(__HIP_PLATFORM_NVCC__)
 #include <cub/block/block_reduce.cuh>
 #endif
 

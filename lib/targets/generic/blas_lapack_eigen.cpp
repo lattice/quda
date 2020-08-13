@@ -1,3 +1,4 @@
+#include "quda_cuda_api.h"
 #include <blas_lapack.h>
 #include <Eigen/LU>
 
@@ -55,7 +56,7 @@ namespace quda
         size_t size = 2 * n * n * batch * prec;
         void *A_h = (location == QUDA_CUDA_FIELD_LOCATION ? pool_pinned_malloc(size) : A);
         void *Ainv_h = (location == QUDA_CUDA_FIELD_LOCATION ? pool_pinned_malloc(size) : Ainv);
-        if (location == QUDA_CUDA_FIELD_LOCATION) { qudaMemcpy(A_h, A, size, cudaMemcpyDeviceToHost); }
+        if (location == QUDA_CUDA_FIELD_LOCATION) { qudaMemcpy(A_h, A, size, qudaMemcpyDeviceToHost); }
 
         long long flops = 0;
         timeval start, stop;
@@ -100,7 +101,7 @@ namespace quda
         if (location == QUDA_CUDA_FIELD_LOCATION) {
           pool_pinned_free(Ainv_h);
           pool_pinned_free(A_h);
-          qudaMemcpy((void *)Ainv, Ainv_h, size, cudaMemcpyHostToDevice);
+          qudaMemcpy((void *)Ainv, Ainv_h, size, qudaMemcpyHostToDevice);
         }
 
         return flops;

@@ -33,7 +33,7 @@ namespace quda {
     const size_t count;
     const int value;
     const bool copy;
-    const hipMemcpyKind kind;
+    const qudaMemcpyKind kind;
     const bool async;
     const char *name;
 
@@ -41,7 +41,7 @@ namespace quda {
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
   public:
-    inline QudaMem(void *dst, const void *src, size_t count, hipMemcpyKind kind, bool async, const char *func,
+    inline QudaMem(void *dst, const void *src, size_t count, qudaMemcpyKind kind, bool async, const char *func,
                    const char *file, const char *line) :
       dst(dst),
       src(src),
@@ -209,7 +209,7 @@ namespace quda {
       errorQuda("(CUDA) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
   }
 
-  void qudaMemcpyAsync_(void *dst, const void *src, size_t count, cudaMemcpyKind kind, const qudaStream_t &stream,
+  void qudaMemcpyAsync_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const qudaStream_t &stream,
                         const char *func, const char *file, const char *line)
   {
     if (count == 0) return;
@@ -242,18 +242,17 @@ namespace quda {
     }
   }
 
-  cudaError_t qudaStreamSynchronize_(qudaStream_t &stream, const char *func, const char *file, const char *line)
+  qudaError_t qudaStreamSynchronize_(qudaStream_t &stream, const char *func, const char *file, const char *line)
   {
 #ifdef USE_DRIVER_API
-    PROFILE(CUresult error = cuStreamSynchronize(stream), QUDA_PROFILE_STREAM_SYNCHRONIZE);
+    PROFILE(qudaError_t error = qudaStreamSynchronize(stream), QUDA_PROFILE_STREAM_SYNCHRONIZE);
     switch (error) {
-    case CUDA_SUCCESS: return cudaSuccess;
+    case qudaSuccess: return qudaSuccess;
     default: // should always return successful
-      const char *str;
-      cuGetErrorName(error, &str);
+      const char *str=qudaGetErrorName(error);
       errorQuda("(CUDA) cuStreamSynchronize returned error %s\n (%s:%s in %s())\n", str, file, line, func);
     }
-    return cudaErrorUnknown;
+    return qudaErrorUnknown;
 #else
     PROFILE(qudaError_t error = qudaStreamSynchronize(stream), QUDA_PROFILE_STREAM_SYNCHRONIZE);
     if (error != qudaSuccess && !activeTuning())
@@ -264,7 +263,7 @@ namespace quda {
   }
 
   void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
-                          cudaMemcpyKind kind, const qudaStream_t &stream, const char *func, const char *file,
+                          qudaMemcpyKind kind, const qudaStream_t &stream, const char *func, const char *file,
                           const char *line)
   {
 #ifdef USE_DRIVER_API

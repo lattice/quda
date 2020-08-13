@@ -7,11 +7,7 @@
 #include <comm_quda.h>
 #include <util_quda.h>
 #include <object.h>
-#if defined(__HIP__)
-#include <hip/hip_runtime.h>
-#else
 #include <quda_cuda_api.h>
-#endif
 
 /**
  * @file lattice_field.h

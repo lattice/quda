@@ -1,3 +1,4 @@
+#include <hip/hip_runtime.h>
 #include <tune_quda.h>
 #include <comm_quda.h>
 #include <quda.h>     // for QUDA_VERSION_STRING
@@ -116,7 +117,7 @@ namespace quda
     }
   }
 
-  static const std::string quda_hash = QUDA_HASH; // defined in lib/Makefile
+  static const std::string quda_hash = "x64_64.quda_dev_rocm.hip3.0"; //QUDA_HASH; // defined in lib/Makefile
   static std::string resource_path;
   static map tunecache;
   static map::iterator it;
@@ -796,28 +797,27 @@ namespace quda
           }
 
           elapsed_time /= (1e3 * tunable.tuningIter());
-          if ((elapsed_time < best_time) && (error == qudaSuccess) && (tunable.jitifyError() == CUDA_SUCCESS)) {
+          if ((elapsed_time < best_time) && (error == qudaSuccess) && (tunable.jitifyError() == qudaSuccessjit)) {
             best_time = elapsed_time;
             best_param = param;
           }
           if ((verbosity >= QUDA_DEBUG_VERBOSE)) {
-            if (error == qudaSuccess && tunable.jitifyError() == CUDA_SUCCESS) {
+            if (error == qudaSuccess && tunable.jitifyError() == qudaSuccessjit) {
               printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(),
                          tunable.perfString(elapsed_time).c_str());
             } else {
-              if (tunable.jitifyError() == CUDA_SUCCESS) {
+              if (tunable.jitifyError() == qudaSuccessjit) {
                 // if not jitify error must be regular error
                 printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), qudaGetErrorString(error));
               } else {
                 // else is a jitify error
-                const char *str;
-                cuGetErrorString(tunable.jitifyError(), &str);
+                const char *str=hipGetErrorString(tunable.jitifyError());
                 printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), str);
               }
             }
           }
           tuning = tunable.advanceTuneParam(param);
-          tunable.jitifyError() = CUDA_SUCCESS;
+          tunable.jitifyError() = qudaSuccessjit;
         }
 
         tune_timer.Stop(__func__, __FILE__, __LINE__);

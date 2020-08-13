@@ -2138,173 +2138,6 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   popVerbosity();
 }
 
-void ApplyHWilsonQUDA(void *h_out, void *h_in, QudaInvertParam *inv_param)
-{
-  profileHWilson.TPSTART(QUDA_PROFILE_TOTAL);
-  if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
-
-  pushVerbosity(inv_param->verbosity);
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
-
-  profileHWilson.TPSTART(QUDA_PROFILE_INIT);
-  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), false, inv_param->input_location);
-  ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
-
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(*in_h);
-    printfQuda("In CPU %e\n", cpu);
-  }
-  profileHWilson.TPSTOP(QUDA_PROFILE_INIT);
-  
-  profileHWilson.TPSTART(QUDA_PROFILE_H2D);
-  ColorSpinorParam cudaParam(cpuParam, *inv_param);
-  cudaColorSpinorField in(*in_h, cudaParam);
-
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(*in_h);
-    double gpu = blas::norm2(in);
-    printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
-  }
-
-  cudaParam.create = QUDA_NULL_FIELD_CREATE;
-  cudaColorSpinorField out(in, cudaParam);
-  int parity = 0;
-  profileHWilson.TPSTOP(QUDA_PROFILE_H2D);
-
-  profileHWilson.TPSTART(QUDA_PROFILE_COMPUTE);
-    int comm_dim[4] = {};
-    // only switch on comms needed for directions with a derivative
-    for (int i = 0; i < 4; i++) {
-      comm_dim[i] = comm_dim_partitioned(i);
-    }
-  //-0.2 should be replaced by the function of rho;
-  TimeProfile profile("Dirac",false);
-  ApplyHWilson(out, in, *gaugePrecise,-inv_param->kappa,in,parity, false, comm_dim, profile);
-  profileHWilson.TPSTOP(QUDA_PROFILE_COMPUTE);
-
-  profileHWilson.TPSTART(QUDA_PROFILE_D2H);
-  cpuParam.v = h_out;
-  cpuParam.location = inv_param->output_location;
-  ColorSpinorField *out_h = ColorSpinorField::Create(cpuParam);
-  *out_h = out;
-  profileHWilson.TPSTOP(QUDA_PROFILE_D2H);
-
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(*out_h);
-    double gpu = blas::norm2(out);
-    printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
-  }
-
-  delete out_h;
-  delete in_h;
-
-  profileHWilson.TPSTOP(QUDA_PROFILE_TOTAL);
-
-  popVerbosity();
-
-}
-
-class Overlap_paramQUDA
-{
-   public:
-    std::vector<void *> hw_evec;
-    std::vector<double> hw_eval;
-    std::vector<std::vector<double> > coef;
-    std::vector<int> hw_size;
-};
-
-void ApplyOverlapQUDA(void *h_out, void *h_in, QudaInvertParam *inv_param, double k0, double k1,double k2, double prec,
-       void *_ov_param)
-{
-
-  profileOverlap.TPSTART(QUDA_PROFILE_TOTAL);
-  if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
-
-  Overlap_paramQUDA *ov_param=(Overlap_paramQUDA *)_ov_param;
-
-  pushVerbosity(inv_param->verbosity);
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
-
-  profileOverlap.TPSTART(QUDA_PROFILE_INIT);
-  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), false, inv_param->input_location);
-  ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
-
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(*in_h);
-    printfQuda("In CPU %e\n", cpu);
-  }
-  profileOverlap.TPSTOP(QUDA_PROFILE_INIT);
-  
-  profileOverlap.TPSTART(QUDA_PROFILE_H2D);
-  ColorSpinorParam cudaParam(cpuParam, *inv_param);
-  cudaColorSpinorField in(*in_h, cudaParam);
-
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(*in_h);
-    double gpu = blas::norm2(in);
-    printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
-  }
-
-  cudaParam.create = QUDA_NULL_FIELD_CREATE;
-  cudaColorSpinorField out(in, cudaParam);
-  
-  DiracParam diracParam;
-  setDiracParam(diracParam, inv_param, false);
-  diracParam.build_hw=false;
-  diracParam.hw_eval=ov_param->hw_eval;
-  diracParam.coef=ov_param->coef;
-  diracParam.hw_size=ov_param->hw_size;
-  diracParam.hw_evec.resize(ov_param->hw_evec.size());
-
-  ColorSpinorField *tmp_h;
-  for(int i=0;i<diracParam.hw_eval.size();i++)
-  {
-       cpuParam.v = ov_param->hw_evec[i];
-       tmp_h = ColorSpinorField::Create(cpuParam);
-       diracParam.hw_evec[i]= cudaColorSpinorField::Create(cudaParam);
-       *diracParam.hw_evec[i]=*tmp_h;
-       delete tmp_h;
-  }
-  DiracOverlapWilson dirac(diracParam);
-
-/*  
-  if(in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS)
-  printfQuda("UK");
-  if(in.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS)
-  printfQuda("DR");
-*/
-
-  profileOverlap.TPSTOP(QUDA_PROFILE_H2D);
-
-  profileOverlap.TPSTART(QUDA_PROFILE_COMPUTE);
-  dirac.general_dov(out,in,k0,k1,k2,prec,QUDA_INVALID_PARITY);
-  profileOverlap.TPSTOP(QUDA_PROFILE_COMPUTE);
-
-  profileOverlap.TPSTART(QUDA_PROFILE_D2H);
-  cpuParam.v = h_out;
-  cpuParam.location = inv_param->output_location;
-  ColorSpinorField *out_h = ColorSpinorField::Create(cpuParam);
-  *out_h = out;
-  profileOverlap.TPSTOP(QUDA_PROFILE_D2H);
-
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(*out_h);
-    double gpu = blas::norm2(out);
-    printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
-  }
-
-  delete out_h;
-  delete in_h;
-  for(int i=0;i<diracParam.hw_evec.size();i++)
-      delete (cudaColorSpinorField *)diracParam.hw_evec[i];
-
-  profileOverlap.TPSTOP(QUDA_PROFILE_TOTAL);
-
-  popVerbosity();
-
-}
-
-
 void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam *eig_param)
 {
   profileEigensolve.TPSTART(QUDA_PROFILE_TOTAL);
@@ -2423,7 +2256,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
         errorQuda("Irreconcilable difference between interface and internal complex number conventions");
       }
       double *host=(double *)host_evals;
-       for (int i = 0; i < eig_param->nConv; i++)
+       for (int i = 0; i < eig_param->n_conv; i++)
        {
             host[2*i]=real(evals[i]);
             host[2*i+1]=imag(evals[i]);
@@ -5811,15 +5644,22 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
   cudaColorSpinorField out(in, cudaParam);
   int parity = 0;
-  profileWuppertal.TPSTOP(QUDA_PROFILE_TOTAL);
 
   // Computes out(x) = 1/(1+6*alpha)*(in(x) + alpha*\sum_mu (U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)))
   double a = alpha/(1.+6.*alpha);
   double b = 1./(1.+6.*alpha);
 
+    int comm_dim[4] = {};
+    // only switch on comms needed for directions with a derivative
+    for (int i = 0; i < 4; i++) {
+      comm_dim[i] = comm_dim_partitioned(i);
+      if (i == 3) comm_dim[i] = 0;
+    }
+
+  TimeProfile profile("Dirac",false);
   for (unsigned int i = 0; i < n_steps; i++) {
     if (i) in = out;
-    ApplyLaplace(out, in, *precise, 3, a, b, in, parity, false, comm_dim, profileWuppertal);
+    ApplyLaplace(out, in, *precise, 3, a, b, in, parity, false, comm_dim, profile);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       double norm = blas::norm2(out);
       printfQuda("Step %d, vector norm %e\n", i, norm);
@@ -5845,7 +5685,7 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
 
   popVerbosity();
 
-//  profileWuppertal.TPSTOP(QUDA_PROFILE_TOTAL);
+  profileWuppertal.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
 void performAPEnStep(unsigned int n_steps, double alpha, int meas_interval)
