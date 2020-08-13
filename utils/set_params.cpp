@@ -233,6 +233,9 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.verbosity = verbosity;
 
   inv_param.extlib_type = solver_ext_lib;
+
+  // Whether or not to use native BLAS LAPACK
+  inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 }
 
 // Parameters defining the eigensolver
@@ -247,23 +250,34 @@ void setEigParam(QudaEigParam &eig_param)
     errorQuda("Only smallest real spectrum type (SR) can be passed to Jacobi-Davidson type solver");
   }
 
-  // The solver will exit when nConv extremal eigenpairs have converged
-  if (eig_nConv < 0) {
-    eig_param.nConv = eig_nEv;
-    eig_nConv = eig_nEv;
+  // The solver will exit when n_conv extremal eigenpairs have converged
+  if (eig_n_conv < 0) {
+    eig_param.n_conv = eig_n_ev;
+    eig_n_conv = eig_n_ev;
   } else {
-    eig_param.nConv = eig_nConv;
+    eig_param.n_conv = eig_n_conv;
+  }
+
+  // Inverters will deflate only this number of vectors.
+  if (eig_n_ev_deflate < 0) {
+    eig_param.n_ev_deflate = eig_n_conv;
+    eig_n_ev_deflate = eig_n_conv;
+  } else {
+    if (eig_n_ev_deflate > eig_n_conv) errorQuda("Can not deflate more that eig_n_conv eigenvectors.");
+    eig_param.n_ev_deflate = eig_n_ev_deflate;
   }
 
   eig_param.block_size = eig_param.eig_type == QUDA_EIG_TR_LANCZOS ? 1 : eig_block_size;
-  eig_param.nEv = eig_nEv;
-  eig_param.nKr = eig_nKr;
+
   if (eig_type == QUDA_EIG_DAV) {
     eig_param.mmin = eig_mmin;
     eig_param.mmax = eig_mmax;
     eig_param.corr_eq_tol = eig_corr_eq_tol;
     eig_param.corr_eq_maxiter = eig_corr_eq_maxiter;
   }
+
+  eig_param.n_ev = eig_n_ev;
+  eig_param.n_kr = eig_n_kr;
   eig_param.tol = eig_tol;
   eig_param.batched_rotate = eig_batched_rotate;
   eig_param.require_convergence = eig_require_convergence ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -290,12 +304,16 @@ void setEigParam(QudaEigParam &eig_param)
 
   strcpy(eig_param.vec_infile, eig_vec_infile);
   strcpy(eig_param.vec_outfile, eig_vec_outfile);
+  eig_param.save_prec = eig_save_prec;
   eig_param.io_parity_inflate = eig_io_parity_inflate ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 }
 
 void setMultigridParam(QudaMultigridParam &mg_param)
 {
   QudaInvertParam &inv_param = *mg_param.invert_param; // this will be used to setup SolverParam parent in MGParam class
+
+  // Whether or not to use native BLAS LAPACK
+  inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 
   inv_param.Ls = 1;
 
@@ -518,6 +536,9 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   // Is NOT a staggered solve
   mg_param.is_staggered = QUDA_BOOLEAN_FALSE;
 
+  // Whether or not to use thin restarts in the evolve tests
+  mg_param.thin_update_only = mg_evolve_thin_updates ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
   // set file i/o parameters
   for (int i = 0; i < mg_param.n_level; i++) {
     strcpy(mg_param.vec_infile[i], mg_vec_infile[i]);
@@ -634,6 +655,9 @@ void setMultigridInvertParam(QudaInvertParam &inv_param)
   inv_param.tol_precondition = 1e-1;
   inv_param.maxiter_precondition = 1;
   inv_param.omega = 1.0;
+
+  // Whether or not to use native BLAS LAPACK
+  inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 }
 
 // Parameters defining the eigensolver
@@ -647,9 +671,20 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
   }
 
   mg_eig_param.block_size = mg_eig_param.eig_type == QUDA_EIG_TR_LANCZOS ? 1 : mg_eig_block_size[level];
-  mg_eig_param.nEv = mg_eig_nEv[level];
-  mg_eig_param.nKr = mg_eig_nKr[level];
-  mg_eig_param.nConv = nvec[level];
+  mg_eig_param.n_ev = mg_eig_n_ev[level];
+  mg_eig_param.n_kr = mg_eig_n_kr[level];
+  mg_eig_param.n_conv = nvec[level];
+
+  // Inverters will deflate only this number of vectors.
+  if (mg_eig_n_ev_deflate[level] < 0) {
+    mg_eig_param.n_ev_deflate = mg_eig_param.n_conv;
+    mg_eig_n_ev_deflate[level] = mg_eig_param.n_conv;
+  } else {
+    if (mg_eig_n_ev_deflate[level] > mg_eig_param.n_conv)
+      errorQuda("Can not deflate more than nvec[%d] eigenvectors.", nvec[level]);
+    mg_eig_param.n_ev_deflate = mg_eig_n_ev_deflate[level];
+  }
+
   mg_eig_param.batched_rotate = mg_eig_batched_rotate[level];
   mg_eig_param.require_convergence = mg_eig_require_convergence[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
@@ -671,6 +706,7 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
   // Give empty strings, Multigrid will handle IO.
   strcpy(mg_eig_param.vec_infile, "");
   strcpy(mg_eig_param.vec_outfile, "");
+  mg_eig_param.save_prec = mg_eig_save_prec[level];
   mg_eig_param.io_parity_inflate = QUDA_BOOLEAN_FALSE;
   strcpy(mg_eig_param.QUDA_logfile, eig_QUDA_logfile);
 }
@@ -765,6 +801,9 @@ void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
   inv_param.tol_precondition = 1e-1;
   inv_param.maxiter_precondition = 1;
   inv_param.omega = 1.0;
+
+  // Whether or not to use native BLAS LAPACK
+  inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 }
 
 void setStaggeredInvertParam(QudaInvertParam &inv_param)
@@ -842,11 +881,17 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 
   inv_param.sp_pad = 0;
+
+  // Whether or not to use native BLAS LAPACK
+  inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 }
 
 void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 {
   QudaInvertParam &inv_param = *mg_param.invert_param; // this will be used to setup SolverParam parent in MGParam class
+
+  // Whether or not to use native BLAS LAPACK
+  inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 
   inv_param.Ls = 1;
 
@@ -1135,7 +1180,7 @@ void setDeflatedInvertParam(QudaInvertParam &inv_param)
 
   inv_param.rhs_idx = 0;
 
-  inv_param.nev = nev;
+  inv_param.n_ev = n_ev;
   inv_param.max_search_dim = max_search_dim;
   inv_param.deflation_grid = deflation_grid;
   inv_param.tol_restart = tol_restart;
@@ -1180,6 +1225,9 @@ void setDeflatedInvertParam(QudaInvertParam &inv_param)
   inv_param.omega = 1.0;
 
   inv_param.extlib_type = solver_ext_lib;
+
+  // Whether or not to use native BLAS LAPACK
+  inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 }
 
 void setDeflationParam(QudaEigParam &df_param)
@@ -1187,8 +1235,8 @@ void setDeflationParam(QudaEigParam &df_param)
   df_param.import_vectors = QUDA_BOOLEAN_FALSE;
   df_param.run_verify = QUDA_BOOLEAN_FALSE;
 
-  df_param.nk = df_param.invert_param->nev;
-  df_param.np = df_param.invert_param->nev * df_param.invert_param->deflation_grid;
+  df_param.nk = df_param.invert_param->n_ev;
+  df_param.np = df_param.invert_param->n_ev * df_param.invert_param->deflation_grid;
   df_param.extlib_type = deflation_ext_lib;
 
   df_param.cuda_prec_ritz = prec_ritz;

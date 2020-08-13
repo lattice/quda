@@ -121,7 +121,7 @@ namespace quda {
           case cudaMemcpyDeviceToHost: type = QUDA_PROFILE_MEMCPY_D2H_ASYNC; break;
           case cudaMemcpyHostToDevice: type = QUDA_PROFILE_MEMCPY_H2D_ASYNC; break;
           case cudaMemcpyDeviceToDevice: type = QUDA_PROFILE_MEMCPY_D2D_ASYNC; break;
-          case cudaMemcpyDefault:  type = QUDA_PROFILE_MEMCPY_DEFAULT_ASYNC; break;
+          case cudaMemcpyDefault: type = QUDA_PROFILE_MEMCPY_DEFAULT_ASYNC; break;
           default: errorQuda("Unsupported cudaMemcpyTypeAsync %d", kind);
           }
 
@@ -323,7 +323,7 @@ namespace quda {
     default: // should always return successful
       const char *str;
       cuGetErrorName(error, &str);
-      errorQuda("cuEventrecord returned error %s", str);
+      errorQuda("cuEventRecord returned error %s", str);
     }
     return cudaErrorUnknown;
 #else
@@ -396,6 +396,13 @@ namespace quda {
   {
     // no driver API variant here since we have C++ functions
     PROFILE(cudaError_t error = cudaFuncSetAttribute(func, attr, value), QUDA_PROFILE_FUNC_SET_ATTRIBUTE);
+    return error;
+  }
+
+  cudaError_t qudaFuncGetAttributes(cudaFuncAttributes &attr, const void* func)
+  {
+    // no driver API variant here since we have C++ functions
+    PROFILE(cudaError_t error = cudaFuncGetAttributes(&attr, func), QUDA_PROFILE_FUNC_SET_ATTRIBUTE);
     return error;
   }
 #endif

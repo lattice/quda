@@ -1,11 +1,10 @@
 #pragma once
 
 #include <color_spinor_field_order.h>
+#include <reduce_helper.h>
 #include <blas_helper.cuh>
 #include <multi_blas_helper.cuh>
-#include <cub_helper.cuh>
-
-//#define WARP_MULTI_REDUCE
+#include <fast_intdiv.h>
 
 namespace quda
 {
@@ -24,255 +23,207 @@ namespace quda
        @tparam SpinorW Type of input spinor for v argument
        @tparam Reducer Functor used to operate on data
     */
-    template <int NXZ, typename ReduceType, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW,
-              typename Reducer>
-    struct MultiReduceArg
-      : public ReduceArg<vector_type<ReduceType, NXZ>>,
-        SpinorXZ<NXZ, SpinorX, SpinorZ, Reducer::use_z>,
-        SpinorYW<max_YW_size<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Reducer>(), SpinorY, SpinorW, Reducer::use_w> {
-      static constexpr int NYW_max = max_YW_size<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Reducer>();
+    template <int NXZ, typename store_t, int N, typename y_store_t, int Ny, typename Reducer_>
+    struct MultiReduceArg :
+      public ReduceArg<vector_type<typename Reducer_::reduce_t, NXZ>>,
+      SpinorXZ<NXZ, store_t, N, Reducer_::use_z>,
+      SpinorYW<max_YW_size<NXZ, store_t, y_store_t, Reducer_>(), store_t, N, y_store_t, Ny, Reducer_::use_w>
+    {
+      using Reducer = Reducer_;
+      static constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, Reducer>();
       const int NYW;
       Reducer r;
       const int length;
+      const int_fastdiv gridSize;
 
-      MultiReduceArg(SpinorX X[NXZ], SpinorY Y[], SpinorZ Z[NXZ], SpinorW W[], Reducer r, int NYW, int length) :
-          NYW(NYW),
-          r(r),
-          length(length)
+      MultiReduceArg(std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
+                     std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
+                     Reducer r, int NYW, int length, int nParity, TuneParam &tp) :
+        // we have NYW * nParity reductions each of length NXZ
+        ReduceArg<vector_type<typename Reducer_::reduce_t, NXZ>>(NYW),
+        NYW(NYW),
+        r(r),
+        length(length),
+        gridSize(tp.grid.x * tp.block.x / nParity)
       {
         if (NYW > NYW_max) errorQuda("NYW = %d greater than maximum size of %d", NYW, NYW_max);
 
         for (int i = 0; i < NXZ; ++i) {
-          this->X[i] = X[i];
-          if (Reducer::use_z) this->Z[i] = Z[i];
+          this->X[i].set(*x[i]);
+          if (Reducer::use_z) this->Z[i].set(*z[i]);
         }
 
         for (int i = 0; i < NYW; ++i) {
-          this->Y[i] = Y[i];
-          if (Reducer::use_w) this->W[i] = W[i];
+          this->Y[i].set(*y[i]);
+          if (Reducer::use_w) this->W[i].set(*w[i]);
         }
       }
     };
 
-#ifdef WARP_MULTI_REDUCE
-    template <typename ReduceType, typename FloatN, int M, int NXZ, typename Arg>
-#else
-    template <int block_size, typename ReduceType, typename FloatN, int M, int NXZ, typename Arg>
-#endif
-
+    template <int block_size, typename real, int n, int NXZ, typename Arg>
     __global__ void multiReduceKernel(Arg arg)
     {
-      unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
-      unsigned int k = blockIdx.y * blockDim.y + threadIdx.y;
-      unsigned int parity = blockIdx.z;
+      // n is real numbers per thread
+      using vec = vector_type<complex<real>, n/2>;
+      unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
+      unsigned int idx = tid % arg.gridSize;
+      unsigned int parity = tid / arg.gridSize;
+
+      const int k = blockIdx.y * blockDim.y + threadIdx.y;
 
       if (k >= arg.NYW) return; // safe since k are different thread blocks
 
-      vector_type<ReduceType, NXZ> sum;
+      using block_reduce_t = vector_type<typename Arg::Reducer::reduce_t, NXZ>;
+      block_reduce_t sum;
 
       while (idx < arg.length) {
 
-        FloatN x[M], y[M], z[M], w[M];
-
-        arg.Y[k].load(y, idx, parity);
-        arg.W[k].load(w, idx, parity);
+        vec x, y, z, w;
+        if (arg.r.read.Y) arg.Y[k].load(y, idx, parity);
+        if (arg.r.read.W) arg.W[k].load(w, idx, parity);
 
         // Each NYW owns its own thread.
         // The NXZ's are all in the same thread block,
         // so they can share the same memory.
 #pragma unroll
         for (int l = 0; l < NXZ; l++) {
-          arg.X[l].load(x, idx, parity);
-          arg.Z[l].load(z, idx, parity);
+          if (arg.r.read.X) arg.X[l].load(x, idx, parity);
+          if (arg.r.read.Z) arg.Z[l].load(z, idx, parity);
 
-          arg.r.pre();
-
-#pragma unroll
-          for (int j = 0; j < M; j++) arg.r(sum[l], x[j], y[j], z[j], w[j], k, l);
-
-          arg.r.post(sum[l]);
+          arg.r(sum[l], x, y, z, w, k, l);
         }
-        arg.Y[k].save(y, idx, parity);
-        arg.W[k].save(w, idx, parity);
+        if (arg.r.write.Y) arg.Y[k].save(y, idx, parity);
+        if (arg.r.write.W) arg.W[k].save(w, idx, parity);
 
-        idx += gridDim.x * blockDim.x;
+        idx += arg.gridSize;
       }
 
-#ifdef WARP_MULTI_REDUCE
-      ::quda::warp_reduce<vector_type<ReduceType, NXZ>>(arg, sum, arg.NYW * parity + k);
-#else
-      ::quda::reduce<block_size, vector_type<ReduceType, NXZ>>(arg, sum, arg.NYW * parity + k);
-#endif
+      ::quda::reduce<block_size, block_reduce_t>(arg, sum, k);
     } // multiReduceKernel
-
-    template <typename T> struct coeff_array {
-      const T *data;
-      coeff_array() : data(nullptr) {}
-      coeff_array(const T *data) : data(data) {}
-    };
 
     /**
        Base class from which all reduction functors should derive.
+
+       @tparam NXZ The number of elements we accumulate per thread
+       @tparam reduce_t The fundamental reduction type
+       @tparam coeff_t The type of any coefficients we multiply by
     */
-    template <int NXZ, typename ReduceType, typename Float2, typename FloatN> struct MultiReduceFunctor {
-      typedef Float2 type;
+    template <typename reduce_t_, typename coeff_t_> struct MultiReduceFunctor {
+      using reduce_t = reduce_t_;
+      using coeff_t = coeff_t_;
       static constexpr bool reducer = true;
-      int NYW;
-      MultiReduceFunctor(int NYW) : NYW(NYW) {}
+      static constexpr bool coeff_mul  = false;
+      static constexpr bool multi_1d = false;
+      const int NXZ;
+      const int NYW;
 
-      __device__ __host__ inline Float2 a(int i, int j) const
+      MultiReduceFunctor(int NXZ, int NYW) : NXZ(NXZ), NYW(NYW) {}
+
+      __device__ __host__ inline coeff_t a(int i, int j) const
       {
 #ifdef __CUDA_ARCH__
-        return reinterpret_cast<Float2 *>(Amatrix_d)[i * NYW + j];
+        return reinterpret_cast<coeff_t *>(Amatrix_d)[i * NYW + j];
 #else
-        return reinterpret_cast<Float2 *>(Amatrix_h)[i * NYW + j];
+        return reinterpret_cast<coeff_t *>(Amatrix_h)[i * NYW + j];
 #endif
       }
 
-      __device__ __host__ inline Float2 b(int i, int j) const
+      __device__ __host__ inline coeff_t b(int i, int j) const
       {
 #ifdef __CUDA_ARCH__
-        return reinterpret_cast<Float2 *>(Bmatrix_d)[i * NYW + j];
+        return reinterpret_cast<coeff_t *>(Bmatrix_d)[i * NYW + j];
 #else
-        return reinterpret_cast<Float2 *>(Bmatrix_h)[i * NYW + j];
+        return reinterpret_cast<coeff_t *>(Bmatrix_h)[i * NYW + j];
 #endif
       }
 
-      __device__ __host__ inline Float2 c(int i, int j) const
+      __device__ __host__ inline coeff_t c(int i, int j) const
       {
 #ifdef __CUDA_ARCH__
-        return reinterpret_cast<Float2 *>(Cmatrix_d)[i * NYW + j];
+        return reinterpret_cast<coeff_t *>(Cmatrix_d)[i * NYW + j];
 #else
-        return reinterpret_cast<Float2 *>(Cmatrix_h)[i * NYW + j];
+        return reinterpret_cast<coeff_t *>(Cmatrix_h)[i * NYW + j];
 #endif
       }
-
-      //! pre-computation routine called before the "M-loop"
-      virtual __device__ __host__ void pre() { ; }
-
-      //! where the reduction is usually computed and any auxiliary operations
-      virtual __device__ __host__ __host__ void operator()(
-          ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
-          = 0;
-
-      //! post-computation routine called after the "M-loop"
-      virtual __device__ __host__ void post(ReduceType &sum) { ; }
     };
 
     /**
        Return the real dot product of x and y
-       Broken at the moment---need to update reDotProduct with permuting, etc of cDotProduct below.
     */
-    template <typename ReduceType> __device__ __host__ void dot_(ReduceType &sum, const double2 &a, const double2 &b)
+    template <typename reduce_t, typename T>
+    __device__ __host__ void dot_(reduce_t &sum, const typename VectorType<T, 2>::type &a, const typename VectorType<T, 2>::type &b)
     {
-      sum += (ReduceType)a.x * (ReduceType)b.x;
-      sum += (ReduceType)a.y * (ReduceType)b.y;
+      sum += static_cast<reduce_t>(a.x) * static_cast<reduce_t>(b.x);
+      sum += static_cast<reduce_t>(a.y) * static_cast<reduce_t>(b.y);
     }
 
-    template <typename ReduceType> __device__ __host__ void dot_(ReduceType &sum, const float2 &a, const float2 &b)
-    {
-      sum += (ReduceType)a.x * (ReduceType)b.x;
-      sum += (ReduceType)a.y * (ReduceType)b.y;
-    }
-
-    template <typename ReduceType> __device__ __host__ void dot_(ReduceType &sum, const float4 &a, const float4 &b)
-    {
-      sum += (ReduceType)a.x * (ReduceType)b.x;
-      sum += (ReduceType)a.y * (ReduceType)b.y;
-      sum += (ReduceType)a.z * (ReduceType)b.z;
-      sum += (ReduceType)a.w * (ReduceType)b.w;
-    }
-
-    template <int NXZ, typename ReduceType, typename Float2, typename FloatN>
-    struct Dot : public MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN> {
+    template <typename reduce_t, typename real>
+    struct multiDot : public MultiReduceFunctor<reduce_t, real> {
+      static constexpr memory_access<1, 1> read { };
+      static constexpr memory_access< > write { };
       static constexpr bool use_z = false;
       static constexpr bool use_w = false;
-      typedef typename scalar<Float2>::type real;
-      using MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN>::NYW;
-      Dot(const coeff_array<Complex> &a, const coeff_array<Complex> &b, const coeff_array<Complex> &c, int NYW) :
-        MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN>(NYW)
+      multiDot(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, real>(NXZ, NYW) { }
+
+      template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, const int i, const int j)
       {
+#pragma unroll
+        for (int k=0; k < x.size(); k++) dot_<reduce_t, real>(sum, x[k], y[k]);
       }
-      __device__ __host__ void operator()(
-          ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
-      {
-        dot_<ReduceType>(sum, x, y);
-      }
-      static int streams() { return 2; } //! total number of input and output streams
-      static int flops() { return 2; }   //! flops per element
+
+      constexpr int flops() const { return 2; }   //! flops per element
     };
 
     /**
        Returns complex-valued dot product of x and y
     */
-    template <typename ReduceType> __device__ __host__ void cdot_(ReduceType &sum, const double2 &a, const double2 &b)
+    template <typename reduce_t, typename T>
+    __device__ __host__ void cdot_(reduce_t &sum, const typename VectorType<T, 2>::type &a, const typename VectorType<T, 2>::type &b)
     {
-      typedef typename scalar<ReduceType>::type scalar;
-      sum.x += (scalar)a.x * (scalar)b.x;
-      sum.x += (scalar)a.y * (scalar)b.y;
-      sum.y += (scalar)a.x * (scalar)b.y;
-      sum.y -= (scalar)a.y * (scalar)b.x;
+      using scalar = typename scalar<reduce_t>::type;
+      sum.x += static_cast<scalar>(a.x) * static_cast<scalar>(b.x);
+      sum.x += static_cast<scalar>(a.y) * static_cast<scalar>(b.y);
+      sum.y += static_cast<scalar>(a.x) * static_cast<scalar>(b.y);
+      sum.y -= static_cast<scalar>(a.y) * static_cast<scalar>(b.x);
     }
 
-    template <typename ReduceType> __device__ __host__ void cdot_(ReduceType &sum, const float2 &a, const float2 &b)
-    {
-      typedef typename scalar<ReduceType>::type scalar;
-      sum.x += (scalar)a.x * (scalar)b.x;
-      sum.x += (scalar)a.y * (scalar)b.y;
-      sum.y += (scalar)a.x * (scalar)b.y;
-      sum.y -= (scalar)a.y * (scalar)b.x;
-    }
-
-    template <typename ReduceType> __device__ __host__ void cdot_(ReduceType &sum, const float4 &a, const float4 &b)
-    {
-      typedef typename scalar<ReduceType>::type scalar;
-      sum.x += (scalar)a.x * (scalar)b.x;
-      sum.x += (scalar)a.y * (scalar)b.y;
-      sum.x += (scalar)a.z * (scalar)b.z;
-      sum.x += (scalar)a.w * (scalar)b.w;
-      sum.y += (scalar)a.x * (scalar)b.y;
-      sum.y -= (scalar)a.y * (scalar)b.x;
-      sum.y += (scalar)a.z * (scalar)b.w;
-      sum.y -= (scalar)a.w * (scalar)b.z;
-    }
-
-    template <int NXZ, typename ReduceType, typename Float2, typename FloatN>
-    struct Cdot : public MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN> {
+    template <typename real_reduce_t, typename real>
+    struct multiCdot : public MultiReduceFunctor<typename VectorType<real_reduce_t, 2>::type, complex<real>> {
+      using reduce_t = typename VectorType<real_reduce_t, 2>::type;
+      static constexpr memory_access<1, 1> read { };
+      static constexpr memory_access< > write { };
       static constexpr bool use_z = false;
       static constexpr bool use_w = false;
-      typedef typename scalar<Float2>::type real;
-      using MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN>::NYW;
-      Cdot(const coeff_array<Complex> &a, const coeff_array<Complex> &b, const coeff_array<Complex> &c, int NYW) :
-        MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN>(NYW)
+      multiCdot(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, complex<real>>(NXZ, NYW) { }
+
+      template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, const int i, const int j)
       {
+#pragma unroll
+        for (int k=0; k < x.size(); k++) cdot_<reduce_t, real>(sum, x[k], y[k]);
       }
-      __device__ __host__ inline void operator()(
-          ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
-      {
-        cdot_<ReduceType>(sum, x, y);
-      }
-      static int streams() { return 2; } //! total number of input and output streams
-      static int flops() { return 4; }   //! flops per element
+
+      constexpr int flops() const { return 4; }   //! flops per element
     };
 
-    template <int NXZ, typename ReduceType, typename Float2, typename FloatN>
-    struct CdotCopy : public MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN> {
+    template <typename real_reduce_t, typename real>
+    struct multiCdotCopy : public MultiReduceFunctor<typename VectorType<real_reduce_t, 2>::type, complex<real>> {
+      using reduce_t = typename VectorType<real_reduce_t, 2>::type;
+      static constexpr memory_access<1, 1> read { };
+      static constexpr memory_access<0, 0, 0, 1> write { };
       static constexpr bool use_z = false;
       static constexpr bool use_w = true;
-      typedef typename scalar<Float2>::type real;
-      using MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN>::NYW;
-      CdotCopy(const coeff_array<Complex> &a, const coeff_array<Complex> &b, const coeff_array<Complex> &c, int NYW) :
-        MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN>(NYW)
+      multiCdotCopy(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, complex<real>>(NXZ, NYW) { }
+
+      template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, const int i, const int j)
       {
+#pragma unroll
+        for (int k = 0; k < x.size(); k++) {
+          cdot_<reduce_t, real>(sum, x[k], y[k]);
+          if (i == j) w[k] = y[k];
+        }
       }
-      __device__ __host__ inline void operator()(
-          ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
-      {
-        cdot_<ReduceType>(sum, x, y);
-        if (i == j) w = y;
-      }
-      static int streams() { return 2; } //! total number of input and output streams
-      static int flops() { return 4; }   //! flops per element
+
+      constexpr int flops() const { return 4; }   //! flops per element
     };
 
   } // namespace blas

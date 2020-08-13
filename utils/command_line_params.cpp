@@ -16,6 +16,8 @@ auto &grid_y = gridsize_from_cmdline[1];
 auto &grid_z = gridsize_from_cmdline[2];
 auto &grid_t = gridsize_from_cmdline[3];
 
+bool native_blas_lapack = true;
+
 std::array<int, 4> dim_partitioned = {0, 0, 0, 0};
 QudaReconstructType link_recon = QUDA_RECONSTRUCT_NO;
 QudaReconstructType link_recon_sloppy = QUDA_RECONSTRUCT_INVALID;
@@ -129,10 +131,11 @@ bool generate_nullspace = true;
 bool generate_all_levels = true;
 quda::mgarray<QudaSchwarzType> mg_schwarz_type = {};
 quda::mgarray<int> mg_schwarz_cycle = {};
+bool mg_evolve_thin_updates = false;
 
 // we only actually support 4 here currently
 quda::mgarray<std::array<int, 4>> geo_block_size = {};
-int nev = 8;
+int n_ev = 8;
 int max_search_dim = 64;
 int deflation_grid = 16;
 double tol_restart = 5e+3 * tol;
@@ -149,13 +152,14 @@ QudaMemoryType mem_type_ritz = QUDA_MEMORY_DEVICE;
 
 // Parameters for the stand alone eigensolver
 int eig_block_size = 4;
-int eig_nEv = 16;
-int eig_nKr = 32;
 int eig_mmin = 16;
 int eig_mmax = 32;
 double eig_corr_eq_tol = 1e-2;
 int eig_corr_eq_maxiter = 5;
-int eig_nConv = -1; // If unchanged, will be set to nEv
+int eig_n_ev = 16;
+int eig_n_kr = 32;
+int eig_n_conv = -1;        // If unchanged, will be set to n_ev
+int eig_n_ev_deflate = -1;  // If unchanged, will be set to n_conv
 int eig_batched_rotate = 0; // If unchanged, will be set to maximum
 bool eig_require_convergence = true;
 int eig_check_interval = 10;
@@ -176,14 +180,16 @@ char eig_QUDA_logfile[256] = "QUDA_logfile.log";
 char eig_vec_infile[256] = "";
 char eig_vec_outfile[256] = "";
 bool eig_io_parity_inflate = false;
+QudaPrecision eig_save_prec = QUDA_DOUBLE_PRECISION;
 
 // Parameters for the MG eigensolver.
 // The coarsest grid params are for deflation,
 // all others are for PR vectors.
 quda::mgarray<bool> mg_eig = {};
 quda::mgarray<int> mg_eig_block_size = {};
-quda::mgarray<int> mg_eig_nEv = {};
-quda::mgarray<int> mg_eig_nKr = {};
+quda::mgarray<int> mg_eig_n_ev_deflate = {};
+quda::mgarray<int> mg_eig_n_ev = {};
+quda::mgarray<int> mg_eig_n_kr = {};
 quda::mgarray<int> mg_eig_batched_rotate = {};
 quda::mgarray<bool> mg_eig_require_convergence = {};
 quda::mgarray<int> mg_eig_check_interval = {};
@@ -197,6 +203,8 @@ quda::mgarray<bool> mg_eig_use_normop = {};
 quda::mgarray<bool> mg_eig_use_dagger = {};
 quda::mgarray<QudaEigSpectrumType> mg_eig_spectrum = {};
 quda::mgarray<QudaEigType> mg_eig_type = {};
+quda::mgarray<QudaPrecision> mg_eig_save_prec = {};
+
 bool mg_eig_coarse_guess = false;
 bool mg_eig_preserve_deflation = false;
 
@@ -431,6 +439,8 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--ngcrkrylov", gcrNkrylov,
                        "The number of inner iterations to use for GCR, BiCGstab-l, CA-CG (default 10)");
   quda_app->add_option("--niter", niter, "The number of iterations to perform (default 100)");
+  quda_app->add_option("--native-blas-lapack", native_blas_lapack,
+                       "Use the native or generic BLAS LAPACK implementation (default true)");
   quda_app->add_option("--maxiter-precondition", maxiter_precondition,
                        "The number of iterations to perform for any preconditioner (default 10)");
   quda_app->add_option("--nsrc", Nsrc,
@@ -576,6 +586,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
 void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
 
+  CLI::QUDACheckedTransformer prec_transform(precision_map);
   // Option group for Eigensolver related options
   auto opgroup = quda_app->add_option_group("Eigensolver", "Options controlling eigensolver");
 
@@ -599,10 +610,13 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--eig-compute-svd", eig_compute_svd,
                       "Solve the MdagM problem, use to compute SVD of M (default false)");
   opgroup->add_option("--eig-max-restarts", eig_max_restarts, "Perform n iterations of the restart in the eigensolver");
-  opgroup->add_option("--eig-nConv", eig_nConv, "The number of converged eigenvalues requested");
+  opgroup->add_option("--eig-n-conv", eig_n_conv, "The number of converged eigenvalues requested (default eig_n_ev)");
+  opgroup->add_option(
+    "--eig-n-ev-deflate", eig_n_ev_deflate,
+    "The number of converged eigenpairs that will be used in the deflation routines (default eig_n_conv)");
   opgroup->add_option("--eig-block-size", eig_block_size, "The block size to use in the block variant eigensolver");
-  opgroup->add_option("--eig-nEv", eig_nEv, "The size of eigenvector search space in the eigensolver");
-  opgroup->add_option("--eig-nKr", eig_nKr, "The size of the Krylov subspace to use in the eigensolver");
+  opgroup->add_option("--eig-n-ev", eig_n_ev, "The size of eigenvector search space in the eigensolver");
+  opgroup->add_option("--eig-n-kr", eig_n_kr, "The size of the Krylov subspace to use in the eigensolver");
   opgroup->add_option("--eig-batched-rotate", eig_batched_rotate,
                       "The maximum number of extra eigenvectors the solver may allocate to perform a Ritz rotation.");
   opgroup->add_option("--eig-poly-deg", eig_poly_deg, "TODO");
@@ -612,6 +626,12 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--eig-save-vec", eig_vec_outfile, "Save eigenvectors to <file> (requires QIO)");
   opgroup->add_option("--eig-load-vec", eig_vec_infile, "Load eigenvectors to <file> (requires QIO)")
     ->check(CLI::ExistingFile);
+  opgroup
+    ->add_option("--eig-save-prec", eig_save_prec,
+                 "If saving eigenvectors, use this precision to save. No-op if eig-save-prec is greater than or equal "
+                 "to precision of eigensolver (default = double)")
+    ->transform(prec_transform);
+
   opgroup->add_option("--eig-io-parity-inflate", eig_io_parity_inflate,
                       "Whether to inflate single-parity eigenvectors onto dual parity full fields for file I/O (default = false)");
 
@@ -654,7 +674,7 @@ void add_deflation_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--df-max-search-dim", max_search_dim, "Set the size of eigenvector search space (default 64)");
   opgroup->add_option("--df-mem-type-ritz", mem_type_ritz,
                       "Set memory type for the ritz vectors  (default device memory type)");
-  opgroup->add_option("--df-nev", nev, "Set number of eigenvectors computed within a single solve cycle (default 8)");
+  opgroup->add_option("--df-n-ev", n_ev, "Set number of eigenvectors computed within a single solve cycle (default 8)");
   opgroup->add_option("--df-tol-eigenval", eigenval_tol, "Set maximum eigenvalue residual norm (default 1e-1)");
   opgroup->add_option("--df-tol-inc", inc_tol,
                       "Set tolerance for the subsequent restarts in the initCG solver  (default 1e-2)");
@@ -670,6 +690,7 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   auto solve_type_transform = CLI::QUDACheckedTransformer(solve_type_map);
 
+  CLI::QUDACheckedTransformer prec_transform(precision_map);
   // TODO
   quda_app->add_mgoption(
     opgroup, "--mg-block-size", geo_block_size, CLI::Validator(),
@@ -715,11 +736,12 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                          "Perform a maximun of n restarts in eigensolver (default 100)");
   quda_app->add_mgoption(opgroup, "--mg-eig-block-size", mg_eig_block_size, CLI::Validator(),
                          "The block size to use in the block variant eigensolver");
-  quda_app->add_mgoption(opgroup, "--mg-eig-nEv", mg_eig_nEv, CLI::Validator(),
+  quda_app->add_mgoption(opgroup, "--mg-eig-n_ev", mg_eig_n_ev, CLI::Validator(),
                          "The size of eigenvector search space in the eigensolver");
-  quda_app->add_mgoption(opgroup, "--mg-eig-nKr", mg_eig_nKr, CLI::Validator(),
+  quda_app->add_mgoption(opgroup, "--mg-eig-n_kr", mg_eig_n_kr, CLI::Validator(),
                          "The size of the Krylov subspace to use in the eigensolver");
-
+  quda_app->add_mgoption(opgroup, "--mg-eig-n-ev-deflate", mg_eig_n_ev_deflate, CLI::Validator(),
+                         "The number of converged eigenpairs that will be used in the deflation routines");
   quda_app->add_mgoption(
     opgroup, "--mg-eig-batched-rotate", mg_eig_batched_rotate, CLI::Validator(),
     "The maximum number of extra eigenvectors the solver may allocate to perform a Ritz rotation.");
@@ -746,6 +768,7 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option(
     "--mg-generate-all-levels",
     generate_all_levels, "true=generate null-space on all levels, false=generate on level 0 and create other levels from that (default true)");
+  opgroup->add_option("--mg-evolve-thin-updates", mg_evolve_thin_updates, "Utilize thin updates for multigrid evolution tests (default false)");
   opgroup->add_option("--mg-generate-nullspace", generate_nullspace,
                       "Generate the null-space vector dynamically (default true, if set false and mg-load-vec isn't "
                       "set, creates free-field null vectors)");
@@ -756,6 +779,12 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                          "Load the vectors <file> for the multigrid_test (requires QIO)");
   quda_app->add_mgoption(opgroup, "--mg-save-vec", mg_vec_outfile, CLI::Validator(),
                          "Save the generated null-space vectors <file> from the multigrid_test (requires QIO)");
+
+  quda_app
+    ->add_mgoption("--mg-eig-save-prec", mg_eig_save_prec, CLI::Validator(),
+                   "If saving eigenvectors, use this precision to save. No-op if mg-eig-save-prec is greater than or "
+                   "equal to precision of eigensolver (default = double)")
+    ->transform(prec_transform);
 
   opgroup->add_option(
     "--mg-low-mode-check", low_mode_check,
@@ -816,7 +845,6 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   quda_app->add_mgoption(opgroup, "--mg-smoother", smoother_type, solver_trans,
                          "The smoother to use for multigrid (default mr)");
 
-  CLI::QUDACheckedTransformer prec_transform(precision_map);
   opgroup
     ->add_option("--mg-smoother-halo-prec", smoother_halo_prec,
                  "The smoother halo precision (applies to all levels - defaults to null_precision)")

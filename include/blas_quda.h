@@ -12,11 +12,7 @@ namespace quda {
 
     // creates and destroys reduction buffers
     void init();
-    void end(void);
-
-    void* getDeviceReduceBuffer();
-    void* getMappedHostReduceBuffer();
-    void* getHostReduceBuffer();
+    void destroy();
 
     void setParam(int kernel, int prec, int threads, int blocks);
 
@@ -64,14 +60,10 @@ namespace quda {
     void cabxpyAx(double a, const Complex &b, ColorSpinorField &x, ColorSpinorField &y);
     void caxpyXmaz(const Complex &a, ColorSpinorField &x,
 		   ColorSpinorField &y, ColorSpinorField &z);
-    void caxpyXmazMR(const Complex &a, ColorSpinorField &x,
-		     ColorSpinorField &y, ColorSpinorField &z);
+    void caxpyXmazMR(const double &a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
 
     void tripleCGUpdate(double alpha, double beta, ColorSpinorField &q,
 			ColorSpinorField &r, ColorSpinorField &x, ColorSpinorField &p);
-    void doubleCG3Init(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
-    void doubleCG3Update(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
-
 
     // reduction kernels - defined in reduce_quda.cu
 
@@ -116,9 +108,6 @@ namespace quda {
 
     double quadrupleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v);
     double quadrupleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v);
-
-    double doubleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
-    double doubleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
 
     // multi-blas kernels - defined in multi_blas.cu
 

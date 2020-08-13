@@ -7,7 +7,7 @@
 #include <comm_quda.h>
 #include <pgauge_monte.h> 
 #include <atomic.cuh>
-#include <cub_helper.cuh> 
+#include <reduce_helper.h> 
 #include <index_helper.cuh> 
 
 namespace quda {
@@ -22,6 +22,7 @@ struct KernelArg : public ReduceArg<double2> {
   int border[4]; 
 #endif
   Gauge dataOr;
+  double2 result;
 
   KernelArg(const Gauge &dataOr, const cudaGaugeField &data)
     : ReduceArg<double2>(), dataOr(dataOr) {
@@ -35,10 +36,8 @@ struct KernelArg : public ReduceArg<double2> {
 #endif
     threads = X[0]*X[1]*X[2]*X[3]/2;
   }
-  double2 getValue(){return result_h[0];}
+  double2 getValue() { return result; }
 };
-
-
 
 template<int blockSize, typename Float, typename Gauge, int NCOLORS, int functiontype>
 __global__ void compute_Value(KernelArg<Gauge> arg){
@@ -75,29 +74,25 @@ __global__ void compute_Value(KernelArg<Gauge> arg){
   reduce2d<blockSize,2>(arg, sum);
 }
 
-
-
 template<typename Float, typename Gauge, int NCOLORS, int functiontype>
 class CalcFunc : TunableLocalParity {
   KernelArg<Gauge> arg;
   TuneParam tp;
   mutable char aux_string[128]; // used as a label in the autotuner
-  private:
   bool tuneGridDim() const { return true; }
 
   public:
   CalcFunc(KernelArg<Gauge> &arg) : arg(arg) {}
-  ~CalcFunc () { }
 
-  void apply(const qudaStream_t &stream){
+  void apply(const qudaStream_t &stream)
+  {
     tp = tuneLaunch(*this, getTuning(), getVerbosity());
-    arg.result_h[0] = make_double2(0.0, 0.0);
     LAUNCH_KERNEL_LOCAL_PARITY(compute_Value, (*this), tp, stream, arg, Float, Gauge, NCOLORS, functiontype);
-    qudaDeviceSynchronize();
+    arg.complete(&arg.result, stream);
 
-    comm_allreduce_array((double*)arg.result_h, 2);
-    arg.result_h[0].x  /= (double)(4*2*arg.threads*comm_size());
-    arg.result_h[0].y  /= (double)(4*2*arg.threads*comm_size());
+    comm_allreduce_array((double*)&arg.result, 2);
+    arg.result.x /= (double)(4*2*arg.threads*comm_size());
+    arg.result.y /= (double)(4*2*arg.threads*comm_size());
   }
 
   TuneKey tuneKey() const {
@@ -105,7 +100,6 @@ class CalcFunc : TunableLocalParity {
     vol << arg.X[0] << "x" << arg.X[1] << "x" << arg.X[2] << "x" << arg.X[3];
     sprintf(aux_string,"threads=%d,prec=%lu", arg.threads, sizeof(Float));
     return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
-    
   }
 
   long long flops() const { 
@@ -117,10 +111,6 @@ class CalcFunc : TunableLocalParity {
 
 }; 
 
-
-
-
-
 template<typename Float, int NCOLORS, int functiontype, typename Gauge>
 double2 computeValue( Gauge dataOr,  cudaGaugeField& data) {
   TimeProfile profileGenericFunc("GenericFunc", false);
@@ -131,7 +121,6 @@ double2 computeValue( Gauge dataOr,  cudaGaugeField& data) {
   if(getVerbosity() >= QUDA_SUMMARIZE && functiontype == 0) printfQuda("Determinant: %.16e, %.16e\n", arg.getValue().x, arg.getValue().y);
   if(getVerbosity() >= QUDA_SUMMARIZE && functiontype == 1) printfQuda("Trace: %.16e, %.16e\n", arg.getValue().x, arg.getValue().y);
   checkCudaError();
-  qudaDeviceSynchronize();
   if (getVerbosity() >= QUDA_SUMMARIZE){
     profileGenericFunc.TPSTOP(QUDA_PROFILE_COMPUTE);
     double secs = profileGenericFunc.Last(QUDA_PROFILE_COMPUTE);

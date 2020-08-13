@@ -113,8 +113,8 @@ void setQudaDefaultMgTestParams()
     // Default eigensolver params
     mg_eig[i] = false;
     mg_eig_tol[i] = 1e-3;
-    mg_eig_nEv[i] = nvec[i];
-    mg_eig_nKr[i] = 3 * nvec[i];
+    mg_eig_n_ev[i] = nvec[i];
+    mg_eig_n_kr[i] = 3 * nvec[i];
     mg_eig_require_convergence[i] = QUDA_BOOLEAN_TRUE;
     mg_eig_type[i] = QUDA_EIG_TR_LANCZOS;
     mg_eig_spectrum[i] = QUDA_SPECTRUM_SR_EIG;
@@ -126,6 +126,7 @@ void setQudaDefaultMgTestParams()
     mg_eig_poly_deg[i] = 100;
     mg_eig_amin[i] = 1.0;
     mg_eig_amax[i] = -1.0; // use power iterations
+    mg_eig_save_prec[i] = QUDA_DOUBLE_PRECISION;
 
     setup_ca_basis[i] = QUDA_POWER_BASIS;
     setup_ca_basis_size[i] = 4;

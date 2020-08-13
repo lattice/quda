@@ -1,7 +1,7 @@
 #pragma once
 #include <typeinfo>
 
-#include <cub_helper.cuh>
+#include <reduce_helper.h>
 #include <uint_to_char.h>
 #include <tune_quda.h>
 
@@ -34,7 +34,7 @@ namespace quda
   template <typename reduce_t, typename T, typename count_t, typename transformer, typename reducer>
   struct TransformReduceArg : public ReduceArg<reduce_t> {
     static constexpr int block_size = 512;
-    static constexpr int n_batch_max = 4;
+    static constexpr int n_batch_max = 8;
     const T *v[n_batch_max];
     count_t n_items;
     int n_batch;
@@ -43,6 +43,7 @@ namespace quda
     transformer h;
     reducer r;
     TransformReduceArg(const std::vector<T *> &v, count_t n_items, transformer h, reduce_t init, reducer r) :
+      ReduceArg<reduce_t>(v.size()),
       n_items(n_items),
       n_batch(v.size()),
       init(init),
@@ -129,8 +130,7 @@ namespace quda
 
       if (location == QUDA_CUDA_FIELD_LOCATION) {
         transform_reduce_kernel<<<tp.grid, tp.block>>>(arg);
-        qudaDeviceSynchronize();
-        for (decltype(arg.n_batch) j = 0; j < arg.n_batch; j++) arg.result[j] = arg.result_h[j];
+        arg.complete(arg.result, stream);
       } else {
         transform_reduce(arg);
       }

@@ -220,11 +220,6 @@ void init(int precision, QudaReconstructType link_recon)
     csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
     csParam.pad = inv_param.sp_pad;
     csParam.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
-#ifdef FLOAT8
-    if (dslash_type == QUDA_MOBIUS_DWF_DSLASH && dtest_type == dslash_test_type::MatPCDagMatPCLocal) {
-      csParam.fieldOrder = QUDA_FLOAT8_FIELD_ORDER;
-    }
-#endif
 
     if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH || dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
       csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;

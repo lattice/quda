@@ -47,9 +47,9 @@ void display_test_info()
         printfQuda(" - level %d spectrum requested %s\n", i + 1, get_eig_spectrum_str(mg_eig_spectrum[i]));
         if (mg_eig_type[i] == QUDA_EIG_BLK_TR_LANCZOS)
           printfQuda(" - eigenvector block size %d\n", mg_eig_block_size[i]);
-        printfQuda(" - level %d number of eigenvectors requested nConv %d\n", i + 1, nvec[i]);
-        printfQuda(" - level %d size of eigenvector search space %d\n", i + 1, mg_eig_nEv[i]);
-        printfQuda(" - level %d size of Krylov space %d\n", i + 1, mg_eig_nKr[i]);
+        printfQuda(" - level %d number of eigenvectors requested n_conv %d\n", i + 1, nvec[i]);
+        printfQuda(" - level %d size of eigenvector search space %d\n", i + 1, mg_eig_n_ev[i]);
+        printfQuda(" - level %d size of Krylov space %d\n", i + 1, mg_eig_n_kr[i]);
         printfQuda(" - level %d solver tolerance %e\n", i + 1, mg_eig_tol[i]);
         printfQuda(" - level %d convergence required (%s)\n", i + 1, mg_eig_require_convergence[i] ? "true" : "false");
         printfQuda(" - level %d Operator: daggered (%s) , norm-op (%s)\n", i + 1,
@@ -72,9 +72,9 @@ void display_test_info()
     printfQuda(" - solver mode %s\n", get_eig_type_str(eig_type));
     printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(eig_spectrum));
     if (eig_type == QUDA_EIG_BLK_TR_LANCZOS) printfQuda(" - eigenvector block size %d\n", eig_block_size);
-    printfQuda(" - number of eigenvectors requested %d\n", eig_nConv);
-    printfQuda(" - size of eigenvector search space %d\n", eig_nEv);
-    printfQuda(" - size of Krylov space %d\n", eig_nKr);
+    printfQuda(" - number of eigenvectors requested %d\n", eig_n_conv);
+    printfQuda(" - size of eigenvector search space %d\n", eig_n_ev);
+    printfQuda(" - size of Krylov space %d\n", eig_n_kr);
     printfQuda(" - solver tolerance %e\n", eig_tol);
     printfQuda(" - convergence required (%s)\n", eig_require_convergence ? "true" : "false");
     if (eig_compute_svd) {
@@ -248,8 +248,6 @@ int main(int argc, char **argv)
   }
 
   // Create ghost gauge fields in case of multi GPU builds.
-#ifdef MULTI_GPU
-
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
   gauge_param.location = QUDA_CPU_FIELD_LOCATION;
 
@@ -261,8 +259,6 @@ int main(int argc, char **argv)
   GaugeFieldParam cpuLongParam(milc_longlink, gauge_param);
   cpuLongParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuLong = GaugeField::Create(cpuLongParam);
-  // constructStaggeredHostGhostGaugeField(cpuFat, cpuLong, milc_fatlink, milc_longlink, gauge_param);
-#endif
 
   loadFatLongGaugeQuda(milc_fatlink, milc_longlink, gauge_param);
 
@@ -408,10 +404,8 @@ int main(int argc, char **argv)
   if (milc_fatlink != nullptr) { free(milc_fatlink); milc_fatlink = nullptr; }
   if (milc_longlink != nullptr) { free(milc_longlink); milc_longlink = nullptr; }
 
-#ifdef MULTI_GPU
   if (cpuFat != nullptr) { delete cpuFat; cpuFat = nullptr; }
   if (cpuLong != nullptr) { delete cpuLong; cpuLong = nullptr; }
-#endif
 
   delete in;
   delete out;

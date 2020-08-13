@@ -338,14 +338,14 @@ extern "C" {
     /** How many vectors to compute after one solve
      *  for eigCG recommended values 8 or 16
     */
-    int nev;
+    int n_ev;
     /** EeigCG  : Search space dimension
      *  gmresdr : Krylov subspace dimension
     */
     int max_search_dim;
     /** For systems with many RHS: current RHS index */
     int rhs_idx;
-    /** Specifies deflation space volume: total number of eigenvectors is nev*deflation_grid */
+    /** Specifies deflation space volume: total number of eigenvectors is n_ev*deflation_grid */
     int deflation_grid;
     /** eigCG: selection criterion for the reduced eigenvector set */
     double eigenval_tol;
@@ -382,6 +382,9 @@ extern "C" {
 
     /** Which external library to use in the linear solvers (MAGMA or Eigen) */
     QudaExtLibType extlib_type;
+
+    /** Whether to use the platform native or generic BLAS / LAPACK */
+    QudaBoolean native_blas_lapack;
 
   } QudaInvertParam;
 
@@ -440,9 +443,9 @@ extern "C" {
     QudaEigSpectrumType spectrum;
 
     /** Size of the eigenvector search space **/
-    int nEv;
+    int n_ev;
     /** Total size of Krylov space **/
-    int nKr;
+    int n_kr;
     /** Minimum size of the subspace when using Jacobi-Davidson **/
     int mmin;
     /** Maximum size of the subspace when using Jacobi-Davidson **/
@@ -454,7 +457,9 @@ extern "C" {
     /** Max number of locked eigenpairs (deduced at runtime) **/
     int nLockedMax;
     /** Number of requested converged eigenvectors **/
-    int nConv;
+    int n_conv;
+    /** Number of requested converged eigenvectors to use in deflation **/
+    int n_ev_deflate;
     /** Tolerance on the least well known eigenvalue's residual **/
     double tol;
     /** For IRLM/IRAM, check every nth restart **/
@@ -501,6 +506,9 @@ extern "C" {
 
     /** Filename prefix for where to save the null-space vectors */
     char vec_outfile[256];
+
+    /** The precision with which to save the vectors */
+    QudaPrecision save_prec;
 
     /** Whether to inflate single-parity eigen-vector I/O to a full
         field (e.g., enabling this is required for compatability with
@@ -698,6 +706,9 @@ extern "C" {
 
     /** Boolean for if this is a staggered solve or not */
     QudaBoolean is_staggered;
+
+    /** Whether to do a full (false) or thin (true) update in the context of updateMultigridQuda */
+    QudaBoolean thin_update_only;
 
   } QudaMultigridParam;
 
@@ -1017,7 +1028,8 @@ extern "C" {
    * @brief Updates the multigrid preconditioner for the new gauge / clover field
    * @param mg_instance Pointer to instance of multigrid_solver
    * @param param Contains all metadata regarding host and device
-   * storage and solver parameters
+   * storage and solver parameters, of note contains a flag specifying whether
+   * to do a full update or a thin update.
    */
   void updateMultigridQuda(void *mg_instance, QudaMultigridParam *param);
 

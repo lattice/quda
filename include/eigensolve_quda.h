@@ -24,17 +24,18 @@ protected:
 
     // Problem parameters
     //------------------
-    int nEv;             /** Size of initial factorisation */
-    int nKr;             /** Size of Krylov space after extension */
+    int n_ev;            /** Size of initial factorisation */
+    int n_kr;            /** Size of Krylov space after extension */
+    int n_conv;          /** Number of converged eigenvalues requested */
+    int n_ev_deflate;    /** Number of converged eigenvalues to use in deflation */
+    double tol;          /** Tolerance on eigenvalues */
+    bool reverse;        /** True if using polynomial acceleration */
+    char spectrum[3];    /** Part of the spectrum to be computed */
     int m_min;           /** Minimim size of subspace for Jacobi-Davidson */
     int m_max;           /** Maximum size of subspace for Jacobi-Davidson */
     int k_max;           /** NUmber of requested eigenpairs for Jacobi-Davidson */
     int corr_eq_maxiter; /** Maximum number of iterations for the correction equation */
     double corr_eq_tol;  /** Tolerance for the correction equation */
-    int nConv;           /** Number of converged eigenvalues requested */
-    double tol;          /** Tolerance on eigenvalues */
-    bool reverse;        /** True if using polynomial acceleration */
-    char spectrum[3];    /** Part of the spectrum to be computed */
 
     // Algorithm variables
     //--------------------
@@ -65,7 +66,9 @@ protected:
     ColorSpinorField *tmp1;
     ColorSpinorField *tmp2;
 
-public:
+    QudaPrecision save_prec;
+
+  public:
     /**
        @brief Constructor for base Eigensolver class
        @param eig_param MGParam struct that defines all meta data
@@ -338,7 +341,7 @@ public:
     */
     void computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals)
     {
-      computeEvals(mat, evecs, evals, nConv);
+      computeEvals(mat, evecs, evals, n_conv);
     }
 
     /**
