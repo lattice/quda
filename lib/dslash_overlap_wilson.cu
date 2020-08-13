@@ -23,7 +23,7 @@ namespace quda
   public:
     HWilson(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
 
-    void apply(const hipStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
@@ -95,7 +95,7 @@ namespace quda
     }
     virtual ~OverlapLinop() { }
 
-    void apply(const hipStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         overlapLinop<Float,nColor,Arg> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); 
     }
