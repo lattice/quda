@@ -582,9 +582,10 @@ void initQudaMemory()
 
   device::create_context();
   createDslashEvents();
-
+  
+  blas_lapack::native::init();
   blas::init();
-
+  
   // initalize the memory pool allocators
   pool::init();
 
@@ -5917,8 +5918,9 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
   // leading dim values and any offsets. All this is done behind the scenes in the
   // BatchGEMM function, and before function exit all pointers and values are
   // restored to the values they had on entry.
-  
-  cublas::BatchGEMM(A_d, B_d, C_d, *cublas_param, QUDA_CUDA_FIELD_LOCATION);
+
+  blas_lapack::native::stridedBatchGEMM(A_d, B_d, C_d, *cublas_param, QUDA_CUDA_FIELD_LOCATION);
+  //blas_lapack::native::BatchGEMM(A_d, B_d, C_d, *cublas_param, QUDA_CUDA_FIELD_LOCATION);
   
   if (getVerbosity() >= QUDA_VERBOSE) printfQuda("BatchGEMM success!\n");
   profileCuBLAS.TPSTOP(QUDA_PROFILE_COMPUTE);
