@@ -5843,47 +5843,47 @@ void contractQuda(void** h_prop_array_flavor_1, void** h_prop_array_flavor_2, vo
   //FIXME
   int s2, c2;
   for (size_t s1 = 0; s1 < 4; s1++) {
-     for (size_t c1 = 0; c1 < 3; c1++) {
-       //FIXME for now, reproduce propagator_test result
-//       for (size_t s2 = 0; s2 < 4; s2++) {
-//         for (size_t c2 = 0; c2 < 3; c2++) {
-           s2 = s1;
-           c2 = c1;
-
-           // copy single prop from host to device
-           *d_single_prop_flavor_1 = *CSF_ptr_container_flavor_1[s1* cs_param->nColor + c1];
-           *d_single_prop_flavor_2 = *CSF_ptr_container_flavor_2[s2* cs_param->nColor + c2];
-
-           memset(h_result_tmp_global, 0, corr_size_in_bytes);
-
-           contractQuda(*d_single_prop_flavor_1, *d_single_prop_flavor_1, s1, c1, s2, c2, h_result_tmp_local, cType);
-           //contractQuda spits out corr_dim*16* complex numbers, one for each channel and corr slice. this if for a set of fixed color+spin indices.
-
-
-           if(comm_dim(corr_dim) > 1) comm_gather_array(h_result_tmp_global, n_numbers_per_slice * local_corr_length);
-
-           for(int G_idx =0; G_idx < 16; G_idx++) {
-             for(size_t t=0; t< global_corr_length; t++) {
-               ((double*)h_result)[n_numbers_per_slice*t + 2*G_idx  ] += h_result_tmp_global[n_numbers_per_slice*t + 2*G_idx  ];
-               ((double*)h_result)[n_numbers_per_slice*t + 2*G_idx+1] += h_result_tmp_global[n_numbers_per_slice*t + 2*G_idx+1];
-             }
-           }
-
-           printfQuda("--------------------------------------------\n");
-           printfQuda("%d %d %d %d \n", s1, c1, s2, c2);
-           for (int G_idx = 0; G_idx < 16; G_idx++) {
-             for (size_t t = 0; t < global_corr_length; t++) {
-               printfQuda("sum: g=%d t=%lu %e %e\n", G_idx, t, ((double*)h_result)[n_numbers_per_slice * t + 2 * G_idx],
-                          ((double*)h_result)[n_numbers_per_slice * t + 2 * G_idx + 1]);
-             }
-           }
-           printfQuda("--------------------------------------------\n");
-        }
-//FIXME see above
-//      }
-//    }
+    for (size_t c1 = 0; c1 < 3; c1++) {
+      //FIXME for now, reproduce propagator_test result
+      //       for (size_t s2 = 0; s2 < 4; s2++) {
+      //         for (size_t c2 = 0; c2 < 3; c2++) {
+      s2 = s1;
+      c2 = c1;
+      
+      // copy single prop from host to device
+      *d_single_prop_flavor_1 = *CSF_ptr_container_flavor_1[s1* cs_param->nColor + c1];
+      *d_single_prop_flavor_2 = *CSF_ptr_container_flavor_2[s2* cs_param->nColor + c2];
+      
+      memset(h_result_tmp_global, 0, corr_size_in_bytes);
+      
+      contractQuda(*d_single_prop_flavor_1, *d_single_prop_flavor_1, s1, c1, s2, c2, h_result_tmp_local, cType);
+      //contractQuda spits out corr_dim*16* complex numbers, one for each channel and corr slice. this if for a set of fixed color+spin indices.
+      
+      
+      if(comm_dim(corr_dim) > 1) comm_gather_array(h_result_tmp_global, n_numbers_per_slice * local_corr_length);
+      
+      for(int G_idx =0; G_idx < 16; G_idx++) {
+	for(size_t t=0; t< global_corr_length; t++) {
+	  ((double*)h_result)[n_numbers_per_slice*t + 2*G_idx  ] += h_result_tmp_global[n_numbers_per_slice*t + 2*G_idx  ];
+	  ((double*)h_result)[n_numbers_per_slice*t + 2*G_idx+1] += h_result_tmp_global[n_numbers_per_slice*t + 2*G_idx+1];
+	}
+      }
+      
+      printfQuda("--------------------------------------------\n");
+      printfQuda("%lu %lu %d %d \n", s1, c1, s2, c2);
+      for (int G_idx = 0; G_idx < 16; G_idx++) {
+	for (size_t t = 0; t < global_corr_length; t++) {
+	  printfQuda("sum: g=%d t=%lu %e %e\n", G_idx, t, ((double*)h_result)[n_numbers_per_slice * t + 2 * G_idx],
+		     ((double*)h_result)[n_numbers_per_slice * t + 2 * G_idx + 1]);
+	}
+      }
+      printfQuda("--------------------------------------------\n");
+    }
+    //FIXME see above
+    //      }
+    //    }
   }
-
+  
   delete d_single_prop_flavor_1;
   delete d_single_prop_flavor_2;
   for (int i=0; i<spinor_dim; i++){
