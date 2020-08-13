@@ -106,7 +106,7 @@ namespace quda
       */
       long long BatchInvertMatrix(void *Ainv, void *A, const int n, const uint64_t batch, QudaPrecision precision,
                                   QudaFieldLocation location);
-
+      
     } // namespace generic
   }   // namespace blas_lapack
 } // namespace quda

@@ -192,18 +192,19 @@ namespace quda
       long long BatchGEMM(void *A_data, void* B_data, void* C_data, QudaCublasParam cublas_param, QudaFieldLocation location)
       {
 	long long flops = 0;
+#ifdef NATIVE_LAPACK_LIB
 	timeval start, stop;
 	gettimeofday(&start, NULL);
-
+	
 	const uint64_t batch = cublas_param.batch_count;
 	uint64_t data_size = (cublas_param.data_type == QUDA_CUBLAS_DATATYPE_S ||
 			      cublas_param.data_type == QUDA_CUBLAS_DATATYPE_C) ? 4 : 8;
-
+	
 	if(cublas_param.data_type == QUDA_CUBLAS_DATATYPE_C ||
 	   cublas_param.data_type == QUDA_CUBLAS_DATATYPE_Z) {
 	  data_size *= 2;
 	}
-
+	
 	// Swap A and B if in row order
 	if (cublas_param.data_order == QUDA_CUBLAS_DATAORDER_ROW) {
 	  std::swap(cublas_param.m, cublas_param.n);
@@ -212,7 +213,7 @@ namespace quda
 	  std::swap(cublas_param.a_offset, cublas_param.b_offset);
 	  std::swap(A_data, B_data);
 	}
-      
+
 	// Number of data between batches      
 	unsigned int A_batch_size = cublas_param.lda * cublas_param.k;
 	if (cublas_param.trans_a != QUDA_CUBLAS_OP_N)
@@ -221,7 +222,7 @@ namespace quda
 	if (cublas_param.trans_b != QUDA_CUBLAS_OP_N)
 	  B_batch_size = cublas_param.ldb * cublas_param.k; 
 	unsigned int C_batch_size = cublas_param.ldc * cublas_param.n;       
-      
+
 	// Data size of the entire array 
 	size_t sizeAarr = A_batch_size * data_size * batch;
 	size_t sizeBarr = B_batch_size * data_size * batch;
@@ -245,7 +246,7 @@ namespace quda
 	case QUDA_CUBLAS_OP_C: trans_a = CUBLAS_OP_C; break;
 	default : errorQuda("Unknown QUDA_CUBLAS_OP type %d\n", cublas_param.trans_a);
 	}
-      
+
 	cublasOperation_t trans_b = CUBLAS_OP_N;
 	switch(cublas_param.trans_b) {
 	case QUDA_CUBLAS_OP_N: trans_b = CUBLAS_OP_N; break;
@@ -346,7 +347,6 @@ namespace quda
 				       A_ptr_array, cublas_param.lda,
 				       B_ptr_array, cublas_param.ldb, &beta,
 				       C_ptr_array, cublas_param.ldc, batch);
-	  
 	    pool_device_free(A_ptr_array);
 	    pool_device_free(B_ptr_array);
 	    pool_device_free(C_ptr_array);
@@ -416,7 +416,6 @@ namespace quda
 				(D*)A_d + cublas_param.a_offset, cublas_param.lda,
 				(D*)B_d + cublas_param.b_offset, cublas_param.ldb, &beta,
 				(D*)C_d + cublas_param.c_offset, cublas_param.ldc);
-	  
 	  }
 	
 	  //flops += batch*FLOPS_CGETRF(n,n);
@@ -489,7 +488,7 @@ namespace quda
 	  std::swap(cublas_param.a_offset, cublas_param.b_offset);
 	  std::swap(A_data, B_data);
 	}
-      
+
 	if (location == QUDA_CPU_FIELD_LOCATION) {
 	  qudaMemcpy(C_data, C_d, sizeCarr, cudaMemcpyDeviceToHost);
 	  pool_device_free(A_d);
@@ -504,14 +503,19 @@ namespace quda
 	double time = ds + 0.000001*dus;
 	if (getVerbosity() >= QUDA_VERBOSE)
 	  printfQuda("Batched matrix GEMM completed in %f seconds with GFLOPS = %f\n", time, 1e-9 * flops / time);
-      
 	return flops;
+#else
+        errorQuda("Native BLAS not built. Please build and use native BLAS or use generic BLAS");
+        return 0; // Stops a compiler warning
+#endif
+
       }
 
       
       long long stridedBatchGEMM(void *A_data, void* B_data, void* C_data, QudaCublasParam cublas_param, QudaFieldLocation location)
       {
         long long flops = 0;
+#ifdef NATIVE_LAPACK_LIB
         timeval start, stop;
         gettimeofday(&start, NULL);
 
@@ -729,8 +733,12 @@ namespace quda
           printfQuda("Batched matrix GEMM completed in %f seconds with GFLOPS = %f\n", time, 1e-9 * flops / time);
 
         return flops;
+#else
+        errorQuda("Native BLAS not built. Please build and use native BLAS or use generic BLAS");
+        return 0; // Stops a compiler warning
+#endif
+	
       }
-
     } // namespace native
   } // namespace blas_lapack
 } // namespace quda
