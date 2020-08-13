@@ -19,13 +19,10 @@
 
 #include <gtest/gtest.h>
 
-using   namespace quda;
+using namespace quda;
 
 int num_failures=0;
 int *num_failures_dev;
-
-#define MAX(a,b) ((a)>(b)?(a):(b))
-#define DABS(a) ((a)<(0.)?(-(a)):(a))
 
 class GaugeAlgTest : public ::testing::Test {
  protected:
@@ -42,29 +39,30 @@ class GaugeAlgTest : public ::testing::Test {
 
   }
 
-  bool checkDimsPartitioned(){
-    if(comm_dim_partitioned(0) || comm_dim_partitioned(1) || comm_dim_partitioned(2) || comm_dim_partitioned(3)) return true;
+  bool checkDimsPartitioned()
+  {
+    if (comm_dim_partitioned(0) || comm_dim_partitioned(1) || comm_dim_partitioned(2) || comm_dim_partitioned(3))
+      return true;
     return false;
   }
 
   bool comparePlaquette(double3 a, double3 b){
     double a0,a1,a2;
-    a0 = DABS(a.x - b.x);
-    a1=DABS(a.y - b.y);
-    a2=DABS(a.z - b.z);
+    a0 = std::abs(a.x - b.x);
+    a1 = std::abs(a.y - b.y);
+    a2 = std::abs(a.z - b.z);
     double prec_val = 1.0e-5;
-    if(prec == QUDA_DOUBLE_PRECISION) prec_val = 1.0e-15;
-    if( (a0 < prec_val) && (a1  < prec_val)  && (a2  < prec_val) ) return true;
+    if (prec == QUDA_DOUBLE_PRECISION) prec_val = 1.0e-15;
+    if ((a0 < prec_val) && (a1 < prec_val) && (a2 < prec_val)) return true;
     return false;
   }
 
   bool CheckDeterminant(double2 detu){
     double prec_val = 5e-8;
-    if(prec == QUDA_DOUBLE_PRECISION) prec_val = 1.0e-15;
-    if(DABS(1.0 - detu.x) < prec_val && DABS(detu.y) < prec_val) return true;
+    if (prec == QUDA_DOUBLE_PRECISION) prec_val = 1.0e-15;
+    if (std::abs(1.0 - detu.x) < prec_val && std::abs(detu.y) < prec_val) return true;
     return false;
   }
-
 
   void CallUnitarizeLinks(cudaGaugeField *cudaInGauge){
     unitarizeLinks(*cudaInGauge, num_failures_dev);
@@ -165,7 +163,7 @@ class GaugeAlgTest : public ::testing::Test {
 
     printfQuda("Time Monte -> %.6f s\n", a1.Last());
     plaq = plaquette(*cudaInGauge);
-    printfQuda("Plaq: %.16e , %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
+    printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
   }
 
   virtual void TearDown() {
@@ -173,7 +171,6 @@ class GaugeAlgTest : public ::testing::Test {
     double2 tru = getLinkTrace(*cudaInGauge);
     printfQuda("Det: %.16e:%.16e\n", detu.x, detu.y);
     printfQuda("Tr: %.16e:%.16e\n", tru.x/3.0, tru.y/3.0);
-
 
     delete cudaInGauge;
     cudaFree(num_failures_dev);
@@ -186,12 +183,11 @@ class GaugeAlgTest : public ::testing::Test {
     delete randstates;
   }
 
-
   QudaGaugeParam param;
 
   Timer a0,a1;
-  double2 detu;// = getLinkDeterminant(*cudaInGauge);
-  double3 plaq;// = plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION) ;
+  double2 detu;
+  double3 plaq;
   cudaGaugeField *cudaInGauge;
   int nsteps;
   int nhbsteps;
@@ -202,51 +198,61 @@ class GaugeAlgTest : public ::testing::Test {
 
 };
 
-
-TEST_F(GaugeAlgTest,Generation){
+TEST_F(GaugeAlgTest, Generation)
+{
   detu = getLinkDeterminant(*cudaInGauge);
   plaq = plaquette(*cudaInGauge);
   bool testgen = false;
   //check plaquette value for beta = 6.2
-  if(plaq.x < 0.614 && plaq.x > 0.611 && plaq.y < 0.614 && plaq.y > 0.611) testgen = true;
+  if (plaq.x < 0.614 && plaq.x > 0.611 && plaq.y < 0.614 && plaq.y > 0.611) testgen = true;
 
-  if(testgen){
-    ASSERT_TRUE(CheckDeterminant(detu));
-  }
+  if (testgen) { ASSERT_TRUE(CheckDeterminant(detu)); }
 }
 
-TEST_F(GaugeAlgTest,Landau_Overrelaxation){
+TEST_F(GaugeAlgTest, Landau_Overrelaxation)
+{
   const int reunit_interval = 10;
   printfQuda("Landau gauge fixing with overrelaxation\n");
-  gaugefixingOVR(*cudaInGauge, 4, 100, 10, 1.5, 0, reunit_interval, 1);
-  ASSERT_TRUE(comparePlaquette(plaq, plaquette(*cudaInGauge)));
+  gaugeFixingOVR(*cudaInGauge, 4, 100, 10, 1.5, 0, reunit_interval, 1);
+  auto plaq_gf = plaquette(*cudaInGauge);
+  printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+  ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
 }
 
-TEST_F(GaugeAlgTest,Coulomb_Overrelaxation){
+TEST_F(GaugeAlgTest, Coulomb_Overrelaxation)
+{
   const int reunit_interval = 10;
   printfQuda("Coulomb gauge fixing with overrelaxation\n");
-  gaugefixingOVR(*cudaInGauge, 3, 100, 10, 1.5, 0, reunit_interval, 1);
-  ASSERT_TRUE(comparePlaquette(plaq, plaquette(*cudaInGauge)));
+  gaugeFixingOVR(*cudaInGauge, 3, 100, 10, 1.5, 0, reunit_interval, 1);
+  auto plaq_gf = plaquette(*cudaInGauge);
+  printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+  ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
 }
 
-TEST_F(GaugeAlgTest,Landau_FFT){
-  if(!checkDimsPartitioned()){
+TEST_F(GaugeAlgTest, Landau_FFT)
+{
+  if (!checkDimsPartitioned()) {
     printfQuda("Landau gauge fixing with steepest descent method with FFTs\n");
-    gaugefixingFFT(*cudaInGauge, 4, 100, 10, 0.08, 0, 0, 1);
-    ASSERT_TRUE(comparePlaquette(plaq, plaquette(*cudaInGauge)));
+    gaugeFixingFFT(*cudaInGauge, 4, 100, 10, 0.08, 0, 0, 1);
+    auto plaq_gf = plaquette(*cudaInGauge);
+    printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+    ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
   }
 }
 
-TEST_F(GaugeAlgTest,Coulomb_FFT){
-  if(!checkDimsPartitioned()){
+TEST_F(GaugeAlgTest, Coulomb_FFT)
+{
+  if (!checkDimsPartitioned()) {
     printfQuda("Coulomb gauge fixing with steepest descent method with FFTs\n");
-    gaugefixingFFT(*cudaInGauge, 3, 100, 10, 0.08, 0, 0, 1);
-    ASSERT_TRUE(comparePlaquette(plaq, plaquette(*cudaInGauge)));
+    gaugeFixingFFT(*cudaInGauge, 3, 100, 10, 0.08, 0, 0, 1);
+    auto plaq_gf = plaquette(*cudaInGauge);
+    printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+    ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
   }
 }
 
-
-int main(int argc, char **argv){
+int main(int argc, char **argv)
+{
   // initalize google test, includes command line options
   ::testing::InitGoogleTest(&argc, argv);
   // return code for google test

@@ -41,7 +41,6 @@ public:
       create_jitify_program("kernels/contraction.cuh");
 #endif
     }
-    virtual ~Contraction() {}
 
     void apply(const qudaStream_t &stream)
     {
@@ -62,9 +61,8 @@ public:
                          .launch(arg);
 #else
         switch (cType) {
-        case QUDA_CONTRACT_TYPE_OPEN: computeColorContraction<real><<<tp.grid, tp.block, tp.shared_bytes>>>(arg); break;
-        case QUDA_CONTRACT_TYPE_DR:
-          computeDegrandRossiContraction<real><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
+        case QUDA_CONTRACT_TYPE_OPEN: qudaLaunchKernel(computeColorContraction<real, Arg>, tp, stream, arg); break;
+        case QUDA_CONTRACT_TYPE_DR:   qudaLaunchKernel(computeDegrandRossiContraction<real, Arg>, tp, stream, arg); break;
           break;
         default: errorQuda("Unexpected contraction type %d", cType);
         }
@@ -93,7 +91,7 @@ public:
     }
   };
 
-  template <typename Arg> class ContractionSumCompute : TunableLocalParity
+  template <typename Arg> class ContractionSumCompute : TunableLocalParityReduction
   {
     //- The protected members of the class are the argument structure we have already seen, 
     //- the memory addresses of the two fermion fields to be contracted, and the type of 
@@ -128,14 +126,14 @@ public:
     //- to denote which timeslice we are working on. This is accessed by a handy member
     //- function of the ColorSpinorField object x, namely `.X(3)`.
     void initTuneParam(TuneParam &param) const {
-      TunableLocalParity::initTuneParam(param);
+      TunableLocalParityReduction::initTuneParam(param);
       param.block.y = 2;
       param.grid.z = x.X(Arg::reduction_dim); // T dimension is mapped to different blocks in the Z dimension
     }
 
     //- This is just making sure the Tunable class defaults to the same params.
     void defaultTuneParam(TuneParam &param) const {
-      TunableLocalParity::defaultTuneParam(param);
+      TunableLocalParityReduction::defaultTuneParam(param);
       param.block.y = 2;
       param.grid.z = x.X(Arg::reduction_dim); // T dimension is mapped to different blocks in the Z dimension
     }
@@ -144,14 +142,14 @@ public:
     //- constructor. This is what was called when we created the `ContractionSumCompute` 
     //- object named `contract_with_sum`.
     //- It is fairly standard for a constructor. We initialise the class from which we 
-    //- inherit `TunableLocalParity()` which just means that all the data the thread uses 
+    //- inherit `TunableLocalParityReduction()` which just means that all the data the thread uses 
     //- is local (no collecting data from other lattice points) and that we may also split the
     //- threads by parity. That particular class of `Tunable` will then tune for that (and only
     //- that) type of calculation. We then initialise the arg, teh x and y vectors, and 
     //- contraction type. 
   public:
     ContractionSumCompute(Arg &arg, const ColorSpinorField &x, const ColorSpinorField &y, const QudaContractType cType) :
-      TunableLocalParity(),
+      TunableLocalParityReduction(),
       arg(arg),
       x(x),
       y(y),
@@ -187,7 +185,7 @@ public:
     //- Before we go any further we must make note of something very important. `apply` is NOT
     //- a member function of this class. It is a pure virtual member function of the Tunable class.
     //- By calling this member function, we have passed control of workflow to the parent class
-    //- namely TunableLocalParity.
+    //- namely TunableLocalParityReduction.
     void apply(const qudaStream_t &stream)
     {
       //- QUDA is evolving so that the C++ in the kernels can be compiled by both NVCC and 

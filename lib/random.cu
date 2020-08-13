@@ -1,10 +1,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <iostream>
-#include <random_quda.h>
-#include <cuda.h>
-#include <quda_internal.h>
 
+#include <quda_internal.h>
+#include <tune_quda.h>
+#include <random_quda.h>
 #include <comm_quda.h>
 #include <index_helper.cuh>
 
@@ -22,7 +22,7 @@
 
 namespace quda {
 
-  dim3 GetBlockDim(size_t threads, size_t size) {
+  dim3 GetGridDim(size_t threads, size_t size) {
     int blockx = BLOCKSDIVUP(size, threads);
     dim3 blocks(blockx,1,1);
     return blocks;
@@ -74,11 +74,12 @@ namespace quda {
   */
   void launch_kernel_random(cuRNGState *state, unsigned long long seed, int size_cb, int n_parity, int X[4])
   {
-    dim3 nthreads(128,1,1);
-    dim3 nblocks = GetBlockDim(nthreads.x, size_cb);
+    TuneParam tp;
+    tp.block = dim3(128, 1, 1);
+    tp.grid = GetGridDim(tp.block.x, size_cb);
     rngArg arg(X);
-    nblocks.y = n_parity;
-    kernel_random<<<nblocks, nthreads>>>(state, seed, size_cb, arg);
+    tp.block.y = n_parity;
+    qudaLaunchKernel(kernel_random, tp, 0, state, seed, size_cb, arg);
     qudaDeviceSynchronize();
   }
 

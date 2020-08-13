@@ -128,7 +128,6 @@ namespace quda {
   template <typename Float, typename vFloat, int fineSpin, int fineColor, int coarseSpin, int coarseColor, int fine_colors_per_thread>
   class ProlongateLaunch : public TunableVectorYZ {
 
-  protected:
     ColorSpinorField &out;
     const ColorSpinorField &in;
     const ColorSpinorField &V;
@@ -155,8 +154,6 @@ namespace quda {
       strcat(aux, in.AuxString());
     }
 
-    virtual ~ProlongateLaunch() { }
-
     void apply(const qudaStream_t &stream) {
       if (location == QUDA_CPU_FIELD_LOCATION) {
         if (out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
@@ -171,8 +168,8 @@ namespace quda {
           TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
           ProlongateArg<Float,vFloat,fineSpin,fineColor,coarseSpin,coarseColor,QUDA_FLOAT2_FIELD_ORDER>
             arg(out, in, V, fine_to_coarse, parity);
-          ProlongateKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,fine_colors_per_thread>
-            <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          qudaLaunchKernel(ProlongateKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,fine_colors_per_thread,decltype(arg)>,
+                           tp, stream, arg);
         } else {
           errorQuda("Unsupported field order %d", out.FieldOrder());
         }

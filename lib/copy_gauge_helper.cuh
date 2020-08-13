@@ -95,11 +95,9 @@ public:
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
         if (!is_ghost) {
-          copyGaugeKernel<FloatOut, FloatIn, length, Arg>
-            <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          qudaLaunchKernel(copyGaugeKernel<FloatOut, FloatIn, length, Arg>, tp, stream, arg);
         } else {
-          copyGhostKernel<FloatOut, FloatIn, length, Arg>
-            <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          qudaLaunchKernel(copyGhostKernel<FloatOut, FloatIn, length, Arg>, tp, stream, arg);
         }
 #endif
       } else {

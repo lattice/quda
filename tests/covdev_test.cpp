@@ -35,9 +35,7 @@ cudaColorSpinorField* tmp;
 
 void *links[4];
 
-#ifdef MULTI_GPU
 void **ghostLink;
-#endif
 
 QudaParity parity = QUDA_EVEN_PARITY;
 

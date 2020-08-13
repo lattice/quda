@@ -399,7 +399,7 @@ namespace quda {
 
       void apply(const qudaStream_t &stream) {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	getUnitarizeForceField<<<tp.grid,tp.block>>>(arg);
+	qudaLaunchKernel(getUnitarizeForceField<decltype(arg)>, tp, stream, arg);
       }
 
       void preTune() { ; }
