@@ -582,7 +582,7 @@ void initQudaMemory()
 
   device::create_context();
   createDslashEvents();
-  
+
   blas_lapack::native::init();
   blas::init();
 
@@ -1386,7 +1386,7 @@ void endQuda(void)
   blas_lapack::generic::destroy();
   blas_lapack::native::destroy();
   blas::destroy();
-  
+
   pool::flush_pinned();
   pool::flush_device();
 
@@ -5887,7 +5887,7 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
 
   // Compute Batched GEMM
   profileCuBLAS.TPSTART(QUDA_PROFILE_COMPUTE);
-  
+
   // cuBLAS works exclusively in column major order. If the input data is in
   // row major order, we may treat the A and B and C arrays as A^T, B^T, and C^T.
   // We swap the order of the A * B multiplication and swap the
@@ -5920,7 +5920,7 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
   // restored to the values they had on entry.
 
   blas_lapack::native::stridedBatchGEMM(A_d, B_d, C_d, *cublas_param, QUDA_CUDA_FIELD_LOCATION);
-  
+
   if (getVerbosity() >= QUDA_VERBOSE) printfQuda("BatchGEMM success!\n");
   profileCuBLAS.TPSTOP(QUDA_PROFILE_COMPUTE);
 

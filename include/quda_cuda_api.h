@@ -8,13 +8,12 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-  
-  extern cudaDeviceProp deviceProp;
-  
+
+extern cudaDeviceProp deviceProp;
+
 #ifdef __cplusplus
 }
 #endif
-
 
 using qudaStream_t = cudaStream_t;
 

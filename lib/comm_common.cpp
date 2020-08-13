@@ -273,22 +273,22 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
                && accessRank[1] <= enable_p2p_max_access_rank)
               || gpuid == neighbor_gpuid) {
             peer2peer_enabled[dir][dim] = true;
-	    if (getVerbosity() > QUDA_SILENT) {
-	      printf("Peer-to-peer enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d, access rank "
-		     "= (%d, %d)\n",
-		     comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim, accessRank[0], accessRank[1]);
-	    }
-	  } else {
-	    intranode_enabled[dir][dim] = true;
-	    if (getVerbosity() > QUDA_SILENT) {
-	      printf("Intra-node (non peer-to-peer) enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d\n",
+            if (getVerbosity() > QUDA_SILENT) {
+              printf("Peer-to-peer enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d, access rank "
+                     "= (%d, %d)\n",
+                     comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim, accessRank[0], accessRank[1]);
+            }
+          } else {
+            intranode_enabled[dir][dim] = true;
+            if (getVerbosity() > QUDA_SILENT) {
+              printf("Intra-node (non peer-to-peer) enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d\n",
 		     comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
-	    }
-          }	  
+            }
+          }
         } // on the same node
       } // different dimensions - x, y, z, t
     } // different directions - forward/backward
-    
+
     host_free(gpuid_recv_buf);
   }
 
