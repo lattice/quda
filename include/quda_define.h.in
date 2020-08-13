@@ -50,7 +50,3 @@
 #define FLOAT8
 #undef QUDA_FLOAT8
 #endif
-
-#if defined(USE_TEXTURE_OBJECTS) && defined(FLOAT8)
-#error "Cannot simultanteously enable QUDA_TEX and QUDA_FLOAT8"
-#endif

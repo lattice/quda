@@ -53,7 +53,16 @@ namespace quda
     using type = float;
   };
 
+  template <int block_size_x, int block_size_y, typename T, bool do_sum, typename Reducer, typename Arg>
+  __device__ void reduce2d(Arg &, const T &, const int idx = 0);
+
   template <typename T> struct ReduceArg {
+
+    template <int, int, typename U, bool, typename Reducer, typename Arg>
+    friend __device__ void reduce2d(Arg &arg, const U &in, const int idx);
+    qudaError_t launch_error; // only do complete if no launch error to avoid hang
+
+  private:
     const int n_reduce; // number of reductions of length n_item
 #ifdef HETEROGENEOUS_ATOMIC
     using system_atomic_t = typename atomic_type<T>::type;
@@ -68,13 +77,17 @@ namespace quda
     T *result_h;
 #endif
     count_t *count;
+    bool consumed; // check to ensure that we don't complete more than once unless we explicitly reset
 
+  public:
     ReduceArg(int n_reduce = 1) :
+      launch_error(QUDA_ERROR_UNINITIALIZED),
       n_reduce(n_reduce),
       partial(static_cast<decltype(partial)>(reducer::get_device_buffer())),
       result_d(static_cast<decltype(result_d)>(reducer::get_mapped_buffer())),
       result_h(static_cast<decltype(result_h)>(reducer::get_host_buffer())),
-      count {reducer::get_count()}
+      count {reducer::get_count()},
+      consumed(false)
     {
       // check reduction buffers are large enough if requested
       auto max_reduce_blocks = 2 * deviceProp.multiProcessorCount;
@@ -99,21 +112,38 @@ namespace quda
 #endif
     }
 
-    template <typename host_t, typename device_t = host_t> void complete(host_t *result, const qudaStream_t stream = 0)
+    template <typename host_t, typename device_t = host_t>
+    void complete(host_t *result, const qudaStream_t stream = 0, bool reset = false)
     {
+      if (launch_error == QUDA_ERROR) return; // kernel launch failed so return
+      if (launch_error == QUDA_ERROR_UNINITIALIZED) errorQuda("No reduction kernel appears to have been launched");
 #ifdef HETEROGENEOUS_ATOMIC
+      if (consumed) errorQuda("Cannot call complete more than once for each construction");
+
       for (int i = 0; i < n_reduce * n_item; i++) {
         result_h[i].wait(init_value<system_atomic_t>(), cuda::std::memory_order_relaxed);
       }
 #else
       auto event = reducer::get_event();
       qudaEventRecord(event, stream);
-      while (cudaSuccess != qudaEventQuery(event)) {}
+      while (!qudaEventQuery(event)) {}
 #endif
       // copy back result element by element and convert if necessary to host reduce type
       // unit size here may differ from system_atomic_t size, e.g., if doing double-double
       const int n_element = n_reduce * sizeof(T) / sizeof(device_t);
       for (int i = 0; i < n_element; i++) result[i] = reinterpret_cast<device_t *>(result_h)[i];
+
+#ifdef HETEROGENEOUS_ATOMIC
+      if (!reset) {
+        consumed = true;
+      } else {
+        // reset the atomic counter - this allows multiple calls to complete with ReduceArg construction
+        for (int i = 0; i < n_reduce * n_item; i++) {
+          result_h[i].store(init_value<system_atomic_t>(), cuda::std::memory_order_relaxed);
+        }
+        std::atomic_thread_fence(std::memory_order_release);
+      }
+#endif
     }
   };
 
@@ -131,7 +161,7 @@ namespace quda
      will be constant along constant blockIdx.y and blockIdx.z.
   */
   template <int block_size_x, int block_size_y, typename T, bool do_sum = true, typename Reducer = cub::Sum, typename Arg>
-  __device__ inline void reduce2d(Arg &arg, const T &in, const int idx = 0)
+  __device__ inline void reduce2d(Arg &arg, const T &in, const int idx)
   {
     using BlockReduce = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y>;
     __shared__ typename BlockReduce::TempStorage cub_tmp;
@@ -200,7 +230,7 @@ namespace quda
      will be constant along constant blockIdx.y and blockIdx.z.
   */
   template <int block_size_x, int block_size_y, typename T, bool do_sum = true, typename Reducer = cub::Sum, typename Arg>
-  __device__ inline void reduce2d(Arg &arg, const T &in, const int idx = 0)
+  __device__ inline void reduce2d(Arg &arg, const T &in, const int idx)
   {
     using BlockReduce = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y>;
     __shared__ typename BlockReduce::TempStorage cub_tmp;

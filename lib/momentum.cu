@@ -123,10 +123,9 @@ namespace quda {
   }
 
   template <typename Float, int nColor, QudaReconstructType recon>
-  class MomAction : TunableLocalParity {
+  class MomAction : TunableLocalParityReduction {
     MomActionArg<Float, nColor, recon> arg;
     const GaugeField &meta;
-    bool tuneGridDim() const { return true; }
 
   public:
     MomAction(const GaugeField &mom, double &action) :
@@ -150,6 +149,7 @@ namespace quda {
   };
 
   double computeMomAction(const GaugeField& mom) {
+    if (!mom.isNative()) errorQuda("Unsupported output ordering: %d\n", mom.Order());
     double action = 0.0;
 #ifdef GPU_GAUGE_TOOLS
     instantiate<MomAction, Reconstruct10>(mom, action);
@@ -159,9 +159,10 @@ namespace quda {
     return action;
   }
 
-  template<typename Float, int nColor, QudaReconstructType recon>
-  struct UpdateMomArg : ReduceArg<double2>, BaseArg<Float, nColor, recon>
+  template<typename Float_, int nColor, QudaReconstructType recon>
+  struct UpdateMomArg : ReduceArg<double2>, BaseArg<Float_, nColor, recon>
   {
+    using Float = Float_;
     typename gauge_mapper<Float, QUDA_RECONSTRUCT_10>::type mom;
     typename gauge_mapper<Float, recon>::type force;
     Float coeff;
@@ -192,7 +193,7 @@ namespace quda {
     }
   };
 
-  template <int blockSize, typename Float, typename Arg>
+  template <int blockSize, typename Arg>
   __global__ void UpdateMomKernel(Arg arg) {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     int parity = threadIdx.y;
@@ -207,8 +208,8 @@ namespace quda {
 
 #pragma unroll
       for (int d=0; d<4; d++) {
-	Matrix<complex<Float>,3> m = arg.mom(d, x_cb, parity);
-        Matrix<complex<Float>,3> f = arg.force(d, e_cb, parity);
+	Matrix<complex<typename Arg::Float>,3> m = arg.mom(d, x_cb, parity);
+        Matrix<complex<typename Arg::Float>,3> f = arg.force(d, e_cb, parity);
 
         // project to traceless anti-hermitian prior to taking norm
 	makeAntiHerm(f);
@@ -229,30 +230,32 @@ namespace quda {
     }
 
     // perform final inter-block reduction and write out result
-    reduce2d<blockSize,2,double2,false,max_reducer2>(arg, norm2, 0);
+    reduce2d<blockSize,2,double2,false,max_reducer2>(arg, norm2);
   } // UpdateMom
 
   template <typename Float, int nColor, QudaReconstructType recon>
-  class UpdateMom : TunableLocalParity {
+  class UpdateMom : TunableLocalParityReduction {
     UpdateMomArg<Float, nColor, recon> arg;
     const GaugeField &meta;
-
-    bool tuneGridDim() const { return true; }
 
   public:
     UpdateMom(GaugeField &force, GaugeField &mom, double coeff, const char *fname) :
       arg(mom, coeff, force),
       meta(force)
     {
+      double2 force_max;
       apply(0);
-      if (forceMonitor()) forceRecord(*((double2*)arg.result_h), arg.coeff, fname);
+      if (forceMonitor()) {
+        arg.complete(&force_max);
+        forceRecord(force_max, arg.coeff, fname);
+      }
     }
 
     void apply(const qudaStream_t &stream)
     {
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	LAUNCH_KERNEL_LOCAL_PARITY(UpdateMomKernel, (*this), tp, stream, arg, Float);
+        LAUNCH_KERNEL_LOCAL_PARITY(UpdateMomKernel, (*this), tp, stream, arg, decltype(arg));
       } else {
 	errorQuda("CPU not supported yet\n");
       }
@@ -287,7 +290,7 @@ namespace quda {
     F force;
     const G U;
     int X[4]; // grid dimensions
-    ApplyUArg(GaugeField  &force, const GaugeField &U) :
+    ApplyUArg(GaugeField &force, const GaugeField &U) :
       BaseArg<Float, nColor, recon>(U),
       force(force),
       U(U)
@@ -300,30 +303,31 @@ namespace quda {
   __global__ void ApplyUKernel(Arg arg)
   {
     int x = blockIdx.x*blockDim.x + threadIdx.x;
-    int parity = threadIdx.y;
+    if (x >= arg.threads) return;
+    int parity = threadIdx.y + blockIdx.y * blockDim.y;
     using mat = Matrix<complex<typename Arg::Float>,Arg::nColor>;
 
-    while (x<arg.threads) {
-      for (int d=0; d<4; d++) {
-	mat f = arg.force(d, x, parity);
-	mat u = arg.U(d, x, parity);
+    for (int d=0; d<4; d++) {
+      mat f = arg.force(d, x, parity);
+      mat u = arg.U(d, x, parity);
 
-	f = u * f;
+      f = u * f;
 
-	arg.force(d, x, parity) = f;
-      }
-
-      x += gridDim.x*blockDim.x;
+      arg.force(d, x, parity) = f;
     }
   } // ApplyU
 
   template <typename Float, int nColor, QudaReconstructType recon>
-  class ApplyU : TunableLocalParity {
+  class ApplyU : TunableVectorY {
     ApplyUArg<Float, nColor, recon> arg;
     const GaugeField &meta;
 
+    bool tuneGridDim() const { return false; }
+    unsigned int minThreads() const { return arg.threads; }
+
   public:
     ApplyU(const GaugeField &U, GaugeField &force) :
+      TunableVectorY(2),
       arg(force, U),
       meta(U)
     {
@@ -333,7 +337,7 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      ApplyUKernel<<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+      qudaLaunchKernel(ApplyUKernel<decltype(arg)>, tp, stream, arg);
     }
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }

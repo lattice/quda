@@ -250,10 +250,22 @@ if(QUDA_FORCE_HISQ)
   install(TARGETS hisq_unitarize_force_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
-# use FindMPI variables for QUDA_CTEST_LAUNCH set MPIEXEC_MAX_NUMPROCS to the
-# number of ranks you want to launch
-set(QUDA_CTEST_LAUNCH ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG}
-                      ${MPIEXEC_MAX_NUMPROCS} ${MPIEXEC_PREFLAGS})
+if(QUDA_MPI OR QUDA_QMP)
+  if(DEFINED ENV{QUDA_TEST_NUMPROCS})
+    # user is setting number of processes to use through the QUDA_TEST_NUMPROCS env
+    set(QUDA_CTEST_LAUNCH ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG}
+                          $ENV{QUDA_TEST_NUMPROCS} ${MPIEXEC_PREFLAGS})
+
+  else()
+    # use FindMPI variables for QUDA_CTEST_LAUNCH set MPIEXEC_MAX_NUMPROCS to the
+    # number of ranks you want to launch
+    set(QUDA_CTEST_LAUNCH ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG}
+                          ${MPIEXEC_MAX_NUMPROCS} ${MPIEXEC_PREFLAGS})
+  endif()
+else()
+  # if single-GPU compilation then only use a single process
+  set(QUDA_CTEST_LAUNCH ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 1 ${MPIEXEC_PREFLAGS})
+endif()
 
 # BLAS test
 
@@ -591,16 +603,39 @@ foreach(pol IN LISTS DSLASH_POLICIES)
 
   if(QUDA_COVDEV)
     add_test(NAME covdev_-policy${pol2}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:covdev_test> ${MPIEXEEC_POSTFLAGS}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:covdev_test> ${MPIEXEC_POSTFLAGS}
                      --dim 6 8 10 12
                      --gtest_output=xml:covdev_test_pol${pol2}.xml)
   endif()
 
 endforeach(pol)
 
-if(QUDA_FORCE_GAUGE)
-  add_test(NAME gauge_force
-           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_force_test> ${MPIEXEEC_POSTFLAGS}
-                   --dim 2 4 6 8
-                   --gtest_output=xml:gauge_force_test.xml)
+# enable the precisions that are compiled
+math(EXPR double_prec "${QUDA_PRECISION} & 8")
+math(EXPR single_prec "${QUDA_PRECISION} & 4")
+
+if(double_prec AND single_prec)
+  set(TEST_PRECS single double)
+elseif(double_prec)
+  set(TEST_PRECS double)
+elseif(single_prec)
+  set(TEST_PRECS single)
 endif()
+
+foreach(prec IN LISTS TEST_PRECS)
+
+  if(QUDA_FORCE_GAUGE)
+    add_test(NAME gauge_force_${prec}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_force_test> ${MPIEXEC_POSTFLAGS}
+                     --dim 2 4 6 8 --prec ${prec}
+                     --gtest_output=xml:gauge_force_test_${prec}.xml)
+  endif()
+
+  if(QUDA_GAUGE_ALG)
+    add_test(NAME gauge_alg_${prec}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_alg_test> ${MPIEXEC_POSTFLAGS}
+                     --dim 2 4 6 8 --prec ${prec}
+                     --gtest_output=xml:gauge_arg_test_${prec}.xml)
+  endif()
+
+endforeach(prec)

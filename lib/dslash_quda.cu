@@ -203,18 +203,18 @@ namespace quda {
 
     void apply(const qudaStream_t &stream) {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-	if(arg.proj == 0) gammaCPU<Float,nColor>(arg);
-	else chiralProjCPU<Float,nColor>(arg);
+        if(arg.proj == 0) gammaCPU<Float, nColor, Arg>(arg);
+        else chiralProjCPU<Float, nColor>(arg);
       } else {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());	
-	if(arg.proj == 0) {
-	  gammaGPU<Float,nColor> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
-	} else {
-	  chiralProjGPU<Float,nColor> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
-	}
+        if(arg.proj == 0) {
+          qudaLaunchKernel(gammaGPU<Float, nColor, Arg>, tp, stream, arg);
+        } else {
+          qudaLaunchKernel(chiralProjGPU<Float, nColor, Arg>, tp, stream, arg);
+        }
       }
     }
-    
+
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
 
     void preTune() { arg.out.save(); }
@@ -368,12 +368,12 @@ namespace quda {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	if (arg.doublet)
 	  switch (arg.d) {
-	  case 4: twistGammaGPU<true,Float,nColor,4> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
+	  case 4: qudaLaunchKernel(twistGammaGPU<true,Float,nColor,4,Arg>, tp, stream, arg); break;
 	  default: errorQuda("%d not instantiated", arg.d);
 	  }
 	else
 	  switch (arg.d) {
-	  case 4: twistGammaGPU<false,Float,nColor,4> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
+	  case 4: qudaLaunchKernel(twistGammaGPU<false,Float,nColor,4,Arg>, tp, stream, arg); break;
 	  default: errorQuda("%d not instantiated", arg.d);
 	  }
       }
@@ -466,7 +466,7 @@ namespace quda {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
 	cloverCPU<Float,nSpin,nColor>(arg);
       } else {
-	cloverGPU<Float,nSpin,nColor> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+	qudaLaunchKernel(cloverGPU<Float,nSpin,nColor,Arg>, tp, stream, arg);
       }
     }
 
@@ -580,8 +580,8 @@ namespace quda {
 	if (arg.inverse) twistCloverCPU<true,Float,nSpin,nColor>(arg);
 	else twistCloverCPU<false,Float,nSpin,nColor>(arg);
       } else {
-	if (arg.inverse) twistCloverGPU<true,Float,nSpin,nColor> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
-	else twistCloverGPU<false,Float,nSpin,nColor> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+	if (arg.inverse) qudaLaunchKernel(twistCloverGPU<true,Float,nSpin,nColor,Arg>, tp, stream, arg);
+	else qudaLaunchKernel(twistCloverGPU<false,Float,nSpin,nColor,Arg>, tp, stream, arg);
       }
     }
 
