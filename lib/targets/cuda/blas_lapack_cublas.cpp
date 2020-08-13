@@ -1,4 +1,3 @@
-#include <complex.h>
 #include <blas_lapack.h>
 #ifdef NATIVE_LAPACK_LIB
 #include <cublas_v2.h>
@@ -267,13 +266,13 @@ namespace quda
 
           typedef cuDoubleComplex Z ;
 
-          const Z alpha = make_double2((double)creal(cublas_param.alpha),
-                                       (double)cimag(cublas_param.alpha));
+	  const Z alpha = make_double2((double)(static_cast<std::complex<double>>(cublas_param.alpha).real()),
+				       (double)(static_cast<std::complex<double>>(cublas_param.alpha).imag()));
 
-          const Z beta  = make_double2((double)creal(cublas_param.beta),
-                                       (double)cimag(cublas_param.beta));
-
-          cublasStatus_t error;
+	  const Z beta = make_double2((double)(static_cast<std::complex<double>>(cublas_param.beta).real()),
+				      (double)(static_cast<std::complex<double>>(cublas_param.beta).imag()));
+	  
+	  cublasStatus_t error;
           if(batch > 1) {
 
             error = cublasZgemmStridedBatched(handle, trans_a, trans_b, cublas_param.m,
@@ -295,14 +294,14 @@ namespace quda
 
         } else if (cublas_param.data_type == QUDA_CUBLAS_DATATYPE_C) {
 
-          typedef cuComplex C;
+          typedef cuFloatComplex C;
 
-          const C alpha = make_float2((float)creal(cublas_param.alpha),
-                                      (float)cimag(cublas_param.alpha));
+	  const C alpha = make_float2((float)(static_cast<std::complex<double>>(cublas_param.alpha).real()),
+				      (float)(static_cast<std::complex<double>>(cublas_param.alpha).imag()));
 
-          const C beta  = make_float2((float)creal(cublas_param.beta),
-                                      (float)cimag(cublas_param.beta));
-
+	  const C beta = make_float2((float)(static_cast<std::complex<double>>(cublas_param.beta).real()),
+				     (float)(static_cast<std::complex<double>>(cublas_param.beta).imag()));
+	  
           cublasStatus_t error;
           if(batch > 1) {
 
@@ -329,9 +328,9 @@ namespace quda
 
           typedef double D;
 
-          const D alpha = (D)creal(cublas_param.alpha);
-          const D beta  = (D)creal(cublas_param.beta);
-
+	  const D alpha = (D)(static_cast<std::complex<double>>(cublas_param.alpha).real());
+	  const D beta = (D)(static_cast<std::complex<double>>(cublas_param.beta).real());
+	  
           cublasStatus_t error;
           if(batch > 1) {
 
@@ -357,9 +356,9 @@ namespace quda
 
           typedef float S;
 
-          const S alpha = (S)creal(cublas_param.alpha);
-          const S beta  = (S)creal(cublas_param.beta);
-
+	  const S alpha = (S)(static_cast<std::complex<double>>(cublas_param.alpha).real());
+	  const S beta = (S)(static_cast<std::complex<double>>(cublas_param.beta).real());
+	  
           cublasStatus_t error;
           if(batch > 1) {
 
