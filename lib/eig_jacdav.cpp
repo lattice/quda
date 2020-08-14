@@ -39,9 +39,31 @@ namespace quda
     profile_corr_eq_invs = new TimeProfile("profile_corr_eq_invs");
     profile_mat_corr_eq_invs = new TimeProfile("profile_mat_corr_eq_invs");
 
+    // Extracting matPre
+    QudaInvertParam* inv_param = eig_param->invert_param;
+    bool pc_solve = (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE) || (inv_param->solve_type == QUDA_NORMOP_PC_SOLVE)
+      || (inv_param->solve_type == QUDA_NORMERR_PC_SOLVE);
+    d = nullptr;
+    dSloppy = nullptr;
+    dPre = nullptr;
+    // create the dirac operator
+    createDirac(d, dSloppy, dPre, *(eig_param->invert_param), pc_solve);
+    Dirac &diracPre = *dPre;
+    if (!eig_param->use_norm_op && !eig_param->use_dagger) {
+      matPre = new DiracM(diracPre);
+    } else if (!eig_param->use_norm_op && eig_param->use_dagger) {
+      matPre = new DiracMdag(diracPre);
+    } else if (eig_param->use_norm_op && !eig_param->use_dagger) {
+      matPre = new DiracMdagM(diracPre);
+    } else if (eig_param->use_norm_op && eig_param->use_dagger) {
+      matPre = new DiracMMdag(diracPre);
+    } else {
+      errorQuda("Invalid use_norm_op and dagger combination");
+    }
+
     outer_prec_lab = mat.Expose()->OpPrecision();
-    //inner_prec_lab = matPrecon.Expose()->OpPrecision();
-    inner_prec_lab = mat.Expose()->OpPrecision();
+    inner_prec_lab = (matPre->Expose())->OpPrecision();
+    //inner_prec_lab = mat.Expose()->OpPrecision();
 
     QudaInvertParam refineparam = *eig_param->invert_param;
     refineparam.cuda_prec_sloppy = eig_param->invert_param->cuda_prec_refinement_sloppy;
@@ -60,13 +82,14 @@ namespace quda
     solverParamPrec->maxiter = 5;
     solverParamPrec->tol = 1e-1;
 
-    //mmPP = new DiracPrecProjCorr(matPrecon.Expose());
-    mmPP = new DiracPrecProjCorr(mat.Expose());
+    mmPP = new DiracPrecProjCorr(matPre->Expose());
+    //mmPP = new DiracPrecProjCorr(mat.Expose());
 
     // Solvers used in the correction equation
     gcrPrec = new GCR(*mmPP, *mmPP, *mmPP, *solverParamPrec, *profile_corr_eq_invs);
-    gcrInner = new GCR(const_cast<DiracMatrix &>(mat), const_cast<DiracMatrix &>(mat), const_cast<DiracMatrix &>(mat),
-                       *solverParam, *profile_mat_corr_eq_invs);
+    //gcrInner = new GCR(const_cast<DiracMatrix &>(mat), const_cast<DiracMatrix &>(mat), const_cast<DiracMatrix &>(mat),
+    //                   *solverParam, *profile_mat_corr_eq_invs);
+    gcrInner = new GCR(*matPre, *matPre, *matPre, *solverParam, *profile_mat_corr_eq_invs);
 
     if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
@@ -262,15 +285,15 @@ namespace quda
         *(u_lowprec[0]) = *(u[0]);
 
         // solving the correction equation
-        //invertProjMat(matPrecon, *t_lowprec[0], *r_lowprec[0], QUDA_SILENT, 1, u_lowprec);
-        invertProjMat(mat, *t_lowprec[0], *r_lowprec[0], QUDA_SILENT, 1, u_lowprec);
+        invertProjMat(*matPre, *t_lowprec[0], *r_lowprec[0], QUDA_SILENT, 1, u_lowprec);
+        //invertProjMat(mat, *t_lowprec[0], *r_lowprec[0], QUDA_SILENT, 1, u_lowprec);
 
         // switch back to higher precision
         *(t[0]) = *(t_lowprec[0]);
       } else {
         // solving the correction equation
-        //invertProjMat(matPrecon, *t[0], *r[0], QUDA_SILENT, 1, u);
-        invertProjMat(mat, *t[0], *r[0], QUDA_SILENT, 1, u);
+        invertProjMat(*matPre, *t[0], *r[0], QUDA_SILENT, 1, u);
+        //invertProjMat(mat, *t[0], *r[0], QUDA_SILENT, 1, u);
       }
 
       iter++;
@@ -360,6 +383,12 @@ namespace quda
     delete solverParamPrec;
 
     delete mmPP;
+
+    delete d;
+    delete dSloppy;
+    delete dPre;
+
+    delete matPre;
   }
 
   // JD Member functions

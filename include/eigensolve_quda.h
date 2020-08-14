@@ -531,6 +531,12 @@ protected:
 
     DiracPrecProjCorr *mmPP;
 
+    Dirac *d;
+    Dirac *dSloppy;
+    Dirac *dPre;
+
+    DiracMatrix *matPre;
+
     int k;
     int m;
     int loopr;
