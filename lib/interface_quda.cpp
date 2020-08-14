@@ -931,8 +931,10 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     if (do_exp) {
       if (inv_param->clover_degree_in == 1) {
         if (inv_param->clover_degree >= 0) {
+          profileClover.TPSTART(QUDA_PROFILE_COMPUTE);
           cloverExponential(*cloverPrecise, inv_param->clover_degree, inv_param->mass, false);
           cloverPrecise->setDegreeExp(inv_param->clover_degree);
+          profileClover.TPSTOP(QUDA_PROFILE_COMPUTE);
         } else {
           errorQuda("Invalid target exponential expansion degree, which is %d",
             inv_param->clover_degree);
