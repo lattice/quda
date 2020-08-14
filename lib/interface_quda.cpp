@@ -5839,15 +5839,12 @@ void contractQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavor_2, vo
     for (size_t c1 = 0; c1 < nColor; c1++) {
       for (size_t b1 = 0; b1 < nSpin; b1++) {
 
-        // copy single prop from host to device
         *d_single_prop_flavor_1 = *CSF_ptr_container_flavor_1[s1 * nColor + c1];
         *d_single_prop_flavor_2 = *CSF_ptr_container_flavor_2[b1 * nColor + c1];
 
-        memset(h_result_tmp_global, 0, corr_size_in_bytes);
-
         contractQuda(*d_single_prop_flavor_1, *d_single_prop_flavor_2, s1, b1, h_result_tmp_global, cType);
 
-        comm_gather_array((double*)h_result_tmp_global, n_numbers_per_slice * local_corr_length);
+        comm_allreduce_array((double*)h_result_tmp_global, n_numbers_per_slice * global_corr_length);
 
         for (int G_idx = 0; G_idx < 16; G_idx++) {
           for (size_t t = 0; t < global_corr_length; t++) {
@@ -5865,8 +5862,8 @@ void contractQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavor_2, vo
   delete d_single_prop_flavor_1;
   delete d_single_prop_flavor_2;
   for (int i = 0; i < spinor_dim; i++) {
-    free(CSF_ptr_container_flavor_1[i]);
-    free(CSF_ptr_container_flavor_2[i]);
+    delete CSF_ptr_container_flavor_1[i];
+    delete CSF_ptr_container_flavor_2[i];
   }
   free(h_result_tmp_global);
 }

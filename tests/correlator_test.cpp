@@ -73,8 +73,8 @@ int main(int argc, char **argv)
 
   //this will be a C array of pointers to the memory (CSF->V()) of the spinor_dim colorspinorfields. functions declared in quda.h
   // can only accept C code for backwards compatibility reasons
-  void **CSF_V_ptr_arr_source = new void*[spinor_dim];
-  void **CSF_V_ptr_arr_prop = new void*[spinor_dim];
+  void **CSF_V_ptr_arr_source = malloc(spinor_dim * sizeof(void *));
+  void **CSF_V_ptr_arr_prop = malloc(spinor_dim * sizeof(void *));
 
   // Actually create ColorSpinorField objects and tell them to use the memory from above
   for (int i = 0; i < spinor_dim; i++) {
@@ -128,8 +128,8 @@ int main(int argc, char **argv)
 
   free(source_array);
   free(prop_array);
-  delete[] CSF_V_ptr_arr_source;
-  delete[] CSF_V_ptr_arr_prop;
+  free(CSF_V_ptr_arr_source);
+  free(CSF_V_ptr_arr_prop);
   free(correlation_function_sum);
 
   printfQuda("----------------------------------------------------------------------------------\n");
