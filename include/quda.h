@@ -1349,18 +1349,33 @@ extern "C" {
 
 
 /**
-   * Public function to perform color contractions of the host spinorfields contained inside first two arguments.
+   * Public function to perform color contractions of the host spinorfields contained 
+   * inside first two arguments. Used for cases where one wishes to contract data in all
+   * but the a spatial dim
    * @param[in] h_prop_array_flavor_1 pointer to pointers of ColorSpinorField host data
    * @param[in] h_prop_array_flavor_2 pointer to pointers of ColorSpinorField host data
-   * @param[out] h_result pointer to the 16*corr_dim complex numbers of the result correlators
+   * @param[out] h_result adress of pointer to the 16*corr_dim complex numbers of the 
+   *            result correlators
    * @param[in] cType Which type of contraction (open, degrand-rossi, etc)
    * @param[in] param meta data for construction of ColorSpinorFields.
-   * @param[in] colorspinorparam pointer to a ColorSpinorParam meta data for construction of ColorSpinorFields
+   * @param[in] colorspinorparam pointer to a ColorSpinorParam meta data for 
+   *            construction of ColorSpinorFields
    * @param[in] X spacetime data for construction of ColorSpinorFields
    */
-void contractQuda(void** h_prop_array_flavor_1, void** h_prop_array_flavor_2, void *h_result, QudaContractType cType,
-                  QudaInvertParam *param, void *colorspinorparam, const int *X);
+void contractSpatialQuda(void** h_prop_array_flavor_1, void** h_prop_array_flavor_2, void **h_result, QudaContractType cType,
+			 QudaInvertParam *param, void *colorspinorparam, const int *X);
 
+  /**
+   * Public function to perform color contractions of the host spinors x and y.
+   * @param[in] x pointer to host data
+   * @param[in] y pointer to host data
+   * @param[out] result pointer to the 16 spin projections per lattice site
+   * @param[in] cType Which type of contraction (open, degrand-rossi, etc)
+   * @param[in] param meta data for construction of ColorSpinorFields.
+   * @param[in] X spacetime data for construction of ColorSpinorFields.
+   */
+  void contractQuda(const void *x, const void *y, void *result, const QudaContractType cType, QudaInvertParam *param,
+                    const int *X);
 
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.

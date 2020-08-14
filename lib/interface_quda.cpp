@@ -215,6 +215,9 @@ static TimeProfile profilePhase("staggeredPhaseQuda");
 //!< Profiler for contractions
 static TimeProfile profileContract("contractQuda");
 
+//!< Profiler for spatial contractions
+static TimeProfile profileContractSpatial("contractSpatialQuda");
+
 //!< Profiler for covariant derivative
 static TimeProfile profileCovDev("covDevQuda");
 
@@ -1369,6 +1372,7 @@ void endQuda(void)
     profileStaggeredForce.Print();
     profileHISQForce.Print();
     profileContract.Print();
+    profileContractSpatial.Print();
     profileCovDev.Print();
     profilePlaq.Print();
     profileGaugeObs.Print();
@@ -5784,54 +5788,49 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
   return 0;
 }
 
-//FIXME what about different precisions for this function? need to check
-void contractQuda(void** h_prop_array_flavor_1, void** h_prop_array_flavor_2, void *h_result, const QudaContractType cType,
-		  QudaInvertParam *param, void *colorspinorparam, const int *X){
-  
-  //create ColorSpinorFields from void** and parameter
-  auto cs_param = (ColorSpinorParam*)colorspinorparam;
+// FIXME what about different precisions for this function? need to check
+void contractSpatialQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavor_2, void **h_result,
+			 const QudaContractType cType, QudaInvertParam *param, void *colorspinorparam, const int *X)
+{
+  // create ColorSpinorFields from void** and parameter
+  auto cs_param = (ColorSpinorParam *)colorspinorparam;
   const size_t nSpin = cs_param->nSpin;
   const size_t nColor = cs_param->nColor;
   const int spinor_dim = nSpin * nColor;
-  std::vector<quda::ColorSpinorField*> CSF_ptr_container_flavor_1(spinor_dim);
-  std::vector<quda::ColorSpinorField*> CSF_ptr_container_flavor_2(spinor_dim);
+  std::vector<quda::ColorSpinorField *> CSF_ptr_container_flavor_1(spinor_dim);
+  std::vector<quda::ColorSpinorField *> CSF_ptr_container_flavor_2(spinor_dim);
 
   cs_param->create = QUDA_REFERENCE_FIELD_CREATE;
-  for (int i = 0; i < spinor_dim ; i++) {
+  for (int i = 0; i < spinor_dim; i++) {
     cs_param->v = h_prop_array_flavor_1[i];
     CSF_ptr_container_flavor_1[i] = quda::ColorSpinorField::Create(*cs_param);
     cs_param->v = h_prop_array_flavor_2[i];
     CSF_ptr_container_flavor_2[i] = quda::ColorSpinorField::Create(*cs_param);
   }
 
-  //temporal or spatial correlator?
-  size_t local_corr_length;
-  size_t corr_dim;
-  if (cType == QUDA_CONTRACT_TYPE_OPEN || cType == QUDA_CONTRACT_TYPE_DR){
-    local_corr_length = CSF_ptr_container_flavor_2[0]->Volume(); //FIXME use better way to get this
-    corr_dim = 3;
-  } else if (cType == QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL){
-    corr_dim = 2;
-  } else {
-    //default: temporal correlator, summed, i.e. QUDA_CONTRACT_TYPE_OPEN_SUM or QUDA_CONTRACT_TYPE_DR_SUM
-    corr_dim = 3;
+  // temporal or spatial correlator?
+  size_t corr_dim, local_corr_length;
+  cType == QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL ? corr_dim = 2 : corr_dim = 3;
+  switch (cType) {
+  case QUDA_CONTRACT_TYPE_OPEN:
+  case QUDA_CONTRACT_TYPE_DR:
+    local_corr_length = CSF_ptr_container_flavor_2[0]->Volume(); // FIXME use better way to get this
+    break;
+  default: local_corr_length = X[corr_dim];
   }
-  
-  //calculate some parameters
-  local_corr_length = CSF_ptr_container_flavor_2[0]->X(corr_dim); //FIXME use better way to get this
-  size_t local_corr_offset = local_corr_length * comm_coord(corr_dim);
+
+  // calculate some parameters
   size_t global_corr_length = local_corr_length * comm_dim(corr_dim);
 
   size_t n_numbers_per_slice = 2 * 16;
   size_t corr_size_in_bytes = n_numbers_per_slice * global_corr_length * cs_param->Precision();
 
-  memset(h_result, 0, corr_size_in_bytes);
-  //array that fits all timeslices and channels but is reset after each computation
-  auto *h_result_tmp_global = (double*)malloc(corr_size_in_bytes);
-  //this points to the local part of the global array
-  void* h_result_tmp_local = (void*)(h_result_tmp_global+local_corr_offset);
+  *h_result = malloc(corr_size_in_bytes);
+  memset(*h_result, 0, corr_size_in_bytes);
+  // array that fits all timeslices and channels but is reset after each computation
+  void *h_result_tmp_global = malloc(corr_size_in_bytes);
 
-  //create device spinor fields
+  // create device spinor fields
   ColorSpinorParam cudaParam(*cs_param);
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
   cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
@@ -5840,43 +5839,95 @@ void contractQuda(void** h_prop_array_flavor_1, void** h_prop_array_flavor_2, vo
   ColorSpinorField *d_single_prop_flavor_1 = ColorSpinorField::Create(cudaParam);
   ColorSpinorField *d_single_prop_flavor_2 = ColorSpinorField::Create(cudaParam);
 
-
-
   for (size_t s1 = 0; s1 < nSpin; s1++) {
-     for (size_t c1 = 0; c1 < nColor; c1++) {
-       for (size_t b1 = 0; b1 < nSpin; b1++) {
+    for (size_t c1 = 0; c1 < nColor; c1++) {
+      for (size_t b1 = 0; b1 < nSpin; b1++) {
 
-           // copy single prop from host to device
-           *d_single_prop_flavor_1 = *CSF_ptr_container_flavor_1[s1* nColor + c1];
-           *d_single_prop_flavor_2 = *CSF_ptr_container_flavor_2[b1* nColor + c1];
+        *d_single_prop_flavor_1 = *CSF_ptr_container_flavor_1[s1 * nColor + c1];
+        *d_single_prop_flavor_2 = *CSF_ptr_container_flavor_2[b1 * nColor + c1];
 
-           memset(h_result_tmp_global, 0, corr_size_in_bytes);
+        contractSpatialQuda(*d_single_prop_flavor_1, *d_single_prop_flavor_2, s1, b1, h_result_tmp_global, cType);
+	
+        comm_allreduce_array((double*)h_result_tmp_global, n_numbers_per_slice * global_corr_length);
 
-           contractQuda(*d_single_prop_flavor_1, *d_single_prop_flavor_2, s1, b1, h_result_tmp_local, cType);
-
-           if(comm_dim(corr_dim) > 1) comm_gather_array(h_result_tmp_global, n_numbers_per_slice * local_corr_length);
-
-           for(int G_idx =0; G_idx < 16; G_idx++) {
-             for(size_t t=0; t< global_corr_length; t++) {
-               ((double*)h_result)[n_numbers_per_slice*t + 2*G_idx  ] += h_result_tmp_global[n_numbers_per_slice*t + 2*G_idx  ];
-               ((double*)h_result)[n_numbers_per_slice*t + 2*G_idx+1] += h_result_tmp_global[n_numbers_per_slice*t + 2*G_idx+1];
-             }
-           }
+        for (int G_idx = 0; G_idx < 16; G_idx++) {
+          for (size_t t = 0; t < global_corr_length; t++) {
+            ((double *)*h_result)[n_numbers_per_slice * t + 2 * G_idx]
+              += ((double*)h_result_tmp_global)[n_numbers_per_slice * t + 2 * G_idx];
+            ((double *)*h_result)[n_numbers_per_slice * t + 2 * G_idx + 1]
+              += ((double*)h_result_tmp_global)[n_numbers_per_slice * t + 2 * G_idx + 1];
+          }
         }
-     }
+      }
+    }
   }
-  
+  //free memory
   delete d_single_prop_flavor_1;
   delete d_single_prop_flavor_2;
-  for (int i=0; i<spinor_dim; i++){
+  for (int i = 0; i < spinor_dim; i++) {
     delete CSF_ptr_container_flavor_1[i];
     delete CSF_ptr_container_flavor_2[i];
   }
-  delete h_result_tmp_global;
-
+  free(h_result_tmp_global);
 }
 
- void gaugeObservablesQuda(QudaGaugeObservableParam *param)
+void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const QudaContractType cType,
+                  QudaInvertParam *param, const int *X)
+{
+  // DMH: Easiest way to construct ColorSpinorField? Do we require the user
+  //     to declare and fill and invert_param, or can it just be hacked?.
+
+  profileContract.TPSTART(QUDA_PROFILE_TOTAL);
+  profileContract.TPSTART(QUDA_PROFILE_INIT);
+  // wrap CPU host side pointers
+  ColorSpinorParam cpuParam((void *)hp_x, *param, X, false, param->input_location);
+  ColorSpinorField *h_x = ColorSpinorField::Create(cpuParam);
+
+  cpuParam.v = (void *)hp_y;
+  ColorSpinorField *h_y = ColorSpinorField::Create(cpuParam);
+
+  // Create device parameter
+  ColorSpinorParam cudaParam(cpuParam);
+  cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
+  // Quda uses Degrand-Rossi gamma basis for contractions and will
+  // automatically reorder data if necessary.
+  cudaParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  cudaParam.setPrecision(cpuParam.Precision(), cpuParam.Precision(), true);
+
+  std::vector<ColorSpinorField *> x, y;
+  x.push_back(ColorSpinorField::Create(cudaParam));
+  y.push_back(ColorSpinorField::Create(cudaParam));
+
+  size_t data_bytes = x[0]->Volume() * x[0]->Nspin() * x[0]->Nspin() * 2 * x[0]->Precision();
+  void *d_result = pool_device_malloc(data_bytes);
+  profileContract.TPSTOP(QUDA_PROFILE_INIT);
+
+  profileContract.TPSTART(QUDA_PROFILE_H2D);
+  *x[0] = *h_x;
+  *y[0] = *h_y;
+  profileContract.TPSTOP(QUDA_PROFILE_H2D);
+
+  profileContract.TPSTART(QUDA_PROFILE_COMPUTE);
+  contractQuda(*x[0], *y[0], d_result, cType);
+  profileContract.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  profileContract.TPSTART(QUDA_PROFILE_D2H);
+  qudaMemcpy(h_result, d_result, data_bytes, cudaMemcpyDeviceToHost);
+  profileContract.TPSTOP(QUDA_PROFILE_D2H);
+
+  profileContract.TPSTART(QUDA_PROFILE_FREE);
+  pool_device_free(d_result);
+  delete x[0];
+  delete y[0];
+  delete h_y;
+  delete h_x;
+  profileContract.TPSTOP(QUDA_PROFILE_FREE);
+
+  profileContract.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
+void gaugeObservablesQuda(QudaGaugeObservableParam *param)
 {
   profileGaugeObs.TPSTART(QUDA_PROFILE_TOTAL);
   checkGaugeObservableParam(param);

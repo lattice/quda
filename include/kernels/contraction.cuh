@@ -188,8 +188,8 @@ namespace quda
       gm_z[15][3] = 1.;
     };
     //FIXME convert these to device functions?
-    //     inline int get_gm_i(const int G_idx, const int row_idx) const {return gm_i[G_idx][row_idx];};
-    //     inline complex<real> get_gm_z(const int G_idx, const int col_idx) const {return gm_z[G_idx][col_idx];};
+    //inline int get_gm_i(const int G_idx, const int row_idx) const {return gm_i[G_idx][row_idx];};
+    //inline complex<real> get_gm_z(const int G_idx, const int col_idx) const {return gm_z[G_idx][col_idx];};
   };
 
   using spinor_array = vector_type<double2, 16>;
@@ -217,7 +217,66 @@ namespace quda
     }
   };
 
-  template <typename Float_, int reduction_dim_ = 3> struct ContractionSumArg :
+  //- Welcome from contract_quda in quda/lib/contract.cu!
+  //- We will now create the `arg` object that will use the input spinors to extract meta data.
+  //- This structure is fairly complex, but none of the elements are beyond the comprehension 
+  //- of a student of lattice gauge theory with a rudimentary knowledge of GPU computing. 
+  //- As advertised, this stuct is templated on precision, and inherits from a reduction. The
+  //- The reduction itself is templated on `spinor_array` which is a custom data type for this
+  //- struct. It is at the top of the file, go take a look and return here.
+  template <typename Float_> struct ContractionSumArg :    
+    public ReduceArg<spinor_array>  
+  {
+    //- Welcome back! We first define the variables in the argument structure: 
+    //- Naturally, this is the number of threads in the block
+    int threads; // number of active threads required
+    //- This is the number of lattice sites on the MPI node
+    int X[4];    // grid dimensions
+
+    //- These vales are hardcoded to prevent template explosion. This particular kernel will 
+    //- only work for spin=4, color=3 fermion fields. The spin_project boolean is a neat 
+    //- feature of QUDA that will automatically convert any fermion into the desired 
+    //- gamma matrix order (defined in the ColorSpinorField object) as it is loaded into the 
+    //- kernel. QUDA uses some very esotric ordering behind the scenes! 
+    using Float = Float_;    
+    static constexpr int nColor = 3;
+    static constexpr int nSpin = 4;
+    static constexpr bool spin_project = true;
+    static constexpr bool spinor_direct_load = false; // false means texture load
+
+    //- This object is a QUDA data type that will handle the way in which fermions are passed 
+    //- to the kernel. As you can see, it needs to know the precision, color, and spin of the 
+    //- fermion, as well as any operations (such as spin_project) that need to be performed 
+    //- during the load. We give it a name F...
+    // Create a typename F for the ColorSpinorField (F for fermion)
+    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
+
+    //- ...and declare two such objects, one for eack color spinor
+    F x;
+    F y;
+
+    //- We now come to the constructor of this argument structure. This is what was called 
+    //- by the ContractionArgSum<real> arg(x, y); line back in quda/lib/contract.cu. 
+    //- `threads` is initialised with the checkerboarded sub-volume of a fermion field, 
+    //- the two fermion fields are, naturally, x, and y. The actual body of the argument 
+    //- structure is to then populate the X array with the MPI lattice dimensions. 
+    //- This argument structure provides the kernel with the pointers it needs to 
+    //- locate data, and the parameters it needs to perform it's computation.
+    ContractionSumArg(const ColorSpinorField &x, const ColorSpinorField &y) :
+      ReduceArg<spinor_array>(),
+      threads(x.VolumeCB() / x.X(3)),
+      x(x),
+      y(y)
+    {
+      for (int dir = 0; dir < 4; dir++) 
+	X[dir] = x.X()[dir];
+    }
+    //- And that the argument struct done. Please go back to `quda/lib/contract.cu` so see
+    //- the computation.
+  };
+
+  
+  template <typename Float_, int reduction_dim_ = 3> struct ContractionSpatialSumArg :
     public ReduceArg<spinor_array>  
   {
     static constexpr int reduction_dim = reduction_dim_; // This the direction we are performing reduction on. default to 3.
@@ -242,7 +301,7 @@ namespace quda
 
     DRGammaMatrix<Float_> Gamma;
     int t_offset;
-    ContractionSumArg(const ColorSpinorField &x, const ColorSpinorField &y,
+    ContractionSpatialSumArg(const ColorSpinorField &x, const ColorSpinorField &y,
         const int s1, const int b1) :
       ReduceArg<spinor_array>(comm_dim(reduction_dim) * x.X(reduction_dim)), // n_reduce = global_dim_t
       threads(x.VolumeCB() / x.X(reduction_dim)),
@@ -506,6 +565,111 @@ namespace quda
     arg.s.save(A, x_cb, parity);
   }
 
+  //- Hello traveller! I am very pleased you have made it this far. None but the bravest dare venture
+  //- this deep into QUDA! What You are about to see is what an individual thread in QUDA
+  //- executes. This is the very core of the computation we set out to do way back in 
+  //- quda/lib/interface_quda.cpp.
+  //- First, notice the template arguments. These are set by the code in the 
+  //- `LAUNCH_KERNEL_LOCAL_PARITY` macro. We have a `blockSize` argument because we will be doing
+  //- a reduction on the data. The other argument `Arg` is all the boilerplace preparation
+  //- we did leading up to here packaging the data and the parameters. Let's see it in action!
+  template <int blockSize, typename Arg> __global__ void computeDegrandRossiContractionSum(Arg arg)
+  {
+    //- The first this we do is establish 'where` we are in the lattice. Recall that we were going
+    //- use the z grid dimension (z block index) to refer to the time slice we are on? We use it 
+    //- here
+    int t = blockIdx.z; // map t to z block index
+    //- Now we deduce which spatial point we are on (independent of time)
+    int xyz = threadIdx.x + blockIdx.x * blockDim.x;
+    //- And lastly which parity.
+    int parity = threadIdx.y;
+    
+    //- The extremly astute adventurer just asked themself a question: how are all the threadIdx
+    //- and blockIdx and blockDim values set so they match up with the spacetime coordinates!?
+    //- The answer is that we specifically chose to use the TunableLocalParity class, which 
+    //- uses these particular variables for those specific lattice coordinates.
+
+    //- Next we extract some of the variables from the argument structure.
+    using real = typename Arg::Float;
+    constexpr int nSpin = Arg::nSpin;
+    constexpr int nColor = Arg::nColor;
+    
+    //- This is a data type known throught QUDA. It's a colorSpinor, templetised on data type,
+    //- colours, and spins. Let's just call it `Vector` 
+    typedef ColorSpinor<real, nColor, nSpin> Vector;
+
+    //- Remember that custom data type we made, the one at the top of the page? We declare one here
+    //- called `res` for result.
+    spinor_array res;
+
+    //- This is slightly cumbersome, not massively. We use a 2D array and a 1D array of complex
+    //- just to be convenient for each use case. spin_elem will hold color contractions, and 
+    //- A will hold the gamma matrix contractions.
+    complex<real> spin_elem[nSpin][nSpin];
+    complex<real> A[nSpin * nSpin];
+       
+    //- The while loop is restricted to the same time slice. Multiple warps may fit into a timeslice
+    //- so we just keep looping until the whole slice is filled up. Any left over threads will 
+    //- not excuute because they are out of bounds.
+    while (xyz < arg.threads) {
+            
+      //- arg.threads is the checkerboard volume of a timeslice. We set it in the argument struct.
+      //- We use it to define a global checkerboard index.
+      int idx_cb = t * arg.threads + xyz;
+
+      //- Now, a litle QUDA magic. We declare two colorSpinor LOCAL field objects x,y, 
+      //- and we populate them using a sepecial accessor defined in the ARG STRUCTURE objects x,y.
+      //- It was that long `F` typedef we made. The `F` type has these built in accessors that 
+      //- allow us to use the local coordinates defined by the block and thread index to access
+      //- the relevant data in the fermion fields.
+      Vector x = arg.x(idx_cb, parity);
+      Vector y = arg.y(idx_cb, parity);
+      
+      //- Number crunching time. We compute all 16 possible colour contractions, and put the result
+      //- in spen_elem.
+      // Color contract: <\phi(x)_{\mu} | \phi(y)_{\nu}>
+      // The Bra is conjugated      
+      for (int mu = 0; mu < nSpin; mu++) {
+	for (int nu = 0; nu < nSpin; nu++) { 
+	  //- The function `innerProduct` is defined in `quda/include/color_spinor.h` along with
+	  //- a multitude of functions that compute operations on colorSpinor objects. The code
+	  //- there is quite straightforward as it all it does is compute these simple 
+	  //- arithmetic operations. You are encouraged to explore that file and make your
+	  //- own custom functions. But remember to document your fucnction with doxygen!!!
+	  spin_elem[mu][nu] = innerProduct(x, y, mu, nu); 
+	}	
+      }
+     
+      //- Next, we use that spin_elem array to compute all gamma matrix insertions. Let's take a 
+      //- quick look, it is defined in this file.
+      computeDRGammaContraction(spin_elem, A);
+      
+      //- Now that the gamma matrix contractions are done, we load result into res array.
+      //- This is the array on which we perform the final reduction. Because it's a double2 
+      //- data type we must use the .x and .y methods for real and imaginary.
+      for (int mu = 0; mu < nSpin; mu++) {
+	for (int nu = 0; nu < nSpin; nu++) { 
+	  res[mu*nSpin + nu].x += A[mu*nSpin + nu].real();
+	  res[mu*nSpin + nu].y += A[mu*nSpin + nu].imag();	  
+	}	
+      }
+
+      //- Increment spatial index
+      xyz += blockDim.x * gridDim.x;
+    }
+    
+    //- The final step... timeslice reduction. This is another part of QUDA which we simply trust
+    //- will work for us. It takes blockSize as one template arg, and 2 for parity. It will reduce 
+    //- the data in res, accoring to the timeslice t, and place the result in an array which is
+    //- defined in the arg structure. Remember, the argument structure iherits from ReduceArg, 
+    //- which is why the reduced array already exists.
+    reduce2d<blockSize, 2>(arg, res, t);
+
+    //- We have computed the contraction! We finally done. Let the Eagles of Manwe take us back to 
+    //- quda/lib/contract.cu, and the line:
+    //- LAUNCH_KERNEL_LOCAL_PARITY(computeDegrandRossiContractionSum, (*this), tp, stream, arg, Arg);
+  }
+  
   template <int t_d, class T> __device__ int x_cb_from_t_xyz_d(int t, int xyz_cb, T X[4], int parity)
   {
 
@@ -531,117 +695,7 @@ namespace quda
     return (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) / 2;
   }
 
-  //- Hello traveller! I am very pleased you have made it this far. None but the bravest dare venture
-  //- this deep into QUDA! What You are about to see is what an individual thread in QUDA
-  //- executes. This is the very core of the computation we set out to do way back in
-  //- quda/lib/interface_quda.cpp.
-  //- First, notice the template arguments. These are set by the code in the
-  //- `LAUNCH_KERNEL_LOCAL_PARITY` macro. We have a `blockSize` argument because we will be doing
-  //- a reduction on the data. The other argument `Arg` is all the boilerplace preparation
-  //- we did leading up to here packaging the data and the parameters. Let's see it in action!
-  template <int blockSize, typename Arg> __global__ void computeDegrandRossiContractionSum(Arg arg)
-  {
-    //- The first this we do is establish 'where` we are in the lattice. Recall that we were going
-    //- use the z grid dimension (z block index) to refer to the time slice we are on? We use it
-    //- here
-    int t = blockIdx.z; // map t to z block index
-    //- Now we deduce which spatial point we are on (independent of time)
-    int xyz = threadIdx.x + blockIdx.x * blockDim.x;
-    //- And lastly which parity.
-    int parity = threadIdx.y;
-
-    //- The extremly astute adventurer just asked themself a question: how are all the threadIdx
-    //- and blockIdx and blockDim values set so they match up with the spacetime coordinates!?
-    //- The answer is that we specifically chose to use the TunableLocalParity class, which
-    //- uses these particular variables for those specific lattice coordinates.
-
-    //- Next we extract some of the variables from the argument structure.
-    using real = typename Arg::Float;
-    constexpr int nSpin = Arg::nSpin;
-    constexpr int nColor = Arg::nColor;
-
-    //- This is a data type known throught QUDA. It's a colorSpinor, templetised on data type,
-    //- colours, and spins. Let's just call it `Vector`
-    typedef ColorSpinor<real, nColor, nSpin> Vector;
-
-    //- Remember that custom data type we made, the one at the top of the page? We declare one here
-    //- called `res` for result.
-    spinor_array res;
-
-    //- This is slightly cumbersome, not massively. We use a 2D array and a 1D array of complex
-    //- just to be convenient for each use case. spin_elem will hold color contractions, and
-    //- A will hold the gamma matrix contractions.
-    complex<real> spin_elem[nSpin][nSpin];
-    complex<real> A[nSpin * nSpin];
-
-    //- The while loop is restricted to the same time slice. Multiple warps may fit into a timeslice
-    //- so we just keep looping until the whole slice is filled up. Any left over threads will
-    //- not excuute because they are out of bounds.
-    while (xyz < arg.threads) {
-
-      //- arg.threads is the checkerboard volume of a timeslice. We set it in the argument struct.
-      //- We use it to define a global checkerboard index.
-
-      // Jiqun Tu: the following trick does not work for spatial slice `t`. Needs fix.
-#if 0
-      // int idx_cb = t * arg.threads + xyz;
-#else
-      int idx_cb = x_cb_from_t_xyz_d<Arg::reduction_dim>(t, xyz, arg.X, parity);
-#endif
-      //- Now, a litle QUDA magic. We declare two colorSpinor LOCAL field objects x,y,
-      //- and we populate them using a sepecial accessor defined in the ARG STRUCTURE objects x,y.
-      //- It was that long `F` typedef we made. The `F` type has these built in accessors that
-      //- allow us to use the local coordinates defined by the block and thread index to access
-      //- the relevant data in the fermion fields.
-      Vector x = arg.x(idx_cb, parity);
-      Vector y = arg.y(idx_cb, parity);
-
-      //- Number crunching time. We compute all 16 possible colour contractions, and put the result
-      //- in spen_elem.
-      // Color contract: <\phi(x)_{\mu} | \phi(y)_{\nu}>
-      // The Bra is conjugated
-      for (int mu = 0; mu < nSpin; mu++) {
-        for (int nu = 0; nu < nSpin; nu++) {
-          //- The function `innerProduct` is defined in `quda/include/color_spinor.h` along with
-          //- a multitude of functions that compute operations on colorSpinor objects. The code
-          //- there is quite straightforward as it all it does is compute these simple
-          //- arithmetic operations. You are encouraged to explore that file and make your
-          //- own custom functions. But remember to document your fucnction with doxygen!!!
-          spin_elem[mu][nu] = innerProduct(x, y, mu, nu);
-        }
-      }
-
-      //- Next, we use that spin_elem array to compute all gamma matrix insertions. Let's take a
-      //- quick look, it is defined in this file.
-      computeDRGammaContraction(spin_elem, A);
-
-      //- Now that the gamma matrix contractions are done, we load result into res array.
-      //- This is the array on which we perform the final reduction. Because it's a double2
-      //- data type we must use the .x and .y methods for real and imaginary.
-      for (int mu = 0; mu < nSpin; mu++) {
-        for (int nu = 0; nu < nSpin; nu++) {
-          res[mu * nSpin + nu].x += A[mu * nSpin + nu].real();
-          res[mu * nSpin + nu].y += A[mu * nSpin + nu].imag();
-        }
-      }
-
-      //- Increment spatial index
-      xyz += blockDim.x * gridDim.x;
-    }
-
-    //- The final step... timeslice reduction. This is another part of QUDA which we simply trust
-    //- will work for us. It takes blockSize as one template arg, and 2 for parity. It will reduce
-    //- the data in res, accoring to the timeslice t, and place the result in an array which is
-    //- defined in the arg structure. Remember, the argument structure iherits from ReduceArg,
-    //- which is why the reduced array already exists.
-    reduce2d<blockSize, 2>(arg, res, t + arg.t_offset);
-
-    //- We have computed the contraction! We finally done. Let the Eagles of Manwe take us back to
-    //- quda/lib/contract.cu, and the line:
-    //- LAUNCH_KERNEL_LOCAL_PARITY(computeDegrandRossiContractionSumSingle, (*this), tp, stream, arg, Arg);
-  }
-
-  template <int blockSize, typename Arg> __global__ void computeDegrandRossiContractionSumSingle(Arg arg)
+  template <int blockSize, typename Arg> __global__ void computeDegrandRossiContractionSpatialSum(Arg arg)
   {
     int t = blockIdx.z; // map t to z block index
     int xyz = threadIdx.x + blockIdx.x * blockDim.x;
@@ -654,27 +708,28 @@ namespace quda
     constexpr int nSpin = Arg::nSpin;
     constexpr int nColor = Arg::nColor;
 
-    typedef ColorSpinor<real, nColor, nSpin> Vector;
     complex<real> propagator_product;
 
     // result array needs to be a spinor_array type object because of the reduce function at the end
-    spinor_array result_all_channels;
+    vector_type<double2, 16> result_all_channels;
 
-    while (xyz < arg.threads) { //loop over all space-coordinates of one time slice
-      //extract current ColorSpinor at xyzt from ColorSpinorField
+    while (xyz < arg.threads) { // loop over all space-coordinates of one time slice
+      // extract current ColorSpinor at xyzt from ColorSpinorField
 
       // This function calculates the index_cb assuming t is the coordinate in direction reduction_dim,
       // and xyz is the linearized index_cb excluding reduction_dim. So this will work for reduction_dim < 3 as well.
       int idx_cb = x_cb_from_t_xyz_d<Arg::reduction_dim>(t, xyz, arg.X, parity);
 
-      Vector x = arg.x(idx_cb, parity);
-      Vector y = arg.y(idx_cb, parity);
+      ColorSpinor<real, nColor, nSpin> x = arg.x(idx_cb, parity);
+      ColorSpinor<real, nColor, nSpin> y = arg.y(idx_cb, parity);
 
       // loop over channels
       for (int G_idx = 0; G_idx < 16; G_idx++) {
         for (int s2 = 0; s2 < nSpin; s2++) {
           int b2 = arg.Gamma.gm_i[G_idx][s2];
+          //get non-zero column index for current s1
           int b1_tmp = arg.Gamma.gm_i[G_idx][s1];
+          //only contributes if were at the correct b1 from the outer loop
           if (b1_tmp == b1) {
             propagator_product = arg.Gamma.gm_z[G_idx][b2] * innerProduct(x, y, b2, s2) * arg.Gamma.gm_z[G_idx][b1];
             result_all_channels[G_idx].x += propagator_product.real();
@@ -685,10 +740,9 @@ namespace quda
       xyz += blockDim.x * gridDim.x;
     }
 
-    // This function reduces the data in result_all_channels in all threads - different threads reduce result to different
-    // index t + arg.t_offset
+    // This function reduces the data in result_all_channels in all threads - different threads reduce result to
+    // different index t + arg.t_offset
     reduce2d<blockSize, 2>(arg, result_all_channels, t + arg.t_offset);
-
   }
 
 } // namespace quda
