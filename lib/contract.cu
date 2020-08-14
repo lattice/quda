@@ -163,6 +163,7 @@ public:
       switch (cType) {
       case QUDA_CONTRACT_TYPE_OPEN_SUM: strcat(aux, "open-summed,"); break;
       case QUDA_CONTRACT_TYPE_DR_SUM: strcat(aux, "degrand-rossi-summed,"); break;
+      case QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL: strcat(aux, "degrand-rossi-summed-spatial,"); break;
       default: errorQuda("Unexpected contraction type %d", cType);
       }
       strcat(aux, x.AuxString());
@@ -204,7 +205,7 @@ public:
         std::string function_name;
         switch (cType) {
 	case QUDA_CONTRACT_TYPE_OPEN_SUM: function_name = "quda::computeColorContractionSum"; break;
-        case QUDA_CONTRACT_TYPE_DR_SUM: function_name = "quda::computeDegrandRossiContractionSumSingle"; break;
+        case QUDA_CONTRACT_TYPE_DR_SUM: function_name = "quda::computeDegrandRossiContractionSum"; break;
         default: errorQuda("Unexpected contraction type %d", cType);
         }
 
@@ -218,7 +219,7 @@ public:
 	//- will contract only the colour indices, leaving the 16 complex numbers per open spin 
 	//- index per lattice site (one for each \mu, and \nu combination) and then sum each one
 	//- of those 16 elements with its counterparts on the same timeslice.
-	//- computeDegrandRossiContractionSumSingle will insert all 16 Gamma matrices into the
+	//- computeDegrandRossiContractionSum will insert all 16 Gamma matrices into the
 	//- contraction, also giving 16 complex numbers, one for each unique gamma matrix 
 	//- combination. It will then do the same timeslice sum. Here we also see how the 
 	//- autotuner works. The standard CUDA kernel arguments of blocks, threads, and 
@@ -230,12 +231,13 @@ public:
 	  LAUNCH_KERNEL_LOCAL_PARITY(computeColorContractionSum, (*this), tp, stream, arg, Arg); 
 	  break;
         case QUDA_CONTRACT_TYPE_DR_SUM:
+        case QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL:
 	  //- This is the kernel we are going to follow. We will NOT go into the Caves of Moria
 	  //- hunting the veritable Balrog that is QUDA's tuning class! Rather we will cheat
 	  //- slighly and look only at the compute code. Please navigate to 
 	  //- quda/include/kernels/contraction.cuh and the function
-	  //- `computeDegrandRossiContractionSumSingle` then return here.
-	  LAUNCH_KERNEL_LOCAL_PARITY(computeDegrandRossiContractionSumSingle, (*this), tp, stream, arg, Arg);
+	  //- `computeDegrandRossiContractionSum` then return here.
+	  LAUNCH_KERNEL_LOCAL_PARITY(computeDegrandRossiContractionSum, (*this), tp, stream, arg, Arg);
 	  //- Welcome back! We're almost done! Back you go to `contraction_with_sum.apply(0);`
           break;
         default: errorQuda("Unexpected contraction type %d", cType);

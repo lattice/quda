@@ -80,17 +80,8 @@ int main(int argc, char **argv)
     CSF_V_ptr_arr_prop[i] = prop_array + offset;
   }
 
-  // temporal or spatial correlator? //FIXME put this as a parameter of contractQuda!
-  size_t corr_dim = 3;
-  if (contract_type == QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL) { corr_dim = 2; }
-  size_t local_corr_length = gauge_param.X[corr_dim];
-  size_t global_corr_length = local_corr_length * comm_dim(corr_dim);
-
-  // host memory for correlator results. comm_dim(corr_dim)*array_length is global Ntau or Nz
-  size_t n_numbers_per_slice = 2 * 16;
-  size_t corr_size_in_bytes = n_numbers_per_slice * global_corr_length * bytes_per_float;
-  void *correlation_function_sum = malloc(corr_size_in_bytes);
-  memset(correlation_function_sum, 0, corr_size_in_bytes);
+  //this is where the result will be stored
+  void *correlation_function_sum = nullptr;
 
   // Loop over the number of sources to use. Default is prop_n_sources=1. Default source position = 0 0 0 0
   for (int n = 0; n < prop_n_sources; n++) {
@@ -106,10 +97,14 @@ int main(int argc, char **argv)
       invertQuda(CSF_V_ptr_arr_prop[i], CSF_V_ptr_arr_source[i], &inv_param);
     }
 
-    contractQuda(CSF_V_ptr_arr_prop, CSF_V_ptr_arr_prop, correlation_function_sum, contract_type, &inv_param, (void*)cs_param_ptr, gauge_param.X);
+    contractQuda(CSF_V_ptr_arr_prop, CSF_V_ptr_arr_prop, &correlation_function_sum, contract_type, &inv_param, (void*)cs_param_ptr, gauge_param.X);
   }
 
   // print correlators
+  size_t corr_dim;
+  contract_type == QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL ? corr_dim = 2 : corr_dim = 3;
+  size_t global_corr_length = gauge_param.X[corr_dim] * comm_dim(corr_dim);
+  size_t n_numbers_per_slice = 2 * 16;
   for (int G_idx = 0; G_idx < 16; G_idx++) {
     for (size_t t = 0; t < global_corr_length; t++) {
       printfQuda("sum: g=%d t=%lu %e %e\n", G_idx, t, ((double*)correlation_function_sum)[n_numbers_per_slice * t + 2 * G_idx],
