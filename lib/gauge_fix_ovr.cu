@@ -1378,12 +1378,14 @@ public:
                    const Float relax_boost, const double tolerance, const int reunit_interval, const int stopWtheta)
     {
       using Gauge = typename gauge_mapper<Float, recon>::type;
-      if (gauge_dir != 3) {
+      if (gauge_dir == 4) {
         printfQuda("Starting Landau gauge fixing...\n");
         gaugefixingOVR<Float, Gauge, recon, 4>(Gauge(data), data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
-      } else {
+      } else if (gauge_dir == 3) {
         printfQuda("Starting Coulomb gauge fixing...\n");
         gaugefixingOVR<Float, Gauge, recon, 3>(Gauge(data), data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
+      } else {
+        errorQuda("Unexpected gauge_dir = %d", gauge_dir);
       }
     }
   };

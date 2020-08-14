@@ -112,6 +112,19 @@ namespace quda
 #endif
     }
 
+
+    /**
+       @brief Finalize the reduction, returning the computed reduction
+       into result.  With heterogeneous atomics this means we poll the
+       atomics until their value differs from the init_value.  The
+       alternate legacy path posts an event after the kernel and then
+       polls on completion of the event.
+       @param[out] result The reduction result is copied here
+       @param[in] stream The stream on which we the reduction is being done
+       @param[in] reset Whether to reset the atomics after the
+       reduction has completed; required if the same aReducearg
+       instance will be used for multiple reductions.
+     */
     template <typename host_t, typename device_t = host_t>
     void complete(host_t *result, const qudaStream_t stream = 0, bool reset = false)
     {
