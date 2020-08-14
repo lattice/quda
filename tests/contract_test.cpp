@@ -82,9 +82,6 @@ int main(int argc, char **argv)
 
   prec = QUDA_INVALID_PRECISION;
 
-  // Clear previous error state if it exists
-  cudaGetLastError();
-
   // Check for correctness
   if (verify_results) {
     ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();

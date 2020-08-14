@@ -879,7 +879,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   clover_param.create = QUDA_NULL_FIELD_CREATE;
   clover_param.norm = nullptr;
   clover_param.invNorm = nullptr;
-  clover_param.setPrecision(inv_param->clover_cuda_prec);
+  clover_param.setPrecision(inv_param->clover_cuda_prec, true);
   clover_param.direct = h_clover || device_calc ? true : false;
   clover_param.inverse = (h_clovinv || pc_solve) && !dynamic_clover_inverse() ? true : false;
   CloverField *in = nullptr;
@@ -902,8 +902,8 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     if (!device_calc || inv_param->return_clover || inv_param->return_clover_inverse) {
       // create a param for the cpu clover field
       CloverFieldParam inParam(clover_param);
-      inParam.setPrecision(inv_param->clover_cpu_prec);
       inParam.order = inv_param->clover_order;
+      inParam.setPrecision(inv_param->clover_cpu_prec);
       inParam.direct = h_clover ? true : false;
       inParam.inverse = h_clovinv ? true : false;
       inParam.clover = h_clover;
@@ -956,7 +956,6 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     if (!h_clover && !h_clovinv) errorQuda("Requested clover field return but no clover host pointers set");
 
     // copy the inverted clover term into host application order on the device
-    clover_param.setPrecision(inv_param->clover_cpu_prec);
     clover_param.direct = (h_clover && inv_param->return_clover);
     clover_param.inverse = (h_clovinv && inv_param->return_clover_inverse);
 
@@ -965,9 +964,11 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     cudaCloverField *hack = nullptr;
     if (!dynamic_clover_inverse()) {
       clover_param.order = inv_param->clover_order;
+      clover_param.setPrecision(inv_param->clover_cpu_prec);
       hack = new cudaCloverField(clover_param);
       hack->copy(*cloverPrecise); // FIXME this can lead to an redundant copies if we're not copying back direct + inverse
     } else {
+      clover_param.setPrecision(inv_param->clover_cuda_prec, true);
       auto *hackOfTheHack = new cudaCloverField(clover_param);	// Hack of the hack
       hackOfTheHack->copy(*cloverPrecise, false);
       cloverInvert(*hackOfTheHack, inv_param->compute_clover_trlog);
@@ -976,6 +977,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 	inv_param->trlogA[1] = cloverPrecise->TrLog()[1];
       }
       clover_param.order = inv_param->clover_order;
+      clover_param.setPrecision(inv_param->clover_cpu_prec);
       hack = new cudaCloverField(clover_param);
       hack->copy(*hackOfTheHack); // FIXME this can lead to an redundant copies if we're not copying back direct + inverse
       delete hackOfTheHack;
@@ -1015,8 +1017,7 @@ void loadSloppyCloverQuda(const QudaPrecision *prec)
   if (cloverPrecise) {
     // create the mirror sloppy clover field
     CloverFieldParam clover_param(*cloverPrecise);
-
-    clover_param.setPrecision(prec[0]);
+    clover_param.setPrecision(prec[0], true);
 
     if (cloverPrecise->V(false) != cloverPrecise->V(true)) {
       clover_param.direct = true;
@@ -1034,7 +1035,7 @@ void loadSloppyCloverQuda(const QudaPrecision *prec)
     }
 
     // switch the parameters for creating the mirror preconditioner clover field
-    clover_param.setPrecision(prec[1]);
+    clover_param.setPrecision(prec[1], true);
 
     // create the mirror preconditioner clover field
     if (clover_param.Precision() == cloverPrecise->Precision()) {
@@ -1047,7 +1048,7 @@ void loadSloppyCloverQuda(const QudaPrecision *prec)
     }
 
     // switch the parameters for creating the mirror preconditioner clover field
-    clover_param.setPrecision(prec[2]);
+    clover_param.setPrecision(prec[2], true);
 
     // create the mirror preconditioner clover field
     if (clover_param.Precision() != cloverSloppy->Precision()) {
@@ -4466,7 +4467,7 @@ void computeHISQForceQuda(void* const milc_momentum,
 
   if (*num_failures_h>0) errorQuda("Error in the unitarization component of the hisq fermion force: %d failures\n", *num_failures_h);
 
-  cudaMemset((void**)(cudaOutForce->Gauge_p()), 0, cudaOutForce->Bytes());
+  qudaMemset((void**)(cudaOutForce->Gauge_p()), 0, cudaOutForce->Bytes());
 
   // read in u-link
   cudaGauge->loadCPUField(cpuULink, profileHISQForce);
@@ -4936,8 +4937,8 @@ double momActionQuda(void* momentum, QudaGaugeParam* param)
 
   // create the device fields
   gParam.create = QUDA_NULL_FIELD_CREATE;
-  gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   gParam.reconstruct = QUDA_RECONSTRUCT_10;
+  gParam.setPrecision(param->cuda_prec, true);
 
   cudaGaugeField *cudaMom = !param->use_resident_mom ? new cudaGaugeField(gParam) : nullptr;
 
@@ -5672,16 +5673,16 @@ int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const u
   if (comm_size() == 1) {
     // perform the update
     GaugeFixOVRQuda.TPSTART(QUDA_PROFILE_COMPUTE);
-    gaugefixingOVR(*cudaInGauge, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, \
-      reunit_interval, stopWtheta);
+    gaugeFixingOVR(*cudaInGauge, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval,
+                   stopWtheta);
     GaugeFixOVRQuda.TPSTOP(QUDA_PROFILE_COMPUTE);
   } else {
     cudaGaugeField *cudaInGaugeEx = createExtendedGauge(*cudaInGauge, R, GaugeFixOVRQuda);
 
     // perform the update
     GaugeFixOVRQuda.TPSTART(QUDA_PROFILE_COMPUTE);
-    gaugefixingOVR(*cudaInGaugeEx, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, \
-      reunit_interval, stopWtheta);
+    gaugeFixingOVR(*cudaInGaugeEx, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval,
+                   stopWtheta);
     GaugeFixOVRQuda.TPSTOP(QUDA_PROFILE_COMPUTE);
 
     //HOW TO COPY BACK TO CPU: cudaInGaugeEx->cpuGauge
@@ -5717,7 +5718,6 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
   const unsigned int verbose_interval, const double alpha, const unsigned int autotune, const double tolerance, \
   const unsigned int  stopWtheta, QudaGaugeParam* param , double* timeinfo)
 {
-
   GaugeFixFFTQuda.TPSTART(QUDA_PROFILE_TOTAL);
 
   checkGaugeParam(param);
@@ -5747,14 +5747,13 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
     gaugePrecise = nullptr;
   } */
 
-
   GaugeFixFFTQuda.TPSTOP(QUDA_PROFILE_H2D);
 
   // perform the update
   GaugeFixFFTQuda.TPSTART(QUDA_PROFILE_COMPUTE);
   checkCudaError();
 
-  gaugefixingFFT(*cudaInGauge, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
+  gaugeFixingFFT(*cudaInGauge, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
 
   GaugeFixFFTQuda.TPSTOP(QUDA_PROFILE_COMPUTE);
 
