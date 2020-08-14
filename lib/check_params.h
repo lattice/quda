@@ -276,6 +276,8 @@ void printQudaCloverParam(QudaInvertParam *param)
     P(return_clover, 0);
     P(return_clover_inverse, 0);
     P(clover_rho, 0.0);
+    P(clover_degree, 1);
+    P(clover_degree_in, 1);
 #else
   P(compute_clover_trlog, QUDA_INVALID_PRECISION);
   P(compute_clover, QUDA_INVALID_PRECISION);
@@ -283,6 +285,8 @@ void printQudaCloverParam(QudaInvertParam *param)
   P(return_clover, QUDA_INVALID_PRECISION);
   P(return_clover_inverse, QUDA_INVALID_PRECISION);
   P(clover_rho, INVALID_DOUBLE);
+  P(clover_degree, INVALID_INT);
+  P(clover_degree_in, INVALID_INT);
 #endif
     P(clover_order, QUDA_INVALID_CLOVER_ORDER);
     P(cl_pad, INVALID_INT);
@@ -318,8 +322,6 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(mu, INVALID_DOUBLE);
   P(twist_flavor, QUDA_TWIST_INVALID);
   P(laplace3D, INVALID_INT);
-  P(clover_degree, INVALID_INT);
-  P(clover_degree_in, INVALID_INT);
 #else
   // asqtad and domain wall use mass parameterization
   if (param->dslash_type == QUDA_STAGGERED_DSLASH || param->dslash_type == QUDA_ASQTAD_DSLASH
@@ -328,6 +330,10 @@ void printQudaInvertParam(QudaInvertParam *param) {
     P(mass, INVALID_DOUBLE);
   } else { // Wilson and clover use kappa parameterization
     P(kappa, INVALID_DOUBLE);
+  }
+  // Exponential clover also uses mass
+  if (param->dslash_type == QUDA_CLOVER_EXP_WILSON_DSLASH) {
+    P(mass, INVALID_DOUBLE);
   }
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
       param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
@@ -338,12 +344,6 @@ void printQudaInvertParam(QudaInvertParam *param) {
   if (param->dslash_type == QUDA_TWISTED_MASS_DSLASH) {
     P(mu, INVALID_DOUBLE);
     P(twist_flavor, QUDA_TWIST_INVALID);
-  }
-  // exponential clover also uses mass
-  if (param->dslash_type == QUDA_CLOVER_EXP_WILSON_DSLASH) {
-    P(mass, INVALID_DOUBLE);
-    P(clover_degree, INVALID_INT);
-    P(clover_degree_in, INVALID_INT);
   }
 #endif
 

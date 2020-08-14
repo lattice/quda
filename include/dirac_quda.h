@@ -536,8 +536,8 @@ namespace quda {
   class DiracCloverExp : public DiracClover {
 
   protected:
-    double mass;
     int degree;
+    double mass;
 
   public:
     DiracCloverExp(const DiracParam &param);

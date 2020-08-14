@@ -5,17 +5,26 @@
 namespace quda {
 
   DiracCloverExp::DiracCloverExp(const DiracParam &param) :
-    DiracClover(param), mass(param.mass), degree(param.degreeExp)
+    DiracClover(param), degree(param.degreeExp), mass(param.mass)
   {
-      printfQuda("Constructing DiracCloverExp\n");
-      if (clover->degreeExp != degree) {
+    if ((clover->degreeExp < 0) || (degree < 0)) {
+      errorQuda("Unexpected exponential expansion degree of input (%d) or target (%d) clover term",
+        clover->degreeExp, degree);
+    }
+
+    if (clover->degreeExp != degree) {
+      if (clover->degreeExp == 1) {
         cloverExponential(*clover, degree, mass, false);
         clover->degreeExp = degree;
+      } else {
+        errorQuda("DiracCloverExp cannot be constructed for degree of input clover is %d",
+          clover->degreeExp);
       }
+    }
   }
 
   DiracCloverExp::DiracCloverExp(const DiracCloverExp &dirac) :
-    DiracClover(dirac), mass(dirac.mass), degree(dirac.degree) {}
+    DiracClover(dirac), degree(dirac.degree), mass(dirac.mass) {}
 
   DiracCloverExp::~DiracCloverExp() { }
 
@@ -23,8 +32,8 @@ namespace quda {
   {
     if (&dirac != this) {
       DiracClover::operator=(dirac);
-      mass = dirac.mass;
       degree = dirac.degree;
+      mass = dirac.mass;
     }
     return *this;
   }
@@ -36,7 +45,6 @@ namespace quda {
     DiracCloverExp(param)
   {
     // For the preconditioned operator, we need to check that the inverse of the clover term is present
-    if (!clover->cloverInv) errorQuda("Clover inverse required for DiracCloverExpPC");
     cloverInvert(*clover, false);
   }
 
