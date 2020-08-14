@@ -3,9 +3,6 @@
 #include <string.h>
 #include <sys/time.h>
 
-#include <cuda.h>
-#include <cuda_runtime.h>
-
 #include "quda.h"
 #include "gauge_field.h"
 #include "host_utils.h"
@@ -104,7 +101,7 @@ static int unitarize_link_test(int &test_rc)
   void *fatlink = (void *)safe_malloc(4 * V * gauge_site_size * cpu_prec);
 
   void* sitelink[4];
-  for(int i = 0 ; i < 4; i++) siteLink[i] = pinned_malloc(V * gauge_site_size * cpu_prec);
+  for (int i = 0 ; i < 4; i++) sitelink[i] = pinned_malloc(V * gauge_site_size * cpu_prec);
 
   createSiteLinkCPU(sitelink, qudaGaugeParam.cpu_prec, 1);
 
@@ -176,7 +173,6 @@ static int unitarize_link_test(int &test_rc)
 
   gettimeofday(&t0,NULL);
   unitarizeLinks(*cudaULink, *cudaFatLink, num_failures_d);
-  cudaDeviceSynchronize();
   gettimeofday(&t1,NULL);
 
   if (verify_results) {
@@ -206,8 +202,7 @@ static int unitarize_link_test(int &test_rc)
   return num_failures;
 }
 
-  static void
-display_test_info()
+static void display_test_info()
 {
   printfQuda("running the following test:\n");
 
@@ -225,11 +220,7 @@ display_test_info()
       dimPartitioned(2),
       dimPartitioned(3));
 #endif
-
-  return ;
-
 }
-
 
 int main(int argc, char **argv)
 {

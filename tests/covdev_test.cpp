@@ -125,9 +125,6 @@ void init(int argc, char **argv)
   printfQuda("Sending spinor field to GPU\n");
   *cudaSpinor = *spinor;
 
-  cudaDeviceSynchronize();
-  checkCudaError();
-
   double spinor_norm2 = blas::norm2(*spinor);
   double cuda_spinor_norm2 = blas::norm2(*cudaSpinor);
   printfQuda("Source CPU = %f, CUDA=%f\n", spinor_norm2, cuda_spinor_norm2);
@@ -180,11 +177,6 @@ double dslashCUDA(int niter, int mu)
   cudaEventDestroy(end);
 
   double secs = runTime / 1000; //stopwatchReadSeconds();
-
-  // check for errors
-  cudaError_t stat = cudaGetLastError();
-  if (stat != cudaSuccess)
-    errorQuda("with ERROR: %s\n", cudaGetErrorString(stat));
 
   return secs;
 }
