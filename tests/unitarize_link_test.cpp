@@ -100,21 +100,13 @@ static int unitarize_link_test(int &test_rc)
 
   TimeProfile profile("dummy");
 
-  void *fatlink = (void *)malloc(4 * V * gauge_site_size * cpu_prec);
-  if(fatlink == NULL){
-    errorQuda("ERROR: allocating fatlink failed\n");
-  }
+  void *inlink = (void *)safe_malloc(4 * V * gauge_site_size * cpu_prec);
+  void *fatlink = (void *)safe_malloc(4 * V * gauge_site_size * cpu_prec);
 
   void* sitelink[4];
-  for(int i=0;i < 4;i++){
-    cudaMallocHost((void **)&sitelink[i], V * gauge_site_size * cpu_prec);
-    if(sitelink[i] == NULL){
-      errorQuda("ERROR; allocate sitelink[%d] failed\n", i);
-    }
-  }
+  for(int i = 0 ; i < 4; i++) siteLink[i] = pinned_malloc(V * gauge_site_size * cpu_prec);
 
   createSiteLinkCPU(sitelink, qudaGaugeParam.cpu_prec, 1);
-  void *inlink = (void *)malloc(4 * V * gauge_site_size * cpu_prec);
 
   if (cpu_prec == QUDA_DOUBLE_PRECISION){
     double* link = reinterpret_cast<double*>(inlink);
@@ -197,14 +189,14 @@ static int unitarize_link_test(int &test_rc)
   delete cpuFatLink;
   delete cudaFatLink;
   delete cudaULink;
-  for(int dir=0; dir<4; ++dir) cudaFreeHost(sitelink[dir]);
+  for(int dir=0; dir<4; ++dir) host_free(sitelink[dir]);
 
-  free(fatlink);
+  host_free(fatlink);
 
   int num_failures = *num_failures_h;
   host_free(num_failures_h);
 
-  free(inlink);
+  host_free(inlink);
 #ifdef MULTI_GPU
   exchange_llfat_cleanup();
 #endif
