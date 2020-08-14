@@ -181,7 +181,8 @@ namespace quda
     }
   }
 
-  template <bool dagger, int twist, QudaPCType pc, typename Arg> __global__ void packKernel(Arg arg)
+  template <bool dagger, int twist, QudaPCType pc, typename Arg, typename... Env_>
+  __global__ void packKernel(Arg arg, Env_... env_)
   {
     const int sites_per_block = arg.sites_per_block;
     int local_tid = threadIdx.x;
@@ -221,7 +222,8 @@ namespace quda
 
   template <bool dagger, QudaPCType pc, typename Arg> struct packShmem {
 
-    template <int twist> __device__ inline void operator()(Arg &arg, int s, int parity)
+    template <int twist, typename... Env_>
+    __device__ inline void operator()(Arg &arg, int s, int parity, Env_... env_)
     {
       // (active_dims * 2 + dir) * blocks_per_dir + local_block_idx
       int local_block_idx = blockIdx.x % arg.blocks_per_dir;
@@ -291,7 +293,8 @@ namespace quda
     }
   };
 
-  template <bool dagger, int twist, QudaPCType pc, typename Arg> __global__ void packShmemKernel(Arg arg)
+  template <bool dagger, int twist, QudaPCType pc, typename Arg, typename... Env_>
+  __global__ void packShmemKernel(Arg arg, Env_... env_)
   {
 
     int s = blockDim.y * blockIdx.y + threadIdx.y;
@@ -305,7 +308,8 @@ namespace quda
     pack<twist>(arg, s, parity);
   }
 
-  template <typename Arg> __global__ void packStaggeredKernel(Arg arg)
+  template <typename Arg, typename... Env_>
+  __global__ void packStaggeredKernel(Arg arg, Env_... env_)
   {
     const int sites_per_block = arg.sites_per_block;
     int local_tid = threadIdx.x;
@@ -344,7 +348,8 @@ namespace quda
 
   template <bool dagger, QudaPCType pc, typename Arg> struct packStaggeredShmem {
 
-    __device__ inline void operator()(Arg &arg, int s, int parity, int twist_pack = 0)
+    template <typename... Env_>
+    __device__ inline void operator()(Arg &arg, int s, int parity, int twist_pack = 0, Env_... env_)
     {
       // (active_dims * 2 + dir) * blocks_per_dir + local_block_idx
       int local_block_idx = blockIdx.x % arg.blocks_per_dir;
@@ -405,7 +410,8 @@ namespace quda
     }
   };
 
-  template <typename Arg> __global__ void packStaggeredShmemKernel(Arg arg)
+  template <typename Arg, typename... Env_>
+  __global__ void packStaggeredShmemKernel(Arg arg, Env_... env_)
   {
 
     int s = blockDim.y * blockIdx.y + threadIdx.y;
@@ -416,7 +422,7 @@ namespace quda
     int parity = (arg.nParity == 2) ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
 
     packStaggeredShmem<0, QUDA_4D_PC, Arg> pack;
-    pack(arg, s, parity);
+    pack(arg, s, parity, env_...);
   }
 
 } // namespace quda
