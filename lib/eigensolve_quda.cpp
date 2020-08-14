@@ -38,21 +38,19 @@ namespace quda
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaEigParam(eig_param);
 
     // Problem parameters
-    n_ev = eig_param->n_ev;
-    n_kr = eig_param->n_kr;
     n_conv = eig_param->n_conv;
     n_ev_deflate = (eig_param->n_ev_deflate == -1 ? n_conv : eig_param->n_ev_deflate);
     tol = eig_param->tol;
     reverse = false;
     if (eig_param->eig_type != QUDA_EIG_DAV) {
-      nEv = eig_param->nEv;
-      nKr = eig_param->nKr;
+      n_ev = eig_param->n_ev;
+      n_kr = eig_param->n_kr;
     } else {
       m_min = eig_param->mmin;
       m_max = eig_param->mmax;
       corr_eq_tol = eig_param->corr_eq_tol;
       corr_eq_maxiter = eig_param->corr_eq_maxiter;
-      k_max = nConv;
+      k_max = n_conv;
     }
 
     // Algorithm variables
@@ -91,8 +89,8 @@ namespace quda
       residua = (double *)safe_malloc(n_kr * sizeof(double));
       for (int i = 0; i < n_kr; i++) { residua[i] = 0.0; }
     } else {
-      residua = (double *)safe_malloc(nConv * sizeof(double));
-      for (int i = 0; i < nConv; i++) { residua[i] = 0.0; }
+      residua = (double *)safe_malloc(n_conv * sizeof(double));
+      for (int i = 0; i < n_conv; i++) { residua[i] = 0.0; }
     }
 
     // Part of the spectrum to be computed.

@@ -115,7 +115,7 @@ namespace quda
 
     // Setting some initial parameters of the eigensolver
     k = 0;
-    k_max = eig_param->nConv;
+    k_max = eig_param->n_conv;
     m = 0;
     m_max = eig_param->mmax;
     m_min = eig_param->mmin;
@@ -188,7 +188,7 @@ namespace quda
     if (getVerbosity() >= QUDA_VERBOSE) {
       printfQuda("spectrum %s\n", spectrum);
       printfQuda("tol %.4e\n", tol);
-      printfQuda("nConv %d\n", nConv);
+      printfQuda("nConv %d\n", n_conv);
       printfQuda("mmin %d\n", m_min);
       printfQuda("mmax %d\n", m_max);
       printfQuda("corr-eq-maxiter %d\n", corr_eq_maxiter);
@@ -289,15 +289,15 @@ namespace quda
       if (eig_param->require_convergence) {
         errorQuda("JD failed to compute the requested %d vectors with a search space of size between %d and %d in %d "
                   "restart steps. Exiting.",
-                  nConv, m_min, m_max, max_restarts);
+                  n_conv, m_min, m_max, max_restarts);
       } else {
         warningQuda("JD failed to compute the requested %d vectors with a search space of size between %d and %d in %d "
                     "restart steps.",
-                    nConv, m_min, m_max, max_restarts);
+                    n_conv, m_min, m_max, max_restarts);
       }
     } else {
       if (getVerbosity() >= QUDA_SUMMARIZE) {
-        printfQuda("JD computed the requested %d vectors in %d restart steps and %d iterations.\n", nConv, restart_iter,
+        printfQuda("JD computed the requested %d vectors in %d restart steps and %d iterations.\n", n_conv, restart_iter,
                    iter);
       }
 
@@ -329,9 +329,9 @@ namespace quda
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("saving eigenvectors\n");
       // Make an array of size nConv
       std::vector<ColorSpinorField *> vecs_ptr;
-      vecs_ptr.reserve(nConv);
+      vecs_ptr.reserve(n_conv);
       const QudaParity mat_parity = impliedParityFromMatPC(mat.getMatPCType());
-      for (int i = 0; i < nConv; i++) {
+      for (int i = 0; i < n_conv; i++) {
         eigSpace[i]->setSuggestedParity(mat_parity);
         vecs_ptr.push_back(eigSpace[i]);
       }
