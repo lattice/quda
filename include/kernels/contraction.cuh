@@ -563,7 +563,9 @@ namespace quda
       for (int G_idx = 0; G_idx < 16; G_idx++) {
         for (int s2 = 0; s2 < nSpin; s2++) {
           int b2 = arg.Gamma.gm_i[G_idx][s2];
+          //get non-zero column index for current s1
           int b1_tmp = arg.Gamma.gm_i[G_idx][s1];
+          //only contributes if were at the correct b1 from the outer loop
           if (b1_tmp == b1) {
             propagator_product = arg.Gamma.gm_z[G_idx][b2] * innerProduct(x, y, b2, s2) * arg.Gamma.gm_z[G_idx][b1];
             result_all_channels[G_idx].x += propagator_product.real();

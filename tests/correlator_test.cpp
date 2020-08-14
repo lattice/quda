@@ -50,6 +50,9 @@ int main(int argc, char **argv)
   void *clover_inv = nullptr;
   // Allocate space on the host
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    if  (!compute_clover){
+      errorQuda("Specified clover dslash-type but did not specify compute-clover!");
+    }
     clover = malloc(V * clover_site_size * host_clover_data_type_size);
     clover_inv = malloc(V * clover_site_size * host_spinor_data_type_size);
     constructHostCloverField(clover, clover_inv, inv_param);
@@ -58,7 +61,7 @@ int main(int argc, char **argv)
   // ColorSpinors (Wilson)
   //FIXME what about this parameter class? should it be part of quda.h like invertparam etc?
   quda::ColorSpinorParam cs_param;
-  quda::ColorSpinorParam*cs_param_ptr = &cs_param;
+  quda::ColorSpinorParam* cs_param_ptr = &cs_param;
   constructWilsonTestSpinorParam(&cs_param, &inv_param, &gauge_param); //FIXME remove Test from this function name?
   int spinor_dim = cs_param.nColor * cs_param.nSpin;
   setSpinorSiteSize(spinor_dim * 2); // this sets the global variable my_spinor_site_size
@@ -95,6 +98,7 @@ int main(int argc, char **argv)
       inv_param.solver_normalization = QUDA_SOURCE_NORMALIZATION; // Make explicit for now.
 
       invertQuda(CSF_V_ptr_arr_prop[i], CSF_V_ptr_arr_source[i], &inv_param);
+
     }
 
     contractQuda(CSF_V_ptr_arr_prop, CSF_V_ptr_arr_prop, &correlation_function_sum, contract_type, &inv_param, (void*)cs_param_ptr, gauge_param.X);
@@ -113,16 +117,20 @@ int main(int argc, char **argv)
   }
 
   // free memory
-  free(correlation_function_sum);
-  free(source_array);
-  free(prop_array);
   freeGaugeQuda();
+  for (auto &dir : gauge) free(dir);
+
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     freeCloverQuda();
     if (clover) free(clover);
     if (clover_inv) free(clover_inv);
   }
-  for (auto &dir : gauge) free(dir);
+
+  free(source_array);
+  free(prop_array);
+  delete[] CSF_V_ptr_arr_source;
+  delete[] CSF_V_ptr_arr_prop;
+  free(correlation_function_sum);
 
   printfQuda("----------------------------------------------------------------------------------\n");
   endQuda();

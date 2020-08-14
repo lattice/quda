@@ -5812,11 +5812,10 @@ void contractQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavor_2, vo
   case QUDA_CONTRACT_TYPE_DR:
     local_corr_length = CSF_ptr_container_flavor_2[0]->Volume(); // FIXME use better way to get this
     break;
-  default: local_corr_length = CSF_ptr_container_flavor_2[0]->X(corr_dim);
+  default: local_corr_length = X[corr_dim];
   }
 
   // calculate some parameters
-  size_t local_corr_offset = local_corr_length * comm_coord(corr_dim);
   size_t global_corr_length = local_corr_length * comm_dim(corr_dim);
 
   size_t n_numbers_per_slice = 2 * 16;
@@ -5825,9 +5824,7 @@ void contractQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavor_2, vo
   *h_result = malloc(corr_size_in_bytes);
   memset(*h_result, 0, corr_size_in_bytes);
   // array that fits all timeslices and channels but is reset after each computation
-  auto *h_result_tmp_global = (double *)malloc(corr_size_in_bytes);
-  // this points to the local part of the global array
-  void *h_result_tmp_local = (void *)(h_result_tmp_global + local_corr_offset);
+  void *h_result_tmp_global = malloc(corr_size_in_bytes);
 
   // create device spinor fields
   ColorSpinorParam cudaParam(*cs_param);
@@ -5848,29 +5845,30 @@ void contractQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavor_2, vo
 
         memset(h_result_tmp_global, 0, corr_size_in_bytes);
 
-        contractQuda(*d_single_prop_flavor_1, *d_single_prop_flavor_2, s1, b1, h_result_tmp_local, cType);
+        contractQuda(*d_single_prop_flavor_1, *d_single_prop_flavor_2, s1, b1, h_result_tmp_global, cType);
 
-        if (comm_dim(corr_dim) > 1) comm_gather_array(h_result_tmp_global, n_numbers_per_slice * local_corr_length);
+        comm_gather_array((double*)h_result_tmp_global, n_numbers_per_slice * local_corr_length);
 
         for (int G_idx = 0; G_idx < 16; G_idx++) {
           for (size_t t = 0; t < global_corr_length; t++) {
             ((double *)*h_result)[n_numbers_per_slice * t + 2 * G_idx]
-              += h_result_tmp_global[n_numbers_per_slice * t + 2 * G_idx];
+              += ((double*)h_result_tmp_global)[n_numbers_per_slice * t + 2 * G_idx];
             ((double *)*h_result)[n_numbers_per_slice * t + 2 * G_idx + 1]
-              += h_result_tmp_global[n_numbers_per_slice * t + 2 * G_idx + 1];
+              += ((double*)h_result_tmp_global)[n_numbers_per_slice * t + 2 * G_idx + 1];
           }
         }
       }
     }
   }
 
+  //free memory
   delete d_single_prop_flavor_1;
   delete d_single_prop_flavor_2;
   for (int i = 0; i < spinor_dim; i++) {
-    delete CSF_ptr_container_flavor_1[i];
-    delete CSF_ptr_container_flavor_2[i];
+    free(CSF_ptr_container_flavor_1[i]);
+    free(CSF_ptr_container_flavor_2[i]);
   }
-  delete h_result_tmp_global;
+  free(h_result_tmp_global);
 }
 
 void gaugeObservablesQuda(QudaGaugeObservableParam *param)
