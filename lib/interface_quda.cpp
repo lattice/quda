@@ -867,7 +867,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   clover_param.csw = inv_param->clover_coeff;
   clover_param.twisted = twisted;
   clover_param.mu2 = twisted ? 4.*inv_param->kappa*inv_param->kappa*inv_param->mu*inv_param->mu : 0.0;
-  clover_param.degreeExp = (inv_param->clover_degree_in == QUDA_INVALID_ENUM) ? 1 : inv_param->clover_degree_in;
+  clover_param.degreeExp = inv_param->clover_degree_in;
   clover_param.siteSubset = QUDA_FULL_SITE_SUBSET;
   for (int i=0; i<4; i++) clover_param.x[i] = gaugePrecise->X()[i];
   clover_param.pad = inv_param->cl_pad;
@@ -921,8 +921,30 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
       profileClover.TPSTART(QUDA_PROFILE_TOTAL);
     }
 
+    // Make exponential clover term when applying exponential operator
+    if (inv_param->clover_degree_in <= 0) {
+      errorQuda("Invalid source exponential expansion degree, which is %d",
+        inv_param->clover_degree_in);
+    }
+    bool do_exp = (inv_param->clover_degree_in != inv_param->clover_degree) &&
+      (inv_param->dslash_type == QUDA_CLOVER_EXP_WILSON_DSLASH);
+    if (do_exp) {
+      if (inv_param->clover_degree_in == 1) {
+        if (inv_param->clover_degree >= 0) {
+          cloverExponential(*cloverPrecise, inv_param->clover_degree, inv_param->mass, false);
+          cloverPrecise->setDegreeExp(inv_param->clover_degree);
+        } else {
+          errorQuda("Invalid target exponential expansion degree, which is %d",
+            inv_param->clover_degree);
+        }
+      } else {
+        errorQuda("Invalid source exponential expansion degree to update clover, which is %d",
+          inv_param->clover_degree_in);
+      }
+    }
+
     // inverted clover term is required when applying preconditioned operator
-    if ((!h_clovinv || inv_param->compute_clover_inverse) && pc_solve) {
+    if ((!h_clovinv || inv_param->compute_clover_inverse || do_exp) && pc_solve) {
       profileClover.TPSTART(QUDA_PROFILE_COMPUTE);
       if (!dynamic_clover_inverse()) {
 	cloverInvert(*cloverPrecise, inv_param->compute_clover_trlog);

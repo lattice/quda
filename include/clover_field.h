@@ -153,9 +153,15 @@ namespace quda {
 
     /**
        @return Degree of Taylor polynomial of exponential
-       function to the clover term (for exponential clover)
+       function (for exponential clover)
     */
     double DegreeExp() const { return degreeExp; }
+
+    /**
+       @brief Set the degree of Taylor polynomial of exponential
+       function (for exponential clover)
+    */
+    void setDegreeExp(int degreeExp);
 
     /**
        @brief Compute the L1 norm of the field

@@ -7,17 +7,21 @@ namespace quda {
   DiracCloverExp::DiracCloverExp(const DiracParam &param) :
     DiracClover(param), degree(param.degreeExp), mass(param.mass)
   {
-    if ((clover->degreeExp < 0) || (degree < 0)) {
-      errorQuda("Unexpected exponential expansion degree of input (%d) or target (%d) clover term",
-        clover->degreeExp, degree);
+    if (clover->degreeExp <= 0) {
+      errorQuda("Invalid source exponential expansion degree, which is %d",
+          clover->degreeExp);
     }
-
     if (clover->degreeExp != degree) {
       if (clover->degreeExp == 1) {
-        cloverExponential(*clover, degree, mass, false);
-        clover->degreeExp = degree;
+        if (degree >= 0) {
+          cloverExponential(*clover, degree, mass, false);
+          clover->degreeExp = degree;
+        } else {
+          errorQuda("Invalid target exponential expansion degree, which is %d",
+            degree);
+        }
       } else {
-        errorQuda("DiracCloverExp cannot be constructed for degree of input clover is %d",
+        errorQuda("Invalid source exponential expansion degree to update clover, which is %d",
           clover->degreeExp);
       }
     }

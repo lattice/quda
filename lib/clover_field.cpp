@@ -76,6 +76,11 @@ namespace quda {
     rho = rho_;
   }
 
+  void CloverField::setDegreeExp(int degreeExp_)
+  {
+    degreeExp = degreeExp_;
+  }
+
   cudaCloverField::cudaCloverField(const CloverFieldParam &param) : CloverField(param) {
     
     if (create != QUDA_NULL_FIELD_CREATE && create != QUDA_REFERENCE_FIELD_CREATE) 
