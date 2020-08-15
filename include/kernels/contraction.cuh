@@ -435,9 +435,11 @@ namespace quda
       //- This is the array on which we perform the final reduction. Because it's a double2 
       //- data type we must use the .x and .y methods for real and imaginary.
       for (int mu = 0; mu < nSpin; mu++) {
-	for (int nu = 0; nu < nSpin; nu++) { 
-	  res[mu*nSpin + nu].x += A[mu*nSpin + nu].real();
-	  res[mu*nSpin + nu].y += A[mu*nSpin + nu].imag();	  
+	for (int nu = 0; nu < nSpin; nu++) {
+	  res[mu*nSpin + nu].x = 0.0*t*1.0;
+	  res[mu*nSpin + nu].y = 0.0*t*2.0;	  
+	  //res[mu*nSpin + nu].x += A[mu*nSpin + nu].real();
+	  //res[mu*nSpin + nu].y += A[mu*nSpin + nu].imag();	  
 	}	
       }
 
