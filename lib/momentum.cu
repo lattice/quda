@@ -119,7 +119,7 @@ namespace quda {
     }
 
     // perform final inter-block reduction and write out result
-    reduce2d<blockSize,2>(arg, action);
+    arg.template reduce2d<blockSize,2>(action);
   }
 
   template <typename Float, int nColor, QudaReconstructType recon>
@@ -230,7 +230,7 @@ namespace quda {
     }
 
     // perform final inter-block reduction and write out result
-    reduce2d<blockSize,2,double2,false,max_reducer2>(arg, norm2);
+    arg.template reduce2d<blockSize,2,false,max_reducer2>(norm2);
   } // UpdateMom
 
   template <typename Float, int nColor, QudaReconstructType recon>

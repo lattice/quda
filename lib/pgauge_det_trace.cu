@@ -64,7 +64,7 @@ namespace quda {
       idx += blockDim.x*gridDim.x;
     }
 
-    reduce2d<blockSize,2>(arg, (double2)val);
+    arg.template reduce2d<blockSize,2>(val);
   }
 
   template <typename Float, int nColor, QudaReconstructType recon, int type>

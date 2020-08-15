@@ -177,7 +177,7 @@ namespace quda {
       idx_cb += blockDim.x * gridDim.x;
     }
 
-    reduce2d<blockSize,2>(argQ, data);
+    argQ.template reduce2d<blockSize,2>(data);
   }
 
   template<int Elems, typename Float, typename Gauge, int gauge_dir>
