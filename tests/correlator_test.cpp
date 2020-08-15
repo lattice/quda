@@ -66,7 +66,8 @@ int main(int argc, char **argv)
   int spinor_dim = cs_param.nColor * cs_param.nSpin;
   setSpinorSiteSize(spinor_dim * 2); // this sets the global variable my_spinor_site_size
 
-  size_t bytes_per_float = sizeof(double);
+  //size_t bytes_per_float = sizeof(double);
+  size_t bytes_per_float = prec;
   // Allocate memory on host for one source (0,0,0,0) for each of the 12x12 color+spinor combinations
   auto *source_array = (double *)malloc(spinor_dim * spinor_dim * V * 2 * bytes_per_float);
   auto *prop_array = (double *)malloc(spinor_dim * spinor_dim * V * 2 * bytes_per_float);
@@ -91,23 +92,26 @@ int main(int argc, char **argv)
   size_t corr_dim=0, local_corr_length=0;
   contract_type == QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL ? corr_dim = 2 : corr_dim = 3;
   switch (contract_type) {
-  case QUDA_CONTRACT_TYPE_OPEN:
-  case QUDA_CONTRACT_TYPE_DR:
-    local_corr_length = V;
-    break;
-  case QUDA_CONTRACT_TYPE_OPEN_SUM:
-  case QUDA_CONTRACT_TYPE_DR_SUM:
+    /*
+      case QUDA_CONTRACT_TYPE_OPEN:
+      case QUDA_CONTRACT_TYPE_DR:
+      local_corr_length = V;
+      break;
+      case QUDA_CONTRACT_TYPE_OPEN_SUM:
+      case QUDA_CONTRACT_TYPE_DR_SUM:
+    */
   case QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL:
     local_corr_length = gauge_param.X[corr_dim];
     break;
-  default: errorQuda("Unknown contraction type %d given", contract_type);
+  default: errorQuda("Unsupported contraction type %d given", contract_type);
   }
   
   // calculate some parameters
   size_t global_corr_length = local_corr_length * comm_dim(corr_dim);
   size_t n_numbers_per_slice = 2 * cs_param.nSpin * cs_param.nSpin;
-  size_t corr_size_in_bytes = n_numbers_per_slice * global_corr_length * cs_param.Precision();
-
+  //size_t corr_size_in_bytes = n_numbers_per_slice * global_corr_length * cs_param.Precision();
+  size_t corr_size_in_bytes = n_numbers_per_slice * global_corr_length * sizeof(double);
+  
   correlation_function_sum = malloc(corr_size_in_bytes);
   
   // Loop over the number of sources to use. Default is prop_n_sources=1.
