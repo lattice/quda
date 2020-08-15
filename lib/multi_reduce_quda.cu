@@ -52,7 +52,7 @@ namespace quda {
       arg.launch_error = launch<max_block_size(), real, len, NXZ>(arg, tp, stream);
 #endif
 
-      T *result_ = new T[NXZ * arg.NYW];
+      std::vector<T> result_(NXZ * arg.NYW);
       if (!commAsyncReduction()) arg.complete(result_, stream);
 
       // need to transpose for same order with vector thread reduction
@@ -62,7 +62,6 @@ namespace quda {
         }
       }
 
-      delete[] result_;
     }
 
     template <template <typename ...> class Reducer, typename store_t, typename y_store_t, int nSpin, typename T>

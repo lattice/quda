@@ -36,7 +36,7 @@ namespace quda {
 #else
 	LAUNCH_KERNEL_LOCAL_PARITY(computePlaq, (*this), tp, stream, arg, decltype(arg));
 #endif
-        arg.complete(&plq);
+        arg.complete(plq);
         if (!activeTuning()) {
           comm_allreduce_array((double*)&plq, 2);
           for (int i = 0; i < 2; i++) ((double*)&plq)[i] /= 9.*2*arg.threads*comm_size();

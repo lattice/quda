@@ -54,7 +54,7 @@ namespace quda {
 
       host_reduce_t result;
       ::quda::zero(result);
-      if (!commAsyncReduction()) arg.complete(&result, stream);
+      if (!commAsyncReduction()) arg.complete(result, stream);
       return result;
     }
 

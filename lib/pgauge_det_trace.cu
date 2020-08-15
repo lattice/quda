@@ -64,7 +64,7 @@ namespace quda {
       idx += blockDim.x*gridDim.x;
     }
 
-    reduce2d<blockSize,2>(arg, (double2)val);
+    arg.template reduce2d<blockSize,2>(val);
   }
 
   template <typename Float, int nColor, QudaReconstructType recon, int type>
@@ -85,7 +85,7 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       KernelArg<Float, nColor, recon> arg(u);
       LAUNCH_KERNEL_LOCAL_PARITY(compute, (*this), tp, stream, arg, type, decltype(arg));
-      arg.complete(&result, stream);
+      arg.complete(result, stream);
       if (!activeTuning()) {
         comm_allreduce_array((double*)&result, 2);
         result.x /= (double)(4*u.LocalVolume()*comm_size());
