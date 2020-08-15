@@ -329,12 +329,6 @@ public:
       //- we place the CUDA specific code under a boolean x.Location() == QUDA_CUDA_FIELD_LOCATION 
       //- so we know we are using a GPU.
       if (x.Location() == QUDA_CUDA_FIELD_LOCATION) {
-<<<<<<< HEAD
-	//- Ensure the reduce array is zeroed out. This is the array that comes baked in to the
-	//- `ReduceArg` class from which the `arg` structure inherited.
-	//for (int i=0; i<2*x.Nspin()*x.Nspin()*x.X(3); i++) ((double*)arg.result_h)[i] = 0.0;
-=======
->>>>>>> origin/feature/smeared_diluted_propagators
 	//- We next define a TuneParam object that is used by the Tunable class. It takes 
 	//- `this` class (see now what *this means?) and some other dat
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -446,21 +440,9 @@ public:
       //- a method called `apply` which will do just that. Head on up to the member function
       //- `apply` to see it all come togther. 
       contraction_with_sum.apply(0);
-<<<<<<< HEAD
-      arg.complete(result);
-      //- Welcome back! We did it! Now we just make sure that all the GPU work is done 
-      //- before moving on...
-      //qudaDeviceSynchronize();
-      //- ... and copy the data we just computed back to the return array.
-      // Copy timeslice sums back to device
-      //double *res = (double*)arg.result_h;
-      //for (int i=0; i<x.Nspin()*x.Nspin()*x.X(3); i++) result[i] = complex<real>(res[2*i], res[2*i+1]);
-=======
 
-      // Copy timeslice sums back to device
       arg.complete(result);
->>>>>>> origin/feature/smeared_diluted_propagators
-      // Head on back to your place in contractQuda to finish up.
+      //- Head on back to your place in contractQuda to finish up.
     } else {
       ContractionArg<real> arg(x, y, result);
       Contraction<real, ContractionArg<real>> contraction(arg, x, y, cType);

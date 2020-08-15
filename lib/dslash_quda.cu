@@ -192,17 +192,6 @@ namespace quda {
 
     void apply(const qudaStream_t &stream) {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-<<<<<<< HEAD
-        if(arg.proj == 0) gammaCPU<Float, nColor, Arg>(arg);
-        else chiralProjCPU<Float, nColor>(arg);
-      } else {
-        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());	
-        if(arg.proj == 0) {
-          qudaLaunchKernel(gammaGPU<Float, nColor, Arg>, tp, stream, arg);
-        } else {
-          qudaLaunchKernel(chiralProjGPU<Float, nColor, Arg>, tp, stream, arg);
-        }
-=======
 	if(arg.proj == 0) gammaCPU<Float,nColor,4,Arg>(arg);
 	else chiralProjCPU<Float,nColor>(arg);
       } else {
@@ -215,7 +204,6 @@ namespace quda {
 	  break;
 	default: errorQuda("%d not instantiated", arg.d);
 	}
->>>>>>> origin/feature/smeared_diluted_propagators
       }
     }
 
