@@ -82,7 +82,7 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
   *quda_quark[0] = *quark[0];
   profileSinkProject.TPSTOP(QUDA_PROFILE_H2D);
   
-   // check we are safe to cast into a Complex (= std::complex<double>)
+  // check we are safe to cast into a Complex (= std::complex<double>)
   if (sizeof(Complex) != sizeof(double _Complex)) {
     errorQuda("Irreconcilable difference between interface and internal complex number conventions");
   }
@@ -115,15 +115,15 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
   profileSinkProject.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
- void laphBaryonKernel(int n1, int n2, int n3, int nMom,
-		       double _Complex *host_coeffs1, 
-		       double _Complex *host_coeffs2, 
-		       double _Complex *host_coeffs3,
-		       double _Complex *host_mom, 
-		       int nEv, void **host_evec, 
-		       void *retArr,
-		       int blockSizeMomProj,
-		       const int X[4]) {
+void laphBaryonKernel(int n1, int n2, int n3, int nMom,
+		      double _Complex *host_coeffs1, 
+		      double _Complex *host_coeffs2, 
+		      double _Complex *host_coeffs3,
+		      double _Complex *host_mom, 
+		      int nEv, void **host_evec, 
+		      void *retArr,
+		      int blockSizeMomProj,
+		      const int X[4]) {
   
   profileBaryonKernel.TPSTART(QUDA_PROFILE_TOTAL);
   profileBaryonKernel.TPSTART(QUDA_PROFILE_INIT);
@@ -373,11 +373,11 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
   profileBaryonKernel.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
- void laphBaryonKernelComputeModeTripletA(int nMom, int nEv, void **host_evec, 
-					  double _Complex *host_mom,
-					  void *retArr,
-					  int blockSizeMomProj,
-					  const int X[4]) {
+void laphBaryonKernelComputeModeTripletA(int nMom, int nEv, void **host_evec, 
+					 double _Complex *host_mom,
+					 void *retArr,
+					 int blockSizeMomProj,
+					 const int X[4]) {
   
    
   profileBaryonKernelModeTripletsA.TPSTART(QUDA_PROFILE_TOTAL);
@@ -553,76 +553,19 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
   profileBaryonKernelModeTripletsA.TPSTOP(QUDA_PROFILE_FREE);
   profileBaryonKernelModeTripletsA.TPSTOP(QUDA_PROFILE_TOTAL);
   
-
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
- void laphBaryonKernelComputeModeTripletB(int n1, int n2, int n3, int nMom,
-					  double _Complex *host_coeffs1, 
-					  double _Complex *host_coeffs2, 
-					  double _Complex *host_coeffs3,
-					  double _Complex *host_mom, 
-					  double _Complex *host_mode_trip_buf,
-					  int nEv, void **host_evec, 
-					  void *retArr,
-					  const int X[4]) {
-   
-   
+void laphBaryonKernelComputeModeTripletB(int n1, int n2, int n3, int nMom,
+					 double _Complex *host_coeffs1, 
+					 double _Complex *host_coeffs2, 
+					 double _Complex *host_coeffs3,
+					 double _Complex *host_mom, 
+					 double _Complex *host_mode_trip_buf,
+					 int nEv, void **host_evec, 
+					 void *retArr,
+					 const int X[4]) {
+  
+  
   profileBaryonKernelModeTripletsB.TPSTART(QUDA_PROFILE_TOTAL);
   profileBaryonKernelModeTripletsB.TPSTART(QUDA_PROFILE_INIT);
   

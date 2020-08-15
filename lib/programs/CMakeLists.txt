@@ -4,11 +4,11 @@ if(QUDA_BUILD_SHAREDLIB)
   set_target_properties(quda_cuda_programs PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
 endif()
 
-target_include_directories(quda_cuda_programs PUBLIC ./include)
+#target_include_directories(quda_cuda_programs PUBLIC ./include)
 
 # this part needs cleanup, thinking about what is needed here
 target_compile_definitions(quda_cuda_programs PRIVATE $<TARGET_PROPERTY:quda_cpp,COMPILE_DEFINITIONS>)
-target_include_directories(quda_cuda_programs PRIVATE $<TARGET_PROPERTY:quda_cpp,INCLUDE_DIRECTORIES>)
+target_include_directories(quda_cuda_programs PRIVATE $<TARGET_PROPERTY:quda_cpp,INCLUDE_DIRECTORIES> ./include)
 target_compile_options(quda_cuda_programs PRIVATE $<TARGET_PROPERTY:quda_cpp,COMPILE_OPTIONS>)
 
 #add alias

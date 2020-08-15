@@ -19,11 +19,6 @@ namespace quda
     // Auxiliary work that can be done while waiting on comms to finish
     extern Worker *aux_worker;
 
-#if CUDA_VERSION >= 8000
-    extern cuuint32_t *commsEnd_h;
-    extern CUdeviceptr commsEnd_d[Nstream];
-#endif
-
     // these variables are used for benchmarking the dslash components in isolation
     extern bool dslash_pack_compute;
     extern bool dslash_interior_compute;
@@ -234,8 +229,6 @@ namespace quda
      - if gdr or zero-copy for the receive buffer then we have nothing
        else to do, it is now safe to post halo kernel
 
-     - if staging with async, we release the scatter by setting the approriate commsEnd_h flag
-
      - if basic staging, we post the scatter (host to device memory copy)
 
      @param[in,out] in Field being commicated
@@ -246,12 +239,11 @@ namespace quda
      @param[in] gdr_recv Whether GPU Direct RDMA is being used for receiving
      @param[in] zero_copy_recv Whether we are using zero-copy on the
      receive end (and hence do not need to do CPU->GPU copy)
-     @param[in] async Whether GPU Direct Async is being used
      @param[in] scatterIndex The stream index used for posting the host-to-device memory copy in
    */
   template <typename Dslash>
   inline bool commsComplete(cudaColorSpinorField &in, const Dslash &dslash, int dim, int dir, bool gdr_send,
-      bool gdr_recv, bool zero_copy_recv, bool async, int scatterIndex = -1)
+                            bool gdr_recv, bool zero_copy_recv, int scatterIndex = -1)
   {
 
     qudaStream_t *stream = nullptr;
@@ -267,22 +259,11 @@ namespace quda
       } else {
 
 	if (!gdr_recv && !zero_copy_recv) { // Issue CPU->GPU copy if not GDR
-
-	  if (async) {
-#if (CUDA_VERSION >= 8000) && 0
-	    // this will trigger the copy asynchronously
-	    *((volatile cuuint32_t*)(commsEnd_h+2*dim+dir2)) = 1;
-#else
-	    errorQuda("Async dslash policy variants require CUDA 8.0 and above");
-#endif
-	  } else {
-	    // note the ColorSpinorField::scatter transforms from
-	    // scatter centric to gather centric (e.g., flips
-	    // direction) so here just use dir not dir2
-	    if (scatterIndex == -1) scatterIndex = 2*dim+dir;
-	    PROFILE(if (dslash_copy) in.scatter(dslash.Nface()/2, dslash.Dagger(), 2*dim+dir, streams+scatterIndex), profile, QUDA_PROFILE_SCATTER);
-	  }
-
+          // note the ColorSpinorField::scatter transforms from
+          // scatter centric to gather centric (e.g., flips
+          // direction) so here just use dir not dir2
+          if (scatterIndex == -1) scatterIndex = 2*dim+dir;
+          PROFILE(if (dslash_copy) in.scatter(dslash.Nface()/2, dslash.Dagger(), 2*dim+dir, streams+scatterIndex), profile, QUDA_PROFILE_SCATTER);
 	}
 
       }
@@ -415,7 +396,7 @@ namespace quda
 
             // Query if comms has finished
             if (!pattern.commsCompleted[2 * i + dir] && pattern.gatherCompleted[2 * i + dir]) {
-              if (commsComplete(*in, dslash, i, dir, false, false, false, false)) {
+              if (commsComplete(*in, dslash, i, dir, false, false, false)) {
                 pattern.commsCompleted[2 * i + dir] = 1;
                 pattern.completeSum++;
               }
@@ -511,7 +492,7 @@ namespace quda
 
             // Query if comms has finished
             if (!pattern.commsCompleted[2 * i + dir] && pattern.gatherCompleted[2 * i + dir]) {
-              if (commsComplete(*in, dslash, i, dir, false, false, false, false, scatterIndex)) {
+              if (commsComplete(*in, dslash, i, dir, false, false, false, scatterIndex)) {
                 pattern.commsCompleted[2 * i + dir] = 1;
                 pattern.completeSum++;
               }
@@ -597,7 +578,7 @@ namespace quda
 
             // Query if comms has finished
             if (!pattern.commsCompleted[2 * i + dir]) {
-              if (commsComplete(*in, dslash, i, dir, true, true, false, false)) {
+              if (commsComplete(*in, dslash, i, dir, true, true, false)) {
                 ;
                 pattern.commsCompleted[2 * i + dir] = 1;
                 pattern.completeSum++;
@@ -679,7 +660,7 @@ namespace quda
 
             // Query if comms has finished
             if (!pattern.commsCompleted[2 * i + dir]) {
-              if (commsComplete(*in, dslash, i, dir, true, true, false, false)) {
+              if (commsComplete(*in, dslash, i, dir, true, true, false)) {
                 pattern.commsCompleted[2 * i + dir] = 1;
                 pattern.completeSum++;
               }
@@ -755,7 +736,7 @@ namespace quda
 
             // Query if comms has finished
             if (!pattern.commsCompleted[2 * i + dir] && pattern.gatherCompleted[2 * i + dir]) {
-              if (commsComplete(*in, dslash, i, dir, false, true, false, false)) {
+              if (commsComplete(*in, dslash, i, dir, false, true, false)) {
                 pattern.commsCompleted[2 * i + dir] = 1;
                 pattern.completeSum++;
               }
@@ -837,7 +818,7 @@ namespace quda
 
             // Query if comms has finished
             if (!pattern.commsCompleted[2 * i + dir] && pattern.gatherCompleted[2 * i + dir]) {
-              if (commsComplete(*in, dslash, i, dir, false, true, false, false)) {
+              if (commsComplete(*in, dslash, i, dir, false, true, false)) {
                 pattern.commsCompleted[2 * i + dir] = 1;
                 pattern.completeSum++;
               }
@@ -858,250 +839,10 @@ namespace quda
     }
   };
 
-#ifdef HOST_DEBUG
-#define CUDA_CALL( call )						\
-  {									\
-    CUresult cudaStatus = call;						\
-    if ( CUDA_SUCCESS != cudaStatus ) {					\
-      const char *err_str = nullptr;					\
-      cuGetErrorString(cudaStatus, &err_str);				\
-      fprintf(stderr, "ERROR: CUDA call \"%s\" in line %d of file %s failed with %s (%d).\n", #call, __LINE__, __FILE__, err_str, cudaStatus); \
-    }									\
-}
-#else
-#define CUDA_CALL( call ) call
-#endif
-
-/**
-   Experimental Dslash parallelization with host staging for send and receive, with GPU Direct Async
- */
-  template <typename Dslash> struct DslashAsync : DslashPolicyImp<Dslash> {
-
-#if (CUDA_VERSION >= 8000) && 0
-
-    void operator()(
-        Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile)
-    {
-
-      profile.TPSTART(QUDA_PROFILE_TOTAL);
-
-      auto &dslashParam = dslash.dslashParam;
-      dslashParam.kernel_type = INTERIOR_KERNEL;
-      dslashParam.threads = volume;
-
-      // Record the start of the dslash if doing communication in T and not kernel packing
-      if (dslashParam.commDim[3] && !getKernelPackT()) {
-        PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream - 1]), profile, QUDA_PROFILE_EVENT_RECORD);
-      }
-
-      issueRecv(*in, dslash, 0, false); // Prepost receives
-
-      const int packIndex = Nstream - 1;
-      const int parity_src = (in->SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
-      issuePack(*in, dslash, parity_src, static_cast<MemoryLocation>(Device | (Remote * dslashParam.remote_write)),
-                packIndex);
-
-      issueGather(*in, dslash);
-
-      PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream - 1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
-      if (aux_worker) aux_worker->apply(streams[Nstream - 1]);
-
-      DslashCommsPattern pattern(dslashParam.commDim);
-      while (pattern.completeSum < pattern.commDimTotal) {
-        for (int i = 3; i >= 0; i--) {
-          if (!dslashParam.commDim[i]) continue;
-
-          for (int dir = 1; dir >= 0; dir--) {
-            // Query if gather has completed
-            if (!pattern.gatherCompleted[2 * i + dir] && pattern.gatherCompleted[pattern.previousDir[2 * i + dir]]) {
-              cudaError_t event_test = comm_peer2peer_enabled(dir, i) ? cudaSuccess : cudaErrorNotReady;
-              if (event_test != cudaSuccess)
-                PROFILE(event_test = qudaEventQuery(gatherEnd[2 * i + dir]), profile, QUDA_PROFILE_EVENT_QUERY);
-
-              if (cudaSuccess == event_test) {
-                pattern.gatherCompleted[2 * i + dir] = 1;
-                pattern.completeSum++;
-                PROFILE(if (dslash_comms) in->sendStart(dslash.Nface() / 2, 2 * i + dir, dslash.Dagger(),
-                            dslashParam.remote_write ? streams + packIndex : nullptr, false, dslashParam.remote_write),
-                    profile, QUDA_PROFILE_COMMS_START);
-
-                // schedule post comms work (scatter into the end zone)
-                if (!comm_peer2peer_enabled(1 - dir, i)) {
-                  *((volatile cuuint32_t *)(commsEnd_h + 2 * i + 1 - dir)) = 0;
-                  CUDA_CALL(cuStreamWaitValue32(
-                      streams[2 * i + dir], commsEnd_d[2 * i + 1 - dir], 1, CU_STREAM_WAIT_VALUE_EQ));
-                  PROFILE(if (dslash_copy)
-                              in->scatter(dslash.Nface() / 2, dslash.Dagger(), 2 * i + dir, &streams[2 * i + dir]),
-                      profile, QUDA_PROFILE_SCATTER);
-                }
-              }
-            }
-
-            // Query if comms has finished
-            if (!pattern.commsCompleted[2 * i + dir] && pattern.gatherCompleted[2 * i + dir]) {
-              if (commsComplete(*in, dslash, i, dir, false, false, false, true)) {
-                pattern.commsCompleted[2 * i + dir] = 1;
-                pattern.completeSum++;
-              }
-            }
-
-          } // dir=0,1
-
-          if (!pattern.dslashCompleted[2 * i] && pattern.dslashCompleted[pattern.previousDir[2 * i + 1]]
-              && pattern.commsCompleted[2 * i] && pattern.commsCompleted[2 * i + 1]) {
-
-            for (int dir = 1; dir >= 0; dir--) {
-              if (!comm_peer2peer_enabled(
-                      1 - dir, i)) { // if not peer-to-peer we post an event in the scatter stream and wait on that
-                // Record the end of the scattering
-                PROFILE(
-                    qudaEventRecord(scatterEnd[2 * i + dir], streams[2 * i + dir]), profile, QUDA_PROFILE_EVENT_RECORD);
-                // wait for scattering to finish and then launch dslash
-                PROFILE(qudaStreamWaitEvent(streams[Nstream - 1], scatterEnd[2 * i + dir], 0), profile,
-                    QUDA_PROFILE_STREAM_WAIT_EVENT);
-              }
-            }
-
-            dslashParam.kernel_type = static_cast<KernelType>(i);
-            dslashParam.threads = dslash.Nface() * faceVolumeCB[i]; // updating 2 or 6 faces
-
-            // all faces use this stream
-            PROFILE(if (dslash_exterior_compute) dslash.apply(streams[Nstream - 1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
-
-            pattern.dslashCompleted[2 * i] = 1;
-          }
-        }
-      }
-
-      completeDslash(*in, dslashParam);
-      in->bufferIndex = (1 - in->bufferIndex);
-      profile.TPSTOP(QUDA_PROFILE_TOTAL);
-    }
-#else
-
-    void operator()(
-        Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile)
-    {
-      errorQuda("Async dslash policy variants require CUDA 8.0 and above");
-    }
-
-#endif // CUDA_VERSION >= 8000
-  };
-
-/**
-   Experimental Dslash parallelization with host staging for send and
-   receive, with GPU Direct Async, and fused hao update kernel
- */
-  template <typename Dslash> struct DslashFusedExteriorAsync : DslashPolicyImp<Dslash> {
-
-#if (CUDA_VERSION >= 8000) && 0
-
-    void operator()(
-        Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile)
-    {
-
-      profile.TPSTART(QUDA_PROFILE_TOTAL);
-
-      auto &dslashParam = dslash.dslashParam;
-      dslashParam.kernel_type = INTERIOR_KERNEL;
-      dslashParam.threads = volume;
-
-      // Record the start of the dslash if doing communication in T and not kernel packing
-      if (dslashParam.commDim[3] && !getKernelPackT()) {
-        PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream - 1]), profile, QUDA_PROFILE_EVENT_RECORD);
-      }
-
-      issueRecv(*in, dslash, 0, false); // Prepost receives
-
-      const int packIndex = Nstream - 1;
-      const int parity_src = (in->SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
-      issuePack(*in, dslash, parity_src, static_cast<MemoryLocation>(Device | (Remote * dslashParam.remote_write)),
-                packIndex);
-
-      issueGather(*in, dslash);
-
-      PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream - 1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
-      if (aux_worker) aux_worker->apply(streams[Nstream - 1]);
-
-      const int scatterIndex = getStreamIndex(dslashParam);
-      DslashCommsPattern pattern(dslashParam.commDim);
-      while (pattern.completeSum < pattern.commDimTotal) {
-        for (int i = 3; i >= 0; i--) {
-          if (!dslashParam.commDim[i]) continue;
-
-          for (int dir = 1; dir >= 0; dir--) {
-
-            // Query if gather has completed
-            if (!pattern.gatherCompleted[2 * i + dir] && pattern.gatherCompleted[pattern.previousDir[2 * i + dir]]) {
-              cudaError_t event_test = comm_peer2peer_enabled(dir, i) ? cudaSuccess : cudaErrorNotReady;
-              if (event_test != cudaSuccess)
-                PROFILE(event_test = qudaEventQuery(gatherEnd[2 * i + dir]), profile, QUDA_PROFILE_EVENT_QUERY);
-
-              if (cudaSuccess == event_test) {
-                pattern.gatherCompleted[2 * i + dir] = 1;
-                pattern.completeSum++;
-                PROFILE(if (dslash_comms) in->sendStart(dslash.Nface() / 2, 2 * i + dir, dslash.Dagger(),
-                            dslashParam.remote_write ? streams + packIndex : nullptr, false, dslashParam.remote_write),
-                    profile, QUDA_PROFILE_COMMS_START);
-
-                // schedule post comms work (scatter into the end zone)
-                if (!comm_peer2peer_enabled(1 - dir, i)) { // gather centric
-                  *((volatile cuuint32_t *)(commsEnd_h + 2 * i + 1 - dir)) = 0;
-                  CUDA_CALL(cuStreamWaitValue32(
-                      streams[scatterIndex], commsEnd_d[2 * i + 1 - dir], 1, CU_STREAM_WAIT_VALUE_EQ));
-                  PROFILE(if (dslash_copy)
-                              in->scatter(dslash.Nface() / 2, dslash.Dagger(), 2 * i + dir, streams + scatterIndex),
-                      profile, QUDA_PROFILE_SCATTER);
-                }
-              }
-            }
-
-            // Query if comms has finished
-            if (!pattern.commsCompleted[2 * i + dir] && pattern.gatherCompleted[2 * i + dir]) {
-              if (commsComplete(*in, dslash, i, dir, false, false, false, true, scatterIndex)) {
-                pattern.commsCompleted[2 * i + dir] = 1;
-                pattern.completeSum++;
-              }
-            }
-
-          } // dir=0,1
-        }   // i
-      }     // while(pattern.completeSum < commDimTotal)
-
-      for (int i = 3; i >= 0; i--) {
-        if (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0, i) || !comm_peer2peer_enabled(1, i))) {
-          // if not peer-to-peer we post an event in the scatter stream and wait on that
-          PROFILE(qudaEventRecord(scatterEnd[0], streams[scatterIndex]), profile, QUDA_PROFILE_EVENT_RECORD);
-          PROFILE(qudaStreamWaitEvent(streams[Nstream - 1], scatterEnd[0], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
-          break;
-        }
-      }
-
-      if (pattern.commDimTotal) {
-        setFusedParam(dslashParam, dslash, faceVolumeCB); // setup for exterior kernel
-        PROFILE(if (dslash_exterior_compute) dslash.apply(streams[Nstream - 1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
-      }
-
-      completeDslash(*in, dslashParam);
-      in->bufferIndex = (1 - in->bufferIndex);
-      profile.TPSTOP(QUDA_PROFILE_TOTAL);
-    }
-
-#else
-
-    void operator()(
-        Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile)
-    {
-      errorQuda("Async dslash policy variants require CUDA 8.0 and above");
-    }
-
-#endif // CUDA_VERSION >= 8000
-  };
-
-/**
-   Variation of multi-gpu dslash where the packing kernel writes
-   buffers directly to host memory
-*/
+  /**
+     Variation of multi-gpu dslash where the packing kernel writes
+     buffers directly to host memory
+  */
   template <typename Dslash> struct DslashZeroCopyPack : DslashPolicyImp<Dslash> {
 
     void operator()(
@@ -1161,7 +902,7 @@ namespace quda
 
             // Query if comms have finished
             if (!pattern.commsCompleted[2 * i + dir]) {
-              if (commsComplete(*in, dslash, i, dir, false, false, false, false)) {
+              if (commsComplete(*in, dslash, i, dir, false, false, false)) {
                 pattern.commsCompleted[2 * i + dir] = 1;
                 pattern.completeSum++;
               }
@@ -1263,7 +1004,7 @@ namespace quda
 
             // Query if comms has finished
             if (!pattern.commsCompleted[2 * i + dir]) {
-              if (commsComplete(*in, dslash, i, dir, false, false, false, false, packScatterIndex)) {
+              if (commsComplete(*in, dslash, i, dir, false, false, false, packScatterIndex)) {
                 pattern.commsCompleted[2 * i + dir] = 1;
                 pattern.completeSum++;
               }
@@ -1356,7 +1097,7 @@ namespace quda
 
             // Query if comms has finished
             if (!pattern.commsCompleted[2 * i + dir] && pattern.gatherCompleted[2 * i + dir]) {
-              if (commsComplete(*in, dslash, i, dir, false, true, false, false)) {
+              if (commsComplete(*in, dslash, i, dir, false, true, false)) {
                 pattern.commsCompleted[2 * i + dir] = 1;
                 pattern.completeSum++;
               }
@@ -1446,7 +1187,7 @@ namespace quda
 
             // Query if comms has finished
             if (!pattern.commsCompleted[2 * i + dir] && pattern.gatherCompleted[2 * i + dir]) {
-              if (commsComplete(*in, dslash, i, dir, false, true, false, false)) {
+              if (commsComplete(*in, dslash, i, dir, false, true, false)) {
                 pattern.commsCompleted[2 * i + dir] = 1;
                 pattern.completeSum++;
               }
@@ -1530,7 +1271,7 @@ namespace quda
 
             // Query if comms have finished
             if (!pattern.commsCompleted[2 * i + dir]) {
-              if (commsComplete(*in, dslash, i, dir, false, false, true, false)) {
+              if (commsComplete(*in, dslash, i, dir, false, false, true)) {
                 pattern.commsCompleted[2 * i + dir] = 1;
                 pattern.completeSum++;
               }
@@ -1620,7 +1361,7 @@ namespace quda
 
             // Query if comms have finished
             if (!pattern.commsCompleted[2 * i + dir]) {
-              if (commsComplete(*in, dslash, i, dir, false, false, true, false)) {
+              if (commsComplete(*in, dslash, i, dir, false, false, true)) {
                 pattern.commsCompleted[2 * i + dir] = 1;
                 pattern.completeSum++;
               }
@@ -1706,7 +1447,7 @@ namespace quda
 
             // Query if comms have finished
             if (!pattern.commsCompleted[2 * i + dir]) {
-              if (commsComplete(*in, dslash, i, dir, false, false, true, false)) {
+              if (commsComplete(*in, dslash, i, dir, false, false, true)) {
                 pattern.commsCompleted[2 * i + dir] = 1;
                 pattern.completeSum++;
               }
@@ -1799,7 +1540,7 @@ namespace quda
 
             // Query if comms have finished
             if (!pattern.commsCompleted[2 * i + dir]) {
-              if (commsComplete(*in, dslash, i, dir, false, false, true, false)) {
+              if (commsComplete(*in, dslash, i, dir, false, false, true)) {
                 pattern.commsCompleted[2 * i + dir] = 1;
                 pattern.completeSum++;
               }
@@ -1862,8 +1603,6 @@ namespace quda
     QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH,
     QUDA_DSLASH_FUSED_PACK,
     QUDA_DSLASH_FUSED_PACK_FUSED_HALO,
-    QUDA_DSLASH_ASYNC,
-    QUDA_FUSED_DSLASH_ASYNC,
     QUDA_DSLASH_NC,
     QUDA_DSLASH_POLICY_DISABLED // this MUST be the last element
   };
@@ -1892,9 +1631,7 @@ namespace quda
 
       switch (dslashPolicy) {
       case QudaDslashPolicy::QUDA_DSLASH: result = new DslashBasic<Dslash>; break;
-      case QudaDslashPolicy::QUDA_DSLASH_ASYNC: result = new DslashAsync<Dslash>; break;
       case QudaDslashPolicy::QUDA_FUSED_DSLASH: result = new DslashFusedExterior<Dslash>; break;
-      case QudaDslashPolicy::QUDA_FUSED_DSLASH_ASYNC: result = new DslashFusedExteriorAsync<Dslash>; break;
       case QudaDslashPolicy::QUDA_GDR_DSLASH:
         if (!comm_gdr_blacklist())
           result = new DslashGDR<Dslash>;
@@ -2050,22 +1787,6 @@ public:
 
           enable_policy(QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK);
           enable_policy(QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK_FUSED_HALO);
-
-          // Async variants are only supported on CUDA 8.0 and up
-#if (CUDA_VERSION >= 8000) && 0
-#if (CUDA_VERSION >= 9000)
-	 CUdevice device;
-	 cuDeviceGet(&device, comm_gpuid());
-	 int can_use_stream_mem_ops;
-	 cuDeviceGetAttribute(&can_use_stream_mem_ops, CU_DEVICE_ATTRIBUTE_CAN_USE_STREAM_MEM_OPS, device);
-#else
-	 int can_use_stream_mem_ops = 1;
-#endif
-	 if (can_use_stream_mem_ops) {
-	   enable_policy(QudaDslashPolicy::QUDA_DSLASH_ASYNC);
-	   enable_policy(QudaDslashPolicy::QUDA_FUSED_DSLASH_ASYNC);
-	 }
-#endif
         }
 
         // construct string specifying which policies have been enabled
@@ -2120,8 +1841,7 @@ public:
 
           for (auto &i : policies) {
 
-            if ((i == QudaDslashPolicy::QUDA_DSLASH || i == QudaDslashPolicy::QUDA_FUSED_DSLASH
-                 || i == QudaDslashPolicy::QUDA_DSLASH_ASYNC || i == QudaDslashPolicy::QUDA_FUSED_DSLASH_ASYNC)
+            if ((i == QudaDslashPolicy::QUDA_DSLASH || i == QudaDslashPolicy::QUDA_FUSED_DSLASH)
                 && !dslashParam.remote_write) {
 
               DslashPolicyImp<Dslash> *dslashImp = DslashFactory<Dslash>::create(i);
@@ -2137,8 +1857,7 @@ public:
                         || i == QudaDslashPolicy::QUDA_ZERO_COPY_DSLASH || i == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_DSLASH
                         || i == QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK
                         || i == QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK_FUSED_HALO)
-                       || ((i == QudaDslashPolicy::QUDA_DSLASH || i == QudaDslashPolicy::QUDA_FUSED_DSLASH
-                            || i == QudaDslashPolicy::QUDA_DSLASH_ASYNC || i == QudaDslashPolicy::QUDA_FUSED_DSLASH_ASYNC)
+                       || ((i == QudaDslashPolicy::QUDA_DSLASH || i == QudaDslashPolicy::QUDA_FUSED_DSLASH)
                            && dslashParam.remote_write)) {
               // these dslash policies all must have kernel packing enabled
 

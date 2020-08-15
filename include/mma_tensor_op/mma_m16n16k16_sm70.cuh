@@ -1,6 +1,6 @@
 #pragma once
 
-#if (__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ >= 1) || (__CUDACC_VER_MAJOR__ > 10)
+#if CUDA_VERSION >= 10100
 
 #include <mma.h>
 
@@ -211,6 +211,6 @@ namespace quda
     }
   }
 
-#endif // #if (__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ >= 1) || __CUDACC_VER_MAJOR__ > 10
+#endif // #if CUDA_VERSION >= 10100
 
 } // namespace quda
