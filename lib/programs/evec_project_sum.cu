@@ -11,7 +11,7 @@
 namespace quda
 {
 
-  template <typename Arg> class EvecProjectSumCompute : TunableLocalParity
+  template <typename Arg> class EvecProjectSumCompute : TunableLocalParityReduction
   {
     Arg &arg;
     const ColorSpinorField &x;
@@ -22,18 +22,18 @@ namespace quda
     bool tuneGridDim() const { return true; }
 
     void initTuneParam(TuneParam &param) const {
-      TunableLocalParity::initTuneParam(param);
+      TunableLocalParityReduction::initTuneParam(param);
       param.grid.z = x.X(3); // T dimension is mapped to different blocks in the Z dimension
     }
 
     void defaultTuneParam(TuneParam &param) const {
-      TunableLocalParity::defaultTuneParam(param);
+      TunableLocalParityReduction::defaultTuneParam(param);
       param.grid.z = x.X(3); // T dimension is mapped to different blocks in the Z dimension
     }
 
   public:
     EvecProjectSumCompute(Arg &arg, const ColorSpinorField &x, const ColorSpinorField &y) :
-      TunableLocalParity(),
+      TunableLocalParityReduction(),
       arg(arg),
       x(x),
       y(y)
@@ -48,7 +48,6 @@ namespace quda
     void apply(const cudaStream_t &stream)
     {
       if (x.Location() == QUDA_CUDA_FIELD_LOCATION) {
-	for (int i=0; i<2*x.Nspin()*x.X(3); i++) ((double*)arg.result_h)[i] = 0.0; 
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
 #ifdef JITIFY
@@ -91,10 +90,7 @@ namespace quda
     EvecProjectSumArg<Float, nColor> arg(x, y);
     EvecProjectSumCompute<decltype(arg)> evec_project_sum(arg, x, y);
     evec_project_sum.apply(0);
-    qudaDeviceSynchronize();
-
-    double *res = (double*)arg.result_h;
-    for (int i=0; i<x.Nspin()*x.X(3); i++) result[i] = std::complex<double>(res[2*i], res[2*i+1]);
+    arg.complete(result);
   }
   
   void evecProjectSumQuda(const ColorSpinorField &x, const ColorSpinorField &y, std::complex<double> *result)

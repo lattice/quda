@@ -24,35 +24,36 @@ namespace quda
 extern "C" {
 #endif
 
-
-  void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_sinks,
+  /**
+   * @brief Hacks for Callat
+   */
+  void laphSinkProject(void *host_quark, void **host_evec, double_complex *host_sinks,
 		       QudaInvertParam inv_param, unsigned int nEv, const int X[4]);
 
   void laphBaryonKernel(int n1, int n2, int n3, int nMom,
 			double _Complex *host_coeffs1, 
 			double _Complex *host_coeffs2, 
 			double _Complex *host_coeffs3,
-			double _Complex *host_mom, 
-			int nEv, void **host_evec, 
-			void *retArr,
+			double _Complex *momP, 
+			int nEv, void **evPtr, 
+			void *retArray,
 			int blockSizeMomProj,
 			const int X[4]);
-
-  void laphBaryonKernelComputeModeTripletA(int nMom, int nEv, void **host_evec, 
+  
+  void laphBaryonKernelComputeModeTripletA(int nMom, int nEv, int blockSizeMomProj,
+					   void **host_evec, 
 					   double _Complex *host_mom,
-					   void *retArr,
-					   int blockSizeMomProj,
-					   const int X[4]);
-
-  void laphBaryonKernelComputeModeTripletB(int n1, int n2, int n3, int nMom,
+					   double _Complex *return_array,
+					   const int X[4]);  
+  
+  void laphBaryonKernelComputeModeTripletB(int n1, int n2, int n3, int nMom, int nEv, 
 					   double _Complex *host_coeffs1, 
 					   double _Complex *host_coeffs2, 
 					   double _Complex *host_coeffs3,
-					   double _Complex *host_mom, 
-					   double _Complex *host_mode_trip_buf,
-					   int nEv, void **host_evec, 
-					   void *retArr,
-					   const int X[4]);
+					   double _Complex *host_mode_trip_buff,
+					   double _Complex *return_array);
+  
+  void laphBaryonKernelComputeModeTripletEnd(); 
 
 #ifdef __cplusplus
 }

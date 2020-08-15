@@ -11,7 +11,7 @@
 namespace quda
 {
 
-  template <typename Float, typename Arg> class ColorContractCompute : TunableLocalParity
+  template <typename Float, typename Arg> class ColorContractCompute : TunableLocalParityReduction
   {
     Arg &arg;
     const ColorSpinorField &x;
@@ -23,7 +23,7 @@ namespace quda
     
   public:
     ColorContractCompute(Arg &arg, const ColorSpinorField &x, const ColorSpinorField &y) :
-      TunableLocalParity(),
+      TunableLocalParityReduction(),
       arg(arg),
       x(x),
       y(y)

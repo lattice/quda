@@ -11,7 +11,7 @@
 namespace quda
 {
 
-  template <typename Float, typename Arg> class ColorCrossCompute : TunableLocalParity
+  template <typename Float, typename Arg> class ColorCrossCompute : TunableLocalParityReduction
   {
     Arg &arg;
     const ColorSpinorField &x;
@@ -24,7 +24,7 @@ namespace quda
     
   public:
     ColorCrossCompute(Arg &arg, const ColorSpinorField &x, const ColorSpinorField &y, ColorSpinorField &result) :
-      TunableLocalParity(),
+      TunableLocalParityReduction(),
       arg(arg),
       x(x),
       y(y),
