@@ -62,7 +62,7 @@ int main(int argc, char **argv)
   //FIXME what about this parameter class? should it be part of quda.h like invertparam etc?
   quda::ColorSpinorParam cs_param;
   quda::ColorSpinorParam* cs_param_ptr = &cs_param;
-  constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param); //FIXME remove Test from this function name?
+  constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
   int spinor_dim = cs_param.nColor * cs_param.nSpin;
   setSpinorSiteSize(spinor_dim * 2); // this sets the global variable my_spinor_site_size
 
@@ -71,8 +71,9 @@ int main(int argc, char **argv)
   auto *source_array = (double *)malloc(spinor_dim * spinor_dim * V * 2 * bytes_per_float);
   auto *prop_array = (double *)malloc(spinor_dim * spinor_dim * V * 2 * bytes_per_float);
 
-  //this will be a C array of pointers to the memory (CSF->V()) of the spinor_dim colorspinorfields. functions declared in quda.h
-  // can only accept C code for backwards compatibility reasons
+  // This will be a C array of pointers to the memory (CSF->V()) of the
+  // spinor_dim colorspinorfields. Functions declared in quda.h
+  // can only accept C code for backwards compatibility reasons.
   void *CSF_V_ptr_arr_source[spinor_dim];
   void *CSF_V_ptr_arr_prop[spinor_dim];
   
@@ -104,20 +105,20 @@ int main(int argc, char **argv)
     }
 
     contractSpatialQuda(CSF_V_ptr_arr_prop, CSF_V_ptr_arr_prop, &correlation_function_sum, contract_type, &inv_param, (void*)cs_param_ptr, gauge_param.X);
-  }
-
-  // print correlators
-  size_t corr_dim;
-  contract_type == QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL ? corr_dim = 2 : corr_dim = 3;
-  size_t global_corr_length = gauge_param.X[corr_dim] * comm_dim(corr_dim);
-  size_t n_numbers_per_slice = 2 * 16;
-  for (int G_idx = 0; G_idx < 16; G_idx++) {
-    for (size_t t = 0; t < global_corr_length; t++) {
-      printfQuda("sum: g=%d t=%lu %e %e\n", G_idx, t, ((double*)correlation_function_sum)[n_numbers_per_slice * t + 2 * G_idx],
-                 ((double*)correlation_function_sum)[n_numbers_per_slice * t + 2 * G_idx + 1]);
+    
+    // Print correlators for this propagator source position
+    size_t corr_dim;
+    contract_type == QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL ? corr_dim = 2 : corr_dim = 3;
+    size_t global_corr_length = gauge_param.X[corr_dim] * comm_dim(corr_dim);
+    size_t n_numbers_per_slice = 2 * 16;
+    for (int G_idx = 0; G_idx < 16; G_idx++) {
+      for (size_t t = 0; t < global_corr_length; t++) {
+	printfQuda("sum: prop_n=%d g=%d t=%lu %e %e\n", n, G_idx, t, ((double*)correlation_function_sum)[n_numbers_per_slice * t + 2 * G_idx],
+		   ((double*)correlation_function_sum)[n_numbers_per_slice * t + 2 * G_idx + 1]);
+      }
     }
   }
-
+  
   // free memory
   freeGaugeQuda();
   for (auto &dir : gauge) free(dir);

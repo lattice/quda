@@ -5792,6 +5792,8 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
 void contractSpatialQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavor_2, void **h_result,
 			 const QudaContractType cType, QudaInvertParam *param, void *colorspinorparam, const int *X)
 {
+  profileContractSpatial.TPSTART(QUDA_PROFILE_TOTAL);
+  profileContractSpatial.TPSTART(QUDA_PROFILE_INIT);
   // create ColorSpinorFields from void** and parameter
   auto cs_param = (ColorSpinorParam *)colorspinorparam;
   const size_t nSpin = cs_param->nSpin;
@@ -5821,14 +5823,8 @@ void contractSpatialQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavo
 
   // calculate some parameters
   size_t global_corr_length = local_corr_length * comm_dim(corr_dim);
-
   size_t n_numbers_per_slice = 2 * 16;
   size_t corr_size_in_bytes = n_numbers_per_slice * global_corr_length * cs_param->Precision();
-
-  *h_result = malloc(corr_size_in_bytes);
-  memset(*h_result, 0, corr_size_in_bytes);
-  // array that fits all timeslices and channels but is reset after each computation
-  void *h_result_tmp_global = malloc(corr_size_in_bytes);
 
   // create device spinor fields
   ColorSpinorParam cudaParam(*cs_param);
@@ -5838,6 +5834,12 @@ void contractSpatialQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavo
   cudaParam.setPrecision(cs_param->Precision(), cs_param->Precision(), true);
   ColorSpinorField *d_single_prop_flavor_1 = ColorSpinorField::Create(cudaParam);
   ColorSpinorField *d_single_prop_flavor_2 = ColorSpinorField::Create(cudaParam);
+  
+  *h_result = malloc(corr_size_in_bytes);
+  memset(*h_result, 0, corr_size_in_bytes);
+  // array that fits all timeslices and channels but is reset after each computation
+  void *h_result_tmp_global = malloc(corr_size_in_bytes);
+  profileContractSpatial.TPSTOP(QUDA_PROFILE_INIT);
 
   for (size_t s1 = 0; s1 < nSpin; s1++) {
     for (size_t c1 = 0; c1 < nColor; c1++) {
@@ -5845,11 +5847,16 @@ void contractSpatialQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavo
 
         *d_single_prop_flavor_1 = *CSF_ptr_container_flavor_1[s1 * nColor + c1];
         *d_single_prop_flavor_2 = *CSF_ptr_container_flavor_2[b1 * nColor + c1];
-
-        contractSpatialQuda(*d_single_prop_flavor_1, *d_single_prop_flavor_2, s1, b1, h_result_tmp_global, cType);
 	
-        comm_allreduce_array((double*)h_result_tmp_global, n_numbers_per_slice * global_corr_length);
+	profileContractSpatial.TPSTART(QUDA_PROFILE_COMPUTE);
+        contractSpatialQuda(*d_single_prop_flavor_1, *d_single_prop_flavor_2, s1, b1, h_result_tmp_global, cType);
+	profileContractSpatial.TPSTOP(QUDA_PROFILE_COMPUTE);
 
+	profileContractSpatial.TPSTART(QUDA_PROFILE_COMMS);
+        comm_allreduce_array((double*)h_result_tmp_global, n_numbers_per_slice * global_corr_length);
+	profileContractSpatial.TPSTOP(QUDA_PROFILE_COMMS);
+
+	profileContractSpatial.TPSTART(QUDA_PROFILE_COMPUTE);
         for (int G_idx = 0; G_idx < 16; G_idx++) {
           for (size_t t = 0; t < global_corr_length; t++) {
             ((double *)*h_result)[n_numbers_per_slice * t + 2 * G_idx]
@@ -5858,9 +5865,12 @@ void contractSpatialQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavo
               += ((double*)h_result_tmp_global)[n_numbers_per_slice * t + 2 * G_idx + 1];
           }
         }
+	profileContractSpatial.TPSTOP(QUDA_PROFILE_COMPUTE);
       }
     }
   }
+
+  profileContractSpatial.TPSTART(QUDA_PROFILE_FREE);
   //free memory
   delete d_single_prop_flavor_1;
   delete d_single_prop_flavor_2;
@@ -5869,6 +5879,9 @@ void contractSpatialQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavo
     delete CSF_ptr_container_flavor_2[i];
   }
   free(h_result_tmp_global);
+  profileContractSpatial.TPSTOP(QUDA_PROFILE_FREE);
+  profileContractSpatial.TPSTOP(QUDA_PROFILE_TOTAL);
+  saveTuneCache();
 }
 
 void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const QudaContractType cType,
