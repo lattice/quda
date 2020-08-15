@@ -73,10 +73,11 @@ namespace quda {
 
         __device__ __host__ inline Matrix() { setZero(this); }
 
-        __device__ __host__ inline Matrix(const Matrix<T,N> &a) {
+        __device__ __host__ inline Matrix(const Matrix<T, N> &a)
+        {
 #pragma unroll
 	  for (int i=0; i<N*N; i++) data[i] = a.data[i];
-	}
+        }
 
         template <class U> __device__ __host__ inline Matrix(const Matrix<U, N> &a)
         {
@@ -570,8 +571,7 @@ namespace quda {
 	}
       }
       return result;
-    }
-
+  }
 
   template<class T>
     __device__ __host__ inline

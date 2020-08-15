@@ -83,6 +83,12 @@ if(QUDA_DIRAC_WILSON
   quda_checkbuildtest(eigensolve_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS eigensolve_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+  add_executable(propagator_test propagator_test.cpp)
+  target_link_libraries(propagator_test ${TEST_LIBS})
+  quda_checkbuildtest(propagator_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS propagator_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+  
   if(QUDA_BLOCKSOLVER)
     add_executable(invertmsrc_test invertmsrc_test.cpp)
     target_link_libraries(invertmsrc_test ${TEST_LIBS})

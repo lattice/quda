@@ -113,11 +113,17 @@ void setInvertParam(QudaInvertParam &inv_param)
   if (kappa == -1.0) {
     inv_param.mass = mass;
     inv_param.kappa = 1.0 / (2.0 * (1 + 3 / anisotropy + mass));
-    if (dslash_type == QUDA_LAPLACE_DSLASH) inv_param.kappa = 1.0 / (8 + mass);
+    if (dslash_type == QUDA_LAPLACE_DSLASH) {
+      if(laplace3D < 4) inv_param.kappa = 1.0 / (8.0 - 2.0 + inv_param.mass);
+      else inv_param.kappa = 1.0 / (8 + inv_param.mass);
+    }
   } else {
     inv_param.kappa = kappa;
     inv_param.mass = 0.5 / kappa - (1.0 + 3.0 / anisotropy);
-    if (dslash_type == QUDA_LAPLACE_DSLASH) inv_param.mass = 1.0 / kappa - 8.0;
+    if (dslash_type == QUDA_LAPLACE_DSLASH) {
+      if(laplace3D < 4) inv_param.mass = 1.0 / inv_param.kappa - (8.0 - 2.0);
+      else inv_param.mass = 1.0 / inv_param.kappa - 8.0;
+    }
   }
   printfQuda("Kappa = %.8f Mass = %.8f\n", inv_param.kappa, inv_param.mass);
 
@@ -159,7 +165,7 @@ void setInvertParam(QudaInvertParam &inv_param)
     inv_param.clover_cuda_prec_eigensolver = cuda_prec_eigensolver;
     inv_param.clover_cuda_prec_refinement_sloppy = cuda_prec_sloppy;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
-    inv_param.clover_coeff = clover_coeff;
+    inv_param.clover_coeff = inv_param.kappa * clover_coeff;
   }
 
   // General parameter setup

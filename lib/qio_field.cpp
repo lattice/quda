@@ -260,9 +260,11 @@ int read_field(QIO_Reader *infile, int Ninternal, int count, void *field_in[], Q
   switch (Ninternal) {
   case 6: status = read_field<6>(infile, count, field_in, cpu_prec, subset, parity, nSpin, nColor); break;
   case 24: status = read_field<24>(infile, count, field_in, cpu_prec, subset, parity, nSpin, nColor); break;
+  case 72: status = read_field<72>(infile, count, field_in, cpu_prec, subset, parity, nSpin, nColor); break;
   case 96: status = read_field<96>(infile, count, field_in, cpu_prec, subset, parity, nSpin, nColor); break;
   case 128: status = read_field<128>(infile, count, field_in, cpu_prec, subset, parity, nSpin, nColor); break;
   case 256: status = read_field<256>(infile, count, field_in, cpu_prec, subset, parity, nSpin, nColor); break;
+  case 288: status = read_field<288>(infile, count, field_in, cpu_prec, subset, parity, nSpin, nColor); break;
   case 384: status = read_field<384>(infile, count, field_in, cpu_prec, subset, parity, nSpin, nColor); break;
   default:
     errorQuda("Undefined %d", Ninternal);
@@ -291,6 +293,27 @@ void read_spinor_field(const char *filename, void *V[], QudaPrecision precision,
   printfQuda("%s: Closed file for reading\n",__func__);
 }
 
+void read_propagator_field(const char *filename, void *V[], QudaPrecision precision, const int *X, QudaSiteSubset subset,
+                       QudaParity parity, int nColor, int nSpin, int Nprop, int argc, char *argv[])
+{
+  quda_this_node = QMP_get_node_number();
+
+  set_layout(X, subset);
+
+  /* Open the test file for reading */
+  QIO_Reader *infile = open_test_input(filename, QIO_UNKNOWN, QIO_PARALLEL);
+  if (infile == NULL) { errorQuda("Open file failed\n"); }
+
+  /* Read the spinor field record */
+  printfQuda("%s: reading %d vector fields\n", __func__, Nprop); fflush(stdout);
+  int status = read_field(infile, 12 * 2 * nSpin * nColor, Nprop, V, precision, subset, parity, nSpin, nColor);
+  if (status) { errorQuda("read_spinor_fields failed %d\n", status); }
+
+  /* Close the file */
+  QIO_close_read(infile);
+  printfQuda("%s: Closed file for reading\n",__func__);
+}
+
 template <int len>
 int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision file_prec, QudaPrecision cpu_prec,
                 QudaSiteSubset subset, QudaParity parity, int nSpin, int nColor, const char *type)
@@ -300,16 +323,19 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
   switch (len) {
   case 6: xml_record += "StaggeredColorSpinorField>"; break; // SU(3) staggered
   case 18: xml_record += "GaugeFieldFile>"; break;           // SU(3) gauge field
-  case 24: xml_record += "WilsonColorSpinorField>"; break;   // SU(3) Wilson
+  case 24: xml_record += "WilsonColorSpinorField>"; break;   // SU(3) Wilson vec 
   case 96:
   case 128:
   case 256:
   case 384: xml_record += "MGColorSpinorField>"; break; // Color spinor vector
+  case 72: xml_record += "StaggeredPropagator>"; break; // SU(3) staggered * 12
+  case 288: xml_record += "WilsonPropagator>"; break;   // SU(3) Wilson vec * 12
   default: errorQuda("Invalid element length for QIO writing."); break;
   }
-  xml_record += "<version>BETA</version>";
-  xml_record += "<type>" + std::string(type) + "</type><info>";
-
+  xml_record += "\n";
+  xml_record += "<version>BETA</version>\n";
+  xml_record += "<type>" + std::string(type) + "</type>\n<info>\n";
+  
   // if parity+even, it's a half-x-dim even only vector
   // if parity+odd, it's a half-x-dim odd only vector
   // if full+even, it's a full vector with only even sites filled, odd are zero
@@ -317,22 +343,22 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
   // if full+full, it's a full vector with all sites filled (either a full ColorSpinorField or a GaugeField)
 
   if (subset == QUDA_PARITY_SITE_SUBSET) {
-    xml_record += "<subset>parity</subset>";
+    xml_record += "  <subset>parity</subset>\n";
   } else {
-    xml_record += "<subset>full</subset>";
+    xml_record += "  <subset>full</subset>\n";
   }
   if (parity == QUDA_EVEN_PARITY) {
-    xml_record += "<parity>even</parity>";
+    xml_record += "    <parity>even</parity>\n";
   } else if (parity == QUDA_ODD_PARITY) {
-    xml_record += "<parity>odd</parity>";
+    xml_record += "    <parity>odd</parity>\n";
   } else {
-    xml_record += "<parity>full</parity>";
+    xml_record += "  <parity>full</parity>\n";
   } // abuse/hack
 
   // A lot of this is redundant of the record info, but eh.
-  xml_record += "<nColor>" + std::to_string(nColor) + "</nColor>";
-  xml_record += "<nSpin>" + std::to_string(nSpin) + "</nSpin>";
-  xml_record += "</info></quda";
+  xml_record += "  <nColor>" + std::to_string(nColor) + "</nColor>\n";
+  xml_record += "  <nSpin>" + std::to_string(nSpin) + "</nSpin>\n";
+  xml_record += "</info>\n</quda";
   switch (len) {
   case 6: xml_record += "StaggeredColorSpinorField>"; break; // SU(3) staggered
   case 18: xml_record += "GaugeFieldFile>"; break;           // SU(3) gauge field
@@ -341,8 +367,11 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
   case 128:
   case 256:
   case 384: xml_record += "MGColorSpinorField>"; break; // Color spinor vector
+  case 72: xml_record += "StaggeredPropagator>"; break; // SU(3) staggered * 12
+  case 288: xml_record += "WilsonPropagator>"; break;   // SU(3) Wilson vec * 12
   default: errorQuda("Invalid element length for QIO writing."); break;
   }
+  xml_record += "\n\n";
 
   int status;
 
@@ -432,10 +461,13 @@ int write_field(QIO_Writer *outfile, int Ninternal, int count, void *field_out[]
   int status = 0;
   switch (Ninternal) {
   case 6:
-    status = write_field<6>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
+    status = write_field<6>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type); 
     break;
   case 24:
     status = write_field<24>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
+    break;
+  case 72:
+    status = write_field<72>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
     break;
   case 96:
     status = write_field<96>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
@@ -445,6 +477,9 @@ int write_field(QIO_Writer *outfile, int Ninternal, int count, void *field_out[]
     break;
   case 256:
     status = write_field<256>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
+    break;
+  case 288:
+    status = write_field<288>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
     break;
   case 384:
     status = write_field<384>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
@@ -476,6 +511,34 @@ void write_spinor_field(const char *filename, void *V[], QudaPrecision precision
   int status
     = write_field(outfile, 2 * nSpin * nColor, Nvec, V, precision, precision, subset, parity, nSpin, nColor, type);
   if (status) { errorQuda("write_spinor_fields failed %d\n", status); }
+
+  /* Close the file */
+  QIO_close_write(outfile);
+  printfQuda("%s: Closed file for writing\n",__func__);
+}
+
+
+void write_propagator_field(const char *filename, void *V[], QudaPrecision precision, const int *X, QudaSiteSubset subset,
+			    QudaParity parity, int nColor, int nSpin, int Nprop, int argc, char *argv[])
+{
+  quda_this_node = QMP_get_node_number();
+
+  set_layout(X, subset);
+
+  QudaPrecision file_prec = precision;
+  
+  char type[128];
+  sprintf(type, "QUDA_%sNs%dNc%d_PropagatorField", (file_prec == QUDA_DOUBLE_PRECISION) ? "D" : "F", nSpin, nColor);
+
+  /* Open the test file for reading */
+  QIO_Writer *outfile = open_test_output(filename, QIO_SINGLEFILE, QIO_PARALLEL, QIO_ILDGNO);
+  if (outfile == NULL) { errorQuda("Open file failed\n"); }
+
+  /* Write the propagator field record */
+  printfQuda("%s: writing %d propagator fields\n", __func__, Nprop); fflush(stdout);
+  int status
+    = write_field(outfile, 12 * 2 * nSpin * nColor, Nprop, V, precision, precision, subset, parity, nSpin, nColor, type);
+  if (status) { errorQuda("write_propagator_fields failed %d\n", status); }
 
   /* Close the file */
   QIO_close_write(outfile);

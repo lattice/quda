@@ -13,6 +13,7 @@
 #include <color_spinor.h>
 #include <linalg.cuh>
 #include <dslash_policy.cuh>
+#include <kernels/dslash_quda.cuh>
 
 namespace quda {
 
@@ -127,7 +128,7 @@ namespace quda {
     strcat(policy_string, ",pol=");
   }
 
-
+  
   void destroyDslashEvents()
   {
     using namespace dslash;
@@ -147,91 +148,29 @@ namespace quda {
     checkCudaError();
   }
 
-  /**
-     @brief Parameter structure for driving the Gamma operator
-   */
-  template <typename Float, int nColor>
-  struct GammaArg {
-    typedef typename colorspinor_mapper<Float,4,nColor>::type F;
-    typedef typename mapper<Float>::type RegType;
-
-    F out;                // output vector field
-    const F in;           // input vector field
-    const int d;          // which gamma matrix are we applying
-    const int nParity;    // number of parities we're working on
-    bool doublet;         // whether we applying the operator to a doublet
-    const int volumeCB;   // checkerboarded volume
-    RegType a;            // scale factor
-    RegType b;            // chiral twist
-    RegType c;            // flavor twist
-
-    GammaArg(ColorSpinorField &out, const ColorSpinorField &in, int d,
-	     RegType kappa=0.0, RegType mu=0.0, RegType epsilon=0.0,
-	     bool dagger=false, QudaTwistGamma5Type twist=QUDA_TWIST_GAMMA5_INVALID)
-      : out(out), in(in), d(d), nParity(in.SiteSubset()),
-	doublet(in.TwistFlavor() == QUDA_TWIST_DEG_DOUBLET || in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
-	volumeCB(doublet ? in.VolumeCB()/2 : in.VolumeCB()), a(0.0), b(0.0), c(0.0)
-    {
-      if (d < 0 || d > 4) errorQuda("Undefined gamma matrix %d", d);
-      if (in.Nspin() != 4) errorQuda("Cannot apply gamma5 to nSpin=%d field", in.Nspin());
-      if (!in.isNative() || !out.isNative()) errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
-
-      if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
-	if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
-          b = 2.0 * kappa * mu;
-          a = 1.0;
-        } else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
-          b = -2.0 * kappa * mu;
-          a = 1.0 / (1.0 + b * b);
-        }
-	c = 0.0;
-        if (dagger) b *= -1.0;
-      } else if (doublet) {
-        if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
-          b = 2.0 * kappa * mu;
-          c = -2.0 * kappa * epsilon;
-          a = 1.0;
-        } else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
-          b = -2.0 * kappa * mu;
-          c = 2.0 * kappa * epsilon;
-          a = 1.0 / (1.0 + b * b - c * c);
-          if (a <= 0) errorQuda("Invalid twisted mass parameters (kappa=%e, mu=%e, epsilon=%e)\n", kappa, mu, epsilon);
-        }
-        if (dagger) b *= -1.0;
-      }
-    }
-  };
-
+  
   // CPU kernel for applying the gamma matrix to a colorspinor
-  template <typename Float, int nColor, typename Arg>
+  template <typename Float, int nColor, int d, typename Arg>
   void gammaCPU(Arg arg)
   {
     typedef typename mapper<Float>::type RegType;
+    
     for (int parity= 0; parity < arg.nParity; parity++) {
-
+      
       for (int x_cb = 0; x_cb < arg.volumeCB; x_cb++) { // 4-d volume
 	ColorSpinor<RegType,nColor,4> in = arg.in(x_cb, parity);
-	arg.out(x_cb, parity) = in.gamma(arg.d);
+	arg.out(x_cb, parity) = in.gamma(d);
       } // 4-d volumeCB
     } // parity
-
   }
 
-  // GPU Kernel for applying the gamma matrix to a colorspinor
-  template <typename Float, int nColor, int d, typename Arg>
-  __global__ void gammaGPU(Arg arg)
+  // CPU kernel for applying the chiral projection matrix to a colorspinor
+  template <typename Float, int nColor, typename Arg>
+  void chiralProjCPU(Arg arg)
   {
-    typedef typename mapper<Float>::type RegType;
-    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
-    int parity = blockDim.y*blockIdx.y + threadIdx.y;
-
-    if (x_cb >= arg.volumeCB) return;
-    if (parity >= arg.nParity) return;
-
-    ColorSpinor<RegType,nColor,4> in = arg.in(x_cb, parity);
-    arg.out(x_cb, parity) = in.gamma(d);
   }
 
+  
   template <typename Float, int nColor, typename Arg>
   class Gamma : public TunableVectorY {
 
@@ -253,22 +192,26 @@ namespace quda {
 
     void apply(const qudaStream_t &stream) {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-	gammaCPU<Float,nColor>(arg);
+	if(arg.proj == 0) gammaCPU<Float,nColor,4,Arg>(arg);
+	else chiralProjCPU<Float,nColor>(arg);
       } else {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	switch (arg.d) {
-	case 4: qudaLaunchKernel(gammaGPU<Float,nColor,4,Arg>, tp, stream, arg); break;
+	case 4:
+	  if(arg.proj == 0) qudaLaunchKernel(gammaGPU<Float,nColor,4,Arg>, tp, stream, arg);
+	  else if (arg.proj == -1 || arg.proj == -1) qudaLaunchKernel(chiralProjGPU<Float,nColor,Arg>, tp, stream, arg);
+	  else errorQuda("Unexpected chrial projection %d", arg.proj);
+	  break;
 	default: errorQuda("%d not instantiated", arg.d);
 	}
       }
     }
-
+    
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
 
     void preTune() { arg.out.save(); }
     void postTune() { arg.out.load(); }
   };
-
 
   template <typename Float, int nColor>
   void ApplyGamma(ColorSpinorField &out, const ColorSpinorField &in, int d)
@@ -309,6 +252,66 @@ namespace quda {
     }
   }
 
+  // Applies a gamma matrix to a spinor (wrapper to ApplyGamma)
+  void gamma5(ColorSpinorField &out, const ColorSpinorField &in) {
+    ApplyGamma(out, in, 4);
+  }
+  
+  // Applies a gamma matrix to a spinor (wrapper to ApplyGamma)
+  void gamma(ColorSpinorField &out, const ColorSpinorField &in, int gamma_mat) {
+    ApplyGamma(out, in, gamma_mat);
+  }
+
+  template <typename Float, int nColor>
+  void ApplyChiralProj(ColorSpinorField &out, const ColorSpinorField &in, const int proj)
+  {
+    // Hardcode 4 to specify gamma5 in 3rd GammaArg.
+    //printfQuda("Proj = %d\n", proj);
+    GammaArg<Float,nColor> arg(out, in, 4, proj);
+    //printfQuda("Flag 1\n");
+    Gamma<Float,nColor,GammaArg<Float,nColor> > gamma(arg, in);
+    //printfQuda("Flag 2\n");
+    gamma.apply(streams[Nstream-1]);
+    //printfQuda("Flag 3\n");
+  }
+  
+  // template on the number of colors
+  template <typename Float>
+  void ApplyChiralProj(ColorSpinorField &out, const ColorSpinorField &in, const int proj)
+  {
+    if (in.Ncolor() == 3) {
+      //printfQuda("Proj = %d\n", proj);
+      ApplyChiralProj<Float,3>(out, in, proj);
+    } else {
+      errorQuda("Unsupported number of colors %d\n", in.Ncolor());
+    }
+  }
+  
+  void ApplyChiralProj(ColorSpinorField &out, const ColorSpinorField &in, const int proj)
+  {
+    checkPrecision(out, in);    // check all precisions match
+    checkLocation(out, in);     // check all locations match
+
+    //printfQuda("Proj = %d\n", proj);
+    if (in.Precision() == QUDA_DOUBLE_PRECISION) {
+      ApplyChiralProj<double>(out, in, proj);
+    } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
+      ApplyChiralProj<float>(out, in, proj);
+    } else if (in.Precision() == QUDA_HALF_PRECISION) {
+      ApplyChiralProj<short>(out, in, proj);
+    } else if (in.Precision() == QUDA_QUARTER_PRECISION) {
+      ApplyChiralProj<char>(out, in, proj);
+    } else {
+      errorQuda("Unsupported precision %d\n", in.Precision());
+    }
+  }
+  
+  // Applies out(x) = 1/2 * [(1 + gamma5) * in_right(x) + (1 - gamma5) * in_left(x)
+  void chiralProject(ColorSpinorField &out, const ColorSpinorField &in, const int proj) {
+    ApplyChiralProj(out, in, proj);
+  }
+  
+  
   // CPU kernel for applying the gamma matrix to a colorspinor
   template <bool doublet, typename Float, int nColor, typename Arg>
   void twistGammaCPU(Arg arg)
@@ -328,26 +331,6 @@ namespace quda {
       } // 4-d volumeCB
     } // parity
 
-  }
-
-  // GPU Kernel for applying the gamma matrix to a colorspinor
-  template <bool doublet, typename Float, int nColor, int d, typename Arg>
-  __global__ void twistGammaGPU(Arg arg)
-  {
-    typedef typename mapper<Float>::type RegType;
-    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
-    int parity = blockDim.y*blockIdx.y + threadIdx.y;
-    if (x_cb >= arg.volumeCB) return;
-
-    if (!doublet) {
-      ColorSpinor<RegType,nColor,4> in = arg.in(x_cb, parity);
-      arg.out(x_cb, parity) = arg.a * (in + arg.b * in.igamma(d));
-    } else {
-      ColorSpinor<RegType,nColor,4> in_1 = arg.in(x_cb+0*arg.volumeCB, parity);
-      ColorSpinor<RegType,nColor,4> in_2 = arg.in(x_cb+1*arg.volumeCB, parity);
-      arg.out(x_cb + 0 * arg.volumeCB, parity) = arg.a * (in_1 + arg.b * in_1.igamma(d) + arg.c * in_2);
-      arg.out(x_cb + 1 * arg.volumeCB, parity) = arg.a * (in_2 - arg.b * in_2.igamma(d) + arg.c * in_1);
-    }
   }
 
   template <typename Float, int nColor, typename Arg>
@@ -397,10 +380,10 @@ namespace quda {
   template <typename Float, int nColor>
   void ApplyTwistGamma(ColorSpinorField &out, const ColorSpinorField &in, int d, double kappa, double mu, double epsilon, int dagger, QudaTwistGamma5Type type)
   {
-    GammaArg<Float,nColor> arg(out, in, d, kappa, mu, epsilon, dagger, type);
+    GammaArg<Float,nColor> arg(out, in, d, 0, kappa, mu, epsilon, dagger, type);
     TwistGamma<Float,nColor,GammaArg<Float,nColor> > gamma(arg, in);
     gamma.apply(streams[Nstream-1]);
-
+    
     checkCudaError();
   }
 
@@ -439,96 +422,6 @@ namespace quda {
 #endif // GPU_TWISTED_MASS_DIRAC
   }
 
-  // Applies a gamma5 matrix to a spinor (wrapper to ApplyGamma)
-  void gamma5(ColorSpinorField &out, const ColorSpinorField &in) { ApplyGamma(out,in,4); }
-
-  /**
-     @brief Parameteter structure for driving the clover and twist-clover application kernels
-     @tparam Float Underlying storage precision
-     @tparam nSpin Number of spin components
-     @tparam nColor Number of colors
-     @tparam dynamic_clover Whether we are inverting the clover field on the fly
-  */
-  template <typename Float, int nSpin, int nColor>
-  struct CloverArg {
-    static constexpr int length = (nSpin / (nSpin/2)) * 2 * nColor * nColor * (nSpin/2) * (nSpin/2) / 2;
-    static constexpr bool dynamic_clover = dynamic_clover_inverse();
-
-    typedef typename colorspinor_mapper<Float,nSpin,nColor>::type F;
-    typedef typename clover_mapper<Float,length>::type C;
-    typedef typename mapper<Float>::type RegType;
-
-    F out;                // output vector field
-    const F in;           // input vector field
-    const C clover;       // clover field
-    const C cloverInv;    // inverse clover field (only set if not dynamic clover and doing twisted clover)
-    const int nParity;    // number of parities we're working on
-    const int parity;     // which parity we're acting on (if nParity=1)
-    bool inverse;         // whether we are applying the inverse
-    bool doublet;         // whether we applying the operator to a doublet
-    const int volumeCB;   // checkerboarded volume
-    RegType a;
-    RegType b;
-    RegType c;
-    QudaTwistGamma5Type twist;
-
-    CloverArg(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover,
-	      bool inverse, int parity, RegType kappa=0.0, RegType mu=0.0, RegType epsilon=0.0,
-	      bool dagger = false, QudaTwistGamma5Type twist=QUDA_TWIST_GAMMA5_INVALID)
-      : out(out), clover(clover, twist == QUDA_TWIST_GAMMA5_INVALID ? inverse : false),
-	cloverInv(clover, (twist != QUDA_TWIST_GAMMA5_INVALID && !dynamic_clover) ? true : false),
-	in(in), nParity(in.SiteSubset()), parity(parity), inverse(inverse),
-	doublet(in.TwistFlavor() == QUDA_TWIST_DEG_DOUBLET || in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
-        volumeCB(doublet ? in.VolumeCB()/2 : in.VolumeCB()), a(0.0), b(0.0), c(0.0), twist(twist)
-    {
-      if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
-	if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
-	  a = 2.0 * kappa * mu;
-	  b = 1.0;
-	} else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
-	  a = -2.0 * kappa * mu;
-	  b = 1.0 / (1.0 + a*a);
-	}
-	c = 0.0;
-	if (dagger) a *= -1.0;
-      } else if (doublet) {
-	errorQuda("ERROR: Non-degenerated twisted-mass not supported in this regularization\n");
-      }
-    }
-  };
-
-  template <typename Float, int nSpin, int nColor, typename Arg>
-  __device__ __host__ inline void cloverApply(Arg &arg, int x_cb, int parity) {
-    using namespace linalg; // for Cholesky
-    typedef typename mapper<Float>::type RegType;
-    typedef ColorSpinor<RegType, nColor, nSpin> Spinor;
-    typedef ColorSpinor<RegType, nColor, nSpin / 2> HalfSpinor;
-    int spinor_parity = arg.nParity == 2 ? parity : 0;
-    Spinor in = arg.in(x_cb, spinor_parity);
-    Spinor out;
-
-    in.toRel(); // change to chiral basis here
-
-#pragma unroll
-    for (int chirality=0; chirality<2; chirality++) {
-
-      HMatrix<RegType,nColor*nSpin/2> A = arg.clover(x_cb, parity, chirality);
-      HalfSpinor chi = in.chiral_project(chirality);
-
-      if (arg.dynamic_clover) {
-        Cholesky<HMatrix, RegType, nColor * nSpin / 2> cholesky(A);
-        chi = static_cast<RegType>(0.25) * cholesky.backward(cholesky.forward(chi));
-      } else {
-        chi = A * chi;
-      }
-
-      out += chi.chiral_reconstruct(chirality);
-    }
-
-    out.toNonRel(); // change basis back
-
-    arg.out(x_cb, spinor_parity) = out;
-  }
 
   template <typename Float, int nSpin, int nColor, typename Arg>
   void cloverCPU(Arg &arg) {
@@ -538,13 +431,6 @@ namespace quda {
     }
   }
 
-  template <typename Float, int nSpin, int nColor, typename Arg>
-  __global__ void cloverGPU(Arg arg) {
-    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
-    int parity = (arg.nParity == 2) ? blockDim.y*blockIdx.y + threadIdx.y : arg.parity;
-    if (x_cb >= arg.volumeCB) return;
-    cloverApply<Float,nSpin,nColor>(arg, x_cb, parity);
-  }
 
   template <typename Float, int nSpin, int nColor, typename Arg>
   class Clover : public TunableVectorY {
@@ -581,7 +467,7 @@ namespace quda {
     void postTune() { if (arg.out.field == arg.in.field) arg.out.load(); } // Restore if the in and out fields alias
   };
 
-
+  
   template <typename Float, int nColor>
   void ApplyClover(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover, bool inverse, int parity)
   {
@@ -636,51 +522,6 @@ namespace quda {
 #endif // GPU_TWISTED_MASS_DIRAC
   }
 
-  // if (!inverse) apply (Clover + i*a*gamma_5) to the input spinor
-  // else apply (Clover + i*a*gamma_5)/(Clover^2 + a^2) to the input spinor
-  template <bool inverse, typename Float, int nSpin, int nColor, typename Arg>
-  __device__ __host__ inline void twistCloverApply(Arg &arg, int x_cb, int parity) {
-    using namespace linalg; // for Cholesky
-    constexpr int N = nColor*nSpin/2;
-    typedef typename mapper<Float>::type RegType;
-    typedef ColorSpinor<RegType,nColor,nSpin> Spinor;
-    typedef ColorSpinor<RegType,nColor,nSpin/2> HalfSpinor;
-    typedef HMatrix<RegType,N> Mat;
-    int spinor_parity = arg.nParity == 2 ? parity : 0;
-    Spinor in = arg.in(x_cb, spinor_parity);
-    Spinor out;
-
-    in.toRel(); // change to chiral basis here
-
-#pragma unroll
-    for (int chirality=0; chirality<2; chirality++) {
-      // factor of 2 comes from clover normalization we need to correct for
-      const complex<RegType> j(0.0, chirality == 0 ? static_cast<RegType>(0.5) : -static_cast<RegType>(0.5));
-
-      Mat A = arg.clover(x_cb, parity, chirality);
-
-      HalfSpinor in_chi = in.chiral_project(chirality);
-      HalfSpinor out_chi = A*in_chi + j*arg.a*in_chi;
-
-      if (inverse) {
-	if (arg.dynamic_clover) {
-	  Mat A2 = A.square();
-	  A2 += arg.a*arg.a*static_cast<RegType>(0.25);
-	  Cholesky<HMatrix,RegType,N> cholesky(A2);
-	  out_chi = static_cast<RegType>(0.25)*cholesky.backward(cholesky.forward(out_chi));
-	} else {
-	  Mat Ainv = arg.cloverInv(x_cb, parity, chirality);
-	  out_chi = static_cast<RegType>(2.0)*(Ainv*out_chi);
-	}
-      }
-
-      out += (out_chi).chiral_reconstruct(chirality);
-    }
-
-    out.toNonRel(); // change basis back
-
-    arg.out(x_cb, spinor_parity) = out;
-  }
 
   template <bool inverse, typename Float, int nSpin, int nColor, typename Arg>
   void twistCloverCPU(Arg &arg) {
