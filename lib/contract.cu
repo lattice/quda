@@ -106,13 +106,13 @@ public:
     void initTuneParam(TuneParam &param) const {
       TunableLocalParityReduction::initTuneParam(param);
       param.block.y = 2;
-      param.grid.z = x.X(Arg::reduction_dim); // T dimension is mapped to different blocks in the Z dimension
+      param.grid.z = x.X(Arg::reduction_dim); // Reduction dimension is mapped to different blocks in the Z dimension
     }
 
     void defaultTuneParam(TuneParam &param) const {
       TunableLocalParityReduction::defaultTuneParam(param);
       param.block.y = 2;
-      param.grid.z = x.X(Arg::reduction_dim); // T dimension is mapped to different blocks in the Z dimension
+      param.grid.z = x.X(Arg::reduction_dim); // Reduction dimension is mapped to different blocks in the Z dimension
     }
 
   public:

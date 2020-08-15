@@ -305,7 +305,7 @@ namespace quda
 
     // This function reduces the data in result_all_channels in all threads -
     // different threads reduce result to different index t + arg.t_offset
-    reduce2d<blockSize, 2>(arg, result_all_channels, t + arg.t_offset);
+    arg.template reduce2d<blockSize, 2>(result_all_channels, t + arg.t_offset);
   }
 
   template <typename real> struct ContractionArg {
@@ -454,7 +454,7 @@ namespace quda
 
       xyz += blockDim.x * gridDim.x;
     }
-    reduce2d<blockSize, 2>(arg, res, t);
+    arg.template reduce2d<blockSize, 2>(res, t);
   }
 
   //- Welcome! This function will take the open spinor contractions, insert gamma matrices, and
@@ -737,7 +737,7 @@ namespace quda
     //- the data in res, accoring to the timeslice t, and place the result in an array which is
     //- defined in the arg structure. Remember, the argument structure iherits from ReduceArg, 
     //- which is why the reduced array already exists.
-    reduce2d<blockSize, 2>(arg, res, t);
+    arg.template reduce2d<blockSize, 2>(res, t);
 
     //- We have computed the contraction! We finally done. Let the Eagles of Manwe take us back to 
     //- quda/lib/contract.cu, and the line:
