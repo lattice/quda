@@ -36,8 +36,9 @@ namespace quda {
   };
 
   template<typename Arg>
-  __device__ inline double plaquette(Arg &arg, int x[], int parity, int mu, int nu) {
-    typedef Matrix<complex<typename Arg::Float>,3> Link;
+  __device__ inline double plaquette(Arg &arg, int x[], int parity, int mu, int nu)
+  {
+    using Link = Matrix<complex<typename Arg::Float>,3>;
 
     int dx[4] = {0, 0, 0, 0};
     Link U1 = arg.U(mu, linkIndexShift(x,dx,arg.E), parity);
@@ -53,7 +54,8 @@ namespace quda {
   }
 
   template<int blockSize, typename Arg>
-  __global__ void computePlaq(Arg arg){
+  __global__ void computePlaq(Arg arg)
+  {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     int parity = threadIdx.y;
 

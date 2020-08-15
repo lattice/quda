@@ -41,7 +41,7 @@ public:
       jitify_error = program->kernel("quda::computeAPEStep").instantiate(Type<decltype(arg)>())
         .configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
 #else
-      computeAPEStep<<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
+      qudaLaunchKernel(computeAPEStep<decltype(arg)>, tp, stream, arg);
 #endif
     }
 

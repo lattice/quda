@@ -8,6 +8,12 @@
 extern "C" {
 #endif
 
+  typedef enum qudaError_t {
+    QUDA_SUCCESS = 0,
+    QUDA_ERROR   = 1,
+    QUDA_ERROR_UNINITIALIZED = 2
+  } qudaError_t;
+
   typedef enum QudaMemoryType_s {
     QUDA_MEMORY_DEVICE,
     QUDA_MEMORY_PINNED,

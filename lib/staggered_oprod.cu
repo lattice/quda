@@ -154,12 +154,12 @@ namespace quda {
 	// Disable tuning for the time being
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	if (arg.kernelType == OPROD_INTERIOR_KERNEL) {
-	  interiorOprodKernel<Float><<<tp.grid,tp.block,tp.shared_bytes, stream>>>(arg);
+	  qudaLaunchKernel(interiorOprodKernel<Float, Arg>, tp, stream, arg);
 	} else if (arg.kernelType == OPROD_EXTERIOR_KERNEL) {
-          if (arg.dir == 0) exteriorOprodKernel<0,Float><<<tp.grid,tp.block,tp.shared_bytes, stream>>>(arg);
-	  else if (arg.dir == 1) exteriorOprodKernel<1,Float><<<tp.grid,tp.block,tp.shared_bytes, stream>>>(arg);
-	  else if (arg.dir == 2) exteriorOprodKernel<2,Float><<<tp.grid,tp.block,tp.shared_bytes, stream>>>(arg);
-	  else if (arg.dir == 3) exteriorOprodKernel<3,Float><<<tp.grid,tp.block,tp.shared_bytes, stream>>>(arg);
+          if (arg.dir == 0) qudaLaunchKernel(exteriorOprodKernel<0,Float,Arg>, tp, stream, arg);
+          else if (arg.dir == 1) qudaLaunchKernel(exteriorOprodKernel<1,Float,Arg>, tp, stream, arg);
+          else if (arg.dir == 2) qudaLaunchKernel(exteriorOprodKernel<2,Float,Arg>, tp, stream, arg);
+          else if (arg.dir == 3) qudaLaunchKernel(exteriorOprodKernel<3,Float,Arg>, tp, stream, arg);
 	} else {
 	  errorQuda("Kernel type not supported\n");
 	}
