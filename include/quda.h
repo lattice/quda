@@ -1346,6 +1346,16 @@ extern "C" {
   void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param, unsigned int n_steps, double alpha);
 
   /**
+   * Performs Gaussian smearing on a given spinor using the gauge field
+   * gaugeSmeared, if it exist, or gaugePrecise if no smeared field is present.
+   * @param h_in   Input spinor field to smear
+   * @param param  Contains all metadata regarding host and device
+   *               storage and operator which will be applied to the spinor
+   * @param n_steps Number of steps to apply.
+   */
+  void performGaussianSmearNStep(void *h_in, QudaInvertParam *param, unsigned int n_steps);
+
+  /**
    * Performs APE smearing on gaugePrecise and stores it in gaugeSmeared
    * @param n_steps Number of steps to apply.
    * @param alpha  Alpha coefficient for APE smearing.
@@ -1439,12 +1449,16 @@ extern "C" {
 
   void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *param);
 
+  void make4DQuarkProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_param5D, QudaInvertParam *inv_param4D, const int *X);
+
+  void make4DMidPointProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_param5D, QudaInvertParam *inv_param4D, const int *X);
+  
+  
   /**
    * @brief Flush the chronological history for the given index
    * @param[in] index Index for which we are flushing
    */
   void flushChronoQuda(int index);
-
 
   /**
   * Open/Close MAGMA library

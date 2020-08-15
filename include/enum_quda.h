@@ -531,11 +531,13 @@ extern "C" {
   } QudaStaggeredPhase;
 
   typedef enum QudaContractType_s {
-    QUDA_CONTRACT_TYPE_OPEN, // Open spin elementals
-    QUDA_CONTRACT_TYPE_DR,   // DegrandRossi
+    QUDA_CONTRACT_TYPE_OPEN,     // Open spin elementals, no spatial summation
+    QUDA_CONTRACT_TYPE_DR,       // DegrandRossi, no spatial summation
+    QUDA_CONTRACT_TYPE_OPEN_SUM, // Open spin elementals, spatially summed
+    QUDA_CONTRACT_TYPE_DR_SUM,   // DegrandRossi, spatially summed
     QUDA_CONTRACT_TYPE_INVALID = QUDA_INVALID_ENUM
   } QudaContractType;
-
+  
   typedef enum QudaContractGamma_s {
     QUDA_CONTRACT_GAMMA_I = 0,
     QUDA_CONTRACT_GAMMA_G1 = 1,
@@ -562,6 +564,19 @@ extern "C" {
     QUDA_WFLOW_TYPE_INVALID = QUDA_INVALID_ENUM
   } QudaWFlowType;
 
+  typedef enum QudaGaugeSmearType_s {
+    QUDA_GAUGE_SMEAR_TYPE_APE,
+    QUDA_GAUGE_SMEAR_TYPE_STOUT,
+    QUDA_GAUGE_SMEAR_TYPE_OVR_IMP_STOUT,
+    QUDA_GAUGE_SMEAR_TYPE_INVALID = QUDA_INVALID_ENUM
+  } QudaGaugeSmearType;
+  
+  typedef enum QudaFermionSmearType_s {
+    QUDA_FERMION_SMEAR_TYPE_GAUSSIAN,
+    QUDA_FERMION_SMEAR_TYPE_WUPPERTAL,
+    QUDA_FERMION_SMEAR_TYPE_INVALID = QUDA_INVALID_ENUM
+  } QudaFermionSmearType;
+  
   // Allows to choose an appropriate external library
   typedef enum QudaExtLibType_s {
     QUDA_CUSOLVE_EXTLIB,

@@ -79,7 +79,7 @@ namespace quda
       x_cb += blockDim.x * gridDim.x;
     }
 
-    reduce2d<blockSize, 2>(arg, E);
+    arg.template reduce2d<blockSize, 2>(E);
   }
 
 } // namespace quda

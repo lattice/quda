@@ -613,7 +613,7 @@ namespace quda {
           }
           free_gauge_buffer(buffer, src.Order(), src.Geometry());
           if (nFace > 0) free_ghost_buffer(ghost_buffer, src.Order(), geometry);
-        }
+	}
       } // reorder_location
     } else {
       errorQuda("Invalid gauge field type");

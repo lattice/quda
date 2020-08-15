@@ -307,10 +307,7 @@ namespace quda {
   /**
      Computes Fmunu given the gauge field U
   */
-  void cudaCloverField::compute(const cudaGaugeField &gauge)
-  {
-    computeClover(*this, gauge, 1.0);
-  }
+  void cudaCloverField::compute(const cudaGaugeField &gauge) { computeClover(*this, gauge, 1.0); }
 
   cpuCloverField::cpuCloverField(const CloverFieldParam &param) : CloverField(param) {
 

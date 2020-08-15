@@ -177,7 +177,7 @@ namespace quda {
       idx_cb += blockDim.x * gridDim.x;
     }
 
-    reduce2d<blockSize,2>(argQ, data);
+    argQ.template reduce2d<blockSize,2>(data);
   }
 
   template<int Elems, typename Float, typename Gauge, int gauge_dir>
@@ -195,7 +195,7 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       LAUNCH_KERNEL_LOCAL_PARITY(computeFix_quality, (*this), tp, stream, arg, Elems, Float, Gauge, gauge_dir);
       auto reset = true; // apply is called multiple times with the same arg instance so we need to reset
-      arg.complete(&arg.result, stream, reset);
+      arg.complete(arg.result, stream, reset);
       if (!activeTuning()) {
         arg.result.x /= (double)(3 * gauge_dir * 2 * arg.threads);
         arg.result.y /= (double)(3 * 2 * arg.threads);

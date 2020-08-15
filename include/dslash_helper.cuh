@@ -297,7 +297,7 @@ namespace quda
       for (int d = 0; d < 4; d++) {
         commDim[d] = (comm_override[d] == 0) ? 0 : comm_dim_partitioned(d);
       }
-
+      
       if (in.Location() == QUDA_CUDA_FIELD_LOCATION) {
         // create comms buffers - need to do this before we grab the dslash constants
         ColorSpinorField *in_ = const_cast<ColorSpinorField *>(&in);

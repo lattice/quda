@@ -95,6 +95,9 @@ TimeProfile profilePlaq("plaqQuda");
 //!< Profiler for wuppertalQuda
 TimeProfile profileWuppertal("wuppertalQuda");
 
+//!< Profiler for gaussianSmearQuda
+static TimeProfile profileGaussianSmear("gaussianSmearQuda");
+
 //!<Profiler for gaussQuda
 TimeProfile profileGauss("gaussQuda");
 
@@ -133,6 +136,9 @@ TimeProfile profileMomAction("momActionQuda");
 
 //!< Profiler for endQuda
 TimeProfile profileEnd("endQuda");
+
+//!< Profiler for endQuda
+static TimeProfile profileMake4DProp("make4DPropQuda");
 
 //!< Profiler for GaugeFixing
 TimeProfile GaugeFixFFTQuda("GaugeFixFFTQuda");
@@ -1521,6 +1527,8 @@ void endQuda(void)
     profileCovDev.Print();
     profilePlaq.Print();
     profileGaugeObs.Print();
+    profileWuppertal.Print();
+    profileGaussianSmear.Print();
     profileAPE.Print();
     profileSTOUT.Print();
     profileOvrImpSTOUT.Print();
@@ -1528,6 +1536,7 @@ void endQuda(void)
     profileProject.Print();
     profilePhase.Print();
     profileMomAction.Print();
+    profileMake4DProp.Print();
     profileEnd.Print();
 
     profileInit2End.Print();
@@ -2329,6 +2338,7 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
 
   popVerbosity();
 }
+
 
 void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam *eig_param)
 {
@@ -4834,16 +4844,16 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
     } else {
       x.Even() = *(solutionResident[i]);
     }
-
+    
     dirac->Dslash(x.Odd(), x.Even(), QUDA_ODD_PARITY);
     dirac->M(p.Even(), x.Even());
     dirac->Dagger(QUDA_DAG_YES);
     dirac->Dslash(p.Odd(), p.Even(), QUDA_ODD_PARITY);
     dirac->Dagger(QUDA_DAG_NO);
-
+    
     gamma5(x, x);
     gamma5(p, p);
-
+    
     force_coeff[i] = 2.0*dt*coeff[i]*kappa2;
   }
 
@@ -5576,6 +5586,117 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
   profileWuppertal.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
+void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned int n_steps)
+{
+  profileGaussianSmear.TPSTART(QUDA_PROFILE_TOTAL);
+  profileGaussianSmear.TPSTART(QUDA_PROFILE_INIT);
+
+  if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
+
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
+
+  cudaGaugeField *gauge_ptr = nullptr;
+
+  if (gaugeSmeared != nullptr) {
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Gaussian smearing done with gaugeSmeared\n");
+    GaugeFieldParam gParam(*gaugePrecise);
+    gParam.create = QUDA_NULL_FIELD_CREATE;
+    gauge_ptr = new cudaGaugeField(gParam);
+    copyExtendedGauge(*gauge_ptr, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
+    gauge_ptr->exchangeGhost();
+  } else {
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Gaussian smearing done with gaugePrecise\n");
+    gauge_ptr = gaugePrecise;
+  }
+
+  if (!initialized) errorQuda("QUDA not initialized");
+
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) { printQudaInvertParam(inv_param); }
+
+  checkInvertParam(inv_param);
+
+  // Create device side ColorSpinorField vectors and to pass to the
+  // compute function.
+  const int *X = gauge_ptr->X();
+  ColorSpinorParam cpuParam(h_in, *inv_param, X, QUDA_MAT_SOLUTION, QUDA_CPU_FIELD_LOCATION);
+  cpuParam.nSpin = 4;
+  // QUDA style pointer for host data.
+  ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
+
+  // Device side data.
+  ColorSpinorParam cudaParam(cpuParam);
+  cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
+  cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+  cudaParam.setPrecision(inv_param->cuda_prec, inv_param->cuda_prec, true);
+  ColorSpinorField *in = ColorSpinorField::Create(cudaParam);
+  ColorSpinorField *out = ColorSpinorField::Create(cudaParam);
+  ColorSpinorField *temp1 = ColorSpinorField::Create(cudaParam);
+  ColorSpinorField *temp2 = ColorSpinorField::Create(cudaParam);
+
+  // Create the laplace operator
+  //------------------------------------------------------
+  bool pc_solve = false;
+
+  Dirac *d = nullptr;
+  Dirac *dSloppy = nullptr;
+  Dirac *dPre = nullptr;
+  createDirac(d, dSloppy, dPre, *inv_param, pc_solve);
+  Dirac &dirac = *d;
+  DiracM laplace_op(dirac);
+  profileGaussianSmear.TPSTOP(QUDA_PROFILE_INIT);
+
+  //massRescale(*static_cast<cudaColorSpinorField*>(in_h), *inv_param);
+
+  // Copy host data to device
+  profileGaussianSmear.TPSTART(QUDA_PROFILE_H2D);
+  *in = *in_h;
+  profileGaussianSmear.TPSTOP(QUDA_PROFILE_H2D);
+
+  // Scale up the source to prevent underflow
+  profileGaussianSmear.TPSTART(QUDA_PROFILE_COMPUTE);
+  blas::ax(1e6, *in);
+
+  // Computes out(x) = (in(x) + (\omega/(4N) * \sum_mu (U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))))
+  if (n_steps == 0) std::swap(in, out);
+  for (unsigned int i = 0; i < n_steps; i++) {
+    // If performing an iteration greater that i=0, swap the `out` and `in` pointers.
+    // This will feed the previous iteration's result into the loop, and
+    // overwrite the previous `in`.
+    if (i > 0) std::swap(in, out);
+    laplace_op.Expose()->M(*out, *in);
+    blas::ax(1.0/inv_param->mass, *out);
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+      double norm = blas::norm2(*out);
+      printfQuda("Step %d, vector norm %e\n", i, norm);
+    }
+  }
+  
+  // Normalise the source
+  double nout = blas::norm2(*out);
+  blas::ax(1.0/sqrt(nout), *out);    
+  profileGaussianSmear.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  // Copy device data to host.
+  profileGaussianSmear.TPSTART(QUDA_PROFILE_D2H);
+  *in_h = *out;
+  profileGaussianSmear.TPSTOP(QUDA_PROFILE_D2H);
+
+  profileGaussianSmear.TPSTART(QUDA_PROFILE_FREE);
+  if (gaugeSmeared != nullptr) delete gauge_ptr;
+  delete temp1;
+  delete temp2;
+  delete out;
+  delete in;
+  delete in_h;
+  delete d;
+  delete dSloppy;
+  delete dPre;
+
+  profileGaussianSmear.TPSTOP(QUDA_PROFILE_FREE);
+  profileGaussianSmear.TPSTOP(QUDA_PROFILE_TOTAL);
+  saveTuneCache();
+}
+
 void performAPEnStep(unsigned int n_steps, double alpha, int meas_interval)
 {
   profileAPE.TPSTART(QUDA_PROFILE_TOTAL);
@@ -5880,63 +6001,142 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
   return 0;
 }
 
-void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const QudaContractType cType,
-                  QudaInvertParam *param, const int *X)
-{
-  // DMH: Easiest way to construct ColorSpinorField? Do we require the user
-  //     to declare and fill and invert_param, or can it just be hacked?.
+//- This is a generic interface to QUDA for a two fermion contraction routine. We will, for the sake 
+//- instruction, reproduce the comments loacted at `https://github.com/lattice/quda/wiki/Writing-QUDA-Kernels`
+//- which use this routine as an example. 
 
-  profileContract.TPSTART(QUDA_PROFILE_TOTAL);
-  profileContract.TPSTART(QUDA_PROFILE_INIT);
-  // wrap CPU host side pointers
-  ColorSpinorParam cpuParam((void *)hp_x, *param, X, false, param->input_location);
-  ColorSpinorField *h_x = ColorSpinorField::Create(cpuParam);
+//- The contractQuda routine in defined lib/interface_quda.cpp and declared in include/quda.h 
+//- accepts three pointers and some meta data. The pointers are the two fermion fields to be 
+//- contracted and an array that will store the result of the contraction, which is the 
+//- 16 \mu \nu contractions associated with the operation \Sum_{a} \phi_{a,\mu, X} \psi_{a,\nu, X} per lattice site.
+ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const QudaContractType cType,
+		   QudaInvertParam *param, const int *X)
+ {
+   //- This is a host function. It is passed pointers to arrays defined on the host. 
+   //- Its function is to move the data from the host to the device, call the GPU functions 
+   //- that will perform a contraction, then move the results from the device back to the host. 
+   //- We will go through it line my line so as to leave no stone unturned.
 
-  cpuParam.v = (void *)hp_y;
-  ColorSpinorField *h_y = ColorSpinorField::Create(cpuParam);
+   //- These objects are defined in the interface_quda.cpp file. They will collect timing 
+   //- data for the various aspects of the function, such as time spent computing, moving data, etc. 
+   //- We start the profiling with TPSTART(QUDA_PROFILE_TOTAL) and then measure specific 
+   //- aspects with TPSTART(QUDA_PROFILE_<aspect>). This is the initialisation.
+   profileContract.TPSTART(QUDA_PROFILE_TOTAL);
+   profileContract.TPSTART(QUDA_PROFILE_INIT);
 
-  // Create device parameter
-  ColorSpinorParam cudaParam(cpuParam);
-  cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
-  cudaParam.create = QUDA_NULL_FIELD_CREATE;
-  // Quda uses Degrand-Rossi gamma basis for contractions and will
-  // automatically reorder data if necessary.
-  cudaParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
-  cudaParam.setPrecision(cpuParam.Precision(), cpuParam.Precision(), true);
+   //- We begin by creating a QUDA object ColorSpinorParam that will collect the data it needs 
+   //- to make a ColorSpinorField object. It is given, as one of its arguments, a pointer to 
+   //- the host data hp_x. Thus, the resulting ColorSpinorField pointer *h_x points to the data 
+   //- associated with hp_x.
+   // Wrap CPU host side pointers
+   ColorSpinorParam cpuParam((void *)hp_x, *param, X, false, param->input_location);
+   ColorSpinorField *h_x = ColorSpinorField::Create(cpuParam);
+   
+   //- We change the ColorSpinorParam pointer to the other host pointer in order to create a 
+   //- ColorSpinorField wrapper for hp_y. This is just done so that we may wrap the host 
+   //- lattice data in a convenient QUDA object.
+   cpuParam.v = (void *)hp_y;
+   ColorSpinorField *h_y = ColorSpinorField::Create(cpuParam);
 
-  std::vector<ColorSpinorField *> x, y;
-  x.push_back(ColorSpinorField::Create(cudaParam));
-  y.push_back(ColorSpinorField::Create(cudaParam));
+   //- Next, we create a ColorSpinorParam object that will describe ColorSpinorField objects on the GPU.
+   //- Notice some important aspects are changed. After cloning the cpuParam object, we change the 
+   //- location to QUDA_CUDA_FIELD_LOCATION. This means that ColorSpinorField objects created using 
+   //- cudaParam will live on device memory. 
+   //- cudaParam.create = QUDA_NULL_FIELD_CREATE; simply means that the data does not need to be initialised. 
+   //- We declare that the GPU data should be in QUDA_DEGRAND_ROSSI_GAMMA_BASIS order, and then 
+   //- we choose the GPU precision. Finally, we create the GPU ColorSpinorField objects.
+   // Create device parameter
+   ColorSpinorParam cudaParam(cpuParam);
+   cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
+   cudaParam.create = QUDA_NULL_FIELD_CREATE;
+   // Quda uses Degrand-Rossi gamma basis for contractions and will
+   // automatically reorder data if necessary.
+   cudaParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+   cudaParam.setPrecision(cpuParam.Precision(), cpuParam.Precision(), true);
 
-  size_t data_bytes = x[0]->Volume() * x[0]->Nspin() * x[0]->Nspin() * 2 * x[0]->Precision();
-  void *d_result = pool_device_malloc(data_bytes);
-  profileContract.TPSTOP(QUDA_PROFILE_INIT);
+   //- We use std::vector so that future developers may more easily extend this code to handle multiple vectors.
+   std::vector<ColorSpinorField *> x, y;
+   x.push_back(ColorSpinorField::Create(cudaParam));
+   y.push_back(ColorSpinorField::Create(cudaParam));
 
-  profileContract.TPSTART(QUDA_PROFILE_H2D);
-  *x[0] = *h_x;
-  *y[0] = *h_y;
-  profileContract.TPSTOP(QUDA_PROFILE_H2D);
+   //- We next create some device memory to store the result of the contraction.
+   size_t array_size = (cType == QUDA_CONTRACT_TYPE_OPEN || cType == QUDA_CONTRACT_TYPE_DR) ? x[0]->Volume() : x[0]->X(3); 
+   size_t data_bytes = array_size * x[0]->Nspin() * x[0]->Nspin() * 2 * x[0]->Precision();
+   void *dev_result;
+   // The location of the array passed to the kernel depends on the type of 
+   // contraction we want.
+   if(cType == QUDA_CONTRACT_TYPE_OPEN || cType == QUDA_CONTRACT_TYPE_DR) {
+     dev_result = device_pinned_malloc(data_bytes);
+     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("device malloc of size %lu * %lu\n", array_size, data_bytes/array_size);
+   } else { 
+     dev_result = pinned_malloc(data_bytes);
+     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("host malloc of size %lu * %lu\n", array_size, data_bytes/array_size);
+   }
+   // The host array will hold the data in the computed precision so 
+   // that we can pass data back to the user in double
+   void *prec_result = pinned_malloc(data_bytes);
+   profileContract.TPSTOP(QUDA_PROFILE_INIT);
 
-  profileContract.TPSTART(QUDA_PROFILE_COMPUTE);
-  contractQuda(*x[0], *y[0], d_result, cType);
-  profileContract.TPSTOP(QUDA_PROFILE_COMPUTE);
+   //- This competes the initialisation. Next, we transfer the host lattice data to the device.
+   profileContract.TPSTART(QUDA_PROFILE_H2D);
+   *x[0] = *h_x;
+   *y[0] = *h_y;
+   profileContract.TPSTOP(QUDA_PROFILE_H2D);
+   //- Yes... that's right. No... I didn't miss out any code. QUDA's ColorSpinorField objects 
+   //- are very smart indeed! The objects on the right are on the host. The objects on the 
+   //- left are on the device. If the = operator is used for ColorSpinorField objects 
+   //- that are located on different memory spaces, it is implied that that a data transfer 
+   //- must take place, and it is done automatically for the user. 
+   //- We next perform the GPU computation which is located and explained in contract.cu
+   profileContract.TPSTART(QUDA_PROFILE_COMPUTE);
+   //- Ok, this is it... this is where the real adventure begins. See you on the other side.
+   contractQuda(*x[0], *y[0], dev_result, cType);
+   profileContract.TPSTOP(QUDA_PROFILE_COMPUTE);
 
-  profileContract.TPSTART(QUDA_PROFILE_D2H);
-  qudaMemcpy(h_result, d_result, data_bytes, cudaMemcpyDeviceToHost);
-  profileContract.TPSTOP(QUDA_PROFILE_D2H);
+   //- Welcome back! We did it! Finally we transfer the result to the original host pointer.
+   //- If we did not timeslice sum, we must to a device to host transfer, else the data
+   //- is already on a host pointer.
+   if(cType == QUDA_CONTRACT_TYPE_OPEN || cType == QUDA_CONTRACT_TYPE_DR) {
+     profileContract.TPSTART(QUDA_PROFILE_D2H);
+     qudaMemcpy(prec_result, dev_result, data_bytes, cudaMemcpyDeviceToHost);
+     profileContract.TPSTOP(QUDA_PROFILE_D2H);
+   } else {
+     memcpy(prec_result, dev_result, data_bytes);
+   }
+   
+   //- Copy the data back to the user's array
+   if(x[0]->Precision() == QUDA_SINGLE_PRECISION) {
+     for(unsigned int i=0; i<(array_size * x[0]->Nspin() * x[0]->Nspin() * 2); i++) {
+       ((double*)h_result)[i] = ((float*)prec_result)[i];
+     }
+   } else {
+     for(unsigned int i=0; i<(array_size * x[0]->Nspin() * x[0]->Nspin() * 2); i++) {
+       ((double*)h_result)[i] = ((double*)prec_result)[i];
+     }
+   }
+ 
+   //- Last, we be good programmers and clean up memory.
+   profileContract.TPSTART(QUDA_PROFILE_FREE);
+   if(cType == QUDA_CONTRACT_TYPE_OPEN || cType == QUDA_CONTRACT_TYPE_DR) {
+     device_pinned_free(dev_result);
+   } else {
+     host_free(dev_result);
+   }
+   host_free(prec_result);
 
-  profileContract.TPSTART(QUDA_PROFILE_FREE);
-  pool_device_free(d_result);
-  delete x[0];
-  delete y[0];
-  delete h_y;
-  delete h_x;
-  profileContract.TPSTOP(QUDA_PROFILE_FREE);
+   delete x[0];
+   delete y[0];
+   delete h_y;
+   delete h_x;
+   profileContract.TPSTOP(QUDA_PROFILE_FREE);   
 
-  profileContract.TPSTOP(QUDA_PROFILE_TOTAL);
-}
+   //- This completes the 2 fermion contraction. We save the tune data and exit.
+   saveTuneCache();
+   profileContract.TPSTOP(QUDA_PROFILE_TOTAL);
+   //- Well done! You made it! Did you learn everything you wanted to learn? Don't be afraid to ask questions.
+ }
 
-void gaugeObservablesQuda(QudaGaugeObservableParam *param)
+ void gaugeObservablesQuda(QudaGaugeObservableParam *param)
 {
   profileGaugeObs.TPSTART(QUDA_PROFILE_TOTAL);
   checkGaugeObservableParam(param);
@@ -5952,6 +6152,7 @@ void gaugeObservablesQuda(QudaGaugeObservableParam *param)
   gaugeObservables(*gauge, *param, profileGaugeObs);
   profileGaugeObs.TPSTOP(QUDA_PROFILE_TOTAL);
 }
+
 
 void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *cublas_param)
 {
@@ -6089,4 +6290,95 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
 
   profileCuBLAS.TPSTOP(QUDA_PROFILE_TOTAL);
   saveTuneCache();
+
+void make4DMidPointProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_param5D, QudaInvertParam *inv_param4D, const int *X)
+{
+  profileMake4DProp.TPSTART(QUDA_PROFILE_TOTAL);
+  profileMake4DProp.TPSTART(QUDA_PROFILE_INIT);
+  // wrap CPU host side pointers
+  ColorSpinorParam cpuParam5D((void *)in5D_ptr, *inv_param5D, X, false, inv_param5D->input_location);
+  ColorSpinorField *h_in5D = ColorSpinorField::Create(cpuParam5D);
+  ColorSpinorParam cpuParam4D((void *)out4D_ptr, *inv_param4D, X, false, inv_param4D->input_location);
+  ColorSpinorField *h_out4D = ColorSpinorField::Create(cpuParam4D);
+
+  // Create device vectors
+  ColorSpinorParam cudaParam5D(cpuParam5D);
+  cudaParam5D.location = QUDA_CUDA_FIELD_LOCATION;
+  cudaParam5D.create = QUDA_NULL_FIELD_CREATE;
+  cudaParam5D.setPrecision(cpuParam5D.Precision(), cpuParam5D.Precision(), true);
+  std::vector<ColorSpinorField *> in5D;
+  in5D.push_back(ColorSpinorField::Create(cudaParam5D));
+
+  ColorSpinorParam cudaParam4D(cpuParam4D);
+  cudaParam4D.location = QUDA_CUDA_FIELD_LOCATION;
+  cudaParam4D.create = QUDA_NULL_FIELD_CREATE;
+  cudaParam4D.setPrecision(cpuParam4D.Precision(), cpuParam4D.Precision(), true);
+  std::vector<ColorSpinorField *> out4D;
+  out4D.push_back(ColorSpinorField::Create(cudaParam4D));
+  profileMake4DProp.TPSTOP(QUDA_PROFILE_INIT);
+
+  profileMake4DProp.TPSTART(QUDA_PROFILE_H2D);  
+  in5D[0] = h_in5D;
+  profileMake4DProp.TPSTOP(QUDA_PROFILE_H2D);  
+
+  profileMake4DProp.TPSTART(QUDA_PROFILE_COMPUTE);  
+  make4DMidPointProp(*out4D[0], *in5D[0]);
+  profileMake4DProp.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  profileMake4DProp.TPSTART(QUDA_PROFILE_D2H);  
+  out4D[0] = h_out4D;
+  profileMake4DProp.TPSTOP(QUDA_PROFILE_D2H);  
+
+  profileMake4DProp.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
+void make4DQuarkProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_param5D, QudaInvertParam *inv_param4D, const int *X)
+{
+  profileMake4DProp.TPSTART(QUDA_PROFILE_TOTAL);
+  profileMake4DProp.TPSTART(QUDA_PROFILE_INIT);
+  // wrap CPU host side pointers
+  ColorSpinorParam cpuParam5D((void *)in5D_ptr, *inv_param5D, X, false, inv_param5D->input_location);
+  std::vector<ColorSpinorField *> h_in5D;
+  h_in5D.push_back(ColorSpinorField::Create(cpuParam5D));
+  
+  ColorSpinorParam cpuParam4D((void *)out4D_ptr, *inv_param4D, X, false, inv_param4D->input_location);
+  std::vector<ColorSpinorField* >h_out4D;
+  h_out4D.push_back(ColorSpinorField::Create(cpuParam4D));
+  
+  // Create device vectors
+  ColorSpinorParam cudaParam5D(cpuParam5D);
+  cudaParam5D.location = QUDA_CUDA_FIELD_LOCATION;
+  cudaParam5D.create = QUDA_NULL_FIELD_CREATE;
+  cudaParam5D.setPrecision(cpuParam5D.Precision(), cpuParam5D.Precision(), true);
+  std::vector<ColorSpinorField *> in5D;
+  in5D.push_back(ColorSpinorField::Create(cudaParam5D));
+
+  ColorSpinorParam cudaParam4D(cpuParam4D);
+  cudaParam4D.location = QUDA_CUDA_FIELD_LOCATION;
+  cudaParam4D.create = QUDA_ZERO_FIELD_CREATE;
+  cudaParam4D.setPrecision(cpuParam4D.Precision(), cpuParam4D.Precision(), true);
+  std::vector<ColorSpinorField *> out4D;
+  out4D.push_back(ColorSpinorField::Create(cudaParam4D));
+  profileMake4DProp.TPSTOP(QUDA_PROFILE_INIT);
+
+  profileMake4DProp.TPSTART(QUDA_PROFILE_H2D);  
+  *in5D[0] = *h_in5D[0];
+  profileMake4DProp.TPSTOP(QUDA_PROFILE_H2D);  
+
+  profileMake4DProp.TPSTART(QUDA_PROFILE_COMPUTE);
+  make4DQuarkProp(*out4D[0], *in5D[0]);
+  profileMake4DProp.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  profileMake4DProp.TPSTART(QUDA_PROFILE_D2H);  
+  *h_out4D[0] = *out4D[0];
+  profileMake4DProp.TPSTOP(QUDA_PROFILE_D2H);  
+
+  profileMake4DProp.TPSTART(QUDA_PROFILE_FREE);  
+  delete out4D[0];
+  delete in5D[0];
+  
+  delete h_in5D[0];
+  delete h_out4D[0];  
+  profileMake4DProp.TPSTOP(QUDA_PROFILE_FREE);  
+  profileMake4DProp.TPSTOP(QUDA_PROFILE_TOTAL);  
 }

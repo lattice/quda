@@ -192,8 +192,7 @@ namespace quda
      @param[in] field LatticeField we wish to instantiate
      @param[in,out] args Additional arguments for kernels
   */
-  template <template <typename, int> class Apply, typename store_t, typename F,
-            typename... Args>
+  template <template <typename, int> class Apply, typename store_t, typename F, typename... Args>
   constexpr void instantiate(F &field, Args &&... args)
   {
     if (field.Ncolor() == 3) {
