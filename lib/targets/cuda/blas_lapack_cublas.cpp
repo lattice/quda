@@ -31,6 +31,7 @@ namespace quda
 #ifdef NATIVE_LAPACK_LIB
           cublasStatus_t error = cublasCreate(&handle);
           if (error != CUBLAS_STATUS_SUCCESS) errorQuda("cublasCreate failed with error %d", error);
+	  else printfQuda("cublasCreated successfully\n");
           cublas_init = true;
 #endif
         }
@@ -187,6 +188,211 @@ namespace quda
 #endif
       }
 
+      long long stridedBatchGEMM(void *A_data, void *B_data, void *C_data, QudaCublasParam cublas_param,
+                                 QudaFieldLocation location)
+      {
+        long long flops = 0;
+#ifdef NATIVE_LAPACK_LIB
+        timeval start, stop;
+        gettimeofday(&start, NULL);
+
+        const uint64_t batch = cublas_param.batch_count;
+        uint64_t data_size
+          = (cublas_param.data_type == QUDA_CUBLAS_DATATYPE_S || cublas_param.data_type == QUDA_CUBLAS_DATATYPE_C) ? 4 :
+                                                                                                                     8;
+
+        if (cublas_param.data_type == QUDA_CUBLAS_DATATYPE_C || cublas_param.data_type == QUDA_CUBLAS_DATATYPE_Z) {
+          data_size *= 2;
+        }
+
+        // Swap A and B if in row order
+        if (cublas_param.data_order == QUDA_CUBLAS_DATAORDER_ROW) {
+          std::swap(cublas_param.m, cublas_param.n);
+          std::swap(cublas_param.lda, cublas_param.ldb);
+          std::swap(cublas_param.trans_a, cublas_param.trans_b);
+          std::swap(cublas_param.a_offset, cublas_param.b_offset);
+          std::swap(cublas_param.strideA, cublas_param.strideB);
+          std::swap(A_data, B_data);
+        }
+
+        // Number of data between batches
+        unsigned int A_batch_size = cublas_param.lda * cublas_param.k;
+        if (cublas_param.trans_a != QUDA_CUBLAS_OP_N) A_batch_size = cublas_param.lda * cublas_param.m;
+        unsigned int B_batch_size = cublas_param.ldb * cublas_param.n;
+        if (cublas_param.trans_b != QUDA_CUBLAS_OP_N) B_batch_size = cublas_param.ldb * cublas_param.k;
+        unsigned int C_batch_size = cublas_param.ldc * cublas_param.n;
+
+        // Strides in the cublas param are defaulted to -1. If that remains unchanged,
+        // the stride will be the regular batch size, else the user specified value
+        // is used.
+        unsigned int strideA = cublas_param.strideA < 0 ? A_batch_size : cublas_param.strideA;
+        unsigned int strideB = cublas_param.strideB < 0 ? B_batch_size : cublas_param.strideB;
+        unsigned int strideC = cublas_param.strideC < 0 ? C_batch_size : cublas_param.strideC;
+
+        // Data size of the entire array
+        size_t sizeAarr = A_batch_size * data_size * batch;
+        size_t sizeBarr = B_batch_size * data_size * batch;
+        size_t sizeCarr = C_batch_size * data_size * batch;
+
+        // If already on the device, just use the given pointer. If the data is on
+        // the host, allocate device memory and transfer
+        void *A_d = location == QUDA_CUDA_FIELD_LOCATION ? A_data : pool_device_malloc(sizeAarr);
+        void *B_d = location == QUDA_CUDA_FIELD_LOCATION ? B_data : pool_device_malloc(sizeBarr);
+        void *C_d = location == QUDA_CUDA_FIELD_LOCATION ? C_data : pool_device_malloc(sizeCarr);
+        if (location == QUDA_CPU_FIELD_LOCATION) {
+          qudaMemcpy(A_d, A_data, sizeAarr, cudaMemcpyHostToDevice);
+          qudaMemcpy(B_d, B_data, sizeBarr, cudaMemcpyHostToDevice);
+          qudaMemcpy(C_d, C_data, sizeCarr, cudaMemcpyHostToDevice);
+        }
+
+        cublasOperation_t trans_a = CUBLAS_OP_N;
+        switch (cublas_param.trans_a) {
+        case QUDA_CUBLAS_OP_N: trans_a = CUBLAS_OP_N; break;
+        case QUDA_CUBLAS_OP_T: trans_a = CUBLAS_OP_T; break;
+        case QUDA_CUBLAS_OP_C: trans_a = CUBLAS_OP_C; break;
+        default: errorQuda("Unknown QUDA_CUBLAS_OP type %d\n", cublas_param.trans_a);
+        }
+
+        cublasOperation_t trans_b = CUBLAS_OP_N;
+        switch (cublas_param.trans_b) {
+        case QUDA_CUBLAS_OP_N: trans_b = CUBLAS_OP_N; break;
+        case QUDA_CUBLAS_OP_T: trans_b = CUBLAS_OP_T; break;
+        case QUDA_CUBLAS_OP_C: trans_b = CUBLAS_OP_C; break;
+        default: errorQuda("Unknown QUDA_CUBLAS_OP type %d\n", cublas_param.trans_b);
+        }
+
+        if (cublas_param.data_type == QUDA_CUBLAS_DATATYPE_Z) {
+
+          typedef cuDoubleComplex Z;
+
+          const Z alpha = make_double2((double)(static_cast<std::complex<double>>(cublas_param.alpha).real()),
+                                       (double)(static_cast<std::complex<double>>(cublas_param.alpha).imag()));
+
+          const Z beta = make_double2((double)(static_cast<std::complex<double>>(cublas_param.beta).real()),
+                                      (double)(static_cast<std::complex<double>>(cublas_param.beta).imag()));
+
+          cublasStatus_t error;
+          if (batch > 1) {
+
+            error = cublasZgemmStridedBatched(handle, trans_a, trans_b, cublas_param.m, cublas_param.n, cublas_param.k,
+                                              &alpha, (Z *)A_d + cublas_param.a_offset, cublas_param.lda, strideA,
+                                              (Z *)B_d + cublas_param.b_offset, cublas_param.ldb, strideB, &beta,
+                                              (Z *)C_d + cublas_param.c_offset, cublas_param.ldc, strideC, batch);
+
+          } else {
+            error = cublasZgemm(handle, trans_a, trans_b, cublas_param.m, cublas_param.n, cublas_param.k, &alpha,
+                                (Z *)A_d + cublas_param.a_offset, cublas_param.lda, (Z *)B_d + cublas_param.b_offset,
+                                cublas_param.ldb, &beta, (Z *)C_d + cublas_param.c_offset, cublas_param.ldc);
+          }
+
+          if (error != CUBLAS_STATUS_SUCCESS) errorQuda("\nError in cuBLASZGEMMBatched), error code = %d\n", error);
+
+        } else if (cublas_param.data_type == QUDA_CUBLAS_DATATYPE_C) {
+
+          typedef cuFloatComplex C;
+
+          const C alpha = make_float2((float)(static_cast<std::complex<double>>(cublas_param.alpha).real()),
+                                      (float)(static_cast<std::complex<double>>(cublas_param.alpha).imag()));
+
+          const C beta = make_float2((float)(static_cast<std::complex<double>>(cublas_param.beta).real()),
+                                     (float)(static_cast<std::complex<double>>(cublas_param.beta).imag()));
+
+          cublasStatus_t error;
+          if (batch > 1) {
+
+            error = cublasCgemmStridedBatched(handle, trans_a, trans_b, cublas_param.m, cublas_param.n, cublas_param.k,
+                                              &alpha, (C *)A_d + cublas_param.a_offset, cublas_param.lda, strideA,
+                                              (C *)B_d + cublas_param.b_offset, cublas_param.ldb, strideB, &beta,
+                                              (C *)C_d + cublas_param.c_offset, cublas_param.ldc, strideC, batch);
+
+          } else {
+            error = cublasCgemm(handle, trans_a, trans_b, cublas_param.m, cublas_param.n, cublas_param.k, &alpha,
+                                (C *)A_d + cublas_param.a_offset, cublas_param.lda, (C *)B_d + cublas_param.b_offset,
+                                cublas_param.ldb, &beta, (C *)C_d + cublas_param.c_offset, cublas_param.ldc);
+          }
+
+          if (error != CUBLAS_STATUS_SUCCESS) errorQuda("\nError in cuBLASCGEMMBatched), error code = %d\n", error);
+
+        } else if (cublas_param.data_type == QUDA_CUBLAS_DATATYPE_D) {
+
+          typedef double D;
+
+          const D alpha = (D)(static_cast<std::complex<double>>(cublas_param.alpha).real());
+          const D beta = (D)(static_cast<std::complex<double>>(cublas_param.beta).real());
+
+          cublasStatus_t error;
+          if (batch > 1) {
+
+            error = cublasDgemmStridedBatched(handle, trans_a, trans_b, cublas_param.m, cublas_param.n, cublas_param.k,
+                                              &alpha, (D *)A_d + cublas_param.a_offset, cublas_param.lda, strideA,
+                                              (D *)B_d + cublas_param.b_offset, cublas_param.ldb, strideB, &beta,
+                                              (D *)C_d + cublas_param.c_offset, cublas_param.ldc, strideC, batch);
+
+          } else {
+            error = cublasDgemm(handle, trans_a, trans_b, cublas_param.m, cublas_param.n, cublas_param.k, &alpha,
+                                (D *)A_d + cublas_param.a_offset, cublas_param.lda, (D *)B_d + cublas_param.b_offset,
+                                cublas_param.ldb, &beta, (D *)C_d + cublas_param.c_offset, cublas_param.ldc);
+          }
+
+          if (error != CUBLAS_STATUS_SUCCESS) errorQuda("\nError in cuBLASDGEMMBatched), error code = %d\n", error);
+
+        } else if (cublas_param.data_type == QUDA_CUBLAS_DATATYPE_S) {
+
+          typedef float S;
+
+          const S alpha = (S)(static_cast<std::complex<double>>(cublas_param.alpha).real());
+          const S beta = (S)(static_cast<std::complex<double>>(cublas_param.beta).real());
+
+          cublasStatus_t error;
+          if (batch > 1) {
+
+            error = cublasSgemmStridedBatched(handle, trans_a, trans_b, cublas_param.m, cublas_param.n, cublas_param.k,
+                                              &alpha, (S *)A_d + cublas_param.a_offset, cublas_param.lda, strideA,
+                                              (S *)B_d + cublas_param.b_offset, cublas_param.ldb, strideB, &beta,
+                                              (S *)C_d + cublas_param.c_offset, cublas_param.ldc, strideC, batch);
+
+          } else {
+            error = cublasSgemm(handle, trans_a, trans_b, cublas_param.m, cublas_param.n, cublas_param.k, &alpha,
+                                (S *)A_d + cublas_param.a_offset, cublas_param.lda, (S *)B_d + cublas_param.b_offset,
+                                cublas_param.ldb, &beta, (S *)C_d + cublas_param.c_offset, cublas_param.ldc);
+          }
+
+          if (error != CUBLAS_STATUS_SUCCESS) errorQuda("\nError in cuBLASSGEMMBatched), error code = %d\n", error);
+
+        } else {
+          errorQuda("cublasGEMM type %d not implemented\n", cublas_param.data_type);
+        }
+
+        if (cublas_param.data_order == QUDA_CUBLAS_DATAORDER_ROW) {
+          std::swap(cublas_param.m, cublas_param.n);
+          std::swap(cublas_param.lda, cublas_param.ldb);
+          std::swap(cublas_param.trans_a, cublas_param.trans_b);
+          std::swap(cublas_param.a_offset, cublas_param.b_offset);
+          std::swap(cublas_param.strideA, cublas_param.strideB);
+          std::swap(A_data, B_data);
+        }
+
+        if (location == QUDA_CPU_FIELD_LOCATION) {
+          qudaMemcpy(C_data, C_d, sizeCarr, cudaMemcpyDeviceToHost);
+          pool_device_free(A_d);
+          pool_device_free(B_d);
+          pool_device_free(C_d);
+        }
+
+        qudaDeviceSynchronize();
+        gettimeofday(&stop, NULL);
+        long ds = stop.tv_sec - start.tv_sec;
+        long dus = stop.tv_usec - start.tv_usec;
+        double time = ds + 0.000001 * dus;
+        if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
+          printfQuda("Batched matrix GEMM completed in %f seconds with GFLOPS = %f\n", time, 1e-9 * flops / time);
+
+        return flops;
+#else
+        errorQuda("Native BLAS not built. Please build and use native BLAS or use generic BLAS");
+        return 0; // Stops a compiler warning
+#endif
+      }
     } // namespace native
-  }   // namespace blas_lapack
+  } // namespace blas_lapack
 } // namespace quda

@@ -3,6 +3,7 @@
 #include <quda.h>
 #include <quda_fortran.h>
 #include <quda_internal.h>
+#include <device.h>
 #include <comm_quda.h>
 #include <tune_quda.h>
 #include <blas_quda.h>

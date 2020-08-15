@@ -148,9 +148,6 @@ static int *num_failures_h = nullptr;
 static int *num_failures_d = nullptr;
 static bool initialized = false;
 
-cudaDeviceProp deviceProp;
-qudaStream_t *streams;
-
 static bool InitMagma = false;
 //for MAGMA lib:
 #include <blas_magma.h>
@@ -527,6 +524,7 @@ void initQudaMemory()
   device::create_context();
   createDslashEvents();
 
+  blas_lapack::native::init();
   blas::init();
 
   // initalize the memory pool allocators
@@ -5830,7 +5828,7 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
 
   // Compute Batched GEMM
   profileCuBLAS.TPSTART(QUDA_PROFILE_COMPUTE);
-  
+
   // cuBLAS works exclusively in column major order. If the input data is in
   // row major order, we may treat the A and B and C arrays as A^T, B^T, and C^T.
   // We swap the order of the A * B multiplication and swap the
@@ -5861,9 +5859,9 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
   // leading dim values and any offsets. All this is done behind the scenes in the
   // BatchGEMM function, and before function exit all pointers and values are
   // restored to the values they had on entry.
-  
-  cublas::BatchGEMM(A_d, B_d, C_d, *cublas_param, QUDA_CUDA_FIELD_LOCATION);
-  
+
+  blas_lapack::native::stridedBatchGEMM(A_d, B_d, C_d, *cublas_param, QUDA_CUDA_FIELD_LOCATION);
+
   if (getVerbosity() >= QUDA_VERBOSE) printfQuda("BatchGEMM success!\n");
   profileCuBLAS.TPSTOP(QUDA_PROFILE_COMPUTE);
 

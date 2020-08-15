@@ -306,9 +306,9 @@ void laphBaryonKernel(int n1, int n2, int n3, int nMom,
   cublas_param_mom_sum.data_type = QUDA_CUBLAS_DATATYPE_Z;
 
   profileCuBLAS.TPSTART(QUDA_PROFILE_COMPUTE);
-  blas_lapack::native::BatchGEMM(d_evec, d_coeffs2, d_q2, cublas_param_init, QUDA_CUDA_FIELD_LOCATION);
+  blas_lapack::native::stridedBatchGEMM(d_evec, d_coeffs2, d_q2, cublas_param_init, QUDA_CUDA_FIELD_LOCATION);
   cublas_param_init.m = n3;
-  blas_lapack::native::BatchGEMM(d_evec, d_coeffs3, d_q3, cublas_param_init, QUDA_CUDA_FIELD_LOCATION);
+  blas_lapack::native::stridedBatchGEMM(d_evec, d_coeffs3, d_q3, cublas_param_init, QUDA_CUDA_FIELD_LOCATION);
   profileCuBLAS.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   
@@ -335,7 +335,7 @@ void laphBaryonKernel(int n1, int n2, int n3, int nMom,
 	  cublas_param_mom_sum.n = nInBlock;
 	  cublas_param_mom_sum.c_offset = (dil1*n2 + dil2)*n3 + dil3 - nInBlock + 1;;
 	  profileCuBLAS.TPSTART(QUDA_PROFILE_COMPUTE);	  
-	  blas_lapack::native::BatchGEMM(d_tmp, d_mom, d_ret, cublas_param_mom_sum, QUDA_CUDA_FIELD_LOCATION);
+	  blas_lapack::native::stridedBatchGEMM(d_tmp, d_mom, d_ret, cublas_param_mom_sum, QUDA_CUDA_FIELD_LOCATION);
 	  profileCuBLAS.TPSTOP(QUDA_PROFILE_COMPUTE);	  
 	  nInBlock = 0;
 	}
@@ -509,7 +509,7 @@ void laphBaryonKernelComputeModeTripletA(int nMom, int nEv, void **host_evec,
 	  cublas_param_mom_sum.c_offset = blockStart;
 	  profileCuBLAS.TPSTART(QUDA_PROFILE_COMPUTE);	  
 	  //printfQuda("cuBLAS start\n"); 
-	  blas_lapack::native::BatchGEMM(d_tmp, d_mom, d_ret, cublas_param_mom_sum, QUDA_CUDA_FIELD_LOCATION);
+	  blas_lapack::native::stridedBatchGEMM(d_tmp, d_mom, d_ret, cublas_param_mom_sum, QUDA_CUDA_FIELD_LOCATION);
 	  //printfQuda("cuBLAS end\n"); 
 	  profileCuBLAS.TPSTOP(QUDA_PROFILE_COMPUTE);	  
 	  blockStart += nInBlock;
@@ -525,7 +525,7 @@ void laphBaryonKernelComputeModeTripletA(int nMom, int nEv, void **host_evec,
     cublas_param_mom_sum.n = nInBlock;
     cublas_param_mom_sum.c_offset = blockStart;
     profileCuBLAS.TPSTART(QUDA_PROFILE_COMPUTE);	  
-    blas_lapack::native::BatchGEMM(d_tmp, d_mom, d_ret, cublas_param_mom_sum, QUDA_CUDA_FIELD_LOCATION);
+    blas_lapack::native::stridedBatchGEMM(d_tmp, d_mom, d_ret, cublas_param_mom_sum, QUDA_CUDA_FIELD_LOCATION);
     profileCuBLAS.TPSTOP(QUDA_PROFILE_COMPUTE);	  
     blockStart = 0;
     nInBlock = 0;
@@ -703,7 +703,7 @@ void laphBaryonKernelComputeModeTripletB(int n1, int n2, int n3, int nMom,
   cublas_param_1.data_type = QUDA_CUBLAS_DATATYPE_Z;
 
   profileCuBLAS.TPSTART(QUDA_PROFILE_COMPUTE);
-  blas_lapack::native::BatchGEMM(d_mtb, d_coeffs3, d_q3, cublas_param_1, QUDA_CUDA_FIELD_LOCATION);
+  blas_lapack::native::stridedBatchGEMM(d_mtb, d_coeffs3, d_q3, cublas_param_1, QUDA_CUDA_FIELD_LOCATION);
   profileCuBLAS.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   
@@ -745,10 +745,10 @@ void laphBaryonKernelComputeModeTripletB(int n1, int n2, int n3, int nMom,
     for(int k=0; k<nSubEv; k++) {
       cublas_param_2.b_offset = (i * nSubEv + k) * nEv * n3;
       cublas_param_2.c_offset = k * n2 * n3;
-      blas_lapack::native::BatchGEMM(d_coeffs2, d_q3, d_tmp, cublas_param_2, QUDA_CUDA_FIELD_LOCATION);
+      blas_lapack::native::stridedBatchGEMM(d_coeffs2, d_q3, d_tmp, cublas_param_2, QUDA_CUDA_FIELD_LOCATION);
     }
     cublas_param_3.c_offset = i * n1 * n2 * n3;
-    blas_lapack::native::BatchGEMM(d_coeffs1, d_tmp, d_ret, cublas_param_3, QUDA_CUDA_FIELD_LOCATION);
+    blas_lapack::native::stridedBatchGEMM(d_coeffs1, d_tmp, d_ret, cublas_param_3, QUDA_CUDA_FIELD_LOCATION);
   }
   profileCuBLAS.TPSTOP(QUDA_PROFILE_COMPUTE);
   

@@ -162,7 +162,7 @@ if(QUDA_MULTIGRID)
 
 endif()
 
-if(QUDA_CUBLAS_INTERFACE)
+if(QUDA_BUILD_NATIVE_LAPACK)
   add_executable(cublas_interface_test cublas_interface_test.cpp)
   target_link_libraries(cublas_interface_test ${TEST_LIBS})
   quda_checkbuildtest(cublas_interface_test QUDA_BUILD_ALL_TESTS)
