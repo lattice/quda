@@ -152,8 +152,7 @@ namespace quda {
         ret = true;
       }
 
-      if (!tuneGridDim())
-	param.grid = dim3((minThreads()+param.block.x-1)/param.block.x, 1, 1);
+      if (!tuneGridDim()) param.grid.x = (minThreads() + param.block.x - 1) / param.block.x;
 
       return ret;
     }
@@ -420,11 +419,11 @@ namespace quda {
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
     /**
-       Reduction kernels require grid-size tuning, so enable this and
-       make it non-virtual so that if user accidentally disables it,
-       compiler will complain
+       Reduction kernels require grid-size tuning, so enable this, and
+       we mark as final to prevent a derived class from accidentally
+       switching it off.
     */
-    bool tuneGridDim() const { return true; }
+    bool tuneGridDim() const final { return true; }
 
     unsigned int minGridSize() const { return maxGridSize() / 8; }
     int gridStep() const { return minGridSize(); }
