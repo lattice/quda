@@ -290,7 +290,7 @@ void comm_allreduce_array(double* data, size_t size)
   }
 }
 
-void comm_gather_array(double* data, size_t size)
+void comm_gather_reduce_timeslice_array(double* data, size_t size)
 {
   size_t n = comm_size();
   // Collect all the data
@@ -298,12 +298,23 @@ void comm_gather_array(double* data, size_t size)
   if(comm_rank() == 0) {
     recv_buf = new double[size * n];
   }
-
+  
   MPI_CHECK(MPI_Gather(data + size*comm_rank(), size, MPI_DOUBLE, recv_buf, size, MPI_DOUBLE, 0, MPI_COMM_HANDLE));
   
-  // Populate the data array with gatherd data
+  // Populate the data array with gathered data
+  memset((void*)data, 0.0, size * sizeof(double));
   if(comm_rank() == 0) {
-    for (size_t j = 0; j < size * n; j++) { data[j] = recv_buf[j]; }
+    size_t spatial_procs = comm_dim(0) * comm_dim(1) * comm_dim(2);
+    // There are size = 2 * 16 * array_size elements per process.
+    // There are n processes. Sum all data from spatially split dims
+    
+    for(size_t i = 0; i < comm_dim(3); i++) {
+      for (size_t j = 0; j < spatial_procs; j++) {
+	for (size_t k = 0; k < size; k++) {
+	  data[size * i + k] += recv_buf[i * spatial_procs * size + j * size + k];
+	}
+      }
+    }
   }
   
   delete[] recv_buf;

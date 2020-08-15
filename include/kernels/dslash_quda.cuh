@@ -67,7 +67,7 @@ namespace quda
   };
   
   // GPU Kernel for applying the gamma matrix to a colorspinor
-  template <typename Float, int nColor, typename Arg>
+  template <typename Float, int nColor, int d, typename Arg>
   __global__ void gammaGPU(Arg arg)
   {
     typedef typename mapper<Float>::type RegType;
@@ -78,7 +78,7 @@ namespace quda
     if (parity >= arg.nParity) return;
 
     ColorSpinor<RegType,nColor,4> in = arg.in(x_cb, parity);
-    arg.out(x_cb, parity) = in.gamma(arg.d);
+    arg.out(x_cb, parity) = in.gamma(d);
   }
 
   // GPU Kernel for applying a chiral projection to a colorspinor
@@ -95,6 +95,8 @@ namespace quda
     if (x_cb >= arg.volumeCB) return;
     if (parity >= arg.nParity) return;
     
+    // arg.proj is either +1 or -1
+    // chiral_project() expects +1 or 0
     int proj = arg.proj == 1 ? 1 : 0;
     
     Spinor in = arg.in(x_cb, parity);

@@ -21,9 +21,6 @@
 
 using namespace quda;
 
-int num_failures=0;
-int *num_failures_dev;
-
 class GaugeAlgTest : public ::testing::Test {
  protected:
   void SetReunitarizationConsts(){
@@ -62,17 +59,6 @@ class GaugeAlgTest : public ::testing::Test {
     if (prec == QUDA_DOUBLE_PRECISION) prec_val = 1.0e-15;
     if (std::abs(1.0 - detu.x) < prec_val && std::abs(detu.y) < prec_val) return true;
     return false;
-  }
-
-  void CallUnitarizeLinks(cudaGaugeField *cudaInGauge){
-    unitarizeLinks(*cudaInGauge, num_failures_dev);
-    cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
-    if(num_failures>0){
-      cudaFree(num_failures_dev);
-      errorQuda("Error in the unitarization\n");
-      exit(1);
-    }
-    cudaMemset(num_failures_dev, 0, sizeof(int));
   }
 
   virtual void SetUp() {
@@ -124,9 +110,9 @@ class GaugeAlgTest : public ::testing::Test {
     gParamEx.t_boundary = gParam.t_boundary;
     gParamEx.nFace = 1;
     for(int dir=0; dir<4; ++dir) gParamEx.r[dir] = R[dir];
-    cudaInGauge = new cudaGaugeField(gParamEx);
+    U = new cudaGaugeField(gParamEx);
 #else
-    cudaInGauge = new cudaGaugeField(gParam);
+    U = new cudaGaugeField(gParam);
 #endif
     // CURAND random generator initialization
     randstates = new RNG(gParam, 1234);
@@ -141,39 +127,46 @@ class GaugeAlgTest : public ::testing::Test {
     a0.Start(__func__, __FILE__, __LINE__);
     a1.Start(__func__, __FILE__, __LINE__);
 
-    cudaMalloc((void**)&num_failures_dev, sizeof(int));
-    cudaMemset(num_failures_dev, 0, sizeof(int));
-    if(num_failures_dev == NULL) errorQuda("cudaMalloc failed for dev_pointer\n");
-    if(link_recon != QUDA_RECONSTRUCT_8 && coldstart) InitGaugeField( *cudaInGauge);
-     else{
-       InitGaugeField( *cudaInGauge, *randstates );
-     }
+    int *num_failures_h = (int*)mapped_malloc(sizeof(int));
+    int *num_failures_d = (int*)get_mapped_device_pointer(num_failures_h);
+
+    if (link_recon != QUDA_RECONSTRUCT_8 && coldstart)
+      InitGaugeField(*U);
+    else
+      InitGaugeField(*U, *randstates );
+
     // Reunitarization setup
     SetReunitarizationConsts();
-    plaquette(*cudaInGauge);
+    plaquette(*U);
 
     for(int step=1; step<=nsteps; ++step){
       printfQuda("Step %d\n",step);
-      Monte( *cudaInGauge, *randstates, beta_value, nhbsteps, novrsteps);
+      Monte(*U, *randstates, beta_value, nhbsteps, novrsteps);
+
       //Reunitarize gauge links...
-      CallUnitarizeLinks(cudaInGauge);
-      plaquette(*cudaInGauge);
+      *num_failures_h = 0;
+      unitarizeLinks(*U, num_failures_d);
+      qudaDeviceSynchronize();
+      if (*num_failures_h > 0) errorQuda("Error in the unitarization\n");
+
+      plaquette(*U);
     }
     a1.Stop(__func__, __FILE__, __LINE__);
 
     printfQuda("Time Monte -> %.6f s\n", a1.Last());
-    plaq = plaquette(*cudaInGauge);
+    plaq = plaquette(*U);
     printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
+
+    host_free(num_failures_h);
   }
 
   virtual void TearDown() {
-    detu = getLinkDeterminant(*cudaInGauge);
-    double2 tru = getLinkTrace(*cudaInGauge);
+    detu = getLinkDeterminant(*U);
+    double2 tru = getLinkTrace(*U);
     printfQuda("Det: %.16e:%.16e\n", detu.x, detu.y);
     printfQuda("Tr: %.16e:%.16e\n", tru.x/3.0, tru.y/3.0);
 
-    delete cudaInGauge;
-    cudaFree(num_failures_dev);
+    delete U;
     //Release all temporary memory used for data exchange between GPUs in multi-GPU mode
     PGaugeExchangeFree();
 
@@ -188,7 +181,7 @@ class GaugeAlgTest : public ::testing::Test {
   Timer a0,a1;
   double2 detu;
   double3 plaq;
-  cudaGaugeField *cudaInGauge;
+  cudaGaugeField *U;
   int nsteps;
   int nhbsteps;
   int novrsteps;
@@ -200,8 +193,8 @@ class GaugeAlgTest : public ::testing::Test {
 
 TEST_F(GaugeAlgTest, Generation)
 {
-  detu = getLinkDeterminant(*cudaInGauge);
-  plaq = plaquette(*cudaInGauge);
+  detu = getLinkDeterminant(*U);
+  plaq = plaquette(*U);
   bool testgen = false;
   //check plaquette value for beta = 6.2
   if (plaq.x < 0.614 && plaq.x > 0.611 && plaq.y < 0.614 && plaq.y > 0.611) testgen = true;
@@ -213,8 +206,8 @@ TEST_F(GaugeAlgTest, Landau_Overrelaxation)
 {
   const int reunit_interval = 10;
   printfQuda("Landau gauge fixing with overrelaxation\n");
-  gaugeFixingOVR(*cudaInGauge, 4, 100, 10, 1.5, 0, reunit_interval, 1);
-  auto plaq_gf = plaquette(*cudaInGauge);
+  gaugeFixingOVR(*U, 4, 100, 10, 1.5, 0, reunit_interval, 1);
+  auto plaq_gf = plaquette(*U);
   printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
   ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
 }
@@ -223,8 +216,8 @@ TEST_F(GaugeAlgTest, Coulomb_Overrelaxation)
 {
   const int reunit_interval = 10;
   printfQuda("Coulomb gauge fixing with overrelaxation\n");
-  gaugeFixingOVR(*cudaInGauge, 3, 100, 10, 1.5, 0, reunit_interval, 1);
-  auto plaq_gf = plaquette(*cudaInGauge);
+  gaugeFixingOVR(*U, 3, 100, 10, 1.5, 0, reunit_interval, 1);
+  auto plaq_gf = plaquette(*U);
   printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
   ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
 }
@@ -233,8 +226,8 @@ TEST_F(GaugeAlgTest, Landau_FFT)
 {
   if (!checkDimsPartitioned()) {
     printfQuda("Landau gauge fixing with steepest descent method with FFTs\n");
-    gaugeFixingFFT(*cudaInGauge, 4, 100, 10, 0.08, 0, 0, 1);
-    auto plaq_gf = plaquette(*cudaInGauge);
+    gaugeFixingFFT(*U, 4, 100, 10, 0.08, 0, 0, 1);
+    auto plaq_gf = plaquette(*U);
     printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
     ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
   }
@@ -244,8 +237,8 @@ TEST_F(GaugeAlgTest, Coulomb_FFT)
 {
   if (!checkDimsPartitioned()) {
     printfQuda("Coulomb gauge fixing with steepest descent method with FFTs\n");
-    gaugeFixingFFT(*cudaInGauge, 3, 100, 10, 0.08, 0, 0, 1);
-    auto plaq_gf = plaquette(*cudaInGauge);
+    gaugeFixingFFT(*U, 3, 100, 10, 0.08, 0, 0, 1);
+    auto plaq_gf = plaquette(*U);
     printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
     ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
   }

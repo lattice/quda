@@ -1,5 +1,4 @@
-#ifndef _COLOR_SPINOR_FIELD_H
-#define _COLOR_SPINOR_FIELD_H
+#pragma once
 
 #include <quda_internal.h>
 #include <quda.h>
@@ -123,7 +122,6 @@ namespace quda {
        bytes = descr.bytes;      // size in bytes of spinor field
        norm_bytes = descr.norm_bytes; // makes no sense but let's keep it...
      }
-
   };
 
   class ColorSpinorParam : public LatticeFieldParam {
@@ -444,9 +442,8 @@ namespace quda {
     ColorSpinorField *even;
     ColorSpinorField *odd;
 
-    //! used for deflation eigenvector sets etc.:
-    CompositeColorSpinorFieldDescriptor composite_descr;//containes info about the set
-    //
+    // used for deflation eigenvector sets etc.
+    CompositeColorSpinorFieldDescriptor composite_descr;// contains info about the set
     CompositeColorSpinorField components;
 
     /**
@@ -1176,4 +1173,3 @@ namespace quda {
 
 } // namespace quda
 
-#endif // _COLOR_SPINOR_FIELD_H

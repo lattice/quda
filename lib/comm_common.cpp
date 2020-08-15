@@ -854,8 +854,6 @@ bool commAsyncReduction() { return asyncReduce; }
 
 void commAsyncReductionSet(bool async_reduction) { asyncReduce = async_reduction; }
 
-void commGather(double *array, const int len) { comm_gather_array(array, len); }
-
 void comm_abort(int status)
 {
 #ifdef HOST_DEBUG

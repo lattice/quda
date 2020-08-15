@@ -150,7 +150,7 @@ namespace quda {
 
   
   // CPU kernel for applying the gamma matrix to a colorspinor
-  template <typename Float, int nColor, typename Arg>
+  template <typename Float, int nColor, int d, typename Arg>
   void gammaCPU(Arg arg)
   {
     typedef typename mapper<Float>::type RegType;
@@ -159,7 +159,7 @@ namespace quda {
       
       for (int x_cb = 0; x_cb < arg.volumeCB; x_cb++) { // 4-d volume
 	ColorSpinor<RegType,nColor,4> in = arg.in(x_cb, parity);
-	arg.out(x_cb, parity) = in.gamma(arg.d);
+	arg.out(x_cb, parity) = in.gamma(d);
       } // 4-d volumeCB
     } // parity
   }
@@ -168,17 +168,6 @@ namespace quda {
   template <typename Float, int nColor, typename Arg>
   void chiralProjCPU(Arg arg)
   {
-  /*
-    typedef typename mapper<Float>::type RegType;
-    
-    for (int parity= 0; parity < arg.nParity; parity++) {
-      
-      for (int x_cb = 0; x_cb < arg.volumeCB; x_cb++) { // 4-d volume
-	ColorSpinor<RegType,nColor,4> in = arg.in(x_cb, parity);
-	arg.out(x_cb, parity) = in.chiralProj(arg.proj);
-      } // 4-d volumeCB
-    } // parity
-  */
   }
 
   
@@ -203,6 +192,7 @@ namespace quda {
 
     void apply(const qudaStream_t &stream) {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
+<<<<<<< HEAD
         if(arg.proj == 0) gammaCPU<Float, nColor, Arg>(arg);
         else chiralProjCPU<Float, nColor>(arg);
       } else {
@@ -212,6 +202,20 @@ namespace quda {
         } else {
           qudaLaunchKernel(chiralProjGPU<Float, nColor, Arg>, tp, stream, arg);
         }
+=======
+	if(arg.proj == 0) gammaCPU<Float,nColor,4,Arg>(arg);
+	else chiralProjCPU<Float,nColor>(arg);
+      } else {
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+	switch (arg.d) {
+	case 4:
+	  if(arg.proj == 0) qudaLaunchKernel(gammaGPU<Float,nColor,4,Arg>, tp, stream, arg);
+	  else if (arg.proj == -1 || arg.proj == -1) qudaLaunchKernel(chiralProjGPU<Float,nColor,Arg>, tp, stream, arg);
+	  else errorQuda("Unexpected chrial projection %d", arg.proj);
+	  break;
+	default: errorQuda("%d not instantiated", arg.d);
+	}
+>>>>>>> origin/feature/smeared_diluted_propagators
       }
     }
 
