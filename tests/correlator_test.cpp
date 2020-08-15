@@ -62,7 +62,7 @@ int main(int argc, char **argv)
   //FIXME what about this parameter class? should it be part of quda.h like invertparam etc?
   quda::ColorSpinorParam cs_param;
   quda::ColorSpinorParam* cs_param_ptr = &cs_param;
-  constructWilsonTestSpinorParam(&cs_param, &inv_param, &gauge_param); //FIXME remove Test from this function name?
+  constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param); //FIXME remove Test from this function name?
   int spinor_dim = cs_param.nColor * cs_param.nSpin;
   setSpinorSiteSize(spinor_dim * 2); // this sets the global variable my_spinor_site_size
 

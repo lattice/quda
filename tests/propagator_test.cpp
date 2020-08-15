@@ -272,7 +272,7 @@ int main(int argc, char **argv)
   quda::ColorSpinorField *out;
   quda::ColorSpinorField *check;
   quda::ColorSpinorParam cs_param;
-  constructWilsonTestSpinorParam(&cs_param, &inv_param, &gauge_param);
+  constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
   in = quda::ColorSpinorField::Create(cs_param);
   out = quda::ColorSpinorField::Create(cs_param);
   check = quda::ColorSpinorField::Create(cs_param);
@@ -290,7 +290,7 @@ int main(int argc, char **argv)
   QudaInvertParam inv_param4D;
   setInvertParam(inv_param4D);  
   quda::ColorSpinorParam cs_param4D;
-  constructWilsonTestSpinorParam(&cs_param4D, &inv_param4D, &gauge_param);  
+  constructWilsonSpinorParam(&cs_param4D, &inv_param4D, &gauge_param);  
   // Reset dslash_type
   dslash_type = dslash_type_orig;
   

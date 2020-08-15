@@ -204,7 +204,7 @@ void constructQudaCloverField(void *clover, double norm, double diag, QudaPrecis
     constructCloverField((float *)clover, norm, diag);
 }
 
-void constructWilsonTestSpinorParam(quda::ColorSpinorParam *cs_param, const QudaInvertParam *inv_param,
+void constructWilsonSpinorParam(quda::ColorSpinorParam *cs_param, const QudaInvertParam *inv_param,
                                     const QudaGaugeParam *gauge_param)
 {
   // Lattice vector spacetime/colour/spin/parity properties

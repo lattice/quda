@@ -119,7 +119,7 @@ int main(int argc, char **argv)
   //-----------------------------------------------------------------------------------
   quda::ColorSpinorField *check;
   quda::ColorSpinorParam cs_param;
-  constructWilsonTestSpinorParam(&cs_param, &inv_param, &gauge_param);
+  constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
   check = quda::ColorSpinorField::Create(cs_param);
 
   // Host arrays for solutions, sources, and check
