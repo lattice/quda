@@ -30,7 +30,7 @@
 #include <deflation.h>
 #include <random_quda.h>
 #include <mpi_comm_handle.h>
-#include <blas_cublas.h>
+#include <blas_lapack.h>
 #include <check_params.h>
 
 #ifdef NUMA_NVML

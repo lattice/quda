@@ -43,12 +43,6 @@ std::vector<cudaColorSpinorField*> solutionResident;
 // each entry is one p
 std::vector< std::vector<ColorSpinorField*> > chronoResident(QUDA_MAX_CHRONO);
 
-// Mapped memory buffer used to hold unitarization failures
-static int *num_failures_h = nullptr;
-static int *num_failures_d = nullptr;
-
-static bool initialized = false;
-
 //!< Profiler for initQuda
 TimeProfile profileInit("initQuda");
 

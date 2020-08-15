@@ -334,25 +334,12 @@ if(QUDA_DIRAC_NDEG_TWISTED_MASS)
   target_compile_definitions(quda PUBLIC GPU_NDEG_TWISTED_MASS_DIRAC)
 endif(QUDA_DIRAC_NDEG_TWISTED_MASS)
 
-<<<<<<< HEAD
-if(QUDA_CUBLAS_INTERFACE)
-  target_link_libraries(quda PUBLIC ${CUDA_cublas_LIBRARY})
-  target_compile_definitions(quda PRIVATE CUBLAS_LIB)
-endif()
-
-if(QUDA_MULTIGRID)
-  if(NOT QUDA_CUBLAS_INTERFACE)
-    target_link_libraries(quda PUBLIC ${CUDA_cublas_LIBRARY})
-    target_compile_definitions(quda PRIVATE CUBLAS_LIB)
-  endif()
-=======
 if(${QUDA_BUILD_NATIVE_LAPACK} STREQUAL "ON")
   target_link_libraries(quda PUBLIC ${CUDA_cublas_LIBRARY})
   target_compile_definitions(quda PRIVATE NATIVE_LAPACK_LIB)
 endif()
 
 if(QUDA_MULTIGRID)
->>>>>>> origin/develop
   target_compile_definitions(quda PRIVATE GPU_MULTIGRID)
 endif(QUDA_MULTIGRID)
 
@@ -431,15 +418,12 @@ if(QUDA_QMP)
   if(QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
     add_dependencies(quda QMP)
     add_dependencies(quda_cpp QMP)
-<<<<<<< HEAD
-    #TODO: need to figure out how to propagate that cleanly
-    add_dependencies(quda_cuda_target QMP)
-    add_dependencies(quda_cuda_programs QMP)
-=======
+
     # TODO: need to figure out how to propagate that cleanly
     add_dependencies(${QUDA_TARGET_LIBRARY} QMP)
     add_dependencies(quda_generic_target QMP)
->>>>>>> origin/develop
+    add_dependencies(quda_cuda_programs QMP)
+
   endif()
   target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_QMPHOME}/include>)
   target_compile_definitions(quda PUBLIC QMP_COMMS)
@@ -451,15 +435,12 @@ if(QUDA_QIO)
   if(QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
     add_dependencies(quda QIO)
     add_dependencies(quda_cpp QIO)
-<<<<<<< HEAD
-    #TODO: need to figure out how to propagate that cleanly
-    add_dependencies(quda_cuda_target QIO)
-    add_dependencies(quda_cuda_programs QIO)
-=======
+
     # TODO: need to figure out how to propagate that cleanly
     add_dependencies(${QUDA_TARGET_LIBRARY} QIO)
     add_dependencies(quda_generic_target QIO)
->>>>>>> origin/develop
+    add_dependencies(quda_cuda_programs QIO)
+
   endif()
   target_compile_definitions(quda PUBLIC HAVE_QIO)
   target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_QIOHOME}/include>)
