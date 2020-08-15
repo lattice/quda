@@ -143,7 +143,7 @@ namespace quda
 
       if (location == QUDA_CUDA_FIELD_LOCATION) {
         arg.launch_error = qudaLaunchKernel(transform_reduce_kernel<Arg>, tp, stream, arg);
-        arg.complete(result.data(), stream);
+        arg.complete(result, stream);
       } else {
         transform_reduce(arg);
         for (size_t j = 0; j < result.size(); j++) result[j] = arg.result[j];

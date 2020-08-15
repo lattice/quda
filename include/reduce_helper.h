@@ -112,7 +112,6 @@ namespace quda
 #endif
     }
 
-
     /**
        @brief Finalize the reduction, returning the computed reduction
        into result.  With heterogeneous atomics this means we poll the
@@ -126,10 +125,11 @@ namespace quda
        instance will be used for multiple reductions.
      */
     template <typename host_t, typename device_t = host_t>
-    void complete(host_t *result, const qudaStream_t stream = 0, bool reset = false)
+    void complete(std::vector<host_t> &result, const qudaStream_t stream = 0, bool reset = false)
     {
       if (launch_error == QUDA_ERROR) return; // kernel launch failed so return
       if (launch_error == QUDA_ERROR_UNINITIALIZED) errorQuda("No reduction kernel appears to have been launched");
+      if (result.size() != (unsigned)n_reduce) errorQuda("result vector length %lu does not match n_reduce %d", result.size(), n_reduce);
 #ifdef HETEROGENEOUS_ATOMIC
       if (consumed) errorQuda("Cannot call complete more than once for each construction");
 
@@ -158,6 +158,23 @@ namespace quda
       }
 #endif
     }
+
+    /**
+       @brief Overload providing a simple reference interface
+       @param[out] result The reduction result is copied here
+       @param[in] stream The stream on which we the reduction is being done
+       @param[in] reset Whether to reset the atomics after the
+       reduction has completed; required if the same aReducearg
+       instance will be used for multiple reductions.
+     */
+    template <typename host_t, typename device_t = host_t>
+    void complete(host_t &result, const qudaStream_t stream = 0, bool reset = false)
+    {
+      std::vector<host_t> result_(1);
+      complete(result_, stream, reset);
+      result = result_[0];
+    }
+
   };
 
 #ifdef HETEROGENEOUS_ATOMIC

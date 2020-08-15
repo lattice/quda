@@ -133,7 +133,7 @@ namespace quda {
       meta(mom)
     {
       apply(0);
-      arg.complete(&action);
+      arg.complete(action);
       comm_allreduce(&action);
     }
 
@@ -246,7 +246,7 @@ namespace quda {
       double2 force_max;
       apply(0);
       if (forceMonitor()) {
-        arg.complete(&force_max);
+        arg.complete(force_max);
         forceRecord(force_max, arg.coeff, fname);
       }
     }
