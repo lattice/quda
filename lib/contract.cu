@@ -95,7 +95,7 @@ public:
   //- In fact, all of QUDA's kernel classes inherit from some form of Tunable class. This 
   //- allows QUDA to automagically experiment with block and thread dimensions to discover 
   //- the optimal set-up for a given problem. 
-  template <typename Arg> class ContractionSumCompute : TunableLocalParity
+  template <typename Arg> class ContractionSumCompute : TunableLocalParityReduction
   {
     //- The protected members of the class are the argument structure we have already seen, 
     //- the memory addresses of the two fermion fields to be contracted, and the type of 
@@ -130,14 +130,14 @@ public:
     //- to denote which timeslice we are working on. This is accessed by a handy member
     //- function of the ColorSpinorField object x, namely `.X(3)`.
     void initTuneParam(TuneParam &param) const {
-      TunableLocalParity::initTuneParam(param);
+      TunableLocalParityReduction::initTuneParam(param);
       param.block.y = 2;
       param.grid.z = x.X(3); // T dimension is mapped to different blocks in the Z dimension
     }
 
     //- This is just making sure the Tunable class defaults to the same params.
     void defaultTuneParam(TuneParam &param) const {
-      TunableLocalParity::defaultTuneParam(param);
+      TunableLocalParityReduction::defaultTuneParam(param);
       param.block.y = 2;
       param.grid.z = x.X(3); // T dimension is mapped to different blocks in the Z dimension
     }
@@ -153,7 +153,7 @@ public:
     //- contraction type. 
   public:
     ContractionSumCompute(Arg &arg, const ColorSpinorField &x, const ColorSpinorField &y, const QudaContractType cType) :
-      TunableLocalParity(),
+      TunableLocalParityReduction(),
       arg(arg),
       x(x),
       y(y),
@@ -197,9 +197,6 @@ public:
       //- we place the CUDA specific code under a boolean x.Location() == QUDA_CUDA_FIELD_LOCATION 
       //- so we know we are using a GPU.
       if (x.Location() == QUDA_CUDA_FIELD_LOCATION) {
-	//- Ensure the reduce array is zeroed out. This is the array that comes baked in to the
-	//- `ReduceArg` class from which the `arg` structure inherited.
-	for (int i=0; i<2*x.Nspin()*x.Nspin()*x.X(3); i++) ((double*)arg.result_h)[i] = 0.0;
 	//- We next define a TuneParam object that is used by the Tunable class. It takes 
 	//- `this` class (see now what *this means?) and some other dat
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -313,13 +310,8 @@ public:
       //- `apply` to see it all come togther. 
       contraction_with_sum.apply(0);
 
-      //- Welcome back! We did it! Now we just make sure that all the GPU work is done 
-      //- before moving on...
-      qudaDeviceSynchronize();
-      //- ... and copy the data we just computed back to the return array.
       // Copy timeslice sums back to device
-      double *res = (double*)arg.result_h;
-      for (int i=0; i<x.Nspin()*x.Nspin()*x.X(3); i++) result[i] = complex<real>(res[2*i], res[2*i+1]);
+      arg.complete(result);
       // Head on back to your place in contractQuda to finish up.
     } else {
       ContractionArg<real> arg(x, y, result);

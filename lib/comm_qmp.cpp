@@ -310,12 +310,12 @@ void comm_gather_reduce_timeslice_array(double* data, size_t size)
   // Populate the data array with gathered data
   memset((void*)data, 0.0, size * sizeof(double));
   if(comm_rank() == 0) {
-    size_t spatial_procs = comm_dim(0) * comm_dim(1) * comm_dim(2);
+    int spatial_procs = comm_dim(0) * comm_dim(1) * comm_dim(2);
     // There are size = 2 * 16 * array_size elements per process.
     // There are n processes. Sum all data from spatially split dims
     
-    for(size_t i = 0; i < comm_dim(3); i++) {
-      for (size_t j = 0; j < spatial_procs; j++) {
+    for(int i = 0; i < comm_dim(3); i++) {
+      for (int j = 0; j < spatial_procs; j++) {
 	for (size_t k = 0; k < size; k++) {
 	  data[size * i + k] += recv_buf[i * spatial_procs * size + j * size + k];
 	}
