@@ -86,20 +86,50 @@ int main(int argc, char **argv)
     CSF_V_ptr_arr_prop[i] = prop_array + offset;
   }
 
-  //this is where the result will be stored
-  void *correlation_function_sum = nullptr;
+  // This is where the result will be stored
+  void *correlation_function_sum = nullptr;  
+  size_t corr_dim=0, local_corr_length=0;
+  contract_type == QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL ? corr_dim = 2 : corr_dim = 3;
+  switch (contract_type) {
+  case QUDA_CONTRACT_TYPE_OPEN:
+  case QUDA_CONTRACT_TYPE_DR:
+    local_corr_length = V;
+    break;
+  case QUDA_CONTRACT_TYPE_OPEN_SUM:
+  case QUDA_CONTRACT_TYPE_DR_SUM:
+  case QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL:
+    local_corr_length = gauge_param.X[corr_dim];
+    break;
+  default: errorQuda("Unknown contraction type %d given", contract_type);
+  }
+  
+  // calculate some parameters
+  size_t global_corr_length = local_corr_length * comm_dim(corr_dim);
+  size_t n_numbers_per_slice = 2 * cs_param.nSpin * cs_param.nSpin;
+  size_t corr_size_in_bytes = n_numbers_per_slice * global_corr_length * cs_param.Precision();
 
-  // Loop over the number of sources to use. Default is prop_n_sources=1. Default source position = 0 0 0 0
+  correlation_function_sum = malloc(corr_size_in_bytes);
+  
+  // Loop over the number of sources to use. Default is prop_n_sources=1.
+  // Default source position = 0 0 0 0
   for (int n = 0; n < prop_n_sources; n++) {
     printfQuda("Source position: %d %d %d %d\n", prop_source_position[n][0], prop_source_position[n][1],
                prop_source_position[n][2], prop_source_position[n][3]);
-    for (int i = 0; i < spinor_dim; i++) {
-      const int source[4] = {prop_source_position[n][0], prop_source_position[n][1], prop_source_position[n][2],
-                             prop_source_position[n][3]};
-      constructPointSpinorSource(CSF_V_ptr_arr_source[i], cs_param.nSpin, cs_param.nColor, inv_param.cpu_prec,
-                                 gauge_param.X, i, source);
-      inv_param.solver_normalization = QUDA_SOURCE_NORMALIZATION; // Make explicit for now.
 
+    // Zero out the result array
+    memset(correlation_function_sum, 0, corr_size_in_bytes);
+    
+    // Loop over spin X color dilution positions
+    for (int i = 0; i < spinor_dim; i++) {
+      const int source[4] = {prop_source_position[n][0],
+			     prop_source_position[n][1],
+			     prop_source_position[n][2],
+                             prop_source_position[n][3]};
+      
+      constructPointSpinorSource(CSF_V_ptr_arr_source[i], cs_param.nSpin,
+				 cs_param.nColor, inv_param.cpu_prec, gauge_param.X,
+				 i, source);
+      inv_param.solver_normalization = QUDA_SOURCE_NORMALIZATION; // Make explicit for now.
       invertQuda(CSF_V_ptr_arr_prop[i], CSF_V_ptr_arr_source[i], &inv_param);
 
     }
@@ -107,10 +137,6 @@ int main(int argc, char **argv)
     contractSpatialQuda(CSF_V_ptr_arr_prop, CSF_V_ptr_arr_prop, &correlation_function_sum, contract_type, &inv_param, (void*)cs_param_ptr, gauge_param.X);
     
     // Print correlators for this propagator source position
-    size_t corr_dim;
-    contract_type == QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL ? corr_dim = 2 : corr_dim = 3;
-    size_t global_corr_length = gauge_param.X[corr_dim] * comm_dim(corr_dim);
-    size_t n_numbers_per_slice = 2 * 16;
     for (int G_idx = 0; G_idx < 16; G_idx++) {
       for (size_t t = 0; t < global_corr_length; t++) {
 	printfQuda("sum: prop_n=%d g=%d t=%lu %e %e\n", n, G_idx, t, ((double*)correlation_function_sum)[n_numbers_per_slice * t + 2 * G_idx],
@@ -131,8 +157,6 @@ int main(int argc, char **argv)
 
   free(source_array);
   free(prop_array);
-  free(CSF_V_ptr_arr_source);
-  free(CSF_V_ptr_arr_prop);
   free(correlation_function_sum);
 
   printfQuda("----------------------------------------------------------------------------------\n");

@@ -5794,6 +5794,7 @@ void contractSpatialQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavo
 {
   profileContractSpatial.TPSTART(QUDA_PROFILE_TOTAL);
   profileContractSpatial.TPSTART(QUDA_PROFILE_INIT);
+  
   // create ColorSpinorFields from void** and parameter
   auto cs_param = (ColorSpinorParam *)colorspinorparam;
   const size_t nSpin = cs_param->nSpin;
@@ -5810,20 +5811,27 @@ void contractSpatialQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavo
     CSF_ptr_container_flavor_2[i] = quda::ColorSpinorField::Create(*cs_param);
   }
 
-  // temporal or spatial correlator?
-  size_t corr_dim, local_corr_length;
+  // temporal or spatial correlator?  
+  size_t corr_dim=0, local_corr_length=0;
   cType == QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL ? corr_dim = 2 : corr_dim = 3;
   switch (cType) {
   case QUDA_CONTRACT_TYPE_OPEN:
   case QUDA_CONTRACT_TYPE_DR:
-    local_corr_length = CSF_ptr_container_flavor_2[0]->Volume(); // FIXME use better way to get this
+    local_corr_length = CSF_ptr_container_flavor_1[0]->Volume();
     break;
-  default: local_corr_length = X[corr_dim];
+  case QUDA_CONTRACT_TYPE_OPEN_SUM:
+  case QUDA_CONTRACT_TYPE_DR_SUM:
+    local_corr_length = CSF_ptr_container_flavor_1[0]->Volume();
+    break;
+  case QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL:
+    local_corr_length = X[corr_dim];
+  break;
+  default: errorQuda("Unknown contraction type %d given", cType);
   }
 
   // calculate some parameters
   size_t global_corr_length = local_corr_length * comm_dim(corr_dim);
-  size_t n_numbers_per_slice = 2 * 16;
+  size_t n_numbers_per_slice = 2 * nSpin * nSpin;
   size_t corr_size_in_bytes = n_numbers_per_slice * global_corr_length * cs_param->Precision();
 
   // create device spinor fields
@@ -5835,12 +5843,11 @@ void contractSpatialQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavo
   ColorSpinorField *d_single_prop_flavor_1 = ColorSpinorField::Create(cudaParam);
   ColorSpinorField *d_single_prop_flavor_2 = ColorSpinorField::Create(cudaParam);
   
-  *h_result = malloc(corr_size_in_bytes);
-  memset(*h_result, 0, corr_size_in_bytes);
   // array that fits all timeslices and channels but is reset after each computation
   void *h_result_tmp_global = malloc(corr_size_in_bytes);
   profileContractSpatial.TPSTOP(QUDA_PROFILE_INIT);
 
+  profileContractSpatial.TPSTART(QUDA_PROFILE_COMPUTE);
   for (size_t s1 = 0; s1 < nSpin; s1++) {
     for (size_t c1 = 0; c1 < nColor; c1++) {
       for (size_t b1 = 0; b1 < nSpin; b1++) {
@@ -5848,16 +5855,10 @@ void contractSpatialQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavo
         *d_single_prop_flavor_1 = *CSF_ptr_container_flavor_1[s1 * nColor + c1];
         *d_single_prop_flavor_2 = *CSF_ptr_container_flavor_2[b1 * nColor + c1];
 	
-	profileContractSpatial.TPSTART(QUDA_PROFILE_COMPUTE);
         contractSpatialQuda(*d_single_prop_flavor_1, *d_single_prop_flavor_2, s1, b1, h_result_tmp_global, cType);
-	profileContractSpatial.TPSTOP(QUDA_PROFILE_COMPUTE);
-
-	profileContractSpatial.TPSTART(QUDA_PROFILE_COMMS);
         comm_allreduce_array((double*)h_result_tmp_global, n_numbers_per_slice * global_corr_length);
-	profileContractSpatial.TPSTOP(QUDA_PROFILE_COMMS);
 
-	profileContractSpatial.TPSTART(QUDA_PROFILE_COMPUTE);
-        for (int G_idx = 0; G_idx < 16; G_idx++) {
+        for (size_t G_idx = 0; G_idx < nSpin * nSpin; G_idx++) {
           for (size_t t = 0; t < global_corr_length; t++) {
             ((double *)*h_result)[n_numbers_per_slice * t + 2 * G_idx]
               += ((double*)h_result_tmp_global)[n_numbers_per_slice * t + 2 * G_idx];
@@ -5865,11 +5866,11 @@ void contractSpatialQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavo
               += ((double*)h_result_tmp_global)[n_numbers_per_slice * t + 2 * G_idx + 1];
           }
         }
-	profileContractSpatial.TPSTOP(QUDA_PROFILE_COMPUTE);
       }
     }
   }
-
+  profileContractSpatial.TPSTOP(QUDA_PROFILE_COMPUTE);
+  
   profileContractSpatial.TPSTART(QUDA_PROFILE_FREE);
   //free memory
   delete d_single_prop_flavor_1;

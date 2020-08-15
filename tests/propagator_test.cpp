@@ -146,14 +146,18 @@ int main(int argc, char **argv)
   setVerbosity(verbosity);
   
   // We exclude staggered fermions for now
-  if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH
-      && dslash_type != QUDA_TWISTED_MASS_DSLASH && dslash_type != QUDA_DOMAIN_WALL_4D_DSLASH
-      && dslash_type != QUDA_MOBIUS_DWF_DSLASH && dslash_type != QUDA_MOBIUS_DWF_EOFA_DSLASH
-      && dslash_type != QUDA_TWISTED_CLOVER_DSLASH && dslash_type != QUDA_DOMAIN_WALL_DSLASH) {
+  if (dslash_type != QUDA_WILSON_DSLASH &&
+      dslash_type != QUDA_CLOVER_WILSON_DSLASH &&
+      dslash_type != QUDA_TWISTED_MASS_DSLASH &&
+      dslash_type != QUDA_DOMAIN_WALL_4D_DSLASH &&
+      dslash_type != QUDA_MOBIUS_DWF_DSLASH &&
+      dslash_type != QUDA_MOBIUS_DWF_EOFA_DSLASH &&
+      dslash_type != QUDA_TWISTED_CLOVER_DSLASH &&
+      dslash_type != QUDA_DOMAIN_WALL_DSLASH) {
     printfQuda("dslash_type %d not supported\n", dslash_type);
     exit(0);
   }
-
+  
   if (inv_multigrid) {
     // Only these fermions are supported with MG
     if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH
@@ -455,7 +459,7 @@ int main(int argc, char **argv)
       // Host side spinor data and correlation_function passed to QUDA.
       // QUDA will allocate GPU memory, transfer the data,
       // perform the requested contraction, and return the
-      // result in the array correlation_function           
+      // result in the array correlation_function
       contractQuda(qudaProp4D[dil]->V(), qudaProp4D[dil]->V(), 
 		   ((double*)correlation_function) + 2*16*array_size*comm_rank(), contract_type, &inv_param, gauge_param.X);
       
