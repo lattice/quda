@@ -81,7 +81,7 @@ namespace quda {
     }
 
     // perform final inter-block reduction and write out result
-    reduce2d<blockSize,2>(arg, plaq);
+    arg.template reduce2d<blockSize, 2>(plaq);
   }
 
 } // namespace quda

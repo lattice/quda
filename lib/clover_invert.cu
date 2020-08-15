@@ -30,7 +30,7 @@ namespace quda {
 
       apply(0);
       if (compute_tr_log) {
-        arg.complete(clover.TrLog());
+        arg.complete(*clover.TrLog());
         comm_allreduce_array(clover.TrLog(), 2);
       }
       checkCudaError();
