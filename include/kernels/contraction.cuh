@@ -200,10 +200,7 @@ namespace quda
   {
     static constexpr int reduction_dim = reduction_dim_; // This the direction we are performing reduction on. default to 3.
 
-    //- Welcome back! We first define the variables in the argument structure:
-    //- Naturally, this is the number of threads in the block
     int threads; // number of active threads required
-    //- This is the number of lattice sites on the MPI node
     int_fastdiv X[4];    // grid dimensions - using int_fastdiv to reduce division overhead on device
 
     using Float = Float_;
