@@ -57,6 +57,9 @@ extern "C" {
     QudaPrecision cuda_prec_precondition; /**< The precision of the preconditioner gauge field */
     QudaReconstructType reconstruct_precondition; /**< The recontruction type of the preconditioner gauge field */
 
+    QudaPrecision cuda_prec_eigensolver;         /**< The precision of the eigensolver gauge field */
+    QudaReconstructType reconstruct_eigensolver; /**< The recontruction type of the eigensolver gauge field */
+
     QudaGaugeFixed gauge_fix; /**< Whether the input gauge field is in the axial gauge or not */
 
     int ga_pad;       /**< The pad size that the cudaGaugeField will use (default=0) */
@@ -227,17 +230,19 @@ extern "C" {
     QudaPrecision cuda_prec_sloppy;        /**< The precision used by the QUDA sloppy operator */
     QudaPrecision cuda_prec_refinement_sloppy; /**< The precision of the sloppy gauge field for the refinement step in multishift */
     QudaPrecision cuda_prec_precondition;  /**< The precision used by the QUDA preconditioner */
+    QudaPrecision cuda_prec_eigensolver;   /**< The precision used by the QUDA eigensolver */
 
     QudaDiracFieldOrder dirac_order;       /**< The order of the input and output fermion fields */
 
     QudaGammaBasis gamma_basis;            /**< Gamma basis of the input and output host fields */
 
-    QudaFieldLocation clover_location;            /**< The location of the clover field */
+    QudaFieldLocation clover_location;     /**< The location of the clover field */
     QudaPrecision clover_cpu_prec;         /**< The precision used for the input clover field */
     QudaPrecision clover_cuda_prec;        /**< The precision used for the clover field in the QUDA solver */
     QudaPrecision clover_cuda_prec_sloppy; /**< The precision used for the clover field in the QUDA sloppy operator */
     QudaPrecision clover_cuda_prec_refinement_sloppy; /**< The precision of the sloppy clover field for the refinement step in multishift */
     QudaPrecision clover_cuda_prec_precondition; /**< The precision used for the clover field in the QUDA preconditioner */
+    QudaPrecision clover_cuda_prec_eigensolver;  /**< The precision used for the clover field in the QUDA eigensolver */
 
     QudaCloverFieldOrder clover_order;     /**< The order of the input clover field */
     QudaUseInitGuess use_init_guess;       /**< Whether to use an initial guess in the solver or not */
