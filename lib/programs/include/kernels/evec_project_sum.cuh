@@ -7,7 +7,7 @@
 namespace quda
 {
 
-  using spinor = vector_type<complex<double>,4>;
+  using spinor = vector_type<double2, 4>;
 
   template <typename Float_, int nColor_> struct EvecProjectSumArg :
     public ReduceArg<spinor>
@@ -57,7 +57,8 @@ namespace quda
     typedef ColorSpinor<real, nColor, nSpinY> Vector1;
 
     spinor res;
-
+    complex<real> tmp;
+    
     // the while loop is restricted to the same time slice
     while (xyz < arg.threads) {
 
@@ -70,7 +71,9 @@ namespace quda
      
       // Compute the inner product over colour
       for (int mu = 0; mu < nSpinX; mu++) {
-	res[mu] += innerProduct(y_vec_local, x_vec_local, 0, mu);
+	tmp = innerProduct(y_vec_local, x_vec_local, 0, mu);
+	res[mu].x += tmp.real();
+	res[mu].y += tmp.imag();
       }      
       xyz += blockDim.x * gridDim.x;
     }
