@@ -1803,7 +1803,7 @@ public:
     void* Mproj;
     std::vector<ColorSpinorField *> Qhat;
     SolverParam *solverParam_;
-    GCR *gcrInner_;
+    void *innerSolver_;
     DiracMatrix *matUnconst_;
     std::vector<ColorSpinorField *> y_hat;
     JD *eigSlvr;

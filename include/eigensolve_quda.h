@@ -9,6 +9,7 @@ namespace quda
 {
   // Forward declarations for the JD eigensolver
   class GCR;
+  class Solver;
 
   // Local enum for the LU axpy block type
   enum blockType { PENCIL, LOWER_TRI, UPPER_TRI };
@@ -507,13 +508,17 @@ protected:
   {
 
   protected:
+    // profilers
     TimeProfile *profile_corr_eq_invs;
     TimeProfile *profile_mat_corr_eq_invs;
 
+    // solver-related
     SolverParam *solverParam;
     SolverParam *solverParamPrec;
     GCR *gcrPrec;
     GCR *gcrInner;
+    Solver *mg_solve;
+    void *mg_preconditioner;
 
     // JD-specific workspace
     std::vector<ColorSpinorField *> t;
@@ -529,24 +534,26 @@ protected:
     std::vector<ColorSpinorField *> t_lowprec;
     std::vector<ColorSpinorField *> u_lowprec;
 
+    // matrix-related
     DiracPrecProjCorr *mmPP;
-
     Dirac *d;
     Dirac *dSloppy;
     Dirac *dPre;
-
     DiracMatrix *matPre;
 
+    // precision-related
+    double outer_prec;
+    double inner_prec;
+    QudaPrecision outer_prec_lab;
+    QudaPrecision inner_prec_lab;
+
+    // other simpler params
     int k;
     int m;
     int loopr;
     double theta;
     double norm;
-
-    double outer_prec;
-    double inner_prec;
-    QudaPrecision outer_prec_lab;
-    QudaPrecision inner_prec_lab;
+    bool inv_multigrid;
 
   public:
     /**
@@ -574,26 +581,26 @@ protected:
 
     /**
        @brief Invert a matrix of the form (I - QQdag)(M-theta*I)(I - QQdag)
-       @param[in] mat The original matrix to be inverted after shift-and-project
+       @param[in] matPrecon The matrix to be inverted after shift-and-project
        @param[in] x Ouput spinor
        @param[in] b Input spinor
        @param[in] verb Local verbosity of the JD proj-eq solve
        @param[in] kp Number of vectors to project against
        @param[in] projSpace Space to project against
     */
-    void invertProjMat(const DiracMatrix &mat, ColorSpinorField &x, ColorSpinorField &b, QudaVerbosity verb,
+    void invertProjMat(const DiracMatrix &matPrecon, ColorSpinorField &x, ColorSpinorField &b, QudaVerbosity verb,
                        int kp, std::vector<ColorSpinorField *> &projSpace);
 
     /**
-       @brief Wrapper for CG to allow flexible solver params throughout the correction equation in JD
-       @param[in] cg Instance of the CG solver
+       @brief Wrapper for the JD preconditioner to allow flexible solver params throughout the correction equation in JD
+       @param[in] slvw Instance of the inner solver
        @param[in] tol Tolerance of the solve
        @param[in] maxiter Maximum allowed number of iterations for the solve
        @param[in] verb Verbosity of the solve
        @param[in] x Output spinor
        @param[in] b Input spinor
     */
-    void K(GCR &slvw, double tol, int maxiter, QudaVerbosity verb, SolverParam &slvrPar, ColorSpinorField &x,
+    void K(void *slvw, double tol, int maxiter, QudaVerbosity verb, SolverParam &slvrPar, ColorSpinorField &x,
            ColorSpinorField &b);
 
     /**

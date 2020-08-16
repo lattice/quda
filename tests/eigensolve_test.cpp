@@ -71,9 +71,12 @@ void display_test_info()
 
 int main(int argc, char **argv)
 {
+  setQudaDefaultMgTestParams();
   // Parse command line options
   auto app = make_app();
   add_eigen_option_group(app);
+  // MG might be needed for Jacobi-Davidson corr-eq solves
+  add_multigrid_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -98,21 +101,62 @@ int main(int argc, char **argv)
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setWilsonGaugeParam(gauge_param);
 
-  // Though no inversions are performed, the inv_param
-  // structure contains all the information we need to
-  // construct the dirac operator. We encapsualte the
-  // inv_param structure inside the eig_param structure
-  // to avoid any confusion
+  // The invert_param-like structs contain all the info we need in
+  // case of having JD+MG
+  // Nested structure :
+  //     -- eig_param.invert_param is set through setInvertParam(...)
+  //     -- if multigrid enabled, eig_mg_param is set through setMultiGridParam(...), and
+  //        eig_mg_param.invert_param is set to eig_mv_inv_param and through setInvertParam(...)
+
+  QudaEigParam eig_param = newQudaEigParam();
   QudaInvertParam eig_inv_param = newQudaInvertParam();
+  QudaMultigridParam eig_mg_param = newQudaMultigridParam();
+  QudaInvertParam eig_mg_inv_param = newQudaInvertParam();
+
+  if (inv_multigrid) {
+    setQudaMgSolveTypes();
+    setMultigridInvertParam(eig_mg_inv_param);
+    // Set sub structures
+    eig_mg_param.invert_param = &eig_mg_inv_param;
+    for (int i = 0; i < mg_levels; i++) {
+      eig_mg_param.eig_param[i] = nullptr;
+    }
+    // Set MG
+    setMultigridParam(eig_mg_param);
+  }
   setInvertParam(eig_inv_param);
-  // Specific changes to the invert param for the eigensolver
+
+  if (inv_multigrid) {
+    eig_mg_inv_param.solve_type
+      = (eig_mg_inv_param.solution_type == QUDA_MAT_SOLUTION ? QUDA_DIRECT_SOLVE : QUDA_DIRECT_PC_SOLVE);
+  }
   eig_inv_param.gamma_basis = QUDA_UKQCD_GAMMA_BASIS;
   eig_inv_param.solve_type
     = (eig_inv_param.solution_type == QUDA_MAT_SOLUTION ? QUDA_DIRECT_SOLVE : QUDA_DIRECT_PC_SOLVE);
-  QudaEigParam eig_param = newQudaEigParam();
-  // Place Invert param inside Eig param
+
+  // Place Invert and Multigrid params inside Eig param
+  if (inv_multigrid) {
+    eig_param.multigrid_param = &eig_mg_param;
+  }
   eig_param.invert_param = &eig_inv_param;
   setEigParam(eig_param);
+  eig_param.inv_multigrid = inv_multigrid;
+
+  if (eig_param.eig_type == QUDA_EIG_DAV && inv_multigrid) {
+    // Only these fermions are supported with MG
+    if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH
+        && dslash_type != QUDA_TWISTED_MASS_DSLASH && dslash_type != QUDA_TWISTED_CLOVER_DSLASH) {
+      printfQuda("dslash_type %d not supported for MG\n", dslash_type);
+      exit(0);
+    }
+
+    // Only these solve types are supported with MG
+    if (solve_type != QUDA_DIRECT_SOLVE && solve_type != QUDA_DIRECT_PC_SOLVE) {
+      printfQuda("Solve_type %d not supported with MG. Please use QUDA_DIRECT_SOLVE or QUDA_DIRECT_PC_SOLVE\n\n",
+                 solve_type);
+      exit(0);
+    }
+  }
 
   // Sanity checks
   if (eig_param.eig_type == QUDA_EIG_DAV && eig_param.use_poly_acc) {

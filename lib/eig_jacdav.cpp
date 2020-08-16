@@ -19,7 +19,6 @@
 
 namespace quda
 {
-
   using namespace Eigen;
   // Jacobi-Davidson Method constructor
   JD::JD(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile) :
@@ -63,33 +62,75 @@ namespace quda
 
     outer_prec_lab = mat.Expose()->OpPrecision();
     inner_prec_lab = (matPre->Expose())->OpPrecision();
-    //inner_prec_lab = mat.Expose()->OpPrecision();
 
-    QudaInvertParam refineparam = *eig_param->invert_param;
-    refineparam.cuda_prec_sloppy = eig_param->invert_param->cuda_prec_refinement_sloppy;
-    solverParam = new SolverParam(refineparam);
-    solverParam->tol = corr_eq_tol;
-    solverParam->maxiter = corr_eq_maxiter;
-    solverParam->use_init_guess = QUDA_USE_INIT_GUESS_YES;
-    solverParam->delta = eig_param->invert_param->reliable_delta_refinement;
-    // disable preconditioning on solvers used in the correction equation
-    solverParam->inv_type_precondition = QUDA_INVALID_INVERTER;
-    solverParam->precision = inner_prec_lab;
-    solverParam->precision_sloppy = inner_prec_lab;
-    solverParam->precision_precondition = inner_prec_lab;
+    inv_multigrid = eig_param->inv_multigrid;
 
-    solverParamPrec = new SolverParam(*solverParam);
-    solverParamPrec->maxiter = 5;
-    solverParamPrec->tol = 1e-1;
+    mg_preconditioner=nullptr;
+    if (inv_multigrid) {
+      eig_param->multigrid_param->verbosity[0] = QUDA_SILENT;
+      eig_param->multigrid_param->verbosity[1] = QUDA_SILENT;
+      eig_param->multigrid_param->verbosity[2] = QUDA_SILENT;
+      eig_param->multigrid_param->invert_param->verbosity = QUDA_SILENT;
+      eig_param->multigrid_param->invert_param->verbosity_precondition = QUDA_SILENT;
+
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Construction of MG (for JD) ... \n");
+      mg_preconditioner = newMultigridQuda(eig_param->multigrid_param);
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("... done\n");
+      eig_param->multigrid_param->invert_param->preconditioner = mg_preconditioner;
+    }
+
+    if (inv_multigrid) {
+      // innver solver, for the correction equation
+      solverParam = new SolverParam(*(eig_param->multigrid_param->invert_param));
+      solverParam->tol = corr_eq_tol;
+      solverParam->maxiter = corr_eq_maxiter;
+      solverParam->use_init_guess = QUDA_USE_INIT_GUESS_YES;
+      solverParam->precision = inner_prec_lab;
+      solverParam->precision_sloppy = inner_prec_lab;
+      solverParam->precision_precondition = inner_prec_lab;
+      solverParam->inv_type_precondition = QUDA_MG_INVERTER ;
+      // outer solver
+      QudaInvertParam refineparam = *eig_param->invert_param;
+      refineparam.cuda_prec_sloppy = eig_param->invert_param->cuda_prec_refinement_sloppy;
+      solverParamPrec = new SolverParam(refineparam);
+      solverParamPrec->tol = 1e-1;
+      solverParamPrec->maxiter = 5;
+      solverParamPrec->use_init_guess = QUDA_USE_INIT_GUESS_YES;
+      solverParamPrec->delta = eig_param->invert_param->reliable_delta_refinement;
+      // disable preconditioning on solvers used in the correction equation
+      solverParamPrec->inv_type_precondition = QUDA_INVALID_INVERTER;
+      solverParamPrec->precision = inner_prec_lab;
+      solverParamPrec->precision_sloppy = inner_prec_lab;
+      solverParamPrec->precision_precondition = inner_prec_lab;
+    } else {
+      QudaInvertParam refineparam = *eig_param->invert_param;
+      refineparam.cuda_prec_sloppy = eig_param->invert_param->cuda_prec_refinement_sloppy;
+      solverParam = new SolverParam(refineparam);
+      solverParam->tol = corr_eq_tol;
+      solverParam->maxiter = corr_eq_maxiter;
+      solverParam->use_init_guess = QUDA_USE_INIT_GUESS_YES;
+      solverParam->delta = eig_param->invert_param->reliable_delta_refinement;
+      // disable preconditioning on solvers used in the correction equation
+      solverParam->inv_type_precondition = QUDA_INVALID_INVERTER;
+      solverParam->precision = inner_prec_lab;
+      solverParam->precision_sloppy = inner_prec_lab;
+      solverParam->precision_precondition = inner_prec_lab;
+
+      solverParamPrec = new SolverParam(*solverParam);
+      solverParamPrec->maxiter = 5;
+      solverParamPrec->tol = 1e-1;
+    }
 
     mmPP = new DiracPrecProjCorr(matPre->Expose());
-    //mmPP = new DiracPrecProjCorr(mat.Expose());
 
-    // Solvers used in the correction equation
+    // construction of the inner solver
+    if (inv_multigrid) {
+      mg_solve = Solver::create(*solverParam, *matPre, *matPre, *matPre, *profile_mat_corr_eq_invs);
+    } else {
+      gcrInner = new GCR(*matPre, *matPre, *matPre, *solverParam, *profile_mat_corr_eq_invs);
+    }
+    // construction of the outer solver
     gcrPrec = new GCR(*mmPP, *mmPP, *mmPP, *solverParamPrec, *profile_corr_eq_invs);
-    //gcrInner = new GCR(const_cast<DiracMatrix &>(mat), const_cast<DiracMatrix &>(mat), const_cast<DiracMatrix &>(mat),
-    //                   *solverParam, *profile_mat_corr_eq_invs);
-    gcrInner = new GCR(*matPre, *matPre, *matPre, *solverParam, *profile_mat_corr_eq_invs);
 
     if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
@@ -373,7 +414,12 @@ namespace quda
   // Jacobi-Davidson destructor
   JD::~JD()
   {
-    delete gcrInner;
+    if (inv_multigrid) {
+      destroyMultigridQuda(mg_preconditioner);
+      delete mg_solve;
+    } else {
+      delete gcrInner;
+    }
     delete gcrPrec;
 
     delete profile_corr_eq_invs;
@@ -418,11 +464,19 @@ namespace quda
     if (size_ps > 1) {
       for (int i = 0; i < size_ps; i++) {
         blas::copy(*Qhat[i], *qSpace[i]);
-        K(*gcrInner, corr_eq_tol, corr_eq_maxiter, QUDA_SILENT, *solverParam, *Qhat[i], *qSpace[i]);
+        if (inv_multigrid) {
+          K(mg_solve, corr_eq_tol, corr_eq_maxiter, QUDA_SILENT, *solverParam, *Qhat[i], *qSpace[i]);
+        } else {
+          K(gcrInner, corr_eq_tol, corr_eq_maxiter, QUDA_SILENT, *solverParam, *Qhat[i], *qSpace[i]);
+        }
       }
     } else {
       blas::copy(*Qhat[0], *qSpace[0]);
-      K(*gcrInner, corr_eq_tol, corr_eq_maxiter, QUDA_SILENT, *solverParam, *Qhat[0], *qSpace[0]);
+      if (inv_multigrid) {
+        K(mg_solve, corr_eq_tol, corr_eq_maxiter, QUDA_SILENT, *solverParam, *Qhat[0], *qSpace[0]);
+      } else {
+        K(gcrInner, corr_eq_tol, corr_eq_maxiter, QUDA_SILENT, *solverParam, *Qhat[0], *qSpace[0]);
+      }
     }
 
     // and, switching back the shift parameters
@@ -466,7 +520,11 @@ namespace quda
     // <r_tilde> is "r-hat" for a few of the upcoming lines
 
     blas::copy(*r_tilde[0], b);
-    K(*gcrInner, corr_eq_tol, corr_eq_maxiter, QUDA_SILENT, *solverParam, *r_tilde[0], b);
+    if (inv_multigrid) {
+      K(mg_solve, corr_eq_tol, corr_eq_maxiter, QUDA_SILENT, *solverParam, *r_tilde[0], b);
+    } else {
+      K(gcrInner, corr_eq_tol, corr_eq_maxiter, QUDA_SILENT, *solverParam, *r_tilde[0], b);
+    }
 
     // and, switching back the shift parameters
     mat_unconst.shift = bare_shift;
@@ -494,7 +552,11 @@ namespace quda
     mmPP->Qhat = Qhat;
     mmPP->solverParam_ = solverParam;
     mmPP->matUnconst_ = &mat_unconst;
-    mmPP->gcrInner_ = gcrInner;
+    if (inv_multigrid) {
+      mmPP->innerSolver_ = mg_solve;
+    } else {
+      mmPP->innerSolver_ = gcrInner;
+    }
     mmPP->eigSlvr = this;
     mmPP->k = size_ps;
     mmPP->tol = corr_eq_tol;
@@ -507,7 +569,7 @@ namespace quda
     setVerbosity(verbTmp);
   }
 
-  void JD::K(GCR &slvw, double tol, int maxiter, QudaVerbosity verb, SolverParam &slvrPrm, ColorSpinorField &x,
+  void JD::K(void *slvrx, double tol, int maxiter, QudaVerbosity verb, SolverParam &slvrPrm, ColorSpinorField &x,
              ColorSpinorField &b)
   {
     QudaVerbosity verbTmp = getVerbosity();
@@ -518,7 +580,13 @@ namespace quda
     int maxiter_buff = slvrPrm.maxiter;
     slvrPrm.maxiter = maxiter;
 
-    slvw(x, b);
+    if (inv_multigrid) {
+      Solver *slvw = (Solver*)slvrx;
+      (*slvw)(x, b);
+    } else {
+      GCR *slvw = (GCR*)slvrx;
+      (*slvw)(x, b);
+    }
 
     slvrPrm.tol = tol_buff;
     slvrPrm.maxiter = maxiter_buff;
@@ -734,7 +802,7 @@ namespace quda
     // unpacking some attributes
     SolverParam &solverParam = *(mmPP.solverParam_);
     DiracMatrix &matUnconst = *(mmPP.matUnconst_);
-    GCR &slvx = *(mmPP.gcrInner_);
+    void *slvx = mmPP.innerSolver_;
 
     // 1. y = (A - \theta I)v
 

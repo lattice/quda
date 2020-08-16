@@ -389,12 +389,20 @@ extern "C" {
   } QudaInvertParam;
 
   // Parameter set for solving eigenvalue problems.
+  struct QudaMultiGridParam_s;
+  typedef struct QudaMultigridParam_s QudaMultigridParam;
   typedef struct QudaEigParam_s {
 
     // EIGENSOLVER PARAMS
     //-------------------------------------------------
     /** Used to store information pertinent to the operator **/
     QudaInvertParam *invert_param;
+
+    /** Used in case of needing the MG solver within the Eigensolver **/
+    QudaMultigridParam *multigrid_param;
+
+    /** One of MG is being used as the K preconditioner in JD **/
+    bool inv_multigrid;
 
     /** Type of eigensolver algorithm to employ **/
     QudaEigType eig_type;
