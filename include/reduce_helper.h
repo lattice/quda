@@ -165,6 +165,7 @@ namespace quda
     template <typename host_t, typename device_t = host_t>
     void complete(host_t &result, const qudaStream_t stream = 0, bool reset = false)
     {
+      if(n_reduce != 1) errorQuda("Attempting to reduce into an array that is not std::vector");
       std::vector<host_t> result_(1);
       complete(result_, stream, reset);
       result = result_[0];
