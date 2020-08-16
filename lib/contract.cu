@@ -193,7 +193,7 @@ public:
       ContractionSpatialSumArg<real, 2> arg(x, y, s1, b1); // reduce in the z direction
       ContractionSpatialSumCompute<decltype(arg)> contraction_with_sum_spatial(arg, x, y, cType);
       contraction_with_sum_spatial.apply(0);
-      int spins = x.Nspin()*x.Nspin();
+      const int spins = 16;
       std::vector<vector_type<double2, spins>> res(local_corr_length);
       arg.complete(res);
       for(int i=0; i<local_corr_length; i++) {
