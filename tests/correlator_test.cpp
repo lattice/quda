@@ -80,8 +80,6 @@ int main(int argc, char **argv)
   
   // Actually create ColorSpinorField objects and tell them to use the memory from above
   for (int i = 0; i < spinor_dim; i++) {
-    CSF_V_ptr_arr_source[i] = malloc(sizeof(void *));
-    CSF_V_ptr_arr_prop[i] = malloc(sizeof(void *));
     int offset = i * V * spinor_dim * 2;
     CSF_V_ptr_arr_source[i] = source_array + offset;
     CSF_V_ptr_arr_prop[i] = prop_array + offset;
@@ -158,7 +156,7 @@ int main(int argc, char **argv)
     if (clover) free(clover);
     if (clover_inv) free(clover_inv);
   }
-
+  
   free(source_array);
   free(prop_array);
   free(correlation_function_sum);

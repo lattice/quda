@@ -5855,7 +5855,7 @@ void contractSpatialQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavo
         *d_single_prop_flavor_1 = *CSF_ptr_container_flavor_1[s1 * nColor + c1];
         *d_single_prop_flavor_2 = *CSF_ptr_container_flavor_2[b1 * nColor + c1];
 	
-        contractSpatialQuda(*d_single_prop_flavor_1, *d_single_prop_flavor_2, s1, b1, h_result_tmp_global, cType);
+        contractSpatialQuda(*d_single_prop_flavor_1, *d_single_prop_flavor_2, s1, b1, h_result_tmp_global, cType, local_corr_length);
         comm_allreduce_array((double*)h_result_tmp_global, n_numbers_per_slice * global_corr_length);
 
         for (size_t G_idx = 0; G_idx < nSpin * nSpin; G_idx++) {
