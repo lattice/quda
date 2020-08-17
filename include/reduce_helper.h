@@ -124,7 +124,6 @@ namespace quda
     {
       if (launch_error == QUDA_ERROR) return; // kernel launch failed so return
       if (launch_error == QUDA_ERROR_UNINITIALIZED) errorQuda("No reduction kernel appears to have been launched");
-      if (result.size() != (unsigned)n_reduce) errorQuda("result vector length %lu does not match n_reduce %d", result.size(), n_reduce);
 #ifdef HETEROGENEOUS_ATOMIC
       if (consumed) errorQuda("Cannot call complete more than once for each construction");
 
@@ -139,6 +138,7 @@ namespace quda
       // copy back result element by element and convert if necessary to host reduce type
       // unit size here may differ from system_atomic_t size, e.g., if doing double-double
       const int n_element = n_reduce * sizeof(T) / sizeof(device_t);
+      if (result.size() != (unsigned)n_element) errorQuda("result vector length %lu does not match n_reduce %d", result.size(), n_reduce);
       for (int i = 0; i < n_element; i++) result[i] = reinterpret_cast<device_t *>(result_h)[i];
 
 #ifdef HETEROGENEOUS_ATOMIC
