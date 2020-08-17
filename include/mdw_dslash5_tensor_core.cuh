@@ -538,7 +538,7 @@ namespace quda
       for (int tile_k = 0; tile_k < tile_acc_dim; tile_k++) {
 
         if (reload) { // the data in registers can be resued.
-          op_a[0].load<M_PAD>(sm_a, tile_k, warp_row, wrm);
+          op_a[0].template load<M_PAD>(sm_a, tile_k, warp_row, wrm);
         }
 
         mma::MmaOperandB op_b;

@@ -371,7 +371,7 @@ namespace quda
       mma::MmaOperandA op_a_aux[reload ? 1 : tk_dim];
       if (!reload) { // the data in registers can be resued.
 #pragma unroll
-        for (int tile_k = 0; tile_k < tk_dim; tile_k++) { op_a[tile_k].load<M_sm>(sm_a, tile_k, warp_m, wrm); }
+        for (int tile_k = 0; tile_k < tk_dim; tile_k++) { op_a[tile_k].template load<M_sm>(sm_a, tile_k, warp_m, wrm); }
       }
 
 #else
@@ -403,7 +403,9 @@ namespace quda
 #ifdef USE_MMA_SYNC
 
 #pragma unroll
-          for (int tile_k = 0; tile_k < tk_dim; tile_k++) { op_a_aux[tile_k].load<M_sm>(sm_a, tile_k, warp_m, wrm); }
+          for (int tile_k = 0; tile_k < tk_dim; tile_k++) {
+            op_a_aux[tile_k].template load<M_sm>(sm_a, tile_k, warp_m, wrm);
+          }
 
 #else
 
