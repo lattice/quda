@@ -1,5 +1,4 @@
-#ifndef _LATTICE_FIELD_H
-#define _LATTICE_FIELD_H
+#pragma once
 
 #include <map>
 #include <quda.h>
@@ -7,7 +6,7 @@
 #include <comm_quda.h>
 #include <util_quda.h>
 #include <object.h>
-#include <quda_cuda_api.h>
+#include <quda_api.h>
 
 /**
  * @file lattice_field.h
@@ -149,6 +148,12 @@ namespace quda {
 
     /** Checkerboarded volume */
     size_t volumeCB;
+
+    /** Local lattice volume */
+    size_t localVolume;
+
+    /** Checkerboarded local volume */
+    size_t localVolumeCB;
 
     size_t stride;
     int pad;
@@ -508,6 +513,16 @@ namespace quda {
     size_t VolumeCB() const { return volumeCB; }
 
     /**
+       @return The local full-field volume without any overlapping region
+    */
+    size_t LocalVolume() const { return localVolume; }
+
+    /**
+       @return The local single-parity volume without any overlapping region
+    */
+    size_t LocalVolumeCB() const { return localVolumeCB; }
+
+    /**
        @param i The dimension of the requested surface 
        @return The single-parity surface of dimension i
     */
@@ -799,5 +814,3 @@ namespace quda {
   }
 
 } // namespace quda
-
-#endif // _LATTICE_FIELD_H

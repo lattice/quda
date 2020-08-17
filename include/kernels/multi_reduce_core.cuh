@@ -98,7 +98,7 @@ namespace quda
         idx += arg.gridSize;
       }
 
-      ::quda::reduce<block_size, block_reduce_t>(arg, sum, k);
+      arg.template reduce<block_size>(sum, k);
     } // multiReduceKernel
 
     /**

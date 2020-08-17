@@ -6,6 +6,22 @@
 
 namespace quda {
 
+  namespace clover
+  {
+
+    inline bool isNative(QudaCloverFieldOrder order, QudaPrecision precision)
+    {
+      if (precision == QUDA_DOUBLE_PRECISION) {
+        if (order == QUDA_FLOAT2_CLOVER_ORDER) return true;
+      } else if (precision == QUDA_SINGLE_PRECISION || precision == QUDA_HALF_PRECISION
+                 || precision == QUDA_QUARTER_PRECISION) {
+        if (order == QUDA_FLOAT4_CLOVER_ORDER) return true;
+      }
+      return false;
+    }
+
+  } // namespace clover
+
   // Prefetch type
   enum class CloverPrefetchType {
     BOTH_CLOVER_PREFETCH_TYPE,    // clover and inverse
@@ -28,11 +44,23 @@ namespace quda {
 
     QudaCloverFieldOrder order;
     QudaFieldCreate create;
-    void setPrecision(QudaPrecision precision) {
+
+    /**
+       @brief Helper function for setting the precision and corresponding
+       field order for QUDA internal fields.
+       @param precision The precision to use
+       @param force_native Whether we should force the field order to be native
+    */
+    void setPrecision(QudaPrecision precision, bool force_native = false)
+    {
+      // is the current status in native field order?
+      bool native = force_native ? true : clover::isNative(order, this->precision);
       this->precision = precision;
       this->ghost_precision = precision;
-      order = (precision == QUDA_DOUBLE_PRECISION) ? 
-	QUDA_FLOAT2_CLOVER_ORDER : QUDA_FLOAT4_CLOVER_ORDER;
+
+      if (native) {
+        order = (precision == QUDA_DOUBLE_PRECISION) ? QUDA_FLOAT2_CLOVER_ORDER : QUDA_FLOAT4_CLOVER_ORDER;
+      }
     }
 
     CloverFieldParam() :  LatticeFieldParam(),
@@ -88,7 +116,7 @@ namespace quda {
        @return True if the field is stored in an internal field order
        for the given precision.
     */
-    bool isNative() const;
+    bool isNative() const { return clover::isNative(order, precision); }
 
     /**
        @return Pointer to array storing trlog on each parity

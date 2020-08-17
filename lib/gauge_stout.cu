@@ -41,7 +41,7 @@ public:
       jitify_error = program->kernel("quda::computeSTOUTStep").instantiate(Type<decltype(arg)>())
         .configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
 #else
-      computeSTOUTStep<<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
+      qudaLaunchKernel(computeSTOUTStep<decltype(arg)>, tp, stream, arg);
 #endif
     }
 
@@ -104,7 +104,7 @@ public:
       jitify_error = program->kernel("quda::computeOvrImpSTOUTStep").instantiate(Type<decltype(arg)>())
         .configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
 #else
-      computeOvrImpSTOUTStep<<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
+      qudaLaunchKernel(computeOvrImpSTOUTStep<decltype(arg)>, tp, stream, arg);
 #endif
     }
 

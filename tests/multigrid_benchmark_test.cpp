@@ -260,9 +260,6 @@ int main(int argc, char** argv)
     freeFields();
   }
 
-  // clear the error state
-  cudaGetLastError();
-
   endQuda();
 
   finalizeComms();
