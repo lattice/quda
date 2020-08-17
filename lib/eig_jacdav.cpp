@@ -67,11 +67,8 @@ namespace quda
 
     mg_preconditioner=nullptr;
     if (inv_multigrid) {
-      eig_param->multigrid_param->verbosity[0] = QUDA_SILENT;
-      eig_param->multigrid_param->verbosity[1] = QUDA_SILENT;
-      eig_param->multigrid_param->verbosity[2] = QUDA_SILENT;
-      eig_param->multigrid_param->invert_param->verbosity = QUDA_SILENT;
-      eig_param->multigrid_param->invert_param->verbosity_precondition = QUDA_SILENT;
+      // giving MG the verbosity of its finest level
+      eig_param->multigrid_param->invert_param->verbosity_precondition = eig_param->multigrid_param->verbosity[0];
 
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Construction of MG (for JD) ... \n");
       mg_preconditioner = newMultigridQuda(eig_param->multigrid_param);
@@ -79,48 +76,48 @@ namespace quda
       eig_param->multigrid_param->invert_param->preconditioner = mg_preconditioner;
     }
 
+    // -- Solver params --
+    // inner solver, for the correction equation
     if (inv_multigrid) {
-      // innver solver, for the correction equation
-      solverParam = new SolverParam(*(eig_param->multigrid_param->invert_param));
-      solverParam->tol = corr_eq_tol;
-      solverParam->maxiter = corr_eq_maxiter;
-      solverParam->use_init_guess = QUDA_USE_INIT_GUESS_YES;
-      solverParam->precision = inner_prec_lab;
-      solverParam->precision_sloppy = inner_prec_lab;
-      solverParam->precision_precondition = inner_prec_lab;
+      QudaInvertParam refineparam = *(eig_param->multigrid_param->invert_param);
+      refineparam.cuda_prec_sloppy = eig_param->multigrid_param->invert_param->cuda_prec_refinement_sloppy;
+      solverParam = new SolverParam(refineparam);
+      solverParam->delta = eig_param->multigrid_param->invert_param->reliable_delta_refinement;
       solverParam->inv_type_precondition = QUDA_MG_INVERTER ;
-      // outer solver
-      QudaInvertParam refineparam = *eig_param->invert_param;
-      refineparam.cuda_prec_sloppy = eig_param->invert_param->cuda_prec_refinement_sloppy;
-      solverParamPrec = new SolverParam(refineparam);
-      solverParamPrec->tol = 1e-1;
-      solverParamPrec->maxiter = 5;
-      solverParamPrec->use_init_guess = QUDA_USE_INIT_GUESS_YES;
-      solverParamPrec->delta = eig_param->invert_param->reliable_delta_refinement;
-      // disable preconditioning on solvers used in the correction equation
-      solverParamPrec->inv_type_precondition = QUDA_INVALID_INVERTER;
-      solverParamPrec->precision = inner_prec_lab;
-      solverParamPrec->precision_sloppy = inner_prec_lab;
-      solverParamPrec->precision_precondition = inner_prec_lab;
+      solverParam->precision_precondition = inner_prec_lab;
     } else {
       QudaInvertParam refineparam = *eig_param->invert_param;
       refineparam.cuda_prec_sloppy = eig_param->invert_param->cuda_prec_refinement_sloppy;
       solverParam = new SolverParam(refineparam);
-      solverParam->tol = corr_eq_tol;
-      solverParam->maxiter = corr_eq_maxiter;
-      solverParam->use_init_guess = QUDA_USE_INIT_GUESS_YES;
       solverParam->delta = eig_param->invert_param->reliable_delta_refinement;
-      // disable preconditioning on solvers used in the correction equation
       solverParam->inv_type_precondition = QUDA_INVALID_INVERTER;
-      solverParam->precision = inner_prec_lab;
-      solverParam->precision_sloppy = inner_prec_lab;
-      solverParam->precision_precondition = inner_prec_lab;
-
+      solverParam->precision_precondition = QUDA_HALF_PRECISION;
+    }
+    solverParam->tol = corr_eq_tol;
+    solverParam->use_init_guess = QUDA_USE_INIT_GUESS_YES;
+    solverParam->precision = inner_prec_lab;
+    solverParam->precision_sloppy = inner_prec_lab;
+    solverParam->maxiter = corr_eq_maxiter;
+    // outer solver
+    if (inv_multigrid) {
+      QudaInvertParam refineparam = *eig_param->invert_param;
+      refineparam.cuda_prec_sloppy = eig_param->invert_param->cuda_prec_refinement_sloppy;
+      solverParamPrec = new SolverParam(refineparam);
+      solverParamPrec->use_init_guess = QUDA_USE_INIT_GUESS_YES;
+      solverParamPrec->delta = eig_param->invert_param->reliable_delta_refinement;
+      solverParamPrec->inv_type_precondition = QUDA_INVALID_INVERTER;
+      solverParamPrec->precision = inner_prec_lab;
+      solverParamPrec->precision_sloppy = inner_prec_lab;
+      solverParamPrec->precision_precondition = inner_prec_lab;
+      solverParamPrec->tol = 1.0e-2;
+      solverParamPrec->maxiter = 20; // set commline param : --eig-coor-eq-maxiter 10, single precision
+    } else {
       solverParamPrec = new SolverParam(*solverParam);
-      solverParamPrec->maxiter = 5;
-      solverParamPrec->tol = 1e-1;
+      solverParamPrec->tol = 1.0e-1;
+      solverParamPrec->maxiter = 5;  // set commline param : --eig-corr-eq-maxiter 10 , and  half precision
     }
 
+    // Matrix-wrapper for the correction equation
     mmPP = new DiracPrecProjCorr(matPre->Expose());
 
     // construction of the inner solver
@@ -256,7 +253,7 @@ namespace quda
       printfQuda("mmin %d\n", m_min);
       printfQuda("mmax %d\n", m_max);
       printfQuda("corr-eq-maxiter %d\n", corr_eq_maxiter);
-      printfQuda("corr-eq-tol %f\n", corr_eq_tol);
+      printfQuda("corr-eq-tol %.4e\n", corr_eq_tol);
     }
 
     profile.TPSTART(QUDA_PROFILE_COMPUTE);

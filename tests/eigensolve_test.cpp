@@ -34,7 +34,7 @@ void display_test_info()
   if (eig_type == QUDA_EIG_DAV) {
     printfQuda(" - minimum size of subspace %d\n", eig_mmin);
     printfQuda(" - maximum size of subspace %d\n", eig_mmax);
-    printfQuda(" - tolerance for the correction equation %f\n", eig_corr_eq_tol);
+    printfQuda(" - tolerance for the correction equation %e\n", eig_corr_eq_tol);
     printfQuda(" - maximum number of iterations for the correction equation %d\n", eig_corr_eq_maxiter);
   } else {
     printfQuda(" - size of eigenvector search space %d\n", eig_n_ev);
