@@ -5821,8 +5821,9 @@ void contractSpatialQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavo
     break;
   case QUDA_CONTRACT_TYPE_OPEN_SUM:
   case QUDA_CONTRACT_TYPE_DR_SUM:
-    local_corr_length = CSF_ptr_container_flavor_1[0]->Volume();
-    break;
+    //local_corr_length = CSF_ptr_container_flavor_1[0]->Volume();
+  //  local_corr_length = X[corr_dim];
+  //  break;
   case QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL:
     local_corr_length = X[corr_dim];
   break;
@@ -5832,7 +5833,7 @@ void contractSpatialQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavo
   // calculate some parameters
   size_t global_corr_length = local_corr_length * comm_dim(corr_dim);
   size_t n_numbers_per_slice = 2 * nSpin * nSpin;
-  size_t corr_size_in_bytes = n_numbers_per_slice * global_corr_length * cs_param->Precision();
+  //size_t corr_size_in_bytes = n_numbers_per_slice * global_corr_length * cs_param->Precision();
 
   // create device spinor fields
   ColorSpinorParam cudaParam(*cs_param);

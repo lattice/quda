@@ -90,14 +90,13 @@ int main(int argc, char **argv)
   size_t corr_dim=0, local_corr_length=0;
   contract_type == QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL ? corr_dim = 2 : corr_dim = 3;
   switch (contract_type) {
-    /*
+
       case QUDA_CONTRACT_TYPE_OPEN:
       case QUDA_CONTRACT_TYPE_DR:
       local_corr_length = V;
       break;
       case QUDA_CONTRACT_TYPE_OPEN_SUM:
       case QUDA_CONTRACT_TYPE_DR_SUM:
-    */
   case QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL:
     local_corr_length = gauge_param.X[corr_dim];
     break;

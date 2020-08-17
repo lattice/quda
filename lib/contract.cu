@@ -156,6 +156,7 @@ public:
 #else
         switch (cType) {
         case QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL:
+        case QUDA_CONTRACT_TYPE_DR_SUM:
 	  LAUNCH_KERNEL_LOCAL_PARITY(computeDegrandRossiContractionSpatialSum, (*this), tp, stream, arg, Arg);
           break;
         default: errorQuda("Unexpected contraction type %d", cType);
@@ -191,6 +192,11 @@ public:
   {
     if (cType == QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL){
       ContractionSpatialSumArg<real, 2> arg(x, y, s1, b1); // reduce in the z direction
+      ContractionSpatialSumCompute<decltype(arg)> contraction_with_sum_spatial(arg, x, y, cType);
+      contraction_with_sum_spatial.apply(0);
+      arg.complete(result);
+    } else if (cType == QUDA_CONTRACT_TYPE_DR_SUM) {
+      ContractionSpatialSumArg<real, 3> arg(x, y, s1, b1); // reduce in the z direction
       ContractionSpatialSumCompute<decltype(arg)> contraction_with_sum_spatial(arg, x, y, cType);
       contraction_with_sum_spatial.apply(0);
       arg.complete(result);
