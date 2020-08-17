@@ -1,9 +1,10 @@
 #pragma once
 
 #include <color_spinor_field_order.h>
+#include <reduce_helper.h>
 #include <blas_helper.cuh>
 #include <multi_blas_helper.cuh>
-#include <cub_helper.cuh>
+#include <fast_intdiv.h>
 
 namespace quda
 {
@@ -33,13 +34,17 @@ namespace quda
       const int NYW;
       Reducer r;
       const int length;
+      const int_fastdiv gridSize;
 
       MultiReduceArg(std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
                      std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
-                     Reducer r, int NYW, int length) :
+                     Reducer r, int NYW, int length, int nParity, TuneParam &tp) :
+        // we have NYW * nParity reductions each of length NXZ
+        ReduceArg<vector_type<typename Reducer_::reduce_t, NXZ>>(NYW),
         NYW(NYW),
         r(r),
-        length(length)
+        length(length),
+        gridSize(tp.grid.x * tp.block.x / nParity)
       {
         if (NYW > NYW_max) errorQuda("NYW = %d greater than maximum size of %d", NYW, NYW_max);
 
@@ -55,18 +60,16 @@ namespace quda
       }
     };
 
-#ifdef WARP_MULTI_REDUCE
-    template <typename real, int n, int NXZ, typename Arg>
-#else
     template <int block_size, typename real, int n, int NXZ, typename Arg>
-#endif
     __global__ void multiReduceKernel(Arg arg)
     {
       // n is real numbers per thread
       using vec = vector_type<complex<real>, n/2>;
-      unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
+      unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
+      unsigned int idx = tid % arg.gridSize;
+      unsigned int parity = tid / arg.gridSize;
+
       const int k = blockIdx.y * blockDim.y + threadIdx.y;
-      const int parity = blockIdx.z;
 
       if (k >= arg.NYW) return; // safe since k are different thread blocks
 
@@ -76,32 +79,26 @@ namespace quda
       while (idx < arg.length) {
 
         vec x, y, z, w;
-        arg.Y[k].load(y, idx, parity);
-        arg.W[k].load(w, idx, parity);
+        if (arg.r.read.Y) arg.Y[k].load(y, idx, parity);
+        if (arg.r.read.W) arg.W[k].load(w, idx, parity);
 
         // Each NYW owns its own thread.
         // The NXZ's are all in the same thread block,
         // so they can share the same memory.
 #pragma unroll
         for (int l = 0; l < NXZ; l++) {
-          arg.X[l].load(x, idx, parity);
-          arg.Z[l].load(z, idx, parity);
+          if (arg.r.read.X) arg.X[l].load(x, idx, parity);
+          if (arg.r.read.Z) arg.Z[l].load(z, idx, parity);
 
-          arg.r.pre();
           arg.r(sum[l], x, y, z, w, k, l);
-          arg.r.post(sum[l]);
         }
-        if (arg.r.write.X) arg.Y[k].save(y, idx, parity);
-        if (arg.r.write.X) arg.W[k].save(w, idx, parity);
+        if (arg.r.write.Y) arg.Y[k].save(y, idx, parity);
+        if (arg.r.write.W) arg.W[k].save(w, idx, parity);
 
-        idx += gridDim.x * blockDim.x;
+        idx += arg.gridSize;
       }
 
-#ifdef WARP_MULTI_REDUCE
-      ::quda::warp_reduce<block_reduce_t>(arg, sum, arg.NYW * parity + k);
-#else
-      ::quda::reduce<block_size, block_reduce_t>(arg, sum, arg.NYW * parity + k);
-#endif
+      ::quda::reduce<block_size, block_reduce_t>(arg, sum, k);
     } // multiReduceKernel
 
     /**
@@ -148,12 +145,6 @@ namespace quda
         return reinterpret_cast<coeff_t *>(Cmatrix_h)[i * NYW + j];
 #endif
       }
-
-      //! pre-computation routine called before the "M-loop"
-      virtual __device__ __host__ void pre() { ; }
-
-      //! post-computation routine called after the "M-loop"
-      virtual __device__ __host__ void post(reduce_t &sum) { ; }
     };
 
     /**
@@ -168,11 +159,10 @@ namespace quda
 
     template <typename reduce_t, typename real>
     struct multiDot : public MultiReduceFunctor<reduce_t, real> {
-      static constexpr write< > write { };
+      static constexpr memory_access<1, 1> read { };
+      static constexpr memory_access< > write { };
       static constexpr bool use_z = false;
       static constexpr bool use_w = false;
-      using MultiReduceFunctor<reduce_t, real>::NXZ;
-      using MultiReduceFunctor<reduce_t, real>::NYW;
       multiDot(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, real>(NXZ, NYW) { }
 
       template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, const int i, const int j)
@@ -181,7 +171,6 @@ namespace quda
         for (int k=0; k < x.size(); k++) dot_<reduce_t, real>(sum, x[k], y[k]);
       }
 
-      constexpr int streams() const { return 2; } //! total number of input and output streams
       constexpr int flops() const { return 2; }   //! flops per element
     };
 
@@ -199,13 +188,12 @@ namespace quda
     }
 
     template <typename real_reduce_t, typename real>
-    struct multiCdot : public MultiReduceFunctor<complex<real_reduce_t>, complex<real>> {
-      using reduce_t = complex<real_reduce_t>;
-      static constexpr write< > write { };
+    struct multiCdot : public MultiReduceFunctor<typename VectorType<real_reduce_t, 2>::type, complex<real>> {
+      using reduce_t = typename VectorType<real_reduce_t, 2>::type;
+      static constexpr memory_access<1, 1> read { };
+      static constexpr memory_access< > write { };
       static constexpr bool use_z = false;
       static constexpr bool use_w = false;
-      using MultiReduceFunctor<reduce_t, complex<real>>::NXZ;
-      using MultiReduceFunctor<reduce_t, complex<real>>::NYW;
       multiCdot(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, complex<real>>(NXZ, NYW) { }
 
       template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, const int i, const int j)
@@ -214,20 +202,17 @@ namespace quda
         for (int k=0; k < x.size(); k++) cdot_<reduce_t, real>(sum, x[k], y[k]);
       }
 
-      constexpr int streams() const { return 2; } //! total number of input and output streams
       constexpr int flops() const { return 4; }   //! flops per element
     };
 
     template <typename real_reduce_t, typename real>
-    struct multiCdotCopy : public MultiReduceFunctor<complex<real_reduce_t>, complex<real>> {
-      using reduce_t = complex<real_reduce_t>;
-      static constexpr write<0, 0, 0, 1> write { };
+    struct multiCdotCopy : public MultiReduceFunctor<typename VectorType<real_reduce_t, 2>::type, complex<real>> {
+      using reduce_t = typename VectorType<real_reduce_t, 2>::type;
+      static constexpr memory_access<1, 1> read { };
+      static constexpr memory_access<0, 0, 0, 1> write { };
       static constexpr bool use_z = false;
       static constexpr bool use_w = true;
-      using MultiReduceFunctor<reduce_t, complex<real>>::NXZ;
-      using MultiReduceFunctor<reduce_t, complex<real>>::NYW;
-
-      multiCdotCopy(int NYW) : MultiReduceFunctor<reduce_t, complex<real>>(NXZ, NYW) { }
+      multiCdotCopy(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, complex<real>>(NXZ, NYW) { }
 
       template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, const int i, const int j)
       {
@@ -238,7 +223,6 @@ namespace quda
         }
       }
 
-      constexpr int streams() const { return 2; } //! total number of input and output streams
       constexpr int flops() const { return 4; }   //! flops per element
     };
 

@@ -3,8 +3,7 @@
 #include <gauge_field.h>
 #include <tune_quda.h>
 
-#if ((__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ >= 1) || (__CUDACC_VER_MAJOR__ > 10))                         \
-  && (__COMPUTE_CAPABILITY__ >= 700)
+#if (CUDA_VERSION >= 10100 && __COMPUTE_CAPABILITY__ >= 700)
 
 #include <kernels/coarse_op_preconditioned_mma.cuh>
 
@@ -21,8 +20,7 @@ namespace quda
   namespace mma
   {
 
-#if ((__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ >= 1) || (__CUDACC_VER_MAJOR__ > 10))                         \
-  && (__COMPUTE_CAPABILITY__ >= 700)
+#if (CUDA_VERSION >= 10100 && __COMPUTE_CAPABILITY__ >= 700)
 
     template <typename F> inline void setMaxDynamicSharedBytesPerBlock(F *func)
     {

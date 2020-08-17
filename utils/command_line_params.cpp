@@ -136,8 +136,7 @@ bool mg_evolve_thin_updates = false;
 // we only actually support 4 here currently
 quda::mgarray<std::array<int, 4>> geo_block_size = {};
 
-#if ((__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ >= 1) || (__CUDACC_VER_MAJOR__ > 10))                         \
-  && (__COMPUTE_CAPABILITY__ >= 700)
+#if (CUDA_VERSION >= 10100 && __COMPUTE_CAPABILITY__ >= 700)
 bool mg_use_mma = true;
 #else
 bool mg_use_mma = false;

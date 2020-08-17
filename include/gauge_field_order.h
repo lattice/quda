@@ -840,8 +840,8 @@ namespace quda {
       Accessor<Float, nColor, QUDA_FLOAT2_GAUGE_ORDER, storeFloat> accessor;
 
       GhostAccessor(const GaugeField &U, void *gauge_, void **ghost_=0)
-	: volumeCB(U.VolumeCB()), accessor(U, gauge_, ghost_),
-	  scale(static_cast<Float>(1.0)), scale_inv(static_cast<Float>(1.0))
+	: volumeCB(U.VolumeCB()), scale(static_cast<Float>(1.0)), 
+	  scale_inv(static_cast<Float>(1.0)), accessor(U, gauge_, ghost_)
       {
 	if (!native_ghost) assert(ghost_ != nullptr);
 	for (int d=0; d<4; d++) {
