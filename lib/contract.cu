@@ -124,9 +124,10 @@ public:
       cType(cType)
     {
       switch (cType) {
-      case QUDA_CONTRACT_TYPE_OPEN_SUM: strcat(aux, "open-summed,"); break;
-      case QUDA_CONTRACT_TYPE_DR_SUM: strcat(aux, "degrand-rossi-summed,"); break;
-      case QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL: strcat(aux, "degrand-rossi-summed-spatial,"); break;
+      case QUDA_CONTRACT_TYPE_OPEN_SUM_T: strcat(aux, "open-sum-t,"); break;
+      case QUDA_CONTRACT_TYPE_OPEN_SUM_Z: strcat(aux, "open-sum-z,"); break;
+      case QUDA_CONTRACT_TYPE_DR_SUM_T: strcat(aux, "degrand-rossi-sum-t,"); break;
+      case QUDA_CONTRACT_TYPE_DR_SUM_Z: strcat(aux, "degrand-rossi-sum-t,"); break;
       default: errorQuda("Unexpected contraction type %d", cType);
       }
       strcat(aux, x.AuxString());
@@ -143,11 +144,13 @@ public:
 #ifdef JITIFY
         std::string function_name;
         switch (cType) {
-	case QUDA_CONTRACT_TYPE_OPEN_SUM: function_name = "quda::computeColorContractionSum"; break;
-        case QUDA_CONTRACT_TYPE_DR_SUM: function_name = "quda::computeDegrandRossiContractionSum"; break;
+	case QUDA_CONTRACT_TYPE_OPEN_SUM_T: function_name = "quda::computeColorContractionSum"; break;
+	case QUDA_CONTRACT_TYPE_OPEN_SUM_Z: function_name = "quda::computeColorContractionSum"; break;
+        case QUDA_CONTRACT_TYPE_DR_SUM_T: function_name = "quda::computeDegrandRossiContractionSum"; break;
+	case QUDA_CONTRACT_TYPE_DR_SUM_Z: function_name = "quda::computeDegrandRossiContractionSum"; break;
         default: errorQuda("Unexpected contraction type %d", cType);
         }
-
+	
         using namespace jitify::reflection;
         jitify_error = program->kernel(function_name)
 	  .instantiate(Type<real>(), Type<Arg>())
@@ -155,8 +158,8 @@ public:
 	  .launch(arg);
 #else
         switch (cType) {
-        case QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL:
-        case QUDA_CONTRACT_TYPE_DR_SUM:
+        case QUDA_CONTRACT_TYPE_DR_SUM_T:
+        case QUDA_CONTRACT_TYPE_DR_SUM_Z:
 	  LAUNCH_KERNEL_LOCAL_PARITY(computeDegrandRossiContractionSpatialSum, (*this), tp, stream, arg, Arg);
           break;
         default: errorQuda("Unexpected contraction type %d", cType);
@@ -174,7 +177,7 @@ public:
 
     long long flops() const
     {
-      if (cType == QUDA_CONTRACT_TYPE_OPEN_SUM)
+      if (cType != QUDA_CONTRACT_TYPE_OPEN || cType != QUDA_CONTRACT_TYPE_DR)
         return x.Nspin() * x.Nspin() * 3 * 6ll * x.Volume();
       else
         return ((x.Nspin() * x.Nspin() * 3 * 6ll) + (x.Nspin() * x.Nspin() * (4 + 12))) * x.Volume();
@@ -190,12 +193,12 @@ public:
   void contract_spatial_quda(const ColorSpinorField &x, const ColorSpinorField &y, const size_t s1,
 			     const size_t b1, std::vector<Complex> &result, const QudaContractType cType, int local_corr_length)
   {
-    if (cType == QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL){
+    if (cType == QUDA_CONTRACT_TYPE_DR_SUM_Z){
       ContractionSpatialSumArg<real, 2> arg(x, y, s1, b1); // reduce in the z direction
       ContractionSpatialSumCompute<decltype(arg)> contraction_with_sum_spatial(arg, x, y, cType);
       contraction_with_sum_spatial.apply(0);
       arg.complete(result);
-    } else if (cType == QUDA_CONTRACT_TYPE_DR_SUM) {
+    } else if (cType == QUDA_CONTRACT_TYPE_DR_SUM_T) {
       ContractionSpatialSumArg<real, 3> arg(x, y, s1, b1); // reduce in the z direction
       ContractionSpatialSumCompute<decltype(arg)> contraction_with_sum_spatial(arg, x, y, cType);
       contraction_with_sum_spatial.apply(0);
@@ -304,8 +307,8 @@ public:
       //- (as defined by the aux string) is called again, the autotuner will use the 
       //- optimal setup immediately. 
       switch (cType) {
-      case QUDA_CONTRACT_TYPE_OPEN_SUM: strcat(aux, "open-summed,"); break;
-      case QUDA_CONTRACT_TYPE_DR_SUM: strcat(aux, "degrand-rossi-summed,"); break;
+      case QUDA_CONTRACT_TYPE_OPEN_SUM_T: strcat(aux, "open-sum-t,"); break;
+      case QUDA_CONTRACT_TYPE_DR_SUM_T: strcat(aux, "degrand-rossi-sum-t,"); break;
       default: errorQuda("Unexpected contraction type %d", cType);
       }
       strcat(aux, x.AuxString());
@@ -344,8 +347,8 @@ public:
 #ifdef JITIFY
         std::string function_name;
         switch (cType) {
-	case QUDA_CONTRACT_TYPE_OPEN_SUM: function_name = "quda::computeColorContractionSum"; break;
-        case QUDA_CONTRACT_TYPE_DR_SUM: function_name = "quda::computeDegrandRossiContractionSum"; break;
+	case QUDA_CONTRACT_TYPE_OPEN_SUM_T: function_name = "quda::computeColorContractionSum"; break;
+        case QUDA_CONTRACT_TYPE_DR_SUM_T: function_name = "quda::computeDegrandRossiContractionSum"; break;
         default: errorQuda("Unexpected contraction type %d", cType);
         }
 
@@ -367,10 +370,10 @@ public:
 	//- `LAUNCH_KERNEL_LOCAL_PARITY` will use the tp object to define a set of possible 
 	//- configurations, then save the best one.
         switch (cType) {
-        case QUDA_CONTRACT_TYPE_OPEN_SUM: 
+        case QUDA_CONTRACT_TYPE_OPEN_SUM_T: 
 	  LAUNCH_KERNEL_LOCAL_PARITY(computeColorContractionSum, (*this), tp, stream, arg, Arg); 
 	  break;
-        case QUDA_CONTRACT_TYPE_DR_SUM:
+        case QUDA_CONTRACT_TYPE_DR_SUM_T:
 	  //- This is the kernel we are going to follow. We will NOT go into the Caves of Moria
 	  //- hunting the veritable Balrog that is QUDA's tuning class! Rather we will cheat
 	  //- slighly and look only at the compute code. Please navigate to 
@@ -394,7 +397,7 @@ public:
 
     long long flops() const
     {
-      if (cType == QUDA_CONTRACT_TYPE_OPEN_SUM)
+      if (cType == QUDA_CONTRACT_TYPE_OPEN || cType == QUDA_CONTRACT_TYPE_DR)
         return x.Nspin() * x.Nspin() * 3 * 6ll * x.Volume();
       else
         return ((x.Nspin() * x.Nspin() * 3 * 6ll) + (x.Nspin() * x.Nspin() * (4 + 12))) * x.Volume();
@@ -417,7 +420,7 @@ public:
   {
     //- First, note that there are two ways one can contract data: just color contraction,
     //- or color contrcation with timeslice summation. This boolean is the latter.
-    if(cType == QUDA_CONTRACT_TYPE_OPEN_SUM || cType == QUDA_CONTRACT_TYPE_DR_SUM) {
+    if(cType == QUDA_CONTRACT_TYPE_OPEN_SUM_T || cType == QUDA_CONTRACT_TYPE_DR_SUM_T) {
       
       //- This line is little more than an object that will store the pointers to data on 
       //- which we will work. You can see that it accepts the x and y fields 

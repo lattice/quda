@@ -5813,27 +5813,25 @@ void contractSpatialQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavo
 
   // temporal or spatial correlator?  
   size_t corr_dim=0, local_corr_length=0;
-  cType == QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL ? corr_dim = 2 : corr_dim = 3;
-  switch (cType) {
+  (cType== QUDA_CONTRACT_TYPE_DR_SUM_Z ||
+   cType== QUDA_CONTRACT_TYPE_OPEN_SUM_Z) ? corr_dim = 2 : corr_dim = 3;
+  switch (cType) {    
   case QUDA_CONTRACT_TYPE_OPEN:
   case QUDA_CONTRACT_TYPE_DR:
     local_corr_length = CSF_ptr_container_flavor_1[0]->Volume();
     break;
-  case QUDA_CONTRACT_TYPE_OPEN_SUM:
-  case QUDA_CONTRACT_TYPE_DR_SUM:
-    //local_corr_length = CSF_ptr_container_flavor_1[0]->Volume();
-  //  local_corr_length = X[corr_dim];
-  //  break;
-  case QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL:
+  case QUDA_CONTRACT_TYPE_OPEN_SUM_T:
+  case QUDA_CONTRACT_TYPE_OPEN_SUM_Z:
+  case QUDA_CONTRACT_TYPE_DR_SUM_T:
+  case QUDA_CONTRACT_TYPE_DR_SUM_Z:
     local_corr_length = X[corr_dim];
-  break;
-  default: errorQuda("Unknown contraction type %d given", cType);
+    break;
+  default: errorQuda("Unsupported contraction type %d given", cType);
   }
 
   // calculate some parameters
   size_t global_corr_length = local_corr_length * comm_dim(corr_dim);
   size_t n_numbers_per_slice = 2 * nSpin * nSpin;
-  //size_t corr_size_in_bytes = n_numbers_per_slice * global_corr_length * cs_param->Precision();
 
   // create device spinor fields
   ColorSpinorParam cudaParam(*cs_param);
@@ -5853,7 +5851,7 @@ void contractSpatialQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavo
   for (size_t s1 = 0; s1 < nSpin; s1++) {
     for (size_t c1 = 0; c1 < nColor; c1++) {
       for (size_t b1 = 0; b1 < nSpin; b1++) {
-
+	
         *d_single_prop_flavor_1 = *CSF_ptr_container_flavor_1[s1 * nColor + c1];
         *d_single_prop_flavor_2 = *CSF_ptr_container_flavor_2[b1 * nColor + c1];
 	

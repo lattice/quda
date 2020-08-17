@@ -245,7 +245,7 @@ QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_TYPE_STOUT;
 
 QudaFermionSmearType prop_smear_type = QUDA_FERMION_SMEAR_TYPE_GAUSSIAN;
 
-QudaContractType contract_type = QUDA_CONTRACT_TYPE_DR_SUM;
+QudaContractType contract_type = QUDA_CONTRACT_TYPE_DR_SUM_T;
 
 namespace
 {
@@ -253,10 +253,11 @@ namespace
 
   CLI::TransformPairs<QudaContractType> contract_type_map {
     {"open", QUDA_CONTRACT_TYPE_OPEN},
-      {"open-sum", QUDA_CONTRACT_TYPE_OPEN_SUM},
-	{"dr", QUDA_CONTRACT_TYPE_DR},
-	  {"dr-sum", QUDA_CONTRACT_TYPE_DR_SUM},
-            {"dr-sum-spatial", QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL}};
+      {"open-sum-t", QUDA_CONTRACT_TYPE_OPEN_SUM_T},
+	{"open-sum-z", QUDA_CONTRACT_TYPE_OPEN_SUM_Z},
+	  {"dr", QUDA_CONTRACT_TYPE_DR},
+	    {"dr-sum-t", QUDA_CONTRACT_TYPE_DR_SUM_T},
+	      {"dr-sum-z", QUDA_CONTRACT_TYPE_DR_SUM_Z}};
   
   CLI::TransformPairs<QudaDslashType> dslash_type_map {{"wilson", QUDA_WILSON_DSLASH},
                                                        {"clover", QUDA_CLOVER_WILSON_DSLASH},
@@ -400,7 +401,8 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
 
   quda_app
     ->add_option("--contraction-type", contract_type,
-                 "Whether to leave spin elemental open, or use a gamma basis and contract on spin (default dr-sum)")
+                 "Whether to leave spin elemental open or insert a gamma basis, and whether to sum in t,z, or not at all"
+		 "(default dr-sum-t)")
     ->transform(CLI::QUDACheckedTransformer(contract_type_map));
   ;
   quda_app->add_flag("--dagger", dagger, "Set the dagger to 1 (default 0)");

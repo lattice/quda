@@ -509,12 +509,13 @@ extern "C" {
     QUDA_STAGGERED_PHASE_INVALID = QUDA_INVALID_ENUM
   } QudaStaggeredPhase;
 
-  typedef enum QudaContractType_s {
-    QUDA_CONTRACT_TYPE_OPEN,     // Open spin elementals, no spatial summation
-    QUDA_CONTRACT_TYPE_DR,       // DegrandRossi, no spatial summation
-    QUDA_CONTRACT_TYPE_OPEN_SUM, // Open spin elementals, spatially summed
-    QUDA_CONTRACT_TYPE_DR_SUM,   // DegrandRossi, spatially summed
-    QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL, // DegrandRossi, summed over all but zdim
+  typedef enum QudaContractType_s {    
+    QUDA_CONTRACT_TYPE_OPEN,       // Open spin elementals, no summation
+    QUDA_CONTRACT_TYPE_OPEN_SUM_T, // Open spin elementals, spatially summed over tdim
+    QUDA_CONTRACT_TYPE_OPEN_SUM_Z, // Open spin elementals, spatially summed over tdim
+    QUDA_CONTRACT_TYPE_DR,         // DegrandRossi insertion, no summation
+    QUDA_CONTRACT_TYPE_DR_SUM_T,   // DegrandRossi insertion, spatially summed over tdim
+    QUDA_CONTRACT_TYPE_DR_SUM_Z,   // DegrandRossi insertion, summed over all but zdim
     QUDA_CONTRACT_TYPE_INVALID = QUDA_INVALID_ENUM
   } QudaContractType;
   
