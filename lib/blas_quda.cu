@@ -117,7 +117,7 @@ namespace quda {
             .configure(tp.grid, tp.block, tp.shared_bytes, stream)
             .launch(arg);
 #else
-          blasKernel<device_real_t, M><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          qudaLaunchKernel(blasKernel<device_real_t, M, decltype(arg)>, tp, stream, arg);
 #endif
         } else {
           if (checkOrder(x, y, z, w, v) != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER)

@@ -211,7 +211,7 @@ namespace quda {
 
     void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      GaugeForceKernel<decltype(arg)><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+      qudaLaunchKernel(GaugeForceKernel<decltype(arg)>, tp, stream, arg);
     }
 
     void preTune() { arg.mom.save(); }

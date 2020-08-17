@@ -21,8 +21,8 @@ namespace quda {
   /** 
       Generic CPU clover reordering and packing
   */
-  template <typename FloatOut, typename FloatIn, int length, typename Out, typename In>
-  void copyClover(CopyCloverArg<Out,In> arg) {
+  template <typename FloatOut, typename FloatIn, int length, typename Arg>
+  void copyClover(Arg &arg) {
     typedef typename mapper<FloatIn>::type RegTypeIn;
     typedef typename mapper<FloatOut>::type RegTypeOut;
 
@@ -41,8 +41,8 @@ namespace quda {
   /** 
       Generic CUDA clover reordering and packing
   */
-  template <typename FloatOut, typename FloatIn, int length, typename Out, typename In>
-  __global__ void copyCloverKernel(CopyCloverArg<Out,In> arg) {
+  template <typename FloatOut, typename FloatIn, int length, typename Arg>
+  __global__ void copyCloverKernel(Arg arg) {
     typedef typename mapper<FloatIn>::type RegTypeIn;
     typedef typename mapper<FloatOut>::type RegTypeOut;
 
@@ -56,15 +56,13 @@ namespace quda {
 #pragma unroll
     for (int i=0; i<length; i++) out[i] = in[i];
     arg.out.save(out, x, parity);
-
   }  
 
   template <typename FloatOut, typename FloatIn, int length, typename Out, typename In>
-    class CopyClover : TunableVectorY {
+  class CopyClover : TunableVectorY {
     CopyCloverArg<Out,In> arg;
     const CloverField &meta;
 
-  private:
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0 ;}
 
@@ -76,12 +74,10 @@ namespace quda {
       : TunableVectorY(2), arg(arg), meta(meta) {
       writeAuxString("out_stride=%d,in_stride=%d", arg.out.stride, arg.in.stride);
     }
-    virtual ~CopyClover() { ; }
-  
+
     void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      copyCloverKernel<FloatOut, FloatIn, length, Out, In> 
-	<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+      qudaLaunchKernel(copyCloverKernel<FloatOut, FloatIn, length, decltype(arg)>, tp, stream, arg);
     }
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
@@ -96,7 +92,7 @@ namespace quda {
    CopyCloverArg<OutOrder,InOrder> arg(outOrder, inOrder, out.Volume());
    
    if (location == QUDA_CPU_FIELD_LOCATION) {
-     copyClover<FloatOut, FloatIn, length, OutOrder, InOrder>(arg);
+     copyClover<FloatOut, FloatIn, length>(arg);
    } else if (location == QUDA_CUDA_FIELD_LOCATION) {
      CopyClover<FloatOut, FloatIn, length, OutOrder, InOrder> cloverCopier(arg, out);
      cloverCopier.apply(0);

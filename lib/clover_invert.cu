@@ -11,10 +11,9 @@ namespace quda {
   using namespace clover;
 
   template <typename store_t>
-  class CloverInvert : TunableLocalParity {
+  class CloverInvert : TunableLocalParityReduction {
     CloverInvertArg<store_t> arg;
     const CloverField &meta; // used for meta data only
-    bool tuneGridDim() const { return true; }
 
   public:
     CloverInvert(CloverField &clover, bool compute_tr_log) :
@@ -31,7 +30,7 @@ namespace quda {
 
       apply(0);
       if (compute_tr_log) {
-        arg.complete(clover.TrLog());
+        arg.complete(*clover.TrLog());
         comm_allreduce_array(clover.TrLog(), 2);
       }
       checkCudaError();
@@ -56,9 +55,9 @@ namespace quda {
 	  }
         } else {
           if (arg.twist) {
-            cloverInvertKernel<1,Arg,false,true> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            qudaLaunchKernel(cloverInvertKernel<1,Arg,false,true>, tp, stream, arg);
           } else {
-            cloverInvertKernel<1,Arg,false,false> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            qudaLaunchKernel(cloverInvertKernel<1,Arg,false,false>, tp, stream, arg);
           }
         }
 #endif

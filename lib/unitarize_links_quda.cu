@@ -352,7 +352,7 @@ namespace {
 
     void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      DoUnitarizedLink<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+      qudaLaunchKernel(DoUnitarizedLink<decltype(arg)>, tp, stream, arg);
     }
 
     void preTune() { if (arg.in.gauge == arg.out.gauge) arg.out.save(); }
@@ -442,7 +442,7 @@ namespace {
 
     void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      ProjectSU3kernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+      qudaLaunchKernel(ProjectSU3kernel<decltype(arg)>, tp, stream, arg);
     }
 
     void preTune() { arg.u.save(); }
