@@ -5844,7 +5844,8 @@ void contractSpatialQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavo
   ColorSpinorField *d_single_prop_flavor_2 = ColorSpinorField::Create(cudaParam);
   
   // array that fits all timeslices and channels but is reset after each computation
-  void *h_result_tmp_global = malloc(corr_size_in_bytes);
+  std::vector<Complex> h_result_tmp_global((n_numbers_per_slice * global_corr_length)/2);
+  
   profileContractSpatial.TPSTOP(QUDA_PROFILE_INIT);
 
   profileContractSpatial.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -5856,14 +5857,14 @@ void contractSpatialQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavo
         *d_single_prop_flavor_2 = *CSF_ptr_container_flavor_2[b1 * nColor + c1];
 	
         contractSpatialQuda(*d_single_prop_flavor_1, *d_single_prop_flavor_2, s1, b1, h_result_tmp_global, cType, local_corr_length);
-        comm_allreduce_array((double*)h_result_tmp_global, n_numbers_per_slice * global_corr_length);
-
+        comm_allreduce_array((double*)&h_result_tmp_global[0], n_numbers_per_slice * global_corr_length);
+	
         for (size_t G_idx = 0; G_idx < nSpin * nSpin; G_idx++) {
           for (size_t t = 0; t < global_corr_length; t++) {
             ((double *)*h_result)[n_numbers_per_slice * t + 2 * G_idx]
-              += ((double*)h_result_tmp_global)[n_numbers_per_slice * t + 2 * G_idx];
-            ((double *)*h_result)[n_numbers_per_slice * t + 2 * G_idx + 1]
-              += ((double*)h_result_tmp_global)[n_numbers_per_slice * t + 2 * G_idx + 1];
+              += h_result_tmp_global[(n_numbers_per_slice * t)/2 + G_idx].real();
+	    ((double *)*h_result)[n_numbers_per_slice * t + 2 * G_idx + 1]
+	      += h_result_tmp_global[(n_numbers_per_slice * t)/2 + G_idx].imag();
           }
         }
       }
@@ -5879,7 +5880,7 @@ void contractSpatialQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavo
     delete CSF_ptr_container_flavor_1[i];
     delete CSF_ptr_container_flavor_2[i];
   }
-  free(h_result_tmp_global);
+
   profileContractSpatial.TPSTOP(QUDA_PROFILE_FREE);
   profileContractSpatial.TPSTOP(QUDA_PROFILE_TOTAL);
   saveTuneCache();

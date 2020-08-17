@@ -187,21 +187,13 @@ public:
 
   template <typename real>
   void contract_spatial_quda(const ColorSpinorField &x, const ColorSpinorField &y, const size_t s1,
-			     const size_t b1, complex<real> *result, const QudaContractType cType, int local_corr_length)
+			     const size_t b1, std::vector<Complex> &result, const QudaContractType cType, int local_corr_length)
   {
     if (cType == QUDA_CONTRACT_TYPE_DR_SUM_SPATIAL){
       ContractionSpatialSumArg<real, 2> arg(x, y, s1, b1); // reduce in the z direction
       ContractionSpatialSumCompute<decltype(arg)> contraction_with_sum_spatial(arg, x, y, cType);
       contraction_with_sum_spatial.apply(0);
-      const int spins = 16;
-      std::vector<vector_type<double2, spins>> res(local_corr_length);
-      arg.complete(res);
-      for(int i=0; i<local_corr_length; i++) {
-	for(int s=0; s<spins; s++) {
-	  result[i*spins+s].real(res[i][s].x);
-	  result[i*spins+s].imag(res[i][s].y);
-	}
-      }
+      arg.complete(result);
     } else {
       errorQuda("Unexpected contraction type %d given.", cType);
     }
@@ -209,7 +201,8 @@ public:
 
 #endif
 
-  void contractSpatialQuda(const ColorSpinorField &x, const ColorSpinorField &y, const size_t s1, const size_t b1, void *result, const QudaContractType cType, int local_corr_length)
+  void contractSpatialQuda(const ColorSpinorField &x, const ColorSpinorField &y, const size_t s1,
+			   const size_t b1, std::vector<Complex> &result, const QudaContractType cType, int local_corr_length)
   {
 #ifdef GPU_CONTRACT
     checkPrecision(x, y);
@@ -220,9 +213,9 @@ public:
     if (x.Nspin() != 4 || y.Nspin() != 4) errorQuda("Unexpected number of spins x=%d y=%d", x.Nspin(), y.Nspin());
 
     if (x.Precision() == QUDA_SINGLE_PRECISION) {
-      contract_spatial_quda<float>(x, y, s1, b1, (complex<float> *)result, cType, local_corr_length);
+      contract_spatial_quda<float>(x, y, s1, b1, result, cType, local_corr_length);
     } else if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-      contract_spatial_quda<double>(x, y, s1, b1, (complex<double> *)result, cType, local_corr_length);
+      contract_spatial_quda<double>(x, y, s1, b1, result, cType, local_corr_length);
     } else {
       errorQuda("Precision %d not supported", x.Precision());
     }
