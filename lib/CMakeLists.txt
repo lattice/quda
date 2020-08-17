@@ -85,7 +85,7 @@ set (QUDA_OBJS
   copy_gauge_double.cu copy_gauge_single.cu
   copy_gauge_half.cu copy_gauge_quarter.cu
   copy_gauge.cu copy_gauge_mg.cu copy_clover.cu
-  staggered_oprod.cu clover_trace_quda.cu ks_force_quda.cu
+  staggered_oprod.cu clover_trace_quda.cu
   hisq_paths_force_quda.cu
   unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp
   extended_color_spinor_utilities.cu
@@ -95,7 +95,7 @@ set (QUDA_OBJS
   gauge_fix_ovr_extra.cu gauge_fix_fft.cu gauge_fix_ovr.cu
   pgauge_det_trace.cu clover_outer_product.cu
   clover_sigma_outer_product.cu momentum.cu gauge_qcharge.cu
-  quda_cuda_api.cpp deflation.cpp checksum.cu
+  deflation.cpp checksum.cu
   instantiate.cpp version.cpp )
 # cmake-format: on
 

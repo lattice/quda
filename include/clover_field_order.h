@@ -556,7 +556,10 @@ namespace quda {
           backup_h(nullptr),
           backup_norm_h(nullptr)
 	{
-	  this->clover = clover_ ? clover_ : (Float*)(clover.V(is_inverse));
+          if (clover.Order() != N) {
+            errorQuda("Invalid clover order %d for FloatN (N=%d) accessor", clover.Order(), N);
+          }
+          this->clover = clover_ ? clover_ : (Float*)(clover.V(is_inverse));
           this->norm = norm_ ? norm_ : (norm_type *)(clover.Norm(is_inverse));
 	}
 
@@ -745,7 +748,10 @@ namespace quda {
       QDPOrder(const CloverField &clover, bool inverse, Float *clover_=0) 
       : volumeCB(clover.VolumeCB()), stride(volumeCB), offset(clover.Bytes()/(2*sizeof(Float))),
 	twisted(clover.Twisted()), mu2(clover.Mu2()) {
-	this->clover = clover_ ? clover_ : (Float*)(clover.V(inverse));
+        if (clover.Order() != QUDA_PACKED_CLOVER_ORDER) {
+          errorQuda("Invalid clover order %d for this accessor", clover.Order());
+        }
+        this->clover = clover_ ? clover_ : (Float *)(clover.V(inverse));
       }
 
 	bool  Twisted()	const	{return twisted;}
@@ -794,7 +800,10 @@ namespace quda {
 
       QDPJITOrder(const CloverField &clover, bool inverse, Float *clover_=0) 
       : volumeCB(clover.VolumeCB()), stride(volumeCB), twisted(clover.Twisted()), mu2(clover.Mu2()) {
-	offdiag = clover_ ? ((Float**)clover_)[0] : ((Float**)clover.V(inverse))[0];
+        if (clover.Order() != QUDA_QDPJIT_CLOVER_ORDER) {
+          errorQuda("Invalid clover order %d for this accessor", clover.Order());
+        }
+        offdiag = clover_ ? ((Float**)clover_)[0] : ((Float**)clover.V(inverse))[0];
 	diag = clover_ ? ((Float**)clover_)[1] : ((Float**)clover.V(inverse))[1];
       }
 	
@@ -860,7 +869,10 @@ namespace quda {
 
       BQCDOrder(const CloverField &clover, bool inverse, Float *clover_=0) 
       : volumeCB(clover.Stride()), stride(volumeCB), twisted(clover.Twisted()), mu2(clover.Mu2()) {
-	this->clover[0] = clover_ ? clover_ : (Float*)(clover.V(inverse));
+        if (clover.Order() != QUDA_BQCD_CLOVER_ORDER) {
+          errorQuda("Invalid clover order %d for this accessor", clover.Order());
+        }
+        this->clover[0] = clover_ ? clover_ : (Float*)(clover.V(inverse));
 	this->clover[1] = (Float*)((char*)this->clover[0] + clover.Bytes()/2);
       }
 
