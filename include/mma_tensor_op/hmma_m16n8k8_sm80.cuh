@@ -1,6 +1,7 @@
 #pragma once
 
 #include <type_traits>
+#include <cuda_fp16.h>
 
 // This macro determines whether or not we are using the fp16 accumulation of the MMA instruction.
 // #define USE_FP16_HMMA_ACCUMULATE
