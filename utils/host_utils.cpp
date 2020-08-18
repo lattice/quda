@@ -205,7 +205,7 @@ void constructQudaCloverField(void *clover, double norm, double diag, QudaPrecis
 }
 
 void constructWilsonSpinorParam(quda::ColorSpinorParam *cs_param, const QudaInvertParam *inv_param,
-                                    const QudaGaugeParam *gauge_param)
+                                const QudaGaugeParam *gauge_param)
 {
   // Lattice vector spacetime/colour/spin/parity properties
   cs_param->nColor = 3;
@@ -252,7 +252,7 @@ void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision p
 }
 
 void constructPointSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x,
-				const int dil, const int *const source_position)
+                                const int dil, const int *const source_position)
 {
   int X[4] = {x[0], x[1], x[2], x[3]};
   // Get local index
@@ -262,35 +262,35 @@ void constructPointSpinorSource(void *v, int nSpin, int nColor, QudaPrecision pr
   int local_idx = ((X[2] * src_local[3] + src_local[2]) * X[1] + src_local[1]) * X[0] + src_local[0];
   int local_idx_cb = local_idx / 2;
   int parity = local_idx % 2;
-  
+
   size_t bytes = V * my_spinor_site_size * host_spinor_data_type_size;
   memset(v, bytes, 0.0);
-  
+
   // Deduce where to place the point source. If the following is satisfied,
   // we have isolated the MPI rank that contains the point source posistion.
   if ((comm_coord(0) * X[0] <= source_position[0] && source_position[0] < (comm_coord(0) + 1) * X[0])
       && (comm_coord(1) * X[1] <= source_position[1] && source_position[1] < (comm_coord(1) + 1) * X[1])
       && (comm_coord(2) * X[2] <= source_position[2] && source_position[2] < (comm_coord(2) + 1) * X[2])
       && (comm_coord(3) * X[3] <= source_position[3] && source_position[3] < (comm_coord(3) + 1) * X[3])) {
-    
-    if(precision == QUDA_DOUBLE_PRECISION) {
-      ((double*)v)[my_spinor_site_size * (parity*Vh + local_idx_cb) + 2*dil] = 1.0;
+
+    if (precision == QUDA_DOUBLE_PRECISION) {
+      ((double *)v)[my_spinor_site_size * (parity * Vh + local_idx_cb) + 2 * dil] = 1.0;
     } else {
-      ((float*)v)[my_spinor_site_size * (parity*Vh + local_idx_cb) + 2*dil] = 1.0;
+      ((float *)v)[my_spinor_site_size * (parity * Vh + local_idx_cb) + 2 * dil] = 1.0;
     }
   }
 }
 
 void constructWallSpinorSource(void *v, QudaPrecision precision, const int dil)
-{  
+{
   size_t bytes = V * my_spinor_site_size * host_spinor_data_type_size;
   memset(v, bytes, 0.0);
-  
-  for(int i=0; i<V; i++) {
-    if(precision == QUDA_DOUBLE_PRECISION) {
-      ((double*)v)[my_spinor_site_size * i + 2*dil] = 1.0;
+
+  for (int i = 0; i < V; i++) {
+    if (precision == QUDA_DOUBLE_PRECISION) {
+      ((double *)v)[my_spinor_site_size * i + 2 * dil] = 1.0;
     } else {
-      ((float*)v)[my_spinor_site_size * i + 2*dil] = 1.0;
+      ((float *)v)[my_spinor_site_size * i + 2 * dil] = 1.0;
     }
   }
 }

@@ -6,9 +6,9 @@
 namespace quda {
 
   /*ColorSpinorField::ColorSpinorField() : init(false) {
-    
+
     }*/
-  
+
   ColorSpinorParam::ColorSpinorParam(const ColorSpinorField &field) : LatticeFieldParam()  {
     field.fill(*this);
   }

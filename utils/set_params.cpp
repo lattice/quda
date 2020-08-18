@@ -108,15 +108,19 @@ void setInvertParam(QudaInvertParam &inv_param)
     inv_param.mass = mass;
     inv_param.kappa = 1.0 / (2.0 * (1 + 3 / anisotropy + mass));
     if (dslash_type == QUDA_LAPLACE_DSLASH) {
-      if(laplace3D < 4) inv_param.kappa = 1.0 / (8.0 - 2.0 + inv_param.mass);
-      else inv_param.kappa = 1.0 / (8 + inv_param.mass);
+      if (laplace3D < 4)
+        inv_param.kappa = 1.0 / (8.0 - 2.0 + inv_param.mass);
+      else
+        inv_param.kappa = 1.0 / (8 + inv_param.mass);
     }
   } else {
     inv_param.kappa = kappa;
     inv_param.mass = 0.5 / kappa - (1.0 + 3.0 / anisotropy);
     if (dslash_type == QUDA_LAPLACE_DSLASH) {
-      if(laplace3D < 4) inv_param.mass = 1.0 / inv_param.kappa - (8.0 - 2.0);
-      else inv_param.mass = 1.0 / inv_param.kappa - 8.0;
+      if (laplace3D < 4)
+        inv_param.mass = 1.0 / inv_param.kappa - (8.0 - 2.0);
+      else
+        inv_param.mass = 1.0 / inv_param.kappa - 8.0;
     }
   }
   printfQuda("Kappa = %.8f Mass = %.8f\n", inv_param.kappa, inv_param.mass);

@@ -683,10 +683,8 @@ namespace quda {
   void chiralProject(ColorSpinorField &out, const ColorSpinorField &in, const int proj);
 
   void make4DMidPointProp(ColorSpinorField &out, ColorSpinorField &in);
-  
-  void make4DQuarkProp(ColorSpinorField &out, ColorSpinorField &in);
 
-  
+  void make4DQuarkProp(ColorSpinorField &out, ColorSpinorField &in);
 }
 
 #endif // _DSLASH_QUDA_H

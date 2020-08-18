@@ -155,7 +155,7 @@ void test(int contractionType, int Prec)
 
   // Perform GPU contraction.
   contractQuda(spinorX, spinorY, d_result, cType, &inv_param, X);
-  
+
   // Compare each site contraction from the host and device.
   // It returns the number of faults it detects.
   int faults = 0;
@@ -164,12 +164,12 @@ void test(int contractionType, int Prec)
   } else {
     faults = contraction_reference((float *)spinorX, (float *)spinorY, (float *)d_result, cType, X);
   }
-  
+
   printfQuda("Contraction comparison for contraction type %s complete with %d/%d faults\n", get_contract_str(cType),
              faults, V * 16 * 2);
-  
+
   EXPECT_LE(faults, 0) << "CPU and GPU implementations do not agree";
-  
+
   free(spinorX);
   free(spinorY);
   free(d_result);

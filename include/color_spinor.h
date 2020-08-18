@@ -919,8 +919,6 @@ namespace quda {
     return dot;
   }
 
-
-
   /**
      @brief Compute the color contraction over color at spin s
      dot = \sum_s,c a(s,c) * b(s,c)

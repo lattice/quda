@@ -24,7 +24,7 @@ namespace quda {
   class LatticeField;
 
   class Propagator;
-  
+
   class ColorSpinorField;
   class cudaColorSpinorField;
   class cpuColorSpinorField;

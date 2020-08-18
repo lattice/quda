@@ -251,14 +251,13 @@ namespace
 {
   CLI::TransformPairs<QudaCABasis> ca_basis_map {{"power", QUDA_POWER_BASIS}, {"chebyshev", QUDA_CHEBYSHEV_BASIS}};
 
-  CLI::TransformPairs<QudaContractType> contract_type_map {
-    {"open", QUDA_CONTRACT_TYPE_OPEN},
-      {"open-sum-t", QUDA_CONTRACT_TYPE_OPEN_SUM_T},
-	{"open-sum-z", QUDA_CONTRACT_TYPE_OPEN_SUM_Z},
-	  {"dr", QUDA_CONTRACT_TYPE_DR},
-	    {"dr-sum-t", QUDA_CONTRACT_TYPE_DR_SUM_T},
-	      {"dr-sum-z", QUDA_CONTRACT_TYPE_DR_SUM_Z}};
-  
+  CLI::TransformPairs<QudaContractType> contract_type_map {{"open", QUDA_CONTRACT_TYPE_OPEN},
+                                                           {"open-sum-t", QUDA_CONTRACT_TYPE_OPEN_SUM_T},
+                                                           {"open-sum-z", QUDA_CONTRACT_TYPE_OPEN_SUM_Z},
+                                                           {"dr", QUDA_CONTRACT_TYPE_DR},
+                                                           {"dr-sum-t", QUDA_CONTRACT_TYPE_DR_SUM_T},
+                                                           {"dr-sum-z", QUDA_CONTRACT_TYPE_DR_SUM_Z}};
+
   CLI::TransformPairs<QudaDslashType> dslash_type_map {{"wilson", QUDA_WILSON_DSLASH},
                                                        {"clover", QUDA_CLOVER_WILSON_DSLASH},
                                                        {"twisted-mass", QUDA_TWISTED_MASS_DSLASH},
@@ -364,14 +363,14 @@ namespace
 
   CLI::TransformPairs<QudaWFlowType> wflow_type_map {{"wilson", QUDA_WFLOW_TYPE_WILSON},
                                                      {"symanzik", QUDA_WFLOW_TYPE_SYMANZIK}};
-  
+
   CLI::TransformPairs<QudaGaugeSmearType> gauge_smear_type_map {{"ape", QUDA_GAUGE_SMEAR_TYPE_APE},
-      {"stout", QUDA_GAUGE_SMEAR_TYPE_STOUT},
-	{"ovr-imp-stout", QUDA_GAUGE_SMEAR_TYPE_OVR_IMP_STOUT}};
+                                                                {"stout", QUDA_GAUGE_SMEAR_TYPE_STOUT},
+                                                                {"ovr-imp-stout", QUDA_GAUGE_SMEAR_TYPE_OVR_IMP_STOUT}};
 
   CLI::TransformPairs<QudaFermionSmearType> fermion_smear_type_map {{"gaussian", QUDA_FERMION_SMEAR_TYPE_GAUSSIAN},
-      {"wuppertal", QUDA_FERMION_SMEAR_TYPE_WUPPERTAL}};
-  
+                                                                    {"wuppertal", QUDA_FERMION_SMEAR_TYPE_WUPPERTAL}};
+
   CLI::TransformPairs<QudaSetupType> setup_type_map {{"test", QUDA_TEST_VECTOR_SETUP}, {"null", QUDA_TEST_VECTOR_SETUP}};
 
   CLI::TransformPairs<QudaExtLibType> extlib_map {{"eigen", QUDA_EIGEN_EXTLIB}, {"magma", QUDA_MAGMA_EXTLIB}};
@@ -400,9 +399,10 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
                        "Compute the fat/long field or use random numbers (default false)");
 
   quda_app
-    ->add_option("--contraction-type", contract_type,
-                 "Whether to leave spin elemental open or insert a gamma basis, and whether to sum in t,z, or not at all"
-		 "(default dr-sum-t)")
+    ->add_option(
+      "--contraction-type", contract_type,
+      "Whether to leave spin elemental open or insert a gamma basis, and whether to sum in t,z, or not at all"
+      "(default dr-sum-t)")
     ->transform(CLI::QUDACheckedTransformer(contract_type_map));
   ;
   quda_app->add_flag("--dagger", dagger, "Set the dagger to 1 (default 0)");
@@ -899,7 +899,7 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
   CLI::QUDACheckedTransformer gauge_smear_transform(gauge_smear_type_map);
   CLI::QUDACheckedTransformer wflow_type_transform(wflow_type_map);
-  
+
   // Option group for SU(3) related options
   auto opgroup = quda_app->add_option_group("SU(3)", "Options controlling SU(3) tests");
   opgroup->add_option("--su3-ape-rho", ape_smear_rho, "rho coefficient for APE smearing (default 0.6)");
@@ -919,10 +919,10 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   opgroup->add_option("--su3-wflow-type", wflow_type, "The type of action to use in the wilson flow (default wilson)")
     ->transform(CLI::QUDACheckedTransformer(wflow_type_map));
-  
+
   opgroup->add_option("--su3-smear-type", gauge_smear_type, "The type of gauge smearing to use (default stout)")
     ->transform(CLI::QUDACheckedTransformer(gauge_smear_type_map));
-  
+
   opgroup->add_option("--su3-measurement-interval", measurement_interval,
                       "Measure the field energy and topological charge every Nth step (default 5) ");
 }
@@ -931,37 +931,50 @@ void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
 
   CLI::QUDACheckedTransformer fermion_smear_transform(fermion_smear_type_map);
-  
+
   // Option group for propagator related options
   auto opgroup = quda_app->add_option_group("Propagator", "Options controlling propagator construction");
 
-  opgroup->add_option("--prop-read-sources", prop_read_sources, "Read all sources from file. There will be one propagator for each source (default false)");
-  
+  opgroup->add_option("--prop-read-sources", prop_read_sources,
+                      "Read all sources from file. There will be one propagator for each source (default false)");
+
   opgroup->add_option("--prop-n-sources", prop_n_sources, "The number of point sources to construct (default 1)");
-  
-  quda_app->add_fileoption(opgroup, "--prop-save-sink-file", prop_sink_outfile, CLI::Validator(), "Save propagators to <file> (requires QIO)");
-  
-  quda_app->add_fileoption(opgroup, "--prop-load-sink-file", prop_sink_infile, CLI::Validator(), "Load propagators from <file> (requires QIO)")->check(CLI::ExistingFile);
-  
-  quda_app->add_fileoption(opgroup, "--prop-save-source-file", prop_source_outfile, CLI::Validator(), "Save source to <file> (requires QIO)");
+
+  quda_app->add_fileoption(opgroup, "--prop-save-sink-file", prop_sink_outfile, CLI::Validator(),
+                           "Save propagators to <file> (requires QIO)");
+
+  quda_app
+    ->add_fileoption(opgroup, "--prop-load-sink-file", prop_sink_infile, CLI::Validator(),
+                     "Load propagators from <file> (requires QIO)")
+    ->check(CLI::ExistingFile);
+
+  quda_app->add_fileoption(opgroup, "--prop-save-source-file", prop_source_outfile, CLI::Validator(),
+                           "Save source to <file> (requires QIO)");
 
   // Do not check for an existing file as QUDA will append any
   // string with a dilution index: "string_<dilution_index>"
-  quda_app->add_fileoption(opgroup, "--prop-load-source-file", prop_source_infile, CLI::Validator(), "Load source to <file> (requires QIO)");
+  quda_app->add_fileoption(opgroup, "--prop-load-source-file", prop_source_infile, CLI::Validator(),
+                           "Load source to <file> (requires QIO)");
 
-  opgroup->add_option("--prop-source-smear-coeff", prop_source_smear_coeff, "Set the alpha(Wuppertal) or omega(Gaussian) source smearing value (default 0.2)");
-  
-  opgroup->add_option("--prop-source-smear-steps", prop_source_smear_steps, "Set the number of source smearing steps (default 50)");
+  opgroup->add_option("--prop-source-smear-coeff", prop_source_smear_coeff,
+                      "Set the alpha(Wuppertal) or omega(Gaussian) source smearing value (default 0.2)");
 
-  opgroup->add_option("--prop-sink-smear-coeff", prop_sink_smear_coeff, "Set the alpha(Wuppertal) or omega(Gaussian) sink smearing value (default 0.2)");
-  
-  opgroup->add_option("--prop-sink-smear-steps", prop_sink_smear_steps, "Set the number of sink smearing steps (default 50)");
-  
-  opgroup->add_option("--prop-smear-type", prop_smear_type, "Type of fermion smearing to employ (default gaussian)")->transform(CLI::QUDACheckedTransformer(fermion_smear_type_map));
+  opgroup->add_option("--prop-source-smear-steps", prop_source_smear_steps,
+                      "Set the number of source smearing steps (default 50)");
 
-  quda_app->add_psoption(opgroup, "--prop-source-position", prop_source_position, CLI::Validator(), "Set the position of the nth point source <Nth source> (X Y Z T) (default(0,0,0,0))");
+  opgroup->add_option("--prop-sink-smear-coeff", prop_sink_smear_coeff,
+                      "Set the alpha(Wuppertal) or omega(Gaussian) sink smearing value (default 0.2)");
 
-  CLI::QUDACheckedTransformer prec_transform(precision_map);  
-  opgroup->add_option("--prop-save-prec", prop_save_prec, "Precision with which to save propagators (default single)")->transform(prec_transform);
-  
+  opgroup->add_option("--prop-sink-smear-steps", prop_sink_smear_steps,
+                      "Set the number of sink smearing steps (default 50)");
+
+  opgroup->add_option("--prop-smear-type", prop_smear_type, "Type of fermion smearing to employ (default gaussian)")
+    ->transform(CLI::QUDACheckedTransformer(fermion_smear_type_map));
+
+  quda_app->add_psoption(opgroup, "--prop-source-position", prop_source_position, CLI::Validator(),
+                         "Set the position of the nth point source <Nth source> (X Y Z T) (default(0,0,0,0))");
+
+  CLI::QUDACheckedTransformer prec_transform(precision_map);
+  opgroup->add_option("--prop-save-prec", prop_save_prec, "Precision with which to save propagators (default single)")
+    ->transform(prec_transform);
 }

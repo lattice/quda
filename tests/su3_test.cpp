@@ -181,7 +181,7 @@ int main(int argc, char **argv)
   }
 
   free(qDensity);
-  
+
   // Q charge Reduction and normalisation
   comm_allreduce(&q_charge_check);
 

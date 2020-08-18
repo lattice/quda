@@ -1347,27 +1347,26 @@ extern "C" {
    */
   void gaugeObservablesQuda(QudaGaugeObservableParam *param);
 
-
-/**
-   * Public function to perform color contractions of the host spinorfields contained 
-   * inside first two arguments. Used for cases where one wishes to contract data in 
-   * either the T or Z dim 
+  /**
+   * Public function to perform color contractions of the host spinorfields contained
+   * inside first two arguments. Used for cases where one wishes to contract data in
+   * either the T or Z dim
    * @param[in] h_prop_array_flavor_1 pointer to pointers of ColorSpinorField host data
    * @param[in] h_prop_array_flavor_2 pointer to pointers of ColorSpinorField host data
-   * @param[out] h_result adress of pointer to the 16*corr_dim complex numbers of the 
+   * @param[out] h_result adress of pointer to the 16*corr_dim complex numbers of the
    *            result correlators
    * @param[in] cType Which type of contraction (open, degrand-rossi, etc)
    * @param[in] param meta data for construction of ColorSpinorFields.
-   * @param[in] colorspinorparam pointer to a ColorSpinorParam meta data for 
+   * @param[in] colorspinorparam pointer to a ColorSpinorParam meta data for
    *            construction of ColorSpinorFields
    * @param[in] X spacetime data for construction of ColorSpinorFields
    */
-void contractSummedQuda(void** h_prop_array_flavor_1, void** h_prop_array_flavor_2, void **h_result, QudaContractType cType,
-			QudaInvertParam *param, void *colorspinorparam, const int *X);
+  void contractSummedQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavor_2, void **h_result,
+                          QudaContractType cType, QudaInvertParam *param, void *colorspinorparam, const int *X);
 
   /**
    * Public function to perform color contractions of the host spinors x and y. Does
-   * not sum the lattice data. 
+   * not sum the lattice data.
    * @param[in] x pointer to host data
    * @param[in] y pointer to host data
    * @param[out] result pointer to the 16 spin projections per lattice site
@@ -1425,11 +1424,12 @@ void contractSummedQuda(void** h_prop_array_flavor_1, void** h_prop_array_flavor
                       QudaGaugeParam* param,
                       double* timeinfo);
 
-  void make4DQuarkProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_param5D, QudaInvertParam *inv_param4D, const int *X);
+  void make4DQuarkProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_param5D, QudaInvertParam *inv_param4D,
+                       const int *X);
 
-  void make4DMidPointProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_param5D, QudaInvertParam *inv_param4D, const int *X);
-  
-  
+  void make4DMidPointProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_param5D, QudaInvertParam *inv_param4D,
+                          const int *X);
+
   /**
    * @brief Flush the chronological history for the given index
    * @param[in] index Index for which we are flushing

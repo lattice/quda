@@ -243,7 +243,7 @@ namespace quda
       std::vector<ColorSpinorField *> vecs_ptr;
       vecs_ptr.reserve(n_conv);
       // Ensure the parity of the eigenvectors is correct
-      const QudaParity mat_parity = impliedParityFromMatPC(mat.getMatPCType());      
+      const QudaParity mat_parity = impliedParityFromMatPC(mat.getMatPCType());
       for (unsigned int i = 0; i < kSpace.size(); i++) kSpace[i]->setSuggestedParity(mat_parity);
 
       // We may wish to compute vectors in high prec, but use in a lower
@@ -251,16 +251,16 @@ namespace quda
       // vectors, but in a lower precision.
       QudaPrecision prec = kSpace[0]->Precision();
       if (save_prec < prec) {
-	io.downPrec(kSpace, vecs_ptr, save_prec);
-	// save the vectors      
-	io.save(vecs_ptr);
-	for (unsigned int i = 0; i < kSpace.size() && save_prec < prec; i++) delete vecs_ptr[i];	
+        io.downPrec(kSpace, vecs_ptr, save_prec);
+        // save the vectors
+        io.save(vecs_ptr);
+        for (unsigned int i = 0; i < kSpace.size() && save_prec < prec; i++) delete vecs_ptr[i];
       } else {
         for (int i = 0; i < n_conv; i++) vecs_ptr.push_back(kSpace[i]);
-	io.save(vecs_ptr);
+        io.save(vecs_ptr);
       }
     }
-    
+
     // Save TRLM tuning
     saveTuneCache();
 

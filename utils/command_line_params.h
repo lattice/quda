@@ -133,8 +133,9 @@ public:
 
   // Add option to parse multiple point source locations
   template <typename T>
-    CLI::Option *add_psoption(CLI::Option_group *group, std::string option_name, std::array<std::array<T, 4>, QUDA_MAX_SOURCES> &variable,
-                            CLI::Validator trans, std::string option_description = "", bool defaulted = false)
+  CLI::Option *add_psoption(CLI::Option_group *group, std::string option_name,
+                            std::array<std::array<T, 4>, QUDA_MAX_SOURCES> &variable, CLI::Validator trans,
+                            std::string option_description = "", bool defaulted = false)
   {
 
     CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {
@@ -170,8 +171,9 @@ public:
 
   // Add option to parse multiple files.
   template <typename T>
-  CLI::Option *add_fileoption(CLI::Option_group *group, std::string option_name, std::array<T, QUDA_MAX_SOURCES> &variable,
-                            CLI::Validator trans, std::string option_description = "", bool defaulted = false)
+  CLI::Option *add_fileoption(CLI::Option_group *group, std::string option_name,
+                              std::array<T, QUDA_MAX_SOURCES> &variable, CLI::Validator trans,
+                              std::string option_description = "", bool defaulted = false)
   {
 
     CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {
@@ -202,9 +204,6 @@ public:
     group->add_option(opt);
     return opt;
   }
-
-  
-  
 };
 
 std::shared_ptr<QUDAApp> make_app(std::string app_description = "QUDA internal test", std::string app_name = "");
