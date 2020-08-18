@@ -178,7 +178,7 @@ namespace quda
 #endif
     } else if (c.Precision() == QUDA_QUARTER_PRECISION) {
 #if QUDA_PRECISION & 1
-      Apply<char>(c, args...);
+      Apply<int8_t>(c, args...);
 #else
       errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
 #endif
@@ -202,6 +202,34 @@ namespace quda
       errorQuda("Unsupported number of colors %d\n", field.Ncolor());
     }
   }
+
+  template <QudaPrecision> constexpr bool is_enabled() { return true; }
+#if !(QUDA_PRECISION & 8)
+  template <> constexpr bool is_enabled<QUDA_DOUBLE_PRECISION>() { return false; }
+#endif
+#if !(QUDA_PRECISION & 4)
+  template <> constexpr bool is_enabled<QUDA_SINGLE_PRECISION>() { return false; }
+#endif
+#if !(QUDA_PRECISION & 2)
+  template <> constexpr bool is_enabled<QUDA_HALF_PRECISION>() { return false; }
+#endif
+#if !(QUDA_PRECISION & 1)
+  template <> constexpr bool is_enabled<QUDA_QUARTER_PRECISION>() { return false; }
+#endif
+
+  struct PrecisionFull {
+    static constexpr std::array<QudaPrecision, 4> precision
+      = {QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION, QUDA_QUARTER_PRECISION};
+  };
+
+#ifdef GPU_MULTIGRID_DOUBLE
+  struct PrecisionMultigrid: public PrecisionDefault { };
+#else
+  struct PrecisionMultigrid {
+    static constexpr std::array<QudaPrecision, 3> precision
+      = {QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION, QUDA_QUARTER_PRECISION};
+  };
+#endif
 
   /**
      @brief This instantiate function is used to instantiate the
@@ -232,7 +260,118 @@ namespace quda
 #endif
     } else if (field.Precision() == QUDA_QUARTER_PRECISION) {
 #if QUDA_PRECISION & 1
-      instantiate<Apply, char>(field, args...);
+      instantiate<Apply, int8_t>(field, args...);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+#endif
+    } else {
+      errorQuda("Unsupported precision %d\n", field.Precision());
+    }
+  }
+
+  /**
+     @brief The instantiatePrecision function is used to instantiate
+     the precision
+     @param[in] field LatticeField we wish to instantiate
+     @param[in,out] args Any additional arguments required for the
+     computation at hand
+  */
+  template <template <typename> class Apply, typename F, typename... Args>
+  constexpr void instantiatePrecision(F &field, Args &&... args)
+  {
+    if (field.Precision() == QUDA_DOUBLE_PRECISION) {
+      // always instantiate double precision
+      Apply<double>(field, args...);
+    } else if (field.Precision() == QUDA_SINGLE_PRECISION) {
+#if QUDA_PRECISION & 4
+      Apply<float>(field, args...);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+#endif
+    } else if (field.Precision() == QUDA_HALF_PRECISION) {
+#if QUDA_PRECISION & 2
+      Apply<short>(field, args...);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#endif
+    } else if (field.Precision() == QUDA_QUARTER_PRECISION) {
+#if QUDA_PRECISION & 1
+      Apply<int8_t>(field, args...);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+#endif
+    } else {
+      errorQuda("Unsupported precision %d\n", field.Precision());
+    }
+  }
+
+  /**
+     @brief The instantiatePrecision function is used to instantiate
+     the precision
+     @param[in] field LatticeField we wish to instantiate
+     @param[in,out] args Any additional arguments required for the
+     computation at hand
+  */
+  template <template <typename, typename> class Apply, typename T, typename F, typename... Args>
+  constexpr void instantiatePrecision2(F &field, Args &&... args)
+  {
+    if (field.Precision() == QUDA_DOUBLE_PRECISION) {
+      // always instantiate double precision
+      Apply<double, T>(field, args...);
+    } else if (field.Precision() == QUDA_SINGLE_PRECISION) {
+#if QUDA_PRECISION & 4
+      Apply<float, T>(field, args...);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+#endif
+    } else if (field.Precision() == QUDA_HALF_PRECISION) {
+#if QUDA_PRECISION & 2
+      Apply<short, T>(field, args...);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#endif
+    } else if (field.Precision() == QUDA_QUARTER_PRECISION) {
+#if QUDA_PRECISION & 1
+      Apply<int8_t, T>(field, args...);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+#endif
+    } else {
+      errorQuda("Unsupported precision %d\n", field.Precision());
+    }
+  }
+
+  /**
+     @brief The instantiatePrecision function is used to instantiate
+     the precision
+     @param[in] field LatticeField we wish to instantiate
+     @param[in,out] args Any additional arguments required for the
+     computation at hand
+  */
+  template <template <typename> class Apply, typename F, typename... Args>
+  constexpr void instantiatePrecisionMG(F &field, Args &&... args)
+  {
+    if (field.Precision() == QUDA_DOUBLE_PRECISION) {
+#ifdef GPU_MULTIGRID_DOUBLE
+      Apply<double>(field, args...);
+#else
+      errorQuda("Multigrid not support in double precision");
+#endif
+    } else if (field.Precision() == QUDA_SINGLE_PRECISION) {
+#if QUDA_PRECISION & 4
+      Apply<float>(field, args...);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+#endif
+    } else if (field.Precision() == QUDA_HALF_PRECISION) {
+#if QUDA_PRECISION & 2
+      Apply<short>(field, args...);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#endif
+    } else if (field.Precision() == QUDA_QUARTER_PRECISION) {
+#if QUDA_PRECISION & 1
+      Apply<int8_t>(field, args...);
 #else
       errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
 #endif
