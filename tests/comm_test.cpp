@@ -191,6 +191,14 @@ int main(int argc, char **argv)
   // Load the gauge field to the device
   loadGaugeQuda((void *)gauge, &gauge_param);
 
+#if 0
+  quda::GaugeFieldParam d_gauge_param(*gaugePrecise);
+  quda::GaugeField *d_gauge = quda::GaugeField::Create(d_gauge_param);
+
+  d_gauge->copy(*gaugePrecise);
+  loadGaugeQuda(d_gauge->Gauge_p(), &gauge_param);
+#endif
+
   // Compute plaquette as a sanity check
   double plaq[3];
   plaqQuda(plaq);

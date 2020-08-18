@@ -55,9 +55,9 @@ namespace quda {
       GaugePlaqArg<Float, nColor, recon> arg(U);
       GaugePlaq<decltype(arg)> gaugePlaq(arg, U);
       gaugePlaq.apply(0);
-      qudaDeviceSynchronize();
-      comm_allreduce_array((double*)arg.result_h, 2);
-      for (int i=0; i<2; i++) ((double*)&plq)[i] = ((double*)arg.result_h)[i] / (9.*2*arg.threads*comm_size());
+      arg.complete(&plq);
+      comm_allreduce_array((double*)&plq, 2);
+      for (int i = 0; i < 2; i++) ((double*)&plq)[i] /= 9.*2*arg.threads*comm_size();
     }
   };
 

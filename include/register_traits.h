@@ -302,6 +302,24 @@ namespace quda {
     typedef float type;
   };
 
+#ifdef QUAD_SUM
+  template <> struct scalar<doubledouble> {
+    typedef doubledouble type;
+  };
+  template <> struct scalar<doubledouble2> {
+    typedef doubledouble type;
+  };
+  template <> struct scalar<doubledouble3> {
+    typedef doubledouble type;
+  };
+  template <> struct scalar<doubledouble4> {
+    typedef doubledouble type;
+  };
+  template <> struct vector<doubledouble, 2> {
+    typedef doubledouble2 type;
+  };
+#endif
+
   /* Traits used to determine if a variable is half precision or not */
   template< typename T > struct isHalf{ static const bool value = false; };
   template<> struct isHalf<short>{ static const bool value = true; };

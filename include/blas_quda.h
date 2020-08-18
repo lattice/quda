@@ -12,14 +12,7 @@ namespace quda {
 
     // creates and destroys reduction buffers
     void init();
-    void end(void);
-
-    /** returns the reduce buffer size allocated */
-    size_t reduceBufferSize();
-
-    void* getDeviceReduceBuffer();
-    void* getMappedHostReduceBuffer();
-    void* getHostReduceBuffer();
+    void destroy();
 
     void setParam(int kernel, int prec, int threads, int blocks);
 
