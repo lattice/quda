@@ -6195,15 +6195,18 @@ void propagatorQuda(void **prop_array, void **source_array, QudaInvertParam *par
       errorQuda("Initial guess not supported for two-pass solver");
     }
   }
-  
-  // Create the dirac operators
+
   Dirac *d = nullptr;
   Dirac *dSloppy = nullptr;
   Dirac *dPre = nullptr;
-  createDirac(d, dSloppy, dPre, *param, pc_solve);
+  Dirac *dEig = nullptr;
+  // Create the dirac operator and operators for sloppy, precondition,
+  // and an eigensolver
+  createDiracWithEig(d, dSloppy, dPre, dEig, *param, pc_solve);
   Dirac &dirac = *d;
   Dirac &diracSloppy = *dSloppy;
   Dirac &diracPre = *dPre;
+  Dirac &diracEig = *dEig;
 
   // Get the local lattice dimensions 
   const int *X = cudaGauge->X();
