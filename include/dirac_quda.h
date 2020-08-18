@@ -1151,6 +1151,85 @@ public:
     virtual bool hermitian() const { return true; }
   };
 
+  // Kahler-Dirac preconditioned staggered
+  class DiracStaggeredKD : public DiracStaggered {
+
+  protected:
+    mutable cudaGaugeField *Xinv; /** inverse Kahler-Dirac matrix */
+
+  public:
+    DiracStaggeredKD(const DiracParam &param);
+    DiracStaggeredKD(const DiracStaggeredKD &dirac);
+    virtual ~DiracStaggeredKD();
+    DiracStaggeredKD& operator=(const DiracStaggeredKD &dirac);
+
+    virtual void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
+
+    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
+      const QudaParity parity) const;
+    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
+          const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+    virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    void KahlerDiracInv(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+       ColorSpinorField &x, ColorSpinorField &b,
+       const QudaSolutionType) const;
+    virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
+           const QudaSolutionType) const;
+
+    /**
+     *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
+     *  These are pointers as opposed to references to support passing in `nullptr`.
+     *
+     *  @param gauge_in Updated gauge field
+     *  @param fat_gauge_in Updated fat links
+     *  @param long_gauge_in Updated long links
+     *  @param clover_in Updated clover field
+     */
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
+                              cudaCloverField *clover_in)
+    {
+      Dirac::updateFields(fat_gauge_in, nullptr, nullptr, nullptr);
+      // Do we want to re-compute Xinv here??
+    }
+
+    /**
+     * @brief Create the coarse staggered KD operator.
+     *
+     * @details Takes the multigrid transfer class, which knows
+     *          about the coarse grid blocking, as well as
+     *          having prolongate and restrict member functions,
+     *          and returns color matrices Y[0..2*dim-1] corresponding
+     *          to the coarse grid hopping terms and X corresponding to
+     *          the coarse grid "clover" term.
+     *
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param kappa Kappa parameter for the coarse operator (ignored, set to 1.0)
+     * @param mass Mass parameter for the coarse operator (gets explicitly built into clover)
+     * @param mu Mu parameter for the coarse operator (ignored for staggered)
+     * @param mu_factor Mu scaling factor for the coarse operator (ignored for staggered)
+     */
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu = 0.,
+                        double mu_factor = 0.) const;
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      all relevant memory fields (gauge, clover, temporary spinors).
+      Will only grab the inverse clover unless the clover field
+      is needed for asymmetric preconditioning
+      to the CPU or GPU as requested
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
+    */
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
+
+  };
+
   // Full staggered
   class DiracImprovedStaggered : public Dirac {
 
@@ -1179,6 +1258,15 @@ public:
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
 
+    /**
+     *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
+     *  These are pointers as opposed to references to support passing in `nullptr`.
+     *
+     *  @param gauge_in Updated gauge field
+     *  @param fat_gauge_in Updated fat links
+     *  @param long_gauge_in Updated long links
+     *  @param clover_in Updated clover field
+     */
     virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
                               cudaCloverField *clover_in)
     {
@@ -1242,6 +1330,88 @@ public:
 			     const QudaSolutionType) const;
 
     virtual bool hermitian() const { return true; }
+  };
+
+  // Kahler-Dirac preconditioned staggered
+  class DiracImprovedStaggeredKD : public DiracImprovedStaggered {
+
+  protected:
+    mutable cudaGaugeField *Xinv; /** inverse Kahler-Dirac matrix */
+
+  public:
+    DiracImprovedStaggeredKD(const DiracParam &param);
+    DiracImprovedStaggeredKD(const DiracImprovedStaggeredKD &dirac);
+    virtual ~DiracImprovedStaggeredKD();
+    DiracImprovedStaggeredKD& operator=(const DiracImprovedStaggeredKD &dirac);
+
+    virtual void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
+
+    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
+      const QudaParity parity) const;
+    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
+          const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+    virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    void KahlerDiracInv(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+       ColorSpinorField &x, ColorSpinorField &b,
+       const QudaSolutionType) const;
+    virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
+           const QudaSolutionType) const;
+
+    /**
+     *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
+     *  These are pointers as opposed to references to support passing in `nullptr`.
+     *
+     *  @param gauge_in Updated gauge field
+     *  @param fat_gauge_in Updated fat links
+     *  @param long_gauge_in Updated long links
+     *  @param clover_in Updated clover field
+     */
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
+                              cudaCloverField *clover_in)
+    {
+      Dirac::updateFields(fat_gauge_in, nullptr, nullptr, nullptr);
+      fatGauge = fat_gauge_in;
+      longGauge = long_gauge_in;
+
+      // Do we want to support recomputing Xinv here??
+    }
+
+    /**
+     * @brief Create the coarse improved staggered KD operator.
+     *
+     * @details Takes the multigrid transfer class, which knows
+     *          about the coarse grid blocking, as well as
+     *          having prolongate and restrict member functions,
+     *          and returns color matrices Y[0..2*dim-1] corresponding
+     *          to the coarse grid hopping terms and X corresponding to
+     *          the coarse grid "clover" term.
+     *
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param kappa Kappa parameter for the coarse operator (ignored, set to 1.0)
+     * @param mass Mass parameter for the coarse operator (gets explicitly built into clover)
+     * @param mu Mu parameter for the coarse operator (ignored for staggered)
+     * @param mu_factor Mu scaling factor for the coarse operator (ignored for staggered)
+     */
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu = 0.,
+                        double mu_factor = 0.) const;
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      all relevant memory fields (gauge, clover, temporary spinors).
+      Will only grab the inverse clover unless the clover field
+      is needed for asymmetric preconditioning
+      to the CPU or GPU as requested
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
+    */
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
+
   };
 
   /**
