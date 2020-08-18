@@ -58,7 +58,7 @@ namespace quda
 
       auto kernel = mma::CalculateYhatGPU<compute_max_only, Arg, bM, bN, bK, block_y, block_z, min_block_cta>;
       setMaxDynamicSharedBytesPerBlock(kernel);
-      kernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+      qudaLaunchKernel(kernel, tp, stream, arg);
     }
 
     /**

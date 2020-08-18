@@ -166,7 +166,7 @@ namespace quda {
     {
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        cloverComputeKernel<<<tp.grid,tp.block,tp.shared_bytes>>>(arg);  
+        qudaLaunchKernel(cloverComputeKernel<decltype(arg)>, tp, stream, arg);
       } else { // run the CPU code
         errorQuda("Not implemented");
       }

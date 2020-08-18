@@ -185,10 +185,11 @@ namespace quda {
   public:
     ExtractGhost(Arg &arg, const GaugeField &meta, QudaFieldLocation location, bool extract)
 #ifndef FINE_GRAINED_ACCESS
-      : TunableVectorYZ(1, 2*nDim), arg(arg), meta(meta), location(location), extract(extract) {
+      : TunableVectorYZ(1, 2*nDim), arg(arg), meta(meta), location(location), extract(extract)
 #else
-      : TunableVectorYZ(Arg::nColor, 2*nDim), arg(arg), meta(meta), location(location), extract(extract) {
+      : TunableVectorYZ(Arg::nColor, 2*nDim), arg(arg), meta(meta), location(location), extract(extract)
 #endif
+    {
       int faceMax = 0;
       for (int d=0; d<nDim; d++)
 	faceMax = (arg.faceVolumeCB[d] > faceMax ) ? arg.faceVolumeCB[d] : faceMax;
@@ -201,8 +202,6 @@ namespace quda {
 #endif
     }
 
-    virtual ~ExtractGhost() { ; }
-
     void apply(const qudaStream_t &stream) {
       if (location==QUDA_CPU_FIELD_LOCATION) {
 	if (extract) extractGhost<nDim,true>(arg);
@@ -210,9 +209,9 @@ namespace quda {
       } else {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	if (extract) {
-	  extractGhostKernel<nDim, true> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  qudaLaunchKernel(extractGhostKernel<nDim, true, Arg>, tp, stream, arg);
 	} else {
-	  extractGhostKernel<nDim, false> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  qudaLaunchKernel(extractGhostKernel<nDim, false, Arg>, tp, stream, arg);
 	}
       }
     }
@@ -226,7 +225,6 @@ namespace quda {
       return 2 * sites * 2 * arg.order.Bytes(); // parity * sites * i/o * vec size
     }
   };
-
 
   /**
      Generic gauge ghost extraction and packing (or the converse)

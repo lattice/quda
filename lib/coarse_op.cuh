@@ -162,15 +162,15 @@ namespace quda {
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
         if (arg.dir == QUDA_BACKWARDS) {
-          if      (arg.dim==0) ComputeUVGPU<from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-          else if (arg.dim==1) ComputeUVGPU<from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-          else if (arg.dim==2) ComputeUVGPU<from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-          else if (arg.dim==3) ComputeUVGPU<from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+          if      (arg.dim==0) qudaLaunchKernel(ComputeUVGPU<from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+          else if (arg.dim==1) qudaLaunchKernel(ComputeUVGPU<from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+          else if (arg.dim==2) qudaLaunchKernel(ComputeUVGPU<from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+          else if (arg.dim==3) qudaLaunchKernel(ComputeUVGPU<from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
         } else if (arg.dir == QUDA_FORWARDS) {
-          if      (arg.dim==0) ComputeUVGPU<from_coarse,Float,0,QUDA_FORWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-          else if (arg.dim==1) ComputeUVGPU<from_coarse,Float,1,QUDA_FORWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-          else if (arg.dim==2) ComputeUVGPU<from_coarse,Float,2,QUDA_FORWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-          else if (arg.dim==3) ComputeUVGPU<from_coarse,Float,3,QUDA_FORWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+          if      (arg.dim==0) qudaLaunchKernel(ComputeUVGPU<from_coarse,Float,0,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+          else if (arg.dim==1) qudaLaunchKernel(ComputeUVGPU<from_coarse,Float,1,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+          else if (arg.dim==2) qudaLaunchKernel(ComputeUVGPU<from_coarse,Float,2,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+          else if (arg.dim==3) qudaLaunchKernel(ComputeUVGPU<from_coarse,Float,3,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
         }
 #endif
         }
@@ -183,7 +183,7 @@ namespace quda {
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
 #if defined(GPU_CLOVER_DIRAC) && !defined(COARSECOARSE)
-          ComputeAVGPU<Float,fineSpin,fineColor,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+        qudaLaunchKernel(ComputeAVGPU<Float,fineSpin,fineColor,coarseColor,Arg>, tp, stream, arg);
 #else
           errorQuda("Clover dslash has not been built");
 #endif
@@ -198,7 +198,7 @@ namespace quda {
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
 #if defined(GPU_TWISTED_MASS_DIRAC) && !defined(COARSECOARSE)
-        ComputeTMAVGPU<Float,fineSpin,fineColor,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+        qudaLaunchKernel(ComputeTMAVGPU<Float,fineSpin,fineColor,coarseColor,Arg>, tp, stream, arg);
 #else
         errorQuda("Twisted mass dslash has not been built");
 #endif
@@ -213,7 +213,7 @@ namespace quda {
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
 #if defined(GPU_TWISTED_CLOVER_DIRAC) && !defined(COARSECOARSE)
-        ComputeTMCAVGPU<Float,fineSpin,fineColor,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+        qudaLaunchKernel(ComputeTMCAVGPU<Float,fineSpin,fineColor,coarseColor,Arg>, tp, stream, arg);
 #else
         errorQuda("Twisted clover dslash has not been built");
 #endif
@@ -231,7 +231,7 @@ namespace quda {
           .launch(arg);
 #else
 #if defined(DYNAMIC_CLOVER) && !defined(COARSECOARSE)
-        ComputeCloverInvMaxGPU<Float, false><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
+        qudaLaunchKernel(ComputeCloverInvMaxGPU<Float, false, Arg>, tp, stream, arg);
 #else
         errorQuda("ComputeCloverInvMax only enabled with dynamic clover");
 #endif
@@ -257,7 +257,7 @@ namespace quda {
           .launch(arg);
 #else
 #if defined(DYNAMIC_CLOVER) && !defined(COARSECOARSE)
-        ComputeCloverInvMaxGPU<Float, true><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
+        qudaLaunchKernel(ComputeCloverInvMaxGPU<Float, true, Arg>, tp, stream, arg);
 #else
         errorQuda("ComputeCloverInvMax only enabled with dynamic clover");
 #endif
@@ -319,15 +319,15 @@ namespace quda {
           constexpr bool parity_flip = true;
 
           if (arg.dir == QUDA_BACKWARDS) {
-            if      (arg.dim==0) ComputeVUVGPU<true,parity_flip,from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-            else if (arg.dim==1) ComputeVUVGPU<true,parity_flip,from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-            else if (arg.dim==2) ComputeVUVGPU<true,parity_flip,from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-            else if (arg.dim==3) ComputeVUVGPU<true,parity_flip,from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+            if      (arg.dim==0) qudaLaunchKernel(ComputeVUVGPU<true,parity_flip,from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+            else if (arg.dim==1) qudaLaunchKernel(ComputeVUVGPU<true,parity_flip,from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+            else if (arg.dim==2) qudaLaunchKernel(ComputeVUVGPU<true,parity_flip,from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+            else if (arg.dim==3) qudaLaunchKernel(ComputeVUVGPU<true,parity_flip,from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
           } else if (arg.dir == QUDA_FORWARDS) {
-            if      (arg.dim==0) ComputeVUVGPU<true,parity_flip,from_coarse,Float,0,QUDA_FORWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-            else if (arg.dim==1) ComputeVUVGPU<true,parity_flip,from_coarse,Float,1,QUDA_FORWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-            else if (arg.dim==2) ComputeVUVGPU<true,parity_flip,from_coarse,Float,2,QUDA_FORWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-            else if (arg.dim==3) ComputeVUVGPU<true,parity_flip,from_coarse,Float,3,QUDA_FORWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+            if      (arg.dim==0) qudaLaunchKernel(ComputeVUVGPU<true,parity_flip,from_coarse,Float,0,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+            else if (arg.dim==1) qudaLaunchKernel(ComputeVUVGPU<true,parity_flip,from_coarse,Float,1,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+            else if (arg.dim==2) qudaLaunchKernel(ComputeVUVGPU<true,parity_flip,from_coarse,Float,2,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+            else if (arg.dim==3) qudaLaunchKernel(ComputeVUVGPU<true,parity_flip,from_coarse,Float,3,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
           } else {
             errorQuda("Undefined direction %d", arg.dir);
           }
@@ -336,15 +336,15 @@ namespace quda {
           constexpr bool parity_flip = false;
 
           if (arg.dir == QUDA_BACKWARDS) {
-            if      (arg.dim==0) ComputeVUVGPU<false,parity_flip,from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-            else if (arg.dim==1) ComputeVUVGPU<false,parity_flip,from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-            else if (arg.dim==2) ComputeVUVGPU<false,parity_flip,from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-            else if (arg.dim==3) ComputeVUVGPU<false,parity_flip,from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+            if      (arg.dim==0) qudaLaunchKernel(ComputeVUVGPU<false,parity_flip,from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+            else if (arg.dim==1) qudaLaunchKernel(ComputeVUVGPU<false,parity_flip,from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+            else if (arg.dim==2) qudaLaunchKernel(ComputeVUVGPU<false,parity_flip,from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+            else if (arg.dim==3) qudaLaunchKernel(ComputeVUVGPU<false,parity_flip,from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
           } else if (arg.dir == QUDA_FORWARDS) {
-            if      (arg.dim==0) ComputeVUVGPU<false,parity_flip,from_coarse,Float,0,QUDA_FORWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-            else if (arg.dim==1) ComputeVUVGPU<false,parity_flip,from_coarse,Float,1,QUDA_FORWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-            else if (arg.dim==2) ComputeVUVGPU<false,parity_flip,from_coarse,Float,2,QUDA_FORWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-            else if (arg.dim==3) ComputeVUVGPU<false,parity_flip,from_coarse,Float,3,QUDA_FORWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+            if      (arg.dim==0) qudaLaunchKernel(ComputeVUVGPU<false,parity_flip,from_coarse,Float,0,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+            else if (arg.dim==1) qudaLaunchKernel(ComputeVUVGPU<false,parity_flip,from_coarse,Float,1,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+            else if (arg.dim==2) qudaLaunchKernel(ComputeVUVGPU<false,parity_flip,from_coarse,Float,2,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+            else if (arg.dim==3) qudaLaunchKernel(ComputeVUVGPU<false,parity_flip,from_coarse,Float,3,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
           } else {
             errorQuda("Undefined direction %d", arg.dir);
           }
@@ -372,8 +372,7 @@ namespace quda {
           .instantiate(from_coarse,Type<Float>(),fineSpin,coarseSpin,fineColor,coarseColor,Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
-        ComputeCoarseCloverGPU<from_coarse,Float,fineSpin,coarseSpin,fineColor,coarseColor>
-          <<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+        qudaLaunchKernel(ComputeCoarseCloverGPU<from_coarse,Float,fineSpin,coarseSpin,fineColor,coarseColor,Arg>, tp, stream, arg);
 #endif
 
       } else if (type == COMPUTE_REVERSE_Y) {
@@ -383,7 +382,7 @@ namespace quda {
           .instantiate(Type<Float>(),coarseSpin,coarseColor,Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
-        ComputeYReverseGPU<Float,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+        qudaLaunchKernel(ComputeYReverseGPU<Float,coarseSpin,coarseColor,Arg>, tp, stream, arg);
 #endif
       } else if (type == COMPUTE_DIAGONAL) {
 
@@ -392,7 +391,7 @@ namespace quda {
           .instantiate(Type<Float>(),coarseSpin,coarseColor,Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
-        AddCoarseDiagonalGPU<Float,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+        qudaLaunchKernel(AddCoarseDiagonalGPU<Float,coarseSpin,coarseColor,Arg>, tp, stream, arg);
 #endif
       } else if (type == COMPUTE_TMDIAGONAL) {
 
@@ -401,7 +400,7 @@ namespace quda {
           .instantiate(Type<Float>(),coarseSpin,coarseColor,Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
-        AddCoarseTmDiagonalGPU<Float,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+        qudaLaunchKernel(AddCoarseTmDiagonalGPU<Float,coarseSpin,coarseColor,Arg>, tp, stream, arg);
 #endif
       } else if (type == COMPUTE_CONVERT) {
 
@@ -410,7 +409,7 @@ namespace quda {
           .instantiate(Type<Float>(),coarseSpin,coarseColor,Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
-        ConvertGPU<Float,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+        qudaLaunchKernel(ConvertGPU<Float,coarseSpin,coarseColor,Arg>, tp, stream, arg);
 #endif
       } else if (type == COMPUTE_RESCALE) {
 
@@ -419,7 +418,7 @@ namespace quda {
           .instantiate(Type<Float>(),coarseSpin,coarseColor,Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
-        RescaleYGPU<Float,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+        qudaLaunchKernel(RescaleYGPU<Float,coarseSpin,coarseColor,Arg>, tp, stream, arg);
 #endif
 
       } else {

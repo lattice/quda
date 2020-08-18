@@ -55,7 +55,7 @@ namespace quda
 
       auto kernel = ComputeUVMMA<from_coarse, dim, dir, bM, bN, bK, block_y, block_z, Arg>;
       setMaxDynamicSharedBytesPerBlock(kernel);
-      kernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+      qudaLaunchKernel(kernel, tp, stream, arg);
     }
 
     template <bool from_coarse, int bM, int bN, int bK, int block_y, int block_z, class Arg>
@@ -350,7 +350,7 @@ namespace quda
 
       auto kernel = ComputeVUVMMA<from_coarse, dim, dir, bM, bN, bK, block_y, block_z, Arg>;
       setMaxDynamicSharedBytesPerBlock(kernel);
-      kernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+      qudaLaunchKernel(kernel, tp, stream, arg);
     }
 
     template <bool from_coarse, int bM, int bN, int bK, int block_y, int block_z, class Arg>

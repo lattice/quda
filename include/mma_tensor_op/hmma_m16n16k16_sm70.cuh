@@ -1,6 +1,7 @@
 #pragma once
 
 #include <type_traits>
+#include <cuda_fp16.h>
 
 // This macro determines whether or not we are using the fp16 accumulation of the MMA instruction.
 // #define USE_FP16_HMMA_ACCUMULATE
@@ -375,8 +376,6 @@ namespace quda
       auto ptr = reinterpret_cast<vector_type *>(cc.data());
 
       constexpr bool check_bounds = !((M % MMA_M == 0) && (N % MMA_N == 0));
-
-      static_assert(std::is_same<vector_type, int2>::value);
 
 #pragma unroll
       for (int i = 0; i < 4; i++) {

@@ -35,7 +35,7 @@ namespace quda
 
         constexpr int nFace = 1;
 
-        auto &tile = arg.uvTile;
+        using TileType = typename Arg::uvTileType;
 
         constexpr bool a_dagger = false;
         constexpr bool b_dagger = false;
@@ -44,9 +44,9 @@ namespace quda
         // Here instead of fineColor x coarseColor x fineColor,
         // we do (fineColor * fineSpin) x coarseColor x fineColor
 
-        constexpr int M = tile.m * fineSpin;
-        constexpr int N = tile.n;
-        constexpr int K = tile.k;
+        constexpr int M = TileType::m * fineSpin;
+        constexpr int N = TileType::n;
+        constexpr int K = TileType::k;
 
         constexpr int lda = K * fineSpin;
         constexpr int ldb = N;
@@ -131,15 +131,15 @@ namespace quda
             * (arg.xc_size[0] / 2)
           + coord_coarse[0];
 
-        auto &tile = arg.vuvTile;
+        using TileType = typename Arg::vuvTileType;
         // We do coarseColor x coarseColor x fineColor
 
         constexpr bool a_dagger = true;
         constexpr bool b_dagger = false;
 
-        constexpr int M = tile.m;
-        constexpr int N = tile.n;
-        constexpr int K = tile.k;
+        constexpr int M = TileType::m;
+        constexpr int N = TileType::n;
+        constexpr int K = TileType::k;
 
         constexpr int lda = N; // Since a_dagger == true here it's N instead of K.
         constexpr int ldb = N;
@@ -180,8 +180,8 @@ namespace quda
           auto a = arg.AV.wrap(parity, x_cb, s);
 
           __syncthreads();
-          a_loader.g2r<Config::lda, a_dagger>(a, m_offset, 0);
-          a_loader.r2s<a_dagger>(smem_obj_a_real, smem_obj_a_imag);
+          a_loader.template g2r<Config::lda, a_dagger>(a, m_offset, 0);
+          a_loader.template r2s<a_dagger>(smem_obj_a_real, smem_obj_a_imag);
           __syncthreads();
 
           for (int s_col = 0; s_col < fineSpin; s_col++) { // which chiral block
@@ -189,8 +189,8 @@ namespace quda
             auto b = arg.UV.wrap(parity, x_cb, s_col * fineSpin + s);
 
             __syncthreads();
-            b_loader.g2r<Config::ldb, b_dagger>(b, n_offset, 0);
-            b_loader.r2s<b_dagger>(smem_obj_b_real, smem_obj_b_imag);
+            b_loader.template g2r<Config::ldb, b_dagger>(b, n_offset, 0);
+            b_loader.template r2s<b_dagger>(smem_obj_b_real, smem_obj_b_imag);
             __syncthreads();
 
 #pragma unroll 1

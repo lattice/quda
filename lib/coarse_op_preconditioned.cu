@@ -57,9 +57,9 @@ namespace quda
         }
       } else {
         if (compute_max_only) {
-          CalculateYhatGPU<true, Arg><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          qudaLaunchKernel(CalculateYhatGPU<true, Arg>, tp, stream, arg);
         } else {
-          CalculateYhatGPU<false, Arg><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          qudaLaunchKernel(CalculateYhatGPU<false, Arg>, tp, stream, arg);
         }
       }
 #endif
