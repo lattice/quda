@@ -5814,17 +5814,15 @@ void contractSummedQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, 
   size_t corr_dim=0, local_corr_length=0;
   (cType== QUDA_CONTRACT_TYPE_DR_SUM_Z ||
    cType== QUDA_CONTRACT_TYPE_OPEN_SUM_Z) ? corr_dim = 2 : corr_dim = 3;
-  switch (cType) {    
-  case QUDA_CONTRACT_TYPE_OPEN:
-  case QUDA_CONTRACT_TYPE_DR:
-    local_corr_length = h_prop_array_flavor_1[0]->Volume();
-    break;
+  switch (cType) {
   case QUDA_CONTRACT_TYPE_OPEN_SUM_T:
   case QUDA_CONTRACT_TYPE_OPEN_SUM_Z:
   case QUDA_CONTRACT_TYPE_DR_SUM_T:
   case QUDA_CONTRACT_TYPE_DR_SUM_Z:
     local_corr_length = X[corr_dim];
     break;
+  case QUDA_CONTRACT_TYPE_OPEN:
+  case QUDA_CONTRACT_TYPE_DR:    
   default: errorQuda("Unsupported contraction type %d given", cType);
   }
   
@@ -5853,33 +5851,33 @@ void contractSummedQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, 
   }
   profileContractSummed.TPSTOP(QUDA_PROFILE_H2D);
   
-  if(cType == QUDA_CONTRACT_TYPE_OPEN_SUM_Z || cType== QUDA_CONTRACT_TYPE_DR_SUM_Z ||
-     cType == QUDA_CONTRACT_TYPE_OPEN_SUM_T || cType== QUDA_CONTRACT_TYPE_DR_SUM_T) {
-    
-    // array that fits all timeslices and channels but is reset after each computation
-    std::vector<Complex> h_result_tmp_global((n_numbers_per_slice * global_corr_length)/2);
-    
-    for (size_t c1 = 0; c1 < nColor; c1++) {
-      for (size_t s1 = 0; s1 < nSpin; s1++) {
-	for (size_t b1 = 0; b1 < nSpin; b1++) {
-
-	  profileContractSummed.TPSTART(QUDA_PROFILE_COMPUTE);
-	  contractSummedQuda(*d_prop_array_flavor_1[s1 * nColor + c1], *d_prop_array_flavor_2[b1 * nColor + c1], h_result_tmp_global, cType, s1, b1);
-	  comm_allreduce_array((double*)&h_result_tmp_global[0], n_numbers_per_slice * global_corr_length);
-	  
-	  for (size_t G_idx = 0; G_idx < nSpin * nSpin; G_idx++) {
-	    for (size_t t = 0; t < global_corr_length; t++) {
-	      ((double *)*h_result)[n_numbers_per_slice * t + 2 * G_idx]
-		+= h_result_tmp_global[(n_numbers_per_slice * t)/2 + G_idx].real();
-	      ((double *)*h_result)[n_numbers_per_slice * t + 2 * G_idx + 1]
-		+= h_result_tmp_global[(n_numbers_per_slice * t)/2 + G_idx].imag();
-	    }
+  // array that fits all timeslices and channels but is reset after each computation
+  std::vector<Complex> h_result_tmp_global((n_numbers_per_slice * global_corr_length)/2);
+  
+  for (size_t c1 = 0; c1 < nColor; c1++) {
+    for (size_t s1 = 0; s1 < nSpin; s1++) {
+      for (size_t b1 = 0; b1 < nSpin; b1++) {
+	
+	profileContractSummed.TPSTART(QUDA_PROFILE_COMPUTE);
+	contractSummedQuda(*d_prop_array_flavor_1[s1 * nColor + c1],
+			   *d_prop_array_flavor_2[b1 * nColor + c1],
+			   h_result_tmp_global, cType, s1, b1);
+	
+	comm_allreduce_array((double*)&h_result_tmp_global[0], n_numbers_per_slice * global_corr_length);
+	
+	for (size_t G_idx = 0; G_idx < nSpin * nSpin; G_idx++) {
+	  for (size_t t = 0; t < global_corr_length; t++) {
+	    ((double *)*h_result)[n_numbers_per_slice * t + 2 * G_idx]
+	      += h_result_tmp_global[(n_numbers_per_slice * t)/2 + G_idx].real();
+	    ((double *)*h_result)[n_numbers_per_slice * t + 2 * G_idx + 1]
+	      += h_result_tmp_global[(n_numbers_per_slice * t)/2 + G_idx].imag();
 	  }
-	  profileContractSummed.TPSTOP(QUDA_PROFILE_COMPUTE);
 	}
+	profileContractSummed.TPSTOP(QUDA_PROFILE_COMPUTE);
       }
     }
   }
+  
   
   profileContractSummed.TPSTART(QUDA_PROFILE_FREE);
   //free memory
