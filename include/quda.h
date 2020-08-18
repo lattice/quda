@@ -1430,6 +1430,9 @@ extern "C" {
   void make4DMidPointProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_param5D, QudaInvertParam *inv_param4D,
                           const int *X);
 
+  void propagatorQuda(void **prop_array, void **source_array, QudaInvertParam *param, void *correlation_function_sum, const QudaContractType cType, void *cs_param_);
+  
+  
   /**
    * @brief Flush the chronological history for the given index
    * @param[in] index Index for which we are flushing

@@ -58,7 +58,6 @@
 
 #include <gauge_tools.h>
 #include <contract_quda.h>
-
 #include <momentum.h>
 
 using namespace quda;
@@ -151,6 +150,9 @@ static TimeProfile profileDslash("dslashQuda");
 
 //!< Profiler for invertQuda
 static TimeProfile profileInvert("invertQuda");
+
+//!< Profiler for propagatorQuda
+static TimeProfile profilePropagator("propagatorQuda");
 
 //!< Profiler for invertMultiShiftQuda
 static TimeProfile profileMulti("invertMultiShiftQuda");
@@ -1362,6 +1364,7 @@ void endQuda(void)
     profileClover.Print();
     profileDslash.Print();
     profileInvert.Print();
+    profilePropagator.Print();
     profileMulti.Print();
     profileEigensolve.Print();
     profileFatLink.Print();
@@ -5825,13 +5828,12 @@ void contractSummedQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, 
   size_t global_corr_length = local_corr_length * comm_dim(corr_dim);
   size_t n_numbers_per_slice = 2 * nSpin * nSpin;
 
-  // create device spinor fields
+  // Create device spinor fields
   ColorSpinorParam cudaParam(*cs_param);
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
   cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
   cudaParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   cudaParam.setPrecision(cs_param->Precision(), cs_param->Precision(), true);
-
   std::vector<quda::ColorSpinorField *> d_prop_array_flavor_1(spinor_dim);
   std::vector<quda::ColorSpinorField *> d_prop_array_flavor_2(spinor_dim);
   for (int i = 0; i < spinor_dim; i++) {
@@ -5840,6 +5842,7 @@ void contractSummedQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, 
   }
   profileContractSummed.TPSTOP(QUDA_PROFILE_INIT);
 
+  // Transfer data from host to device
   profileContractSummed.TPSTART(QUDA_PROFILE_H2D);
   for (int i = 0; i < spinor_dim; i++) {
     *d_prop_array_flavor_1[i] = *h_prop_array_flavor_1[i];
@@ -5847,7 +5850,7 @@ void contractSummedQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, 
   }
   profileContractSummed.TPSTOP(QUDA_PROFILE_H2D);
 
-  // array that fits all timeslices and channels but is reset after each computation
+  // Array that fits all timeslices and channels but is reset after each computation
   std::vector<Complex> h_result_tmp_global((n_numbers_per_slice * global_corr_length) / 2);
 
   for (size_t c1 = 0; c1 < nColor; c1++) {
@@ -5874,7 +5877,7 @@ void contractSummedQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, 
   }
 
   profileContractSummed.TPSTART(QUDA_PROFILE_FREE);
-  // free memory
+  // Free memory
   for (int i = 0; i < spinor_dim; i++) {
     delete h_prop_array_flavor_1[i];
     delete h_prop_array_flavor_2[i];
@@ -5941,6 +5944,325 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
   profileContract.TPSTOP(QUDA_PROFILE_FREE);
 
   profileContract.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
+void propagatorQuda(void **prop_array, void **source_array, QudaInvertParam *param, void *correlation_function_sum, const QudaContractType cType, void *cs_param_)
+{
+  profilePropagator.TPSTART(QUDA_PROFILE_TOTAL);
+  profilePropagator.TPSTART(QUDA_PROFILE_INIT);
+
+  // We start with some general sanity checks
+  if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH || param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
+      || param->dslash_type == QUDA_MOBIUS_DWF_DSLASH || param->dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH)
+    setKernelPackT(true);
+
+  if (!initialized) errorQuda("QUDA not initialized");
+
+  pushVerbosity(param->verbosity);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(param);
+
+  // check the invert parameters are good
+  checkInvertParam(param, source_array[0], prop_array[0]);
+  // check the gauge fields have been created
+  cudaGaugeField *cudaGauge = checkGauge(param);
+
+  // Deduce the solve and solution type from the operator types
+  bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION) ||
+    (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+  bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
+    (param->solve_type == QUDA_NORMOP_PC_SOLVE) || (param->solve_type == QUDA_NORMERR_PC_SOLVE);
+  bool mat_solution = (param->solution_type == QUDA_MAT_SOLUTION) ||
+    (param->solution_type ==  QUDA_MATPC_SOLUTION);
+  bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) ||
+    (param->solve_type == QUDA_DIRECT_PC_SOLVE);
+  bool norm_error_solve = (param->solve_type == QUDA_NORMERR_SOLVE) ||
+    (param->solve_type == QUDA_NORMERR_PC_SOLVE);
+
+  if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+    // initial guess only supported for single-pass solvers
+    if ((param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) &&
+        (param->solve_type == QUDA_DIRECT_SOLVE || param->solve_type == QUDA_DIRECT_PC_SOLVE)) {
+      errorQuda("Initial guess not supported for two-pass solver");
+    }
+  }
+  
+  // Create the dirac operators
+  Dirac *d = nullptr;
+  Dirac *dSloppy = nullptr;
+  Dirac *dPre = nullptr;
+  createDirac(d, dSloppy, dPre, *param, pc_solve);
+  Dirac &dirac = *d;
+  Dirac &diracSloppy = *dSloppy;
+  Dirac &diracPre = *dPre;
+
+  // Get the local lattice dimensions 
+  const int *X = cudaGauge->X();
+
+  // Create ColorSpinorField wrappers
+  ColorSpinorParam cpu_param(source_array[0], *param, X, pc_solution, param->input_location);
+  // Deduce propagator dimension
+  const size_t nSpin = cpu_param.nSpin;
+  const size_t nColor = cpu_param.nColor;
+  const int spinor_dim = nSpin * nColor;
+
+  // Wrap CPU host side pointers and device side memory
+  //-----------------------------------------------------------------------------
+  // We use reference field create because we have already allocated memeory in the
+  // form of 'source_array'. We simply wish to wrap that memory with a QUDA object
+  // so we can better manipulate it.
+  cpu_param.create = QUDA_REFERENCE_FIELD_CREATE;
+  std::vector<quda::ColorSpinorField *> h_source_array(spinor_dim);
+  std::vector<quda::ColorSpinorField *> h_prop_array(spinor_dim);
+  for (int i = 0; i < spinor_dim; i++) {
+    cpu_param.v = source_array[i];
+    h_source_array[i] = quda::ColorSpinorField::Create(cpu_param);
+    
+    cpu_param.v = prop_array[i];
+    h_prop_array[i] = quda::ColorSpinorField::Create(cpu_param);
+  }
+
+  // Create device side memory and transfer the source. Here we clone the cpu
+  // parameters, so we need to change the location and the creation type.
+  // NB: We are not wrapping existing memory, but creating new memeory.
+  // As such, we do not need to assign an address to the ->v memeber of the
+  // parameter structure, as we did when wrapping cpu data.
+  ColorSpinorParam dev_param(cpu_param);
+  dev_param.location = QUDA_CUDA_FIELD_LOCATION;
+  dev_param.create = QUDA_ZERO_FIELD_CREATE;
+  std::vector<quda::ColorSpinorField *> d_source_array(spinor_dim);
+  std::vector<quda::ColorSpinorField *> d_prop_array(spinor_dim);
+  for (int i = 0; i < spinor_dim; i++) {
+    d_source_array[i] = quda::ColorSpinorField::Create(dev_param);
+    d_prop_array[i] = quda::ColorSpinorField::Create(dev_param);
+  }
+  profilePropagator.TPSTOP(QUDA_PROFILE_INIT);
+  
+  // We now transfer the data from h_source_array to d_source_array
+  profilePropagator.TPSTART(QUDA_PROFILE_H2D);
+  for (int i = 0; i < spinor_dim; i++) *d_source_array[i] = *h_source_array[i];
+  profilePropagator.TPSTOP(QUDA_PROFILE_H2D);
+
+  profilePropagator.TPSTOP(QUDA_PROFILE_TOTAL);
+  
+  /*
+  param->secs = 0;
+  param->gflops = 0;
+  param->iter = 0;
+
+
+  profileInvert.TPSTOP(QUDA_PROFILE_H2D);
+  profileInvert.TPSTART(QUDA_PROFILE_PREAMBLE);
+
+  if (getVerbosity() >= QUDA_VERBOSE) {
+    double nh_b = blas::norm2(*h_b);
+    printfQuda("Source: CPU = %g, CUDA copy = %g\n", nh_b, nb);
+    if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+      double nh_x = blas::norm2(*h_x);
+      double nx = blas::norm2(*x);
+      printfQuda("Solution: CPU = %g, CUDA copy = %g\n", nh_x, nx);
+    }
+  }
+
+  // rescale the source and solution vectors to help prevent the onset of underflow
+  if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
+    blas::ax(1.0/sqrt(nb), *b);
+    blas::ax(1.0/sqrt(nb), *x);
+  }
+
+  massRescale(*static_cast<cudaColorSpinorField*>(b), *param);
+
+  dirac.prepare(in, out, *x, *b, param->solution_type);
+
+  if (getVerbosity() >= QUDA_VERBOSE) {
+    double nin = blas::norm2(*in);
+    double nout = blas::norm2(*out);
+    printfQuda("Prepared source = %g\n", nin);
+    printfQuda("Prepared solution = %g\n", nout);
+  }
+
+  if (getVerbosity() >= QUDA_VERBOSE) {
+    double nin = blas::norm2(*in);
+    printfQuda("Prepared source post mass rescale = %g\n", nin);
+  }
+
+  // solution_type specifies *what* system is to be solved.
+  // solve_type specifies *how* the system is to be solved.
+  //
+  // We have the following four cases (plus preconditioned variants):
+  //
+  // solution_type    solve_type    Effect
+  // -------------    ----------    ------
+  // MAT              DIRECT        Solve Ax=b
+  // MATDAG_MAT       DIRECT        Solve A^dag y = b, followed by Ax=y
+  // MAT              NORMOP        Solve (A^dag A) x = (A^dag b)
+  // MATDAG_MAT       NORMOP        Solve (A^dag A) x = b
+  // MAT              NORMERR       Solve (A A^dag) y = b, then x = A^dag y
+  //
+  // We generally require that the solution_type and solve_type
+  // preconditioning match.  As an exception, the unpreconditioned MAT
+  // solution_type may be used with any solve_type, including
+  // DIRECT_PC and NORMOP_PC.  In these cases, preparation of the
+  // preconditioned source and reconstruction of the full solution are
+  // taken care of by Dirac::prepare() and Dirac::reconstruct(),
+  // respectively.
+
+  if (pc_solution && !pc_solve) {
+    errorQuda("Preconditioned (PC) solution_type requires a PC solve_type");
+  }
+
+  if (!mat_solution && !pc_solution && pc_solve) {
+    errorQuda("Unpreconditioned MATDAG_MAT solution_type requires an unpreconditioned solve_type");
+  }
+
+  if (!mat_solution && norm_error_solve) {
+    errorQuda("Normal-error solve requires Mat solution");
+  }
+
+  if (param->inv_type_precondition == QUDA_MG_INVERTER && (!direct_solve || !mat_solution)) {
+    errorQuda("Multigrid preconditioning only supported for direct solves");
+  }
+
+  if (param->chrono_use_resident && ( norm_error_solve) ){
+    errorQuda("Chronological forcasting only presently supported for M^dagger M solver");
+  }
+
+  profileInvert.TPSTOP(QUDA_PROFILE_PREAMBLE);
+
+  if (mat_solution && !direct_solve && !norm_error_solve) { // prepare source: b' = A^dag b
+    cudaColorSpinorField tmp(*in);
+    dirac.Mdag(*in, tmp);
+  } else if (!mat_solution && direct_solve) { // perform the first of two solves: A^dag y = b
+    DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+    SolverParam solverParam(*param);
+    Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+    (*solve)(*out, *in);
+    blas::copy(*in, *out);
+    delete solve;
+    solverParam.updateInvertParam(*param);
+  }
+
+  if (direct_solve) {
+    DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+    SolverParam solverParam(*param);
+    // chronological forecasting
+    if (param->chrono_use_resident && chronoResident[param->chrono_index].size() > 0) {
+      profileInvert.TPSTART(QUDA_PROFILE_CHRONO);
+
+      auto &basis = chronoResident[param->chrono_index];
+
+      ColorSpinorParam cs_param(*basis[0]);
+      ColorSpinorField *tmp = ColorSpinorField::Create(cs_param);
+      ColorSpinorField *tmp2 = (param->chrono_precision == out->Precision()) ? out : ColorSpinorField::Create(cs_param);
+      std::vector<ColorSpinorField*> Ap;
+      for (unsigned int k=0; k < basis.size(); k++) {
+        Ap.emplace_back((ColorSpinorField::Create(cs_param)));
+      }
+
+      if (param->chrono_precision == param->cuda_prec) {
+        for (unsigned int j=0; j<basis.size(); j++) m(*Ap[j], *basis[j], *tmp, *tmp2);
+      } else if (param->chrono_precision == param->cuda_prec_sloppy) {
+        for (unsigned int j=0; j<basis.size(); j++) mSloppy(*Ap[j], *basis[j], *tmp, *tmp2);
+      } else {
+        errorQuda("Unexpected precision %d for chrono vectors (doesn't match outer %d or sloppy precision %d)",
+                  param->chrono_precision, param->cuda_prec, param->cuda_prec_sloppy);
+      }
+
+      bool orthogonal = true;
+      bool apply_mat = false;
+      bool hermitian = false;
+      MinResExt mre(m, orthogonal, apply_mat, hermitian, profileInvert);
+
+      blas::copy(*tmp, *in);
+      mre(*out, *tmp, basis, Ap);
+
+      for (auto ap: Ap) {
+        if (ap) delete (ap);
+      }
+      delete tmp;
+      if (tmp2 != out) delete tmp2;
+
+      profileInvert.TPSTOP(QUDA_PROFILE_CHRONO);
+    }
+
+    Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+    (*solve)(*out, *in);
+    delete solve;
+    solverParam.updateInvertParam(*param);
+  } else if (!norm_error_solve) {
+    DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+    SolverParam solverParam(*param);
+
+    // chronological forecasting
+    if (param->chrono_use_resident && chronoResident[param->chrono_index].size() > 0) {
+      profileInvert.TPSTART(QUDA_PROFILE_CHRONO);
+
+      auto &basis = chronoResident[param->chrono_index];
+
+      ColorSpinorParam cs_param(*basis[0]);
+      std::vector<ColorSpinorField*> Ap;
+      ColorSpinorField *tmp = ColorSpinorField::Create(cs_param);
+      ColorSpinorField *tmp2 = (param->chrono_precision == out->Precision()) ? out : ColorSpinorField::Create(cs_param);
+      for (unsigned int k=0; k < basis.size(); k++) {
+        Ap.emplace_back((ColorSpinorField::Create(cs_param)));
+      }
+
+      if (param->chrono_precision == param->cuda_prec) {
+        for (unsigned int j=0; j<basis.size(); j++) m(*Ap[j], *basis[j], *tmp, *tmp2);
+      } else if (param->chrono_precision == param->cuda_prec_sloppy) {
+        for (unsigned int j=0; j<basis.size(); j++) mSloppy(*Ap[j], *basis[j], *tmp, *tmp2);
+      } else {
+        errorQuda("Unexpected precision %d for chrono vectors (doesn't match outer %d or sloppy precision %d)",
+                  param->chrono_precision, param->cuda_prec, param->cuda_prec_sloppy);
+      }
+
+      bool orthogonal = true;
+      bool apply_mat = false;
+      bool hermitian = true;
+      MinResExt mre(m, orthogonal, apply_mat, hermitian, profileInvert);
+
+      blas::copy(*tmp, *in);
+      mre(*out, *tmp, basis, Ap);
+
+      for (auto ap: Ap) {
+        if (ap) delete(ap);
+      }
+      delete tmp;
+      if (tmp2 != out) delete tmp2;
+
+      profileInvert.TPSTOP(QUDA_PROFILE_CHRONO);
+    }
+
+    // if using a Schwarz preconditioner with a normal operator then we must use the DiracMdagMLocal operator
+    if (param->inv_type_precondition != QUDA_INVALID_INVERTER && param->schwarz_type != QUDA_INVALID_SCHWARZ) {
+      DiracMdagMLocal mPreLocal(diracPre);
+      Solver *solve = Solver::create(solverParam, m, mSloppy, mPreLocal, profileInvert);
+      (*solve)(*out, *in);
+      delete solve;
+      solverParam.updateInvertParam(*param);
+    } else {
+      Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+      (*solve)(*out, *in);
+      delete solve;
+      solverParam.updateInvertParam(*param);
+    }
+  } else { // norm_error_solve
+    DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+    cudaColorSpinorField tmp(*out);
+    SolverParam solverParam(*param);
+    Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+    (*solve)(tmp, *in); // y = (M M^\dag) b
+    dirac.Mdag(*out, tmp);  // x = M^dag y
+    delete solve;
+    solverParam.updateInvertParam(*param);
+  }
+
+  if (getVerbosity() >= QUDA_VERBOSE){
+    double nx = blas::norm2(*x);
+    printfQuda("Solution = %g\n",nx);
+  }
+
+  */
+  // Not done yet...  
 }
 
 void gaugeObservablesQuda(QudaGaugeObservableParam *param)

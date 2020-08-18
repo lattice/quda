@@ -73,14 +73,14 @@ int main(int argc, char **argv)
   // This will be a C array of pointers to the memory (CSF->V()) of the
   // spinor_dim colorspinorfields. Functions declared in quda.h
   // can only accept C code for backwards compatibility reasons.
-  void *CSF_V_ptr_arr_source[spinor_dim];
-  void *CSF_V_ptr_arr_prop[spinor_dim];
-
+  void *source_array_ptr[spinor_dim];
+  void *prop_array_ptr[spinor_dim];
+  
   // Actually create ColorSpinorField objects and tell them to use the memory from above
   for (int i = 0; i < spinor_dim; i++) {
     int offset = i * V * spinor_dim * 2;
-    CSF_V_ptr_arr_source[i] = source_array + offset;
-    CSF_V_ptr_arr_prop[i] = prop_array + offset;
+    source_array_ptr[i] = source_array + offset;
+    prop_array_ptr[i] = prop_array + offset;
   }
 
   // This is where the result will be stored
@@ -114,20 +114,23 @@ int main(int argc, char **argv)
     // Zero out the result array
     memset(correlation_function_sum, 0, corr_size_in_bytes);
 
-    // Loop over spin X color dilution positions
+    // Loop over spin X color dilution positions, construct the sources
+    // FIXME add the smearing too
     for (int i = 0; i < spinor_dim; i++) {
       const int source[4] = {prop_source_position[n][0], prop_source_position[n][1], prop_source_position[n][2],
                              prop_source_position[n][3]};
-
-      constructPointSpinorSource(CSF_V_ptr_arr_source[i], cs_param.nSpin, cs_param.nColor, inv_param.cpu_prec,
+      
+      constructPointSpinorSource(source_array_ptr[i], cs_param.nSpin, cs_param.nColor, inv_param.cpu_prec,
                                  gauge_param.X, i, source);
       inv_param.solver_normalization = QUDA_SOURCE_NORMALIZATION; // Make explicit for now.
-      invertQuda(CSF_V_ptr_arr_prop[i], CSF_V_ptr_arr_source[i], &inv_param);
+      
+      invertQuda(prop_array_ptr[i], source_array_ptr[i], &inv_param);
     }
-
-    contractSpatialQuda(CSF_V_ptr_arr_prop, CSF_V_ptr_arr_prop, &correlation_function_sum, contract_type, &inv_param,
-                        (void *)cs_param_ptr, gauge_param.X);
-
+    // Coming soon....
+    //propagatorQuda(prop_array_ptr, source_array_ptr, &inv_param, &correlation_function_sum, contract_type, (void *)cs_param_ptr, gauge_param.X);
+    
+    contractSummedQuda(prop_array_ptr, prop_array_ptr, &correlation_function_sum, contract_type, &inv_param,(void *)cs_param_ptr, gauge_param.X);
+    
     // Print correlators for this propagator source position
     for (int G_idx = 0; G_idx < 16; G_idx++) {
       for (size_t t = 0; t < global_corr_length; t++) {
