@@ -1350,8 +1350,8 @@ extern "C" {
 
 /**
    * Public function to perform color contractions of the host spinorfields contained 
-   * inside first two arguments. Used for cases where one wishes to contract data in all
-   * but the a spatial dim
+   * inside first two arguments. Used for cases where one wishes to contract data in 
+   * either the T or Z dim 
    * @param[in] h_prop_array_flavor_1 pointer to pointers of ColorSpinorField host data
    * @param[in] h_prop_array_flavor_2 pointer to pointers of ColorSpinorField host data
    * @param[out] h_result adress of pointer to the 16*corr_dim complex numbers of the 
@@ -1362,11 +1362,12 @@ extern "C" {
    *            construction of ColorSpinorFields
    * @param[in] X spacetime data for construction of ColorSpinorFields
    */
-void contractSpatialQuda(void** h_prop_array_flavor_1, void** h_prop_array_flavor_2, void **h_result, QudaContractType cType,
-			 QudaInvertParam *param, void *colorspinorparam, const int *X);
+void contractSummedQuda(void** h_prop_array_flavor_1, void** h_prop_array_flavor_2, void **h_result, QudaContractType cType,
+			QudaInvertParam *param, void *colorspinorparam, const int *X);
 
   /**
-   * Public function to perform color contractions of the host spinors x and y.
+   * Public function to perform color contractions of the host spinors x and y. Does
+   * not sum the lattice data. 
    * @param[in] x pointer to host data
    * @param[in] y pointer to host data
    * @param[out] result pointer to the 16 spin projections per lattice site

@@ -215,8 +215,8 @@ static TimeProfile profilePhase("staggeredPhaseQuda");
 //!< Profiler for contractions
 static TimeProfile profileContract("contractQuda");
 
-//!< Profiler for spatial contractions
-static TimeProfile profileContractSpatial("contractSpatialQuda");
+//!< Profiler for summed contractions
+static TimeProfile profileContractSummed("contractSummedQuda");
 
 //!< Profiler for covariant derivative
 static TimeProfile profileCovDev("covDevQuda");
@@ -1372,7 +1372,7 @@ void endQuda(void)
     profileStaggeredForce.Print();
     profileHISQForce.Print();
     profileContract.Print();
-    profileContractSpatial.Print();
+    profileContractSummed.Print();
     profileCovDev.Print();
     profilePlaq.Print();
     profileGaugeObs.Print();
@@ -5788,27 +5788,26 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
   return 0;
 }
 
-// FIXME what about different precisions for this function? need to check
-void contractSpatialQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavor_2, void **h_result,
-			 const QudaContractType cType, QudaInvertParam *param, void *colorspinorparam, const int *X)
+void contractSummedQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void **h_result,
+			const QudaContractType cType, QudaInvertParam *param, void *cs_param_, const int *X)
 {
-  profileContractSpatial.TPSTART(QUDA_PROFILE_TOTAL);
-  profileContractSpatial.TPSTART(QUDA_PROFILE_INIT);
+  profileContractSummed.TPSTART(QUDA_PROFILE_TOTAL);
+  profileContractSummed.TPSTART(QUDA_PROFILE_INIT);
   
   // create ColorSpinorFields from void** and parameter
-  auto cs_param = (ColorSpinorParam *)colorspinorparam;
+  auto cs_param = (ColorSpinorParam *)cs_param_;
   const size_t nSpin = cs_param->nSpin;
   const size_t nColor = cs_param->nColor;
   const int spinor_dim = nSpin * nColor;
-  std::vector<quda::ColorSpinorField *> CSF_ptr_container_flavor_1(spinor_dim);
-  std::vector<quda::ColorSpinorField *> CSF_ptr_container_flavor_2(spinor_dim);
+  std::vector<quda::ColorSpinorField *> h_prop_array_flavor_1(spinor_dim);
+  std::vector<quda::ColorSpinorField *> h_prop_array_flavor_2(spinor_dim);
 
   cs_param->create = QUDA_REFERENCE_FIELD_CREATE;
   for (int i = 0; i < spinor_dim; i++) {
-    cs_param->v = h_prop_array_flavor_1[i];
-    CSF_ptr_container_flavor_1[i] = quda::ColorSpinorField::Create(*cs_param);
-    cs_param->v = h_prop_array_flavor_2[i];
-    CSF_ptr_container_flavor_2[i] = quda::ColorSpinorField::Create(*cs_param);
+    cs_param->v = prop_array_flavor_1[i];
+    h_prop_array_flavor_1[i] = quda::ColorSpinorField::Create(*cs_param);
+    cs_param->v = prop_array_flavor_2[i];
+    h_prop_array_flavor_2[i] = quda::ColorSpinorField::Create(*cs_param);
   }
 
   // temporal or spatial correlator?  
@@ -5818,7 +5817,7 @@ void contractSpatialQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavo
   switch (cType) {    
   case QUDA_CONTRACT_TYPE_OPEN:
   case QUDA_CONTRACT_TYPE_DR:
-    local_corr_length = CSF_ptr_container_flavor_1[0]->Volume();
+    local_corr_length = h_prop_array_flavor_1[0]->Volume();
     break;
   case QUDA_CONTRACT_TYPE_OPEN_SUM_T:
   case QUDA_CONTRACT_TYPE_OPEN_SUM_Z:
@@ -5828,8 +5827,7 @@ void contractSpatialQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavo
     break;
   default: errorQuda("Unsupported contraction type %d given", cType);
   }
-
-  // calculate some parameters
+  
   size_t global_corr_length = local_corr_length * comm_dim(corr_dim);
   size_t n_numbers_per_slice = 2 * nSpin * nSpin;
 
@@ -5839,57 +5837,70 @@ void contractSpatialQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavo
   cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
   cudaParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   cudaParam.setPrecision(cs_param->Precision(), cs_param->Precision(), true);
-  ColorSpinorField *d_single_prop_flavor_1 = ColorSpinorField::Create(cudaParam);
-  ColorSpinorField *d_single_prop_flavor_2 = ColorSpinorField::Create(cudaParam);
-  
-  // array that fits all timeslices and channels but is reset after each computation
-  std::vector<Complex> h_result_tmp_global((n_numbers_per_slice * global_corr_length)/2);
-  
-  profileContractSpatial.TPSTOP(QUDA_PROFILE_INIT);
 
-  profileContractSpatial.TPSTART(QUDA_PROFILE_COMPUTE);
-  for (size_t s1 = 0; s1 < nSpin; s1++) {
+  std::vector<quda::ColorSpinorField *> d_prop_array_flavor_1(spinor_dim);
+  std::vector<quda::ColorSpinorField *> d_prop_array_flavor_2(spinor_dim);
+  for (int i = 0; i < spinor_dim; i++) {
+    d_prop_array_flavor_1[i] = ColorSpinorField::Create(cudaParam);
+    d_prop_array_flavor_2[i] = ColorSpinorField::Create(cudaParam);
+  }
+  profileContractSummed.TPSTOP(QUDA_PROFILE_INIT);
+  
+  profileContractSummed.TPSTART(QUDA_PROFILE_H2D);
+  for (int i = 0; i < spinor_dim; i++) {
+    *d_prop_array_flavor_1[i] = *h_prop_array_flavor_1[i];
+    *d_prop_array_flavor_2[i] = *h_prop_array_flavor_2[i];
+  }
+  profileContractSummed.TPSTOP(QUDA_PROFILE_H2D);
+  
+  if(cType == QUDA_CONTRACT_TYPE_OPEN_SUM_Z || cType== QUDA_CONTRACT_TYPE_DR_SUM_Z ||
+     cType == QUDA_CONTRACT_TYPE_OPEN_SUM_T || cType== QUDA_CONTRACT_TYPE_DR_SUM_T) {
+    
+    // array that fits all timeslices and channels but is reset after each computation
+    std::vector<Complex> h_result_tmp_global((n_numbers_per_slice * global_corr_length)/2);
+    
     for (size_t c1 = 0; c1 < nColor; c1++) {
-      for (size_t b1 = 0; b1 < nSpin; b1++) {
-	
-        *d_single_prop_flavor_1 = *CSF_ptr_container_flavor_1[s1 * nColor + c1];
-        *d_single_prop_flavor_2 = *CSF_ptr_container_flavor_2[b1 * nColor + c1];
-	
-        contractSpatialQuda(*d_single_prop_flavor_1, *d_single_prop_flavor_2, s1, b1, h_result_tmp_global, cType, local_corr_length);
-        comm_allreduce_array((double*)&h_result_tmp_global[0], n_numbers_per_slice * global_corr_length);
-	
-        for (size_t G_idx = 0; G_idx < nSpin * nSpin; G_idx++) {
-          for (size_t t = 0; t < global_corr_length; t++) {
-            ((double *)*h_result)[n_numbers_per_slice * t + 2 * G_idx]
-              += h_result_tmp_global[(n_numbers_per_slice * t)/2 + G_idx].real();
-	    ((double *)*h_result)[n_numbers_per_slice * t + 2 * G_idx + 1]
-	      += h_result_tmp_global[(n_numbers_per_slice * t)/2 + G_idx].imag();
-          }
-        }
+      for (size_t s1 = 0; s1 < nSpin; s1++) {
+	for (size_t b1 = 0; b1 < nSpin; b1++) {
+
+	  profileContractSummed.TPSTART(QUDA_PROFILE_COMPUTE);
+	  contractSummedQuda(*d_prop_array_flavor_1[s1 * nColor + c1], *d_prop_array_flavor_2[b1 * nColor + c1], h_result_tmp_global, cType, s1, b1);
+	  comm_allreduce_array((double*)&h_result_tmp_global[0], n_numbers_per_slice * global_corr_length);
+	  
+	  for (size_t G_idx = 0; G_idx < nSpin * nSpin; G_idx++) {
+	    for (size_t t = 0; t < global_corr_length; t++) {
+	      ((double *)*h_result)[n_numbers_per_slice * t + 2 * G_idx]
+		+= h_result_tmp_global[(n_numbers_per_slice * t)/2 + G_idx].real();
+	      ((double *)*h_result)[n_numbers_per_slice * t + 2 * G_idx + 1]
+		+= h_result_tmp_global[(n_numbers_per_slice * t)/2 + G_idx].imag();
+	    }
+	  }
+	  profileContractSummed.TPSTOP(QUDA_PROFILE_COMPUTE);
+	}
       }
     }
   }
-  profileContractSpatial.TPSTOP(QUDA_PROFILE_COMPUTE);
   
-  profileContractSpatial.TPSTART(QUDA_PROFILE_FREE);
+  profileContractSummed.TPSTART(QUDA_PROFILE_FREE);
   //free memory
-  delete d_single_prop_flavor_1;
-  delete d_single_prop_flavor_2;
   for (int i = 0; i < spinor_dim; i++) {
-    delete CSF_ptr_container_flavor_1[i];
-    delete CSF_ptr_container_flavor_2[i];
+    delete h_prop_array_flavor_1[i];
+    delete h_prop_array_flavor_2[i];
+    delete d_prop_array_flavor_1[i];
+    delete d_prop_array_flavor_2[i];
   }
 
-  profileContractSpatial.TPSTOP(QUDA_PROFILE_FREE);
-  profileContractSpatial.TPSTOP(QUDA_PROFILE_TOTAL);
+  profileContractSummed.TPSTOP(QUDA_PROFILE_FREE);
+  profileContractSummed.TPSTOP(QUDA_PROFILE_TOTAL);
   saveTuneCache();
+  
 }
 
 void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const QudaContractType cType,
                   QudaInvertParam *param, const int *X)
 {
   // DMH: Easiest way to construct ColorSpinorField? Do we require the user
-  //     to declare and fill and invert_param, or can it just be hacked?.
+  //      to declare and fill and invert_param, or can it just be hacked?.
 
   profileContract.TPSTART(QUDA_PROFILE_TOTAL);
   profileContract.TPSTART(QUDA_PROFILE_INIT);

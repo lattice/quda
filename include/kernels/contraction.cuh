@@ -195,7 +195,7 @@ namespace quda
     //inline complex<real> get_gm_z(const int G_idx, const int col_idx) const {return gm_z[G_idx][col_idx];};
   };
 
-  template <typename Float_, int reduction_dim_ = 3> struct ContractionSpatialSumArg :
+  template <typename Float_, int reduction_dim_ = 3> struct ContractionSummedArg :
     public ReduceArg<spinor_array>  
   {
     static constexpr int reduction_dim = reduction_dim_; // This the direction we are performing reduction on. default to 3.
@@ -217,8 +217,8 @@ namespace quda
 
     DRGammaMatrix<Float_> Gamma;
     int t_offset;
-    ContractionSpatialSumArg(const ColorSpinorField &x, const ColorSpinorField &y,
-        const int s1, const int b1) :
+    ContractionSummedArg(const ColorSpinorField &x, const ColorSpinorField &y,
+			     const int s1 = 0, const int b1 = 0) :
       ReduceArg<spinor_array>(comm_dim(reduction_dim) * x.X(reduction_dim)), // n_reduce = global_dim_t
       threads(x.VolumeCB() / x.X(reduction_dim)),
       x(x),
@@ -257,7 +257,7 @@ namespace quda
     return (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) / 2;
   }
 
-  template <int blockSize, typename Arg> __global__ void computeDegrandRossiContractionSpatialSum(Arg arg)
+  template <int blockSize, typename Arg> __global__ void computeDegrandRossiContractionSummed(Arg arg)
   {
     int t = blockIdx.z; // map t to z block index
     int xyz = threadIdx.x + blockIdx.x * blockDim.x;
@@ -275,9 +275,8 @@ namespace quda
     // result array needs to be a spinor_array type object because of the reduce function at the end
     vector_type<double2, 16> result_all_channels;
 
-    while (xyz < arg.threads) { // loop over all space-coordinates of one time slice
-      // extract current ColorSpinor at xyzt from ColorSpinorField
-
+    while (xyz < arg.threads) {
+      // extract current ColorSpinor at xyzt from ColorSpinorField      
       // This function calculates the index_cb assuming t is the coordinate in
       // direction reduction_dim, and xyz is the linearized index_cb excluding reduction_dim.
       // So this will work for reduction_dim < 3 as well.
@@ -285,7 +284,7 @@ namespace quda
       
       ColorSpinor<real, nColor, nSpin> x = arg.x(idx_cb, parity);
       ColorSpinor<real, nColor, nSpin> y = arg.y(idx_cb, parity);
-
+      
       // loop over channels
       for (int G_idx = 0; G_idx < 16; G_idx++) {
         for (int s2 = 0; s2 < nSpin; s2++) {
@@ -297,9 +296,12 @@ namespace quda
             propagator_product = arg.Gamma.gm_z[G_idx][b2] * innerProduct(x, y, b2, s2) * arg.Gamma.gm_z[G_idx][b1];
             result_all_channels[G_idx].x += propagator_product.real();
             result_all_channels[G_idx].y += propagator_product.imag();
-          }
-        }
-      }
+	    //if(xyz == 0) printf("Yes Comp\n");  
+          } else {
+	    //if(xyz == 0) printf("No Comp\n");  
+	  }
+	}
+      }      
       xyz += blockDim.x * gridDim.x;
     }
 
@@ -345,7 +347,7 @@ namespace quda
     //- Naturally, this is the number of threads in the block
     int threads; // number of active threads required
     //- This is the number of lattice sites on the MPI node
-    int X[4];    // grid dimensions
+    int_fastdiv X[4];    // grid dimensions
 
     //- These vales are hardcoded to prevent template explosion. This particular kernel will 
     //- only work for spin=4, color=3 fermion fields. The spin_project boolean is a neat 
@@ -377,7 +379,7 @@ namespace quda
     //- This argument structure provides the kernel with the pointers it needs to 
     //- locate data, and the parameters it needs to perform it's computation.
     ContractionSumArg(const ColorSpinorField &x, const ColorSpinorField &y) :
-      ReduceArg<spinor_array>(),
+      ReduceArg<spinor_array>(comm_dim(3) * x.X(3)),
       threads(x.VolumeCB() / x.X(3)),
       x(x),
       y(y)
@@ -743,5 +745,5 @@ namespace quda
     //- quda/lib/contract.cu, and the line:
     //- LAUNCH_KERNEL_LOCAL_PARITY(computeDegrandRossiContractionSum, (*this), tp, stream, arg, Arg);
   }
-    
+  
 } // namespace quda
