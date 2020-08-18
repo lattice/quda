@@ -45,11 +45,7 @@ namespace quda {
     cudaCloverField *clover;
     
     // used by overlap-wilson only
-    bool build_hw;
-    std::vector<ColorSpinorField*> hw_evec;
-    std::vector<double> hw_eval;
-    std::vector<std::vector<double> > coef;
-    std::vector<int> hw_size;
+    QudaInvertParam *inv_param;
   
     double mu; // used by twisted mass only
     double mu_factor; // used by multigrid only
@@ -76,14 +72,14 @@ namespace quda {
       dagger(QUDA_DAG_INVALID),
       gauge(0),
       clover(0),
+      inv_param(0),
       mu(0.0),
       mu_factor(0.0),
       epsilon(0.0),
       tmp1(0),
       tmp2(0),
       halo_precision(QUDA_INVALID_PRECISION),
-      need_bidirectional(false),
-      build_hw(false)
+      need_bidirectional(false)
     {
       for (int i=0; i<QUDA_MAX_DIM; i++) commDim[i] = 1;
     }
@@ -816,6 +812,8 @@ public:
     std::vector<double> hw_eval;
     std::vector<std::vector<double> > coef;
     std::vector<int> hw_size;
+    bool build_hw;
+    void calc_coef(double cut);
     
   public:
   
@@ -826,19 +824,21 @@ public:
     void set_prec(double prec) {prec0=prec;}
     
     DiracOverlapWilson(const DiracParam &param);
-    DiracOverlapWilson(const DiracOverlapWilson &dirac);
+    DiracOverlapWilson(const DiracParam &param, std::vector<ColorSpinorField*> &evecs, std::vector<double> &evals,
+            std::vector<std::vector<double> > &coefs, std::vector<int> &sizes);
  
     virtual ~DiracOverlapWilson();
     DiracOverlapWilson& operator=(const DiracOverlapWilson &dirac);
  
+    void eps_l(ColorSpinorField &out, ColorSpinorField &in,int size) const;
     virtual void Kernel(ColorSpinorField &out, const ColorSpinorField &in) const;
-    virtual void KernelSq_scaled(ColorSpinorField &out, ColorSpinorField &in,double cut) const;
-    virtual void general_dov(ColorSpinorField &out, const ColorSpinorField &in,
+    virtual void KernelSq_scaled(ColorSpinorField &out, const ColorSpinorField &in,double cut) const;
+    void general_dov(ColorSpinorField &out, const ColorSpinorField &in,
          double k0, double k1,double k2,double prec, const QudaParity parity) const;
-    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
+    void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
                            double prec, const QudaParity parity=QUDA_INVALID_PARITY) const;
-    virtual void M(ColorSpinorField &out, const ColorSpinorField &in, double mass,double prec) const;
-    virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in,double mass,int chirality,double prec) const;
+    void M(ColorSpinorField &out, const ColorSpinorField &in, double mass,double prec) const;
+    void MdagM(ColorSpinorField &out, const ColorSpinorField &in,double mass,int chirality,double prec) const;
  
     virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
                        const QudaParity parity) const {Dslash(out,in,prec0,parity);}
@@ -1964,4 +1964,5 @@ public:
   void createDirac(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dRef, QudaInvertParam &param, const bool pc_solve);
 
 } // namespace quda
+
 

@@ -1492,6 +1492,7 @@ namespace quda {
       break;
     case QUDA_OVERLAP_WILSON_DSLASH:
       diracParam.type = pc ? QUDA_OVERLAP_WILSONPC_DIRAC : QUDA_OVERLAP_WILSON_DIRAC;
+      diracParam.inv_param = inv_param;
       break;
     case QUDA_LAPLACE_DSLASH:
       diracParam.type = pc ? QUDA_GAUGE_LAPLACEPC_DIRAC : QUDA_GAUGE_LAPLACE_DIRAC;
@@ -2127,7 +2128,7 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   popVerbosity();
 }
 
-void ApplyHWilsonQUDA(void *h_out, void *h_in, QudaInvertParam *inv_param)
+void ApplyHWilsonQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 {
   profileHWilson.TPSTART(QUDA_PROFILE_TOTAL);
   if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
@@ -2202,7 +2203,53 @@ class Overlap_paramQUDA
     std::vector<int> hw_size;
 };
 
-void ApplyOverlapQUDA(void *h_out, void *h_in, QudaInvertParam *inv_param, double k0, double k1,double k2, double prec,
+void* newOverlapQuda(QudaInvertParam *inv_param, void **host_evecs, double *host_evals)
+{
+
+  profileOverlap.TPSTART(QUDA_PROFILE_TOTAL);
+  if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
+
+  pushVerbosity(inv_param->verbosity);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
+
+  profileOverlap.TPSTART(QUDA_PROFILE_INIT);
+  DiracParam diracParam;
+  setDiracParam(diracParam, inv_param, false);
+  profileOverlap.TPSTOP(QUDA_PROFILE_INIT);
+
+  profileOverlap.TPSTART(QUDA_PROFILE_COMPUTE);
+  DiracOverlapWilson *ov_instance = new DiracOverlapWilson(diracParam);
+  profileOverlap.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  profileOverlap.TPSTART(QUDA_PROFILE_D2H);
+  if(host_evecs!=nullptr&&host_evals!=nullptr)
+  {
+       int size=inv_param->eigen_size;
+       ColorSpinorParam cpuParam(nullptr, *inv_param, gaugePrecise->X(), false, inv_param->output_location);
+       for(int i=0;i<size;i++)
+       {
+           host_evals[i]=ov_instance->Hw_eval(i);
+           cpuParam.v = host_evecs[i];
+           ColorSpinorField *out_h = ColorSpinorField::Create(cpuParam);
+           *out_h=ov_instance->Hw_evec(i);
+           delete out_h;
+       }
+  }
+  profileOverlap.TPSTOP(QUDA_PROFILE_D2H);
+
+  profileOverlap.TPSTOP(QUDA_PROFILE_TOTAL);
+
+  popVerbosity();
+  return static_cast<void*>(ov_instance);
+
+}
+
+void destroyOverlapQuda(void *ov_instance)
+{
+     delete static_cast<DiracOverlapWilson*>(ov_instance);
+}
+
+void ApplyOverlapQuda0(void *h_out, void *h_in, QudaInvertParam *inv_param, double k0, double k1,double k2, double prec,
        void *_ov_param)
 {
 
@@ -2239,22 +2286,18 @@ void ApplyOverlapQUDA(void *h_out, void *h_in, QudaInvertParam *inv_param, doubl
   
   DiracParam diracParam;
   setDiracParam(diracParam, inv_param, false);
-  diracParam.build_hw=false;
-  diracParam.hw_eval=ov_param->hw_eval;
-  diracParam.coef=ov_param->coef;
-  diracParam.hw_size=ov_param->hw_size;
-  diracParam.hw_evec.resize(ov_param->hw_evec.size());
 
   ColorSpinorField *tmp_h;
-  for(int i=0;i<diracParam.hw_eval.size();i++)
+  std::vector<ColorSpinorField*> hw_evec(ov_param->hw_evec.size());
+  for(int i=0;i<ov_param->hw_eval.size();i++)
   {
        cpuParam.v = ov_param->hw_evec[i];
        tmp_h = ColorSpinorField::Create(cpuParam);
-       diracParam.hw_evec[i]= cudaColorSpinorField::Create(cudaParam);
-       *diracParam.hw_evec[i]=*tmp_h;
+       hw_evec[i]= cudaColorSpinorField::Create(cudaParam);
+       *hw_evec[i]=*tmp_h;
        delete tmp_h;
   }
-  DiracOverlapWilson dirac(diracParam);
+  DiracOverlapWilson dirac(diracParam,hw_evec,ov_param->hw_eval,ov_param->coef,ov_param->hw_size);
 
 /*  
   if(in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS)
@@ -2284,8 +2327,72 @@ void ApplyOverlapQUDA(void *h_out, void *h_in, QudaInvertParam *inv_param, doubl
 
   delete out_h;
   delete in_h;
-  for(int i=0;i<diracParam.hw_evec.size();i++)
-      delete (cudaColorSpinorField *)diracParam.hw_evec[i];
+  for(int i=0;i<hw_evec.size();i++)
+      delete (cudaColorSpinorField *)hw_evec[i];
+
+  profileOverlap.TPSTOP(QUDA_PROFILE_TOTAL);
+
+  popVerbosity();
+
+}
+
+void ApplyOverlapQuda(void *h_out, void *h_in, QudaInvertParam *inv_param,double k0, double k1,double k2, double prec,
+       void *ov_instance)
+{
+
+  profileOverlap.TPSTART(QUDA_PROFILE_TOTAL);
+  if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
+  profileOverlap.TPSTART(QUDA_PROFILE_INIT);
+
+  pushVerbosity(inv_param->verbosity);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
+  
+  DiracOverlapWilson *dirac=static_cast<DiracOverlapWilson*>(ov_instance);
+  
+  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), false, inv_param->input_location);
+  ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
+
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    double cpu = blas::norm2(*in_h);
+    printfQuda("In CPU %e\n", cpu);
+  }
+  profileOverlap.TPSTOP(QUDA_PROFILE_INIT);
+
+  profileOverlap.TPSTART(QUDA_PROFILE_H2D);
+
+  ColorSpinorParam cudaParam(cpuParam, *inv_param);
+  cudaColorSpinorField in(*in_h, cudaParam);
+
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    double cpu = blas::norm2(*in_h);
+    double gpu = blas::norm2(in);
+    printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
+  }
+
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
+  cudaColorSpinorField out(in, cudaParam);
+
+  profileOverlap.TPSTOP(QUDA_PROFILE_H2D);
+
+  profileOverlap.TPSTART(QUDA_PROFILE_COMPUTE);
+  dirac->general_dov(out,in,k0,k1,k2,prec,QUDA_INVALID_PARITY);
+  profileOverlap.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  profileOverlap.TPSTART(QUDA_PROFILE_D2H);
+  cpuParam.v = h_out;
+  cpuParam.location = inv_param->output_location;
+  ColorSpinorField *out_h = ColorSpinorField::Create(cpuParam);
+  *out_h = out;
+  profileOverlap.TPSTOP(QUDA_PROFILE_D2H);
+
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    double cpu = blas::norm2(*out_h);
+    double gpu = blas::norm2(out);
+    printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
+  }
+
+  delete out_h;
+  delete in_h;
 
   profileOverlap.TPSTOP(QUDA_PROFILE_TOTAL);
 
