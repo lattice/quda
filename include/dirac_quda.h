@@ -1163,6 +1163,11 @@ public:
     virtual ~DiracStaggeredKD();
     DiracStaggeredKD& operator=(const DiracStaggeredKD &dirac);
 
+    /**
+     * @brief Build Xinv from the current gauge field, allocating if needed.
+     */
+    virtual void buildKahlerDiracInv();
+
     virtual void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
 
     virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
@@ -1345,6 +1350,11 @@ public:
     DiracImprovedStaggeredKD& operator=(const DiracImprovedStaggeredKD &dirac);
 
     virtual void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
+
+    /**
+     * @brief Build Xinv from the current gauge field, allocating if needed.
+     */
+    virtual void buildKahlerDiracInv();
 
     virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
       const QudaParity parity) const;
