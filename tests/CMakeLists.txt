@@ -255,7 +255,6 @@ if(QUDA_MPI OR QUDA_QMP)
     # user is setting number of processes to use through the QUDA_TEST_NUMPROCS env
     set(QUDA_CTEST_LAUNCH ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG}
                           $ENV{QUDA_TEST_NUMPROCS} ${MPIEXEC_PREFLAGS})
-
   else()
     # use FindMPI variables for QUDA_CTEST_LAUNCH set MPIEXEC_MAX_NUMPROCS to the
     # number of ranks you want to launch
@@ -278,11 +277,13 @@ if(QUDA_DIRAC_WILSON
   add_test(NAME blas_test_parity_wilson
            COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:blas_test> ${MPIEXEC_POSTFLAGS}
                    --dim 2 4 6 8
+                   --nsrc 8 --msrc 9
                    --solve-type direct-pc
                    --gtest_output=xml:blas_test_parity.xml)
   add_test(NAME blas_test_full_wilson
            COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:blas_test> ${MPIEXEC_POSTFLAGS}
                    --dim 2 4 6 8
+                   --nsrc 8 --msrc 9
                    --solve-type direct
                    --gtest_output=xml:blas_test_full.xml)
 endif()
@@ -291,12 +292,14 @@ if(QUDA_DIRAC_STAGGERED)
   add_test(NAME blas_test_parity_staggered
            COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:blas_test> ${MPIEXEC_POSTFLAGS}
                    --dim 2 4 6 8
+                   --nsrc 8 --msrc 9
                    --dslash-type staggered
                    --solve-type direct-pc
                    --gtest_output=xml:blas_test_parity.xml)
   add_test(NAME blas_test_full_staggered
            COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:blas_test> ${MPIEXEC_POSTFLAGS}
                    --dim 2 4 6 8
+                   --nsrc 8 --msrc 9
                    --dslash-type staggered
                    --solve-type direct
                    --gtest_output=xml:blas_test_full.xml)
