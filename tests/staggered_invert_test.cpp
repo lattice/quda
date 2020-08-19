@@ -363,7 +363,6 @@ int main(int argc, char **argv)
     }
     quda::spinorNoise(*in, *rng, QUDA_NOISE_UNIFORM);
     invertMultiShiftQuda((void **)outArray, in->V(), &inv_param);
-    cudaDeviceSynchronize();
 
     printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
                inv_param.gflops / inv_param.secs);

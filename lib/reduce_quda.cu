@@ -11,20 +11,18 @@ namespace quda {
     qudaStream_t* getStream();
 
     template <int block_size, typename real, int len, typename Arg>
-    typename std::enable_if<block_size!=32, cudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+    typename std::enable_if<block_size!=32, qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
-      void *args[] = {&arg};
       if (tp.block.x == block_size)
-        return qudaLaunchKernel((const void*)reduceKernel<block_size, real, len, Arg>, tp.grid, tp.block, args, tp.shared_bytes, stream);
+        return qudaLaunchKernel(reduceKernel<block_size, real, len, Arg>, tp, stream, arg);
       else
         return launch<block_size - 32, real, len>(arg, tp, stream);
     }
 
     template <int block_size, typename real, int len, typename Arg>
-    typename std::enable_if<block_size==32, cudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+    typename std::enable_if<block_size==32, qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
-      void *args[] = {&arg};
-      return qudaLaunchKernel((const void*)reduceKernel<block_size, real, len, Arg>, tp.grid, tp.block, args, tp.shared_bytes, stream);
+      return qudaLaunchKernel(reduceKernel<block_size, real, len, Arg>, tp, stream, arg);
     }
 
 #ifdef QUDA_FAST_COMPILE_REDUCE
@@ -49,22 +47,14 @@ namespace quda {
                                   .instantiate((int)tp.block.x, Type<real>(), len, Type<Arg>())
                                   .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                                   .launch(arg);
+      arg.launch_error = tunable.jitifyError() == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
 #else
-      if (tp.block.x <= max_block_size()) {
-        auto error = launch<max_block_size(), real, len>(arg, tp, stream);
-        // flag any failures when tuning so we don't try and complete which could hang
-        if (activeTuning() && error != cudaSuccess) tunable.jitifyError() = CUDA_ERROR_INVALID_VALUE;
-      } else {
-        tunable.jitifyError() = CUDA_ERROR_INVALID_VALUE;
-        if (!activeTuning()) errorQuda("block size %d not instantiated", tp.block.x);
-      }
+      arg.launch_error = launch<max_block_size(), real, len>(arg, tp, stream);
 #endif
 
       host_reduce_t result;
       ::quda::zero(result);
-      if (!commAsyncReduction()) {
-        if (tunable.jitifyError() != CUDA_ERROR_INVALID_VALUE) arg.complete(&result, stream);
-      }
+      if (!commAsyncReduction()) arg.complete(result, stream);
       return result;
     }
 
@@ -95,6 +85,8 @@ namespace quda {
             sharedBytesPerBlock(param);
         return false;
       }
+
+      unsigned int maxBlockSize(const TuneParam &param) const { return max_block_size(); }
 
     public:
       Reduce(const coeff_t &a, const coeff_t &b, const coeff_t &c, ColorSpinorField &x, ColorSpinorField &y,

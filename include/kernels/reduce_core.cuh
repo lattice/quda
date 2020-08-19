@@ -77,7 +77,7 @@ namespace quda
         i += arg.gridSize;
       }
 
-      ::quda::reduce<block_size, reduce_t>(arg, sum);
+      arg.template reduce<block_size>(sum);
     }
 
     /**

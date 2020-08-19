@@ -103,7 +103,7 @@ namespace quda {
 
     void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      SpinorNoiseGPU<real, Ns, Nc, type><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+      qudaLaunchKernel(SpinorNoiseGPU<real, Ns, Nc, type, Arg>, tp, stream, arg);
     }
 
     bool advanceTuneParam(TuneParam &param) const {

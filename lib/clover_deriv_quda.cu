@@ -79,7 +79,7 @@ namespace quda {
                          .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                          .launch(arg);
 #else
-      cloverDerivativeKernel<Float><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+      qudaLaunchKernel(cloverDerivativeKernel<Float, Arg>, tp, stream, arg);
 #endif
     } // apply
 

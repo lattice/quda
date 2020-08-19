@@ -14,20 +14,18 @@ namespace quda {
     qudaStream_t* getStream();
 
     template <int block_size, typename real, int len, int NXZ, typename Arg>
-    typename std::enable_if<block_size!=32, cudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+    typename std::enable_if<block_size!=32, qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
-      void *args[] = {&arg};
       if (tp.block.x == block_size)
-        return qudaLaunchKernel((const void*)multiReduceKernel<block_size, real, len, NXZ, Arg>, tp.grid, tp.block, args, tp.shared_bytes, stream);
+        return qudaLaunchKernel(multiReduceKernel<block_size, real, len, NXZ, Arg>, tp, stream, arg);
       else
         return launch<block_size - 32, real, len, NXZ>(arg, tp, stream);
     }
 
     template <int block_size, typename real, int len, int NXZ, typename Arg>
-    typename std::enable_if<block_size==32, cudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+    typename std::enable_if<block_size==32, qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
-      void *args[] = {&arg};
-      return qudaLaunchKernel((const void*)multiReduceKernel<block_size, real, len, NXZ, Arg>, tp.grid, tp.block, args, tp.shared_bytes, stream);
+      return qudaLaunchKernel(multiReduceKernel<block_size, real, len, NXZ, Arg>, tp, stream, arg);
     }
 
 #ifdef QUDA_FAST_COMPILE_REDUCE
@@ -49,21 +47,13 @@ namespace quda {
                                   .instantiate((int)tp.block.x, Type<real>(), len, NXZ, Type<Arg>())
                                   .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                                   .launch(arg);
+      arg.launch_error = tunable.jitifyError() == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
 #else
-      if (tp.block.x <= max_block_size()) {
-        auto error = launch<max_block_size(), real, len, NXZ>(arg, tp, stream);
-        // flag any failures when tuning so we don't try and complete which could hang
-        if (activeTuning() && error != cudaSuccess) tunable.jitifyError() = CUDA_ERROR_INVALID_VALUE;
-      } else {
-        tunable.jitifyError() = CUDA_ERROR_INVALID_VALUE;
-        if (!activeTuning()) errorQuda("block size %d not instantiated", tp.block.x);
-      }
+      arg.launch_error = launch<max_block_size(), real, len, NXZ>(arg, tp, stream);
 #endif
 
-      T *result_ = new T[NXZ * arg.NYW];
-      if (!commAsyncReduction()) {
-        if (tunable.jitifyError() != CUDA_ERROR_INVALID_VALUE) arg.complete(result_, stream);
-      }
+      std::vector<T> result_(NXZ * arg.NYW);
+      if (!commAsyncReduction()) arg.complete(result_, stream);
 
       // need to transpose for same order with vector thread reduction
       for (int i = 0; i < NXZ; i++) {
@@ -72,7 +62,6 @@ namespace quda {
         }
       }
 
-      delete[] result_;
     }
 
     template <template <typename ...> class Reducer, typename store_t, typename y_store_t, int nSpin, typename T>
@@ -102,9 +91,7 @@ namespace quda {
         return false;
       }
 
-      // we only launch thread blocks up to size 512 since the autotuner
-      // tuner favours smaller blocks and this helps with compile time
-      unsigned int maxBlockSize(const TuneParam &param) const { return 128; } // deviceProp.maxThreadsPerBlock / 2; }
+      unsigned int maxBlockSize(const TuneParam &param) const { return max_block_size(); }
 
     public:
       MultiReduce(const T &a, const T &b, const T &c, const ColorSpinorField &x_meta, const ColorSpinorField &y_meta,

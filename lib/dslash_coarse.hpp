@@ -266,21 +266,21 @@ namespace quda
         case 1:
           switch (tp.aux.x) { // this is color_col_stride
           case 1:
-            coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 1, 1, dslash, clover, dagger, type>
-              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+            qudaLaunchKernel(coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 1, 1, dslash, clover, dagger, type, Arg>, tp,
+                             stream, arg);
             break;
 #ifdef DOT_PRODUCT_SPLIT
           case 2:
-            coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 2, 1, dslash, clover, dagger, type>
-              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+            qudaLaunchKernel(coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 2, 1, dslash, clover, dagger, type, Arg>, tp,
+                             stream, arg);
             break;
           case 4:
-            coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 4, 1, dslash, clover, dagger, type>
-              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+            qudaLaunchKernel(coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 4, 1, dslash, clover, dagger, type, Arg>, tp,
+                             stream, arg);
             break;
           case 8:
-            coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 8, 1, dslash, clover, dagger, type>
-              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+            qudaLaunchKernel(coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 8, 1, dslash, clover, dagger, type, Arg>, tp,
+                             stream, arg);
             break;
 #endif // DOT_PRODUCT_SPLIT
           default: errorQuda("Color column stride %d not valid", tp.aux.x);
@@ -289,21 +289,21 @@ namespace quda
         case 2:
           switch (tp.aux.x) { // this is color_col_stride
           case 1:
-            coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 1, 2, dslash, clover, dagger, type>
-              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+            qudaLaunchKernel(coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 1, 2, dslash, clover, dagger, type, Arg>, tp,
+                             stream, arg);
             break;
 #ifdef DOT_PRODUCT_SPLIT
           case 2:
-            coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 2, 2, dslash, clover, dagger, type>
-              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+            qudaLaunchKernel(coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 2, 2, dslash, clover, dagger, type, Arg>, tp,
+                             stream, arg);
             break;
           case 4:
-            coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 4, 2, dslash, clover, dagger, type>
-              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+            qudaLaunchKernel(coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 4, 2, dslash, clover, dagger, type, Arg>, tp,
+                             stream, arg);
             break;
           case 8:
-            coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 8, 2, dslash, clover, dagger, type>
-              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+            qudaLaunchKernel(coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 8, 2, dslash, clover, dagger, type, Arg>, tp,
+                             stream, arg);
             break;
 #endif // DOT_PRODUCT_SPLIT
           default: errorQuda("Color column stride %d not valid", tp.aux.x);
@@ -312,21 +312,21 @@ namespace quda
         case 4:
           switch (tp.aux.x) { // this is color_col_stride
           case 1:
-            coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 1, 4, dslash, clover, dagger, type>
-              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+            qudaLaunchKernel(coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 1, 4, dslash, clover, dagger, type, Arg>, tp,
+                             stream, arg);
             break;
 #ifdef DOT_PRODUCT_SPLIT
           case 2:
-            coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 2, 4, dslash, clover, dagger, type>
-              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+            qudaLaunchKernel(coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 2, 4, dslash, clover, dagger, type, Arg>, tp,
+                             stream, arg);
             break;
           case 4:
-            coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 4, 4, dslash, clover, dagger, type>
-              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+            qudaLaunchKernel(coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 4, 4, dslash, clover, dagger, type, Arg>, tp,
+                             stream, arg);
             break;
           case 8:
-            coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 8, 4, dslash, clover, dagger, type>
-              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+            qudaLaunchKernel(coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 8, 4, dslash, clover, dagger, type, Arg>, tp,
+                             stream, arg);
             break;
 #endif // DOT_PRODUCT_SPLIT
           default: errorQuda("Color column stride %d not valid", tp.aux.x);
