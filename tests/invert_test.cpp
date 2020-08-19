@@ -301,8 +301,9 @@ int main(int argc, char **argv)
     // If deflating, preserve the deflation space between solves
     if (inv_deflate) eig_param.preserve_deflation = (i < Nsrc - 1 && eig_param.n_conv > 0) ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     
-    if (inv_param.inv_type == QUDA_INC_EIGCG_INVERTER && eig_param.is_complete == QUDA_BOOLEAN_TRUE) {
-      inv_param.inv_type = QUDA_CG_INVERTER;
+    if (inv_param.inv_type == QUDA_INC_EIGCG_INVERTER) {
+      if( eig_param.is_complete == QUDA_BOOLEAN_TRUE ) inv_param.inv_type = QUDA_CG_INVERTER;
+      eig_param.is_last_rhs = (i == (Nsrc-1)) ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     }
     // Perform QUDA inversions
     if (multishift > 1) {
@@ -316,6 +317,7 @@ int main(int argc, char **argv)
     printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
                inv_param.gflops / inv_param.secs);
   }
+
   // QUDA invert test COMPLETE
   //----------------------------------------------------------------------------
 

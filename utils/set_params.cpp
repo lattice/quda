@@ -272,6 +272,7 @@ void setEigParam(QudaEigParam &eig_param, QudaInverterType inv_type)
     if (eig_n_conv < 0) errorQuda("Invalid value for parameter eig_n_conv (= %d)", eig_n_conv);
     eig_param.nLockedMax = eig_n_conv;
     eig_param.n_conv = 0;
+    eig_param.is_complete = QUDA_BOOLEAN_FALSE;
   }
 
   eig_param.block_size = eig_param.eig_type == QUDA_EIG_TR_LANCZOS ? 1 : eig_block_size;

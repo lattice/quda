@@ -496,6 +496,8 @@ extern "C" {
     //-------------------------------------------------
     /** Whether deflation space is complete */
     QudaBoolean is_complete;
+    /** Whether this is the last rhs solve */
+    QudaBoolean is_last_rhs;    
 
   } QudaEigParam;
 

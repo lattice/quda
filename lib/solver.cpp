@@ -237,7 +237,10 @@ namespace quda {
 
   void Solver::constructDeflationSpace(const ColorSpinorField &meta, const int size)
   {
-    if (deflate_init || param.rhs_idx > 0) return;
+    if (deflate_init || param.rhs_idx > 0) {
+      deflate_init = true; //for inc EigCG	    
+      return;
+    }
 
     // Deflation requested + first instance of solver
     bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
@@ -312,8 +315,14 @@ namespace quda {
 
         param.eig_param.preserve_deflation_space = space;
       } else {
-        for (auto &vec : evecs)
-          if (vec) delete vec;
+        for (auto &vec : evecs) if (vec) delete vec;
+        if (param.eig_param.preserve_deflation_space) {
+          deflation_space *space = reinterpret_cast<deflation_space *>(param.eig_param.preserve_deflation_space);
+          // first ensure that any existing space is freed
+          for (auto &vec : space->evecs) if (vec) delete vec;
+          space->evecs.resize(0);
+          delete space;
+        }	
       }
 
       evecs.resize(0);

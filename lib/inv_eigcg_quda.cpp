@@ -19,8 +19,11 @@
 #include <Eigen/Dense>
 
 /*
-Based on  eigCG(n_ev, m) algorithm:
+Based on eigCG(n_ev, m) algorithm:
 A. Stathopolous and K. Orginos, arXiv:0707.0131
+
+Pipelined version is based on :
+
 */
 
 namespace quda {
@@ -445,7 +448,6 @@ namespace quda {
 
          if (id == (2 * k + solver_param.pipeline) && restarts > 0) {
            ColorSpinorFieldSet &vm = *Vm;
-           warningQuda("Try to prefetch!\n\n");
            for (int i = 0; i < solver_param.pipeline; i++) vm[2 * k + i] = vm[m + i];
          }
 
@@ -1616,18 +1618,18 @@ namespace quda {
       param.eig_param.n_ev = param.eig_param.n_conv;
     }
 
-    if (param.eig_param.n_conv == param.eig_param.n_ev) {
+    if (param.eig_param.n_conv == param.eig_param.n_ev || param.eig_param.is_last_rhs) {
       if (getVerbosity() == QUDA_DEBUG_VERBOSE) {
         blas::zero(out);
         initCGsolve(out, in);
       }
-      printfQuda("\nRequested to reserve %d eigenvectors with max tol %le.\n", param.eig_param.n_ev, param.eig_param.tol);
-      Reduce(param.eig_param.tol, param.eig_param.n_ev);
+      printfQuda("\nRequested to reserve %d eigenvectors with max tol %le.\n", param.eig_param.n_conv, param.eig_param.tol);
+      Reduce(param.eig_param.tol, param.eig_param.n_conv);
       param.eig_param.is_complete = QUDA_BOOLEAN_TRUE;
-      
+      destroyDeflationSpace();
+
       if(param.eig_param.n_conv == 0) {
 	// No eigenvectors found!
-	destroyDeflationSpace();
 	param.eig_param.preserve_deflation = QUDA_BOOLEAN_FALSE;
       }
       
