@@ -659,9 +659,10 @@ namespace quda
        Fourth performs the operation norm(z)
     */
     template <typename real_reduce_t, typename real>
-    struct quadrupleEigCGUpdate_ : ReduceFunctor<typename VectorType<real_reduce_t, 4>::type> {
+    struct quadrupleEigCGUpdate_ : public ReduceFunctor<typename VectorType<real_reduce_t, 4>::type> {
       using reduce_t = typename VectorType<real_reduce_t, 4>::type;
-      static constexpr write<1,1,0,1,1> write{ };
+      static constexpr memory_access<1, 1, 1, 1, 1> read{ };
+      static constexpr memory_access<1, 1, 0, 1, 1> write{ };      
       const real a;
       const real b;
       quadrupleEigCGUpdate_(const real &a, const real &b) : a(a), b(b) { ; }
