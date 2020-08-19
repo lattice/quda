@@ -1890,7 +1890,7 @@ public:
    * @param[in/out] d        User prec
    * @param[in/out] dSloppy  Sloppy prec
    * @param[in/out] dPre     Preconditioner prec
-   * @param[in/out] dEig     Refine prec (EigCG and deflation)
+   * @param[in/out] dEig     Eigensolver prec
    * @param[in] param        Invert param container
    * @param[in] pc_solve     Whether or not to perform an even/odd preconditioned solve
    */
