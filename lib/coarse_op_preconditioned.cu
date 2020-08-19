@@ -140,7 +140,8 @@ namespace quda
 
         constexpr bool compute_max_only_dummy = true;
         constexpr bool query_max = true;
-        if (param.aux.x < mma::launch_yhat_kernel<compute_max_only_dummy, query_max>(arg, 1, param, 0)) {
+        int max =  mma::template launch_yhat_kernel<compute_max_only_dummy, query_max>(arg, 1, param, 0);
+        if (param.aux.x < max) {
           param.aux.x++;
           return true;
         }

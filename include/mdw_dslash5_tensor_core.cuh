@@ -13,7 +13,7 @@
 #if (CUDA_VERSION >= 9000 && __COMPUTE_CAPABILITY__ >= 700)
 
 // The `mma.sync` PTX is only available with CUDA 10.1 or after
-#if (CUDA_VERSION >= 10100)
+#if (CUDA_VERSION >= 10010)
 
 #define USE_MMA_SYNC // rather than using wmma
 
@@ -27,11 +27,11 @@
 
 #endif // (__COMPUTE_CAPABILITY__ == 700)
 
-#else // (CUDA_VERSION >= 10100)
+#else // (CUDA_VERSION >= 10010)
 // if not we use wmma.
 #include <mma.h>
 
-#endif // (CUDA_VERSION >= 10100)
+#endif // (CUDA_VERSION >= 10010)
 
 namespace quda
 {

@@ -3,7 +3,7 @@
 #include <gauge_field.h>
 #include <tune_quda.h>
 
-#if (CUDA_VERSION >= 10100 && __COMPUTE_CAPABILITY__ >= 700)
+#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
 
 #include <kernels/coarse_op_preconditioned_mma.cuh>
 
@@ -20,7 +20,7 @@ namespace quda
   namespace mma
   {
 
-#if (CUDA_VERSION >= 10100 && __COMPUTE_CAPABILITY__ >= 700)
+#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
 
     template <typename F> inline void setMaxDynamicSharedBytesPerBlock(F *func)
     {
@@ -167,7 +167,7 @@ namespace quda
 #else
 
     template <bool compute_max_only, bool query_max = false, class Arg>
-    void launch_yhat_kernel(Arg &arg, int min_threads, TuneParam &tp, const cudaStream_t &stream)
+    int launch_yhat_kernel(Arg &arg, int min_threads, TuneParam &tp, const cudaStream_t &stream)
     {
       errorQuda("MMA multigrid is not available for this setup.");
     }
