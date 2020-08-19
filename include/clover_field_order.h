@@ -804,7 +804,7 @@ namespace quda {
           errorQuda("Invalid clover order %d for this accessor", clover.Order());
         }
         offdiag = clover_ ? ((Float **)clover_)[0] : ((Float **)clover.V(inverse))[0];
-        diag = clover_ ? ((Float**)clover_)[1] : ((Float**)clover.V(inverse))[1];
+        diag = clover_ ? ((Float **)clover_)[1] : ((Float **)clover.V(inverse))[1];
       }
 	
       bool  Twisted()	const	{return twisted;}
@@ -873,7 +873,7 @@ namespace quda {
           errorQuda("Invalid clover order %d for this accessor", clover.Order());
         }
         this->clover[0] = clover_ ? clover_ : (Float *)(clover.V(inverse));
-        this->clover[1] = (Float*)((char*)this->clover[0] + clover.Bytes()/2);
+        this->clover[1] = (Float *)((char *)this->clover[0] + clover.Bytes() / 2);
       }
 
 
