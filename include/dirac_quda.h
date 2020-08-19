@@ -1195,11 +1195,7 @@ public:
      *  @param clover_in Updated clover field
      */
     virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
-                              cudaCloverField *clover_in)
-    {
-      Dirac::updateFields(fat_gauge_in, nullptr, nullptr, nullptr);
-      // Do we want to re-compute Xinv here??
-    }
+                              cudaCloverField *clover_in);
 
     /**
      * @brief Create the coarse staggered KD operator.
@@ -1381,14 +1377,7 @@ public:
      *  @param clover_in Updated clover field
      */
     virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
-                              cudaCloverField *clover_in)
-    {
-      Dirac::updateFields(fat_gauge_in, nullptr, nullptr, nullptr);
-      fatGauge = fat_gauge_in;
-      longGauge = long_gauge_in;
-
-      // Do we want to support recomputing Xinv here??
-    }
+                              cudaCloverField *clover_in);
 
     /**
      * @brief Create the coarse improved staggered KD operator.

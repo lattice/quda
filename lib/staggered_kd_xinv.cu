@@ -19,7 +19,7 @@ namespace quda {
     GaugeField &X;
 
     long long flops() const { 
-      // only real work is adding mass
+      // only real work is multiplying the mass by two
       return arg.coarseVolumeCB*coarseSpin*coarseColor;
     }
 
@@ -61,7 +61,6 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_VERBOSE);
 
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-        errorQuda("ComputeStaggeredKDBlock does not really support CPU execution yet");
         ComputeStaggeredKDBlockCPU<Float,fineColor,coarseSpin,coarseColor>(arg);
       } else {
 #ifdef JITIFY
@@ -123,6 +122,9 @@ namespace quda {
     Arg arg(X, G, mass, x_size, xc_size);
     CalculateStaggeredKDBlock<Float, fineColor, coarseSpin, coarseColor, Arg> y(arg, G_, X_);
 
+    QudaFieldLocation location = checkLocation(X_, G_);
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Calculating the KD block on the %s\n", location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
+
     // We know exactly what the scale should be: the max of all of the (fat) links.
     double max_scale = G_.abs_max();
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Global U_max = %e\n", max_scale);
@@ -132,11 +134,7 @@ namespace quda {
       X_.Scale(max_scale > 2.0*mass ? max_scale : 2.0*mass); // To be safe
     }
 
-    // We can technically do a uni-directional build, but becauase
-    // the coarse link builds are just permutations plus lots of zeros,
-    // it's faster to skip the flip!
-
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing KD Block\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing KD block\n");
     y.apply(0);
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("X2 = %e\n", X_.norm2(0));
@@ -146,17 +144,36 @@ namespace quda {
   void calculateStaggeredKDBlock(GaugeField &X, const GaugeField &g, const double mass)
   {
 
-    constexpr QudaGaugeFieldOrder gOrder = QUDA_FLOAT2_GAUGE_ORDER;
+    QudaFieldLocation location = X.Location();
 
-    if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
+    if (location == QUDA_CPU_FIELD_LOCATION) {
 
-    typedef typename gauge::FieldOrder<Float,fineColor,1,gOrder,true,Float> gFine;
-    typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat> xCoarse;
+      constexpr QudaGaugeFieldOrder gOrder = QUDA_QDP_GAUGE_ORDER;
 
-    gFine gAccessor(const_cast<GaugeField&>(g));
-    xCoarse xAccessor(const_cast<GaugeField&>(X));
+      if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
 
-    calculateStaggeredKDBlock<Float,fineColor,coarseSpin,coarseColor>(xAccessor, gAccessor, X, g, mass);
+      typedef typename gauge::FieldOrder<Float,fineColor,1,gOrder> gFine;
+      typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat> xCoarse;
+
+      gFine gAccessor(const_cast<GaugeField&>(g));
+      xCoarse xAccessor(const_cast<GaugeField&>(X));
+
+      calculateStaggeredKDBlock<Float,fineColor,coarseSpin,coarseColor>(xAccessor, gAccessor, X, g, mass);
+
+    } else {
+
+      constexpr QudaGaugeFieldOrder gOrder = QUDA_FLOAT2_GAUGE_ORDER;
+
+      if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
+
+      typedef typename gauge::FieldOrder<Float,fineColor,1,gOrder,true,Float> gFine;
+      typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat> xCoarse;
+
+      gFine gAccessor(const_cast<GaugeField&>(g));
+      xCoarse xAccessor(const_cast<GaugeField&>(X));
+
+      calculateStaggeredKDBlock<Float,fineColor,coarseSpin,coarseColor>(xAccessor, gAccessor, X, g, mass);
+    }
 
   }
 
@@ -225,20 +242,49 @@ namespace quda {
   }
 
   // Calculates the inverse KD block and puts the result in Xinv. Assumes Xinv has been allocated, in MILC data order
-  void BuildStaggeredKahlerDiracInverse(cudaGaugeField &Xinv, const cudaGaugeField &gauge, const double mass)
+  void BuildStaggeredKahlerDiracInverse(GaugeField &Xinv, const cudaGaugeField &gauge, const double mass)
   {
     using namespace blas_lapack;
     auto invert = use_native() ? native::BatchInvertMatrix : generic::BatchInvertMatrix;
 
+    // Xinv should have a MILC gauge order independent of being
+    // on the CPU or GPU
+    if (Xinv.FieldOrder() != QUDA_QDP_GAUGE_ORDER)
+      errorQuda("Unsupported field order %d", Xinv.FieldOrder());
+
     QudaPrecision precision = Xinv.Precision();
-    QudaFieldLocation location = checkLocation(Xinv, gauge);
+    QudaFieldLocation location = Xinv.Location();
 
-    if (location == QUDA_CUDA_FIELD_LOCATION && Xinv.FieldOrder() == QUDA_MILC_GAUGE_ORDER) {
+    // Logic copied from `staggered_coarse_op.cu`
+    GaugeField *U = location == QUDA_CUDA_FIELD_LOCATION ? const_cast<cudaGaugeField*>(&gauge) : nullptr;
 
-      GaugeField *U = const_cast<cudaGaugeField*>(&gauge);
+    if (location == QUDA_CPU_FIELD_LOCATION) {
+
+      //First make a cpu gauge field from the cuda gauge field
+      int pad = 0;
+      GaugeFieldParam gf_param(gauge.X(), precision, QUDA_RECONSTRUCT_NO, pad, gauge.Geometry());
+      gf_param.order = QUDA_QDP_GAUGE_ORDER;
+      gf_param.fixed = gauge.GaugeFixed();
+      gf_param.link_type = gauge.LinkType();
+      gf_param.t_boundary = gauge.TBoundary();
+      gf_param.anisotropy = gauge.Anisotropy();
+      gf_param.gauge = NULL;
+      gf_param.create = QUDA_NULL_FIELD_CREATE;
+      gf_param.siteSubset = QUDA_FULL_SITE_SUBSET;
+      gf_param.nFace = 1;
+      gf_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+
+      U = new cpuGaugeField(gf_param);
+
+      //Copy the cuda gauge field to the cpu
+      gauge.saveCPUField(*static_cast<cpuGaugeField*>(U));
+
+    } else if (location == QUDA_CUDA_FIELD_LOCATION) {
 
       // no reconstruct not strictly necessary, for now we do this for simplicity so
       // we can take advantage of fine-grained access like in "staggered_coarse_op.cu"
+      // technically don't need to require the precision check, but it should
+      // generally be equal anyway
       if (gauge.Reconstruct() != QUDA_RECONSTRUCT_NO || gauge.Precision() != precision) {
         GaugeFieldParam gf_param(gauge);
         gf_param.reconstruct = QUDA_RECONSTRUCT_NO;
@@ -248,41 +294,59 @@ namespace quda {
 
         U->copy(gauge);
       }
+    }
 
-      // Create X based on Xinv, remember Xinv is in QDP order
-      GaugeFieldParam x_param(Xinv);
+    // Create X based on Xinv, but switch to a native ordering
+    // for a GPU setup.
+    GaugeField *X = nullptr;
+    GaugeFieldParam x_param(Xinv);
+    if (location == QUDA_CUDA_FIELD_LOCATION) {
       x_param.order = QUDA_FLOAT2_GAUGE_ORDER;
       x_param.setPrecision(x_param.Precision());
-      cudaGaugeField X(x_param);
+      X = static_cast<GaugeField*>(new cudaGaugeField(x_param));
+    } else {
+      X = static_cast<GaugeField*>(new cpuGaugeField(x_param));
+    }
 
-      calculateStaggeredKDBlock(X, *U, mass);
+    // Calculate X
+    calculateStaggeredKDBlock(*X, *U, mass);
 
+    // Invert X
+    // Logic copied from `coarse_op_preconditioned.cu`
+    const int n = Xinv.Ncolor();
+    if (location == QUDA_CUDA_FIELD_LOCATION) {
       // FIXME: add support for double precision inverse
       // Reorder to MILC order for inversion, based on "coarse_op_preconditioned.cu"
       GaugeFieldParam param(Xinv);
-      param.order = QUDA_MILC_GAUGE_ORDER;
-      param.setPrecision( X.Precision() != QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION : X.Precision());
+      // param.order = QUDA_MILC_GAUGE_ORDER; // MILC order == QDP order for Xinv
+      param.setPrecision(QUDA_SINGLE_PRECISION); // FIXME until double prec support is added
       cudaGaugeField X_(param);
-      cudaGaugeField* Xinv_ = ( Xinv.Precision() == QUDA_SINGLE_PRECISION) ? &Xinv : new cudaGaugeField(param);
+      cudaGaugeField* Xinv_ = ( Xinv.Precision() == QUDA_SINGLE_PRECISION) ? static_cast<cudaGaugeField*>(&Xinv) : new cudaGaugeField(param);
 
-      X_.copy(X);
+      X_.copy(*X);
 
-      const int n = X.Ncolor();
-      blas::flops += invert((void*)Xinv_->Gauge_p(), (void*)X_.Gauge_p(), n, X_.Volume(), X_.Precision(), X.Location());
+      blas::flops += invert((void*)Xinv_->Gauge_p(), (void*)X_.Gauge_p(), n, X_.Volume(), X_.Precision(), X->Location());
       
       if ( Xinv_ != &Xinv) {
-
         if (Xinv.Precision() < QUDA_SINGLE_PRECISION) Xinv.Scale( Xinv_->abs_max() );
         Xinv.copy(*Xinv_);
         delete Xinv_;
       }
 
-      if (U != &gauge) delete U;
+    } else if (location == QUDA_CPU_FIELD_LOCATION) {
 
-    } else { 
-      errorQuda("Unsupported field location %d", location);
+      if (Xinv.Precision() == QUDA_DOUBLE_PRECISION)
+        errorQuda("Unsupported precision %d", Xinv.Precision());
+
+      const cpuGaugeField *X_h = static_cast<const cpuGaugeField*>(X);
+      cpuGaugeField *Xinv_h = static_cast<cpuGaugeField*>(&Xinv);
+      blas::flops += invert((void*)Xinv_h->Gauge_p(), (void*)X_h->Gauge_p(), n, X_h->Volume(), X->Precision(), X->Location());
+
     }
 
+    // Clean up
+    delete X;
+    if (U != &gauge) delete U;
 
   }
 

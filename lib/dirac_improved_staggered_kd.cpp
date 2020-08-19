@@ -1,16 +1,53 @@
 #include <dirac_quda.h>
 #include <blas_quda.h>
 #include <multigrid.h>
+#include <staggered_kd_xinv.h>
 
 namespace quda {
 
   DiracImprovedStaggeredKD::DiracImprovedStaggeredKD(const DiracParam &param) : DiracImprovedStaggered(param),
     Xinv(nullptr) {
-      // TODO: Build Xinv
+      
+    // for future reference
+    const bool gpu = true;
+
+    // Allocate the KD inverse block (inverse coarse clover)
+    // Copied from `dirac_coarse.cpp`, `DiracCoarse::createY`
+    const int ndim = 4;
+    int xc[QUDA_MAX_DIM];
+    for (int i = 0; i < ndim; i++) { xc[i] = gauge->X()[i]/2; }
+    const int Nc_c = gauge->Ncolor() * 8; // 24
+    const int Ns_c = 2; // staggered parity
+
+    GaugeFieldParam gParam;
+    memcpy(gParam.x, xc, QUDA_MAX_DIM*sizeof(int));
+    gParam.nColor = Nc_c*Ns_c;
+    gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+    gParam.order = gpu ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_QDP_GAUGE_ORDER;
+    gParam.link_type = QUDA_COARSE_LINKS;
+    gParam.t_boundary = QUDA_PERIODIC_T;
+    gParam.create = QUDA_ZERO_FIELD_CREATE;
+    gParam.setPrecision( gauge->Precision() );
+    gParam.nDim = ndim;
+    gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+    gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+    gParam.nFace = 0;
+    gParam.geometry = QUDA_SCALAR_GEOMETRY;
+    gParam.pad = 0;
+
+    Xinv = new cudaGaugeField(gParam);
+
+    // Populate Xinv
+    BuildStaggeredKahlerDiracInverse(*Xinv, *fatGauge, mass);
   }
 
   DiracImprovedStaggeredKD::DiracImprovedStaggeredKD(const DiracImprovedStaggeredKD &dirac) : DiracImprovedStaggered(dirac) {
-    // TODO: Deep copy Xinv
+    
+    // deep copy Xinv
+    GaugeFieldParam gParam(dirac.Xinv);
+    gParam.create = QUDA_NULL_FIELD_CREATE;
+    Xinv = new cudaGaugeField(gParam);
+    Xinv->copy(*dirac.Xinv);
   }
 
   DiracImprovedStaggeredKD::~DiracImprovedStaggeredKD() {
@@ -21,7 +58,12 @@ namespace quda {
   {
     if (&dirac != this) {
       DiracImprovedStaggered::operator=(dirac);
+      
       // deep copy Xinv
+      GaugeFieldParam gParam(dirac.Xinv);
+      gParam.create = QUDA_NULL_FIELD_CREATE;
+      Xinv = new cudaGaugeField(gParam);
+      Xinv->copy(*dirac.Xinv);
     }
     return *this;
   }
@@ -139,6 +181,17 @@ namespace quda {
 
     // TODO: technically KD is a different type of preconditioning.
     // Should we support "preparing" and "reconstructing"?
+  }
+
+  void DiracImprovedStaggeredKD::updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
+                              cudaCloverField *clover_in)
+  {
+    Dirac::updateFields(fat_gauge_in, nullptr, nullptr, nullptr);
+    fatGauge = fat_gauge_in;
+    longGauge = long_gauge_in;
+
+    // Recompute Xinv (I guess we should do that here?)
+    BuildStaggeredKahlerDiracInverse(*Xinv, *fatGauge, mass);
   }
 
   void DiracImprovedStaggeredKD::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa,

@@ -10,7 +10,7 @@ namespace quda {
      @param[in] in gauge original fine gauge field
      @param[in] in mass the mass of the original staggered operator w/out factor of 2 convention
   */
-  void BuildStaggeredKahlerDiracInverse(cudaGaugeField &Xinv, const cudaGaugeField &gauge, const double mass);
+  void BuildStaggeredKahlerDiracInverse(GaugeField &Xinv, const cudaGaugeField &gauge, const double mass);
 
   // Note: see routine
   // void ApplyStaggeredKahlerDiracInverse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Xinv, bool dagger);
