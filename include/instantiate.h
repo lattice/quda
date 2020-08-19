@@ -203,34 +203,6 @@ namespace quda
     }
   }
 
-  template <QudaPrecision> constexpr bool is_enabled() { return true; }
-#if !(QUDA_PRECISION & 8)
-  template <> constexpr bool is_enabled<QUDA_DOUBLE_PRECISION>() { return false; }
-#endif
-#if !(QUDA_PRECISION & 4)
-  template <> constexpr bool is_enabled<QUDA_SINGLE_PRECISION>() { return false; }
-#endif
-#if !(QUDA_PRECISION & 2)
-  template <> constexpr bool is_enabled<QUDA_HALF_PRECISION>() { return false; }
-#endif
-#if !(QUDA_PRECISION & 1)
-  template <> constexpr bool is_enabled<QUDA_QUARTER_PRECISION>() { return false; }
-#endif
-
-  struct PrecisionFull {
-    static constexpr std::array<QudaPrecision, 4> precision
-      = {QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION, QUDA_QUARTER_PRECISION};
-  };
-
-#ifdef GPU_MULTIGRID_DOUBLE
-  struct PrecisionMultigrid: public PrecisionDefault { };
-#else
-  struct PrecisionMultigrid {
-    static constexpr std::array<QudaPrecision, 3> precision
-      = {QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION, QUDA_QUARTER_PRECISION};
-  };
-#endif
-
   /**
      @brief This instantiate function is used to instantiate the
      precision and number of colors
