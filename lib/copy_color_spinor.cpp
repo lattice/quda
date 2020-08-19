@@ -6,7 +6,7 @@ namespace quda {
   void copyGenericColorSpinorDS(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
   void copyGenericColorSpinorDH(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
   void copyGenericColorSpinorDQ(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
-  
+
   void copyGenericColorSpinorSD(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
   void copyGenericColorSpinorSS(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
   void copyGenericColorSpinorSH(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
@@ -35,16 +35,16 @@ namespace quda {
   void copyGenericColorSpinorMGQS(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
   void copyGenericColorSpinorMGQH(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
   void copyGenericColorSpinorMGQQ(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
-  
 
-  void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src, 
-			      QudaFieldLocation location, void *Dst, void *Src, 
+
+  void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,
+			      QudaFieldLocation location, void *Dst, void *Src,
 			      void *dstNorm, void *srcNorm) {
 
     if (dst.SiteSubset() != src.SiteSubset())
       errorQuda("Destination %d and source %d site subsets not equal", dst.SiteSubset(), src.SiteSubset());
 
-    if (dst.Ncolor() != src.Ncolor()) 
+    if (dst.Ncolor() != src.Ncolor())
       errorQuda("Destination %d and source %d colors not equal", dst.Ncolor(), src.Ncolor());
 
     if (dst.Ncolor() == 3) {
@@ -144,6 +144,6 @@ namespace quda {
         errorQuda("Unsupported Destination Precision %d", dst.Precision());
       }
     }
-  }  
+  }
 
 } // namespace quda
