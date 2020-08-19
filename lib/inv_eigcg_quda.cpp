@@ -23,7 +23,8 @@ Based on eigCG(n_ev, m) algorithm:
 A. Stathopolous and K. Orginos, arXiv:0707.0131
 
 Pipelined version is based on :
-
+T. Chen and E. Carson, arXiv:1905.01549
+See also: G. Meurant, Parellel Computing Vol 5, Issue 3, p. 267, 1987
 */
 
 namespace quda {
