@@ -9,9 +9,31 @@ namespace quda
   {
 
   private:
+    /**
+       @brief Array that hold the numerical data of the propagator
+    */
+    void *prop_data;
+    /**
+       @brief Convenient container for the data
+    */
     std::vector<ColorSpinorField *> prop_vectors;
+    /**
+       @brief Specifies if the data has been allocated
+    */        
     bool prop_init;
-
+    /**
+       @brief Dimension of propagator (spin x color)
+    */            
+    size_t prop_dim;
+    /**
+       @brief Location of the propagator
+    */            
+    QudaFieldLocation prop_location;
+    /**
+       @brief Precision of the propagator
+    */            
+    QudaPrecision prop_precision;
+        
   public:
     Propagator(const ColorSpinorParam &);
 
@@ -40,6 +62,11 @@ namespace quda
     */
     Propagator &operator=(const Propagator &);
 
+    /**
+       @brief Returns a void pointer to the prop_data array 
+    */
+    void *V();
+    
     /**
        @brief Class destructor
     */
