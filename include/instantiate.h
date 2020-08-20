@@ -187,6 +187,10 @@ namespace quda
     }
   }
 
+#if defined(__CUDA_ARCH__) && __CUDACC_VER_MAJOR__ <= 9
+#define constexpr
+#endif
+
   /**
      @brief This instantiate function is used to instantiate the colors
      @param[in] field LatticeField we wish to instantiate
@@ -202,6 +206,11 @@ namespace quda
       errorQuda("Unsupported number of colors %d\n", field.Ncolor());
     }
   }
+
+#if defined(__CUDA_ARCH__) && __CUDACC_VER_MAJOR__ <= 9
+#undef constexpr
+#define constexpr constexpr
+#endif
 
   /**
      @brief This instantiate function is used to instantiate the

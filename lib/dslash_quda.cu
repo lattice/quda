@@ -1,7 +1,3 @@
-#include <cstdlib>
-#include <cstdio>
-#include <string>
-#include <iostream>
 #include <stack>
 
 #include <color_spinor_field.h>
