@@ -1368,7 +1368,7 @@ extern "C" {
    */
   void contractSummedQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavor_2, void **h_result,
                           QudaContractType cType, QudaInvertParam *param, void *colorspinorparam, const int *X,
-                          const int *const source_position, const int *const pxpyp_dim_opposite);
+                          const int *const source_position, const int *const pxpypzpt);
 
   /**
    * Public function to perform color contractions of the host spinors x and y. Does

@@ -6002,7 +6002,7 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
 
 void contractSummedQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void **h_result,
                         const QudaContractType cType, QudaInvertParam *param, void *cs_param_,
-                        const int *X, const int *const source_position, const int *const pxpyp_dim_opposite)
+                        const int *X, const int *const source_position, const int *const pxpypzpt)
 {
   profileContractSummed.TPSTART(QUDA_PROFILE_TOTAL);
   profileContractSummed.TPSTART(QUDA_PROFILE_INIT);
@@ -6070,7 +6070,7 @@ void contractSummedQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, 
 
         profileContractSummed.TPSTART(QUDA_PROFILE_COMPUTE);
         contractSummedQuda(*d_prop_array_flavor_1[s1 * nColor + c1], *d_prop_array_flavor_2[b1 * nColor + c1],
-                           h_result_tmp_global, cType, source_position, pxpyp_dim_opposite, s1, b1);
+                           h_result_tmp_global, cType, source_position, pxpypzpt, s1, b1);
 
         comm_allreduce_array((double *)&h_result_tmp_global[0], n_numbers_per_slice * global_corr_length);
 

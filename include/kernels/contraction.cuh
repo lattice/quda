@@ -211,7 +211,7 @@ namespace quda
 
     int s1, b1;
     int source_position[4];
-    int pxpyp_dim_opposite[3];
+    int pxpypzpt[3];
     typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
     F x;
     F y;
@@ -220,7 +220,7 @@ namespace quda
     int t_offset;
     int offsets[4];
     ContractionSummedArg(const ColorSpinorField &x, const ColorSpinorField &y,
-                         const int _source_position[4], const int _pxpyp_dim_opposite[3], const int s1 = 0, const int b1 = 0) :
+                         const int _source_position[4], const int _pxpypzpt[3], const int s1 = 0, const int b1 = 0) :
       ReduceArg<spinor_array>(comm_dim(reduction_dim) * x.X(reduction_dim)), // n_reduce = global_dim_t
       threads(x.VolumeCB() / x.X(reduction_dim)),
       x(x),
@@ -231,9 +231,9 @@ namespace quda
       t_offset(comm_coord(reduction_dim) * x.X(reduction_dim)) // offset of the slice we are doing reduction on
     {
       for (int dir = 0; dir < 4; dir++) { X[dir] = x.X()[dir]; }
-      for ( int i=0;i<3;i++) pxpyp_dim_opposite[i]=_pxpyp_dim_opposite[i];
+      for ( int i=0;i<3;i++) pxpypzpt[i]=_pxpypzpt[i];
       for (int i=0;i<4;i++) source_position[i]=_source_position[i];
-      for (int i=0;i<4;i++) offsets[i]=comm_coord(i) * X[i];
+      for (int i=0;i<4;i++) offsets[i]=comm_coord(i) * x.X(i);
     }
   };
 
@@ -276,10 +276,12 @@ namespace quda
     int s1 = arg.s1;
     int b1 = arg.b1;
 
-    int pxpyp_dim_opposite[3];
-    for(int i=0;i<3;i++) pxpyp_dim_opposite[i]=arg.pxpyp_dim_opposite[i];
+    int pxpypzpt[4];
+    for(int i=0;i<4;i++) pxpypzpt[i]=arg.pxpypzpt[i];
     int source_position[4];
     for(int i=0;i<4;i++) source_position[i]=arg.source_position[i];
+    int offsets[4];
+    for(int i=0;i<4;i++) offsets[i]=arg.offsets[i];
 
     using real = typename Arg::Float;
     constexpr int nSpin = Arg::nSpin;
@@ -291,7 +293,9 @@ namespace quda
     int *sink;
     // result array needs to be a spinor_array type object because of the reduce function at the end
     vector_type<double2, 16> result_all_channels;
-
+    double phase_real;
+    double phase_imag;
+    double Sum_dXi_dot_Pi;
     while (xyz < arg.threads) {
       // extract current ColorSpinor at xyzt from ColorSpinorField      
       // This function calculates the index_cb assuming t is the coordinate in
@@ -299,11 +303,17 @@ namespace quda
       // So this will work for reduction_dim < 3 as well.
       sink=get_sink<Arg::reduction_dim>(t, xyz, arg.X, parity);
       int idx_cb = x_cb_from_sink(arg.X, sink);
-      //FIXME need to calculate exp(-i*(x*px+y*py+z*pz)) or exp(-i*(x*px+y*py+t*pt))
-      
+      //calculate exp(-i*x*p)
+      Sum_dXi_dot_Pi=(double)((source_position[0]-sink[0]-offsets[0])*pxpypzpt[0]+
+                     (source_position[1]-sink[1]-offsets[1])*pxpypzpt[1]+
+                     (source_position[2]-sink[2]-offsets[2])*pxpypzpt[2]+
+                     (source_position[3]-sink[3]-offsets[3])*pxpypzpt[3]);
+      phase_real=cos(Sum_dXi_dot_Pi);
+      phase_imag=-sin(Sum_dXi_dot_Pi);
+
       ColorSpinor<real, nColor, nSpin> x = arg.x(idx_cb, parity);
       ColorSpinor<real, nColor, nSpin> y = arg.y(idx_cb, parity);
-      
+
       // loop over channels
       for (int G_idx = 0; G_idx < 16; G_idx++) {
         for (int s2 = 0; s2 < nSpin; s2++) {
@@ -313,10 +323,8 @@ namespace quda
           // only contributes if we're at the correct b1 from the outer loop
           if (b1_tmp == b1) {
             propagator_product = arg.Gamma.gm_z[G_idx][b2] * innerProduct(x, y, b2, s2) * arg.Gamma.gm_z[G_idx][b1];
-            result_all_channels[G_idx].x += propagator_product.real();
-            result_all_channels[G_idx].y += propagator_product.imag();
-            //result_all_channels[G_idx].x += source_position[2];
-            //result_all_channels[G_idx].y += source_position[0];
+            result_all_channels[G_idx].x += propagator_product.real()*phase_real-propagator_product.imag()*phase_imag;
+            result_all_channels[G_idx].y += propagator_product.imag()*phase_real+propagator_product.real()*phase_imag;
 	    //if(xyz == 0) printf("Yes Comp\n");
           } else {
 	    //if(xyz == 0) printf("No Comp\n");  
