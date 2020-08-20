@@ -210,15 +210,17 @@ namespace quda
     static constexpr bool spinor_direct_load = false; // false means texture load
 
     int s1, b1;
-
+    int source_position[4];
+    int pxpypzpt[4];
     typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
     F x;
     F y;
 
     DRGammaMatrix<Float_> Gamma;
     int t_offset;
+    int offsets[4];
     ContractionSummedArg(const ColorSpinorField &x, const ColorSpinorField &y,
-			     const int s1 = 0, const int b1 = 0) :
+                         const int _source_position[4], const int _pxpypzpt[4], const int s1 = 0, const int b1 = 0) :
       ReduceArg<spinor_array>(comm_dim(reduction_dim) * x.X(reduction_dim)), // n_reduce = global_dim_t
       threads(x.VolumeCB() / x.X(reduction_dim)),
       x(x),
@@ -229,32 +231,40 @@ namespace quda
       t_offset(comm_coord(reduction_dim) * x.X(reduction_dim)) // offset of the slice we are doing reduction on
     {
       for (int dir = 0; dir < 4; dir++) { X[dir] = x.X()[dir]; }
+      for ( int i=0;i<4;i++) pxpypzpt[i]=_pxpypzpt[i];
+      for (int i=0;i<4;i++) source_position[i]=_source_position[i];
+      for (int i=0;i<4;i++) offsets[i]=comm_coord(i) * x.X(i);
     }
   };
 
-  template <int t_d, class T> __device__ int x_cb_from_t_xyz_d(int t, int xyz_cb, T X[4], int parity)
+  template <int t_d, class T> __device__ int* get_sink(int t, int xyz_cb, T X[4], int parity)
   {
 
-    int x[4];
+    static int sink[4];
     int xyz = xyz_cb * 2;
 
 #pragma unroll
     for (int d = 0; d < 4; d++) {
       if (d != t_d) {
-        x[d] = xyz % X[d];
+        sink[d] = xyz % X[d];
         xyz /= X[d];
       }
     }
 
-    x[t_d] = t;
+    sink[t_d] = t;
 
     if (t_d > 0) {
-      x[0] += (x[0] + x[1] + x[2] + x[3] + parity) & 1;
+      sink[0] += (sink[0] + sink[1] + sink[2] + sink[3] + parity) & 1;
     } else {
-      x[1] += (x[0] + x[1] + x[2] + x[3] + parity) & 1;
+      sink[1] += (sink[0] + sink[1] + sink[2] + sink[3] + parity) & 1;
     }
+    return sink;
+  }
 
-    return (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) / 2;
+  //template <int t_d, class T> __device__ int x_cb_from_t_xyz_d(int t, int xyz_cb, T X[4], int parity)
+  template <class T> __device__ int x_cb_from_sink(T X[4], int* sink)
+  {
+    return (((sink[3] * X[2] + sink[2]) * X[1] + sink[1]) * X[0] + sink[0]) / 2;
   }
 
   template <int blockSize, typename Arg> __global__ void computeDegrandRossiContractionSummed(Arg arg)
@@ -266,25 +276,44 @@ namespace quda
     int s1 = arg.s1;
     int b1 = arg.b1;
 
+    int pxpypzpt[4];
+    for(int i=0;i<4;i++) pxpypzpt[i]=arg.pxpypzpt[i];
+    int source_position[4];
+    for(int i=0;i<4;i++) source_position[i]=arg.source_position[i];
+    int offsets[4];
+    for(int i=0;i<4;i++) offsets[i]=arg.offsets[i];
+
     using real = typename Arg::Float;
     constexpr int nSpin = Arg::nSpin;
     constexpr int nColor = Arg::nColor;
 
     complex<real> propagator_product;
 
+    //the coordinate of the sink
+    int *sink;
     // result array needs to be a spinor_array type object because of the reduce function at the end
     vector_type<double2, 16> result_all_channels;
-
+    double phase_real;
+    double phase_imag;
+    double Sum_dXi_dot_Pi;
     while (xyz < arg.threads) {
       // extract current ColorSpinor at xyzt from ColorSpinorField      
       // This function calculates the index_cb assuming t is the coordinate in
       // direction reduction_dim, and xyz is the linearized index_cb excluding reduction_dim.
       // So this will work for reduction_dim < 3 as well.
-      int idx_cb = x_cb_from_t_xyz_d<Arg::reduction_dim>(t, xyz, arg.X, parity);
-      
+      sink=get_sink<Arg::reduction_dim>(t, xyz, arg.X, parity);
+      int idx_cb = x_cb_from_sink(arg.X, sink);
+      //calculate exp(-i*x*p)
+      Sum_dXi_dot_Pi=(double)((source_position[0]-sink[0]-offsets[0])*pxpypzpt[0]+
+                     (source_position[1]-sink[1]-offsets[1])*pxpypzpt[1]+
+                     (source_position[2]-sink[2]-offsets[2])*pxpypzpt[2]+
+                     (source_position[3]-sink[3]-offsets[3])*pxpypzpt[3]);
+      phase_real=cos(Sum_dXi_dot_Pi);
+      phase_imag=-sin(Sum_dXi_dot_Pi);
+
       ColorSpinor<real, nColor, nSpin> x = arg.x(idx_cb, parity);
       ColorSpinor<real, nColor, nSpin> y = arg.y(idx_cb, parity);
-      
+
       // loop over channels
       for (int G_idx = 0; G_idx < 16; G_idx++) {
         for (int s2 = 0; s2 < nSpin; s2++) {
@@ -294,9 +323,9 @@ namespace quda
           // only contributes if we're at the correct b1 from the outer loop
           if (b1_tmp == b1) {
             propagator_product = arg.Gamma.gm_z[G_idx][b2] * innerProduct(x, y, b2, s2) * arg.Gamma.gm_z[G_idx][b1];
-            result_all_channels[G_idx].x += propagator_product.real();
-            result_all_channels[G_idx].y += propagator_product.imag();
-	    //if(xyz == 0) printf("Yes Comp\n");  
+            result_all_channels[G_idx].x += propagator_product.real()*phase_real-propagator_product.imag()*phase_imag;
+            result_all_channels[G_idx].y += propagator_product.imag()*phase_real+propagator_product.real()*phase_imag;
+	    //if(xyz == 0) printf("Yes Comp\n");
           } else {
 	    //if(xyz == 0) printf("No Comp\n");  
 	  }

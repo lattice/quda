@@ -12,6 +12,8 @@ int main(int argc, char **argv)
 {
   // Parameter class that reads line arguments. It modifies global parameter variables
   auto app = make_app();
+  add_multigrid_option_group(app);
+  add_propagator_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -75,7 +77,7 @@ int main(int argc, char **argv)
   // can only accept C code for backwards compatibility reasons.
   void *source_array_ptr[spinor_dim];
   void *prop_array_ptr[spinor_dim];
-  
+
   // Actually create ColorSpinorField objects and tell them to use the memory from above
   for (int i = 0; i < spinor_dim; i++) {
     int offset = i * V * spinor_dim * 2;
@@ -88,6 +90,8 @@ int main(int argc, char **argv)
   size_t corr_dim = 0, local_corr_length = 0;
   (contract_type == QUDA_CONTRACT_TYPE_DR_SUM_Z || contract_type == QUDA_CONTRACT_TYPE_OPEN_SUM_Z) ? corr_dim = 2 :
                                                                                                      corr_dim = 3;
+
+
   switch (contract_type) {
   case QUDA_CONTRACT_TYPE_OPEN:
   case QUDA_CONTRACT_TYPE_DR: local_corr_length = V; break;
@@ -104,39 +108,67 @@ int main(int argc, char **argv)
   size_t corr_size_in_bytes = n_numbers_per_slice * global_corr_length * sizeof(double);
 
   correlation_function_sum = malloc(corr_size_in_bytes);
+  //we need this to calculate the finite momentum corrs. for temporal corrs we sum up x*px + y*pz + z*pz
+  int Pz, Pt;
+  if (contract_type == QUDA_CONTRACT_TYPE_DR_SUM_Z || contract_type == QUDA_CONTRACT_TYPE_OPEN_SUM_Z)  {
+    Pz = 0;
+    Pt = momentum[3];
+  } else if (contract_type == QUDA_CONTRACT_TYPE_DR_SUM_T || contract_type == QUDA_CONTRACT_TYPE_OPEN_SUM_T)  {
+    Pz = momentum[2];
+    Pt = 0;
+  } else {
+    Pz = momentum[2];
+    Pt = momentum[3];
+  }
+
 
   // Loop over the number of sources to use. Default is prop_n_sources=1.
   // Default source position = 0 0 0 0
   for (int n = 0; n < prop_n_sources; n++) {
     printfQuda("Source position: %d %d %d %d\n", prop_source_position[n][0], prop_source_position[n][1],
                prop_source_position[n][2], prop_source_position[n][3]);
+    const int source[4] = {prop_source_position[n][0], prop_source_position[n][1], prop_source_position[n][2],
+                           prop_source_position[n][3]};
 
-    // Zero out the result array
-    memset(correlation_function_sum, 0, corr_size_in_bytes);
+    //the overall shift of the position of the corr. need this when the source is not at origin.
+    const int overall_shift_dim = source[corr_dim];
 
     // Loop over spin X color dilution positions, construct the sources
     // FIXME add the smearing too
     for (int i = 0; i < spinor_dim; i++) {
-      const int source[4] = {prop_source_position[n][0], prop_source_position[n][1], prop_source_position[n][2],
-                             prop_source_position[n][3]};
-      
+
       constructPointSpinorSource(source_array_ptr[i], cs_param.nSpin, cs_param.nColor, inv_param.cpu_prec,
                                  gauge_param.X, i, source);
       inv_param.solver_normalization = QUDA_SOURCE_NORMALIZATION; // Make explicit for now.
-      
       invertQuda(prop_array_ptr[i], source_array_ptr[i], &inv_param);
     }
     // Coming soon....
     //propagatorQuda(prop_array_ptr, source_array_ptr, &inv_param, &correlation_function_sum, contract_type, (void *)cs_param_ptr, gauge_param.X);
-    
-    contractSummedQuda(prop_array_ptr, prop_array_ptr, &correlation_function_sum, contract_type, &inv_param,(void *)cs_param_ptr, gauge_param.X);
-    
-    // Print correlators for this propagator source position
-    for (int G_idx = 0; G_idx < 16; G_idx++) {
-      for (size_t t = 0; t < global_corr_length; t++) {
-        printfQuda("sum: prop_n=%d g=%d t=%lu %e %e\n", n, G_idx, t,
-                   ((double *)correlation_function_sum)[n_numbers_per_slice * t + 2 * G_idx],
-                   ((double *)correlation_function_sum)[n_numbers_per_slice * t + 2 * G_idx + 1]);
+
+
+    for ( int px=0; px <= momentum[0]; px++) {
+      for ( int py=0; py <= momentum[1]; py++) {
+        for ( int pz=0; pz <= Pz; pz++) {
+          for ( int pt=0; pt <= Pt; pt++ ) {
+            // Zero out the result array
+            memset(correlation_function_sum, 0, corr_size_in_bytes);
+            const int pxpypzpt[4] = {px, py, pz, pt};
+            contractSummedQuda(prop_array_ptr, prop_array_ptr, &correlation_function_sum, contract_type, &inv_param,
+                               (void *)cs_param_ptr, gauge_param.X, source, pxpypzpt);
+
+            // Print correlators for this propagator source position
+            for (int G_idx = 0; G_idx < 16; G_idx++) {
+              for (size_t t = 0; t < global_corr_length; t++) {
+                printfQuda(
+                  "sum: prop_n=%d px=%d py=%d pz=%d pt=%d g=%d t=%lu %e %e\n", n, px, py, pz, pt, G_idx, t,
+                  ((double *)correlation_function_sum)[n_numbers_per_slice * ((t + overall_shift_dim) % global_corr_length)
+                                                       + 2 * G_idx],
+                  ((double *)correlation_function_sum)[n_numbers_per_slice * ((t + overall_shift_dim) % global_corr_length)
+                                                       + 2 * G_idx + 1]);
+              }
+            }
+          }
+        }
       }
     }
   }
