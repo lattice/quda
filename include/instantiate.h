@@ -243,7 +243,11 @@ namespace quda
 
   /**
      @brief The instantiatePrecision function is used to instantiate
-     the precision
+     the precision.  Note unlike the "instantiate" functions above,
+     this helper always instantiates double precision regardless of
+     the QUDA_PRECISION value: this enables its use for copy interface
+     routines which should always enable double precision support.
+
      @param[in] field LatticeField we wish to instantiate
      @param[in,out] args Any additional arguments required for the
      computation at hand
@@ -278,8 +282,17 @@ namespace quda
   }
 
   /**
-     @brief The instantiatePrecision function is used to instantiate
-     the precision
+     @brief The instantiatePrecision2 function is used to instantiate
+     the precision for a class that accepts 2 typename arguments, with
+     the first typename corresponding to the precision being
+     instantiated at hand.  This is useful for copy routines, where we
+     need to instantiate a second, e.g., destination, precision after
+     already instantiating the first, e.g., source, precision.
+     Similar to the "instantiatePrecision" function above, this helper
+     always instantiates double precision regardless of the
+     QUDA_PRECISION value: this enables its use for copy interface
+     routines which should always enable double precision support.
+
      @param[in] field LatticeField we wish to instantiate
      @param[in,out] args Any additional arguments required for the
      computation at hand
