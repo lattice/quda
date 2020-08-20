@@ -43,7 +43,7 @@ namespace quda {
     transfer(nullptr),
     dirac(nullptr),
     need_bidirectional(false),
-    use_mma(false),
+    use_mma(param.use_mma),
     Y_h(Y_h),
     X_h(X_h),
     Xinv_h(Xinv_h),
