@@ -12,6 +12,8 @@ int main(int argc, char **argv)
 {
   // Parameter class that reads line arguments. It modifies global parameter variables
   auto app = make_app();
+  add_multigrid_option_group(app);
+  add_propagator_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -110,6 +112,11 @@ int main(int argc, char **argv)
   for (int n = 0; n < prop_n_sources; n++) {
     printfQuda("Source position: %d %d %d %d\n", prop_source_position[n][0], prop_source_position[n][1],
                prop_source_position[n][2], prop_source_position[n][3]);
+    const int source[4] = {prop_source_position[n][0], prop_source_position[n][1], prop_source_position[n][2],
+                           prop_source_position[n][3]};
+
+    //the overall shift of the position of the corr. need this when the source is not at origin.
+    const int overall_shift_dim = source[corr_dim];
 
     // Zero out the result array
     memset(correlation_function_sum, 0, corr_size_in_bytes);
@@ -117,9 +124,7 @@ int main(int argc, char **argv)
     // Loop over spin X color dilution positions, construct the sources
     // FIXME add the smearing too
     for (int i = 0; i < spinor_dim; i++) {
-      const int source[4] = {prop_source_position[n][0], prop_source_position[n][1], prop_source_position[n][2],
-                             prop_source_position[n][3]};
-      
+
       constructPointSpinorSource(source_array_ptr[i], cs_param.nSpin, cs_param.nColor, inv_param.cpu_prec,
                                  gauge_param.X, i, source);
       inv_param.solver_normalization = QUDA_SOURCE_NORMALIZATION; // Make explicit for now.
@@ -135,8 +140,8 @@ int main(int argc, char **argv)
     for (int G_idx = 0; G_idx < 16; G_idx++) {
       for (size_t t = 0; t < global_corr_length; t++) {
         printfQuda("sum: prop_n=%d g=%d t=%lu %e %e\n", n, G_idx, t,
-                   ((double *)correlation_function_sum)[n_numbers_per_slice * t + 2 * G_idx],
-                   ((double *)correlation_function_sum)[n_numbers_per_slice * t + 2 * G_idx + 1]);
+                   ((double *)correlation_function_sum)[n_numbers_per_slice * ((t+overall_shift_dim)%global_corr_length) + 2 * G_idx],
+                   ((double *)correlation_function_sum)[n_numbers_per_slice * ((t+overall_shift_dim)%global_corr_length) + 2 * G_idx + 1]);
       }
     }
   }
