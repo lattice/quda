@@ -77,7 +77,7 @@ int main(int argc, char **argv)
   // can only accept C code for backwards compatibility reasons.
   void *source_array_ptr[spinor_dim];
   void *prop_array_ptr[spinor_dim];
-  
+
   // Actually create ColorSpinorField objects and tell them to use the memory from above
   for (int i = 0; i < spinor_dim; i++) {
     int offset = i * V * spinor_dim * 2;
@@ -90,6 +90,11 @@ int main(int argc, char **argv)
   size_t corr_dim = 0, local_corr_length = 0;
   (contract_type == QUDA_CONTRACT_TYPE_DR_SUM_Z || contract_type == QUDA_CONTRACT_TYPE_OPEN_SUM_Z) ? corr_dim = 2 :
                                                                                                      corr_dim = 3;
+  //we need this to calculate the finite momentum corrs. for temporal corrs we sum up x*px + y*pz + z*pz
+  size_t corr_dim_oppsite;
+  (contract_type == QUDA_CONTRACT_TYPE_DR_SUM_Z || contract_type == QUDA_CONTRACT_TYPE_OPEN_SUM_Z) ? corr_dim_oppsite = 3 :
+    corr_dim_oppsite = 2;
+
   switch (contract_type) {
   case QUDA_CONTRACT_TYPE_OPEN:
   case QUDA_CONTRACT_TYPE_DR: local_corr_length = V; break;
@@ -118,9 +123,6 @@ int main(int argc, char **argv)
     //the overall shift of the position of the corr. need this when the source is not at origin.
     const int overall_shift_dim = source[corr_dim];
 
-    // Zero out the result array
-    memset(correlation_function_sum, 0, corr_size_in_bytes);
-
     // Loop over spin X color dilution positions, construct the sources
     // FIXME add the smearing too
     for (int i = 0; i < spinor_dim; i++) {
@@ -132,15 +134,29 @@ int main(int argc, char **argv)
     }
     // Coming soon....
     //propagatorQuda(prop_array_ptr, source_array_ptr, &inv_param, &correlation_function_sum, contract_type, (void *)cs_param_ptr, gauge_param.X);
-    
-    contractSummedQuda(prop_array_ptr, prop_array_ptr, &correlation_function_sum, contract_type, &inv_param,(void *)cs_param_ptr, gauge_param.X);
-    
-    // Print correlators for this propagator source position
-    for (int G_idx = 0; G_idx < 16; G_idx++) {
-      for (size_t t = 0; t < global_corr_length; t++) {
-        printfQuda("sum: prop_n=%d g=%d t=%lu %e %e\n", n, G_idx, t,
-                   ((double *)correlation_function_sum)[n_numbers_per_slice * ((t+overall_shift_dim)%global_corr_length) + 2 * G_idx],
-                   ((double *)correlation_function_sum)[n_numbers_per_slice * ((t+overall_shift_dim)%global_corr_length) + 2 * G_idx + 1]);
+
+    for ( int px=0; px <= momentum[0]; px++) {
+      for ( int py=0; py <= momentum[1]; py++) {
+        for ( int p_dim_opposite=0; p_dim_opposite <= momentum[corr_dim_oppsite]; p_dim_opposite++) {
+            // Zero out the result array
+            memset(correlation_function_sum, 0, corr_size_in_bytes);
+
+          const int pxpyp_dim_opposite_opposite[3] = {px, py, p_dim_opposite};
+            contractSummedQuda(prop_array_ptr, prop_array_ptr, &correlation_function_sum, contract_type,
+                             &inv_param,(void *)cs_param_ptr, gauge_param.X, source, pxpyp_dim_opposite_opposite);
+
+            // Print correlators for this propagator source position
+            for (int G_idx = 0; G_idx < 16; G_idx++) {
+              for (size_t t = 0; t < global_corr_length; t++) {
+                printfQuda(
+                  "sum: prop_n=%d px=%d py=%d pz/pt=%d g=%d t=%lu %e %e\n", n, px, py, p_dim_opposite, G_idx, t,
+                  ((double *)correlation_function_sum)[n_numbers_per_slice * ((t + overall_shift_dim) % global_corr_length)
+                                                       + 2 * G_idx],
+                  ((double *)correlation_function_sum)[n_numbers_per_slice * ((t + overall_shift_dim) % global_corr_length)
+                                                       + 2 * G_idx + 1]);
+              }
+            }
+        }
       }
     }
   }

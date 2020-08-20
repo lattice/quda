@@ -436,6 +436,7 @@ extern quda::file_array<char[256]> prop_source_outfile;
 extern quda::file_array<char[256]> prop_sink_infile;
 extern quda::file_array<char[256]> prop_sink_outfile;
 extern quda::source_array<std::array<int, 4>> prop_source_position;
+extern std::array<int, 4> momentum;
 extern int prop_source_smear_steps;
 extern int prop_sink_smear_steps;
 extern double prop_source_smear_coeff;

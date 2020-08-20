@@ -225,6 +225,7 @@ quda::file_array<char[256]> prop_source_outfile;
 quda::file_array<char[256]> prop_sink_infile;
 quda::file_array<char[256]> prop_sink_outfile;
 quda::source_array<std::array<int, 4>> prop_source_position = {0, 0, 0, 0};
+std::array<int, 4> momentum = {0, 0, 0, 0};
 
 int prop_source_smear_steps = 20;
 int prop_sink_smear_steps = 20;
@@ -978,6 +979,7 @@ void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   quda_app->add_psoption(opgroup, "--prop-source-position", prop_source_position, CLI::Validator(),
                          "Set the position of the nth point source <Nth source> (X Y Z T) (default(0,0,0,0))");
+  quda_app->add_option("--momentum", momentum, "Set momentum for correlators (px py pz pt) (default(0,0,0,0))")->expected(4);;
 
   CLI::QUDACheckedTransformer prec_transform(precision_map);
   opgroup->add_option("--prop-save-prec", prop_save_prec, "Precision with which to save propagators (default single)")

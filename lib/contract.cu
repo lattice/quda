@@ -119,15 +119,15 @@ namespace quda {
   template <typename real>
   void contract_summed_quda(const ColorSpinorField &x, const ColorSpinorField &y,
 			    std::vector<Complex> &result, const QudaContractType cType,
-			     const size_t s1, const size_t b1)
+                            const int *const source_position, const int *const pxpyp_dim_opposite, const size_t s1, const size_t b1)
   {
     if (cType == QUDA_CONTRACT_TYPE_DR_SUM_Z || cType == QUDA_CONTRACT_TYPE_OPEN_SUM_Z){
-      ContractionSummedArg<real, 2> arg(x, y, s1, b1); // reduce in the z direction
+      ContractionSummedArg<real, 2> arg(x, y, source_position, pxpyp_dim_opposite, s1, b1); // reduce in the z direction
       ContractionSummedCompute<decltype(arg)> contraction_with_sum(arg, x, y, cType);
       contraction_with_sum.apply(0);
       arg.complete(result);
     } else if (cType == QUDA_CONTRACT_TYPE_DR_SUM_T || cType == QUDA_CONTRACT_TYPE_OPEN_SUM_T) {
-      ContractionSummedArg<real, 3> arg(x, y, s1, b1); // reduce in the t direction
+      ContractionSummedArg<real, 3> arg(x, y, source_position, pxpyp_dim_opposite, s1, b1); // reduce in the t direction
       ContractionSummedCompute<decltype(arg)> contraction_with_sum(arg, x, y, cType);
       contraction_with_sum.apply(0);
       arg.complete(result);
@@ -139,7 +139,7 @@ namespace quda {
   
   void contractSummedQuda(const ColorSpinorField &x, const ColorSpinorField &y,
 			  std::vector<Complex> &result, const QudaContractType cType,
-			  const size_t s1, const size_t b1)
+                          const int *const source_position, const int *const pxpyp_dim_opposite, const size_t s1, const size_t b1)
   {
 #ifdef GPU_CONTRACT
     checkPrecision(x, y);
@@ -150,9 +150,9 @@ namespace quda {
     if (x.Nspin() != 4 || y.Nspin() != 4) errorQuda("Unexpected number of spins x=%d y=%d", x.Nspin(), y.Nspin());
 
     if (x.Precision() == QUDA_SINGLE_PRECISION) {
-      contract_summed_quda<float>(x, y, result, cType, s1, b1);
+      contract_summed_quda<float>(x, y, result, cType, source_position, pxpyp_dim_opposite, s1, b1);
     } else if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-      contract_summed_quda<double>(x, y, result, cType, s1, b1);
+      contract_summed_quda<double>(x, y, result, cType, source_position, pxpyp_dim_opposite, s1, b1);
     } else {
       errorQuda("Precision %d not supported", x.Precision());
     }
