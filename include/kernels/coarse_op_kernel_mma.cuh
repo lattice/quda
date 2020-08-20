@@ -85,7 +85,7 @@ namespace quda
     } // namespace impl
 
     template <bool from_coarse, int dim, QudaDirection dir, int bM, int bN, int bK, int block_y, int block_z, typename Arg>
-    __global__ void __launch_bounds__(block_y * block_z, 1) ComputeUVMMA(Arg arg)
+    __global__ void __launch_bounds__(block_y *block_z, 1) ComputeUVMMA(Arg arg)
     {
       int x_cb = blockDim.x * blockIdx.x + threadIdx.x;
       if (x_cb >= arg.fineVolumeCB) return;
@@ -257,7 +257,7 @@ namespace quda
     } // namespace impl
 
     template <bool from_coarse, int dim, QudaDirection dir, int bM, int bN, int bK, int block_y, int block_z, typename Arg>
-    __global__ void __launch_bounds__(block_y * block_z, 1) ComputeVUVMMA(Arg arg)
+    __global__ void __launch_bounds__(block_y *block_z, 1) ComputeVUVMMA(Arg arg)
     {
       static_assert(from_coarse, "The MMA implementation is only for from_coarse == true.");
 

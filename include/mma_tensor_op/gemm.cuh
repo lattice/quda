@@ -553,7 +553,6 @@ namespace quda
             a_loader.template r2s<a_dagger>(smem_obj_a_real, smem_obj_a_imag);
             __syncthreads();
           }
-
         }
 
         return max;

@@ -58,7 +58,7 @@ namespace quda {
       auto yHat = make_tile_C<complex,true>(arg.tile);
 
 #pragma unroll
-      for (int k = 0; k<Arg::yhatTileType::k; k+=Arg::yhatTileType::K) {
+      for (int k = 0; k < Arg::yhatTileType::k; k += Arg::yhatTileType::K) {
         auto Y = make_tile_A<complex, true>(arg.tile);
         Y.load(arg.Y, d, 1-parity, ghost_idx, i0, k);
 
@@ -80,7 +80,7 @@ namespace quda {
       auto yHat = make_tile_C<complex,false>(arg.tile);
 
 #pragma unroll
-      for (int k = 0; k<Arg::yhatTileType::k; k+=Arg::yhatTileType::K) {
+      for (int k = 0; k < Arg::yhatTileType::k; k += Arg::yhatTileType::K) {
         auto Y = make_tile_A<complex, false>(arg.tile);
         Y.load(arg.Y, d, 1-parity, back_idx, i0, k);
 
@@ -100,7 +100,7 @@ namespace quda {
       auto yHat = make_tile_C<complex, false>(arg.tile);
 
 #pragma unroll
-      for (int k = 0; k<Arg::yhatTileType::k; k+=Arg::yhatTileType::K) {
+      for (int k = 0; k < Arg::yhatTileType::k; k += Arg::yhatTileType::K) {
         auto X = make_tile_A<complex, false>(arg.tile);
         X.load(arg.Xinv, 0, parity, x_cb, i0, k);
 
@@ -126,8 +126,8 @@ namespace quda {
       for (int parity=0; parity<2; parity++) {
 #pragma omp parallel for
         for (int x_cb = 0; x_cb < arg.Y.VolumeCB(); x_cb++) {
-          for (int i = 0; i < Arg::yhatTileType::m; i+=Arg::yhatTileType::M)
-            for (int j = 0; j < Arg::yhatTileType::n; j+=Arg::yhatTileType::N) {
+          for (int i = 0; i < Arg::yhatTileType::m; i += Arg::yhatTileType::M)
+            for (int j = 0; j < Arg::yhatTileType::n; j += Arg::yhatTileType::N) {
               typename Arg::Float max_x = computeYhat<compute_max_only>(arg, d, x_cb, parity, i, j);
               if (compute_max_only) max = max > max_x ? max : max_x;
             }
@@ -142,16 +142,17 @@ namespace quda {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.Y.VolumeCB()) return;
     int i_parity = blockDim.y*blockIdx.y + threadIdx.y;
-    if (i_parity >= 2*Arg::yhatTileType::M_tiles) return;
+    if (i_parity >= 2 * Arg::yhatTileType::M_tiles) return;
     int j_d = blockDim.z*blockIdx.z + threadIdx.z;
-    if (j_d >= 4*Arg::yhatTileType::N_tiles) return;
+    if (j_d >= 4 * Arg::yhatTileType::N_tiles) return;
 
     int i = i_parity % Arg::yhatTileType::M_tiles;
     int parity = i_parity / Arg::yhatTileType::M_tiles;
     int j = j_d % Arg::yhatTileType::N_tiles;
     int d = j_d / Arg::yhatTileType::N_tiles;
 
-    typename Arg::Float max = computeYhat<compute_max_only>(arg, d, x_cb, parity, i * Arg::yhatTileType::M, j * Arg::yhatTileType::N);
+    typename Arg::Float max
+      = computeYhat<compute_max_only>(arg, d, x_cb, parity, i * Arg::yhatTileType::M, j * Arg::yhatTileType::N);
     if (compute_max_only) atomicAbsMax(arg.max_d, max);
   }
 
