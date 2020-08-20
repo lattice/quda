@@ -211,7 +211,7 @@ namespace quda
 
     int s1, b1;
     int source_position[4];
-    int pxpypzpt[3];
+    int pxpypzpt[4];
     typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
     F x;
     F y;
@@ -220,7 +220,7 @@ namespace quda
     int t_offset;
     int offsets[4];
     ContractionSummedArg(const ColorSpinorField &x, const ColorSpinorField &y,
-                         const int _source_position[4], const int _pxpypzpt[3], const int s1 = 0, const int b1 = 0) :
+                         const int _source_position[4], const int _pxpypzpt[4], const int s1 = 0, const int b1 = 0) :
       ReduceArg<spinor_array>(comm_dim(reduction_dim) * x.X(reduction_dim)), // n_reduce = global_dim_t
       threads(x.VolumeCB() / x.X(reduction_dim)),
       x(x),
@@ -231,7 +231,7 @@ namespace quda
       t_offset(comm_coord(reduction_dim) * x.X(reduction_dim)) // offset of the slice we are doing reduction on
     {
       for (int dir = 0; dir < 4; dir++) { X[dir] = x.X()[dir]; }
-      for ( int i=0;i<3;i++) pxpypzpt[i]=_pxpypzpt[i];
+      for ( int i=0;i<4;i++) pxpypzpt[i]=_pxpypzpt[i];
       for (int i=0;i<4;i++) source_position[i]=_source_position[i];
       for (int i=0;i<4;i++) offsets[i]=comm_coord(i) * x.X(i);
     }
