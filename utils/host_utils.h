@@ -37,6 +37,7 @@ extern QudaPrecision &cpu_prec;
 extern QudaPrecision &cuda_prec;
 extern QudaPrecision &cuda_prec_sloppy;
 extern QudaPrecision &cuda_prec_precondition;
+extern QudaPrecision &cuda_prec_eigensolver;
 extern QudaPrecision &cuda_prec_refinement_sloppy;
 extern QudaPrecision &cuda_prec_ritz;
 
@@ -101,11 +102,12 @@ template <typename Float> void applyGaugeFieldScaling(Float **gauge, int Vh, Qud
 
 // Spinor utils
 //------------------------------------------------------
-void constructWilsonTestSpinorParam(quda::ColorSpinorParam *csParam, const QudaInvertParam *inv_param,
-                                    const QudaGaugeParam *gauge_param);
+void constructWilsonSpinorParam(quda::ColorSpinorParam *csParam, const QudaInvertParam *inv_param,
+                                const QudaGaugeParam *gauge_param);
 void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x,
                                  quda::RNG &rng);
-void constructPointSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x, const int dil, const int *const src);
+void constructPointSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x,
+                                const int dil, const int *const src);
 
 void constructWallSpinorSource(void *v, QudaPrecision precision, const int dil);
 //------------------------------------------------------

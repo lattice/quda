@@ -47,7 +47,7 @@ namespace quda
        @brief Save propagator (12 vecs, Chroma compliant) to filename
        @param[in] vecs The set of vectors to save
     */
-    void saveProp(const std::vector<ColorSpinorField *> &vecs);    
+    void saveProp(const std::vector<ColorSpinorField *> &vecs);
 
     /**
        @brief Create alias pointers to a vector space of lower precision
@@ -56,8 +56,8 @@ namespace quda
        @param[in] low_prec The low precsision value
     */
 
-    void downPrec(const std::vector<ColorSpinorField *> &vecs_high_prec, std::vector<ColorSpinorField *> &vecs_low_prec, const QudaPrecision save_prec);
-
+    void downPrec(const std::vector<ColorSpinorField *> &vecs_high_prec, std::vector<ColorSpinorField *> &vecs_low_prec,
+                  const QudaPrecision save_prec);
   };
 
 } // namespace quda

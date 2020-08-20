@@ -57,6 +57,9 @@ extern "C" {
     QudaPrecision cuda_prec_precondition; /**< The precision of the preconditioner gauge field */
     QudaReconstructType reconstruct_precondition; /**< The recontruction type of the preconditioner gauge field */
 
+    QudaPrecision cuda_prec_eigensolver;         /**< The precision of the eigensolver gauge field */
+    QudaReconstructType reconstruct_eigensolver; /**< The recontruction type of the eigensolver gauge field */
+
     QudaGaugeFixed gauge_fix; /**< Whether the input gauge field is in the axial gauge or not */
 
     int ga_pad;       /**< The pad size that the cudaGaugeField will use (default=0) */
@@ -227,17 +230,19 @@ extern "C" {
     QudaPrecision cuda_prec_sloppy;        /**< The precision used by the QUDA sloppy operator */
     QudaPrecision cuda_prec_refinement_sloppy; /**< The precision of the sloppy gauge field for the refinement step in multishift */
     QudaPrecision cuda_prec_precondition;  /**< The precision used by the QUDA preconditioner */
+    QudaPrecision cuda_prec_eigensolver;   /**< The precision used by the QUDA eigensolver */
 
     QudaDiracFieldOrder dirac_order;       /**< The order of the input and output fermion fields */
 
     QudaGammaBasis gamma_basis;            /**< Gamma basis of the input and output host fields */
 
-    QudaFieldLocation clover_location;            /**< The location of the clover field */
+    QudaFieldLocation clover_location;     /**< The location of the clover field */
     QudaPrecision clover_cpu_prec;         /**< The precision used for the input clover field */
     QudaPrecision clover_cuda_prec;        /**< The precision used for the clover field in the QUDA solver */
     QudaPrecision clover_cuda_prec_sloppy; /**< The precision used for the clover field in the QUDA sloppy operator */
     QudaPrecision clover_cuda_prec_refinement_sloppy; /**< The precision of the sloppy clover field for the refinement step in multishift */
     QudaPrecision clover_cuda_prec_precondition; /**< The precision used for the clover field in the QUDA preconditioner */
+    QudaPrecision clover_cuda_prec_eigensolver;  /**< The precision used for the clover field in the QUDA eigensolver */
 
     QudaCloverFieldOrder clover_order;     /**< The order of the input clover field */
     QudaUseInitGuess use_init_guess;       /**< Whether to use an initial guess in the solver or not */
@@ -1348,7 +1353,25 @@ extern "C" {
   void gaugeObservablesQuda(QudaGaugeObservableParam *param);
 
   /**
-   * Public function to perform color contractions of the host spinors x and y.
+   * Public function to perform color contractions of the host spinorfields contained
+   * inside first two arguments. Used for cases where one wishes to contract data in
+   * either the T or Z dim
+   * @param[in] h_prop_array_flavor_1 pointer to pointers of ColorSpinorField host data
+   * @param[in] h_prop_array_flavor_2 pointer to pointers of ColorSpinorField host data
+   * @param[out] h_result adress of pointer to the 16*corr_dim complex numbers of the
+   *            result correlators
+   * @param[in] cType Which type of contraction (open, degrand-rossi, etc)
+   * @param[in] param meta data for construction of ColorSpinorFields.
+   * @param[in] colorspinorparam pointer to a ColorSpinorParam meta data for
+   *            construction of ColorSpinorFields
+   * @param[in] X spacetime data for construction of ColorSpinorFields
+   */
+  void contractSummedQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavor_2, void **h_result,
+                          QudaContractType cType, QudaInvertParam *param, void *colorspinorparam, const int *X);
+
+  /**
+   * Public function to perform color contractions of the host spinors x and y. Does
+   * not sum the lattice data.
    * @param[in] x pointer to host data
    * @param[in] y pointer to host data
    * @param[out] result pointer to the 16 spin projections per lattice site
@@ -1406,9 +1429,13 @@ extern "C" {
                       QudaGaugeParam* param,
                       double* timeinfo);
 
-  void make4DQuarkProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_param5D, QudaInvertParam *inv_param4D, const int *X);
+  void make4DQuarkProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_param5D, QudaInvertParam *inv_param4D,
+                       const int *X);
 
-  void make4DMidPointProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_param5D, QudaInvertParam *inv_param4D, const int *X);
+  void make4DMidPointProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_param5D, QudaInvertParam *inv_param4D,
+                          const int *X);
+
+  void propagatorQuda(void **prop_array, void **source_array, QudaInvertParam *param, void *correlation_function_sum, const QudaContractType cType, void *cs_param_);
   
   
   /**

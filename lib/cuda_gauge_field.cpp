@@ -601,19 +601,20 @@ namespace quda {
 
           if (src.Order() > 4 && GhostExchange() == QUDA_GHOST_EXCHANGE_PAD
               && src.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
-            for (int d=0; d<geometry; d++)
+            for (int d = 0; d < geometry; d++)
               qudaMemcpy(ghost_buffer[d], src.Ghost()[d], ghost_bytes[d], cudaMemcpyDefault);
 
           if (ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED && src.GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
             copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer, 0, ghost_buffer);
-            if (geometry == QUDA_COARSE_GEOMETRY) copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer, 0, ghost_buffer, 3);
+            if (geometry == QUDA_COARSE_GEOMETRY)
+              copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer, 0, ghost_buffer, 3);
           } else {
             copyExtendedGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer);
             if (geometry == QUDA_COARSE_GEOMETRY) errorQuda("Extended gauge copy for coarse geometry not supported");
           }
           free_gauge_buffer(buffer, src.Order(), src.Geometry());
           if (nFace > 0) free_ghost_buffer(ghost_buffer, src.Order(), geometry);
-	}
+        }
       } // reorder_location
     } else {
       errorQuda("Invalid gauge field type");
@@ -683,7 +684,7 @@ namespace quda {
 
         if (cpu.Order() > 4 && GhostExchange() == QUDA_GHOST_EXCHANGE_PAD
             && cpu.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
-          for (int d=0; d<geometry; d++)
+          for (int d = 0; d < geometry; d++)
             qudaMemcpy(cpu.Ghost()[d], ghost_buffer[d], ghost_bytes[d], cudaMemcpyDefault);
 
         free_gauge_buffer(buffer, cpu.Order(), cpu.Geometry());

@@ -294,7 +294,7 @@ void read_spinor_field(const char *filename, void *V[], QudaPrecision precision,
 }
 
 void read_propagator_field(const char *filename, void *V[], QudaPrecision precision, const int *X, QudaSiteSubset subset,
-                       QudaParity parity, int nColor, int nSpin, int Nprop, int argc, char *argv[])
+                           QudaParity parity, int nColor, int nSpin, int Nprop, int argc, char *argv[])
 {
   quda_this_node = QMP_get_node_number();
 
@@ -305,13 +305,14 @@ void read_propagator_field(const char *filename, void *V[], QudaPrecision precis
   if (infile == NULL) { errorQuda("Open file failed\n"); }
 
   /* Read the spinor field record */
-  printfQuda("%s: reading %d vector fields\n", __func__, Nprop); fflush(stdout);
+  printfQuda("%s: reading %d vector fields\n", __func__, Nprop);
+  fflush(stdout);
   int status = read_field(infile, 12 * 2 * nSpin * nColor, Nprop, V, precision, subset, parity, nSpin, nColor);
   if (status) { errorQuda("read_spinor_fields failed %d\n", status); }
 
   /* Close the file */
   QIO_close_read(infile);
-  printfQuda("%s: Closed file for reading\n",__func__);
+  printfQuda("%s: Closed file for reading\n", __func__);
 }
 
 template <int len>
@@ -323,7 +324,7 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
   switch (len) {
   case 6: xml_record += "StaggeredColorSpinorField>"; break; // SU(3) staggered
   case 18: xml_record += "GaugeFieldFile>"; break;           // SU(3) gauge field
-  case 24: xml_record += "WilsonColorSpinorField>"; break;   // SU(3) Wilson vec 
+  case 24: xml_record += "WilsonColorSpinorField>"; break;   // SU(3) Wilson vec
   case 96:
   case 128:
   case 256:
@@ -335,7 +336,7 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
   xml_record += "\n";
   xml_record += "<version>BETA</version>\n";
   xml_record += "<type>" + std::string(type) + "</type>\n<info>\n";
-  
+
   // if parity+even, it's a half-x-dim even only vector
   // if parity+odd, it's a half-x-dim odd only vector
   // if full+even, it's a full vector with only even sites filled, odd are zero
@@ -461,7 +462,7 @@ int write_field(QIO_Writer *outfile, int Ninternal, int count, void *field_out[]
   int status = 0;
   switch (Ninternal) {
   case 6:
-    status = write_field<6>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type); 
+    status = write_field<6>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
     break;
   case 24:
     status = write_field<24>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
@@ -517,16 +518,15 @@ void write_spinor_field(const char *filename, void *V[], QudaPrecision precision
   printfQuda("%s: Closed file for writing\n",__func__);
 }
 
-
 void write_propagator_field(const char *filename, void *V[], QudaPrecision precision, const int *X, QudaSiteSubset subset,
-			    QudaParity parity, int nColor, int nSpin, int Nprop, int argc, char *argv[])
+                            QudaParity parity, int nColor, int nSpin, int Nprop, int argc, char *argv[])
 {
   quda_this_node = QMP_get_node_number();
 
   set_layout(X, subset);
 
   QudaPrecision file_prec = precision;
-  
+
   char type[128];
   sprintf(type, "QUDA_%sNs%dNc%d_PropagatorField", (file_prec == QUDA_DOUBLE_PRECISION) ? "D" : "F", nSpin, nColor);
 
@@ -535,12 +535,13 @@ void write_propagator_field(const char *filename, void *V[], QudaPrecision preci
   if (outfile == NULL) { errorQuda("Open file failed\n"); }
 
   /* Write the propagator field record */
-  printfQuda("%s: writing %d propagator fields\n", __func__, Nprop); fflush(stdout);
+  printfQuda("%s: writing %d propagator fields\n", __func__, Nprop);
+  fflush(stdout);
   int status
     = write_field(outfile, 12 * 2 * nSpin * nColor, Nprop, V, precision, precision, subset, parity, nSpin, nColor, type);
   if (status) { errorQuda("write_propagator_fields failed %d\n", status); }
 
   /* Close the file */
   QIO_close_write(outfile);
-  printfQuda("%s: Closed file for writing\n",__func__);
+  printfQuda("%s: Closed file for writing\n", __func__);
 }

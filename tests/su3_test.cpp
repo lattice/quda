@@ -180,6 +180,8 @@ int main(int argc, char **argv)
     for (int i = 0; i < V; i++) q_charge_check += ((float *)qDensity)[i];
   }
 
+  free(qDensity);
+
   // Q charge Reduction and normalisation
   comm_allreduce(&q_charge_check);
 

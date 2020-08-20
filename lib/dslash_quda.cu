@@ -206,7 +206,7 @@ namespace quda {
 	}
       }
     }
-    
+
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
 
     void preTune() { arg.out.save(); }

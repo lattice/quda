@@ -57,8 +57,9 @@ namespace quda
       for (int i = 0; i < Nvec; i++) {
         for (int j = 0; j < Ls; j++) { V[i * Ls + j] = static_cast<char *>(tmp[i]->V()) + j * stride; }
       }
-      
-      read_spinor_field(filename.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), tmp[0]->SiteSubset(), spinor_parity, tmp[0]->Ncolor(), tmp[0]->Nspin(), Nvec * Ls, 0, (char **)0);
+
+      read_spinor_field(filename.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), tmp[0]->SiteSubset(), spinor_parity,
+                        tmp[0]->Ncolor(), tmp[0]->Nspin(), Nvec * Ls, 0, (char **)0);
 
       host_free(V);
     } else {
@@ -118,7 +119,7 @@ namespace quda
   void VectorIO::loadProp(std::vector<ColorSpinorField *> &vecs)
   {
 #ifdef HAVE_QIO
-    if(vecs.size() != 12) errorQuda("Must have 12 vectors in propagator, passed %lu", vecs.size());
+    if (vecs.size() != 12) errorQuda("Must have 12 vectors in propagator, passed %lu", vecs.size());
     const int Nvec = vecs.size();
     auto spinor_parity = vecs[0]->SuggestedParity();
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Start loading %04d vectors from %s\n", Nvec, filename.c_str());
@@ -156,8 +157,9 @@ namespace quda
       for (int i = 0; i < Nvec; i++) {
         for (int j = 0; j < Ls; j++) { V[i * Ls + j] = static_cast<char *>(tmp[i]->V()) + j * stride; }
       }
-      
-      read_propagator_field(filename.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), tmp[0]->SiteSubset(), spinor_parity, tmp[0]->Ncolor(), tmp[0]->Nspin(), Nvec/12, 0, (char **)0);
+
+      read_propagator_field(filename.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), tmp[0]->SiteSubset(),
+                            spinor_parity, tmp[0]->Ncolor(), tmp[0]->Nspin(), Nvec / 12, 0, (char **)0);
 
       host_free(V);
     } else {
@@ -213,7 +215,6 @@ namespace quda
     errorQuda("\nQIO library was not built.\n");
 #endif
   }
-
 
   void VectorIO::save(const std::vector<ColorSpinorField *> &vecs)
   {
@@ -292,9 +293,9 @@ namespace quda
       for (int i = 0; i < Nvec; i++) {
         for (int j = 0; j < Ls; j++) { V[i * Ls + j] = static_cast<char *>(tmp[i]->V()) + j * stride; }
       }
-      
+
       write_spinor_field(filename.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), tmp[0]->SiteSubset(), spinor_parity,
-			 tmp[0]->Ncolor(), tmp[0]->Nspin(), Nvec * Ls, 0, (char **)0);
+                         tmp[0]->Ncolor(), tmp[0]->Nspin(), Nvec * Ls, 0, (char **)0);
 
       host_free(V);
     } else {
@@ -314,8 +315,8 @@ namespace quda
   void VectorIO::saveProp(const std::vector<ColorSpinorField *> &vecs)
   {
 #ifdef HAVE_QIO
-    if(vecs.size() != 12) errorQuda("Must have 12 vectors in propagator, passed %lu", vecs.size());
-    
+    if (vecs.size() != 12) errorQuda("Must have 12 vectors in propagator, passed %lu", vecs.size());
+
     const int Nvec = vecs.size();
     std::vector<ColorSpinorField *> tmp;
     tmp.reserve(Nvec);
@@ -389,33 +390,33 @@ namespace quda
       void **V = static_cast<void **>(safe_malloc(Nvec * Ls * sizeof(void *)));
       for (int i = 0; i < Nvec; i++) {
         for (int j = 0; j < Ls; j++) { V[i * Ls + j] = static_cast<char *>(tmp[i]->V()) + j * stride; }
-  }
+      }
 
-      write_propagator_field(filename.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), tmp[0]->SiteSubset(), spinor_parity,
-      tmp[0]->Ncolor(), tmp[0]->Nspin(), (Nvec)/12, 0, (char **)0);
-      
+      write_propagator_field(filename.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), tmp[0]->SiteSubset(),
+                             spinor_parity, tmp[0]->Ncolor(), tmp[0]->Nspin(), (Nvec) / 12, 0, (char **)0);
+
       host_free(V);
     } else {
       errorQuda("Unexpected field dimension %d", vecs[0]->Ndim());
     }
-    
+
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Done saving vectors\n");
     if (vecs[0]->Location() == QUDA_CUDA_FIELD_LOCATION
-      || (vecs[0]->Location() == QUDA_CPU_FIELD_LOCATION && vecs[0]->SiteSubset() == QUDA_PARITY_SITE_SUBSET)) {
-    for (int i = 0; i < Nvec; i++) delete tmp[i];
-  }
+        || (vecs[0]->Location() == QUDA_CPU_FIELD_LOCATION && vecs[0]->SiteSubset() == QUDA_PARITY_SITE_SUBSET)) {
+      for (int i = 0; i < Nvec; i++) delete tmp[i];
+    }
 #else
     errorQuda("\nQIO library was not built.\n");
 #endif
   }
 
-
-  void VectorIO::downPrec(const std::vector<ColorSpinorField *> &vecs_high_prec, std::vector<ColorSpinorField *> &vecs_low_prec, const QudaPrecision low_prec)  
+  void VectorIO::downPrec(const std::vector<ColorSpinorField *> &vecs_high_prec,
+                          std::vector<ColorSpinorField *> &vecs_low_prec, const QudaPrecision low_prec)
   {
-    if(low_prec >= vecs_high_prec[0]->Precision()) {
+    if (low_prec >= vecs_high_prec[0]->Precision()) {
       errorQuda("Attempting to down-prec from precision %d to %d", vecs_high_prec[0]->Precision(), low_prec);
     }
-    
+
     ColorSpinorParam csParamClone(*vecs_high_prec[0]);
     csParamClone.create = QUDA_REFERENCE_FIELD_CREATE;
     csParamClone.setPrecision(low_prec);
@@ -424,8 +425,8 @@ namespace quda
     }
     if (getVerbosity() >= QUDA_SUMMARIZE) {
       printfQuda("Vector space successfully down copied from prec %d to prec %d\n", vecs_high_prec[0]->Precision(),
-		 vecs_low_prec[0]->Precision());
-    }    
-  } 
-  
+                 vecs_low_prec[0]->Precision());
+    }
+  }
+
 } // namespace quda

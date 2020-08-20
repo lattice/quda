@@ -443,7 +443,7 @@ namespace quda {
     ColorSpinorField *odd;
 
     // used for deflation eigenvector sets etc.
-    CompositeColorSpinorFieldDescriptor composite_descr;// contains info about the set
+    CompositeColorSpinorFieldDescriptor composite_descr; // contains info about the set
     CompositeColorSpinorField components;
 
     /**
