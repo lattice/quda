@@ -170,6 +170,7 @@ namespace quda
     int launch_yhat_kernel(Arg &arg, int min_threads, TuneParam &tp, const cudaStream_t &stream)
     {
       errorQuda("MMA multigrid is not available for this setup.");
+      return -1;
     }
 
 #endif // compute capability >= 700, CUDA >= 10.1
