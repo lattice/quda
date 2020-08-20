@@ -128,7 +128,6 @@ int main(int argc, char **argv)
       constructPointSpinorSource(source_array_ptr[i], cs_param.nSpin, cs_param.nColor, inv_param.cpu_prec,
                                  gauge_param.X, i, source);
       inv_param.solver_normalization = QUDA_SOURCE_NORMALIZATION; // Make explicit for now.
-      
       invertQuda(prop_array_ptr[i], source_array_ptr[i], &inv_param);
     }
     // Coming soon....
