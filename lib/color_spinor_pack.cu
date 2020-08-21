@@ -220,13 +220,13 @@ namespace quda {
 #ifdef NSPIN4
   // never need block-float format with nSpin=4 fields for arbitrary colors
   template<int nColor_> struct precision_spin_color_mapper<float,short,4,nColor_> { static constexpr int nColor = 3; };
-  template<int nColor_> struct precision_spin_color_mapper<float,char,4,nColor_> { static constexpr int nColor = 3; };
+  template<int nColor_> struct precision_spin_color_mapper<float,int8_t,4,nColor_> { static constexpr int nColor = 3; };
 #endif
 
 #ifdef NSPIN1
   // never need block-float format with nSpin=4 fields for arbitrary colors
   template<int nColor_> struct precision_spin_color_mapper<float,short,1,nColor_> { static constexpr int nColor = 3; };
-  template<int nColor_> struct precision_spin_color_mapper<float,char,1,nColor_> { static constexpr int nColor = 3; };
+  template<int nColor_> struct precision_spin_color_mapper<float,int8_t,1,nColor_> { static constexpr int nColor = 3; };
 #endif
 
 #ifndef GPU_MULTIGRID_DOUBLE
@@ -348,13 +348,13 @@ namespace quda {
   template<> struct non_native_precision_mapper<double> { typedef double type; };
   template<> struct non_native_precision_mapper<float> { typedef float type; };
   template<> struct non_native_precision_mapper<short> { typedef float type; };
-  template<> struct non_native_precision_mapper<char> { typedef float type; };
+  template<> struct non_native_precision_mapper<int8_t> { typedef float type; };
 
   // traits used to ensure we only instantiate float and lower precision for float4 fields
   template<typename T> struct float4_precision_mapper { typedef T type; };
   template<> struct float4_precision_mapper<double> { typedef float type; };
   template<> struct float4_precision_mapper<short> { typedef float type; };
-  template<> struct float4_precision_mapper<char> { typedef float type; };
+  template<> struct float4_precision_mapper<int8_t> { typedef float type; };
 
   template <typename Float, typename ghostFloat>
   inline void genericPackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity,
@@ -426,7 +426,7 @@ namespace quda {
 #endif
       } else if (a.GhostPrecision() == QUDA_QUARTER_PRECISION) {
 #if QUDA_PRECISION & 1
-        genericPackGhost<float,char>(ghost, a, parity, nFace, dagger, destination);
+        genericPackGhost<float,int8_t>(ghost, a, parity, nFace, dagger, destination);
 #else
         errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
 #endif
