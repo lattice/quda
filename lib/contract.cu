@@ -50,7 +50,9 @@ namespace quda {
       case QUDA_CONTRACT_TYPE_OPEN_SUM_T: strcat(aux, "open-sum-t,"); break;
       case QUDA_CONTRACT_TYPE_OPEN_SUM_Z: strcat(aux, "open-sum-z,"); break;
       case QUDA_CONTRACT_TYPE_DR_SUM_T: strcat(aux, "degrand-rossi-sum-t,"); break;
-      case QUDA_CONTRACT_TYPE_DR_SUM_Z: strcat(aux, "degrand-rossi-sum-t,"); break;
+      case QUDA_CONTRACT_TYPE_DR_SUM_Z: strcat(aux, "degrand-rossi-sum-z,"); break;
+      case QUDA_CONTRACT_TYPE_DR_FT_T: strcat(aux, "degrand-rossi-ft-t,"); break;
+      case QUDA_CONTRACT_TYPE_DR_FT_Z: strcat(aux, "degrand-rossi-ft-z,"); break;
       default: errorQuda("Unexpected contraction type %d", cType);
       }
       strcat(aux, x.AuxString());
@@ -67,10 +69,10 @@ namespace quda {
 #ifdef JITIFY
         std::string function_name;
         switch (cType) {
-	case QUDA_CONTRACT_TYPE_OPEN_SUM_T: function_name = "quda::computeColorContractionSum"; break;
-	case QUDA_CONTRACT_TYPE_OPEN_SUM_Z: function_name = "quda::computeColorContractionSum"; break;
-        case QUDA_CONTRACT_TYPE_DR_SUM_T: function_name = "quda::computeDegrandRossiContractionSum"; break;
-	case QUDA_CONTRACT_TYPE_DR_SUM_Z: function_name = "quda::computeDegrandRossiContractionSum"; break;
+	case QUDA_CONTRACT_TYPE_OPEN_SUM_T: function_name = "quda::computeColorContractionSummed"; break;
+	case QUDA_CONTRACT_TYPE_OPEN_SUM_Z: function_name = "quda::computeColorContractionSummed"; break;
+        case QUDA_CONTRACT_TYPE_DR_SUM_T: function_name = "quda::computeDegrandRossiContractionSummed"; break;
+	case QUDA_CONTRACT_TYPE_DR_SUM_Z: function_name = "quda::computeDegrandRossiContractionSummed"; break;
         default: errorQuda("Unexpected contraction type %d", cType);
         }
 	
@@ -85,9 +87,17 @@ namespace quda {
         case QUDA_CONTRACT_TYPE_DR_SUM_Z:
 	  LAUNCH_KERNEL_LOCAL_PARITY(computeDegrandRossiContractionSummed, (*this), tp, stream, arg, Arg);
           break;
+	case QUDA_CONTRACT_TYPE_DR_FT_T:
+        case QUDA_CONTRACT_TYPE_DR_FT_Z:
+	  LAUNCH_KERNEL_LOCAL_PARITY(computeDegrandRossiContractionFT, (*this), tp, stream, arg, Arg);
+	  break;
 	case QUDA_CONTRACT_TYPE_OPEN_SUM_T:
         case QUDA_CONTRACT_TYPE_OPEN_SUM_Z:
-	  LAUNCH_KERNEL_LOCAL_PARITY(computeColorContractionSum, (*this), tp, stream, arg, Arg);
+	  LAUNCH_KERNEL_LOCAL_PARITY(computeColorContractionSummed, (*this), tp, stream, arg, Arg);
+	  break;
+	case QUDA_CONTRACT_TYPE_OPEN_FT_T:
+        case QUDA_CONTRACT_TYPE_OPEN_FT_Z:
+	  errorQuda("Contraction type %d not implemented", cType);
 	  break;
 	default: errorQuda("Unexpected contraction type %d", cType);
         }
@@ -139,7 +149,7 @@ namespace quda {
   
   void contractSummedQuda(const ColorSpinorField &x, const ColorSpinorField &y,
 			  std::vector<Complex> &result, const QudaContractType cType,
-                          const int *const source_position, const int *const pxpypzpt, const size_t s1, const size_t b1)
+			  const int *const source_position, const int *const pxpypzpt, const size_t s1, const size_t b1)
   {
 #ifdef GPU_CONTRACT
     checkPrecision(x, y);

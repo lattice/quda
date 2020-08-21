@@ -88,10 +88,9 @@ int main(int argc, char **argv)
   // This is where the result will be stored
   void *correlation_function_sum = nullptr;
   size_t corr_dim = 0, local_corr_length = 0;
-  (contract_type == QUDA_CONTRACT_TYPE_DR_SUM_Z || contract_type == QUDA_CONTRACT_TYPE_OPEN_SUM_Z) ? corr_dim = 2 :
-                                                                                                     corr_dim = 3;
-
-
+  (contract_type == QUDA_CONTRACT_TYPE_DR_SUM_Z || contract_type == QUDA_CONTRACT_TYPE_OPEN_SUM_Z) ? corr_dim = 2 : corr_dim = 3;
+  
+  
   switch (contract_type) {
   case QUDA_CONTRACT_TYPE_OPEN:
   case QUDA_CONTRACT_TYPE_DR: local_corr_length = V; break;
@@ -108,7 +107,7 @@ int main(int argc, char **argv)
   size_t corr_size_in_bytes = n_numbers_per_slice * global_corr_length * sizeof(double);
 
   correlation_function_sum = malloc(corr_size_in_bytes);
-  //we need this to calculate the finite momentum corrs. for temporal corrs we sum up x*px + y*pz + z*pz
+  // We need this to calculate the finite momentum corrs. for temporal corrs we sum up x*px + y*pz + z*pz
   int Pz, Pt;
   if (contract_type == QUDA_CONTRACT_TYPE_DR_SUM_Z || contract_type == QUDA_CONTRACT_TYPE_OPEN_SUM_Z)  {
     Pz = 0;
@@ -145,16 +144,15 @@ int main(int argc, char **argv)
     // Coming soon....
     //propagatorQuda(prop_array_ptr, source_array_ptr, &inv_param, &correlation_function_sum, contract_type, (void *)cs_param_ptr, gauge_param.X);
 
-
-    for ( int px=0; px <= momentum[0]; px++) {
-      for ( int py=0; py <= momentum[1]; py++) {
-        for ( int pz=0; pz <= Pz; pz++) {
-          for ( int pt=0; pt <= Pt; pt++ ) {
+    for (int px=0; px <= momentum[0]; px++) {
+      for (int py=0; py <= momentum[1]; py++) {
+        for (int pz=0; pz <= Pz; pz++) {
+          for (int pt=0; pt <= Pt; pt++ ) {
             // Zero out the result array
             memset(correlation_function_sum, 0, corr_size_in_bytes);
             const int pxpypzpt[4] = {px, py, pz, pt};
-            contractSummedQuda(prop_array_ptr, prop_array_ptr, &correlation_function_sum, contract_type, &inv_param,
-                               (void *)cs_param_ptr, gauge_param.X, source, pxpypzpt);
+            contractFTQuda(prop_array_ptr, prop_array_ptr, &correlation_function_sum, contract_type, &inv_param,
+			   (void *)cs_param_ptr, gauge_param.X, source, pxpypzpt);
 
             // Print correlators for this propagator source position
             for (int G_idx = 0; G_idx < 16; G_idx++) {
