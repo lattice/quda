@@ -462,7 +462,7 @@ int main(int argc, char **argv)
       //contractQuda(qudaSink4D[dil]->V(), qudaSink4D[dil]->V(),
       //((double *)correlation_function) + 2 * 16 * array_size * comm_rank(), contract_type, &inv_param, gauge_param.X);
     }
-    contractSummedQuda(qudaSink4D, qudaSink4D, &correlation_function_sum, contract_type, &inv_param, gauge_param.X);
+    contractSummedQuda((void**)out_array, (void**)out_array, &correlation_function_sum, contract_type, &inv_param, (void*)(&cs_param4D), gauge_param.X);
   
     //contractQuda(qudaSink4D[dil]->V(), qudaSink4D[dil]->V(), ((double *)correlation_function) + 2 * 16 * array_size * comm_rank(), contract_type, &inv_param, gauge_param.X);
     // Collect all the data from all MPI nodes to the 0 MPI node if there is splitting int the T dim:

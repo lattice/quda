@@ -1385,8 +1385,7 @@ extern "C" {
    * @param[in] X spacetime data for construction of ColorSpinorFields
    */
   void contractSummedQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavor_2, void **h_result,
-                          QudaContractType cType, QudaInvertParam *param, void *colorspinorparam, const int *X,
-                          const int *const source_position, const int *const pxpypzpt);
+                          QudaContractType cType, QudaInvertParam *param, void *colorspinorparam, const int *X);
 
   /**
    * Public function to perform color contractions of the host spinors x and y. Does
