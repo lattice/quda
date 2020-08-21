@@ -65,6 +65,9 @@ namespace quda {
     }
   }
 
+  /** for convenience and potentially future updates to using smart pointer use this here*/
+  using ColorSpinorFieldVector = std::vector<ColorSpinorField*>;
+
   /** Typedef for a set of spinors. Can be further divided into subsets ,e.g., with different precisions (not implemented currently) */
   typedef std::vector<ColorSpinorField*> CompositeColorSpinorField;
 

@@ -110,6 +110,7 @@ int main(int argc, char **argv)
   add_eigen_option_group(app);
   add_deflation_option_group(app);
   add_multigrid_option_group(app);
+  test_type = 3;
   CLI::TransformPairs<int> test_type_map {{"full", 0}, {"full_ee_prec", 1}, {"full_oo_prec", 2}, {"even", 3},
                                           {"odd", 4},  {"mcg_even", 5},     {"mcg_odd", 6}};
   app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
@@ -274,14 +275,19 @@ int main(int argc, char **argv)
 
   // Staggered vector construct START
   //-----------------------------------------------------------------------------------
-  quda::ColorSpinorField *in;
-  quda::ColorSpinorField *out;
+  
+  // quda::ColorSpinorField *in;
+  // quda::ColorSpinorField *out;
+  std::vector<std::unique_ptr<quda::ColorSpinorField>> in;
+  std::vector<std::unique_ptr<quda::ColorSpinorField>> out;
   quda::ColorSpinorField *ref;
   quda::ColorSpinorField *tmp;
   quda::ColorSpinorParam cs_param;
   constructStaggeredTestSpinorParam(&cs_param, &inv_param, &gauge_param);
-  in = quda::ColorSpinorField::Create(cs_param);
-  out = quda::ColorSpinorField::Create(cs_param);
+  for (int k = 0; k < std::max(Nsrc, Msrc); k++) {
+    in.emplace_back(quda::ColorSpinorField::Create(cs_param));
+    out.emplace_back(quda::ColorSpinorField::Create(cs_param));
+  }
   ref = quda::ColorSpinorField::Create(cs_param);
   tmp = quda::ColorSpinorField::Create(cs_param);
   // Staggered vector construct END
@@ -299,9 +305,10 @@ int main(int argc, char **argv)
   // Quark masses
   std::vector<double> masses(multishift);
   // Host array for solutions
-  void **outArray = (void **)malloc(multishift * sizeof(void *));
+  void **outArray = (void **)malloc(std::max(std::max(Msrc,Nsrc), multishift) * sizeof(void *));
+  void **inArray = (void **)malloc(std::max(Nsrc, Msrc) * sizeof(void *));
   // QUDA host array for internal checks and malloc
-  std::vector<ColorSpinorField *> qudaOutArray(multishift);
+  std::vector<std::unique_ptr<quda::ColorSpinorField>> qudaOutArray;
 
   // QUDA invert test
   //----------------------------------------------------------------------------
@@ -316,24 +323,44 @@ int main(int argc, char **argv)
       printfQuda("Multishift not supported for test %d\n", test_type);
       exit(0);
     }
+    if (Msrc == 1) {
+      for (int k = 0; k < Nsrc; k++) {
+        quda::spinorNoise(*in[k], *rng, QUDA_NOISE_UNIFORM);
+        if (inv_deflate) eig_param.preserve_deflation = k < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+        invertQuda(out[k]->V(), in[k]->V(), &inv_param);
 
-    for (int k = 0; k < Nsrc; k++) {
-      quda::spinorNoise(*in, *rng, QUDA_NOISE_UNIFORM);
-      if (inv_deflate) eig_param.preserve_deflation = k < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-      invertQuda(out->V(), in->V(), &inv_param);
+        time[k] = inv_param.secs;
+        gflops[k] = inv_param.gflops / inv_param.secs;
+        printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
+                   inv_param.gflops / inv_param.secs);
+        if (verify_results)
+          verifyStaggeredInversion(tmp, ref, in[k].get(), out[k].get(), mass, qdp_fatlink, qdp_longlink,
+                                   (void **)cpuFat->Ghost(), (void **)cpuLong->Ghost(), gauge_param, inv_param, 0);
+      }
 
-      time[k] = inv_param.secs;
-      gflops[k] = inv_param.gflops / inv_param.secs;
+      // Compute timings
+      if (Nsrc > 1) performanceStats(time, gflops);
+    } else {
+      for (int k = 0; k < Msrc; k++) {
+        quda::spinorNoise(*in[k], *rng, QUDA_NOISE_UNIFORM);
+        outArray[k] = out[k]->V();
+        inArray[k] = in[k]->V();
+        // invertQuda(outArray[k], inArray[k], &inv_param);
+
+      }
+      invertMultiSrcQuda(outArray, inArray, &inv_param);
       printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
                  inv_param.gflops / inv_param.secs);
-      if (verify_results)
-        verifyStaggeredInversion(tmp, ref, in, out, mass, qdp_fatlink, qdp_longlink, (void **)cpuFat->Ghost(),
-                                 (void **)cpuLong->Ghost(), gauge_param, inv_param, 0);
-    }
 
-    // Compute timings
-    if (Nsrc > 1) performanceStats(time, gflops);
+      if (verify_results) {
+        for (int k = 0; k < Msrc; k++) {
+          verifyStaggeredInversion(tmp, ref, in[k].get(), out[k].get(), mass, qdp_fatlink, qdp_longlink,
+                                   (void **)cpuFat->Ghost(), (void **)cpuLong->Ghost(), gauge_param, inv_param, 0);
+        }
+      }
+    }
     break;
+
 
   case 5: // multi mass CG, even parity solution, solving EVEN system
   case 6: // multi mass CG, odd parity solution, solving ODD system
@@ -353,22 +380,22 @@ int main(int argc, char **argv)
       inv_param.tol_offset[i] = inv_param.tol;
       inv_param.tol_hq_offset[i] = inv_param.tol_hq;
       // Allocate memory and set pointers
-      qudaOutArray[i] = ColorSpinorField::Create(cs_param);
+      qudaOutArray.emplace_back(ColorSpinorField::Create(cs_param));
       outArray[i] = qudaOutArray[i]->V();
     }
-    quda::spinorNoise(*in, *rng, QUDA_NOISE_UNIFORM);
-    invertMultiShiftQuda((void **)outArray, in->V(), &inv_param);
+    quda::spinorNoise(*in[0], *rng, QUDA_NOISE_UNIFORM);
+    invertMultiShiftQuda(outArray, in[0]->V(), &inv_param);
 
     printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
                inv_param.gflops / inv_param.secs);
 
     for (int i = 0; i < multishift; i++) {
       printfQuda("%dth solution: mass=%f, ", i, masses[i]);
-      verifyStaggeredInversion(tmp, ref, in, qudaOutArray[i], masses[i], qdp_fatlink, qdp_longlink,
+      verifyStaggeredInversion(tmp, ref, in[0].get(), qudaOutArray[i].get(), masses[i], qdp_fatlink, qdp_longlink,
                                (void **)cpuFat->Ghost(), (void **)cpuLong->Ghost(), gauge_param, inv_param, i);
     }
 
-    for (int i = 0; i < multishift; i++) delete qudaOutArray[i];
+    qudaOutArray.clear();
     break;
 
   default: errorQuda("Unsupported test type");
@@ -406,11 +433,13 @@ int main(int argc, char **argv)
   if (cpuFat != nullptr) { delete cpuFat; cpuFat = nullptr; }
   if (cpuLong != nullptr) { delete cpuLong; cpuLong = nullptr; }
 
-  delete in;
-  delete out;
+
+  in.clear();
+  out.clear();
   delete ref;
   delete tmp;
   free(outArray);
+  free(inArray);
 
   // Finalize the QUDA library
   endQuda();

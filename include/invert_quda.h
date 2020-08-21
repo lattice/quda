@@ -652,8 +652,6 @@ namespace quda {
      */
     void operator()(ColorSpinorField &out, ColorSpinorField &in, ColorSpinorField *p_init, double r2_old_init);
 
-    void blocksolve(ColorSpinorField& out, ColorSpinorField& in);
-
     virtual bool hermitian() { return true; } /** CG is only for Hermitian systems */
   };
 
@@ -1248,6 +1246,63 @@ public:
       for (auto& pp : p) delete pp;
     }
 
+  };
+
+
+class MultiRhsSolver  {
+
+  protected:
+    SolverParam &param;
+    TimeProfile &profile;
+
+  public:
+    MultiRhsSolver(SolverParam &param, TimeProfile &profile) :
+    param(param), profile(profile) { ; }
+    virtual ~MultiRhsSolver() { ; }
+
+    virtual void operator()(ColorSpinorFieldVector& out, ColorSpinorFieldVector& in) = 0;
+    bool convergence(const double &r2, const double &hq2, const double &r2_tol,
+         const double &hq_tol) const;
+    static double stopping(const double &tol, const double &b2, QudaResidualType residual_type);
+        /**
+       Prints out the running statistics of the solver (requires a verbosity of QUDA_VERBOSE)
+     */
+    void PrintStats(const char*, int k, const double &r2, const double &b2, const double &hq2);
+
+    /**
+  Prints out the summary of the solver convergence (requires a
+  versbosity of QUDA_SUMMARIZE).  Assumes
+  SolverParam.true_res and SolverParam.true_res_hq has
+  been set
+    */
+    void PrintSummary(const char *name, int k, const double &r2, const double &b2);
+  };
+
+  class BlockCG : public MultiRhsSolver {
+
+  private:
+    const DiracMatrix &mat;
+    const DiracMatrix &matSloppy;
+    // pointers to fields to avoid multiple creation overhead
+    std::vector<ColorSpinorField*> yp, rp, App, tmpp;
+    std::vector<ColorSpinorField*> p;
+    std::vector<ColorSpinorField*> x_sloppy_savedp, pp, qp, tmp_matsloppyp;
+    std::vector<ColorSpinorField*> p_oldp; // only for BLOCKSOLVER_PRECISE_Q
+    bool init;
+
+    template <int n>
+    void solve_n(ColorSpinorFieldVector& out, ColorSpinorFieldVector& in);
+    int block_reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta);
+
+    
+
+  public:
+    BlockCG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    virtual ~BlockCG();
+    void operator()(ColorSpinorFieldVector &out, ColorSpinorFieldVector &in);
+
+
+    
   };
 
 
