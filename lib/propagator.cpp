@@ -6,15 +6,20 @@ namespace quda {
   {
     ColorSpinorParam param(param_);
     prop_dim = param.nColor * param.nSpin;
-    std::vector<quda::ColorSpinorField *> prop_vectors(prop_dim);
-
+    prop_vectors.reserve(prop_dim);
+    
     // Allocate memory on host or device in a contiguous chunk.    
     size_t volume = 1;
     for (int d = 0; d < param.nDim; d++) volume *= param.x[d];
     prop_location = param.location;
     prop_precision = param.Precision();
+
+    if(prop_location == QUDA_CPU_FIELD_LOCATION) printfQuda("prop_location == QUDA_CPU_FIELD_LOCATION)\n");
     
-    prop_data = (prop_location == QUDA_CPU_FIELD_LOCATION ? (void *)malloc(prop_dim * prop_dim * volume * 2 * prop_precision) : (void *)device_malloc(prop_dim * prop_dim * volume * 2 * prop_precision));
+    size_t prop_size_bytes = prop_dim * prop_dim * volume * 2 * prop_precision;
+    printfQuda("prop_size_bytes = %lu\n", prop_size_bytes); 
+    prop_data = (prop_location == QUDA_CPU_FIELD_LOCATION ?
+		 (void *)malloc(prop_size_bytes) : (void *)device_malloc(prop_size_bytes));
     
     param.create = QUDA_REFERENCE_FIELD_CREATE;
     for (size_t i = 0; i < prop_dim; i++) {
@@ -28,7 +33,7 @@ namespace quda {
       case QUDA_QUARTER_PRECISION : 
 	param.v = (char *)prop_data + i * volume * prop_dim * 2; break;
       default :
-	errorQuda("Unknow precision type %d given", prop_precision);
+	errorQuda("Unknown precision type %d given", prop_precision);
       }	
       prop_vectors[i] = ColorSpinorField::Create(param);
     }
@@ -55,11 +60,19 @@ namespace quda {
     if (vecs.size() == 0) errorQuda("Zero sized vector set in Propagator");
     size_t n_vecs = vecs[0]->Ncolor() * vecs[0]->Nspin();
     if (vecs.size() != n_vecs) errorQuda("Propgator expected %lu vectors, %lu passed", n_vecs, vecs.size());
-
+    
+    printfQuda("Here!\n");
+    
     // Copy vectors from input
-    for (size_t i = 0; i < n_vecs; i++) prop_vectors[i] = vecs[i];
+    for (size_t i = 0; i < n_vecs; i++) {
+      printfQuda("Here %lu!\n", i);
+      prop_vectors[i]->PrintVector(0);	    
+      vecs[i]->PrintVector(0);
+      *prop_vectors[i] = *vecs[i];
+      printfQuda("Here %lu!\n", i);
+    }
   }
-
+  
   ColorSpinorField *Propagator::selectVector(const int vec)
   {
     // Sanity checks

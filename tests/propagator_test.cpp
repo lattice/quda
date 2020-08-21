@@ -382,7 +382,7 @@ int main(int argc, char **argv)
       // load the source
       quda::VectorIO io(infile, QUDA_BOOLEAN_TRUE);
       io.load(src_ptr);
-
+      
     } else {
       // We will construct a point source.
       printfQuda("Source position: %d %d %d %d\n", prop_source_position[n][0], prop_source_position[n][1],
@@ -420,11 +420,11 @@ int main(int argc, char **argv)
 
       // If deflating, preserve the deflation space between solves, destroy on the last solve
       if (inv_deflate) eig_param.preserve_deflation = dil < 12 - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-
+      
       // Perform QUDA inversions
       inv_param.solver_normalization = QUDA_SOURCE_NORMALIZATION; // Make explicit for now.
       invertQuda(out->V(), in->V(), &inv_param);
-
+      
       // Performance states
       time[dil] = inv_param.secs;
       gflops[dil] = inv_param.gflops / inv_param.secs;
@@ -445,10 +445,10 @@ int main(int argc, char **argv)
       if (verify_results) {
         verifyInversion(out->V(), in->V(), check->V(), gauge_param, inv_param, gauge, clover, clover_inv);
       }
-
+      
       // Gaussian smear the sink.
       performGaussianSmearNStep(qudaSink4D[dil]->V(), &inv_param_smear, prop_sink_smear_steps);
-
+      
       // Debugging...
       for (int i = 0; i < 5; i++) {
         // qudaSink4D[dil]->PrintVector(i);
@@ -461,38 +461,40 @@ int main(int argc, char **argv)
       // result in the array correlation_function
       //contractQuda(qudaSink4D[dil]->V(), qudaSink4D[dil]->V(),
       //((double *)correlation_function) + 2 * 16 * array_size * comm_rank(), contract_type, &inv_param, gauge_param.X);
-
-      contractQuda(qudaSink4D[dil]->V(), qudaSink4D[dil]->V(), ((double *)correlation_function) + 2 * 16 * array_size * comm_rank(), contract_type, &inv_param, gauge_param.X);
-      
-      // Collect all the data from all MPI nodes to the 0 MPI node if there is splitting int the T dim:
-      comm_gather_reduce_timeslice_array((double *)correlation_function, 2 * 16 * array_size);
-
-      // Dump data to stdout. This needs some elegance.
-      for (int gamma_mat = 0; gamma_mat < 16; gamma_mat++) {
-        for (size_t t = 0; t < comm_dim(3) * array_size; t++) {
-          // printfQuda("t=%d %e %e\n", t, ((double*)correlation_function)[2*(16*t + gamma_mat)],
-          // ((double*)correlation_function)[2*(16*t + gamma_mat) + 1]);
-          ((double *)correlation_function_sum)[2 * (16 * t + gamma_mat)]
-            += ((double *)correlation_function)[2 * (16 * t + gamma_mat)];
+    }
+    contractSummedQuda(qudaSink4D, qudaSink4D, &correlation_function_sum, contract_type, &inv_param, gauge_param.X);
+  
+    //contractQuda(qudaSink4D[dil]->V(), qudaSink4D[dil]->V(), ((double *)correlation_function) + 2 * 16 * array_size * comm_rank(), contract_type, &inv_param, gauge_param.X);
+    // Collect all the data from all MPI nodes to the 0 MPI node if there is splitting int the T dim:
+    //comm_gather_reduce_timeslice_array((double *)correlation_function, 2 * 16 * array_size);
+  
+  /*
+  // Dump data to stdout. This needs some elegance.
+    for (int gamma_mat = 0; gamma_mat < 16; gamma_mat++) {
+      for (size_t t = 0; t < comm_dim(3) * array_size; t++) {
+	// printfQuda("t=%d %e %e\n", t, ((double*)correlation_function)[2*(16*t + gamma_mat)],
+	// ((double*)correlation_function)[2*(16*t + gamma_mat) + 1]);
+	((double *)correlation_function_sum)[2 * (16 * t + gamma_mat)]
+	  += ((double *)correlation_function)[2 * (16 * t + gamma_mat)];
           ((double *)correlation_function_sum)[2 * (16 * t + gamma_mat) + 1]
             += ((double *)correlation_function)[2 * (16 * t + gamma_mat) + 1];
-        }
       }
-    }
-
-    for (int gamma_mat = 0; gamma_mat < 16; gamma_mat++) {
+      }
+  */
+  
+  for (int gamma_mat = 0; gamma_mat < 16; gamma_mat++) {
       for (size_t t = 0; t < comm_dim(3) * array_size; t++) {
         printfQuda("sum: g=%d t=%lu %e %e\n", gamma_mat, t,
                    ((double *)correlation_function_sum)[2 * (16 * t + gamma_mat)],
                    ((double *)correlation_function_sum)[2 * (16 * t + gamma_mat) + 1]);
       }
     }
-
+    
     for (int gamma_mat = 0; gamma_mat < 16; gamma_mat++) {
       for (size_t t = 0; t < comm_dim(3) * array_size; t++) {
         printfQuda("ratio: g=%d t=%lu %e\n", gamma_mat, t,
                    (((double *)correlation_function_sum)[2 * (16 * t + gamma_mat)])
-                     / (((double *)correlation_function_sum)[2 * (16 * ((t + 1) % (comm_dim(3) * tdim)) + gamma_mat)]));
+		   / (((double *)correlation_function_sum)[2 * (16 * ((t + 1) % (comm_dim(3) * tdim)) + gamma_mat)]));
       }
     }
 
