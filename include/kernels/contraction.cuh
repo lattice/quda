@@ -212,6 +212,7 @@ namespace quda
     int s1, b1;
     int source_position[4];
     int pxpypzpt[4];
+    int NxNyNzNt[4];
     typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
     F x;
     F y;
@@ -234,6 +235,7 @@ namespace quda
       for (int i=0;i<4;i++) pxpypzpt[i]=_pxpypzpt[i];
       for (int i=0;i<4;i++) source_position[i]=_source_position[i];
       for (int i=0;i<4;i++) offsets[i]=comm_coord(i) * x.X(i);
+      for (int i=0;i<4;i++) NxNyNzNt[i]=comm_dim(i) * x.X(i);
     }
   };
 
@@ -291,8 +293,8 @@ namespace quda
     return (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) / 2;
   }
 
-  
-  template <int blockSize, typename Arg> __global__ void computeDegrandRossiContractionSummed(Arg arg)
+
+ /* template <int blockSize, typename Arg> __global__ void computeDegrandRossiContractionSummed(Arg arg)
   {
     int t = blockIdx.z; // map t to z block index
     int xyz = threadIdx.x + blockIdx.x * blockDim.x;
@@ -344,7 +346,7 @@ namespace quda
     // different threads reduce result to different index t + arg.t_offset
     arg.template reduce2d<blockSize, 2>(result_all_channels, t + arg.t_offset);
   }
-
+*/
   template <int blockSize, typename Arg> __global__ void computeDegrandRossiContractionFT(Arg arg)
   {
     int t = blockIdx.z; // map t to z block index
@@ -355,11 +357,15 @@ namespace quda
     int b1 = arg.b1;
 
     int pxpypzpt[4];
-    for(int i=0;i<4;i++) pxpypzpt[i]=arg.pxpypzpt[i];
     int source_position[4];
-    for(int i=0;i<4;i++) source_position[i]=arg.source_position[i];
     int offsets[4];
-    for(int i=0;i<4;i++) offsets[i]=arg.offsets[i];
+    int NxNyNzNt[4];
+    for(int i=0;i<4;i++) {
+      source_position[i]=arg.source_position[i];
+      offsets[i]=arg.offsets[i];
+      pxpypzpt[i]=arg.pxpypzpt[i];
+      NxNyNzNt[i]=arg.NxNyNzNt[i];
+    }
 
     using real = typename Arg::Float;
     constexpr int nSpin = Arg::nSpin;
@@ -382,12 +388,12 @@ namespace quda
       sink=get_sink<Arg::reduction_dim>(t, xyz, arg.X, parity);
       int idx_cb = x_cb_from_sink(arg.X, sink);
       //calculate exp(-i*x*p)
-      Sum_dXi_dot_Pi=(double)((source_position[0]-sink[0]-offsets[0])*pxpypzpt[0]+
-                     (source_position[1]-sink[1]-offsets[1])*pxpypzpt[1]+
-                     (source_position[2]-sink[2]-offsets[2])*pxpypzpt[2]+
-                     (source_position[3]-sink[3]-offsets[3])*pxpypzpt[3]);
-      phase_real=cos(Sum_dXi_dot_Pi);
-      phase_imag=-sin(Sum_dXi_dot_Pi);
+      Sum_dXi_dot_Pi=(double)((source_position[0]-sink[0]-offsets[0])*pxpypzpt[0]*1./NxNyNzNt[0]+
+                     (source_position[1]-sink[1]-offsets[1])*pxpypzpt[1]*1./NxNyNzNt[1]+
+                     (source_position[2]-sink[2]-offsets[2])*pxpypzpt[2]*1./NxNyNzNt[2]+
+                     (source_position[3]-sink[3]-offsets[3])*pxpypzpt[3]*1./NxNyNzNt[3]);
+      phase_real=cos(Sum_dXi_dot_Pi*2.*M_PI);
+      phase_imag=-sin(Sum_dXi_dot_Pi*2.*M_PI);
 
       ColorSpinor<real, nColor, nSpin> x = arg.x(idx_cb, parity);
       ColorSpinor<real, nColor, nSpin> y = arg.y(idx_cb, parity);

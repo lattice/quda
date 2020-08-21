@@ -89,14 +89,13 @@ int main(int argc, char **argv)
   void *correlation_function_sum = nullptr;
   size_t corr_dim = 0, local_corr_length = 0;
   // We need this to calculate the finite momentum corrs. for temporal corrs we sum up x*px + y*pz + z*pz
-  int Pz, Pt;
+  int Pz=momentum[2];
+  int Pt=momentum[3];
   if (contract_type == QUDA_CONTRACT_TYPE_DR_FT_Z) {
     corr_dim = 2;
     Pz = 0;
-    Pt = momentum[3];
   } else if (contract_type == QUDA_CONTRACT_TYPE_DR_FT_T) {
     corr_dim = 3;
-    Pz = momentum[2];
     Pt = 0;
   } else {
     errorQuda("Unsupported contraction type %d given", contract_type);
