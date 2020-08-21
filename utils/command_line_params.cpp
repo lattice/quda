@@ -257,9 +257,15 @@ namespace
   CLI::TransformPairs<QudaContractType> contract_type_map {{"open", QUDA_CONTRACT_TYPE_OPEN},
                                                            {"open-sum-t", QUDA_CONTRACT_TYPE_OPEN_SUM_T},
                                                            {"open-sum-z", QUDA_CONTRACT_TYPE_OPEN_SUM_Z},
+							   {"open-ft-t", QUDA_CONTRACT_TYPE_OPEN_FT_T},
+                                                           {"open-ft-z", QUDA_CONTRACT_TYPE_OPEN_FT_Z},
                                                            {"dr", QUDA_CONTRACT_TYPE_DR},
                                                            {"dr-sum-t", QUDA_CONTRACT_TYPE_DR_SUM_T},
-                                                           {"dr-sum-z", QUDA_CONTRACT_TYPE_DR_SUM_Z}};
+							   {"dr-sum-z", QUDA_CONTRACT_TYPE_DR_SUM_Z},
+							   {"dr-ft-t", QUDA_CONTRACT_TYPE_DR_FT_T},
+                                                           {"dr-ft-z", QUDA_CONTRACT_TYPE_DR_FT_Z}
+
+  };
 
   CLI::TransformPairs<QudaDslashType> dslash_type_map {{"wilson", QUDA_WILSON_DSLASH},
                                                        {"clover", QUDA_CLOVER_WILSON_DSLASH},

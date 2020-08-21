@@ -6033,8 +6033,13 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
   switch (cType) {
   case QUDA_CONTRACT_TYPE_OPEN_SUM_T:
   case QUDA_CONTRACT_TYPE_OPEN_SUM_Z:
+  case QUDA_CONTRACT_TYPE_OPEN_FT_T:
+  case QUDA_CONTRACT_TYPE_OPEN_FT_Z:    
   case QUDA_CONTRACT_TYPE_DR_SUM_T:
-  case QUDA_CONTRACT_TYPE_DR_SUM_Z: local_corr_length = X[corr_dim]; break;
+  case QUDA_CONTRACT_TYPE_DR_SUM_Z:
+  case QUDA_CONTRACT_TYPE_DR_FT_T:
+  case QUDA_CONTRACT_TYPE_DR_FT_Z:
+    local_corr_length = X[corr_dim]; break;
   case QUDA_CONTRACT_TYPE_OPEN:
   case QUDA_CONTRACT_TYPE_DR:
   default: errorQuda("Unsupported contraction type %d given", cType);

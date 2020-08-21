@@ -109,10 +109,12 @@ int main(int argc, char **argv)
   correlation_function_sum = malloc(corr_size_in_bytes);
   // We need this to calculate the finite momentum corrs. for temporal corrs we sum up x*px + y*pz + z*pz
   int Pz, Pt;
-  if (contract_type == QUDA_CONTRACT_TYPE_DR_SUM_Z || contract_type == QUDA_CONTRACT_TYPE_OPEN_SUM_Z)  {
+  if (contract_type == QUDA_CONTRACT_TYPE_DR_SUM_Z || contract_type == QUDA_CONTRACT_TYPE_OPEN_SUM_Z ||
+      contract_type == QUDA_CONTRACT_TYPE_DR_FT_Z  || contract_type == QUDA_CONTRACT_TYPE_OPEN_FT_Z)  {
     Pz = 0;
     Pt = momentum[3];
-  } else if (contract_type == QUDA_CONTRACT_TYPE_DR_SUM_T || contract_type == QUDA_CONTRACT_TYPE_OPEN_SUM_T)  {
+  } else if (contract_type == QUDA_CONTRACT_TYPE_DR_SUM_T || contract_type == QUDA_CONTRACT_TYPE_OPEN_SUM_T ||
+	     contract_type == QUDA_CONTRACT_TYPE_DR_FT_T  || contract_type == QUDA_CONTRACT_TYPE_OPEN_FT_T)  {
     Pz = momentum[2];
     Pt = 0;
   } else {
