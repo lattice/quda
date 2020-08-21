@@ -1355,6 +1355,24 @@ extern "C" {
   /**
    * Public function to perform color contractions of the host spinorfields contained
    * inside first two arguments. Used for cases where one wishes to contract data in
+   * either the T or Z dim, with a Fourier phase applied
+   * @param[in] h_prop_array_flavor_1 pointer to pointers of ColorSpinorField host data
+   * @param[in] h_prop_array_flavor_2 pointer to pointers of ColorSpinorField host data
+   * @param[out] h_result adress of pointer to the 16*corr_dim complex numbers of the
+   *            result correlators
+   * @param[in] cType Which type of contraction (open, degrand-rossi, etc)
+   * @param[in] param meta data for construction of ColorSpinorFields.
+   * @param[in] colorspinorparam pointer to a ColorSpinorParam meta data for
+   *            construction of ColorSpinorFields
+   * @param[in] X spacetime data for construction of ColorSpinorFields
+   */
+  void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void **h_result,
+		      const QudaContractType cType, QudaInvertParam *param, void *cs_param_,
+		      const int *X, const int *const source_position, const int *const pxpypzpt);
+  
+  /**
+   * Public function to perform color contractions of the host spinorfields contained
+   * inside first two arguments. Used for cases where one wishes to contract data in
    * either the T or Z dim
    * @param[in] h_prop_array_flavor_1 pointer to pointers of ColorSpinorField host data
    * @param[in] h_prop_array_flavor_2 pointer to pointers of ColorSpinorField host data
