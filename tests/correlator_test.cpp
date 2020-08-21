@@ -88,18 +88,20 @@ int main(int argc, char **argv)
   // This is where the result will be stored
   void *correlation_function_sum = nullptr;
   size_t corr_dim = 0, local_corr_length = 0;
-  (contract_type == QUDA_CONTRACT_TYPE_DR_SUM_Z || contract_type == QUDA_CONTRACT_TYPE_OPEN_SUM_Z) ? corr_dim = 2 : corr_dim = 3;
-  
-  
-  switch (contract_type) {
-  case QUDA_CONTRACT_TYPE_OPEN:
-  case QUDA_CONTRACT_TYPE_DR: local_corr_length = V; break;
-  case QUDA_CONTRACT_TYPE_OPEN_SUM_T:
-  case QUDA_CONTRACT_TYPE_OPEN_SUM_Z:
-  case QUDA_CONTRACT_TYPE_DR_SUM_T:
-  case QUDA_CONTRACT_TYPE_DR_SUM_Z: local_corr_length = gauge_param.X[corr_dim]; break;
-  default: errorQuda("Unsupported contraction type %d given", contract_type);
+  // We need this to calculate the finite momentum corrs. for temporal corrs we sum up x*px + y*pz + z*pz
+  int Pz, Pt;
+  if (contract_type == QUDA_CONTRACT_TYPE_DR_FT_Z) {
+    corr_dim = 2;
+    Pz = 0;
+    Pt = momentum[3];
+  } else if (contract_type == QUDA_CONTRACT_TYPE_DR_FT_T) {
+    corr_dim = 3;
+    Pz = momentum[2];
+    Pt = 0;
+  } else {
+    errorQuda("Unsupported contraction type %d given", contract_type);
   }
+  local_corr_length = gauge_param.X[corr_dim];
 
   // calculate some parameters
   size_t global_corr_length = local_corr_length * comm_dim(corr_dim);
@@ -107,24 +109,8 @@ int main(int argc, char **argv)
   size_t corr_size_in_bytes = n_numbers_per_slice * global_corr_length * sizeof(double);
 
   correlation_function_sum = malloc(corr_size_in_bytes);
-  // We need this to calculate the finite momentum corrs. for temporal corrs we sum up x*px + y*pz + z*pz
-  int Pz, Pt;
-  if (contract_type == QUDA_CONTRACT_TYPE_DR_SUM_Z || contract_type == QUDA_CONTRACT_TYPE_OPEN_SUM_Z ||
-      contract_type == QUDA_CONTRACT_TYPE_DR_FT_Z  || contract_type == QUDA_CONTRACT_TYPE_OPEN_FT_Z)  {
-    Pz = 0;
-    Pt = momentum[3];
-  } else if (contract_type == QUDA_CONTRACT_TYPE_DR_SUM_T || contract_type == QUDA_CONTRACT_TYPE_OPEN_SUM_T ||
-	     contract_type == QUDA_CONTRACT_TYPE_DR_FT_T  || contract_type == QUDA_CONTRACT_TYPE_OPEN_FT_T)  {
-    Pz = momentum[2];
-    Pt = 0;
-  } else {
-    Pz = momentum[2];
-    Pt = momentum[3];
-  }
 
-
-  // Loop over the number of sources to use. Default is prop_n_sources=1.
-  // Default source position = 0 0 0 0
+  // Loop over the number of sources to use. Default is prop_n_sources=1 and source position = 0 0 0 0
   for (int n = 0; n < prop_n_sources; n++) {
     printfQuda("Source position: %d %d %d %d\n", prop_source_position[n][0], prop_source_position[n][1],
                prop_source_position[n][2], prop_source_position[n][3]);

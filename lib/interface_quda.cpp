@@ -6029,21 +6029,14 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
 
   // temporal or spatial correlator?
   size_t corr_dim = 0, local_corr_length = 0;
-  (cType == QUDA_CONTRACT_TYPE_DR_SUM_Z || cType == QUDA_CONTRACT_TYPE_OPEN_SUM_Z) ? corr_dim = 2 : corr_dim = 3;
-  switch (cType) {
-  case QUDA_CONTRACT_TYPE_OPEN_SUM_T:
-  case QUDA_CONTRACT_TYPE_OPEN_SUM_Z:
-  case QUDA_CONTRACT_TYPE_OPEN_FT_T:
-  case QUDA_CONTRACT_TYPE_OPEN_FT_Z:    
-  case QUDA_CONTRACT_TYPE_DR_SUM_T:
-  case QUDA_CONTRACT_TYPE_DR_SUM_Z:
-  case QUDA_CONTRACT_TYPE_DR_FT_T:
-  case QUDA_CONTRACT_TYPE_DR_FT_Z:
-    local_corr_length = X[corr_dim]; break;
-  case QUDA_CONTRACT_TYPE_OPEN:
-  case QUDA_CONTRACT_TYPE_DR:
-  default: errorQuda("Unsupported contraction type %d given", cType);
+  if (cType == QUDA_CONTRACT_TYPE_DR_FT_Z) {
+    corr_dim = 2;
+  } else if (cType == QUDA_CONTRACT_TYPE_DR_FT_T) {
+    corr_dim = 3;
+  } else {
+    errorQuda("Unsupported contraction type %d given", cType);
   }
+  local_corr_length = X[corr_dim];
 
   size_t global_corr_length = local_corr_length * comm_dim(corr_dim);
   size_t n_numbers_per_slice = 2 * nSpin * nSpin;
@@ -6134,12 +6127,12 @@ void contractSummedQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, 
 
   // temporal or spatial correlator?
   size_t corr_dim = 0, local_corr_length = 0;
-  (cType == QUDA_CONTRACT_TYPE_DR_SUM_Z || cType == QUDA_CONTRACT_TYPE_OPEN_SUM_Z) ? corr_dim = 2 : corr_dim = 3;
+  (cType == QUDA_CONTRACT_TYPE_DR_FT_Z || cType == QUDA_CONTRACT_TYPE_OPEN_SUM_Z) ? corr_dim = 2 : corr_dim = 3;
   switch (cType) {
   case QUDA_CONTRACT_TYPE_OPEN_SUM_T:
   case QUDA_CONTRACT_TYPE_OPEN_SUM_Z:
-  case QUDA_CONTRACT_TYPE_DR_SUM_T:
-  case QUDA_CONTRACT_TYPE_DR_SUM_Z: local_corr_length = X[corr_dim]; break;
+  case QUDA_CONTRACT_TYPE_DR_FT_T:
+  case QUDA_CONTRACT_TYPE_DR_FT_Z: local_corr_length = X[corr_dim]; break;
   case QUDA_CONTRACT_TYPE_OPEN:
   case QUDA_CONTRACT_TYPE_DR:
   default: errorQuda("Unsupported contraction type %d given", cType);
