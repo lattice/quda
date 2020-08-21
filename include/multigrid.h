@@ -166,7 +166,7 @@ namespace quda {
       location(param.mg_global.location[level]),
       setup_location(param.mg_global.setup_location[level]),
       is_staggered(param.is_staggered),
-      use_mma(param.use_mma == QUDA_BOOLEAN_TRUE)
+      use_mma(param.use_mma)
     {
       // set the block size
       for (int i = 0; i < QUDA_MAX_DIM; i++) geoBlockSize[i] = param.mg_global.geo_block_size[level][i];
