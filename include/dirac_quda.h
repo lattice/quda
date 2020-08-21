@@ -78,7 +78,11 @@ namespace quda {
       tmp2(0),
       halo_precision(QUDA_INVALID_PRECISION),
       need_bidirectional(false),
+#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
+      use_mma(true)
+#else
       use_mma(false)
+#endif
     {
       for (int i=0; i<QUDA_MAX_DIM; i++) commDim[i] = 1;
     }
