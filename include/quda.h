@@ -1368,7 +1368,7 @@ extern "C" {
    */
   void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void **h_result,
 		      const QudaContractType cType, QudaInvertParam *param, void *cs_param_,
-		      const int *X, const int *const source_position, const int *const pxpypzpt);
+		      const int *X, const int *const source_position, int* Mom);
   
   /**
    * Public function to perform color contractions of the host spinorfields contained

@@ -89,14 +89,16 @@ int main(int argc, char **argv)
   void *correlation_function_sum = nullptr;
   size_t corr_dim = 0, local_corr_length = 0;
   // We need this to calculate the finite momentum corrs. for temporal corrs we sum up x*px + y*pz + z*pz
-  int Pz=momentum[2];
-  int Pt=momentum[3];
+  int Nmom=(momentum[0]+1)*(momentum[1]+1);
+  int Mom[4]={momentum[0], momentum[1], momentum[2], momentum[3]};
   if (contract_type == QUDA_CONTRACT_TYPE_DR_FT_Z) {
     corr_dim = 2;
-    Pz = 0;
+    Mom[2]=0;
+    Nmom *= (momentum[3]+1);
   } else if (contract_type == QUDA_CONTRACT_TYPE_DR_FT_T) {
     corr_dim = 3;
-    Pt = 0;
+    Mom[3]=0;
+    Nmom *= (momentum[2]+1);
   } else {
     errorQuda("Unsupported contraction type %d given", contract_type);
   }
@@ -107,7 +109,7 @@ int main(int argc, char **argv)
   size_t n_numbers_per_slice = 2 * cs_param.nSpin * cs_param.nSpin;
   size_t corr_size_in_bytes = n_numbers_per_slice * global_corr_length * sizeof(double);
 
-  correlation_function_sum = malloc(corr_size_in_bytes);
+  correlation_function_sum = malloc(Nmom*corr_size_in_bytes);
 
   // Loop over the number of sources to use. Default is prop_n_sources=1 and source position = 0 0 0 0
   for (int n = 0; n < prop_n_sources; n++) {
@@ -131,25 +133,24 @@ int main(int argc, char **argv)
     // Coming soon....
     //propagatorQuda(prop_array_ptr, source_array_ptr, &inv_param, &correlation_function_sum, contract_type, (void *)cs_param_ptr, gauge_param.X);
 
-    for (int px=0; px <= momentum[0]; px++) {
-      for (int py=0; py <= momentum[1]; py++) {
-        for (int pz=0; pz <= Pz; pz++) {
-          for (int pt=0; pt <= Pt; pt++ ) {
-            // Zero out the result array
-            memset(correlation_function_sum, 0, corr_size_in_bytes);
-            const int pxpypzpt[4] = {px, py, pz, pt};
-            contractFTQuda(prop_array_ptr, prop_array_ptr, &correlation_function_sum, contract_type, &inv_param,
-			   (void *)cs_param_ptr, gauge_param.X, source, pxpypzpt);
-
+    // Zero out the result array
+    memset(correlation_function_sum, 0, Nmom*corr_size_in_bytes);
+    contractFTQuda(prop_array_ptr, prop_array_ptr, &correlation_function_sum, contract_type, &inv_param,
+		   (void *)cs_param_ptr, gauge_param.X, source, Mom);
+    for (int px=0; px <= Mom[0]; px++) {
+      for (int py=0; py <= Mom[1]; py++) {
+        for (int pz=0; pz <= Mom[2]; pz++) {
+          for (int pt=0; pt <= Mom[3]; pt++ ) {
             // Print correlators for this propagator source position
             for (int G_idx = 0; G_idx < 16; G_idx++) {
               for (size_t t = 0; t < global_corr_length; t++) {
+                int index_real = (px+py*(Mom[0]+1)+pz*(Mom[0]+1)*(Mom[1]+1)+pt*(Mom[0]+1)*(Mom[1]+1)*(Mom[2]+1))
+                    *n_numbers_per_slice * global_corr_length+n_numbers_per_slice * ((t + overall_shift_dim) % global_corr_length) + 2 * G_idx;
+                int index_imag = index_real+1;
                 printfQuda(
                   "sum: prop_n=%d px=%d py=%d pz=%d pt=%d g=%d t=%lu %e %e\n", n, px, py, pz, pt, G_idx, t,
-                  ((double *)correlation_function_sum)[n_numbers_per_slice * ((t + overall_shift_dim) % global_corr_length)
-                                                       + 2 * G_idx],
-                  ((double *)correlation_function_sum)[n_numbers_per_slice * ((t + overall_shift_dim) % global_corr_length)
-                                                       + 2 * G_idx + 1]);
+                  ((double *)correlation_function_sum)[index_real],
+                  ((double *)correlation_function_sum)[index_imag]);
               }
             }
           }

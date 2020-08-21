@@ -231,11 +231,13 @@ namespace quda
       Gamma(),
       t_offset(comm_coord(reduction_dim) * x.X(reduction_dim)) // offset of the slice we are doing reduction on
     {
-      for (int dir = 0; dir < 4; dir++) { X[dir] = x.X()[dir]; }
-      for (int i=0;i<4;i++) pxpypzpt[i]=_pxpypzpt[i];
-      for (int i=0;i<4;i++) source_position[i]=_source_position[i];
-      for (int i=0;i<4;i++) offsets[i]=comm_coord(i) * x.X(i);
-      for (int i=0;i<4;i++) NxNyNzNt[i]=comm_dim(i) * x.X(i);
+      for (int i = 0; i < 4; i++) {
+        X[i] = x.X()[i];
+        pxpypzpt[i]=_pxpypzpt[i];
+        source_position[i]=_source_position[i];
+        offsets[i]=comm_coord(i) * x.X(i);
+        NxNyNzNt[i]=comm_dim(i) * x.X(i);
+      }
     }
   };
 
