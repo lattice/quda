@@ -248,7 +248,7 @@ QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_TYPE_STOUT;
 
 QudaFermionSmearType prop_smear_type = QUDA_FERMION_SMEAR_TYPE_GAUSSIAN;
 
-QudaContractType contract_type = QUDA_CONTRACT_TYPE_DR_SUM_T;
+QudaContractType contract_type = QUDA_CONTRACT_TYPE_DR_FT_T;
 
 namespace
 {
@@ -260,8 +260,6 @@ namespace
 							   {"open-ft-t", QUDA_CONTRACT_TYPE_OPEN_FT_T},
                                                            {"open-ft-z", QUDA_CONTRACT_TYPE_OPEN_FT_Z},
                                                            {"dr", QUDA_CONTRACT_TYPE_DR},
-                                                           {"dr-sum-t", QUDA_CONTRACT_TYPE_DR_SUM_T},
-							   {"dr-sum-z", QUDA_CONTRACT_TYPE_DR_SUM_Z},
 							   {"dr-ft-t", QUDA_CONTRACT_TYPE_DR_FT_T},
                                                            {"dr-ft-z", QUDA_CONTRACT_TYPE_DR_FT_Z}
 

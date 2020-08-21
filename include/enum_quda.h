@@ -500,8 +500,6 @@ typedef enum QudaBoolean_s {
     QUDA_CONTRACT_TYPE_OPEN_FT_T,  // Open spin elementals, FT in tdim
     QUDA_CONTRACT_TYPE_OPEN_FT_Z,  // Open spin elementals, FT in zdim
     QUDA_CONTRACT_TYPE_DR,         // DegrandRossi insertion, no summation
-    QUDA_CONTRACT_TYPE_DR_SUM_T,   // DegrandRossi insertion, spatially summed over tdim
-    QUDA_CONTRACT_TYPE_DR_SUM_Z,   // DegrandRossi insertion, summed over all but zdim
     QUDA_CONTRACT_TYPE_DR_FT_T,   // DegrandRossi insertion, FT in tdim
     QUDA_CONTRACT_TYPE_DR_FT_Z,   // DegrandRossi insertion, FT in zdim
     QUDA_CONTRACT_TYPE_INVALID = QUDA_INVALID_ENUM

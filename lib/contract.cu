@@ -49,8 +49,6 @@ namespace quda {
       switch (cType) {
       case QUDA_CONTRACT_TYPE_OPEN_SUM_T: strcat(aux, "open-sum-t,"); break;
       case QUDA_CONTRACT_TYPE_OPEN_SUM_Z: strcat(aux, "open-sum-z,"); break;
-      case QUDA_CONTRACT_TYPE_DR_SUM_T: strcat(aux, "degrand-rossi-sum-t,"); break;
-      case QUDA_CONTRACT_TYPE_DR_SUM_Z: strcat(aux, "degrand-rossi-sum-z,"); break;
       case QUDA_CONTRACT_TYPE_DR_FT_T: strcat(aux, "degrand-rossi-ft-t,"); break;
       case QUDA_CONTRACT_TYPE_DR_FT_Z: strcat(aux, "degrand-rossi-ft-z,"); break;
       default: errorQuda("Unexpected contraction type %d", cType);
@@ -71,8 +69,6 @@ namespace quda {
         switch (cType) {
 	case QUDA_CONTRACT_TYPE_OPEN_SUM_T: function_name = "quda::computeColorContractionSummed"; break;
 	case QUDA_CONTRACT_TYPE_OPEN_SUM_Z: function_name = "quda::computeColorContractionSummed"; break;
-        case QUDA_CONTRACT_TYPE_DR_SUM_T: function_name = "quda::computeDegrandRossiContractionSummed"; break;
-	case QUDA_CONTRACT_TYPE_DR_SUM_Z: function_name = "quda::computeDegrandRossiContractionSummed"; break;
         default: errorQuda("Unexpected contraction type %d", cType);
         }
 	
@@ -83,10 +79,6 @@ namespace quda {
 	  .launch(arg);
 #else
         switch (cType) {
-        case QUDA_CONTRACT_TYPE_DR_SUM_T:
-        case QUDA_CONTRACT_TYPE_DR_SUM_Z:
-	  LAUNCH_KERNEL_LOCAL_PARITY(computeDegrandRossiContractionSummed, (*this), tp, stream, arg, Arg);
-          break;
 	case QUDA_CONTRACT_TYPE_DR_FT_T:
         case QUDA_CONTRACT_TYPE_DR_FT_Z:
 	  LAUNCH_KERNEL_LOCAL_PARITY(computeDegrandRossiContractionFT, (*this), tp, stream, arg, Arg);
@@ -131,12 +123,12 @@ namespace quda {
 			    std::vector<Complex> &result, const QudaContractType cType,
                             const int *const source_position, const int *const pxpypzpt, const size_t s1, const size_t b1)
   {
-    if (cType == QUDA_CONTRACT_TYPE_DR_SUM_Z || cType == QUDA_CONTRACT_TYPE_OPEN_SUM_Z){
+    if (cType == QUDA_CONTRACT_TYPE_DR_FT_Z || cType == QUDA_CONTRACT_TYPE_OPEN_SUM_Z){
       ContractionSummedArg<real, 2> arg(x, y, source_position, pxpypzpt, s1, b1); // reduce in the z direction
       ContractionSummedCompute<decltype(arg)> contraction_with_sum(arg, x, y, cType);
       contraction_with_sum.apply(0);
       arg.complete(result);
-    } else if (cType == QUDA_CONTRACT_TYPE_DR_SUM_T || cType == QUDA_CONTRACT_TYPE_OPEN_SUM_T) {
+    } else if (cType == QUDA_CONTRACT_TYPE_DR_FT_T || cType == QUDA_CONTRACT_TYPE_OPEN_SUM_T) {
       ContractionSummedArg<real, 3> arg(x, y, source_position, pxpypzpt, s1, b1); // reduce in the t direction
       ContractionSummedCompute<decltype(arg)> contraction_with_sum(arg, x, y, cType);
       contraction_with_sum.apply(0);
