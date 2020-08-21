@@ -199,10 +199,10 @@ namespace quda {
       { return norm(scale * complex<ReduceType>(x.real(), x.imag())); }
     };
 
-    template<typename ReduceType> struct square_<ReduceType,char> {
+    template<typename ReduceType> struct square_<ReduceType,int8_t> {
       const ReduceType scale;
       square_(ReduceType scale) : scale(scale) { }
-      __host__ __device__ inline ReduceType operator()(const quda::complex<char> &x)
+      __host__ __device__ inline ReduceType operator()(const quda::complex<int8_t> &x)
       { return norm(scale * complex<ReduceType>(x.real(), x.imag())); }
     };
 
@@ -218,10 +218,10 @@ namespace quda {
       { return abs(scale * complex<Float>(x.real(), x.imag())); }
     };
 
-    template<typename Float> struct abs_<Float,char> {
+    template<typename Float> struct abs_<Float,int8_t> {
       Float scale;
       abs_(const Float scale) : scale(scale) { }
-      __host__ __device__ Float operator()(const quda::complex<char> &x)
+      __host__ __device__ Float operator()(const quda::complex<int8_t> &x)
       { return abs(scale * complex<Float>(x.real(), x.imag())); }
     };
 
@@ -431,12 +431,12 @@ namespace quda {
     };
 
     template <typename Float, typename storeFloat> __host__ __device__ inline constexpr bool fixed_point() { return false; }
-    template<> __host__ __device__ inline constexpr bool fixed_point<float,char>() { return true; }
+    template<> __host__ __device__ inline constexpr bool fixed_point<float,int8_t>() { return true; }
     template<> __host__ __device__ inline constexpr bool fixed_point<float,short>() { return true; }
     template<> __host__ __device__ inline constexpr bool fixed_point<float,int>() { return true; }
 
     template <typename Float, typename storeFloat> __host__ __device__ inline constexpr bool match() { return false; }
-    template<> __host__ __device__ inline constexpr bool match<char,char>() { return true; }
+    template<> __host__ __device__ inline constexpr bool match<int8_t,int8_t>() { return true; }
     template<> __host__ __device__ inline constexpr bool match<int,int>() { return true; }
     template<> __host__ __device__ inline constexpr bool match<short,short>() { return true; }
 
@@ -1769,17 +1769,17 @@ namespace quda {
   };
 
   // quarter precision
-  template <int Nc, bool huge_alloc> struct colorspinor_mapper<char, 4, Nc, false, huge_alloc> {
-    typedef colorspinor::FloatNOrder<char, 4, Nc, N8, false, huge_alloc> type;
+  template <int Nc, bool huge_alloc> struct colorspinor_mapper<int8_t, 4, Nc, false, huge_alloc> {
+    typedef colorspinor::FloatNOrder<int8_t, 4, Nc, N8, false, huge_alloc> type;
   };
-  template <int Nc, bool huge_alloc> struct colorspinor_mapper<char, 4, Nc, true, huge_alloc> {
-    typedef colorspinor::FloatNOrder<char, 4, Nc, N8, true, huge_alloc> type;
+  template <int Nc, bool huge_alloc> struct colorspinor_mapper<int8_t, 4, Nc, true, huge_alloc> {
+    typedef colorspinor::FloatNOrder<int8_t, 4, Nc, N8, true, huge_alloc> type;
   };
-  template <int Nc, bool huge_alloc> struct colorspinor_mapper<char, 2, Nc, false, huge_alloc> {
-    typedef colorspinor::FloatNOrder<char, 2, Nc, 2, false, huge_alloc> type;
+  template <int Nc, bool huge_alloc> struct colorspinor_mapper<int8_t, 2, Nc, false, huge_alloc> {
+    typedef colorspinor::FloatNOrder<int8_t, 2, Nc, 2, false, huge_alloc> type;
   };
-  template <int Nc, bool huge_alloc> struct colorspinor_mapper<char, 1, Nc, false, huge_alloc> {
-    typedef colorspinor::FloatNOrder<char, 1, Nc, 2, false, huge_alloc> type;
+  template <int Nc, bool huge_alloc> struct colorspinor_mapper<int8_t, 1, Nc, false, huge_alloc> {
+    typedef colorspinor::FloatNOrder<int8_t, 1, Nc, 2, false, huge_alloc> type;
   };
 
 #undef N8

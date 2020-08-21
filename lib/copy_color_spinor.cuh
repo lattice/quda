@@ -180,7 +180,7 @@ namespace quda {
       if (out.GammaBasis()!=in.GammaBasis()) errorQuda("Cannot change gamma basis for nSpin=%d\n", Ns);
       writeAuxString("out_stride=%d,in_stride=%d", arg.out.stride, arg.in.stride);
     }
-  
+
     void apply(const qudaStream_t &stream) {
       if (location == QUDA_CPU_FIELD_LOCATION) {
 	copyColorSpinor<Arg, PreserveBasis>(arg);
@@ -191,7 +191,7 @@ namespace quda {
     }
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
-    long long flops() const { return 0; } 
+    long long flops() const { return 0; }
     long long bytes() const { return arg.in.Bytes() + arg.out.Bytes(); }
   };
 
@@ -277,7 +277,7 @@ namespace quda {
 
   /** Decide on the output order*/
   template <typename FloatOut, typename FloatIn, int Ns, int Nc, typename InOrder>
-    void genericCopyColorSpinor(InOrder &inOrder, ColorSpinorField &out, 
+    void genericCopyColorSpinor(InOrder &inOrder, ColorSpinorField &out,
 				const ColorSpinorField &in, QudaFieldLocation location,
 				FloatOut *Out, float *outNorm) {
     const bool override = true;
@@ -327,8 +327,8 @@ namespace quda {
 
   /** Decide on the input order*/
   template <typename FloatOut, typename FloatIn, int Ns, int Nc>
-    void genericCopyColorSpinor(ColorSpinorField &out, const ColorSpinorField &in, 
-				QudaFieldLocation location, FloatOut *Out, FloatIn *In, 
+    void genericCopyColorSpinor(ColorSpinorField &out, const ColorSpinorField &in,
+				QudaFieldLocation location, FloatOut *Out, FloatIn *In,
 				float *outNorm, float *inNorm) {
     const bool override = true;
     if (in.isNative()) {
@@ -371,8 +371,8 @@ namespace quda {
 
 
   template <int Ns, int Nc, typename dstFloat, typename srcFloat>
-    void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src, 
-				QudaFieldLocation location, dstFloat *Dst, srcFloat *Src, 
+    void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,
+				QudaFieldLocation location, dstFloat *Dst, srcFloat *Src,
 				float *dstNorm, float *srcNorm) {
 
     if (dst.Ndim() != src.Ndim())
@@ -381,9 +381,9 @@ namespace quda {
     if (dst.Volume() != src.Volume()) errorQuda("Volumes %lu %lu don't match", dst.Volume(), src.Volume());
 
     if (!( dst.SiteOrder() == src.SiteOrder() ||
-	   (dst.SiteOrder() == QUDA_EVEN_ODD_SITE_ORDER && 
+	   (dst.SiteOrder() == QUDA_EVEN_ODD_SITE_ORDER &&
 	    src.SiteOrder() == QUDA_ODD_EVEN_SITE_ORDER) ||
-	   (dst.SiteOrder() == QUDA_ODD_EVEN_SITE_ORDER && 
+	   (dst.SiteOrder() == QUDA_ODD_EVEN_SITE_ORDER &&
 	    src.SiteOrder() == QUDA_EVEN_ODD_SITE_ORDER) ) ) {
       errorQuda("Subset orders %d %d don't match", dst.SiteOrder(), src.SiteOrder());
     }
@@ -405,10 +405,10 @@ namespace quda {
   }
 
   template <int Nc, typename dstFloat, typename srcFloat>
-  void CopyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src, 
-			      QudaFieldLocation location, dstFloat *Dst, srcFloat *Src, 
-			      float *dstNorm=0, float *srcNorm=0) {
-
+  void CopyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,
+			      QudaFieldLocation location, dstFloat *Dst, srcFloat *Src,
+			      float *dstNorm=0, float *srcNorm=0)
+  {
     if (dst.Nspin() != src.Nspin())
       errorQuda("source and destination spins must match");
 
@@ -433,7 +433,6 @@ namespace quda {
     } else {
       errorQuda("Nspin=%d unsupported", dst.Nspin());
     }
-    
   }
 
 } // namespace quda
