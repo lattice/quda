@@ -4,10 +4,10 @@
 #include <blas_quda.h>
 #include <blas_lapack.h>
 
-#include <staggered_kd_xinv.h>
+#include <staggered_kd_build_xinv.h>
 
 #include <jitify_helper.cuh>
-#include <kernels/staggered_kd_xinv_kernel.cuh>
+#include <kernels/staggered_kd_build_xinv_kernel.cuh>
 
 namespace quda {
 
@@ -25,10 +25,11 @@ namespace quda {
 
     long long bytes() const
     {
-      // FIXME: this is from staggered_coarse_op which additionally builds Y. We only need X here.
-      // 2 from forwards / backwards contributions, Y and X are sparse - only needs to write non-zero elements, 2nd term is mass term
-      //return meta.Bytes() + (2 * meta.Bytes() * Y.Precision()) / meta.Precision() + 2 * 2 * coarseSpin * coarseColor * arg.coarseVolumeCB * X.Precision();
-      return 0ll;
+      // 1. meta.Bytes() / 2 b/c the Kahler-Dirac blocking is a dual decomposition: only
+      //    half of the gauge field needs to be loaded.
+      // 2. Storing X, extra factor of two b/c it stores forwards and backwards.
+      // 3. Storing mass contribution
+      return meta.Bytes() / 2 + (meta.Bytes() * X.Precision()) / meta.Precision() + 2 * coarseSpin * coarseColor * arg.coarseVolumeCB * X.Precision();
     }
 
     unsigned int minThreads() const { return arg.fineVolumeCB; }
@@ -44,7 +45,7 @@ namespace quda {
       X(X)
     {
 #ifdef JITIFY
-      create_jitify_program("kernels/staggered_kd_xinv_kernel.cuh");
+      create_jitify_program("kernels/staggered_kd_build_xinv_kernel.cuh");
 #endif
       strcpy(aux, compile_type_str(meta));
       strcpy(aux, meta.AuxString());
@@ -130,6 +131,7 @@ namespace quda {
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Global U_max = %e\n", max_scale);
 
     if (xGauge::fixedPoint()) {
+      printfQuda("I AM FIXED POINT\n"); 
       arg.X.resetScale(max_scale > 2.0*mass ? max_scale : 2.0*mass); // To be safe
       X_.Scale(max_scale > 2.0*mass ? max_scale : 2.0*mass); // To be safe
     }
@@ -206,12 +208,11 @@ namespace quda {
   void calculateStaggeredKDBlock(GaugeField &X, const GaugeField &g, const double mass)
   {
 #if defined(GPU_STAGGERED_DIRAC)
-    checkPrecision(X, g);
 
     // FIXME remove when done
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing X for StaggeredKD...\n");
 
-#if QUDA_PRECISION & 8
+#if QUDA_PRECISION & 8 && defined(GPU_MULTIGRID_DOUBLE)
     if (X.Precision() == QUDA_DOUBLE_PRECISION) {
       calculateStaggeredKDBlock<double,double>(X, g, mass);
     } else
@@ -226,11 +227,11 @@ namespace quda {
       calculateStaggeredKDBlock<float,short>(X, g, mass);
     } else
 #endif
-#if QUDA_PRECISION & 1
-    if (X.Precision() == QUDA_QUARTER_PRECISION) {
-      calculateStaggeredKDBlock<float,char>(X, g, mass);
-    } else
-#endif
+//#if QUDA_PRECISION & 1
+//    if (X.Precision() == QUDA_QUARTER_PRECISION) {
+//      calculateStaggeredKDBlock<float,char>(X, g, mass);
+//    } else
+//#endif
     {
       errorQuda("Unsupported precision %d\n", X.Precision());
     }
@@ -249,7 +250,7 @@ namespace quda {
 
     // Xinv should have a MILC gauge order independent of being
     // on the CPU or GPU
-    if (Xinv.FieldOrder() != QUDA_QDP_GAUGE_ORDER)
+    if (Xinv.FieldOrder() != QUDA_MILC_GAUGE_ORDER)
       errorQuda("Unsupported field order %d", Xinv.FieldOrder());
 
     QudaPrecision precision = Xinv.Precision();
@@ -285,11 +286,13 @@ namespace quda {
       // we can take advantage of fine-grained access like in "staggered_coarse_op.cu"
       // technically don't need to require the precision check, but it should
       // generally be equal anyway
-      if (gauge.Reconstruct() != QUDA_RECONSTRUCT_NO || gauge.Precision() != precision) {
+
+      // FIXME: make this work for any gauge precision
+      if (gauge.Reconstruct() != QUDA_RECONSTRUCT_NO || gauge.Precision() != precision || gauge.Precision() < QUDA_SINGLE_PRECISION) {
         GaugeFieldParam gf_param(gauge);
         gf_param.reconstruct = QUDA_RECONSTRUCT_NO;
         gf_param.order = QUDA_FLOAT2_GAUGE_ORDER; // guaranteed for no recon
-        gf_param.setPrecision(gf_param.Precision());
+        gf_param.setPrecision( precision == QUDA_DOUBLE_PRECISION ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION );
         U = new cudaGaugeField(gf_param);
 
         U->copy(gauge);
@@ -343,6 +346,8 @@ namespace quda {
       blas::flops += invert((void*)Xinv_h->Gauge_p(), (void*)X_h->Gauge_p(), n, X_h->Volume(), X->Precision(), X->Location());
 
     }
+
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Xinv = %e\n", Xinv.norm2(0));
 
     // Clean up
     delete X;

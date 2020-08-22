@@ -1,7 +1,7 @@
 #include <dirac_quda.h>
 #include <blas_quda.h>
 #include <multigrid.h>
-#include <staggered_kd_xinv.h>
+#include <staggered_kd_build_xinv.h>
 
 namespace quda {
 
@@ -27,7 +27,14 @@ namespace quda {
     gParam.link_type = QUDA_COARSE_LINKS;
     gParam.t_boundary = QUDA_PERIODIC_T;
     gParam.create = QUDA_ZERO_FIELD_CREATE;
-    gParam.setPrecision( gauge->Precision() );
+    auto precision = gauge->Precision();
+    // right now the build Xinv routines only support single and double
+    if (precision < QUDA_HALF_PRECISION) { 
+      precision = QUDA_HALF_PRECISION;
+    } else if (precision > QUDA_SINGLE_PRECISION) {
+      precision = QUDA_SINGLE_PRECISION;
+    }
+    gParam.setPrecision( precision );
     gParam.nDim = ndim;
     gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;

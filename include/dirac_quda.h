@@ -283,6 +283,11 @@ namespace quda {
     /** @return is operator hermitian */
     virtual bool hermitian() const { return false; }
 
+    // TEMPORARY FOR DEBUGGING
+    // remove me when this is all said and done
+    /** @return gauge field */
+    virtual const cudaGaugeField* getGaugeField() const { return gauge; }
+
     /**
      *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
      *  These are pointers as opposed to references to support passing in `nullptr`.
@@ -1166,7 +1171,7 @@ public:
     /**
      * @brief Build Xinv from the current gauge field, allocating if needed.
      */
-    virtual void buildKahlerDiracInv();
+    //virtual void buildKahlerDiracInv();
 
     virtual void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
 
@@ -1350,7 +1355,7 @@ public:
     /**
      * @brief Build Xinv from the current gauge field, allocating if needed.
      */
-    virtual void buildKahlerDiracInv();
+    //virtual void buildKahlerDiracInv();
 
     virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
       const QudaParity parity) const;
