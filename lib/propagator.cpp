@@ -1,27 +1,32 @@
 #include <propagator.h>
 
 namespace quda {
-  
-  Propagator::Propagator(const ColorSpinorParam &param_)
+
+  Propagator::Propagator(const ColorSpinorParam &param_) :
+    prop_data(nullptr),
+    prop_init(false),
+    prop_dim(0),
+    prop_location(QUDA_INVALID_FIELD_LOCATION),
+    prop_precision(QUDA_INVALID_PRECISION)
   {
     ColorSpinorParam param(param_);
-    prop_dim = param.nColor * param.nSpin;
-    prop_vectors.reserve(prop_dim);
-    
-    // Allocate memory on host or device in a contiguous chunk.    
     size_t volume = 1;
     for (int d = 0; d < param.nDim; d++) volume *= param.x[d];
+    
+    prop_dim = param.nColor * param.nSpin;
     prop_location = param.location;
     prop_precision = param.Precision();
-
-    if(prop_location == QUDA_CPU_FIELD_LOCATION) printfQuda("prop_location == QUDA_CPU_FIELD_LOCATION)\n");
     
+    // Allocate memory on host or device.
     size_t prop_size_bytes = prop_dim * prop_dim * volume * 2 * prop_precision;
     printfQuda("prop_size_bytes = %lu\n", prop_size_bytes); 
     prop_data = (prop_location == QUDA_CPU_FIELD_LOCATION ?
 		 (void *)malloc(prop_size_bytes) : (void *)device_malloc(prop_size_bytes));
+
+    printfQuda("Creating prop on the %s\n", prop_location == QUDA_CPU_FIELD_LOCATION ? "host" : "device");
     
     param.create = QUDA_REFERENCE_FIELD_CREATE;
+    prop_vectors.reserve(prop_dim);
     for (size_t i = 0; i < prop_dim; i++) {
       switch(prop_precision) {
       case QUDA_DOUBLE_PRECISION : 
@@ -35,59 +40,75 @@ namespace quda {
       default :
 	errorQuda("Unknown precision type %d given", prop_precision);
       }	
-      prop_vectors[i] = ColorSpinorField::Create(param);
+      prop_vectors.push_back(ColorSpinorField::Create(param));
+    }    
+    if(prop_dim == prop_vectors.size()) prop_init = true;
+    else errorQuda("prop_dim %lu not equal to vector set size %lu", prop_dim, prop_vectors.size());
+  }
+
+  Propagator::Propagator(const ColorSpinorParam &param_, void **host_data) :
+    prop_data(nullptr),
+    prop_init(false),
+    prop_dim(0),
+    prop_location(QUDA_INVALID_FIELD_LOCATION),
+    prop_precision(QUDA_INVALID_PRECISION)
+  {
+    ColorSpinorParam param(param_);
+    if(param.create != QUDA_REFERENCE_FIELD_CREATE) errorQuda("This constructor is for referenece fields only");
+    
+    size_t volume = 1;
+    for (int d = 0; d < param.nDim; d++) volume *= param.x[d];
+
+    prop_dim = param.nColor * param.nSpin;
+    prop_location = param.location;
+    prop_precision = param.Precision();
+
+    // Use host memory provided
+    size_t prop_size_bytes = prop_dim * prop_dim * volume * 2 * prop_precision;
+    printfQuda("prop_size_bytes = %lu\n", prop_size_bytes); 
+    printfQuda("Creating prop on the host\n");
+ 
+    prop_vectors.reserve(prop_dim);
+    for (size_t i = 0; i < prop_dim; i++) {
+      param.v = host_data[i];
+      prop_vectors.push_back(ColorSpinorField::Create(param));
+    }
+    if(prop_dim == prop_vectors.size()) prop_init = true;
+    else errorQuda("prop_dim %lu not equal to vector set size %lu", prop_dim, prop_vectors.size());
+  }
+    
+  Propagator &Propagator::operator=(Propagator &src)
+  {
+    // Sanity checks
+    if (!prop_init) errorQuda("Propagator not initialised");
+    if (src.Dim() != prop_dim) errorQuda("Propgator expected %lu vectors, %lu passed", prop_dim, src.Dim());
+    
+    // Copy vectors from input
+    for (size_t i = 0; i < prop_dim; i++) {
+      *prop_vectors[i] = *src.Vectors()[i];
     }
     
-    prop_init = true;
-  }
-  
-  Propagator *Propagator::Create(const ColorSpinorParam &param)
-  {
-    Propagator *prop = new Propagator(param);
-    return prop;
-  }
-  
-  Propagator &Propagator::operator=(const Propagator &src)
-  {
-    if (&src != this) { *this = (dynamic_cast<const Propagator &>(src)); }
+    // Update Propagator attributes
+    prop_precision = src.Precision();
+    
     return *this;
   }
 
-  void Propagator::copyVectors(const std::vector<ColorSpinorField *> &vecs)
-  {
-    // Sanity checks
-    if (!prop_init) errorQuda("Propgator not initialised");
-    if (vecs.size() == 0) errorQuda("Zero sized vector set in Propagator");
-    size_t n_vecs = vecs[0]->Ncolor() * vecs[0]->Nspin();
-    if (vecs.size() != n_vecs) errorQuda("Propgator expected %lu vectors, %lu passed", n_vecs, vecs.size());
-    
-    printfQuda("Here!\n");
-    
-    // Copy vectors from input
-    for (size_t i = 0; i < n_vecs; i++) {
-      printfQuda("Here %lu!\n", i);
-      prop_vectors[i]->PrintVector(0);	    
-      vecs[i]->PrintVector(0);
-      *prop_vectors[i] = *vecs[i];
-      printfQuda("Here %lu!\n", i);
-    }
-  }
-  
-  ColorSpinorField *Propagator::selectVector(const int vec)
+  ColorSpinorField* Propagator::selectVector(const size_t vec)
   {
     // Sanity checks
     if (!prop_init) errorQuda("Propgator not initialised");
     size_t n_vecs = prop_vectors.size();
-    if ((size_t)vec >= n_vecs) errorQuda("Propgator has %lu vectors, vector[%d] requested", n_vecs, vec);
+    if ((size_t)vec >= n_vecs) errorQuda("Propgator has %lu vectors, vector[%lu] requested", n_vecs, vec);
 
     return prop_vectors[vec];
   }
 
-  void *Propagator::V()
+  std::vector<ColorSpinorField *> Propagator::Vectors()
   {
     if (!prop_init) errorQuda("Propgator not initialised");
     if (prop_vectors.size() == 0) errorQuda("Zero sized vector set in Propagator");
-    return (void*)prop_data;
+    return prop_vectors;
   }
   
   Propagator::~Propagator()
@@ -97,6 +118,10 @@ namespace quda {
         if (vec) delete vec;
       prop_vectors.resize(0);
       prop_init = false;
+      if(prop_create != QUDA_REFERENCE_FIELD_CREATE) {
+	if(prop_location == QUDA_CPU_FIELD_LOCATION) free(prop_data);
+	else device_free(prop_data);
+      }
     }
   }
 } // namespace quda

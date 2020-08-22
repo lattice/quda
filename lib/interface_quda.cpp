@@ -19,6 +19,7 @@
 #include <invert_quda.h>
 #include <eigensolve_quda.h>
 #include <color_spinor_field.h>
+#include <propagator.h>
 #include <clover_field.h>
 #include <llfat_quda.h>
 #include <unitarization_links.h>
@@ -6016,17 +6017,10 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
   const size_t nSpin = cs_param->nSpin;
   const size_t nColor = cs_param->nColor;
   const int spinor_dim = nSpin * nColor;
-  std::vector<quda::ColorSpinorField *> h_prop_array_flavor_1(spinor_dim);
-  std::vector<quda::ColorSpinorField *> h_prop_array_flavor_2(spinor_dim);
-
   cs_param->create = QUDA_REFERENCE_FIELD_CREATE;
-  for (int i = 0; i < spinor_dim; i++) {
-    cs_param->v = prop_array_flavor_1[i];
-    h_prop_array_flavor_1[i] = quda::ColorSpinorField::Create(*cs_param);
-    cs_param->v = prop_array_flavor_2[i];
-    h_prop_array_flavor_2[i] = quda::ColorSpinorField::Create(*cs_param);
-  }
-
+  Propagator *h_propagator_flavor1 = new Propagator(*cs_param, prop_array_flavor_1);
+  Propagator *h_propagator_flavor2 = new Propagator(*cs_param, prop_array_flavor_2);
+  
   // temporal or spatial correlator?
   size_t corr_dim = 0, local_corr_length = 0;
   if (cType == QUDA_CONTRACT_TYPE_DR_FT_Z) {
@@ -6047,25 +6041,19 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
   cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
   cudaParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   cudaParam.setPrecision(cs_param->Precision(), cs_param->Precision(), true);
-  std::vector<quda::ColorSpinorField *> d_prop_array_flavor_1(spinor_dim);
-  std::vector<quda::ColorSpinorField *> d_prop_array_flavor_2(spinor_dim);
-  for (int i = 0; i < spinor_dim; i++) {
-    d_prop_array_flavor_1[i] = ColorSpinorField::Create(cudaParam);
-    d_prop_array_flavor_2[i] = ColorSpinorField::Create(cudaParam);
-  }
+  Propagator *d_propagator_flavor1 = new Propagator(cudaParam);
+  Propagator *d_propagator_flavor2 = new Propagator(cudaParam);
   profileContractFT.TPSTOP(QUDA_PROFILE_INIT);
 
   // Transfer data from host to device
   profileContractFT.TPSTART(QUDA_PROFILE_H2D);
-  for (int i = 0; i < spinor_dim; i++) {
-    *d_prop_array_flavor_1[i] = *h_prop_array_flavor_1[i];
-    *d_prop_array_flavor_2[i] = *h_prop_array_flavor_2[i];
-  }
+  *d_propagator_flavor1 = *h_propagator_flavor1;
+  *d_propagator_flavor2 = *h_propagator_flavor2;
   profileContractFT.TPSTOP(QUDA_PROFILE_H2D);
 
   // Array that fits all timeslices and channels but is reset after each computation
   std::vector<Complex> h_result_tmp_global((n_numbers_per_slice * global_corr_length) / 2);
-  for (int px=0; px <= Mom[0]; px++) {
+  for (int px = 0; px <= Mom[0]; px++) {
     for (int py = 0; py <= Mom[1]; py++) {
       for (int pz = 0; pz <= Mom[2]; pz++) {
         for (int pt = 0; pt <= Mom[3]; pt++) {
@@ -6076,9 +6064,9 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
               for (size_t b1 = 0; b1 < nSpin; b1++) {
                 profileContractFT.TPSTART(QUDA_PROFILE_COMPUTE);
 
-                contractSummedQuda(*d_prop_array_flavor_1[s1 * nColor + c1], *d_prop_array_flavor_2[b1 * nColor + c1],
+                contractSummedQuda(*d_propagator_flavor1->selectVector(s1 * nColor + c1), *d_propagator_flavor2->selectVector(b1 * nColor + c1),
                                    h_result_tmp_global, cType, source_position, pxpypzpt, s1, b1);
-
+		
                 comm_allreduce_array((double *)&h_result_tmp_global[0], n_numbers_per_slice * global_corr_length);
 
                 for (size_t G_idx = 0; G_idx < nSpin * nSpin; G_idx++) {
@@ -6105,13 +6093,11 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
 
   profileContractFT.TPSTART(QUDA_PROFILE_FREE);
   // Free memory
-  for (int i = 0; i < spinor_dim; i++) {
-    delete h_prop_array_flavor_1[i];
-    delete h_prop_array_flavor_2[i];
-    delete d_prop_array_flavor_1[i];
-    delete d_prop_array_flavor_2[i];
-  }
-
+  delete d_propagator_flavor1;
+  delete d_propagator_flavor2;
+  delete h_propagator_flavor1;
+  delete h_propagator_flavor2;
+  
   profileContractFT.TPSTOP(QUDA_PROFILE_FREE);
   profileContractFT.TPSTOP(QUDA_PROFILE_TOTAL);
   saveTuneCache();
