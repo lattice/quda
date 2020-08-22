@@ -288,36 +288,44 @@ int main(int argc, char **argv)
   setInvertParam(inv_param4D);
   quda::ColorSpinorParam cs_param4D;
   constructWilsonSpinorParam(&cs_param4D, &inv_param4D, &gauge_param);
+  int spinor_dim = cs_param4D.nColor * cs_param4D.nSpin;
   // Reset dslash_type
   dslash_type = dslash_type_orig;
 
+  size_t bytes_per_float = sizeof(double);
+  // Allocate memory on host for one source for each of the 12x12 color+spinor combinations
+  auto *source_array = (double *)malloc(spinor_dim * spinor_dim * V * 2 * bytes_per_float);
+  auto *prop_array = (double *)malloc(spinor_dim * spinor_dim * V * 2 * bytes_per_float);
+
+  // This will be a C array of pointers to the memory of the
+  // spinor_dim colorSpinorField objecs. Functions declared in quda.h
+  // can only accept C code for backwards compatibility reasons.
+  void *source_array_ptr[spinor_dim];
+  void *prop_array_ptr[spinor_dim];
+
+  // Actually create ColorSpinorField objects and tell them to use the memory from above
+  for (int i = 0; i < spinor_dim; i++) {
+    int offset = i * V * spinor_dim * 2;
+    source_array_ptr[i] = source_array + offset;
+    prop_array_ptr[i] = prop_array + offset;
+  }
+  
   // Host arrays for 4D propagators and 4D sources
   std::vector<quda::ColorSpinorField *> qudaSink4D(12);
   std::vector<quda::ColorSpinorField *> qudaSource4D(12);
-  // Allocate contiguous host memory
-  void *out_array = (void *)malloc(12 * V * 3 * 4 * 2 * sizeof(double));
-  void *in_array = (void *)malloc(12 * V * 3 * 4 * 2 * sizeof(double));
 
   // This flag instructs QUDA to use the pre-allocated memory.
   cs_param4D.create = QUDA_REFERENCE_FIELD_CREATE;
-  for (int dil = 0; dil < 12; dil++) {
+  for (int i = 0; i < spinor_dim; i++) {
     // The .v member of the parameter struct is a pointer
     // to where we want the colour spinor data to be
-    cs_param4D.v = (double *)in_array + dil * V * 3 * 4 * 2;
-    qudaSource4D[dil] = quda::ColorSpinorField::Create(cs_param4D);
+    cs_param4D.v = source_array_ptr[i];
+    qudaSource4D[i] = quda::ColorSpinorField::Create(cs_param4D);
 
-    cs_param4D.v = (double *)out_array + dil * V * 3 * 4 * 2;
-    qudaSink4D[dil] = quda::ColorSpinorField::Create(cs_param4D);
+    cs_param4D.v = prop_array_ptr[i];
+    qudaSink4D[i] = quda::ColorSpinorField::Create(cs_param4D);
   }
 
-  // Make a propagator
-  quda::Propagator *prop_source, *prop_sink; 
-  prop_source = quda::Propagator::Create(cs_param4D);
-  prop_sink   = quda::Propagator::Create(cs_param4D);
-
-  prop_source->copyVectors(qudaSource4D);
-  prop_sink->copyVectors(qudaSink4D);
-    
   // Construct 4D smearing parameters.
   // Borrow problem 4D parameters, then adjust
   QudaInvertParam inv_param_smear = newQudaInvertParam();
@@ -345,17 +353,32 @@ int main(int argc, char **argv)
 
   // Contraction construct START
   //-----------------------------------------------------------------------------------
-  // All host arrays are double. The QUDA routine wil compute in the specified
-  // precision then cast the results to double
-  size_t data_size = sizeof(double);
+  // This is where the result will be stored
+  void *correlation_function_sum = nullptr;
+  size_t corr_dim = 0, local_corr_length = 0;
+  // We need this to calculate the finite momentum corrs. For temporal corrs we sum up
+  // x*px + y*pz + z*pz
+  int Nmom=(momentum[0]+1)*(momentum[1]+1);
+  int Mom[4]={momentum[0], momentum[1], momentum[2], momentum[3]};
+  if (contract_type == QUDA_CONTRACT_TYPE_DR_FT_Z) {
+    corr_dim = 2;
+    Mom[2]=0;
+    Nmom *= (momentum[3]+1);
+  } else if (contract_type == QUDA_CONTRACT_TYPE_DR_FT_T) {
+    corr_dim = 3;
+    Mom[3]=0;
+    Nmom *= (momentum[2]+1);
+  } else {
+    errorQuda("Unsupported contraction type %d given", contract_type);
+  }
+  local_corr_length = gauge_param.X[corr_dim];
 
-  // If we timeslice sum, there will be tdim * 16 complex elements returned by the
-  // function, where tdim is the local time length. If we do not sum, there will be
-  // V * 16 complex elements, where V is the local 4D volume
-  size_t array_size = (contract_type == QUDA_CONTRACT_TYPE_OPEN || contract_type == QUDA_CONTRACT_TYPE_DR) ? V : tdim;
-  void *correlation_function = (double *)malloc(2 * 16 * array_size * comm_size() * sizeof(double));
-  void *correlation_function_sum = (double *)malloc(2 * 16 * array_size * comm_dim(3) * sizeof(double));
-  memset(correlation_function_sum, 0, 2 * 16 * comm_dim(3) * array_size * data_size);
+  // calculate some parameters
+  size_t global_corr_length = local_corr_length * comm_dim(corr_dim);
+  size_t n_numbers_per_slice = 2 * cs_param.nSpin * cs_param.nSpin;
+  size_t corr_size_in_bytes = n_numbers_per_slice * global_corr_length * sizeof(double);
+
+  correlation_function_sum = malloc(Nmom*corr_size_in_bytes);
   // Contraction construct END
   //-----------------------------------------------------------------------------------
 
@@ -377,7 +400,7 @@ int main(int argc, char **argv)
       std::string infile(prop_source_infile[n]);
       std::vector<quda::ColorSpinorField *> src_ptr;
       src_ptr.reserve(12);
-      for (int dil = 0; dil < 12; dil++) src_ptr.push_back(qudaSource4D[dil]);
+      for (int i = 0; i < spinor_dim; i++) src_ptr.push_back(qudaSource4D[i]);
 
       // load the source
       quda::VectorIO io(infile, QUDA_BOOLEAN_TRUE);
@@ -389,56 +412,59 @@ int main(int argc, char **argv)
                  prop_source_position[n][2], prop_source_position[n][3]);
     }
 
-    for (int dil = 0; dil < 12; dil++) {
+    const int source[4] = {prop_source_position[n][0], prop_source_position[n][1], prop_source_position[n][2],
+			   prop_source_position[n][3]};
 
+    //the overall shift of the position of the corr. need this when the source is not at origin.
+    const int overall_shift_dim = source[corr_dim];
+    
+    for (int i = 0; i < spinor_dim; i++) {
+      
       // Zero out source and sink
       size_t vol_bytes = V * my_spinor_site_size * host_spinor_data_type_size;
       memset(in->V(), inv_param.Ls * vol_bytes, 0.0);
       memset(out->V(), inv_param.Ls * vol_bytes, 0.0);
-
+      
       if (strcmp(prop_source_infile[n], "") != 0) {
         // If we loaded a source, copy it in
-        memcpy(in->V(), qudaSource4D[dil]->V(), vol_bytes);
+        memcpy(in->V(), qudaSource4D[i]->V(), vol_bytes);
       } else {
-        // Construct a point source
-        const int source[4] = {prop_source_position[n][0], prop_source_position[n][1], prop_source_position[n][2],
-                               prop_source_position[n][3]};
-        constructPointSpinorSource(qudaSource4D[dil]->V(), 4, 3, inv_param.cpu_prec, gauge_param.X, dil, source);
-        // constructWallSpinorSource(qudaSource4D[dil]->V(), inv_param.cpu_prec, dil);
-
+        // Construct a point source	
+        constructPointSpinorSource(qudaSource4D[i]->V(), 4, 3, inv_param.cpu_prec, gauge_param.X, i, source);
+	
         // Gaussian smear the point source.
-        performGaussianSmearNStep(qudaSource4D[dil]->V(), &inv_param_smear, prop_source_smear_steps);
+        performGaussianSmearNStep(qudaSource4D[i]->V(), &inv_param_smear, prop_source_smear_steps);
 
         // Debugging...
         for (int i = 0; i < 5; i++) {
-          // qudaSource4D[dil]->PrintVector(i);
+          // qudaSource4D[i]->PrintVector(i);
         }
 
         // Copy the smeared source into the input vector
-        memcpy(in->V(), qudaSource4D[dil]->V(), vol_bytes);
+        memcpy(in->V(), qudaSource4D[i]->V(), vol_bytes);
       }
 
       // If deflating, preserve the deflation space between solves, destroy on the last solve
-      if (inv_deflate) eig_param.preserve_deflation = dil < 12 - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+      if (inv_deflate) eig_param.preserve_deflation = i < 12 - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
       
       // Perform QUDA inversions
       inv_param.solver_normalization = QUDA_SOURCE_NORMALIZATION; // Make explicit for now.
       invertQuda(out->V(), in->V(), &inv_param);
       
       // Performance states
-      time[dil] = inv_param.secs;
-      gflops[dil] = inv_param.gflops / inv_param.secs;
-      printfQuda("Prop %d done: %d iter / %g secs = %g Gflops\n\n", dil, inv_param.iter, inv_param.secs,
+      time[i] = inv_param.secs;
+      gflops[i] = inv_param.gflops / inv_param.secs;
+      printfQuda("Prop %d done: %d iter / %g secs = %g Gflops\n\n", i, inv_param.iter, inv_param.secs,
                  inv_param.gflops / inv_param.secs);
 
       if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH || dslash_type == QUDA_MOBIUS_DWF_DSLASH
           || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
         // If using a DWF type, we construct the 4D prop
         printfQuda("Constructing 4D prop from DWF prop\n");
-        make4DQuarkProp(qudaSink4D[dil]->V(), out->V(), &inv_param, &inv_param4D, gauge_param.X);
+        make4DQuarkProp(qudaSink4D[i]->V(), out->V(), &inv_param, &inv_param4D, gauge_param.X);
       } else {
         // Just copy the solution in to the propagator array
-        memcpy(qudaSink4D[dil]->V(), out->V(), vol_bytes);
+        memcpy(qudaSink4D[i]->V(), out->V(), vol_bytes);
       }
 
       // Perform host side verification of inversion if requested
@@ -447,57 +473,40 @@ int main(int argc, char **argv)
       }
       
       // Gaussian smear the sink.
-      performGaussianSmearNStep(qudaSink4D[dil]->V(), &inv_param_smear, prop_sink_smear_steps);
+      performGaussianSmearNStep(qudaSink4D[i]->V(), &inv_param_smear, prop_sink_smear_steps);
       
       // Debugging...
       for (int i = 0; i < 5; i++) {
-        // qudaSink4D[dil]->PrintVector(i);
-      }
-
-      // Perform GPU contraction.
-      // Host side spinor data and correlation_function passed to QUDA.
-      // QUDA will allocate GPU memory, transfer the data,
-      // perform the requested contraction, and return the
-      // result in the array correlation_function
-      //contractQuda(qudaSink4D[dil]->V(), qudaSink4D[dil]->V(),
-      //((double *)correlation_function) + 2 * 16 * array_size * comm_rank(), contract_type, &inv_param, gauge_param.X);
-    }
-    contractSummedQuda((void**)out_array, (void**)out_array, &correlation_function_sum, contract_type, &inv_param, (void*)(&cs_param4D), gauge_param.X);
-  
-    //contractQuda(qudaSink4D[dil]->V(), qudaSink4D[dil]->V(), ((double *)correlation_function) + 2 * 16 * array_size * comm_rank(), contract_type, &inv_param, gauge_param.X);
-    // Collect all the data from all MPI nodes to the 0 MPI node if there is splitting int the T dim:
-    //comm_gather_reduce_timeslice_array((double *)correlation_function, 2 * 16 * array_size);
-  
-  /*
-  // Dump data to stdout. This needs some elegance.
-    for (int gamma_mat = 0; gamma_mat < 16; gamma_mat++) {
-      for (size_t t = 0; t < comm_dim(3) * array_size; t++) {
-	// printfQuda("t=%d %e %e\n", t, ((double*)correlation_function)[2*(16*t + gamma_mat)],
-	// ((double*)correlation_function)[2*(16*t + gamma_mat) + 1]);
-	((double *)correlation_function_sum)[2 * (16 * t + gamma_mat)]
-	  += ((double *)correlation_function)[2 * (16 * t + gamma_mat)];
-          ((double *)correlation_function_sum)[2 * (16 * t + gamma_mat) + 1]
-            += ((double *)correlation_function)[2 * (16 * t + gamma_mat) + 1];
-      }
-      }
-  */
-  
-  for (int gamma_mat = 0; gamma_mat < 16; gamma_mat++) {
-      for (size_t t = 0; t < comm_dim(3) * array_size; t++) {
-        printfQuda("sum: g=%d t=%lu %e %e\n", gamma_mat, t,
-                   ((double *)correlation_function_sum)[2 * (16 * t + gamma_mat)],
-                   ((double *)correlation_function_sum)[2 * (16 * t + gamma_mat) + 1]);
+        // qudaSink4D[i]->PrintVector(i);
       }
     }
     
-    for (int gamma_mat = 0; gamma_mat < 16; gamma_mat++) {
-      for (size_t t = 0; t < comm_dim(3) * array_size; t++) {
-        printfQuda("ratio: g=%d t=%lu %e\n", gamma_mat, t,
-                   (((double *)correlation_function_sum)[2 * (16 * t + gamma_mat)])
-		   / (((double *)correlation_function_sum)[2 * (16 * ((t + 1) % (comm_dim(3) * tdim)) + gamma_mat)]));
+    // Zero out the result array
+    memset(correlation_function_sum, 0, Nmom*corr_size_in_bytes);
+    contractFTQuda(prop_array_ptr, prop_array_ptr, &correlation_function_sum, contract_type, &inv_param,
+		   (void *)(&cs_param4D), gauge_param.X, source, Mom);
+    
+    for (int px=0; px <= Mom[0]; px++) {
+      for (int py=0; py <= Mom[1]; py++) {
+        for (int pz=0; pz <= Mom[2]; pz++) {
+          for (int pt=0; pt <= Mom[3]; pt++ ) {
+            // Print correlators for this propagator source position
+            for (int G_idx = 0; G_idx < 16; G_idx++) {
+              for (size_t t = 0; t < global_corr_length; t++) {
+                int index_real = (px+py*(Mom[0]+1)+pz*(Mom[0]+1)*(Mom[1]+1)+pt*(Mom[0]+1)*(Mom[1]+1)*(Mom[2]+1))
+                    *n_numbers_per_slice * global_corr_length+n_numbers_per_slice * ((t + overall_shift_dim) % global_corr_length) + 2 * G_idx;
+                int index_imag = index_real+1;
+                printfQuda(
+                  "sum: prop_n=%d px=%d py=%d pz=%d pt=%d g=%d t=%lu %e %e\n", n, px, py, pz, pt, G_idx, t,
+                  ((double *)correlation_function_sum)[index_real],
+                  ((double *)correlation_function_sum)[index_imag]);
+              }
+            }
+          }
+        }
       }
     }
-
+    
     // Compute performance statistics for this propagator
     Nsrc = 12;
     performanceStats(time, gflops);
@@ -544,10 +553,10 @@ int main(int argc, char **argv)
     delete qudaSink4D[i];
     delete qudaSource4D[i];
   }
-  free(correlation_function);
+  //free(correlation_function);
   free(correlation_function_sum);
-  free(in_array);
-  free(out_array);
+  free(source_array);
+  free(prop_array);
 
   freeGaugeQuda();
   for (int dir = 0; dir < 4; dir++) free(gauge[dir]);

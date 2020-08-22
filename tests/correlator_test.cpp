@@ -67,7 +67,6 @@ int main(int argc, char **argv)
   setSpinorSiteSize(spinor_dim * 2); // this sets the global variable my_spinor_site_size
 
   size_t bytes_per_float = sizeof(double);
-  // size_t bytes_per_float = prec;
   // Allocate memory on host for one source (0,0,0,0) for each of the 12x12 color+spinor combinations
   auto *source_array = (double *)malloc(spinor_dim * spinor_dim * V * 2 * bytes_per_float);
   auto *prop_array = (double *)malloc(spinor_dim * spinor_dim * V * 2 * bytes_per_float);
@@ -118,7 +117,7 @@ int main(int argc, char **argv)
     const int source[4] = {prop_source_position[n][0], prop_source_position[n][1], prop_source_position[n][2],
                            prop_source_position[n][3]};
 
-    //the overall shift of the position of the corr. need this when the source is not at origin.
+    // The overall shift of the position of the corr. need this when the source is not at origin.
     const int overall_shift_dim = source[corr_dim];
 
     // Loop over spin X color dilution positions, construct the sources
