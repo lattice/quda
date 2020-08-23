@@ -76,8 +76,7 @@ namespace quda
 
     long long bytes() const
     {
-      bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
-      int clover_bytes = 72 * in.Precision() + (isFixed ? 2 * sizeof(float) : 0);
+      int clover_bytes = 72 * in.Precision() + (isFixed<typename Arg::Float>::value ? 2 * sizeof(float) : 0);
       if (!arg.dynamic_clover) clover_bytes *= 2;
 
       long long bytes = Dslash::bytes();

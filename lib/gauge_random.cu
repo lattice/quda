@@ -124,7 +124,7 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      computeGenGauss<<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
+      qudaLaunchKernel(computeGenGauss<Arg>, tp, stream, arg);
     }
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }

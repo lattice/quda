@@ -60,16 +60,6 @@ namespace quda {
   
   CloverField::~CloverField() { }
 
-  bool CloverField::isNative() const {
-    if (precision == QUDA_DOUBLE_PRECISION) {
-      if (order  == QUDA_FLOAT2_CLOVER_ORDER) return true;
-    } else if (precision == QUDA_SINGLE_PRECISION || precision == QUDA_HALF_PRECISION
-        || precision == QUDA_QUARTER_PRECISION) {
-      if (order == QUDA_FLOAT4_CLOVER_ORDER) return true;
-    }
-    return false;
-  }
-
   void CloverField::setRho(double rho_)
   {
     rho = rho_;
@@ -270,14 +260,6 @@ namespace quda {
                                  QudaParity parity) const
   {
     if (is_prefetch_enabled()) {
-      int dev_id = 0;
-      if (mem_space == QUDA_CUDA_FIELD_LOCATION)
-        dev_id = comm_gpuid();
-      else if (mem_space == QUDA_CPU_FIELD_LOCATION)
-        dev_id = cudaCpuDeviceId;
-      else
-        errorQuda("Invalid QudaFieldLocation.");
-
       auto clover_parity = clover;
       auto norm_parity = norm;
       auto cloverInv_parity = cloverInv;
@@ -302,20 +284,20 @@ namespace quda {
 
       switch (type) {
       case CloverPrefetchType::BOTH_CLOVER_PREFETCH_TYPE:
-        if (clover_parity) cudaMemPrefetchAsync(clover_parity, bytes_parity, dev_id, stream);
-        if (norm_parity) cudaMemPrefetchAsync(norm_parity, norm_bytes_parity, dev_id, stream);
+        if (clover_parity) qudaMemPrefetchAsync(clover_parity, bytes_parity, mem_space, stream);
+        if (norm_parity) qudaMemPrefetchAsync(norm_parity, norm_bytes_parity, mem_space, stream);
         if (clover_parity != cloverInv_parity) {
-          if (cloverInv_parity) cudaMemPrefetchAsync(cloverInv_parity, bytes_parity, dev_id, stream);
-          if (invNorm_parity) cudaMemPrefetchAsync(invNorm_parity, norm_bytes_parity, dev_id, stream);
+          if (cloverInv_parity) qudaMemPrefetchAsync(cloverInv_parity, bytes_parity, mem_space, stream);
+          if (invNorm_parity) qudaMemPrefetchAsync(invNorm_parity, norm_bytes_parity, mem_space, stream);
         }
         break;
       case CloverPrefetchType::CLOVER_CLOVER_PREFETCH_TYPE:
-        if (clover_parity) cudaMemPrefetchAsync(clover_parity, bytes_parity, dev_id, stream);
-        if (norm_parity) cudaMemPrefetchAsync(norm_parity, norm_bytes_parity, dev_id, stream);
+        if (clover_parity) qudaMemPrefetchAsync(clover_parity, bytes_parity, mem_space, stream);
+        if (norm_parity) qudaMemPrefetchAsync(norm_parity, norm_bytes_parity, mem_space, stream);
         break;
       case CloverPrefetchType::INVERSE_CLOVER_PREFETCH_TYPE:
-        if (cloverInv_parity) cudaMemPrefetchAsync(cloverInv_parity, bytes_parity, dev_id, stream);
-        if (invNorm_parity) cudaMemPrefetchAsync(invNorm_parity, norm_bytes_parity, dev_id, stream);
+        if (cloverInv_parity) qudaMemPrefetchAsync(cloverInv_parity, bytes_parity, mem_space, stream);
+        if (invNorm_parity) qudaMemPrefetchAsync(invNorm_parity, norm_bytes_parity, mem_space, stream);
         break;
       default: errorQuda("Invalid CloverPrefetchType.");
       }

@@ -131,13 +131,13 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
       if (location == QUDA_CPU_FIELD_LOCATION) {
-	if(arg.regularToextended) copyGaugeEx<FloatOut, FloatIn, length, OutOrder, InOrder, true>(arg);
+	if (arg.regularToextended) copyGaugeEx<FloatOut, FloatIn, length, OutOrder, InOrder, true>(arg);
 	else copyGaugeEx<FloatOut, FloatIn, length, OutOrder, InOrder, false>(arg);
       } else if (location == QUDA_CUDA_FIELD_LOCATION) {
-	if(arg.regularToextended) copyGaugeExKernel<FloatOut, FloatIn, length, OutOrder, InOrder, true>
-				    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	else copyGaugeExKernel<FloatOut, FloatIn, length, OutOrder, InOrder, false>
-	       <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	if (arg.regularToextended)
+          qudaLaunchKernel(copyGaugeExKernel<FloatOut, FloatIn, length, OutOrder, InOrder, true>, tp, stream, arg);
+	else
+          qudaLaunchKernel(copyGaugeExKernel<FloatOut, FloatIn, length, OutOrder, InOrder, false>, tp, stream, arg);
       }
     }
 
@@ -385,7 +385,7 @@ namespace quda {
     } else if (out.Precision() == QUDA_QUARTER_PRECISION) {
       if (in.Precision() == QUDA_QUARTER_PRECISION) {
 #if QUDA_PRECISION & 1
-        copyGaugeEx(out, in, location, (char *)Out, (char *)In);
+        copyGaugeEx(out, in, location, (int8_t *)Out, (int8_t *)In);
 #else
         errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
 #endif

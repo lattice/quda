@@ -60,16 +60,16 @@ namespace quda {
       switch (arg.wflow_type) {
       case QUDA_WFLOW_TYPE_WILSON:
         switch (arg.step_type) {
-        case WFLOW_STEP_W1: computeWFlowStep<QUDA_WFLOW_TYPE_WILSON, WFLOW_STEP_W1><<<tp.grid, tp.block, tp.shared_bytes>>>(arg); break;
-        case WFLOW_STEP_W2: computeWFlowStep<QUDA_WFLOW_TYPE_WILSON, WFLOW_STEP_W2><<<tp.grid, tp.block, tp.shared_bytes>>>(arg); break;
-        case WFLOW_STEP_VT: computeWFlowStep<QUDA_WFLOW_TYPE_WILSON, WFLOW_STEP_VT><<<tp.grid, tp.block, tp.shared_bytes>>>(arg); break;
+        case WFLOW_STEP_W1: qudaLaunchKernel(computeWFlowStep<QUDA_WFLOW_TYPE_WILSON, WFLOW_STEP_W1, decltype(arg)>, tp, stream, arg); break;
+        case WFLOW_STEP_W2: qudaLaunchKernel(computeWFlowStep<QUDA_WFLOW_TYPE_WILSON, WFLOW_STEP_W2, decltype(arg)>, tp, stream, arg); break;
+        case WFLOW_STEP_VT: qudaLaunchKernel(computeWFlowStep<QUDA_WFLOW_TYPE_WILSON, WFLOW_STEP_VT, decltype(arg)>, tp, stream, arg); break;
         }
         break;
       case QUDA_WFLOW_TYPE_SYMANZIK:
         switch (arg.step_type) {
-        case WFLOW_STEP_W1: computeWFlowStep<QUDA_WFLOW_TYPE_SYMANZIK, WFLOW_STEP_W1><<<tp.grid, tp.block, tp.shared_bytes>>>(arg); break;
-        case WFLOW_STEP_W2: computeWFlowStep<QUDA_WFLOW_TYPE_SYMANZIK, WFLOW_STEP_W2><<<tp.grid, tp.block, tp.shared_bytes>>>(arg); break;
-        case WFLOW_STEP_VT: computeWFlowStep<QUDA_WFLOW_TYPE_SYMANZIK, WFLOW_STEP_VT><<<tp.grid, tp.block, tp.shared_bytes>>>(arg); break;
+        case WFLOW_STEP_W1: qudaLaunchKernel(computeWFlowStep<QUDA_WFLOW_TYPE_SYMANZIK, WFLOW_STEP_W1, decltype(arg)>, tp, stream, arg); break;
+        case WFLOW_STEP_W2: qudaLaunchKernel(computeWFlowStep<QUDA_WFLOW_TYPE_SYMANZIK, WFLOW_STEP_W2, decltype(arg)>, tp, stream, arg); break;
+        case WFLOW_STEP_VT: qudaLaunchKernel(computeWFlowStep<QUDA_WFLOW_TYPE_SYMANZIK, WFLOW_STEP_VT, decltype(arg)>, tp, stream, arg); break;
         }
         break;
       default: errorQuda("Unknown Wilson Flow type %d", arg.wflow_type);

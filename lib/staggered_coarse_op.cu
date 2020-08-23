@@ -66,7 +66,7 @@ namespace quda {
           .instantiate(Type<Float>(),fineColor,coarseSpin,coarseColor,Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else // not jitify
-        ComputeStaggeredVUVGPU<Float,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+        qudaLaunchKernel(ComputeStaggeredVUVGPU<Float,fineColor,coarseSpin,coarseColor,Arg>, tp, stream, arg);
 #endif // JITIFY
       }
     }
