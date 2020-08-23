@@ -1,6 +1,7 @@
 #pragma once
 
 #include <color_spinor_field_order.h>
+#include <propagator.h>
 #include <index_helper.cuh>
 #include <quda_matrix.h>
 #include <matrix_field.h>
@@ -241,6 +242,57 @@ namespace quda
     }
   };
 
+  template <typename Float_, int reduction_dim_ = 3> struct ContractionSummedPropArg :
+    public ReduceArg<spinor_array>  
+  {
+    static constexpr int reduction_dim = reduction_dim_; // This the direction we are performing reduction on. default to 3.
+
+    int threads; // number of active threads required
+    int_fastdiv X[4];    // grid dimensions - using int_fastdiv to reduce division overhead on device
+
+    using Float = Float_;
+    static constexpr int nColor = 3;
+    static constexpr int nSpin = 4;
+    static constexpr bool spin_project = true;
+    static constexpr bool spinor_direct_load = false; // false means texture load
+
+    int source_position[4];
+    int pxpypzpt[4];
+    int NxNyNzNt[4];
+    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
+
+    F x_vec;//[0];//[nColor * nSpin];
+    F y_vec;//[0];//[nColor * nSpin];
+
+    Propagator prop_x;
+    Propagator prop_y;
+    
+    DRGammaMatrix<Float_> Gamma;
+    int t_offset;
+    int offsets[4];
+    ContractionSummedPropArg(const Propagator &x, const Propagator &y,
+			     const int source_position_[4], const int pxpypzpt_[4]) :
+      ReduceArg<spinor_array>(comm_dim(reduction_dim) * x.Vectors()[0]->X(reduction_dim)), // n_reduce = global_dim_t
+      threads(x.Vectors()[0]->VolumeCB() / x.Vectors()[0]->X(reduction_dim)),
+      prop_x(x),
+      prop_y(y),
+      x_vec(*x.Vectors()[0]),
+      y_vec(*y.Vectors()[0]),
+      Gamma(),
+      t_offset(comm_coord(reduction_dim) * x.Vectors()[0]->X(reduction_dim)) // offset of the slice we are doing reduction on
+    {
+      for (int i = 0; i < 4; i++) {
+        X[i] = x.Vectors()[0]->X()[i];
+        pxpypzpt[i] = pxpypzpt_[i];	
+        source_position[i] = source_position_[i];
+        offsets[i] = comm_coord(i) * x.Vectors()[0]->X(i);
+        NxNyNzNt[i] = comm_dim(i) * x.Vectors()[0]->X(i);
+      }
+      //x_vec(*x.Vectors()[0]);
+      //y_vec(*x.Vectors()[0]);
+    }
+  };
+  
   template <int t_d, class T> __device__ int* get_sink(int t, int xyz_cb, T X[4], int parity)
   {
 
@@ -349,6 +401,7 @@ namespace quda
     arg.template reduce2d<blockSize, 2>(result_all_channels, t + arg.t_offset);
   }
 */
+  
   template <int blockSize, typename Arg> __global__ void computeDegrandRossiContractionFT(Arg arg)
   {
     int t = blockIdx.z; // map t to z block index
@@ -390,12 +443,12 @@ namespace quda
       sink=get_sink<Arg::reduction_dim>(t, xyz, arg.X, parity);
       int idx_cb = x_cb_from_sink(arg.X, sink);
       //calculate exp(-i*x*p)
-      Sum_dXi_dot_Pi=(double)((source_position[0]-sink[0]-offsets[0])*pxpypzpt[0]*1./NxNyNzNt[0]+
-                     (source_position[1]-sink[1]-offsets[1])*pxpypzpt[1]*1./NxNyNzNt[1]+
-                     (source_position[2]-sink[2]-offsets[2])*pxpypzpt[2]*1./NxNyNzNt[2]+
-                     (source_position[3]-sink[3]-offsets[3])*pxpypzpt[3]*1./NxNyNzNt[3]);
-      phase_real=cos(Sum_dXi_dot_Pi*2.*M_PI);
-      phase_imag=-sin(Sum_dXi_dot_Pi*2.*M_PI);
+      Sum_dXi_dot_Pi = (double)((source_position[0]-sink[0]-offsets[0])*pxpypzpt[0]*1./NxNyNzNt[0]+
+				(source_position[1]-sink[1]-offsets[1])*pxpypzpt[1]*1./NxNyNzNt[1]+
+				(source_position[2]-sink[2]-offsets[2])*pxpypzpt[2]*1./NxNyNzNt[2]+
+				(source_position[3]-sink[3]-offsets[3])*pxpypzpt[3]*1./NxNyNzNt[3]);
+      phase_real = cos(Sum_dXi_dot_Pi*2.*M_PI);
+      phase_imag = -sin(Sum_dXi_dot_Pi*2.*M_PI);
 
       ColorSpinor<real, nColor, nSpin> x = arg.x(idx_cb, parity);
       ColorSpinor<real, nColor, nSpin> y = arg.y(idx_cb, parity);
@@ -425,6 +478,83 @@ namespace quda
     arg.template reduce2d<blockSize, 2>(result_all_channels, t + arg.t_offset);
   }
 
+  
+  template <int blockSize, typename Arg> __global__ void computeDegrandRossiContractionPropFT(Arg arg)
+  {
+    int t = blockIdx.z; // map t to z block index
+    int xyz = threadIdx.x + blockIdx.x * blockDim.x;
+    int parity = threadIdx.y;
+
+    int pxpypzpt[4];
+    int source_position[4];
+    int offsets[4];
+    int NxNyNzNt[4];
+    for(int i=0;i<4;i++) {
+      source_position[i]=arg.source_position[i];
+      offsets[i]=arg.offsets[i];
+      pxpypzpt[i]=arg.pxpypzpt[i];
+      NxNyNzNt[i]=arg.NxNyNzNt[i];
+    }
+
+    using real = typename Arg::Float;
+    constexpr int nSpin = Arg::nSpin;
+    constexpr int nColor = Arg::nColor;
+
+    complex<real> propagator_product;
+
+    //the coordinate of the sink
+    int *sink;
+    // result array needs to be a spinor_array type object because of the reduce function at the end
+    vector_type<double2, 16> result_all_channels;
+    double phase_real;
+    double phase_imag;
+    double Sum_dXi_dot_Pi;
+    while (xyz < arg.threads) {
+      // extract current ColorSpinor at xyzt from ColorSpinorField      
+      // This function calculates the index_cb assuming t is the coordinate in
+      // direction reduction_dim, and xyz is the linearized index_cb excluding reduction_dim.
+      // So this will work for reduction_dim < 3 as well.
+      sink = get_sink<Arg::reduction_dim>(t, xyz, arg.X, parity);
+      int idx_cb = x_cb_from_sink(arg.X, sink);
+      //calculate exp(-i*x*p)
+      Sum_dXi_dot_Pi = (double)((source_position[0]-sink[0]-offsets[0])*pxpypzpt[0]*1./NxNyNzNt[0]+
+				(source_position[1]-sink[1]-offsets[1])*pxpypzpt[1]*1./NxNyNzNt[1]+
+				(source_position[2]-sink[2]-offsets[2])*pxpypzpt[2]*1./NxNyNzNt[2]+
+				(source_position[3]-sink[3]-offsets[3])*pxpypzpt[3]*1./NxNyNzNt[3]);
+      phase_real = cos(Sum_dXi_dot_Pi*2.*M_PI);
+      phase_imag = -sin(Sum_dXi_dot_Pi*2.*M_PI);
+
+      ColorSpinor<real, nColor, nSpin> x = arg.x_vec(idx_cb, parity);
+      ColorSpinor<real, nColor, nSpin> y = arg.y_vec(idx_cb, parity);
+      
+      /*
+      // loop over channels
+      for (int G_idx = 0; G_idx < 16; G_idx++) {
+        for (int s2 = 0; s2 < nSpin; s2++) {
+          int b2 = arg.Gamma.gm_i[G_idx][s2];
+          // get non-zero column index for current s1
+          int b1_tmp = arg.Gamma.gm_i[G_idx][s1];
+          // only contributes if we're at the correct b1 from the outer loop
+          if (b1_tmp == b1) {
+            propagator_product = arg.Gamma.gm_z[G_idx][b2] * innerProduct(x, y, b2, s2) * arg.Gamma.gm_z[G_idx][b1];
+            result_all_channels[G_idx].x += propagator_product.real()*phase_real-propagator_product.imag()*phase_imag;
+            result_all_channels[G_idx].y += propagator_product.imag()*phase_real+propagator_product.real()*phase_imag;
+	    //if(xyz == 0) printf("Yes Comp\n");
+          } else {
+	    //if(xyz == 0) printf("No Comp\n");  
+	  }
+	}
+      } 
+      */     
+      xyz += blockDim.x * gridDim.x;
+    }
+
+    // This function reduces the data in result_all_channels in all threads -
+    // different threads reduce result to different index t + arg.t_offset
+    arg.template reduce2d<blockSize, 2>(result_all_channels, t + arg.t_offset);
+  }
+  
+  
   
   template <typename real> struct ContractionArg {
     int threads; // number of active threads required

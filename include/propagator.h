@@ -46,38 +46,49 @@ namespace quda
     
   public:
     /**
-       @brief Creates a propagator
+       @brief Default constructor
+    */
+    Propagator();
+
+    /**
+       @brief Initialise a Propagator object using src as input
+       @param src Propagator object from which to initialise
+    */
+    Propagator(const Propagator &src);
+    
+    /**
+       @brief Creates a propagator using a ColorSpinorParam instance
        @param [in] param ColorSpinorParam that defines the vectors
     */
-    Propagator(const ColorSpinorParam &);
+    Propagator(const ColorSpinorParam & param);
 
     /**
        @brief Creates a propagator from host data
        @param [in] param ColorSpinorParam that defines the vectors
+       @param [in] data void pointers holding the vector data
     */
-    Propagator(const ColorSpinorParam &, void **);
-        
-    /**
-       @brief Return a pointer to the selected vector
-       @param [in] vec The requested vector
-       @param [out] Pointer to the vector
-    */
-    ColorSpinorField* selectVector(const size_t vec);
-    
+    Propagator(const ColorSpinorParam & param, void ** data);
+            
     /**
        @brief Operator to copy one Propagator to another
+       @param src Propagator object to copy
     */
-    Propagator& operator=(Propagator &);
+    Propagator& operator=(const Propagator &src);
 
     /**
        @brief Returns a pointer to the prop_vectors array 
     */
-    std::vector<ColorSpinorField *> Vectors();
+    //std::vector<ColorSpinorField *> Vectors();
 
     
     size_t Dim() const { return prop_dim; };
     QudaFieldLocation Location() const { return prop_location; };
     QudaPrecision Precision() const { return prop_precision; };
+    std::vector<ColorSpinorField *> Vectors() const {
+      if (!prop_init) errorQuda("Propgator not initialised");
+      if (prop_vectors.size() == 0) errorQuda("Zero sized vector set in Propagator");
+      return prop_vectors;
+    }    
     
     /**
        @brief Class destructor

@@ -2,6 +2,26 @@
 
 namespace quda {
 
+  Propagator::Propagator() :
+    prop_data(nullptr),
+    prop_init(false),
+    prop_dim(0),
+    prop_location(QUDA_INVALID_FIELD_LOCATION),
+    prop_precision(QUDA_INVALID_PRECISION)
+  {    
+  }
+
+  Propagator::Propagator(const Propagator &src) :
+    prop_data(nullptr),
+    prop_init(false),
+    prop_dim(0),
+    prop_location(QUDA_INVALID_FIELD_LOCATION),
+    prop_precision(QUDA_INVALID_PRECISION)
+  {
+    *this = src;
+  }
+
+  
   Propagator::Propagator(const ColorSpinorParam &param_) :
     prop_data(nullptr),
     prop_init(false),
@@ -77,7 +97,7 @@ namespace quda {
     else errorQuda("prop_dim %lu not equal to vector set size %lu", prop_dim, prop_vectors.size());
   }
     
-  Propagator &Propagator::operator=(Propagator &src)
+  Propagator &Propagator::operator=(const Propagator &src)
   {
     // Sanity checks
     if (!prop_init) errorQuda("Propagator not initialised");
@@ -89,28 +109,10 @@ namespace quda {
     }
     
     // Update Propagator attributes
-    prop_precision = src.Precision();
-    
+    prop_precision = src.Precision();    
     return *this;
   }
 
-  ColorSpinorField* Propagator::selectVector(const size_t vec)
-  {
-    // Sanity checks
-    if (!prop_init) errorQuda("Propgator not initialised");
-    size_t n_vecs = prop_vectors.size();
-    if ((size_t)vec >= n_vecs) errorQuda("Propgator has %lu vectors, vector[%lu] requested", n_vecs, vec);
-
-    return prop_vectors[vec];
-  }
-
-  std::vector<ColorSpinorField *> Propagator::Vectors()
-  {
-    if (!prop_init) errorQuda("Propgator not initialised");
-    if (prop_vectors.size() == 0) errorQuda("Zero sized vector set in Propagator");
-    return prop_vectors;
-  }
-  
   Propagator::~Propagator()
   {
     if (prop_init) {

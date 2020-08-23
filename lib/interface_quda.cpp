@@ -6059,21 +6059,24 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
         for (int pt = 0; pt <= Mom[3]; pt++) {
           const int pxpypzpt[4] = {px, py, pz, pt};
 
+	  // Code path using propagator. Not quite done.
+	  //contractSummedPropQuda(*d_propagator_flavor1, *d_propagator_flavor2,
+	  //h_result_tmp_global, cType, source_position, pxpypzpt);
+	  
           for (size_t c1 = 0; c1 < nColor; c1++) {
             for (size_t s1 = 0; s1 < nSpin; s1++) {
               for (size_t b1 = 0; b1 < nSpin; b1++) {
                 profileContractFT.TPSTART(QUDA_PROFILE_COMPUTE);
-
-                contractSummedQuda(*d_propagator_flavor1->selectVector(s1 * nColor + c1), *d_propagator_flavor2->selectVector(b1 * nColor + c1),
-                                   h_result_tmp_global, cType, source_position, pxpypzpt, s1, b1);
+		
+                contractSummedQuda(*d_propagator_flavor1->Vectors()[s1 * nColor + c1], *d_propagator_flavor2->Vectors()[b1 * nColor + c1],
+				   h_result_tmp_global, cType, source_position, pxpypzpt, s1, b1);
 		
                 comm_allreduce_array((double *)&h_result_tmp_global[0], n_numbers_per_slice * global_corr_length);
-
+		
                 for (size_t G_idx = 0; G_idx < nSpin * nSpin; G_idx++) {
                   for (size_t t = 0; t < global_corr_length; t++) {
-                    int index_real = (px+py*(Mom[0]+1)+pz*(Mom[0]+1)*(Mom[1]+1)+pt*(Mom[0]+1)*
-                                        (Mom[1]+1)*(Mom[2]+1))*n_numbers_per_slice * global_corr_length+
-                                     n_numbers_per_slice * t + 2 * G_idx;
+                    int index_real = ((px+py*(Mom[0]+1)+pz*(Mom[0]+1)*(Mom[1]+1)+pt*(Mom[0]+1)*(Mom[1]+1)*(Mom[2]+1)) *
+				      n_numbers_per_slice * global_corr_length + n_numbers_per_slice * t + 2 * G_idx);
                     int index_imag = index_real+1;
 
                     ((double *)*h_result)[index_real]
