@@ -43,6 +43,9 @@ void display_test_info()
 
   printfQuda(" - solver tolerance %e\n", eig_tol);
   printfQuda(" - convergence required (%s)\n", eig_require_convergence ? "true" : "false");
+
+  // TODO : change things related to the following (not only this, but in general) targeting
+  //        the case when we have JD+MG
   if (eig_compute_svd) {
     printfQuda(" - Operator: MdagM. Will compute SVD of M\n");
     printfQuda(" - ***********************************************************\n");
@@ -121,12 +124,19 @@ int main(int argc, char **argv)
     for (int i = 0; i < mg_levels; i++) {
       eig_mg_param.eig_param[i] = nullptr;
     }
+    // If we're using MG within the eigensolver, it means we're using JD, and
+    // for now we're turning off the recursive use of solver-eigensolver
+    for (int i = 0; i < mg_levels; i++) {
+      eig_mg_param.use_eig_solver[i] = QUDA_BOOLEAN_FALSE;
+    }
+
     // Set MG
     setMultigridParam(eig_mg_param);
   }
   setInvertParam(eig_inv_param);
 
   if (inv_multigrid) {
+    //eig_mg_inv_param.gamma_basis = QUDA_UKQCD_GAMMA_BASIS;
     eig_mg_inv_param.solve_type
       = (eig_mg_inv_param.solution_type == QUDA_MAT_SOLUTION ? QUDA_DIRECT_SOLVE : QUDA_DIRECT_PC_SOLVE);
   }
@@ -141,6 +151,19 @@ int main(int argc, char **argv)
   eig_param.invert_param = &eig_inv_param;
   setEigParam(eig_param);
   eig_param.inv_multigrid = inv_multigrid;
+
+  // TODO : switch (some of) the following to commandline
+  if (inv_multigrid) {
+    eig_param.multigrid_param->setup_type = QUDA_TEST_VECTOR_SETUP;
+    eig_param.multigrid_param->compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_NO;
+    eig_param.multigrid_param->generate_all_levels = QUDA_BOOLEAN_TRUE;
+
+    eig_param.multigrid_param->invert_param->solution_type = QUDA_MAT_SOLUTION; // QUDA_MATPC_SOLUTION
+    eig_param.multigrid_param->invert_param->solve_type = QUDA_DIRECT_SOLVE; // QUDA_DIRECT_PC_SOLVE
+    eig_param.multigrid_param->invert_param->dagger = QUDA_DAG_NO; //QUDA_DAG_YES
+    eig_param.multigrid_param->invert_param->use_init_guess = QUDA_USE_INIT_GUESS_YES; // QUDA_USE_INIT_GUESS_NO
+  }
+
 
   if (eig_param.eig_type == QUDA_EIG_DAV && inv_multigrid) {
     // Only these fermions are supported with MG

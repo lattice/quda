@@ -510,15 +510,19 @@ protected:
   protected:
     // profilers
     TimeProfile *profile_corr_eq_invs;
-    TimeProfile *profile_mat_corr_eq_invs;
+    TimeProfile *profile_mat_corr_eq_invsGCR;
+    TimeProfile *profile_mat_corr_eq_invsMG;
 
     // solver-related
-    SolverParam *solverParam;
-    SolverParam *solverParamPrec;
+    SolverParam *solverParamInnerMG;
+    SolverParam *solverParamInnerGCR;
+    SolverParam *solverParamOuter;
     GCR *gcrPrec;
     GCR *gcrInner;
     Solver *mg_solve;
     void *mg_preconditioner;
+    Solver *innerSolver;
+    SolverParam *innerSolverParam;
 
     // JD-specific workspace
     std::vector<ColorSpinorField *> t;
@@ -533,6 +537,7 @@ protected:
     std::vector<ColorSpinorField *> r_lowprec;
     std::vector<ColorSpinorField *> t_lowprec;
     std::vector<ColorSpinorField *> u_lowprec;
+    std::vector<ColorSpinorField *> Vlast;
 
     // matrix-related
     DiracPrecProjCorr *mmPP;
@@ -540,6 +545,7 @@ protected:
     Dirac *dSloppy;
     Dirac *dPre;
     DiracMatrix *matPre;
+    DiracMatrix *matSloppy;
 
     // precision-related
     double outer_prec;
@@ -607,8 +613,9 @@ protected:
        @brief Some more initializations in the JD eigensolver
        @param[in] csParam Information about the spinors
        @param[in] initVec Spinor assigned to t before the main loop starts
+       @param[in] ce_ps   Number of vectors to use in the projection of the correction equation
     */
-    void moreInits(ColorSpinorParam &csParam, ColorSpinorField &initVec);
+    void moreInits(ColorSpinorParam &csParam, ColorSpinorField &initVec, int ce_ps);
 
     /**
        @brief Some more initializations in the JD eigensolver
@@ -651,7 +658,7 @@ protected:
     */
     virtual ~JD();
 
-    virtual bool hermitian() { return true; } /** The current implementation of JD is only for Hermitian systems */
+    virtual bool hermitian() { return eig_param->use_norm_op; }
   };
 
 } // namespace quda
