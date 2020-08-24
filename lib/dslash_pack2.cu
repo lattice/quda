@@ -7,6 +7,7 @@
 
 #include <dslash_quda.h>
 #include <kernels/dslash_pack.cuh>
+#include <instantiate.h>
 
 namespace quda
 {
@@ -341,30 +342,19 @@ public:
     }
   };
 
-  template <typename Float, int nColor>
-  void PackGhost(void *ghost[], const ColorSpinorField &in, MemoryLocation location, int nFace, bool dagger, int parity,
-                 bool spin_project, double a, double b, double c, const qudaStream_t &stream)
-  {
-    if (spin_project) {
-      Pack<Float, nColor, true> pack(ghost, in, location, nFace, dagger, parity, a, b, c);
-      pack.apply(stream);
-    } else {
-      Pack<Float, nColor, false> pack(ghost, in, location, nFace, dagger, parity, a, b, c);
-      pack.apply(stream);
+  template <typename Float, int nColor> struct GhostPack {
+    GhostPack(const ColorSpinorField &in, void *ghost[], MemoryLocation location, int nFace, bool dagger,
+              int parity, bool spin_project, double a, double b, double c, const qudaStream_t &stream)
+    {
+      if (spin_project) {
+        Pack<Float, nColor, true> pack(ghost, in, location, nFace, dagger, parity, a, b, c);
+        pack.apply(stream);
+      } else {
+        Pack<Float, nColor, false> pack(ghost, in, location, nFace, dagger, parity, a, b, c);
+        pack.apply(stream);
+      }
     }
-  }
-
-  // template on the number of colors
-  template <typename Float>
-  void PackGhost(void *ghost[], const ColorSpinorField &in, MemoryLocation location, int nFace, bool dagger, int parity,
-                 bool spin_project, double a, double b, double c, const qudaStream_t &stream)
-  {
-    if (in.Ncolor() == 3) {
-      PackGhost<Float, 3>(ghost, in, location, nFace, dagger, parity, spin_project, a, b, c, stream);
-    } else {
-      errorQuda("Unsupported number of colors %d\n", in.Ncolor());
-    }
-  }
+  };
 
   // Pack the ghost for the Dslash operator
   void PackGhost(void *ghost[2 * QUDA_MAX_DIM], const ColorSpinorField &in, MemoryLocation location, int nFace,
@@ -375,36 +365,9 @@ public:
       if (!commDim[d]) continue;
       if (d != 3 || getKernelPackT()) nDimPack++;
     }
-
     if (!nDimPack) return; // if zero then we have nothing to pack
 
-    if (in.Precision() == QUDA_DOUBLE_PRECISION) {
-#if QUDA_PRECISION & 8
-      PackGhost<double>(ghost, in, location, nFace, dagger, parity, spin_project, a, b, c, stream);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
-#endif
-    } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
-#if QUDA_PRECISION & 4
-      PackGhost<float>(ghost, in, location, nFace, dagger, parity, spin_project, a, b, c, stream);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
-#endif
-    } else if (in.Precision() == QUDA_HALF_PRECISION) {
-#if QUDA_PRECISION & 2
-      PackGhost<short>(ghost, in, location, nFace, dagger, parity, spin_project, a, b, c, stream);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
-#endif
-    } else if (in.Precision() == QUDA_QUARTER_PRECISION) {
-#if QUDA_PRECISION & 1
-      PackGhost<char>(ghost, in, location, nFace, dagger, parity, spin_project, a, b, c, stream);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
-#endif
-    } else {
-      errorQuda("Unsupported precision %d\n", in.Precision());
-    }
+    instantiate<GhostPack>(in, ghost, location, nFace, dagger, parity, spin_project, a, b, c, stream);
   }
 
 } // namespace quda
