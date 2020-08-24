@@ -131,7 +131,6 @@ namespace quda {
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Global U_max = %e\n", max_scale);
 
     if (xGauge::fixedPoint()) {
-      printfQuda("I AM FIXED POINT\n"); 
       arg.X.resetScale(max_scale > 2.0*mass ? max_scale : 2.0*mass); // To be safe
       X_.Scale(max_scale > 2.0*mass ? max_scale : 2.0*mass); // To be safe
     }
@@ -229,11 +228,11 @@ namespace quda {
 #endif
 //#if QUDA_PRECISION & 1
 //    if (X.Precision() == QUDA_QUARTER_PRECISION) {
-//      calculateStaggeredKDBlock<float,char>(X, g, mass);
+//      calculateStaggeredKDBlock<float,int8_t>(X, g, mass);
 //    } else
 //#endif
     {
-      errorQuda("Unsupported precision %d\n", X.Precision());
+      errorQuda("Unsupported precision %d", X.Precision());
     }
 
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("....done computing X for StaggeredKD\n");
