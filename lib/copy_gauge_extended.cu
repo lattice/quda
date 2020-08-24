@@ -385,7 +385,7 @@ namespace quda {
     } else if (out.Precision() == QUDA_QUARTER_PRECISION) {
       if (in.Precision() == QUDA_QUARTER_PRECISION) {
 #if QUDA_PRECISION & 1
-        copyGaugeEx(out, in, location, (char *)Out, (char *)In);
+        copyGaugeEx(out, in, location, (int8_t *)Out, (int8_t *)In);
 #else
         errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
 #endif

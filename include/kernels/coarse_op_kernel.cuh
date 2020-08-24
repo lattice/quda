@@ -1035,35 +1035,47 @@ namespace quda {
 
     if (!from_coarse) {
       //If Nspin = 4, then the clover term has structure C_{\mu\nu} = \gamma_{\mu\nu}C^{\mu\nu}
+#pragma unroll
       for (int s = 0; s < fineSpin; s++) { //Loop over fine spin row
 	const int s_c = arg.spin_map(s,parity);
 	//On the fine lattice, the clover field is chirally blocked, so loop over rows/columns
 	//in the same chiral block.
+#pragma unroll
 	for (int s_col = s_c*arg.spin_bs; s_col < (s_c+1)*arg.spin_bs; s_col++) { //Loop over fine spin column
+#pragma unroll
           for (int ic = 0; ic < fineColor; ic++) { //Sum over fine color row
+            complex<Float> CV = 0.0;
+#pragma unroll
             for (int jc = 0; jc < fineColor; jc++) {  //Sum over fine color column
-              X[s_c*coarseSpin + s_c] +=
-                conj(arg.V(parity, x_cb, s, ic, ic_c)) * arg.C(0, parity, x_cb, s, s_col, ic, jc) * arg.V(parity, x_cb, s_col, jc, jc_c);
+              CV = cmac(arg.C(0, parity, x_cb, s, s_col, ic, jc), arg.V(parity, x_cb, s_col, jc, jc_c), CV);
             } //Fine color column
+            X[s_c*coarseSpin + s_c] = cmac(conj(arg.V(parity, x_cb, s, ic, ic_c)), CV, X[s_c*coarseSpin + s_c]);
           }  //Fine color row
 	}  //Fine spin column
       } //Fine spin
     } else {
       //If Nspin != 4, then spin structure is a dense matrix and there is now spin aggregation
       //N.B. assumes that no further spin blocking is done in this case.
+#pragma unroll
       for (int s = 0; s < fineSpin; s++) { //Loop over spin row
+#pragma unroll
 	for (int s_col = 0; s_col < fineSpin; s_col++) { //Loop over spin column
+#pragma unroll
           for (int ic = 0; ic < fineColor; ic++) { //Sum over fine color row
+            complex<Float> CV = 0.0;
+#pragma unroll
             for (int jc = 0; jc < fineColor; jc++) {  //Sum over fine color column
-              X[s*coarseSpin + s_col] +=
-                conj(arg.V(parity, x_cb, s, ic, ic_c)) * arg.C(0, parity, x_cb, s, s_col, ic, jc) * arg.V(parity, x_cb, s_col, jc, jc_c);
+              CV = cmac(arg.C(0, parity, x_cb, s, s_col, ic, jc), arg.V(parity, x_cb, s_col, jc, jc_c), CV);;
             } //Fine color column
+            X[s*coarseSpin + s_col] = cmac(conj(arg.V(parity, x_cb, s, ic, ic_c)), CV, X[s*coarseSpin + s_col]);
           }  //Fine color row
 	}  //Fine spin column
       } //Fine spin
     }
 
+#pragma unroll
     for (int si = 0; si < coarseSpin; si++) {
+#pragma unroll
       for (int sj = 0; sj < coarseSpin; sj++) {
         arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,si,sj,ic_c,jc_c,X[si*coarseSpin+sj]);
       }

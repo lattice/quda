@@ -81,8 +81,8 @@ namespace quda
     long long bytes() const
     {
       int gauge_bytes = arg.reconstruct * in.Precision();
-      bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
-      int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed ? sizeof(float) : 0);
+      int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() +
+        (isFixed<typename Arg::Float>::value ? sizeof(float) : 0);
       int ghost_bytes = gauge_bytes + 3 * spinor_bytes; // 3 since we have to load the partial
       int dim = arg.mu % 4;
       long long bytes_ = 0;
