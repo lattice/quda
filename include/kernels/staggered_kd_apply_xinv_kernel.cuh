@@ -28,6 +28,7 @@ namespace quda {
     int x_size[QUDA_MAX_DIM];           /** Dimensions of fine grid */
     int_fastdiv xc_size[QUDA_MAX_DIM];  /** Dimensions of coarse grid */
 
+    const int fineVolumeCB;
     const int coarseVolumeCB;   /** Coarse grid volume */
 
     ApplyStaggeredKDBlockArg(fineColorSpinor &out, const fineColorSpinor &in, const xInvGauge &xInv,
@@ -35,6 +36,7 @@ namespace quda {
       out(out),
       in(in),
       xInv(xInv),
+      fineVolumeCB(in.VolumeCB()),
       coarseVolumeCB(xInv.VolumeCB())
     {
       for (int i=0; i<QUDA_MAX_DIM; i++) {
@@ -58,104 +60,140 @@ namespace quda {
     using real_spinor = typename mapper<Arg::vFloatSpinor>::type;
     using Vector = ColorSpinor<real_spinor, Arg::fineColor, 1>;
 
-    // For warp-wide reductions
-    typedef cub::WarpReduce<real,32> WarpReduce32;
-    __shared__ typename WarpReduce32::TempStorage temp_storage_32;
-    typedef cub::WarpReduce<real,16> WarpReduce32;
+    // For each "dot product" in the mat-vec
+    typedef cub::WarpReduce<real,16> WarpReduce16;
     __shared__ typename WarpReduce16::TempStorage temp_storage_16;
 
-    // eventually we'll do multiple KD blocks per CUDA block
-    // for now, just one KD block per warp
-    int tid = blockDim.x*blockIdx.x + threadIdx.x;
-    const int warp_size = 32;
+    /////////////////////////////////
+    // Figure out some identifiers //
+    /////////////////////////////////
 
-    const int x_coarse_cb = tid / warp_size;
-    const int warp_id = tid % warp_size;
-    complex* buffer = reinterpret_cast<complex*>(cs_buffer) + warp_id * 48; // each warp stores 48 complex nums to shared memory
+    // What is my overall thread id?
+    const unsigned int tid = ((blockIdx.y*gridDim.x + blockIdx.x)*blockDim.y + threadIdx.y)*blockDim.x + threadIdx.x;
 
-    const int parity_coarse = blockDim.y*blockIdx.y + threadIdx.y;
+    // Decompose into factors of 16.
+    const unsigned int fast_idx = tid & 0b1111;
+    const unsigned int mid_idx = (tid >> 4) & 0b1111;
+    const unsigned int slow_idx = tid >> 8;
 
-    const int x_coarse = 2 * x_coarse_cb + 1;
+    // The fundamental unit of work is 256 threads = 16 KD blocks
+    // What's the first KD block in my unit of work?
+    const unsigned int x_coarse_first = 16 * slow_idx;
 
-    // This is going to get confusing real fast so buckle up!
+    // What's my KD block for loading spinors?
+    // [0-15] loads first corner of consecutive hypercubes,
+    // [16-31] loads the second corner, etc
+    const unsigned int x_coarse_spinor = x_coarse_first + fast_idx;
+    const unsigned int parity_coarse_spinor = x_coarse_spinor % 2;
+    const unsigned int x_coarse_spinor_cb = x_coarse_spinor / 2;
 
-    // Part 1. Figure out which site my thread is responsible for.
-    //         There's probably a better way to do this.
+    // What's my KD block for loading Xinv?
+    // [0-15] loads consecutive elements of Xinv for the first block,
+    // [16-31] loads consecutive elements of Xinv for the second block, etc
+    const unsigned int x_coarse_xinv = x_coarse_first + mid_idx;
+    const unsigned int parity_coarse_xinv = x_coarse_xinv % 2;
+    const unsigned int x_coarse_xinv_cb = x_coarse_xinv / 2;
+
+    /////////////////////////////////////
+    // Set up my shared memory buffers //
+    /////////////////////////////////////
+
+     // dof needed for one unit of work
+    const int buffer_size = 3 * 16 * 16;
+
+    // Which unit of work am I within this block?
+    const int unit_of_work = (threadIdx.x + threadIdx.y * blockDim.x) / 256;
+    complex* in_buffer = cs_buffer + (2 * unit_of_work) * buffer_size;
+    complex* out_buffer = cs_buffer + (2 * unit_of_work + 1) * buffer_size;
+    
+    ////////////////////////////////////////////////////
+    // Hey, real work! What ColorVector am I loading? //
+    ////////////////////////////////////////////////////
+    
     int coarseCoords[4];
-    getCoords(coarseCoords, x_coarse_cb, xc_size, parity_coarse); // this has int div...
+    getCoords(coarseCoords, x_coarse_spinor_cb, xc_size, parity_coarse_spinor);
 
-    // Grab one corner of the hypercube
-    int tmp_warp_id = warp_id;
-    int y_bit = tmp_warp_id & 1; tmp_warp_id >>= 1;
-    int z_bit = tmp_warp_id & 1; tmp_warp_id >>= 1;
-    int t_bit = tmp_warp_id & 1; tmp_warp_id >>= 1;
-    int parity = tmp_warp_id & 1;
+    // What corner of the hypercube am I grabbing?
+    int tmp_mid_idx = mid_idx;
+    int y_bit = tmp_mid_idx & 1; tmp_mid_idx >>= 1;
+    int z_bit = tmp_mid_idx & 1; tmp_mid_idx >>= 1;
+    int t_bit = tmp_mid_idx & 1; tmp_mid_idx >>= 1;
+    int parity_spinor = tmp_mid_idx & 1;
 
     // Last xc_size[0] is intentional
-    int x_cb = ((((2 * coarseCoords[3] + t_bit) * x_size[2]) + 2 * coarseCoords[2] + z_bit) * x_size[1] + 2 * coarseCoords[1] + y_bit) * xc_size[0] + coarseCoords[0];
+    int x_spinor_cb = ((((2 * coarseCoords[3] + t_bit) * x_size[2]) + 2 * coarseCoords[2] + z_bit) * x_size[1] + 2 * coarseCoords[1] + y_bit) * xc_size[0] + coarseCoords[0];
 
-    // Alright, that was gross.
+    // Load!
+    if (x_spinor_cb < fineVolumeCB) {
 
-    // Part 2. Load my ColorSpinor, store it to shared memory
-    // in a convenient order for the Xinv multiply
-    // it's a shame we can't generically use LDGSTS?
-    if (warp_id < 16) {
-      const Vector in = arg.in(x_cb, parity);
+      const Vector in = arg.in(x_spinor_cb, parity_spinor);
 
-      // ColorSpinor type may not equal compute type (if ColorSpinor type is double)
-      // Will find out if this cast works at compile time 
-      buffer[warp_id] = static_cast<complex>(in[0]);
-      buffer[warp_id+16] = static_cast<complex>(in[1]);
-      buffer[warp_id+32] = static_cast<complex>(in[2]);
+      // ♫ do you believe in bank conflicts ♫
+      // aka add some padding somewhere
+
+      in_buffer[48 * fast_idx + mid_idx] = static_cast<complex>(in[0]);
+      in_buffer[48 * fast_idx + mid_idx + 16] = static_cast<complex>(in[1]);
+      in_buffer[48 * fast_idx + mid_idx + 32] = static_cast<complex>(in[2]);
+
+    } else {
+
+      in_buffer[48 * fast_idx + mid_idx] = { 0, 0 }; 
+      in_buffer[48 * fast_idx + mid_idx + 16] = { 0, 0 }; 
+      in_buffer[48 * fast_idx + mid_idx + 32] = { 0, 0 }; 
+
     }
-    __syncwarp();
 
-    // Part 3. // Multiply by Xinv. 
+    __syncthreads();
 
-    Vector out;
+    /////////////////////////////
+    // Multiply by Xinv, store //
+    /////////////////////////////
 
-    #pragma unroll // eh, we'll see if this is a good idea.
-    for (int coarse_spin_row = 0; coarse_spin_row < Arg::coarseSpin; coarse_spin_row++) {
-      #pragma unroll
-      for (int coarse_color_row = 0; coarse_color_row < Arg::coarseColor; coarse_color_row++) {
-        // load a row, reduce, continue
-        int color_idx = warp_id % 24;
-        int spin_idx = warp_id / 24;
-        complex xinv_elem = arg.Xinv(parity_coarse, x_coarse_cb, spin_idx, color_idx);
-        complex prod = cmul(xinv_elem, buffer[warp_id]);
-        __syncwarp();
+    if (x_coarse_xinv_cb < coarseVolumeCB) {
+      #pragma unroll // eh, we'll see if this is a good idea.
+      for (int coarse_spin_row = 0; coarse_spin_row < Arg::coarseSpin; coarse_spin_row++) {
+        #pragma unroll
+        for (int coarse_color_row = 0; coarse_color_row < Arg::coarseColor; coarse_color_row++) {
+          
+          complex re_sum = 0, im_sum = 0;
 
-        // Reduce
-        real re_reduce, im_reduce;
-        re_reduce = WarpReduce32(temp_storage_32).Sum(prod.real());
-        im_reduce = WarpReduce32(temp_storage_32).Sum(prod.imag());
+          // load rows in three chunks
+          #pragma unroll
+          for (int elem = fast_idx; elem < Arg::coarseSpin*Arg::coarseColor; elem += 16) {
+            const int color_idx = elem % 24;
+            const int spin_idx = elem / 24;
 
-        // First 16 threads grab the remaining 16 elements
-        if (warp_id < 16) {
-          xinv_elem = arg.Xinv(parity_coarse, x_coarse_cb, 1, color_idx + 8);
-          prod = cmul(xinv_elem, buffer[warp_id+32]);
-        } else {
-          prod = complex(0,0);
-        }
+            const complex xinv_elem = arg.Xinv(parity_coarse_xinv, x_coarse_xinv_cb, spin_idx, color_idx);
+            const complex cs_component = in_buffer[48 * mid_idx + elem];
+            complex prod = cmul(xinv_elem, cs_component);
 
-        re_reduce += WarpReduce16(temp_storage_16).Sum(prod.real());
-        im_reduce += WarpReduce16(temp_storage_16).Sum(prod.real());
+            re_sum += WarpReduce16(temp_storage_16).Sum(prod.real());
+            im_sum += WarpReduce16(temp_storage_16).Sum(prod.imag());
+          }
 
-        // broadcast
-        Float val_re = __shfl_sync(0xffffffff, re_reduce, 0);
-        Float val_im = __shfl_sync(0xffffffff, im_reduce, 0);
-
-        int cs_index = coarse_spin_row * Arg::coarseColor + coarse_color_row;
-        if (warp_id < 16 && warp_id == cs_index / 3) {
-          out[cs_index % 3] = { val_re, val_im };
+          if (fast_idx == 0)
+            out_buffer[48 * mid_idx + coarse_spin_row * Arg::coarseColor + coarse_color_row];
         }
       }
     }
 
-    // Part 4. Store
-    __syncwarp();
-    if (warp_id < 16) {
-      arg.out(x_cb, parity) = out;
+    __syncthreads();
+
+    /////////////////////////////////////
+    // Store: one whole thing is easy! //
+    /////////////////////////////////////
+
+    Vector out;
+
+    if (x_spinor_cb < fineVolumeCB) {
+      Vector out;
+
+      #pragma unroll
+      for (int c_f = 0; c_f < Arg::fineColor; c_f++) {
+        out[c_f] = out_buffer[48 * fast_idx + 16 * c_f + mid_idx];
+      }
+
+      arg.out(x_spinor_cb, parity_spinor);
     }
     
     // Who knows

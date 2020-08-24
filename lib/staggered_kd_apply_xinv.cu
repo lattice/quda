@@ -8,7 +8,81 @@
 
 namespace quda {
 
-  // need to add Tuneable class, etc
+  template <typename Arg>
+  class ApplyStaggeredKDBlock : public TunableVectorY {
+
+    Arg &arg;
+    const ColorSpinorField &meta;
+    const GaugeField &Xinv;
+
+    long long flops() const { 
+      // FIXME
+      return arg.coarseVolumeCB*coarseSpin*coarseColor;
+    }
+
+    long long bytes() const
+    {
+      // FIXME
+      // 1. meta.Bytes() / 2 b/c the Kahler-Dirac blocking is a dual decomposition: only
+      //    half of the gauge field needs to be loaded.
+      // 2. Storing X, extra factor of two b/c it stores forwards and backwards.
+      // 3. Storing mass contribution
+      return meta.Bytes() / 2 + (meta.Bytes() * X.Precision()) / meta.Precision() + 2 * coarseSpin * coarseColor * arg.coarseVolumeCB * X.Precision();
+    }
+
+    unsigned int sharedBytesPerThread() const {
+      // 16 threads needs to store 16 ColorVectors in the compute
+      // precision, times 2 for in vs out
+      // -> each thread needs to store 2 x size of ColorVector
+      return 2*Arg::fineColor*sizeof(complex<Arg::Float>);
+    }
+
+    int blockStep() const { return 256; }
+    int blockMin() const { return 256; }
+
+    unsigned int minThreads() const { return arg.fineVolumeCB; }
+    bool tuneGridDim() const { return false; } // don't tune the grid dimension
+
+  public:
+    ApplyStaggeredKDBlock(Arg &arg, const ColorSpinorField &meta, const GaugeField &Xinv) :
+      TunableVectorY(8),
+      arg(arg),
+      meta(meta),
+      X(X)
+    {
+#ifdef JITIFY
+      create_jitify_program("kernels/staggered_kd_apply_xinv_kernel.cuh");
+#endif
+      strcpy(aux, compile_type_str(meta));
+      // should be all we need?
+    }
+
+    void apply(const qudaStream_t &stream)
+    {
+      TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_VERBOSE);
+
+      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
+        ComputeStaggeredKDBlockCPU<Float,fineColor,coarseSpin,coarseColor>(arg);
+      } else {
+#ifdef JITIFY
+        using namespace jitify::reflection;
+        jitify_error = program->kernel("quda::ComputeStaggeredKDBlockGPU")
+          .instantiate(Type<Float>(),fineColor,coarseSpin,coarseColor,Type<Arg>())
+          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+#else // not jitify
+        qudaLaunchKernel(ComputeStaggeredKDBlockGPU<Float,fineColor,coarseSpin,coarseColor,Arg>, tp, stream, arg);
+#endif // JITIFY
+      }
+    }
+
+    bool advanceTuneParam(TuneParam &param) const {
+      // only do autotuning if we have device fields
+      if (X.MemType() == QUDA_MEMORY_DEVICE) return Tunable::advanceTuneParam(param);
+      else return false;
+    }
+
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
+  };
 
   /**
      @brief Apply the staggered Kahler-Dirac block inverse
@@ -40,7 +114,7 @@ namespace quda {
       x_size[i] = out_.X()[i];
       xc_size[i] = Xinv_.X()[i];
       // check that local volumes are consistent
-      if (2 * xc_size[i] != out_.X()[i]) {
+      if (2 * xc_size[i] != x_size[i]) {
         errorQuda("Inconsistent fine dimension %d and coarse KD dimension %d", x_size[i], xc_size[i]);
       }
     }
