@@ -23,7 +23,7 @@ namespace quda {
     memcpy(gParam.x, xc, QUDA_MAX_DIM*sizeof(int));
     gParam.nColor = Nc_c*Ns_c;
     gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-    gParam.order = gpu ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_QDP_GAUGE_ORDER;
+    gParam.order = QUDA_MILC_GAUGE_ORDER; //gpu ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_QDP_GAUGE_ORDER;
     gParam.link_type = QUDA_COARSE_LINKS;
     gParam.t_boundary = QUDA_PERIODIC_T;
     gParam.create = QUDA_ZERO_FIELD_CREATE;
