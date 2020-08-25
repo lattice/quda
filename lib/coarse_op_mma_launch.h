@@ -140,7 +140,7 @@ namespace quda
                             int>::type
     launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
     {
-#if (__COMPUTE_CAPABILITY__ > 700)
+#if (__COMPUTE_CAPABILITY__ >= 750) // Turing or above
       if (query_max) return 5;
       switch (tp.aux.x) {
       // clang-format off
@@ -429,7 +429,7 @@ namespace quda
                             int>::type
     launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
     {
-#if (__COMPUTE_CAPABILITY__ > 700)
+#if (__COMPUTE_CAPABILITY__ >= 750) // Turing or above
       if (query_max) return 1;
       switch (tp.aux.x) {
       // clang-format off

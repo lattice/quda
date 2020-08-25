@@ -7,7 +7,7 @@
 #include <jitify_helper.cuh>
 #include <kernels/coarse_op_preconditioned.cuh>
 
-#include <coarse_op_preconditioned_mma.cuh>
+#include <coarse_op_preconditioned_mma_launch.h>
 
 namespace quda
 {

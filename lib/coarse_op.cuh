@@ -5,7 +5,7 @@
 #include <kernels/coarse_op_kernel.cuh>
 #include <uint_to_char.h>
 
-#include <coarse_op_mma.cuh>
+#include <coarse_op_mma_launch.h>
 
 namespace quda {
 

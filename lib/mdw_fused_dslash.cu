@@ -1,7 +1,10 @@
 #include <gauge_field.h>
 #include <gauge_field_order.h>
 #include <dslash.h>
+
+#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
 #include <mdw_dslash5_tensor_core.cuh>
+#endif
 
 #include <unordered_set>
 
@@ -9,25 +12,18 @@ namespace quda
 {
   namespace mobius_tensor_core
   {
+
+#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
+
     constexpr int sm_m_pad_size(int m)
     {
-#ifdef USE_MMA_SYNC
       return quda::mma::pad_size(m);
-#else
-      return m == 64 ? 16 : 0;
-#endif
     }
 
     constexpr int sm_n_pad_size(int n)
     {
-#ifdef USE_MMA_SYNC
       return quda::mma::pad_size(n);
-#else
-      return 16;
-#endif
     }
-
-#if (CUDA_VERSION >= 9000 && __COMPUTE_CAPABILITY__ >= 700)
 
     /**
       @brief Parameter structure for applying the Dslash
@@ -346,15 +342,9 @@ namespace quda
       int s4_shift_base = blockIdx.x * blockDim.x; // base.
       int s4_shift, sid;
 
-#ifdef USE_MMA_SYNC
       constexpr int tm_dim = M / mma::MMA_M;
       constexpr int tn_dim = N / mma::MMA_N;
       constexpr int tk_dim = M / mma::MMA_K;
-#else
-      constexpr int tm_dim = M / WMMA_M;
-      constexpr int tn_dim = N / WMMA_N;
-      constexpr int tk_dim = M / WMMA_K;
-#endif
 
       constexpr int total_warp = block_dim_x * Ls >> 5;
       const int this_warp = (threadIdx.y * block_dim_x + threadIdx.x) >> 5;
@@ -364,8 +354,6 @@ namespace quda
       constexpr int warp_cycle = total_tile / total_warp;
       const int warp_m = this_warp * warp_cycle / tn_dim;
 
-#ifdef USE_MMA_SYNC
-
       mma::WarpRegisterMapping wrm(threadIdx.y * blockDim.x + threadIdx.x);
       mma::MmaOperandA op_a[reload ? 1 : tk_dim];
       mma::MmaOperandA op_a_aux[reload ? 1 : tk_dim];
@@ -374,50 +362,16 @@ namespace quda
         for (int tile_k = 0; tile_k < tk_dim; tile_k++) { op_a[tile_k].template load<M_sm>(sm_a, tile_k, warp_m, wrm); }
       }
 
-#else
-
-      typedef
-        typename nvcuda::wmma::fragment<nvcuda::wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, nvcuda::wmma::col_major>
-          a_type;
-
-      a_type a_frag[reload ? 1 : tk_dim];
-      a_type a_frag_black[reload ? 1 : tk_dim];
-      if (!reload) { // in the preload case we preload ...
-#pragma unroll
-        for (int k = 0; k < tk_dim; k++) {
-          const int a_row = warp_m * WMMA_M;
-          const int a_col = k * WMMA_K;
-          // Load Matrix
-          nvcuda::wmma::load_matrix_sync(a_frag[k], sm_a + a_row + a_col * M_sm, M_sm);
-        }
-      }
-
-#endif
-
       if (type == 1) {
         arg.alpha = 1.;
         if (!reload) {                                                           // in the preload case we preload ...
           construct_matrix_a_m5inv<block_dim_x, Ls, M_sm, true, Arg>(arg, sm_a); // dagger = true
           __syncthreads();
 
-#ifdef USE_MMA_SYNC
-
 #pragma unroll
           for (int tile_k = 0; tile_k < tk_dim; tile_k++) {
             op_a_aux[tile_k].template load<M_sm>(sm_a, tile_k, warp_m, wrm);
           }
-
-#else
-
-#pragma unroll
-          for (int k = 0; k < tk_dim; k++) {
-            const int a_row = warp_m * WMMA_M;
-            const int a_col = k * WMMA_K;
-            // Load Matrix
-            nvcuda::wmma::load_matrix_sync(a_frag_black[k], sm_c + a_row + a_col * M_sm, M_sm);
-          }
-
-#endif
 
         } else {
           construct_matrix_a_m5inv<block_dim_x, Ls, M_sm, true, Arg>(arg, sm_a_black); // dagger = true
@@ -455,11 +409,7 @@ namespace quda
         load_matrix_b_vector<block_dim_x, Ls, N_sm / 2, false>(in_vec, sm_b, smem_scale); // acc(accumulation) = false
 
         __syncthreads();
-#ifdef USE_MMA_SYNC
         mma_sync_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(op_a, sm_a, sm_c, sm_c, wrm);
-#else
-        wmma_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(a_frag, sm_a, sm_c, sm_c);
-#endif
         __syncthreads();
 
         if (type == 1) {
@@ -476,11 +426,7 @@ namespace quda
           load_matrix_b_vector<block_dim_x, Ls, N_sm / 2, true>(aux_in_vec, sm_b, smem_scale, arg.m_scale); // acc = true
           if (!idle && center) { store_matrix_c<storage_type, N_sm>(arg.y, sm_b, sid_back, smem_scale[0]); }
           __syncthreads();
-#ifdef USE_MMA_SYNC
           mma_sync_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(op_a_aux, sm_a_black, sm_c, sm_c, wrm);
-#else
-          wmma_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(a_frag_black, sm_a_black, sm_c, sm_c);
-#endif
           __syncthreads();
 
         } else if (type == 3) {
@@ -747,13 +693,13 @@ namespace quda
         }
       }
     };
-#endif // #if (CUDA_VERSION >= 9000 && __COMPUTE_CAPABILITY__ >= 700)
+#endif // #if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
 
     void apply_fused_dslash(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, ColorSpinorField &y,
                             const ColorSpinorField &x, double m_f, double m_5, const Complex *b_5, const Complex *c_5,
                             bool dagger, int parity, int shift[4], int halo_shift[4], MdwfFusedDslashType type)
     {
-#if defined(GPU_DOMAIN_WALL_DIRAC) && (CUDA_VERSION >= 9000 && __COMPUTE_CAPABILITY__ >= 700)
+#if defined(GPU_DOMAIN_WALL_DIRAC) && (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
       checkLocation(out, in); // check all locations match
       instantiatePreconditioner<FusedApply>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift,
                                             type);

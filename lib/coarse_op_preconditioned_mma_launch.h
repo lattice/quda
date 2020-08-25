@@ -125,7 +125,7 @@ namespace quda
       // clang-format off
       switch (tp.aux.x) {
       case   0: launch_kernel<compute_max_only,  64,  64,  16,  32,  16,  2>(arg, min_threads, tp, stream); break;
-#if (__COMPUTE_CAPABILITY__ > 700)
+#if (__COMPUTE_CAPABILITY__ >= 750) // Turing or above
       case   1: launch_kernel<compute_max_only,  16, 128, 128,  32,  16,  2>(arg, min_threads, tp, stream); break;
 #else
       case   1: launch_kernel<compute_max_only,  32, 128, 128,  32,  16,  2>(arg, min_threads, tp, stream); break;
@@ -153,7 +153,7 @@ namespace quda
       case   1: launch_kernel<compute_max_only,  64,  64,  64,  16,  16,  2>(arg, min_threads, tp, stream); break;
       case   2: launch_kernel<compute_max_only,  16, 192, 192,  24,  16    >(arg, min_threads, tp, stream); break;
       case   3: launch_kernel<compute_max_only,  64,  64,  32,  16,  16,  2>(arg, min_threads, tp, stream); break;
-#if (__COMPUTE_CAPABILITY__ > 700)
+#if (__COMPUTE_CAPABILITY__ >= 750) // Turing or above
       case   4: launch_kernel<compute_max_only,  16, 192, 192,  96,   8    >(arg, min_threads, tp, stream); break;
 #else
       case   4: launch_kernel<compute_max_only,  16, 192, 192,  48,   8    >(arg, min_threads, tp, stream); break;
