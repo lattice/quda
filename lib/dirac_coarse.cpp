@@ -209,10 +209,9 @@ namespace quda {
 
     } else {
 
-      // TODO: The following fancy copies reduce the number of gauge field copies (from and to QUDA_MILC_GAUGE_ORDER) by 2:
-      // one for X and one for Y, both to QUDA_MILC_GAUGE_ORDER.
-      // We haven't figure out the way to correctly use these fancy copies. :(
-#if 0
+      // The following fancy copies reduce the number of gauge field
+      // copies (from and to QUDA_MILC_GAUGE_ORDER) by 2: one for X
+      // and one for Y, both to QUDA_MILC_GAUGE_ORDER.
       if (use_mma && dirac->isCoarse()) {
 
         constexpr QudaGaugeFieldOrder gOrder = QUDA_MILC_GAUGE_ORDER;
@@ -244,27 +243,30 @@ namespace quda {
 
         Y_d->copy(*Y_order);
 
+        // this extra exchange shouldn't be needed, but at present the
+        // copy from Y_order to Y_d doesn't preserve the
+        // bi-directional halo (in_offset isn't set in the copy
+        // routine)
+        Y_d->exchangeGhost(QUDA_LINK_BIDIRECTIONAL);
+
         delete Y_order;
         delete X_order;
 
       } else {
-#endif
-      dirac->createCoarseOp(*Y_d, *X_d, *transfer, kappa, mass, Mu(), MuFactor());
+        dirac->createCoarseOp(*Y_d, *X_d, *transfer, kappa, mass, Mu(), MuFactor());
 
-      // save the intermediate tunecache after the UV and VUV tune
-      saveTuneCache();
+        // save the intermediate tunecache after the UV and VUV tune
+        saveTuneCache();
 
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("About to build the preconditioned coarse clover\n");
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("About to build the preconditioned coarse clover\n");
 
-      createYhat(gpu_setup);
+        createYhat(gpu_setup);
 
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Finished building the preconditioned coarse clover\n");
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("About to create the preconditioned coarse op\n");
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Finished building the preconditioned coarse clover\n");
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("About to create the preconditioned coarse op\n");
 
-      calculateYhat(*Yhat_d, *Xinv_d, *Y_d, *X_d, use_mma);
-#if 0
+        calculateYhat(*Yhat_d, *Xinv_d, *Y_d, *X_d, use_mma);
       }
-#endif
     }
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Finished creating the preconditioned coarse op\n");
