@@ -292,8 +292,9 @@ int main(int argc, char **argv)
   rng->Init();
 
   // Performance measuring
-  double *time = new double[Nsrc];
-  double *gflops = new double[Nsrc];
+  std::vector<double> time(Nsrc);
+  std::vector<double> gflops(Nsrc);
+  std::vector<int> iter(Nsrc);
 
   // Pointers for tests 5 and 6
   // Quark masses
@@ -324,6 +325,7 @@ int main(int argc, char **argv)
 
       time[k] = inv_param.secs;
       gflops[k] = inv_param.gflops / inv_param.secs;
+      iter[i] = inv_param.iter;
       printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
                  inv_param.gflops / inv_param.secs);
       if (verify_results)
@@ -332,7 +334,7 @@ int main(int argc, char **argv)
     }
 
     // Compute timings
-    if (Nsrc > 1) performanceStats(time, gflops);
+    if (Nsrc > 1) performanceStats(time, gflops, iter);
     break;
 
   case 5: // multi mass CG, even parity solution, solving EVEN system
@@ -374,9 +376,6 @@ int main(int argc, char **argv)
   default: errorQuda("Unsupported test type");
 
   } // switch
-
-  delete[] time;
-  delete[] gflops;
 
   // Free RNG
   rng->Release();

@@ -108,7 +108,7 @@ void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision p
                                  quda::RNG &rng);
 //------------------------------------------------------
 
-void performanceStats(double *time, double *gflops);
+void performanceStats(std::vector<double> &time, std::vector<double> &gflops, std::vector<int> &iter);
 
 void initComms(int argc, char **argv, std::array<int, 4> &commDims);
 void initComms(int argc, char **argv, int *const commDims);

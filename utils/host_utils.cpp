@@ -1616,18 +1616,22 @@ double stopwatchReadSeconds()
   return ds + 0.000001*dus;
 }
 
-void performanceStats(double *time, double *gflops)
+void performanceStats(std::vector<double> &time, std::vector<double> &gflops, std::vector<int> &iter)
 {
   auto mean_time = 0.0;
   auto mean_time2 = 0.0;
   auto mean_gflops = 0.0;
   auto mean_gflops2 = 0.0;
+  auto mean_iter = 0.0;
+  auto mean_iter2 = 0.0;
   // skip first solve due to allocations, potential UVM swapping overhead
   for (int i = 1; i < Nsrc; i++) {
     mean_time += time[i];
     mean_time2 += time[i] * time[i];
     mean_gflops += gflops[i];
     mean_gflops2 += gflops[i] * gflops[i];
+    mean_iter += iter[i];
+    mean_iter2 += iter[i] * iter[i];
   }
 
   auto NsrcM1 = Nsrc - 1;
@@ -1640,6 +1644,12 @@ void performanceStats(double *time, double *gflops)
   mean_gflops2 /= NsrcM1;
   auto stddev_gflops = NsrcM1 > 1 ? sqrt((NsrcM1 / ((double)NsrcM1 - 1.0)) * (mean_gflops2 - mean_gflops * mean_gflops)) :
                                     std::numeric_limits<double>::infinity();
-  printfQuda("%d solves, with mean solve time %g (stddev = %g), mean GFLOPS %g (stddev = %g) [excluding first solve]\n",
-             Nsrc, mean_time, stddev_time, mean_gflops, stddev_gflops);
+
+  mean_iter /= NsrcM1;
+  mean_iter2 /= NsrcM1;
+  auto stddev_iter = NsrcM1 > 1 ? sqrt((NsrcM1 / ((double)NsrcM1 - 1.0)) * (mean_iter2 - mean_iter * mean_iter)) :
+                                    std::numeric_limits<double>::infinity();
+
+  printfQuda("%d solves, mean iteration count %g (stddev = %g), with mean solve time %g (stddev = %g), mean GFLOPS %g (stddev = %g) [excluding first solve]\n",
+             Nsrc, mean_iter, stddev_iter, mean_time, stddev_time, mean_gflops, stddev_gflops);
 }
