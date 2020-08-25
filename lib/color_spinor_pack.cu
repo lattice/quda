@@ -377,7 +377,7 @@ namespace quda {
                        QUDA_FLOAT4_FIELD_ORDER>(ghost, a, parity, nFace, dagger, destination);
 
     } else if (a.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-#if 0 // This doesn't work
+#ifndef GPU_MULTIGRID // with MG mma we need half-precision AoS exchange support
       if (typeid(Float) != typeid(typename non_native_precision_mapper<Float>::type))
         errorQuda("Precision %d not supported for field type %d", a.Precision(), a.FieldOrder());
       if (typeid(ghostFloat) != typeid(typename non_native_precision_mapper<ghostFloat>::type))
@@ -385,7 +385,7 @@ namespace quda {
       genericPackGhost<typename non_native_precision_mapper<Float>::type,
                        typename non_native_precision_mapper<ghostFloat>::type,
                        QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(ghost, a, parity, nFace, dagger, destination);
-#else // The following works
+#else
       genericPackGhost<Float, ghostFloat, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(ghost, a, parity, nFace, dagger,
                                                                              destination);
 #endif
