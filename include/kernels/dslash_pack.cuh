@@ -220,6 +220,16 @@ namespace quda
     } // while tid
   }
 
+  template <bool dagger, int twist, QudaPCType pc>
+  struct PackKern {
+    template<typename Arg, typename... Env_>
+    auto fptr(void) { return packKernel<dagger,twist,pc,Arg,Env_...>; }
+    template<typename Arg, typename... Env_>
+    void run(Arg arg, Env_... env_) {
+      packKernel<dagger,twist,pc>(arg, env_...);
+    }
+  };
+
   template <bool dagger, QudaPCType pc, typename Arg> struct packShmem {
 
     template <int twist, typename... Env_>
@@ -308,6 +318,14 @@ namespace quda
     pack<twist>(arg, s, parity);
   }
 
+  template <bool dagger, int twist, QudaPCType pc>
+  struct PackShmemKern {
+    template<typename Arg, typename... Env_>
+    auto fptr(void) { return packShmemKernel<dagger,twist,pc,Arg,Env_...>; }
+    template<typename Arg, typename... Env_>
+    void run(Arg arg, Env_... env_) { packShmemKernel<dagger,twist,pc>(arg, env_...); }
+  };
+
   template <typename Arg, typename... Env_>
   __global__ void packStaggeredKernel(Arg arg, Env_... env_)
   {
@@ -345,6 +363,13 @@ namespace quda
       tid += blockDim.x;
     } // while tid
   }
+
+  struct PackStaggeredKern {
+    template<typename Arg, typename... Env_>
+    auto fptr(void) { return packStaggeredKernel<Arg,Env_...>; }
+    template<typename Arg, typename... Env_>
+    void run(Arg arg, Env_... env_) { packStaggeredKernel(arg, env_...); }
+  };
 
   template <bool dagger, QudaPCType pc, typename Arg> struct packStaggeredShmem {
 
@@ -424,5 +449,12 @@ namespace quda
     packStaggeredShmem<0, QUDA_4D_PC, Arg> pack;
     pack(arg, s, parity, env_...);
   }
+
+  struct PackStaggeredShmemKern {
+    template<typename Arg, typename... Env_>
+    auto fptr(void) { return packStaggeredShmemKernel<Arg,Env_...>; }
+    template<typename Arg, typename... Env_>
+    void run(Arg arg, Env_... env_) { packStaggeredShmemKernel(arg, env_...); }
+  };
 
 } // namespace quda

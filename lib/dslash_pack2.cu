@@ -192,48 +192,42 @@ public:
 
     virtual ~Pack() {}
 
-    template <bool dagger, int twist, QudaPCType pc, typename Arg>
-    void launchPack(TuneParam tp, qudaStream_t stream, Arg arg)
+    // this should move into device target
+    template <typename Kern, typename... Args>
+    void launch(TuneParam tp, qudaStream_t stream, Args... args)
     {
-      auto f = (const void *)packKernel<dagger,twist,pc,Arg>;
+      auto f = (const void *)Kern().template fptr<Args...>();
+      //auto f = & Kern::template run<Args...>;
       if (deviceProp.major >= 7) { // enable max shared memory mode on GPUs that support it
         this->setMaxDynamicSharedBytesPerBlock(f);
       }
-      void *args[] = {(void*)&arg};
-      qudaLaunchKernel(f, tp.grid, tp.block, args, tp.shared_bytes, stream);
+      void *arga[] = {(void*)&args...};
+      qudaLaunchKernel(f, tp.grid, tp.block, arga, tp.shared_bytes, stream);
+    }
+
+    // just for convenience, could be inlined
+    template <bool dagger, int twist, QudaPCType pc, typename Arg>
+    void launchPack(TuneParam tp, qudaStream_t stream, Arg arg)
+    {
+      launch<PackKern<dagger,twist,pc>>(tp, stream, arg);
     }
 
     template <bool dagger, int twist, QudaPCType pc, typename Arg>
     void launchPackShmem(TuneParam tp, qudaStream_t stream, Arg arg)
     {
-      auto f = (const void *)packShmemKernel<dagger,twist,pc,Arg>;
-      if (deviceProp.major >= 7) { // enable max shared memory mode on GPUs that support it
-        this->setMaxDynamicSharedBytesPerBlock(f);
-      }
-      void *args[] = {(void*)&arg};
-      qudaLaunchKernel(f, tp.grid, tp.block, args, tp.shared_bytes, stream);
+      launch<PackShmemKern<dagger,twist,pc>>(tp, stream, arg);
     }
 
     template <typename Arg>
     void launchPackStaggered(TuneParam tp, qudaStream_t stream, Arg arg)
     {
-      auto f = (const void *)packStaggeredKernel<Arg>;
-      if (deviceProp.major >= 7) { // enable max shared memory mode on GPUs that support it
-        this->setMaxDynamicSharedBytesPerBlock(f);
-      }
-      void *args[] = {(void*)&arg};
-      qudaLaunchKernel(f, tp.grid, tp.block, args, tp.shared_bytes, stream);
+      launch<PackStaggeredKern>(tp, stream, arg);
     }
 
     template <typename Arg>
     void launchPackStaggeredShmem(TuneParam tp, qudaStream_t stream, Arg arg)
     {
-      auto f = (const void *)packStaggeredShmemKernel<Arg>;
-      if (deviceProp.major >= 7) { // enable max shared memory mode on GPUs that support it
-        this->setMaxDynamicSharedBytesPerBlock(f);
-      }
-      void *args[] = {(void*)&arg};
-      qudaLaunchKernel(f, tp.grid, tp.block, args, tp.shared_bytes, stream);
+      launch<PackStaggeredShmemKern>(tp, stream, arg);
     }
 
     void apply(const qudaStream_t &stream)
