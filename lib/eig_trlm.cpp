@@ -343,12 +343,21 @@ namespace quda
 
   void TRLM::computeKeptRitz(std::vector<ColorSpinorField *> &kSpace)
   {
+    // START TRLM specific
+    //----------------------------------------------------------------------
     int offset = n_kr + 1;
     int dim = n_kr - num_locked;
 
     // Multi-BLAS friendly array to store part of Ritz matrix we want
     double *ritz_mat_keep = (double *)safe_malloc((dim * iter_keep) * sizeof(double));
+    // END TRLM specific
+    //----------------------------------------------------------------------
 
+    // START rotate specific
+    //----------------------------------------------------------------------
+
+    // Need a complex Ritz matrix
+    
     // If we have memory availible, do the entire rotation
     if (batched_rotate <= 0 || batched_rotate >= iter_keep) {
       ColorSpinorParam csParamClone(*kSpace[0]);
@@ -380,8 +389,13 @@ namespace quda
       }
 
       // multiBLAS axpy
+      // START TRLM specific
+      //----------------------------------------------------------------------
       blas::axpy(ritz_mat_keep, vecs_ptr, kSpace_ptr);
-
+      // END TRLM specific
+      //----------------------------------------------------------------------
+      // Need a caxpy here
+      
       // Copy back to the Krylov space
       for (int i = 0; i < iter_keep; i++) std::swap(kSpace[i + num_locked], kSpace[offset + i]);
     } else {

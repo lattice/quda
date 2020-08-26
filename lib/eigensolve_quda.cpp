@@ -61,13 +61,17 @@ namespace quda
     save_prec = eig_param->save_prec;
 
     // Sanity checks
-    if (n_kr <= n_ev) errorQuda("n_kr = %d is less than or equal to n_ev = %d", n_kr, n_ev);
+    if(eig_param->eig_type == QUDA_EIG_TR_LANCZOS || eig_param->eig_type == QUDA_EIG_BLK_TR_LANCZOS) {
+      if (n_kr <= n_ev) errorQuda("n_kr = %d is less than or equal to n_ev = %d", n_kr, n_ev);
+    } else {
+      if (n_kr < n_ev) errorQuda("n_kr = %d is less than n_ev = %d", n_kr, n_ev);
+    }
     if (n_ev < n_conv) errorQuda("n_conv=%d is greater than n_ev=%d", n_conv, n_ev);
     if (n_ev == 0) errorQuda("n_ev=0 passed to Eigensolver");
     if (n_kr == 0) errorQuda("n_kr=0 passed to Eigensolver");
     if (n_conv == 0) errorQuda("n_conv=0 passed to Eigensolver");
     if (n_ev_deflate > n_conv) errorQuda("deflation vecs = %d is greater than n_conv = %d", n_ev_deflate, n_conv);
-
+    
     residua = (double *)safe_malloc(n_kr * sizeof(double));
     for (int i = 0; i < n_kr; i++) { residua[i] = 0.0; }
 
@@ -103,7 +107,10 @@ namespace quda
     EigenSolver *eig_solver = nullptr;
 
     switch (eig_param->eig_type) {
-    case QUDA_EIG_IR_ARNOLDI: errorQuda("IR Arnoldi not implemented"); break;
+    case QUDA_EIG_IR_ARNOLDI:
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating IR Arnoldi eigensolver\n");
+      eig_solver = new IRAM(mat, eig_param, profile);
+      break;
     case QUDA_EIG_IR_LANCZOS: errorQuda("IR Lanczos not implemented"); break;
     case QUDA_EIG_TR_LANCZOS:
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating TR Lanczos eigensolver\n");
@@ -116,7 +123,7 @@ namespace quda
     default: errorQuda("Invalid eig solver type");
     }
 
-    if (!mat.hermitian() && eig_solver->hermitian()) errorQuda("Cannot solve non-Hermitian system with Hermitian eigensolver");
+    if (!mat.hermitian() && !eig_solver->hermitian()) errorQuda("Cannot solve non-Hermitian system with Hermitian eigensolver %d, %d", (int)!mat.hermitian(), (int)eig_solver->hermitian());
     return eig_solver;
   }
 

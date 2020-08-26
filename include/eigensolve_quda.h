@@ -360,8 +360,11 @@ protected:
        @brief Destructor for Thick Restarted Eigensolver class
     */
     virtual ~TRLM();
-
-    virtual bool hermitian() { return true; } /** TRLM is only for Hermitian systems */
+    
+    /**
+       @return Whether the solver is only for Hermitian systems
+    */
+    virtual bool hermitian() { return false; } /** IRAM is only for any linear system */
 
     // Variable size matrix
     std::vector<double> ritz_mat;
@@ -471,6 +474,52 @@ protected:
     void computeBlockKeptRitz(std::vector<ColorSpinorField *> &kSpace);
   };
 
+  /**
+     @brief Implicitly Restarted Arnoldi Method.
+  */
+  class IRAM : public EigenSolver
+  {
+
+  public:
+
+    Complex **upperHess;
+    // Variable size matrix
+    std::vector<Complex> ritz_mat_complex;
+    
+    /**
+       @brief Constructor for Thick Restarted Eigensolver class
+       @param eig_param The eigensolver parameters
+       @param mat The operator to solve
+       @param profile Time Profile
+    */
+    IRAM(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile);
+
+    virtual bool hermitian() { return true; } /** TRLM is only for Hermitian systems */
+    
+    /**
+       @brief Destructor for Thick Restarted Eigensolver class
+    */
+    virtual ~IRAM();
+
+    /**
+       @brief Compute eigenpairs
+       @param[in] kSpace Krylov vector space
+       @param[in] evals Computed eigenvalues
+    */
+    void operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
+
+    /**
+       @brief Lanczos step: extends the Kylov space.
+       @param[in] v Vector space
+       @param[in] j Index of vector being computed
+    */
+    void arnoldiStep(std::vector<ColorSpinorField *> &v, int j);
+
+    void rotateVecsComplex(std::vector<ColorSpinorField *> &v, int j);
+    
+  };
+
+  
   /**
      arpack_solve()
 
