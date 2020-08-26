@@ -931,7 +931,7 @@ namespace quda {
   template<int N, bool add_rho> struct clover_mapper<short,N,add_rho> { typedef clover::FloatNOrder<short, N, 4, add_rho> type; };
 
   // quarter precision uses Float4
-  template<int N, bool add_rho> struct clover_mapper<char,N,add_rho> { typedef clover::FloatNOrder<char, N, 4, add_rho> type; };
+  template<int N, bool add_rho> struct clover_mapper<int8_t,N,add_rho> { typedef clover::FloatNOrder<int8_t, N, 4, add_rho> type; };
 
 } // namespace quda
 
