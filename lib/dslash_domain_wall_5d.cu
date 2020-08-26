@@ -50,8 +50,7 @@ namespace quda
 
     long long bytes() const
     {
-      bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
-      int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed ? sizeof(float) : 0);
+      int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed<typename Arg::Float>::value ? sizeof(float) : 0);
       long long bytes = Dslash::bytes();
       switch (arg.kernel_type) {
       case INTERIOR_KERNEL:
