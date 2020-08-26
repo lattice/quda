@@ -325,7 +325,7 @@ int main(int argc, char **argv)
 
       time[k] = inv_param.secs;
       gflops[k] = inv_param.gflops / inv_param.secs;
-      iter[i] = inv_param.iter;
+      iter[k] = inv_param.iter;
       printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
                  inv_param.gflops / inv_param.secs);
       if (verify_results)
