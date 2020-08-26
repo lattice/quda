@@ -524,7 +524,7 @@ namespace quda {
 	  packBuffer[2*dim+dir] = my_face_dim_dir_hd[bufferIndex][dim][dir];
           break;
         case Remote: // pack to remote peer memory
-          packBuffer[2*dim+dir] = static_cast<char*>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + precision*ghostOffset[dim][1-dir];
+          packBuffer[2*dim+dir] = static_cast<char*>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + ghostOffset[dim][1-dir];
           break;
 	default: errorQuda("Undefined location %d", location[2*dim+dir]);
 	}
@@ -614,7 +614,7 @@ namespace quda {
     const void *src = ghost_spinor;
   
     int ghost_offset = (dir == QUDA_BACKWARDS) ? ghostOffset[dim][0] : ghostOffset[dim][1];
-    void *ghost_dst = (char*)ghost_recv_buffer_d[bufferIndex] + ghost_precision*ghost_offset;
+    void *ghost_dst = (char*)ghost_recv_buffer_d[bufferIndex] + ghost_offset;
 
     qudaMemcpyAsync(ghost_dst, src, ghost_face_bytes[dim], cudaMemcpyHostToDevice, *stream);
   }
@@ -659,9 +659,10 @@ namespace quda {
       for (int i=0; i<nDimComms; ++i) {
 	if (commDimPartitioned(i)) {
 	  for (int b=0; b<2; b++) {
-	    ghost[b][i] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostOffset[i][0]*ghost_precision;
+	    ghost[b][i] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostOffset[i][0];
 	    if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION)
-	      ghostNorm[b][i] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostNormOffset[i][0]*QUDA_SINGLE_PRECISION;
+	      ghostNorm[b][i] = static_cast<char*>(ghost[b][i]) +
+                nFace * surface[i] * (nSpin / (spin_project ? 2 : 1)) * nColor * 2 * ghost_precision;
 	  }
 	}
       }
@@ -777,14 +778,14 @@ namespace quda {
       if (!remote_write) {
         // all goes here
         void* ghost_dst = static_cast<char*>(ghost_remote_send_buffer_d[bufferIndex][dim][dir])
-          + ghost_precision*ghostOffset[dim][(dir+1)%2];
+          + ghostOffset[dim][(dir+1)%2];
 
         if (ghost_precision != precision) pushKernelPackT(true);
 
         if (dim != 3 || getKernelPackT()) {
 
           void* ghost_dst = static_cast<char*>(ghost_remote_send_buffer_d[bufferIndex][dim][dir])
-            + ghost_precision*ghostOffset[dim][(dir+1)%2];
+            + ghostOffset[dim][(dir+1)%2];
           cudaMemcpyAsync(ghost_dst,
                           my_face_dim_dir_d[bufferIndex][dim][dir],
                           ghost_face_bytes[dim],

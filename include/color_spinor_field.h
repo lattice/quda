@@ -559,10 +559,14 @@ namespace quda {
 
     const int *GhostFace() const { return ghostFace; }
     const int *GhostFaceCB() const { return ghostFaceCB; }
-    int GhostOffset(const int i) const { return ghostOffset[i][0]; }
-    int GhostOffset(const int i, const int j) const { return ghostOffset[i][j]; }
-    int GhostNormOffset(const int i ) const { return ghostNormOffset[i][0]; }
-    int GhostNormOffset(const int i, const int j) const { return ghostNormOffset[i][j]; }
+
+    /**
+       Return the offset in bytes to the start of the ghost zone in a
+       given dimension and direction
+       @param[in] dim The dimension of the ghost
+       @param[in] dir The direction of the ghost
+     */
+    size_t GhostOffset(const int dim, const int dir) const { return ghostOffset[dim][dir]; }
 
     void* Ghost(const int i);
     const void* Ghost(const int i) const;

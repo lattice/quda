@@ -72,7 +72,6 @@ namespace quda {
     ghost_bytes_old(0),
     ghost_face_bytes {},
     ghostOffset(),
-    ghostNormOffset(),
     my_face_h {},
     my_face_hd {},
     my_face_d {},
@@ -165,7 +164,6 @@ namespace quda {
     ghost_bytes_old(0),
     ghost_face_bytes {},
     ghostOffset(),
-    ghostNormOffset(),
     my_face_h {},
     my_face_hd {},
     my_face_d {},
@@ -336,7 +334,7 @@ namespace quda {
 	from_face_dim_dir_hd[b][i][0] = static_cast<char*>(from_face_hd[b]) + offset;
 
         my_face_dim_dir_d[b][i][0] = static_cast<char *>(my_face_d[b]) + offset;
-        from_face_dim_dir_d[b][i][0] = static_cast<char *>(from_face_d[b]) + ghostOffset[i][0] * ghost_precision;
+        from_face_dim_dir_d[b][i][0] = static_cast<char *>(from_face_d[b]) + ghostOffset[i][0];
       } // loop over b
 
       // if not bidir then forwards and backwards will alias
@@ -350,7 +348,7 @@ namespace quda {
 	from_face_dim_dir_hd[b][i][1] = static_cast<char*>(from_face_hd[b]) + offset;
 
         my_face_dim_dir_d[b][i][1] = static_cast<char *>(my_face_d[b]) + offset;
-        from_face_dim_dir_d[b][i][1] = static_cast<char *>(from_face_d[b]) + ghostOffset[i][1] * ghost_precision;
+        from_face_dim_dir_d[b][i][1] = static_cast<char *>(from_face_d[b]) + ghostOffset[i][1];
       } // loop over b
       offset += ghost_face_bytes[i];
 

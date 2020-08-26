@@ -344,7 +344,7 @@ namespace quda {
     } else { // doing peer-to-peer
 
       void* ghost_dst = static_cast<char*>(ghost_remote_send_buffer_d[bufferIndex][dim][dir])
-	+ precision*ghostOffset[dim][(dir+1)%2];
+	+ ghostOffset[dim][(dir+1)%2];
 
       cudaMemcpyAsync(ghost_dst, my_face_dim_dir_d[bufferIndex][dim][dir],
 		      ghost_face_bytes[dim], cudaMemcpyDeviceToDevice,

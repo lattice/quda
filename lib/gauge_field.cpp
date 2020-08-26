@@ -131,8 +131,8 @@ namespace quda {
       if ( !(comm_dim_partitioned(i) || (no_comms_fill && R[i])) ) ghostFace[i] = 0;
       else ghostFace[i] = surface[i] * R[i]; // includes the radius (unlike ColorSpinorField)
 
-      ghostOffset[i][0] = (i == 0) ? 0 : ghostOffset[i-1][1] + ghostFace[i-1]*geometry_comms*nInternal;
-      ghostOffset[i][1] = (bidir ? ghostOffset[i][0] + ghostFace[i]*geometry_comms*nInternal : ghostOffset[i][0]);
+      ghostOffset[i][0] = (i == 0) ? 0 : ghostOffset[i-1][1] + ghostFace[i-1] * geometry_comms * nInternal * ghost_precision;
+      ghostOffset[i][1] = (bidir ? ghostOffset[i][0] + ghostFace[i] * geometry_comms * nInternal * ghost_precision : ghostOffset[i][0]);
 
       ghost_face_bytes[i] = ghostFace[i] * geometry_comms * nInternal * ghost_precision;
       ghost_bytes += (bidir ? 2 : 1 ) * ghost_face_bytes[i]; // factor of two from direction
