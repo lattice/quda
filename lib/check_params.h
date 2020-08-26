@@ -81,8 +81,7 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
 #else
   if (param->cuda_prec_sloppy == QUDA_INVALID_PRECISION)
     param->cuda_prec_sloppy = param->cuda_prec;
-    if (param->cuda_prec_eigensolver == QUDA_INVALID_PRECISION)
-    param->cuda_prec_eigensolver = param->cuda_prec;
+  if (param->cuda_prec_eigensolver == QUDA_INVALID_PRECISION) param->cuda_prec_eigensolver = param->cuda_prec;
   if (param->reconstruct_sloppy == QUDA_RECONSTRUCT_INVALID)
     param->reconstruct_sloppy = param->reconstruct;
   if (param->reconstruct_eigensolver == QUDA_RECONSTRUCT_INVALID)
@@ -274,7 +273,7 @@ void printQudaCloverParam(QudaInvertParam *param)
     param->clover_cuda_prec_refinement_sloppy = param->clover_cuda_prec_sloppy;
   if (param->clover_cuda_prec_precondition == QUDA_INVALID_PRECISION)
     param->clover_cuda_prec_precondition = param->clover_cuda_prec_sloppy;
-    if (param->clover_cuda_prec_eigensolver == QUDA_INVALID_PRECISION)
+  if (param->clover_cuda_prec_eigensolver == QUDA_INVALID_PRECISION)
     param->clover_cuda_prec_eigensolver = param->clover_cuda_prec_sloppy;
 #endif
 
@@ -446,8 +445,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
     param->cuda_prec_refinement_sloppy = param->cuda_prec_sloppy;
   if (param->cuda_prec_precondition == QUDA_INVALID_PRECISION)
     param->cuda_prec_precondition = param->cuda_prec_sloppy;
-    if (param->cuda_prec_eigensolver == QUDA_INVALID_PRECISION)
-    param->cuda_prec_eigensolver = param->cuda_prec_sloppy;
+  if (param->cuda_prec_eigensolver == QUDA_INVALID_PRECISION) param->cuda_prec_eigensolver = param->cuda_prec_sloppy;
 #endif
 
   // leave the default behaviour to cpu pointers

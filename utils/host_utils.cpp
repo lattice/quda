@@ -1648,8 +1648,9 @@ void performanceStats(std::vector<double> &time, std::vector<double> &gflops, st
   mean_iter /= NsrcM1;
   mean_iter2 /= NsrcM1;
   auto stddev_iter = NsrcM1 > 1 ? sqrt((NsrcM1 / ((double)NsrcM1 - 1.0)) * (mean_iter2 - mean_iter * mean_iter)) :
-                                    std::numeric_limits<double>::infinity();
+                                  std::numeric_limits<double>::infinity();
 
-  printfQuda("%d solves, mean iteration count %g (stddev = %g), with mean solve time %g (stddev = %g), mean GFLOPS %g (stddev = %g) [excluding first solve]\n",
+  printfQuda("%d solves, mean iteration count %g (stddev = %g), with mean solve time %g (stddev = %g), mean GFLOPS %g "
+             "(stddev = %g) [excluding first solve]\n",
              Nsrc, mean_iter, stddev_iter, mean_time, stddev_time, mean_gflops, stddev_gflops);
 }

@@ -517,8 +517,8 @@ namespace quda {
                                                   comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
           } else if (halo_precision == QUDA_QUARTER_PRECISION) {
 #if QUDA_PRECISION & 1
-            ApplyCoarse<float,short,int8_t,dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                 comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
+            ApplyCoarse<float, short, int8_t, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                                      comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
 #else
             errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
 #endif
