@@ -792,7 +792,8 @@ namespace quda {
       std::vector<ColorSpinorField *> av_(ws(0));
       
       swp = *evecs[i];
-      matDefl(vk0, *evecs[i]);
+      matDefl(vk0, swp);
+      *evecs[i] = swp;
       
       blas::cDotProduct(alpha.get(), vj_, av_);
 
