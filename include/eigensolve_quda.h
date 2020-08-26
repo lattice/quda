@@ -364,7 +364,7 @@ protected:
     /**
        @return Whether the solver is only for Hermitian systems
     */
-    virtual bool hermitian() { return false; } /** IRAM is only for any linear system */
+    virtual bool hermitian() { return false; } /** TRLM is only for Hermitian systems */
 
     // Variable size matrix
     std::vector<double> ritz_mat;
@@ -494,7 +494,7 @@ protected:
     */
     IRAM(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile);
 
-    virtual bool hermitian() { return true; } /** TRLM is only for Hermitian systems */
+    virtual bool hermitian() { return true; } /** IRAM is for any linear system */
     
     /**
        @brief Destructor for Thick Restarted Eigensolver class

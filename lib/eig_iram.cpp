@@ -172,7 +172,7 @@ namespace quda
     host_free(upperHess);
   }
   
-  // Thick Restart Member functions
+  // Arnoldi Member functions
   //---------------------------------------------------------------------------
   void IRAM::arnoldiStep(std::vector<ColorSpinorField *> &v, int j)
   {
