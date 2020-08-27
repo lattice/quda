@@ -1284,10 +1284,16 @@ class MultiRhsSolver  {
     const DiracMatrix &mat;
     const DiracMatrix &matSloppy;
     // pointers to fields to avoid multiple creation overhead
+#if 1
+    ColorSpinorFieldUniqueVector yp, rp, App, tmpp;
+    ColorSpinorFieldUniqueVector x_sloppy_savedp, pp, qp, tmp_matsloppyp;
+    ColorSpinorFieldUniqueVector p_oldp; // only for BLOCKSOLVER_PRECISE_Q
+#else
     std::vector<ColorSpinorField*> yp, rp, App, tmpp;
     std::vector<ColorSpinorField*> p;
     std::vector<ColorSpinorField*> x_sloppy_savedp, pp, qp, tmp_matsloppyp;
     std::vector<ColorSpinorField*> p_oldp; // only for BLOCKSOLVER_PRECISE_Q
+#endif
     bool init;
 
     template <int n>

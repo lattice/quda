@@ -19,19 +19,11 @@ namespace quda
 {
 
 
-// helper function - here for now
-  template<typename T>
-std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
-  std::vector<T*> res;
-  std::transform(in.begin(), in.end(), std::back_inserter(res), [](const auto& m) { std::cout << 
-  "getraw" << std::endl; return m.get(); });
-  return res;
-}
 // define this to use multi-functions, otherwise it'll
 // do loops over dot products.
 // this is more here for development convenience.
 
-#define BLOCKSOLVER_MULTIFUNCTIONS
+// #define BLOCKSOLVER_MULTIFUNCTIONS
 // #define BLOCKSOLVE_DSLASH5D
 // #define BLOCKSOLVER_VERBOSE
 
@@ -256,70 +248,66 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
     if (!init) {
       for(int i=0; i < nsrc; i++){
       csParam.create = QUDA_NULL_FIELD_CREATE;
-      rp.emplace_back(ColorSpinorField::CreateSmartPtr(csParam));
+      rp.emplace_back(ColorSpinorField::Create(csParam));
       // csParam.create = QUDA_ZERO_FIELD_CREATE;
-      yp.emplace_back(ColorSpinorField::CreateSmartPtr(csParam));
+      yp.emplace_back(ColorSpinorField::Create(csParam));
     
 #ifdef BLOCKSOLVER_PRECISE_Q // high precision Q
-      qp.emplace_back(ColorSpinorField::CreateSmartPtr(csParam));
-      tmpp.emplace_back(ColorSpinorField::CreateSmartPtr(csParam));
+      qp.emplace_back(ColorSpinorField::Create(csParam));
+      tmpp.emplace_back(ColorSpinorField::Create(csParam));
 #endif
       // sloppy fields
       csParam.setPrecision(param.precision_sloppy);
-      x_sloppy_savedp.emplace_back(ColorSpinorField::CreateSmartPtr(csParam));
-      pp.emplace_back(ColorSpinorField::CreateSmartPtr(csParam));
+      x_sloppy_savedp.emplace_back(ColorSpinorField::Create(csParam));
+      pp.emplace_back(ColorSpinorField::Create(csParam));
 #ifdef BLOCKSOLVER_PRECISE_Q // we need an extra temporary p since we can't tmpp <-> qp <-> pp swap anymore.
-      p_oldp.emplace_back(ColorSpinorField::CreateSmartPtr(csParam));
+      p_oldp.emplace_back(ColorSpinorField::Create(csParam));
 #else
-      qp.emplace_back(ColorSpinorField::CreateSmartPtr(csParam)); // We need a sloppy q.
-      tmpp.emplace_back(ColorSpinorField::CreateSmartPtr(csParam));
+      qp.emplace_back(ColorSpinorField::Create(csParam)); // We need a sloppy q.
+      tmpp.emplace_back(ColorSpinorField::Create(csParam));
 #endif
-      App.emplace_back(ColorSpinorField::CreateSmartPtr(csParam));
-      tmp_matsloppyp.emplace_back(ColorSpinorField::CreateSmartPtr(csParam));
+      App.emplace_back(ColorSpinorField::Create(csParam));
+      tmp_matsloppyp.emplace_back(ColorSpinorField::Create(csParam));
       }
       init = true;
     }
-    ColorSpinorFieldVector r = getraw(rp);
-    ColorSpinorFieldVector y = getraw(yp);
-    ColorSpinorFieldVector Ap = getraw(App);
-    ColorSpinorFieldVector tmp_matsloppy = getraw(tmp_matsloppyp);
+    ColorSpinorFieldVector &r = rp;
+    ColorSpinorFieldVector &y = yp;
+    ColorSpinorFieldVector &Ap = App;
+    ColorSpinorFieldVector &tmp_matsloppy = tmp_matsloppyp;
 
-    ColorSpinorFieldVector x_sloppy;
-    x_sloppy.resize(nsrc); // Gets assigned below.
-
-    ColorSpinorFieldVector p = getraw(pp);
-    ColorSpinorFieldVector q = getraw(qp);
-    ColorSpinorFieldVector tmp = getraw(tmpp);
-    ColorSpinorFieldVector p_old = getraw(p_oldp);
-    ColorSpinorFieldVector x_sloppy_saved = getraw(x_sloppy_savedp);
-    
+    ColorSpinorFieldVector x_sloppyp;
+    x_sloppyp.resize(nsrc); // Gets assigned below.
 
     csParam.setPrecision(param.precision_sloppy);
     // tmp2 only needed for multi-gpu Wilson-like kernels
-    // ColorSpinorFieldUniqueVector tmp2_p;
-    ColorSpinorFieldVector tmp2;
+    // ColorSpinorField *tmp2_p = !mat.isStaggered() ?
+    // ColorSpinorField::Create(x, csParam) : &tmp;
+    // ColorSpinorField &tmp2 = *tmp2_p;
+    ColorSpinorFieldVector tmp2_p; // = nullptr;
+
     // if (!mat.isStaggered()) {
     //   csParam.create = QUDA_ZERO_FIELD_CREATE;
-    //   for (int i=0; i< nsrc; i++) tmp2_p.emplace_back(ColorSpinorField::CreateSmartPtr(csParam));
-    //   tmp2 = getraw(tmp2_p);
+    //   tmp2_p.resize(nsrc, ColorSpinorField::Create(*x[0], csParam));
     // } else {
-      tmp2 = getraw(tmp_matsloppyp);
+      tmp2_p = tmp_matsloppyp;
     // }
 
-
+    ColorSpinorFieldVector &tmp2 = tmp2_p;
 
     // additional high-precision temporary if Wilson and mixed-precision
     csParam.setPrecision(param.precision);
 
-    // ColorSpinorFieldUniqueVector tmp3_p;
-    ColorSpinorFieldVector tmp3;
-    // if (!mat.isStaggered()) {
-    //   csParam.create = QUDA_ZERO_FIELD_CREATE;
-    //   for (int i=0; i< nsrc; i++) tmp3_p.emplace_back(ColorSpinorField::CreateSmartPtr(csParam));
-    //   tmp3 = getraw(tmp3_p);
+    ColorSpinorFieldVector tmp3_p; // = nullptr;
+    // if (param.precision != param.precision_sloppy && !mat.isStaggered()) {
+    //   // csParam.create = QUDA_ZERO_FIELD_CREATE;
+    //   tmp3_p.emplace_back(ColorSpinorField::Create(*x[0], csParam)); // ColorSpinorField::Create(csParam);
+    //   // tmp3_p->ExtendLastDimension();
     // } else {
-      tmp3 = getraw(tmp_matsloppyp);
+      tmp3_p = tmp_matsloppyp;
     // }
+
+    ColorSpinorFieldVector &tmp3 = tmp_matsloppyp;
 
     // Step 2: R = AX - B, using Y as a temporary with the right precision.
 // #ifdef BLOCKSOLVE_DSLASH5D
@@ -336,7 +324,7 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
     }
 
     // #ifdef BLOCKSOLVER_MULTIFUNCTIONS
-    // // blas::xpay(b, -1.0, r);
+    // blas::xpay(b, -1.0, r);
     // #else
     for (int i = 0; i < nsrc; i++) { blas::xpay(*b[i], -1.0, *r[i]); }
     // #endif
@@ -355,23 +343,23 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
     if (param.precision_sloppy == x[0]->Precision() || !param.use_sloppy_partial_accumulator) {
       
       // printfQuda("Go here ...\n");
-      for(int i=0; i < nsrc; i++) x_sloppy[i] = x[i];
+      for(int i=0; i < nsrc; i++) x_sloppyp[i] = x[i];
       // x_sloppyp = std::shared_ptr<ColorSpinorField>(&x, ; // s_sloppy and x point to the same vector in memory.
       // #ifdef BLOCKSOLVER_MULTIFUNCTIONS
       // blas::zero(*x_sloppyp); // x_sloppy is zeroed out (and, by extension, so is x)
       // #else
-      for (int i = 0; i < nsrc; i++) blas::zero(*x_sloppy[i]);
+      for (int i = 0; i < nsrc; i++) blas::zero(*x_sloppyp[i]);
       // #endif
     } else {
       // printfQuda("Go there ...\n");
-      x_sloppy = x_sloppy_saved; // x_sloppy point to saved x_sloppy memory.
+      x_sloppyp = x_sloppy_savedp; // x_sloppy point to saved x_sloppy memory.
                                    // x_sloppy_savedp was already zero.
     }
     // No need to alias r---we need a separate q, which is analagous
     // to an 'r_sloppy' in other algorithms.
 
     // Syntatic sugar.
-    // ColorSpinorFieldVector &x_sloppy = x_sloppyp;
+    ColorSpinorFieldVector &x_sloppy = x_sloppyp;
 
 #ifdef BLOCKSOLVER_MULTIFUNCTIONS
     // Set up eigen matrices here.
@@ -475,17 +463,17 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
 #ifdef BLOCKSOLVER_PRECISE_Q
 
 #ifdef BLOCKSOLVER_MULTIFUNCTIONS
-    BlockCGUpdate blockcg_update(x_sloppy, p_old, alpha_raw);
+    BlockCGUpdate blockcg_update(x_sloppyp, p_oldp, alpha_raw);
 #else
-    BlockCGUpdate blockcg_update(x_sloppy, p_old, alpha);
+    BlockCGUpdate blockcg_update(x_sloppyp, p_oldp, alpha);
 #endif
 
 #else // !BLOCKSOLVER_PRECISE_Q
 
 #ifdef BLOCKSOLVER_MULTIFUNCTIONS
-    BlockCGUpdate blockcg_update(x_sloppy, tmp, alpha_raw);
+    BlockCGUpdate blockcg_update(x_sloppyp, tmpp, alpha_raw);
 #else
-    BlockCGUpdate blockcg_update(x_sloppy, tmp, alpha);
+    BlockCGUpdate blockcg_update(x_sloppyp, tmpp, alpha);
 #endif
 
 #endif
@@ -548,7 +536,7 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
     rNorm = C.norm();
     maxrx = C.norm();
     maxrr = C.norm();
-     printfQuda("rNorm = %.8e on iteration %d!\n", rNorm, 0);
+    printfQuda("rNorm = %.8e on iteration %d!\n", rNorm, 0);
 
 #ifdef BLOCKSOLVER_VERBOSE
     std::cout << "r2\n " << H << std::endl;
@@ -558,43 +546,41 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
 
     // Step 8: finally set Q to thin QR decompsition of R.
     for(int i=0; i < nsrc; i++){
-    blas::zero(*q[i]); // guaranteed to be zero at start.
+    blas::zero(*qp[i]); // guaranteed to be zero at start.
   }
 #ifdef BLOCKSOLVER_PRECISE_Q
 
-#ifdef BLOCKSOLVER_MULTIFUNCTIONS
-    blas::caxpy_U(Linv_raw, r, q);
-#else
+// #ifdef BLOCKSOLVER_MULTIFUNCTIONS
+//     blas::caxpy_U(Linv_raw, r, qp);
+// #else
     for (int i = 0; i < nsrc; i++) {
-      for (int j = i; j < nsrc; j++) { blas::caxpy(Linv(i, j), *r[i], *q[j]); }
+      for (int j = i; j < nsrc; j++) { blas::caxpy(Linv(i, j), *r[i], *qp[j]); }
     }
-#endif
+// #endif
 
 #else
 
-#ifdef BLOCKSOLVER_MULTIFUNCTIONS
-     for (int i = 0; i < nsrc; i++) {
-       blas::copy(*tmp, r);    // Need to do this b/c r is fine, q is sloppy, can't caxpy w/ x fine, y sloppy.
-       }          
-    blas::caxpy_U(Linv_raw, tmp, q); // C is upper triangular, so its inverse is.
-#else
+// #ifdef BLOCKSOLVER_MULTIFUNCTIONS
+//     blas::copy(*tmpp, r);              // Need to do this b/c r is fine, q is sloppy, can't caxpy w/ x fine, y sloppy.
+//     blas::caxpy_U(Linv_raw, tmpp, qp); // C is upper triangular, so its inverse is.
+// #else
     for (int i = 0; i < nsrc; i++) {
       blas::copy(*tmpp[i], *r[i]);
-      for (int j = i; j < nsrc; j++) { blas::caxpy(Linv(i, j), *tmpp[i], *q[j]); }
+      for (int j = i; j < nsrc; j++) { blas::caxpy(Linv(i, j), *tmpp[i], *qp[j]); }
     }
-#endif
+// #endif
 
 #endif // BLOCKSOLVER_PRECISE_Q
 
     // Step 9: P = Q; additionally set P to thin QR decompoistion of r
-    for (int i = 0; i < nsrc; i++) blas::copy(*p[i], *q[i]);
+    for (int i = 0; i < nsrc; i++) blas::copy(*pp[i], *qp[i]);
 
 #ifdef BLOCKSOLVER_VERBOSE
 // #ifdef BLOCKSOLVER_MULTIFUNCTIONS
-    // blas::hDotProduct(pTp_raw, p, p);
+    // blas::hDotProduct(pTp_raw, pp, pp);
 // #else
     for (int i = 0; i < nsrc; i++) {
-      for (int j = 0; j < nsrc; j++) { pTp(i, j) = blas::cDotProduct(*p[i], *p[j]); }
+      for (int j = 0; j < nsrc; j++) { pTp(i, j) = blas::cDotProduct(*pp[i], *pp[j]); }
     }
 // #endif
 
@@ -618,18 +604,18 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
       }
       // Step 12: Compute Ap.
 // #ifdef BLOCKSOLVE_DSLASH5D
-      // matSloppy(Ap, p, tmp_matsloppy, tmp2);
+      // matSloppy(Ap, *pp, tmp_matsloppy, tmp2);
 // #else
-      for (int i = 0; i < nsrc; i++) matSloppy(*Ap[i], *p[i], *tmp_matsloppy[i], *tmp2[i]);
+      for (int i = 0; i < nsrc; i++) matSloppy(*Ap[i], *pp[i], *tmp_matsloppy[i], *tmp2[i]);
 // #endif
 
       // Step 13: calculate pAp = P^\dagger Ap
 #ifdef BLOCKSOLVER_MULTIFUNCTIONS
-      blas::hDotProduct_Anorm(pAp_raw, p, Ap);
+      blas::hDotProduct_Anorm(pAp_raw, pp, Ap);
 #else
       for (int i = 0; i < nsrc; i++) {
         for (int j = i; j < nsrc; j++) {
-          pAp(i, j) = blas::cDotProduct(*p[i], *Ap[j]);
+          pAp(i, j) = blas::cDotProduct(*pp[i], *Ap[j]);
           if (i != j) pAp(j, i) = std::conj(pAp(i, j));
         }
       }
@@ -653,16 +639,16 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
       // This step now gets overlapped with the
       // comms in matSloppy.
 
-    // Step 17: Update Q = Q - Ap beta (remember we already put the minus sign on beta)
+      // Step 17: Update Q = Q - Ap beta (remember we already put the minus sign on beta)
       // update rSloppy
 
-#ifdef BLOCKSOLVER_MULTIFUNCTIONS
-      blas::caxpy(beta_raw, Ap, q);
-#else
+// #ifdef BLOCKSOLVER_MULTIFUNCTIONS
+      // blas::caxpy(beta_raw, Ap, qp);
+// #else
       for (int i = 0; i < nsrc; i++) {
-        for (int j = 0; j < nsrc; j++) { blas::caxpy(beta(i, j), *Ap[i], *q[j]); }
+        for (int j = 0; j < nsrc; j++) { blas::caxpy(beta(i, j), *Ap[i], *qp[j]); }
       }
-#endif
+// #endif
 
       // MWALTBETA
 #ifdef BLOCKSOLVER_ALTERNATIVE_BETA
@@ -678,12 +664,12 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
       // Orthogonalize Q via a thin QR decomposition.
       // Step 18: H = Q^\dagger Q
 #ifdef BLOCKSOLVER_MULTIFUNCTIONS
-      blas::hDotProduct(H_raw, q, q);
+      blas::hDotProduct(H_raw, qp, qp);
 #else
       printfQuda("Iteration %d\n", k);
       for (int i = 0; i < nsrc; i++) {
         for (int j = i; j < nsrc; j++) {
-          H(i, j) = blas::cDotProduct(*q[i], *q[j]);
+          H(i, j) = blas::cDotProduct(*qp[i], *qp[j]);
           // printfQuda("r2(%d,%d) = %.15e + I %.15e\n", i, j, real(r2(i,j)), imag(r2(i,j)));
           if (i != j) H(j, i) = std::conj(H(i, j));
         }
@@ -703,22 +689,22 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
       // swap.
 
       Linv = S.inverse();
-      for (int i = 0; i < nsrc; i++) blas::zero(*tmp[i]);
+      for (int i = 0; i < nsrc; i++) blas::zero(*tmpp[i]);
 #ifdef BLOCKSOLVER_MULTIFUNCTIONS
-      blas::caxpy_U(Linv_raw, q, tmp); // tmp is acting as Q.
+      blas::caxpy_U(Linv_raw, qp, tmpp); // tmp is acting as Q.
 #else
       for (int i = 0; i < nsrc; i++) {
-        for (int j = i; j < nsrc; j++) { blas::caxpy(Linv(i, j), *q[i], *tmp[j]); }
+        for (int j = i; j < nsrc; j++) { blas::caxpy(Linv(i, j), *qp[i], *tmpp[j]); }
       }
 #endif
 
 #ifdef BLOCKSOLVER_MULTIFUNCTIONS
-      q.swap(tmp); // now Q actually is Q. tmp is the old Q.
+      qp.swap(tmpp); // now Q actually is Q. tmp is the old Q.
 #else
       // Technically, this is a 5D function that should
       // be split into a bunch of 4D functions... but it's
       // pointer swapping, that gets messy.
-      q.swap(tmp); // now Q actually is Q. tmp is the old Q.
+      qp.swap(tmpp); // now Q actually is Q. tmp is the old Q.
 #endif
 
       // Step 22: Back up C (we need to have it if we trigger a reliable update)
@@ -772,10 +758,10 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
         // to do this X update now.
         // Step 16: update Xsloppy = Xsloppy + P alpha
 #ifdef BLOCKSOLVER_MULTIFUNCTIONS
-        blas::caxpy(alpha_raw, p, x_sloppy);
+        blas::caxpy(alpha_raw, pp, x_sloppy);
 #else
         for (int i = 0; i < nsrc; i++) {
-          for (int j = 0; j < nsrc; j++) { blas::caxpy(alpha(i, j), *p[i], *x_sloppy[j]); }
+          for (int j = 0; j < nsrc; j++) { blas::caxpy(alpha(i, j), *pp[i], *x_sloppy[j]); }
         }
 #endif
 
@@ -846,16 +832,16 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
 #endif
 
         // Reliable updates step 8: set Q to thin QR decompsition of R.
-        for (int i = 0; i < nsrc; i++) blas::zero(*q[i]);
+        for (int i = 0; i < nsrc; i++) blas::zero(*qp[i]);
 
 #ifdef BLOCKSOLVER_PRECISE_Q
 
 #ifdef BLOCKSOLVER_MULTIFUNCTIONS
-        blas::caxpy_U(Linv_raw, r, q);
+        blas::caxpy_U(Linv_raw, r, qp);
 #else
         // temporary hack - use AC to pass matrix arguments to multiblas
         for (int i = 0; i < nsrc; i++) {
-          for (int j = i; j < nsrc; j++) { blas::caxpy(Linv(i, j), *r[i], *q[j]); }
+          for (int j = i; j < nsrc; j++) { blas::caxpy(Linv(i, j), *r[i], *qp[j]); }
         }
 #endif
 
@@ -864,12 +850,12 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
 #ifdef BLOCKSOLVER_MULTIFUNCTIONS
         for (int i = 0; i < nsrc; i++) { blas::copy(*tmpp[i], *r[i]); }
         // blas::copy(*tmpp, r); // Need to do this b/c r is fine, q is sloppy, can't caxpy w/ x fine, y sloppy.
-        blas::caxpy_U(Linv_raw, tmp, q);
+        blas::caxpy_U(Linv_raw, tmpp, qp);
 #else
         // temporary hack - use AC to pass matrix arguments to multiblas
         for (int i = 0; i < nsrc; i++) {
           blas::copy(tmpp[i], r[i]);
-          for (int j = i; j < nsrc; j++) { blas::caxpy(Linv(i, j), tmp[i], q[j]); }
+          for (int j = i; j < nsrc; j++) { blas::caxpy(Linv(i, j), tmpp[i], qp[j]); }
         }
 #endif
 
@@ -909,10 +895,10 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
       // Debug print of Q.
 #ifdef BLOCKSOLVER_VERBOSE
 #ifdef BLOCKSOLVER_MULTIFUNCTIONS
-      blas::hDotProduct(pTp_raw, q, q);
+      blas::hDotProduct(pTp_raw, qp, qp);
 #else
       for (int i = 0; i < nsrc; i++) {
-        for (int j = 0; j < nsrc; j++) { pTp(i, j) = blas::cDotProduct(q[i], q[j]); }
+        for (int j = 0; j < nsrc; j++) { pTp(i, j) = blas::cDotProduct(qp[i], qp[j]); }
       }
 #endif
       std::cout << " qTq " << std::endl << pTp << std::endl;
@@ -926,25 +912,25 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
       // reason a block cax is difficult.
       // Instead, we do it by a caxpyz + pointer swap.
       Sdagger = S.adjoint();
-#ifdef BLOCKSOLVER_MULTIFUNCTIONS3
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
       if (just_reliable_updated)
-        blas::caxpyz(Sdagger_raw, p, q, tmp); // tmp contains P.
+        blas::caxpyz(Sdagger_raw, pp, qp, tmpp); // tmp contains P.
       else
-        blas::caxpyz_L(Sdagger_raw, p, q, tmp); // tmp contains P.
+        blas::caxpyz_L(Sdagger_raw, pp, qp, tmpp); // tmp contains P.
 #else
       // FIXME: check whether the implementation without BLOCKSOLVER_MULTIFUNCTIONS is correct
       if (just_reliable_updated) {
         // blas::caxpyz(Sdagger_raw,*pp,*qp,*tmpp); // tmp contains P.
-        for (int j = 0; j < nsrc; j++) { blas::copy(*tmp[j], *q[j]); }
+        for (int j = 0; j < nsrc; j++) { blas::copy(*tmpp[j], *qp[j]); }
         for (int i = 0; i < nsrc; i++) {
-          for (int j = 0; j < nsrc; j++) { blas::caxpy(Sdagger(i, j), *p[i], *tmp[j]);
+          for (int j = 0; j < nsrc; j++) { blas::caxpy(Sdagger(i, j), *pp[i], *tmpp[j]);
           }
         }
       } else {
         // blas::caxpyz_L(Sdagger_raw,*pp,*qp,*tmpp); // tmp contains P.
-        for (int j = 0; j < nsrc; j++) { blas::copy(*tmp[j], *q[j]); }
+        for (int j = 0; j < nsrc; j++) { blas::copy(*tmpp[j], *qp[j]); }
         for (int i = 0; i < nsrc; i++) {
-          for (int j = 0; j <= i; j++) { blas::caxpy(Sdagger(i, j), *p[i], *tmp[j]); }
+          for (int j = 0; j <= i; j++) { blas::caxpy(Sdagger(i, j), *pp[i], *tmpp[j]); }
         }
       }
 #endif
@@ -955,12 +941,12 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
       // #ifdef BLOCKSOLVER_MULTIFUNCTIONS
       //       blas::copy(*p_oldp, *tmpp);
       // #else
-      for (int i = 0; i < nsrc; i++) { blas::copy(*p_old[i], *tmp[i]); }
+      for (int i = 0; i < nsrc; i++) { blas::copy(*p_oldp[i], *tmpp[i]); }
       // #endif
-      p.swap(p_old);
+      pp.swap(p_oldp);
 
 #else
-      p.swap(tmp); // now P contains P, tmp now contains P_old
+      pp.swap(tmpp); // now P contains P, tmp now contains P_old
 #endif
 
       // Done with step 28.
@@ -973,11 +959,11 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
         Complex O_raw[nsrc * nsrc];
 #ifdef BLOCKSOLVER_MULTIFUNCTIONS
         Map<MatrixBCG> O(O_raw, nsrc, nsrc);
-        blas::cDotProduct(O_raw, q, p);
+        blas::cDotProduct(O_raw, qp, pp;
 #else
         MatrixXcd O = MatrixXcd::Zero(nsrc, nsrc);
         for (int i = 0; i < nsrc; i++) {
-          for (int j = 0; j < nsrc; j++) { O(i, j) = blas::cDotProduct(q[i], p[j]); }
+          for (int j = 0; j < nsrc; j++) { O(i, j) = blas::cDotProduct(qp[i], pp[j]); }
         }
 #endif
 
@@ -992,20 +978,20 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
         O = -O;
         std::cout << "BLAH\n" << O << "\n";
 #ifdef BLOCKSOLVER_MULTIFUNCTIONS
-        blas::caxpy(O_raw, q, p);
+        blas::caxpy(O_raw, *qp, *pp);
 #else
         // temporary hack
         for (int i = 0; i < nsrc; i++) {
-          for (int j = 0; j < nsrc; j++) { blas::caxpy(O(i, j), q[i], p[j]); }
+          for (int j = 0; j < nsrc; j++) { blas::caxpy(O(i, j), qp[i], pp[j]); }
         }
 #endif
 
         // Check...
 #ifdef BLOCKSOLVER_MULTIFUNCTIONS
-        blas::cDotProduct(O_raw, q, p);
+        blas::cDotProduct(O_raw, qp, pp);
 #else
         for (int i = 0; i < nsrc; i++) {
-          for (int j = 0; j < nsrc; j++) { O(i, j) = blas::cDotProduct(q[i], p[j]); }
+          for (int j = 0; j < nsrc; j++) { O(i, j) = blas::cDotProduct(qp[i], pp[j]); }
         }
 #endif
         printfQuda("Updated Q^\\dagger P:\n");
@@ -1016,10 +1002,10 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
 
 #ifdef BLOCKSOLVER_VERBOSE
 #ifdef BLOCKSOLVER_MULTIFUNCTIONS
-      blas::hDotProduct(pTp_raw, p, p );
+      blas::hDotProduct(pTp_raw, pp, pp );
 #else
       for (int i = 0; i < nsrc; i++) {
-        for (int j = 0; j < nsrc; j++) { pTp(i, j) = blas::cDotProduct(p[i], p[j]); }
+        for (int j = 0; j < nsrc; j++) { pTp(i, j) = blas::cDotProduct(pp[i], pp[j]); }
       }
 #endif
 
@@ -1048,25 +1034,25 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
 #ifdef BLOCKSOLVER_PRECISE_Q
     // But remember p_oldp holds the old p.
     if (!just_reliable_updated) {
-#ifdef BLOCKSOLVER_MULTIFUNCTIONS
-      blas::caxpy(alpha_raw, p_old, x_sloppy);
-#else
+// #ifdef BLOCKSOLVER_MULTIFUNCTIONS
+      // blas::caxpy(alpha_raw, p_oldp, x_sloppy);
+// #else
       // temporary hack using AC
       for (int i = 0; i < nsrc; i++) {
-        for (int j = 0; j < nsrc; j++) { blas::caxpy(alpha(i, j), *p_old[i], *x_sloppy[j]); }
+        for (int j = 0; j < nsrc; j++) { blas::caxpy(alpha(i, j), *p_oldp[i], *x_sloppy[j]); }
       }
-#endif 
+// #endif
     }
 
 #else // !BLOCKSOLVER_PRECISE_Q
     // But remember tmpp holds the old P.
     if (!just_reliable_updated) {
 #ifdef BLOCKSOLVER_MULTIFUNCTIONS
-      blas::caxpy(alpha_raw, tmp, x_sloppy);
+      blas::caxpy(alpha_raw, tmpp, x_sloppy);
 #else
       // temporary hack using AC
       for (int i = 0; i < nsrc; i++) {
-        for (int j = 0; j < nsrc; j++) { blas::caxpy(alpha(i, j), tmp[i], x_sloppy[j]); }
+        for (int j = 0; j < nsrc; j++) { blas::caxpy(alpha(i, j), tmpp[i], x_sloppy[j]); }
       }
 #endif
     }
@@ -1146,7 +1132,7 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
     return;
   }
 
-  BlockCG::BlockCG(DiracMatrix &mat, DiracMatrix &matSloppy,  SolverParam &param, TimeProfile &profile) :
+  BlockCG::BlockCG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
     MultiRhsSolver(param, profile),
     mat(mat),
     matSloppy(matSloppy),
@@ -1168,24 +1154,24 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
     if (init) {
       // for (auto pi : p) delete pi;
       init = false;
-      // for (auto v : rp) delete v;
-      // rp.clear();
-      // for (auto v : yp) delete v;
-      // yp.clear();
-      // for (auto v : qp) delete v;
-      // qp.clear();
-      // for (auto v : tmpp) delete v;
-      // tmpp.clear();
-      // for (auto v : x_sloppy_savedp) delete v;
-      // x_sloppy_savedp.clear();
-      // for (auto v : pp) delete v;
-      // pp.clear();
-      // for (auto v : p_oldp) delete v;
-      // p_oldp.clear();
-      // for (auto v : App) delete v;
-      // App.clear();
-      // for (auto v : tmp_matsloppyp) delete v;
-      // tmp_matsloppyp.clear();
+      for (auto v : rp) delete v;
+      rp.clear();
+      for (auto v : yp) delete v;
+      yp.clear();
+      for (auto v : qp) delete v;
+      qp.clear();
+      for (auto v : tmpp) delete v;
+      tmpp.clear();
+      for (auto v : x_sloppy_savedp) delete v;
+      x_sloppy_savedp.clear();
+      for (auto v : pp) delete v;
+      pp.clear();
+      for (auto v : p_oldp) delete v;
+      p_oldp.clear();
+      for (auto v : App) delete v;
+      App.clear();
+      for (auto v : tmp_matsloppyp) delete v;
+      tmp_matsloppyp.clear();
     }
   }
     void BlockCG::operator()(ColorSpinorFieldVector &x, ColorSpinorFieldVector &b)

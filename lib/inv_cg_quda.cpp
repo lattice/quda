@@ -5,10 +5,6 @@
 #include <memory>
 #include <iostream>
 
-#ifdef BLOCKSOLVER
-#include <Eigen/Dense>
-#endif
-
 #include <quda_internal.h>
 #include <color_spinor_field.h>
 #include <blas_quda.h>

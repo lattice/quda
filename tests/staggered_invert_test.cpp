@@ -323,7 +323,7 @@ int main(int argc, char **argv)
       printfQuda("Multishift not supported for test %d\n", test_type);
       exit(0);
     }
-    if (Msrc == 1) {
+    if (Msrc==0) {
       for (int k = 0; k < Nsrc; k++) {
         quda::spinorNoise(*in[k], *rng, QUDA_NOISE_UNIFORM);
         if (inv_deflate) eig_param.preserve_deflation = k < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -348,6 +348,8 @@ int main(int argc, char **argv)
         // invertQuda(outArray[k], inArray[k], &inv_param);
 
       }
+      inv_param.num_src=Msrc; // number of spinors to apply to simultaneously
+      
       invertMultiSrcQuda(outArray, inArray, &inv_param);
       printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
                  inv_param.gflops / inv_param.secs);

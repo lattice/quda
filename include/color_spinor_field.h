@@ -9,6 +9,7 @@
 #include <lattice_field.h>
 #include <random_quda.h>
 #include <fast_intdiv.h>
+#include <memory>
 
 namespace quda {
 
@@ -67,6 +68,7 @@ namespace quda {
 
   /** for convenience and potentially future updates to using smart pointer use this here*/
   using ColorSpinorFieldVector = std::vector<ColorSpinorField*>;
+  using ColorSpinorFieldUniqueVector = std::vector<std::unique_ptr<ColorSpinorField>>;
 
   /** Typedef for a set of spinors. Can be further divided into subsets ,e.g., with different precisions (not implemented currently) */
   typedef std::vector<ColorSpinorField*> CompositeColorSpinorField;
@@ -615,6 +617,8 @@ namespace quda {
 
     static ColorSpinorField* Create(const ColorSpinorParam &param);
     static ColorSpinorField* Create(const ColorSpinorField &src, const ColorSpinorParam &param);
+    static std::unique_ptr<ColorSpinorField> CreateSmartPtr(const ColorSpinorParam &param);
+    static std::unique_ptr<ColorSpinorField> CreateSmartPtr(const ColorSpinorField &src, const ColorSpinorParam &param);
 
     /**
        @brief Create a field that aliases this field's storage.  The
