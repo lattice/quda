@@ -3,6 +3,10 @@
 #include <multigrid.h>
 #include <vector_io.h>
 
+// TEMPORARY for verify
+#include <staggered_kd_build_xinv.h> // for build
+#include <dirac_quda.h> // for apply
+
 namespace quda
 {
 
@@ -904,6 +908,95 @@ namespace quda
         printfQuda("L2 norms: Emulated = %e, Native = %e, relative deviation = %e\n", norm2(x_coarse->Odd()), r_nrm,
                    deviation);
       if (deviation > tol) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
+
+      // TEMPORARY FOR VERIFY
+      /*if (param.level == 0)
+      {
+        printfQuda("BEGIN XINV DEBUGGING\n");
+        // hack: get gauge field
+        auto fine_gauge = diracSmoother->getGaugeField();
+
+        // Allocate the KD inverse block (inverse coarse clover)
+        // Copied from `dirac_coarse.cpp`, `DiracCoarse::createY`
+        const int ndim = 4;
+        int xc[QUDA_MAX_DIM];
+        for (int i = 0; i < ndim; i++) { xc[i] = fine_gauge->X()[i]/2; }
+        const int Nc_c = fine_gauge->Ncolor() * 8; // 24
+        const int Ns_c = 2; // staggered parity
+
+        GaugeFieldParam gParam;
+        memcpy(gParam.x, xc, QUDA_MAX_DIM*sizeof(int));
+        gParam.nColor = Nc_c*Ns_c;
+        gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+        gParam.order = QUDA_MILC_GAUGE_ORDER; // Xinv is stored in AoS order
+        gParam.link_type = QUDA_COARSE_LINKS;
+        gParam.t_boundary = QUDA_PERIODIC_T;
+        gParam.create = QUDA_ZERO_FIELD_CREATE;
+        auto precision = fine_gauge->Precision();
+        // right now the build Xinv routines only support single and double
+        if (precision < QUDA_HALF_PRECISION) { 
+          precision = QUDA_HALF_PRECISION;
+        } else if (precision > QUDA_SINGLE_PRECISION) {
+          precision = QUDA_SINGLE_PRECISION;
+        }
+        gParam.setPrecision( QUDA_HALF_PRECISION );
+        gParam.nDim = ndim;
+        gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+        gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+        gParam.nFace = 0;
+        gParam.geometry = QUDA_SCALAR_GEOMETRY;
+        gParam.pad = 0;
+
+        cudaGaugeField* Xinv = new cudaGaugeField(gParam);
+
+        printfQuda("Begin build\n"); fflush(stdout);
+
+        BuildStaggeredKahlerDiracInverse(*Xinv, *fine_gauge, diracSmoother->Mass());
+
+        printfQuda("End build\n"); fflush(stdout);
+
+        ColorSpinorParam csParam2(*r);
+        csParam2.create = QUDA_NULL_FIELD_CREATE;
+        //csParam2.setPrecision(QUDA_DOUBLE)
+        ColorSpinorField *tmp3 = ColorSpinorField::Create(csParam2);
+        ColorSpinorField *tmp4 = ColorSpinorField::Create(csParam2);
+
+        // Well, here goes nothing
+        spinorNoise(*tmp3, *rng, QUDA_NOISE_UNIFORM);
+        blas::zero(*tmp4);
+
+        printfQuda("Fine gauge precision is %d\n", fine_gauge->Precision());
+        printfQuda("Fine spinor precision is %d\n", tmp3->Precision());
+
+        printf("Orig tmp3 %e\n", norm2(*tmp3));
+        printf("Orig tmp4 %e\n", norm2(*tmp4));
+
+        printfQuda("Entering some ugh\n"); fflush(stdout);
+        ApplyStaggeredKahlerDiracInverse(*tmp4, *tmp3, *Xinv, false);
+        printfQuda("Exiting some ugh\n"); fflush(stdout);
+
+        printf("New tmp4 %e\n", norm2(*tmp4));
+
+        // ... Compare with the KD op...
+        transfer->R(*r_coarse, *tmp3);
+        static_cast<DiracCoarse *>(diracCoarseResidual)->CloverInv(x_coarse->Even(), r_coarse->Even(), QUDA_EVEN_PARITY);
+        static_cast<DiracCoarse *>(diracCoarseResidual)->CloverInv(x_coarse->Odd(), r_coarse->Odd(), QUDA_ODD_PARITY);
+        transfer->P(*tmp3, *x_coarse);
+
+        tmp3->PrintVector(0);
+        tmp4->PrintVector(0);
+
+        // Moment of truth...
+        double old_norm = norm2(*tmp3);
+        double new_norm = norm2(*tmp4);
+        deviation = sqrt( xmyNorm(*tmp3, *tmp4) / old_norm );
+        printfQuda("Old norm %e\nNew norm %e\nDeviation %e\n", sqrt(old_norm), sqrt(new_norm), deviation); fflush(stdout);
+
+        delete tmp3;
+        delete tmp4;
+
+        delete Xinv;
+      }*/
     }
 
     // here we check that the Hermitian conjugate operator is working

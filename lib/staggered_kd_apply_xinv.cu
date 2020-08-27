@@ -2,6 +2,7 @@
 #include <gauge_field.h>
 #include <color_spinor_field.h>
 #include <register_traits.h>
+#include <dslash_quda.h>
 
 #include <jitify_helper.cuh>
 #include <kernels/staggered_kd_apply_xinv_kernel.cuh>
@@ -32,13 +33,13 @@ namespace quda {
       // plus some padding to avoid bank conflicts: each KD block stores
       // 17 ColorVectors. (2 * 16 threads * 51 complex * 8 bytes per complex) / 256 threads
       // -> each thread needs 51 bytes
-      return 2 * ((Arg::fineColor * 16 * Arg::paddedSizeKD * sizeof(complex<typename Arg::Float>)) / 256 + 1);
+      return 2 * Arg::fineColor * 16 * Arg::paddedSizeKD * sizeof(complex<typename Arg::Float>) / 256; //((Arg::fineColor * 16 * Arg::paddedSizeKD * sizeof(complex<typename Arg::Float>)) / 256 + 1);
     }
 
     int blockStep() const { return 256; }
     int blockMin() const { return 256; }
 
-    unsigned int minThreads() const { return arg.fineVolumeCB; }
+    unsigned int minThreads() const { return 2 * arg.fineVolumeCB; }
     bool tuneGridDim() const { return false; } // don't tune the grid dimension
 
   public:
@@ -52,6 +53,10 @@ namespace quda {
       create_jitify_program("kernels/staggered_kd_apply_xinv_kernel.cuh");
 #endif
       strcpy(aux, compile_type_str(meta));
+      strcpy(aux, meta.AuxString());
+      strcpy(aux, ",applyStaggeredKDBlock");
+      strcpy(aux, ",coarse_vol=");
+      strcpy(aux, Xinv.AuxString());
       // should be all we need?
     }
 
@@ -116,8 +121,10 @@ namespace quda {
 
     ApplyStaggeredKDBlock<Arg> y(arg, out_, Xinv_);
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Applying KD block\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Applying KD block...\n");
     y.apply(0);
+
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("... done applying KD block\n");
   }
 
   // create accessors, specify dagger vs non-dagger

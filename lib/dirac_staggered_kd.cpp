@@ -7,9 +7,6 @@ namespace quda {
 
   DiracStaggeredKD::DiracStaggeredKD(const DiracParam &param) : DiracStaggered(param),
     Xinv(nullptr) { 
-    
-    // for future reference
-    const bool gpu = true;
 
     // Allocate the KD inverse block (inverse coarse clover)
     // Copied from `dirac_coarse.cpp`, `DiracCoarse::createY`

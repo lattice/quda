@@ -3,7 +3,7 @@
 #include <algorithm>
 
 // temporary for verify
-#include <staggered_kd_build_xinv.h>
+#include <staggered_kd_build_xinv.h> // for build
 
 namespace quda {
 
@@ -221,9 +221,6 @@ namespace quda {
     {
       // hack: get gauge field
       auto fine_gauge = dirac->getGaugeField();
-
-      // for future reference
-      const bool gpu = true;
 
       // Allocate the KD inverse block (inverse coarse clover)
       // Copied from `dirac_coarse.cpp`, `DiracCoarse::createY`

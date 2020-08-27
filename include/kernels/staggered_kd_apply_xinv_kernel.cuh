@@ -24,17 +24,17 @@ namespace quda {
     static constexpr bool dagger = dagger_;
 
     static constexpr int blockSizeKD = 16; /** Elements per KD block */
-    static constexpr int paddedSizeKD = blockSizeKD + 1; /** Padded size */
+    static constexpr int paddedSizeKD = blockSizeKD; // padding is currently broken + 1; /** Padded size */
 
     fineColorSpinor out;      /** Output staggered spinor field */
     const fineColorSpinor in; /** Input staggered spinor field */
     const xInvGauge xInv;     /** Kahler-Dirac inverse field */
 
-    int x_size[QUDA_MAX_DIM];           /** Dimensions of fine grid */
+    int_fastdiv x_size[QUDA_MAX_DIM];           /** Dimensions of fine grid */
     int_fastdiv xc_size[QUDA_MAX_DIM];  /** Dimensions of coarse grid */
 
     const int fineVolumeCB;
-    const int coarseVolumeCB;   /** Coarse grid volume */
+    const int_fastdiv coarseVolumeCB;   /** Coarse grid volume */
 
     ApplyStaggeredKDBlockArg(fineColorSpinor &out, const fineColorSpinor &in, const xInvGauge &xInv,
                            const int *x_size_, const int *xc_size_) :
@@ -78,6 +78,8 @@ namespace quda {
     // What is my overall thread id?
     const unsigned int tid = ((blockIdx.y*gridDim.x + blockIdx.x)*blockDim.y + threadIdx.y)*blockDim.x + threadIdx.x;
 
+    if (tid >= arg.fineVolumeCB*2) return;
+
     // Decompose into factors of 16.
     const unsigned int fast_idx = tid & 0b1111;
     const unsigned int mid_idx = (tid >> 4) & 0b1111;
@@ -87,19 +89,44 @@ namespace quda {
     // What's the first KD block in my unit of work?
     const unsigned int x_coarse_first = 16 * slow_idx;
 
-    // What's my KD block for loading spinors?
-    // [0-15] loads first corner of consecutive hypercubes,
-    // [16-31] loads the second corner, etc
-    const unsigned int x_coarse_spinor = x_coarse_first + fast_idx;
-    const unsigned int parity_coarse_spinor = x_coarse_spinor % 2;
-    const unsigned int x_coarse_spinor_cb = x_coarse_spinor / 2;
+    unsigned int x_coarse_tmp, coarse_x, coarse_y, coarse_z, coarse_t;
 
     // What's my KD block for loading Xinv?
     // [0-15] loads consecutive elements of Xinv for the first block,
     // [16-31] loads consecutive elements of Xinv for the second block, etc
     const unsigned int x_coarse_xinv = x_coarse_first + mid_idx;
-    const unsigned int parity_coarse_xinv = x_coarse_xinv % 2;
-    const unsigned int x_coarse_xinv_cb = x_coarse_xinv / 2;
+    const unsigned int x_coarse_xinv_cb = x_coarse_xinv >> 1;
+
+    x_coarse_tmp = x_coarse_xinv;
+    coarse_x = x_coarse_tmp % arg.xc_size[0];
+    x_coarse_tmp = x_coarse_tmp / arg.xc_size[0];
+    coarse_y = x_coarse_tmp % arg.xc_size[1];
+    x_coarse_tmp = x_coarse_tmp / arg.xc_size[1];
+    coarse_z = x_coarse_tmp % arg.xc_size[2];
+    coarse_t = x_coarse_tmp / arg.xc_size[2];
+
+    const unsigned int parity_coarse_xinv = (coarse_x + coarse_y + coarse_z + coarse_t) & 1;
+
+    // What's my KD block for loading spinors?
+    // [0-15] loads first corner of consecutive hypercubes,
+    // [16-31] loads the second corner, etc
+    const unsigned int x_coarse_spinor = x_coarse_first + fast_idx;
+    const unsigned int x_coarse_spinor_cb = x_coarse_spinor >> 1;
+    
+    // There's got to be a better way to do this
+      x_coarse_tmp = x_coarse_spinor;
+      coarse_x = x_coarse_tmp % arg.xc_size[0];
+      x_coarse_tmp = x_coarse_tmp / arg.xc_size[0];
+      coarse_y = x_coarse_tmp % arg.xc_size[1];
+      x_coarse_tmp = x_coarse_tmp / arg.xc_size[1];
+      coarse_z = x_coarse_tmp % arg.xc_size[2];
+      coarse_t = x_coarse_tmp / arg.xc_size[2];
+
+    const unsigned int parity_coarse_spinor = (coarse_x + coarse_y + coarse_z + coarse_t) & 1;
+
+    //printf("coarseIdx %d %d %d %d %d %d %d\n", x_coarse_first,
+    //        x_coarse_spinor, x_coarse_spinor_cb, parity_coarse_spinor, 
+    //        x_coarse_xinv, x_coarse_xinv_cb, parity_coarse_xinv);
 
     /////////////////////////////////////
     // Set up my shared memory buffers //
@@ -107,7 +134,7 @@ namespace quda {
 
     // This is complicated b/c we need extra padding to avoid bank conflcits
     // Check `staggered_kd_apply_xinv.cu` for the dirty details
-    constexpr int buffer_size = 256 * ((Arg::fineColor * 16 * Arg::paddedSizeKD * sizeof(complex)) / 256 + 1);
+    constexpr int buffer_size = Arg::fineColor * 16 * Arg::paddedSizeKD; //256 * ((Arg::fineColor * 16 * Arg::paddedSizeKD * sizeof(complex)) / 256 + 1);
 
     // Which unit of work am I within this block?
     const int unit_of_work = (threadIdx.x + threadIdx.y * blockDim.x) / 256;
@@ -126,13 +153,30 @@ namespace quda {
     int y_bit = tmp_mid_idx & 1; tmp_mid_idx >>= 1;
     int z_bit = tmp_mid_idx & 1; tmp_mid_idx >>= 1;
     int t_bit = tmp_mid_idx & 1; tmp_mid_idx >>= 1;
-    int parity_spinor = tmp_mid_idx & 1;
+    int spin_bit = tmp_mid_idx;
+
+    int x_bit = (y_bit + z_bit + t_bit) & 1;
+    if (spin_bit) x_bit = 1 - x_bit;
+
+    int parity_spinor = (x_bit + y_bit + z_bit + t_bit) & 1;
 
     // Last xc_size[0] is intentional
-    int x_spinor_cb = ((((2 * coarseCoords[3] + t_bit) * arg.x_size[2]) + 2 * coarseCoords[2] + z_bit) * arg.x_size[1] + 2 * coarseCoords[1] + y_bit) * arg.xc_size[0] + coarseCoords[0];
+    int x_spinor_cb = (((((2 * coarseCoords[3] + t_bit) * arg.x_size[2]) + 2 * coarseCoords[2] + z_bit) * arg.x_size[1] + 2 * coarseCoords[1] + y_bit) * arg.x_size[0] + 2 * coarseCoords[0] + x_bit) >> 1;
+
+    //if (x_coarse_first == 0) {
+    //  printf("tid %03d spinor_cb %02d spinor_parity %d xinv_cb %02d xinv_parity %d\n",
+    //    tid & 0b11111111, x_spinor_cb, parity_spinor, x_coarse_xinv_cb, parity_coarse_xinv);
+    //}
 
     // Load!
-    if (x_spinor_cb < arg.fineVolumeCB) {
+    int buffer_index = mid_idx & 0b111; // 0th component of fine color
+    //buffer_index += 8 * c_f;
+    buffer_index += 24 * spin_bit; // spin offset
+    buffer_index += Arg::fineColor * Arg::paddedSizeKD * fast_idx;
+
+    // arg.fineVolumeCB will always divide into 256 b/c the fine volume
+    // needs to be some multiple of 4^4, which equals 256!
+    //if (x_spinor_cb < arg.fineVolumeCB) {
 
       const Vector in = arg.in(x_spinor_cb, parity_spinor);
 
@@ -140,17 +184,17 @@ namespace quda {
       // ♫ do you believe in bank conflicts ♫
       for (int c_f = 0; c_f < Arg::fineColor; c_f++) {
         // the 51, 17 is to avoid bank conflicts
-        in_buffer[Arg::fineColor * Arg::paddedSizeKD * fast_idx + Arg::paddedSizeKD * c_f + mid_idx] = static_cast<complex>(in(0,c_f));
+        //auto in_spinor = in(0,c_f);
+        in_buffer[buffer_index + 8 * c_f] = static_cast<complex>(in(0,c_f)); // { (real)(in_spinor.real()), (real)(in_spinor.imag()) };
       }
 
-    } else {
-
-      for (int c_f = 0; c_f < Arg::fineColor; c_f++) {
-        // the 51, 17 is to avoid bank conflicts
-        in_buffer[Arg::fineColor * Arg::paddedSizeKD * fast_idx + Arg::paddedSizeKD * c_f + mid_idx] = { 0, 0 };
-      }
-
-    }
+    //} else {
+    //
+    //  for (int c_f = 0; c_f < Arg::fineColor; c_f++) {
+    //    // the 51, 17 is to avoid bank conflicts
+    //    in_buffer[buffer_index + 8 * c_f] = { 0, 0 };
+    //  }
+    //}
 
     // in reality we only need to sync over my chunk of 256 threads
     __syncthreads();
@@ -159,7 +203,7 @@ namespace quda {
     // Multiply by Xinv, store //
     /////////////////////////////
 
-    if (x_coarse_xinv_cb < arg.coarseVolumeCB) {
+    //if (x_coarse_xinv_cb < arg.coarseVolumeCB) {
       #pragma unroll // eh, we'll see if this is a good idea.
       for (int coarse_spin_row = 0; coarse_spin_row < Arg::coarseSpin; coarse_spin_row++) {
         #pragma unroll
@@ -183,11 +227,15 @@ namespace quda {
             im_sum += WarpReduce16(temp_storage_16).Sum(prod.imag());
           }
 
+          __syncwarp();
+
           if (fast_idx == 0)
-            out_buffer[48 * mid_idx + coarse_spin_row * Arg::coarseColor + coarse_color_row] = { re_sum, im_sum };
+          {
+            out_buffer[Arg::paddedSizeKD * Arg::fineColor * mid_idx + coarse_spin_row * Arg::coarseColor + coarse_color_row] = { re_sum, im_sum };
+          }
         }
       }
-    }
+    //}
 
     __syncthreads();
 
@@ -195,18 +243,18 @@ namespace quda {
     // Store: one whole thing is easy! //
     /////////////////////////////////////
 
-    Vector out;
-
-    if (x_spinor_cb < arg.fineVolumeCB) {
+    //if (x_spinor_cb < arg.fineVolumeCB) {
       Vector out;
 
       #pragma unroll
       for (int c_f = 0; c_f < Arg::fineColor; c_f++) {
-        out(0,c_f) = static_cast<complex_spinor>(out_buffer[Arg::paddedSizeKD * Arg::fineColor * fast_idx + Arg::paddedSizeKD * c_f + mid_idx]);
+        //printf("%d %e + I %e\n", x_spinor_cb, out_buffer[Arg::paddedSizeKD * Arg::fineColor * fast_idx + Arg::paddedSizeKD * c_f + mid_idx].real(),
+        //                                      out_buffer[Arg::paddedSizeKD * Arg::fineColor * fast_idx + Arg::paddedSizeKD * c_f + mid_idx].imag());
+        out(0,c_f) = static_cast<complex_spinor>(out_buffer[buffer_index + 8 * c_f]);
       }
 
-      arg.out(x_spinor_cb, parity_spinor);
-    }
+      arg.out(x_spinor_cb, parity_spinor) = out;
+    //}
     
     // Who knows
   }
