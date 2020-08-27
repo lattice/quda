@@ -7,8 +7,8 @@
 
 namespace quda {
 
-  template <typename vFloatSpinor_, typename vFloatGauge_, int coarseSpin_, int fineColor_,
-            int coarseColor_, bool dagger_, typename fineColorSpinor, typename xInvGauge>
+  template <typename vFloatSpinor_, typename vFloatGauge_, int coarseDof_, int fineColor_,
+            bool dagger_, typename fineColorSpinor, typename xInvGauge>
   struct ApplyStaggeredKDBlockArg {
 
     using vFloatSpinor = vFloatSpinor_;
@@ -18,13 +18,15 @@ namespace quda {
 
     static constexpr int fineColor = fineColor_;
     static constexpr int fineSpin = 1;
-    static constexpr int coarseColor = coarseColor_;
-    static constexpr int coarseSpin = coarseSpin_;
-    static constexpr int coarseDof = coarseColor*coarseSpin;
+    static constexpr int coarseDof = coarseDof_;
     static constexpr bool dagger = dagger_;
 
     static constexpr int blockSizeKD = 16; /** Elements per KD block */
-    static constexpr int paddedSizeKD = blockSizeKD; // padding is currently broken + 1; /** Padded size */
+    static constexpr int paddedSpinorSizeKD = blockSizeKD; // padding is currently broken + 1; /** Padded size */
+
+    static constexpr int xinvTileSize = 16; /** Length of a tile for KD */
+    static constexpr int xinvPaddedTileSize = xinvTileSize + 1; /** Padding to avoid bank conflicts */
+    static constexpr int numTiles = (coarseDof + xinvTileSize - 1) / xinvTileSize; /** Number of tiles, should always be three. */
 
     fineColorSpinor out;      /** Output staggered spinor field */
     const fineColorSpinor in; /** Input staggered spinor field */
@@ -76,7 +78,7 @@ namespace quda {
     /////////////////////////////////
 
     // What is my overall thread id?
-    const unsigned int tid = ((blockIdx.y*gridDim.x + blockIdx.x)*blockDim.y + threadIdx.y)*blockDim.x + threadIdx.x;
+    const unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x; //((blockIdx.y*gridDim.x + blockIdx.x)*blockDim.y + threadIdx.y)*blockDim.x + threadIdx.x;
 
     if (tid >= arg.fineVolumeCB*2) return;
 
@@ -134,12 +136,18 @@ namespace quda {
 
     // This is complicated b/c we need extra padding to avoid bank conflcits
     // Check `staggered_kd_apply_xinv.cu` for the dirty details
-    constexpr int buffer_size = Arg::fineColor * 16 * Arg::paddedSizeKD; //256 * ((Arg::fineColor * 16 * Arg::paddedSizeKD * sizeof(complex)) / 256 + 1);
+    constexpr int buffer_size = Arg::fineColor * 16 * Arg::paddedSpinorSizeKD; //256 * ((Arg::fineColor * 16 * Arg::paddedSpinorSizeKD * sizeof(complex)) / 256 + 1);
 
-    // Which unit of work am I within this block?
-    const int unit_of_work = (threadIdx.x + threadIdx.y * blockDim.x) / 256;
+    // size of tile: 
+    constexpr int fullTileSize = 16 * Arg::xinvTileSize * Arg::xinvPaddedTileSize;
+
+    // Which unit of spinor work am I within this block?
+    const int unit_of_work = threadIdx.x / 256; // (threadIdx.x + threadIdx.y * blockDim.x) / 256;
     complex* in_buffer = cs_buffer + (2 * unit_of_work) * buffer_size;
     complex* out_buffer = cs_buffer + (2 * unit_of_work + 1) * buffer_size;
+
+    // Which unit of Xinv tile am I?
+    complex* xinv_buffer = cs_buffer + 2 * (blockDim.x / 256) * buffer_size + unit_of_work * fullTileSize + mid_idx * Arg::xinvTileSize * Arg::xinvPaddedTileSize;
     
     ////////////////////////////////////////////////////
     // Hey, real work! What ColorVector am I loading? //
@@ -163,38 +171,15 @@ namespace quda {
     // Last xc_size[0] is intentional
     int x_spinor_cb = (((((2 * coarseCoords[3] + t_bit) * arg.x_size[2]) + 2 * coarseCoords[2] + z_bit) * arg.x_size[1] + 2 * coarseCoords[1] + y_bit) * arg.x_size[0] + 2 * coarseCoords[0] + x_bit) >> 1;
 
-    //if (x_coarse_first == 0) {
-    //  printf("tid %03d spinor_cb %02d spinor_parity %d xinv_cb %02d xinv_parity %d\n",
-    //    tid & 0b11111111, x_spinor_cb, parity_spinor, x_coarse_xinv_cb, parity_coarse_xinv);
-    //}
+    //  Load into:     (0th fine color)  + (coarse spin) + (Xinv offset)
+    int buffer_index = (mid_idx & 0b111) + 24 * spin_bit + Arg::fineColor * Arg::paddedSpinorSizeKD * fast_idx;
 
-    // Load!
-    int buffer_index = mid_idx & 0b111; // 0th component of fine color
-    //buffer_index += 8 * c_f;
-    buffer_index += 24 * spin_bit; // spin offset
-    buffer_index += Arg::fineColor * Arg::paddedSizeKD * fast_idx;
+    const Vector in = arg.in(x_spinor_cb, parity_spinor);
 
-    // arg.fineVolumeCB will always divide into 256 b/c the fine volume
-    // needs to be some multiple of 4^4, which equals 256!
-    //if (x_spinor_cb < arg.fineVolumeCB) {
-
-      const Vector in = arg.in(x_spinor_cb, parity_spinor);
-
-      // Legacy comment:
-      // ♫ do you believe in bank conflicts ♫
-      for (int c_f = 0; c_f < Arg::fineColor; c_f++) {
-        // the 51, 17 is to avoid bank conflicts
-        //auto in_spinor = in(0,c_f);
-        in_buffer[buffer_index + 8 * c_f] = static_cast<complex>(in(0,c_f)); // { (real)(in_spinor.real()), (real)(in_spinor.imag()) };
-      }
-
-    //} else {
-    //
-    //  for (int c_f = 0; c_f < Arg::fineColor; c_f++) {
-    //    // the 51, 17 is to avoid bank conflicts
-    //    in_buffer[buffer_index + 8 * c_f] = { 0, 0 };
-    //  }
-    //}
+    // ♫ do you believe in bank conflicts ♫
+    for (int c_f = 0; c_f < Arg::fineColor; c_f++) {
+      in_buffer[buffer_index + 8 * c_f] = static_cast<complex>(in(0,c_f)); // { (real)(in_spinor.real()), (real)(in_spinor.imag()) };
+    }
 
     // in reality we only need to sync over my chunk of 256 threads
     __syncthreads();
@@ -203,39 +188,45 @@ namespace quda {
     // Multiply by Xinv, store //
     /////////////////////////////
 
-    //if (x_coarse_xinv_cb < arg.coarseVolumeCB) {
-      #pragma unroll // eh, we'll see if this is a good idea.
-      for (int coarse_spin_row = 0; coarse_spin_row < Arg::coarseSpin; coarse_spin_row++) {
+    // Zero the shared memory buffer, which is 48 components
+    #pragma unroll
+    for (int coarse_row = fast_idx; coarse_row < Arg::coarseDof; coarse_row += Arg::blockSizeKD) {
+      out_buffer[Arg::paddedSpinorSizeKD * Arg::fineColor * mid_idx + coarse_row] = { 0, 0 };
+    }
+
+    #pragma unroll
+    for (int tile_row = 0; tile_row < Arg::numTiles; tile_row++) {
+      #pragma unroll
+      for (int tile_col = 0; tile_col < Arg::numTiles; tile_col++) {
+        // load Xinv
         #pragma unroll
-        for (int coarse_color_row = 0; coarse_color_row < Arg::coarseColor; coarse_color_row++) {
-          
-          real re_sum = 0, im_sum = 0;
+        for (int row = 0; row < Arg::xinvTileSize; row++) {
+          xinv_buffer[row * Arg::xinvPaddedTileSize + fast_idx] = arg.xInv(0, parity_coarse_xinv, x_coarse_xinv_cb, 0, 0, Arg::xinvTileSize * tile_row + row, Arg::xinvTileSize * tile_col + fast_idx);
+        }
 
-          // load rows in three chunks
-          #pragma unroll
-          for (int elem = fast_idx; elem < Arg::coarseSpin*Arg::coarseColor; elem += Arg::blockSizeKD) {
-            const int color_idx = elem % Arg::coarseColor;
-            const int spin_idx = elem / Arg::coarseColor;
+        __syncwarp();
 
-            int padded_elem = (elem / Arg::blockSizeKD) * Arg::paddedSizeKD + (elem % Arg::blockSizeKD);
+        // do the tile multiplication
+        #pragma unroll
+        for (int row = 0; row < Arg::xinvTileSize; row++) {
+          const complex xinv_elem = xinv_buffer[row * Arg::xinvPaddedTileSize + fast_idx];
+          const complex cs_component = in_buffer[Arg::coarseDof * mid_idx + Arg::xinvTileSize * tile_col + fast_idx];
+          const complex prod = cmul(xinv_elem, cs_component);
 
-            const complex xinv_elem = arg.xInv(0, parity_coarse_xinv, x_coarse_xinv_cb, coarse_spin_row, spin_idx, coarse_color_row, color_idx);
-            const complex cs_component = in_buffer[Arg::paddedSizeKD * Arg::fineColor * mid_idx + padded_elem];
-            complex prod = cmul(xinv_elem, cs_component);
-
-            re_sum += WarpReduce16(temp_storage_16).Sum(prod.real());
-            im_sum += WarpReduce16(temp_storage_16).Sum(prod.imag());
-          }
+          const real re_sum = WarpReduce16(temp_storage_16).Sum(prod.real());
+          const real im_sum = WarpReduce16(temp_storage_16).Sum(prod.imag());
 
           __syncwarp();
 
           if (fast_idx == 0)
           {
-            out_buffer[Arg::paddedSizeKD * Arg::fineColor * mid_idx + coarse_spin_row * Arg::coarseColor + coarse_color_row] = { re_sum, im_sum };
+            out_buffer[Arg::paddedSpinorSizeKD * Arg::fineColor * mid_idx + Arg::xinvTileSize * tile_row + row].x += re_sum; 
+            out_buffer[Arg::paddedSpinorSizeKD * Arg::fineColor * mid_idx + Arg::xinvTileSize * tile_row + row].y += im_sum; 
           }
         }
       }
-    //}
+    }
+
 
     __syncthreads();
 
@@ -243,20 +234,15 @@ namespace quda {
     // Store: one whole thing is easy! //
     /////////////////////////////////////
 
-    //if (x_spinor_cb < arg.fineVolumeCB) {
-      Vector out;
+    Vector out;
 
-      #pragma unroll
-      for (int c_f = 0; c_f < Arg::fineColor; c_f++) {
-        //printf("%d %e + I %e\n", x_spinor_cb, out_buffer[Arg::paddedSizeKD * Arg::fineColor * fast_idx + Arg::paddedSizeKD * c_f + mid_idx].real(),
-        //                                      out_buffer[Arg::paddedSizeKD * Arg::fineColor * fast_idx + Arg::paddedSizeKD * c_f + mid_idx].imag());
-        out(0,c_f) = static_cast<complex_spinor>(out_buffer[buffer_index + 8 * c_f]);
-      }
+    #pragma unroll
+    for (int c_f = 0; c_f < Arg::fineColor; c_f++) {
+      out(0,c_f) = static_cast<complex_spinor>(out_buffer[buffer_index + 8 * c_f]);
+    }
 
-      arg.out(x_spinor_cb, parity_spinor) = out;
-    //}
-    
-    // Who knows
+    arg.out(x_spinor_cb, parity_spinor) = out;
+
   }
 
 } // namespace quda

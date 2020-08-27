@@ -910,7 +910,7 @@ namespace quda
       if (deviation > tol) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
 
       // TEMPORARY FOR VERIFY
-      /*if (param.level == 0)
+      if (param.level == 0)
       {
         printfQuda("BEGIN XINV DEBUGGING\n");
         // hack: get gauge field
@@ -939,7 +939,7 @@ namespace quda
         } else if (precision > QUDA_SINGLE_PRECISION) {
           precision = QUDA_SINGLE_PRECISION;
         }
-        gParam.setPrecision( QUDA_HALF_PRECISION );
+        gParam.setPrecision( precision );
         gParam.nDim = ndim;
         gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
         gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
@@ -996,7 +996,7 @@ namespace quda
         delete tmp4;
 
         delete Xinv;
-      }*/
+      }
     }
 
     // here we check that the Hermitian conjugate operator is working
