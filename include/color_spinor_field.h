@@ -566,7 +566,7 @@ namespace quda {
        @param[in] dim The dimension of the ghost
        @param[in] dir The direction of the ghost
      */
-    size_t GhostOffset(const int dim, const int dir) const { return ghostOffset[dim][dir]; }
+    size_t GhostOffset(const int dim, const int dir) const { return ghost_offset[dim][dir]; }
 
     void* Ghost(const int i);
     const void* Ghost(const int i) const;

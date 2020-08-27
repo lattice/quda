@@ -262,9 +262,14 @@ namespace quda {
     mutable size_t ghost_face_bytes[QUDA_MAX_DIM];
 
     /**
+       Actual allocated size in bytes of the ghost in each dimension
+    */
+    mutable size_t ghost_face_bytes_aligned[QUDA_MAX_DIM];
+
+    /**
        Byte offsets to each ghost zone
     */
-    mutable size_t ghostOffset[QUDA_MAX_DIM][2];
+    mutable size_t ghost_offset[QUDA_MAX_DIM][2];
 
     /**
        Pinned memory buffer used for sending messages

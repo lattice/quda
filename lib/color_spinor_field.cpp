@@ -53,8 +53,7 @@ namespace quda {
     int ghost_volume = 0;
     int dims = nDim == 5 ? (nDim - 1) : nDim;
     int x5   = nDim == 5 ? x[4] : 1; ///includes DW and non-degenerate TM ghosts
-    const int ghost_align = 1; // TODO perhaps in the future we should align each ghost dim/dir, e.g., along 128-byte boundaries
-    size_t ghost_face_bytes_aligned[4] = { };
+    const int ghost_align = 1; // TODO perhaps in the future we should align each ghost dim/dir, e.g., along 32-byte boundaries
     ghost_bytes = 0;
     for (int i=0; i<dims; i++) {
       ghostFace[i] = 0;
@@ -71,8 +70,8 @@ namespace quda {
 
       ghost_face_bytes[i] = nFace * ghostFace[i] * site_size;
       ghost_face_bytes_aligned[i] = ((ghost_face_bytes[i] + ghost_align - 1) / ghost_align) * ghost_align;
-      ghostOffset[i][0] = i == 0 ? 0 : ghostOffset[i-1][0] + 2 * ghost_face_bytes_aligned[i-1];
-      ghostOffset[i][1] = ghostOffset[i][0] + ghost_face_bytes_aligned[i];
+      ghost_offset[i][0] = i == 0 ? 0 : ghost_offset[i-1][0] + 2 * ghost_face_bytes_aligned[i-1];
+      ghost_offset[i][1] = ghost_offset[i][0] + ghost_face_bytes_aligned[i];
       ghost_bytes += 2 * ghost_face_bytes_aligned[i];
 
       ghostFaceCB[i] = (siteSubset == QUDA_FULL_SITE_SUBSET ? ghostFace[i] / 2 : ghostFace[i]);

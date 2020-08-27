@@ -136,8 +136,8 @@ namespace quda {
 
       size_t offset = 0;
       for (int d=0; d<nDim; d++) {
-	recv_d[d] = static_cast<char*>(ghost_recv_buffer_d[bufferIndex]) + offset; if (bidir) offset += ghost_face_bytes[d];
-	send_d[d] = static_cast<char*>(ghost_send_buffer_d[bufferIndex]) + offset; offset += ghost_face_bytes[d];
+	recv_d[d] = static_cast<char*>(ghost_recv_buffer_d[bufferIndex]) + offset; if (bidir) offset += ghost_face_bytes_aligned[d];
+	send_d[d] = static_cast<char*>(ghost_send_buffer_d[bufferIndex]) + offset; offset += ghost_face_bytes_aligned[d];
       }
 
       extractGaugeGhost(*this, send_d, true, link_dir*nDim); // get the links into contiguous buffers
@@ -220,9 +220,9 @@ namespace quda {
       size_t offset = 0;
       for (int d=0; d<nDim; d++) {
 	// send backwards is first half of each ghost_send_buffer
-	send_d[d] = static_cast<char*>(ghost_send_buffer_d[bufferIndex]) + offset; if (bidir) offset += ghost_face_bytes[d];
+	send_d[d] = static_cast<char*>(ghost_send_buffer_d[bufferIndex]) + offset; if (bidir) offset += ghost_face_bytes_aligned[d];
 	// receive from forwards is the second half of each ghost_recv_buffer
-	recv_d[d] = static_cast<char*>(ghost_recv_buffer_d[bufferIndex]) + offset; offset += ghost_face_bytes[d];
+	recv_d[d] = static_cast<char*>(ghost_recv_buffer_d[bufferIndex]) + offset; offset += ghost_face_bytes_aligned[d];
       }
 
       if (isNative()) { // copy from padded region in gauge field into send buffer
@@ -344,7 +344,7 @@ namespace quda {
     } else { // doing peer-to-peer
 
       void* ghost_dst = static_cast<char*>(ghost_remote_send_buffer_d[bufferIndex][dim][dir])
-	+ ghostOffset[dim][(dir+1)%2];
+	+ ghost_offset[dim][(dir+1)%2];
 
       cudaMemcpyAsync(ghost_dst, my_face_dim_dir_d[bufferIndex][dim][dir],
 		      ghost_face_bytes[dim], cudaMemcpyDeviceToDevice,
@@ -421,8 +421,8 @@ namespace quda {
 
       // silence cuda-memcheck initcheck errors that arise since we
       // have an oversized ghost buffer when doing the extended exchange
-      qudaMemsetAsync(send_d[dim], 0, 2 * ghost_face_bytes[dim], 0);
-      offset += 2*ghost_face_bytes[dim]; // factor of two from fwd/back
+      qudaMemsetAsync(send_d[dim], 0, 2 * ghost_face_bytes_aligned[dim], 0);
+      offset += 2 * ghost_face_bytes_aligned[dim]; // factor of two from fwd/back
     }
 
     for (int dim=0; dim<nDim; dim++) {
