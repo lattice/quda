@@ -136,6 +136,8 @@ int main(int argc, char **argv)
     memset(correlation_function_sum, 0, Nmom*corr_size_in_bytes);
     contractFTQuda(prop_array_ptr, prop_array_ptr, &correlation_function_sum, contract_type, &inv_param,
 		   (void *)cs_param_ptr, gauge_param.X, source, Mom);
+    printfQuda("    g= 0,  1,  2,  3,    4,    5,    6,    7, 8,  9,  10,  11,  12,  13,  14,  15 correspond to channel:\n"
+               "Gamma=g1, g2, g3, g4, g5g1, g5g2, g5g3, g5g4, 1, g5, s12, s13, s14, s23, s24, s34\n");
     for (int px=0; px <= Mom[0]; px++) {
       for (int py=0; py <= Mom[1]; py++) {
         for (int pz=0; pz <= Mom[2]; pz++) {
@@ -146,10 +148,15 @@ int main(int argc, char **argv)
                 int index_real = (px+py*(Mom[0]+1)+pz*(Mom[0]+1)*(Mom[1]+1)+pt*(Mom[0]+1)*(Mom[1]+1)*(Mom[2]+1))
                     *n_numbers_per_slice * global_corr_length+n_numbers_per_slice * ((t + overall_shift_dim) % global_corr_length) + 2 * G_idx;
                 int index_imag = index_real+1;
-                printfQuda(
-                  "sum: prop_n=%d px=%d py=%d pz=%d pt=%d g=%d t=%lu %e %e\n", n, px, py, pz, pt, G_idx, t,
-                  ((double *)correlation_function_sum)[index_real],
-                  ((double *)correlation_function_sum)[index_imag]);
+                if (G_idx<8) { //the minus sign from g5gm -> gmg5
+                  printfQuda("sum: prop_n=%d px=%d py=%d pz=%d pt=%d g=%d t=%lu %e %e\n", n, px, py, pz, pt, G_idx, t,
+                             -((double *)correlation_function_sum)[index_real],
+                             -((double *)correlation_function_sum)[index_imag]);
+                } else {
+                  printfQuda("sum: prop_n=%d px=%d py=%d pz=%d pt=%d g=%d t=%lu %e %e\n", n, px, py, pz, pt, G_idx, t,
+                             ((double *)correlation_function_sum)[index_real],
+                             ((double *)correlation_function_sum)[index_imag]);
+                }
               }
             }
           }

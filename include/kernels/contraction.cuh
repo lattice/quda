@@ -17,118 +17,171 @@ namespace quda
 
   public:
     //FIXME make these private?
-    int gm_i[16][4] {};        // stores gamma matrix column index for non-zero complex value
-    complex<real> gm_z[16][4]; // stores gamma matrix non-zero complex value for the corresponding gm_i
+    int gm_i[16][4] {};        // stores gamma matrix column index for non-zero complex value. this is shared by g5gm, gmg5.
+    //complex<real> gm_z[16][4]; // stores gamma matrix non-zero complex value for the corresponding gm_i. not used actually
+    complex<real> g5gm_z[16][4]; // stores gamma matrix non-zero complex value for the corresponding g5gm_i
+    //use -tr[Gamma*Prop*Gamma*g5*conj(Prop)*g5] = -tr[g5*Gamma*Prop*g5*Gamma*(-1)^{?}*conj(Prop)].
+    //the possible minus sign will be taken care in the main function
     //! Constructor
     DRGammaMatrix()
     {
 
       const complex<real> i(0., 1.);
-
-      // SCALAR
-      // G_idx = 0: I
-      gm_i[0][0] = 0;
-      gm_i[0][1] = 1;
-      gm_i[0][2] = 2;
-      gm_i[0][3] = 3;
-      gm_z[0][0] = 1.;
-      gm_z[0][1] = 1.;
-      gm_z[0][2] = 1.;
-      gm_z[0][3] = 1.;
-
       // VECTORS
       // G_idx = 1: \gamma_1
+      gm_i[0][0] = 3;
+      gm_i[0][1] = 2;
+      gm_i[0][2] = 1;
+      gm_i[0][3] = 0;
+      //gm_z[0][0] = i;
+      //gm_z[0][1] = i;
+      //gm_z[0][2] = -i;
+      //gm_z[0][3] = -i;
+
+      g5gm_z[0][0] = i;
+      g5gm_z[0][1] = i;
+      g5gm_z[0][2] = i;
+      g5gm_z[0][3] = i;
+
+      // G_idx = 2: \gamma_2
       gm_i[1][0] = 3;
       gm_i[1][1] = 2;
       gm_i[1][2] = 1;
       gm_i[1][3] = 0;
-      gm_z[1][0] = i;
-      gm_z[1][1] = i;
-      gm_z[1][2] = -i;
-      gm_z[1][3] = -i;
+      //gm_z[1][0] = -1.;
+      //gm_z[1][1] = 1.;
+      //gm_z[1][2] = 1.;
+      //gm_z[1][3] = -1.;
 
-      // G_idx = 2: \gamma_2
-      gm_i[2][0] = 3;
-      gm_i[2][1] = 2;
-      gm_i[2][2] = 1;
-      gm_i[2][3] = 0;
-      gm_z[2][0] = -1.;
-      gm_z[2][1] = 1.;
-      gm_z[2][2] = 1.;
-      gm_z[2][3] = -1.;
+      g5gm_z[1][0] = -1.;
+      g5gm_z[1][1] = 1.;
+      g5gm_z[1][2] = -1.;
+      g5gm_z[1][3] = 1.;
 
       // G_idx = 3: \gamma_3
+      gm_i[2][0] = 2;
+      gm_i[2][1] = 3;
+      gm_i[2][2] = 0;
+      gm_i[2][3] = 1;
+      //gm_z[2][0] = i;
+      //gm_z[2][1] = -i;
+      //gm_z[2][2] = -i;
+      //gm_z[2][3] = i;
+
+      g5gm_z[2][0] = i;
+      g5gm_z[2][1] = -i;
+      g5gm_z[2][2] = i;
+      g5gm_z[2][3] = -i;
+
+      // G_idx = 4: \gamma_4
       gm_i[3][0] = 2;
       gm_i[3][1] = 3;
       gm_i[3][2] = 0;
       gm_i[3][3] = 1;
-      gm_z[3][0] = i;
-      gm_z[3][1] = -i;
-      gm_z[3][2] = -i;
-      gm_z[3][3] = i;
+      //gm_z[3][0] = 1.;
+      //gm_z[3][1] = 1.;
+      //gm_z[3][2] = 1.;
+      //gm_z[3][3] = 1.;
 
-      // G_idx = 4: \gamma_4
-      gm_i[4][0] = 2;
-      gm_i[4][1] = 3;
-      gm_i[4][2] = 0;
-      gm_i[4][3] = 1;
-      gm_z[4][0] = 1.;
-      gm_z[4][1] = 1.;
-      gm_z[4][2] = 1.;
-      gm_z[4][3] = 1.;
+      g5gm_z[3][0] = 1.;
+      g5gm_z[3][1] = 1.;
+      g5gm_z[3][2] = -1.;
+      g5gm_z[3][3] = -1.;
+
+
+
+      // PSEUDO-VECTORS
+      // G_idx = 6: \gamma_5\gamma_1
+      gm_i[4][0] = 3;
+      gm_i[4][1] = 2;
+      gm_i[4][2] = 1;
+      gm_i[4][3] = 0;
+      //gm_z[4][0] = i;
+      //gm_z[4][1] = i;
+      //gm_z[4][2] = i;
+      //gm_z[4][3] = i;
+
+      g5gm_z[4][0] = i;
+      g5gm_z[4][1] = i;
+      g5gm_z[4][2] = -i;
+      g5gm_z[4][3] = -i;
+
+      // G_idx = 7: \gamma_5\gamma_2
+      gm_i[5][0] = 3;
+      gm_i[5][1] = 2;
+      gm_i[5][2] = 1;
+      gm_i[5][3] = 0;
+      //gm_z[5][0] = -1.;
+      //gm_z[5][1] = 1.;
+      //gm_z[5][2] = -1.;
+      //gm_z[5][3] = 1.;
+
+      g5gm_z[5][0] = -1.;
+      g5gm_z[5][1] = 1.;
+      g5gm_z[5][2] = 1.;
+      g5gm_z[5][3] = -1.;
+
+      // G_idx = 8: \gamma_5\gamma_3
+      gm_i[6][0] = 2;
+      gm_i[6][1] = 3;
+      gm_i[6][2] = 0;
+      gm_i[6][3] = 1;
+      //gm_z[6][0] = i;
+      //gm_z[6][1] = -i;
+      //gm_z[6][2] = i;
+      //gm_z[6][3] = -i;
+
+      g5gm_z[6][0] = i;
+      g5gm_z[6][1] = -i;
+      g5gm_z[6][2] = -i;
+      g5gm_z[6][3] = i;
+
+      // G_idx = 9: \gamma_5\gamma_4
+      gm_i[7][0] = 2;
+      gm_i[7][1] = 3;
+      gm_i[7][2] = 0;
+      gm_i[7][3] = 1;
+      //gm_z[7][0] = 1.;
+      //gm_z[7][1] = 1.;
+      //gm_z[7][2] = -1.;
+      //gm_z[7][3] = -1.;
+
+      g5gm_z[7][0] = 1.;
+      g5gm_z[7][1] = 1.;
+      g5gm_z[7][2] = 1.;
+      g5gm_z[7][3] = 1.;
+
+      // SCALAR
+      // G_idx = 0: I
+      gm_i[8][0] = 0;
+      gm_i[8][1] = 1;
+      gm_i[8][2] = 2;
+      gm_i[8][3] = 3;
+      //gm_z[8][0] = 1.;
+      //gm_z[8][1] = 1.;
+      //gm_z[8][2] = 1.;
+      //gm_z[8][3] = 1.;
+
+      g5gm_z[8][0] = 1.;
+      g5gm_z[8][1] = 1.;
+      g5gm_z[8][2] = -1.;
+      g5gm_z[8][3] = -1.;
 
       // PSEUDO-SCALAR
       // G_idx = 5: \gamma_5
-      gm_i[5][0] = 0;
-      gm_i[5][1] = 1;
-      gm_i[5][2] = 2;
-      gm_i[5][3] = 3;
-      gm_z[5][0] = 1.;
-      gm_z[5][1] = 1.;
-      gm_z[5][2] = -1.;
-      gm_z[5][3] = -1.;
+      gm_i[9][0] = 0;
+      gm_i[9][1] = 1;
+      gm_i[9][2] = 2;
+      gm_i[9][3] = 3;
+      //gm_z[9][0] = 1.;
+      //gm_z[9][1] = 1.;
+      //gm_z[9][2] = -1.;
+      //gm_z[9][3] = -1.;
 
-      // PSEUDO-VECTORS
-      // DMH: Careful here... we may wish to use  \gamma_1,2,3,4\gamma_5 for pseudovectors
-      // G_idx = 6: \gamma_5\gamma_1
-      gm_i[6][0] = 3;
-      gm_i[6][1] = 2;
-      gm_i[6][2] = 1;
-      gm_i[6][3] = 0;
-      gm_z[6][0] = i;
-      gm_z[6][1] = i;
-      gm_z[6][2] = i;
-      gm_z[6][3] = i;
-
-      // G_idx = 7: \gamma_5\gamma_2
-      gm_i[7][0] = 3;
-      gm_i[7][1] = 2;
-      gm_i[7][2] = 1;
-      gm_i[7][3] = 0;
-      gm_z[7][0] = -1.;
-      gm_z[7][1] = 1.;
-      gm_z[7][2] = -1.;
-      gm_z[7][3] = 1.;
-
-      // G_idx = 8: \gamma_5\gamma_3
-      gm_i[8][0] = 2;
-      gm_i[8][1] = 3;
-      gm_i[8][2] = 0;
-      gm_i[8][3] = 1;
-      gm_z[8][0] = i;
-      gm_z[8][1] = -i;
-      gm_z[8][2] = i;
-      gm_z[8][3] = -i;
-
-      // G_idx = 9: \gamma_5\gamma_4
-      gm_i[9][0] = 2;
-      gm_i[9][1] = 3;
-      gm_i[9][2] = 0;
-      gm_i[9][3] = 1;
-      gm_z[9][0] = 1.;
-      gm_z[9][1] = 1.;
-      gm_z[9][2] = -1.;
-      gm_z[9][3] = -1.;
+      g5gm_z[9][0] = 1.;
+      g5gm_z[9][1] = 1.;
+      g5gm_z[9][2] = 1.;
+      g5gm_z[9][3] = 1.;
 
       // TENSORS
       // G_idx = 10: (i/2) * [\gamma_1, \gamma_2]
@@ -136,60 +189,86 @@ namespace quda
       gm_i[10][1] = 1;
       gm_i[10][2] = 2;
       gm_i[10][3] = 3;
-      gm_z[10][0] = 1.;
-      gm_z[10][1] = -1.;
-      gm_z[10][2] = 1.;
-      gm_z[10][3] = -1.;
+      //gm_z[10][0] = 1.;
+      //gm_z[10][1] = -1.;
+      //gm_z[10][2] = 1.;
+      //gm_z[10][3] = -1.;
 
-      // G_idx = 11: (i/2) * [\gamma_1, \gamma_3]
-      gm_i[11][0] = 2;
-      gm_i[11][1] = 3;
-      gm_i[11][2] = 0;
-      gm_i[11][3] = 1;
-      gm_z[11][0] = -i;
-      gm_z[11][1] = -i;
-      gm_z[11][2] = i;
-      gm_z[11][3] = i;
+      g5gm_z[10][0] = 1.;
+      g5gm_z[10][1] = -1.;
+      g5gm_z[10][2] = -1.;
+      g5gm_z[10][3] = 1.;
+      // G_idx = 11: (i/2) * [\gamma_1, \gamma_3]. this matrix was corrected
+      gm_i[11][0] = 1;
+      gm_i[11][1] = 0;
+      gm_i[11][2] = 3;
+      gm_i[11][3] = 2;
+      //gm_z[11][0] = -i;
+      //gm_z[11][1] = i;
+      //gm_z[11][2] = -i;
+      //gm_z[11][3] = i;
 
+      g5gm_z[11][0] = -i;
+      g5gm_z[11][1] = i;
+      g5gm_z[11][2] = i;
+      g5gm_z[11][3] = -i;
       // G_idx = 12: (i/2) * [\gamma_1, \gamma_4]
       gm_i[12][0] = 1;
       gm_i[12][1] = 0;
       gm_i[12][2] = 3;
       gm_i[12][3] = 2;
-      gm_z[12][0] = -1.;
-      gm_z[12][1] = -1.;
-      gm_z[12][2] = 1.;
-      gm_z[12][3] = 1.;
+      //gm_z[12][0] = -1.;
+      //gm_z[12][1] = -1.;
+      //gm_z[12][2] = 1.;
+      //gm_z[12][3] = 1.;
+
+      g5gm_z[12][0] = -1.;
+      g5gm_z[12][1] = -1.;
+      g5gm_z[12][2] = -1.;
+      g5gm_z[12][3] = -1.;
 
       // G_idx = 13: (i/2) * [\gamma_2, \gamma_3]
       gm_i[13][0] = 1;
       gm_i[13][1] = 0;
       gm_i[13][2] = 3;
       gm_i[13][3] = 2;
-      gm_z[13][0] = 1.;
-      gm_z[13][1] = 1.;
-      gm_z[13][2] = 1.;
-      gm_z[13][3] = 1.;
+      //gm_z[13][0] = 1.;
+      //gm_z[13][1] = 1.;
+      //gm_z[13][2] = 1.;
+      //gm_z[13][3] = 1.;
 
+      g5gm_z[13][0] = 1.;
+      g5gm_z[13][1] = 1.;
+      g5gm_z[13][2] = -1.;
+      g5gm_z[13][3] = -1.;
       // G_idx = 14: (i/2) * [\gamma_2, \gamma_4]
       gm_i[14][0] = 1;
       gm_i[14][1] = 0;
       gm_i[14][2] = 3;
       gm_i[14][3] = 2;
-      gm_z[14][0] = -i;
-      gm_z[14][1] = i;
-      gm_z[14][2] = i;
-      gm_z[14][3] = -i;
+      //gm_z[14][0] = -i;
+      //gm_z[14][1] = i;
+      //gm_z[14][2] = i;
+      //gm_z[14][3] = -i;
 
-      // G_idx = 15: (i/2) * [\gamma_3, \gamma_4]
+      g5gm_z[14][0] = -i;
+      g5gm_z[14][1] = i;
+      g5gm_z[14][2] = -i;
+      g5gm_z[14][3] = i;
+      // G_idx = 15: (i/2) * [\gamma_3, \gamma_4]. this matrix was corrected
       gm_i[15][0] = 0;
       gm_i[15][1] = 1;
       gm_i[15][2] = 2;
       gm_i[15][3] = 3;
-      gm_z[15][0] = -1.;
-      gm_z[15][1] = -1.;
-      gm_z[15][2] = 1.;
-      gm_z[15][3] = 1.;
+      //gm_z[15][0] = -1.;
+      //gm_z[15][1] = 1.;
+      //gm_z[15][2] = 1.;
+      //gm_z[15][3] = -1.;
+
+      g5gm_z[15][0] = -1.;
+      g5gm_z[15][1] = 1.;
+      g5gm_z[15][2] = -1.;
+      g5gm_z[15][3] = 1.;
     };
     //FIXME convert these to device functions?
     //inline int get_gm_i(const int G_idx, const int row_idx) const {return gm_i[G_idx][row_idx];};
@@ -461,7 +540,7 @@ namespace quda
           int b1_tmp = arg.Gamma.gm_i[G_idx][s1];
           // only contributes if we're at the correct b1 from the outer loop
           if (b1_tmp == b1) {
-            propagator_product = arg.Gamma.gm_z[G_idx][b2] * innerProduct(x, y, b2, s2) * arg.Gamma.gm_z[G_idx][b1];
+            propagator_product = arg.Gamma.g5gm_z[G_idx][b2] * innerProduct(x, y, b2, s2) * arg.Gamma.g5gm_z[G_idx][b1];
             result_all_channels[G_idx].x += propagator_product.real()*phase_real-propagator_product.imag()*phase_imag;
             result_all_channels[G_idx].y += propagator_product.imag()*phase_real+propagator_product.real()*phase_imag;
 	    //if(xyz == 0) printf("Yes Comp\n");
