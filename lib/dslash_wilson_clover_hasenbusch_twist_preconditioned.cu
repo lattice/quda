@@ -78,8 +78,7 @@ namespace quda
 
     long long bytes() const
     {
-      bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
-      int clover_bytes = 72 * in.Precision() + (isFixed ? 2 * sizeof(float) : 0);
+      int clover_bytes = 72 * in.Precision() + (isFixed<typename Arg::Float>::value ? 2 * sizeof(float) : 0);
 
       long long bytes = Dslash::bytes();
       switch (arg.kernel_type) {
@@ -229,8 +228,7 @@ namespace quda
 
     long long bytes() const
     {
-      bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
-      int clover_bytes = 72 * in.Precision() + (isFixed ? 2 * sizeof(float) : 0);
+      int clover_bytes = 72 * in.Precision() + (isFixed<typename Arg::Float>::value ? 2 * sizeof(float) : 0);
 
       // if we use dynamic clover we read only A (even for A^{-1}
       // otherwise we read both A and A^{-1}

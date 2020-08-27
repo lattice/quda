@@ -4,7 +4,6 @@
 #include <worker.h>
 #include <tune_quda.h>
 
-
 #include <jitify_helper.cuh>
 #include <kernels/dslash_coarse.cuh>
 
@@ -85,9 +84,6 @@ namespace quda {
     // Experimental autotuning of the color column stride
     bool advanceAux(TuneParam &param) const
     {
-
-#ifdef DOT_PRODUCT_SPLIT
-      // we can only split the dot product on Kepler and later since we need the __shfl instruction
       if (2*param.aux.x <= max_color_col_stride && Nc % (2*param.aux.x) == 0 &&
 	  param.block.x % deviceProp.warpSize == 0) {
 	// An x-dimension block size that is not a multiple of the
@@ -103,7 +99,6 @@ namespace quda {
 	// check this grid size is valid before returning
 	if (param.grid.x < (unsigned int)deviceProp.maxGridSize[0]) return true;
       }
-#endif // DOT_PRODUCT_SPLIT
 
       // reset color column stride if too large or not divisible
       param.aux.x = 1;
@@ -243,19 +238,21 @@ namespace quda {
         case 1:
           switch (tp.aux.x) { // this is color_col_stride
           case 1:
-            coarseDslashKernel<Float,nDim,Ns,Nc,Mc,1,1,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            qudaLaunchKernel(coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 1, 1, dslash, clover, dagger, type, Arg>, tp,
+                             stream, arg);
             break;
-#ifdef DOT_PRODUCT_SPLIT
           case 2:
-            coarseDslashKernel<Float,nDim,Ns,Nc,Mc,2,1,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            qudaLaunchKernel(coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 2, 1, dslash, clover, dagger, type, Arg>, tp,
+                             stream, arg);
             break;
           case 4:
-            coarseDslashKernel<Float,nDim,Ns,Nc,Mc,4,1,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            qudaLaunchKernel(coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 4, 1, dslash, clover, dagger, type, Arg>, tp,
+                             stream, arg);
             break;
           case 8:
-            coarseDslashKernel<Float,nDim,Ns,Nc,Mc,8,1,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            qudaLaunchKernel(coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 8, 1, dslash, clover, dagger, type, Arg>, tp,
+                             stream, arg);
             break;
-#endif // DOT_PRODUCT_SPLIT
           default:
             errorQuda("Color column stride %d not valid", tp.aux.x);
           }
@@ -263,19 +260,21 @@ namespace quda {
         case 2:
           switch (tp.aux.x) { // this is color_col_stride
           case 1:
-            coarseDslashKernel<Float,nDim,Ns,Nc,Mc,1,2,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            qudaLaunchKernel(coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 1, 2, dslash, clover, dagger, type, Arg>, tp,
+                             stream, arg);
             break;
-#ifdef DOT_PRODUCT_SPLIT
           case 2:
-            coarseDslashKernel<Float,nDim,Ns,Nc,Mc,2,2,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            qudaLaunchKernel(coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 2, 2, dslash, clover, dagger, type, Arg>, tp,
+                             stream, arg);
             break;
           case 4:
-            coarseDslashKernel<Float,nDim,Ns,Nc,Mc,4,2,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            qudaLaunchKernel(coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 4, 2, dslash, clover, dagger, type, Arg>, tp,
+                             stream, arg);
             break;
           case 8:
-            coarseDslashKernel<Float,nDim,Ns,Nc,Mc,8,2,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            qudaLaunchKernel(coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 8, 2, dslash, clover, dagger, type, Arg>, tp,
+                             stream, arg);
             break;
-#endif // DOT_PRODUCT_SPLIT
           default:
             errorQuda("Color column stride %d not valid", tp.aux.x);
           }
@@ -283,19 +282,21 @@ namespace quda {
         case 4:
           switch (tp.aux.x) { // this is color_col_stride
           case 1:
-            coarseDslashKernel<Float,nDim,Ns,Nc,Mc,1,4,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            qudaLaunchKernel(coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 1, 4, dslash, clover, dagger, type, Arg>, tp,
+                             stream, arg);
             break;
-#ifdef DOT_PRODUCT_SPLIT
           case 2:
-            coarseDslashKernel<Float,nDim,Ns,Nc,Mc,2,4,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            qudaLaunchKernel(coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 2, 4, dslash, clover, dagger, type, Arg>, tp,
+                             stream, arg);
             break;
           case 4:
-            coarseDslashKernel<Float,nDim,Ns,Nc,Mc,4,4,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            qudaLaunchKernel(coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 4, 4, dslash, clover, dagger, type, Arg>, tp,
+                             stream, arg);
             break;
           case 8:
-            coarseDslashKernel<Float,nDim,Ns,Nc,Mc,8,4,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            qudaLaunchKernel(coarseDslashKernel<Float, nDim, Ns, Nc, Mc, 8, 4, dslash, clover, dagger, type, Arg>, tp,
+                             stream, arg);
             break;
-#endif // DOT_PRODUCT_SPLIT
           default:
             errorQuda("Color column stride %d not valid", tp.aux.x);
           }
@@ -516,7 +517,7 @@ namespace quda {
                                                   comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
           } else if (halo_precision == QUDA_QUARTER_PRECISION) {
 #if QUDA_PRECISION & 1
-            ApplyCoarse<float,short,char,dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+            ApplyCoarse<float,short,int8_t,dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
                                                  comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
 #else
             errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);

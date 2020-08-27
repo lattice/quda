@@ -180,10 +180,10 @@ namespace quda {
           if (b.data) { set_param<decltype(f_)::multi_1d>(Bmatrix_d, arg, 'b', b, stream); }
           if (c.data) { set_param<decltype(f_)::multi_1d>(Cmatrix_d, arg, 'c', c, stream); }
           switch (tp.aux.x) {
-          case 1: multiBlasKernel<device_real_t, M, NXZ, 1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+          case 1: qudaLaunchKernel(multiBlasKernel<device_real_t, M, NXZ, 1, decltype(arg)>, tp, stream, arg); break;
 #ifdef WARP_SPLIT
-          case 2: multiBlasKernel<device_real_t, M, NXZ, 2><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
-          case 4: multiBlasKernel<device_real_t, M, NXZ, 4><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+          case 2: qudaLaunchKernel(multiBlasKernel<device_real_t, M, NXZ, 2, decltype(arg)>, tp, stream, arg); break;
+          case 4: qudaLaunchKernel(multiBlasKernel<device_real_t, M, NXZ, 4, decltype(arg)>, tp, stream, arg); break;
 #endif
           default: errorQuda("warp-split factor %d not instantiated", tp.aux.x);
           }
@@ -294,12 +294,19 @@ namespace quda {
         param.aux = make_int4(1, 0, 0, 0); // warp-split parameter
       }
 
-      long long flops() const { return f.flops() * x[0]->Length(); }
+      long long flops() const
+      {
+        return NYW * NXZ * f.flops() * x[0]->Length();
+      }
 
       long long bytes() const
       {
-        // the factor two here assumes we are reading and writing to the high precision vector
-        return ((f.streams() - 2) * x[0]->Bytes() + 2 * y[0]->Bytes());
+        // X and Z reads are repeated (and hopefully cached) across NYW
+        // each Y and W read/write is done once
+        return NYW * NXZ * (f.read.X + f.write.X) * x[0]->Bytes() +
+          NYW * (f.read.Y + f.write.Y) * y[0]->Bytes() +
+          NYW * NXZ * (f.read.Z + f.write.Z) * z[0]->Bytes() +
+          NYW * (f.read.W + f.write.W) * w[0]->Bytes();
       }
 
       int tuningIter() const { return 3; }

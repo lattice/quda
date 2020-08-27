@@ -156,8 +156,7 @@ namespace quda
       if (deviceProp.major >= 7) { // should test whether this is always optimal on Volta
         this->setMaxDynamicSharedBytesPerBlock(f);
       }
-      void *args[] = {&arg};
-      qudaLaunchKernel((const void *)f, tp.grid, tp.block, args, tp.shared_bytes, stream);
+      qudaLaunchKernel(f, tp, stream, arg);
     }
 
     /**
@@ -588,7 +587,7 @@ namespace quda
 #endif
     } else if (U.Precision() == QUDA_QUARTER_PRECISION) {
 #if QUDA_PRECISION & 1
-      instantiate<Apply, Recon, char>(out, in, U, args...);
+      instantiate<Apply, Recon, int8_t>(out, in, U, args...);
 #else
       errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
 #endif
@@ -619,7 +618,7 @@ namespace quda
 #endif
     } else if (U.Precision() == QUDA_QUARTER_PRECISION) {
 #if QUDA_PRECISION & 1
-      instantiate<Apply, Recon, char>(out, in, U, args...);
+      instantiate<Apply, Recon, int8_t>(out, in, U, args...);
 #else
       errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
 #endif

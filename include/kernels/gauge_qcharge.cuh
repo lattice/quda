@@ -1,6 +1,6 @@
 #include <gauge_field_order.h>
 #include <index_helper.cuh>
-#include <cub_helper.cuh>
+#include <reduce_helper.h>
 
 namespace quda
 {
@@ -79,7 +79,7 @@ namespace quda
       x_cb += blockDim.x * gridDim.x;
     }
 
-    reduce2d<blockSize, 2>(arg, E);
+    arg.template reduce2d<blockSize, 2>(E);
   }
 
 } // namespace quda

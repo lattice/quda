@@ -9,19 +9,13 @@
 namespace quda
 {
 
-  template <typename Arg> class QChargeCompute : TunableLocalParity
+  template <typename Arg> class QChargeCompute : TunableLocalParityReduction
   {
     Arg &arg;
     const GaugeField &meta;
 
-  private:
-    bool tuneSharedBytes() const { return false; }
-    bool tuneGridDim() const { return true; }
-    unsigned int minThreads() const { return arg.threads; }
-
   public:
     QChargeCompute(Arg &arg, const GaugeField &meta) :
-      TunableLocalParity(),
       arg(arg),
       meta(meta)
     {
@@ -33,7 +27,6 @@ namespace quda
     void apply(const qudaStream_t &stream)
     {
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
-	for (int i=0; i<4; i++) ((double*)arg.result_h)[i] = 0.0;
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 #ifdef JITIFY
         using namespace jitify::reflection;
@@ -71,27 +64,23 @@ namespace quda
     {
       if (!Fmunu.isNative()) errorQuda("Topological charge computation only supported on native ordered fields");
 
+      std::vector<double> result(3);
       if (density) {
         QChargeArg<Float, nColor, recon, true> arg(Fmunu, (Float*)qdensity);
         QChargeCompute<decltype(arg)> qChargeCompute(arg, Fmunu);
         qChargeCompute.apply(0);
-        qudaDeviceSynchronize();
-
-        comm_allreduce_array((double *)arg.result_h, 3);
-        for (int i=0; i<2; i++) energy[i+1] = ((double*)arg.result_h)[i] / (2.0*arg.threads*comm_size());
-        qcharge = ((double*)arg.result_h)[2];
+        arg.complete(result);
       } else {
         QChargeArg<Float, nColor, recon, false> arg(Fmunu, (Float*)qdensity);
         QChargeCompute<decltype(arg)> qChargeCompute(arg, Fmunu);
         qChargeCompute.apply(0);
-        qudaDeviceSynchronize();
-
-        comm_allreduce_array((double *)arg.result_h, 3);
-        for (int i=0; i<2; i++) energy[i+1] = ((double*)arg.result_h)[i] / (2.0*arg.threads*comm_size());
-        qcharge = ((double*)arg.result_h)[2];
+        arg.complete(result);
       }
 
+      comm_allreduce_array(result.data(), 3);
+      for (int i=0; i<2; i++) energy[i+1] = result[i] / (Fmunu.Volume() * comm_size());
       energy[0] = energy[1] + energy[2];
+      qcharge = result[2];
     }
   };
 

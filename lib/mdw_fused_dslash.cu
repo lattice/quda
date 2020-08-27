@@ -30,7 +30,7 @@ namespace quda
 #endif
     }
 
-#if (__CUDACC_VER_MAJOR__ >= 9 && __COMPUTE_CAPABILITY__ >= 700)
+#if (CUDA_VERSION >= 9000 && __COMPUTE_CAPABILITY__ >= 700)
 
     /**
       @brief Parameter structure for applying the Dslash
@@ -636,8 +636,7 @@ namespace quda
           cache.insert(f);
           setMaxDynamicSharedBytesPerBlock(f);
         }
-        void *args[] = {&arg};
-        qudaLaunchKernel((const void *)f, tp.grid, tp.block, args, tp.shared_bytes, stream);
+        qudaLaunchKernel(f, tp, stream, arg);
       }
 
       // The following apply<...> functions are used to turn the tune parameters into template arguments.
@@ -746,17 +745,13 @@ namespace quda
         }
       }
     };
-#endif // #if (__CUDACC_VER_MAJOR__ >= 9 && __COMPUTE_CAPABILITY__ >= 700)
+#endif // #if (CUDA_VERSION >= 9000 && __COMPUTE_CAPABILITY__ >= 700)
 
     void apply_fused_dslash(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, ColorSpinorField &y,
                             const ColorSpinorField &x, double m_f, double m_5, const Complex *b_5, const Complex *c_5,
                             bool dagger, int parity, int shift[4], int halo_shift[4], MdwfFusedDslashType type)
     {
-#if defined(GPU_DOMAIN_WALL_DIRAC) && (__CUDACC_VER_MAJOR__ >= 9 && __COMPUTE_CAPABILITY__ >= 700)
-#ifdef FLOAT8
-      if (checkOrder(out, in, y, x) != QUDA_FLOAT8_FIELD_ORDER)
-        errorQuda("FLOAT8 enabled but fields are not FLOAT8 ordered");
-#endif
+#if defined(GPU_DOMAIN_WALL_DIRAC) && (CUDA_VERSION >= 9000 && __COMPUTE_CAPABILITY__ >= 700)
       checkLocation(out, in); // check all locations match
       instantiatePreconditioner<FusedApply>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift,
                                             type);

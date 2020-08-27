@@ -12,61 +12,56 @@ namespace quda {
   namespace blas {
 
     qudaStream_t* getStream();
-    cudaEvent_t* getReduceEvent();
-    bool getFastReduce();
-    void initFastReduce(int words);
-    void completeFastReduce(int32_t words);
 
-    template <typename real, int M, int NXZ, typename Arg, typename T>
+    template <int block_size, typename real, int len, int NXZ, typename Arg>
+    typename std::enable_if<block_size!=32, qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+    {
+      if (tp.block.x == block_size)
+        return qudaLaunchKernel(multiReduceKernel<block_size, real, len, NXZ, Arg>, tp, stream, arg);
+      else
+        return launch<block_size - 32, real, len, NXZ>(arg, tp, stream);
+    }
+
+    template <int block_size, typename real, int len, int NXZ, typename Arg>
+    typename std::enable_if<block_size==32, qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+    {
+      return qudaLaunchKernel(multiReduceKernel<block_size, real, len, NXZ, Arg>, tp, stream, arg);
+    }
+
+#ifdef QUDA_FAST_COMPILE_REDUCE
+    constexpr unsigned int max_block_size() { return 32; }
+#else
+    constexpr unsigned int max_block_size() { return 128; }
+#endif
+
+    template <typename real, int len, int NXZ, typename Arg, typename T>
     void multiReduceLaunch(T result[], Arg &arg, const TuneParam &tp, const qudaStream_t &stream, Tunable &tunable)
     {
       using reduce_t = typename Arg::Reducer::reduce_t;
       if (tp.grid.x > (unsigned int)deviceProp.maxGridSize[0])
         errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, deviceProp.maxGridSize[0]);
 
-      const int32_t words = tp.grid.z * NXZ * arg.NYW * sizeof(reduce_t) / sizeof(int32_t);
-      if (getFastReduce() && !commAsyncReduction()) initFastReduce(words);
-
-#ifdef WARP_MULTI_REDUCE
-#error "Untested - should be reverified"
-      // multiReduceKernel<FloatN,M,NXZ><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-#else
 #ifdef JITIFY
       using namespace jitify::reflection;
       tunable.jitifyError() = program->kernel("quda::blas::multiReduceKernel")
-                                  .instantiate((int)tp.block.x, Type<real>(), M, NXZ, Type<Arg>())
+                                  .instantiate((int)tp.block.x, Type<real>(), len, NXZ, Type<Arg>())
                                   .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                                   .launch(arg);
+      arg.launch_error = tunable.jitifyError() == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
 #else
-      LAUNCH_KERNEL_REDUCE(multiReduceKernel, tunable, tp, stream, arg, real, M, NXZ, Arg);
-#endif
+      arg.launch_error = launch<max_block_size(), real, len, NXZ>(arg, tp, stream);
 #endif
 
-      if (!commAsyncReduction()) {
-#if (defined(_MSC_VER) && defined(_WIN64) || defined(__LP64__))
-        if (deviceProp.canMapHostMemory) {
-          if (getFastReduce()) {
-            completeFastReduce(words);
-          } else {
-            qudaEventRecord(*getReduceEvent(), stream);
-            while (cudaSuccess != qudaEventQuery(*getReduceEvent())) {}
-          }
-        } else
-#endif
-        {
-          qudaMemcpy(getHostReduceBuffer(), getMappedHostReduceBuffer(), tp.grid.z * sizeof(reduce_t) * NXZ * arg.NYW,
-                     cudaMemcpyDeviceToHost);
-        }
-      }
+      std::vector<T> result_(NXZ * arg.NYW);
+      if (!commAsyncReduction()) arg.complete(result_, stream);
 
       // need to transpose for same order with vector thread reduction
-      auto buffer = (reduce_t *)getHostReduceBuffer();
       for (int i = 0; i < NXZ; i++) {
         for (int j = 0; j < arg.NYW; j++) {
-          result[i * arg.NYW + j] = static_cast<T>(buffer[j * NXZ + i]);
-          if (tp.grid.z == 2) result[i * arg.NYW + j] += static_cast<T>(buffer[NXZ * arg.NYW + j * NXZ + i]);
+          result[i * arg.NYW + j] = result_[j * NXZ + i];
         }
       }
+
     }
 
     template <template <typename ...> class Reducer, typename store_t, typename y_store_t, int nSpin, typename T>
@@ -96,9 +91,7 @@ namespace quda {
         return false;
       }
 
-      // we only launch thread blocks up to size 512 since the autotuner
-      // tuner favours smaller blocks and this helps with compile time
-      unsigned int maxBlockSize(const TuneParam &param) const { return 128; } // deviceProp.maxThreadsPerBlock / 2; }
+      unsigned int maxBlockSize(const TuneParam &param) const { return max_block_size(); }
 
     public:
       MultiReduce(const T &a, const T &b, const T &c, const ColorSpinorField &x_meta, const ColorSpinorField &y_meta,
@@ -134,7 +127,7 @@ namespace quda {
           strcat(aux, ",");
           strcat(aux, y[0]->AuxString());
         }
-        if (getFastReduce()) strcat(aux, ",fast_reduce");
+        strcat(aux, nParity == 2 ? ",nParity=2" : ",nParity=1");
 
         // since block dot product and block norm use the same functors, we need to distinguish them
         bool is_norm = false;
@@ -210,7 +203,7 @@ namespace quda {
           constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
           const int length = x[0]->Length() / (nParity * M);
 
-          MultiReduceArg<NXZ, device_store_t, N, device_y_store_t, Ny, decltype(r_)> arg(x, y, z, w, r_, NYW, length);
+          MultiReduceArg<NXZ, device_store_t, N, device_y_store_t, Ny, decltype(r_)> arg(x, y, z, w, r_, NYW, length, nParity, tp);
 
 #ifdef JITIFY
           // need to get constants pointer from jitify instance
@@ -256,29 +249,6 @@ namespace quda {
         else errorQuda("x.size %lu greater than MAX_MULTI_BLAS_N %d", x.size(), MAX_MULTI_BLAS_N);
       }
 
-      // Should these be NYW?
-#ifdef WARP_MULTI_REDUCE
-      /**
-         @brief This is a specialized variant of the reducer that only
-         assigns an individial warp within a thread block to a given row
-         of the reduction.  It's typically slower than CTA-wide reductions
-         and spreading the y dimension across blocks rather then within
-         the blocks so left disabled.
-      */
-      bool advanceBlockDim(TuneParam &param) const
-      {
-        if (param.block.y < NYW) {
-          param.block.y++;
-          param.grid.y = (NYW + param.block.y - 1) / param.block.y;
-          return true;
-        } else {
-          param.block.y = 1;
-          param.grid.y = NYW;
-          return false;
-        }
-      }
-#endif
-
       bool advanceGridDim(TuneParam &param) const
       {
         bool rtn = Tunable::advanceGridDim(param);
@@ -291,7 +261,6 @@ namespace quda {
         Tunable::initTuneParam(param);
         param.block.y = 1;
         param.grid.y = NYW;
-        param.grid.z = nParity;
       }
 
       void defaultTuneParam(TuneParam &param) const
@@ -299,7 +268,6 @@ namespace quda {
         Tunable::defaultTuneParam(param);
         param.block.y = 1;
         param.grid.y = NYW;
-        param.grid.z = nParity;
       }
 
       void preTune()
@@ -329,8 +297,12 @@ namespace quda {
 
       long long bytes() const
       {
-        // this will be wrong when mixed precision is added
-        return NYW * NXZ * r.streams() * x[0]->Bytes();
+        // X and Z reads are repeated (and hopefully cached) across NYW
+        // each Y and W read/write is done once
+        return NYW * NXZ * (r.read.X + r.write.X) * x[0]->Bytes() +
+          NYW * (r.read.Y + r.write.Y) * y[0]->Bytes() +
+          NYW * NXZ * (r.read.Z + r.write.Z) * z[0]->Bytes() +
+          NYW * (r.read.W + r.write.W) * w[0]->Bytes();
       }
 
       int tuningIter() const { return 3; }

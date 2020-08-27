@@ -1,7 +1,7 @@
 #include <clover_field_order.h>
 #include <quda_matrix.h>
 #include <linalg.cuh>
-#include <cub_helper.cuh>
+#include <reduce_helper.h>
 
 namespace quda
 {
@@ -93,7 +93,7 @@ namespace quda
       trlogA = parity ? make_double2(0.0, trlogA.y + trlogA_parity) : make_double2(trlogA.x + trlogA_parity, 0.0);
       idx += blockDim.x * gridDim.x;
     }
-    if (compute_tr_log) reduce2d<blockSize, 2>(arg, trlogA);
+    if (compute_tr_log) arg.template reduce2d<blockSize, 2>(trlogA);
   }
 
 } // namespace quda

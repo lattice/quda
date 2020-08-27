@@ -10,34 +10,13 @@
 namespace quda
 {
 
-  template <bool X_ = false, bool Y_ = false, bool Z_ = false, bool W_ = false, bool V_ = false> struct write {
+  template <bool X_ = false, bool Y_ = false, bool Z_ = false, bool W_ = false, bool V_ = false> struct memory_access {
     static constexpr bool X = X_;
     static constexpr bool Y = Y_;
     static constexpr bool Z = Z_;
     static constexpr bool W = W_;
     static constexpr bool V = V_;
   };
-
-#ifdef QUAD_SUM
-  using device_reduce_t = doubledouble;
-  template <> struct scalar<doubledouble> {
-    typedef doubledouble type;
-  };
-  template <> struct scalar<doubledouble2> {
-    typedef doubledouble type;
-  };
-  template <> struct scalar<doubledouble3> {
-    typedef doubledouble type;
-  };
-  template <> struct scalar<doubledouble4> {
-    typedef doubledouble type;
-  };
-  template <> struct vector<doubledouble, 2> {
-    typedef doubledouble2 type;
-  };
-#else
-  using device_reduce_t = double;
-#endif
 
   __host__ __device__ inline double set(double &x) { return x; }
   __host__ __device__ inline double2 set(double2 &x) { return x; }
@@ -91,8 +70,8 @@ namespace quda
   template <> struct VectorType<short, 24> {
     using type = vector_type<short, 24>;
   };
-  template <> struct VectorType<char, 24> {
-    using type = vector_type<char, 24>;
+  template <> struct VectorType<int8_t, 24> {
+    using type = vector_type<int8_t, 24>;
   };
   template <> struct VectorType<double, 6> {
     using type = vector_type<double, 6>;
@@ -103,8 +82,8 @@ namespace quda
   template <> struct VectorType<short, 6> {
     using type = vector_type<short, 6>;
   };
-  template <> struct VectorType<char, 6> {
-    using type = vector_type<char, 6>;
+  template <> struct VectorType<int8_t, 6> {
+    using type = vector_type<int8_t, 6>;
   };
 
   namespace blas
@@ -309,11 +288,11 @@ namespace quda
     template <> constexpr int n_vector<short, true, 1, true>() { return 2; }
 
 #ifdef FLOAT8
-    template <> constexpr int n_vector<char, true, 4, true>() { return 8; }
+    template <> constexpr int n_vector<int8_t, true, 4, true>() { return 8; }
 #else
-    template <> constexpr int n_vector<char, true, 4, true>() { return 4; }
+    template <> constexpr int n_vector<int8_t, true, 4, true>() { return 4; }
 #endif
-    template <> constexpr int n_vector<char, true, 1, true>() { return 2; }
+    template <> constexpr int n_vector<int8_t, true, 1, true>() { return 2; }
 
     // Just use float-2/float-4 ordering on CPU when not site unrolling
     template <> constexpr int n_vector<double, false, 4, false>() { return 2; }
@@ -328,8 +307,8 @@ namespace quda
     template <> constexpr int n_vector<float, false, 1, true>() { return 6; }
     template <> constexpr int n_vector<short, false, 4, true>() { return 24; }
     template <> constexpr int n_vector<short, false, 1, true>() { return 6; }
-    template <> constexpr int n_vector<char, false, 4, true>() { return 24; }
-    template <> constexpr int n_vector<char, false, 1, true>() { return 6; }
+    template <> constexpr int n_vector<int8_t, false, 4, true>() { return 24; }
+    template <> constexpr int n_vector<int8_t, false, 1, true>() { return 6; }
 
     template <template <typename...> class Functor,
               template <template <typename...> class, typename store_t, typename y_store_t, int, typename> class Blas,
@@ -400,7 +379,7 @@ namespace quda
 #endif
       } else if (y.Precision() == QUDA_QUARTER_PRECISION) {
 #if QUDA_PRECISION & 1
-        instantiate<Functor, Blas, T, x_store_t, typename PromoteTypeId<x_store_t, char>::type>(a, b, c, x, y,
+        instantiate<Functor, Blas, T, x_store_t, typename PromoteTypeId<x_store_t, int8_t>::type>(a, b, c, x, y,
                                                                                                 args...);
 #else
         errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
@@ -438,7 +417,7 @@ namespace quda
 #endif
       } else if (x.Precision() == QUDA_QUARTER_PRECISION) {
 #if QUDA_PRECISION & 1
-        instantiate<Functor, Blas, mixed, T, char>(a, b, c, x, args...);
+        instantiate<Functor, Blas, mixed, T, int8_t>(a, b, c, x, args...);
 #else
         errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
 #endif
@@ -466,7 +445,7 @@ namespace quda
 #elif QUDA_PRECISION & 2
       using type = short;
 #elif QUDA_PRECISION & 1
-      using type = char;
+      using type = int8_t;
 #endif
     };
 
@@ -485,7 +464,7 @@ namespace quda
       using type = double;
 #endif
     };
-    template <> struct host_type_mapper<char> {
+    template <> struct host_type_mapper<int8_t> {
 #if QUDA_PRECISION & 4
       using type = float;
 #else

@@ -12,6 +12,11 @@
 
 namespace quda {
 
+  namespace reducer {
+    void init();
+    void destroy();
+  }
+  
   namespace blas {
 
     unsigned long long flops;
@@ -112,7 +117,7 @@ namespace quda {
             .configure(tp.grid, tp.block, tp.shared_bytes, stream)
             .launch(arg);
 #else
-          blasKernel<device_real_t, M><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          qudaLaunchKernel(blasKernel<device_real_t, M, decltype(arg)>, tp, stream, arg);
 #endif
         } else {
           if (checkOrder(x, y, z, w, v) != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER)
@@ -173,9 +178,8 @@ namespace quda {
       long long flops() const { return f.flops() * x.Length(); }
       long long bytes() const
       {
-        // the factor two here assumes we are reading and writing to the high precision vector
-        // this will evaluate correctly for non-mixed kernels since the +2/-2 will cancel out
-        return (f.streams() - 2) * x.Bytes() + 2 * y.Bytes();
+        return (f.read.X + f.write.X) * x.Bytes() + (f.read.Y + f.write.Y) * y.Bytes() +
+          (f.read.Z + f.write.Z) * z.Bytes() + (f.read.W + f.write.W) * w.Bytes() + (f.read.V + f.write.V) * v.Bytes();
       }
       int tuningIter() const { return 3; }
     };
@@ -188,18 +192,15 @@ namespace quda {
       }
     }
 
-    void initReduce();
-    void endReduce();
-
     void init()
     {
       blasStream = &streams[Nstream-1];
-      initReduce();
+      reducer::init();
     }
 
-    void end(void)
+    void destroy(void)
     {
-      endReduce();
+      reducer::destroy();
     }
 
     qudaStream_t* getStream() { return blasStream; }

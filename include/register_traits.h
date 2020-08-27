@@ -57,10 +57,10 @@ namespace quda {
   template <> struct PromoteTypeId<short, double> {
     typedef double type;
   };
-  template <> struct PromoteTypeId<double, char> {
+  template <> struct PromoteTypeId<double, int8_t> {
     typedef double type;
   };
-  template <> struct PromoteTypeId<char, double> {
+  template <> struct PromoteTypeId<int8_t, double> {
     typedef double type;
   };
   template <> struct PromoteTypeId<float, short> {
@@ -69,16 +69,16 @@ namespace quda {
   template <> struct PromoteTypeId<short, float> {
     typedef float type;
   };
-  template <> struct PromoteTypeId<float, char> {
+  template <> struct PromoteTypeId<float, int8_t> {
     typedef float type;
   };
-  template <> struct PromoteTypeId<char, float> {
+  template <> struct PromoteTypeId<int8_t, float> {
     typedef float type;
   };
-  template <> struct PromoteTypeId<short, char> {
+  template <> struct PromoteTypeId<short, int8_t> {
     typedef short type;
   };
-  template <> struct PromoteTypeId<char, short> {
+  template <> struct PromoteTypeId<int8_t, short> {
     typedef short type;
   };
 
@@ -95,7 +95,7 @@ namespace quda {
   template<> struct mapper<double> { typedef double type; };
   template<> struct mapper<float> { typedef float type; };
   template<> struct mapper<short> { typedef float type; };
-  template<> struct mapper<char> { typedef float type; };
+  template<> struct mapper<int8_t> { typedef float type; };
 
   template<> struct mapper<double2> { typedef double2 type; };
   template<> struct mapper<float2> { typedef float2 type; };
@@ -192,7 +192,7 @@ namespace quda {
     static const int value = 3;
   };
   template<> struct vec_length<char2> { static const int value = 2; };
-  template<> struct vec_length<char> { static const int value = 1; };
+  template<> struct vec_length<int8_t> { static const int value = 1; };
 
   template <> struct vec_length<Complex> {
     static const int value = 2;
@@ -206,7 +206,7 @@ namespace quda {
   template <> struct vec_length<complex<short>> {
     static const int value = 2;
   };
-  template <> struct vec_length<complex<char>> {
+  template <> struct vec_length<complex<int8_t>> {
     static const int value = 2;
   };
 
@@ -280,19 +280,19 @@ namespace quda {
     typedef short type;
   };
   template <> struct scalar<char8> {
-    typedef char type;
+    typedef int8_t type;
   };
   template <> struct scalar<char4> {
-    typedef char type;
+    typedef int8_t type;
   };
   template <> struct scalar<char3> {
-    typedef char type;
+    typedef int8_t type;
   };
   template <> struct scalar<char2> {
-    typedef char type;
+    typedef int8_t type;
   };
-  template <> struct scalar<char> {
-    typedef char type;
+  template <> struct scalar<int8_t> {
+    typedef int8_t type;
   };
 
   template <> struct scalar<complex<double>> {
@@ -301,6 +301,24 @@ namespace quda {
   template <> struct scalar<complex<float>> {
     typedef float type;
   };
+
+#ifdef QUAD_SUM
+  template <> struct scalar<doubledouble> {
+    typedef doubledouble type;
+  };
+  template <> struct scalar<doubledouble2> {
+    typedef doubledouble type;
+  };
+  template <> struct scalar<doubledouble3> {
+    typedef doubledouble type;
+  };
+  template <> struct scalar<doubledouble4> {
+    typedef doubledouble type;
+  };
+  template <> struct vector<doubledouble, 2> {
+    typedef doubledouble2 type;
+  };
+#endif
 
   /* Traits used to determine if a variable is half precision or not */
   template< typename T > struct isHalf{ static const bool value = false; };
@@ -313,7 +331,7 @@ namespace quda {
 
   /* Traits used to determine if a variable is quarter precision or not */
   template< typename T > struct isQuarter{ static const bool value = false; };
-  template<> struct isQuarter<char>{ static const bool value = true; };
+  template<> struct isQuarter<int8_t>{ static const bool value = true; };
   template<> struct isQuarter<char2>{ static const bool value = true; };
   template<> struct isQuarter<char4>{ static const bool value = true; };
   template <> struct isQuarter<char8> {
@@ -328,7 +346,7 @@ namespace quda {
   template <> struct isFixed<short8> {
     static const bool value = true;
   };
-  template<> struct isFixed<char>{ static const bool value = true; };
+  template<> struct isFixed<int8_t>{ static const bool value = true; };
   template<> struct isFixed<char2>{ static const bool value = true; };
   template<> struct isFixed<char4>{ static const bool value = true; };
   template <> struct isFixed<char8> {
@@ -449,13 +467,13 @@ namespace quda {
   };
 
   // quarter precision
-  template <> struct VectorType<char, 1>{typedef char type; };
-  template <> struct VectorType<char, 2>{typedef char2 type; };
-  template <> struct VectorType<char, 3> {
+  template <> struct VectorType<int8_t, 1>{typedef int8_t type; };
+  template <> struct VectorType<int8_t, 2>{typedef char2 type; };
+  template <> struct VectorType<int8_t, 3> {
     typedef char3 type;
   };
-  template <> struct VectorType<char, 4>{typedef char4 type; };
-  template <> struct VectorType<char, 8> {
+  template <> struct VectorType<int8_t, 4>{typedef char4 type; };
+  template <> struct VectorType<int8_t, 8> {
     typedef char8 type;
   };
 
@@ -477,15 +495,15 @@ namespace quda {
   template <> struct TexVectorType<short, 4>{typedef short4 type; };
 
   // quarter precision
-  template <> struct TexVectorType<char, 1>{typedef char type; };
-  template <> struct TexVectorType<char, 2>{typedef char2 type; };
-  template <> struct TexVectorType<char, 4>{typedef char4 type; };
+  template <> struct TexVectorType<int8_t, 1>{typedef int8_t type; };
+  template <> struct TexVectorType<int8_t, 2>{typedef char2 type; };
+  template <> struct TexVectorType<int8_t, 4>{typedef char4 type; };
 
   template <typename VectorType>
     __device__ __host__ inline VectorType vector_load(const void *ptr, int idx)
   {
 #if (__CUDA_ARCH__ >= 320 && __CUDA_ARCH__ < 520)
-    return __ldg(reinterpret_cast< VectorType* >(ptr) + idx);
+    return __ldg(reinterpret_cast< const VectorType* >(ptr) + idx);
 #else
     return reinterpret_cast< const VectorType * >(ptr)[idx];
 #endif

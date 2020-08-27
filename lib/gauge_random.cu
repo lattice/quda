@@ -5,7 +5,6 @@
 #include <gauge_field_order.h>
 #include <launch_kernel.cuh>
 #include <atomic.cuh>
-#include <cub_helper.cuh>
 #include <index_helper.cuh>
 #include <random_quda.h>
 #include <instantiate.h>
@@ -125,7 +124,7 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      computeGenGauss<<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
+      qudaLaunchKernel(computeGenGauss<Arg>, tp, stream, arg);
     }
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
