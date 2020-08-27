@@ -6016,8 +6016,10 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
   auto cs_param = (ColorSpinorParam *)cs_param_;
   const size_t nSpin = cs_param->nSpin;
   const size_t nColor = cs_param->nColor;
-  const int spinor_dim = nSpin * nColor;
+  //const int spinor_dim = nSpin * nColor; //not used
   cs_param->create = QUDA_REFERENCE_FIELD_CREATE;
+
+  //FIXME can we merge the two propagators if they are the same to save mem?
   Propagator *h_propagator_flavor1 = new Propagator(*cs_param, prop_array_flavor_1);
   Propagator *h_propagator_flavor2 = new Propagator(*cs_param, prop_array_flavor_2);
   

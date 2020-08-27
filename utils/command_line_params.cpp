@@ -70,6 +70,9 @@ bool low_mode_check = false;
 bool oblique_proj_check = false;
 double mass = 0.1;
 double kappa = -1.0;
+double kappa_light = -1.0;
+double kappa_strange = -1.0;
+bool open_flavor = false;
 double mu = 0.1;
 double epsilon = 0.01;
 double m5 = -1.5;
@@ -447,6 +450,8 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--inv-deflate", inv_deflate, "Deflate the inverter using the eigensolver");
   quda_app->add_option("--inv-multigrid", inv_multigrid, "Precondition the inverter using multigrid");
   quda_app->add_option("--kappa", kappa, "Kappa of Dirac operator (default 0.12195122... [equiv to mass])");
+  quda_app->add_option("--kappa-light", kappa_light, "Kappa of Dirac operator of light quark ud(default 0.12195122... [equiv to mass])");
+  quda_app->add_option("--kappa-strange", kappa_strange, "Kappa of Dirac operator of strange quark s(default 0.12195122... [equiv to mass])");
   quda_app->add_option(
     "--laplace3D", laplace3D,
     "Restrict laplace operator to omit the t dimension (n=3), or include all dims (n=4) (default 4)");
@@ -456,6 +461,9 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
 
   quda_app->add_option("--mass-normalization", normalization, "Mass normalization (kappa (default) / mass / asym-mass)")
     ->transform(CLI::QUDACheckedTransformer(mass_normalization_map));
+
+  quda_app->add_option("--open-flavor", open_flavor,
+                       "Compute the open flavor correlators (default false)");
 
   quda_app
     ->add_option("--matpc", matpc_type, "Matrix preconditioning type (even-even, odd-odd, even-even-asym, odd-odd-asym)")
@@ -482,7 +490,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
 
   quda_app->add_option("--pipeline", pipeline,
                        "The pipeline length for fused operations in GCR, BiCGstab-l (default 0, no pipelining)");
-
+  quda_app->add_option("--momentum", momentum, "Set momentum for correlators (px py pz pt) (default(0,0,0,0))")->expected(4);
   // precision options
 
   CLI::QUDACheckedTransformer prec_transform(precision_map);
@@ -983,7 +991,6 @@ void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   quda_app->add_psoption(opgroup, "--prop-source-position", prop_source_position, CLI::Validator(),
                          "Set the position of the nth point source <Nth source> (X Y Z T) (default(0,0,0,0))");
-  quda_app->add_option("--momentum", momentum, "Set momentum for correlators (px py pz pt) (default(0,0,0,0))")->expected(4);;
 
   CLI::QUDACheckedTransformer prec_transform(precision_map);
   opgroup->add_option("--prop-save-prec", prop_save_prec, "Precision with which to save propagators (default single)")

@@ -20,7 +20,7 @@ namespace quda
     int gm_i[16][4] {};        // stores gamma matrix column index for non-zero complex value. this is shared by g5gm, gmg5.
     //complex<real> gm_z[16][4]; // stores gamma matrix non-zero complex value for the corresponding gm_i. not used actually
     complex<real> g5gm_z[16][4]; // stores gamma matrix non-zero complex value for the corresponding g5gm_i
-    //use -tr[Gamma*Prop*Gamma*g5*conj(Prop)*g5] = -tr[g5*Gamma*Prop*g5*Gamma*(-1)^{?}*conj(Prop)].
+    //use tr[Gamma*Prop*Gamma*g5*conj(Prop)*g5] = tr[g5*Gamma*Prop*g5*Gamma*(-1)^{?}*conj(Prop)].
     //the possible minus sign will be taken care in the main function
     //! Constructor
     DRGammaMatrix()
