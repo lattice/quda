@@ -24,9 +24,10 @@ namespace quda {
     static constexpr int blockSizeKD = 16; /** Elements per KD block */
     static constexpr int paddedSpinorSizeKD = blockSizeKD; // padding is currently broken + 1; /** Padded size */
 
-    static constexpr int xinvTileSize = 16; /** Length of a tile for KD */
-    static constexpr int xinvPaddedTileSize = xinvTileSize + 1; /** Padding to avoid bank conflicts */
-    static constexpr int numTiles = (coarseDof + xinvTileSize - 1) / xinvTileSize; /** Number of tiles, should always be three. */
+    static constexpr int xinvRowTileSize = 16; /** Length of a tile for KD */
+    static constexpr int xinvColTileSize = 16; /** Length of a tile for KD */
+    static constexpr int xinvPaddedColTileSize = xinvColTileSize + 1; /** Padding to avoid bank conflicts */
+    static constexpr int numTiles = (coarseDof + xinvColTileSize - 1) / xinvColTileSize; /** Number of tiles, should always be three. */
 
     fineColorSpinor out;      /** Output staggered spinor field */
     const fineColorSpinor in; /** Input staggered spinor field */
@@ -139,7 +140,7 @@ namespace quda {
     constexpr int buffer_size = Arg::fineColor * 16 * Arg::paddedSpinorSizeKD; //256 * ((Arg::fineColor * 16 * Arg::paddedSpinorSizeKD * sizeof(complex)) / 256 + 1);
 
     // size of tile: 
-    constexpr int fullTileSize = 16 * Arg::xinvTileSize * Arg::xinvPaddedTileSize;
+    constexpr int fullTileSize = 16 * Arg::xinvRowTileSize * Arg::xinvPaddedColTileSize;
 
     // Which unit of spinor work am I within this block?
     const int unit_of_work = threadIdx.x / 256; // (threadIdx.x + threadIdx.y * blockDim.x) / 256;
@@ -147,7 +148,7 @@ namespace quda {
     complex* out_buffer = cs_buffer + (2 * unit_of_work + 1) * buffer_size;
 
     // Which unit of Xinv tile am I?
-    complex* xinv_buffer = cs_buffer + 2 * (blockDim.x / 256) * buffer_size + unit_of_work * fullTileSize + mid_idx * Arg::xinvTileSize * Arg::xinvPaddedTileSize;
+    complex* xinv_buffer = cs_buffer + 2 * (blockDim.x / 256) * buffer_size + unit_of_work * fullTileSize + mid_idx * Arg::xinvRowTileSize * Arg::xinvPaddedColTileSize;
     
     ////////////////////////////////////////////////////
     // Hey, real work! What ColorVector am I loading? //
@@ -200,17 +201,17 @@ namespace quda {
       for (int tile_col = 0; tile_col < Arg::numTiles; tile_col++) {
         // load Xinv
         #pragma unroll
-        for (int row = 0; row < Arg::xinvTileSize; row++) {
-          xinv_buffer[row * Arg::xinvPaddedTileSize + fast_idx] = arg.xInv(0, parity_coarse_xinv, x_coarse_xinv_cb, 0, 0, Arg::xinvTileSize * tile_row + row, Arg::xinvTileSize * tile_col + fast_idx);
+        for (int row = 0; row < Arg::xinvColTileSize; row++) {
+          xinv_buffer[row * Arg::xinvPaddedColTileSize + fast_idx] = arg.xInv(0, parity_coarse_xinv, x_coarse_xinv_cb, 0, 0, Arg::xinvRowTileSize * tile_row + row, Arg::xinvColTileSize * tile_col + fast_idx);
         }
 
         __syncwarp();
 
         // do the tile multiplication
         #pragma unroll
-        for (int row = 0; row < Arg::xinvTileSize; row++) {
-          const complex xinv_elem = xinv_buffer[row * Arg::xinvPaddedTileSize + fast_idx];
-          const complex cs_component = in_buffer[Arg::coarseDof * mid_idx + Arg::xinvTileSize * tile_col + fast_idx];
+        for (int row = 0; row < Arg::xinvRowTileSize; row++) {
+          const complex xinv_elem = xinv_buffer[row * Arg::xinvPaddedColTileSize + fast_idx];
+          const complex cs_component = in_buffer[Arg::coarseDof * mid_idx + Arg::xinvColTileSize * tile_col + fast_idx];
           const complex prod = cmul(xinv_elem, cs_component);
 
           const real re_sum = WarpReduce16(temp_storage_16).Sum(prod.real());
@@ -220,8 +221,8 @@ namespace quda {
 
           if (fast_idx == 0)
           {
-            out_buffer[Arg::paddedSpinorSizeKD * Arg::fineColor * mid_idx + Arg::xinvTileSize * tile_row + row].x += re_sum; 
-            out_buffer[Arg::paddedSpinorSizeKD * Arg::fineColor * mid_idx + Arg::xinvTileSize * tile_row + row].y += im_sum; 
+            out_buffer[Arg::paddedSpinorSizeKD * Arg::fineColor * mid_idx + Arg::xinvRowTileSize * tile_row + row].x += re_sum; 
+            out_buffer[Arg::paddedSpinorSizeKD * Arg::fineColor * mid_idx + Arg::xinvRowTileSize * tile_row + row].y += im_sum; 
           }
         }
       }

@@ -34,7 +34,7 @@ namespace quda {
       // 17 ColorVectors. (2 * 16 threads * 51 complex * 8 bytes per complex) / 256 threads
       // -> each thread needs 51 bytes
       return 2 * Arg::fineColor * 16 * Arg::paddedSpinorSizeKD * sizeof(complex<typename Arg::Float>) / 256 +
-              Arg::xinvPaddedTileSize * sizeof(complex<typename Arg::Float>);
+              Arg::xinvPaddedColTileSize * sizeof(complex<typename Arg::Float>);
     }
 
     int blockStep() const { return 256; }
