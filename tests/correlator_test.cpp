@@ -28,8 +28,7 @@ int main(int argc, char **argv)
   initComms(argc, argv, gridsize_from_cmdline);
 
   //check dslash
-  if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH
-      && dslash_type != QUDA_DOMAIN_WALL_4D_DSLASH && dslash_type != QUDA_DOMAIN_WALL_DSLASH) {
+  if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH) {
     printfQuda("dslash_type %d not supported\n", dslash_type);
     exit(0);
   }
@@ -81,11 +80,19 @@ int main(int argc, char **argv)
   }
   inv_param.eig_param = nullptr;
 
-  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
-    dw_setDims(gauge_param.X, inv_param.Ls);
-  } else {
-    setDims(gauge_param.X);
+  if (inv_multigrid) {
+    if (open_flavor) {
+      printfQuda("all the MG settings will be shared for qq, ql and qs propagator\n");
+      for (int i = 0; i < mg_levels; i++) {
+         if (strcmp(mg_param.vec_infile[i], "") != 0 || strcmp(mg_param.vec_outfile[i], "") != 0){
+          printfQuda("Save or write vec not possible! As when open flavor turned on inverter will be called "
+                     "3 times thus vec will be over written\n");
+          exit(0);
+        }
+      }
+    }
   }
+  setDims(gauge_param.X);
 
   // allocate gaugefield on host
   void *gauge[4];
@@ -103,7 +110,7 @@ int main(int argc, char **argv)
   void *clover = nullptr;
   void *clover_inv = nullptr;
   // Allocate space on the host
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
     if (!compute_clover) { errorQuda("Specified clover dslash-type but did not specify compute-clover!"); }
     clover = malloc(V * clover_site_size * host_clover_data_type_size);
     clover_inv = malloc(V * clover_site_size * host_spinor_data_type_size);
@@ -233,11 +240,31 @@ int main(int argc, char **argv)
   if(open_flavor){
     //first we calculate heavy-light correlators
     kappa=kappa_light;
-    setInvertParam(inv_param);
-    if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-      constructHostCloverField(clover, clover_inv, inv_param);
-      loadCloverQuda(clover, clover_inv, &inv_param);
+    if (inv_multigrid) {
+      setMultigridInvertParam(inv_param);
+      mg_param.invert_param = &mg_inv_param;
+      setMultigridParam(mg_param);
+    } else {
+      setInvertParam(inv_param);
     }
+    inv_param.eig_param = nullptr;
+
+    if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+      constructHostCloverField(clover, clover_inv, inv_param);
+      if (inv_multigrid) {
+        if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE) {
+          inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+        }
+      }
+      loadCloverQuda(clover, clover_inv, &inv_param);
+      if (inv_multigrid) {
+        inv_param.solve_type = solve_type;
+      }
+    }
+    if (inv_multigrid) {
+      inv_param.preconditioner = mg_preconditioner;
+    }
+
     constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
     auto *prop_array_light = (double *)malloc(spinor_dim * spinor_dim * V * 2 * bytes_per_float);
     void *prop_array_ptr_light[spinor_dim];
@@ -289,11 +316,31 @@ int main(int argc, char **argv)
 
     //then we calculate heavy-strange correlators
     kappa=kappa_strange;
-    setInvertParam(inv_param);
-    if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-      constructHostCloverField(clover, clover_inv, inv_param);
-      loadCloverQuda(clover, clover_inv, &inv_param);
+    if (inv_multigrid) {
+      setMultigridInvertParam(inv_param);
+      mg_param.invert_param = &mg_inv_param;
+      setMultigridParam(mg_param);
+    } else {
+      setInvertParam(inv_param);
     }
+    inv_param.eig_param = nullptr;
+
+    if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+      constructHostCloverField(clover, clover_inv, inv_param);
+      if (inv_multigrid) {
+        if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE) {
+          inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+        }
+      }
+      loadCloverQuda(clover, clover_inv, &inv_param);
+      if (inv_multigrid) {
+        inv_param.solve_type = solve_type;
+      }
+    }
+    if (inv_multigrid) {
+      inv_param.preconditioner = mg_preconditioner;
+    }
+
     constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
     auto *prop_array_strange = (double *)malloc(spinor_dim * spinor_dim * V * 2 * bytes_per_float);
     void *prop_array_ptr_strange[spinor_dim];
@@ -350,7 +397,7 @@ int main(int argc, char **argv)
   freeGaugeQuda();
   for (auto &dir : gauge) free(dir);
 
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
     freeCloverQuda();
     if (clover) free(clover);
     if (clover_inv) free(clover_inv);
