@@ -1165,8 +1165,17 @@ public:
   public:
     DiracStaggeredKD(const DiracParam &param);
     DiracStaggeredKD(const DiracStaggeredKD &dirac);
+
     virtual ~DiracStaggeredKD();
     DiracStaggeredKD& operator=(const DiracStaggeredKD &dirac);
+
+    /**
+     * @ brief Build a KD op from a staggered operator, reusing the same gauge field
+     * 
+     * @param dirac_staggered Base staggered operator to borrow parameters from
+     * @param xinv_override_precision Override the precision of the input gauge field for Xinv
+     */
+    DiracStaggeredKD(const DiracStaggered &dirac_staggered, const QudaPrecision xinv_override_prec = QUDA_INVALID_PRECISION);
 
     /**
      * @brief Build Xinv from the current gauge field, allocating if needed.
@@ -1313,6 +1322,7 @@ public:
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
     virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
+
   };
 
   // Even-odd preconditioned staggered
@@ -1349,6 +1359,14 @@ public:
     DiracImprovedStaggeredKD(const DiracImprovedStaggeredKD &dirac);
     virtual ~DiracImprovedStaggeredKD();
     DiracImprovedStaggeredKD& operator=(const DiracImprovedStaggeredKD &dirac);
+
+    /**
+     * @ brief Build a KD op from an improved staggered operator
+     * 
+     * @param dirac_staggered Base improved staggered operator to borrow parameters from
+     * @param xinv_override_precision Override the precision of the input gauge field for Xinv
+     */
+    DiracImprovedStaggeredKD(const DiracImprovedStaggered &dirac_staggered, const QudaPrecision xinv_override_prec = QUDA_INVALID_PRECISION);
 
     virtual void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
 

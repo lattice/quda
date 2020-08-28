@@ -910,7 +910,7 @@ namespace quda
       if (deviation > tol) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
 
       // TEMPORARY FOR VERIFY
-      if (param.level == 0)
+      /*if (param.level == 0)
       {
         printfQuda("BEGIN XINV DEBUGGING\n");
         // hack: get gauge field
@@ -961,19 +961,22 @@ namespace quda
         ColorSpinorField *tmp3 = ColorSpinorField::Create(csParam2);
         ColorSpinorField *tmp4 = ColorSpinorField::Create(csParam2);
 
-        // Well, here goes nothing
-        spinorNoise(*tmp3, *rng, QUDA_NOISE_UNIFORM);
-        blas::zero(*tmp4);
-
         printfQuda("Fine gauge precision is %d\n", fine_gauge->Precision());
         printfQuda("Fine spinor precision is %d\n", tmp3->Precision());
+
+        // Well, here goes nothing
+
+        printfQuda("**************\n");
+        printfQuda("* Non-dagger *\n");
+        printfQuda("**************\n");
+
+        spinorNoise(*tmp3, *rng, QUDA_NOISE_UNIFORM);
+        blas::zero(*tmp4);
 
         printf("Orig tmp3 %e\n", norm2(*tmp3));
         printf("Orig tmp4 %e\n", norm2(*tmp4));
 
-        printfQuda("Entering some ugh\n"); fflush(stdout);
         ApplyStaggeredKahlerDiracInverse(*tmp4, *tmp3, *Xinv, false);
-        printfQuda("Exiting some ugh\n"); fflush(stdout);
 
         printf("New tmp4 %e\n", norm2(*tmp4));
 
@@ -992,11 +995,114 @@ namespace quda
         deviation = sqrt( xmyNorm(*tmp3, *tmp4) / old_norm );
         printfQuda("Old norm %e\nNew norm %e\nDeviation %e\n", sqrt(old_norm), sqrt(new_norm), deviation); fflush(stdout);
 
+        printfQuda("**********\n");
+        printfQuda("* Dagger *\n");
+        printfQuda("**********\n");
+
+        spinorNoise(*tmp3, *rng, QUDA_NOISE_UNIFORM);
+        blas::zero(*tmp4);
+
+        printf("Orig tmp3 %e\n", norm2(*tmp3));
+        printf("Orig tmp4 %e\n", norm2(*tmp4));
+
+        ApplyStaggeredKahlerDiracInverse(*tmp4, *tmp3, *Xinv, true);
+
+        printf("New tmp4 %e\n", norm2(*tmp4));
+
+        // ... Compare with the KD op...
+        transfer->R(*r_coarse, *tmp3);
+        diracCoarseResidual->flipDagger();
+        static_cast<DiracCoarse *>(diracCoarseResidual)->CloverInv(x_coarse->Even(), r_coarse->Even(), QUDA_EVEN_PARITY);
+        static_cast<DiracCoarse *>(diracCoarseResidual)->CloverInv(x_coarse->Odd(), r_coarse->Odd(), QUDA_ODD_PARITY);
+        diracCoarseResidual->flipDagger();
+        transfer->P(*tmp3, *x_coarse);
+
+        tmp3->PrintVector(0);
+        tmp4->PrintVector(0);
+
+        // Moment of truth...
+        old_norm = norm2(*tmp3);
+        new_norm = norm2(*tmp4);
+        deviation = sqrt( xmyNorm(*tmp3, *tmp4) / old_norm );
+        printfQuda("Old norm %e\nNew norm %e\nDeviation %e\n", sqrt(old_norm), sqrt(new_norm), deviation); fflush(stdout);
+
+
+        printfQuda("********************\n");
+        printfQuda("* Applying the op! *\n");
+        printfQuda("********************\n");
+
+        DiracParam diracParamKD;
+
+        // have to do something about this
+        // diracParamKD.transfer = transfer;
+
+        // Parameters that matter for coarse construction and application, need to think about this
+        //diracParam.dirac = preconditioned_coarsen ? const_cast<Dirac*>(diracSmoother) : const_cast<Dirac*>(diracResidual);
+        diracParamKD.kappa = -1.0; // shouldn't matter, but -1 cancells automatic kappa in Y field application, which may be relevant if it propagates down
+        diracParamKD.mass = diracSmoother->Mass(); // matters
+        diracParamKD.mu = diracSmoother->Mu(); // doesn't matter
+        diracParamKD.mu_factor = 1.0; // doesn't matter
+
+        // Need to figure out if we need to force bi-directional build. If any previous level (incl this one) was
+        // preconditioned, we have to force bi-directional builds.
+        // Shouldn't matter?
+        //diracParam.need_bidirectional = QUDA_BOOLEAN_FALSE;
+        //for (int i = 0; i <= param.level; i++) {
+        //  if (param.mg_global.coarse_grid_solution_type[i] == QUDA_MATPC_SOLUTION
+        //      && param.mg_global.smoother_solve_type[i] == QUDA_DIRECT_PC_SOLVE) {
+        //    diracParam.need_bidirectional = QUDA_BOOLEAN_TRUE;
+        //  }
+        //}
+
+        diracParamKD.dagger = QUDA_DAG_NO;
+        diracParamKD.matpcType = QUDA_MATPC_EVEN_EVEN; // I guess we could hack this for left vs right block Jacobi?
+        diracParamKD.type = QUDA_STAGGEREDKD_DIRAC; // eyyy
+
+        diracParamKD.gauge = const_cast<cudaGaugeField*>(fine_gauge); // need a better way to do this. also need a way to pass in fat/long gauge.
+                                         // really the solution might be a constructor from a Dirac(Improved)Staggered(PC) itself
+                                         // or the create coarse routine?
+                                         // probably need to create a fresh gauge field too and maintain it somehow (in the MG struct?)
+
+        // Create some temp color spinors
+        ColorSpinorField *tmp1_kd = ColorSpinorField::Create(csParam2);
+        ColorSpinorField *tmp2_kd = ColorSpinorField::Create(csParam2);
+
+        diracParamKD.tmp1 = tmp1_kd;
+        diracParamKD.tmp2 = tmp2_kd;
+
+        auto diracKD = new DiracStaggeredKD(diracParamKD);
+
+        // Apply the KD operator
+        spinorNoise(*tmp3, *rng, QUDA_NOISE_UNIFORM);
+        blas::zero(*tmp4);
+        diracKD->M(*tmp4, *tmp3);
+
+        // Test w/the full operator
+        transfer->R(*r_coarse, *tmp3);
+        static_cast<DiracCoarsePC *>(diracCoarseSmoother)->DslashXpay(x_coarse->Even(), r_coarse->Odd(), QUDA_EVEN_PARITY, r_coarse->Even(), 1.0);
+        static_cast<DiracCoarsePC *>(diracCoarseSmoother)->DslashXpay(x_coarse->Odd(), r_coarse->Even(), QUDA_ODD_PARITY , r_coarse->Odd(), 1.0);
+        transfer->P(*tmp3, *x_coarse);
+
+        // More moments of truth
+        old_norm = norm2(*tmp3);
+        new_norm = norm2(*tmp4);
+        deviation = sqrt( xmyNorm(*tmp3, *tmp4) / old_norm );
+        printfQuda("Old norm %e\nNew norm %e\nDeviation %e\n", sqrt(old_norm), sqrt(new_norm), deviation); fflush(stdout);
+
+        printfQuda("*************\n");
+        printfQuda("* End tests *\n");
+        printfQuda("*************\n");
+
+        delete diracKD;
+
+        delete tmp1_kd;
+        delete tmp2_kd;
+
         delete tmp3;
         delete tmp4;
 
         delete Xinv;
-      }
+      }*/
     }
 
     // here we check that the Hermitian conjugate operator is working

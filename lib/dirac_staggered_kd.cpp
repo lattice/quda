@@ -45,7 +45,12 @@ namespace quda {
     BuildStaggeredKahlerDiracInverse(*Xinv, *gauge, mass);
   }
 
-  DiracStaggeredKD::DiracStaggeredKD(const DiracStaggeredKD &dirac) : DiracStaggered(dirac) {
+  // Add a constructor from DiracStaggered and DiracStaggeredPC specifically?
+
+  DiracStaggeredKD::DiracStaggeredKD(const DiracStaggeredKD &dirac)
+    : DiracStaggered(dirac),
+    Xinv(nullptr)
+  {
 
     // deep copy Xinv
     GaugeFieldParam gParam(dirac.Xinv);
@@ -70,6 +75,47 @@ namespace quda {
       Xinv->copy(*dirac.Xinv);
     }
     return *this;
+  }
+
+  DiracStaggeredKD::DiracStaggeredKD(const DiracStaggered &dirac_staggered, const QudaPrecision xinv_override_prec)
+    : DiracStaggered(dirac_staggered), Xinv(nullptr)
+  {
+    // Allocate the KD inverse block (inverse coarse clover)
+    // Copied from `dirac_coarse.cpp`, `DiracCoarse::createY`
+    const int ndim = 4;
+    int xc[QUDA_MAX_DIM];
+    for (int i = 0; i < ndim; i++) { xc[i] = gauge->X()[i]/2; }
+    const int Nc_c = gauge->Ncolor() * 8; // 24
+    const int Ns_c = 2; // staggered parity
+
+    GaugeFieldParam gParam;
+    memcpy(gParam.x, xc, QUDA_MAX_DIM*sizeof(int));
+    gParam.nColor = Nc_c*Ns_c;
+    gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+    gParam.order = QUDA_MILC_GAUGE_ORDER; //gpu ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_QDP_GAUGE_ORDER;
+    gParam.link_type = QUDA_COARSE_LINKS;
+    gParam.t_boundary = QUDA_PERIODIC_T;
+    gParam.create = QUDA_ZERO_FIELD_CREATE;
+    auto precision = xinv_override_prec == QUDA_INVALID_PRECISION ? gauge->Precision() : xinv_override_prec;
+    // right now the build Xinv routines only support single and double
+    if (precision < QUDA_HALF_PRECISION) { 
+      precision = QUDA_HALF_PRECISION;
+    } else if (precision > QUDA_SINGLE_PRECISION) {
+      precision = QUDA_SINGLE_PRECISION;
+    }
+    gParam.setPrecision( precision );
+    gParam.nDim = ndim;
+    gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+    gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+    gParam.nFace = 0;
+    gParam.geometry = QUDA_SCALAR_GEOMETRY;
+    gParam.pad = 0;
+
+    Xinv = new cudaGaugeField(gParam);
+
+    // Populate Xinv
+    BuildStaggeredKahlerDiracInverse(*Xinv, *gauge, mass);
+
   }
 
   void DiracStaggeredKD::checkParitySpinor(const ColorSpinorField &in, const ColorSpinorField &out) const
@@ -120,28 +166,59 @@ namespace quda {
 
     bool reset = newTmp(&tmp2, in);
 
-    if (dagger == QUDA_DAG_NO) {
-      // K-D op is right-block preconditioned
-      ApplyStaggeredKahlerDiracInverse(*tmp2, in, *Xinv, false);
-      flops += (8ll * 48 - 2ll) * 48 * in.Volume() / 16; // for 2^4 block
-      if (mass == 0.) {
-        ApplyStaggered(out, *tmp2, *gauge, 0., *tmp2, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim, profile);
-        flops += 570ll * in.Volume();
-      } else {
-        ApplyStaggered(out, *tmp2, *gauge, 2. * mass, *tmp2, QUDA_INVALID_PARITY, dagger, commDim, profile);
-        flops += 582ll * in.Volume();
-      }
-    } else { // QUDA_DAG_YES
+    bool right_block_precond = false;
 
-      if (mass == 0.) {
-        ApplyStaggered(*tmp2, in, *gauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_NO, commDim, profile);
-        flops += 570ll * in.Volume();
-      } else {
-        ApplyStaggered(*tmp2, in, *gauge, 2. * mass, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
-        flops += 582ll * in.Volume();
+    if (right_block_precond) {
+      if (dagger == QUDA_DAG_NO) {
+        // K-D op is right-block preconditioned
+        ApplyStaggeredKahlerDiracInverse(*tmp2, in, *Xinv, false);
+        flops += (8ll * 48 - 2ll) * 48 * in.Volume() / 16; // for 2^4 block
+        if (mass == 0.) {
+          ApplyStaggered(out, *tmp2, *gauge, 0., *tmp2, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim, profile);
+          flops += 570ll * in.Volume();
+        } else {
+          ApplyStaggered(out, *tmp2, *gauge, 2. * mass, *tmp2, QUDA_INVALID_PARITY, dagger, commDim, profile);
+          flops += 582ll * in.Volume();
+        }
+      } else { // QUDA_DAG_YES
+
+        if (mass == 0.) {
+          ApplyStaggered(*tmp2, in, *gauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_NO, commDim, profile);
+          flops += 570ll * in.Volume();
+        } else {
+          ApplyStaggered(*tmp2, in, *gauge, 2. * mass, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+          flops += 582ll * in.Volume();
+        }
+        ApplyStaggeredKahlerDiracInverse(out, *tmp2, *Xinv, true);
+        flops += (8ll * 48 - 2ll) * 48 * in.Volume() / 16; // for 2^4 block
       }
-      ApplyStaggeredKahlerDiracInverse(out, *tmp2, *Xinv, true);
-      flops += (8ll * 48 - 2ll) * 48 * in.Volume() / 16; // for 2^4 block
+    } else { // left preconditioned
+      if (dagger == QUDA_DAG_NO) {
+        
+        if (mass == 0.) {
+          ApplyStaggered(*tmp2, in, *gauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim, profile);
+          flops += 570ll * in.Volume();
+        } else {
+          ApplyStaggered(*tmp2, in, *gauge, 2. * mass, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+          flops += 582ll * in.Volume();
+        }
+        ApplyStaggeredKahlerDiracInverse(out, *tmp2, *Xinv, false);
+        flops += (8ll * 48 - 2ll) * 48 * in.Volume() / 16; // for 2^4 block
+
+      } else { // QUDA_DAG_YES
+
+        ApplyStaggeredKahlerDiracInverse(*tmp2, in, *Xinv, true);
+        flops += (8ll * 48 - 2ll) * 48 * in.Volume() / 16; // for 2^4 block
+
+        if (mass == 0.) {
+          ApplyStaggered(out, *tmp2, *gauge, 0., *tmp2, QUDA_INVALID_PARITY, QUDA_DAG_NO, commDim, profile);
+          flops += 570ll * in.Volume();
+        } else {
+          ApplyStaggered(out, *tmp2, *gauge, 2. * mass, *tmp2, QUDA_INVALID_PARITY, dagger, commDim, profile);
+          flops += 582ll * in.Volume();
+        }
+        
+      }
     }
 
 

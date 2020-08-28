@@ -58,7 +58,6 @@ namespace quda {
   template<typename Arg>
   __global__ void ApplyStaggeredKDBlockGPU(Arg arg)
   {
-    if (Arg::dagger) return; // FIXME
 
     // Vector type for spinor
     using real_spinor = typename mapper<typename Arg::vFloatSpinor>::type;
@@ -200,9 +199,16 @@ namespace quda {
       #pragma unroll
       for (int tile_col = 0; tile_col < Arg::numTiles; tile_col++) {
         // load Xinv
-        #pragma unroll
-        for (int row = 0; row < Arg::xinvColTileSize; row++) {
-          xinv_buffer[row * Arg::xinvPaddedColTileSize + fast_idx] = arg.xInv(0, parity_coarse_xinv, x_coarse_xinv_cb, 0, 0, Arg::xinvRowTileSize * tile_row + row, Arg::xinvColTileSize * tile_col + fast_idx);
+        if (Arg::dagger) {
+          #pragma unroll
+          for (int col = 0; col < Arg::xinvColTileSize; col++) {  
+            xinv_buffer[fast_idx * Arg::xinvPaddedColTileSize + col] = conj(arg.xInv(0, parity_coarse_xinv, x_coarse_xinv_cb, 0, 0, Arg::xinvColTileSize * tile_col + col, Arg::xinvRowTileSize * tile_row + fast_idx));
+          }
+        } else {
+          #pragma unroll
+          for (int row = 0; row < Arg::xinvColTileSize; row++) {  
+            xinv_buffer[row * Arg::xinvPaddedColTileSize + fast_idx] = arg.xInv(0, parity_coarse_xinv, x_coarse_xinv_cb, 0, 0, Arg::xinvRowTileSize * tile_row + row, Arg::xinvColTileSize * tile_col + fast_idx);
+          }
         }
 
         __syncwarp();

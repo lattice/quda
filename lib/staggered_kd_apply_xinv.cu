@@ -212,10 +212,6 @@ namespace quda {
 
     if (location == QUDA_CPU_FIELD_LOCATION)
       errorQuda("There is no support for applying the KD operator to CPU fields (yet)");
-    
-    // FIXME For first pass let's not think about the dagger op...
-    if (dagger)
-      errorQuda("There is no support for applying the KD inverse dagger (yet)");
 
     // the staggered KD block inverse can only be applied to a full field
     if (out.SiteSubset() != QUDA_FULL_SITE_SUBSET || out.SiteSubset() != QUDA_FULL_SITE_SUBSET)
