@@ -10,9 +10,12 @@
 //
 int main(int argc, char **argv)
 {
+  //This function sets default values to the MG parameter struct
+  setQudaDefaultMgTestParams();
   // Parameter class that reads line arguments. It modifies global parameter variables
   auto app = make_app();
   add_multigrid_option_group(app);
+  add_eigen_option_group(app);
   add_propagator_option_group(app);
   try {
     app->parse(argc, argv);
@@ -23,13 +26,66 @@ int main(int argc, char **argv)
 
   // init QUDA
   initComms(argc, argv, gridsize_from_cmdline);
+
+  //check dslash
+  if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH
+      && dslash_type != QUDA_DOMAIN_WALL_4D_DSLASH && dslash_type != QUDA_DOMAIN_WALL_DSLASH) {
+    printfQuda("dslash_type %d not supported\n", dslash_type);
+    exit(0);
+  }
+
+  if (inv_multigrid) {
+    // Only these fermions are supported with MG
+    if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH) {
+      printfQuda("dslash_type %d not supported for MG\n", dslash_type);
+      exit(0);
+    }
+
+    // Only these solve types are supported with MG
+    if (solve_type != QUDA_DIRECT_SOLVE && solve_type != QUDA_DIRECT_PC_SOLVE) {
+      printfQuda("Solve_type %d not supported with MG. Please use QUDA_DIRECT_SOLVE or QUDA_DIRECT_PC_SOLVE\n\n",
+                 solve_type);
+      exit(0);
+    }
+  }
+
   initQuda(device);
 
   // gauge params
   QudaGaugeParam gauge_param = newQudaGaugeParam(); // create an instance of a class that can hold the gauge parameters
-  setWilsonGaugeParam(gauge_param); // set the content of this instance to the globally set values (default or from
-                                    // command line)
-  setDims(gauge_param.X);
+  setWilsonGaugeParam(gauge_param); // set the content of this instance to the globally set values (default or from command line)
+  QudaInvertParam inv_param = newQudaInvertParam();
+  QudaMultigridParam mg_param = newQudaMultigridParam();
+  QudaInvertParam mg_inv_param = newQudaInvertParam();
+  QudaEigParam mg_eig_param[mg_levels];
+  //QudaEigParam eig_param = newQudaEigParam();
+
+  if (inv_multigrid) {
+    setQudaMgSolveTypes();
+    setMultigridInvertParam(inv_param);
+    // Set sub structures
+    mg_param.invert_param = &mg_inv_param;
+    for (int i = 0; i < mg_levels; i++) {
+      if (mg_eig[i]) {
+        mg_eig_param[i] = newQudaEigParam();
+        setMultigridEigParam(mg_eig_param[i], i);
+        mg_param.eig_param[i] = &mg_eig_param[i];
+      } else {
+        mg_param.eig_param[i] = nullptr;
+      }
+    }
+    // Set MG
+    setMultigridParam(mg_param);
+  } else {
+    setInvertParam(inv_param);
+  }
+  inv_param.eig_param = nullptr;
+
+  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
+    dw_setDims(gauge_param.X, inv_param.Ls);
+  } else {
+    setDims(gauge_param.X);
+  }
 
   // allocate gaugefield on host
   void *gauge[4];
@@ -43,22 +99,35 @@ int main(int argc, char **argv)
   plaqQuda(plaq);
   printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
 
-  // invert params
-  QudaInvertParam inv_param = newQudaInvertParam();
-  setInvertParam(inv_param);
-
   // Allocate host side memory for clover terms if needed.
   void *clover = nullptr;
   void *clover_inv = nullptr;
   // Allocate space on the host
-  //FIXME add domain wall fermion
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     if (!compute_clover) { errorQuda("Specified clover dslash-type but did not specify compute-clover!"); }
     clover = malloc(V * clover_site_size * host_clover_data_type_size);
     clover_inv = malloc(V * clover_site_size * host_spinor_data_type_size);
     constructHostCloverField(clover, clover_inv, inv_param);
+    if (inv_multigrid) {
+      // This line ensures that if we need to construct the clover inverse (in either the smoother or the solver) we do so
+      if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE) {
+        inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+      }
+    }
     loadCloverQuda(clover, clover_inv, &inv_param);
+    if (inv_multigrid) {
+      // Restore actual solve_type we want to do
+      inv_param.solve_type = solve_type;
+    }
   }
+
+  // Now QUDA is initialised and the fields are loaded, we may setup the preconditioner
+  void *mg_preconditioner = nullptr;
+  if (inv_multigrid) {
+    mg_preconditioner = newMultigridQuda(&mg_param);
+    inv_param.preconditioner = mg_preconditioner;
+  }
+
   // ColorSpinors (Wilson)
   // FIXME what about this parameter class? should it be part of quda.h like invertparam etc?
   quda::ColorSpinorParam cs_param;
@@ -274,6 +343,9 @@ int main(int argc, char **argv)
     }
     free(prop_array_strange);
   }
+
+  if (inv_multigrid) destroyMultigridQuda(mg_preconditioner);
+
   // free memory
   freeGaugeQuda();
   for (auto &dir : gauge) free(dir);
