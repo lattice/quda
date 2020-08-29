@@ -19,7 +19,7 @@ namespace quda {
   * however we do even-odd to preserve chirality (that is straightforward)
   */
   Transfer::Transfer(const std::vector<ColorSpinorField *> &B, int Nvec, int n_block_ortho, int *geo_bs, int spin_bs,
-                     QudaPrecision null_precision, TimeProfile &profile) :
+                     QudaPrecision null_precision, const QudaTransferType transfer_type, TimeProfile &profile) :
     B(B),
     Nvec(Nvec),
     NblockOrtho(n_block_ortho),
@@ -43,7 +43,7 @@ namespace quda {
     enable_gpu(false),
     enable_cpu(false),
     use_gpu(true),
-    is_staggered(B[0]->Nspin() == 1),
+    transfer_type(transfer_type),
     flops_(0),
     profile(profile)
   {
@@ -132,7 +132,7 @@ namespace quda {
     param.fieldOrder = location == QUDA_CUDA_FIELD_LOCATION ? QUDA_FLOAT2_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
     param.setPrecision(location == QUDA_CUDA_FIELD_LOCATION ? null_precision : B[0]->Precision());
 
-    if (is_staggered) {
+    if (transfer_type == QUDA_TRANSFER_COARSE_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD) {
       // Need to create V_d and V_h as metadata containers, but we don't
       // actually need to allocate the memory.
       param.create = QUDA_REFERENCE_FIELD_CREATE;
@@ -155,7 +155,7 @@ namespace quda {
   void Transfer::createTmp(QudaFieldLocation location) const
   {
     // The CPU temporaries are needed for creating geometry mappings.
-    if (is_staggered && location != QUDA_CPU_FIELD_LOCATION) { return; }
+    if ((transfer_type == QUDA_TRANSFER_COARSE_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD) && location != QUDA_CPU_FIELD_LOCATION) { return; }
 
     postTrace();
     ColorSpinorParam param(*B[0]);
@@ -186,7 +186,7 @@ namespace quda {
     case QUDA_CUDA_FIELD_LOCATION:
       if (enable_gpu) return;
       createV(location);
-      if (!is_staggered) *V_d = *V_h;
+      if (transfer_type == QUDA_TRANSFER_AGGREGATE) *V_d = *V_h;
       createTmp(location);
       fine_to_coarse_d = static_cast<int*>(pool_device_malloc(B[0]->Volume()*sizeof(int)));
       coarse_to_fine_d = static_cast<int*>(pool_device_malloc(B[0]->Volume()*sizeof(int)));
@@ -196,7 +196,7 @@ namespace quda {
     case QUDA_CPU_FIELD_LOCATION:
       if (enable_cpu) return;
       createV(location);
-      if (!is_staggered) *V_h = *V_d;
+      if (transfer_type == QUDA_TRANSFER_AGGREGATE) *V_h = *V_d;
       break;
     default:
       errorQuda("Unknown location %d", location);
@@ -207,7 +207,7 @@ namespace quda {
   {
     postTrace();
 
-    if (is_staggered) { return; }
+    if (transfer_type == QUDA_TRANSFER_COARSE_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD) { return; }
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer: block orthogonalizing\n");
 
     if (B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
@@ -336,10 +336,26 @@ namespace quda {
     initializeLazy(use_gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION);
     const int *fine_to_coarse = use_gpu ? fine_to_coarse_d : fine_to_coarse_h;
 
-    if (is_staggered) {
+    if (transfer_type == QUDA_TRANSFER_COARSE_KD) {
       StaggeredProlongate(*output, *input, fine_to_coarse, spin_map, parity);
       flops_ += 0; // it's only a permutation
-    } else {
+    } else if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD) {
+
+      if (in.SiteSubset() != QUDA_FULL_SITE_SUBSET)
+        errorQuda("Optimized KD op only supports full-parity spinors");
+
+      if (output->VolumeCB() != input->Volume())
+        errorQuda("Optimized KD transfer is only between equal volumes");
+
+      // the optimized KD op acts on fine spinors
+      if (out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) {
+        *output = input->Even();
+      } else {
+        *output = *input;
+      }
+      flops_ += 0;
+
+    } else if (transfer_type == QUDA_TRANSFER_AGGREGATE ) {
 
       const ColorSpinorField *V = use_gpu ? V_d : V_h;
 
@@ -366,6 +382,8 @@ namespace quda {
       Prolongate(*output, *input, *V, Nvec, fine_to_coarse, spin_map, parity);
 
       flops_ += 8 * in.Ncolor() * out.Ncolor() * out.VolumeCB() * out.SiteSubset();
+    } else {
+      errorQuda("Invalid transfer type in prolongate");
     }
 
     out = *output; // copy result to out field (aliasing handled automatically)
@@ -384,10 +402,26 @@ namespace quda {
     const int *fine_to_coarse = use_gpu ? fine_to_coarse_d : fine_to_coarse_h;
     const int *coarse_to_fine = use_gpu ? coarse_to_fine_d : coarse_to_fine_h;
 
-    if (is_staggered) {
+    if (transfer_type == QUDA_TRANSFER_COARSE_KD) {
       StaggeredRestrict(*output, *input, fine_to_coarse, spin_map, parity);
       flops_ += 0; // it's only a permutation
-    } else {
+    } else if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD) {
+
+      if (out.SiteSubset() != QUDA_FULL_SITE_SUBSET)
+        errorQuda("Optimized KD op only supports full-parity spinors");
+
+      if (output->VolumeCB() != input->Volume())
+        errorQuda("Optimized KD transfer is only between equal volumes");
+
+      // the optimized KD op acts on fine spinors
+      if (in.SiteSubset() == QUDA_PARITY_SITE_SUBSET) {
+        output->Even() = *input;
+        blas::zero(output->Odd());
+      } else {
+        *output = *input;
+      }
+      flops_ += 0;
+    } else if (transfer_type == QUDA_TRANSFER_AGGREGATE) {
 
       const ColorSpinorField *V = use_gpu ? V_d : V_h;
 
@@ -418,6 +452,8 @@ namespace quda {
 
         flops_ += 8 * out.Ncolor() * in.Ncolor() * in.VolumeCB() * in.SiteSubset();
       }
+    } else {
+      errorQuda("Invalid transfer type in prolongate");
     }
 
     out = *output; // copy result to out field (aliasing handled automatically)

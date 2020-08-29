@@ -133,6 +133,10 @@ quda::mgarray<QudaSchwarzType> mg_schwarz_type = {};
 quda::mgarray<int> mg_schwarz_cycle = {};
 bool mg_evolve_thin_updates = false;
 
+// Aggregation type for the top level of staggered
+// FIXME: replace with QUDA_TRANSFER_OPTIMIZED_KD when ready
+QudaTransferType staggered_transfer_type = QUDA_TRANSFER_COARSE_KD;
+
 // we only actually support 4 here currently
 quda::mgarray<std::array<int, 4>> geo_block_size = {};
 int n_ev = 8;
@@ -299,6 +303,10 @@ namespace
                                                  {"irlm", QUDA_EIG_IR_LANCZOS},
                                                  {"iram", QUDA_EIG_IR_ARNOLDI},
                                                  {"blktrlm", QUDA_EIG_BLK_TR_LANCZOS}};
+
+  CLI::TransformPairs<QudaTransferType> transfer_type_map {{"aggregate", QUDA_TRANSFER_AGGREGATE},
+                                                 {"kd-coarse", QUDA_TRANSFER_COARSE_KD},
+                                                 {"kd-optimized", QUDA_TRANSFER_OPTIMIZED_KD}};
 
   CLI::TransformPairs<QudaTboundary> fermion_t_boundary_map {{"periodic", QUDA_PERIODIC_T},
                                                              {"anti-periodic", QUDA_ANTI_PERIODIC_T}};
@@ -831,6 +839,12 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   opgroup->add_option("--mg-setup-type", setup_type, "The type of setup to use for the multigrid (default null)")
     ->transform(CLI::QUDACheckedTransformer(setup_type_map));
+
+    // FIXME: default should become kd-optimized
+  opgroup->add_option("--mg-staggered-coarsen-type", staggered_transfer_type,
+                        "The type of coarsening to use for the top level staggered operator (aggregate, kd-coarse (default), kd-optimized)")
+                        ->transform(CLI::QUDACheckedTransformer(transfer_type_map));
+
   quda_app->add_mgoption(opgroup, "--mg-smoother", smoother_type, solver_trans,
                          "The smoother to use for multigrid (default mr)");
 

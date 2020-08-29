@@ -1726,8 +1726,6 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
   auto solve_type = QUDA_DIRECT_SOLVE;
   inv_param.solve_type = solve_type;
 
-  mg_param.is_staggered = QUDA_BOOLEAN_TRUE;
-
   mg_param.invert_param = &inv_param;
   mg_param.n_level = mg_levels; // set from file
 
@@ -1778,6 +1776,10 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
     mg_param.mu_factor[i] = 1.; // mu_factor[i];
 
     mg_param.cycle_type[i] = QUDA_MG_CYCLE_RECURSIVE;
+
+    // top level: coarse vs optimized KD, otherwise standard
+    // aggregation. FIXME optimized
+    mg_param.transfer_type[i] = (i == 0) ? QUDA_TRANSFER_COARSE_KD : QUDA_TRANSFER_AGGREGATE;
 
     // set the coarse solver wrappers including bottom solver
     mg_param.coarse_solver[i] = input_struct.coarse_solver[i];

@@ -80,7 +80,7 @@ namespace quda
     rng = new RNG(*param.B[0], 1234);
     rng->Init();
 
-    if (param.level != 0 || !param.is_staggered) {
+    if (param.transfer_type == QUDA_TRANSFER_AGGREGATE) {
       if (param.level < param.Nlevel - 1) {
         if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
           if (param.mg_global.generate_all_levels == QUDA_BOOLEAN_TRUE || param.level == 0) {
@@ -132,8 +132,9 @@ namespace quda
     diracSmoother = param.matSmooth->Expose();
     diracSmootherSloppy = param.matSmoothSloppy->Expose();
 
-    // Check if we're on the top level of a staggered MG build.
-    if (param.level != 0 || !param.is_staggered) {
+    // Only refresh if we needed to generate near-nulls, that is, 
+    // if we aren't doing a staggered KD solve
+    if (param.level != 0 || param.transfer_type == QUDA_TRANSFER_AGGREGATE) {
       // Refresh the null-space vectors if we need to
       if (refresh && param.level < param.Nlevel - 1) {
         if (param.mg_global.setup_maxiter_refresh[param.level]) generateNullVectors(param.B, refresh);
@@ -154,7 +155,7 @@ namespace quda
         // create transfer operator
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating transfer operator\n");
         transfer = new Transfer(param.B, param.Nvec, param.NblockOrtho, param.geoBlockSize, param.spinBlockSize,
-                                param.mg_global.precision_null[param.level], profile);
+                                param.mg_global.precision_null[param.level], param.mg_global.transfer_type[param.level], profile);
         for (int i=0; i<QUDA_MAX_MG_LEVEL; i++) param.mg_global.geo_block_size[param.level][i] = param.geoBlockSize[i];
 
         // create coarse temporary vector if not already created in verify()
@@ -702,7 +703,7 @@ namespace quda
     double tol = (prec == QUDA_QUARTER_PRECISION || prec == QUDA_HALF_PRECISION) ? 5e-2 : prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-8;
 
     // No need to check (projector) v_k for staggered case
-    if (param.level != 0 || !param.is_staggered) {
+    if (param.transfer_type == QUDA_TRANSFER_AGGREGATE) {
 
       if (getVerbosity() >= QUDA_SUMMARIZE)
         printfQuda("Checking 0 = (1 - P P^\\dagger) v_k for %d vectors\n", param.Nvec);
@@ -875,7 +876,7 @@ namespace quda
 
     // FIXME: This check will fail for ASQTAD because we leave out the long links.
     // Need to put in temporary zero links for long links
-    if (param.level != 0 || !param.is_staggered) {
+    if (param.transfer_type == QUDA_TRANSFER_AGGREGATE) {
       if (deviation > tol) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
     }
 
@@ -1137,7 +1138,7 @@ namespace quda
     }
 
     // Not useful for staggered op since it's a unitary transform
-    if (param.level != 0 || !param.is_staggered) {
+    if (param.transfer_type == QUDA_TRANSFER_AGGREGATE) {
       if (param.mg_global.run_low_mode_check) {
 
         sprintf(prefix, "MG level %d (%s): eigenvector overlap : ", param.level + 1,
@@ -1338,7 +1339,7 @@ namespace quda
   // supports separate reading or single file read
   void MG::loadVectors(std::vector<ColorSpinorField *> &B)
   {
-    if (param.level == 0 && param.is_staggered) {
+    if (param.transfer_type != QUDA_TRANSFER_AGGREGATE) {
       warningQuda("Cannot load near-null vectors for top level of staggered MG solve.");
     } else {
       bool is_running = profile_global.isRunning(QUDA_PROFILE_INIT);
@@ -1360,7 +1361,7 @@ namespace quda
 
   void MG::saveVectors(const std::vector<ColorSpinorField *> &B) const
   {
-    if (param.level == 0 && param.is_staggered) {
+    if (param.transfer_type != QUDA_TRANSFER_AGGREGATE) {
       warningQuda("Cannot save near-null vectors for top level of staggered MG solve.");
     } else {
       bool is_running = profile_global.isRunning(QUDA_PROFILE_INIT);
@@ -1382,7 +1383,7 @@ namespace quda
 
   void MG::dumpNullVectors() const
   {
-    if (param.level == 0 && param.is_staggered) {
+    if (param.transfer_type != QUDA_TRANSFER_AGGREGATE) {
       warningQuda("Cannot dump near-null vectors for top level of staggered MG solve.");
     } else {
       saveVectors(param.B);
@@ -1427,7 +1428,7 @@ namespace quda
     ColorSpinorParam csParam(*B[0]);                            // Create spinor field parameters:
     csParam.setPrecision(r->Precision(), r->Precision(), true); // ensure native ordering
     csParam.location = QUDA_CUDA_FIELD_LOCATION; // hard code to GPU location for null-space generation for now
-    csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+    csParam.gammaBasis = B[0]->Nspin() == 1 ? QUDA_DEGRAND_ROSSI_GAMMA_BASIS : QUDA_UKQCD_GAMMA_BASIS; // degrand-rossi required for staggered
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     ColorSpinorField *b = static_cast<ColorSpinorField *>(new cudaColorSpinorField(csParam));
     ColorSpinorField *x = static_cast<ColorSpinorField *>(new cudaColorSpinorField(csParam));

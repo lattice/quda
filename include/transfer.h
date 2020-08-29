@@ -110,9 +110,9 @@ namespace quda {
 	enable_gpu=true in the constructor) */
     mutable bool use_gpu;
 
-    /** Whether or not the fine level is a staggered operator, in which
+    /** Implies whether or not the fine level is a staggered operator, in which
     case we don't actually need to allocate any memory. */
-    mutable bool is_staggered;
+    mutable QudaTransferType transfer_type;
 
     /**
      * @brief Allocate V field
@@ -169,7 +169,7 @@ namespace quda {
        * @param enable_gpu Whether to enable this to run on GPU (as well as CPU)
        */
       Transfer(const std::vector<ColorSpinorField *> &B, int Nvec, int NblockOrtho, int *geo_bs, int spin_bs,
-               QudaPrecision null_precision, TimeProfile &profile);
+               QudaPrecision null_precision, const QudaTransferType transfer_type, TimeProfile &profile);
 
       /** The destructor for Transfer */
       virtual ~Transfer();

@@ -398,6 +398,9 @@ void setMultigridParam(QudaMultigridParam &mg_param)
 
     mg_param.cycle_type[i] = QUDA_MG_CYCLE_RECURSIVE;
 
+    // Is not a staggered solve, always aggregate
+    mg_param.transfer_type[i] = QUDA_TRANSFER_AGGREGATE;
+
     // set the coarse solver wrappers including bottom solver
     mg_param.coarse_solver[i] = coarse_solver[i];
     mg_param.coarse_solver_tol[i] = coarse_solver_tol[i];
@@ -522,9 +525,6 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   mg_param.run_verify = verify_results ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_param.run_low_mode_check = low_mode_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_param.run_oblique_proj_check = oblique_proj_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-
-  // Is NOT a staggered solve
-  mg_param.is_staggered = QUDA_BOOLEAN_FALSE;
 
   // Whether or not to use thin restarts in the evolve tests
   mg_param.thin_update_only = mg_evolve_thin_updates ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -912,8 +912,6 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 
   inv_param.solve_type = QUDA_DIRECT_SOLVE;
 
-  mg_param.is_staggered = QUDA_BOOLEAN_TRUE;
-
   mg_param.invert_param = &inv_param;
   mg_param.n_level = mg_levels;
   for (int i = 0; i < mg_param.n_level; i++) {
@@ -946,6 +944,8 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
     mg_param.nu_pre[i] = nu_pre[i];
     mg_param.nu_post[i] = nu_post[i];
     mg_param.mu_factor[i] = mu_factor[i];
+
+    mg_param.transfer_type[i] = (i == 0) ? staggered_transfer_type : QUDA_TRANSFER_AGGREGATE;
 
     mg_param.cycle_type[i] = QUDA_MG_CYCLE_RECURSIVE;
 

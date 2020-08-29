@@ -775,6 +775,12 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
 #ifdef INIT_PARAM
+    P(transfer_type[i], QUDA_TRANSFER_AGGREGATE);
+#else
+    P(transfer_type[i], QUDA_TRANSFER_INVALID);
+#endif
+
+#ifdef INIT_PARAM
     P(mu_factor[i], 1);
 #else
     P(mu_factor[i], INVALID_DOUBLE);
@@ -847,12 +853,6 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #elif defined(PRINT_PARAM)
   P(gflops, INVALID_DOUBLE);
   P(secs, INVALID_DOUBLE);
-#endif
-
-#ifdef INIT_PARAM
-  P(is_staggered, QUDA_BOOLEAN_FALSE);
-#else
-  P(is_staggered, QUDA_BOOLEAN_INVALID);
 #endif
 
 #ifdef INIT_PARAM
