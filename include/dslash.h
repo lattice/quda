@@ -99,7 +99,7 @@ namespace quda
           // since these may have been assigned to zero-copy memory
           if (!comm_peer2peer_enabled(dir, dim) || arg.kernel_type == INTERIOR_KERNEL) {
             ghost[2 * dim + dir]
-              = (typename Arg::Float *)((char *)in.Ghost2() + in.GhostOffset(dim, dir) * in.GhostPrecision());
+              = (typename Arg::Float *)((char *)in.Ghost2() + in.GhostOffset(dim, dir));
           }
         }
       }
@@ -338,7 +338,7 @@ namespace quda
         for (int dir = 0; dir < 2; dir++) {
           if ((location & Remote) && comm_peer2peer_enabled(dir, dim)) { // pack to p2p remote
             packBuffer[2 * dim + dir]
-              = static_cast<char *>(in.remoteFace_d(dir, dim)) + in.Precision() * in.GhostOffset(dim, 1 - dir);
+              = static_cast<char *>(in.remoteFace_d(dir, dim)) + in.GhostOffset(dim, 1 - dir);
           } else if (location & Host && !comm_peer2peer_enabled(dir, dim)) { // pack to cpu memory
             packBuffer[2 * dim + dir] = in.myFace_hd(dir, dim);
           } else { // pack to local gpu memory

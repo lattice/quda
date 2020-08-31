@@ -699,6 +699,9 @@ extern "C" {
     /** Boolean for aggregation type, implies staggered or not */
     QudaTransferType transfer_type[QUDA_MAX_MG_LEVEL];
 
+    /** Whether to use tensor cores (if available) */
+    QudaBoolean use_mma;
+
     /** Whether to do a full (false) or thin (true) update in the context of updateMultigridQuda */
     QudaBoolean thin_update_only;
 
