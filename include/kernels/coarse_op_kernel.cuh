@@ -53,6 +53,7 @@ namespace quda {
     int comm_dim[QUDA_MAX_DIM]; /** Node parition array */
 
     Float kappa;                /** kappa value */
+    Float mass;                 /** mass value */
     Float mu;                   /** mu value */
     Float mu_factor;            /** multiplicative factor for mu applied when mu is added to the operator */
     Float rescale;              /** rescaling factor used when rescaling the Y links if the maximum increases */
@@ -118,12 +119,12 @@ namespace quda {
     CalculateYArg(coarseGauge &Y, coarseGauge &X,
 		  coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic,
 		  fineSpinorTmp &UV, fineSpinor &AV, const fineGauge &U, const fineSpinorV &V,
-		  const fineClover &C, const fineClover &Cinv, double kappa, double mu, double mu_factor,
+		  const fineClover &C, const fineClover &Cinv, double kappa, double mass, double mu, double mu_factor,
 		  const int *x_size_, const int *xc_size_, int *geo_bs_, int spin_bs_,
 		  const int *fine_to_coarse, const int *coarse_to_fine, bool bidirectional)
       : Y(Y), X(X), Y_atomic(Y_atomic), X_atomic(X_atomic),
 	UV(UV), AV(AV), U(U), V(V), C(C), Cinv(Cinv), spin_bs(spin_bs_), spin_map(),
-	kappa(static_cast<Float>(kappa)), mu(static_cast<Float>(mu)), mu_factor(static_cast<Float>(mu_factor)),
+	kappa(static_cast<Float>(kappa)), mass(static_cast<Float>(mass)), mu(static_cast<Float>(mu)), mu_factor(static_cast<Float>(mu_factor)),
         fineVolumeCB(V.VolumeCB()), coarseVolumeCB(X.VolumeCB()),
         fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
         bidirectional(bidirectional), shared_atomic(false), parity_flip(shared_atomic ? true : false),
