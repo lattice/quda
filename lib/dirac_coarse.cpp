@@ -479,6 +479,9 @@ namespace quda {
   //Make the coarse operator one level down.  Pass both the coarse gauge field and coarse clover field.
   void DiracCoarse::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu, double mu_factor) const
   {
+    if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
+      errorQuda("Coarse operators only support aggregation coarsening");
+
     double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
     if (checkLocation(Y, X) == QUDA_CPU_FIELD_LOCATION) {
       initializeLazy(QUDA_CPU_FIELD_LOCATION);
@@ -698,6 +701,9 @@ namespace quda {
   //pass the fine clover fields, though they are actually ignored.
   void DiracCoarsePC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu, double mu_factor) const
   {
+    if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
+      errorQuda("Coarse operators only support aggregation coarsening");
+
     double a = -2.0 * kappa * mu * T.Vectors().TwistFlavor();
     if (checkLocation(Y, X) == QUDA_CPU_FIELD_LOCATION) {
       initializeLazy(QUDA_CPU_FIELD_LOCATION);

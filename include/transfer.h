@@ -232,6 +232,13 @@ namespace quda {
      * @return geo_bs
      */
     const int *Geo_bs() const {return geo_bs;}
+
+    /**
+     * Returns the transfer type; used to inform staggered-type coarsenings
+     * @return transfer_type
+     */
+    QudaTransferType getTransferType() const { return transfer_type; }
+
     
     /**
        @return Pointer to the lookup table to the fine-to-coarse map

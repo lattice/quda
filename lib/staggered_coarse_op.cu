@@ -4,7 +4,13 @@
 #include <gauge_field.h>
 
 #include <jitify_helper.cuh>
+
+// For naive Kahler-Dirac coarsening
 #include <kernels/staggered_coarse_op_kernel.cuh>
+
+// For directly coarsening the staggered op
+#define STAGGEREDCOARSE
+#include <coarse_op.cuh>
 
 namespace quda {
 
@@ -215,8 +221,20 @@ namespace quda {
     const int coarseSpin = 2;
     const int coarseColor = Y.Ncolor() / coarseSpin;
 
-    if (coarseColor == 24) { // free field staggered
-      calculateStaggeredY<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, T, g, mass, dirac, matpc);
+    if (coarseColor == 24) {
+      if (T.getTransferType() == QUDA_TRANSFER_COARSE_KD)
+        calculateStaggeredY<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, T, g, mass, dirac, matpc);
+      else {
+        errorQuda("Staggered aggregation temporarily unsupported");
+        // free field aggregation
+        //aggregateStaggeredY<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, T, g, mass, dirac, matpc);
+      }
+    } else if (coarseColor == 64) {
+      errorQuda("Staggered aggregation temporarily unsupported");
+      //aggregateStaggeredY<Float,vFloat,fineColor,fineSpin,64,coarseSpin>(Y, X, T, g, mass, dirac, matpc);
+    } else if (coarseColor == 96) {
+      errorQuda("Staggered aggregation temporarily unsupported");
+      //aggregateStaggeredY<Float,vFloat,fineColor,fineSpin,96,coarseSpin>(Y, X, T, g, mass, dirac, matpc);
     } else {
       errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
     }

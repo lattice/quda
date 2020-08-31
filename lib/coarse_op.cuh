@@ -58,7 +58,7 @@ namespace quda {
       } else if (type == COMPUTE_AV) {
         if (from_coarse) errorQuda("ComputeAV should only be called from the fine grid");
 
-#if defined(GPU_CLOVER_DIRAC) && !defined(COARSECOARSE)
+#if defined(GPU_CLOVER_DIRAC) && defined(WILSONCOARSE)
         ComputeAVCPU<Float,fineSpin,fineColor,coarseColor>(arg);
 #else
         errorQuda("Clover dslash has not been built");
@@ -67,7 +67,7 @@ namespace quda {
       } else if (type == COMPUTE_TMAV) {
         if (from_coarse) errorQuda("ComputeTMAV should only be called from the fine grid");
 
-#if defined(GPU_TWISTED_MASS_DIRAC) && !defined(COARSECOARSE)
+#if defined(GPU_TWISTED_MASS_DIRAC) && defined(WILSONCOARSE)
         ComputeTMAVCPU<Float,fineSpin,fineColor,coarseColor>(arg);
 #else
         errorQuda("Twisted mass dslash has not been built");
@@ -76,7 +76,7 @@ namespace quda {
       } else if (type == COMPUTE_TMCAV) {
         if (from_coarse) errorQuda("ComputeTMCAV should only be called from the fine grid");
 
-#if defined(GPU_TWISTED_CLOVER_DIRAC) && !defined(COARSECOARSE)
+#if defined(GPU_TWISTED_CLOVER_DIRAC) && defined(WILSONCOARSE)
         ComputeTMCAVCPU<Float,fineSpin,fineColor,coarseColor>(arg);
 #else
         errorQuda("Twisted clover dslash has not been built");
@@ -85,7 +85,7 @@ namespace quda {
       } else if (type == COMPUTE_CLOVER_INV_MAX) {
         if (from_coarse) errorQuda("ComputeInvCloverMax should only be called from the fine grid");
 
-#if defined(DYNAMIC_CLOVER) && !defined(COARSECOARSE)
+#if defined(DYNAMIC_CLOVER) && defined(WILSONCOARSE)
         ComputeCloverInvMaxCPU<Float, false>(arg);
         double max = arg.max_h;
         comm_allreduce_max(&max);
@@ -97,7 +97,7 @@ namespace quda {
       } else if (type == COMPUTE_TWISTED_CLOVER_INV_MAX) {
         if (from_coarse) errorQuda("ComputeInvCloverMax should only be called from the fine grid");
 
-#if defined(DYNAMIC_CLOVER) && !defined(COARSECOARSE)
+#if defined(DYNAMIC_CLOVER) && defined(WILSONCOARSE)
         ComputeCloverInvMaxCPU<Float, true>(arg);
         double max = arg.max_h;
         comm_allreduce_max(&max);
@@ -182,7 +182,7 @@ namespace quda {
           .instantiate(Type<Float>(),fineSpin,fineColor,coarseColor,Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
-#if defined(GPU_CLOVER_DIRAC) && !defined(COARSECOARSE)
+#if defined(GPU_CLOVER_DIRAC) && defined(WILSONCOARSE)
         qudaLaunchKernel(ComputeAVGPU<Float,fineSpin,fineColor,coarseColor,Arg>, tp, stream, arg);
 #else
           errorQuda("Clover dslash has not been built");
@@ -197,7 +197,7 @@ namespace quda {
           .instantiate(Type<Float>(),fineSpin,fineColor,coarseColor,Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
-#if defined(GPU_TWISTED_MASS_DIRAC) && !defined(COARSECOARSE)
+#if defined(GPU_TWISTED_MASS_DIRAC) && defined(WILSONCOARSE)
         qudaLaunchKernel(ComputeTMAVGPU<Float,fineSpin,fineColor,coarseColor,Arg>, tp, stream, arg);
 #else
         errorQuda("Twisted mass dslash has not been built");
@@ -212,7 +212,7 @@ namespace quda {
           .instantiate(Type<Float>(),fineSpin,fineColor,coarseColor,Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
-#if defined(GPU_TWISTED_CLOVER_DIRAC) && !defined(COARSECOARSE)
+#if defined(GPU_TWISTED_CLOVER_DIRAC) && defined(WILSONCOARSE)
         qudaLaunchKernel(ComputeTMCAVGPU<Float,fineSpin,fineColor,coarseColor,Arg>, tp, stream, arg);
 #else
         errorQuda("Twisted clover dslash has not been built");
@@ -230,7 +230,7 @@ namespace quda {
           .configure(tp.grid, tp.block, tp.shared_bytes, stream)
           .launch(arg);
 #else
-#if defined(DYNAMIC_CLOVER) && !defined(COARSECOARSE)
+#if defined(DYNAMIC_CLOVER) && defined(WILSONCOARSE)
         qudaLaunchKernel(ComputeCloverInvMaxGPU<Float, false, Arg>, tp, stream, arg);
 #else
         errorQuda("ComputeCloverInvMax only enabled with dynamic clover");
@@ -256,7 +256,7 @@ namespace quda {
           .configure(tp.grid, tp.block, tp.shared_bytes, stream)
           .launch(arg);
 #else
-#if defined(DYNAMIC_CLOVER) && !defined(COARSECOARSE)
+#if defined(DYNAMIC_CLOVER) && defined(WILSONCOARSE)
         qudaLaunchKernel(ComputeCloverInvMaxGPU<Float, true, Arg>, tp, stream, arg);
 #else
         errorQuda("ComputeCloverInvMax only enabled with dynamic clover");
@@ -372,7 +372,12 @@ namespace quda {
           .instantiate(from_coarse,Type<Float>(),fineSpin,coarseSpin,fineColor,coarseColor,Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
+#if !defined(STAGGEREDCOARSE)
         qudaLaunchKernel(ComputeCoarseCloverGPU<from_coarse,Float,fineSpin,coarseSpin,fineColor,coarseColor,Arg>, tp, stream, arg);
+#else
+        errorQuda("ComputeCoarseClover not enabled for staggered coarsenings");
+#endif
+        
 #endif
 
       } else if (type == COMPUTE_REVERSE_Y) {
