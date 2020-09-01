@@ -940,7 +940,7 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
     mg_param.setup_ca_lambda_max[i] = setup_ca_lambda_max[i];
 
     mg_param.spin_block_size[i] = 1;
-    mg_param.n_vec[i] = (i == 0) ? 24 : nvec[i] == 0 ? 96 : nvec[i]; // default to 96 vectors if not set
+    mg_param.n_vec[i] = nvec[i] == 0 ? 96 : nvec[i];                 // default to 96 vectors if not set
     mg_param.n_block_ortho[i] = n_block_ortho[i];                    // number of times to Gram-Schmidt
     mg_param.precision_null[i] = prec_null;                          // precision to store the null-space basis
     mg_param.smoother_halo_precision[i] = smoother_halo_prec;        // precision of the halo exchange in the smoother

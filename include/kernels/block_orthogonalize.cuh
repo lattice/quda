@@ -249,7 +249,7 @@ namespace quda {
     if (x_cb >= arg.fineVolumeCB) return;
     int chirality = blockIdx.z; // which chiral block we're working on (if chirality is present)
 
-    constexpr int spinBlock = nSpin / coarseSpin; // size of spin block
+    constexpr int spinBlock = (nSpin == 1) ? 1 : nSpin / coarseSpin; // size of spin block
     typedef cub::BlockReduce<complex<sumFloat>, block_size, cub::BLOCK_REDUCE_WARP_REDUCTIONS, 2> dotReduce;
     typedef cub::BlockReduce<sumFloat, block_size, cub::BLOCK_REDUCE_WARP_REDUCTIONS, 2> normReduce;
 
@@ -265,7 +265,20 @@ namespace quda {
     for (int n = 0; n < arg.nBlockOrtho; n++) {
       for (int j = 0; j < nVec; j++) {
 
+        // FIXME: everything I did for staggered is an untested disaster
+        // don't trust me with any of this being efficient or maybe even right
         complex<Float> v[spinBlock][nColor];
+        if (nSpin == 0) {
+          if (parity == chirality) {
+            if (n == 0) {
+              for (int c = 0; c < nColor; c++) v[0][c] = arg.B[j](parity, x_cb, 0, c);
+            } else {
+              for (int c = 0; c < nColor; c++) v[0][c] = arg.V(parity, x_cb, 0, c, j);
+            }
+          } else {
+            for (int c = 0; c < nColor; c++) v[0][c] = { 0., 0. };
+          }
+        } else
         if (n == 0) { // load from B on first Gram-Schmidt, otherwise V.
           complex<Float> v_[spinBlock * nColor];
           B[j].template load<spinBlock>(v_, parity, x_cb, chirality);
@@ -286,10 +299,17 @@ namespace quda {
 
           // compute (j,i) block inner products
           complex<Float> vi[spinBlock][nColor];
+          if (nSpin == 1) {
+            if (parity == chirality)
+              for (int c = 0; c < nColor; c++) vi[0][c] = arg.V(parity, x_cb, 0, c, i);
+            else
+              for (int c = 0; c < nColor; c++) vi[0][c] = { 0, 0 };
+          } else {
 #pragma unroll
-          for (int s = 0; s < spinBlock; s++)
+            for (int s = 0; s < spinBlock; s++)
 #pragma unroll
-            for (int c = 0; c < nColor; c++) vi[s][c] = arg.V(parity, x_cb, chirality * spinBlock + s, c, i);
+              for (int c = 0; c < nColor; c++) vi[s][c] = arg.V(parity, x_cb, chirality * spinBlock + s, c, i);
+          }
 
 #pragma unroll
           for (int s = 0; s < spinBlock; s++) { colorInnerProduct<nColor>(dot, i, v[s], vi[s]); }
@@ -323,10 +343,15 @@ namespace quda {
 #pragma unroll
         for (int s = 0; s < spinBlock; s++) { colorScale<Float, nColor>(v[s], nrm); }
 
+        if (nSpin == 1) {
+          if (parity == chirality)
+            for (int c = 0; c < nColor; c++) arg.V(parity, x_cb, 0, c, j) = v[0][c];
+        } else {
 #pragma unroll
-        for (int s = 0; s < spinBlock; s++)
+          for (int s = 0; s < spinBlock; s++)
 #pragma unroll
-          for (int c = 0; c < nColor; c++) arg.V(parity, x_cb, chirality * spinBlock + s, c, j) = v[s][c];
+            for (int c = 0; c < nColor; c++) arg.V(parity, x_cb, chirality * spinBlock + s, c, j) = v[s][c];
+        }
 
       } // j
     }   // n

@@ -227,26 +227,51 @@ namespace quda {
   {
     const int Nvec = B.size();
     if (V.Ncolor()/Nvec == 3) {
-      if (V.Nspin() != 4) errorQuda("Unexpected nSpin = %d", V.Nspin());
-#ifdef NSPIN4
-      constexpr int nSpin = 4;
-      if (spin_bs != 2) errorQuda("Unexpected spin block size = %d", spin_bs);
-      constexpr int spinBlockSize = 2;
       constexpr int nColor = 3;
+#ifdef NSPIN4
+      if (V.Nspin() == 4) {
+        constexpr int nSpin = 4;
+        if (spin_bs != 2) errorQuda("Unexpected spin block size = %d", spin_bs);
+        constexpr int spinBlockSize = 2;
 
-      if (Nvec == 6) { // for Wilson free field
-        BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 6>(V, B, fine_to_coarse, coarse_to_fine,
-                                                                            geo_bs, n_block_ortho);
-      } else if (Nvec == 24) {
-        BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 24>(V, B, fine_to_coarse, coarse_to_fine,
-                                                                             geo_bs, n_block_ortho);
-      } else if (Nvec == 32) {
-        BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 32>(V, B, fine_to_coarse, coarse_to_fine,
-                                                                             geo_bs, n_block_ortho);
-      } else {
-        errorQuda("Unsupported nVec %d\n", Nvec);
-      }
+        if (Nvec == 6) { // for Wilson free field
+          BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 6>(V, B, fine_to_coarse, coarse_to_fine,
+                                                                              geo_bs, n_block_ortho);
+        } else if (Nvec == 24) {
+          BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 24>(V, B, fine_to_coarse, coarse_to_fine,
+                                                                               geo_bs, n_block_ortho);
+        } else if (Nvec == 32) {
+          BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 32>(V, B, fine_to_coarse, coarse_to_fine,
+                                                                               geo_bs, n_block_ortho);
+        } else {
+          errorQuda("Unsupported nVec %d\n", Nvec);
+        }
+      } else
 #endif // NSPIN4
+#ifdef NSPIN1
+      if (V.Nspin() == 1) {
+        constexpr int nSpin = 1;
+        if (spin_bs != 0) errorQuda("Unexpected spin block size = %d", spin_bs);
+        constexpr int spinBlockSize = 0;
+
+        if (Nvec == 24) {
+          BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 24>(V, B, fine_to_coarse, coarse_to_fine,
+                                                                               geo_bs, n_block_ortho);
+        } else if (Nvec == 64) {
+          BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 64>(V, B, fine_to_coarse, coarse_to_fine,
+                                                                               geo_bs, n_block_ortho);
+        } else if (Nvec == 96) {
+          BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 96>(V, B, fine_to_coarse, coarse_to_fine,
+                                                                               geo_bs, n_block_ortho);
+        } else {
+          errorQuda("Unsupported nVec %d\n", Nvec);
+        }
+
+      } else
+#endif // NSPIN1
+      {
+        errorQuda("Unexpected nSpin = %d", V.Nspin());
+      }
 
     } else { // Nc != 3
       if (V.Nspin() != 2) errorQuda("Unexpected nSpin = %d", V.Nspin());
