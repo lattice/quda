@@ -279,7 +279,10 @@ namespace quda {
                                               double mass, double mu, double mu_factor) const
   {
     errorQuda("DiracStaggeredKD does not support multigrid coarsening (yet)");
-    //StaggeredCoarseOp(Y, X, T, *fatGauge, mass, QUDA_ASQTAD_DIRAC, QUDA_MATPC_INVALID);
+
+    if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
+      errorQuda("Staggered KD operators only support aggregation coarsening");
+    //StaggeredCoarseOp(Y, X, T, *fatGauge, mass, QUDA_ASQTADKD_DIRAC, QUDA_MATPC_INVALID);
   }
 
   void DiracImprovedStaggeredKD::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
