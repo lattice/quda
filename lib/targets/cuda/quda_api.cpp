@@ -296,7 +296,7 @@ namespace quda {
     default: {
       const char *str;
       cuGetErrorName(error, &str);
-      errorQuda("cuEventQuery returned error %s", str);
+      errorQuda("cuEventQuery returned error %s\n (%s:%s in %s())", str, file, line, func);
     }
     }
 #else
@@ -317,7 +317,7 @@ namespace quda {
     if (error != CUDA_SUCCESS) {
       const char *str;
       cuGetErrorName(error, &str);
-      errorQuda("cuEventRecord returned error %s", str);
+      errorQuda("cuEventRecord returned error %s\n (%s:%s in %s())", str, file, line, func);
     }
 #else
     PROFILE(cudaError_t error = cudaEventRecord(event, stream), QUDA_PROFILE_EVENT_RECORD);
@@ -333,7 +333,7 @@ namespace quda {
     if (error != CUDA_SUCCESS) {
       const char *str;
       cuGetErrorName(error, &str);
-      errorQuda("cuStreamWaitEvent returned error %s", str);
+      errorQuda("cuStreamWaitEvent returned error %s\n (%s:%s in %s())", str, file, line, func);
     }
 #else
     PROFILE(cudaError_t error = cudaStreamWaitEvent(stream, event, flags), QUDA_PROFILE_STREAM_WAIT_EVENT);
@@ -348,7 +348,7 @@ namespace quda {
     if (error != CUDA_SUCCESS) {
       const char *str;
       cuGetErrorName(error, &str);
-      errorQuda("cuEventSynchronize returned error %s", str);
+      errorQuda("cuEventSynchronize returned error %s\n (%s:%s in %s())", str, file, line, func);
     }
 #else
     PROFILE(cudaError_t error = cudaEventSynchronize(event), QUDA_PROFILE_EVENT_SYNCHRONIZE);
