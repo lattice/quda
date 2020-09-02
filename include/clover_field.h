@@ -103,6 +103,11 @@ namespace quda {
 
     mutable double trlog[2];
 
+    /**
+       @brief Set the vol_string and aux_string for use in tuning
+    */
+    void setTuningString();
+
   public:
     CloverField(const CloverFieldParam &param);
     virtual ~CloverField();
@@ -198,6 +203,16 @@ namespace quda {
        @return Absolute minimum value
      */
     double abs_min(bool inverse = false) const;
+
+    /**
+       @brief Backs up the CloverField
+    */
+    void backup() const;
+
+    /**
+       @brief Restores the CloverField
+    */
+    void restore() const;
   };
 
   class cudaCloverField : public CloverField {

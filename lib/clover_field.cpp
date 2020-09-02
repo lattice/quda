@@ -56,9 +56,74 @@ namespace quda {
 //for twisted mass only:
     twisted = false;//param.twisted;
     mu2 = 0.0; //param.mu2;
+
+    setTuningString();
   }
   
   CloverField::~CloverField() { }
+
+  void CloverField::setTuningString() {
+    LatticeField::setTuningString();
+    int aux_string_n = TuneKey::aux_n / 2;
+    int check = snprintf(aux_string, aux_string_n, "vol=%lu,stride=%lu,precision=%d,Nc=%d", volume, stride,
+                         precision, nColor);
+    if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
+  }
+
+  /**
+     @brief Backup the field to the host when tuning
+  */
+  void CloverField::backup() const {
+    if (backup_h) errorQuda("Already allocated host backup");
+    backup_h = static_cast<char*>(safe_malloc(2 * bytes));
+    if (norm_bytes) backup_norm_h = static_cast<char*>(safe_malloc(2 * norm_bytes));
+
+    if (Location() == QUDA_CUDA_FIELD_LOCATION) {
+      cudaMemcpy(backup_h, clover, bytes, cudaMemcpyDeviceToHost);
+      cudaMemcpy(backup_h + bytes, cloverInv, bytes, cudaMemcpyDeviceToHost);
+      if (norm_bytes) {
+        cudaMemcpy(backup_norm_h, norm, norm_bytes, cudaMemcpyDeviceToHost);
+        cudaMemcpy(backup_norm_h + norm_bytes, invNorm, norm_bytes, cudaMemcpyDeviceToHost);
+      }
+      checkCudaError();
+    } else {
+      memcpy(backup_h, clover, bytes);
+      memcpy(backup_h + bytes, cloverInv, bytes);
+      if (norm_bytes) {
+        memcpy(backup_norm_h, norm, norm_bytes);
+        memcpy(backup_norm_h + norm_bytes, invNorm, norm_bytes);
+      }
+    }
+  }
+
+  /**
+     @brief Restore the field from the host after tuning
+  */
+  void CloverField::restore() const {
+    if (Location() == QUDA_CUDA_FIELD_LOCATION) {
+      cudaMemcpy(clover, backup_h, bytes, cudaMemcpyHostToDevice);
+      cudaMemcpy(cloverInv, backup_h + bytes, bytes, cudaMemcpyHostToDevice);
+      if (norm_bytes) {
+        cudaMemcpy(norm, backup_norm_h, norm_bytes, cudaMemcpyHostToDevice);
+        cudaMemcpy(invNorm, backup_norm_h + norm_bytes, norm_bytes, cudaMemcpyHostToDevice);
+      }
+      checkCudaError();
+    } else {
+      memcpy(clover, backup_h, bytes);
+      memcpy(cloverInv, backup_h + bytes, bytes);
+      if (norm_bytes) {
+        memcpy(norm, backup_norm_h, norm_bytes);
+        memcpy(invNorm, backup_norm_h + norm_bytes, norm_bytes);
+      }
+    }
+
+    host_free(backup_h);
+    backup_h = nullptr;
+    if (norm_bytes) {
+      host_free(backup_norm_h);
+      backup_norm_h = nullptr;
+    }
+  }
 
   void CloverField::setRho(double rho_)
   {
