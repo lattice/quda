@@ -15,22 +15,6 @@
 namespace quda
 {
 
-  template <typename T> struct plus {
-    __device__ __host__ T operator()(T a, T b) { return a + b; }
-  };
-
-  template <typename T> struct maximum {
-    __device__ __host__ T operator()(T a, T b) { return a > b ? a : b; }
-  };
-
-  template <typename T> struct minimum {
-    __device__ __host__ T operator()(T a, T b) { return a < b ? a : b; }
-  };
-
-  template <typename T> struct identity {
-    __device__ __host__ T operator()(T a) { return a; }
-  };
-
   template <typename reduce_t, typename T, typename count_t, typename transformer, typename reducer>
   struct TransformReduceArg : public ReduceArg<reduce_t> {
     static constexpr int block_size = 512;

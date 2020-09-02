@@ -3,7 +3,6 @@
 #include <color_spinor_field_order.h>
 #include <uint_to_char.h>
 
-#include <launch_kernel.cuh>
 #include <jitify_helper.cuh>
 #include <kernels/multi_reduce_core.cuh>
 

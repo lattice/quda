@@ -1,79 +1,48 @@
 #include <quda_internal.h>
 #include <tune_quda.h>
 #include <gauge_field.h>
-#include <launch_kernel.cuh>
 #include <jitify_helper.cuh>
-#include <kernels/gauge_qcharge.cuh>
 #include <instantiate.h>
+
+#include <tunable_reduction.h>
+#include <kernels/gauge_qcharge.cuh>
 
 namespace quda
 {
 
-  template <typename Arg> class QChargeCompute : TunableLocalParityReduction
-  {
-    Arg &arg;
-    const GaugeField &meta;
+  template <typename Float, int nColor, QudaReconstructType recon>
+  class QCharge : TunableReduction2D<qCharge> {
+    const GaugeField &Fmunu;
+    double *energy;
+    double &qcharge;
+    void *qdensity;
+    bool density;
 
   public:
-    QChargeCompute(Arg &arg, const GaugeField &meta) :
-      arg(arg),
-      meta(meta)
+    QCharge(const GaugeField &Fmunu, double energy[3], double &qcharge, void *qdensity, bool density) :
+      TunableReduction2D(Fmunu),
+      Fmunu(Fmunu),
+      energy(energy),
+      qcharge(qcharge),
+      qdensity(qdensity),
+      density(density)
     {
-#ifdef JITIFY
-      create_jitify_program("kernels/gauge_qcharge.cuh");
-#endif
+      if (!Fmunu.isNative()) errorQuda("Topological charge only supported on native ordered fields");
+      apply(0);
     }
 
     void apply(const qudaStream_t &stream)
     {
-      if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
-        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-#ifdef JITIFY
-        using namespace jitify::reflection;
-        jitify_error = program->kernel("quda::qChargeComputeKernel")
-                         .instantiate((int)tp.block.x, Type<Arg>())
-                         .configure(tp.grid, tp.block, tp.shared_bytes, stream)
-                         .launch(arg);
-#else
-	LAUNCH_KERNEL_LOCAL_PARITY(qChargeComputeKernel, (*this), tp, stream, arg, Arg);
-#endif
-      } else { // run the CPU code
-        errorQuda("qChargeComputeKernel not supported on CPU");
-      }
-    }
-
-    TuneKey tuneKey() const
-    {
-      return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString());
-    }
-
-    long long flops() const
-    {
-      auto mm_flops = 8 * Arg::nColor * Arg::nColor * (Arg::nColor - 2);
-      auto traceless_flops = (Arg::nColor * Arg::nColor + Arg::nColor + 1);
-      auto energy_flops = 6 * (mm_flops + traceless_flops + Arg::nColor);
-      auto q_flops = 3*mm_flops + 2*Arg::nColor + 2;
-      return 2ll * arg.threads * (energy_flops + q_flops);
-    }
-
-    long long bytes() const { return 2 * arg.threads * (6 * arg.f.Bytes() + Arg::density * sizeof(typename Arg::Float)); }
-  }; // QChargeCompute
-
-  template <typename Float, int nColor, QudaReconstructType recon> struct QCharge {
-    QCharge(const GaugeField &Fmunu, double energy[3], double &qcharge, void *qdensity, bool density)
-    {
-      if (!Fmunu.isNative()) errorQuda("Topological charge computation only supported on native ordered fields");
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
       std::vector<double> result(3);
       if (density) {
         QChargeArg<Float, nColor, recon, true> arg(Fmunu, (Float*)qdensity);
-        QChargeCompute<decltype(arg)> qChargeCompute(arg, Fmunu);
-        qChargeCompute.apply(0);
+        launch(tp, stream, arg);
         arg.complete(result);
       } else {
         QChargeArg<Float, nColor, recon, false> arg(Fmunu, (Float*)qdensity);
-        QChargeCompute<decltype(arg)> qChargeCompute(arg, Fmunu);
-        qChargeCompute.apply(0);
+        launch(tp, stream, arg);
         arg.complete(result);
       }
 
@@ -82,7 +51,19 @@ namespace quda
       energy[0] = energy[1] + energy[2];
       qcharge = result[2];
     }
-  };
+
+    long long flops() const
+    {
+      auto Nc = Fmunu.Ncolor();
+      auto mm_flops = 8 * Nc * Nc * (Nc - 2);
+      auto traceless_flops = (Nc * Nc + Nc + 1);
+      auto energy_flops = 6 * (mm_flops + traceless_flops + Nc);
+      auto q_flops = 3*mm_flops + 2 * Nc + 2;
+      return Fmunu.Volume() * (energy_flops + q_flops);
+    }
+
+    long long bytes() const { return Fmunu.Bytes() + Fmunu.Volume() * (density * Fmunu.Precision()); }
+  }; // QChargeCompute
 
   void computeQCharge(double energy[3], double &qcharge, const GaugeField &Fmunu)
   {
