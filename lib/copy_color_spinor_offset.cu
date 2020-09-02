@@ -235,7 +235,7 @@ namespace quda
     case QUDA_DOUBLE_PRECISION: copy_color_spinor_offset<double>(out, in, offset); break;
     case QUDA_SINGLE_PRECISION: copy_color_spinor_offset<float>(out, in, offset); break;
     case QUDA_HALF_PRECISION: copy_color_spinor_offset<short>(out, in, offset); break;
-    case QUDA_QUARTER_PRECISION: copy_color_spinor_offset<char>(out, in, offset); break;
+    case QUDA_QUARTER_PRECISION: copy_color_spinor_offset<int8_t>(out, in, offset); break;
     default: errorQuda("Unsupported precision %d\n", in.Precision());
     }
   }

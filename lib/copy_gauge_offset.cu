@@ -239,7 +239,7 @@ namespace quda
     case QUDA_DOUBLE_PRECISION: copyGaugeOffset<double>(out, in, offset); break;
     case QUDA_SINGLE_PRECISION: copyGaugeOffset<float>(out, in, offset); break;
     case QUDA_HALF_PRECISION: copyGaugeOffset<short>(out, in, offset); break;
-    case QUDA_QUARTER_PRECISION: copyGaugeOffset<char>(out, in, offset); break;
+    case QUDA_QUARTER_PRECISION: copyGaugeOffset<int8_t>(out, in, offset); break;
     default: errorQuda("unknown precision.");
     }
   }
