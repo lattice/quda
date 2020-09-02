@@ -130,7 +130,6 @@ namespace quda {
     bytes = length * precision;
     if (isNative()) bytes = (siteSubset == QUDA_FULL_SITE_SUBSET && fieldOrder != QUDA_QDPJIT_FIELD_ORDER) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
 
-
     if (pad != 0) errorQuda("Non-zero pad not supported");
     if (precision < QUDA_SINGLE_PRECISION) errorQuda("Fixed-point precision not supported");
 
