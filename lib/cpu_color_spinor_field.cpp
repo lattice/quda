@@ -132,8 +132,7 @@ namespace quda {
 
 
     if (pad != 0) errorQuda("Non-zero pad not supported");  
-    if (precision == QUDA_HALF_PRECISION) errorQuda("Half precision not supported");
-    if (precision == QUDA_QUARTER_PRECISION) errorQuda("Quarter precision not supported");
+    if (precision < QUDA_SINGLE_PRECISION) errorQuda("Fixed-point precision not supported");
 
     if (fieldOrder != QUDA_SPACE_COLOR_SPIN_FIELD_ORDER && 
 	fieldOrder != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER &&

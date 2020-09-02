@@ -60,6 +60,7 @@ namespace quda {
     Transfer *transfer; 
     Dirac *dirac;
     bool need_bidirectional; // whether or not we need to force a bi-directional build
+    bool use_mma;            // whether to use tensor cores where applicable
 
     // Default constructor
     DiracParam() :
@@ -76,7 +77,12 @@ namespace quda {
       tmp1(0),
       tmp2(0),
       halo_precision(QUDA_INVALID_PRECISION),
-      need_bidirectional(false)
+      need_bidirectional(false),
+#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
+      use_mma(true)
+#else
+      use_mma(false)
+#endif
     {
       for (int i=0; i<QUDA_MAX_DIM; i++) commDim[i] = 1;
     }
@@ -99,6 +105,7 @@ namespace quda {
       for (int i = 0; i < Ls; i++)
         printfQuda(
             "b_5[%d] = %e %e \t c_5[%d] = %e %e\n", i, b_5[i].real(), b_5[i].imag(), i, c_5[i].real(), c_5[i].imag());
+      printfQuda("use_mma = %d\n", use_mma);
     }
   };
 
@@ -165,6 +172,11 @@ namespace quda {
     void setCommDim(const int commDim_[QUDA_MAX_DIM]) const {
       for (int i=0; i<QUDA_MAX_DIM; i++) { commDim[i] = commDim_[i]; }
     }
+
+    /**
+      @brief Whether the Dirac object is the DiracCoarse.
+    */
+    virtual bool isCoarse() const { return false; }
 
     /**
         @brief Check parity spinors are usable (check geometry ?)
@@ -1257,6 +1269,7 @@ public:
     const Transfer *transfer; /** restrictor / prolongator defined here */
     const Dirac *dirac; /** Parent Dirac operator */
     const bool need_bidirectional; /** Whether or not to force a bi-directional build */
+    const bool use_mma;            /** Whether to use tensor cores or not */
 
     mutable cpuGaugeField *Y_h; /** CPU copy of the coarse link field */
     mutable cpuGaugeField *X_h; /** CPU copy of the coarse clover term */
@@ -1334,6 +1347,8 @@ public:
      */
     DiracCoarse(const DiracCoarse &dirac, const DiracParam &param);
     virtual ~DiracCoarse();
+
+    virtual bool isCoarse() const { return true; }
 
     /**
        @brief Apply the coarse clover operator

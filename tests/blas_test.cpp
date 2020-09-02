@@ -681,7 +681,6 @@ double test(Kernel kernel)
 
   case Kernel::norm2:
     *xD = *xH;
-    *yH = *xD;
     error = fabs(blas::norm2(*xD) - blas::norm2(*xH)) / blas::norm2(*xH);
     break;
 

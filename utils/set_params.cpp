@@ -526,6 +526,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   // Is NOT a staggered solve
   mg_param.is_staggered = QUDA_BOOLEAN_FALSE;
 
+  mg_param.use_mma = mg_use_mma ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   // Whether or not to use thin restarts in the evolve tests
   mg_param.thin_update_only = mg_evolve_thin_updates ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
@@ -913,6 +914,8 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
   inv_param.solve_type = QUDA_DIRECT_SOLVE;
 
   mg_param.is_staggered = QUDA_BOOLEAN_TRUE;
+
+  mg_param.use_mma = mg_use_mma ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   mg_param.invert_param = &inv_param;
   mg_param.n_level = mg_levels;
