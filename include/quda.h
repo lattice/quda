@@ -704,6 +704,9 @@ extern "C" {
     /** Boolean for if this is a staggered solve or not */
     QudaBoolean is_staggered;
 
+    /** Whether to use tensor cores (if available) */
+    QudaBoolean use_mma;
+
     /** Whether to do a full (false) or thin (true) update in the context of updateMultigridQuda */
     QudaBoolean thin_update_only;
 

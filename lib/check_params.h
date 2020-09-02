@@ -862,6 +862,16 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
 #ifdef INIT_PARAM
+#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
+  P(use_mma, QUDA_BOOLEAN_TRUE);
+#else
+  P(use_mma, QUDA_BOOLEAN_FALSE);
+#endif
+#else
+  P(use_mma, QUDA_BOOLEAN_INVALID);
+#endif
+
+#ifdef INIT_PARAM
   P(thin_update_only, QUDA_BOOLEAN_FALSE);
 #else
   P(thin_update_only, QUDA_BOOLEAN_INVALID);

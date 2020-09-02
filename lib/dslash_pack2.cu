@@ -247,7 +247,7 @@ public:
                   tp, arg, stream);
               break;
             case 1:
-              launch(location & Host ? packShmemKernel<true, 1, QUDA_4D_PC, Arg> : packKernel<true, 0, QUDA_4D_PC, Arg>,
+              launch(location & Host ? packShmemKernel<true, 1, QUDA_4D_PC, Arg> : packKernel<true, 1, QUDA_4D_PC, Arg>,
                   tp, arg, stream);
               break;
             case 2:

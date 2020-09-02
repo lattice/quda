@@ -41,6 +41,17 @@ namespace quda {
       errorQuda("QDP interface has not been built\n");
 #endif
 
+    } else if (u.Order() == QUDA_MILC_GAUGE_ORDER) {
+      if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+#ifdef FINE_GRAINED_ACCESS
+        typedef typename gauge::FieldOrder<Float, Nc, 1, QUDA_MILC_GAUGE_ORDER, true, storeFloat> G;
+        extractGhost<Float, length>(G(const_cast<GaugeField &>(u), 0, (void **)Ghost), u, extract, offset);
+#else
+        typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO, length>::type G;
+        extractGhost<Float, length>(MILCOrder<Float, length>(u, 0, Ghost), u, extract, offset);
+#endif
+      }
+
     } else {
       errorQuda("Gauge field %d order not supported", u.Order());
     }

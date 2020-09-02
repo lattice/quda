@@ -247,6 +247,19 @@ namespace quda {
     {
       return parity * offset_cb + ((x_cb * nSpin + s) * nColor + c) * nVec + v;
     }
+
+    /**
+     * @brief This and the following `wrap_index` method returns the index for the pointer that points to
+     * the start of the memory chunk corresponds to the matrix at parity, x_cb, s. Only available for the
+     * QUDA_SPACE_SPIN_COLOR_FIELD_ORDER order.
+     * @param parity Parity index
+     * @param x_cb 1-d checkboarding site index
+     * @param s spin index
+     */
+    __device__ __host__ inline int wrap_index(int parity, int x_cb, int s) const
+    {
+      return parity * offset_cb + (x_cb * nSpin + s) * nColor * nVec;
+    }
     };
 
     template<typename Float, int nSpin, int nColor, int nVec>
@@ -262,6 +275,14 @@ namespace quda {
       GhostAccessorCB() : ghostOffset{ } { }
       __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const
       { return parity*ghostOffset[dim] + ((x_cb*nSpin+s)*nColor+c)*nVec+v; }
+
+      /**
+       * @brief This `wrap_index` method for ghost.
+       */
+      __device__ __host__ inline int wrap_index(int dim, int dir, int parity, int x_cb, int s) const
+      {
+        return parity * ghostOffset[dim] + (x_cb * nSpin + s) * nColor * nVec;
+      }
     };
 
     template <int nSpin, int nColor, int nVec, int N> // note this will not work for N=1
@@ -428,18 +449,25 @@ namespace quda {
     */
     template <typename Float, typename storeFloat>
       struct fieldorder_wrapper {
-  complex<storeFloat> *v;
-  const int idx;
-  const Float scale;
-  const Float scale_inv;
-  static constexpr bool fixed = fixed_point<Float,storeFloat>();
+      /**
+       * computing type and storage types that can be inferred from this object.
+       */
+      using type = Float;
+      using store_type = storeFloat;
+      complex<storeFloat> *v;
+      const int idx;
+      const Float scale;
+      const Float scale_inv;
+      static constexpr bool fixed = fixed_point<Float, storeFloat>();
 
-  /**
-     @brief fieldorder_wrapper constructor
-     @param idx Field index
-  */
-        __device__ __host__ inline fieldorder_wrapper(complex<storeFloat> *v, int idx, Float scale, Float scale_inv)
-    : v(v), idx(idx), scale(scale), scale_inv(scale_inv) {}
+      /**
+         @brief fieldorder_wrapper constructor
+         @param idx Field index
+      */
+      __device__ __host__ inline fieldorder_wrapper(complex<storeFloat> *v, int idx, Float scale, Float scale_inv) :
+        v(v), idx(idx), scale(scale), scale_inv(scale_inv)
+      {
+      }
 
   __device__ __host__ inline Float real() const {
     if (!fixed) {
@@ -471,6 +499,13 @@ namespace quda {
       v[idx].imag(storeFloat(round(scale * a)));
     }
   }
+
+  /**
+   * @brief returns the pointor of this wrapper object
+   */
+  __device__ __host__ inline auto data() { return &v[idx]; }
+
+  __device__ __host__ inline const auto data() const { return &v[idx]; }
 
   /**
      @brief negation operator
@@ -540,7 +575,6 @@ namespace quda {
                 typename ghostFloat = storeFloat, bool disable_ghost = false, bool block_float = false>
       class FieldOrderCB
       {
-
         typedef float norm_type;
 
       protected:
@@ -611,10 +645,10 @@ namespace quda {
       {
         for (int dim=0; dim<4; dim++) {
           for (int dir=0; dir<2; dir++) {
-          ghost[2*dim+dir] = static_cast<complex<ghostFloat>*>(ghost_[2*dim+dir]);
-          ghost_norm[2 * dim + dir] = !block_float_ghost ? nullptr :
-            reinterpret_cast<norm_type *>(static_cast<char *>(ghost_[2 * dim + dir]) + a.GhostNormOffset(dim, dir) * sizeof(norm_type)
-                                          - a.GhostOffset(dim, dir) * sizeof(ghostFloat));
+            ghost[2*dim+dir] = static_cast<complex<ghostFloat>*>(ghost_[2*dim+dir]);
+            ghost_norm[2 * dim + dir] = !block_float_ghost ? nullptr :
+            reinterpret_cast<norm_type *>(static_cast<char *>(ghost_[2 * dim + dir]) +
+                                          nParity * nColor * nSpin * nVec * 2 * ghostAccessor.faceVolumeCB[dim] * sizeof(ghostFloat));
           }
         }
       }
@@ -709,6 +743,27 @@ namespace quda {
       __device__ __host__ inline fieldorder_wrapper<Float,storeFloat> operator()(int parity, int x_cb, int s, int c, int n=0)
   { return fieldorder_wrapper<Float,storeFloat>(v, accessor.index(parity,x_cb,s,c,n), scale, scale_inv); }
 
+  /**
+   * @brief This and the following method (eventually) creates a fieldorder_wrapper object whose pointer points to
+   * the start of the memory chunk corresponds to the matrix at parity, x_cb, s. Only available for the
+   * QUDA_SPACE_SPIN_COLOR_FIELD_ORDER order.
+   * @param parity Parity index
+   * @param x_cb 1-d checkboarding site index
+   * @param s spin index
+   */
+  __device__ __host__ inline const auto wrap(int parity, int x_cb, int s) const
+  {
+    return fieldorder_wrapper<Float, storeFloat>(v, accessor.wrap_index(parity, x_cb, s), scale, scale_inv);
+  }
+
+  /**
+   * The non-const `wrap` method.
+   */
+  __device__ __host__ inline auto wrap(int parity, int x_cb, int s)
+  {
+    return fieldorder_wrapper<Float, storeFloat>(v, accessor.wrap_index(parity, x_cb, s), scale, scale_inv);
+  }
+
 #ifndef DISABLE_GHOST
       /**
        * Read-only complex-member accessor function for the ghost
@@ -763,6 +818,31 @@ namespace quda {
               block_float_ghost ? ghost_scale/max : ghost_scale,
               block_float_ghost ? ghost_scale_inv*max : ghost_scale_inv);
 
+      }
+
+      /**
+       * @brief This and the following method (eventually) creates a fieldorder_wrapper object whose pointer points to
+       * the start of the memory chunk corresponds to the matrix at dim, dir, parity, x_cb, s. Only available for the
+       * QUDA_SPACE_SPIN_COLOR_FIELD_ORDER order.
+       * @param dim
+       * @param dir
+       * @param parity Parity index
+       * @param x_cb 1-d checkboarding site index
+       * @param s spin index
+       */
+      __device__ __host__ inline const auto wrap_ghost(int dim, int dir, int parity, int x_cb, int s) const
+      {
+        const int idx = ghostAccessor.wrap_index(dim, dir, parity, x_cb, s);
+        return fieldorder_wrapper<Float, ghostFloat>(ghost[2 * dim + dir], idx, ghost_scale, ghost_scale_inv);
+      }
+
+      /**
+       * @brief the non-const `wrap_ghost` method
+       */
+      __device__ __host__ inline auto wrap_ghost(int dim, int dir, int parity, int x_cb, int s)
+      {
+        const int idx = ghostAccessor.wrap_index(dim, dir, parity, x_cb, s);
+        return fieldorder_wrapper<Float, ghostFloat>(ghost[2 * dim + dir], idx, ghost_scale, ghost_scale_inv);
       }
 
       /**

@@ -71,8 +71,8 @@ namespace quda {
     ghost_bytes(0),
     ghost_bytes_old(0),
     ghost_face_bytes {},
-    ghostOffset(),
-    ghostNormOffset(),
+    ghost_face_bytes_aligned {},
+    ghost_offset(),
     my_face_h {},
     my_face_hd {},
     my_face_d {},
@@ -164,8 +164,8 @@ namespace quda {
     ghost_bytes(0),
     ghost_bytes_old(0),
     ghost_face_bytes {},
-    ghostOffset(),
-    ghostNormOffset(),
+    ghost_face_bytes_aligned {},
+    ghost_offset(),
     my_face_h {},
     my_face_hd {},
     my_face_d {},
@@ -324,35 +324,30 @@ namespace quda {
     }
 
     // initialize ghost send pointers
-    size_t offset = 0;
     for (int i=0; i<nDimComms; i++) {
       if (!commDimPartitioned(i) && no_comms_fill==false) continue;
 
       for (int b=0; b<2; ++b) {
-	my_face_dim_dir_h[b][i][0] = static_cast<char*>(my_face_h[b]) + offset;
-	from_face_dim_dir_h[b][i][0] = static_cast<char*>(from_face_h[b]) + offset;
+	my_face_dim_dir_h[b][i][0] = static_cast<char*>(my_face_h[b]) + ghost_offset[i][0];
+	from_face_dim_dir_h[b][i][0] = static_cast<char*>(from_face_h[b]) + ghost_offset[i][0];
 
-	my_face_dim_dir_hd[b][i][0] = static_cast<char*>(my_face_hd[b]) + offset;
-	from_face_dim_dir_hd[b][i][0] = static_cast<char*>(from_face_hd[b]) + offset;
+	my_face_dim_dir_hd[b][i][0] = static_cast<char*>(my_face_hd[b]) + ghost_offset[i][0];
+	from_face_dim_dir_hd[b][i][0] = static_cast<char*>(from_face_hd[b]) + ghost_offset[i][0];
 
-        my_face_dim_dir_d[b][i][0] = static_cast<char *>(my_face_d[b]) + offset;
-        from_face_dim_dir_d[b][i][0] = static_cast<char *>(from_face_d[b]) + ghostOffset[i][0] * ghost_precision;
+        my_face_dim_dir_d[b][i][0] = static_cast<char *>(my_face_d[b]) + ghost_offset[i][0];
+        from_face_dim_dir_d[b][i][0] = static_cast<char *>(from_face_d[b]) + ghost_offset[i][0];
       } // loop over b
-
-      // if not bidir then forwards and backwards will alias
-      if (bidir) offset += ghost_face_bytes[i];
 
       for (int b=0; b<2; ++b) {
-	my_face_dim_dir_h[b][i][1] = static_cast<char*>(my_face_h[b]) + offset;
-	from_face_dim_dir_h[b][i][1] = static_cast<char*>(from_face_h[b]) + offset;
+	my_face_dim_dir_h[b][i][1] = static_cast<char*>(my_face_h[b]) + ghost_offset[i][1];
+	from_face_dim_dir_h[b][i][1] = static_cast<char*>(from_face_h[b]) + ghost_offset[i][1];
 
-	my_face_dim_dir_hd[b][i][1] = static_cast<char*>(my_face_hd[b]) + offset;
-	from_face_dim_dir_hd[b][i][1] = static_cast<char*>(from_face_hd[b]) + offset;
+	my_face_dim_dir_hd[b][i][1] = static_cast<char*>(my_face_hd[b]) + ghost_offset[i][1];
+	from_face_dim_dir_hd[b][i][1] = static_cast<char*>(from_face_hd[b]) + ghost_offset[i][1];
 
-        my_face_dim_dir_d[b][i][1] = static_cast<char *>(my_face_d[b]) + offset;
-        from_face_dim_dir_d[b][i][1] = static_cast<char *>(from_face_d[b]) + ghostOffset[i][1] * ghost_precision;
+        my_face_dim_dir_d[b][i][1] = static_cast<char *>(my_face_d[b]) + ghost_offset[i][1];
+        from_face_dim_dir_d[b][i][1] = static_cast<char *>(from_face_d[b]) + ghost_offset[i][1];
       } // loop over b
-      offset += ghost_face_bytes[i];
 
     } // loop over dimension
 

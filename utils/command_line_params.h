@@ -269,6 +269,8 @@ extern quda::mgarray<int> mg_schwarz_cycle;
 extern bool mg_evolve_thin_updates;
 
 extern quda::mgarray<std::array<int, 4>> geo_block_size;
+extern bool mg_use_mma;
+
 extern int n_ev;
 extern int max_search_dim;
 extern int deflation_grid;
