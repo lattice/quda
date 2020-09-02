@@ -67,9 +67,7 @@ namespace quda {
 	packSpinor<FloatOut, FloatIn, Ns, Nc>(out, in, meta.VolumeCB());
       } else {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	packSpinorKernel<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder>
-	  <<<tp.grid, tp.block, tp.shared_bytes, stream>>>
-	  (out, in, meta.VolumeCB());
+	qudaLaunchKernel(packSpinorKernel<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder>, tp, stream, out, in, meta.VolumeCB());
       }
     }
 

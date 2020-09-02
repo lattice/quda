@@ -1,7 +1,7 @@
 #include <quda_internal.h>
-#include <quda_cuda_api.h>
 #include <malloc_quda.h>
 #include <reduce_helper.h>
+#include <tune_quda.h>
 
 // These are used for reduction kernels
 static device_reduce_t *d_reduce = nullptr;
@@ -23,25 +23,25 @@ namespace quda
     void *get_host_buffer() { return h_reduce; }
     count_t *get_count() { return reduce_count; }
     cudaEvent_t &get_event() { return reduceEnd; }
+    constexpr int max_n_reduce() { return QUDA_MAX_MULTI_REDUCE; }
 
     size_t buffer_size()
     {
       /* we have these different reductions to cater for:
 
          - regular reductions (reduce_quda.cu) where are reducing to a
-           single vector type (max length 4 presently), with possibly
-           parity dimension, and a grid-stride loop with max number of
-           blocks = 2 x SM count
+           single vector type (max length 4 presently), and a
+           grid-stride loop with max number of blocks = 2 x SM count
 
          - multi-reductions where we are reducing to a matrix of size
-           of size QUDA_MAX_MULTI_REDUCE of vectors (max length 4), with
-           possible parity dimension, and a grid-stride loop with
-           maximum number of blocks = 2 x SM count
+           of size QUDA_MAX_MULTI_REDUCE of vectors (max length 4),
+           and a grid-stride loop with maximum number of blocks = 2 x
+           SM count
       */
 
       int reduce_size = 4 * sizeof(device_reduce_t);
-      int max_reduce = 2 * reduce_size;
-      int max_multi_reduce = 2 * QUDA_MAX_MULTI_REDUCE * reduce_size;
+      int max_reduce = reduce_size;
+      int max_multi_reduce = max_n_reduce() * reduce_size;
       int max_reduce_blocks = 2 * deviceProp.multiProcessorCount;
 
       // reduction buffer size
@@ -49,10 +49,10 @@ namespace quda
       return bytes;
     }
 
-    // need to placement new constructor to initialize the atomic counters
-    template <typename T> __global__ void init_count(T *counter, int n)
+    // need to use placement new constructor to initialize the atomic counters
+    template <typename T> __global__ void init_count(T *counter)
     {
-      for (int i = 0; i < n; i++) new (counter + i) T {0};
+      for (int i = 0; i < max_n_reduce(); i++) new (counter + i) T {0};
     }
 
     void init()
@@ -78,8 +78,12 @@ namespace quda
       }
 
       if (!reduce_count) {
-        reduce_count = static_cast<count_t *>(device_malloc(QUDA_MAX_MULTI_REDUCE * sizeof(decltype(*reduce_count))));
-        init_count<<<1, 1>>>(reduce_count, QUDA_MAX_MULTI_REDUCE);
+        reduce_count = static_cast<count_t *>(device_malloc(max_n_reduce() * sizeof(decltype(*reduce_count))));
+        TuneParam tp;
+        tp.grid = dim3(1, 1, 1);
+        tp.block = dim3(1, 1, 1);
+
+        qudaLaunchKernel(init_count<count_t>, tp, 0, reduce_count);
       }
 
       cudaEventCreateWithFlags(&reduceEnd, cudaEventDisableTiming);

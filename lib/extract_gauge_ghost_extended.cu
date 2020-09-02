@@ -96,8 +96,8 @@ namespace quda {
      Generic CPU gauge ghost extraction and packing
      NB This routines is specialized to four dimensions
   */
-  template <typename Float, int length, int nDim, int dim, typename Order, bool extract>
-  void extractGhostEx(ExtractGhostExArg<Order,nDim,dim> arg)
+  template <typename Float, int length, int dim, bool extract, typename Arg>
+  void extractGhostEx(Arg &arg)
   {
     for (int parity=0; parity<2; parity++) {
 
@@ -140,8 +140,8 @@ namespace quda {
      Generic CPU gauge ghost extraction and packing
      NB This routines is specialized to four dimensions
   */
-  template <typename Float, int length, int nDim, int dim, typename Order, bool extract>
-  __global__ void extractGhostExKernel(ExtractGhostExArg<Order,nDim,dim> arg)
+  template <typename Float, int length, int dim, bool extract, typename Arg>
+  __global__ void extractGhostExKernel(Arg arg)
   {
     // parallelize over parity and dir using block or grid 
     /*for (int parity=0; parity<2; parity++) {*/
@@ -218,23 +218,21 @@ namespace quda {
     void apply(const qudaStream_t &stream) {
       if (extract) {
 	if (location==QUDA_CPU_FIELD_LOCATION) {
-	  extractGhostEx<Float,length,nDim,dim,Order,true>(arg);
+	  extractGhostEx<Float,length,dim,true>(arg);
 	} else {
 	  TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	  tp.grid.y = 2;
 	  tp.grid.z = 2;
-	  extractGhostExKernel<Float,length,nDim,dim,Order,true> 
-	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  qudaLaunchKernel(extractGhostExKernel<Float,length,dim,true,decltype(arg)>, tp, stream, arg); 
 	}
       } else { // we are injecting
 	if (location==QUDA_CPU_FIELD_LOCATION) {
-	  extractGhostEx<Float,length,nDim,dim,Order,false>(arg);
+	  extractGhostEx<Float,length,dim,false>(arg);
 	} else {
 	  TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	  tp.grid.y = 2;
 	  tp.grid.z = 2;
-	  extractGhostExKernel<Float,length,nDim,dim,Order,false> 
-	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  qudaLaunchKernel(extractGhostExKernel<Float,length,dim,false,decltype(arg)>, tp, stream, arg);
 	}
       }
     }
