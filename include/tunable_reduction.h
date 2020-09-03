@@ -59,7 +59,7 @@ namespace quda {
     typename std::enable_if<block_size_x == warp_size(), qudaError_t>::type
       launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
-      return qudaLaunchKernel(Reduction2D<block_size_x, block_size_y, Reducer, Arg>, tp, stream, arg);
+      return qudaLaunchKernel(Reduction2D<block_size_x, block_size_y, Transformer, Reducer, Arg>, tp, stream, arg);
     }
 
     template <template <typename> class Reducer = plus, typename Arg>
@@ -84,7 +84,7 @@ namespace quda {
         arg.launch_error = launch<max_block_size<block_size_y>(), Reducer>(arg, tp, stream);
 #endif
       } else {
-	errorQuda("CPU not supported yet\n");
+	errorQuda("CPU not supported yet");
       }
     }
 
