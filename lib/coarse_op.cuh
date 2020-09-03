@@ -916,8 +916,8 @@ namespace quda {
      preconditioned clover operator else in general this just aliases V
      @param V[in] Packed null-space vector accessor
      @param G[in] Fine grid link / gauge field accessor
-     @param C[in] Fine grid clover field accessor
-     @param Cinv[in] Fine grid clover inverse field accessor
+     @param C[in] Fine grid clover field accessor, or Xinv accessor for the KD operator
+     @param Cinv[in] Fine grid clover inverse field accessor, or Xinv accessor for the KD operator
      @param Y_[out] Coarse link field
      @param X_[out] Coarse clover field
      @param X_[out] Coarse clover inverese field (used as temporary here)
@@ -945,10 +945,15 @@ namespace quda {
       errorQuda("Unsupported coarsening of matpc = %d", matpc);
 
     bool is_dirac_coarse = (dirac == QUDA_COARSE_DIRAC || dirac == QUDA_COARSEPC_DIRAC) ? true : false;
+    bool is_dirac_staggered = (dirac == QUDA_STAGGERED_DIRAC || dirac == QUDA_STAGGEREDPC_DIRAC || dirac == QUDA_STAGGEREDKD_DIRAC ||
+                               dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC || dirac == QUDA_ASQTADKD_DIRAC);
+    bool is_dirac_wilson = !is_dirac_coarse && !is_dirac_staggered;
     if (is_dirac_coarse && fineSpin != 2)
       errorQuda("Input Dirac operator %d should have nSpin=2, not nSpin=%d\n", dirac, fineSpin);
-    if (!is_dirac_coarse && fineSpin != 4)
+    if (is_dirac_wilson && fineSpin != 4)
       errorQuda("Input Dirac operator %d should have nSpin=4, not nSpin=%d\n", dirac, fineSpin);
+    if (is_dirac_staggered && fineSpin != 1)
+      errorQuda("Input Dirac operator %d should have nSpin=1, not nSpin=%d\n", dirac, fineSpin);
     if (!is_dirac_coarse && fineColor != 3)
       errorQuda("Input Dirac operator %d should have nColor=3, not nColor=%d\n", dirac, fineColor);
 
@@ -970,7 +975,7 @@ namespace quda {
     // If doing a preconditioned operator with a clover term then we
     // have bi-directional links, though we can do the bidirectional setup for all operators for debugging
     bool bidirectional_links = (dirac == QUDA_CLOVERPC_DIRAC || dirac == QUDA_COARSEPC_DIRAC || bidirectional_debug ||
-				dirac == QUDA_TWISTED_MASSPC_DIRAC || dirac == QUDA_TWISTED_CLOVERPC_DIRAC || need_bidirectional);
+				dirac == QUDA_TWISTED_MASSPC_DIRAC || dirac == QUDA_TWISTED_CLOVERPC_DIRAC || dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC || need_bidirectional);
 
     if (getVerbosity() >= QUDA_VERBOSE) {
       if (bidirectional_links) printfQuda("Doing bi-directional link coarsening\n");
@@ -1149,8 +1154,8 @@ namespace quda {
       }
     }
 
-    if ( (dirac == QUDA_CLOVERPC_DIRAC || dirac == QUDA_TWISTED_MASSPC_DIRAC || dirac == QUDA_TWISTED_CLOVERPC_DIRAC) &&
-	 (matpc == QUDA_MATPC_EVEN_EVEN || matpc == QUDA_MATPC_ODD_ODD) ) {
+    if ( ((dirac == QUDA_CLOVERPC_DIRAC || dirac == QUDA_TWISTED_MASSPC_DIRAC || dirac == QUDA_TWISTED_CLOVERPC_DIRAC) &&
+	 (matpc == QUDA_MATPC_EVEN_EVEN || matpc == QUDA_MATPC_ODD_ODD)) || (dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) ) {
       av.exchangeGhost(QUDA_INVALID_PARITY, nFace, 0);
       arg.AV.resetGhost(av, av.Ghost());  // make sure we point to the correct pointer in the accessor
       LatticeField::bufferIndex = (1 - LatticeField::bufferIndex); // update ghost bufferIndex for next exchange
@@ -1244,6 +1249,7 @@ namespace quda {
       y.setComputeType(COMPUTE_COARSE_CLOVER);
       y.apply(0);
     } else {  //Otherwise, we just have to add the identity matrix
+      // FIXME: add path for staggered, non-KD, adding the mass.
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Summing diagonal contribution to coarse clover\n");
       y.setComputeType(COMPUTE_DIAGONAL);
       y.apply(0);
