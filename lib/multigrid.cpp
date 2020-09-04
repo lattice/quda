@@ -719,7 +719,7 @@ namespace quda
 
         if (getVerbosity() >= QUDA_VERBOSE)
           printfQuda(
-            "Vector %d: norms v_k = %e P^\\dagger v_k = %e P P^\\dagger v_k = %e, L2 relative deviation = %e\n", i,
+            "Vector %d: norms v_k = %e P^\\dagger v_k = %e (1 - P P^\\dagger) v_k = %e, L2 relative deviation = %e\n", i,
             norm2(*tmp1), norm2(*r_coarse), norm2(*tmp2), deviation);
         if (deviation > tol) errorQuda("L2 relative deviation for k=%d failed, %e > %e", i, deviation, tol);
       }
