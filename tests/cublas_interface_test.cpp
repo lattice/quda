@@ -57,7 +57,8 @@ int main(int argc, char **argv)
   initRand();
   setQudaPrecisions();
   display_test_info();
-
+  setVerbosity(verbosity);
+  
   // initialize the QUDA library
   initQuda(device);
   //-----------------------------------------------------------------------------

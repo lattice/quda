@@ -5874,7 +5874,7 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
   void *A_d = pool_device_malloc(A_bytes);
   void *B_d = pool_device_malloc(B_bytes);
   void *C_d = pool_device_malloc(C_bytes);
-  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("QUDA: arrays allocated sucsessfully.\n");
+  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("QUDA: arrays allocated sucessfully.\n");
   profileCuBLAS.TPSTOP(QUDA_PROFILE_INIT);
 
   // Transfer host data to device
@@ -5882,7 +5882,7 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
   qudaMemcpy(A_d, arrayA, A_bytes, cudaMemcpyHostToDevice);
   qudaMemcpy(B_d, arrayB, B_bytes, cudaMemcpyHostToDevice);
   qudaMemcpy(C_d, arrayC, C_bytes, cudaMemcpyHostToDevice);
-  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("QUDA: arrays copied sucsessfully.\n");
+  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("QUDA: arrays copied susessfully.\n");
   profileCuBLAS.TPSTOP(QUDA_PROFILE_H2D);
 
   // Compute Batched GEMM

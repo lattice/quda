@@ -1,4 +1,4 @@
-#include <ccomplex>
+#include <complex.h>
 #include <blas_lapack.h>
 #ifdef NATIVE_LAPACK_LIB
 #include <cublas_v2.h>
@@ -258,8 +258,8 @@ namespace quda
 #if 0
 	  typedef cuDoubleComplex Z ;
 	  
-	  const Z alpha = make_double2((double)creal(cublas_param.alpha),
-				       (double)cimag(cublas_param.alpha));
+	  const Z alpha = make_double2((double)reinterpret_cast<Complex>(cublas_param.alpha).real(),
+				       (double)reinterpret_cast<Complex>(cublas_param.alpha).imag());
 	  
 	  const Z beta  = make_double2((double)creal(cublas_param.beta),
 				       (double)cimag(cublas_param.beta));
@@ -298,7 +298,7 @@ namespace quda
 #endif	  
 	} else if (cublas_param.data_type == QUDA_CUBLAS_DATATYPE_C) {
 	  
-	  typedef cuComplex C;
+	  typedef cuFloatComplex C;
 
 	  const C alpha  = make_float2((float)creal(cublas_param.alpha),
 				       (float)cimag(cublas_param.alpha));	  
@@ -311,12 +311,20 @@ namespace quda
 	    C **A_ptr_array = static_cast<C**>(pool_device_malloc(batch*sizeof(C*)));
 	    C **B_ptr_array = static_cast<C**>(pool_device_malloc(batch*sizeof(C*)));
 	    C **C_ptr_array = static_cast<C**>(pool_device_malloc(batch*sizeof(C*)));
-	    
+
+	    C **A_ptr_array_h = static_cast<C**>(pool_pinned_malloc(batch*sizeof(C*)));
+	    C **B_ptr_array_h = static_cast<C**>(pool_pinned_malloc(batch*sizeof(C*)));
+	    C **C_ptr_array_h = static_cast<C**>(pool_pinned_malloc(batch*sizeof(C*)));
+
 	    for (uint64_t i = 0; i < batch; i++) {
-	      A_ptr_array[i] = static_cast<C *>(A_d) + cublas_param.a_offset + i * A_batch_size;
-	      B_ptr_array[i] = static_cast<C *>(B_d) + cublas_param.b_offset + i * B_batch_size;
-	      C_ptr_array[i] = static_cast<C *>(C_d) + cublas_param.c_offset + i * C_batch_size;
+	      A_ptr_array_h[i] = (static_cast<C *>(A_d)) + cublas_param.a_offset + i * A_batch_size;
+	      B_ptr_array_h[i] = (static_cast<C *>(B_d)) + cublas_param.b_offset + i * B_batch_size;
+	      C_ptr_array_h[i] = (static_cast<C *>(C_d)) + cublas_param.c_offset + i * C_batch_size;
 	    }
+	    
+	    qudaMemcpy(A_ptr_array, A_ptr_array_h, batch * sizeof(C *), cudaMemcpyHostToDevice);
+	    qudaMemcpy(B_ptr_array, B_ptr_array_h, batch * sizeof(C *), cudaMemcpyHostToDevice);
+	    qudaMemcpy(C_ptr_array, C_ptr_array_h, batch * sizeof(C *), cudaMemcpyHostToDevice);
 	    
 	    error = cublasCgemmBatched(handle, trans_a, trans_b, cublas_param.m,
 				       cublas_param.n, cublas_param.k, &alpha,
@@ -327,6 +335,10 @@ namespace quda
 	    pool_device_free(A_ptr_array);
 	    pool_device_free(B_ptr_array);
 	    pool_device_free(C_ptr_array);
+
+	    pool_pinned_free(A_ptr_array_h);
+	    pool_pinned_free(B_ptr_array_h);
+	    pool_pinned_free(C_ptr_array_h);
 	    
 	  } else {
 	    error = cublasCgemm(handle, trans_a, trans_b, cublas_param.m,
