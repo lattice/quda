@@ -447,12 +447,13 @@ public:
      @param X[out] Coarse clover field
      @param T[in] Transfer operator that defines the coarse space
      @param gauge[in] Gauge field from fine grid, needs to be generalized for long link.
+     @param XinvKD[in] Inverse Kahler-Dirac block
      @param mass[in] Mass parameter
      @param matpc[in] The type of even-odd preconditioned fine-grid
      operator we are constructing the coarse grid operator from.
      For staggered, should always be QUDA_MATPC_INVALID.
    */
-  void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge, double mass,
+  void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge, const cudaGaugeField* XinvKD, double mass,
                          QudaDiracType dirac, QudaMatPCType matpc);
 
   /**

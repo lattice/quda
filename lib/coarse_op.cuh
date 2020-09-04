@@ -25,6 +25,7 @@ namespace quda {
     COMPUTE_COARSE_CLOVER,
     COMPUTE_REVERSE_Y,
     COMPUTE_DIAGONAL,
+    COMPUTE_STAGGEREDMASS,
     COMPUTE_TMDIAGONAL,
     COMPUTE_CONVERT,
     COMPUTE_RESCALE,
@@ -123,9 +124,19 @@ namespace quda {
       } else if (type == COMPUTE_COARSE_CLOVER) {
         ComputeCoarseCloverCPU<from_coarse,Float,fineSpin,coarseSpin,fineColor,coarseColor>(arg);
       } else if (type == COMPUTE_REVERSE_Y) {
+#if !defined(STAGGEREDCOARSE)
         ComputeYReverseCPU<Float,coarseSpin,coarseColor>(arg);
+#else
+        errorQuda("ComputeYReverse not enabled for staggered coarsenings");
+#endif
       } else if (type == COMPUTE_DIAGONAL) {
         AddCoarseDiagonalCPU<Float,coarseSpin,coarseColor>(arg);
+      } else if (type == COMPUTE_STAGGEREDMASS) {
+#if defined(STAGGEREDCOARSE)
+        AddCoarseStaggeredMassCPU<Float,coarseSpin,coarseColor>(arg);
+#else
+        errorQuda("AddCoarseStaggeredMass not enabled for non-staggered coarsenings");
+#endif
       } else if (type == COMPUTE_TMDIAGONAL) {
         AddCoarseTmDiagonalCPU<Float,coarseSpin,coarseColor>(arg);
       } else if (type == COMPUTE_CONVERT) {
@@ -372,6 +383,7 @@ namespace quda {
           .instantiate(from_coarse,Type<Float>(),fineSpin,coarseSpin,fineColor,coarseColor,Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
+          // FIXME may be needed for KD coarsening...
 #if !defined(STAGGEREDCOARSE)
         qudaLaunchKernel(ComputeCoarseCloverGPU<from_coarse,Float,fineSpin,coarseSpin,fineColor,coarseColor,Arg>, tp, stream, arg);
 #else
@@ -379,7 +391,6 @@ namespace quda {
 #endif
         
 #endif
-
       } else if (type == COMPUTE_REVERSE_Y) {
 
 #ifdef JITIFY
@@ -387,7 +398,12 @@ namespace quda {
           .instantiate(Type<Float>(),coarseSpin,coarseColor,Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
+#if !defined(STAGGEREDCOARSE)
         qudaLaunchKernel(ComputeYReverseGPU<Float,coarseSpin,coarseColor,Arg>, tp, stream, arg);
+#else
+        errorQuda("ComputeYReverse not enabled for staggered coarsenings");
+#endif
+
 #endif
       } else if (type == COMPUTE_DIAGONAL) {
 
@@ -397,6 +413,20 @@ namespace quda {
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
         qudaLaunchKernel(AddCoarseDiagonalGPU<Float,coarseSpin,coarseColor,Arg>, tp, stream, arg);
+#endif
+      } else if (type == COMPUTE_STAGGEREDMASS) {
+
+#ifdef JITIFY
+        error = program->kernel("quda::AddCoarseStaggeredMassGPU")
+          .instantiate(Type<Float>(),coarseSpin,coarseColor,Type<Arg>())
+          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+#else
+#if defined(STAGGEREDCOARSE)
+        qudaLaunchKernel(AddCoarseStaggeredMassGPU<Float,coarseSpin,coarseColor,Arg>, tp, stream, arg);
+#else
+        errorQuda("AddCoarseStaggeredMass not enabled for non-staggered coarsenings");
+#endif
+
 #endif
       } else if (type == COMPUTE_TMDIAGONAL) {
 
@@ -485,6 +515,7 @@ namespace quda {
         flops_ = 0;
 	break;
       case COMPUTE_DIAGONAL:
+      case COMPUTE_STAGGEREDMASS:
       case COMPUTE_TMDIAGONAL:
 	// read addition on the diagonal
 	flops_ = 2l * arg.coarseVolumeCB*coarseSpin*coarseColor;
@@ -534,8 +565,9 @@ namespace quda {
       case COMPUTE_REVERSE_Y:
 	bytes_ = 4*2*2*arg.Y.Bytes(); // 4 from direction, 2 from i/o, 2 from parity
       case COMPUTE_DIAGONAL:
+      case COMPUTE_STAGGEREDMASS:
       case COMPUTE_TMDIAGONAL:
-	bytes_ = 2*2*arg.X.Bytes(); // 2 from i/o, 2 from parity
+	bytes_ = 2*2*arg.X.Bytes()/(coarseSpin*coarseColor); // 2 from i/o, 2 from parity, division because of diagonal
 	break;
       case COMPUTE_CONVERT:
 	bytes_ = dim == 4 ? 2*(arg.X.Bytes() + arg.X_atomic.Bytes()) : 2*(arg.Y.Bytes() + arg.Y_atomic.Bytes());
@@ -564,6 +596,7 @@ namespace quda {
 	break;
       case COMPUTE_REVERSE_Y:
       case COMPUTE_DIAGONAL:
+      case COMPUTE_STAGGEREDMASS:
       case COMPUTE_TMDIAGONAL:
       case COMPUTE_CONVERT:
       case COMPUTE_RESCALE:
@@ -797,6 +830,7 @@ namespace quda {
         strcat(Aux, ",computeCoarseClover");
       else if (type == COMPUTE_REVERSE_Y)          strcat(Aux,",computeYreverse");
       else if (type == COMPUTE_DIAGONAL)           strcat(Aux,",computeCoarseDiagonal");
+      else if (type == COMPUTE_STAGGEREDMASS)      strcat(Aux,",computeCoarseStaggeredMass");
       else if (type == COMPUTE_TMDIAGONAL)         strcat(Aux,",computeCoarseTmDiagonal");
       else if (type == COMPUTE_CONVERT)            strcat(Aux,",computeConvert");
       else if (type == COMPUTE_RESCALE)            strcat(Aux,",computeRescale");
@@ -832,7 +866,7 @@ namespace quda {
         if (arg.bidirectional && type == COMPUTE_VUV) strcat(Aux,",bidirectional");
       }
 
-      const char *vol_str = (type == COMPUTE_REVERSE_Y || type == COMPUTE_DIAGONAL || type == COMPUTE_TMDIAGONAL ||
+      const char *vol_str = (type == COMPUTE_REVERSE_Y || type == COMPUTE_DIAGONAL || type == COMPUTE_STAGGEREDMASS || type == COMPUTE_TMDIAGONAL ||
                              type == COMPUTE_CONVERT || type == COMPUTE_RESCALE) ? X.VolString () : meta.VolString();
 
       if (type == COMPUTE_VUV || type == COMPUTE_COARSE_CLOVER) {
@@ -853,6 +887,7 @@ namespace quda {
       case COMPUTE_VUV:
         Y_atomic.backup();
       case COMPUTE_DIAGONAL:
+      case COMPUTE_STAGGEREDMASS:
       case COMPUTE_TMDIAGONAL:
       case COMPUTE_COARSE_CLOVER:
 	X_atomic.backup();
@@ -881,6 +916,7 @@ namespace quda {
       case COMPUTE_VUV:
 	Y_atomic.restore();
       case COMPUTE_DIAGONAL:
+      case COMPUTE_STAGGEREDMASS:
       case COMPUTE_TMDIAGONAL:
       case COMPUTE_COARSE_CLOVER:
 	X_atomic.restore();
@@ -1235,6 +1271,7 @@ namespace quda {
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("X2 = %e\n", X_atomic_.norm2(0, coarseGaugeAtomic::fixedPoint()));
 
+    // FIXME: you can write a "REVERSE Y" for staggered, it just has a different structure.
     // if not doing a preconditioned operator then we can trivially
     // construct the forward links from the backward links
     if ( !bidirectional_links ) {
@@ -1243,13 +1280,17 @@ namespace quda {
       y.apply(0);
     }
 
+    // FIXME: idk how we're going to handle the KD contribution
     // Check if we have a clover term that needs to be coarsened
     if (dirac == QUDA_CLOVER_DIRAC || dirac == QUDA_COARSE_DIRAC || dirac == QUDA_TWISTED_CLOVER_DIRAC) {
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing fine->coarse clover term\n");
       y.setComputeType(COMPUTE_COARSE_CLOVER);
       y.apply(0);
+    } else if (dirac == QUDA_STAGGERED_DIRAC || dirac == QUDA_STAGGEREDPC_DIRAC || dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC) { 
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Summing staggered mass contribution to coarse clover\n");
+      y.setComputeType(COMPUTE_STAGGEREDMASS);
+      y.apply(0);
     } else {  //Otherwise, we just have to add the identity matrix
-      // FIXME: add path for staggered, non-KD, adding the mass.
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Summing diagonal contribution to coarse clover\n");
       y.setComputeType(COMPUTE_DIAGONAL);
       y.apply(0);

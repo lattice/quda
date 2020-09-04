@@ -131,8 +131,10 @@ namespace quda {
            double kappa, double mass, double mu, double mu_factor) const {
     if (T.getTransferType() == QUDA_TRANSFER_OPTIMIZED_KD)
       errorQuda("The optimized Kahler-Dirac operator is not built through createCoarseOp");
-    
-    StaggeredCoarseOp(Y, X, T, *gauge, mass, QUDA_STAGGERED_DIRAC, QUDA_MATPC_INVALID);
+
+    // nullptr == no Kahler-Dirac Xinv
+    const cudaGaugeField* XinvKD = nullptr; 
+    StaggeredCoarseOp(Y, X, T, *gauge, XinvKD, mass, QUDA_STAGGERED_DIRAC, QUDA_MATPC_INVALID);
   }
 
 

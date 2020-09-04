@@ -85,6 +85,13 @@ namespace quda {
     for (int d = 1; d < ndim; d++) block_str += " x " + std::to_string(geo_bs[d]);
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer: using block size %s\n", block_str.c_str());
 
+    if (transfer_type == QUDA_TRANSFER_COARSE_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD) {
+      for (int d = 0; d < 4; d++) {
+        if (geo_bs[d] != 2)
+          errorQuda("Invalid staggered KD block size %d for dimension %d", geo_bs[d], d);
+      }
+    }
+
     createV(B[0]->Location()); // allocate V field
     createTmp(QUDA_CPU_FIELD_LOCATION); // allocate temporaries
 
@@ -440,20 +447,15 @@ namespace quda {
       if (V->SiteSubset() == QUDA_PARITY_SITE_SUBSET && in.SiteSubset() == QUDA_FULL_SITE_SUBSET)
         errorQuda("Cannot restrict a full field since only have single parity null-space components");
 
-      // Check for KD preconditioned staggered op
-      if (input->Nspin() == 1) {
+      if (V->Nspin() != 1 && (output->GammaBasis() != V->GammaBasis() || input->GammaBasis() != V->GammaBasis()))
+        errorQuda("Cannot apply restrictor using fields in a different basis from the null space (%d,%d) != %d",
+                  out.GammaBasis(), input->GammaBasis(), V->GammaBasis());
 
-      } else { // (wilson or coarse)->coarse}
-        if (V->Nspin() != 1 && (output->GammaBasis() != V->GammaBasis() || input->GammaBasis() != V->GammaBasis()))
-          errorQuda("Cannot apply restrictor using fields in a different basis from the null space (%d,%d) != %d",
-                    out.GammaBasis(), input->GammaBasis(), V->GammaBasis());
+      Restrict(*output, *input, *V, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
 
-        Restrict(*output, *input, *V, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
-
-        flops_ += 8 * out.Ncolor() * in.Ncolor() * in.VolumeCB() * in.SiteSubset();
-      }
+      flops_ += 8 * out.Ncolor() * in.Ncolor() * in.VolumeCB() * in.SiteSubset();
     } else {
-      errorQuda("Invalid transfer type in prolongate");
+      errorQuda("Invalid transfer type in restrict");
     }
 
     out = *output; // copy result to out field (aliasing handled automatically)

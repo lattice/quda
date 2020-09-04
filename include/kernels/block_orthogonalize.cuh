@@ -104,6 +104,7 @@ namespace quda {
   template <typename sumFloat, typename Float, int nSpin, int spinBlockSize, int nColor, int coarseSpin, int nVec, typename Arg>
   void blockOrthoCPU(Arg &arg)
   {
+    //FIXME: may be broken for staggered...
     // loop over geometric blocks
 #pragma omp parallel for
     for (int x_coarse=0; x_coarse<arg.coarseVolume; x_coarse++) {
@@ -268,14 +269,19 @@ namespace quda {
         // FIXME: everything I did for staggered is an untested disaster
         // don't trust me with any of this being efficient or maybe even right
         complex<Float> v[spinBlock][nColor];
-        if (nSpin == 0) {
+        if (nSpin == 1) {
           if (parity == chirality) {
             if (n == 0) {
-              for (int c = 0; c < nColor; c++) v[0][c] = arg.B[j](parity, x_cb, 0, c);
+              complex<Float> v_[spinBlock * nColor];
+              B[j].template load<spinBlock>(v_, parity, x_cb, 0);
+#pragma unroll
+              for (int c = 0; c < nColor; c++) v[0][c] = v_[c];
             } else {
+#pragma unroll
               for (int c = 0; c < nColor; c++) v[0][c] = arg.V(parity, x_cb, 0, c, j);
             }
           } else {
+#pragma unroll
             for (int c = 0; c < nColor; c++) v[0][c] = { 0., 0. };
           }
         } else
@@ -301,8 +307,10 @@ namespace quda {
           complex<Float> vi[spinBlock][nColor];
           if (nSpin == 1) {
             if (parity == chirality)
+#pragma unroll
               for (int c = 0; c < nColor; c++) vi[0][c] = arg.V(parity, x_cb, 0, c, i);
             else
+#pragma unroll
               for (int c = 0; c < nColor; c++) vi[0][c] = { 0, 0 };
           } else {
 #pragma unroll
@@ -345,6 +353,7 @@ namespace quda {
 
         if (nSpin == 1) {
           if (parity == chirality)
+#pragma unroll
             for (int c = 0; c < nColor; c++) arg.V(parity, x_cb, 0, c, j) = v[0][c];
         } else {
 #pragma unroll

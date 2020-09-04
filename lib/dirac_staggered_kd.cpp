@@ -275,12 +275,12 @@ namespace quda {
 
   void DiracStaggeredKD::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
            double kappa, double mass, double mu, double mu_factor) const {
-    
+
     errorQuda("DiracStaggeredKD does not support multigrid coarsening (yet)");
 
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Staggered KD operators only support aggregation coarsening");
-    //StaggeredCoarseOp(Y, X, T, *fatGauge, mass, QUDA_STAGGEREDKD_DIRAC, QUDA_MATPC_INVALID);
+    //StaggeredCoarseOp(Y, X, T, *fatGauge, Xinv, mass, QUDA_STAGGEREDKD_DIRAC, QUDA_MATPC_INVALID);
   }
 
   void DiracStaggeredKD::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const

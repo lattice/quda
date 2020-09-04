@@ -282,7 +282,7 @@ namespace quda {
 
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Staggered KD operators only support aggregation coarsening");
-    //StaggeredCoarseOp(Y, X, T, *fatGauge, mass, QUDA_ASQTADKD_DIRAC, QUDA_MATPC_INVALID);
+    //StaggeredCoarseOp(Y, X, T, *fatGauge, Xinv, mass, QUDA_ASQTADKD_DIRAC, QUDA_MATPC_INVALID);
   }
 
   void DiracImprovedStaggeredKD::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const

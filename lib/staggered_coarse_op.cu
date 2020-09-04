@@ -249,14 +249,11 @@ namespace quda {
     // Actually create the temporaries like UV, etc.
     auto location = Y.Location();
 
-    //Create a field UV which holds U*V.  Has the same similar
-    //structure to V but double the number of spins so we can store
-    //the two distinct block chiral multiplications in a single UV
-    //computation.
+    //Create a field UV which holds U*V.  Has the same structure as V,
+    // no need to double the spins b/c chirality is parity.
     ColorSpinorParam UVparam(T.Vectors(location));
     UVparam.create = QUDA_ZERO_FIELD_CREATE;
     UVparam.location = location;
-    UVparam.nSpin *= 2; // so nSpin == 2
     UVparam.setPrecision(T.Vectors(location).Precision());
     UVparam.mem_type = Y.MemType(); // allocate temporaries to match coarse-grid link field
 
@@ -284,24 +281,25 @@ namespace quda {
     const double mu_dummy = 0.; 
     const double mu_factor_dummy = 0.;
 
-    bool need_bidirectional = false;
-    if (dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) 
-      need_bidirectional = true;
+    // FIXME: should be able to get away with bidirectional for non-KD
+    //bool need_bidirectional = false;
+    //if (dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) 
+    bool need_bidirectional = true;
+
+    constexpr QudaGaugeFieldOrder xinvOrder = QUDA_MILC_GAUGE_ORDER;
+    if (XinvKD.FieldOrder() != xinvOrder && XinvKD.Bytes()) errorQuda("unsupported field order %d\n", XinvKD.FieldOrder());
 
     if (Y.Location() == QUDA_CPU_FIELD_LOCATION) {
 
       constexpr QudaFieldOrder csOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
       constexpr QudaGaugeFieldOrder gOrder = QUDA_QDP_GAUGE_ORDER;
-      constexpr QudaGaugeFieldOrder xinvOrder = QUDA_MILC_GAUGE_ORDER;
 
       if (T.Vectors(Y.Location()).FieldOrder() != csOrder)
         errorQuda("Unsupported field order %d\n", T.Vectors(Y.Location()).FieldOrder());
       if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
-      if (XinvKD.FieldOrder() != xinvOrder) errorQuda("unsupported field order %d\n", XinvKD.FieldOrder());
 
       typedef typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder,vFloat> V;
-      // not sure on factor of 2? may be needed to pack both chiralities, idk.
-      typedef typename colorspinor::FieldOrderCB<Float,2*fineSpin,fineColor,coarseColor,csOrder,vFloat> F;
+      typedef typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder,vFloat> F;
       typedef typename gauge::FieldOrder<Float,fineColor,1,gOrder> gFine;
       typedef typename gauge::FieldOrder<typename mapper<vFloatXinv>::type,xinvColor,xinvSpin,xinvOrder,true,vFloatXinv> xinvFine;
       typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat> gCoarse;
@@ -328,16 +326,13 @@ namespace quda {
 
       constexpr QudaFieldOrder csOrder = QUDA_FLOAT2_FIELD_ORDER;
       constexpr QudaGaugeFieldOrder gOrder = QUDA_FLOAT2_GAUGE_ORDER;
-      constexpr QudaGaugeFieldOrder xinvOrder = QUDA_MILC_GAUGE_ORDER;
 
       if (T.Vectors(Y.Location()).FieldOrder() != csOrder)
         errorQuda("Unsupported field order %d\n", T.Vectors(Y.Location()).FieldOrder());
       if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
-      if (XinvKD.FieldOrder() != xinvOrder) errorQuda("unsupported field order %d\n", XinvKD.FieldOrder());
 
       typedef typename colorspinor::FieldOrderCB<Float, fineSpin, fineColor, coarseColor, csOrder, vFloat> V;
-      // not sure on the factor of 2? may be needed to pack both chiralities
-      typedef typename colorspinor::FieldOrderCB<Float, 2 * fineSpin, fineColor, coarseColor, csOrder, vFloat> F;
+      typedef typename colorspinor::FieldOrderCB<Float, fineSpin, fineColor, coarseColor, csOrder, vFloat> F;
       typedef typename gauge::FieldOrder<Float, fineColor * fineSpin, fineSpin, gOrder, true, vFloat> gFine;
       typedef typename gauge::FieldOrder<typename mapper<vFloatXinv>::type,xinvColor,xinvSpin,xinvOrder,true,vFloatXinv> xinvFine;
       typedef typename gauge::FieldOrder<Float, coarseColor * coarseSpin, coarseSpin, gOrder, true, vFloat> gCoarse;
@@ -412,9 +407,8 @@ namespace quda {
         // the permutation routines don't need Yatomic, Xatomic, uv, av
         calculateStaggeredY<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, T, g, mass, dirac, matpc);
       else {
-        errorQuda("Staggered aggregation temporarily unsupported");
         // free field aggregation
-        //aggregateStaggeredY<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, T, g, XinvKD, mass, dirac, matpc);
+        aggregateStaggeredY<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, T, g, XinvKD, mass, dirac, matpc);
       }
     } else if (coarseColor == 64) {
       //errorQuda("Staggered aggregation temporarily unsupported");
