@@ -16,10 +16,12 @@ void setGaugeParam(QudaGaugeParam &gauge_param)
   gauge_param.cuda_prec = cuda_prec;
   gauge_param.cuda_prec_sloppy = cuda_prec;
   gauge_param.cuda_prec_precondition = cuda_prec;
+  gauge_param.cuda_prec_eigensolver = cuda_prec;
 
   gauge_param.reconstruct = link_recon;
   gauge_param.reconstruct_sloppy = link_recon;
   gauge_param.reconstruct_precondition = link_recon;
+  gauge_param.reconstruct_eigensolver = link_recon;
   gauge_param.reconstruct_refinement_sloppy = link_recon;
 
   gauge_param.anisotropy = 1.0;
@@ -40,10 +42,12 @@ void setWilsonGaugeParam(QudaGaugeParam &gauge_param)
 
   gauge_param.cuda_prec_sloppy = cuda_prec_sloppy;
   gauge_param.cuda_prec_precondition = cuda_prec_precondition;
+  gauge_param.cuda_prec_eigensolver = cuda_prec_eigensolver;
   gauge_param.cuda_prec_refinement_sloppy = cuda_prec_refinement_sloppy;
 
   gauge_param.reconstruct_sloppy = link_recon_sloppy;
   gauge_param.reconstruct_precondition = link_recon_precondition;
+  gauge_param.reconstruct_eigensolver = link_recon_eigensolver;
   gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
 
   int pad_size = 0;
@@ -65,8 +69,10 @@ void setStaggeredGaugeParam(QudaGaugeParam &gauge_param)
   gauge_param.cuda_prec_sloppy = prec_sloppy;
   gauge_param.cuda_prec_refinement_sloppy = prec_refinement_sloppy;
   gauge_param.cuda_prec_precondition = prec_precondition;
+  gauge_param.cuda_prec_eigensolver = prec_eigensolver;
   gauge_param.reconstruct_sloppy = link_recon_sloppy;
-  gauge_param.reconstruct_precondition = link_recon;
+  gauge_param.reconstruct_precondition = link_recon_precondition;
+  gauge_param.reconstruct_eigensolver = link_recon_eigensolver;
   gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
 
   // For HISQ, this must always be set to 1.0, since the tadpole
@@ -150,6 +156,7 @@ void setInvertParam(QudaInvertParam &inv_param)
     inv_param.clover_cuda_prec = cuda_prec;
     inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
     inv_param.clover_cuda_prec_precondition = cuda_prec_precondition;
+    inv_param.clover_cuda_prec_eigensolver = cuda_prec_eigensolver;
     inv_param.clover_cuda_prec_refinement_sloppy = cuda_prec_sloppy;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
     inv_param.clover_coeff = clover_coeff;
@@ -213,13 +220,13 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.maxiter_precondition = maxiter_precondition;
   inv_param.verbosity_precondition = mg_verbosity[0];
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
+  inv_param.cuda_prec_eigensolver = cuda_prec_eigensolver;
   inv_param.omega = 1.0;
 
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
   inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
   inv_param.cuda_prec_refinement_sloppy = cuda_prec_refinement_sloppy;
-  // inv_param.cuda_prec_ritz = cuda_prec_ritz;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
@@ -273,7 +280,6 @@ void setEigParam(QudaEigParam &eig_param)
   eig_param.require_convergence = eig_require_convergence ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   eig_param.check_interval = eig_check_interval;
   eig_param.max_restarts = eig_max_restarts;
-  eig_param.cuda_prec_ritz = cuda_prec;
 
   eig_param.use_norm_op = eig_use_normop ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   eig_param.use_dagger = eig_use_dagger ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -314,6 +320,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   inv_param.cuda_prec = cuda_prec;
   inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
+  inv_param.cuda_prec_eigensolver = cuda_prec_eigensolver;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
@@ -323,6 +330,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     inv_param.clover_cuda_prec = cuda_prec;
     inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
     inv_param.clover_cuda_prec_precondition = cuda_prec_precondition;
+    inv_param.clover_cuda_prec_eigensolver = cuda_prec_eigensolver;
     inv_param.clover_cuda_prec_refinement_sloppy = cuda_prec_sloppy;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
     inv_param.clover_coeff = clover_coeff;
@@ -564,6 +572,7 @@ void setMultigridInvertParam(QudaInvertParam &inv_param)
   inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
 
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
+  inv_param.cuda_prec_eigensolver = cuda_prec_eigensolver;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
@@ -573,6 +582,7 @@ void setMultigridInvertParam(QudaInvertParam &inv_param)
     inv_param.clover_cuda_prec = cuda_prec;
     inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
     inv_param.clover_cuda_prec_precondition = cuda_prec_precondition;
+    inv_param.clover_cuda_prec_eigensolver = cuda_prec_eigensolver;
     inv_param.clover_cuda_prec_refinement_sloppy = cuda_prec_sloppy;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
   }
@@ -682,7 +692,6 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
   mg_eig_param.tol = mg_eig_tol[level];
   mg_eig_param.check_interval = mg_eig_check_interval[level];
   mg_eig_param.max_restarts = mg_eig_max_restarts[level];
-  mg_eig_param.cuda_prec_ritz = cuda_prec;
 
   mg_eig_param.compute_svd = QUDA_BOOLEAN_FALSE;
   mg_eig_param.use_norm_op = mg_eig_use_normop[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -712,6 +721,7 @@ void setContractInvertParam(QudaInvertParam &inv_param)
   inv_param.cuda_prec = cuda_prec;
   inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
+  inv_param.cuda_prec_eigensolver = cuda_prec_eigensolver;
 
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
@@ -752,6 +762,7 @@ void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
   // inv_param.verbosity_precondition = mg_verbosity[0];
   inv_param.verbosity_precondition = QUDA_SUMMARIZE; // ESW HACK
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
+  inv_param.cuda_prec_eigensolver = cuda_prec_eigensolver;
 
   // Specify Krylov sub-size for GCR, BICGSTAB(L)
   inv_param.gcrNkrylov = gcrNkrylov;
@@ -842,6 +853,7 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
   inv_param.maxiter_precondition = maxiter_precondition;
   inv_param.verbosity_precondition = QUDA_SILENT;
   inv_param.cuda_prec_precondition = prec_precondition;
+  inv_param.cuda_prec_eigensolver = prec_eigensolver;
 
   // Specify Krylov sub-size for GCR, BICGSTAB(L), basis size for CA-CG, CA-GCR
   inv_param.gcrNkrylov = gcrNkrylov;
@@ -893,6 +905,7 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
   inv_param.cuda_prec = cuda_prec;
   inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
+  inv_param.cuda_prec_eigensolver = cuda_prec_eigensolver;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
@@ -1114,6 +1127,7 @@ void setDeflatedInvertParam(QudaInvertParam &inv_param)
   inv_param.cuda_prec_refinement_sloppy = cuda_prec_refinement_sloppy;
 
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
+  inv_param.cuda_prec_eigensolver = cuda_prec_eigensolver;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
@@ -1189,7 +1203,6 @@ void setDeflatedInvertParam(QudaInvertParam &inv_param)
     inv_param.tol_restart = 0.0; // restart is not requested...
   }
 
-  inv_param.cuda_prec_ritz = cuda_prec_ritz;
   inv_param.verbosity = verbosity;
   inv_param.verbosity_precondition = verbosity;
 

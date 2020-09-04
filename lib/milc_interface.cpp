@@ -1192,7 +1192,6 @@ void qudaEigCGInvert(int external_precision, int quda_precision, double mass, Qu
   invertParam.n_ev = eig_args.nev;
   invertParam.max_search_dim     = eig_args.max_search_dim;
   invertParam.deflation_grid     = eig_args.deflation_grid;
-  invertParam.cuda_prec_ritz     = eig_args.prec_ritz;
   invertParam.tol_restart        = eig_args.tol_restart;
   invertParam.eigcg_max_restarts = eig_args.eigcg_max_restarts;
   invertParam.max_restart_num    = eig_args.max_restart_num;
@@ -1607,7 +1606,6 @@ void milcSetMultigridEigParam(QudaEigParam &mg_eig_param, mgInputStruct &input_s
   mg_eig_param.tol = input_struct.deflate_tol;                   // mg_eig_tol[level];
   mg_eig_param.check_interval = 10;                              // mg_eig_check_interval[level];
   mg_eig_param.max_restarts = input_struct.deflate_max_restarts; // mg_eig_max_restarts[level];
-  mg_eig_param.cuda_prec_ritz = QUDA_DOUBLE_PRECISION;           // cuda_prec;
 
   mg_eig_param.compute_svd = QUDA_BOOLEAN_FALSE;
   mg_eig_param.use_norm_op = QUDA_BOOLEAN_TRUE; // mg_eig_use_normop[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;

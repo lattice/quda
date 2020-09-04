@@ -168,7 +168,7 @@ namespace quda {
       { return static_cast<ReduceType>(norm(x)); }
     };
 
-    template<typename ReduceType> struct square_<ReduceType,int8_t> {
+    template <typename ReduceType> struct square_<ReduceType, int8_t> {
       const ReduceType scale;
       square_(const ReduceType scale) : scale(scale) { }
       __host__ __device__ inline ReduceType operator()(const quda::complex<int8_t> &x)
@@ -194,7 +194,7 @@ namespace quda {
       __host__ __device__ Float operator()(const quda::complex<storeFloat> &x) { return abs(x); }
     };
 
-    template<typename Float> struct abs_<Float,int8_t> {
+    template <typename Float> struct abs_<Float, int8_t> {
       Float scale;
       abs_(const Float scale) : scale(scale) { }
       __host__ __device__ Float operator()(const quda::complex<int8_t> &x)
@@ -216,7 +216,7 @@ namespace quda {
     };
 
     template <typename Float, typename storeFloat> __host__ __device__ inline constexpr bool fixed_point() { return false; }
-    template<> __host__ __device__ inline constexpr bool fixed_point<float,int8_t>() { return true; }
+    template <> __host__ __device__ inline constexpr bool fixed_point<float, int8_t>() { return true; }
     template<> __host__ __device__ inline constexpr bool fixed_point<float,short>() { return true; }
     template<> __host__ __device__ inline constexpr bool fixed_point<float,int>() { return true; }
 
