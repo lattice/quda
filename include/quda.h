@@ -728,6 +728,9 @@ extern "C" {
     int a_offset;                /**< position of the A array from which begin read/write. */
     int b_offset;                /**< position of the B array from which begin read/write. */
     int c_offset;                /**< position of the C array from which begin read/write. */
+    int strideA;                 /**< stride of the A array in strided(batched) mode */
+    int strideB;                 /**< stride of the B array in strided(batched) mode */
+    int strideC;                 /**< stride of the C array in strided(batched) mode */
 
     double_complex alpha; /**< scalar used for multiplication. */
     double_complex beta;  /**< scalar used for multiplication. If beta==0, C does not have to be a valid input. */

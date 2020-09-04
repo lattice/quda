@@ -1,6 +1,7 @@
 #include <comm_quda.h>
 #include <gauge_fix_ovr_extra.h>
 #include <thrust_helper.cuh>
+#include <tune_quda.h>
 
 namespace quda {
 
@@ -80,16 +81,19 @@ namespace quda {
     thrust::device_ptr<int> array_interiorT[2];
     for ( int i = 0; i < 2; i++ ) { //even and odd ids
       borderpoints[i] = static_cast<int*>(pool_device_malloc(nlinksfaces * sizeof(int) ));
-      cudaMemset(borderpoints[i], 0, nlinksfaces * sizeof(int) );
+      qudaMemset(borderpoints[i], 0, nlinksfaces * sizeof(int) );
       array_faceT[i] = thrust::device_pointer_cast(borderpoints[i]);
     }
-    dim3 nthreads(128, 1, 1);
+    TuneParam tp;
+    tp.block = dim3(128, 1, 1);
     int start = 0;
     for ( int dir = 0; dir < 4; ++dir ) {
       if ( comm_dim_partitioned(dir)) {
-        dim3 blocks((faceVolume[dir] + nthreads.x - 1) / nthreads.x,1,1);
-        for ( int oddbit = 0; oddbit < 2; oddbit++ )
-          ComputeBorderPointsActiveFaceIndex <<< blocks, nthreads >>> (arg, borderpoints[oddbit] + start, faceVolume[dir], dir, oddbit);
+        tp.grid = dim3((faceVolume[dir] + tp.block.x - 1) / tp.block.x,1,1);
+        for ( int oddbit = 0; oddbit < 2; oddbit++) {
+          auto faceindices = borderpoints[oddbit] + start;
+          qudaLaunchKernel(ComputeBorderPointsActiveFaceIndex, tp, (qudaStream_t)0, arg, faceindices, faceVolume[dir], dir, oddbit);
+        }
         start += faceVolume[dir];
       }
     }
@@ -108,4 +112,3 @@ namespace quda {
 #endif // GPU_GAUGE_ALG && MULTI_GPU
 
 }
-

@@ -87,13 +87,20 @@ namespace quda
       i += blockDim.x * gridDim.x;
     }
 
-    reduce<Arg::block_size, reduce_t, false, decltype(arg.r)>(arg, r_, j);
+    arg.template reduce<Arg::block_size, false, decltype(arg.r)>(r_, j);
   }
 
-  template <typename Arg> class TransformReduce : Tunable
+  template <typename reduce_t, typename T, typename I, typename transformer, typename reducer>
+  class TransformReduce : Tunable
   {
-    Arg &arg;
+    using Arg = TransformReduceArg<reduce_t, T, I, transformer, reducer>;
     QudaFieldLocation location;
+    std::vector<reduce_t> &result;
+    const std::vector<T *> &v;
+    I n_items;
+    transformer &h;
+    reduce_t init;
+    reducer &r;
 
     bool tuneSharedBytes() const { return false; }
     unsigned int sharedBytesPerThread() const { return 0; }
@@ -101,50 +108,57 @@ namespace quda
     int blockMin() const { return Arg::block_size; }
     unsigned int maxBlockSize(const TuneParam &param) const { return Arg::block_size; }
 
-    bool advanceTuneParam(TuneParam &param) const
+    bool advanceTuneParam(TuneParam &param) const // only do autotuning if we have device fields
     {
-      // only do autotuning if we have device fields
-      if (location == QUDA_CUDA_FIELD_LOCATION)
-        return Tunable::advanceTuneParam(param);
-      else
-        return false;
+      return location == QUDA_CUDA_FIELD_LOCATION ? Tunable::advanceTuneParam(param) : false;
     }
 
     void initTuneParam(TuneParam &param) const
     {
       Tunable::initTuneParam(param);
-      param.grid.y = arg.n_batch;
+      param.grid.y = v.size();
     }
 
   public:
-    TransformReduce(Arg &arg, QudaFieldLocation location) : arg(arg), location(location)
+    TransformReduce(QudaFieldLocation location, std::vector<reduce_t> &result, const std::vector<T *> &v, I n_items,
+                    transformer &h, reduce_t init, reducer &r) :
+      location(location),
+      result(result),
+      v(v),
+      n_items(n_items),
+      h(h),
+      init(init),
+      r(r)
     {
       strcpy(aux, "batch_size=");
-      u32toa(aux + 11, arg.n_batch);
+      u32toa(aux + 11, v.size());
       if (location == QUDA_CPU_FIELD_LOCATION) strcat(aux, ",cpu");
+      apply(0);
     }
 
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      Arg arg(v, n_items, h, init, r);
 
       if (location == QUDA_CUDA_FIELD_LOCATION) {
-        transform_reduce_kernel<<<tp.grid, tp.block>>>(arg);
-        arg.complete(arg.result, stream);
+        arg.launch_error = qudaLaunchKernel(transform_reduce_kernel<Arg>, tp, stream, arg);
+        arg.complete(result, stream);
       } else {
         transform_reduce(arg);
+        for (size_t j = 0; j < result.size(); j++) result[j] = arg.result[j];
       }
     }
 
     TuneKey tuneKey() const
     {
       char count[16];
-      u32toa(count, arg.n_items);
+      u32toa(count, n_items);
       return TuneKey(count, typeid(*this).name(), aux);
     }
 
     long long flops() const { return 0; } // just care about bandwidth
-    long long bytes() const { return arg.n_batch * arg.n_items * sizeof(*arg.v); }
+    long long bytes() const { return v.size() * n_items * sizeof(T); }
   };
 
   /**
@@ -166,10 +180,7 @@ namespace quda
   {
     if (result.size() != v.size())
       errorQuda("result %lu and input %lu set sizes do not match", result.size(), v.size());
-    TransformReduceArg<reduce_t, T, I, transformer, reducer> arg(v, n_items, h, init, r);
-    TransformReduce<decltype(arg)> reduce(arg, location);
-    reduce.apply(0);
-    for (size_t j = 0; j < result.size(); j++) result[j] = arg.result[j];
+    TransformReduce<reduce_t, T, I, transformer, reducer> reduce(location, result, v, n_items, h, init, r);
   }
 
   /**

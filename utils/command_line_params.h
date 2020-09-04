@@ -368,6 +368,7 @@ extern QudaCublasDataOrder cublas_data_order;
 extern std::array<int, 3> cublas_mnk;
 extern std::array<int, 3> cublas_leading_dims;
 extern std::array<int, 3> cublas_offsets;
+extern std::array<int, 3> cublas_strides;
 extern std::array<double, 2> cublas_alpha_re_im;
 extern std::array<double, 2> cublas_beta_re_im;
 extern int cublas_batch;

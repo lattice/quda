@@ -261,31 +261,28 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
 	  cudaDeviceCanAccessPeer(&canAccessPeer[1], neighbor_gpuid, gpuid);
 
 	  int accessRank[2] = { };
-#if CUDA_VERSION >= 8000  // this was introduced with CUDA 8
 	  if (canAccessPeer[0]*canAccessPeer[1] != 0) {
 	    cudaDeviceGetP2PAttribute(&accessRank[0], cudaDevP2PAttrPerformanceRank, gpuid, neighbor_gpuid);
 	    cudaDeviceGetP2PAttribute(&accessRank[1], cudaDevP2PAttrPerformanceRank, neighbor_gpuid, gpuid);
 	  }
-#endif
 
 	  // enable P2P if we can access the peer or if peer is self
           if ((canAccessPeer[0] * canAccessPeer[1] != 0 && accessRank[0] <= enable_p2p_max_access_rank
                && accessRank[1] <= enable_p2p_max_access_rank)
               || gpuid == neighbor_gpuid) {
             peer2peer_enabled[dir][dim] = true;
-	    if (getVerbosity() > QUDA_SILENT) {
+            if (getVerbosity() > QUDA_SILENT) {
               printf("Peer-to-peer enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d, access rank "
                      "= (%d, %d)\n",
                      comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim, accessRank[0], accessRank[1]);
             }
-	  } else {
+          } else {
             intranode_enabled[dir][dim] = true;
             if (getVerbosity() > QUDA_SILENT) {
-	      printf("Intra-node (non peer-to-peer) enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d\n",
+              printf("Intra-node (non peer-to-peer) enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d\n",
 		     comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
-	    }
+            }
           }
-
         } // on the same node
       } // different dimensions - x, y, z, t
     } // different directions - forward/backward

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <quda_cuda_api.h>
+#include <quda_api.h>
 #include <string>
 #include <complex>
 #include <vector>
@@ -54,7 +54,7 @@ extern "C" {
     void *field; /**< Pointer to a ColorSpinorField */
   };
 
-  //extern cudaDeviceProp deviceProp;
+  // extern cudaDeviceProp deviceProp;
   extern qudaStream_t *streams;
 
 #ifdef __cplusplus

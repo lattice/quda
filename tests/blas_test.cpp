@@ -1034,9 +1034,6 @@ int main(int argc, char** argv)
 
   setVerbosity(verbosity);
 
-  // clear the error state
-  cudaGetLastError();
-
   // lastly check for correctness
   ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
   if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }

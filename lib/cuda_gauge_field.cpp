@@ -599,14 +599,14 @@ namespace quda {
             qudaMemcpy(buffer, src.Gauge_p(), src.Bytes(), cudaMemcpyDefault);
           }
 
-          if (src.Order() > 4 && GhostExchange() == QUDA_GHOST_EXCHANGE_PAD &&
-	      src.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
-	    for (int d=0; d<geometry; d++)
+          if (src.Order() > 4 && GhostExchange() == QUDA_GHOST_EXCHANGE_PAD
+              && src.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
+            for (int d=0; d<geometry; d++)
               qudaMemcpy(ghost_buffer[d], src.Ghost()[d], ghost_bytes[d], cudaMemcpyDefault);
 
           if (ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED && src.GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
             copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer, 0, ghost_buffer);
-	    if (geometry == QUDA_COARSE_GEOMETRY) copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer, 0, ghost_buffer, 3);
+            if (geometry == QUDA_COARSE_GEOMETRY) copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer, 0, ghost_buffer, 3);
           } else {
             copyExtendedGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer);
             if (geometry == QUDA_COARSE_GEOMETRY) errorQuda("Extended gauge copy for coarse geometry not supported");
@@ -681,9 +681,9 @@ namespace quda {
           qudaMemcpy(cpu.gauge, buffer, cpu.Bytes(), cudaMemcpyDefault);
         }
 
-        if (cpu.Order() > 4 && GhostExchange() == QUDA_GHOST_EXCHANGE_PAD &&
-	    cpu.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
-	  for (int d=0; d<geometry; d++)
+        if (cpu.Order() > 4 && GhostExchange() == QUDA_GHOST_EXCHANGE_PAD
+            && cpu.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
+          for (int d=0; d<geometry; d++)
             qudaMemcpy(cpu.Ghost()[d], ghost_buffer[d], ghost_bytes[d], cudaMemcpyDefault);
 
         free_gauge_buffer(buffer, cpu.Order(), cpu.Geometry());
@@ -737,23 +737,14 @@ namespace quda {
 
   void cudaGaugeField::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
   {
-
     if (is_prefetch_enabled() && mem_type == QUDA_MEMORY_DEVICE) {
-      int dev_id = 0;
-      if (mem_space == QUDA_CUDA_FIELD_LOCATION)
-        dev_id = comm_gpuid();
-      else if (mem_space == QUDA_CPU_FIELD_LOCATION)
-        dev_id = cudaCpuDeviceId;
-      else
-        errorQuda("Invalid QudaFieldLocation.");
-
-      if (gauge) cudaMemPrefetchAsync(gauge, bytes, dev_id, stream);
+      if (gauge) qudaMemPrefetchAsync(gauge, bytes, mem_space, stream);
       if (!isNative()) {
         for (int i = 0; i < nDim; i++) {
           size_t nbytes = nFace * surface[i] * nInternal * precision;
-          if (ghost[i] && nbytes) cudaMemPrefetchAsync(ghost[i], nbytes, dev_id, stream);
+          if (ghost[i] && nbytes) qudaMemPrefetchAsync(ghost[i], nbytes, mem_space, stream);
           if (ghost[i + 4] && nbytes && geometry == QUDA_COARSE_GEOMETRY)
-            cudaMemPrefetchAsync(ghost[i + 4], nbytes, dev_id, stream);
+            qudaMemPrefetchAsync(ghost[i + 4], nbytes, mem_space, stream);
         }
       }
     }
