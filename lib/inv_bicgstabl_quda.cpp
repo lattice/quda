@@ -247,7 +247,7 @@ namespace quda {
   }
 
   BiCGstabL::BiCGstabL(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matSloppy, param, profile),
+    Solver(mat, matSloppy, matSloppy, matSloppy, param, profile),
     n_krylov(param.Nkrylov),
     init(false)
   {

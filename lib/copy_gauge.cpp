@@ -1,18 +1,18 @@
 #include <gauge_field.h>
 
 namespace quda {
- 
-  void copyGenericGaugeDoubleIn(GaugeField &out, const GaugeField &in, QudaFieldLocation location,
-                                void *Out, void *In, void **ghostOut, void **ghostIn, int type);
+
+  void copyGenericGaugeDoubleIn(GaugeField &out, const GaugeField &in, QudaFieldLocation location, void *Out, void *In,
+                                void **ghostOut, void **ghostIn, int type);
 
   void copyGenericGaugeSingleIn(GaugeField &out, const GaugeField &in, QudaFieldLocation location, void *Out, void *In,
                                 void **ghostOut, void **ghostIn, int type);
 
-  void copyGenericGaugeHalfIn(GaugeField &out, const GaugeField &in, QudaFieldLocation location,
-                              void *Out, void *In, void **ghostOut, void **ghostIn, int type);
+  void copyGenericGaugeHalfIn(GaugeField &out, const GaugeField &in, QudaFieldLocation location, void *Out, void *In,
+                              void **ghostOut, void **ghostIn, int type);
 
-  void copyGenericGaugeQuarterIn(GaugeField &out, const GaugeField &in, QudaFieldLocation location, void *Out,
-                                 void *In, void **ghostOut, void **ghostIn, int type);
+  void copyGenericGaugeQuarterIn(GaugeField &out, const GaugeField &in, QudaFieldLocation location, void *Out, void *In,
+                                 void **ghostOut, void **ghostIn, int type);
 
   // specialized variation where we restrict different field orders supported but instantiate different colors
   // this, as with all of the above are hacks until JIT is supported

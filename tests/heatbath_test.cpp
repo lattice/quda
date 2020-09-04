@@ -92,8 +92,8 @@ int main(int argc, char **argv)
   // Load the gauge field to the device
   loadGaugeQuda((void *)load_gauge, &gauge_param);
 
-  int *num_failures_h = (int*)mapped_malloc(sizeof(int));
-  int *num_failures_d = (int*)get_mapped_device_pointer(num_failures_h);
+  int *num_failures_h = (int *)mapped_malloc(sizeof(int));
+  int *num_failures_d = (int *)get_mapped_device_pointer(num_failures_h);
   *num_failures_h = 0;
 
   // start the timer

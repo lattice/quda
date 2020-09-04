@@ -559,7 +559,7 @@ namespace quda {
           if (clover.Order() != N) {
             errorQuda("Invalid clover order %d for FloatN (N=%d) accessor", clover.Order(), N);
           }
-          this->clover = clover_ ? clover_ : (Float*)(clover.V(is_inverse));
+          this->clover = clover_ ? clover_ : (Float *)(clover.V(is_inverse));
           this->norm = norm_ ? norm_ : (norm_type *)(clover.Norm(is_inverse));
 	}
 
@@ -803,8 +803,8 @@ namespace quda {
         if (clover.Order() != QUDA_QDPJIT_CLOVER_ORDER) {
           errorQuda("Invalid clover order %d for this accessor", clover.Order());
         }
-        offdiag = clover_ ? ((Float**)clover_)[0] : ((Float**)clover.V(inverse))[0];
-	diag = clover_ ? ((Float**)clover_)[1] : ((Float**)clover.V(inverse))[1];
+        offdiag = clover_ ? ((Float **)clover_)[0] : ((Float **)clover.V(inverse))[0];
+        diag = clover_ ? ((Float **)clover_)[1] : ((Float **)clover.V(inverse))[1];
       }
 	
       bool  Twisted()	const	{return twisted;}
@@ -872,8 +872,8 @@ namespace quda {
         if (clover.Order() != QUDA_BQCD_CLOVER_ORDER) {
           errorQuda("Invalid clover order %d for this accessor", clover.Order());
         }
-        this->clover[0] = clover_ ? clover_ : (Float*)(clover.V(inverse));
-	this->clover[1] = (Float*)((char*)this->clover[0] + clover.Bytes()/2);
+        this->clover[0] = clover_ ? clover_ : (Float *)(clover.V(inverse));
+        this->clover[1] = (Float *)((char *)this->clover[0] + clover.Bytes() / 2);
       }
 
 
@@ -931,7 +931,9 @@ namespace quda {
   template<int N, bool add_rho> struct clover_mapper<short,N,add_rho> { typedef clover::FloatNOrder<short, N, 4, add_rho> type; };
 
   // quarter precision uses Float4
-  template<int N, bool add_rho> struct clover_mapper<int8_t,N,add_rho> { typedef clover::FloatNOrder<int8_t, N, 4, add_rho> type; };
+  template <int N, bool add_rho> struct clover_mapper<int8_t, N, add_rho> {
+    typedef clover::FloatNOrder<int8_t, N, 4, add_rho> type;
+  };
 
 } // namespace quda
 

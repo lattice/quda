@@ -13,7 +13,7 @@
 namespace quda {
 
   MPBiCGstab::MPBiCGstab(const DiracMatrix &mat, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, mat, mat, param, profile)
+    Solver(mat, mat, mat, mat, param, profile)
   {
   }
 
