@@ -1,6 +1,7 @@
 #include <communicator_quda.h>
 #include <map>
 #include <array>
+#include <lattice_field.h>
 
 int Communicator::gpuid = -1;
 
@@ -64,6 +65,8 @@ void push_to_current(const CommKey &split_key)
     print(split_key);
     printf(" added.\n");
   }
+
+  quda::LatticeField::destroyIPCComms(); // Destroy the IPC Comm buffers with the old communicator.
 
   current_key = split_key;
 }
