@@ -1,5 +1,5 @@
-#include <cuda_runtime.h>
-#include <cuda_profiler_api.h>
+#include <hip/hip_runtime.h>
+#include <hip/hip_profile.h>
 #include <util_quda.h>
 #include <quda_internal.h>
 
@@ -11,7 +11,9 @@
 #include <numa_affinity.h>
 #endif
 
-cudaDeviceProp deviceProp;
+#include <hip/hip_runtime.h>
+
+hipDeviceProp_t deviceProp;
 qudaStream_t *streams;
 
 namespace quda
@@ -28,11 +30,11 @@ namespace quda
       initialized = true;
       printfQuda("*** HIP BACKEND ***\n");
       int driver_version;
-      cudaDriverGetVersion(&driver_version);
+      hipDriverGetVersion(&driver_version);
       printfQuda("CUDA Driver version = %d\n", driver_version);
 
       int runtime_version;
-      cudaRuntimeGetVersion(&runtime_version);
+      hipRuntimeGetVersion(&runtime_version);
       printfQuda("CUDA Runtime version = %d\n", runtime_version);
 
 #ifdef QUDA_NVML
@@ -48,20 +50,20 @@ namespace quda
 #endif
 
       int deviceCount;
-      cudaGetDeviceCount(&deviceCount);
+      hipGetDeviceCount(&deviceCount);
       if (deviceCount == 0) {
         errorQuda("No CUDA devices found");
       }
 
       for (int i = 0; i < deviceCount; i++) {
-        cudaGetDeviceProperties(&deviceProp, i);
+        hipGetDeviceProperties(&deviceProp, i);
         checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
         if (getVerbosity() >= QUDA_SUMMARIZE) {
           printfQuda("Found device %d: %s\n", i, deviceProp.name);
         }
       }
 
-      cudaGetDeviceProperties(&deviceProp, dev);
+      hipGetDeviceProperties(&deviceProp, dev);
       checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
       if (deviceProp.major < 1) {
         errorQuda("Device %d does not support CUDA", dev);
@@ -98,7 +100,7 @@ namespace quda
         printfQuda("Using device %d: %s\n", dev, deviceProp.name);
       }
 #ifndef USE_QDPJIT
-      cudaSetDevice(dev);
+      hipSetDevice(dev);
       checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
 #endif
 
@@ -111,9 +113,9 @@ namespace quda
       }
 #endif
 
-      cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
-      //cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
-      // cudaGetDeviceProperties(&deviceProp, dev);
+      hipDeviceSetCacheConfig(hipFuncCachePreferL1);
+      //hipDeviceSetSharedMemConfig(hipSharedMemBankSizeEightByte);
+      // hipGetDeviceProperties(&deviceProp, dev);
     }
 
     void create_context()
@@ -122,11 +124,11 @@ namespace quda
 
       int greatestPriority;
       int leastPriority;
-      cudaDeviceGetStreamPriorityRange(&leastPriority, &greatestPriority);
+      hipDeviceGetStreamPriorityRange(&leastPriority, &greatestPriority);
       for (int i=0; i<Nstream-1; i++) {
-        cudaStreamCreateWithPriority(&streams[i], cudaStreamDefault, greatestPriority);
+        hipStreamCreateWithPriority(&streams[i], hipStreamDefault, greatestPriority);
       }
-      cudaStreamCreateWithPriority(&streams[Nstream-1], cudaStreamDefault, leastPriority);
+      hipStreamCreateWithPriority(&streams[Nstream-1], hipStreamDefault, leastPriority);
 
       checkCudaError();
 
@@ -135,7 +137,7 @@ namespace quda
     void destroy()
     {
       if (streams) {
-        for (int i=0; i<Nstream; i++) cudaStreamDestroy(streams[i]);
+        for (int i=0; i<Nstream; i++) hipStreamDestroy(streams[i]);
         delete []streams;
         streams = nullptr;
       }
@@ -143,7 +145,7 @@ namespace quda
       char *device_reset_env = getenv("QUDA_DEVICE_RESET");
       if (device_reset_env && strcmp(device_reset_env,"1") == 0) {
         // end this CUDA context
-        cudaDeviceReset();
+        hipDeviceReset();
       }
     }
 
@@ -151,12 +153,12 @@ namespace quda
 
       void start()
       {
-        cudaProfilerStart();
+        hipProfilerStart();
       }
 
       void stop()
       {
-        cudaProfilerStop();
+        hipProfilerStop();
       }
 
     }

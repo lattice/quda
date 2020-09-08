@@ -6,6 +6,7 @@
 #include <execinfo.h> // for backtrace
 #include <quda_internal.h>
 
+#include <hip/hip_runtime.h>
 #ifdef USE_QDPJIT
 #include "qdp_quda.h"
 #include "qdp_config.h"
@@ -136,7 +137,7 @@ namespace quda
   }
 
   /**
-   * Under CUDA 4.0, cudaHostRegister seems to require that both the
+   * Under CUDA 4.0, hipHostRegister seems to require that both the
    * beginning and end of the buffer be aligned on page boundaries.
    * This local function takes care of the alignment and gets called
    * by pinned_malloc_() and mapped_malloc_()
@@ -168,7 +169,9 @@ namespace quda
         warningQuda("Using managed memory for HIP allocations");
         managed = true;
 
-        if (deviceProp.major < 6) warningQuda("Using managed memory on pre-Pascal architecture is limited");
+	// Managed memory is nor really recommended on HIP. It is a compatibility feature
+	// presently
+	warningQuda("Managed memory in HIP is a currently inefficient compatibility feature");
       }
 
       init = true;
@@ -186,8 +189,14 @@ namespace quda
       if (use_managed_memory()) {
         char *enable_managed_prefetch = getenv("QUDA_ENABLE_MANAGED_PREFETCH");
         if (enable_managed_prefetch && strcmp(enable_managed_prefetch, "1") == 0) {
+	  // BJoo: Managed Memory Prefetch is not supported currently under HIP
+#ifdef __HIP_PLATFORM_NVCC__
           warningQuda("Enabling prefetch support for managed memory");
           prefetch = true;
+#else
+	  warningQuda("HIP Does not currently allow prefetch support for managed memory. Setting prefetch to false");
+	  prefetch = false;
+#endif
         }
       }
 
@@ -198,7 +207,7 @@ namespace quda
   }
 
   /**
-   * Perform a standard cudaMalloc() with error-checking.  This
+   * Perform a standard hipMalloc() with error-checking.  This
    * function should only be called via the device_malloc() macro,
    * defined in malloc_quda.h
    */
@@ -222,20 +231,21 @@ namespace quda
 #endif
     return ptr;
 #else
-    // when QDO uses managed memory we can bypass the QDP memory manager
+    // when QDP uses managed memory we can bypass the QDP memory manager
     return device_pinned_malloc_(func, file, line, size);
 #endif
   }
 
   /**
-   * Perform a cuMemAlloc with error-checking.  This function is to
+   * Perform a hipMalloc with error-checking.  This function is to
    * guarantee a unique memory allocation on the device, since
-   * cudaMalloc can be redirected (as is the case with QDPJIT).  This
+   * hipMalloc can be redirected (as is the case with QDPJIT).  This
    * should only be called via the device_pinned_malloc() macro,
    * defined in malloc_quda.h.
    */
   void *device_pinned_malloc_(const char *func, const char *file, int line, size_t size)
   {
+
     if (!comm_peer2peer_present()) return device_malloc_(func, file, line, size);
 
     MemAlloc a(func, file, line);
@@ -243,8 +253,15 @@ namespace quda
 
     a.size = a.base_size = size;
 
-    hipError_t err = hipMemAlloc((hipDeviceptr_t *)&ptr, size);
-    if (err != HIP_SUCCESS) {
+
+    // FIXME: QDP-JIT may have hijacked this function. 
+#ifdef USE_QDPJIT
+    warningQuda("calling hipMalloc() while using QDP-JIT. QDP-JIT may have hijacked this.  (%s:%d in %s())\n", file, line, func);
+#endif
+    hipError_t err = hipMalloc(&ptr, size);
+
+
+    if (err != hipSuccess) {
       errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
     track_malloc(DEVICE_PINNED, a, ptr);
@@ -278,7 +295,7 @@ namespace quda
    * should only be called via the pinned_malloc() macro, defined in
    * malloc_quda.h
    *
-   * Note that we do not rely on cudaHostAlloc(), since buffers
+   * Note that we do not rely on hipHostMalloc(), since buffers
    * allocated in this way have been observed to cause problems when
    * shared with MPI via GPU Direct on some systems.
    */
@@ -321,7 +338,7 @@ namespace quda
   }
 
   /**
-   * Perform a standard cudaMallocManaged() with error-checking.  This
+   * Perform a standard hipMallocManaged() with error-checking.  This
    * function should only be called via the managed_malloc() macro,
    * defined in malloc_quda.h
    */
@@ -384,8 +401,12 @@ namespace quda
     if (!alloc[DEVICE_PINNED].count(ptr)) {
       errorQuda("Attempt to free invalid device pointer (%s:%d in %s())\n", file, line, func);
     }
-    hipError_t err = hipMemFree((hipDeviceptr_t)ptr);
-    if (err != HIP_SUCCESS) { printfQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func); }
+
+#ifdef USE_QDPJIT
+    warningQuda("device_pinned_free_ while using QDP-JIT calls hipFree()\n");
+#endif
+    hipError_t err = hipFree(ptr);
+    if (err != hipSuccess) { printfQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func); }
     track_free(DEVICE_PINNED, ptr);
   }
 
@@ -467,29 +488,21 @@ namespace quda
 
   QudaFieldLocation get_pointer_location(const void *ptr)
   {
-    
-    // Unsupported in HIP
-    /*
-    CUpointer_attribute attribute[] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE};
-    CUmemorytype mem_type;
-    void *data[] = {&mem_type};
-    CUresult error = cuPointerGetAttributes(1, attribute, data, reinterpret_cast<CUdeviceptr>(ptr));
-    if (error != CUDA_SUCCESS) {
-      const char *string;
-      cuGetErrorString(error, &string);
-      errorQuda("cuPointerGetAttributes failed with error %s", string);
-    }
 
-    // catch pointers that have not been created in CUDA
-    if (mem_type == 0) mem_type = CU_MEMORYTYPE_HOST;
-
-    switch (mem_type) {
-    case CU_MEMORYTYPE_DEVICE:
-    case CU_MEMORYTYPE_UNIFIED: return QUDA_CUDA_FIELD_LOCATION;
-    case CU_MEMORYTYPE_HOST: return QUDA_CPU_FIELD_LOCATION;
-    default: errorQuda("Unknown memory type %d", mem_type); return QUDA_INVALID_FIELD_LOCATION;
+    hipPointerAttribute_t pointer_attributes;
+    hipError_t err = hipPointerGetAttributes(&pointer_attributes, ptr);
+    if ( err == hipSuccess ) {
+      hipMemoryType mem_type = pointer_attributes.memoryType;
+      switch (mem_type) {
+        case hipMemoryTypeDevice: return QUDA_CUDA_FIELD_LOCATION; break;
+        case hipMemoryTypeHost: return QUDA_CPU_FIELD_LOCATION; break;
+        default: errorQuda("Unknown memory type %d", mem_type); return QUDA_INVALID_FIELD_LOCATION;
+      };
     }
-    */
+    else {
+      errorQuda("hipPointerGetAttributes() failed with %d (%s:%d in %s()\n)",err, __FILE__, __LINE__, __FUNCTION__);
+      return QUDA_INVALID_FIELD_LOCATION;
+    }
   }
   
   void *get_mapped_device_pointer_(const char *func, const char *file, int line, const void *host)

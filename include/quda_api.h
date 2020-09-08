@@ -1,12 +1,38 @@
 #pragma once
 
+#if 0
 #ifndef __CUDACC_RTC__
 #include <cuda.h>
 #include <cuda_runtime.h>
 #endif
+#endif
 
-extern cudaDeviceProp deviceProp;
+#include "quda_define.h"
+
+#if defined(QUDA_BUILD_TARGET_QUDA)
+#include <cuda.h>
+#include <cuda_runtime.h>
+using qudaDeviceProp_t = cudaDeviceProp;
 using qudaStream_t = cudaStream_t;
+using qudaMemcpyKind = cudaMemcpyKind;
+constexpr qudaMemcpyKind  qudaMemcpyDeviceToHost = cudaMemcpyDeviceToHost;
+constexpr qudaMemcpyKind  qudaMemcpyHostToDevice = cudaMemcpyHostToDevice;
+constexpr qudaMemcpyKind  qudaMemcpyDeviceToDevice = cudaMemcpyDeviceToDevice;
+constexpr qudaMemcpyKind  qudaMemcpyDefault = cudaMemcpyDefault;
+#elif defined(QUDA_BUILD_TARGET_HIP)
+
+#include <hip/hip_runtime.h>
+#include <hip/hip_runtime_api.h>
+using qudaDeviceProp_t = hipDeviceProp_t;
+using qudaStream_t = hipStream_t;
+using qudaMemcpyKind = hipMemcpyKind;
+constexpr qudaMemcpyKind  qudaMemcpyDeviceToHost = hipMemcpyDeviceToHost;
+constexpr qudaMemcpyKind  qudaMemcpyHostToDevice = hipMemcpyHostToDevice;
+constexpr qudaMemcpyKind  qudaMemcpyDeviceToDevice = hipMemcpyDeviceToDevice;
+constexpr qudaMemcpyKind  qudaMemcpyDefault = hipMemcpyDefault;
+#endif
+
+extern qudaDeviceProp_t deviceProp;
 
 #include <enum_quda.h>
 
@@ -53,7 +79,7 @@ namespace quda
      @param[in] count Size of transfer
      @param[in] kind Type of memory copy
   */
-  void qudaMemcpy_(void *dst, const void *src, size_t count, cudaMemcpyKind kind, const char *func, const char *file,
+  void qudaMemcpy_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const char *func, const char *file,
                    const char *line);
 
   /**
@@ -64,7 +90,7 @@ namespace quda
      @param[in] kind Type of memory copy
      @param[in] stream Stream to issue copy
   */
-  void qudaMemcpyAsync_(void *dst, const void *src, size_t count, cudaMemcpyKind kind, const qudaStream_t &stream,
+  void qudaMemcpyAsync_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const qudaStream_t &stream,
                         const char *func, const char *file, const char *line);
 
   /**
@@ -79,7 +105,7 @@ namespace quda
      @param[in] stream Stream to issue copy
   */
   void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t hieght,
-                          cudaMemcpyKind kind, const qudaStream_t &stream, const char *func, const char *file,
+                          qudaMemcpyKind kind, const qudaStream_t &stream, const char *func, const char *file,
                           const char *line);
 
   /**
