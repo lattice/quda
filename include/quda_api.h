@@ -9,7 +9,7 @@
 
 #include "quda_define.h"
 
-#if defined(QUDA_BUILD_TARGET_QUDA)
+#if defined(QUDA_BUILD_TARGET_CUDA)
 #include <cuda.h>
 #include <cuda_runtime.h>
 using qudaDeviceProp_t = cudaDeviceProp;
