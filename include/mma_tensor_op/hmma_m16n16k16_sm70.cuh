@@ -1,7 +1,7 @@
 #pragma once
 
 #include <type_traits>
-#include <quda_fp16.h>
+#include <quda_fp16.cuh>
 
 // This macro determines whether or not we are using the fp16 accumulation of the MMA instruction.
 // #define USE_FP16_HMMA_ACCUMULATE
