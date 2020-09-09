@@ -364,4 +364,3 @@ extern int measurement_interval;
 extern QudaContractType contract_type;
 
 extern std::array<int, 4> grid_partition;
-

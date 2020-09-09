@@ -735,7 +735,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 #if 0
     const int *R_ = extendedGaugeResident->R();
 #else
-    const int R[] = { commDimPartitioned(0), commDimPartitioned(1), commDimPartitioned(2), commDimPartitioned(3) };
+    const int R[] = {commDimPartitioned(0), commDimPartitioned(1), commDimPartitioned(2), commDimPartitioned(3)};
 #endif
     QudaReconstructType recon = extendedGaugeResident->Reconstruct();
     delete extendedGaugeResident;
@@ -2974,7 +2974,8 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, voi
 
   if (param->num_src != num_src) { errorQuda("Number of rhs should be equal to the number of sub-partitions"); }
   if (inv.dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
-    errorQuda("Split Grid does NOT support 5d even-odd preconditioned DWF yet, because of, well, its 5d even-odd checker-boarding. :(");
+    errorQuda("Split Grid does NOT support 5d even-odd preconditioned DWF yet, because of, well, its 5d even-odd "
+              "checker-boarding. :(");
   }
 
   GaugeFieldParam gf_param(h_gauge, *gauge_param);
@@ -2986,13 +2987,13 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, voi
   plaqQuda(plaq);
   printfQuda("Computed plaquette is %12.8e: (spatial = %12.8e, temporal = %12.8e)\n", plaq[0], plaq[1], plaq[2]);
 
-  bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION) ||
-    (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+  bool pc_solution
+    = (param->solution_type == QUDA_MATPC_SOLUTION) || (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
 
   const int *X = gauge_param->X;
   ColorSpinorParam cpuParam(_hp_b[0], *param, X, pc_solution, param->input_location);
   std::vector<ColorSpinorField *> _h_b(num_src);
-  for(int i = 0; i < num_src; i++) {
+  for (int i = 0; i < num_src; i++) {
     cpuParam.v = _hp_b[i];
     _h_b[i] = ColorSpinorField::Create(cpuParam);
     printfQuda("_h_b[%2d] norm = %12.8e (no split)\n", i, quda::blas::norm2(*_h_b[i]));
