@@ -115,20 +115,6 @@ void display_test_info()
              dimPartitioned(3));
 }
 
-auto plaquette_gauge(quda::GaugeField &g)
-{
-  int R[4] = {2 * comm_dim_partitioned(0), 2 * comm_dim_partitioned(1), 2 * comm_dim_partitioned(2),
-              2 * comm_dim_partitioned(3)};
-
-  quda::cudaGaugeField *data
-    = quda::createExtendedGauge(*reinterpret_cast<quda::cudaGaugeField *>(&g), R, profileExtendedGauge);
-  double3 plaq3 = quda::plaquette(*data);
-
-  delete data;
-
-  return plaq3;
-}
-
 int comm_rank_from_coords(const int *coords);
 
 double plaq_ref;
@@ -149,12 +135,13 @@ int main(int argc, char **argv)
 
   // Parse command line options
   auto app = make_app();
+  add_split_grid_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
     return app->exit(e);
   }
-
+  
   // Set values for precisions via the command line.
   setQudaPrecisions();
 
@@ -191,14 +178,6 @@ int main(int argc, char **argv)
   // Load the gauge field to the device
   loadGaugeQuda((void *)gauge, &gauge_param);
 
-#if 0
-  quda::GaugeFieldParam d_gauge_param(*gaugePrecise);
-  quda::GaugeField *d_gauge = quda::GaugeField::Create(d_gauge_param);
-
-  d_gauge->copy(*gaugePrecise);
-  loadGaugeQuda(d_gauge->Gauge_p(), &gauge_param);
-#endif
-
   // Compute plaquette as a sanity check
   double plaq[3];
   plaqQuda(plaq);
@@ -206,10 +185,10 @@ int main(int argc, char **argv)
 
   plaq_ref = plaq[0];
 
-  // CommKey split_key
-  //   = {gridsize_from_cmdline[0], gridsize_from_cmdline[1], gridsize_from_cmdline[2], gridsize_from_cmdline[3]};
-
-  CommKey split_key = {1, 1, 1, 2};
+  inv_param.split_grid[0] = grid_partition[0];
+  inv_param.split_grid[1] = grid_partition[1];
+  inv_param.split_grid[2] = grid_partition[2];
+  inv_param.split_grid[3] = grid_partition[3];
 
   quda::ColorSpinorParam cpu_cs_param;
   constructWilsonTestSpinorParam(&cpu_cs_param, &inv_param, &gauge_param);
@@ -219,34 +198,33 @@ int main(int argc, char **argv)
   auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234 * comm_rank());
   rng->Init();
 
-  int n_src = quda::product(split_key);
-  inv_param.num_src = n_src;
+  inv_param.num_src = Nsrc;
 
-  std::vector<quda::ColorSpinorField *> _h_b(n_src, nullptr);
+  std::vector<quda::ColorSpinorField *> _h_b(inv_param.num_src, nullptr);
   for (auto &p : _h_b) {
     p = new quda::cpuColorSpinorField(cpu_cs_param);
     constructRandomSpinorSource(p->V(), 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
   }
-  std::vector<quda::ColorSpinorField *> _h_x(n_src, nullptr);
+  std::vector<quda::ColorSpinorField *> _h_x(inv_param.num_src, nullptr);
   for (auto &p : _h_x) { p = new quda::cpuColorSpinorField(cpu_cs_param); }
 
   // Host arrays for solutions, sources, and check
-  void **_hp_x = (void **)malloc(n_src * sizeof(void *));
-  void **_hp_b = (void **)malloc(n_src * sizeof(void *));
-  for (int i = 0; i < n_src; i++) {
+  void **_hp_x = (void **)malloc(inv_param.num_src * sizeof(void *));
+  void **_hp_b = (void **)malloc(inv_param.num_src * sizeof(void *));
+  for (int i = 0; i < inv_param.num_src; i++) {
     _hp_x[i] = _h_x[i]->V();
     _hp_b[i] = _h_b[i]->V();
   }
 
   // Call the split grid solver
-  invertSplitGridQuda(_hp_x, _hp_b, &inv_param, (void *)gauge, &gauge_param, split_key.data());
+  invertSplitGridQuda(_hp_x, _hp_b, &inv_param, (void *)gauge, &gauge_param);
 
   loadGaugeQuda(gauge, &gauge_param);
   plaqQuda(plaq);
   printfQuda("Computed plaquette is %12.8e: (spatial = %12.8e, temporal = %12.8e)\n", plaq[0], plaq[1], plaq[2]);
 
   if (verify_results) {
-    for (int i = 0; i < n_src; i++) {
+    for (int i = 0; i < inv_param.num_src; i++) {
       verifyInversion(_h_x[i]->V(), nullptr, _h_b[i]->V(), meta->V(), gauge_param, inv_param, gauge, nullptr, nullptr);
     }
   }

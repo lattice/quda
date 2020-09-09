@@ -133,6 +133,7 @@ void add_deflation_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app);
+void add_split_grid_option_group(std::shared_ptr<QUDAApp> quda_app);
 
 template <typename T> std::string inline get_string(CLI::TransformPairs<T> &map, T val)
 {
@@ -361,3 +362,6 @@ extern QudaWFlowType wflow_type;
 extern int measurement_interval;
 
 extern QudaContractType contract_type;
+
+extern std::array<int, 4> grid_partition;
+

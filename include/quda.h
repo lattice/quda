@@ -181,6 +181,10 @@ extern "C" {
     int num_offset; /**< Number of offsets in the multi-shift solver */
 
     int num_src; /**< Number of sources in the multiple source solver */
+    
+    /**< The grid of sub-partition according to which the processor grid will be partitioned 
+    The product of the four integers should be equal to `num_src`. */
+    int split_grid[QUDA_MAX_DIM];
 
     int overlap; /**< Width of domain overlaps */
 
@@ -1008,7 +1012,7 @@ extern "C" {
    *                    spliting into 4 sub-partitions - 2 in the z direction and 2 in the t direction
    */
   void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge,
-                           QudaGaugeParam *gauge_param, int *split_key);
+                           QudaGaugeParam *gauge_param);
 
   /**
    * Solve for multiple shifts (e.g., masses).

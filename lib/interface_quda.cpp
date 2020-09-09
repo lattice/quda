@@ -2966,12 +2966,16 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   profilerStop(__func__);
 }
 
-void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge, QudaGaugeParam *gauge_param, int *_split_key)
+void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge, QudaGaugeParam *gauge_param)
 {
+  const int *_split_key = param->split_grid;
   CommKey split_key = {_split_key[0], _split_key[1], _split_key[2], _split_key[3]};
   int num_src = quda::product(split_key);
 
   if (param->num_src != num_src) { errorQuda("Number of rhs should be equal to the number of sub-partitions"); }
+  if (inv.dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+    errorQuda("Split Grid does NOT support 5d even-odd preconditioned DWF yet, because of, well, its 5d even-odd checker-boarding. :(");
+  }
 
   GaugeFieldParam gf_param(h_gauge, *gauge_param);
   if (gf_param.order <= 4) { gf_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO; }
@@ -3012,7 +3016,7 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, voi
   }
 
   gf_param.create = QUDA_NULL_FIELD_CREATE;
-  quda::GaugeField *collected_gauge = new quda::cpuGaugeField(gf_param); // quda::GaugeField::Create(gf_param);
+  quda::GaugeField *collected_gauge = new quda::cpuGaugeField(gf_param);
   std::vector<quda::GaugeField *> v_g(1);
   v_g[0] = in;
   quda::split_field(*collected_gauge, v_g, split_key);
@@ -3033,8 +3037,6 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, voi
   push_to_current(split_key);
   updateR();
   comm_barrier();
-
-  // printf("collect_b = %12.8e.\n", quda::blas::norm2(*collect_b));
 
   plaqQuda(plaq);
 
