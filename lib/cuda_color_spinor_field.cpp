@@ -351,7 +351,7 @@ namespace quda {
       char   *dst  = (char*)v + ((!composite_descr.is_composite || composite_descr.is_component) ? volumeCB : composite_descr.volumeCB)*fieldOrder*precision;
       if (pad_bytes)
         for (int subset=0; subset<siteSubset; subset++) {
-          cudaMemset2DAsync(dst + subset*bytes/siteSubset, pitch, 0, pad_bytes, Npad);
+          qudaMemset2DAsync(dst + subset*bytes/siteSubset, pitch, 0, pad_bytes, Npad, 0);
         }
     }
 

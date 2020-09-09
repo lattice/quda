@@ -258,7 +258,7 @@ namespace quda {
     QudaMem set(ptr, value, count, false, func, file, line);
     set.apply(0);
     cudaError_t error = cudaGetLastError();
-    if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    if (error != cudaSuccess && !activeTuning())) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
   void qudaMemsetAsync_(void *ptr, int value, size_t count, const qudaStream_t &stream, const char *func,
