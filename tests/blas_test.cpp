@@ -1029,7 +1029,7 @@ int main(int argc, char** argv)
   setSpinorSiteSize(24);
   initComms(argc, argv, gridsize_from_cmdline);
   display_test_info();
-  initQuda(device);
+  initQuda(device_ordinal);
 
   setVerbosity(verbosity);
 

@@ -195,7 +195,7 @@ int main(int argc, char **argv)
   display_test_info();
 
   // Initialize the QUDA library
-  initQuda(device);
+  initQuda(device_ordinal);
 
   // set parameters for the reference Dslash, and prepare fields to be loaded
   if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH

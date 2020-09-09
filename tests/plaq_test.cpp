@@ -30,7 +30,7 @@ int main(int argc, char **argv)
   setWilsonGaugeParam(gauge_param);
   setDims(gauge_param.X);
 
-  initQuda(device);
+  initQuda(device_ordinal);
 
   setVerbosity(verbosity);
 

@@ -45,7 +45,7 @@ const int nColor = 3;
 
 void init(int argc, char **argv)
 {
-  initQuda(device);
+  initQuda(device_ordinal);
 
   setVerbosity(QUDA_VERBOSE);
 

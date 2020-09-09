@@ -58,7 +58,7 @@ void createNoisyLinkCPU(void** field, QudaPrecision prec, int seed)
 // set the layout, etc.
 static void hisq_force_init()
 {
-  initQuda(device);
+  initQuda(device_ordinal);
 
   gaugeParam.X[0] = xdim;
   gaugeParam.X[1] = ydim;

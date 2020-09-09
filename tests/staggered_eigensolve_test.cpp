@@ -5,14 +5,6 @@
 
 // QUDA headers
 #include <quda.h>
-#include <quda_internal.h>
-#include <dirac_quda.h>
-#include <dslash_quda.h>
-#include <invert_quda.h>
-#include <util_quda.h>
-#include <blas_quda.h>
-#include <unitarization_links.h>
-#include <gauge_field.h>
 
 // External headers
 #include <misc.h>
@@ -64,8 +56,6 @@ void display_test_info()
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
-
-  return;
 }
 
 int main(int argc, char **argv)
@@ -121,9 +111,7 @@ int main(int argc, char **argv)
     errorQuda("ARPACK check only available in double precision");
   }
 
-  // This must be before the FaceBuffer is created
-  // (this is because it allocates pinned memory - FIXME)
-  initQuda(device);
+  initQuda(device_ordinal);
 
   setDims(gauge_param.X);
   dw_setDims(gauge_param.X, 1); // so we can use 5-d indexing from dwf
