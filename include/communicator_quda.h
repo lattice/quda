@@ -983,4 +983,4 @@ struct Communicator {
 constexpr int nDim = 4;
 using CommKey = std::array<int, nDim>;
 
-void push_to_current(const CommKey &split_key);
+void push_communicator(const CommKey &split_key);

@@ -14,15 +14,6 @@ namespace backward
 } // namespace backward
 #endif
 
-struct Topology_s {
-  int ndim;
-  int dims[QUDA_MAX_DIM];
-  int *ranks;
-  int (*coords)[QUDA_MAX_DIM];
-  int my_rank;
-  int my_coords[QUDA_MAX_DIM];
-};
-
 char *comm_hostname(void)
 {
   static bool cached = false;

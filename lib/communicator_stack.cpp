@@ -47,7 +47,7 @@ Communicator &get_current_communicator()
   }
 }
 
-void push_to_current(const CommKey &split_key)
+void push_communicator(const CommKey &split_key)
 {
   auto search = communicator_stack.find(split_key);
   if (search != communicator_stack.end()) {

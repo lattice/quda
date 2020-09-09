@@ -3035,7 +3035,7 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, voi
 
   comm_barrier();
 
-  push_to_current(split_key);
+  push_communicator(split_key);
   updateR();
   comm_barrier();
 
@@ -3043,7 +3043,7 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, voi
 
   invertQuda(collect_x->V(), collect_b->V(), param);
 
-  push_to_current({1, 1, 1, 1});
+  push_communicator({1, 1, 1, 1});
   updateR();
 
   for (int d = 0; d < nDim; d++) {
