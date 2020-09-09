@@ -23,8 +23,7 @@ namespace quda
   template<typename T>
 std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
   std::vector<T*> res;
-  std::transform(in.begin(), in.end(), std::back_inserter(res), [](const auto& m) { std::cout << 
-  "getraw" << std::endl; return m.get(); });
+  std::transform(in.begin(), in.end(), std::back_inserter(res), [](const auto& m) { return m.get(); });
   return res;
 }
 // define this to use multi-functions, otherwise it'll
@@ -327,13 +326,20 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
 // #else
     // for (int i = 0; i < nsrc; i++) { mat(*rp[i], *x[i], *yp[i], *tmp3_p[i]); }
 // #endif
-    for (int i = 0; i < nsrc; i++) {
-      // r2avg += H(i, i).real();
-      // printfQuda("r2[%i] %e\n", i, H(i, i).real());
-            // printfQuda("CHECK r2 %e\n",blas::norm2(*r[i]));
-      mat(*r[i], *x[i], *y[i], *tmp3[i]);
-      // printfQuda("CHECK r2 %e\n",blas::norm2(*r[i]));
-    }
+
+// #ifdef BLOCKSOLVE_DSLASH5D
+     mat(r, x, y, tmp3);
+// #else
+//     for (int i = 0; i < nsrc; i++) {
+//       // r2avg += H(i, i).real();
+//       // printfQuda("r2[%i] %e\n", i, H(i, i).real());
+//             // printfQuda("CHECK r2 %e\n",blas::norm2(*r[i])); 
+//       mat(*r[i], *x[i], *y[i], *tmp3[i]);
+//       // printfQuda("CHECK r2 %e\n",blas::norm2(*r[i]));
+//     }
+// #endif
+
+
 
     // #ifdef BLOCKSOLVER_MULTIFUNCTIONS
     // // blas::xpay(b, -1.0, r);
@@ -618,9 +624,9 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
       }
       // Step 12: Compute Ap.
 // #ifdef BLOCKSOLVE_DSLASH5D
-      // matSloppy(Ap, p, tmp_matsloppy, tmp2);
+      matSloppy(Ap, p, tmp_matsloppy, tmp2);
 // #else
-      for (int i = 0; i < nsrc; i++) matSloppy(*Ap[i], *p[i], *tmp_matsloppy[i], *tmp2[i]);
+//       for (int i = 0; i < nsrc; i++) matSloppy(*Ap[i], *p[i], *tmp_matsloppy[i], *tmp2[i]);
 // #endif
 
       // Step 13: calculate pAp = P^\dagger Ap
@@ -790,9 +796,9 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
 
         // Reliable updates step 4: R = AY - B, using X as a temporary with the right precision.
 // #ifdef BLOCKSOLVE_DSLASH5D
-        // mat(r, y, x, tmp3);
+        mat(r, y, x, tmp3);
 // #else
-        for (int i = 0; i < nsrc; i++) mat(*r[i], *y[i], *x[i], *tmp3[i]);
+        // for (int i = 0; i < nsrc; i++) mat(*r[i], *y[i], *x[i], *tmp3[i]);
 // #endif
 
         // #ifdef BLOCKSOLVER_MULTIFUNCTIONS
@@ -1112,9 +1118,9 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
     if (param.compute_true_res) {
     // compute the true residuals
 // #ifdef BLOCKSOLVE_DSLASH5D
-      // mat(r, x, y, tmp3);
+      mat(r, x, y, tmp3);
 // #else
-      for (int i = 0; i < nsrc; i++) mat(*r[i], *x[i], *y[i], *tmp3[i]);
+//       for (int i = 0; i < nsrc; i++) mat(*r[i], *x[i], *y[i], *tmp3[i]);
 // #endif
       for (int i = 0; i < nsrc; i++) {
         param.true_res = sqrt(blas::xmyNorm(*b[i], *r[i]) / b2[i]);

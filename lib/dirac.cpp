@@ -89,6 +89,21 @@ namespace quda {
 
 #define flip(x) (x) = ((x) == QUDA_DAG_YES ? QUDA_DAG_NO : QUDA_DAG_YES)
 
+  void Dirac::Dslash(std::vector<ColorSpinorField *> &out, const std::vector<ColorSpinorField *> &in,
+                     const QudaParity parity) const
+  {
+    if (out.size() != in.size()) errorQuda("in and out arryas do not have the same size in mrhs operator");
+    for (decltype(out.size()) i = 0; i < out.size(); i++) { Dslash(*out[i], *in[i], parity); }
+  };
+
+  void Dirac::DslashXpay(std::vector<ColorSpinorField *> &out, const std::vector<ColorSpinorField *> &in,
+                         const QudaParity parity, const std::vector<ColorSpinorField *> &x, const double &k) const
+  {
+    if (out.size() != in.size() || out.size() != x.size())
+      errorQuda("in and out arryas do not have the same size in mrhs operator");
+    for (decltype(out.size()) i = 0; i < out.size(); i++) { DslashXpay(*out[i], *in[i], parity, *x[i], k); }
+  }
+
   void Dirac::Mdag(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     flip(dagger);
@@ -97,6 +112,25 @@ namespace quda {
   }
 
   void Dirac::MMdag(ColorSpinorField &out, const ColorSpinorField &in) const
+  {
+    flip(dagger);
+    MdagM(out, in);
+    flip(dagger);
+  }
+
+  void Dirac::M(std::vector<ColorSpinorField *> &out, const std::vector<ColorSpinorField *> &in) const
+  {
+    if (out.size() != in.size()) errorQuda("in and out arryas do not have the same size in mrhs operator");
+    for (decltype(out.size()) i = 0; i < out.size(); i++) { M(*out[i], *in[i]); }
+  }
+
+  void Dirac::MdagM(std::vector<ColorSpinorField *> &out, const std::vector<ColorSpinorField *> &in) const
+  {
+    if (out.size() != in.size()) errorQuda("in and out arryas do not have the same size in mrhs operator");
+    for (decltype(out.size()) i = 0; i < out.size(); i++) { MdagM(*out[i], *in[i]); }
+  }
+
+  void Dirac::MMdag(std::vector<ColorSpinorField *> &out, const std::vector<ColorSpinorField *> &in) const
   {
     flip(dagger);
     MdagM(out, in);
