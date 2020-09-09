@@ -6,8 +6,6 @@
 #include <mdw_dslash5_tensor_core.cuh>
 #endif
 
-#include <unordered_set>
-
 namespace quda
 {
   namespace mobius_tensor_core
@@ -578,12 +576,7 @@ namespace quda
 
       template <typename T> inline void launch(T *f, const TuneParam &tp, Arg &arg, const qudaStream_t &stream)
       {
-        static std::unordered_set<T *> cache;
-        auto search = cache.find(f);
-        if (search == cache.end()) {
-          cache.insert(f);
-          const_cast<TuneParam &>(tp).set_max_shared_bytes = true;
-        }
+        const_cast<TuneParam &>(tp).set_max_shared_bytes = true;
         qudaLaunchKernel(f, tp, stream, arg);
       }
 

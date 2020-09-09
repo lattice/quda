@@ -1,3 +1,4 @@
+#include <unordered_set>
 #include <tune_quda.h>
 #include <uint_to_char.h>
 #include <quda_internal.h>
@@ -55,11 +56,16 @@ namespace quda {
   qudaError_t qudaLaunchKernel(const void *func, const TuneParam &tp, void **args, qudaStream_t stream)
   {
     if (tp.set_max_shared_bytes) {
-      qudaFuncSetAttribute(func, cudaFuncAttributePreferredSharedMemoryCarveout, (int)cudaSharedmemCarveoutMaxShared);
-      cudaFuncAttributes attributes;
-      qudaFuncGetAttributes(attributes, func);
-      qudaFuncSetAttribute(func, cudaFuncAttributeMaxDynamicSharedMemorySize,
-                           device::max_dynamic_shared_memory() - attributes.sharedSizeBytes);
+      static std::unordered_set<const void *> cache;
+      auto search = cache.find(func);
+      if (search == cache.end()) {
+        cache.insert(func);
+        qudaFuncSetAttribute(func, cudaFuncAttributePreferredSharedMemoryCarveout, (int)cudaSharedmemCarveoutMaxShared);
+        cudaFuncAttributes attributes;
+        qudaFuncGetAttributes(attributes, func);
+        qudaFuncSetAttribute(func, cudaFuncAttributeMaxDynamicSharedMemorySize,
+                             device::max_dynamic_shared_memory() - attributes.sharedSizeBytes);
+      }
     }
 
     // no driver API variant here since we have C++ functions
