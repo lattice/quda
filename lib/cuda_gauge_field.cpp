@@ -721,17 +721,15 @@ namespace quda {
   void cudaGaugeField::backup() const {
     if (backed_up) errorQuda("Gauge field already backed up");
     backup_h = new char[bytes];
-    cudaMemcpy(backup_h, gauge, bytes, cudaMemcpyDefault);
-    checkCudaError();
+    qudaMemcpy(backup_h, gauge, bytes, cudaMemcpyDefault);
     backed_up = true;
   }
 
   void cudaGaugeField::restore() const
   {
     if (!backed_up) errorQuda("Cannot restore since not backed up");
-    cudaMemcpy(gauge, backup_h, bytes, cudaMemcpyDefault);
+    qudaMemcpy(gauge, backup_h, bytes, cudaMemcpyDefault);
     delete []backup_h;
-    checkCudaError();
     backed_up = false;
   }
 

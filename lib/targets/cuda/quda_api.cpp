@@ -45,20 +45,22 @@ namespace quda {
     const cudaMemcpyKind kind;
     const bool async;
     const char *name;
+    const bool active_tuning;
 
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
   public:
-    inline QudaMem(void *dst, const void *src, size_t count, cudaMemcpyKind kind, bool async, const char *func,
-                   const char *file, const char *line) :
+    inline QudaMem(void *dst, const void *src, size_t count, cudaMemcpyKind kind, const cudaStream_t &stream,
+                   bool async, const char *func, const char *file, const char *line) :
       dst(dst),
       src(src),
       count(count),
       value(0),
       copy(true),
       kind(kind),
-      async(async)
+      async(async),
+      active_tuning(activeTuning())
     {
       if (!async) {
         switch (kind) {
@@ -84,16 +86,20 @@ namespace quda {
       strcat(aux, file);
       strcat(aux, ",");
       strcat(aux, line);
+
+      apply(stream);
     }
 
-    inline QudaMem(void *dst, int value, size_t count, bool async, const char *func, const char *file, const char *line) :
+    inline QudaMem(void *dst, int value, size_t count, const cudaStream_t &stream, bool async,
+                   const char *func, const char *file, const char *line) :
       dst(dst),
       src(nullptr),
       count(count),
       value(value),
       copy(false),
       kind(cudaMemcpyDefault),
-      async(async)
+      async(async),
+      active_tuning(activeTuning())
     {
       name = !async ? "cudaMemset" : "cudaMemsetAsync";
       strcpy(aux, func);
@@ -101,11 +107,14 @@ namespace quda {
       strcat(aux, file);
       strcat(aux, ",");
       strcat(aux, line);
+
+      apply(stream);
     }
 
     inline void apply(const qudaStream_t &stream)
     {
-      tuneLaunch(*this, getTuning(), getVerbosity());
+      if (!active_tuning) tuneLaunch(*this, getTuning(), getVerbosity());
+
       if (copy) {
         if (async) {
 #ifdef USE_DRIVER_API
@@ -181,8 +190,7 @@ namespace quda {
   void qudaMemcpy_(void *dst, const void *src, size_t count, cudaMemcpyKind kind,
                    const char *func, const char *file, const char *line) {
     if (count == 0) return;
-    QudaMem copy(dst, src, count, kind, false, func, file, line);
-    copy.apply(0);
+    QudaMem copy(dst, src, count, kind, 0, false, func, file, line);
     cudaError_t error = cudaGetLastError();
     if (error != cudaSuccess)
       errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
@@ -194,8 +202,7 @@ namespace quda {
     if (count == 0) return;
 
     if (kind == cudaMemcpyDeviceToDevice) {
-      QudaMem copy(dst, src, count, kind, true, func, file, line);
-      copy.apply(stream);
+      QudaMem copy(dst, src, count, kind, stream, true, func, file, line);
     } else {
 #ifdef USE_DRIVER_API
       switch (kind) {
@@ -255,18 +262,16 @@ namespace quda {
   void qudaMemset_(void *ptr, int value, size_t count, const char *func, const char *file, const char *line)
   {
     if (count == 0) return;
-    QudaMem set(ptr, value, count, false, func, file, line);
-    set.apply(0);
+    QudaMem set(ptr, value, count, 0, false, func, file, line);
     cudaError_t error = cudaGetLastError();
-    if (error != cudaSuccess && !activeTuning())) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    if (error != cudaSuccess && !activeTuning()) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
   void qudaMemsetAsync_(void *ptr, int value, size_t count, const qudaStream_t &stream, const char *func,
                         const char *file, const char *line)
   {
     if (count == 0) return;
-    QudaMem copy(ptr, value, count, true, func, file, line);
-    copy.apply(0);
+    QudaMem copy(ptr, value, count, stream, true, func, file, line);
     cudaError_t error = cudaGetLastError();
     if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
