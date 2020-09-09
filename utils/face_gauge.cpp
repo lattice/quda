@@ -1018,7 +1018,6 @@ void exchange_llfat_cleanup(void)
     }
 
   }
-  checkCudaError();
 }
 
 #undef gauge_site_size

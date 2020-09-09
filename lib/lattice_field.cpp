@@ -405,7 +405,6 @@ namespace quda {
       comm_barrier();
 
       initComms = false;
-      checkCudaError();
     }
 
   }
@@ -557,7 +556,6 @@ namespace quda {
   void LatticeField::destroyIPCComms() {
 
     if (!initIPCComms) return;
-    checkCudaError();
 
     // ensure that all processes bring down their communicators
     // synchronously so that we don't end up in an undefined state

@@ -627,13 +627,11 @@ namespace quda {
     staggeredPhaseType = src.StaggeredPhase();
 
     qudaDeviceSynchronize(); // include sync here for accurate host-device profiling
-    checkCudaError();
   }
 
   void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu) {
     copy(cpu);
     qudaDeviceSynchronize();
-    checkCudaError();
   }
 
   void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu, TimeProfile &profile) {
@@ -709,7 +707,6 @@ namespace quda {
     cpu.staggeredPhaseType = staggeredPhaseType;
 
     qudaDeviceSynchronize();
-    checkCudaError();
   }
 
   void cudaGaugeField::saveCPUField(cpuGaugeField &cpu, TimeProfile &profile) const {

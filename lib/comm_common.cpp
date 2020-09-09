@@ -565,12 +565,7 @@ MsgHandle *comm_declare_strided_send_relative_(const char *func, const char *fil
   } else {
     // test this memory allocation is ok by doing a memcpy from it
     void *tmp = device_malloc(blksize*nblocks);
-    cudaError_t err = cudaMemcpy2D(tmp, blksize, buffer, stride, blksize, nblocks, cudaMemcpyDeviceToDevice);
-    if (err != cudaSuccess) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n",
-		 file, line, func, dim, dir, blksize, nblocks, stride);
-      errorQuda("aborting with error %s", cudaGetErrorString(err));
-    }
+    qudaMemcpy2D(tmp, blksize, buffer, stride, blksize, nblocks, cudaMemcpyDeviceToDevice);
     device_free(tmp);
   }
 #endif

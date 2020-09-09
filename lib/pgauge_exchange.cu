@@ -244,7 +244,6 @@ namespace quda {
         qudaStreamSynchronize(GFStream[0]);
         qudaStreamSynchronize(GFStream[1]);
       }
-      checkCudaError();
       qudaDeviceSynchronize();
     }
   };

@@ -183,8 +183,6 @@ namespace quda
       } else {
         errorQuda("Unsupported nSpin= %d", in.Nspin());
       }
-
-      checkCudaError();
     }
   };
 

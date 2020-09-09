@@ -374,8 +374,6 @@ namespace quda {
       }
     }
 
-    checkCudaError();
-
     for (int j = 0; j < args.k; j++) {
       Complex alpha = cDotProduct(Vm->Component(j), Vm->Component(args.k));
       caxpy(-alpha, Vm->Component(j), Vm->Component(args.k));

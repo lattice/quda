@@ -394,7 +394,6 @@ namespace quda {
       {
         apply(0);
         qudaDeviceSynchronize(); // need to synchronize to ensure failure write has completed
-        checkCudaError();
       }
 
       void apply(const qudaStream_t &stream) {

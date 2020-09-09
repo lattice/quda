@@ -379,8 +379,6 @@ namespace quda {
                         subset_bytes - (size_t)stride * sizeof(float), 0);
       }
     }
-
-    checkCudaError();
   }
 
   void cudaColorSpinorField::copy(const cudaColorSpinorField &src)
@@ -445,7 +443,6 @@ namespace quda {
     }
 
     qudaDeviceSynchronize(); // include sync here for accurate host-device profiling
-    checkCudaError();
   }
 
 
@@ -495,7 +492,6 @@ namespace quda {
     }
 
     qudaDeviceSynchronize(); // need to sync before data can be used on CPU
-    checkCudaError();
   }
 
   void cudaColorSpinorField::allocateGhostBuffer(int nFace, bool spin_project) const

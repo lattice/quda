@@ -267,8 +267,6 @@ void initFields(prec_pair_t prec_pair)
   QudaPrecision prec = prec_pair.first;
   QudaPrecision prec_other = prec_pair.second;
 
-  checkCudaError();
-
   param.setPrecision(prec, prec, true);
   vD = new cudaColorSpinorField(param);
   wD = new cudaColorSpinorField(param);
@@ -306,9 +304,6 @@ void initFields(prec_pair_t prec_pair)
 
   param.composite_dim = Nsrc;
   zmoD = new cudaColorSpinorField(param);
-
-  // check for successful allocation
-  checkCudaError();
 
   // only do copy if not doing half precision with mg
   bool flag = !(param.nSpin == 2 && (prec < QUDA_SINGLE_PRECISION || prec_other < QUDA_HALF_PRECISION));
