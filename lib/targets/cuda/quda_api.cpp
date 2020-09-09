@@ -1,6 +1,7 @@
 #include <tune_quda.h>
 #include <uint_to_char.h>
 #include <quda_internal.h>
+#include <device.h>
 
 // if this macro is defined then we use the driver API, else use the
 // runtime API.  Typically the driver API has 10-20% less overhead
@@ -20,6 +21,31 @@
 
 namespace quda {
 
+  // No need to abstract these across the library so keep these definitions local to CUDA target
+
+  /**
+     @brief Wrapper around cudaFuncSetAttribute with built-in error checking
+     @param[in] kernel Kernel function for which we are setting the attribute
+     @param[in] attr Attribute to set
+     @param[in] value Value to set
+  */
+  void qudaFuncSetAttribute_(const void *kernel, cudaFuncAttribute attr, int value, const char *func, const char *file,
+                             const char *line);
+
+  /**
+     @brief Wrapper around cudaFuncGetAttributes with built-in error checking
+     @param[in] attr the cudaFuncGetAttributes object to store the output
+     @param[in] kernel Kernel function for which we are setting the attribute
+  */
+  void qudaFuncGetAttributes_(cudaFuncAttributes &attr, const void *kernel, const char *func, const char *file,
+                              const char *line);
+
+#define qudaFuncSetAttribute(kernel, attr, value)                       \
+  ::quda::qudaFuncSetAttribute_(kernel, attr, value, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
+#define qudaFuncGetAttributes(attr, kernel)                             \
+  ::quda::qudaFuncGetAttributes_(attr, kernel, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
 #ifdef USE_DRIVER_API
   static TimeProfile apiTimer("CUDA API calls (driver)");
 #else
@@ -28,6 +54,14 @@ namespace quda {
 
   qudaError_t qudaLaunchKernel(const void *func, const TuneParam &tp, void **args, qudaStream_t stream)
   {
+    if (tp.set_max_shared_bytes) {
+      qudaFuncSetAttribute(func, cudaFuncAttributePreferredSharedMemoryCarveout, (int)cudaSharedmemCarveoutMaxShared);
+      cudaFuncAttributes attributes;
+      qudaFuncGetAttributes(attributes, func);
+      qudaFuncSetAttribute(func, cudaFuncAttributeMaxDynamicSharedMemorySize,
+                           device::max_dynamic_shared_memory() - attributes.sharedSizeBytes);
+    }
+
     // no driver API variant here since we have C++ functions
     PROFILE(cudaError_t error = cudaLaunchKernel(func, tp.grid, tp.block, args, tp.shared_bytes, stream),
             QUDA_PROFILE_LAUNCH_KERNEL);

@@ -582,7 +582,7 @@ namespace quda
         auto search = cache.find(f);
         if (search == cache.end()) {
           cache.insert(f);
-          setMaxDynamicSharedBytesPerBlock(f);
+          const_cast<TuneParam &>(tp).set_max_shared_bytes = true;
         }
         qudaLaunchKernel(f, tp, stream, arg);
       }

@@ -179,23 +179,6 @@ namespace quda
   void qudaDeviceSynchronize_(const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around cudaFuncSetAttribute with built-in error checking
-     @param[in] kernel Kernel function for which we are setting the attribute
-     @param[in] attr Attribute to set
-     @param[in] value Value to set
-  */
-  void qudaFuncSetAttribute_(const void *kernel, cudaFuncAttribute attr, int value, const char *func, const char *file,
-                             const char *line);
-
-  /**
-     @brief Wrapper around cudaFuncGetAttributes with built-in error checking
-     @param[in] attr the cudaFuncGetAttributes object to store the output
-     @param[in] kernel Kernel function for which we are setting the attribute
-  */
-  void qudaFuncGetAttributes_(cudaFuncAttributes &attr, const void *kernel, const char *func, const char *file,
-                              const char *line);
-
-  /**
      @brief Print out the timer profile for CUDA API calls
    */
   void printAPIProfile();
@@ -248,9 +231,3 @@ namespace quda
 
 #define qudaDeviceSynchronize()                                                                                        \
   ::quda::qudaDeviceSynchronize_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
-
-#define qudaFuncSetAttribute(kernel, attr, value)                                                                      \
-  ::quda::qudaFuncSetAttribute_(kernel, attr, value, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
-
-#define qudaFuncGetAttributes(attr, kernel)                                                                            \
-  ::quda::qudaFuncGetAttributes_(attr, kernel, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
