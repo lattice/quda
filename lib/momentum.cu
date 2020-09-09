@@ -7,6 +7,7 @@
 #include <fstream>
 
 #include <tunable_reduction.h>
+#include <tunable_nd.h>
 #include <kernels/momentum.cuh>
 
 namespace quda {
@@ -68,7 +69,7 @@ namespace quda {
   }
 
   template <typename Float, int nColor, QudaReconstructType recon>
-  class ActionMom : TunableReduction2D<MomAction> {
+  class ActionMom : TunableReduction2D<> {
     MomActionArg<Float, nColor, recon> arg;
     const GaugeField &meta;
 
@@ -86,11 +87,11 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch(tp, stream, arg);
+      launch<MomAction>(tp, stream, arg);
     }
 
-    long long flops() const { return 4*2*arg.threads*23; }
-    long long bytes() const { return 4*2*arg.threads*arg.mom.Bytes(); }
+    long long flops() const { return 4*2*arg.threads.x*23; }
+    long long bytes() const { return 4*2*arg.threads.x*arg.mom.Bytes(); }
   };
 
   double computeMomAction(const GaugeField& mom) {
@@ -105,7 +106,7 @@ namespace quda {
   }
 
   template <typename Float, int nColor, QudaReconstructType recon>
-  class UpdateMom : TunableReduction2D<MomUpdate> {
+  class UpdateMom : TunableReduction2D<> {
     UpdateMomArg<Float, nColor, recon> arg;
     const GaugeField &meta;
 
@@ -126,13 +127,13 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<max_reducer2>(tp, stream, arg);
+      launch<MomUpdate, max_reducer2>(tp, stream, arg);
     }
 
     void preTune() { arg.mom.save();}
     void postTune() { arg.mom.load();}
-    long long flops() const { return 4*2*arg.threads*(36+42); }
-    long long bytes() const { return 4*2*arg.threads*(2*arg.mom.Bytes()+arg.force.Bytes()); }
+    long long flops() const { return 4*2*arg.threads.x*(36+42); }
+    long long bytes() const { return 4*2*arg.threads.x*(2*arg.mom.Bytes()+arg.force.Bytes()); }
   };
 
   void updateMomentum(GaugeField &mom, double coeff, GaugeField &force, const char *fname)
@@ -143,60 +144,22 @@ namespace quda {
 
     checkPrecision(mom, force);
     instantiate<UpdateMom, ReconstructMom>(force, mom, coeff, fname);
-    checkCudaError();
 #else
     errorQuda("%s not built", __func__);
 #endif // GPU_GAUGE_TOOLS
   }
 
   template <typename Float, int nColor, QudaReconstructType recon>
-  struct ApplyUArg : BaseArg<Float, nColor, recon>
-  {
-    typedef typename gauge_mapper<Float,recon>::type G;
-    typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type F;
-    F force;
-    const G U;
-    int X[4]; // grid dimensions
-    ApplyUArg(GaugeField &force, const GaugeField &U) :
-      BaseArg<Float, nColor, recon>(U),
-      force(force),
-      U(U)
-    {
-      for (int dir=0; dir<4; ++dir) X[dir] = U.X()[dir];
-    }
-  };
-
-  template <typename Arg>
-  __global__ void ApplyUKernel(Arg arg)
-  {
-    int x = blockIdx.x*blockDim.x + threadIdx.x;
-    if (x >= arg.threads) return;
-    int parity = threadIdx.y + blockIdx.y * blockDim.y;
-    using mat = Matrix<complex<typename Arg::Float>,Arg::nColor>;
-
-    for (int d=0; d<4; d++) {
-      mat f = arg.force(d, x, parity);
-      mat u = arg.U(d, x, parity);
-
-      f = u * f;
-
-      arg.force(d, x, parity) = f;
-    }
-  } // ApplyU
-
-  template <typename Float, int nColor, QudaReconstructType recon>
-  class ApplyU : TunableVectorY {
-    ApplyUArg<Float, nColor, recon> arg;
-    const GaugeField &meta;
-
-    bool tuneGridDim() const { return false; }
-    unsigned int minThreads() const { return arg.threads; }
+  class UApply : TunableKernel2D {
+    const GaugeField &U;
+    GaugeField &force;
+    unsigned int minThreads() const { return U.LocalVolumeCB(); }
 
   public:
-    ApplyU(const GaugeField &U, GaugeField &force) :
-      TunableVectorY(2),
-      arg(force, U),
-      meta(U)
+    UApply(const GaugeField &U, GaugeField &force) :
+      TunableKernel2D(U, 2),
+      U(U),
+      force(force)
     {
       apply(0);
     }
@@ -204,14 +167,18 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      qudaLaunchKernel(ApplyUKernel<decltype(arg)>, tp, stream, arg);
+      ApplyUArg<Float, nColor, recon> arg(force, U);
+      launch<ApplyU>(tp, stream, arg);
     }
 
-    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
-    void preTune() { arg.force.save();}
-    void postTune() { arg.force.load();}
-    long long flops() const { return 4*2*arg.threads*198; }
-    long long bytes() const { return 4*2*arg.threads*(2*arg.force.Bytes()+arg.U.Bytes()); }
+    void preTune() { force.backup(); }
+    void postTune() { force.restore(); }
+    long long flops() const
+    {
+      int Nc = U.Ncolor();
+      return 4 * U.Volume() * (8 * Nc * Nc * Nc - 2 * Nc * Nc);
+    }
+    long long bytes() const { return 2 * force.Bytes() + U.Bytes(); }
   };
 
   void applyU(GaugeField &force, GaugeField &U)
@@ -219,8 +186,7 @@ namespace quda {
 #ifdef GPU_GAUGE_TOOLS
     if (!force.isNative()) errorQuda("Unsupported output ordering: %d\n", force.Order());
     checkPrecision(force, U);
-    instantiate<ApplyU, ReconstructNo12>(U, force);
-    checkCudaError();
+    instantiate<UApply, ReconstructNo12>(U, force);
 #else
     errorQuda("%s not built", __func__);
 #endif // GPU_GAUGE_TOOLS

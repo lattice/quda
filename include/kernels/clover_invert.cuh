@@ -1,7 +1,7 @@
 #include <clover_field_order.h>
 #include <quda_matrix.h>
 #include <linalg.cuh>
-#include <kernels/generic_reduction.cuh>
+#include <reduction_kernel.h>
 
 namespace quda
 {
@@ -14,7 +14,7 @@ namespace quda
     static constexpr int nSpin = 4;
     using Clover = typename clover_mapper<store_t>::type;
 
-    int threads; // number of active threads required
+    dim3 threads; // number of active threads required
     Clover inverse;
     const Clover clover;
     bool compute_tr_log;
@@ -22,7 +22,7 @@ namespace quda
 
     CloverInvertArg(CloverField &field, bool compute_tr_log) :
       ReduceArg<double2>(),
-      threads(field.VolumeCB()),
+      threads(field.VolumeCB(), 2, 1),
       inverse(field, true),
       clover(field, false),
       compute_tr_log(compute_tr_log),

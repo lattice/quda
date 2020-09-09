@@ -1,7 +1,9 @@
+#pragma once
+
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
 #include <index_helper.cuh>
-#include <kernels/generic_reduction.cuh>
+#include <reduction_kernel.h>
 
 namespace quda {
 
@@ -13,7 +15,7 @@ namespace quda {
     static constexpr QudaReconstructType recon = recon_;
     typedef typename gauge_mapper<Float,recon>::type Gauge;
 
-    int threads; // number of active threads required
+    dim3 threads; // number of active threads required
     int E[4]; // extended grid dimensions
     int X[4]; // true grid dimensions
     int border[4];
@@ -30,7 +32,7 @@ namespace quda {
 	X[dir] = U_.X()[dir] - border[dir]*2;
 	R += border[dir];
       }
-      threads = X[0]*X[1]*X[2]*X[3]/2;
+      threads.x = X[0]*X[1]*X[2]*X[3]/2;
     }
   };
 

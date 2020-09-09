@@ -2,7 +2,7 @@
 
 #include <gauge_field_order.h>
 #include <index_helper.cuh>
-#include <kernels/generic_reduction.cuh>
+#include <reduction_kernel.h>
 
 namespace quda {
 
@@ -16,20 +16,21 @@ namespace quda {
     using Gauge = typename gauge_mapper<store_t, recon>::type;
     static constexpr int gauge_dir = gauge_dir_;
 
-    int threads; // number of active threads required
+    dim3 threads; // number of active threads required
     int X[4]; // grid dimensions
     int border[4];
     Gauge data;
     double2 result;
     GaugeFixQualityOVRArg(const GaugeField &data) :
       ReduceArg<double2>(),
+      threads(1, 2, 1),
       data(data)
     {
       for ( int dir = 0; dir < 4; ++dir ) {
         X[dir] = data.X()[dir] - data.R()[dir] * 2;
         border[dir] = data.R()[dir];
       }
-      threads = X[0]*X[1]*X[2]*X[3]/2;
+      threads.x = X[0]*X[1]*X[2]*X[3]/2;
     }
 
     double getAction(){ return result.x; }

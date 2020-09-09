@@ -1,5 +1,4 @@
-#ifndef _COLOR_SPINOR_ORDER_H
-#define _COLOR_SPINOR_ORDER_H
+#pragma once
 
 /**
  * @file color_spinor_field_order.h
@@ -1709,5 +1708,3 @@ namespace quda {
   template<typename T, int Ns, int Nc> struct colorspinor_order_mapper<T,QUDA_FLOAT2_FIELD_ORDER,Ns,Nc> { typedef colorspinor::FloatNOrder<T, Ns, Nc, 2> type; };
 
 } // namespace quda
-
-#endif // _COLOR_SPINOR_ORDER_H

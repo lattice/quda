@@ -6,7 +6,7 @@
 namespace quda {
 
   template <typename store_t>
-  class CloverInvert : TunableReduction2D<InvertClover> {
+  class CloverInvert : TunableReduction2D<> {
     CloverField &clover;
     bool compute_tr_log;
 
@@ -28,14 +28,14 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (clover.Twisted()) {
         CloverInvertArg<store_t, true> arg(clover, compute_tr_log);
-        launch(tp, stream, arg);
+        launch<InvertClover>(tp, stream, arg);
         if (compute_tr_log) {
           arg.complete(*clover.TrLog());
           comm_allreduce_array(clover.TrLog(), 2);
         }
       } else {
         CloverInvertArg<store_t, false> arg(clover, compute_tr_log);
-        launch(tp, stream, arg);
+        launch<InvertClover>(tp, stream, arg);
         if (compute_tr_log) {
           arg.complete(*clover.TrLog());
           comm_allreduce_array(clover.TrLog(), 2);
@@ -43,7 +43,6 @@ namespace quda {
       }
     }
 
-    TuneKey tuneKey() const { return TuneKey(clover.VolString(), typeid(*this).name(), aux); }
     long long flops() const { return 0; }
     long long bytes() const { return 2 * clover.Bytes(); }
     void preTune() { if (clover.V(true) == clover.V(false)) clover.backup(); }

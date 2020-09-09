@@ -1,5 +1,4 @@
-#ifndef _CLOVER_ORDER_H
-#define _CLOVER_ORDER_H
+#pragma once
 
 /**
  * @file  clover_field_order.h
@@ -20,7 +19,7 @@ namespace quda {
 
   /**
      @brief clover_wrapper is an internal class that is used to
-     wrap instances of colorspinor accessors, currying in a specifc
+     wrap instances of cover accessors, currying in a specifc
      location and chirality on the field.  The operator() accessors in
      clover-field accessors return instances to this class,
      allowing us to then use operator overloading upon this class
@@ -542,8 +541,7 @@ namespace quda {
 	void *backup_h; //! host memory for backing up the field when tuning
 	void *backup_norm_h; //! host memory for backing up norm when tuning
 
-        FloatNOrder(const CloverField &clover, bool is_inverse, Float *clover_ = 0, norm_type *norm_ = 0,
-                    bool override = false) :
+        FloatNOrder(const CloverField &clover, bool is_inverse, Float *clover_ = nullptr, norm_type *norm_ = nullptr) :
           offset(clover.Bytes() / (2 * sizeof(Float) * N)),
           norm_offset(clover.NormBytes() / (2 * sizeof(norm_type))),
           volumeCB(clover.VolumeCB()),
@@ -734,7 +732,7 @@ namespace quda {
     /**
        QDP ordering for clover fields
     */
-    template <typename Float, int length>
+    template <typename Float, int length = 72>
       struct QDPOrder {
 	typedef typename mapper<Float>::type RegType;
 	Float *clover;
@@ -745,8 +743,8 @@ namespace quda {
 	const bool twisted;
 	const Float mu2;
 
-      QDPOrder(const CloverField &clover, bool inverse, Float *clover_=0) 
-      : volumeCB(clover.VolumeCB()), stride(volumeCB), offset(clover.Bytes()/(2*sizeof(Float))),
+        QDPOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void *norm_ = nullptr) :
+         volumeCB(clover.VolumeCB()), stride(volumeCB), offset(clover.Bytes()/(2*sizeof(Float))),
 	twisted(clover.Twisted()), mu2(clover.Mu2()) {
         if (clover.Order() != QUDA_PACKED_CLOVER_ORDER) {
           errorQuda("Invalid clover order %d for this accessor", clover.Order());
@@ -787,7 +785,7 @@ namespace quda {
     /**
        QDPJIT ordering for clover fields
     */
-    template <typename Float, int length>
+    template <typename Float, int length = 72>
       struct QDPJITOrder {
 	typedef typename mapper<Float>::type RegType;
 	Float *diag; 	   /**< Pointers to the off-diagonal terms (two parities) */
@@ -798,8 +796,8 @@ namespace quda {
 	const bool twisted;
 	const Float mu2;
 
-      QDPJITOrder(const CloverField &clover, bool inverse, Float *clover_=0) 
-      : volumeCB(clover.VolumeCB()), stride(volumeCB), twisted(clover.Twisted()), mu2(clover.Mu2()) {
+        QDPJITOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void *norm_ = nullptr) :
+          volumeCB(clover.VolumeCB()), stride(volumeCB), twisted(clover.Twisted()), mu2(clover.Mu2()) {
         if (clover.Order() != QUDA_QDPJIT_CLOVER_ORDER) {
           errorQuda("Invalid clover order %d for this accessor", clover.Order());
         }
@@ -857,7 +855,7 @@ namespace quda {
        expected by QUDA.  As well as reordering the clover matrix
        elements, we are also changing basis.
     */
-    template <typename Float, int length>
+    template <typename Float, int length = 72>
       struct BQCDOrder {
 	typedef typename mapper<Float>::type RegType;
 	Float *clover[2];
@@ -867,8 +865,8 @@ namespace quda {
 	const bool twisted;
 	const Float mu2;
 
-      BQCDOrder(const CloverField &clover, bool inverse, Float *clover_=0) 
-      : volumeCB(clover.Stride()), stride(volumeCB), twisted(clover.Twisted()), mu2(clover.Mu2()) {
+        BQCDOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void *norm_ = nullptr) :
+          volumeCB(clover.Stride()), stride(volumeCB), twisted(clover.Twisted()), mu2(clover.Mu2()) {
         if (clover.Order() != QUDA_BQCD_CLOVER_ORDER) {
           errorQuda("Invalid clover order %d for this accessor", clover.Order());
         }
@@ -934,7 +932,3 @@ namespace quda {
   template<int N, bool add_rho> struct clover_mapper<int8_t,N,add_rho> { typedef clover::FloatNOrder<int8_t, N, 4, add_rho> type; };
 
 } // namespace quda
-
-#endif //_CLOVER_ORDER_H
-
-

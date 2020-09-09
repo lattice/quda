@@ -114,7 +114,7 @@ namespace quda {
   };
 
   template <typename Arg>
-  class GaugeFixQuality : TunableReduction2D<FixQualityFFT> {
+  class GaugeFixQuality : TunableReduction2D<> {
     Arg &arg;
     const GaugeField &meta;
 
@@ -127,16 +127,16 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch(tp, stream, arg);
+      launch<FixQualityFFT>(tp, stream, arg);
       auto reset = true; // apply called multiple times with the same arg so need to reset
       arg.complete(arg.result, stream, reset);
       if (!activeTuning()) {
-        arg.result.x /= (double)(3 * Arg::gauge_dir * 2 * arg.threads);
-        arg.result.y /= (double)(3 * 2 * arg.threads);
+        arg.result.x /= (double)(3 * Arg::gauge_dir * 2 * arg.threads.x);
+        arg.result.y /= (double)(3 * 2 * arg.threads.x);
       }
     }
 
-    long long flops() const { return (36LL * Arg::gauge_dir + 65LL) * 2 * arg.threads; }
+    long long flops() const { return (36LL * Arg::gauge_dir + 65LL) * 2 * arg.threads.x; }
     long long bytes() const
     { return (Arg::gauge_dir * meta.Bytes() / 4) + 12 * meta.Volume() * meta.Precision(); }
   };

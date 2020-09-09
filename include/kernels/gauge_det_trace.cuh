@@ -1,7 +1,7 @@
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
 #include <index_helper.cuh>
-#include <kernels/generic_reduction.cuh>
+#include <reduction_kernel.h>
 
 namespace quda {
 
@@ -12,7 +12,7 @@ namespace quda {
     static constexpr int type = type_;
     using real = typename mapper<Float>::type;
     using Gauge = typename gauge_mapper<real, recon>::type;
-    int threads; // number of active threads required
+    dim3 threads; // number of active threads required
     int X[4]; // grid dimensions
     int border[4];
     Gauge u;
@@ -20,7 +20,7 @@ namespace quda {
     KernelArg(const GaugeField &u) :
       ReduceArg<double2>(),
       u(u),
-      threads(u.LocalVolumeCB())
+      threads(u.LocalVolumeCB(), 2, 1)
     {
       for (int dir=0; dir<4; ++dir) {
         border[dir] = u.R()[dir];

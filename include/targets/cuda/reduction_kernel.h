@@ -18,7 +18,7 @@ namespace quda {
     reduce_t reduced_value;
     zero(reduced_value);
 
-    while (idx < arg.threads) {
+    while (idx < arg.threads.x) {
       auto value = t(idx, parity);
       reduced_value = r(value, reduced_value);
       idx += blockDim.x * gridDim.x;

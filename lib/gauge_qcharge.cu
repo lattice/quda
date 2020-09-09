@@ -11,7 +11,7 @@ namespace quda
 {
 
   template <typename Float, int nColor, QudaReconstructType recon>
-  class QCharge : TunableReduction2D<qCharge> {
+  class QCharge : TunableReduction2D<> {
     const GaugeField &Fmunu;
     double *energy;
     double &qcharge;
@@ -38,11 +38,11 @@ namespace quda
       std::vector<double> result(3);
       if (density) {
         QChargeArg<Float, nColor, recon, true> arg(Fmunu, (Float*)qdensity);
-        launch(tp, stream, arg);
+        launch<qCharge>(tp, stream, arg);
         arg.complete(result);
       } else {
         QChargeArg<Float, nColor, recon, false> arg(Fmunu, (Float*)qdensity);
-        launch(tp, stream, arg);
+        launch<qCharge>(tp, stream, arg);
         arg.complete(result);
       }
 

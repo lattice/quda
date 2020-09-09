@@ -11,7 +11,7 @@
 namespace quda {
 
   template <typename Float, int nColor, QudaReconstructType recon>
-  class CalcFunc : TunableReduction2D<DetTrace> {
+  class CalcFunc : TunableReduction2D<> {
     double2 &result;
     const GaugeField &u;
     const int type;
@@ -32,11 +32,11 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (type == 0) {
         KernelArg<Float, nColor, recon, 0> arg(u);
-        launch(tp, stream, arg);
+        launch<DetTrace>(tp, stream, arg);
         arg.complete(result, stream);
       } else {
         KernelArg<Float, nColor, recon, 1> arg(u);
-        launch(tp, stream, arg);
+        launch<DetTrace>(tp, stream, arg);
         arg.complete(result, stream);
       }
 

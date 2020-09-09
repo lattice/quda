@@ -1,6 +1,6 @@
 #include <gauge_field_order.h>
 #include <index_helper.cuh>
-#include <kernels/generic_reduction.cuh>
+#include <reduction_kernel.h>
 
 namespace quda
 {
@@ -15,14 +15,14 @@ namespace quda
     static constexpr bool density = density_;
     typedef typename gauge_mapper<Float,recon>::type F;
 
-    int threads; // number of active threads required
+    dim3 threads; // number of active threads required
     F f;
     Float *qDensity;
 
     QChargeArg(const GaugeField &Fmunu, Float *qDensity = nullptr) :
       ReduceArg<double3>(),
       f(Fmunu),
-      threads(Fmunu.VolumeCB()),
+      threads(Fmunu.VolumeCB(), 2, 1),
       qDensity(qDensity)
     {
     }
@@ -78,7 +78,7 @@ namespace quda
       // apply correct levi-civita symbol
       for (int i=0; i<3; i++) i % 2 == 0 ? Q_idx += Qi[i]: Q_idx -= Qi[i];
       Q += Q_idx * q_norm;
-      if (Arg::density) arg.qDensity[x_cb + parity * arg.threads] = Q_idx * q_norm;
+      if (Arg::density) arg.qDensity[x_cb + parity * arg.threads.x] = Q_idx * q_norm;
 
       return E;
     }

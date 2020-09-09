@@ -85,7 +85,7 @@ namespace quda {
    * @brief Tunable object for the gauge fixing quality kernel
    */
   template <typename Arg>
-  class GaugeFixQuality : TunableReduction2D<FixQualityOVR> {
+  class GaugeFixQuality : TunableReduction2D<> {
     Arg &arg;
     const GaugeField &meta;
 
@@ -99,13 +99,13 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch(tp, stream, arg);
+      launch<FixQualityOVR>(tp, stream, arg);
       auto reset = true; // apply is called multiple times with the same arg instance so we need to reset
       arg.complete(arg.result, stream, reset);
       if (!activeTuning()) {
         comm_allreduce_array((double*)&arg.result, 2);
-        arg.result.x /= (double)(3 * Arg::gauge_dir * 2 * arg.threads * comm_size());
-        arg.result.y /= (double)(3 * 2 * arg.threads * comm_size());
+        arg.result.x /= (double)(3 * Arg::gauge_dir * 2 * arg.threads.x * comm_size());
+        arg.result.y /= (double)(3 * 2 * arg.threads.x * comm_size());
       }
     }
 

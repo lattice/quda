@@ -1,6 +1,6 @@
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
-#include <kernels/generic_reduction.cuh>
+#include <reduction_kernel.h>
 
 namespace quda {
 
@@ -9,9 +9,9 @@ namespace quda {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;
-    int threads; // number of active threads required
+    dim3 threads; // number of active threads required
     BaseArg(const GaugeField &meta) :
-      threads(meta.VolumeCB()) {}
+      threads(meta.VolumeCB(), 2, 1) {}
   };
 
   template <typename Float, int nColor, QudaReconstructType recon>
@@ -136,6 +136,44 @@ namespace quda {
         arg.mom(d, x_cb, parity) = m;
       }
       return norm;
+    }
+  };
+
+  template <typename Float, int nColor, QudaReconstructType recon>
+  struct ApplyUArg : BaseArg<Float, nColor, recon>
+  {
+    typedef typename gauge_mapper<Float,recon>::type G;
+    typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type F;
+    F force;
+    const G U;
+    int X[4]; // grid dimensions
+    ApplyUArg(GaugeField &force, const GaugeField &U) :
+      BaseArg<Float, nColor, recon>(U),
+      force(force),
+      U(U)
+    {
+      for (int dir=0; dir<4; ++dir) X[dir] = U.X()[dir];
+    }
+  };
+
+  template <typename Arg> struct ApplyU
+  {
+    Arg &arg;
+    constexpr ApplyU(Arg &arg) : arg(arg) {}
+    static constexpr const char *filename() { return KERNEL_FILE; }
+
+    __device__ __host__ inline void operator()(int x_cb, int parity)
+    {
+      using mat = Matrix<complex<typename Arg::Float>,Arg::nColor>;
+
+      for (int d=0; d<4; d++) {
+        mat f = arg.force(d, x_cb, parity);
+        mat u = arg.U(d, x_cb, parity);
+
+        f = u * f;
+
+        arg.force(d, x_cb, parity) = f;
+      }
     }
   };
 

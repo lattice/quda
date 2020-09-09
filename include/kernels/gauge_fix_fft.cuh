@@ -2,7 +2,7 @@
 
 #include <gauge_field_order.h>
 #include <index_helper.cuh>
-#include <kernels/generic_reduction.cuh>
+#include <reduction_kernel.h>
 
 namespace quda {
 
@@ -16,7 +16,7 @@ namespace quda {
     using Gauge = typename gauge_mapper<store_t, recon>::type;
     static constexpr int gauge_dir = gauge_dir_;
 
-    int threads;     // number of active threads required
+    dim3 threads;     // number of active threads required
     int X[4];     // grid dimensions
     Gauge data;
     complex<real> *delta;
@@ -24,7 +24,7 @@ namespace quda {
 
     GaugeFixQualityFFTArg(const GaugeField &data, complex<real> *delta) :
       ReduceArg<double2>(),
-      threads(data.VolumeCB()),
+      threads(data.VolumeCB(), 2, 1),
       data(data),
       delta(delta)
     {
@@ -73,11 +73,11 @@ namespace quda {
 
       //Saving Delta
       arg.delta[idx] = delta(0,0);
-      arg.delta[idx + 2 * arg.threads] = delta(0,1);
-      arg.delta[idx + 4 * arg.threads] = delta(0,2);
-      arg.delta[idx + 6 * arg.threads] = delta(1,1);
-      arg.delta[idx + 8 * arg.threads] = delta(1,2);
-      arg.delta[idx + 10 * arg.threads] = delta(2,2);
+      arg.delta[idx + 2 * arg.threads.x] = delta(0,1);
+      arg.delta[idx + 4 * arg.threads.x] = delta(0,2);
+      arg.delta[idx + 6 * arg.threads.x] = delta(1,1);
+      arg.delta[idx + 8 * arg.threads.x] = delta(1,2);
+      arg.delta[idx + 10 * arg.threads.x] = delta(2,2);
       //12
       data.y += getRealTraceUVdagger(delta, delta);
 

@@ -441,7 +441,7 @@ namespace quda {
      @param coeff Multiplicative coefficient (e.g., clover coefficient)
      @param parity The field parity we are working on 
    */
-  void cloverDerivative(cudaGaugeField &force, cudaGaugeField& gauge, cudaGaugeField& oprod, double coeff, QudaParity parity);
+  void cloverDerivative(GaugeField &force, GaugeField& gauge, GaugeField& oprod, double coeff, QudaParity parity);
 
   /**
      @brief Helper function that returns whether we have enabled
