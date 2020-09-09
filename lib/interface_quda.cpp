@@ -2973,7 +2973,7 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, voi
   int num_src = quda::product(split_key);
 
   if (param->num_src != num_src) { errorQuda("Number of rhs should be equal to the number of sub-partitions"); }
-  if (inv.dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+  if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
     errorQuda("Split Grid does NOT support 5d even-odd preconditioned DWF yet, because of, well, its 5d even-odd "
               "checker-boarding. :(");
   }
