@@ -70,9 +70,9 @@ namespace quda
   /**
      @brief Wrapper around cudaMemcpy2DAsync or driver API equivalent
      @param[out] dst Destination pointer
-     @param[in] dpitch Destination pitch
+     @param[in] dpitch Destination pitch in bytes
      @param[in] src Source pointer
-     @param[in] spitch Source pitch
+     @param[in] spitch Source pitch in bytes
      @param[in] width Width in bytes
      @param[in] height Number of rows
      @param[in] kind Type of memory copy
@@ -91,14 +91,37 @@ namespace quda
   void qudaMemset_(void *ptr, int value, size_t count, const char *func, const char *file, const char *line);
 
   /**
+     @brief Wrapper around cudaMemset2D or driver API equivalent
+     @param[out] ptr Starting address pointer
+     @param[in] Pitch in bytes
+     @param[in] value Value to set for each byte of specified memory
+     @param[in] width Width in bytes
+     @param[in] height Height in bytes
+   */
+  void qudaMemset2D_(void *ptr, size_t pitch, int value, size_t width, size_t height,
+                     const char *func, const char *file, const char *line);
+
+  /**
      @brief Wrapper around cudaMemsetAsync or driver API equivalent
      @param[out] ptr Starting address pointer
      @param[in] value Value to set for each byte of specified memory
      @param[in] count Size in bytes to set
-     @param[in] stream  Stream to issue memset
+     @param[in] stream Stream to issue memset
    */
   void qudaMemsetAsync_(void *ptr, int value, size_t count, const qudaStream_t &stream, const char *func,
                         const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaMemsetAsync or driver API equivalent
+     @param[out] ptr Starting address pointer
+     @param[in] Pitch in bytes
+     @param[in] value Value to set for each byte of specified memory
+     @param[in] width Width in bytes
+     @param[in] height Height in bytes
+     @param[in] stream Stream to issue memset
+   */
+  void qudaMemset2DAsync_(void *ptr, size_t pitch, int value, size_t width, size_t height,
+                          const qudaStream_t &stream, const char *func, const char *file, const char *line);
 
   /**
      @brief Wrapper around cudaMemPrefetchAsync or driver API equivalent
@@ -195,8 +218,14 @@ namespace quda
 #define qudaMemset(ptr, value, count)                                                                                  \
   ::quda::qudaMemset_(ptr, value, count, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
 
+#define qudaMemset2D(ptr, pitch, value, width, height)             \
+  ::quda::qudaMemset2D_(ptr, pitch, value, width, height, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
 #define qudaMemsetAsync(ptr, value, count, stream)                                                                     \
   ::quda::qudaMemsetAsync_(ptr, value, count, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
+#define qudaMemset2DAsync(ptr, pitch, value, width, height, stream)            \
+  ::quda::qudaMemset2DAsync_(ptr, pitch, value, width, height, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
 
 #define qudaMemPrefetchAsync(ptr, count, mem_space, stream)                                                            \
   ::quda::qudaMemPrefetchAsync_(ptr, count, mem_space, stream, __func__, quda::file_name(__FILE__),                    \

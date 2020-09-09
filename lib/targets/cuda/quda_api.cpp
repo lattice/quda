@@ -271,6 +271,20 @@ namespace quda {
     if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
+  void qudaMemset2D_(void *ptr, size_t pitch, int value, size_t width, size_t height,
+                     const char *func, const char *file, const char *line)
+  {
+    cudaError_t error = cudaMemset2D(ptr, pitch, value, width, height);
+    if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+  }
+
+  void qudaMemset2DAsync_(void *ptr, size_t pitch, int value, size_t width, size_t height,
+                          const qudaStream_t &stream, const char *func, const char *file, const char *line)
+  {
+    cudaError_t error = cudaMemset2DAsync(ptr, pitch, value, width, height, stream);
+    if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+  }
+
   void qudaMemPrefetchAsync_(void *ptr, size_t count, QudaFieldLocation mem_space, const qudaStream_t &stream,
                              const char *func, const char *file, const char *line)
   {
