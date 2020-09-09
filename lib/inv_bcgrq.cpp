@@ -23,8 +23,7 @@ namespace quda
   template<typename T>
 std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
   std::vector<T*> res;
-  std::transform(in.begin(), in.end(), std::back_inserter(res), [](const auto& m) { std::cout << 
-  "getraw" << std::endl; return m.get(); });
+  std::transform(in.begin(), in.end(), std::back_inserter(res), [](const auto& m) { return m.get(); });
   return res;
 }
 // define this to use multi-functions, otherwise it'll
@@ -32,7 +31,7 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
 // this is more here for development convenience.
 
 #define BLOCKSOLVER_MULTIFUNCTIONS
-// #define BLOCKSOLVE_DSLASH5D
+#define BLOCKSOLVE_DSLASH5D
 // #define BLOCKSOLVER_VERBOSE
 
 // Run algorithm with Q in high precision.
@@ -327,13 +326,20 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
 // #else
     // for (int i = 0; i < nsrc; i++) { mat(*rp[i], *x[i], *yp[i], *tmp3_p[i]); }
 // #endif
-    for (int i = 0; i < nsrc; i++) {
-      // r2avg += H(i, i).real();
-      // printfQuda("r2[%i] %e\n", i, H(i, i).real());
-            // printfQuda("CHECK r2 %e\n",blas::norm2(*r[i]));
-      mat(*r[i], *x[i], *y[i], *tmp3[i]);
-      // printfQuda("CHECK r2 %e\n",blas::norm2(*r[i]));
-    }
+
+// #ifdef BLOCKSOLVE_DSLASH5D
+     mat(r, x, y, tmp3);
+// #else
+//     for (int i = 0; i < nsrc; i++) {
+//       // r2avg += H(i, i).real();
+//       // printfQuda("r2[%i] %e\n", i, H(i, i).real());
+//             // printfQuda("CHECK r2 %e\n",blas::norm2(*r[i])); 
+//       mat(*r[i], *x[i], *y[i], *tmp3[i]);
+//       // printfQuda("CHECK r2 %e\n",blas::norm2(*r[i]));
+//     }
+// #endif
+
+
 
     // #ifdef BLOCKSOLVER_MULTIFUNCTIONS
     // // blas::xpay(b, -1.0, r);
@@ -611,16 +617,16 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
     while (!allconverged && k < param.maxiter) {
       // Prepare to overlap some compute with comms.
       if (k > 0 && !just_reliable_updated) {
-        dslash::aux_worker = &blockcg_update;
+        // dslash::aux_worker = &blockcg_update;
       } else {
-        dslash::aux_worker = NULL;
+        dslash::aux_worker = nullptr;
         just_reliable_updated = false;
       }
       // Step 12: Compute Ap.
 // #ifdef BLOCKSOLVE_DSLASH5D
-      // matSloppy(Ap, p, tmp_matsloppy, tmp2);
+      matSloppy(Ap, p, tmp_matsloppy, tmp2);
 // #else
-      for (int i = 0; i < nsrc; i++) matSloppy(*Ap[i], *p[i], *tmp_matsloppy[i], *tmp2[i]);
+//       for (int i = 0; i < nsrc; i++) matSloppy(*Ap[i], *p[i], *tmp_matsloppy[i], *tmp2[i]);
 // #endif
 
       // Step 13: calculate pAp = P^\dagger Ap
@@ -650,8 +656,16 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
       // MWREL: regular update
 
       // Step 16: update Xsloppy = Xsloppy + P alpha
-      // This step now gets overlapped with the
+      // Currently not: This step now gets overlapped with the
       // comms in matSloppy.
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
+        blas::caxpy(alpha_raw, p, x_sloppy);
+#else
+        for (int i = 0; i < nsrc; i++) {
+          for (int j = 0; j < nsrc; j++) { blas::caxpy(alpha(i, j), *p[i], *x_sloppy[j]); }
+        }
+#endif
+
 
     // Step 17: Update Q = Q - Ap beta (remember we already put the minus sign on beta)
       // update rSloppy
@@ -771,13 +785,13 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
         // If we triggered a reliable update, we need
         // to do this X update now.
         // Step 16: update Xsloppy = Xsloppy + P alpha
-#ifdef BLOCKSOLVER_MULTIFUNCTIONS
-        blas::caxpy(alpha_raw, p, x_sloppy);
-#else
-        for (int i = 0; i < nsrc; i++) {
-          for (int j = 0; j < nsrc; j++) { blas::caxpy(alpha(i, j), *p[i], *x_sloppy[j]); }
-        }
-#endif
+// #ifdef BLOCKSOLVER_MULTIFUNCTIONS
+//         blas::caxpy(alpha_raw, p, x_sloppy);
+// #else
+//         for (int i = 0; i < nsrc; i++) {
+//           for (int j = 0; j < nsrc; j++) { blas::caxpy(alpha(i, j), *p[i], *x_sloppy[j]); }
+//         }
+// #endif
 
         // Reliable updates step 2: Y = Y + X_s
         // #ifdef BLOCKSOLVER_MULTIFUNCTIONS
@@ -786,13 +800,13 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
         for (int i = 0; i < nsrc; i++) blas::xpy(*x_sloppy[i], *y[i]);
         // #endif
         // Don't do aux work!
-        dslash::aux_worker = NULL;
+        dslash::aux_worker = nullptr;
 
         // Reliable updates step 4: R = AY - B, using X as a temporary with the right precision.
 // #ifdef BLOCKSOLVE_DSLASH5D
-        // mat(r, y, x, tmp3);
+        mat(r, y, x, tmp3);
 // #else
-        for (int i = 0; i < nsrc; i++) mat(*r[i], *y[i], *x[i], *tmp3[i]);
+        // for (int i = 0; i < nsrc; i++) mat(*r[i], *y[i], *x[i], *tmp3[i]);
 // #endif
 
         // #ifdef BLOCKSOLVER_MULTIFUNCTIONS
@@ -876,7 +890,7 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
 #endif
 
         // Reliable updates step 9: Set S = C * C_old^{-1} (equation 6.1 in the blockCGrQ paper)
-        // S = C * C_old.inverse();
+        S = C * C_old.inverse();
 #ifdef BLOCKSOLVER_VERBOSE
         std::cout << "reliable S " << S << std::endl;
 #endif
@@ -1107,14 +1121,14 @@ std::vector<T*> getraw(const std::vector<std::unique_ptr<T>> &in){
     if (getVerbosity() >= QUDA_VERBOSE)
       printfQuda("Block-CG: ReliableUpdateInfo (delta,iter,rupdates): %f %i %i \n", delta, k, rUpdate);
 
-    dslash::aux_worker = NULL;
+    dslash::aux_worker = nullptr;
 
     if (param.compute_true_res) {
     // compute the true residuals
 // #ifdef BLOCKSOLVE_DSLASH5D
-      // mat(r, x, y, tmp3);
+      mat(r, x, y, tmp3);
 // #else
-      for (int i = 0; i < nsrc; i++) mat(*r[i], *x[i], *y[i], *tmp3[i]);
+//       for (int i = 0; i < nsrc; i++) mat(*r[i], *x[i], *y[i], *tmp3[i]);
 // #endif
       for (int i = 0; i < nsrc; i++) {
         param.true_res = sqrt(blas::xmyNorm(*b[i], *r[i]) / b2[i]);
