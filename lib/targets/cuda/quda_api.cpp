@@ -268,6 +268,33 @@ namespace quda {
     }
   }
 
+
+  void qudaMemcpyToSymbolAsync_(const char *symbol, const void *src, size_t count, size_t offset, cudaMemcpyKind kind, const qudaStream_t &stream,
+                        const char *func, const char *file, const char *line)
+  {
+    if (count == 0) return;
+    switch(kind) { 
+    case cudaMemcpyDeviceToHost:
+	PROFILE(cudaMemcpyToSymbolAsync(symbol, src, count, offset, kind, stream), QUDA_PROFILE_MEMCPY_D2H_ASYNC);
+	break
+    case cudaMemcpyHostToDevice:
+        PROFILE(cudaMemcpyToSymbolAsync(symbol, src, count, offset, kind, stream), QUDA_PROFILE_MEMCPY_H2D_ASYNC);
+        break
+    case cudaMemcpyDeviceToDevice:
+        PROFILE(cudaMemcpyToSymbolAsync(symbol, src, count, offset, kind, stream), QUDA_PROFILE_MEMCPY_D2D_ASYNC);
+        break
+    case cudaMemcpyDeviceToHost:
+        PROFILE(cudaMemcpyToSymbolAsync(symbol, src, count, offset, kind, stream), QUDA_PROFILE_MEMCPY_H2H_ASYNC);
+	break;
+    case cudaMemcpyDefault:
+	PROFILE(cudaMemcpyToSymbolAsync(symbol, src, count, offset, kind, stream), QUDA_PROFILE_MEMCPY_DEFAULT_ASYNC);
+        break;
+     default: 
+	errorQuda("Unsupported cudaMemcpyToSymbolAsync: %d", kind);
+	break;
+     }
+   }
+
   void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
                           cudaMemcpyKind kind, const qudaStream_t &stream, const char *func, const char *file,
                           const char *line)

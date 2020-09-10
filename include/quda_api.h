@@ -94,6 +94,19 @@ namespace quda
   void qudaMemcpyAsync_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const qudaStream_t &stream,
                         const char *func, const char *file, const char *line);
 
+
+  /** 
+     @brief Wrapper around cudaMemcpyToSymbolAsync or driver API equivalent
+     @param[out] symbol   Destination symbol 
+     @param[in] src      Source pointer
+     @param[in] count    Size of transfer
+     @param[in] offset   Offset from start of symbol
+     @param[in] kind     Type of memory copy
+     @param[in] stream   Stream to issue copy  
+  */
+  void qudaMemcpyToSymbolAsync_(const char *symbol, const void *src, size_t count, size_t offset,  qudaMemcpyKind kind, const qudaStream_t &stream, 
+			        const char *func, const char *file, const char *line);
+
   /**
      @brief Wrapper around cudaMemcpy2DAsync or driver API equivalent
      @param[out] dst Destination pointer
@@ -218,8 +231,11 @@ namespace quda
 #define qudaMemcpy(dst, src, count, kind)                                                                              \
   ::quda::qudaMemcpy_(dst, src, count, kind, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
 
-#define qudaMemcpyAsync(dst, src, count, kind, stream)                                                                 \
+#define qudaMemcpyAsync(dst, src, count, kind, stream)                                                \
   ::quda::qudaMemcpyAsync_(dst, src, count, kind, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
+#define qudaMemcpyToSymbolAsync(dst, src, count, offset, kind, stream)                                                \
+  ::quda::qudaMemcpyToSymbolAsync_(dst, src, count, offset, kind, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
 
 #define qudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream)                                       \
   ::quda::qudaMemcpy2DAsync_(dst, dpitch, src, spitch, width, height, kind, stream, __func__,                          \

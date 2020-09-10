@@ -133,7 +133,7 @@ namespace quda {
 #ifdef JITIFY
         cuMemcpyHtoDAsync(buf_d, tmp, NXZ * NYW * sizeof(coeff_t), stream);
 #else
-        cudaMemcpyToSymbolAsync(buf_d, tmp, NXZ * NYW * sizeof(coeff_t), 0, cudaMemcpyHostToDevice, stream);
+        qudaMemcpyToSymbolAsync(buf_d, tmp, NXZ * NYW * sizeof(coeff_t), 0, qudaMemcpyHostToDevice, stream);
 #endif
       }
 

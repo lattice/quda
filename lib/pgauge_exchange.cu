@@ -216,8 +216,8 @@ namespace quda {
         arg.borderid = data.R()[d];
         qudaLaunchKernel(Kernel_UnPack<recon, Float, true, decltype(arg)>, tp, GFStream[1], arg);
 
-        qudaMemcpyAsync(send[d], send_d[d], bytes[d], cudaMemcpyDeviceToHost, GFStream[0]);
-        qudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], cudaMemcpyDeviceToHost, GFStream[1]);
+        qudaMemcpyAsync(send[d], send_d[d], bytes[d], qudaMemcpyDeviceToHost, GFStream[0]);
+        qudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], qudaMemcpyDeviceToHost, GFStream[1]);
 
         qudaStreamSynchronize(GFStream[0]);
         comm_start(mh_send_fwd[d]);
@@ -226,14 +226,14 @@ namespace quda {
         comm_start(mh_send_back[d]);
 
         comm_wait(mh_recv_back[d]);
-        qudaMemcpyAsync(recv_d[d], recv[d], bytes[d], cudaMemcpyHostToDevice, GFStream[0]);
+        qudaMemcpyAsync(recv_d[d], recv[d], bytes[d], qudaMemcpyHostToDevice, GFStream[0]);
 
         arg.array = reinterpret_cast<complex<Float>*>(recv_d[d]);
         arg.borderid = data.R()[d] - 1;
         qudaLaunchKernel(Kernel_UnPack<recon, Float, false, decltype(arg)>, tp, GFStream[0], arg);
 
         comm_wait(mh_recv_fwd[d]);
-        qudaMemcpyAsync(recvg_d[d], recvg[d], bytes[d], cudaMemcpyHostToDevice, GFStream[1]);
+        qudaMemcpyAsync(recvg_d[d], recvg[d], bytes[d], qudaMemcpyHostToDevice, GFStream[1]);
 
         arg.array = reinterpret_cast<complex<Float>*>(recvg_d[d]);
         arg.borderid = X[d] - data.R()[d];
