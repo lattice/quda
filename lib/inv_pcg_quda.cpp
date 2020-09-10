@@ -10,6 +10,8 @@
 #include <invert_quda.h>
 #include <util_quda.h>
 
+#include <ml.h>
+
 namespace quda
 {
 
@@ -71,7 +73,8 @@ namespace quda
     Kparam.deflate = false;
 
     if (param.inv_type_precondition == QUDA_CG_INVERTER) {
-      K = new CG(matPrecon, matPrecon, matPrecon, matEig, Kparam, profile);
+      // K = new CG(matPrecon, matPrecon, matPrecon, matEig, Kparam, profile);
+      K = new Acc<MADWFacc, CG>(matPrecon, matPrecon, matPrecon, matEig, Kparam, profile);
     } else if (param.inv_type_precondition == QUDA_MR_INVERTER) {
       K = new MR(matPrecon, matPrecon, Kparam, profile);
     } else if (param.inv_type_precondition == QUDA_SD_INVERTER) {
@@ -94,6 +97,8 @@ namespace quda
   void PreconCG::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
     profile.TPSTART(QUDA_PROFILE_INIT);
+
+    K->train_param(b);
 
     double b2 = blas::norm2(b);
 

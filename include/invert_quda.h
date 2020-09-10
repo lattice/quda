@@ -486,6 +486,11 @@ namespace quda {
 
     virtual void blocksolve(ColorSpinorField &out, ColorSpinorField &in);
 
+    virtual void train_param(ColorSpinorField &in)
+    {
+      errorQuda("NOT implemented.");
+    }
+
     const DiracMatrix& M() { return mat; }
     const DiracMatrix& Msloppy() { return matSloppy; }
     const DiracMatrix& Mprecon() { return matPrecon; }
@@ -663,6 +668,51 @@ namespace quda {
     void blocksolve(ColorSpinorField& out, ColorSpinorField& in);
 
     virtual bool hermitian() { return true; } /** CG is only for Hermitian systems */
+  };
+
+  /**
+     @brief  Conjugate-Gradient Solver with an accelerator.
+   */
+  template <class Transformer, class Base>
+  class Acc : public Base {
+
+  public:
+
+    Transformer transformer;
+
+    Acc(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
+       SolverParam &param, TimeProfile &profile) :
+       Base(mat, matSloppy, matSloppy, matEig, param, profile){ }
+
+    virtual ~Acc() { }
+
+    /**
+     * @brief Forward transform, run base solver (e.g. CG), then backward transform.
+     * @param out Solution vector.
+     * @param in Right-hand side.
+     */
+    virtual void operator()(ColorSpinorField &out, ColorSpinorField &in){
+      auto base = [&](ColorSpinorField &out_, ColorSpinorField &in_) { Base::operator()(out_, in_); };
+      transformer.apply(base, out, in);
+    }
+
+    virtual void train_param(ColorSpinorField &in){
+      auto base = [&](ColorSpinorField &out_, ColorSpinorField &in_) { Base::operator()(out_, in_); };
+      transformer.train(Solver::matPrecon, base, base, in);
+    }
+
+    /** TODO: Update this.
+     * @brief Solve re-using an initial Krylov space defined by an initial r2_old_init and search direction p_init.
+     * @details This can be used when continuing a CG, e.g. as refinement step after a multi-shift solve.
+     * @param out Solution-vector.
+     * @param in Right-hand side.
+     * @param p_init Initial-search direction.
+     * @param r2_old_init [description]
+     */
+    void operator()(ColorSpinorField &out, ColorSpinorField &in, ColorSpinorField *p_init, double r2_old_init) {
+      errorQuda("NOT implemented!");
+    }
+
   };
 
   class CGNE : public CG
