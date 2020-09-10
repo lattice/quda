@@ -23,6 +23,7 @@ constexpr qudaMemcpyKind  qudaMemcpyDefault = cudaMemcpyDefault;
 
 #include <hip/hip_runtime.h>
 #include <hip/hip_runtime_api.h>
+
 using qudaDeviceProp_t = hipDeviceProp_t;
 using qudaStream_t = hipStream_t;
 using qudaMemcpyKind = hipMemcpyKind;
