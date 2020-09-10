@@ -341,7 +341,7 @@ namespace quda
       tp.grid = dim3(min_threads * t_m * t_n, 2, 1);
 
       auto kernel = ComputeVUVMMA<from_coarse, dim, dir, bM, bN, bK, block_y, block_z, Arg>;
-      setMaxDynamicSharedBytesPerBlock(kernel);
+      tp.set_max_shared_bytes = true;
       qudaLaunchKernel(kernel, tp, stream, arg);
     }
 
