@@ -58,7 +58,7 @@ static int unitarize_link_test(int &test_rc)
 {
   QudaGaugeParam qudaGaugeParam = newQudaGaugeParam();
 
-  initQuda(device);
+  initQuda(device_ordinal);
 
   qudaGaugeParam.anisotropy = 1.0;
 

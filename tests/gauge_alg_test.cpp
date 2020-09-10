@@ -266,7 +266,7 @@ int main(int argc, char **argv)
   ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
   if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
 
-  initQuda(device);
+  initQuda(device_ordinal);
   test_rc = RUN_ALL_TESTS();
   endQuda();
 

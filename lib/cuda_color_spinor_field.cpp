@@ -301,7 +301,6 @@ namespace quda {
       backup_norm_h = new char[norm_bytes];
       qudaMemcpy(backup_norm_h, norm, norm_bytes, qudaMemcpyDefault);
     }
-    checkCudaError();
     backed_up = true;
   }
 
@@ -314,7 +313,6 @@ namespace quda {
       qudaMemcpy(norm, backup_norm_h, norm_bytes, qudaMemcpyDefault);
       delete []backup_norm_h;
     }
-    checkCudaError();
     backed_up = false;
   }
 
@@ -351,7 +349,7 @@ namespace quda {
       char   *dst  = (char*)v + ((!composite_descr.is_composite || composite_descr.is_component) ? volumeCB : composite_descr.volumeCB)*fieldOrder*precision;
       if (pad_bytes)
         for (int subset=0; subset<siteSubset; subset++) {
-          cudaMemset2DAsync(dst + subset*bytes/siteSubset, pitch, 0, pad_bytes, Npad);
+          qudaMemset2DAsync(dst + subset*bytes/siteSubset, pitch, 0, pad_bytes, Npad, 0);
         }
     }
 
@@ -381,8 +379,6 @@ namespace quda {
                         subset_bytes - (size_t)stride * sizeof(float), 0);
       }
     }
-
-    checkCudaError();
   }
 
   void cudaColorSpinorField::copy(const cudaColorSpinorField &src)
@@ -447,7 +443,6 @@ namespace quda {
     }
 
     qudaDeviceSynchronize(); // include sync here for accurate host-device profiling
-    checkCudaError();
   }
 
 
@@ -497,7 +492,6 @@ namespace quda {
     }
 
     qudaDeviceSynchronize(); // need to sync before data can be used on CPU
-    checkCudaError();
   }
 
   void cudaColorSpinorField::allocateGhostBuffer(int nFace, bool spin_project) const

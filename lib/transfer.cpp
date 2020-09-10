@@ -306,7 +306,6 @@ namespace quda {
     if (enable_gpu) {
       qudaMemcpy(fine_to_coarse_d, fine_to_coarse_h, B[0]->Volume()*sizeof(int), qudaMemcpyHostToDevice);
       qudaMemcpy(coarse_to_fine_d, coarse_to_fine_h, B[0]->Volume()*sizeof(int), qudaMemcpyHostToDevice);
-      checkCudaError();
     }
 
   }

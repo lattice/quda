@@ -51,7 +51,7 @@ namespace quda {
       default:
 	errorQuda("Unsupported memory type %d", mem_type);
       }
-      if (create == QUDA_ZERO_FIELD_CREATE) cudaMemset(gauge, 0, bytes);
+      if (create == QUDA_ZERO_FIELD_CREATE) qudaMemset(gauge, 0, bytes);
     } else {
       gauge = param.gauge;
     }
@@ -79,8 +79,8 @@ namespace quda {
 
     size_t pitch = stride*order*precision;
     if (pad_bytes) {
-      cudaMemset2D(static_cast<char*>(even) + volumeCB*order*precision, pitch, 0, pad_bytes, Npad);
-      cudaMemset2D(static_cast<char*>(odd) + volumeCB*order*precision, pitch, 0, pad_bytes, Npad);
+      qudaMemset2D(static_cast<char*>(even) + volumeCB*order*precision, pitch, 0, pad_bytes, Npad);
+      qudaMemset2D(static_cast<char*>(odd) + volumeCB*order*precision, pitch, 0, pad_bytes, Npad);
     }
   }
 
@@ -627,13 +627,11 @@ namespace quda {
     staggeredPhaseType = src.StaggeredPhase();
 
     qudaDeviceSynchronize(); // include sync here for accurate host-device profiling
-    checkCudaError();
   }
 
   void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu) {
     copy(cpu);
     qudaDeviceSynchronize();
-    checkCudaError();
   }
 
   void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu, TimeProfile &profile) {
@@ -709,7 +707,6 @@ namespace quda {
     cpu.staggeredPhaseType = staggeredPhaseType;
 
     qudaDeviceSynchronize();
-    checkCudaError();
   }
 
   void cudaGaugeField::saveCPUField(cpuGaugeField &cpu, TimeProfile &profile) const {
@@ -722,7 +719,6 @@ namespace quda {
     if (backed_up) errorQuda("Gauge field already backed up");
     backup_h = new char[bytes];
     qudaMemcpy(backup_h, gauge, bytes, qudaMemcpyDefault);
-    checkCudaError();
     backed_up = true;
   }
 
@@ -731,7 +727,6 @@ namespace quda {
     if (!backed_up) errorQuda("Cannot restore since not backed up");
     qudaMemcpy(gauge, backup_h, bytes, qudaMemcpyDefault);
     delete []backup_h;
-    checkCudaError();
     backed_up = false;
   }
 

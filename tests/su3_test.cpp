@@ -130,7 +130,7 @@ int main(int argc, char **argv)
     new_gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
   }
 
-  initQuda(device);
+  initQuda(device_ordinal);
 
   setVerbosity(verbosity);
 
