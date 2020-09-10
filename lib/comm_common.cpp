@@ -235,7 +235,7 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
     const int gpuid = comm_gpuid();
     cudaDeviceProp prop;
     cudaGetDeviceProperties(&prop, gpuid);
-    if(!prop.unifiedAddressing) return;
+    if (!prop.unifiedAddressing) return;
 
     comm_set_neighbor_ranks();
 
@@ -298,7 +298,6 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
   peer2peer_present = comm_peer2peer_enabled_global();
 
   checkCudaErrorNoSync();
-  return;
 }
 
 bool comm_peer2peer_present() { return peer2peer_present; }
@@ -414,15 +413,12 @@ static int neighbor_rank[2][4] = { {-1,-1,-1,-1},
 
 static bool neighbors_cached = false;
 
-void comm_set_neighbor_ranks(Topology *topo){
-
+void comm_set_neighbor_ranks(Topology *topo)
+{
   if(neighbors_cached) return;
 
   Topology *topology = topo ? topo : default_topo; // use default topology if topo is NULL
-  if(!topology){
-    errorQuda("Topology not specified");
-    return;
-  }
+  if (!topology) errorQuda("Topology not specified");
      
   for(int d=0; d<4; ++d){
     int pos_displacement[QUDA_MAX_DIM] = { };
@@ -433,7 +429,6 @@ void comm_set_neighbor_ranks(Topology *topo){
     neighbor_rank[1][d] = comm_rank_displaced(topology, pos_displacement);
   }
   neighbors_cached = true;
-  return;
 }
 
 int comm_neighbor_rank(int dir, int dim){
