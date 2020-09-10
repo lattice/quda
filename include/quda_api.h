@@ -104,7 +104,7 @@ namespace quda
      @param[in] kind     Type of memory copy
      @param[in] stream   Stream to issue copy  
   */
-  void qudaMemcpyToSymbolAsync_(const char *symbol, const void *src, size_t count, size_t offset,  qudaMemcpyKind kind, const qudaStream_t &stream, 
+  void qudaMemcpyToSymbolAsync_(const void *symbol, const void *src, size_t count, size_t offset,  qudaMemcpyKind kind, const qudaStream_t &stream, 
 			        const char *func, const char *file, const char *line);
 
   /**
