@@ -213,7 +213,6 @@ namespace quda {
     }
 
     qudaDeviceSynchronize();
-    checkCudaError();
 
     delete staple;
     delete staple1;

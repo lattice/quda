@@ -174,8 +174,6 @@ namespace quda {
     } else {
       errorQuda("Unsupported V precision %d", v.Precision());
     }
-
-    if (checkLocation(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
   }
 
   template <typename Float>

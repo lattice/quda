@@ -37,6 +37,7 @@ extern QudaPrecision &cpu_prec;
 extern QudaPrecision &cuda_prec;
 extern QudaPrecision &cuda_prec_sloppy;
 extern QudaPrecision &cuda_prec_precondition;
+extern QudaPrecision &cuda_prec_eigensolver;
 extern QudaPrecision &cuda_prec_refinement_sloppy;
 extern QudaPrecision &cuda_prec_ritz;
 
@@ -107,7 +108,7 @@ void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision p
                                  quda::RNG &rng);
 //------------------------------------------------------
 
-void performanceStats(double *time, double *gflops);
+void performanceStats(std::vector<double> &time, std::vector<double> &gflops, std::vector<int> &iter);
 
 void initComms(int argc, char **argv, std::array<int, 4> &commDims);
 void initComms(int argc, char **argv, int *const commDims);

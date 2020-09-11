@@ -73,7 +73,7 @@ void init() {
 
   spinor->Source(QUDA_RANDOM_SOURCE);
 
-  initQuda(device);
+  initQuda(device_ordinal);
 
   setVerbosityQuda(QUDA_VERBOSE, "", stdout);
 

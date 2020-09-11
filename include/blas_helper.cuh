@@ -310,6 +310,10 @@ namespace quda
     template <> constexpr int n_vector<int8_t, false, 4, true>() { return 24; }
     template <> constexpr int n_vector<int8_t, false, 1, true>() { return 6; }
 
+#if defined(__CUDA_ARCH__) && __CUDACC_VER_MAJOR__ <= 9
+#define constexpr
+#endif
+
     template <template <typename...> class Functor,
               template <template <typename...> class, typename store_t, typename y_store_t, int, typename> class Blas,
               typename T, typename store_t, typename y_store_t, typename V, typename... Args>
@@ -330,6 +334,11 @@ namespace quda
 #endif
       }
     }
+
+#if defined(__CUDA_ARCH__) && __CUDACC_VER_MAJOR__ <= 9
+#undef constexpr
+#define constexpr constexpr
+#endif
 
     // The instantiate helpers are used to instantiate the precision
     // and spin for the blas and reduce kernels

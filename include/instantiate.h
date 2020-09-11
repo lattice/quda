@@ -150,6 +150,10 @@ namespace quda
     }
   }
 
+#if defined(__CUDA_ARCH__) && __CUDACC_VER_MAJOR__ <= 9
+#define constexpr
+#endif
+
   /**
      @brief This instantiate function is used to instantiate the clover precision
      @param[in] c CloverField we wish to instantiate
@@ -203,32 +207,9 @@ namespace quda
     }
   }
 
-  template <QudaPrecision> constexpr bool is_enabled() { return true; }
-#if !(QUDA_PRECISION & 8)
-  template <> constexpr bool is_enabled<QUDA_DOUBLE_PRECISION>() { return false; }
-#endif
-#if !(QUDA_PRECISION & 4)
-  template <> constexpr bool is_enabled<QUDA_SINGLE_PRECISION>() { return false; }
-#endif
-#if !(QUDA_PRECISION & 2)
-  template <> constexpr bool is_enabled<QUDA_HALF_PRECISION>() { return false; }
-#endif
-#if !(QUDA_PRECISION & 1)
-  template <> constexpr bool is_enabled<QUDA_QUARTER_PRECISION>() { return false; }
-#endif
-
-  struct PrecisionFull {
-    static constexpr std::array<QudaPrecision, 4> precision
-      = {QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION, QUDA_QUARTER_PRECISION};
-  };
-
-#ifdef GPU_MULTIGRID_DOUBLE
-  struct PrecisionMultigrid: public PrecisionDefault { };
-#else
-  struct PrecisionMultigrid {
-    static constexpr std::array<QudaPrecision, 3> precision
-      = {QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION, QUDA_QUARTER_PRECISION};
-  };
+#if defined(__CUDA_ARCH__) && __CUDACC_VER_MAJOR__ <= 9
+#undef constexpr
+#define constexpr constexpr
 #endif
 
   /**
@@ -271,7 +252,11 @@ namespace quda
 
   /**
      @brief The instantiatePrecision function is used to instantiate
-     the precision
+     the precision.  Note unlike the "instantiate" functions above,
+     this helper always instantiates double precision regardless of
+     the QUDA_PRECISION value: this enables its use for copy interface
+     routines which should always enable double precision support.
+
      @param[in] field LatticeField we wish to instantiate
      @param[in,out] args Any additional arguments required for the
      computation at hand
@@ -306,8 +291,17 @@ namespace quda
   }
 
   /**
-     @brief The instantiatePrecision function is used to instantiate
-     the precision
+     @brief The instantiatePrecision2 function is used to instantiate
+     the precision for a class that accepts 2 typename arguments, with
+     the first typename corresponding to the precision being
+     instantiated at hand.  This is useful for copy routines, where we
+     need to instantiate a second, e.g., destination, precision after
+     already instantiating the first, e.g., source, precision.
+     Similar to the "instantiatePrecision" function above, this helper
+     always instantiates double precision regardless of the
+     QUDA_PRECISION value: this enables its use for copy interface
+     routines which should always enable double precision support.
+
      @param[in] field LatticeField we wish to instantiate
      @param[in,out] args Any additional arguments required for the
      computation at hand

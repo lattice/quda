@@ -217,8 +217,6 @@ namespace quda {
       if (cloverInv) pool_device_free(cloverInv);
       if (invNorm) pool_device_free(invNorm);
     }
-    
-    checkCudaError();
   }
 
   void cudaCloverField::copy(const CloverField &src, bool inverse) {
@@ -277,7 +275,6 @@ namespace quda {
     }
 
     qudaDeviceSynchronize();
-    checkCudaError();
   }
 
   void cudaCloverField::loadCPUField(const cpuCloverField &cpu) { copy(cpu); }
@@ -313,7 +310,6 @@ namespace quda {
     pool_pinned_free(packClover);
 
     qudaDeviceSynchronize();
-    checkCudaError();
   }
 
   void cudaCloverField::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const

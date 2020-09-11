@@ -23,6 +23,12 @@ namespace quda
      */
     void destroy();
 
+    /**
+     * @brief Returns the maximum dynamic shared memory per block.
+     * @return The maximum dynamic shared memory to each block of threads
+     */
+    size_t max_dynamic_shared_memory();
+
     namespace profile
     {
 

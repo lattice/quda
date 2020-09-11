@@ -12,6 +12,7 @@
 
 #include <tune_key.h>
 #include <quda_internal.h>
+#include <device.h>
 
 // this file has some workarounds to allow compilation using nvrtc of kernels that include this file
 #ifdef __CUDACC_RTC__
@@ -27,24 +28,26 @@ namespace quda {
     dim3 block;
     dim3 grid;
     int shared_bytes;
+    bool set_max_shared_bytes; // whether to opt in to max shared bytes per thread block
     int4 aux; // free parameter that can be used as an arbitrary autotuning dimension outside of launch parameters
 
     std::string comment;
     float time;
     long long n_calls;
 
-    inline TuneParam() : block(32, 1, 1), grid(1, 1, 1), shared_bytes(0), aux(), time(FLT_MAX), n_calls(0) {
+    inline TuneParam() : block(32, 1, 1), grid(1, 1, 1), shared_bytes(0), set_max_shared_bytes(false), aux(), time(FLT_MAX), n_calls(0) {
       aux = make_int4(1,1,1,1);
     }
 
     inline TuneParam(const TuneParam &param)
-      : block(param.block), grid(param.grid), shared_bytes(param.shared_bytes), aux(param.aux), comment(param.comment), time(param.time), n_calls(param.n_calls) { }
+      : block(param.block), grid(param.grid), shared_bytes(param.shared_bytes), set_max_shared_bytes(param.set_max_shared_bytes), aux(param.aux), comment(param.comment), time(param.time), n_calls(param.n_calls) { }
 
     inline TuneParam& operator=(const TuneParam &param) {
       if (&param != this) {
 	block = param.block;
 	grid = param.grid;
 	shared_bytes = param.shared_bytes;
+        set_max_shared_bytes = param.set_max_shared_bytes;
 	aux = param.aux;
 	comment = param.comment;
 	time = param.time;
@@ -193,30 +196,12 @@ namespace quda {
     }
 
     /**
-     * @brief Enable the maximum dynamic shared bytes for the kernel
-     * "func" (values given by maxDynamicSharedBytesPerBlock()).
-     * @param[in] func Function pointer to the kernel we want to
-     * enable max shared memory per block for
-     */
-    template <typename F> inline void setMaxDynamicSharedBytesPerBlock(F *func) const
-    {
-      qudaFuncSetAttribute(
-          (const void *)func, cudaFuncAttributePreferredSharedMemoryCarveout, (int)cudaSharedmemCarveoutMaxShared);
-      cudaFuncAttributes attributes;
-      qudaFuncGetAttributes(attributes, (const void *)func);
-      qudaFuncSetAttribute((const void *)func, cudaFuncAttributeMaxDynamicSharedMemorySize,
-                           maxDynamicSharedBytesPerBlock() - attributes.sharedSizeBytes);
-    }
-
-    /**
      * @brief Returns the maximum dynamic shared memory per block.
      * @return The maximum dynamic shared memory to CUDA thread block
      */
     unsigned int maxDynamicSharedBytesPerBlock() const
     {
-      static int max_shared_bytes = 0;
-      if (!max_shared_bytes) cudaDeviceGetAttribute(&max_shared_bytes, cudaDevAttrMaxSharedMemoryPerBlockOptin, comm_gpuid());
-      return max_shared_bytes;
+      return device::max_dynamic_shared_memory();
     }
 
     /**

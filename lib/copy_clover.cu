@@ -100,9 +100,9 @@ namespace quda {
   {
 #ifdef GPU_CLOVER_DIRAC
     if (out.Precision() < QUDA_SINGLE_PRECISION && out.Order() > 4) 
-      errorQuda("Half precision not supported for order %d", out.Order());
+      errorQuda("Fixed-point precision not supported for order %d", out.Order());
     if (in.Precision() < QUDA_SINGLE_PRECISION && in.Order() > 4) 
-      errorQuda("Half precision not supported for order %d", in.Order());
+      errorQuda("Fixed-point precision not supported for order %d", in.Order());
 
     // swizzle in/out since we first want to instantiate precision
     instantiatePrecision<CloverCopyIn>(in, out, inverse, location, Out, In,

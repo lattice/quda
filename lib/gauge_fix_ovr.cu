@@ -1009,7 +1009,7 @@ public:
                                svd_rel_error, svd_abs_error);
     int num_failures = 0;
     int* num_failures_dev = static_cast<int*>(pool_device_malloc(sizeof(int)));
-    cudaMemset(num_failures_dev, 0, sizeof(int));
+    qudaMemset(num_failures_dev, 0, sizeof(int));
 
     GaugeFixQualityOVRArg<Float, recon, gauge_dir> argQ(data);
     GaugeFixQuality<decltype(argQ)> GaugeFixQuality(argQ, data);
@@ -1113,7 +1113,7 @@ public:
       errorQuda("Error in the unitarization\n");
       exit(1);
     }
-    cudaMemset(num_failures_dev, 0, sizeof(int));
+    qudaMemset(num_failures_dev, 0, sizeof(int));
 
     int iter = 0;
     for ( iter = 0; iter < Nsteps; iter++ ) {
@@ -1165,11 +1165,11 @@ public:
         #else
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
-            cudaMemcpyAsync(send[d], send_d[d], bytes[d], cudaMemcpyDeviceToHost, GFStream[d]);
+            qudaMemcpyAsync(send[d], send_d[d], bytes[d], cudaMemcpyDeviceToHost, GFStream[d]);
           }
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
-            cudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], cudaMemcpyDeviceToHost, GFStream[4 + d]);
+            qudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], cudaMemcpyDeviceToHost, GFStream[4 + d]);
           }
         #endif
           //compute interior points
@@ -1186,12 +1186,12 @@ public:
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
             comm_wait(mh_recv_back[d]);
-            cudaMemcpyAsync(recv_d[d], recv[d], bytes[d], cudaMemcpyHostToDevice, GFStream[d]);
+            qudaMemcpyAsync(recv_d[d], recv[d], bytes[d], cudaMemcpyHostToDevice, GFStream[d]);
           }
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
             comm_wait(mh_recv_fwd[d]);
-            cudaMemcpyAsync(recvg_d[d], recvg[d], bytes[d], cudaMemcpyHostToDevice, GFStream[4 + d]);
+            qudaMemcpyAsync(recvg_d[d], recvg[d], bytes[d], cudaMemcpyHostToDevice, GFStream[4 + d]);
           }
         #endif
           for ( int d = 0; d < 4; d++ ) {
@@ -1225,7 +1225,7 @@ public:
         unitarizeLinks(data, data, num_failures_dev);
         qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
         if ( num_failures > 0 ) errorQuda("Error in the unitarization\n");
-        cudaMemset(num_failures_dev, 0, sizeof(int));
+        qudaMemset(num_failures_dev, 0, sizeof(int));
         flop += 4588.0 * data.X()[0]*data.X()[1]*data.X()[2]*data.X()[3];
         byte += 8.0 * data.X()[0]*data.X()[1]*data.X()[2]*data.X()[3] * dataOr.Bytes();
       }
@@ -1248,7 +1248,7 @@ public:
       unitarizeLinks(data, data, num_failures_dev);
       qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
       if ( num_failures > 0 ) errorQuda("Error in the unitarization\n");
-      cudaMemset(num_failures_dev, 0, sizeof(int));
+      qudaMemset(num_failures_dev, 0, sizeof(int));
       flop += 4588.0 * data.X()[0]*data.X()[1]*data.X()[2]*data.X()[3];
       byte += 8.0 * data.X()[0]*data.X()[1]*data.X()[2]*data.X()[3] * dataOr.Bytes();
     }
@@ -1284,7 +1284,6 @@ public:
       cudaStreamDestroy(GFStream[8]);
     }
   #endif
-    checkCudaError();
     qudaDeviceSynchronize();
     profileInternalGaugeFixOVR.TPSTOP(QUDA_PROFILE_COMPUTE);
     if (getVerbosity() > QUDA_SUMMARIZE){

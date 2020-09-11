@@ -4,9 +4,9 @@
 // parameters parsed from the command line
 
 #ifdef MULTI_GPU
-int device = -1;
+int device_ordinal = -1;
 #else
-int device = 0;
+int device_ordinal = 0;
 #endif
 
 int rank_order;
@@ -22,10 +22,12 @@ std::array<int, 4> dim_partitioned = {0, 0, 0, 0};
 QudaReconstructType link_recon = QUDA_RECONSTRUCT_NO;
 QudaReconstructType link_recon_sloppy = QUDA_RECONSTRUCT_INVALID;
 QudaReconstructType link_recon_precondition = QUDA_RECONSTRUCT_INVALID;
+QudaReconstructType link_recon_eigensolver = QUDA_RECONSTRUCT_INVALID;
 QudaPrecision prec = QUDA_SINGLE_PRECISION;
 QudaPrecision prec_sloppy = QUDA_INVALID_PRECISION;
 QudaPrecision prec_refinement_sloppy = QUDA_INVALID_PRECISION;
 QudaPrecision prec_precondition = QUDA_INVALID_PRECISION;
+QudaPrecision prec_eigensolver = QUDA_INVALID_PRECISION;
 QudaPrecision prec_null = QUDA_INVALID_PRECISION;
 QudaPrecision prec_ritz = QUDA_INVALID_PRECISION;
 QudaVerbosity verbosity = QUDA_SUMMARIZE;
@@ -135,6 +137,13 @@ bool mg_evolve_thin_updates = false;
 
 // we only actually support 4 here currently
 quda::mgarray<std::array<int, 4>> geo_block_size = {};
+
+#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
+bool mg_use_mma = true;
+#else
+bool mg_use_mma = false;
+#endif
+
 int n_ev = 8;
 int max_search_dim = 64;
 int deflation_grid = 16;
@@ -374,7 +383,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     ->transform(CLI::QUDACheckedTransformer(contract_type_map));
   ;
   quda_app->add_flag("--dagger", dagger, "Set the dagger to 1 (default 0)");
-  quda_app->add_option("--device", device, "Set the CUDA device to use (default 0, single GPU only)")
+  quda_app->add_option("--device", device_ordinal, "Set the CUDA device to use (default 0, single GPU only)")
     ->check(CLI::Range(0, 16));
 
   quda_app->add_option("--dslash-type", dslash_type, "Set the dslash type")
@@ -449,16 +458,17 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   CLI::QUDACheckedTransformer prec_transform(precision_map);
   quda_app->add_option("--prec", prec, "Precision in GPU")->transform(prec_transform);
   quda_app->add_option("--prec-precondition", prec_precondition, "Preconditioner precision in GPU")->transform(prec_transform);
-  ;
+
+  quda_app->add_option("--prec-eigensolver", prec_eigensolver, "Eigensolver precision in GPU")->transform(prec_transform);
+
   quda_app->add_option("--prec-refine", prec_refinement_sloppy, "Sloppy precision for refinement in GPU")
     ->transform(prec_transform);
-  ;
+
   quda_app->add_option("--prec-ritz", prec_ritz, "Eigenvector precision in GPU")->transform(prec_transform);
-  ;
+
   quda_app->add_option("--prec-sloppy", prec_sloppy, "Sloppy precision in GPU")->transform(prec_transform);
-  ;
+
   quda_app->add_option("--prec-null", prec_null, "Precison TODO")->transform(prec_transform);
-  ;
 
   quda_app->add_option("--precon-type", precon_type, "The type of solver to use (default none (=unspecified)).")
     ->transform(CLI::QUDACheckedTransformer(inverter_type_map));
@@ -478,6 +488,8 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--recon", link_recon, "Link reconstruction type")
     ->transform(CLI::QUDACheckedTransformer(reconstruct_type_map));
   quda_app->add_option("--recon-precondition", link_recon_precondition, "Preconditioner link reconstruction type")
+    ->transform(CLI::QUDACheckedTransformer(reconstruct_type_map));
+  quda_app->add_option("--recon-eigensolver", link_recon_eigensolver, "Eigensolver link reconstruction type")
     ->transform(CLI::QUDACheckedTransformer(reconstruct_type_map));
   quda_app->add_option("--recon-sloppy", link_recon_sloppy, "Sloppy link reconstruction type")
     ->transform(CLI::QUDACheckedTransformer(reconstruct_type_map));
@@ -848,6 +860,10 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   quda_app->add_mgoption(opgroup, "--mg-verbosity", mg_verbosity, CLI::QUDACheckedTransformer(verbosity_map),
                          "The verbosity to use on each level of the multigrid (default summarize)");
+
+  opgroup->add_option(
+    "--mg-use-mma", mg_use_mma,
+    "Use tensor-core to accelerate multigrid (default = true on Volta or later with CUDA >=10.1, otherwise false)");
 }
 
 void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app)

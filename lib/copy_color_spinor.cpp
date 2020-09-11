@@ -6,7 +6,7 @@ namespace quda {
   void copyGenericColorSpinorDS(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
   void copyGenericColorSpinorDH(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
   void copyGenericColorSpinorDQ(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
-  
+
   void copyGenericColorSpinorSD(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
   void copyGenericColorSpinorSS(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
   void copyGenericColorSpinorSH(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
@@ -35,16 +35,15 @@ namespace quda {
   void copyGenericColorSpinorMGQS(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
   void copyGenericColorSpinorMGQH(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
   void copyGenericColorSpinorMGQQ(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
-  
 
-  void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src, 
-			      QudaFieldLocation location, void *Dst, void *Src, 
-			      void *dstNorm, void *srcNorm) {
+  void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src, QudaFieldLocation location, void *Dst,
+                              void *Src, void *dstNorm, void *srcNorm)
+  {
 
     if (dst.SiteSubset() != src.SiteSubset())
       errorQuda("Destination %d and source %d site subsets not equal", dst.SiteSubset(), src.SiteSubset());
 
-    if (dst.Ncolor() != src.Ncolor()) 
+    if (dst.Ncolor() != src.Ncolor())
       errorQuda("Destination %d and source %d colors not equal", dst.Ncolor(), src.Ncolor());
 
     if (dst.Ncolor() == 3) {
@@ -56,7 +55,7 @@ namespace quda {
         } else if (src.Precision() == QUDA_HALF_PRECISION) {
           copyGenericColorSpinorDH(dst, src, location, (double*)Dst, (short*)Src, 0, (float*)srcNorm);
         } else if (src.Precision() == QUDA_QUARTER_PRECISION) {
-          copyGenericColorSpinorDQ(dst, src, location, (double*)Dst, (int8_t*)Src, 0, (float*)srcNorm);
+          copyGenericColorSpinorDQ(dst, src, location, (double *)Dst, (int8_t *)Src, 0, (float *)srcNorm);
         } else {
           errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
         }
@@ -68,7 +67,7 @@ namespace quda {
         } else if (src.Precision() == QUDA_HALF_PRECISION) {
           copyGenericColorSpinorSH(dst, src, location, (float*)Dst, (short*)Src, 0, (float*)srcNorm);
         } else if (src.Precision() == QUDA_QUARTER_PRECISION) {
-          copyGenericColorSpinorSQ(dst, src, location, (float*)Dst, (int8_t*)Src, 0, (float*)srcNorm);
+          copyGenericColorSpinorSQ(dst, src, location, (float *)Dst, (int8_t *)Src, 0, (float *)srcNorm);
         } else {
           errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
         }
@@ -80,19 +79,19 @@ namespace quda {
         } else if (src.Precision() == QUDA_HALF_PRECISION) {
           copyGenericColorSpinorHH(dst, src, location, (short*)Dst, (short*)Src, (float*)dstNorm, (float*)srcNorm);
         } else if (src.Precision() == QUDA_QUARTER_PRECISION) {
-          copyGenericColorSpinorHQ(dst, src, location, (short*)Dst, (int8_t*)Src, (float*)dstNorm, (float*)srcNorm);
+          copyGenericColorSpinorHQ(dst, src, location, (short *)Dst, (int8_t *)Src, (float *)dstNorm, (float *)srcNorm);
         } else {
           errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
         }
       } else if (dst.Precision() == QUDA_QUARTER_PRECISION) {
         if (src.Precision() == QUDA_DOUBLE_PRECISION) {
-          copyGenericColorSpinorQD(dst, src, location, (int8_t*)Dst, (double*)Src, (float*)dstNorm, 0);
+          copyGenericColorSpinorQD(dst, src, location, (int8_t *)Dst, (double *)Src, (float *)dstNorm, 0);
         } else if (src.Precision() == QUDA_SINGLE_PRECISION) {
-          copyGenericColorSpinorQS(dst, src, location, (int8_t*)Dst, (float*)Src, (float*)dstNorm, 0);
+          copyGenericColorSpinorQS(dst, src, location, (int8_t *)Dst, (float *)Src, (float *)dstNorm, 0);
         } else if (src.Precision() == QUDA_HALF_PRECISION) {
-          copyGenericColorSpinorQH(dst, src, location, (int8_t*)Dst, (short*)Src, (float*)dstNorm, (float*)srcNorm);
+          copyGenericColorSpinorQH(dst, src, location, (int8_t *)Dst, (short *)Src, (float *)dstNorm, (float *)srcNorm);
         } else if (src.Precision() == QUDA_QUARTER_PRECISION) {
-          copyGenericColorSpinorQQ(dst, src, location, (int8_t*)Dst, (int8_t*)Src, (float*)dstNorm, (float*)srcNorm);
+          copyGenericColorSpinorQQ(dst, src, location, (int8_t *)Dst, (int8_t *)Src, (float *)dstNorm, (float *)srcNorm);
         } else {
           errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
         }
@@ -116,7 +115,7 @@ namespace quda {
         } else if (src.Precision() == QUDA_HALF_PRECISION) {
           copyGenericColorSpinorMGSH(dst, src, location, (float*)Dst, (short*)Src);
         } else if (src.Precision() == QUDA_QUARTER_PRECISION) {
-          copyGenericColorSpinorMGSQ(dst, src, location, (float*)Dst, (int8_t*)Src);
+          copyGenericColorSpinorMGSQ(dst, src, location, (float *)Dst, (int8_t *)Src);
         } else {
           errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
         }
@@ -126,17 +125,17 @@ namespace quda {
         } else if (src.Precision() == QUDA_HALF_PRECISION) {
           copyGenericColorSpinorMGHH(dst, src, location, (short*)Dst, (short*)Src);
         } else if (src.Precision() == QUDA_QUARTER_PRECISION) {
-          copyGenericColorSpinorMGHQ(dst, src, location, (short*)Dst, (int8_t*)Src);
+          copyGenericColorSpinorMGHQ(dst, src, location, (short *)Dst, (int8_t *)Src);
         } else {
           errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
         }
       } else if (dst.Precision() == QUDA_QUARTER_PRECISION) {
         if (src.Precision() == QUDA_SINGLE_PRECISION) {
-          copyGenericColorSpinorMGQS(dst, src, location, (int8_t*)Dst, (float*)Src);
+          copyGenericColorSpinorMGQS(dst, src, location, (int8_t *)Dst, (float *)Src);
         } else if (src.Precision() == QUDA_HALF_PRECISION) {
-          copyGenericColorSpinorMGQH(dst, src, location, (int8_t*)Dst, (short*)Src);
+          copyGenericColorSpinorMGQH(dst, src, location, (int8_t *)Dst, (short *)Src);
         } else if (src.Precision() == QUDA_QUARTER_PRECISION) {
-          copyGenericColorSpinorMGQQ(dst, src, location, (int8_t*)Dst, (int8_t*)Src);
+          copyGenericColorSpinorMGQQ(dst, src, location, (int8_t *)Dst, (int8_t *)Src);
         } else {
           errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
         }
@@ -144,6 +143,6 @@ namespace quda {
         errorQuda("Unsupported Destination Precision %d", dst.Precision());
       }
     }
-  }  
+  }
 
 } // namespace quda
