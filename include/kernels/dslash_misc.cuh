@@ -21,9 +21,9 @@ namespace quda {
     F out;                // output vector field
     const F in;           // input vector field
     const int d;          // which gamma matrix are we applying
-    dim3 threads;         // thread shape for this kernel
     const int nParity;    // number of parities we're working on
     bool doublet;         // whether we applying the operator to a doublet
+    dim3 threads;         // thread shape for this kernel
     const int volumeCB;   // checkerboarded volume
     real a;               // scale factor
     real b;               // chiral twist
@@ -32,9 +32,9 @@ namespace quda {
     GammaArg(ColorSpinorField &out, const ColorSpinorField &in, int d,
 	     real kappa=0.0, real mu=0.0, real epsilon=0.0,
 	     bool dagger=false, QudaTwistGamma5Type twist=QUDA_TWIST_GAMMA5_INVALID)
-      : out(out), in(in), d(d), threads(doublet ? in.VolumeCB()/2 : in.VolumeCB(), in.SiteSubset(), 1),
-        nParity(in.SiteSubset()),
+      : out(out), in(in), d(d), nParity(in.SiteSubset()),
 	doublet(in.TwistFlavor() == QUDA_TWIST_DEG_DOUBLET || in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
+        threads(doublet ? in.VolumeCB()/2 : in.VolumeCB(), in.SiteSubset(), 1),
 	volumeCB(doublet ? in.VolumeCB()/2 : in.VolumeCB()), a(0.0), b(0.0), c(0.0)
     {
       checkPrecision(out, in);
