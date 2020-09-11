@@ -301,7 +301,7 @@ namespace quda {
     {
 #ifdef GPU_HISQ_FORCE
       checkNative(link, oprod, newOprod);
-      if (checkLocation(newOprod,oprod,link) == QUDA_CPU_FIELD_LOCATION) errorQuda("CPU not implemented");
+      checkLocation(newOprod, oprod, link);
 
       // create color matrix fields with zero padding
       GaugeFieldParam gauge_param(link);
@@ -348,6 +348,7 @@ namespace quda {
       {
         arg.sig = sig;
         arg.mu = mu;
+        apply(0);
       }
 
       void apply(const qudaStream_t &stream) {
@@ -413,7 +414,6 @@ namespace quda {
       {
         LongLinkArg<real, nColor, recon> arg(newOprod, link, oldOprod, coeff);
         HisqForce<decltype(arg)> longLink(arg, link, 0, 0, FORCE_LONG_LINK);
-        longLink.apply(0);
         qudaDeviceSynchronize();
       }
     };
@@ -421,10 +421,8 @@ namespace quda {
     void hisqLongLinkForce(GaugeField &newOprod, const GaugeField &oldOprod, const GaugeField &link, double coeff)
     {
 #ifdef GPU_HISQ_FORCE
-      if (!link.isNative()) errorQuda("Unsupported gauge order %d", link.Order());
-      if (!oldOprod.isNative()) errorQuda("Unsupported gauge order %d", oldOprod.Order());
-      if (!newOprod.isNative()) errorQuda("Unsupported gauge order %d", newOprod.Order());
-      if (checkLocation(newOprod,oldOprod,link) == QUDA_CPU_FIELD_LOCATION) errorQuda("CPU not implemented");
+      checkNative(link, oldOprod, newOprod);
+      checkLocation(newOprod, oldOprod, link);
       checkPrecision(newOprod, link, oldOprod);
       instantiate<HisqLongLinkForce, ReconstructNone>(newOprod, oldOprod, link, coeff);
 #else
@@ -438,7 +436,6 @@ namespace quda {
       {
         CompleteForceArg<real, nColor, recon> arg(force, link);
         HisqForce<decltype(arg)> completeForce(arg, link, 0, 0, FORCE_COMPLETE);
-        completeForce.apply(0);
         qudaDeviceSynchronize();
       }
     };
@@ -446,9 +443,8 @@ namespace quda {
     void hisqCompleteForce(GaugeField &force, const GaugeField &link)
     {
 #ifdef GPU_HISQ_FORCE
-      if (!link.isNative()) errorQuda("Unsupported gauge order %d", link.Order());
-      if (!force.isNative()) errorQuda("Unsupported gauge order %d", force.Order());
-      if (checkLocation(force,link) == QUDA_CPU_FIELD_LOCATION) errorQuda("CPU not implemented");
+      checkNative(link, force);
+      checkLocation(force, link);
       checkPrecision(link, force);
       instantiate<HisqCompleteForce, ReconstructNone>(force, link);
 #else
