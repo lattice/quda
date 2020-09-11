@@ -76,9 +76,22 @@ namespace quda
      @param[in] width Width in bytes
      @param[in] height Number of rows
      @param[in] kind Type of memory copy
+  */
+  void qudaMemcpy2D_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
+                     cudaMemcpyKind kind, const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaMemcpy2DAsync or driver API equivalent
+     @param[out] dst Destination pointer
+     @param[in] dpitch Destination pitch in bytes
+     @param[in] src Source pointer
+     @param[in] spitch Source pitch in bytes
+     @param[in] width Width in bytes
+     @param[in] height Number of rows
+     @param[in] kind Type of memory copy
      @param[in] stream Stream to issue copy
   */
-  void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t hieght,
+  void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
                           cudaMemcpyKind kind, const qudaStream_t &stream, const char *func, const char *file,
                           const char *line);
 
@@ -193,6 +206,10 @@ namespace quda
 
 #define qudaMemcpyAsync(dst, src, count, kind, stream)                                                                 \
   ::quda::qudaMemcpyAsync_(dst, src, count, kind, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
+#define qudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind)     \
+  ::quda::qudaMemcpy2D_(dst, dpitch, src, spitch, width, height, kind, __func__, \
+                        quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
 
 #define qudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream)                                       \
   ::quda::qudaMemcpy2DAsync_(dst, dpitch, src, spitch, width, height, kind, stream, __func__,                          \

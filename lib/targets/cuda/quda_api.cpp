@@ -268,6 +268,36 @@ namespace quda {
     }
   }
 
+  void qudaMemcpy2D_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
+                     cudaMemcpyKind kind, const char *func, const char *file, const char *line)
+  {
+#ifdef USE_DRIVER_API
+    CUDA_MEMCPY2D param;
+    param.srcPitch = spitch;
+    param.srcY = 0;
+    param.srcXInBytes = 0;
+    param.dstPitch = dpitch;
+    param.dstY = 0;
+    param.dstXInBytes = 0;
+    param.WidthInBytes = width;
+    param.Height = height;
+
+    switch (kind) {
+    case cudaMemcpyDeviceToHost:
+      param.srcDevice = (CUdeviceptr)src;
+      param.srcMemoryType = CU_MEMORYTYPE_DEVICE;
+      param.dstHost = dst;
+      param.dstMemoryType = CU_MEMORYTYPE_HOST;
+      break;
+    default:
+      errorQuda("Unsupported cuMemcpyType2DAsync %d", kind);
+    }
+    PROFILE(cuMemcpy2D(&param), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
+#else
+    PROFILE(cudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
+#endif
+  }
+
   void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
                           cudaMemcpyKind kind, const qudaStream_t &stream, const char *func, const char *file,
                           const char *line)
