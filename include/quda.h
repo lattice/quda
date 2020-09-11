@@ -721,6 +721,8 @@ extern "C" {
   } QudaGaugeObservableParam;
 
   typedef struct QudaCorrelatorParam_s {
+    size_t corr_dim;
+    size_t local_corr_length;
     size_t global_corr_length;
     size_t n_numbers_per_slice;
     size_t corr_size_in_bytes;
