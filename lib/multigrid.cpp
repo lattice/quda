@@ -364,8 +364,7 @@ namespace quda
 
     // Parameters that matter for coarse construction and application
     diracParam.dirac = preconditioned_coarsen ? const_cast<Dirac*>(diracSmoother) : const_cast<Dirac*>(diracResidual);
-    diracParam.kappa = (param.B[0]->Nspin() == 1) ?
-      -1.0 :
+    diracParam.kappa = (param.B[0]->Nspin() == 1) ? -1.0 :
       diracParam.dirac->Kappa(); // -1 cancels automatic kappa in application of Y fields
     diracParam.mass = diracParam.dirac->Mass();
     diracParam.mu = diracParam.dirac->Mu();
@@ -815,7 +814,12 @@ namespace quda
     zero(*tmp_coarse);
     zero(*r_coarse);
 
+#if 0 // debugging trick: point source matrix elements
+    tmp_coarse->Source(QUDA_POINT_SOURCE, 0, 0, 0);
+#else
     spinorNoise(*tmp_coarse, *rng, QUDA_NOISE_UNIFORM);
+#endif
+
     transfer->P(*tmp1, *tmp_coarse);
 
     if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
@@ -848,13 +852,13 @@ namespace quda
 #if 0 // enable to print out emulated and actual coarse-grid operator vectors for debugging
     setOutputPrefix("");
 
-    for (int i=0; i<comm_rank(); i++) { // this ensures that we print each rank in order
+    for (unsigned int i=0; i<comm_size(); i++) { // this ensures that we print each rank in order
       if (i==comm_rank()) {
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("emulated\n");
-        for (int x=0; x<x_coarse->Volume(); x++) tmp1->PrintVector(x);
+        for (int x=0; x<x_coarse->Volume(); x++) x_coarse->PrintVector(x);
 
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("actual\n");
-        for (int x=0; x<r_coarse->Volume(); x++) tmp2->PrintVector(x);
+        for (int x=0; x<r_coarse->Volume(); x++) r_coarse->PrintVector(x);
       }
       comm_barrier();
     }

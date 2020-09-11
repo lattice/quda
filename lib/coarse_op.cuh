@@ -1130,21 +1130,31 @@ namespace quda {
     if (bidirectional_links) {
       for (int d = 0; d < nDim; d++) {
         y.setDimension(d);
-	y.setDirection(QUDA_FORWARDS);
-	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing forward %d UV and VUV\n", d);
+      	y.setDirection(QUDA_FORWARDS);
+      	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing forward %d UV and VUV\n", d);
 
-	if (uv.Precision() == QUDA_HALF_PRECISION) {
-	  double U_max = 3.0*G_.abs_max(from_coarse ? d+4 : d);
-	  double uv_max = U_max * v.Scale();
-	  uv.Scale(uv_max);
-	  arg.UV.resetScale(uv_max);
+        if (uv.Precision() == QUDA_HALF_PRECISION) {
+          double U_max = 3.0*G_.abs_max(from_coarse ? d+4 : d);
+          double uv_max = U_max * v.Scale();
+          uv.Scale(uv_max);
+          arg.UV.resetScale(uv_max);
 
-	  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%d U_max = %e v_max = %e uv_max = %e\n", d, U_max, v.Scale(), uv_max);
-	}
+          if (getVerbosity() >= QUDA_VERBOSE) printfQuda("%d U_max = %e v_max = %e uv_max = %e\n", from_coarse ? d+4 : d, U_max, v.Scale(), uv_max);
+        }
 
-	y.setComputeType(COMPUTE_UV);  // compute U*V product
-	y.apply(0);
-	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("UV2[%d] = %e\n", d, arg.UV.norm2());
+        //v.PrintVector(0); fflush(stdout);
+        //v.PrintVector(1); fflush(stdout);
+        //exit(-1);
+
+
+        y.setComputeType(COMPUTE_UV);  // compute U*V product
+        y.apply(0);
+
+        //uv.PrintVector(0); fflush(stdout);
+
+        //exit(-1);
+
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("UV2[%d] = %e\n", d, arg.UV.norm2());
 
         // if we are writing to a temporary, we need to zero it before each computation
         if (Y_atomic.Geometry() == 1) Y_atomic_.zero();
@@ -1204,12 +1214,12 @@ namespace quda {
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing backward %d UV and VUV\n", d);
 
       if (uv.Precision() == QUDA_HALF_PRECISION) {
-	double U_max = 3.0*G_.abs_max(d);
-	double uv_max = U_max * av.Scale();
-	uv.Scale(uv_max);
-	arg.UV.resetScale(uv_max);
+        double U_max = 3.0*G_.abs_max(d);
+        double uv_max = U_max * av.Scale();
+        uv.Scale(uv_max);
+        arg.UV.resetScale(uv_max);
 
-	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%d U_max = %e av_max = %e uv_max = %e\n", d, U_max, av.Scale(), uv_max);
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("%d U_max = %e av_max = %e uv_max = %e\n", d, U_max, av.Scale(), uv_max);
       }
 
       y.setComputeType(COMPUTE_UV);  // compute U*A*V product

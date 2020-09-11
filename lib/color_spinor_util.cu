@@ -516,6 +516,8 @@ else if (a.Ncolor() == 96 && a.Nspin() == 2) {
       } else if (field.Ncolor() == 96 && field.Nspin() == 2) {
         genericCudaPrintVector<Float, 2, 96>(field, i);
 #endif
+      } else if (field.Ncolor() == 72 && field.Nspin() == 1) {
+        genericCudaPrintVector<Float, 1, 72>(field, i); // FIXME REMOVE
       } else {
         errorQuda("Not supported Ncolor = %d, Nspin = %d", field.Ncolor(), field.Nspin());
       }

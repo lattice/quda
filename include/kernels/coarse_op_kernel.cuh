@@ -683,10 +683,11 @@ namespace quda {
         // FIXME: need a different AV vs V for KD op for left vs right
         // this should be good for left block Jacobi
         auto V = make_tile_At<complex, false>(tile);
-        if (dir == QUDA_BACKWARDS) {
-          V.loadCS(arg.V, 0, 0, parity, x_cb, 0, k, i0);
-        } else {
+        if (dir == QUDA_FORWARDS) {
           V.loadCS(arg.AV, 0, 0, parity, x_cb, 0, k, i0);
+          V *= static_cast<Float>(-1.);
+        } else { // dir == QUDA_BACKWARDS
+          V.loadCS(arg.V, 0, 0, parity, x_cb, 0, k, i0);
         }
 
         auto UV = make_tile_B<complex, false>(tile);

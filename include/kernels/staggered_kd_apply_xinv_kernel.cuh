@@ -93,6 +93,8 @@ namespace quda {
 
     unsigned int x_coarse_tmp, coarse_x, coarse_y, coarse_z, coarse_t;
 
+    // FIXME: switch to using getParityCBFromFull in index_helper.cuh.
+    
     // What's my KD block for loading Xinv?
     // [0-15] loads consecutive elements of Xinv for the first block,
     // [16-31] loads consecutive elements of Xinv for the second block, etc

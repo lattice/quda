@@ -277,7 +277,7 @@ namespace quda {
 
     // Moving along to the build
 
-    const double kappa = -1.; // used to cancel minus convention from Wilson
+    const double kappa = -1.; // cancels a minus sign factor for kappa w/in the dslash application
     const double mu_dummy = 0.; 
     const double mu_factor_dummy = 0.;
 
