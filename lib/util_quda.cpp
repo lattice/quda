@@ -8,6 +8,7 @@
 #include <enum_quda.h>
 #include <util_quda.h>
 #include <malloc_quda.h>
+#include <tune_quda.h>
 
 static const size_t MAX_PREFIX_SIZE = 100;
 
@@ -141,4 +142,16 @@ char* getOmpThreadStr() {
     init = true;
   }
   return omp_thread_string;
+}
+
+void errorQuda_(const char *func, const char *file, int line, ...)
+{
+  fprintf(getOutputFile(), " (rank %d, host %s, " __FILE__ ":%d in %s())\n",
+          comm_rank(), comm_hostname(), __LINE__, __func__);
+  fprintf(getOutputFile(), "%s       last kernel called was (name=%s,volume=%s,aux=%s)\n",
+	  getOutputPrefix(), getLastTuneKey().name,
+	  getLastTuneKey().volume, getLastTuneKey().aux);
+  fflush(getOutputFile());
+  quda::saveTuneCache(true);
+  comm_abort(1);
 }
