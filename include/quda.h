@@ -720,6 +720,15 @@ extern "C" {
     void *qcharge_density; /**< Pointer to host array of length volume where the q-charge density will be copied */
   } QudaGaugeObservableParam;
 
+  typedef struct QudaCorrelatorParam_s {
+    size_t global_corr_length;
+    size_t n_numbers_per_slice;
+    size_t corr_size_in_bytes;
+    size_t overall_shift_dim;
+    QudaCorrelatorFlavors corr_flavors;
+  } QudaCorrelatorParam;
+
+
   /*
    * Interface functions, found in interface_quda.cpp
    */

@@ -525,6 +525,13 @@ typedef enum QudaBoolean_s {
     QUDA_CONTRACT_GAMMA_INVALID = QUDA_INVALID_ENUM
   } QudaContractGamma;
 
+  typedef enum QudaCorrelatorFlavors_s {
+    QUDA_CORRELATOR_QQ,
+    QUDA_CORRELATOR_QS,
+    QUDA_CORRELATOR_QL,
+    QUDA_CORRELATOR_INVALID = QUDA_INVALID_ENUM
+  } QudaCorrelatorFlavors;
+
   typedef enum QudaWFlowType_s {
     QUDA_WFLOW_TYPE_WILSON,
     QUDA_WFLOW_TYPE_SYMANZIK,

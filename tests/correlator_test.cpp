@@ -5,21 +5,24 @@
 #include <host_utils.h>
 #include <command_line_params.h>
 
-void print_correlators(const void* correlation_function_sum, const size_t global_corr_length, const int n_numbers_per_slice, const int overall_shift_dim, const int n, const int* Mom){
-  std::vector<std::string> QudaCorrelatorChannels = {
-    "G1", "G2", "G3", "G4", "G5G1", "G5G2", "G5G3", "G5G4", "1", "G5", "S12", "S13", "S14", "S23", "S24", "S34"
-  };
+#include <iostream>
+
+const std::vector<std::string> QudaCorrelatorChannels = {
+  "G1", "G2", "G3", "G4", "G5G1", "G5G2", "G5G3", "G5G4", "1", "G5", "S12", "S13", "S14", "S23", "S24", "S34"
+};
+
+void print_correlators(const void* correlation_function_sum, const QudaCorrelatorParam corr_param, const int n){
   printfQuda("#src_x src_y src_z src_t    px    py    pz    pt     G   z/t          real          imag  channel\n");
-  for (int px = 0; px <= Mom[0]; px++) {
-    for (int py = 0; py <= Mom[1]; py++) {
-      for (int pz = 0; pz <= Mom[2]; pz++) {
-        for (int pt = 0; pt <= Mom[3]; pt++) {
+  for (int px = 0; px <= momentum[0]; px++) {
+    for (int py = 0; py <= momentum[1]; py++) {
+      for (int pz = 0; pz <= momentum[2]; pz++) {
+        for (int pt = 0; pt <= momentum[3]; pt++) {
           for (int G_idx = 0; G_idx < 16; G_idx++) {
-            for (size_t t = 0; t < global_corr_length; t++) {
-              int index_real = (px + py * (Mom[0] + 1) + pz * (Mom[0] + 1) * (Mom[1] + 1)
-                                + pt * (Mom[0] + 1) * (Mom[1] + 1) * (Mom[2] + 1))
-                               * n_numbers_per_slice * global_corr_length
-                               + n_numbers_per_slice * ((t + overall_shift_dim) % global_corr_length) + 2 * G_idx;
+            for (size_t t = 0; t < corr_param.global_corr_length; t++) {
+              int index_real = (px + py * (momentum[0] + 1) + pz * (momentum[0] + 1) * (momentum[1] + 1)
+                                + pt * (momentum[0] + 1) * (momentum[1] + 1) * (momentum[2] + 1))
+                               * corr_param.n_numbers_per_slice * corr_param.global_corr_length
+                               + corr_param.n_numbers_per_slice * ((t + corr_param.overall_shift_dim) % corr_param.global_corr_length) + 2 * G_idx;
               int index_imag = index_real + 1;
               double sign = G_idx < 8 ? -1. : 1.; // the minus sign from g5gm -> gmg5
               printfQuda(" %5d %5d %5d %5d %5d %5d %5d %5d %5d %5lu % e % e #%s",
@@ -33,7 +36,90 @@ void print_correlators(const void* correlation_function_sum, const size_t global
       }
     }
   }
-};
+}
+
+void save_correlators_to_file(const void* correlation_function_sum, const QudaCorrelatorParam &corr_param, const int n){
+  std::ofstream corr_file;
+  std::stringstream filepath;
+  filepath << correlator_save_dir << "/";
+  filepath << "mcorr";
+  switch(corr_param.corr_flavors){
+  case QUDA_CORRELATOR_QQ: filepath << "_qq"; break;
+  case QUDA_CORRELATOR_QS: filepath << "_qs"; break;
+  case QUDA_CORRELATOR_QL: filepath << "_ql"; break;
+  default:break;
+  }
+  switch(contract_type){
+  case QUDA_CONTRACT_TYPE_DR_FT_Z:
+  case QUDA_CONTRACT_TYPE_OPEN_FT_Z:
+  case QUDA_CONTRACT_TYPE_OPEN_SUM_Z:
+    filepath << "_s"; //spatial
+    break;
+  default: filepath << "_t"; //temporal
+  }
+  filepath << "_s" << dim[0] << "t" << dim[3];
+  if (correlator_file_affix[0] != '\0') {
+    filepath << "_" << correlator_file_affix ;
+    }
+  filepath << "_" << "k" << std::setprecision(5) << std::fixed << kappa;
+  filepath << ".dat";
+  printfQuda("Saving correlator in %s \n", filepath.str().c_str());
+
+  corr_file.open(filepath.str());
+
+  const int src_width = 6, mom_width = 3, precision = 8;
+  const int float_width = precision+9; //for scientific notation
+  corr_file << "#"
+            << std::setw(src_width) << "src_x"
+            << std::setw(src_width) << "src_y"
+            << std::setw(src_width) << "src_z"
+            << std::setw(src_width) << "src_t"
+            << std::setw(mom_width) << "px"
+            << std::setw(mom_width) << "py"
+            << std::setw(mom_width) << "pz"
+            << std::setw(mom_width) << "pt"
+            << std::setw(src_width) << "G"
+            << std::setw(src_width) << "z/t"
+            << std::setw(float_width) << "real"
+            << std::setw(float_width) << "imag"
+            << std::endl;
+  for (int px = 0; px <= momentum[0]; px++) {
+    for (int py = 0; py <= momentum[1]; py++) {
+      for (int pz = 0; pz <= momentum[2]; pz++) {
+        for (int pt = 0; pt <= momentum[3]; pt++) {
+          for (int G_idx = 0; G_idx < 16; G_idx++) {
+            for (size_t t = 0; t < corr_param.global_corr_length; t++) {
+              size_t index_real = (px + py * (momentum[0] + 1) + pz * (momentum[0] + 1) * (momentum[1] + 1)
+                                + pt * (momentum[0] + 1) * (momentum[1] + 1) * (momentum[2] + 1))
+                               * corr_param.n_numbers_per_slice * corr_param.global_corr_length
+                               + corr_param.n_numbers_per_slice * ((t + corr_param.overall_shift_dim) % corr_param.global_corr_length) + 2 * G_idx;
+              size_t index_imag = index_real + 1;
+              double sign = G_idx < 8 ? -1. : 1.; // the minus sign from g5gm -> gmg5
+              corr_file << " "
+                        << std::setw(src_width) << prop_source_position[n][0]
+                        << std::setw(src_width) << prop_source_position[n][1]
+                        << std::setw(src_width) << prop_source_position[n][2]
+                        << std::setw(src_width) << prop_source_position[n][3]
+                        << std::setw(mom_width) << px
+                        << std::setw(mom_width) << py
+                        << std::setw(mom_width) << pz
+                        << std::setw(mom_width) << pt
+                        << std::setw(src_width) << G_idx
+                        << std::setw(src_width) << t
+                        << std::setw(float_width) << std::setprecision(precision)
+                        << std::scientific << ((double *)correlation_function_sum)[index_real] * sign
+                        << std::setw(float_width) << std::setprecision(precision)
+                        << std::scientific << ((double *)correlation_function_sum)[index_imag] * sign
+                        << std::endl;
+            }
+          }
+        }
+      }
+    }
+  }
+  corr_file.close();
+}
+
 
 int main(int argc, char **argv)
 {
@@ -42,6 +128,7 @@ int main(int argc, char **argv)
   add_multigrid_option_group(app);
   add_eigen_option_group(app);
   add_propagator_option_group(app);
+  add_contraction_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -183,14 +270,13 @@ int main(int argc, char **argv)
   // Decide between contract types (open or with gammas, summed or non-summed, spatial or temporal, finite momentum)
   size_t corr_dim = 0, local_corr_length = 0;
   int Nmom = (momentum[0]+1)*(momentum[1]+1);
-  int Mom[4] = {momentum[0], momentum[1], momentum[2], momentum[3]};
   if (contract_type == QUDA_CONTRACT_TYPE_DR_FT_Z) {
     corr_dim = 2;
-    Mom[2]=0;
+    momentum[2]=0;
     Nmom *= (momentum[3]+1);
   } else if (contract_type == QUDA_CONTRACT_TYPE_DR_FT_T) {
     corr_dim = 3;
-    Mom[3]=0;
+    momentum[3]=0;
     Nmom *= (momentum[2]+1);
   } else {
     errorQuda("Unsupported contraction type %d given", contract_type);
@@ -198,18 +284,13 @@ int main(int argc, char **argv)
   local_corr_length = gauge_param.X[corr_dim];
 
   // some lengths and sizes
-  size_t global_corr_length = local_corr_length * comm_dim(corr_dim);
-  size_t n_numbers_per_slice = 2 * cs_param.nSpin * cs_param.nSpin;
-  size_t corr_size_in_bytes = n_numbers_per_slice * global_corr_length * sizeof(double);
+  QudaCorrelatorParam corr_param;
+  corr_param.global_corr_length = local_corr_length * comm_dim(corr_dim);
+  corr_param.n_numbers_per_slice = 2 * cs_param.nSpin * cs_param.nSpin;
+  corr_param.corr_size_in_bytes = Nmom*corr_param.n_numbers_per_slice * corr_param.global_corr_length * sizeof(double);
+  corr_param.corr_flavors = QUDA_CORRELATOR_QQ;
 
-  void* correlation_function_sum = malloc(Nmom*corr_size_in_bytes); // This is where the result will be stored
-
-  //FIXME this info output
-
-//  printfQuda(
-//    "    g= 0,  1,  2,  3,    4,    5,    6,    7, 8,  9,  10,  11,  12,  13,  14,  15 correspond to channel:\n"
-//    "Gamma=g1, g2, g3, g4, g5g1, g5g2, g5g3, g5g4, 1, g5, s12, s13, s14, s23, s24, s34\n");
-
+  void* correlation_function_sum = malloc(corr_param.corr_size_in_bytes); // This is where the result will be stored
 
   // Loop over the number of sources to use. Default is prop_n_sources=1 and source position = 0 0 0 0
   for (int n = 0; n < prop_n_sources; n++) {
@@ -219,7 +300,7 @@ int main(int argc, char **argv)
       = {prop_source_position[n][0], prop_source_position[n][1], prop_source_position[n][2], prop_source_position[n][3]};
 
     // The overall shift of the position of the corr. need this when the source is not at origin.
-    const int overall_shift_dim = source[corr_dim];
+    corr_param.overall_shift_dim = source[corr_dim];
 
     // Loop over spin X color dilution positions, construct the sources and invert
     for (int i = 0; i < spinor_dim; i++) {
@@ -232,14 +313,16 @@ int main(int argc, char **argv)
     // Coming soon....
     // propagatorQuda(prop_array_ptr, source_array_ptr, &inv_param, &correlation_function_sum, contract_type, (void *)cs_param_ptr, gauge_param.X);
 
-    memset(correlation_function_sum, 0, Nmom * corr_size_in_bytes); // zero out the result array
+    memset(correlation_function_sum, 0, corr_param.corr_size_in_bytes); // zero out the result array
     contractFTQuda(prop_array_ptr, prop_array_ptr, &correlation_function_sum, contract_type, &inv_param,
-                   (void *)cs_param_ptr, gauge_param.X, source, Mom);
+                   (void *)cs_param_ptr, gauge_param.X, source, momentum.begin());
 
     // Print correlators for this source
-    print_correlators(correlation_function_sum, global_corr_length, n_numbers_per_slice, overall_shift_dim, n, Mom);
+    print_correlators(correlation_function_sum, corr_param, n);
+    save_correlators_to_file(correlation_function_sum, corr_param, n);
   }
 
+  //FIXME abstract the whole flavor selection into one function!
   if(open_flavor){
     //first we calculate heavy-light correlators
     kappa=kappa_light;
@@ -282,7 +365,7 @@ int main(int argc, char **argv)
       const int source[4] = {prop_source_position[n][0], prop_source_position[n][1], prop_source_position[n][2],
                              prop_source_position[n][3]};
 
-      const int overall_shift_dim = source[corr_dim];
+      corr_param.overall_shift_dim = source[corr_dim];
 
       // FIXME add the smearing too
       for (int i = 0; i < spinor_dim; i++) {
@@ -291,11 +374,13 @@ int main(int argc, char **argv)
         inv_param.solver_normalization = QUDA_SOURCE_NORMALIZATION; // Make explicit for now.
         invertQuda(prop_array_ptr_light[i], source_array_ptr[i], &inv_param);
       }
-      memset(correlation_function_sum, 0, Nmom*corr_size_in_bytes);
+      memset(correlation_function_sum, 0, corr_param.corr_size_in_bytes);
       contractFTQuda(prop_array_ptr, prop_array_ptr_light, &correlation_function_sum, contract_type, &inv_param,
-                     (void *)cs_param_ptr, gauge_param.X, source, Mom);
+                     (void *)cs_param_ptr, gauge_param.X, source, momentum.begin());
       printfQuda("printing heavy-light correlators\n");
-      print_correlators(correlation_function_sum, global_corr_length, n_numbers_per_slice, overall_shift_dim, n, Mom);
+      corr_param.corr_flavors = QUDA_CORRELATOR_QL;
+      print_correlators(correlation_function_sum, corr_param, n);
+      save_correlators_to_file(correlation_function_sum, corr_param, n);
     }
     free(prop_array_light);
 
@@ -340,7 +425,7 @@ int main(int argc, char **argv)
       const int source[4] = {prop_source_position[n][0], prop_source_position[n][1], prop_source_position[n][2],
                              prop_source_position[n][3]};
 
-      const int overall_shift_dim = source[corr_dim];
+      corr_param.overall_shift_dim = source[corr_dim];
 
       // FIXME add the smearing too
       for (int i = 0; i < spinor_dim; i++) {
@@ -349,11 +434,13 @@ int main(int argc, char **argv)
         inv_param.solver_normalization = QUDA_SOURCE_NORMALIZATION; // Make explicit for now.
         invertQuda(prop_array_ptr_strange[i], source_array_ptr[i], &inv_param);
       }
-      memset(correlation_function_sum, 0, Nmom*corr_size_in_bytes);
+      memset(correlation_function_sum, 0, corr_param.corr_size_in_bytes);
       contractFTQuda(prop_array_ptr, prop_array_ptr_strange, &correlation_function_sum, contract_type, &inv_param,
-                     (void *)cs_param_ptr, gauge_param.X, source, Mom);
+                     (void *)cs_param_ptr, gauge_param.X, source, momentum.begin());
       printfQuda("printing heavy-strange correlators\n");
-      print_correlators(correlation_function_sum, global_corr_length, n_numbers_per_slice, overall_shift_dim, n, Mom);
+      corr_param.corr_flavors = QUDA_CORRELATOR_QS;
+      print_correlators(correlation_function_sum, corr_param, n);
+      save_correlators_to_file(correlation_function_sum, corr_param, n);
     }
     free(prop_array_strange);
   }

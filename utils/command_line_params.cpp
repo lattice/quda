@@ -72,7 +72,6 @@ double mass = 0.1;
 double kappa = -1.0;
 double kappa_light = -1.0;
 double kappa_strange = -1.0;
-bool open_flavor = false;
 double mu = 0.1;
 double epsilon = 0.01;
 double m5 = -1.5;
@@ -228,7 +227,7 @@ quda::file_array<char[256]> prop_source_outfile;
 quda::file_array<char[256]> prop_sink_infile;
 quda::file_array<char[256]> prop_sink_outfile;
 quda::source_array<std::array<int, 4>> prop_source_position = {0, 0, 0, 0};
-std::array<int, 4> momentum = {0, 0, 0, 0};
+
 
 int prop_source_smear_steps = 20;
 int prop_sink_smear_steps = 20;
@@ -251,7 +250,12 @@ QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_TYPE_STOUT;
 
 QudaFermionSmearType prop_smear_type = QUDA_FERMION_SMEAR_TYPE_GAUSSIAN;
 
+// contract options
 QudaContractType contract_type = QUDA_CONTRACT_TYPE_DR_FT_T;
+std::array<int,4> momentum = {0, 0, 0, 0};
+char correlator_file_affix[256] = "";
+char correlator_save_dir[256] = ".";
+bool open_flavor = false;
 
 namespace
 {
@@ -408,13 +412,6 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--compute-fat-long", compute_fatlong,
                        "Compute the fat/long field or use random numbers (default false)");
 
-  quda_app
-    ->add_option(
-      "--contraction-type", contract_type,
-      "Whether to leave spin elemental open or insert a gamma basis, and whether to sum in t,z, or not at all"
-      "(default dr-sum-t)")
-    ->transform(CLI::QUDACheckedTransformer(contract_type_map));
-  ;
   quda_app->add_flag("--dagger", dagger, "Set the dagger to 1 (default 0)");
   quda_app->add_option("--device", device, "Set the CUDA device to use (default 0, single GPU only)")
     ->check(CLI::Range(0, 16));
@@ -462,9 +459,6 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--mass-normalization", normalization, "Mass normalization (kappa (default) / mass / asym-mass)")
     ->transform(CLI::QUDACheckedTransformer(mass_normalization_map));
 
-  quda_app->add_option("--open-flavor", open_flavor,
-                       "Compute the open flavor correlators (default false)");
-
   quda_app
     ->add_option("--matpc", matpc_type, "Matrix preconditioning type (even-even, odd-odd, even-even-asym, odd-odd-asym)")
     ->transform(CLI::QUDACheckedTransformer(matpc_type_map));
@@ -490,7 +484,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
 
   quda_app->add_option("--pipeline", pipeline,
                        "The pipeline length for fused operations in GCR, BiCGstab-l (default 0, no pipelining)");
-  quda_app->add_option("--momentum", momentum, "Set momentum for correlators (px py pz pt) (default(0,0,0,0))")->expected(4);
+
   // precision options
 
   CLI::QUDACheckedTransformer prec_transform(precision_map);
@@ -995,4 +989,21 @@ void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
   CLI::QUDACheckedTransformer prec_transform(precision_map);
   opgroup->add_option("--prop-save-prec", prop_save_prec, "Precision with which to save propagators (default single)")
     ->transform(prec_transform);
+}
+
+void add_contraction_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+    // Option group for contraction related options
+    auto opgroup = quda_app->add_option_group("Contraction", "Options controlling contraction");
+
+    opgroup->add_option("--contraction-type", contract_type,
+                    "Whether to leave spin elemental open or insert a gamma basis, "
+                        "and whether to sum in t,z, or not at all (default dr-sum-t)")
+            ->transform(CLI::QUDACheckedTransformer(contract_type_map));
+
+    opgroup->add_option("--correlator-save-dir", correlator_save_dir,"Save propagators in directory <dir>");
+    opgroup->add_option("--momentum", momentum, "Set momentum for correlators (px py pz pt) (default(0,0,0,0))")->expected(4);
+    opgroup->add_option("--open-flavor", open_flavor,
+                         "Compute the open flavor correlators (default false)");
+    opgroup->add_option("--correlator-file-affix", correlator_file_affix, "Additional string to put into the correlator file name");
 }

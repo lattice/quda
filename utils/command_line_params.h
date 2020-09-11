@@ -213,6 +213,7 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app);
+void add_contraction_option_group(std::shared_ptr<QUDAApp> quda_app);
 
 template <typename T> std::string inline get_string(CLI::TransformPairs<T> &map, T val)
 {
@@ -285,7 +286,6 @@ extern double mass;
 extern double kappa;
 extern double kappa_light;
 extern double kappa_strange;
-extern bool open_flavor;
 extern double mu;
 extern double epsilon;
 extern double m5;
@@ -441,7 +441,6 @@ extern quda::file_array<char[256]> prop_source_outfile;
 extern quda::file_array<char[256]> prop_sink_infile;
 extern quda::file_array<char[256]> prop_sink_outfile;
 extern quda::source_array<std::array<int, 4>> prop_source_position;
-extern std::array<int, 4> momentum;
 extern int prop_source_smear_steps;
 extern int prop_sink_smear_steps;
 extern double prop_source_smear_coeff;
@@ -461,4 +460,9 @@ extern int wflow_steps;
 extern QudaWFlowType wflow_type;
 extern int measurement_interval;
 
+// contract options
 extern QudaContractType contract_type;
+extern char correlator_save_dir[256];
+extern char correlator_file_affix[256];
+extern std::array<int,4> momentum;
+extern bool open_flavor;
