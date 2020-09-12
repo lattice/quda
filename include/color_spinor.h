@@ -448,9 +448,9 @@ namespace quda {
 		    -i  0  0  0
 		     0  i  0  0
     */
-    __device__ __host__ inline ColorSpinor<Float,Nc,4> sigma(int mu, int nu) {
+    __device__ __host__ inline ColorSpinor<Float,Nc,4> sigma(int mu, int nu) const {
       ColorSpinor<Float,Nc,4> a;
-      ColorSpinor<Float,Nc,4> &b = *this;
+      const ColorSpinor<Float,Nc,4> &b = *this;
       complex<Float> j(0.0,1.0);
 
       switch(mu) {

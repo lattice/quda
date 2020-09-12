@@ -47,7 +47,7 @@ namespace quda {
 
     long long flops() const // just counts matrix multiplication
     {
-      auto mat_flops = in.Ncolor() * in.Ncolor() * (8ll * in.Ncolor() - 2);
+      auto mat_flops = in.Ncolor() * in.Ncolor() * (8ll * in.Ncolor() - 2ll);
       return (2 + (stoutDim - 1) * (improved ? 28 : 4)) * mat_flops * stoutDim * in.LocalVolume();
     }
 
