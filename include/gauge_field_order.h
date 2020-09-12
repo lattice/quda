@@ -2111,18 +2111,16 @@ namespace quda {
       void save() {
 	if (backup_h) errorQuda("Already allocated host backup");
 	backup_h = safe_malloc(bytes);
-	cudaMemcpy(backup_h, gauge, bytes, cudaMemcpyDeviceToHost);
-	checkCudaError();
+	qudaMemcpy(backup_h, gauge, bytes, cudaMemcpyDeviceToHost);
       }
 
       /**
 	 @brief Restore the field from the host after tuning
       */
       void load() {
-	cudaMemcpy(gauge, backup_h, bytes, cudaMemcpyHostToDevice);
+	qudaMemcpy(gauge, backup_h, bytes, cudaMemcpyHostToDevice);
 	host_free(backup_h);
 	backup_h = nullptr;
-	checkCudaError();
       }
 
       size_t Bytes() const { return reconLen * sizeof(Float); }

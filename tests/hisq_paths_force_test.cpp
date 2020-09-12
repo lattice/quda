@@ -165,7 +165,7 @@ static int R[4] = {0, 0, 0, 0};
 // set the layout, etc.
 static void hisq_force_init()
 {
-  initQuda(device);
+  initQuda(device_ordinal);
 
   qudaGaugeParam.X[0] = xdim;
   qudaGaugeParam.X[1] = ydim;
@@ -373,8 +373,6 @@ static int hisq_force_test(void)
 
   qudaDeviceSynchronize();
   gettimeofday(&t3, NULL);
-
-  checkCudaError();
 
   cudaMom->saveCPUField(*cpuMom);
 

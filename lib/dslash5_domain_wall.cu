@@ -108,11 +108,11 @@ public:
       apply(streams[Nstream - 1]);
     }
 
-    template <typename T, typename Arg> inline void launch(T *f, const TuneParam &tp, Arg &arg, const qudaStream_t &stream)
+    template <typename T, typename Arg> inline void launch(T *f, TuneParam &tp, Arg &arg, const qudaStream_t &stream)
     {
       if (shared && (arg.type == M5_INV_DWF || arg.type == M5_INV_MOBIUS || arg.type == M5_INV_ZMOBIUS)) {
         // if inverse kernel uses shared memory then maximize total shared memory pool
-        setMaxDynamicSharedBytesPerBlock(f);
+        tp.set_max_shared_bytes = true;
       }
       qudaLaunchKernel(f, tp, stream, arg);
     }
