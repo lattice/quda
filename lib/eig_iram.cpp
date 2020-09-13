@@ -106,10 +106,10 @@ namespace quda
 	
 	// mat_norm and residua are updated.
 	mat_norm = upperHessEigen.norm();
-	printfQuda("mat_norm = %e\n", mat_norm);
+	//printfQuda("mat_norm = %e\n", mat_norm);
 	for (int i = 0; i < iter; i++) {
 	  residua[i] = abs(upperHess[iter][iter-1] * eigenSolverUH.eigenvectors().col(i)[iter-1]);
-	  printfQuda("Residuum[%d] = %e\n", i, residua[i]);
+	  //printfQuda("Residuum[%d] = %e\n", i, residua[i]);
 	}
 
 	//Halting check
@@ -118,7 +118,7 @@ namespace quda
 	  for(int i=0; i<iter; i++) {
 	    if(residua[i] < tol * abs(eigenSolverUH.eigenvalues()[i])) num_converged++;
 	  }
-	  printf("%04d converged eigenvalues at iter %d\n", num_converged, iter);	
+	  printfQuda("%04d converged eigenvalues at iter %d\n", num_converged, iter);	
 	  if (num_converged >= n_ev) {
 	    converged = true;
 	    // Transfer ritz matrix
@@ -187,13 +187,13 @@ namespace quda
     }
 
     double norm_r = sqrt(blas::norm2(*r[0]));
-    printfQuda("Residual norm = %e\n", norm_r);
+    //printfQuda("Residual norm = %e\n", norm_r);
     if(j < (int)v.size() - 1) {
       upperHess[j+1][j].real(norm_r);
     }
 
     if(j>0) {
-      for(int i=0; i<2; i++) blockOrthogonalize(v, r, j);
+      //for(int i=0; i<2; i++) blockOrthogonalize(v, r, j);
     }
     
     blas::zero(*v[j + 1]);
