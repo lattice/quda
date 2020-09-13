@@ -105,7 +105,7 @@ int main(int argc, char **argv)
   setEigParam(eig_param);
 
   // Initialize the QUDA library
-  initQuda(device);
+  initQuda(device_ordinal);
   display_test_info();
 
   // Set some dimension parameters

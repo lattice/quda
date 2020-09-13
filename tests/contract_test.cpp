@@ -70,7 +70,7 @@ int main(int argc, char **argv)
   display_test_info();
 
   // initialize the QUDA library
-  initQuda(device);
+  initQuda(device_ordinal);
   int X[4] = {xdim, ydim, zdim, tdim};
   setDims(X);
   setSpinorSiteSize(24);

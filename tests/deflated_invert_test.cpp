@@ -75,7 +75,7 @@ int main(int argc, char **argv)
   display_test_info();
 
   // initialize the QUDA library
-  initQuda(device);
+  initQuda(device_ordinal);
 
   // *** QUDA parameters begin here.
 

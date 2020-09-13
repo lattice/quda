@@ -298,9 +298,7 @@ namespace quda {
     GaugeFixINVPSP(GaugeFixArg<Float> &arg, const GaugeField &meta) :
       arg(arg),
       meta(meta)
-    {
-      cudaFuncSetCacheConfig(kernel_gauge_mult_norm_2D<Float>, cudaFuncCachePreferL1);
-    }
+    { }
 
     void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -447,7 +445,6 @@ namespace quda {
       meta(meta)
     {
       half_alpha = alpha * 0.5;
-      cudaFuncSetCacheConfig(kernel_gauge_fix_U_EO_NEW<Float, Gauge>, cudaFuncCachePreferL1);
     }
 
     void setAlpha(Float alpha){ half_alpha = alpha * 0.5; }
@@ -523,7 +520,6 @@ namespace quda {
       meta(meta)
     {
       half_alpha = alpha * 0.5;
-      cudaFuncSetCacheConfig( kernel_gauge_GX<Elems, Float>,   cudaFuncCachePreferL1);
     }
 
     void setAlpha(Float alpha) { half_alpha = alpha * 0.5; }
@@ -610,9 +606,7 @@ namespace quda {
       dataOr(dataOr),
       arg(arg),
       meta(meta)
-    {
-      cudaFuncSetCacheConfig(kernel_gauge_fix_U_EO<Elems, Float, Gauge>, cudaFuncCachePreferL1);
-    }
+    { }
 
     void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -796,7 +790,6 @@ namespace quda {
     arg.free();
     CUFFT_SAFE_CALL(cufftDestroy(plan_zt));
     CUFFT_SAFE_CALL(cufftDestroy(plan_xy));
-    checkCudaError();
     qudaDeviceSynchronize();
     profileInternalGaugeFixFFT.TPSTOP(QUDA_PROFILE_COMPUTE);
 

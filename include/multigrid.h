@@ -101,6 +101,9 @@ namespace quda {
     /** Whether or not this is a staggered solve or not */
     bool is_staggered;
 
+    /** Whether to use tensor cores (if available) */
+    bool use_mma;
+
     /**
        This is top level instantiation done when we start creating the multigrid operator.
      */
@@ -127,7 +130,8 @@ namespace quda {
       smoother_solve_type(param.smoother_solve_type[level]),
       location(param.location[level]),
       setup_location(param.setup_location[level]),
-      is_staggered(param.is_staggered == QUDA_BOOLEAN_YES)
+      is_staggered(param.is_staggered == QUDA_BOOLEAN_TRUE),
+      use_mma(param.use_mma == QUDA_BOOLEAN_TRUE)
     {
       // set the block size
       for (int i = 0; i < QUDA_MAX_DIM; i++) geoBlockSize[i] = param.geo_block_size[level][i];
@@ -161,7 +165,8 @@ namespace quda {
       smoother_solve_type(param.mg_global.smoother_solve_type[level]),
       location(param.mg_global.location[level]),
       setup_location(param.mg_global.setup_location[level]),
-      is_staggered(param.is_staggered == QUDA_BOOLEAN_YES)
+      is_staggered(param.is_staggered),
+      use_mma(param.use_mma)
     {
       // set the block size
       for (int i = 0; i < QUDA_MAX_DIM; i++) geoBlockSize[i] = param.mg_global.geo_block_size[level][i];
@@ -467,10 +472,11 @@ public:
      @param need_bidirectional[in] Whether or not we need to force a bi-directional
      build, even if the given level isn't preconditioned---if any previous level is
      preconditioned, we've violated that symmetry.
+     @param use_mma[in] Whether or not use MMA (tensor core) to do the calculation, default to false
    */
   void CoarseCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
                       const GaugeField &clover, const GaugeField &cloverInv, double kappa, double mu, double mu_factor,
-                      QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional);
+                      QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional, bool use_mma = false);
 
   /**
      @brief Calculate preconditioned coarse links and coarse clover inverse field
@@ -478,8 +484,9 @@ public:
      @param Xinv[out] Coarse clover inverse field
      @param Y[in] Coarse link field
      @param X[in] Coarse clover field
+     @param use_mma[in] Whether or not use MMA (tensor core) to do the calculation, default to false
    */
-  void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X);
+  void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X, bool use_mma = false);
 
   /**
      This is an object that captures an entire MG preconditioner

@@ -11,7 +11,7 @@ namespace quda
   static bool debug = false;
 
   MG::MG(MGParam &param, TimeProfile &profile_global) :
-    Solver(*param.matResidual, *param.matSmooth, *param.matSmoothSloppy, param, profile),
+    Solver(*param.matResidual, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, param, profile),
     param(param),
     transfer(0),
     resetTransfer(false),
@@ -317,11 +317,12 @@ namespace quda
     // inner solver should recompute the true residual after each cycle if using Schwarz preconditioning
     param_presmooth->compute_true_res = (param_presmooth->schwarz_type != QUDA_INVALID_SCHWARZ) ? true : false;
 
-    presmoother = ( (param.level < param.Nlevel-1 || param_presmooth->schwarz_type != QUDA_INVALID_SCHWARZ) &&
-                    param_presmooth->inv_type != QUDA_INVALID_INVERTER && param_presmooth->maxiter > 0) ?
-      Solver::create(*param_presmooth, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile) : nullptr;
-
-    if (param.level < param.Nlevel-1) { //Create the post smoother
+    presmoother = ((param.level < param.Nlevel - 1 || param_presmooth->schwarz_type != QUDA_INVALID_SCHWARZ)
+                   && param_presmooth->inv_type != QUDA_INVALID_INVERTER && param_presmooth->maxiter > 0) ?
+      Solver::create(*param_presmooth, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy,
+                     *param.matSmoothSloppy, profile) :
+      nullptr;
+    if (param.level < param.Nlevel - 1) { // Create the post smoother
       param_postsmooth = new SolverParam(*param_presmooth);
       param_postsmooth->return_residual = false;  // post smoother does not need to return the residual vector
       param_postsmooth->use_init_guess = QUDA_USE_INIT_GUESS_YES;
@@ -334,7 +335,9 @@ namespace quda
       param_postsmooth->compute_true_res = false;
 
       postsmoother = (param_postsmooth->inv_type != QUDA_INVALID_INVERTER && param_postsmooth->maxiter > 0) ?
-	Solver::create(*param_postsmooth, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile) : nullptr;
+        Solver::create(*param_postsmooth, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy,
+                       *param.matSmoothSloppy, profile) :
+        nullptr;
     }
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Smoother done\n");
 
@@ -379,6 +382,7 @@ namespace quda
     diracParam.tmp1 = tmp_coarse;
     diracParam.tmp2 = tmp2_coarse;
     diracParam.halo_precision = param.mg_global.precision_null[param.level];
+    diracParam.use_mma = param.use_mma;
 
     // use even-odd preconditioning for the coarse grid solver
     if (diracCoarseResidual) delete diracCoarseResidual;
@@ -547,15 +551,15 @@ namespace quda
       param_coarse_solver->precision_precondition = param_coarse_solver->precision_sloppy;
 
       if (param.mg_global.coarse_grid_solution_type[param.level + 1] == QUDA_MATPC_SOLUTION) {
-        Solver *solver
-          = Solver::create(*param_coarse_solver, *matCoarseSmoother, *matCoarseSmoother, *matCoarseSmoother, profile);
+        Solver *solver = Solver::create(*param_coarse_solver, *matCoarseSmoother, *matCoarseSmoother,
+                                        *matCoarseSmoother, *matCoarseSmoother, profile);
         sprintf(coarse_prefix, "MG level %d (%s): ", param.level + 1,
                 param.mg_global.location[param.level + 1] == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
         coarse_solver = new PreconditionedSolver(*solver, *matCoarseSmoother->Expose(), *param_coarse_solver, profile,
                                                  coarse_prefix);
       } else {
-        Solver *solver
-          = Solver::create(*param_coarse_solver, *matCoarseResidual, *matCoarseResidual, *matCoarseResidual, profile);
+        Solver *solver = Solver::create(*param_coarse_solver, *matCoarseResidual, *matCoarseResidual,
+                                        *matCoarseResidual, *matCoarseResidual, profile);
         sprintf(coarse_prefix, "MG level %d (%s): ", param.level + 1,
                 param.mg_global.location[param.level + 1] == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
         coarse_solver = new PreconditionedSolver(*solver, *matCoarseResidual->Expose(), *param_coarse_solver, profile, coarse_prefix);
@@ -1253,8 +1257,8 @@ namespace quda
     DiracMdagM *mdagm = (solverParam.inv_type == QUDA_CG_INVERTER || solverParam.inv_type == QUDA_CA_CG_INVERTER) ? new DiracMdagM(*diracSmoother) : nullptr;
     DiracMdagM *mdagmSloppy = (solverParam.inv_type == QUDA_CG_INVERTER || solverParam.inv_type == QUDA_CA_CG_INVERTER) ? new DiracMdagM(*diracSmootherSloppy) : nullptr;
     if (solverParam.inv_type == QUDA_CG_INVERTER || solverParam.inv_type == QUDA_CA_CG_INVERTER) {
-      solve = Solver::create(solverParam, *mdagm, *mdagmSloppy, *mdagmSloppy, profile);
-    } else if(solverParam.inv_type == QUDA_MG_INVERTER) {
+      solve = Solver::create(solverParam, *mdagm, *mdagmSloppy, *mdagmSloppy, *mdagmSloppy, profile);
+    } else if (solverParam.inv_type == QUDA_MG_INVERTER) {
       // in case MG has not been created, we create the Smoother
       if (!transfer) createSmoother();
 
@@ -1271,10 +1275,12 @@ namespace quda
       solverParam.preconditioner = this;
 
       solverParam.inv_type = QUDA_GCR_INVERTER;
-      solve = Solver::create(solverParam, *param.matSmooth, *param.matSmooth, *param.matSmoothSloppy, profile);
+      solve = Solver::create(solverParam, *param.matSmooth, *param.matSmooth, *param.matSmoothSloppy,
+                             *param.matSmoothSloppy, profile);
       solverParam.inv_type = QUDA_MG_INVERTER;
     } else {
-      solve = Solver::create(solverParam, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
+      solve = Solver::create(solverParam, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy,
+                             *param.matSmoothSloppy, profile);
     }
 
     for (int si = 0; si < param.mg_global.num_setup_iter[param.level]; si++) {

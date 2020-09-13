@@ -195,7 +195,7 @@ int main(int argc, char **argv)
   display_test_info();
 
   // Initialize the QUDA library
-  initQuda(device);
+  initQuda(device_ordinal);
 
   // set parameters for the reference Dslash, and prepare fields to be loaded
   if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
@@ -288,8 +288,10 @@ int main(int argc, char **argv)
     }
   }
 
-  double *time = new double[Nsrc];
-  double *gflops = new double[Nsrc];
+  std::vector<double> time(Nsrc);
+  std::vector<double> gflops(Nsrc);
+  std::vector<int> iter(Nsrc);
+
   auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
   rng->Init();
 
@@ -308,6 +310,7 @@ int main(int argc, char **argv)
 
     time[i] = inv_param.secs;
     gflops[i] = inv_param.gflops / inv_param.secs;
+    iter[i] = inv_param.iter;
     printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
                inv_param.gflops / inv_param.secs);
   }
@@ -321,9 +324,7 @@ int main(int argc, char **argv)
   if (inv_multigrid) destroyMultigridQuda(mg_preconditioner);
 
   // Compute performance statistics
-  if (Nsrc > 1) performanceStats(time, gflops);
-  delete[] time;
-  delete[] gflops;
+  if (Nsrc > 1) performanceStats(time, gflops, iter);
 
   // Perform host side verification of inversion if requested
   if (verify_results) {

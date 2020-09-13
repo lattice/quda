@@ -147,7 +147,6 @@ namespace quda {
 #endif
 
         apply(*blas::getStream());
-        checkCudaError();
 
         blas::bytes += bytes();
         blas::flops += flops();
