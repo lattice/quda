@@ -193,6 +193,11 @@ namespace quda {
     void checkSpinorAlias(const ColorSpinorField &, const ColorSpinorField &) const;
 
     /**
+       @brief Whether or not the operator has a single-parity Dslash
+    */
+    virtual bool hasDslash() const { return true; }
+
+    /**
         @brief apply 'dslash' operator for the DiracOp. This may be e.g. AD
     */
     virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
@@ -294,6 +299,12 @@ namespace quda {
     /** @return is operator hermitian */
     virtual bool hermitian() const { return false; }
 
+    /** @brief returns the Dirac type
+
+        @return Dirac type
+     */
+    virtual QudaDiracType getDiracType() const = 0;
+
     // TEMPORARY FOR DEBUGGING
     // remove me when this is all said and done
     /** @return gauge field */
@@ -369,6 +380,8 @@ namespace quda {
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
 
+    virtual QudaDiracType getDiracType() { return QUDA_WILSON_DIRAC; }
+
     /**
      * @brief Create the coarse Wilson operator.
      *
@@ -408,6 +421,8 @@ namespace quda {
 		 const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 		     const QudaSolutionType) const;
+
+    virtual QudaDiracType getDiracType() { return QUDA_WILSONPC_DIRAC; }
   };
 
   // Full clover
@@ -438,6 +453,8 @@ namespace quda {
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
+
+    virtual QudaDiracType getDiracType() { return QUDA_CLOVER_DIRAC; }
 
     /**
      *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
@@ -519,6 +536,8 @@ namespace quda {
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 		     const QudaSolutionType) const;
 
+    virtual QudaDiracType getDiracType() { return QUDA_CLOVERPC_DIRAC; }
+
     /**
      * @brief Create the coarse even-odd preconditioned clover
      * operator.  Unlike the Wilson operator, the coarsening of the
@@ -575,6 +594,8 @@ namespace quda {
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
+    virtual QudaDiracType getDiracType() { return QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC; }
+
     /**
      * @brief Create the coarse clover operator
      *
@@ -623,6 +644,8 @@ namespace quda {
     // squared op
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
+    virtual QudaDiracType getDiracType() { return QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC; }
+
     /**
      * @brief Create the coarse even-odd preconditioned clover
      * operator.  Unlike the Wilson operator, the coarsening of the
@@ -667,6 +690,8 @@ public:
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
+
+    virtual QudaDiracType getDiracType() { return QUDA_DOMAIN_WALL_DIRAC; }
   };
 
   // 5d Even-odd preconditioned domain wall
@@ -688,6 +713,8 @@ public:
 		 const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 		     const QudaSolutionType) const;
+
+    virtual QudaDiracType getDiracType() { return QUDA_DOMAIN_WALLPC_DIRAC; }
   };
 
   // Full domain wall, but with 4-d parity ordered fields
@@ -714,6 +741,8 @@ public:
     void prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x, ColorSpinorField &b,
         const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
+
+    virtual QudaDiracType getDiracType() { return QUDA_DOMAIN_WALL_4D_DIRAC; }
   };
 
   // 4d Even-odd preconditioned domain wall
@@ -740,6 +769,8 @@ public:
 		 const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 		     const QudaSolutionType) const;
+
+    virtual QudaDiracType getDiracType() { return QUDA_DOMAIN_WALL_4DPC_DIRAC; }
   };
 
   // Full Mobius
@@ -784,6 +815,8 @@ public:
       virtual void prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x, ColorSpinorField &b,
                            const QudaSolutionType) const;
       virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
+
+      virtual QudaDiracType getDiracType() { return QUDA_MOBIUS_DOMAIN_WALL_DIRAC; }
   };
 
   // 4d even-odd preconditioned Mobius domain wall
@@ -810,6 +843,8 @@ public:
     void prepare(ColorSpinorField* &src, ColorSpinorField* &sol, ColorSpinorField &x, 
 		 ColorSpinorField &b, const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
+
+    virtual QudaDiracType getDiracType() { return QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC; }
   };
 
   // Full Mobius EOFA
@@ -841,6 +876,9 @@ public:
     virtual void prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x, ColorSpinorField &b,
                          const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
+
+    virtual QudaDiracType getDiracType() { return QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC; }
+
   };
 
   // 4d Even-odd preconditioned Mobius domain wall with EOFA
@@ -863,6 +901,8 @@ public:
     void prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x, ColorSpinorField &b,
                  const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
+
+    virtual QudaDiracType getDiracType() { return QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC; }
   };
 
   // Full twisted mass
@@ -892,6 +932,8 @@ public:
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
+
+    virtual QudaDiracType getDiracType() { return QUDA_TWISTED_MASS_DIRAC; }
 
     double Mu() const { return mu; }
 
@@ -942,6 +984,9 @@ public:
 		 const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 		     const QudaSolutionType) const;
+
+    virtual QudaDiracType getDiracType() { return QUDA_TWISTED_MASSPC_DIRAC; }
+
    /**
      * @brief Create the coarse even-odd preconditioned twisted-mass
      *        operator
@@ -988,6 +1033,8 @@ public:
        const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
            const QudaSolutionType) const;
+
+    virtual QudaDiracType getDiracType() { return QUDA_TWISTED_CLOVER_DIRAC; }
 
     double Mu() const { return mu; }
 
@@ -1065,6 +1112,8 @@ public:
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
          const QudaSolutionType) const;
 
+    virtual QudaDiracType getDiracType() { return QUDA_TWISTED_CLOVERPC_DIRAC; }
+
     /**
      * @brief Create the coarse even-odd preconditioned twisted-clover
      * operator.  Unlike the Wilson operator, the coarsening of the
@@ -1120,6 +1169,8 @@ public:
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
 
+    virtual QudaDiracType getDiracType() { return QUDA_STAGGERED_DIRAC; }
+
     /**
      * @brief Create the coarse staggered operator.
      *
@@ -1164,6 +1215,8 @@ public:
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
 
+    virtual QudaDiracType getDiracType() { return QUDA_STAGGEREDPC_DIRAC; }
+
     virtual bool hermitian() const { return true; }
   };
 
@@ -1195,6 +1248,8 @@ public:
 
     virtual void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
 
+    virtual bool hasDslash() const { return false; }
+
     virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
       const QudaParity parity) const;
     virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
@@ -1209,6 +1264,8 @@ public:
        const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
            const QudaSolutionType) const;
+
+    virtual QudaDiracType getDiracType() { return QUDA_STAGGEREDKD_DIRAC; }
 
     /**
      *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
@@ -1284,6 +1341,8 @@ public:
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
 
+    virtual QudaDiracType getDiracType() { return QUDA_ASQTAD_DIRAC; }
+
     /**
      *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
      *  These are pointers as opposed to references to support passing in `nullptr`.
@@ -1356,6 +1415,8 @@ public:
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
 
+    virtual QudaDiracType getDiracType() { return QUDA_ASQTADPC_DIRAC; }
+
     virtual bool hermitian() const { return true; }
   };
 
@@ -1386,6 +1447,8 @@ public:
      */
     //virtual void buildKahlerDiracInv();
 
+    virtual bool hasDslash() const { return false; }
+
     virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
       const QudaParity parity) const;
     virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
@@ -1400,6 +1463,8 @@ public:
        const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
            const QudaSolutionType) const;
+
+    virtual QudaDiracType getDiracType() { return QUDA_ASQTADKD_DIRAC; }
 
     /**
      *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
@@ -1589,6 +1654,8 @@ public:
 
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
 
+    virtual QudaDiracType getDiracType() { return QUDA_COARSE_DIRAC; }
+
     virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
                               cudaCloverField *clover_in)
     {
@@ -1660,6 +1727,8 @@ public:
 		 const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
 
+    virtual QudaDiracType getDiracType() { return QUDA_COARSEPC_DIRAC; }
+
     /**
      * @brief Create the coarse even-odd preconditioned coarse
      * operator.  Unlike the Wilson operator, the coarsening of the
@@ -1714,6 +1783,8 @@ public:
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
     virtual bool hermitian() const { return true; }
+
+    virtual QudaDiracType getDiracType() { return QUDA_GAUGE_LAPLACE_DIRAC; }
   };
 
   /**
@@ -1735,6 +1806,8 @@ public:
 		 const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
     virtual bool hermitian() const { return true; }
+
+    virtual QudaDiracType getDiracType() { return QUDA_GAUGE_LAPLACEPC_DIRAC; }
   };
 
   /**
@@ -1768,6 +1841,7 @@ public:
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
 
+    virtual QudaDiracType getDiracType() { return QUDA_GAUGE_COVDEV_DIRAC; }
 
   };
 
@@ -1808,7 +1882,9 @@ public:
       return (Type() == typeid(DiracStaggeredPC).name() ||
 	      Type() == typeid(DiracStaggered).name()   ||
 	      Type() == typeid(DiracImprovedStaggeredPC).name() ||
-	      Type() == typeid(DiracImprovedStaggered).name()) ? true : false;
+	      Type() == typeid(DiracImprovedStaggered).name() ||
+        Type() == typeid(DiracStaggeredKD).name() ||
+        Type() == typeid(DiracImprovedStaggeredKD).name()) ? true : false;
     }
 
     virtual bool hermitian() const { return dirac->hermitian(); }
