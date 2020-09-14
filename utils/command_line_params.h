@@ -196,6 +196,17 @@ extern bool inv_deflate;
 extern bool inv_multigrid;
 extern QudaInverterType precon_type;
 extern QudaSchwarzType precon_schwarz_type;
+
+extern double madwf_diagonal_suppressor;
+extern int madwf_ls;
+extern int madwf_null_maxiter;
+extern double madwf_null_tol;
+extern int madwf_train_maxiter;
+extern bool madwf_param_load;
+extern bool madwf_param_save;
+extern char madwf_param_infile[256];
+extern char madwf_param_outfile[256];
+
 extern int precon_schwarz_cycle;
 extern int multishift;
 extern bool verify_results;

@@ -63,6 +63,17 @@ bool inv_deflate = false;
 bool inv_multigrid = false;
 QudaInverterType precon_type = QUDA_INVALID_INVERTER;
 QudaSchwarzType precon_schwarz_type = QUDA_INVALID_SCHWARZ;
+
+double madwf_diagonal_suppressor = 0.0;
+int madwf_ls = 4;
+int madwf_null_maxiter = niter;
+double madwf_null_tol = tol;
+int madwf_train_maxiter = niter;
+bool madwf_param_load = false;
+bool madwf_param_save = false;
+char madwf_param_infile[256] = "";
+char madwf_param_outfile[256] = "";
+
 int precon_schwarz_cycle = 1;
 int multishift = 1;
 bool verify_results = true;
@@ -296,6 +307,7 @@ namespace
 
   CLI::TransformPairs<QudaSchwarzType> schwarz_type_map {{"invalid", QUDA_INVALID_SCHWARZ},
                                                          {"additive", QUDA_ADDITIVE_SCHWARZ},
+                                                         {"additive-madwf", QUDA_ADDITIVE_MADWF_SCHWARZ},
                                                          {"multiplicative", QUDA_MULTIPLICATIVE_SCHWARZ}};
 
   CLI::TransformPairs<QudaSolutionType> solution_type_map {{"mat", QUDA_MAT_SOLUTION},
@@ -476,6 +488,20 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     ->add_option("--precon-schwarz-type", precon_schwarz_type,
                  "The type of Schwarz preconditioning to use (default=invalid)")
     ->transform(CLI::QUDACheckedTransformer(schwarz_type_map));
+  
+  quda_app->add_option("--madwf-diagonal-suppressor", madwf_diagonal_suppressor, "Set the digonal suppressor for MADWF (default 0)");
+  quda_app->add_option("--madwf-ls", madwf_ls, "Set the reduced Ls for MADWF (default 4)");
+  
+  quda_app->add_option("--madwf-null-maxiter", madwf_null_maxiter, "Max iteration for null vector generation for MADWF");
+  quda_app->add_option("--madwf-null-tol", madwf_null_tol, "Stopping condition for null vector generation for MADWF");
+  quda_app->add_option("--madwf-train-maxiter", madwf_train_maxiter, "Max iteration for parameter training for MADWF");
+  
+  quda_app->add_option("--madwf-param-load", madwf_param_load, "Whether or not load trained parameters for MADWF");
+  quda_app->add_option("--madwf-param-save", madwf_param_save, "Whether or not save trained parameters for MADWF");
+  
+  quda_app->add_option("--madwf-param-infile", madwf_param_infile, "Where to load trained parameters for MADWF from");
+  quda_app->add_option("--madwf-param-outfile", madwf_param_outfile, "Where to save trained parameters for MADWF to");
+
   quda_app->add_option("--precon-schwarz-cycle", precon_schwarz_cycle,
                        "The number of Schwarz cycles to apply per smoother application (default=1)");
 

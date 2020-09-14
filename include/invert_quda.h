@@ -243,6 +243,25 @@ namespace quda {
         (used internally in MG) or of multigrid_solver (used in the
         interface)*/
     bool mg_instance;
+    
+    // the diagonal constant number used to suppress zero modes for MADWF-ML 
+    double madwf_diagonal_suppressor;
+
+    int madwf_ls;
+
+    int madwf_null_maxiter;
+    
+    double madwf_null_tol;
+      
+    int madwf_train_maxiter;
+    
+    QudaBoolean madwf_param_load;
+    
+    QudaBoolean madwf_param_save;
+
+    char madwf_param_infile[256];
+    
+    char madwf_param_outfile[256];
 
     /** Which external lib to use in the solver */
     QudaExtLibType extlib_type;
@@ -327,6 +346,13 @@ namespace quda {
       is_preconditioner(false),
       global_reduction(true),
       mg_instance(false),
+      madwf_diagonal_suppressor(param.madwf_diagonal_suppressor),
+      madwf_ls(param.madwf_ls),
+      madwf_null_maxiter(param.madwf_null_maxiter),
+      madwf_null_tol(param.madwf_null_tol),
+      madwf_train_maxiter(param.madwf_train_maxiter),
+      madwf_param_load(param.madwf_param_load),
+      madwf_param_save(param.madwf_param_save),
       extlib_type(param.extlib_type)
     {
       if (deflate) { eig_param = *(static_cast<QudaEigParam *>(param.eig_param)); }
@@ -340,6 +366,9 @@ namespace quda {
           && (param.inv_type == QUDA_INC_EIGCG_INVERTER || param.inv_type == QUDA_GMRESDR_PROJ_INVERTER)) {
         rhs_idx = param.rhs_idx;
       }
+      
+      strcpy(madwf_param_infile, param.madwf_param_infile);
+      strcpy(madwf_param_outfile, param.madwf_param_outfile);
     }
 
     SolverParam(const SolverParam &param) :
@@ -402,6 +431,13 @@ namespace quda {
       is_preconditioner(param.is_preconditioner),
       global_reduction(param.global_reduction),
       mg_instance(param.mg_instance),
+      madwf_diagonal_suppressor(param.madwf_diagonal_suppressor),
+      madwf_ls(param.madwf_ls),
+      madwf_null_maxiter(param.madwf_null_maxiter),
+      madwf_null_tol(param.madwf_null_tol),
+      madwf_train_maxiter(param.madwf_train_maxiter),
+      madwf_param_load(param.madwf_param_load),
+      madwf_param_save(param.madwf_param_save),
       extlib_type(param.extlib_type)
     {
       for (int i=0; i<num_offset; i++) {
@@ -417,6 +453,9 @@ namespace quda {
       if(param.rhs_idx != 0 && (param.inv_type==QUDA_INC_EIGCG_INVERTER || param.inv_type==QUDA_GMRESDR_PROJ_INVERTER)){
         rhs_idx = param.rhs_idx;
       }
+      
+      strcpy(madwf_param_infile, param.madwf_param_infile);
+      strcpy(madwf_param_outfile, param.madwf_param_outfile);
     }
 
     ~SolverParam() { }
@@ -483,12 +522,24 @@ namespace quda {
     virtual ~Solver();
 
     virtual void operator()(ColorSpinorField &out, ColorSpinorField &in) = 0;
-
+    
     virtual void blocksolve(ColorSpinorField &out, ColorSpinorField &in);
 
-    virtual void train_param(ColorSpinorField &in)
+    virtual void train_param(Solver &null, ColorSpinorField &in)
     {
       errorQuda("NOT implemented.");
+    }
+
+    void set_compute_null_vector(bool true_or_false) {
+      param.compute_null_vector = true_or_false ? QUDA_COMPUTE_NULL_VECTOR_YES : QUDA_COMPUTE_NULL_VECTOR_NO;
+    }
+    
+    void set_use_initial_guess(bool true_or_false) {
+      param.use_init_guess  = true_or_false ? QUDA_USE_INIT_GUESS_YES : QUDA_USE_INIT_GUESS_NO;
+    }
+    
+    void set_tol(double tol) {
+      param.tol  = tol;
     }
 
     const DiracMatrix& M() { return mat; }
@@ -676,13 +727,17 @@ namespace quda {
   template <class Transformer, class Base>
   class Acc : public Base {
 
+    bool active_training = false;
+    Base ref_solver;
+
   public:
 
     Transformer transformer;
 
     Acc(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
        SolverParam &param, TimeProfile &profile) :
-       Base(mat, matSloppy, matSloppy, matEig, param, profile){ }
+       Base(mat, matSloppy, matPrecon, matEig, param, profile),
+       ref_solver(mat, matSloppy, matPrecon, matEig, param, profile), transformer(param) { }
 
     virtual ~Acc() { }
 
@@ -691,14 +746,35 @@ namespace quda {
      * @param out Solution vector.
      * @param in Right-hand side.
      */
-    virtual void operator()(ColorSpinorField &out, ColorSpinorField &in){
-      auto base = [&](ColorSpinorField &out_, ColorSpinorField &in_) { Base::operator()(out_, in_); };
-      transformer.apply(base, out, in);
+    virtual void operator()(ColorSpinorField &out, ColorSpinorField &in) {
+
+    auto base = [&](ColorSpinorField &out, ColorSpinorField &in) {
+      pushVerbosity(QUDA_SILENT);
+      Base::operator()(out, in);
+      popVerbosity();
+    };
+
+      if (transformer.trained) {
+        transformer.apply(base, out, in);
+      } else {
+        ref_solver(out, in);
+      }
     }
 
-    virtual void train_param(ColorSpinorField &in){
-      auto base = [&](ColorSpinorField &out_, ColorSpinorField &in_) { Base::operator()(out_, in_); };
-      transformer.train(Solver::matPrecon, base, base, in);
+    virtual void train_param(Solver &null, ColorSpinorField &in) {
+
+    auto base = [&](ColorSpinorField &out, ColorSpinorField &in) {
+      pushVerbosity(QUDA_SILENT);
+      Base::operator()(out, in);
+      popVerbosity();
+    };
+
+      if (!active_training && !transformer.trained) {
+        active_training = true;
+        transformer.train(Solver::matPrecon, base, null, in);
+        active_training = false;
+        transformer.trained = true;
+      }
     }
 
     /** TODO: Update this.
@@ -842,7 +918,13 @@ namespace quda {
 
       virtual ~PreconCG();
 
-      void operator()(ColorSpinorField &out, ColorSpinorField &in);
+      void operator()(ColorSpinorField &out, ColorSpinorField &in) {
+        std::vector<ColorSpinorField *> v_r(0);
+        (*this)(out, in, v_r, 0);
+      }
+      
+      void operator()(ColorSpinorField &x, ColorSpinorField &b, std::vector<ColorSpinorField *> &v_r, int collect_k);
+      
       virtual bool hermitian() { return true; } /** MPCG is only Hermitian system */
   };
 

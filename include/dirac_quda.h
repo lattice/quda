@@ -160,7 +160,7 @@ namespace quda {
   public:
     Dirac(const DiracParam &param);       // construct from params
     Dirac(const Dirac &dirac);            // Copy construct
-    virtual ~Dirac();                     // virtual destructor as this is a base classe
+    virtual ~Dirac();                     // virtual destructor as this is a base class
     Dirac &operator=(const Dirac &dirac); // assignment
 
     /**
@@ -1735,7 +1735,7 @@ public:
       dirac->tmp1 = &tmp;
       dirac->MdagMLocal(out, in);
       if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
-      dirac->tmp1 = NULL;
+      dirac->tmp1 = nullptr;
     }
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
@@ -1744,8 +1744,8 @@ public:
       dirac->tmp2 = &Tmp2;
       dirac->MdagMLocal(out, in);
       if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
-      dirac->tmp2 = NULL;
-      dirac->tmp1 = NULL;
+      dirac->tmp2 = nullptr;
+      dirac->tmp1 = nullptr;
     }
 
     int getStencilSteps() const

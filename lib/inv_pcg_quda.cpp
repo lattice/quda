@@ -73,8 +73,11 @@ namespace quda
     Kparam.deflate = false;
 
     if (param.inv_type_precondition == QUDA_CG_INVERTER) {
-      // K = new CG(matPrecon, matPrecon, matPrecon, matEig, Kparam, profile);
-      K = new Acc<MADWFacc, CG>(matPrecon, matPrecon, matPrecon, matEig, Kparam, profile);
+      if (param.schwarz_type == QUDA_ADDITIVE_MADWF_SCHWARZ) {
+        K = new Acc<MADWFacc, CG>(matPrecon, matPrecon, matPrecon, matEig, Kparam, profile);
+      } else {
+        K = new CG(matPrecon, matPrecon, matPrecon, matEig, Kparam, profile);
+      }
     } else if (param.inv_type_precondition == QUDA_MR_INVERTER) {
       K = new MR(matPrecon, matPrecon, Kparam, profile);
     } else if (param.inv_type_precondition == QUDA_SD_INVERTER) {
@@ -94,11 +97,14 @@ namespace quda
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
-  void PreconCG::operator()(ColorSpinorField &x, ColorSpinorField &b)
+  void PreconCG::operator()(ColorSpinorField &x, ColorSpinorField &b, std::vector<ColorSpinorField *> &v_r, int collect_k)
   {
-    profile.TPSTART(QUDA_PROFILE_INIT);
+    
+    if (param.schwarz_type == QUDA_ADDITIVE_MADWF_SCHWARZ) {
+      K->train_param(*this, b);
+    }
 
-    K->train_param(b);
+    profile.TPSTART(QUDA_PROFILE_INIT);
 
     double b2 = blas::norm2(b);
 
@@ -229,6 +235,9 @@ namespace quda
     profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
+    printfQuda("stop = %12.8e!\n", stop);
+    printfQuda("b2 = %12.8e!\n", b2);
+    printfQuda("param.tol = %12.8e!\n", param.tol);
     double heavy_quark_res = 0.0;                               // heavy quark residual
     if (use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNorm(x, r).z);
 
@@ -262,6 +271,8 @@ namespace quda
     int resIncrease = 0;
     int resIncreaseTotal = 0;
 
+    int collect = v_r.size();
+
     while (!convergence(r2, heavy_quark_res, stop, param.tol_hq) && k < param.maxiter) {
 
       matSloppy(Ap, *p, tmp, tmp2);
@@ -288,6 +299,11 @@ namespace quda
 
       // force a reliable update if we are within target tolerance (only if doing reliable updates)
       if (convergence(r2, heavy_quark_res, stop, param.tol_hq) && delta >= param.tol) updateX = 1;
+
+      if (collect > 0 && k > collect_k) {
+        *v_r[v_r.size() - collect] = rSloppy;
+        collect--;
+      }
 
       if (!(updateR || updateX)) {
 

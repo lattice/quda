@@ -225,6 +225,7 @@ namespace quda {
 
   void CG::operator()(ColorSpinorField &x, ColorSpinorField &b, ColorSpinorField *p_init, double r2_old_init)
   {
+    bool global_reduction = commGlobalReduction();
     if (param.is_preconditioner && param.global_reduction == false) commGlobalReductionSet(false);
 
     if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
@@ -777,7 +778,7 @@ namespace quda {
       profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     }
 
-    if (param.is_preconditioner && param.global_reduction == false) commGlobalReductionSet(true);
+    if (param.is_preconditioner && param.global_reduction == false) commGlobalReductionSet(global_reduction);
   }
 
 // use BlockCGrQ algortithm or BlockCG (with / without GS, see BLOCKCG_GS option)

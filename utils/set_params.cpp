@@ -215,6 +215,20 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.inv_type_precondition = precon_type;
 
   inv_param.schwarz_type = precon_schwarz_type;
+  
+  inv_param.madwf_diagonal_suppressor = madwf_diagonal_suppressor;
+  inv_param.madwf_ls = madwf_ls;
+
+  inv_param.madwf_null_maxiter = madwf_null_maxiter;
+  inv_param.madwf_null_tol = madwf_null_tol;
+  inv_param.madwf_train_maxiter = madwf_train_maxiter;
+
+  inv_param.madwf_param_load = madwf_param_load ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  inv_param.madwf_param_save = madwf_param_save ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
+  strcpy(inv_param.madwf_param_infile, madwf_param_infile);
+  strcpy(inv_param.madwf_param_outfile, madwf_param_outfile);
+  
   inv_param.precondition_cycle = precon_schwarz_cycle;
   inv_param.tol_precondition = tol_precondition;
   inv_param.maxiter_precondition = maxiter_precondition;
