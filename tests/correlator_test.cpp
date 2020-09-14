@@ -128,6 +128,7 @@ void save_correlators_to_file(const void* correlation_function_sum, const QudaCo
 void set_kappa(const double new_kappa, QudaInvertParam &inv_param, QudaMultigridParam &mg_param,
                QudaInvertParam &mg_inv_param, void *&clover, void *&clover_inv, void *&mg_preconditioner)
 {
+  const double kappa_backup = kappa;
   kappa = new_kappa;
   if (inv_multigrid) {
     setMultigridInvertParam(inv_param);
@@ -149,6 +150,7 @@ void set_kappa(const double new_kappa, QudaInvertParam &inv_param, QudaMultigrid
     if (inv_multigrid) { inv_param.solve_type = solve_type; }
   }
   if (inv_multigrid) { inv_param.preconditioner = mg_preconditioner; }
+  kappa = kappa_backup;
 }
 
 // Calculate propagator from source_array_ptr, save it in prop_array_ptr_2. Then contract propagators stored
