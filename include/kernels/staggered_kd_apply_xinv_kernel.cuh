@@ -78,7 +78,7 @@ namespace quda {
     /////////////////////////////////
 
     // What is my overall thread id?
-    const unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x; //((blockIdx.y*gridDim.x + blockIdx.x)*blockDim.y + threadIdx.y)*blockDim.x + threadIdx.x;
+    const unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x; 
 
     if (tid >= arg.fineVolumeCB*2) return;
 
@@ -90,51 +90,28 @@ namespace quda {
     // The fundamental unit of work is 256 threads = 16 KD blocks
     // What's the first KD block in my unit of work?
     const unsigned int x_coarse_first = 16 * slow_idx;
-
-    unsigned int x_coarse_tmp, coarse_x, coarse_y, coarse_z, coarse_t;
-
-    // FIXME: switch to using getParityCBFromFull in index_helper.cuh.
     
     // What's my KD block for loading Xinv?
     // [0-15] loads consecutive elements of Xinv for the first block,
     // [16-31] loads consecutive elements of Xinv for the second block, etc
     const unsigned int x_coarse_xinv = x_coarse_first + mid_idx;
-    const unsigned int x_coarse_xinv_cb = x_coarse_xinv >> 1;
 
-    x_coarse_tmp = x_coarse_xinv;
-    coarse_x = x_coarse_tmp % arg.xc_size[0];
-    x_coarse_tmp = x_coarse_tmp / arg.xc_size[0];
-    coarse_y = x_coarse_tmp % arg.xc_size[1];
-    x_coarse_tmp = x_coarse_tmp / arg.xc_size[1];
-    coarse_z = x_coarse_tmp % arg.xc_size[2];
-    coarse_t = x_coarse_tmp / arg.xc_size[2];
-
-    const unsigned int parity_coarse_xinv = (coarse_x + coarse_y + coarse_z + coarse_t) & 1;
+    int parity_coarse_xinv_ = 0;
+    const int x_coarse_xinv_cb = getParityCBFromFull(parity_coarse_xinv_, arg.xc_size, x_coarse_xinv);
+    const int parity_coarse_xinv = parity_coarse_xinv_;
 
     // What's my KD block for loading spinors?
     // [0-15] loads first corner of consecutive hypercubes,
     // [16-31] loads the second corner, etc
     const unsigned int x_coarse_spinor = x_coarse_first + fast_idx;
-    const unsigned int x_coarse_spinor_cb = x_coarse_spinor >> 1;
-    
-    // There's got to be a better way to do this
-      x_coarse_tmp = x_coarse_spinor;
-      coarse_x = x_coarse_tmp % arg.xc_size[0];
-      x_coarse_tmp = x_coarse_tmp / arg.xc_size[0];
-      coarse_y = x_coarse_tmp % arg.xc_size[1];
-      x_coarse_tmp = x_coarse_tmp / arg.xc_size[1];
-      coarse_z = x_coarse_tmp % arg.xc_size[2];
-      coarse_t = x_coarse_tmp / arg.xc_size[2];
 
-    const unsigned int parity_coarse_spinor = (coarse_x + coarse_y + coarse_z + coarse_t) & 1;
+    int parity_coarse_spinor_ = 0;
+    const int x_coarse_spinor_cb = getParityCBFromFull(parity_coarse_spinor_, arg.xc_size, x_coarse_spinor);
+    const int parity_coarse_spinor = parity_coarse_spinor_;
 
-    //printf("coarseIdx %d %d %d %d %d %d %d\n", x_coarse_first,
-    //        x_coarse_spinor, x_coarse_spinor_cb, parity_coarse_spinor, 
-    //        x_coarse_xinv, x_coarse_xinv_cb, parity_coarse_xinv);
-
-    /////////////////////////////////////
-    // Set up my shared memory buffers //
-    /////////////////////////////////////
+    //////////////////////////////////
+    // Set up shared memory buffers //
+    //////////////////////////////////
 
     // This is complicated b/c we need extra padding to avoid bank conflcits
     // Check `staggered_kd_apply_xinv.cu` for the dirty details
@@ -151,9 +128,9 @@ namespace quda {
     // Which unit of Xinv tile am I?
     complex* xinv_buffer = cs_buffer + 2 * (blockDim.x / 256) * buffer_size + unit_of_work * fullTileSize + mid_idx * Arg::xinvRowTileSize * Arg::xinvPaddedColTileSize;
     
-    ////////////////////////////////////////////////////
-    // Hey, real work! What ColorVector am I loading? //
-    ////////////////////////////////////////////////////
+    ////////////////////////
+    // Load a ColorVector //
+    ////////////////////////
     
     int coarseCoords[4];
     getCoords(coarseCoords, x_coarse_spinor_cb, arg.xc_size, parity_coarse_spinor);
@@ -186,9 +163,9 @@ namespace quda {
     // in reality we only need to sync over my chunk of 256 threads
     __syncthreads();
 
-    /////////////////////////////
-    // Multiply by Xinv, store //
-    /////////////////////////////
+    //////////////////////
+    // Multiply by Xinv //
+    //////////////////////
 
     // Zero the shared memory buffer, which is 48 components
     #pragma unroll
@@ -239,9 +216,9 @@ namespace quda {
 
     __syncthreads();
 
-    /////////////////////////////////////
-    // Store: one whole thing is easy! //
-    /////////////////////////////////////
+    ///////////
+    // Store //
+    ///////////
 
     Vector out;
 

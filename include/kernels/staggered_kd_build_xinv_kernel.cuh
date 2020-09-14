@@ -10,6 +10,10 @@ namespace quda {
             typename xGauge, typename fineGauge>
   struct CalculateStaggeredKDBlockArg {
 
+    // FIXME: this can probably be merged into the same 
+    // code as staggered_coarse_op_kernel.cuh, we just need
+    // a templated version that builds vs doesn't build Y.
+
     xGauge X;           /** Computed Kahler-Dirac (coarse clover) field */
 
     const fineGauge U;       /** Fine grid (fat-)link field */

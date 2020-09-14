@@ -40,8 +40,8 @@ namespace quda {
 
     const fineGauge U;       /** Fine grid link field */
     const fineSpinorV V;     /** Fine grid spinor field */
-    const fineClover C;      /** Fine grid clover field */
-    const fineClover Cinv;   /** Fine grid clover field */
+    const fineClover C;      /** Fine grid clover field, or Xinv for coarsening the optimized KD op */
+    const fineClover Cinv;   /** Fine grid clover field, or Xinv for coarsening the optimize KD op */
 
     int_fastdiv x_size[QUDA_MAX_DIM];   /** Dimensions of fine grid */
     int xc_size[QUDA_MAX_DIM];  /** Dimensions of coarse grid */
