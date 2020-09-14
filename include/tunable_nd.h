@@ -3,6 +3,7 @@
 #include <tune_quda.h>
 #include <lattice_field.h>
 #include <device.h>
+#include <tunable_nd.h>
 #include <kernel.h>
 
 #ifdef JITIFY

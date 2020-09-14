@@ -3,6 +3,7 @@
 #include <quda_matrix.h>
 #include <gauge_field_order.h>
 #include <clover_field_order.h>
+#include <kernel.h>
 
 namespace quda {
 
@@ -152,7 +153,7 @@ namespace quda {
   {
     Arg &arg;
     constexpr CloverSigmaTr(Arg &arg) : arg(arg) {}
-    static constexpr const char* fileame() { return KERNEL_FILE; }
+    static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb)
     {

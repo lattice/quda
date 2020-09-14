@@ -1,5 +1,6 @@
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
+#include <kernel.h>
 #include <reduction_kernel.h>
 
 namespace quda {

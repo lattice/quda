@@ -5864,6 +5864,7 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
 
   profileContract.TPSTART(QUDA_PROFILE_TOTAL);
   profileContract.TPSTART(QUDA_PROFILE_INIT);
+
   // wrap CPU host side pointers
   ColorSpinorParam cpuParam((void *)hp_x, *param, X, false, param->input_location);
   ColorSpinorField *h_x = ColorSpinorField::Create(cpuParam);

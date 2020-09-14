@@ -2,6 +2,7 @@
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
 #include <color_spinor.h>
+#include <kernel.h>
 
 namespace quda
 {
@@ -63,7 +64,7 @@ namespace quda
   template <typename Arg> struct SigmaOprod {
     Arg &arg;
     constexpr SigmaOprod(Arg &arg) : arg(arg) {}
-    constexpr const char *filename() { return KERNEL_FILE; }
+    static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int mu_nu)
     {

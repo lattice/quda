@@ -3,6 +3,7 @@
 #include <index_helper.cuh>
 #include <gauge_field_order.h>
 #include <fast_intdiv.h>
+#include <kernel.h>
 
 namespace quda {
 

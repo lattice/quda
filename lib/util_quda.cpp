@@ -146,8 +146,8 @@ char* getOmpThreadStr() {
 
 void errorQuda_(const char *func, const char *file, int line, ...)
 {
-  fprintf(getOutputFile(), " (rank %d, host %s, " __FILE__ ":%d in %s())\n",
-          comm_rank(), comm_hostname(), __LINE__, __func__);
+  fprintf(getOutputFile(), " (rank %d, host %s, %s:%d in %s())\n",
+          comm_rank(), comm_hostname(), file, line, func);
   fprintf(getOutputFile(), "%s       last kernel called was (name=%s,volume=%s,aux=%s)\n",
 	  getOutputPrefix(), getLastTuneKey().name,
 	  getLastTuneKey().volume, getLastTuneKey().aux);

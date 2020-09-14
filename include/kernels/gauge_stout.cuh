@@ -5,6 +5,7 @@
 #include <quda_matrix.h>
 #include <su3_project.cuh>
 #include <kernels/gauge_utils.cuh>
+#include <kernel.h>
 
 namespace quda
 {

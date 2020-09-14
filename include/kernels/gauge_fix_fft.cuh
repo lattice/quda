@@ -2,6 +2,7 @@
 
 #include <gauge_field_order.h>
 #include <index_helper.cuh>
+#include <kernel.h>
 #include <reduction_kernel.h>
 
 namespace quda {

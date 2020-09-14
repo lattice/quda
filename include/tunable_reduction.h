@@ -2,6 +2,7 @@
 
 #include <tune_quda.h>
 #include <device.h>
+#include <reduce_helper.h>
 #include <reduction_kernel.h>
 
 #ifdef JITIFY

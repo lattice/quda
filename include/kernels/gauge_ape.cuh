@@ -2,6 +2,7 @@
 #include <index_helper.cuh>
 #include <quda_matrix.h>
 #include <su3_project.cuh>
+#include <kernel.h>
 #include <kernels/gauge_utils.cuh>
 
 namespace quda
@@ -44,7 +45,7 @@ namespace quda
   template <typename Arg> struct APE {
     Arg &arg;
     constexpr APE(Arg &arg) : arg(arg) {}
-    constexpr const char* filename() { return KERNEL_FILE; }
+    static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)
     {

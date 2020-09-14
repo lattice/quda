@@ -3,12 +3,10 @@
 #include <quda_matrix.h>
 #include <gauge_field_order.h>
 #include <color_spinor.h>
+#include <svd_quda.h>
+#include <kernel.h>
 
 namespace quda {
-
-  namespace { // anonymous
-#include <svd_quda.h>
-  }
 
 #define HISQ_UNITARIZE_PI 3.14159265358979323846
 #define HISQ_UNITARIZE_PI23 HISQ_UNITARIZE_PI*2.0/3.0

@@ -652,7 +652,6 @@ namespace quda {
       }
 
       gfixquality.apply(0);
-      printfQuda("Debug %e\n", argQ.getAction());
 #ifdef GAUGEFIXING_DONT_USE_GX
       //------------------------------------------------------------------------
       // Apply gauge fix to current gauge field
