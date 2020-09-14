@@ -1153,7 +1153,7 @@ void freeSloppyGaugeQuda()
   // Long gauges
   //---------------------------------------------------------------------------
   // Delete gaugeLongRefinement if it does not alias gaugeLongSloppy.
-  if ( gaugeLongRefinement != gaugeLongSloppy && gaugeLongRefinement) delete gaugeLongRefinement;
+  if (gaugeLongRefinement != gaugeLongSloppy && gaugeLongRefinement) delete gaugeLongRefinement;
 
   // Delete gaugeLongPrecondition if it does not alias gaugeLongPrecise, gaugeLongSloppy, or gaugeLongEigensolver.
   if (gaugeLongPrecondition != gaugeLongSloppy && gaugeLongPrecondition != gaugeLongPrecise
@@ -1166,7 +1166,7 @@ void freeSloppyGaugeQuda()
 
   // Delete gaugeLongSloppy if it does not alias gaugeLongPrecise.
   if (gaugeLongSloppy != gaugeLongPrecise && gaugeLongSloppy) delete gaugeLongSloppy;
-  
+
   gaugeLongEigensolver = nullptr;
   gaugeLongRefinement = nullptr;
   gaugeLongPrecondition = nullptr;
@@ -1254,8 +1254,7 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
 
     if (gaugePrecondition) errorQuda("gaugePrecondition already exists");
 
-    if (gauge_param.Precision() == gaugePrecise->Precision()
-	&& gauge_param.reconstruct == gaugePrecise->Reconstruct()) {
+    if (gauge_param.Precision() == gaugePrecise->Precision() && gauge_param.reconstruct == gaugePrecise->Reconstruct()) {
       gaugePrecondition = gaugePrecise;
     } else if (gauge_param.Precision() == gaugeSloppy->Precision()
                && gauge_param.reconstruct == gaugeSloppy->Reconstruct()) {
@@ -1271,8 +1270,7 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
 
     if (gaugeRefinement) errorQuda("gaugeRefinement already exists");
 
-    if (gauge_param.Precision() == gaugeSloppy->Precision()
-	&& gauge_param.reconstruct == gaugeSloppy->Reconstruct()) {
+    if (gauge_param.Precision() == gaugeSloppy->Precision() && gauge_param.reconstruct == gaugeSloppy->Reconstruct()) {
       gaugeRefinement = gaugeSloppy;
     } else {
       gaugeRefinement = new cudaGaugeField(gauge_param);
@@ -1285,8 +1283,7 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
 
     if (gaugeEigensolver) errorQuda("gaugeEigensolver already exists");
 
-    if (gauge_param.Precision() == gaugePrecise->Precision()
-	&& gauge_param.reconstruct == gaugePrecise->Reconstruct()) {
+    if (gauge_param.Precision() == gaugePrecise->Precision() && gauge_param.reconstruct == gaugePrecise->Reconstruct()) {
       gaugeEigensolver = gaugePrecise;
     } else if (gauge_param.Precision() == gaugeSloppy->Precision()
                && gauge_param.reconstruct == gaugeSloppy->Reconstruct()) {
@@ -1304,7 +1301,7 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
   if (gaugeFatPrecise) {
     GaugeFieldParam gauge_param(*gaugeFatPrecise);
     // switch the parameters for creating the mirror sloppy cuda gauge field
-    
+
     gauge_param.setPrecision(prec[0], true);
 
     if (gaugeFatSloppy) errorQuda("gaugeFatSloppy already exists");
@@ -1370,7 +1367,7 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
   if (gaugeLongPrecise) {
     GaugeFieldParam gauge_param(*gaugeLongPrecise);
     // switch the parameters for creating the mirror sloppy cuda gauge field
-    
+
     gauge_param.reconstruct = recon[0];
     gauge_param.setPrecision(prec[0], true);
 
