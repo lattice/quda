@@ -215,7 +215,7 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.inv_type_precondition = precon_type;
 
   inv_param.schwarz_type = precon_schwarz_type;
-  
+
   inv_param.madwf_diagonal_suppressor = madwf_diagonal_suppressor;
   inv_param.madwf_ls = madwf_ls;
 
@@ -228,7 +228,7 @@ void setInvertParam(QudaInvertParam &inv_param)
 
   strcpy(inv_param.madwf_param_infile, madwf_param_infile);
   strcpy(inv_param.madwf_param_outfile, madwf_param_outfile);
-  
+
   inv_param.precondition_cycle = precon_schwarz_cycle;
   inv_param.tol_precondition = tol_precondition;
   inv_param.maxiter_precondition = maxiter_precondition;

@@ -99,10 +99,8 @@ namespace quda
 
   void PreconCG::operator()(ColorSpinorField &x, ColorSpinorField &b, std::vector<ColorSpinorField *> &v_r, int collect_k)
   {
-    
-    if (param.schwarz_type == QUDA_ADDITIVE_MADWF_SCHWARZ) {
-      K->train_param(*this, b);
-    }
+
+    if (param.schwarz_type == QUDA_ADDITIVE_MADWF_SCHWARZ) { K->train_param(*this, b); }
 
     profile.TPSTART(QUDA_PROFILE_INIT);
 

@@ -23,27 +23,23 @@ namespace quda
       TrainingParameter(std::vector<real> &host_vector) : size(host_vector.size())
       {
         size_t m_size = size * sizeof(real);
-        if(m_size > 0){
+        if (m_size > 0) {
           device_data = (real *)device_malloc(m_size);
           if (!device_data) { errorQuda("Unable to allocate a device buffer of %lu bytes.\n", m_size); }
           cudaMemcpy(device_data, host_vector.data(), m_size, cudaMemcpyHostToDevice);
         }
       }
 
-      TrainingParameter(size_t size_) : size(size_)
-      {
-        resize(size_);
-      }
-      
+      TrainingParameter(size_t size_) : size(size_) { resize(size_); }
+
       TrainingParameter() : size(0) { }
 
-      void resize(size_t size_) {
-        if (device_data) {
-          device_free(device_data);
-        }
+      void resize(size_t size_)
+      {
+        if (device_data) { device_free(device_data); }
         size = size_;
         size_t m_size = size * sizeof(real);
-        if(m_size > 0){
+        if (m_size > 0) {
           device_data = (real *)device_malloc(m_size);
           if (!device_data) { errorQuda("Unable to allocate a device buffer of %lu bytes.\n", m_size); }
           cudaMemset(device_data, 0, m_size);
@@ -55,13 +51,11 @@ namespace quda
         if (device_data) { device_free_(__func__, __FILE__, __LINE__, device_data); }
       }
 
-      void copy(const TrainingParameter& other)
+      void copy(const TrainingParameter &other)
       {
-        if(size != other.size){
-          errorQuda("Copying from a vector with different size.\n");
-        }
+        if (size != other.size) { errorQuda("Copying from a vector with different size.\n"); }
         size_t m_size = size * sizeof(real);
-        if(device_data != other.device_data){
+        if (device_data != other.device_data) {
           cudaMemcpy(device_data, other.device_data, m_size, cudaMemcpyDeviceToDevice);
         }
       }
@@ -89,7 +83,6 @@ namespace quda
     void axpby(TrainingParameter<float> &out, complex<float> a, const TrainingParameter<float> &x, complex<float> b,
                const TrainingParameter<float> &y);
 
-    
     float inner_product(const TrainingParameter<float> &a, const TrainingParameter<float> &b);
 
     constexpr int spin_dim = 4;

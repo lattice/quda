@@ -488,17 +488,18 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     ->add_option("--precon-schwarz-type", precon_schwarz_type,
                  "The type of Schwarz preconditioning to use (default=invalid)")
     ->transform(CLI::QUDACheckedTransformer(schwarz_type_map));
-  
-  quda_app->add_option("--madwf-diagonal-suppressor", madwf_diagonal_suppressor, "Set the digonal suppressor for MADWF (default 0)");
+
+  quda_app->add_option("--madwf-diagonal-suppressor", madwf_diagonal_suppressor,
+                       "Set the digonal suppressor for MADWF (default 0)");
   quda_app->add_option("--madwf-ls", madwf_ls, "Set the reduced Ls for MADWF (default 4)");
-  
+
   quda_app->add_option("--madwf-null-maxiter", madwf_null_maxiter, "Max iteration for null vector generation for MADWF");
   quda_app->add_option("--madwf-null-tol", madwf_null_tol, "Stopping condition for null vector generation for MADWF");
   quda_app->add_option("--madwf-train-maxiter", madwf_train_maxiter, "Max iteration for parameter training for MADWF");
-  
+
   quda_app->add_option("--madwf-param-load", madwf_param_load, "Whether or not load trained parameters for MADWF");
   quda_app->add_option("--madwf-param-save", madwf_param_save, "Whether or not save trained parameters for MADWF");
-  
+
   quda_app->add_option("--madwf-param-infile", madwf_param_infile, "Where to load trained parameters for MADWF from");
   quda_app->add_option("--madwf-param-outfile", madwf_param_outfile, "Where to save trained parameters for MADWF to");
 

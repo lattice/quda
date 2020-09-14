@@ -17,7 +17,7 @@ namespace quda
     // The parameters to be trained.
     using Tp = madwf_ml::TrainingParameter<TrainingFloat>;
     Tp device_param;
-    
+
     // The diagonal component to suppress/lift the zero modes.
     double mu;
     int Ls_base;
@@ -32,14 +32,14 @@ namespace quda
 
     bool param_load;
     bool param_save;
-    
+
     char param_infile[256];
     char param_outfile[256];
 
     // Has device_param been trained?
     bool trained = false;
 
-    MADWFacc(const SolverParam &solve_param):
+    MADWFacc(const SolverParam &solve_param) :
       mu(solve_param.madwf_diagonal_suppressor),
       Ls_base(solve_param.madwf_ls),
       null_maxiter(solve_param.madwf_null_maxiter),
@@ -50,19 +50,19 @@ namespace quda
     {
       strcpy(param_infile, solve_param.madwf_param_infile);
       strcpy(param_outfile, solve_param.madwf_param_outfile);
-    
+
       printfQuda("MADWFacc:\n");
       printfQuda("madwf_mu = %.4f\n", mu);
       printfQuda("madwf_ls = %d\n", Ls_base);
       printfQuda("madwf_null_maxiter = %d\n", null_maxiter);
       printfQuda("madwf_null_tol = %.2f\n", null_tol);
       printfQuda("madwf_train_maxiter = %d\n", train_maxiter);
-    
     }
-    
-    ~MADWFacc() {
-      if (forward_tmp) { delete forward_tmp; } 
-      if (backward_tmp) { delete backward_tmp; } 
+
+    ~MADWFacc()
+    {
+      if (forward_tmp) { delete forward_tmp; }
+      if (backward_tmp) { delete backward_tmp; }
     }
 
     void fill_random(std::vector<TrainingFloat> &v)
@@ -72,26 +72,25 @@ namespace quda
       static std::mt19937 rng(23ul * comm_rank());
       // The gaussian distribution
       static std::normal_distribution<double> n(0., 1.);
-  
+
       for (auto &x : v) { x = 1e-1 * n(rng); }
     }
 
-    template <class Base>
-    void apply(Base base, ColorSpinorField &out, const ColorSpinorField &in)
+    template <class Base> void apply(Base base, ColorSpinorField &out, const ColorSpinorField &in)
     {
       madwf_ml::transfer_5d_hh(*forward_tmp, in, device_param, false);
       base(*backward_tmp, *forward_tmp);
       madwf_ml::transfer_5d_hh(out, *backward_tmp, device_param, true);
-      
+
       blas::axpy(mu, const_cast<ColorSpinorField &>(in), out);
     }
 
     // double calculate_chi(ColorSpinorField &out, const ColorSpinorField &in, const Tp &tp, double mu, int Ls_cheap);
-    
+
     template <class Ref, class Base>
     double cost(const Ref &ref, Base base, ColorSpinorField &out, const ColorSpinorField &in)
     {
-      
+
       ColorSpinorParam csParam(in);
       cudaColorSpinorField tmp1(csParam);
       cudaColorSpinorField tmp2(csParam);
@@ -103,29 +102,27 @@ namespace quda
 
       // M * T^ * A * T * phi - phi
       return blas::xmyNorm(tmp2, out);
-
     }
-    
+
     // void ATx(ColorSpinorField &out, const ColorSpinorField &in, const Tp &tp);
 
     template <class Ref, class Base, class Null>
-    void train(const Ref &ref, Base base, Null &null, const ColorSpinorField &in) {
+    void train(const Ref &ref, Base base, Null &null, const ColorSpinorField &in)
+    {
 #if 1
       constexpr int complex_matrix_size = 16; // spin by spin
 #else
       constexpr int complex_matrix_size = 2; // chiral
-#endif   
+#endif
 
       ColorSpinorParam csParam(in);
       // csParam.setPrecision(QUDA_HALF_PRECISION);
       cudaColorSpinorField null_rhs(csParam);
       cudaColorSpinorField null_x(csParam);
-      
+
       std::vector<ColorSpinorField *> B(16);
       csParam.setPrecision(QUDA_HALF_PRECISION);
-      for (auto &pB : B) {
-        pB = new cudaColorSpinorField(csParam);
-      }
+      for (auto &pB : B) { pB = new cudaColorSpinorField(csParam); }
       auto rng = new RNG(*B[0], 1234);
       rng->Init();
 
@@ -138,15 +135,18 @@ namespace quda
       }
 
       // global orthonormalization of the initial null-space vectors
-      if(0) {
-        for(int i=0; i<(int)B.size(); i++) {
-          for (int j=0; j<i; j++) {
-            Complex alpha = blas::cDotProduct(*B[j], *B[i]);// <j,i>
-            blas::caxpy(-alpha, *B[j], *B[i]); // i - <j,i> j
+      if (0) {
+        for (int i = 0; i < (int)B.size(); i++) {
+          for (int j = 0; j < i; j++) {
+            Complex alpha = blas::cDotProduct(*B[j], *B[i]); // <j,i>
+            blas::caxpy(-alpha, *B[j], *B[i]);               // i - <j,i> j
           }
           double nrm2 = blas::norm2(*B[i]);
-          if (nrm2 > 1e-16) { blas::ax(1.0 /sqrt(nrm2), *B[i]); } // i / <i,i>
-          else errorQuda("\nCannot normalize %u vector\n", i);
+          if (nrm2 > 1e-16) {
+            blas::ax(1.0 / sqrt(nrm2), *B[i]);
+          } // i / <i,i>
+          else
+            errorQuda("\nCannot normalize %u vector\n", i);
         }
       }
 
@@ -157,7 +157,7 @@ namespace quda
       int param_size = Ls * Ls_base * complex_matrix_size * 2;
 
       device_param.resize(param_size); // 2 for complex
-      
+
       cudaColorSpinorField chi(csParam);
       cudaColorSpinorField tmp(csParam);
       cudaColorSpinorField theta(csParam);
@@ -188,7 +188,7 @@ namespace quda
 
       std::vector<TrainingFloat> host_param(param_size);
       fill_random(host_param);
-      
+
       device_param.resize(param_size);
       device_param.from_host(host_param);
 
@@ -218,15 +218,15 @@ namespace quda
           chi2 += cost(ref, base, chi, *phi);
           // ATx(ATphi, *phi, T);
           madwf_ml::transfer_5d_hh(*forward_tmp, *phi, device_param, false);
-          
+
           base(ATphi, *forward_tmp);
 
           // inner_dslash(Mchi, chi);
           ref(Mchi, chi);
-          
+
           // ATx(ATMchi, Mchi, T);
           madwf_ml::transfer_5d_hh(*forward_tmp, Mchi, device_param, false);
-          
+
           base(ATMchi, *forward_tmp);
 
           // d1 = A * T * phi -x- M * chi
@@ -255,7 +255,7 @@ namespace quda
           // D' * A * T * phi
           madwf_ml::transfer_5d_hh(theta, ATphi, P, true);
 
-          // ATx(ADphi, *phi, P);          
+          // ATx(ADphi, *phi, P);
           madwf_ml::transfer_5d_hh(*forward_tmp, *phi, P, false);
           base(ADphi, *forward_tmp);
 
@@ -264,7 +264,7 @@ namespace quda
           // theta
           blas::axpy(1.0, theta, tmp);
           // axpy(pmu, *phi, tmp);
-          
+
           // inner_dslash(theta, tmp);
           ref(theta, tmp);
 
@@ -305,7 +305,7 @@ namespace quda
 
         printfQuda("grad min iter %03d: %04d chi2 = %8.4e, chi2 %% = %8.4e, alpha = %+8.4e, mu = %+8.4e\n", comm_rank(),
                    iteration, chi2, chi2 / residual, alpha, mu);
-      
+
         // if((chi2 - old_chi2) * (chi2 - old_chi2) / (ref * ref) / (old_chi2*old_chi2 / (ref*ref)) < 1e-10){ break; }
         // old_chi2 = chi2;
       }
@@ -318,41 +318,36 @@ namespace quda
         printfQuda("chi2 %03d %% = %8.4e, phi2 = %8.4e\n", count, ind_chi2 / phi2, phi2);
         count++;
       }
-/**
-      tp = T.to_host();
+      /**
+            tp = T.to_host();
 
-      std::string save_param_path(getenv("QUDA_RESOURCE_PATH"));
-      char cstring[512];
-      // sprintf(cstring, "/training_param_rank_%03d_ls_%02d_%02d_mu_%.3f.dat", comm_rank(), Ls_in, Ls_cheap, mu);
-      sprintf(cstring, "/training_param_rank_%05d_ls_%02d_%02d_mu_%.3f_it_%02d.dat", comm_rank(), Ls_in, Ls_cheap, mu, inner_iterations);
-      save_param_path += std::string(cstring);
-      FILE *fp = fopen(save_param_path.c_str(), "w");
-      size_t fwrite_count = fwrite(tp.data(), sizeof(TrainingFloat), tp.size(), fp);
-      fclose(fp);
-      if (fwrite_count != tp.size()) {
-        errorQuda("Unable to write training params to %s (%lu neq %lu).\n", save_param_path.c_str(), fwrite_count,
-                  tp.size());
-      }
-      printfQuda("Training params saved to %s ...\n", save_param_path.c_str());
-      
-      
-      double dummy_for_sync = 0.0;
-      reduceDouble(dummy_for_sync);
-      
-      return;
-*/
+            std::string save_param_path(getenv("QUDA_RESOURCE_PATH"));
+            char cstring[512];
+            // sprintf(cstring, "/training_param_rank_%03d_ls_%02d_%02d_mu_%.3f.dat", comm_rank(), Ls_in, Ls_cheap, mu);
+            sprintf(cstring, "/training_param_rank_%05d_ls_%02d_%02d_mu_%.3f_it_%02d.dat", comm_rank(), Ls_in, Ls_cheap,
+         mu, inner_iterations); save_param_path += std::string(cstring); FILE *fp = fopen(save_param_path.c_str(), "w");
+            size_t fwrite_count = fwrite(tp.data(), sizeof(TrainingFloat), tp.size(), fp);
+            fclose(fp);
+            if (fwrite_count != tp.size()) {
+              errorQuda("Unable to write training params to %s (%lu neq %lu).\n", save_param_path.c_str(), fwrite_count,
+                        tp.size());
+            }
+            printfQuda("Training params saved to %s ...\n", save_param_path.c_str());
+
+
+            double dummy_for_sync = 0.0;
+            reduceDouble(dummy_for_sync);
+
+            return;
+      */
       /** ... */
-      
+
       // Destroy all dynamically allocated stuff.
       rng->Release();
       delete rng;
-      for (auto &pB : B) {
-        delete pB;
-      }
+      for (auto &pB : B) { delete pB; }
       commGlobalReductionSet(global_reduction);
     }
-
   };
 
 } // namespace quda
-

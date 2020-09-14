@@ -106,20 +106,20 @@ namespace quda
       }
       return out;
     }
-    
+
     template <class real> using ChiralProjector = complex<real>[2];
-    
+
     template <bool dagger, class real>
     __device__ __host__ inline WilsonVector<real> matrix_vector_multiply(const ChiralProjector<real> &m,
                                                                          const WilsonVector<real> &v)
     {
-      if(dagger){
+      if (dagger) {
         return conj(m[0]) * v.project(4, +1).reconstruct(4, +1) + conj(m[1]) * v.project(4, -1).reconstruct(4, -1);
-      }else{
+      } else {
         return m[0] * v.project(4, +1).reconstruct(4, +1) + m[1] * v.project(4, -1).reconstruct(4, -1);
       }
     }
-    
+
     constexpr int warp_size = 32;
 
     template <class T> __device__ inline void warp_reduce(T &f)
@@ -204,18 +204,18 @@ namespace quda
     __device__ inline void vector_tensor_matrix(ChiralProjector<real> *mp, int m_index, const WilsonVector<real> &v,
                                                 const WilsonVector<real> &w)
     {
-      
+
       complex<real> *p = reinterpret_cast<complex<real> *>(mp);
 
 #pragma unroll
-      for (int pm = 0; pm < 2; pm++){
+      for (int pm = 0; pm < 2; pm++) {
         complex<real> z = 0;
-        WilsonVector<real> projected_w = w.project(4, 1-2*pm).reconstruct(4, 1-2*pm);
+        WilsonVector<real> projected_w = w.project(4, 1 - 2 * pm).reconstruct(4, 1 - 2 * pm);
 #pragma unroll
         for (int spin = 0; spin < spin_dim; spin++) {
 #pragma unroll
-          for (int color = 0; color < color_dim; color++) { 
-            z += conj(conj(v(spin, color)) * projected_w(spin, color)); 
+          for (int color = 0; color < color_dim; color++) {
+            z += conj(conj(v(spin, color)) * projected_w(spin, color));
           }
         }
         // Perform a block reduction across the x direction
@@ -436,9 +436,7 @@ namespace quda
 
     public:
       Transfer5d(const ColorSpinorField &meta, Arg &arg) :
-        TunableVectorYZ(arg.Ls_out, arg.nParity),
-        arg(arg),
-        meta(meta)
+        TunableVectorYZ(arg.Ls_out, arg.nParity), arg(arg), meta(meta)
       {
         strcpy(aux, meta.AuxString());
         char tmp[512];
@@ -516,7 +514,7 @@ namespace quda
 // The following macro choose the structure of the transfer matrix.
 #if 1
     using matrix_type = SpinMatrix<float>;
-#else    
+#else
     using matrix_type = ChiralProjector<float>;
 #endif
 
@@ -547,7 +545,7 @@ namespace quda
     {
 #ifdef GPU_DOMAIN_WALL_DIRAC
       checkLocation(out, in); // check all locations match
-      
+
       switch (checkPrecision(out, in)) {
       case QUDA_HALF_PRECISION: {
         using arg_type = MadwfMlArg<short, matrix_type>;
@@ -576,7 +574,7 @@ namespace quda
         index += blockDim.x * gridDim.x;
       }
     }
-    
+
     void axpby(TrainingParameter<float> &out, complex<float> a, const TrainingParameter<float> &x, complex<float> b,
                const TrainingParameter<float> &y)
     {
@@ -586,13 +584,11 @@ namespace quda
       axpby_kernel<<<grid_size, block_size, 0, streams[Nstream - 1]>>>(
         (complex<float> *)out.data(), p_size, a, (complex<float> *)x.data(), b, (complex<float> *)y.data());
     }
-    
+
     float inner_product(const TrainingParameter<float> &a, const TrainingParameter<float> &b)
     {
       size_t p_size = a.get_size();
-      if(p_size != b.get_size()){
-        errorQuda("size mismatch between inputs.\n");
-      }
+      if (p_size != b.get_size()) { errorQuda("size mismatch between inputs.\n"); }
       return thrust::inner_product(thrust::device, a.data(), a.data() + p_size, b.data(), 0.0f);
     }
 

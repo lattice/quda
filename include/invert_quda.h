@@ -243,24 +243,24 @@ namespace quda {
         (used internally in MG) or of multigrid_solver (used in the
         interface)*/
     bool mg_instance;
-    
-    // the diagonal constant number used to suppress zero modes for MADWF-ML 
+
+    // the diagonal constant number used to suppress zero modes for MADWF-ML
     double madwf_diagonal_suppressor;
 
     int madwf_ls;
 
     int madwf_null_maxiter;
-    
+
     double madwf_null_tol;
-      
+
     int madwf_train_maxiter;
-    
+
     QudaBoolean madwf_param_load;
-    
+
     QudaBoolean madwf_param_save;
 
     char madwf_param_infile[256];
-    
+
     char madwf_param_outfile[256];
 
     /** Which external lib to use in the solver */
@@ -366,7 +366,7 @@ namespace quda {
           && (param.inv_type == QUDA_INC_EIGCG_INVERTER || param.inv_type == QUDA_GMRESDR_PROJ_INVERTER)) {
         rhs_idx = param.rhs_idx;
       }
-      
+
       strcpy(madwf_param_infile, param.madwf_param_infile);
       strcpy(madwf_param_outfile, param.madwf_param_outfile);
     }
@@ -453,7 +453,7 @@ namespace quda {
       if(param.rhs_idx != 0 && (param.inv_type==QUDA_INC_EIGCG_INVERTER || param.inv_type==QUDA_GMRESDR_PROJ_INVERTER)){
         rhs_idx = param.rhs_idx;
       }
-      
+
       strcpy(madwf_param_infile, param.madwf_param_infile);
       strcpy(madwf_param_outfile, param.madwf_param_outfile);
     }
@@ -522,25 +522,22 @@ namespace quda {
     virtual ~Solver();
 
     virtual void operator()(ColorSpinorField &out, ColorSpinorField &in) = 0;
-    
+
     virtual void blocksolve(ColorSpinorField &out, ColorSpinorField &in);
 
-    virtual void train_param(Solver &null, ColorSpinorField &in)
-    {
-      errorQuda("NOT implemented.");
-    }
+    virtual void train_param(Solver &null, ColorSpinorField &in) { errorQuda("NOT implemented."); }
 
-    void set_compute_null_vector(bool true_or_false) {
+    void set_compute_null_vector(bool true_or_false)
+    {
       param.compute_null_vector = true_or_false ? QUDA_COMPUTE_NULL_VECTOR_YES : QUDA_COMPUTE_NULL_VECTOR_NO;
     }
-    
-    void set_use_initial_guess(bool true_or_false) {
-      param.use_init_guess  = true_or_false ? QUDA_USE_INIT_GUESS_YES : QUDA_USE_INIT_GUESS_NO;
+
+    void set_use_initial_guess(bool true_or_false)
+    {
+      param.use_init_guess = true_or_false ? QUDA_USE_INIT_GUESS_YES : QUDA_USE_INIT_GUESS_NO;
     }
-    
-    void set_tol(double tol) {
-      param.tol  = tol;
-    }
+
+    void set_tol(double tol) { param.tol = tol; }
 
     const DiracMatrix& M() { return mat; }
     const DiracMatrix& Msloppy() { return matSloppy; }
@@ -724,20 +721,22 @@ namespace quda {
   /**
      @brief  Conjugate-Gradient Solver with an accelerator.
    */
-  template <class Transformer, class Base>
-  class Acc : public Base {
+  template <class Transformer, class Base> class Acc : public Base
+  {
 
     bool active_training = false;
     Base ref_solver;
 
   public:
-
     Transformer transformer;
 
     Acc(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
-       SolverParam &param, TimeProfile &profile) :
-       Base(mat, matSloppy, matPrecon, matEig, param, profile),
-       ref_solver(mat, matSloppy, matPrecon, matEig, param, profile), transformer(param) { }
+        SolverParam &param, TimeProfile &profile) :
+      Base(mat, matSloppy, matPrecon, matEig, param, profile),
+      ref_solver(mat, matSloppy, matPrecon, matEig, param, profile),
+      transformer(param)
+    {
+    }
 
     virtual ~Acc() { }
 
@@ -746,13 +745,14 @@ namespace quda {
      * @param out Solution vector.
      * @param in Right-hand side.
      */
-    virtual void operator()(ColorSpinorField &out, ColorSpinorField &in) {
+    virtual void operator()(ColorSpinorField &out, ColorSpinorField &in)
+    {
 
-    auto base = [&](ColorSpinorField &out, ColorSpinorField &in) {
-      pushVerbosity(QUDA_SILENT);
-      Base::operator()(out, in);
-      popVerbosity();
-    };
+      auto base = [&](ColorSpinorField &out, ColorSpinorField &in) {
+        pushVerbosity(QUDA_SILENT);
+        Base::operator()(out, in);
+        popVerbosity();
+      };
 
       if (transformer.trained) {
         transformer.apply(base, out, in);
@@ -761,13 +761,14 @@ namespace quda {
       }
     }
 
-    virtual void train_param(Solver &null, ColorSpinorField &in) {
+    virtual void train_param(Solver &null, ColorSpinorField &in)
+    {
 
-    auto base = [&](ColorSpinorField &out, ColorSpinorField &in) {
-      pushVerbosity(QUDA_SILENT);
-      Base::operator()(out, in);
-      popVerbosity();
-    };
+      auto base = [&](ColorSpinorField &out, ColorSpinorField &in) {
+        pushVerbosity(QUDA_SILENT);
+        Base::operator()(out, in);
+        popVerbosity();
+      };
 
       if (!active_training && !transformer.trained) {
         active_training = true;
@@ -785,10 +786,10 @@ namespace quda {
      * @param p_init Initial-search direction.
      * @param r2_old_init [description]
      */
-    void operator()(ColorSpinorField &out, ColorSpinorField &in, ColorSpinorField *p_init, double r2_old_init) {
+    void operator()(ColorSpinorField &out, ColorSpinorField &in, ColorSpinorField *p_init, double r2_old_init)
+    {
       errorQuda("NOT implemented!");
     }
-
   };
 
   class CGNE : public CG
@@ -918,13 +919,14 @@ namespace quda {
 
       virtual ~PreconCG();
 
-      void operator()(ColorSpinorField &out, ColorSpinorField &in) {
+      void operator()(ColorSpinorField &out, ColorSpinorField &in)
+      {
         std::vector<ColorSpinorField *> v_r(0);
         (*this)(out, in, v_r, 0);
       }
-      
+
       void operator()(ColorSpinorField &x, ColorSpinorField &b, std::vector<ColorSpinorField *> &v_r, int collect_k);
-      
+
       virtual bool hermitian() { return true; } /** MPCG is only Hermitian system */
   };
 
