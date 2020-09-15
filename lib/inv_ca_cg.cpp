@@ -12,8 +12,9 @@
 
 namespace quda {
 
-  CACG::CACG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, param, profile),
+  CACG::CACG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+             const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
+    Solver(mat, matSloppy, matPrecon, matEig, param, profile),
     init(false),
     lambda_init(false),
     basis(param.ca_basis),
@@ -64,12 +65,13 @@ namespace quda {
     if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
-  CACGNE::CACGNE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
-                 TimeProfile &profile) :
-    CACG(mmdag, mmdagSloppy, mmdagPrecon, param, profile),
+  CACGNE::CACGNE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+                 const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
+    CACG(mmdag, mmdagSloppy, mmdagPrecon, mmdagEig, param, profile),
     mmdag(mat.Expose()),
     mmdagSloppy(matSloppy.Expose()),
     mmdagPrecon(matPrecon.Expose()),
+    mmdagEig(matEig.Expose()),
     xp(nullptr),
     yp(nullptr),
     init(false)
@@ -153,12 +155,13 @@ namespace quda {
 
   }
 
-  CACGNR::CACGNR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
-                 TimeProfile &profile) :
-    CACG(mdagm, mdagmSloppy, mdagmPrecon, param, profile),
+  CACGNR::CACGNR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+                 const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
+    CACG(mdagm, mdagmSloppy, mdagmPrecon, mdagmEig, param, profile),
     mdagm(mat.Expose()),
     mdagmSloppy(matSloppy.Expose()),
     mdagmPrecon(matPrecon.Expose()),
+    mdagmEig(matEig.Expose()),
     bp(nullptr),
     init(false)
   {
@@ -495,7 +498,7 @@ namespace quda {
 
     if (param.deflate) {
       // Construct the eigensolver and deflation space.
-      constructDeflationSpace(b, matPrecon);
+      constructDeflationSpace(b, matEig);
       if (deflate_compute) {
         // compute the deflation space.
         if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
@@ -504,7 +507,7 @@ namespace quda {
         deflate_compute = false;
       }
       if (recompute_evals) {
-        eig_solve->computeEvals(matPrecon, evecs, evals);
+        eig_solve->computeEvals(matEig, evecs, evals);
         recompute_evals = false;
       }
     }
@@ -789,7 +792,7 @@ namespace quda {
       param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
 
       // store flops and reset counters
-      double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops()) * 1e-9;
+      double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops() + matEig.flops()) * 1e-9;
 
       param.gflops += gflops;
       param.iter += total_iter;
@@ -799,6 +802,7 @@ namespace quda {
       mat.flops();
       matSloppy.flops();
       matPrecon.flops();
+      matEig.flops();
 
       profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     }

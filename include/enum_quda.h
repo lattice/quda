@@ -1,5 +1,4 @@
-#ifndef _ENUM_QUDA_H
-#define _ENUM_QUDA_H
+#pragma once
 
 #include <limits.h>
 #define QUDA_INVALID_ENUM INT_MIN
@@ -8,11 +7,7 @@
 extern "C" {
 #endif
 
-  typedef enum qudaError_t {
-    QUDA_SUCCESS = 0,
-    QUDA_ERROR   = 1,
-    QUDA_ERROR_UNINITIALIZED = 2
-  } qudaError_t;
+  typedef enum qudaError_t { QUDA_SUCCESS = 0, QUDA_ERROR = 1, QUDA_ERROR_UNINITIALIZED = 2 } qudaError_t;
 
   typedef enum QudaMemoryType_s {
     QUDA_MEMORY_DEVICE,
@@ -30,12 +25,12 @@ extern "C" {
     QUDA_GENERAL_LINKS,
     QUDA_THREE_LINKS,
     QUDA_MOMENTUM_LINKS,
-    QUDA_COARSE_LINKS, // used for coarse-gauge field with multigrid
-    QUDA_SMEARED_LINKS, // used for loading and saving gaugeSmeared in the interface
+    QUDA_COARSE_LINKS,                  // used for coarse-gauge field with multigrid
+    QUDA_SMEARED_LINKS,                 // used for loading and saving gaugeSmeared in the interface
     QUDA_WILSON_LINKS = QUDA_SU3_LINKS, // used by wilson, clover, twisted mass, and domain wall
     QUDA_ASQTAD_FAT_LINKS = QUDA_GENERAL_LINKS,
     QUDA_ASQTAD_LONG_LINKS = QUDA_THREE_LINKS,
-    QUDA_ASQTAD_MOM_LINKS  = QUDA_MOMENTUM_LINKS,
+    QUDA_ASQTAD_MOM_LINKS = QUDA_MOMENTUM_LINKS,
     QUDA_ASQTAD_GENERAL_LINKS = QUDA_GENERAL_LINKS,
     QUDA_INVALID_LINKS = QUDA_INVALID_ENUM
   } QudaLinkType;
@@ -74,7 +69,7 @@ extern "C" {
   typedef enum QudaReconstructType_s {
     QUDA_RECONSTRUCT_NO = 18, // store all 18 real numbers explicitly
     QUDA_RECONSTRUCT_12 = 12, // reconstruct from 12 real numbers
-    QUDA_RECONSTRUCT_8 = 8,  // reconstruct from 8 real numbers
+    QUDA_RECONSTRUCT_8 = 8,   // reconstruct from 8 real numbers
     QUDA_RECONSTRUCT_9 = 9,   // used for storing HISQ long-link variables
     QUDA_RECONSTRUCT_13 = 13, // used for storing HISQ long-link variables
     QUDA_RECONSTRUCT_10 = 10, // 10-number parameterization used for storing the momentum field
@@ -175,7 +170,7 @@ extern "C" {
     QUDA_NORMOP_PC_SOLVE,
     QUDA_NORMERR_SOLVE,
     QUDA_NORMERR_PC_SOLVE,
-    QUDA_NORMEQ_SOLVE = QUDA_NORMOP_SOLVE, // deprecated
+    QUDA_NORMEQ_SOLVE = QUDA_NORMOP_SOLVE,       // deprecated
     QUDA_NORMEQ_PC_SOLVE = QUDA_NORMOP_PC_SOLVE, // deprecated
     QUDA_INVALID_SOLVE = QUDA_INVALID_ENUM
   } QudaSolveType;
@@ -225,11 +220,7 @@ extern "C" {
     QUDA_MATPC_INVALID = QUDA_INVALID_ENUM
   } QudaMatPCType;
 
-  typedef enum QudaDagType_s {
-    QUDA_DAG_NO,
-    QUDA_DAG_YES,
-    QUDA_DAG_INVALID = QUDA_INVALID_ENUM
-  } QudaDagType;
+  typedef enum QudaDagType_s { QUDA_DAG_NO, QUDA_DAG_YES, QUDA_DAG_INVALID = QUDA_INVALID_ENUM } QudaDagType;
 
   typedef enum QudaMassNormalization_s {
     QUDA_KAPPA_NORMALIZATION,
@@ -240,7 +231,7 @@ extern "C" {
 
   typedef enum QudaSolverNormalization_s {
     QUDA_DEFAULT_NORMALIZATION, // leave source and solution untouched
-    QUDA_SOURCE_NORMALIZATION  // normalize such that || src || = 1
+    QUDA_SOURCE_NORMALIZATION   // normalize such that || src || = 1
   } QudaSolverNormalization;
 
   typedef enum QudaPreserveSource_s {
@@ -278,11 +269,7 @@ extern "C" {
     QUDA_INVALID_VERBOSITY = QUDA_INVALID_ENUM
   } QudaVerbosity;
 
-  typedef enum QudaTune_s {
-    QUDA_TUNE_NO,
-    QUDA_TUNE_YES,
-    QUDA_TUNE_INVALID = QUDA_INVALID_ENUM
-  } QudaTune;
+  typedef enum QudaTune_s { QUDA_TUNE_NO, QUDA_TUNE_YES, QUDA_TUNE_INVALID = QUDA_INVALID_ENUM } QudaTune;
 
   typedef enum QudaPreserveDirac_s {
     QUDA_PRESERVE_DIRAC_NO,
@@ -294,11 +281,7 @@ extern "C" {
   // Type used for "parity" argument to dslashQuda()
   //
 
-  typedef enum QudaParity_s {
-    QUDA_EVEN_PARITY = 0,
-    QUDA_ODD_PARITY,
-    QUDA_INVALID_PARITY = QUDA_INVALID_ENUM
-  } QudaParity;
+  typedef enum QudaParity_s { QUDA_EVEN_PARITY = 0, QUDA_ODD_PARITY, QUDA_INVALID_PARITY = QUDA_INVALID_ENUM } QudaParity;
 
   //
   // Types used only internally
@@ -352,8 +335,8 @@ extern "C" {
   // Site ordering (always t-z-y-x, with rightmost varying fastest)
   typedef enum QudaSiteOrder_s {
     QUDA_LEXICOGRAPHIC_SITE_ORDER, // lexicographic ordering
-    QUDA_EVEN_ODD_SITE_ORDER, // QUDA and QDP use this
-    QUDA_ODD_EVEN_SITE_ORDER, // CPS uses this
+    QUDA_EVEN_ODD_SITE_ORDER,      // QUDA and QDP use this
+    QUDA_ODD_EVEN_SITE_ORDER,      // CPS uses this
     QUDA_INVALID_SITE_ORDER = QUDA_INVALID_ENUM
   } QudaSiteOrder;
 
@@ -372,9 +355,9 @@ extern "C" {
   } QudaFieldOrder;
 
   typedef enum QudaFieldCreate_s {
-    QUDA_NULL_FIELD_CREATE, // create new field
-    QUDA_ZERO_FIELD_CREATE, // create new field and zero it
-    QUDA_COPY_FIELD_CREATE, // create copy to field
+    QUDA_NULL_FIELD_CREATE,      // create new field
+    QUDA_ZERO_FIELD_CREATE,      // create new field and zero it
+    QUDA_COPY_FIELD_CREATE,      // create copy to field
     QUDA_REFERENCE_FIELD_CREATE, // create reference to field
     QUDA_INVALID_FIELD_CREATE = QUDA_INVALID_ENUM
   } QudaFieldCreate;
@@ -403,9 +386,9 @@ extern "C" {
 
   // used to select projection method for deflated solvers
   typedef enum QudaProjectionType_s {
-      QUDA_MINRES_PROJECTION,
-      QUDA_GALERKIN_PROJECTION,
-      QUDA_INVALID_PROJECTION = QUDA_INVALID_ENUM
+    QUDA_MINRES_PROJECTION,
+    QUDA_GALERKIN_PROJECTION,
+    QUDA_INVALID_PROJECTION = QUDA_INVALID_ENUM
   } QudaProjectionType;
 
   // used to select checkerboard preconditioning method
@@ -469,7 +452,12 @@ extern "C" {
     QUDA_BOOLEAN_TRUE = 1,
     QUDA_BOOLEAN_INVALID = QUDA_INVALID_ENUM
   } QudaBoolean;
-
+  
+  // define these for backwards compatibility
+  
+#define QUDA_BOOLEAN_NO QUDA_BOOLEAN_FALSE
+#define QUDA_BOOLEAN_YES QUDA_BOOLEAN_TRUE
+  
   typedef enum QudaCublasOperation_s {
     QUDA_CUBLAS_OP_N = 0, // No transpose
     QUDA_CUBLAS_OP_T = 1, // Transpose only
@@ -491,9 +479,6 @@ extern "C" {
     QUDA_CUBLAS_DATAORDER_INVALID = QUDA_INVALID_ENUM
   } QudaCublasDataOrder;
 
-  // define these for backwards compatibility
-#define QUDA_BOOLEAN_NO QUDA_BOOLEAN_FALSE
-#define QUDA_BOOLEAN_YES QUDA_BOOLEAN_TRUE
 
   typedef enum QudaDirection_s {
     QUDA_BACKWARDS = -1,
@@ -574,4 +559,3 @@ extern "C" {
 }
 #endif
 
-#endif // _ENUM_QUDA_H

@@ -524,7 +524,7 @@ namespace quda {
 	  packBuffer[2*dim+dir] = my_face_dim_dir_hd[bufferIndex][dim][dir];
           break;
         case Remote: // pack to remote peer memory
-          packBuffer[2*dim+dir] = static_cast<char*>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + precision*ghostOffset[dim][1-dir];
+          packBuffer[2*dim+dir] = static_cast<char*>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + ghost_offset[dim][1-dir];
           break;
 	default: errorQuda("Undefined location %d", location[2*dim+dir]);
 	}
@@ -542,7 +542,6 @@ namespace quda {
   void cudaColorSpinorField::sendGhost(void *ghost_spinor, const int nFace, const int dim, const QudaDirection dir,
                                        const int dagger, qudaStream_t *stream)
   {
-
 #ifdef MULTI_GPU
     if (precision != ghost_precision) { pushKernelPackT(true); }
     
@@ -612,13 +611,11 @@ namespace quda {
                                          const QudaDirection dir, const int dagger, qudaStream_t *stream)
   {
     const void *src = ghost_spinor;
-  
-    int ghost_offset = (dir == QUDA_BACKWARDS) ? ghostOffset[dim][0] : ghostOffset[dim][1];
-    void *ghost_dst = (char*)ghost_recv_buffer_d[bufferIndex] + ghost_precision*ghost_offset;
+    auto offset = (dir == QUDA_BACKWARDS) ? ghost_offset[dim][0] : ghost_offset[dim][1];
+    void *ghost_dst = static_cast<char*>(ghost_recv_buffer_d[bufferIndex]) + offset;
 
     qudaMemcpyAsync(ghost_dst, src, ghost_face_bytes[dim], cudaMemcpyHostToDevice, *stream);
   }
-
 
   // pack the ghost zone into a contiguous buffer for communications
   void cudaColorSpinorField::packGhostExtended(const int nFace, const int R[], const QudaParity parity, const int dim,
@@ -627,7 +624,6 @@ namespace quda {
   {
     errorQuda("not implemented");
   }
-
 
   // copy data from host buffer into boundary region of device field
   void cudaColorSpinorField::unpackGhostExtended(const void *ghost_spinor, const int nFace, const QudaParity parity,
@@ -659,9 +655,10 @@ namespace quda {
       for (int i=0; i<nDimComms; ++i) {
 	if (commDimPartitioned(i)) {
 	  for (int b=0; b<2; b++) {
-	    ghost[b][i] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostOffset[i][0]*ghost_precision;
+	    ghost[b][i] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghost_offset[i][0];
 	    if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION)
-	      ghostNorm[b][i] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostNormOffset[i][0]*QUDA_SINGLE_PRECISION;
+	      ghostNorm[b][i] = static_cast<char*>(ghost[b][i]) +
+                nFace * surface[i] * (nSpin / (spin_project ? 2 : 1)) * nColor * 2 * ghost_precision;
 	  }
 	}
       }
@@ -777,14 +774,14 @@ namespace quda {
       if (!remote_write) {
         // all goes here
         void* ghost_dst = static_cast<char*>(ghost_remote_send_buffer_d[bufferIndex][dim][dir])
-          + ghost_precision*ghostOffset[dim][(dir+1)%2];
+          + ghost_offset[dim][(dir+1)%2];
 
         if (ghost_precision != precision) pushKernelPackT(true);
 
         if (dim != 3 || getKernelPackT()) {
 
           void* ghost_dst = static_cast<char*>(ghost_remote_send_buffer_d[bufferIndex][dim][dir])
-            + ghost_precision*ghostOffset[dim][(dir+1)%2];
+            + ghost_offset[dim][(dir+1)%2];
           cudaMemcpyAsync(ghost_dst,
                           my_face_dim_dir_d[bufferIndex][dim][dir],
                           ghost_face_bytes[dim],
@@ -1096,7 +1093,7 @@ namespace quda {
     genericPackGhost(send, *this, parity, nFace, dagger, pack_destination); // FIXME - need support for asymmetric topologies
 
     size_t total_bytes = 0;
-    for (int i=0; i<nDimComms; i++) if (comm_dim_partitioned(i)) total_bytes += 2*ghost_face_bytes[i]; // 2 for fwd/bwd
+    for (int i=0; i<nDimComms; i++) if (comm_dim_partitioned(i)) total_bytes += 2*ghost_face_bytes_aligned[i]; // 2 for fwd/bwd
 
     if (!gdr_send)  {
       if (!fused_pack_memcpy) {
@@ -1104,7 +1101,7 @@ namespace quda {
 	  if (comm_dim_partitioned(i)) {
 	    if (pack_destination[2*i+0] == Device && !comm_peer2peer_enabled(0,i) && // fuse forwards and backwards if possible
 		pack_destination[2*i+1] == Device && !comm_peer2peer_enabled(1,i)) {
-	      cudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_d[bufferIndex][i][0], 2*ghost_face_bytes[i], cudaMemcpyDeviceToHost, 0);
+	      cudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_d[bufferIndex][i][0], 2*ghost_face_bytes_aligned[i], cudaMemcpyDeviceToHost, 0);
 	    } else {
 	      if (pack_destination[2*i+0] == Device && !comm_peer2peer_enabled(0,i))
 		cudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_d[bufferIndex][i][0], ghost_face_bytes[i], cudaMemcpyDeviceToHost, 0);
@@ -1158,7 +1155,7 @@ namespace quda {
 	  if (comm_dim_partitioned(i)) {
 	    if (halo_location[2*i+0] == Device && !comm_peer2peer_enabled(0,i) && // fuse forwards and backwards if possible
 		halo_location[2*i+1] == Device && !comm_peer2peer_enabled(1,i)) {
-	      cudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0], 2*ghost_face_bytes[i], cudaMemcpyHostToDevice, 0);
+	      cudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0], 2*ghost_face_bytes_aligned[i], cudaMemcpyHostToDevice, 0);
 	    } else {
 	      if (halo_location[2*i+0] == Device && !comm_peer2peer_enabled(0,i))
 		cudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0], ghost_face_bytes[i], cudaMemcpyHostToDevice, 0);

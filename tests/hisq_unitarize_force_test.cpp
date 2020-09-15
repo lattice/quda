@@ -132,7 +132,7 @@ static void hisq_force_test()
 
   fermion_force::setUnitarizeForceConstants(unitarize_eps, hisq_force_filter, max_det_error, allow_svd, svd_only, svd_rel_err, svd_abs_err);
 
-  int* num_failures_dev = (int*)device_malloc(sizeof(int));
+  int *num_failures_dev = (int *)device_malloc(sizeof(int));
   qudaMemset(num_failures_dev, 0, sizeof(int));
 
   printfQuda("Calling unitarizeForce\n");
