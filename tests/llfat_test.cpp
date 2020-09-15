@@ -27,7 +27,7 @@ static void llfat_test()
   void* ghost_sitelink_diag[16];
 #endif
 
-  initQuda(device);
+  initQuda(device_ordinal);
 
   cpu_prec = prec;
   host_gauge_data_type_size = cpu_prec;

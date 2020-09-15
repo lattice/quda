@@ -225,7 +225,7 @@ namespace quda
     }
     track_malloc(DEVICE, a, ptr);
 #ifdef HOST_DEBUG
-    cudaMemset(ptr, 0xff, size);
+    qudaMemset(ptr, 0xff, size);
 #endif
     return ptr;
 #else
@@ -256,7 +256,7 @@ namespace quda
     }
     track_malloc(DEVICE_PINNED, a, ptr);
 #ifdef HOST_DEBUG
-    cudaMemset(ptr, 0xff, size);
+    qudaMemset(ptr, 0xff, size);
 #endif
     return ptr;
   }
@@ -355,7 +355,7 @@ namespace quda
     }
     track_malloc(MANAGED, a, ptr);
 #ifdef HOST_DEBUG
-    cudaMemset(ptr, 0xff, size);
+    qudaMemset(ptr, 0xff, size);
 #endif
     return ptr;
   }

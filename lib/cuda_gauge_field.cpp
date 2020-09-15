@@ -51,7 +51,7 @@ namespace quda {
       default:
 	errorQuda("Unsupported memory type %d", mem_type);
       }
-      if (create == QUDA_ZERO_FIELD_CREATE) cudaMemset(gauge, 0, bytes);
+      if (create == QUDA_ZERO_FIELD_CREATE) qudaMemset(gauge, 0, bytes);
     } else {
       gauge = param.gauge;
     }
@@ -79,8 +79,8 @@ namespace quda {
 
     size_t pitch = stride*order*precision;
     if (pad_bytes) {
-      cudaMemset2D(static_cast<char*>(even) + volumeCB*order*precision, pitch, 0, pad_bytes, Npad);
-      cudaMemset2D(static_cast<char*>(odd) + volumeCB*order*precision, pitch, 0, pad_bytes, Npad);
+      qudaMemset2D(static_cast<char*>(even) + volumeCB*order*precision, pitch, 0, pad_bytes, Npad);
+      qudaMemset2D(static_cast<char*>(odd) + volumeCB*order*precision, pitch, 0, pad_bytes, Npad);
     }
   }
 
@@ -147,7 +147,7 @@ namespace quda {
 	if (!comm_dim_partitioned(dim)) continue;
 	recvStart(dim, dir); // prepost the receive
 	if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) {
-	  cudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][dim][dir], my_face_dim_dir_d[bufferIndex][dim][dir],
+	  qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][dim][dir], my_face_dim_dir_d[bufferIndex][dim][dir],
 			  ghost_face_bytes[dim], cudaMemcpyDeviceToHost, streams[2*dim+dir]);
 	}
       }
@@ -167,7 +167,7 @@ namespace quda {
 	if (!comm_dim_partitioned(dim)) continue;
 	commsComplete(dim, dir);
 	if (!comm_peer2peer_enabled(1-dir,dim) && !comm_gdr_enabled()) {
-	  cudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][dim][1-dir], from_face_dim_dir_h[bufferIndex][dim][1-dir],
+	  qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][dim][1-dir], from_face_dim_dir_h[bufferIndex][dim][1-dir],
 			  ghost_face_bytes[dim], cudaMemcpyHostToDevice, streams[2*dim+dir]);
 	}
       }
@@ -236,7 +236,7 @@ namespace quda {
 	if (!comm_dim_partitioned(dim)) continue;
 	recvStart(dim, dir); // prepost the receive
 	if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) {
-	  cudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][dim][dir], my_face_dim_dir_d[bufferIndex][dim][dir],
+	  qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][dim][dir], my_face_dim_dir_d[bufferIndex][dim][dir],
 			  ghost_face_bytes[dim], cudaMemcpyDeviceToHost, streams[2*dim+dir]);
 	}
       }
@@ -256,7 +256,7 @@ namespace quda {
 	if (!comm_dim_partitioned(dim)) continue;
 	commsComplete(dim, dir);
 	if (!comm_peer2peer_enabled(1-dir,dim) && !comm_gdr_enabled()) {
-	  cudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][dim][1-dir], from_face_dim_dir_h[bufferIndex][dim][1-dir],
+	  qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][dim][1-dir], from_face_dim_dir_h[bufferIndex][dim][1-dir],
 			  ghost_face_bytes[dim], cudaMemcpyHostToDevice, streams[2*dim+dir]);
 	}
       }
@@ -437,7 +437,7 @@ namespace quda {
 	for (int dir=0; dir<2; dir++) {
 	  // issue host-to-device copies if needed
 	  if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) {
-	    cudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][dim][dir], my_face_dim_dir_d[bufferIndex][dim][dir],
+	    qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][dim][dir], my_face_dim_dir_d[bufferIndex][dim][dir],
 			    ghost_face_bytes[dim], cudaMemcpyDeviceToHost, streams[dir]);
 	  }
 	}
@@ -452,7 +452,7 @@ namespace quda {
 	for (int dir=0; dir<2; dir++) {
 	  // issue host-to-device copies if needed
 	  if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) {
-	    cudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][dim][dir], from_face_dim_dir_h[bufferIndex][dim][dir],
+	    qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][dim][dir], from_face_dim_dir_h[bufferIndex][dim][dir],
 			    ghost_face_bytes[dim], cudaMemcpyHostToDevice, streams[dir]);
 	  }
 	}
@@ -627,13 +627,11 @@ namespace quda {
     staggeredPhaseType = src.StaggeredPhase();
 
     qudaDeviceSynchronize(); // include sync here for accurate host-device profiling
-    checkCudaError();
   }
 
   void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu) {
     copy(cpu);
     qudaDeviceSynchronize();
-    checkCudaError();
   }
 
   void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu, TimeProfile &profile) {
@@ -709,7 +707,6 @@ namespace quda {
     cpu.staggeredPhaseType = staggeredPhaseType;
 
     qudaDeviceSynchronize();
-    checkCudaError();
   }
 
   void cudaGaugeField::saveCPUField(cpuGaugeField &cpu, TimeProfile &profile) const {
@@ -721,17 +718,15 @@ namespace quda {
   void cudaGaugeField::backup() const {
     if (backed_up) errorQuda("Gauge field already backed up");
     backup_h = new char[bytes];
-    cudaMemcpy(backup_h, gauge, bytes, cudaMemcpyDefault);
-    checkCudaError();
+    qudaMemcpy(backup_h, gauge, bytes, cudaMemcpyDefault);
     backed_up = true;
   }
 
   void cudaGaugeField::restore() const
   {
     if (!backed_up) errorQuda("Cannot restore since not backed up");
-    cudaMemcpy(gauge, backup_h, bytes, cudaMemcpyDefault);
+    qudaMemcpy(gauge, backup_h, bytes, cudaMemcpyDefault);
     delete []backup_h;
-    checkCudaError();
     backed_up = false;
   }
 

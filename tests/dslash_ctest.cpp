@@ -1059,7 +1059,7 @@ public:
   }
 
   static void SetUpTestCase() {
-    initQuda(device);
+    initQuda(device_ordinal);
   }
 
   // Per-test-case tear-down.
