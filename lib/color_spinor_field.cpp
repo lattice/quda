@@ -775,9 +775,22 @@ namespace quda {
                                                    QudaMemoryType new_mem_type) {
     ColorSpinorParam coarseParam(*this);
     for (int d=0; d<nDim; d++) coarseParam.x[d] = x[d]/geoBlockSize[d];
-    coarseParam.nSpin = (nSpin == 1) ? 2 : (nSpin / spinBlockSize); // coarsening staggered check
 
-    coarseParam.nColor = Nvec;
+    // check for optimized-KD build by seeing if total geoBlockSize == 1
+    bool is_optimized_kd = false;
+    int geoBlockVolume = 1;
+    for (int d = 0; d < nDim; d++) { geoBlockVolume *= geoBlockSize[d]; }
+    if (geoBlockVolume == 1) is_optimized_kd = true;
+
+    if (is_optimized_kd) {
+      // the "coarse" op is actually a fine staggered ColorSpinorField
+      coarseParam.nSpin = nSpin;
+      coarseParam.nColor = nColor;
+    } else {
+      coarseParam.nSpin = (nSpin == 1) ? 2 : (nSpin / spinBlockSize); // coarsening staggered check
+      coarseParam.nColor = Nvec;
+    }
+
     coarseParam.siteSubset = QUDA_FULL_SITE_SUBSET; // coarse grid is always full
     coarseParam.create = QUDA_ZERO_FIELD_CREATE;
 

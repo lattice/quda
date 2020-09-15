@@ -53,8 +53,28 @@ namespace quda {
   {
 
     // deep copy Xinv
-    GaugeFieldParam gParam(dirac.Xinv);
+    const int ndim = 4;
+    int xc[QUDA_MAX_DIM];
+    for (int i = 0; i < ndim; i++) { xc[i] = gauge->X()[i]/2; }
+    const int Nc_c = gauge->Ncolor() * 8; // 24
+    const int Ns_c = 2; // staggered parity
+
+    GaugeFieldParam gParam;
+    memcpy(gParam.x, xc, QUDA_MAX_DIM*sizeof(int));
+    gParam.nColor = Nc_c*Ns_c;
+    gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+    gParam.order = QUDA_MILC_GAUGE_ORDER;
+    gParam.link_type = QUDA_COARSE_LINKS;
+    gParam.t_boundary = QUDA_PERIODIC_T;
     gParam.create = QUDA_NULL_FIELD_CREATE;
+    gParam.setPrecision( dirac.Xinv->Precision() );
+    gParam.nDim = ndim;
+    gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+    gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+    gParam.nFace = 0;
+    gParam.geometry = QUDA_SCALAR_GEOMETRY;
+    gParam.pad = 0;
+
     Xinv = new cudaGaugeField(gParam);
     Xinv->copy(*dirac.Xinv);
   }
@@ -69,15 +89,35 @@ namespace quda {
       Dirac::operator=(dirac);
 
       // deep copy Xinv
-      GaugeFieldParam gParam(dirac.Xinv);
+      const int ndim = 4;
+      int xc[QUDA_MAX_DIM];
+      for (int i = 0; i < ndim; i++) { xc[i] = gauge->X()[i]/2; }
+      const int Nc_c = gauge->Ncolor() * 8; // 24
+      const int Ns_c = 2; // staggered parity
+
+      GaugeFieldParam gParam;
+      memcpy(gParam.x, xc, QUDA_MAX_DIM*sizeof(int));
+      gParam.nColor = Nc_c*Ns_c;
+      gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+      gParam.order = QUDA_MILC_GAUGE_ORDER;
+      gParam.link_type = QUDA_COARSE_LINKS;
+      gParam.t_boundary = QUDA_PERIODIC_T;
       gParam.create = QUDA_NULL_FIELD_CREATE;
+      gParam.setPrecision( dirac.Xinv->Precision() );
+      gParam.nDim = ndim;
+      gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+      gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+      gParam.nFace = 0;
+      gParam.geometry = QUDA_SCALAR_GEOMETRY;
+      gParam.pad = 0;
+
       Xinv = new cudaGaugeField(gParam);
       Xinv->copy(*dirac.Xinv);
     }
     return *this;
   }
 
-  DiracStaggeredKD::DiracStaggeredKD(const DiracStaggered &dirac_staggered, const QudaPrecision xinv_override_prec)
+  DiracStaggeredKD::DiracStaggeredKD(const DiracStaggered &dirac_staggered, const ColorSpinorField* tmp1_, const ColorSpinorField* tmp2_, const QudaPrecision xinv_override_prec)
     : DiracStaggered(dirac_staggered), Xinv(nullptr)
   {
     // Allocate the KD inverse block (inverse coarse clover)
@@ -115,6 +155,10 @@ namespace quda {
 
     // Populate Xinv
     BuildStaggeredKahlerDiracInverse(*Xinv, *gauge, mass);
+
+    // needs its own tmp, tmp2
+    tmp1 = const_cast<ColorSpinorField*>(tmp1_);
+    tmp2 = const_cast<ColorSpinorField*>(tmp2_);
 
   }
 
@@ -227,10 +271,11 @@ namespace quda {
 
   void DiracStaggeredKD::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
+    
     bool reset = newTmp(&tmp1, in);
 
-    Mdag(*tmp1, in);
-    M(out, *tmp1);
+    M(*tmp1, in);
+    Mdag(out, *tmp1);
 
     deleteTmp(&tmp1, reset);
 
@@ -285,7 +330,7 @@ namespace quda {
 
   void DiracStaggeredKD::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
   {
-    DiracStaggeredKD::prefetch(mem_space, stream);
+    DiracStaggered::prefetch(mem_space, stream);
     if (Xinv != nullptr) Xinv->prefetch(mem_space, stream);
   }
 

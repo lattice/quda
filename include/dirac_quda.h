@@ -380,7 +380,7 @@ namespace quda {
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
 
-    virtual QudaDiracType getDiracType() { return QUDA_WILSON_DIRAC; }
+    virtual QudaDiracType getDiracType() const { return QUDA_WILSON_DIRAC; }
 
     /**
      * @brief Create the coarse Wilson operator.
@@ -422,7 +422,7 @@ namespace quda {
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 		     const QudaSolutionType) const;
 
-    virtual QudaDiracType getDiracType() { return QUDA_WILSONPC_DIRAC; }
+    virtual QudaDiracType getDiracType() const { return QUDA_WILSONPC_DIRAC; }
   };
 
   // Full clover
@@ -454,7 +454,7 @@ namespace quda {
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
 
-    virtual QudaDiracType getDiracType() { return QUDA_CLOVER_DIRAC; }
+    virtual QudaDiracType getDiracType() const { return QUDA_CLOVER_DIRAC; }
 
     /**
      *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
@@ -536,7 +536,7 @@ namespace quda {
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 		     const QudaSolutionType) const;
 
-    virtual QudaDiracType getDiracType() { return QUDA_CLOVERPC_DIRAC; }
+    virtual QudaDiracType getDiracType() const { return QUDA_CLOVERPC_DIRAC; }
 
     /**
      * @brief Create the coarse even-odd preconditioned clover
@@ -594,7 +594,7 @@ namespace quda {
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
-    virtual QudaDiracType getDiracType() { return QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC; }
+    virtual QudaDiracType getDiracType() const { return QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC; }
 
     /**
      * @brief Create the coarse clover operator
@@ -644,7 +644,7 @@ namespace quda {
     // squared op
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
-    virtual QudaDiracType getDiracType() { return QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC; }
+    virtual QudaDiracType getDiracType() const { return QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC; }
 
     /**
      * @brief Create the coarse even-odd preconditioned clover
@@ -691,7 +691,7 @@ public:
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
 
-    virtual QudaDiracType getDiracType() { return QUDA_DOMAIN_WALL_DIRAC; }
+    virtual QudaDiracType getDiracType() const { return QUDA_DOMAIN_WALL_DIRAC; }
   };
 
   // 5d Even-odd preconditioned domain wall
@@ -714,7 +714,7 @@ public:
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 		     const QudaSolutionType) const;
 
-    virtual QudaDiracType getDiracType() { return QUDA_DOMAIN_WALLPC_DIRAC; }
+    virtual QudaDiracType getDiracType() const { return QUDA_DOMAIN_WALLPC_DIRAC; }
   };
 
   // Full domain wall, but with 4-d parity ordered fields
@@ -742,7 +742,7 @@ public:
         const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
 
-    virtual QudaDiracType getDiracType() { return QUDA_DOMAIN_WALL_4D_DIRAC; }
+    virtual QudaDiracType getDiracType() const { return QUDA_DOMAIN_WALL_4D_DIRAC; }
   };
 
   // 4d Even-odd preconditioned domain wall
@@ -770,7 +770,7 @@ public:
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 		     const QudaSolutionType) const;
 
-    virtual QudaDiracType getDiracType() { return QUDA_DOMAIN_WALL_4DPC_DIRAC; }
+    virtual QudaDiracType getDiracType() const { return QUDA_DOMAIN_WALL_4DPC_DIRAC; }
   };
 
   // Full Mobius
@@ -816,7 +816,7 @@ public:
                            const QudaSolutionType) const;
       virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
 
-      virtual QudaDiracType getDiracType() { return QUDA_MOBIUS_DOMAIN_WALL_DIRAC; }
+      virtual QudaDiracType getDiracType() const { return QUDA_MOBIUS_DOMAIN_WALL_DIRAC; }
   };
 
   // 4d even-odd preconditioned Mobius domain wall
@@ -844,7 +844,7 @@ public:
 		 ColorSpinorField &b, const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
 
-    virtual QudaDiracType getDiracType() { return QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC; }
+    virtual QudaDiracType getDiracType() const { return QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC; }
   };
 
   // Full Mobius EOFA
@@ -877,7 +877,7 @@ public:
                          const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
 
-    virtual QudaDiracType getDiracType() { return QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC; }
+    virtual QudaDiracType getDiracType() const { return QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC; }
 
   };
 
@@ -902,7 +902,7 @@ public:
                  const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
 
-    virtual QudaDiracType getDiracType() { return QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC; }
+    virtual QudaDiracType getDiracType() const { return QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC; }
   };
 
   // Full twisted mass
@@ -933,7 +933,7 @@ public:
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
 
-    virtual QudaDiracType getDiracType() { return QUDA_TWISTED_MASS_DIRAC; }
+    virtual QudaDiracType getDiracType() const { return QUDA_TWISTED_MASS_DIRAC; }
 
     double Mu() const { return mu; }
 
@@ -985,7 +985,7 @@ public:
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 		     const QudaSolutionType) const;
 
-    virtual QudaDiracType getDiracType() { return QUDA_TWISTED_MASSPC_DIRAC; }
+    virtual QudaDiracType getDiracType() const { return QUDA_TWISTED_MASSPC_DIRAC; }
 
    /**
      * @brief Create the coarse even-odd preconditioned twisted-mass
@@ -1034,7 +1034,7 @@ public:
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
            const QudaSolutionType) const;
 
-    virtual QudaDiracType getDiracType() { return QUDA_TWISTED_CLOVER_DIRAC; }
+    virtual QudaDiracType getDiracType() const { return QUDA_TWISTED_CLOVER_DIRAC; }
 
     double Mu() const { return mu; }
 
@@ -1112,7 +1112,7 @@ public:
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
          const QudaSolutionType) const;
 
-    virtual QudaDiracType getDiracType() { return QUDA_TWISTED_CLOVERPC_DIRAC; }
+    virtual QudaDiracType getDiracType() const { return QUDA_TWISTED_CLOVERPC_DIRAC; }
 
     /**
      * @brief Create the coarse even-odd preconditioned twisted-clover
@@ -1169,7 +1169,7 @@ public:
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
 
-    virtual QudaDiracType getDiracType() { return QUDA_STAGGERED_DIRAC; }
+    virtual QudaDiracType getDiracType() const { return QUDA_STAGGERED_DIRAC; }
 
     /**
      * @brief Create the coarse staggered operator.
@@ -1215,7 +1215,7 @@ public:
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
 
-    virtual QudaDiracType getDiracType() { return QUDA_STAGGEREDPC_DIRAC; }
+    virtual QudaDiracType getDiracType() const { return QUDA_STAGGEREDPC_DIRAC; }
 
     virtual bool hermitian() const { return true; }
   };
@@ -1237,9 +1237,11 @@ public:
      * @ brief Build a KD op from a staggered operator, reusing the same gauge field
      * 
      * @param dirac_staggered Base staggered operator to borrow parameters from
+     * @param tmp1 Override tmp1 instead of copying what's in DiracStaggered
+     * @param tmp2 Override tmp2 instead of copying what's in DiracStaggered
      * @param xinv_override_precision Override the precision of the input gauge field for Xinv
      */
-    DiracStaggeredKD(const DiracStaggered &dirac_staggered, const QudaPrecision xinv_override_prec = QUDA_INVALID_PRECISION);
+    DiracStaggeredKD(const DiracStaggered &dirac_staggered, const ColorSpinorField* tmp1_, const ColorSpinorField* tmp2_, const QudaPrecision xinv_override_prec = QUDA_INVALID_PRECISION);
 
     /**
      * @brief Build Xinv from the current gauge field, allocating if needed.
@@ -1265,7 +1267,7 @@ public:
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
            const QudaSolutionType) const;
 
-    virtual QudaDiracType getDiracType() { return QUDA_STAGGEREDKD_DIRAC; }
+    virtual QudaDiracType getDiracType() const { return QUDA_STAGGEREDKD_DIRAC; }
 
     /**
      *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
@@ -1341,7 +1343,7 @@ public:
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
 
-    virtual QudaDiracType getDiracType() { return QUDA_ASQTAD_DIRAC; }
+    virtual QudaDiracType getDiracType() const { return QUDA_ASQTAD_DIRAC; }
 
     /**
      *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
@@ -1415,7 +1417,7 @@ public:
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
 
-    virtual QudaDiracType getDiracType() { return QUDA_ASQTADPC_DIRAC; }
+    virtual QudaDiracType getDiracType() const { return QUDA_ASQTADPC_DIRAC; }
 
     virtual bool hermitian() const { return true; }
   };
@@ -1436,9 +1438,11 @@ public:
      * @ brief Build a KD op from an improved staggered operator
      * 
      * @param dirac_staggered Base improved staggered operator to borrow parameters from
+     * @param tmp1 Override tmp1 instead of copying what's in DiracImprovedStaggered
+     * @param tmp2 Override tmp2 instead of copying what's in DiracImprovedStaggered
      * @param xinv_override_precision Override the precision of the input gauge field for Xinv
      */
-    DiracImprovedStaggeredKD(const DiracImprovedStaggered &dirac_staggered, const QudaPrecision xinv_override_prec = QUDA_INVALID_PRECISION);
+    DiracImprovedStaggeredKD(const DiracImprovedStaggered &dirac_staggered, const ColorSpinorField* tmp1_, const ColorSpinorField* tmp2_, const QudaPrecision xinv_override_prec = QUDA_INVALID_PRECISION);
 
     virtual void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
 
@@ -1464,7 +1468,7 @@ public:
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
            const QudaSolutionType) const;
 
-    virtual QudaDiracType getDiracType() { return QUDA_ASQTADKD_DIRAC; }
+    virtual QudaDiracType getDiracType() const { return QUDA_ASQTADKD_DIRAC; }
 
     /**
      *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
@@ -1654,7 +1658,7 @@ public:
 
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
 
-    virtual QudaDiracType getDiracType() { return QUDA_COARSE_DIRAC; }
+    virtual QudaDiracType getDiracType() const { return QUDA_COARSE_DIRAC; }
 
     virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
                               cudaCloverField *clover_in)
@@ -1727,7 +1731,7 @@ public:
 		 const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
 
-    virtual QudaDiracType getDiracType() { return QUDA_COARSEPC_DIRAC; }
+    virtual QudaDiracType getDiracType() const { return QUDA_COARSEPC_DIRAC; }
 
     /**
      * @brief Create the coarse even-odd preconditioned coarse
@@ -1784,7 +1788,7 @@ public:
 			     const QudaSolutionType) const;
     virtual bool hermitian() const { return true; }
 
-    virtual QudaDiracType getDiracType() { return QUDA_GAUGE_LAPLACE_DIRAC; }
+    virtual QudaDiracType getDiracType() const { return QUDA_GAUGE_LAPLACE_DIRAC; }
   };
 
   /**
@@ -1807,7 +1811,7 @@ public:
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
     virtual bool hermitian() const { return true; }
 
-    virtual QudaDiracType getDiracType() { return QUDA_GAUGE_LAPLACEPC_DIRAC; }
+    virtual QudaDiracType getDiracType() const { return QUDA_GAUGE_LAPLACEPC_DIRAC; }
   };
 
   /**
@@ -1841,7 +1845,7 @@ public:
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
 
-    virtual QudaDiracType getDiracType() { return QUDA_GAUGE_COVDEV_DIRAC; }
+    virtual QudaDiracType getDiracType() const { return QUDA_GAUGE_COVDEV_DIRAC; }
 
   };
 
@@ -1963,21 +1967,24 @@ public:
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
     {
-      dirac->tmp1 = &tmp;
+      bool reset1 = false;
+      if (!dirac->tmp1) { dirac->tmp1 = &tmp; reset1 = true; }
       dirac->MdagM(out, in);
       if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
-      dirac->tmp1 = NULL;
+      if (reset1) { dirac->tmp1 = NULL; reset1 = false; }
     }
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
 			   ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
     {
-      dirac->tmp1 = &Tmp1;
-      dirac->tmp2 = &Tmp2;
+      bool reset1 = false;
+      bool reset2 = false;
+      if (!dirac->tmp1) { dirac->tmp1 = &Tmp1; reset1 = true; }
+      if (!dirac->tmp2) { dirac->tmp2 = &Tmp2; reset2 = true; }
       dirac->MdagM(out, in);
       if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
-      dirac->tmp2 = NULL;
-      dirac->tmp1 = NULL;
+      if (reset2) { dirac->tmp2 = NULL; reset2 = false; }
+      if (reset1) { dirac->tmp1 = NULL; reset1 = false; }
     }
  
     int getStencilSteps() const
@@ -2000,20 +2007,23 @@ public:
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
     {
-      dirac->tmp1 = &tmp;
+      bool reset1 = false;
+      if (!dirac->tmp1) { dirac->tmp1 = &tmp; reset1 = true; }
       dirac->MdagMLocal(out, in);
       if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
-      dirac->tmp1 = NULL;
+      if (reset1) { dirac->tmp1 = NULL; reset1 = false; }
     }
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
     {
-      dirac->tmp1 = &Tmp1;
-      dirac->tmp2 = &Tmp2;
+      bool reset1 = false;
+      bool reset2 = false;
+      if (!dirac->tmp1) { dirac->tmp1 = &Tmp1; reset1 = true; }
+      if (!dirac->tmp2) { dirac->tmp2 = &Tmp2; reset2 = true; }
       dirac->MdagMLocal(out, in);
       if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
-      dirac->tmp2 = NULL;
-      dirac->tmp1 = NULL;
+      if (reset2) { dirac->tmp2 = NULL; reset2 = false; }
+      if (reset1) { dirac->tmp1 = NULL; reset1 = false; }
     }
 
     int getStencilSteps() const
@@ -2038,21 +2048,24 @@ public:
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
     {
-      dirac->tmp1 = &tmp;
+      bool reset1 = false;
+      if (!dirac->tmp1) { dirac->tmp1 = &tmp; reset1 = true; }
       dirac->MMdag(out, in);
       if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
-      dirac->tmp1 = NULL;
+      if (reset1) { dirac->tmp1 = NULL; reset1 = false; }
     }
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
 			   ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
     {
-      dirac->tmp1 = &Tmp1;
-      dirac->tmp2 = &Tmp2;
+      bool reset1 = false;
+      bool reset2 = false;
+      if (!dirac->tmp1) { dirac->tmp1 = &Tmp1; reset1 = true; }
+      if (!dirac->tmp2) { dirac->tmp2 = &Tmp2; reset2 = true; }
       dirac->MMdag(out, in);
       if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
-      dirac->tmp2 = NULL;
-      dirac->tmp1 = NULL;
+      if (reset2) { dirac->tmp2 = NULL; reset2 = false; }
+      if (reset1) { dirac->tmp1 = NULL; reset1 = false; }
     }
 
     int getStencilSteps() const
@@ -2078,21 +2091,24 @@ public:
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
     {
-      dirac->tmp1 = &tmp;
+      bool reset1 = false;
+      if (!dirac->tmp1) { dirac->tmp1 = &tmp; reset1 = true; }
       dirac->Mdag(out, in);
       if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
-      dirac->tmp1 = NULL;
+      if (reset1) { dirac->tmp1 = NULL; reset1 = false; }
     }
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
 		    ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
     {
-      dirac->tmp1 = &Tmp1;
-      dirac->tmp2 = &Tmp2;
+      bool reset1 = false;
+      bool reset2 = false;
+      if (!dirac->tmp1) { dirac->tmp1 = &Tmp1; reset1 = true; }
+      if (!dirac->tmp2) { dirac->tmp2 = &Tmp2; reset2 = true; }
       dirac->Mdag(out, in);
       if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
-      dirac->tmp2 = NULL;
-      dirac->tmp1 = NULL;
+      if (reset2) { dirac->tmp2 = NULL; reset2 = false; }
+      if (reset1) { dirac->tmp1 = NULL; reset1 = false; }
     }
 
     int getStencilSteps() const

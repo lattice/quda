@@ -217,7 +217,8 @@ namespace quda {
     if (out.SiteSubset() != QUDA_FULL_SITE_SUBSET || out.SiteSubset() != QUDA_FULL_SITE_SUBSET)
       errorQuda("There is no meaning to applying the KD inverse to a single parity field");
 
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Applying StaggeredKD...\n");
+    // FIXME: remove
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Applying StaggeredKD...\n");
 
     // Instantiate based on ColorSpinor precision
     // We don't have a constraint on the precision of Xinv matching
@@ -248,7 +249,7 @@ namespace quda {
       errorQuda("Unsupported precision %d\n", precision);
     }
 
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("...done applying StaggeredKD\n");
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("...done applying StaggeredKD\n");
 
 #else
     errorQuda("Staggered fermion support has not been built");

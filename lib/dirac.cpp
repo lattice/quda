@@ -83,7 +83,7 @@ namespace quda {
   void Dirac::deleteTmp(ColorSpinorField **a, const bool &reset) const {
     if (reset) {
       delete *a;
-      *a = NULL;
+      *a = nullptr;
     }
   }
 

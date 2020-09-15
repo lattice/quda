@@ -79,13 +79,14 @@ namespace quda {
       total_block_size *= geo_bs[d];
     }
 
-    if (total_block_size == 1) errorQuda("Total geometric block size is 1");
+    // Aggregation size is "technically" 1 for optimized KD
+    if (total_block_size == 1 && transfer_type != QUDA_TRANSFER_OPTIMIZED_KD) errorQuda("Total geometric block size is 1 but transfer type isn't optimized-kd");
 
     std::string block_str = std::to_string(geo_bs[0]);
     for (int d = 1; d < ndim; d++) block_str += " x " + std::to_string(geo_bs[d]);
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer: using block size %s\n", block_str.c_str());
 
-    if (transfer_type == QUDA_TRANSFER_COARSE_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD) {
+    if (transfer_type == QUDA_TRANSFER_COARSE_KD) {
       for (int d = 0; d < 4; d++) {
         if (geo_bs[d] != 2)
           errorQuda("Invalid staggered KD block size %d for dimension %d", geo_bs[d], d);
@@ -351,7 +352,7 @@ namespace quda {
       if (in.SiteSubset() != QUDA_FULL_SITE_SUBSET)
         errorQuda("Optimized KD op only supports full-parity spinors");
 
-      if (output->VolumeCB() != input->Volume())
+      if (output->VolumeCB() != input->VolumeCB())
         errorQuda("Optimized KD transfer is only between equal volumes");
 
       // the optimized KD op acts on fine spinors
@@ -417,7 +418,7 @@ namespace quda {
       if (out.SiteSubset() != QUDA_FULL_SITE_SUBSET)
         errorQuda("Optimized KD op only supports full-parity spinors");
 
-      if (output->VolumeCB() != input->Volume())
+      if (output->VolumeCB() != input->VolumeCB())
         errorQuda("Optimized KD transfer is only between equal volumes");
 
       // the optimized KD op acts on fine spinors
