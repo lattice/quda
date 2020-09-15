@@ -14,7 +14,7 @@
 namespace quda {
 
   MR::MR(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matSloppy, param, profile),
+    Solver(mat, matSloppy, matSloppy, matSloppy, param, profile),
     rp(nullptr),
     r_sloppy(nullptr),
     Arp(nullptr),

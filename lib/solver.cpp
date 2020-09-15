@@ -10,11 +10,12 @@ namespace quda {
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a %s solver\n", type);
   }
 
-  Solver::Solver(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
-                 TimeProfile &profile) :
+  Solver::Solver(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+                 const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
     mat(mat),
     matSloppy(matSloppy),
     matPrecon(matPrecon),
+    matEig(matEig),
     param(param),
     profile(profile),
     node_parity(0),
@@ -38,7 +39,7 @@ namespace quda {
 
   // solver factory
   Solver *Solver::create(SolverParam &param, const DiracMatrix &mat, const DiracMatrix &matSloppy,
-                         const DiracMatrix &matPrecon, TimeProfile &profile)
+                         const DiracMatrix &matPrecon, const DiracMatrix &matEig, TimeProfile &profile)
   {
     Solver *solver = nullptr;
 
@@ -51,11 +52,11 @@ namespace quda {
     switch (param.inv_type) {
     case QUDA_CG_INVERTER:
       report("CG");
-      solver = new CG(mat, matSloppy, matPrecon, param, profile);
+      solver = new CG(mat, matSloppy, matPrecon, matEig, param, profile);
       break;
     case QUDA_BICGSTAB_INVERTER:
       report("BiCGstab");
-      solver = new BiCGstab(mat, matSloppy, matPrecon, param, profile);
+      solver = new BiCGstab(mat, matSloppy, matPrecon, matEig, param, profile);
       break;
     case QUDA_GCR_INVERTER:
       report("GCR");
@@ -63,26 +64,26 @@ namespace quda {
 	Solver *mg = param.mg_instance ? static_cast<MG*>(param.preconditioner) : static_cast<multigrid_solver*>(param.preconditioner)->mg;
 	// FIXME dirty hack to ensure that preconditioner precision set in interface isn't used in the outer GCR-MG solver
 	if (!param.mg_instance) param.precision_precondition = param.precision_sloppy;
-	solver = new GCR(mat, *(mg), matSloppy, matPrecon, param, profile);
+        solver = new GCR(mat, *(mg), matSloppy, matPrecon, matEig, param, profile);
       } else {
-	solver = new GCR(mat, matSloppy, matPrecon, param, profile);
+        solver = new GCR(mat, matSloppy, matPrecon, matEig, param, profile);
       }
       break;
     case QUDA_CA_CG_INVERTER:
       report("CA-CG");
-      solver = new CACG(mat, matSloppy, matPrecon, param, profile);
+      solver = new CACG(mat, matSloppy, matPrecon, matEig, param, profile);
       break;
     case QUDA_CA_CGNE_INVERTER:
       report("CA-CGNE");
-      solver = new CACGNE(mat, matSloppy, matPrecon, param, profile);
+      solver = new CACGNE(mat, matSloppy, matPrecon, matEig, param, profile);
       break;
     case QUDA_CA_CGNR_INVERTER:
       report("CA-CGNR");
-      solver = new CACGNR(mat, matSloppy, matPrecon, param, profile);
+      solver = new CACGNR(mat, matSloppy, matPrecon, matEig, param, profile);
       break;
     case QUDA_CA_GCR_INVERTER:
       report("CA-GCR");
-      solver = new CAGCR(mat, matSloppy, matPrecon, param, profile);
+      solver = new CAGCR(mat, matSloppy, matPrecon, matEig, param, profile);
       break;
     case QUDA_MR_INVERTER:
       report("MR");
@@ -102,7 +103,7 @@ namespace quda {
       break;
     case QUDA_PCG_INVERTER:
       report("PCG");
-      solver = new PreconCG(mat, matSloppy, matPrecon, param, profile);
+      solver = new PreconCG(mat, matSloppy, matPrecon, matEig, param, profile);
       break;
     case QUDA_MPCG_INVERTER:
       report("MPCG");
@@ -137,11 +138,11 @@ namespace quda {
       break;
     case QUDA_CGNE_INVERTER:
       report("CGNE");
-      solver = new CGNE(mat, matSloppy, matPrecon, param, profile);
+      solver = new CGNE(mat, matSloppy, matPrecon, matEig, param, profile);
       break;
     case QUDA_CGNR_INVERTER:
       report("CGNR");
-      solver = new CGNR(mat, matSloppy, matPrecon, param, profile);
+      solver = new CGNR(mat, matSloppy, matPrecon, matEig, param, profile);
       break;
     case QUDA_CG3_INVERTER:
       report("CG3");
@@ -187,8 +188,8 @@ namespace quda {
     // Clone from an existing vector
     ColorSpinorParam csParam(meta);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
-    // This is the vector precision used by matPrecon
-    csParam.setPrecision(param.precision_precondition, QUDA_INVALID_PRECISION, true);
+    // This is the vector precision used by matEig
+    csParam.setPrecision(param.precision_eigensolver, QUDA_INVALID_PRECISION, true);
 
     if (deflate_compute) {
       evecs.reserve(param.eig_param.n_conv);
@@ -359,7 +360,7 @@ namespace quda {
     ColorSpinorParam csParam(*evecs[0]);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     // This is the vector precision used by matResidual
-    csParam.setPrecision(param.precision_precondition, QUDA_INVALID_PRECISION, true);
+    csParam.setPrecision(param.precision_eigensolver, QUDA_INVALID_PRECISION, true);
     for (int i = param.eig_param.n_conv; i < 2 * param.eig_param.n_conv; i++) {
       evecs.push_back(ColorSpinorField::Create(csParam));
     }

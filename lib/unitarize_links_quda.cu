@@ -347,7 +347,6 @@ namespace {
     {
       apply(0);
       qudaDeviceSynchronize(); // need to synchronize to ensure failure write has completed
-      checkCudaError();
     }
 
     void apply(const qudaStream_t &stream) {
@@ -358,7 +357,7 @@ namespace {
     void preTune() { if (arg.in.gauge == arg.out.gauge) arg.out.save(); }
     void postTune() {
       if (arg.in.gauge == arg.out.gauge) arg.out.load();
-      cudaMemset(arg.fails, 0, sizeof(int)); // reset fails counter
+      qudaMemset(arg.fails, 0, sizeof(int)); // reset fails counter
     }
 
     long long flops() const {
@@ -437,7 +436,6 @@ namespace {
     {
       apply(0);
       qudaDeviceSynchronize();
-      checkCudaError();
     }
 
     void apply(const qudaStream_t &stream) {
@@ -448,7 +446,7 @@ namespace {
     void preTune() { arg.u.save(); }
     void postTune() {
       arg.u.load();
-      cudaMemset(arg.fails, 0, sizeof(int)); // reset fails counter
+      qudaMemset(arg.fails, 0, sizeof(int)); // reset fails counter
     }
 
     long long flops() const { return 0; } // depends on number of iterations

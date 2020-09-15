@@ -235,7 +235,7 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
     const int gpuid = comm_gpuid();
     cudaDeviceProp prop;
     cudaGetDeviceProperties(&prop, gpuid);
-    if(!prop.unifiedAddressing) return;
+    if (!prop.unifiedAddressing) return;
 
     comm_set_neighbor_ranks();
 
@@ -298,7 +298,6 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
   peer2peer_present = comm_peer2peer_enabled_global();
 
   checkCudaErrorNoSync();
-  return;
 }
 
 bool comm_peer2peer_present() { return peer2peer_present; }
@@ -414,15 +413,12 @@ static int neighbor_rank[2][4] = { {-1,-1,-1,-1},
 
 static bool neighbors_cached = false;
 
-void comm_set_neighbor_ranks(Topology *topo){
-
+void comm_set_neighbor_ranks(Topology *topo)
+{
   if(neighbors_cached) return;
 
   Topology *topology = topo ? topo : default_topo; // use default topology if topo is NULL
-  if(!topology){
-    errorQuda("Topology not specified");
-    return;
-  }
+  if (!topology) errorQuda("Topology not specified");
      
   for(int d=0; d<4; ++d){
     int pos_displacement[QUDA_MAX_DIM] = {};
@@ -433,7 +429,6 @@ void comm_set_neighbor_ranks(Topology *topo){
     neighbor_rank[1][d] = comm_rank_displaced(topology, pos_displacement);
   }
   neighbors_cached = true;
-  return;
 }
 
 int comm_neighbor_rank(int dir, int dim){
@@ -501,11 +496,7 @@ MsgHandle *comm_declare_send_relative_(const char *func, const char *file, int l
   } else {
     // test this memory allocation is ok by doing a memcpy from it
     void *tmp = device_malloc(nbytes);
-    cudaError_t err = cudaMemcpy(tmp, buffer, nbytes, cudaMemcpyDeviceToDevice);
-    if (err != cudaSuccess) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir, nbytes);
-      errorQuda("aborting with error %s", cudaGetErrorString(err));
-    }
+    qudaMemcpy(tmp, buffer, nbytes, cudaMemcpyDeviceToDevice);
     device_free(tmp);
   }
 #endif
@@ -535,11 +526,7 @@ MsgHandle *comm_declare_receive_relative_(const char *func, const char *file, in
     }
   } else {
     // test this memory allocation is ok by doing a memset
-    cudaError_t err = cudaMemset(buffer, 0, nbytes);
-    if (err != cudaSuccess) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir, nbytes);
-      errorQuda("aborting with error %s", cudaGetErrorString(err));
-    }
+    qudaMemset(buffer, 0, nbytes);
   }
 #endif
 
@@ -573,12 +560,7 @@ MsgHandle *comm_declare_strided_send_relative_(const char *func, const char *fil
   } else {
     // test this memory allocation is ok by doing a memcpy from it
     void *tmp = device_malloc(blksize*nblocks);
-    cudaError_t err = cudaMemcpy2D(tmp, blksize, buffer, stride, blksize, nblocks, cudaMemcpyDeviceToDevice);
-    if (err != cudaSuccess) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n",
-		 file, line, func, dim, dir, blksize, nblocks, stride);
-      errorQuda("aborting with error %s", cudaGetErrorString(err));
-    }
+    qudaMemcpy2D(tmp, blksize, buffer, stride, blksize, nblocks, cudaMemcpyDeviceToDevice);
     device_free(tmp);
   }
 #endif
@@ -611,12 +593,7 @@ MsgHandle *comm_declare_strided_receive_relative_(const char *func, const char *
     }
   } else {
     // test this memory allocation is ok by doing a memset
-    cudaError_t err = cudaMemset2D(buffer, stride, 0, blksize, nblocks);
-    if (err != cudaSuccess) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n",
-		 file, line, func, dim, dir, blksize, nblocks, stride);
-      errorQuda("aborting with error %s", cudaGetErrorString(err));
-    }
+    qudaMemset2D(buffer, stride, 0, blksize, nblocks);
   }
 #endif
 

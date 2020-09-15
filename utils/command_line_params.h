@@ -147,7 +147,7 @@ template <typename T> std::string inline get_string(CLI::TransformPairs<T> &map,
 // }
 // parameters
 
-extern int device;
+extern int device_ordinal;
 extern int rank_order;
 extern bool native_blas_lapack;
 extern std::array<int, 4> gridsize_from_cmdline;
@@ -155,10 +155,12 @@ extern std::array<int, 4> dim_partitioned;
 extern QudaReconstructType link_recon;
 extern QudaReconstructType link_recon_sloppy;
 extern QudaReconstructType link_recon_precondition;
+extern QudaReconstructType link_recon_eigensolver;
 extern QudaPrecision prec;
 extern QudaPrecision prec_sloppy;
 extern QudaPrecision prec_refinement_sloppy;
 extern QudaPrecision prec_precondition;
+extern QudaPrecision prec_eigensolver;
 extern QudaPrecision prec_null;
 extern QudaPrecision prec_ritz;
 extern QudaVerbosity verbosity;

@@ -83,7 +83,6 @@ namespace quda {
 #endif
 
         apply(*blasStream);
-        checkCudaError();
 
         blas::bytes += bytes();
         blas::flops += flops();

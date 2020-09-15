@@ -143,24 +143,18 @@ namespace quda {
     }
   }
 
-  /*! @brief Restore CURAND array states initialization */
-  void RNG::restore() {
-    cudaError_t err = cudaMemcpy(state, backup_state, size * sizeof(cuRNGState), cudaMemcpyHostToDevice);
-    if (err != cudaSuccess) {
-      host_free(backup_state);
-      errorQuda("Failed to restore curand rng states array\n");
-    }
-    host_free(backup_state);
+  /*! @brief Backup CURAND array states initialization */
+  void RNG::backup()
+  {
+    backup_state = (cuRNGState *)safe_malloc(size * sizeof(cuRNGState));
+    qudaMemcpy(backup_state, state, size * sizeof(cuRNGState), cudaMemcpyDeviceToHost);
   }
 
-  /*! @brief Backup CURAND array states initialization */
-  void RNG::backup() {
-    backup_state = (cuRNGState *)safe_malloc(size * sizeof(cuRNGState));
-    cudaError_t err = cudaMemcpy(backup_state, state, size * sizeof(cuRNGState), cudaMemcpyDeviceToHost);
-    if (err != cudaSuccess) {
-      host_free(backup_state);
-      errorQuda("Failed to backup curand rng states array\n");
-    }
+  /*! @brief Restore CURAND array states initialization */
+  void RNG::restore()
+  {
+    qudaMemcpy(state, backup_state, size * sizeof(cuRNGState), cudaMemcpyHostToDevice);
+    host_free(backup_state);
   }
 
 } // namespace quda

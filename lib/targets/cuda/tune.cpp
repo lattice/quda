@@ -839,7 +839,9 @@ namespace quda
         cudaEventDestroy(end);
 
         if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("PostTune %s\n", key.name);
+        tuning = true;
         tunable.postTune();
+        tuning = false;
         param = best_param;
         tunecache[key] = best_param;
       }

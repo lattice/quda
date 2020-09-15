@@ -58,7 +58,7 @@ void createNoisyLinkCPU(void** field, QudaPrecision prec, int seed)
 // set the layout, etc.
 static void hisq_force_init()
 {
-  initQuda(device);
+  initQuda(device_ordinal);
 
   gaugeParam.X[0] = xdim;
   gaugeParam.X[1] = ydim;
@@ -132,7 +132,7 @@ static void hisq_force_test()
 
   fermion_force::setUnitarizeForceConstants(unitarize_eps, hisq_force_filter, max_det_error, allow_svd, svd_only, svd_rel_err, svd_abs_err);
 
-  int* num_failures_dev = (int*)device_malloc(sizeof(int));
+  int *num_failures_dev = (int *)device_malloc(sizeof(int));
   qudaMemset(num_failures_dev, 0, sizeof(int));
 
   printfQuda("Calling unitarizeForce\n");

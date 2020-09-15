@@ -327,8 +327,6 @@ namespace quda {
 	src.GhostExchange() != QUDA_GHOST_EXCHANGE_PAD) {
       exchangeGhost(geometry == QUDA_VECTOR_GEOMETRY ? QUDA_LINK_BACKWARDS : QUDA_LINK_BIDIRECTIONAL);
     }
-
-    checkCudaError();
   }
 
   void cpuGaugeField::setGauge(void **gauge_)

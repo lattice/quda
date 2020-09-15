@@ -175,7 +175,7 @@ int main(int argc, char **argv)
   display_test_info();
 
   // initialize the QUDA library
-  initQuda(device);
+  initQuda(device_ordinal);
 
   // *** Everything between here and the timer is application specific
   setDims(gauge_param.X);

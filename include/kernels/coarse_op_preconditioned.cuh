@@ -1,16 +1,26 @@
+#pragma once
+
 #include <gauge_field_order.h>
 #include <index_helper.cuh>
 #include <matrix_tile.cuh>
 
 namespace quda {
 
-  template <typename Float_, typename PreconditionedGauge, typename Gauge, int n_, int M_, int N_> struct CalculateYhatArg {
+  template <typename Float_, typename PreconditionedGauge, typename Gauge, typename GaugeInv, int n_, int M_, int N_>
+  struct CalculateYhatArg {
     using Float = Float_;
-    TileSize<n_, n_, n_, M_, N_, 1> tile;
+    using yhatTileType = TileSize<n_, n_, n_, M_, N_, 1>;
+    yhatTileType tile;
+
+    static constexpr int M = n_;
+    static constexpr int N = n_;
+    static constexpr int K = n_;
+
+    static constexpr bool is_mma_compatible = PreconditionedGauge::is_mma_compatible;
 
     PreconditionedGauge Yhat;
     const Gauge Y;
-    const Gauge Xinv;
+    const GaugeInv Xinv;
     int dim[QUDA_MAX_DIM];
     int comm_dim[QUDA_MAX_DIM];
     int nFace;
@@ -18,14 +28,9 @@ namespace quda {
     Float *max_h;  // host scalar that stores the maximum element of Yhat. Pointer b/c pinned.
     Float *max_d; // device scalar that stores the maximum element of Yhat
 
-    CalculateYhatArg(const PreconditionedGauge &Yhat, const Gauge Y, const Gauge Xinv, const int *dim,
+    CalculateYhatArg(const PreconditionedGauge &Yhat, const Gauge Y, const GaugeInv Xinv, const int *dim,
                      const int *comm_dim, int nFace) :
-      Yhat(Yhat),
-      Y(Y),
-      Xinv(Xinv),
-      nFace(nFace),
-      max_h(nullptr),
-      max_d(nullptr)
+      Yhat(Yhat), Y(Y), Xinv(Xinv), nFace(nFace), max_h(nullptr), max_d(nullptr)
     {
       for (int i=0; i<4; i++) {
         this->comm_dim[i] = comm_dim[i];
@@ -53,7 +58,7 @@ namespace quda {
       auto yHat = make_tile_C<complex,true>(arg.tile);
 
 #pragma unroll
-      for (int k = 0; k<arg.tile.k; k+=arg.tile.K) {
+      for (int k = 0; k < Arg::yhatTileType::k; k += Arg::yhatTileType::K) {
         auto Y = make_tile_A<complex, true>(arg.tile);
         Y.load(arg.Y, d, 1-parity, ghost_idx, i0, k);
 
@@ -75,7 +80,7 @@ namespace quda {
       auto yHat = make_tile_C<complex,false>(arg.tile);
 
 #pragma unroll
-      for (int k = 0; k<arg.tile.k; k+=arg.tile.K) {
+      for (int k = 0; k < Arg::yhatTileType::k; k += Arg::yhatTileType::K) {
         auto Y = make_tile_A<complex, false>(arg.tile);
         Y.load(arg.Y, d, 1-parity, back_idx, i0, k);
 
@@ -95,7 +100,7 @@ namespace quda {
       auto yHat = make_tile_C<complex, false>(arg.tile);
 
 #pragma unroll
-      for (int k = 0; k<arg.tile.k; k+=arg.tile.K) {
+      for (int k = 0; k < Arg::yhatTileType::k; k += Arg::yhatTileType::K) {
         auto X = make_tile_A<complex, false>(arg.tile);
         X.load(arg.Xinv, 0, parity, x_cb, i0, k);
 
@@ -121,8 +126,8 @@ namespace quda {
       for (int parity=0; parity<2; parity++) {
 #pragma omp parallel for
         for (int x_cb = 0; x_cb < arg.Y.VolumeCB(); x_cb++) {
-          for (int i = 0; i < arg.tile.m; i+=arg.tile.M)
-            for (int j = 0; j < arg.tile.n; j+=arg.tile.N) {
+          for (int i = 0; i < Arg::yhatTileType::m; i += Arg::yhatTileType::M)
+            for (int j = 0; j < Arg::yhatTileType::n; j += Arg::yhatTileType::N) {
               typename Arg::Float max_x = computeYhat<compute_max_only>(arg, d, x_cb, parity, i, j);
               if (compute_max_only) max = max > max_x ? max : max_x;
             }
@@ -137,16 +142,17 @@ namespace quda {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.Y.VolumeCB()) return;
     int i_parity = blockDim.y*blockIdx.y + threadIdx.y;
-    if (i_parity >= 2*arg.tile.M_tiles) return;
+    if (i_parity >= 2 * Arg::yhatTileType::M_tiles) return;
     int j_d = blockDim.z*blockIdx.z + threadIdx.z;
-    if (j_d >= 4*arg.tile.N_tiles) return;
+    if (j_d >= 4 * Arg::yhatTileType::N_tiles) return;
 
-    int i = i_parity % arg.tile.M_tiles;
-    int parity = i_parity / arg.tile.M_tiles;
-    int j = j_d % arg.tile.N_tiles;
-    int d = j_d / arg.tile.N_tiles;
+    int i = i_parity % Arg::yhatTileType::M_tiles;
+    int parity = i_parity / Arg::yhatTileType::M_tiles;
+    int j = j_d % Arg::yhatTileType::N_tiles;
+    int d = j_d / Arg::yhatTileType::N_tiles;
 
-    typename Arg::Float max = computeYhat<compute_max_only>(arg, d, x_cb, parity, i * arg.tile.M, j * arg.tile.N);
+    typename Arg::Float max
+      = computeYhat<compute_max_only>(arg, d, x_cb, parity, i * Arg::yhatTileType::M, j * Arg::yhatTileType::N);
     if (compute_max_only) atomicAbsMax(arg.max_d, max);
   }
 
