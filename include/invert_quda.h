@@ -527,17 +527,9 @@ namespace quda {
 
     virtual void train_param(Solver &null, ColorSpinorField &in) { errorQuda("NOT implemented."); }
 
-    void set_compute_null_vector(bool true_or_false)
-    {
-      param.compute_null_vector = true_or_false ? QUDA_COMPUTE_NULL_VECTOR_YES : QUDA_COMPUTE_NULL_VECTOR_NO;
-    }
-
-    void set_use_initial_guess(bool true_or_false)
-    {
-      param.use_init_guess = true_or_false ? QUDA_USE_INIT_GUESS_YES : QUDA_USE_INIT_GUESS_NO;
-    }
-
     void set_tol(double tol) { param.tol = tol; }
+
+    void set_maxiter(int maxiter) { param.maxiter = maxiter; }
 
     const DiracMatrix& M() { return mat; }
     const DiracMatrix& Msloppy() { return matSloppy; }

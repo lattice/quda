@@ -153,6 +153,7 @@ namespace quda
         ColorSpinorParam csParam(in);
         csParam.x[4] = Ls_base;
         csParam.create = QUDA_NULL_FIELD_CREATE;
+        // TODO: The precision is currently hardcoded.
         csParam.setPrecision(QUDA_HALF_PRECISION);
 
         forward_tmp = new cudaColorSpinorField(csParam);
@@ -167,6 +168,7 @@ namespace quda
       cudaColorSpinorField null_x(csParam);
 
       std::vector<ColorSpinorField *> B(16);
+      // TODO: The precision is currently hardcoded.
       csParam.setPrecision(QUDA_HALF_PRECISION);
       for (auto &pB : B) { pB = new cudaColorSpinorField(csParam); }
       auto rng = new RNG(*B[0], 1234);
@@ -174,6 +176,7 @@ namespace quda
 
       printfQuda("Generating Null Space Vectors ... \n");
       spinorNoise(null_rhs, *rng, QUDA_NOISE_UNIFORM);
+      // TODO: Currently this only work for PreconCG.
       static_cast<PreconCG &>(null)(null_x, null_rhs, B, 400);
       for (auto &pB : B) {
         printfQuda("pB norm2 = %12.8e\n", blas::norm2(null_rhs));
@@ -183,13 +186,10 @@ namespace quda
       bool global_reduction = commGlobalReduction();
       commGlobalReductionSet(false);
 
-      // device_param.resize(param_size); // 2 for complex
-
       cudaColorSpinorField chi(csParam);
       cudaColorSpinorField tmp(csParam);
       cudaColorSpinorField theta(csParam);
       cudaColorSpinorField lambda(csParam);
-
       cudaColorSpinorField Mchi(csParam);
 
       double residual = 0.0;
@@ -220,9 +220,7 @@ namespace quda
 
       Tp d1(param_size);
       Tp d2(param_size);
-
       Tp P(param_size);
-
       Tp D_old(param_size);
 
       // double pmu = 0.0;
@@ -244,7 +242,6 @@ namespace quda
           chi2 += cost(ref, base, chi, *phi);
           // ATx(ATphi, *phi, T);
           madwf_ml::transfer_5d_hh(*forward_tmp, *phi, device_param, false);
-
           base(ATphi, *forward_tmp);
 
           // inner_dslash(Mchi, chi);
@@ -252,7 +249,6 @@ namespace quda
 
           // ATx(ATMchi, Mchi, T);
           madwf_ml::transfer_5d_hh(*forward_tmp, Mchi, device_param, false);
-
           base(ATMchi, *forward_tmp);
 
           // d1 = A * T * phi -x- M * chi
