@@ -1,5 +1,4 @@
-#ifndef _COLOR_SPINOR_FIELD_H
-#define _COLOR_SPINOR_FIELD_H
+#pragma once
 
 #include <quda_internal.h>
 #include <quda.h>
@@ -1178,5 +1177,3 @@ namespace quda {
 #define checkLength(...) Length_(__func__, __FILE__, __LINE__, __VA_ARGS__)
 
 } // namespace quda
-
-#endif // _COLOR_SPINOR_FIELD_H

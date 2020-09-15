@@ -1,5 +1,4 @@
-#ifndef _CLOVER_QUDA_H
-#define _CLOVER_QUDA_H
+#pragma once
 
 #include <quda_internal.h>
 #include <lattice_field.h>
@@ -456,7 +455,4 @@ namespace quda {
 #endif
   }
 
-
 } // namespace quda
-
-#endif // _CLOVER_QUDA_H

@@ -1,9 +1,5 @@
-#include <quda_internal.h>
-#include <tune_quda.h>
 #include <gauge_field.h>
-#include <jitify_helper.cuh>
 #include <instantiate.h>
-
 #include <tunable_reduction.h>
 #include <kernels/gauge_qcharge.cuh>
 
