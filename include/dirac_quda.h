@@ -244,9 +244,18 @@ namespace quda {
     // required methods to use e-o preconditioning for solving full system
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
 			 ColorSpinorField &x, ColorSpinorField &b,
-			 const QudaSolutionType) const = 0;
+			 const QudaSolutionType solType) const = 0;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-			     const QudaSolutionType) const = 0;
+			     const QudaSolutionType solType) const = 0;
+
+    // special prepare/recon methods that go into PreconditionedSolve in MG
+    virtual void prepareSpecialMG(ColorSpinorField* &src, ColorSpinorField* &sol,
+       ColorSpinorField &x, ColorSpinorField &b,
+       const QudaSolutionType solType) const { prepare(src, sol, x, b, solType); }
+    virtual void reconstructSpecialMG(ColorSpinorField &x, const ColorSpinorField &b,
+           const QudaSolutionType solType) const { reconstruct(x, b, solType); }
+
+
     void setMass(double mass){ this->mass = mass;}
 
     // Dirac operator factory
@@ -1267,6 +1276,12 @@ public:
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
            const QudaSolutionType) const;
 
+    virtual void prepareSpecialMG(ColorSpinorField* &src, ColorSpinorField* &sol,
+       ColorSpinorField &x, ColorSpinorField &b,
+       const QudaSolutionType solType) const;
+    virtual void reconstructSpecialMG(ColorSpinorField &x, const ColorSpinorField &b,
+           const QudaSolutionType solType) const;
+
     virtual QudaDiracType getDiracType() const { return QUDA_STAGGEREDKD_DIRAC; }
 
     /**
@@ -1467,6 +1482,12 @@ public:
        const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
            const QudaSolutionType) const;
+
+    virtual void prepareSpecialMG(ColorSpinorField* &src, ColorSpinorField* &sol,
+       ColorSpinorField &x, ColorSpinorField &b,
+       const QudaSolutionType solType) const;
+    virtual void reconstructSpecialMG(ColorSpinorField &x, const ColorSpinorField &b,
+           const QudaSolutionType solType) const;
 
     virtual QudaDiracType getDiracType() const { return QUDA_ASQTADKD_DIRAC; }
 

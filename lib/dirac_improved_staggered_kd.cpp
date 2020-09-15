@@ -299,6 +299,38 @@ namespace quda {
     sol = &x;  
   }
 
+  void DiracImprovedStaggeredKD::prepareSpecialMG(ColorSpinorField* &src, ColorSpinorField* &sol,
+             ColorSpinorField &x, ColorSpinorField &b, 
+             const QudaSolutionType solType) const
+  {
+    // TODO: technically KD is a different type of preconditioning.
+    // Should we support "preparing" and "reconstructing"?
+    if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
+      errorQuda("Preconditioned solution requires a preconditioned solve_type");
+    }
+
+    checkFullSpinor(x, b);
+
+    bool right_block_precond = false;
+
+    if (right_block_precond) {
+      // need to modify the solution
+      src = &b;
+      sol = &x;
+    } else {
+      // need to modify rhs
+      bool reset = newTmp(&tmp1, b);
+
+      KahlerDiracInv(*tmp1, b);
+      b = *tmp1;
+
+      deleteTmp(&tmp1, reset);
+      sol = &x;
+      src = &b;
+    }
+
+  }
+
   void DiracImprovedStaggeredKD::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 				   const QudaSolutionType solType) const
   {
@@ -306,6 +338,30 @@ namespace quda {
 
     // TODO: technically KD is a different type of preconditioning.
     // Should we support "preparing" and "reconstructing"?
+  }
+
+  void DiracImprovedStaggeredKD::reconstructSpecialMG(ColorSpinorField &x, const ColorSpinorField &b,
+           const QudaSolutionType solType) const
+  {
+    // do nothing
+
+    // TODO: technically KD is a different type of preconditioning.
+    // Should we support "preparing" and "reconstructing"?
+
+    checkFullSpinor(x, b);
+
+    bool right_block_precond = false;
+
+    if (right_block_precond) {
+      bool reset = newTmp(&tmp1, b.Even());
+
+      KahlerDiracInv(*tmp1, x);
+      x = *tmp1;
+
+      deleteTmp(&tmp1, reset);
+    } 
+    // nothing required for left block preconditioning
+
   }
 
   void DiracImprovedStaggeredKD::updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
