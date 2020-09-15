@@ -200,7 +200,7 @@ int main(int argc, char **argv)
   }
 
   // This must be before the FaceBuffer is created (this is because it allocates pinned memory - FIXME)
-  initQuda(device);
+  initQuda(device_ordinal);
 
   setDims(gauge_param.X);
   // Hack: use the domain wall dimensions so we may use the 5th dim for multi indexing

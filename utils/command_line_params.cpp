@@ -4,9 +4,9 @@
 // parameters parsed from the command line
 
 #ifdef MULTI_GPU
-int device = -1;
+int device_ordinal = -1;
 #else
-int device = 0;
+int device_ordinal = 0;
 #endif
 
 int rank_order;
@@ -391,7 +391,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     ->transform(CLI::QUDACheckedTransformer(contract_type_map));
   ;
   quda_app->add_flag("--dagger", dagger, "Set the dagger to 1 (default 0)");
-  quda_app->add_option("--device", device, "Set the CUDA device to use (default 0, single GPU only)")
+  quda_app->add_option("--device", device_ordinal, "Set the CUDA device to use (default 0, single GPU only)")
     ->check(CLI::Range(0, 16));
 
   quda_app->add_option("--dslash-type", dslash_type, "Set the dslash type")

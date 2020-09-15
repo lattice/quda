@@ -209,10 +209,7 @@ namespace quda {
     } else {
       errorQuda("Unsupported V precision %d", v.Precision());
     }
-
-    if (checkLocation(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
   }
-
 
   template <typename Float, int fineSpin>
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
@@ -348,8 +345,6 @@ namespace quda {
     } else {
       errorQuda("Unsupported precision %d", out.Precision());
     }
-
-    if (checkLocation(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
 #else
     errorQuda("Multigrid has not been built");
 #endif

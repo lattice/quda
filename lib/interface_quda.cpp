@@ -1045,7 +1045,6 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     profileClover.TPSTOP(QUDA_PROFILE_D2H);
 
     delete hack;
-    checkCudaError();
   }
 
   profileClover.TPSTART(QUDA_PROFILE_FREE);
@@ -1129,6 +1128,9 @@ void freeSloppyGaugeQuda()
 {
   if (!initialized) errorQuda("QUDA not initialized");
 
+  // Wilson gauges
+  //---------------------------------------------------------------------------
+  // Delete gaugeRefinement if it does not alias gaugeSloppy.
   if (gaugeRefinement != gaugeSloppy && gaugeRefinement) delete gaugeRefinement;
 
   // Delete gaugePrecondition if it does not alias gaugePrecise, gaugeSloppy, or gaugeEigensolver.
@@ -1146,33 +1148,47 @@ void freeSloppyGaugeQuda()
   gaugeRefinement = nullptr;
   gaugePrecondition = nullptr;
   gaugeSloppy = nullptr;
+  //---------------------------------------------------------------------------
 
-  if (gaugeLongSloppy != gaugeLongRefinement && gaugeLongRefinement) delete gaugeLongRefinement;
+  // Long gauges
+  //---------------------------------------------------------------------------
+  // Delete gaugeLongRefinement if it does not alias gaugeLongSloppy.
+  if (gaugeLongRefinement != gaugeLongSloppy && gaugeLongRefinement) delete gaugeLongRefinement;
 
+  // Delete gaugeLongPrecondition if it does not alias gaugeLongPrecise, gaugeLongSloppy, or gaugeLongEigensolver.
   if (gaugeLongPrecondition != gaugeLongSloppy && gaugeLongPrecondition != gaugeLongPrecise
       && gaugeLongPrecondition != gaugeLongEigensolver && gaugeLongPrecondition)
     delete gaugeLongPrecondition;
 
+  // Delete gaugeLongEigensolver if it does not alias gaugeLongPrecise or gaugeLongSloppy.
   if (gaugeLongEigensolver != gaugeLongSloppy && gaugeLongEigensolver != gaugeLongPrecise && gaugeLongEigensolver)
     delete gaugeLongEigensolver;
 
-  if (gaugeLongSloppy != gaugeLongPrecise && gaugeLongSloppy != gaugeLongEigensolver) delete gaugeLongSloppy;
+  // Delete gaugeLongSloppy if it does not alias gaugeLongPrecise.
+  if (gaugeLongSloppy != gaugeLongPrecise && gaugeLongSloppy) delete gaugeLongSloppy;
 
   gaugeLongEigensolver = nullptr;
   gaugeLongRefinement = nullptr;
   gaugeLongPrecondition = nullptr;
   gaugeLongSloppy = nullptr;
+  //---------------------------------------------------------------------------
 
-  if (gaugeFatSloppy != gaugeFatRefinement && gaugeFatRefinement) delete gaugeFatRefinement;
+  // Fat gauges
+  //---------------------------------------------------------------------------
+  // Delete gaugeFatRefinement if it does not alias gaugeFatSloppy.
+  if (gaugeFatRefinement != gaugeFatSloppy && gaugeFatRefinement) delete gaugeFatRefinement;
 
+  // Delete gaugeFatPrecondition if it does not alias gaugeFatPrecise, gaugeFatSloppy, or gaugeFatEigensolver.
   if (gaugeFatPrecondition != gaugeFatSloppy && gaugeFatPrecondition != gaugeFatPrecise
       && gaugeFatPrecondition != gaugeFatEigensolver && gaugeFatPrecondition)
     delete gaugeFatPrecondition;
 
+  // Delete gaugeFatEigensolver if it does not alias gaugeFatPrecise or gaugeFatSloppy.
   if (gaugeFatEigensolver != gaugeFatSloppy && gaugeFatEigensolver != gaugeFatPrecise && gaugeFatEigensolver)
     delete gaugeFatEigensolver;
 
-  if (gaugeFatSloppy != gaugeFatPrecise && gaugeFatSloppy != gaugeFatEigensolver) delete gaugeFatSloppy;
+  // Delete gaugeFatSloppy if it does not alias gaugeFatPrecise.
+  if (gaugeFatSloppy != gaugeFatPrecise && gaugeFatSloppy) delete gaugeFatSloppy;
 
   gaugeFatEigensolver = nullptr;
   gaugeFatRefinement = nullptr;
@@ -1284,6 +1300,7 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
   // fat links (if they exist)
   if (gaugeFatPrecise) {
     GaugeFieldParam gauge_param(*gaugeFatPrecise);
+    // switch the parameters for creating the mirror sloppy cuda gauge field
 
     gauge_param.setPrecision(prec[0], true);
 
@@ -1327,10 +1344,9 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
     }
 
     // switch the parameters for creating the mirror eigensolver cuda gauge field
-    gauge_param.reconstruct = recon[3];
     gauge_param.setPrecision(prec[3], true);
 
-    if (gaugeFatEigensolver) errorQuda("gaugePrecondition already exists");
+    if (gaugeFatEigensolver) errorQuda("gaugeFatEigensolver already exists");
 
     if (gauge_param.Precision() == gaugeFatPrecise->Precision()
         && gauge_param.reconstruct == gaugeFatPrecise->Reconstruct()) {
@@ -1350,6 +1366,7 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
   // long links (if they exist)
   if (gaugeLongPrecise) {
     GaugeFieldParam gauge_param(*gaugeLongPrecise);
+    // switch the parameters for creating the mirror sloppy cuda gauge field
 
     gauge_param.reconstruct = recon[0];
     gauge_param.setPrecision(prec[0], true);
@@ -4172,7 +4189,6 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
 
   profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
 
-  checkCudaError();
 #else
   errorQuda("Gauge force has not been built");
 #endif // GPU_GAUGE_FORCE
@@ -4232,8 +4248,6 @@ void momResidentQuda(void *mom, QudaGaugeParam *param)
   }
 
   profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
-
-  checkCudaError();
 }
 
 void createCloverQuda(QudaInvertParam* invertParam)
@@ -4465,8 +4479,6 @@ void computeStaggeredForceQuda(void* h_mom, double dt, double delta, void *h_for
 
   profileStaggeredForce.TPSTOP(QUDA_PROFILE_FREE);
   profileStaggeredForce.TPSTOP(QUDA_PROFILE_TOTAL);
-
-  checkCudaError();
 }
 
 void computeHISQForceQuda(void* const milc_momentum,
@@ -4899,7 +4911,6 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
   delete dirac;
   profileCloverForce.TPSTOP(QUDA_PROFILE_FREE);
 
-  checkCudaError();
   profileCloverForce.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
@@ -5000,10 +5011,8 @@ void updateGaugeFieldQuda(void* gauge,
   delete cudaInGauge;
   if (cpuMom) delete cpuMom;
   if (cpuGauge) delete cpuGauge;
+
   profileGaugeUpdate.TPSTOP(QUDA_PROFILE_FREE);
-
-  checkCudaError();
-
   profileGaugeUpdate.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
@@ -5174,10 +5183,8 @@ double momActionQuda(void* momentum, QudaGaugeParam* param)
   }
 
   profileMomAction.TPSTOP(QUDA_PROFILE_FREE);
-
-  checkCudaError();
-
   profileMomAction.TPSTOP(QUDA_PROFILE_TOTAL);
+
   return action;
 }
 
@@ -5760,8 +5767,6 @@ int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const u
 
   GaugeFixOVRQuda.TPSTOP(QUDA_PROFILE_H2D);
 
-  checkCudaError();
-
   if (comm_size() == 1) {
     // perform the update
     GaugeFixOVRQuda.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -5781,7 +5786,6 @@ int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const u
     copyExtendedGauge(*cudaInGauge, *cudaInGaugeEx, QUDA_CUDA_FIELD_LOCATION);
   }
 
-  checkCudaError();
   // copy the gauge field back to the host
   GaugeFixOVRQuda.TPSTART(QUDA_PROFILE_D2H);
   cudaInGauge->saveCPUField(*cpuGauge);
@@ -5802,7 +5806,6 @@ int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const u
     timeinfo[2] = GaugeFixOVRQuda.Last(QUDA_PROFILE_D2H);
   }
 
-  checkCudaError();
   return 0;
 }
 
@@ -5843,19 +5846,15 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
 
   // perform the update
   GaugeFixFFTQuda.TPSTART(QUDA_PROFILE_COMPUTE);
-  checkCudaError();
 
   gaugeFixingFFT(*cudaInGauge, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
 
   GaugeFixFFTQuda.TPSTOP(QUDA_PROFILE_COMPUTE);
 
-  checkCudaError();
   // copy the gauge field back to the host
   GaugeFixFFTQuda.TPSTART(QUDA_PROFILE_D2H);
-  checkCudaError();
   cudaInGauge->saveCPUField(*cpuGauge);
   GaugeFixFFTQuda.TPSTOP(QUDA_PROFILE_D2H);
-  checkCudaError();
 
   GaugeFixFFTQuda.TPSTOP(QUDA_PROFILE_TOTAL);
 
@@ -5872,7 +5871,6 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
     timeinfo[2] = GaugeFixFFTQuda.Last(QUDA_PROFILE_D2H);
   }
 
-  checkCudaError();
   return 0;
 }
 

@@ -162,7 +162,6 @@ namespace quda {
       arg(outOrder, inOrder, E, X, faceVolumeCB, meta.Ndim(), meta.Geometry());
     CopyGaugeEx<FloatOut, FloatIn, length, OutOrder, InOrder> copier(arg, meta, location);
     copier.apply(0);
-    if (location == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
   }
 
   template <typename FloatOut, typename FloatIn, int length, typename InOrder>

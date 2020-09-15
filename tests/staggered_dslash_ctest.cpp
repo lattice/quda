@@ -5,21 +5,14 @@
 #include <algorithm>
 
 #include <quda.h>
-#include <quda_internal.h>
+#include <gauge_field.h>
 #include <dirac_quda.h>
-#include <dslash_quda.h>
-#include <invert_quda.h>
-#include <util_quda.h>
-#include <blas_quda.h>
-
 #include <misc.h>
 #include <host_utils.h>
 #include <command_line_params.h>
 #include <dslash_reference.h>
 #include <staggered_dslash_reference.h>
 #include <staggered_gauge_utils.h>
-#include <gauge_field.h>
-#include <unitarization_links.h>
 
 #include "dslash_test_helpers.h"
 #include <assert.h>
@@ -477,7 +470,7 @@ public:
     end();
   }
 
-  static void SetUpTestCase() { initQuda(device); }
+  static void SetUpTestCase() { initQuda(device_ordinal); }
 
   // Per-test-case tear-down.
   // Called after the last test in this test case.

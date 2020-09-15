@@ -158,8 +158,6 @@ namespace quda
         staggered, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
         in.GhostFaceCB(), profile);
       policy.apply(0);
-
-      checkCudaError();
     }
   };
 

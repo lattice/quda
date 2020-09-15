@@ -53,7 +53,7 @@ CLI::TransformPairs<dslash_test_type> dtest_type_map {{"Dslash", dslash_test_typ
 
 void init(int argc, char **argv)
 {
-  initQuda(device);
+  initQuda(device_ordinal);
 
   gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
