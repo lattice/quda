@@ -747,9 +747,8 @@ namespace quda {
      */
     virtual void operator()(ColorSpinorField &out, ColorSpinorField &in)
     {
-
       auto base = [&](ColorSpinorField &out, ColorSpinorField &in) {
-        pushVerbosity(QUDA_SILENT);
+        pushVerbosity(this->param.verbosity_precondition);
         Base::operator()(out, in);
         popVerbosity();
       };
@@ -763,9 +762,8 @@ namespace quda {
 
     virtual void train_param(Solver &null, ColorSpinorField &in)
     {
-
       auto base = [&](ColorSpinorField &out, ColorSpinorField &in) {
-        pushVerbosity(QUDA_SILENT);
+        pushVerbosity(this->param.verbosity_precondition);
         Base::operator()(out, in);
         popVerbosity();
       };
@@ -774,22 +772,9 @@ namespace quda {
         active_training = true;
         transformer.train(Solver::matPrecon, base, null, in);
         active_training = false;
-        transformer.trained = true;
       }
     }
 
-    /** TODO: Update this.
-     * @brief Solve re-using an initial Krylov space defined by an initial r2_old_init and search direction p_init.
-     * @details This can be used when continuing a CG, e.g. as refinement step after a multi-shift solve.
-     * @param out Solution-vector.
-     * @param in Right-hand side.
-     * @param p_init Initial-search direction.
-     * @param r2_old_init [description]
-     */
-    void operator()(ColorSpinorField &out, ColorSpinorField &in, ColorSpinorField *p_init, double r2_old_init)
-    {
-      errorQuda("NOT implemented!");
-    }
   };
 
   class CGNE : public CG

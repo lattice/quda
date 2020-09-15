@@ -7,10 +7,9 @@
 #include <shared_memory_cache_helper.cuh>
 
 #include <cub_helper.cuh>
-#include <thrust/inner_product.h>
-#include <thrust/execution_policy.h>
+#include <thrust_helper.cuh>
 
-#include <madwf_ml.h>
+#include <madwf_transfer.h>
 
 namespace quda
 {

@@ -10,7 +10,7 @@
 #include <invert_quda.h>
 #include <util_quda.h>
 
-#include <ml.h>
+#include <madwf_ml.h>
 
 namespace quda
 {
@@ -133,11 +133,11 @@ namespace quda
       }
     }
 
-    cudaColorSpinorField *minvrPre = NULL;
-    cudaColorSpinorField *rPre = NULL;
-    cudaColorSpinorField *minvr = NULL;
-    cudaColorSpinorField *minvrSloppy = NULL;
-    cudaColorSpinorField *p = NULL;
+    cudaColorSpinorField *minvrPre = nullptr;
+    cudaColorSpinorField *rPre = nullptr;
+    cudaColorSpinorField *minvr = nullptr;
+    cudaColorSpinorField *minvrSloppy = nullptr;
+    cudaColorSpinorField *p = nullptr;
 
     ColorSpinorParam csParam(b);
     cudaColorSpinorField r(b);
@@ -222,7 +222,9 @@ namespace quda
       rPre = new cudaColorSpinorField(rSloppy, csParam);
       // Create minvrPre
       minvrPre = new cudaColorSpinorField(*rPre);
+      pushVerbosity(param.verbosity_precondition);
       (*K)(*minvrPre, *rPre);
+      popVerbosity();
       *minvrSloppy = *minvrPre;
       p = new cudaColorSpinorField(*minvrSloppy);
     } else {
@@ -233,9 +235,6 @@ namespace quda
     profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
-    printfQuda("stop = %12.8e!\n", stop);
-    printfQuda("b2 = %12.8e!\n", b2);
-    printfQuda("param.tol = %12.8e!\n", param.tol);
     double heavy_quark_res = 0.0;                               // heavy quark residual
     if (use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNorm(x, r).z);
 
@@ -310,7 +309,9 @@ namespace quda
           r_new_Minvr_old = reDotProduct(rSloppy, *minvrSloppy);
           *rPre = rSloppy;
 
+          pushVerbosity(param.verbosity_precondition);
           (*K)(*minvrPre, *rPre);
+          popVerbosity();
 
           // can fuse these two kernels
           *minvrSloppy = *minvrPre;
@@ -367,7 +368,9 @@ namespace quda
 
         if (K) {
           *rPre = rSloppy;
+          pushVerbosity(param.verbosity_precondition);
           (*K)(*minvrPre, *rPre);
+          popVerbosity();
           *minvrSloppy = *minvrPre;
 
           rMinvr = reDotProduct(rSloppy, *minvrSloppy);

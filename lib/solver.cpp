@@ -359,10 +359,10 @@ namespace quda {
   void Solver::PrintStats(const char* name, int k, double r2, double b2, double hq2) {
     if (getVerbosity() >= QUDA_VERBOSE) {
       if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
-	printfQuda("%s: %d iterations, <r,r> = %e, |r|/|b| = %e, heavy-quark residual = %e\n",
+	printfQuda("%s: %5d iterations, <r,r> = %12.8e, |r|/|b| = %12.8e, heavy-quark residual = %12.8e\n",
 		   name, k, r2, sqrt(r2/b2), hq2);
       } else {
-	printfQuda("%s: %d iterations, <r,r> = %e, |r|/|b| = %e\n",
+	printfQuda("%s: %5d iterations, <r,r> = %12.8e, |r|/|b| = %12.8e\n",
 		   name, k, r2, sqrt(r2/b2));
       }
     }
