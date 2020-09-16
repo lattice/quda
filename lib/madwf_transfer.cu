@@ -470,7 +470,7 @@ namespace quda
           int alloc_size = num_x_blocks * Arg::matrix_size * arg.Ls_in * arg.Ls_out;
 
           Complex *tensor_out = reinterpret_cast<Complex *>(arg.tensor_out_p);
-          arg.tensor_out_p = (matrix_type *)device_malloc_(__func__, __FILE__, __LINE__, alloc_size);
+          arg.tensor_out_p = (matrix_type *)device_malloc(alloc_size);
           Complex *tensor_in = reinterpret_cast<Complex *>(arg.tensor_out_p);
 
           launch(tensor_5d_kernel<storage_type, Arg>, tp, arg, stream);
@@ -480,7 +480,7 @@ namespace quda
             <<<arg.Ls_in * arg.Ls_out * sizeof(matrix_type) / sizeof(Complex), block_size, 0, stream>>>(
               tensor_out, tensor_in, num_x_blocks);
 
-          device_free_(__func__, __FILE__, __LINE__, tensor_in);
+          device_free(tensor_in);
         }
       }
 

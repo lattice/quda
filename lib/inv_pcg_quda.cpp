@@ -97,7 +97,7 @@ namespace quda
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
-  void PreconCG::operator()(ColorSpinorField &x, ColorSpinorField &b, std::vector<ColorSpinorField *> &v_r, int collect_k)
+  void PreconCG::operator()(ColorSpinorField &x, ColorSpinorField &b, std::vector<ColorSpinorField *> &v_r, int collect_maxiter, double collect_tol)
   {
 
     if (param.schwarz_type == QUDA_ADDITIVE_MADWF_SCHWARZ) { K->train_param(*this, b); }
@@ -297,8 +297,9 @@ namespace quda
       // force a reliable update if we are within target tolerance (only if doing reliable updates)
       if (convergence(r2, heavy_quark_res, stop, param.tol_hq) && delta >= param.tol) updateX = 1;
 
-      if (collect > 0 && k > collect_k) {
+      if (collect > 0 && k > collect_maxiter && r2 < collect_tol * collect_tol * b2 ) {
         *v_r[v_r.size() - collect] = rSloppy;
+        printfQuda("Collecting r %2d: r2 / b2 = %12.8e, k = %5d.\n", collect, sqrt(r2 / b2), k);
         collect--;
       }
 

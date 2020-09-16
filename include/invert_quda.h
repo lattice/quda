@@ -711,13 +711,14 @@ namespace quda {
   };
 
   /**
-     @brief  Conjugate-Gradient Solver with an accelerator.
+     @brief  Generic solver with an accelerator.
    */
   template <class Transformer, class Base> class Acc : public Base
   {
 
     bool active_training = false;
-    Base ref_solver;
+
+    Base ref_solver; // Here we declare a copy of the solver to avoid temporary buffer collisions.
 
   public:
     Transformer transformer;
@@ -752,10 +753,15 @@ namespace quda {
       }
     }
 
+    /**
+     * @brief Train the underlying accelerate parameter.
+     * @param null Solver to solve for null vectors.
+     * @param in meta color spinor field.
+     */
     virtual void train_param(Solver &null, ColorSpinorField &in)
     {
       auto base = [&](ColorSpinorField &out, ColorSpinorField &in) {
-        pushVerbosity(this->param.verbosity_precondition);
+        pushVerbosity(QUDA_SILENT); // silent this since there are a lot of them.
         Base::operator()(out, in);
         popVerbosity();
       };
@@ -899,10 +905,10 @@ namespace quda {
       void operator()(ColorSpinorField &out, ColorSpinorField &in)
       {
         std::vector<ColorSpinorField *> v_r(0);
-        (*this)(out, in, v_r, 0);
+        (*this)(out, in, v_r, 0, 0);
       }
 
-      void operator()(ColorSpinorField &x, ColorSpinorField &b, std::vector<ColorSpinorField *> &v_r, int collect_k);
+      void operator()(ColorSpinorField &x, ColorSpinorField &b, std::vector<ColorSpinorField *> &v_r, int collect_maxiter, double collect_col);
 
       virtual bool hermitian() { return true; } /** MPCG is only Hermitian system */
   };

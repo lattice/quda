@@ -48,7 +48,7 @@ namespace quda
 
       ~TrainingParameter()
       {
-        if (device_data) { device_free_(__func__, __FILE__, __LINE__, device_data); }
+        if (device_data) { device_free(device_data); }
       }
 
       void copy(const TrainingParameter &other)

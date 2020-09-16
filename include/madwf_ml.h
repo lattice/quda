@@ -163,23 +163,17 @@ namespace quda
       }
 
       ColorSpinorParam csParam(in);
-      // csParam.setPrecision(QUDA_HALF_PRECISION);
-      cudaColorSpinorField null_rhs(csParam);
       cudaColorSpinorField null_x(csParam);
 
       std::vector<ColorSpinorField *> B(16);
       // TODO: The precision is currently hardcoded.
       csParam.setPrecision(QUDA_HALF_PRECISION);
       for (auto &pB : B) { pB = new cudaColorSpinorField(csParam); }
-      auto rng = new RNG(*B[0], 1234);
-      rng->Init();
 
       printfQuda("Generating Null Space Vectors ... \n");
-      spinorNoise(null_rhs, *rng, QUDA_NOISE_UNIFORM);
       // TODO: Currently this only work for PreconCG.
-      static_cast<PreconCG &>(null)(null_x, null_rhs, B, 400);
+      static_cast<PreconCG &>(null)(null_x, const_cast<ColorSpinorField &>(in), B, null_maxiter, null_tol);
       for (auto &pB : B) {
-        printfQuda("pB norm2 = %12.8e\n", blas::norm2(null_rhs));
         blas::ax(5e3 / sqrt(blas::norm2(*pB)), *pB);
       }
 
@@ -363,8 +357,6 @@ namespace quda
       }
 
       // Destroy all dynamically allocated stuff.
-      rng->Release();
-      delete rng;
       for (auto &pB : B) { delete pB; }
       commGlobalReductionSet(global_reduction);
     }
