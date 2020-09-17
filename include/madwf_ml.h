@@ -175,6 +175,8 @@ namespace quda
       static_cast<PreconCG &>(null)(null_x, const_cast<ColorSpinorField &>(in), B, null_maxiter, null_tol);
       for (auto &pB : B) { blas::ax(5e3 / sqrt(blas::norm2(*pB)), *pB); }
 
+      saveTuneCache();
+
       bool global_reduction = commGlobalReduction();
       commGlobalReductionSet(false);
 
