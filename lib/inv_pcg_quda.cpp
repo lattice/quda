@@ -339,7 +339,7 @@ namespace quda
       int updateR;
 
       if (alternative_reliable) { // alternative reliable updates
-        updateX = ( (d <= deps*sqrt(r2_old)) or (dfac * dinit > deps * r0Norm) ) and (d_new > deps*rNorm) and (d_new > dfac * dinit);
+        updateX = ( (d <= deps * sqrt(r2_old)) or (dfac * dinit > deps * r0Norm) ) and (d_new > deps * rNorm) and (d_new > dfac * dinit);
         updateR = 0;
       } else {
         if (rNorm > maxrx) maxrx = rNorm;
@@ -387,7 +387,7 @@ namespace quda
 	        xnorm = sqrt(pnorm);
 	        d_new = d + u*rNorm + uhigh*Anorm * xnorm;
 	        if (steps_since_reliable==0 && getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-            printfQuda("New dnew: %e (r %e , y %e)\n",d_new,u*rNorm,uhigh*Anorm * sqrt(blas::norm2(y)) );
+            printfQuda("New dnew: %e (r %e , y %e)\n",d_new,u * rNorm, uhigh * Anorm * sqrt(blas::norm2(y)));
 	        }
         }
 
@@ -436,7 +436,9 @@ namespace quda
           d = d_new;
           xnorm = 0;//sqrt(norm2(x));
           pnorm = 0;//pnorm + alpha * sqrt(norm2(p));
-          if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("New dinit: %e (r %e , y %e)\n",dinit,uhigh*sqrt(r2),uhigh*Anorm*sqrt(blas::norm2(y)));
+          if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+            printfQuda("New dinit: %e (r %e , y %e)\n", dinit, uhigh * sqrt(r2), uhigh * Anorm * sqrt(blas::norm2(y)));
+          }
           d_new = dinit;
         } else {
           rNorm = sqrt(r2);
@@ -449,15 +451,19 @@ namespace quda
         ++rUpdate;
 
         if (K) {
+          // can fuse these two kernels
+          r_new_Minvr_old = reDotProduct(rSloppy, *minvrSloppy);
           *rPre = rSloppy;
+
           pushVerbosity(param.verbosity_precondition);
           (*K)(*minvrPre, *rPre);
           popVerbosity();
+
+          // can fuse these two kernels
           *minvrSloppy = *minvrPre;
-
           rMinvr = reDotProduct(rSloppy, *minvrSloppy);
-          beta = rMinvr / rMinvr_old;
 
+          beta = (rMinvr - r_new_Minvr_old) / rMinvr_old;
           xpay(*minvrSloppy, beta, *p); // p = minvrSloppy + beta*p
         } else {                        // standard CG - no preconditioning
 
@@ -469,6 +475,7 @@ namespace quda
           xpay(rSloppy, beta, *p);
         }
       }
+
       ++k;
       PrintStats("PCG", k, r2, b2, heavy_quark_res);
     }
