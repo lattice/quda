@@ -128,10 +128,10 @@ namespace quda
         sprintf(param_file_name, "/madwf_trained_param_rank_%05d_ls_%02d_%02d_mu_%.3f.dat", 0, Ls, Ls_base, mu);
         std::string param_file_name_str(param_file_name);
         auto search_cache = host_training_param_cache.find(param_file_name_str);
-        if(search_cache != host_training_param_cache.end()){
+        if (search_cache != host_training_param_cache.end()) {
           host_param = search_cache->second;
           printfQuda("Training params loaded from CACHE.\n");
-        }else{
+        } else {
           // the parameter is not in cache: load from file system.
           std::string save_param_path(param_infile);
           save_param_path += param_file_name_str;
@@ -173,9 +173,7 @@ namespace quda
       printfQuda("Generating Null Space Vectors ... \n");
       // TODO: Currently this only work for PreconCG.
       static_cast<PreconCG &>(null)(null_x, const_cast<ColorSpinorField &>(in), B, null_maxiter, null_tol);
-      for (auto &pB : B) {
-        blas::ax(5e3 / sqrt(blas::norm2(*pB)), *pB);
-      }
+      for (auto &pB : B) { blas::ax(5e3 / sqrt(blas::norm2(*pB)), *pB); }
 
       bool global_reduction = commGlobalReduction();
       commGlobalReductionSet(false);
@@ -348,8 +346,8 @@ namespace quda
         size_t fwrite_count = fwrite(host_param.data(), sizeof(TrainingFloat), host_param.size(), fp);
         fclose(fp);
         if (fwrite_count != host_param.size()) {
-          errorQuda("Unable to write trained parameters to %s (%lu neq %lu).\n",
-              save_param_path.c_str(), fwrite_count, host_param.size());
+          errorQuda("Unable to write trained parameters to %s (%lu neq %lu).\n", save_param_path.c_str(), fwrite_count,
+                    host_param.size());
         }
         printfQuda("Trained parameters saved to %s ...\n", save_param_path.c_str());
 

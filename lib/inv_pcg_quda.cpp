@@ -97,7 +97,8 @@ namespace quda
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
-  void PreconCG::operator()(ColorSpinorField &x, ColorSpinorField &b, std::vector<ColorSpinorField *> &v_r, int collect_maxiter, double collect_tol)
+  void PreconCG::operator()(ColorSpinorField &x, ColorSpinorField &b, std::vector<ColorSpinorField *> &v_r,
+                            int collect_maxiter, double collect_tol)
   {
 
     if (param.schwarz_type == QUDA_ADDITIVE_MADWF_SCHWARZ) { K->train_param(*this, b); }
@@ -171,13 +172,14 @@ namespace quda
     // alternative reliable updates
     // alternative reliable updates - set precision - does not hurt performance here
 
-    const double u = param.precision_sloppy == 8 ?
-      std::numeric_limits<double>::epsilon() / 2. :
-      param.precision_sloppy == 4 ? std::numeric_limits<float>::epsilon() / 2. :
-                                    param.precision_sloppy == 2 ? pow(2., -13) : pow(2., -6);
+    const double u = param.precision_sloppy == 8 ? std::numeric_limits<double>::epsilon() / 2. :
+      param.precision_sloppy == 4                ? std::numeric_limits<float>::epsilon() / 2. :
+      param.precision_sloppy == 2                ? pow(2., -13) :
+                                                   pow(2., -6);
     const double uhigh = param.precision == 8 ? std::numeric_limits<double>::epsilon() / 2. :
-                                                param.precision == 4 ? std::numeric_limits<float>::epsilon() / 2. :
-                                                                       param.precision == 2 ? pow(2., -13) : pow(2., -6);
+      param.precision == 4                    ? std::numeric_limits<float>::epsilon() / 2. :
+      param.precision == 2                    ? pow(2., -13) :
+                                                pow(2., -6);
 
     const double deps = sqrt(u);
     constexpr double dfac = 1.1;
@@ -194,7 +196,7 @@ namespace quda
     if (alternative_reliable) {
       // estimate norm for reliable updates
       mat(r, b, y, tmp3);
-      Anorm = sqrt(blas::norm2(r)/b2);
+      Anorm = sqrt(blas::norm2(r) / b2);
     }
 
     // compute initial residual
@@ -305,7 +307,7 @@ namespace quda
     int collect = v_r.size();
 
     // alternative reliable updates
-    if(alternative_reliable){
+    if (alternative_reliable) {
       dinit = uhigh * (rNorm + Anorm * xNorm);
       d = dinit;
     }
@@ -339,7 +341,8 @@ namespace quda
       int updateR;
 
       if (alternative_reliable) { // alternative reliable updates
-        updateX = ( (d <= deps * sqrt(r2_old)) or (dfac * dinit > deps * r0Norm) ) and (d_new > deps * rNorm) and (d_new > dfac * dinit);
+        updateX = ((d <= deps * sqrt(r2_old)) or (dfac * dinit > deps * r0Norm)) and (d_new > deps * rNorm)
+          and (d_new > dfac * dinit);
         updateR = 0;
       } else {
         if (rNorm > maxrx) maxrx = rNorm;
@@ -352,7 +355,7 @@ namespace quda
       // force a reliable update if we are within target tolerance (only if doing reliable updates)
       if (convergence(r2, heavy_quark_res, stop, param.tol_hq) && delta >= param.tol) updateX = 1;
 
-      if (collect > 0 && k > collect_maxiter && r2 < collect_tol * collect_tol * b2 ) {
+      if (collect > 0 && k > collect_maxiter && r2 < collect_tol * collect_tol * b2) {
         *v_r[v_r.size() - collect] = rSloppy;
         printfQuda("Collecting r %2d: r2 / b2 = %12.8e, k = %5d.\n", collect, sqrt(r2 / b2), k);
         collect--;
@@ -381,14 +384,14 @@ namespace quda
         }
 
         // alternative reliable updates
-	      if (alternative_reliable) {
-	        d = d_new;
-	        pnorm = pnorm + alpha * alpha * ppnorm;
-	        xnorm = sqrt(pnorm);
-	        d_new = d + u*rNorm + uhigh*Anorm * xnorm;
-	        if (steps_since_reliable==0 && getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-            printfQuda("New dnew: %e (r %e , y %e)\n",d_new,u * rNorm, uhigh * Anorm * sqrt(blas::norm2(y)));
-	        }
+        if (alternative_reliable) {
+          d = d_new;
+          pnorm = pnorm + alpha * alpha * ppnorm;
+          xnorm = sqrt(pnorm);
+          d_new = d + u * rNorm + uhigh * Anorm * xnorm;
+          if (steps_since_reliable == 0 && getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+            printfQuda("New dnew: %e (r %e , y %e)\n", d_new, u * rNorm, uhigh * Anorm * sqrt(blas::norm2(y)));
+          }
         }
 
         steps_since_reliable++;
@@ -432,10 +435,10 @@ namespace quda
 
         // alternative reliable updates
         if (alternative_reliable) {
-          dinit = uhigh*(sqrt(r2) + Anorm * sqrt(blas::norm2(y)));
+          dinit = uhigh * (sqrt(r2) + Anorm * sqrt(blas::norm2(y)));
           d = d_new;
-          xnorm = 0;//sqrt(norm2(x));
-          pnorm = 0;//pnorm + alpha * sqrt(norm2(p));
+          xnorm = 0; // sqrt(norm2(x));
+          pnorm = 0; // pnorm + alpha * sqrt(norm2(p));
           if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
             printfQuda("New dinit: %e (r %e , y %e)\n", dinit, uhigh * sqrt(r2), uhigh * Anorm * sqrt(blas::norm2(y)));
           }
@@ -447,7 +450,7 @@ namespace quda
         }
 
         steps_since_reliable = 0;
-        r0Norm = sqrt(r2);;
+        r0Norm = sqrt(r2);
         ++rUpdate;
 
         if (K) {

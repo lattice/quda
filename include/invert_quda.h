@@ -772,7 +772,6 @@ namespace quda {
         active_training = false;
       }
     }
-
   };
 
   class CGNE : public CG
@@ -908,7 +907,8 @@ namespace quda {
         (*this)(out, in, v_r, 0, 0);
       }
 
-      void operator()(ColorSpinorField &x, ColorSpinorField &b, std::vector<ColorSpinorField *> &v_r, int collect_maxiter, double collect_col);
+      void operator()(ColorSpinorField &x, ColorSpinorField &b, std::vector<ColorSpinorField *> &v_r,
+                      int collect_maxiter, double collect_col);
 
       virtual bool hermitian() { return true; } /** MPCG is only Hermitian system */
   };
