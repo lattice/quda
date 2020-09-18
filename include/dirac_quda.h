@@ -1234,6 +1234,7 @@ public:
 
   protected:
     mutable cudaGaugeField *Xinv; /** inverse Kahler-Dirac matrix */
+    bool own_xinv; /** determine if we own our own Xinv---if so we need to delete on destructor */
 
   public:
     DiracStaggeredKD(const DiracParam &param);
@@ -1442,6 +1443,7 @@ public:
 
   protected:
     mutable cudaGaugeField *Xinv; /** inverse Kahler-Dirac matrix */
+    bool own_xinv; /** determine if we own our own Xinv---if so we need to delete on destructor */
 
   public:
     DiracImprovedStaggeredKD(const DiracParam &param);

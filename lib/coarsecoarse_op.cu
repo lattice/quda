@@ -168,7 +168,7 @@ namespace quda {
     const int fineColor = g.Ncolor() / fineSpin;
     const int coarseSpin = 2;
     const int coarseColor = Y.Ncolor() / coarseSpin;
-
+    // FIXME: un-comment out everything that I commented out for compile time reasons
 #ifdef NSPIN4
     if (fineColor == 6) { // free field Wilson
       if (coarseColor == 6) {
@@ -195,13 +195,13 @@ namespace quda {
 #endif // NSPIN4
 #ifdef NSPIN1
         if (coarseColor == 64) {
-        calculateYcoarse<Float, vFloat, 24, fineSpin, 64, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
-                                                                      cloverInv, kappa, mass, mu, mu_factor, dirac, matpc,
-                                                                      need_bidirectional, use_mma);
+        //calculateYcoarse<Float, vFloat, 24, fineSpin, 64, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
+        //                                                              cloverInv, kappa, mass, mu, mu_factor, dirac, matpc,
+        //                                                              need_bidirectional, use_mma);
       } else if (coarseColor == 96) {
-        calculateYcoarse<Float, vFloat, 24, fineSpin, 96, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
-                                                                      cloverInv, kappa, mass, mu, mu_factor, dirac, matpc,
-                                                                      need_bidirectional, use_mma);
+        //calculateYcoarse<Float, vFloat, 24, fineSpin, 96, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
+        //                                                              cloverInv, kappa, mass, mu, mu_factor, dirac, matpc,
+        //                                                              need_bidirectional, use_mma);
       } else
 #endif
       {
@@ -220,21 +220,21 @@ namespace quda {
 #ifdef NSPIN1
     } else if (fineColor == 64) {
       if (coarseColor == 64) {
-        calculateYcoarse<Float, vFloat, 64, fineSpin, 64, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
-                                                                      cloverInv, kappa, mass, mu, mu_factor, dirac, matpc,
-                                                                      need_bidirectional, use_mma);
+        //calculateYcoarse<Float, vFloat, 64, fineSpin, 64, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
+        //                                                              cloverInv, kappa, mass, mu, mu_factor, dirac, matpc,
+        //                                                              need_bidirectional, use_mma);
       } else if (coarseColor == 96) {
-        calculateYcoarse<Float, vFloat, 64, fineSpin, 96, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
-                                                                      cloverInv, kappa, mass, mu, mu_factor, dirac, matpc,
-                                                                      need_bidirectional, use_mma);
+        //calculateYcoarse<Float, vFloat, 64, fineSpin, 96, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
+        //                                                              cloverInv, kappa, mass, mu, mu_factor, dirac, matpc,
+        //                                                              need_bidirectional, use_mma);
       } else {
         errorQuda("Unsupported fineColor = %d coarseColor = %d\n", fineColor, coarseColor);
       }
     } else if (fineColor == 96) {
       if (coarseColor == 96) {
-        calculateYcoarse<Float, vFloat, 96, fineSpin, 96, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
-                                                                      cloverInv, kappa, mass, mu, mu_factor, dirac, matpc,
-                                                                      need_bidirectional, use_mma);
+        //calculateYcoarse<Float, vFloat, 96, fineSpin, 96, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
+        //                                                              cloverInv, kappa, mass, mu, mu_factor, dirac, matpc,
+        //                                                              need_bidirectional, use_mma);
       } else {
         errorQuda("Unsupported fineColor = %d coarseColor = %d\n", fineColor, coarseColor);
       }

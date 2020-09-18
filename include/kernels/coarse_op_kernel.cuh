@@ -27,6 +27,9 @@ namespace quda {
     static constexpr int fineColor = fineColor_;
     static constexpr int coarseColor = coarseColor_;
 
+    static constexpr int fineDof = fineSpin * fineColor;
+    static constexpr int coarseDof = coarseSpin * coarseColor;
+
     static constexpr bool is_mma_compatible = coarseGauge::is_mma_compatible;
 
     coarseGauge Y;           /** Computed coarse link field */
@@ -94,6 +97,15 @@ namespace quda {
     int dim;           // which dimension are we working on
     QudaDirection dir; // which direction are working on
     int dim_index;     // which direction / dimension we are working on
+
+    // values used for computeKDAV
+    static constexpr int blockSizeKD = 16; /** Elements per KD block */
+    static constexpr int xinvKD = 48; /** Elements per KD block */
+    static constexpr int xinvTileSize = 16; /** Length of a tile for KD */
+    static constexpr int xinvPaddedTileSize = xinvTileSize + 1; /** Padding to avoid bank conflicts */
+    static constexpr int numXinvTiles = coarseDof / xinvTileSize; /** Number of xinv tiles, should always be three */
+    static constexpr int coarseColorTileSize = 4;  /** Number of V vectors handled at a time, must divide into 24, 64, and 96 */
+    static constexpr int coarseColorPaddedTileSize = coarseColorTileSize + 1; /** Padding to avoid some bank conflicts */
 
     // tile used for computeUV
     static constexpr int tile_height_uv = fineColor % 4 == 0 ? 4 : fineColor % 3 == 0 ? 3 : fineColor % 2 ? 2 : 1;
@@ -567,6 +579,198 @@ namespace quda {
       computeTMCAV<Float, fineSpin, fineColor, coarseColor, Arg>(arg, parity, x_cb, 0, ic_c);
     else
       computeTMCAV<Float, fineSpin, fineColor, coarseColor, Arg>(arg, parity, x_cb, 1, ic_c);
+  }
+
+  /**
+     Calculates the matrix A V^{s,c}(x) = \sum_c A^{c,c2}(x) * V^{s,c2}(x)
+     Where: s = fine spin, c and c2 = fine color, A in this case is the KD block inverse
+     FIXME: add host support
+  */
+  template <typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
+  __device__ inline void computeKDAV(Arg &arg, const int tid, const int unit_of_work, const int num_units)
+  {
+    // Type for gauge/compute
+    using real = typename Arg::Float;
+    using complex = complex<real>;
+    extern __shared__ complex cs_buffer[];
+
+    // For each "dot product" in the mat-vec
+    typedef cub::WarpReduce<real,16> WarpReduce16;
+    __shared__ typename WarpReduce16::TempStorage temp_storage_16;
+
+    /////////////////////////////////
+    // Figure out some identifiers //
+    /////////////////////////////////
+
+    // Decompose thread id into factors of 16.
+    const unsigned int fast_idx = tid & 0b1111;       // what's my KD block for loading spinors?
+    const unsigned int mid_idx = (tid >> 4) & 0b1111; // what's my KD block for loading Xinv?
+    const unsigned int slow_idx = tid >> 8;
+
+    // The fundamental unit of work is 256 threads = 16 KD blocks
+    // What's the first KD block in my unit of work?
+    const unsigned int x_coarse_first = 16 * slow_idx;
+    
+    // What's my KD block for loading Xinv?
+    // [0-15] loads consecutive elements of Xinv for the first block,
+    // [16-31] loads consecutive elements of Xinv for the second block, etc
+    const unsigned int x_coarse_xinv = x_coarse_first + mid_idx;
+
+    int parity_coarse_xinv_ = 0;
+    const int x_coarse_xinv_cb = getParityCBFromFull(parity_coarse_xinv_, arg.xc_size, x_coarse_xinv);
+    const int parity_coarse_xinv = parity_coarse_xinv_;
+
+    // What's my KD block for loading spinors?
+    // [0-15] loads first corner of consecutive hypercubes,
+    // [16-31] loads the second corner, etc
+    const unsigned int x_coarse_spinor = x_coarse_first + fast_idx;
+
+    int parity_coarse_spinor_ = 0;
+    const int x_coarse_spinor_cb = getParityCBFromFull(parity_coarse_spinor_, arg.xc_size, x_coarse_spinor);
+    const int parity_coarse_spinor = parity_coarse_spinor_;
+
+    //////////////////////////////////
+    // Set up shared memory buffers //
+    //////////////////////////////////
+
+    // Size of 16 spinor buffers                  (48 dof in a KD block)         * (8 near-nulls at a time)
+    constexpr int coarse_color_buffer_size = 16 * (fineColor * Arg::blockSizeKD) * Arg::coarseColorPaddedTileSize;
+
+    // size of 16 xinv buffers
+    constexpr int xinv_buffer_size = 16 * Arg::xinvTileSize * Arg::xinvPaddedTileSize;
+
+    // create offset into input spinor buffer
+    complex* in_buffer = cs_buffer + (2 * unit_of_work) * coarse_color_buffer_size;
+    complex* out_buffer = cs_buffer + (2 * unit_of_work + 1) * coarse_color_buffer_size;
+
+    // Which unit of Xinv tile am I?
+    complex* xinv_buffer = cs_buffer + 2 * num_units * coarse_color_buffer_size + unit_of_work * xinv_buffer_size + mid_idx * Arg::xinvTileSize * Arg::xinvPaddedTileSize;
+
+    ////////////////////////////////////////////////
+    // Find base index for the spinor I'm loading //
+    ////////////////////////////////////////////////
+
+    int coarseCoords[4];
+    getCoords(coarseCoords, x_coarse_spinor_cb, arg.xc_size, parity_coarse_spinor);
+
+    // What corner of the hypercube am I grabbing?
+    int tmp_mid_idx = mid_idx;
+    int y_bit = tmp_mid_idx & 1; tmp_mid_idx >>= 1;
+    int z_bit = tmp_mid_idx & 1; tmp_mid_idx >>= 1;
+    int t_bit = tmp_mid_idx & 1; tmp_mid_idx >>= 1;
+    int spin_bit = tmp_mid_idx;
+
+    int x_bit = (y_bit + z_bit + t_bit) & 1;
+    if (spin_bit) x_bit = 1 - x_bit;
+
+    int parity_spinor = (x_bit + y_bit + z_bit + t_bit) & 1;
+
+    // Last xc_size[0] is intentional
+    int x_spinor_cb = (((((2 * coarseCoords[3] + t_bit) * arg.x_size[2]) + 2 * coarseCoords[2] + z_bit) * arg.x_size[1] + 2 * coarseCoords[1] + y_bit) * arg.x_size[0] + 2 * coarseCoords[0] + x_bit) >> 1;
+
+    //  Load into:     (0th fine color)  + (coarse spin)                                    + (Xinv offset)
+    int buffer_index = ((mid_idx & 0b111) + 24 * spin_bit) * Arg::coarseColorPaddedTileSize + (fineColor * Arg::blockSizeKD * Arg::coarseColorPaddedTileSize) * fast_idx;
+
+    // ^ will need to be augmented by fine color, separate offset for each 
+
+    /////////////////////////////////////////
+    // Uh... do the tiled matrix multiples //
+    /////////////////////////////////////////
+
+    constexpr int xinvRowTiles = Arg::fineColor * Arg::blockSizeKD / Arg::xinvTileSize; // should be 48 / 16 == 3
+    constexpr int xinvColTiles = Arg::fineColor * Arg::blockSizeKD / Arg::xinvTileSize; // should be 48 / 16 == 3
+
+    // Loop over tiles of coarse colors
+    for (int ic_c_tile = 0; ic_c_tile < coarseColor / Arg::coarseColorTileSize; ic_c_tile++) {
+
+      // Zero out the shared memory buffer, which is (coarseColorTileSize == 8) * 48 components
+#pragma unroll
+      for (int ic_c = 0; ic_c < Arg::coarseColorTileSize; ic_c++) {
+#pragma unroll
+        for (int kd_row = fast_idx; kd_row < fineColor * Arg::blockSizeKD; kd_row += Arg::blockSizeKD) {
+          out_buffer[Arg::coarseColorPaddedTileSize * fineColor * Arg::blockSizeKD * mid_idx + Arg::coarseColorPaddedTileSize * kd_row + ic_c] = { 0, 0 };
+        }
+      }
+
+      // Load the input shared memory buffer
+#pragma unroll
+      for (int ic_c = 0; ic_c < Arg::coarseColorTileSize; ic_c++) {
+#pragma unroll
+        for (int c_f = 0; c_f < fineColor; c_f++) {
+          in_buffer[buffer_index + 8 * c_f * Arg::coarseColorPaddedTileSize + ic_c] = arg.V(parity_spinor, x_spinor_cb, 0, c_f, ic_c_tile * Arg::coarseColorTileSize + ic_c);
+        }
+      }
+
+      // in reality we only need to sync over my chunk of 256 threads
+      __syncthreads();
+
+      // Whelp, everything's awful, let's load some xinv.
+#pragma unroll
+      for (int tile_row = 0; tile_row < xinvRowTiles; tile_row++) {
+#pragma unroll
+        for (int tile_col = 0; tile_col < xinvColTiles; tile_col++) {
+          // load Xinv
+#pragma unroll
+          for (int row = 0; row < Arg::xinvTileSize; row++) {  
+            xinv_buffer[row * Arg::xinvPaddedTileSize + fast_idx] = arg.C(0, parity_coarse_xinv, x_coarse_xinv_cb, 0, 0, Arg::xinvTileSize * tile_row + row, Arg::xinvTileSize * tile_col + fast_idx);
+          }
+
+          __syncwarp();
+
+          // do the tile multiplication
+#pragma unroll
+          for (int ic_c = 0; ic_c < Arg::coarseColorTileSize; ic_c++) {
+#pragma unroll
+            for (int row = 0; row < Arg::xinvTileSize; row++) {
+              const complex xinv_elem = xinv_buffer[row * Arg::xinvPaddedTileSize + fast_idx];
+              //                                     which color spinor block                                                  which xinv column tile                                          which xinv column                           which near-null
+              const complex cs_component = in_buffer[fineColor * Arg::blockSizeKD * Arg::coarseColorPaddedTileSize * mid_idx + Arg::coarseColorPaddedTileSize * Arg::xinvTileSize * tile_col + Arg::coarseColorPaddedTileSize * fast_idx + ic_c];
+              const complex prod = cmul(xinv_elem, cs_component);
+
+              const real re_sum = WarpReduce16(temp_storage_16).Sum(prod.real());
+              const real im_sum = WarpReduce16(temp_storage_16).Sum(prod.imag());
+
+              __syncwarp();
+
+              if (fast_idx == 0)
+              {
+                out_buffer[Arg::blockSizeKD * Arg::fineColor * Arg::coarseColorPaddedTileSize * mid_idx + Arg::coarseColorPaddedTileSize * Arg::xinvTileSize * tile_row + Arg::coarseColorPaddedTileSize * row + ic_c].x += re_sum; 
+                out_buffer[Arg::blockSizeKD * Arg::fineColor * Arg::coarseColorPaddedTileSize * mid_idx + Arg::coarseColorPaddedTileSize * Arg::xinvTileSize * tile_row + Arg::coarseColorPaddedTileSize * row + ic_c].y += im_sum; 
+              }
+            }
+          }
+        }
+      }
+
+      __syncthreads();
+
+      // Save the spinor
+#pragma unroll
+      for (int ic_c = 0; ic_c < Arg::coarseColorTileSize; ic_c++) {
+#pragma unroll
+        for (int c_f = 0; c_f < fineColor; c_f++) {
+          arg.AV(parity_spinor, x_spinor_cb, 0, c_f, ic_c_tile * Arg::coarseColorTileSize + ic_c) = out_buffer[buffer_index + 8 * c_f * Arg::coarseColorPaddedTileSize + ic_c];
+        }
+      }
+
+    } // loop over tiles of coarse colors
+
+  } // computeKDAV
+
+  template <typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
+  __global__ void ComputeKDAVGPU(Arg arg)
+  {
+    // What is my overall thread id?
+    const unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x; 
+    if (tid >= arg.fineVolumeCB*2) return;
+
+    // Which unit of spinor work am I within this block?
+    const int unit_of_work = threadIdx.x / 256; // (threadIdx.x + threadIdx.y * blockDim.x) / 256;
+
+    // How many 256 thread "sub-blocks" are there?
+    const int num_units = blockDim.x / 256;
+
+    computeKDAV<Float, fineSpin, fineColor, coarseColor, Arg>(arg, tid, unit_of_work, num_units);
   }
 
   template<typename Arg>

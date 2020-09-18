@@ -6,7 +6,7 @@
 namespace quda {
 
   DiracStaggeredKD::DiracStaggeredKD(const DiracParam &param) : DiracStaggered(param),
-    Xinv(nullptr) { 
+    Xinv(nullptr), own_xinv(true) { 
 
     // Allocate the KD inverse block (inverse coarse clover)
     // Copied from `dirac_coarse.cpp`, `DiracCoarse::createY`
@@ -45,80 +45,27 @@ namespace quda {
     BuildStaggeredKahlerDiracInverse(*Xinv, *gauge, mass);
   }
 
-  // Add a constructor from DiracStaggered and DiracStaggeredPC specifically?
-
   DiracStaggeredKD::DiracStaggeredKD(const DiracStaggeredKD &dirac)
     : DiracStaggered(dirac),
-    Xinv(nullptr)
-  {
-
-    // deep copy Xinv
-    const int ndim = 4;
-    int xc[QUDA_MAX_DIM];
-    for (int i = 0; i < ndim; i++) { xc[i] = gauge->X()[i]/2; }
-    const int Nc_c = gauge->Ncolor() * 8; // 24
-    const int Ns_c = 2; // staggered parity
-
-    GaugeFieldParam gParam;
-    memcpy(gParam.x, xc, QUDA_MAX_DIM*sizeof(int));
-    gParam.nColor = Nc_c*Ns_c;
-    gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-    gParam.order = QUDA_MILC_GAUGE_ORDER;
-    gParam.link_type = QUDA_COARSE_LINKS;
-    gParam.t_boundary = QUDA_PERIODIC_T;
-    gParam.create = QUDA_NULL_FIELD_CREATE;
-    gParam.setPrecision( dirac.Xinv->Precision() );
-    gParam.nDim = ndim;
-    gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-    gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-    gParam.nFace = 0;
-    gParam.geometry = QUDA_SCALAR_GEOMETRY;
-    gParam.pad = 0;
-
-    Xinv = new cudaGaugeField(gParam);
-    Xinv->copy(*dirac.Xinv);
-  }
+    Xinv(dirac.Xinv), own_xinv(false)
+  { }
 
   DiracStaggeredKD::~DiracStaggeredKD() {
-    if (Xinv) delete Xinv;
+    if (Xinv && own_xinv) delete Xinv;
   }
 
   DiracStaggeredKD& DiracStaggeredKD::operator=(const DiracStaggeredKD &dirac)
   {
     if (&dirac != this) {
-      Dirac::operator=(dirac);
-
-      // deep copy Xinv
-      const int ndim = 4;
-      int xc[QUDA_MAX_DIM];
-      for (int i = 0; i < ndim; i++) { xc[i] = gauge->X()[i]/2; }
-      const int Nc_c = gauge->Ncolor() * 8; // 24
-      const int Ns_c = 2; // staggered parity
-
-      GaugeFieldParam gParam;
-      memcpy(gParam.x, xc, QUDA_MAX_DIM*sizeof(int));
-      gParam.nColor = Nc_c*Ns_c;
-      gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-      gParam.order = QUDA_MILC_GAUGE_ORDER;
-      gParam.link_type = QUDA_COARSE_LINKS;
-      gParam.t_boundary = QUDA_PERIODIC_T;
-      gParam.create = QUDA_NULL_FIELD_CREATE;
-      gParam.setPrecision( dirac.Xinv->Precision() );
-      gParam.nDim = ndim;
-      gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-      gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-      gParam.nFace = 0;
-      gParam.geometry = QUDA_SCALAR_GEOMETRY;
-      gParam.pad = 0;
-
-      Xinv = new cudaGaugeField(gParam);
-      Xinv->copy(*dirac.Xinv);
+      DiracStaggered::operator=(dirac);
+      Xinv = dirac.Xinv;
+      own_xinv = false;
     }
     return *this;
   }
 
   DiracStaggeredKD::DiracStaggeredKD(const DiracStaggered &dirac_staggered, const ColorSpinorField* tmp1_, const ColorSpinorField* tmp2_, const QudaPrecision xinv_override_prec)
-    : DiracStaggered(dirac_staggered), Xinv(nullptr)
+    : DiracStaggered(dirac_staggered), Xinv(nullptr), own_xinv(true)
   {
     // Allocate the KD inverse block (inverse coarse clover)
     // Copied from `dirac_coarse.cpp`, `DiracCoarse::createY`
@@ -379,11 +326,9 @@ namespace quda {
   void DiracStaggeredKD::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
            double kappa, double mass, double mu, double mu_factor) const {
 
-    errorQuda("DiracStaggeredKD does not support multigrid coarsening (yet)");
-
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Staggered KD operators only support aggregation coarsening");
-    //StaggeredCoarseOp(Y, X, T, *fatGauge, Xinv, mass, QUDA_STAGGEREDKD_DIRAC, QUDA_MATPC_INVALID);
+    StaggeredCoarseOp(Y, X, T, *gauge, Xinv, mass, QUDA_STAGGEREDKD_DIRAC, QUDA_MATPC_INVALID);
   }
 
   void DiracStaggeredKD::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
