@@ -37,6 +37,8 @@ using qudaDeviceProp = hipDeviceProp_t;
 #define qudaMemcpyHostToDevice hipMemcpyHostToDevice
 #define qudaMemcpyDeviceToHost hipMemcpyDeviceToHost
 #define qudaMemcpyDeviceToDevice hipMemcpyDeviceToDevice
+#define qudaMemPrefetchAsync hipMemPrefetchAsync
+#define qudaCpuDeviceId hipCpuDeviceId
 #define qudaFuncSetCacheConfig hipFuncSetCacheConfig
 #define qudaFuncCachePreferL1 hipFuncCachePreferL1
 #define qudaGetErrorName hipGetErrorName
@@ -44,8 +46,10 @@ using qudaDeviceProp = hipDeviceProp_t;
 #define qudaMemset2DAsync hipMemset2DAsync
 #define qudaCtxSynchronize hipCtxSynchronize
 #define qudaMalloc hipMalloc
+#define qudaMallocHost hipHostMalloc
 #define qudarand hiprand
 #define qudaFree hipFree
+#define qudaMemcpyToSymbolAsync hipMemcpyToSymbolAsync
 
 #else
 
@@ -89,6 +93,8 @@ using qudaDeviceProp = cudaDeviceProp;
 #define qudaMemcpyHostToDevice cudaMemcpyHostToDevice
 #define qudaMemcpyDeviceToHost cudaMemcpyDeviceToHost
 #define qudaMemcpyDeviceToDevice cudaMemcpyDeviceToDevice
+#define qudaMemPrefetchAsync cudaMemPrefetchAsync
+#define qudaCpuDeviceId cudaCpuDeviceId
 #define qudaFuncSetCacheConfig cudaFuncSetCacheConfig
 #define qudaFuncCachePreferL1 cudaFuncCachePreferL1
 #define qudaGetErrorName cudaGetErrorName
@@ -96,8 +102,10 @@ using qudaDeviceProp = cudaDeviceProp;
 #define qudaMemset2DAsync cudaMemset2DAsync
 #define qudaCtxSynchronize cudaCtxSynchronize
 #define qudaMalloc cudaMalloc
+#define qudaMallocHost cudaMallocHost
 #define qudarand curand
 #define qudaFree cudaFree
+#define qudaMemcpyToSymbolAsync cudaMemcpyToSymbolAsync
 
 #endif
 

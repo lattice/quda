@@ -107,11 +107,7 @@ static int unitarize_link_test(int &test_rc)
 
   void* sitelink[4];
   for(int i=0;i < 4;i++){
-<<<<<<< HEAD
-    hipHostMalloc((void**)&sitelink[i], V*gaugeSiteSize*cpu_prec);
-=======
-    cudaMallocHost((void **)&sitelink[i], V * gauge_site_size * cpu_prec);
->>>>>>> feature/overlap_wilson
+    qudaMallocHost((void **)&sitelink[i], V * gauge_site_size * cpu_prec);
     if(sitelink[i] == NULL){
       errorQuda("ERROR; allocate sitelink[%d] failed\n", i);
     }

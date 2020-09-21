@@ -34,6 +34,8 @@ namespace quda
 #endif
     }
 
+    __global__ void set_eofa_d(signed char *ref,int n) {int idx = blockIdx.x * blockDim.x + threadIdx.x;if(idx>=n)return;mobius_eofa_d[idx]=ref[idx];}
+
     template <typename storage_type, int nColor> struct Dslash5Arg {
       typedef typename colorspinor_mapper<storage_type, 4, nColor>::type F;
       typedef typename mapper<storage_type>::type real;
@@ -91,12 +93,15 @@ namespace quda
           errorQuda("Coefficient buffer too large at %lu bytes\n", sizeof(eofa_coeff<real>));
 
         eofa_coeff<real> *eofa_coeffs = reinterpret_cast<eofa_coeff<real> *>(mobius_eofa_h);
+	signed char *A_d;hipMalloc(&A_d, size);
 
         switch (type) {
         case M5_EOFA:
           for (int s = 0; s < Ls; s++) { eofa_coeffs->u[s] = eofa_u[s]; }
-          cudaMemcpyToSymbolAsync(mobius_eofa_d, mobius_eofa_h, sizeof(eofa_coeff<real>) / 3, 0, cudaMemcpyHostToDevice,
-                                  streams[Nstream - 1]);
+	  qudaMemcpyAsync(A_d,mobius_eofa_h,sizeof(eofa_coeff<real>) / 3,qudaMemcpyHostToDevice,streams[Nstream - 1]);
+	  set_eofa_d<<<256,16,0,streams[Nstream - 1]>>>(A_d,sizeof(eofa_coeff<real>) / 3);
+//          qudaMemcpyToSymbolAsync(mobius_eofa_d, mobius_eofa_h, sizeof(eofa_coeff<real>) / 3, 0, qudaMemcpyHostToDevice,
+//                                  streams[Nstream - 1]);
           break;
         case M5INV_EOFA:
           for (int s = 0; s < Ls; s++) {
@@ -104,11 +109,14 @@ namespace quda
             eofa_coeffs->x[s] = eofa_x[s];
             eofa_coeffs->y[s] = eofa_y[s];
           }
-          cudaMemcpyToSymbolAsync(mobius_eofa_d, mobius_eofa_h, sizeof(eofa_coeff<real>), 0, cudaMemcpyHostToDevice,
-                                  streams[Nstream - 1]);
+          qudaMemcpyAsync(A_d,mobius_eofa_h,sizeof(eofa_coeff<real>),qudaMemcpyHostToDevice,streams[Nstream - 1]);
+          set_eofa_d<<<256,16,0,streams[Nstream - 1]>>>(A_d,sizeof(eofa_coeff<real>));
+//          qudaMemcpyToSymbolAsync(mobius_eofa_d, mobius_eofa_h, sizeof(eofa_coeff<real>), 0, qudaMemcpyHostToDevice,
+//                                  streams[Nstream - 1]);
           break;
         default: errorQuda("Unknown EOFA Dslash5Type %d", type);
         }
+	hipDeviceSynchronize();hipFree(A_d);
       }
     };
 

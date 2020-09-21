@@ -320,20 +320,23 @@ namespace quda {
 
   void cudaColorSpinorField::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
   {
-
     // conditionals based on destructor
     if (is_prefetch_enabled() && alloc && mem_type == QUDA_MEMORY_DEVICE) {
+#if defined(__HIP__)
+    errorQuda("prefetch is not supoorted on HIP\n");
+#else    
       int dev_id = 0;
       if (mem_space == QUDA_CUDA_FIELD_LOCATION)
         dev_id = comm_gpuid();
       else if (mem_space == QUDA_CPU_FIELD_LOCATION)
-        dev_id = cudaCpuDeviceId;
+        dev_id = qudaCpuDeviceId;
       else
         errorQuda("Invalid QudaFieldLocation.");
 
-      cudaMemPrefetchAsync(v, bytes, dev_id, stream);
+      qudaMemPrefetchAsync(v, bytes, dev_id, stream);
       if ((precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) && norm_bytes > 0)
-        cudaMemPrefetchAsync(norm, norm_bytes, dev_id, stream);
+        qudaMemPrefetchAsync(norm, norm_bytes, dev_id, stream);
+#endif
     }
   }
 

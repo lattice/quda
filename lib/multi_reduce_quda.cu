@@ -20,7 +20,11 @@ namespace quda {
     {
       void *args[] = {&arg};
       if (tp.block.x == block_size)
-        return qudaLaunchKernel((const void*)multiReduceKernel<block_size, real, len, NXZ, Arg>, tp.grid, tp.block, args, tp.shared_bytes, stream);
+      {
+        multiReduceKernel<block_size, real, len, NXZ, Arg><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+        return qudaSuccess;
+//        return qudaLaunchKernel((const void*)multiReduceKernel<block_size, real, len, NXZ, Arg>, tp.grid, tp.block, args, tp.shared_bytes, stream);
+      }
       else
         return launch<block_size - 32, real, len, NXZ>(arg, tp, stream);
     }
@@ -29,7 +33,9 @@ namespace quda {
     typename std::enable_if<block_size==32, qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
       void *args[] = {&arg};
-      return qudaLaunchKernel((const void*)multiReduceKernel<block_size, real, len, NXZ, Arg>, tp.grid, tp.block, args, tp.shared_bytes, stream);
+      multiReduceKernel<block_size, real, len, NXZ, Arg><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+      return qudaSuccess;
+//      return qudaLaunchKernel((const void*)multiReduceKernel<block_size, real, len, NXZ, Arg>, tp.grid, tp.block, args, tp.shared_bytes, stream);
     }
 
 #ifdef QUDA_FAST_COMPILE_REDUCE
@@ -182,7 +188,7 @@ namespace quda {
       }
 
       template <typename buffer_t>
-      void set_param(buffer_t &d, const T &h, const qudaStream_t &stream)
+      void set_param(buffer_t &d, char select, const T &h, const qudaStream_t &stream)
       {
         using coeff_t = typename decltype(r)::coeff_t;
         constexpr size_t n_coeff = MAX_MATRIX_SIZE / sizeof(coeff_t);
@@ -190,8 +196,18 @@ namespace quda {
         coeff_t tmp[n_coeff];
         for (int i = 0; i < NXZ; i++)
           for (int j = 0; j < NYW; j++) tmp[NYW * i + j] = coeff_t(h.data[NYW * i + j]);
+#ifdef __HIP__
+          signed char *tmp_d;hipMalloc(&tmp_d, MAX_MATRIX_SIZE);hipMemcpy(tmp_d,tmp,MAX_MATRIX_SIZE,hipMemcpyHostToDevice);
+          switch (select) {
+          case 'a': set_AmatixR<<<256,MAX_MATRIX_SIZE/256>>>(tmp_d);
+          case 'b': set_BmatixR<<<256,MAX_MATRIX_SIZE/256>>>(tmp_d);
+          case 'c': set_CmatixR<<<256,MAX_MATRIX_SIZE/256>>>(tmp_d);
+          default: errorQuda("Unknown buffer %c", select);
+          }
+          hipDeviceSynchronize();hipFree(tmp_d);
+#else
         cudaMemcpyToSymbolAsync(d, tmp, NXZ * NYW * sizeof(decltype(tmp[0])), 0, cudaMemcpyHostToDevice, stream);
-        //cuMemcpyHtoDAsync(d, tmp, NXZ * NYW * sizeof(decltype(tmp[0])), stream);
+#endif
       }
 
       template <int NXZ> void compute(const qudaStream_t &stream)
@@ -224,49 +240,19 @@ namespace quda {
           // need to get constants pointer from jitify instance
           if (a.data || b.data || c.data) errorQuda("Constant memory buffer support not enabled with jitify yet");
 #else
-#if defined(__HIP__)
-
-	using coeff_t = typename decltype(r)::coeff_t;
-	signed char *A_d;
-	if(a.data)
-	{
-          coeff_t A[MAX_MATRIX_SIZE / sizeof(coeff_t)];
-          for (int i = 0; i < NXZ; i++)
-            for (int j = 0; j < NYW; j++) A[NYW * i + j] = coeff_t(a.data[NYW * i + j]);
-	
-		hipMalloc(&A_d, MAX_MATRIX_SIZE);hipMemcpy(A_d,A,MAX_MATRIX_SIZE,hipMemcpyHostToDevice);
-        	set_AmatixR<<<256,MAX_MATRIX_SIZE/256>>>(A_d);
-        	hipDeviceSynchronize();hipFree(A_d);
-	}
-
-	if(b.data)
-	{
-          coeff_t A[MAX_MATRIX_SIZE / sizeof(coeff_t)];
-          for (int i = 0; i < NXZ; i++)
-            for (int j = 0; j < NYW; j++) A[NYW * i + j] = coeff_t(b.data[NYW * i + j]);
-
-        	hipMalloc(&A_d, MAX_MATRIX_SIZE);hipMemcpy(A_d,A,MAX_MATRIX_SIZE,hipMemcpyHostToDevice);
-        	set_BmatixR<<<256,MAX_MATRIX_SIZE/256>>>(A_d);
-        	hipDeviceSynchronize();hipFree(A_d);
-	}
-
-	if(c.data)
-	{
-          coeff_t A[MAX_MATRIX_SIZE / sizeof(coeff_t)];
-          for (int i = 0; i < NXZ; i++)
-            for (int j = 0; j < NYW; j++) A[NYW * i + j] = coeff_t(c.data[NYW * i + j]);
-
-        	hipMalloc(&A_d, MAX_MATRIX_SIZE);hipMemcpy(A_d,A,MAX_MATRIX_SIZE,hipMemcpyHostToDevice);
-        	set_CmatixR<<<256,MAX_MATRIX_SIZE/256>>>(A_d);
-        	hipDeviceSynchronize();hipFree(A_d);
-	}
-#else
-          if (a.data) set_param(Amatrix_d, a, stream);
-          if (b.data) set_param(Bmatrix_d, b, stream);
-          if (c.data) set_param(Cmatrix_d, c, stream);
+          if (a.data) set_param(Amatrix_d, 'a', a, stream);
+          if (b.data) set_param(Bmatrix_d, 'b', b, stream);
+          if (c.data) set_param(Cmatrix_d, 'c', c, stream);
 #endif
-#endif
+
+#ifdef __HIP__
+	  typedef MultiReduceArg<NXZ, device_store_t, N, device_y_store_t, Ny, decltype(r_)> Arg;
+	  Arg *arg_d;hipMalloc(&arg_d, sizeof(Arg));hipMemcpy(arg_d,&arg,sizeof(Arg),hipMemcpyHostToDevice);
+	  multiReduceLaunch<device_real_t, M, NXZ>(result, *arg_d, tp, stream, *this);
+	  hipDeviceSynchronize();hipFree(arg_d);
+#else	  
           multiReduceLaunch<device_real_t, M, NXZ>(result, arg, tp, stream, *this);
+#endif
         } else {
           errorQuda("Only implemented for GPU fields");
         }

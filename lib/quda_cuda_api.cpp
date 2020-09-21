@@ -229,8 +229,8 @@ namespace quda {
       case hipMemcpyDeviceToDevice:
         PROFILE(hipMemcpyDtoDAsync((hipDeviceptr_t)dst, (hipDeviceptr_t)src, count, stream), QUDA_PROFILE_MEMCPY_D2D_ASYNC);
         break;
-      case cudaMemcpyDefault:
-        PROFILE(cuMemcpyAsync((CUdeviceptr)dst, (CUdeviceptr)src, count, stream), QUDA_PROFILE_MEMCPY_DEFAULT_ASYNC);
+      case hipMemcpyDefault:
+        PROFILE(hipMemcpyAsync((hipDeviceptr_t)dst, (hipDeviceptr_t)src, count, hipMemcpyDefault, stream), QUDA_PROFILE_MEMCPY_DEFAULT_ASYNC);
         break;
       default:
         errorQuda("Unsupported cuMemcpyTypeAsync %d", kind);
@@ -349,7 +349,7 @@ namespace quda {
 #endif
   }
 
-  qudaError_t qudaEventRecord(cudaEvent_t &event, qudaStream_t stream)
+  qudaError_t qudaEventRecord(qudaEvent_t &event, qudaStream_t stream)
   {
 #ifdef USE_DRIVER_API
     PROFILE(qudaError_t error = qudaEventRecord(event, stream), QUDA_PROFILE_EVENT_RECORD);
@@ -368,7 +368,7 @@ namespace quda {
 #endif
   }
 
-  qudaError_t qudaStreamWaitEvent(qudaStream_t stream, cudaEvent_t event, unsigned int flags)
+  qudaError_t qudaStreamWaitEvent(qudaStream_t stream, qudaEvent_t event, unsigned int flags)
   {
 #ifdef USE_DRIVER_API
     PROFILE(qudaError_t error = qudaStreamWaitEvent(stream, event, flags), QUDA_PROFILE_STREAM_WAIT_EVENT);

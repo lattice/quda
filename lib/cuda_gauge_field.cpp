@@ -738,8 +738,10 @@ namespace quda {
 
   void cudaGaugeField::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
   {
-
     if (is_prefetch_enabled() && mem_type == QUDA_MEMORY_DEVICE) {
+#if defined(__HIP__)
+    errorQuda("prefetch is not supoorted on HIP\n");
+#else    
       int dev_id = 0;
       if (mem_space == QUDA_CUDA_FIELD_LOCATION)
         dev_id = comm_gpuid();
@@ -757,6 +759,7 @@ namespace quda {
             cudaMemPrefetchAsync(ghost[i + 4], nbytes, dev_id, stream);
         }
       }
+#endif
     }
   }
 

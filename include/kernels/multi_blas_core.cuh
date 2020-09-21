@@ -7,7 +7,7 @@
 #include <float_vector.h>
 
 #if (__COMPUTE_CAPABILITY__ >= 300 || __HIP_DEVICE_COMPILE__ >= 300) && !defined(QUDA_FAST_COMPILE_REDUCE)
-#define WARP_SPLIT
+//#define WARP_SPLIT
 #include <generics/shfl.h>
 #endif
 
@@ -84,7 +84,7 @@ namespace quda
        @param[in,out] arg Argument struct with required meta data
        (input/output fields, functor, etc.)
     */
-    template <typename real, int n, int NXZ, int warp_split, typename Arg> __global__ void multiBlasKernel(Arg arg)
+    template <typename real, int n, int NXZ, int warp_split, typename Arg> __global__ void multiBlasKernel(Arg &arg)
     {
       // n is real numbers per thread
       using vec = vector_type<complex<real>, n/2>;

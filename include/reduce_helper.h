@@ -27,7 +27,7 @@ namespace quda
     void *get_mapped_buffer();
     void *get_host_buffer();
     count_t *get_count();
-    cudaEvent_t &get_event();
+    qudaEvent_t &get_event();
   } // namespace reducer
 
   /**

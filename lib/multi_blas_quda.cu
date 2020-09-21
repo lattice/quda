@@ -122,7 +122,7 @@ namespace quda {
       }
 
       template <bool multi_1d, typename device_buffer_t, typename Arg> typename std::enable_if<!multi_1d, void>::type
-      set_param(device_buffer_t &&buf_d, Arg &arg, char dummy, const T &h, const qudaStream_t &stream)
+      set_param(device_buffer_t &&buf_d, Arg &arg, char select, const T &h, const qudaStream_t &stream)
       {
         using coeff_t = typename decltype(arg.f)::coeff_t;
         constexpr size_t n_coeff = MAX_MATRIX_SIZE / sizeof(coeff_t);
@@ -134,7 +134,18 @@ namespace quda {
 #ifdef JITIFY
         cuMemcpyHtoDAsync(buf_d, tmp, NXZ * NYW * sizeof(coeff_t), stream);
 #else
+#ifdef __HIP__
+          signed char *tmp_d;hipMalloc(&tmp_d, MAX_MATRIX_SIZE);hipMemcpy(tmp_d,tmp,MAX_MATRIX_SIZE,hipMemcpyHostToDevice);
+	  switch (select) {
+          case 'a': set_Amatix<<<256,MAX_MATRIX_SIZE/256>>>(tmp_d);
+          case 'b': set_Bmatix<<<256,MAX_MATRIX_SIZE/256>>>(tmp_d);
+          case 'c': set_Cmatix<<<256,MAX_MATRIX_SIZE/256>>>(tmp_d);
+          default: errorQuda("Unknown buffer %c", select);
+          }
+          hipDeviceSynchronize();hipFree(tmp_d);	
+#else
         cudaMemcpyToSymbolAsync(buf_d, tmp, NXZ * NYW * sizeof(coeff_t), 0, cudaMemcpyHostToDevice, stream);
+#endif
 #endif
       }
 
@@ -177,59 +188,23 @@ namespace quda {
           jitify_error = instance.configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
 #else
 
-#if defined(__HIP__)
-	using coeff_t = typename decltype(arg.f)::coeff_t;
-        if (a.data) {
-          coeff_t A[MAX_MATRIX_SIZE / sizeof(coeff_t)];
-          for (int i = 0; i < NXZ; i++)
-            for (int j = 0; j < NYW; j++) A[NYW * i + j] = coeff_t(a.data[NYW * i + j]);
-
-	  signed char *A_d;hipMalloc(&A_d, MAX_MATRIX_SIZE);hipMemcpy(A_d,A,MAX_MATRIX_SIZE,hipMemcpyHostToDevice);
-          set_Amatix<<<256,MAX_MATRIX_SIZE/256>>>(A_d);
-          hipDeviceSynchronize();hipFree(A_d);
-
-        }
-
-        if (b.data) {
-          coeff_t B[MAX_MATRIX_SIZE / sizeof(coeff_t)];
-          for (int i = 0; i < NXZ; i++)
-            for (int j = 0; j < NYW; j++) B[NYW * i + j] = coeff_t(b.data[NYW * i + j]);
-
-          signed char *B_d;hipMalloc(&B_d, MAX_MATRIX_SIZE);hipMemcpy(B_d,B,MAX_MATRIX_SIZE,hipMemcpyHostToDevice);
-          set_Bmatix<<<256,MAX_MATRIX_SIZE/256>>>(B_d);
-          hipDeviceSynchronize();hipFree(B_d);
-
-        }
-
-        if (c.data) {
-          coeff_t C[MAX_MATRIX_SIZE / sizeof(coeff_t)];
-          for (int i = 0; i < NXZ; i++)
-            for (int j = 0; j < NYW; j++) C[NYW * i + j] = coeff_t(c.data[NYW * i + j]);
-
-          signed char *C_d;hipMalloc(&C_d, MAX_MATRIX_SIZE);hipMemcpy(C_d,C,MAX_MATRIX_SIZE,hipMemcpyHostToDevice);
-          set_Cmatix<<<256,MAX_MATRIX_SIZE/256>>>(C_d);
-          hipDeviceSynchronize();hipFree(C_d);
-
-        }
-
-        typedef MultiBlasArg<NXZ, device_store_t, N, device_y_store_t, Ny, decltype(f_)> Arg;
-        Arg *arg_d;hipMalloc(&arg_d, sizeof(Arg));hipMemcpy(arg_d,&arg,sizeof(Arg),hipMemcpyHostToDevice);
-
-        switch (tp.aux.x) {
-        case 1: multiBlasKernel<device_real_t, M, NXZ, 1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(*arg_d); break;
-#ifdef WARP_SPLIT
-        case 2: multiBlasKernel<device_real_t, M, NXZ, 2><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(*arg_d); break;
-        case 4: multiBlasKernel<device_real_t, M, NXZ, 4><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(*arg_d); break;
-#endif
-        default: errorQuda("warp-split factor %d not instantiated", tp.aux.x);
-        }
-
-        hipDeviceSynchronize();hipFree(arg_d);
-#else
-
           if (a.data) { set_param<decltype(f_)::multi_1d>(Amatrix_d, arg, 'a', a, stream); }
           if (b.data) { set_param<decltype(f_)::multi_1d>(Bmatrix_d, arg, 'b', b, stream); }
           if (c.data) { set_param<decltype(f_)::multi_1d>(Cmatrix_d, arg, 'c', c, stream); }
+
+#if defined(__HIP__)
+          typedef MultiBlasArg<NXZ, device_store_t, N, device_y_store_t, Ny, decltype(f_)> Arg;
+          Arg *arg_d;hipMalloc(&arg_d, sizeof(Arg));hipMemcpy(arg_d,&arg,sizeof(Arg),hipMemcpyHostToDevice);
+          switch (tp.aux.x) {
+          case 1: multiBlasKernel<device_real_t, M, NXZ, 1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(*arg_d); break;
+#ifdef WARP_SPLIT
+          case 2: multiBlasKernel<device_real_t, M, NXZ, 2><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(*arg_d); break;
+          case 4: multiBlasKernel<device_real_t, M, NXZ, 4><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(*arg_d); break;
+#endif
+          default: errorQuda("warp-split factor %d not instantiated", tp.aux.x);
+          }
+          hipDeviceSynchronize();hipFree(arg_d);
+#else
           switch (tp.aux.x) {
           case 1: multiBlasKernel<device_real_t, M, NXZ, 1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
 #ifdef WARP_SPLIT

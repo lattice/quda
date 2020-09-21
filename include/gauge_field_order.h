@@ -783,7 +783,7 @@ namespace quda {
 	: volumeCB(U.VolumeCB()), scale(static_cast<Float>(1.0)), 
 	  scale_inv(static_cast<Float>(1.0)), accessor(U, gauge_, ghost_)
       {
-	if (!native_ghost) assert(ghost_ != nullptr);
+//	if (!native_ghost) assert(ghost_ != nullptr);
 	for (int d=0; d<4; d++) {
 	  ghost[d] = !native_ghost ? static_cast<complex<storeFloat>*>(ghost_[d]) : nullptr;
 	  ghostVolumeCB[d] = U.Nface()*U.SurfaceCB(d);
