@@ -25,7 +25,8 @@ namespace quda
 
     // most preconditioners are uni-precision solvers, with CG being an exception
     inner.precision
-      = outer.inv_type_precondition == QUDA_CG_INVERTER ? outer.precision_sloppy : outer.precision_precondition;
+      = (outer.inv_type_precondition == QUDA_CG_INVERTER && !outer.precondition_no_advanced_feature) ?
+        outer.precision_sloppy : outer.precision_precondition;
     inner.precision_sloppy = outer.precision_precondition;
 
     // this sets a fixed iteration count if we're using the MR solver
@@ -100,10 +101,9 @@ namespace quda
   void PreconCG::operator()(ColorSpinorField &x, ColorSpinorField &b, std::vector<ColorSpinorField *> &v_r,
                             int collect_maxiter, double collect_tol)
   {
+    profile.TPSTART(QUDA_PROFILE_INIT);
 
     if (param.schwarz_type == QUDA_ADDITIVE_MADWF_SCHWARZ) { K->train_param(*this, b); }
-
-    profile.TPSTART(QUDA_PROFILE_INIT);
 
     // whether to select alternative reliable updates
     bool alternative_reliable = param.use_alternative_reliable;

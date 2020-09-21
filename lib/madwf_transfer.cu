@@ -456,11 +456,8 @@ namespace quda
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         if (arg.transfer) {
-          if (arg.dagger) {
-            transfer_5d_kernel<storage_type, true><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-          } else {
-            transfer_5d_kernel<storage_type, false><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-          }
+          auto f = arg.dagger ? transfer_5d_kernel<storage_type, true, Arg> : transfer_5d_kernel<storage_type, false, Arg>;
+          qudaLaunchKernel(f, tp, stream, arg);
         } else {
           using Complex = complex<real>;
           using matrix_type = typename Arg::MatrixType;
@@ -521,18 +518,24 @@ namespace quda
     {
 #ifdef GPU_DOMAIN_WALL_DIRAC
       checkLocation(out, in); // check all locations match
-
+      size_t m_size = in.X(4) * out.X(4) * sizeof(matrix_type);
+      if (tp.get_size() * sizeof(float) != m_size) {
+        errorQuda("Training Parameter size mismatch %lu neq %lu.\n", tp.get_size() * sizeof(float), m_size);
+      }
       switch (checkPrecision(out, in)) {
       case QUDA_HALF_PRECISION: {
         using arg_type = MadwfMlArg<short, matrix_type>;
-        size_t m_size = in.X(4) * out.X(4) * sizeof(matrix_type);
-        if (tp.get_size() * sizeof(float) != m_size) {
-          errorQuda("Training Parameter size mismatch %lu neq %lu.\n", tp.get_size() * sizeof(float), m_size);
-        }
         arg_type arg(out, in, (const matrix_type *)tp.data(), dagger);
         Transfer5d<short, arg_type> dslash(in, arg);
         dslash.apply(streams[Nstream - 1]);
       } break;
+      case QUDA_QUARTER_PRECISION: {
+        using arg_type = MadwfMlArg<int8_t, matrix_type>;
+        arg_type arg(out, in, (const matrix_type *)tp.data(), dagger);
+        Transfer5d<int8_t, arg_type> dslash(in, arg);
+        dslash.apply(streams[Nstream - 1]);
+      } break;
+
       default: errorQuda("Unsupported precision %d\n", in.Precision());
       }
 #else
@@ -544,17 +547,23 @@ namespace quda
     {
 #ifdef GPU_DOMAIN_WALL_DIRAC
       checkLocation(out, in); // check all locations match
-
+      size_t m_size = in.X(4) * out.X(4) * sizeof(matrix_type);
+      if (tp.get_size() * sizeof(float) != m_size) {
+        errorQuda("Training Parameter size mismatch %lu neq %lu.\n", tp.get_size() * sizeof(float), m_size);
+      }
       switch (checkPrecision(out, in)) {
       case QUDA_HALF_PRECISION: {
         using arg_type = MadwfMlArg<short, matrix_type>;
-        size_t m_size = in.X(4) * out.X(4) * sizeof(matrix_type);
-        if (tp.get_size() * sizeof(float) != m_size) {
-          errorQuda("Training Parameter size mismatch %lu neq %lu.\n", tp.get_size() * sizeof(float), m_size);
-        }
         cudaMemsetAsync(tp.data(), 0, m_size, streams[Nstream - 1]);
         arg_type arg(out, in, (matrix_type *)tp.data());
         Transfer5d<short, arg_type> dslash(in, arg);
+        dslash.apply(streams[Nstream - 1]);
+      } break;
+      case QUDA_QUARTER_PRECISION: {
+        using arg_type = MadwfMlArg<int8_t, matrix_type>;
+        cudaMemsetAsync(tp.data(), 0, m_size, streams[Nstream - 1]);
+        arg_type arg(out, in, (matrix_type *)tp.data());
+        Transfer5d<int8_t, arg_type> dslash(in, arg);
         dslash.apply(streams[Nstream - 1]);
       } break;
       default: errorQuda("Unsupported precision %d\n", in.Precision());

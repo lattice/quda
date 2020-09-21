@@ -263,6 +263,8 @@ namespace quda {
 
     char madwf_param_outfile[256];
 
+    bool precondition_no_advanced_feature;
+
     /** Which external lib to use in the solver */
     QudaExtLibType extlib_type;
 
@@ -353,6 +355,7 @@ namespace quda {
       madwf_train_maxiter(param.madwf_train_maxiter),
       madwf_param_load(param.madwf_param_load),
       madwf_param_save(param.madwf_param_save),
+      precondition_no_advanced_feature(param.schwarz_type == QUDA_ADDITIVE_SCHWARZ || param.schwarz_type == QUDA_ADDITIVE_MADWF_SCHWARZ),
       extlib_type(param.extlib_type)
     {
       if (deflate) { eig_param = *(static_cast<QudaEigParam *>(param.eig_param)); }
@@ -438,6 +441,7 @@ namespace quda {
       madwf_train_maxiter(param.madwf_train_maxiter),
       madwf_param_load(param.madwf_param_load),
       madwf_param_save(param.madwf_param_save),
+      precondition_no_advanced_feature(param.precondition_no_advanced_feature),
       extlib_type(param.extlib_type)
     {
       for (int i=0; i<num_offset; i++) {

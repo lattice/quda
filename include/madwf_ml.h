@@ -41,6 +41,8 @@ namespace quda
     // Has device_param been trained?
     bool trained = false;
 
+    QudaPrecision prec_precondition;
+
     std::unordered_map<std::string, std::vector<TrainingFloat>> host_training_param_cache; // empty map
 
     MADWFacc(const SolverParam &solve_param) :
@@ -50,7 +52,8 @@ namespace quda
       null_tol(solve_param.madwf_null_tol),
       train_maxiter(solve_param.madwf_train_maxiter),
       param_load(solve_param.madwf_param_load == QUDA_BOOLEAN_TRUE),
-      param_save(solve_param.madwf_param_save == QUDA_BOOLEAN_TRUE)
+      param_save(solve_param.madwf_param_save == QUDA_BOOLEAN_TRUE),
+      prec_precondition(solve_param.precision_precondition)
     {
       strcpy(param_infile, solve_param.madwf_param_infile);
       strcpy(param_outfile, solve_param.madwf_param_outfile);
@@ -144,7 +147,9 @@ namespace quda
                       host_param.size());
           }
           host_training_param_cache.insert({param_file_name_str, host_param});
-          printfQuda("Training params loaded from FILE %s.\n", save_param_path.c_str());
+          printf("Rank %05d: Training params loaded from FILE %s ... \n", comm_rank(), save_param_path.c_str());
+          comm_barrier();
+          printfQuda("All ranks loaded.\n");
         }
         device_param.resize(param_size); // 2 for complex
         device_param.from_host(host_param);
@@ -154,10 +159,11 @@ namespace quda
         csParam.x[4] = Ls_base;
         csParam.create = QUDA_NULL_FIELD_CREATE;
         // TODO: The precision is currently hardcoded.
-        csParam.setPrecision(QUDA_HALF_PRECISION);
+        csParam.setPrecision(prec_precondition);
 
         forward_tmp = new cudaColorSpinorField(csParam);
         backward_tmp = new cudaColorSpinorField(csParam);
+
 
         return;
       }
@@ -167,7 +173,7 @@ namespace quda
 
       std::vector<ColorSpinorField *> B(16);
       // TODO: The precision is currently hardcoded.
-      csParam.setPrecision(QUDA_HALF_PRECISION);
+      csParam.setPrecision(prec_precondition);
       for (auto &pB : B) { pB = new cudaColorSpinorField(csParam); }
 
       printfQuda("Generating Null Space Vectors ... \n");
