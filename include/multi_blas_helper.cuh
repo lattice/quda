@@ -11,13 +11,41 @@ namespace quda
     // storage for matrix coefficients
 #define MAX_MATRIX_SIZE 8192
 #define MAX_ARG_SIZE 4096
-    __constant__ signed char Amatrix_d[MAX_MATRIX_SIZE];
-    __constant__ signed char Bmatrix_d[MAX_MATRIX_SIZE];
-    __constant__ signed char Cmatrix_d[MAX_MATRIX_SIZE];
+    __constant__ char Amatrix_d[MAX_MATRIX_SIZE];
+    __constant__ char Bmatrix_d[MAX_MATRIX_SIZE];
+    __constant__ char Cmatrix_d[MAX_MATRIX_SIZE];
 
-    static signed char *Amatrix_h;
-    static signed char *Bmatrix_h;
-    static signed char *Cmatrix_h;
+    static char *Amatrix_h;
+    static char *Bmatrix_h;
+    static char *Cmatrix_h;
+
+    template <bool multi_1d = false, typename Arg, typename T> typename std::enable_if<multi_1d, void>::type
+    set_param(void *buf_d, Arg &arg, char select, const T &h, const qudaStream_t &stream)
+    {
+      using coeff_t = typename decltype(arg.f)::coeff_t;
+      coeff_t *buf_arg = nullptr;
+      switch (select) {
+      case 'a': buf_arg = arg.f.a; break;
+      case 'b': buf_arg = arg.f.b; break;
+      case 'c': buf_arg = arg.f.c; break;
+      default: errorQuda("Unknown buffer %c", select);
+      }
+      const auto N = std::max(arg.NXZ, arg.NYW);
+      for (int i = 0; i < N; i++) buf_arg[i] = coeff_t(h.data[i]);
+    }
+
+    template <bool multi_1d = false, typename Arg, typename T> typename std::enable_if<!multi_1d, void>::type
+    set_param(void *buf_d, Arg &arg, char dummy, const T &h, const qudaStream_t &stream)
+    {
+      using coeff_t = typename decltype(arg.f)::coeff_t;
+      constexpr size_t n_coeff = MAX_MATRIX_SIZE / sizeof(coeff_t);
+
+      coeff_t tmp[n_coeff];
+      for (int i = 0; i < arg.NXZ; i++)
+        for (int j = 0; j < arg.NYW; j++) tmp[arg.NYW * i + j] = coeff_t(h.data[arg.NYW * i + j]);
+
+      qudaMemcpyAsync((void*)buf_d, tmp, arg.NXZ * arg.NYW * sizeof(coeff_t), cudaMemcpyHostToDevice, stream);
+    }
 
     /**
        @param[in] x Value we are testing

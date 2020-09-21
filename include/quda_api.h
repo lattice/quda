@@ -192,6 +192,16 @@ namespace quda
   void qudaDeviceSynchronize_(const char *func, const char *file, const char *line);
 
   /**
+     @brief Wrapper around cudaGetSymbolAddress with built in error
+     checking.  Returns the address of symbol on the device; symbol
+     is a variable that resides in global memory space.
+
+     @param[in] symbol Global variable or string symbol to search for
+     @return Return device pointer associated with symbol
+  */
+  void* qudaGetSymbolAddress_(const char *symbol, const char *func, const char *file, const char *line);
+
+  /**
      @brief Print out the timer profile for CUDA API calls
    */
   void printAPIProfile();
@@ -248,3 +258,6 @@ namespace quda
 
 #define qudaDeviceSynchronize()                                                                                        \
   ::quda::qudaDeviceSynchronize_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
+#define qudaGetSymbolAddress(symbol)                                    \
+  ::quda::qudaGetSymbolAddress_(symbol, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))

@@ -72,9 +72,9 @@ namespace quda {
         }
         max_warp_split = std::min(NXZ, max_warp_split); // ensure we only split if valid
 
-        Amatrix_h = reinterpret_cast<signed char *>(const_cast<typename T::type *>(a.data));
-        Bmatrix_h = reinterpret_cast<signed char *>(const_cast<typename T::type *>(b.data));
-        Cmatrix_h = reinterpret_cast<signed char *>(const_cast<typename T::type *>(c.data));
+        Amatrix_h = reinterpret_cast<char *>(const_cast<typename T::type *>(a.data));
+        Bmatrix_h = reinterpret_cast<char *>(const_cast<typename T::type *>(b.data));
+        Cmatrix_h = reinterpret_cast<char *>(const_cast<typename T::type *>(c.data));
 
         strcpy(aux, x[0]->AuxString());
         if (x_prec != y_prec) {
@@ -103,38 +103,6 @@ namespace quda {
         strcat(name, NYW_str);
         strcat(name, typeid(f).name());
         return TuneKey(x[0]->VolString(), name, aux);
-      }
-
-      template <bool multi_1d, typename device_buffer_t, typename Arg> typename std::enable_if<multi_1d, void>::type
-      set_param(device_buffer_t &&buf_d, Arg &arg, char select, const T &h, const qudaStream_t &stream)
-      {
-        using coeff_t = typename decltype(arg.f)::coeff_t;
-        coeff_t *buf_arg = nullptr;
-        switch (select) {
-        case 'a': buf_arg = arg.f.a; break;
-        case 'b': buf_arg = arg.f.b; break;
-        case 'c': buf_arg = arg.f.c; break;
-        default: errorQuda("Unknown buffer %c", select);
-        }
-        const auto N = std::max(NXZ,NYW);
-        for (int i = 0; i < N; i++) buf_arg[i] = coeff_t(h.data[i]);
-      }
-
-      template <bool multi_1d, typename device_buffer_t, typename Arg> typename std::enable_if<!multi_1d, void>::type
-      set_param(device_buffer_t &&buf_d, Arg &arg, char dummy, const T &h, const qudaStream_t &stream)
-      {
-        using coeff_t = typename decltype(arg.f)::coeff_t;
-        constexpr size_t n_coeff = MAX_MATRIX_SIZE / sizeof(coeff_t);
-
-        coeff_t tmp[n_coeff];
-        for (int i = 0; i < NXZ; i++)
-          for (int j = 0; j < NYW; j++) tmp[NYW * i + j] = coeff_t(h.data[NYW * i + j]);
-
-#ifdef JITIFY
-        cuMemcpyHtoDAsync(buf_d, tmp, NXZ * NYW * sizeof(coeff_t), stream);
-#else
-        cudaMemcpyToSymbolAsync(buf_d, tmp, NXZ * NYW * sizeof(coeff_t), 0, cudaMemcpyHostToDevice, stream);
-#endif
       }
 
       template <int NXZ> void compute(const qudaStream_t &stream)
@@ -169,15 +137,15 @@ namespace quda {
           auto instance = program->kernel("quda::blas::multiBlasKernel")
             .instantiate(Type<device_real_t>(), M, NXZ, tp.aux.x, Type<decltype(arg)>());
 
-          if (a.data) set_param<decltype(f_)::multi_1d>(instance.get_constant_ptr("quda::blas::Amatrix_d"), arg, 'a', a, stream);
-          if (b.data) set_param<decltype(f_)::multi_1d>(instance.get_constant_ptr("quda::blas::Bmatrix_d"), arg, 'b', b, stream);
-          if (c.data) set_param<decltype(f_)::multi_1d>(instance.get_constant_ptr("quda::blas::Cmatrix_d"), arg, 'c', c, stream);
+          if (a.data) set_param<decltype(f_)::multi_1d>((void*)instance.get_constant_ptr("quda::blas::Amatrix_d"), arg, 'a', a, stream);
+          if (b.data) set_param<decltype(f_)::multi_1d>((void*)instance.get_constant_ptr("quda::blas::Bmatrix_d"), arg, 'b', b, stream);
+          if (c.data) set_param<decltype(f_)::multi_1d>((void*)instance.get_constant_ptr("quda::blas::Cmatrix_d"), arg, 'c', c, stream);
 
           jitify_error = instance.configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
 #else
-          if (a.data) { set_param<decltype(f_)::multi_1d>(Amatrix_d, arg, 'a', a, stream); }
-          if (b.data) { set_param<decltype(f_)::multi_1d>(Bmatrix_d, arg, 'b', b, stream); }
-          if (c.data) { set_param<decltype(f_)::multi_1d>(Cmatrix_d, arg, 'c', c, stream); }
+          if (a.data) set_param<decltype(f_)::multi_1d>(qudaGetSymbolAddress(Amatrix_d), arg, 'a', a, stream);
+          if (b.data) set_param<decltype(f_)::multi_1d>(qudaGetSymbolAddress(Bmatrix_d), arg, 'b', b, stream);
+          if (c.data) set_param<decltype(f_)::multi_1d>(qudaGetSymbolAddress(Cmatrix_d), arg, 'c', c, stream);
           switch (tp.aux.x) {
           case 1: qudaLaunchKernel(multiBlasKernel<device_real_t, M, NXZ, 1, decltype(arg)>, tp, stream, arg); break;
 #ifdef WARP_SPLIT

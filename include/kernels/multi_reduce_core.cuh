@@ -15,34 +15,34 @@ namespace quda
     /**
        @brief Parameter struct for generic multi-blas kernel.
        @tparam NXZ is dimension of input vectors: X,Z,V
-       @tparam NYW is dimension of in-output vectors: Y,W
-       @tparam SpinorX Type of input spinor for x argument
-       @tparam SpinorY Type of input spinor for y argument
-       @tparam SpinorZ Type of input spinor for z argument
-       @tparam SpinorW Type of input spinor for w argument
-       @tparam SpinorW Type of input spinor for v argument
+       @tparam NXZ is dimension of input vectors: X,Z
+       @tparam store_t Default store type for the fields
+       @tparam N Default field vector i/o length
+       @tparam y_store_t Store type for the y fields
+       @tparam N Y-field vector i/o length
        @tparam Reducer Functor used to operate on data
     */
-    template <int NXZ, typename store_t, int N, typename y_store_t, int Ny, typename Reducer_>
+    template <int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Reducer_>
     struct MultiReduceArg :
-      public ReduceArg<vector_type<typename Reducer_::reduce_t, NXZ>>,
-      SpinorXZ<NXZ, store_t, N, Reducer_::use_z>,
-      SpinorYW<max_YW_size<NXZ, store_t, y_store_t, Reducer_>(), store_t, N, y_store_t, Ny, Reducer_::use_w>
+      public ReduceArg<vector_type<typename Reducer_::reduce_t, NXZ_>>,
+      SpinorXZ<NXZ_, store_t, N, Reducer_::use_z>,
+      SpinorYW<max_YW_size<NXZ_, store_t, y_store_t, Reducer_>(), store_t, N, y_store_t, Ny, Reducer_::use_w>
     {
       using Reducer = Reducer_;
+      static constexpr int NXZ = NXZ_;
       static constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, Reducer>();
       const int NYW;
-      Reducer r;
+      Reducer f;
       const int length;
       const int_fastdiv gridSize;
 
       MultiReduceArg(std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
                      std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
-                     Reducer r, int NYW, int length, int nParity, TuneParam &tp) :
+                     Reducer f, int NYW, int length, int nParity, TuneParam &tp) :
         // we have NYW * nParity reductions each of length NXZ
         ReduceArg<vector_type<typename Reducer_::reduce_t, NXZ>>(NYW),
         NYW(NYW),
-        r(r),
+        f(f),
         length(length),
         gridSize(tp.grid.x * tp.block.x / nParity)
       {
@@ -79,21 +79,21 @@ namespace quda
       while (idx < arg.length) {
 
         vec x, y, z, w;
-        if (arg.r.read.Y) arg.Y[k].load(y, idx, parity);
-        if (arg.r.read.W) arg.W[k].load(w, idx, parity);
+        if (arg.f.read.Y) arg.Y[k].load(y, idx, parity);
+        if (arg.f.read.W) arg.W[k].load(w, idx, parity);
 
         // Each NYW owns its own thread.
         // The NXZ's are all in the same thread block,
         // so they can share the same memory.
 #pragma unroll
         for (int l = 0; l < NXZ; l++) {
-          if (arg.r.read.X) arg.X[l].load(x, idx, parity);
-          if (arg.r.read.Z) arg.Z[l].load(z, idx, parity);
+          if (arg.f.read.X) arg.X[l].load(x, idx, parity);
+          if (arg.f.read.Z) arg.Z[l].load(z, idx, parity);
 
-          arg.r(sum[l], x, y, z, w, k, l);
+          arg.f(sum[l], x, y, z, w, k, l);
         }
-        if (arg.r.write.Y) arg.Y[k].save(y, idx, parity);
-        if (arg.r.write.W) arg.W[k].save(w, idx, parity);
+        if (arg.f.write.Y) arg.Y[k].save(y, idx, parity);
+        if (arg.f.write.W) arg.W[k].save(w, idx, parity);
 
         idx += arg.gridSize;
       }

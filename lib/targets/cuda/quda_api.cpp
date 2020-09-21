@@ -477,6 +477,15 @@ namespace quda {
 #endif
   }
 
+  void* qudaGetSymbolAddress_(const char *symbol, const char *func, const char *file, const char *line)
+  {
+    void *ptr;
+    cudaError_t error = cudaGetSymbolAddress(&ptr, symbol);
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    return ptr;
+  }
+
   void qudaFuncSetAttribute_(const void *kernel, cudaFuncAttribute attr, int value, const char *func, const char *file,
                              const char *line)
   {

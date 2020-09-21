@@ -20,17 +20,17 @@ namespace quda
     /**
        @brief Parameter struct for generic multi-blas kernel.
        @tparam NXZ is dimension of input vectors: X,Z
-       @tparam NYW is dimension of in-output vectors: Y,W
-       @tparam SpinorX Type of input spinor for x argument
-       @tparam SpinorY Type of input spinor for y argument
-       @tparam SpinorZ Type of input spinor for z argument
-       @tparam SpinorW Type of input spinor for w argument
+       @tparam store_t Default store type for the fields
+       @tparam N Default field vector i/o length
+       @tparam y_store_t Store type for the y fields
+       @tparam N Y-field vector i/o length
        @tparam Functor Functor used to operate on data
     */
-    template <int NXZ, typename store_t, int N, typename y_store_t, int Ny, typename Functor>
+    template <int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Functor>
     struct MultiBlasArg :
-      SpinorXZ<NXZ, store_t, N, Functor::use_z>,
-      SpinorYW<max_YW_size<NXZ, store_t, y_store_t, Functor>(), store_t, N, y_store_t, Ny, Functor::use_w> {
+      SpinorXZ<NXZ_, store_t, N, Functor::use_z>,
+      SpinorYW<max_YW_size<NXZ_, store_t, y_store_t, Functor>(), store_t, N, y_store_t, Ny, Functor::use_w> {
+      static constexpr int NXZ = NXZ_;
       static constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, Functor>();
       const int NYW;
       Functor f;

@@ -164,19 +164,6 @@ namespace quda {
         return TuneKey(x[0]->VolString(), name, aux);
       }
 
-      template <typename buffer_t>
-      void set_param(buffer_t &d, const T &h, const qudaStream_t &stream)
-      {
-        using coeff_t = typename decltype(r)::coeff_t;
-        constexpr size_t n_coeff = MAX_MATRIX_SIZE / sizeof(coeff_t);
-
-        coeff_t tmp[n_coeff];
-        for (int i = 0; i < NXZ; i++)
-          for (int j = 0; j < NYW; j++) tmp[NYW * i + j] = coeff_t(h.data[NYW * i + j]);
-        cudaMemcpyToSymbolAsync(d, tmp, NXZ * NYW * sizeof(decltype(tmp[0])), 0, cudaMemcpyHostToDevice, stream);
-        //cuMemcpyHtoDAsync(d, tmp, NXZ * NYW * sizeof(decltype(tmp[0])), stream);
-      }
-
       template <int NXZ> void compute(const qudaStream_t &stream)
       {
         staticCheck<NXZ, store_t, y_store_t, decltype(r)>(r, x, y);
@@ -207,9 +194,9 @@ namespace quda {
           // need to get constants pointer from jitify instance
           if (a.data || b.data || c.data) errorQuda("Constant memory buffer support not enabled with jitify yet");
 #else
-          if (a.data) set_param(Amatrix_d, a, stream);
-          if (b.data) set_param(Bmatrix_d, b, stream);
-          if (c.data) set_param(Cmatrix_d, c, stream);
+          if (a.data) set_param<false>(qudaGetSymbolAddress(Amatrix_d), arg, 'a', a, stream);
+          if (b.data) set_param<false>(qudaGetSymbolAddress(Cmatrix_d), arg, 'b', b, stream);
+          if (c.data) set_param<false>(qudaGetSymbolAddress(Bmatrix_d), arg, 'c', c, stream);
 #endif
           multiReduceLaunch<device_real_t, M, NXZ>(result, arg, tp, stream, *this);
         } else {
