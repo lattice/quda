@@ -24,7 +24,6 @@
 
 namespace quda
 {
-  constexpr int warp_size = 32;
 
   template <class T> struct TensorCoreSharedMemory {
     __device__ inline operator T *()

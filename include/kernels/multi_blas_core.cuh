@@ -59,7 +59,7 @@ namespace quda
     template <int warp_split, typename T> __device__ __host__ void warp_combine(T &x)
     {
 #ifdef WARP_SPLIT
-      constexpr int warp_size = 32;
+      constexpr int warp_size = device::warp_size();
       if (warp_split > 1) {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
@@ -89,7 +89,7 @@ namespace quda
       const int parity = blockIdx.z;
 
       // partition the warp between grid points and the NXZ update
-      constexpr int warp_size = 32;
+      constexpr int warp_size = device::warp_size();
       constexpr int vector_site_width = warp_size / warp_split;
       const int lane_id = threadIdx.x % warp_size;
       const int warp_id = threadIdx.x / warp_size;

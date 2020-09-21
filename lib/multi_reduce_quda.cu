@@ -13,25 +13,19 @@ namespace quda {
     qudaStream_t* getStream();
 
     template <int block_size, typename real, int len, int NXZ, typename Arg>
-    typename std::enable_if<block_size!=32, qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+    typename std::enable_if<block_size!=device::warp_size(), qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
       if (tp.block.x == block_size)
         return qudaLaunchKernel(multiReduceKernel<block_size, real, len, NXZ, Arg>, tp, stream, arg);
       else
-        return launch<block_size - 32, real, len, NXZ>(arg, tp, stream);
+        return launch<block_size - device::warp_size(), real, len, NXZ>(arg, tp, stream);
     }
 
     template <int block_size, typename real, int len, int NXZ, typename Arg>
-    typename std::enable_if<block_size==32, qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+    typename std::enable_if<block_size==device::warp_size(), qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
       return qudaLaunchKernel(multiReduceKernel<block_size, real, len, NXZ, Arg>, tp, stream, arg);
     }
-
-#ifdef QUDA_FAST_COMPILE_REDUCE
-    constexpr unsigned int max_block_size() { return 32; }
-#else
-    constexpr unsigned int max_block_size() { return 128; }
-#endif
 
     template <typename real, int len, int NXZ, typename Arg, typename T>
     void multiReduceLaunch(T result[], Arg &arg, const TuneParam &tp, const qudaStream_t &stream, Tunable &tunable)
@@ -48,7 +42,7 @@ namespace quda {
                                   .launch(arg);
       arg.launch_error = tunable.jitifyError() == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
 #else
-      arg.launch_error = launch<max_block_size(), real, len, NXZ>(arg, tp, stream);
+      arg.launch_error = launch<device::max_block_size(), real, len, NXZ>(arg, tp, stream);
 #endif
 
       std::vector<T> result_(NXZ * arg.NYW);
@@ -90,7 +84,7 @@ namespace quda {
         return false;
       }
 
-      unsigned int maxBlockSize(const TuneParam &param) const { return max_block_size(); }
+      unsigned int maxBlockSize(const TuneParam &param) const { return device::max_block_size(); }
 
     public:
       MultiReduce(const T &a, const T &b, const T &c, const ColorSpinorField &x_meta, const ColorSpinorField &y_meta,

@@ -569,10 +569,9 @@ namespace quda {
 
   template<typename Arg>
   __device__ __host__ inline int virtualThreadIdx(const Arg &arg) {
-    constexpr int warp_size = 32;
-    int warp_id = threadIdx.x / warp_size;
-    int warp_lane = threadIdx.x % warp_size;
-    int tx = warp_id * (warp_size / arg.aggregates_per_block) + warp_lane / arg.aggregates_per_block;
+    int warp_id = threadIdx.x / device::warp_size();
+    int warp_lane = threadIdx.x % device::warp_size();
+    int tx = warp_id * (device::warp_size() / arg.aggregates_per_block) + warp_lane / arg.aggregates_per_block;
     return tx;
   }
 
@@ -584,8 +583,7 @@ namespace quda {
 
   template<typename Arg>
   __device__ __host__ inline int coarseIndex(const Arg &arg) {
-    constexpr int warp_size = 32;
-    int warp_lane = threadIdx.x % warp_size;
+    int warp_lane = threadIdx.x % device::warp_size();
     int x_coarse = (arg.coarse_color_wave ? blockIdx.y : blockIdx.x)*arg.aggregates_per_block + warp_lane % arg.aggregates_per_block;
     return x_coarse;
   }

@@ -318,7 +318,7 @@ namespace quda {
 #pragma unroll
       for (int color_local=0; color_local<Mc; color_local++) {
 	// reduce down to the first group of column-split threads
-	constexpr int warp_size = 32; // FIXME - this is buggy when x-dim * color_stride < 32
+	constexpr int warp_size = device::warp_size(); // FIXME - this is buggy when x-dim * color_stride < 32
 #pragma unroll
 	for (int offset = warp_size/2; offset >= warp_size/color_stride; offset /= 2)
 #define WARP_CONVERGED 0xffffffff // we know warp should be converged here
@@ -373,7 +373,7 @@ namespace quda {
   template <typename Float, int nDim, int Ns, int Nc, int Mc, int color_stride, int dim_thread_split, bool dslash, bool clover, bool dagger, DslashType type, typename Arg>
   __global__ void coarseDslashKernel(Arg arg)
   {
-    constexpr int warp_size = 32;
+    constexpr int warp_size = device::warp_size();
     const int lane_id = threadIdx.x % warp_size;
     const int warp_id = threadIdx.x / warp_size;
     const int vector_site_width = warp_size / color_stride;
