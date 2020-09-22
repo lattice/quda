@@ -2400,8 +2400,8 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
   cudaParam.create = QUDA_ZERO_FIELD_CREATE;
   cudaParam.setPrecision(inv_param->cuda_prec_eigensolver, inv_param->cuda_prec_eigensolver, true);
-  // Ensure device vectors qre in UKQCD basis.
-  cudaParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+  // Ensure device vectors qre in UKQCD basis for Wilson type fermions
+  if(cudaParam.nSpin != 1) cudaParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
   
   std::vector<Complex> evals(eig_param->n_conv, 0.0);
   std::vector<ColorSpinorField *> kSpace;
