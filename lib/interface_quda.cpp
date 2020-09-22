@@ -2388,7 +2388,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   // compute function.
   const int *X = cudaGauge->X();
   ColorSpinorParam cpuParam(host_evecs[0], *inv_param, X, inv_param->solution_type, inv_param->input_location);
-  
+
   // create wrappers around application vector set
   std::vector<ColorSpinorField *> host_evecs_;
   for (int i = 0; i < eig_param->n_conv; i++) {
@@ -2402,7 +2402,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   cudaParam.setPrecision(inv_param->cuda_prec_eigensolver, inv_param->cuda_prec_eigensolver, true);
   // Ensure device vectors qre in UKQCD basis for Wilson type fermions
   if(cudaParam.nSpin != 1) cudaParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-  
+
   std::vector<Complex> evals(eig_param->n_conv, 0.0);
   std::vector<ColorSpinorField *> kSpace;
   for (int i = 0; i < eig_param->n_conv; i++) { kSpace.push_back(ColorSpinorField::Create(cudaParam)); }
@@ -2462,8 +2462,8 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   for (int i = 0; i < eig_param->n_conv; i++) { memcpy(host_evals + i, &evals[i], sizeof(Complex)); }
 
   // Transfer Eigenpairs back to host if using GPU eigensolver. The copy
-  // will automatically rotate from device UKQCD gamma basis to the 
-  // host side gamma basis. 
+  // will automatically rotate from device UKQCD gamma basis to the
+  // host side gamma basis.
   if (!(eig_param->arpack_check)) {
     profileEigensolve.TPSTART(QUDA_PROFILE_D2H);
     for (int i = 0; i < eig_param->n_conv; i++) *host_evecs_[i] = *kSpace[i];
