@@ -60,7 +60,7 @@ int main(int argc, char **argv)
   setVerbosity(verbosity);
   
   // initialize the QUDA library
-  initQuda(device);
+  initQuda(device_ordinal);
   //-----------------------------------------------------------------------------
 
   QudaCublasParam cublas_param = newQudaCublasParam();
