@@ -101,9 +101,11 @@ namespace quda
   void PreconCG::operator()(ColorSpinorField &x, ColorSpinorField &b, std::vector<ColorSpinorField *> &v_r,
                             int collect_maxiter, double collect_tol)
   {
-    profile.TPSTART(QUDA_PROFILE_INIT);
-
+    profile.TPSTART(QUDA_PROFILE_D2H);
     if (param.schwarz_type == QUDA_ADDITIVE_MADWF_SCHWARZ) { K->train_param(*this, b); }
+    profile.TPSTOP(QUDA_PROFILE_D2H);
+
+    profile.TPSTART(QUDA_PROFILE_INIT);
 
     // whether to select alternative reliable updates
     bool alternative_reliable = param.use_alternative_reliable;
@@ -536,5 +538,7 @@ namespace quda
     profile.TPSTOP(QUDA_PROFILE_FREE);
     return;
   }
+
+  std::unordered_map<std::string, std::vector<float>> MADWFacc::host_training_param_cache; // empty map
 
 } // namespace quda

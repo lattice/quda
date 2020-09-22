@@ -43,7 +43,7 @@ namespace quda
 
     QudaPrecision prec_precondition;
 
-    std::unordered_map<std::string, std::vector<TrainingFloat>> host_training_param_cache; // empty map
+    static std::unordered_map<std::string, std::vector<TrainingFloat>> host_training_param_cache; // empty map
 
     MADWFacc(const SolverParam &solve_param) :
       mu(solve_param.madwf_diagonal_suppressor),
