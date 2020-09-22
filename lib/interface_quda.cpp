@@ -2466,6 +2466,8 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
   cudaParam.create = QUDA_ZERO_FIELD_CREATE;
   cudaParam.setPrecision(inv_param->cuda_prec_eigensolver, inv_param->cuda_prec_eigensolver, true);
+  // Ensure device vectors qre in UKQCD basis for Wilson type fermions
+  if(cudaParam.nSpin != 1) cudaParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 
   std::vector<Complex> evals(eig_param->n_conv, 0.0);
   std::vector<ColorSpinorField *> kSpace;
@@ -2525,7 +2527,9 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   // Copy eigen values back
   for (int i = 0; i < eig_param->n_conv; i++) { memcpy(host_evals + i, &evals[i], sizeof(Complex)); }
 
-  // Transfer Eigenpairs back to host if using GPU eigensolver
+  // Transfer Eigenpairs back to host if using GPU eigensolver. The copy
+  // will automatically rotate from device UKQCD gamma basis to the
+  // host side gamma basis.
   if (!(eig_param->arpack_check)) {
     profileEigensolve.TPSTART(QUDA_PROFILE_D2H);
     for (int i = 0; i < eig_param->n_conv; i++) *host_evecs_[i] = *kSpace[i];
