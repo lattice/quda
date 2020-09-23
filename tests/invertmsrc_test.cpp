@@ -137,7 +137,7 @@ int main(int argc, char **argv)
     qudaInMulti[i] = quda::ColorSpinorField::Create(cs_param);
     inMulti[i] = qudaInMulti[i]->V();
     // Populate the host spinor with random numbers.
-    constructRandomSpinorSource(qudaInMulti[i]->V(), 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
+    constructRandomSpinorSource(cs_param, qudaInMulti[i]->V(), *rng);
   }
   // Vector construct END
   //-----------------------------------------------------------------------------------
