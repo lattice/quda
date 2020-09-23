@@ -158,27 +158,33 @@ namespace quda
         ColorSpinorParam csParam(in);
         csParam.x[4] = Ls_base;
         csParam.create = QUDA_NULL_FIELD_CREATE;
-        // TODO: The precision is currently hardcoded.
         csParam.setPrecision(prec_precondition);
 
         forward_tmp = new cudaColorSpinorField(csParam);
         backward_tmp = new cudaColorSpinorField(csParam);
-
 
         return;
       }
 
       ColorSpinorParam csParam(in);
       cudaColorSpinorField null_x(csParam);
+      cudaColorSpinorField null_b(csParam);
+
+      auto rng = new RNG(null_b, 1234);
+      rng->Init();
+
+      printfQuda("Generating Null Space Vectors ... \n");
+      spinorNoise(null_b, *rng, QUDA_NOISE_GAUSS);
+
+      rng->Release();
+      delete rng;
 
       std::vector<ColorSpinorField *> B(16);
-      // TODO: The precision is currently hardcoded.
       csParam.setPrecision(prec_precondition);
       for (auto &pB : B) { pB = new cudaColorSpinorField(csParam); }
 
-      printfQuda("Generating Null Space Vectors ... \n");
       // TODO: Currently this only work for PreconCG.
-      static_cast<PreconCG &>(null)(null_x, const_cast<ColorSpinorField &>(in), B, null_maxiter, null_tol);
+      static_cast<PreconCG &>(null)(null_x, null_b, B, null_maxiter, null_tol);
       for (auto &pB : B) { blas::ax(5e3 / sqrt(blas::norm2(*pB)), *pB); }
 
       saveTuneCache();
