@@ -7,6 +7,7 @@
 
 namespace quda
 {
+
   // Local enum for the LU axpy block type
   enum blockType { PENCIL, LOWER_TRI, UPPER_TRI };
 
@@ -45,7 +46,7 @@ protected:
     int num_locked;
     int num_keep;
 
-    double *residua;
+    std::vector<double> residua;
 
     // Device side vector workspace
     std::vector<ColorSpinorField *> r;
@@ -339,8 +340,18 @@ protected:
        @param[in] file The filename to save
     */
     void loadFromFile(const DiracMatrix &mat, std::vector<ColorSpinorField *> &eig_vecs, std::vector<Complex> &evals);
+
+    void sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<Complex> &x, std::vector<Complex> &y);
+    
+    void sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<double> &x, std::vector<Complex> &y);
+    
+    void sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<Complex> &x, std::vector<double> &y);
+    
+    void sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<double> &x, std::vector<double> &y);
+    
   };
 
+  
   /**
      @brief Thick Restarted Lanczos Method.
   */
@@ -483,8 +494,7 @@ protected:
   public:
 
     Complex **upperHess;
-    // Variable size matrix
-    std::vector<Complex> ritz_mat_complex;
+    Complex **Qmat;
     
     /**
        @brief Constructor for Thick Restarted Eigensolver class
@@ -513,9 +523,15 @@ protected:
        @param[in] v Vector space
        @param[in] j Index of vector being computed
     */
-    void arnoldiStep(std::vector<ColorSpinorField *> &v, int j);
+    void arnoldiStep(std::vector<ColorSpinorField *> &v, std::vector<ColorSpinorField *> &r, double &beta, int j);
 
-    void rotateVecsComplex(std::vector<ColorSpinorField *> &v, int j);
+    void eigensolveFromUpperHess(std::vector<Complex> &evals, const double beta);
+    
+    void rotateVecsComplex(std::vector<ColorSpinorField *> &v, int keep);
+
+    void rotateArnoldiBasis(std::vector<ColorSpinorField *> &v);
+    
+    void qrShifts(const std::vector<Complex> evals, const int num_shifts, const double epsilon);
     
   };
 
@@ -539,3 +555,4 @@ protected:
                     QudaEigParam *eig_param, TimeProfile &profile);
 
 } // namespace quda
+

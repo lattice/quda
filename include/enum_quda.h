@@ -145,15 +145,15 @@ typedef enum QudaEigType_s {
 /** S=smallest L=largest
     R=real M=modulus I=imaniary **/
 typedef enum QudaEigSpectrumType_s {
-  QUDA_SPECTRUM_SR_EIG,
-  QUDA_SPECTRUM_LR_EIG,
-  QUDA_SPECTRUM_SM_EIG,
-  QUDA_SPECTRUM_LM_EIG,
-  QUDA_SPECTRUM_SI_EIG,
-  QUDA_SPECTRUM_LI_EIG,
+  QUDA_SPECTRUM_LM_EIG = 0,
+  QUDA_SPECTRUM_SM_EIG = 1,
+  QUDA_SPECTRUM_LR_EIG = 2,
+  QUDA_SPECTRUM_SR_EIG = 3,
+  QUDA_SPECTRUM_LI_EIG = 4,
+  QUDA_SPECTRUM_SI_EIG = 5,
   QUDA_SPECTRUM_INVALID = QUDA_INVALID_ENUM
 } QudaEigSpectrumType;
-
+  
 typedef enum QudaSolutionType_s {
   QUDA_MAT_SOLUTION,
   QUDA_MATDAG_MAT_SOLUTION,

@@ -71,21 +71,22 @@ namespace quda
     if (n_kr == 0) errorQuda("n_kr=0 passed to Eigensolver");
     if (n_conv == 0) errorQuda("n_conv=0 passed to Eigensolver");
     if (n_ev_deflate > n_conv) errorQuda("deflation vecs = %d is greater than n_conv = %d", n_ev_deflate, n_conv);
-    
-    residua = (double *)safe_malloc(n_kr * sizeof(double));
-    for (int i = 0; i < n_kr; i++) { residua[i] = 0.0; }
 
+    residua.reserve(n_kr);
+    for(int i=0; i<n_kr; i++) residua.push_back(0.0);
+    
     // Part of the spectrum to be computed.
     switch (eig_param->spectrum) {
-    case QUDA_SPECTRUM_SR_EIG: strcpy(spectrum, "SR"); break;
-    case QUDA_SPECTRUM_LR_EIG: strcpy(spectrum, "LR"); break;
-    case QUDA_SPECTRUM_SM_EIG: strcpy(spectrum, "SM"); break;
     case QUDA_SPECTRUM_LM_EIG: strcpy(spectrum, "LM"); break;
-    case QUDA_SPECTRUM_SI_EIG: strcpy(spectrum, "SI"); break;
+    case QUDA_SPECTRUM_SM_EIG: strcpy(spectrum, "SM"); break;      
+    case QUDA_SPECTRUM_LR_EIG: strcpy(spectrum, "LR"); break;
+    case QUDA_SPECTRUM_SR_EIG: strcpy(spectrum, "SR"); break;
     case QUDA_SPECTRUM_LI_EIG: strcpy(spectrum, "LI"); break;
+    case QUDA_SPECTRUM_SI_EIG: strcpy(spectrum, "SI"); break;
     default: errorQuda("Unexpected spectrum type %d", eig_param->spectrum);
     }
 
+    
     // Deduce whether to reverse the sorting
     if (strncmp("L", spectrum, 1) == 0 && !eig_param->use_poly_acc) {
       reverse = true;
@@ -95,8 +96,8 @@ namespace quda
     } else if (strncmp("L", spectrum, 1) == 0 && eig_param->use_poly_acc) {
       reverse = true;
       spectrum[0] = 'S';
-    }
-
+    }    
+    
     if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
 
@@ -178,16 +179,16 @@ namespace quda
     csParamClone.create = QUDA_ZERO_FIELD_CREATE;
     for (int b = 0; b < block_size; b++) { r.push_back(ColorSpinorField::Create(csParamClone)); }
     // Increase evals space to n_ev
-    evals.reserve(n_ev);
-    for (int i = n_conv; i < n_ev; i++) evals.push_back(0.0);
+    evals.reserve(n_kr);
+    for (int i = n_conv; i < n_kr; i++) evals.push_back(0.0);
   }
 
   void EigenSolver::printEigensolverSetup()
   {
     if (getVerbosity() >= QUDA_SUMMARIZE) {
-      printfQuda("*****************************\n");
-      printfQuda("**** START TRLM SOLUTION ****\n");
-      printfQuda("*****************************\n");
+      printfQuda("*********************************\n");
+      printfQuda("**** START QUDA EIG SOLUTION ****\n");
+      printfQuda("*********************************\n");
     }
 
     if (getVerbosity() >= QUDA_VERBOSE) {
@@ -792,11 +793,105 @@ namespace quda
     computeEvals(mat, kSpace, evals);
     delete r[0];
   }
+  
+  void EigenSolver::sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<Complex> &x, std::vector<Complex> &y) {
+    
+    //  'LM' -> sort into increasing order of magnitude.
+    //  'SM' -> sort into decreasing order of magnitude.
+    //  'LR' -> sort with real(x) in increasing algebraic order 
+    //  'SR' -> sort with real(x) in decreasing algebraic order
+    //  'LI' -> sort with imag(x) in increasing algebraic order
+    //  'SI' -> sort with imag(x) in decreasing algebraic order
 
+    std::vector<std::pair<Complex, Complex>> array(n);
+    for(int i=0; i<n; i++) array[i] = std::make_pair(x[i], y[i]);
+  
+    switch(spec_type) {
+    case QUDA_SPECTRUM_LM_EIG:
+      std::sort(array.begin(), array.begin()+n,
+		[] (const std::pair<Complex,Complex> &a,
+		    const std::pair<Complex,Complex> &b) {
+		  return (abs(a.first) < abs(b.first)); } );
+      break;
+    case QUDA_SPECTRUM_SM_EIG:
+      std::sort(array.begin(), array.begin()+n,
+		[] (const std::pair<Complex,Complex> &a,
+		    const std::pair<Complex,Complex> &b) {
+		  return (abs(a.first) > abs(b.first)); } );
+      break;
+    case QUDA_SPECTRUM_LR_EIG:
+      std::sort(array.begin(), array.begin()+n,
+		[] (const std::pair<Complex,Complex> &a,
+		    const std::pair<Complex,Complex> &b) {
+		  return (a.first).real() < (b.first).real(); } );
+      break;
+    case QUDA_SPECTRUM_SR_EIG:
+      std::sort(array.begin(), array.begin()+n,
+		[] (const std::pair<Complex,Complex> &a,
+		    const std::pair<Complex,Complex> &b) {
+		  return (a.first).real() > (b.first).real(); } );
+      break;
+    case QUDA_SPECTRUM_LI_EIG:
+      std::sort(array.begin(), array.begin()+n,
+		[] (const std::pair<Complex,Complex> &a,
+		    const std::pair<Complex,Complex> &b) {
+		  return (a.first).imag() < (b.first).imag(); } );
+      break;
+    case QUDA_SPECTRUM_SI_EIG:
+      std::sort(array.begin(), array.begin()+n,
+		[] (const std::pair<Complex,Complex> &a,
+		    const std::pair<Complex,Complex> &b) {
+		  return (a.first).imag() > (b.first).imag(); } );
+      break;
+    default: errorQuda("Undefined sort %d given", spec_type);
+    }
+    
+    // Repopulate x and y arrays with sorted elements
+    for(int i=0; i<n; i++) {
+      x[i] = array[i].first;
+      y[i] = array[i].second;
+    }
+  }
+
+  // Overloaded version of sortArrays to deal with real y array.
+  void EigenSolver::sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<Complex> &x, std::vector<double> &y) {
+
+    std::vector<Complex> y_tmp(n,0.0);
+    for(int i=0; i<n; i++) y_tmp[i].real(y[i]);
+    sortArrays(spec_type, n, x, y_tmp);
+    for(int i=0; i<n; i++) y[i] = y_tmp[i].real();
+  }
+
+  // Overloaded version of sortArrays to deal with real x array.
+  void EigenSolver::sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<double> &x, std::vector<Complex> &y) {
+
+    std::vector<Complex> x_tmp(n,0.0);
+    for(int i=0; i<n; i++) x_tmp[i].real(x[i]);
+    sortArrays(spec_type, n, x_tmp, y);
+    for(int i=0; i<n; i++) x[i] = x_tmp[i].real();
+  }
+
+  // Overloaded version of sortArrays to deal with real x and y array.
+  void EigenSolver::sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<double> &x, std::vector<double> &y) {
+
+    std::vector<Complex> x_tmp(n,0.0);
+    std::vector<Complex> y_tmp(n,0.0);
+    for(int i=0; i<n; i++) {
+      x_tmp[i].real(x[i]);
+      y_tmp[i].real(y[i]);
+    }
+    sortArrays(spec_type, n, x_tmp, y_tmp);
+    for(int i=0; i<n; i++) {
+      x[i] = x_tmp[i].real();
+      y[i] = y_tmp[i].real();
+    }
+  }
+
+
+  
   EigenSolver::~EigenSolver()
   {
     if (tmp1) delete tmp1;
     if (tmp2) delete tmp2;
-    host_free(residua);
   }
 } // namespace quda
