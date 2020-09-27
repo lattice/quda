@@ -419,9 +419,8 @@ namespace quda
 	  printfQuda("Eval[%04d] = (%+.16e,%+.16e) residual = %+.16e\n",
 		     i, evals[i].real(), evals[i].imag(), residua[i]);
       }
-
-      // Check order
-      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) computeEvals(mat, kSpace, evals);
+      
+      computeEvals(mat, kSpace, evals, n_conv);
     }
 
     // Local clean-up
