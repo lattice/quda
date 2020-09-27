@@ -52,6 +52,7 @@ namespace quda
     //| an exact j-step Arnoldi factorization is present. |
     //%---------------------------------------------------%
     beta = sqrt(blas::norm2(*r[0]));
+    if(j > 0) upperHess[j][j-1] = beta;
     
     //%--------------------------------%
     //| STEP 2:  v_{j} = r_{j-1}/rnorm |
@@ -59,8 +60,8 @@ namespace quda
     //blas::zero(*v[j]);
     //blas::axpy(1.0/beta, *r[0], *v[j]);
     blas::ax(1.0/beta, *r[0]);
-    blas::copy(*v[j], *r[0]);
-        
+    std::swap(v[j], r[0]);
+    
     //%----------------------------%
     //| STEP 3:  r_{j} = OP*v_{j}; |
     //%----------------------------%  
@@ -86,25 +87,20 @@ namespace quda
     //| WORKD(IPJ:IPJ+N-1) contains B*OP*v_{j}.  |
     //%------------------------------------------%
     //H_{j,i}_j = v_i^dag * r
-    std::vector<Complex> uh_col(j+1);
-    //blas::cDotProduct(uh_col, v, r);
-    for (int i = 0; i < j+1; i++) {
-      //upperHess[i][j] = uh_col(i);
-      upperHess[i][j] = blas::cDotProduct(*v[i], *r[0]);
-    }
-    
+    std::vector<Complex> tmp(j+1);
+    std::vector<ColorSpinorField *> v_;
+    v_.reserve(j+1);
+    for (int i = 0; i < j+1; i++) { v_.push_back(v[i]); }    
+    blas::cDotProduct(tmp.data(), v_, r);
+
     //%--------------------------------------%
     //| Orthogonalize r_{j} against V_{j}.   |
     //| RESID contains OP*v_{j}. See STEP 3. | 
     //%--------------------------------------%
     //r = r - H_{j,i} * v_j 
-    for (int i = 0; i < j+1; i++) {
-      blas::caxpy(-1.0*upperHess[i][j], *v[i], *r[0]);
-    }
-    
-    if(j > 0) upperHess[j][j-1] = beta;
-    
-    beta = sqrt(blas::norm2(*r[0]));
+    for (int i = 0; i < j+1; i++) tmp[i] *= -1.0;    
+    blas::caxpy(tmp.data(), v_, r);
+    for (int i = 0; i < j+1; i++) upperHess[i][j] = -1.0*tmp[i];
     
     //%-----------------------------------------------------------%
     //| STEP 5: Re-orthogonalization / Iterative refinement phase |
@@ -126,6 +122,7 @@ namespace quda
 
     int orth_iter = 0;
     int orth_iter_max = 100;
+    beta = sqrt(blas::norm2(*r[0]));
     while(beta < 0.717*wnorm && orth_iter < orth_iter_max) {
     
       //%---------------------------------------------------%
@@ -144,18 +141,13 @@ namespace quda
 
       wnorm = beta;
     
-      // reorthogonalise r against the K space
+      // reorthogonalise r against the Krylov space
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("beta[%d] = %e > 0.717*beta[%d] = %e: Reorthogonalise at step %d, iter %d\n", j+1, beta, j, 0.717*wnorm, j, orth_iter);
-      std::vector<Complex> alpha(j+1, 0.0);
-      for(int i=0; i < j+1; i++) {
-	alpha[i] = blas::cDotProduct(*v[i], *r[0]);
-	upperHess[i][j] += alpha[i];
-      }
-    
-      for(int i=0; i < j+1; i++) {
-	blas::caxpy(-1.0*alpha[i], *v[i], *r[0]);
-      }
-    
+      blas::cDotProduct(tmp.data(), v_, r);
+      for (int i = 0; i < j+1; i++) tmp[i] *= -1.0;    
+      blas::caxpy(tmp.data(), v_, r);    
+      for (int i = 0; i < j+1; i++) upperHess[i][j] -= tmp[i];
+      
       beta = sqrt(blas::norm2(*r[0]));
       orth_iter++;
     }
