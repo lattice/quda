@@ -208,26 +208,6 @@ namespace quda
     // Save Krylov rotation tuning
     saveTuneCache();
   }
-
-  void IRAM::rotateArnoldiBasis(std::vector<ColorSpinorField *> &kSpace)
-  {
-    Eigen::MatrixXcd upperHessEigen = MatrixXcd::Zero(n_kr, n_kr);
-    for(int i = 0; i < n_kr; i++) {
-      for(int j = 0; j < n_kr; j++) {
-	upperHessEigen(i,j) = upperHess[i][j];
-      }
-    }
-    
-    Eigen::ComplexEigenSolver<MatrixXcd> eigenSolver(upperHessEigen);
-    for(int i = 0; i < n_kr; i++) {
-      for(int j = 0; j < n_kr; j++) {
-	Qmat[j][i] = eigenSolver.eigenvectors().col(i)[j];
-      }
-    }
-    
-    rotateVecsComplex(kSpace, n_kr);
-  }
-  
   
   void IRAM::qrShifts(const std::vector<Complex> evals, const int num_shifts, const double epsilon)
   {
@@ -349,8 +329,13 @@ namespace quda
       evals[i] = eigenSolverUH.eigenvalues()[i];
       residua[i] = abs(beta * eigenSolverUH.eigenvectors().col(i)[n_kr - 1]);
     }
+    // Update the Q matrix
+    for(int i = 0; i < n_kr; i++) {
+      for(int j = 0; j < n_kr; j++) {
+	Qmat[j][i] = eigenSolverUH.eigenvectors().col(i)[j];
+      }
+    }
   }
-
   
   void IRAM::operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)
   {
@@ -435,10 +420,13 @@ namespace quda
       
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("%04d converged eigenvalues at iter %d\n", num_converged, restart_iter);
 
-      if (num_converged >= n_ev) {
+      if (num_converged >= n_conv) {	
 	converged = true;
-      } else if (restart_iter < max_restarts) {
-      
+	eigensolveFromUpperHess(evals, beta);
+	rotateVecsComplex(kSpace, n_kr);
+	reorder(kSpace, evals, eig_param->spectrum);
+      } else {
+	
 	int num_keep0 = num_keep;
 	iter_keep = std::min(iter_converged + (n_kr - num_converged) / 2, n_kr - 12);
 	
@@ -462,7 +450,7 @@ namespace quda
 	blas::caxpby(upperHess[num_keep][num_keep-1], *kSpace[num_keep], Qmat[n_kr-1][num_keep-1], *r[0]);
 
 	if(sqrt(blas::norm2(*r[0])) < epsilon) {
-	  errorQuda("nope...");	 
+	  errorQuda("IRAM has encountered an invariant subspace...");	 
 	}
       }      
       restart_iter++;
@@ -485,15 +473,101 @@ namespace quda
         printfQuda("IRAM computed the requested %d vectors in %d restart steps and %d OP*x operations.\n", n_conv,
                    restart_iter, iter);
       }
-      
-      rotateArnoldiBasis(kSpace);
-      computeEvals(mat, kSpace, evals, n_kr);
+
+      if (getVerbosity() >= QUDA_SUMMARIZE) {
+	for(int i=0; i<n_conv; i++)
+	  printfQuda("Eval[%04d] = (%+.16e,%+.16e) residual = %+.16e\n",
+		     i, evals[i].real(), evals[i].imag(), residua[i]);
+      }
+
+      // Check order
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) computeEvals(mat, kSpace, evals, n_kr);
     }
 
     // Local clean-up
     cleanUpEigensolver(kSpace, evals);
   }
 
+  void IRAM::reorder(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals, const QudaEigSpectrumType spec_type)
+  {
+    int i=0;
+    switch(spec_type) {
+    case QUDA_SPECTRUM_LM_EIG:
+      while (i < n_kr) {
+        if ((i == 0) || abs(evals[i - 1]) >= abs(evals[i]))
+	  i++;
+        else {
+          std::swap(evals[i], evals[i - 1]);
+	  std::swap(residua[i], residua[i - 1]);
+          std::swap(kSpace[i], kSpace[i - 1]);
+          i--;
+        }
+      }
+      break;
+    case QUDA_SPECTRUM_SM_EIG:
+      while (i < n_kr) {
+        if ((i == 0) || abs(evals[i - 1]) <= abs(evals[i]))
+	  i++;
+        else {
+          std::swap(evals[i], evals[i - 1]);
+	  std::swap(residua[i], residua[i - 1]);
+          std::swap(kSpace[i], kSpace[i - 1]);
+          i--;
+        }
+      }
+      break;
+    case QUDA_SPECTRUM_LR_EIG:      
+      while (i < n_kr) {
+        if ((i == 0) || evals[i - 1].real() >= evals[i].real())
+	  i++;
+        else {
+          std::swap(evals[i], evals[i - 1]);
+	  std::swap(residua[i], residua[i - 1]);
+          std::swap(kSpace[i], kSpace[i - 1]);
+          i--;
+        }
+      }
+      break;
+    case QUDA_SPECTRUM_SR_EIG:
+      while (i < n_kr) {
+        if ((i == 0) || evals[i - 1].real() <= evals[i].real())
+	  i++;
+        else {
+          std::swap(evals[i], evals[i - 1]);
+	  std::swap(residua[i], residua[i - 1]);
+          std::swap(kSpace[i], kSpace[i - 1]);
+          i--;
+        }
+      }
+      break;
+    case QUDA_SPECTRUM_LI_EIG:
+      while (i < n_kr) {
+        if ((i == 0) || evals[i - 1].imag() >= evals[i].imag())
+	  i++;
+        else {
+          std::swap(evals[i], evals[i - 1]);
+	  std::swap(residua[i], residua[i - 1]);
+          std::swap(kSpace[i], kSpace[i - 1]);
+          i--;
+        }
+      }
+      break;
+    case QUDA_SPECTRUM_SI_EIG:
+      while (i < n_kr) {
+        if ((i == 0) || evals[i - 1].imag() <= evals[i].imag())
+	  i++;
+        else {
+          std::swap(evals[i], evals[i - 1]);
+	  std::swap(residua[i], residua[i - 1]);
+          std::swap(kSpace[i], kSpace[i - 1]);
+          i--;
+        }
+      }
+      break;
+    default: errorQuda("Undefined sort %d given", spec_type);
+    }
+  }
+  
   // Destructor
   IRAM::~IRAM()
   {

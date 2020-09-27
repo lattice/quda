@@ -719,7 +719,8 @@ namespace quda
       blas::caxpby(evals[i], *evecs[i], n_unit, *temp[0]);
       residua[i] = sqrt(blas::norm2(*temp[0]));
 
-      if (getVerbosity() >= QUDA_SUMMARIZE)
+      // If size = n_conv, this routine is called post sort
+      if (getVerbosity() >= QUDA_SUMMARIZE && size == n_conv)
         printfQuda("Eval[%04d] = (%+.16e,%+.16e) residual = %+.16e\n", i, evals[i].real(), evals[i].imag(), residua[i]);
     }
     delete temp[0];
@@ -843,7 +844,7 @@ namespace quda
 		    const std::pair<Complex,Complex> &b) {
 		  return (a.first).imag() > (b.first).imag(); } );
       break;
-    default: errorQuda("Undefined sort %d given", spec_type);
+    default: errorQuda("Undefined spectrum type %d given", spec_type);
     }
     
     // Repopulate x and y arrays with sorted elements
@@ -886,8 +887,6 @@ namespace quda
       y[i] = y_tmp[i].real();
     }
   }
-
-
   
   EigenSolver::~EigenSolver()
   {

@@ -529,9 +529,9 @@ protected:
     
     void rotateVecsComplex(std::vector<ColorSpinorField *> &v, int keep);
 
-    void rotateArnoldiBasis(std::vector<ColorSpinorField *> &v);
-    
     void qrShifts(const std::vector<Complex> evals, const int num_shifts, const double epsilon);
+
+    void reorder(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals, const QudaEigSpectrumType spec_type);
     
   };
 
