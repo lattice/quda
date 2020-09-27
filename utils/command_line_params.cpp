@@ -305,10 +305,10 @@ namespace
                                                            {"mat-pc-dag-mat-pc", QUDA_MATPCDAG_MATPC_SOLUTION}};
 
   CLI::TransformPairs<QudaEigType> eig_type_map {{"trlm", QUDA_EIG_TR_LANCZOS},
-                                                 {"irlm", QUDA_EIG_IR_LANCZOS},
-                                                 {"iram", QUDA_EIG_IR_ARNOLDI},
-                                                 {"blktrlm", QUDA_EIG_BLK_TR_LANCZOS}};
-
+                                                 {"blktrlm", QUDA_EIG_BLK_TR_LANCZOS},
+						 {"iram", QUDA_EIG_IR_ARNOLDI},
+						 {"blkiram", QUDA_EIG_BLK_IR_ARNOLDI}};
+                                                 
   CLI::TransformPairs<QudaTboundary> fermion_t_boundary_map {{"periodic", QUDA_PERIODIC_T},
                                                              {"anti-periodic", QUDA_ANTI_PERIODIC_T}};
 

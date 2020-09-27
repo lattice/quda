@@ -250,7 +250,7 @@ void setEigParam(QudaEigParam &eig_param)
 {
   eig_param.eig_type = eig_type;
   eig_param.spectrum = eig_spectrum;
-  if ((eig_type == QUDA_EIG_TR_LANCZOS || eig_type == QUDA_EIG_IR_LANCZOS)
+  if ((eig_type == QUDA_EIG_TR_LANCZOS || eig_type == QUDA_EIG_BLK_TR_LANCZOS)
       && !(eig_spectrum == QUDA_SPECTRUM_LR_EIG || eig_spectrum == QUDA_SPECTRUM_SR_EIG)) {
     errorQuda("Only real spectrum type (LR or SR) can be passed to Lanczos type solver.");
   }
@@ -272,7 +272,7 @@ void setEigParam(QudaEigParam &eig_param)
     eig_param.n_ev_deflate = eig_n_ev_deflate;
   }
 
-  eig_param.block_size = eig_param.eig_type == QUDA_EIG_TR_LANCZOS ? 1 : eig_block_size;
+  eig_param.block_size = (eig_param.eig_type == QUDA_EIG_TR_LANCZOS || eig_param.eig_type == QUDA_EIG_IR_ARNOLDI) ? 1 : eig_block_size;
   eig_param.n_ev = eig_n_ev;
   eig_param.n_kr = eig_n_kr;
   eig_param.tol = eig_tol;
@@ -666,12 +666,12 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
 {
   mg_eig_param.eig_type = mg_eig_type[level];
   mg_eig_param.spectrum = mg_eig_spectrum[level];
-  if ((mg_eig_type[level] == QUDA_EIG_TR_LANCZOS || mg_eig_type[level] == QUDA_EIG_IR_LANCZOS)
+  if ((mg_eig_type[level] == QUDA_EIG_TR_LANCZOS || mg_eig_type[level] == QUDA_EIG_BLK_TR_LANCZOS)
       && !(mg_eig_spectrum[level] == QUDA_SPECTRUM_LR_EIG || mg_eig_spectrum[level] == QUDA_SPECTRUM_SR_EIG)) {
     errorQuda("Only real spectrum type (LR or SR) can be passed to the a Lanczos type solver");
   }
 
-  mg_eig_param.block_size = mg_eig_param.eig_type == QUDA_EIG_TR_LANCZOS ? 1 : mg_eig_block_size[level];
+  mg_eig_param.block_size = (mg_eig_param.eig_type == QUDA_EIG_TR_LANCZOS || mg_eig_param.eig_type == QUDA_EIG_IR_ARNOLDI) ? 1 : mg_eig_block_size[level];
   mg_eig_param.n_ev = mg_eig_n_ev[level];
   mg_eig_param.n_kr = mg_eig_n_kr[level];
   mg_eig_param.n_conv = nvec[level];
