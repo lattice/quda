@@ -694,6 +694,11 @@ namespace quda {
     virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const { ; }
 
     virtual bool isNative() const = 0;
+
+    /**
+       @brief Return the number of bytes in the field allocation.
+     */
+    virtual size_t Bytes() const = 0;
   };
   
   /**
