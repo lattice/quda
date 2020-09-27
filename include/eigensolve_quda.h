@@ -183,13 +183,30 @@ protected:
     */
     bool orthoCheck(std::vector<ColorSpinorField *> v, int j);
 
-    void rotateVecs(std::vector<ColorSpinorField *> &kSpace,
-		    double *rot_array,
+    /**
+       @brief Rotate the Krylov space 
+       @param[in] kSpace the Krylov space 
+       @param[in] rot_array The real rotation matrix
+       @param[in] offset The position of the start of unused vector in kSpace
+       @param[in] dim The number of rows in the rotation array
+       @param[in] keep The number of columns in the rotation array
+       @param[in] profile Time profiler
+    */    
+    void rotateVecs(std::vector<ColorSpinorField *> &kSpace, double *rot_array,
 		    const int offset,
 		    const int dim,
 		    const int keep,
 		    TimeProfile &profile);
-    
+
+    /**
+       @brief Rotate the Krylov space 
+       @param[in] kSpace the Krylov space 
+       @param[in] rot_array The complex rotation matrix
+       @param[in] offset The position of the start of unused vector in kSpace
+       @param[in] dim The number of rows in the rotation array
+       @param[in] keep The number of columns in the rotation array
+       @param[in] profile Time profiler
+    */    
     void rotateVecsComplex(std::vector<ColorSpinorField *> &kSpace,
 			   Complex *rot_array,
 			   const int offset,
@@ -356,12 +373,44 @@ protected:
     */
     void loadFromFile(const DiracMatrix &mat, std::vector<ColorSpinorField *> &eig_vecs, std::vector<Complex> &evals);
 
+    /**
+       @brief Sort array the first n elements of x according to spec_type, y comes alond for the ride 
+       @param[in] spec_type The spectrum type (Largest/Smallest)(Modulus/Imaginary/Real)
+       @param[in] n The number of elements to sort
+       @param[in] x The array to sort
+       @param[in] y An array whose elements will be permuted in tandem with x
+    */    
     void sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<Complex> &x, std::vector<Complex> &y);
-    
+
+    /**
+       @brief Sort array the first n elements of x according to spec_type, y comes alond for the ride 
+       Overloaded version with real x
+       @param[in] spec_type The spectrum type (Largest/Smallest)(Modulus/Imaginary/Real)
+       @param[in] n The number of elements to sort
+       @param[in] x The array to sort
+       @param[in] y An array whose elements will be permuted in tandem with x
+    */    
     void sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<double> &x, std::vector<Complex> &y);
-    
+
+    /**
+       @brief Sort array the first n elements of x according to spec_type, y comes alond for the ride 
+       Overloaded version with real y
+       @param[in] spec_type The spectrum type (Largest/Smallest)(Modulus/Imaginary/Real)
+       @param[in] n The number of elements to sort
+       @param[in] x The array to sort
+       @param[in] y An array whose elements will be permuted in tandem with x
+    */    
     void sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<Complex> &x, std::vector<double> &y);
-    
+
+    /**
+       @brief Sort array the first n elements of x according to spec_type, y comes alond for the ride 
+       Overloaded version with real x and real y
+       @param[in] spec_type The spectrum type (Largest/Smallest)(Modulus/Imaginary/Real) that 
+       determines the sorting condition
+       @param[in] n The number of elements to sort
+       @param[in] x The array to sort
+       @param[in] y An array whose elements will be permuted in tandem with x
+    */    
     void sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<double> &x, std::vector<double> &y);
     
   };
@@ -407,7 +456,7 @@ protected:
     void operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
 
     /**
-       @brief Lanczos step: extends the Kylov space.
+       @brief Lanczos step: extends the Krylov space.
        @param[in] v Vector space
        @param[in] j Index of vector being computed
     */
@@ -474,7 +523,7 @@ protected:
     void operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
 
     /**
-       @brief block lanczos step: extends the Kylov space in block step
+       @brief block lanczos step: extends the Krylov space in block step
        @param[in] v Vector space
        @param[in] j Index of block of vectors being computed
     */
@@ -534,18 +583,43 @@ protected:
     void operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
 
     /**
-       @brief Lanczos step: extends the Kylov space.
+       @brief Arnoldi step: extends the Krylov space by one vector
        @param[in] v Vector space
+       @param[in] r Residual vector
+       @param[in] beta Norm of residual vector
        @param[in] j Index of vector being computed
     */
     void arnoldiStep(std::vector<ColorSpinorField *> &v, std::vector<ColorSpinorField *> &r, double &beta, int j);
 
+    /**
+       @brief Get the eigendecomposition from the upper Hessenberg matrix
+       @param[in] evals Complex eigenvalues
+       @param[in] beta Norm of residual (used to compute errors on eigenvalues)
+    */
     void eigensolveFromUpperHess(std::vector<Complex> &evals, const double beta);
-    
+
+    /**
+       @brief Rotate the Krylov space
+       @param[in] v Vector space
+       @param[in] keep The number of vectors to keep after rotation
+    */
     void rotateBasis(std::vector<ColorSpinorField *> &v, int keep);
 
+    /**
+       @brief Apply shifts to the upper Hessenberg matrix via QR decomposition
+       @param[in] evals The shifts to apply
+       @param[in] num_shifts The number of shifts to apply
+       @param[in] epsilon The ceiling for which one can floor a value to zero.
+    */    
     void qrShifts(const std::vector<Complex> evals, const int num_shifts, const double epsilon);
 
+    /**
+       @brief Reorder the Krylov space and eigenvalues
+       @param[in] kSpace The Krylov space
+       @param[in] evals the eigenvalues
+       @param[in] spec_type The spectrum type (Largest/Smallest)(Modulus/Imaginary/Real) that 
+       determines the sorting condition
+    */        
     void reorder(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals, const QudaEigSpectrumType spec_type);
     
   };
