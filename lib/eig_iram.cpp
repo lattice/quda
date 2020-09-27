@@ -46,46 +46,24 @@ namespace quda
   //---------------------------------------------------------------------------
   void IRAM::arnoldiStep(std::vector<ColorSpinorField *> &v, std::vector<ColorSpinorField *> &r, double &beta, int j)
   {
-    //%---------------------------------------------------%
-    //| STEP 1: Check if the B norm of j-th residual      |
-    //| vector is zero. Equivalent to determine whether   |
-    //| an exact j-step Arnoldi factorization is present. |
-    //%---------------------------------------------------%
     beta = sqrt(blas::norm2(*r[0]));
     if(j > 0) upperHess[j][j-1] = beta;
     
-    //%--------------------------------%
-    //| STEP 2:  v_{j} = r_{j-1}/rnorm |
-    //%--------------------------------%
-    //blas::zero(*v[j]);
-    //blas::axpy(1.0/beta, *r[0], *v[j]);
+    // v_{j} = r_{j-1}/beta 
     blas::ax(1.0/beta, *r[0]);
     std::swap(v[j], r[0]);
     
-    //%----------------------------%
-    //| STEP 3:  r_{j} = OP*v_{j}; |
-    //%----------------------------%  
+    // r_{j} = M * v_{j};
     matVec(mat, *r[0], *v[j]);
     
-    //%-------------------------------------%
-    //| The following is needed for STEP 5. |
-    //| Compute the B-norm of OP*v_{j}.     |
-    //%-------------------------------------%
+    double beta_pre = sqrt(blas::norm2(*r[0]));
     
-    double wnorm = sqrt(blas::norm2(*r[0]));
-    
-    //%-----------------------------------------%
-    //| Compute the j-th residual corresponding |
-    //| to the j step factorization.            |
-    //| Use Classical Gram Schmidt and compute: |
-    //| w_{j} <-  V_{j}^T * B * OP * v_{j}      |
-    //| r_{j} <-  OP*v_{j} - V_{j} * w_{j}      |
-    //%-----------------------------------------%
+    // Compute the j-th residual corresponding 
+    // to the j step factorization.            
+    // Use Classical Gram Schmidt and compute: 
+    // w_{j} <-  V_{j}^dag * M * v_{j}      
+    // r_{j} <-  M * v_{j} - V_{j} * w_{j}
 
-    //%------------------------------------------%
-    //| Compute the j Fourier coefficients w_{j} |
-    //| WORKD(IPJ:IPJ+N-1) contains B*OP*v_{j}.  |
-    //%------------------------------------------%
     //H_{j,i}_j = v_i^dag * r
     std::vector<Complex> tmp(j+1);
     std::vector<ColorSpinorField *> v_;
@@ -93,56 +71,43 @@ namespace quda
     for (int i = 0; i < j+1; i++) { v_.push_back(v[i]); }    
     blas::cDotProduct(tmp.data(), v_, r);
 
-    //%--------------------------------------%
-    //| Orthogonalize r_{j} against V_{j}.   |
-    //| RESID contains OP*v_{j}. See STEP 3. | 
-    //%--------------------------------------%
+    // Orthogonalise r_{j} against V_{j}.
     //r = r - H_{j,i} * v_j 
     for (int i = 0; i < j+1; i++) tmp[i] *= -1.0;    
     blas::caxpy(tmp.data(), v_, r);
     for (int i = 0; i < j+1; i++) upperHess[i][j] = -1.0*tmp[i];
     
-    //%-----------------------------------------------------------%
-    //| STEP 5: Re-orthogonalization / Iterative refinement phase |
-    //| Maximum NITER_ITREF tries.                                |
-    //|                                                           |
-    //|          s      = V_{j}^T * B * r_{j}                     |
-    //|          r_{j}  = r_{j} - V_{j}*s                         |
-    //|          alphaj = alphaj + s_{j}                          |
-    //|                                                           |
-    //| The stopping criteria used for iterative refinement is    |
-    //| discussed in Parlett's book SEP, page 107 and in Gragg &  |
-    //| Reichel ACM TOMS paper; Algorithm 686, Dec. 1990.         |
-    //| Determine if we need to correct the residual. The goal is |
-    //| to enforce ||v(:,1:j)^T * r_{j}|| .le. eps * || r_{j} ||  |
-    //| The following test determines whether the sine of the     |
-    //| angle between  OP*x and the computed residual is less     |
-    //| than or equal to 0.717.                                   |
-    //%-----------------------------------------------------------%
+    // Re-orthogonalization / Iterative refinement phase 
+    // Maximum 100 tries.                                
+
+    // s      = V_{j}^T * B * r_{j}
+    // r_{j}  = r_{j} - V_{j}*s    
+    // alphaj = alphaj + s_{j}     
+
+    // The stopping criteria used for iterative refinement is    
+    // discussed in Parlett's book SEP, page 107 and in Gragg &  
+    // Reichel ACM TOMS paper; Algorithm 686, Dec. 1990.         
+    // Determine if we need to correct the residual. The goal is 
+    // to enforce ||v(:,1:j)^T * r_{j}|| .le. eps * || r_{j} ||  
+    // The following test determines whether the sine of the     
+    // angle between  OP*x and the computed residual is less     
+    // than or equal to 0.717.
 
     int orth_iter = 0;
     int orth_iter_max = 100;
     beta = sqrt(blas::norm2(*r[0]));
-    while(beta < 0.717*wnorm && orth_iter < orth_iter_max) {
-    
-      //%---------------------------------------------------%
-      //| Enter the Iterative refinement phase. If further  |
-      //| refinement is necessary, loop back here. The loop |
-      //| variable is ITER. Perform a step of Classical     |
-      //| Gram-Schmidt using all the Arnoldi vectors V_{j}  |
-      //%---------------------------------------------------%
+    while(beta < 0.717*beta_pre && orth_iter < orth_iter_max) {
 
-      //%---------------------------------------------%
-      //| Compute the correction to the residual:     |
-      //| r_{j} = r_{j} - V_{j} * WORKD(IRJ:IRJ+J-1). |
-      //| The correction to H is v(:,1:J)*H(1:J,1:J)  |
-      //| + v(:,1:J)*WORKD(IRJ:IRJ+J-1)*e'_j.         |
-      //%---------------------------------------------%
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+	printfQuda("beta = %e > 0.717*beta_pre = %e: Reorthogonalise at step %d, iter %d\n", beta, 0.717*beta_pre, j, orth_iter);
+      }
 
-      wnorm = beta;
-    
-      // reorthogonalise r against the Krylov space
-      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("beta[%d] = %e > 0.717*beta[%d] = %e: Reorthogonalise at step %d, iter %d\n", j+1, beta, j, 0.717*wnorm, j, orth_iter);
+      beta_pre = beta;
+      
+      // Compute the correction to the residual:
+      // r_{j} = r_{j} - V_{j} * r_{j}
+      // and adjust for the correction in the
+      // upper Hessenberg matrix.
       blas::cDotProduct(tmp.data(), v_, r);
       for (int i = 0; i < j+1; i++) tmp[i] *= -1.0;    
       blas::caxpy(tmp.data(), v_, r);    
@@ -153,165 +118,20 @@ namespace quda
     }
 
     if(orth_iter == orth_iter_max) {
-      //%---------------------------------------%
-      //| RESID is numerically in the span of V |
-      //%---------------------------------------%
       errorQuda("Unable to orthonormalise r");
     }
   }
-
-  void IRAM::rotateVecsComplex(std::vector<ColorSpinorField *> &kSpace, int keep)
+  
+  void IRAM::rotateBasis(std::vector<ColorSpinorField *> &kSpace, int keep)
   {
-    // Multi-BLAS friendly array to store part of Ritz matrix we want
+    // Multi-BLAS friendly array to store the part of the rotation matrix
     Complex *Qmat_keep = (Complex *)safe_malloc((n_kr * keep) * sizeof(Complex));
-
-    // If we have memory availible, do the entire rotation
-    if (batched_rotate <= 0 || batched_rotate >= keep) {
-      if ((int)kSpace.size() < n_kr + keep) {
-        ColorSpinorParam csParamClone(*kSpace[0]);
-        csParamClone.create = QUDA_ZERO_FIELD_CREATE;
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", n_kr + keep);
-        kSpace.reserve(n_kr + keep);
-        for (int i = kSpace.size(); i < n_kr + keep; i++) {
-          kSpace.push_back(ColorSpinorField::Create(csParamClone));
-        }
-      }
-      
-      // Pointers to the relevant vectors
-      std::vector<ColorSpinorField *> vecs_ptr;
-      std::vector<ColorSpinorField *> kSpace_ptr;
-
-      // Alias the extra space vectors, zero the workspace
-      kSpace_ptr.reserve(keep);
-      for (int i = 0; i < keep; i++) {
-        kSpace_ptr.push_back(kSpace[n_kr + i]);
-        blas::zero(*kSpace_ptr[i]);
-      }
-
-      // Alias the vectors we wish to keep, populate the Ritz matrix and transpose.
-      vecs_ptr.reserve(n_kr);
-      for (int j = 0; j < n_kr; j++) {
-        vecs_ptr.push_back(kSpace[j]);
-        for (int i = 0; i < keep; i++) { Qmat_keep[j * keep + i] = Qmat[j][i]; }
-      }
-      
-      // multiBLAS caxpy
-      blas::caxpy(Qmat_keep, vecs_ptr, kSpace_ptr);
-
-      // Copy compressed Krylov
-      for (int i = 0; i < keep; i++) std::swap(kSpace[i], kSpace[n_kr + i]);
-      
-    } else {
-
-      // Do batched rotation to save on memory
-      int offset = n_kr;
-      int batch_size = batched_rotate;
-      int full_batches = keep / batch_size;
-      int batch_size_r = keep % batch_size;
-      bool do_batch_remainder = (batch_size_r != 0 ? true : false);
-
-      if ((int)kSpace.size() < offset + batch_size) {
-        ColorSpinorParam csParamClone(*kSpace[0]);
-        csParamClone.create = QUDA_ZERO_FIELD_CREATE;
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + batch_size);
-        kSpace.reserve(offset + batch_size);
-        for (int i = kSpace.size(); i < offset + batch_size; i++) {
-          kSpace.push_back(ColorSpinorField::Create(csParamClone));
-        }
-      }
-
-      //profile.TPSTART(QUDA_PROFILE_EIGEN);
-      MatrixXcd mat = MatrixXcd::Zero(n_kr, keep);
-      for (int j = 0; j < keep; j++)
-        for (int i = 0; i < n_kr; i++) mat(i, j) = Qmat[i][j];
-      
-      FullPivLU<MatrixXcd> matLU(mat);
-
-      // Extract the upper triangular matrix
-      MatrixXcd matUpper = MatrixXcd::Zero(keep, keep);
-      matUpper = matLU.matrixLU().triangularView<Eigen::Upper>();
-      matUpper.conservativeResize(keep, keep);
-
-      // Extract the lower triangular matrix
-      MatrixXcd matLower = MatrixXcd::Identity(n_kr, n_kr);
-      matLower.block(0, 0, n_kr, keep).triangularView<Eigen::StrictlyLower>() = matLU.matrixLU();
-      matLower.conservativeResize(n_kr, keep);
-
-      // Extract the desired permutation matrices
-      MatrixXi matP = MatrixXi::Zero(n_kr, n_kr);
-      MatrixXi matQ = MatrixXi::Zero(keep, keep);
-      matP = matLU.permutationP().inverse();
-      matQ = matLU.permutationQ().inverse();
-      //profile.TPSTOP(QUDA_PROFILE_EIGEN);
-
-      //profile.TPSTART(QUDA_PROFILE_COMPUTE);
-      // Compute V * A = V * PLUQ
-
-      // Do P Permute
-      //---------------------------------------------------------------------------
-      permuteVecs(kSpace, matP.data(), n_kr);
-
-      // Do L Multiply
-      //---------------------------------------------------------------------------
-      // Loop over full batches
-      for (int b = 0; b < full_batches; b++) {
-
-        // batch triangle
-        blockRotateComplex(kSpace, matLower.data(), n_kr, {b * batch_size, (b + 1) * batch_size},
-                           {b * batch_size, (b + 1) * batch_size}, LOWER_TRI, offset);
-        // batch pencil
-        blockRotateComplex(kSpace, matLower.data(), n_kr, {(b + 1) * batch_size, n_kr},
-                           {b * batch_size, (b + 1) * batch_size}, PENCIL, offset);
-        blockReset(kSpace, b * batch_size, (b + 1) * batch_size, offset);
-      }
-
-      if (do_batch_remainder) {
-        // remainder triangle
-        blockRotateComplex(kSpace, matLower.data(), n_kr, {full_batches * batch_size, keep},
-                           {full_batches * batch_size, keep}, LOWER_TRI, offset);
-        // remainder pencil
-        if (keep < n_kr) {
-          blockRotateComplex(kSpace, matLower.data(), n_kr, {keep, n_kr}, {full_batches * batch_size, keep},
-                             PENCIL, offset);
-        }
-        blockReset(kSpace, full_batches * batch_size, keep, offset);
-      }
-
-      // Do U Multiply
-      //---------------------------------------------------------------------------
-      if (do_batch_remainder) {
-        // remainder triangle
-        blockRotateComplex(kSpace, matUpper.data(), keep, {full_batches * batch_size, keep},
-                           {full_batches * batch_size, keep}, UPPER_TRI, offset);
-        // remainder pencil
-        blockRotateComplex(kSpace, matUpper.data(), keep, {0, full_batches * batch_size},
-                           {full_batches * batch_size, keep}, PENCIL, offset);
-        blockReset(kSpace, full_batches * batch_size, keep, offset);
-      }
-
-      // Loop over full batches
-      for (int b = full_batches - 1; b >= 0; b--) {
-        // batch triangle
-        blockRotateComplex(kSpace, matUpper.data(), keep, {b * batch_size, (b + 1) * batch_size},
-                           {b * batch_size, (b + 1) * batch_size}, UPPER_TRI, offset);
-        if (b > 0) {
-          // batch pencil
-          blockRotateComplex(kSpace, matUpper.data(), keep, {0, b * batch_size},
-                             {b * batch_size, (b + 1) * batch_size}, PENCIL, offset);
-        }
-        blockReset(kSpace, b * batch_size, (b + 1) * batch_size, offset);
-      }
-
-      // Do Q Permute
-      //---------------------------------------------------------------------------
-      permuteVecs(kSpace, matQ.data(), keep);
-      //profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-    }
+    for (int j = 0; j < n_kr; j++)       
+      for (int i = 0; i < keep; i++) { Qmat_keep[j * keep + i] = Qmat[j][i]; }
+    
+    rotateVecsComplex(kSpace, Qmat_keep, n_kr, n_kr, keep, profile);
     
     host_free(Qmat_keep);
-    
-    // Save Krylov rotation tuning
-    saveTuneCache();
   }
   
   void IRAM::qrShifts(const std::vector<Complex> evals, const int num_shifts, const double epsilon)
@@ -525,8 +345,13 @@ namespace quda
       
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("%04d converged eigenvalues at iter %d\n", num_converged, restart_iter);
 
-      if (num_converged >= n_conv) {	
+      if (num_converged >= n_conv) {
+
+	eigensolveFromUpperHess(evals, beta);
+	rotateBasis(kSpace, n_kr);
+	reorder(kSpace, evals, eig_param->spectrum);
 	converged = true;
+	
       } else {
 	
 	int num_keep0 = num_keep;
@@ -546,7 +371,7 @@ namespace quda
 	qrShifts(evals, num_shifts, epsilon);
 	  
 	// Compress the Krylov space using the accumulated Givens rotations in Qmat
-	rotateVecsComplex(kSpace, num_keep+1);
+	rotateBasis(kSpace, num_keep+1);
 	
 	// Update the residual vector
 	blas::caxpby(upperHess[num_keep][num_keep-1], *kSpace[num_keep], Qmat[n_kr-1][num_keep-1], *r[0]);
@@ -575,10 +400,6 @@ namespace quda
         printfQuda("IRAM computed the requested %d vectors in %d restart steps and %d OP*x operations.\n", n_conv,
                    restart_iter, iter);
       }
-
-      eigensolveFromUpperHess(evals, beta);
-      rotateVecsComplex(kSpace, n_kr);
-      reorder(kSpace, evals, eig_param->spectrum);
       
       if (getVerbosity() >= QUDA_SUMMARIZE) {
 	for(int i=0; i<n_conv; i++)

@@ -186,9 +186,9 @@ namespace quda
   void EigenSolver::printEigensolverSetup()
   {
     if (getVerbosity() >= QUDA_SUMMARIZE) {
-      printfQuda("*********************************\n");
-      printfQuda("**** START QUDA EIG SOLUTION ****\n");
-      printfQuda("*********************************\n");
+      printfQuda("********************************\n");
+      printfQuda("**** START QUDA EIGENSOLVER ****\n");
+      printfQuda("********************************\n");
     }
 
     if (getVerbosity() >= QUDA_VERBOSE) {
@@ -211,19 +211,15 @@ namespace quda
     double eps = 0.0;
     switch (prec) {
     case QUDA_DOUBLE_PRECISION:
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in double precision\n");
       eps = DBL_EPSILON;
       break;
     case QUDA_SINGLE_PRECISION:
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in single precision\n");
       eps = FLT_EPSILON;
       break;
     case QUDA_HALF_PRECISION:
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in half precision\n");
       eps = 2e-3;
       break;
     case QUDA_QUARTER_PRECISION:
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in quarter precision\n");
       eps = 5e-2;
       break;
     default: errorQuda("Invalid precision %d", prec);
@@ -281,9 +277,9 @@ namespace quda
     mat.flops();
 
     if (getVerbosity() >= QUDA_SUMMARIZE) {
-      printfQuda("*****************************\n");
-      printfQuda("***** END TRLM SOLUTION *****\n");
-      printfQuda("*****************************\n");
+      printfQuda("********************************\n");
+      printfQuda("***** END QUDA EIGENSOLVER *****\n");
+      printfQuda("********************************\n");
     }
   }
 
@@ -524,6 +520,9 @@ namespace quda
     int block_i_rank = i_range.second - i_range.first;
     int block_j_rank = j_range.second - j_range.first;
 
+    // Quick return if no op.
+    if(block_i_rank == 0 || block_j_rank == 0) return;
+    
     // Pointers to the relevant vectors
     std::vector<ColorSpinorField *> vecs_ptr;
     std::vector<ColorSpinorField *> kSpace_ptr;
@@ -574,7 +573,10 @@ namespace quda
   {
     int block_i_rank = i_range.second - i_range.first;
     int block_j_rank = j_range.second - j_range.first;
-
+    
+    // Quick return if no op.
+    if(block_i_rank == 0 || block_j_rank == 0) return;
+    
     // Pointers to the relevant vectors
     std::vector<ColorSpinorField *> vecs_ptr;
     std::vector<ColorSpinorField *> kSpace_ptr;
@@ -598,7 +600,7 @@ namespace quda
         batch_array[i_arr * block_j_rank + j_arr] = array[j * rank + i];
       }
     }
-    switch (b_type) {
+    switch (b_type) {      
     case PENCIL: blas::caxpy(batch_array, vecs_ptr, kSpace_ptr); break;
     case LOWER_TRI: blas::caxpy_L(batch_array, vecs_ptr, kSpace_ptr); break;
     case UPPER_TRI: blas::caxpy_U(batch_array, vecs_ptr, kSpace_ptr); break;
@@ -887,6 +889,298 @@ namespace quda
       y[i] = y_tmp[i].real();
     }
   }
+
+
+  void EigenSolver::rotateVecsComplex(std::vector<ColorSpinorField *> &kSpace,
+				      Complex *rot_array,
+				      const int offset,
+				      const int dim,
+				      const int keep,
+				      TimeProfile &profile) {
+    
+    // If we have memory availible, do the entire rotation
+    if (batched_rotate <= 0 || batched_rotate >= keep) {
+      if ((int)kSpace.size() < n_kr + keep) {
+        ColorSpinorParam csParamClone(*kSpace[0]);
+        csParamClone.create = QUDA_ZERO_FIELD_CREATE;
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", n_kr + keep);
+        kSpace.reserve(n_kr + keep);
+        for (int i = kSpace.size(); i < n_kr + keep; i++) {
+          kSpace.push_back(ColorSpinorField::Create(csParamClone));
+        }
+      }
+      
+      // Pointers to the relevant vectors
+      std::vector<ColorSpinorField *> vecs_ptr;
+      std::vector<ColorSpinorField *> kSpace_ptr;
+
+      // Alias the extra space vectors, zero the workspace
+      kSpace_ptr.reserve(keep);
+      for (int i = 0; i < keep; i++) {
+        kSpace_ptr.push_back(kSpace[n_kr + i]);
+        blas::zero(*kSpace_ptr[i]);
+      }
+
+      // Alias the vectors we wish to keep.
+      vecs_ptr.reserve(n_kr);
+      for (int j = 0; j < n_kr; j++) vecs_ptr.push_back(kSpace[j]);
+      
+      // multiBLAS caxpy
+      blas::caxpy(rot_array, vecs_ptr, kSpace_ptr);
+
+      // Copy compressed Krylov
+      for (int i = 0; i < keep; i++) std::swap(kSpace[i], kSpace[n_kr + i]);
+      
+    } else {
+
+      int batch_size = batched_rotate;
+      int full_batches = keep / batch_size;
+      int batch_size_r = keep % batch_size;
+      bool do_batch_remainder = (batch_size_r != 0 ? true : false);
+
+      if ((int)kSpace.size() < offset + batch_size) {
+	ColorSpinorParam csParamClone(*kSpace[0]);
+	csParamClone.create = QUDA_ZERO_FIELD_CREATE;
+	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + batch_size);
+	kSpace.reserve(offset + batch_size);
+	for (int i = kSpace.size(); i < offset + batch_size; i++) {
+	  kSpace.push_back(ColorSpinorField::Create(csParamClone));
+	}
+      }
+
+      profile.TPSTART(QUDA_PROFILE_EIGEN);
+      MatrixXcd mat = MatrixXcd::Zero(dim, keep);
+      for (int j = 0; j < keep; j++)
+	for (int i = 0; i < dim; i++) mat(i, j) = rot_array[i * keep + j];
+      
+      FullPivLU<MatrixXcd> matLU(mat);
+
+      // Extract the upper triangular matrix
+      MatrixXcd matUpper = MatrixXcd::Zero(keep, keep);
+      matUpper = matLU.matrixLU().triangularView<Eigen::Upper>();
+      matUpper.conservativeResize(keep, keep);
+
+      // Extract the lower triangular matrix
+      MatrixXcd matLower = MatrixXcd::Identity(dim, dim);
+      matLower.block(0, 0, dim, keep).triangularView<Eigen::StrictlyLower>() = matLU.matrixLU();
+      matLower.conservativeResize(dim, keep);
+
+      // Extract the desired permutation matrices
+      MatrixXi matP = MatrixXi::Zero(dim, dim);
+      MatrixXi matQ = MatrixXi::Zero(keep, keep);
+      matP = matLU.permutationP().inverse();
+      matQ = matLU.permutationQ().inverse();
+      profile.TPSTOP(QUDA_PROFILE_EIGEN);
+
+      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      // Compute V * A = V * PLUQ
+
+      // Do P Permute
+      //---------------------------------------------------------------------------
+      permuteVecs(kSpace, matP.data(), dim);
+
+      // Do L Multiply
+      //---------------------------------------------------------------------------
+      // Loop over full batches
+      for (int b = 0; b < full_batches; b++) {
+
+	// batch triangle
+	blockRotateComplex(kSpace, matLower.data(), dim, {b * batch_size, (b + 1) * batch_size},
+			   {b * batch_size, (b + 1) * batch_size}, LOWER_TRI, offset);
+	// batch pencil
+	blockRotateComplex(kSpace, matLower.data(), dim, {(b + 1) * batch_size, dim},
+			   {b * batch_size, (b + 1) * batch_size}, PENCIL, offset);
+	blockReset(kSpace, b * batch_size, (b + 1) * batch_size, offset);
+      }
+      if (do_batch_remainder) {
+	// remainder triangle
+	blockRotateComplex(kSpace, matLower.data(), dim, {full_batches * batch_size, keep},
+			   {full_batches * batch_size, keep}, LOWER_TRI, offset);
+	// remainder pencil
+	if (keep < dim) {
+	  blockRotateComplex(kSpace, matLower.data(), dim, {keep, dim}, {full_batches * batch_size, keep},
+			     PENCIL, offset);
+	}
+	blockReset(kSpace, full_batches * batch_size, keep, offset);
+      }
+
+      // Do U Multiply
+      //---------------------------------------------------------------------------
+      if (do_batch_remainder) {
+	// remainder triangle
+	blockRotateComplex(kSpace, matUpper.data(), keep, {full_batches * batch_size, keep},
+			   {full_batches * batch_size, keep}, UPPER_TRI, offset);
+	// remainder pencil
+	blockRotateComplex(kSpace, matUpper.data(), keep, {0, full_batches * batch_size},
+			   {full_batches * batch_size, keep}, PENCIL, offset);
+	blockReset(kSpace, full_batches * batch_size, keep, offset);
+      }
+
+      // Loop over full batches
+      for (int b = full_batches - 1; b >= 0; b--) {
+	// batch triangle
+	blockRotateComplex(kSpace, matUpper.data(), keep, {b * batch_size, (b + 1) * batch_size},
+			   {b * batch_size, (b + 1) * batch_size}, UPPER_TRI, offset);
+	if (b > 0) {
+	  // batch pencil
+	  blockRotateComplex(kSpace, matUpper.data(), keep, {0, b * batch_size},
+			     {b * batch_size, (b + 1) * batch_size}, PENCIL, offset);
+	}
+	blockReset(kSpace, b * batch_size, (b + 1) * batch_size, offset);
+      }
+
+      // Do Q Permute
+      //---------------------------------------------------------------------------
+      permuteVecs(kSpace, matQ.data(), keep);
+      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    }
+  }      
+
+  void EigenSolver::rotateVecs(std::vector<ColorSpinorField *> &kSpace,
+			       double *rot_array,
+			       const int offset,
+			       const int dim,
+			       const int keep,
+			       TimeProfile &profile) {
+    
+    // If we have memory availible, do the entire rotation
+    if (batched_rotate <= 0 || batched_rotate >= keep) {
+      if ((int)kSpace.size() < n_kr + keep) {
+        ColorSpinorParam csParamClone(*kSpace[0]);
+        csParamClone.create = QUDA_ZERO_FIELD_CREATE;
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", n_kr + keep);
+        kSpace.reserve(n_kr + keep);
+        for (int i = kSpace.size(); i < n_kr + keep; i++) {
+          kSpace.push_back(ColorSpinorField::Create(csParamClone));
+        }
+      }
+      
+      // Pointers to the relevant vectors
+      std::vector<ColorSpinorField *> vecs_ptr;
+      std::vector<ColorSpinorField *> kSpace_ptr;
+
+      // Alias the extra space vectors, zero the workspace
+      kSpace_ptr.reserve(keep);
+      for (int i = 0; i < keep; i++) {
+        kSpace_ptr.push_back(kSpace[n_kr + i]);
+        blas::zero(*kSpace_ptr[i]);
+      }
+
+      // Alias the vectors we wish to keep.
+      vecs_ptr.reserve(n_kr);
+      for (int j = 0; j < n_kr; j++) vecs_ptr.push_back(kSpace[j]);
+      
+      // multiBLAS axpy
+      blas::axpy(rot_array, vecs_ptr, kSpace_ptr);
+
+      // Copy compressed Krylov
+      for (int i = 0; i < keep; i++) std::swap(kSpace[i], kSpace[n_kr + i]);
+      
+    } else {
+
+      int batch_size = batched_rotate;
+      int full_batches = keep / batch_size;
+      int batch_size_r = keep % batch_size;
+      bool do_batch_remainder = (batch_size_r != 0 ? true : false);
+
+      if ((int)kSpace.size() < offset + batch_size) {
+	ColorSpinorParam csParamClone(*kSpace[0]);
+	csParamClone.create = QUDA_ZERO_FIELD_CREATE;
+	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + batch_size);
+	kSpace.reserve(offset + batch_size);
+	for (int i = kSpace.size(); i < offset + batch_size; i++) {
+	  kSpace.push_back(ColorSpinorField::Create(csParamClone));
+	}
+      }
+
+      profile.TPSTART(QUDA_PROFILE_EIGEN);
+      MatrixXd mat = MatrixXd::Zero(dim, keep);
+      for (int j = 0; j < keep; j++)
+	for (int i = 0; i < dim; i++) mat(i, j) = rot_array[i * keep + j];
+      
+      FullPivLU<MatrixXd> matLU(mat);
+
+      // Extract the upper triangular matrix
+      MatrixXd matUpper = MatrixXd::Zero(keep, keep);
+      matUpper = matLU.matrixLU().triangularView<Eigen::Upper>();
+      matUpper.conservativeResize(keep, keep);
+
+      // Extract the lower triangular matrix
+      MatrixXd matLower = MatrixXd::Identity(dim, dim);
+      matLower.block(0, 0, dim, keep).triangularView<Eigen::StrictlyLower>() = matLU.matrixLU();
+      matLower.conservativeResize(dim, keep);
+
+      // Extract the desired permutation matrices
+      MatrixXi matP = MatrixXi::Zero(dim, dim);
+      MatrixXi matQ = MatrixXi::Zero(keep, keep);
+      matP = matLU.permutationP().inverse();
+      matQ = matLU.permutationQ().inverse();
+      profile.TPSTOP(QUDA_PROFILE_EIGEN);
+
+      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      // Compute V * A = V * PLUQ
+
+      // Do P Permute
+      //---------------------------------------------------------------------------
+      permuteVecs(kSpace, matP.data(), dim);
+
+      // Do L Multiply
+      //---------------------------------------------------------------------------
+      // Loop over full batches
+      for (int b = 0; b < full_batches; b++) {
+
+	// batch triangle
+	blockRotate(kSpace, matLower.data(), dim, {b * batch_size, (b + 1) * batch_size}, {b * batch_size, (b + 1) * batch_size}, LOWER_TRI);
+	// batch pencil
+	blockRotate(kSpace, matLower.data(), dim, {(b + 1) * batch_size, dim},
+			   {b * batch_size, (b + 1) * batch_size}, PENCIL);
+	blockReset(kSpace, b * batch_size, (b + 1) * batch_size, offset);
+      }
+      if (do_batch_remainder) {
+	// remainder triangle
+	blockRotate(kSpace, matLower.data(), dim, {full_batches * batch_size, keep},
+		    {full_batches * batch_size, keep}, LOWER_TRI);
+	// remainder pencil
+	if (keep < dim) {
+	  blockRotate(kSpace, matLower.data(), dim, {keep, dim}, {full_batches * batch_size, keep},
+			     PENCIL);
+	}
+	blockReset(kSpace, full_batches * batch_size, keep, offset);
+      }
+
+      // Do U Multiply
+      //---------------------------------------------------------------------------
+      if (do_batch_remainder) {
+	// remainder triangle
+	blockRotate(kSpace, matUpper.data(), keep, {full_batches * batch_size, keep},
+			   {full_batches * batch_size, keep}, UPPER_TRI);
+	// remainder pencil
+	blockRotate(kSpace, matUpper.data(), keep, {0, full_batches * batch_size},
+			   {full_batches * batch_size, keep}, PENCIL);
+	blockReset(kSpace, full_batches * batch_size, keep, offset);
+      }
+
+      // Loop over full batches
+      for (int b = full_batches - 1; b >= 0; b--) {
+	// batch triangle
+	blockRotate(kSpace, matUpper.data(), keep, {b * batch_size, (b + 1) * batch_size},
+			   {b * batch_size, (b + 1) * batch_size}, UPPER_TRI);
+	if (b > 0) {
+	  // batch pencil
+	  blockRotate(kSpace, matUpper.data(), keep, {0, b * batch_size},
+		      {b * batch_size, (b + 1) * batch_size}, PENCIL);
+	}
+	blockReset(kSpace, b * batch_size, (b + 1) * batch_size, offset);
+      }
+
+      // Do Q Permute
+      //---------------------------------------------------------------------------
+      permuteVecs(kSpace, matQ.data(), keep);
+      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    }
+  }      
+
+  
   
   EigenSolver::~EigenSolver()
   {

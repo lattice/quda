@@ -183,6 +183,21 @@ protected:
     */
     bool orthoCheck(std::vector<ColorSpinorField *> v, int j);
 
+    void rotateVecs(std::vector<ColorSpinorField *> &kSpace,
+		    double *rot_array,
+		    const int offset,
+		    const int dim,
+		    const int keep,
+		    TimeProfile &profile);
+    
+    void rotateVecsComplex(std::vector<ColorSpinorField *> &kSpace,
+			   Complex *rot_array,
+			   const int offset,
+			   const int dim,
+			   const int keep,
+			   TimeProfile &profile);
+
+    
     /**
        @brief Permute the vector space using the permutation matrix.
        @param[in/out] kSpace The current Krylov space
@@ -527,7 +542,7 @@ protected:
 
     void eigensolveFromUpperHess(std::vector<Complex> &evals, const double beta);
     
-    void rotateVecsComplex(std::vector<ColorSpinorField *> &v, int keep);
+    void rotateBasis(std::vector<ColorSpinorField *> &v, int keep);
 
     void qrShifts(const std::vector<Complex> evals, const int num_shifts, const double epsilon);
 

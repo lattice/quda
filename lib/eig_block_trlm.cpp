@@ -475,152 +475,15 @@ namespace quda
   {
     int offset = n_kr + block_size;
     int dim = n_kr - num_locked;
-
+    
     // Multi-BLAS friendly array to store part of Ritz matrix we want
     Complex *ritz_mat_keep = (Complex *)safe_malloc((dim * iter_keep) * sizeof(Complex));
-
-    // If we have memory availible, do the entire rotation
-    if (batched_rotate <= 0 || batched_rotate >= iter_keep) {
-      if ((int)kSpace.size() < offset + iter_keep) {
-        ColorSpinorParam csParamClone(*kSpace[0]);
-        csParamClone.create = QUDA_ZERO_FIELD_CREATE;
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + iter_keep);
-        kSpace.reserve(offset + iter_keep);
-        for (int i = kSpace.size(); i < offset + iter_keep; i++) {
-          kSpace.push_back(ColorSpinorField::Create(csParamClone));
-        }
-      }
-
-      // Pointers to the relevant vectors
-      std::vector<ColorSpinorField *> vecs_ptr;
-      std::vector<ColorSpinorField *> kSpace_ptr;
-
-      // Alias the extra space vectors, zero the workspace
-      kSpace_ptr.reserve(iter_keep);
-      for (int i = 0; i < iter_keep; i++) {
-        kSpace_ptr.push_back(kSpace[offset + i]);
-        blas::zero(*kSpace_ptr[i]);
-      }
-
-      // Alias the vectors we wish to keep, populate the Ritz matrix and transpose.
-      vecs_ptr.reserve(dim);
-      for (int j = 0; j < dim; j++) {
-        vecs_ptr.push_back(kSpace[num_locked + j]);
-        for (int i = 0; i < iter_keep; i++) { ritz_mat_keep[j * iter_keep + i] = block_ritz_mat[i * dim + j]; }
-      }
-
-      // multiBLAS caxpy
-      blas::caxpy(ritz_mat_keep, vecs_ptr, kSpace_ptr);
-
-      // Copy compressed Krylov
-      for (int i = 0; i < iter_keep; i++) std::swap(kSpace[i + num_locked], kSpace[offset + i]);
-
-    } else {
-
-      // Do batched rotation to save on memory
-      int batch_size = batched_rotate;
-      int full_batches = iter_keep / batch_size;
-      int batch_size_r = iter_keep % batch_size;
-      bool do_batch_remainder = (batch_size_r != 0 ? true : false);
-
-      if ((int)kSpace.size() < offset + batch_size) {
-        ColorSpinorParam csParamClone(*kSpace[0]);
-        csParamClone.create = QUDA_ZERO_FIELD_CREATE;
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + batch_size);
-        kSpace.reserve(offset + batch_size);
-        for (int i = kSpace.size(); i < offset + batch_size; i++) {
-          kSpace.push_back(ColorSpinorField::Create(csParamClone));
-        }
-      }
-
-      profile.TPSTART(QUDA_PROFILE_EIGEN);
-      MatrixXcd mat = MatrixXcd::Zero(dim, iter_keep);
-      for (int j = 0; j < iter_keep; j++)
-        for (int i = 0; i < dim; i++) mat(i, j) = block_ritz_mat[j * dim + i];
-
-      FullPivLU<MatrixXcd> matLU(mat);
-
-      // Extract the upper triangular matrix
-      MatrixXcd matUpper = MatrixXcd::Zero(iter_keep, iter_keep);
-      matUpper = matLU.matrixLU().triangularView<Eigen::Upper>();
-      matUpper.conservativeResize(iter_keep, iter_keep);
-
-      // Extract the lower triangular matrix
-      MatrixXcd matLower = MatrixXcd::Identity(dim, dim);
-      matLower.block(0, 0, dim, iter_keep).triangularView<Eigen::StrictlyLower>() = matLU.matrixLU();
-      matLower.conservativeResize(dim, iter_keep);
-
-      // Extract the desired permutation matrices
-      MatrixXi matP = MatrixXi::Zero(dim, dim);
-      MatrixXi matQ = MatrixXi::Zero(iter_keep, iter_keep);
-      matP = matLU.permutationP().inverse();
-      matQ = matLU.permutationQ().inverse();
-      profile.TPSTOP(QUDA_PROFILE_EIGEN);
-
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
-      // Compute V * A = V * PLUQ
-
-      // Do P Permute
-      //---------------------------------------------------------------------------
-      permuteVecs(kSpace, matP.data(), dim);
-
-      // Do L Multiply
-      //---------------------------------------------------------------------------
-      // Loop over full batches
-      for (int b = 0; b < full_batches; b++) {
-
-        // batch triangle
-        blockRotateComplex(kSpace, matLower.data(), dim, {b * batch_size, (b + 1) * batch_size},
-                           {b * batch_size, (b + 1) * batch_size}, LOWER_TRI, offset);
-        // batch pencil
-        blockRotateComplex(kSpace, matLower.data(), dim, {(b + 1) * batch_size, dim},
-                           {b * batch_size, (b + 1) * batch_size}, PENCIL, offset);
-        blockReset(kSpace, b * batch_size, (b + 1) * batch_size, offset);
-      }
-
-      if (do_batch_remainder) {
-        // remainder triangle
-        blockRotateComplex(kSpace, matLower.data(), dim, {full_batches * batch_size, iter_keep},
-                           {full_batches * batch_size, iter_keep}, LOWER_TRI, offset);
-        // remainder pencil
-        if (iter_keep < dim) {
-          blockRotateComplex(kSpace, matLower.data(), dim, {iter_keep, dim}, {full_batches * batch_size, iter_keep},
-                             PENCIL, offset);
-        }
-        blockReset(kSpace, full_batches * batch_size, iter_keep, offset);
-      }
-
-      // Do U Multiply
-      //---------------------------------------------------------------------------
-      if (do_batch_remainder) {
-        // remainder triangle
-        blockRotateComplex(kSpace, matUpper.data(), iter_keep, {full_batches * batch_size, iter_keep},
-                           {full_batches * batch_size, iter_keep}, UPPER_TRI, offset);
-        // remainder pencil
-        blockRotateComplex(kSpace, matUpper.data(), iter_keep, {0, full_batches * batch_size},
-                           {full_batches * batch_size, iter_keep}, PENCIL, offset);
-        blockReset(kSpace, full_batches * batch_size, iter_keep, offset);
-      }
-
-      // Loop over full batches
-      for (int b = full_batches - 1; b >= 0; b--) {
-        // batch triangle
-        blockRotateComplex(kSpace, matUpper.data(), iter_keep, {b * batch_size, (b + 1) * batch_size},
-                           {b * batch_size, (b + 1) * batch_size}, UPPER_TRI, offset);
-        if (b > 0) {
-          // batch pencil
-          blockRotateComplex(kSpace, matUpper.data(), iter_keep, {0, b * batch_size},
-                             {b * batch_size, (b + 1) * batch_size}, PENCIL, offset);
-        }
-        blockReset(kSpace, b * batch_size, (b + 1) * batch_size, offset);
-      }
-
-      // Do Q Permute
-      //---------------------------------------------------------------------------
-      permuteVecs(kSpace, matQ.data(), iter_keep);
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    for (int j = 0; j < dim; j++) {
+      for (int i = 0; i < iter_keep; i++) { ritz_mat_keep[j * iter_keep + i] = block_ritz_mat[i * dim + j]; }
     }
-
+    
+    rotateVecsComplex(kSpace, ritz_mat_keep, offset, dim, iter_keep, profile);
+    
     // Update residual vectors
     for (int i = 0; i < block_size; i++) std::swap(kSpace[num_locked + iter_keep + i], kSpace[n_kr + i]);
 
