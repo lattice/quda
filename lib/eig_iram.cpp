@@ -162,12 +162,11 @@ namespace quda
 
   void IRAM::rotateVecsComplex(std::vector<ColorSpinorField *> &kSpace, int keep)
   {
-
     // Multi-BLAS friendly array to store part of Ritz matrix we want
     Complex *Qmat_keep = (Complex *)safe_malloc((n_kr * keep) * sizeof(Complex));
 
     // If we have memory availible, do the entire rotation
-    if (batched_rotate <= 0 || batched_rotate >= keep || 1) {
+    if (batched_rotate <= 0 || batched_rotate >= keep) {
       if ((int)kSpace.size() < n_kr + keep) {
         ColorSpinorParam csParamClone(*kSpace[0]);
         csParamClone.create = QUDA_ZERO_FIELD_CREATE;
@@ -201,6 +200,112 @@ namespace quda
 
       // Copy compressed Krylov
       for (int i = 0; i < keep; i++) std::swap(kSpace[i], kSpace[n_kr + i]);
+      
+    } else {
+
+      // Do batched rotation to save on memory
+      int offset = n_kr;
+      int batch_size = batched_rotate;
+      int full_batches = keep / batch_size;
+      int batch_size_r = keep % batch_size;
+      bool do_batch_remainder = (batch_size_r != 0 ? true : false);
+
+      if ((int)kSpace.size() < offset + batch_size) {
+        ColorSpinorParam csParamClone(*kSpace[0]);
+        csParamClone.create = QUDA_ZERO_FIELD_CREATE;
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + batch_size);
+        kSpace.reserve(offset + batch_size);
+        for (int i = kSpace.size(); i < offset + batch_size; i++) {
+          kSpace.push_back(ColorSpinorField::Create(csParamClone));
+        }
+      }
+
+      //profile.TPSTART(QUDA_PROFILE_EIGEN);
+      MatrixXcd mat = MatrixXcd::Zero(n_kr, keep);
+      for (int j = 0; j < keep; j++)
+        for (int i = 0; i < n_kr; i++) mat(i, j) = Qmat[i][j];
+      
+      FullPivLU<MatrixXcd> matLU(mat);
+
+      // Extract the upper triangular matrix
+      MatrixXcd matUpper = MatrixXcd::Zero(keep, keep);
+      matUpper = matLU.matrixLU().triangularView<Eigen::Upper>();
+      matUpper.conservativeResize(keep, keep);
+
+      // Extract the lower triangular matrix
+      MatrixXcd matLower = MatrixXcd::Identity(n_kr, n_kr);
+      matLower.block(0, 0, n_kr, keep).triangularView<Eigen::StrictlyLower>() = matLU.matrixLU();
+      matLower.conservativeResize(n_kr, keep);
+
+      // Extract the desired permutation matrices
+      MatrixXi matP = MatrixXi::Zero(n_kr, n_kr);
+      MatrixXi matQ = MatrixXi::Zero(keep, keep);
+      matP = matLU.permutationP().inverse();
+      matQ = matLU.permutationQ().inverse();
+      //profile.TPSTOP(QUDA_PROFILE_EIGEN);
+
+      //profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      // Compute V * A = V * PLUQ
+
+      // Do P Permute
+      //---------------------------------------------------------------------------
+      permuteVecs(kSpace, matP.data(), n_kr);
+
+      // Do L Multiply
+      //---------------------------------------------------------------------------
+      // Loop over full batches
+      for (int b = 0; b < full_batches; b++) {
+
+        // batch triangle
+        blockRotateComplex(kSpace, matLower.data(), n_kr, {b * batch_size, (b + 1) * batch_size},
+                           {b * batch_size, (b + 1) * batch_size}, LOWER_TRI, offset);
+        // batch pencil
+        blockRotateComplex(kSpace, matLower.data(), n_kr, {(b + 1) * batch_size, n_kr},
+                           {b * batch_size, (b + 1) * batch_size}, PENCIL, offset);
+        blockReset(kSpace, b * batch_size, (b + 1) * batch_size, offset);
+      }
+
+      if (do_batch_remainder) {
+        // remainder triangle
+        blockRotateComplex(kSpace, matLower.data(), n_kr, {full_batches * batch_size, keep},
+                           {full_batches * batch_size, keep}, LOWER_TRI, offset);
+        // remainder pencil
+        if (keep < n_kr) {
+          blockRotateComplex(kSpace, matLower.data(), n_kr, {keep, n_kr}, {full_batches * batch_size, keep},
+                             PENCIL, offset);
+        }
+        blockReset(kSpace, full_batches * batch_size, keep, offset);
+      }
+
+      // Do U Multiply
+      //---------------------------------------------------------------------------
+      if (do_batch_remainder) {
+        // remainder triangle
+        blockRotateComplex(kSpace, matUpper.data(), keep, {full_batches * batch_size, keep},
+                           {full_batches * batch_size, keep}, UPPER_TRI, offset);
+        // remainder pencil
+        blockRotateComplex(kSpace, matUpper.data(), keep, {0, full_batches * batch_size},
+                           {full_batches * batch_size, keep}, PENCIL, offset);
+        blockReset(kSpace, full_batches * batch_size, keep, offset);
+      }
+
+      // Loop over full batches
+      for (int b = full_batches - 1; b >= 0; b--) {
+        // batch triangle
+        blockRotateComplex(kSpace, matUpper.data(), keep, {b * batch_size, (b + 1) * batch_size},
+                           {b * batch_size, (b + 1) * batch_size}, UPPER_TRI, offset);
+        if (b > 0) {
+          // batch pencil
+          blockRotateComplex(kSpace, matUpper.data(), keep, {0, b * batch_size},
+                             {b * batch_size, (b + 1) * batch_size}, PENCIL, offset);
+        }
+        blockReset(kSpace, b * batch_size, (b + 1) * batch_size, offset);
+      }
+
+      // Do Q Permute
+      //---------------------------------------------------------------------------
+      permuteVecs(kSpace, matQ.data(), keep);
+      //profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     }
     
     host_free(Qmat_keep);
@@ -422,9 +527,6 @@ namespace quda
 
       if (num_converged >= n_conv) {	
 	converged = true;
-	eigensolveFromUpperHess(evals, beta);
-	rotateVecsComplex(kSpace, n_kr);
-	reorder(kSpace, evals, eig_param->spectrum);
       } else {
 	
 	int num_keep0 = num_keep;
@@ -474,6 +576,10 @@ namespace quda
                    restart_iter, iter);
       }
 
+      eigensolveFromUpperHess(evals, beta);
+      rotateVecsComplex(kSpace, n_kr);
+      reorder(kSpace, evals, eig_param->spectrum);
+      
       if (getVerbosity() >= QUDA_SUMMARIZE) {
 	for(int i=0; i<n_conv; i++)
 	  printfQuda("Eval[%04d] = (%+.16e,%+.16e) residual = %+.16e\n",
