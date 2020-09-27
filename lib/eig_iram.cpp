@@ -240,6 +240,7 @@ namespace quda
   
   void IRAM::eigensolveFromUpperHess(std::vector<Complex> &evals, const double beta)
   {
+    profile.TPSTART(QUDA_PROFILE_EIGEN);
     //Construct the upper Hessenberg matrix       
     MatrixXcd upperHessEigen = MatrixXcd::Zero(n_kr, n_kr);
     for(int i=0; i<n_kr; i++) {
@@ -260,6 +261,7 @@ namespace quda
 	Qmat[j][i] = eigenSolverUH.eigenvectors().col(i)[j];
       }
     }
+    profile.TPSTOP(QUDA_PROFILE_EIGEN);
   }
   
   void IRAM::operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)
@@ -305,7 +307,8 @@ namespace quda
 
     // Begin IRAM Eigensolver computation
     //---------------------------------------------------------------------------
-
+    profile.TPSTART(QUDA_PROFILE_COMPUTE);
+    
     // Do the first n_ev steps
     for (int step = 0; step < n_ev; step++) arnoldiStep(kSpace, r, beta, step);
     num_keep = n_ev;
@@ -317,8 +320,10 @@ namespace quda
       iter += n_kr - num_keep;
       
       // Ritz values and their residua are updated.
+      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
       eigensolveFromUpperHess(evals, beta);
-
+      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      
       num_keep = n_ev;
       int num_shifts = n_kr - num_keep;
 
@@ -346,11 +351,12 @@ namespace quda
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("%04d converged eigenvalues at iter %d\n", num_converged, restart_iter);
 
       if (num_converged >= n_conv) {
-
+	profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 	eigensolveFromUpperHess(evals, beta);
 	rotateBasis(kSpace, n_kr);
 	reorder(kSpace, evals, eig_param->spectrum);
 	converged = true;
+	profile.TPSTART(QUDA_PROFILE_COMPUTE);
 	
       } else {
 	
@@ -366,12 +372,14 @@ namespace quda
 	  sortArrays(eig_param->spectrum, n_kr, evals, residua);
 	  sortArrays(QUDA_SPECTRUM_LM_EIG, num_shifts, residua, evals);    
 	}
-
+	
+	profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 	// Apply the shifts of the unwated Ritz values via QR
 	qrShifts(evals, num_shifts, epsilon);
 	  
 	// Compress the Krylov space using the accumulated Givens rotations in Qmat
 	rotateBasis(kSpace, num_keep+1);
+	profile.TPSTART(QUDA_PROFILE_COMPUTE);
 	
 	// Update the residual vector
 	blas::caxpby(upperHess[num_keep][num_keep-1], *kSpace[num_keep], Qmat[n_kr-1][num_keep-1], *r[0]);
@@ -382,7 +390,9 @@ namespace quda
       }      
       restart_iter++;
     }
-        
+
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    
     // Post computation report
     //---------------------------------------------------------------------------
     if (!converged) {
