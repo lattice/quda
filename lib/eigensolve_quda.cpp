@@ -424,13 +424,13 @@ namespace quda
         if (j != i) {
           if (abs(cnorm) > 5.0 * epsilon) {
             if (getVerbosity() >= QUDA_SUMMARIZE)
-              printfQuda("Norm <%d|%d>^2 = (%e,%e): %e\n", i, j, cnorm.real(), cnorm.imag(), abs(cnorm));
+              printfQuda("Norm <%d|%d>^2 = ||(%e,%e)|| = %e\n", i, j, cnorm.real(), cnorm.imag(), abs(cnorm));
             orthed = false;
           }
         } else {
           if (abs(Unit - cnorm) > 5.0 * epsilon) {
             if (getVerbosity() >= QUDA_SUMMARIZE)
-              printfQuda("Norm <%d|%d>^2 = (%e,%e): %e\n", i, j, cnorm.real(), cnorm.imag(), abs(Unit - cnorm));
+              printfQuda("1 - Norm <%d|%d>^2 = 1 - ||(%e,%e)|| = %e\n", i, j, cnorm.real(), cnorm.imag(), abs(Unit - cnorm));
             orthed = false;
           }
         }

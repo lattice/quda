@@ -136,6 +136,8 @@ namespace quda
   
   void IRAM::qrShifts(const std::vector<Complex> evals, const int num_shifts, const double epsilon)
   {
+    // This isn't really Eigen, but it's morally equivalent
+    profile.TPSTART(QUDA_PROFILE_EIGEN);
     Complex T11, T12, T21, T22, temp, temp2, temp3, U1, U2;
     double dV;
     
@@ -236,6 +238,7 @@ namespace quda
       }
       for(int i=0; i<n_kr; i++) upperHess[i][i] += evals[shift];
     }
+    profile.TPSTOP(QUDA_PROFILE_EIGEN);
   }
   
   void IRAM::eigensolveFromUpperHess(std::vector<Complex> &evals, const double beta)
@@ -288,12 +291,12 @@ namespace quda
     // Increase the size of kSpace passed to the function, will be trimmed to
     // original size before exit.
     prepareKrylovSpace(kSpace, evals);
+
+    // Apply a matrix op to the residual to place it in the
+    // range of the operator
     matVec(mat, *r[0], *kSpace[0]);
     
-    // Check for Chebyshev maximum estimation
-    checkChebyOpMax(mat, kSpace);
-
-    // Convergence and locking criteria
+    // Convergence criteria
     double epsilon = setEpsilon(kSpace[0]->Precision());
     double epsilon23 = pow(epsilon, 2.0/3.0);
     double beta = 0.0;
@@ -418,7 +421,7 @@ namespace quda
       }
 
       // Check order
-      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) computeEvals(mat, kSpace, evals, n_kr);
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) computeEvals(mat, kSpace, evals);
     }
 
     // Local clean-up
