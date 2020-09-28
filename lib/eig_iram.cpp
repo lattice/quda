@@ -440,6 +440,7 @@ namespace quda
 	reorder(kSpace, evals, eig_param->spectrum);
 	converged = true;
 	profile.TPSTART(QUDA_PROFILE_COMPUTE);
+	computeEvals(mat, kSpace, evals);
 	
       } else {
 	
@@ -490,21 +491,11 @@ namespace quda
       }
     } else {
       if (getVerbosity() >= QUDA_SUMMARIZE) {
-        printfQuda("IRAM computed the requested %d vectors in %d restart steps and %d OP*x operations.\n", n_conv,
-                   restart_iter, iter);
-      }
-
-      /*
-	if (getVerbosity() >= QUDA_SUMMARIZE) {
-	for(int i=0; i<n_conv; i++)
-	printfQuda("Eval[%04d] = (%+.16e,%+.16e) residual = %+.16e\n",
-	i, evals[i].real(), evals[i].imag(), residua[i]);
-	}
-      */
-      
-      computeEvals(mat, kSpace, evals);
+        printfQuda("IRAM computed the requested %d vectors with a %d search space and %d Krylov space in %d "
+		   "restart steps and %d OP*x operations.\n", n_conv, n_ev, n_kr, restart_iter, iter);
+      }      
     }
-
+    
     // Local clean-up
     cleanUpEigensolver(kSpace, evals);
   }
