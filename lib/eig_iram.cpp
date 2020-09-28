@@ -398,9 +398,6 @@ namespace quda
     omp_set_num_threads(atoi(getenv("OMP_NUM_THREADS")));
     Eigen::setNbThreads(atoi(getenv("OMP_NUM_THREADS")));
     
-    omp_set_num_threads(atoi(getenv("OMP_NUM_THREADS")));
-    Eigen::setNbThreads(atoi(getenv("OMP_NUM_THREADS")));
-    
     // Print Eigensolver params
     printEigensolverSetup();
     //---------------------------------------------------------------------------
