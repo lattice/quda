@@ -390,9 +390,9 @@ namespace quda
 
     // Eigen object for computing Ritz values from the upper Hessenberg matrix
     Eigen::ComplexEigenSolver<MatrixXcd> eigenSolverUH;
-
-    omp_set_num_threads(threads);                                                                                                                                                
-    Eigen::setNbThreads(threads);
+    
+    omp_set_num_threads(atoi(getenv("OMP_NUM_THREADS")));
+    Eigen::setNbThreads(atoi(getenv("OMP_NUM_THREADS")));
     
     // Print Eigensolver params
     printEigensolverSetup();
@@ -440,7 +440,14 @@ namespace quda
 	  break;
 	}
       }
+
+      int num_keep0 = num_keep;
+      iter_keep = std::min(iter_converged + (n_kr - num_converged) / 2, n_kr - 12);
       
+      num_converged = iter_converged;
+      num_keep = iter_keep;      
+      num_shifts = n_kr - num_keep;
+            
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("%04d converged eigenvalues at iter %d\n", num_converged, restart_iter);
 
       if (num_converged >= n_conv) {
@@ -448,17 +455,10 @@ namespace quda
 	eigensolveFromUpperHess(evals, beta);
 	rotateBasis(kSpace, n_kr);
 	reorder(kSpace, evals, eig_param->spectrum);
-	converged = true;
 	profile.TPSTART(QUDA_PROFILE_COMPUTE);
-	
+	computeEvals(mat, kSpace, evals);
+	converged = true;	
       } else {
-	
-	int num_keep0 = num_keep;
-	iter_keep = std::min(iter_converged + (n_kr - num_converged) / 2, n_kr - 12);
-	
-	num_converged = iter_converged;
-	num_keep = iter_keep;      
-	num_shifts = n_kr - num_keep;
 
 	// If num_keep changed, we resort the Ritz values and residua
 	if(num_keep0 < num_keep) {
@@ -503,14 +503,6 @@ namespace quda
         printfQuda("IRAM computed the requested %d vectors in %d restart steps and %d OP*x operations.\n", n_conv,
                    restart_iter, iter);
       }
-
-      /*
-	if (getVerbosity() >= QUDA_SUMMARIZE) {
-	for(int i=0; i<n_conv; i++)
-	printfQuda("Eval[%04d] = (%+.16e,%+.16e) residual = %+.16e\n",
-	i, evals[i].real(), evals[i].imag(), residua[i]);
-	}
-      */
       
       computeEvals(mat, kSpace, evals);
     }

@@ -927,8 +927,10 @@ namespace quda
       for (int j = 0; j < n_kr; j++) vecs_ptr.push_back(kSpace[j]);
       
       // multiBLAS caxpy
+      profile.TPSTART(QUDA_PROFILE_COMPUTE);
       blas::caxpy(rot_array, vecs_ptr, kSpace_ptr);
-
+      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+      
       // Copy compressed Krylov
       for (int i = 0; i < keep; i++) std::swap(kSpace[i], kSpace[n_kr + i]);
       
@@ -1072,8 +1074,10 @@ namespace quda
       for (int j = 0; j < n_kr; j++) vecs_ptr.push_back(kSpace[j]);
       
       // multiBLAS axpy
+      profile.TPSTART(QUDA_PROFILE_COMPUTE);
       blas::axpy(rot_array, vecs_ptr, kSpace_ptr);
-
+      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+      
       // Copy compressed Krylov
       for (int i = 0; i < keep; i++) std::swap(kSpace[i], kSpace[n_kr + i]);
       
