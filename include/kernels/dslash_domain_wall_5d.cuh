@@ -35,23 +35,23 @@ namespace quda
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
     constexpr QudaPCType pc_type() const { return QUDA_5D_PC; }
 
-    __device__ __host__ inline void apply(int idx, int parity)
+    template <KernelType mykernel_type> __device__ __host__ inline void apply(int idx, int parity)
     {
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
 
       bool active
-        = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
+        = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
       // we pass s=0, since x_cb is a 5-d index that includes s
-      auto coord = getCoords<QUDA_5D_PC, kernel_type>(arg, idx, 0, parity, thread_dim);
+      auto coord = getCoords<QUDA_5D_PC, mykernel_type>(arg, idx, 0, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
 
-      applyWilson<nParity, dagger, kernel_type>(out, arg, coord, parity, idx, thread_dim, active);
+      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
 
-      if (kernel_type == INTERIOR_KERNEL) { // 5th dimension derivative always local
+      if (mykernel_type == INTERIOR_KERNEL) { // 5th dimension derivative always local
         constexpr int d = 4;
         const int s = coord[4];
         const int their_spinor_parity = nParity == 2 ? 1 - parity : 0;
@@ -78,21 +78,21 @@ namespace quda
         }
       }
 
-      if (xpay && kernel_type == INTERIOR_KERNEL) {
+      if (xpay && mykernel_type == INTERIOR_KERNEL) {
         Vector x = arg.x(coord.x_cb, my_spinor_parity);
         out = x + arg.a * out;
-      } else if (kernel_type != INTERIOR_KERNEL && active) {
+      } else if (mykernel_type != INTERIOR_KERNEL && active) {
         Vector x = arg.out(coord.x_cb, my_spinor_parity);
         out = x + (xpay ? arg.a * out : out);
       }
 
-      if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(coord.x_cb, my_spinor_parity) = out;
+      if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(coord.x_cb, my_spinor_parity) = out;
     }
 
-    __host__ __device__ void operator()(int idx, int s, int parity)
+    template <KernelType mykernel_type = kernel_type> __host__ __device__ void operator()(int idx, int s, int parity)
     {
       int x5_cb = s * arg.threads + idx; // 5-d checkerboard index
-      apply(x5_cb, parity);
+      apply<mykernel_type>(x5_cb, parity);
     }
   };
 

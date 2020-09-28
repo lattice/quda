@@ -5,8 +5,27 @@
 #include <register_traits.h>
 #include <index_helper.cuh>
 
+#ifdef NVSHMEM_COMMS
+#include <nvshmem.h>
+#include <cuda/atomic>
+
+namespace
+{
+  __device__ cuda::atomic<long, cuda::thread_scope_system> intersync {0};
+  __device__ cuda::atomic<long, cuda::thread_scope_device> interior_done {0};
+  __device__ cuda::atomic<int, cuda::thread_scope_block> interior_count {0};
+} // namespace
+#endif
+
 namespace quda
 {
+
+  namespace dslash
+  {
+    // helpers for in-kernel barriers in nvshmem
+    extern long *sync_arr;
+    extern long synccounter;
+  } // namespace dslash
 
   /**
      @brief Helper function to determine if we should do halo
@@ -264,13 +283,25 @@ namespace quda
 
     int pack_threads; // really number of face sites we have to pack
     int_fastdiv blocks_per_dir;
+    int sites_per_block;
     int dim_map[4];
     int active_dims;
     int pack_blocks; // total number of blocks used for packing in the dslash
+    int ext_dims;    // dimension to run in the exterior Dslash
+    int ext_blocks;
+
+    // for shmem ...
+    static constexpr bool packkernel = false;
+    void *packBuffer[4 * QUDA_MAX_DIM];
+    int neighbor_ranks[2 * QUDA_MAX_DIM];
+    int bytes[2 * QUDA_MAX_DIM];
+    volatile long *sync_arr;
+    long counter;
+    int shmem;
 
     // constructor needed for staggered to set xpay from derived class
     DslashArg(const ColorSpinorField &in, const GaugeField &U, int parity, bool dagger, bool xpay, int nFace,
-              int spin_project, const int *comm_override) :
+              int spin_project, const int *comm_override, const int shmem_ = 0) :
       parity(parity),
       nParity(in.SiteSubset()),
       nFace(nFace),
@@ -292,7 +323,12 @@ namespace quda
       blocks_per_dir(1),
       dim_map {},
       active_dims(0),
-      pack_blocks(0)
+      pack_blocks(0),
+      ext_dims(0),
+      ext_blocks(0),
+      sync_arr(dslash::sync_arr),
+      counter(dslash::synccounter),
+      shmem(shmem_)
     {
       for (int d = 0; d < 4; d++) {
         commDim[d] = (comm_override[d] == 0) ? 0 : comm_dim_partitioned(d);
@@ -304,9 +340,15 @@ namespace quda
         static_cast<cudaColorSpinorField *>(in_)->createComms(nFace, spin_project);
       }
       dc = in.getDslashConstant();
+      for (int dim = 0; dim < 4; dim++) {
+        for (int dir = 0; dir < 2; dir++) {
+          neighbor_ranks[2 * dim + dir] = commDim[dim] ? comm_neighbor_rank(dir, dim) : -1;
+          bytes[2 * dim + dir] = in.GhostFaceBytes(dim);
+        }
+      }
     }
 
-    void setPack(bool pack)
+    void setPack(bool pack, void *packBuffer_[4 * QUDA_MAX_DIM])
     {
       if (pack) {
         // set packing parameters
@@ -321,10 +363,29 @@ namespace quda
         }
         active_dims = d;
         pack_blocks = active_dims * blocks_per_dir * 2;
+        for (int i = 0; i < 4 * QUDA_MAX_DIM; i++) { packBuffer[i] = packBuffer_[i]; }
       } else {
+        // we need dim_map for the grid-stride exterior kernel used in shmem
+        int d = 0;
+        for (int i = 0; i < 4; i++) {
+          if (!commDim[i]) continue;
+          if (i == 3 && !getKernelPackT()) continue;
+          dim_map[d++] = i;
+        }
         pack_threads = 0;
         pack_blocks = 0;
         active_dims = 0;
+      }
+    }
+
+    void setExt(bool ext)
+    {
+      if (ext) {
+        int nDimComms = 0;
+        for (int d = 0; d < 4; d++) nDimComms += commDim[d];
+        ext_dims = nDimComms;
+      } else {
+        ext_dims = 0;
       }
     }
   };
@@ -364,7 +425,8 @@ namespace quda
     out << std::endl;
     out << "active_dims = " << arg.active_dims << std::endl;
     out << "pack_blocks = " << arg.pack_blocks << std::endl;
-
+    out << "ext_dim = " << arg.ext_dim;
+    out << "ext_blocks " << arg.ext_blocks;
     return out;
   }
 
@@ -429,17 +491,151 @@ namespace quda
       // first few blocks do packing kernel
       P<dagger, dslash.pc_type(), Arg> packer;
       packer(arg, s, 1 - parity, dslash.twist_pack()); // flip parity since pack is on input
+
+      // we use that when running the exterior -- this is either
+      // * an explicit call to the exterior when not merged with the interior or
+      // * the interior with ext_blocks > 0
+#ifdef NVSHMEM_COMMS
+    } else if (arg.shmem > 0
+               && ((kernel_type == EXTERIOR_KERNEL_ALL && arg.ext_blocks == 0)
+                   || (kernel_type == INTERIOR_KERNEL && arg.ext_blocks > 0
+                       && blockIdx.x >= (gridDim.x - arg.ext_blocks)))) {
+      // shmem exterior kernel with grid-strided loop
+
+      // figure out some details on blocks
+      const bool shmem_interiordone = (arg.shmem & 64);
+      const int myblockidx = arg.ext_blocks > 0 ? blockIdx.x - (gridDim.x - arg.ext_blocks) : blockIdx.x;
+      const int nComm = arg.commDim[0] + arg.commDim[1] + arg.commDim[2] + arg.commDim[3];
+      const int blocks_per_dim = (arg.ext_blocks > 0 ? arg.ext_blocks : gridDim.x) / (nComm);
+
+      int dir = (myblockidx % blocks_per_dim) / (blocks_per_dim / 2);
+      // this id the dimdir we are working on ...
+      int dim;
+      int threadl;
+      int threads_my_dir;
+      switch (myblockidx / blocks_per_dim) {
+      case 0: dim = arg.dim_map[0]; break;
+      case 1: dim = arg.dim_map[1]; break;
+      case 2: dim = arg.dim_map[2]; break;
+      case 3: dim = arg.dim_map[3]; break;
+      default: dim = -1;
+      }
+
+      switch (dim) {
+      case 0:
+        threads_my_dir = (arg.threadDimMapUpper[0] - arg.threadDimMapLower[0]) / 2;
+        threadl = arg.threadDimMapLower[0];
+        break;
+      case 1:
+        threads_my_dir = (arg.threadDimMapUpper[1] - arg.threadDimMapLower[1]) / 2;
+        threadl = arg.threadDimMapLower[1];
+        break;
+      case 2:
+        threads_my_dir = (arg.threadDimMapUpper[2] - arg.threadDimMapLower[2]) / 2;
+        threadl = arg.threadDimMapLower[2];
+        break;
+      case 3:
+        threads_my_dir = (arg.threadDimMapUpper[3] - arg.threadDimMapLower[3]) / 2;
+        threadl = arg.threadDimMapLower[3];
+        break;
+      default: threadl = 0; threads_my_dir = 0;
+      }
+      int dimdir = 2 * dim + dir;
+      int local_tid = threadIdx.x + blockDim.x * (myblockidx % (blocks_per_dim / 2)); // index within the block
+      int tid = local_tid + threadl + dir * threads_my_dir; // global index corresponfing to local_tid
+
+      constexpr bool shmembarrier = true; // always true for now (arg.shmem & 16);
+
+      if (shmembarrier) {
+
+        if (shmem_interiordone and threadIdx.x == blockDim.x - 1) {
+          interior_done.wait(arg.counter - 1, cuda::std::memory_order_acquire);
+        }
+        if (threadIdx.x < 8) {
+          // spin for my direction
+          bool spin = threadIdx.x == dimdir ? true : false;
+          // figure out which other directions also to spin for (to make corners work)
+          switch (dim) {
+          case 3:
+            if (arg.commDim[3]) {
+              spin = threadIdx.x / 2 < 3 ? arg.commDim[2] : spin;
+              spin = threadIdx.x / 2 < 2 ? arg.commDim[1] : spin;
+              spin = threadIdx.x / 2 < 1 ? arg.commDim[0] : spin;
+            } else {
+              spin = false;
+            }
+            break;
+          case 2:
+            if (arg.commDim[2]) {
+              if (arg.commDim[1]) spin = threadIdx.x / 2 < 2 ? true : spin;
+              if (arg.commDim[0]) spin = threadIdx.x / 2 < 1 ? true : spin;
+            }
+            break;
+          case 1:
+            if (arg.commDim[1]) {
+              if (arg.commDim[0]) spin = threadIdx.x / 2 < 1 ? true : spin;
+            }
+            break;
+          case 0: break;
+          }
+
+          if (getNeighborRank(threadIdx.x, arg) >= 0) {
+            if (spin) {
+              while (arg.counter > *(arg.sync_arr + threadIdx.x)) { __nanosleep(10); };
+            }
+          }
+        }
+
+        // wait for all threads here as not all threads spin
+        __syncthreads();
+        // do exterior
+      }
+      arg.kernel_type = EXTERIOR_KERNEL_ALL;
+      while (local_tid < threads_my_dir) {
+        // for full fields set parity from z thread index else use arg setting
+        int parity = nParity == 2 ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
+        // if (false && !(arg.shmem & 64)) {
+        if (true) {
+          switch (parity) {
+          case 0: dslash.template operator()<EXTERIOR_KERNEL_ALL>(tid, s, 0); break;
+          case 1: dslash.template operator()<EXTERIOR_KERNEL_ALL>(tid, s, 1); break;
+          }
+        } else {
+          dslash.template operator()<EXTERIOR_KERNEL_ALL>(tid, s, parity);
+          break;
+        }
+        local_tid += blockDim.x * blocks_per_dim / 2;
+        tid += blockDim.x * blocks_per_dim / 2;
+      }
+#endif
     } else {
       const int dslash_block_offset = (kernel_type == INTERIOR_KERNEL ? arg.pack_blocks : 0);
       int x_cb = (blockIdx.x - dslash_block_offset) * blockDim.x + threadIdx.x;
       if (x_cb >= arg.threads) return;
 
 #ifdef QUDA_DSLASH_FAST_COMPILE
-      dslash(x_cb, s, parity);
+        dslash(x_cb, s, parity);
 #else
-      switch (parity) {
-      case 0: dslash(x_cb, s, 0); break;
-      case 1: dslash(x_cb, s, 1); break;
+        switch (parity) {
+        case 0: dslash(x_cb, s, 0); break;
+        case 1: dslash(x_cb, s, 1); break;
+        }
+#endif
+#ifdef NVSHMEM_COMMS
+      const bool shmem_interiordone = (arg.shmem & 64);
+      if (shmem_interiordone) {
+        // put wait at end of interior kernel
+        if (kernel_type == INTERIOR_KERNEL) {
+          __syncthreads();
+          if (threadIdx.x == 0) {
+            int amlast = interior_count.fetch_add(1, cuda::std::memory_order_acq_rel); // ensure that my block is done
+            if (amlast == gridDim.x - arg.pack_blocks - arg.ext_blocks - 1) {
+              interior_done.store(arg.counter, cuda::std::memory_order_release);
+              interior_done.notify_all();
+              interior_count.store(0, cuda::std::memory_order_relaxed);
+            }
+          }
+        }
       }
 #endif
     }

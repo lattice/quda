@@ -502,17 +502,30 @@ namespace quda {
 
   // pack the ghost zone into a contiguous buffer for communications
   void cudaColorSpinorField::packGhost(const int nFace, const QudaParity parity, const int dim, const QudaDirection dir,
-                                       const int dagger, qudaStream_t *stream, MemoryLocation location[2 * QUDA_MAX_DIM],
-                                       MemoryLocation location_label, bool spin_project, double a, double b, double c)
+                                       const int dagger, qudaStream_t *stream,
+                                       MemoryLocation location[2 * QUDA_MAX_DIM], MemoryLocation location_label,
+                                       bool spin_project, double a, double b, double c, int shmem)
   {
 #ifdef MULTI_GPU
-    void *packBuffer[2 * QUDA_MAX_DIM] = {};
-
+    void *packBuffer[4 * QUDA_MAX_DIM] = {};
+  
     for (int dim=0; dim<4; dim++) {
       for (int dir=0; dir<2; dir++) {
-	switch(location[2*dim+dir]) {
-	case Device: // pack to local device buffer
-	  packBuffer[2*dim+dir] = my_face_dim_dir_d[bufferIndex][dim][dir];
+        switch (location[2 * dim + dir]) {
+
+        case Device: // pack to local device buffer
+          packBuffer[2*dim+dir] = my_face_dim_dir_d[bufferIndex][dim][dir];
+          packBuffer[2 * QUDA_MAX_DIM + 2 * dim + dir] = nullptr;
+          break;
+        case Shmem:
+          // this is the remote buffer when using shmem ...
+          packBuffer[2 * dim + dir] = comm_peer2peer_possible(dir, dim) ?
+            static_cast<char *>(ghost_remote_send_buffer_d[bufferIndex][dim][dir])
+              +  ghost_offset[dim][1 - dir] :
+            my_face_dim_dir_d[bufferIndex][dim][dir];
+          packBuffer[2 * QUDA_MAX_DIM + 2 * dim + dir] = comm_peer2peer_possible(dir, dim) ?
+            nullptr :
+            static_cast<char *>(ghost_recv_buffer_d[bufferIndex]) + ghost_offset[dim][1 - dir];
           break;
 	case Host:   // pack to zero-copy memory
 	  packBuffer[2*dim+dir] = my_face_dim_dir_hd[bufferIndex][dim][dir];
@@ -521,12 +534,10 @@ namespace quda {
           packBuffer[2*dim+dir] = static_cast<char*>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + ghost_offset[dim][1-dir];
           break;
 	default: errorQuda("Undefined location %d", location[2*dim+dir]);
-	}
+        }
       }
     }
-
-    PackGhost(packBuffer, *this, location_label, nFace, dagger, parity, spin_project, a, b, c, *stream);
-
+    PackGhost(packBuffer, *this, location_label, nFace, dagger, parity, spin_project, a, b, c, shmem, *stream);
 #else
     errorQuda("packGhost not built on single-GPU build");
 #endif
@@ -668,14 +679,14 @@ namespace quda {
 
   void cudaColorSpinorField::pack(int nFace, int parity, int dagger, int stream_idx,
                                   MemoryLocation location[2 * QUDA_MAX_DIM], MemoryLocation location_label,
-                                  bool spin_project, double a, double b, double c)
+                                  bool spin_project, double a, double b, double c, int shmem)
   {
     createComms(nFace, spin_project); // must call this first
 
     const int dim=-1; // pack all partitioned dimensions
 
     packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[stream_idx], location, location_label,
-              spin_project, a, b, c);
+              spin_project, a, b, c, shmem);
   }
 
   void cudaColorSpinorField::packExtended(const int nFace, const int R[], const int parity, const int dagger,

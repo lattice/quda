@@ -31,6 +31,7 @@ namespace quda
 
     F out;      /** output vector field */
     const F in; /** input vector field */
+    const F in_pack; /** input vector field */
     const G U;  /** the gauge field */
     int mu;     /** The direction in which to apply the derivative */
 
@@ -39,6 +40,7 @@ namespace quda
       DslashArg<Float, nDim>(in, U, parity, dagger, false, 1, spin_project, comm_override),
       out(out),
       in(in),
+      in_pack(in),
       U(U),
       mu(mu)
     {
@@ -127,55 +129,40 @@ namespace quda
     constexpr covDev(Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
+    template <KernelType mykernel_type = kernel_type>
     __device__ __host__ inline void operator()(int idx, int s, int parity)
     {
       using real = typename mapper<typename Arg::Float>::type;
       using Vector = ColorSpinor<real, Arg::nColor, 4>;
 
       // is thread active (non-trival for fused kernel only)
-      bool active = kernel_type == EXTERIOR_KERNEL_ALL ? false : true;
+      bool active = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true;
 
       // which dimension is thread working on (fused kernel only)
       int thread_dim;
 
-      auto coord = getCoords<QUDA_4D_PC, kernel_type, Arg>(arg, idx, s, parity, thread_dim);
+      auto coord = getCoords<QUDA_4D_PC, mykernel_type, Arg>(arg, idx, s, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
 
       switch (arg.mu) { // ensure that mu is known to compiler for indexing in applyCovDev (avoid register spillage)
-      case 0:
-        applyCovDev<nParity, dagger, kernel_type, 0>(out, arg, coord, parity, idx, thread_dim, active);
-        break;
-      case 1:
-        applyCovDev<nParity, dagger, kernel_type, 1>(out, arg, coord, parity, idx, thread_dim, active);
-        break;
-      case 2:
-        applyCovDev<nParity, dagger, kernel_type, 2>(out, arg, coord, parity, idx, thread_dim, active);
-        break;
-      case 3:
-        applyCovDev<nParity, dagger, kernel_type, 3>(out, arg, coord, parity, idx, thread_dim, active);
-        break;
-      case 4:
-        applyCovDev<nParity, dagger, kernel_type, 4>(out, arg, coord, parity, idx, thread_dim, active);
-        break;
-      case 5:
-        applyCovDev<nParity, dagger, kernel_type, 5>(out, arg, coord, parity, idx, thread_dim, active);
-        break;
-      case 6:
-        applyCovDev<nParity, dagger, kernel_type, 6>(out, arg, coord, parity, idx, thread_dim, active);
-        break;
-      case 7:
-        applyCovDev<nParity, dagger, kernel_type, 7>(out, arg, coord, parity, idx, thread_dim, active);
-        break;
+      case 0: applyCovDev<nParity, dagger, mykernel_type, 0>(out, arg, coord, parity, idx, thread_dim, active); break;
+      case 1: applyCovDev<nParity, dagger, mykernel_type, 1>(out, arg, coord, parity, idx, thread_dim, active); break;
+      case 2: applyCovDev<nParity, dagger, mykernel_type, 2>(out, arg, coord, parity, idx, thread_dim, active); break;
+      case 3: applyCovDev<nParity, dagger, mykernel_type, 3>(out, arg, coord, parity, idx, thread_dim, active); break;
+      case 4: applyCovDev<nParity, dagger, mykernel_type, 4>(out, arg, coord, parity, idx, thread_dim, active); break;
+      case 5: applyCovDev<nParity, dagger, mykernel_type, 5>(out, arg, coord, parity, idx, thread_dim, active); break;
+      case 6: applyCovDev<nParity, dagger, mykernel_type, 6>(out, arg, coord, parity, idx, thread_dim, active); break;
+      case 7: applyCovDev<nParity, dagger, mykernel_type, 7>(out, arg, coord, parity, idx, thread_dim, active); break;
       }
 
-      if (kernel_type != INTERIOR_KERNEL && active) {
+      if (mykernel_type != INTERIOR_KERNEL && active) {
         Vector x = arg.out(coord.x_cb, my_spinor_parity);
         out += x;
       }
 
-      if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(coord.x_cb, my_spinor_parity) = out;
+      if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(coord.x_cb, my_spinor_parity) = out;
     }
   };
 

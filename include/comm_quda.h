@@ -220,6 +220,14 @@ extern "C" {
   bool comm_peer2peer_enabled(int dir, int dim);
 
   /**
+     Query if peer-to-peer communication is possible (not necessarily also enabled)
+     @param dir Direction (0 - backwards, 1 forwards)
+     @param dim Dimension (0-3)
+     @return Whether peer-to-peer is enabled
+  */
+  bool comm_peer2peer_possible(int dir, int dim);
+
+  /**
      @brief Enable / disable peer-to-peer communication: used for dslash
      policies that do not presently support peer-to-peer communication
      @param[in] enable Boolean flag to enable / disable peer-to-peer communication
@@ -249,7 +257,12 @@ extern "C" {
   bool comm_gdr_enabled();
 
   /**
-     @brief Query if GPU Direct RDMA communication is blacklisted for this GPU
+     @brief Query if NVSHMEM communication is enabled (global setting)
+  */
+  bool comm_nvshmem_enabled();
+
+  /**
+      @brief Query if GPU Direct RDMA communication is blacklisted for this GPU
   */
   bool comm_gdr_blacklist();
 

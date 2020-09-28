@@ -308,6 +308,8 @@ bool comm_peer2peer_enabled(int dir, int dim){
   return enable_p2p ? peer2peer_enabled[dir][dim] : false;
 }
 
+bool comm_peer2peer_possible(int dir, int dim) { return peer2peer_enabled[dir][dim]; }
+
 int comm_peer2peer_enabled_global() {
   if (!enable_p2p) return false;
 
@@ -696,6 +698,25 @@ bool comm_gdr_blacklist() {
   return blacklist;
 }
 
+bool comm_nvshmem_enabled()
+{
+#if (defined MULTI_GPU) && (defined NVSHMEM_COMMS)
+  static bool nvshmem_enabled = true;
+#else
+  static bool nvshmem_enabled = false;
+#endif
+#ifdef MULTI_GPU
+  static bool nvshmem_init = false;
+  if (!nvshmem_init) {
+    char *enable_nvshmem_env = getenv("QUDA_ENABLE_NVSHMEM");
+    if (enable_nvshmem_env && strcmp(enable_nvshmem_env, "1") == 0) { nvshmem_enabled = true; }
+    if (enable_nvshmem_env && strcmp(enable_nvshmem_env, "0") == 0) { nvshmem_enabled = false; }
+    nvshmem_init = true;
+  }
+#endif
+  return nvshmem_enabled;
+}
+
 static bool deterministic_reduce = false;
 
 void comm_init_common(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
@@ -778,6 +799,8 @@ const char *comm_config_string()
     }
     strcat(config_string, ",gdr=");
     strcat(config_string, std::to_string(comm_gdr_enabled()).c_str());
+    strcat(config_string, ",nvshmem=");
+    strcat(config_string, std::to_string(comm_nvshmem_enabled()).c_str());
     config_init = true;
   }
 

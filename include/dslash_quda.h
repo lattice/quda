@@ -671,7 +671,8 @@ namespace quda {
      @param[in] stream Which stream are we executing in
   */
   void PackGhost(void *ghost[2 * QUDA_MAX_DIM], const ColorSpinorField &field, MemoryLocation location, int nFace,
-                 bool dagger, int parity, bool spin_project, double a, double b, double c, const qudaStream_t &stream);
+                 bool dagger, int parity, bool spin_project, double a, double b, double c, int shmem,
+                 const qudaStream_t &stream);
 
   /**
      @brief Applies a gamma5 matrix to a spinor (wrapper to ApplyGamma)

@@ -45,7 +45,7 @@ namespace quda {
 
   } // namespace colorspinor
 
-  enum MemoryLocation { Device = 1, Host = 2, Remote = 4 };
+  enum MemoryLocation { Device = 1, Host = 2, Remote = 4, Shmem = 8 };
 
   struct FullClover;
 
@@ -490,6 +490,7 @@ namespace quda {
     size_t Bytes() const { return bytes; }
     size_t NormBytes() const { return norm_bytes; }
     size_t GhostBytes() const { return ghost_bytes; }
+    size_t GhostFaceBytes(int i) const { return ghost_face_bytes[i]; }
     size_t GhostNormBytes() const { return ghost_bytes; }
     void PrintDims() const { printfQuda("dimensions=%d %d %d %d\n", x[0], x[1], x[2], x[3]); }
 
@@ -746,7 +747,7 @@ namespace quda {
       */
     void packGhost(const int nFace, const QudaParity parity, const int dim, const QudaDirection dir, const int dagger,
                    qudaStream_t *stream, MemoryLocation location[2 * QUDA_MAX_DIM], MemoryLocation location_label,
-                   bool spin_project, double a = 0, double b = 0, double c = 0);
+                   bool spin_project, double a = 0, double b = 0, double c = 0, int shmem = 0);
 
     void packGhostExtended(const int nFace, const int R[], const QudaParity parity, const int dim,
                            const QudaDirection dir, const int dagger, qudaStream_t *stream, bool zero_copy = false);
@@ -807,8 +808,8 @@ namespace quda {
        @param[in] b Used for twisted mass (chiral twist factor)
        @param[in] c Used for twisted mass (flavor twist factor)
     */
-    void pack(int nFace, int parity, int dagger, int stream_idx, MemoryLocation location[],
-              MemoryLocation location_label, bool spin_project = true, double a = 0, double b = 0, double c = 0);
+    void pack(int nFace, int parity, int dagger, int stream_idx, MemoryLocation location[], MemoryLocation location_label,
+              bool spin_project = true, double a = 0, double b = 0, double c = 0, int shmem = 0);
 
     void packExtended(const int nFace, const int R[], const int parity, const int dagger, const int dim,
                       qudaStream_t *stream_p, const bool zeroCopyPack = false);

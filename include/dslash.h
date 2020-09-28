@@ -41,9 +41,10 @@ namespace quda
     char aux_base[TuneKey::aux_n - 32];
     char aux[8][TuneKey::aux_n];
     char aux_pack[TuneKey::aux_n];
+    char aux_barrier[TuneKey::aux_n];
 
     // pointers to ghost buffers we are packing to
-    void *packBuffer[2 * QUDA_MAX_DIM];
+    void *packBuffer[4 * QUDA_MAX_DIM];
 
     std::string kernel_file;
     /**
@@ -77,8 +78,30 @@ namespace quda
       strncat(aux[kernel_type], aux_base, TuneKey::aux_n - 1);
     }
 
-    virtual bool tuneGridDim() const { return false; }
+    virtual bool tuneGridDim() const { return arg.kernel_type == EXTERIOR_KERNEL_ALL && arg.shmem > 0; }
     virtual unsigned int minThreads() const { return arg.threads; }
+
+    virtual unsigned int minGridSize() const
+    {
+      if (arg.kernel_type == EXTERIOR_KERNEL_ALL && arg.shmem > 0) {
+        int nDimComms = 0;
+        for (int d = 0; d < in.Ndim(); d++) nDimComms += arg.commDim[d];
+        return ((deviceProp.multiProcessorCount) / nDimComms) * nDimComms;
+      } else {
+        return TunableVectorYZ::minGridSize();
+      }
+    }
+
+    virtual int gridStep() const
+    {
+      if (arg.kernel_type == EXTERIOR_KERNEL_ALL && arg.shmem > 0) {
+        int nDimComms = 0;
+        for (int d = 0; d < in.Ndim(); d++) nDimComms += arg.commDim[d];
+        return ((deviceProp.multiProcessorCount) / nDimComms) * nDimComms;
+      } else {
+        return TunableVectorYZ::gridStep();
+      }
+    }
 
     inline void setParam(TuneParam &tp)
     {
@@ -108,9 +131,21 @@ namespace quda
 
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) {
         arg.blocks_per_dir = tp.aux.x;
-        arg.setPack(true); // need to recompute for updated block_per_dir
-        arg.in.resetGhost(in, this->packBuffer);
+        arg.setPack(true, this->packBuffer); // need to recompute for updated block_per_dir
+        arg.in_pack.resetGhost(in, this->packBuffer);
         tp.grid.x += arg.pack_blocks;
+        arg.counter = dslash::synccounter;
+      }
+      if (arg.shmem > 0 && arg.kernel_type == EXTERIOR_KERNEL_ALL) {
+        int nDimComms = 0;
+        for (int d = 0; d < in.Ndim(); d++) nDimComms += arg.commDim[d];
+        arg.counter = (activeTuning() && !policyTuning()) ? -1 : dslash::synccounter;
+      }
+      if (arg.shmem > 0 && arg.kernel_type == INTERIOR_KERNEL) {
+        arg.counter = activeTuning() ? (uberTuning() && !policyTuning() ? dslash::synccounter++ : dslash::synccounter) :
+                                       dslash::synccounter;
+        arg.ext_blocks = 8 * tp.aux.y * arg.ext_dims;
+        tp.grid.x += arg.ext_blocks;
       }
     }
 
@@ -126,12 +161,22 @@ namespace quda
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) {
         // if doing the fused kernel we tune how many blocks to use for
         // communication
-        constexpr int max_blocks_per_dir = 4;
+        constexpr int max_blocks_per_dir = 6;
         if (param.aux.x + 1 <= max_blocks_per_dir) {
           param.aux.x++;
           return true;
         } else {
           param.aux.x = 1;
+          if (arg.ext_dims > 0) {
+            auto maxgridsize = TunableVectorYZ::maxGridSize();
+            if ((param.aux.y + 1) * arg.ext_dims * 8 <= static_cast<int>(maxgridsize)) {
+              param.aux.y++;
+              return true;
+            } else {
+              param.aux.y = 1;
+              return false;
+            }
+          }
           return false;
         }
       } else {
@@ -143,12 +188,14 @@ namespace quda
     {
       TunableVectorYZ::initTuneParam(param);
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1; // packing blocks per direction
+      if (arg.ext_dims && arg.kernel_type == INTERIOR_KERNEL) param.aux.y = 1;     // exterior blocks
     }
 
     virtual void defaultTuneParam(TuneParam &param) const
     {
       TunableVectorYZ::defaultTuneParam(param);
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1; // packing blocks per direction
+      if (arg.ext_dims && arg.kernel_type == INTERIOR_KERNEL) param.aux.y = 1;     // exterior blocks
     }
 
     /**
@@ -299,6 +346,7 @@ namespace quda
 
       // this sets the communications pattern for the packing kernel
       setPackComms(arg.commDim);
+      setUberTuning(true);
 
       // strcpy(aux, in.AuxString());
       fillAuxBase();
@@ -314,6 +362,9 @@ namespace quda
 #endif // MULTI_GPU
       fillAux(KERNEL_POLICY, "policy");
 
+      strcpy(aux_barrier, aux[EXTERIOR_KERNEL_ALL]);
+      strcat(aux_barrier, ",shmem");
+
       // extract the filename from the template template class (do
       // this regardless of jitify to ensure a build error if filename
       // helper isn't defined)
@@ -326,8 +377,10 @@ namespace quda
 
     void setPack(bool pack, MemoryLocation location)
     {
-      arg.setPack(pack);
-      if (!pack) return;
+      if (!pack) {
+        arg.setPack(pack, packBuffer);
+        return;
+      }
 
       for (int dim = 0; dim < 4; dim++) {
         for (int dir = 0; dir < 2; dir++) {
@@ -336,12 +389,20 @@ namespace quda
               = static_cast<char *>(in.remoteFace_d(dir, dim)) + in.GhostOffset(dim, 1 - dir);
           } else if (location & Host && !comm_peer2peer_enabled(dir, dim)) { // pack to cpu memory
             packBuffer[2 * dim + dir] = in.myFace_hd(dir, dim);
+          } else if (location & Shmem) {
+            packBuffer[2 * dim + dir] = comm_peer2peer_possible(dir, dim) ?
+              static_cast<char *>(in.remoteFace_d(dir, dim)) + in.GhostOffset(dim, 1 - dir) :
+              in.myFace_d(dir, dim);
+            packBuffer[2 * QUDA_MAX_DIM + 2 * dim + dir] = comm_peer2peer_possible(dir, dim) ?
+              nullptr :
+              static_cast<char *>(in.remoteFace_r()) + in.GhostOffset(dim, 1 - dir);
           } else { // pack to local gpu memory
             packBuffer[2 * dim + dir] = in.myFace_d(dir, dim);
           }
         }
       }
 
+      arg.setPack(pack, packBuffer);
       // set the tuning string for the fused interior + packer kernel
       strcpy(aux_pack, aux[arg.kernel_type]);
       strcat(aux_pack, "");
@@ -353,6 +414,11 @@ namespace quda
       case Host | Remote: strcat(aux_pack, ",host-remote"); break;
       case Device: strcat(aux_pack, ",device-device"); break;
       case Host: strcat(aux_pack, comm_peer2peer_enabled_global() ? ",host-device" : ",host-host"); break;
+      case Shmem:
+        strcat(aux_pack, arg.ext_dims > 0 ? ",shmemuber" : ",shmem");
+        strcat(aux_pack, (arg.shmem & 1 && arg.shmem & 2) ? "3" : "1");
+        break;
+
       default: errorQuda("Unknown pack target location %d\n", location);
       }
     }
@@ -371,7 +437,9 @@ namespace quda
 
     virtual TuneKey tuneKey() const
     {
-      auto aux_ = (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? aux_pack : aux[arg.kernel_type];
+      auto aux_ = (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ?
+        aux_pack :
+        ((arg.shmem > 0 && arg.kernel_type == EXTERIOR_KERNEL_ALL) ? aux_barrier : aux[arg.kernel_type]);
       return TuneKey(in.VolString(), typeid(*this).name(), aux_);
     }
 

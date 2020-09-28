@@ -511,6 +511,11 @@ namespace quda
 
   void setPolicyTuning(bool policy_tuning_) { policy_tuning = policy_tuning_; }
 
+  static bool uber_tuning = false;
+  bool uberTuning() { return uber_tuning; }
+
+  void setUberTuning(bool uber_tuning_) { uber_tuning = uber_tuning_; }
+
   // flush profile, setting counts to zero
   void flushProfile()
   {
@@ -743,7 +748,7 @@ namespace quda
       /* As long as global reductions are not disabled, only do the
          tuning on node 0, else do the tuning on all nodes since we
          can't guarantee that all nodes are partaking */
-      if (comm_rank() == 0 || !commGlobalReduction() || policyTuning()) {
+      if (comm_rank() == 0 || !commGlobalReduction() || policyTuning() || uberTuning()) {
         TuneParam best_param;
         cudaError_t error = cudaSuccess;
         cudaEvent_t start, end;
@@ -845,7 +850,7 @@ namespace quda
         param = best_param;
         tunecache[key] = best_param;
       }
-      if (commGlobalReduction() || policyTuning()) broadcastTuneCache();
+      if (commGlobalReduction() || policyTuning() || uberTuning()) broadcastTuneCache();
 
       // check this process is getting the key that is expected
       if (tunecache.find(key) == tunecache.end()) {

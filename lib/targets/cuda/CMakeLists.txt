@@ -1,4 +1,4 @@
-# generate an object library for all target specific files
+# generate an object library for all target specific files 
 add_library(quda_cuda_target OBJECT quda_api.cpp device.cpp malloc.cpp tune.cpp blas_lapack_cublas.cpp)
 if(QUDA_BUILD_SHAREDLIB)
   set_target_properties(quda_cuda_target PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
@@ -8,5 +8,9 @@ target_compile_definitions(quda_cuda_target PRIVATE $<TARGET_PROPERTY:quda_cpp,C
 target_include_directories(quda_cuda_target PRIVATE $<TARGET_PROPERTY:quda_cpp,INCLUDE_DIRECTORIES>)
 target_compile_options(quda_cuda_target PRIVATE $<TARGET_PROPERTY:quda_cpp,COMPILE_OPTIONS>)
 
-# add alias
+#add alias
 add_library(quda_target ALIAS quda_cuda_target)
+
+if(QUDA_NVSHMEM AND QUDA_DOWNLOAD_NVSHMEM)
+  add_dependencies(quda_cuda_target NVSHMEM)
+endif()

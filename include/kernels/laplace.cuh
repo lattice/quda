@@ -31,6 +31,7 @@ namespace quda
 
     F out;        /** output vector field */
     const F in;   /** input vector field */
+    const F in_pack; /** input vector field */
     const F x;    /** input vector field for xpay*/
     const G U;    /** the gauge field */
     const real a; /** xpay scale factor - can be -kappa or -kappa^2 */
@@ -43,6 +44,7 @@ namespace quda
       DslashArg<Float, nDim>(in, U, parity, dagger, a != 0.0 ? true : false, 1, false, comm_override),
       out(out),
       in(in),
+      in_pack(in),
       U(U),
       dir(dir),
       x(x),
@@ -139,18 +141,19 @@ namespace quda
     constexpr laplace(Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
+    template <KernelType mykernel_type = kernel_type>
     __device__ __host__ inline void operator()(int idx, int s, int parity)
     {
       using real = typename mapper<typename Arg::Float>::type;
       using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;
 
       // is thread active (non-trival for fused kernel only)
-      bool active = kernel_type == EXTERIOR_KERNEL_ALL ? false : true;
+      bool active = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true;
 
       // which dimension is thread working on (fused kernel only)
       int thread_dim;
 
-      auto coord = getCoords<QUDA_4D_PC, kernel_type>(arg, idx, s, parity, thread_dim);
+      auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, s, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
@@ -159,19 +162,17 @@ namespace quda
       // case 4 is an operator in all x,y,z,t dimensions
       // case 3 is a spatial operator only, the t dimension is omitted.
       switch (arg.dir) {
-      case 3:
-        applyLaplace<nParity, dagger, kernel_type, 3>(out, arg, coord, parity, idx, thread_dim, active);
-        break;
+      case 3: applyLaplace<nParity, dagger, mykernel_type, 3>(out, arg, coord, parity, idx, thread_dim, active); break;
       case 4:
       default:
-        applyLaplace<nParity, dagger, kernel_type, -1>(out, arg, coord, parity, idx, thread_dim, active);
+        applyLaplace<nParity, dagger, mykernel_type, -1>(out, arg, coord, parity, idx, thread_dim, active);
         break;
       }
 
-      if (xpay && kernel_type == INTERIOR_KERNEL) {
+      if (xpay && mykernel_type == INTERIOR_KERNEL) {
         Vector x = arg.x(coord.x_cb, my_spinor_parity);
         out = arg.a * out + arg.b * x;
-      } else if (kernel_type != INTERIOR_KERNEL) {
+      } else if (mykernel_type != INTERIOR_KERNEL) {
         Vector x = arg.out(coord.x_cb, my_spinor_parity);
         out = x + (xpay ? arg.a * out : out);
       }
