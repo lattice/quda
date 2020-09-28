@@ -109,7 +109,8 @@ namespace quda
       return blas::xmyNorm(tmp2, out);
     }
 
-    // void ATx(ColorSpinorField &out, const ColorSpinorField &in, const Tp &tp);
+// Uncomment the following marco to enable tuning mu (suppressor).
+// #define TUNE_SUPPRESSOR
 
     template <class Ref, class Base, class Null>
     void train(const Ref &ref, Base base, Null &null, const ColorSpinorField &in)
@@ -229,9 +230,10 @@ namespace quda
       Tp P(param_size);
       Tp D_old(param_size);
 
-      // double pmu = 0.0;
+#ifdef TUNE_SUPPRESSOR
+      double pmu = 0.0;
+#endif
 
-      // double old_chi2 = 0.0;
       TrainingFloat alpha;
       TrainingFloat b = 0.8;
       printfQuda("beta          = %.3f\n", b);
@@ -239,10 +241,11 @@ namespace quda
       for (int iteration = 0; iteration < train_maxiter; iteration++) {
 
         Tp D(param_size);
-        // double dmu = 0.0;
-
+#ifdef TUNE_SUPPRESSOR
+        double dmu = 0.0;
+#endif
         double chi2 = 0.0;
-        std::vector<double> a(5, 0.0);
+        std::array<double, 5> a = {};
 
         for (const auto &phi : B) {
           chi2 += cost(ref, base, chi, *phi);
@@ -263,11 +266,15 @@ namespace quda
           madwf_ml::tensor_5d_hh(ATMchi, *phi, d2);
 
           madwf_ml::axpby(D, 2.0f, d1, 2.0f, d2);
-          // dmu += 2.0 * reDotProduct(Mchi, *phi);
+#ifdef TUNE_SUPPRESSOR
+          dmu += 2.0 * blas::reDotProduct(Mchi, *phi);
+#endif
         }
 
         madwf_ml::axpby(P, (b - 1), P, (1 - b), D);
-        // pmu = b * pmu + (1-b) * dmu;
+#ifdef TUNE_SUPPRESSOR
+        pmu = b * pmu + (1 - b) * dmu;
+#endif
 
         chi2 = 0.0;
         // line search
@@ -291,7 +298,9 @@ namespace quda
           madwf_ml::transfer_5d_hh(tmp, ADphi, device_param, true);
           // theta
           blas::axpy(1.0, theta, tmp);
-          // axpy(pmu, *phi, tmp);
+#ifdef TUNE_SUPPRESSOR
+          blas::axpy(pmu, *phi, tmp);
+#endif
 
           // inner_dslash(theta, tmp);
           ref(theta, tmp);
@@ -314,28 +323,27 @@ namespace quda
           a[4] += dot[8].real();
         }
 
-        double r[3] = {0.0, 0.0, 0.0};
-        solve_deg3(4.0 * a[4], 3.0 * a[3], 2.0 * a[2], a[1], r[0], r[1], r[2]);
+        std::array<double, 4> coeffs = {4.0 * a[4], 3.0 * a[3], 2.0 * a[2], a[1]};
+        auto rs = cubic_formula(coeffs);
 
-        // try the three roots
-        double try_root[3];
-        for (int i = 0; i < 3; i++) { try_root[i] = eval_deg4(a[4], a[3], a[2], a[1], a[0], r[i]); }
-
-        if (try_root[0] < try_root[1] && try_root[0] < try_root[2]) {
-          alpha = r[0];
-        } else if (try_root[1] < try_root[2]) {
-          alpha = r[1];
-        } else {
-          alpha = r[2];
+        alpha = 0;
+        double root_min = poly4(a, 0);
+        for (auto r : rs) {
+          double eval = poly4(a, r);
+          if (root_min > eval) {
+            root_min = eval;
+            alpha = r;
+          }
         }
+
         madwf_ml::axpby(device_param, 0.0f, device_param, -alpha, P);
-        // mu -= alpha * pmu;
+#ifdef TUNE_SUPPRESSOR
+        mu -= alpha * pmu;
+#endif
 
         printfQuda("grad min iter %03d: %04d chi2 = %8.4e, chi2 %% = %8.4e, alpha = %+8.4e, mu = %+8.4e\n", comm_rank(),
                    iteration, chi2, chi2 / residual, alpha, mu);
 
-        // if((chi2 - old_chi2) * (chi2 - old_chi2) / (ref * ref) / (old_chi2*old_chi2 / (ref*ref)) < 1e-10){ break; }
-        // old_chi2 = chi2;
       }
 
       trained = true;

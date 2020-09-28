@@ -73,18 +73,22 @@ namespace quda
     // so we explicily set this here.
     Kparam.deflate = false;
 
-    if (param.inv_type_precondition == QUDA_CG_INVERTER) {
-      if (param.schwarz_type == QUDA_ADDITIVE_MADWF_SCHWARZ) {
+    if (param.schwarz_type == QUDA_ADDITIVE_MADWF_SCHWARZ) {
+      if (param.inv_type_precondition == QUDA_CG_INVERTER) {
         K = new Acc<MADWFacc, CG>(matPrecon, matPrecon, matPrecon, matEig, Kparam, profile);
-      } else {
-        K = new CG(matPrecon, matPrecon, matPrecon, matEig, Kparam, profile);
+      } else { // unknown preconditioner
+        errorQuda("Unknown inner solver %d for MADWF", param.inv_type_precondition);
       }
-    } else if (param.inv_type_precondition == QUDA_MR_INVERTER) {
-      K = new MR(matPrecon, matPrecon, Kparam, profile);
-    } else if (param.inv_type_precondition == QUDA_SD_INVERTER) {
-      K = new SD(matPrecon, Kparam, profile);
-    } else if (param.inv_type_precondition != QUDA_INVALID_INVERTER) { // unknown preconditioner
-      errorQuda("Unknown inner solver %d", param.inv_type_precondition);
+    } else {
+      if (param.inv_type_precondition == QUDA_CG_INVERTER) {
+        K = new CG(matPrecon, matPrecon, matPrecon, matEig, Kparam, profile);
+      } else if (param.inv_type_precondition == QUDA_MR_INVERTER) {
+        K = new MR(matPrecon, matPrecon, Kparam, profile);
+      } else if (param.inv_type_precondition == QUDA_SD_INVERTER) {
+        K = new SD(matPrecon, Kparam, profile);
+      } else if (param.inv_type_precondition != QUDA_INVALID_INVERTER) { // unknown preconditioner
+        errorQuda("Unknown inner solver %d", param.inv_type_precondition);
+      }
     }
   }
 
