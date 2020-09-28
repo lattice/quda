@@ -241,6 +241,10 @@ namespace quda
       for(int i=0; i<n_kr; i++) upperHess[i][i] -= evals[shift];
       
       for(int i=0; i<n_kr-1; i++) {
+
+	// If the sub-diagonal element is numerically
+	// small enough, there is no need to perfrom a Givens
+	// rotation
 	if (abs(upperHess[i+1][i]) < epsilon) {
 	  upperHess[i+1][i] = 0.0;
 	  continue;
@@ -390,6 +394,9 @@ namespace quda
 
     // Eigen object for computing Ritz values from the upper Hessenberg matrix
     Eigen::ComplexEigenSolver<MatrixXcd> eigenSolverUH;
+
+    omp_set_num_threads(atoi(getenv("OMP_NUM_THREADS")));
+    Eigen::setNbThreads(atoi(getenv("OMP_NUM_THREADS")));
     
     omp_set_num_threads(atoi(getenv("OMP_NUM_THREADS")));
     Eigen::setNbThreads(atoi(getenv("OMP_NUM_THREADS")));
@@ -443,28 +450,29 @@ namespace quda
 
       int num_keep0 = num_keep;
       iter_keep = std::min(iter_converged + (n_kr - num_converged) / 2, n_kr - 12);
-      
+
       num_converged = iter_converged;
-      num_keep = iter_keep;      
+      num_keep = iter_keep;
       num_shifts = n_kr - num_keep;
-            
+
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("%04d converged eigenvalues at iter %d\n", num_converged, restart_iter);
 
       if (num_converged >= n_conv) {
-	profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-	eigensolveFromUpperHess(evals, beta);
-	rotateBasis(kSpace, n_kr);
-	reorder(kSpace, evals, eig_param->spectrum);
-	profile.TPSTART(QUDA_PROFILE_COMPUTE);
+        profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+        eigensolveFromUpperHess(evals, beta);
+        rotateBasis(kSpace, n_kr);
+        reorder(kSpace, evals, eig_param->spectrum);
+        profile.TPSTART(QUDA_PROFILE_COMPUTE);
 	computeEvals(mat, kSpace, evals);
-	converged = true;	
+        converged = true;
+	
       } else {
 
-	// If num_keep changed, we resort the Ritz values and residua
-	if(num_keep0 < num_keep) {
-	  sortArrays(eig_param->spectrum, n_kr, evals, residua);
-	  sortArrays(QUDA_SPECTRUM_LM_EIG, num_shifts, residua, evals);    
-	}
+        // If num_keep changed, we resort the Ritz values and residua
+        if(num_keep0 < num_keep) {
+          sortArrays(eig_param->spectrum, n_kr, evals, residua);
+          sortArrays(QUDA_SPECTRUM_LM_EIG, num_shifts, residua, evals);
+        }
 	
 	profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 	// Apply the shifts of the unwated Ritz values via QR
@@ -500,13 +508,11 @@ namespace quda
       }
     } else {
       if (getVerbosity() >= QUDA_SUMMARIZE) {
-        printfQuda("IRAM computed the requested %d vectors in %d restart steps and %d OP*x operations.\n", n_conv,
-                   restart_iter, iter);
-      }
-      
-      computeEvals(mat, kSpace, evals);
+        printfQuda("IRAM computed the requested %d vectors with a %d search space and %d Krylov space in %d "
+		   "restart steps and %d OP*x operations.\n", n_conv, n_ev, n_kr, restart_iter, iter);
+      }      
     }
-
+    
     // Local clean-up
     cleanUpEigensolver(kSpace, evals);
   }
