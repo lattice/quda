@@ -113,6 +113,7 @@ namespace quda {
     QUDA_PROFILE_CHRONO,   /**< time spent on chronology */
     QUDA_PROFILE_EIGEN,    /**< time spent on host-side Eigen */
     QUDA_PROFILE_ARPACK,   /**< time spent on host-side ARPACK */
+    QUDA_PROFILE_HOST_COMPUTE,   /**< time spent on miscellaneous host-side computation */
 
     // lower level counters used in the dslash and api profiling
     QUDA_PROFILE_LOWER_LEVEL, /**< dummy timer to mark beginning of lower level timers which do not count towrads global time */

@@ -217,7 +217,7 @@ namespace quda
   void IRAM::qrShifts(const std::vector<Complex> evals, const int num_shifts, const double epsilon)
   {
     // This isn't really Eigen, but it's morally equivalent
-    profile.TPSTART(QUDA_PROFILE_EIGEN);
+    profile.TPSTART(QUDA_PROFILE_HOST_COMPUTE);
     Complex T11, T12, T21, T22, temp, temp2, temp3, U1, U2;
     double dV;
     
@@ -284,15 +284,16 @@ namespace quda
 	
 	// Continue for the other columns
 	// PARALLELIZE ME OVER j
+	//#pragma omp parallel for
 	for(int j=i+1; j < n_kr; j++) {
-	  temp = upperHess[i][j];
-	  temp2 = T11 * temp;
-	  temp2 += T12 * upperHess[i+1][j];
-	  upperHess[i][j] -= temp2;
+	  Complex tempp = upperHess[i][j];
+	  Complex tempp2 = T11 * tempp;
+	  tempp2 += T12 * upperHess[i+1][j];
+	  upperHess[i][j] -= tempp2;
 	  
-	  temp2 = T21 * temp;
-	  temp2 += T22 * upperHess[i+1][j];
-	  upperHess[i+1][j] -= temp2;
+	  tempp2 = T21 * tempp;
+	  tempp2 += T22 * upperHess[i+1][j];
+	  upperHess[i+1][j] -= tempp2;
 	}
       }
       
@@ -300,36 +301,38 @@ namespace quda
       // Loop over columns of upper Hessenberg
       for(int j = 0; j < n_kr - 1; j++) {
 	if(abs(R11[j]) > epsilon) {
-
+	  
 	  // Loop over the rows, up to the sub diagonal element i=j+1
 	  // PARALLELIZE ME OVER i
+	  //#pragma omp parallel for
 	  for(int i = 0; i < j+2; i++) {
-	    temp = upperHess[i][j];
-	    temp2 = R11[j] * temp;
-	    temp2 += R12[j] * upperHess[i][j+1];
-	    upperHess[i][j] -= temp2;
+	    Complex tempp = upperHess[i][j];
+	    Complex tempp2 = R11[j] * tempp;
+	    tempp2 += R12[j] * upperHess[i][j+1];
+	    upperHess[i][j] -= tempp2;
 	    
-	    temp2 = R21[j] * temp;
-	    temp2 += R22[j] * upperHess[i][j+1];
-	    upperHess[i][j+1] -= temp2;
+	    tempp2 = R21[j] * tempp;
+	    tempp2 += R22[j] * upperHess[i][j+1];
+	    upperHess[i][j+1] -= tempp2;
 	  }
 
 	  // PARALLELIZE ME OVER i
+	  //#pragma omp parallel for
 	  for(int i = 0; i < n_kr; i++) {
-	    temp = Qmat[i][j];
-	    temp2 = R11[j] * temp;
-	    temp2 += R12[j] * Qmat[i][j+1];
-	    Qmat[i][j] -= temp2;
+	    Complex tempp = Qmat[i][j];
+	    Complex tempp2 = R11[j] * tempp;
+	    tempp2 += R12[j] * Qmat[i][j+1];
+	    Qmat[i][j] -= tempp2;
 	    
-	    temp2 = R21[j] * temp;
-	    temp2 += R22[j] * Qmat[i][j+1];
-	    Qmat[i][j+1] -= temp2;
+	    tempp2 = R21[j] * tempp;
+	    tempp2 += R22[j] * Qmat[i][j+1];
+	    Qmat[i][j+1] -= tempp2;
 	  }
 	}
       }
       for(int i=0; i<n_kr; i++) upperHess[i][i] += evals[shift];
     }
-    profile.TPSTOP(QUDA_PROFILE_EIGEN);
+    profile.TPSTOP(QUDA_PROFILE_HOST_COMPUTE);
   }
   
   void IRAM::eigensolveFromUpperHess(std::vector<Complex> &evals, const double beta)
@@ -357,6 +360,30 @@ namespace quda
     }
     profile.TPSTOP(QUDA_PROFILE_EIGEN);
   }
+
+  void IRAM::qrFromUpperHess(std::vector<Complex> &evals, const double beta)
+  {
+    profile.TPSTART(QUDA_PROFILE_EIGEN);
+    //Construct the upper Hessenberg matrix       
+    MatrixXcd Q = MatrixXcd::Identity(n_kr, n_kr);
+    MatrixXcd R = MatrixXcd::Zero(n_kr, n_kr);
+    for(int i=0; i<n_kr; i++) {
+      for(int j=0; j<n_kr; j++) {
+	R(i,j) = upperHess[i][j];
+      }
+    }
+    
+    // QR the upper Hessenberg matrix
+    Eigen::ComplexSchur<MatrixXcd> schurUH;
+    schurUH.computeFromHessenberg(R, Q);
+    for(int i=0; i<n_kr; i++) {
+      evals[i] = schurUH.matrixT().col(i)[i];
+      residua[i] = abs(beta * schurUH.matrixU().col(i)[n_kr-1]);
+    }
+
+    profile.TPSTOP(QUDA_PROFILE_EIGEN);
+  }
+
   
   void IRAM::operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)
   {
@@ -398,9 +425,6 @@ namespace quda
     omp_set_num_threads(atoi(getenv("OMP_NUM_THREADS")));
     Eigen::setNbThreads(atoi(getenv("OMP_NUM_THREADS")));
     
-    omp_set_num_threads(atoi(getenv("OMP_NUM_THREADS")));
-    Eigen::setNbThreads(atoi(getenv("OMP_NUM_THREADS")));
-    
     // Print Eigensolver params
     printEigensolverSetup();
     //---------------------------------------------------------------------------
@@ -422,6 +446,7 @@ namespace quda
       // Ritz values and their residua are updated.
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
       eigensolveFromUpperHess(evals, beta);
+      //qrFromUpperHess(evals, beta);
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
       
       num_keep = n_ev;
