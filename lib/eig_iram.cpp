@@ -376,11 +376,20 @@ namespace quda
     // QR the upper Hessenberg matrix
     Eigen::ComplexSchur<MatrixXcd> schurUH;
     schurUH.computeFromHessenberg(R, Q);
-    for(int i=0; i<n_kr; i++) {
-      evals[i] = schurUH.matrixT().col(i)[i];
-      residua[i] = abs(beta * schurUH.matrixU().col(i)[n_kr-1]);
-    }
 
+      // Extract the upper triangular matrix
+    MatrixXcd matUpper = MatrixXcd::Zero(n_kr, n_kr);
+    matUpper = schurUH.matrixT().triangularView<Eigen::Upper>();
+    matUpper.conservativeResize(n_kr, n_kr);
+    
+    Eigen::ComplexEigenSolver<MatrixXcd> eigenSolver(matUpper);
+    Q = schurUH.matrixU() * eigenSolver.eigenvectors();
+    for(int i=0; i<n_kr; i++) {
+      //evals[i] = schurUH.matrixT().col(i)[i];
+      evals[i] = eigenSolver.eigenvalues()[i];
+      residua[i] = abs(beta * Q.col(i)[n_kr-1]);
+    }
+    
     profile.TPSTOP(QUDA_PROFILE_EIGEN);
   }
 
