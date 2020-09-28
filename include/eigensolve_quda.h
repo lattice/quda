@@ -597,6 +597,7 @@ protected:
        @param[in] beta Norm of residual (used to compute errors on eigenvalues)
     */
     void eigensolveFromUpperHess(std::vector<Complex> &evals, const double beta);
+    void qrFromUpperHess(std::vector<Complex> &evals, const double beta);
 
     /**
        @brief Rotate the Krylov space

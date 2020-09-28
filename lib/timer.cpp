@@ -47,6 +47,7 @@ namespace quda {
                                       "chronology",
                                       "eigen",
                                       "arpack",
+				      "host compute",
                                       "dummy",
                                       "pack kernel",
                                       "dslash kernel",
