@@ -277,7 +277,9 @@ namespace quda
 	temp2 += temp3;
 	upperHess[i][i] -= temp2;
 	upperHess[i+1][i] = 0;
+	
 	// Continue for the other columns
+	// PARALLELIZE ME OVER j
 	for(int j=i+1; j < n_kr; j++) {
 	  temp = upperHess[i][j];
 	  temp2 = T11 * temp;
@@ -290,9 +292,13 @@ namespace quda
 	}
       }
       
-      // Rotate R and V, i.e. H->RQ. V->VQ 
+      // Rotate R and V, i.e. H->RQ. V->VQ
+      // Loop over columns of upper Hessenberg
       for(int j = 0; j < n_kr - 1; j++) {
 	if(abs(R11[j]) > epsilon) {
+
+	  // Loop over the rows, up to the sub diagonal element i=j+1
+	  // PARALLELIZE ME OVER i
 	  for(int i = 0; i < j+2; i++) {
 	    temp = upperHess[i][j];
 	    temp2 = R11[j] * temp;
@@ -303,7 +309,8 @@ namespace quda
 	    temp2 += R22[j] * upperHess[i][j+1];
 	    upperHess[i][j+1] -= temp2;
 	  }
-	  
+
+	  // PARALLELIZE ME OVER i
 	  for(int i = 0; i < n_kr; i++) {
 	    temp = Qmat[i][j];
 	    temp2 = R11[j] * temp;
@@ -383,6 +390,9 @@ namespace quda
 
     // Eigen object for computing Ritz values from the upper Hessenberg matrix
     Eigen::ComplexEigenSolver<MatrixXcd> eigenSolverUH;
+
+    omp_set_num_threads(threads);                                                                                                                                                
+    Eigen::setNbThreads(threads);
     
     // Print Eigensolver params
     printEigensolverSetup();
