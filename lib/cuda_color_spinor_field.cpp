@@ -508,20 +508,19 @@ namespace quda {
   {
 #ifdef MULTI_GPU
     void *packBuffer[4 * QUDA_MAX_DIM] = {};
-  
+
     for (int dim=0; dim<4; dim++) {
       for (int dir=0; dir<2; dir++) {
         switch (location[2 * dim + dir]) {
 
         case Device: // pack to local device buffer
-          packBuffer[2*dim+dir] = my_face_dim_dir_d[bufferIndex][dim][dir];
+          packBuffer[2 * dim + dir] = my_face_dim_dir_d[bufferIndex][dim][dir];
           packBuffer[2 * QUDA_MAX_DIM + 2 * dim + dir] = nullptr;
           break;
         case Shmem:
           // this is the remote buffer when using shmem ...
           packBuffer[2 * dim + dir] = comm_peer2peer_possible(dir, dim) ?
-            static_cast<char *>(ghost_remote_send_buffer_d[bufferIndex][dim][dir])
-              +  ghost_offset[dim][1 - dir] :
+            static_cast<char *>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + ghost_offset[dim][1 - dir] :
             my_face_dim_dir_d[bufferIndex][dim][dir];
           packBuffer[2 * QUDA_MAX_DIM + 2 * dim + dir] = comm_peer2peer_possible(dir, dim) ?
             nullptr :

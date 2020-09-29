@@ -614,12 +614,12 @@ namespace quda
       if (x_cb >= arg.threads) return;
 
 #ifdef QUDA_DSLASH_FAST_COMPILE
-        dslash(x_cb, s, parity);
+      dslash(x_cb, s, parity);
 #else
-        switch (parity) {
-        case 0: dslash(x_cb, s, 0); break;
-        case 1: dslash(x_cb, s, 1); break;
-        }
+      switch (parity) {
+      case 0: dslash(x_cb, s, 0); break;
+      case 1: dslash(x_cb, s, 1); break;
+      }
 #endif
 #ifdef NVSHMEM_COMMS
       const bool shmem_interiordone = (arg.shmem & 64);

@@ -914,10 +914,10 @@ namespace quda
     }
   };
 
-/**
-   Variation of multi-gpu dslash where the packing kernel writes
-   buffers directly to host memory
-*/
+  /**
+     Variation of multi-gpu dslash where the packing kernel writes
+     buffers directly to host memory
+  */
   template <typename Dslash> struct DslashZeroCopyPack : DslashPolicyImp<Dslash> {
 
     void operator()(
@@ -1851,7 +1851,6 @@ public:
               errorQuda("Cannot select a GDR policy %d unless QUDA_ENABLE_GDR is set", static_cast<int>(dslash_policy));
             }
 
-
             // check valid policy for nvshmem
             if (dslash_policy == QudaDslashPolicy::QUDA_SHMEM_UBER_PACKINTRA_DSLASH
                 || dslash_policy == QudaDslashPolicy::QUDA_SHMEM_UBER_PACKFULL_DSLASH
@@ -1861,13 +1860,10 @@ public:
               errorQuda("Cannot select a NVSHMEM policy %d when QUDA is not build with QUDA_NVSHMEM enabled.",
                         static_cast<int>(dslash_policy));
 #endif
-              if(in->X(4)>1){
-                errorQuda("Cannot select NVSHMEM policy %d for X(4) > 1.",
-                        static_cast<int>(dslash_policy));
+              if (in->X(4) > 1) {
+                errorQuda("Cannot select NVSHMEM policy %d for X(4) > 1.", static_cast<int>(dslash_policy));
               }
             }
-
-
 
             enable_policy(static_cast<QudaDslashPolicy>(policy_));
             first_active_policy = policy_ < first_active_policy ? policy_ : first_active_policy;
@@ -1903,13 +1899,12 @@ public:
           enable_policy(QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK);
           enable_policy(QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK_FUSED_HALO);
 
-
-         if (comm_nvshmem_enabled() && in->X(4)==1) {
-           enable_policy(QudaDslashPolicy::QUDA_SHMEM_UBER_PACKINTRA_DSLASH);
-           enable_policy(QudaDslashPolicy::QUDA_SHMEM_UBER_PACKFULL_DSLASH);
-           enable_policy(QudaDslashPolicy::QUDA_SHMEM_PACKINTRA_DSLASH);
-           enable_policy(QudaDslashPolicy::QUDA_SHMEM_PACKFULL_DSLASH);
-         }
+          if (comm_nvshmem_enabled() && in->X(4) == 1) {
+            enable_policy(QudaDslashPolicy::QUDA_SHMEM_UBER_PACKINTRA_DSLASH);
+            enable_policy(QudaDslashPolicy::QUDA_SHMEM_UBER_PACKFULL_DSLASH);
+            enable_policy(QudaDslashPolicy::QUDA_SHMEM_PACKINTRA_DSLASH);
+            enable_policy(QudaDslashPolicy::QUDA_SHMEM_PACKFULL_DSLASH);
+          }
         }
         // construct string specifying which policies have been enabled
         for (int i = 0; i < (int)QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED; i++) {
@@ -1983,7 +1978,7 @@ public:
                         || i == QudaDslashPolicy::QUDA_SHMEM_UBER_PACKFULL_DSLASH
                         || i == QudaDslashPolicy::QUDA_SHMEM_PACKINTRA_DSLASH
                         || i == QudaDslashPolicy::QUDA_SHMEM_PACKFULL_DSLASH)
-                        || ((i == QudaDslashPolicy::QUDA_DSLASH || i == QudaDslashPolicy::QUDA_FUSED_DSLASH)
+                       || ((i == QudaDslashPolicy::QUDA_DSLASH || i == QudaDslashPolicy::QUDA_FUSED_DSLASH)
                            && dslashParam.remote_write)) {
               // these dslash policies all must have kernel packing enabled
 

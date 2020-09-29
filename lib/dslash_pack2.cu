@@ -350,8 +350,8 @@ public:
   };
 
   template <typename Float, int nColor> struct GhostPack {
-    GhostPack(const ColorSpinorField &in, void *ghost[], MemoryLocation location, int nFace, bool dagger,
-              int parity, bool spin_project, double a, double b, double c, int shmem, const qudaStream_t &stream)
+    GhostPack(const ColorSpinorField &in, void *ghost[], MemoryLocation location, int nFace, bool dagger, int parity,
+              bool spin_project, double a, double b, double c, int shmem, const qudaStream_t &stream)
     {
       if (spin_project) {
         Pack<Float, nColor, true> pack(ghost, in, location, nFace, dagger, parity, a, b, c, shmem);

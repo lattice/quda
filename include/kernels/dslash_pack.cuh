@@ -476,7 +476,7 @@ namespace quda
 
   template <bool dagger, int twist, QudaPCType pc, typename Arg> __global__ void packShmemKernel(Arg arg)
   {
-    
+
     int s = blockDim.y * blockIdx.y + threadIdx.y;
     if (s >= arg.dc.Ls) return;
 
@@ -529,7 +529,7 @@ namespace quda
 
     __device__ inline void operator()(Arg &arg, int s, int parity, int twist_pack = 0)
     {
-     // (active_dims * 2 + dir) * blocks_per_dir + local_block_idx
+      // (active_dims * 2 + dir) * blocks_per_dir + local_block_idx
       int local_block_idx = blockIdx.x % arg.blocks_per_dir;
       int dim_dir = blockIdx.x / arg.blocks_per_dir;
       int dir = dim_dir % 2;
