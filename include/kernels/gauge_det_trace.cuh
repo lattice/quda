@@ -57,7 +57,7 @@ namespace quda {
         if (Arg::type == 0) val += getDeterminant(U);
         else if (Arg::type == 1) val += getTrace(U);
       }
-      return val;
+      return static_cast<double2&>(val);
     }
   };
 
