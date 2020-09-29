@@ -172,8 +172,8 @@ option(QUDA_MAGMA "build magma interface" OFF)
 option(QUDA_ARPACK "build arpack interface" OFF)
 option(QUDA_ARPACK_LOGGING "enable ARPACK logging (not availible for NG)" OFF)
 
-# OpenBLAS 
-option(QUDA_OPENBLAS "enable OPENBLAS interafce" OFF)
+# OpenBLAS
+option(QUDA_OPENBLAS "enable OpenBLAS" OFF)
 
 # Interface options
 option(QUDA_INTERFACE_QDP "build qdp interface" ON)
@@ -204,7 +204,7 @@ set(QUDA_ARPACK_HOME
     CACHE PATH "path to arpack / parpack")
 set(QUDA_OPENBLAS_HOME
     ""
-    CACHE PATH "path to openblas")
+    CACHE PATH "path to OpenBLAS")
 set(QUDA_MAGMAHOME
     ""
     CACHE PATH "path to MAGMA, if not set, pkg-config will be attempted")
@@ -261,11 +261,11 @@ option(QUDA_INTERFACE_NVTX "add NVTC markup to interface calls" OFF)
 option(QUDA_SSTEP "build s-step linear solvers" OFF)
 option(QUDA_MULTIGRID "build multigrid solvers" OFF)
 option(QUDA_BLOCKSOLVER "build block solvers" OFF)
-option(QUDA_USE_EIGEN "use EIGEN library (where optional)" OFF)
+option(QUDA_USE_EIGEN "use EIGEN library (where optional)" ON)
 option(QUDA_DOWNLOAD_EIGEN "Download Eigen" ON)
 option(QUDA_DOWNLOAD_USQCD "Download USQCD software as requested by QUDA_QMP / QUDA_QIO" OFF)
 option(QUDA_DOWNLOAD_ARPACK "Download ARPACK-NG software as requested by QUDA_ARPACK" OFF)
-option(QUDA_DOWNLOAD_OPENBLAS "Download OPENBLAS software as requested by QUDA_FAST_ARNOLDI" OFF)
+option(QUDA_DOWNLOAD_OPENBLAS "Download OpenBLAS software as requested by QUDA_OPENBLAS" OFF)
 option(QUDA_JITIFY "build QUDA using Jitify" OFF)
 
 option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
@@ -378,7 +378,8 @@ enable_language(C)
 
 if(QUDA_INTERFACE_TIFR
    OR QUDA_INTERFACE_BQCD
-   OR QUDA_ARPACK)
+   OR QUDA_ARPACK
+   OR QUDA_OPENBLAS)
   set(BUILD_FORTRAN_INTERFACE ON)
   enable_language(Fortran)
 endif()
@@ -538,7 +539,7 @@ if(QUDA_MPI OR QUDA_QMP)
     )
   endif()
   # we need to enable Fortran if we want to detect MPI_Fortran_COMPILER
-  if(QUDA_ARPACK)
+  if(QUDA_ARPACK OR QUDA_OPENBLAS)
     enable_language(Fortran)
   endif()
   find_package(MPI)
@@ -774,17 +775,7 @@ endif(QUDA_ARPACK)
 if(QUDA_OPENBLAS)
   enable_language(Fortran)
 
-  find_library(OPENBLAS_FOUND openblas HINTS ${QUDA_OPENBLAS_HOME}/lib NO_DEFAULT_PATH)
-  mark_as_advanced(OPENBLAS_FOUND)
-  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${OPENBLAS_FOUND})
-  
-  if(QUDA_MPI OR QUDA_QMP)
-    set(OPENBLAS_MPI ON)
-  else()
-    set(OPENBLAS_MPI OFF)
-  endif()
-
-  if(QUDA_DOWNLOAD_OPENBLAS AND NOT OPENBLAS_FOUND)
+  if(QUDA_DOWNLOAD_OPENBLAS)
     include(GNUInstallDirs)
     ExternalProject_Add(
       OPENBLAS
@@ -792,29 +783,26 @@ if(QUDA_OPENBLAS)
       GIT_TAG v0.3.10
       GIT_SHALLOW YES
       PREFIX openblas
-      CMAKE_ARGS -DMPI=${OPENBLAS_MPI} -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+      CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR> 
       CMAKE_GENERATOR "Unix Makefiles")
     ExternalProject_Get_Property(OPENBLAS INSTALL_DIR)
     set(QUDA_OPENBLAS_HOME ${INSTALL_DIR})
     add_library(openblas STATIC IMPORTED)
     add_dependencies(openblas OPENBLAS)
-    target_link_libraries(openblas INTERFACE)
     set_target_properties(openblas PROPERTIES IMPORTED_LINK_INTERFACE_LANGUAGES Fortran)
     set_target_properties(openblas PROPERTIES IMPORTED_LOCATION
                                                ${QUDA_OPENBLAS_HOME}/${CMAKE_INSTALL_LIBDIR}/libopenblas.a)
 
-  else()
+  else(QUDA_DOWNLOAD_OPENBLAS)
     find_package(PkgConfig REQUIRED)
 
-    # We always need the serial library
     pkg_check_modules(OPENBLAS QUIET openblas)
     if(NOT OPENBLAS_FOUND OR QUDA_OPENBLAS_HOME)
       find_library(OPENBLAS openblas PATH ${QUDA_OPENBLAS_HOME})
     else()
       find_library(OPENBLAS ${OPENBLAS_LIBRARIES} PATH ${OPENBLAS_LIBRARY_DIRS})
-    endif()
-    
-  endif()
+    endif()    
+  endif(QUDA_DOWNLOAD_OPENBLAS)
 endif(QUDA_OPENBLAS)
 
 

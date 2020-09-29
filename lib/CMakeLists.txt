@@ -27,8 +27,7 @@ set (QUDA_OBJS
   dirac_coarse.cpp dslash_coarse.cu dslash_coarse_dagger.cu
   coarse_op.cu coarsecoarse_op.cu
   coarse_op_preconditioned.cu staggered_coarse_op.cu
-  eig_trlm.cpp eig_block_trlm.cpp
-  eig_iram.cpp vector_io.cpp
+  eig_iram.cpp eig_trlm.cpp eig_block_trlm.cpp vector_io.cpp
   eigensolve_quda.cpp quda_arpack_interface.cpp
   multigrid.cpp transfer.cpp block_orthogonalize.cu inv_bicgstab_quda.cpp
   prolongator.cu restrictor.cu staggered_prolong_restrict.cu
@@ -479,15 +478,12 @@ endif()
 if(QUDA_OPENBLAS)
   target_compile_definitions(quda PRIVATE OPENBLAS_LIB)
   
-  if(QUDA_DOWNLOAD_OPENBLAS AND NOT OPENBLAS_FOUND)
-    add_dependencies(quda OPENBLAS)
-    add_dependencies(quda_cpp OPENBLAS)
-    add_dependencies(${QUDA_TARGET_LIBRARY} OPENBLAS)
-    add_dependencies(quda_generic_target OPENBLAS)
+  if(QUDA_DOWNLOAD_OPENBLAS)
+    target_link_libraries(quda PUBLIC openblas)
+    target_link_libraries(quda_cpp PUBLIC openblas)
+  else()
+    target_link_libraries(quda INTERFACE ${OPENBLAS})
   endif()
-  target_compile_definitions(quda PUBLIC HAVE_OPENBLAS)
-  target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_OPENBLAS_HOME}/include/openblas>)
-  target_link_libraries(quda INTERFACE ${QUDA_OPENBLAS_LDFLAGS} ${QUDA_OPENBLAS_LIBS}) 
 endif()
 
 if(QUDA_USE_EIGEN)

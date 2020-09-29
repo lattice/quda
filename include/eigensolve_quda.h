@@ -374,7 +374,7 @@ protected:
     void loadFromFile(const DiracMatrix &mat, std::vector<ColorSpinorField *> &eig_vecs, std::vector<Complex> &evals);
 
     /**
-       @brief Sort array the first n elements of x according to spec_type, y comes alond for the ride 
+       @brief Sort array the first n elements of x according to spec_type, y comes along for the ride 
        @param[in] spec_type The spectrum type (Largest/Smallest)(Modulus/Imaginary/Real)
        @param[in] n The number of elements to sort
        @param[in] x The array to sort
@@ -383,7 +383,7 @@ protected:
     void sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<Complex> &x, std::vector<Complex> &y);
 
     /**
-       @brief Sort array the first n elements of x according to spec_type, y comes alond for the ride 
+       @brief Sort array the first n elements of x according to spec_type, y comes along for the ride 
        Overloaded version with real x
        @param[in] spec_type The spectrum type (Largest/Smallest)(Modulus/Imaginary/Real)
        @param[in] n The number of elements to sort
@@ -393,7 +393,7 @@ protected:
     void sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<double> &x, std::vector<Complex> &y);
 
     /**
-       @brief Sort array the first n elements of x according to spec_type, y comes alond for the ride 
+       @brief Sort array the first n elements of x according to spec_type, y comes along for the ride 
        Overloaded version with real y
        @param[in] spec_type The spectrum type (Largest/Smallest)(Modulus/Imaginary/Real)
        @param[in] n The number of elements to sort
@@ -403,7 +403,7 @@ protected:
     void sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<Complex> &x, std::vector<double> &y);
 
     /**
-       @brief Sort array the first n elements of x according to spec_type, y comes alond for the ride 
+       @brief Sort array the first n elements of x according to spec_type, y comes along for the ride 
        Overloaded version with real x and real y
        @param[in] spec_type The spectrum type (Largest/Smallest)(Modulus/Imaginary/Real) that 
        determines the sorting condition
@@ -597,6 +597,12 @@ protected:
        @param[in] beta Norm of residual (used to compute errors on eigenvalues)
     */
     void eigensolveFromUpperHess(std::vector<Complex> &evals, const double beta);
+
+    /**
+       @brief Get the eigendecomposition from the upper Hessenberg matrix via QR
+       @param[in] evals Complex eigenvalues
+       @param[in] beta Norm of residual (used to compute errors on eigenvalues)
+    */
     void qrFromUpperHess(std::vector<Complex> &evals, const double beta);
 
     /**

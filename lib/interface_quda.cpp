@@ -2418,9 +2418,9 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
 
   // If you attempt to compute part of the the imaginary spectrum of a symmetric matrix,
   // the solver will fail.
-  if (((eig_param->spectrum == QUDA_SPECTRUM_LI_EIG || eig_param->spectrum == QUDA_SPECTRUM_SI_EIG) &&
-       (eig_param->use_norm_op || (inv_param->dslash_type == QUDA_LAPLACE_DSLASH))) ||
-      (((inv_param->dslash_type == QUDA_STAGGERED_DSLASH || inv_param->dslash_type == QUDA_ASQTAD_DSLASH) && inv_param->solve_type == QUDA_DIRECT_PC_SOLVE))) {
+  if ((eig_param->spectrum == QUDA_SPECTRUM_LI_EIG || eig_param->spectrum == QUDA_SPECTRUM_SI_EIG) &&
+      ((eig_param->use_norm_op || (inv_param->dslash_type == QUDA_LAPLACE_DSLASH)) ||
+       ((inv_param->dslash_type == QUDA_STAGGERED_DSLASH || inv_param->dslash_type == QUDA_ASQTAD_DSLASH) && inv_param->solve_type == QUDA_DIRECT_PC_SOLVE))) {
     errorQuda("Cannot compute imaginary spectra with a hermitian operator");    
   }
 
