@@ -1,5 +1,5 @@
 #include <blas_lapack.h>
-#include <Eigen/LU>
+#include <eigen_helper.h>
 
 //#define _DEBUG
 
@@ -19,8 +19,6 @@ namespace quda
       void init() {}
 
       void destroy() {}
-
-      using namespace Eigen;
 
       template <typename EigenMatrix, typename Float>
       void invertEigen(std::complex<Float> *A_eig, std::complex<Float> *Ainv_eig, int n, uint64_t batch)

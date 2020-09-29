@@ -11,20 +11,10 @@
 #include <color_spinor_field.h>
 #include <blas_quda.h>
 #include <util_quda.h>
-
-#ifdef OPENBLAS_LIB
-#define EIGEN_USE_LAPACKE
-#define EIGEN_USE_BLAS
-#endif
-
-#include <Eigen/Eigenvalues>
-#include <Eigen/Dense>
+#include <eigen_helper.h>
 
 namespace quda
 {
-
-  using namespace Eigen;
-      
   // Implicitly Restarted Arnoldi Method constructor
   IRAM::IRAM(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile) :
     EigenSolver(mat, eig_param, profile)

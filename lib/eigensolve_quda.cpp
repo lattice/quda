@@ -12,14 +12,10 @@
 #include <blas_quda.h>
 #include <util_quda.h>
 #include <vector_io.h>
-
-#include <Eigen/Eigenvalues>
-#include <Eigen/Dense>
+#include <eigen_helper.h>
 
 namespace quda
 {
-
-  using namespace Eigen;
 
   // Eigensolver class
   //-----------------------------------------------------------------------------
