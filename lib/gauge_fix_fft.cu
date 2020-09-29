@@ -81,98 +81,107 @@ namespace quda {
     { return (Arg::gauge_dir * meta.Bytes() / 4) + 12 * meta.Volume() * meta.Precision(); }
   };
 
-  template <typename Arg> class GaugeFixSETINVPSP : TunableKernel2D {
-    Arg &arg;
-    unsigned int minThreads() const { return arg.threads.x; }
-
-  public:
-    GaugeFixSETINVPSP(Arg &arg, const GaugeField &meta) :
-      TunableKernel2D(meta, 2),
-      arg(arg) { }
-
-    void apply(const qudaStream_t &stream)
-    {
-      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<set_invpsq>(tp, stream, arg);
-    }
-
-    long long flops() const { return 21 * field.Volume(); }
-    long long bytes() const { return sizeof(typename Arg::Float) * field.Volume(); }
+  enum GaugeFixFFTKernel {
+    KERNEL_SET_INVPSQ,
+    KERNEL_NORMALIZE,
+    KERNEL_GX,
+    KERNEL_UEO
   };
 
-  template <typename Arg> class GaugeFixINVPSP : TunableKernel2D {
+  template <typename Arg> class GaugeFixerFFT : TunableKernel2D {
     Arg &arg;
+    GaugeFixFFTKernel type;
+    char aux_tmp[TuneKey::aux_n];
     unsigned int minThreads() const { return arg.threads.x; }
 
   public:
-    GaugeFixINVPSP(Arg &arg, const GaugeField &meta) :
-      TunableKernel2D(meta, 2),
-      arg(arg) { }
-
-    void apply(const qudaStream_t &stream)
-    {
-      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<mult_norm_2d>(tp, stream, arg);
-    }
-
-    //since delta contents are irrelevant at this point, we can swap gx with delta
-    void preTune() { std::swap(arg.gx, arg.delta); }
-    void postTune() { std::swap(arg.gx, arg.delta); }
-    long long flops() const { return 2 * field.Volume(); }
-    long long bytes() const { return 5 * sizeof(typename Arg::Float) * field.Volume(); }
-  };
-
-  template <typename Arg> class GaugeFix_GX : TunableKernel2D {
-    Arg &arg;
-    unsigned int minThreads() const { return arg.threads.x; }
-
-  public:
-    GaugeFix_GX(Arg &arg, const GaugeField &meta) :
-      TunableKernel2D(meta, 2),
-      arg(arg) {}
-
-    void apply(const qudaStream_t &stream)
-    {
-      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<GX>(tp, stream, arg);
-    }
-
-    long long flops() const { return (arg.elems == 6 ? 208 : 166) * field.Volume(); }
-    long long bytes() const { return 4 * arg.elems * field.Precision() * field.Volume(); }
-  };
-
-  template <typename Arg> class GaugeFix : TunableKernel2D {
-    Arg &arg;
-    unsigned int minThreads() const { return arg.threads.x; }
-
-  public:
-    GaugeFix(Arg &arg, const GaugeField &meta) :
+    GaugeFixerFFT(Arg &arg, const GaugeField &meta) :
       TunableKernel2D(meta, 2),
       arg(arg)
     {
-#ifdef GAUGEFIXING_DONT_USE_GX
-      strcat(aux, ",new");
-#endif //GAUGEFIXING_DONT_USE_GX
+      strcpy(aux_tmp, aux);
     }
 
-    void apply(const qudaStream_t &stream) {
+    void set_type(GaugeFixFFTKernel type) {
+      this->type = type;
+      strcpy(aux, aux_tmp);
+      switch (type) {
+      case KERNEL_SET_INVPSQ: strcat(aux, ",set_invpsq"); break;
+      case KERNEL_NORMALIZE: strcat(aux, ",normalize"); break;
+      case KERNEL_GX: strcat(aux, ",gx"); break;
+      case KERNEL_UEO:
+        strcat(aux, ",ueo");
+#ifdef GAUGEFIXING_DONT_USE_GX
+        strcat(aux, "_new");
+#endif
+        break;
+      default: errorQuda("Unknown kernel type %d", type);
+      }
+    }
+
+    void apply(const qudaStream_t &stream)
+    {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      switch (type) {
+      case KERNEL_SET_INVPSQ: launch<set_invpsq>(tp, stream, arg); break;
+      case KERNEL_NORMALIZE: launch<mult_norm_2d>(tp, stream, arg); break;
+      case KERNEL_GX: launch<GX>(tp, stream, arg); break;
 #ifdef GAUGEFIXING_DONT_USE_GX
-      launch<U_EO_NEW>(tp, stream, arg);
+      case KERNEL_UEO: launch<U_EO_NEW>(tp, stream, arg); break;
 #else
-      launch<U_EO>(tp, stream, arg);
+      case KERNEL_UEO: launch<U_EO>(tp, stream, arg); break;
 #endif //GAUGEFIXING_DONT_USE_GX
+      default: errorQuda("Unexpected kernel type %d", type);
+      }
     }
 
-    void preTune() { field.backup(); }
-    void postTune() { field.restore(); }
+    void preTune()
+    {
+      switch (type) {
+      case KERNEL_NORMALIZE: std::swap(arg.gx, arg.delta); break; // delta is irrelevant here, so use as backup
+      case KERNEL_UEO: field.backup(); break;
+      default: break;
+      }
+    }
+
+    void postTune()
+    {
+      switch (type) {
+      case KERNEL_NORMALIZE: std::swap(arg.gx, arg.delta); break;
+      case KERNEL_UEO: field.restore(); break;
+      default: break;
+      }
+    }
+
+    long long flops() const
+    {
+      switch (type) {
+      case KERNEL_SET_INVPSQ: return 2 * field.Volume();
+      case KERNEL_NORMALIZE: return 2 * field.Volume();
+      case KERNEL_GX: return (arg.elems == 6 ? 208 : 166) * field.Volume();
 #ifdef GAUGEFIXING_DONT_USE_GX
-    long long flops() const { return 2414 * field.Volume(); }
-    long long bytes() const { return field.Bytes() + (5 * 12 * sizeof(typename Arg::Float)) * field.Volume(); }
+      case KERNEL_UEO: return 2414 * field.Volume();
 #else
-    long long flops() const { return (arg.elems == 6 ? 1794 : 1536) * field.Volume(); }
-    long long bytes() const { return 26 * arg.elems * field.Precision() * field.Volume(); }
-#endif //GAUGEFIXING_DONT_USE_GX
+      case KERNEL_UEO: return (arg.elems == 6 ? 1794 : 1536) * field.Volume();
+#endif
+      default: errorQuda("Unexpected kernel type %d", type); return 0;
+      }
+    }
+
+    long long bytes() const
+    {
+      switch (type) {
+      case KERNEL_SET_INVPSQ: return sizeof(typename Arg::Float) * field.Volume();
+      case KERNEL_NORMALIZE: return 3 * sizeof(typename Arg::Float) * field.Volume();
+      case KERNEL_GX: return 4 * arg.elems * field.Precision() * field.Volume();
+#ifdef GAUGEFIXING_DONT_USE_GX
+      case KERNEL_UEO: return field.Bytes() + (5 * 12 * sizeof(typename Arg::Float)) * field.Volume();
+#else
+      case KERNEL_UEO: return 26 * arg.elems * field.Precision() * field.Volume();
+#endif
+      default: errorQuda("Unexpected kernel type %d", type); return 0;
+      }
+    }
   };
 
   template <typename Float, QudaReconstructType recon, int gauge_dir>
@@ -203,14 +212,9 @@ namespace quda {
 
     GaugeFixFFTRotate<Float> GFRotate(data);
 
-    GaugeFixSETINVPSP<decltype(arg)> setinvpsp(arg, data);
-    setinvpsp.apply(0);
-    GaugeFixINVPSP<decltype(arg)> invpsp(arg, data);
-
-#ifndef GAUGEFIXING_DONT_USE_GX
-    GaugeFix_GX<decltype(arg)> calcGX(arg, data); //using GX
-#endif // (else without using GX, gx will be created only for plane rotation but with less size)
-    GaugeFix<decltype(arg)> gfix(arg, data);
+    GaugeFixerFFT<decltype(arg)> gfix(arg, data);
+    gfix.set_type(KERNEL_SET_INVPSQ);
+    gfix.apply(0);
 
     GaugeFixQualityFFTArg<Float, recon, gauge_dir> argQ(data, arg.delta);
     GaugeFixQuality<decltype(argQ)> gfixquality(argQ, data);
@@ -245,7 +249,8 @@ namespace quda {
         //------------------------------------------------------------------------
         // Normalize FFT and apply pmax^2/p^2
         //------------------------------------------------------------------------
-        invpsp.apply(0);
+        gfix.set_type(KERNEL_NORMALIZE);
+        gfix.apply(0);
         //------------------------------------------------------------------------
         // Perform IFFT on zt plane
         //------------------------------------------------------------------------
@@ -264,12 +269,16 @@ namespace quda {
 #ifndef GAUGEFIXING_DONT_USE_GX
       //------------------------------------------------------------------------
       // Calculate g(x)
-      //------------------------------------------------------------------------
-      calcGX.apply(0);
+      // ------------------------------------------------------------------------
+      // (using GX - else without using GX, gx will be created only
+      // for plane rotation but with less size)
+      gfix.set_type(KERNEL_GX);
+      gfix.apply(0);
 #endif
       //------------------------------------------------------------------------
       // Apply gauge fix to current gauge field
       //------------------------------------------------------------------------
+      gfix.set_type(KERNEL_UEO);
       gfix.apply(0);
 
       //------------------------------------------------------------------------
@@ -329,17 +338,21 @@ namespace quda {
     if (getVerbosity() > QUDA_SUMMARIZE){
       double secs = profileInternalGaugeFixFFT.Last(QUDA_PROFILE_COMPUTE);
       double fftflop = 5.0 * (log2((double)( data.X()[0] * data.X()[1]) ) + log2( (double)(data.X()[2] * data.X()[3] )));
-      fftflop *= (double)( data.X()[0] * data.X()[1] * data.X()[2] * data.X()[3] );
-      double gflops = setinvpsp.flops() + gfixquality.flops();
-      double gbytes = setinvpsp.bytes() + gfixquality.bytes();
-      double flop = invpsp.flops() * recon / 2;
-      double byte = invpsp.bytes() * recon / 2;
+      fftflop *= (double)data.Volume();
+      gfix.set_type(KERNEL_SET_INVPSQ);
+      double gflops = gfix.flops() + gfixquality.flops();
+      double gbytes = gfix.bytes() + gfixquality.bytes();
+      gfix.set_type(KERNEL_NORMALIZE);
+      double flop = gfix.flops() * recon / 2;
+      double byte = gfix.bytes() * recon / 2;
       flop += (GFRotate.flops() + fftflop) * (recon / 2) * 2;
       byte += GFRotate.bytes() * (recon / 2) * 4;     //includes FFT reads, assuming 1 read and 1 write per site
 #ifndef GAUGEFIXING_DONT_USE_GX
-      flop += calcGX.flops();
-      byte += calcGX.bytes();
+      gfix.set_type(KERNEL_GX);
+      flop += gfix.flops();
+      byte += gfix.bytes();
 #endif
+      gfix.set_type(KERNEL_UEO);
       flop += gfix.flops();
       byte += gfix.bytes();
       flop += gfixquality.flops();
