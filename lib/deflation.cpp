@@ -8,17 +8,12 @@
 #include <blas_magma.h>
 #endif
 
-#ifdef HAVE_OPENBLAS
-#define EIGEN_USE_LAPACKE
-#define EIGEN_USE_BLAS
-#endif
-#include <Eigen/Dense>
+#include <eigen_helper.h>
 
 namespace quda
 {
 
   using namespace blas;
-  using namespace Eigen;
   using DynamicStride = Stride<Dynamic, Dynamic>;
 
   static auto pinned_allocator = [] (size_t bytes ) { return static_cast<Complex*>(pool_pinned_malloc(bytes)); };

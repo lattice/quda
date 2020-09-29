@@ -5,14 +5,6 @@
 #include <memory>
 #include <iostream>
 
-#ifdef BLOCKSOLVER
-#ifdef HAVE_OPENBLAS
-#define EIGEN_USE_LAPACKE
-#define EIGEN_USE_BLAS
-#endif
-#include <Eigen/Dense>
-#endif
-
 #include <quda_internal.h>
 #include <color_spinor_field.h>
 #include <blas_quda.h>
@@ -20,6 +12,7 @@
 #include <invert_quda.h>
 #include <util_quda.h>
 #include <eigensolve_quda.h>
+#include <eigen_helper.h>
 
 namespace quda {
 

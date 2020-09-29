@@ -7,12 +7,7 @@
 //#define _DEBUG
 
 #ifdef _DEBUG
-#ifdef HAVE_OPENBLAS
-#define EIGEN_USE_LAPACKE
-#define EIGEN_USE_BLAS
-#endif
-#include <Eigen/LU>
-using namespace Eigen;
+#include <eigen_helper.h>
 #endif
 
 namespace quda

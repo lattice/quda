@@ -1,10 +1,6 @@
 #include <invert_quda.h>
 #include <blas_quda.h>
-#ifdef HAVE_OPENBLAS
-#define EIGEN_USE_LAPACKE
-#define EIGEN_USE_BLAS
-#endif
-#include <Eigen/Dense>
+#include <eigen_helper.h>
 
 namespace quda {
 
@@ -99,7 +95,6 @@ namespace quda {
 
   void CAGCR::solve(Complex *psi_, std::vector<ColorSpinorField*> &q, ColorSpinorField &b)
   {
-    using namespace Eigen;
     typedef Matrix<Complex, Dynamic, Dynamic> matrix;
     typedef Matrix<Complex, Dynamic, 1> vector;
 

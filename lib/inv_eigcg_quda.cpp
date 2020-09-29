@@ -16,12 +16,7 @@
 #include <blas_magma.h>
 #endif
 
-#ifdef HAVE_OPENBLAS
-#define EIGEN_USE_LAPACKE
-#define EIGEN_USE_BLAS
-#endif
-#include <Eigen/Dense>
-
+#include <eigen_helper.h>
 #include <deflation.h>
 
 /*
@@ -32,7 +27,6 @@ A. Stathopolous and K. Orginos, arXiv:0707.0131
 namespace quda {
 
    using namespace blas;
-   using namespace Eigen;
 
    using DynamicStride   = Stride<Dynamic, Dynamic>;
    using DenseMatrix     = MatrixXcd;

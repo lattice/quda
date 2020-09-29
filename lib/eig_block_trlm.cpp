@@ -11,18 +11,10 @@
 #include <color_spinor_field.h>
 #include <blas_quda.h>
 #include <util_quda.h>
-
-#ifdef HAVE_OPENBLAS
-#define EIGEN_USE_LAPACKE
-#define EIGEN_USE_BLAS
-#endif
-#include <Eigen/Eigenvalues>
-#include <Eigen/Dense>
+#include <eigen_helper.h>
 
 namespace quda
 {
-
-  using namespace Eigen;
   // Thick Restarted Block Lanczos Method constructor
   BLKTRLM::BLKTRLM(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile) :
     TRLM(mat, eig_param, profile)

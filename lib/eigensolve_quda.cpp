@@ -12,19 +12,10 @@
 #include <blas_quda.h>
 #include <util_quda.h>
 #include <vector_io.h>
-
-#ifdef HAVE_OPENBLAS
-#define EIGEN_USE_LAPACKE
-#define EIGEN_USE_BLAS
-#endif
-
-#include <Eigen/Eigenvalues>
-#include <Eigen/Dense>
+#include <eigen_helper.h>
 
 namespace quda
 {
-
-  using namespace Eigen;
 
   // Eigensolver class
   //-----------------------------------------------------------------------------
@@ -66,11 +57,7 @@ namespace quda
     save_prec = eig_param->save_prec;
 
     // Sanity checks
-    if(eig_param->eig_type == QUDA_EIG_TR_LANCZOS || eig_param->eig_type == QUDA_EIG_BLK_TR_LANCZOS) {
-      if (n_kr <= n_ev) errorQuda("n_kr = %d is less than or equal to n_ev = %d", n_kr, n_ev);
-    } else {
-      if (n_kr < n_ev) errorQuda("n_kr = %d is less than n_ev = %d", n_kr, n_ev);
-    }
+    if (n_kr <= n_ev) errorQuda("n_kr = %d is less than or equal to n_ev = %d", n_kr, n_ev);    
     if (n_ev < n_conv) errorQuda("n_conv=%d is greater than n_ev=%d", n_conv, n_ev);
     if (n_ev == 0) errorQuda("n_ev=0 passed to Eigensolver");
     if (n_kr == 0) errorQuda("n_kr=0 passed to Eigensolver");
@@ -90,7 +77,6 @@ namespace quda
     case QUDA_SPECTRUM_SI_EIG: strcpy(spectrum, "SI"); break;
     default: errorQuda("Unexpected spectrum type %d", eig_param->spectrum);
     }
-
     
     // Deduce whether to reverse the sorting
     if (strncmp("L", spectrum, 1) == 0 && !eig_param->use_poly_acc) {

@@ -11,20 +11,10 @@
 #include <color_spinor_field.h>
 #include <blas_quda.h>
 #include <util_quda.h>
-
-#ifdef HAVE_OPENBLAS
-#define EIGEN_USE_LAPACKE
-#define EIGEN_USE_BLAS
-#endif
-
-#include <Eigen/Eigenvalues>
-#include <Eigen/Dense>
+#include <eigen_helper.h>
 
 namespace quda
 {
-
-  using namespace Eigen;
-      
   // Implicitly Restarted Arnoldi Method constructor
   IRAM::IRAM(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile) :
     EigenSolver(mat, eig_param, profile)
@@ -96,7 +86,8 @@ namespace quda
     // to enforce ||v(:,1:j)^T * r_{j}|| .le. eps * || r_{j} ||  
     // The following test determines whether the sine of the     
     // angle between  OP*x and the computed residual is less     
-    // than or equal to 0.717.
+    // than or equal to 0.717. In practice, more than one
+    // step of iterative refinement is rare.
 
     int orth_iter = 0;
     int orth_iter_max = 100;
@@ -141,81 +132,56 @@ namespace quda
 
   void IRAM::reorder(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals, const QudaEigSpectrumType spec_type)
   {
-    int i=0;
+
+    int n = n_kr;
+    std::vector<std::tuple<Complex, double, ColorSpinorField*>> array(n);
+    for(int i=0; i<n; i++) array[i] = std::make_tuple(evals[i], residua[i], kSpace[i]);
+    
     switch(spec_type) {
     case QUDA_SPECTRUM_LM_EIG:
-      while (i < n_kr) {
-        if ((i == 0) || abs(evals[i - 1]) >= abs(evals[i]))
-	  i++;
-        else {
-          std::swap(evals[i], evals[i - 1]);
-	  std::swap(residua[i], residua[i - 1]);
-          std::swap(kSpace[i], kSpace[i - 1]);
-          i--;
-        }
-      }
+      std::sort(array.begin(), array.begin() + n,
+		[] (const std::tuple<Complex, double, ColorSpinorField*> &a,
+		    const std::tuple<Complex, double, ColorSpinorField*> &b) {
+		  return (abs(std::get<0>(a)) > abs(std::get<0>(b))); } );
       break;
     case QUDA_SPECTRUM_SM_EIG:
-      while (i < n_kr) {
-        if ((i == 0) || abs(evals[i - 1]) <= abs(evals[i]))
-	  i++;
-        else {
-          std::swap(evals[i], evals[i - 1]);
-	  std::swap(residua[i], residua[i - 1]);
-          std::swap(kSpace[i], kSpace[i - 1]);
-          i--;
-        }
-      }
+      std::sort(array.begin(), array.begin() + n,
+		[] (const std::tuple<Complex, double, ColorSpinorField*> &a,
+		    const std::tuple<Complex, double, ColorSpinorField*> &b) {
+		  return (abs(std::get<0>(a)) < abs(std::get<0>(b))); } );
       break;
-    case QUDA_SPECTRUM_LR_EIG:      
-      while (i < n_kr) {
-        if ((i == 0) || evals[i - 1].real() >= evals[i].real())
-	  i++;
-        else {
-          std::swap(evals[i], evals[i - 1]);
-	  std::swap(residua[i], residua[i - 1]);
-          std::swap(kSpace[i], kSpace[i - 1]);
-          i--;
-        }
-      }
+    case QUDA_SPECTRUM_LR_EIG:
+      std::sort(array.begin(), array.begin() + n,
+		[] (const std::tuple<Complex, double, ColorSpinorField*> &a,
+		    const std::tuple<Complex, double, ColorSpinorField*> &b) {
+		  return (std::get<0>(a).real() > std::get<0>(b).real()); } );
       break;
     case QUDA_SPECTRUM_SR_EIG:
-      while (i < n_kr) {
-        if ((i == 0) || evals[i - 1].real() <= evals[i].real())
-	  i++;
-        else {
-          std::swap(evals[i], evals[i - 1]);
-	  std::swap(residua[i], residua[i - 1]);
-          std::swap(kSpace[i], kSpace[i - 1]);
-          i--;
-        }
-      }
+      std::sort(array.begin(), array.begin() + n,
+		[] (const std::tuple<Complex, double, ColorSpinorField*> &a,
+		    const std::tuple<Complex, double, ColorSpinorField*> &b) {
+		  return (std::get<0>(a).real() < std::get<0>(b).real()); } );
       break;
     case QUDA_SPECTRUM_LI_EIG:
-      while (i < n_kr) {
-        if ((i == 0) || evals[i - 1].imag() >= evals[i].imag())
-	  i++;
-        else {
-          std::swap(evals[i], evals[i - 1]);
-	  std::swap(residua[i], residua[i - 1]);
-          std::swap(kSpace[i], kSpace[i - 1]);
-          i--;
-        }
-      }
+      std::sort(array.begin(), array.begin() + n,
+		[] (const std::tuple<Complex, double, ColorSpinorField*> &a,
+		    const std::tuple<Complex, double, ColorSpinorField*> &b) {
+		  return (std::get<0>(a).imag() > std::get<0>(b).imag()); } );
       break;
     case QUDA_SPECTRUM_SI_EIG:
-      while (i < n_kr) {
-        if ((i == 0) || evals[i - 1].imag() <= evals[i].imag())
-	  i++;
-        else {
-          std::swap(evals[i], evals[i - 1]);
-	  std::swap(residua[i], residua[i - 1]);
-          std::swap(kSpace[i], kSpace[i - 1]);
-          i--;
-        }
-      }
+      std::sort(array.begin(), array.begin() + n,
+		[] (const std::tuple<Complex, double, ColorSpinorField*> &a,
+		    const std::tuple<Complex, double, ColorSpinorField*> &b) {
+		  return (std::get<0>(a).imag() < std::get<0>(b).imag()); } );
       break;
-    default: errorQuda("Undefined sort %d given", spec_type);
+    default: errorQuda("Undefined spectrum type %d given", spec_type);      
+    }
+    
+    // Repopulate arrays with sorted elements
+    for(int i=0; i<n; i++) {
+      std::swap(evals[i], std::get<0>(array[i]));
+      std::swap(residua[i], std::get<1>(array[i]));
+      std::swap(kSpace[i], std::get<2>(array[i]));
     }
   }
   

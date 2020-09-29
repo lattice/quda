@@ -18,12 +18,7 @@
 #include <algorithm>
 #include <memory>
 
-#ifdef HAVE_OPENBLAS
-#define EIGEN_USE_LAPACKE
-#define EIGEN_USE_BLAS
-#endif
-#include <Eigen/Dense>
-#include <Eigen/Eigenvalues>
+#include <eigen_helper.h>
 
 /*
   GMRES-DR algorithm:
@@ -35,8 +30,6 @@ namespace quda {
 
   using namespace blas;
   using namespace std;
-
-  using namespace Eigen;
 
   using DynamicStride = Stride<Dynamic, Dynamic>;
 
