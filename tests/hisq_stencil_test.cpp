@@ -51,7 +51,7 @@ static void hisq_test()
 
   QudaGaugeParam qudaGaugeParam;
 
-  initQuda(device);
+  initQuda(device_ordinal);
 
   if (prec == QUDA_HALF_PRECISION || prec == QUDA_QUARTER_PRECISION) {
     errorQuda("Precision %d is unsupported in some link fattening routines\n",prec);

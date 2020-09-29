@@ -168,7 +168,7 @@ namespace quda {
       { return static_cast<ReduceType>(norm(x)); }
     };
 
-    template<typename ReduceType> struct square_<ReduceType,int8_t> {
+    template <typename ReduceType> struct square_<ReduceType, int8_t> {
       const ReduceType scale;
       square_(const ReduceType scale) : scale(scale) { }
       __host__ __device__ inline ReduceType operator()(const quda::complex<int8_t> &x)
@@ -194,7 +194,7 @@ namespace quda {
       __host__ __device__ Float operator()(const quda::complex<storeFloat> &x) { return abs(x); }
     };
 
-    template<typename Float> struct abs_<Float,int8_t> {
+    template <typename Float> struct abs_<Float, int8_t> {
       Float scale;
       abs_(const Float scale) : scale(scale) { }
       __host__ __device__ Float operator()(const quda::complex<int8_t> &x)
@@ -216,7 +216,7 @@ namespace quda {
     };
 
     template <typename Float, typename storeFloat> __host__ __device__ inline constexpr bool fixed_point() { return false; }
-    template<> __host__ __device__ inline constexpr bool fixed_point<float,int8_t>() { return true; }
+    template <> __host__ __device__ inline constexpr bool fixed_point<float, int8_t>() { return true; }
     template<> __host__ __device__ inline constexpr bool fixed_point<float,short>() { return true; }
     template<> __host__ __device__ inline constexpr bool fixed_point<float,int>() { return true; }
 
@@ -2111,18 +2111,16 @@ namespace quda {
       void save() {
 	if (backup_h) errorQuda("Already allocated host backup");
 	backup_h = safe_malloc(bytes);
-	cudaMemcpy(backup_h, gauge, bytes, cudaMemcpyDeviceToHost);
-	checkCudaError();
+	qudaMemcpy(backup_h, gauge, bytes, cudaMemcpyDeviceToHost);
       }
 
       /**
 	 @brief Restore the field from the host after tuning
       */
       void load() {
-	cudaMemcpy(gauge, backup_h, bytes, cudaMemcpyHostToDevice);
+	qudaMemcpy(gauge, backup_h, bytes, cudaMemcpyHostToDevice);
 	host_free(backup_h);
 	backup_h = nullptr;
-	checkCudaError();
       }
 
       size_t Bytes() const { return reconLen * sizeof(Float); }

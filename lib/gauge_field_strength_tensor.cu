@@ -30,7 +30,6 @@ public:
       }
       apply(0);
       qudaDeviceSynchronize();
-      checkCudaError();
     }
 
     void apply(const qudaStream_t &stream)

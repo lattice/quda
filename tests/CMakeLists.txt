@@ -255,9 +255,6 @@ if(QUDA_MPI OR QUDA_QMP)
     set(QUDA_CTEST_LAUNCH ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG}
                           ${MPIEXEC_MAX_NUMPROCS} ${MPIEXEC_PREFLAGS})
   endif()
-else()
-  # if single-GPU compilation then only use a single process
-  set(QUDA_CTEST_LAUNCH ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 1 ${MPIEXEC_PREFLAGS})
 endif()
 
 # BLAS test

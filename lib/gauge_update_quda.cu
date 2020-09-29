@@ -135,7 +135,6 @@ namespace quda {
           updateGauge.apply(0);
         }
       }
-      checkCudaError();
     }
   };
 

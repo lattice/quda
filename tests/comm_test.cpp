@@ -142,17 +142,46 @@ int main(int argc, char **argv)
     return app->exit(e);
   }
 
+  if (inv_deflate && inv_multigrid) {
+    printfQuda("Error: Cannot use both deflation and multigrid preconditioners on top level solve.\n");
+    exit(0);
+  }
+
   // Set values for precisions via the command line.
   setQudaPrecisions();
 
   // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
 
+  if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH
+      && dslash_type != QUDA_TWISTED_MASS_DSLASH && dslash_type != QUDA_DOMAIN_WALL_4D_DSLASH
+      && dslash_type != QUDA_MOBIUS_DWF_DSLASH && dslash_type != QUDA_MOBIUS_DWF_EOFA_DSLASH
+      && dslash_type != QUDA_TWISTED_CLOVER_DSLASH && dslash_type != QUDA_DOMAIN_WALL_DSLASH) {
+    printfQuda("dslash_type %d not supported\n", dslash_type);
+    exit(0);
+  }
+
+  if (inv_multigrid) {
+    // Only these fermions are supported with MG
+    if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH
+        && dslash_type != QUDA_TWISTED_MASS_DSLASH && dslash_type != QUDA_TWISTED_CLOVER_DSLASH) {
+      printfQuda("dslash_type %d not supported for MG\n", dslash_type);
+      exit(0);
+    }
+
+    // Only these solve types are supported with MG
+    if (solve_type != QUDA_DIRECT_SOLVE && solve_type != QUDA_DIRECT_PC_SOLVE) {
+      printfQuda("Solve_type %d not supported with MG. Please use QUDA_DIRECT_SOLVE or QUDA_DIRECT_PC_SOLVE\n\n",
+                 solve_type);
+      exit(0);
+    }
+  }
+
   // All parameters have been set. Display the parameters via stdout
   display_test_info();
 
   // Initialize the QUDA library
-  initQuda(device);
+  initQuda(device_ordinal);
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setWilsonGaugeParam(gauge_param);

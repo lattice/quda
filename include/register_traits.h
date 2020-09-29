@@ -95,7 +95,9 @@ namespace quda {
   template<> struct mapper<double> { typedef double type; };
   template<> struct mapper<float> { typedef float type; };
   template<> struct mapper<short> { typedef float type; };
-  template<> struct mapper<int8_t> { typedef float type; };
+  template <> struct mapper<int8_t> {
+    typedef float type;
+  };
 
   template<> struct mapper<double2> { typedef double2 type; };
   template<> struct mapper<float2> { typedef float2 type; };
@@ -192,7 +194,9 @@ namespace quda {
     static const int value = 3;
   };
   template<> struct vec_length<char2> { static const int value = 2; };
-  template<> struct vec_length<int8_t> { static const int value = 1; };
+  template <> struct vec_length<int8_t> {
+    static const int value = 1;
+  };
 
   template <> struct vec_length<Complex> {
     static const int value = 2;
@@ -331,7 +335,9 @@ namespace quda {
 
   /* Traits used to determine if a variable is quarter precision or not */
   template< typename T > struct isQuarter{ static const bool value = false; };
-  template<> struct isQuarter<int8_t>{ static const bool value = true; };
+  template <> struct isQuarter<int8_t> {
+    static const bool value = true;
+  };
   template<> struct isQuarter<char2>{ static const bool value = true; };
   template<> struct isQuarter<char4>{ static const bool value = true; };
   template <> struct isQuarter<char8> {
@@ -346,7 +352,9 @@ namespace quda {
   template <> struct isFixed<short8> {
     static const bool value = true;
   };
-  template<> struct isFixed<int8_t>{ static const bool value = true; };
+  template <> struct isFixed<int8_t> {
+    static const bool value = true;
+  };
   template<> struct isFixed<char2>{ static const bool value = true; };
   template<> struct isFixed<char4>{ static const bool value = true; };
   template <> struct isFixed<char8> {
@@ -467,12 +475,18 @@ namespace quda {
   };
 
   // quarter precision
-  template <> struct VectorType<int8_t, 1>{typedef int8_t type; };
-  template <> struct VectorType<int8_t, 2>{typedef char2 type; };
+  template <> struct VectorType<int8_t, 1> {
+    typedef int8_t type;
+  };
+  template <> struct VectorType<int8_t, 2> {
+    typedef char2 type;
+  };
   template <> struct VectorType<int8_t, 3> {
     typedef char3 type;
   };
-  template <> struct VectorType<int8_t, 4>{typedef char4 type; };
+  template <> struct VectorType<int8_t, 4> {
+    typedef char4 type;
+  };
   template <> struct VectorType<int8_t, 8> {
     typedef char8 type;
   };

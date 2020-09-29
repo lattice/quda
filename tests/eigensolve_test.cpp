@@ -96,7 +96,11 @@ int main(int argc, char **argv)
   QudaInvertParam eig_inv_param = newQudaInvertParam();
   setInvertParam(eig_inv_param);
   // Specific changes to the invert param for the eigensolver
-  eig_inv_param.gamma_basis = QUDA_UKQCD_GAMMA_BASIS;
+  // QUDA's device routines require UKQCD gamma basis. QUDA will
+  // automatically rotate from this basis on the host, to UKQCD
+  // on the device, and back to this basis upon completion.
+  eig_inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+
   eig_inv_param.solve_type
     = (eig_inv_param.solution_type == QUDA_MAT_SOLUTION ? QUDA_DIRECT_SOLVE : QUDA_DIRECT_PC_SOLVE);
   QudaEigParam eig_param = newQudaEigParam();
@@ -105,7 +109,7 @@ int main(int argc, char **argv)
   setEigParam(eig_param);
 
   // Initialize the QUDA library
-  initQuda(device);
+  initQuda(device_ordinal);
   display_test_info();
 
   // Set some dimension parameters

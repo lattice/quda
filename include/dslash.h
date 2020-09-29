@@ -151,14 +151,6 @@ namespace quda
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1; // packing blocks per direction
     }
 
-    template <typename T> inline void launch(T *f, const TuneParam &tp, const qudaStream_t &stream)
-    {
-      if (deviceProp.major >= 7) { // should test whether this is always optimal on Volta
-        this->setMaxDynamicSharedBytesPerBlock(f);
-      }
-      qudaLaunchKernel(f, tp, stream, arg);
-    }
-
     /**
        @brief This is a helper class that is used to instantiate the
        correct templated kernel for the dslash.  This can be used for
@@ -166,9 +158,12 @@ namespace quda
        compilation time.
     */
     template <template <bool, QudaPCType, typename> class P, int nParity, bool dagger, bool xpay, KernelType kernel_type>
-    inline void Launch(TuneParam &tp, const qudaStream_t &stream)
+    inline void launch(TuneParam &tp, const qudaStream_t &stream)
     {
-      launch(dslashGPU<D, P, nParity, dagger, xpay, kernel_type, Arg>, tp, stream);
+      if (deviceProp.major >= 7) { // should test whether this is always optimal on Volta
+        tp.set_max_shared_bytes = true;
+      }
+      qudaLaunchKernel(dslashGPU<D, P, nParity, dagger, xpay, kernel_type, Arg>, tp, stream, arg);
     }
 
 #ifdef JITIFY
@@ -215,13 +210,13 @@ namespace quda
         Tunable::jitify_error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
 #else
         switch (arg.kernel_type) {
-        case INTERIOR_KERNEL: Launch<P, nParity, dagger, xpay, INTERIOR_KERNEL>(tp, stream); break;
+        case INTERIOR_KERNEL: launch<P, nParity, dagger, xpay, INTERIOR_KERNEL>(tp, stream); break;
 #ifdef MULTI_GPU
-        case EXTERIOR_KERNEL_X: Launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_X>(tp, stream); break;
-        case EXTERIOR_KERNEL_Y: Launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_Y>(tp, stream); break;
-        case EXTERIOR_KERNEL_Z: Launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_Z>(tp, stream); break;
-        case EXTERIOR_KERNEL_T: Launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_T>(tp, stream); break;
-        case EXTERIOR_KERNEL_ALL: Launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_ALL>(tp, stream); break;
+        case EXTERIOR_KERNEL_X: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_X>(tp, stream); break;
+        case EXTERIOR_KERNEL_Y: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_Y>(tp, stream); break;
+        case EXTERIOR_KERNEL_Z: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_Z>(tp, stream); break;
+        case EXTERIOR_KERNEL_T: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_T>(tp, stream); break;
+        case EXTERIOR_KERNEL_ALL: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_ALL>(tp, stream); break;
         default: errorQuda("Unexpected kernel type %d", arg.kernel_type);
 #else
         default: errorQuda("Unexpected kernel type %d for single-GPU build", arg.kernel_type);

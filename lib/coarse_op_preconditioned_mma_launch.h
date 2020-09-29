@@ -22,16 +22,6 @@ namespace quda
 
 #if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
 
-    template <typename F> inline void setMaxDynamicSharedBytesPerBlock(F *func)
-    {
-      qudaFuncSetAttribute((const void *)func, cudaFuncAttributePreferredSharedMemoryCarveout,
-                           (int)cudaSharedmemCarveoutMaxShared);
-      cudaFuncAttributes attr;
-      cudaFuncGetAttributes(&attr, (const void *)func);
-      qudaFuncSetAttribute((const void *)func, cudaFuncAttributeMaxDynamicSharedMemorySize,
-                           deviceProp.sharedMemPerBlockOptin - attr.sharedSizeBytes);
-    }
-
     template <bool compute_max_only, int bM, int bN, int bK, int block_y, int block_z, int min_block_cta = 1, class Arg>
     typename std::enable_if<!Arg::is_mma_compatible, void>::type launch_kernel(Arg &arg, int min_threads, TuneParam &tp,
                                                                                const cudaStream_t &stream)
@@ -57,7 +47,7 @@ namespace quda
       tp.grid = dim3(min_threads * t_m * t_n, 2, 4);
 
       auto kernel = mma::CalculateYhatGPU<compute_max_only, Arg, bM, bN, bK, block_y, block_z, min_block_cta>;
-      setMaxDynamicSharedBytesPerBlock(kernel);
+      tp.set_max_shared_bytes = true;
       qudaLaunchKernel(kernel, tp, stream, arg);
     }
 

@@ -33,7 +33,6 @@ namespace quda {
         arg.complete(*clover.TrLog());
         comm_allreduce_array(clover.TrLog(), 2);
       }
-      checkCudaError();
     }
 
     void apply(const qudaStream_t &stream) {

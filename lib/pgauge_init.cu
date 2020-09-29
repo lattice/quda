@@ -65,7 +65,6 @@ namespace quda {
       meta(data)
     {
       apply(0);
-      checkCudaError();
     }
 
     void apply(const qudaStream_t &stream)
@@ -271,7 +270,6 @@ namespace quda {
       meta(data)
     {
       apply(0);
-      checkCudaError();
       qudaDeviceSynchronize();
       data.exchangeExtendedGhost(data.R(),false);
     }

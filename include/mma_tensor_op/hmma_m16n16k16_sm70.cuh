@@ -1,7 +1,7 @@
 #pragma once
 
 #include <type_traits>
-#include <cuda_fp16.h>
+#include <quda_fp16.cuh>
 
 // This macro determines whether or not we are using the fp16 accumulation of the MMA instruction.
 // #define USE_FP16_HMMA_ACCUMULATE
@@ -154,7 +154,7 @@ namespace quda
       {
 #pragma unroll
         for (int i = 0; i < 4; i++) {
-          const half2 h2 = __habs2(*(reinterpret_cast<const half2 *>(&(reg[i]))));
+          const half2 h2 = habs2(*(reinterpret_cast<const half2 *>(&(reg[i]))));
           max = fmax(max, h2.x);
           max = fmax(max, h2.y);
         }
