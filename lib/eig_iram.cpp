@@ -12,6 +12,12 @@
 #include <blas_quda.h>
 #include <util_quda.h>
 
+#ifdef HAVE_OPENBLAS
+#define EIGEN_USE_LAPACKE
+#define EIGEN_USE_BLAS
+#include <lapacke.h>
+#endif
+
 #include <Eigen/Eigenvalues>
 #include <Eigen/Dense>
 
@@ -295,7 +301,7 @@ namespace quda
 	  tempp2 += T22 * upperHess[i+1][j];
 	  upperHess[i+1][j] -= tempp2;
 	}
-      }
+      }	
       
       // Rotate R and V, i.e. H->RQ. V->VQ
       // Loop over columns of upper Hessenberg
@@ -337,7 +343,7 @@ namespace quda
   
   void IRAM::eigensolveFromUpperHess(std::vector<Complex> &evals, const double beta)
   {
-    profile.TPSTART(QUDA_PROFILE_EIGEN);
+    profile.TPSTART(QUDA_PROFILE_EIGENEV);
     //Construct the upper Hessenberg matrix       
     MatrixXcd upperHessEigen = MatrixXcd::Zero(n_kr, n_kr);
     for(int i=0; i<n_kr; i++) {
@@ -345,7 +351,7 @@ namespace quda
 	upperHessEigen(i,j) = upperHess[i][j];
       }
     }
-    
+
     // Eigensolve the upper Hessenberg matrix
     Eigen::ComplexEigenSolver<MatrixXcd> eigenSolverUH(upperHessEigen);
     for(int i=0; i<n_kr; i++) {
@@ -358,12 +364,12 @@ namespace quda
 	Qmat[j][i] = eigenSolverUH.eigenvectors().col(i)[j];
       }
     }
-    profile.TPSTOP(QUDA_PROFILE_EIGEN);
+    profile.TPSTOP(QUDA_PROFILE_EIGENEV);		   
   }
 
   void IRAM::qrFromUpperHess(std::vector<Complex> &evals, const double beta)
   {
-    profile.TPSTART(QUDA_PROFILE_EIGEN);
+    profile.TPSTART(QUDA_PROFILE_EIGENQR);
     //Construct the upper Hessenberg matrix       
     MatrixXcd Q = MatrixXcd::Identity(n_kr, n_kr);
     MatrixXcd R = MatrixXcd::Zero(n_kr, n_kr);
@@ -376,8 +382,10 @@ namespace quda
     // QR the upper Hessenberg matrix
     Eigen::ComplexSchur<MatrixXcd> schurUH;
     schurUH.computeFromHessenberg(R, Q);
+    profile.TPSTOP(QUDA_PROFILE_EIGENQR);
 
-      // Extract the upper triangular matrix
+    profile.TPSTART(QUDA_PROFILE_EIGENEV);
+    // Extract the upper triangular matrix
     MatrixXcd matUpper = MatrixXcd::Zero(n_kr, n_kr);
     matUpper = schurUH.matrixT().triangularView<Eigen::Upper>();
     matUpper.conservativeResize(n_kr, n_kr);
@@ -385,12 +393,10 @@ namespace quda
     Eigen::ComplexEigenSolver<MatrixXcd> eigenSolver(matUpper);
     Q = schurUH.matrixU() * eigenSolver.eigenvectors();
     for(int i=0; i<n_kr; i++) {
-      //evals[i] = schurUH.matrixT().col(i)[i];
       evals[i] = eigenSolver.eigenvalues()[i];
       residua[i] = abs(beta * Q.col(i)[n_kr-1]);
-    }
-    
-    profile.TPSTOP(QUDA_PROFILE_EIGEN);
+    }    
+    profile.TPSTOP(QUDA_PROFILE_EIGENEV);
   }
 
   
@@ -431,9 +437,6 @@ namespace quda
     // Eigen object for computing Ritz values from the upper Hessenberg matrix
     Eigen::ComplexEigenSolver<MatrixXcd> eigenSolverUH;
 
-    omp_set_num_threads(atoi(getenv("OMP_NUM_THREADS")));
-    Eigen::setNbThreads(atoi(getenv("OMP_NUM_THREADS")));
-    
     // Print Eigensolver params
     printEigensolverSetup();
     //---------------------------------------------------------------------------
@@ -454,8 +457,8 @@ namespace quda
       
       // Ritz values and their residua are updated.
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-      eigensolveFromUpperHess(evals, beta);
-      //qrFromUpperHess(evals, beta);
+      //eigensolveFromUpperHess(evals, beta);
+      qrFromUpperHess(evals, beta);
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
       
       num_keep = n_ev;

@@ -112,6 +112,9 @@ namespace quda {
     QUDA_PROFILE_IO,       /**< time spent on file i/o */
     QUDA_PROFILE_CHRONO,   /**< time spent on chronology */
     QUDA_PROFILE_EIGEN,    /**< time spent on host-side Eigen */
+    QUDA_PROFILE_EIGENLU,  /**< time spent on host-side Eigen LU */
+    QUDA_PROFILE_EIGENEV,  /**< time spent on host-side Eigen EV */
+    QUDA_PROFILE_EIGENQR,  /**< time spent on host-side Eigen QR */
     QUDA_PROFILE_ARPACK,   /**< time spent on host-side ARPACK */
     QUDA_PROFILE_HOST_COMPUTE,   /**< time spent on miscellaneous host-side computation */
 

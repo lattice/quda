@@ -951,7 +951,7 @@ namespace quda
 	}
       }
 
-      profile.TPSTART(QUDA_PROFILE_EIGEN);
+      profile.TPSTART(QUDA_PROFILE_EIGENLU);
       MatrixXcd mat = MatrixXcd::Zero(dim, keep);
       for (int j = 0; j < keep; j++)
 	for (int i = 0; i < dim; i++) mat(i, j) = rot_array[i * keep + j];
@@ -973,7 +973,7 @@ namespace quda
       MatrixXi matQ = MatrixXi::Zero(keep, keep);
       matP = matLU.permutationP().inverse();
       matQ = matLU.permutationQ().inverse();
-      profile.TPSTOP(QUDA_PROFILE_EIGEN);
+      profile.TPSTOP(QUDA_PROFILE_EIGENLU);
 
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
       // Compute V * A = V * PLUQ
