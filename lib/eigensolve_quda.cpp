@@ -13,6 +13,11 @@
 #include <util_quda.h>
 #include <vector_io.h>
 
+#ifdef HAVE_OPENBLAS
+#define EIGEN_USE_LAPACKE
+#define EIGEN_USE_BLAS
+#endif
+
 #include <Eigen/Eigenvalues>
 #include <Eigen/Dense>
 

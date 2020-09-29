@@ -8,6 +8,10 @@
 #include <blas_magma.h>
 #endif
 
+#ifdef HAVE_OPENBLAS
+#define EIGEN_USE_LAPACKE
+#define EIGEN_USE_BLAS
+#endif
 #include <Eigen/Dense>
 
 namespace quda

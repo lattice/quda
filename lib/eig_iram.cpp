@@ -15,7 +15,6 @@
 #ifdef HAVE_OPENBLAS
 #define EIGEN_USE_LAPACKE
 #define EIGEN_USE_BLAS
-#include <lapacke.h>
 #endif
 
 #include <Eigen/Eigenvalues>

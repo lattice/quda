@@ -6,6 +6,10 @@
 #include <iostream>
 
 #ifdef BLOCKSOLVER
+#ifdef HAVE_OPENBLAS
+#define EIGEN_USE_LAPACKE
+#define EIGEN_USE_BLAS
+#endif
 #include <Eigen/Dense>
 #endif
 

@@ -18,6 +18,10 @@
 #include <algorithm>
 #include <memory>
 
+#ifdef HAVE_OPENBLAS
+#define EIGEN_USE_LAPACKE
+#define EIGEN_USE_BLAS
+#endif
 #include <Eigen/Dense>
 #include <Eigen/Eigenvalues>
 

@@ -1,5 +1,9 @@
 #include <invert_quda.h>
 #include <blas_quda.h>
+#ifdef HAVE_OPENBLAS
+#define EIGEN_USE_LAPACKE
+#define EIGEN_USE_BLAS
+#endif
 #include <Eigen/Dense>
 
 /**
