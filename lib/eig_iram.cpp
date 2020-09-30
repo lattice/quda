@@ -306,33 +306,7 @@ namespace quda
     profile.TPSTOP(QUDA_PROFILE_HOST_COMPUTE);
   }
   
-  void IRAM::eigensolveFromUpperHess(std::vector<Complex> &evals, const double beta)
-  {
-    profile.TPSTART(QUDA_PROFILE_EIGENEV);
-    //Construct the upper Hessenberg matrix       
-    MatrixXcd upperHessEigen = MatrixXcd::Zero(n_kr, n_kr);
-    for(int i=0; i<n_kr; i++) {
-      for(int j=0; j<n_kr; j++) {
-	upperHessEigen(i,j) = upperHess[i][j];
-      }
-    }
-
-    // Eigensolve the upper Hessenberg matrix
-    Eigen::ComplexEigenSolver<MatrixXcd> eigenSolverUH(upperHessEigen);
-    for(int i=0; i<n_kr; i++) {
-      evals[i] = eigenSolverUH.eigenvalues()[i];
-      residua[i] = abs(beta * eigenSolverUH.eigenvectors().col(i)[n_kr - 1]);
-    }
-    // Update the Q matrix
-    for(int i = 0; i < n_kr; i++) {
-      for(int j = 0; j < n_kr; j++) {
-	Qmat[j][i] = eigenSolverUH.eigenvectors().col(i)[j];
-      }
-    }
-    profile.TPSTOP(QUDA_PROFILE_EIGENEV);		   
-  }
-
-  void IRAM::qrFromUpperHess(std::vector<Complex> &evals, const double beta)
+  void IRAM::eigensolveFromUpperHess(std::vector<Complex> &evals, const double beta, bool updateQ)
   {
     profile.TPSTART(QUDA_PROFILE_EIGENQR);
     //Construct the upper Hessenberg matrix       
@@ -348,7 +322,7 @@ namespace quda
     Eigen::ComplexSchur<MatrixXcd> schurUH;
     schurUH.computeFromHessenberg(R, Q);
     profile.TPSTOP(QUDA_PROFILE_EIGENQR);
-
+    
     profile.TPSTART(QUDA_PROFILE_EIGENEV);
     // Extract the upper triangular matrix
     MatrixXcd matUpper = MatrixXcd::Zero(n_kr, n_kr);
@@ -360,7 +334,8 @@ namespace quda
     for(int i=0; i<n_kr; i++) {
       evals[i] = eigenSolver.eigenvalues()[i];
       residua[i] = abs(beta * Q.col(i)[n_kr-1]);
-    }    
+      for(int j=0; j<n_kr && updateQ; j++) Qmat[i][j] = Q(i,j);
+    }
     profile.TPSTOP(QUDA_PROFILE_EIGENEV);
   }
 
@@ -422,8 +397,7 @@ namespace quda
       
       // Ritz values and their residua are updated.
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-      //eigensolveFromUpperHess(evals, beta);
-      qrFromUpperHess(evals, beta);
+      eigensolveFromUpperHess(evals, beta);
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
       
       num_keep = n_ev;
@@ -460,12 +434,19 @@ namespace quda
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("%04d converged eigenvalues at iter %d\n", num_converged, restart_iter);
 
       if (num_converged >= n_conv) {
+	
         profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-        eigensolveFromUpperHess(evals, beta);
-        rotateBasis(kSpace, n_kr);
+	// Update the Q matrix in this eigensolve
+        eigensolveFromUpperHess(evals, beta, true);
+	// Rotate the Krylov space
+	rotateBasis(kSpace, n_kr);
+	// Reorder the Krylov space and Ritz values
         reorder(kSpace, evals, eig_param->spectrum);
-        profile.TPSTART(QUDA_PROFILE_COMPUTE);
+	
+	// Compute the eigenvalues.
+	profile.TPSTART(QUDA_PROFILE_COMPUTE);
 	computeEvals(mat, kSpace, evals);
+	
         converged = true;
 	
       } else {

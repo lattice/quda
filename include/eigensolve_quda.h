@@ -592,19 +592,13 @@ protected:
     void arnoldiStep(std::vector<ColorSpinorField *> &v, std::vector<ColorSpinorField *> &r, double &beta, int j);
 
     /**
-       @brief Get the eigendecomposition from the upper Hessenberg matrix
-       @param[in] evals Complex eigenvalues
-       @param[in] beta Norm of residual (used to compute errors on eigenvalues)
-    */
-    void eigensolveFromUpperHess(std::vector<Complex> &evals, const double beta);
-
-    /**
        @brief Get the eigendecomposition from the upper Hessenberg matrix via QR
        @param[in] evals Complex eigenvalues
        @param[in] beta Norm of residual (used to compute errors on eigenvalues)
+       @param[in] updateQ Update Qmat for basis rotation.
     */
-    void qrFromUpperHess(std::vector<Complex> &evals, const double beta);
-
+    void eigensolveFromUpperHess(std::vector<Complex> &evals, const double beta, bool updateQ = false);
+    
     /**
        @brief Rotate the Krylov space
        @param[in] v Vector space
