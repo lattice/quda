@@ -559,6 +559,7 @@ protected:
 
     Complex **upperHess;
     Complex **Qmat;
+    Complex **Rmat;
     
     /**
        @brief Constructor for Thick Restarted Eigensolver class
@@ -613,7 +614,8 @@ protected:
        @param[in] epsilon The ceiling for which one can floor a value to zero.
     */    
     void qrShifts(const std::vector<Complex> evals, const int num_shifts, const double epsilon);
-
+    void qrIteration(Complex** Q, Complex** R);
+    
     /**
        @brief Reorder the Krylov space and eigenvalues
        @param[in] kSpace The Krylov space

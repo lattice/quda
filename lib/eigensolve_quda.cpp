@@ -788,7 +788,7 @@ namespace quda
     computeEvals(mat, kSpace, evals);
     delete r[0];
   }
-  
+
   void EigenSolver::sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<Complex> &x, std::vector<Complex> &y) {
     
     //  'LM' -> sort into increasing order of magnitude.
