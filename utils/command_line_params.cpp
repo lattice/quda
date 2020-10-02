@@ -604,7 +604,7 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--eig-ARPACK-logfile", eig_arpack_logfile, "The filename storing the log from arpack");
   opgroup->add_option("--eig-arpack-check", eig_arpack_check,
                       "Cross check the device data against ARPACK (requires ARPACK, default false)");
-  opgroup->add_option("--eig-use-eigen", eig_use_eigen_qr, "Use Eigen to eigensolve the upper Hessenberg in IRAM, else use QUDA's QR code. (default true)");
+  opgroup->add_option("--eig-use-eigen-qr", eig_use_eigen_qr, "Use Eigen to eigensolve the upper Hessenberg in IRAM, else use QUDA's QR code. (default true)");
   opgroup->add_option("--eig-compute-svd", eig_compute_svd,
                       "Solve the MdagM problem, use to compute SVD of M (default false)");
   opgroup->add_option("--eig-max-restarts", eig_max_restarts, "Perform n iterations of the restart in the eigensolver");
