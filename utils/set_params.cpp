@@ -289,6 +289,7 @@ void setEigParam(QudaEigParam &eig_param)
     eig_param.use_norm_op = QUDA_BOOLEAN_TRUE;
   }
 
+  eig_param.use_eigen_qr = eig_use_eigen_qr ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   eig_param.use_poly_acc = eig_use_poly_acc ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   eig_param.poly_deg = eig_poly_deg;
   eig_param.a_min = eig_amin;
@@ -296,7 +297,6 @@ void setEigParam(QudaEigParam &eig_param)
 
   eig_param.arpack_check = eig_arpack_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   strcpy(eig_param.arpack_logfile, eig_arpack_logfile);
-  strcpy(eig_param.QUDA_logfile, eig_QUDA_logfile);
 
   strcpy(eig_param.vec_infile, eig_vec_infile);
   strcpy(eig_param.vec_outfile, eig_vec_outfile);
@@ -697,6 +697,7 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
   mg_eig_param.use_norm_op = mg_eig_use_normop[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_eig_param.use_dagger = mg_eig_use_dagger[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
+  mg_eig_param.use_eigen_qr = mg_eig_use_eigen_qr[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_eig_param.use_poly_acc = mg_eig_use_poly_acc[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_eig_param.poly_deg = mg_eig_poly_deg[level];
   mg_eig_param.a_min = mg_eig_amin[level];
@@ -708,7 +709,6 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
   strcpy(mg_eig_param.vec_outfile, "");
   mg_eig_param.save_prec = mg_eig_save_prec[level];
   mg_eig_param.io_parity_inflate = QUDA_BOOLEAN_FALSE;
-  strcpy(mg_eig_param.QUDA_logfile, eig_QUDA_logfile);
 }
 
 void setContractInvertParam(QudaInvertParam &inv_param)

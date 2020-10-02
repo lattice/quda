@@ -153,6 +153,7 @@ void printQudaEigParam(QudaEigParam *param) {
 #endif
 
 #if defined INIT_PARAM
+  P(use_eigen_qr, QUDA_BOOLEAN_FALSE);
   P(use_poly_acc, QUDA_BOOLEAN_FALSE);
   P(poly_deg, 0);
   P(a_min, 0.0);
@@ -180,6 +181,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(extlib_type, QUDA_EIGEN_EXTLIB);
   P(mem_type_ritz, QUDA_MEMORY_DEVICE);
 #else
+  P(use_eigen_qr, QUDA_BOOLEAN_INVALID);
   P(use_poly_acc, QUDA_BOOLEAN_INVALID);
   P(poly_deg, INVALID_INT);
   P(a_min, INVALID_DOUBLE);

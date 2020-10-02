@@ -593,12 +593,20 @@ protected:
     void arnoldiStep(std::vector<ColorSpinorField *> &v, std::vector<ColorSpinorField *> &r, double &beta, int j);
 
     /**
+       @brief Get the eigendecomposition from the upper Hessenberg matrix via QR using Eigen
+       @param[in] evals Complex eigenvalues
+       @param[in] beta Norm of residual (used to compute errors on eigenvalues)
+       @param[in] updateQ Update Qmat for basis rotation.
+    */
+    void eigensolveFromUpperHessEigen(std::vector<Complex> &evals, const double beta);
+
+    /**
        @brief Get the eigendecomposition from the upper Hessenberg matrix via QR
        @param[in] evals Complex eigenvalues
        @param[in] beta Norm of residual (used to compute errors on eigenvalues)
        @param[in] updateQ Update Qmat for basis rotation.
     */
-    void eigensolveFromUpperHess(std::vector<Complex> &evals, const double beta, bool updateQ = false);
+    void eigensolveFromUpperHess(std::vector<Complex> &evals, const double beta);
     
     /**
        @brief Rotate the Krylov space
@@ -614,6 +622,12 @@ protected:
        @param[in] epsilon The ceiling for which one can floor a value to zero.
     */    
     void qrShifts(const std::vector<Complex> evals, const int num_shifts, const double epsilon);
+
+    /**
+       @brief Apply One step of the the QR algorithm
+       @param[in] Q The Q matrix
+       @param[in] R The R matrix
+    */    
     void qrIteration(Complex** Q, Complex** R);
     
     /**
@@ -626,7 +640,6 @@ protected:
     void reorder(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals, const QudaEigSpectrumType spec_type);
     
   };
-
   
   /**
      arpack_solve()

@@ -218,7 +218,7 @@ namespace quda
 
   void IRAM::qrIteration(Complex** Q, Complex** R)
   {
-    Complex T11, T12, T21, T22, temp, temp2, temp3, U1, U2;
+    Complex T11, T12, T21, T22, temp, U1, U2;
     double dV;
 
     double tol = 1e-11;
@@ -237,7 +237,7 @@ namespace quda
 	R[i+1][i] = 0.0;
 	continue;
       }
-
+      
       U1 = R[i][i];
       dV = sqrt(norm(R[i][i]) + norm(R[i+1][i]));
       dV = (U1.real() > 0) ? dV : -dV;      
@@ -260,49 +260,79 @@ namespace quda
       R[i][i] -= (T11 * R[i][i] + T12 * R[i+1][i]);
       R[i+1][i] = 0;
 
-      //printfQuda("Before\n");
-      
       // Continue for the other columns
       // PARALLELIZE ME OVER j
-      //#pragma omp parallel for
       for(int j=i+1; j < n_kr; j++) {
-	//printfQuda("Mid %d\n", i);
-	Complex temp = R[i][j];
-	R[i][j]   -= (T11 * R[i][j] + T12 * R[i+1][j]);      
+	temp = R[i][j];
+	R[i][j] -= (T11 * R[i][j] + T12 * R[i+1][j]);      
 	R[i+1][j] -= (T21 * temp + T22 * R[i+1][j]);
       }
-    }	
-
-    //printfQuda("After\n");
+      // Quarantined OMP accelerated code. Kills performance
+      // when tested on Power9 and Haswell...
+#if 0
+      // Continue for the other columns
+#pragma omp parallel for schedule(static,32)
+      for(int j=i+1; j < n_kr; j++) {
+	temp = R[i][j];
+	R[i][j] -= (T11 * R[i][j] + T12 * R[i+1][j]);      
+	R[i+1][j] -= (T21 * temp + T22 * R[i+1][j]);
+      }
+#endif
+    }
     
     // Rotate R and V, i.e. H->RQ. V->VQ
     // Loop over columns of upper Hessenberg
     for(int j = 0; j < n_kr - 1; j++) {
       if(abs(R11[j]) > tol) {
-	
 	// Loop over the rows, up to the sub diagonal element i=j+1
 	// PARALLELIZE ME OVER i
-	//#pragma omp parallel for
 	for(int i = 0; i < j+2; i++) {	  
-	  Complex temp = R[i][j];
+	  temp = R[i][j];
 	  R[i][j] -= (R11[j] * temp + R12[j] * R[i][j+1]);	
 	  R[i][j+1] -= (R21[j] * temp + R22[j] * R[i][j+1]);	
 	}
 	
 	// PARALLELIZE ME OVER i
-	//#pragma omp parallel for
 	for(int i = 0; i < n_kr; i++) {
-	  Complex temp = Q[i][j];
+	  temp = Q[i][j];
 	  Q[i][j] -= (R11[j] * temp + R12[j] * Q[i][j+1]);
 	  Q[i][j+1] -= (R21[j] * temp + R22[j] * Q[i][j+1]);		  
 	}
       }
     }    
+
+#if 0
+    // Quarantined OMP accelerated code. Kills performance
+    // when tested on Power9 and Haswell...
+    // Rotate R and V, i.e. H->RQ. V->VQ
+    // Loop over columns of upper Hessenberg    
+    for(int j = 0; j < n_kr - 1; j++) {
+      if(abs(R11[j]) > tol) {
+	// Loop over the rows, up to the sub diagonal element i=j+1
+#pragma omp parallel 
+	{
+#pragma omp for schedule(static,32) nowait
+	  for(int i = 0; i < j+2; i++) {	  
+	    temp = R[i][j];
+	    R[i][j] -= (R11[j] * temp + R12[j] * R[i][j+1]);	
+	    R[i][j+1] -= (R21[j] * temp + R22[j] * R[i][j+1]);	
+	  }
+	  
+	// PARALLELIZE ME OVER i
+#pragma omp for schedule(static,32) nowait
+	  for(int i = 0; i < n_kr; i++) {
+	    temp = Q[i][j];
+	    Q[i][j] -= (R11[j] * temp + R12[j] * Q[i][j+1]);
+	    Q[i][j+1] -= (R21[j] * temp + R22[j] * Q[i][j+1]);		  
+	  }
+	}
+      }
+    }
+#endif
   }
   
-  void IRAM::eigensolveFromUpperHess(std::vector<Complex> &evals, const double beta, bool updateQ)
+  void IRAM::eigensolveFromUpperHess(std::vector<Complex> &evals, const double beta)
   {
-#if 1
     profile.TPSTART(QUDA_PROFILE_EIGENQR);
     // Copy the upper Hessenberg matrix into Rmat, and set Qmat to the identity       
     for(int i=0; i<n_kr; i++) {
@@ -352,10 +382,12 @@ namespace quda
 	  // Shift back
 	  for(int j = 0; j < n_kr; j++) Rmat[j][j] += eval;
 	}
-	iter++;    
+	iter++;
       } 
     }
-    
+    profile.TPSTOP(QUDA_PROFILE_EIGENQR);
+
+    profile.TPSTART(QUDA_PROFILE_EIGENEV);
     // Compute the eigevectors of the origial upper Hessenberg
     // This is now very cheap because the input matrix to Eigen
     // is upper triangular.
@@ -367,7 +399,7 @@ namespace quda
 	R(i,j) = Rmat[i][j];
       }
     }
-
+    
     MatrixXcd matUpper = MatrixXcd::Zero(n_kr, n_kr);       
     matUpper = R.triangularView<Eigen::Upper>();
     matUpper.conservativeResize(n_kr, n_kr);
@@ -378,14 +410,15 @@ namespace quda
     for(int i=0; i<n_kr; i++) {
       evals[i] = eigenSolver.eigenvalues()[i];
       residua[i] = abs(beta * Q.col(i)[n_kr-1]);
-      for(int j=0; j<n_kr && updateQ; j++) Qmat[i][j] = Q(i,j);
+      for(int j=0; j<n_kr; j++) Qmat[i][j] = Q(i,j);
     }
   
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("QR iterations = %d\n", iter);
-    profile.TPSTOP(QUDA_PROFILE_EIGENQR);
-
-#endif
-#if 0
+    profile.TPSTOP(QUDA_PROFILE_EIGENEV);
+  }
+  
+  void IRAM::eigensolveFromUpperHessEigen(std::vector<Complex> &evals, const double beta)
+  {
     profile.TPSTART(QUDA_PROFILE_EIGENQR);
     //Construct the upper Hessenberg matrix       
     MatrixXcd Q = MatrixXcd::Identity(n_kr, n_kr);
@@ -414,11 +447,11 @@ namespace quda
     for(int i=0; i<n_kr; i++) {
       evals[i] = eigenSolver.eigenvalues()[i];
       residua[i] = abs(beta * Q.col(i)[n_kr-1]);
-      for(int j=0; j<n_kr && updateQ; j++) Qmat[i][j] = Q(i,j);
+      for(int j=0; j<n_kr; j++) Qmat[i][j] = Q(i,j);
     }
     profile.TPSTOP(QUDA_PROFILE_EIGENEV);
- #endif
   }
+  
   void IRAM::operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)
   {
     // In case we are deflating an operator, save the tunechache from the inverter
@@ -476,7 +509,8 @@ namespace quda
       
       // Ritz values and their errors are updated.
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-      eigensolveFromUpperHess(evals, beta);
+      if(eig_param->use_eigen_qr) eigensolveFromUpperHessEigen(evals, beta);
+      else eigensolveFromUpperHess(evals, beta);
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
       
       num_keep = n_ev;
@@ -515,8 +549,8 @@ namespace quda
       if (num_converged >= n_conv) {
 	
         profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-	// Update the Q matrix in this eigensolve
-        eigensolveFromUpperHess(evals, beta, true);
+	if(eig_param->use_eigen_qr) eigensolveFromUpperHessEigen(evals, beta);
+	else eigensolveFromUpperHess(evals, beta);
 	// Rotate the Krylov space
 	rotateBasis(kSpace, n_kr);
 	// Reorder the Krylov space and Ritz values
@@ -539,11 +573,11 @@ namespace quda
 	profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 	// Apply the shifts of the unwated Ritz values via QR
 	qrShifts(evals, num_shifts, epsilon);
-	  
+	
 	// Compress the Krylov space using the accumulated Givens rotations in Qmat
 	rotateBasis(kSpace, num_keep+1);
 	profile.TPSTART(QUDA_PROFILE_COMPUTE);
-	
+		
 	// Update the residual vector
 	blas::caxpby(upperHess[num_keep][num_keep-1], *kSpace[num_keep], Qmat[n_kr-1][num_keep-1], *r[0]);
 
