@@ -199,9 +199,9 @@ namespace quda {
 #ifdef __HIP__
           signed char *tmp_d;hipMalloc(&tmp_d, MAX_MATRIX_SIZE);hipMemcpy(tmp_d,tmp,MAX_MATRIX_SIZE,hipMemcpyHostToDevice);
           switch (select) {
-          case 'a': set_AmatixR<<<256,MAX_MATRIX_SIZE/256>>>(tmp_d);
-          case 'b': set_BmatixR<<<256,MAX_MATRIX_SIZE/256>>>(tmp_d);
-          case 'c': set_CmatixR<<<256,MAX_MATRIX_SIZE/256>>>(tmp_d);
+          case 'a': set_AmatixR<<<256,MAX_MATRIX_SIZE/256>>>(tmp_d);break;
+          case 'b': set_BmatixR<<<256,MAX_MATRIX_SIZE/256>>>(tmp_d);break;
+          case 'c': set_CmatixR<<<256,MAX_MATRIX_SIZE/256>>>(tmp_d);break;
           default: errorQuda("Unknown buffer %c", select);
           }
           hipDeviceSynchronize();hipFree(tmp_d);

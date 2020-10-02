@@ -14,8 +14,11 @@ namespace quda {
     typename std::enable_if<block_size!=32, qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
       void *args[] = {&arg};
-      if (tp.block.x == block_size)
-        return qudaLaunchKernel((const void*)reduceKernel<block_size, real, len, Arg>, tp.grid, tp.block, args, tp.shared_bytes, stream);
+      if (tp.block.x == block_size){
+	reduceKernel<block_size, real, len, Arg><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+        return qudaSuccess;
+	}
+        //return qudaLaunchKernel((const void*)reduceKernel<block_size, real, len, Arg>, tp.grid, tp.block, args, tp.shared_bytes, stream);
       else
         return launch<block_size - 32, real, len>(arg, tp, stream);
     }
@@ -24,7 +27,9 @@ namespace quda {
     typename std::enable_if<block_size==32, qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
       void *args[] = {&arg};
-      return qudaLaunchKernel((const void*)reduceKernel<block_size, real, len, Arg>, tp.grid, tp.block, args, tp.shared_bytes, stream);
+	reduceKernel<block_size, real, len, Arg><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+
+//      return qudaLaunchKernel((const void*)reduceKernel<block_size, real, len, Arg>, tp.grid, tp.block, args, tp.shared_bytes, stream);
     }
 
 #ifdef QUDA_FAST_COMPILE_REDUCE

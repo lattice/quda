@@ -637,7 +637,10 @@ namespace quda
           setMaxDynamicSharedBytesPerBlock(f);
         }
         void *args[] = {&arg};
-        qudaLaunchKernel((const void *)f, tp.grid, tp.block, args, tp.shared_bytes, stream);
+
+	f<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+
+//        qudaLaunchKernel((const void *)f, tp.grid, tp.block, args, tp.shared_bytes, stream);
       }
 
       // The following apply<...> functions are used to turn the tune parameters into template arguments.

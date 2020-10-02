@@ -140,22 +140,35 @@ namespace quda {
 #define STRINGIFY__(x) #x
 #define __STRINGIFY__(x) STRINGIFY__(x)
 
-#define qudaStreamSynchronize(stream)                                                                                  \
+
+#define qudaStreamSynchronize  hipStreamSynchronize
+
+//#define qudaStreamSynchronize(stream)                                                                                  \
   ::quda::qudaStreamSynchronize_(stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
-#define qudaMemcpy(dst, src, count, kind) \
+#define qudaMemcpy hipMemcpy
+
+//#define qudaMemcpy(dst, src, count, kind) \
   ::quda::qudaMemcpy_(dst, src, count, kind, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
-#define qudaMemcpyAsync(dst, src, count, kind, stream) \
+#define qudaMemcpyAsync  hipMemcpyAsync
+
+//#define qudaMemcpyAsync(dst, src, count, kind, stream) \
   ::quda::qudaMemcpyAsync_(dst, src, count, kind, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
-#define qudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream) \
+#define qudaMemcpy2DAsync  hipMemcpy2DAsync
+
+//#define qudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream) \
   ::quda::qudaMemcpy2DAsync_(dst, dpitch, src, spitch, width, height, kind, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
-#define qudaMemset(ptr, value, count)                                                                                  \
+#define qudaMemset hipMemset
+
+//#define qudaMemset(ptr, value, count)                                                                                  \
   ::quda::qudaMemset_(ptr, value, count, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
-#define qudaMemsetAsync(ptr, value, count, stream)                                                                     \
+#define qudaMemsetAsync hipMemsetAsync
+
+//#define qudaMemsetAsync(ptr, value, count, stream)                                                                     \
   ::quda::qudaMemsetAsync_(ptr, value, count, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
 namespace quda {
@@ -277,5 +290,9 @@ namespace quda {
   
 } // namespace quda
 
-#define qudaDeviceSynchronize() \
+#define qudaDeviceSynchronize hipDeviceSynchronize
+
+//#define qudaDeviceSynchronize() \
   ::quda::qudaDeviceSynchronize_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+

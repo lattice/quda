@@ -331,7 +331,7 @@ namespace quda {
   qudaError_t qudaEventQuery(qudaEvent_t &event)
   {
 #ifdef USE_DRIVER_API
-    PROFILE(qudaError_t error = qudaEventQuery(event), QUDA_PROFILE_EVENT_QUERY);
+    PROFILE(qudaError_t error = hipEventQuery(event), QUDA_PROFILE_EVENT_QUERY);
     switch (error) {
     case qudaSuccess:
       return qudaSuccess;
@@ -344,7 +344,7 @@ namespace quda {
     }
     return qudaErrorUnknown;
 #else
-    PROFILE(qudaError_t error = qudaEventQuery(event), QUDA_PROFILE_EVENT_QUERY);
+    PROFILE(qudaError_t error = hipEventQuery(event), QUDA_PROFILE_EVENT_QUERY);
     return error;
 #endif
   }
@@ -352,7 +352,7 @@ namespace quda {
   qudaError_t qudaEventRecord(qudaEvent_t &event, qudaStream_t stream)
   {
 #ifdef USE_DRIVER_API
-    PROFILE(qudaError_t error = qudaEventRecord(event, stream), QUDA_PROFILE_EVENT_RECORD);
+    PROFILE(qudaError_t error = hipEventRecord(event, stream), QUDA_PROFILE_EVENT_RECORD);
     switch (error) {
     case qudaSuccess:
       return qudaSuccess;
@@ -363,7 +363,7 @@ namespace quda {
     }
     return qudaErrorUnknown;
 #else
-    PROFILE(qudaError_t error = qudaEventRecord(event, stream), QUDA_PROFILE_EVENT_RECORD);
+    PROFILE(qudaError_t error = hipEventRecord(event, stream), QUDA_PROFILE_EVENT_RECORD);
     return error;
 #endif
   }
@@ -371,7 +371,7 @@ namespace quda {
   qudaError_t qudaStreamWaitEvent(qudaStream_t stream, qudaEvent_t event, unsigned int flags)
   {
 #ifdef USE_DRIVER_API
-    PROFILE(qudaError_t error = qudaStreamWaitEvent(stream, event, flags), QUDA_PROFILE_STREAM_WAIT_EVENT);
+    PROFILE(qudaError_t error = hipStreamWaitEvent(stream, event, flags), QUDA_PROFILE_STREAM_WAIT_EVENT);
     switch (error) {
     case qudaSuccess:
       return qudaSuccess;
@@ -382,7 +382,7 @@ namespace quda {
     }
     return qudaErrorUnknown;
 #else
-    PROFILE(qudaError_t error = qudaStreamWaitEvent(stream, event, flags), QUDA_PROFILE_STREAM_WAIT_EVENT);
+    PROFILE(qudaError_t error = hipStreamWaitEvent(stream, event, flags), QUDA_PROFILE_STREAM_WAIT_EVENT);
     return error;
 #endif
   }
@@ -390,7 +390,7 @@ namespace quda {
   qudaError_t qudaEventSynchronize(qudaEvent_t &event)
   {
 #ifdef USE_DRIVER_API
-    PROFILE(qudaError_t error = qudaEventSynchronize(event), QUDA_PROFILE_EVENT_SYNCHRONIZE);
+    PROFILE(qudaError_t error = hipEventSynchronize(event), QUDA_PROFILE_EVENT_SYNCHRONIZE);
     switch (error) {
     case qudaSuccess:
       return qudaSuccess;
@@ -401,7 +401,7 @@ namespace quda {
     }
     return qudaErrorUnknown;
 #else
-    PROFILE(qudaError_t error = qudaEventSynchronize(event), QUDA_PROFILE_EVENT_SYNCHRONIZE);
+    PROFILE(qudaError_t error = hipEventSynchronize(event), QUDA_PROFILE_EVENT_SYNCHRONIZE);
     return error;
 #endif
   }
@@ -420,7 +420,7 @@ namespace quda {
     }
     return qudaErrorUnknown;
 #else
-    PROFILE(qudaError_t error = qudaDeviceSynchronize(), QUDA_PROFILE_DEVICE_SYNCHRONIZE);
+    PROFILE(qudaError_t error = hipDeviceSynchronize(), QUDA_PROFILE_DEVICE_SYNCHRONIZE);
     if (error != qudaSuccess)
       errorQuda("(CUDA) %s\n (%s:%s in %s())\n", qudaGetErrorString(error), file, line, func);
     return error;
