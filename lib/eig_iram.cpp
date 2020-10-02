@@ -273,9 +273,9 @@ namespace quda
       // Continue for the other columns
 #pragma omp parallel for schedule(static,32)
       for(int j=i+1; j < n_kr; j++) {
-	temp = R[i][j];
-	R[i][j] -= (T11 * R[i][j] + T12 * R[i+1][j]);      
-	R[i+1][j] -= (T21 * temp + T22 * R[i+1][j]);
+	Complex tempp = R[i][j];
+	R[i][j] -= (T11 * tempp + T12 * R[i+1][j]);      
+	R[i+1][j] -= (T21 * tempp + T22 * R[i+1][j]);
       }
 #endif
     }
@@ -313,17 +313,17 @@ namespace quda
 	{
 #pragma omp for schedule(static,32) nowait
 	  for(int i = 0; i < j+2; i++) {	  
-	    temp = R[i][j];
-	    R[i][j] -= (R11[j] * temp + R12[j] * R[i][j+1]);	
-	    R[i][j+1] -= (R21[j] * temp + R22[j] * R[i][j+1]);	
+	    Complex tempp = R[i][j];
+	    R[i][j] -= (R11[j] * tempp + R12[j] * R[i][j+1]);	
+	    R[i][j+1] -= (R21[j] * tempp + R22[j] * R[i][j+1]);	
 	  }
 	  
 	// PARALLELIZE ME OVER i
 #pragma omp for schedule(static,32) nowait
 	  for(int i = 0; i < n_kr; i++) {
-	    temp = Q[i][j];
-	    Q[i][j] -= (R11[j] * temp + R12[j] * Q[i][j+1]);
-	    Q[i][j+1] -= (R21[j] * temp + R22[j] * Q[i][j+1]);		  
+	    Complex tempp = Q[i][j];
+	    Q[i][j] -= (R11[j] * tempp + R12[j] * Q[i][j+1]);
+	    Q[i][j+1] -= (R21[j] * tempp + R22[j] * Q[i][j+1]);		  
 	  }
 	}
       }
