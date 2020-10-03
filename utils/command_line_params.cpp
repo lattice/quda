@@ -170,6 +170,7 @@ bool eig_require_convergence = true;
 int eig_check_interval = 10;
 int eig_max_restarts = 1000;
 double eig_tol = 1e-6;
+double eig_qr_tol = 1e-11;
 bool eig_use_eigen_qr = true;
 bool eig_use_poly_acc = true;
 int eig_poly_deg = 100;
@@ -200,6 +201,7 @@ quda::mgarray<bool> mg_eig_require_convergence = {};
 quda::mgarray<int> mg_eig_check_interval = {};
 quda::mgarray<int> mg_eig_max_restarts = {};
 quda::mgarray<double> mg_eig_tol = {};
+quda::mgarray<double> mg_eig_qr_tol = {};
 quda::mgarray<bool> mg_eig_use_eigen_qr = {};
 quda::mgarray<bool> mg_eig_use_poly_acc = {};
 quda::mgarray<int> mg_eig_poly_deg = {};
@@ -637,7 +639,8 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
     ->add_option("--eig-spectrum", eig_spectrum,
                  "The spectrum part to be calulated. S=smallest L=largest R=real M=modulus I=imaginary")
     ->transform(CLI::QUDACheckedTransformer(eig_spectrum_map));
-  opgroup->add_option("--eig-tol", eig_tol, "The tolerance to use in the eigensolver");
+  opgroup->add_option("--eig-tol", eig_tol, "The tolerance to use in the eigensolver (default 1e-6)");
+  opgroup->add_option("--eig-qr-tol", eig_qr_tol, "The tolerance to use in the qr (default 1e-11)");
 
   opgroup->add_option("--eig-type", eig_type, "The type of eigensolver to use (default trlm)")
     ->transform(CLI::QUDACheckedTransformer(eig_type_map));
@@ -755,7 +758,9 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
     "The spectrum part to be calulated. S=smallest L=largest R=real M=modulus I=imaginary (default SR)");
   quda_app->add_mgoption(opgroup, "--mg-eig-tol", mg_eig_tol, CLI::PositiveNumber,
                          "The tolerance to use in the eigensolver (default 1e-6)");
-
+  quda_app->add_mgoption(opgroup, "--mg-eig-qr-tol", mg_eig_qr_tol, CLI::PositiveNumber,
+			 "The tolerance to use in the QR (default 1e-11)");
+  
   quda_app->add_mgoption(opgroup, "--mg-eig-type", mg_eig_type, CLI::QUDACheckedTransformer(eig_type_map),
                          "The type of eigensolver to use (default trlm)");
   quda_app->add_mgoption(opgroup, "--mg-eig-use-dagger", mg_eig_use_dagger, CLI::Validator(),

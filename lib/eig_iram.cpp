@@ -221,7 +221,7 @@ namespace quda
     Complex T11, T12, T21, T22, temp, U1, U2;
     double dV;
 
-    double tol = 1e-11;
+    double tol = eig_param->qr_tol;
     
     // Allocate the rotation matrices.
     std::vector<Complex> R11(n_kr-1, 0.0);
@@ -261,65 +261,34 @@ namespace quda
       R[i+1][i] = 0;
 
       // Continue for the other columns
-      // PARALLELIZE ME OVER j
-      for(int j=i+1; j < n_kr; j++) {
-	temp = R[i][j];
-	R[i][j] -= (T11 * R[i][j] + T12 * R[i+1][j]);      
-	R[i+1][j] -= (T21 * temp + T22 * R[i+1][j]);
-      }
-      // Quarantined OMP accelerated code. Kills performance
-      // when tested on Power9 and Haswell...
-#if 0
-      // Continue for the other columns
+#ifdef _OPENMP
 #pragma omp parallel for schedule(static,32)
+#endif
       for(int j=i+1; j < n_kr; j++) {
 	Complex tempp = R[i][j];
 	R[i][j] -= (T11 * tempp + T12 * R[i+1][j]);      
 	R[i+1][j] -= (T21 * tempp + T22 * R[i+1][j]);
       }
-#endif
     }
-    
-    // Rotate R and V, i.e. H->RQ. V->VQ
-    // Loop over columns of upper Hessenberg
-    for(int j = 0; j < n_kr - 1; j++) {
-      if(abs(R11[j]) > tol) {
-	// Loop over the rows, up to the sub diagonal element i=j+1
-	// PARALLELIZE ME OVER i
-	for(int i = 0; i < j+2; i++) {	  
-	  temp = R[i][j];
-	  R[i][j] -= (R11[j] * temp + R12[j] * R[i][j+1]);	
-	  R[i][j+1] -= (R21[j] * temp + R22[j] * R[i][j+1]);	
-	}
-	
-	// PARALLELIZE ME OVER i
-	for(int i = 0; i < n_kr; i++) {
-	  temp = Q[i][j];
-	  Q[i][j] -= (R11[j] * temp + R12[j] * Q[i][j+1]);
-	  Q[i][j+1] -= (R21[j] * temp + R22[j] * Q[i][j+1]);		  
-	}
-      }
-    }    
 
-#if 0
-    // Quarantined OMP accelerated code. Kills performance
-    // when tested on Power9 and Haswell...
     // Rotate R and V, i.e. H->RQ. V->VQ
     // Loop over columns of upper Hessenberg    
     for(int j = 0; j < n_kr - 1; j++) {
       if(abs(R11[j]) > tol) {
 	// Loop over the rows, up to the sub diagonal element i=j+1
+#ifdef _OPENMP
 #pragma omp parallel 
 	{
 #pragma omp for schedule(static,32) nowait
+#endif
 	  for(int i = 0; i < j+2; i++) {	  
 	    Complex tempp = R[i][j];
 	    R[i][j] -= (R11[j] * tempp + R12[j] * R[i][j+1]);	
 	    R[i][j+1] -= (R21[j] * tempp + R22[j] * R[i][j+1]);	
 	  }
-	  
-	// PARALLELIZE ME OVER i
+#ifdef _OPENMP	  
 #pragma omp for schedule(static,32) nowait
+#endif
 	  for(int i = 0; i < n_kr; i++) {
 	    Complex tempp = Q[i][j];
 	    Q[i][j] -= (R11[j] * tempp + R12[j] * Q[i][j+1]);
@@ -328,130 +297,128 @@ namespace quda
 	}
       }
     }
-#endif
   }
   
   void IRAM::eigensolveFromUpperHess(std::vector<Complex> &evals, const double beta)
   {
-    profile.TPSTART(QUDA_PROFILE_EIGENQR);
-    // Copy the upper Hessenberg matrix into Rmat, and set Qmat to the identity       
-    for(int i=0; i<n_kr; i++) {
-      for(int j=0; j<n_kr; j++) {
-	Rmat[i][j] = upperHess[i][j];
-	if(i == j) Qmat[i][j] = 1.0;
-	else Qmat[i][j] = 0.0;
-      }
-    }
-    
-    // This is about as high as one cat get in double without causing
-    // the Arnoldi to compute more restarts.
-    double tol = 1e-11;
-    int max_iter = 100000;
-    int iter = 0;
-    
-    Complex temp, discriminant, sol1, sol2, eval;
-    for (int i = n_kr-2; i >= 0; i--) {    
-      while (iter < max_iter) {
-	if(abs(Rmat[i+1][i]) < tol) {
-	  Rmat[i+1][i] = 0.0;
-	  break;
-	} else {
-	  
-	  // Compute the 2 eigenvalues via the quadratic formula
-	  //----------------------------------------------------
-	  // The discriminant
-	  temp = (Rmat[i][i] - Rmat[i+1][i+1]) * (Rmat[i][i] - Rmat[i+1][i+1]) / 4.0;
-	  discriminant = sqrt(Rmat[i+1][i] * Rmat[i][i+1] + temp);
-	  
-	  // Reuse temp
-	  temp = (Rmat[i][i] + Rmat[i+1][i+1])/2.0;
-	  
-	  sol1 = temp - Rmat[i+1][i+1] + discriminant;
-	  sol2 = temp - Rmat[i+1][i+1] - discriminant;
-	  //----------------------------------------------------
-	  
-	  // Deduce the better eval to shift
-	  eval = Rmat[i+1][i+1] + (norm(sol1) < norm(sol2) ? sol1 : sol2);
-	  
-	  // Shift the eigenvalue
-	  for(int j = 0; j < n_kr; j++) Rmat[j][j] -= eval;
-	  
-	  // Do the QR iteration
-	  qrIteration(Qmat, Rmat);
-	  
-	  // Shift back
-	  for(int j = 0; j < n_kr; j++) Rmat[j][j] += eval;
+    if(eig_param->use_eigen_qr) {
+      profile.TPSTART(QUDA_PROFILE_EIGENQR);
+      //Construct the upper Hessenberg matrix       
+      MatrixXcd Q = MatrixXcd::Identity(n_kr, n_kr);
+      MatrixXcd R = MatrixXcd::Zero(n_kr, n_kr);
+      for(int i=0; i<n_kr; i++) {
+	for(int j=0; j<n_kr; j++) {
+	  R(i,j) = upperHess[i][j];
 	}
-	iter++;
-      } 
-    }
-    profile.TPSTOP(QUDA_PROFILE_EIGENQR);
-
-    profile.TPSTART(QUDA_PROFILE_EIGENEV);
-    // Compute the eigevectors of the origial upper Hessenberg
-    // This is now very cheap because the input matrix to Eigen
-    // is upper triangular.
-    MatrixXcd Q = MatrixXcd::Zero(n_kr, n_kr);
-    MatrixXcd R = MatrixXcd::Zero(n_kr, n_kr);
-    for(int i=0; i<n_kr; i++) {
-      for(int j=0; j<n_kr; j++) {
-	Q(i,j) = Qmat[i][j];
-	R(i,j) = Rmat[i][j];
       }
-    }
-    
-    MatrixXcd matUpper = MatrixXcd::Zero(n_kr, n_kr);       
-    matUpper = R.triangularView<Eigen::Upper>();
-    matUpper.conservativeResize(n_kr, n_kr);
-    Eigen::ComplexEigenSolver<MatrixXcd> eigenSolver(matUpper);
-    Q *= eigenSolver.eigenvectors();
-    
-    // Update eigenvalues, residiua, and the Q matrix
-    for(int i=0; i<n_kr; i++) {
-      evals[i] = eigenSolver.eigenvalues()[i];
-      residua[i] = abs(beta * Q.col(i)[n_kr-1]);
-      for(int j=0; j<n_kr; j++) Qmat[i][j] = Q(i,j);
-    }
-  
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("QR iterations = %d\n", iter);
-    profile.TPSTOP(QUDA_PROFILE_EIGENEV);
-  }
-  
-  void IRAM::eigensolveFromUpperHessEigen(std::vector<Complex> &evals, const double beta)
-  {
-    profile.TPSTART(QUDA_PROFILE_EIGENQR);
-    //Construct the upper Hessenberg matrix       
-    MatrixXcd Q = MatrixXcd::Identity(n_kr, n_kr);
-    MatrixXcd R = MatrixXcd::Zero(n_kr, n_kr);
-    for(int i=0; i<n_kr; i++) {
-      for(int j=0; j<n_kr; j++) {
-	R(i,j) = upperHess[i][j];
+      
+      // QR the upper Hessenberg matrix
+      Eigen::ComplexSchur<MatrixXcd> schurUH;
+      schurUH.computeFromHessenberg(R, Q);
+      profile.TPSTOP(QUDA_PROFILE_EIGENQR);
+      
+      profile.TPSTART(QUDA_PROFILE_EIGENEV);
+      // Extract the upper triangular matrix, eigensolve, then
+      // get the eigenvectors of the upper Hessenberg 
+      MatrixXcd matUpper = MatrixXcd::Zero(n_kr, n_kr);
+      matUpper = schurUH.matrixT().triangularView<Eigen::Upper>();
+      matUpper.conservativeResize(n_kr, n_kr);    
+      Eigen::ComplexEigenSolver<MatrixXcd> eigenSolver(matUpper);
+      Q = schurUH.matrixU() * eigenSolver.eigenvectors();
+      
+      // Update eigenvalues, residuia, and the Q matrix
+      for(int i=0; i<n_kr; i++) {
+	evals[i] = eigenSolver.eigenvalues()[i];
+	residua[i] = abs(beta * Q.col(i)[n_kr-1]);
+	for(int j=0; j<n_kr; j++) Qmat[i][j] = Q(i,j);
       }
-    }
-    
-    // QR the upper Hessenberg matrix
-    Eigen::ComplexSchur<MatrixXcd> schurUH;
-    schurUH.computeFromHessenberg(R, Q);
-    profile.TPSTOP(QUDA_PROFILE_EIGENQR);
-    
-    profile.TPSTART(QUDA_PROFILE_EIGENEV);
-    // Extract the upper triangular matrix, eigensolve, then
-    // get the eigenvectors of the upper Hessenberg 
-    MatrixXcd matUpper = MatrixXcd::Zero(n_kr, n_kr);
-    matUpper = schurUH.matrixT().triangularView<Eigen::Upper>();
-    matUpper.conservativeResize(n_kr, n_kr);    
-    Eigen::ComplexEigenSolver<MatrixXcd> eigenSolver(matUpper);
-    Q = schurUH.matrixU() * eigenSolver.eigenvectors();
-
-    // Update eigenvalues, residiua, and the Q matrix
-    for(int i=0; i<n_kr; i++) {
-      evals[i] = eigenSolver.eigenvalues()[i];
-      residua[i] = abs(beta * Q.col(i)[n_kr-1]);
-      for(int j=0; j<n_kr; j++) Qmat[i][j] = Q(i,j);
-    }
-    profile.TPSTOP(QUDA_PROFILE_EIGENEV);
-  }
+      profile.TPSTOP(QUDA_PROFILE_EIGENEV);
+    } else {
+      profile.TPSTART(QUDA_PROFILE_HOST_COMPUTE);
+      // Copy the upper Hessenberg matrix into Rmat, and set Qmat to the identity       
+      for(int i=0; i<n_kr; i++) {
+	for(int j=0; j<n_kr; j++) {
+	  Rmat[i][j] = upperHess[i][j];
+	  if(i == j) Qmat[i][j] = 1.0;
+	  else Qmat[i][j] = 0.0;
+	}
+      }
+      
+      // This is about as high as one cat get in double without causing
+      // the Arnoldi to compute more restarts.
+      double tol = eig_param->qr_tol;
+      int max_iter = 100000;
+      int iter = 0;
+      
+      Complex temp, discriminant, sol1, sol2, eval;
+      for (int i = n_kr-2; i >= 0; i--) {    
+	while (iter < max_iter) {
+	  if(abs(Rmat[i+1][i]) < tol) {
+	    Rmat[i+1][i] = 0.0;
+	    break;
+	  } else {
+	    
+	    // Compute the 2 eigenvalues via the quadratic formula
+	    //----------------------------------------------------
+	    // The discriminant
+	    temp = (Rmat[i][i] - Rmat[i+1][i+1]) * (Rmat[i][i] - Rmat[i+1][i+1]) / 4.0;
+	    discriminant = sqrt(Rmat[i+1][i] * Rmat[i][i+1] + temp);
+	    
+	    // Reuse temp
+	    temp = (Rmat[i][i] + Rmat[i+1][i+1])/2.0;
+	    
+	    sol1 = temp - Rmat[i+1][i+1] + discriminant;
+	    sol2 = temp - Rmat[i+1][i+1] - discriminant;
+	    //----------------------------------------------------
+	    
+	    // Deduce the better eval to shift
+	    eval = Rmat[i+1][i+1] + (norm(sol1) < norm(sol2) ? sol1 : sol2);
+	    
+	    // Shift the eigenvalue
+	    for(int j = 0; j < n_kr; j++) Rmat[j][j] -= eval;
+	    
+	    // Do the QR iteration
+	    qrIteration(Qmat, Rmat);
+	    
+	    // Shift back
+	    for(int j = 0; j < n_kr; j++) Rmat[j][j] += eval;
+	  }
+	  iter++;
+	} 
+      }
+      profile.TPSTOP(QUDA_PROFILE_HOST_COMPUTE);
+      
+      profile.TPSTART(QUDA_PROFILE_EIGENEV);
+      // Compute the eigevectors of the origial upper Hessenberg
+      // This is now very cheap because the input matrix to Eigen
+      // is upper triangular.
+      MatrixXcd Q = MatrixXcd::Zero(n_kr, n_kr);
+      MatrixXcd R = MatrixXcd::Zero(n_kr, n_kr);
+      for(int i=0; i<n_kr; i++) {
+	for(int j=0; j<n_kr; j++) {
+	  Q(i,j) = Qmat[i][j];
+	  R(i,j) = Rmat[i][j];
+	}
+      }
+      
+      MatrixXcd matUpper = MatrixXcd::Zero(n_kr, n_kr);       
+      matUpper = R.triangularView<Eigen::Upper>();
+      matUpper.conservativeResize(n_kr, n_kr);
+      Eigen::ComplexEigenSolver<MatrixXcd> eigenSolver(matUpper);
+      Q *= eigenSolver.eigenvectors();
+      
+      // Update eigenvalues, residuia, and the Q matrix
+      for(int i=0; i<n_kr; i++) {
+	evals[i] = eigenSolver.eigenvalues()[i];
+	residua[i] = abs(beta * Q.col(i)[n_kr-1]);
+	for(int j=0; j<n_kr; j++) Qmat[i][j] = Q(i,j);
+      }
   
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("QR iterations = %d\n", iter);
+      profile.TPSTOP(QUDA_PROFILE_EIGENEV);
+    }
+  }
+    
   void IRAM::operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)
   {
     // In case we are deflating an operator, save the tunechache from the inverter
@@ -509,8 +476,7 @@ namespace quda
       
       // Ritz values and their errors are updated.
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-      if(eig_param->use_eigen_qr) eigensolveFromUpperHessEigen(evals, beta);
-      else eigensolveFromUpperHess(evals, beta);
+      eigensolveFromUpperHess(evals, beta);
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
       
       num_keep = n_ev;
@@ -549,8 +515,7 @@ namespace quda
       if (num_converged >= n_conv) {
 	
         profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-	if(eig_param->use_eigen_qr) eigensolveFromUpperHessEigen(evals, beta);
-	else eigensolveFromUpperHess(evals, beta);
+	//eigensolveFromUpperHess(evals, beta);
 	// Rotate the Krylov space
 	rotateBasis(kSpace, n_kr);
 	// Reorder the Krylov space and Ritz values

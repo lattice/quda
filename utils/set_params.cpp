@@ -276,6 +276,7 @@ void setEigParam(QudaEigParam &eig_param)
   eig_param.n_ev = eig_n_ev;
   eig_param.n_kr = eig_n_kr;
   eig_param.tol = eig_tol;
+  eig_param.qr_tol = eig_qr_tol;
   eig_param.batched_rotate = eig_batched_rotate;
   eig_param.require_convergence = eig_require_convergence ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   eig_param.check_interval = eig_check_interval;
@@ -690,6 +691,7 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
   mg_eig_param.require_convergence = mg_eig_require_convergence[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   mg_eig_param.tol = mg_eig_tol[level];
+  mg_eig_param.qr_tol = mg_eig_qr_tol[level];
   mg_eig_param.check_interval = mg_eig_check_interval[level];
   mg_eig_param.max_restarts = mg_eig_max_restarts[level];
 

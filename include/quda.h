@@ -462,6 +462,8 @@ extern "C" {
     int n_ev_deflate;
     /** Tolerance on the least well known eigenvalue's residual **/
     double tol;
+    /** Tolerance on the QR iteration **/
+    double qr_tol;
     /** For IRLM/IRAM, check every nth restart **/
     int check_interval;
     /** For IRLM/IRAM, quit after n restarts **/

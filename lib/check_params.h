@@ -172,6 +172,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(n_ev_deflate, -1);
   P(batched_rotate, 0);
   P(tol, 0.0);
+  P(qr_tol, 0.0);
   P(check_interval, 0);
   P(max_restarts, 0);
   P(arpack_check, QUDA_BOOLEAN_FALSE);
@@ -198,6 +199,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(n_ev_deflate, INVALID_INT);
   P(batched_rotate, INVALID_INT);
   P(tol, INVALID_DOUBLE);
+  P(qr_tol, INVALID_DOUBLE);
   P(check_interval, INVALID_INT);
   P(max_restarts, INVALID_INT);
   P(arpack_check, QUDA_BOOLEAN_INVALID);
