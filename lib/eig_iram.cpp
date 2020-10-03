@@ -515,7 +515,7 @@ namespace quda
       if (num_converged >= n_conv) {
 	
         profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-	//eigensolveFromUpperHess(evals, beta);
+	eigensolveFromUpperHess(evals, beta);
 	// Rotate the Krylov space
 	rotateBasis(kSpace, n_kr);
 	// Reorder the Krylov space and Ritz values
