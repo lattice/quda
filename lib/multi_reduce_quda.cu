@@ -25,13 +25,14 @@ namespace quda {
     template <int block_size, typename real, int len, int NXZ, typename Arg>
     typename std::enable_if<block_size==32, qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
+      if (block_size != tp.block.x) errorQuda("Unexpected block size %d\n", tp.block.x);
       return qudaLaunchKernel(multiReduceKernel<block_size, real, len, NXZ, Arg>, tp, stream, arg);
     }
 
 #ifdef QUDA_FAST_COMPILE_REDUCE
-    constexpr unsigned int max_block_size() { return 32; }
+    constexpr static unsigned int max_block_size() { return 32; }
 #else
-    constexpr unsigned int max_block_size() { return 128; }
+    constexpr static unsigned int max_block_size() { return 128; }
 #endif
 
     template <typename real, int len, int NXZ, typename Arg, typename T>
