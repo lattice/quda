@@ -348,7 +348,7 @@ namespace quda {
 
         coeff_array<T> a, b, c;
 
-        if (x.size() <= tile_size.x && is_valid_NXZ(x.size(), true)) {
+        if (x.size() <= tile_size.x && is_valid_NXZ(x.size(), true) && x.size() * y.size() <= max_n_reduce()) {
           // problem will fit, so do the computation
           multiReduce<ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
         } else {
