@@ -294,7 +294,9 @@ namespace quda
 	    Q[i][j] -= (R11[j] * temp + R12[j] * Q[i][j+1]);
 	    Q[i][j+1] -= (R21[j] * temp + R22[j] * Q[i][j+1]);		  
 	  }
+#ifdef _OPENMP
 	}
+#endif
       }
     }
   }
