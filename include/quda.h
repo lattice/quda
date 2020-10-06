@@ -109,6 +109,14 @@ extern "C" {
     double m5;    /**< Domain wall height */
     int Ls;       /**< Extent of the 5th dimension (for domain wall) */
 
+    int eigen_size;      /**< overlap kernel eigen size*/
+    int krylov_space;    /**< overlap kernel krylov space*/
+    double eigen_cut;    /**< overlap kernel eigen cutoff (initial guess) */
+    int ov_eigen_size;   /**< overlap eigen size*/
+    int ov_krylov_space; /**< overlap eigen krylov_space*/
+    double ov_eigen_cut; /**< overlap eigen cutoff (initial guess)*/
+    int ov_poly_order;   /**< overlap eigen cutoff (initial guess)*/
+
     double_complex b_5[QUDA_MAX_DWF_LS]; /**< Mobius coefficients - only real part used if regular Mobius */
     double_complex c_5[QUDA_MAX_DWF_LS]; /**< Mobius coefficients - only real part used if regular Mobius */
 
@@ -1299,12 +1307,29 @@ extern "C" {
 
   /**
    * Performs HWilson on a given spinor using the gauge field
-   * @param h_out  Result spinor field
-   * @param h_in   Input spinor field
-   * @param param  Contains all metadata regarding host and device
+   * @param[out] h_out  Result spinor field
+   * @param[in]  h_in   Input spinor field
+   * @param[in]  param  Contains all metadata regarding host and device
    *               storage and operator which will be applied to the spinor
    */ 
-  void ApplyHWilsonQUDA(void *h_out, void *h_in, QudaInvertParam *inv_param);
+  void ApplyHWilsonQuda(void *h_out, void *h_in, QudaInvertParam *inv_param);
+
+  /**
+     * Setup the overlap_wilson class with HW eigen, according to the parameters set in params
+     * is assumed that the gauge field has already been loaded via
+     * loadGaugeQuda().
+     * @param[in]  inv_param Contains all metadata regarding host and device
+     *               parameters
+     * @param[out] host_evecs; Return result eigen vectors if it is not nullptr
+     * @param[out] hw_cut;     Return result eigen values if it is not nullptr
+ **/
+  void* newOverlapQuda(QudaInvertParam *inv_param, void **host_evecs=nullptr, double *host_evals=nullptr);
+
+  /**
+  * @brief Free resources allocated by the overlap_wilson class
+  * @param ov_instance Pointer to instance of the overlap_wilson class
+  */
+  void destroyOverlapQuda(void *ov_instance);
 
   /**
    * Performs HWilson on a given spinor using the gauge field
@@ -1316,12 +1341,28 @@ extern "C" {
    * @param k1	   scale factor on eps5
    * @param k2     scale factor on eps
    * @param prec   precision
-   * @param_ov_param Hwilson eigensystem and chebychev informations.
+   * @param _ov_param Hwilson eigensystem and chebychev informations.
    */ 
 
 
-  void ApplyOverlapQUDA(void *h_out, void *h_in, QudaInvertParam *inv_param, double k0, double k1,double k2, double prec,
+  void ApplyOverlapQUDA0(void *h_out, void *h_in, QudaInvertParam *inv_param, double k0, double k1,double k2, double prec,
        void *_ov_param);
+
+   /**
+   * Performs Overlap operation on a given spinor using the gauge field
+   * @param[out] h_out  Result spinor field
+   * @param[in]  h_in   Input spinor field
+   * @param param  Contains all metadata regarding host and device
+         storage and operator which will be applied to the spinor
+   * @param[in]  k0    scale factor on x 
+   * @param[in]  k1    scale factor on eps5
+   * @param[in]  k2     scale factor on eps
+   * @param[in]  prec   precision
+   * @param[in]  ov_instance Pointer to instance of the overlap_wilson class
+   */ 
+
+   void ApplyOverlapQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, double k0, double k1,double k2, double prec,
+        void *ov_instance);
 
   /**
    * Performs Wuppertal smearing on a given spinor using the gauge field
