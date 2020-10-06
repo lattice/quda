@@ -2026,7 +2026,7 @@ public:
         }                                     // p2p policies
 
         enableProfileCount();
-        dslash::synccounter = 5000000;
+        // dslash::synccounter = 5000000;
         setPolicyTuning(true);
       }
       dslash_policy_init = true;

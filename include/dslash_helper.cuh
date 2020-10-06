@@ -549,6 +549,10 @@ namespace quda
       if (shmembarrier) {
 
         if (shmem_interiordone and threadIdx.x == blockDim.x - 1) {
+          long tst_val = interior_done.load(); //TODO  memory order
+          while(tst_val < arg.counter -1){
+            interior_done.compare_exchange_strong( tst_val, arg.counter -1 );
+          }
           interior_done.wait(arg.counter - 1, cuda::std::memory_order_acquire);
         }
         if (threadIdx.x < 8) {
@@ -594,16 +598,14 @@ namespace quda
       while (local_tid < threads_my_dir) {
         // for full fields set parity from z thread index else use arg setting
         int parity = nParity == 2 ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
-        // if (false && !(arg.shmem & 64)) {
-        if (true) {
-          switch (parity) {
-          case 0: dslash.template operator()<EXTERIOR_KERNEL_ALL>(tid, s, 0); break;
-          case 1: dslash.template operator()<EXTERIOR_KERNEL_ALL>(tid, s, 1); break;
-          }
-        } else {
-          dslash.template operator()<EXTERIOR_KERNEL_ALL>(tid, s, parity);
-          break;
+#ifdef QUDA_DSLASH_FAST_COMPILE
+        dslash.template operator()<EXTERIOR_KERNEL_ALL>(tid, s, parity);
+#else
+        switch (parity) {
+        case 0: dslash.template operator()<EXTERIOR_KERNEL_ALL>(tid, s, 0); break;
+        case 1: dslash.template operator()<EXTERIOR_KERNEL_ALL>(tid, s, 1); break;
         }
+#endif
         local_tid += blockDim.x * blocks_per_dim / 2;
         tid += blockDim.x * blocks_per_dim / 2;
       }
