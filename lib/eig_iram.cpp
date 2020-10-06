@@ -218,7 +218,7 @@ namespace quda
 
   void IRAM::qrIteration(Complex** Q, Complex** R)
   {
-    Complex T11, T12, T21, T22, temp, U1, U2;
+    Complex T11, T12, T21, T22, U1, U2;
     double dV;
 
     double tol = eig_param->qr_tol;
@@ -265,9 +265,9 @@ namespace quda
 #pragma omp parallel for schedule(static,32)
 #endif
       for(int j=i+1; j < n_kr; j++) {
-	Complex tempp = R[i][j];
-	R[i][j] -= (T11 * tempp + T12 * R[i+1][j]);      
-	R[i+1][j] -= (T21 * tempp + T22 * R[i+1][j]);
+	Complex temp = R[i][j];
+	R[i][j] -= (T11 * temp + T12 * R[i+1][j]);      
+	R[i+1][j] -= (T21 * temp + T22 * R[i+1][j]);
       }
     }
 
@@ -282,17 +282,17 @@ namespace quda
 #pragma omp for schedule(static,32) nowait
 #endif
 	  for(int i = 0; i < j+2; i++) {	  
-	    Complex tempp = R[i][j];
-	    R[i][j] -= (R11[j] * tempp + R12[j] * R[i][j+1]);	
-	    R[i][j+1] -= (R21[j] * tempp + R22[j] * R[i][j+1]);	
+	    Complex temp = R[i][j];
+	    R[i][j] -= (R11[j] * temp + R12[j] * R[i][j+1]);	
+	    R[i][j+1] -= (R21[j] * temp + R22[j] * R[i][j+1]);	
 	  }
 #ifdef _OPENMP	  
 #pragma omp for schedule(static,32) nowait
 #endif
 	  for(int i = 0; i < n_kr; i++) {
-	    Complex tempp = Q[i][j];
-	    Q[i][j] -= (R11[j] * tempp + R12[j] * Q[i][j+1]);
-	    Q[i][j+1] -= (R21[j] * tempp + R22[j] * Q[i][j+1]);		  
+	    Complex temp = Q[i][j];
+	    Q[i][j] -= (R11[j] * temp + R12[j] * Q[i][j+1]);
+	    Q[i][j+1] -= (R21[j] * temp + R22[j] * Q[i][j+1]);		  
 	  }
 	}
       }
