@@ -8,15 +8,9 @@
 #include <comm_quda.h>
 #include <index_helper.cuh>
 
-#define BLOCKSDIVUP(a, b)  (((a)+(b)-1)/(b))
-
 namespace quda {
 
-  dim3 GetGridDim(size_t threads, size_t size) {
-    int blockx = BLOCKSDIVUP(size, threads);
-    dim3 blocks(blockx,1,1);
-    return blocks;
-  }
+  dim3 GetGridDim(size_t threads, size_t size) { return dim3((size + threads - 1) / threads, 1, 1); }
 
   struct rngArg {
     int commDim[QUDA_MAX_DIM];
