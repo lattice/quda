@@ -4,6 +4,7 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <cfloat>
 
 #include <quda_internal.h>
 #include <eigensolve_quda.h>
@@ -11,6 +12,7 @@
 #include <color_spinor_field.h>
 #include <blas_quda.h>
 #include <util_quda.h>
+#include <tune_quda.h>
 #include <vector_io.h>
 
 #include <Eigen/Eigenvalues>

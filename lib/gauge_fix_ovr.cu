@@ -3,7 +3,6 @@
 #include <tune_quda.h>
 #include <gauge_field.h>
 #include <gauge_field_order.h>
-#include <launch_kernel.cuh>
 #include <unitarization_links.h>
 #include <comm_quda.h>
 #include <gauge_fix_ovr_extra.h>
@@ -11,6 +10,9 @@
 #include <reduce_helper.h>
 #include <index_helper.cuh>
 #include <instantiate.h>
+
+#include <tunable_reduction.h>
+#include <kernels/gauge_fix_ovr.cuh>
 
 namespace quda {
 
@@ -80,96 +82,16 @@ namespace quda {
   }
 
   /**
-   * @brief container to pass parameters for the gauge fixing quality kernel
-   */
-  template <typename Gauge>
-  struct GaugeFixQualityArg : public ReduceArg<double2> {
-    int threads; // number of active threads required
-    int X[4]; // grid dimensions
-#ifdef MULTI_GPU
-    int border[4];
-#endif
-    Gauge dataOr;
-    double2 result;
-    GaugeFixQualityArg(const Gauge &dataOr, const GaugeField &data)
-      : ReduceArg<double2>(), dataOr(dataOr) {
-
-      for ( int dir = 0; dir < 4; ++dir ) {
-        X[dir] = data.X()[dir] - data.R()[dir] * 2;
-      #ifdef MULTI_GPU
-        border[dir] = data.R()[dir];
-      #endif
-      }
-      threads = X[0]*X[1]*X[2]*X[3]/2;
-    }
-    double getAction(){ return result.x; }
-    double getTheta(){ return result.y; }
-  };
-
-  /**
-   * @brief Measure gauge fixing quality
-   */
-  template<int blockSize, typename Float, typename Gauge, int gauge_dir>
-  __global__ void computeFix_quality(GaugeFixQualityArg<Gauge> argQ){
-    typedef complex<Float> Cmplx;
-
-    int idx_cb = threadIdx.x + blockIdx.x * blockDim.x;
-    int parity = threadIdx.y;
-
-    double2 data = make_double2(0.0,0.0);
-    while (idx_cb < argQ.threads) {
-      int X[4];
-#pragma unroll
-      for ( int dr = 0; dr < 4; ++dr ) X[dr] = argQ.X[dr];
-
-      int x[4];
-      getCoords(x, idx_cb, X, parity);
-#ifdef MULTI_GPU
-    #pragma unroll
-      for ( int dr = 0; dr < 4; ++dr ) {
-        x[dr] += argQ.border[dr];
-        X[dr] += 2 * argQ.border[dr];
-      }
-#endif
-      Matrix<Cmplx,3> delta;
-      setZero(&delta);
-      //load upward links
-      for ( int mu = 0; mu < gauge_dir; mu++ ) {
-        Matrix<Cmplx,3> U = argQ.dataOr(mu, linkIndex(x, X), parity);
-        delta -= U;
-      }
-      //18*gauge_dir
-      data.x += -delta(0, 0).x - delta(1, 1).x - delta(2, 2).x;
-      //2
-      //load downward links
-      for ( int mu = 0; mu < gauge_dir; mu++ ) {
-        Matrix<Cmplx,3> U = argQ.dataOr(mu, linkIndexM1(x,X,mu), 1 - parity);
-        delta += U;
-      }
-      //18*gauge_dir
-      delta -= conj(delta);
-      //18
-      SubTraceUnit(delta);
-      //12
-      data.y += getRealTraceUVdagger(delta, delta);
-      //35
-      //T=36*gauge_dir+65
-
-      idx_cb += blockDim.x * gridDim.x;
-    }
-    argQ.template reduce2d<blockSize,2>(data);
-  }
-
-  /**
    * @brief Tunable object for the gauge fixing quality kernel
    */
-  template<typename Float, typename Gauge, int gauge_dir>
-  class GaugeFixQuality : TunableLocalParityReduction {
-    GaugeFixQualityArg<Gauge> &arg;
+  template <typename Arg>
+  class GaugeFixQuality : TunableReduction2D<> {
+    Arg &arg;
     const GaugeField &meta;
 
   public:
-    GaugeFixQuality(GaugeFixQualityArg<Gauge> &arg, const GaugeField &meta) :
+    GaugeFixQuality(Arg &arg, const GaugeField &meta) :
+      TunableReduction2D(meta),
       arg(arg),
       meta(meta)
     { }
@@ -177,20 +99,19 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      LAUNCH_KERNEL_LOCAL_PARITY(computeFix_quality, (*this), tp, stream, arg, Float, Gauge, gauge_dir);
+      launch<FixQualityOVR>(tp, stream, arg);
       auto reset = true; // apply is called multiple times with the same arg instance so we need to reset
       arg.complete(arg.result, stream, reset);
       if (!activeTuning()) {
         comm_allreduce_array((double*)&arg.result, 2);
-        arg.result.x /= (double)(3 * gauge_dir * 2 * arg.threads * comm_size());
-        arg.result.y /= (double)(3 * 2 * arg.threads * comm_size());
+        arg.result.x /= (double)(3 * Arg::gauge_dir * 2 * arg.threads.x * comm_size());
+        arg.result.y /= (double)(3 * 2 * arg.threads.x * comm_size());
       }
     }
 
-    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
-    long long flops() const { return (36LL * gauge_dir + 65LL) * meta.Volume(); }
+    long long flops() const { return (36LL * Arg::gauge_dir + 65LL) * meta.Volume(); }
     //long long bytes() const { return (1)*2*gauge_dir*arg.Bytes(); }
-    long long bytes() const { return 2LL * gauge_dir * meta.Volume() * meta.Reconstruct() * sizeof(Float); }
+    long long bytes() const { return 2LL * Arg::gauge_dir * meta.Volume() * meta.Reconstruct() * meta.Precision(); }
   };
 
   /**
@@ -1058,11 +979,10 @@ public:
 #endif
 
 
-  template<typename Float, typename Gauge, int NElems, int gauge_dir>
-  void gaugefixingOVR( Gauge dataOr, GaugeField& data,
-		       const int Nsteps, const int verbose_interval,
-		       const Float relax_boost, const double tolerance,
-		       const int reunit_interval, const int stopWtheta)
+  template<typename Float, QudaReconstructType recon, int gauge_dir>
+  void gaugefixingOVR(GaugeField &data,const int Nsteps, const int verbose_interval,
+                      const Float relax_boost, const double tolerance,
+                      const int reunit_interval, const int stopWtheta)
   {
     TimeProfile profileInternalGaugeFixOVR("InternalGaugeFixQudaOVR", false);
 
@@ -1091,9 +1011,11 @@ public:
     int* num_failures_dev = static_cast<int*>(pool_device_malloc(sizeof(int)));
     qudaMemset(num_failures_dev, 0, sizeof(int));
 
-    GaugeFixQualityArg<Gauge> argQ(dataOr, data);
-    GaugeFixQuality<Float,Gauge, gauge_dir> GaugeFixQuality(argQ, data);
+    GaugeFixQualityOVRArg<Float, recon, gauge_dir> argQ(data);
+    GaugeFixQuality<decltype(argQ)> GaugeFixQuality(argQ, data);
 
+    using Gauge = typename gauge_mapper<Float, recon>::type;
+    Gauge dataOr(data);
     GaugeFixArg<Float, Gauge> arg(dataOr, data, relax_boost);
     GaugeFix<Float,Gauge, gauge_dir> gaugeFix(arg, data);
 
@@ -1137,7 +1059,7 @@ public:
 
       for ( int d = 0; d < 4; d++ ) {
         if ( !commDimPartitioned(d)) continue;
-        offset[d] = faceVolumeCB[d] * NElems;
+        offset[d] = faceVolumeCB[d] * recon;
         bytes[d] =  sizeof(Float) * offset[d];
         send_d[d] = device_malloc(bytes[d]);
         recv_d[d] = device_malloc(bytes[d]);
@@ -1171,7 +1093,7 @@ public:
         mh_send_fwd[d]  = comm_declare_send_relative(send[d], d, +1, bytes[d]);
       }
     }
-    GaugeFixUnPackArg<NElems,Gauge> dataexarg(dataOr, data);
+    GaugeFixUnPackArg<recon,Gauge> dataexarg(dataOr, data);
     GaugeFixBorderPointsArg<Float, Gauge> argBorder(dataOr, data, relax_boost, faceVolume, faceVolumeCB);
     GaugeFixBorderPoints<Float,Gauge, gauge_dir> gfixBorderPoints(argBorder, data);
     GaugeFixInteriorPointsArg<Float, Gauge> argInt(dataOr, data, relax_boost);
@@ -1376,13 +1298,12 @@ public:
     GaugeFixingOVR(GaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval,
                    const Float relax_boost, const double tolerance, const int reunit_interval, const int stopWtheta)
     {
-      using Gauge = typename gauge_mapper<Float, recon>::type;
       if (gauge_dir == 4) {
         printfQuda("Starting Landau gauge fixing...\n");
-        gaugefixingOVR<Float, Gauge, recon, 4>(Gauge(data), data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
+        gaugefixingOVR<Float, recon, 4>(data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
       } else if (gauge_dir == 3) {
         printfQuda("Starting Coulomb gauge fixing...\n");
-        gaugefixingOVR<Float, Gauge, recon, 3>(Gauge(data), data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
+        gaugefixingOVR<Float, recon, 3>(data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
       } else {
         errorQuda("Unexpected gauge_dir = %d", gauge_dir);
       }

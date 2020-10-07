@@ -1,5 +1,4 @@
-#ifndef _GAUGE_QUDA_H
-#define _GAUGE_QUDA_H
+#pragma once
 
 #include <quda_internal.h>
 #include <quda.h>
@@ -831,5 +830,3 @@ namespace quda {
 #define checkReconstruct(...) Reconstruct_(__func__, __FILE__, __LINE__, __VA_ARGS__)
 
 } // namespace quda
-
-#endif // _GAUGE_QUDA_H

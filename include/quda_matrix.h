@@ -11,6 +11,7 @@
 
 namespace quda {
 
+  template <typename T> constexpr bool is_nan(T x) { return x != x; }
 
   template<class T>
     struct Zero
@@ -225,8 +226,8 @@ namespace quda {
           for (int i=0; i<N; i++) {
 #pragma unroll
             for (int j=0; j<N; j++) {
-              if (std::isnan((*this)(i,j).real()) ||
-                  std::isnan((*this)(i,j).imag())) return false;
+              if (is_nan((*this)(i,j).real()) ||
+                  is_nan((*this)(i,j).imag())) return false;
             }
           }
 

@@ -53,11 +53,10 @@ namespace quda {
 #ifdef __CUDA_ARCH__
     // workout how big a shared-memory allocation we need
     // just statically compute the largest size needed to avoid templating on block size
-    constexpr int max_block_size = 1024; // all supported GPUs have 1024 as their max block size
     constexpr int bank_width = 32; // shared memory has 32 banks
     constexpr int color_spin_threads = Nc <= max_block_float_nc ? (Ns/Ms) * (Nc/Mc) : 1;
     // this is the largest size of blockDim.x (rounded up to multiples of bank_width)
-    constexpr int thread_width_x = ( (max_block_size / color_spin_threads + bank_width-1) / bank_width) * bank_width;
+    constexpr int thread_width_x = ( (device::max_block_size() / color_spin_threads + bank_width-1) / bank_width) * bank_width;
     __shared__ Float v[ (Ns/Ms) * (Nc/Mc) * thread_width_x];
     const auto &rhs = arg.field;
     if (active) {

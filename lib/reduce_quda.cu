@@ -11,27 +11,21 @@ namespace quda {
     qudaStream_t* getStream();
 
     template <int block_size, typename real, int len, typename Arg>
-    typename std::enable_if<block_size!=32, qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+    typename std::enable_if<block_size!=device::warp_size(), qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
       if (tp.block.x == block_size)
         return qudaLaunchKernel(reduceKernel<block_size, real, len, Arg>, tp, stream, arg);
       else
-        return launch<block_size - 32, real, len>(arg, tp, stream);
+        return launch<block_size - device::warp_size(), real, len>(arg, tp, stream);
     }
 
     template <int block_size, typename real, int len, typename Arg>
-    typename std::enable_if<block_size==32, qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+    typename std::enable_if<block_size==device::warp_size(), qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
       return qudaLaunchKernel(reduceKernel<block_size, real, len, Arg>, tp, stream, arg);
     }
 
-#ifdef QUDA_FAST_COMPILE_REDUCE
-    constexpr unsigned int max_block_size() { return 32; }
-#else
-    constexpr unsigned int max_block_size() { return 1024; }
-#endif
-
-   /**
+    /**
        Generic reduction kernel launcher
     */
     template <typename host_reduce_t, typename real, int len, typename Arg>
@@ -49,7 +43,7 @@ namespace quda {
                                   .launch(arg);
       arg.launch_error = tunable.jitifyError() == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
 #else
-      arg.launch_error = launch<max_block_size(), real, len>(arg, tp, stream);
+      arg.launch_error = launch<device::max_block_size(), real, len>(arg, tp, stream);
 #endif
 
       host_reduce_t result;
@@ -86,7 +80,7 @@ namespace quda {
         return false;
       }
 
-      unsigned int maxBlockSize(const TuneParam &param) const { return max_block_size(); }
+      unsigned int maxBlockSize(const TuneParam &param) const { return device::max_block_size(); }
 
     public:
       Reduce(const coeff_t &a, const coeff_t &b, const coeff_t &c, ColorSpinorField &x, ColorSpinorField &y,

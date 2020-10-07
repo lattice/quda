@@ -1,5 +1,4 @@
-#ifndef _CLOVER_QUDA_H
-#define _CLOVER_QUDA_H
+#pragma once
 
 #include <quda_internal.h>
 #include <lattice_field.h>
@@ -103,6 +102,11 @@ namespace quda {
 
     mutable double trlog[2];
 
+    /**
+       @brief Set the vol_string and aux_string for use in tuning
+    */
+    void setTuningString();
+
   public:
     CloverField(const CloverFieldParam &param);
     virtual ~CloverField();
@@ -198,6 +202,16 @@ namespace quda {
        @return Absolute minimum value
      */
     double abs_min(bool inverse = false) const;
+
+    /**
+       @brief Backs up the CloverField
+    */
+    void backup() const;
+
+    /**
+       @brief Restores the CloverField
+    */
+    void restore() const;
   };
 
   class cudaCloverField : public CloverField {
@@ -426,7 +440,7 @@ namespace quda {
      @param coeff Multiplicative coefficient (e.g., clover coefficient)
      @param parity The field parity we are working on 
    */
-  void cloverDerivative(cudaGaugeField &force, cudaGaugeField& gauge, cudaGaugeField& oprod, double coeff, QudaParity parity);
+  void cloverDerivative(GaugeField &force, GaugeField& gauge, GaugeField& oprod, double coeff, QudaParity parity);
 
   /**
      @brief Helper function that returns whether we have enabled
@@ -441,7 +455,4 @@ namespace quda {
 #endif
   }
 
-
 } // namespace quda
-
-#endif // _CLOVER_QUDA_H

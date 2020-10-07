@@ -5,7 +5,6 @@
 #include <assert.h>
 #include <utility>
 
-#include <launch_kernel.cuh>
 #include <jitify_helper.cuh>
 #include <kernels/block_orthogonalize.cuh>
 

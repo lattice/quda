@@ -1,8 +1,9 @@
-#include <quda_matrix.h>
+#pragma once
+
 #include <gauge_field_order.h>
-#include <launch_kernel.cuh>
+#include <quda_matrix.h>
 #include <index_helper.cuh>
-#include <reduce_helper.h>
+#include <reduction_kernel.h>
 
 namespace quda {
 
@@ -14,12 +15,12 @@ namespace quda {
     static constexpr QudaReconstructType recon = recon_;
     typedef typename gauge_mapper<Float,recon>::type Gauge;
 
-    int threads; // number of active threads required
+    dim3 threads; // number of active threads required
     int E[4]; // extended grid dimensions
     int X[4]; // true grid dimensions
-    int border[4]; 
+    int border[4];
     Gauge U;
-    
+
     GaugePlaqArg(const GaugeField &U_) :
       ReduceArg<double2>(),
       U(U_)
@@ -31,7 +32,7 @@ namespace quda {
 	X[dir] = U_.X()[dir] - border[dir]*2;
 	R += border[dir];
       }
-      threads = X[0]*X[1]*X[2]*X[3]/2;
+      threads.x = X[0]*X[1]*X[2]*X[3]/2;
     }
   };
 
@@ -53,35 +54,36 @@ namespace quda {
     return getTrace( U1 * U2 * conj(U3) * conj(U4) ).real();
   }
 
-  template<int blockSize, typename Arg>
-  __global__ void computePlaq(Arg arg)
-  {
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    int parity = threadIdx.y;
+  template <typename Arg> struct Plaquette {
 
-    double2 plaq = make_double2(0.0,0.0);
+    using reduce_t = double2;
+    Arg &arg;
+    constexpr Plaquette(Arg &arg) : arg(arg) {}
+    static constexpr const char *filename() { return KERNEL_FILE; }
 
-    while (idx < arg.threads) {
+    // return the plaquette at site (x_cb, parity)
+    __device__ __host__ inline reduce_t operator()(int x_cb, int parity)
+    {
+      reduce_t plaq = make_double2(0.0,0.0);
+
       int x[4];
-      getCoords(x, idx, arg.X, parity);
+      getCoords(x, x_cb, arg.X, parity);
 #pragma unroll
       for (int dr=0; dr<4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
 
 #pragma unroll
       for (int mu = 0; mu < 3; mu++) {
 #pragma unroll
-	for (int nu = 0; nu < 3; nu++) {
-	  if (nu >= mu + 1) plaq.x += plaquette(arg, x, parity, mu, nu);
-	}
+        for (int nu = 0; nu < 3; nu++) {
+          if (nu >= mu + 1) plaq.x += plaquette(arg, x, parity, mu, nu);
+        }
 
-	plaq.y += plaquette(arg, x, parity, mu, 3);
+        plaq.y += plaquette(arg, x, parity, mu, 3);
       }
 
-      idx += blockDim.x*gridDim.x;
+      return plaq;
     }
 
-    // perform final inter-block reduction and write out result
-    arg.template reduce2d<blockSize, 2>(plaq);
-  }
+  };
 
 } // namespace quda

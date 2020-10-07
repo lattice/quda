@@ -389,56 +389,6 @@ namespace quda {
     CUresult& jitifyError() { return jitify_error; }
   };
 
-
-  /**
-     This derived class is for algorithms that deploy parity across
-     the y dimension of the thread block with no shared memory tuning.
-     The x threads will typically correspond to the checkboarded
-     volume.
-   */
-  class TunableLocalParityReduction : public Tunable
-  {
-
-  protected:
-    unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
-
-    /**
-       Reduction kernels require grid-size tuning, so enable this, and
-       we mark as final to prevent a derived class from accidentally
-       switching it off.
-    */
-    bool tuneGridDim() const final { return true; }
-
-    unsigned int minGridSize() const { return maxGridSize() / 8; }
-    int gridStep() const { return minGridSize(); }
-
-    /**
-       The maximum block size in the x dimension is the total number
-       of threads divided by the size of the y dimension.  Since
-       parity is local to the thread block in the y dimension, half
-       the max threads in the x dimension.
-     */
-    unsigned int maxBlockSize(const TuneParam &param) const { return deviceProp.maxThreadsPerBlock / 2; }
-
-  public:
-    bool advanceBlockDim(TuneParam &param) const {
-      bool rtn = Tunable::advanceBlockDim(param);
-      param.block.y = 2;
-      return rtn;
-    }
-
-    void initTuneParam(TuneParam &param) const {
-      Tunable::initTuneParam(param);
-      param.block.y = 2;
-    }
-
-    void defaultTuneParam(TuneParam &param) const {
-      Tunable::defaultTuneParam(param);
-      param.block.y = 2;
-    }
-  };
-
   /**
      This derived class is for algorithms that deploy a vector of
      computations across the y dimension of both the threads block and

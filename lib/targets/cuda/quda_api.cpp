@@ -268,29 +268,35 @@ namespace quda {
     }
   }
 
-
-  void qudaMemcpyToSymbolAsync_(const void* symbol, const void *src, size_t count, size_t offset, cudaMemcpyKind kind, const qudaStream_t &stream,
-                        const char *func, const char *file, const char *line)
+  void qudaMemcpy2D_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
+                     cudaMemcpyKind kind, const char *func, const char *file, const char *line)
   {
-    if (count == 0) return;
-    switch(kind) { 
+#ifdef USE_DRIVER_API
+    CUDA_MEMCPY2D param;
+    param.srcPitch = spitch;
+    param.srcY = 0;
+    param.srcXInBytes = 0;
+    param.dstPitch = dpitch;
+    param.dstY = 0;
+    param.dstXInBytes = 0;
+    param.WidthInBytes = width;
+    param.Height = height;
+
+    switch (kind) {
     case cudaMemcpyDeviceToHost:
-	PROFILE(cudaMemcpyToSymbolAsync(symbol, src, count, offset, kind, stream), QUDA_PROFILE_MEMCPY_D2H_ASYNC);
-	break;
-    case cudaMemcpyHostToDevice:
-        PROFILE(cudaMemcpyToSymbolAsync(symbol, src, count, offset, kind, stream), QUDA_PROFILE_MEMCPY_H2D_ASYNC);
-        break;
-    case cudaMemcpyDeviceToDevice:
-        PROFILE(cudaMemcpyToSymbolAsync(symbol, src, count, offset, kind, stream), QUDA_PROFILE_MEMCPY_D2D_ASYNC);
-        break;
-    case cudaMemcpyDefault:
-	PROFILE(cudaMemcpyToSymbolAsync(symbol, src, count, offset, kind, stream), QUDA_PROFILE_MEMCPY_DEFAULT_ASYNC);
-        break;
-     default: 
-	errorQuda("Unsupported cudaMemcpyToSymbolAsync: %d", kind);
-	break;
-     }
-   }
+      param.srcDevice = (CUdeviceptr)src;
+      param.srcMemoryType = CU_MEMORYTYPE_DEVICE;
+      param.dstHost = dst;
+      param.dstMemoryType = CU_MEMORYTYPE_HOST;
+      break;
+    default:
+      errorQuda("Unsupported cuMemcpyType2DAsync %d", kind);
+    }
+    PROFILE(cuMemcpy2D(&param), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
+#else
+    PROFILE(cudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
+#endif
+  }
 
   void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
                           cudaMemcpyKind kind, const qudaStream_t &stream, const char *func, const char *file,
@@ -379,7 +385,7 @@ namespace quda {
     default: {
       const char *str;
       cuGetErrorName(error, &str);
-      errorQuda("cuEventQuery returned error %s", str);
+      errorQuda("cuEventQuery returned error %s\n (%s:%s in %s())", str, file, line, func);
     }
     }
 #else
@@ -400,7 +406,7 @@ namespace quda {
     if (error != CUDA_SUCCESS) {
       const char *str;
       cuGetErrorName(error, &str);
-      errorQuda("cuEventRecord returned error %s", str);
+      errorQuda("cuEventRecord returned error %s\n (%s:%s in %s())", str, file, line, func);
     }
 #else
     PROFILE(cudaError_t error = cudaEventRecord(event, stream), QUDA_PROFILE_EVENT_RECORD);
@@ -416,7 +422,7 @@ namespace quda {
     if (error != CUDA_SUCCESS) {
       const char *str;
       cuGetErrorName(error, &str);
-      errorQuda("cuStreamWaitEvent returned error %s", str);
+      errorQuda("cuStreamWaitEvent returned error %s\n (%s:%s in %s())", str, file, line, func);
     }
 #else
     PROFILE(cudaError_t error = cudaStreamWaitEvent(stream, event, flags), QUDA_PROFILE_STREAM_WAIT_EVENT);
@@ -431,7 +437,7 @@ namespace quda {
     if (error != CUDA_SUCCESS) {
       const char *str;
       cuGetErrorName(error, &str);
-      errorQuda("cuEventSynchronize returned error %s", str);
+      errorQuda("cuEventSynchronize returned error %s\n (%s:%s in %s())", str, file, line, func);
     }
 #else
     PROFILE(cudaError_t error = cudaEventSynchronize(event), QUDA_PROFILE_EVENT_SYNCHRONIZE);
@@ -469,6 +475,15 @@ namespace quda {
     if (error != cudaSuccess)
       errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
 #endif
+  }
+
+  void* qudaGetSymbolAddress_(const char *symbol, const char *func, const char *file, const char *line)
+  {
+    void *ptr;
+    cudaError_t error = cudaGetSymbolAddress(&ptr, symbol);
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    return ptr;
   }
 
   void qudaFuncSetAttribute_(const void *kernel, cudaFuncAttribute attr, int value, const char *func, const char *file,

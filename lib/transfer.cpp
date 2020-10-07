@@ -5,6 +5,7 @@
 
 #include <transfer.h>
 #include <multigrid.h>
+#include <tune_quda.h>
 #include <malloc_quda.h>
 
 #include <iostream>

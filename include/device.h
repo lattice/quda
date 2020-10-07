@@ -1,3 +1,5 @@
+#include <target_device.h>
+
 namespace quda
 {
 

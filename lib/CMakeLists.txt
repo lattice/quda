@@ -216,9 +216,11 @@ target_compile_options(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,COMPILE_OPTIONS>)
 # add target specific files
 if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")
   add_subdirectory(targets/cuda)
+  target_include_directories(quda PRIVATE ../include/targets/cuda)
 endif()
 if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
   add_subdirectory(targets/hip)
+  target_include_directories(quda PRIVATE ../include/targets/hip)
 endif()
 target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_target>)
 

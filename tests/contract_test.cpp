@@ -106,13 +106,13 @@ int main(int argc, char **argv)
 // Performs the CPU GPU comparison with the given parameters
 void test(int contractionType, int Prec)
 {
-
   QudaPrecision test_prec = QUDA_INVALID_PRECISION;
   switch (Prec) {
   case 0: test_prec = QUDA_SINGLE_PRECISION; break;
   case 1: test_prec = QUDA_DOUBLE_PRECISION; break;
   default: errorQuda("Undefined QUDA precision type %d\n", Prec);
   }
+  if ((test_prec & QUDA_PRECISION) == 0) GTEST_SKIP();
 
   int X[4] = {xdim, ydim, zdim, tdim};
 
@@ -184,7 +184,6 @@ using ::testing::Values;
 
 class ContractionTest : public ::testing::TestWithParam<::testing::tuple<int, int>>
 {
-
   protected:
   ::testing::tuple<int, int> param;
 

@@ -1,6 +1,4 @@
-
-#ifndef _GAUGE_ORDER_H
-#define _GAUGE_ORDER_H
+#pragma once
 
 /**
  * @file  gauge_field_order.h
@@ -3246,5 +3244,3 @@ namespace quda {
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_FLOAT2_GAUGE_ORDER,Nc> { typedef gauge::FloatNOrder<T, 2*Nc*Nc, 2, 2*Nc*Nc> type; };
 
 } // namespace quda
-
-#endif // _GAUGE_ORDER_H

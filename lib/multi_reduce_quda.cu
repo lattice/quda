@@ -3,7 +3,6 @@
 #include <color_spinor_field_order.h>
 #include <uint_to_char.h>
 
-#include <launch_kernel.cuh>
 #include <jitify_helper.cuh>
 #include <kernels/multi_reduce_core.cuh>
 
@@ -14,25 +13,19 @@ namespace quda {
     qudaStream_t* getStream();
 
     template <int block_size, typename real, int len, int NXZ, typename Arg>
-    typename std::enable_if<block_size!=32, qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+    typename std::enable_if<block_size!=device::warp_size(), qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
       if (tp.block.x == block_size)
         return qudaLaunchKernel(multiReduceKernel<block_size, real, len, NXZ, Arg>, tp, stream, arg);
       else
-        return launch<block_size - 32, real, len, NXZ>(arg, tp, stream);
+        return launch<block_size - device::warp_size(), real, len, NXZ>(arg, tp, stream);
     }
 
     template <int block_size, typename real, int len, int NXZ, typename Arg>
-    typename std::enable_if<block_size==32, qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+    typename std::enable_if<block_size==device::warp_size(), qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
       return qudaLaunchKernel(multiReduceKernel<block_size, real, len, NXZ, Arg>, tp, stream, arg);
     }
-
-#ifdef QUDA_FAST_COMPILE_REDUCE
-    constexpr unsigned int max_block_size() { return 32; }
-#else
-    constexpr unsigned int max_block_size() { return 128; }
-#endif
 
     template <typename real, int len, int NXZ, typename Arg, typename T>
     void multiReduceLaunch(T result[], Arg &arg, const TuneParam &tp, const qudaStream_t &stream, Tunable &tunable)
@@ -49,7 +42,7 @@ namespace quda {
                                   .launch(arg);
       arg.launch_error = tunable.jitifyError() == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
 #else
-      arg.launch_error = launch<max_block_size(), real, len, NXZ>(arg, tp, stream);
+      arg.launch_error = launch<device::max_block_size(), real, len, NXZ>(arg, tp, stream);
 #endif
 
       std::vector<T> result_(NXZ * arg.NYW);
@@ -91,7 +84,7 @@ namespace quda {
         return false;
       }
 
-      unsigned int maxBlockSize(const TuneParam &param) const { return max_block_size(); }
+      unsigned int maxBlockSize(const TuneParam &param) const { return device::max_block_size(); }
 
     public:
       MultiReduce(const T &a, const T &b, const T &c, const ColorSpinorField &x_meta, const ColorSpinorField &y_meta,
@@ -165,19 +158,6 @@ namespace quda {
         return TuneKey(x[0]->VolString(), name, aux);
       }
 
-      template <typename buffer_t>
-      void set_param(buffer_t &d, const T &h, const qudaStream_t &stream)
-      {
-        using coeff_t = typename decltype(r)::coeff_t;
-        constexpr size_t n_coeff = MAX_MATRIX_SIZE / sizeof(coeff_t);
-
-        coeff_t tmp[n_coeff];
-        for (int i = 0; i < NXZ; i++)
-          for (int j = 0; j < NYW; j++) tmp[NYW * i + j] = coeff_t(h.data[NYW * i + j]);
-        qudaMemcpyToSymbolAsync(d, tmp, NXZ * NYW * sizeof(decltype(tmp[0])), 0, qudaMemcpyHostToDevice, stream);
-        //cuMemcpyHtoDAsync(d, tmp, NXZ * NYW * sizeof(decltype(tmp[0])), stream);
-      }
-
       template <int NXZ> void compute(const qudaStream_t &stream)
       {
         staticCheck<NXZ, store_t, y_store_t, decltype(r)>(r, x, y);
@@ -208,9 +188,9 @@ namespace quda {
           // need to get constants pointer from jitify instance
           if (a.data || b.data || c.data) errorQuda("Constant memory buffer support not enabled with jitify yet");
 #else
-          if (a.data) set_param(Amatrix_d, a, stream);
-          if (b.data) set_param(Bmatrix_d, b, stream);
-          if (c.data) set_param(Cmatrix_d, c, stream);
+          if (a.data) set_param<false>(qudaGetSymbolAddress(Amatrix_d), arg, 'a', a, stream);
+          if (b.data) set_param<false>(qudaGetSymbolAddress(Cmatrix_d), arg, 'b', b, stream);
+          if (c.data) set_param<false>(qudaGetSymbolAddress(Bmatrix_d), arg, 'c', c, stream);
 #endif
           multiReduceLaunch<device_real_t, M, NXZ>(result, arg, tp, stream, *this);
         } else {

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <enum_quda.h>
+
 namespace quda {
   /**
      Compute the checkerboard 1-d index from the 4-d coordinate x[] + dx[]

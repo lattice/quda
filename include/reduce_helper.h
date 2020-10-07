@@ -1,5 +1,6 @@
 #pragma once
 
+#include <float_vector.h> // for zero
 #include <cub_helper.cuh>
 
 #ifdef QUAD_SUM
@@ -29,6 +30,22 @@ namespace quda
     count_t *get_count();
     cudaEvent_t &get_event();
   } // namespace reducer
+
+  template <typename T> struct plus {
+    __device__ __host__ T operator()(T a, T b) { return a + b; }
+  };
+
+  template <typename T> struct maximum {
+    __device__ __host__ T operator()(T a, T b) { return a > b ? a : b; }
+  };
+
+  template <typename T> struct minimum {
+    __device__ __host__ T operator()(T a, T b) { return a < b ? a : b; }
+  };
+
+  template <typename T> struct identity {
+    __device__ __host__ T operator()(T a) { return a; }
+  };
 
   /**
      @brief The initialization value we used to check for completion

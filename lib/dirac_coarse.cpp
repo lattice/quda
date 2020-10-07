@@ -1,5 +1,6 @@
 #include <string.h>
 #include <multigrid.h>
+#include <tune_quda.h>
 #include <algorithm>
 
 namespace quda {

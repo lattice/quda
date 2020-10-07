@@ -3,7 +3,6 @@
 #include <tune_quda.h>
 #include <gauge_field.h>
 #include <gauge_field_order.h>
-#include <launch_kernel.cuh>
 #include <atomic.cuh>
 #include <index_helper.cuh>
 #include <random_quda.h>
