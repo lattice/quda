@@ -265,7 +265,7 @@ target_compile_options(
           -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field>
           $<$<CONFIG:STRICT>:
           -Xcompiler
-          -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field>
+          -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field,-Wno-unused-but-set-variable>
           $<$<CONFIG:HOSTDEBUG>:-lineinfo>
           $<$<CONFIG:SANITIZE>:-lineinfo
           -Xcompiler
