@@ -1045,9 +1045,6 @@ namespace quda {
 
   void exchangeExtendedGhost(cudaColorSpinorField *spinor, int R[], int parity, qudaStream_t *stream_p);
 
-  void copyExtendedColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,
-      QudaFieldLocation location, const int parity, void *Dst, void *Src, void *dstNorm, void *srcNorm);
-
   /**
      @brief Generic ghost packing routine
 
