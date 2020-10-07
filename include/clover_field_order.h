@@ -19,7 +19,7 @@ namespace quda {
 
   /**
      @brief clover_wrapper is an internal class that is used to
-     wrap instances of cover accessors, currying in a specifc
+     wrap instances of clover accessors, currying in a specifc
      location and chirality on the field.  The operator() accessors in
      clover-field accessors return instances to this class,
      allowing us to then use operator overloading upon this class
