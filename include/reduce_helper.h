@@ -30,6 +30,8 @@ namespace quda
     cudaEvent_t &get_event();
   } // namespace reducer
 
+  constexpr int max_n_reduce() { return QUDA_MAX_MULTI_REDUCE; }
+
   /**
      @brief The initialization value we used to check for completion
    */

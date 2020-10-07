@@ -23,7 +23,6 @@ namespace quda
     void *get_host_buffer() { return h_reduce; }
     count_t *get_count() { return reduce_count; }
     cudaEvent_t &get_event() { return reduceEnd; }
-    constexpr int max_n_reduce() { return QUDA_MAX_MULTI_REDUCE; }
 
     size_t buffer_size()
     {

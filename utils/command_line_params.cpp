@@ -719,9 +719,9 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                          "Perform a maximun of n restarts in eigensolver (default 100)");
   quda_app->add_mgoption(opgroup, "--mg-eig-block-size", mg_eig_block_size, CLI::Validator(),
                          "The block size to use in the block variant eigensolver");
-  quda_app->add_mgoption(opgroup, "--mg-eig-n_ev", mg_eig_n_ev, CLI::Validator(),
+  quda_app->add_mgoption(opgroup, "--mg-eig-n-ev", mg_eig_n_ev, CLI::Validator(),
                          "The size of eigenvector search space in the eigensolver");
-  quda_app->add_mgoption(opgroup, "--mg-eig-n_kr", mg_eig_n_kr, CLI::Validator(),
+  quda_app->add_mgoption(opgroup, "--mg-eig-n-kr", mg_eig_n_kr, CLI::Validator(),
                          "The size of the Krylov subspace to use in the eigensolver");
   quda_app->add_mgoption(opgroup, "--mg-eig-n-ev-deflate", mg_eig_n_ev_deflate, CLI::Validator(),
                          "The number of converged eigenpairs that will be used in the deflation routines");
