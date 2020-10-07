@@ -184,12 +184,12 @@ namespace quda {
       }
       idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
       Matrix<Cmplx,3> link = arg.dataOr(mu, idx, oddbit);
-      // 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
+      // 8 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
       // this implementation needs 8x more shared memory than the implementation using atomicadd
       if ( ImplementationType == 0 ) GaugeFixHit_NoAtomicAdd<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
-      // 8 treads per lattice site, the reduction is performed by shared memory using atomicadd
+      // 8 threads per lattice site, the reduction is performed by shared memory using atomicadd
       if ( ImplementationType == 1 ) GaugeFixHit_AtomicAdd<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
-      // 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
+      // 8 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
       // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
       if ( ImplementationType == 2 ) GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
       arg.dataOr(mu, idx, oddbit) = link;
@@ -217,12 +217,12 @@ namespace quda {
       //load downward link
       Matrix<Cmplx,3> link1 = arg.dataOr(mu, idx1, 1 - parity);
 
-      // 4 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
+      // 4 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
       // this implementation needs 4x more shared memory than the implementation using atomicadd
       if ( ImplementationType == 3 ) GaugeFixHit_NoAtomicAdd<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
-      // 4 treads per lattice site, the reduction is performed by shared memory using atomicadd
+      // 4 threads per lattice site, the reduction is performed by shared memory using atomicadd
       if ( ImplementationType == 4 ) GaugeFixHit_AtomicAdd<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
-      // 4 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
+      // 4 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
       // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
       if ( ImplementationType == 5 ) GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
 
@@ -292,12 +292,12 @@ namespace quda {
       }
       idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
       Matrix<Complex,3> link = arg.dataOr(mu, idx, parity);
-      // 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
+      // 8 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
       // this implementation needs 8x more shared memory than the implementation using atomicadd
       if ( ImplementationType == 0 ) GaugeFixHit_NoAtomicAdd<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
-      // 8 treads per lattice site, the reduction is performed by shared memory using atomicadd
+      // 8 threads per lattice site, the reduction is performed by shared memory using atomicadd
       if ( ImplementationType == 1 ) GaugeFixHit_AtomicAdd<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
-      // 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
+      // 8 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
       // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
       if ( ImplementationType == 2 ) GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
       arg.dataOr(mu, idx, parity) = link;
@@ -312,12 +312,12 @@ namespace quda {
       int idx1 = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
       Matrix<Complex,3> link1 = arg.dataOr(mu, idx1, 1 - parity);
 
-      // 4 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
+      // 4 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
       // this implementation needs 4x more shared memory than the implementation using atomicadd
       if ( ImplementationType == 3 ) GaugeFixHit_NoAtomicAdd<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
-      // 4 treads per lattice site, the reduction is performed by shared memory using atomicadd
+      // 4 threads per lattice site, the reduction is performed by shared memory using atomicadd
       if ( ImplementationType == 4 ) GaugeFixHit_AtomicAdd<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
-      // 4 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
+      // 4 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
       // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
       if ( ImplementationType == 5 ) GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
 
@@ -350,11 +350,6 @@ namespace quda {
         border[dir] = data.R()[dir];
       }
 
-      /*for(int dir=0; dir<4; ++dir){
-         if(comm_dim_partitioned(dir)) border[dir] = BORDER_RADIUS;
-         else border[dir] = 0;
-         }
-         for(int dir=0; dir<4; ++dir) X[dir] = data.X()[dir] - border[dir]*2;*/
       for ( int dir = 0; dir < 4; ++dir ) {
         faceVolume[dir] = faceVolume_[dir];
         faceVolumeCB[dir] = faceVolumeCB_[dir];
@@ -394,12 +389,12 @@ namespace quda {
       }
       idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
       Matrix<Cmplx,3> link = arg.dataOr(mu, idx, parity);
-      // 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
+      // 8 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
       // this implementation needs 8x more shared memory than the implementation using atomicadd
       if ( ImplementationType == 0 ) GaugeFixHit_NoAtomicAdd<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
-      // 8 treads per lattice site, the reduction is performed by shared memory using atomicadd
+      // 8 threads per lattice site, the reduction is performed by shared memory using atomicadd
       if ( ImplementationType == 1 ) GaugeFixHit_AtomicAdd<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
-      // 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
+      // 8 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
       // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
       if ( ImplementationType == 2 ) GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
       arg.dataOr(mu, idx, parity) = link;
@@ -414,12 +409,12 @@ namespace quda {
       int idx1 = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
       Matrix<Cmplx,3> link1 = arg.dataOr(mu, idx1, 1 - parity);
 
-      // 4 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
+      // 4 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
       // this implementation needs 4x more shared memory than the implementation using atomicadd
       if ( ImplementationType == 3 ) GaugeFixHit_NoAtomicAdd<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
-      // 4 treads per lattice site, the reduction is performed by shared memory using atomicadd
+      // 4 threads per lattice site, the reduction is performed by shared memory using atomicadd
       if ( ImplementationType == 4 ) GaugeFixHit_AtomicAdd<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
-      // 4 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
+      // 4 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
       // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
       if ( ImplementationType == 5 ) GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
 

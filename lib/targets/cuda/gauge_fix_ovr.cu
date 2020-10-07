@@ -7,6 +7,7 @@
 #include <thrust_helper.cuh>
 #include <instantiate.h>
 #include <tunable_reduction.h>
+#include <tunable_nd.h>
 #include <kernels/gauge_fix_ovr.cuh>
 
 namespace quda {
@@ -203,7 +204,6 @@ public:
     long long bytes() const { return 8LL * 2 * arg.threads * meta.Reconstruct() * sizeof(Float);  }
   };
 
-#ifdef MULTI_GPU
   /**
    * @brief Tunable object for the interior points of the gauge fixing
    * kernel in multi-GPU implementation
@@ -429,7 +429,7 @@ public:
       meta(meta),
       parity(0) { }
 
-    ~GaugeFixBorderPoints () {
+    virtual ~GaugeFixBorderPoints () {
       if ( comm_partitioned() ) for ( int i = 0; i < 2; i++ ) pool_device_free(arg.borderpoints[i]);
     }
 
@@ -464,7 +464,6 @@ public:
     //long long bytes() const { return (1)*8*2*arg.dataOr.Bytes(); } // Only correct if there is no link reconstruction load+save
     long long bytes() const { return 8LL * 2 * arg.threads * meta.Reconstruct() * sizeof(Float); }
   };
-#endif
 
   /**
    * @brief Pre-calculate lattice border points used by the gauge
@@ -512,8 +511,8 @@ public:
     else errorQuda("BORDER: Even and Odd sizes does not match, not supported!!!!, %d:%d", size[0], size[1]);
   }
 
-  template<typename Float, QudaReconstructType recon, int gauge_dir>
-  void gaugefixingOVR(GaugeField &data,const int Nsteps, const int verbose_interval,
+  template <typename Float, QudaReconstructType recon, int gauge_dir>
+  void gaugeFixingOVR(GaugeField &data,const int Nsteps, const int verbose_interval,
                       const Float relax_boost, const double tolerance,
                       const int reunit_interval, const int stopWtheta)
   {
@@ -552,7 +551,6 @@ public:
     GaugeFixArg<Float, Gauge> arg(dataOr, data, relax_boost);
     GaugeFix<Float,Gauge, gauge_dir> gaugeFix(arg, data);
 
-#ifdef MULTI_GPU
     void *send[4];
     void *recv[4];
     void *sendg[4];
@@ -600,26 +598,17 @@ public:
         recvg_d[d] = device_malloc(bytes[d]);
         cudaStreamCreate(&GFStream[d]);
         cudaStreamCreate(&GFStream[4 + d]);
-      #ifndef GPU_COMMS
         hostbuffer_h[d] = (void*)pinned_malloc(4 * bytes[d]);
-      #endif
         tp[d].block = make_uint3(128, 1, 1);
         tp[d].grid = make_uint3((faceVolumeCB[d] + tp[d].block.x - 1) / tp[d].block.x, 1, 1);
       }
       cudaStreamCreate(&GFStream[8]);
       for ( int d = 0; d < 4; d++ ) {
         if ( !commDimPartitioned(d)) continue;
-      #ifdef GPU_COMMS
-        recv[d] = recv_d[d];
-        send[d] = send_d[d];
-        recvg[d] = recvg_d[d];
-        sendg[d] = sendg_d[d];
-      #else
         recv[d] = hostbuffer_h[d];
         send[d] = static_cast<char*>(hostbuffer_h[d]) + bytes[d];
         recvg[d] = static_cast<char*>(hostbuffer_h[d]) + 3 * bytes[d];
         sendg[d] = static_cast<char*>(hostbuffer_h[d]) + 2 * bytes[d];
-      #endif
         mh_recv_back[d] = comm_declare_receive_relative(recv[d], d, -1, bytes[d]);
         mh_recv_fwd[d]  = comm_declare_receive_relative(recvg[d], d, +1, bytes[d]);
         mh_send_back[d] = comm_declare_send_relative(sendg[d], d, -1, bytes[d]);
@@ -631,7 +620,6 @@ public:
     GaugeFixBorderPoints<Float,Gauge, gauge_dir> gfixBorderPoints(argBorder, data);
     GaugeFixInteriorPointsArg<Float, Gauge> argInt(dataOr, data, relax_boost);
     GaugeFixInteriorPoints<Float,Gauge, gauge_dir> gfixIntPoints(argInt, data);
-  #endif
 
     GaugeFixQuality.apply(0);
     flop += (double)GaugeFixQuality.flops();
@@ -651,19 +639,12 @@ public:
     int iter = 0;
     for ( iter = 0; iter < Nsteps; iter++ ) {
       for ( int p = 0; p < 2; p++ ) {
-      #ifndef MULTI_GPU
-        gaugeFix.setParity(p);
-        gaugeFix.apply(0);
-        flop += (double)gaugeFix.flops();
-        byte += (double)gaugeFix.bytes();
-      #else
         if ( !comm_partitioned() ) {
           gaugeFix.setParity(p);
           gaugeFix.apply(0);
           flop += (double)gaugeFix.flops();
           byte += (double)gaugeFix.bytes();
-        }
-        else{
+        } else {
           gfixIntPoints.setParity(p);
           gfixBorderPoints.setParity(p); //compute border points
           gfixBorderPoints.apply(0);
@@ -687,15 +668,6 @@ public:
             qudaLaunchKernel(Kernel_UnPackGhost<Float, true, decltype(dataexarg)>, tp[d], GFStream[4 + d],
                              faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(sendg_d[d]), 1 - p, d, d);
           }
-        #ifdef GPU_COMMS
-          for ( int d = 0; d < 4; d++ ) {
-            if ( !commDimPartitioned(d)) continue;
-            qudaStreamSynchronize(GFStream[d]);
-            comm_start(mh_send_fwd[d]);
-            qudaStreamSynchronize(GFStream[4 + d]);
-            comm_start(mh_send_back[d]);
-          }
-        #else
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
             qudaMemcpyAsync(send[d], send_d[d], bytes[d], cudaMemcpyDeviceToHost, GFStream[d]);
@@ -704,11 +676,9 @@ public:
             if ( !commDimPartitioned(d)) continue;
             qudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], cudaMemcpyDeviceToHost, GFStream[4 + d]);
           }
-        #endif
           //compute interior points
           gfixIntPoints.apply(GFStream[8]);
 
-        #ifndef GPU_COMMS
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
             qudaStreamSynchronize(GFStream[d]);
@@ -726,20 +696,14 @@ public:
             comm_wait(mh_recv_fwd[d]);
             qudaMemcpyAsync(recvg_d[d], recvg[d], bytes[d], cudaMemcpyHostToDevice, GFStream[4 + d]);
           }
-        #endif
+
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
-          #ifdef GPU_COMMS
-            comm_wait(mh_recv_back[d]);
-          #endif
             qudaLaunchKernel(Kernel_UnPackGhost<Float, false, decltype(dataexarg)>, tp[d], GFStream[d],
                              faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recv_d[d]), p, d, d);
           }
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
-          #ifdef GPU_COMMS
-            comm_wait(mh_recv_fwd[d]);
-          #endif
             qudaLaunchKernel(Kernel_UnPackTop<Float, false, decltype(dataexarg)>, tp[d], GFStream[4 + d],
                              faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recvg_d[d]), 1 - p, d, d);
           }
@@ -752,7 +716,6 @@ public:
           }
           qudaStreamSynchronize(GFStream[8]);
         }
-      #endif
       }
       if ((iter % reunit_interval) == (reunit_interval - 1)) {
         unitarizeLinks(data, data, num_failures_dev);
@@ -794,7 +757,7 @@ public:
       printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
     }
     pool_device_free(num_failures_dev);
-  #ifdef MULTI_GPU
+
     if ( comm_partitioned() ) {
       data.exchangeExtendedGhost(data.R(),false);
       for ( int d = 0; d < 4; d++ ) {
@@ -809,14 +772,12 @@ public:
           device_free(recvg_d[d]);
           cudaStreamDestroy(GFStream[d]);
           cudaStreamDestroy(GFStream[4 + d]);
-        #ifndef GPU_COMMS
           host_free(hostbuffer_h[d]);
-        #endif
         }
       }
       cudaStreamDestroy(GFStream[8]);
     }
-  #endif
+
     qudaDeviceSynchronize();
     profileInternalGaugeFixOVR.TPSTOP(QUDA_PROFILE_COMPUTE);
     if (getVerbosity() > QUDA_SUMMARIZE){
@@ -833,10 +794,10 @@ public:
     {
       if (gauge_dir == 4) {
         printfQuda("Starting Landau gauge fixing...\n");
-        gaugefixingOVR<Float, recon, 4>(data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
+        gaugeFixingOVR<Float, recon, 4>(data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
       } else if (gauge_dir == 3) {
         printfQuda("Starting Coulomb gauge fixing...\n");
-        gaugefixingOVR<Float, recon, 3>(data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
+        gaugeFixingOVR<Float, recon, 3>(data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
       } else {
         errorQuda("Unexpected gauge_dir = %d", gauge_dir);
       }
@@ -855,7 +816,8 @@ public:
    * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
    */
   void gaugeFixingOVR(GaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval, const double relax_boost,
-                      const double tolerance, const int reunit_interval, const int stopWtheta) {
+                      const double tolerance, const int reunit_interval, const int stopWtheta)
+  {
 #ifdef GPU_GAUGE_ALG
     instantiate<GaugeFixingOVR>(data, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
 #else
