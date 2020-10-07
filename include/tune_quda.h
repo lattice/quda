@@ -170,7 +170,9 @@ namespace quda {
     {
 #if CUDA_VERSION >= 11000
       static int max_blocks_per_sm = 0;
+#ifndef __CUDACC_RTC__
       if (!max_blocks_per_sm) cudaDeviceGetAttribute(&max_blocks_per_sm, cudaDevAttrMaxBlocksPerMultiprocessor, comm_gpuid());
+#endif
       return max_blocks_per_sm;
 #else
       // these variables are taken from Table 14 of the CUDA 10.2 prgramming guide
