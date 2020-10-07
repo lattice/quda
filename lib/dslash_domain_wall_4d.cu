@@ -40,7 +40,7 @@ namespace quda
                         stream);
       Tunable::jitify_error = instance.configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
 #else
-      qudaMemcpyToSymbolAsync(mobius_d, arg.a_5, QUDA_MAX_DWF_LS * sizeof(complex<real>), 0, qudaMemcpyHostToDevice,
+      cudaMemcpyToSymbolAsync(mobius_d, arg.a_5, QUDA_MAX_DWF_LS * sizeof(complex<real>), 0, cudaMemcpyHostToDevice,
                               streams[Nstream - 1]);
       Dslash::template instantiate<packShmem>(tp, stream);
 #endif
