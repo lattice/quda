@@ -266,7 +266,7 @@ namespace quda {
 
    GMResDR::GMResDR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
                     SolverParam &param, TimeProfile &profile) :
-     Solver(mat, matSloppy, matPrecon, param, profile),
+     Solver(mat, matSloppy, matPrecon, matSloppy, param, profile),
      K(nullptr),
      Kparam(param),
      nKrylov(param.Nkrylov),
@@ -279,7 +279,7 @@ namespace quda {
      fillFGMResDRInnerSolveParam(Kparam, param);
 
      if (param.inv_type_precondition == QUDA_CG_INVERTER) {
-       K = new CG(matPrecon, matPrecon, matPrecon, Kparam, profile);
+       K = new CG(matPrecon, matPrecon, matPrecon, matPrecon, Kparam, profile);
      } else if (param.inv_type_precondition == QUDA_MR_INVERTER) {
        K = new MR(matPrecon, matPrecon, Kparam, profile);
      } else if (param.inv_type_precondition == QUDA_SD_INVERTER) {
@@ -297,7 +297,7 @@ namespace quda {
 
  GMResDR::GMResDR(const DiracMatrix &mat, Solver &K_, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
                   SolverParam &param, TimeProfile &profile) :
-   Solver(mat, matSloppy, matPrecon, param, profile),
+   Solver(mat, matSloppy, matPrecon, matSloppy, param, profile),
    K(&K_),
    Kparam(param),
    nKrylov(param.Nkrylov),

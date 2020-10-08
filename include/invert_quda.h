@@ -323,8 +323,7 @@ namespace quda {
       }
 
       if (param.rhs_idx != 0
-          && (param.inv_type == QUDA_INC_EIGCG_INVERTER || param.inv_type == QUDA_GCRODR_INVERTER
-              || param.inv_type == QUDA_FGCRODR_INVERTER)) {
+          && (param.inv_type == QUDA_INC_EIGCG_INVERTER)) {
         rhs_idx = param.rhs_idx;
       }
     }
@@ -392,8 +391,7 @@ namespace quda {
       }
 
       if (param.rhs_idx != 0
-          && (param.inv_type == QUDA_INC_EIGCG_INVERTER || param.inv_type == QUDA_GCRODR_INVERTER
-              || param.inv_type == QUDA_FGCRODR_INVERTER)) {
+          && (param.inv_type == QUDA_INC_EIGCG_INVERTER)) {
         rhs_idx = param.rhs_idx;
       }
     }
@@ -468,7 +466,7 @@ namespace quda {
     const DiracMatrix& M() { return mat; }
     const DiracMatrix& Msloppy() { return matSloppy; }
     const DiracMatrix& Mprecon() { return matPrecon; }
->>>>>>> develop
+    const DiracMatrix &Meig() { return matEig; }
 
     /**
        @return Whether the solver is only for Hermitian systems

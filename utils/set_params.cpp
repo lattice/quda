@@ -227,10 +227,7 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.cuda_prec = cuda_prec;
   inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
   inv_param.cuda_prec_refinement_sloppy = cuda_prec_refinement_sloppy;
-<<<<<<< HEAD
   inv_param.cuda_prec_ritz = cuda_prec_ritz;//?
-=======
->>>>>>> develop
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
@@ -294,11 +291,8 @@ void setEigParam(QudaEigParam &eig_param, QudaInverterType inv_type)
   eig_param.require_convergence = eig_require_convergence ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   eig_param.check_interval = eig_check_interval;
   eig_param.max_restarts = eig_max_restarts;
-<<<<<<< HEAD
   eig_param.cuda_prec_ritz
     = (inv_type == QUDA_EIGCG_INVERTER || inv_type == QUDA_INC_EIGCG_INVERTER) ? prec_ritz : cuda_prec;
-=======
->>>>>>> develop
 
   eig_param.use_norm_op = eig_use_normop ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   eig_param.use_dagger = eig_use_dagger ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -553,7 +547,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   // Is NOT a staggered solve
   mg_param.is_staggered = QUDA_BOOLEAN_FALSE;
 
-  mg_param.use_mma = mg_use_mma ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  //mg_param.use_mma = mg_use_mma ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   // Whether or not to use thin restarts in the evolve tests
   mg_param.thin_update_only = mg_evolve_thin_updates ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
@@ -947,7 +941,7 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 
   mg_param.is_staggered = QUDA_BOOLEAN_TRUE;
 
-  mg_param.use_mma = mg_use_mma ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  //mg_param.use_mma = mg_use_mma ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   mg_param.invert_param = &inv_param;
   mg_param.n_level = mg_levels;

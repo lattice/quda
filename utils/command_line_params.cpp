@@ -269,8 +269,6 @@ namespace
                                                            {"inc-eigcg", QUDA_INC_EIGCG_INVERTER},
                                                            {"gmresdr", QUDA_GMRESDR_INVERTER},
                                                            {"fgmresdr", QUDA_FGMRESDR_INVERTER},
-                                                           {"gcrodr", QUDA_GCRODR_INVERTER},
-                                                           {"fgcrodr", QUDA_FGCRODR_INVERTER},
                                                            {"mg", QUDA_MG_INVERTER},
                                                            {"bicgstab-l", QUDA_BICGSTABL_INVERTER},
                                                            {"cgne", QUDA_CGNE_INVERTER},

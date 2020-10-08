@@ -256,20 +256,16 @@ namespace quda {
       if (space && space->evecs.size() != 0) {
         errorQuda("Detected deflation space of size %lu, double allocation is prohibited.\n", space->evecs.size());
       } else {
-        printfQuda("\nAllocate deflation space...\n");
-        // Allocate defaltion space
-        auto *space = new deflation_space();
-
         // Clone from an existing vector
         ColorSpinorParam csParam(meta);
         csParam.create = QUDA_ZERO_FIELD_CREATE;
         // This is the vector precision used by matPrecon
         csParam.setPrecision(param.precision_precondition, QUDA_INVALID_PRECISION, true);
-
         // Computing the deflation space, rather than transferring, so we create space.
         for (int i = 0; i < size; i++) evecs.push_back(ColorSpinorField::Create(csParam));
         for (int i = 0; i < size; i++) evals.push_back(0.0);
-
+        // Allocate defaltion space
+        auto *space = new deflation_space();
         param.eig_param.preserve_deflation_space = reinterpret_cast<void *>(space);
 
         for (auto &vec : evecs) space->evecs.push_back(vec);

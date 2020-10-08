@@ -540,7 +540,7 @@ namespace quda {
 
   IncEigCG::IncEigCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
                      SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, param, profile),
+    Solver(mat, matSloppy, matPrecon, matSloppy, param, profile),
     matDefl(matSloppy),
     K(nullptr),
     Kparam(param),
@@ -579,7 +579,7 @@ namespace quda {
     }
 
     if(param.inv_type_precondition == QUDA_CG_INVERTER){
-      K = std::make_shared<CG>(matPrecon, matPrecon, matPrecon, Kparam, profile);
+      K = std::make_shared<CG>(matPrecon, matPrecon, matPrecon, matPrecon, Kparam, profile);
     }else if(param.inv_type_precondition == QUDA_MR_INVERTER){
       K = std::make_shared<MR>(matPrecon, matPrecon, Kparam, profile);
     }else if(param.inv_type_precondition == QUDA_SD_INVERTER){
@@ -603,6 +603,8 @@ namespace quda {
   {
 
     EigCGArgs &args = *eigcg_args;
+
+    if(args.run_residual_correction) return;
 
     ColorSpinorField &Ap = (*work_space)[0];
     // whether we want preconditiond (id = 5) or unpreconditioned (id = 2) residual:
@@ -687,7 +689,7 @@ namespace quda {
 
     printfQuda("\nOrthonormalize new eigenvectors..\n");
 
-#if 0 // communication optimized version
+#if 1 // communication optimized version
     MatrixXcd R ( MatrixXcd::Identity(first_idx+k, first_idx+k) );
     MatrixXcd T ( MatrixXcd::Identity(first_idx+k, first_idx+k) );
     RowMajorComplexMatrix L (first_idx+k-1, 2);
@@ -939,7 +941,8 @@ namespace quda {
 
     reserved_space->evals.resize(param.eig_param.n_conv);
     reserved_space->evecs.resize(0);
-
+    // first ensure that any existing space is freed
+    for (int i = param.eig_param.n_conv; i < param.eig_param.n_ev; i++) if (evecs[i]) delete evecs[i];//??
     evecs.resize(param.eig_param.n_conv);
 
     for (int i = 0; i < param.eig_param.n_conv; i++) {
@@ -985,8 +988,8 @@ namespace quda {
 
     std::unique_ptr<ColorSpinorField> r(ColorSpinorField::Create(csParam));
 
-    csParam.setPrecision(param.eig_param.cuda_prec_ritz); // accum fields always full precision
-    if (csParam.location == QUDA_CUDA_FIELD_LOCATION && param.eig_param.cuda_prec_ritz != QUDA_DOUBLE_PRECISION)
+    csParam.setPrecision(param.precision_sloppy); 
+    if (csParam.location == QUDA_CUDA_FIELD_LOCATION && param.precision_sloppy != QUDA_DOUBLE_PRECISION)
       csParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
 
     std::unique_ptr<ColorSpinorField> r_sloppy(ColorSpinorField::Create(csParam));
@@ -1038,6 +1041,7 @@ namespace quda {
     }
 
     double local_stop = x.Precision() == QUDA_DOUBLE_PRECISION ? b2*param.tol*param.tol :  b2*1e-11;
+    const double local_rel_stop = param.delta;
 
     EigCGArgs &args = *eigcg_args;
 
@@ -1102,7 +1106,7 @@ namespace quda {
 
     bool converged = convergence(r2, heavy_quark_res, args.global_stop, param.tol_hq);
 
-    while ( !converged && k < param.maxiter ) {
+    while ( (!converged && k < param.maxiter) || (args.restarts < 3) ) {
 
       matSloppy(Ap, p, tmp, tmp2); // tmp as tmp
 
@@ -1146,7 +1150,9 @@ namespace quda {
       PrintStats("eigCG", k, r2, b2, heavy_quark_res);
       // check convergence, if convergence is satisfied we only need to check that we had a reliable update for the heavy quarks recently
 
-      converged = convergence(r2, heavy_quark_res, args.global_stop, param.tol_hq) or convergence(r2, heavy_quark_res, local_stop, param.tol_hq);
+      double rel_r2 = r2 / b2;
+      converged = (convergence(r2, heavy_quark_res, args.global_stop, param.tol_hq) or convergence(r2, heavy_quark_res, local_stop, param.tol_hq))
+                  or convergence(rel_r2, heavy_quark_res, local_rel_stop, param.tol_hq);
     }
 
     blas::zero(*args.V2k);
@@ -1312,7 +1318,7 @@ namespace quda {
 
     cudaProfilerStart();
 
-    while (!converged && k < param.maxiter) {
+    while ((!converged && k < param.maxiter) || (args.restarts < 3)) {
       // Update search space
       PipelinedSearchSpaceUpdate(lanczos_diag, lanczos_offdiag, beta, sqrt(nu));
 
@@ -1449,9 +1455,9 @@ namespace quda {
       x = xProj;
 
       if (!K)
-        K = std::make_shared<CG>(mat, matPrecon, matPrecon, Kparam, profile);
+        K = std::make_shared<CG>(mat, matPrecon, matPrecon, matPrecon, Kparam, profile);
       else
-        K.reset(new CG(mat, matPrecon, matPrecon, Kparam, profile));
+        K.reset(new CG(mat, matPrecon, matPrecon, matPrecon, Kparam, profile));
       
       (*K)(x, b);
 
@@ -1561,18 +1567,6 @@ namespace quda {
       //
       eSloppy = e, rSloppy = r;
 
-      if (dcg_cycle) { // run CG instead
-        if (!K) {
-          Kparam.precision = param.precision_sloppy;
-          Kparam.tol = 5 * param.inc_tol; // former cg_iterref_tol param
-          Kparam.deflate = false;
-          K.reset(new CG(matSloppy, matPrecon, matPrecon, Kparam, profile));
-        }
-
-        eigcg_args->run_residual_correction = true;
-        printfQuda("Running CG correction cycle.\n");
-      }
-
       int iters = param.pipeline == 0 ? EigCGsolve(eSloppy, rSloppy) : CAEigCGsolve(eSloppy, rSloppy);
 
       bool update_ritz = !dcg_cycle && (eigcg_args->restarts >= 1) && (param.eig_param.n_conv < param.eig_param.n_ev);
@@ -1601,16 +1595,11 @@ namespace quda {
       param.true_res_hq = sqrt(HeavyQuarkResidualNorm(out, r).z);
       PrintSummary(!dcg_cycle ? "EigCG:" : "DCG (correction cycle):", iters, r2, b2, stop, param.tol_hq);
 
-      if (/*getVerbosity() >= QUDA_VERBOSE*/ false) { // disable intermediate checks
+      if (getVerbosity() >= QUDA_VERBOSE) { // disable intermediate checks
         if (!dcg_cycle && (eigcg_args->restarts >= 1) && (param.eig_param.n_conv < param.eig_param.n_ev)) Verify();
       }
 
     } while ((r2 > stop && logical_rhs_id < max_eigcg_cycles) /*&& mixed_prec*/);
-
-    // if (mixed_prec && max_eigcg_cycles > logical_rhs_id) {
-    // printfQuda("Reset maximum eigcg cycles to %d (was %d)\n", logical_rhs_id, max_eigcg_cycles);
-    // max_eigcg_cycles = logical_rhs_id;//adjust maximum allowed cycles based on the actual information
-    //}
 
     // we need to update rhs index and number of computed eigenvectors
     param.rhs_idx += 1;
@@ -1625,10 +1614,10 @@ namespace quda {
         blas::zero(out);
         initCGsolve(out, in);
       }
-      printfQuda("\nRequested to reserve %d eigenvectors with max tol %le.\n", param.eig_param.n_conv, param.eig_param.tol);
+      printfQuda("\nRequested to reserve %d eigenvectors (requested %d) with max tol %le.\n", param.eig_param.n_conv, param.eig_param.n_ev,  param.eig_param.tol);
       Reduce(param.eig_param.tol, param.eig_param.n_conv);
       param.eig_param.is_complete = QUDA_BOOLEAN_TRUE;
-      destroyDeflationSpace();
+      destroyDeflationSpace();//?
 
       if(param.eig_param.n_conv == 0) {
 	// No eigenvectors found!
