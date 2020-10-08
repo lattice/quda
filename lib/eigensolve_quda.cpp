@@ -928,6 +928,7 @@ namespace quda
       
     } else {
 
+      // Do batched rotation to save on memory
       int batch_size = batched_rotate;
       int full_batches = keep / batch_size;
       int batch_size_r = keep % batch_size;
