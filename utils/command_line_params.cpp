@@ -735,7 +735,7 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                        "If the multigrid operator is updated, preserve generated deflation space (default = false)");
   quda_app->add_mgoption(opgroup, "--mg-eig-max-restarts", mg_eig_max_restarts, CLI::PositiveNumber,
                          "Perform a maximun of n restarts in eigensolver (default 100)");
-  quda_app->add_mgoption(opgroup, "--mg-eig-use-eigen", mg_eig_use_eigen_qr, CLI::Validator(), "Use Eigen to eigensolve the upper Hessenberg in IRAM, else use QUDA's QR code. (default true)");
+  quda_app->add_mgoption(opgroup, "--mg-eig-use-eigen-qr", mg_eig_use_eigen_qr, CLI::Validator(), "Use Eigen to eigensolve the upper Hessenberg in IRAM, else use QUDA's QR code. (default true)");
   quda_app->add_mgoption(opgroup, "--mg-eig-block-size", mg_eig_block_size, CLI::Validator(),
                          "The block size to use in the block variant eigensolver");
   quda_app->add_mgoption(opgroup, "--mg-eig-n-ev", mg_eig_n_ev, CLI::Validator(),
