@@ -1,5 +1,6 @@
 #include <color_spinor_field_order.h>
 #include <random_quda.h>
+#include <kernel.h>
 
 namespace quda {
 
