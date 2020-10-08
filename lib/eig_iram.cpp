@@ -36,6 +36,10 @@ namespace quda
 	Rmat[i][j] = 0.0;
       }
     }
+
+    if(eig_param->qr_tol == 0) {
+      eig_param->qr_tol = eig_param->tol * 1e-2;
+    }
     
     if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }

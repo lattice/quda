@@ -656,7 +656,11 @@ namespace quda
                                bool accumulate) const
   {
     // number of evecs
-    if (n_ev_deflate == 0) return;
+    if (n_ev_deflate == 0) {
+      warningQuda("deflateSVD called with n_ev_deflate = 0");
+      return;
+    }
+    
     int n_defl = n_ev_deflate;
     if (evecs.size() != (unsigned int)(2 * eig_param->n_conv))
       errorQuda("Incorrect deflation space sized %d passed to deflateSVD, expected %d", (int)(evecs.size()),
@@ -729,7 +733,11 @@ namespace quda
                             bool accumulate) const
   {
     // number of evecs
-    if (n_ev_deflate == 0) return;
+    if (n_ev_deflate == 0) {
+      warningQuda("deflate called with n_ev_deflate = 0");
+      return;
+    }
+
     int n_defl = n_ev_deflate;
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Deflating %d vectors\n", n_defl);
