@@ -1,22 +1,18 @@
 #include <quda_internal.h>
-#include <quda_matrix.h>
-#include <tune_quda.h>
 #include <gauge_field.h>
-#include <gauge_field_order.h>
 #include <unitarization_links.h>
 #include <comm_quda.h>
-#include <gauge_fix_ovr_extra.h>
 #include <gauge_fix_ovr_hit_devf.cuh>
 #include <reduce_helper.h>
-#include <index_helper.cuh>
+#include <thrust_helper.cuh>
 #include <instantiate.h>
-
 #include <tunable_reduction.h>
+#include <tunable_nd.h>
 #include <kernels/gauge_fix_ovr.cuh>
 
 namespace quda {
 
-#define LAUNCH_KERNEL_GAUGEFIX(kernel, tp, stream, arg, parity, ...)                                                   \
+#define LAUNCH_KERNEL_GAUGEFIX(kernel, tp, stream, arg, parity, ...)    \
   if (tp.aux.x == 0) {                                                                                                 \
     switch (tp.block.x) {                                                                                              \
     case 256: qudaLaunchKernel(kernel<0, 32, __VA_ARGS__>, tp, stream, arg, parity); break;      \
@@ -79,152 +75,6 @@ namespace quda {
     }                                                                                                                  \
   } else {                                                                                                             \
     errorQuda("Not implemented for %d", tp.aux.x);                                                                     \
-  }
-
-  /**
-   * @brief Tunable object for the gauge fixing quality kernel
-   */
-  template <typename Arg>
-  class GaugeFixQuality : TunableReduction2D<> {
-    Arg &arg;
-    const GaugeField &meta;
-
-  public:
-    GaugeFixQuality(Arg &arg, const GaugeField &meta) :
-      TunableReduction2D(meta),
-      arg(arg),
-      meta(meta)
-    { }
-
-    void apply(const qudaStream_t &stream)
-    {
-      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<FixQualityOVR>(tp, stream, arg);
-      auto reset = true; // apply is called multiple times with the same arg instance so we need to reset
-      arg.complete(arg.result, stream, reset);
-      if (!activeTuning()) {
-        comm_allreduce_array((double*)&arg.result, 2);
-        arg.result.x /= (double)(3 * Arg::gauge_dir * 2 * arg.threads.x * comm_size());
-        arg.result.y /= (double)(3 * 2 * arg.threads.x * comm_size());
-      }
-    }
-
-    long long flops() const { return (36LL * Arg::gauge_dir + 65LL) * meta.Volume(); }
-    //long long bytes() const { return (1)*2*gauge_dir*arg.Bytes(); }
-    long long bytes() const { return 2LL * Arg::gauge_dir * meta.Volume() * meta.Reconstruct() * meta.Precision(); }
-  };
-
-  /**
-   * @brief container to pass parameters for the gauge fixing kernel
-   */
-  template <typename Float, typename Gauge>
-  struct GaugeFixArg {
-    int threads; // number of active threads required
-    int X[4]; // grid dimensions
-#ifdef MULTI_GPU
-    int border[4];
-#endif
-    Gauge dataOr;
-    GaugeField &data;
-    const Float relax_boost;
-
-    GaugeFixArg(Gauge & dataOr, GaugeField & data, const Float relax_boost)
-      : dataOr(dataOr), data(data), relax_boost(relax_boost) {
-
-      for ( int dir = 0; dir < 4; ++dir ) {
-        X[dir] = data.X()[dir] - data.R()[dir] * 2;
-      #ifdef MULTI_GPU
-        border[dir] = data.R()[dir];
-      #endif
-      }
-      threads = X[0] * X[1] * X[2] * X[3] >> 1;
-    }
-  };
-
-
-  /**
-   * @brief Kernel to perform gauge fixing with overrelaxation for single-GPU
-   */
-  template<int ImplementationType, int blockSize, typename Float, typename Gauge, int gauge_dir>
-  __global__ void computeFix(GaugeFixArg<Float, Gauge> arg, int parity)
-  {
-    typedef complex<Float> Cmplx;
-    int tid = (threadIdx.x + blockSize) % blockSize;
-    int idx = blockIdx.x * blockSize + tid;
-
-    if ( idx >= arg.threads ) return;
-
-    // 8 threads per lattice site
-    if ( ImplementationType < 3 ) {
-      int X[4];
-    #pragma unroll
-      for ( int dr = 0; dr < 4; ++dr ) X[dr] = arg.X[dr];
-
-      int x[4];
-      getCoords(x, idx, X, parity);
-  #ifdef MULTI_GPU
-    #pragma unroll
-      for ( int dr = 0; dr < 4; ++dr ) {
-        x[dr] += arg.border[dr];
-        X[dr] += 2 * arg.border[dr];
-      }
-  #endif
-      int mu = (threadIdx.x / blockSize);
-      int oddbit = parity;
-      if ( threadIdx.x >= blockSize * 4 ) {
-        mu -= 4;
-        x[mu] = (x[mu] - 1 + X[mu]) % X[mu];
-        oddbit = 1 - parity;
-      }
-      idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
-      Matrix<Cmplx,3> link = arg.dataOr(mu, idx, oddbit);
-      // 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
-      // this implementation needs 8x more shared memory than the implementation using atomicadd
-      if ( ImplementationType == 0 ) GaugeFixHit_NoAtomicAdd<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
-      // 8 treads per lattice site, the reduction is performed by shared memory using atomicadd
-      if ( ImplementationType == 1 ) GaugeFixHit_AtomicAdd<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
-      // 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
-      // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
-      if ( ImplementationType == 2 ) GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
-      arg.dataOr(mu, idx, oddbit) = link;
-    }
-    // 4 threads per lattice site
-    else{
-      int X[4];
-    #pragma unroll
-      for ( int dr = 0; dr < 4; ++dr ) X[dr] = arg.X[dr];
-
-      int x[4];
-      getCoords(x, idx, X, parity);
-  #ifdef MULTI_GPU
-    #pragma unroll
-      for ( int dr = 0; dr < 4; ++dr ) {
-        x[dr] += arg.border[dr];
-        X[dr] += 2 * arg.border[dr];
-      }
-  #endif
-      int mu = (threadIdx.x / blockSize);
-      idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
-      //load upward link
-      Matrix<Cmplx,3> link = arg.dataOr(mu, idx, parity);
-
-      x[mu] = (x[mu] - 1 + X[mu]) % X[mu];
-      int idx1 = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
-      //load downward link
-      Matrix<Cmplx,3> link1 = arg.dataOr(mu, idx1, 1 - parity);
-
-      // 4 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
-      // this implementation needs 4x more shared memory than the implementation using atomicadd
-      if ( ImplementationType == 3 ) GaugeFixHit_NoAtomicAdd<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
-      // 4 treads per lattice site, the reduction is performed by shared memory using atomicadd
-      if ( ImplementationType == 4 ) GaugeFixHit_AtomicAdd<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
-      // 4 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
-      // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
-      if ( ImplementationType == 5 ) GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
-
-      arg.dataOr(mu, idx, parity) = link;
-      arg.dataOr(mu, idx1, 1 - parity) = link1;
-    }
   }
 
   /**
@@ -353,110 +203,6 @@ public:
     long long flops() const { return 3LL * (22 + 28 * gauge_dir + 224 * 3) * arg.threads; }
     long long bytes() const { return 8LL * 2 * arg.threads * meta.Reconstruct() * sizeof(Float);  }
   };
-
-#ifdef MULTI_GPU
-  template <typename Float, typename Gauge>
-  struct GaugeFixInteriorPointsArg {
-    int threads; // number of active threads required
-    int X[4]; // grid dimensions
-#ifdef MULTI_GPU
-    int border[4];
-#endif
-    Gauge dataOr;
-    GaugeField &data;
-    const Float relax_boost;
-    GaugeFixInteriorPointsArg(Gauge & dataOr, GaugeField & data, const Float relax_boost)
-      : dataOr(dataOr), data(data), relax_boost(relax_boost) {
-
-#ifdef MULTI_GPU
-      for ( int dir = 0; dir < 4; ++dir ) {
-        if ( comm_dim_partitioned(dir)) border[dir] = data.R()[dir] + 1;  //skip BORDER_RADIUS + face border point
-        else border[dir] = 0;
-      }
-      for ( int dir = 0; dir < 4; ++dir ) X[dir] = data.X()[dir] - border[dir] * 2;
-#else
-      for ( int dir = 0; dir < 4; ++dir ) X[dir] = data.X()[dir];
-#endif
-      threads = X[0] * X[1] * X[2] * X[3] >> 1;
-    }
-  };
-
-
-  /**
-   * @brief Kernel to perform gauge fixing with overrelaxation in the interior points for multi-GPU implementation
-   */
-  template<int ImplementationType, int blockSize, typename Float, typename Gauge, int gauge_dir>
-  __global__ void computeFixInteriorPoints(GaugeFixInteriorPointsArg<Float, Gauge> arg, int parity){
-    int tid = (threadIdx.x + blockSize) % blockSize;
-    int idx = blockIdx.x * blockSize + tid;
-    if ( idx >= arg.threads ) return;
-    typedef complex<Float> Complex;
-    int X[4];
-#pragma unroll
-    for ( int dr = 0; dr < 4; ++dr ) X[dr] = arg.X[dr];
-    int x[4];
-#ifdef MULTI_GPU
-    int za = (idx / (X[0] / 2));
-    int zb =  (za / X[1]);
-    x[1] = za - zb * X[1];
-    x[3] = (zb / X[2]);
-    x[2] = zb - x[3] * X[2];
-    int p = 0; for ( int dr = 0; dr < 4; ++dr ) p += arg.border[dr];
-    p = p & 1;
-    int x1odd = (x[1] + x[2] + x[3] + parity + p) & 1;
-    //int x1odd = (x[1] + x[2] + x[3] + parity) & 1;
-    x[0] = (2 * idx + x1odd)  - za * X[0];
-    for ( int dr = 0; dr < 4; ++dr ) {
-      x[dr] += arg.border[dr];
-      X[dr] += 2 * arg.border[dr];
-    }
-#else
-    getCoords(x, idx, X, parity);
-#endif
-    int mu = (threadIdx.x / blockSize);
-
-    // 8 threads per lattice site
-    if ( ImplementationType < 3 ) {
-      if ( threadIdx.x >= blockSize * 4 ) {
-        mu -= 4;
-        x[mu] = (x[mu] - 1 + X[mu]) % X[mu];
-        parity = 1 - parity;
-      }
-      idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
-      Matrix<Complex,3> link = arg.dataOr(mu, idx, parity);
-      // 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
-      // this implementation needs 8x more shared memory than the implementation using atomicadd
-      if ( ImplementationType == 0 ) GaugeFixHit_NoAtomicAdd<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
-      // 8 treads per lattice site, the reduction is performed by shared memory using atomicadd
-      if ( ImplementationType == 1 ) GaugeFixHit_AtomicAdd<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
-      // 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
-      // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
-      if ( ImplementationType == 2 ) GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
-      arg.dataOr(mu, idx, parity) = link;
-    }
-    // 4 threads per lattice site
-    else{
-      idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
-      Matrix<Complex,3> link = arg.dataOr(mu, idx, parity);
-
-
-      x[mu] = (x[mu] - 1 + X[mu]) % X[mu];
-      int idx1 = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
-      Matrix<Complex,3> link1 = arg.dataOr(mu, idx1, 1 - parity);
-
-      // 4 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
-      // this implementation needs 4x more shared memory than the implementation using atomicadd
-      if ( ImplementationType == 3 ) GaugeFixHit_NoAtomicAdd<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
-      // 4 treads per lattice site, the reduction is performed by shared memory using atomicadd
-      if ( ImplementationType == 4 ) GaugeFixHit_AtomicAdd<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
-      // 4 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
-      // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
-      if ( ImplementationType == 5 ) GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
-
-      arg.dataOr(mu, idx, parity) = link;
-      arg.dataOr(mu, idx1, 1 - parity) = link1;
-    }
-  }
 
   /**
    * @brief Tunable object for the interior points of the gauge fixing
@@ -587,105 +333,6 @@ public:
     long long bytes() const { return 8LL * 2 * arg.threads * meta.Reconstruct() * sizeof(Float); }
   };
 
-  template <typename Float, typename Gauge>
-  struct GaugeFixBorderPointsArg {
-    int threads; // number of active threads required
-    int X[4]; // grid dimensions
-    int border[4];
-    int *borderpoints[2];
-    int *faceindicessize[2];
-    size_t faceVolume[4];
-    size_t faceVolumeCB[4];
-    Gauge dataOr;
-    GaugeField &data;
-    const Float relax_boost;
-
-    GaugeFixBorderPointsArg(Gauge & dataOr, GaugeField & data, const Float relax_boost, size_t faceVolume_[4], size_t faceVolumeCB_[4])
-      : dataOr(dataOr), data(data), relax_boost(relax_boost)
-    {
-      for ( int dir = 0; dir < 4; ++dir ) {
-        X[dir] = data.X()[dir] - data.R()[dir] * 2;
-        border[dir] = data.R()[dir];
-      }
-
-      /*for(int dir=0; dir<4; ++dir){
-         if(comm_dim_partitioned(dir)) border[dir] = BORDER_RADIUS;
-         else border[dir] = 0;
-         }
-         for(int dir=0; dir<4; ++dir) X[dir] = data.X()[dir] - border[dir]*2;*/
-      for ( int dir = 0; dir < 4; ++dir ) {
-        faceVolume[dir] = faceVolume_[dir];
-        faceVolumeCB[dir] = faceVolumeCB_[dir];
-      }
-      if ( comm_partitioned() ) PreCalculateLatticeIndices(faceVolume, faceVolumeCB, X, border, threads, borderpoints);
-    }
-  };
-
-  /**
-   * @brief Kernel to perform gauge fixing with overrelaxation in the border points for multi-GPU implementation
-  */
-  template<int ImplementationType, int blockSize, typename Float, typename Gauge, int gauge_dir>
-  __global__ void computeFixBorderPoints(GaugeFixBorderPointsArg<Float, Gauge> arg, int parity){
-    typedef complex<Float> Cmplx;
-
-    int tid = (threadIdx.x + blockSize) % blockSize;
-    int idx = blockIdx.x * blockSize + tid;
-    if ( idx >= arg.threads ) return;
-    int mu = (threadIdx.x / blockSize);
-    idx = arg.borderpoints[parity][idx];
-    int X[4], x[4];
-    x[3] = idx / (arg.X[0] * arg.X[1]  * arg.X[2]);
-    x[2] = (idx / (arg.X[0] * arg.X[1])) % arg.X[2];
-    x[1] = (idx / arg.X[0]) % arg.X[1];
-    x[0] = idx % arg.X[0];
-  #pragma unroll
-    for ( int dr = 0; dr < 4; ++dr ) x[dr] += arg.border[dr];
-  #pragma unroll
-    for ( int dr = 0; dr < 4; ++dr ) X[dr] = arg.X[dr] + 2 * arg.border[dr];
-
-    // 8 threads per lattice site
-    if ( ImplementationType < 3 ) {
-      if ( threadIdx.x >= blockSize * 4 ) {
-        mu -= 4;
-        x[mu] = (x[mu] - 1 + X[mu]) % X[mu];
-        parity = 1 - parity;
-      }
-      idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
-      Matrix<Cmplx,3> link = arg.dataOr(mu, idx, parity);
-      // 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
-      // this implementation needs 8x more shared memory than the implementation using atomicadd
-      if ( ImplementationType == 0 ) GaugeFixHit_NoAtomicAdd<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
-      // 8 treads per lattice site, the reduction is performed by shared memory using atomicadd
-      if ( ImplementationType == 1 ) GaugeFixHit_AtomicAdd<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
-      // 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
-      // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
-      if ( ImplementationType == 2 ) GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
-      arg.dataOr(mu, idx, parity) = link;
-    }
-    // 4 threads per lattice site
-    else{
-      idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
-      Matrix<Cmplx,3> link = arg.dataOr(mu, idx, parity);
-
-
-      x[mu] = (x[mu] - 1 + X[mu]) % X[mu];
-      int idx1 = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
-      Matrix<Cmplx,3> link1 = arg.dataOr(mu, idx1, 1 - parity);
-
-      // 4 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
-      // this implementation needs 4x more shared memory than the implementation using atomicadd
-      if ( ImplementationType == 3 ) GaugeFixHit_NoAtomicAdd<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
-      // 4 treads per lattice site, the reduction is performed by shared memory using atomicadd
-      if ( ImplementationType == 4 ) GaugeFixHit_AtomicAdd<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
-      // 4 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
-      // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
-      if ( ImplementationType == 5 ) GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
-
-      arg.dataOr(mu, idx, parity) = link;
-      arg.dataOr(mu, idx1, 1 - parity) = link1;
-    }
-  }
-
   /**
    * @brief Tunable object for the border points of the gauge fixing kernel in multi-GPU implementation
    */
@@ -782,7 +429,7 @@ public:
       meta(meta),
       parity(0) { }
 
-    ~GaugeFixBorderPoints () {
+    virtual ~GaugeFixBorderPoints () {
       if ( comm_partitioned() ) for ( int i = 0; i < 2; i++ ) pool_device_free(arg.borderpoints[i]);
     }
 
@@ -818,169 +465,54 @@ public:
     long long bytes() const { return 8LL * 2 * arg.threads * meta.Reconstruct() * sizeof(Float); }
   };
 
-  template <int NElems_, typename Gauge>
-  struct GaugeFixUnPackArg {
-    static constexpr int NElems = NElems_;
-    int X[4]; // grid dimensions
-#ifdef MULTI_GPU
-    int border[4];
-#endif
-    Gauge dataOr;
-    GaugeFixUnPackArg(Gauge & dataOr, GaugeField & data)
-      : dataOr(dataOr) {
-      for ( int dir = 0; dir < 4; ++dir ) {
-        X[dir] = data.X()[dir] - data.R()[dir] * 2;
-      #ifdef MULTI_GPU
-        border[dir] = data.R()[dir];
-      #endif
-      }
-    }
-  };
-
-  template <typename Float, bool pack, typename Arg>
-  __global__ void Kernel_UnPackGhost(int size, Arg arg, complex<Float> *array, int parity, int face, int dir)
+  /**
+   * @brief Pre-calculate lattice border points used by the gauge
+   * fixing with overrelaxation in multi-GPU implementation
+   */
+  void PreCalculateLatticeIndices(size_t faceVolume[4], size_t faceVolumeCB[4], int X[4], int border[4],
+                                  int &threads, int *borderpoints[2])
   {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if ( idx >= size ) return;
-    int X[4];
-    for ( int dr = 0; dr < 4; ++dr ) X[dr] = arg.X[dr];
-    int x[4];
-    int za, xodd;
-    int borderid = 0;
-    parity = 1 - parity;
-    switch ( face ) {
-    case 0: //X FACE
-      za = idx / ( X[1] / 2);
-      x[3] = za / X[2];
-      x[2] = za - x[3] * X[2];
-      x[0] = borderid;
-      xodd = (borderid + x[2] + x[3] + parity) & 1;
-      x[1] = (2 * idx + xodd)  - za * X[1];
-      break;
-    case 1: //Y FACE
-      za = idx / ( X[0] / 2);
-      x[3] = za / X[2];
-      x[2] = za - x[3] * X[2];
-      x[1] = borderid;
-      xodd = (borderid  + x[2] + x[3] + parity) & 1;
-      x[0] = (2 * idx + xodd)  - za * X[0];
-      break;
-    case 2: //Z FACE
-      za = idx / ( X[0] / 2);
-      x[3] = za / X[1];
-      x[1] = za - x[3] * X[1];
-      x[2] = borderid;
-      xodd = (borderid  + x[1] + x[3] + parity) & 1;
-      x[0] = (2 * idx + xodd)  - za * X[0];
-      break;
-    case 3: //T FACE
-      za = idx / ( X[0] / 2);
-      x[2] = za / X[1];
-      x[1] = za - x[2] * X[1];
-      x[3] = borderid;
-      xodd = (borderid  + x[1] + x[2] + parity) & 1;
-      x[0] = (2 * idx + xodd)  - za * X[0];
-      break;
+    BorderIdArg arg(X, border);
+    int nlinksfaces = 0;
+    for (int dir = 0; dir < 4; dir++)
+      if (comm_dim_partitioned(dir)) nlinksfaces += faceVolume[dir];
+
+    thrust::device_ptr<int> array_faceT[2];
+    thrust::device_ptr<int> array_interiorT[2];
+
+    for (int i = 0; i < 2; i++) { //even and odd ids
+      borderpoints[i] = static_cast<int*>(pool_device_malloc(nlinksfaces * sizeof(int)));
+      qudaMemset(borderpoints[i], 0, nlinksfaces * sizeof(int) );
+      array_faceT[i] = thrust::device_pointer_cast(borderpoints[i]);
     }
-    for ( int dr = 0; dr < 4; ++dr ) {
-      x[dr] += arg.border[dr];
-      X[dr] += 2 * arg.border[dr];
-    }
-    x[face] -= 1;
-    parity = 1 - parity;
-    int id = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
-    typedef complex<Float> Cmplx;
-    typedef typename mapper<Float>::type RegType;
-    RegType tmp[Arg::NElems];
-    Cmplx data[9];
-    if ( pack ) {
-      arg.dataOr.load(data, id, dir, parity);
-      arg.dataOr.reconstruct.Pack(tmp, data, id);
-      for ( int i = 0; i < Arg::NElems / 2; ++i ) {
-        array[idx + size * i] = Cmplx(tmp[2*i+0], tmp[2*i+1]);
+
+    TuneParam tp;
+    tp.block = dim3(128, 1, 1);
+    int start = 0;
+    for (int dir = 0; dir < 4; ++dir) {
+      if (comm_dim_partitioned(dir)) {
+        tp.grid = dim3((faceVolume[dir] + tp.block.x - 1) / tp.block.x,1,1);
+        for (int oddbit = 0; oddbit < 2; oddbit++) {
+          auto faceindices = borderpoints[oddbit] + start;
+          qudaLaunchKernel(ComputeBorderPointsActiveFaceIndex, tp, (qudaStream_t)0, arg, faceindices, faceVolume[dir], dir, oddbit);
+        }
+        start += faceVolume[dir];
       }
-    } else {
-      for ( int i = 0; i < Arg::NElems / 2; ++i ) {
-        tmp[2*i+0] = array[idx + size * i].real();
-        tmp[2*i+1] = array[idx + size * i].imag();
-      }
-      arg.dataOr.reconstruct.Unpack(data, tmp, id, dir, 0, arg.dataOr.X, arg.dataOr.R);
-      arg.dataOr.save(data, id, dir, parity);
     }
+    int size[2];
+    for (int i = 0; i < 2; i++) {
+      //sort and remove duplicated lattice indices
+      thrust_allocator alloc;
+      thrust::sort(thrust::cuda::par(alloc), array_faceT[i], array_faceT[i] + nlinksfaces);
+      thrust::device_ptr<int> new_end = thrust::unique(array_faceT[i], array_faceT[i] + nlinksfaces);
+      size[i] = thrust::raw_pointer_cast(new_end) - thrust::raw_pointer_cast(array_faceT[i]);
+    }
+    if (size[0] == size[1]) threads = size[0];
+    else errorQuda("BORDER: Even and Odd sizes does not match, not supported!!!!, %d:%d", size[0], size[1]);
   }
 
-  template <typename Float, bool pack, typename Arg>
-  __global__ void Kernel_UnPackTop(int size, Arg arg, complex<Float> *array, int parity, int face, int dir)
-  {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if ( idx >= size ) return;
-    int X[4];
-    for ( int dr = 0; dr < 4; ++dr ) X[dr] = arg.X[dr];
-    int x[4];
-    int za, xodd;
-    int borderid = arg.X[face] - 1;
-    switch ( face ) {
-    case 0: //X FACE
-      za = idx / ( X[1] / 2);
-      x[3] = za / X[2];
-      x[2] = za - x[3] * X[2];
-      x[0] = borderid;
-      xodd = (borderid + x[2] + x[3] + parity) & 1;
-      x[1] = (2 * idx + xodd)  - za * X[1];
-      break;
-    case 1: //Y FACE
-      za = idx / ( X[0] / 2);
-      x[3] = za / X[2];
-      x[2] = za - x[3] * X[2];
-      x[1] = borderid;
-      xodd = (borderid  + x[2] + x[3] + parity) & 1;
-      x[0] = (2 * idx + xodd)  - za * X[0];
-      break;
-    case 2: //Z FACE
-      za = idx / ( X[0] / 2);
-      x[3] = za / X[1];
-      x[1] = za - x[3] * X[1];
-      x[2] = borderid;
-      xodd = (borderid  + x[1] + x[3] + parity) & 1;
-      x[0] = (2 * idx + xodd)  - za * X[0];
-      break;
-    case 3: //T FACE
-      za = idx / ( X[0] / 2);
-      x[2] = za / X[1];
-      x[1] = za - x[2] * X[1];
-      x[3] = borderid;
-      xodd = (borderid  + x[1] + x[2] + parity) & 1;
-      x[0] = (2 * idx + xodd)  - za * X[0];
-      break;
-    }
-    for ( int dr = 0; dr < 4; ++dr ) {
-      x[dr] += arg.border[dr];
-      X[dr] += 2 * arg.border[dr];
-    }
-    int id = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
-    typedef complex<Float> Cmplx;
-    typedef typename mapper<Float>::type RegType;
-    RegType tmp[Arg::NElems];
-    Cmplx data[9];
-    if ( pack ) {
-      arg.dataOr.load(data, id, dir, parity);
-      arg.dataOr.reconstruct.Pack(tmp, data, id);
-      for ( int i = 0; i < Arg::NElems / 2; ++i ) array[idx + size * i] = Cmplx(tmp[2*i+0], tmp[2*i+1]);
-    }
-    else{
-      for ( int i = 0; i < Arg::NElems / 2; ++i ) {
-        tmp[2*i+0] = array[idx + size * i].real();
-        tmp[2*i+1] = array[idx + size * i].imag();
-      }
-      arg.dataOr.reconstruct.Unpack(data, tmp, id, dir, 0, arg.dataOr.X, arg.dataOr.R);
-      arg.dataOr.save(data, id, dir, parity);
-    }
-  }
-#endif
-
-
-  template<typename Float, QudaReconstructType recon, int gauge_dir>
-  void gaugefixingOVR(GaugeField &data,const int Nsteps, const int verbose_interval,
+  template <typename Float, QudaReconstructType recon, int gauge_dir>
+  void gaugeFixingOVR(GaugeField &data,const int Nsteps, const int verbose_interval,
                       const Float relax_boost, const double tolerance,
                       const int reunit_interval, const int stopWtheta)
   {
@@ -1019,7 +551,6 @@ public:
     GaugeFixArg<Float, Gauge> arg(dataOr, data, relax_boost);
     GaugeFix<Float,Gauge, gauge_dir> gaugeFix(arg, data);
 
-#ifdef MULTI_GPU
     void *send[4];
     void *recv[4];
     void *sendg[4];
@@ -1067,26 +598,17 @@ public:
         recvg_d[d] = device_malloc(bytes[d]);
         cudaStreamCreate(&GFStream[d]);
         cudaStreamCreate(&GFStream[4 + d]);
-      #ifndef GPU_COMMS
         hostbuffer_h[d] = (void*)pinned_malloc(4 * bytes[d]);
-      #endif
         tp[d].block = make_uint3(128, 1, 1);
         tp[d].grid = make_uint3((faceVolumeCB[d] + tp[d].block.x - 1) / tp[d].block.x, 1, 1);
       }
       cudaStreamCreate(&GFStream[8]);
       for ( int d = 0; d < 4; d++ ) {
         if ( !commDimPartitioned(d)) continue;
-      #ifdef GPU_COMMS
-        recv[d] = recv_d[d];
-        send[d] = send_d[d];
-        recvg[d] = recvg_d[d];
-        sendg[d] = sendg_d[d];
-      #else
         recv[d] = hostbuffer_h[d];
         send[d] = static_cast<char*>(hostbuffer_h[d]) + bytes[d];
         recvg[d] = static_cast<char*>(hostbuffer_h[d]) + 3 * bytes[d];
         sendg[d] = static_cast<char*>(hostbuffer_h[d]) + 2 * bytes[d];
-      #endif
         mh_recv_back[d] = comm_declare_receive_relative(recv[d], d, -1, bytes[d]);
         mh_recv_fwd[d]  = comm_declare_receive_relative(recvg[d], d, +1, bytes[d]);
         mh_send_back[d] = comm_declare_send_relative(sendg[d], d, -1, bytes[d]);
@@ -1098,7 +620,6 @@ public:
     GaugeFixBorderPoints<Float,Gauge, gauge_dir> gfixBorderPoints(argBorder, data);
     GaugeFixInteriorPointsArg<Float, Gauge> argInt(dataOr, data, relax_boost);
     GaugeFixInteriorPoints<Float,Gauge, gauge_dir> gfixIntPoints(argInt, data);
-  #endif
 
     GaugeFixQuality.apply(0);
     flop += (double)GaugeFixQuality.flops();
@@ -1118,19 +639,12 @@ public:
     int iter = 0;
     for ( iter = 0; iter < Nsteps; iter++ ) {
       for ( int p = 0; p < 2; p++ ) {
-      #ifndef MULTI_GPU
-        gaugeFix.setParity(p);
-        gaugeFix.apply(0);
-        flop += (double)gaugeFix.flops();
-        byte += (double)gaugeFix.bytes();
-      #else
         if ( !comm_partitioned() ) {
           gaugeFix.setParity(p);
           gaugeFix.apply(0);
           flop += (double)gaugeFix.flops();
           byte += (double)gaugeFix.bytes();
-        }
-        else{
+        } else {
           gfixIntPoints.setParity(p);
           gfixBorderPoints.setParity(p); //compute border points
           gfixBorderPoints.apply(0);
@@ -1154,15 +668,6 @@ public:
             qudaLaunchKernel(Kernel_UnPackGhost<Float, true, decltype(dataexarg)>, tp[d], GFStream[4 + d],
                              faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(sendg_d[d]), 1 - p, d, d);
           }
-        #ifdef GPU_COMMS
-          for ( int d = 0; d < 4; d++ ) {
-            if ( !commDimPartitioned(d)) continue;
-            qudaStreamSynchronize(GFStream[d]);
-            comm_start(mh_send_fwd[d]);
-            qudaStreamSynchronize(GFStream[4 + d]);
-            comm_start(mh_send_back[d]);
-          }
-        #else
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
             qudaMemcpyAsync(send[d], send_d[d], bytes[d], qudaMemcpyDeviceToHost, GFStream[d]);
@@ -1171,11 +676,9 @@ public:
             if ( !commDimPartitioned(d)) continue;
             qudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], qudaMemcpyDeviceToHost, GFStream[4 + d]);
           }
-        #endif
           //compute interior points
           gfixIntPoints.apply(GFStream[8]);
 
-        #ifndef GPU_COMMS
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
             qudaStreamSynchronize(GFStream[d]);
@@ -1193,20 +696,14 @@ public:
             comm_wait(mh_recv_fwd[d]);
             qudaMemcpyAsync(recvg_d[d], recvg[d], bytes[d], qudaMemcpyHostToDevice, GFStream[4 + d]);
           }
-        #endif
+
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
-          #ifdef GPU_COMMS
-            comm_wait(mh_recv_back[d]);
-          #endif
             qudaLaunchKernel(Kernel_UnPackGhost<Float, false, decltype(dataexarg)>, tp[d], GFStream[d],
                              faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recv_d[d]), p, d, d);
           }
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
-          #ifdef GPU_COMMS
-            comm_wait(mh_recv_fwd[d]);
-          #endif
             qudaLaunchKernel(Kernel_UnPackTop<Float, false, decltype(dataexarg)>, tp[d], GFStream[4 + d],
                              faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recvg_d[d]), 1 - p, d, d);
           }
@@ -1219,7 +716,6 @@ public:
           }
           qudaStreamSynchronize(GFStream[8]);
         }
-      #endif
       }
       if ((iter % reunit_interval) == (reunit_interval - 1)) {
         unitarizeLinks(data, data, num_failures_dev);
@@ -1261,7 +757,7 @@ public:
       printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
     }
     pool_device_free(num_failures_dev);
-  #ifdef MULTI_GPU
+
     if ( comm_partitioned() ) {
       data.exchangeExtendedGhost(data.R(),false);
       for ( int d = 0; d < 4; d++ ) {
@@ -1276,14 +772,12 @@ public:
           device_free(recvg_d[d]);
           cudaStreamDestroy(GFStream[d]);
           cudaStreamDestroy(GFStream[4 + d]);
-        #ifndef GPU_COMMS
           host_free(hostbuffer_h[d]);
-        #endif
         }
       }
       cudaStreamDestroy(GFStream[8]);
     }
-  #endif
+
     qudaDeviceSynchronize();
     profileInternalGaugeFixOVR.TPSTOP(QUDA_PROFILE_COMPUTE);
     if (getVerbosity() > QUDA_SUMMARIZE){
@@ -1300,10 +794,10 @@ public:
     {
       if (gauge_dir == 4) {
         printfQuda("Starting Landau gauge fixing...\n");
-        gaugefixingOVR<Float, recon, 4>(data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
+        gaugeFixingOVR<Float, recon, 4>(data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
       } else if (gauge_dir == 3) {
         printfQuda("Starting Coulomb gauge fixing...\n");
-        gaugefixingOVR<Float, recon, 3>(data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
+        gaugeFixingOVR<Float, recon, 3>(data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
       } else {
         errorQuda("Unexpected gauge_dir = %d", gauge_dir);
       }
@@ -1322,7 +816,8 @@ public:
    * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
    */
   void gaugeFixingOVR(GaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval, const double relax_boost,
-                      const double tolerance, const int reunit_interval, const int stopWtheta) {
+                      const double tolerance, const int reunit_interval, const int stopWtheta)
+  {
 #ifdef GPU_GAUGE_ALG
     instantiate<GaugeFixingOVR>(data, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
 #else
