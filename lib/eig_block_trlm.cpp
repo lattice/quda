@@ -471,14 +471,14 @@ namespace quda
   {
     int offset = n_kr + block_size;
     int dim = n_kr - num_locked;
-    
+
     // Multi-BLAS friendly array to store part of Ritz matrix we want
     Complex *ritz_mat_keep = (Complex *)safe_malloc((dim * iter_keep) * sizeof(Complex));
     for (int j = 0; j < dim; j++) {
       for (int i = 0; i < iter_keep; i++) { ritz_mat_keep[j * iter_keep + i] = block_ritz_mat[i * dim + j]; }
     }
-    
-    rotateVecsComplex(kSpace, ritz_mat_keep, offset, dim, iter_keep, profile);
+
+    rotateVecsComplex(kSpace, ritz_mat_keep, offset, dim, iter_keep, num_locked, profile);
     
     // Update residual vectors
     for (int i = 0; i < block_size; i++) std::swap(kSpace[num_locked + iter_keep + i], kSpace[n_kr + i]);

@@ -187,15 +187,18 @@ protected:
        @brief Rotate the Krylov space 
        @param[in] kSpace the Krylov space 
        @param[in] rot_array The real rotation matrix
-       @param[in] offset The position of the start of unused vector in kSpace
+       @param[in] offset The position of the start of unused vectors in kSpace
        @param[in] dim The number of rows in the rotation array
        @param[in] keep The number of columns in the rotation array
+       @param[in] locked The number of locked vectors in kSpace
        @param[in] profile Time profiler
     */    
-    void rotateVecs(std::vector<ColorSpinorField *> &kSpace, double *rot_array,
+    void rotateVecs(std::vector<ColorSpinorField *> &kSpace,
+		    const double *rot_array,
 		    const int offset,
 		    const int dim,
 		    const int keep,
+		    const int locked,
 		    TimeProfile &profile);
 
     /**
@@ -205,13 +208,15 @@ protected:
        @param[in] offset The position of the start of unused vector in kSpace
        @param[in] dim The number of rows in the rotation array
        @param[in] keep The number of columns in the rotation array
+       @param[in] locked The number of locked vectors in kSpace
        @param[in] profile Time profiler
     */    
     void rotateVecsComplex(std::vector<ColorSpinorField *> &kSpace,
-			   Complex *rot_array,
+			   const Complex *rot_array,
 			   const int offset,
 			   const int dim,
 			   const int keep,
+			   const int locked,			   
 			   TimeProfile &profile);
 
     

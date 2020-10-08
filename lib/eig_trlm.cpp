@@ -338,18 +338,16 @@ namespace quda
 
   void TRLM::computeKeptRitz(std::vector<ColorSpinorField *> &kSpace)
   {
-    // START TRLM specific
-    //----------------------------------------------------------------------
     int offset = n_kr + 1;
     int dim = n_kr - num_locked;
-
+    
     // Multi-BLAS friendly array to store part of Ritz matrix we want
     double *ritz_mat_keep = (double *)safe_malloc((dim * iter_keep) * sizeof(double));
     for (int j = 0; j < dim; j++) {
       for (int i = 0; i < iter_keep; i++) { ritz_mat_keep[j * iter_keep + i] = ritz_mat[i * dim + j]; }
     }
-
-    rotateVecs(kSpace, ritz_mat_keep, offset, dim, iter_keep, profile);
+    
+    rotateVecs(kSpace, ritz_mat_keep, offset, dim, iter_keep, num_locked, profile);
     
     // Update residual vector
     std::swap(kSpace[num_locked + iter_keep], kSpace[n_kr]);

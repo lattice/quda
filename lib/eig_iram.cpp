@@ -124,13 +124,11 @@ namespace quda
   void IRAM::rotateBasis(std::vector<ColorSpinorField *> &kSpace, int keep)
   {
     // Multi-BLAS friendly array to store the part of the rotation matrix
-    Complex *Qmat_keep = (Complex *)safe_malloc((n_kr * keep) * sizeof(Complex));
+    std::vector<Complex> Qmat_keep(n_kr * keep, 0.0);
     for (int j = 0; j < n_kr; j++)       
       for (int i = 0; i < keep; i++) { Qmat_keep[j * keep + i] = Qmat[j][i]; }
     
-    rotateVecsComplex(kSpace, Qmat_keep, n_kr, n_kr, keep, profile);
-    
-    host_free(Qmat_keep);
+    rotateVecsComplex(kSpace, Qmat_keep.data(), n_kr, n_kr, keep, 0, profile);
   }
 
   void IRAM::reorder(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals, const QudaEigSpectrumType spec_type)

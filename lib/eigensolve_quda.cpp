@@ -884,20 +884,21 @@ namespace quda
 
 
   void EigenSolver::rotateVecsComplex(std::vector<ColorSpinorField *> &kSpace,
-				      Complex *rot_array,
+				      const Complex *rot_array,
 				      const int offset,
 				      const int dim,
 				      const int keep,
-				      TimeProfile &profile) {
-    
+				      const int locked,
+				      TimeProfile &profile)
+  {
     // If we have memory availible, do the entire rotation
     if (batched_rotate <= 0 || batched_rotate >= keep) {
-      if ((int)kSpace.size() < n_kr + keep) {
+      if ((int)kSpace.size() < offset + keep) {
         ColorSpinorParam csParamClone(*kSpace[0]);
         csParamClone.create = QUDA_ZERO_FIELD_CREATE;
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", n_kr + keep);
-        kSpace.reserve(n_kr + keep);
-        for (int i = kSpace.size(); i < n_kr + keep; i++) {
+        kSpace.reserve(offset + keep);
+        for (int i = kSpace.size(); i < offset + keep; i++) {
           kSpace.push_back(ColorSpinorField::Create(csParamClone));
         }
       }
@@ -909,13 +910,13 @@ namespace quda
       // Alias the extra space vectors, zero the workspace
       kSpace_ptr.reserve(keep);
       for (int i = 0; i < keep; i++) {
-        kSpace_ptr.push_back(kSpace[n_kr + i]);
+        kSpace_ptr.push_back(kSpace[offset + i]);
         blas::zero(*kSpace_ptr[i]);
       }
 
-      // Alias the vectors we wish to keep.
-      vecs_ptr.reserve(n_kr);
-      for (int j = 0; j < n_kr; j++) vecs_ptr.push_back(kSpace[j]);
+      // Alias the vectors we wish to compress.
+      vecs_ptr.reserve(dim);
+      for (int j = 0; j < dim; j++) vecs_ptr.push_back(kSpace[locked + j]);
       
       // multiBLAS caxpy
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -923,7 +924,7 @@ namespace quda
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
       
       // Copy compressed Krylov
-      for (int i = 0; i < keep; i++) std::swap(kSpace[i], kSpace[n_kr + i]);
+      for (int i = 0; i < keep; i++) std::swap(kSpace[locked + i], kSpace[offset + i]);
       
     } else {
 
@@ -1030,21 +1031,16 @@ namespace quda
     }
   }      
 
-  void EigenSolver::rotateVecs(std::vector<ColorSpinorField *> &kSpace,
-			       double *rot_array,
-			       const int offset,
-			       const int dim,
-			       const int keep,
-			       TimeProfile &profile) {
-    
+  void EigenSolver::rotateVecs(std::vector<ColorSpinorField *> &kSpace, const double *rot_array, const int offset, const int dim, const int keep, const int locked, TimeProfile &profile)
+  {
     // If we have memory availible, do the entire rotation
     if (batched_rotate <= 0 || batched_rotate >= keep) {
-      if ((int)kSpace.size() < n_kr + keep) {
+      if ((int)kSpace.size() < offset + keep) {
         ColorSpinorParam csParamClone(*kSpace[0]);
         csParamClone.create = QUDA_ZERO_FIELD_CREATE;
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", n_kr + keep);
-        kSpace.reserve(n_kr + keep);
-        for (int i = kSpace.size(); i < n_kr + keep; i++) {
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + keep);
+        kSpace.reserve(offset + keep);
+        for (int i = kSpace.size(); i < offset + keep; i++) {
           kSpace.push_back(ColorSpinorField::Create(csParamClone));
         }
       }
@@ -1056,13 +1052,13 @@ namespace quda
       // Alias the extra space vectors, zero the workspace
       kSpace_ptr.reserve(keep);
       for (int i = 0; i < keep; i++) {
-        kSpace_ptr.push_back(kSpace[n_kr + i]);
+        kSpace_ptr.push_back(kSpace[offset + i]);
         blas::zero(*kSpace_ptr[i]);
       }
 
       // Alias the vectors we wish to keep.
-      vecs_ptr.reserve(n_kr);
-      for (int j = 0; j < n_kr; j++) vecs_ptr.push_back(kSpace[j]);
+      vecs_ptr.reserve(dim);
+      for (int j = 0; j < dim; j++) vecs_ptr.push_back(kSpace[locked + j]);
       
       // multiBLAS axpy
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -1070,7 +1066,7 @@ namespace quda
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
       
       // Copy compressed Krylov
-      for (int i = 0; i < keep; i++) std::swap(kSpace[i], kSpace[n_kr + i]);
+      for (int i = 0; i < keep; i++) std::swap(kSpace[locked + i], kSpace[offset + i]);
       
     } else {
 
