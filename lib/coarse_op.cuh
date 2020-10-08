@@ -647,20 +647,6 @@ namespace quda {
       return threads;
     }
 
-    int blockStep() const { 
-      if (type == COMPUTE_KDAV)
-        return 256;
-      else
-        return TunableVectorYZ::blockStep();
-    }
-
-    int blockMin() const {
-      if (type == COMPUTE_KDAV)
-        return 256;
-      else
-        return TunableVectorYZ::blockMin();
-    }
-
     bool tuneGridDim() const { return false; } // don't tune the grid dimension
     bool tuneAuxDim() const { return type != COMPUTE_VUV ? false : true; }
 
@@ -671,9 +657,11 @@ namespace quda {
     }
 
     unsigned int sharedBytesPerThread() const {
-      if (type == COMPUTE_KDAV)
+      if (type == COMPUTE_KDAV) {
+        // each warp needs... something
         return 2 * (16 * (fineColor * Arg::blockSizeKD) * Arg::coarseColorPaddedTileSize) * sizeof(complex<typename Arg::Float>) / 256 +
               Arg::xinvPaddedTileSize * sizeof(complex<typename Arg::Float>);
+      }
       else
         return TunableVectorYZ::sharedBytesPerThread();
     }
@@ -1048,8 +1036,10 @@ namespace quda {
       errorQuda("Unsupported coarsening of matpc = %d", matpc);
 
     bool is_dirac_coarse = (dirac == QUDA_COARSE_DIRAC || dirac == QUDA_COARSEPC_DIRAC) ? true : false;
-    bool is_dirac_staggered = (dirac == QUDA_STAGGERED_DIRAC || dirac == QUDA_STAGGEREDPC_DIRAC || dirac == QUDA_STAGGEREDKD_DIRAC ||
-                               dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC || dirac == QUDA_ASQTADKD_DIRAC);
+    bool is_dirac_staggered_kd_specifically = (dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC);
+    bool is_dirac_staggered = (dirac == QUDA_STAGGERED_DIRAC || dirac == QUDA_STAGGEREDPC_DIRAC || 
+                               dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC || is_dirac_staggered_kd_specifically);
+
     bool is_dirac_wilson = !is_dirac_coarse && !is_dirac_staggered;
     if (is_dirac_coarse && fineSpin != 2)
       errorQuda("Input Dirac operator %d should have nSpin=2, not nSpin=%d\n", dirac, fineSpin);
@@ -1089,7 +1079,7 @@ namespace quda {
 
     typedef CalculateYArg<Float,fineSpin,coarseSpin,fineColor,coarseColor,coarseGauge,coarseGaugeAtomic,fineGauge,F,Ftmp,Vt,fineClover> Arg;
     Arg arg(Y, X, Y_atomic, X_atomic, UV, AV, G, V, C, Cinv, kappa, mass,
-	    mu, mu_factor, x_size, xc_size, geo_bs, spin_bs, fine_to_coarse, coarse_to_fine, bidirectional_links);
+	    mu, mu_factor, is_dirac_staggered_kd_specifically, x_size, xc_size, geo_bs, spin_bs, fine_to_coarse, coarse_to_fine, bidirectional_links);
     CalculateY<location, from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> y(
       arg, v, Y_, X_, Y_atomic_, X_atomic_, use_mma);
 
@@ -1185,9 +1175,8 @@ namespace quda {
       if (getVerbosity() >= QUDA_VERBOSE) printf("Compute KDAV\n");
 
       if (av.Precision() == QUDA_HALF_PRECISION) {
-        // FIXME: find a better way to set the scale, probably some max of Xinv
-        double max = 48; // probably way too high
-        if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("kdav max %e\n", max);
+        double max = 6*sqrt(C_.abs_max(true)); // may not be high enough
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("kdav max %e\n", max);
         av.Scale(max);
         arg.AV.resetScale(max);
       }

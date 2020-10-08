@@ -179,6 +179,7 @@ namespace quda {
 
     long long flops() const
     {
+      // FIXME: verify for staggered
       return n_block_ortho * nBlock * (geoBlockSize / 2) * (spinBlockSize == 0 ? 1 : 2 * spinBlockSize) / 2 * nColor
         * (nVec * ((nVec - 1) * (8l + 8l)) + 6l);
     }

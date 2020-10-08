@@ -61,6 +61,8 @@ namespace quda {
     Float mu_factor;            /** multiplicative factor for mu applied when mu is added to the operator */
     Float rescale;              /** rescaling factor used when rescaling the Y links if the maximum increases */
 
+    bool from_staggered_kd;      /** are we coarsening the staggered KD opp (hack for now, will become template param) */
+
     const int fineVolumeCB;     /** Fine grid volume */
     const int coarseVolumeCB;   /** Coarse grid volume */
 
@@ -104,8 +106,8 @@ namespace quda {
     static constexpr int xinvTileSize = 16; /** Length of a tile for KD */
     static constexpr int xinvPaddedTileSize = xinvTileSize + 1; /** Padding to avoid bank conflicts */
     static constexpr int numXinvTiles = coarseDof / xinvTileSize; /** Number of xinv tiles, should always be three */
-    static constexpr int coarseColorTileSize = 4;  /** Number of V vectors handled at a time, must divide into 24, 64, and 96 */
-    static constexpr int coarseColorPaddedTileSize = coarseColorTileSize + 1; /** Padding to avoid some bank conflicts */
+    static constexpr int coarseColorTileSize = 2; //4;  /** Number of V vectors handled at a time, must divide into 24, 64, and 96 */
+    static constexpr int coarseColorPaddedTileSize = coarseColorTileSize; // + 1; /** Padding to avoid some bank conflicts */
 
     // tile used for computeUV
     static constexpr int tile_height_uv = fineColor % 4 == 0 ? 4 : fineColor % 3 == 0 ? 3 : fineColor % 2 ? 2 : 1;
@@ -131,12 +133,12 @@ namespace quda {
     CalculateYArg(coarseGauge &Y, coarseGauge &X, 
       coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic,
       fineSpinorTmp &UV, fineSpinor &AV, const fineGauge &U, const fineSpinorV &V,
-      const fineClover &C, const fineClover &Cinv, double kappa, double mass, double mu, double mu_factor,
+      const fineClover &C, const fineClover &Cinv, double kappa, double mass, double mu, double mu_factor, bool from_staggered_kd,
       const int *x_size_, const int *xc_size_, int *geo_bs_, int spin_bs_,
       const int *fine_to_coarse, const int *coarse_to_fine, bool bidirectional)
       : Y(Y), X(X), Y_atomic(Y_atomic), X_atomic(X_atomic),
       UV(UV), AV(AV), U(U), V(V), C(C), Cinv(Cinv), spin_bs(spin_bs_), spin_map(),
-      kappa(static_cast<Float>(kappa)), mass(static_cast<Float>(mass)), mu(static_cast<Float>(mu)), mu_factor(static_cast<Float>(mu_factor)),
+      kappa(static_cast<Float>(kappa)), mass(static_cast<Float>(mass)), mu(static_cast<Float>(mu)), mu_factor(static_cast<Float>(mu_factor)), from_staggered_kd(from_staggered_kd),
       fineVolumeCB(V.VolumeCB()), coarseVolumeCB(X.VolumeCB()),
       fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
       bidirectional(bidirectional), shared_atomic(false), parity_flip(shared_atomic ? true : false),
@@ -884,20 +886,46 @@ namespace quda {
       const int s_c_col = arg.spin_map(0, 1-parity);
 
       for (int k = 0; k < TileType::k; k += TileType::K) { // Sum over fine color 
-        // FIXME: need a different AV vs V for KD op for left vs right
-        // this should be good for left block Jacobi
-        auto V = make_tile_At<complex, false>(tile);
-        if (dir == QUDA_FORWARDS) {
-          V.loadCS(arg.AV, 0, 0, parity, x_cb, 0, k, i0);
-          V *= static_cast<Float>(-1.);
-        } else { // dir == QUDA_BACKWARDS
+
+
+        if (dir == QUDA_BACKWARDS) {
+
+          auto V = make_tile_At<complex, false>(tile);
           V.loadCS(arg.V, 0, 0, parity, x_cb, 0, k, i0);
+
+          // here UV is really UAV
+          auto UV = make_tile_B<complex, false>(tile);
+          UV.loadCS(arg.UV, 0, 0, parity, x_cb, 0, k, j0);
+
+          vuv[s_c_row*coarseSpin+s_c_col].mma_tn(V, UV);
+
+        } else {
+
+          auto AV = make_tile_At<complex, false>(tile);
+          AV.loadCS(arg.AV, 0, 0, parity, x_cb, 0, k, i0);
+          AV *= static_cast<Float>(-1.);
+
+          auto UV = make_tile_B<complex, false>(tile);
+          UV.loadCS(arg.UV, 0, 0, parity, x_cb, 0, k, j0);
+
+          vuv[s_c_row*coarseSpin+s_c_col].mma_tn(AV, UV);
+
         }
 
-        auto UV = make_tile_B<complex, false>(tile);
-        UV.loadCS(arg.UV, 0, 0, parity, x_cb, 0, k, j0);
+        // FIXME: need a different AV vs V for KD op for left vs right
+        // this should be good for left block Jacobi
+        //auto V = make_tile_At<complex, false>(tile);
+        //if (dir == QUDA_FORWARDS) {
+        //  V.loadCS(arg.AV, 0, 0, parity, x_cb, 0, k, i0);
+        //  V *= static_cast<Float>(-1.);
+        //} else { // dir == QUDA_BACKWARDS
+        //  V.loadCS(arg.V, 0, 0, parity, x_cb, 0, k, i0);
+        //}
 
-        vuv[s_c_row*coarseSpin+s_c_col].mma_tn(V, UV);
+        //auto UV = make_tile_B<complex, false>(tile);
+        //UV.loadCS(arg.UV, 0, 0, parity, x_cb, 0, k, j0);
+
+        //vuv[s_c_row*coarseSpin+s_c_col].mma_tn(V, UV);
 
       }
 
