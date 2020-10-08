@@ -57,7 +57,7 @@ namespace quda
     save_prec = eig_param->save_prec;
 
     // Sanity checks
-    if (n_kr <= n_ev) errorQuda("n_kr = %d is less than or equal to n_ev = %d", n_kr, n_ev);    
+    if (n_kr <= n_ev) errorQuda("n_kr = %d is less than or equal to n_ev = %d", n_kr, n_ev);
     if (n_ev < n_conv) errorQuda("n_conv=%d is greater than n_ev=%d", n_conv, n_ev);
     if (n_ev == 0) errorQuda("n_ev=0 passed to Eigensolver");
     if (n_kr == 0) errorQuda("n_kr=0 passed to Eigensolver");
@@ -65,19 +65,19 @@ namespace quda
     if (n_ev_deflate > n_conv) errorQuda("deflation vecs = %d is greater than n_conv = %d", n_ev_deflate, n_conv);
 
     residua.reserve(n_kr);
-    for(int i=0; i<n_kr; i++) residua.push_back(0.0);
-    
+    for (int i = 0; i < n_kr; i++) residua.push_back(0.0);
+
     // Part of the spectrum to be computed.
     switch (eig_param->spectrum) {
     case QUDA_SPECTRUM_LM_EIG: strcpy(spectrum, "LM"); break;
-    case QUDA_SPECTRUM_SM_EIG: strcpy(spectrum, "SM"); break;      
+    case QUDA_SPECTRUM_SM_EIG: strcpy(spectrum, "SM"); break;
     case QUDA_SPECTRUM_LR_EIG: strcpy(spectrum, "LR"); break;
     case QUDA_SPECTRUM_SR_EIG: strcpy(spectrum, "SR"); break;
     case QUDA_SPECTRUM_LI_EIG: strcpy(spectrum, "LI"); break;
     case QUDA_SPECTRUM_SI_EIG: strcpy(spectrum, "SI"); break;
     default: errorQuda("Unexpected spectrum type %d", eig_param->spectrum);
     }
-    
+
     // Deduce whether to reverse the sorting
     if (strncmp("L", spectrum, 1) == 0 && !eig_param->use_poly_acc) {
       reverse = true;
@@ -87,8 +87,8 @@ namespace quda
     } else if (strncmp("L", spectrum, 1) == 0 && eig_param->use_poly_acc) {
       reverse = true;
       spectrum[0] = 'S';
-    }    
-    
+    }
+
     if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
 
@@ -103,8 +103,7 @@ namespace quda
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating IR Arnoldi eigensolver\n");
       eig_solver = new IRAM(mat, eig_param, profile);
       break;
-    case QUDA_EIG_BLK_IR_ARNOLDI:
-      errorQuda("Block IR Arnoldi not implemented");
+    case QUDA_EIG_BLK_IR_ARNOLDI: errorQuda("Block IR Arnoldi not implemented");
     case QUDA_EIG_TR_LANCZOS:
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating TR Lanczos eigensolver\n");
       eig_solver = new TRLM(mat, eig_param, profile);
@@ -421,7 +420,8 @@ namespace quda
         } else {
           if (abs(Unit - cnorm) > 5.0 * epsilon) {
             if (getVerbosity() >= QUDA_SUMMARIZE)
-              printfQuda("1 - Norm <%d|%d>^2 = 1 - ||(%e,%e)|| = %e\n", i, j, cnorm.real(), cnorm.imag(), abs(Unit - cnorm));
+              printfQuda("1 - Norm <%d|%d>^2 = 1 - ||(%e,%e)|| = %e\n", i, j, cnorm.real(), cnorm.imag(),
+                         abs(Unit - cnorm));
             orthed = false;
           }
         }
@@ -513,8 +513,8 @@ namespace quda
     int block_j_rank = j_range.second - j_range.first;
 
     // Quick return if no op.
-    if(block_i_rank == 0 || block_j_rank == 0) return;
-    
+    if (block_i_rank == 0 || block_j_rank == 0) return;
+
     // Pointers to the relevant vectors
     std::vector<ColorSpinorField *> vecs_ptr;
     std::vector<ColorSpinorField *> kSpace_ptr;
@@ -565,10 +565,10 @@ namespace quda
   {
     int block_i_rank = i_range.second - i_range.first;
     int block_j_rank = j_range.second - j_range.first;
-    
+
     // Quick return if no op.
-    if(block_i_rank == 0 || block_j_rank == 0) return;
-    
+    if (block_i_rank == 0 || block_j_rank == 0) return;
+
     // Pointers to the relevant vectors
     std::vector<ColorSpinorField *> vecs_ptr;
     std::vector<ColorSpinorField *> kSpace_ptr;
@@ -592,7 +592,7 @@ namespace quda
         batch_array[i_arr * block_j_rank + j_arr] = array[j * rank + i];
       }
     }
-    switch (b_type) {      
+    switch (b_type) {
     case PENCIL: blas::caxpy(batch_array, vecs_ptr, kSpace_ptr); break;
     case LOWER_TRI: blas::caxpy_L(batch_array, vecs_ptr, kSpace_ptr); break;
     case UPPER_TRI: blas::caxpy_U(batch_array, vecs_ptr, kSpace_ptr); break;
@@ -660,7 +660,7 @@ namespace quda
       warningQuda("deflateSVD called with n_ev_deflate = 0");
       return;
     }
-    
+
     int n_defl = n_ev_deflate;
     if (evecs.size() != (unsigned int)(2 * eig_param->n_conv))
       errorQuda("Incorrect deflation space sized %d passed to deflateSVD, expected %d", (int)(evecs.size()),
@@ -797,107 +797,105 @@ namespace quda
     delete r[0];
   }
 
-  void EigenSolver::sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<Complex> &x, std::vector<Complex> &y) {
-    
+  void EigenSolver::sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<Complex> &x, std::vector<Complex> &y)
+  {
+
     //  'LM' -> sort into increasing order of magnitude.
     //  'SM' -> sort into decreasing order of magnitude.
-    //  'LR' -> sort with real(x) in increasing algebraic order 
+    //  'LR' -> sort with real(x) in increasing algebraic order
     //  'SR' -> sort with real(x) in decreasing algebraic order
     //  'LI' -> sort with imag(x) in increasing algebraic order
     //  'SI' -> sort with imag(x) in decreasing algebraic order
 
     std::vector<std::pair<Complex, Complex>> array(n);
-    for(int i=0; i<n; i++) array[i] = std::make_pair(x[i], y[i]);
-  
-    switch(spec_type) {
+    for (int i = 0; i < n; i++) array[i] = std::make_pair(x[i], y[i]);
+
+    switch (spec_type) {
     case QUDA_SPECTRUM_LM_EIG:
-      std::sort(array.begin(), array.begin()+n,
-		[] (const std::pair<Complex,Complex> &a,
-		    const std::pair<Complex,Complex> &b) {
-		  return (abs(a.first) < abs(b.first)); } );
+      std::sort(array.begin(), array.begin() + n,
+                [](const std::pair<Complex, Complex> &a, const std::pair<Complex, Complex> &b) {
+                  return (abs(a.first) < abs(b.first));
+                });
       break;
     case QUDA_SPECTRUM_SM_EIG:
-      std::sort(array.begin(), array.begin()+n,
-		[] (const std::pair<Complex,Complex> &a,
-		    const std::pair<Complex,Complex> &b) {
-		  return (abs(a.first) > abs(b.first)); } );
+      std::sort(array.begin(), array.begin() + n,
+                [](const std::pair<Complex, Complex> &a, const std::pair<Complex, Complex> &b) {
+                  return (abs(a.first) > abs(b.first));
+                });
       break;
     case QUDA_SPECTRUM_LR_EIG:
-      std::sort(array.begin(), array.begin()+n,
-		[] (const std::pair<Complex,Complex> &a,
-		    const std::pair<Complex,Complex> &b) {
-		  return (a.first).real() < (b.first).real(); } );
+      std::sort(array.begin(), array.begin() + n,
+                [](const std::pair<Complex, Complex> &a, const std::pair<Complex, Complex> &b) {
+                  return (a.first).real() < (b.first).real();
+                });
       break;
     case QUDA_SPECTRUM_SR_EIG:
-      std::sort(array.begin(), array.begin()+n,
-		[] (const std::pair<Complex,Complex> &a,
-		    const std::pair<Complex,Complex> &b) {
-		  return (a.first).real() > (b.first).real(); } );
+      std::sort(array.begin(), array.begin() + n,
+                [](const std::pair<Complex, Complex> &a, const std::pair<Complex, Complex> &b) {
+                  return (a.first).real() > (b.first).real();
+                });
       break;
     case QUDA_SPECTRUM_LI_EIG:
-      std::sort(array.begin(), array.begin()+n,
-		[] (const std::pair<Complex,Complex> &a,
-		    const std::pair<Complex,Complex> &b) {
-		  return (a.first).imag() < (b.first).imag(); } );
+      std::sort(array.begin(), array.begin() + n,
+                [](const std::pair<Complex, Complex> &a, const std::pair<Complex, Complex> &b) {
+                  return (a.first).imag() < (b.first).imag();
+                });
       break;
     case QUDA_SPECTRUM_SI_EIG:
-      std::sort(array.begin(), array.begin()+n,
-		[] (const std::pair<Complex,Complex> &a,
-		    const std::pair<Complex,Complex> &b) {
-		  return (a.first).imag() > (b.first).imag(); } );
+      std::sort(array.begin(), array.begin() + n,
+                [](const std::pair<Complex, Complex> &a, const std::pair<Complex, Complex> &b) {
+                  return (a.first).imag() > (b.first).imag();
+                });
       break;
     default: errorQuda("Undefined spectrum type %d given", spec_type);
     }
-    
+
     // Repopulate x and y arrays with sorted elements
-    for(int i=0; i<n; i++) {
+    for (int i = 0; i < n; i++) {
       x[i] = array[i].first;
       y[i] = array[i].second;
     }
   }
 
   // Overloaded version of sortArrays to deal with real y array.
-  void EigenSolver::sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<Complex> &x, std::vector<double> &y) {
+  void EigenSolver::sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<Complex> &x, std::vector<double> &y)
+  {
 
-    std::vector<Complex> y_tmp(n,0.0);
-    for(int i=0; i<n; i++) y_tmp[i].real(y[i]);
+    std::vector<Complex> y_tmp(n, 0.0);
+    for (int i = 0; i < n; i++) y_tmp[i].real(y[i]);
     sortArrays(spec_type, n, x, y_tmp);
-    for(int i=0; i<n; i++) y[i] = y_tmp[i].real();
+    for (int i = 0; i < n; i++) y[i] = y_tmp[i].real();
   }
 
   // Overloaded version of sortArrays to deal with real x array.
-  void EigenSolver::sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<double> &x, std::vector<Complex> &y) {
+  void EigenSolver::sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<double> &x, std::vector<Complex> &y)
+  {
 
-    std::vector<Complex> x_tmp(n,0.0);
-    for(int i=0; i<n; i++) x_tmp[i].real(x[i]);
+    std::vector<Complex> x_tmp(n, 0.0);
+    for (int i = 0; i < n; i++) x_tmp[i].real(x[i]);
     sortArrays(spec_type, n, x_tmp, y);
-    for(int i=0; i<n; i++) x[i] = x_tmp[i].real();
+    for (int i = 0; i < n; i++) x[i] = x_tmp[i].real();
   }
 
   // Overloaded version of sortArrays to deal with real x and y array.
-  void EigenSolver::sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<double> &x, std::vector<double> &y) {
+  void EigenSolver::sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<double> &x, std::vector<double> &y)
+  {
 
-    std::vector<Complex> x_tmp(n,0.0);
-    std::vector<Complex> y_tmp(n,0.0);
-    for(int i=0; i<n; i++) {
+    std::vector<Complex> x_tmp(n, 0.0);
+    std::vector<Complex> y_tmp(n, 0.0);
+    for (int i = 0; i < n; i++) {
       x_tmp[i].real(x[i]);
       y_tmp[i].real(y[i]);
     }
     sortArrays(spec_type, n, x_tmp, y_tmp);
-    for(int i=0; i<n; i++) {
+    for (int i = 0; i < n; i++) {
       x[i] = x_tmp[i].real();
       y[i] = y_tmp[i].real();
     }
   }
 
-
-  void EigenSolver::rotateVecsComplex(std::vector<ColorSpinorField *> &kSpace,
-				      const Complex *rot_array,
-				      const int offset,
-				      const int dim,
-				      const int keep,
-				      const int locked,
-				      TimeProfile &profile)
+  void EigenSolver::rotateVecsComplex(std::vector<ColorSpinorField *> &kSpace, const Complex *rot_array, const int offset,
+                                      const int dim, const int keep, const int locked, TimeProfile &profile)
   {
     // If we have memory availible, do the entire rotation
     if (batched_rotate <= 0 || batched_rotate >= keep) {
@@ -910,7 +908,7 @@ namespace quda
           kSpace.push_back(ColorSpinorField::Create(csParamClone));
         }
       }
-      
+
       // Pointers to the relevant vectors
       std::vector<ColorSpinorField *> vecs_ptr;
       std::vector<ColorSpinorField *> kSpace_ptr;
@@ -925,15 +923,15 @@ namespace quda
       // Alias the vectors we wish to compress.
       vecs_ptr.reserve(dim);
       for (int j = 0; j < dim; j++) vecs_ptr.push_back(kSpace[locked + j]);
-      
+
       // multiBLAS caxpy
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
       blas::caxpy(rot_array, vecs_ptr, kSpace_ptr);
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-      
+
       // Copy compressed Krylov
       for (int i = 0; i < keep; i++) std::swap(kSpace[locked + i], kSpace[offset + i]);
-      
+
     } else {
 
       // Do batched rotation to save on memory
@@ -943,20 +941,20 @@ namespace quda
       bool do_batch_remainder = (batch_size_r != 0 ? true : false);
 
       if ((int)kSpace.size() < offset + batch_size) {
-	ColorSpinorParam csParamClone(*kSpace[0]);
-	csParamClone.create = QUDA_ZERO_FIELD_CREATE;
-	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + batch_size);
-	kSpace.reserve(offset + batch_size);
-	for (int i = kSpace.size(); i < offset + batch_size; i++) {
-	  kSpace.push_back(ColorSpinorField::Create(csParamClone));
-	}
+        ColorSpinorParam csParamClone(*kSpace[0]);
+        csParamClone.create = QUDA_ZERO_FIELD_CREATE;
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + batch_size);
+        kSpace.reserve(offset + batch_size);
+        for (int i = kSpace.size(); i < offset + batch_size; i++) {
+          kSpace.push_back(ColorSpinorField::Create(csParamClone));
+        }
       }
 
       profile.TPSTART(QUDA_PROFILE_EIGENLU);
       MatrixXcd mat = MatrixXcd::Zero(dim, keep);
       for (int j = 0; j < keep; j++)
-	for (int i = 0; i < dim; i++) mat(i, j) = rot_array[i * keep + j];
-      
+        for (int i = 0; i < dim; i++) mat(i, j) = rot_array[i * keep + j];
+
       FullPivLU<MatrixXcd> matLU(mat);
 
       // Extract the upper triangular matrix
@@ -988,49 +986,49 @@ namespace quda
       // Loop over full batches
       for (int b = 0; b < full_batches; b++) {
 
-	// batch triangle
-	blockRotateComplex(kSpace, matLower.data(), dim, {b * batch_size, (b + 1) * batch_size},
-			   {b * batch_size, (b + 1) * batch_size}, LOWER_TRI, offset);
-	// batch pencil
-	blockRotateComplex(kSpace, matLower.data(), dim, {(b + 1) * batch_size, dim},
-			   {b * batch_size, (b + 1) * batch_size}, PENCIL, offset);
-	blockReset(kSpace, b * batch_size, (b + 1) * batch_size, offset);
+        // batch triangle
+        blockRotateComplex(kSpace, matLower.data(), dim, {b * batch_size, (b + 1) * batch_size},
+                           {b * batch_size, (b + 1) * batch_size}, LOWER_TRI, offset);
+        // batch pencil
+        blockRotateComplex(kSpace, matLower.data(), dim, {(b + 1) * batch_size, dim},
+                           {b * batch_size, (b + 1) * batch_size}, PENCIL, offset);
+        blockReset(kSpace, b * batch_size, (b + 1) * batch_size, offset);
       }
       if (do_batch_remainder) {
-	// remainder triangle
-	blockRotateComplex(kSpace, matLower.data(), dim, {full_batches * batch_size, keep},
-			   {full_batches * batch_size, keep}, LOWER_TRI, offset);
-	// remainder pencil
-	if (keep < dim) {
-	  blockRotateComplex(kSpace, matLower.data(), dim, {keep, dim}, {full_batches * batch_size, keep},
-			     PENCIL, offset);
-	}
-	blockReset(kSpace, full_batches * batch_size, keep, offset);
+        // remainder triangle
+        blockRotateComplex(kSpace, matLower.data(), dim, {full_batches * batch_size, keep},
+                           {full_batches * batch_size, keep}, LOWER_TRI, offset);
+        // remainder pencil
+        if (keep < dim) {
+          blockRotateComplex(kSpace, matLower.data(), dim, {keep, dim}, {full_batches * batch_size, keep}, PENCIL,
+                             offset);
+        }
+        blockReset(kSpace, full_batches * batch_size, keep, offset);
       }
 
       // Do U Multiply
       //---------------------------------------------------------------------------
       if (do_batch_remainder) {
-	// remainder triangle
-	blockRotateComplex(kSpace, matUpper.data(), keep, {full_batches * batch_size, keep},
-			   {full_batches * batch_size, keep}, UPPER_TRI, offset);
-	// remainder pencil
-	blockRotateComplex(kSpace, matUpper.data(), keep, {0, full_batches * batch_size},
-			   {full_batches * batch_size, keep}, PENCIL, offset);
-	blockReset(kSpace, full_batches * batch_size, keep, offset);
+        // remainder triangle
+        blockRotateComplex(kSpace, matUpper.data(), keep, {full_batches * batch_size, keep},
+                           {full_batches * batch_size, keep}, UPPER_TRI, offset);
+        // remainder pencil
+        blockRotateComplex(kSpace, matUpper.data(), keep, {0, full_batches * batch_size},
+                           {full_batches * batch_size, keep}, PENCIL, offset);
+        blockReset(kSpace, full_batches * batch_size, keep, offset);
       }
 
       // Loop over full batches
       for (int b = full_batches - 1; b >= 0; b--) {
-	// batch triangle
-	blockRotateComplex(kSpace, matUpper.data(), keep, {b * batch_size, (b + 1) * batch_size},
-			   {b * batch_size, (b + 1) * batch_size}, UPPER_TRI, offset);
-	if (b > 0) {
-	  // batch pencil
-	  blockRotateComplex(kSpace, matUpper.data(), keep, {0, b * batch_size},
-			     {b * batch_size, (b + 1) * batch_size}, PENCIL, offset);
-	}
-	blockReset(kSpace, b * batch_size, (b + 1) * batch_size, offset);
+        // batch triangle
+        blockRotateComplex(kSpace, matUpper.data(), keep, {b * batch_size, (b + 1) * batch_size},
+                           {b * batch_size, (b + 1) * batch_size}, UPPER_TRI, offset);
+        if (b > 0) {
+          // batch pencil
+          blockRotateComplex(kSpace, matUpper.data(), keep, {0, b * batch_size}, {b * batch_size, (b + 1) * batch_size},
+                             PENCIL, offset);
+        }
+        blockReset(kSpace, b * batch_size, (b + 1) * batch_size, offset);
       }
 
       // Do Q Permute
@@ -1038,9 +1036,10 @@ namespace quda
       permuteVecs(kSpace, matQ.data(), keep);
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     }
-  }      
+  }
 
-  void EigenSolver::rotateVecs(std::vector<ColorSpinorField *> &kSpace, const double *rot_array, const int offset, const int dim, const int keep, const int locked, TimeProfile &profile)
+  void EigenSolver::rotateVecs(std::vector<ColorSpinorField *> &kSpace, const double *rot_array, const int offset,
+                               const int dim, const int keep, const int locked, TimeProfile &profile)
   {
     // If we have memory availible, do the entire rotation
     if (batched_rotate <= 0 || batched_rotate >= keep) {
@@ -1053,7 +1052,7 @@ namespace quda
           kSpace.push_back(ColorSpinorField::Create(csParamClone));
         }
       }
-      
+
       // Pointers to the relevant vectors
       std::vector<ColorSpinorField *> vecs_ptr;
       std::vector<ColorSpinorField *> kSpace_ptr;
@@ -1068,15 +1067,15 @@ namespace quda
       // Alias the vectors we wish to keep.
       vecs_ptr.reserve(dim);
       for (int j = 0; j < dim; j++) vecs_ptr.push_back(kSpace[locked + j]);
-      
+
       // multiBLAS axpy
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
       blas::axpy(rot_array, vecs_ptr, kSpace_ptr);
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-      
+
       // Copy compressed Krylov
       for (int i = 0; i < keep; i++) std::swap(kSpace[locked + i], kSpace[offset + i]);
-      
+
     } else {
 
       int batch_size = batched_rotate;
@@ -1085,20 +1084,20 @@ namespace quda
       bool do_batch_remainder = (batch_size_r != 0 ? true : false);
 
       if ((int)kSpace.size() < offset + batch_size) {
-	ColorSpinorParam csParamClone(*kSpace[0]);
-	csParamClone.create = QUDA_ZERO_FIELD_CREATE;
-	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + batch_size);
-	kSpace.reserve(offset + batch_size);
-	for (int i = kSpace.size(); i < offset + batch_size; i++) {
-	  kSpace.push_back(ColorSpinorField::Create(csParamClone));
-	}
+        ColorSpinorParam csParamClone(*kSpace[0]);
+        csParamClone.create = QUDA_ZERO_FIELD_CREATE;
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + batch_size);
+        kSpace.reserve(offset + batch_size);
+        for (int i = kSpace.size(); i < offset + batch_size; i++) {
+          kSpace.push_back(ColorSpinorField::Create(csParamClone));
+        }
       }
 
       profile.TPSTART(QUDA_PROFILE_EIGEN);
       MatrixXd mat = MatrixXd::Zero(dim, keep);
       for (int j = 0; j < keep; j++)
-	for (int i = 0; i < dim; i++) mat(i, j) = rot_array[i * keep + j];
-      
+        for (int i = 0; i < dim; i++) mat(i, j) = rot_array[i * keep + j];
+
       FullPivLU<MatrixXd> matLU(mat);
 
       // Extract the upper triangular matrix
@@ -1130,48 +1129,47 @@ namespace quda
       // Loop over full batches
       for (int b = 0; b < full_batches; b++) {
 
-	// batch triangle
-	blockRotate(kSpace, matLower.data(), dim, {b * batch_size, (b + 1) * batch_size}, {b * batch_size, (b + 1) * batch_size}, LOWER_TRI);
-	// batch pencil
-	blockRotate(kSpace, matLower.data(), dim, {(b + 1) * batch_size, dim},
-			   {b * batch_size, (b + 1) * batch_size}, PENCIL);
-	blockReset(kSpace, b * batch_size, (b + 1) * batch_size, offset);
+        // batch triangle
+        blockRotate(kSpace, matLower.data(), dim, {b * batch_size, (b + 1) * batch_size},
+                    {b * batch_size, (b + 1) * batch_size}, LOWER_TRI);
+        // batch pencil
+        blockRotate(kSpace, matLower.data(), dim, {(b + 1) * batch_size, dim}, {b * batch_size, (b + 1) * batch_size},
+                    PENCIL);
+        blockReset(kSpace, b * batch_size, (b + 1) * batch_size, offset);
       }
       if (do_batch_remainder) {
-	// remainder triangle
-	blockRotate(kSpace, matLower.data(), dim, {full_batches * batch_size, keep},
-		    {full_batches * batch_size, keep}, LOWER_TRI);
-	// remainder pencil
-	if (keep < dim) {
-	  blockRotate(kSpace, matLower.data(), dim, {keep, dim}, {full_batches * batch_size, keep},
-			     PENCIL);
-	}
-	blockReset(kSpace, full_batches * batch_size, keep, offset);
+        // remainder triangle
+        blockRotate(kSpace, matLower.data(), dim, {full_batches * batch_size, keep}, {full_batches * batch_size, keep},
+                    LOWER_TRI);
+        // remainder pencil
+        if (keep < dim) {
+          blockRotate(kSpace, matLower.data(), dim, {keep, dim}, {full_batches * batch_size, keep}, PENCIL);
+        }
+        blockReset(kSpace, full_batches * batch_size, keep, offset);
       }
 
       // Do U Multiply
       //---------------------------------------------------------------------------
       if (do_batch_remainder) {
-	// remainder triangle
-	blockRotate(kSpace, matUpper.data(), keep, {full_batches * batch_size, keep},
-			   {full_batches * batch_size, keep}, UPPER_TRI);
-	// remainder pencil
-	blockRotate(kSpace, matUpper.data(), keep, {0, full_batches * batch_size},
-			   {full_batches * batch_size, keep}, PENCIL);
-	blockReset(kSpace, full_batches * batch_size, keep, offset);
+        // remainder triangle
+        blockRotate(kSpace, matUpper.data(), keep, {full_batches * batch_size, keep}, {full_batches * batch_size, keep},
+                    UPPER_TRI);
+        // remainder pencil
+        blockRotate(kSpace, matUpper.data(), keep, {0, full_batches * batch_size}, {full_batches * batch_size, keep},
+                    PENCIL);
+        blockReset(kSpace, full_batches * batch_size, keep, offset);
       }
 
       // Loop over full batches
       for (int b = full_batches - 1; b >= 0; b--) {
-	// batch triangle
-	blockRotate(kSpace, matUpper.data(), keep, {b * batch_size, (b + 1) * batch_size},
-			   {b * batch_size, (b + 1) * batch_size}, UPPER_TRI);
-	if (b > 0) {
-	  // batch pencil
-	  blockRotate(kSpace, matUpper.data(), keep, {0, b * batch_size},
-		      {b * batch_size, (b + 1) * batch_size}, PENCIL);
-	}
-	blockReset(kSpace, b * batch_size, (b + 1) * batch_size, offset);
+        // batch triangle
+        blockRotate(kSpace, matUpper.data(), keep, {b * batch_size, (b + 1) * batch_size},
+                    {b * batch_size, (b + 1) * batch_size}, UPPER_TRI);
+        if (b > 0) {
+          // batch pencil
+          blockRotate(kSpace, matUpper.data(), keep, {0, b * batch_size}, {b * batch_size, (b + 1) * batch_size}, PENCIL);
+        }
+        blockReset(kSpace, b * batch_size, (b + 1) * batch_size, offset);
       }
 
       // Do Q Permute
@@ -1179,10 +1177,8 @@ namespace quda
       permuteVecs(kSpace, matQ.data(), keep);
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     }
-  }      
+  }
 
-  
-  
   EigenSolver::~EigenSolver()
   {
     if (tmp1) delete tmp1;

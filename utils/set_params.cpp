@@ -272,7 +272,8 @@ void setEigParam(QudaEigParam &eig_param)
     eig_param.n_ev_deflate = eig_n_ev_deflate;
   }
 
-  eig_param.block_size = (eig_param.eig_type == QUDA_EIG_TR_LANCZOS || eig_param.eig_type == QUDA_EIG_IR_ARNOLDI) ? 1 : eig_block_size;
+  eig_param.block_size
+    = (eig_param.eig_type == QUDA_EIG_TR_LANCZOS || eig_param.eig_type == QUDA_EIG_IR_ARNOLDI) ? 1 : eig_block_size;
   eig_param.n_ev = eig_n_ev;
   eig_param.n_kr = eig_n_kr;
   eig_param.tol = eig_tol;
@@ -672,14 +673,19 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
     errorQuda("Only real spectrum type (LR or SR) can be passed to the a Lanczos type solver");
   }
 
-  mg_eig_param.block_size = (mg_eig_param.eig_type == QUDA_EIG_TR_LANCZOS || mg_eig_param.eig_type == QUDA_EIG_IR_ARNOLDI) ? 1 : mg_eig_block_size[level];
+  mg_eig_param.block_size
+    = (mg_eig_param.eig_type == QUDA_EIG_TR_LANCZOS || mg_eig_param.eig_type == QUDA_EIG_IR_ARNOLDI) ?
+    1 :
+    mg_eig_block_size[level];
   mg_eig_param.n_ev = mg_eig_n_ev[level];
   mg_eig_param.n_kr = mg_eig_n_kr[level];
   mg_eig_param.n_conv = nvec[level];
 
   // Inverters will deflate only this number of vectors.
-  if (mg_eig_n_ev_deflate[level] > 0 && mg_eig_n_ev_deflate[level] < mg_eig_param.n_conv) mg_eig_param.n_ev_deflate = mg_eig_n_ev_deflate[level];
-  else if (mg_eig_n_ev_deflate[level] > mg_eig_param.n_conv) errorQuda("Can not deflate more than nvec[%d] eigenvectors.", mg_eig_param.n_conv);
+  if (mg_eig_n_ev_deflate[level] > 0 && mg_eig_n_ev_deflate[level] < mg_eig_param.n_conv)
+    mg_eig_param.n_ev_deflate = mg_eig_n_ev_deflate[level];
+  else if (mg_eig_n_ev_deflate[level] > mg_eig_param.n_conv)
+    errorQuda("Can not deflate more than nvec[%d] eigenvectors.", mg_eig_param.n_conv);
   else {
     mg_eig_param.n_ev_deflate = mg_eig_param.n_conv;
     mg_eig_n_ev_deflate[level] = mg_eig_param.n_conv;

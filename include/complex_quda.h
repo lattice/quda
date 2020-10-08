@@ -718,20 +718,20 @@ public:
     imag(im);
   }
 
-  __host__ __device__ inline complex<int8_t>(const complex<int8_t> &z) : char2(z) {}
+  __host__ __device__ inline complex<int8_t>(const complex<int8_t> &z) : char2(z) { }
 
   __host__ __device__ inline complex<int8_t> &operator+=(const complex<int8_t> z)
   {
     real(real() + z.real());
     imag(imag() + z.imag());
     return *this;
-    }
+  }
 
-    __host__ __device__ inline complex<int8_t> &operator-=(const complex<int8_t> z)
-    {
-      real(real()-z.real());
-      imag(imag()-z.imag());
-      return *this;
+  __host__ __device__ inline complex<int8_t> &operator-=(const complex<int8_t> z)
+  {
+    real(real() - z.real());
+    imag(imag() - z.imag());
+    return *this;
     }
 
     __host__ __device__ inline int8_t real() const volatile { return x; }

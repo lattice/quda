@@ -479,7 +479,7 @@ namespace quda
     }
 
     rotateVecsComplex(kSpace, ritz_mat_keep, offset, dim, iter_keep, num_locked, profile);
-    
+
     // Update residual vectors
     for (int i = 0; i < block_size; i++) std::swap(kSpace[num_locked + iter_keep + i], kSpace[n_kr + i]);
 

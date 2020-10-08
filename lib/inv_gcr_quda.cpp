@@ -292,30 +292,29 @@ namespace quda {
 
     if (param.deflate) {
       // Construct the eigensolver and deflation space if requested.
-      if(param.eig_param.eig_type == QUDA_EIG_TR_LANCZOS ||
-	 param.eig_param.eig_type == QUDA_EIG_BLK_TR_LANCZOS) {	
-	constructDeflationSpace(b, matMdagM);
+      if (param.eig_param.eig_type == QUDA_EIG_TR_LANCZOS || param.eig_param.eig_type == QUDA_EIG_BLK_TR_LANCZOS) {
+        constructDeflationSpace(b, matMdagM);
       } else {
-	// Use Arnoldi to inspect the space only and turn off deflation
-	constructDeflationSpace(b, mat);
-	param.deflate = false;
+        // Use Arnoldi to inspect the space only and turn off deflation
+        constructDeflationSpace(b, mat);
+        param.deflate = false;
       }
       if (deflate_compute) {
         // compute the deflation space.
         profile.TPSTOP(QUDA_PROFILE_INIT);
         (*eig_solve)(evecs, evals);
-	if(param.deflate) {	
-	  // double the size of the Krylov space
-	  extendSVDDeflationSpace();
-	  // populate extra memory with L/R singular vectors
-	  eig_solve->computeSVD(matMdagM, evecs, evals);
-	}
+        if (param.deflate) {
+          // double the size of the Krylov space
+          extendSVDDeflationSpace();
+          // populate extra memory with L/R singular vectors
+          eig_solve->computeSVD(matMdagM, evecs, evals);
+        }
         profile.TPSTART(QUDA_PROFILE_INIT);
         deflate_compute = false;
       }
       if (recompute_evals) {
-	eig_solve->computeEvals(matMdagM, evecs, evals);
-	eig_solve->computeSVD(matMdagM, evecs, evals);
+        eig_solve->computeEvals(matMdagM, evecs, evals);
+        eig_solve->computeSVD(matMdagM, evecs, evals);
         recompute_evals = false;
       }
     }
@@ -343,7 +342,7 @@ namespace quda {
     if (param.deflate && param.maxiter > 1) {
       // Deflate: Hardcoded to SVD. If maxiter == 1, this is a dummy solve
       eig_solve->deflateSVD(x, r, evecs, evals, true);
-      
+
       // Compute r_defl = RHS - A * LHS
       mat(r, x, tmp);
       r2 = blas::xmyNorm(b, r);
@@ -457,9 +456,9 @@ namespace quda {
         r2 = blas::xmyNorm(b, r);
 
         if (param.deflate && sqrt(r2) < maxr_deflate * param.tol_restart) {
-	  // Deflate: Hardcoded to SVD.
-	  eig_solve->deflateSVD(x, r, evecs, evals, true);
-	  
+          // Deflate: Hardcoded to SVD.
+          eig_solve->deflateSVD(x, r, evecs, evals, true);
+
           // Compute r_defl = RHS - A * LHS
           mat(r, x, tmp);
           r2 = blas::xmyNorm(b, r);

@@ -309,9 +309,9 @@ namespace
 
   CLI::TransformPairs<QudaEigType> eig_type_map {{"trlm", QUDA_EIG_TR_LANCZOS},
                                                  {"blktrlm", QUDA_EIG_BLK_TR_LANCZOS},
-						 {"iram", QUDA_EIG_IR_ARNOLDI},
-						 {"blkiram", QUDA_EIG_BLK_IR_ARNOLDI}};
-                                                 
+                                                 {"iram", QUDA_EIG_IR_ARNOLDI},
+                                                 {"blkiram", QUDA_EIG_BLK_IR_ARNOLDI}};
+
   CLI::TransformPairs<QudaTboundary> fermion_t_boundary_map {{"periodic", QUDA_PERIODIC_T},
                                                              {"anti-periodic", QUDA_ANTI_PERIODIC_T}};
 
@@ -606,15 +606,16 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--eig-ARPACK-logfile", eig_arpack_logfile, "The filename storing the log from arpack");
   opgroup->add_option("--eig-arpack-check", eig_arpack_check,
                       "Cross check the device data against ARPACK (requires ARPACK, default false)");
-  opgroup->add_option("--eig-use-eigen-qr", eig_use_eigen_qr, "Use Eigen to eigensolve the upper Hessenberg in IRAM, else use QUDA's QR code. (default true)");
+  opgroup->add_option("--eig-use-eigen-qr", eig_use_eigen_qr,
+                      "Use Eigen to eigensolve the upper Hessenberg in IRAM, else use QUDA's QR code. (default true)");
   opgroup->add_option("--eig-compute-svd", eig_compute_svd,
                       "Solve the MdagM problem, use to compute SVD of M (default false)");
   opgroup->add_option("--eig-max-restarts", eig_max_restarts, "Perform n iterations of the restart in the eigensolver");
   opgroup->add_option("--eig-block-size", eig_block_size, "The block size to use in the block variant eigensolver");
   opgroup->add_option(
-		      "--eig-n-ev-deflate", eig_n_ev_deflate,
-		      "The number of converged eigenpairs that will be used in the deflation routines (default eig_n_conv)");  
-  opgroup->add_option("--eig-n-conv", eig_n_conv, "The number of converged eigenvalues requested (default eig_n_ev)");  
+    "--eig-n-ev-deflate", eig_n_ev_deflate,
+    "The number of converged eigenpairs that will be used in the deflation routines (default eig_n_conv)");
+  opgroup->add_option("--eig-n-conv", eig_n_conv, "The number of converged eigenvalues requested (default eig_n_ev)");
   opgroup->add_option("--eig-n-ev", eig_n_ev, "The size of eigenvector search space in the eigensolver");
   opgroup->add_option("--eig-n-kr", eig_n_kr, "The size of the Krylov subspace to use in the eigensolver");
   opgroup->add_option("--eig-batched-rotate", eig_batched_rotate,
@@ -735,7 +736,9 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                        "If the multigrid operator is updated, preserve generated deflation space (default = false)");
   quda_app->add_mgoption(opgroup, "--mg-eig-max-restarts", mg_eig_max_restarts, CLI::PositiveNumber,
                          "Perform a maximun of n restarts in eigensolver (default 100)");
-  quda_app->add_mgoption(opgroup, "--mg-eig-use-eigen-qr", mg_eig_use_eigen_qr, CLI::Validator(), "Use Eigen to eigensolve the upper Hessenberg in IRAM, else use QUDA's QR code. (default true)");
+  quda_app->add_mgoption(
+    opgroup, "--mg-eig-use-eigen-qr", mg_eig_use_eigen_qr, CLI::Validator(),
+    "Use Eigen to eigensolve the upper Hessenberg in IRAM, else use QUDA's QR code. (default true)");
   quda_app->add_mgoption(opgroup, "--mg-eig-block-size", mg_eig_block_size, CLI::Validator(),
                          "The block size to use in the block variant eigensolver");
   quda_app->add_mgoption(opgroup, "--mg-eig-n-ev", mg_eig_n_ev, CLI::Validator(),
@@ -759,8 +762,8 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   quda_app->add_mgoption(opgroup, "--mg-eig-tol", mg_eig_tol, CLI::PositiveNumber,
                          "The tolerance to use in the eigensolver (default 1e-6)");
   quda_app->add_mgoption(opgroup, "--mg-eig-qr-tol", mg_eig_qr_tol, CLI::PositiveNumber,
-			 "The tolerance to use in the QR (default 1e-11)");
-  
+                         "The tolerance to use in the QR (default 1e-11)");
+
   quda_app->add_mgoption(opgroup, "--mg-eig-type", mg_eig_type, CLI::QUDACheckedTransformer(eig_type_map),
                          "The type of eigensolver to use (default trlm)");
   quda_app->add_mgoption(opgroup, "--mg-eig-use-dagger", mg_eig_use_dagger, CLI::Validator(),

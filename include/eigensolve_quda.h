@@ -184,42 +184,31 @@ protected:
     bool orthoCheck(std::vector<ColorSpinorField *> v, int j);
 
     /**
-       @brief Rotate the Krylov space 
-       @param[in] kSpace the Krylov space 
+       @brief Rotate the Krylov space
+       @param[in] kSpace the Krylov space
        @param[in] rot_array The real rotation matrix
        @param[in] offset The position of the start of unused vectors in kSpace
        @param[in] dim The number of rows in the rotation array
        @param[in] keep The number of columns in the rotation array
        @param[in] locked The number of locked vectors in kSpace
        @param[in] profile Time profiler
-    */    
-    void rotateVecs(std::vector<ColorSpinorField *> &kSpace,
-		    const double *rot_array,
-		    const int offset,
-		    const int dim,
-		    const int keep,
-		    const int locked,
-		    TimeProfile &profile);
+    */
+    void rotateVecs(std::vector<ColorSpinorField *> &kSpace, const double *rot_array, const int offset, const int dim,
+                    const int keep, const int locked, TimeProfile &profile);
 
     /**
-       @brief Rotate the Krylov space 
-       @param[in] kSpace the Krylov space 
+       @brief Rotate the Krylov space
+       @param[in] kSpace the Krylov space
        @param[in] rot_array The complex rotation matrix
        @param[in] offset The position of the start of unused vector in kSpace
        @param[in] dim The number of rows in the rotation array
        @param[in] keep The number of columns in the rotation array
        @param[in] locked The number of locked vectors in kSpace
        @param[in] profile Time profiler
-    */    
-    void rotateVecsComplex(std::vector<ColorSpinorField *> &kSpace,
-			   const Complex *rot_array,
-			   const int offset,
-			   const int dim,
-			   const int keep,
-			   const int locked,			   
-			   TimeProfile &profile);
+    */
+    void rotateVecsComplex(std::vector<ColorSpinorField *> &kSpace, const Complex *rot_array, const int offset,
+                           const int dim, const int keep, const int locked, TimeProfile &profile);
 
-    
     /**
        @brief Permute the vector space using the permutation matrix.
        @param[in/out] kSpace The current Krylov space
@@ -379,48 +368,46 @@ protected:
     void loadFromFile(const DiracMatrix &mat, std::vector<ColorSpinorField *> &eig_vecs, std::vector<Complex> &evals);
 
     /**
-       @brief Sort array the first n elements of x according to spec_type, y comes along for the ride 
+       @brief Sort array the first n elements of x according to spec_type, y comes along for the ride
        @param[in] spec_type The spectrum type (Largest/Smallest)(Modulus/Imaginary/Real)
        @param[in] n The number of elements to sort
        @param[in] x The array to sort
        @param[in] y An array whose elements will be permuted in tandem with x
-    */    
+    */
     void sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<Complex> &x, std::vector<Complex> &y);
 
     /**
-       @brief Sort array the first n elements of x according to spec_type, y comes along for the ride 
+       @brief Sort array the first n elements of x according to spec_type, y comes along for the ride
        Overloaded version with real x
        @param[in] spec_type The spectrum type (Largest/Smallest)(Modulus/Imaginary/Real)
        @param[in] n The number of elements to sort
        @param[in] x The array to sort
        @param[in] y An array whose elements will be permuted in tandem with x
-    */    
+    */
     void sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<double> &x, std::vector<Complex> &y);
 
     /**
-       @brief Sort array the first n elements of x according to spec_type, y comes along for the ride 
+       @brief Sort array the first n elements of x according to spec_type, y comes along for the ride
        Overloaded version with real y
        @param[in] spec_type The spectrum type (Largest/Smallest)(Modulus/Imaginary/Real)
        @param[in] n The number of elements to sort
        @param[in] x The array to sort
        @param[in] y An array whose elements will be permuted in tandem with x
-    */    
+    */
     void sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<Complex> &x, std::vector<double> &y);
 
     /**
-       @brief Sort array the first n elements of x according to spec_type, y comes along for the ride 
+       @brief Sort array the first n elements of x according to spec_type, y comes along for the ride
        Overloaded version with real x and real y
-       @param[in] spec_type The spectrum type (Largest/Smallest)(Modulus/Imaginary/Real) that 
+       @param[in] spec_type The spectrum type (Largest/Smallest)(Modulus/Imaginary/Real) that
        determines the sorting condition
        @param[in] n The number of elements to sort
        @param[in] x The array to sort
        @param[in] y An array whose elements will be permuted in tandem with x
-    */    
+    */
     void sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<double> &x, std::vector<double> &y);
-    
   };
 
-  
   /**
      @brief Thick Restarted Lanczos Method.
   */
@@ -565,7 +552,7 @@ protected:
     Complex **upperHess;
     Complex **Qmat;
     Complex **Rmat;
-    
+
     /**
        @brief Constructor for Thick Restarted Eigensolver class
        @param eig_param The eigensolver parameters
@@ -575,7 +562,7 @@ protected:
     IRAM(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile);
 
     virtual bool hermitian() { return true; } /** IRAM is for any linear system */
-    
+
     /**
        @brief Destructor for Thick Restarted Eigensolver class
     */
@@ -603,7 +590,7 @@ protected:
        @param[in] beta Norm of residual (used to compute errors on eigenvalues)
     */
     void eigensolveFromUpperHess(std::vector<Complex> &evals, const double beta);
-    
+
     /**
        @brief Rotate the Krylov space
        @param[in] v Vector space
@@ -616,27 +603,27 @@ protected:
        @param[in] evals The shifts to apply
        @param[in] num_shifts The number of shifts to apply
        @param[in] epsilon The ceiling for which one can floor a value to zero.
-    */    
+    */
     void qrShifts(const std::vector<Complex> evals, const int num_shifts, const double epsilon);
 
     /**
        @brief Apply One step of the the QR algorithm
        @param[in] Q The Q matrix
        @param[in] R The R matrix
-    */    
-    void qrIteration(Complex** Q, Complex** R);
-    
+    */
+    void qrIteration(Complex **Q, Complex **R);
+
     /**
        @brief Reorder the Krylov space and eigenvalues
        @param[in] kSpace The Krylov space
        @param[in] evals the eigenvalues
-       @param[in] spec_type The spectrum type (Largest/Smallest)(Modulus/Imaginary/Real) that 
+       @param[in] spec_type The spectrum type (Largest/Smallest)(Modulus/Imaginary/Real) that
        determines the sorting condition
-    */        
-    void reorder(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals, const QudaEigSpectrumType spec_type);
-    
+    */
+    void reorder(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals,
+                 const QudaEigSpectrumType spec_type);
   };
-  
+
   /**
      arpack_solve()
 
@@ -656,4 +643,3 @@ protected:
                     QudaEigParam *eig_param, TimeProfile &profile);
 
 } // namespace quda
-

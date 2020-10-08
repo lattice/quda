@@ -440,7 +440,7 @@ extern "C" {
 
     /** Use Eigen routines to eigensolve the upper Hessenberg via QR **/
     QudaBoolean use_eigen_qr;
-    
+
     /** Performs an MdagM solve, then constructs the left and right SVD. **/
     QudaBoolean compute_svd;
 

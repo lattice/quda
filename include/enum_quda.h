@@ -153,7 +153,7 @@ typedef enum QudaEigSpectrumType_s {
   QUDA_SPECTRUM_SI_EIG = 5,
   QUDA_SPECTRUM_INVALID = QUDA_INVALID_ENUM
 } QudaEigSpectrumType;
-  
+
 typedef enum QudaSolutionType_s {
   QUDA_MAT_SOLUTION,
   QUDA_MATDAG_MAT_SOLUTION,
