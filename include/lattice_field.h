@@ -1,6 +1,5 @@
 #pragma once
 
-#include <map>
 #include <quda.h>
 #include <iostream>
 #include <comm_quda.h>

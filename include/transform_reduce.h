@@ -1,5 +1,4 @@
 #pragma once
-#include <typeinfo>
 
 #include <reduce_helper.h>
 #include <uint_to_char.h>

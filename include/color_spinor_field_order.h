@@ -13,7 +13,6 @@
 
 #include <register_traits.h>
 #include <convert.h>
-#include <typeinfo>
 #include <complex_quda.h>
 #include <index_helper.cuh>
 #include <color_spinor.h>

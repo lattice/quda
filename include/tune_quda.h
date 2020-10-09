@@ -2,20 +2,20 @@
 
 #include <string>
 #include <iostream>
-#include <iomanip>
 #include <cstring>
 #include <cfloat>
-#include <stdarg.h>
-#include <map>
 #include <algorithm>
-#include <typeinfo>
-
 #include <tune_key.h>
 #include <quda_internal.h>
 #include <device.h>
 
 // this file has some workarounds to allow compilation using nvrtc of kernels that include this file
-#ifdef __CUDACC_RTC__
+#ifndef __CUDACC_RTC__
+#include <cstdarg>
+#include <iomanip>
+#include <typeinfo>
+#include <map>
+#else
 #define CUresult bool
 #define CUDA_SUCCESS true
 #endif

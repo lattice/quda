@@ -1,8 +1,9 @@
 #pragma once
 
+#include <vector>
+#include <array>
 #include <quda.h>
 #include <random_quda.h>
-#include <vector>
 #include <color_spinor_field.h>
 
 #define gauge_site_size 18      // real numbers per link
