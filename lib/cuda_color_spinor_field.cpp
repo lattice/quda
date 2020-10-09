@@ -1100,7 +1100,7 @@ namespace quda {
               qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_d[bufferIndex][i][0],
                               2 * ghost_face_bytes_aligned[i], cudaMemcpyDeviceToHost, 0);
             } else {
-              if (pack_destination[2*i+0] == Device && !comm_peer2peer_enabled(0,i))
+              if (pack_destination[2 * i + 0] == Device && !comm_peer2peer_enabled(0, i))
                 qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_d[bufferIndex][i][0],
                                 ghost_face_bytes[i], cudaMemcpyDeviceToHost, 0);
               if (pack_destination[2 * i + 1] == Device && !comm_peer2peer_enabled(1, i))
@@ -1108,7 +1108,7 @@ namespace quda {
                                 ghost_face_bytes[i], cudaMemcpyDeviceToHost, 0);
             }
           }
-	}
+        }
       } else if (total_bytes && !pack_host) {
         qudaMemcpyAsync(my_face_h[bufferIndex], ghost_send_buffer_d[bufferIndex], total_bytes, cudaMemcpyDeviceToHost, 0);
       }
@@ -1157,7 +1157,7 @@ namespace quda {
               qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0],
                               2 * ghost_face_bytes_aligned[i], cudaMemcpyHostToDevice, 0);
             } else {
-              if (halo_location[2*i+0] == Device && !comm_peer2peer_enabled(0,i))
+              if (halo_location[2 * i + 0] == Device && !comm_peer2peer_enabled(0, i))
                 qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0],
                                 ghost_face_bytes[i], cudaMemcpyHostToDevice, 0);
               if (halo_location[2 * i + 1] == Device && !comm_peer2peer_enabled(1, i))
@@ -1165,7 +1165,7 @@ namespace quda {
                                 ghost_face_bytes[i], cudaMemcpyHostToDevice, 0);
             }
           }
-	}
+        }
       } else if (total_bytes && !halo_host) {
         qudaMemcpyAsync(ghost_recv_buffer_d[bufferIndex], from_face_h[bufferIndex], total_bytes, cudaMemcpyHostToDevice,
                         0);

@@ -117,13 +117,13 @@ protected:
        @param[out] epsilon The deduced epsilon value
     */
     double setEpsilon(const QudaPrecision prec);
-    
+
     /**
        @brief Query the eigensolver precision to stdout
        @param[in] prec Precision of the solver instance
     */
     void queryPrec(const QudaPrecision prec);
-    
+
     /**
        @brief Dump the eigensolver parameters to stdout
     */

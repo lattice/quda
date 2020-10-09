@@ -61,7 +61,7 @@ namespace quda {
         set_max_shared_bytes = param.set_max_shared_bytes;
         aux = param.aux;
         comment = param.comment;
-	time = param.time;
+        time = param.time;
 	n_calls = param.n_calls;
       }
       return *this;

@@ -33,9 +33,13 @@ latest develop branch.  More details can be found at
 https://github.com/lattice/quda/wiki/Multigrid-Solver.
 
 Support for eigen-vector deflation solvers is also included through
-the Thick Restarted Lanczos Method (TRLM).  For more details we refer
-the user to the wiki
-(https://github.com/lattice/quda/wiki/Deflated-Solvers).
+the Thick Restarted Lanczos Method (TRLM), and we offer an Implicitly
+Restarted Arnoldi for observing non-hermitian operator spectra.
+For more details we refer the user to the wiki:
+QUDA's eigensolvers
+(https://github.com/lattice/quda/wiki/QUDA%27s-eigensolvers)
+Deflating coarse grid solves in Multigrid
+(https://github.com/lattice/quda/wiki/Multigrid-Solver#multigrid-inverter--lanczos)
 
 ## Software Compatibility:
 
@@ -245,7 +249,7 @@ http://lattice.github.com/quda .
 *  Arjun Gambhir (William and Mary)
 *  Steven Gottlieb (Indiana University) 
 *  Kyriakos Hadjiyiannakou (Cyprus)
-*  Dean Howarth (Boston University)
+*  Dean Howarth (Lawrence Livermore Lab, Lawrence Berkeley Lab)
 *  Balint Joo (OLCF, Oak Ridge National Laboratory, formerly Jefferson Lab)
 *  Hyung-Jin Kim (Samsung Advanced Institute of Technology)
 *  Bartek Kostrzewa (Bonn)

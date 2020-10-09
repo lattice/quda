@@ -463,7 +463,7 @@ namespace quda
     double epsilon = setEpsilon(kSpace[0]->Precision());
     double epsilon23 = pow(epsilon, 2.0 / 3.0);
     double beta = 0.0;
-    
+
     // Print Eigensolver params
     printEigensolverSetup();
     //---------------------------------------------------------------------------

@@ -310,17 +310,17 @@ namespace quda {
         }
       }
 
-        /**
-	   @brief Operator+= with complex number instance as input
-	   @param a Complex number we want to add to this accessor
-	*/
-        template<typename theirFloat>
-	__device__ __host__ inline void operator+=(const complex<theirFloat> &a) {
-	  if (match<storeFloat,theirFloat>()) {
-	    v[idx] += complex<storeFloat>(a.x, a.y);
-	  } else {
-	    v[idx] += fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
-	  }
+      /**
+         @brief Operator+= with complex number instance as input
+         @param a Complex number we want to add to this accessor
+      */
+      template <typename theirFloat> __device__ __host__ inline void operator+=(const complex<theirFloat> &a)
+      {
+        if (match<storeFloat, theirFloat>()) {
+          v[idx] += complex<storeFloat>(a.x, a.y);
+        } else {
+          v[idx] += fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
+        }
 	}
 
 	/**
@@ -1129,7 +1129,7 @@ namespace quda {
         __device__ __host__ inline fieldorder_wrapper<Float, storeFloat> Ghost(int d, int parity, int x, int s_row,
                                                                                int s_col, int c_row, int c_col)
         {
-          return Ghost(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
+          return Ghost(d, parity, x, s_row * nColorCoarse + c_row, s_col * nColorCoarse + c_col);
         }
         /**
          * @brief This and the following method (eventually) creates a fieldorder_wrapper object whose pointer points to
