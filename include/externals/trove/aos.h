@@ -215,7 +215,7 @@ load_dispatch(const T* src) {
     src, warp_id / address_constants<T>::m, warp_id % address_constants<T>::m);
   r2c_warp_transpose(loaded);
   return detail::fuse<T>(loaded);
-  // }   
+  // }
 }
 
 

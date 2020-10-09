@@ -63,7 +63,8 @@ namespace quda
 
     // Pre-launch checks and preparation
     //---------------------------------------------------------------------------
-    // Check to see if we are loading eigenvectors
+    if (getVerbosity() >= QUDA_VERBOSE) queryPrec(kSpace[0]->Precision());
+    // Check to see if we are loading eigenvectors    
     if (strcmp(eig_param->vec_infile, "") != 0) {
       printfQuda("Loading evecs from file name %s\n", eig_param->vec_infile);
       loadFromFile(mat, kSpace, evals);
@@ -93,9 +94,8 @@ namespace quda
     printEigensolverSetup();
     //---------------------------------------------------------------------------
 
-    // Begin TRLM Eigensolver computation
+    // Begin BLOCK TRLM Eigensolver computation
     //---------------------------------------------------------------------------
-
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
     // Loop over restart iterations.

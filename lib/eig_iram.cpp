@@ -194,7 +194,7 @@ namespace quda
     }
   }
 
-  void IRAM::qrShifts(const std::vector<Complex> evals, const int num_shifts, const double epsilon)
+  void IRAM::qrShifts(const std::vector<Complex> evals, const int num_shifts)
   {
     // This isn't really Eigen, but it's morally equivalent
     profile.TPSTART(QUDA_PROFILE_HOST_COMPUTE);
@@ -439,6 +439,7 @@ namespace quda
 
     // Pre-launch checks and preparation
     //---------------------------------------------------------------------------
+    if (getVerbosity() >= QUDA_SUMMARIZE) queryPrec(kSpace[0]->Precision());
     // Check to see if we are loading eigenvectors
     if (strcmp(eig_param->vec_infile, "") != 0) {
       printfQuda("Loading evecs from file name %s\n", eig_param->vec_infile);
@@ -462,10 +463,7 @@ namespace quda
     double epsilon = setEpsilon(kSpace[0]->Precision());
     double epsilon23 = pow(epsilon, 2.0 / 3.0);
     double beta = 0.0;
-
-    // Eigen object for computing Ritz values from the upper Hessenberg matrix
-    Eigen::ComplexEigenSolver<MatrixXcd> eigenSolverUH;
-
+    
     // Print Eigensolver params
     printEigensolverSetup();
     //---------------------------------------------------------------------------
@@ -474,12 +472,8 @@ namespace quda
     //---------------------------------------------------------------------------
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
-    // Do the first n_ev steps
-    for (int step = 0; step < n_ev; step++) arnoldiStep(kSpace, r, beta, step);
-    num_keep = n_ev;
-    iter += n_ev;
-
-    // Loop over restart iterations.    
+    // Loop over restart iterations.
+    num_keep = 0;
     while (restart_iter < max_restarts && !converged) {
       for (int step = num_keep; step < n_kr; step++) arnoldiStep(kSpace, r, beta, step);
       iter += n_kr - num_keep;
@@ -549,7 +543,7 @@ namespace quda
 
         profile.TPSTOP(QUDA_PROFILE_COMPUTE);
         // Apply the shifts of the unwated Ritz values via QR
-        qrShifts(evals, num_shifts, epsilon);
+        qrShifts(evals, num_shifts);
 
         // Compress the Krylov space using the accumulated Givens rotations in Qmat
         rotateBasis(kSpace, num_keep + 1);

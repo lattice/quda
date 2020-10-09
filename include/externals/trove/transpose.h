@@ -558,7 +558,7 @@ struct r2c_compute_indices_impl<Array, composite> {
       int lb = (size * warp_id) & WARP_MASK;
       int ub = lb + size;
       int offset = lb + warp_id / (WARP_SIZE / c);
-      indices = detail::r2c_compute_composite_offsets<Array, Array::size>::impl(warp_id, offset, lb, ub);        
+      indices = detail::r2c_compute_composite_offsets<Array, Array::size>::impl(warp_id, offset, lb, ub);
     }
 };
 

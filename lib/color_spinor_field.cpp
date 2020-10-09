@@ -65,7 +65,7 @@ namespace quda {
 	  ghostFace[i] *= x[j];
 	}
         ghostFace[i] *= x5; // temporary hack : extra dimension for DW ghosts
-        if (i==0 && siteSubset != QUDA_FULL_SITE_SUBSET) ghostFace[i] /= 2;
+        if (i == 0 && siteSubset != QUDA_FULL_SITE_SUBSET) ghostFace[i] /= 2;
         ghost_volume += 2 * nFace * ghostFace[i];
       }
 

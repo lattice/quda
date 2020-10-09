@@ -444,7 +444,7 @@ namespace quda {
             qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][dim][dir], my_face_dim_dir_d[bufferIndex][dim][dir],
                             ghost_face_bytes[dim], cudaMemcpyDeviceToHost, streams[dir]);
           }
-	}
+        }
 
 	// if either direction is not peer-to-peer then we need to synchronize
 	if (!comm_peer2peer_enabled(0,dim) || !comm_peer2peer_enabled(1,dim)) qudaDeviceSynchronize();
@@ -459,7 +459,7 @@ namespace quda {
             qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][dim][dir], from_face_dim_dir_h[bufferIndex][dim][dir],
                             ghost_face_bytes[dim], cudaMemcpyHostToDevice, streams[dir]);
           }
-	}
+        }
 
       } else { // if just doing a local exchange to fill halo then need to swap faces
 	qudaMemcpy(from_face_dim_dir_d[b][dim][1], my_face_dim_dir_d[b][dim][0],

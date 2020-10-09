@@ -117,7 +117,13 @@ protected:
        @param[out] epsilon The deduced epsilon value
     */
     double setEpsilon(const QudaPrecision prec);
-
+    
+    /**
+       @brief Query the eigensolver precision to stdout
+       @param[in] prec Precision of the solver instance
+    */
+    void queryPrec(const QudaPrecision prec);
+    
     /**
        @brief Dump the eigensolver parameters to stdout
     */
@@ -602,9 +608,8 @@ protected:
        @brief Apply shifts to the upper Hessenberg matrix via QR decomposition
        @param[in] evals The shifts to apply
        @param[in] num_shifts The number of shifts to apply
-       @param[in] epsilon The ceiling for which one can floor a value to zero.
     */
-    void qrShifts(const std::vector<Complex> evals, const int num_shifts, const double epsilon);
+    void qrShifts(const std::vector<Complex> evals, const int num_shifts);
 
     /**
        @brief Apply One step of the the QR algorithm

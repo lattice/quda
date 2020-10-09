@@ -218,6 +218,26 @@ namespace quda
     return eps;
   }
 
+  void EigenSolver::queryPrec(const QudaPrecision prec)
+  {
+    switch (prec) {
+    case QUDA_DOUBLE_PRECISION:
+      printfQuda("Running eigensolver in double precision\n");
+      break;
+    case QUDA_SINGLE_PRECISION:
+      printfQuda("Running eigensolver in single precision\n");
+      break;
+    case QUDA_HALF_PRECISION:
+      printfQuda("Running eigensolver in half precision\n");
+      break;
+    case QUDA_QUARTER_PRECISION:
+      printfQuda("Running eigensolver in quarter precision\n");
+      break;
+    default: errorQuda("Invalid precision %d", prec);
+    }
+  }
+
+  
   void EigenSolver::cleanUpEigensolver(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)
   {
     for (int b = 0; b < block_size; b++) delete r[b];

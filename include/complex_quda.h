@@ -732,23 +732,23 @@ public:
     real(real() - z.real());
     imag(imag() - z.imag());
     return *this;
-    }
+  }
 
-    __host__ __device__ inline int8_t real() const volatile { return x; }
-    __host__ __device__ inline int8_t imag() const volatile { return y; }
-    __host__ __device__ inline int8_t real() const { return x; }
-    __host__ __device__ inline int8_t imag() const { return y; }
-    __host__ __device__ inline void real(int8_t re) volatile { x = re; }
-    __host__ __device__ inline void imag(int8_t im) volatile { y = im; }
-    __host__ __device__ inline void real(int8_t re) { x = re; }
-    __host__ __device__ inline void imag(int8_t im) { y = im; }
+  __host__ __device__ inline int8_t real() const volatile { return x; }
+  __host__ __device__ inline int8_t imag() const volatile { return y; }
+  __host__ __device__ inline int8_t real() const { return x; }
+  __host__ __device__ inline int8_t imag() const { return y; }
+  __host__ __device__ inline void real(int8_t re) volatile { x = re; }
+  __host__ __device__ inline void imag(int8_t im) volatile { y = im; }
+  __host__ __device__ inline void real(int8_t re) { x = re; }
+  __host__ __device__ inline void imag(int8_t im) { y = im; }
 
-    // cast operators
-    inline operator std::complex<int8_t>() const { return std::complex<int8_t>(real(), imag()); }
-    template <typename T> inline __host__ __device__ operator complex<T>() const
-    {
-      return complex<T>(static_cast<T>(real()), static_cast<T>(imag()));
-    }
+  // cast operators
+  inline operator std::complex<int8_t>() const { return std::complex<int8_t>(real(), imag()); }
+  template <typename T> inline __host__ __device__ operator complex<T>() const
+  {
+    return complex<T>(static_cast<T>(real()), static_cast<T>(imag()));
+  }
 };
 
 template<>
