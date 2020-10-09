@@ -43,7 +43,7 @@ namespace quda {
                                   .launch(arg);
       arg.launch_error = tunable.jitifyError() == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
 #else
-      arg.launch_error = launch<device::max_block_size(), real, len>(arg, tp, stream);
+      arg.launch_error = launch<device::max_reduce_block_size(), real, len>(arg, tp, stream);
 #endif
 
       host_reduce_t result;
@@ -80,7 +80,7 @@ namespace quda {
         return false;
       }
 
-      unsigned int maxBlockSize(const TuneParam &param) const { return device::max_block_size(); }
+      unsigned int maxBlockSize(const TuneParam &param) const { return device::max_reduce_block_size(); }
 
     public:
       Reduce(const coeff_t &a, const coeff_t &b, const coeff_t &c, ColorSpinorField &x, ColorSpinorField &y,

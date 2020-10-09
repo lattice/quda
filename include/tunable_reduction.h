@@ -43,7 +43,7 @@ namespace quda {
        parity is local to the thread block in the y dimension, half
        the max threads in the x dimension.
      */
-    unsigned int maxBlockSize(const TuneParam &param) const { return device::max_block_size<block_size_y>(); }
+    unsigned int maxBlockSize(const TuneParam &param) const { return device::max_reduce_block_size<block_size_y>(); }
 
     template <int block_size_x, template <typename> class Transformer, template <typename> class Reducer, typename Arg>
     typename std::enable_if<block_size_x != device::warp_size(), qudaError_t>::type
@@ -83,7 +83,7 @@ namespace quda {
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
         arg.launch_error = jitify_error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
 #else
-        arg.launch_error = launch<device::max_block_size<block_size_y>(), Transformer, Reducer>(arg, tp, stream);
+        arg.launch_error = launch<device::max_reduce_block_size<block_size_y>(), Transformer, Reducer>(arg, tp, stream);
 #endif
       } else {
 	errorQuda("CPU not supported yet");
