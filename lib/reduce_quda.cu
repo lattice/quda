@@ -22,6 +22,7 @@ namespace quda {
     template <int block_size, typename real, int len, typename Arg>
     typename std::enable_if<block_size==device::warp_size(), qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
+      if (block_size != tp.block.x) errorQuda("Unexpected block size %d\n", tp.block.x);
       return qudaLaunchKernel(reduceKernel<block_size, real, len, Arg>, tp, stream, arg);
     }
 

@@ -35,6 +35,20 @@ namespace quda {
 #endif
       }
 
+    /**
+       @brief Helper function that returns the maximum number of threads
+       in a block in the x dimension for reduction kernels.
+    */
+    constexpr unsigned int max_multi_reduce_block_size()
+    {
+#ifdef QUDA_FAST_COMPILE_REDUCE
+      // This is the specialized variant used when we have fast-compilation mode enabled
+      return warp_size();
+#else
+      return 128;
+#endif
+    }
+
   }
 
 }

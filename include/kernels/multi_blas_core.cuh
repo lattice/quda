@@ -56,6 +56,13 @@ namespace quda
       }
     };
 
+    // strictly required pre-C++17 and can cause link errors otherwise
+    template <int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Functor>
+    constexpr int MultiBlasArg<NXZ_, store_t, N, y_store_t, Ny, Functor>::NXZ;
+
+    template <int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Functor>
+    constexpr int MultiBlasArg<NXZ_, store_t, N, y_store_t, Ny, Functor>::NYW_max;
+
     template <int warp_split, typename T> __device__ __host__ void warp_combine(T &x)
     {
 #ifdef WARP_SPLIT
