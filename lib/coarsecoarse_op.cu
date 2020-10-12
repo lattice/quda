@@ -198,11 +198,7 @@ namespace quda {
         calculateYcoarse<Float, vFloat, 24, fineSpin, 64, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
                                                                       cloverInv, kappa, mass, mu, mu_factor, dirac, matpc,
                                                                       need_bidirectional, use_mma);
-      } else if (coarseColor == 96) {
-        calculateYcoarse<Float, vFloat, 24, fineSpin, 96, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
-                                                                      cloverInv, kappa, mass, mu, mu_factor, dirac, matpc,
-                                                                      need_bidirectional, use_mma);
-      } else
+      } else // --- note, coarsening Nc == 24 -> Nc == 96 for staggered is worth revisiting in the future
 #endif
       {
         errorQuda("Unsupported fineColor = %d coarseColor = %d\n", fineColor, coarseColor);
@@ -229,15 +225,7 @@ namespace quda {
                                                                       need_bidirectional, use_mma);
       } else {
         errorQuda("Unsupported fineColor = %d coarseColor = %d\n", fineColor, coarseColor);
-      }
-    } else if (fineColor == 96) {
-      if (coarseColor == 96) {
-        calculateYcoarse<Float, vFloat, 96, fineSpin, 96, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
-                                                                      cloverInv, kappa, mass, mu, mu_factor, dirac, matpc,
-                                                                      need_bidirectional, use_mma);
-      } else {
-        errorQuda("Unsupported fineColor = %d coarseColor = %d\n", fineColor, coarseColor);
-      }
+      } // --- note, revisit Nc == 96 -> Nc == 96 in the future
 #endif // NSPIN1
     } else {
       errorQuda("Unsupported number of colors %d\n", g.Ncolor());
