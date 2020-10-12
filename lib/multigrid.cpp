@@ -1583,7 +1583,7 @@ namespace quda
 
     for (int i = 0; i < n_conv; i++) B_evecs.push_back(ColorSpinorField::Create(csParam));
 
-    // before entering the eigen solver, lets free the B vectors to save some memory
+    // before entering the eigen solver, let's free the B vectors to save some memory
     ColorSpinorParam bParam(*param.B[0]);
     for (int i = 0; i < (int)param.B.size(); i++) delete param.B[i];
 

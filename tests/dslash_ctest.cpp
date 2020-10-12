@@ -1058,9 +1058,7 @@ public:
     end();
   }
 
-  static void SetUpTestCase() {
-    initQuda(device_ordinal);
-  }
+  static void SetUpTestCase() { initQuda(device_ordinal); }
 
   // Per-test-case tear-down.
   // Called after the last test in this test case.
