@@ -549,9 +549,9 @@ namespace quda
       if (shmembarrier) {
 
         if (shmem_interiordone and threadIdx.x == blockDim.x - 1) {
-          long tst_val = interior_done.load(); //TODO  memory order
+          long tst_val = interior_done.load(cuda::std::memory_order_relaxed);
           while(tst_val < arg.counter -1){
-            interior_done.compare_exchange_strong( tst_val, arg.counter -1 );
+            interior_done.compare_exchange_strong( tst_val, arg.counter -1, cuda::std::memory_order_relaxed ,cuda::std::memory_order_relaxed );
           }
           interior_done.wait(arg.counter - 1, cuda::std::memory_order_acquire);
         }

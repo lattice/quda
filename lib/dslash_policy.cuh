@@ -1899,7 +1899,7 @@ public:
           enable_policy(QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK);
           enable_policy(QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK_FUSED_HALO);
 
-          if (comm_nvshmem_enabled() && in->X(4) == 1) {
+          if (comm_nvshmem_enabled() && !(in->X(4) > 1)) {
             enable_policy(QudaDslashPolicy::QUDA_SHMEM_UBER_PACKINTRA_DSLASH);
             enable_policy(QudaDslashPolicy::QUDA_SHMEM_UBER_PACKFULL_DSLASH);
             enable_policy(QudaDslashPolicy::QUDA_SHMEM_PACKINTRA_DSLASH);
