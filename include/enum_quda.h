@@ -137,20 +137,20 @@ typedef enum QudaInverterType_s {
 typedef enum QudaEigType_s {
   QUDA_EIG_TR_LANCZOS,     // Thick restarted lanczos solver
   QUDA_EIG_BLK_TR_LANCZOS, // Block Thick restarted lanczos solver
-  QUDA_EIG_IR_LANCZOS,     // Implicitly Restarted Lanczos solver (not implemented)
-  QUDA_EIG_IR_ARNOLDI,     // Implicitly Restarted Arnoldi solver (not implemented)
+  QUDA_EIG_IR_ARNOLDI,     // Implicitly Restarted Arnoldi solver
+  QUDA_EIG_BLK_IR_ARNOLDI, // Block Implicitly Restarted Arnoldi solver
   QUDA_EIG_INVALID = QUDA_INVALID_ENUM
 } QudaEigType;
 
 /** S=smallest L=largest
     R=real M=modulus I=imaniary **/
 typedef enum QudaEigSpectrumType_s {
-  QUDA_SPECTRUM_SR_EIG,
-  QUDA_SPECTRUM_LR_EIG,
-  QUDA_SPECTRUM_SM_EIG,
-  QUDA_SPECTRUM_LM_EIG,
-  QUDA_SPECTRUM_SI_EIG,
-  QUDA_SPECTRUM_LI_EIG,
+  QUDA_SPECTRUM_LM_EIG = 0,
+  QUDA_SPECTRUM_SM_EIG = 1,
+  QUDA_SPECTRUM_LR_EIG = 2,
+  QUDA_SPECTRUM_SR_EIG = 3,
+  QUDA_SPECTRUM_LI_EIG = 4,
+  QUDA_SPECTRUM_SI_EIG = 5,
   QUDA_SPECTRUM_INVALID = QUDA_INVALID_ENUM
 } QudaEigSpectrumType;
 
