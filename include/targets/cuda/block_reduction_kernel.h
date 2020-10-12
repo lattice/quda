@@ -62,7 +62,7 @@ namespace quda {
      TODO: add a Reducer class for non summation reductions
   */
   template <int block_size, template <typename> class Transformer, typename Arg>
-  __global__ void BlockReductionKernel2D(Arg arg)
+    __launch_bounds__(block_size) __global__ void BlockReductionKernel2D(Arg arg)
   {
     using reduce_t = typename Transformer<Arg>::reduce_t;
     Transformer<Arg> t(arg);
