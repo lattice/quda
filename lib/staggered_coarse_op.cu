@@ -331,16 +331,15 @@ namespace quda {
         errorQuda("Unsupported field order %d\n", T.Vectors(Y.Location()).FieldOrder());
       if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
 
-      typedef typename colorspinor::FieldOrderCB<Float, fineSpin, fineColor, coarseColor, csOrder, vFloat> V;
-      typedef typename colorspinor::FieldOrderCB<Float, fineSpin, fineColor, coarseColor, csOrder, vFloat> F;
-      typedef typename gauge::FieldOrder<Float, fineColor * fineSpin, fineSpin, gOrder, true, vFloat> gFine;
+      typedef typename colorspinor::FieldOrderCB<Float, fineSpin, fineColor, coarseColor, csOrder, vFloat, vFloat, false, false> F;
+      typedef typename gauge::FieldOrder<Float,fineColor,1,gOrder,true,Float> gFine;
       typedef typename gauge::FieldOrder<typename mapper<vFloatXinv>::type,xinvColor,xinvSpin,xinvOrder,true,vFloatXinv> xinvFine;
       typedef typename gauge::FieldOrder<Float, coarseColor * coarseSpin, coarseSpin, gOrder, true, vFloat> gCoarse;
       typedef typename gauge::FieldOrder<Float, coarseColor * coarseSpin, coarseSpin, gOrder, true, storeType> gCoarseAtomic;
 
       const ColorSpinorField &v = T.Vectors(Y.Location());
 
-      V vAccessor(const_cast<ColorSpinorField &>(v));
+      F vAccessor(const_cast<ColorSpinorField &>(v));
       F uvAccessor(*uv);
       F avAccessor(*av);
       gFine gAccessor(const_cast<GaugeField &>(g));

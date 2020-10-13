@@ -249,9 +249,10 @@ namespace quda {
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
 #if defined(GPU_STAGGERED_DIRAC) && defined(STAGGEREDCOARSE)
-        tp.set_max_shared_bytes = true;
-        qudaLaunchKernel(ComputeKDAVGPU<Float,fineSpin,fineColor,coarseColor,Arg>, tp, stream, arg);
-        tp.set_max_shared_bytes = false;
+        errorQuda("ComputeKDAV has not yet been defined");
+        //tp.set_max_shared_bytes = true;
+        //qudaLaunchKernel(ComputeKDAVGPU<Float,fineSpin,fineColor,coarseColor,Arg>, tp, stream, arg);
+        //tp.set_max_shared_bytes = false;
 #else
         errorQuda("Staggered dslash has not been built");
 #endif
@@ -694,7 +695,8 @@ namespace quda {
 
     void apply(const qudaStream_t &stream)
     {
-      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      TuneParam tp;
+      tp = tuneLaunch(*this, getTuning(), getVerbosity());
       arg.dim = dim;
       arg.dir = dir;
       if (type == COMPUTE_VUV || type == COMPUTE_CONVERT || type == COMPUTE_RESCALE) arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
@@ -1220,17 +1222,8 @@ namespace quda {
           if (getVerbosity() >= QUDA_VERBOSE) printfQuda("%d U_max = %e v_max = %e uv_max = %e\n", from_coarse ? d+4 : d, U_max, v.Scale(), uv_max);
         }
 
-        //v.PrintVector(0); fflush(stdout);
-        //v.PrintVector(1); fflush(stdout);
-        //exit(-1);
-
-
         y.setComputeType(COMPUTE_UV);  // compute U*V product
         y.apply(0);
-
-        //uv.PrintVector(0); fflush(stdout);
-
-        //exit(-1);
 
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("UV2[%d] = %e\n", d, arg.UV.norm2());
 
