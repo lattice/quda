@@ -27,6 +27,7 @@ namespace quda {
     const LatticeField &field;
     mutable unsigned int vector_length_y;
     mutable unsigned int step_y;
+    const unsigned int max_block_y;
     bool tune_block_x;
 
     unsigned int sharedBytesPerThread() const { return 0; }
@@ -53,6 +54,17 @@ namespace quda {
       else errorQuda("Unexpected block size %d\n", tp.block.x);
     }
 
+    /**
+       @brief Launch function for BlockReductionKernel2D.
+       @tparam Transformer Class which performs any pre-reduction
+       transformation (defined as ternary operator) as well as a store
+       method for writing out the result.
+       @tparam Block Class that must contain a static std::array of
+       block sizes "block" we wish to instantiate
+       @param[in] tp Kernel launch parameters
+       @param[in] stream Stream in which to execute
+       @param[in,out] arg Algorithm meta data
+     */
     template <template <typename> class Transformer, typename Block, typename Arg>
     void launch(const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
@@ -78,10 +90,12 @@ namespace quda {
     }
 
   public:
-    TunableBlockReduction2D(const LatticeField &field, unsigned int vector_length_y) :
+    TunableBlockReduction2D(const LatticeField &field, unsigned int vector_length_y,
+                            unsigned int max_block_y = 0) :
       field(field),
       vector_length_y(vector_length_y),
       step_y(1),
+      max_block_y(max_block_y == 0 ? vector_length_y : max_block_y),
       tune_block_x(false)
     {
       strcpy(aux, compile_type_str(field));
@@ -103,7 +117,8 @@ namespace quda {
 
 	// we can advance spin/block-color since this is valid
 	if (param.block.y < vector_length_y && param.block.y < (unsigned int)deviceProp.maxThreadsDim[1] &&
-	    param.block.x*(param.block.y+step_y)*param.block.z <= (unsigned int)deviceProp.maxThreadsPerBlock) {
+	    param.block.x*(param.block.y+step_y)*param.block.z <= (unsigned int)deviceProp.maxThreadsPerBlock &&
+            ((param.block.y + step_y) <= max_block_y)) {
 	  param.block.y += step_y;
 	  param.grid.y = (vector_length_y + param.block.y - 1) / param.block.y;
 	  return true;

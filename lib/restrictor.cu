@@ -5,7 +5,12 @@
 namespace quda {
 
   struct Aggregates {
-    static constexpr std::array<unsigned int, 36> block = {4, 8, 9, 12, 16, 18, 24, 27, 32, 36, 48, 54, 64, 72, 81, 96, 100, 108, 128, 144, 162, 192, 200, 216, 384, 250, 256, 288, 400, 432, 500, 512, 576, 864, 1000, 1024};
+    // List of block sizes we wish to instantiate.  The required block
+    // size is equal to number of fine points per aggregate, rounded
+    // up to whole multiples of the warp size.  So for example,
+    // 2x2x2x2 and 3x3x3x1 aggregation would both use the same block
+    // size 32
+    static constexpr std::array<unsigned int, 16> block = {32, 64, 96, 128, 160, 192, 224, 256, 288, 384, 416, 448, 512, 576, 864, 1024};
   };
 
   template <typename Float, typename vFloat, int fineSpin, int fineColor, int coarseSpin, int coarseColor>
@@ -20,13 +25,14 @@ namespace quda {
     const int parity;
     char vol[TuneKey::volume_n];
 
+    bool tuneSharedBytes() const { return false; }
     bool tuneAuxDim() const { return true; }
     unsigned int minThreads() const { return in.Volume(); } // fine parity is the block y dimension
 
   public:
     RestrictLaunch(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
                    const int *fine_to_coarse, const int *coarse_to_fine, int parity) :
-      TunableBlockReduction2D(in, coarseColor / coarse_colors_per_thread<fineColor, coarseColor>()),
+      TunableBlockReduction2D(in, coarseColor / coarse_colors_per_thread<fineColor, coarseColor>(), max_y_block()),
       out(out), in(in), v(v), fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
       parity(parity)
     {
@@ -66,20 +72,23 @@ namespace quda {
       }
     }
 
-    // Only tune shared memory per thread and aux tuning since
-    // blockDim.y > 1 gives incorrect results due to cub reductions
-    // being unable to do independent sliced reductions along
-    // blockDim.y.  So for now we only split between colors per thread
-    // and grid.y.  Moreover, the x and y block sizes are fixed.
-    bool advanceTuneParam(TuneParam &param) const { return advanceSharedBytes(param) || advanceAux(param); }
-
     TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
 
-    void initTuneParam(TuneParam &param) const { defaultTuneParam(param); }
+    // round up the block size to be a multiple of the warp_size
+    constexpr int block_mapper(int block) const { return ((block + device::warp_size() - 1) / device::warp_size()) * device::warp_size(); }
+
+    void initTuneParam(TuneParam &param) const {
+      TunableBlockReduction2D::initTuneParam(param);
+      param.block.x = block_mapper(in.Volume() / out.Volume());
+      param.grid.x = out.Volume();
+      param.shared_bytes = 0;
+      param.aux.x = 1; // swizzle factor
+    }
 
     void defaultTuneParam(TuneParam &param) const {
-      param.block = dim3(in.Volume() / out.Volume(), 1, 1);
-      param.grid = dim3(out.Volume(), coarseColor / coarse_colors_per_thread<fineColor, coarseColor>(), 1);
+      TunableBlockReduction2D::defaultTuneParam(param);
+      param.block.x = block_mapper(in.Volume() / out.Volume());
+      param.grid.x = out.Volume();
       param.shared_bytes = 0;
       param.aux.x = 1; // swizzle factor
     }

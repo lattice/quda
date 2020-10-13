@@ -15,6 +15,8 @@ namespace quda {
     //coarseColor >= 8 && coarseColor % 8 == 0 ? 8 : coarseColor >= 4 && coarseColor % 4 == 0 ? 4 : 2;
   }
 
+  constexpr int max_y_block() { return 8; }
+
   /** 
       Kernel argument struct
   */
@@ -42,14 +44,16 @@ namespace quda {
     static constexpr bool swizzle = true;
     int_fastdiv swizzle_factor; // for transposing blockIdx.x mapping to coarse grid coordinate
 
+    static constexpr int n_vector_y = std::min(coarseColor/coarse_colors_per_thread<fineColor, coarseColor>(), max_y_block());
+    static_assert(n_vector_y > 0, "n_vector_y cannot be less than 1");
     const int n_block;
     dim3 threads;
 
     RestrictArg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &V,
 		const int *fine_to_coarse, const int *coarse_to_fine, int parity)
       : out(out), in(in), V(V),
-        aggregate_size(in.Volume()/(out.Volume())),
-        aggregate_size_cb(in.VolumeCB()/(out.Volume())),
+        aggregate_size(in.Volume()/out.Volume()),
+        aggregate_size_cb(in.VolumeCB()/out.Volume()),
         fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
 	spin_map(), parity(parity), nParity(in.SiteSubset()), swizzle_factor(1),
         n_block(out.Volume()),
