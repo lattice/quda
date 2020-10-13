@@ -236,6 +236,9 @@ static  void invalidateGaugeQuda() {
   qudamilc_called<true>(__func__);
   freeGaugeQuda();
   invalidate_quda_gauge = true;
+#ifdef GAUGE_PIPE
+  have_resident_gauge = false;
+#endif
   qudamilc_called<false>(__func__);
 }
 
