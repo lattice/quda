@@ -1153,7 +1153,7 @@ void freeSloppyGaugeQuda()
   // Long gauges
   //---------------------------------------------------------------------------
   // Delete gaugeLongRefinement if it does not alias gaugeLongSloppy.
-  if ( gaugeLongRefinement != gaugeLongSloppy && gaugeLongRefinement) delete gaugeLongRefinement;
+  if (gaugeLongRefinement != gaugeLongSloppy && gaugeLongRefinement) delete gaugeLongRefinement;
 
   // Delete gaugeLongPrecondition if it does not alias gaugeLongPrecise, gaugeLongSloppy, or gaugeLongEigensolver.
   if (gaugeLongPrecondition != gaugeLongSloppy && gaugeLongPrecondition != gaugeLongPrecise
@@ -1166,7 +1166,7 @@ void freeSloppyGaugeQuda()
 
   // Delete gaugeLongSloppy if it does not alias gaugeLongPrecise.
   if (gaugeLongSloppy != gaugeLongPrecise && gaugeLongSloppy) delete gaugeLongSloppy;
-  
+
   gaugeLongEigensolver = nullptr;
   gaugeLongRefinement = nullptr;
   gaugeLongPrecondition = nullptr;
@@ -1254,8 +1254,7 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
 
     if (gaugePrecondition) errorQuda("gaugePrecondition already exists");
 
-    if (gauge_param.Precision() == gaugePrecise->Precision()
-	&& gauge_param.reconstruct == gaugePrecise->Reconstruct()) {
+    if (gauge_param.Precision() == gaugePrecise->Precision() && gauge_param.reconstruct == gaugePrecise->Reconstruct()) {
       gaugePrecondition = gaugePrecise;
     } else if (gauge_param.Precision() == gaugeSloppy->Precision()
                && gauge_param.reconstruct == gaugeSloppy->Reconstruct()) {
@@ -1271,8 +1270,7 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
 
     if (gaugeRefinement) errorQuda("gaugeRefinement already exists");
 
-    if (gauge_param.Precision() == gaugeSloppy->Precision()
-	&& gauge_param.reconstruct == gaugeSloppy->Reconstruct()) {
+    if (gauge_param.Precision() == gaugeSloppy->Precision() && gauge_param.reconstruct == gaugeSloppy->Reconstruct()) {
       gaugeRefinement = gaugeSloppy;
     } else {
       gaugeRefinement = new cudaGaugeField(gauge_param);
@@ -1285,8 +1283,7 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
 
     if (gaugeEigensolver) errorQuda("gaugeEigensolver already exists");
 
-    if (gauge_param.Precision() == gaugePrecise->Precision()
-	&& gauge_param.reconstruct == gaugePrecise->Reconstruct()) {
+    if (gauge_param.Precision() == gaugePrecise->Precision() && gauge_param.reconstruct == gaugePrecise->Reconstruct()) {
       gaugeEigensolver = gaugePrecise;
     } else if (gauge_param.Precision() == gaugeSloppy->Precision()
                && gauge_param.reconstruct == gaugeSloppy->Reconstruct()) {
@@ -1304,7 +1301,7 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
   if (gaugeFatPrecise) {
     GaugeFieldParam gauge_param(*gaugeFatPrecise);
     // switch the parameters for creating the mirror sloppy cuda gauge field
-    
+
     gauge_param.setPrecision(prec[0], true);
 
     if (gaugeFatSloppy) errorQuda("gaugeFatSloppy already exists");
@@ -1370,7 +1367,7 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
   if (gaugeLongPrecise) {
     GaugeFieldParam gauge_param(*gaugeLongPrecise);
     // switch the parameters for creating the mirror sloppy cuda gauge field
-    
+
     gauge_param.reconstruct = recon[0];
     gauge_param.setPrecision(prec[0], true);
 
@@ -2403,6 +2400,8 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
   cudaParam.create = QUDA_ZERO_FIELD_CREATE;
   cudaParam.setPrecision(inv_param->cuda_prec_eigensolver, inv_param->cuda_prec_eigensolver, true);
+  // Ensure device vectors qre in UKQCD basis for Wilson type fermions
+  if(cudaParam.nSpin != 1) cudaParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 
   std::vector<Complex> evals(eig_param->n_conv, 0.0);
   std::vector<ColorSpinorField *> kSpace;
@@ -2462,7 +2461,9 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   // Copy eigen values back
   for (int i = 0; i < eig_param->n_conv; i++) { memcpy(host_evals + i, &evals[i], sizeof(Complex)); }
 
-  // Transfer Eigenpairs back to host if using GPU eigensolver
+  // Transfer Eigenpairs back to host if using GPU eigensolver. The copy
+  // will automatically rotate from device UKQCD gamma basis to the
+  // host side gamma basis.
   if (!(eig_param->arpack_check)) {
     profileEigensolve.TPSTART(QUDA_PROFILE_D2H);
     for (int i = 0; i < eig_param->n_conv; i++) *host_evecs_[i] = *kSpace[i];

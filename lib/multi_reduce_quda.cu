@@ -24,6 +24,7 @@ namespace quda {
     template <int block_size, typename real, int len, int NXZ, typename Arg>
     typename std::enable_if<block_size==device::warp_size(), qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
+      if (block_size != tp.block.x) errorQuda("Unexpected block size %d\n", tp.block.x);
       return qudaLaunchKernel(multiReduceKernel<block_size, real, len, NXZ, Arg>, tp, stream, arg);
     }
 
@@ -42,7 +43,7 @@ namespace quda {
                                   .launch(arg);
       arg.launch_error = tunable.jitifyError() == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
 #else
-      arg.launch_error = launch<device::max_block_size(), real, len, NXZ>(arg, tp, stream);
+      arg.launch_error = launch<device::max_multi_reduce_block_size(), real, len, NXZ>(arg, tp, stream);
 #endif
 
       std::vector<T> result_(NXZ * arg.NYW);
@@ -84,7 +85,7 @@ namespace quda {
         return false;
       }
 
-      unsigned int maxBlockSize(const TuneParam &param) const { return device::max_block_size(); }
+      unsigned int maxBlockSize(const TuneParam &param) const { return device::max_multi_reduce_block_size(); }
 
     public:
       MultiReduce(const T &a, const T &b, const T &c, const ColorSpinorField &x_meta, const ColorSpinorField &y_meta,
@@ -327,7 +328,7 @@ namespace quda {
 
         coeff_array<T> a, b, c;
 
-        if (x.size() <= tile_size.x && is_valid_NXZ(x.size(), true)) {
+        if (x.size() <= tile_size.x && is_valid_NXZ(x.size(), true) && x.size() * y.size() <= max_n_reduce()) {
           // problem will fit, so do the computation
           multiReduce<ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
         } else {

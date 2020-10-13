@@ -22,6 +22,7 @@ namespace quda {
     template <int block_size, typename real, int len, typename Arg>
     typename std::enable_if<block_size==device::warp_size(), qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
+      if (tp.block.x != block_size) errorQuda("Unexpected block size %d\n", tp.block.x);
       return qudaLaunchKernel(reduceKernel<block_size, real, len, Arg>, tp, stream, arg);
     }
 
@@ -43,7 +44,7 @@ namespace quda {
                                   .launch(arg);
       arg.launch_error = tunable.jitifyError() == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
 #else
-      arg.launch_error = launch<device::max_block_size(), real, len>(arg, tp, stream);
+      arg.launch_error = launch<device::max_reduce_block_size(), real, len>(arg, tp, stream);
 #endif
 
       host_reduce_t result;
@@ -80,7 +81,7 @@ namespace quda {
         return false;
       }
 
-      unsigned int maxBlockSize(const TuneParam &param) const { return device::max_block_size(); }
+      unsigned int maxBlockSize(const TuneParam &param) const { return device::max_reduce_block_size(); }
 
     public:
       Reduce(const coeff_t &a, const coeff_t &b, const coeff_t &c, ColorSpinorField &x, ColorSpinorField &y,

@@ -47,6 +47,8 @@ namespace quda
     __device__ __host__ T operator()(T a) { return a; }
   };
 
+  constexpr int max_n_reduce() { return QUDA_MAX_MULTI_REDUCE; }
+
   /**
      @brief The initialization value we used to check for completion
    */

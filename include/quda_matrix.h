@@ -1,9 +1,7 @@
 #pragma once
 
 #include <cstdio>
-#include <cstdlib>
 #include <iostream>
-#include <iomanip>
 
 #include <register_traits.h>
 #include <float_vector.h>

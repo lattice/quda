@@ -1,109 +1,51 @@
 #include <color_spinor_field.h>
-#include <tune_quda.h>
-
-#include <jitify_helper.cuh>
+#include <tunable_block_reduction.h>
 #include <kernels/restrictor.cuh>
 
 namespace quda {
 
-  template <typename Float, typename vFloat, int fineSpin, int fineColor, int coarseSpin, int coarseColor,
-            int coarse_colors_per_thread>
-  class RestrictLaunch : public Tunable {
+  struct Aggregates {
+    static constexpr std::array<unsigned int, 36> block = {4, 8, 9, 12, 16, 18, 24, 27, 32, 36, 48, 54, 64, 72, 81, 96, 100, 108, 128, 144, 162, 192, 200, 216, 384, 250, 256, 288, 400, 432, 500, 512, 576, 864, 1000, 1024};
+  };
 
-  protected:
+  template <typename Float, typename vFloat, int fineSpin, int fineColor, int coarseSpin, int coarseColor>
+  class RestrictLaunch : public TunableBlockReduction2D {
+    template <QudaFieldOrder order = QUDA_FLOAT2_FIELD_ORDER> using Arg =
+      RestrictArg<Float, vFloat, fineSpin, fineColor, coarseSpin, coarseColor, order>;
     ColorSpinorField &out;
     const ColorSpinorField &in;
     const ColorSpinorField &v;
     const int *fine_to_coarse;
     const int *coarse_to_fine;
     const int parity;
-    const QudaFieldLocation location;
-    const int block_size;
     char vol[TuneKey::volume_n];
 
-    unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
-    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-    bool tuneAuxDim() const { return true; } // Do tune the aux dimensions.
-    unsigned int minThreads() const { return in.VolumeCB(); } // fine parity is the block y dimension
+    bool tuneAuxDim() const { return true; }
+    unsigned int minThreads() const { return in.Volume(); } // fine parity is the block y dimension
 
   public:
     RestrictLaunch(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-                   const int *fine_to_coarse, const int *coarse_to_fine, int parity)
-      : out(out), in(in), v(v), fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
-        parity(parity), location(checkLocation(out,in,v)), block_size(in.VolumeCB()/(2*out.VolumeCB()))
+                   const int *fine_to_coarse, const int *coarse_to_fine, int parity) :
+      TunableBlockReduction2D(in, coarseColor / coarse_colors_per_thread<fineColor, coarseColor>()),
+      out(out), in(in), v(v), fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
+      parity(parity)
     {
-      if (v.Location() == QUDA_CUDA_FIELD_LOCATION) {
-#ifdef JITIFY
-        create_jitify_program("kernels/restrictor.cuh");
-#endif
-      }
-      strcpy(aux, compile_type_str(in));
-      strcat(aux, out.AuxString());
       strcat(aux, ",");
-      strcat(aux, in.AuxString());
-
+      strcat(aux, out.AuxString());
       strcpy(vol, out.VolString());
       strcat(vol, ",");
       strcat(vol, in.VolString());
-    } // block size is checkerboard fine length / full coarse length
-
-    void apply(const qudaStream_t &stream) {
-      if (location == QUDA_CPU_FIELD_LOCATION) {
-        if (out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-          RestrictArg<Float,vFloat,fineSpin,fineColor,coarseSpin,coarseColor,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>
-            arg(out, in, v, fine_to_coarse, coarse_to_fine, parity);
-          Restrict<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread>(arg);
-        } else {
-          errorQuda("Unsupported field order %d", out.FieldOrder());
-        }
-      } else {
-        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-
-        if (out.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
-          typedef RestrictArg<Float,vFloat,fineSpin,fineColor,coarseSpin,coarseColor,QUDA_FLOAT2_FIELD_ORDER> Arg;
-          Arg arg(out, in, v, fine_to_coarse, coarse_to_fine, parity);
-          arg.swizzle = tp.aux.x;
-
-#ifdef JITIFY
-          using namespace jitify::reflection;
-          jitify_error = program->kernel("quda::RestrictKernel")
-            .instantiate((int)tp.block.x,Type<Float>(),fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Type<Arg>())
-            .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
-#else
-          LAUNCH_KERNEL_MG_BLOCK_SIZE(RestrictKernel,tp,stream,arg,Float,fineSpin,fineColor,
-                                      coarseSpin,coarseColor,coarse_colors_per_thread,Arg);
-#endif
-        } else {
-          errorQuda("Unsupported field order %d", out.FieldOrder());
-        }
-      }
     }
 
-    // This block tuning tunes for the optimal amount of color
-    // splitting between blockDim.z and gridDim.z.  However, enabling
-    // blockDim.z > 1 gives incorrect results due to cub reductions
-    // being unable to do independent sliced reductions along
-    // blockDim.z.  So for now we only split between colors per thread
-    // and grid.z.
-    bool advanceBlockDim(TuneParam &param) const
+    void apply(const qudaStream_t &stream)
     {
-      // let's try to advance spin/block-color
-      while(param.block.z <= coarseColor/coarse_colors_per_thread) {
-        param.block.z++;
-        if ( (coarseColor/coarse_colors_per_thread) % param.block.z == 0) {
-          param.grid.z = (coarseColor/coarse_colors_per_thread) / param.block.z;
-          break;
-        }
-      }
-
-      // we can advance spin/block-color since this is valid
-      if (param.block.z <= (coarseColor/coarse_colors_per_thread) ) { //
-        return true;
-      } else { // we have run off the end so let's reset
-        param.block.z = 1;
-        param.grid.z = coarseColor/coarse_colors_per_thread;
-        return false;
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      if (out.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
+        Arg<QUDA_FLOAT2_FIELD_ORDER> arg(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        arg.swizzle_factor = tp.aux.x;
+        launch<Restrictor, Aggregates>(tp, stream, arg);
+      } else {
+        errorQuda("Unsupported field order %d", out.FieldOrder());
       }
     }
 
@@ -111,34 +53,34 @@ namespace quda {
 
     bool advanceAux(TuneParam &param) const
     {
-#ifdef SWIZZLE
-      if (param.aux.x < 2*deviceProp.multiProcessorCount) {
-        param.aux.x++;
-        return true;
+      if (Arg<>::swizzle) {
+        if (param.aux.x < 2*deviceProp.multiProcessorCount) {
+          param.aux.x++;
+          return true;
+        } else {
+          param.aux.x = 1;
+          return false;
+        }
       } else {
-        param.aux.x = 1;
         return false;
       }
-#else
-      return false;
-#endif
     }
 
-    // only tune shared memory per thread (disable tuning for block.z for now)
+    // Only tune shared memory per thread and aux tuning since
+    // blockDim.y > 1 gives incorrect results due to cub reductions
+    // being unable to do independent sliced reductions along
+    // blockDim.y.  So for now we only split between colors per thread
+    // and grid.y.  Moreover, the x and y block sizes are fixed.
     bool advanceTuneParam(TuneParam &param) const { return advanceSharedBytes(param) || advanceAux(param); }
 
     TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
 
     void initTuneParam(TuneParam &param) const { defaultTuneParam(param); }
 
-    /** sets default values for when tuning is disabled */
     void defaultTuneParam(TuneParam &param) const {
-      param.block = dim3(block_size, in.SiteSubset(), 1);
-      param.grid = dim3( (minThreads()+param.block.x-1) / param.block.x, 1, 1);
+      param.block = dim3(in.Volume() / out.Volume(), 1, 1);
+      param.grid = dim3(out.Volume(), coarseColor / coarse_colors_per_thread<fineColor, coarseColor>(), 1);
       param.shared_bytes = 0;
-
-      param.block.z = 1;
-      param.grid.z = coarseColor / coarse_colors_per_thread;
       param.aux.x = 1; // swizzle factor
     }
 
@@ -155,20 +97,16 @@ namespace quda {
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
                 const int *fine_to_coarse, const int *coarse_to_fine, int parity) {
 
-    // for fine grids (Nc=3) have more parallelism so can use more coarse strategy
-    constexpr int coarse_colors_per_thread = fineColor != 3 ? 2 : coarseColor >= 4 && coarseColor % 4 == 0 ? 4 : 2;
-    //coarseColor >= 8 && coarseColor % 8 == 0 ? 8 : coarseColor >= 4 && coarseColor % 4 == 0 ? 4 : 2;
-
     if (v.Precision() == QUDA_HALF_PRECISION) {
 #if QUDA_PRECISION & 2
-      RestrictLaunch<Float, short, fineSpin, fineColor, coarseSpin, coarseColor, coarse_colors_per_thread>
+      RestrictLaunch<Float, short, fineSpin, fineColor, coarseSpin, coarseColor>
         restrictor(out, in, v, fine_to_coarse, coarse_to_fine, parity);
       restrictor.apply(0);
 #else
       errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
 #endif
     } else if (v.Precision() == in.Precision()) {
-      RestrictLaunch<Float, Float, fineSpin, fineColor, coarseSpin, coarseColor, coarse_colors_per_thread>
+      RestrictLaunch<Float, Float, fineSpin, fineColor, coarseSpin, coarseColor>
         restrictor(out, in, v, fine_to_coarse, coarse_to_fine, parity);
       restrictor.apply(0);
     } else {
@@ -282,10 +220,8 @@ namespace quda {
                 int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int * const * spin_map, int parity)
   {
 #ifdef GPU_MULTIGRID
-    if (out.FieldOrder() != in.FieldOrder() || out.FieldOrder() != v.FieldOrder())
-      errorQuda("Field orders do not match (out=%d, in=%d, v=%d)",
-                out.FieldOrder(), in.FieldOrder(), v.FieldOrder());
-
+    checkOrder(out, in, v);
+    checkLocation(out, in, v);
     QudaPrecision precision = checkPrecision(out, in);
 
     if (precision == QUDA_DOUBLE_PRECISION) {

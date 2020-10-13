@@ -197,9 +197,9 @@ namespace quda
       if (f.NYW > NYW_max) errorQuda("NYW exceeds max size (%d > %d)", f.NYW, NYW_max);
       if (NXZ * f.NYW * scalar_width > MAX_MATRIX_SIZE)
         errorQuda("Coefficient matrix exceeds max size (%d > %d)", NXZ * f.NYW * scalar_width, MAX_MATRIX_SIZE);
-      if (f.reducer && NXZ * f.NYW > QUDA_MAX_MULTI_REDUCE)
+      if (f.reducer && NXZ * f.NYW > max_n_reduce())
         errorQuda("NXZ * NYW = %d exceeds maximum number of reductions %d * %d > %d",
-                  NXZ * f.NYW, NXZ, f.NYW, QUDA_MAX_MULTI_REDUCE);
+                  NXZ * f.NYW, NXZ, f.NYW, max_n_reduce());
       if (Functor::multi_1d && std::min(NXZ, f.NYW) != 1)
         errorQuda("Expected 1-d multi-blas but appears 2-d (NXZ = %d, NYW = %d)", NXZ, f.NYW);
       if (Functor::multi_1d && std::max(NXZ, f.NYW) > max_N_multi_1d())

@@ -15,7 +15,6 @@ namespace quda
     /**
        @brief Parameter struct for generic multi-blas kernel.
        @tparam NXZ is dimension of input vectors: X,Z,V
-       @tparam NXZ is dimension of input vectors: X,Z
        @tparam store_t Default store type for the fields
        @tparam N Default field vector i/o length
        @tparam y_store_t Store type for the y fields
@@ -60,6 +59,13 @@ namespace quda
       }
     };
 
+    // strictly required pre-C++17 and can cause link errors otherwise
+    template <int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Reducer>
+    constexpr int MultiReduceArg<NXZ_, store_t, N, y_store_t, Ny, Reducer>::NXZ;
+
+    template <int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Reducer>
+    constexpr int MultiReduceArg<NXZ_, store_t, N, y_store_t, Ny, Reducer>::NYW_max;
+
     template <int block_size, typename real, int n, int NXZ, typename Arg>
     __global__ void multiReduceKernel(Arg arg)
     {
@@ -91,6 +97,7 @@ namespace quda
           if (arg.f.read.Z) arg.Z[l].load(z, idx, parity);
 
           arg.f(sum[l], x, y, z, w, k, l);
+
         }
         if (arg.f.write.Y) arg.Y[k].save(y, idx, parity);
         if (arg.f.write.W) arg.W[k].save(w, idx, parity);
