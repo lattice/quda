@@ -60,15 +60,18 @@ namespace quda
   }
 
   PreconCG::PreconCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-                     SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, param, profile),
+                     const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
+    Solver(mat, matSloppy, matPrecon, matEig, param, profile),
     K(0),
     Kparam(param)
   {
     fillInnerSolverParam(Kparam, param);
+    // Preconditioners do not need a deflation space,
+    // so we explicily set this here.
+    Kparam.deflate = false;
 
     if (param.inv_type_precondition == QUDA_CG_INVERTER) {
-      K = new CG(matPrecon, matPrecon, matPrecon, Kparam, profile);
+      K = new CG(matPrecon, matPrecon, matPrecon, matEig, Kparam, profile);
     } else if (param.inv_type_precondition == QUDA_MR_INVERTER) {
       K = new MR(matPrecon, matPrecon, Kparam, profile);
     } else if (param.inv_type_precondition == QUDA_SD_INVERTER) {
@@ -109,14 +112,14 @@ namespace quda
 
     if (param.deflate) {
       // Construct the eigensolver and deflation space if requested.
-      constructDeflationSpace(b, matPrecon);
+      constructDeflationSpace(b, matEig);
       if (deflate_compute) {
         // compute the deflation space.
         (*eig_solve)(evecs, evals);
         deflate_compute = false;
       }
       if (recompute_evals) {
-        eig_solve->computeEvals(matPrecon, evecs, evals);
+        eig_solve->computeEvals(matEig, evecs, evals);
         recompute_evals = false;
       }
     }
@@ -207,11 +210,6 @@ namespace quda
     if (K) {
       csParam.create = QUDA_COPY_FIELD_CREATE;
       csParam.setPrecision(Kparam.precision);
-#ifdef FLOAT8
-      warningQuda("Using experimental FLOAT8 ordering for the preconditioner: only supported by the "
-                  "DiracMobiusPC::MdagMLocal operator");
-      csParam.fieldOrder = QUDA_FLOAT8_FIELD_ORDER;
-#endif
       rPre = new cudaColorSpinorField(rSloppy, csParam);
       // Create minvrPre
       minvrPre = new cudaColorSpinorField(*rPre);
@@ -379,7 +377,7 @@ namespace quda
     xpy(y, x); // x += y
 
     param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops()) * 1e-9;
+    double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops() + matEig.flops()) * 1e-9;
     param.gflops = gflops;
     param.iter += k;
 
@@ -397,6 +395,7 @@ namespace quda
     mat.flops();
     matSloppy.flops();
     matPrecon.flops();
+    matEig.flops();
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     profile.TPSTART(QUDA_PROFILE_FREE);

@@ -198,7 +198,6 @@ namespace quda {
       }
     }
 
-
   template<typename FloatOut, typename FloatIn, int Ns, int Nc, typename OutOrder, typename InOrder, typename Basis, bool extend>
     __global__ void copyInteriorKernel(CopySpinorExArg<OutOrder,InOrder,Basis> arg)
     {
@@ -221,9 +220,6 @@ namespace quda {
       }
     }
 
-
-
-
   template<typename FloatOut, typename FloatIn, int Ns, int Nc, typename OutOrder, typename InOrder, typename Basis, bool extend>
     class CopySpinorEx : Tunable {
 
@@ -231,7 +227,6 @@ namespace quda {
       const ColorSpinorField &meta;
       QudaFieldLocation location;
 
-      private:
       unsigned int sharedBytesPerThread() const { return 0; }
       unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
       bool advanceSharedBytes(TuneParam &param) const { return false; } // Don't tune shared mem
@@ -243,29 +238,21 @@ namespace quda {
         : arg(arg), meta(meta), location(location) {
 	writeAuxString("out_stride=%d,in_stride=%d",arg.out.stride,arg.in.stride);
       }
-      virtual ~CopySpinorEx() {}
 
       void apply(const qudaStream_t &stream){
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-        if(location == QUDA_CPU_FIELD_LOCATION){
+        if (location == QUDA_CPU_FIELD_LOCATION) {
           copyInterior<FloatOut,FloatIn,Ns,Nc,OutOrder,InOrder,Basis,extend>(arg);    
-        }else if(location == QUDA_CUDA_FIELD_LOCATION){
-          copyInteriorKernel<FloatOut,FloatIn,Ns,Nc,OutOrder,InOrder,Basis,extend>
-            <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);    
+        } else if (location == QUDA_CUDA_FIELD_LOCATION) {
+          qudaLaunchKernel(copyInteriorKernel<FloatOut,FloatIn,Ns,Nc,OutOrder,InOrder,Basis,extend>, tp, stream, arg);
         }
       } 
 
       TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
-
       long long flops() const { return 0; }
-      long long bytes() const {
-        return arg.length*2*Nc*Ns*(sizeof(FloatIn) + sizeof(FloatOut));
-      }
-
+      long long bytes() const { return arg.length*2*Nc*Ns*(sizeof(FloatIn) + sizeof(FloatOut));  }
     }; // CopySpinorEx
-
-
 
   template<typename FloatOut, typename FloatIn, int Ns, int Nc, typename OutOrder, typename InOrder, typename Basis>
     void copySpinorEx(OutOrder outOrder, const InOrder inOrder, const Basis basis, const int *E, 
@@ -279,7 +266,6 @@ namespace quda {
         CopySpinorEx<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, Basis, false> copier(arg, meta, location);
         copier.apply(0);
       }
-      if(location == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
     }
 
   template<typename FloatOut, typename FloatIn, int Ns, int Nc, typename OutOrder, typename InOrder>

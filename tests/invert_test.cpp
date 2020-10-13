@@ -42,9 +42,9 @@ void display_test_info()
         printfQuda(" - level %d spectrum requested %s\n", i + 1, get_eig_spectrum_str(mg_eig_spectrum[i]));
         if (mg_eig_type[i] == QUDA_EIG_BLK_TR_LANCZOS)
           printfQuda(" - eigenvector block size %d\n", mg_eig_block_size[i]);
-        printfQuda(" - level %d number of eigenvectors requested nConv %d\n", i + 1, nvec[i]);
-        printfQuda(" - level %d size of eigenvector search space %d\n", i + 1, mg_eig_nEv[i]);
-        printfQuda(" - level %d size of Krylov space %d\n", i + 1, mg_eig_nKr[i]);
+        printfQuda(" - level %d number of eigenvectors requested n_conv %d\n", i + 1, nvec[i]);
+        printfQuda(" - level %d size of eigenvector search space %d\n", i + 1, mg_eig_n_ev[i]);
+        printfQuda(" - level %d size of Krylov space %d\n", i + 1, mg_eig_n_kr[i]);
         printfQuda(" - level %d solver tolerance %e\n", i + 1, mg_eig_tol[i]);
         printfQuda(" - level %d convergence required (%s)\n", i + 1, mg_eig_require_convergence[i] ? "true" : "false");
         printfQuda(" - level %d Operator: daggered (%s) , norm-op (%s)\n", i + 1,
@@ -67,9 +67,9 @@ void display_test_info()
     printfQuda(" - solver mode %s\n", get_eig_type_str(eig_type));
     printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(eig_spectrum));
     if (eig_type == QUDA_EIG_BLK_TR_LANCZOS) printfQuda(" - eigenvector block size %d\n", eig_block_size);
-    printfQuda(" - number of eigenvectors requested %d\n", eig_nConv);
-    printfQuda(" - size of eigenvector search space %d\n", eig_nEv);
-    printfQuda(" - size of Krylov space %d\n", eig_nKr);
+    printfQuda(" - number of eigenvectors requested %d\n", eig_n_conv);
+    printfQuda(" - size of eigenvector search space %d\n", eig_n_ev);
+    printfQuda(" - size of Krylov space %d\n", eig_n_kr);
     printfQuda(" - solver tolerance %e\n", eig_tol);
     printfQuda(" - convergence required (%s)\n", eig_require_convergence ? "true" : "false");
     if (eig_compute_svd) {
@@ -195,7 +195,7 @@ int main(int argc, char **argv)
   display_test_info();
 
   // Initialize the QUDA library
-  initQuda(device);
+  initQuda(device_ordinal);
 
   // set parameters for the reference Dslash, and prepare fields to be loaded
   if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
@@ -288,8 +288,10 @@ int main(int argc, char **argv)
     }
   }
 
-  double *time = new double[Nsrc];
-  double *gflops = new double[Nsrc];
+  std::vector<double> time(Nsrc);
+  std::vector<double> gflops(Nsrc);
+  std::vector<int> iter(Nsrc);
+
   auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
   rng->Init();
 
@@ -308,6 +310,7 @@ int main(int argc, char **argv)
 
     time[i] = inv_param.secs;
     gflops[i] = inv_param.gflops / inv_param.secs;
+    iter[i] = inv_param.iter;
     printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
                inv_param.gflops / inv_param.secs);
   }
@@ -321,9 +324,7 @@ int main(int argc, char **argv)
   if (inv_multigrid) destroyMultigridQuda(mg_preconditioner);
 
   // Compute performance statistics
-  if (Nsrc > 1) performanceStats(time, gflops);
-  delete[] time;
-  delete[] gflops;
+  if (Nsrc > 1) performanceStats(time, gflops, iter);
 
   // Perform host side verification of inversion if requested
   if (verify_results) {

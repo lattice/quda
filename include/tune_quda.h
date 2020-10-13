@@ -12,6 +12,7 @@
 
 #include <tune_key.h>
 #include <quda_internal.h>
+#include <device.h>
 
 // this file has some workarounds to allow compilation using nvrtc of kernels that include this file
 #ifdef __CUDACC_RTC__
@@ -27,24 +28,26 @@ namespace quda {
     dim3 block;
     dim3 grid;
     int shared_bytes;
+    bool set_max_shared_bytes; // whether to opt in to max shared bytes per thread block
     int4 aux; // free parameter that can be used as an arbitrary autotuning dimension outside of launch parameters
 
     std::string comment;
     float time;
     long long n_calls;
 
-    inline TuneParam() : block(32, 1, 1), grid(1, 1, 1), shared_bytes(0), aux(), time(FLT_MAX), n_calls(0) {
+    inline TuneParam() : block(32, 1, 1), grid(1, 1, 1), shared_bytes(0), set_max_shared_bytes(false), aux(), time(FLT_MAX), n_calls(0) {
       aux = make_int4(1,1,1,1);
     }
 
     inline TuneParam(const TuneParam &param)
-      : block(param.block), grid(param.grid), shared_bytes(param.shared_bytes), aux(param.aux), comment(param.comment), time(param.time), n_calls(param.n_calls) { }
+      : block(param.block), grid(param.grid), shared_bytes(param.shared_bytes), set_max_shared_bytes(param.set_max_shared_bytes), aux(param.aux), comment(param.comment), time(param.time), n_calls(param.n_calls) { }
 
     inline TuneParam& operator=(const TuneParam &param) {
       if (&param != this) {
 	block = param.block;
 	grid = param.grid;
 	shared_bytes = param.shared_bytes;
+        set_max_shared_bytes = param.set_max_shared_bytes;
 	aux = param.aux;
 	comment = param.comment;
 	time = param.time;
@@ -152,8 +155,7 @@ namespace quda {
         ret = true;
       }
 
-      if (!tuneGridDim())
-	param.grid = dim3((minThreads()+param.block.x-1)/param.block.x, 1, 1);
+      if (!tuneGridDim()) param.grid.x = (minThreads() + param.block.x - 1) / param.block.x;
 
       return ret;
     }
@@ -194,44 +196,12 @@ namespace quda {
     }
 
     /**
-     * @brief Enable the maximum dynamic shared bytes for the kernel
-     * "func" (values given by maxDynamicSharedBytesPerBlock()).
-     * @param[in] func Function pointer to the kernel we want to
-     * enable max shared memory per block for
-     */
-    template <typename F> inline void setMaxDynamicSharedBytesPerBlock(F *func) const
-    {
-#if CUDA_VERSION >= 9000
-      qudaFuncSetAttribute(
-          (const void *)func, cudaFuncAttributePreferredSharedMemoryCarveout, (int)cudaSharedmemCarveoutMaxShared);
-      qudaFuncSetAttribute(
-          (const void *)func, cudaFuncAttributeMaxDynamicSharedMemorySize, maxDynamicSharedBytesPerBlock());
-#endif
-    }
-
-    /**
      * @brief Returns the maximum dynamic shared memory per block.
      * @return The maximum dynamic shared memory to CUDA thread block
      */
     unsigned int maxDynamicSharedBytesPerBlock() const
     {
-#if CUDA_VERSION >= 9000
-      static int max_shared_bytes = 0;
-      if (!max_shared_bytes) cudaDeviceGetAttribute(&max_shared_bytes, cudaDevAttrMaxSharedMemoryPerBlockOptin, comm_gpuid());
-      return max_shared_bytes;
-#else
-      // these variables are taken from Table 14 of the CUDA 10.2 prgramming guide
-      switch (deviceProp.major) {
-      case 2:
-      case 3:
-      case 5:
-      case 6: return 48 * 1024;
-      default:
-        warningQuda("Unknown SM architecture %d.%d - assuming limit of 48 KiB per SM\n",
-                    deviceProp.major, deviceProp.minor);
-        return 48 * 1024;
-      }
-#endif
+      return device::max_dynamic_shared_memory();
     }
 
     /**
@@ -426,18 +396,28 @@ namespace quda {
      The x threads will typically correspond to the checkboarded
      volume.
    */
-  class TunableLocalParity : public Tunable {
+  class TunableLocalParityReduction : public Tunable
+  {
 
   protected:
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
-    // don't tune the grid dimension
-    virtual bool tuneGridDim() const { return false; }
+    /**
+       Reduction kernels require grid-size tuning, so enable this, and
+       we mark as final to prevent a derived class from accidentally
+       switching it off.
+    */
+    bool tuneGridDim() const final { return true; }
+
+    unsigned int minGridSize() const { return maxGridSize() / 8; }
+    int gridStep() const { return minGridSize(); }
 
     /**
        The maximum block size in the x dimension is the total number
-       of threads divided by the size of the y dimension
+       of threads divided by the size of the y dimension.  Since
+       parity is local to the thread block in the y dimension, half
+       the max threads in the x dimension.
      */
     unsigned int maxBlockSize(const TuneParam &param) const { return deviceProp.maxThreadsPerBlock / 2; }
 
@@ -457,7 +437,6 @@ namespace quda {
       Tunable::defaultTuneParam(param);
       param.block.y = 2;
     }
-
   };
 
   /**

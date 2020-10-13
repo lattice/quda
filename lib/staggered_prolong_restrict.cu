@@ -162,7 +162,6 @@ namespace quda {
   template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, StaggeredTransferType transferType>
   class StaggeredProlongRestrictLaunch : public TunableVectorYZ {
 
-  protected:
     ColorSpinorField &out;
     const ColorSpinorField &in;
     const int *fine_to_coarse;
@@ -188,8 +187,6 @@ namespace quda {
       strcat(aux, coarseColorSpinorField<transferType>(in,out).AuxString());
     }
 
-    virtual ~StaggeredProlongRestrictLaunch() { }
-
     void apply(const qudaStream_t &stream) {
       if (location == QUDA_CPU_FIELD_LOCATION) {
         if (out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
@@ -205,8 +202,7 @@ namespace quda {
 
           StaggeredProlongRestrictArg<Float,fineSpin,fineColor,coarseSpin,coarseColor,QUDA_FLOAT2_FIELD_ORDER,transferType>
             arg(out, in, fine_to_coarse, parity);
-          StaggeredProlongRestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor>
-            <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          qudaLaunchKernel(StaggeredProlongRestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,decltype(arg)>, tp, stream, arg);
         } else {
           errorQuda("Unsupported field order %d", out.FieldOrder());
         }
@@ -230,8 +226,6 @@ namespace quda {
     StaggeredProlongRestrictLaunch<Float, fineSpin, fineColor, coarseSpin, coarseColor, transferType>
     staggered_prolong_restrict(out, in, fine_to_coarse, parity);
     staggered_prolong_restrict.apply(0);
-    
-    if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
   }
 
   template <int fineSpin, int fineColor, int coarseSpin, int coarseColor, StaggeredTransferType transferType>

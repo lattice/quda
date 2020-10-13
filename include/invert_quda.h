@@ -144,6 +144,9 @@ namespace quda {
     /**< The precision used by the QUDA preconditioner */
     QudaPrecision precision_precondition;
 
+    /**< The precision used by the QUDA eigensolver */
+    QudaPrecision precision_eigensolver;
+
     /**< Preserve the source or not in the linear solver (deprecated?) */
     QudaPreserveSource preserve_source;
 
@@ -220,7 +223,7 @@ namespace quda {
     /**< The precision of the Ritz vectors */
     QudaPrecision precision_ritz;//also search space precision
 
-    int nev;//number of eigenvectors produced by EigCG
+    int n_ev; // number of eigenvectors produced by EigCG
     int m;//Dimension of the search space
     int deflation_grid;
     int rhs_idx;
@@ -294,6 +297,7 @@ namespace quda {
       precision_sloppy(param.cuda_prec_sloppy),
       precision_refinement_sloppy(param.cuda_prec_refinement_sloppy),
       precision_precondition(param.cuda_prec_precondition),
+      precision_eigensolver(param.cuda_prec_eigensolver),
       preserve_source(param.preserve_source),
       return_residual(preserve_source == QUDA_PRESERVE_SOURCE_NO ? true : false),
       num_src(param.num_src),
@@ -311,7 +315,7 @@ namespace quda {
       secs(param.secs),
       gflops(param.gflops),
       precision_ritz(param.cuda_prec_ritz),
-      nev(param.nev),
+      n_ev(param.n_ev),
       m(param.max_search_dim),
       deflation_grid(param.deflation_grid),
       rhs_idx(0),
@@ -369,6 +373,7 @@ namespace quda {
       precision_sloppy(param.precision_sloppy),
       precision_refinement_sloppy(param.precision_refinement_sloppy),
       precision_precondition(param.precision_precondition),
+      precision_eigensolver(param.precision_eigensolver),
       preserve_source(param.preserve_source),
       return_residual(param.return_residual),
       num_offset(param.num_offset),
@@ -385,7 +390,7 @@ namespace quda {
       secs(param.secs),
       gflops(param.gflops),
       precision_ritz(param.precision_ritz),
-      nev(param.nev),
+      n_ev(param.n_ev),
       m(param.m),
       deflation_grid(param.deflation_grid),
       rhs_idx(0),
@@ -460,6 +465,7 @@ namespace quda {
     const DiracMatrix &mat;
     const DiracMatrix &matSloppy;
     const DiracMatrix &matPrecon;
+    const DiracMatrix &matEig;
 
     SolverParam &param;
     TimeProfile &profile;
@@ -473,7 +479,7 @@ namespace quda {
 
   public:
     Solver(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-           SolverParam &param, TimeProfile &profile);
+           const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile);
     virtual ~Solver();
 
     virtual void operator()(ColorSpinorField &out, ColorSpinorField &in) = 0;
@@ -483,6 +489,7 @@ namespace quda {
     const DiracMatrix& M() { return mat; }
     const DiracMatrix& Msloppy() { return matSloppy; }
     const DiracMatrix& Mprecon() { return matPrecon; }
+    const DiracMatrix &Meig() { return matEig; }
 
     /**
        @return Whether the solver is only for Hermitian systems
@@ -492,8 +499,8 @@ namespace quda {
     /**
        @brief Solver factory
     */
-    static Solver* create(SolverParam &param, const DiracMatrix &mat, const DiracMatrix &matSloppy,
-			  const DiracMatrix &matPrecon, TimeProfile &profile);
+    static Solver *create(SolverParam &param, const DiracMatrix &mat, const DiracMatrix &matSloppy,
+                          const DiracMatrix &matPrecon, const DiracMatrix &matEig, TimeProfile &profile);
 
     /**
        @brief Set the solver L2 stopping condition
@@ -631,7 +638,8 @@ namespace quda {
     bool init;
 
   public:
-    CG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+    CG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
+       SolverParam &param, TimeProfile &profile);
     virtual ~CG();
     /**
      * @brief Run CG.
@@ -664,13 +672,14 @@ namespace quda {
     DiracMMdag mmdag;
     DiracMMdag mmdagSloppy;
     DiracMMdag mmdagPrecon;
+    DiracMMdag mmdagEig;
     ColorSpinorField *xp;
     ColorSpinorField *yp;
     bool init;
 
   public:
-    CGNE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
-         TimeProfile &profile);
+    CGNE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
+         SolverParam &param, TimeProfile &profile);
     virtual ~CGNE();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
@@ -685,12 +694,13 @@ namespace quda {
     DiracMdagM mdagm;
     DiracMdagM mdagmSloppy;
     DiracMdagM mdagmPrecon;
+    DiracMdagM mdagmEig;
     ColorSpinorField *bp;
     bool init;
 
   public:
-    CGNR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
-         TimeProfile &profile);
+    CGNR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
+         SolverParam &param, TimeProfile &profile);
     virtual ~CGNR();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
@@ -777,7 +787,8 @@ namespace quda {
       SolverParam Kparam; // parameters for preconditioner solve
 
     public:
-      PreconCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+      PreconCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+               const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile);
 
       virtual ~PreconCG();
 
@@ -795,7 +806,7 @@ namespace quda {
 
   public:
     BiCGstab(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-	     SolverParam &param, TimeProfile &profile);
+             const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile);
     virtual ~BiCGstab();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
@@ -840,7 +851,7 @@ namespace quda {
     /**
        The size of the Krylov space that BiCGstabL uses.
      */
-    int nKrylov; // in the language of BiCGstabL, this is L.
+    int n_krylov; // in the language of BiCGstabL, this is L.
 
     // Various coefficients and params needed on each iteration.
     Complex rho0, rho1, alpha, omega, beta; // Various coefficients for the BiCG part of BiCGstab-L.
@@ -874,16 +885,16 @@ namespace quda {
     void updateR(Complex **tau, std::vector<ColorSpinorField*> r, int begin, int size, int j);
     void orthoDir(Complex **tau, double* sigma, std::vector<ColorSpinorField*> r, int j, int pipeline);
 
-    void updateUend(Complex* gamma, std::vector<ColorSpinorField*> u, int nKrylov);
-    void updateXRend(Complex* gamma, Complex* gamma_prime, Complex* gamma_prime_prime,
-                                std::vector<ColorSpinorField*> r, ColorSpinorField& x, int nKrylov);
+    void updateUend(Complex *gamma, std::vector<ColorSpinorField *> u, int n_krylov);
+    void updateXRend(Complex *gamma, Complex *gamma_prime, Complex *gamma_prime_prime,
+                     std::vector<ColorSpinorField *> r, ColorSpinorField &x, int n_krylov);
 
     /**
        Solver uses lazy allocation: this flag determines whether we have allocated or not.
      */
     bool init;
 
-    std::string solver_name; // holds BiCGstab-l, where 'l' literally equals nKrylov.
+    std::string solver_name; // holds BiCGstab-l, where 'l' literally equals n_krylov.
 
   public:
     BiCGstabL(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
@@ -905,7 +916,7 @@ namespace quda {
     /**
        The size of the Krylov space that GCR uses
      */
-    int nKrylov;
+    int n_krylov;
 
     Complex *alpha;
     Complex **beta;
@@ -925,14 +936,14 @@ namespace quda {
     std::vector<ColorSpinorField*> Ap; // mat * direction vectors
 
   public:
-    GCR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-	SolverParam &param, TimeProfile &profile);
+    GCR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
+        SolverParam &param, TimeProfile &profile);
 
     /**
        @param K Preconditioner
     */
-    GCR(const DiracMatrix &mat, Solver &K, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
-        TimeProfile &profile);
+    GCR(const DiracMatrix &mat, Solver &K, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+        const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile);
     virtual ~GCR();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
@@ -962,8 +973,8 @@ namespace quda {
 
   /**
      @brief Communication-avoiding CG solver.  This solver does
-     un-preconditioned CG, running in steps of nKrylov, build up a
-     polynomial in the linear operator of length nKrylov, and then
+     un-preconditioned CG, running in steps of n_krylov, build up a
+     polynomial in the linear operator of length n_krylov, and then
      performs a steepest descent minimization on the resulting basis
      vectors.  For now only implemented using the power basis so is
      only useful as a preconditioner.
@@ -1021,7 +1032,8 @@ namespace quda {
     int reliable(double &rNorm,  double &maxrr, int &rUpdate, const double &r2, const double &delta);
 
   public:
-    CACG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+    CACG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
+         SolverParam &param, TimeProfile &profile);
     virtual ~CACG();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
@@ -1035,12 +1047,14 @@ namespace quda {
     DiracMMdag mmdag;
     DiracMMdag mmdagSloppy;
     DiracMMdag mmdagPrecon;
+    DiracMMdag mmdagEig;
     ColorSpinorField *xp;
     ColorSpinorField *yp;
     bool init;
 
   public:
-    CACGNE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+    CACGNE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+           const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile);
     virtual ~CACGNE();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
@@ -1054,11 +1068,13 @@ namespace quda {
     DiracMdagM mdagm;
     DiracMdagM mdagmSloppy;
     DiracMdagM mdagmPrecon;
+    DiracMdagM mdagmEig;
     ColorSpinorField *bp;
     bool init;
 
   public:
-    CACGNR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+    CACGNR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+           const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile);
     virtual ~CACGNR();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
@@ -1069,7 +1085,7 @@ namespace quda {
   /**
      @brief Communication-avoiding GCR solver.  This solver does
      un-preconditioned GCR, first building up a polynomial in the
-     linear operator of length nKrylov, and then performs a minimum
+     linear operator of length n_krylov, and then performs a minimum
      residual extrapolation on the resulting basis vectors.  For use as
      a multigrid smoother with minimum global synchronization.
    */
@@ -1111,12 +1127,13 @@ namespace quda {
     void solve(Complex *psi_, std::vector<ColorSpinorField*> &q, ColorSpinorField &b);
 
 public:
-    CAGCR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
-    virtual ~CAGCR();
+  CAGCR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
+        SolverParam &param, TimeProfile &profile);
+  virtual ~CAGCR();
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+  void operator()(ColorSpinorField &out, ColorSpinorField &in);
 
-    virtual bool hermitian() { return false; } /** GCR is for any linear system */
+  virtual bool hermitian() { return false; } /** GCR is for any linear system */
   };
 
   // Steepest descent solver used as a preconditioner
@@ -1163,14 +1180,13 @@ private:
     const char *prefix;
 
 public:
-    PreconditionedSolver(Solver &solver, const Dirac &dirac, SolverParam &param, TimeProfile &profile,
-                         const char *prefix) :
-      Solver(solver.M(), solver.Msloppy(), solver.Mprecon(), param, profile),
-      solver(&solver),
-      dirac(dirac),
-      prefix(prefix)
-    {
-    }
+  PreconditionedSolver(Solver &solver, const Dirac &dirac, SolverParam &param, TimeProfile &profile, const char *prefix) :
+    Solver(solver.M(), solver.Msloppy(), solver.Mprecon(), solver.Meig(), param, profile),
+    solver(&solver),
+    dirac(dirac),
+    prefix(prefix)
+  {
+  }
 
     virtual ~PreconditionedSolver() { delete solver; }
 
@@ -1348,9 +1364,9 @@ public:
     /**
        @brief Expands deflation space.
        @param V Composite field container of new eigenvectors
-       @param nev number of vectors to load
+       @param n_ev number of vectors to load
      */
-    void increment(ColorSpinorField &V, int nev);
+    void increment(ColorSpinorField &V, int n_ev);
 
     void RestartVT(const double beta, const double rho);
     void UpdateVm(ColorSpinorField &res, double beta, double sqrtr2);

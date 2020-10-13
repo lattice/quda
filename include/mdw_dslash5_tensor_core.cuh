@@ -8,15 +8,19 @@
 #include <math_helper.cuh>
 #include <shared_memory_cache_helper.cuh>
 
-#if (__CUDACC_VER_MAJOR__ >= 9 && __COMPUTE_CAPABILITY__ >= 700)
-#include <mma.h>
+#include <quda_fp16.cuh>
 
-// The `mma.sync` PTX is only available with CUDA 10.1 or after
-#if ((__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ >= 1) || (__CUDACC_VER_MAJOR__ > 10))                         \
-  && (__COMPUTE_CAPABILITY__ == 700)
-#define USE_MMA_SYNC // rather than using wmma
-#include <mma_tensor_op/mma_m16n16k16_sm70.cuh>
-#endif
+#include <cub_helper.cuh>
+
+#if (__COMPUTE_CAPABILITY__ < 750)
+
+#include <mma_tensor_op/hmma_m16n16k16_sm70.cuh>
+
+#else // (__COMPUTE_CAPABILITY__ < 750)
+
+#include <mma_tensor_op/hmma_m16n8k8_sm80.cuh>
+
+#endif // (__COMPUTE_CAPABILITY__ < 750)
 
 namespace quda
 {
@@ -232,16 +236,7 @@ namespace quda
 
   __device__ inline void __half_max_abs_half2__(half &max, const half2 &input)
   {
-#if ((__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ == 2) || __CUDACC_VER_MAJOR__ >= 11)
-    // For CUDA >= 10.2
-    half2 lh = __habs2(input);
-#else
-    // Set the fisrt bit of the halves to 0.
-    static constexpr uint32_t maximum_mask = 0x7fff7fffu; // 0111 1111 1111 1111 0111 1111 1111 1111
-
-    uint32_t input_masked = *reinterpret_cast<const uint32_t *>(&input) & maximum_mask;
-    half2 lh = *reinterpret_cast<half2 *>(&input_masked);
-#endif
+    half2 lh = habs2(input);
     if (__hgt(lh.x, max)) { max = lh.x; }
     if (__hgt(lh.y, max)) { max = lh.y; }
   }
@@ -265,7 +260,8 @@ namespace quda
 
   constexpr float target_scale = 2e3;
 
-  template <class Vector> __device__ inline void block_wise_reduce_vector(const Vector &v, float *smem_scale)
+  template <int block_x, int block_y, class Vector>
+  __device__ inline void block_wise_reduce_vector(const Vector &v, float *smem_scale)
   {
 
     __syncthreads();
@@ -283,23 +279,19 @@ namespace quda
         __float_max_abs_floats__(warp_max, v(spin, color).imag());
       }
     }
-    // Find the maximum absolute value in a warp across different lanes
-    warp_wise_reduce_float(warp_max);
-    // Now lane 0 of each warp holds the maximum value
-    if (lane_id == 0) { smem_scale[warp_id] = warp_max; }
-    __syncthreads();
-    if (warp_id == 0) {
-      warp_max = (lane_id < ((blockDim.x * blockDim.y) >> 5)) ? smem_scale[lane_id] : 0.0f;
-      warp_wise_reduce_float(warp_max);
-      if (lane_id == 0) { smem_scale[0] = warp_max / target_scale; }
-    }
+
+    typedef cub::BlockReduce<float, block_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_y, 1> BlockReduce;
+    __shared__ typename BlockReduce::TempStorage temp_storage;
+    float aggregate = BlockReduce(temp_storage).Reduce(warp_max, cub::Max());
+
+    if (warp_id == 0 && lane_id == 0) { smem_scale[0] = aggregate / target_scale; }
     __syncthreads();
   }
 
   // Actually does more than the function name suggests.
   // will find the maximum absolute value among the vector, scale that, and store
   // to sm_b
-  template <int N_sm_d2, bool accumulate, bool store = true, class Vector>
+  template <int block_x, int block_y, int N_sm_d2, bool accumulate, bool store = true, class Vector>
   __device__ inline void load_matrix_b_vector(Vector &v, half2 *sm_b, float *smem_scale, float m_scale = 1.0f)
   {
     if (accumulate) {
@@ -315,7 +307,7 @@ namespace quda
       }
     }
     if (store) {
-      block_wise_reduce_vector(v, smem_scale);
+      block_wise_reduce_vector<block_x, block_y>(v, smem_scale);
       // Now smem_scale[0] contains the maximum value
       float current_scale = smem_scale[0];
 #pragma unroll
@@ -405,77 +397,69 @@ namespace quda
 #endif
   }
 
-  // For "reload" version(reload == true) of wmma gemm, matrix a is loaded when
-  // needed.
-  // It is a waste of time but has less register usage.
-  // For "preload" version(reload == false) of wmma gemm, matrix a is preloaded
-  // before hand.
-  // It saves time but uses more registers.
-  template <int BlockDimX, int Ls, int M, int N, int M_sm, int N_sm, bool reload, class T>
-  __device__ inline void wmma_gemm(T *a_frag, half *sm_a, half *sm_b, half *sm_c)
+  template <int BlockDimX, int Ls, int M, int N, int M_PAD, int N_PAD, bool reload, class T>
+  __device__ inline void mma_sync_gemm(T op_a[], half *sm_a, half *sm_b, half *sm_c, const mma::WarpRegisterMapping &wrm)
   {
-    constexpr int WMMA_M = 16;
-    constexpr int WMMA_N = 16;
-    constexpr int WMMA_K = 16;
 
-    constexpr int tm_dim = M / WMMA_M;
-    constexpr int tn_dim = N / WMMA_N;
+#ifdef USE_FP16_HMMA_ACCUMULATE
+    using accumuate_reg_type = half;
+#else
+    using accumuate_reg_type = float;
+#endif
 
-    constexpr int total_warp = BlockDimX * Ls / warp_size;
+    constexpr int tile_row_dim = M / mma::MMA_M; // number of tiles in the column dimension
+    constexpr int tile_col_dim = N / mma::MMA_N; // number of tiles in the row dimension
+    constexpr int tile_acc_dim = M / mma::MMA_K; // number of tiles in the row dimension
 
-    static_assert((tm_dim * tn_dim) % total_warp == 0, "(tm_dim*tn_dim)%%total_warp==0\n");
-    static_assert(tn_dim % (tm_dim * tn_dim / total_warp) == 0, "tn_dim%%(tm_dim*tn_dim/total_warp)==0\n");
+    constexpr int total_warp = BlockDimX * Ls / 32;
 
-    const int this_warp = (threadIdx.y * blockDim.x + threadIdx.x) >> 5;
+    static_assert((tile_row_dim * tile_col_dim) % total_warp == 0,
+                  "Total number of tiles should be divisible by the number of warps.");
+    static_assert(tile_col_dim % (tile_row_dim * tile_col_dim / total_warp) == 0,
+                  "Each warp should only be responsible a single tile row.");
 
-    constexpr int total_tile = tm_dim * tn_dim;
-
+    constexpr int total_tile = tile_row_dim * tile_col_dim;
     constexpr int warp_cycle = total_tile / total_warp;
-    const int warp_m = this_warp * warp_cycle / tn_dim;
+
+    const int thread_id = threadIdx.y * blockDim.x + threadIdx.x;
+    const int warp_id = thread_id >> 5;
+    const int warp_row = warp_id * warp_cycle / tile_col_dim;
+
 #pragma unroll
     for (int c = 0; c < warp_cycle; c++) {
-      // Set up the wmma stuff
-      nvcuda::wmma::fragment<nvcuda::wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, half, nvcuda::wmma::row_major> b_frag;
-      nvcuda::wmma::fragment<nvcuda::wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, half> c_frag;
+
+      mma::MmaOperandC<accumuate_reg_type> op_c;
 
       // The logical warp assigned to each part of the matrix.
-      const int phys_warp_index = this_warp * warp_cycle + c;
-      const int warp_n = phys_warp_index - warp_m * tn_dim;
-      // eg. for 12 warps:
+      const int logical_warp_index = warp_id * warp_cycle + c;
+      const int warp_col = logical_warp_index - warp_row * tile_col_dim;
+      // e.g. for 12 warps:
       // 000|111|222|333
       // 444|555|666|777
       // 888|999|000|111
 
-      // Zero the initial acc.
-      nvcuda::wmma::fill_fragment(c_frag, static_cast<half>(0.0f));
-
 #pragma unroll
-      for (int k = 0; k < tm_dim; k++) {
-        const int a_row = warp_m * WMMA_M;
-        const int a_col = k * WMMA_K;
-        const int b_row = k * WMMA_K;
-        const int b_col = warp_n * WMMA_N;
+      for (int tile_k = 0; tile_k < tile_acc_dim; tile_k++) {
 
-        // Load Matrix
-        if (reload) { nvcuda::wmma::load_matrix_sync(a_frag[0], sm_a + a_row + a_col * M_sm, M_sm); }
-        nvcuda::wmma::load_matrix_sync(b_frag, sm_c + b_col + b_row * N_sm, N_sm);
-        // Perform the matrix multiplication
+        if (reload) { // the data in registers can be resued.
+          op_a[0].template load<M_PAD>(sm_a, tile_k, warp_row, wrm);
+        }
+
+        mma::MmaOperandB op_b;
+        op_b.load<N_PAD>(sm_b, tile_k, warp_col, wrm);
+
         if (reload) {
-          nvcuda::wmma::mma_sync(c_frag, a_frag[0], b_frag, c_frag);
+          mma::gemm(op_a[0], op_b, op_c);
         } else {
-          nvcuda::wmma::mma_sync(c_frag, a_frag[k], b_frag, c_frag);
+          mma::gemm(op_a[tile_k], op_b, op_c);
         }
       }
 
       __syncthreads();
 
-      int c_row = warp_m * WMMA_M;
-      int c_col = warp_n * WMMA_N;
-
-      nvcuda::wmma::store_matrix_sync(sm_c + c_col + c_row * N_sm, c_frag, N_sm, nvcuda::wmma::mem_row_major);
+      op_c.store<N_PAD>(sm_c, warp_row, warp_col, wrm);
     }
   }
 
 } // namespace quda
 
-#endif // #if (__CUDACC_VER_MAJOR__ >= 9 && __COMPUTE_CAPABILITY__ >= 700)

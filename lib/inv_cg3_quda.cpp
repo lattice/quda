@@ -15,7 +15,7 @@ namespace quda {
 
   CG3::CG3(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
            TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, param, profile),
+    Solver(mat, matSloppy, matPrecon, matPrecon, param, profile),
     init(false)
   {
   }

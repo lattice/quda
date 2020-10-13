@@ -70,7 +70,7 @@ int main(int argc, char **argv)
   display_test_info();
 
   // initialize the QUDA library
-  initQuda(device);
+  initQuda(device_ordinal);
   int X[4] = {xdim, ydim, zdim, tdim};
   setDims(X);
   setSpinorSiteSize(24);
@@ -81,9 +81,6 @@ int main(int argc, char **argv)
   ::testing::InitGoogleTest(&argc, argv);
 
   prec = QUDA_INVALID_PRECISION;
-
-  // Clear previous error state if it exists
-  cudaGetLastError();
 
   // Check for correctness
   if (verify_results) {

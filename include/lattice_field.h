@@ -1,5 +1,4 @@
-#ifndef _LATTICE_FIELD_H
-#define _LATTICE_FIELD_H
+#pragma once
 
 #include <map>
 #include <quda.h>
@@ -7,7 +6,7 @@
 #include <comm_quda.h>
 #include <util_quda.h>
 #include <object.h>
-#include <quda_cuda_api.h>
+#include <quda_api.h>
 
 /**
  * @file lattice_field.h
@@ -150,6 +149,12 @@ namespace quda {
     /** Checkerboarded volume */
     size_t volumeCB;
 
+    /** Local lattice volume */
+    size_t localVolume;
+
+    /** Checkerboarded local volume */
+    size_t localVolumeCB;
+
     size_t stride;
     int pad;
 
@@ -257,14 +262,14 @@ namespace quda {
     mutable size_t ghost_face_bytes[QUDA_MAX_DIM];
 
     /**
-       Real-number offsets to each ghost zone
+       Actual allocated size in bytes of the ghost in each dimension
     */
-    mutable int ghostOffset[QUDA_MAX_DIM][2];
+    mutable size_t ghost_face_bytes_aligned[QUDA_MAX_DIM];
 
     /**
-       Real-number (in floats) offsets to each ghost zone for norm field
+       Byte offsets to each ghost zone
     */
-    mutable int ghostNormOffset[QUDA_MAX_DIM][2];
+    mutable size_t ghost_offset[QUDA_MAX_DIM][2];
 
     /**
        Pinned memory buffer used for sending messages
@@ -508,6 +513,16 @@ namespace quda {
     size_t VolumeCB() const { return volumeCB; }
 
     /**
+       @return The local full-field volume without any overlapping region
+    */
+    size_t LocalVolume() const { return localVolume; }
+
+    /**
+       @return The local single-parity volume without any overlapping region
+    */
+    size_t LocalVolumeCB() const { return localVolumeCB; }
+
+    /**
        @param i The dimension of the requested surface 
        @return The single-parity surface of dimension i
     */
@@ -677,6 +692,8 @@ namespace quda {
       @param[in] mem_space Memory space we are prefetching to
     */
     virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const { ; }
+
+    virtual bool isNative() const = 0;
   };
   
   /**
@@ -741,6 +758,31 @@ namespace quda {
 #define checkPrecision(...) Precision_(__func__, __FILE__, __LINE__, __VA_ARGS__)
 
   /**
+     @brief Helper function for determining if the field is in native order
+     @param[in] a Input field
+     @return true if field is in native order
+   */
+  inline bool Native_(const char *func, const char *file, int line, const LatticeField &a)
+  {
+    if (!a.isNative()) errorQuda("Non-native field detected (%s:%d in %s())\n", file, line, func);
+    return true;
+  }
+
+  /**
+     @brief Helper function for determining if the fields are in native order
+     @param[in] a Input field
+     @param[in] args List of additional fields to check
+     @return true if all fields are in native order
+   */
+  template <typename... Args>
+  inline bool Native_(const char *func, const char *file, int line, const LatticeField &a, const Args &... args)
+  {
+    return (Native_(func, file, line, a) & Native_(func, file, line, args...));
+  }
+
+#define checkNative(...) Native_(__func__, __FILE__, __LINE__, __VA_ARGS__)
+
+  /**
      @brief Return whether data is reordered on the CPU or GPU.  This can set
      at QUDA initialization using the environment variable
      QUDA_REORDER_LOCATION.
@@ -772,5 +814,3 @@ namespace quda {
   }
 
 } // namespace quda
-
-#endif // _LATTICE_FIELD_H

@@ -3,9 +3,6 @@
 #include <string.h>
 #include <sys/time.h>
 
-#include <cuda.h>
-#include <cuda_runtime.h>
-
 #include "quda.h"
 #include "gauge_field.h"
 #include "host_utils.h"
@@ -61,7 +58,7 @@ static int unitarize_link_test(int &test_rc)
 {
   QudaGaugeParam qudaGaugeParam = newQudaGaugeParam();
 
-  initQuda(device);
+  initQuda(device_ordinal);
 
   qudaGaugeParam.anisotropy = 1.0;
 
@@ -100,21 +97,13 @@ static int unitarize_link_test(int &test_rc)
 
   TimeProfile profile("dummy");
 
-  void *fatlink = (void *)malloc(4 * V * gauge_site_size * cpu_prec);
-  if(fatlink == NULL){
-    errorQuda("ERROR: allocating fatlink failed\n");
-  }
+  void *inlink = (void *)safe_malloc(4 * V * gauge_site_size * cpu_prec);
+  void *fatlink = (void *)safe_malloc(4 * V * gauge_site_size * cpu_prec);
 
   void* sitelink[4];
-  for(int i=0;i < 4;i++){
-    cudaMallocHost((void **)&sitelink[i], V * gauge_site_size * cpu_prec);
-    if(sitelink[i] == NULL){
-      errorQuda("ERROR; allocate sitelink[%d] failed\n", i);
-    }
-  }
+  for (int i = 0; i < 4; i++) sitelink[i] = pinned_malloc(V * gauge_site_size * cpu_prec);
 
   createSiteLinkCPU(sitelink, qudaGaugeParam.cpu_prec, 1);
-  void *inlink = (void *)malloc(4 * V * gauge_site_size * cpu_prec);
 
   if (cpu_prec == QUDA_DOUBLE_PRECISION){
     double* link = reinterpret_cast<double*>(inlink);
@@ -176,17 +165,14 @@ static int unitarize_link_test(int &test_rc)
 			     svd_rel_error,
 			     svd_abs_error);
 
-  int *num_failures_h = (int*)mapped_malloc(sizeof(int));
-  int *num_failures_d = nullptr;
-  cudaError_t error = cudaHostGetDevicePointer(&num_failures_d, num_failures_h, 0);
-  if (error != cudaSuccess) errorQuda("cudaHostGetDevicePointer failed with error: %s", cudaGetErrorString(error));
+  int *num_failures_h = static_cast<int *>(mapped_malloc(sizeof(int)));
+  int *num_failures_d = static_cast<int *>(get_mapped_device_pointer(num_failures_h));
   *num_failures_h = 0;
 
   struct timeval t0, t1;
 
   gettimeofday(&t0,NULL);
   unitarizeLinks(*cudaULink, *cudaFatLink, num_failures_d);
-  cudaDeviceSynchronize();
   gettimeofday(&t1,NULL);
 
   if (verify_results) {
@@ -199,14 +185,14 @@ static int unitarize_link_test(int &test_rc)
   delete cpuFatLink;
   delete cudaFatLink;
   delete cudaULink;
-  for(int dir=0; dir<4; ++dir) cudaFreeHost(sitelink[dir]);
+  for (int dir = 0; dir < 4; ++dir) host_free(sitelink[dir]);
 
-  free(fatlink);
+  host_free(fatlink);
 
   int num_failures = *num_failures_h;
   host_free(num_failures_h);
 
-  free(inlink);
+  host_free(inlink);
 #ifdef MULTI_GPU
   exchange_llfat_cleanup();
 #endif
@@ -216,8 +202,7 @@ static int unitarize_link_test(int &test_rc)
   return num_failures;
 }
 
-  static void
-display_test_info()
+static void display_test_info()
 {
   printfQuda("running the following test:\n");
 
@@ -235,11 +220,7 @@ display_test_info()
       dimPartitioned(2),
       dimPartitioned(3));
 #endif
-
-  return ;
-
 }
-
 
 int main(int argc, char **argv)
 {

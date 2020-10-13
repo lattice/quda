@@ -131,11 +131,13 @@ namespace quda {
       if ( !(comm_dim_partitioned(i) || (no_comms_fill && R[i])) ) ghostFace[i] = 0;
       else ghostFace[i] = surface[i] * R[i]; // includes the radius (unlike ColorSpinorField)
 
-      ghostOffset[i][0] = (i == 0) ? 0 : ghostOffset[i-1][1] + ghostFace[i-1]*geometry_comms*nInternal;
-      ghostOffset[i][1] = (bidir ? ghostOffset[i][0] + ghostFace[i]*geometry_comms*nInternal : ghostOffset[i][0]);
-
       ghost_face_bytes[i] = ghostFace[i] * geometry_comms * nInternal * ghost_precision;
-      ghost_bytes += (bidir ? 2 : 1 ) * ghost_face_bytes[i]; // factor of two from direction
+      ghost_face_bytes_aligned[i] = ghost_face_bytes[i];
+
+      ghost_offset[i][0] = (i == 0) ? 0 : ghost_offset[i-1][1] + ghost_face_bytes_aligned[i-1];
+      ghost_offset[i][1] = (bidir ? ghost_offset[i][0] + ghost_face_bytes_aligned[i] : ghost_offset[i][0]);
+
+      ghost_bytes += (bidir ? 2 : 1) * ghost_face_bytes_aligned[i]; // factor of two from direction
     }
 
     if (isNative()) ghost_bytes = ALIGNMENT_ADJUST(ghost_bytes);
@@ -168,8 +170,6 @@ namespace quda {
     }
     staggeredPhaseApplied = false;
   }
-
-  bool GaugeField::isNative() const { return gauge::isNative(order, precision, reconstruct); }
 
   void GaugeField::exchange(void **ghost_link, void **link_sendbuf, QudaDirection dir) const {
     MsgHandle *mh_send[4];
@@ -305,12 +305,10 @@ namespace quda {
     spinor_param.nSpin = 1;
     spinor_param.nDim = a.Ndim();
     for (int d=0; d<a.Ndim(); d++) spinor_param.x[d] = a.X()[d];
-    spinor_param.setPrecision(a.Precision());
     spinor_param.pad = a.Pad();
     spinor_param.siteSubset = QUDA_FULL_SITE_SUBSET;
     spinor_param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-    spinor_param.fieldOrder = (a.Precision() == QUDA_DOUBLE_PRECISION || spinor_param.nSpin == 1) ?
-      QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
+    spinor_param.setPrecision(a.Precision(), a.Precision(), true);
     spinor_param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
     spinor_param.create = QUDA_REFERENCE_FIELD_CREATE;
     spinor_param.v = (void*)a.Gauge_p();

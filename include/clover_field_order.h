@@ -14,7 +14,6 @@
 #include <quda_matrix.h>
 #include <color_spinor.h>
 #include <trove_helper.cuh>
-#include <texture_helper.cuh>
 #include <transform_reduce.h>
 
 namespace quda {
@@ -531,11 +530,6 @@ namespace quda {
       norm_type *norm;
       const AllocInt offset; // offset can be 32-bit or 64-bit
       const AllocInt norm_offset;
-#ifdef USE_TEXTURE_OBJECTS
-	typedef typename TexVectorType<real, N>::type TexVector;
-	cudaTextureObject_t tex;
-	cudaTextureObject_t normTex;
-#endif
 	const int volumeCB;
 	const int stride;
 
@@ -552,10 +546,6 @@ namespace quda {
                     bool override = false) :
           offset(clover.Bytes() / (2 * sizeof(Float) * N)),
           norm_offset(clover.NormBytes() / (2 * sizeof(norm_type))),
-#ifdef USE_TEXTURE_OBJECTS
-          tex(0),
-          normTex(0),
-#endif
           volumeCB(clover.VolumeCB()),
           stride(clover.Stride()),
           twisted(clover.Twisted()),
@@ -566,23 +556,11 @@ namespace quda {
           backup_h(nullptr),
           backup_norm_h(nullptr)
 	{
-	  this->clover = clover_ ? clover_ : (Float*)(clover.V(is_inverse));
+          if (clover.Order() != N) {
+            errorQuda("Invalid clover order %d for FloatN (N=%d) accessor", clover.Order(), N);
+          }
+          this->clover = clover_ ? clover_ : (Float *)(clover.V(is_inverse));
           this->norm = norm_ ? norm_ : (norm_type *)(clover.Norm(is_inverse));
-#ifdef USE_TEXTURE_OBJECTS
-	  if (clover.Location() == QUDA_CUDA_FIELD_LOCATION) {
-	    if (is_inverse) {
-	      tex = static_cast<const cudaCloverField&>(clover).InvTex();
-	      normTex = static_cast<const cudaCloverField&>(clover).InvNormTex();
-	    } else {
-	      tex = static_cast<const cudaCloverField&>(clover).Tex();
-	      normTex = static_cast<const cudaCloverField&>(clover).NormTex();
-	    }
-	    if (!huge_alloc && (this->clover != clover.V(is_inverse) ||
-				((clover.Precision() == QUDA_HALF_PRECISION || clover.Precision() == QUDA_QUARTER_PRECISION) && this->norm != clover.Norm(is_inverse)) ) && !override) {
-	      errorQuda("Cannot use texture read since data pointer does not equal field pointer - use with huge_alloc=true instead");
-	    }
-	  }
-#endif
 	}
 
 	bool Twisted() const { return twisted; }
@@ -630,36 +608,17 @@ namespace quda {
         {
           norm_type nrm;
           if (isFixed<Float>::value) {
-#if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
-            nrm = !huge_alloc ? tex1Dfetch_<float>(normTex, parity * norm_offset + chirality * stride + x) :
-                                norm[parity * norm_offset + chirality * stride + x];
-#else
             nrm = vector_load<float>(norm, parity * norm_offset + chirality * stride + x);
-#endif
           }
 
 #pragma unroll
 	  for (int i=0; i<M; i++) {
-#if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
-	    if (!huge_alloc) { // use textures unless we have a huge alloc
-                               // first do texture load from memory
-              TexVector vecTmp = tex1Dfetch_<TexVector>(tex, parity * offset + stride * (chirality * M + i) + x);
-              // now insert into output array
+            // first load from memory
+            Vector vecTmp = vector_load<Vector>(clover, parity * offset + x + stride * (chirality * M + i));
+            // second do scalar copy converting into register type
 #pragma unroll
-              for (int j = 0; j < N; j++) {
-                copy(v[i * N + j], reinterpret_cast<real *>(&vecTmp)[j]);
-                if (isFixed<Float>::value) v[i * N + j] *= nrm;
-              }
-            } else
-#endif
-	    {
-              // first load from memory
-              Vector vecTmp = vector_load<Vector>(clover, parity * offset + x + stride * (chirality * M + i));
-              // second do scalar copy converting into register type
-#pragma unroll
-              for (int j = 0; j < N; j++) { copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm); }
-            }
-	  }
+            for (int j = 0; j < N; j++) { copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm); }
+          }
 
           if (add_rho) for (int i=0; i<6; i++) v[i] += rho;
         }
@@ -734,27 +693,25 @@ namespace quda {
 	void save() {
 	  if (backup_h) errorQuda("Already allocated host backup");
 	  backup_h = safe_malloc(bytes);
-	  cudaMemcpy(backup_h, clover, bytes, cudaMemcpyDeviceToHost);
+	  qudaMemcpy(backup_h, clover, bytes, cudaMemcpyDeviceToHost);
 	  if (norm_bytes) {
 	    backup_norm_h = safe_malloc(norm_bytes);
-	    cudaMemcpy(backup_norm_h, norm, norm_bytes, cudaMemcpyDeviceToHost);
+	    qudaMemcpy(backup_norm_h, norm, norm_bytes, cudaMemcpyDeviceToHost);
 	  }
-	  checkCudaError();
 	}
 
 	/**
 	   @brief Restore the field from the host after tuning
 	*/
 	void load() {
-	  cudaMemcpy(clover, backup_h, bytes, cudaMemcpyHostToDevice);
+	  qudaMemcpy(clover, backup_h, bytes, cudaMemcpyHostToDevice);
 	  host_free(backup_h);
 	  backup_h = nullptr;
 	  if (norm_bytes) {
-	    cudaMemcpy(norm, backup_norm_h, norm_bytes, cudaMemcpyHostToDevice);
+	    qudaMemcpy(norm, backup_norm_h, norm_bytes, cudaMemcpyHostToDevice);
 	    host_free(backup_norm_h);
 	    backup_norm_h = nullptr;
 	  }
-	  checkCudaError();
 	}
 
 	size_t Bytes() const {
@@ -789,7 +746,10 @@ namespace quda {
       QDPOrder(const CloverField &clover, bool inverse, Float *clover_=0) 
       : volumeCB(clover.VolumeCB()), stride(volumeCB), offset(clover.Bytes()/(2*sizeof(Float))),
 	twisted(clover.Twisted()), mu2(clover.Mu2()) {
-	this->clover = clover_ ? clover_ : (Float*)(clover.V(inverse));
+        if (clover.Order() != QUDA_PACKED_CLOVER_ORDER) {
+          errorQuda("Invalid clover order %d for this accessor", clover.Order());
+        }
+        this->clover = clover_ ? clover_ : (Float *)(clover.V(inverse));
       }
 
 	bool  Twisted()	const	{return twisted;}
@@ -838,8 +798,11 @@ namespace quda {
 
       QDPJITOrder(const CloverField &clover, bool inverse, Float *clover_=0) 
       : volumeCB(clover.VolumeCB()), stride(volumeCB), twisted(clover.Twisted()), mu2(clover.Mu2()) {
-	offdiag = clover_ ? ((Float**)clover_)[0] : ((Float**)clover.V(inverse))[0];
-	diag = clover_ ? ((Float**)clover_)[1] : ((Float**)clover.V(inverse))[1];
+        if (clover.Order() != QUDA_QDPJIT_CLOVER_ORDER) {
+          errorQuda("Invalid clover order %d for this accessor", clover.Order());
+        }
+        offdiag = clover_ ? ((Float **)clover_)[0] : ((Float **)clover.V(inverse))[0];
+        diag = clover_ ? ((Float **)clover_)[1] : ((Float **)clover.V(inverse))[1];
       }
 	
       bool  Twisted()	const	{return twisted;}
@@ -904,8 +867,11 @@ namespace quda {
 
       BQCDOrder(const CloverField &clover, bool inverse, Float *clover_=0) 
       : volumeCB(clover.Stride()), stride(volumeCB), twisted(clover.Twisted()), mu2(clover.Mu2()) {
-	this->clover[0] = clover_ ? clover_ : (Float*)(clover.V(inverse));
-	this->clover[1] = (Float*)((char*)this->clover[0] + clover.Bytes()/2);
+        if (clover.Order() != QUDA_BQCD_CLOVER_ORDER) {
+          errorQuda("Invalid clover order %d for this accessor", clover.Order());
+        }
+        this->clover[0] = clover_ ? clover_ : (Float *)(clover.V(inverse));
+        this->clover[1] = (Float *)((char *)this->clover[0] + clover.Bytes() / 2);
       }
 
 
@@ -963,7 +929,9 @@ namespace quda {
   template<int N, bool add_rho> struct clover_mapper<short,N,add_rho> { typedef clover::FloatNOrder<short, N, 4, add_rho> type; };
 
   // quarter precision uses Float4
-  template<int N, bool add_rho> struct clover_mapper<char,N,add_rho> { typedef clover::FloatNOrder<char, N, 4, add_rho> type; };
+  template <int N, bool add_rho> struct clover_mapper<int8_t, N, add_rho> {
+    typedef clover::FloatNOrder<int8_t, N, 4, add_rho> type;
+  };
 
 } // namespace quda
 

@@ -225,7 +225,7 @@ namespace quda
     }
     track_malloc(DEVICE, a, ptr);
 #ifdef HOST_DEBUG
-    cudaMemset(ptr, 0xff, size);
+    qudaMemset(ptr, 0xff, size);
 #endif
     return ptr;
 #else
@@ -256,7 +256,7 @@ namespace quda
     }
     track_malloc(DEVICE_PINNED, a, ptr);
 #ifdef HOST_DEBUG
-    cudaMemset(ptr, 0xff, size);
+    qudaMemset(ptr, 0xff, size);
 #endif
     return ptr;
   }
@@ -355,7 +355,7 @@ namespace quda
     }
     track_malloc(MANAGED, a, ptr);
 #ifdef HOST_DEBUG
-    cudaMemset(ptr, 0xff, size);
+    qudaMemset(ptr, 0xff, size);
 #endif
     return ptr;
   }
@@ -505,6 +505,18 @@ namespace quda
     default: errorQuda("Unknown memory type %d", mem_type); return QUDA_INVALID_FIELD_LOCATION;
     }
   }
+
+  void *get_mapped_device_pointer_(const char *func, const char *file, int line, const void *host)
+  {
+    void *device;
+    auto error = cudaHostGetDevicePointer(&device, const_cast<void *>(host), 0);
+    if (error != cudaSuccess) {
+      errorQuda("cudaHostGetDevicePointer failed with error %s (%s:%d in %s()",
+                cudaGetErrorString(error), file, line, func);
+    }
+    return device;
+  }
+
 
   namespace pool
   {

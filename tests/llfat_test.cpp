@@ -2,8 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
-#include <cuda.h>
-#include <cuda_runtime.h>
 
 #include "quda.h"
 #include "host_utils.h"
@@ -29,7 +27,7 @@ static void llfat_test()
   void* ghost_sitelink_diag[16];
 #endif
 
-  initQuda(device);
+  initQuda(device_ordinal);
 
   cpu_prec = prec;
   host_gauge_data_type_size = cpu_prec;

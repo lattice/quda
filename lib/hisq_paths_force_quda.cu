@@ -585,63 +585,64 @@ namespace quda {
         return TuneKey(meta.VolString(), typeid(*this).name(), aux.str().c_str());
       }
 
-      void apply(const qudaStream_t &stream) {
+      void apply(const qudaStream_t &stream)
+      {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         switch (type) {
         case FORCE_ONE_LINK:
-          oneLinkTermKernel<Arg> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+          qudaLaunchKernel(oneLinkTermKernel<Arg>, tp, stream, arg);
           break;
         case FORCE_ALL_LINK:
           if (goes_forward(arg.sig) && goes_forward(arg.mu))
-            allLinkKernel<1,1,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            qudaLaunchKernel(allLinkKernel<1,1,Arg>, tp, stream, arg);
           else if (goes_forward(arg.sig) && goes_backward(arg.mu))
-            allLinkKernel<1,0,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            qudaLaunchKernel(allLinkKernel<1,0,Arg>, tp, stream, arg);
           else if (goes_backward(arg.sig) && goes_forward(arg.mu))
-            allLinkKernel<0,1,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            qudaLaunchKernel(allLinkKernel<0,1,Arg>, tp, stream, arg);
           else
-            allLinkKernel<0,0,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            qudaLaunchKernel(allLinkKernel<0,0,Arg>, tp, stream, arg);
           break;
         case FORCE_MIDDLE_LINK:
           if (!arg.p_mu || !arg.q_mu) errorQuda("Expect p_mu=%d and q_mu=%d to both be true", arg.p_mu, arg.q_mu);
           if (arg.q_prev) {
             if (goes_forward(arg.sig) && goes_forward(arg.mu))
-              middleLinkKernel<1,1,true,true,true,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+              qudaLaunchKernel(middleLinkKernel<1,1,true,true,true,Arg>, tp, stream, arg);
             else if (goes_forward(arg.sig) && goes_backward(arg.mu))
-              middleLinkKernel<1,0,true,true,true,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+              qudaLaunchKernel(middleLinkKernel<1,0,true,true,true,Arg>, tp, stream, arg);
             else if (goes_backward(arg.sig) && goes_forward(arg.mu))
-              middleLinkKernel<0,1,true,true,true,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+              qudaLaunchKernel(middleLinkKernel<0,1,true,true,true,Arg>, tp, stream, arg);
             else
-              middleLinkKernel<0,0,true,true,true,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+              qudaLaunchKernel(middleLinkKernel<0,0,true,true,true,Arg>, tp, stream, arg);
           } else {
             if (goes_forward(arg.sig) && goes_forward(arg.mu))
-              middleLinkKernel<1,1,true,true,false,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+              qudaLaunchKernel(middleLinkKernel<1,1,true,true,false,Arg>, tp, stream, arg);
             else if (goes_forward(arg.sig) && goes_backward(arg.mu))
-              middleLinkKernel<1,0,true,true,false,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+              qudaLaunchKernel(middleLinkKernel<1,0,true,true,false,Arg>, tp, stream, arg);
             else if (goes_backward(arg.sig) && goes_forward(arg.mu))
-              middleLinkKernel<0,1,true,true,false,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+              qudaLaunchKernel(middleLinkKernel<0,1,true,true,false,Arg>, tp, stream, arg);
             else
-              middleLinkKernel<0,0,true,true,false,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+              qudaLaunchKernel(middleLinkKernel<0,0,true,true,false,Arg>, tp, stream, arg);
           }
           break;
         case FORCE_LEPAGE_MIDDLE_LINK:
           if (arg.p_mu || arg.q_mu || !arg.q_prev)
             errorQuda("Expect p_mu=%d and q_mu=%d to both be false and q_prev=%d true", arg.p_mu, arg.q_mu, arg.q_prev);
           if (goes_forward(arg.sig) && goes_forward(arg.mu))
-            middleLinkKernel<1,1,false,false,true,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            qudaLaunchKernel(middleLinkKernel<1,1,false,false,true,Arg>, tp, stream, arg);
           else if (goes_forward(arg.sig) && goes_backward(arg.mu))
-            middleLinkKernel<1,0,false,false,true,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            qudaLaunchKernel(middleLinkKernel<1,0,false,false,true,Arg>, tp, stream, arg);
           else if (goes_backward(arg.sig) && goes_forward(arg.mu))
-            middleLinkKernel<0,1,false,false,true,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            qudaLaunchKernel(middleLinkKernel<0,1,false,false,true,Arg>, tp, stream, arg);
           else
-            middleLinkKernel<0,0,false,false,true,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            qudaLaunchKernel(middleLinkKernel<0,0,false,false,true,Arg>, tp, stream, arg);
           break;
         case FORCE_SIDE_LINK:
-          if (goes_forward(arg.mu)) sideLinkKernel<1,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
-          else                      sideLinkKernel<0,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+          if (goes_forward(arg.mu)) qudaLaunchKernel(sideLinkKernel<1,Arg>, tp, stream, arg);
+          else                      qudaLaunchKernel(sideLinkKernel<0,Arg>, tp, stream, arg);
           break;
         case FORCE_SIDE_LINK_SHORT:
-          if (goes_forward(arg.mu)) sideLinkShortKernel<1,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
-          else                      sideLinkShortKernel<0,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+          if (goes_forward(arg.mu)) qudaLaunchKernel(sideLinkShortKernel<1,Arg>, tp, stream, arg);
+          else                      qudaLaunchKernel(sideLinkShortKernel<0,Arg>, tp, stream, arg);
           break;
         default:
           errorQuda("Undefined force type %d", type);
@@ -843,8 +844,7 @@ namespace quda {
       QudaPrecision precision = checkPrecision(oprod, link, newOprod);
       instantiate<HisqStaplesForce, ReconstructNone>(Pmu, P3, P5, Pnumu, Qmu, Qnumu, newOprod, oprod, link, path_coeff_array);
 
-      cudaDeviceSynchronize();
-      checkCudaError();
+      qudaDeviceSynchronize();
     }
 
     template <typename real, int nColor, QudaReconstructType reconstruct=QUDA_RECONSTRUCT_NO>
@@ -989,10 +989,8 @@ namespace quda {
       void apply(const qudaStream_t &stream) {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         switch (type) {
-        case FORCE_LONG_LINK:
-          longLinkKernel<Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
-        case FORCE_COMPLETE:
-          completeForceKernel<Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
+        case FORCE_LONG_LINK: qudaLaunchKernel(longLinkKernel<Arg>, tp, stream, arg); break;
+        case FORCE_COMPLETE:  qudaLaunchKernel(completeForceKernel<Arg>, tp, stream, arg); break;
         default:
           errorQuda("Undefined force type %d", type);
         }
@@ -1053,8 +1051,7 @@ namespace quda {
         LongLinkArg<real, nColor, recon> arg(newOprod, link, oldOprod, coeff);
         HisqForce<decltype(arg)> longLink(arg, link, 0, 0, FORCE_LONG_LINK);
         longLink.apply(0);
-        cudaDeviceSynchronize();
-        checkCudaError();
+        qudaDeviceSynchronize();
       }
     };
 
@@ -1075,8 +1072,7 @@ namespace quda {
         CompleteForceArg<real, nColor, recon> arg(force, link);
         HisqForce<decltype(arg)> completeForce(arg, link, 0, 0, FORCE_COMPLETE);
         completeForce.apply(0);
-        cudaDeviceSynchronize();
-        checkCudaError();
+        qudaDeviceSynchronize();
       }
     };
 

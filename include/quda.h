@@ -57,6 +57,9 @@ extern "C" {
     QudaPrecision cuda_prec_precondition; /**< The precision of the preconditioner gauge field */
     QudaReconstructType reconstruct_precondition; /**< The recontruction type of the preconditioner gauge field */
 
+    QudaPrecision cuda_prec_eigensolver;         /**< The precision of the eigensolver gauge field */
+    QudaReconstructType reconstruct_eigensolver; /**< The recontruction type of the eigensolver gauge field */
+
     QudaGaugeFixed gauge_fix; /**< Whether the input gauge field is in the axial gauge or not */
 
     int ga_pad;       /**< The pad size that the cudaGaugeField will use (default=0) */
@@ -227,17 +230,19 @@ extern "C" {
     QudaPrecision cuda_prec_sloppy;        /**< The precision used by the QUDA sloppy operator */
     QudaPrecision cuda_prec_refinement_sloppy; /**< The precision of the sloppy gauge field for the refinement step in multishift */
     QudaPrecision cuda_prec_precondition;  /**< The precision used by the QUDA preconditioner */
+    QudaPrecision cuda_prec_eigensolver;   /**< The precision used by the QUDA eigensolver */
 
     QudaDiracFieldOrder dirac_order;       /**< The order of the input and output fermion fields */
 
     QudaGammaBasis gamma_basis;            /**< Gamma basis of the input and output host fields */
 
-    QudaFieldLocation clover_location;            /**< The location of the clover field */
+    QudaFieldLocation clover_location;     /**< The location of the clover field */
     QudaPrecision clover_cpu_prec;         /**< The precision used for the input clover field */
     QudaPrecision clover_cuda_prec;        /**< The precision used for the clover field in the QUDA solver */
     QudaPrecision clover_cuda_prec_sloppy; /**< The precision used for the clover field in the QUDA sloppy operator */
     QudaPrecision clover_cuda_prec_refinement_sloppy; /**< The precision of the sloppy clover field for the refinement step in multishift */
     QudaPrecision clover_cuda_prec_precondition; /**< The precision used for the clover field in the QUDA preconditioner */
+    QudaPrecision clover_cuda_prec_eigensolver;  /**< The precision used for the clover field in the QUDA eigensolver */
 
     QudaCloverFieldOrder clover_order;     /**< The order of the input clover field */
     QudaUseInitGuess use_init_guess;       /**< Whether to use an initial guess in the solver or not */
@@ -338,14 +343,14 @@ extern "C" {
     /** How many vectors to compute after one solve
      *  for eigCG recommended values 8 or 16
     */
-    int nev;
+    int n_ev;
     /** EeigCG  : Search space dimension
      *  gmresdr : Krylov subspace dimension
     */
     int max_search_dim;
     /** For systems with many RHS: current RHS index */
     int rhs_idx;
-    /** Specifies deflation space volume: total number of eigenvectors is nev*deflation_grid */
+    /** Specifies deflation space volume: total number of eigenvectors is n_ev*deflation_grid */
     int deflation_grid;
     /** eigCG: selection criterion for the reduced eigenvector set */
     double eigenval_tol;
@@ -382,6 +387,9 @@ extern "C" {
 
     /** Which external library to use in the linear solvers (MAGMA or Eigen) */
     QudaExtLibType extlib_type;
+
+    /** Whether to use the platform native or generic BLAS / LAPACK */
+    QudaBoolean native_blas_lapack;
 
   } QudaInvertParam;
 
@@ -440,13 +448,15 @@ extern "C" {
     QudaEigSpectrumType spectrum;
 
     /** Size of the eigenvector search space **/
-    int nEv;
+    int n_ev;
     /** Total size of Krylov space **/
-    int nKr;
+    int n_kr;
     /** Max number of locked eigenpairs (deduced at runtime) **/
     int nLockedMax;
     /** Number of requested converged eigenvectors **/
-    int nConv;
+    int n_conv;
+    /** Number of requested converged eigenvectors to use in deflation **/
+    int n_ev_deflate;
     /** Tolerance on the least well known eigenvalue's residual **/
     double tol;
     /** For IRLM/IRAM, check every nth restart **/
@@ -493,6 +503,9 @@ extern "C" {
 
     /** Filename prefix for where to save the null-space vectors */
     char vec_outfile[256];
+
+    /** The precision with which to save the vectors */
+    QudaPrecision save_prec;
 
     /** Whether to inflate single-parity eigen-vector I/O to a full
         field (e.g., enabling this is required for compatability with
@@ -690,6 +703,12 @@ extern "C" {
 
     /** Boolean for if this is a staggered solve or not */
     QudaBoolean is_staggered;
+
+    /** Whether to use tensor cores (if available) */
+    QudaBoolean use_mma;
+
+    /** Whether to do a full (false) or thin (true) update in the context of updateMultigridQuda */
+    QudaBoolean thin_update_only;
 
   } QudaMultigridParam;
 
@@ -1009,7 +1028,8 @@ extern "C" {
    * @brief Updates the multigrid preconditioner for the new gauge / clover field
    * @param mg_instance Pointer to instance of multigrid_solver
    * @param param Contains all metadata regarding host and device
-   * storage and solver parameters
+   * storage and solver parameters, of note contains a flag specifying whether
+   * to do a full update or a thin update.
    */
   void updateMultigridQuda(void *mg_instance, QudaMultigridParam *param);
 

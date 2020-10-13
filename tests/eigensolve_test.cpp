@@ -30,9 +30,9 @@ void display_test_info()
   printfQuda(" - solver mode %s\n", get_eig_type_str(eig_type));
   printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(eig_spectrum));
   if (eig_type == QUDA_EIG_BLK_TR_LANCZOS) printfQuda(" - eigenvector block size %d\n", eig_block_size);
-  printfQuda(" - number of eigenvectors requested %d\n", eig_nConv);
-  printfQuda(" - size of eigenvector search space %d\n", eig_nEv);
-  printfQuda(" - size of Krylov space %d\n", eig_nKr);
+  printfQuda(" - number of eigenvectors requested %d\n", eig_n_conv);
+  printfQuda(" - size of eigenvector search space %d\n", eig_n_ev);
+  printfQuda(" - size of Krylov space %d\n", eig_n_kr);
   printfQuda(" - solver tolerance %e\n", eig_tol);
   printfQuda(" - convergence required (%s)\n", eig_require_convergence ? "true" : "false");
   if (eig_compute_svd) {
@@ -96,7 +96,11 @@ int main(int argc, char **argv)
   QudaInvertParam eig_inv_param = newQudaInvertParam();
   setInvertParam(eig_inv_param);
   // Specific changes to the invert param for the eigensolver
-  eig_inv_param.gamma_basis = QUDA_UKQCD_GAMMA_BASIS;
+  // QUDA's device routines require UKQCD gamma basis. QUDA will
+  // automatically rotate from this basis on the host, to UKQCD
+  // on the device, and back to this basis upon completion.
+  eig_inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+
   eig_inv_param.solve_type
     = (eig_inv_param.solution_type == QUDA_MAT_SOLUTION ? QUDA_DIRECT_SOLVE : QUDA_DIRECT_PC_SOLVE);
   QudaEigParam eig_param = newQudaEigParam();
@@ -105,7 +109,7 @@ int main(int argc, char **argv)
   setEigParam(eig_param);
 
   // Initialize the QUDA library
-  initQuda(device);
+  initQuda(device_ordinal);
   display_test_info();
 
   // Set some dimension parameters
@@ -140,11 +144,11 @@ int main(int argc, char **argv)
   // QUDA eigensolver test BEGIN
   //----------------------------------------------------------------------------
   // Host side arrays to store the eigenpairs computed by QUDA
-  void **host_evecs = (void **)malloc(eig_nConv * sizeof(void *));
-  for (int i = 0; i < eig_nConv; i++) {
+  void **host_evecs = (void **)malloc(eig_n_conv * sizeof(void *));
+  for (int i = 0; i < eig_n_conv; i++) {
     host_evecs[i] = (void *)malloc(V * eig_inv_param.Ls * sss * eig_inv_param.cpu_prec);
   }
-  double _Complex *host_evals = (double _Complex *)malloc(eig_param.nEv * sizeof(double _Complex));
+  double _Complex *host_evals = (double _Complex *)malloc(eig_param.n_ev * sizeof(double _Complex));
 
   // This function returns the host_evecs and host_evals pointers, populated with the
   // requested data, at the requested prec. All the information needed to perfom the
@@ -162,7 +166,7 @@ int main(int argc, char **argv)
   //----------------------------------------------------------------------------
 
   // Clean up memory allocations
-  for (int i = 0; i < eig_nConv; i++) free(host_evecs[i]);
+  for (int i = 0; i < eig_n_conv; i++) free(host_evecs[i]);
   free(host_evecs);
   free(host_evals);
 

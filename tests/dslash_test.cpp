@@ -53,7 +53,7 @@ CLI::TransformPairs<dslash_test_type> dtest_type_map {{"Dslash", dslash_test_typ
 
 void init(int argc, char **argv)
 {
-  initQuda(device);
+  initQuda(device_ordinal);
 
   gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
@@ -204,11 +204,6 @@ void init(int argc, char **argv)
     csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
     csParam.pad = inv_param.sp_pad;
     csParam.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
-#ifdef FLOAT8
-    if (dslash_type == QUDA_MOBIUS_DWF_DSLASH && dtest_type == dslash_test_type::MatPCDagMatPCLocal) {
-      csParam.fieldOrder = QUDA_FLOAT8_FIELD_ORDER;
-    }
-#endif
 
     if (inv_param.solution_type == QUDA_MAT_SOLUTION || inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION) {
       csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
@@ -519,11 +514,6 @@ DslashTime dslashCUDA(int niter) {
   cudaEventDestroy(end);
 
   dslash_time.event_time = runTime / 1000;
-
-  // check for errors
-  cudaError_t stat = cudaGetLastError();
-  if (stat != cudaSuccess)
-    printfQuda("with ERROR: %s\n", cudaGetErrorString(stat));
 
   return dslash_time;
 }

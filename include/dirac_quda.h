@@ -1,5 +1,4 @@
-#ifndef _DIRAC_QUDA_H
-#define _DIRAC_QUDA_H
+#pragma once
 
 #include <quda_internal.h>
 #include <color_spinor_field.h>
@@ -60,6 +59,7 @@ namespace quda {
     Transfer *transfer; 
     Dirac *dirac;
     bool need_bidirectional; // whether or not we need to force a bi-directional build
+    bool use_mma;            // whether to use tensor cores where applicable
 
     // Default constructor
     DiracParam() :
@@ -76,7 +76,12 @@ namespace quda {
       tmp1(0),
       tmp2(0),
       halo_precision(QUDA_INVALID_PRECISION),
-      need_bidirectional(false)
+      need_bidirectional(false),
+#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
+      use_mma(true)
+#else
+      use_mma(false)
+#endif
     {
       for (int i=0; i<QUDA_MAX_DIM; i++) commDim[i] = 1;
     }
@@ -99,6 +104,7 @@ namespace quda {
       for (int i = 0; i < Ls; i++)
         printfQuda(
             "b_5[%d] = %e %e \t c_5[%d] = %e %e\n", i, b_5[i].real(), b_5[i].imag(), i, c_5[i].real(), c_5[i].imag());
+      printfQuda("use_mma = %d\n", use_mma);
     }
   };
 
@@ -165,6 +171,11 @@ namespace quda {
     void setCommDim(const int commDim_[QUDA_MAX_DIM]) const {
       for (int i=0; i<QUDA_MAX_DIM; i++) { commDim[i] = commDim_[i]; }
     }
+
+    /**
+      @brief Whether the Dirac object is the DiracCoarse.
+    */
+    virtual bool isCoarse() const { return false; }
 
     /**
         @brief Check parity spinors are usable (check geometry ?)
@@ -284,6 +295,21 @@ namespace quda {
     virtual bool hermitian() const { return false; }
 
     /**
+     *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
+     *  These are pointers as opposed to references to support passing in `nullptr`.
+     *
+     *  @param gauge_in Updated gauge field
+     *  @param fat_gauge_in Updated fat links
+     *  @param long_gauge_in Updated long links
+     *  @param clover_in Updated clover field
+     */
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
+                              cudaCloverField *clover_in)
+    {
+      gauge = gauge_in;
+    }
+
+    /**
      * @brief Create the coarse operator (virtual parent)
      *
      * @param Y[out] Coarse link field
@@ -383,7 +409,7 @@ namespace quda {
   class DiracClover : public DiracWilson {
 
   protected:
-    cudaCloverField &clover;
+    cudaCloverField *clover;
     void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
     void initConstants();
 
@@ -407,6 +433,22 @@ namespace quda {
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
+
+    /**
+     *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
+     *  These are pointers as opposed to references to support passing in `nullptr`.
+     *
+     *  @param gauge_in Updated gauge field
+     *  @param fat_gauge_in Updated fat links
+     *  @param long_gauge_in Updated long links
+     *  @param clover_in Updated clover field
+     */
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
+                              cudaCloverField *clover_in)
+    {
+      DiracWilson::updateFields(gauge_in, nullptr, nullptr, nullptr);
+      clover = clover_in;
+    }
 
     /**
      * @brief Create the coarse clover operator
@@ -512,7 +554,7 @@ namespace quda {
     // Inherit these so I will comment them out
     /*
   protected:
-    cudaCloverField &clover;
+    cudaCloverField *clover;
     void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
     void initConstants();
     */
@@ -916,7 +958,7 @@ public:
   protected:
     double mu;
     double epsilon;
-    cudaCloverField &clover;
+    cudaCloverField *clover;
     void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
     void twistedCloverApply(ColorSpinorField &out, const ColorSpinorField &in, 
           const QudaTwistGamma5Type twistType, const int parity) const;
@@ -943,6 +985,22 @@ public:
            const QudaSolutionType) const;
 
     double Mu() const { return mu; }
+
+    /**
+     *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
+     *  These are pointers as opposed to references to support passing in `nullptr`.
+     *
+     *  @param gauge_in Updated gauge field
+     *  @param fat_gauge_in Updated fat links
+     *  @param long_gauge_in Updated long links
+     *  @param clover_in Updated clover field
+     */
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
+                              cudaCloverField *clover_in)
+    {
+      DiracWilson::updateFields(gauge_in, nullptr, nullptr, nullptr);
+      clover = clover_in;
+    }
 
     /**
      * @brief Create the coarse twisted-clover operator
@@ -1108,8 +1166,8 @@ public:
   class DiracImprovedStaggered : public Dirac {
 
   protected:
-    cudaGaugeField &fatGauge;
-    cudaGaugeField &longGauge;
+    cudaGaugeField *fatGauge;
+    cudaGaugeField *longGauge;
 
   public:
     DiracImprovedStaggered(const DiracParam &param);
@@ -1131,6 +1189,14 @@ public:
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
+
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
+                              cudaCloverField *clover_in)
+    {
+      Dirac::updateFields(fat_gauge_in, nullptr, nullptr, nullptr);
+      fatGauge = fat_gauge_in;
+      longGauge = long_gauge_in;
+    }
 
     /**
      * @brief Create the coarse staggered operator.
@@ -1202,6 +1268,7 @@ public:
     const Transfer *transfer; /** restrictor / prolongator defined here */
     const Dirac *dirac; /** Parent Dirac operator */
     const bool need_bidirectional; /** Whether or not to force a bi-directional build */
+    const bool use_mma;            /** Whether to use tensor cores or not */
 
     mutable cpuGaugeField *Y_h; /** CPU copy of the coarse link field */
     mutable cpuGaugeField *X_h; /** CPU copy of the coarse clover term */
@@ -1280,6 +1347,8 @@ public:
     DiracCoarse(const DiracCoarse &dirac, const DiracParam &param);
     virtual ~DiracCoarse();
 
+    virtual bool isCoarse() const { return true; }
+
     /**
        @brief Apply the coarse clover operator
        @param[out] out Output field
@@ -1327,6 +1396,13 @@ public:
 			 const QudaSolutionType) const;
 
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
+
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
+                              cudaCloverField *clover_in)
+    {
+      Dirac::updateFields(gauge_in, nullptr, nullptr, nullptr);
+      warningQuda("Coarse gauge links cannot be trivially updated for DiracCoarse(PC). Perform an MG update instead.");
+    }
 
     /**
      * @brief Create the coarse operator from this coarse operator
@@ -1797,7 +1873,8 @@ public:
   };
 
   /**
-   * Create the Dirac operator
+   * Create the Dirac operator. By default, we also create operators with possibly different
+   * precisions: Sloppy, and Preconditioner.
    * @param[in/out] d        User prec
    * @param[in/out] dSloppy  Sloppy prec
    * @param[in/out] dPre     Preconditioner prec
@@ -1807,16 +1884,33 @@ public:
   void createDirac(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, QudaInvertParam &param, const bool pc_solve);
 
   /**
-   * Create the Dirac operator
+   * Create the Dirac operator. By default, we also create operators with possibly different
+   * precisions: Sloppy, and Preconditioner. This function also creates a dirac operator for
+   * refinement, dRef, used in invertMultiShiftQuda().
    * @param[in/out] d        User prec
    * @param[in/out] dSloppy  Sloppy prec
    * @param[in/out] dPre     Preconditioner prec
-   * @param[in] dRef         Refine prec (EigCG and deflation)
+   * @param[in/out] dRef     Refine prec (EigCG and deflation)
    * @param[in] param        Invert param container
    * @param[in] pc_solve     Whether or not to perform an even/odd preconditioned solve
    */
-  void createDirac(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dRef, QudaInvertParam &param, const bool pc_solve);
+  void createDiracWithRefine(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dRef, QudaInvertParam &param,
+                             const bool pc_solve);
+
+  /**
+   * Create the Dirac operator. By default, we also create operators with possibly different
+   * precisions: Sloppy, and Preconditioner. This function also creates a dirac operator for
+   * an eigensolver that creates a deflation space, dEig. We may not use dPrecon for this
+   * as, for example, the MSPCG solver uses dPrecon for a different purpose.
+   * @param[in/out] d        User prec
+   * @param[in/out] dSloppy  Sloppy prec
+   * @param[in/out] dPre     Preconditioner prec
+   * @param[in/out] dEig     Eigensolver prec
+   * @param[in] param        Invert param container
+   * @param[in] pc_solve     Whether or not to perform an even/odd preconditioned solve
+   */
+  void createDiracWithEig(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dRef, QudaInvertParam &param,
+                          const bool pc_solve);
 
 } // namespace quda
 
-#endif // _DIRAC_QUDA_H

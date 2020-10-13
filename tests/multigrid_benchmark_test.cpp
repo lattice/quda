@@ -84,9 +84,6 @@ void initFields(QudaPrecision prec)
   xD = new cudaColorSpinorField(param);
   yD = new cudaColorSpinorField(param);
 
-  // check for successful allocation
-  checkCudaError();
-
   //*xD = *xH;
   //*yD = *yH;
 
@@ -229,7 +226,7 @@ int main(int argc, char** argv)
 
   initComms(argc, argv, gridsize_from_cmdline);
   display_test_info();
-  initQuda(device);
+  initQuda(device_ordinal);
 
   setVerbosity(verbosity);
 
@@ -259,9 +256,6 @@ int main(int argc, char** argv)
     delete dirac;
     freeFields();
   }
-
-  // clear the error state
-  cudaGetLastError();
 
   endQuda();
 

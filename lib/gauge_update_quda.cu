@@ -95,7 +95,7 @@ namespace quda {
 
     void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      updateGaugeFieldKernel<conj_mom,exact><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+      qudaLaunchKernel(updateGaugeFieldKernel<conj_mom,exact,Arg>, tp, stream, arg);
     } // apply
 
     long long flops() const {
@@ -135,7 +135,6 @@ namespace quda {
           updateGauge.apply(0);
         }
       }
-      checkCudaError();
     }
   };
 

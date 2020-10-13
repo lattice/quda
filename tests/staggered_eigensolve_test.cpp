@@ -5,14 +5,6 @@
 
 // QUDA headers
 #include <quda.h>
-#include <quda_internal.h>
-#include <dirac_quda.h>
-#include <dslash_quda.h>
-#include <invert_quda.h>
-#include <util_quda.h>
-#include <blas_quda.h>
-#include <unitarization_links.h>
-#include <gauge_field.h>
 
 // External headers
 #include <misc.h>
@@ -37,9 +29,9 @@ void display_test_info()
   printfQuda(" - solver mode %s\n", get_eig_type_str(eig_type));
   printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(eig_spectrum));
   if (eig_type == QUDA_EIG_BLK_TR_LANCZOS) printfQuda(" - eigenvector block size %d\n", eig_block_size);
-  printfQuda(" - number of eigenvectors requested %d\n", eig_nConv);
-  printfQuda(" - size of eigenvector search space %d\n", eig_nEv);
-  printfQuda(" - size of Krylov space %d\n", eig_nKr);
+  printfQuda(" - number of eigenvectors requested %d\n", eig_n_conv);
+  printfQuda(" - size of eigenvector search space %d\n", eig_n_ev);
+  printfQuda(" - size of Krylov space %d\n", eig_n_kr);
   printfQuda(" - solver tolerance %e\n", eig_tol);
   printfQuda(" - convergence required (%s)\n", eig_require_convergence ? "true" : "false");
   if (eig_compute_svd) {
@@ -64,8 +56,6 @@ void display_test_info()
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
-
-  return;
 }
 
 int main(int argc, char **argv)
@@ -121,9 +111,7 @@ int main(int argc, char **argv)
     errorQuda("ARPACK check only available in double precision");
   }
 
-  // This must be before the FaceBuffer is created
-  // (this is because it allocates pinned memory - FIXME)
-  initQuda(device);
+  initQuda(device_ordinal);
 
   setDims(gauge_param.X);
   dw_setDims(gauge_param.X, 1); // so we can use 5-d indexing from dwf
@@ -168,11 +156,11 @@ int main(int argc, char **argv)
   //-----------------------------------------------------------------------------------
 
   // Host side arrays to store the eigenpairs computed by QUDA
-  void **host_evecs = (void **)malloc(eig_nConv * sizeof(void *));
-  for (int i = 0; i < eig_nConv; i++) {
+  void **host_evecs = (void **)malloc(eig_n_conv * sizeof(void *));
+  for (int i = 0; i < eig_n_conv; i++) {
     host_evecs[i] = (void *)malloc(V * my_spinor_site_size * eig_inv_param.cpu_prec);
   }
-  double _Complex *host_evals = (double _Complex *)malloc(eig_param.nEv * sizeof(double _Complex));
+  double _Complex *host_evals = (double _Complex *)malloc(eig_param.n_ev * sizeof(double _Complex));
 
   double time = 0.0;
 
@@ -200,7 +188,7 @@ int main(int argc, char **argv)
   } // switch
 
   // Deallocate host memory
-  for (int i = 0; i < eig_nConv; i++) free(host_evecs[i]);
+  for (int i = 0; i < eig_n_conv; i++) free(host_evecs[i]);
   free(host_evecs);
   free(host_evals);
 

@@ -27,23 +27,23 @@ namespace quda
     if (!profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
 
     // Block Thick restart specific checks
-    if (nKr < nEv + 6) errorQuda("nKr=%d must be greater than nEv+6=%d\n", nKr, nEv + 6);
+    if (n_kr < n_ev + 6) errorQuda("n_kr=%d must be greater than n_ev+6=%d\n", n_kr, n_ev + 6);
 
     if (!(eig_param->spectrum == QUDA_SPECTRUM_LR_EIG || eig_param->spectrum == QUDA_SPECTRUM_SR_EIG)) {
       errorQuda("Only real spectrum type (LR or SR) can be passed to the TR Lanczos solver");
     }
 
-    if (nKr % block_size != 0) {
-      errorQuda("Block size %d is not a factor of the Krylov space size %d", block_size, nKr);
+    if (n_kr % block_size != 0) {
+      errorQuda("Block size %d is not a factor of the Krylov space size %d", block_size, n_kr);
     }
 
-    if (nEv % block_size != 0) {
-      errorQuda("Block size %d is not a factor of the compressed space %d", block_size, nEv);
+    if (n_ev % block_size != 0) {
+      errorQuda("Block size %d is not a factor of the compressed space %d", block_size, n_ev);
     }
 
     if (block_size == 0) { errorQuda("Block size %d passed to block eigensolver", block_size); }
 
-    int n_blocks = nKr / block_size;
+    int n_blocks = n_kr / block_size;
     block_data_length = block_size * block_size;
     int arrow_mat_array_size = block_data_length * n_blocks;
     // Tridiagonal/Arrow matrix
@@ -105,8 +105,8 @@ namespace quda
     // Loop over restart iterations.
     while (restart_iter < max_restarts && !converged) {
 
-      for (int step = num_keep; step < nKr; step += block_size) blockLanczosStep(kSpace, step);
-      iter += (nKr - num_keep);
+      for (int step = num_keep; step < n_kr; step += block_size) blockLanczosStep(kSpace, step);
+      iter += (n_kr - num_keep);
 
       // Solve current block tridiag
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -114,12 +114,12 @@ namespace quda
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
       // mat_norm is updated.
-      for (int i = num_locked; i < nKr; i++)
+      for (int i = num_locked; i < n_kr; i++)
         if (fabs(alpha[i]) > mat_norm) mat_norm = fabs(alpha[i]);
 
       // Locking check
       iter_locked = 0;
-      for (int i = 1; i < (nKr - num_locked); i++) {
+      for (int i = 1; i < (n_kr - num_locked); i++) {
         if (residua[i + num_locked] < epsilon * mat_norm) {
           if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
             printfQuda("**** Locking %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked],
@@ -133,7 +133,7 @@ namespace quda
 
       // Convergence check
       iter_converged = iter_locked;
-      for (int i = iter_locked + 1; i < nKr - num_locked; i++) {
+      for (int i = iter_locked + 1; i < n_kr - num_locked; i++) {
         if (residua[i + num_locked] < tol * mat_norm) {
           if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
             printfQuda("**** Converged %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked], tol * mat_norm);
@@ -146,7 +146,7 @@ namespace quda
 
       // In order to maintain the block structure, we truncate the
       // algorithmic variables to be multiples of the block size
-      iter_keep = std::min(iter_converged + (nKr - num_converged) / 2, nKr - num_locked - 12);
+      iter_keep = std::min(iter_converged + (n_kr - num_converged) / 2, n_kr - num_locked - 12);
       iter_keep = (iter_keep / block_size) * block_size;
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
       computeBlockKeptRitz(kSpace);
@@ -173,13 +173,13 @@ namespace quda
         printfQuda("num_converged = %d\n", num_converged);
         printfQuda("num_keep = %d\n", num_keep);
         printfQuda("num_locked = %d\n", num_locked);
-        for (int i = 0; i < nKr; i++) {
+        for (int i = 0; i < n_kr; i++) {
           printfQuda("Ritz[%d] = %.16e residual[%d] = %.16e\n", i, alpha[i], i, residua[i]);
         }
       }
 
       // Check for convergence
-      if (num_converged >= nConv) converged = true;
+      if (num_converged >= n_conv) converged = true;
       restart_iter++;
     }
 
@@ -191,20 +191,20 @@ namespace quda
       if (eig_param->require_convergence) {
         errorQuda("BLOCK TRLM failed to compute the requested %d vectors with a %d search space, %d block size, "
                   "and %d Krylov space in %d restart steps. Exiting.",
-                  nConv, nEv, nKr, block_size, max_restarts);
+                  n_conv, n_ev, n_kr, block_size, max_restarts);
       } else {
         warningQuda("BLOCK TRLM failed to compute the requested %d vectors with a %d search space, %d block size, "
                     "and %d Krylov space in %d restart steps. Continuing with current lanczos factorisation.",
-                    nConv, nEv, nKr, block_size, max_restarts);
+                    n_conv, n_ev, n_kr, block_size, max_restarts);
       }
     } else {
       if (getVerbosity() >= QUDA_SUMMARIZE) {
         printfQuda("BLOCK TRLM computed the requested %d vectors in %d restart steps with %d block size and "
                    "%d BLOCKED OP*x operations.\n",
-                   nConv, restart_iter, block_size, iter / block_size);
+                   n_conv, restart_iter, block_size, iter / block_size);
 
         // Dump all Ritz values and residua
-        for (int i = 0; i < nConv; i++) {
+        for (int i = 0; i < n_conv; i++) {
           printfQuda("RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, alpha[i], 0.0, residua[i]);
         }
       }
@@ -385,7 +385,7 @@ namespace quda
   void BLKTRLM::eigensolveFromBlockArrowMat()
   {
     profile.TPSTART(QUDA_PROFILE_EIGEN);
-    int dim = nKr - num_locked;
+    int dim = n_kr - num_locked;
     if (dim % block_size != 0) errorQuda("dim = %d modulo block_size = %d != 0", dim, block_size);
     int blocks = dim / block_size;
 
@@ -463,7 +463,7 @@ namespace quda
     for (int i = 0; i < blocks; i++) {
       for (int b = 0; b < block_size; b++) {
         idx = b * (block_size + 1);
-        residua[i * block_size + b + num_locked] = fabs(block_beta[nKr * block_size - block_data_length + idx]
+        residua[i * block_size + b + num_locked] = fabs(block_beta[n_kr * block_size - block_data_length + idx]
                                                         * block_ritz_mat[dim * (i * block_size + b + 1) - 1]);
       }
     }
@@ -473,8 +473,8 @@ namespace quda
 
   void BLKTRLM::computeBlockKeptRitz(std::vector<ColorSpinorField *> &kSpace)
   {
-    int offset = nKr + block_size;
-    int dim = nKr - num_locked;
+    int offset = n_kr + block_size;
+    int dim = n_kr - num_locked;
 
     // Multi-BLAS friendly array to store part of Ritz matrix we want
     Complex *ritz_mat_keep = (Complex *)safe_malloc((dim * iter_keep) * sizeof(Complex));
@@ -622,7 +622,7 @@ namespace quda
     }
 
     // Update residual vectors
-    for (int i = 0; i < block_size; i++) std::swap(kSpace[num_locked + iter_keep + i], kSpace[nKr + i]);
+    for (int i = 0; i < block_size; i++) std::swap(kSpace[num_locked + iter_keep + i], kSpace[n_kr + i]);
 
     // Compute new r blocks
     // Use Eigen, it's neater
@@ -631,7 +631,7 @@ namespace quda
     MatrixXcd ritzi = MatrixXcd::Zero(block_size, block_size);
     int blocks = iter_keep / block_size;
     int idx = 0;
-    int beta_offset = nKr * block_size - block_data_length;
+    int beta_offset = n_kr * block_size - block_data_length;
     int num_locked_offset = num_locked * block_size;
 
     for (int b = 0; b < block_size; b++) {

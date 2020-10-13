@@ -2,6 +2,7 @@
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
 #include <blas_quda.h>
+#include <instantiate.h>
 
 namespace quda {
 
@@ -455,13 +456,13 @@ else if (a.Ncolor() == 96 && a.Nspin() == 2) {
     float scale = 1.0;
 
     if (isFixed<StoreType>::value) {
-      cudaMemcpy(&scale, &norm_ptr[i], sizeof(float), cudaMemcpyDeviceToHost);
+      qudaMemcpy(&scale, &norm_ptr[i], sizeof(float), cudaMemcpyDeviceToHost);
       scale *= fixedInvMaxValue<StoreType>::value;
     }
 
     for (int s = 0; s < Ns; s++) {
       for (int c = 0; c < Nc; c++) {
-        cudaMemcpy(indiv_num, &field_ptr[A.index(i % 2, i / 2, s, c, 0)], 2 * sizeof(StoreType), cudaMemcpyDeviceToHost);
+        qudaMemcpy(indiv_num, &field_ptr[A.index(i % 2, i / 2, s, c, 0)], 2 * sizeof(StoreType), cudaMemcpyDeviceToHost);
         data_cpu[2 * (c + Nc * s)] = scale * static_cast<Float>(indiv_num[0]);
         data_cpu[2 * (c + Nc * s) + 1] = scale * static_cast<Float>(indiv_num[1]);
       }
@@ -485,6 +486,7 @@ else if (a.Ncolor() == 96 && a.Nspin() == 2) {
     case QUDA_FLOAT_FIELD_ORDER: genericCudaPrintVector<Float, Ns, Nc, QUDA_FLOAT_FIELD_ORDER>(field, i); break;
     case QUDA_FLOAT2_FIELD_ORDER: genericCudaPrintVector<Float, Ns, Nc, QUDA_FLOAT2_FIELD_ORDER>(field, i); break;
     case QUDA_FLOAT4_FIELD_ORDER: genericCudaPrintVector<Float, Ns, Nc, QUDA_FLOAT4_FIELD_ORDER>(field, i); break;
+    case QUDA_FLOAT8_FIELD_ORDER: genericCudaPrintVector<Float, Ns, Nc, QUDA_FLOAT8_FIELD_ORDER>(field, i); break;
     case QUDA_SPACE_SPIN_COLOR_FIELD_ORDER:
       genericCudaPrintVector<Float, Ns, Nc, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(field, i);
       break;
@@ -495,49 +497,34 @@ else if (a.Ncolor() == 96 && a.Nspin() == 2) {
     }
   }
 
-  template <typename Float> void genericCudaPrintVector(const cudaColorSpinorField &field, unsigned int i)
-  {
-    if (field.Ncolor() == 3 && field.Nspin() == 4) {
-      genericCudaPrintVector<Float, 4, 3>(field, i);
-    } else if (field.Ncolor() == 3 && field.Nspin() == 1) {
-      genericCudaPrintVector<Float, 1, 3>(field, i);
-    } else if (field.Ncolor() == 6 && field.Nspin() == 2) { // wilson free field MG
-      genericCudaPrintVector<Float, 2, 6>(field, i);
-    } else if (field.Ncolor() == 24 && field.Nspin() == 2) { // common value for Wilson, also staggered free field
-      genericCudaPrintVector<Float, 2, 24>(field, i);
-    } else if (field.Ncolor() == 32 && field.Nspin() == 2) {
-      genericCudaPrintVector<Float, 2, 32>(field, i);
+  template <typename Float> struct GenericCudaPrintVector {
+    GenericCudaPrintVector(const cudaColorSpinorField &field, unsigned int i)
+    {
+      if (field.Ncolor() == 3 && field.Nspin() == 4) {
+        genericCudaPrintVector<Float, 4, 3>(field, i);
+      } else if (field.Ncolor() == 3 && field.Nspin() == 1) {
+        genericCudaPrintVector<Float, 1, 3>(field, i);
+      } else if (field.Ncolor() == 6 && field.Nspin() == 2) { // wilson free field MG
+        genericCudaPrintVector<Float, 2, 6>(field, i);
+      } else if (field.Ncolor() == 24 && field.Nspin() == 2) { // common value for Wilson, also staggered free field
+        genericCudaPrintVector<Float, 2, 24>(field, i);
+      } else if (field.Ncolor() == 32 && field.Nspin() == 2) {
+        genericCudaPrintVector<Float, 2, 32>(field, i);
 #ifdef GPU_STAGGERED_DIRAC
-    } else if (field.Ncolor() == 64 && field.Nspin() == 2) {
-      genericCudaPrintVector<Float, 2, 64>(field, i);
-    } else if (field.Ncolor() == 96 && field.Nspin() == 2) {
-      genericCudaPrintVector<Float, 2, 96>(field, i);
+      } else if (field.Ncolor() == 64 && field.Nspin() == 2) {
+        genericCudaPrintVector<Float, 2, 64>(field, i);
+      } else if (field.Ncolor() == 96 && field.Nspin() == 2) {
+        genericCudaPrintVector<Float, 2, 96>(field, i);
 #endif
-    } else {
-      errorQuda("Not supported Ncolor = %d, Nspin = %d", field.Ncolor(), field.Nspin());
+      } else {
+        errorQuda("Not supported Ncolor = %d, Nspin = %d", field.Ncolor(), field.Nspin());
+      }
     }
-  }
+  };
 
   void genericCudaPrintVector(const cudaColorSpinorField &field, unsigned int i)
   {
-
-    switch (field.Precision()) {
-    case QUDA_QUARTER_PRECISION: genericCudaPrintVector<char>(field, i); break;
-    case QUDA_HALF_PRECISION: genericCudaPrintVector<short>(field, i); break;
-    case QUDA_SINGLE_PRECISION: genericCudaPrintVector<float>(field, i); break;
-    case QUDA_DOUBLE_PRECISION: genericCudaPrintVector<double>(field, i); break;
-    default: errorQuda("Unsupported precision = %d\n", field.Precision());
-    }
-
-    /*
-    ColorSpinorParam param(*this);
-    param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-    param.location = QUDA_CPU_FIELD_LOCATION;
-    param.create = QUDA_NULL_FIELD_CREATE;
-
-    cpuColorSpinorField tmp(param);
-    tmp = *this;
-    tmp.PrintVector(i);*/
+    instantiatePrecision<GenericCudaPrintVector>(field, i);
   }
 
 } // namespace quda

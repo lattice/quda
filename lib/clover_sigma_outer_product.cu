@@ -48,7 +48,7 @@ namespace quda {
                              .launch(arg);
 #else
           switch (arg.nvector) {
-          case 1: sigmaOprodKernel<1, Float><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+          case 1: qudaLaunchKernel(sigmaOprodKernel<1, Float, Arg>, tp, stream, arg); break;
           default: errorQuda("Unsupported nvector = %d\n", arg.nvector);
           }
 #endif
@@ -125,7 +125,6 @@ namespace quda {
     errorQuda("Clover Dirac operator has not been built!");
 #endif
 
-    checkCudaError();
   } // computeCloverForce
 
 } // namespace quda

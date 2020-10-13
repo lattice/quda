@@ -57,32 +57,33 @@ namespace quda {
   }
 
   LatticeField::LatticeField(const LatticeFieldParam &param) :
-      volume(1),
-      pad(param.pad),
-      total_bytes(0),
-      nDim(param.nDim),
-      precision(param.Precision()),
-      ghost_precision(param.GhostPrecision()),
-      ghost_precision_reset(false),
-      scale(param.scale),
-      siteSubset(param.siteSubset),
-      ghostExchange(param.ghostExchange),
-      ghost_bytes(0),
-      ghost_bytes_old(0),
-      ghost_face_bytes {},
-      ghostOffset(),
-      ghostNormOffset(),
-      my_face_h {},
-      my_face_hd {},
-      my_face_d {},
-      from_face_h {},
-      from_face_hd {},
-      from_face_d {},
-      initComms(false),
-      mem_type(param.mem_type),
-      backup_h(nullptr),
-      backup_norm_h(nullptr),
-      backed_up(false)
+    volume(1),
+    localVolume(1),
+    pad(param.pad),
+    total_bytes(0),
+    nDim(param.nDim),
+    precision(param.Precision()),
+    ghost_precision(param.GhostPrecision()),
+    ghost_precision_reset(false),
+    scale(param.scale),
+    siteSubset(param.siteSubset),
+    ghostExchange(param.ghostExchange),
+    ghost_bytes(0),
+    ghost_bytes_old(0),
+    ghost_face_bytes {},
+    ghost_face_bytes_aligned {},
+    ghost_offset(),
+    my_face_h {},
+    my_face_hd {},
+    my_face_d {},
+    from_face_h {},
+    from_face_hd {},
+    from_face_d {},
+    initComms(false),
+    mem_type(param.mem_type),
+    backup_h(nullptr),
+    backup_norm_h(nullptr),
+    backed_up(false)
   {
     precisionCheck();
 
@@ -115,6 +116,7 @@ namespace quda {
       x[i] = param.x[i];
       r[i] = ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED ? param.r[i] : 0;
       volume *= param.x[i];
+      localVolume *= (x[i] - 2 * r[i]);
       surface[i] = 1;
       for (int j=0; j<nDim; j++) {
 	if (i==j) continue;
@@ -124,6 +126,7 @@ namespace quda {
 
     if (siteSubset == QUDA_INVALID_SITE_SUBSET) errorQuda("siteSubset is not set");
     volumeCB = (siteSubset == QUDA_FULL_SITE_SUBSET) ? volume / 2 : volume;
+    localVolumeCB = (siteSubset == QUDA_FULL_SITE_SUBSET) ? localVolume / 2 : localVolume;
     stride = volumeCB + pad;
 
     // for parity fields the factor of half is present for all surfaces dimensions except x, so add it manually
@@ -147,32 +150,33 @@ namespace quda {
   }
 
   LatticeField::LatticeField(const LatticeField &field) :
-      volume(1),
-      pad(field.pad),
-      total_bytes(0),
-      nDim(field.nDim),
-      precision(field.precision),
-      ghost_precision(field.ghost_precision),
-      ghost_precision_reset(false),
-      scale(field.scale),
-      siteSubset(field.siteSubset),
-      ghostExchange(field.ghostExchange),
-      ghost_bytes(0),
-      ghost_bytes_old(0),
-      ghost_face_bytes {},
-      ghostOffset(),
-      ghostNormOffset(),
-      my_face_h {},
-      my_face_hd {},
-      my_face_d {},
-      from_face_h {},
-      from_face_hd {},
-      from_face_d {},
-      initComms(false),
-      mem_type(field.mem_type),
-      backup_h(nullptr),
-      backup_norm_h(nullptr),
-      backed_up(false)
+    volume(1),
+    localVolume(1),
+    pad(field.pad),
+    total_bytes(0),
+    nDim(field.nDim),
+    precision(field.precision),
+    ghost_precision(field.ghost_precision),
+    ghost_precision_reset(false),
+    scale(field.scale),
+    siteSubset(field.siteSubset),
+    ghostExchange(field.ghostExchange),
+    ghost_bytes(0),
+    ghost_bytes_old(0),
+    ghost_face_bytes {},
+    ghost_face_bytes_aligned {},
+    ghost_offset(),
+    my_face_h {},
+    my_face_hd {},
+    my_face_d {},
+    from_face_h {},
+    from_face_hd {},
+    from_face_d {},
+    initComms(false),
+    mem_type(field.mem_type),
+    backup_h(nullptr),
+    backup_norm_h(nullptr),
+    backed_up(false)
   {
     precisionCheck();
 
@@ -194,6 +198,7 @@ namespace quda {
       x[i] = field.x[i];
       r[i] = ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED ? field.r[i] : 0;
       volume *= field.x[i];
+      localVolume *= (x[i] - 2 * r[i]);
       surface[i] = 1;
       for (int j=0; j<nDim; j++) {
 	if (i==j) continue;
@@ -203,6 +208,7 @@ namespace quda {
 
     if (siteSubset == QUDA_INVALID_SITE_SUBSET) errorQuda("siteSubset is not set");
     volumeCB = (siteSubset == QUDA_FULL_SITE_SUBSET) ? volume / 2 : volume;
+    localVolumeCB = (siteSubset == QUDA_FULL_SITE_SUBSET) ? localVolume / 2 : localVolume;
     stride = volumeCB + pad;
   
     // for parity fields the factor of half is present for all surfaces dimensions except x, so add it manually
@@ -250,13 +256,13 @@ namespace quda {
 	  ghost_pinned_send_buffer_h[b] = mapped_malloc(ghost_bytes);
 
 	  // set the matching device-mapped pointer
-	  cudaHostGetDevicePointer(&ghost_pinned_send_buffer_hd[b], ghost_pinned_send_buffer_h[b], 0);
+	  ghost_pinned_send_buffer_hd[b] = get_mapped_device_pointer(ghost_pinned_send_buffer_h[b]);
 
 	  // pinned buffer used for receiving
 	  ghost_pinned_recv_buffer_h[b] = mapped_malloc(ghost_bytes);
 
 	  // set the matching device-mapped pointer
-	  cudaHostGetDevicePointer(&ghost_pinned_recv_buffer_hd[b], ghost_pinned_recv_buffer_h[b], 0);
+	  ghost_pinned_recv_buffer_hd[b] = get_mapped_device_pointer(ghost_pinned_recv_buffer_h[b]);
         }
 
         initGhostFaceBuffer = true;
@@ -318,35 +324,30 @@ namespace quda {
     }
 
     // initialize ghost send pointers
-    size_t offset = 0;
     for (int i=0; i<nDimComms; i++) {
       if (!commDimPartitioned(i) && no_comms_fill==false) continue;
 
       for (int b=0; b<2; ++b) {
-	my_face_dim_dir_h[b][i][0] = static_cast<char*>(my_face_h[b]) + offset;
-	from_face_dim_dir_h[b][i][0] = static_cast<char*>(from_face_h[b]) + offset;
+	my_face_dim_dir_h[b][i][0] = static_cast<char*>(my_face_h[b]) + ghost_offset[i][0];
+	from_face_dim_dir_h[b][i][0] = static_cast<char*>(from_face_h[b]) + ghost_offset[i][0];
 
-	my_face_dim_dir_hd[b][i][0] = static_cast<char*>(my_face_hd[b]) + offset;
-	from_face_dim_dir_hd[b][i][0] = static_cast<char*>(from_face_hd[b]) + offset;
+	my_face_dim_dir_hd[b][i][0] = static_cast<char*>(my_face_hd[b]) + ghost_offset[i][0];
+	from_face_dim_dir_hd[b][i][0] = static_cast<char*>(from_face_hd[b]) + ghost_offset[i][0];
 
-        my_face_dim_dir_d[b][i][0] = static_cast<char *>(my_face_d[b]) + offset;
-        from_face_dim_dir_d[b][i][0] = static_cast<char *>(from_face_d[b]) + ghostOffset[i][0] * ghost_precision;
+        my_face_dim_dir_d[b][i][0] = static_cast<char *>(my_face_d[b]) + ghost_offset[i][0];
+        from_face_dim_dir_d[b][i][0] = static_cast<char *>(from_face_d[b]) + ghost_offset[i][0];
       } // loop over b
-
-      // if not bidir then forwards and backwards will alias
-      if (bidir) offset += ghost_face_bytes[i];
 
       for (int b=0; b<2; ++b) {
-	my_face_dim_dir_h[b][i][1] = static_cast<char*>(my_face_h[b]) + offset;
-	from_face_dim_dir_h[b][i][1] = static_cast<char*>(from_face_h[b]) + offset;
+	my_face_dim_dir_h[b][i][1] = static_cast<char*>(my_face_h[b]) + ghost_offset[i][1];
+	from_face_dim_dir_h[b][i][1] = static_cast<char*>(from_face_h[b]) + ghost_offset[i][1];
 
-	my_face_dim_dir_hd[b][i][1] = static_cast<char*>(my_face_hd[b]) + offset;
-	from_face_dim_dir_hd[b][i][1] = static_cast<char*>(from_face_hd[b]) + offset;
+	my_face_dim_dir_hd[b][i][1] = static_cast<char*>(my_face_hd[b]) + ghost_offset[i][1];
+	from_face_dim_dir_hd[b][i][1] = static_cast<char*>(from_face_hd[b]) + ghost_offset[i][1];
 
-        my_face_dim_dir_d[b][i][1] = static_cast<char *>(my_face_d[b]) + offset;
-        from_face_dim_dir_d[b][i][1] = static_cast<char *>(from_face_d[b]) + ghostOffset[i][1] * ghost_precision;
+        my_face_dim_dir_d[b][i][1] = static_cast<char *>(my_face_d[b]) + ghost_offset[i][1];
+        from_face_dim_dir_d[b][i][1] = static_cast<char *>(from_face_d[b]) + ghost_offset[i][1];
       } // loop over b
-      offset += ghost_face_bytes[i];
 
     } // loop over dimension
 
@@ -404,7 +405,6 @@ namespace quda {
       comm_barrier();
 
       initComms = false;
-      checkCudaError();
     }
 
   }
@@ -556,7 +556,6 @@ namespace quda {
   void LatticeField::destroyIPCComms() {
 
     if (!initIPCComms) return;
-    checkCudaError();
 
     // ensure that all processes bring down their communicators
     // synchronously so that we don't end up in an undefined state

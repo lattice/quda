@@ -38,20 +38,6 @@ void setReunitarizationConsts()
   setUnitarizeLinksConstants(unitarize_eps, max_error, reunit_allow_svd, reunit_svd_only, svd_rel_error, svd_abs_error);
 }
 
-void CallUnitarizeLinks(quda::cudaGaugeField *cudaInGauge)
-{
-  using namespace quda;
-  int *num_failures_dev = (int *)device_malloc(sizeof(int));
-  int num_failures;
-  cudaMemset(num_failures_dev, 0, sizeof(int));
-  unitarizeLinks(*cudaInGauge, num_failures_dev);
-
-  cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
-  if (num_failures > 0) errorQuda("Error in the unitarization\n");
-  device_free(num_failures_dev);
-}
-//------------------------------------------------------------------------------------
-
 void display_test_info()
 {
   printfQuda("running the following test:\n");
@@ -88,7 +74,7 @@ int main(int argc, char **argv)
   display_test_info();
 
   // initialize the QUDA library
-  initQuda(device);
+  initQuda(device_ordinal);
 
   // *** QUDA parameters begin here.
 
@@ -105,6 +91,10 @@ int main(int argc, char **argv)
   constructHostGaugeField(load_gauge, gauge_param, argc, argv);
   // Load the gauge field to the device
   loadGaugeQuda((void *)load_gauge, &gauge_param);
+
+  int *num_failures_h = (int *)mapped_malloc(sizeof(int));
+  int *num_failures_d = (int *)get_mapped_device_pointer(num_failures_h);
+  *num_failures_h = 0;
 
   // start the timer
   double time0 = -((double)clock());
@@ -191,7 +181,9 @@ int main(int argc, char **argv)
     if (nwarm > 0) {
       for (int step = 1; step <= nwarm; ++step) {
         Monte(*gaugeEx, *randstates, beta_value, nhbsteps, novrsteps);
-        CallUnitarizeLinks(gaugeEx);
+
+        quda::unitarizeLinks(*gaugeEx, num_failures_d);
+        if (*num_failures_h > 0) errorQuda("Error in the unitarization\n");
       }
     }
 
@@ -212,7 +204,8 @@ int main(int argc, char **argv)
       Monte( *gaugeEx, *randstates, beta_value, nhbsteps, novrsteps);
 
       //Reunitarize gauge links...
-      CallUnitarizeLinks(gaugeEx);
+      quda::unitarizeLinks(*gaugeEx, num_failures_d);
+      if (*num_failures_h > 0) errorQuda("Error in the unitarization\n");
 
       // copy into regular field
       copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
@@ -263,6 +256,8 @@ int main(int argc, char **argv)
   // printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n",
   // inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
   printfQuda("\nDone, total time = %g secs\n", time0);
+
+  host_free(num_failures_h);
 
   freeGaugeQuda();
 

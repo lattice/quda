@@ -39,10 +39,10 @@ void CallUnitarizeLinks(quda::cudaGaugeField *cudaInGauge)
   using namespace quda;
   int *num_failures_dev = (int *)device_malloc(sizeof(int));
   int num_failures;
-  cudaMemset(num_failures_dev, 0, sizeof(int));
+  qudaMemset(num_failures_dev, 0, sizeof(int));
   unitarizeLinks(*cudaInGauge, num_failures_dev);
 
-  cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
+  qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
   if (num_failures > 0) errorQuda("Error in the unitarization\n");
   device_free(num_failures_dev);
 }
@@ -73,9 +73,9 @@ void display_test_info()
       printfQuda(" - level %d solver mode %s\n", i + 1, get_eig_type_str(mg_eig_type[i]));
       printfQuda(" - level %d spectrum requested %s\n", i + 1, get_eig_spectrum_str(mg_eig_spectrum[i]));
       if (mg_eig_type[i] == QUDA_EIG_BLK_TR_LANCZOS) printfQuda(" - eigenvector block size %d\n", mg_eig_block_size[i]);
-      printfQuda(" - level %d number of eigenvectors requested nConv %d\n", i + 1, nvec[i]);
-      printfQuda(" - level %d size of eigenvector search space %d\n", i + 1, mg_eig_nEv[i]);
-      printfQuda(" - level %d size of Krylov space %d\n", i + 1, mg_eig_nKr[i]);
+      printfQuda(" - level %d number of eigenvectors requested n_conv %d\n", i + 1, nvec[i]);
+      printfQuda(" - level %d size of eigenvector search space %d\n", i + 1, mg_eig_n_ev[i]);
+      printfQuda(" - level %d size of Krylov space %d\n", i + 1, mg_eig_n_kr[i]);
       printfQuda(" - level %d solver tolerance %e\n", i + 1, mg_eig_tol[i]);
       printfQuda(" - level %d convergence required (%s)\n", i + 1, mg_eig_require_convergence[i] ? "true" : "false");
       printfQuda(" - level %d Operator: daggered (%s) , norm-op (%s)\n", i + 1, mg_eig_use_dagger[i] ? "true" : "false",
@@ -175,7 +175,7 @@ int main(int argc, char **argv)
   display_test_info();
 
   // initialize the QUDA library
-  initQuda(device);
+  initQuda(device_ordinal);
 
   // *** Everything between here and the timer is application specific
   setDims(gauge_param.X);
@@ -318,6 +318,18 @@ int main(int argc, char **argv)
       copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
       loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
 
+      if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+        constructHostCloverField(clover, clover_inv, inv_param);
+
+        if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE) {
+          inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+        }
+        // Load the clover terms to the device
+        loadCloverQuda(clover, clover_inv, &inv_param);
+        // Restore actual solve_type we want to do
+        inv_param.solve_type = solve_type;
+      }
+
       // Recompute Gauge Observables
       gaugeObservablesQuda(&obs_param);
       printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n", step,
@@ -395,11 +407,23 @@ int main(int argc, char **argv)
         if (inv_multigrid) mg_param.invert_param->mu = inv_param.mu;
       }
 
+      // as needed to bake in mu
+      if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+        constructHostCloverField(clover, clover_inv, inv_param);
+
+        if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE) {
+          inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+        }
+        // Load the clover terms to the device
+        loadCloverQuda(clover, clover_inv, &inv_param);
+        // Restore actual solve_type we want to do
+        inv_param.solve_type = solve_type;
+      }
+
       printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n", step,
                  obs_param.plaquette[0], obs_param.qcharge, inv_param.mass, inv_param.kappa, inv_param.mu);
 
-      if (inv_multigrid)
-        updateMultigridQuda(mg_preconditioner, &mg_param); // update the multigrid operator for new mass and mu values
+      if (inv_multigrid) updateMultigridQuda(mg_preconditioner, &mg_param);
       invertQuda(spinorOut, spinorIn, &inv_param);
 
       if (inv_multigrid && inv_param.iter == inv_param.maxiter) {

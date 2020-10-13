@@ -76,11 +76,16 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(reconstruct_refinement_sloppy, QUDA_RECONSTRUCT_INVALID);
   P(cuda_prec_precondition, QUDA_INVALID_PRECISION);
   P(reconstruct_precondition, QUDA_RECONSTRUCT_INVALID);
+  P(cuda_prec_eigensolver, QUDA_INVALID_PRECISION);
+  P(reconstruct_eigensolver, QUDA_RECONSTRUCT_INVALID);
 #else
   if (param->cuda_prec_sloppy == QUDA_INVALID_PRECISION)
     param->cuda_prec_sloppy = param->cuda_prec;
+  if (param->cuda_prec_eigensolver == QUDA_INVALID_PRECISION) param->cuda_prec_eigensolver = param->cuda_prec;
   if (param->reconstruct_sloppy == QUDA_RECONSTRUCT_INVALID)
     param->reconstruct_sloppy = param->reconstruct;
+  if (param->reconstruct_eigensolver == QUDA_RECONSTRUCT_INVALID)
+    param->reconstruct_eigensolver = param->reconstruct_sloppy;
   if (param->cuda_prec_refinement_sloppy == QUDA_INVALID_PRECISION)
     param->cuda_prec_refinement_sloppy = param->cuda_prec_sloppy;
   if (param->reconstruct_refinement_sloppy == QUDA_RECONSTRUCT_INVALID)
@@ -160,9 +165,10 @@ void printQudaEigParam(QudaEigParam *param) {
   P(compute_svd, QUDA_BOOLEAN_FALSE);
   P(require_convergence, QUDA_BOOLEAN_TRUE);
   P(spectrum, QUDA_SPECTRUM_LR_EIG);
-  P(nEv, 0);
-  P(nKr, 0);
-  P(nConv, 0);
+  P(n_ev, 0);
+  P(n_kr, 0);
+  P(n_conv, 0);
+  P(n_ev_deflate, -1);
   P(batched_rotate, 0);
   P(tol, 0.0);
   P(check_interval, 0);
@@ -184,9 +190,10 @@ void printQudaEigParam(QudaEigParam *param) {
   P(use_norm_op, QUDA_BOOLEAN_INVALID);
   P(compute_svd, QUDA_BOOLEAN_INVALID);
   P(require_convergence, QUDA_BOOLEAN_INVALID);
-  P(nEv, INVALID_INT);
-  P(nKr, INVALID_INT);
-  P(nConv, INVALID_INT);
+  P(n_ev, INVALID_INT);
+  P(n_kr, INVALID_INT);
+  P(n_conv, INVALID_INT);
+  P(n_ev_deflate, INVALID_INT);
   P(batched_rotate, INVALID_INT);
   P(tol, INVALID_DOUBLE);
   P(check_interval, INVALID_INT);
@@ -209,6 +216,12 @@ void printQudaEigParam(QudaEigParam *param) {
   P(location, QUDA_CUDA_FIELD_LOCATION);
 #else
   P(location, QUDA_INVALID_FIELD_LOCATION);
+#endif
+
+#if defined INIT_PARAM
+  P(save_prec, QUDA_DOUBLE_PRECISION);
+#else
+  P(save_prec, QUDA_INVALID_PRECISION);
 #endif
 
 #if defined INIT_PARAM
@@ -252,6 +265,7 @@ void printQudaCloverParam(QudaInvertParam *param)
     P(clover_cuda_prec_sloppy, QUDA_INVALID_PRECISION);
     P(clover_cuda_prec_refinement_sloppy, QUDA_INVALID_PRECISION);
     P(clover_cuda_prec_precondition, QUDA_INVALID_PRECISION);
+    P(clover_cuda_prec_eigensolver, QUDA_INVALID_PRECISION);
 #else
   if (param->clover_cuda_prec_sloppy == QUDA_INVALID_PRECISION)
     param->clover_cuda_prec_sloppy = param->clover_cuda_prec;
@@ -259,6 +273,8 @@ void printQudaCloverParam(QudaInvertParam *param)
     param->clover_cuda_prec_refinement_sloppy = param->clover_cuda_prec_sloppy;
   if (param->clover_cuda_prec_precondition == QUDA_INVALID_PRECISION)
     param->clover_cuda_prec_precondition = param->clover_cuda_prec_sloppy;
+  if (param->clover_cuda_prec_eigensolver == QUDA_INVALID_PRECISION)
+    param->clover_cuda_prec_eigensolver = param->clover_cuda_prec_sloppy;
 #endif
 
 #ifdef INIT_PARAM
@@ -421,6 +437,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(cuda_prec_sloppy, QUDA_INVALID_PRECISION);
   P(cuda_prec_refinement_sloppy, QUDA_INVALID_PRECISION);
   P(cuda_prec_precondition, QUDA_INVALID_PRECISION);
+  P(cuda_prec_eigensolver, QUDA_INVALID_PRECISION);
 #else
   if (param->cuda_prec_sloppy == QUDA_INVALID_PRECISION)
     param->cuda_prec_sloppy = param->cuda_prec;
@@ -428,6 +445,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
     param->cuda_prec_refinement_sloppy = param->cuda_prec_sloppy;
   if (param->cuda_prec_precondition == QUDA_INVALID_PRECISION)
     param->cuda_prec_precondition = param->cuda_prec_sloppy;
+  if (param->cuda_prec_eigensolver == QUDA_INVALID_PRECISION) param->cuda_prec_eigensolver = param->cuda_prec_sloppy;
 #endif
 
   // leave the default behaviour to cpu pointers
@@ -499,10 +517,6 @@ void printQudaInvertParam(QudaInvertParam *param) {
 
 #if defined(INIT_PARAM)
   P(eig_param, 0);
-#elif defined(CHECK_PARAM)
-  if (param->eig_param && param->inv_type_precondition != QUDA_INVALID_INVERTER) {
-    errorQuda("At present cannot combine deflation with Schwarz preconditioner");
-  }
 #endif
 
 #ifdef INIT_PARAM
@@ -552,7 +566,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
 
 #if defined INIT_PARAM
   P(cuda_prec_ritz, QUDA_SINGLE_PRECISION);
-  P(nev, 8);
+  P(n_ev, 8);
   P(max_search_dim, 64);
   P(rhs_idx, 0);
   P(deflation_grid, 1);
@@ -564,7 +578,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(eigenval_tol, 1e-1);
 #else
   P(cuda_prec_ritz, QUDA_INVALID_PRECISION);
-  P(nev, INVALID_INT);
+  P(n_ev, INVALID_INT);
   P(max_search_dim, INVALID_INT);
   P(rhs_idx, INVALID_INT);
   P(deflation_grid, INVALID_INT);
@@ -609,6 +623,12 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(extlib_type, QUDA_EIGEN_EXTLIB);
 #else
   P(extlib_type, QUDA_EXTLIB_INVALID);
+#endif
+
+#if defined INIT_PARAM
+  P(native_blas_lapack, QUDA_BOOLEAN_TRUE);
+#else
+  P(native_blas_lapack, QUDA_BOOLEAN_INVALID);
 #endif
 
 #ifdef INIT_PARAM
@@ -839,6 +859,22 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
   P(is_staggered, QUDA_BOOLEAN_FALSE);
 #else
   P(is_staggered, QUDA_BOOLEAN_INVALID);
+#endif
+
+#ifdef INIT_PARAM
+#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
+  P(use_mma, QUDA_BOOLEAN_TRUE);
+#else
+  P(use_mma, QUDA_BOOLEAN_FALSE);
+#endif
+#else
+  P(use_mma, QUDA_BOOLEAN_INVALID);
+#endif
+
+#ifdef INIT_PARAM
+  P(thin_update_only, QUDA_BOOLEAN_FALSE);
+#else
+  P(thin_update_only, QUDA_BOOLEAN_INVALID);
 #endif
 
 #ifdef INIT_PARAM

@@ -1,7 +1,6 @@
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
 #include <index_helper.cuh>
-#include <generics/ldg.h>
 #include <tune_quda.h>
 #include <instantiate.h>
 
@@ -207,12 +206,11 @@ namespace quda {
     {
       apply(0);
       qudaDeviceSynchronize();
-      checkCudaError();
     }
 
     void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      GaugeForceKernel<decltype(arg)><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+      qudaLaunchKernel(GaugeForceKernel<decltype(arg)>, tp, stream, arg);
     }
 
     void preTune() { arg.mom.save(); }

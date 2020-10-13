@@ -5,21 +5,14 @@
 #include <algorithm>
 
 #include <quda.h>
-#include <quda_internal.h>
+#include <gauge_field.h>
 #include <dirac_quda.h>
-#include <dslash_quda.h>
-#include <invert_quda.h>
-#include <util_quda.h>
-#include <blas_quda.h>
-
 #include <misc.h>
 #include <host_utils.h>
 #include <command_line_params.h>
 #include <dslash_reference.h>
 #include <staggered_dslash_reference.h>
 #include <staggered_gauge_utils.h>
-#include <gauge_field.h>
-#include <unitarization_links.h>
 
 #include "dslash_test_helpers.h"
 #include <assert.h>
@@ -230,9 +223,6 @@ void init(int precision, QudaReconstructType link_recon, int partition)
   // printfQuda("Sending spinor field to GPU\n");
   *cudaSpinor = *spinor;
 
-  cudaDeviceSynchronize();
-  checkCudaError();
-
   tmp = new cudaColorSpinorField(csParam);
 
   bool pc = (dtest_type == dslash_test_type::MatPC);  // For test_type 0, can use either pc or not pc
@@ -349,11 +339,6 @@ DslashTime dslashCUDA(int niter) {
   cudaEventDestroy(end);
 
   dslash_time.event_time = runTime / 1000;
-
-  // check for errors
-  cudaError_t stat = cudaGetLastError();
-  if (stat != cudaSuccess)
-    errorQuda("with ERROR: %s\n", cudaGetErrorString(stat));
 
   return dslash_time;
 }
@@ -485,7 +470,7 @@ public:
     end();
   }
 
-  static void SetUpTestCase() { initQuda(device); }
+  static void SetUpTestCase() { initQuda(device_ordinal); }
 
   // Per-test-case tear-down.
   // Called after the last test in this test case.

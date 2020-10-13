@@ -2,6 +2,7 @@
 #include <tune_quda.h>
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
+#include <instantiate.h>
 
 namespace quda {
 
@@ -96,8 +97,8 @@ namespace quda {
      Generic CPU gauge ghost extraction and packing
      NB This routines is specialized to four dimensions
   */
-  template <typename Float, int length, int nDim, int dim, typename Order, bool extract>
-  void extractGhostEx(ExtractGhostExArg<Order,nDim,dim> arg)
+  template <typename Float, int length, int dim, bool extract, typename Arg>
+  void extractGhostEx(Arg &arg)
   {
     for (int parity=0; parity<2; parity++) {
 
@@ -140,8 +141,8 @@ namespace quda {
      Generic CPU gauge ghost extraction and packing
      NB This routines is specialized to four dimensions
   */
-  template <typename Float, int length, int nDim, int dim, typename Order, bool extract>
-  __global__ void extractGhostExKernel(ExtractGhostExArg<Order,nDim,dim> arg)
+  template <typename Float, int length, int dim, bool extract, typename Arg>
+  __global__ void extractGhostExKernel(Arg arg)
   {
     // parallelize over parity and dir using block or grid 
     /*for (int parity=0; parity<2; parity++) {*/
@@ -218,23 +219,21 @@ namespace quda {
     void apply(const qudaStream_t &stream) {
       if (extract) {
 	if (location==QUDA_CPU_FIELD_LOCATION) {
-	  extractGhostEx<Float,length,nDim,dim,Order,true>(arg);
+	  extractGhostEx<Float,length,dim,true>(arg);
 	} else {
 	  TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	  tp.grid.y = 2;
 	  tp.grid.z = 2;
-	  extractGhostExKernel<Float,length,nDim,dim,Order,true> 
-	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  qudaLaunchKernel(extractGhostExKernel<Float,length,dim,true,decltype(arg)>, tp, stream, arg); 
 	}
       } else { // we are injecting
 	if (location==QUDA_CPU_FIELD_LOCATION) {
-	  extractGhostEx<Float,length,nDim,dim,Order,false>(arg);
+	  extractGhostEx<Float,length,dim,false>(arg);
 	} else {
 	  TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	  tp.grid.y = 2;
 	  tp.grid.z = 2;
-	  extractGhostExKernel<Float,length,nDim,dim,Order,false> 
-	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  qudaLaunchKernel(extractGhostExKernel<Float,length,dim,false,decltype(arg)>, tp, stream, arg);
 	}
       }
     }
@@ -320,142 +319,120 @@ namespace quda {
     } else {
       errorQuda("Invalid dim=%d", dim);
     }
-
-    checkCudaError();
   }
 
   /** This is the template driver for extractGhost */
-  template <typename Float>
-  void extractGhostEx(const GaugeField &u, int dim, const int *R, Float **Ghost, bool extract) {
+  template <typename Float> struct GhostExtractEx {
+    GhostExtractEx(const GaugeField &u, int dim, const int *R, void **Ghost_, bool extract)
+    {
+      Float **Ghost = reinterpret_cast<Float**>(Ghost_);
+      const int length = 18;
 
-    const int length = 18;
+      QudaFieldLocation location = 
+        (typeid(u)==typeid(cudaGaugeField)) ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION;
 
-    QudaFieldLocation location = 
-      (typeid(u)==typeid(cudaGaugeField)) ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION;
-
-    if (u.isNative()) {
-      if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-        typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type G;
-        extractGhostEx<Float, length>(G(u, 0, Ghost), dim, u.SurfaceCB(), u.X(), R, extract, u, location);
-      } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
+      if (u.isNative()) {
+        if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+          typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type G;
+          extractGhostEx<Float, length>(G(u, 0, Ghost), dim, u.SurfaceCB(), u.X(), R, extract, u, location);
+        } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
 #if QUDA_RECONSTRUCT & 2
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type G;
-	extractGhostEx<Float,length>(G(u, 0, Ghost),
-				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
+          typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type G;
+          extractGhostEx<Float,length>(G(u, 0, Ghost),
+                                       dim, u.SurfaceCB(), u.X(), R, extract, u, location);
 #else
-        errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_12", QUDA_RECONSTRUCT);
+          errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_12", QUDA_RECONSTRUCT);
 #endif
-      } else if (u.Reconstruct() == QUDA_RECONSTRUCT_8) {
+        } else if (u.Reconstruct() == QUDA_RECONSTRUCT_8) {
 #if QUDA_RECONSTRUCT & 1
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type G;
-	extractGhostEx<Float,length>(G(u, 0, Ghost), 
-				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
+          typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type G;
+          extractGhostEx<Float,length>(G(u, 0, Ghost), 
+                                       dim, u.SurfaceCB(), u.X(), R, extract, u, location);
 #else
-        errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_8", QUDA_RECONSTRUCT);
+          errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_8", QUDA_RECONSTRUCT);
 #endif
-      } else if (u.Reconstruct() == QUDA_RECONSTRUCT_13) {
+        } else if (u.Reconstruct() == QUDA_RECONSTRUCT_13) {
 #if QUDA_RECONSTRUCT & 2
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_13>::type G;
-	extractGhostEx<Float,length>(G(u, 0, Ghost),
-				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
+          typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_13>::type G;
+          extractGhostEx<Float,length>(G(u, 0, Ghost),
+                                       dim, u.SurfaceCB(), u.X(), R, extract, u, location);
 #else
-        errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_13", QUDA_RECONSTRUCT);
+          errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_13", QUDA_RECONSTRUCT);
 #endif
-      } else if (u.Reconstruct() == QUDA_RECONSTRUCT_9) {
+        } else if (u.Reconstruct() == QUDA_RECONSTRUCT_9) {
 #if QUDA_RECONSTRUCT & 1
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_9>::type G;
-	extractGhostEx<Float,length>(G(u, 0, Ghost),
-				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
+          typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_9>::type G;
+          extractGhostEx<Float,length>(G(u, 0, Ghost),
+                                       dim, u.SurfaceCB(), u.X(), R, extract, u, location);
 #else
-        errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_9", QUDA_RECONSTRUCT);
+          errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_9", QUDA_RECONSTRUCT);
 #endif
-      }
-    } else if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
-      
+        }
+      } else if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
+
 #ifdef BUILD_QDP_INTERFACE
-      extractGhostEx<Float,length>(QDPOrder<Float,length>(u, 0, Ghost),
-				   dim, u.SurfaceCB(), u.X(), R, extract, u, location);
+        extractGhostEx<Float,length>(QDPOrder<Float,length>(u, 0, Ghost),
+                                     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
 #else
-      errorQuda("QDP interface has not been built\n");
+        errorQuda("QDP interface has not been built\n");
 #endif
       
-    } else if (u.Order() == QUDA_QDPJIT_GAUGE_ORDER) {
+      } else if (u.Order() == QUDA_QDPJIT_GAUGE_ORDER) {
 
 #ifdef BUILD_QDPJIT_INTERFACE
-      extractGhostEx<Float,length>(QDPJITOrder<Float,length>(u, 0, Ghost),
-				   dim, u.SurfaceCB(), u.X(), R, extract, u, location);
+        extractGhostEx<Float,length>(QDPJITOrder<Float,length>(u, 0, Ghost),
+                                     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
 #else
-      errorQuda("QDPJIT interface has not been built\n");
+        errorQuda("QDPJIT interface has not been built\n");
 #endif
 
-    } else if (u.Order() == QUDA_CPS_WILSON_GAUGE_ORDER) {
+      } else if (u.Order() == QUDA_CPS_WILSON_GAUGE_ORDER) {
 
 #ifdef BUILD_CPS_INTERFACE
-      extractGhostEx<Float,length>(CPSOrder<Float,length>(u, 0, Ghost),
-				   dim, u.SurfaceCB(), u.X(), R, extract, u, location);
+        extractGhostEx<Float,length>(CPSOrder<Float,length>(u, 0, Ghost),
+                                     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
 #else
-      errorQuda("CPS interface has not been built\n");
+        errorQuda("CPS interface has not been built\n");
 #endif
 
-    } else if (u.Order() == QUDA_MILC_GAUGE_ORDER) {
+      } else if (u.Order() == QUDA_MILC_GAUGE_ORDER) {
 
 #ifdef BUILD_MILC_INTERFACE
-      extractGhostEx<Float,length>(MILCOrder<Float,length>(u, 0, Ghost),
-				   dim, u.SurfaceCB(), u.X(), R, extract, u, location);
+        extractGhostEx<Float,length>(MILCOrder<Float,length>(u, 0, Ghost),
+                                     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
 #else
-      errorQuda("MILC interface has not been built\n");
+        errorQuda("MILC interface has not been built\n");
 #endif
 
-    } else if (u.Order() == QUDA_BQCD_GAUGE_ORDER) {
+      } else if (u.Order() == QUDA_BQCD_GAUGE_ORDER) {
 
 #ifdef BUILD_BQCD_INTERFACE
-      extractGhostEx<Float,length>(BQCDOrder<Float,length>(u, 0, Ghost),
-				   dim, u.SurfaceCB(), u.X(), R, extract, u, location);
+        extractGhostEx<Float,length>(BQCDOrder<Float,length>(u, 0, Ghost),
+                                     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
 #else
-      errorQuda("BQCD interface has not been built\n");
+        errorQuda("BQCD interface has not been built\n");
 #endif
 
-    } else if (u.Order() == QUDA_TIFR_GAUGE_ORDER) {
+      } else if (u.Order() == QUDA_TIFR_GAUGE_ORDER) {
 
 #ifdef BUILD_TIFR_INTERFACE
-      extractGhostEx<Float,length>(TIFROrder<Float,length>(u, 0, Ghost),
-				   dim, u.SurfaceCB(), u.X(), R, extract, u, location);
+        extractGhostEx<Float,length>(TIFROrder<Float,length>(u, 0, Ghost),
+                                     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
 #else
-      errorQuda("TIFR interface has not been built\n");
+        errorQuda("TIFR interface has not been built\n");
 #endif
 
-    } else {
-      errorQuda("Gauge field %d order not supported", u.Order());
-    }
+      } else {
+        errorQuda("Gauge field %d order not supported", u.Order());
+      }
 
-  }
+    }
+  };
 
   void extractExtendedGaugeGhost(const GaugeField &u, int dim, const int *R, 
-				 void **ghost, bool extract) {
-
-    if (u.Precision() == QUDA_DOUBLE_PRECISION) {
-      extractGhostEx(u, dim, R, (double**)ghost, extract);
-    } else if (u.Precision() == QUDA_SINGLE_PRECISION) {
-#if QUDA_PRECISION & 4
-      extractGhostEx(u, dim, R, (float**)ghost, extract);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
-#endif
-    } else if (u.Precision() == QUDA_HALF_PRECISION) {
-#if QUDA_PRECISION & 2
-      extractGhostEx(u, dim, R, (short **)ghost, extract);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
-#endif
-    } else if (u.Precision() == QUDA_QUARTER_PRECISION) {
-#if QUDA_PRECISION & 1
-      extractGhostEx(u, dim, R, (char **)ghost, extract);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
-#endif
-    } else {
-      errorQuda("Unknown precision type %d", u.Precision());
-    }
+				 void **ghost, bool extract)
+  {
+    instantiatePrecision<GhostExtractEx>(u, dim, R, ghost, extract);
   }
 
 } // namespace quda

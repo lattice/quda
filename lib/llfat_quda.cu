@@ -13,8 +13,10 @@
 
 namespace quda {
 
-  template <typename Float, int nColor, QudaReconstructType recon>
+  template <typename Float_, int nColor_, QudaReconstructType recon>
   struct LinkArg {
+    using Float = Float_;
+    static constexpr int nColor = nColor_;
     typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type Link;
     typedef typename gauge_mapper<Float, recon, 18, QUDA_STAGGERED_PHASE_MILC>::type Gauge;
 
@@ -50,7 +52,7 @@ namespace quda {
     }
   };
 
-  template <typename Float, int dir, typename Arg>
+  template <int dir, typename Arg>
   __device__ void longLinkDir(Arg &arg, int idx, int parity) {
     int x[4];
     int dx[4] = {0, 0, 0, 0};
@@ -59,7 +61,7 @@ namespace quda {
     getCoords(x, idx, arg.X, parity);
     for (int d=0; d<4; d++) x[d] += arg.border[d];
 
-    typedef Matrix<complex<Float>,3> Link;
+    using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
 
     Link a = arg.u(dir, linkIndex(y, x, arg.E), parity);
 
@@ -73,7 +75,7 @@ namespace quda {
     arg.link(dir, idx, parity) = arg.coeff * a * b * c;
   }
 
-  template <typename Float, typename Arg>
+  template <typename Arg>
   __global__ void computeLongLink(Arg arg) {
 
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
@@ -83,10 +85,10 @@ namespace quda {
     if (dir >= 4) return;
 
     switch(dir) {
-    case 0: longLinkDir<Float, 0>(arg, idx, parity); break;
-    case 1: longLinkDir<Float, 1>(arg, idx, parity); break;
-    case 2: longLinkDir<Float, 2>(arg, idx, parity); break;
-    case 3: longLinkDir<Float, 3>(arg, idx, parity); break;
+    case 0: longLinkDir<0>(arg, idx, parity); break;
+    case 1: longLinkDir<1>(arg, idx, parity); break;
+    case 2: longLinkDir<2>(arg, idx, parity); break;
+    case 3: longLinkDir<3>(arg, idx, parity); break;
     }
     return;
   }
@@ -112,11 +114,10 @@ namespace quda {
 
     void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      computeLongLink<Float><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+      qudaLaunchKernel(computeLongLink<decltype(arg)>, tp, stream, arg);
     }
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
-
     long long flops() const { return 2*4*arg.threads*198; }
     long long bytes() const { return 2*4*arg.threads*(3*arg.u.Bytes()+arg.link.Bytes()); }
   };
@@ -126,7 +127,7 @@ namespace quda {
     instantiate<LongLink, ReconstructNo12>(u, lng, coeff); // u first arg so we pick its recon
   }
 
-  template <typename Float, typename Arg>
+  template <typename Arg>
   __global__ void computeOneLink(Arg arg)
   {
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
@@ -139,7 +140,7 @@ namespace quda {
     getCoords(x, idx, arg.X, parity);
     for (int d=0; d<4; d++) x[d] += arg.border[d];
 
-    typedef Matrix<complex<Float>,3> Link;
+    using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
 
     Link a = arg.u(dir, linkIndex(x,arg.E), parity);
 
@@ -169,7 +170,7 @@ namespace quda {
 
     void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      computeOneLink<Float><<<tp.grid,tp.block>>>(arg);
+      qudaLaunchKernel(computeOneLink<decltype(arg)>, tp, stream, arg);
     }
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
@@ -184,8 +185,10 @@ namespace quda {
     instantiate<OneLink, ReconstructNo12>(u, fat, coeff);
   }
 
-  template <typename Float, typename Fat, typename Staple, typename Mulink, typename Gauge>
+  template <typename Float_, int nColor_, typename Fat, typename Staple, typename Mulink, typename Gauge>
   struct StapleArg {
+    using Float = Float_;
+    static constexpr int nColor = nColor_;
     unsigned int threads;
 
     int_fastdiv X[4];
@@ -229,9 +232,10 @@ namespace quda {
     }
   };
 
-  template<typename Float, int mu, int nu, typename Arg>
-  __device__ inline void computeStaple(Matrix<complex<Float>,3> &staple, Arg &arg, int x[], int parity) {
-    typedef Matrix<complex<Float>,3> Link;
+  template <int mu, int nu, typename Arg>
+  __device__ inline void computeStaple(Matrix<complex<typename Arg::Float>, Arg::nColor> &staple, Arg &arg, int x[], int parity)
+  {
+    using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
     int *y = arg.u.coords, *y_mu = arg.mulink.coords, dx[4] = {0, 0, 0, 0};
 
     /* Computes the upper staple :
@@ -283,7 +287,7 @@ namespace quda {
     }
   }
 
-  template<typename Float, bool save_staple, typename Arg>
+  template <bool save_staple, typename Arg>
   __global__ void computeStaple(Arg arg, int nu)
   {
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
@@ -303,32 +307,32 @@ namespace quda {
     getCoords(x, idx, arg.X, (parity+arg.odd_bit)%2);
     for (int d=0; d<4; d++) x[d] += arg.border[d];
 
-    typedef Matrix<complex<Float>,3> Link;
+    using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
     Link staple;
     switch(mu) {
     case 0:
       switch(nu) {
-      case 1: computeStaple<Float,0,1>(staple, arg, x, parity); break;
-      case 2: computeStaple<Float,0,2>(staple, arg, x, parity); break;
-      case 3: computeStaple<Float,0,3>(staple, arg, x, parity); break;
+      case 1: computeStaple<0,1>(staple, arg, x, parity); break;
+      case 2: computeStaple<0,2>(staple, arg, x, parity); break;
+      case 3: computeStaple<0,3>(staple, arg, x, parity); break;
       } break;
     case 1:
       switch(nu) {
-      case 0: computeStaple<Float,1,0>(staple, arg, x, parity); break;
-      case 2: computeStaple<Float,1,2>(staple, arg, x, parity); break;
-      case 3: computeStaple<Float,1,3>(staple, arg, x, parity); break;
+      case 0: computeStaple<1,0>(staple, arg, x, parity); break;
+      case 2: computeStaple<1,2>(staple, arg, x, parity); break;
+      case 3: computeStaple<1,3>(staple, arg, x, parity); break;
       } break;
     case 2:
       switch(nu) {
-      case 0: computeStaple<Float,2,0>(staple, arg, x, parity); break;
-      case 1: computeStaple<Float,2,1>(staple, arg, x, parity); break;
-      case 3: computeStaple<Float,2,3>(staple, arg, x, parity); break;
+      case 0: computeStaple<2,0>(staple, arg, x, parity); break;
+      case 1: computeStaple<2,1>(staple, arg, x, parity); break;
+      case 3: computeStaple<2,3>(staple, arg, x, parity); break;
       } break;
     case 3:
       switch(nu) {
-      case 0: computeStaple<Float,3,0>(staple, arg, x, parity); break;
-      case 1: computeStaple<Float,3,1>(staple, arg, x, parity); break;
-      case 2: computeStaple<Float,3,2>(staple, arg, x, parity); break;
+      case 0: computeStaple<3,0>(staple, arg, x, parity); break;
+      case 1: computeStaple<3,1>(staple, arg, x, parity); break;
+      case 2: computeStaple<3,2>(staple, arg, x, parity); break;
       } break;
     }
 
@@ -380,9 +384,9 @@ namespace quda {
     void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (save_staple)
-	computeStaple<Float,true><<<tp.grid,tp.block>>>(arg, nu);
+        qudaLaunchKernel(computeStaple<true, Arg>, tp, stream, arg, nu);
       else
-	computeStaple<Float,false><<<tp.grid,tp.block>>>(arg, nu);
+	qudaLaunchKernel(computeStaple<false, Arg>, tp, stream, arg, nu);
     }
 
     TuneKey tuneKey() const {
@@ -412,11 +416,11 @@ namespace quda {
       typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type L;
       typedef typename gauge_mapper<Float,recon,18,QUDA_STAGGERED_PHASE_MILC>::type G;
       if (mulink.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-        StapleArg<Float,L,L,L,G> arg(L(fat), L(staple), L(mulink), G(u), coeff, fat, u);
+        StapleArg<Float, nColor, L, L, L, G> arg(L(fat), L(staple), L(mulink), G(u), coeff, fat, u);
         Staple<Float,decltype(arg)> stapler(arg, nu, dir1, dir2, save_staple, fat);
         stapler.apply(0);
       } else if (mulink.Reconstruct() == recon) {
-        StapleArg<Float,L,L,G,G> arg(L(fat), L(staple), G(mulink), G(u), coeff, fat, u);
+        StapleArg<Float, nColor, L, L, G, G> arg(L(fat), L(staple), G(mulink), G(u), coeff, fat, u);
         Staple<Float,decltype(arg)> stapler(arg, nu, dir1, dir2, save_staple, fat);
         stapler.apply(0);
       } else {
@@ -480,7 +484,6 @@ namespace quda {
     }
 
     qudaDeviceSynchronize();
-    checkCudaError();
 
     delete staple;
     delete staple1;

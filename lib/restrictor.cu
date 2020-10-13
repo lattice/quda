@@ -175,8 +175,6 @@ namespace quda {
     } else {
       errorQuda("Unsupported V precision %d", v.Precision());
     }
-
-    if (checkLocation(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
   }
 
   template <typename Float>
@@ -285,7 +283,7 @@ namespace quda {
                 int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int * const * spin_map, int parity)
   {
 #ifdef GPU_MULTIGRID
-    if (out.FieldOrder() != in.FieldOrder() ||        out.FieldOrder() != v.FieldOrder())
+    if (out.FieldOrder() != in.FieldOrder() || out.FieldOrder() != v.FieldOrder())
       errorQuda("Field orders do not match (out=%d, in=%d, v=%d)",
                 out.FieldOrder(), in.FieldOrder(), v.FieldOrder());
 
