@@ -2,31 +2,35 @@
 
 namespace quda {
 
-  template <template <typename> class Functor, typename Arg>
+  template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   __global__ void Kernel1D(Arg arg)
   {
     Functor<Arg> f(arg);
 
     int i = threadIdx.x + blockIdx.x * blockDim.x;
-    if (i >= arg.threads.x) return;
 
-    f(i);
+    while (i < arg.threads.x) {
+      f(i);
+      if (grid_stride) i += gridDim.x * blockDim.x;
+    }
   }
 
-  template <template <typename> class Functor, typename Arg>
+  template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   __global__ void Kernel2D(Arg arg)
   {
     Functor<Arg> f(arg);
 
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     int j = threadIdx.y + blockIdx.y * blockDim.y;
-    if (i >= arg.threads.x) return;
     if (j >= arg.threads.y) return;
 
-    f(i, j);
+    while (i < arg.threads.x) {
+      f(i, j);
+      if (grid_stride) i += gridDim.x * blockDim.x;
+    }
   }
 
-  template <template <typename> class Functor, typename Arg>
+  template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   __global__ void Kernel3D(Arg arg)
   {
     Functor<Arg> f(arg);
@@ -34,11 +38,13 @@ namespace quda {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     int j = threadIdx.y + blockIdx.y * blockDim.y;
     int k = threadIdx.z + blockIdx.z * blockDim.z;
-    if (i >= arg.threads.x) return;
     if (j >= arg.threads.y) return;
     if (k >= arg.threads.z) return;
 
-    f(i, j, k);
+    while (i < arg.threads.x) {
+      f(i, j, k);
+      if (grid_stride) i += gridDim.x * blockDim.x;
+    }
   }
 
 }

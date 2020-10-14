@@ -63,6 +63,16 @@ extern "C" {
 
 namespace quda {
 
+  struct constant_param_t {
+    static constexpr size_t max_size = 8192;
+    size_t bytes;
+    char host[max_size];
+    void *device_ptr;      
+    char device_name[128];
+  };
+
+  static std::vector<constant_param_t> dummy_param;
+
   struct alignas(8) char8 {
     char4 x;
     char4 y;
