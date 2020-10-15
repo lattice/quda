@@ -44,7 +44,7 @@ namespace quda
       for (int i = 0; i < arg.NXZ; i++)
         for (int j = 0; j < arg.NYW; j++) tmp[arg.NYW * i + j] = coeff_t(h.data[arg.NYW * i + j]);
 
-      qudaMemcpyAsync((void*)buf_d, tmp, arg.NXZ * arg.NYW * sizeof(coeff_t), cudaMemcpyHostToDevice, stream);
+      qudaMemcpyAsync((void*)buf_d, tmp, arg.NXZ * arg.NYW * sizeof(coeff_t), qudaMemcpyHostToDevice, stream);
     }
 
     /**

@@ -9,6 +9,7 @@
 #include <gauge_field.h>
 #include <color_spinor_field.h>
 #include <blas_quda.h>
+#include <quda_api.h>
 
 namespace quda {
 
@@ -79,11 +80,11 @@ namespace quda {
     if (norm_bytes) backup_norm_h = static_cast<char*>(safe_malloc(2 * norm_bytes));
 
     if (Location() == QUDA_CUDA_FIELD_LOCATION) {
-      cudaMemcpy(backup_h, clover, bytes, cudaMemcpyDeviceToHost);
-      cudaMemcpy(backup_h + bytes, cloverInv, bytes, cudaMemcpyDeviceToHost);
+      qudaMemcpy(backup_h, clover, bytes, qudaMemcpyDeviceToHost);
+      qudaMemcpy(backup_h + bytes, cloverInv, bytes, qudaMemcpyDeviceToHost);
       if (norm_bytes) {
-        cudaMemcpy(backup_norm_h, norm, norm_bytes, cudaMemcpyDeviceToHost);
-        cudaMemcpy(backup_norm_h + norm_bytes, invNorm, norm_bytes, cudaMemcpyDeviceToHost);
+        qudaMemcpy(backup_norm_h, norm, norm_bytes, qudaMemcpyDeviceToHost);
+        qudaMemcpy(backup_norm_h + norm_bytes, invNorm, norm_bytes, qudaMemcpyDeviceToHost);
       }
       checkCudaError();
     } else {
@@ -101,11 +102,11 @@ namespace quda {
   */
   void CloverField::restore() const {
     if (Location() == QUDA_CUDA_FIELD_LOCATION) {
-      cudaMemcpy(clover, backup_h, bytes, cudaMemcpyHostToDevice);
-      cudaMemcpy(cloverInv, backup_h + bytes, bytes, cudaMemcpyHostToDevice);
+      qudaMemcpy(clover, backup_h, bytes, qudaMemcpyHostToDevice);
+      qudaMemcpy(cloverInv, backup_h + bytes, bytes, qudaMemcpyHostToDevice);
       if (norm_bytes) {
-        cudaMemcpy(norm, backup_norm_h, norm_bytes, cudaMemcpyHostToDevice);
-        cudaMemcpy(invNorm, backup_norm_h + norm_bytes, norm_bytes, cudaMemcpyHostToDevice);
+        qudaMemcpy(norm, backup_norm_h, norm_bytes, qudaMemcpyHostToDevice);
+        qudaMemcpy(invNorm, backup_norm_h + norm_bytes, norm_bytes, qudaMemcpyHostToDevice);
       }
       checkCudaError();
     } else {
