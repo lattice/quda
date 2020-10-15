@@ -328,7 +328,7 @@ void qudaComputeOprod(int prec, int num_terms, int num_naik_terms, double** coef
   errorQuda("This interface has been removed and is no longer supported");
 }
 
-void qudaUpdateUPhased2(int prec, double eps, QudaMILCSiteArg_t *arg, int phase_in, int want_gaugepipe)
+void qudaUpdateUPhasedPipeline(int prec, double eps, QudaMILCSiteArg_t *arg, int phase_in, int want_gaugepipe)
 {
   qudamilc_called<true>(__func__);
   QudaGaugeParam qudaGaugeParam
@@ -369,7 +369,7 @@ void qudaUpdateUPhased2(int prec, double eps, QudaMILCSiteArg_t *arg, int phase_
   return;
 }
 
-void qudaUpdateUPhased(int prec, double eps, QudaMILCSiteArg_t *arg, int phase_in){ qudaUpdateUPhased2(prec, eps, arg, 0, 0);}
+void qudaUpdateUPhased(int prec, double eps, QudaMILCSiteArg_t *arg, int phase_in){ qudaUpdateUPhasedPipeline(prec, eps, arg, 0, 0);}
 
 void qudaUpdateU(int prec, double eps, QudaMILCSiteArg_t *arg) { qudaUpdateUPhased(prec, eps, arg, 0); }
 

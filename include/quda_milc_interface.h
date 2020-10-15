@@ -765,7 +765,7 @@ extern "C" {
    * @param phase_in whether staggered phases are applied
    * @param want_gaugepipe whether to enabled QUDA gaugepipe for HMC
    */
-  void qudaUpdateUPhased2(int precision, double eps, QudaMILCSiteArg_t *arg, int phase_in, int want_gaugepipe);
+  void qudaUpdateUPhasedPipeline(int precision, double eps, QudaMILCSiteArg_t *arg, int phase_in, int want_gaugepipe);
 
   /**
    * Download the momentum from MILC and place into QUDA's resident
