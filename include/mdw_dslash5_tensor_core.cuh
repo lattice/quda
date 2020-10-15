@@ -251,8 +251,7 @@ namespace quda
   {
 #pragma unroll
     for (int offset = 16; offset > 0; offset /= 2) {
-      // TODO: Only works for CUDA 9.2 or later
-      float other_f = __shfl_down_sync(0xffffffffu, f, offset);
+      float other_f = __shfl_down_sync(device::warp_converged_mask(), f, offset);
       if (other_f > f) { f = other_f; }
     }
   }

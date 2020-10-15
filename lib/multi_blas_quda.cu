@@ -1,12 +1,6 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <cstring> // needed for memset
-
-#include <tune_quda.h>
 #include <blas_quda.h>
 #include <color_spinor_field.h>
-
-#include <jitify_helper.cuh>
+#include <tunable_nd.h>
 #include <kernels/multi_blas_core.cuh>
 
 namespace quda {
@@ -16,7 +10,7 @@ namespace quda {
     qudaStream_t* getStream();
 
     template <template <typename ...> class Functor, typename store_t, typename y_store_t, int nSpin, typename T>
-    class MultiBlas : public TunableVectorY
+    class MultiBlas : public TunableGridStrideKernel3D
     {
       using real = typename mapper<y_store_t>::type;
       const int NXZ;
@@ -27,7 +21,6 @@ namespace quda {
       const int nParity;
       const T &a, &b, &c;
       std::vector<ColorSpinorField *> &x, &y, &z, &w;
-      const QudaFieldLocation location;
 
       bool tuneSharedBytes() const { return false; }
 
@@ -38,7 +31,7 @@ namespace quda {
       MultiBlas(const T &a, const T &b, const T &c, const ColorSpinorField &x_meta, const ColorSpinorField &y_meta,
                 std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
                 std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w) :
-        TunableVectorY(y.size()),
+        TunableGridStrideKernel3D(*x[0], y.size(), x[0]->SiteSubset()),
         NXZ(x.size()),
         NYW(y.size()),
         f(NXZ, NYW),
@@ -50,9 +43,9 @@ namespace quda {
         x(x),
         y(y),
         z(z),
-        w(w),
-        location(checkLocation(*x[0], *y[0], *z[0], *w[0]))
+        w(w)
       {
+        checkLocation(*x[0], *y[0], *z[0], *w[0]);
         checkLength(*x[0], *y[0], *z[0], *w[0]);
         auto x_prec = checkPrecision(*x[0], *z[0], *w[0]);
         auto y_prec = y[0]->Precision();
@@ -82,10 +75,6 @@ namespace quda {
           strcat(aux, y[0]->AuxString());
         }
 
-#ifdef JITIFY
-        ::quda::create_jitify_program("kernels/multi_blas_core.cuh");
-#endif
-
         apply(*getStream());
 
         blas::bytes += bytes();
@@ -103,6 +92,16 @@ namespace quda {
         strcat(name, NYW_str);
         strcat(name, typeid(f).name());
         return TuneKey(x[0]->VolString(), name, aux);
+      }
+
+      template <typename Arg> void launch(const TuneParam &tp, const qudaStream_t &stream, Arg &&arg)
+      {
+        constexpr bool multi_1d = arg.f.multi_1d;
+        std::vector<constant_param_t> param;
+        if (a.data) { set_param<multi_1d>(param, arg, 'a', a); }
+        if (b.data) { set_param<multi_1d>(param, arg, 'b', b); }
+        if (c.data) { set_param<multi_1d>(param, arg, 'c', c); }
+        launch_device<MultiBlas_>(tp, stream, arg, param);
       }
 
       template <int NXZ> void compute(const qudaStream_t &stream)
@@ -131,30 +130,23 @@ namespace quda {
 
           tp.block.x *= tp.aux.x; // include warp-split factor
 
-          MultiBlasArg<NXZ, device_store_t, N, device_y_store_t, Ny, decltype(f_)> arg(x, y, z, w, f_, NYW, length);
-#ifdef JITIFY
-          using namespace jitify::reflection;
-          auto instance = program->kernel("quda::blas::multiBlasKernel")
-            .instantiate(Type<device_real_t>(), M, NXZ, tp.aux.x, Type<decltype(arg)>());
-
-          if (a.data) set_param<decltype(f_)::multi_1d>((void*)instance.get_constant_ptr("quda::blas::Amatrix_d"), arg, 'a', a, stream);
-          if (b.data) set_param<decltype(f_)::multi_1d>((void*)instance.get_constant_ptr("quda::blas::Bmatrix_d"), arg, 'b', b, stream);
-          if (c.data) set_param<decltype(f_)::multi_1d>((void*)instance.get_constant_ptr("quda::blas::Cmatrix_d"), arg, 'c', c, stream);
-
-          jitify_error = instance.configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
-#else
-          if (a.data) set_param<decltype(f_)::multi_1d>(qudaGetSymbolAddress(Amatrix_d), arg, 'a', a, stream);
-          if (b.data) set_param<decltype(f_)::multi_1d>(qudaGetSymbolAddress(Bmatrix_d), arg, 'b', b, stream);
-          if (c.data) set_param<decltype(f_)::multi_1d>(qudaGetSymbolAddress(Cmatrix_d), arg, 'c', c, stream);
           switch (tp.aux.x) {
-          case 1: qudaLaunchKernel(multiBlasKernel<device_real_t, M, NXZ, 1, decltype(arg)>, tp, stream, arg); break;
+          case 1:
+            launch(tp, stream, MultiBlasArg<1, device_real_t, M, NXZ, device_store_t, N,
+                   device_y_store_t, Ny, decltype(f_)>(x, y, z, w, f_, NYW, length));
+            break;
 #ifdef WARP_SPLIT
-          case 2: qudaLaunchKernel(multiBlasKernel<device_real_t, M, NXZ, 2, decltype(arg)>, tp, stream, arg); break;
-          case 4: qudaLaunchKernel(multiBlasKernel<device_real_t, M, NXZ, 4, decltype(arg)>, tp, stream, arg); break;
+          case 2:
+            launch(tp, stream, MultiBlasArg<2, device_real_t, M, NXZ, device_store_t, N,
+                   device_y_store_t, Ny, decltype(f_)>(x, y, z, w, f_, NYW, length));
+            break;
+          case 4:
+            launch(tp, stream, MultiBlasArg<4, device_real_t, M, NXZ, device_store_t, N,
+                   device_y_store_t, Ny, decltype(f_)>(x, y, z, w, f_, NYW, length));
+            break;
 #endif
           default: errorQuda("warp-split factor %d not instantiated", tp.aux.x);
           }
-#endif
 
           tp.block.x /= tp.aux.x; // restore block size
         } else {
@@ -249,15 +241,13 @@ namespace quda {
 
       void initTuneParam(TuneParam &param) const
       {
-        TunableVectorY::initTuneParam(param);
-        param.grid.z = nParity;
+        TunableGridStrideKernel3D::initTuneParam(param);
         param.aux = make_int4(1, 0, 0, 0); // warp-split parameter
       }
 
       void defaultTuneParam(TuneParam &param) const
       {
-        TunableVectorY::defaultTuneParam(param);
-        param.grid.z = nParity;
+        TunableGridStrideKernel3D::defaultTuneParam(param);
         param.aux = make_int4(1, 0, 0, 0); // warp-split parameter
       }
 

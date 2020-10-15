@@ -185,14 +185,6 @@ namespace quda {
 
           MultiReduceArg<NXZ, device_store_t, N, device_y_store_t, Ny, decltype(r_)> arg(x, y, z, w, r_, NYW, length, nParity, tp);
 
-#ifdef JITIFY
-          // need to get constants pointer from jitify instance
-          if (a.data || b.data || c.data) errorQuda("Constant memory buffer support not enabled with jitify yet");
-#else
-          if (a.data) set_param<false>(qudaGetSymbolAddress(Amatrix_d), arg, 'a', a, stream);
-          if (b.data) set_param<false>(qudaGetSymbolAddress(Cmatrix_d), arg, 'b', b, stream);
-          if (c.data) set_param<false>(qudaGetSymbolAddress(Bmatrix_d), arg, 'c', c, stream);
-#endif
           multiReduceLaunch<device_real_t, M, NXZ>(result, arg, tp, stream, *this);
         } else {
           errorQuda("Only implemented for GPU fields");

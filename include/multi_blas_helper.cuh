@@ -20,7 +20,7 @@ namespace quda
     static char *Cmatrix_h;
 
     template <bool multi_1d = false, typename Arg, typename T> typename std::enable_if<multi_1d, void>::type
-    set_param(void *buf_d, Arg &arg, char select, const T &h, const qudaStream_t &stream)
+    set_param(std::vector<constant_param_t> &params, Arg &arg, char select, const T &h)
     {
       using coeff_t = typename decltype(arg.f)::coeff_t;
       coeff_t *buf_arg = nullptr;
@@ -35,16 +35,38 @@ namespace quda
     }
 
     template <bool multi_1d = false, typename Arg, typename T> typename std::enable_if<!multi_1d, void>::type
-    set_param(void *buf_d, Arg &arg, char dummy, const T &h, const qudaStream_t &stream)
+    set_param(std::vector<constant_param_t> &params, Arg &arg, char select, const T &h)
     {
+      constant_param_t param;
       using coeff_t = typename decltype(arg.f)::coeff_t;
-      constexpr size_t n_coeff = MAX_MATRIX_SIZE / sizeof(coeff_t);
+      if (arg.NXZ * arg.NYW * sizeof(coeff_t) > param.max_size)
+        printfQuda("Requested parameter size %lu larger than max %lu", arg.NXZ * arg.NYW * sizeof(coeff_t), param.max_size);
+      param.bytes = arg.NXZ * arg.NYW * sizeof(coeff_t);
 
-      coeff_t tmp[n_coeff];
+      switch (select) {
+      case 'a':
+        strcpy(param.device_name, "quda::blas::Amatrix_d");
+        param.device_ptr = qudaGetSymbolAddress(Amatrix_d);
+        Amatrix_h = param.host;
+        break;
+      case 'b':
+        strcpy(param.device_name, "quda::blas::Bmatrix_d");
+        param.device_ptr = qudaGetSymbolAddress(Bmatrix_d);
+        Bmatrix_h = param.host;
+        break;
+      case 'c':
+        strcpy(param.device_name, "quda::blas::Cmatrix_d");
+        param.device_ptr = qudaGetSymbolAddress(Cmatrix_d);
+        Cmatrix_h = param.host;
+        break;
+      default: errorQuda("Unknown buffer %c", select);
+      }
+
+      coeff_t *host = (coeff_t*)(param.host);
       for (int i = 0; i < arg.NXZ; i++)
-        for (int j = 0; j < arg.NYW; j++) tmp[arg.NYW * i + j] = coeff_t(h.data[arg.NYW * i + j]);
+        for (int j = 0; j < arg.NYW; j++) host[arg.NYW * i + j] = coeff_t(h.data[arg.NYW * i + j]);
 
-      qudaMemcpyAsync((void*)buf_d, tmp, arg.NXZ * arg.NYW * sizeof(coeff_t), cudaMemcpyHostToDevice, stream);
+      params.push_back(param);
     }
 
     /**

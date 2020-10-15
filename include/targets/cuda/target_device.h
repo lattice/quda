@@ -11,6 +11,11 @@ namespace quda {
     constexpr int warp_size() { return 32; }
 
     /**
+       @brief Return the thread mask for a converged warp.
+    */
+    constexpr unsigned int warp_converged_mask() { return 0xffffffff; }
+
+    /**
        @brief Helper function that returns the maximum number of threads
        in a block in the x dimension.
     */

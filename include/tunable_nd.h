@@ -27,7 +27,8 @@ namespace quda {
     */
     bool tuneGridDim() const final { return grid_stride; }
 
-    template <template <typename> class Functor, typename Arg> void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
+    template <template <typename> class Functor, typename Arg>
+    void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
     {
 #ifdef JITIFY
       std::string kernel_file(std::string("kernels/") + Functor<Arg>::filename());
@@ -38,15 +39,24 @@ namespace quda {
       auto Functor_instance = reflect<Functor<Arg>>();
       auto Functor_naked = Functor_instance.substr(0, Functor_instance.find("<"));
 
-      jitify_error = program->kernel("quda::Kernel1D")
-        .instantiate({Functor_naked, reflect<Arg>(), reflect(grid_stride)})
-        .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+      auto instance = program->kernel("quda::Kernel1D")
+        .instantiate({Functor_naked, reflect<Arg>(), reflect(grid_stride)});
+
+      for (unsigned int i=0; i < param.size(); i++) {
+        auto device_ptr = instance.get_constant_ptr(param[i].device_name);
+        qudaMemcpyAsync((void*)device_ptr, param[i].host, param[i].bytes, cudaMemcpyHostToDevice, stream);
+      }
+
+      jitify_error = instance.configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
+      for (unsigned int i = 0; i < param.size(); i++)
+        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, cudaMemcpyHostToDevice, stream);
       qudaLaunchKernel(Kernel1D<Functor, Arg, grid_stride>, tp, stream, arg);
 #endif
     }
 
-    template <template <typename> class Functor, typename Arg> void launch_host(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
+    template <template <typename> class Functor, typename Arg>
+    void launch_host(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
     {
       Functor<Arg> f(const_cast<Arg &>(arg));
       for (int i = 0; i < (int)arg.threads.x; i++) {
@@ -54,10 +64,11 @@ namespace quda {
       }
     }
 
-    template <template <typename> class Functor, typename Arg> void launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
+    template <template <typename> class Functor, typename Arg>
+    void launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
     {
       if (location == QUDA_CUDA_FIELD_LOCATION) {
-        launch_device<Functor, Arg>(tp, stream, arg);
+        launch_device<Functor, Arg>(tp, stream, arg, param);
       } else {
 	errorQuda("CPU not supported yet");
       }
@@ -116,7 +127,8 @@ namespace quda {
     mutable unsigned int step_y;
     bool tune_block_x;
 
-    template <template <typename> class Functor, typename Arg> void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
+    template <template <typename> class Functor, typename Arg>
+    void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
     {
 #ifdef JITIFY
       std::string kernel_file(std::string("kernels/") + Functor<Arg>::filename());
@@ -127,15 +139,24 @@ namespace quda {
       auto Functor_instance = reflect<Functor<Arg>>();
       auto Functor_naked = Functor_instance.substr(0, Functor_instance.find("<"));
 
-      jitify_error = program->kernel("quda::Kernel2D")
-        .instantiate({Functor_naked, reflect<Arg>(), reflect(grid_stride)})
-        .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+      auto instance = program->kernel("quda::Kernel2D")
+        .instantiate({Functor_naked, reflect<Arg>(), reflect(grid_stride)});
+
+      for (unsigned int i=0; i < param.size(); i++) {
+        auto device_ptr = instance.get_constant_ptr(param[i].device_name);
+        qudaMemcpyAsync((void*)device_ptr, param[i].host, param[i].bytes, cudaMemcpyHostToDevice, stream);
+      }
+
+      jitify_error = instance.configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
+      for (unsigned int i = 0; i < param.size(); i++)
+        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, cudaMemcpyHostToDevice, stream);
       qudaLaunchKernel(Kernel2D<Functor, Arg, grid_stride>, tp, stream, arg);
 #endif
     }
 
-    template <template <typename> class Functor, typename Arg> void launch_host(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
+    template <template <typename> class Functor, typename Arg>
+    void launch_host(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
     {
       Functor<Arg> f(const_cast<Arg &>(arg));
       for (int i = 0; i < (int)arg.threads.x; i++) {
@@ -145,11 +166,12 @@ namespace quda {
       }
     }
 
-    template <template <typename> class Functor, typename Arg> void launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
+    template <template <typename> class Functor, typename Arg>
+    void launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
     {
       const_cast<Arg &>(arg).threads.y = vector_length_y;
       if (TunableKernel1D_base<grid_stride>::location == QUDA_CUDA_FIELD_LOCATION) {
-        launch_device<Functor, Arg>(tp, stream, arg);
+        launch_device<Functor, Arg>(tp, stream, arg, param);
       } else {
 	errorQuda("CPU not supported yet");
       }
@@ -252,7 +274,8 @@ namespace quda {
     bool tune_block_y;
 
   protected:
-    template <template <typename> class Functor, typename Arg> void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
+    template <template <typename> class Functor, typename Arg>
+    void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
     {
 #ifdef JITIFY
       std::string kernel_file(std::string("kernels/") + Functor<Arg>::filename());
@@ -279,7 +302,8 @@ namespace quda {
 #endif
     }
 
-    template <template <typename> class Functor, typename Arg> void launch_host(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
+    template <template <typename> class Functor, typename Arg>
+    void launch_host(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
     {
       Functor<Arg> f(const_cast<Arg &>(arg));
       for (int i = 0; i < (int)arg.threads.x; i++) {
@@ -291,12 +315,13 @@ namespace quda {
       }
     }
 
-    template <template <typename> class Functor, typename Arg> void launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
+    template <template <typename> class Functor, typename Arg>
+    void launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
     {
       const_cast<Arg &>(arg).threads.y = vector_length_y;
       const_cast<Arg &>(arg).threads.z = vector_length_z;
       if (TunableKernel2D_base<grid_stride>::location == QUDA_CUDA_FIELD_LOCATION) {
-        launch_device<Functor, Arg>(tp, stream, arg);
+        launch_device<Functor, Arg>(tp, stream, arg, param);
       } else {
 	errorQuda("CPU not supported yet");
       }
