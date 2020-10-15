@@ -756,6 +756,18 @@ extern "C" {
   void qudaUpdateUPhased(int precision, double eps, QudaMILCSiteArg_t *arg, int phase_in);
 
   /**
+   * Evolve the gauge field by step size dt, using the momentum field
+   * I.e., Evalulate U(t+dt) = e(dt pi) U(t).  All fields are CPU fields in MILC order.
+   *
+   * @param precision Precision of the field (2 - double, 1 - single)
+   * @param dt The integration step size step
+   * @param arg Metadata for MILC's internal site struct array
+   * @param phase_in whether staggered phases are applied
+   * @param want_gaugepipe whether to enabled QUDA gaugepipe for HMC
+   */
+  void qudaUpdateUPhased2(int precision, double eps, QudaMILCSiteArg_t *arg, int phase_in, int want_gaugepipe);
+
+  /**
    * Download the momentum from MILC and place into QUDA's resident
    * momentum field.  The source momentum field can either be as part
    * of a MILC site struct (QUDA_MILC_SITE_GAUGE_ORDER) or as a
