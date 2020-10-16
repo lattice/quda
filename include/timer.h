@@ -122,12 +122,21 @@ namespace quda {
     QUDA_PROFILE_SCATTER,       /**< scatter (host -> device) */
 
     QUDA_PROFILE_LAUNCH_KERNEL,      /**< cudaLaunchKernel */
+    QUDA_PROFILE_EVENT_CREATE,	     /**< cudaEventCreate  */
+    QUDA_PROFILE_EVENT_CREATE_DISABLE_TIMING, /**< cudaEventCreateWithFlags */
+    QUDA_PROFILE_EVENT_CREATE_IPC_DISABLE_TIMING, /**< cudaEventCreateWithFlags */
+    QUDA_PROFILE_EVENT_DESTROY, 	/**< cudaEventDestroy */
     QUDA_PROFILE_EVENT_RECORD,       /**< cuda event record  */
     QUDA_PROFILE_EVENT_QUERY,        /**< cuda event querying */
+    QUDA_PROFILE_EVENT_ELAPSED_TIME, /**< cuda profile event elspased time */
     QUDA_PROFILE_STREAM_WAIT_EVENT,  /**< stream waiting for event completion */
     QUDA_PROFILE_FUNC_SET_ATTRIBUTE, /**< set function attribute */
-
     QUDA_PROFILE_EVENT_SYNCHRONIZE,  /**< event synchronization */
+    QUDA_PROFILE_IPC_GET_EVENT_HANDLE, /**< IPC Get Event handle */
+    QUDA_PROFILE_IPC_OPEN_EVENT_HANDLE, /**< IPC open Event handle */
+    QUDA_PROFILE_IPC_GET_MEM_HANDLE, /**< IPC Get Mem Handle */
+    QUDA_PROFILE_IPC_OPEN_MEM_HANDLE, /**< IPC open Mem handle */
+    QUDA_PROFILE_IPC_CLOSE_MEM_HANDLE, /**< IPC close Mem handle */
     QUDA_PROFILE_STREAM_SYNCHRONIZE, /**< stream synchronization */
     QUDA_PROFILE_DEVICE_SYNCHRONIZE, /**< device synchronization */
 

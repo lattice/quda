@@ -5,6 +5,7 @@
 #define DISABLE_GHOST true // do not rename this (it is both a template parameter and a macro)
 
 #include <color_spinor_field_order.h>
+#include <quda_api.h>
 #include <cub_helper.cuh>
 
 // enabling CTA swizzling improves spatial locality of MG blocks reducing cache line wastage
@@ -250,8 +251,8 @@ namespace quda {
     int chirality = blockIdx.z; // which chiral block we're working on (if chirality is present)
 
     constexpr int spinBlock = nSpin / coarseSpin; // size of spin block
-    typedef cub::BlockReduce<complex<sumFloat>, block_size, cub::BLOCK_REDUCE_WARP_REDUCTIONS, 2> dotReduce;
-    typedef cub::BlockReduce<sumFloat, block_size, cub::BLOCK_REDUCE_WARP_REDUCTIONS, 2> normReduce;
+    typedef QudaCub::BlockReduce<complex<sumFloat>, block_size, QudaCub::BLOCK_REDUCE_WARP_REDUCTIONS, 2> dotReduce;
+    typedef QudaCub::BlockReduce<sumFloat, block_size, QudaCub::BLOCK_REDUCE_WARP_REDUCTIONS, 2> normReduce;
 
     __shared__ typename dotReduce::TempStorage dot_storage;
     typename normReduce::TempStorage *norm_storage = (typename normReduce::TempStorage *)&dot_storage;

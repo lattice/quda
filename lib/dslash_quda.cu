@@ -46,12 +46,12 @@ namespace quda {
   namespace dslash {
     int it = 0;
 
-    cudaEvent_t packEnd[2];
-    cudaEvent_t gatherStart[Nstream];
-    cudaEvent_t gatherEnd[Nstream];
-    cudaEvent_t scatterStart[Nstream];
-    cudaEvent_t scatterEnd[Nstream];
-    cudaEvent_t dslashStart[2];
+    qudaEvent_t packEnd[2];
+    qudaEvent_t gatherStart[Nstream];
+    qudaEvent_t gatherEnd[Nstream];
+    qudaEvent_t scatterStart[Nstream];
+    qudaEvent_t scatterEnd[Nstream];
+    qudaEvent_t dslashStart[2];
 
     // these variables are used for benchmarking the dslash components in isolation
     bool dslash_pack_compute;
@@ -86,14 +86,14 @@ namespace quda {
     using namespace dslash;
     // add cudaEventDisableTiming for lower sync overhead
     for (int i=0; i<Nstream; i++) {
-      cudaEventCreateWithFlags(&gatherStart[i], cudaEventDisableTiming);
-      cudaEventCreateWithFlags(&gatherEnd[i], cudaEventDisableTiming);
-      cudaEventCreateWithFlags(&scatterStart[i], cudaEventDisableTiming);
-      cudaEventCreateWithFlags(&scatterEnd[i], cudaEventDisableTiming);
+      qudaEventCreateDisableTiming(&gatherStart[i]);
+      qudaEventCreateDisableTiming(&gatherEnd[i]);
+      qudaEventCreateDisableTiming(&scatterStart[i]);
+      qudaEventCreateDisableTiming(&scatterEnd[i]);
     }
     for (int i=0; i<2; i++) {
-      cudaEventCreateWithFlags(&packEnd[i], cudaEventDisableTiming);
-      cudaEventCreateWithFlags(&dslashStart[i], cudaEventDisableTiming);
+      qudaEventCreateDisableTiming(&packEnd[i]);
+      qudaEventCreateDisableTiming(&dslashStart[i]);
     }
 
     aux_worker = NULL;
@@ -127,15 +127,15 @@ namespace quda {
     using namespace dslash;
 
     for (int i=0; i<Nstream; i++) {
-      cudaEventDestroy(gatherStart[i]);
-      cudaEventDestroy(gatherEnd[i]);
-      cudaEventDestroy(scatterStart[i]);
-      cudaEventDestroy(scatterEnd[i]);
+      qudaEventDestroy(gatherStart[i]);
+      qudaEventDestroy(gatherEnd[i]);
+      qudaEventDestroy(scatterStart[i]);
+      qudaEventDestroy(scatterEnd[i]);
     }
 
     for (int i=0; i<2; i++) {
-      cudaEventDestroy(packEnd[i]);
-      cudaEventDestroy(dslashStart[i]);
+      qudaEventDestroy(packEnd[i]);
+      qudaEventDestroy(dslashStart[i]);
     }
 
     checkCudaError();

@@ -166,10 +166,10 @@ DiracCoarse *dirac;
 
 double benchmark(int test, const int niter) {
 
-  cudaEvent_t start, end;
-  cudaEventCreate(&start);
-  cudaEventCreate(&end);
-  cudaEventRecord(start, 0);
+  qudaEvent_t start, end;
+  qudaEventCreate(&start);
+  qudaEventCreate(&end);
+  qudaEventRecord(start, 0);
 
   switch(test) {
   case 0:
@@ -185,12 +185,12 @@ double benchmark(int test, const int niter) {
     errorQuda("Undefined test %d", test);
   }
 
-  cudaEventRecord(end, 0);
-  cudaEventSynchronize(end);
+  qudaEventRecord(end, 0);
+  qudaEventSynchronize(end);
   float runTime;
-  cudaEventElapsedTime(&runTime, start, end);
-  cudaEventDestroy(start);
-  cudaEventDestroy(end);
+  qudaEventElapsedTime(&runTime, start, end);
+  qudaEventDestroy(start);
+  qudaEventDestroy(end);
 
   double secs = runTime / 1000;
   return secs;

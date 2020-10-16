@@ -161,20 +161,20 @@ void end(void)
 
 double dslashCUDA(int niter, int mu)
 {
-  cudaEvent_t start, end;
-  cudaEventCreate(&start);
-  cudaEventRecord(start, 0);
-  cudaEventSynchronize(start);
+  qudaEvent_t start, end;
+  qudaEventCreate(&start);
+  qudaEventRecord(start, 0);
+  qudaEventSynchronize(start);
 
   for (int i = 0; i < niter; i++) dirac->MCD(*cudaSpinorOut, *cudaSpinor, mu);
 
-  cudaEventCreate(&end);
-  cudaEventRecord(end, 0);
-  cudaEventSynchronize(end);
+  qudaEventCreate(&end);
+  qudaEventRecord(end, 0);
+  qudaEventSynchronize(end);
   float runTime;
-  cudaEventElapsedTime(&runTime, start, end);
-  cudaEventDestroy(start);
-  cudaEventDestroy(end);
+  qudaEventElapsedTime(&runTime, start, end);
+  qudaEventDestroy(start);
+  qudaEventDestroy(end);
 
   double secs = runTime / 1000; //stopwatchReadSeconds();
 

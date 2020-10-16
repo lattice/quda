@@ -28,7 +28,7 @@ namespace quda
     void *get_mapped_buffer();
     void *get_host_buffer();
     count_t *get_count();
-    cudaEvent_t &get_event();
+    qudaEvent_t &get_event();
   } // namespace reducer
 
   template <typename T> struct plus {
@@ -202,10 +202,10 @@ namespace quda
        which reduction this thread block corresponds to.  Typically idx
        will be constant along constant blockIdx.y and blockIdx.z.
     */
-    template <int block_size_x, int block_size_y, bool do_sum = true, typename Reducer = cub::Sum>
+    template <int block_size_x, int block_size_y, bool do_sum = true, typename Reducer = QudaCub::Sum>
     __device__ inline void reduce2d(const T &in, const int idx = 0)
     {
-      using BlockReduce = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y>;
+      using BlockReduce = QudaCub::BlockReduce<T, block_size_x, QudaCub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y>;
       __shared__ typename BlockReduce::TempStorage cub_tmp;
       __shared__ bool isLastBlockDone;
 
@@ -270,10 +270,10 @@ namespace quda
        which reduction this thread block corresponds to.  Typically idx
        will be constant along constant blockIdx.y and blockIdx.z.
     */
-    template <int block_size_x, int block_size_y, bool do_sum = true, typename Reducer = cub::Sum>
+    template <int block_size_x, int block_size_y, bool do_sum = true, typename Reducer = QudaCub::Sum>
     __device__ inline void reduce2d(const T &in, const int idx = 0)
     {
-      using BlockReduce = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y>;
+      using BlockReduce = QudaCub::BlockReduce<T, block_size_x, QudaCub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y>;
       __shared__ typename BlockReduce::TempStorage cub_tmp;
       __shared__ bool isLastBlockDone;
 
@@ -314,7 +314,7 @@ namespace quda
     }
 #endif
 
-    template <int block_size, bool do_sum = true, typename Reducer = cub::Sum>
+    template <int block_size, bool do_sum = true, typename Reducer = QudaCub::Sum>
     __device__ inline void reduce(const T &in, const int idx = 0)
     {
       reduce2d<block_size, 1, do_sum, Reducer>(in, idx);

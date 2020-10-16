@@ -22,30 +22,6 @@
 
 namespace quda {
 
-  // No need to abstract these across the library so keep these definitions local to CUDA target
-
-  /**
-     @brief Wrapper around cudaFuncSetAttribute with built-in error checking
-     @param[in] kernel Kernel function for which we are setting the attribute
-     @param[in] attr Attribute to set
-     @param[in] value Value to set
-  */
-  void qudaFuncSetAttribute_(const void *kernel, cudaFuncAttribute attr, int value, const char *func, const char *file,
-                             const char *line);
-
-  /**
-     @brief Wrapper around cudaFuncGetAttributes with built-in error checking
-     @param[in] attr the cudaFuncGetAttributes object to store the output
-     @param[in] kernel Kernel function for which we are setting the attribute
-  */
-  void qudaFuncGetAttributes_(cudaFuncAttributes &attr, const void *kernel, const char *func, const char *file,
-                              const char *line);
-
-#define qudaFuncSetAttribute(kernel, attr, value)                       \
-  ::quda::qudaFuncSetAttribute_(kernel, attr, value, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
-
-#define qudaFuncGetAttributes(attr, kernel)                             \
-  ::quda::qudaFuncGetAttributes_(attr, kernel, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
 
 #ifdef USE_DRIVER_API
   static TimeProfile apiTimer("CUDA API calls (driver)");
@@ -60,10 +36,10 @@ namespace quda {
       auto search = cache.find(func);
       if (search == cache.end()) {
         cache.insert(func);
-        qudaFuncSetAttribute(func, cudaFuncAttributePreferredSharedMemoryCarveout, (int)cudaSharedmemCarveoutMaxShared);
+        cudaFuncSetAttribute(func, cudaFuncAttributePreferredSharedMemoryCarveout, (int)cudaSharedmemCarveoutMaxShared);
         cudaFuncAttributes attributes;
-        qudaFuncGetAttributes(attributes, func);
-        qudaFuncSetAttribute(func, cudaFuncAttributeMaxDynamicSharedMemorySize,
+        cudaFuncGetAttributes(&attributes, func);
+        cudaFuncSetAttribute(func, cudaFuncAttributeMaxDynamicSharedMemorySize,
                              device::max_dynamic_shared_memory() - attributes.sharedSizeBytes);
       }
     }
@@ -375,7 +351,80 @@ namespace quda {
     if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
-  bool qudaEventQuery_(cudaEvent_t &event, const char *func, const char *file, const char *line)
+  void qudaEventCreate_(qudaEvent_t *event,  const char *func, const char *file, const char *line)
+  {
+#ifdef USE_DRIVER_API
+    PROFILE(CUresult error = cuEventCreate(event, CU_EVENT_DEFAULT), QUDA_PROFILE_EVENT_CREATE);
+    if( error != CUDA_SUCCESS ) {
+      const char *str;
+      cuGetErrorName(error, &str);
+      errorQuda("cuEventQuery returned error %s\n (%s:%s in %s())", str, file, line, func);
+    }
+#else
+    PROFILE(cudaError_t error = cudaEventCreate(event), QUDA_PROFILE_EVENT_CREATE);
+    if( error != CudaSuccess ) {
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    }
+#endif
+    return;
+  }
+
+  void qudaEventCreateDisableTiming_(qudaEvent_t *event,  const char *func, const char *file, const char *line)
+  {
+#ifdef USE_DRIVER_API
+    PROFILE(CUresult error = cuEventCreate(event, CU_EVENT_DISABLE_TIMING), QUDA_PROFILE_EVENT_CREATE_DISABLED_TIMING);
+    if( error != CUDA_SUCCESS ) {
+      const char *str;
+      cuGetErrorName(error, &str);
+      errorQuda("cuEventQuery returned error %s\n (%s:%s in %s())", str, file, line, func);
+    }
+#else
+    PROFILE(cudaError_t error = cudaEventCreateWitFlags(event,cudaEventDisableTiming), QUDA_PROFILE_EVENT_CREATE_DISABLED_TIMING);
+    if( error != CudaSuccess ) {
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    }
+#endif
+    return;
+  }
+
+  void qudaEventCreateIpcDisableTiming_(qudaEvent_t *event,  const char *func, const char *file, const char *line)
+  {
+#ifdef USE_DRIVER_API
+    PROFILE(CUresult error = cuEventCreate(event, CU_EVENT_DISABLE_TIMING | CU_EVENT_INTERPROCESS), QUDA_PROFILE_EVENT_CREATE_IPC_DISABLED_TIMING);
+    if( error != CUDA_SUCCESS ) {
+      const char *str;
+      cuGetErrorName(error, &str);
+      errorQuda("cuEventQuery returned error %s\n (%s:%s in %s())", str, file, line, func);
+    }
+#else
+    PROFILE(cudaError_t error = cudaEventCreateWitFlags(event,cudaEventDisableTiming | cudaInterprocess), QUDA_PROFILE_EVENT_CREATE_DISABLED_TIMING);
+    if( error != CudaSuccess ) {
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    }
+#endif
+    return;
+  }
+
+  void qudaEventDestroy_(qudaEvent_t event,  const char *func, const char *file, const char *line)
+  {
+#ifdef USE_DRIVER_API
+    PROFILE(CUresult error = cuEventDestroy(event), QUDA_PROFILE_EVENT_DESTROY);
+    if( error != CUDA_SUCCESS ) {
+      const char *str;
+      cuGetErrorName(error, &str);
+      errorQuda("cuEventDestroy returned error %s\n (%s:%s in %s())", str, file, line, func);
+    }
+#else
+    PROFILE(cudaError_t error = cudaEventDestroy(event), QUDA_PROFILE_EVENT_DESTROY);
+    if( error != CudaSuccess ) {
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    }
+#endif
+    return;
+  }
+
+  
+  bool qudaEventQuery_(qudaEvent_t &event, const char *func, const char *file, const char *line)
   {
 #ifdef USE_DRIVER_API
     PROFILE(CUresult error = cuEventQuery(event), QUDA_PROFILE_EVENT_QUERY);
@@ -414,6 +463,22 @@ namespace quda {
 #endif
   }
 
+  void qudaEventElapsedTime_(float *ms, qudaEvent_t start, qudaEvent_t end, const char *func, const char *file, const char *line)
+  {
+#ifdef USE_DRIVER_API
+    PROFILE(CUresult error = cuEventElapsedTime(ms,start,end), QUDA_PROFILE_EVENT_ELAPSED_TIME);
+    if (error != CUDA_SUCCESS) {
+      const char *str;
+      cuGetErrorName(error, &str);
+      errorQuda("cuEventElapsedTime returned error %s\n (%s:%s in %s())", str, file, line, func);
+    }
+#else
+    PROFILE(cudaError_t error = cudaEventElapsedTime(event,start,end), QUDA_PROFILE_EVENT_ELAPSED_TIME);
+    if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+#endif
+  }
+
+  
   void qudaStreamWaitEvent_(qudaStream_t stream, cudaEvent_t event, unsigned int flags, const char *func,
                             const char *file, const char *line)
   {
@@ -443,6 +508,46 @@ namespace quda {
     PROFILE(cudaError_t error = cudaEventSynchronize(event), QUDA_PROFILE_EVENT_SYNCHRONIZE);
     if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
 #endif
+  }
+
+  void qudaIpcGetEventHandle_(qudaIpcEventHandle_t *handle, qudaEvent_t event, const char *func, const char *file,
+                              const char *line)
+  {
+    // qudaIpcEventHandle_t doesn't convert nicely to CUipcEventHandle so no driver API
+    PROFILE(cudaError_t error = cudaIpcGetEventHandle(handle,event), QUDA_PROFILE_IPC_GET_EVENT_HANDLE);
+    if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+  }
+
+  void qudaIpcGetMemHandle_(qudaIpcMemHandle_t *handle, void *ptr, const char *func, const char *file,
+                              const char *line)
+  {
+    // qudaIpcEventHandle_t doesn't convert nicely to CUipcEventHandle so no driver API
+    PROFILE(cudaError_t error = cudaIpcGetMemHandle(handle,ptr), QUDA_PROFILE_IPC_GET_MEM_HANDLE);
+    if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+  }
+
+  void qudaIpcOpenEventHandle_(qudaEvent_t *event, qudaIpcEventHandle_t handle, const char *func, const char *file,
+                              const char *line)
+  {
+    // qudaIpcEventHandle_t doesn't convert nicely to CUipcEventHandle so no driver API
+    PROFILE(cudaError_t error = cudaIpcOpenEventHandle(event,handle), QUDA_PROFILE_IPC_OPEN_EVENT_HANDLE);
+    if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+  }
+
+  void qudaIpcOpenMemHandle_(void **devPtr, qudaIpcMemHandle_t handle, const char *func, const char *file,
+			     const char *line)
+  {
+    // qudaIpcEventHandle_t doesn't convert nicely to CUipcEventHandle so no driver API
+    PROFILE(cudaError_t error = cudaIpcOpenMemHandle(devPtr,handle,cudaIpcMemLazyEnablePeerAccess),
+	    QUDA_PROFILE_IPC_OPEN_MEM_HANDLE);
+    if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+  }
+  
+  void qudaIpcCloseMemHandle_(void *devPtr, const char *func, const char *file, const char *line)
+  {
+    // qudaIpcEventHandle_t doesn't convert nicely to CUipcEventHandle so no driver API
+    PROFILE(cudaError_t error = cudaIpcCloseMemHandle(devPtr),QUDA_PROFILE_IPC_CLOSE_MEM_HANDLE);
+    if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
   void qudaStreamSynchronize_(qudaStream_t &stream, const char *func, const char *file, const char *line)

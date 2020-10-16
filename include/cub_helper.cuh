@@ -1,18 +1,8 @@
 #pragma once
-
-using namespace quda;
-
-/**
-   @file cub_helper.cuh
-
-   @section Description
-   Include this file as opposed to cub headers directly to ensure
-   correct compilation with clang and nvrtc
- */
-
-// ensures we use shfl_sync and not shfl when compiling with clang
-#if defined(__clang__) && defined(__CUDA__) && CUDA_VERSION >= 9000
-#define CUB_USE_COOPERATIVE_GROUPS
+#include "quda_define.h"
+#if defined(QUDA_BUILD_TARGET_CUDA)
+#include "targets/cuda/cub_helper_cuda.cuh"
+#elif defined(QUDA_BUILD_TARGET_HIP)
+#include "targets/hip/cub_helper_hip.cuh"
 #endif
 
-#include <cub/block/block_reduce.cuh>
