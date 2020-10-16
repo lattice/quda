@@ -1163,6 +1163,9 @@ namespace quda {
       c_col = blockDim.z*blockIdx.z + threadIdx.z; // coarse color col index
     }
 
+    // if (parity > 1 && shared_atomic), you can go outside the bounds of arg.coarse_to_fine below
+    if (parity > 1) return;
+
     if (!shared_atomic) {
       x_cb = blockDim.x*(arg.coarse_color_wave ? blockIdx.y : blockIdx.x) + threadIdx.x;
       x_coarse_cb = 0;
