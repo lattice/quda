@@ -250,7 +250,7 @@ namespace quda {
     auto location = Y.Location();
 
     //Create a field UV which holds U*V.  Has the same structure as V,
-    // no need to double the spins b/c chirality is parity.
+    // No need to double spin for the staggered operator, will need to double it for the K-D op.
     ColorSpinorParam UVparam(T.Vectors(location));
     UVparam.create = QUDA_ZERO_FIELD_CREATE;
     UVparam.location = location;
@@ -281,9 +281,9 @@ namespace quda {
     const double mu_dummy = 0.; 
     const double mu_factor_dummy = 0.;
 
-    // FIXME: should be able to get away with bidirectional for non-KD
+    // TODO: add bidirectional for non-KD
     //bool need_bidirectional = false;
-    //if (dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) 
+    //if (dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) need_bidirectional = true;
     bool need_bidirectional = true;
 
     constexpr QudaGaugeFieldOrder xinvOrder = QUDA_MILC_GAUGE_ORDER;
@@ -299,7 +299,7 @@ namespace quda {
       if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
 
       typedef typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder,vFloat> V;
-      typedef typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder,vFloat> F;
+      typedef typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder,vFloat> F; // will need 2x the spin components for the KD op
       typedef typename gauge::FieldOrder<Float,fineColor,1,gOrder> gFine;
       typedef typename gauge::FieldOrder<typename mapper<vFloatXinv>::type,xinvColor,xinvSpin,xinvOrder,true,vFloatXinv> xinvFine;
       typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat> gCoarse;
@@ -308,8 +308,8 @@ namespace quda {
       const ColorSpinorField &v = T.Vectors(Y.Location());
 
       V vAccessor(const_cast<ColorSpinorField&>(v));
-      F uvAccessor(*uv);
-      F avAccessor(*av);
+      F uvAccessor(*uv); // will need 2x the spin components for the KD op
+      V avAccessor(*av);
       gFine gAccessor(const_cast<GaugeField&>(g));
       xinvFine xinvAccessor(const_cast<GaugeField&>(XinvKD));
       gCoarse yAccessor(const_cast<GaugeField&>(Y));
@@ -331,7 +331,8 @@ namespace quda {
         errorQuda("Unsupported field order %d\n", T.Vectors(Y.Location()).FieldOrder());
       if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
 
-      typedef typename colorspinor::FieldOrderCB<Float, fineSpin, fineColor, coarseColor, csOrder, vFloat, vFloat, false, false> F;
+      typedef typename colorspinor::FieldOrderCB<Float, fineSpin, fineColor, coarseColor, csOrder, vFloat, vFloat, false, false> V;
+      typedef typename colorspinor::FieldOrderCB<Float, fineSpin, fineColor, coarseColor, csOrder, vFloat, vFloat, false, false> F; // will need 2x the spin components for the KD op
       typedef typename gauge::FieldOrder<Float,fineColor,1,gOrder,true,Float> gFine;
       typedef typename gauge::FieldOrder<typename mapper<vFloatXinv>::type,xinvColor,xinvSpin,xinvOrder,true,vFloatXinv> xinvFine;
       typedef typename gauge::FieldOrder<Float, coarseColor * coarseSpin, coarseSpin, gOrder, true, vFloat> gCoarse;
@@ -339,9 +340,9 @@ namespace quda {
 
       const ColorSpinorField &v = T.Vectors(Y.Location());
 
-      F vAccessor(const_cast<ColorSpinorField &>(v));
-      F uvAccessor(*uv);
-      F avAccessor(*av);
+      V vAccessor(const_cast<ColorSpinorField &>(v));
+      F uvAccessor(*uv); // will need 2x the spin components for the KD op
+      V avAccessor(*av);
       gFine gAccessor(const_cast<GaugeField &>(g));
       xinvFine xinvAccessor(const_cast<GaugeField&>(XinvKD));
       gCoarse yAccessor(const_cast<GaugeField &>(Y));
@@ -377,23 +378,18 @@ namespace quda {
     constexpr int xinvColor = 16 * fineColor;
     constexpr int xinvSpin = 2;
 
-#if QUDA_PRECISION & 4
     if (XinvKD.Precision() == QUDA_SINGLE_PRECISION) {
       aggregateStaggeredY<Float,vFloat,float,fineColor,fineSpin,xinvColor,xinvSpin,coarseColor,coarseSpin>(Y, X, T, g, XinvKD, mass, dirac, matpc);
-    } else
-#endif
-#if QUDA_PRECISION & 2
-    if (XinvKD.Precision() == QUDA_HALF_PRECISION) {
-      aggregateStaggeredY<Float,vFloat,short,fineColor,fineSpin,xinvColor,xinvSpin,coarseColor,coarseSpin>(Y, X, T, g, XinvKD, mass, dirac, matpc);
-    } else
-#endif
-    {
+    //} else if (XinvKD.Precision() == QUDA_HALF_PRECISION) { --- unnecessary until we add KD coarsening support
+    //  aggregateStaggeredY<Float,vFloat,short,fineColor,fineSpin,xinvColor,xinvSpin,coarseColor,coarseSpin>(Y, X, T, g, XinvKD, mass, dirac, matpc);
+    } else {
       errorQuda("Unsupported precision %d", XinvKD.Precision());
     }
   }
 
 
-  // template on the number of coarse degrees of freedom
+  // template on the number of coarse degrees of freedom, branch between naive K-D 
+  // and actual aggregation
   template <typename Float, typename vFloat, int fineColor, int fineSpin>
   void calculateStaggeredY(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &g,
                            const GaugeField &XinvKD, double mass, QudaDiracType dirac, QudaMatPCType matpc)
@@ -410,12 +406,8 @@ namespace quda {
         aggregateStaggeredY<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, T, g, XinvKD, mass, dirac, matpc);
       }
     } else if (coarseColor == 64) {
-      //errorQuda("Staggered aggregation temporarily unsupported");
       aggregateStaggeredY<Float,vFloat,fineColor,fineSpin,64,coarseSpin>(Y, X, T, g, XinvKD, mass, dirac, matpc);
-    } else if (coarseColor == 96) {
-      errorQuda("Staggered aggregation temporarily unsupported");
-      //aggregateStaggeredY<Float,vFloat,fineColor,fineSpin,96,coarseSpin>(Y, X, T, g, XinvKD, mass, dirac, matpc);
-    } else {
+    } else { // note --- may revisit 3 -> 96 in the future
       errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
     }
   }

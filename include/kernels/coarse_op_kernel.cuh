@@ -877,8 +877,9 @@ namespace quda {
           } // Fine color
         }
       } else { // fineSpin == 1
-        // FIXME for now: this won't work for the KD op
-        // need to preserve more info in UV
+        
+        // This is for staggered/asqtad only
+        // the KD op will even to even, odd to odd terms
 
         const int s_c_row = arg.spin_map(0, parity);
 
@@ -1229,6 +1230,7 @@ namespace quda {
   /**
    * Compute the forward links from backwards links by flipping the
    * sign of the spin projector
+   * TODO: add a specialized version for staggered/asqtad
    */
   template<typename Float, int nSpin, int nColor, typename Arg>
   __device__ __host__ void computeYreverse(Arg &arg, int parity, int x_cb, int ic_c, int jc_c) {
