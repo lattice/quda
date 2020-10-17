@@ -62,7 +62,7 @@ class GaugeAlgTest : public ::testing::Test {
   }
 
   virtual void SetUp() {
-    setVerbosity(QUDA_VERBOSE);
+    setVerbosity(verbosity);
 
     param = newQudaGaugeParam();
 
