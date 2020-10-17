@@ -11,7 +11,7 @@ namespace quda {
 
     while (i < arg.threads.x) {
       f(i);
-      if (grid_stride) i += gridDim.x * blockDim.x;
+      if (grid_stride) i += gridDim.x * blockDim.x; else break;
     }
   }
 
@@ -26,7 +26,7 @@ namespace quda {
 
     while (i < arg.threads.x) {
       f(i, j);
-      if (grid_stride) i += gridDim.x * blockDim.x;
+      if (grid_stride) i += gridDim.x * blockDim.x; else break;
     }
   }
 
@@ -43,7 +43,7 @@ namespace quda {
 
     while (i < arg.threads.x) {
       f(i, j, k);
-      if (grid_stride) i += gridDim.x * blockDim.x;
+      if (grid_stride) i += gridDim.x * blockDim.x; else break;
     }
   }
 
