@@ -24,7 +24,7 @@ namespace quda {
     Gauge data;
     double2 result;
     GaugeFixQualityOVRArg(const GaugeField &data) :
-      ReduceArg<double2>(),
+      ReduceArg<double2>(1, true), // reset = true
       threads(1, 2, 1),
       data(data)
     {
@@ -91,39 +91,6 @@ namespace quda {
 
       return data;
     }
-  };
-
-  /**
-   * @brief Tunable object for the gauge fixing quality kernel
-   */
-  template <typename Arg>
-  class GaugeFixQuality : TunableReduction2D<> {
-    Arg &arg;
-    const GaugeField &meta;
-
-  public:
-    GaugeFixQuality(Arg &arg, const GaugeField &meta) :
-      TunableReduction2D(meta),
-      arg(arg),
-      meta(meta)
-    { }
-
-    void apply(const qudaStream_t &stream)
-    {
-      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<FixQualityOVR>(tp, stream, arg);
-      auto reset = true; // apply is called multiple times with the same arg instance so we need to reset
-      arg.complete(arg.result, stream, reset);
-      if (!activeTuning()) {
-        comm_allreduce_array((double*)&arg.result, 2);
-        arg.result.x /= (double)(3 * Arg::gauge_dir * 2 * arg.threads.x * comm_size());
-        arg.result.y /= (double)(3 * 2 * arg.threads.x * comm_size());
-      }
-    }
-
-    long long flops() const { return (36LL * Arg::gauge_dir + 65LL) * meta.Volume(); }
-    //long long bytes() const { return (1)*2*gauge_dir*arg.Bytes(); }
-    long long bytes() const { return 2LL * Arg::gauge_dir * meta.Volume() * meta.Reconstruct() * meta.Precision(); }
   };
 
   /**

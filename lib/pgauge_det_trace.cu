@@ -32,16 +32,13 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (type == 0) {
         KernelArg<Float, nColor, recon, 0> arg(u);
-        launch<DetTrace>(tp, stream, arg);
-        arg.complete(result, stream);
+        launch<DetTrace>(result, tp, stream, arg);
       } else {
         KernelArg<Float, nColor, recon, 1> arg(u);
-        launch<DetTrace>(tp, stream, arg);
-        arg.complete(result, stream);
+        launch<DetTrace>(result, tp, stream, arg);
       }
 
       if (!activeTuning()) {
-        comm_allreduce_array((double*)&result, 2);
         result.x /= (double)(4*u.LocalVolume()*comm_size());
         result.y /= (double)(4*u.LocalVolume()*comm_size());
       }

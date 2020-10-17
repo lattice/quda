@@ -4,6 +4,7 @@
 #include <device.h>
 #include <reduce_helper.h>
 #include <reduction_kernel.h>
+#include <register_traits.h>
 
 #ifdef JITIFY
 #include <jitify_helper.cuh>
@@ -21,9 +22,10 @@ namespace quda {
   template <int block_size_y = 2>
   class TunableReduction2D : public Tunable
   {
-    const LatticeField &field;
-
   protected:
+    const LatticeField &field;
+    QudaFieldLocation location;
+
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
@@ -62,41 +64,143 @@ namespace quda {
       return qudaLaunchKernel(Reduction2D<block_size_x, block_size_y, Transformer, Reducer, Arg>, tp, stream, arg);
     }
 
-    template <template <typename> class Transformer, template <typename> class Reducer = plus, typename Arg>
-    void launch(const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
+    template <template <typename> class Transformer, template <typename> class Reducer = plus, typename Arg, typename T>
+    void launch_device(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg,
+                       const std::vector<constant_param_t> &param = dummy_param)
     {
-      if (field.Location() == QUDA_CUDA_FIELD_LOCATION) {
+      if (tp.grid.x > (unsigned int)deviceProp.maxGridSize[0])
+        errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, deviceProp.maxGridSize[0]);
+
 #ifdef JITIFY
-        std::string kernel_file(std::string("kernels/") + Transformer<Arg>::filename());
-        if (field.Location() == QUDA_CUDA_FIELD_LOCATION) create_jitify_program(kernel_file);
-        using namespace jitify::reflection;
+      std::string kernel_file(std::string("kernels/") + Transformer<Arg>::filename());
+      create_jitify_program(kernel_file);
+      using namespace jitify::reflection;
 
-        // we need this hackery to get the naked unbound template class parameters        
-        auto Transformer_instance = reflect<Transformer<Arg>>();
-        auto Transformer_naked = Transformer_instance.substr(0, Transformer_instance.find("<"));
-        auto Reducer_instance = reflect<Reducer<Arg>>();
-        auto Reducer_naked = Reducer_instance.substr(0, Reducer_instance.find("<"));
+      // we need this hackery to get the naked unbound template class parameters
+      auto Transformer_instance = reflect<Transformer<Arg>>();
+      auto Transformer_naked = Transformer_instance.substr(0, Transformer_instance.find("<"));
+      auto Reducer_instance = reflect<Reducer<Arg>>();
+      auto Reducer_naked = Reducer_instance.substr(0, Reducer_instance.find("<"));
 
-        jitify_error = program->kernel("quda::Reduction2D")
-        .instantiate({reflect((int)tp.block.x), reflect((int)tp.block.y),
-              Transformer_naked, Reducer_naked, reflect<Arg>()})
-          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
-        arg.launch_error = jitify_error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
+      auto instance = program->kernel("quda::Reduction2D")
+      .instantiate({reflect((int)tp.block.x), reflect((int)tp.block.y),
+            Transformer_naked, Reducer_naked, reflect<Arg>()});
+
+      for (unsigned int i=0; i < param.size(); i++) {
+        auto device_ptr = instance.get_constant_ptr(param[i].device_name);
+        qudaMemcpyAsync((void*)device_ptr, param[i].host, param[i].bytes, cudaMemcpyHostToDevice, stream);
+      }
+
+      jitify_error = instance.configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+      arg.launch_error = jitify_error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
 #else
-        arg.launch_error = launch<device::max_reduce_block_size<block_size_y>(), Transformer, Reducer>(arg, tp, stream);
+      for (unsigned int i = 0; i < param.size(); i++)
+        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, cudaMemcpyHostToDevice, stream);
+      arg.launch_error = launch<device::max_reduce_block_size<block_size_y>(), Transformer, Reducer>(arg, tp, stream);
 #endif
+
+      if (!commAsyncReduction()) {
+        arg.complete(result, stream);
+        if (!activeTuning() && commGlobalReduction()) {
+          // FIXME - this will break when we have non-double reduction types, e.g., double-double on the host
+          comm_allreduce_array((double*)result.data(), result.size() * sizeof(T) / sizeof(double));
+        }
+      }
+    }
+
+    template <template <typename> class Transformer, template <typename> class Reducer = plus, typename Arg, typename T>
+    void launch_device(T &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg,
+                       const std::vector<constant_param_t> &param = dummy_param)
+    {
+      std::vector<T> result_(1);
+      launch_device<Transformer, Reducer>(result_, tp, stream, arg, param);
+      result = result_[0];
+    }
+
+    template <template <typename> class Transformer, template <typename> class Reducer = plus, typename Arg, typename T>
+    void launch_host(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg,
+                     const std::vector<constant_param_t> &param = dummy_param)
+    {
+      using reduce_t = typename Transformer<Arg>::reduce_t;
+      Transformer<Arg> t(arg);
+      Reducer<reduce_t> r;
+
+      reduce_t reduced_value;
+      zero(reduced_value); // FIXME won't work for min reductions
+
+      for (int j = 0; j < (int)arg.threads.y; j++) {
+        for (int i = 0; i < (int)arg.threads.x; i++) {
+          auto value = t(i, j);
+          reduced_value = r(value, reduced_value);
+        }
+      }
+
+      int input_size = vec_length<reduce_t>::value;
+      int output_size = result.size() * vec_length<T>::value;
+      if (output_size != input_size) errorQuda("Input %d and output %d length do not match", input_size, output_size);
+
+      // copy element by element to output vector
+      for (int i = 0; i < output_size; i++) {
+        reinterpret_cast<typename scalar<T>::type*>(result.data())[i] =
+          reinterpret_cast<typename scalar<reduce_t>::type*>(&reduced_value)[i];
+      }
+
+      if (!activeTuning() && commGlobalReduction()) {
+        // FIXME - this will break when we have non-double reduction types, e.g., double-double on the host
+        comm_allreduce_array((double*)result.data(), result.size() * sizeof(T) / sizeof(double));
+      }
+    }
+
+    template <template <typename> class Transformer, template <typename> class Reducer = plus, typename Arg, typename T>
+    void launch_host(T &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg,
+                     const std::vector<constant_param_t> &param = dummy_param)
+    {
+      std::vector<T> result_(1);
+      launch_host<Transformer, Reducer>(result_, tp, stream, arg, param);
+      result = result_[0];
+    }
+
+    template <template <typename> class Transformer, template <typename> class Reducer = plus, typename T, typename Arg>
+    void launch(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg,
+                const std::vector<constant_param_t> &param = dummy_param)
+    {
+      if (location == QUDA_CUDA_FIELD_LOCATION) {
+        launch_device<Transformer, Reducer>(result, tp, stream, arg, param);
       } else {
 	errorQuda("CPU not supported yet");
       }
     }
 
+    /**
+       @brief Overload providing a simple reference interface
+       @param[out] result The reduction result is copied here
+       @param[in] tp The launch parameters
+       @param[in] stream The stream on which we the reduction is being done
+       @param[in] arg Kernel argument struct
+       @param[in] param Constant kernel meta data
+     */
+    template <template <typename> class Transformer, template <typename> class Reducer = plus, typename T, typename Arg>
+    void launch(T &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg,
+                const std::vector<constant_param_t> &param = dummy_param)
+    {
+      std::vector<T> result_(1);
+      launch<Transformer, Reducer>(result_, tp, stream, arg, param);
+      result = result_[0];
+    }
+
   public:
-    TunableReduction2D(const LatticeField &field) :
-      field(field)
+    TunableReduction2D(const LatticeField &field, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
+      field(field),
+      location(location != QUDA_INVALID_FIELD_LOCATION ? location : field.Location())
     {
       strcpy(aux, compile_type_str(field));
       strcat(aux, field.AuxString());
-      strcat(aux, field.Location() == QUDA_CPU_FIELD_LOCATION ? ",CPU" : ",GPU");
+      strcat(aux, location == QUDA_CPU_FIELD_LOCATION ? ",CPU" : ",GPU");
+    }
+
+    bool advanceTuneParam(TuneParam &param) const
+    {
+      return location == QUDA_CPU_FIELD_LOCATION ? false : Tunable::advanceTuneParam(param);
     }
 
     bool advanceBlockDim(TuneParam &param) const {

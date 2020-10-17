@@ -34,12 +34,10 @@ namespace quda
       std::vector<double> result(3);
       if (density) {
         QChargeArg<Float, nColor, recon, true> arg(Fmunu, (Float*)qdensity);
-        launch<qCharge>(tp, stream, arg);
-        arg.complete(result);
+        launch<qCharge>(result, tp, stream, arg);
       } else {
         QChargeArg<Float, nColor, recon, false> arg(Fmunu, (Float*)qdensity);
-        launch<qCharge>(tp, stream, arg);
-        arg.complete(result);
+        launch<qCharge>(result, tp, stream, arg);
       }
 
       if (!activeTuning()) {

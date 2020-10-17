@@ -13,7 +13,8 @@ namespace quda {
 
   template <bool grid_stride>
   class TunableKernel1D_base : public Tunable
-  { protected:
+  {
+  protected:
     const LatticeField &field;
     QudaFieldLocation location;
 
@@ -81,7 +82,7 @@ namespace quda {
     {
       strcpy(aux, compile_type_str(field));
       strcat(aux, field.AuxString());
-      strcat(aux, field.Location() == QUDA_CPU_FIELD_LOCATION ? ",CPU" : ",GPU");
+      strcat(aux, location == QUDA_CPU_FIELD_LOCATION ? ",CPU" : ",GPU");
     }
 
     TuneKey tuneKey() const { return TuneKey(field.VolString(), typeid(*this).name(), aux); }

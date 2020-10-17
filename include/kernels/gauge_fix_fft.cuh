@@ -165,7 +165,7 @@ namespace quda {
     dim3 threads;     // number of active threads required
 
     GaugeFixQualityFFTArg(const GaugeField &data, complex<real> *delta) :
-      ReduceArg<double2>(),
+      ReduceArg<double2>(1, true), // reset = true
       data(data),
       delta(delta),
       volume(data.Volume()),

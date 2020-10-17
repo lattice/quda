@@ -56,13 +56,13 @@ namespace quda {
     count++;
   }
 
-  void forceRecord(double2 &force, double dt, const char *fname) {
+  void forceRecord(std::vector<double> &force, double dt, const char *fname) {
     qudaDeviceSynchronize();
-    comm_allreduce_max_array((double*)&force, 2);
+    comm_allreduce_max_array(force.data(), 2);
 
     if (comm_rank()==0) {
-      force_stream << fname << "\t" << std::setprecision(5) << force.x << "\t"
-                   << std::setprecision(5) << force.y << "\t"
+      force_stream << fname << "\t" << std::setprecision(5) << force[0] << "\t"
+                   << std::setprecision(5) << force[1] << "\t"
                    << std::setprecision(5) << dt << std::endl;
       if (++force_count % force_flush == 0) flushForceMonitor();
     }
@@ -72,22 +72,23 @@ namespace quda {
   class ActionMom : TunableReduction2D<> {
     MomActionArg<Float, nColor, recon> arg;
     const GaugeField &meta;
+    double &action;
 
   public:
     ActionMom(const GaugeField &mom, double &action) :
       TunableReduction2D(mom),
       arg(mom),
-      meta(mom)
+      meta(mom),
+      action(action)
     {
       apply(0);
-      arg.complete(action);
       comm_allreduce(&action);
     }
 
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<MomAction>(tp, stream, arg);
+      launch<MomAction>(action, tp, stream, arg);
     }
 
     long long flops() const { return 4*2*arg.threads.x*23; }
@@ -109,25 +110,23 @@ namespace quda {
   class UpdateMom : TunableReduction2D<> {
     UpdateMomArg<Float, nColor, recon> arg;
     const GaugeField &meta;
+    std::vector<double> force_max;
 
   public:
     UpdateMom(GaugeField &force, GaugeField &mom, double coeff, const char *fname) :
       TunableReduction2D(mom),
       arg(mom, coeff, force),
-      meta(force)
+      meta(force),
+      force_max(2)
     {
-      double2 force_max;
       apply(0);
-      if (forceMonitor()) {
-        arg.complete(force_max);
-        forceRecord(force_max, arg.coeff, fname);
-      }
+      if (forceMonitor()) forceRecord(force_max, arg.coeff, fname);
     }
 
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<MomUpdate, max_reducer2>(tp, stream, arg);
+      launch<MomUpdate, max_reducer2>(force_max, tp, stream, arg);
     }
 
     void preTune() { arg.mom.save();}

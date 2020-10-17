@@ -511,6 +511,36 @@ public:
     else errorQuda("BORDER: Even and Odd sizes does not match, not supported!!!!, %d:%d", size[0], size[1]);
   }
 
+  /**
+   * @brief Tunable object for the gauge fixing quality kernel
+   */
+  template <typename Arg>
+  class GaugeFixQuality : TunableReduction2D<> {
+    Arg &arg;
+    const GaugeField &meta;
+
+  public:
+    GaugeFixQuality(Arg &arg, const GaugeField &meta) :
+      TunableReduction2D(meta),
+      arg(arg),
+      meta(meta)
+    { }
+
+    void apply(const qudaStream_t &stream)
+    {
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      launch<FixQualityOVR>(arg.result, tp, stream, arg);
+      if (!activeTuning()) {
+        arg.result.x /= (double)(3 * Arg::gauge_dir * 2 * arg.threads.x * comm_size());
+        arg.result.y /= (double)(3 * 2 * arg.threads.x * comm_size());
+      }
+    }
+
+    long long flops() const { return (36LL * Arg::gauge_dir + 65LL) * meta.Volume(); }
+    //long long bytes() const { return (1)*2*gauge_dir*arg.Bytes(); }
+    long long bytes() const { return 2LL * Arg::gauge_dir * meta.Volume() * meta.Reconstruct() * meta.Precision(); }
+  };
+
   template <typename Float, QudaReconstructType recon, int gauge_dir>
   void gaugeFixingOVR(GaugeField &data,const int Nsteps, const int verbose_interval,
                       const Float relax_boost, const double tolerance,

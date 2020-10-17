@@ -23,10 +23,8 @@ namespace quda {
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       GaugePlaqArg<Float, nColor, recon> arg(u);
-      launch<Plaquette>(tp, stream, arg);
-      arg.complete(plq);
+      launch<Plaquette>(plq, tp, stream, arg);
       if (!activeTuning()) {
-        comm_allreduce_array((double*)&plq, 2);
         for (int i = 0; i < 2; i++) ((double*)&plq)[i] /= 9.*2*arg.threads.x*comm_size();
       }
     }

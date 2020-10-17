@@ -67,9 +67,7 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<FixQualityFFT>(tp, stream, arg);
-      auto reset = true; // apply called multiple times with the same arg so need to reset
-      arg.complete(arg.result, stream, reset);
+      launch<FixQualityFFT>(arg.result, tp, stream, arg);
       if (!activeTuning()) {
         arg.result.x /= (double)(3 * Arg::gauge_dir * meta.Volume());
         arg.result.y /= (double)(3 * meta.Volume());

@@ -3,7 +3,7 @@
 #include <color_spinor_field_order.h>
 #include <blas_helper.cuh>
 #include <reduce_helper.h>
-#include <fast_intdiv.h>
+#include <reduction_kernel.h>
 
 namespace quda
 {
@@ -11,8 +11,10 @@ namespace quda
   namespace blas
   {
 
-    template <typename store_t, int N, typename y_store_t, int Ny, typename Reducer_>
+    template <typename real_, int n_, typename store_t, int N, typename y_store_t, int Ny, typename Reducer_>
     struct ReductionArg : public ReduceArg<typename Reducer_::reduce_t> {
+      using real = real_;
+      static constexpr int n = n_;
       using Reducer = Reducer_;
       Spinor<store_t, N> X;
       Spinor<y_store_t, Ny> Y;
@@ -21,9 +23,9 @@ namespace quda
       Spinor<store_t, N> V;
       Reducer r;
 
-      const int length;
+      const int length_cb;
       const int nParity;
-      const int_fastdiv gridSize;
+      dim3 threads;
 
       ReductionArg(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w,
                    ColorSpinorField &v, Reducer r, int length, int nParity, TuneParam &tp) :
@@ -34,29 +36,30 @@ namespace quda
         W(w),
         V(v),
         r(r),
-        length(length),
+        length_cb(length / nParity),
         nParity(nParity),
-        gridSize(tp.grid.x * tp.block.x / nParity)
+        threads(length, 1, 1)
       { ; }
     };
 
     /**
        Generic reduction kernel with up to five loads and saves.
     */
-    template <int block_size, typename real, int n, typename Arg>
-    __global__ void reduceKernel(Arg arg)
-    {
-      // n is real numbers per thread
-      using vec = vector_type<complex<real>, n/2>;
-      unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
-      unsigned int i = tid % arg.gridSize;
-      unsigned int parity = tid / arg.gridSize;
-
+    template <typename Arg> struct Reduce_ {
       using reduce_t = typename Arg::Reducer::reduce_t;
-      reduce_t sum;
-      ::quda::zero(sum);
+      Arg &arg;
+      constexpr Reduce_(Arg &arg) : arg(arg) {}
+      static constexpr const char *filename() { return KERNEL_FILE; }
 
-      while (i < arg.length) {
+      __device__ __host__ inline reduce_t operator()(int tid, int)
+      {
+        using vec = vector_type<complex<typename Arg::real>, Arg::n/2>;
+        reduce_t sum;
+        ::quda::zero(sum);
+
+        unsigned int parity = tid >= arg.length_cb ? 1 : 0;
+        unsigned int i = tid - parity * arg.length_cb;
+
         vec x, y, z, w, v;
         if (arg.r.read.X) arg.X.load(x, i, parity);
         if (arg.r.read.Y) arg.Y.load(y, i, parity);
@@ -74,47 +77,9 @@ namespace quda
         if (arg.r.write.W) arg.W.save(w, i, parity);
         if (arg.r.write.V) arg.V.save(v, i, parity);
 
-        i += arg.gridSize;
+        return sum;
       }
-
-      arg.template reduce<block_size>(sum);
-    }
-
-    /**
-       Generic reduction kernel with up to four loads and three saves.
-    */
-    template <typename real, int n, typename Arg> auto reduceCPU(Arg &arg)
-    {
-      // n is real numbers per thread
-      using vec = vector_type<complex<real>, n/2>;
-
-      using reduce_t = typename Arg::Reducer::reduce_t;
-      reduce_t sum;
-      ::quda::zero(sum);
-
-      for (int parity = 0; parity < arg.nParity; parity++) {
-        for (int i = 0; i < arg.length; i++) {
-          vec x, y, z, w, v;
-          if (arg.r.read.X) arg.X.load(x, i, parity);
-          if (arg.r.read.Y) arg.Y.load(y, i, parity);
-          if (arg.r.read.Z) arg.Z.load(z, i, parity);
-          if (arg.r.read.W) arg.W.load(w, i, parity);
-          if (arg.r.read.V) arg.V.load(v, i, parity);
-
-          arg.r.pre();
-          arg.r(sum, x, y, z, w, v);
-          arg.r.post(sum);
-
-          if (arg.r.write.X) arg.X.save(x, i, parity);
-          if (arg.r.write.Y) arg.Y.save(y, i, parity);
-          if (arg.r.write.Z) arg.Z.save(z, i, parity);
-          if (arg.r.write.W) arg.W.save(w, i, parity);
-          if (arg.r.write.V) arg.V.save(v, i, parity);
-        }
-      }
-
-      return sum;
-    }
+    };
 
     /**
        Base class from which all reduction functors should derive.

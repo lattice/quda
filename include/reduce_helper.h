@@ -78,6 +78,7 @@ namespace quda
 
   private:
     const int n_reduce; // number of reductions of length n_item
+    bool reset = false; // reset the counter post completion (required for multiple calls with the same arg instance
 #ifdef HETEROGENEOUS_ATOMIC
     using system_atomic_t = typename atomic_type<T>::type;
     static constexpr int n_item = sizeof(T) / sizeof(system_atomic_t);
@@ -94,7 +95,14 @@ namespace quda
     bool consumed; // check to ensure that we don't complete more than once unless we explicitly reset
 
   public:
-    ReduceArg(int n_reduce = 1) :
+    /**
+       @brief Constructor for ReduceArg
+       @param[in] The number of reductions of length n_item
+       @param[in] reset Whether to reset the atomics after the
+       reduction has completed; required if the same ReduceArg
+       instance will be used for multiple reductions.
+    */
+    ReduceArg(int n_reduce = 1, bool reset = false) :
       launch_error(QUDA_ERROR_UNINITIALIZED),
       n_reduce(n_reduce),
       partial(static_cast<decltype(partial)>(reducer::get_device_buffer())),
@@ -134,12 +142,9 @@ namespace quda
        polls on completion of the event.
        @param[out] result The reduction result is copied here
        @param[in] stream The stream on which we the reduction is being done
-       @param[in] reset Whether to reset the atomics after the
-       reduction has completed; required if the same aReducearg
-       instance will be used for multiple reductions.
      */
     template <typename host_t, typename device_t = host_t>
-    void complete(std::vector<host_t> &result, const qudaStream_t stream = 0, bool reset = false)
+    void complete(std::vector<host_t> &result, const qudaStream_t stream = 0)
     {
       if (launch_error == QUDA_ERROR) return; // kernel launch failed so return
       if (launch_error == QUDA_ERROR_UNINITIALIZED) errorQuda("No reduction kernel appears to have been launched");
@@ -172,22 +177,6 @@ namespace quda
         std::atomic_thread_fence(std::memory_order_release);
       }
 #endif
-    }
-
-    /**
-       @brief Overload providing a simple reference interface
-       @param[out] result The reduction result is copied here
-       @param[in] stream The stream on which we the reduction is being done
-       @param[in] reset Whether to reset the atomics after the
-       reduction has completed; required if the same ReduceArg
-       instance will be used for multiple reductions.
-     */
-    template <typename host_t, typename device_t = host_t>
-    void complete(host_t &result, const qudaStream_t stream = 0, bool reset = false)
-    {
-      std::vector<host_t> result_(1);
-      complete(result_, stream, reset);
-      result = result_[0];
     }
 
 #ifdef HETEROGENEOUS_ATOMIC

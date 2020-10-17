@@ -31,10 +31,6 @@ namespace quda {
     template <typename real, int len, int NXZ, typename Arg, typename T>
     void multiReduceLaunch(T result[], Arg &arg, const TuneParam &tp, const qudaStream_t &stream, Tunable &tunable)
     {
-      using reduce_t = typename Arg::Reducer::reduce_t;
-      if (tp.grid.x > (unsigned int)deviceProp.maxGridSize[0])
-        errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, deviceProp.maxGridSize[0]);
-
 #ifdef JITIFY
       using namespace jitify::reflection;
       tunable.jitifyError() = program->kernel("quda::blas::multiReduceKernel")
@@ -320,7 +316,7 @@ namespace quda {
 
         coeff_array<T> a, b, c;
 
-        if (x.size() <= tile_size.x && is_valid_NXZ(x.size(), true) && x.size() * y.size() <= max_n_reduce()) {
+        if (x.size() <= tile_size.x && is_valid_NXZ(x.size(), true) && x.size() * y.size() <= (unsigned)max_n_reduce()) {
           // problem will fit, so do the computation
           multiReduce<ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
         } else {
