@@ -426,12 +426,7 @@ namespace quda {
           .instantiate(Type<Float>(),coarseSpin,coarseColor,Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
-#if !defined(STAGGEREDCOARSE)
         qudaLaunchKernel(ComputeYReverseGPU<Float,coarseSpin,coarseColor,Arg>, tp, stream, arg);
-#else
-        errorQuda("ComputeYReverse not enabled for staggered coarsenings");
-#endif
-
 #endif
       } else if (type == COMPUTE_DIAGONAL) {
 
@@ -529,7 +524,7 @@ namespace quda {
 	break;
       case COMPUTE_KDAV:
       // # kd blocks * (48 x 48 x coarseColor multiply)
-      flops_ = (2l * arg.fineVolumeCB) / Arg::blockSizeKD * (8 * fineColor * fineColor * Arg::blockSizeKD * Arg::blockSizeKD * coarseColor);
+      //flops_ = (2l * arg.fineVolumeCB) / Arg::blockSizeKD * (8 * fineColor * fineColor * Arg::blockSizeKD * Arg::blockSizeKD * coarseColor);
       break;
       case COMPUTE_VUV:
       // when the fine operator is truly fine the VUV multiplication is block sparse which halves the number of operations
@@ -581,7 +576,7 @@ namespace quda {
 #endif
 	break;
       case COMPUTE_KDAV:
-      bytes_ = arg.AV.Bytes() + arg.V.Bytes() + (coarseColor / Arg::coarseColorTileSize) * arg.C.Bytes(); // multiple loads of C due to tiling
+      //bytes_ = arg.AV.Bytes() + arg.V.Bytes() + (coarseColor / Arg::coarseColorTileSize) * arg.C.Bytes(); // multiple loads of C due to tiling
       break;
       case COMPUTE_CLOVER_INV_MAX:
       case COMPUTE_TWISTED_CLOVER_INV_MAX:
@@ -658,13 +653,13 @@ namespace quda {
     }
 
     unsigned int sharedBytesPerThread() const {
-      if (type == COMPUTE_KDAV) {
-        // each warp needs... something
-        return 2 * (16 * (fineColor * Arg::blockSizeKD) * Arg::coarseColorPaddedTileSize) * sizeof(complex<typename Arg::Float>) / 256 +
-              Arg::xinvPaddedTileSize * sizeof(complex<typename Arg::Float>);
-      }
-      else
-        return TunableVectorYZ::sharedBytesPerThread();
+      //if (type == COMPUTE_KDAV) {
+      //  // each warp needs... something
+      //  return 2 * (16 * (fineColor * Arg::blockSizeKD) * Arg::coarseColorPaddedTileSize) * sizeof(complex<typename Arg::Float>) / 256 +
+      //        Arg::xinvPaddedTileSize * sizeof(complex<typename Arg::Float>);
+      //}
+      //else
+      return TunableVectorYZ::sharedBytesPerThread();
     }
 
   public:

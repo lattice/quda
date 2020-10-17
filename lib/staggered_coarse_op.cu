@@ -281,10 +281,8 @@ namespace quda {
     const double mu_dummy = 0.; 
     const double mu_factor_dummy = 0.;
 
-    // TODO: add bidirectional for non-KD
-    //bool need_bidirectional = false;
-    //if (dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) need_bidirectional = true;
-    bool need_bidirectional = true;
+    bool need_bidirectional = false;
+    if (dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) need_bidirectional = true;
 
     constexpr QudaGaugeFieldOrder xinvOrder = QUDA_MILC_GAUGE_ORDER;
     if (XinvKD.FieldOrder() != xinvOrder && XinvKD.Bytes()) errorQuda("unsupported field order %d\n", XinvKD.FieldOrder());

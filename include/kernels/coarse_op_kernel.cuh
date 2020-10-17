@@ -826,8 +826,8 @@ namespace quda {
 
           // FIXME: need to update for staggered
           if (!arg.bidirectional) {
-            if (s_row == s_col) arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,
-                                                       X[i_block0+i][j_block0+j][x_][s_row][s_col]);
+            if (Arg::fineSpin != 1 && s_row == s_col) arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,
+                                                                     X[i_block0+i][j_block0+j][x_][s_row][s_col]);
             else arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,
                                         -X[i_block0+i][j_block0+j][x_][s_row][s_col]);
           }
@@ -892,11 +892,13 @@ namespace quda {
 #pragma unroll
           for (int s_col = 0; s_col < coarseSpin; s_col++) { // Chiral column block
             if (s_row != s_col) vuv[s_row * coarseSpin + s_col] *= static_cast<Float>(-1.0);
+            if (Arg::fineSpin != 1 || s_row != s_col) {
 #pragma unroll
-            for (int i = 0; i < TileType::M; i++)
+              for (int i = 0; i < TileType::M; i++)
 #pragma unroll
-              for (int j = 0; j < TileType::N; j++)
-                arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,vuv[s_row*coarseSpin+s_col](i,j));
+                for (int j = 0; j < TileType::N; j++)
+                  arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,vuv[s_row*coarseSpin+s_col](i,j));
+            }
           }
         }
       }
@@ -1026,9 +1028,9 @@ namespace quda {
   }
 
   /**
-   * Compute the forward links from backwards links by flipping the
+   * Wilson-type: Compute the forward links from backwards links by flipping the
    * sign of the spin projector
-   * TODO: add a specialized version for staggered/asqtad
+   * Staggered-type: there's no spin-diagonal term, only flip off-spin term
    */
   template<typename Float, int nSpin, int nColor, typename Arg>
   __device__ __host__ void computeYreverse(Arg &arg, int parity, int x_cb, int ic_c, int jc_c) {
@@ -1039,12 +1041,12 @@ namespace quda {
 #pragma unroll
       for (int s_row = 0; s_row < nSpin; s_row++) { //Spin row
 #pragma unroll
-	for (int s_col = 0; s_col < nSpin; s_col++) { //Spin column
-	if (s_row == s_col)
-	  Y(d+4,parity,x_cb,s_row,s_col,ic_c,jc_c) = Y(d,parity,x_cb,s_row,s_col,ic_c,jc_c);
-	else
-	  Y(d+4,parity,x_cb,s_row,s_col,ic_c,jc_c) = -Y(d,parity,x_cb,s_row,s_col,ic_c,jc_c);
-	} //Spin column
+        for (int s_col = 0; s_col < nSpin; s_col++) { //Spin column
+          if (s_row == s_col && nSpin != 1) 
+            Y(d+4,parity,x_cb,s_row,s_col,ic_c,jc_c) = Y(d,parity,x_cb,s_row,s_col,ic_c,jc_c);
+          else
+            Y(d+4,parity,x_cb,s_row,s_col,ic_c,jc_c) = -Y(d,parity,x_cb,s_row,s_col,ic_c,jc_c);
+        } //Spin column
       } //Spin row
 
     } // dimension
