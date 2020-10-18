@@ -37,15 +37,16 @@ namespace quda
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     // return the qcharge and field strength at site (x_cb, parity)
-    __device__ __host__ inline reduce_t operator()(int x_cb, int parity)
+    template <typename Reducer>
+    __device__ __host__ inline reduce_t operator()(reduce_t &E, Reducer &r, int x_cb, int parity)
     {
       using real = typename Arg::Float;
       using Link = Matrix<complex<real>, Arg::nColor>;
       constexpr real q_norm = static_cast<real>(-1.0 / (4*M_PI*M_PI));
       constexpr real n_inv = static_cast<real>(1.0 / Arg::nColor);
 
-      double3 E = make_double3(0.0, 0.0, 0.0);
-      double &Q = E.z;
+      reduce_t E_local = zero<reduce_t>();
+      double &Q = E_local.z;
 
       // Load the field-strength tensor from global memory
       //F0 = F[Y,X], F1 = F[Z,X], F2 = F[Z,Y],
@@ -62,8 +63,8 @@ namespace quda
         auto tmp = F[i] - n_inv * getTrace(F[i]) * iden;
 
         // Sum trace of square, normalise in .cu
-        if (i<3) E.x -= getTrace(tmp * tmp).real(); //spatial
-        else     E.y -= getTrace(tmp * tmp).real(); //temporal
+        if (i<3) E_local.x -= getTrace(tmp * tmp).real(); //spatial
+        else     E_local.y -= getTrace(tmp * tmp).real(); //temporal
       }
 
       // now compute topological charge
@@ -77,8 +78,9 @@ namespace quda
 
       // apply correct levi-civita symbol
       for (int i=0; i<3; i++) i % 2 == 0 ? Q_idx += Qi[i]: Q_idx -= Qi[i];
-      Q += Q_idx * q_norm;
-      if (Arg::density) arg.qDensity[x_cb + parity * arg.threads.x] = Q_idx * q_norm;
+      Q = Q_idx * q_norm;
+      if (Arg::density) arg.qDensity[x_cb + parity * arg.threads.x] = Q;
+      E = r(E, E_local);
 
       return E;
     }

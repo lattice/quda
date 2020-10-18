@@ -64,9 +64,10 @@ namespace quda {
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     // return the plaquette at site (x_cb, parity)
-    __device__ __host__ inline reduce_t operator()(int x_cb, int parity)
+    template <typename Reducer>
+    __device__ __host__ inline reduce_t operator()(reduce_t &value, Reducer &r, int x_cb, int parity)
     {
-      reduce_t plaq = make_double2(0.0,0.0);
+      reduce_t plaq = zero<reduce_t>();
 
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
@@ -83,7 +84,7 @@ namespace quda {
         plaq.y += plaquette(arg, x, parity, mu, 3);
       }
 
-      return plaq;
+      return r(plaq, value);
     }
 
   };

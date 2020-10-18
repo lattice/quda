@@ -50,9 +50,10 @@ namespace quda {
     /**
      * @brief Measure gauge fixing quality
      */
-    __device__ __host__ inline reduce_t operator()(int x_cb, int parity)
+    template <typename Reducer>
+    __device__ __host__ inline reduce_t operator()(reduce_t &value, Reducer &r, int x_cb, int parity)
     {
-      reduce_t data = make_double2(0.0,0.0);
+      reduce_t data;
       using Link = Matrix<complex<typename Arg::real>, 3>;
 
       int X[4];
@@ -74,7 +75,7 @@ namespace quda {
         delta -= U;
       }
       //18*gauge_dir
-      data.x += -delta(0, 0).real() - delta(1, 1).real() - delta(2, 2).real();
+      data.x = -delta(0, 0).real() - delta(1, 1).real() - delta(2, 2).real();
       //2
       //load downward links
       for (int mu = 0; mu < Arg::gauge_dir; mu++) {
@@ -86,11 +87,11 @@ namespace quda {
       //18
       SubTraceUnit(delta);
       //12
-      data.y += getRealTraceUVdagger(delta, delta);
+      data.y = getRealTraceUVdagger(delta, delta);
       //35
       //T=36*gauge_dir+65
 
-      return data;
+      return r(data, value);
     }
   };
 

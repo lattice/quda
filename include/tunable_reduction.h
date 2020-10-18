@@ -125,12 +125,11 @@ namespace quda {
       Transformer<Arg> t(arg);
       Reducer<reduce_t> r;
 
-      reduce_t reduced_value = arg.init();
+      reduce_t value = arg.init();
 
       for (int j = 0; j < (int)arg.threads.y; j++) {
         for (int i = 0; i < (int)arg.threads.x; i++) {
-          auto value = t(i, j);
-          reduced_value = r(value, reduced_value);
+          value = t(value, r, i, j);
         }
       }
 
@@ -141,7 +140,7 @@ namespace quda {
       // copy element by element to output vector
       for (int i = 0; i < output_size; i++) {
         reinterpret_cast<typename scalar<T>::type*>(result.data())[i] =
-          reinterpret_cast<typename scalar<reduce_t>::type*>(&reduced_value)[i];
+          reinterpret_cast<typename scalar<reduce_t>::type*>(&value)[i];
       }
 
       if (!activeTuning() && commGlobalReduction()) {

@@ -53,10 +53,10 @@ namespace quda
       constexpr Reduce_(Arg &arg) : arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }
 
-      __device__ __host__ inline reduce_t operator()(int tid, int)
+      template <typename Reducer>
+      __device__ __host__ inline reduce_t operator()(reduce_t &sum, Reducer &, int tid, int)
       {
         using vec = vector_type<complex<typename Arg::real>, Arg::n/2>;
-        reduce_t sum = arg.init();
 
         unsigned int parity = tid >= arg.length_cb ? 1 : 0;
         unsigned int i = tid - parity * arg.length_cb;
