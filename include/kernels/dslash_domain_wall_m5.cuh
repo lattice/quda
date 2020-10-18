@@ -17,7 +17,14 @@ namespace quda
   };
 
   constexpr int size = 4096;
-  static __constant__ char mobius_d[size]; // buffer used for Mobius coefficients for GPU kernel
+//  static __constant__ char mobius_d[size]; // buffer used for Mobius coefficients for GPU kernel
+  __device__ char mobius_d[size]; // buffer used for Mobius coefficients for GPU kernel
+  __global__ void set_mobius_d(signed char *ref) 
+  {
+      int idx = blockIdx.x * blockDim.x + threadIdx.x;
+      if(idx>=size)return;
+      mobius_d[idx]=ref[idx];
+  }
 
   // helper trait for determining if we are using variable coefficients
   template <Dslash5Type type> struct is_variable {
@@ -101,6 +108,7 @@ public:
     Dslash5Type type;
 
     coeff_5<real> *mobius_h; // constant buffer used for Mobius coefficients for CPU kernel
+    coeff_5<real> mobius_data;
 
     Dslash5Arg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f, double m_5,
         const Complex *b_5_, const Complex *c_5_, double a_, bool dagger, Dslash5Type type) :
@@ -123,7 +131,8 @@ public:
         errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
 
       if (sizeof(coeff_5<real>) > size) errorQuda("Coefficient buffer too large at %lu bytes\n", sizeof(coeff_5<real>));
-      mobius_h = new coeff_5<real>;
+//      mobius_h = new coeff_5<real>;
+      mobius_h = &mobius_data;
       auto *a_5 = mobius_h->a;
       auto *b_5 = mobius_h->b;
       auto *c_5 = mobius_h->c;
@@ -174,11 +183,14 @@ public:
       } break;
       default: errorQuda("Unknown Dslash5Type %d", type);
       }
+      signed char *tmp_d;hipMalloc(&tmp_d,size);hipMemcpy(tmp_d,mobius_h,sizeof(coeff_5<real>),hipMemcpyHostToDevice);
+      set_mobius_d<<<256,size/256>>>(tmp_d);
+      hipDeviceSynchronize();hipFree(tmp_d); 
 
-      hipMemcpyToSymbolAsync(HIP_SYMBOL(mobius_d), mobius_h, sizeof(coeff_5<real>), 0, hipMemcpyHostToDevice, streams[Nstream - 1]);
+//      cudaMemcpyToSymbolAsync(HIP_SYMBOL(mobius_d), mobius_h, sizeof(coeff_5<real>), 0, hipMemcpyHostToDevice, streams[Nstream - 1]);
     }
 
-    virtual ~Dslash5Arg() { delete mobius_h; }
+    virtual ~Dslash5Arg() {}
   };
 
   /**

@@ -40,8 +40,12 @@ namespace quda
                         stream);
       Tunable::jitify_error = instance.configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
 #else
-      hipMemcpyToSymbolAsync(HIP_SYMBOL(mobius_d), arg.a_5, QUDA_MAX_DWF_LS * sizeof(complex<real>), 0, hipMemcpyHostToDevice,
-                              streams[Nstream - 1]);
+      signed char *tmp_d;hipMalloc(&tmp_d,size);hipMemcpy(tmp_d,arg.a_5,QUDA_MAX_DWF_LS * sizeof(complex<real>),hipMemcpyHostToDevice);
+      set_mobius_d_4d<<<256,size/256>>>(tmp_d);
+      hipDeviceSynchronize();hipFree(tmp_d); 
+      
+//      cudaMemcpyToSymbolAsync(HIP_SYMBOL(mobius_d), arg.a_5, QUDA_MAX_DWF_LS * sizeof(complex<real>), 0, hipMemcpyHostToDevice,
+//                              streams[Nstream - 1]);
       Dslash::template instantiate<packShmem>(tp, stream);
 #endif
     }

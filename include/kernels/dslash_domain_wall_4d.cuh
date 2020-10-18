@@ -6,7 +6,13 @@ namespace quda
 {
 
   constexpr int size = 4096;
-  __constant__ char mobius_d[size]; // constant buffer used for Mobius coefficients for GPU kernel
+  __device__ char mobius_d[size]; // constant buffer used for Mobius coefficients for GPU kernel
+  __global__ void set_mobius_d_4d(signed char *ref) 
+  {
+      int idx = blockIdx.x * blockDim.x + threadIdx.x;
+      if(idx>=size)return;
+      mobius_d[idx]=ref[idx];
+  }
 
   template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_>
   struct DomainWall4DArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
