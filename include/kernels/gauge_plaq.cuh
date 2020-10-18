@@ -34,6 +34,8 @@ namespace quda {
       }
       threads.x = X[0]*X[1]*X[2]*X[3]/2;
     }
+
+    __device__ __host__ double2 init() const { return zero<double2>(); }
   };
 
   template<typename Arg>

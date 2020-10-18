@@ -30,6 +30,8 @@ namespace quda
     {
       if (!field.isNative()) errorQuda("Clover field %d order not supported", field.Order());
     }
+
+    __device__ __host__ auto init() const { return zero<double2>(); }
   };
 
   template <typename Arg> struct InvertClover {

@@ -16,6 +16,7 @@ namespace quda
       using real = real_;
       static constexpr int n = n_;
       using Reducer = Reducer_;
+      using reduce_t = typename Reducer_::reduce_t;
       Spinor<store_t, N> X;
       Spinor<y_store_t, Ny> Y;
       Spinor<store_t, N> Z;
@@ -29,7 +30,6 @@ namespace quda
 
       ReductionArg(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w,
                    ColorSpinorField &v, Reducer r, int length, int nParity, TuneParam &tp) :
-        ReduceArg<typename Reducer_::reduce_t>(),
         X(x),
         Y(y),
         Z(z),
@@ -40,6 +40,8 @@ namespace quda
         nParity(nParity),
         threads(length, 1, 1)
       { ; }
+
+      __device__ __host__ auto init() const { return ::quda::zero<reduce_t>(); }
     };
 
     /**
@@ -54,8 +56,7 @@ namespace quda
       __device__ __host__ inline reduce_t operator()(int tid, int)
       {
         using vec = vector_type<complex<typename Arg::real>, Arg::n/2>;
-        reduce_t sum;
-        ::quda::zero(sum);
+        reduce_t sum = arg.init();
 
         unsigned int parity = tid >= arg.length_cb ? 1 : 0;
         unsigned int i = tid - parity * arg.length_cb;

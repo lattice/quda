@@ -12,10 +12,10 @@ namespace quda {
     static constexpr int type = type_;
     using real = typename mapper<Float>::type;
     using Gauge = typename gauge_mapper<real, recon>::type;
-    dim3 threads; // number of active threads required
     int X[4]; // grid dimensions
     int border[4];
     Gauge u;
+    dim3 threads; // number of active threads required
 
     KernelArg(const GaugeField &u) :
       ReduceArg<double2>(),
@@ -27,6 +27,8 @@ namespace quda {
         X[dir] = u.X()[dir] - border[dir]*2;
       }
     }
+
+    __device__ __host__ auto init() const { return zero<double2>(); }
   };
 
   template <typename Arg> struct DetTrace {

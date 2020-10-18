@@ -23,6 +23,8 @@ namespace quda {
     MomActionArg(const GaugeField &mom) :
       BaseArg<Float, nColor, recon>(mom),
       mom(mom) {}
+
+    __device__ __host__ double init() const { return 0.0; }
   };
 
   template <typename Arg> struct MomAction {
@@ -71,17 +73,21 @@ namespace quda {
     int X[4]; // grid dimensions on mom
     int E[4]; // grid dimensions on force (possibly extended)
     int border[4]; //
+
     UpdateMomArg(GaugeField &mom, const Float &coeff, GaugeField &force) :
       BaseArg<Float, nColor, recon>(mom),
       mom(mom),
       coeff(coeff),
-      force(force) {
+      force(force)
+    {
       for (int dir=0; dir<4; ++dir) {
         X[dir] = mom.X()[dir];
         E[dir] = force.X()[dir];
         border[dir] = force.R()[dir];
       }
     }
+
+    __device__ __host__ double2 init() const{ return zero<double2>(); }
   };
 
   /**

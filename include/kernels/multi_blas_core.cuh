@@ -112,8 +112,8 @@ namespace quda
           if (arg.f.read.Y) arg.Y[k].load(y, idx, parity);
           if (arg.f.read.W) arg.W[k].load(w, idx, parity);
         } else {
-          zero(y);
-          zero(w);
+          y = ::quda::zero<complex<typename Arg::real>, Arg::n/2>();
+          w = ::quda::zero<complex<typename Arg::real>, Arg::n/2>();
         }
 
 #pragma unroll

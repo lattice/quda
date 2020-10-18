@@ -125,8 +125,7 @@ namespace quda {
       Transformer<Arg> t(arg);
       Reducer<reduce_t> r;
 
-      reduce_t reduced_value;
-      zero(reduced_value); // FIXME won't work for min reductions
+      reduce_t reduced_value = arg.init();
 
       for (int j = 0; j < (int)arg.threads.y; j++) {
         for (int i = 0; i < (int)arg.threads.x; i++) {

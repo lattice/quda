@@ -28,6 +28,7 @@ namespace quda
       SpinorYW<max_YW_size<NXZ_, store_t, y_store_t, Reducer_>(), store_t, N, y_store_t, Ny, Reducer_::use_w>
     {
       using Reducer = Reducer_;
+      using reduce_t = vector_type<typename Reducer_::reduce_t, NXZ_>;
       static constexpr int NXZ = NXZ_;
       static constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, Reducer>();
       const int NYW;
@@ -39,7 +40,7 @@ namespace quda
                      std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
                      Reducer f, int NYW, int length, int nParity, TuneParam &tp) :
         // we have NYW * nParity reductions each of length NXZ
-        ReduceArg<vector_type<typename Reducer_::reduce_t, NXZ>>(NYW),
+        ReduceArg<reduce_t>(NYW),
         NYW(NYW),
         f(f),
         length(length),
@@ -57,6 +58,8 @@ namespace quda
           if (Reducer::use_w) this->W[i].set(*w[i]);
         }
       }
+
+      __device__ __host__ auto init() const { return ::quda::zero<typename Reducer_::reduce_t, NXZ>(); }
     };
 
     // strictly required pre-C++17 and can cause link errors otherwise
@@ -80,7 +83,7 @@ namespace quda
       if (k >= arg.NYW) return; // safe since k are different thread blocks
 
       using block_reduce_t = vector_type<typename Arg::Reducer::reduce_t, NXZ>;
-      block_reduce_t sum;
+      block_reduce_t sum = arg.init();
 
       while (idx < arg.length) {
 
@@ -105,7 +108,7 @@ namespace quda
         idx += arg.gridSize;
       }
 
-      arg.template reduce<block_size>(sum, k);
+      reduce<block_size>(arg, sum, k);
     } // multiReduceKernel
 
     /**

@@ -15,8 +15,7 @@ namespace quda {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     int parity = threadIdx.y;
 
-    reduce_t reduced_value;
-    zero(reduced_value);
+    reduce_t reduced_value = arg.init();
 
     while (idx < arg.threads.x) {
       auto value = t(idx, parity);
@@ -25,7 +24,7 @@ namespace quda {
     }
 
     // perform final inter-block reduction and write out result
-    arg.template reduce2d<block_size_x, block_size_y, false, decltype(r)>(reduced_value);
+    reduce<block_size_x, block_size_y, false, decltype(r)>(arg, reduced_value);
   }
 
 }

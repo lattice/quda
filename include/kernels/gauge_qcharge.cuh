@@ -23,9 +23,9 @@ namespace quda
       ReduceArg<double3>(),
       f(Fmunu),
       threads(Fmunu.VolumeCB(), 2, 1),
-      qDensity(qDensity)
-    {
-    }
+      qDensity(qDensity) {}
+
+    __device__ __host__ double3 init() const { return zero<double3>(); }
   };
 
   // Core routine for computing the topological charge from the field strength

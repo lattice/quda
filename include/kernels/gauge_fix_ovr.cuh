@@ -18,23 +18,24 @@ namespace quda {
     using Gauge = typename gauge_mapper<store_t, recon>::type;
     static constexpr int gauge_dir = gauge_dir_;
 
-    dim3 threads; // number of active threads required
     int X[4]; // grid dimensions
     int border[4];
     Gauge data;
     double2 result;
+    dim3 threads; // number of active threads required
+
     GaugeFixQualityOVRArg(const GaugeField &data) :
       ReduceArg<double2>(1, true), // reset = true
-      threads(1, 2, 1),
+      threads(data.LocalVolumeCB(), 2, 1),
       data(data)
     {
       for ( int dir = 0; dir < 4; ++dir ) {
         X[dir] = data.X()[dir] - data.R()[dir] * 2;
         border[dir] = data.R()[dir];
       }
-      threads.x = X[0]*X[1]*X[2]*X[3]/2;
     }
 
+    __device__ __host__ double2 init() const { return zero<double2>(); }
     double getAction(){ return result.x; }
     double getTheta(){ return result.y; }
   };
@@ -73,7 +74,7 @@ namespace quda {
         delta -= U;
       }
       //18*gauge_dir
-      data.x += -delta(0, 0).x - delta(1, 1).x - delta(2, 2).x;
+      data.x += -delta(0, 0).real() - delta(1, 1).real() - delta(2, 2).real();
       //2
       //load downward links
       for (int mu = 0; mu < Arg::gauge_dir; mu++) {

@@ -155,7 +155,6 @@ namespace quda {
     {
       using host_reduce_t = typename Functor<double, double>::reduce_t;
       host_reduce_t value;
-      ::quda::zero(value); // no default constructor so we need to explicitly zero
       instantiate<Functor, Reduce, mixed>(args..., value);
       return value;
     }

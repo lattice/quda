@@ -173,6 +173,8 @@ namespace quda {
     {
       for (int dir = 0; dir < 4; dir++) X[dir] = data.X()[dir];
     }
+
+    __device__ __host__ double2 init() const { return zero<double2>(); }
     double getAction() { return result.x; }
     double getTheta() { return result.y; }
   };
