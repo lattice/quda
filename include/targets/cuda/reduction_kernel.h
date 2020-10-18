@@ -24,7 +24,7 @@ namespace quda {
     }
 
     // perform final inter-block reduction and write out result
-    reduce<block_size_x, block_size_y, false, decltype(r)>(arg, reduced_value);
+    reduce<block_size_x, block_size_y, decltype(r)>(arg, reduced_value);
   }
 
 }

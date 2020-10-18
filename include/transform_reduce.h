@@ -70,7 +70,7 @@ namespace quda
       i += blockDim.x * gridDim.x;
     }
 
-    reduce<Arg::block_size, 1, false, decltype(arg.r)>(arg, r_, j);
+    reduce<Arg::block_size, 1, decltype(arg.r)>(arg, r_, j);
   }
 
   template <typename reduce_t, typename T, typename I, typename transformer, typename reducer>

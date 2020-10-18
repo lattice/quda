@@ -96,6 +96,8 @@ namespace quda {
    */
   template <typename T>
   struct max_reducer2 {
+    static constexpr bool do_sum = false;
+
     __device__ __host__ inline T operator()(const T &a, const T &b) {
       auto c = a;
       if (b.x > a.x) c.x = b.x;

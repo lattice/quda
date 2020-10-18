@@ -31,18 +31,22 @@ namespace quda
   } // namespace reducer
 
   template <typename T> struct plus {
+    static constexpr bool do_sum = true;
     __device__ __host__ T operator()(T a, T b) { return a + b; }
   };
 
   template <typename T> struct maximum {
+    static constexpr bool do_sum = false;
     __device__ __host__ T operator()(T a, T b) { return a > b ? a : b; }
   };
 
   template <typename T> struct minimum {
+    static constexpr bool do_sum = false;
     __device__ __host__ T operator()(T a, T b) { return a < b ? a : b; }
   };
 
   template <typename T> struct identity {
+    static constexpr bool do_sum = false;
     __device__ __host__ T operator()(T a) { return a; }
   };
 
@@ -73,7 +77,7 @@ namespace quda
 
   template <typename T> struct ReduceArg {
 
-    template <int, int, bool, typename Reduce, typename Arg, typename I>
+    template <int, int, typename Reduce, typename Arg, typename I>
     friend __device__  void reduce(Arg&, const I &, const int);
     qudaError_t launch_error; // only do complete if no launch error to avoid hang
 
@@ -194,7 +198,7 @@ namespace quda
        which reduction this thread block corresponds to.  Typically idx
        will be constant along constant blockIdx.y and blockIdx.z.
     */
-    template <int block_size_x, int block_size_y = 1, bool do_sum = true, typename Reducer = cub::Sum, typename Arg, typename T>
+    template <int block_size_x, int block_size_y = 1, typename Reducer, typename Arg, typename T>
     __device__ inline void reduce(Arg &arg, const T &in, const int idx = 0)
     {
       using BlockReduce = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y>;
@@ -202,7 +206,7 @@ namespace quda
       __shared__ bool isLastBlockDone;
 
       Reducer r;
-      T aggregate = do_sum ? BlockReduce(cub_tmp).Sum(in) : BlockReduce(cub_tmp).Reduce(in, r);
+      T aggregate = Reducer::do_sum ? BlockReduce(cub_tmp).Sum(in) : BlockReduce(cub_tmp).Reduce(in, r);
 
       if (threadIdx.x == 0 && threadIdx.y == 0) {
         // need to call placement new constructor since partial is not necessarily constructed
@@ -226,7 +230,7 @@ namespace quda
           i += block_size_x * block_size_y;
         }
 
-        sum = (do_sum ? BlockReduce(cub_tmp).Sum(sum) : BlockReduce(cub_tmp).Reduce(sum, r));
+        sum = (Reducer::do_sum ? BlockReduce(cub_tmp).Sum(sum) : BlockReduce(cub_tmp).Reduce(sum, r));
 
         // write out the final reduced value
         if (threadIdx.y * block_size_x + threadIdx.x == 0) {
@@ -261,7 +265,7 @@ namespace quda
        which reduction this thread block corresponds to.  Typically idx
        will be constant along constant blockIdx.y and blockIdx.z.
     */
-    template <int block_size_x, int block_size_y = 1, bool do_sum = true, typename Reducer = cub::Sum, typename Arg, typename T>
+    template <int block_size_x, int block_size_y = 1, typename Reducer, typename Arg, typename T>
     __device__ inline void reduce(Arg &arg, const T &in, const int idx = 0)
     {
       using BlockReduce = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y>;
@@ -269,7 +273,7 @@ namespace quda
       __shared__ bool isLastBlockDone;
 
       Reducer r;
-      T aggregate = do_sum ? BlockReduce(cub_tmp).Sum(in) : BlockReduce(cub_tmp).Reduce(in, r);
+      T aggregate = Reducer::do_sum ? BlockReduce(cub_tmp).Sum(in) : BlockReduce(cub_tmp).Reduce(in, r);
 
       if (threadIdx.x == 0 && threadIdx.y == 0) {
         arg.partial[idx * gridDim.x + blockIdx.x] = aggregate;
@@ -293,7 +297,7 @@ namespace quda
           i += block_size_x * block_size_y;
         }
 
-        sum = (do_sum ? BlockReduce(cub_tmp).Sum(sum) : BlockReduce(cub_tmp).Reduce(sum, r));
+        sum = (Reducer::do_sum ? BlockReduce(cub_tmp).Sum(sum) : BlockReduce(cub_tmp).Reduce(sum, r));
 
         // write out the final reduced value
         if (threadIdx.y * block_size_x + threadIdx.x == 0) {
