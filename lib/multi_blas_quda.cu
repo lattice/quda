@@ -96,7 +96,7 @@ namespace quda {
 
       template <typename Arg> void launch(const TuneParam &tp, const qudaStream_t &stream, Arg &&arg)
       {
-        constexpr bool multi_1d = arg.f.multi_1d;
+        constexpr bool multi_1d = Arg::Functor::multi_1d;
         std::vector<constant_param_t> param;
         if (a.data) { set_param<multi_1d>(param, arg, 'a', a); }
         if (b.data) { set_param<multi_1d>(param, arg, 'b', b); }

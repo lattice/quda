@@ -1,5 +1,6 @@
 #pragma once
 
+#include <float_vector.h>
 #include <cub_helper.cuh>
 
 #ifdef QUAD_SUM

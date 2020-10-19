@@ -27,11 +27,12 @@ namespace quda
        @tparam N Y-field vector i/o length
        @tparam Functor Functor used to operate on data
     */
-    template <int warp_split_, typename real_, int n_, int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Functor>
+    template <int warp_split_, typename real_, int n_, int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Functor_>
     struct MultiBlasArg :    
-      SpinorXZ<NXZ_, store_t, N, Functor::use_z>,
-      SpinorYW<max_YW_size<NXZ_, store_t, y_store_t, Functor>(), store_t, N, y_store_t, Ny, Functor::use_w> {
+      SpinorXZ<NXZ_, store_t, N, Functor_::use_z>,
+      SpinorYW<max_YW_size<NXZ_, store_t, y_store_t, Functor_>(), store_t, N, y_store_t, Ny, Functor_::use_w> {
       using real = real_;
+      using Functor = Functor_;
       static constexpr int warp_split = warp_split_;
       static constexpr int n = n_;
       static constexpr int NXZ = NXZ_;
