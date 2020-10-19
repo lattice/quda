@@ -33,24 +33,6 @@ namespace quda {
     return block_idx;
   }
 
-#if 0
-  template <template <typename> class Transformer, typename Arg>
-  void BlockReduction2D(Arg &arg)
-  {
-    using reduce_t = typename Transformer<Arg>::reduce_t;
-    Transformer<Arg> t(arg);
-
-    for (int block = 0; block < arg.n_block; block++) {
-      for (int j = 0; j < (int)arg.threads.y; j++) {
-        reduce_t value;
-        for (int i = 0; i < (int)arg.threads.x; i++) value += t(block, i, j);
-
-        t.store(value, block, j);
-      }
-    }
-  }
-#endif
-
   /**
      @brief Generic block reduction kernel.  Here, we ensure that each
      thread block maps exactly to a logical block to be reduced, with
