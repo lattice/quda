@@ -23,10 +23,10 @@ namespace quda {
       sigma(static_cast<Float>(sigma)),
       group(U.LinkType() == QUDA_SU3_LINKS)
     {
-      if (getVerbosity() >= QUDA_SUMMARIZE)
+      if (getVerbosity() >= QUDA_SUMMARIZE) {
         if (group) printfQuda("Creating Gaussian distrbuted Lie group field with sigma = %e\n", sigma);
         else printfQuda("Creating Gaussian distrbuted Lie algebra field\n");
-
+      }
       strcat(aux, group ? ",lie_group" : "lie_algebra");
       apply(0);
     }
