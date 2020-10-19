@@ -1,5 +1,5 @@
 # generate an object library for all target specific files
-add_library(quda_cuda_target OBJECT quda_api.cpp device.cpp malloc.cpp tune.cpp blas_lapack_cublas.cpp
+add_library(quda_cuda_target OBJECT quda_api.cpp device.cpp malloc.cpp tune.cpp blas_lapack_cublas.cpp quda_fortran.cpp
 
 # CUDA specific kernels that need to be generalized
 gauge_fix_ovr.cu

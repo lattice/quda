@@ -71,7 +71,7 @@ static bool redundant_comms = false;
 
 //for MAGMA lib:
 #include <blas_magma.h>
-
+#ifdef MAGMA_LIB
 static bool InitMagma = false;
 
 void openMagma() {
@@ -95,6 +95,7 @@ void closeMagma(){
   }
 
 }
+#endif
 
 cudaGaugeField *gaugePrecise = nullptr;
 cudaGaugeField *gaugeSloppy = nullptr;
@@ -5244,16 +5245,6 @@ void invert_multishift_quda_(void *h_x, void *hp_b, QudaInvertParam *param) {
 }
 
 void flush_chrono_quda_(int *index) { flushChronoQuda(*index); }
-
-void register_pinned_quda_(void *ptr, size_t *bytes) {
-  cudaHostRegister(ptr, *bytes, cudaHostRegisterDefault);
-  checkCudaError();
-}
-
-void unregister_pinned_quda_(void *ptr) {
-  cudaHostUnregister(ptr);
-  checkCudaError();
-}
 
 void new_quda_gauge_param_(QudaGaugeParam *param) {
   *param = newQudaGaugeParam();

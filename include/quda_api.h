@@ -83,6 +83,7 @@ namespace quda
     return qudaLaunchKernel(reinterpret_cast<const void *>(func), tp, const_cast<void **>(args), stream);
   }
 
+
   /**
      @brief Wrapper around cudaMemcpy or driver API equivalent
      @param[out] dst Destination pointer

@@ -607,10 +607,13 @@ namespace quda {
     if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
+
   void printAPIProfile() {
 #ifdef API_PROFILE
     apiTimer.Print();
 #endif
   }
 
+
+  
 } // namespace quda

@@ -1,6 +1,7 @@
 #ifndef _BLAS_MAGMA_H
 #define _BLAS_MAGMA_H
 
+#ifdef MAGMA_LIB
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <string>
@@ -62,5 +63,6 @@
      @param prec Matrix precision
   */
   void magma_Xheev(void *Mat, const int n, const int ldm, void *evalues, const int prec);
-
 #endif // _BLAS_MAGMA_H
+#endif // MAGMA LIB
+

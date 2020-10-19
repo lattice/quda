@@ -3,6 +3,7 @@
 #include <invert_quda.h>
 #include <vector>
 #include <complex_quda.h>
+#include "malloc_quda.h"
 
 namespace quda {
 
@@ -52,23 +53,26 @@ namespace quda {
              cur_dim(cur_dim), use_inv_ritz(false), location(param.location) {
 
         if(param.nk == 0 || param.np == 0 || (param.np % param.nk != 0)) errorQuda("\nIncorrect deflation space parameters...\n");
-        // redesign: param.nk => param.n_ev, param.np => param.deflation_grid*param.n_ev;
-        tot_dim      = param.np;
-        ld           = ((tot_dim+15) / 16) * tot_dim;
-        //allocate deflation resources:
-        matProj      = new Complex[ld*tot_dim];
-        invRitzVals  = new double[tot_dim];
 
         //Check that RV is a composite field:
         if(RV->IsComposite() == false) errorQuda("\nRitz vectors must be contained in a composite field.\n");
 
-        cudaHostRegister(matProj,ld*tot_dim*sizeof(Complex),cudaHostRegisterDefault);
+	// redesign: param.nk => param.n_ev, param.np => param.deflation_grid*param.n_ev;
+        tot_dim      = param.np;
+        ld           = ((tot_dim+15) / 16) * tot_dim;
+        //allocate deflation resources:
+        
+        invRitzVals  = new double[tot_dim];
+
+	//matProj      = new Complex[ld*tot_dim];
+        // hostRegister(matProj,ld*tot_dim*sizeof(Complex),cudaHostRegisterDefault);
+	matProj = (Complex*)pinned_malloc(ld*tot_dim*sizeof(Complex));
+	  
      }
 
      ~DeflationParam(){
-        cudaHostUnregister(matProj);
-        if(matProj) delete[]  matProj;
-        if(invRitzVals)       delete[]  invRitzVals;
+       if(matProj) host_free(matProj);
+       if(invRitzVals)       delete[]  invRitzVals;
      }
   };
 
