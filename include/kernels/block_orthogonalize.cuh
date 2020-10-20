@@ -104,7 +104,6 @@ namespace quda {
   template <typename sumFloat, typename Float, int nSpin, int spinBlockSize, int nColor, int coarseSpin, int nVec, typename Arg>
   void blockOrthoCPU(Arg &arg)
   {
-    //FIXME: may be broken for staggered...
     // loop over geometric blocks
 #pragma omp parallel for
     for (int x_coarse=0; x_coarse<arg.coarseVolume; x_coarse++) {

@@ -765,8 +765,7 @@ void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
 
   /* ESW HACK: comment this out to do a non-MG solve. */
   inv_param.inv_type_precondition = QUDA_MG_INVERTER;
-  // inv_param.verbosity_precondition = mg_verbosity[0];
-  inv_param.verbosity_precondition = QUDA_SUMMARIZE; // ESW HACK
+  inv_param.verbosity_precondition = mg_verbosity[0];
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
   inv_param.cuda_prec_eigensolver = cuda_prec_eigensolver;
 
@@ -959,7 +958,7 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
     mg_param.setup_ca_lambda_max[i] = setup_ca_lambda_max[i];
 
     mg_param.spin_block_size[i] = 1;
-    mg_param.n_vec[i] = nvec[i] == 0 ? 96 : nvec[i];                 // default to 96 vectors if not set
+    mg_param.n_vec[i] = nvec[i] == 0 ? 64 : nvec[i];                 // default to 64 vectors if not set
     mg_param.n_block_ortho[i] = n_block_ortho[i];                    // number of times to Gram-Schmidt
     mg_param.precision_null[i] = prec_null;                          // precision to store the null-space basis
     mg_param.smoother_halo_precision[i] = smoother_halo_prec;        // precision of the halo exchange in the smoother
