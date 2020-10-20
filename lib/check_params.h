@@ -153,6 +153,7 @@ void printQudaEigParam(QudaEigParam *param) {
 #endif
 
 #if defined INIT_PARAM
+  P(use_eigen_qr, QUDA_BOOLEAN_FALSE);
   P(use_poly_acc, QUDA_BOOLEAN_FALSE);
   P(poly_deg, 0);
   P(a_min, 0.0);
@@ -171,6 +172,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(n_ev_deflate, -1);
   P(batched_rotate, 0);
   P(tol, 0.0);
+  P(qr_tol, 0.0);
   P(check_interval, 0);
   P(max_restarts, 0);
   P(arpack_check, QUDA_BOOLEAN_FALSE);
@@ -180,6 +182,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(extlib_type, QUDA_EIGEN_EXTLIB);
   P(mem_type_ritz, QUDA_MEMORY_DEVICE);
 #else
+  P(use_eigen_qr, QUDA_BOOLEAN_INVALID);
   P(use_poly_acc, QUDA_BOOLEAN_INVALID);
   P(poly_deg, INVALID_INT);
   P(a_min, INVALID_DOUBLE);
@@ -196,6 +199,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(n_ev_deflate, INVALID_INT);
   P(batched_rotate, INVALID_INT);
   P(tol, INVALID_DOUBLE);
+  P(qr_tol, INVALID_DOUBLE);
   P(check_interval, INVALID_INT);
   P(max_restarts, INVALID_INT);
   P(arpack_check, QUDA_BOOLEAN_INVALID);
@@ -915,21 +919,21 @@ void printQudaGaugeObservableParam(QudaGaugeObservableParam *param)
 }
 
 #if defined INIT_PARAM
-QudaCublasParam newQudaCublasParam(void)
+QudaBLASParam newQudaBLASParam(void)
 {
-  QudaCublasParam ret;
+  QudaBLASParam ret;
 #elif defined CHECK_PARAM
-static void checkCublasParam(QudaCublasParam *param)
+static void checkBLASParam(QudaBLASParam *param)
 {
 #else
-void printQudaCublasParam(QudaCublasParam *param)
+void printQudaBLASParam(QudaBLASParam *param)
 {
-  printfQuda("QUDA cublas parameters:\n");
+  printfQuda("QUDA blas parameters:\n");
 #endif
 
 #ifdef INIT_PARAM
-  P(trans_a, QUDA_CUBLAS_OP_N);
-  P(trans_b, QUDA_CUBLAS_OP_N);
+  P(trans_a, QUDA_BLAS_OP_N);
+  P(trans_b, QUDA_BLAS_OP_N);
   P(m, 0);
   P(n, 0);
   P(k, 0);
@@ -943,11 +947,11 @@ void printQudaCublasParam(QudaCublasParam *param)
   P(strideB, -1);
   P(strideC, -1);
   P(batch_count, 1);
-  P(data_type, QUDA_CUBLAS_DATATYPE_S);
-  P(data_order, QUDA_CUBLAS_DATAORDER_ROW);
+  P(data_type, QUDA_BLAS_DATATYPE_S);
+  P(data_order, QUDA_BLAS_DATAORDER_ROW);
 #else
-  P(trans_a, QUDA_CUBLAS_OP_INVALID);
-  P(trans_b, QUDA_CUBLAS_OP_INVALID);
+  P(trans_a, QUDA_BLAS_OP_INVALID);
+  P(trans_b, QUDA_BLAS_OP_INVALID);
   P(m, INVALID_INT);
   P(n, INVALID_INT);
   P(k, INVALID_INT);
@@ -961,8 +965,8 @@ void printQudaCublasParam(QudaCublasParam *param)
   P(strideB, INVALID_INT);
   P(strideC, INVALID_INT);
   P(batch_count, INVALID_INT);
-  P(data_type, QUDA_CUBLAS_DATATYPE_INVALID);
-  P(data_order, QUDA_CUBLAS_DATAORDER_INVALID);
+  P(data_type, QUDA_BLAS_DATATYPE_INVALID);
+  P(data_order, QUDA_BLAS_DATAORDER_INVALID);
 #endif
 
 #ifdef INIT_PARAM

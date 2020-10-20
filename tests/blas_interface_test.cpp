@@ -9,7 +9,7 @@
 #include <util_quda.h>
 #include <host_utils.h>
 #include <command_line_params.h>
-#include "cublas_reference.h"
+#include "blas_reference.h"
 #include "misc.h"
 
 // google test
@@ -30,7 +30,7 @@ void display_test_info()
   printfQuda("prec    sloppy_prec\n");
   printfQuda("%s   %s\n", get_prec_str(prec), get_prec_str(prec_sloppy));
 
-  printfQuda("cuBLAS interface test\n");
+  printfQuda("BLAS interface test\n");
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
@@ -63,61 +63,61 @@ int main(int argc, char **argv)
   initQuda(device_ordinal);
   //-----------------------------------------------------------------------------
 
-  QudaCublasParam cublas_param = newQudaCublasParam();
-  cublas_param.trans_a = cublas_trans_a;
-  cublas_param.trans_b = cublas_trans_b;
-  cublas_param.m = cublas_mnk[0];
-  cublas_param.n = cublas_mnk[1];
-  cublas_param.k = cublas_mnk[2];
-  cublas_param.lda = cublas_leading_dims[0];
-  cublas_param.ldb = cublas_leading_dims[1];
-  cublas_param.ldc = cublas_leading_dims[2];
-  cublas_param.a_offset = cublas_offsets[0];
-  cublas_param.b_offset = cublas_offsets[1];
-  cublas_param.c_offset = cublas_offsets[2];
-  cublas_param.strideA = cublas_strides[0];
-  cublas_param.strideB = cublas_strides[1];
-  cublas_param.strideC = cublas_strides[2];
-  cublas_param.alpha = (__complex__ double)cublas_alpha_re_im[0];
-  cublas_param.beta = (__complex__ double)cublas_beta_re_im[0];
-  cublas_param.data_order = cublas_data_order;
-  cublas_param.data_type = cublas_data_type;
-  cublas_param.batch_count = cublas_batch;
+  QudaBLASParam blas_param = newQudaBLASParam();
+  blas_param.trans_a = blas_trans_a;
+  blas_param.trans_b = blas_trans_b;
+  blas_param.m = blas_mnk[0];
+  blas_param.n = blas_mnk[1];
+  blas_param.k = blas_mnk[2];
+  blas_param.lda = blas_leading_dims[0];
+  blas_param.ldb = blas_leading_dims[1];
+  blas_param.ldc = blas_leading_dims[2];
+  blas_param.a_offset = blas_offsets[0];
+  blas_param.b_offset = blas_offsets[1];
+  blas_param.c_offset = blas_offsets[2];
+  blas_param.strideA = blas_strides[0];
+  blas_param.strideB = blas_strides[1];
+  blas_param.strideC = blas_strides[2];
+  blas_param.alpha = (__complex__ double)blas_alpha_re_im[0];
+  blas_param.beta = (__complex__ double)blas_beta_re_im[0];
+  blas_param.data_order = blas_data_order;
+  blas_param.data_type = blas_data_type;
+  blas_param.batch_count = blas_batch;
 
   // Reference data is always in complex double
   size_t data_size = sizeof(double);
   int re_im = 2;
-  int batches = cublas_param.batch_count;
+  int batches = blas_param.batch_count;
   uint64_t refA_size = 0, refB_size = 0, refC_size = 0;
-  if (cublas_param.data_order == QUDA_CUBLAS_DATAORDER_COL) {
+  if (blas_param.data_order == QUDA_BLAS_DATAORDER_COL) {
     // leading dimension is in terms of consecutive data
     // elements in a column, multiplied by number of rows
-    if (cublas_param.trans_a == QUDA_CUBLAS_OP_N) {
-      refA_size = cublas_param.lda * cublas_param.k; // A_mk
+    if (blas_param.trans_a == QUDA_BLAS_OP_N) {
+      refA_size = blas_param.lda * blas_param.k; // A_mk
     } else {
-      refA_size = cublas_param.lda * cublas_param.m; // A_km
+      refA_size = blas_param.lda * blas_param.m; // A_km
     }
 
-    if (cublas_param.trans_b == QUDA_CUBLAS_OP_N) {
-      refB_size = cublas_param.ldb * cublas_param.n; // B_kn
+    if (blas_param.trans_b == QUDA_BLAS_OP_N) {
+      refB_size = blas_param.ldb * blas_param.n; // B_kn
     } else {
-      refB_size = cublas_param.ldb * cublas_param.k; // B_nk
+      refB_size = blas_param.ldb * blas_param.k; // B_nk
     }
-    refC_size = cublas_param.ldc * cublas_param.n; // C_mn
+    refC_size = blas_param.ldc * blas_param.n; // C_mn
   } else {
     // leading dimension is in terms of consecutive data
     // elements in a row, multiplied by number of columns.
-    if (cublas_param.trans_a == QUDA_CUBLAS_OP_N) {
-      refA_size = cublas_param.lda * cublas_param.m; // A_mk
+    if (blas_param.trans_a == QUDA_BLAS_OP_N) {
+      refA_size = blas_param.lda * blas_param.m; // A_mk
     } else {
-      refA_size = cublas_param.lda * cublas_param.k; // A_km
+      refA_size = blas_param.lda * blas_param.k; // A_km
     }
-    if (cublas_param.trans_b == QUDA_CUBLAS_OP_N) {
-      refB_size = cublas_param.ldb * cublas_param.k; // B_nk
+    if (blas_param.trans_b == QUDA_BLAS_OP_N) {
+      refB_size = blas_param.ldb * blas_param.k; // B_nk
     } else {
-      refB_size = cublas_param.ldb * cublas_param.n; // B_kn
+      refB_size = blas_param.ldb * blas_param.n; // B_kn
     }
-    refC_size = cublas_param.ldc * cublas_param.m; // C_mn
+    refC_size = blas_param.ldc * blas_param.m; // C_mn
   }
 
   void *refA = pinned_malloc(batches * refA_size * re_im * data_size);
@@ -139,7 +139,7 @@ int main(int argc, char **argv)
   }
 
   // Populate the imaginary part with rands if needed
-  if (cublas_param.data_type == QUDA_CUBLAS_DATATYPE_C || cublas_param.data_type == QUDA_CUBLAS_DATATYPE_Z) {
+  if (blas_param.data_type == QUDA_BLAS_DATATYPE_C || blas_param.data_type == QUDA_BLAS_DATATYPE_Z) {
     for (uint64_t i = 1; i < 2 * refA_size * batches; i += 2) { ((double *)refA)[i] = rand() / (double)RAND_MAX; }
     for (uint64_t i = 1; i < 2 * refB_size * batches; i += 2) { ((double *)refB)[i] = rand() / (double)RAND_MAX; }
     for (uint64_t i = 1; i < 2 * refC_size * batches; i += 2) {
@@ -154,8 +154,8 @@ int main(int argc, char **argv)
   void *arrayC = nullptr;
   void *arrayCcopy = nullptr;
 
-  switch (cublas_param.data_type) {
-  case QUDA_CUBLAS_DATATYPE_S:
+  switch (blas_param.data_type) {
+  case QUDA_BLAS_DATATYPE_S:
     arrayA = pinned_malloc(batches * refA_size * sizeof(float));
     arrayB = pinned_malloc(batches * refB_size * sizeof(float));
     arrayC = pinned_malloc(batches * refC_size * sizeof(float));
@@ -168,7 +168,7 @@ int main(int argc, char **argv)
       ((float *)arrayCcopy)[i / 2] = ((double *)refC)[i];
     }
     break;
-  case QUDA_CUBLAS_DATATYPE_D:
+  case QUDA_BLAS_DATATYPE_D:
     arrayA = pinned_malloc(batches * refA_size * sizeof(double));
     arrayB = pinned_malloc(batches * refB_size * sizeof(double));
     arrayC = pinned_malloc(batches * refC_size * sizeof(double));
@@ -181,7 +181,7 @@ int main(int argc, char **argv)
       ((double *)arrayCcopy)[i / 2] = ((double *)refC)[i];
     }
     break;
-  case QUDA_CUBLAS_DATATYPE_C:
+  case QUDA_BLAS_DATATYPE_C:
     arrayA = pinned_malloc(batches * refA_size * 2 * sizeof(float));
     arrayB = pinned_malloc(batches * refB_size * 2 * sizeof(float));
     arrayC = pinned_malloc(batches * refC_size * 2 * sizeof(float));
@@ -194,7 +194,7 @@ int main(int argc, char **argv)
       ((float *)arrayCcopy)[i] = ((double *)refC)[i];
     }
     break;
-  case QUDA_CUBLAS_DATATYPE_Z:
+  case QUDA_BLAS_DATATYPE_Z:
     arrayA = pinned_malloc(batches * refA_size * 2 * sizeof(double));
     arrayB = pinned_malloc(batches * refB_size * 2 * sizeof(double));
     arrayC = pinned_malloc(batches * refC_size * 2 * sizeof(double));
@@ -207,15 +207,15 @@ int main(int argc, char **argv)
       ((double *)arrayCcopy)[i] = ((double *)refC)[i];
     }
     break;
-  default: errorQuda("Unrecognised data type %d\n", cublas_param.data_type);
+  default: errorQuda("Unrecognised data type %d\n", blas_param.data_type);
   }
 
   // Perform GPU GEMM Blas operation
-  cublasGEMMQuda(arrayA, arrayB, arrayC, &cublas_param);
+  blasGEMMQuda(arrayA, arrayB, arrayC, &blas_param);
 
   if (verify_results) {
-    cublasGEMMQudaVerify(arrayA, arrayB, arrayC, arrayCcopy, refA_size, refB_size, refC_size, re_im, data_size,
-                         &cublas_param);
+    blasGEMMQudaVerify(arrayA, arrayB, arrayC, arrayCcopy, refA_size, refB_size, refC_size, re_im, data_size,
+		       &blas_param);
   }
 
   host_free(refA);

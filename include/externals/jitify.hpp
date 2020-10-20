@@ -883,7 +883,7 @@ struct type_reflection<NonType<T, VALUE> > {
 template <typename T>
 struct Instance {
   const T& value;
-  Instance(const T &value_arg) : value(value_arg) {}
+  Instance(const T &value_arg) : value(value_arg) { }
 };
 
 /*! Create an Instance object from which we can extract the value's run-time
@@ -3041,7 +3041,7 @@ class KernelLauncher {
    *
    *  \see launch
    */
-  template <typename... ArgTypes> inline CUresult operator()(const ArgTypes &... args) const
+  template <typename... ArgTypes> inline CUresult operator()(const ArgTypes &...args) const
   {
     return this->launch(args...);
   }
@@ -3049,7 +3049,7 @@ class KernelLauncher {
    *
    *  \param args Function arguments for the kernel.
    */
-  template <typename... ArgTypes> inline CUresult launch(const ArgTypes &... args) const
+  template <typename... ArgTypes> inline CUresult launch(const ArgTypes &...args) const
   {
     return this->launch(std::vector<void*>({(void*)&args...}),
                         {reflection::reflect<ArgTypes>()...});
@@ -3058,7 +3058,7 @@ class KernelLauncher {
    *
    *  \param args Function arguments for the kernel.
    */
-  template <typename... ArgTypes> inline void safe_launch(const ArgTypes &... args) const
+  template <typename... ArgTypes> inline void safe_launch(const ArgTypes &...args) const
   {
     this->safe_launch(std::vector<void *>({(void *)&args...}), {reflection::reflect<ArgTypes>()...});
   }
@@ -4296,7 +4296,7 @@ public:
    *
    *  \param args Function arguments for the kernel.
    */
-  template <typename... ArgTypes> CUresult launch(const ArgTypes &... args) const
+  template <typename... ArgTypes> CUresult launch(const ArgTypes &...args) const
   {
     return this->launch(std::vector<void*>({(void*)&args...}),
                         {reflection::reflect<ArgTypes>()...});
@@ -4306,7 +4306,7 @@ public:
    *
    *  \param args Function arguments for the kernel.
    */
-  template <typename... ArgTypes> void safe_launch(const ArgTypes &... args) const
+  template <typename... ArgTypes> void safe_launch(const ArgTypes &...args) const
   {
     return this->safe_launch(std::vector<void *>({(void *)&args...}), {reflection::reflect<ArgTypes>()...});
   }

@@ -418,7 +418,7 @@ void comm_set_neighbor_ranks(Topology *topo)
 
   Topology *topology = topo ? topo : default_topo; // use default topology if topo is NULL
   if (!topology) errorQuda("Topology not specified");
-     
+
   for(int d=0; d<4; ++d){
     int pos_displacement[QUDA_MAX_DIM] = { };
     int neg_displacement[QUDA_MAX_DIM] = { };

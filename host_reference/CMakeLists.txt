@@ -3,7 +3,7 @@ add_library(
   quda_reference STATIC
   clover_reference.cpp
   covdev_reference.cpp
-  cublas_reference.cpp
+  blas_reference.cpp
   domain_wall_dslash_reference.cpp
   dslash_reference.cpp
   dslash_test_helpers.cpp

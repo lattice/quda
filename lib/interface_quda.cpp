@@ -215,8 +215,8 @@ static TimeProfile profilePhase("staggeredPhaseQuda");
 //!< Profiler for contractions
 static TimeProfile profileContract("contractQuda");
 
-//!< Profiler for contractions
-static TimeProfile profileCuBLAS("cublasQuda");
+//!< Profiler for GEMM and other BLAS 
+static TimeProfile profileBLAS("blasQuda");
 
 //!< Profiler for covariant derivative
 static TimeProfile profileCovDev("covDevQuda");
@@ -1208,7 +1208,7 @@ void freeSloppyGaugeQuda()
 
   // Delete gaugeSloppy if it does not alias gaugePrecise.
   if (gaugeSloppy != gaugePrecise && gaugeSloppy) delete gaugeSloppy;
-  
+
   gaugeEigensolver = nullptr;
   gaugeRefinement = nullptr;
   gaugePrecondition = nullptr;
@@ -1596,7 +1596,7 @@ void endQuda(void)
     profileStaggeredForce.Print();
     profileHISQForce.Print();
     profileContract.Print();
-    profileCuBLAS.Print();
+    profileBLAS.Print();
     profileCovDev.Print();
     profilePlaq.Print();
     profileGaugeObs.Print();
@@ -2467,7 +2467,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   cudaParam.create = QUDA_ZERO_FIELD_CREATE;
   cudaParam.setPrecision(inv_param->cuda_prec_eigensolver, inv_param->cuda_prec_eigensolver, true);
   // Ensure device vectors qre in UKQCD basis for Wilson type fermions
-  if(cudaParam.nSpin != 1) cudaParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+  if (cudaParam.nSpin != 1) cudaParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 
   std::vector<Complex> evals(eig_param->n_conv, 0.0);
   std::vector<ColorSpinorField *> kSpace;
@@ -2476,10 +2476,19 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   // If you use polynomial acceleration on a non-symmetric matrix,
   // the solver will fail.
   if (eig_param->use_poly_acc && !eig_param->use_norm_op && !(inv_param->dslash_type == QUDA_LAPLACE_DSLASH)) {
-    // Breaking up the boolean check a little bit. If it's a staggered dslash type and a PC type, we can use poly accel.
+    // Breaking up the boolean check a little bit. If it's a staggered dslash type and a PC type, we can use poly acceleration.
     if (!((inv_param->dslash_type == QUDA_STAGGERED_DSLASH || inv_param->dslash_type == QUDA_ASQTAD_DSLASH) && inv_param->solve_type == QUDA_DIRECT_PC_SOLVE)) {
       errorQuda("Polynomial acceleration with non-symmetric matrices not supported");
     }
+  }
+
+  // If you attempt to compute part of the the imaginary spectrum of a symmetric matrix,
+  // the solver will fail.
+  if ((eig_param->spectrum == QUDA_SPECTRUM_LI_EIG || eig_param->spectrum == QUDA_SPECTRUM_SI_EIG)
+      && ((eig_param->use_norm_op || (inv_param->dslash_type == QUDA_LAPLACE_DSLASH))
+          || ((inv_param->dslash_type == QUDA_STAGGERED_DSLASH || inv_param->dslash_type == QUDA_ASQTAD_DSLASH)
+              && inv_param->solve_type == QUDA_DIRECT_PC_SOLVE))) {
+    errorQuda("Cannot compute imaginary spectra with a hermitian operator");
   }
 
   profileEigensolve.TPSTOP(QUDA_PROFILE_INIT);
@@ -5109,6 +5118,7 @@ void updateGaugeFieldQuda(void* gauge,
    if (param->use_resident_gauge) {
      if (!gaugePrecise) errorQuda("No resident gauge field to use");
      cudaGauge = gaugePrecise;
+     gaugePrecise = nullptr;
    } else {
      profileProject.TPSTART(QUDA_PROFILE_H2D);
      cudaGauge->loadCPUField(*cpuGauge);
@@ -6017,11 +6027,11 @@ void gaugeObservablesQuda(QudaGaugeObservableParam *param)
   profileGaugeObs.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *cublas_param)
+void blasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaBLASParam *blas_param)
 {
-  profileCuBLAS.TPSTART(QUDA_PROFILE_TOTAL);
-  profileCuBLAS.TPSTART(QUDA_PROFILE_INIT);
-  checkCublasParam(cublas_param);
+  profileBLAS.TPSTART(QUDA_PROFILE_TOTAL);
+  profileBLAS.TPSTART(QUDA_PROFILE_INIT);
+  checkBLASParam(blas_param);
 
   // The data in the arrays is on the host. We transfer the data to the device here
   // for timing purposes. One can pass host pointers to the BatchGEMM function
@@ -6029,57 +6039,57 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
 
   // Extract data from the param struct for device malloc
   uint64_t arrayA_size = 0, arrayB_size = 0, arrayC_size = 0;
-  if (cublas_param->data_order == QUDA_CUBLAS_DATAORDER_COL) {
+  if (blas_param->data_order == QUDA_BLAS_DATAORDER_COL) {
     // leading dimension is in terms of consecutive data
     // elements in a column, multiplied by number of rows
-    if (cublas_param->trans_a == QUDA_CUBLAS_OP_N) {
-      arrayA_size = cublas_param->lda * cublas_param->k; // A_mk
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%d, %d}\n", cublas_param->lda, cublas_param->k);
+    if (blas_param->trans_a == QUDA_BLAS_OP_N) {
+      arrayA_size = blas_param->lda * blas_param->k; // A_mk
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%d, %d}\n", blas_param->lda, blas_param->k);
     } else {
-      arrayA_size = cublas_param->lda * cublas_param->m; // A_km
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%d, %d}\n", cublas_param->lda, cublas_param->m);
+      arrayA_size = blas_param->lda * blas_param->m; // A_km
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%d, %d}\n", blas_param->lda, blas_param->m);
     }
 
-    if (cublas_param->trans_b == QUDA_CUBLAS_OP_N) {
-      arrayB_size = cublas_param->ldb * cublas_param->n; // B_kn
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%d, %d}\n", cublas_param->ldb, cublas_param->n);
+    if (blas_param->trans_b == QUDA_BLAS_OP_N) {
+      arrayB_size = blas_param->ldb * blas_param->n; // B_kn
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%d, %d}\n", blas_param->ldb, blas_param->n);
     } else {
-      arrayB_size = cublas_param->ldb * cublas_param->k; // B_nk
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%d, %d}\n", cublas_param->ldb, cublas_param->k);
+      arrayB_size = blas_param->ldb * blas_param->k; // B_nk
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%d, %d}\n", blas_param->ldb, blas_param->k);
     }
-    arrayC_size = cublas_param->ldc * cublas_param->n; // C_mn
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array C_{%d, %d}\n", cublas_param->ldc, cublas_param->n);
+    arrayC_size = blas_param->ldc * blas_param->n; // C_mn
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array C_{%d, %d}\n", blas_param->ldc, blas_param->n);
   } else {
     // leading dimension is in terms of consecutive data
     // elements in a row, multiplied by number of columns.
-    if (cublas_param->trans_a == QUDA_CUBLAS_OP_N) {
-      arrayA_size = cublas_param->lda * cublas_param->m; // A_mk
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%d, %d}\n", cublas_param->m, cublas_param->lda);
+    if (blas_param->trans_a == QUDA_BLAS_OP_N) {
+      arrayA_size = blas_param->lda * blas_param->m; // A_mk
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%d, %d}\n", blas_param->m, blas_param->lda);
     } else {
-      arrayA_size = cublas_param->lda * cublas_param->k; // A_km
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%d, %d}\n", cublas_param->k, cublas_param->lda);
+      arrayA_size = blas_param->lda * blas_param->k; // A_km
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array A_{%d, %d}\n", blas_param->k, blas_param->lda);
     }
-    if (cublas_param->trans_b == QUDA_CUBLAS_OP_N) {
-      arrayB_size = cublas_param->ldb * cublas_param->k; // B_nk
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%d, %d}\n", cublas_param->k, cublas_param->ldb);
+    if (blas_param->trans_b == QUDA_BLAS_OP_N) {
+      arrayB_size = blas_param->ldb * blas_param->k; // B_nk
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%d, %d}\n", blas_param->k, blas_param->ldb);
     } else {
-      arrayB_size = cublas_param->ldb * cublas_param->n; // B_kn
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%d, %d}\n", cublas_param->n, cublas_param->ldb);
+      arrayB_size = blas_param->ldb * blas_param->n; // B_kn
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array B_{%d, %d}\n", blas_param->n, blas_param->ldb);
     }
-    arrayC_size = cublas_param->ldc * cublas_param->m; // C_mn
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array C_{%d, %d}\n", cublas_param->m, cublas_param->ldc);
+    arrayC_size = blas_param->ldc * blas_param->m; // C_mn
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array C_{%d, %d}\n", blas_param->m, blas_param->ldc);
   }
 
   size_t data_size
-    = (cublas_param->data_type == QUDA_CUBLAS_DATATYPE_D || cublas_param->data_type == QUDA_CUBLAS_DATATYPE_Z) ?
+    = (blas_param->data_type == QUDA_BLAS_DATATYPE_D || blas_param->data_type == QUDA_BLAS_DATATYPE_Z) ?
     sizeof(double) :
     sizeof(float);
   int re_im = 1;
-  if (cublas_param->data_type == QUDA_CUBLAS_DATATYPE_C || cublas_param->data_type == QUDA_CUBLAS_DATATYPE_Z) {
+  if (blas_param->data_type == QUDA_BLAS_DATATYPE_C || blas_param->data_type == QUDA_BLAS_DATATYPE_Z) {
     re_im *= 2;
   }
 
-  int batches = cublas_param->batch_count;
+  int batches = blas_param->batch_count;
   size_t A_bytes = batches * arrayA_size * re_im * data_size;
   size_t B_bytes = batches * arrayB_size * re_im * data_size;
   size_t C_bytes = batches * arrayC_size * re_im * data_size;
@@ -6090,18 +6100,18 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
   void *B_d = pool_device_malloc(B_bytes);
   void *C_d = pool_device_malloc(C_bytes);
   if (getVerbosity() >= QUDA_VERBOSE) printfQuda("QUDA: arrays allocated sucessfully.\n");
-  profileCuBLAS.TPSTOP(QUDA_PROFILE_INIT);
+  profileBLAS.TPSTOP(QUDA_PROFILE_INIT);
 
   // Transfer host data to device
-  profileCuBLAS.TPSTART(QUDA_PROFILE_H2D);
+  profileBLAS.TPSTART(QUDA_PROFILE_H2D);
   qudaMemcpy(A_d, arrayA, A_bytes, cudaMemcpyHostToDevice);
   qudaMemcpy(B_d, arrayB, B_bytes, cudaMemcpyHostToDevice);
   qudaMemcpy(C_d, arrayC, C_bytes, cudaMemcpyHostToDevice);
   if (getVerbosity() >= QUDA_VERBOSE) printfQuda("QUDA: arrays copied susessfully.\n");
-  profileCuBLAS.TPSTOP(QUDA_PROFILE_H2D);
+  profileBLAS.TPSTOP(QUDA_PROFILE_H2D);
 
   // Compute Batched GEMM
-  profileCuBLAS.TPSTART(QUDA_PROFILE_COMPUTE);
+  profileBLAS.TPSTART(QUDA_PROFILE_COMPUTE);
 
   // cuBLAS works exclusively in column major order. If the input data is in
   // row major order, we may treat the A and B and C arrays as A^T, B^T, and C^T.
@@ -6134,23 +6144,23 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
   // BatchGEMM function, and before function exit all pointers and values are
   // restored to the values they had on entry.
 
-  blas_lapack::native::stridedBatchGEMM(A_d, B_d, C_d, *cublas_param, QUDA_CUDA_FIELD_LOCATION);
+  blas_lapack::native::stridedBatchGEMM(A_d, B_d, C_d, *blas_param, QUDA_CUDA_FIELD_LOCATION);
 
   if (getVerbosity() >= QUDA_VERBOSE) printfQuda("BatchGEMM success!\n");
-  profileCuBLAS.TPSTOP(QUDA_PROFILE_COMPUTE);
+  profileBLAS.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   // Copy device C array back to host
-  profileCuBLAS.TPSTART(QUDA_PROFILE_D2H);
+  profileBLAS.TPSTART(QUDA_PROFILE_D2H);
   qudaMemcpy(arrayC, C_d, C_bytes, cudaMemcpyDeviceToHost);
-  profileCuBLAS.TPSTOP(QUDA_PROFILE_D2H);
+  profileBLAS.TPSTOP(QUDA_PROFILE_D2H);
 
   // Clean up
-  profileCuBLAS.TPSTART(QUDA_PROFILE_FREE);
+  profileBLAS.TPSTART(QUDA_PROFILE_FREE);
   pool_device_free(A_d);
   pool_device_free(B_d);
   pool_device_free(C_d);
-  profileCuBLAS.TPSTOP(QUDA_PROFILE_FREE);
+  profileBLAS.TPSTOP(QUDA_PROFILE_FREE);
 
-  profileCuBLAS.TPSTOP(QUDA_PROFILE_TOTAL);
+  profileBLAS.TPSTOP(QUDA_PROFILE_TOTAL);
   saveTuneCache();
 }

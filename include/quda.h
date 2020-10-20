@@ -438,6 +438,9 @@ extern "C" {
     QudaBoolean use_dagger;
     QudaBoolean use_norm_op;
 
+    /** Use Eigen routines to eigensolve the upper Hessenberg via QR **/
+    QudaBoolean use_eigen_qr;
+
     /** Performs an MdagM solve, then constructs the left and right SVD. **/
     QudaBoolean compute_svd;
 
@@ -459,6 +462,8 @@ extern "C" {
     int n_ev_deflate;
     /** Tolerance on the least well known eigenvalue's residual **/
     double tol;
+    /** Tolerance on the QR iteration **/
+    double qr_tol;
     /** For IRLM/IRAM, check every nth restart **/
     int check_interval;
     /** For IRLM/IRAM, quit after n restarts **/
@@ -723,10 +728,10 @@ extern "C" {
     void *qcharge_density; /**< Pointer to host array of length volume where the q-charge density will be copied */
   } QudaGaugeObservableParam;
 
-  typedef struct QudaCublasParam_s {
+  typedef struct QudaBLASParam_s {
 
-    QudaCublasOperation trans_a; /**< operation op(A) that is non- or (conj.) transpose. */
-    QudaCublasOperation trans_b; /**< operation op(B) that is non- or (conj.) transpose. */
+    QudaBLASOperation trans_a; /**< operation op(A) that is non- or (conj.) transpose. */
+    QudaBLASOperation trans_b; /**< operation op(B) that is non- or (conj.) transpose. */
     int m;                       /**< number of rows of matrix op(A) and C. */
     int n;                       /**< number of columns of matrix op(B) and C. */
     int k;                       /**< number of columns of op(A) and rows of op(B). */
@@ -745,10 +750,10 @@ extern "C" {
     
     int batch_count; /**< number of pointers contained in arrayA, arrayB and arrayC. */
     
-    QudaCublasDataType data_type;   /**< Specifies if using S(C) or D(Z) BLAS type */
-    QudaCublasDataOrder data_order; /**< Specifies if using Row or Column major */
+    QudaBLASDataType data_type;   /**< Specifies if using S(C) or D(Z) BLAS type */
+    QudaBLASDataOrder data_order; /**< Specifies if using Row or Column major */
 
-  } QudaCublasParam;
+  } QudaBLASParam;
 
   /*
    * Interface functions, found in interface_quda.cpp
@@ -918,13 +923,13 @@ extern "C" {
   QudaGaugeObservableParam newQudaGaugeObservableParam(void);
 
   /**
-   * A new QudaCublasParam should always be initialized immediately
+   * A new QudaBLASParam should always be initialized immediately
    * after it's defined (and prior to explicitly setting its members)
    * using this function.  Typical usage is as follows:
    *
-   *   QudaCublasParam cublas_param = newQudaCublasParam();
+   *   QudaBLASParam blas_param = newQudaBLASParam();
    */
-  QudaCublasParam newQudaCublasParam(void);
+  QudaBLASParam newQudaBLASParam(void);
 
   /**
    * Print the device properties of each device on the node
@@ -962,10 +967,10 @@ extern "C" {
   void printQudaGaugeObservableParam(QudaGaugeObservableParam *param);
 
   /**
-   * Print the members of QudaCublasParam.
-   * @param param The QudaCublasParam whose elements we are to print.
+   * Print the members of QudaBLASParam.
+   * @param param The QudaBLASParam whose elements we are to print.
    */
-  void printQudaCublasParam(QudaCublasParam *param);
+  void printQudaBLASParam(QudaBLASParam *param);
 
   /**
    * Load the gauge field from the host.
@@ -1440,8 +1445,8 @@ extern "C" {
                                 const double tolerance, const unsigned int stopWtheta, QudaGaugeParam *param,
                                 double *timeinfo);
 
-  void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *param);
-
+  void blasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaBLASParam *param);
+  
   /**
    * @brief Flush the chronological history for the given index
    * @param[in] index Index for which we are flushing

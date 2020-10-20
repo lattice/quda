@@ -170,6 +170,8 @@ bool eig_require_convergence = true;
 int eig_check_interval = 10;
 int eig_max_restarts = 1000;
 double eig_tol = 1e-6;
+double eig_qr_tol = 1e-11;
+bool eig_use_eigen_qr = true;
 bool eig_use_poly_acc = true;
 int eig_poly_deg = 100;
 double eig_amin = 0.1;
@@ -181,7 +183,6 @@ QudaEigSpectrumType eig_spectrum = QUDA_SPECTRUM_LR_EIG;
 QudaEigType eig_type = QUDA_EIG_TR_LANCZOS;
 bool eig_arpack_check = false;
 char eig_arpack_logfile[256] = "arpack_logfile.log";
-char eig_QUDA_logfile[256] = "QUDA_logfile.log";
 char eig_vec_infile[256] = "";
 char eig_vec_outfile[256] = "";
 bool eig_io_parity_inflate = false;
@@ -200,6 +201,8 @@ quda::mgarray<bool> mg_eig_require_convergence = {};
 quda::mgarray<int> mg_eig_check_interval = {};
 quda::mgarray<int> mg_eig_max_restarts = {};
 quda::mgarray<double> mg_eig_tol = {};
+quda::mgarray<double> mg_eig_qr_tol = {};
+quda::mgarray<bool> mg_eig_use_eigen_qr = {};
 quda::mgarray<bool> mg_eig_use_poly_acc = {};
 quda::mgarray<int> mg_eig_poly_deg = {};
 quda::mgarray<double> mg_eig_amin = {};
@@ -237,49 +240,49 @@ int measurement_interval = 5;
 
 QudaContractType contract_type = QUDA_CONTRACT_TYPE_OPEN;
 
-QudaCublasOperation cublas_trans_a = QUDA_CUBLAS_OP_N;
-QudaCublasOperation cublas_trans_b = QUDA_CUBLAS_OP_N;
-QudaCublasDataType cublas_data_type = QUDA_CUBLAS_DATATYPE_C;
-QudaCublasDataOrder cublas_data_order = QUDA_CUBLAS_DATAORDER_COL;
+QudaBLASOperation blas_trans_a = QUDA_BLAS_OP_N;
+QudaBLASOperation blas_trans_b = QUDA_BLAS_OP_N;
+QudaBLASDataType blas_data_type = QUDA_BLAS_DATATYPE_C;
+QudaBLASDataOrder blas_data_order = QUDA_BLAS_DATAORDER_COL;
 
-std::array<int, 3> cublas_mnk = {64, 64, 64};
-auto &cublas_m = cublas_mnk[0];
-auto &cublas_n = cublas_mnk[1];
-auto &cublas_k = cublas_mnk[2];
+std::array<int, 3> blas_mnk = {64, 64, 64};
+auto &blas_m = blas_mnk[0];
+auto &blas_n = blas_mnk[1];
+auto &blas_k = blas_mnk[2];
 
-std::array<int, 3> cublas_leading_dims = {128, 128, 128};
-auto &cublas_lda = cublas_leading_dims[0];
-auto &cublas_ldb = cublas_leading_dims[1];
-auto &cublas_ldc = cublas_leading_dims[2];
+std::array<int, 3> blas_leading_dims = {128, 128, 128};
+auto &blas_lda = blas_leading_dims[0];
+auto &blas_ldb = blas_leading_dims[1];
+auto &blas_ldc = blas_leading_dims[2];
 
-std::array<int, 3> cublas_offsets = {0, 0, 0};
-auto &cublas_a_offset = cublas_offsets[0];
-auto &cublas_b_offset = cublas_offsets[1];
-auto &cublas_c_offset = cublas_offsets[2];
+std::array<int, 3> blas_offsets = {0, 0, 0};
+auto &blas_a_offset = blas_offsets[0];
+auto &blas_b_offset = blas_offsets[1];
+auto &blas_c_offset = blas_offsets[2];
 
-std::array<int, 3> cublas_strides = {-1, -1, -1};
-auto &cublas_a_stride = cublas_strides[0];
-auto &cublas_b_stride = cublas_strides[1];
-auto &cublas_c_stride = cublas_strides[2];
+std::array<int, 3> blas_strides = {-1, -1, -1};
+auto &blas_a_stride = blas_strides[0];
+auto &blas_b_stride = blas_strides[1];
+auto &blas_c_stride = blas_strides[2];
 
-std::array<double, 2> cublas_alpha_re_im = {1.0, 0.0};
-std::array<double, 2> cublas_beta_re_im = {1.0, 0.0};
-int cublas_batch = 16;
+std::array<double, 2> blas_alpha_re_im = {1.0, 0.0};
+std::array<double, 2> blas_beta_re_im = {1.0, 0.0};
+int blas_batch = 16;
 
 namespace
 {
   CLI::TransformPairs<QudaCABasis> ca_basis_map {{"power", QUDA_POWER_BASIS}, {"chebyshev", QUDA_CHEBYSHEV_BASIS}};
 
-  CLI::TransformPairs<QudaCublasDataType> cublas_dt_map {{"C", QUDA_CUBLAS_DATATYPE_C},
-                                                         {"Z", QUDA_CUBLAS_DATATYPE_Z},
-                                                         {"S", QUDA_CUBLAS_DATATYPE_S},
-                                                         {"D", QUDA_CUBLAS_DATATYPE_D}};
+  CLI::TransformPairs<QudaBLASDataType> blas_dt_map {{"C", QUDA_BLAS_DATATYPE_C},
+                                                         {"Z", QUDA_BLAS_DATATYPE_Z},
+                                                         {"S", QUDA_BLAS_DATATYPE_S},
+                                                         {"D", QUDA_BLAS_DATATYPE_D}};
 
-  CLI::TransformPairs<QudaCublasDataOrder> cublas_data_order_map {{"row", QUDA_CUBLAS_DATAORDER_ROW},
-                                                                  {"col", QUDA_CUBLAS_DATAORDER_COL}};
+  CLI::TransformPairs<QudaBLASDataOrder> blas_data_order_map {{"row", QUDA_BLAS_DATAORDER_ROW},
+                                                                  {"col", QUDA_BLAS_DATAORDER_COL}};
 
-  CLI::TransformPairs<QudaCublasOperation> cublas_op_map {
-    {"N", QUDA_CUBLAS_OP_N}, {"T", QUDA_CUBLAS_OP_T}, {"C", QUDA_CUBLAS_OP_C}};
+  CLI::TransformPairs<QudaBLASOperation> blas_op_map {
+    {"N", QUDA_BLAS_OP_N}, {"T", QUDA_BLAS_OP_T}, {"C", QUDA_BLAS_OP_C}};
 
   CLI::TransformPairs<QudaContractType> contract_type_map {{"open", QUDA_CONTRACT_TYPE_OPEN},
                                                            {"dr", QUDA_CONTRACT_TYPE_DR}};
@@ -345,9 +348,9 @@ namespace
                                                            {"mat-pc-dag-mat-pc", QUDA_MATPCDAG_MATPC_SOLUTION}};
 
   CLI::TransformPairs<QudaEigType> eig_type_map {{"trlm", QUDA_EIG_TR_LANCZOS},
-                                                 {"irlm", QUDA_EIG_IR_LANCZOS},
+                                                 {"blktrlm", QUDA_EIG_BLK_TR_LANCZOS},
                                                  {"iram", QUDA_EIG_IR_ARNOLDI},
-                                                 {"blktrlm", QUDA_EIG_BLK_TR_LANCZOS}};
+                                                 {"blkiram", QUDA_EIG_BLK_IR_ARNOLDI}};
 
   CLI::TransformPairs<QudaTboundary> fermion_t_boundary_map {{"periodic", QUDA_PERIODIC_T},
                                                              {"anti-periodic", QUDA_ANTI_PERIODIC_T}};
@@ -424,51 +427,51 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     ->transform(CLI::QUDACheckedTransformer(contract_type_map));
 
   quda_app
-    ->add_option("--cublas-data-type", cublas_data_type,
+    ->add_option("--blas-data-type", blas_data_type,
                  "Whether to use single(S), double(D), and/or complex(C/Z) data types (default C)")
-    ->transform(CLI::QUDACheckedTransformer(cublas_dt_map));
+    ->transform(CLI::QUDACheckedTransformer(blas_dt_map));
 
   quda_app
-    ->add_option("--cublas-data-order", cublas_data_order,
+    ->add_option("--blas-data-order", blas_data_order,
                  "Whether data is in row major or column major order (default row)")
-    ->transform(CLI::QUDACheckedTransformer(cublas_data_order_map));
+    ->transform(CLI::QUDACheckedTransformer(blas_data_order_map));
 
   quda_app
     ->add_option(
-      "--cublas-trans-a", cublas_trans_a,
+      "--blas-trans-a", blas_trans_a,
       "Whether to leave the A GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")
-    ->transform(CLI::QUDACheckedTransformer(cublas_op_map));
+    ->transform(CLI::QUDACheckedTransformer(blas_op_map));
 
   quda_app
     ->add_option(
-      "--cublas-trans-b", cublas_trans_b,
+      "--blas-trans-b", blas_trans_b,
       "Whether to leave the B GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")
-    ->transform(CLI::QUDACheckedTransformer(cublas_op_map));
+    ->transform(CLI::QUDACheckedTransformer(blas_op_map));
 
   quda_app
-    ->add_option("--cublas-alpha", cublas_alpha_re_im, "Set the complex value of alpha for GEMM (default {1.0,0.0}")
+    ->add_option("--blas-alpha", blas_alpha_re_im, "Set the complex value of alpha for GEMM (default {1.0,0.0}")
     ->expected(2);
 
-  quda_app->add_option("--cublas-beta", cublas_beta_re_im, "Set the complex value of beta for GEMM (default {1.0,0.0}")
+  quda_app->add_option("--blas-beta", blas_beta_re_im, "Set the complex value of beta for GEMM (default {1.0,0.0}")
     ->expected(2);
 
   quda_app
-    ->add_option("--cublas-mnk", cublas_mnk, "Set the dimensions of the A, B, and C matrices GEMM (default 128 128 128)")
+    ->add_option("--blas-mnk", blas_mnk, "Set the dimensions of the A, B, and C matrices GEMM (default 128 128 128)")
     ->expected(3);
 
   quda_app
-    ->add_option("--cublas-leading-dims", cublas_leading_dims,
+    ->add_option("--blas-leading-dims", blas_leading_dims,
                  "Set the leading dimensions A, B, and C matrices GEMM (default 128 128 128) ")
     ->expected(3);
 
-  quda_app->add_option("--cublas-offsets", cublas_offsets, "Set the offsets for matrices A, B, and C (default 0 0 0)")
+  quda_app->add_option("--blas-offsets", blas_offsets, "Set the offsets for matrices A, B, and C (default 0 0 0)")
     ->expected(3);
 
   quda_app
-    ->add_option("--cublas-strides", cublas_strides, "Set the strides for matrices A, B, and C (default -1 -1 -1)")
+    ->add_option("--blas-strides", blas_strides, "Set the strides for matrices A, B, and C (default -1 -1 -1)")
     ->expected(3);
 
-  quda_app->add_option("--cublas-batch", cublas_batch, "Set the number of batches for GEMM (default 16)");
+  quda_app->add_option("--blas-batch", blas_batch, "Set the number of batches for GEMM (default 16)");
 
   quda_app->add_flag("--dagger", dagger, "Set the dagger to 1 (default 0)");
   quda_app->add_option("--device", device_ordinal, "Set the CUDA device to use (default 0, single GPU only)")
@@ -689,21 +692,18 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--eig-amin", eig_amin, "The minimum in the polynomial acceleration")->check(CLI::PositiveNumber);
 
   opgroup->add_option("--eig-ARPACK-logfile", eig_arpack_logfile, "The filename storing the log from arpack");
-  opgroup->add_option("--eig-QUDA-logfile", eig_QUDA_logfile,
-                      "The filename storing the stdout from the QUDA eigensolver");
   opgroup->add_option("--eig-arpack-check", eig_arpack_check,
                       "Cross check the device data against ARPACK (requires ARPACK, default false)");
-  opgroup->add_option(
-    "--eig-check-interval", eig_check_interval,
-    "Perform a convergence check every nth restart/iteration in the IRAM,IRLM/lanczos,arnoldi eigensolver");
+  opgroup->add_option("--eig-use-eigen-qr", eig_use_eigen_qr,
+                      "Use Eigen to eigensolve the upper Hessenberg in IRAM, else use QUDA's QR code. (default true)");
   opgroup->add_option("--eig-compute-svd", eig_compute_svd,
                       "Solve the MdagM problem, use to compute SVD of M (default false)");
   opgroup->add_option("--eig-max-restarts", eig_max_restarts, "Perform n iterations of the restart in the eigensolver");
-  opgroup->add_option("--eig-n-conv", eig_n_conv, "The number of converged eigenvalues requested (default eig_n_ev)");
+  opgroup->add_option("--eig-block-size", eig_block_size, "The block size to use in the block variant eigensolver");
   opgroup->add_option(
     "--eig-n-ev-deflate", eig_n_ev_deflate,
     "The number of converged eigenpairs that will be used in the deflation routines (default eig_n_conv)");
-  opgroup->add_option("--eig-block-size", eig_block_size, "The block size to use in the block variant eigensolver");
+  opgroup->add_option("--eig-n-conv", eig_n_conv, "The number of converged eigenvalues requested (default eig_n_ev)");
   opgroup->add_option("--eig-n-ev", eig_n_ev, "The size of eigenvector search space in the eigensolver");
   opgroup->add_option("--eig-n-kr", eig_n_kr, "The size of the Krylov subspace to use in the eigensolver");
   opgroup->add_option("--eig-batched-rotate", eig_batched_rotate,
@@ -728,7 +728,8 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
     ->add_option("--eig-spectrum", eig_spectrum,
                  "The spectrum part to be calulated. S=smallest L=largest R=real M=modulus I=imaginary")
     ->transform(CLI::QUDACheckedTransformer(eig_spectrum_map));
-  opgroup->add_option("--eig-tol", eig_tol, "The tolerance to use in the eigensolver");
+  opgroup->add_option("--eig-tol", eig_tol, "The tolerance to use in the eigensolver (default 1e-6)");
+  opgroup->add_option("--eig-qr-tol", eig_qr_tol, "The tolerance to use in the qr (default 1e-11)");
 
   opgroup->add_option("--eig-type", eig_type, "The type of eigensolver to use (default trlm)")
     ->transform(CLI::QUDACheckedTransformer(eig_type_map));
@@ -823,6 +824,9 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                        "If the multigrid operator is updated, preserve generated deflation space (default = false)");
   quda_app->add_mgoption(opgroup, "--mg-eig-max-restarts", mg_eig_max_restarts, CLI::PositiveNumber,
                          "Perform a maximun of n restarts in eigensolver (default 100)");
+  quda_app->add_mgoption(
+    opgroup, "--mg-eig-use-eigen-qr", mg_eig_use_eigen_qr, CLI::Validator(),
+    "Use Eigen to eigensolve the upper Hessenberg in IRAM, else use QUDA's QR code. (default true)");
   quda_app->add_mgoption(opgroup, "--mg-eig-block-size", mg_eig_block_size, CLI::Validator(),
                          "The block size to use in the block variant eigensolver");
   quda_app->add_mgoption(opgroup, "--mg-eig-n-ev", mg_eig_n_ev, CLI::Validator(),
@@ -845,6 +849,8 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
     "The spectrum part to be calulated. S=smallest L=largest R=real M=modulus I=imaginary (default SR)");
   quda_app->add_mgoption(opgroup, "--mg-eig-tol", mg_eig_tol, CLI::PositiveNumber,
                          "The tolerance to use in the eigensolver (default 1e-6)");
+  quda_app->add_mgoption(opgroup, "--mg-eig-qr-tol", mg_eig_qr_tol, CLI::PositiveNumber,
+                         "The tolerance to use in the QR (default 1e-11)");
 
   quda_app->add_mgoption(opgroup, "--mg-eig-type", mg_eig_type, CLI::QUDACheckedTransformer(eig_type_map),
                          "The type of eigensolver to use (default trlm)");

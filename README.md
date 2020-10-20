@@ -29,13 +29,17 @@ QUDA includes an implementations of adaptive multigrid for the Wilson,
 clover-improved, twisted-mass and twisted-clover fermion actions.  We
 note however that this is undergoing continued evolution and
 improvement and we highly recommend using adaptive multigrid use the
-latest develop branch.  More details can be found at
-https://github.com/lattice/quda/wiki/Multigrid-Solver.
+latest develop branch.  More details can be found [here]
+(https://github.com/lattice/quda/wiki/Multigrid-Solver).
 
 Support for eigen-vector deflation solvers is also included through
-the Thick Restarted Lanczos Method (TRLM).  For more details we refer
-the user to the wiki
-(https://github.com/lattice/quda/wiki/Deflated-Solvers).
+the Thick Restarted Lanczos Method (TRLM), and we offer an Implicitly
+Restarted Arnoldi for observing non-hermitian operator spectra.
+For more details we refer the user to the wiki:
+[QUDA's eigensolvers]
+(https://github.com/lattice/quda/wiki/QUDA%27s-eigensolvers)
+[Deflating coarse grid solves in Multigrid]
+(https://github.com/lattice/quda/wiki/Multigrid-Solver#multigrid-inverter--lanczos)
 
 ## Software Compatibility:
 
@@ -245,7 +249,7 @@ http://lattice.github.com/quda .
 *  Joel Giedt (Rensselaer Polytechnic Institute) 
 *  Steven Gottlieb (Indiana University) 
 *  Kyriakos Hadjiyiannakou (Cyprus)
-*  Dean Howarth (Lawrence Livermore National Laboratory, Lawrence Livermore National Laboratory)
+*  Dean Howarth (Lawrence Livermore Lab, Lawrence Berkeley Lab)
 *  Balint Joo (OLCF, Oak Ridge National Laboratory, formerly Jefferson Lab)
 *  Hyung-Jin Kim (Samsung Advanced Institute of Technology)
 *  Bartek Kostrzewa (Bonn)
