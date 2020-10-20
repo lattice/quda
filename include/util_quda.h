@@ -6,6 +6,11 @@
 #include <comm_quda.h>
 #include <tune_key.h>
 #include <malloc_quda.h>
+#include <quda_define.h>
+#if defined(QUDA_BUILD_TARGET_HIP)
+#include "hip/hip_runtime.h"
+#endif
+
 
 /**
    @brief Query whether autotuning is enabled or not.  Default is enabled but can be overridden by setting QUDA_ENABLE_TUNING=0.
@@ -118,21 +123,40 @@ void errorQuda_(const char *func, const char *file, int line, ...);
 #endif // MULTI_GPU
 
 
+#if defined(QUDA_BUILD_TARGET_CUDA)
 #define checkCudaErrorNoSync() do {                    \
   cudaError_t error = cudaGetLastError();              \
   if (error != cudaSuccess)                            \
     errorQuda("(CUDA) %s", cudaGetErrorString(error))  \
     ;\
 } while (0)
+#elif defined(QUDA_BUILD_TARGET_HIP)
 
+#define checkCudaErrorNoSync() do {                    \
+  hipError_t error = hipGetLastError();              \
+  if (error != hipSuccess)                            \
+    errorQuda("(CUDA) %s", hipGetErrorString(error))  \
+    ;\
+} while (0)
+
+#endif
 
 #ifdef HOST_DEBUG
+#if defined(QUDA_BUILD_TARGET_CUDA)
 
 #define checkCudaError() do {  \
   cudaDeviceSynchronize();     \
   checkCudaErrorNoSync();      \
 } while (0)
 
+#elif defined(QUDA_BUILD_TARGET_HIP)
+
+#define checkCudaError() do {  \
+  hipDeviceSynchronize();     \
+  checkCudaErrorNoSync();      \
+} while (0)
+
+#endif
 #else
 
 #define checkCudaError() checkCudaErrorNoSync()
