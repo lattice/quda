@@ -244,6 +244,29 @@ namespace quda {
     }
   }
 
+
+
+
+   /**
+     @brief Wrapper around cudaMemcpyToSymbolAsync or driver API equivalent
+     @param[out] symbol   Destination symbol
+     @param[in] src      Source pointer
+     @param[in] count    Size of transfer
+     @param[in] offset   Offset from start of symbol
+     @param[in] kind     Type of memory copy
+     @param[in] stream   Stream to issue copy
+  */
+  void qudaMemcpyToSymbolAsync_(const void *symbol, const void *src, size_t count, size_t offset,  qudaMemcpyKind kind, const qudaStream_t &stream,
+                                const char *func, const char *file, const char *line)
+  {
+    cudaError_t error = cudaMemcpyToSymbolAsync(symbol,src,count,offset,kind,stream);
+    if( error != cudaSuccess ) {
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    }
+
+  }
+
+  
   void qudaMemcpy2D_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
                      cudaMemcpyKind kind, const char *func, const char *file, const char *line)
   {
