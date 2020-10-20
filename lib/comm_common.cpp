@@ -279,8 +279,9 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
           } else {
             intranode_enabled[dir][dim] = true;
             if (getVerbosity() > QUDA_SILENT) {
-              printf("Intra-node (non peer-to-peer) enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d\n",
-		     comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
+              printf(
+                "Intra-node (non peer-to-peer) enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d\n",
+                comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
             }
           }
         } // on the same node

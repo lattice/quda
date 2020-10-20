@@ -58,7 +58,7 @@ int main(int argc, char **argv)
   setQudaPrecisions();
   display_test_info();
   setVerbosity(verbosity);
-  
+
   // initialize the QUDA library
   initQuda(device_ordinal);
   //-----------------------------------------------------------------------------
@@ -215,7 +215,7 @@ int main(int argc, char **argv)
 
   if (verify_results) {
     blasGEMMQudaVerify(arrayA, arrayB, arrayC, arrayCcopy, refA_size, refB_size, refC_size, re_im, data_size,
-		       &blas_param);
+                       &blas_param);
   }
 
   host_free(refA);

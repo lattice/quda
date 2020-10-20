@@ -595,4 +595,4 @@ namespace quda
     host_free(Qmat);
     host_free(Rmat);
   }
-}
+} // namespace quda

@@ -20,8 +20,7 @@ void fillEigenArrayColMaj(MatrixXcd &EigenArr, complex<double> *arr, int rows, i
 
 void fillEigenArrayRowMaj(MatrixXcd &EigenArr, complex<double> *arr, int rows, int cols, int ld, int offset);
 void blasGEMMEigenVerify(void *arrayA, void *arrayB, void *arrayCcopy, void *arrayC, uint64_t refA_size,
-			 uint64_t refB_size, uint64_t refC_size, QudaBLASParam *blas_param);
+                         uint64_t refB_size, uint64_t refC_size, QudaBLASParam *blas_param);
 
 void blasGEMMQudaVerify(void *arrayA, void *arrayB, void *arrayC, void *arrayCcopy, uint64_t refA_size,
-			uint64_t refB_size, uint64_t refC_size, int re_im, size_t data_size,
-			QudaBLASParam *blas_param);
+                        uint64_t refB_size, uint64_t refC_size, int re_im, size_t data_size, QudaBLASParam *blas_param);

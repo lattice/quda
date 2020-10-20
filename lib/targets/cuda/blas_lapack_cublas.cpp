@@ -31,7 +31,8 @@ namespace quda
 #ifdef NATIVE_LAPACK_LIB
           cublasStatus_t error = cublasCreate(&handle);
           if (error != CUBLAS_STATUS_SUCCESS) errorQuda("cublasCreate failed with error %d", error);
-	  else printfQuda("cublasCreated successfully\n");
+          else
+            printfQuda("cublasCreated successfully\n");
           cublas_init = true;
 #endif
         }
@@ -198,8 +199,7 @@ namespace quda
 
         const uint64_t batch = blas_param.batch_count;
         uint64_t data_size
-          = (blas_param.data_type == QUDA_BLAS_DATATYPE_S || blas_param.data_type == QUDA_BLAS_DATATYPE_C) ? 4 :
-                                                                                                                     8;
+          = (blas_param.data_type == QUDA_BLAS_DATATYPE_S || blas_param.data_type == QUDA_BLAS_DATATYPE_C) ? 4 : 8;
 
         if (blas_param.data_type == QUDA_BLAS_DATATYPE_C || blas_param.data_type == QUDA_BLAS_DATATYPE_Z) {
           data_size *= 2;
@@ -394,5 +394,5 @@ namespace quda
 #endif
       }
     } // namespace native
-  } // namespace blas_lapack
+  }   // namespace blas_lapack
 } // namespace quda

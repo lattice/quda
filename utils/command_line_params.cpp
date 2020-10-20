@@ -273,16 +273,13 @@ namespace
 {
   CLI::TransformPairs<QudaCABasis> ca_basis_map {{"power", QUDA_POWER_BASIS}, {"chebyshev", QUDA_CHEBYSHEV_BASIS}};
 
-  CLI::TransformPairs<QudaBLASDataType> blas_dt_map {{"C", QUDA_BLAS_DATATYPE_C},
-                                                         {"Z", QUDA_BLAS_DATATYPE_Z},
-                                                         {"S", QUDA_BLAS_DATATYPE_S},
-                                                         {"D", QUDA_BLAS_DATATYPE_D}};
+  CLI::TransformPairs<QudaBLASDataType> blas_dt_map {
+    {"C", QUDA_BLAS_DATATYPE_C}, {"Z", QUDA_BLAS_DATATYPE_Z}, {"S", QUDA_BLAS_DATATYPE_S}, {"D", QUDA_BLAS_DATATYPE_D}};
 
   CLI::TransformPairs<QudaBLASDataOrder> blas_data_order_map {{"row", QUDA_BLAS_DATAORDER_ROW},
-                                                                  {"col", QUDA_BLAS_DATAORDER_COL}};
+                                                              {"col", QUDA_BLAS_DATAORDER_COL}};
 
-  CLI::TransformPairs<QudaBLASOperation> blas_op_map {
-    {"N", QUDA_BLAS_OP_N}, {"T", QUDA_BLAS_OP_T}, {"C", QUDA_BLAS_OP_C}};
+  CLI::TransformPairs<QudaBLASOperation> blas_op_map {{"N", QUDA_BLAS_OP_N}, {"T", QUDA_BLAS_OP_T}, {"C", QUDA_BLAS_OP_C}};
 
   CLI::TransformPairs<QudaContractType> contract_type_map {{"open", QUDA_CONTRACT_TYPE_OPEN},
                                                            {"dr", QUDA_CONTRACT_TYPE_DR}};
@@ -432,8 +429,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     ->transform(CLI::QUDACheckedTransformer(blas_dt_map));
 
   quda_app
-    ->add_option("--blas-data-order", blas_data_order,
-                 "Whether data is in row major or column major order (default row)")
+    ->add_option("--blas-data-order", blas_data_order, "Whether data is in row major or column major order (default row)")
     ->transform(CLI::QUDACheckedTransformer(blas_data_order_map));
 
   quda_app
@@ -448,8 +444,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
       "Whether to leave the B GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")
     ->transform(CLI::QUDACheckedTransformer(blas_op_map));
 
-  quda_app
-    ->add_option("--blas-alpha", blas_alpha_re_im, "Set the complex value of alpha for GEMM (default {1.0,0.0}")
+  quda_app->add_option("--blas-alpha", blas_alpha_re_im, "Set the complex value of alpha for GEMM (default {1.0,0.0}")
     ->expected(2);
 
   quda_app->add_option("--blas-beta", blas_beta_re_im, "Set the complex value of beta for GEMM (default {1.0,0.0}")
@@ -467,8 +462,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--blas-offsets", blas_offsets, "Set the offsets for matrices A, B, and C (default 0 0 0)")
     ->expected(3);
 
-  quda_app
-    ->add_option("--blas-strides", blas_strides, "Set the strides for matrices A, B, and C (default -1 -1 -1)")
+  quda_app->add_option("--blas-strides", blas_strides, "Set the strides for matrices A, B, and C (default -1 -1 -1)")
     ->expected(3);
 
   quda_app->add_option("--blas-batch", blas_batch, "Set the number of batches for GEMM (default 16)");

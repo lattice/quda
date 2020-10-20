@@ -215,7 +215,7 @@ static TimeProfile profilePhase("staggeredPhaseQuda");
 //!< Profiler for contractions
 static TimeProfile profileContract("contractQuda");
 
-//!< Profiler for GEMM and other BLAS 
+//!< Profiler for GEMM and other BLAS
 static TimeProfile profileBLAS("blasQuda");
 
 //!< Profiler for covariant derivative
@@ -6080,14 +6080,11 @@ void blasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaBLASParam *blas_
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("array C_{%d, %d}\n", blas_param->m, blas_param->ldc);
   }
 
-  size_t data_size
-    = (blas_param->data_type == QUDA_BLAS_DATATYPE_D || blas_param->data_type == QUDA_BLAS_DATATYPE_Z) ?
+  size_t data_size = (blas_param->data_type == QUDA_BLAS_DATATYPE_D || blas_param->data_type == QUDA_BLAS_DATATYPE_Z) ?
     sizeof(double) :
     sizeof(float);
   int re_im = 1;
-  if (blas_param->data_type == QUDA_BLAS_DATATYPE_C || blas_param->data_type == QUDA_BLAS_DATATYPE_Z) {
-    re_im *= 2;
-  }
+  if (blas_param->data_type == QUDA_BLAS_DATATYPE_C || blas_param->data_type == QUDA_BLAS_DATATYPE_Z) { re_im *= 2; }
 
   int batches = blas_param->batch_count;
   size_t A_bytes = batches * arrayA_size * re_im * data_size;

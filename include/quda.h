@@ -732,24 +732,24 @@ extern "C" {
 
     QudaBLASOperation trans_a; /**< operation op(A) that is non- or (conj.) transpose. */
     QudaBLASOperation trans_b; /**< operation op(B) that is non- or (conj.) transpose. */
-    int m;                       /**< number of rows of matrix op(A) and C. */
-    int n;                       /**< number of columns of matrix op(B) and C. */
-    int k;                       /**< number of columns of op(A) and rows of op(B). */
-    int lda;                     /**< leading dimension of two-dimensional array used to store the matrix A. */
-    int ldb;                     /**< leading dimension of two-dimensional array used to store matrix B. */
-    int ldc;                     /**< leading dimension of two-dimensional array used to store matrix C. */
-    int a_offset;                /**< position of the A array from which begin read/write. */
-    int b_offset;                /**< position of the B array from which begin read/write. */
-    int c_offset;                /**< position of the C array from which begin read/write. */
-    int strideA;                 /**< stride of the A array in strided(batched) mode */
-    int strideB;                 /**< stride of the B array in strided(batched) mode */
-    int strideC;                 /**< stride of the C array in strided(batched) mode */
+    int m;                     /**< number of rows of matrix op(A) and C. */
+    int n;                     /**< number of columns of matrix op(B) and C. */
+    int k;                     /**< number of columns of op(A) and rows of op(B). */
+    int lda;                   /**< leading dimension of two-dimensional array used to store the matrix A. */
+    int ldb;                   /**< leading dimension of two-dimensional array used to store matrix B. */
+    int ldc;                   /**< leading dimension of two-dimensional array used to store matrix C. */
+    int a_offset;              /**< position of the A array from which begin read/write. */
+    int b_offset;              /**< position of the B array from which begin read/write. */
+    int c_offset;              /**< position of the C array from which begin read/write. */
+    int strideA;               /**< stride of the A array in strided(batched) mode */
+    int strideB;               /**< stride of the B array in strided(batched) mode */
+    int strideC;               /**< stride of the C array in strided(batched) mode */
 
     double_complex alpha; /**< scalar used for multiplication. */
     double_complex beta;  /**< scalar used for multiplication. If beta==0, C does not have to be a valid input. */
-    
+
     int batch_count; /**< number of pointers contained in arrayA, arrayB and arrayC. */
-    
+
     QudaBLASDataType data_type;   /**< Specifies if using S(C) or D(Z) BLAS type */
     QudaBLASDataOrder data_order; /**< Specifies if using Row or Column major */
 
@@ -1446,7 +1446,7 @@ extern "C" {
                                 double *timeinfo);
 
   void blasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaBLASParam *param);
-  
+
   /**
    * @brief Flush the chronological history for the given index
    * @param[in] index Index for which we are flushing
