@@ -65,7 +65,7 @@ set (QUDA_OBJS
   dslash_pack2.cu
   blas_quda.cu multi_blas_quda.cu reduce_quda.cu
   multi_reduce_quda.cu reduce_helper.cu
-  contract.cu comm_common.cpp
+  contract.cu 
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cpp spinor_noise.cu
   copy_color_spinor_dd.cu copy_color_spinor_ds.cu
@@ -529,11 +529,6 @@ endif(QUDA_NVTX)
 
 if(QUDA_BACKWARDS)
   target_include_directories(quda_cpp SYSTEM PRIVATE ${backward-cpp_SOURCE_DIR})
-  set_property(
-    SOURCE comm_common.cpp
-    APPEND
-    PROPERTY COMPILE_DEFINITIONS ${BACKWARD_DEFINITIONS})
-  set_property(SOURCE comm_common.cpp APPEND PROPERTY COMPILE_DEFINITIONS QUDA_BACKWARDSCPP)
   set_property(SOURCE malloc.cpp APPEND PROPERTY COMPILE_DEFINITIONS ${BACKWARD_DEFINITIONS})
   set_property(SOURCE malloc.cpp APPEND PROPERTY COMPILE_DEFINITIONS QUDA_BACKWARDSCPP)
   target_link_libraries(quda PUBLIC ${BACKWARD_LIBRARIES})
