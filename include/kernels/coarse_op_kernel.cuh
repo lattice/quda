@@ -1058,11 +1058,11 @@ namespace quda {
     for (int parity=0; parity<2; parity++) {
 #pragma omp parallel for
       for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
-	for (int ic_c = 0; ic_c < nColor; ic_c++) { //Color row
-	  for (int jc_c = 0; jc_c < nColor; jc_c++) { //Color col
-	    computeYreverse<Float,nSpin,nColor,Arg>(arg, parity, x_cb, ic_c, jc_c);
-	  }
-	}
+        for (int ic_c = 0; ic_c < nColor; ic_c++) { //Color row
+          for (int jc_c = 0; jc_c < nColor; jc_c++) { //Color col
+            computeYreverse<Float,nSpin,nColor,Arg>(arg, parity, x_cb, ic_c, jc_c);
+          }
+        }
       } // c/b volume
     } // parity
   }

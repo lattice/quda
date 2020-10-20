@@ -135,11 +135,7 @@ namespace quda {
       } else if (type == COMPUTE_COARSE_CLOVER) {
         ComputeCoarseCloverCPU<from_coarse,Float,fineSpin,coarseSpin,fineColor,coarseColor>(arg);
       } else if (type == COMPUTE_REVERSE_Y) {
-#if !defined(STAGGEREDCOARSE)
         ComputeYReverseCPU<Float,coarseSpin,coarseColor>(arg);
-#else
-        errorQuda("ComputeYReverse not enabled for staggered coarsenings");
-#endif
       } else if (type == COMPUTE_DIAGONAL) {
         AddCoarseDiagonalCPU<Float,coarseSpin,coarseColor>(arg);
       } else if (type == COMPUTE_STAGGEREDMASS) {
