@@ -5052,6 +5052,7 @@ void updateGaugeFieldQuda(void* gauge,
    if (param->use_resident_gauge) {
      if (!gaugePrecise) errorQuda("No resident gauge field to use");
      cudaGauge = gaugePrecise;
+     gaugePrecise = nullptr;
    } else {
      profileProject.TPSTART(QUDA_PROFILE_H2D);
      cudaGauge->loadCPUField(*cpuGauge);
