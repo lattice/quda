@@ -121,7 +121,11 @@ namespace quda {
     aabs = sqrt( 1.0 - a(0,0) * a(0,0));
     ctheta = Random<T>(localState, (T)-1.0, (T)1.0);
     phi = PII * Random<T>(localState);
-    stheta = ( curand(&localState) & 1 ? 1 : -1 ) * sqrt( (T)1.0 - ctheta * ctheta );
+
+    // Was   xurand(*localState>& 1 ? 1 : -1
+    // which presumably just selects when the lowest bit is 1 or 0 with 50% probability each
+    // so this should do the same, without an appeal to the bit swizzle, but may end up being slower.
+    stheta = ( uniform<T>::rand(localState) < static_cast<T>(0.5) ? 1 : -1 ) * sqrt( (T)1.0 - ctheta * ctheta );
     a(0,1) = aabs * stheta * cos( phi );
     a(1,0) = aabs * stheta * sin( phi );
     a(1,1) = aabs * ctheta;
