@@ -1,10 +1,10 @@
 #pragma once
 
-#include <color_spinor_field_order.h>
+#include <convert.h>
 #include <reduce_helper.h>
 #include <blas_helper.cuh>
 #include <multi_blas_helper.cuh>
-#include <fast_intdiv.h>
+#include <reduction_kernel.h>
 
 namespace quda
 {
@@ -21,20 +21,24 @@ namespace quda
        @tparam N Y-field vector i/o length
        @tparam Reducer Functor used to operate on data
     */
-    template <int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Reducer_>
+    template <typename real_, int n_, int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Reducer_>
     struct MultiReduceArg :
       public ReduceArg<vector_type<typename Reducer_::reduce_t, NXZ_>>,
       SpinorXZ<NXZ_, store_t, N, Reducer_::use_z>,
       SpinorYW<max_YW_size<NXZ_, store_t, y_store_t, Reducer_>(), store_t, N, y_store_t, Ny, Reducer_::use_w>
     {
+      using real = real_;
       using Reducer = Reducer_;
       using reduce_t = vector_type<typename Reducer_::reduce_t, NXZ_>;
+      static constexpr int n = n_;
       static constexpr int NXZ = NXZ_;
       static constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, Reducer>();
       const int NYW;
       Reducer f;
-      const int length;
-      const int_fastdiv gridSize;
+
+      const int length_cb;
+      const int nParity;
+      dim3 threads;
 
       MultiReduceArg(std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
                      std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
@@ -43,8 +47,9 @@ namespace quda
         ReduceArg<reduce_t>(NYW),
         NYW(NYW),
         f(f),
-        length(length),
-        gridSize(tp.grid.x * tp.block.x / nParity)
+        length_cb(length / nParity),
+        nParity(nParity),
+        threads(length, NYW, 1)
       {
         if (NYW > NYW_max) errorQuda("NYW = %d greater than maximum size of %d", NYW, NYW_max);
 
@@ -63,53 +68,49 @@ namespace quda
     };
 
     // strictly required pre-C++17 and can cause link errors otherwise
-    template <int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Reducer>
-    constexpr int MultiReduceArg<NXZ_, store_t, N, y_store_t, Ny, Reducer>::NXZ;
+    template <typename real_, int n_, int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Reducer>
+    constexpr int MultiReduceArg<real_, n_, NXZ_, store_t, N, y_store_t, Ny, Reducer>::NXZ;
 
-    template <int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Reducer>
-    constexpr int MultiReduceArg<NXZ_, store_t, N, y_store_t, Ny, Reducer>::NYW_max;
+    template <typename real_, int n_, int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Reducer>
+    constexpr int MultiReduceArg<real_, n_, NXZ_, store_t, N, y_store_t, Ny, Reducer>::NYW_max;
 
-    template <int block_size, typename real, int n, int NXZ, typename Arg>
-    __global__ void multiReduceKernel(Arg arg)
-    {
-      // n is real numbers per thread
-      using vec = vector_type<complex<real>, n/2>;
-      unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
-      unsigned int idx = tid % arg.gridSize;
-      unsigned int parity = tid / arg.gridSize;
+    /**
+       Generic multi-reduction functor with up to four loads and saves
+    */
+    template <typename Arg> struct MultiReduce_ {
+      using vec = vector_type<complex<typename Arg::real>, Arg::n/2>;
+      using reduce_t = vector_type<typename Arg::Reducer::reduce_t, Arg::NXZ>;
+      Arg &arg;
+      constexpr MultiReduce_(Arg &arg) : arg(arg) {}
+      static constexpr const char *filename() { return KERNEL_FILE; }
 
-      const int k = blockIdx.y * blockDim.y + threadIdx.y;
-
-      if (k >= arg.NYW) return; // safe since k are different thread blocks
-
-      using block_reduce_t = vector_type<typename Arg::Reducer::reduce_t, NXZ>;
-      block_reduce_t sum = arg.init();
-
-      while (idx < arg.length) {
+      template <typename Reducer>
+      __device__ __host__ inline reduce_t operator()(reduce_t &sum, Reducer &, int tid, int k, int)
+      {
+        unsigned int parity = tid >= arg.length_cb ? 1 : 0;
+        unsigned int i = tid - parity * arg.length_cb;
 
         vec x, y, z, w;
-        if (arg.f.read.Y) arg.Y[k].load(y, idx, parity);
-        if (arg.f.read.W) arg.W[k].load(w, idx, parity);
+        if (arg.f.read.Y) arg.Y[k].load(y, i, parity);
+        if (arg.f.read.W) arg.W[k].load(w, i, parity);
 
         // Each NYW owns its own thread.
         // The NXZ's are all in the same thread block,
         // so they can share the same memory.
 #pragma unroll
-        for (int l = 0; l < NXZ; l++) {
-          if (arg.f.read.X) arg.X[l].load(x, idx, parity);
-          if (arg.f.read.Z) arg.Z[l].load(z, idx, parity);
+        for (int l = 0; l < Arg::NXZ; l++) {
+          if (arg.f.read.X) arg.X[l].load(x, i, parity);
+          if (arg.f.read.Z) arg.Z[l].load(z, i, parity);
 
           arg.f(sum[l], x, y, z, w, k, l);
 
         }
-        if (arg.f.write.Y) arg.Y[k].save(y, idx, parity);
-        if (arg.f.write.W) arg.W[k].save(w, idx, parity);
+        if (arg.f.write.Y) arg.Y[k].save(y, i, parity);
+        if (arg.f.write.W) arg.W[k].save(w, i, parity);
 
-        idx += arg.gridSize;
+        return sum;
       }
-
-      reduce<block_size, 1, plus<block_reduce_t>>(arg, sum, k);
-    } // multiReduceKernel
+    };
 
     /**
        Base class from which all reduction functors should derive.

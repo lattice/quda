@@ -1,9 +1,6 @@
 #include <blas_quda.h>
-#include <tune_quda.h>
-#include <color_spinor_field_order.h>
 #include <uint_to_char.h>
-
-#include <jitify_helper.cuh>
+#include <tunable_reduction.h>
 #include <kernels/multi_reduce_core.cuh>
 
 namespace quda {
@@ -12,50 +9,8 @@ namespace quda {
 
     qudaStream_t* getStream();
 
-    template <int block_size, typename real, int len, int NXZ, typename Arg>
-    typename std::enable_if<block_size!=device::warp_size(), qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
-    {
-      if (tp.block.x == block_size)
-        return qudaLaunchKernel(multiReduceKernel<block_size, real, len, NXZ, Arg>, tp, stream, arg);
-      else
-        return launch<block_size - device::warp_size(), real, len, NXZ>(arg, tp, stream);
-    }
-
-    template <int block_size, typename real, int len, int NXZ, typename Arg>
-    typename std::enable_if<block_size==device::warp_size(), qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
-    {
-      if (block_size != tp.block.x) errorQuda("Unexpected block size %d\n", tp.block.x);
-      return qudaLaunchKernel(multiReduceKernel<block_size, real, len, NXZ, Arg>, tp, stream, arg);
-    }
-
-    template <typename real, int len, int NXZ, typename Arg, typename T>
-    void multiReduceLaunch(T result[], Arg &arg, const TuneParam &tp, const qudaStream_t &stream, Tunable &tunable)
-    {
-#ifdef JITIFY
-      using namespace jitify::reflection;
-      tunable.jitifyError() = program->kernel("quda::blas::multiReduceKernel")
-                                  .instantiate((int)tp.block.x, Type<real>(), len, NXZ, Type<Arg>())
-                                  .configure(tp.grid, tp.block, tp.shared_bytes, stream)
-                                  .launch(arg);
-      arg.launch_error = tunable.jitifyError() == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
-#else
-      arg.launch_error = launch<device::max_multi_reduce_block_size(), real, len, NXZ>(arg, tp, stream);
-#endif
-
-      std::vector<T> result_(NXZ * arg.NYW);
-      if (!commAsyncReduction()) arg.complete(result_, stream);
-
-      // need to transpose for same order with vector thread reduction
-      for (int i = 0; i < NXZ; i++) {
-        for (int j = 0; j < arg.NYW; j++) {
-          result[i * arg.NYW + j] = result_[j * NXZ + i];
-        }
-      }
-
-    }
-
     template <template <typename ...> class Reducer, typename store_t, typename y_store_t, int nSpin, typename T>
-    class MultiReduce : public Tunable
+    class MultiReduce : public TunableMultiReduction<1>
     {
       using real = typename mapper<y_store_t>::type;
       using host_reduce_t = typename Reducer<double, real>::reduce_t;
@@ -68,9 +23,6 @@ namespace quda {
       host_reduce_t *result;
       QudaFieldLocation location;
 
-      unsigned int sharedBytesPerThread() const { return 0; }
-      unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
-
       virtual bool advanceSharedBytes(TuneParam &param) const
       {
         TuneParam next(param);
@@ -81,13 +33,12 @@ namespace quda {
         return false;
       }
 
-      unsigned int maxBlockSize(const TuneParam &param) const { return device::max_multi_reduce_block_size(); }
-
     public:
       MultiReduce(const T &a, const T &b, const T &c, const ColorSpinorField &x_meta, const ColorSpinorField &y_meta,
                   std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
                   std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
                   host_reduce_t *result) :
+        TunableMultiReduction(*x[0], y.size()),
         NXZ(x.size()),
         NYW(y.size()),
         r(NXZ, NYW),
@@ -132,10 +83,6 @@ namespace quda {
         }
         if (is_norm) strcat(aux, ",norm");
 
-#ifdef JITIFY
-        ::quda::create_jitify_program("kernels/multi_reduce_core.cuh");
-#endif
-
         apply(*blas::getStream());
 
         blas::bytes += bytes();
@@ -179,9 +126,24 @@ namespace quda {
           constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
           const int length = x[0]->Length() / (nParity * M);
 
-          MultiReduceArg<NXZ, device_store_t, N, device_y_store_t, Ny, decltype(r_)> arg(x, y, z, w, r_, NYW, length, nParity, tp);
+          MultiReduceArg<device_real_t, M, NXZ, device_store_t, N, device_y_store_t, Ny, decltype(r_)> arg(x, y, z, w, r_, NYW, length, nParity, tp);
 
-          multiReduceLaunch<device_real_t, M, NXZ>(result, arg, tp, stream, *this);
+          std::vector<host_reduce_t> result_(NXZ * arg.NYW);
+
+          constexpr bool multi_1d = false;
+          std::vector<constant_param_t> param;
+          if (a.data) { set_param<multi_1d>(param, arg, 'a', a); }
+          if (b.data) { set_param<multi_1d>(param, arg, 'b', b); }
+          if (c.data) { set_param<multi_1d>(param, arg, 'c', c); }
+          launch<MultiReduce_>(result_, tp, stream, arg);
+
+          // need to transpose for same order with vector thread reduction
+          for (int i = 0; i < NXZ; i++) {
+            for (int j = 0; j < arg.NYW; j++) {
+              result[i * arg.NYW + j] = result_[j * NXZ + i];
+            }
+          }
+
         } else {
           errorQuda("Only implemented for GPU fields");
         }
@@ -215,27 +177,6 @@ namespace quda {
         if (NXZ <= pow2_max && is_power2(NXZ)) instantiatePow2<pow2_max>(stream);
         else if (NXZ <= MAX_MULTI_BLAS_N) instantiateLinear<MAX_MULTI_BLAS_N>(stream);
         else errorQuda("x.size %lu greater than MAX_MULTI_BLAS_N %d", x.size(), MAX_MULTI_BLAS_N);
-      }
-
-      bool advanceGridDim(TuneParam &param) const
-      {
-        bool rtn = Tunable::advanceGridDim(param);
-        if (NYW > deviceProp.maxGridSize[1]) errorQuda("N=%d is greater than the maximum support grid size", NYW);
-        return rtn;
-      }
-
-      void initTuneParam(TuneParam &param) const
-      {
-        Tunable::initTuneParam(param);
-        param.block.y = 1;
-        param.grid.y = NYW;
-      }
-
-      void defaultTuneParam(TuneParam &param) const
-      {
-        Tunable::defaultTuneParam(param);
-        param.block.y = 1;
-        param.grid.y = NYW;
       }
 
       void preTune()
