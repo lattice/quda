@@ -4,9 +4,9 @@
 // parameters parsed from the command line
 
 #ifdef MULTI_GPU
-int device = -1;
+int device_ordinal = -1;
 #else
-int device = 0;
+int device_ordinal = 0;
 #endif
 
 int rank_order;
@@ -137,6 +137,13 @@ bool mg_evolve_thin_updates = false;
 
 // we only actually support 4 here currently
 quda::mgarray<std::array<int, 4>> geo_block_size = {};
+
+#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
+bool mg_use_mma = true;
+#else
+bool mg_use_mma = false;
+#endif
+
 int n_ev = 8;
 int max_search_dim = 64;
 int deflation_grid = 16;
@@ -163,6 +170,8 @@ bool eig_require_convergence = true;
 int eig_check_interval = 10;
 int eig_max_restarts = 1000;
 double eig_tol = 1e-6;
+double eig_qr_tol = 1e-11;
+bool eig_use_eigen_qr = true;
 bool eig_use_poly_acc = true;
 int eig_poly_deg = 100;
 double eig_amin = 0.1;
@@ -174,7 +183,6 @@ QudaEigSpectrumType eig_spectrum = QUDA_SPECTRUM_LR_EIG;
 QudaEigType eig_type = QUDA_EIG_TR_LANCZOS;
 bool eig_arpack_check = false;
 char eig_arpack_logfile[256] = "arpack_logfile.log";
-char eig_QUDA_logfile[256] = "QUDA_logfile.log";
 char eig_vec_infile[256] = "";
 char eig_vec_outfile[256] = "";
 bool eig_io_parity_inflate = false;
@@ -193,6 +201,8 @@ quda::mgarray<bool> mg_eig_require_convergence = {};
 quda::mgarray<int> mg_eig_check_interval = {};
 quda::mgarray<int> mg_eig_max_restarts = {};
 quda::mgarray<double> mg_eig_tol = {};
+quda::mgarray<double> mg_eig_qr_tol = {};
+quda::mgarray<bool> mg_eig_use_eigen_qr = {};
 quda::mgarray<bool> mg_eig_use_poly_acc = {};
 quda::mgarray<int> mg_eig_poly_deg = {};
 quda::mgarray<double> mg_eig_amin = {};
@@ -326,9 +336,9 @@ namespace
                                                            {"mat-pc-dag-mat-pc", QUDA_MATPCDAG_MATPC_SOLUTION}};
 
   CLI::TransformPairs<QudaEigType> eig_type_map {{"trlm", QUDA_EIG_TR_LANCZOS},
-                                                 {"irlm", QUDA_EIG_IR_LANCZOS},
+                                                 {"blktrlm", QUDA_EIG_BLK_TR_LANCZOS},
                                                  {"iram", QUDA_EIG_IR_ARNOLDI},
-                                                 {"blktrlm", QUDA_EIG_BLK_TR_LANCZOS}};
+                                                 {"blkiram", QUDA_EIG_BLK_IR_ARNOLDI}};
 
   CLI::TransformPairs<QudaTboundary> fermion_t_boundary_map {{"periodic", QUDA_PERIODIC_T},
                                                              {"anti-periodic", QUDA_ANTI_PERIODIC_T}};
@@ -413,7 +423,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     ->transform(CLI::QUDACheckedTransformer(contract_type_map));
   ;
   quda_app->add_flag("--dagger", dagger, "Set the dagger to 1 (default 0)");
-  quda_app->add_option("--device", device, "Set the CUDA device to use (default 0, single GPU only)")
+  quda_app->add_option("--device", device_ordinal, "Set the CUDA device to use (default 0, single GPU only)")
     ->check(CLI::Range(0, 16));
 
   quda_app->add_option("--dslash-type", dslash_type, "Set the dslash type")
@@ -631,21 +641,18 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--eig-amin", eig_amin, "The minimum in the polynomial acceleration")->check(CLI::PositiveNumber);
 
   opgroup->add_option("--eig-ARPACK-logfile", eig_arpack_logfile, "The filename storing the log from arpack");
-  opgroup->add_option("--eig-QUDA-logfile", eig_QUDA_logfile,
-                      "The filename storing the stdout from the QUDA eigensolver");
   opgroup->add_option("--eig-arpack-check", eig_arpack_check,
                       "Cross check the device data against ARPACK (requires ARPACK, default false)");
-  opgroup->add_option(
-    "--eig-check-interval", eig_check_interval,
-    "Perform a convergence check every nth restart/iteration in the IRAM,IRLM/lanczos,arnoldi eigensolver");
+  opgroup->add_option("--eig-use-eigen-qr", eig_use_eigen_qr,
+                      "Use Eigen to eigensolve the upper Hessenberg in IRAM, else use QUDA's QR code. (default true)");
   opgroup->add_option("--eig-compute-svd", eig_compute_svd,
                       "Solve the MdagM problem, use to compute SVD of M (default false)");
   opgroup->add_option("--eig-max-restarts", eig_max_restarts, "Perform n iterations of the restart in the eigensolver");
-  opgroup->add_option("--eig-n-conv", eig_n_conv, "The number of converged eigenvalues requested (default eig_n_ev)");
+  opgroup->add_option("--eig-block-size", eig_block_size, "The block size to use in the block variant eigensolver");
   opgroup->add_option(
     "--eig-n-ev-deflate", eig_n_ev_deflate,
     "The number of converged eigenpairs that will be used in the deflation routines (default eig_n_conv)");
-  opgroup->add_option("--eig-block-size", eig_block_size, "The block size to use in the block variant eigensolver");
+  opgroup->add_option("--eig-n-conv", eig_n_conv, "The number of converged eigenvalues requested (default eig_n_ev)");
   opgroup->add_option("--eig-n-ev", eig_n_ev, "The size of eigenvector search space in the eigensolver");
   opgroup->add_option("--eig-n-kr", eig_n_kr, "The size of the Krylov subspace to use in the eigensolver");
   opgroup->add_option("--eig-batched-rotate", eig_batched_rotate,
@@ -670,7 +677,8 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
     ->add_option("--eig-spectrum", eig_spectrum,
                  "The spectrum part to be calulated. S=smallest L=largest R=real M=modulus I=imaginary")
     ->transform(CLI::QUDACheckedTransformer(eig_spectrum_map));
-  opgroup->add_option("--eig-tol", eig_tol, "The tolerance to use in the eigensolver");
+  opgroup->add_option("--eig-tol", eig_tol, "The tolerance to use in the eigensolver (default 1e-6)");
+  opgroup->add_option("--eig-qr-tol", eig_qr_tol, "The tolerance to use in the qr (default 1e-11)");
 
   opgroup->add_option("--eig-type", eig_type, "The type of eigensolver to use (default trlm)")
     ->transform(CLI::QUDACheckedTransformer(eig_type_map));
@@ -765,11 +773,14 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                        "If the multigrid operator is updated, preserve generated deflation space (default = false)");
   quda_app->add_mgoption(opgroup, "--mg-eig-max-restarts", mg_eig_max_restarts, CLI::PositiveNumber,
                          "Perform a maximun of n restarts in eigensolver (default 100)");
+  quda_app->add_mgoption(
+    opgroup, "--mg-eig-use-eigen-qr", mg_eig_use_eigen_qr, CLI::Validator(),
+    "Use Eigen to eigensolve the upper Hessenberg in IRAM, else use QUDA's QR code. (default true)");
   quda_app->add_mgoption(opgroup, "--mg-eig-block-size", mg_eig_block_size, CLI::Validator(),
                          "The block size to use in the block variant eigensolver");
-  quda_app->add_mgoption(opgroup, "--mg-eig-n_ev", mg_eig_n_ev, CLI::Validator(),
+  quda_app->add_mgoption(opgroup, "--mg-eig-n-ev", mg_eig_n_ev, CLI::Validator(),
                          "The size of eigenvector search space in the eigensolver");
-  quda_app->add_mgoption(opgroup, "--mg-eig-n_kr", mg_eig_n_kr, CLI::Validator(),
+  quda_app->add_mgoption(opgroup, "--mg-eig-n-kr", mg_eig_n_kr, CLI::Validator(),
                          "The size of the Krylov subspace to use in the eigensolver");
   quda_app->add_mgoption(opgroup, "--mg-eig-n-ev-deflate", mg_eig_n_ev_deflate, CLI::Validator(),
                          "The number of converged eigenpairs that will be used in the deflation routines");
@@ -787,6 +798,8 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
     "The spectrum part to be calulated. S=smallest L=largest R=real M=modulus I=imaginary (default SR)");
   quda_app->add_mgoption(opgroup, "--mg-eig-tol", mg_eig_tol, CLI::PositiveNumber,
                          "The tolerance to use in the eigensolver (default 1e-6)");
+  quda_app->add_mgoption(opgroup, "--mg-eig-qr-tol", mg_eig_qr_tol, CLI::PositiveNumber,
+                         "The tolerance to use in the QR (default 1e-11)");
 
   quda_app->add_mgoption(opgroup, "--mg-eig-type", mg_eig_type, CLI::QUDACheckedTransformer(eig_type_map),
                          "The type of eigensolver to use (default trlm)");
@@ -890,6 +903,10 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   quda_app->add_mgoption(opgroup, "--mg-verbosity", mg_verbosity, CLI::QUDACheckedTransformer(verbosity_map),
                          "The verbosity to use on each level of the multigrid (default summarize)");
+
+  opgroup->add_option(
+    "--mg-use-mma", mg_use_mma,
+    "Use tensor-core to accelerate multigrid (default = true on Volta or later with CUDA >=10.1, otherwise false)");
 }
 
 void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app)

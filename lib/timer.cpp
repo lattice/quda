@@ -13,11 +13,10 @@ namespace quda {
     double accounted = 0.0;
     for (int i=0; i<QUDA_PROFILE_COUNT-1; i++) {
       if (profile[i].count > 0) {
-	printfQuda("     %20s     = %f secs (%6.3g%%), with %8d calls at %e us per call\n",
-		   (const char*)&pname[i][0],  profile[i].time,
-		   100*profile[i].time/profile[QUDA_PROFILE_TOTAL].time,
-		   profile[i].count, 1e6*profile[i].time/profile[i].count);
-	accounted += profile[i].time;
+        printfQuda("     %20s     = %f secs (%6.3g%%),\t with %8d calls at %e us per call\n", (const char *)&pname[i][0],
+                   profile[i].time, 100 * profile[i].time / profile[QUDA_PROFILE_TOTAL].time, profile[i].count,
+                   1e6 * profile[i].time / profile[i].count);
+        accounted += profile[i].time;
       }
     }
     if (accounted > 0.0) {
@@ -46,7 +45,11 @@ namespace quda {
                                       "file i/o",
                                       "chronology",
                                       "eigen",
+                                      "eigenLU",
+                                      "eigenEV",
+                                      "eigenQR",
                                       "arpack",
+                                      "host compute",
                                       "dummy",
                                       "pack kernel",
                                       "dslash kernel",
@@ -89,10 +92,11 @@ namespace quda {
     bool print_timer = true; // whether to print that timer
     for (int i=0; i<QUDA_PROFILE_LOWER_LEVEL; i++) { // we do not want to print detailed lower level timers
       if (global_profile[i].count > 0) {
-        if (print_timer) printfQuda("     %20s     = %f secs (%6.3g%%), with %8d calls at %e us per call\n",
-                   (const char*)&pname[i][0],  global_profile[i].time,
-                   100*global_profile[i].time/global_profile[QUDA_PROFILE_TOTAL].time,
-                   global_profile[i].count, 1e6*global_profile[i].time/global_profile[i].count);
+        if (print_timer)
+          printfQuda("     %20s     = %f secs (%6.3g%%),\t with %8d calls at %e us per call\n",
+                     (const char *)&pname[i][0], global_profile[i].time,
+                     100 * global_profile[i].time / global_profile[QUDA_PROFILE_TOTAL].time, global_profile[i].count,
+                     1e6 * global_profile[i].time / global_profile[i].count);
         accounted += global_profile[i].time;
       }
     }

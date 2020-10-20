@@ -267,8 +267,6 @@ void initFields(prec_pair_t prec_pair)
   QudaPrecision prec = prec_pair.first;
   QudaPrecision prec_other = prec_pair.second;
 
-  checkCudaError();
-
   param.setPrecision(prec, prec, true);
   vD = new cudaColorSpinorField(param);
   wD = new cudaColorSpinorField(param);
@@ -306,9 +304,6 @@ void initFields(prec_pair_t prec_pair)
 
   param.composite_dim = Nsrc;
   zmoD = new cudaColorSpinorField(param);
-
-  // check for successful allocation
-  checkCudaError();
 
   // only do copy if not doing half precision with mg
   bool flag = !(param.nSpin == 2 && (prec < QUDA_SINGLE_PRECISION || prec_other < QUDA_HALF_PRECISION));
@@ -681,7 +676,6 @@ double test(Kernel kernel)
 
   case Kernel::norm2:
     *xD = *xH;
-    *yH = *xD;
     error = fabs(blas::norm2(*xD) - blas::norm2(*xH)) / blas::norm2(*xH);
     break;
 
@@ -1030,7 +1024,7 @@ int main(int argc, char** argv)
   setSpinorSiteSize(24);
   initComms(argc, argv, gridsize_from_cmdline);
   display_test_info();
-  initQuda(device);
+  initQuda(device_ordinal);
 
   setVerbosity(verbosity);
 

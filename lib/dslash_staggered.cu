@@ -86,8 +86,6 @@ namespace quda
       } else {
         errorQuda("Unsupported staggered phase type %d", U.StaggeredPhase());
       }
-
-      checkCudaError();
     }
   };
 

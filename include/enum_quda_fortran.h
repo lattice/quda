@@ -135,17 +135,18 @@
 
 #define QudaEigType integer(4)
 #define QUDA_EIG_TR_LANCZOS 0 // Thick Restarted Lanczos Solver
-#define QUDA_EIG_IR_LANCZOS 1 // Implicitly restarted Lanczos solver (not yet implemented)
-#define QUDA_EIG_IR_ARNOLDI 2 // Implicitly restarted Arnoldi solver (not yet implemented)
+#define QUDA_EIG_BLK_IR_LANCZOS 1 // Block Thick Restarted Lanczos Solver
+#define QUDA_EIG_IR_ARNOLDI 2 // Implicitly restarted Arnoldi solver
+#define QUDA_EIG_BLK_IR_ARNOLDI 3 // Block Implicitly restarted Arnoldi solver (not yet implemented)
 #define QUDA_EIG_INVALID QUDA_INVALID_ENUM
 
 #define QudaEigSpectrumType integer(4)
-#define QUDA_SPECTRUM_SR_EIG 0
-#define QUDA_SPECTRUM_LR_EIG 1
-#define QUDA_SPECTRUM_SM_EIG 2
-#define QUDA_SPECTRUM_LM_EIG 3
-#define QUDA_SPECTRUM_SI_EIG 4
-#define QUDA_SPECTRUM_LI_EIG 5
+#define QUDA_SPECTRUM_LM_EIG 0
+#define QUDA_SPECTRUM_SM_EIG 1
+#define QUDA_SPECTRUM_LR_EIG 2
+#define QUDA_SPECTRUM_SR_EIG 3
+#define QUDA_SPECTRUM_LI_EIG 4
+#define QUDA_SPECTRUM_SI_EIG 5
 #define QUDA_SPECTRUM_INVALID QUDA_INVALID_ENUM
 
 #define QudaSolutionType integer(4)

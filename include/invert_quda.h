@@ -1186,7 +1186,7 @@ public:
     dirac(dirac),
     prefix(prefix)
   {
-    }
+  }
 
     virtual ~PreconditionedSolver() { delete solver; }
 

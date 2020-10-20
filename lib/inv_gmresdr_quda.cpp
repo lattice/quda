@@ -18,8 +18,7 @@
 #include <algorithm>
 #include <memory>
 
-#include <Eigen/Dense>
-#include <Eigen/Eigenvalues>
+#include <eigen_helper.h>
 
 /*
   GMRES-DR algorithm:
@@ -31,8 +30,6 @@ namespace quda {
 
   using namespace blas;
   using namespace std;
-
-  using namespace Eigen;
 
   using DynamicStride = Stride<Dynamic, Dynamic>;
 
@@ -373,8 +370,6 @@ namespace quda {
           blas::zero(Zm->Component(i));
       }
     }
-
-    checkCudaError();
 
     for (int j = 0; j < args.k; j++) {
       Complex alpha = cDotProduct(Vm->Component(j), Vm->Component(args.k));

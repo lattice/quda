@@ -112,7 +112,7 @@ void constructPointSpinorSource(void *v, int nSpin, int nColor, QudaPrecision pr
 void constructWallSpinorSource(void *v, QudaPrecision precision, const int dil);
 //------------------------------------------------------
 
-void performanceStats(double *time, double *gflops);
+void performanceStats(std::vector<double> &time, std::vector<double> &gflops, std::vector<int> &iter);
 
 void initComms(int argc, char **argv, std::array<int, 4> &commDims);
 void initComms(int argc, char **argv, int *const commDims);

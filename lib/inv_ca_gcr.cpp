@@ -1,6 +1,6 @@
 #include <invert_quda.h>
 #include <blas_quda.h>
-#include <Eigen/Dense>
+#include <eigen_helper.h>
 
 namespace quda {
 
@@ -95,7 +95,6 @@ namespace quda {
 
   void CAGCR::solve(Complex *psi_, std::vector<ColorSpinorField*> &q, ColorSpinorField &b)
   {
-    using namespace Eigen;
     typedef Matrix<Complex, Dynamic, Dynamic> matrix;
     typedef Matrix<Complex, Dynamic, 1> vector;
 
@@ -193,12 +192,24 @@ namespace quda {
 
     if (param.deflate) {
       // Construct the eigensolver and deflation space if requested.
-      constructDeflationSpace(b, matMdagM);
+      if (param.eig_param.eig_type == QUDA_EIG_TR_LANCZOS || param.eig_param.eig_type == QUDA_EIG_BLK_TR_LANCZOS) {
+        constructDeflationSpace(b, matMdagM);
+      } else {
+        // Use Arnoldi to inspect the space only and turn off deflation
+        constructDeflationSpace(b, mat);
+        param.deflate = false;
+      }
       if (deflate_compute) {
         // compute the deflation space.
+        if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
         (*eig_solve)(evecs, evals);
-        extendSVDDeflationSpace();
-        eig_solve->computeSVD(matMdagM, evecs, evals);
+        if (param.deflate) {
+          // double the size of the Krylov space
+          extendSVDDeflationSpace();
+          // populate extra memory with L/R singular vectors
+          eig_solve->computeSVD(matMdagM, evecs, evals);
+        }
+        if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_PREAMBLE);
         deflate_compute = false;
       }
       if (recompute_evals) {

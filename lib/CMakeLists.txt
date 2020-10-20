@@ -27,7 +27,7 @@ set (QUDA_OBJS
   dirac_coarse.cpp dslash_coarse.cu dslash_coarse_dagger.cu
   coarse_op.cu coarsecoarse_op.cu
   coarse_op_preconditioned.cu staggered_coarse_op.cu
-  eig_trlm.cpp eig_block_trlm.cpp vector_io.cpp
+  eig_iram.cpp eig_trlm.cpp eig_block_trlm.cpp vector_io.cpp
   eigensolve_quda.cpp quda_arpack_interface.cpp
   multigrid.cpp transfer.cpp block_orthogonalize.cu inv_bicgstab_quda.cpp
   prolongator.cu restrictor.cu staggered_prolong_restrict.cu
@@ -67,7 +67,7 @@ set (QUDA_OBJS
   multi_reduce_quda.cu reduce_helper.cu
   contract.cu comm_common.cpp
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
-  extract_gauge_ghost_extended.cu copy_color_spinor.cu spinor_noise.cu
+  extract_gauge_ghost_extended.cu copy_color_spinor.cpp spinor_noise.cu
   copy_color_spinor_dd.cu copy_color_spinor_ds.cu
   copy_color_spinor_dh.cu copy_color_spinor_dq.cu
   copy_color_spinor_ss.cu copy_color_spinor_sd.cu
@@ -84,7 +84,7 @@ set (QUDA_OBJS
   copy_color_spinor_mg_qh.cu copy_color_spinor_mg_qq.cu
   copy_gauge_double.cu copy_gauge_single.cu
   copy_gauge_half.cu copy_gauge_quarter.cu
-  copy_gauge.cu copy_gauge_mg.cu copy_clover.cu
+  copy_gauge.cpp copy_gauge_mg.cu copy_clover.cu
   staggered_oprod.cu clover_trace_quda.cu
   hisq_paths_force_quda.cu
   unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp
@@ -473,6 +473,17 @@ if(QUDA_ARPACK)
     if(QUDA_MPI OR QUDA_QMP)
       target_link_libraries(quda INTERFACE ${PARPACK} MPI::MPI_Fortran)
     endif()
+  endif()
+endif()
+
+if(QUDA_OPENBLAS)
+  target_compile_definitions(quda PRIVATE OPENBLAS_LIB)
+  
+  if(QUDA_DOWNLOAD_OPENBLAS)
+    target_link_libraries(quda PUBLIC openblas)
+    target_link_libraries(quda_cpp PUBLIC openblas)
+  else()
+    target_link_libraries(quda INTERFACE ${OPENBLAS})
   endif()
 endif()
 

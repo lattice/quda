@@ -76,11 +76,16 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(reconstruct_refinement_sloppy, QUDA_RECONSTRUCT_INVALID);
   P(cuda_prec_precondition, QUDA_INVALID_PRECISION);
   P(reconstruct_precondition, QUDA_RECONSTRUCT_INVALID);
+  P(cuda_prec_eigensolver, QUDA_INVALID_PRECISION);
+  P(reconstruct_eigensolver, QUDA_RECONSTRUCT_INVALID);
 #else
   if (param->cuda_prec_sloppy == QUDA_INVALID_PRECISION)
     param->cuda_prec_sloppy = param->cuda_prec;
+  if (param->cuda_prec_eigensolver == QUDA_INVALID_PRECISION) param->cuda_prec_eigensolver = param->cuda_prec;
   if (param->reconstruct_sloppy == QUDA_RECONSTRUCT_INVALID)
     param->reconstruct_sloppy = param->reconstruct;
+  if (param->reconstruct_eigensolver == QUDA_RECONSTRUCT_INVALID)
+    param->reconstruct_eigensolver = param->reconstruct_sloppy;
   if (param->cuda_prec_refinement_sloppy == QUDA_INVALID_PRECISION)
     param->cuda_prec_refinement_sloppy = param->cuda_prec_sloppy;
   if (param->reconstruct_refinement_sloppy == QUDA_RECONSTRUCT_INVALID)
@@ -148,6 +153,7 @@ void printQudaEigParam(QudaEigParam *param) {
 #endif
 
 #if defined INIT_PARAM
+  P(use_eigen_qr, QUDA_BOOLEAN_FALSE);
   P(use_poly_acc, QUDA_BOOLEAN_FALSE);
   P(poly_deg, 0);
   P(a_min, 0.0);
@@ -166,6 +172,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(n_ev_deflate, -1);
   P(batched_rotate, 0);
   P(tol, 0.0);
+  P(qr_tol, 0.0);
   P(check_interval, 0);
   P(max_restarts, 0);
   P(arpack_check, QUDA_BOOLEAN_FALSE);
@@ -175,6 +182,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(extlib_type, QUDA_EIGEN_EXTLIB);
   P(mem_type_ritz, QUDA_MEMORY_DEVICE);
 #else
+  P(use_eigen_qr, QUDA_BOOLEAN_INVALID);
   P(use_poly_acc, QUDA_BOOLEAN_INVALID);
   P(poly_deg, INVALID_INT);
   P(a_min, INVALID_DOUBLE);
@@ -191,6 +199,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(n_ev_deflate, INVALID_INT);
   P(batched_rotate, INVALID_INT);
   P(tol, INVALID_DOUBLE);
+  P(qr_tol, INVALID_DOUBLE);
   P(check_interval, INVALID_INT);
   P(max_restarts, INVALID_INT);
   P(arpack_check, QUDA_BOOLEAN_INVALID);
@@ -260,6 +269,7 @@ void printQudaCloverParam(QudaInvertParam *param)
     P(clover_cuda_prec_sloppy, QUDA_INVALID_PRECISION);
     P(clover_cuda_prec_refinement_sloppy, QUDA_INVALID_PRECISION);
     P(clover_cuda_prec_precondition, QUDA_INVALID_PRECISION);
+    P(clover_cuda_prec_eigensolver, QUDA_INVALID_PRECISION);
 #else
   if (param->clover_cuda_prec_sloppy == QUDA_INVALID_PRECISION)
     param->clover_cuda_prec_sloppy = param->clover_cuda_prec;
@@ -267,6 +277,8 @@ void printQudaCloverParam(QudaInvertParam *param)
     param->clover_cuda_prec_refinement_sloppy = param->clover_cuda_prec_sloppy;
   if (param->clover_cuda_prec_precondition == QUDA_INVALID_PRECISION)
     param->clover_cuda_prec_precondition = param->clover_cuda_prec_sloppy;
+  if (param->clover_cuda_prec_eigensolver == QUDA_INVALID_PRECISION)
+    param->clover_cuda_prec_eigensolver = param->clover_cuda_prec_sloppy;
 #endif
 
 #ifdef INIT_PARAM
@@ -429,6 +441,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(cuda_prec_sloppy, QUDA_INVALID_PRECISION);
   P(cuda_prec_refinement_sloppy, QUDA_INVALID_PRECISION);
   P(cuda_prec_precondition, QUDA_INVALID_PRECISION);
+  P(cuda_prec_eigensolver, QUDA_INVALID_PRECISION);
 #else
   if (param->cuda_prec_sloppy == QUDA_INVALID_PRECISION)
     param->cuda_prec_sloppy = param->cuda_prec;
@@ -436,6 +449,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
     param->cuda_prec_refinement_sloppy = param->cuda_prec_sloppy;
   if (param->cuda_prec_precondition == QUDA_INVALID_PRECISION)
     param->cuda_prec_precondition = param->cuda_prec_sloppy;
+  if (param->cuda_prec_eigensolver == QUDA_INVALID_PRECISION) param->cuda_prec_eigensolver = param->cuda_prec_sloppy;
 #endif
 
   // leave the default behaviour to cpu pointers
@@ -849,6 +863,16 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
   P(is_staggered, QUDA_BOOLEAN_FALSE);
 #else
   P(is_staggered, QUDA_BOOLEAN_INVALID);
+#endif
+
+#ifdef INIT_PARAM
+#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
+  P(use_mma, QUDA_BOOLEAN_TRUE);
+#else
+  P(use_mma, QUDA_BOOLEAN_FALSE);
+#endif
+#else
+  P(use_mma, QUDA_BOOLEAN_INVALID);
 #endif
 
 #ifdef INIT_PARAM

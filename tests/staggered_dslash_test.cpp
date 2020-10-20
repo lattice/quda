@@ -67,7 +67,7 @@ CLI::TransformPairs<dslash_test_type> dtest_type_map {{"Dslash", dslash_test_typ
 
 void init()
 {
-  initQuda(device);
+  initQuda(device_ordinal);
 
   gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
@@ -508,12 +508,7 @@ int main(int argc, char **argv)
   // If we're building fat/long links, there are some
   // tests we have to skip.
   if (dslash_type == QUDA_ASQTAD_DSLASH && compute_fatlong) {
-    if (prec == QUDA_HALF_PRECISION /* half */) {
-      errorQuda("Half precision unsupported in fat/long compute");
-    }
-  }
-  if (dslash_type == QUDA_LAPLACE_DSLASH && prec == QUDA_HALF_PRECISION) {
-    errorQuda("Half precision unsupported for Laplace operator.\n");
+    if (prec < QUDA_SINGLE_PRECISION /* half */) { errorQuda("Half precision unsupported in fat/long compute"); }
   }
 
   display_test_info();

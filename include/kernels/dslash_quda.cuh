@@ -35,6 +35,8 @@ namespace quda
 	doublet(in.TwistFlavor() == QUDA_TWIST_DEG_DOUBLET || in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
 	volumeCB(doublet ? in.VolumeCB()/2 : in.VolumeCB()), a(0.0), b(0.0), c(0.0)
     {
+      checkPrecision(out, in);
+      checkLocation(out, in);
       if (d < 0 || d > 4) errorQuda("Undefined gamma matrix %d", d);
       if (proj != -1 && proj != 0 && proj != 1) errorQuda("Undefined gamma projection %d", proj);
       if (in.Nspin() != 4) errorQuda("Cannot apply gamma5 to nSpin=%d field", in.Nspin());

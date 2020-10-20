@@ -237,7 +237,6 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.cuda_prec = cuda_prec;
   inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
   inv_param.cuda_prec_refinement_sloppy = cuda_prec_refinement_sloppy;
-  // inv_param.cuda_prec_ritz = cuda_prec_ritz;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
@@ -261,7 +260,7 @@ void setEigParam(QudaEigParam &eig_param)
 {
   eig_param.eig_type = eig_type;
   eig_param.spectrum = eig_spectrum;
-  if ((eig_type == QUDA_EIG_TR_LANCZOS || eig_type == QUDA_EIG_IR_LANCZOS)
+  if ((eig_type == QUDA_EIG_TR_LANCZOS || eig_type == QUDA_EIG_BLK_TR_LANCZOS)
       && !(eig_spectrum == QUDA_SPECTRUM_LR_EIG || eig_spectrum == QUDA_SPECTRUM_SR_EIG)) {
     errorQuda("Only real spectrum type (LR or SR) can be passed to Lanczos type solver.");
   }
@@ -283,15 +282,16 @@ void setEigParam(QudaEigParam &eig_param)
     eig_param.n_ev_deflate = eig_n_ev_deflate;
   }
 
-  eig_param.block_size = eig_param.eig_type == QUDA_EIG_TR_LANCZOS ? 1 : eig_block_size;
+  eig_param.block_size
+    = (eig_param.eig_type == QUDA_EIG_TR_LANCZOS || eig_param.eig_type == QUDA_EIG_IR_ARNOLDI) ? 1 : eig_block_size;
   eig_param.n_ev = eig_n_ev;
   eig_param.n_kr = eig_n_kr;
   eig_param.tol = eig_tol;
+  eig_param.qr_tol = eig_qr_tol;
   eig_param.batched_rotate = eig_batched_rotate;
   eig_param.require_convergence = eig_require_convergence ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   eig_param.check_interval = eig_check_interval;
   eig_param.max_restarts = eig_max_restarts;
-  eig_param.cuda_prec_ritz = cuda_prec;
 
   eig_param.use_norm_op = eig_use_normop ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   eig_param.use_dagger = eig_use_dagger ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -301,6 +301,7 @@ void setEigParam(QudaEigParam &eig_param)
     eig_param.use_norm_op = QUDA_BOOLEAN_TRUE;
   }
 
+  eig_param.use_eigen_qr = eig_use_eigen_qr ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   eig_param.use_poly_acc = eig_use_poly_acc ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   eig_param.poly_deg = eig_poly_deg;
   eig_param.a_min = eig_amin;
@@ -308,7 +309,6 @@ void setEigParam(QudaEigParam &eig_param)
 
   eig_param.arpack_check = eig_arpack_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   strcpy(eig_param.arpack_logfile, eig_arpack_logfile);
-  strcpy(eig_param.QUDA_logfile, eig_QUDA_logfile);
 
   strcpy(eig_param.vec_infile, eig_vec_infile);
   strcpy(eig_param.vec_outfile, eig_vec_outfile);
@@ -546,6 +546,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   // Is NOT a staggered solve
   mg_param.is_staggered = QUDA_BOOLEAN_FALSE;
 
+  mg_param.use_mma = mg_use_mma ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   // Whether or not to use thin restarts in the evolve tests
   mg_param.thin_update_only = mg_evolve_thin_updates ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
@@ -677,38 +678,42 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
 {
   mg_eig_param.eig_type = mg_eig_type[level];
   mg_eig_param.spectrum = mg_eig_spectrum[level];
-  if ((mg_eig_type[level] == QUDA_EIG_TR_LANCZOS || mg_eig_type[level] == QUDA_EIG_IR_LANCZOS)
+  if ((mg_eig_type[level] == QUDA_EIG_TR_LANCZOS || mg_eig_type[level] == QUDA_EIG_BLK_TR_LANCZOS)
       && !(mg_eig_spectrum[level] == QUDA_SPECTRUM_LR_EIG || mg_eig_spectrum[level] == QUDA_SPECTRUM_SR_EIG)) {
     errorQuda("Only real spectrum type (LR or SR) can be passed to the a Lanczos type solver");
   }
 
-  mg_eig_param.block_size = mg_eig_param.eig_type == QUDA_EIG_TR_LANCZOS ? 1 : mg_eig_block_size[level];
+  mg_eig_param.block_size
+    = (mg_eig_param.eig_type == QUDA_EIG_TR_LANCZOS || mg_eig_param.eig_type == QUDA_EIG_IR_ARNOLDI) ?
+    1 :
+    mg_eig_block_size[level];
   mg_eig_param.n_ev = mg_eig_n_ev[level];
   mg_eig_param.n_kr = mg_eig_n_kr[level];
   mg_eig_param.n_conv = nvec[level];
 
   // Inverters will deflate only this number of vectors.
-  if (mg_eig_n_ev_deflate[level] < 0) {
+  if (mg_eig_n_ev_deflate[level] > 0 && mg_eig_n_ev_deflate[level] < mg_eig_param.n_conv)
+    mg_eig_param.n_ev_deflate = mg_eig_n_ev_deflate[level];
+  else if (mg_eig_n_ev_deflate[level] > mg_eig_param.n_conv)
+    errorQuda("Can not deflate more than nvec[%d] eigenvectors.", mg_eig_param.n_conv);
+  else {
     mg_eig_param.n_ev_deflate = mg_eig_param.n_conv;
     mg_eig_n_ev_deflate[level] = mg_eig_param.n_conv;
-  } else {
-    if (mg_eig_n_ev_deflate[level] > mg_eig_param.n_conv)
-      errorQuda("Can not deflate more than nvec[%d] eigenvectors.", nvec[level]);
-    mg_eig_param.n_ev_deflate = mg_eig_n_ev_deflate[level];
   }
 
   mg_eig_param.batched_rotate = mg_eig_batched_rotate[level];
   mg_eig_param.require_convergence = mg_eig_require_convergence[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   mg_eig_param.tol = mg_eig_tol[level];
+  mg_eig_param.qr_tol = mg_eig_qr_tol[level];
   mg_eig_param.check_interval = mg_eig_check_interval[level];
   mg_eig_param.max_restarts = mg_eig_max_restarts[level];
-  mg_eig_param.cuda_prec_ritz = cuda_prec;
 
   mg_eig_param.compute_svd = QUDA_BOOLEAN_FALSE;
   mg_eig_param.use_norm_op = mg_eig_use_normop[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_eig_param.use_dagger = mg_eig_use_dagger[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
+  mg_eig_param.use_eigen_qr = mg_eig_use_eigen_qr[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_eig_param.use_poly_acc = mg_eig_use_poly_acc[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_eig_param.poly_deg = mg_eig_poly_deg[level];
   mg_eig_param.a_min = mg_eig_amin[level];
@@ -720,7 +725,6 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
   strcpy(mg_eig_param.vec_outfile, "");
   mg_eig_param.save_prec = mg_eig_save_prec[level];
   mg_eig_param.io_parity_inflate = QUDA_BOOLEAN_FALSE;
-  strcpy(mg_eig_param.QUDA_logfile, eig_QUDA_logfile);
 }
 
 void setContractInvertParam(QudaInvertParam &inv_param)
@@ -939,6 +943,8 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
   inv_param.solve_type = QUDA_DIRECT_SOLVE;
 
   mg_param.is_staggered = QUDA_BOOLEAN_TRUE;
+
+  mg_param.use_mma = mg_use_mma ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   mg_param.invert_param = &inv_param;
   mg_param.n_level = mg_levels;
@@ -1213,7 +1219,6 @@ void setDeflatedInvertParam(QudaInvertParam &inv_param)
     inv_param.tol_restart = 0.0; // restart is not requested...
   }
 
-  inv_param.cuda_prec_ritz = cuda_prec_ritz;
   inv_param.verbosity = verbosity;
   inv_param.verbosity_precondition = verbosity;
 

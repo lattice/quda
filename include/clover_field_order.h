@@ -693,27 +693,25 @@ namespace quda {
 	void save() {
 	  if (backup_h) errorQuda("Already allocated host backup");
 	  backup_h = safe_malloc(bytes);
-	  cudaMemcpy(backup_h, clover, bytes, cudaMemcpyDeviceToHost);
-	  if (norm_bytes) {
-	    backup_norm_h = safe_malloc(norm_bytes);
-	    cudaMemcpy(backup_norm_h, norm, norm_bytes, cudaMemcpyDeviceToHost);
-	  }
-	  checkCudaError();
-	}
+          qudaMemcpy(backup_h, clover, bytes, cudaMemcpyDeviceToHost);
+          if (norm_bytes) {
+            backup_norm_h = safe_malloc(norm_bytes);
+            qudaMemcpy(backup_norm_h, norm, norm_bytes, cudaMemcpyDeviceToHost);
+          }
+        }
 
-	/**
+        /**
 	   @brief Restore the field from the host after tuning
 	*/
 	void load() {
-	  cudaMemcpy(clover, backup_h, bytes, cudaMemcpyHostToDevice);
-	  host_free(backup_h);
-	  backup_h = nullptr;
-	  if (norm_bytes) {
-	    cudaMemcpy(norm, backup_norm_h, norm_bytes, cudaMemcpyHostToDevice);
-	    host_free(backup_norm_h);
-	    backup_norm_h = nullptr;
-	  }
-	  checkCudaError();
+          qudaMemcpy(clover, backup_h, bytes, cudaMemcpyHostToDevice);
+          host_free(backup_h);
+          backup_h = nullptr;
+          if (norm_bytes) {
+            qudaMemcpy(norm, backup_norm_h, norm_bytes, cudaMemcpyHostToDevice);
+            host_free(backup_norm_h);
+            backup_norm_h = nullptr;
+          }
 	}
 
 	size_t Bytes() const {
@@ -804,7 +802,7 @@ namespace quda {
           errorQuda("Invalid clover order %d for this accessor", clover.Order());
         }
         offdiag = clover_ ? ((Float **)clover_)[0] : ((Float **)clover.V(inverse))[0];
-        diag = clover_ ? ((Float**)clover_)[1] : ((Float**)clover.V(inverse))[1];
+        diag = clover_ ? ((Float **)clover_)[1] : ((Float **)clover.V(inverse))[1];
       }
 	
       bool  Twisted()	const	{return twisted;}
@@ -873,7 +871,7 @@ namespace quda {
           errorQuda("Invalid clover order %d for this accessor", clover.Order());
         }
         this->clover[0] = clover_ ? clover_ : (Float *)(clover.V(inverse));
-        this->clover[1] = (Float*)((char*)this->clover[0] + clover.Bytes()/2);
+        this->clover[1] = (Float *)((char *)this->clover[0] + clover.Bytes() / 2);
       }
 
 
@@ -931,7 +929,9 @@ namespace quda {
   template<int N, bool add_rho> struct clover_mapper<short,N,add_rho> { typedef clover::FloatNOrder<short, N, 4, add_rho> type; };
 
   // quarter precision uses Float4
-  template<int N, bool add_rho> struct clover_mapper<char,N,add_rho> { typedef clover::FloatNOrder<char, N, 4, add_rho> type; };
+  template <int N, bool add_rho> struct clover_mapper<int8_t, N, add_rho> {
+    typedef clover::FloatNOrder<int8_t, N, 4, add_rho> type;
+  };
 
 } // namespace quda
 

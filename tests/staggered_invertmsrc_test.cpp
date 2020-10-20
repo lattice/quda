@@ -166,7 +166,7 @@ invert_test(void)
       0.8);
 
   // this must be before the FaceBuffer is created (this is because it allocates pinned memory - FIXME)
-  initQuda(device);
+  initQuda(device_ordinal);
 
   setDims(gaugeParam.X);
   dw_setDims(gaugeParam.X,1); // so we can use 5-d indexing from dwf

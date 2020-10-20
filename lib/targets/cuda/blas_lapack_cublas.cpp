@@ -7,8 +7,7 @@
 //#define _DEBUG
 
 #ifdef _DEBUG
-#include <Eigen/LU>
-using namespace Eigen;
+#include <eigen_helper.h>
 #endif
 
 namespace quda

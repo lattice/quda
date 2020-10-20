@@ -322,8 +322,7 @@ namespace quda
       Solver::create(*param_presmooth, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy,
                      *param.matSmoothSloppy, profile) :
       nullptr;
-    // DMH
-    if (param.level < param.Nlevel-1) { //Create the post smoother
+    if (param.level < param.Nlevel - 1) { // Create the post smoother
       param_postsmooth = new SolverParam(*param_presmooth);
       param_postsmooth->return_residual = false;  // post smoother does not need to return the residual vector
       param_postsmooth->use_init_guess = QUDA_USE_INIT_GUESS_YES;
@@ -383,6 +382,7 @@ namespace quda
     diracParam.tmp1 = tmp_coarse;
     diracParam.tmp2 = tmp2_coarse;
     diracParam.halo_precision = param.mg_global.precision_null[param.level];
+    diracParam.use_mma = param.use_mma;
 
     // use even-odd preconditioning for the coarse grid solver
     if (diracCoarseResidual) delete diracCoarseResidual;
@@ -1258,7 +1258,7 @@ namespace quda
     DiracMdagM *mdagmSloppy = (solverParam.inv_type == QUDA_CG_INVERTER || solverParam.inv_type == QUDA_CA_CG_INVERTER) ? new DiracMdagM(*diracSmootherSloppy) : nullptr;
     if (solverParam.inv_type == QUDA_CG_INVERTER || solverParam.inv_type == QUDA_CA_CG_INVERTER) {
       solve = Solver::create(solverParam, *mdagm, *mdagmSloppy, *mdagmSloppy, *mdagmSloppy, profile);
-    } else if(solverParam.inv_type == QUDA_MG_INVERTER) {
+    } else if (solverParam.inv_type == QUDA_MG_INVERTER) {
       // in case MG has not been created, we create the Smoother
       if (!transfer) createSmoother();
 
@@ -1583,7 +1583,7 @@ namespace quda
 
     for (int i = 0; i < n_conv; i++) B_evecs.push_back(ColorSpinorField::Create(csParam));
 
-    // before entering the eigen solver, lets free the B vectors to save some memory
+    // before entering the eigen solver, let's free the B vectors to save some memory
     ColorSpinorParam bParam(*param.B[0]);
     for (int i = 0; i < (int)param.B.size(); i++) delete param.B[i];
 

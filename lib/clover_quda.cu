@@ -158,7 +158,6 @@ namespace quda {
       writeAuxString("threads=%d,stride=%d,prec=%lu",arg.threads,arg.clover.stride,sizeof(store_t));
 
       apply(0);
-      checkCudaError();
       qudaDeviceSynchronize();
     }
 

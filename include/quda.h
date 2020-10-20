@@ -438,6 +438,9 @@ extern "C" {
     QudaBoolean use_dagger;
     QudaBoolean use_norm_op;
 
+    /** Use Eigen routines to eigensolve the upper Hessenberg via QR **/
+    QudaBoolean use_eigen_qr;
+
     /** Performs an MdagM solve, then constructs the left and right SVD. **/
     QudaBoolean compute_svd;
 
@@ -459,6 +462,8 @@ extern "C" {
     int n_ev_deflate;
     /** Tolerance on the least well known eigenvalue's residual **/
     double tol;
+    /** Tolerance on the QR iteration **/
+    double qr_tol;
     /** For IRLM/IRAM, check every nth restart **/
     int check_interval;
     /** For IRLM/IRAM, quit after n restarts **/
@@ -703,6 +708,9 @@ extern "C" {
 
     /** Boolean for if this is a staggered solve or not */
     QudaBoolean is_staggered;
+
+    /** Whether to use tensor cores (if available) */
+    QudaBoolean use_mma;
 
     /** Whether to do a full (false) or thin (true) update in the context of updateMultigridQuda */
     QudaBoolean thin_update_only;

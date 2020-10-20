@@ -41,6 +41,8 @@ module quda_fortran
      QudaReconstructType :: reconstruct_refinement_sloppy
      QudaPrecision :: cuda_prec_precondition
      QudaReconstructType :: reconstruct_precondition
+     QudaPrecision :: cuda_prec_eigensolver
+     QudaReconstructType :: reconstruct_eigensolver
      QudaGaugeFixed :: gauge_fix
 
      integer(4) :: ga_pad
@@ -163,6 +165,7 @@ module quda_fortran
      QudaPrecision :: cuda_prec_sloppy
      QudaPrecision :: cuda_prec_refinement_sloppy
      QudaPrecision :: cuda_prec_precondition
+     QudaPrecision :: cuda_prec_eigensolver
 
      QudaDiracFieldOrder :: dirac_order
 
@@ -175,6 +178,7 @@ module quda_fortran
      QudaPrecision :: clover_cuda_prec_sloppy
      QudaPrecision :: clover_cuda_prec_refinement_sloppy
      QudaPrecision :: clover_cuda_prec_precondition
+     QudaPrecision :: clover_cuda_prec_eigensolver
 
      QudaCloverFieldOrder :: clover_order
      QudaUseInitGuess :: use_init_guess

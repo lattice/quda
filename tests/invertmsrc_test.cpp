@@ -76,7 +76,7 @@ int main(int argc, char **argv)
   for (int i=0; i<inv_param.num_offset; i++) inv_param.offset[i] = offset[i];
 
   // initialize the QUDA library
-  initQuda(device);
+  initQuda(device_ordinal);
 
   // Set some dimension parameters for the host routines
   if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
