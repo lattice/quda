@@ -154,7 +154,7 @@ namespace quda {
     auto instantiateReduce(Args &&... args)
     {
       using host_reduce_t = typename Functor<double, double>::reduce_t;
-      host_reduce_t value;
+      host_reduce_t value = ::quda::zero<host_reduce_t>();
       instantiate<Functor, Reduce, mixed>(args..., value);
       return value;
     }
