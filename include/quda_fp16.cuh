@@ -1,12 +1,15 @@
 #pragma once
 
+#if defined(QUDA_BUILD_TARGET_CUDA)
 #include <cuda_fp16.h>
-
+#elif defined(QUDA_BUILD_TARGET_CUDA)
+#include <hip/hip_fp16.h>
+#endif
 namespace quda
 {
 
   __device__ inline half2 habs2(half2 input) {
-#if CUDA_VERSION >= 10020
+#if defined(CUDA_VERSION) && (CUDA_VERSION >= 10020)
     return __habs2(input);
 #else
     static constexpr uint32_t maximum_mask = 0x7fff7fffu; // 0111 1111 1111 1111 0111 1111 1111 1111
