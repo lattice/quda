@@ -253,10 +253,18 @@ namespace quda {
   template<> struct RealType<short2> { typedef short type; };
   template<> struct RealType<complex<short> > { typedef short type; };
   template<> struct RealType<short4> { typedef short type; };
-  template<> struct RealType<int8_t> { typedef int8_t type; };
-  template<> struct RealType<char2> { typedef int8_t type; };
-  template<> struct RealType<complex<int8_t> > { typedef int8_t type; };
-  template<> struct RealType<char4> { typedef int8_t type; };
+  template <> struct RealType<int8_t> {
+    typedef int8_t type;
+  };
+  template <> struct RealType<char2> {
+    typedef int8_t type;
+  };
+  template <> struct RealType<complex<int8_t>> {
+    typedef int8_t type;
+  };
+  template <> struct RealType<char4> {
+    typedef int8_t type;
+  };
 
 #ifndef __CUDACC_RTC__
   inline std::ostream &operator<<(std::ostream &output, const double2 &a)

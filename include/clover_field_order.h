@@ -691,25 +691,25 @@ namespace quda {
 	void save() {
 	  if (backup_h) errorQuda("Already allocated host backup");
 	  backup_h = safe_malloc(bytes);
-	  qudaMemcpy(backup_h, clover, bytes, cudaMemcpyDeviceToHost);
-	  if (norm_bytes) {
-	    backup_norm_h = safe_malloc(norm_bytes);
-	    qudaMemcpy(backup_norm_h, norm, norm_bytes, cudaMemcpyDeviceToHost);
-	  }
-	}
+          qudaMemcpy(backup_h, clover, bytes, cudaMemcpyDeviceToHost);
+          if (norm_bytes) {
+            backup_norm_h = safe_malloc(norm_bytes);
+            qudaMemcpy(backup_norm_h, norm, norm_bytes, cudaMemcpyDeviceToHost);
+          }
+        }
 
-	/**
+        /**
 	   @brief Restore the field from the host after tuning
 	*/
 	void load() {
-	  qudaMemcpy(clover, backup_h, bytes, cudaMemcpyHostToDevice);
-	  host_free(backup_h);
-	  backup_h = nullptr;
-	  if (norm_bytes) {
-	    qudaMemcpy(norm, backup_norm_h, norm_bytes, cudaMemcpyHostToDevice);
-	    host_free(backup_norm_h);
-	    backup_norm_h = nullptr;
-	  }
+          qudaMemcpy(clover, backup_h, bytes, cudaMemcpyHostToDevice);
+          host_free(backup_h);
+          backup_h = nullptr;
+          if (norm_bytes) {
+            qudaMemcpy(norm, backup_norm_h, norm_bytes, cudaMemcpyHostToDevice);
+            host_free(backup_norm_h);
+            backup_norm_h = nullptr;
+          }
 	}
 
 	size_t Bytes() const {

@@ -150,7 +150,8 @@ namespace quda
     size_t max_dynamic_shared_memory()
     {
       static int max_shared_bytes = 0;
-      if (!max_shared_bytes) cudaDeviceGetAttribute(&max_shared_bytes, cudaDevAttrMaxSharedMemoryPerBlockOptin, comm_gpuid());
+      if (!max_shared_bytes)
+        cudaDeviceGetAttribute(&max_shared_bytes, cudaDevAttrMaxSharedMemoryPerBlockOptin, comm_gpuid());
       return max_shared_bytes;
     }
 

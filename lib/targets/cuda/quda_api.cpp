@@ -41,10 +41,10 @@ namespace quda {
   void qudaFuncGetAttributes_(cudaFuncAttributes &attr, const void *kernel, const char *func, const char *file,
                               const char *line);
 
-#define qudaFuncSetAttribute(kernel, attr, value)                       \
+#define qudaFuncSetAttribute(kernel, attr, value)                                                                      \
   ::quda::qudaFuncSetAttribute_(kernel, attr, value, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
 
-#define qudaFuncGetAttributes(attr, kernel)                             \
+#define qudaFuncGetAttributes(attr, kernel)                                                                            \
   ::quda::qudaFuncGetAttributes_(attr, kernel, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
 
 #ifdef USE_DRIVER_API
@@ -93,14 +93,7 @@ namespace quda {
   public:
     inline QudaMem(void *dst, const void *src, size_t count, cudaMemcpyKind kind, const cudaStream_t &stream,
                    bool async, const char *func, const char *file, const char *line) :
-      dst(dst),
-      src(src),
-      count(count),
-      value(0),
-      copy(true),
-      kind(kind),
-      async(async),
-      active_tuning(activeTuning())
+      dst(dst), src(src), count(count), value(0), copy(true), kind(kind), async(async), active_tuning(activeTuning())
     {
       if (!async) {
         switch (kind) {
@@ -130,8 +123,8 @@ namespace quda {
       apply(stream);
     }
 
-    inline QudaMem(void *dst, int value, size_t count, const cudaStream_t &stream, bool async,
-                   const char *func, const char *file, const char *line) :
+    inline QudaMem(void *dst, int value, size_t count, const cudaStream_t &stream, bool async, const char *func,
+                   const char *file, const char *line) :
       dst(dst),
       src(nullptr),
       count(count),
@@ -289,8 +282,7 @@ namespace quda {
       param.dstHost = dst;
       param.dstMemoryType = CU_MEMORYTYPE_HOST;
       break;
-    default:
-      errorQuda("Unsupported cuMemcpyType2DAsync %d", kind);
+    default: errorQuda("Unsupported cuMemcpyType2DAsync %d", kind);
     }
     PROFILE(cuMemcpy2D(&param), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
 #else
@@ -334,7 +326,8 @@ namespace quda {
     if (count == 0) return;
     QudaMem set(ptr, value, count, 0, false, func, file, line);
     cudaError_t error = cudaGetLastError();
-    if (error != cudaSuccess && !activeTuning()) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    if (error != cudaSuccess && !activeTuning())
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
   void qudaMemsetAsync_(void *ptr, int value, size_t count, const qudaStream_t &stream, const char *func,
@@ -346,15 +339,15 @@ namespace quda {
     if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
-  void qudaMemset2D_(void *ptr, size_t pitch, int value, size_t width, size_t height,
-                     const char *func, const char *file, const char *line)
+  void qudaMemset2D_(void *ptr, size_t pitch, int value, size_t width, size_t height, const char *func,
+                     const char *file, const char *line)
   {
     cudaError_t error = cudaMemset2D(ptr, pitch, value, width, height);
     if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
-  void qudaMemset2DAsync_(void *ptr, size_t pitch, int value, size_t width, size_t height,
-                          const qudaStream_t &stream, const char *func, const char *file, const char *line)
+  void qudaMemset2DAsync_(void *ptr, size_t pitch, int value, size_t width, size_t height, const qudaStream_t &stream,
+                          const char *func, const char *file, const char *line)
   {
     cudaError_t error = cudaMemset2DAsync(ptr, pitch, value, width, height, stream);
     if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);

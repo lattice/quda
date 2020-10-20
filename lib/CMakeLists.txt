@@ -27,7 +27,7 @@ set (QUDA_OBJS
   dirac_coarse.cpp dslash_coarse.cu dslash_coarse_dagger.cu
   coarse_op.cu coarsecoarse_op.cu
   coarse_op_preconditioned.cu staggered_coarse_op.cu
-  eig_trlm.cpp eig_block_trlm.cpp vector_io.cpp
+  eig_iram.cpp eig_trlm.cpp eig_block_trlm.cpp vector_io.cpp
   eigensolve_quda.cpp quda_arpack_interface.cpp
   multigrid.cpp transfer.cpp block_orthogonalize.cu inv_bicgstab_quda.cpp
   prolongator.cu restrictor.cu staggered_prolong_restrict.cu
@@ -473,6 +473,17 @@ if(QUDA_ARPACK)
     if(QUDA_MPI OR QUDA_QMP)
       target_link_libraries(quda INTERFACE ${PARPACK} MPI::MPI_Fortran)
     endif()
+  endif()
+endif()
+
+if(QUDA_OPENBLAS)
+  target_compile_definitions(quda PRIVATE OPENBLAS_LIB)
+  
+  if(QUDA_DOWNLOAD_OPENBLAS)
+    target_link_libraries(quda PUBLIC openblas)
+    target_link_libraries(quda_cpp PUBLIC openblas)
+  else()
+    target_link_libraries(quda INTERFACE ${OPENBLAS})
   endif()
 endif()
 
