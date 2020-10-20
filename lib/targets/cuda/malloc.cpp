@@ -147,12 +147,12 @@ namespace quda
 
     a.size = size;
 
-#if (CUDA_VERSION > 4000)                                                                                              \
-  && 0 // we need to manually align to page boundaries to allow us to bind a texture to mapped memory
+#if 0
     a.base_size = size;
     ptr = malloc(size);
     if (!ptr) {
 #else
+    // we need to manually align to page boundaries to allow us to bind a texture to mapped memory
     static int page_size = 2 * getpagesize();
     a.base_size = ((size + page_size - 1) / page_size) * page_size; // round up to the nearest multiple of page_size
     int align = posix_memalign(&ptr, page_size, a.base_size);
