@@ -1,5 +1,6 @@
 #pragma once
 
+#include <quda_api.h>
 #include <shared_memory_cache_helper.cuh>
 #include <math_helper.cuh>
 
@@ -95,7 +96,7 @@ namespace quda
         switch (type) {
         case M5_EOFA:
           for (int s = 0; s < Ls; s++) { eofa_coeffs->u[s] = eofa_u[s]; }
-          cudaMemcpyToSymbolAsync(mobius_eofa_d, mobius_eofa_h, sizeof(eofa_coeff<real>) / 3, 0, cudaMemcpyHostToDevice,
+          qudaMemcpyToSymbolAsync(mobius_eofa_d, mobius_eofa_h, sizeof(eofa_coeff<real>) / 3, 0, qudaMemcpyHostToDevice,
                                   streams[Nstream - 1]);
           break;
         case M5INV_EOFA:
@@ -104,7 +105,7 @@ namespace quda
             eofa_coeffs->x[s] = eofa_x[s];
             eofa_coeffs->y[s] = eofa_y[s];
           }
-          cudaMemcpyToSymbolAsync(mobius_eofa_d, mobius_eofa_h, sizeof(eofa_coeff<real>), 0, cudaMemcpyHostToDevice,
+          qudaMemcpyToSymbolAsync(mobius_eofa_d, mobius_eofa_h, sizeof(eofa_coeff<real>), 0, qudaMemcpyHostToDevice,
                                   streams[Nstream - 1]);
           break;
         default: errorQuda("Unknown EOFA Dslash5Type %d", type);
