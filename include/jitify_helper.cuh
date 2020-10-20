@@ -56,10 +56,16 @@ namespace quda {
     if (!jitify_init) {
       kernel_cache = new jitify::JitCache;
 
-      std::vector<std::string> options = {"-std=c++14", "-ftz=true", "-prec-div=false", "-prec-sqrt=false"};
+      std::vector<std::string> options = {"-ftz=true", "-prec-div=false", "-prec-sqrt=false", "-remove-unused-globals"};
 
 #ifdef DEVICE_DEBUG
       options.push_back(std::string("-G"));
+#endif
+
+#if __cplusplus >= 201703L
+      options.push_back(std::string("-std=c++17"));
+#else
+      options.push_back(std::string("-std=c++14"));
 #endif
 
       // add an extra compilation options specific to this instance
