@@ -339,7 +339,6 @@ namespace quda {
   /** Compute the 1-d checkerboard index and parity from
       the full linear lattice (not what's used for
       indexing into fields, re:padding argument for getIndexFull).
-      FIXME: still need to verify
 
       @param[out] out_parity Output site parity
       @param[in] X full lattice dimensions

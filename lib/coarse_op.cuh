@@ -19,7 +19,6 @@ namespace quda {
     COMPUTE_AV,
     COMPUTE_TMAV,
     COMPUTE_TMCAV,
-    COMPUTE_KDAV,
     COMPUTE_CLOVER_INV_MAX,
     COMPUTE_TWISTED_CLOVER_INV_MAX,
     COMPUTE_VUV,
@@ -82,16 +81,6 @@ namespace quda {
         ComputeTMCAVCPU<Float,fineSpin,fineColor,coarseColor>(arg);
 #else
         errorQuda("Twisted clover dslash has not been built");
-#endif
-
-      } else if (type == COMPUTE_KDAV) {
-        if (from_coarse) errorQuda("ComputeTMCAV should only be called from the fine grid");
-
-#if defined(GPU_STAGGERED_DIRAC) && defined(STAGGEREDCOARSE)
-        //ComputeTMCAVCPU<Float,fineSpin,fineColor,coarseColor>(arg);
-        errorQuda("ComputeKDAV does not have a CPU implementation yet");
-#else
-        errorQuda("Staggered dslash has not been built");
 #endif
 
       } else if (type == COMPUTE_CLOVER_INV_MAX) {
@@ -234,23 +223,6 @@ namespace quda {
         qudaLaunchKernel(ComputeTMCAVGPU<Float,fineSpin,fineColor,coarseColor,Arg>, tp, stream, arg);
 #else
         errorQuda("Twisted clover dslash has not been built");
-#endif
-#endif
-
-      } else if (type == COMPUTE_KDAV) {
-        if (from_coarse) errorQuda("ComputeKDAV should only be called from the fine grid");
-#ifdef JITIFY
-        error = program->kernel("quda::ComputeKDAVGPU")
-          .instantiate(Type<Float>(),fineSpin,fineColor,coarseColor,Type<Arg>())
-          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
-#else
-#if defined(GPU_STAGGERED_DIRAC) && defined(STAGGEREDCOARSE)
-        errorQuda("ComputeKDAV has not yet been defined");
-        //tp.set_max_shared_bytes = true;
-        //qudaLaunchKernel(ComputeKDAVGPU<Float,fineSpin,fineColor,coarseColor,Arg>, tp, stream, arg);
-        //tp.set_max_shared_bytes = false;
-#else
-        errorQuda("Staggered dslash has not been built");
 #endif
 #endif
 
@@ -518,10 +490,6 @@ namespace quda {
 	// # Twice chiral blocks * size of chiral block * number of null space vectors
 	flops_ = 4l * arg.fineVolumeCB * 8 * (fineSpin/2) * (fineSpin/2) * (fineSpin/2) * fineColor * fineColor * coarseColor;
 	break;
-      case COMPUTE_KDAV:
-      // # kd blocks * (48 x 48 x coarseColor multiply)
-      //flops_ = (2l * arg.fineVolumeCB) / Arg::blockSizeKD * (8 * fineColor * fineColor * Arg::blockSizeKD * Arg::blockSizeKD * coarseColor);
-      break;
       case COMPUTE_VUV:
       // when the fine operator is truly fine the VUV multiplication is block sparse which halves the number of operations
       // FIXME verify for staggered coarsening
@@ -571,9 +539,6 @@ namespace quda {
 	bytes_ = arg.AV.Bytes() + arg.V.Bytes() + 4*arg.C.Bytes()*coarseColor; // Both clover and its inverse
 #endif
 	break;
-      case COMPUTE_KDAV:
-      //bytes_ = arg.AV.Bytes() + arg.V.Bytes() + (coarseColor / Arg::coarseColorTileSize) * arg.C.Bytes(); // multiple loads of C due to tiling
-      break;
       case COMPUTE_CLOVER_INV_MAX:
       case COMPUTE_TWISTED_CLOVER_INV_MAX:
         bytes_ = 2*arg.C.Bytes(); // read both parities of the clover field
@@ -622,9 +587,6 @@ namespace quda {
       case COMPUTE_COARSE_CLOVER:
 	threads = arg.fineVolumeCB;
 	break;
-      case COMPUTE_KDAV:
-      threads = 2l * arg.fineVolumeCB;
-      break;
       case COMPUTE_REVERSE_Y:
       case COMPUTE_DIAGONAL:
       case COMPUTE_STAGGEREDMASS:
@@ -649,12 +611,6 @@ namespace quda {
     }
 
     unsigned int sharedBytesPerThread() const {
-      //if (type == COMPUTE_KDAV) {
-      //  // each warp needs... something
-      //  return 2 * (16 * (fineColor * Arg::blockSizeKD) * Arg::coarseColorPaddedTileSize) * sizeof(complex<typename Arg::Float>) / 256 +
-      //        Arg::xinvPaddedTileSize * sizeof(complex<typename Arg::Float>);
-      //}
-      //else
       return TunableVectorYZ::sharedBytesPerThread();
     }
 
@@ -686,8 +642,7 @@ namespace quda {
 
     void apply(const qudaStream_t &stream)
     {
-      TuneParam tp;
-      tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       arg.dim = dim;
       arg.dir = dir;
       if (type == COMPUTE_VUV || type == COMPUTE_CONVERT || type == COMPUTE_RESCALE) arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
@@ -696,8 +651,6 @@ namespace quda {
       Launch<location, from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg>(arg, jitify_error, tp,
                                                                                               type, use_mma, stream);
       if (type == COMPUTE_VUV) tp.shared_bytes += sharedBytesPerBlock(tp); // restore shared memory
-
-      // FIXME: COMPUTE_KDAV uses shared memory
     };
 
     /**
@@ -736,7 +689,6 @@ namespace quda {
       case COMPUTE_TMAV: resizeVector(2, coarseColor); break;
       case COMPUTE_AV:
       case COMPUTE_TMCAV: resizeVector(4, coarseColor); break; // y dimension is chirality and parity
-      case COMPUTE_KDAV: resizeVector(1, 1); break;
       default: resizeVector(2, 1); break;
       }
 
@@ -864,7 +816,6 @@ namespace quda {
         strcat(Aux, ",computeAV");
       else if (type == COMPUTE_TMAV)               strcat(Aux,",computeTmAV");
       else if (type == COMPUTE_TMCAV)              strcat(Aux,",computeTmcAV");
-      else if (type == COMPUTE_KDAV)               strcat(Aux,",computeKDAV");
       else if (type == COMPUTE_CLOVER_INV_MAX)
         strcat(Aux, ",computeCloverInverseMax");
       else if (type == COMPUTE_TWISTED_CLOVER_INV_MAX)
@@ -948,7 +899,6 @@ namespace quda {
       case COMPUTE_AV:
       case COMPUTE_TMAV:
       case COMPUTE_TMCAV:
-      case COMPUTE_KDAV:
       case COMPUTE_CLOVER_INV_MAX:
       case COMPUTE_TWISTED_CLOVER_INV_MAX:
       case COMPUTE_REVERSE_Y:
@@ -978,7 +928,6 @@ namespace quda {
       case COMPUTE_AV:
       case COMPUTE_TMAV:
       case COMPUTE_TMCAV:
-      case COMPUTE_KDAV:
       case COMPUTE_CLOVER_INV_MAX:
       case COMPUTE_TWISTED_CLOVER_INV_MAX:
       case COMPUTE_REVERSE_Y:
@@ -1029,9 +978,8 @@ namespace quda {
       errorQuda("Unsupported coarsening of matpc = %d", matpc);
 
     bool is_dirac_coarse = (dirac == QUDA_COARSE_DIRAC || dirac == QUDA_COARSEPC_DIRAC) ? true : false;
-    bool is_dirac_staggered_kd_specifically = (dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC);
     bool is_dirac_staggered = (dirac == QUDA_STAGGERED_DIRAC || dirac == QUDA_STAGGEREDPC_DIRAC || 
-                               dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC || is_dirac_staggered_kd_specifically);
+                               dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC || dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC);
 
     bool is_dirac_wilson = !is_dirac_coarse && !is_dirac_staggered;
     if (is_dirac_coarse && fineSpin != 2)
@@ -1072,7 +1020,7 @@ namespace quda {
 
     typedef CalculateYArg<Float,fineSpin,coarseSpin,fineColor,coarseColor,coarseGauge,coarseGaugeAtomic,fineGauge,F,Ftmp,Vt,fineClover> Arg;
     Arg arg(Y, X, Y_atomic, X_atomic, UV, AV, G, V, C, Cinv, kappa, mass,
-	    mu, mu_factor, is_dirac_staggered_kd_specifically, x_size, xc_size, geo_bs, spin_bs, fine_to_coarse, coarse_to_fine, bidirectional_links);
+	    mu, mu_factor, x_size, xc_size, geo_bs, spin_bs, fine_to_coarse, coarse_to_fine, bidirectional_links);
     CalculateY<location, from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> y(
       arg, v, Y_, X_, Y_atomic_, X_atomic_, use_mma);
 
@@ -1159,27 +1107,6 @@ namespace quda {
       y.apply(0);
 
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("AV2 = %e\n", arg.AV.norm2());
-    }
-
-    // If we're coarsening the KD operator we need to multiply the null-space vectors
-    // by the KD block inverse. 
-    // FIXME: figure out a smart way to determine the scale
-    if ( dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC ) {
-      if (getVerbosity() >= QUDA_VERBOSE) printf("Compute KDAV\n");
-
-      if (av.Precision() == QUDA_HALF_PRECISION) {
-        double max = 6*sqrt(C_.abs_max(true)); // may not be high enough
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("kdav max %e\n", max);
-        av.Scale(max);
-        arg.AV.resetScale(max);
-      }
-
-      y.setComputeType(COMPUTE_KDAV);
-      y.apply(0);
-
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("AV2 = %e\n", arg.AV.norm2());
-
-      exit(-1);
     }
 
     // work out what to set the scales to
