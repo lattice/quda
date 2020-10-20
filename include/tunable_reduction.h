@@ -235,7 +235,7 @@ namespace quda {
   class TunableMultiReduction : public TunableReduction2D<block_size_y>
   {
     // for now we do not support anything other than block_size_y = 1
-    static_assert(block_size_y == 1);
+    static_assert(block_size_y == 1, "only block_size_y = 1 supported");
     using Tunable::jitify_error;
     using TunableReduction2D<block_size_y>::field;
     using TunableReduction2D<block_size_y>::location;
