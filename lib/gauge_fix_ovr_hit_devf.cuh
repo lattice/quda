@@ -5,6 +5,7 @@
 #include <quda_internal.h>
 #include <quda_matrix.h>
 #include <atomic.cuh>
+#include "quda_api.h"
 
 namespace quda {
 
@@ -15,13 +16,13 @@ namespace quda {
   {
     __device__ inline operator T*()
     {
-      extern __shared__ int __smem[];
+      QUDA_DYNAMIC_SHARED(int, __smem);
       return (T*)__smem;
     }
 
     __device__ inline operator const T*() const
     {
-      extern __shared__ int __smem[];
+      QUDA_DYNAMIC_SHARED(int, __smem);
       return (T*)__smem;
     }
   };

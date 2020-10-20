@@ -25,6 +25,9 @@ constexpr qudaMemcpyKind  qudaMemcpyHostToDevice = cudaMemcpyHostToDevice;
 constexpr qudaMemcpyKind  qudaMemcpyDeviceToDevice = cudaMemcpyDeviceToDevice;
 constexpr qudaMemcpyKind  qudaMemcpyDefault = cudaMemcpyDefault;
 
+#define QUDA_DYNAMIC_SHARED( type, var )	\
+	extern __shared__ type var[] ;
+
 #elif defined(QUDA_BUILD_TARGET_HIP)
 
 #include <hip/hip_runtime.h>
@@ -345,6 +348,10 @@ namespace quda
 
 #define qudaMemcpyAsync(dst, src, count, kind, stream)                                                \
   ::quda::qudaMemcpyAsync_(dst, src, count, kind, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
+#define qudaMemcpyToSymbolAsync(symbol,src,count,offset,kind,stream)							\
+  ::quda::qudaMemcpyToSymbolAsync_(symbol, src, count, offset, kind, stream, __func__,  quda::file_name(__FILE__), \
+		  __STRINGIFY__(__LINE__))
 
 #define qudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind)     \
   ::quda::qudaMemcpy2D_(dst, dpitch, src, spitch, width, height, kind, __func__, \

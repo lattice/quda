@@ -3,6 +3,7 @@
 #include <index_helper.cuh>
 #include <float_vector.h>
 #include <generics/shfl.h>
+#include "quda_api.h"
 
 namespace quda {
 
@@ -88,7 +89,8 @@ namespace quda {
      @param parity The site parity
      @param x_cb The checkerboarded site index
    */
-  extern __shared__ float s[];
+  QUDA_DYNAMIC_SHARED(float, s);
+
   template <typename Float, int nDim, int Ns, int Nc, int Mc, int color_stride, int dim_stride, int thread_dir, int thread_dim, bool dagger, DslashType type, typename Arg>
   __device__ __host__ inline void applyDslash(complex<Float> out[], Arg &arg, int x_cb, int src_idx, int parity, int s_row, int color_block, int color_offset) {
     const int their_spinor_parity = (arg.nParity == 2) ? 1-parity : 0;

@@ -110,7 +110,7 @@ namespace quda {
     Link linkA, linkB, staple;
 
 #ifdef __CUDA_ARCH__
-    extern __shared__ int s[];
+    QUDA_DYNAMIC_SHARED(int, s);
     int tid = (threadIdx.z*blockDim.y + threadIdx.y)*blockDim.x + threadIdx.x;
     s[tid] = 0;
     signed char *dx = (signed char*)&s[tid];
