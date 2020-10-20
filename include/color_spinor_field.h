@@ -883,13 +883,7 @@ namespace quda {
 
     void scatterExtended(int nFace, int parity, int dagger, int dir);
 
-    inline const void* Ghost2() const {
-      if (bufferIndex < 2) {
-        return ghost_recv_buffer_d[bufferIndex];
-      } else {
-        return ghost_pinned_recv_buffer_hd[bufferIndex%2];
-      }
-    }
+    const void* Ghost2() const;
 
     /**
        @brief This is a unified ghost exchange function for doing a complete

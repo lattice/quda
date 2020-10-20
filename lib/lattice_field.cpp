@@ -616,6 +616,26 @@ namespace quda {
     return ipcRemoteCopyEvent[bufferIndex][dir][dim];
   }
 
+  void* LatticeField::myFace_h(int dir, int dim) const
+  {
+    return my_face_dim_dir_h[bufferIndex][dim][dir];
+  }
+
+  void* LatticeField::myFace_hd(int dir, int dim) const
+  {
+    return my_face_dim_dir_hd[bufferIndex][dim][dir];
+  }
+
+  void* LatticeField::myFace_d(int dir, int dim) const
+  {
+    return my_face_dim_dir_d[bufferIndex][dim][dir];
+  }
+
+  void* LatticeField::remoteFace_d(int dir, int dim) const
+  {
+    return ghost_remote_send_buffer_d[bufferIndex][dim][dir];
+  }
+
   void LatticeField::setTuningString() {
     char vol_tmp[TuneKey::volume_n];
     int check  = snprintf(vol_string, TuneKey::volume_n, "%d", x[0]);

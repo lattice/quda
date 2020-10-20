@@ -1285,4 +1285,13 @@ namespace quda {
 
   void cudaColorSpinorField::PrintVector(unsigned int i) const { genericCudaPrintVector(*this, i); }
 
+  const void* cudaColorSpinorField::Ghost2() const
+  {
+    if (bufferIndex < 2) {
+      return ghost_recv_buffer_d[bufferIndex];
+    } else {
+      return ghost_pinned_recv_buffer_hd[bufferIndex%2];
+    }
+  }
+
 } // namespace quda
