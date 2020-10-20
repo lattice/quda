@@ -23,7 +23,7 @@ int main(int argc, char **argv)
 
   // init QUDA
   initComms(argc, argv, gridsize_from_cmdline);
-  initQuda(device);
+  initQuda(device_ordinal);
 
   // gauge params
   QudaGaugeParam gauge_param = newQudaGaugeParam(); // create an instance of a class that can hold the gauge parameters

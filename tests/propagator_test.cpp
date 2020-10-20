@@ -141,8 +141,8 @@ int main(int argc, char **argv)
   initComms(argc, argv, gridsize_from_cmdline);
 
   // Initialize the QUDA library
-  initQuda(device);
-
+  initQuda(device_ordinal);
+  
   // Set verbosity
   setVerbosity(verbosity);
 
@@ -387,8 +387,9 @@ int main(int argc, char **argv)
   auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
   rng->Init();
 
-  double *time = new double[12];
-  double *gflops = new double[12];
+  std::vector<double> time(12);
+  std::vector<double> gflops(12);
+  std::vector<int> iter(12);
 
   // Loop over the number of sources to use.
   for (int n = 0; n < prop_n_sources; n++) {
@@ -451,9 +452,11 @@ int main(int argc, char **argv)
       inv_param.solver_normalization = QUDA_SOURCE_NORMALIZATION; // Make explicit for now.
       invertQuda(out->V(), in->V(), &inv_param);
       
-      // Performance states
+      // Performance stats
       time[i] = inv_param.secs;
       gflops[i] = inv_param.gflops / inv_param.secs;
+      iter[i] = inv_param.iter;
+      
       printfQuda("Prop %d done: %d iter / %g secs = %g Gflops\n\n", i, inv_param.iter, inv_param.secs,
                  inv_param.gflops / inv_param.secs);
 
@@ -509,7 +512,7 @@ int main(int argc, char **argv)
     
     // Compute performance statistics for this propagator
     Nsrc = 12;
-    performanceStats(time, gflops);
+    performanceStats(time, gflops, iter);
 
     if (strcmp(prop_sink_outfile[n], "") != 0) {
       // Save the propagator if requested
@@ -541,9 +544,6 @@ int main(int argc, char **argv)
   // Clean up memory allocations
   rng->Release();
   delete rng;
-
-  delete[] time;
-  delete[] gflops;
 
   delete in;
   delete out;

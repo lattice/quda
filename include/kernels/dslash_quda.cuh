@@ -172,6 +172,8 @@ namespace quda
 	doublet(in.TwistFlavor() == QUDA_TWIST_DEG_DOUBLET || in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
         volumeCB(doublet ? in.VolumeCB()/2 : in.VolumeCB()), a(0.0), b(0.0), c(0.0), twist(twist)
     {
+      checkPrecision(out, in, clover);
+      checkLocation(out, in, clover);
       if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
 	if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
 	  a = 2.0 * kappa * mu;
