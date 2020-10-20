@@ -7,8 +7,7 @@
 #include <atomic.cuh>
 #include <index_helper.cuh>
 
-#include <cufft.h>
-#include <CUFFT_Plans.h>
+#include <FFT_Plans.h>
 #include <instantiate.h>
 
 #include <tunable_nd.h>
@@ -203,8 +202,8 @@ namespace quda {
 
     unsigned int delta_pad = data.X()[0] * data.X()[1] * data.X()[2] * data.X()[3];
     int4 size = make_int4(data.X()[0], data.X()[1], data.X()[2], data.X()[3]);
-    cufftHandle plan_xy;
-    cufftHandle plan_zt;
+    FFTPlanHandle plan_xy;
+    FFTPlanHandle plan_zt;
 
     GaugeFixArg<Float, recon> arg(data, alpha0);
     SetPlanFFT2DMany( plan_zt, size, 0, arg.delta);     //for space and time ZT
@@ -236,7 +235,7 @@ namespace quda {
         //------------------------------------------------------------------------
         // Perform FFT on xy plane
         //------------------------------------------------------------------------
-        ApplyFFT(plan_xy, _array, arg.gx, CUFFT_FORWARD);
+        ApplyFFT(plan_xy, _array, arg.gx, FFT_FORWARD);
         //------------------------------------------------------------------------
         // Rotate hypercube, xyzt -> ztxy
         //------------------------------------------------------------------------
@@ -245,7 +244,7 @@ namespace quda {
         //------------------------------------------------------------------------
         // Perform FFT on zt plane
         //------------------------------------------------------------------------
-        ApplyFFT(plan_zt, _array, arg.gx, CUFFT_FORWARD);
+        ApplyFFT(plan_zt, _array, arg.gx, FFT_FORWARD);
         //------------------------------------------------------------------------
         // Normalize FFT and apply pmax^2/p^2
         //------------------------------------------------------------------------
@@ -254,7 +253,7 @@ namespace quda {
         //------------------------------------------------------------------------
         // Perform IFFT on zt plane
         //------------------------------------------------------------------------
-        ApplyFFT(plan_zt, arg.gx, _array, CUFFT_INVERSE);
+        ApplyFFT(plan_zt, arg.gx, _array, FFT_INVERSE);
         //------------------------------------------------------------------------
         // Rotate hypercube, ztxy -> xyzt
         //------------------------------------------------------------------------
@@ -263,7 +262,7 @@ namespace quda {
         //------------------------------------------------------------------------
         // Perform IFFT on xy plane
         //------------------------------------------------------------------------
-        ApplyFFT(plan_xy, arg.gx, _array, CUFFT_INVERSE);
+        ApplyFFT(plan_xy, arg.gx, _array, FFT_INVERSE);
       }
 
 #ifndef GAUGEFIXING_DONT_USE_GX
@@ -330,8 +329,8 @@ namespace quda {
     // end reunitarize
 
     arg.free();
-    CUFFT_SAFE_CALL(cufftDestroy(plan_zt));
-    CUFFT_SAFE_CALL(cufftDestroy(plan_xy));
+    FFTDestroyPlan(plan_zt);
+    FFTDestroyPlan(plan_xy);
     qudaDeviceSynchronize();
     profileInternalGaugeFixFFT.TPSTOP(QUDA_PROFILE_COMPUTE);
 
