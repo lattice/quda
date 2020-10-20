@@ -168,7 +168,6 @@ namespace quda {
     const int fineColor = g.Ncolor() / fineSpin;
     const int coarseSpin = 2;
     const int coarseColor = Y.Ncolor() / coarseSpin;
-    // FIXME: un-comment out everything that I commented out for compile time reasons
 #ifdef NSPIN4
     if (fineColor == 6) { // free field Wilson
       if (coarseColor == 6) {

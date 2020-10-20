@@ -2,7 +2,6 @@
 #include <gauge_field_order.h>
 #include <multigrid_helper.cuh>
 #include <index_helper.cuh>
-#include <gamma.cuh>
 
 namespace quda {
 

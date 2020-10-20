@@ -156,7 +156,7 @@ namespace quda {
     getCoords(coord, x_cb, arg.x_size, parity);
 
     constexpr int uvSpin = fineSpin * (from_coarse ? 2 : 1);
-    constexpr int nFace = 1; // FIXME for coarsening the long-links I guess
+    constexpr int nFace = 1; // to do: nFace == 3 version for long links
 
     using complex = complex<typename Arg::Float>;
     using TileType = typename Arg::uvTileType;
@@ -243,7 +243,7 @@ namespace quda {
       for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) {
         for (int ic = 0; ic < TileType::m; ic += TileType::M)   // fine color
           for (int jc = 0; jc < TileType::n; jc += TileType::N) // coarse color
-            if (dir == QUDA_FORWARDS) // only for preconditioned clover is V != AV // FIXME logic changes for staggered KD
+            if (dir == QUDA_FORWARDS) // only for preconditioned clover is V != AV, will need extra logic for staggered KD
               computeUV<from_coarse,dim,dir,fineSpin,coarseSpin>(arg, arg.V, parity, x_cb, ic, jc);
             else
               computeUV<from_coarse,dim,dir,fineSpin,coarseSpin>(arg, arg.AV, parity, x_cb, ic, jc);
@@ -265,8 +265,7 @@ namespace quda {
     int jc = blockDim.z*blockIdx.z + threadIdx.z; // tiled coarse color
     if (jc >= arg.uvTile.N_tiles) return;
 
-    // FIXME logic changes for staggered KD
-    if (dir == QUDA_FORWARDS) // only for preconditioned clover is V != AV
+    if (dir == QUDA_FORWARDS) // only for preconditioned clover is V != AV, will need extra logic for staggered KD
       computeUV<from_coarse,dim,dir,fineSpin,coarseSpin>(arg, arg.V, parity, x_cb, ic * arg.uvTile.M, jc * arg.uvTile.N);
     else
       computeUV<from_coarse,dim,dir,fineSpin,coarseSpin>(arg, arg.AV, parity, x_cb, ic * arg.uvTile.M, jc * arg.uvTile.N);
@@ -822,7 +821,6 @@ namespace quda {
                                    X[i_block0+i][j_block0+j][x_][s_row][s_col]);
           }
 
-          // FIXME: need to update for staggered
           if (!arg.bidirectional) {
             if (Arg::fineSpin != 1 && s_row == s_col) arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,
                                                                      X[i_block0+i][j_block0+j][x_][s_row][s_col]);
@@ -883,7 +881,6 @@ namespace quda {
         }
       }
 
-      // FIXME: need to modify for staggered
       if (!arg.bidirectional) {
 #pragma unroll
         for (int s_row = 0; s_row < coarseSpin; s_row++) { // Chiral row block

@@ -379,7 +379,6 @@ namespace quda {
           .instantiate(from_coarse,Type<Float>(),fineSpin,coarseSpin,fineColor,coarseColor,Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
-          // FIXME may be needed for KD coarsening...
 #if !defined(STAGGEREDCOARSE)
         qudaLaunchKernel(ComputeCoarseCloverGPU<from_coarse,Float,fineSpin,coarseSpin,fineColor,coarseColor,Arg>, tp, stream, arg);
 #else
@@ -478,7 +477,6 @@ namespace quda {
       switch (type) {
       case COMPUTE_UV:
       // when fine operator is coarse take into account that the link matrix has spin dependence
-      // FIXME verify for staggered coarsening
       flops_ = 2l * arg.fineVolumeCB * 8 * fineSpin * coarseColor * fineColor * fineColor * (!from_coarse ? 1 : fineSpin);
 	break;
       case COMPUTE_AV:
@@ -492,7 +490,6 @@ namespace quda {
 	break;
       case COMPUTE_VUV:
       // when the fine operator is truly fine the VUV multiplication is block sparse which halves the number of operations
-      // FIXME verify for staggered coarsening
       flops_ = 2l * arg.fineVolumeCB * 8 * fineSpin * fineSpin * coarseColor * coarseColor * fineColor / (!from_coarse ? coarseSpin : 1);
 	break;
       case COMPUTE_COARSE_CLOVER:
@@ -1270,7 +1267,6 @@ namespace quda {
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("X2 = %e\n", X_atomic_.norm2(0, coarseGaugeAtomic::fixedPoint()));
 
-    // FIXME: you can write a "REVERSE Y" for staggered, it just has a different structure.
     // if not doing a preconditioned operator then we can trivially
     // construct the forward links from the backward links
     if ( !bidirectional_links ) {
@@ -1279,7 +1275,6 @@ namespace quda {
       y.apply(0);
     }
 
-    // FIXME: idk how we're going to handle the KD contribution
     // Check if we have a clover term that needs to be coarsened
     if (dirac == QUDA_CLOVER_DIRAC || dirac == QUDA_COARSE_DIRAC || dirac == QUDA_TWISTED_CLOVER_DIRAC) {
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing fine->coarse clover term\n");

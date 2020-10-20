@@ -2,9 +2,6 @@
 #include <multigrid.h>
 #include <algorithm>
 
-// temporary for verify
-#include <staggered_kd_build_xinv.h> // for build
-
 namespace quda {
 
   DiracCoarse::DiracCoarse(const DiracParam &param, bool gpu_setup, bool mapped) :
@@ -276,59 +273,6 @@ namespace quda {
 
     // save the intermediate tunecache after the Yhat tune
     saveTuneCache();
-
-    // TEMPORARY
-    // hack in verifying BuildStaggeredKahlerDiracInverse
-    // remove me when this is said and done
-#if 0
-    {
-      // hack: get gauge field
-      auto fine_gauge = dirac->getGaugeField();
-
-      // Allocate the KD inverse block (inverse coarse clover)
-      // Copied from `dirac_coarse.cpp`, `DiracCoarse::createY`
-      const int ndim = 4;
-      int xc[QUDA_MAX_DIM];
-      for (int i = 0; i < ndim; i++) { xc[i] = fine_gauge->X()[i]/2; }
-      const int Nc_c = fine_gauge->Ncolor() * 8; // 24
-      const int Ns_c = 2; // staggered parity
-
-      printf("Gauge precision = %d\n", fine_gauge->Precision());
-
-      GaugeFieldParam gParam;
-      memcpy(gParam.x, xc, QUDA_MAX_DIM*sizeof(int));
-      gParam.nColor = Nc_c*Ns_c;
-      gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-      gParam.order = QUDA_MILC_GAUGE_ORDER; // Xinv is stored in AoS order
-      gParam.link_type = QUDA_COARSE_LINKS;
-      gParam.t_boundary = QUDA_PERIODIC_T;
-      gParam.create = QUDA_ZERO_FIELD_CREATE;
-      auto precision = gauge->Precision();
-      // right now the build Xinv routines only support single and double
-      if (precision < QUDA_HALF_PRECISION) { 
-        precision = QUDA_HALF_PRECISION;
-      } else if (precision > QUDA_SINGLE_PRECISION) {
-        precision = QUDA_SINGLE_PRECISION;
-      }
-      gParam.setPrecision( precision );
-      gParam.nDim = ndim;
-      gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-      gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-      gParam.nFace = 0;
-      gParam.geometry = QUDA_SCALAR_GEOMETRY;
-      gParam.pad = 0;
-
-      cudaGaugeField* Xinv = new cudaGaugeField(gParam);
-
-      printfQuda("Begin build\n"); fflush(stdout);
-
-      BuildStaggeredKahlerDiracInverse(*Xinv, *fine_gauge, dirac->Mass());
-
-      printfQuda("End build\n"); fflush(stdout);
-
-      delete Xinv;
-    }
-#endif
 
     if (gpu_setup) {
       enable_gpu = true;

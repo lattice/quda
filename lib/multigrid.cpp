@@ -3,16 +3,12 @@
 #include <multigrid.h>
 #include <vector_io.h>
 
-// TEMPORARY for verify
-#include <staggered_kd_build_xinv.h> // for build
-#include <dirac_quda.h> // for apply
-
 namespace quda
 {
 
   using namespace blas;
 
-  static bool debug = true;
+  static bool debug = false;
 
   MG::MG(MGParam &param, TimeProfile &profile_global) :
     Solver(*param.matResidual, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, param, profile),
@@ -970,7 +966,7 @@ namespace quda
 
     { // normal operator check for residual operator
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Checking normality of residual operator\n");
-      if (tmp2->Nspin() != 1 || tmp2->SiteSubset() == QUDA_FULL_SITE_SUBSET) { // FIXME need to update this
+      if (tmp2->Nspin() != 1 || tmp2->SiteSubset() == QUDA_FULL_SITE_SUBSET) { 
         diracResidual->MdagM(*tmp2, *tmp1);
       } else {
         // staggered preconditioned op.
