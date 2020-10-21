@@ -292,13 +292,13 @@ int main(int argc, char **argv)
   std::vector<double> gflops(Nsrc);
   std::vector<int> iter(Nsrc);
 
-  auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
+  auto *rng = new quda::RNG(*in, 1234);
   rng->Init();
 
   for (int i = 0; i < Nsrc; i++) {
 
     // Populate the host spinor with random numbers.
-    constructRandomSpinorSource(in->V(), 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
+    constructRandomSpinorSource(cs_param, in->V(), *rng);
     // If deflating, preserve the deflation space between solves
     if (inv_deflate) eig_param.preserve_deflation = i < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     // Perform QUDA inversions

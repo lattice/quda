@@ -327,6 +327,24 @@ extern "C" {
     /** Whether to use additive or multiplicative Schwarz preconditioning */
     QudaSchwarzType schwarz_type;
 
+    double madwf_diagonal_suppressor;
+
+    int madwf_ls;
+
+    int madwf_null_maxiter;
+
+    double madwf_null_tol;
+
+    int madwf_train_maxiter;
+
+    QudaBoolean madwf_param_load;
+
+    QudaBoolean madwf_param_save;
+
+    char madwf_param_infile[256];
+
+    char madwf_param_outfile[256];
+
     /**
      * Whether to use the L2 relative residual, Fermilab heavy-quark
      * residual, or both to determine convergence.  To require that both

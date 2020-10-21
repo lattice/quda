@@ -186,6 +186,7 @@ typedef enum QudaMultigridCycleType_s {
 
 typedef enum QudaSchwarzType_s {
   QUDA_ADDITIVE_SCHWARZ,
+  QUDA_ADDITIVE_MADWF_SCHWARZ,
   QUDA_MULTIPLICATIVE_SCHWARZ,
   QUDA_INVALID_SCHWARZ = QUDA_INVALID_ENUM
 } QudaSchwarzType;

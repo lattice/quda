@@ -235,21 +235,20 @@ void constructWilsonTestSpinorParam(quda::ColorSpinorParam *cs_param, const Quda
   cs_param->location = QUDA_CPU_FIELD_LOCATION;
 }
 
-void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x,
-                                 quda::RNG &rng)
+void constructRandomSpinorSource(const quda::ColorSpinorParam &ref_param, void *v, quda::RNG &rng)
 {
   quda::ColorSpinorParam param;
   param.v = v;
-  param.nColor = nColor;
-  param.nSpin = nSpin;
-  param.setPrecision(precision);
+  param.nColor = ref_param.nColor;
+  param.nSpin = ref_param.nSpin;
+  param.setPrecision(ref_param.Precision());
   param.create = QUDA_REFERENCE_FIELD_CREATE;
   param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-  param.nDim = 4;
-  param.siteSubset = QUDA_FULL_SITE_SUBSET;
-  param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+  param.nDim = ref_param.nDim;
+  param.siteSubset = ref_param.siteSubset;
+  param.siteOrder = ref_param.siteOrder;
   param.location = QUDA_CPU_FIELD_LOCATION; // DMH FIXME so one can construct device noise
-  for (int d = 0; d < 4; d++) param.x[d] = x[d];
+  for (int d = 0; d < ref_param.nDim; d++) { param.x[d] = ref_param.x[d]; };
   quda::cpuColorSpinorField spinor_in(param);
   quda::spinorNoise(spinor_in, rng, QUDA_NOISE_UNIFORM);
 }
