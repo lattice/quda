@@ -5,6 +5,12 @@ set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_FULL_LIBDIR})
 add_library(quda_test STATIC googletest/src/gtest-all.cc)
 target_include_directories(quda_test PUBLIC googletest/include googletest)
 
+if(QUDA_HDF5
+   AND QUDA_DOWNLOAD_HDF5
+   AND NOT HDF5_FOUND)
+ add_dependencies(quda_test HDF5)
+endif()
+
 if(QUDA_QIO
    AND QUDA_DOWNLOAD_USQCD
    AND NOT QIO_FOUND)
@@ -27,6 +33,12 @@ macro(QUDA_CHECKBUILDTEST mytarget qudabuildtests)
     set(QUDA_EXCLUDE_FROM_INSTALL "EXCLUDE_FROM_ALL")
   endif()
 
+  if(QUDA_HDF5
+      AND QUDA_DOWNLOAD_HDF5
+      AND NOT HDF5_FOUND)
+    add_dependencies(${mytarget} HDF5)
+  endif()
+  
   if(QUDA_QIO
      AND QUDA_DOWNLOAD_USQCD
      AND NOT QIO_FOUND)

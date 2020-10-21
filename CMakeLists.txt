@@ -175,6 +175,9 @@ option(QUDA_ARPACK_LOGGING "enable ARPACK logging (not availible for NG)" OFF)
 # OpenBLAS
 option(QUDA_OPENBLAS "enable OpenBLAS" OFF)
 
+# HDF5 
+option(QUDA_HDF5 "enable HDF5" OFF)
+
 # Interface options
 option(QUDA_INTERFACE_QDP "build qdp interface" ON)
 option(QUDA_INTERFACE_MILC "build milc interface" ON)
@@ -211,7 +214,11 @@ set(QUDA_MAGMAHOME
 set(QUDA_MAGMA_LIBS
     ""
     CACHE STRING "additional linker flags required to link against magma")
-
+set(QUDA_HDF5_HOME
+    ""
+    CACHE PATH "path to HDF5, if not set, pkg-config will be attempted")
+  
+  
 # ######################################################################################################################
 # QUDA ADVANCED OPTIONS that usually should not be changed by users
 # ######################################################################################################################
@@ -266,6 +273,7 @@ option(QUDA_DOWNLOAD_EIGEN "Download Eigen" ON)
 option(QUDA_DOWNLOAD_USQCD "Download USQCD software as requested by QUDA_QMP / QUDA_QIO" OFF)
 option(QUDA_DOWNLOAD_ARPACK "Download ARPACK-NG software as requested by QUDA_ARPACK" OFF)
 option(QUDA_DOWNLOAD_OPENBLAS "Download OpenBLAS software as requested by QUDA_OPENBLAS" OFF)
+option(QUDA_DOWNLOAD_HDF5 "Download HDF5" OFF)
 option(QUDA_JITIFY "build QUDA using Jitify" OFF)
 
 option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
@@ -805,6 +813,46 @@ if(QUDA_OPENBLAS)
   endif(QUDA_DOWNLOAD_OPENBLAS)
 endif(QUDA_OPENBLAS)
 
+if(QUDA_HDF5)
+  # Mathias Magic that sets a variable HDF5_FOUND to the file address
+  # of the hdf5 library. If it is not null, we already found a viable
+  # hdf5 library, so we may skip the download and recompile.
+  find_library(HDF5_FOUND hdf5 HINTS ${QUDA_HDF5_HOME}/lib NO_DEFAULT_PATH)
+  mark_as_advanced(HDF5_FOUND)
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${HDF5_FOUND})
+
+  if(NOT QUDA_DOWNLOAD_HDF5 AND NOT HDF5_FOUND)
+
+    # We want HDF5, we don't want to download, and we didn't find it yet:
+    # look for a standard C++ installation
+    find_package(HDF5 REQUIRED COMPONENTS CXX)
+    include_directories(${HDF5_INCLUDE_DIR})
+  elseif(QUDA_DOWNLOAD_HDF5 AND NOT HDF5_FOUND)
+    # We want HDF5, we want to download, and we didn't find it yet:
+    # download, configure, and build.    
+    find_package(PkgConfig REQUIRED)
+    include(GNUInstallDirs)
+    ExternalProject_Add(
+      hdf5
+      GIT_REPOSITORY https://github.com/HDFGroup/hdf5.git
+      GIT_TAG hdf5-1_12_0
+      GIT_SHALLOW YES
+      PREFIX hdf5
+      CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+      -DHDF5_BUILD_EXAMPLES=OFF
+      -DBUILD_TESTING=OFF
+      -DONLY_SHARED_LIBS=ON
+      -DHDF5_BUILD_CPP_LIB=ON
+      #-DHDF5_BUILD_C_LIB=ON
+      #HDF5_ENABLE_SANITIZERS
+      CMAKE_GENERATOR "Unix Makefiles")
+    ExternalProject_Get_Property(HDF5 INSTALL_DIR)
+    set(QUDA_HDF5_HOME ${INSTALL_DIR} CACHE PATH "path to QIO" FORCE)
+    add_library(hdf5 STATIC IMPORTED)
+    add_dependencies(hdf5 HDF5)
+    set_target_properties(hdf5 PROPERTIES IMPORTED_LOCATION ${HDF5_HOME}/${CMAKE_INSTALL_LIBDIR}/libhdf5.a)    
+  endif()
+endif()
 
 # BACKWARDS
 if(QUDA_BACKWARDS)
