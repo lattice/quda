@@ -192,9 +192,8 @@ namespace quda {
       field(field),
       location(location != QUDA_INVALID_FIELD_LOCATION ? location : field.Location())
     {
-      strcpy(aux, compile_type_str(field));
+      strcpy(aux, compile_type_str(field, location));
       strcat(aux, field.AuxString());
-      strcat(aux, location == QUDA_CPU_FIELD_LOCATION ? ",CPU" : ",GPU");
     }
 
     virtual bool advanceTuneParam(TuneParam &param) const

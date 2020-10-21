@@ -25,6 +25,7 @@ namespace quda {
   {
   protected:
     const LatticeField &field;
+    QudaFieldLocation location;
     mutable unsigned int vector_length_y;
     mutable unsigned int step_y;
     const unsigned int max_block_y;
@@ -59,7 +60,7 @@ namespace quda {
     {
 #ifdef JITIFY
       std::string kernel_file(std::string("kernels/") + Transformer<Arg>::filename());
-      if (field.Location() == QUDA_CUDA_FIELD_LOCATION) create_jitify_program(kernel_file);
+      create_jitify_program(kernel_file);
       using namespace jitify::reflection;
 
       // we need this hackery to get the naked unbound template class parameters
@@ -104,7 +105,7 @@ namespace quda {
     template <template <typename> class Transformer, typename Block, typename Arg>
     void launch(const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
-      if (field.Location() == QUDA_CUDA_FIELD_LOCATION) {
+      if (location == QUDA_CUDA_FIELD_LOCATION) {
         launch_device<Transformer, Block>();
       } else {
 	errorQuda("CPU not supported yet");
@@ -113,16 +114,16 @@ namespace quda {
 
   public:
     TunableBlockReduction2D(const LatticeField &field, unsigned int vector_length_y,
-                            unsigned int max_block_y = 0) :
+                            unsigned int max_block_y = 0, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
       field(field),
+      location(location != QUDA_INVALID_FIELD_LOCATION ? location : field.Location()),
       vector_length_y(vector_length_y),
       step_y(1),
       max_block_y(max_block_y == 0 ? vector_length_y : max_block_y),
       tune_block_x(false)
     {
-      strcpy(aux, compile_type_str(field));
+      strcpy(aux, compile_type_str(field, location));
       strcat(aux, field.AuxString());
-      strcat(aux, field.Location() == QUDA_CPU_FIELD_LOCATION ? ",CPU" : ",GPU");
     }
 
     bool advanceBlockDim(TuneParam &param) const
