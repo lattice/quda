@@ -29,7 +29,7 @@ namespace quda
     RegType c;            // flavor twist
 
     GammaArg(ColorSpinorField &out, const ColorSpinorField &in, int d, int proj = 0,
-	     RegType kappa=0.0, RegType mu=0.0, RegType epsilon=0.0,
+	     RegType kappa = 0.0, RegType mu = 0.0, RegType epsilon = 0.0,
 	     bool dagger=false, QudaTwistGamma5Type twist=QUDA_TWIST_GAMMA5_INVALID)
       : out(out), in(in), d(d), proj(proj), nParity(in.SiteSubset()),
 	doublet(in.TwistFlavor() == QUDA_TWIST_DEG_DOUBLET || in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
@@ -103,13 +103,10 @@ namespace quda
     
     Spinor in = arg.in(x_cb, parity);
     Spinor out = arg.out(x_cb, parity);
-    HalfSpinor chi;
+    HalfSpinor chi = in.chiral_project(proj);
     
     // out += P_{L/R} * in
-    chi = in.chiral_project(proj);
-    out += 0.5*chi.chiral_reconstruct(proj);
-    
-    arg.out(x_cb, parity) = 0.5*out;
+    arg.out(x_cb, parity) = 0.5*chi.chiral_reconstruct(proj);
   }
   
   

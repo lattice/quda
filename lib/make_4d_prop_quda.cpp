@@ -43,8 +43,8 @@ namespace quda
     qudaMemsetAsync(out.V(), 0, vol4D * spin * col * data_size, 0);
 
     // out(x) = P_L L0(x) + P_R Lsm1(x)
-    //chiralProject(out, *Ls2m1[0], 1);
-    //chiralProject(out, *Ls2[0], -1);
+    chiralProject(out, *Ls2m1[0], 1);
+    chiralProject(out, *Ls2[0], -1);
   }
 
   void make4DQuarkProp(ColorSpinorField &out, ColorSpinorField &in)
@@ -79,8 +79,8 @@ namespace quda
     qudaMemsetAsync(out.V(), 0, vol4D * spin * col * data_size, 0);
 
     // out(x) = P_L L0(x) + P_R Lsm1(x)
-    //chiralProject(out, *L0[0], -1);
-    //chiralProject(out, *Lsm1[0], 1);
+    chiralProject(out, *L0[0], -1);
+    chiralProject(out, *Lsm1[0], 1);
 
     delete Lsm1[0];
     delete L0[0];

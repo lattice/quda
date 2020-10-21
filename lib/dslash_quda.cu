@@ -144,67 +144,6 @@ namespace quda {
 
     checkCudaError();
   }
-
-  /**
-     @brief Parameter structure for driving the Gamma operator
-   */
-  /*
-  template <typename Float, int nColor>
-  struct GammaArg {
-    typedef typename colorspinor_mapper<Float,4,nColor>::type F;
-    typedef typename mapper<Float>::type RegType;
-
-    F out;                // output vector field
-    const F in;           // input vector field
-    const int d;          // which gamma matrix are we applying
-    const int proj;       // performs L(-1) or R(+1) chiral projection
-    const int nParity;    // number of parities we're working on
-    bool doublet;         // whether we applying the operator to a doublet
-    const int volumeCB;   // checkerboarded volume
-    RegType a;            // scale factor
-    RegType b;            // chiral twist
-    RegType c;            // flavor twist
-
-    GammaArg(ColorSpinorField &out, const ColorSpinorField &in, int d, int proj = 0,
-	     RegType kappa=0.0, RegType mu=0.0, RegType epsilon=0.0,
-	     bool dagger=false, QudaTwistGamma5Type twist=QUDA_TWIST_GAMMA5_INVALID)
-      : out(out), in(in), d(d), proj(proj), nParity(in.SiteSubset()),
-	doublet(in.TwistFlavor() == QUDA_TWIST_DEG_DOUBLET || in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
-	volumeCB(doublet ? in.VolumeCB()/2 : in.VolumeCB()), a(0.0), b(0.0), c(0.0)
-    {
-      checkPrecision(out, in);
-      checkLocation(out, in);
-      if (d < 0 || d > 4) errorQuda("Undefined gamma matrix %d", d);
-      if (proj != -1 && proj != 0 && proj != 1) errorQuda("Undefined gamma5 projection %d", proj);
-      if (in.Nspin() != 4) errorQuda("Cannot apply gamma5 to nSpin=%d field", in.Nspin());
-      if (!in.isNative() || !out.isNative()) errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
-
-      if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
-	if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
-          b = 2.0 * kappa * mu;
-          a = 1.0;
-        } else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
-          b = -2.0 * kappa * mu;
-          a = 1.0 / (1.0 + b * b);
-        }
-	c = 0.0;
-        if (dagger) b *= -1.0;
-      } else if (doublet) {
-        if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
-          b = 2.0 * kappa * mu;
-          c = -2.0 * kappa * epsilon;
-          a = 1.0;
-        } else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
-          b = -2.0 * kappa * mu;
-          c = 2.0 * kappa * epsilon;
-          a = 1.0 / (1.0 + b * b - c * c);
-          if (a <= 0) errorQuda("Invalid twisted mass parameters (kappa=%e, mu=%e, epsilon=%e)\n", kappa, mu, epsilon);
-        }
-        if (dagger) b *= -1.0;
-      }
-    }
-  };
-  */
   
   // CPU kernel for applying the gamma matrix to a colorspinor
   template <typename Float, int nColor, int d, typename Arg>
@@ -212,8 +151,7 @@ namespace quda {
   {
     typedef typename mapper<Float>::type RegType;
     
-    for (int parity= 0; parity < arg.nParity; parity++) {
-      
+    for (int parity= 0; parity < arg.nParity; parity++) {      
       for (int x_cb = 0; x_cb < arg.volumeCB; x_cb++) { // 4-d volume
 	ColorSpinor<RegType,nColor,4> in = arg.in(x_cb, parity);
 	arg.out(x_cb, parity) = in.gamma(d);
@@ -225,6 +163,25 @@ namespace quda {
   template <typename Float, int nColor, typename Arg>
   void chiralProjCPU(Arg arg)
   {
+    typedef typename mapper<Float>::type RegType;
+    typedef ColorSpinor<RegType, nColor, 4> Spinor;
+    typedef ColorSpinor<RegType, nColor, 2> HalfSpinor;
+    
+    // arg.proj is either +1 or -1
+    // chiral_project() expects +1 or 0
+    int proj = arg.proj == 1 ? 1 : 0;
+    
+    for (int parity = 0; parity < arg.nParity; parity++) {      
+      for (int x_cb = 0; x_cb < arg.volumeCB; x_cb++) { // 4-d volume
+	
+	Spinor in = arg.in(x_cb, parity);
+	Spinor out = arg.out(x_cb, parity);
+	HalfSpinor chi = in.chiral_project(proj);
+	
+	// out += P_{L/R} * in
+	arg.out(x_cb, parity) = 0.5*chi.chiral_reconstruct(proj);
+      }
+    }
   }
 
   template <typename Float, int nColor>
@@ -239,9 +196,9 @@ namespace quda {
     unsigned int minThreads() const { return arg.volumeCB; }
 
   public:
-    Gamma(ColorSpinorField &out, const ColorSpinorField &in, int d) :
+    Gamma(ColorSpinorField &out, const ColorSpinorField &in, int d, int proj) :
       TunableVectorY(in.SiteSubset()),
-      arg(out, in, d),
+      arg(out, in, d, proj),
       meta(in)
     {
       strcpy(aux, meta.AuxString());
@@ -276,72 +233,24 @@ namespace quda {
   //out(x) = gamma_d*in
   void ApplyGamma(ColorSpinorField &out, const ColorSpinorField &in, int d)
   {
-    instantiate<Gamma>(out, in, d);
+    instantiate<Gamma>(out, in, d, 0);
   }
-
-  /*
+  
   // Applies a gamma5 matrix to a spinor (wrapper to ApplyGamma)
   void gamma5(ColorSpinorField &out, const ColorSpinorField &in) {
-    ApplyGamma(out, in, 4);
-  }
-  
-  // Applies a gamma matrix to a spinor (wrapper to ApplyGamma)
-  void gamma(ColorSpinorField &out, const ColorSpinorField &in, int gamma_mat) {
-    ApplyGamma(out, in, gamma_mat);
-  }
-  */
-
-
-  /*
-  template <typename Float, int nColor>
-  void ApplyChiralProj(ColorSpinorField &out, const ColorSpinorField &in, const int proj)
-  {
-    // Hardcode 4 to specify gamma5 in 3rd GammaArg.
-    //printfQuda("Proj = %d\n", proj);
-    GammaArg<Float,nColor> arg(out, in, 4, proj);
-    //printfQuda("Flag 1\n");
-    Gamma<Float,nColor,GammaArg<Float,nColor> > gamma(arg, in);
-    //printfQuda("Flag 2\n");
-    gamma.apply(streams[Nstream-1]);
-    //printfQuda("Flag 3\n");
-  }
-  
-  // template on the number of colors
-  template <typename Float>
-  void ApplyChiralProj(ColorSpinorField &out, const ColorSpinorField &in, const int proj)
-  {
-    if (in.Ncolor() == 3) {
-      //printfQuda("Proj = %d\n", proj);
-      ApplyChiralProj<Float,3>(out, in, proj);
-    } else {
-      errorQuda("Unsupported number of colors %d\n", in.Ncolor());
-    }
+    ApplyGamma(out,in,4);
   }
   
   void ApplyChiralProj(ColorSpinorField &out, const ColorSpinorField &in, const int proj)
   {
-    checkPrecision(out, in);    // check all precisions match
-    checkLocation(out, in);     // check all locations match
-
-    //printfQuda("Proj = %d\n", proj);
-    if (in.Precision() == QUDA_DOUBLE_PRECISION) {
-      ApplyChiralProj<double>(out, in, proj);
-    } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
-      ApplyChiralProj<float>(out, in, proj);
-    } else if (in.Precision() == QUDA_HALF_PRECISION) {
-      ApplyChiralProj<short>(out, in, proj);
-    } else if (in.Precision() == QUDA_QUARTER_PRECISION) {
-      ApplyChiralProj<char>(out, in, proj);
-    } else {
-      errorQuda("Unsupported precision %d\n", in.Precision());
-    }
+    instantiate<Gamma>(out, in, 4, proj);
   }
   
   // Applies out(x) = 1/2 * [(1 + gamma5) * in_right(x) + (1 - gamma5) * in_left(x)
   void chiralProject(ColorSpinorField &out, const ColorSpinorField &in, const int proj) {
     ApplyChiralProj(out, in, proj);
   }
-  */
+  
   
   // CPU kernel for applying the gamma matrix to a colorspinor
   template <bool doublet, typename Float, int nColor, typename Arg>
@@ -420,10 +329,6 @@ namespace quda {
     errorQuda("Twisted mass dslash has not been built");
 #endif // GPU_TWISTED_MASS_DIRAC
   }
-
-  // Applies a gamma5 matrix to a spinor (wrapper to ApplyGamma)
-  void gamma5(ColorSpinorField &out, const ColorSpinorField &in) { ApplyGamma(out,in,4); }
-  
 
   template <typename Float, int nSpin, int nColor, typename Arg>
   void cloverCPU(Arg &arg) {
