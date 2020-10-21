@@ -106,7 +106,7 @@ namespace quda {
     typename std::enable_if<!enable_host, void>::type launch(const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
       if (location == QUDA_CUDA_FIELD_LOCATION) {
-        launch_device<Transformer, Block>();
+        launch_device<Transformer, Block>(tp, stream, arg);
       } else {
 	errorQuda("CPU not supported yet");
       }
@@ -116,9 +116,9 @@ namespace quda {
     typename std::enable_if<enable_host, void>::type launch(const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
       if (location == QUDA_CUDA_FIELD_LOCATION) {
-        launch_device<Transformer, Block>();
+        launch_device<Transformer, Block>(tp, stream ,arg);
       } else {
-        launch_host<Transformer, Block>();
+        launch_host<Transformer, Block>(tp, stream, arg);
       }
     }
 
