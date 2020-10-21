@@ -55,7 +55,8 @@ namespace quda {
 
   qudaError_t qudaLaunchKernel(const void *func, const TuneParam &tp, void **args, qudaStream_t stream)
   {
-    if (tp.set_max_shared_bytes) {
+    // if launch requests the maximum shared memory and the device supports it then opt in
+    if (tp.set_max_shared_bytes && device::max_dynamic_shared_memory() > device::max_default_shared_memory()) {
       static std::unordered_set<const void *> cache;
       auto search = cache.find(func);
       if (search == cache.end()) {

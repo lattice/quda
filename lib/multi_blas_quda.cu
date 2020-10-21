@@ -56,7 +56,7 @@ namespace quda {
         if (x_prec == y_prec && x_order != y_order) errorQuda("Orders %d %d do not match", x_order, y_order);
 
         // heuristic for enabling if we need the warp-splitting optimization
-        const int gpu_size = 2 * deviceProp.maxThreadsPerBlock * deviceProp.multiProcessorCount;
+        const int gpu_size = 2 * device::max_threads_per_block() * device::processor_count();
         switch (gpu_size / (x[0]->Length() * NYW)) {
         case 0: max_warp_split = 1; break; // we have plenty of work, no need to split
         case 1: max_warp_split = 2; break; // double the thread count
@@ -236,8 +236,8 @@ namespace quda {
 #endif
       }
 
-      int blockStep() const { return deviceProp.warpSize / warp_split; }
-      int blockMin() const { return deviceProp.warpSize / warp_split; }
+      int blockStep() const { return device::warp_size() / warp_split; }
+      int blockMin() const { return device::warp_size() / warp_split; }
 
       void initTuneParam(TuneParam &param) const
       {

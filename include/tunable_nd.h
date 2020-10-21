@@ -200,8 +200,8 @@ namespace quda {
       } else { // block.x (spacetime) was reset
 
 	// we can advance spin/block-color since this is valid
-	if (param.block.y < vector_length_y && param.block.y < (unsigned int)deviceProp.maxThreadsDim[1] &&
-	    param.block.x*(param.block.y+step_y)*param.block.z <= (unsigned int)deviceProp.maxThreadsPerBlock) {
+	if (param.block.y < vector_length_y && param.block.y < device::max_threads_per_block_dim(1) &&
+	    param.block.x*(param.block.y+step_y)*param.block.z <= device::max_threads_per_block()) {
 	  param.block.y += step_y;
 	  param.grid.y = (vector_length_y + param.block.y - 1) / param.block.y;
 	  return true;
@@ -351,8 +351,8 @@ namespace quda {
       } else { // block.x/block.y (spacetime) was reset
 
 	// we can advance spin/block-color since this is valid
-	if (param.block.z < vector_length_z && param.block.z < (unsigned int)deviceProp.maxThreadsDim[2] &&
-	    param.block.x*param.block.y*(param.block.z+step_z) <= (unsigned int)deviceProp.maxThreadsPerBlock) {
+	if (param.block.z < vector_length_z && param.block.z < device::max_threads_per_block_dim(2) &&
+	    param.block.x*param.block.y*(param.block.z+step_z) <= device::max_threads_per_block()) {
 	  param.block.z += step_z;
 	  param.grid.z = (vector_length_z + param.block.z - 1) / param.block.z;
 	  return true;

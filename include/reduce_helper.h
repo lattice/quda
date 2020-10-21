@@ -2,6 +2,7 @@
 
 #include <float_vector.h>
 #include <cub_helper.cuh>
+#include <device.h>
 
 #ifdef QUAD_SUM
 using device_reduce_t = doubledouble;
@@ -119,7 +120,7 @@ namespace quda
       consumed(false)
     {
       // check reduction buffers are large enough if requested
-      auto max_reduce_blocks = 2 * deviceProp.multiProcessorCount;
+      auto max_reduce_blocks = 2 * device::processor_count();
       auto reduce_size = max_reduce_blocks * n_reduce * sizeof(*partial);
       if (reduce_size > reducer::buffer_size())
         errorQuda("Requested reduction requires a larger buffer %lu than allocated %lu", reduce_size,

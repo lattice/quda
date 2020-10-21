@@ -66,8 +66,8 @@ namespace quda {
 
         // we can advance spin/block-color since this is valid
         if (param.block.z <= (unsigned int)(dim_threads * 2 * 2 * (Nc/Mc)) &&
-            param.block.z <= (unsigned int)deviceProp.maxThreadsDim[2] &&
-            param.block.x*param.block.y*param.block.z <= (unsigned int)deviceProp.maxThreadsPerBlock ) { //
+            param.block.z <= device::max_threads_per_block_dim(2) &&
+            param.block.x*param.block.y*param.block.z <= device::max_threads_per_block()) { //
           return true;
         } else { // we have run off the end so let's reset
           param.block.z = dim_threads * 2;
@@ -78,14 +78,14 @@ namespace quda {
     }
 
     // FIXME: understand why this leads to slower perf and variable correctness
-    //int blockStep() const { return deviceProp.warpSize/4; }
-    //int blockMin() const { return deviceProp.warpSize/4; }
+    //int blockStep() const { return device::warp_size()/4; }
+    //int blockMin() const { return device::warp_size()/4; }
 
     // Experimental autotuning of the color column stride
     bool advanceAux(TuneParam &param) const
     {
       if (2*param.aux.x <= max_color_col_stride && Nc % (2*param.aux.x) == 0 &&
-	  param.block.x % deviceProp.warpSize == 0) {
+	  param.block.x % device::warp_size() == 0) {
 	// An x-dimension block size that is not a multiple of the
 	// warp size is incompatible with splitting the dot product
 	// across the warp so we must skip this
@@ -97,7 +97,7 @@ namespace quda {
 	param.grid.x = (minThreads()+param.block.x-1)/param.block.x;
 
 	// check this grid size is valid before returning
-	if (param.grid.x < (unsigned int)deviceProp.maxGridSize[0]) return true;
+	if (param.grid.x < device::max_grid_size(0)) return true;
       }
 
       // reset color column stride if too large or not divisible
@@ -108,7 +108,7 @@ namespace quda {
       param.grid.x = (minThreads()+param.block.x-1)/param.block.x;
 
       if (2*param.aux.y <= nDim &&
-          param.block.x*param.block.y*dim_threads*2 <= (unsigned int)deviceProp.maxThreadsPerBlock) {
+          param.block.x*param.block.y*dim_threads*2 <= device::max_threads_per_block()) {
 	param.aux.y *= 2;
 	dim_threads = param.aux.y;
 
@@ -160,7 +160,7 @@ namespace quda {
 
       TunableVectorY::defaultTuneParam(param);
       // ensure that the default x block size is divisible by the warpSize
-      param.block.x = deviceProp.warpSize;
+      param.block.x = device::warp_size();
       param.grid.x = (minThreads()+param.block.x-1)/param.block.x;
       param.block.z = dim_threads * 2;
       param.grid.z = 2*(Nc/Mc);

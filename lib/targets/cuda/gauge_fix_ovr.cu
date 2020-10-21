@@ -100,7 +100,6 @@ namespace quda {
       // to make use or not of atomicAdd operations and 4 or 8 threads per lattice site!!!
       const unsigned int min_threads0 = 32 * 8;
       const unsigned int min_threads1 = 32 * 4;
-      const unsigned int max_threads = 1024; // FIXME: use deviceProp.maxThreadsDim[0];
       const unsigned int atmadd = 0;
       unsigned int min_threads = min_threads0;
       param.aux.x += atmadd; // USE TO SELECT BEST KERNEL OPTION WITH/WITHOUT USING ATOMICADD
@@ -109,7 +108,7 @@ namespace quda {
       param.block.y = 1;
       param.grid = createGrid(param);
 
-      if ((param.block.x >= min_threads) && (param.block.x <= max_threads)) {
+      if ((param.block.x >= min_threads) && (param.block.x <= device::max_threads_per_block_dim(0))) {
         param.shared_bytes = sharedBytesPerBlock(param);
         return true;
       } else if (param.aux.x == 0) {
@@ -228,7 +227,6 @@ public:
       // to make use or not of atomicAdd operations and 4 or 8 threads per lattice site!!!
       const unsigned int min_threads0 = 32 * 8;
       const unsigned int min_threads1 = 32 * 4;
-      const unsigned int max_threads = 1024; // FIXME: use deviceProp.maxThreadsDim[0];
       const unsigned int atmadd = 0;
       unsigned int min_threads = min_threads0;
       param.aux.x += atmadd; // USE TO SELECT BEST KERNEL OPTION WITH/WITHOUT USING ATOMICADD
@@ -237,7 +235,7 @@ public:
       param.block.y = 1;
       param.grid = createGrid(param);
 
-      if ((param.block.x >= min_threads) && (param.block.x <= max_threads)) {
+      if ((param.block.x >= min_threads) && (param.block.x <= device::max_threads_per_block_dim(0))) {
         param.shared_bytes = sharedBytesPerBlock(param);
         return true;
       } else if (param.aux.x == 0) {
@@ -356,7 +354,6 @@ public:
       // to make use or not of atomicAdd operations and 4 or 8 threads per lattice site!!!
       const unsigned int min_threads0 = 32 * 8;
       const unsigned int min_threads1 = 32 * 4;
-      const unsigned int max_threads = 1024; // FIXME: use deviceProp.maxThreadsDim[0];
       const unsigned int atmadd = 0;
       unsigned int min_threads = min_threads0;
       param.aux.x += atmadd; // USE TO SELECT BEST KERNEL OPTION WITH/WITHOUT USING ATOMICADD
@@ -365,7 +362,7 @@ public:
       param.block.y = 1;
       param.grid = createGrid(param);
 
-      if ((param.block.x >= min_threads) && (param.block.x <= max_threads)) {
+      if ((param.block.x >= min_threads) && (param.block.x <= device::max_threads_per_block_dim(0))) {
         param.shared_bytes = sharedBytesPerBlock(param);
         return true;
       } else if (param.aux.x == 0) {

@@ -144,7 +144,7 @@ namespace quda {
     bool advanceAux(TuneParam &param) const
     {
 #ifdef SWIZZLE
-      if (param.aux.x < 2*deviceProp.multiProcessorCount) {
+      if (param.aux.x < 2 * device::processor_count()) {
         param.aux.x++;
 	return true;
       } else {

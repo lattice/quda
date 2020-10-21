@@ -72,9 +72,6 @@ namespace quda {
     void launch_device(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg,
                        const std::vector<constant_param_t> &param = dummy_param)
     {
-      if (tp.grid.x > (unsigned int)deviceProp.maxGridSize[0])
-        errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, deviceProp.maxGridSize[0]);
-
 #ifdef JITIFY
       std::string kernel_file(std::string("kernels/") + Transformer<Arg>::filename());
       create_jitify_program(kernel_file);
@@ -290,12 +287,6 @@ namespace quda {
     void launch_device(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg,
                        const std::vector<constant_param_t> &param = dummy_param)
     {
-      if (tp.grid.x > (unsigned int)deviceProp.maxGridSize[0])
-        errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, deviceProp.maxGridSize[0]);
-
-      if (tp.grid.y > (unsigned int)deviceProp.maxGridSize[1])
-        errorQuda("Grid size %d greater than maximum %d\n", tp.grid.y, deviceProp.maxGridSize[1]);
-
 #ifdef JITIFY
       std::string kernel_file(std::string("kernels/") + Transformer<Arg>::filename());
       create_jitify_program(kernel_file);

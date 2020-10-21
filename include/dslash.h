@@ -159,9 +159,7 @@ namespace quda
     template <template <bool, QudaPCType, typename> class P, int nParity, bool dagger, bool xpay, KernelType kernel_type>
     inline void launch(TuneParam &tp, const qudaStream_t &stream)
     {
-      if (deviceProp.major >= 7) { // should test whether this is always optimal on Volta
-        tp.set_max_shared_bytes = true;
-      }
+      tp.set_max_shared_bytes = true;
       qudaLaunchKernel(dslashGPU<D, P, nParity, dagger, xpay, kernel_type, Arg>, tp, stream, arg);
     }
 

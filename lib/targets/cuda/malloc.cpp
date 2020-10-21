@@ -5,6 +5,7 @@
 #include <unistd.h>   // for getpagesize()
 #include <execinfo.h> // for backtrace
 #include <quda_internal.h>
+#include <device.h>
 
 #ifdef USE_QDPJIT
 #include "qdp_quda.h"
@@ -175,7 +176,8 @@ namespace quda
         warningQuda("Using managed memory for CUDA allocations");
         managed = true;
 
-        if (deviceProp.major < 6) warningQuda("Using managed memory on pre-Pascal architecture is limited");
+        if (!device::managed_memory_supported())
+          warningQuda("Target device does not report supporting managed memory");
       }
 
       init = true;

@@ -41,7 +41,7 @@ namespace quda
       int reduce_size = 4 * sizeof(device_reduce_t);
       int max_reduce = reduce_size;
       int max_multi_reduce = max_n_reduce() * reduce_size;
-      int max_reduce_blocks = 2 * deviceProp.multiProcessorCount;
+      int max_reduce_blocks = 2 * device::processor_count();
 
       // reduction buffer size
       size_t bytes = max_reduce_blocks * std::max(max_reduce, max_multi_reduce);

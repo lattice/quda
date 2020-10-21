@@ -120,8 +120,8 @@ namespace quda {
       }
     }
 
-    virtual unsigned int maxBlockSize(const TuneParam &param) const { return deviceProp.maxThreadsPerBlock / (param.block.y*param.block.z); }
-    virtual unsigned int maxGridSize() const { return 2*deviceProp.multiProcessorCount; }
+    virtual unsigned int maxBlockSize(const TuneParam &param) const { return device::max_threads_per_block() / (param.block.y*param.block.z); }
+    virtual unsigned int maxGridSize() const { return 2*device::processor_count(); }
     virtual unsigned int minGridSize() const { return 1; }
 
     /**
@@ -131,8 +131,8 @@ namespace quda {
     */
     virtual int gridStep() const { return 1; }
 
-    virtual int blockStep() const { return deviceProp.warpSize; }
-    virtual int blockMin() const { return deviceProp.warpSize; }
+    virtual int blockStep() const { return device::warp_size(); }
+    virtual int blockMin() const { return device::warp_size(); }
 
     virtual void resetBlockDim(TuneParam &param) const {
       if (tuneGridDim()) {
@@ -140,7 +140,7 @@ namespace quda {
       } else { // not tuning the grid dimension so have to set a valid grid size
         const auto step = blockStep();
         const auto max_threads = maxBlockSize(param);
-        const auto max_blocks = deviceProp.maxGridSize[0];
+        const auto max_blocks = device::max_grid_size(0);
 
         // ensure the blockDim is large enough given the limit on gridDim
         param.block.x = (minThreads()+max_blocks-1)/max_blocks;
@@ -172,43 +172,6 @@ namespace quda {
     }
 
     /**
-     * @brief Returns the maximum number of simultaneously resident
-     * blocks per SM.  We can directly query this of CUDA 11, but
-     * previously this needed to be hand coded.
-     * @return The maximum number of simultaneously resident blocks per SM
-     */
-    unsigned int maxBlocksPerSM() const
-    {
-#if CUDA_VERSION >= 11000
-      static int max_blocks_per_sm = 0;
-#ifndef __CUDACC_RTC__
-      if (!max_blocks_per_sm) cudaDeviceGetAttribute(&max_blocks_per_sm, cudaDevAttrMaxBlocksPerMultiprocessor, comm_gpuid());
-#endif
-      return max_blocks_per_sm;
-#else
-      // these variables are taken from Table 14 of the CUDA 10.2 prgramming guide
-      switch (deviceProp.major) {
-      case 2:
-	return 8;
-      case 3:
-	return 16;
-      case 5:
-      case 6: return 32;
-      case 7:
-        switch (deviceProp.minor) {
-        case 0: return 32;
-        case 2: return 32;
-        case 5: return 16;
-        }
-      default:
-        warningQuda("Unknown SM architecture %d.%d - assuming limit of 32 blocks per SM\n",
-                    deviceProp.major, deviceProp.minor);
-        return 32;
-      }
-#endif
-    }
-
-    /**
      * @brief Returns the maximum dynamic shared memory per block.
      * @return The maximum dynamic shared memory to CUDA thread block
      */
@@ -218,14 +181,13 @@ namespace quda {
      * @brief The maximum shared memory that a CUDA thread block can
      * use in the autotuner.  This isn't necessarily the same as
      * maxDynamicSharedMemoryPerBlock since that may need explicit opt
-     * in to enable (by calling setMaxDynamicSharedBytes for the
-     * kernel in question).  If the CUDA kernel in question does this
-     * opt in then this function can be overloaded to return
+     * in to enable.  If the kernel in question does this opt in then
+     * this function can be overloaded to return
      * maxDynamicSharedBytesPerBlock.
      * @return The maximum shared bytes limit per block the autotung
      * will utilize.
      */
-    virtual unsigned int maxSharedBytesPerBlock() const { return deviceProp.sharedMemPerBlock; }
+    virtual unsigned int maxSharedBytesPerBlock() const { return device::max_default_shared_memory(); }
 
     /**
      * The goal here is to throttle the number of thread blocks per SM
@@ -238,7 +200,7 @@ namespace quda {
     {
       if (tuneSharedBytes()) {
         const int max_shared = maxSharedBytesPerBlock();
-        const int max_blocks_per_sm = std::min(deviceProp.maxThreadsPerMultiProcessor / (param.block.x*param.block.y*param.block.z), maxBlocksPerSM());
+        const int max_blocks_per_sm = std::min(device::max_threads_per_processor() / (param.block.x*param.block.y*param.block.z), device::max_blocks_per_processor());
 	int blocks_per_sm = max_shared / (param.shared_bytes ? param.shared_bytes : 1);
 	if (blocks_per_sm > max_blocks_per_sm) blocks_per_sm = max_blocks_per_sm;
 	param.shared_bytes = (blocks_per_sm > 0 ? max_shared / blocks_per_sm + 1 : max_shared + 1);
@@ -326,8 +288,8 @@ namespace quda {
 
     virtual void initTuneParam(TuneParam &param) const
     {
-      const unsigned int max_threads = deviceProp.maxThreadsDim[0];
-      const unsigned int max_blocks = deviceProp.maxGridSize[0];
+      const unsigned int max_threads = device::max_threads_per_block_dim(0);
+      const unsigned int max_blocks = device::max_grid_size(0);
       const int min_grid_size = minGridSize();
       const int min_block_size = blockMin();
 
@@ -364,35 +326,36 @@ namespace quda {
      * Check the launch parameters of the kernel to ensure that they are
      * valid for the current device.
      */
-    void checkLaunchParam(TuneParam &param) {
+    void checkLaunchParam(TuneParam &tp)
+    {
+      if (tp.block.x*tp.block.y*tp.block.z > device::max_threads_per_block())
+        errorQuda("Requested block size %dx%dx%d=%d greater than max %d",
+                  tp.block.x, tp.block.y, tp.block.z, tp.block.x*tp.block.y*tp.block.z,
+                  device::max_threads_per_block());
 
-      if (param.block.x*param.block.y*param.block.z > (unsigned)deviceProp.maxThreadsPerBlock)
-        errorQuda("Requested block size %dx%dx%d=%d greater than hardware limit %d",
-                  param.block.x, param.block.y, param.block.z, param.block.x*param.block.y*param.block.z, deviceProp.maxThreadsPerBlock);
+      if (tp.block.x > device::max_threads_per_block_dim(0))
+        errorQuda("Requested X-dimension block size %d greater than max %d",
+                  tp.block.x, device::max_threads_per_block_dim(0));
 
-      if (param.block.x > (unsigned int)deviceProp.maxThreadsDim[0])
-	errorQuda("Requested X-dimension block size %d greater than hardware limit %d",
-		  param.block.x, deviceProp.maxThreadsDim[0]);
+      if (tp.block.y > device::max_threads_per_block_dim(1))
+        errorQuda("Requested Y-dimension block size %d greater than max %d",
+                  tp.block.y, device::max_threads_per_block_dim(1));
 
-      if (param.block.y > (unsigned int)deviceProp.maxThreadsDim[1])
-	errorQuda("Requested Y-dimension block size %d greater than hardware limit %d",
-		  param.block.y, deviceProp.maxThreadsDim[1]);
+      if (tp.block.z > device::max_threads_per_block_dim(2))
+        errorQuda("Requested Z-dimension block size %d greater than max %d",
+                  tp.block.z, device::max_threads_per_block_dim(2));
 
-      if (param.block.z > (unsigned int)deviceProp.maxThreadsDim[2])
-	errorQuda("Requested Z-dimension block size %d greater than hardware limit %d",
-		  param.block.z, deviceProp.maxThreadsDim[2]);
+      if (tp.grid.x > device::max_grid_size(0))
+        errorQuda("Requested X-dimension grid size %d greater than max %d",
+                  tp.grid.x, device::max_grid_size(0));
 
-      if (param.grid.x > (unsigned int)deviceProp.maxGridSize[0])
-	errorQuda("Requested X-dimension grid size %d greater than hardware limit %d",
-		  param.grid.x, deviceProp.maxGridSize[0]);
+      if (tp.grid.y > device::max_grid_size(1))
+        errorQuda("Requested Y-dimension grid size %d greater than max %d",
+                  tp.grid.y, device::max_grid_size(1));
 
-      if (param.grid.y > (unsigned int)deviceProp.maxGridSize[1])
-	errorQuda("Requested Y-dimension grid size %d greater than hardware limit %d",
-		  param.grid.y, deviceProp.maxGridSize[1]);
-
-      if (param.grid.z > (unsigned int)deviceProp.maxGridSize[2])
-	errorQuda("Requested Z-dimension grid size %d greater than hardware limit %d",
-		  param.grid.z, deviceProp.maxGridSize[2]);
+      if (tp.grid.z > device::max_grid_size(2))
+        errorQuda("Requested Z-dimension grid size %d greater than max %d",
+                  tp.grid.z, device::max_grid_size(2));
     }
 
     CUresult jitifyError() const { return jitify_error; }
@@ -432,8 +395,8 @@ namespace quda {
       } else { // block.x (spacetime) was reset
 
 	// we can advance spin/block-color since this is valid
-	if (param.block.y < vector_length_y && param.block.y < (unsigned int)deviceProp.maxThreadsDim[1] &&
-	    param.block.x*(param.block.y+step_y)*param.block.z <= (unsigned int)deviceProp.maxThreadsPerBlock) {
+	if (param.block.y < vector_length_y && param.block.y < device::max_threads_per_block_dim(1) &&
+	    param.block.x*(param.block.y+step_y)*param.block.z <= device::max_threads_per_block()) {
 	  param.block.y += step_y;
 	  param.grid.y = (vector_length_y + param.block.y - 1) / param.block.y;
 	  return true;
@@ -489,8 +452,8 @@ namespace quda {
       } else { // block.x/block.y (spacetime) was reset
 
 	// we can advance spin/block-color since this is valid
-	if (param.block.z < vector_length_z && param.block.z < (unsigned int)deviceProp.maxThreadsDim[2] &&
-	    param.block.x*param.block.y*(param.block.z+step_z) <= (unsigned int)deviceProp.maxThreadsPerBlock) {
+	if (param.block.z < vector_length_z && param.block.z < device::max_threads_per_block_dim(2) &&
+	    param.block.x*param.block.y*(param.block.z+step_z) <= device::max_threads_per_block()) {
 	  param.block.z += step_z;
 	  param.grid.z = (vector_length_z + param.block.z - 1) / param.block.z;
 	  return true;

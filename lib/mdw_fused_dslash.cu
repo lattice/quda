@@ -510,9 +510,9 @@ namespace quda
       int blockMin() const { return 16; }
       unsigned int maxBlockSize(const TuneParam &param) const { return 32; }
 
-      int gridStep() const { return deviceProp.multiProcessorCount; }
+      int gridStep() const { return device::processor_count(); }
       unsigned int maxGridSize() const { return (arg.volume_4d_cb_shift + blockMin() - 1) / blockMin(); }
-      unsigned int minGridSize() const { return deviceProp.multiProcessorCount; }
+      unsigned int minGridSize() const { return device::processor_count(); }
 
       unsigned int sharedBytesPerBlock(const TuneParam &param) const
       {
