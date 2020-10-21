@@ -421,6 +421,9 @@ namespace quda {
 #endif // GPU_TWISTED_MASS_DIRAC
   }
 
+  // Applies a gamma5 matrix to a spinor (wrapper to ApplyGamma)
+  void gamma5(ColorSpinorField &out, const ColorSpinorField &in) { ApplyGamma(out,in,4); }
+  
 
   template <typename Float, int nSpin, int nColor, typename Arg>
   void cloverCPU(Arg &arg) {
