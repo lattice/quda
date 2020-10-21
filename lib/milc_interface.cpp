@@ -57,6 +57,9 @@ static int localDim[4];
 static bool invalidate_quda_gauge = true;
 static bool create_quda_gauge = false;
 
+static bool have_resident_gauge = false;
+
+
 static bool invalidate_quda_mom = true;
 
 static bool invalidate_quda_mg = true;
@@ -230,6 +233,7 @@ static  void invalidateGaugeQuda() {
   qudamilc_called<true>(__func__);
   freeGaugeQuda();
   invalidate_quda_gauge = true;
+  have_resident_gauge = false;
   qudamilc_called<false>(__func__);
 }
 
@@ -300,6 +304,8 @@ void qudaHisqForce(int prec, int num_terms, int num_naik_terms, double dt, doubl
                        w_link, v_link, u_link,
                        quark_field, num_terms, num_naik_terms, coeff,
                        &gParam);
+  
+  have_resident_gauge = false;
   qudamilc_called<false>(__func__);
   return;
 }
@@ -320,7 +326,7 @@ void qudaComputeOprod(int prec, int num_terms, int num_naik_terms, double** coef
   errorQuda("This interface has been removed and is no longer supported");
 }
 
-void qudaUpdateUPhased(int prec, double eps, QudaMILCSiteArg_t *arg, int phase_in)
+void qudaUpdateUPhasedPipeline(int prec, double eps, QudaMILCSiteArg_t *arg, int phase_in, int want_gaugepipe)
 {
   qudamilc_called<true>(__func__);
   QudaGaugeParam qudaGaugeParam
@@ -336,6 +342,18 @@ void qudaUpdateUPhased(int prec, double eps, QudaMILCSiteArg_t *arg, int phase_i
   qudaGaugeParam.staggered_phase_applied = phase_in;
   qudaGaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
   if (phase_in) qudaGaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
+  if (want_gaugepipe) {
+    qudaGaugeParam.make_resident_gauge = true;
+    qudaGaugeParam.return_result_gauge = true;
+    if (!have_resident_gauge) {
+      qudaGaugeParam.use_resident_gauge = false;
+      have_resident_gauge = true;
+      if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("QUDA_MILC_INTERFACE: Using gauge pipeline \n"); }
+    } else {
+      qudaGaugeParam.use_resident_gauge = true;
+    }
+  }
+
   if (!invalidate_quda_mom) {
     qudaGaugeParam.use_resident_mom = true;
     qudaGaugeParam.make_resident_mom = true;
@@ -349,7 +367,10 @@ void qudaUpdateUPhased(int prec, double eps, QudaMILCSiteArg_t *arg, int phase_i
   return;
 }
 
+void qudaUpdateUPhased(int prec, double eps, QudaMILCSiteArg_t *arg, int phase_in){ qudaUpdateUPhasedPipeline(prec, eps, arg, 0, 0);}
+
 void qudaUpdateU(int prec, double eps, QudaMILCSiteArg_t *arg) { qudaUpdateUPhased(prec, eps, arg, 0); }
+
 
 void qudaRephase(int prec, void *gauge, int flag, double i_mu)
 {
@@ -382,8 +403,18 @@ void qudaUnitarizeSU3Phased(int prec, double tol, QudaMILCSiteArg_t *arg, int ph
   // when we take care of phases in QUDA we need to respect MILC boundary conditions.
   if (phase_in) qudaGaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
 
-  projectSU3Quda(gauge, tol, &qudaGaugeParam);
+  if(!have_resident_gauge) {
+    qudaGaugeParam.make_resident_gauge = false;
+    qudaGaugeParam.use_resident_gauge = false;
+  } else {
+    qudaGaugeParam.use_resident_gauge = true;
+    qudaGaugeParam.make_resident_gauge = true;
+  }
+  qudaGaugeParam.return_result_gauge = true;
+  have_resident_gauge = false;
 
+  projectSU3Quda(gauge, tol, &qudaGaugeParam);
+  invalidateGaugeQuda();
   qudamilc_called<false>(__func__);
   return;
 }
@@ -548,7 +579,17 @@ void qudaGaugeForcePhased(int precision, int num_loop_types, double milc_loop_co
   qudaGaugeParam.staggered_phase_applied = phase_in;
   qudaGaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
   if (phase_in) qudaGaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
-  qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  if (phase_in) qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
+
+  if(!have_resident_gauge) {
+    qudaGaugeParam.make_resident_gauge = true;
+    qudaGaugeParam.use_resident_gauge = false;
+    // have_resident_gauge = true;
+  } else {
+    qudaGaugeParam.make_resident_gauge = true;
+    qudaGaugeParam.use_resident_gauge = true;
+  }
+
 
   double *loop_coeff = static_cast<double*>(safe_malloc(numPaths*sizeof(double)));
   int *length = static_cast<int*>(safe_malloc(numPaths*sizeof(int)));

@@ -13,10 +13,7 @@
 #include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
-
-#include <cuda_profiler_api.h>
-
-#include <Eigen/Dense>
+#include <eigen_helper.h>
 
 /*
 Based on eigCG(n_ev, m) algorithm:
@@ -30,7 +27,6 @@ See also: G. Meurant, Parellel Computing Vol 5, Issue 3, p. 267, 1987
 namespace quda {
 
    using namespace blas;
-   using namespace Eigen;
 
    using DynamicStride = Stride<Dynamic, Dynamic>;
    using RealMatrix = MatrixXd;

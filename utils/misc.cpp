@@ -174,8 +174,9 @@ const char *get_eig_type_str(QudaEigType type)
 
   switch (type) {
   case QUDA_EIG_TR_LANCZOS: ret = "trlm"; break;
-  case QUDA_EIG_IR_LANCZOS: ret = "irlm"; break;
+  case QUDA_EIG_BLK_TR_LANCZOS: ret = "blktrlm"; break;
   case QUDA_EIG_IR_ARNOLDI: ret = "iram"; break;
+  case QUDA_EIG_BLK_IR_ARNOLDI: ret = "blkiram"; break;
   default: ret = "unknown eigensolver"; break;
   }
 
