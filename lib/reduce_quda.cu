@@ -97,7 +97,7 @@ namespace quda {
           const int length = x.Length() / M;
 
           ReductionArg<device_real_t, M, device_store_t, N, device_y_store_t, Ny, decltype(r_)> arg(x, y, z, w, v, r_, length, nParity, tp);
-          launch_device<Reduce_>(result, tp, stream, arg);
+          launch<Reduce_>(result, tp, stream, arg);
         } else {
           if (checkOrder(x, y, z, w, v) != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
             warningQuda("CPU Blas functions expect AoS field order");

@@ -102,13 +102,23 @@ namespace quda {
        @param[in] stream Stream in which to execute
        @param[in,out] arg Algorithm meta data
      */
-    template <template <typename> class Transformer, typename Block, typename Arg>
-    void launch(const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
+    template <template <typename> class Transformer, typename Block, bool enable_host = false, typename Arg>
+    typename std::enable_if<!enable_host, void>::type launch(const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
       if (location == QUDA_CUDA_FIELD_LOCATION) {
         launch_device<Transformer, Block>();
       } else {
 	errorQuda("CPU not supported yet");
+      }
+    }
+
+    template <template <typename> class Transformer, typename Block, bool enable_host = false, typename Arg>
+    typename std::enable_if<enable_host, void>::type launch(const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
+    {
+      if (location == QUDA_CUDA_FIELD_LOCATION) {
+        launch_device<Transformer, Block>();
+      } else {
+        launch_host<Transformer, Block>();
       }
     }
 

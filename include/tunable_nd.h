@@ -36,7 +36,7 @@ namespace quda {
       create_jitify_program(kernel_file);
       using namespace jitify::reflection;
 
-      // we need this hackery to get the naked unbound template class parameters        
+      // we need this hackery to get the naked unbound template class parameters
       auto Functor_instance = reflect<Functor<Arg>>();
       auto Functor_naked = Functor_instance.substr(0, Functor_instance.find("<"));
 
@@ -65,13 +65,27 @@ namespace quda {
       }
     }
 
-    template <template <typename> class Functor, typename Arg>
-    void launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
+    template <template <typename> class Functor, bool enable_host = false, typename Arg>
+    typename std::enable_if<!enable_host, void>::type
+      launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
+             const std::vector<constant_param_t> &param = dummy_param)
     {
       if (location == QUDA_CUDA_FIELD_LOCATION) {
         launch_device<Functor, Arg>(tp, stream, arg, param);
       } else {
 	errorQuda("CPU not supported yet");
+      }
+    }
+
+    template <template <typename> class Functor, bool enable_host = false, typename Arg>
+    typename std::enable_if<enable_host, void>::type
+      launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
+             const std::vector<constant_param_t> &param = dummy_param)
+    {
+      if (location == QUDA_CUDA_FIELD_LOCATION) {
+        launch_device<Functor, Arg>(tp, stream, arg, param);
+      } else {
+	launch_host<Functor, Arg>(tp, stream, arg, param);
       }
     }
 
@@ -140,7 +154,7 @@ namespace quda {
       create_jitify_program(kernel_file);
       using namespace jitify::reflection;
 
-      // we need this hackery to get the naked unbound template class parameters        
+      // we need this hackery to get the naked unbound template class parameters
       auto Functor_instance = reflect<Functor<Arg>>();
       auto Functor_naked = Functor_instance.substr(0, Functor_instance.find("<"));
 
@@ -171,14 +185,29 @@ namespace quda {
       }
     }
 
-    template <template <typename> class Functor, typename Arg>
-    void launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
+    template <template <typename> class Functor, bool enable_host = false, typename Arg>
+    typename std::enable_if<!enable_host, void>::type
+      launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
+             const std::vector<constant_param_t> &param = dummy_param)
     {
       const_cast<Arg &>(arg).threads.y = vector_length_y;
       if (TunableKernel1D_base<grid_stride>::location == QUDA_CUDA_FIELD_LOCATION) {
         launch_device<Functor, Arg>(tp, stream, arg, param);
       } else {
 	errorQuda("CPU not supported yet");
+      }
+    }
+
+    template <template <typename> class Functor, bool enable_host = false, typename Arg>
+    typename std::enable_if<enable_host, void>::type
+      launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
+             const std::vector<constant_param_t> &param = dummy_param)
+    {
+      const_cast<Arg &>(arg).threads.y = vector_length_y;
+      if (TunableKernel1D_base<grid_stride>::location == QUDA_CUDA_FIELD_LOCATION) {
+        launch_device<Functor, Arg>(tp, stream, arg, param);
+      } else {
+        launch_host<Functor, Arg>(tp, stream, arg, param);
       }
     }
 
@@ -287,7 +316,7 @@ namespace quda {
       create_jitify_program(kernel_file);
       using namespace jitify::reflection;
 
-      // we need this hackery to get the naked unbound template class parameters        
+      // we need this hackery to get the naked unbound template class parameters
       auto Functor_instance = reflect<Functor<Arg>>();
       auto Functor_naked = Functor_instance.substr(0, Functor_instance.find("<"));
 
@@ -320,8 +349,10 @@ namespace quda {
       }
     }
 
-    template <template <typename> class Functor, typename Arg>
-    void launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
+    template <template <typename> class Functor, bool enable_host = false, typename Arg>
+    typename std::enable_if<!enable_host, void>::type
+      launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
+             const std::vector<constant_param_t> &param = dummy_param)
     {
       const_cast<Arg &>(arg).threads.y = vector_length_y;
       const_cast<Arg &>(arg).threads.z = vector_length_z;
@@ -331,7 +362,21 @@ namespace quda {
 	errorQuda("CPU not supported yet");
       }
     }
-    
+
+    template <template <typename> class Functor, bool enable_host = false, typename Arg>
+    typename std::enable_if<enable_host, void>::type
+      launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
+             const std::vector<constant_param_t> &param = dummy_param)
+    {
+      const_cast<Arg &>(arg).threads.y = vector_length_y;
+      const_cast<Arg &>(arg).threads.z = vector_length_z;
+      if (TunableKernel2D_base<grid_stride>::location == QUDA_CUDA_FIELD_LOCATION) {
+        launch_device<Functor, Arg>(tp, stream, arg, param);
+      } else {
+        launch_host<Functor, Arg>(tp, stream, arg, param);
+      }
+    }
+
   public:
     TunableKernel3D_base(const LatticeField &field, unsigned int vector_length_y, unsigned int vector_length_z,
                          QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
@@ -412,5 +457,5 @@ namespace quda {
                     QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
       TunableKernel3D_base<true>(field, vector_length_y, vector_length_z, location) {}
   };
-  
+
 }

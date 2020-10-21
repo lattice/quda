@@ -159,14 +159,29 @@ namespace quda {
       result = result_[0];
     }
 
-    template <template <typename> class Transformer, template <typename> class Reducer = plus, typename T, typename Arg>
-    void launch(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg,
-                const std::vector<constant_param_t> &param = dummy_param)
+    template <template <typename> class Transformer, template <typename> class Reducer = plus,
+              bool enable_host = false, typename T, typename Arg>
+    typename std::enable_if<!enable_host, void>::type
+      launch(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg,
+             const std::vector<constant_param_t> &param = dummy_param)
     {
       if (location == QUDA_CUDA_FIELD_LOCATION) {
         launch_device<Transformer, Reducer>(result, tp, stream, arg, param);
       } else {
 	errorQuda("CPU not supported yet");
+      }
+    }
+
+    template <template <typename> class Transformer, template <typename> class Reducer = plus,
+              bool enable_host = false, typename T, typename Arg>
+    typename std::enable_if<enable_host, void>::type
+      launch(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg,
+             const std::vector<constant_param_t> &param = dummy_param)
+    {
+      if (location == QUDA_CUDA_FIELD_LOCATION) {
+        launch_device<Transformer, Reducer>(result, tp, stream, arg, param);
+      } else {
+        launch_host<Transformer, Reducer>(result, tp, stream, arg, param);
       }
     }
 
@@ -332,14 +347,28 @@ namespace quda {
     }
 
     template <template <typename> class Transformer, template <typename> class Reducer = plus,
-              typename T, typename Arg>
-    void launch(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg,
-                const std::vector<constant_param_t> &param = dummy_param)
+              bool enable_host = false, typename T, typename Arg>
+    typename std::enable_if<!enable_host, void>::type
+    launch(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg,
+           const std::vector<constant_param_t> &param = dummy_param)
     {
       if (location == QUDA_CUDA_FIELD_LOCATION) {
         launch_device<Transformer, Reducer>(result, tp, stream, arg, param);
       } else {
 	errorQuda("CPU not supported yet");
+      }
+    }
+
+    template <template <typename> class Transformer, template <typename> class Reducer = plus,
+              bool enable_host, typename T, typename Arg>
+    typename std::enable_if<enable_host, void>::type
+    launch(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg,
+           const std::vector<constant_param_t> &param = dummy_param)
+    {
+      if (location == QUDA_CUDA_FIELD_LOCATION) {
+        launch_device<Transformer, Reducer>(result, tp, stream, arg, param);
+      } else {
+	launch_host<Transformer, Reducer>(result, tp, stream, arg, param);
       }
     }
 

@@ -94,14 +94,14 @@ namespace quda {
         return TuneKey(x[0]->VolString(), name, aux);
       }
 
-      template <typename Arg> void launch(const TuneParam &tp, const qudaStream_t &stream, Arg &&arg)
+      template <typename Arg> void Launch(const TuneParam &tp, const qudaStream_t &stream, Arg &&arg)
       {
         constexpr bool multi_1d = Arg::Functor::multi_1d;
         std::vector<constant_param_t> param;
         if (a.data) { set_param<multi_1d>(param, arg, 'a', a); }
         if (b.data) { set_param<multi_1d>(param, arg, 'b', b); }
         if (c.data) { set_param<multi_1d>(param, arg, 'c', c); }
-        launch_device<MultiBlas_>(tp, stream, arg, param);
+        launch<MultiBlas_>(tp, stream, arg, param);
       }
 
       template <int NXZ> void compute(const qudaStream_t &stream)
@@ -132,16 +132,16 @@ namespace quda {
 
           switch (tp.aux.x) {
           case 1:
-            launch(tp, stream, MultiBlasArg<1, device_real_t, M, NXZ, device_store_t, N,
+            Launch(tp, stream, MultiBlasArg<1, device_real_t, M, NXZ, device_store_t, N,
                    device_y_store_t, Ny, decltype(f_)>(x, y, z, w, f_, NYW, length));
             break;
 #ifdef WARP_SPLIT
           case 2:
-            launch(tp, stream, MultiBlasArg<2, device_real_t, M, NXZ, device_store_t, N,
+            Launch(tp, stream, MultiBlasArg<2, device_real_t, M, NXZ, device_store_t, N,
                    device_y_store_t, Ny, decltype(f_)>(x, y, z, w, f_, NYW, length));
             break;
           case 4:
-            launch(tp, stream, MultiBlasArg<4, device_real_t, M, NXZ, device_store_t, N,
+            Launch(tp, stream, MultiBlasArg<4, device_real_t, M, NXZ, device_store_t, N,
                    device_y_store_t, Ny, decltype(f_)>(x, y, z, w, f_, NYW, length));
             break;
 #endif

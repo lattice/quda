@@ -92,7 +92,7 @@ namespace quda {
 
           TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
           BlasArg<device_real_t, M, device_store_t, N, device_y_store_t, Ny, decltype(f_)> arg(x, y, z, w, v, f_, threads, nParity);
-          launch_device<Blas_>(tp, stream, arg);
+          launch<Blas_>(tp, stream, arg);
         } else {
           if (checkOrder(x, y, z, w, v) != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER)
             errorQuda("CPU Blas functions expect AoS field order");
