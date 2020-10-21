@@ -85,6 +85,11 @@ namespace quda {
       strcat(aux, location == QUDA_CPU_FIELD_LOCATION ? ",CPU" : ",GPU");
     }
 
+    virtual bool advanceTuneParam(TuneParam &param) const
+    {
+      return location == QUDA_CPU_FIELD_LOCATION ? false : Tunable::advanceTuneParam(param);
+    }
+
     TuneKey tuneKey() const { return TuneKey(field.VolString(), typeid(*this).name(), aux); }
   };
 
@@ -268,13 +273,13 @@ namespace quda {
   template <bool grid_stride = false>
   class TunableKernel3D_base : public TunableKernel2D_base<grid_stride>
   {
+  protected:
     using Tunable::jitify_error;
     using TunableKernel2D_base<grid_stride>::vector_length_y;
     mutable unsigned vector_length_z;
     mutable unsigned step_z;
     bool tune_block_y;
 
-  protected:
     template <template <typename> class Functor, typename Arg>
     void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
     {
