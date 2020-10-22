@@ -104,7 +104,7 @@ namespace quda {
     } else if (out.Order() == QUDA_TIFR_GAUGE_ORDER) {
 
 #ifdef BUILD_TIFR_INTERFACE
-      using G = TIFROrder<FloatOut,length>(out, Out);
+      using G = TIFROrder<FloatOut,length>;
       CopyGaugeEx<FloatOut,FloatIn,length, G, InOrder>(out, in, location, Out, In);
 #else
       errorQuda("TIFR interface has not been built\n");

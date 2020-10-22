@@ -744,8 +744,8 @@ namespace quda {
       Float scale_inv;
       static constexpr bool fixed = fixed_point<Float,storeFloat>();
 
-    Accessor(const GaugeField &U, void *gauge_=0, void **ghost_=0, bool override=false)
-      : u(gauge_ ? static_cast<complex<storeFloat>*>(gauge_) :
+      Accessor(const GaugeField &U, void *gauge_=0, void **ghost_=0) :
+        u(gauge_ ? static_cast<complex<storeFloat>*>(gauge_) :
 	  static_cast<complex<storeFloat>*>(const_cast<void*>(U.Gauge_p()))),
 	offset_cb( (U.Bytes()>>1) / sizeof(complex<storeFloat>)),
         volumeCB(U.VolumeCB()), stride(U.Stride()), geometry(U.Geometry()),
@@ -1838,7 +1838,7 @@ namespace quda {
         void *backup_h; //! host memory for backing up the field when tuning
         size_t bytes;
 
-        FloatNOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0, bool override = false) :
+        FloatNOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
           reconstruct(u),
           gauge(gauge_ ? gauge_ : (Float *)u.Gauge_p()),
           offset(u.Bytes() / (2 * sizeof(Float) * N)),

@@ -8,25 +8,20 @@ namespace quda {
   void copyGauge(const InOrder &inOrder, GaugeField &out, const GaugeField &in,
 		 QudaFieldLocation location, FloatOut *Out, FloatOut **outGhost, int type) {
     if (out.isNative()) {
-      // this overrides the check that the texture maps to the gauge
-      // pointer - this is safe here since it only occurs when running
-      // the copier on the host when we will not be using texture
-      // reads
-      const bool override = true;
       if (out.Reconstruct() == QUDA_RECONSTRUCT_NO) {
         typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_NO>::type G;
-        copyGauge<FloatOut, FloatIn, length>(G(out, Out, outGhost, override), inOrder, out, in, location, type);
+        copyGauge<FloatOut, FloatIn, length>(G(out, Out, outGhost), inOrder, out, in, location, type);
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_12) {
 #if QUDA_RECONSTRUCT & 2
         typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_12>::type G;
-        copyGauge<FloatOut, FloatIn, length>(G(out, Out, outGhost, override), inOrder, out, in, location, type);
+        copyGauge<FloatOut, FloatIn, length>(G(out, Out, outGhost), inOrder, out, in, location, type);
 #else
         errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-12", QUDA_RECONSTRUCT);
 #endif
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_8) {
 #if QUDA_RECONSTRUCT & 1
         typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_8>::type G;
-        copyGauge<FloatOut, FloatIn, length>(G(out, Out, outGhost, override), inOrder, out, in, location, type);
+        copyGauge<FloatOut, FloatIn, length>(G(out, Out, outGhost), inOrder, out, in, location, type);
 #else
         errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-8", QUDA_RECONSTRUCT);
 #endif
@@ -34,7 +29,7 @@ namespace quda {
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_13) {
 #if QUDA_RECONSTRUCT & 2
         typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_13>::type G;
-        copyGauge<FloatOut, FloatIn, length>(G(out, Out, outGhost, override), inOrder, out, in, location, type);
+        copyGauge<FloatOut, FloatIn, length>(G(out, Out, outGhost), inOrder, out, in, location, type);
 #else
         errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-13", QUDA_RECONSTRUCT);
 #endif
@@ -42,17 +37,17 @@ namespace quda {
 #if QUDA_RECONSTRUCT & 1
         if (out.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC) {
           typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_9, 18, QUDA_STAGGERED_PHASE_MILC>::type G;
-          copyGauge<FloatOut, FloatIn, length>(G(out, Out, outGhost, override), inOrder, out, in, location, type);
+          copyGauge<FloatOut, FloatIn, length>(G(out, Out, outGhost), inOrder, out, in, location, type);
         } else if (out.StaggeredPhase() == QUDA_STAGGERED_PHASE_TIFR) {
 #ifdef BUILD_TIFR_INTERFACE
           typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_9, 18, QUDA_STAGGERED_PHASE_TIFR>::type G;
-          copyGauge<FloatOut, FloatIn, length>(G(out, Out, outGhost, override), inOrder, out, in, location, type);
+          copyGauge<FloatOut, FloatIn, length>(G(out, Out, outGhost), inOrder, out, in, location, type);
 #else
           errorQuda("TIFR interface has not been built so TIFR phase type not enabled\n");
 #endif
         } else if (out.StaggeredPhase() == QUDA_STAGGERED_PHASE_NO) {
           typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_9>::type G;
-          copyGauge<FloatOut, FloatIn, length>(G(out, Out, outGhost, override), inOrder, out, in, location, type);
+          copyGauge<FloatOut, FloatIn, length>(G(out, Out, outGhost), inOrder, out, in, location, type);
         } else {
           errorQuda("Staggered phase type %d not supported", out.StaggeredPhase());
         }
@@ -148,25 +143,20 @@ namespace quda {
 
     // reconstruction only supported on FloatN fields currently
     if (in.isNative()) {
-      // this overrides the check that the texture maps to the gauge
-      // pointer - this is safe here since it only occurs when running
-      // the copier on the host when we will not be using texture
-      // reads
-      const bool override = true;
       if (in.Reconstruct() == QUDA_RECONSTRUCT_NO) {
         typedef typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_NO>::type G;
-        copyGauge<FloatOut, FloatIn, length>(G(in, In, inGhost, override), out, in, location, Out, outGhost, type);
+        copyGauge<FloatOut, FloatIn, length>(G(in, In, inGhost), out, in, location, Out, outGhost, type);
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_12) {
 #if QUDA_RECONSTRUCT & 2
         typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_12>::type G;
-	copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost,override), out, in, location, Out, outGhost, type);
+	copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost), out, in, location, Out, outGhost, type);
 #else
         errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-12", QUDA_RECONSTRUCT);
 #endif
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_8) {
 #if QUDA_RECONSTRUCT & 1
         typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_8>::type G;
-	copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost,override), out, in, location, Out, outGhost, type);
+	copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost), out, in, location, Out, outGhost, type);
 #else
         errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-8", QUDA_RECONSTRUCT);
 #endif
@@ -174,7 +164,7 @@ namespace quda {
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_13) {
 #if QUDA_RECONSTRUCT & 2
         typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_13>::type G;
-	copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost,override), out, in, location, Out, outGhost, type);
+	copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost), out, in, location, Out, outGhost, type);
 #else
         errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-13", QUDA_RECONSTRUCT);
 #endif
@@ -182,10 +172,10 @@ namespace quda {
 #if QUDA_RECONSTRUCT & 1
         if (in.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC) {
           typedef typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_9, 18, QUDA_STAGGERED_PHASE_MILC>::type G;
-          copyGauge<FloatOut, FloatIn, length>(G(in, In, inGhost, override), out, in, location, Out, outGhost, type);
+          copyGauge<FloatOut, FloatIn, length>(G(in, In, inGhost), out, in, location, Out, outGhost, type);
         } else if (in.StaggeredPhase() == QUDA_STAGGERED_PHASE_NO) {
           typedef typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_9>::type G;
-          copyGauge<FloatOut, FloatIn, length>(G(in, In, inGhost, override), out, in, location, Out, outGhost, type);
+          copyGauge<FloatOut, FloatIn, length>(G(in, In, inGhost), out, in, location, Out, outGhost, type);
         } else {
           errorQuda("Staggered phase type %d not supported", in.StaggeredPhase());
         }
@@ -307,24 +297,18 @@ namespace quda {
         checkMomOrder(in);
         checkMomOrder(out);
 
-        // this overrides the check that the texture maps to the gauge
-        // pointer - this is safe here since it only occurs when running
-        // the copier on the host when we will not be using texture
-        // reads
-        const bool override = true;
-
         // momentum only currently supported on MILC (10), TIFR (18) and Float2 (10) fields currently
 	if (out.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
 	  if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
 	    typedef FloatNOrder<FloatOut,10,2,10> momOut;
 	    typedef FloatNOrder<FloatIn,10,2,10> momIn;
-	    CopyGaugeArg<FloatOut, FloatIn, 10, momOut, momIn> arg(momOut(out, Out, 0, override), momIn(in, In, 0, override), in);
+	    CopyGaugeArg<FloatOut, FloatIn, 10, momOut, momIn> arg(momOut(out, Out, 0), momIn(in, In, 0), in);
 	    copyMom<decltype(arg)>(arg,out,in,location);
 	  } else if (in.Order() == QUDA_QDP_GAUGE_ORDER) {
 #ifdef BUILD_QDP_INTERFACE
 	    typedef FloatNOrder<FloatOut,10,2,10> momOut;
 	    typedef QDPOrder<FloatIn,10> momIn;
-	    CopyGaugeArg<FloatOut, FloatIn, 10, momOut, momIn> arg(momOut(out, Out, 0, override), momIn(in, In), in);
+	    CopyGaugeArg<FloatOut, FloatIn, 10, momOut, momIn> arg(momOut(out, Out, 0), momIn(in, In), in);
 	    copyMom<decltype(arg)>(arg,out,in,location);
 #else
 	    errorQuda("QDP interface has not been built\n");
@@ -333,7 +317,7 @@ namespace quda {
 #ifdef BUILD_MILC_INTERFACE
 	    typedef FloatNOrder<FloatOut,10,2,10> momOut;
 	    typedef MILCOrder<FloatIn,10> momIn;
-	    CopyGaugeArg<FloatOut, FloatIn, 10, momOut, momIn> arg(momOut(out, Out, 0, override), momIn(in, In), in);
+	    CopyGaugeArg<FloatOut, FloatIn, 10, momOut, momIn> arg(momOut(out, Out, 0), momIn(in, In), in);
 	    copyMom<decltype(arg)>(arg,out,in,location);
 #else
 	    errorQuda("MILC interface has not been built\n");
@@ -342,7 +326,7 @@ namespace quda {
 #ifdef BUILD_MILC_INTERFACE
 	    typedef FloatNOrder<FloatOut,10,2,10> momOut;
 	    typedef MILCSiteOrder<FloatIn,10> momIn;
-	    CopyGaugeArg<FloatOut, FloatIn, 10, momOut, momIn> arg(momOut(out, Out, 0, override), momIn(in, In), in);
+	    CopyGaugeArg<FloatOut, FloatIn, 10, momOut, momIn> arg(momOut(out, Out, 0), momIn(in, In), in);
 	    copyMom<decltype(arg)>(arg,out,in,location);
 #else
 	    errorQuda("MILC interface has not been built\n");
@@ -351,7 +335,7 @@ namespace quda {
 #ifdef BUILD_TIFR_INTERFACE
 	    typedef FloatNOrder<FloatOut,18,2,11> momOut;
 	    typedef TIFROrder<FloatIn,18> momIn;
-	    CopyGaugeArg<FloatOut, FloatIn, 18, momOut, momIn> arg(momOut(out, Out, 0, override), momIn(in, In), in);
+	    CopyGaugeArg<FloatOut, FloatIn, 18, momOut, momIn> arg(momOut(out, Out, 0), momIn(in, In), in);
 	    copyMom<decltype(arg)>(arg,out,in,location);
 #else
 	    errorQuda("TIFR interface has not been built\n");
@@ -360,7 +344,7 @@ namespace quda {
 #ifdef BUILD_TIFR_INTERFACE
 	    typedef FloatNOrder<FloatOut,18,2,11> momOut;
 	    typedef TIFRPaddedOrder<FloatIn,18> momIn;
-	    CopyGaugeArg<FloatOut, FloatIn, 18, momOut, momIn> arg(momOut(out, Out, 0, override), momIn(in, In), in);
+	    CopyGaugeArg<FloatOut, FloatIn, 18, momOut, momIn> arg(momOut(out, Out, 0), momIn(in, In), in);
 	    copyMom<decltype(arg)>(arg,out,in,location);
 #else
 	    errorQuda("TIFR interface has not been built\n");
@@ -373,7 +357,7 @@ namespace quda {
 #ifdef BUILD_QDP_INTERFACE
 	  if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
 	    typedef FloatNOrder<FloatIn,10,2,10> momIn;
-	    CopyGaugeArg<FloatOut, FloatIn, 10, momOut, momIn> arg(momOut(out, Out), momIn(in, In, 0, override), in);
+	    CopyGaugeArg<FloatOut, FloatIn, 10, momOut, momIn> arg(momOut(out, Out), momIn(in, In, 0), in);
 	    copyMom<decltype(arg)>(arg,out,in,location);
 	  } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
 	    typedef MILCOrder<FloatIn,10> momIn;
@@ -390,7 +374,7 @@ namespace quda {
 #ifdef BUILD_MILC_INTERFACE
 	  if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
 	    typedef FloatNOrder<FloatIn,10,2,10> momIn;
-	    CopyGaugeArg<FloatOut, FloatIn, 10, momOut, momIn> arg(momOut(out, Out), momIn(in, In, 0, override), in);
+	    CopyGaugeArg<FloatOut, FloatIn, 10, momOut, momIn> arg(momOut(out, Out), momIn(in, In, 0), in);
 	    copyMom<decltype(arg)>(arg,out,in,location);
 	  } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
 	    typedef MILCOrder<FloatIn,10> momIn;
@@ -411,7 +395,7 @@ namespace quda {
 #ifdef BUILD_MILC_INTERFACE
 	  if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
 	    typedef FloatNOrder<FloatIn,10,2,10> momIn;
-	    CopyGaugeArg<FloatOut, FloatIn, 10, momOut, momIn> arg(momOut(out, Out), momIn(in, In, 0, override), in);
+	    CopyGaugeArg<FloatOut, FloatIn, 10, momOut, momIn> arg(momOut(out, Out), momIn(in, In, 0), in);
 	    copyMom<decltype(arg)>(arg,out,in,location);
 	  } else if (in.Order() == QUDA_MILC_SITE_GAUGE_ORDER) {
 	    typedef MILCSiteOrder<FloatIn,10> momIn;
@@ -429,7 +413,7 @@ namespace quda {
 	  if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
 	    // FIX ME - 11 is a misnomer to avoid confusion in template instantiation
 	    typedef FloatNOrder<FloatIn,18,2,11> momIn;
-	    CopyGaugeArg<FloatOut, FloatIn, 18, momOut, momIn> arg(momOut(out, Out), momIn(in, In, 0, override), in);
+	    CopyGaugeArg<FloatOut, FloatIn, 18, momOut, momIn> arg(momOut(out, Out), momIn(in, In, 0), in);
 	    copyMom<decltype(arg)>(arg,out,in,location);
 	  } else if (in.Order() == QUDA_TIFR_GAUGE_ORDER) {
 	    typedef TIFROrder<FloatIn,18> momIn;
@@ -447,7 +431,7 @@ namespace quda {
 	  if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
 	    // FIX ME - 11 is a misnomer to avoid confusion in template instantiation
 	    typedef FloatNOrder<FloatIn,18,2,11> momIn;
-	    CopyGaugeArg<FloatOut, FloatIn, 18, momOut, momIn> arg(momOut(out, Out), momIn(in, In, 0, override), in);
+	    CopyGaugeArg<FloatOut, FloatIn, 18, momOut, momIn> arg(momOut(out, Out), momIn(in, In, 0), in);
 	    copyMom<decltype(arg)>(arg,out,in,location);
 	  } else if (in.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
 	    typedef TIFRPaddedOrder<FloatIn,18> momIn;
