@@ -51,10 +51,17 @@ void blasGEMMEigenVerify(void *arrayA, void *arrayB, void *arrayCcopy, void *arr
   int lda = blas_param->lda;
   int ldb = blas_param->ldb;
   int ldc = blas_param->ldc;
+
+  // If the user did not set any stride values, we default them to 1
+  // as batch size 0 is an option. 
+  int a_stride = blas_param->strideA == -1 ? 1 : blas_param->strideA;
+  int b_stride = blas_param->strideB == -1 ? 1 : blas_param->strideB;
+  int c_stride = blas_param->strideC == -1 ? 1 : blas_param->strideC;
   int a_offset = blas_param->a_offset;
   int b_offset = blas_param->b_offset;
   int c_offset = blas_param->c_offset;
   int batches = blas_param->batch_count;
+  
   complex<double> alpha = blas_param->alpha;
   complex<double> beta = blas_param->beta;
 
@@ -74,8 +81,12 @@ void blasGEMMEigenVerify(void *arrayA, void *arrayB, void *arrayCcopy, void *arr
   printfQuda("Computing Eigen matrix opertaion a * A_{%lu,%lu} * B_{%lu,%lu} + b * C_{%lu,%lu} = C_{%lu,%lu}\n",
              A.rows(), A.cols(), B.rows(), B.cols(), C_eigen.rows(), C_eigen.cols(), C_eigen.rows(), C_eigen.cols());
 
-  for (int batch = 0; batch < batches; batch++) {
-
+  // Get maximum stride length to deduce the number of batches in the
+  // computation
+  int max_stride = std::max(std::max(a_stride, b_stride), c_stride);
+  
+  for (int batch = 0; batch < batches; batch+=max_stride) {
+    
     // Populate Eigen objects
     if (blas_param->data_order == QUDA_BLAS_DATAORDER_COL) {
       fillEigenArrayColMaj(A, A_ptr, m, k, lda, a_offset);
@@ -113,9 +124,9 @@ void blasGEMMEigenVerify(void *arrayA, void *arrayB, void *arrayCcopy, void *arr
     printfQuda("batch %d: (C_host - C_gpu) Frobenius norm = %e. Relative deviation = %e\n", batch, C_resid.norm(),
                C_resid.norm() / (C_resid.rows() * C_resid.cols()));
 
-    a_offset += refA_size;
-    b_offset += refB_size;
-    c_offset += refC_size;
+    a_offset += refA_size * a_stride;
+    b_offset += refB_size * b_stride;
+    c_offset += refC_size * c_stride;
   }
 }
 

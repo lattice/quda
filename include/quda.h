@@ -1445,8 +1445,16 @@ extern "C" {
                                 const double tolerance, const unsigned int stopWtheta, QudaGaugeParam *param,
                                 double *timeinfo);
 
-  void blasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaBLASParam *param);
-
+  /**
+   * @brief Strided Batched GEMM
+   * @param[in] arrayA The array containing the A matrix data
+   * @param[in] arrayB The array containing the A matrix data
+   * @param[in] arrayC The array containing the A matrix data
+   * @param[in] native boolean to use either the native or generic version
+   * @param[in] param The data defining the problem execution.
+   */  
+  void blasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, bool native, QudaBLASParam *param);
+  
   /**
    * @brief Flush the chronological history for the given index
    * @param[in] index Index for which we are flushing
@@ -1459,7 +1467,7 @@ extern "C" {
   *
   **/
   void openMagma();
-
+  
   void closeMagma();
 
   /**

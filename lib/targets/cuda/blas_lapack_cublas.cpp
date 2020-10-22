@@ -197,7 +197,17 @@ namespace quda
         timeval start, stop;
         gettimeofday(&start, NULL);
 
-        const uint64_t batch = blas_param.batch_count;
+	// Get maximum stride length to deduce the number of batches in the
+	// computation
+	int max_stride = std::max(std::max(blas_param.strideA, blas_param.strideB), blas_param.strideC);
+
+	// If the user gives strides of 0 for all arrays, we are essentially performing
+	// a GEMM on the first matrices in the array N_{batch} times.
+	// Give them what they ask for, YMMV...
+	if(max_stride == 0) max_stride = 1;
+	
+	// Then number of GEMMs to compute
+        const uint64_t batch = blas_param.batch_count/max_stride;
         uint64_t data_size
           = (blas_param.data_type == QUDA_BLAS_DATATYPE_S || blas_param.data_type == QUDA_BLAS_DATATYPE_C) ? 4 : 8;
 
@@ -225,9 +235,9 @@ namespace quda
         // Strides in the cublas param are defaulted to -1. If that remains unchanged,
         // the stride will be the regular batch size, else the user specified value
         // is used.
-        unsigned int strideA = blas_param.strideA < 0 ? A_batch_size : blas_param.strideA;
-        unsigned int strideB = blas_param.strideB < 0 ? B_batch_size : blas_param.strideB;
-        unsigned int strideC = blas_param.strideC < 0 ? C_batch_size : blas_param.strideC;
+        unsigned int strideA = blas_param.strideA < 0 ? A_batch_size : A_batch_size * blas_param.strideA;
+        unsigned int strideB = blas_param.strideB < 0 ? B_batch_size : B_batch_size * blas_param.strideB;
+        unsigned int strideC = blas_param.strideC < 0 ? C_batch_size : C_batch_size * blas_param.strideC;
 
         // Data size of the entire array
         size_t sizeAarr = A_batch_size * data_size * batch;

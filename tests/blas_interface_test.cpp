@@ -210,8 +210,8 @@ int main(int argc, char **argv)
   default: errorQuda("Unrecognised data type %d\n", blas_param.data_type);
   }
 
-  // Perform GPU GEMM Blas operation
-  blasGEMMQuda(arrayA, arrayB, arrayC, &blas_param);
+  // Perform device GEMM Blas operation
+  blasGEMMQuda(arrayA, arrayB, arrayC, native_blas_lapack, &blas_param);
 
   if (verify_results) {
     blasGEMMQudaVerify(arrayA, arrayB, arrayC, arrayCcopy, refA_size, refB_size, refC_size, re_im, data_size,
