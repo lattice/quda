@@ -6,7 +6,9 @@ namespace quda {
 
   template <int Ns, int Nc, typename Out, typename In, typename param_t>
   class CopyColorSpinor : TunableKernel2D {
-    template <template <typename> class Basis> using Arg = CopyColorSpinorArg<Ns, Nc, Out, In, Basis, param_t>;
+    using FloatOut = typename std::remove_pointer<typename std::tuple_element<0, param_t>::type>::type;
+    using FloatIn = typename std::remove_pointer<typename std::tuple_element<1, param_t>::type>::type;
+    template <template <typename> class Basis> using Arg = CopyColorSpinorArg<FloatOut, FloatIn, Ns, Nc, Out, In, Basis, param_t>;
     ColorSpinorField &out;
     const ColorSpinorField &in;
     param_t &param;

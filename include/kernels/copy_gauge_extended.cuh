@@ -2,6 +2,7 @@
 #include <quda_matrix.h>
 #include <fast_intdiv.h>
 #include <index_helper.cuh>
+#include <kernel.h>
 
 namespace quda {
 

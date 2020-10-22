@@ -1,4 +1,5 @@
 #include <color_spinor_field_order.h>
+#include <kernel.h>
 
 #define PRESERVE_SPINOR_NORM
 
@@ -14,10 +15,8 @@ namespace quda {
 
   using namespace colorspinor;
 
-  template <int nSpin_, int nColor_, typename Out, typename In, template <typename> class Basis_, typename param_t>
+  template <typename FloatOut, typename FloatIn, int nSpin_, int nColor_, typename Out, typename In, template <typename> class Basis_, typename param_t>
   struct CopyColorSpinorArg {
-    using FloatOut = typename std::remove_pointer<typename std::tuple_element<0, param_t>::type>::type;
-    using FloatIn = typename std::remove_pointer<typename std::tuple_element<1, param_t>::type>::type;
     template <typename Arg_> using Basis = Basis_<Arg_>;
     using realOut = typename mapper<FloatOut>::type;
     using realIn = typename mapper<FloatIn>::type;
