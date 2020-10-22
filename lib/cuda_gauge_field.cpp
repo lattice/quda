@@ -447,9 +447,9 @@ namespace quda {
         }
 
         // if either direction is not peer-to-peer then we need to synchronize
-        if (!comm_peer2peer_enabled(0,dim) || !comm_peer2peer_enabled(1,dim)) qudaDeviceSynchronize();
+        if (!comm_peer2peer_enabled(0, dim) || !comm_peer2peer_enabled(1, dim)) qudaDeviceSynchronize();
 
-	// if we pass a stream to sendStart then we must ensure that stream is synchronized
+        // if we pass a stream to sendStart then we must ensure that stream is synchronized
 	for (int dir=0; dir<2; dir++) sendStart(dim, dir, &streams[dir]);
 	for (int dir=0; dir<2; dir++) commsComplete(dim, dir);
 

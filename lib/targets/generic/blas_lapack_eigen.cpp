@@ -47,7 +47,6 @@ namespace quda
       }
       //---------------------------------------------------
 
-      
       // Batched Inversions
       //---------------------------------------------------
       long long BatchInvertMatrix(void *Ainv, void *A, const int n, const uint64_t batch, QudaPrecision prec,
@@ -110,57 +109,60 @@ namespace quda
         return flops;
       }
 
-
       // Batched GEMM helpers
-      //---------------------------------------------------      
+      //---------------------------------------------------
       template <typename EigenMat, typename T>
       void fillArrayColMaj(EigenMat &EigenArr, T *arr, int rows, int cols, int ld, int offset, bool fill_eigen)
       {
-	int counter = offset;
-	for (int j = 0; j < cols; j++) {
-	  for (int i = 0; i < rows; i++) {
-	    if (fill_eigen) EigenArr(i, j) = arr[counter];
-	    else arr[counter] = EigenArr(i, j);
-	    counter++;
-	  }
-	  counter += (ld - rows);
-	}
+        int counter = offset;
+        for (int j = 0; j < cols; j++) {
+          for (int i = 0; i < rows; i++) {
+            if (fill_eigen)
+              EigenArr(i, j) = arr[counter];
+            else
+              arr[counter] = EigenArr(i, j);
+            counter++;
+          }
+          counter += (ld - rows);
+        }
       }
 
       template <typename EigenMat, typename T>
       void fillArrayRowMaj(EigenMat &EigenArr, T *arr, int rows, int cols, int ld, int offset, bool fill_eigen)
       {
-	int counter = offset;
-	for (int i = 0; i < rows; i++) {
-	  for (int j = 0; j < cols; j++) {
-	    if (fill_eigen) EigenArr(i, j) = arr[counter];
-	    else arr[counter] = EigenArr(i, j);
-	    counter++;
-	  }
-	  counter += (ld - cols);
-	}
+        int counter = offset;
+        for (int i = 0; i < rows; i++) {
+          for (int j = 0; j < cols; j++) {
+            if (fill_eigen)
+              EigenArr(i, j) = arr[counter];
+            else
+              arr[counter] = EigenArr(i, j);
+            counter++;
+          }
+          counter += (ld - cols);
+        }
       }
 
       template <typename EigenMat, typename T>
       void GEMM(void *A_h, void *B_h, void *C_h, T alpha, T beta, int max_stride, QudaBLASParam &blas_param)
       {
-	// Problem parameters
-	int m = blas_param.m;
-	int n = blas_param.n;
-	int k = blas_param.k;
-	int lda = blas_param.lda;
-	int ldb = blas_param.ldb;
-	int ldc = blas_param.ldc;
-	
-	// If the user did not set any stride values, we default them to 1
-	// as batch size 0 is an option. 
-	int a_stride = blas_param.strideA == -1 ? 1 : blas_param.strideA;
-	int b_stride = blas_param.strideB == -1 ? 1 : blas_param.strideB;
-	int c_stride = blas_param.strideC == -1 ? 1 : blas_param.strideC;
-	int a_offset = blas_param.a_offset;
-	int b_offset = blas_param.b_offset;
-	int c_offset = blas_param.c_offset;
-	int batches = blas_param.batch_count;
+        // Problem parameters
+        int m = blas_param.m;
+        int n = blas_param.n;
+        int k = blas_param.k;
+        int lda = blas_param.lda;
+        int ldb = blas_param.ldb;
+        int ldc = blas_param.ldc;
+
+        // If the user did not set any stride values, we default them to 1
+        // as batch size 0 is an option.
+        int a_stride = blas_param.strideA == -1 ? 1 : blas_param.strideA;
+        int b_stride = blas_param.strideB == -1 ? 1 : blas_param.strideB;
+        int c_stride = blas_param.strideC == -1 ? 1 : blas_param.strideC;
+        int a_offset = blas_param.a_offset;
+        int b_offset = blas_param.b_offset;
+        int c_offset = blas_param.c_offset;
+        int batches = blas_param.batch_count;
 
         // Number of data between batches
         unsigned int A_batch_size = blas_param.lda * blas_param.k;
@@ -168,82 +170,82 @@ namespace quda
         unsigned int B_batch_size = blas_param.ldb * blas_param.n;
         if (blas_param.trans_b != QUDA_BLAS_OP_N) B_batch_size = blas_param.ldb * blas_param.k;
         unsigned int C_batch_size = blas_param.ldc * blas_param.n;
-	
-	T *A_ptr = (T *)(&A_h)[0];
-	T *B_ptr = (T *)(&B_h)[0];
-	T *C_ptr = (T *)(&C_h)[0];
 
-	// Eigen objects to store data
-	EigenMat Amat = EigenMat::Zero(m, k);
-	EigenMat Bmat = EigenMat::Zero(k, n);
-	EigenMat Cmat = EigenMat::Zero(m, n);
-	  
-	for (int batch = 0; batch < batches; batch+=max_stride) {
-	    
-	  // Populate Eigen objects
-	  if (blas_param.data_order == QUDA_BLAS_DATAORDER_COL) {
-	    fillArrayColMaj<EigenMat, T>(Amat, A_ptr, m, k, lda, a_offset, true);
-	    fillArrayColMaj<EigenMat, T>(Bmat, B_ptr, k, n, ldb, b_offset, true);
-	    fillArrayColMaj<EigenMat, T>(Cmat, C_ptr, m, n, ldc, c_offset, true);
-	  } else {
-	    fillArrayRowMaj<EigenMat, T>(Amat, A_ptr, m, k, lda, a_offset, true);
-	    fillArrayRowMaj<EigenMat, T>(Bmat, B_ptr, k, n, ldb, b_offset, true);
-	    fillArrayRowMaj<EigenMat, T>(Cmat, C_ptr, m, n, ldc, c_offset, true);
-	  }
-	    
-	  // Apply op(A) and op(B)
-	  switch (blas_param.trans_a) {
-	  case QUDA_BLAS_OP_T: Amat.transposeInPlace(); break;
-	  case QUDA_BLAS_OP_C: Amat.adjointInPlace(); break;
-	  case QUDA_BLAS_OP_N: break;
-	  default: errorQuda("Unknown blas op type %d", blas_param.trans_a);
-	  }
-	    
-	  switch (blas_param.trans_b) {
-	  case QUDA_BLAS_OP_T: Bmat.transposeInPlace(); break;
-	  case QUDA_BLAS_OP_C: Bmat.adjointInPlace(); break;
-	  case QUDA_BLAS_OP_N: break;
-	  default: errorQuda("Unknown blas op type %d", blas_param.trans_b);
-	  }
-	    
-	  // Perform GEMM using Eigen
-	  Cmat = alpha * Amat * Bmat + beta * Cmat;
+        T *A_ptr = (T *)(&A_h)[0];
+        T *B_ptr = (T *)(&B_h)[0];
+        T *C_ptr = (T *)(&C_h)[0];
 
-	  // Write back to the C array 
-	  if (blas_param.data_order == QUDA_BLAS_DATAORDER_COL) {
-	    fillArrayColMaj<EigenMat, T>(Cmat, C_ptr, m, n, ldc, c_offset, false);
-	  } else {
-	    fillArrayRowMaj<EigenMat, T>(Cmat, C_ptr, m, n, ldc, c_offset, false);
-	  }
+        // Eigen objects to store data
+        EigenMat Amat = EigenMat::Zero(m, k);
+        EigenMat Bmat = EigenMat::Zero(k, n);
+        EigenMat Cmat = EigenMat::Zero(m, n);
 
-	  a_offset += A_batch_size * a_stride;
-	  b_offset += B_batch_size * b_stride;
-	  c_offset += C_batch_size * c_stride;
-	}
-      }      
-      //---------------------------------------------------      
+        for (int batch = 0; batch < batches; batch += max_stride) {
+
+          // Populate Eigen objects
+          if (blas_param.data_order == QUDA_BLAS_DATAORDER_COL) {
+            fillArrayColMaj<EigenMat, T>(Amat, A_ptr, m, k, lda, a_offset, true);
+            fillArrayColMaj<EigenMat, T>(Bmat, B_ptr, k, n, ldb, b_offset, true);
+            fillArrayColMaj<EigenMat, T>(Cmat, C_ptr, m, n, ldc, c_offset, true);
+          } else {
+            fillArrayRowMaj<EigenMat, T>(Amat, A_ptr, m, k, lda, a_offset, true);
+            fillArrayRowMaj<EigenMat, T>(Bmat, B_ptr, k, n, ldb, b_offset, true);
+            fillArrayRowMaj<EigenMat, T>(Cmat, C_ptr, m, n, ldc, c_offset, true);
+          }
+
+          // Apply op(A) and op(B)
+          switch (blas_param.trans_a) {
+          case QUDA_BLAS_OP_T: Amat.transposeInPlace(); break;
+          case QUDA_BLAS_OP_C: Amat.adjointInPlace(); break;
+          case QUDA_BLAS_OP_N: break;
+          default: errorQuda("Unknown blas op type %d", blas_param.trans_a);
+          }
+
+          switch (blas_param.trans_b) {
+          case QUDA_BLAS_OP_T: Bmat.transposeInPlace(); break;
+          case QUDA_BLAS_OP_C: Bmat.adjointInPlace(); break;
+          case QUDA_BLAS_OP_N: break;
+          default: errorQuda("Unknown blas op type %d", blas_param.trans_b);
+          }
+
+          // Perform GEMM using Eigen
+          Cmat = alpha * Amat * Bmat + beta * Cmat;
+
+          // Write back to the C array
+          if (blas_param.data_order == QUDA_BLAS_DATAORDER_COL) {
+            fillArrayColMaj<EigenMat, T>(Cmat, C_ptr, m, n, ldc, c_offset, false);
+          } else {
+            fillArrayRowMaj<EigenMat, T>(Cmat, C_ptr, m, n, ldc, c_offset, false);
+          }
+
+          a_offset += A_batch_size * a_stride;
+          b_offset += B_batch_size * b_stride;
+          c_offset += C_batch_size * c_stride;
+        }
+      }
+      //---------------------------------------------------
 
       // Strided Batched GEMM
       //---------------------------------------------------
       long long stridedBatchGEMM(void *A_data, void *B_data, void *C_data, QudaBLASParam blas_param,
                                  QudaFieldLocation location)
-      {	
+      {
         long long flops = 0;
         timeval start, stop;
         gettimeofday(&start, NULL);
 
-	// Get maximum stride length to deduce the number of batches in the
-	// computation
-	int max_stride = std::max(std::max(blas_param.strideA, blas_param.strideB), blas_param.strideC);
+        // Get maximum stride length to deduce the number of batches in the
+        // computation
+        int max_stride = std::max(std::max(blas_param.strideA, blas_param.strideB), blas_param.strideC);
 
-	// If the user gives strides of 0 for all arrays, we are essentially performing
-	// a GEMM on the first matrices in the array N_{batch} times.
-	// Give them what they ask for, YMMV...
-	// If this evaluates to -1, the user did not set any strides.
-	if(max_stride <= 0) max_stride = 1;
-	
-	// Then number of GEMMs to compute
-        const uint64_t batch = blas_param.batch_count/max_stride;
+        // If the user gives strides of 0 for all arrays, we are essentially performing
+        // a GEMM on the first matrices in the array N_{batch} times.
+        // Give them what they ask for, YMMV...
+        // If this evaluates to -1, the user did not set any strides.
+        if (max_stride <= 0) max_stride = 1;
+
+        // Then number of GEMMs to compute
+        const uint64_t batch = blas_param.batch_count / max_stride;
 
         uint64_t data_size
           = (blas_param.data_type == QUDA_BLAS_DATATYPE_S || blas_param.data_type == QUDA_BLAS_DATATYPE_C) ? 4 : 8;
@@ -261,7 +263,7 @@ namespace quda
           std::swap(blas_param.strideA, blas_param.strideB);
           std::swap(A_data, B_data);
         }
-	
+
         // Number of data between batches
         unsigned int A_batch_size = blas_param.lda * blas_param.k;
         if (blas_param.trans_a != QUDA_BLAS_OP_N) A_batch_size = blas_param.lda * blas_param.m;
@@ -284,40 +286,40 @@ namespace quda
           qudaMemcpy(B_h, B_data, sizeBarr, cudaMemcpyDeviceToHost);
           qudaMemcpy(C_h, C_data, sizeCarr, cudaMemcpyDeviceToHost);
         }
-	
+
         if (blas_param.data_type == QUDA_BLAS_DATATYPE_Z) {
-	  
+
           typedef std::complex<double> Z;
           const Z alpha = blas_param.alpha;
           const Z beta = blas_param.beta;
-	  GEMM<MatrixXcd, Z>(A_h, B_h, C_h, alpha, beta, max_stride, blas_param);
-	  
-	} else if (blas_param.data_type == QUDA_BLAS_DATATYPE_C) {
+          GEMM<MatrixXcd, Z>(A_h, B_h, C_h, alpha, beta, max_stride, blas_param);
+
+        } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_C) {
 
           typedef std::complex<float> C;
           const C alpha = blas_param.alpha;
           const C beta = blas_param.beta;
-	  GEMM<MatrixXcf, C>(A_h, B_h, C_h, alpha, beta, max_stride, blas_param);
+          GEMM<MatrixXcf, C>(A_h, B_h, C_h, alpha, beta, max_stride, blas_param);
 
-	} else if (blas_param.data_type == QUDA_BLAS_DATATYPE_D) {
+        } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_D) {
 
           typedef double D;
           const D alpha = (D)(static_cast<std::complex<double>>(blas_param.alpha).real());
           const D beta = (D)(static_cast<std::complex<double>>(blas_param.beta).real());
-	  GEMM<MatrixXd, D>(A_h, B_h, C_h, alpha, beta, max_stride, blas_param);
+          GEMM<MatrixXd, D>(A_h, B_h, C_h, alpha, beta, max_stride, blas_param);
 
-	} else if (blas_param.data_type == QUDA_BLAS_DATATYPE_S) {
+        } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_S) {
 
           typedef double S;
           const S alpha = (S)(static_cast<std::complex<float>>(blas_param.alpha).real());
           const S beta = (S)(static_cast<std::complex<float>>(blas_param.beta).real());
-	  GEMM<MatrixXf, S>(A_h, B_h, C_h, alpha, beta, max_stride, blas_param);
-	  
+          GEMM<MatrixXf, S>(A_h, B_h, C_h, alpha, beta, max_stride, blas_param);
+
         } else {
           errorQuda("blasGEMM type %d not implemented\n", blas_param.data_type);
         }
 
-	// Restore the blas parameters to their original values
+        // Restore the blas parameters to their original values
         if (blas_param.data_order == QUDA_BLAS_DATAORDER_COL) {
           std::swap(blas_param.m, blas_param.n);
           std::swap(blas_param.lda, blas_param.ldb);
@@ -327,14 +329,14 @@ namespace quda
           std::swap(A_data, B_data);
         }
 
-	// Transfer data
+        // Transfer data
         if (location == QUDA_CUDA_FIELD_LOCATION) {
           qudaMemcpy(C_data, C_h, sizeCarr, cudaMemcpyHostToDevice);
-	  pool_pinned_free(A_h);
-	  pool_pinned_free(B_h);
-	  pool_pinned_free(C_h);
+          pool_pinned_free(A_h);
+          pool_pinned_free(B_h);
+          pool_pinned_free(C_h);
         }
-	
+
         qudaDeviceSynchronize();
         gettimeofday(&stop, NULL);
         long ds = stop.tv_sec - start.tv_sec;
@@ -342,9 +344,9 @@ namespace quda
         double time = ds + 0.000001 * dus;
         if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
           printfQuda("Batched matrix GEMM completed in %f seconds with GFLOPS = %f\n", time, 1e-9 * flops / time);
-	
-	return flops;
+
+        return flops;
       }
     } // namespace generic
-  } // namespace blas_lapack
+  }   // namespace blas_lapack
 } // namespace quda

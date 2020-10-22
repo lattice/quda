@@ -197,17 +197,17 @@ namespace quda
         timeval start, stop;
         gettimeofday(&start, NULL);
 
-	// Get maximum stride length to deduce the number of batches in the
-	// computation
-	int max_stride = std::max(std::max(blas_param.strideA, blas_param.strideB), blas_param.strideC);
+        // Get maximum stride length to deduce the number of batches in the
+        // computation
+        int max_stride = std::max(std::max(blas_param.strideA, blas_param.strideB), blas_param.strideC);
 
-	// If the user gives strides of 0 for all arrays, we are essentially performing
-	// a GEMM on the first matrices in the array N_{batch} times.
-	// Give them what they ask for, YMMV...
-	if(max_stride == 0) max_stride = 1;
-	
-	// Then number of GEMMs to compute
-        const uint64_t batch = blas_param.batch_count/max_stride;
+        // If the user gives strides of 0 for all arrays, we are essentially performing
+        // a GEMM on the first matrices in the array N_{batch} times.
+        // Give them what they ask for, YMMV...
+        if (max_stride == 0) max_stride = 1;
+
+        // Then number of GEMMs to compute
+        const uint64_t batch = blas_param.batch_count / max_stride;
         uint64_t data_size
           = (blas_param.data_type == QUDA_BLAS_DATATYPE_S || blas_param.data_type == QUDA_BLAS_DATATYPE_C) ? 4 : 8;
 

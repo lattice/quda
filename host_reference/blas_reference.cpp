@@ -53,7 +53,7 @@ void blasGEMMEigenVerify(void *arrayA, void *arrayB, void *arrayCcopy, void *arr
   int ldc = blas_param->ldc;
 
   // If the user did not set any stride values, we default them to 1
-  // as batch size 0 is an option. 
+  // as batch size 0 is an option.
   int a_stride = blas_param->strideA == -1 ? 1 : blas_param->strideA;
   int b_stride = blas_param->strideB == -1 ? 1 : blas_param->strideB;
   int c_stride = blas_param->strideC == -1 ? 1 : blas_param->strideC;
@@ -61,7 +61,7 @@ void blasGEMMEigenVerify(void *arrayA, void *arrayB, void *arrayCcopy, void *arr
   int b_offset = blas_param->b_offset;
   int c_offset = blas_param->c_offset;
   int batches = blas_param->batch_count;
-  
+
   complex<double> alpha = blas_param->alpha;
   complex<double> beta = blas_param->beta;
 
@@ -84,9 +84,9 @@ void blasGEMMEigenVerify(void *arrayA, void *arrayB, void *arrayCcopy, void *arr
   // Get maximum stride length to deduce the number of batches in the
   // computation
   int max_stride = std::max(std::max(a_stride, b_stride), c_stride);
-  
-  for (int batch = 0; batch < batches; batch+=max_stride) {
-    
+
+  for (int batch = 0; batch < batches; batch += max_stride) {
+
     // Populate Eigen objects
     if (blas_param->data_order == QUDA_BLAS_DATAORDER_COL) {
       fillEigenArrayColMaj(A, A_ptr, m, k, lda, a_offset);

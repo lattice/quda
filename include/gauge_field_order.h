@@ -323,17 +323,17 @@ namespace quda {
         }
       }
 
-        /**
-	   @brief Operator-= with complex number instance as input
-	   @param a Complex number we want to subtract from this accessor
-	*/
-	template<typename theirFloat>
-	__device__ __host__ inline void operator-=(const complex<theirFloat> &a) {
-	  if (match<storeFloat,theirFloat>()) {
-	    v[idx] -= complex<storeFloat>(a.x, a.y);
-	  } else {
-	    v[idx] -= fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
-	  }
+      /**
+         @brief Operator-= with complex number instance as input
+         @param a Complex number we want to subtract from this accessor
+      */
+      template <typename theirFloat> __device__ __host__ inline void operator-=(const complex<theirFloat> &a)
+      {
+        if (match<storeFloat, theirFloat>()) {
+          v[idx] -= complex<storeFloat>(a.x, a.y);
+        } else {
+          v[idx] -= fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
+        }
 	}
 
       };
