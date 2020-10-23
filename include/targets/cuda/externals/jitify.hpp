@@ -1374,7 +1374,7 @@ static const char* jitsafe_header_preinclude_h = R"(
 //#include <string>
 
 // WAR for generics/shfl.h
-#define THRUST_STATIC_ASSERT(x)
+//#define THRUST_STATIC_ASSERT(x)
 
 // WAR for CUB
 #ifdef __host__
@@ -1732,6 +1732,12 @@ static const char* jitsafe_header_type_traits = R"(
     // TODO: This is a hack; a proper implem is quite complicated.
     typedef typename F::result_type type;
     };
+
+    template <class T> struct remove_pointer { typedef T type; };
+    template <class T> struct remove_pointer<T*> { typedef T type; };
+    template <class T> struct remove_pointer<T* const> { typedef T type; };
+    template <class T> struct remove_pointer<T* volatile> { typedef T type; };
+    template <class T> struct remove_pointer<T* const volatile> { typedef T type; };
 
     template <class T> struct remove_reference { typedef T type; };
     template <class T> struct remove_reference<T&> { typedef T type; };

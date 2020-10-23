@@ -8,7 +8,11 @@
    directly.
 */
 
-#ifdef JITIFY
+#if defined(JITIFY) && !defined(TARGET_CUDA)
+#error "Jitify compilation cannot be enabled unless targeting CUDA"
+#endif
+
+#if defined(JITIFY)
 
 #ifdef HOST_DEBUG
 
