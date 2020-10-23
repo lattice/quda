@@ -8,10 +8,13 @@ namespace quda {
   class CopyColorSpinor : TunableKernel2D {
     using FloatOut = typename std::remove_pointer<typename std::tuple_element<0, param_t>::type>::type;
     using FloatIn = typename std::remove_pointer<typename std::tuple_element<1, param_t>::type>::type;
-    template <template <typename> class Basis> using Arg = CopyColorSpinorArg<FloatOut, FloatIn, Ns, Nc, Out, In, Basis, param_t>;
+    template <template <int, int> class Basis> using Arg = CopyColorSpinorArg<FloatOut, FloatIn, Ns, Nc, Out, In, Basis>;
+    FloatOut *Out_;
+    FloatIn *In_;
+    float *outNorm;
+    float *inNorm;
     ColorSpinorField &out;
     const ColorSpinorField &in;
-    param_t &param;
 
     bool advanceSharedBytes(TuneParam &param) const { return false; } // Don't tune shared mem
     unsigned int minThreads() const { return in.VolumeCB(); }
@@ -21,7 +24,10 @@ namespace quda {
       TunableKernel2D(in, in.SiteSubset(), std::get<4>(param)),
       out(out),
       in(in),
-      param(param)
+      Out_(std::get<0>(param)),
+      In_(std::get<1>(param)),
+      outNorm(std::get<2>(param)),
+      inNorm(std::get<3>(param))
     {
       strcat(aux, out.AuxString());
       if (out.GammaBasis()==in.GammaBasis()) strcat(aux, ",PreserveBasis");
@@ -39,7 +45,7 @@ namespace quda {
     {
       constexpr bool enable_host = true;
       if (out.GammaBasis()==in.GammaBasis()) {
-        launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<PreserveBasis>(out, in, param));
+        launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<PreserveBasis>(out, in, Out_, In_, outNorm, inNorm));
       } else {
         errorQuda("Unexpected basis change from %d to %d", in.GammaBasis(), out.GammaBasis());
       }
@@ -50,15 +56,15 @@ namespace quda {
     {
       constexpr bool enable_host = true;
       if (out.GammaBasis()==in.GammaBasis()) {
-        launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<PreserveBasis>(out, in, param));
+        launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<PreserveBasis>(out, in, Out_, In_, outNorm, inNorm));
       } else if (out.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
-        launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<NonRelBasis>(out, in, param));
+        launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<NonRelBasis>(out, in, Out_, In_, outNorm, inNorm));
       } else if (in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && out.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
-        launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<RelBasis>(out, in, param));
+        launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<RelBasis>(out, in, Out_, In_, outNorm, inNorm));
       } else if (out.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_CHIRAL_GAMMA_BASIS) {
-        launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<ChiralToNonRelBasis>(out, in, param));
+        launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<ChiralToNonRelBasis>(out, in, Out_, In_, outNorm, inNorm));
       } else if (in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && out.GammaBasis() == QUDA_CHIRAL_GAMMA_BASIS) {
-        launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<NonRelToChiralBasis>(out, in, param));
+        launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<NonRelToChiralBasis>(out, in, Out_, In_, outNorm, inNorm));
       } else {
         errorQuda("Unexpected basis change from %d to %d", in.GammaBasis(), out.GammaBasis());
       }

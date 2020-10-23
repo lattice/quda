@@ -15,9 +15,9 @@ namespace quda {
 
   using namespace colorspinor;
 
-  template <typename FloatOut, typename FloatIn, int nSpin_, int nColor_, typename Out, typename In, template <typename> class Basis_, typename param_t>
+  template <typename FloatOut, typename FloatIn, int nSpin_, int nColor_, typename Out, typename In, template <int, int> class Basis_>
   struct CopyColorSpinorArg {
-    template <typename Arg_> using Basis = Basis_<Arg_>;
+    using Basis = Basis_<nSpin_, nColor_>;
     using realOut = typename mapper<FloatOut>::type;
     using realIn = typename mapper<FloatIn>::type;
     static constexpr int nSpin = nSpin_;
@@ -27,9 +27,10 @@ namespace quda {
     const int outParity;
     const int inParity;
     dim3 threads;
-    CopyColorSpinorArg(ColorSpinorField &out, const ColorSpinorField &in, param_t &param) :
-      out(out, 1, std::get<0>(param), std::get<2>(param)),
-      in(in, 1, std::get<1>(param), std::get<3>(param)),
+    CopyColorSpinorArg(ColorSpinorField &out, const ColorSpinorField &in,
+                       FloatOut* Out_, FloatIn *In_, float *outNorm, float *inNorm) :
+      out(out, 1, Out_, outNorm),
+      in(in, 1, In_, inNorm),
       outParity(out.SiteOrder()==QUDA_ODD_EVEN_SITE_ORDER ? 1 : 0),
       inParity(in.SiteOrder()==QUDA_ODD_EVEN_SITE_ORDER ? 1 : 0),
       threads(in.VolumeCB(), in.SiteSubset(), 1)
@@ -37,10 +38,8 @@ namespace quda {
   };
 
   /** Straight copy with no basis change */
-  template <typename Arg>
+  template <int Ns, int Nc>
   struct PreserveBasis {
-    static constexpr int Ns = Arg::nSpin;
-    static constexpr int Nc = Arg::nColor;
     template <typename FloatOut, typename FloatIn>
     __device__ __host__ inline void operator()(complex<FloatOut> out[Ns*Nc], const complex<FloatIn> in[Ns*Nc]) const {
       for (int s=0; s<Ns; s++) for (int c=0; c<Nc; c++) out[s*Nc+c] = in[s*Nc+c];
@@ -48,10 +47,8 @@ namespace quda {
   };
 
   /** Transform from relativistic into non-relavisitic basis */
-  template <typename Arg>
+  template <int Ns, int Nc>
   struct NonRelBasis {
-    static constexpr int Ns = Arg::nSpin;
-    static constexpr int Nc = Arg::nColor;
     template <typename FloatOut, typename FloatIn>
     __device__ __host__ inline void operator()(complex<FloatOut> out[Ns*Nc], const complex<FloatIn> in[Ns*Nc]) const {
       int s1[4] = {1, 2, 3, 0};
@@ -67,10 +64,8 @@ namespace quda {
   };
 
   /** Transform from non-relativistic into relavisitic basis */
-  template <typename Arg>
+  template <int Ns, int Nc>
   struct RelBasis {
-    static constexpr int Ns = Arg::nSpin;
-    static constexpr int Nc = Arg::nColor;
     template <typename FloatOut, typename FloatIn>
     __device__ __host__ inline void operator()(complex<FloatOut> out[Ns*Nc], const complex<FloatIn> in[Ns*Nc]) const {
       int s1[4] = {1, 2, 3, 0};
@@ -86,10 +81,8 @@ namespace quda {
   };
 
   /** Transform from chiral into non-relavisitic basis */
-  template <typename Arg>
+  template <int Ns, int Nc>
   struct ChiralToNonRelBasis {
-    static constexpr int Ns = Arg::nSpin;
-    static constexpr int Nc = Arg::nColor;
     template <typename FloatOut, typename FloatIn>
     __device__ __host__ inline void operator()(complex<FloatOut> out[Ns*Nc], const complex<FloatIn> in[Ns*Nc]) const {
       int s1[4] = {0, 1, 0, 1};
@@ -105,10 +98,8 @@ namespace quda {
   };
 
   /** Transform from non-relativistic into chiral basis */
-  template <typename Arg>
+  template <int Ns, int Nc>
   struct NonRelToChiralBasis {
-    static constexpr int Ns = Arg::nSpin;
-    static constexpr int Nc = Arg::nColor;
     template <typename FloatOut, typename FloatIn>
     __device__ __host__ inline void operator()(complex<FloatOut> out[Ns*Nc], const complex<FloatIn> in[Ns*Nc]) const {
       int s1[4] = {0, 1, 0, 1};
@@ -132,7 +123,7 @@ namespace quda {
     {
       ColorSpinor<typename Arg::realIn, Arg::nColor, Arg::nSpin> in = arg.in(x_cb, (parity+arg.inParity)&1);
       ColorSpinor<typename Arg::realOut, Arg::nColor, Arg::nSpin> out;
-      typename Arg::Basis<Arg> basis;
+      typename Arg::Basis basis;
       basis(out.data, in.data);
       arg.out(x_cb, (parity+arg.outParity)&1) = out;
     }
