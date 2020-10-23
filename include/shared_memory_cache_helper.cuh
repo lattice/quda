@@ -1,5 +1,5 @@
 #pragma once
-
+#include "quda_api.h"
 /**
    @file shared_memory_cache_helper.cuh
 
@@ -27,7 +27,7 @@ namespace quda
      */
     __device__ inline real *cache()
     {
-      extern __shared__ int cache_[];
+      QUDA_DYNAMIC_SHARED(int,  cache_);
       return reinterpret_cast<real *>(cache_);
     }
 
