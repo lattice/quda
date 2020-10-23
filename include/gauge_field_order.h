@@ -930,10 +930,10 @@ namespace quda {
        * Constructor for the FieldOrder class
        * @param field The field that we are accessing
        */
-      FieldOrder(GaugeField &U, void *gauge_=0, void **ghost_=0)
+      FieldOrder(const GaugeField &U, storeFloat *gauge_=0, storeFloat **ghost_=0)
       : volumeCB(U.VolumeCB()), nDim(U.Ndim()), geometry(U.Geometry()),
 	  location(U.Location()),
-	  accessor(U, gauge_, ghost_), ghostAccessor(U, gauge_, ghost_)
+        accessor(U, (void*)gauge_, (void**)ghost_), ghostAccessor(U, (void*)gauge_, (void**)ghost_)
 	{
 	  if (U.Reconstruct() != QUDA_RECONSTRUCT_NO)
 	    errorQuda("GaugeField ordering not supported with reconstruction");

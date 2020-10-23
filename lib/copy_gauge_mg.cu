@@ -32,10 +32,10 @@ namespace quda {
 #ifdef FINE_GRAINED_ACCESS
       if (outGhost) {
 	typedef typename gauge::FieldOrder<FloatOut,Nc,1,QUDA_FLOAT2_GAUGE_ORDER,false,sFloatOut> G;
-	copyGauge<FloatOut,FloatIn,length>(G(out,(void*)Out,(void**)outGhost), inOrder, out, in, location, type);
+	copyGauge<FloatOut,FloatIn,length>(G(out, Out, outGhost), inOrder, out, in, location, type);
       } else {
 	typedef typename gauge::FieldOrder<FloatOut,Nc,1,QUDA_FLOAT2_GAUGE_ORDER,true,sFloatOut> G;
-	copyGauge<FloatOut,FloatIn,length>(G(out,(void*)Out,(void**)outGhost), inOrder, out, in, location, type);
+	copyGauge<FloatOut,FloatIn,length>(G(out, Out, outGhost), inOrder, out, in, location, type);
       }
 #else
       typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_NO,length>::type G;
@@ -47,7 +47,7 @@ namespace quda {
 
 #ifdef FINE_GRAINED_ACCESS
       typedef typename gauge::FieldOrder<FloatOut,Nc,1,QUDA_QDP_GAUGE_ORDER,true,sFloatOut> G;
-      copyGauge<FloatOut,FloatIn,length>(G(out,(void*)Out,(void**)outGhost), inOrder, out, in, location, type);
+      copyGauge<FloatOut,FloatIn,length>(G(out, Out, outGhost), inOrder, out, in, location, type);
 #else
       typedef typename QDPOrder<FloatOut,length> G;
       copyGauge<FloatOut,FloatIn,length>(G(out, Out, outGhost), inOrder, out, in, location, type);
@@ -57,7 +57,7 @@ namespace quda {
 
 #ifdef FINE_GRAINED_ACCESS
       typedef typename gauge::FieldOrder<FloatOut,Nc,1,QUDA_MILC_GAUGE_ORDER,true,sFloatOut> G;
-      copyGauge<FloatOut,FloatIn,length>(G(out,(void*)Out,(void**)outGhost), inOrder, out, in, location, type);
+      copyGauge<FloatOut,FloatIn,length>(G(out, Out, outGhost), inOrder, out, in, location, type);
 #else
       typedef typename MILCOrder<FloatOut,length> G;
       copyGauge<FloatOut,FloatIn,length>(G(out, Out, outGhost), inOrder, out, in, location, type);
@@ -86,10 +86,10 @@ namespace quda {
 #ifdef FINE_GRAINED_ACCESS
       if (inGhost) {
 	typedef typename gauge::FieldOrder<FloatIn,Nc,1,QUDA_FLOAT2_GAUGE_ORDER,false,sFloatIn> G;
-	copyGaugeMG<sFloatOut,FloatIn,Nc> (G(const_cast<GaugeField&>(in),(void*)In,(void**)inGhost), out, in, location, Out, outGhost, type);
+	copyGaugeMG<sFloatOut,FloatIn,Nc> (G(const_cast<GaugeField&>(in),In,inGhost), out, in, location, Out, outGhost, type);
       } else {
 	typedef typename gauge::FieldOrder<FloatIn,Nc,1,QUDA_FLOAT2_GAUGE_ORDER,true,sFloatIn> G;
-	copyGaugeMG<sFloatOut,FloatIn,Nc> (G(const_cast<GaugeField&>(in),(void*)In,(void**)inGhost), out, in, location, Out, outGhost, type);
+	copyGaugeMG<sFloatOut,FloatIn,Nc> (G(const_cast<GaugeField&>(in),In,inGhost), out, in, location, Out, outGhost, type);
       }
 #else
       typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_NO,length>::type G;
@@ -99,7 +99,7 @@ namespace quda {
 
 #ifdef FINE_GRAINED_ACCESS
       typedef typename gauge::FieldOrder<FloatIn,Nc,1,QUDA_QDP_GAUGE_ORDER,true,sFloatIn> G;
-      copyGaugeMG<sFloatOut,FloatIn,Nc>(G(const_cast<GaugeField&>(in),(void*)In,(void**)inGhost), out, in, location, Out, outGhost, type);
+      copyGaugeMG<sFloatOut,FloatIn,Nc>(G(const_cast<GaugeField&>(in),In,inGhost), out, in, location, Out, outGhost, type);
 #else
       typedef typename QDPOrder<FloatIn,length> G;
       copyGaugeMG<FloatOut,FloatIn,Nc>(G(in, In, inGhost), out, in, location, Out, outGhost, type);
@@ -109,7 +109,7 @@ namespace quda {
 
 #ifdef FINE_GRAINED_ACCESS
       typedef typename gauge::FieldOrder<FloatIn,Nc,1,QUDA_MILC_GAUGE_ORDER,true,sFloatIn> G;
-      copyGaugeMG<sFloatOut,FloatIn,Nc>(G(const_cast<GaugeField&>(in),(void*)In,(void**)inGhost), out, in, location, Out, outGhost, type);
+      copyGaugeMG<sFloatOut,FloatIn,Nc>(G(const_cast<GaugeField&>(in),In,inGhost), out, in, location, Out, outGhost, type);
 #else
       typedef typename MILCOrder<FloatIn,length> G;
       copyGaugeMG<FloatOut,FloatIn,Nc>(G(in, In, inGhost), out, in, location, Out, outGhost, type);
