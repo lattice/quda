@@ -50,3 +50,9 @@
 #define FLOAT8
 #undef QUDA_FLOAT8
 #endif
+
+// if we are using nvcc or clang-cuda then we are ocmpiling for CUDA target
+// FIXME - have a cmake driven way of setting this
+#if defined(__CUDACC__) || (defined(__clang__) && defined(__CUDA__))
+#define TARGET_CUDA
+#endif
