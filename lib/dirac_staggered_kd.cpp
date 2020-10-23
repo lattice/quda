@@ -6,107 +6,23 @@
 namespace quda {
 
   DiracStaggeredKD::DiracStaggeredKD(const DiracParam &param) : DiracStaggered(param),
-    Xinv(nullptr), own_xinv(true) { 
-
-    // Allocate the KD inverse block (inverse coarse clover)
-    // Copied from `dirac_coarse.cpp`, `DiracCoarse::createY`
-    const int ndim = 4;
-    int xc[QUDA_MAX_DIM];
-    for (int i = 0; i < ndim; i++) { xc[i] = gauge->X()[i]/2; }
-    const int Nc_c = gauge->Ncolor() * 8; // 24
-    const int Ns_c = 2; // staggered parity
-
-    GaugeFieldParam gParam;
-    memcpy(gParam.x, xc, QUDA_MAX_DIM*sizeof(int));
-    gParam.nColor = Nc_c*Ns_c;
-    gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-    gParam.order = QUDA_MILC_GAUGE_ORDER; //gpu ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_QDP_GAUGE_ORDER;
-    gParam.link_type = QUDA_COARSE_LINKS;
-    gParam.t_boundary = QUDA_PERIODIC_T;
-    gParam.create = QUDA_ZERO_FIELD_CREATE;
-    auto precision = gauge->Precision();
-    // right now the build Xinv routines only support single and double
-    if (precision < QUDA_HALF_PRECISION) { 
-      precision = QUDA_HALF_PRECISION;
-    } else if (precision > QUDA_SINGLE_PRECISION) {
-      precision = QUDA_SINGLE_PRECISION;
-    }
-    gParam.setPrecision( precision );
-    gParam.nDim = ndim;
-    gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-    gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-    gParam.nFace = 0;
-    gParam.geometry = QUDA_SCALAR_GEOMETRY;
-    gParam.pad = 0;
-
-    Xinv = new cudaGaugeField(gParam);
-
-    // Populate Xinv
-    BuildStaggeredKahlerDiracInverse(*Xinv, *gauge, mass);
-  }
+    Xinv(param.xInvKD)
+  { }
 
   DiracStaggeredKD::DiracStaggeredKD(const DiracStaggeredKD &dirac)
     : DiracStaggered(dirac),
-    Xinv(dirac.Xinv), own_xinv(false)
+    Xinv(dirac.Xinv)
   { }
 
-  DiracStaggeredKD::~DiracStaggeredKD() {
-    if (Xinv && own_xinv) delete Xinv;
-  }
+  DiracStaggeredKD::~DiracStaggeredKD() { }
 
   DiracStaggeredKD& DiracStaggeredKD::operator=(const DiracStaggeredKD &dirac)
   {
     if (&dirac != this) {
       DiracStaggered::operator=(dirac);
       Xinv = dirac.Xinv;
-      own_xinv = false;
     }
     return *this;
-  }
-
-  DiracStaggeredKD::DiracStaggeredKD(const DiracStaggered &dirac_staggered, const ColorSpinorField* tmp1_, const ColorSpinorField* tmp2_, const QudaPrecision xinv_override_prec)
-    : DiracStaggered(dirac_staggered), Xinv(nullptr), own_xinv(true)
-  {
-    // Allocate the KD inverse block (inverse coarse clover)
-    // Copied from `dirac_coarse.cpp`, `DiracCoarse::createY`
-    const int ndim = 4;
-    int xc[QUDA_MAX_DIM];
-    for (int i = 0; i < ndim; i++) { xc[i] = gauge->X()[i]/2; }
-    const int Nc_c = gauge->Ncolor() * 8; // 24
-    const int Ns_c = 2; // staggered parity
-
-    GaugeFieldParam gParam;
-    memcpy(gParam.x, xc, QUDA_MAX_DIM*sizeof(int));
-    gParam.nColor = Nc_c*Ns_c;
-    gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-    gParam.order = QUDA_MILC_GAUGE_ORDER; //gpu ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_QDP_GAUGE_ORDER;
-    gParam.link_type = QUDA_COARSE_LINKS;
-    gParam.t_boundary = QUDA_PERIODIC_T;
-    gParam.create = QUDA_ZERO_FIELD_CREATE;
-    auto precision = xinv_override_prec == QUDA_INVALID_PRECISION ? gauge->Precision() : xinv_override_prec;
-    // right now the build Xinv routines only support single and double
-    if (precision < QUDA_HALF_PRECISION) { 
-      precision = QUDA_HALF_PRECISION;
-    } else if (precision > QUDA_SINGLE_PRECISION) {
-      precision = QUDA_SINGLE_PRECISION;
-    }
-    gParam.setPrecision( precision );
-    gParam.nDim = ndim;
-    gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-    gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-    gParam.nFace = 0;
-    gParam.geometry = QUDA_SCALAR_GEOMETRY;
-    gParam.pad = 0;
-
-    Xinv = new cudaGaugeField(gParam);
-
-    // Populate Xinv
-    BuildStaggeredKahlerDiracInverse(*Xinv, *gauge, mass);
-
-    // needs its own tmp, tmp2
-    tmp1 = const_cast<ColorSpinorField*>(tmp1_);
-    tmp2 = const_cast<ColorSpinorField*>(tmp2_);
-
   }
 
   void DiracStaggeredKD::checkParitySpinor(const ColorSpinorField &in, const ColorSpinorField &out) const

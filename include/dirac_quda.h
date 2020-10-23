@@ -43,6 +43,7 @@ namespace quda {
     cudaGaugeField *longGauge; // used by staggered only
     int laplace3D;
     cudaCloverField *clover;
+    cudaGaugeField* xInvKD; // used for the Kahler-Dirac operator only
   
     double mu; // used by twisted mass only
     double mu_factor; // used by multigrid only
@@ -313,11 +314,6 @@ namespace quda {
         @return Dirac type
      */
     virtual QudaDiracType getDiracType() const = 0;
-
-    // TEMPORARY FOR DEBUGGING
-    // remove me when this is all said and done
-    /** @return gauge field */
-    virtual const cudaGaugeField* getGaugeField() const { return gauge; }
 
     /**
      *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
@@ -1181,6 +1177,13 @@ public:
     virtual QudaDiracType getDiracType() const { return QUDA_STAGGERED_DIRAC; }
 
     /**
+     * @brief Get the fine gauge field for MG setup.
+     *
+     * @return gauge field
+     */
+    virtual const cudaGaugeField* getGaugeField() const { return gauge; }
+
+    /**
      * @brief Create the coarse staggered operator.
      *
      * @details Takes the multigrid transfer class, which knows
@@ -1234,7 +1237,6 @@ public:
 
   protected:
     mutable cudaGaugeField *Xinv; /** inverse Kahler-Dirac matrix */
-    bool own_xinv; /** determine if we own our own Xinv---if so we need to delete on destructor */
 
   public:
     DiracStaggeredKD(const DiracParam &param);
@@ -1242,21 +1244,6 @@ public:
 
     virtual ~DiracStaggeredKD();
     DiracStaggeredKD& operator=(const DiracStaggeredKD &dirac);
-
-    /**
-     * @ brief Build a KD op from a staggered operator, reusing the same gauge field
-     * 
-     * @param dirac_staggered Base staggered operator to borrow parameters from
-     * @param tmp1 Override tmp1 instead of copying what's in DiracStaggered
-     * @param tmp2 Override tmp2 instead of copying what's in DiracStaggered
-     * @param xinv_override_precision Override the precision of the input gauge field for Xinv
-     */
-    DiracStaggeredKD(const DiracStaggered &dirac_staggered, const ColorSpinorField* tmp1_, const ColorSpinorField* tmp2_, const QudaPrecision xinv_override_prec = QUDA_INVALID_PRECISION);
-
-    /**
-     * @brief Build Xinv from the current gauge field, allocating if needed.
-     */
-    //virtual void buildKahlerDiracInv();
 
     virtual void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
 
@@ -1362,6 +1349,20 @@ public:
     virtual QudaDiracType getDiracType() const { return QUDA_ASQTAD_DIRAC; }
 
     /**
+     * @brief Get the fat link field for MG setup.
+     *
+     * @return fat link field
+     */
+    virtual const cudaGaugeField* getFatLinkField() const { return fatGauge; }
+
+    /**
+     * @brief Get the long link field for MG setup.
+     *
+     * @return long link field
+     */
+    virtual const cudaGaugeField* getLongLinkField() const { return longGauge; }
+
+    /**
      *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
      *  These are pointers as opposed to references to support passing in `nullptr`.
      *
@@ -1451,22 +1452,7 @@ public:
     virtual ~DiracImprovedStaggeredKD();
     DiracImprovedStaggeredKD& operator=(const DiracImprovedStaggeredKD &dirac);
 
-    /**
-     * @ brief Build a KD op from an improved staggered operator
-     * 
-     * @param dirac_staggered Base improved staggered operator to borrow parameters from
-     * @param tmp1 Override tmp1 instead of copying what's in DiracImprovedStaggered
-     * @param tmp2 Override tmp2 instead of copying what's in DiracImprovedStaggered
-     * @param xinv_override_precision Override the precision of the input gauge field for Xinv
-     */
-    DiracImprovedStaggeredKD(const DiracImprovedStaggered &dirac_staggered, const ColorSpinorField* tmp1_, const ColorSpinorField* tmp2_, const QudaPrecision xinv_override_prec = QUDA_INVALID_PRECISION);
-
     virtual void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
-
-    /**
-     * @brief Build Xinv from the current gauge field, allocating if needed.
-     */
-    //virtual void buildKahlerDiracInv();
 
     virtual bool hasDslash() const { return false; }
 

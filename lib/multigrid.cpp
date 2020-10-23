@@ -3,6 +3,9 @@
 #include <multigrid.h>
 #include <vector_io.h>
 
+// for building the KD inverse op
+#include <staggered_kd_build_xinv.h>
+
 namespace quda
 {
 
@@ -31,6 +34,7 @@ namespace quda
     x_coarse(nullptr),
     tmp_coarse(nullptr),
     tmp2_coarse(nullptr),
+    xInvKD(nullptr),
     diracResidual(param.matResidual->Expose()),
     diracSmoother(param.matSmooth->Expose()),
     diracSmootherSloppy(param.matSmoothSloppy->Expose()),
@@ -361,7 +365,6 @@ namespace quda
 
     // custom setup for the staggered KD ops
     if (param.level == 0 && param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD) {
-      auto setup_location = param.setup_location;
       auto dirac_type = diracSmoother->getDiracType();
 
       auto smoother_solve_type = param.mg_global.smoother_solve_type[param.level+1];
@@ -369,15 +372,46 @@ namespace quda
         errorQuda("Invalid solve type %d for optimized KD operator", smoother_solve_type);
       }
 
+      // Allocate and build the KD inverse block (inverse coarse clover)
+      auto fine_dirac_type = diracSmoother->getDiracType();
+      if (fine_dirac_type != dirac_type) errorQuda("Input dirac type %d does not match smoother type %d\n", dirac_type, fine_dirac_type);
+
+      cudaGaugeField* fine_gauge = nullptr;
+      if (dirac_type == QUDA_STAGGERED_DIRAC || dirac_type == QUDA_STAGGEREDPC_DIRAC)
+        fine_gauge = const_cast<cudaGaugeField*>(reinterpret_cast<const DiracStaggered*>(diracSmoother)->getGaugeField());
+      if (dirac_type == QUDA_ASQTAD_DIRAC || dirac_type == QUDA_ASQTADPC_DIRAC)
+        fine_gauge = const_cast<cudaGaugeField*>(reinterpret_cast<const DiracImprovedStaggered*>(diracSmoother)->getFatLinkField());
+
+      xInvKD = AllocateAndBuildStaggeredKahlerDiracInverse(*fine_gauge, diracSmoother->Mass(), param.mg_global.invert_param->cuda_prec_precondition);
+
+      DiracParam diracParamKD;
+      diracParamKD.kappa = -1.0; // Cancels automatic kappa in Y field application, which may be relevant if it propagates down
+      diracParamKD.mass = diracSmoother->Mass();
+      diracParamKD.mu = diracSmoother->Mu(); // doesn't matter
+      diracParamKD.mu_factor = 1.0; // doesn't matter
+      diracParamKD.dagger = QUDA_DAG_NO;
+      diracParamKD.matpcType = QUDA_MATPC_EVEN_EVEN; // I guess we could hack this for left vs right block Jacobi?
+      diracParamKD.gauge = const_cast<cudaGaugeField*>(fine_gauge);
+      diracParamKD.xInvKD = xInvKD;
+
+      diracParamKD.tmp1 = tmp_coarse;
+      diracParamKD.tmp2 = tmp2_coarse;
+
       if (dirac_type == QUDA_STAGGERED_DIRAC || dirac_type == QUDA_STAGGEREDPC_DIRAC) {
-        // well this seems silly.
-        diracCoarseResidual = new DiracStaggeredKD(*const_cast<DiracStaggered*>(static_cast<const DiracStaggered*>(diracSmoother)), tmp_coarse, tmp2_coarse, transfer->NullPrecision(setup_location));
-        diracCoarseSmoother = new DiracStaggeredKD(static_cast<DiracStaggeredKD&>(*diracCoarseResidual));
-        diracCoarseSmootherSloppy = new DiracStaggeredKD(static_cast<DiracStaggeredKD&>(*diracCoarseSmoother)); // FIXME: should obey Schward
+        diracParamKD.type = QUDA_STAGGEREDKD_DIRAC;
+
+        diracCoarseResidual = new DiracStaggeredKD(diracParamKD);
+        diracCoarseSmoother = new DiracStaggeredKD(diracParamKD);
+        diracCoarseSmootherSloppy = new DiracStaggeredKD(diracParamKD);
       } else if (dirac_type == QUDA_ASQTAD_DIRAC || dirac_type == QUDA_ASQTADPC_DIRAC) {
-        diracCoarseResidual = new DiracImprovedStaggeredKD(*const_cast<DiracImprovedStaggered*>(static_cast<const DiracImprovedStaggered*>(diracSmoother)), tmp_coarse, tmp2_coarse, transfer->NullPrecision(setup_location));
-        diracCoarseSmoother = new DiracImprovedStaggeredKD(static_cast<DiracImprovedStaggeredKD&>(*diracCoarseResidual));
-        diracCoarseSmootherSloppy = new DiracImprovedStaggeredKD(static_cast<DiracImprovedStaggeredKD&>(*diracCoarseSmoother)); // FIXME: should obey Schward
+        diracParamKD.type = QUDA_ASQTADKD_DIRAC;
+
+        diracParamKD.fatGauge = fine_gauge;
+        diracParamKD.longGauge = const_cast<cudaGaugeField*>(reinterpret_cast<const DiracImprovedStaggered*>(diracSmoother)->getLongLinkField());
+
+        diracCoarseResidual = new DiracImprovedStaggeredKD(diracParamKD);
+        diracCoarseSmoother = new DiracImprovedStaggeredKD(diracParamKD);
+        diracCoarseSmootherSloppy = new DiracImprovedStaggeredKD(diracParamKD);
       } else {
         errorQuda("Invalid dirac_type %d", dirac_type);
       }
@@ -672,6 +706,8 @@ namespace quda
     if (tmp_coarse) delete tmp_coarse;
     if (tmp2_coarse) delete tmp2_coarse;
 
+    if (xInvKD) delete xInvKD;
+
     if (param_coarse) delete param_coarse;
 
     if (getVerbosity() >= QUDA_VERBOSE) profile.Print();
@@ -944,7 +980,6 @@ namespace quda
         printfQuda("L2 norms: Emulated = %e, Native = %e, relative deviation = %e\n", norm2(x_coarse->Odd()), r_nrm,
                    deviation);
       if (deviation > tol) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
-
 
     }
 

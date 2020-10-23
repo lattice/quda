@@ -320,7 +320,7 @@ namespace quda {
       // FIXME: add support for double precision inverse
       // Reorder to MILC order for inversion, based on "coarse_op_preconditioned.cu"
       GaugeFieldParam param(Xinv);
-      // param.order = QUDA_MILC_GAUGE_ORDER; // MILC order == QDP order for Xinv
+      param.order = QUDA_MILC_GAUGE_ORDER; // MILC order == QDP order for Xinv
       param.setPrecision(QUDA_SINGLE_PRECISION); // FIXME until double prec support is added
       cudaGaugeField X_(param);
       cudaGaugeField* Xinv_ = ( Xinv.Precision() == QUDA_SINGLE_PRECISION) ? static_cast<cudaGaugeField*>(&Xinv) : new cudaGaugeField(param);
@@ -353,5 +353,37 @@ namespace quda {
     if (U != &gauge) delete U;
 
   }
+
+
+  // Allocates and calculates the inverse KD block, returning Xinv
+  cudaGaugeField* AllocateAndBuildStaggeredKahlerDiracInverse(const cudaGaugeField &gauge, const double mass, const QudaPrecision override_prec)
+  {
+    const int ndim = 4;
+    int xc[QUDA_MAX_DIM];
+    for (int i = 0; i < ndim; i++) { xc[i] = gauge.X()[i]/2; }
+    const int Nc_c = gauge.Ncolor() * 8; // 24
+    const int Ns_c = 2; // staggered parity
+    GaugeFieldParam gParam;
+    memcpy(gParam.x, xc, QUDA_MAX_DIM*sizeof(int));
+    gParam.nColor = Nc_c*Ns_c;
+    gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+    gParam.order = QUDA_MILC_GAUGE_ORDER;
+    gParam.link_type = QUDA_COARSE_LINKS;
+    gParam.t_boundary = QUDA_PERIODIC_T;
+    gParam.create = QUDA_ZERO_FIELD_CREATE;
+    gParam.setPrecision( override_prec );
+    gParam.nDim = ndim;
+    gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+    gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+    gParam.nFace = 0;
+    gParam.geometry = QUDA_SCALAR_GEOMETRY;
+    gParam.pad = 0;
+
+    cudaGaugeField* Xinv = new cudaGaugeField(gParam);
+
+    BuildStaggeredKahlerDiracInverse(*Xinv, gauge, mass);
+
+    return Xinv;
+ }
 
 } //namespace quda
