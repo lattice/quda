@@ -5,6 +5,7 @@
 #include <instantiate.h>
 #include <tunable_nd.h>
 #include <kernels/pgauge_exchange.cuh>
+#include <quda_api.h>
 
 namespace quda {
 
@@ -28,8 +29,8 @@ namespace quda {
   {
     if (comm_partitioned()) {
       if (init) {
-        cudaStreamDestroy(GFStream[0]);
-        cudaStreamDestroy(GFStream[1]);
+        qudaStreamDestroy(GFStream[0]);
+        qudaStreamDestroy(GFStream[1]);
         for (int d = 0; d < 4; d++ ) {
           if (commDimPartitioned(d)) {
             comm_free(mh_send_fwd[d]);
@@ -85,8 +86,8 @@ namespace quda {
         X = (int*)safe_malloc(4 * sizeof(int));
         for (int d = 0; d < 4; d++) X[d] = U.X()[d];
 
-        cudaStreamCreate(&GFStream[0]);
-        cudaStreamCreate(&GFStream[1]);
+        qudaStreamCreate(&GFStream[0]);
+        qudaStreamCreate(&GFStream[1]);
         for (int d = 0; d < 4; d++ ) {
           if (!commDimPartitioned(d)) continue;
           // store both parities and directions in each

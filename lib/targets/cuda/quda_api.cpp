@@ -637,6 +637,24 @@ namespace quda {
 #endif
   }
 
+  /**
+   * @brief Create a QUDA Stream
+   *
+   */
+  void qudaStreamCreate_(qudaStream_t* stream, const char *func, const char *file, const char *line)
+  {
+        cudaError_t error = cudaStreamCreate( stream );
+        if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+  }
 
-  
+  /**
+   * @brief Destroy a QUDA Stream
+   *
+   */
+  void qudaStreamDestroy_(qudaStream_t stream, const char *func, const char *file, const char *line)
+  {
+	cudaError_t error = cudaStreamDestroy( stream );
+	if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+  }
+
 } // namespace quda

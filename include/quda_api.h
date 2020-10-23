@@ -333,6 +333,20 @@ namespace quda
   */
   void* qudaGetSymbolAddress_(const char *symbol, const char *func, const char *file, const char *line);
 
+
+
+  /** 
+   * @brief Create a QUDA Stream
+   *
+   */
+  void qudaStreamCreate_(qudaStream_t* pStream, const char *func, const char *file, const char *line);
+
+  /** 
+   * @brief Destroy a QUDA Stream
+   * 
+   */
+  void qudaStreamDestroy_(qudaStream_t pStream, const char *func, const char *file, const char *line);
+
   /**
      @brief Print out the timer profile for CUDA API calls
    */
@@ -427,3 +441,10 @@ namespace quda
 
 #define qudaGetSymbolAddress(symbol)                                    \
   ::quda::qudaGetSymbolAddress_(symbol, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
+
+#define qudaStreamCreate(stream) 									\
+  ::quda::qudaStreamCreate_(stream,  __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
+#define qudaStreamDestroy(stream)                                                                        \
+  ::quda::qudaStreamDestroy_(stream,  __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
