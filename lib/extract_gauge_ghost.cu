@@ -27,7 +27,7 @@ namespace quda {
 #endif
         } else if (u.Reconstruct() == QUDA_RECONSTRUCT_8) {
 #if QUDA_RECONSTRUCT & 1
-          using G = typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type;
+          using G = typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type;
           ExtractGhost<Float, nColor, G>(u, Ghost, extract, offset);
 #else
           errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_8", QUDA_RECONSTRUCT);
