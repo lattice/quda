@@ -35,7 +35,7 @@ namespace quda {
       offset(offset)
     {
       if (nDim != u.Ndim()) errorQuda("Require 4-dimensional field");
-      uint64_t faceMax = 0;
+      int faceMax = 0;
       for (int d=0; d<nDim; d++) faceMax = (u.SurfaceCB(d) > faceMax) ? u.SurfaceCB(d) : faceMax;
       size = 2 * faceMax * u.Nface(); // factor of comes from parity
 
