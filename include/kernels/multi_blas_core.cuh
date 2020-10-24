@@ -7,9 +7,8 @@
 #include <float_vector.h>
 #include <kernel.h>
 
-#if (__COMPUTE_CAPABILITY__ >= 300 || __CUDA_ARCH__ >= 300) && !defined(QUDA_FAST_COMPILE_REDUCE)
+#ifndef QUDA_FAST_COMPILE_REDUCE
 #define WARP_SPLIT
-#include <generics/shfl.h>
 #endif
 
 namespace quda
