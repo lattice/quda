@@ -1809,13 +1809,15 @@ namespace quda {
         }
       }
 
-      template <typename Float, int length, int N, int reconLenParam,
+      template <typename Float, int length_, int N, int reconLenParam,
           QudaStaggeredPhase stag_phase = QUDA_STAGGERED_PHASE_NO, bool huge_alloc = default_huge_alloc,
           QudaGhostExchange ghostExchange_ = QUDA_GHOST_EXCHANGE_INVALID, bool use_inphase = false>
       struct FloatNOrder {
         using Accessor
-            = FloatNOrder<Float, length, N, reconLenParam, stag_phase, huge_alloc, ghostExchange_, use_inphase>;
+            = FloatNOrder<Float, length_, N, reconLenParam, stag_phase, huge_alloc, ghostExchange_, use_inphase>;
 
+        using store_t = Float;
+        static constexpr int length = length_;
         using real = typename mapper<Float>::type;
         using complex = complex<real>;
         typedef typename VectorType<Float, N>::type Vector;
@@ -2143,8 +2145,10 @@ namespace quda {
          @brief The LegacyOrder defines the ghost zone storage and ordering for
          all cpuGaugeFields, which use the same ghost zone storage.
       */
-      template <typename Float, int length> struct LegacyOrder {
+      template <typename Float, int length_> struct LegacyOrder {
+        static constexpr int length = length_;
         using Accessor = LegacyOrder<Float, length>;
+        using store_t = Float;
         using real = typename mapper<Float>::type;
         using complex = complex<real>;
         Float *ghost[QUDA_MAX_DIM];
