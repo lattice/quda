@@ -2,7 +2,7 @@
 
 #include <type_traits>
 #include <quda_fp16.cuh>
-#include <trove_helper.cuh>
+#include <trove/ptr.h>
 
 // This macro determines whether or not we are using the fp16 accumulation of the MMA instruction.
 // #define USE_FP16_HMMA_ACCUMULATE
