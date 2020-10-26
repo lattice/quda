@@ -75,11 +75,11 @@ namespace quda {
     state = nullptr;
     for (int i = 0; i < 4; i++) X[i] = meta.X()[i];
 #if defined(XORWOW)
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using curandStateXORWOW\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using randStateXORWOW\n");
 #elif defined(RG32k3a)
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using curandStateMRG32k3a\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using randStateMRG32k3a\n");
 #else
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using curandStateMRG32k3a\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using randStateMRG32k3a\n");
 #endif
   }
 

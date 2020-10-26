@@ -4,7 +4,7 @@
 #include <quda_define.h>
 
 // trove requires CUDA and has issues with device debug
-#if defined(TARGET_CUDA) && !defined(DEVICE_DEBUG)
+#if defined(QUDA_TARGET_CUDA) && !defined(DEVICE_DEBUG)
 #include <trove/ptr.h>
 #else
 #define DISABLE_TROVE

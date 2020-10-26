@@ -51,8 +51,13 @@
 #undef QUDA_FLOAT8
 #endif
 
-// if we are using nvcc or clang-cuda then we are ocmpiling for CUDA target
-// FIXME - have a cmake driven way of setting this
-#if defined(__CUDACC__) || (defined(__clang__) && defined(__CUDA__))
-#define TARGET_CUDA
+/**
+ * If we are building for a QUDA Device this will be set by CMAKE
+ */
+#cmakedefine QUDA_TARGET_CUDA
+#cmakedefine QUDA_TARGET_HIP
+
+#if defined(QUDA_TARGET_CUDA) && defined(QUDA_TARGET_HIP)
+#error "Cannot define both QUDA_TARGET_CUDA and QUDA_TARGET_HIP at the same time"
 #endif
+
