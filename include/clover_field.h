@@ -100,7 +100,7 @@ namespace quda {
     QudaCloverFieldOrder order;
     QudaFieldCreate create;
 
-    mutable double trlog[2];
+    mutable std::vector<double> trlog;
 
     /**
        @brief Set the vol_string and aux_string for use in tuning
@@ -125,7 +125,7 @@ namespace quda {
     /**
        @return Pointer to array storing trlog on each parity
     */
-    double* TrLog() const { return trlog; }
+    std::vector<double>& TrLog() const { return trlog; }
     
     /**
        @return The order of the field

@@ -171,7 +171,7 @@ namespace quda
       // unit size here may differ from system_atomic_t size, e.g., if doing double-double
       const int n_element = n_reduce * sizeof(T) / sizeof(device_t);
       if (result.size() != (unsigned)n_element)
-        errorQuda("result vector length %lu does not match n_reduce %d", result.size(), n_reduce);
+        errorQuda("result vector length %lu does not match n_reduce %d", result.size(), n_element);
       for (int i = 0; i < n_element; i++) result[i] = reinterpret_cast<device_t *>(result_h)[i];
 
 #ifdef HETEROGENEOUS_ATOMIC
