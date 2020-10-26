@@ -18,7 +18,7 @@
 
 namespace quda
 {
-
+  int getStackSize();
   template <typename Arg> class CovDev : public Dslash<covDev, Arg>
   {
     using Dslash = Dslash<covDev, Arg>;
@@ -37,7 +37,13 @@ namespace quda
 
       constexpr bool xpay = false;
       constexpr int nParity = 2;
+      pushKernelPackT(getKernelPackT());
+      int stack_size=getStackSize();
       Dslash::template instantiate<packShmem, nParity, xpay>(tp, stream);
+      if(getStackSize()==stack_size)
+         popKernelPackT();
+      else
+         printfQuda("Hack for HIP: addtional push/pop of kptstack\n");
     }
 
     long long flops() const

@@ -27,6 +27,8 @@ namespace quda {
 
   static std::stack<bool> kptstack;
 
+  int getStackSize() {return static_cast<unsigned int>(kptstack.size());}
+
   void pushKernelPackT(bool packT)
   {
     kptstack.push(getKernelPackT());
