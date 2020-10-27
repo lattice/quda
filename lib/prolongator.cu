@@ -14,7 +14,6 @@ namespace quda {
     const int *fine_to_coarse;
     int parity;
     QudaFieldLocation location;
-    char vol[TuneKey::volume_n];
 
     unsigned int minThreads() const { return out.VolumeCB(); } // fine parity is the block y dimension
 
@@ -24,9 +23,9 @@ namespace quda {
       : TunableKernel3D(in, out.SiteSubset(), fineColor/fine_colors_per_thread), out(out), in(in), V(V),
         fine_to_coarse(fine_to_coarse), parity(parity), location(checkLocation(out, in, V))
     {
-      strcpy(vol, out.VolString());
       strcat(vol, ",");
-      strcat(vol, in.VolString());
+      strcat(vol, out.VolString());
+      strcat(aux, ",");
       strcat(aux, out.AuxString());
     }
 
@@ -38,8 +37,6 @@ namespace quda {
         errorQuda("Unsupported field order %d", out.FieldOrder());
       }
     }
-
-    TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
 
     long long flops() const { return 8 * fineSpin * fineColor * coarseColor * out.SiteSubset()*(long long)out.VolumeCB(); }
 

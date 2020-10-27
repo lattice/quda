@@ -99,7 +99,7 @@ namespace quda {
         strcpy(name, NXZ_str);
         strcat(name, NYW_str);
         strcat(name, typeid(r).name());
-        return TuneKey(x[0]->VolString(), name, aux);
+        return TuneKey(vol, name, aux);
       }
 
       template <int NXZ> void compute(const qudaStream_t &stream)

@@ -174,7 +174,7 @@ namespace quda {
     {
       std::stringstream aux2(aux);
       aux2 << aux << ",dim=" << dim_str[arg.face] << ",geo_dir=" << dim_str[arg.dir] << (arg.pack ? ",extract" : ",insert");
-      return TuneKey(field.VolString(), typeid(*this).name(), aux2.str().c_str());
+      return TuneKey(vol, typeid(*this).name(), aux2.str().c_str());
     }
 
     void apply(const qudaStream_t &stream)
