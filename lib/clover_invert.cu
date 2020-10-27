@@ -28,10 +28,10 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (clover.Twisted()) {
         CloverInvertArg<store_t, true> arg(clover, compute_tr_log);
-        launch<InvertClover>(*clover.TrLog(), tp, stream, arg);
+        launch<InvertClover>(clover.TrLog(), tp, stream, arg);
       } else {
         CloverInvertArg<store_t, false> arg(clover, compute_tr_log);
-        launch<InvertClover>(*clover.TrLog(), tp, stream, arg);
+        launch<InvertClover>(clover.TrLog(), tp, stream, arg);
       }
     }
 

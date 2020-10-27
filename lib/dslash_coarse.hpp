@@ -9,8 +9,6 @@
 
 namespace quda {
 
-#ifdef GPU_MULTIGRID
-
   template <typename Float, typename yFloat, typename ghostFloat, int nDim, int Ns, int Nc, int Mc, bool dslash, bool clover, bool dagger, DslashType type>
   class DslashCoarse : public TunableVectorY {
 
@@ -407,8 +405,6 @@ namespace quda {
     extern Worker* aux_worker;
   }
 
-#endif // GPU_MULTIGRID
-
   enum class DslashCoarsePolicy {
     DSLASH_COARSE_BASIC,          // stage both sends and recvs in host memory using memcpys
     DSLASH_COARSE_ZERO_COPY_PACK, // zero copy write pack buffers
@@ -447,8 +443,8 @@ namespace quda {
     /**
        @brief Execute the coarse dslash using the given policy
      */
-    inline void operator()(DslashCoarsePolicy policy) {
-#ifdef GPU_MULTIGRID
+    inline void operator()(DslashCoarsePolicy policy)
+    {
       if (inA.V() == out.V()) errorQuda("Aliasing pointers");
 
       // check all precisions match
@@ -537,9 +533,6 @@ namespace quda {
 
       if (dslash && comm_partitioned() && comms) inA.bufferIndex = (1 - inA.bufferIndex);
       comm_enable_peer2peer(true);
-#else
-      errorQuda("Multigrid has not been built");
-#endif
     }
 
   };

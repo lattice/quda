@@ -40,6 +40,7 @@ namespace quda {
       size = 2 * faceMax * u.Nface(); // factor of comes from parity
 
       if (fine_grain()) strcat(aux, "fine-grained");
+      strcat(aux, extract ? ",extract" : ",inject");
 
       apply(0);
     }

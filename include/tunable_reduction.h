@@ -331,10 +331,12 @@ namespace quda {
 
       if (!commAsyncReduction()) {
         arg.complete(result, stream);
+#if 0 // WAR for now since otherwise we do a double reduction in multi_reduce_quda
         if (!activeTuning() && commGlobalReduction()) {
           // FIXME - this will break when we have non-double reduction types, e.g., double-double on the host
           comm_allreduce_array((double*)result.data(), result.size() * sizeof(T) / sizeof(double));
         }
+#endif
       }
     }
 

@@ -769,10 +769,12 @@ namespace quda {
   void extractGaugeGhost(const GaugeField &u, void **ghost, bool extract=true, int offset=0);
 
   /**
-     This function is used for  extracting the gauge ghost zone from a
-     gauge field array.  Defined in extract_gauge_ghost.cu.
+     This function is used for extracting the extended gauge ghost
+     zone from a gauge field array.  Defined in
+     extract_gauge_ghost_extended.cu.
      @param u The gauge field from which we want to extract/pack the ghost zone
      @param dim The dimension in which we are packing/unpacking
+     @param R array holding the radius of the extended region
      @param ghost The array where we want to pack/unpack the ghost zone into/from
      @param extract Whether we are extracting into ghost or injecting from ghost
   */

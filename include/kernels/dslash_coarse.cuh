@@ -2,7 +2,6 @@
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
 #include <float_vector.h>
-#include <generics/shfl.h>
 
 namespace quda {
 

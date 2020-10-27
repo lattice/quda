@@ -1,4 +1,4 @@
-#include <complex_quda.h>
+#pragma once
 
 /**
    @file float_vector.h
@@ -7,7 +7,8 @@
    Inline device functions for elementary operations on short vectors, e.g., float4, etc.
 */
 
-#pragma once
+#include <complex_quda.h>
+#include <register_traits.h>
 
 namespace quda {
 
@@ -325,6 +326,31 @@ namespace quda {
     vector_type<scalar, n>& operator=(const vector_type<scalar, n> &) = default;
     vector_type<scalar, n>& operator=(vector_type<scalar, n> &&) = default;
   };
+
+  // the following four specializations are WARs required while we
+  // have retain Kepler support to avoid.  Without these, the default
+  // Kepler path will try to wrap these in __ldg which will fail to
+  // compile.  When we either remove Kepler support or do another pass
+  // at cleaning up vector_type, we can delete these
+  template <> __device__ __host__ inline vector_type<double,24> vector_load(const void *ptr, int idx)
+  {
+    return reinterpret_cast< const vector_type<double,24>* >(ptr)[idx];
+  }
+
+  template <> __device__ __host__ inline vector_type<float,24> vector_load(const void *ptr, int idx)
+  {
+    return reinterpret_cast< const vector_type<float,24>* >(ptr)[idx];
+  }
+
+  template <> __device__ __host__ inline vector_type<double,6> vector_load(const void *ptr, int idx)
+  {
+    return reinterpret_cast< const vector_type<double,6>* >(ptr)[idx];
+  }
+
+  template <> __device__ __host__ inline vector_type<float,6> vector_load(const void *ptr, int idx)
+  {
+    return reinterpret_cast< const vector_type<float,6>* >(ptr)[idx];
+  }
 
   template <typename T, int n> std::ostream &operator<<(std::ostream &output, const vector_type<T, n> &a)
   {
