@@ -94,6 +94,7 @@ namespace quda {
       field(field),
       location(location != QUDA_INVALID_FIELD_LOCATION ? location : field.Location())
     {
+      strcpy(vol, field.VolString());
       strcpy(aux, compile_type_str(field, location));
       strcat(aux, field.AuxString());
     }
@@ -103,7 +104,7 @@ namespace quda {
       return location == QUDA_CPU_FIELD_LOCATION ? false : Tunable::advanceTuneParam(param);
     }
 
-    TuneKey tuneKey() const { return TuneKey(field.VolString(), typeid(*this).name(), aux); }
+    TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
   };
 
   class TunableKernel1D : public TunableKernel1D_base<false> {

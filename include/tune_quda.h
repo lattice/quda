@@ -223,6 +223,7 @@ namespace quda {
 
     virtual bool advanceAux(TuneParam &param) const { return false; }
 
+    char vol[TuneKey::volume_n];
     char aux[TuneKey::aux_n];
 
     int writeAuxString(const char *format, ...) {

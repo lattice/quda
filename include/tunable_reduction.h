@@ -207,6 +207,7 @@ namespace quda {
       field(field),
       location(location != QUDA_INVALID_FIELD_LOCATION ? location : field.Location())
     {
+      strcpy(vol, field.VolString());
       strcpy(aux, compile_type_str(field, location));
       strcat(aux, field.AuxString());
     }
@@ -232,7 +233,7 @@ namespace quda {
       param.block.y = block_size_y;
     }
 
-    TuneKey tuneKey() const { return TuneKey(field.VolString(), typeid(*this).name(), aux); }
+    TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
   };
 
   /**
