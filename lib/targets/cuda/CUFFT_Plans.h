@@ -4,16 +4,37 @@
 #include <quda_matrix.h>
 #include <cufft.h>
 
+using FFTPlanHandle = cufftHandle;
+#define FFT_FORWARD     CUFFT_FORWARD
+#define FFT_INVERSE     CUFFT_INVERSE
+
 #ifndef GPU_GAUGE_ALG
 
 #define CUFFT_SAFE_CALL(call)
 
+inline void ApplyFFT(FFTPlanHandle &plan, float2 *data_in, float2 *data_out, int direction){
+  errorQuda("CPU_GAUGE_ALG is disabled so FFTs are also disabled");
+}
+inline void ApplyFFT(FFTPlanHandle &plan, double2 *data_in, double2 *data_out, int direction){
+  errorQuda("CPU_GAUGE_ALG is disabled so FFTs are also disabled");
+}
+void SetPlanFFTMany( FFTPlanHandle &plan, int4 size, int dim, float2 *data){
+  errorQuda("CPU_GAUGE_ALG is disabled so FFTs are also disabled");
+}
+inline void SetPlanFFTMany( FFTPlanHandle &plan, int4 size, int dim, double2 *data){
+  errorQuda("CPU_GAUGE_ALG is disabled so FFTs are also disabled");
+}
+inline void SetPlanFFT2DMany( FFTPlanHandle &plan, int4 size, int dim, float2 *data){
+  errorQuda("CPU_GAUGE_ALG is disabled so FFTs are also disabled");
+}
+inline void SetPlanFFT2DMany( FFTPlanHandle &plan, int4 size, int dim, double2 *data){
+  errorQuda("CPU_GAUGE_ALG is disabled so FFTs are also disabled");
+}
+inline void FFTDestroyPlan( FFTPlanHandle &plan){
+  errorQuda("CPU_GAUGE_ALG is disabled so FFTs are also disabled");
+}
+
 #else
-
-using FFTPlanHandle = cufftHandle;
-
-#define	FFT_FORWARD	CUFFT_FORWARD
-#define FFT_INVERSE	CUFFT_INVERSE
 
 /*-------------------------------------------------------------------------------*/
 #define CUFFT_SAFE_CALL( call) {                                      \
@@ -61,15 +82,18 @@ inline void ApplyFFT(FFTPlanHandle &plan, double2 *data_in, double2 *data_out, i
 void SetPlanFFTMany( FFTPlanHandle &plan, int4 size, int dim, float2 *data){
   switch ( dim ) {
   case 1:
-  { int n[1] = { size.w };
-    cufftPlanMany(&plan, 1, n, NULL, 1, 0, NULL, 1, 0, CUFFT_C2C, size.x * size.y * size.z); }
-                                                                                             break;
-  case 3:
-  { int n[3] = { size.x, size.y, size.z };
-    cufftPlanMany(&plan, 3, n, NULL, 1, 0, NULL, 1, 0, CUFFT_C2C, size.w); }
-                                                                           break;
+  {
+    int n[1] = { size.w };
+    CUFFT_SAFE_CALL(cufftPlanMany(&plan, 1, n, NULL, 1, 0, NULL, 1, 0, CUFFT_C2C, size.x * size.y * size.z)); 
   }
-  //printf("Created %dD FFT Plan in Single Precision\n", dim);
+  break;
+  case 3:
+  { 
+    int n[3] = { size.x, size.y, size.z };
+    CUFFT_SAFE_CALL( cufftPlanMany(&plan, 3, n, NULL, 1, 0, NULL, 1, 0, CUFFT_C2C, size.w)); 
+  }
+  break;
+  }
 }
 
 /**
@@ -82,15 +106,18 @@ void SetPlanFFTMany( FFTPlanHandle &plan, int4 size, int dim, float2 *data){
 inline void SetPlanFFTMany( FFTPlanHandle &plan, int4 size, int dim, double2 *data){
   switch ( dim ) {
   case 1:
-  { int n[1] = { size.w };
-    cufftPlanMany(&plan, 1, n, NULL, 1, 0, NULL, 1, 0, CUFFT_Z2Z, size.x * size.y * size.z); }
-                                                                                             break;
-  case 3:
-  { int n[3] = { size.x, size.y, size.z };
-    cufftPlanMany(&plan, 3, n, NULL, 1, 0, NULL, 1, 0, CUFFT_Z2Z, size.w); }
-                                                                           break;
+  { 
+    int n[1] = { size.w };
+    CUFFT_SAFE_CALL(cufftPlanMany(&plan, 1, n, NULL, 1, 0, NULL, 1, 0, CUFFT_Z2Z, size.x * size.y * size.z));
   }
-  //printf("Created %dD FFT Plan in Double Precision\n", dim);
+  break;
+  case 3:
+  { 
+    int n[3] = { size.x, size.y, size.z };
+    CUFFT_SAFE_CALL(cufftPlanMany(&plan, 3, n, NULL, 1, 0, NULL, 1, 0, CUFFT_Z2Z, size.w));
+  }
+  break;
+  }
 }
 
 
@@ -104,15 +131,19 @@ inline void SetPlanFFTMany( FFTPlanHandle &plan, int4 size, int dim, double2 *da
 inline void SetPlanFFT2DMany( FFTPlanHandle &plan, int4 size, int dim, float2 *data){
   switch ( dim ) {
   case 0:
-  { int n[2] = { size.w, size.z };
-    cufftPlanMany(&plan, 2, n, NULL, 1, 0, NULL, 1, 0, CUFFT_C2C, size.x * size.y); }
-                                                                                    break;
-  case 1:
-  { int n[2] = { size.x, size.y };
-    cufftPlanMany(&plan, 2, n, NULL, 1, 0, NULL, 1, 0, CUFFT_C2C, size.z * size.w); }
-                                                                                    break;
+  { 
+    int n[2] = { size.w, size.z };
+    CUFFT_SAFE_CALL(cufftPlanMany(&plan, 2, n, NULL, 1, 0, NULL, 1, 0, CUFFT_C2C, size.x * size.y));
   }
-  //printf("Created 2D FFT Plan in Single Precision\n");
+  break;
+  case 1:
+  { 
+    int n[2] = { size.x, size.y };
+    CUFFT_SAFE_CALL(cufftPlanMany(&plan, 2, n, NULL, 1, 0, NULL, 1, 0, CUFFT_C2C, size.z * size.w));
+  }
+  break;
+  }
+  
 }
 
 /**
@@ -125,15 +156,19 @@ inline void SetPlanFFT2DMany( FFTPlanHandle &plan, int4 size, int dim, float2 *d
 inline void SetPlanFFT2DMany( FFTPlanHandle &plan, int4 size, int dim, double2 *data){
   switch ( dim ) {
   case 0:
-  { int n[2] = { size.w, size.z };
-    cufftPlanMany(&plan, 2, n, NULL, 1, 0, NULL, 1, 0, CUFFT_Z2Z, size.x * size.y); }
-                                                                                    break;
-  case 1:
-  { int n[2] = { size.x, size.y };
-    cufftPlanMany(&plan, 2, n, NULL, 1, 0, NULL, 1, 0, CUFFT_Z2Z, size.z * size.w); }
-                                                                                    break;
+  { 
+    int n[2] = { size.w, size.z };
+    CUFFT_SAFE_CALL(cufftPlanMany(&plan, 2, n, NULL, 1, 0, NULL, 1, 0, CUFFT_Z2Z, size.x * size.y));
   }
-  //printf("Created 2D FFT Plan in Double Precision\n");
+  break;
+  case 1:
+  { 
+    int n[2] = { size.x, size.y };
+										      
+    CUFFT_SAFE_CALL(cufftPlanMany(&plan, 2, n, NULL, 1, 0, NULL, 1, 0, CUFFT_Z2Z, size.z * size.w)); 
+  }
+  break;
+  }
 }
 
 inline void FFTDestroyPlan( FFTPlanHandle &plan) {
