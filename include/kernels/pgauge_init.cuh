@@ -117,10 +117,10 @@ namespace quda {
   __device__ static inline Matrix<T,2> randomSU2(cuRNGState& localState){
     Matrix<T,2> a;
     T aabs, ctheta, stheta, phi;
-    a(0,0) = Random<T>(localState, (T)-1.0, (T)1.0);
+    a(0,0) = uniform<T>::rand(localState, (T)-1.0, (T)1.0);
     aabs = sqrt( 1.0 - a(0,0) * a(0,0));
-    ctheta = Random<T>(localState, (T)-1.0, (T)1.0);
-    phi = PII * Random<T>(localState);
+    ctheta = uniform<T>::rand(localState, (T)-1.0, (T)1.0);
+    phi = PII * uniform<T>::rand(localState);
 
     // Was   xurand(*localState>& 1 ? 1 : -1
     // which presumably just selects when the lowest bit is 1 or 0 with 50% probability each
@@ -186,7 +186,7 @@ namespace quda {
 
     for ( int i = 0; i < NCOLORS; i++ )
       for ( int j = 0; j < NCOLORS; j++ )
-        U(i,j) = complex<Float>( (Float)(Random<Float>(localState) - 0.5), (Float)(Random<Float>(localState) - 0.5) );
+        U(i,j) = complex<Float>( (Float)(uniform<Float>::rand(localState) - 0.5), (Float)(uniform<Float>::rand(localState) - 0.5) );
     reunit_link<Float>(U);
     return U;
 

@@ -24,16 +24,16 @@ namespace quda {
 
   template<typename real, typename Arg> // Gauss
   __device__ __host__ inline void genGauss(Arg &arg, cuRNGState& localState, int parity, int x_cb, int s, int c) {
-    real phi = 2.0*M_PI*Random<real>(localState);
-    real radius = Random<real>(localState);
+    real phi = 2.0*M_PI*uniform<real>::rand(localState);
+    real radius = uniform<real>::rand(localState);
     radius = sqrt(-1.0 * log(radius));
     arg.v(parity, x_cb, s, c) = complex<real>(radius*cos(phi),radius*sin(phi));
   }
 
   template<typename real, typename Arg> // Uniform
   __device__ __host__ inline void genUniform(Arg &arg, cuRNGState& localState, int parity, int x_cb, int s, int c) {
-    real x = Random<real>(localState);
-    real y = Random<real>(localState);
+    real x = uniform<real>::rand(localState);
+    real y = uniform<real>::rand(localState);
     arg.v(parity, x_cb, s, c) = complex<real>(x, y);
   }
 
