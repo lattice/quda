@@ -12,11 +12,10 @@
 
 namespace quda {
 
-#define MAX_MATRIX_SIZE 4096
-  __constant__ signed char B_array_d[MAX_MATRIX_SIZE];
+  __constant__ signed char B_array_d[device::max_constant_param_size()];
 
   // to avoid overflowing the parameter space we put the B array into a separate constant memory buffer
-  static signed char B_array_h[MAX_MATRIX_SIZE];
+  static signed char B_array_h[device::max_constant_param_size()];
 
   /**
       Kernel argument struct
@@ -48,7 +47,8 @@ namespace quda {
       B(V.Location() == QUDA_CPU_FIELD_LOCATION ? reinterpret_cast<Vector *>(B_array_h) : nullptr)
     {
       const Vector Btmp[nVec]{*B...};
-      if (sizeof(Btmp) > MAX_MATRIX_SIZE) errorQuda("B array size (%lu) is larger than maximum allowed (%d)\n", sizeof(Btmp), MAX_MATRIX_SIZE);
+      if (sizeof(Btmp) > device::max_constant_param_size())
+        errorQuda("B array size (%lu) is larger than maximum allowed (%lu)\n", sizeof(Btmp), device::max_constant_param_size());
       memcpy(B_array_h, (void *)Btmp, sizeof(Btmp));
       int geoBlockSize = 1;
       for (int d = 0; d < V.Ndim(); d++) geoBlockSize *= geo_bs[d];

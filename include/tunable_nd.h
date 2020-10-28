@@ -3,6 +3,7 @@
 #include <tune_quda.h>
 #include <lattice_field.h>
 #include <device.h>
+#include <kernel_helper.h>
 #include <kernel.h>
 
 #ifdef JITIFY
@@ -42,6 +43,8 @@ namespace quda {
 
       auto instance = program->kernel("quda::Kernel1D")
         .instantiate({Functor_naked, reflect<Arg>(), reflect(grid_stride)});
+
+      if (tp.set_max_shared_bytes && device::max_dynamic_shared_memory() > device::max_default_shared_memory()) set_max_shared_bytes(instance);
 
       for (unsigned int i=0; i < param.size(); i++) {
         auto device_ptr = instance.get_constant_ptr(param[i].device_name);
@@ -161,6 +164,8 @@ namespace quda {
 
       auto instance = program->kernel("quda::Kernel2D")
         .instantiate({Functor_naked, reflect<Arg>(), reflect(grid_stride)});
+
+      if (tp.set_max_shared_bytes && device::max_dynamic_shared_memory() > device::max_default_shared_memory()) set_max_shared_bytes(instance);
 
       for (unsigned int i=0; i < param.size(); i++) {
         auto device_ptr = instance.get_constant_ptr(param[i].device_name);
@@ -323,6 +328,8 @@ namespace quda {
 
       auto instance = program->kernel("quda::Kernel3D")
         .instantiate({Functor_naked, reflect<Arg>(), reflect(grid_stride)});
+
+      if (tp.set_max_shared_bytes && device::max_dynamic_shared_memory() > device::max_default_shared_memory()) set_max_shared_bytes(instance);
 
       for (unsigned int i=0; i < param.size(); i++) {
         auto device_ptr = instance.get_constant_ptr(param[i].device_name);

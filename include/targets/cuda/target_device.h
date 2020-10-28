@@ -54,6 +54,20 @@ namespace quda {
 #endif
     }
 
+    /**
+       @brief Helper function that returns the maximum size of a
+       constant_param_t buffer on the target architecture.  For CUDA,
+       this corresponds to the maximum __constant__ buffer size.
+    */
+    constexpr size_t max_constant_param_size() { return 8192; }
+
+    /**
+       @brief Helper function that returns the maximum static size of
+       the kernel arguments passed to a kernel on the target
+       architecture.
+    */
+    constexpr size_t max_kernel_arg_size() { return 4096; }
+
   }
 
 }

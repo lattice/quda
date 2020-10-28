@@ -2,6 +2,7 @@
 
 #include <tune_quda.h>
 #include <device.h>
+#include <kernel_helper.h>
 #include <reduce_helper.h>
 #include <reduction_kernel.h>
 #include <register_traits.h>
@@ -86,6 +87,8 @@ namespace quda {
       auto instance = program->kernel("quda::Reduction2D")
       .instantiate({reflect((int)tp.block.x), reflect((int)tp.block.y),
             Transformer_naked, Reducer_naked, reflect<Arg>()});
+
+      if (tp.set_max_shared_bytes && device::max_dynamic_shared_memory() > device::max_default_shared_memory()) set_max_shared_bytes(instance);
 
       for (unsigned int i=0; i < param.size(); i++) {
         auto device_ptr = instance.get_constant_ptr(param[i].device_name);
@@ -316,6 +319,8 @@ namespace quda {
       auto instance = program->kernel("quda::MultiReduction")
       .instantiate({reflect((int)tp.block.x), reflect((int)tp.block.y),
             Transformer_naked, Reducer_naked, reflect<Arg>()});
+
+      if (tp.set_max_shared_bytes && device::max_dynamic_shared_memory() > device::max_default_shared_memory()) set_max_shared_bytes(instance);
 
       for (unsigned int i=0; i < param.size(); i++) {
         auto device_ptr = instance.get_constant_ptr(param[i].device_name);

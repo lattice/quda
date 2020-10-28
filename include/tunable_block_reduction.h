@@ -2,6 +2,7 @@
 
 #include <tune_quda.h>
 #include <device.h>
+#include <kernel_helper.h>
 #include <reduce_helper.h>
 #include <block_reduction_kernel.h>
 

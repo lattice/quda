@@ -112,10 +112,10 @@ namespace quda {
       using namespace jitify::reflection;
       auto instance = program->kernel("quda::blockOrthoGPU")
         .instantiate((int)tp.block.x,Type<sumType>(),Type<RegType>(),nSpin,spinBlockSize,nColor,coarseSpin,nVec,Type<Arg>());
-      cuMemcpyHtoDAsync(instance.get_constant_ptr("quda::B_array_d"), B_array_h, MAX_MATRIX_SIZE, stream);
+      cuMemcpyHtoDAsync(instance.get_constant_ptr("quda::B_array_d"), B_array_h, device::max_constant_param_size(), stream);
       jitify_error = instance.configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
-      cudaMemcpyToSymbolAsync(B_array_d, B_array_h, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, stream);
+      cudaMemcpyToSymbolAsync(B_array_d, B_array_h, device::max_constant_param_size(), 0, cudaMemcpyHostToDevice, stream);
       LAUNCH_KERNEL_MG_BLOCK_SIZE(blockOrthoGPU,tp,stream,arg,sumType,RegType,nSpin,spinBlockSize,nColor,coarseSpin,nVec,Arg);
 #endif
     }

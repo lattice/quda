@@ -44,6 +44,7 @@
 
 #include "jitify_options.hpp"
 #include <jitify.hpp>
+#include <device.h>
 
 #endif
 
@@ -78,6 +79,15 @@ namespace quda {
       program = new jitify::Program(kernel_cache->program(file, 0, options));
       jitify_init = true;
     }
+  }
+
+  template <typename instance_t>
+  void set_max_shared_bytes(instance_t &instance)
+  {
+    instance.set_func_attribute(CU_FUNC_ATTRIBUTE_PREFERRED_SHARED_MEMORY_CARVEOUT, 100);
+    auto shared_size = instance.get_func_attribute(CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES);
+    instance.set_func_attribute(CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES,
+                                device::max_dynamic_shared_memory() - shared_size);
   }
 
 #endif
