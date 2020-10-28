@@ -2,6 +2,7 @@
 
 #include <comm_quda.h>
 #include <quda_matrix.h>
+#include <gauge_field_order.h>
 #include <kernel.h>
 
 namespace quda {
