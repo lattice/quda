@@ -109,7 +109,7 @@ namespace quda
   template <typename ValueType, typename ExponentType>
     __host__ __device__
     inline ValueType pow(ValueType x, ExponentType e){
-    return std::pow(x,e);
+    return std::pow(x,static_cast<ValueType>(e));
   }
   template <typename ValueType>
     __host__ __device__
