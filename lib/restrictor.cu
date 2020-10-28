@@ -25,7 +25,6 @@ namespace quda {
     const int *fine_to_coarse;
     const int *coarse_to_fine;
     const int parity;
-    char vol[TuneKey::volume_n];
 
     bool tuneSharedBytes() const { return false; }
     bool tuneAuxDim() const { return true; }
@@ -38,11 +37,10 @@ namespace quda {
       out(out), in(in), v(v), fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
       parity(parity)
     {
+      strcat(vol, ",");
+      strcat(vol, out.VolString());
       strcat(aux, ",");
       strcat(aux, out.AuxString());
-      strcpy(vol, out.VolString());
-      strcat(vol, ",");
-      strcat(vol, in.VolString());
     }
 
     void apply(const qudaStream_t &stream)
@@ -73,8 +71,6 @@ namespace quda {
         return false;
       }
     }
-
-    TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
 
     // round up the block size to be a multiple of the warp_size
     constexpr int block_mapper(int block) const { return ((block + device::warp_size() - 1) / device::warp_size()) * device::warp_size(); }

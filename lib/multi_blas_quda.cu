@@ -91,7 +91,7 @@ namespace quda {
         strcpy(name, NXZ_str);
         strcat(name, NYW_str);
         strcat(name, typeid(f).name());
-        return TuneKey(x[0]->VolString(), name, aux);
+        return TuneKey(vol, name, aux);
       }
 
       template <typename Arg> void Launch(const TuneParam &tp, const qudaStream_t &stream, Arg &&arg)

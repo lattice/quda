@@ -132,6 +132,7 @@ namespace quda {
       max_block_y(max_block_y == 0 ? vector_length_y : max_block_y),
       tune_block_x(false)
     {
+      strcpy(vol, field.VolString());
       strcpy(aux, compile_type_str(field, location));
       strcat(aux, field.AuxString());
     }
@@ -181,7 +182,7 @@ namespace quda {
     void resizeVector(int y) const { vector_length_y = y; }
     void resizeStep(int y) const { step_y = y; }
 
-    TuneKey tuneKey() const { return TuneKey(field.VolString(), typeid(*this).name(), aux); }
+    TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
   };
 
 }

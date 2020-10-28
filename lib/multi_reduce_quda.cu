@@ -99,7 +99,7 @@ namespace quda {
         strcpy(name, NXZ_str);
         strcat(name, NYW_str);
         strcat(name, typeid(r).name());
-        return TuneKey(x[0]->VolString(), name, aux);
+        return TuneKey(vol, name, aux);
       }
 
       template <int NXZ> void compute(const qudaStream_t &stream)
@@ -124,7 +124,7 @@ namespace quda {
           constexpr int N = n_vector<device_store_t, true, nSpin, site_unroll>();
           constexpr int Ny = n_vector<device_y_store_t, true, nSpin, site_unroll>();
           constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
-          const int length = x[0]->Length() / (nParity * M);
+          const int length = x[0]->Length() / M;
 
           MultiReduceArg<device_real_t, M, NXZ, device_store_t, N, device_y_store_t, Ny, decltype(r_)> arg(x, y, z, w, r_, NYW, length, nParity, tp);
 
