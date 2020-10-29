@@ -159,6 +159,9 @@ static TimeProfile profileDslash("dslashQuda");
 //!< Profiler for invertQuda
 static TimeProfile profileInvert("invertQuda");
 
+//!< Profiler for invertSplitGridQuda
+static TimeProfile profileInvertSplitGrid("invertSplitGridQuda");
+
 //!< Profiler for invertMultiShiftQuda
 static TimeProfile profileMulti("invertMultiShiftQuda");
 
@@ -1497,6 +1500,7 @@ void endQuda(void)
     profileClover.Print();
     profileDslash.Print();
     profileInvert.Print();
+    profileInvertSplitGrid.Print();
     profileMulti.Print();
     profileEigensolve.Print();
     profileFatLink.Print();
@@ -3202,14 +3206,23 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
 void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge, QudaGaugeParam *gauge_param)
 {
+  profilerStart(__func__);
+  profileInvertSplitGrid.TPSTART(QUDA_PROFILE_TOTAL);
+  profileInvertSplitGrid.TPSTART(QUDA_PROFILE_INIT);
   const int *_split_key = param->split_grid;
   CommKey split_key = {_split_key[0], _split_key[1], _split_key[2], _split_key[3]};
   int num_src = quda::product(split_key);
 
-  if (param->num_src != num_src) { errorQuda("Number of rhs should be equal to the number of sub-partitions"); }
+  if (param->num_src != num_src) { errorQuda("Number of rhs should be equal to the number of sub-partitions."); }
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
     errorQuda("Split Grid does NOT support 5d even-odd preconditioned DWF yet, because of, well, its 5d even-odd "
               "checker-boarding. :(");
+  }
+  if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    errorQuda("Split Grid does NOT work with clover yet.");
+  }
+  if (param->inv_type_precondition == QUDA_MG_INVERTER) {
+    errorQuda("Split Grid does NOT work with MG yet.");
   }
 
   GaugeFieldParam gf_param(h_gauge, *gauge_param);
@@ -3254,7 +3267,11 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, voi
   quda::GaugeField *collected_gauge = new quda::cpuGaugeField(gf_param);
   std::vector<quda::GaugeField *> v_g(1);
   v_g[0] = in;
+
+  profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_INIT);
+  profileInvertSplitGrid.TPSTART(QUDA_PROFILE_PREAMBLE);
   quda::split_field(*collected_gauge, v_g, split_key);
+
   loadGaugeQuda(collected_gauge->Gauge_p(), gauge_param);
 
   comm_barrier();
@@ -3275,8 +3292,13 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, voi
 
   plaqQuda(plaq);
 
+  profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_PREAMBLE);
+  profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_TOTAL);
+
   invertQuda(collect_x->V(), collect_b->V(), param);
 
+  profileInvertSplitGrid.TPSTART(QUDA_PROFILE_TOTAL);
+  profileInvertSplitGrid.TPSTART(QUDA_PROFILE_EPILOGUE);
   push_communicator({1, 1, 1, 1});
   updateR();
 
@@ -3303,6 +3325,9 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, voi
   delete collected_gauge;
 
   freeGaugeQuda();
+  profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_EPILOGUE);
+  profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_TOTAL);
+  profilerStop(__func__);
 }
 
 /*!
