@@ -155,7 +155,7 @@ namespace quda
     void initTuneParam(TuneParam &param) const
     {
       TunableKernel3D::initTuneParam(param);
-      if (shared && (type == M5_INV_DWF || type == M5_INV_MOBIUS || type == M5_INV_ZMOBIUS)) {
+      if (shared() && (type == M5_INV_DWF || type == M5_INV_MOBIUS || type == M5_INV_ZMOBIUS)) {
         param.block.y = in.X(4); // Ls must be contained in the block
         param.grid.y = 1;
         param.shared_bytes = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
@@ -165,7 +165,7 @@ namespace quda
     void defaultTuneParam(TuneParam &param) const
     {
       TunableKernel3D::defaultTuneParam(param);
-      if (shared && (type == M5_INV_DWF || type == M5_INV_MOBIUS || type == M5_INV_ZMOBIUS)) {
+      if (shared() && (type == M5_INV_DWF || type == M5_INV_MOBIUS || type == M5_INV_ZMOBIUS)) {
         param.block.y = in.X(4); // Ls must be contained in the block
         param.grid.y = 1;
         param.shared_bytes = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
