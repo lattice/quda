@@ -348,5 +348,5 @@ namespace quda
         return flops;
       }
     } // namespace generic
-  }   // namespace blas_lapack
+  } // namespace blas_lapack
 } // namespace quda

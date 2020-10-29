@@ -932,11 +932,6 @@ extern "C" {
   QudaBLASParam newQudaBLASParam(void);
 
   /**
-   * Print the device properties of each device on the node
-   */
-  void printDeviceProp();
-
-  /**
    * Print the members of QudaGaugeParam.
    * @param param The QudaGaugeParam whose elements we are to print.
    */

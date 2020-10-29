@@ -259,8 +259,7 @@ if(QUDA_MPI OR QUDA_QMP)
   endif()
 endif()
 
-# BLAS test
-
+# BLAS tests
 if(QUDA_DIRAC_WILSON
    OR QUDA_DIRAC_CLOVER
    OR QUDA_DIRAC_TWISTED_MASS
@@ -296,6 +295,23 @@ if(QUDA_DIRAC_STAGGERED)
                    --dslash-type staggered
                    --solve-type direct
                    --gtest_output=xml:blas_test_full.xml)
+endif()
+
+# BLAS interface test
+if(QUDA_BUILD_NATIVE_LAPACK)
+  add_test(NAME blas_interface_test
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:blas_interface_test> ${MPIEXEC_POSTFLAGS}
+    --blas-mnk 64 64 64
+    --blas-leading-dims 128 128 128
+    --blas-offsets 16 16 16
+    --blas-data-type Z
+    --blas-data-order row
+    --blas-batch 20
+    --blas-alpha 1.0 2.0
+    --blas-beta -3.0 1.5
+    --blas-trans-a T
+    --blas-trans-b C
+    --gtest_output=xml:blas_interface_test.xml)
 endif()
 
 # loop over Dslash policies

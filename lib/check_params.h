@@ -934,12 +934,12 @@ void printQudaBLASParam(QudaBLASParam *param)
 #ifdef INIT_PARAM
   P(trans_a, QUDA_BLAS_OP_N);
   P(trans_b, QUDA_BLAS_OP_N);
-  P(m, INVALID_INT);
-  P(n, INVALID_INT);
-  P(k, INVALID_INT);
-  P(lda, INVALID_INT);
-  P(ldb, INVALID_INT);
-  P(ldc, INVALID_INT);
+  P(m, 0);
+  P(n, 0);
+  P(k, 0);
+  P(lda, 0);
+  P(ldb, 0);
+  P(ldc, 0);
   P(a_offset, 0);
   P(b_offset, 0);
   P(c_offset, 0);
