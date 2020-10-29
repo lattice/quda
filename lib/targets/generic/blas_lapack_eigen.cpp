@@ -310,7 +310,7 @@ namespace quda
 
         } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_S) {
 
-          typedef double S;
+          typedef float S;
           const S alpha = (S)(static_cast<std::complex<float>>(blas_param.alpha).real());
           const S beta = (S)(static_cast<std::complex<float>>(blas_param.beta).real());
           GEMM<MatrixXf, S>(A_h, B_h, C_h, alpha, beta, max_stride, blas_param);
