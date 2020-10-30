@@ -204,6 +204,7 @@ namespace quda
         // If the user gives strides of 0 for all arrays, we are essentially performing
         // a GEMM on the first matrices in the array N_{batch} times.
         // Give them what they ask for, YMMV...
+	// If the strides have not been set, we are just using strides of 1.
         if (max_stride == 0 || max_stride == -1) max_stride = 1;
 
         // Then number of GEMMs to compute

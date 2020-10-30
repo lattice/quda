@@ -61,7 +61,7 @@ namespace quda
                                   QudaFieldLocation location);
 
       /**
-         @breif Strided Batch GEMM. This function performs N GEMM type operations in a
+         @brief Strided Batch GEMM. This function performs N GEMM type operations in a
          strided batched fashion. If the user passes
 
          stride<A,B,C> = -1
