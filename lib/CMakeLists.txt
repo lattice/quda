@@ -225,6 +225,9 @@ target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_target>)
 add_subdirectory(targets/generic)
 target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_generic>)
 
+add_subdirectory(interface)
+target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_interface>)
+
 # propagate CXX flags to CUDA host compiler
 #TODO: Do we still need that? 
 if(${QUDA_PROPAGATE_CXX_FLAGS})

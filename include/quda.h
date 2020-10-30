@@ -1456,7 +1456,6 @@ extern "C" {
    */
   void flushChronoQuda(int index);
 
-
   /**
   * Open/Close MAGMA library
   *
@@ -1476,9 +1475,9 @@ extern "C" {
    * Free resources allocated by the deflated solver
    */
   void destroyDeflationQuda(void *df_instance);
-
+  
   void setMPICommHandleQuda(void *mycomm);
-
+  
 #ifdef __cplusplus
 }
 #endif
