@@ -7,7 +7,7 @@
 #include <tune_key.h>
 #include <malloc_quda.h>
 #include <quda_define.h>
-#if defined(QUDA_BUILD_TARGET_HIP)
+#if defined(QUDA_TARGET_HIP)
 #include "hip/hip_runtime.h"
 #endif
 
@@ -123,14 +123,14 @@ void errorQuda_(const char *func, const char *file, int line, ...);
 #endif // MULTI_GPU
 
 
-#if defined(QUDA_BUILD_TARGET_CUDA)
+#if defined(QUDA_TARGET_CUDA)
 #define checkCudaErrorNoSync() do {                    \
   cudaError_t error = cudaGetLastError();              \
   if (error != cudaSuccess)                            \
     errorQuda("(CUDA) %s", cudaGetErrorString(error))  \
     ;\
 } while (0)
-#elif defined(QUDA_BUILD_TARGET_HIP)
+#elif defined(QUDA_TARGET_HIP)
 
 #define checkCudaErrorNoSync() do {                    \
   hipError_t error = hipGetLastError();              \
@@ -142,14 +142,14 @@ void errorQuda_(const char *func, const char *file, int line, ...);
 #endif
 
 #ifdef HOST_DEBUG
-#if defined(QUDA_BUILD_TARGET_CUDA)
+#if defined(QUDA_TARGET_CUDA)
 
 #define checkCudaError() do {  \
   cudaDeviceSynchronize();     \
   checkCudaErrorNoSync();      \
 } while (0)
 
-#elif defined(QUDA_BUILD_TARGET_HIP)
+#elif defined(QUDA_TARGET_HIP)
 
 #define checkCudaError() do {  \
   hipDeviceSynchronize();     \

@@ -72,12 +72,12 @@ endif()
 
 if( ${CHECK_TARGET_TYPE} STREQUAL "CUDA") 
   set(QUDA_TARGET_LIBRARY quda_cuda_target)
-  set(QUDA_BUILD_TARGET_CUDA ON)
+  set(QUDA_TARGET_CUDA ON)
 endif()
 
 if( ${CHECK_TARGET_TYPE} STREQUAL "HIP")
   set(QUDA_TARGET_LIBRARY quda_hip_target)
-  set(QUDA_BUILD_TARGET_HIP ON)
+  set(QUDA_TARGET_HIP ON)
 endif()
 #
 # PROJECT is QUDA

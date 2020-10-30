@@ -9,7 +9,7 @@
 
 #include "quda_define.h"
 
-#if defined(QUDA_BUILD_TARGET_CUDA)
+#if defined(QUDA_TARGET_CUDA)
 #include <cuda.h>
 #include <cuda_runtime.h>
 using qudaDeviceProp_t = cudaDeviceProp;
@@ -28,7 +28,7 @@ constexpr qudaMemcpyKind  qudaMemcpyDefault = cudaMemcpyDefault;
 #define QUDA_DYNAMIC_SHARED( type, var )	\
 	extern __shared__ type var[] ;
 
-#elif defined(QUDA_BUILD_TARGET_HIP)
+#elif defined(QUDA_TARGET_HIP)
 
 #include <hip/hip_runtime.h>
 #include <hip/hip_runtime_api.h>
@@ -38,12 +38,18 @@ using qudaStream_t = hipStream_t;
 using qudaMemcpyKind = hipMemcpyKind;
 
 using qudaEvent_t = hipEvent_t;
-using qudaIpcEventHandle_t = cudaIpcEventHandle_t;
+using qudaIpcEventHandle_t = hipIpcEventHandle_t;
+using qudaIpcMemHandle_t = hipIpcMemHandle_t;
+
 
 constexpr qudaMemcpyKind  qudaMemcpyDeviceToHost = hipMemcpyDeviceToHost;
 constexpr qudaMemcpyKind  qudaMemcpyHostToDevice = hipMemcpyHostToDevice;
 constexpr qudaMemcpyKind  qudaMemcpyDeviceToDevice = hipMemcpyDeviceToDevice;
 constexpr qudaMemcpyKind  qudaMemcpyDefault = hipMemcpyDefault;
+
+#define QUDA_DYNAMIC_SHARED( type, var )        \
+        extern HIP_DYNAMIC_SHARED(type, var);
+
 #endif
 
 extern qudaDeviceProp_t deviceProp;
