@@ -14,7 +14,7 @@ namespace quda
        @brief Query and print to stdout device properties of all GPUs
     */
     void print_device_properties();
-    
+
     /**
        @brief Create the streams associated with parallel execution.
     */

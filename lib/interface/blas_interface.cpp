@@ -7,12 +7,12 @@ using namespace quda;
 
 // Forward declarations for profiling and parameter checking
 // The helper functions are defined in interface_quda.cpp
-TimeProfile& getProfileBLAS();
+TimeProfile &getProfileBLAS();
 void checkBLASParam(QudaBLASParam &param);
 
 void blasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, bool use_native, QudaBLASParam *blas_param)
-{  
-  getProfileBLAS().TPSTART(QUDA_PROFILE_TOTAL);  
+{
+  getProfileBLAS().TPSTART(QUDA_PROFILE_TOTAL);
   getProfileBLAS().TPSTART(QUDA_PROFILE_INIT);
   checkBLASParam(*blas_param);
 

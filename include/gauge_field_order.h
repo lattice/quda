@@ -334,8 +334,7 @@ namespace quda {
         } else {
           v[idx] -= fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
         }
-	}
-
+      }
       };
 
     template<typename Float, typename storeFloat>

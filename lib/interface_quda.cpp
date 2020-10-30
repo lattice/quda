@@ -50,9 +50,7 @@
 #define CHECK_PARAM
 #include "check_params.h"
 #undef CHECK_PARAM
-void checkBLASParam(QudaBLASParam &param) {
-  checkBLASParam(&param);
-}
+void checkBLASParam(QudaBLASParam &param) { checkBLASParam(&param); }
 
 // define printQudaGaugeParam() and printQudaInvertParam()
 #define PRINT_PARAM
@@ -220,9 +218,7 @@ static TimeProfile profileContract("contractQuda");
 
 //!< Profiler for GEMM and other BLAS
 static TimeProfile profileBLAS("blasQuda");
-TimeProfile& getProfileBLAS() {
-  return profileBLAS;
-}
+TimeProfile &getProfileBLAS() { return profileBLAS; }
 
 //!< Profiler for covariant derivative
 static TimeProfile profileCovDev("covDevQuda");
@@ -5970,4 +5966,3 @@ void gaugeObservablesQuda(QudaGaugeObservableParam *param)
   gaugeObservables(*gauge, *param, profileGaugeObs);
   profileGaugeObs.TPSTOP(QUDA_PROFILE_TOTAL);
 }
-

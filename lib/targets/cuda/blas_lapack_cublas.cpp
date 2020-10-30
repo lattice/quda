@@ -204,12 +204,12 @@ namespace quda
         // If the user gives strides of 0 for all arrays, we are essentially performing
         // a GEMM on the first matrices in the array N_{batch} times.
         // Give them what they ask for, YMMV...
-	// If the strides have not been set, we are just using strides of 1.
+        // If the strides have not been set, we are just using strides of 1.
         if (max_stride == 0 || max_stride == -1) max_stride = 1;
 
         // Then number of GEMMs to compute
         const uint64_t batch = blas_param.batch_count / max_stride;
-	
+
         uint64_t data_size
           = (blas_param.data_type == QUDA_BLAS_DATATYPE_S || blas_param.data_type == QUDA_BLAS_DATATYPE_C) ? 4 : 8;
 
@@ -289,14 +289,15 @@ namespace quda
                                               &alpha, (Z *)A_d + blas_param.a_offset, blas_param.lda, strideA,
                                               (Z *)B_d + blas_param.b_offset, blas_param.ldb, strideB, &beta,
                                               (Z *)C_d + blas_param.c_offset, blas_param.ldc, strideC, batch);
-	    
-	    if (error != CUBLAS_STATUS_SUCCESS) errorQuda("\nError in cuBLASZGEMMStridedBatched, error code = %d\n", error);
+
+            if (error != CUBLAS_STATUS_SUCCESS)
+              errorQuda("\nError in cuBLASZGEMMStridedBatched, error code = %d\n", error);
           } else {
             error = cublasZgemm(handle, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, &alpha,
                                 (Z *)A_d + blas_param.a_offset, blas_param.lda, (Z *)B_d + blas_param.b_offset,
                                 blas_param.ldb, &beta, (Z *)C_d + blas_param.c_offset, blas_param.ldc);
-	    
-	    if (error != CUBLAS_STATUS_SUCCESS) errorQuda("\nError in cuBLASZGEMM, error code = %d\n", error);	    
+
+            if (error != CUBLAS_STATUS_SUCCESS) errorQuda("\nError in cuBLASZGEMM, error code = %d\n", error);
           }
         } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_C) {
 
@@ -315,13 +316,14 @@ namespace quda
                                               (C *)B_d + blas_param.b_offset, blas_param.ldb, strideB, &beta,
                                               (C *)C_d + blas_param.c_offset, blas_param.ldc, strideC, batch);
 
-	    if (error != CUBLAS_STATUS_SUCCESS) errorQuda("\nError in cuBLASCGEMMStridedBatched, error code = %d\n", error);
+            if (error != CUBLAS_STATUS_SUCCESS)
+              errorQuda("\nError in cuBLASCGEMMStridedBatched, error code = %d\n", error);
           } else {
             error = cublasCgemm(handle, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, &alpha,
                                 (C *)A_d + blas_param.a_offset, blas_param.lda, (C *)B_d + blas_param.b_offset,
                                 blas_param.ldb, &beta, (C *)C_d + blas_param.c_offset, blas_param.ldc);
-	    
-	    if (error != CUBLAS_STATUS_SUCCESS) errorQuda("\nError in cuBLASCGEMMBatched, error code = %d\n", error);
+
+            if (error != CUBLAS_STATUS_SUCCESS) errorQuda("\nError in cuBLASCGEMMBatched, error code = %d\n", error);
           }
         } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_D) {
 
@@ -336,14 +338,15 @@ namespace quda
                                               &alpha, (D *)A_d + blas_param.a_offset, blas_param.lda, strideA,
                                               (D *)B_d + blas_param.b_offset, blas_param.ldb, strideB, &beta,
                                               (D *)C_d + blas_param.c_offset, blas_param.ldc, strideC, batch);
-	    
-	    if (error != CUBLAS_STATUS_SUCCESS) errorQuda("\nError in cuBLASDGEMMStridedBatched, error code = %d\n", error);
+
+            if (error != CUBLAS_STATUS_SUCCESS)
+              errorQuda("\nError in cuBLASDGEMMStridedBatched, error code = %d\n", error);
           } else {
             error = cublasDgemm(handle, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, &alpha,
                                 (D *)A_d + blas_param.a_offset, blas_param.lda, (D *)B_d + blas_param.b_offset,
                                 blas_param.ldb, &beta, (D *)C_d + blas_param.c_offset, blas_param.ldc);
-	    
-	    if (error != CUBLAS_STATUS_SUCCESS) errorQuda("\nError in cuBLASDGEMMBatched, error code = %d\n", error);
+
+            if (error != CUBLAS_STATUS_SUCCESS) errorQuda("\nError in cuBLASDGEMMBatched, error code = %d\n", error);
           }
         } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_S) {
 
@@ -359,13 +362,14 @@ namespace quda
                                               (S *)B_d + blas_param.b_offset, blas_param.ldb, strideB, &beta,
                                               (S *)C_d + blas_param.c_offset, blas_param.ldc, strideC, batch);
 
-	    if (error != CUBLAS_STATUS_SUCCESS) errorQuda("\nError in cuBLASSGEMMStridedBatched, error code = %d\n", error);
+            if (error != CUBLAS_STATUS_SUCCESS)
+              errorQuda("\nError in cuBLASSGEMMStridedBatched, error code = %d\n", error);
           } else {
             error = cublasSgemm(handle, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, &alpha,
                                 (S *)A_d + blas_param.a_offset, blas_param.lda, (S *)B_d + blas_param.b_offset,
                                 blas_param.ldb, &beta, (S *)C_d + blas_param.c_offset, blas_param.ldc);
 
-	    if (error != CUBLAS_STATUS_SUCCESS) errorQuda("\nError in cuBLASSGEMMBatched, error code = %d\n", error);
+            if (error != CUBLAS_STATUS_SUCCESS) errorQuda("\nError in cuBLASSGEMMBatched, error code = %d\n", error);
           }
         } else {
           errorQuda("cublasGEMM type %d not implemented\n", blas_param.data_type);
