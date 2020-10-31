@@ -175,7 +175,6 @@ namespace quda {
       for (int x_cb = 0; x_cb < arg.volumeCB; x_cb++) { // 4-d volume
 	
 	Spinor in = arg.in(x_cb, parity);
-	Spinor out = arg.out(x_cb, parity);
 	HalfSpinor chi = in.chiral_project(proj);
 	
 	// out += P_{L/R} * in

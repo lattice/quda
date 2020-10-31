@@ -363,10 +363,10 @@ namespace quda
     int offsets[4];
     int NxNyNzNt[4];
     for(int i=0;i<4;i++) {
-      source_position[i]=arg.source_position[i];
-      offsets[i]=arg.offsets[i];
-      pxpypzpt[i]=arg.pxpypzpt[i];
-      NxNyNzNt[i]=arg.NxNyNzNt[i];
+      source_position[i] = arg.source_position[i];
+      offsets[i] = arg.offsets[i];
+      pxpypzpt[i] = arg.pxpypzpt[i];
+      NxNyNzNt[i] = arg.NxNyNzNt[i];
     }
 
     using real = typename Arg::Float;
@@ -374,7 +374,7 @@ namespace quda
     constexpr int nColor = Arg::nColor;
 
     complex<real> propagator_product;
-
+    
     //the coordinate of the sink
     int *sink;
     // result array needs to be a spinor_array type object because of the reduce function at the end
@@ -396,10 +396,10 @@ namespace quda
                      (source_position[3]-sink[3]-offsets[3])*pxpypzpt[3]*1./NxNyNzNt[3]);
       phase_real=cos(Sum_dXi_dot_Pi*2.*M_PI);
       phase_imag=-sin(Sum_dXi_dot_Pi*2.*M_PI);
-
+      
       ColorSpinor<real, nColor, nSpin> x = arg.x(idx_cb, parity);
       ColorSpinor<real, nColor, nSpin> y = arg.y(idx_cb, parity);
-
+      
       // loop over channels
       for (int G_idx = 0; G_idx < 16; G_idx++) {
         for (int s2 = 0; s2 < nSpin; s2++) {
@@ -408,9 +408,13 @@ namespace quda
           int b1_tmp = arg.Gamma.gm_i[G_idx][s1];
           // only contributes if we're at the correct b1 from the outer loop
           if (b1_tmp == b1) {
-            propagator_product = arg.Gamma.gm_z[G_idx][b2] * innerProduct(x, y, b2, s2) * arg.Gamma.gm_z[G_idx][b1];
-            result_all_channels[G_idx].x += propagator_product.real()*phase_real-propagator_product.imag()*phase_imag;
+	    propagator_product = arg.Gamma.gm_z[G_idx][b2] * innerProduct(x, y, b2, s2) * arg.Gamma.gm_z[G_idx][b1];
+	    result_all_channels[G_idx].x += propagator_product.real()*phase_real-propagator_product.imag()*phase_imag;
             result_all_channels[G_idx].y += propagator_product.imag()*phase_real+propagator_product.real()*phase_imag;
+	    
+            //result_all_channels[G_idx].x += 1.0 * ((t + arg.t_offset) + 1);
+            //result_all_channels[G_idx].y += 2.0 * ((t + arg.t_offset) + 1);
+	    
 	    //if(xyz == 0) printf("Yes Comp\n");
           } else {
 	    //if(xyz == 0) printf("No Comp\n");  
@@ -419,10 +423,11 @@ namespace quda
       }      
       xyz += blockDim.x * gridDim.x;
     }
-
+    
     // This function reduces the data in result_all_channels in all threads -
     // different threads reduce result to different index t + arg.t_offset
-    arg.template reduce2d<blockSize, 2>(result_all_channels, t + arg.t_offset);
+    arg.template reduce2d<blockSize, 2>(result_all_channels, (t + arg.t_offset));
+    //arg.template reduce2d<blockSize, 2>(result_all_channels, t);
   }
 
   

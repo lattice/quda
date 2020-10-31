@@ -5614,6 +5614,187 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
   profileWuppertal.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
+#if 1
+void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned int n_steps)
+{
+  profileGaussianSmear.TPSTART(QUDA_PROFILE_TOTAL);
+  profileGaussianSmear.TPSTART(QUDA_PROFILE_INIT);
+
+  if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
+
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
+
+  cudaGaugeField *gauge_ptr = nullptr;
+
+  if (gaugeSmeared != nullptr) {
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Gaussian smearing done with gaugeSmeared\n");
+    GaugeFieldParam gParam(*gaugePrecise);
+    gParam.create = QUDA_NULL_FIELD_CREATE;
+    gauge_ptr = new cudaGaugeField(gParam);
+    copyExtendedGauge(*gauge_ptr, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
+    gauge_ptr->exchangeGhost();
+  } else {
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Gaussian smearing done with gaugePrecise\n");
+    gauge_ptr = gaugePrecise;
+  }
+
+  if (!initialized) errorQuda("QUDA not initialized");
+
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) { printQudaInvertParam(inv_param); }
+
+  checkInvertParam(inv_param);
+
+  // Create device side ColorSpinorField vectors and to pass to the
+  // compute function.
+  const int *X = gauge_ptr->X();
+  ColorSpinorParam cpuParam(h_in, *inv_param, X, QUDA_MAT_SOLUTION, QUDA_CPU_FIELD_LOCATION);
+  cpuParam.nSpin = 4;
+  // QUDA style pointer for host data.
+  ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
+
+  // Device side data.
+  ColorSpinorParam cudaParam(cpuParam);
+  cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
+  cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+  cudaParam.setPrecision(inv_param->cuda_prec, inv_param->cuda_prec, true);
+  ColorSpinorField *chi = ColorSpinorField::Create(cudaParam);
+  ColorSpinorField *psi = ColorSpinorField::Create(cudaParam);
+  ColorSpinorField *temp1 = ColorSpinorField::Create(cudaParam);
+  ColorSpinorField *temp2 = ColorSpinorField::Create(cudaParam);
+
+  // Create the laplace operator
+  //------------------------------------------------------
+  bool pc_solve = false;
+
+  Dirac *d = nullptr;
+  Dirac *dSloppy = nullptr;
+  Dirac *dPre = nullptr;
+  createDirac(d, dSloppy, dPre, *inv_param, pc_solve);
+  Dirac &dirac = *d;
+  DiracM laplace_op(dirac);
+  profileGaussianSmear.TPSTOP(QUDA_PROFILE_INIT);
+
+  // massRescale(*static_cast<cudaColorSpinorField*>(in_h), *inv_param);
+
+  // Copy host data to device
+  profileGaussianSmear.TPSTART(QUDA_PROFILE_H2D);
+  *chi = *in_h;
+  profileGaussianSmear.TPSTOP(QUDA_PROFILE_H2D);
+
+  // Scale up the source to prevent underflow
+  profileGaussianSmear.TPSTART(QUDA_PROFILE_COMPUTE);
+  //blas::ax(1e6, *in);
+
+  double ftempi = - (inv_param->mass * inv_param->mass) / (4 * n_steps);  
+  double ftemp = 1.0 / ftempi;
+  
+  // Computes out(x) = (in(x) + (\omega/(4N) * \sum_mu (U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))))
+
+  // Chroma's smearing function
+
+    // Real ftmp = - (width*width) / Real(4*ItrGaus);
+    // // The Klein-Gordon operator is (Lapl + mass_sq), where Lapl = -d^2/dx^2.. 
+    // // We want (1 + ftmp * Lapl ) = (Lapl + 1/ftmp)*ftmp 
+    // Real ftmpi = Real(1) / ftmp;
+    
+    // for(int n = 0; n < ItrGaus; ++n)
+    // {
+    //   psi = chi * ftmp;
+    //   klein_gord(u, psi, chi, ftmpi, j_decay);
+    // }    
+
+
+  //*out = *in;
+  for (unsigned int i = 0; i < n_steps; i++) {
+    // If performing an iteration greater that i=0, swap the `out` and `in` pointers.
+    // This will feed the previous iteration's result into the loop, and
+    // overwrite the previous `in`.
+    //if (i > 0) std::swap(in, out);
+    
+    // Emulate the CHROMA worklow
+    // Scale `out` with ftemp and copy to in
+    // psi = chi * ftmp;
+    *psi = *chi;
+    blas::ax(ftemp, *psi);
+    
+    //printfQuda("Step %d, vector norm in %e\n", i, blas::norm2(*in));
+
+    // Apply klein_gord
+    // klein_gord(u, psi, chi, ftmpi, j_decay);
+    // in CHROMA's KG op, we have (with mass_sq = ftempi)
+
+    // void klein_gord(const multi1d<LatticeColorMatrix>& u, const T& psi, T& chi, const Real& mass_sq, int j_decay)
+    // {
+    //   Real ftmp;
+
+    //   if( j_decay < Nd )
+    // 	ftmp = Real(2*Nd-2) + mass_sq;
+    //   else
+    // 	ftmp = Real(2*Nd) + mass_sq;
+
+    //   chi = psi * ftmp;
+
+    //   for(int mu = 0; mu < Nd; ++mu )
+    // 	if( mu != j_decay )
+    // 	  {
+    // 	    chi -= u[mu]*shift(psi, FORWARD, mu) + shift(adj(u[mu])*psi, BACKWARD, mu);
+    // 	  }
+    // }
+
+    // To emulate this with QUDA functions, we multiply `psi` with ((2*Nd-2) + ftempi) 
+    // and copy to chi 
+    *chi = *psi;
+    blas::ax(ftempi + 6, *chi);
+
+    // chi = chi - KGOP * psi.
+
+    // Now we apply the Dslash to `out` and remove the extra part QUDA adds
+    laplace_op.Expose()->Dslash(*temp1, *psi, QUDA_INVALID_PARITY);
+    
+    // QUDA added a vector 1.0 * psi to temp1. We remove it.
+    //blas::axpy(-1.0, *psi, *temp1);
+
+    // temp1 now contains KGOP * psi.
+    blas::axpy(-1.0, *temp1, *chi);
+	       
+    //printfQuda("Step %d, vector norm %e\n", i, blas::norm2(*out));
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+      //printfQuda("Step %d, vector norm %e\n", i, blas::norm2(*out));
+    }
+  }
+
+  // Rescale back down
+  //blas::ax(1e-6, *out);
+
+  // Normalise the source
+  double nout = blas::norm2(*chi);
+  printfQuda("vector norm final %e\n", nout);
+  blas::ax(1.0 / sqrt(nout), *chi);
+  profileGaussianSmear.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  // Copy device data to host.
+  profileGaussianSmear.TPSTART(QUDA_PROFILE_D2H);
+  *in_h = *chi;
+  profileGaussianSmear.TPSTOP(QUDA_PROFILE_D2H);
+
+  profileGaussianSmear.TPSTART(QUDA_PROFILE_FREE);
+  if (gaugeSmeared != nullptr) delete gauge_ptr;
+  delete temp1;
+  delete temp2;
+  delete chi;
+  delete psi;
+  delete in_h;
+  delete d;
+  delete dSloppy;
+  delete dPre;
+
+  profileGaussianSmear.TPSTOP(QUDA_PROFILE_FREE);
+  profileGaussianSmear.TPSTOP(QUDA_PROFILE_TOTAL);
+  saveTuneCache();
+}
+#endif
+
+#if 0
 void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned int n_steps)
 {
   profileGaussianSmear.TPSTART(QUDA_PROFILE_TOTAL);
@@ -5724,6 +5905,7 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned 
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_TOTAL);
   saveTuneCache();
 }
+#endif
 
 void performAPEnStep(unsigned int n_steps, double alpha, int meas_interval)
 {
@@ -6086,9 +6268,8 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
 
                 for (size_t G_idx = 0; G_idx < nSpin * nSpin; G_idx++) {
                   for (size_t t = 0; t < global_corr_length; t++) {
-                    int index_real = (px+py*(Mom[0]+1)+pz*(Mom[0]+1)*(Mom[1]+1)+pt*(Mom[0]+1)*
-                                        (Mom[1]+1)*(Mom[2]+1))*n_numbers_per_slice * global_corr_length+
-                                     n_numbers_per_slice * t + 2 * G_idx;
+                    int index_real = (px+py*(Mom[0]+1) + pz*(Mom[0]+1)*(Mom[1]+1) + pt*(Mom[0]+1)*(Mom[1]+1)*(Mom[2]+1))*n_numbers_per_slice * global_corr_length+
+		      n_numbers_per_slice * t + 2 * G_idx;
                     int index_imag = index_real+1;
 
                     ((double *)*h_result)[index_real]

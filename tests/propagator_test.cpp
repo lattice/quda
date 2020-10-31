@@ -499,10 +499,10 @@ int main(int argc, char **argv)
                 int index_real = (px+py*(Mom[0]+1)+pz*(Mom[0]+1)*(Mom[1]+1)+pt*(Mom[0]+1)*(Mom[1]+1)*(Mom[2]+1))
                     *n_numbers_per_slice * global_corr_length+n_numbers_per_slice * ((t + overall_shift_dim) % global_corr_length) + 2 * G_idx;
                 int index_imag = index_real+1;
-                printfQuda(
-                  "sum: prop_n=%d px=%d py=%d pz=%d pt=%d g=%d t=%lu %e %e\n", n, px, py, pz, pt, G_idx, t,
-                  ((double *)correlation_function_sum)[index_real],
-                  ((double *)correlation_function_sum)[index_imag]);
+                printfQuda("sum: prop_n=%d px=%d py=%d pz=%d pt=%d g=%d t=%lu %.16f %.16f (from %d, %d)\n", n, px, py, pz, pt, G_idx, t,
+			   ((double *)correlation_function_sum)[index_real],
+			   ((double *)correlation_function_sum)[index_imag],
+			   index_real, index_imag);
               }
             }
           }
