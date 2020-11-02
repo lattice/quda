@@ -118,7 +118,7 @@ namespace quda {
       }
     }
     
-    typedef ApplyStaggeredKDBlockArg<vFloatSpinor,vFloatGauge,coarseDof,fineColor,dagger,fineColorSpinor,xInvGauge> Arg;
+    using Arg = ApplyStaggeredKDBlockArg<vFloatSpinor,vFloatGauge,coarseDof,fineColor,dagger,fineColorSpinor,xInvGauge>;
     Arg arg(out, in, Xinv, x_size, xc_size);
 
     ApplyStaggeredKDBlock<Arg> y(arg, out_, Xinv_);
@@ -137,13 +137,13 @@ namespace quda {
     // Create the accessor for Xinv
     constexpr QudaGaugeFieldOrder xOrder = QUDA_MILC_GAUGE_ORDER;
     if (Xinv.FieldOrder() != xOrder) errorQuda("Unsupported field order %d\n", Xinv.FieldOrder());
-    typedef typename gauge::FieldOrder<typename mapper<vFloatGauge>::type,coarseDof,1,xOrder,true,vFloatGauge> xInvCoarse;
+    using xInvCoarse = typename gauge::FieldOrder<typename mapper<vFloatGauge>::type,coarseDof,1,xOrder,true,vFloatGauge>;
     xInvCoarse xInvAccessor(const_cast<GaugeField &>(Xinv));
 
     // Create the accessors for out, in
     constexpr bool spin_project = false;
     constexpr bool spinor_direct_load = false; // seems legacy? false means texture load
-    typedef typename colorspinor_mapper<vFloatSpinor, fineSpin, fineColor, spin_project, spinor_direct_load>::type csFine;
+    using csFine = typename colorspinor_mapper<vFloatSpinor, fineSpin, fineColor, spin_project, spinor_direct_load>::type;
     const csFine inAccessor(in);
     csFine outAccessor(out);
 

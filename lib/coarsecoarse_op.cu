@@ -2,6 +2,9 @@
 #include <color_spinor_field.h>
 #include <gauge_field.h>
 
+// This define controls which kernels get compiled in `coarse_op.cuh`.
+// This ensures only kernels relevant for coarsening a coarse operator
+// get built, saving compile time.
 #define COARSECOARSE
 #include <coarse_op.cuh>
 

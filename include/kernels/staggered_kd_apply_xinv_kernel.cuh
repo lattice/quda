@@ -70,7 +70,7 @@ namespace quda {
     extern __shared__ complex cs_buffer[];
 
     // For each "dot product" in the mat-vec
-    typedef cub::WarpReduce<real,16> WarpReduce16;
+    using WarpReduce16 = cub::WarpReduce<real,16>;
     __shared__ typename WarpReduce16::TempStorage temp_storage_16;
 
     /////////////////////////////////

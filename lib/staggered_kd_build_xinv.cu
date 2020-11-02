@@ -119,7 +119,7 @@ namespace quda {
     x_size[4] = xc_size[4] = 1;
 
     // Calculate X (KD block), which is really just a permutation of the gauge fields w/in a KD block
-    typedef CalculateStaggeredKDBlockArg<Float,coarseSpin,fineColor,coarseColor,xGauge,fineGauge> Arg;
+    using Arg = CalculateStaggeredKDBlockArg<Float,coarseSpin,fineColor,coarseColor,xGauge,fineGauge>;
     Arg arg(X, G, mass, x_size, xc_size);
     CalculateStaggeredKDBlock<Float, fineColor, coarseSpin, coarseColor, Arg> y(arg, G_, X_);
 
@@ -153,8 +153,8 @@ namespace quda {
 
       if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
 
-      typedef typename gauge::FieldOrder<Float,fineColor,1,gOrder> gFine;
-      typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat> xCoarse;
+      using gFine = typename gauge::FieldOrder<Float,fineColor,1,gOrder>;
+      using xCoarse = typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat>;
 
       gFine gAccessor(const_cast<GaugeField&>(g));
       xCoarse xAccessor(const_cast<GaugeField&>(X));
@@ -167,8 +167,8 @@ namespace quda {
 
       if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
 
-      typedef typename gauge::FieldOrder<Float,fineColor,1,gOrder,true,Float> gFine;
-      typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat> xCoarse;
+      using gFine = typename gauge::FieldOrder<Float,fineColor,1,gOrder,true,Float>;
+      using xCoarse = typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat>;
 
       gFine gAccessor(const_cast<GaugeField&>(g));
       xCoarse xAccessor(const_cast<GaugeField&>(X));

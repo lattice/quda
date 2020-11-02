@@ -8,7 +8,9 @@
 // For naive Kahler-Dirac coarsening
 #include <kernels/staggered_coarse_op_kernel.cuh>
 
-// For directly coarsening the staggered op
+// This define controls which kernels get compiled in `coarse_op.cuh`.
+// This ensures only kernels relevant for coarsening the staggered
+// operator get built, saving compile time.
 #define STAGGEREDCOARSE
 #include <coarse_op.cuh>
 
@@ -163,7 +165,7 @@ namespace quda {
     // Calculate VUV in one pass (due to KD-transform) for each dimension,
     // accumulating directly into the coarse gauge field Y
 
-    typedef CalculateStaggeredYArg<Float,coarseSpin,fineColor,coarseColor,coarseGauge,fineGauge> Arg;
+    using Arg = CalculateStaggeredYArg<Float,coarseSpin,fineColor,coarseColor,coarseGauge,fineGauge>;
     Arg arg(Y, X, G, mass, x_size, xc_size, geo_bs, spin_bs);
     CalculateStaggeredY<Float, fineColor, coarseSpin, coarseColor, Arg> y(arg, G_, Y_, X_);
 
@@ -211,8 +213,8 @@ namespace quda {
         errorQuda("Unsupported field order %d\n", T.Vectors(Y.Location()).FieldOrder());
       if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
 
-      typedef typename gauge::FieldOrder<Float,fineColor,1,gOrder> gFine;
-      typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat> gCoarse;
+      using gFine = typename gauge::FieldOrder<Float,fineColor,1,gOrder>;
+      using gCoarse = typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat>;
 
       gFine gAccessor(const_cast<GaugeField&>(g));
       gCoarse yAccessor(const_cast<GaugeField&>(Y));
@@ -229,8 +231,8 @@ namespace quda {
         errorQuda("Unsupported field order %d\n", T.Vectors(Y.Location()).FieldOrder());
       if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
 
-      typedef typename gauge::FieldOrder<Float,fineColor,1,gOrder,true,Float> gFine;
-      typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat> gCoarse;
+      using gFine = typename gauge::FieldOrder<Float,fineColor,1,gOrder,true,Float>;
+      using gCoarse = typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat>;
 
       gFine gAccessor(const_cast<GaugeField&>(g));
       gCoarse yAccessor(const_cast<GaugeField&>(Y));
@@ -296,18 +298,18 @@ namespace quda {
         errorQuda("Unsupported field order %d\n", T.Vectors(Y.Location()).FieldOrder());
       if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
 
-      typedef typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder,vFloat> V;
-      typedef typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder,vFloat> F; // will need 2x the spin components for the KD op
-      typedef typename gauge::FieldOrder<Float,fineColor,1,gOrder> gFine;
-      typedef typename gauge::FieldOrder<typename mapper<vFloatXinv>::type,xinvColor,xinvSpin,xinvOrder,true,vFloatXinv> xinvFine;
-      typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat> gCoarse;
-      typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,storeType> gCoarseAtomic;
+      using V = typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder,vFloat>;
+      using F = typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder,vFloat>; // will need 2x the spin components for the KD op
+      using gFine = typename gauge::FieldOrder<Float,fineColor,1,gOrder>;
+      using xinvFine = typename gauge::FieldOrder<typename mapper<vFloatXinv>::type,xinvColor,xinvSpin,xinvOrder,true,vFloatXinv>;
+      using gCoarse = typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat>;
+      using gCoarseAtomic = typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,storeType>;
 
       const ColorSpinorField &v = T.Vectors(Y.Location());
 
       V vAccessor(const_cast<ColorSpinorField&>(v));
-      F uvAccessor(*uv); // will need 2x the spin components for the KD op
-      V avAccessor(*av);
+      V uvAccessor(*uv); // will need 2x the spin components for the KD op
+      F avAccessor(*av);
       gFine gAccessor(const_cast<GaugeField&>(g));
       xinvFine xinvAccessor(const_cast<GaugeField&>(XinvKD));
       gCoarse yAccessor(const_cast<GaugeField&>(Y));
@@ -329,18 +331,18 @@ namespace quda {
         errorQuda("Unsupported field order %d\n", T.Vectors(Y.Location()).FieldOrder());
       if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
 
-      typedef typename colorspinor::FieldOrderCB<Float, fineSpin, fineColor, coarseColor, csOrder, vFloat, vFloat, false, false> V;
-      typedef typename colorspinor::FieldOrderCB<Float, fineSpin, fineColor, coarseColor, csOrder, vFloat, vFloat, false, false> F; // will need 2x the spin components for the KD op
-      typedef typename gauge::FieldOrder<Float,fineColor,1,gOrder,true,Float> gFine;
-      typedef typename gauge::FieldOrder<typename mapper<vFloatXinv>::type,xinvColor,xinvSpin,xinvOrder,true,vFloatXinv> xinvFine;
-      typedef typename gauge::FieldOrder<Float, coarseColor * coarseSpin, coarseSpin, gOrder, true, vFloat> gCoarse;
-      typedef typename gauge::FieldOrder<Float, coarseColor * coarseSpin, coarseSpin, gOrder, true, storeType> gCoarseAtomic;
+      using V = typename colorspinor::FieldOrderCB<Float, fineSpin, fineColor, coarseColor, csOrder, vFloat, vFloat, false, false>;
+      using F = typename colorspinor::FieldOrderCB<Float, fineSpin, fineColor, coarseColor, csOrder, vFloat, vFloat, false, false>; // will need 2x the spin components for the KD op
+      using gFine =  typename gauge::FieldOrder<Float,fineColor,1,gOrder,true,Float>;
+      using xinvFine = typename gauge::FieldOrder<typename mapper<vFloatXinv>::type,xinvColor,xinvSpin,xinvOrder,true,vFloatXinv>;
+      using gCoarse = typename gauge::FieldOrder<Float, coarseColor * coarseSpin, coarseSpin, gOrder, true, vFloat>;
+      using gCoarseAtomic = typename gauge::FieldOrder<Float, coarseColor * coarseSpin, coarseSpin, gOrder, true, storeType>;
 
       const ColorSpinorField &v = T.Vectors(Y.Location());
 
       V vAccessor(const_cast<ColorSpinorField &>(v));
-      F uvAccessor(*uv); // will need 2x the spin components for the KD op
-      V avAccessor(*av);
+      V uvAccessor(*uv); // will need 2x the spin components for the KD op
+      F avAccessor(*av);
       gFine gAccessor(const_cast<GaugeField &>(g));
       xinvFine xinvAccessor(const_cast<GaugeField&>(XinvKD));
       gCoarse yAccessor(const_cast<GaugeField &>(Y));
