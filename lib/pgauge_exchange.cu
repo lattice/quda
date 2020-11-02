@@ -111,6 +111,7 @@ namespace quda {
         }
       }
 
+      qudaDeviceSynchronize();
       for (int d = 0; d < 4; d++) {
         if (!commDimPartitioned(d)) continue;
         comm_start(mh_recv_back[d]);

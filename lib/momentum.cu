@@ -82,7 +82,6 @@ namespace quda {
       action(action)
     {
       apply(device::get_default_stream());
-      comm_allreduce(&action);
     }
 
     void apply(const qudaStream_t &stream)
