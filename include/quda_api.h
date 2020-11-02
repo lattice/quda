@@ -5,8 +5,6 @@
 #include <cuda_runtime.h>
 #endif
 
-using qudaStream_t = cudaStream_t;
-
 #include <enum_quda.h>
 
 /**
@@ -20,6 +18,11 @@ namespace quda
 {
 
   class TuneParam;
+
+  struct qudaStream_t {
+    int idx;
+    //qudaStream_t(int idx) : idx(idx) {}
+  };
 
   /**
      @brief Wrapper around cudaLaunchKernel
@@ -67,6 +70,16 @@ namespace quda
                         const char *func, const char *file, const char *line);
 
   /**
+     @brief Wrapper around cudaMemcpyAsync or driver API equivalent for peer-to-peer copies
+     @param[out] dst Destination pointer
+     @param[in] src Source pointer
+     @param[in] count Size of transfer
+     @param[in] stream Stream to issue copy
+  */
+  void qudaMemcpyP2PAsync_(void *dst, const void *src, size_t count, const qudaStream_t &stream,
+                           const char *func, const char *file, const char *line);
+
+  /**
      @brief Wrapper around cudaMemcpy2DAsync or driver API equivalent
      @param[out] dst Destination pointer
      @param[in] dpitch Destination pitch in bytes
@@ -93,6 +106,19 @@ namespace quda
   void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
                           cudaMemcpyKind kind, const qudaStream_t &stream, const char *func, const char *file,
                           const char *line);
+
+  /**
+     @brief Wrapper around cudaMemcpy2DAsync or driver API equivalent
+     @param[out] dst Destination pointer
+     @param[in] dpitch Destination pitch in bytes
+     @param[in] src Source pointer
+     @param[in] spitch Source pitch in bytes
+     @param[in] width Width in bytes
+     @param[in] height Number of rows
+     @param[in] stream Stream to issue copy
+  */
+  void qudaMemcpy2DP2PAsync_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
+                             const qudaStream_t &stream, const char *func, const char *file, const char *line);
 
   /**
      @brief Wrapper around cudaMemset or driver API equivalent
@@ -175,14 +201,14 @@ namespace quda
      with built-in error checking
      @param[in] event Event which we are synchronizing with respect to
    */
-  void qudaEventSynchronize_(cudaEvent_t &event, const char *func, const char *file, const char *line);
+  void qudaEventSynchronize_(const cudaEvent_t &event, const char *func, const char *file, const char *line);
 
   /**
      @brief Wrapper around cudaStreamSynchronize or
      cuStreamSynchronize with built-in error checking
      @param[in] stream Stream which we are synchronizing
   */
-  void qudaStreamSynchronize_(qudaStream_t &stream, const char *func, const char *file, const char *line);
+  void qudaStreamSynchronize_(const qudaStream_t &stream, const char *func, const char *file, const char *line);
 
   /**
      @brief Wrapper around cudaDeviceSynchronize or
@@ -216,6 +242,9 @@ namespace quda
 #define qudaMemcpyAsync(dst, src, count, kind, stream)                                                                 \
   ::quda::qudaMemcpyAsync_(dst, src, count, kind, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
 
+#define qudaMemcpyP2PAsync(dst, src, count, stream)                     \
+  ::quda::qudaMemcpyP2PAsync_(dst, src, count, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
 #define qudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind)                                                    \
   ::quda::qudaMemcpy2D_(dst, dpitch, src, spitch, width, height, kind, __func__, quda::file_name(__FILE__),            \
                         __STRINGIFY__(__LINE__))
@@ -223,6 +252,10 @@ namespace quda
 #define qudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream)                                       \
   ::quda::qudaMemcpy2DAsync_(dst, dpitch, src, spitch, width, height, kind, stream, __func__,                          \
                              quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
+#define qudaMemcpy2DP2PAsync(dst, dpitch, src, spitch, width, height, stream)                                       \
+  ::quda::qudaMemcpy2DP2PAsync_(dst, dpitch, src, spitch, width, height, stream, __func__,                          \
+                                quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
 
 #define qudaMemset(ptr, value, count)                                                                                  \
   ::quda::qudaMemset_(ptr, value, count, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))

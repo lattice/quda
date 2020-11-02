@@ -118,7 +118,7 @@ namespace quda {
         for ( int parity = 0; parity < 2; ++parity ) {
           for ( int mu = 0; mu < 4; ++mu ) {
             hb.set_param(mu, parity, true);
-            hb.apply(0);
+            hb.apply(device::get_default_stream());
             PGaugeExchange(data, mu, parity);
           }
         }
@@ -138,7 +138,7 @@ namespace quda {
         for ( int parity = 0; parity < 2; ++parity ) {
           for ( int mu = 0; mu < 4; ++mu ) {
             relax.set_param(mu, parity, false);
-            relax.apply(0);
+            relax.apply(device::get_default_stream());
             PGaugeExchange(data, mu, parity);
           }
         }

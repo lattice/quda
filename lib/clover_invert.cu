@@ -20,7 +20,7 @@ namespace quda {
                      compute_tr_log ? "true" : "false",
                      clover.Twisted() ? "true" : "false");
 
-      apply(0);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)

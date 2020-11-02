@@ -36,7 +36,7 @@ namespace quda {
             max_det_error, allow_svd, svd_only, svd_rel_error, svd_abs_error),
         meta(u)
       {
-        apply(0);
+        apply(device::get_default_stream());
         qudaDeviceSynchronize(); // need to synchronize to ensure failure write has completed
       }
 

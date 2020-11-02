@@ -204,7 +204,7 @@ namespace quda
         errorQuda("Not implemented");
       } else {
 #ifdef JITIFY
-        Tunable::jitify_error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
+        Tunable::jitify_error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, device::get_cuda_stream(stream)).launch(arg);
 #else
         switch (arg.kernel_type) {
         case INTERIOR_KERNEL: launch<P, nParity, dagger, xpay, INTERIOR_KERNEL>(tp, stream); break;
@@ -233,7 +233,7 @@ namespace quda
     inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
     {
 #ifdef JITIFY
-      Tunable::jitify_error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
+      Tunable::jitify_error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, device::get_cuda_stream(stream)).launch(arg);
 #else
       if (arg.dagger)
         instantiate<P, nParity, true, xpay>(tp, stream);
@@ -252,7 +252,7 @@ namespace quda
     inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
     {
 #ifdef JITIFY
-      Tunable::jitify_error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
+      Tunable::jitify_error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, device::get_cuda_stream(stream)).launch(arg);
 #else
       switch (arg.nParity) {
       case 1: instantiate<P, 1, xpay>(tp, stream); break;
@@ -272,7 +272,7 @@ namespace quda
     inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
     {
 #ifdef JITIFY
-      Tunable::jitify_error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
+      Tunable::jitify_error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, device::get_cuda_stream(stream)).launch(arg);
 #else
       if (arg.xpay)
         instantiate<P, true>(tp, stream);

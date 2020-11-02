@@ -46,8 +46,7 @@ namespace quda {
       default : errorQuda("Unknown Wilson Flow step type %d", step_type);
       }
 
-      apply(0);
-      qudaDeviceSynchronize();
+      apply(device::get_default_stream());
     }
 
     template <QudaWFlowType wflow_type, WFlowStepType step_type> using Arg =

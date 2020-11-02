@@ -112,10 +112,10 @@ namespace quda {
       using namespace jitify::reflection;
       auto instance = program->kernel("quda::blockOrthoGPU")
         .instantiate((int)tp.block.x,Type<sumType>(),Type<RegType>(),nSpin,spinBlockSize,nColor,coarseSpin,nVec,Type<Arg>());
-      cuMemcpyHtoDAsync(instance.get_constant_ptr("quda::B_array_d"), B_array_h, device::max_constant_param_size(), stream);
-      jitify_error = instance.configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+      cuMemcpyHtoDAsync(instance.get_constant_ptr("quda::B_array_d"), B_array_h, device::max_constant_param_size(), device::get_cuda_stream(stream));
+      jitify_error = instance.configure(tp.grid,tp.block,tp.shared_bytes,device::get_cuda_stream(stream)).launch(arg);
 #else
-      cudaMemcpyToSymbolAsync(B_array_d, B_array_h, device::max_constant_param_size(), 0, cudaMemcpyHostToDevice, stream);
+      cudaMemcpyToSymbolAsync(B_array_d, B_array_h, device::max_constant_param_size(), 0, cudaMemcpyHostToDevice, device::get_cuda_stream(stream));
       LAUNCH_KERNEL_MG_BLOCK_SIZE(blockOrthoGPU,tp,stream,arg,sumType,RegType,nSpin,spinBlockSize,nColor,coarseSpin,nVec,Arg);
 #endif
     }
@@ -216,7 +216,7 @@ namespace quda {
     V.Scale(1.0); // by definition this is true
     BlockOrtho<double, vFloat, bFloat, nSpin, spinBlockSize, nColor, coarseSpin, nVec> ortho(
       V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
-    ortho.apply(0);
+    ortho.apply(device::get_default_stream());
   }
 
   template <typename vFloat, typename bFloat>

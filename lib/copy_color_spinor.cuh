@@ -37,7 +37,7 @@ namespace quda {
       else if (in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && out.GammaBasis() == QUDA_CHIRAL_GAMMA_BASIS) strcat(aux, ",NonRelToChiralBasis");
       else errorQuda("Basis change from %d to %d not supported", in.GammaBasis(), out.GammaBasis());
 
-      apply(0);
+      apply(device::get_default_stream());
     }
 
     template <int nSpin>

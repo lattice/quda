@@ -95,7 +95,7 @@ namespace quda {
         qudaMemcpyAsync((void*)device_ptr, param[i].host, param[i].bytes, cudaMemcpyHostToDevice, stream);
       }
 
-      jitify_error = instance.configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+      jitify_error = instance.configure(tp.grid, tp.block, tp.shared_bytes, device::get_cuda_stream(stream)).launch(arg);
       arg.launch_error = jitify_error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
 #else
       for (unsigned int i = 0; i < param.size(); i++)
@@ -106,6 +106,7 @@ namespace quda {
       if (!commAsyncReduction()) {
         arg.complete(result, stream);
         if (!activeTuning() && commGlobalReduction()) {
+          // FIXME - this will break when we have non-summation reductions (MG fixed point will break and so will force monitoring)
           // FIXME - this will break when we have non-double reduction types, e.g., double-double on the host
           comm_allreduce_array((double*)result.data(), result.size() * sizeof(T) / sizeof(double));
         }
@@ -251,6 +252,7 @@ namespace quda {
   {
     // for now we do not support anything other than block_size_y = 1
     static_assert(block_size_y == 1, "only block_size_y = 1 supported");
+    using Tunable::apply;
     using Tunable::jitify_error;
     using TunableReduction2D<block_size_y>::field;
     using TunableReduction2D<block_size_y>::location;
@@ -327,7 +329,7 @@ namespace quda {
         qudaMemcpyAsync((void*)device_ptr, param[i].host, param[i].bytes, cudaMemcpyHostToDevice, stream);
       }
 
-      jitify_error = instance.configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+      jitify_error = instance.configure(tp.grid,tp.block,tp.shared_bytes,device::get_cuda_stream(stream)).launch(arg);
       arg.launch_error = jitify_error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
 #else
       for (unsigned int i = 0; i < param.size(); i++)

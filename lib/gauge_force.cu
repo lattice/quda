@@ -21,8 +21,7 @@ namespace quda {
       strcat(aux, ",num_paths=");
       strcat(aux, std::to_string(arg.p.num_paths).c_str());
       strcat(aux, comm_dim_partitioned_string());
-      apply(0);
-      qudaDeviceSynchronize();
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream) {

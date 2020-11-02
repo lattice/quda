@@ -98,7 +98,7 @@ namespace quda {
         using namespace jitify::reflection;
         jitify_error = program->kernel("quda::GenericPackGhostKernel")
           .instantiate(Type<Float>(),block_float,Ns,Ms,Nc,Mc,arg.nDim,(int)tp.aux.x,Type<Arg>())
-          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+          .configure(tp.grid,tp.block,tp.shared_bytes,device::get_cuda_stream(stream)).launch(arg);
 #else
         switch(tp.aux.x) {
         case 1:
@@ -208,7 +208,7 @@ namespace quda {
     GenericPackGhostLauncher<RegFloat,block_float,Ns,spins_per_thread,Nc_,colors_per_thread,PackGhostArg<Q> >
       launch(arg, a, destination);
 
-    launch.apply(0);
+    launch.apply(device::get_default_stream());
   }
 
   // traits used to ensure we only instantiate arbitrary colors for nSpin=2,4 fields, and only 3 colors otherwise

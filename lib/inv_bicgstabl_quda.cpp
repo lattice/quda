@@ -210,7 +210,7 @@ namespace quda {
     
     // note that we can't set the stream parameter here so it is
     // ignored.  This is more of a future design direction to consider
-    void apply(const qudaStream_t &stream)
+    void apply(const qudaStream_t stream = device::get_default_stream())
     {
       static int count = 0;
 

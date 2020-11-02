@@ -63,8 +63,7 @@ namespace quda {
     tp.grid = GetGridDim(tp.block.x, size_cb);
     rngArg arg(X);
     tp.block.y = n_parity;
-    qudaLaunchKernel(kernel_random, tp, 0, state, seed, size_cb, arg);
-    qudaDeviceSynchronize();
+    qudaLaunchKernel(kernel_random, tp, device::get_default_stream(), state, seed, size_cb, arg);
   }
 
   RNG::RNG(const LatticeField &meta, unsigned long long seedin) :

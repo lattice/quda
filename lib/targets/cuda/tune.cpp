@@ -777,11 +777,11 @@ namespace quda
                        param.block.x, param.block.y, param.block.z, param.grid.x, param.grid.y, param.grid.z,
                        param.shared_bytes, param.aux.x, param.aux.y, param.aux.z);
           }
-          tunable.apply(0); // do initial call in case we need to jit compile for these parameters or if policy tuning
+          tunable.apply(); // do initial call in case we need to jit compile for these parameters or if policy tuning
 
           cudaEventRecord(start, 0);
           for (int i = 0; i < tunable.tuningIter(); i++) {
-            tunable.apply(0); // calls tuneLaunch() again, which simply returns the currently active param
+            tunable.apply(); // calls tuneLaunch() again, which simply returns the currently active param
           }
           cudaEventRecord(end, 0);
           cudaEventSynchronize(end);

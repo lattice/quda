@@ -7,8 +7,6 @@ namespace quda {
 
   namespace blas {
 
-    qudaStream_t* getStream();
-
     template <template <typename ReducerType, typename real> class Reducer,
               typename store_t, typename y_store_t, int nSpin, typename coeff_t>
     class Reduce : public TunableReduction2D<1>
@@ -67,7 +65,7 @@ namespace quda {
         strcat(aux, nParity == 2 ? ",nParity=2" : ",nParity=1");
         if (commAsyncReduction()) strcat(aux, ",async");
 
-        apply(*(blas::getStream()));
+        apply(device::get_default_stream());
 
         blas::bytes += bytes();
         blas::flops += flops();

@@ -30,7 +30,7 @@ namespace quda {
       coeff(coeff)
     {
       writeAuxString(",nvector=%d", (int)inA.size());
-      apply(0);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)

@@ -18,7 +18,7 @@ namespace quda {
                                       clover, commDim, halo_precision);
 
     DslashCoarsePolicyTune<decltype(Dslash)>  policy(Dslash);
-    policy.apply(0);
+    policy.apply(device::get_default_stream());
 #else
     errorQuda("Multigrid has not been built");
 #endif

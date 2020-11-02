@@ -42,7 +42,7 @@ namespace quda {
       if (fine_grain()) strcat(aux, "fine-grained");
       strcat(aux, extract ? ",extract" : ",inject");
 
-      apply(0);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream) {

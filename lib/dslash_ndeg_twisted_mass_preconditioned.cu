@@ -105,7 +105,6 @@ namespace quda
         dslash::DslashPolicyTune<decltype(twisted)> policy(twisted,
           const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
           in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
-        policy.apply(0);
       } else {
         NdegTwistedMassArg<Float, nColor, nDim, recon, false> arg(out, in, U, a, b, c, xpay, x, parity, dagger, comm_override);
         NdegTwistedMassPreconditioned<decltype(arg)> twisted(arg, out, in);
@@ -113,7 +112,6 @@ namespace quda
         dslash::DslashPolicyTune<decltype(twisted)> policy(twisted,
           const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
           in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
-        policy.apply(0);
       }
     }
   };

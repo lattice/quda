@@ -152,7 +152,7 @@ namespace quda
        @param[in] stream The stream on which we the reduction is being done
      */
     template <typename host_t, typename device_t = host_t>
-    void complete(std::vector<host_t> &result, const qudaStream_t stream = 0)
+        void complete(std::vector<host_t> &result, const qudaStream_t stream = device::get_default_stream())
     {
       if (launch_error == QUDA_ERROR) return; // kernel launch failed so return
       if (launch_error == QUDA_ERROR_UNINITIALIZED) errorQuda("No reduction kernel appears to have been launched");

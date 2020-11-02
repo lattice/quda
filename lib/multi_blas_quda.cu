@@ -7,8 +7,6 @@ namespace quda {
 
   namespace blas {
 
-    qudaStream_t* getStream();
-
     template <template <typename ...> class Functor, typename store_t, typename y_store_t, int nSpin, typename T>
     class MultiBlas : public TunableGridStrideKernel3D
     {
@@ -75,7 +73,7 @@ namespace quda {
           strcat(aux, y[0]->AuxString());
         }
 
-        apply(*getStream());
+        apply(device::get_default_stream());
 
         blas::bytes += bytes();
         blas::flops += flops();

@@ -15,8 +15,6 @@ namespace quda {
     unsigned long long flops;
     unsigned long long bytes;
 
-    static qudaStream_t *blasStream;
-
     template <template <typename real> class Functor, typename store_t, typename y_store_t,
               int nSpin, typename coeff_t>
     class Blas : public TunableGridStrideKernel2D
@@ -62,7 +60,7 @@ namespace quda {
           strcat(aux, y.AuxString());
         }
 
-        apply(*blasStream);
+        apply(device::get_default_stream());
 
         blas::bytes += bytes();
         blas::flops += flops();
@@ -158,7 +156,6 @@ namespace quda {
 
     void init()
     {
-      blasStream = &streams[Nstream-1];
       reducer::init();
     }
 
@@ -166,8 +163,6 @@ namespace quda {
     {
       reducer::destroy();
     }
-
-    qudaStream_t* getStream() { return blasStream; }
 
     void axpbyz(double a, ColorSpinorField &x, double b, ColorSpinorField &y, ColorSpinorField &z)
     {

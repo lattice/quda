@@ -56,9 +56,9 @@ namespace quda {
     count++;
   }
 
-  void forceRecord(std::vector<double> &force, double dt, const char *fname) {
-    qudaDeviceSynchronize();
-    comm_allreduce_max_array(force.data(), 2);
+  void forceRecord(std::vector<double> &force, double dt, const char *fname)
+  {
+    comm_allreduce_max_array(force.data(), 2); // FIXME - this needs to be subsumed into the reduction launch
 
     if (comm_rank()==0) {
       force_stream << fname << "\t" << std::setprecision(5) << force[0] << "\t"
@@ -81,7 +81,7 @@ namespace quda {
       meta(mom),
       action(action)
     {
-      apply(0);
+      apply(device::get_default_stream());
       comm_allreduce(&action);
     }
 
@@ -119,7 +119,7 @@ namespace quda {
       meta(force),
       force_max(2)
     {
-      apply(0);
+      apply(device::get_default_stream());
       if (forceMonitor()) forceRecord(force_max, arg.coeff, fname);
     }
 
@@ -160,7 +160,7 @@ namespace quda {
       U(U),
       force(force)
     {
-      apply(0);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)

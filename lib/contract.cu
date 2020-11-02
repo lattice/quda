@@ -27,8 +27,7 @@ public:
       case QUDA_CONTRACT_TYPE_DR: strcat(aux, "degrand-rossi,"); break;
       default: errorQuda("Unexpected contraction type %d", cType);
       }
-      apply(0);
-      qudaDeviceSynchronize();
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)

@@ -27,6 +27,8 @@ namespace quda {
       strcat(vol, out.VolString());
       strcat(aux, ",");
       strcat(aux, out.AuxString());
+
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream) {
@@ -54,15 +56,13 @@ namespace quda {
     if (v.Precision() == QUDA_HALF_PRECISION) {
 #if QUDA_PRECISION & 2
       ProlongateLaunch<Float, short, fineSpin, fineColor, coarseSpin, coarseColor>
-      prolongator(out, in, v, fine_to_coarse, parity);
-      prolongator.apply(0);
+        prolongator(out, in, v, fine_to_coarse, parity);
 #else
       errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
 #endif
     } else if (v.Precision() == in.Precision()) {
       ProlongateLaunch<Float, Float, fineSpin, fineColor, coarseSpin, coarseColor>
-      prolongator(out, in, v, fine_to_coarse, parity);
-      prolongator.apply(0);
+        prolongator(out, in, v, fine_to_coarse, parity);
     } else {
       errorQuda("Unsupported V precision %d", v.Precision());
     }

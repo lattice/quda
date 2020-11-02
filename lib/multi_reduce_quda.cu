@@ -7,8 +7,6 @@ namespace quda {
 
   namespace blas {
 
-    qudaStream_t* getStream();
-
     template <template <typename ...> class Reducer, typename store_t, typename y_store_t, int nSpin, typename T>
     class MultiReduce : public TunableMultiReduction<1>
     {
@@ -83,7 +81,7 @@ namespace quda {
         }
         if (is_norm) strcat(aux, ",norm");
 
-        apply(*blas::getStream());
+        apply(device::get_default_stream());
 
         blas::bytes += bytes();
         blas::flops += flops();
@@ -397,6 +395,8 @@ namespace quda {
           if (!nested_policy) enableProfileCount();
           setPolicyTuning(true);
         }
+
+        apply(device::get_default_stream());
       }
 
       virtual ~TileSizeTune() { setPolicyTuning(false); }
@@ -526,26 +526,24 @@ namespace quda {
           // reductions, but I'll keep this code here for now
           if (x.size() == 1) {
             TileTuner tile(result, x, y, x, x, coeff_width, hermitian, Anorm, true);
-            tile.apply(0);
           } else if (y.size() == 1) {
             TileTuner tile(result, y, x, y, y, coeff_width, hermitian, Anorm, true);
-            tile.apply(0);
           } else {
 
             { // tune regular inner product
               TileTuner tile(result, x, y, x, x, coeff_width, hermitian, Anorm, true);
-              tile.apply(0);
             }
 
             { // tune transpose inner product
               TileTuner tile(result, y, x, y, y, coeff_width, hermitian, Anorm, true);
-              tile.apply(0);
             }
           }
 
           enableProfileCount();
           setPolicyTuning(true);
         }
+
+        apply(device::get_default_stream());
       }
 
       virtual ~TransposeTune() { setPolicyTuning(false); }
@@ -555,14 +553,12 @@ namespace quda {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
         if (tp.aux.x == 0) {
-          TileTuner tile(result, x, y, x, x, coeff_width, hermitian, Anorm, true);
-          tile.apply(stream);
+          TileTuner(result, x, y, x, x, coeff_width, hermitian, Anorm, true);
         } else if (tp.aux.x == 1) {
           T *result_trans = new T[x.size() * y.size()];
 
           // swap (x<->y and w<-z> when doing transpose calculation)
-          TileTuner tile(result_trans, y, x, y, y, coeff_width, hermitian, Anorm, true);
-          tile.apply(stream);
+          TileTuner(result_trans, y, x, y, y, coeff_width, hermitian, Anorm, true);
 
           // tranpose the result if we are doing the transpose calculation
           const auto xlen = x.size();
@@ -646,11 +642,9 @@ namespace quda {
         delete[] result_trans;
 
       } else if (x[0]->Precision() == y[0]->Precision()) {
-        TransposeTune<multiDot, multiDot, double> trans(result_tmp, x, y, coeff_width, false);
-        trans.apply(0);
+        TransposeTune<multiDot, multiDot, double>(result_tmp, x, y, coeff_width, false);
       } else {
-        TileSizeTune<multiDot, multiDot, double> tile(result_tmp, x, y, x, x, coeff_width, false);
-        tile.apply(0);
+        TileSizeTune<multiDot, multiDot, double>(result_tmp, x, y, x, x, coeff_width, false);
       }
 
       // do a single multi-node reduction only once we have computed all local dot products
@@ -699,11 +693,9 @@ namespace quda {
         delete[] result_trans;
 
       } else if (x[0]->Precision() == y[0]->Precision()) {
-        TransposeTune<multiCdot, multiCdot, Complex> trans(result_tmp, x, y, coeff_width, false);
-        trans.apply(0);
+        TransposeTune<multiCdot, multiCdot, Complex>(result_tmp, x, y, coeff_width, false);
       } else {
-        TileSizeTune<multiCdot, multiCdot, Complex> tile(result_tmp, x, y, x, x, coeff_width, false);
-        tile.apply(0);
+        TileSizeTune<multiCdot, multiCdot, Complex>(result_tmp, x, y, x, x, coeff_width, false);
       }
 
       // do a single multi-node reduction only once we have computed all local dot products
@@ -731,8 +723,7 @@ namespace quda {
       for (unsigned int i = 0; i < x.size()*y.size(); i++) result_tmp[i] = 0.0;
 
       int coeff_width = 0;
-      TileSizeTune<multiCdot, multiCdot, Complex> tile(result_tmp, x, y, x, x, coeff_width, true, false); // last false is b/c L2 norm
-      tile.apply(0);
+      TileSizeTune<multiCdot, multiCdot, Complex>(result_tmp, x, y, x, x, coeff_width, true, false); // last false is b/c L2 norm
 
       // do a single multi-node reduction only once we have computed all local dot products
       const int Nreduce = 2*x.size()*y.size();
@@ -760,8 +751,7 @@ namespace quda {
       for (unsigned int i = 0; i < x.size()*y.size(); i++) result_tmp[i] = 0.0;
 
       int coeff_width = 0;
-      TileSizeTune<multiCdot, multiCdot, Complex> tile(result_tmp, x, y, x, x, coeff_width, true, true); // last true is b/c A norm
-      tile.apply(0);
+      TileSizeTune<multiCdot, multiCdot, Complex>(result_tmp, x, y, x, x, coeff_width, true, true); // last true is b/c A norm
 
       // do a single multi-node reduction only once we have computed all local dot products
       const int Nreduce = 2*x.size()*y.size();
@@ -795,8 +785,7 @@ namespace quda {
 
       int coeff_width = 0;
       // When recursing, only the diagonal tiles will do the copy, the rest just do the outer product
-      TileSizeTune<double2, typename vector<device_reduce_t,2>::type,multiCdotCopy,multiCdot,Complex> tile(result_tmp, x, y, x, y, coeff_width, true);
-      tile.apply(0);
+      TileSizeTune<double2, typename vector<device_reduce_t,2>::type,multiCdotCopy,multiCdot,Complex>(result_tmp, x, y, x, y, coeff_width, true);
 
       // do a single multi-node reduction only once we have computed all local dot products
       const int Nreduce = 2*x.size()*y.size();

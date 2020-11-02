@@ -268,7 +268,7 @@ namespace quda {
   template <typename Arg>
   void copyMom(Arg &arg, GaugeField &out, const GaugeField &in, QudaFieldLocation location) {
     CopyGauge<Arg> momCopier(arg, out, in, location);
-    momCopier.apply(0);
+    momCopier.apply(device::get_default_stream());
   }
 
   template <typename FloatOut, typename FloatIn> struct GaugeCopy {

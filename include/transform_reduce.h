@@ -116,7 +116,7 @@ namespace quda
       strcpy(aux, "batch_size=");
       u32toa(aux + 11, v.size());
       if (location == QUDA_CPU_FIELD_LOCATION) strcat(aux, ",cpu");
-      apply(0);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)

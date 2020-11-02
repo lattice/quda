@@ -41,7 +41,7 @@ namespace quda {
       char aux2[TuneKey::aux_n];
       strcpy(aux2, aux);
       kernel = INTERIOR;
-      apply(0);
+      apply(device::get_default_stream());
 
       for (int i = 3; i >= 0; i--) {
         if (commDimPartitioned(i)) {
@@ -61,7 +61,7 @@ namespace quda {
             strcat(aux, ",displacement=");
             u32toa(tmp, displacement);
             strcat(aux, tmp);
-            apply(0);
+            apply(device::get_default_stream());
           }
         }
       } // i=3,..,0

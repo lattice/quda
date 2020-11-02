@@ -230,7 +230,7 @@ namespace quda {
         using namespace jitify::reflection;
         jitify_error = program->kernel("quda::coarseDslashKernel")
           .instantiate(Type<Float>(),nDim,Ns,Nc,Mc,(int)tp.aux.x,(int)tp.aux.y,dslash,clover,dagger,type,Type<Arg>())
-          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+          .configure(tp.grid,tp.block,tp.shared_bytes,device::get_cuda_stream(stream)).launch(arg);
 #else // !JITIFY
         switch (tp.aux.y) { // dimension gather parallelisation
         case 1:
@@ -338,14 +338,14 @@ namespace quda {
 
         if (type == DSLASH_FULL) {
           DslashCoarse<Float,yFloat,ghostFloat,nDim,coarseSpin,coarseColor,colors_per_thread,true,true,dagger,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
-          dslash.apply(0);
+          dslash.apply(device::get_default_stream());
         } else { errorQuda("Dslash type %d not instantiated", type); }
 
       } else { // plain dslash
 
         if (type == DSLASH_FULL) {
           DslashCoarse<Float,yFloat,ghostFloat,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,dagger,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
-          dslash.apply(0);
+          dslash.apply(device::get_default_stream());
         } else { errorQuda("Dslash type %d not instantiated", type); }
 
       }
@@ -354,7 +354,7 @@ namespace quda {
       if (type == DSLASH_EXTERIOR) errorQuda("Cannot call halo on pure clover kernel");
       if (clover) {
         DslashCoarse<Float,yFloat,ghostFloat,nDim,coarseSpin,coarseColor,colors_per_thread,false,true,dagger,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
-        dslash.apply(0);
+        dslash.apply(device::get_default_stream());
       } else {
         errorQuda("Unsupported dslash=false clover=false");
       }
@@ -485,7 +485,7 @@ namespace quda {
                           pack_destination, halo_location, gdr_send, gdr_recv, halo_precision);
       }
 
-      if (dslash::aux_worker) dslash::aux_worker->apply(0);
+      if (dslash::aux_worker) dslash::aux_worker->apply(device::get_default_stream());
 
       if (precision == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE

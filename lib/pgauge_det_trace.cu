@@ -24,7 +24,7 @@ namespace quda {
       type(type)
     {
       strcat(aux, type == 0 ? ",det" : ",trace");
-      apply(0);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)

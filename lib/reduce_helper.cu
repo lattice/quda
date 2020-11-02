@@ -82,7 +82,7 @@ namespace quda
         tp.grid = dim3(1, 1, 1);
         tp.block = dim3(1, 1, 1);
 
-        qudaLaunchKernel(init_count<count_t>, tp, 0, reduce_count);
+        qudaLaunchKernel(init_count<count_t>, tp, device::get_default_stream(), reduce_count);
       }
 
       cudaEventCreateWithFlags(&reduceEnd, cudaEventDisableTiming);

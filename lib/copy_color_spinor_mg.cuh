@@ -33,7 +33,7 @@ namespace quda {
       Out(Out),
       In(In)
     {
-      apply(0);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)

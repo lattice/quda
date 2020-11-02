@@ -22,7 +22,7 @@ namespace quda {
       arg(lng, u, coeff)
     {
       strcat(aux, comm_dim_partitioned_string());
-      apply(0);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream) {
@@ -50,7 +50,7 @@ namespace quda {
       arg(fat, u, coeff)
     {
       strcat(aux, comm_dim_partitioned_string());
-      apply(0);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream) {
@@ -122,7 +122,7 @@ namespace quda {
       aux_ << ",nu=" << nu << ",dir1=" << dir1 << ",dir2=" << dir2 << ",save=" << save_staple;
       strcat(aux, aux_.str().c_str());
 
-      apply(0);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream) {
@@ -211,8 +211,6 @@ namespace quda {
         } //rho
       } //nu
     }
-
-    qudaDeviceSynchronize();
 
     delete staple;
     delete staple1;

@@ -744,11 +744,8 @@ namespace quda {
        @param[in] c Twisted mass parameter (chiral twist factor, default=0)
       */
     void packGhost(const int nFace, const QudaParity parity, const int dim, const QudaDirection dir, const int dagger,
-                   qudaStream_t *stream, MemoryLocation location[2 * QUDA_MAX_DIM], MemoryLocation location_label,
+                   qudaStream_t stream, MemoryLocation location[2 * QUDA_MAX_DIM], MemoryLocation location_label,
                    bool spin_project, double a = 0, double b = 0, double c = 0);
-
-    void packGhostExtended(const int nFace, const int R[], const QudaParity parity, const int dim,
-                           const QudaDirection dir, const int dagger, qudaStream_t *stream, bool zero_copy = false);
 
     /**
       Initiate the gpu to cpu send of the ghost zone (halo)
@@ -760,7 +757,7 @@ namespace quda {
       @param stream The array of streams to use
       */
     void sendGhost(void *ghost_spinor, const int nFace, const int dim, const QudaDirection dir, const int dagger,
-                   qudaStream_t *stream);
+                   qudaStream_t stream);
 
     /**
       Initiate the cpu to gpu send of the ghost zone (halo)
@@ -772,30 +769,14 @@ namespace quda {
       @param stream The array of streams to use
       */
     void unpackGhost(const void *ghost_spinor, const int nFace, const int dim, const QudaDirection dir,
-                     const int dagger, qudaStream_t *stream);
-
-    /**
-      Initiate the cpu to gpu copy of the extended border region
-      @param ghost_spinor Source of the ghost zone
-      @param parity Parity of the field
-      @param nFace Number of face to send
-      @param dim The lattice dimension we are sending
-      @param dir The direction (QUDA_BACKWARDS or QUDA_FORWARDS)
-      @param dagger Whether the operator is daggered or not
-      @param stream The array of streams to use
-      @param zero_copy Whether we are unpacking from zero_copy memory
-      */
-    void unpackGhostExtended(const void *ghost_spinor, const int nFace, const QudaParity parity, const int dim,
-                             const QudaDirection dir, const int dagger, qudaStream_t *stream, bool zero_copy);
-
-    void streamInit(qudaStream_t *stream_p);
+                     const int dagger, qudaStream_t stream);
 
     /**
        Pack the field halos in preparation for halo exchange, e.g., for Dslash
        @param[in] nFace Depth of faces
        @param[in] parity Field parity
        @param[in] dagger Whether this exchange is for the conjugate operator
-       @param[in] stream CUDA stream index to be used for packing kernel
+       @param[in] stream Stream to be used for packing kernel
        @param[in] location Array of field locations where each halo
        will be sent (Host, Device or Remote)
        @param[in] location_label Consistent label used for labeling
@@ -806,13 +787,19 @@ namespace quda {
        @param[in] b Used for twisted mass (chiral twist factor)
        @param[in] c Used for twisted mass (flavor twist factor)
     */
-    void pack(int nFace, int parity, int dagger, int stream_idx, MemoryLocation location[],
+    void pack(int nFace, int parity, int dagger, const qudaStream_t &stream, MemoryLocation location[],
               MemoryLocation location_label, bool spin_project = true, double a = 0, double b = 0, double c = 0);
 
-    void packExtended(const int nFace, const int R[], const int parity, const int dagger, const int dim,
-                      qudaStream_t *stream_p, const bool zeroCopyPack = false);
-
-    void gather(int nFace, int dagger, int dir, qudaStream_t *stream_p = NULL);
+    /**
+       @brief Copies the ghost to the host from the device, prior to
+       communication.
+       @param[in] nFace Depth of face exchange
+       @param[in] dagger Whether this exchange is for the conjugate operator
+       @param[in] d d=[2*dim+dir], where dim is dimension and dir is
+       the scatter-centric direction (0=backwards,1=forwards)
+       @param[in] stream The stream in which to do the copy
+     */
+    void gather(int nFace, int dagger, int dir, const qudaStream_t &stream);
 
     /**
        @brief Initiate halo communication receive
@@ -820,10 +807,10 @@ namespace quda {
        @param[in] d d=[2*dim+dir], where dim is dimension and dir is
        the scatter-centric direction (0=backwards,1=forwards)
        @param[in] dagger Whether this exchange is for the conjugate operator
-       @param[in] stream CUDA stream to be used (unused)
+       @param[in] stream (presently unused)
        @param[in] gdr Whether we are using GDR on the receive side
     */
-    void recvStart(int nFace, int dir, int dagger = 0, qudaStream_t *stream_p = nullptr, bool gdr = false);
+    void recvStart(int nFace, int dir, int dagger, const qudaStream_t &stream, bool gdr = false);
 
     /**
        @brief Initiate halo communication sending
@@ -831,12 +818,12 @@ namespace quda {
        @param[in] d d=[2*dim+dir], where dim is dimension and dir is
        the scatter-centric direction (0=backwards,1=forwards)
        @param[in] dagger Whether this exchange is for the conjugate operator
-       @param[in] stream CUDA stream that we will post the p2p event
-       synchronization to (if nullptr then stream+d will be used
+       @param[in] stream_idx The stream in which to do the copy.  If
+       -1 is passed then the copy will be issied to the d^th stream
        @param[in] gdr Whether we are using GDR on the send side
        @param[in] remote_write Whether we are writing direct to remote memory (or using copy engines)
     */
-    void sendStart(int nFace, int d, int dagger = 0, qudaStream_t *stream_p = nullptr, bool gdr = false,
+    void sendStart(int nFace, int d, int dagger, const qudaStream_t &stream, bool gdr = false,
                    bool remote_write = false);
 
     /**
@@ -845,11 +832,11 @@ namespace quda {
        @param[in] d d=[2*dim+dir], where dim is dimension and dir is
        the scatter-centric direction (0=backwards,1=forwards)
        @param[in] dagger Whether this exchange is for the conjugate operator
-       @param[in] stream CUDA stream to be used (unused)
+       @param[in] stream (presently unused)
        @param[in] gdr_send Whether we are using GDR on the send side
        @param[in] gdr_recv Whether we are using GDR on the receive side
     */
-    void commsStart(int nFace, int d, int dagger = 0, qudaStream_t *stream_p = nullptr, bool gdr_send = false,
+    void commsStart(int nFace, int d, int dagger, const qudaStream_t &stream, bool gdr_send = false,
                     bool gdr_recv = false);
 
     /**
@@ -858,11 +845,11 @@ namespace quda {
        @param[in] d d=[2*dim+dir], where dim is dimension and dir is
        the scatter-centric direction (0=backwards,1=forwards)
        @param[in] dagger Whether this exchange is for the conjugate operator
-       @param[in] stream CUDA stream to be used (unused)
+       @param[in] stream (presently unused)
        @param[in] gdr_send Whether we are using GDR on the send side
        @param[in] gdr_recv Whether we are using GDR on the receive side
     */
-    int commsQuery(int nFace, int d, int dagger = 0, qudaStream_t *stream_p = nullptr, bool gdr_send = false,
+    int commsQuery(int nFace, int d, int dagger, const qudaStream_t &stream, bool gdr_send = false,
                    bool gdr_recv = false);
 
     /**
@@ -871,17 +858,24 @@ namespace quda {
        @param[in] d d=[2*dim+dir], where dim is dimension and dir is
        the scatter-centric direction (0=backwards,1=forwards)
        @param[in] dagger Whether this exchange is for the conjugate operator
-       @param[in] stream CUDA stream to be used (unused)
+       @param[in] stream (unused)
        @param[in] gdr_send Whether we are using GDR on the send side
        @param[in] gdr_recv Whether we are using GDR on the receive side
     */
-    void commsWait(int nFace, int d, int dagger = 0, qudaStream_t *stream_p = nullptr, bool gdr_send = false,
+    void commsWait(int nFace, int d, int dagger, const qudaStream_t &stream, bool gdr_send = false,
                    bool gdr_recv = false);
 
-    void scatter(int nFace, int dagger, int dir, qudaStream_t *stream_p);
-    void scatter(int nFace, int dagger, int dir);
-
-    void scatterExtended(int nFace, int parity, int dagger, int dir);
+    /**
+       @brief Unpacks the ghost from host to device after
+       communication has finished.
+       @param[in] nFace Depth of face exchange
+       @param[in] dagger Whether this exchange is for the conjugate operator
+       @param[in] d d=[2*dim+dir], where dim is dimension and dir is
+       the scatter-centric direction (0=backwards,1=forwards)
+       @param[in] stream The stream in which to do the copy.  If
+       -1 is passed then the copy will be issied to the d^th stream
+     */
+    void scatter(int nFace, int dagger, int d, const qudaStream_t &stream);
 
     const void* Ghost2() const;
 
@@ -931,7 +925,7 @@ namespace quda {
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
+    void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
   };
 
   // CPU implementation
@@ -1036,8 +1030,6 @@ namespace quda {
 
   void genericPrintVector(const cpuColorSpinorField &a, unsigned int x);
   void genericCudaPrintVector(const cudaColorSpinorField &a, unsigned x);
-
-  void exchangeExtendedGhost(cudaColorSpinorField *spinor, int R[], int parity, qudaStream_t *stream_p);
 
   /**
      @brief Generic ghost packing routine

@@ -29,7 +29,7 @@ namespace quda {
       strcat(aux, ",");
       strcat(aux, coarseColorSpinorField<transferType>(in,out).AuxString());
 
-      apply(0);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream) {

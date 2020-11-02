@@ -2,6 +2,7 @@
 #include <gauge_field.h>
 #include <typeinfo>
 #include <blas_quda.h>
+#include <device.h>
 
 namespace quda {
 
@@ -143,6 +144,7 @@ namespace quda {
       }
 
       extractGaugeGhost(*this, send_d, true, link_dir*nDim); // get the links into contiguous buffers
+      qudaDeviceSynchronize(); // synchronize before issuing mem copies in different streams - could replace with event post and wait
 
       // issue receive preposts and host-to-device copies if needed
       for (int dim=0; dim<nDim; dim++) {
@@ -150,7 +152,7 @@ namespace quda {
 	recvStart(dim, dir); // prepost the receive
 	if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) {
           qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][dim][dir], my_face_dim_dir_d[bufferIndex][dim][dir],
-                          ghost_face_bytes[dim], cudaMemcpyDeviceToHost, streams[2 * dim + dir]);
+                          ghost_face_bytes[dim], cudaMemcpyDeviceToHost, device::get_stream(2 * dim + dir));
         }
       }
 
@@ -160,8 +162,8 @@ namespace quda {
       // if the sending direction is not peer-to-peer then we need to synchronize before we start sending
       for (int dim=0; dim<nDim; dim++) {
 	if (!comm_dim_partitioned(dim)) continue;
-	if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) qudaStreamSynchronize(streams[2*dim+dir]);
-	sendStart(dim, dir, &streams[2*dim+dir]); // start sending
+	if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) qudaStreamSynchronize(device::get_stream(2 * dim + dir));
+	sendStart(dim, dir, device::get_stream(2*dim+dir)); // start sending
       }
 
       // complete communication and issue host-to-device copies if needed
@@ -170,9 +172,11 @@ namespace quda {
 	commsComplete(dim, dir);
 	if (!comm_peer2peer_enabled(1-dir,dim) && !comm_gdr_enabled()) {
           qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][dim][1 - dir], from_face_dim_dir_h[bufferIndex][dim][1 - dir],
-                          ghost_face_bytes[dim], cudaMemcpyHostToDevice, streams[2 * dim + dir]);
+                          ghost_face_bytes[dim], cudaMemcpyHostToDevice, device::get_stream(2 * dim + dir));
         }
       }
+
+      qudaDeviceSynchronize(); // synchronize before issuing kernels / copies in default stream - could replace with event post and wait
 
       // fill in the halos for non-partitioned dimensions
       for (int dim=0; dim<nDim; dim++) {
@@ -198,8 +202,8 @@ namespace quda {
   // This does the opposite of exchangeGhost and sends back the ghost
   // zone to the node from which it came and injects it back into the
   // field
-  void cudaGaugeField::injectGhost(QudaLinkDirection link_direction) {
-
+  void cudaGaugeField::injectGhost(QudaLinkDirection link_direction)
+  {
     if (ghostExchange != QUDA_GHOST_EXCHANGE_PAD) errorQuda("Cannot call exchangeGhost with ghostExchange=%d", ghostExchange);
     if (geometry != QUDA_VECTOR_GEOMETRY && geometry != QUDA_COARSE_GEOMETRY) errorQuda("Invalid geometry=%d", geometry);
     if (link_direction != QUDA_LINK_BACKWARDS) errorQuda("Invalid link_direction = %d", link_direction);
@@ -234,6 +238,7 @@ namespace quda {
       } else { // copy from receive buffer into ghost array
 	for (int dim=0; dim<nDim; dim++) qudaMemcpy(send_d[dim], ghost[dim+link_dir*nDim], ghost_face_bytes[dim], cudaMemcpyDeviceToDevice);
       }
+      qudaDeviceSynchronize(); // need to synchronize before issueing copies in different streams - could replace with event post and wait
 
       // issue receive preposts and host-to-device copies if needed
       for (int dim=0; dim<nDim; dim++) {
@@ -241,7 +246,7 @@ namespace quda {
 	recvStart(dim, dir); // prepost the receive
 	if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) {
           qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][dim][dir], my_face_dim_dir_d[bufferIndex][dim][dir],
-                          ghost_face_bytes[dim], cudaMemcpyDeviceToHost, streams[2 * dim + dir]);
+                          ghost_face_bytes[dim], cudaMemcpyDeviceToHost, device::get_stream(2 * dim + dir));
         }
       }
 
@@ -251,8 +256,8 @@ namespace quda {
       // if the sending direction is not peer-to-peer then we need to synchronize before we start sending
       for (int dim=0; dim<nDim; dim++) {
 	if (!comm_dim_partitioned(dim)) continue;
-	if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) qudaStreamSynchronize(streams[2*dim+dir]);
-	sendStart(dim, dir, &streams[2*dim+dir]); // start sending
+	if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) qudaStreamSynchronize(device::get_stream(2*dim+dir));
+	sendStart(dim, dir, device::get_stream(2*dim+dir)); // start sending
       }
 
       // complete communication and issue host-to-device copies if needed
@@ -261,9 +266,11 @@ namespace quda {
 	commsComplete(dim, dir);
 	if (!comm_peer2peer_enabled(1-dir,dim) && !comm_gdr_enabled()) {
           qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][dim][1 - dir], from_face_dim_dir_h[bufferIndex][dim][1 - dir],
-                          ghost_face_bytes[dim], cudaMemcpyHostToDevice, streams[2 * dim + dir]);
+                          ghost_face_bytes[dim], cudaMemcpyHostToDevice, device::get_stream(2 * dim + dir));
         }
       }
+
+      qudaDeviceSynchronize(); // synchronize before issuing kernel / copies in default stream - could replace with event post and wait
 
       // fill in the halos for non-partitioned dimensions
       for (int dim=0; dim<nDim; dim++) {
@@ -328,7 +335,7 @@ namespace quda {
     }
   }
 
-  void cudaGaugeField::sendStart(int dim, int dir, qudaStream_t *stream_p)
+  void cudaGaugeField::sendStart(int dim, int dir, const qudaStream_t &stream)
   {
     if (!comm_dim_partitioned(dim)) return;
 
@@ -350,17 +357,15 @@ namespace quda {
       void *ghost_dst
         = static_cast<char *>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + ghost_offset[dim][(dir + 1) % 2];
 
-      cudaMemcpyAsync(ghost_dst, my_face_dim_dir_d[bufferIndex][dim][dir],
-		      ghost_face_bytes[dim], cudaMemcpyDeviceToDevice,
-		      stream_p ? *stream_p : 0);
+      qudaMemcpyP2PAsync(ghost_dst, my_face_dim_dir_d[bufferIndex][dim][dir], ghost_face_bytes[dim], stream);
 
       if (dir == 0) {
 	// record the event
-	qudaEventRecord(ipcCopyEvent[bufferIndex][0][dim], stream_p ? *stream_p : 0);
+	qudaEventRecord(ipcCopyEvent[bufferIndex][0][dim], stream);
 	// send to the processor in the -1 direction
 	comm_start(mh_send_p2p_back[bufferIndex][dim]);
       } else {
-	qudaEventRecord(ipcCopyEvent[bufferIndex][1][dim], stream_p ? *stream_p : 0);
+	qudaEventRecord(ipcCopyEvent[bufferIndex][1][dim], stream);
 	// send to the processor in the +1 direction
 	comm_start(mh_send_p2p_fwd[bufferIndex][dim]);
       }
@@ -425,7 +430,7 @@ namespace quda {
 
       // silence cuda-memcheck initcheck errors that arise since we
       // have an oversized ghost buffer when doing the extended exchange
-      qudaMemsetAsync(send_d[dim], 0, 2 * ghost_face_bytes_aligned[dim], 0);
+      qudaMemsetAsync(send_d[dim], 0, 2 * ghost_face_bytes_aligned[dim], device::get_default_stream());
       offset += 2 * ghost_face_bytes_aligned[dim]; // factor of two from fwd/back
     }
 
@@ -436,13 +441,15 @@ namespace quda {
       extractExtendedGaugeGhost(*this, dim, R, send_d, true);
 
       if (comm_dim_partitioned(dim)) {
+        qudaDeviceSynchronize(); // synchronize before issuing mem copies in different streams - could replace with event post and wait
+
 	for (int dir=0; dir<2; dir++) recvStart(dim, dir);
 
 	for (int dir=0; dir<2; dir++) {
 	  // issue host-to-device copies if needed
 	  if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) {
             qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][dim][dir], my_face_dim_dir_d[bufferIndex][dim][dir],
-                            ghost_face_bytes[dim], cudaMemcpyDeviceToHost, streams[dir]);
+                            ghost_face_bytes[dim], cudaMemcpyDeviceToHost, device::get_stream(dir));
           }
         }
 
@@ -450,14 +457,14 @@ namespace quda {
 	if (!comm_peer2peer_enabled(0,dim) || !comm_peer2peer_enabled(1,dim)) qudaDeviceSynchronize();
 
 	// if we pass a stream to sendStart then we must ensure that stream is synchronized
-	for (int dir=0; dir<2; dir++) sendStart(dim, dir, &streams[dir]);
+	for (int dir=0; dir<2; dir++) sendStart(dim, dir, device::get_stream(dir));
 	for (int dir=0; dir<2; dir++) commsComplete(dim, dir);
 
 	for (int dir=0; dir<2; dir++) {
 	  // issue host-to-device copies if needed
 	  if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) {
             qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][dim][dir], from_face_dim_dir_h[bufferIndex][dim][dir],
-                            ghost_face_bytes[dim], cudaMemcpyHostToDevice, streams[dir]);
+                            ghost_face_bytes[dim], cudaMemcpyHostToDevice, device::get_stream(dir));
           }
         }
 

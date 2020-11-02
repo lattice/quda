@@ -73,7 +73,6 @@ namespace quda
       dslash::DslashPolicyTune<decltype(dwf)> policy(
         dwf, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
         in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
-      policy.apply(0);
     }
   };
 

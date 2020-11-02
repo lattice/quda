@@ -95,7 +95,7 @@ namespace quda {
     // first copy body
     if (type == 0 || type == 2) {
       gaugeCopier.set_ghost(0);
-      gaugeCopier.apply(0);
+      gaugeCopier.apply(device::get_default_stream());
     }
 
 #ifdef MULTI_GPU
@@ -103,7 +103,7 @@ namespace quda {
       if (in.Geometry() == QUDA_VECTOR_GEOMETRY || in.Geometry() == QUDA_COARSE_GEOMETRY) {
         // now copy ghost
         gaugeCopier.set_ghost(1);
-        gaugeCopier.apply(0);
+        gaugeCopier.apply(device::get_default_stream());
       } else {
         warningQuda("Cannot copy for %d geometry gauge field", in.Geometry());
       }
@@ -117,7 +117,7 @@ namespace quda {
     if (type == 3) {
       if (in.Geometry() != QUDA_COARSE_GEOMETRY) errorQuda("Cannot request copy type %d on non-coarse link fields", in.Geometry());
       gaugeCopier.set_ghost(2);
-      gaugeCopier.apply(0);
+      gaugeCopier.apply(device::get_default_stream());
     }
 #endif
 

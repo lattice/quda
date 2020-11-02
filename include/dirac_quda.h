@@ -334,7 +334,7 @@ namespace quda {
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
   };
 
   // Full Wilson
@@ -476,7 +476,7 @@ namespace quda {
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
   };
 
   // Even-odd preconditioned clover
@@ -538,7 +538,7 @@ namespace quda {
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
   };
 
   // Full clover with Hasenbusch Twist
@@ -1031,7 +1031,7 @@ public:
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
   };
 
   // Even-odd preconditioned twisted mass with a clover term
@@ -1086,7 +1086,7 @@ public:
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
   };
 
   // Full staggered
@@ -1229,7 +1229,7 @@ public:
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
   };
 
   // Even-odd preconditioned staggered
@@ -1436,7 +1436,7 @@ public:
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
   };
 
   /**
@@ -1492,7 +1492,7 @@ public:
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
   };
 
 

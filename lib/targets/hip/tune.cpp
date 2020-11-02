@@ -772,7 +772,7 @@ namespace quda
           cudaDeviceSynchronize();
           cudaGetLastError(); // clear error counter
           tunable.checkLaunchParam(param);
-          tunable.apply(0); // do initial call in case we need to jit compile for these parameters or if policy tuning
+          tunable.apply(); // do initial call in case we need to jit compile for these parameters or if policy tuning
           if (verbosity >= QUDA_DEBUG_VERBOSE) {
             printfQuda("About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d)\n",
                        param.block.x, param.block.y, param.block.z, param.grid.x, param.grid.y, param.grid.z,
@@ -781,7 +781,7 @@ namespace quda
 
           cudaEventRecord(start, 0);
           for (int i = 0; i < tunable.tuningIter(); i++) {
-            tunable.apply(0); // calls tuneLaunch() again, which simply returns the currently active param
+            tunable.apply(); // calls tuneLaunch() again, which simply returns the currently active param
           }
           cudaEventRecord(end, 0);
           cudaEventSynchronize(end);

@@ -64,7 +64,7 @@ namespace quda {
         using namespace jitify::reflection;
         jitify_error = program->kernel("quda::ComputeStaggeredVUVGPU")
           .instantiate(Type<Float>(),fineColor,coarseSpin,coarseColor,Type<Arg>())
-          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+          .configure(tp.grid,tp.block,tp.shared_bytes,device::get_cuda_stream(stream)).launch(arg);
 #else // not jitify
         qudaLaunchKernel(ComputeStaggeredVUVGPU<Float,fineColor,coarseSpin,coarseColor,Arg>, tp, stream, arg);
 #endif // JITIFY
@@ -151,7 +151,7 @@ namespace quda {
     // it's faster to skip the flip!
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing VUV\n");
-    y.apply(0);
+    y.apply(device::get_default_stream());
 
     if (getVerbosity() >= QUDA_VERBOSE) {
       for (int d = 0; d < nDim; d++) printfQuda("Y2[%d] = %e\n", 4+d, Y_.norm2( 4+d ));

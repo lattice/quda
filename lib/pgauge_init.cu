@@ -19,7 +19,7 @@ namespace quda {
       TunableKernel2D(U, 2),
       U(U)
     {
-      apply(0);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)
@@ -44,7 +44,7 @@ namespace quda {
       rng(rng),
       U(U)
     {
-      apply(0);
+      apply(device::get_default_stream());
       qudaDeviceSynchronize();
       U.exchangeExtendedGhost(U.R(),false);
     }

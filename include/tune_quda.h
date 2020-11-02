@@ -8,6 +8,7 @@
 #include <tune_key.h>
 #include <quda_internal.h>
 #include <device.h>
+#include <target_device.h>
 
 // this file has some workarounds to allow compilation using nvrtc of kernels that include this file
 #ifndef __CUDACC_RTC__
@@ -264,6 +265,7 @@ namespace quda {
     virtual ~Tunable() { }
     virtual TuneKey tuneKey() const = 0;
     virtual void apply(const qudaStream_t &stream) = 0;
+    void apply() { apply(device::get_default_stream()); }
     virtual void preTune() { }
     virtual void postTune() { }
     virtual int tuningIter() const { return 1; }

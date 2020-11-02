@@ -238,7 +238,7 @@ namespace quda {
           FatLinkArg<real, nColor> arg(newOprod, oprod, link, OneLink, FORCE_ONE_LINK);
           arg.threads.z = 4;
           FatLinkForce<decltype(arg)> oneLink(arg, link, 0, 0, FORCE_ONE_LINK);
-          oneLink.apply(0);
+          oneLink.apply(device::get_default_stream());
         }
 
         for (int sig=0; sig<8; sig++) {
@@ -249,7 +249,7 @@ namespace quda {
             //Kernel A: middle link
             FatLinkArg<real, nColor> middleLinkArg(newOprod, Pmu, P3, Qmu, oprod, link, mThreeSt, 2, FORCE_MIDDLE_LINK);
             FatLinkForce<decltype(middleLinkArg)> middleLink(middleLinkArg, link, sig, mu, FORCE_MIDDLE_LINK);
-            middleLink.apply(0);
+            middleLink.apply(device::get_default_stream());
 
             for (int nu=0; nu < 8; nu++) {
               if (nu == sig || nu == opp_dir(sig) || nu == mu || nu == opp_dir(mu)) continue;
@@ -258,7 +258,7 @@ namespace quda {
               //Kernel B
               FatLinkArg<real, nColor> middleLinkArg( newOprod, Pnumu, P5, Qnumu, Pmu, Qmu, link, FiveSt, 1, FORCE_MIDDLE_LINK);
               FatLinkForce<decltype(middleLinkArg)> middleLink(middleLinkArg, link, sig, nu, FORCE_MIDDLE_LINK);
-              middleLink.apply(0);
+              middleLink.apply(device::get_default_stream());
 
               for (int rho = 0; rho < 8; rho++) {
                 if (rho == sig || rho == opp_dir(sig) || rho == mu || rho == opp_dir(mu) || rho == nu || rho == opp_dir(nu)) continue;
@@ -266,14 +266,14 @@ namespace quda {
                 //7-link: middle link and side link
                 FatLinkArg<real, nColor> arg(newOprod, P5, Pnumu, Qnumu, link, SevenSt, FiveSt != 0 ? SevenSt/FiveSt : 0, 1, FORCE_ALL_LINK, true);
                 FatLinkForce<decltype(arg)> all(arg, link, sig, rho, FORCE_ALL_LINK);
-                all.apply(0);
+                all.apply(device::get_default_stream());
 
               }//rho
 
               //5-link: side link
               FatLinkArg<real, nColor> arg(newOprod, P3, P5, Qmu, link, mFiveSt, (ThreeSt != 0 ? FiveSt/ThreeSt : 0), 1, FORCE_SIDE_LINK);
               FatLinkForce<decltype(arg)> side(arg, link, sig, nu, FORCE_SIDE_LINK);
-              side.apply(0);
+              side.apply(device::get_default_stream());
 
             } //nu
 
@@ -281,17 +281,17 @@ namespace quda {
             if (Lepage != 0.) {
               FatLinkArg<real, nColor> middleLinkArg(newOprod, P5, Pmu, Qmu, link, Lepage, 2, FORCE_LEPAGE_MIDDLE_LINK);
               FatLinkForce<decltype(middleLinkArg)> middleLink(middleLinkArg, link, sig, mu, FORCE_LEPAGE_MIDDLE_LINK);
-              middleLink.apply(0);
+              middleLink.apply(device::get_default_stream());
 
               FatLinkArg<real, nColor> arg(newOprod, P3, P5, Qmu, link, mLepage, (ThreeSt != 0 ? Lepage/ThreeSt : 0), 2, FORCE_SIDE_LINK);
               FatLinkForce<decltype(arg)> side(arg, link, sig, mu, FORCE_SIDE_LINK);
-              side.apply(0);
+              side.apply(device::get_default_stream());
             } // Lepage != 0.0
 
             // 3-link side link
             FatLinkArg<real, nColor> arg(newOprod, P3, link, ThreeSt, 1, FORCE_SIDE_LINK_SHORT);
             FatLinkForce<decltype(arg)> side(arg, P3, sig, mu, FORCE_SIDE_LINK_SHORT);
-            side.apply(0);
+            side.apply(device::get_default_stream());
           }//mu
         }//sig
       }
@@ -318,7 +318,6 @@ namespace quda {
 
       QudaPrecision precision = checkPrecision(oprod, link, newOprod);
       instantiate<HisqStaplesForce, ReconstructNone>(*Pmu, *P3, *P5, *Pnumu, *Qmu, *Qnumu, newOprod, oprod, link, path_coeff_array);
-      qudaDeviceSynchronize();
 
       delete Pmu;
       delete P3;
@@ -348,7 +347,7 @@ namespace quda {
       {
         arg.sig = sig;
         arg.mu = mu;
-        apply(0);
+        apply(device::get_default_stream());
       }
 
       void apply(const qudaStream_t &stream) {
@@ -414,7 +413,6 @@ namespace quda {
       {
         LongLinkArg<real, nColor, recon> arg(newOprod, link, oldOprod, coeff);
         HisqForce<decltype(arg)> longLink(arg, link, 0, 0, FORCE_LONG_LINK);
-        qudaDeviceSynchronize();
       }
     };
 
@@ -436,7 +434,6 @@ namespace quda {
       {
         CompleteForceArg<real, nColor, recon> arg(force, link);
         HisqForce<decltype(arg)> completeForce(arg, link, 0, 0, FORCE_COMPLETE);
-        qudaDeviceSynchronize();
       }
     };
 

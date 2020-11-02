@@ -162,7 +162,6 @@ namespace quda
         dslash::DslashPolicyTune<decltype(laplace)> policy(
           laplace, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
           in.GhostFaceCB(), profile);
-        policy.apply(0);
 #else
         errorQuda("nSpin=1 Laplace operator required staggered dslash to be enabled");
 #endif
@@ -176,7 +175,6 @@ namespace quda
         dslash::DslashPolicyTune<decltype(laplace)> policy(
           laplace, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
           in.GhostFaceCB(), profile);
-        policy.apply(0);
 #else
         errorQuda("nSpin=4 Laplace operator required wilson dslash to be enabled");
 #endif

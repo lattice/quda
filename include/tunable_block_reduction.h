@@ -70,7 +70,7 @@ namespace quda {
 
       jitify_error = program->kernel("quda::BlockReductionKernel2D")
         .instantiate({reflect((int)tp.block.x), Transformer_naked, reflect<Arg>()})
-        .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+        .configure(tp.grid,tp.block,tp.shared_bytes,device::get_cuda_stream(stream)).launch(arg);
 #else
       launch<Block::block.size() - 1, Block, Transformer>(arg, tp, stream);
 #endif

@@ -46,11 +46,15 @@ namespace quda {
   namespace dslash {
     int it = 0;
 
+    static constexpr int nDim = 4;
+    static constexpr int nDir = 2;
+    static constexpr int nStream = nDim * nDir + 1;
+
     cudaEvent_t packEnd[2];
-    cudaEvent_t gatherStart[Nstream];
-    cudaEvent_t gatherEnd[Nstream];
-    cudaEvent_t scatterStart[Nstream];
-    cudaEvent_t scatterEnd[Nstream];
+    cudaEvent_t gatherStart[nStream];
+    cudaEvent_t gatherEnd[nStream];
+    cudaEvent_t scatterStart[nStream];
+    cudaEvent_t scatterEnd[nStream];
     cudaEvent_t dslashStart[2];
 
     // these variables are used for benchmarking the dslash components in isolation
@@ -85,7 +89,7 @@ namespace quda {
   {
     using namespace dslash;
     // add cudaEventDisableTiming for lower sync overhead
-    for (int i=0; i<Nstream; i++) {
+    for (int i=0; i<nStream; i++) {
       cudaEventCreateWithFlags(&gatherStart[i], cudaEventDisableTiming);
       cudaEventCreateWithFlags(&gatherEnd[i], cudaEventDisableTiming);
       cudaEventCreateWithFlags(&scatterStart[i], cudaEventDisableTiming);
@@ -126,7 +130,7 @@ namespace quda {
   {
     using namespace dslash;
 
-    for (int i=0; i<Nstream; i++) {
+    for (int i=0; i<nStream; i++) {
       cudaEventDestroy(gatherStart[i]);
       cudaEventDestroy(gatherEnd[i]);
       cudaEventDestroy(scatterStart[i]);
@@ -154,7 +158,7 @@ namespace quda {
       in(in),
       d(d)
     {
-      apply(streams[Nstream-1]);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream) {
@@ -200,7 +204,7 @@ namespace quda {
       type(type)
     {
       if (d != 4) errorQuda("Unexpected d=%d", d);
-      apply(streams[Nstream-1]);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)
@@ -248,7 +252,7 @@ namespace quda {
     {
       if (in.Nspin() != 4 || out.Nspin() != 4) errorQuda("Unsupported nSpin=%d %d", out.Nspin(), in.Nspin());
       if (!inverse) errorQuda("Unsupported direct application");
-      apply(streams[Nstream-1]);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)
@@ -303,7 +307,7 @@ namespace quda {
     {
       if (in.Nspin() != 4 || out.Nspin() != 4) errorQuda("Unsupported nSpin=%d %d", out.Nspin(), in.Nspin());
       strcat(aux, inverse ? ",inverse" : ",direct");
-      apply(streams[Nstream-1]);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)

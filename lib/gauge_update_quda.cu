@@ -34,7 +34,7 @@ namespace quda {
     {
       if (conj_mom) strcat(aux, ",conj_mom");
       if (exact) strcat(aux, ",exact");
-      apply(0);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)

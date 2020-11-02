@@ -25,7 +25,7 @@ namespace quda {
       In(In)
     {
       strcat(aux, out.AuxString());
-      apply(0);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)

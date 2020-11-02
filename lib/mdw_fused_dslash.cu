@@ -656,31 +656,31 @@ namespace quda
           FusedDslashArg<storage_type, recon, 4> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
                                                      halo_shift, type);
           FusedDslash<decltype(arg)> dslash(arg, in);
-          dslash.apply(streams[Nstream - 1]);
+          dslash.apply(device::get_default_stream());
         } break;
         case 8: {
           FusedDslashArg<storage_type, recon, 8> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
                                                      halo_shift, type);
           FusedDslash<decltype(arg)> dslash(arg, in);
-          dslash.apply(streams[Nstream - 1]);
+          dslash.apply(device::get_default_stream());
         } break;
         case 12: {
           FusedDslashArg<storage_type, recon, 12> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
                                                       halo_shift, type);
           FusedDslash<decltype(arg)> dslash(arg, in);
-          dslash.apply(streams[Nstream - 1]);
+          dslash.apply(device::get_default_stream());
         } break;
         case 16: {
           FusedDslashArg<storage_type, recon, 16> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
                                                       halo_shift, type);
           FusedDslash<decltype(arg)> dslash(arg, in);
-          dslash.apply(streams[Nstream - 1]);
+          dslash.apply(device::get_default_stream());
         } break;
         case 20: {
           FusedDslashArg<storage_type, recon, 20> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
                                                       halo_shift, type);
           FusedDslash<decltype(arg)> dslash(arg, in);
-          dslash.apply(streams[Nstream - 1]);
+          dslash.apply(device::get_default_stream());
         } break;
         default: errorQuda("Ls = %d is NOT supported.\n", in.X(4));
         }

@@ -104,7 +104,7 @@ namespace quda {
       in(in),
       fails(fails)
     {
-      apply(0);
+      apply(device::get_default_stream());
       qudaDeviceSynchronize(); // need to synchronize to ensure failure write has completed
     }
 
@@ -152,7 +152,7 @@ namespace quda {
       tol(tol),
       fails(fails)
     {
-      apply(0);
+      apply(device::get_default_stream());
       qudaDeviceSynchronize();
     }
 

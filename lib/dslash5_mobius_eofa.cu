@@ -122,7 +122,7 @@ namespace quda
         default: errorQuda("Unknown Dslash5Type %d", type);
         }
 
-        apply(streams[Nstream - 1]);
+        apply(device::get_default_stream());
       }
 
       template <bool pm, bool dagger, bool xpay, Dslash5Type type> using Arg = Dslash5Arg<store_t, nColor, pm, dagger, xpay, type>;

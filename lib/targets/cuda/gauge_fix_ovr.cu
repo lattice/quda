@@ -491,7 +491,7 @@ public:
         tp.grid = dim3((faceVolume[dir] + tp.block.x - 1) / tp.block.x,1,1);
         for (int oddbit = 0; oddbit < 2; oddbit++) {
           auto faceindices = borderpoints[oddbit] + start;
-          qudaLaunchKernel(ComputeBorderPointsActiveFaceIndex, tp, (qudaStream_t)0, arg, faceindices, faceVolume[dir], dir, oddbit);
+          qudaLaunchKernel(ComputeBorderPointsActiveFaceIndex, tp, device::get_default_stream(), arg, faceindices, faceVolume[dir], dir, oddbit);
         }
         start += faceVolume[dir];
       }
@@ -587,7 +587,6 @@ public:
     void *sendg_d[4];
     void *recvg_d[4];
     void *hostbuffer_h[4];
-    qudaStream_t GFStream[9];
     size_t offset[4];
     size_t bytes[4];
     size_t faceVolume[4];
@@ -623,13 +622,10 @@ public:
         recv_d[d] = device_malloc(bytes[d]);
         sendg_d[d] = device_malloc(bytes[d]);
         recvg_d[d] = device_malloc(bytes[d]);
-        cudaStreamCreate(&GFStream[d]);
-        cudaStreamCreate(&GFStream[4 + d]);
         hostbuffer_h[d] = (void*)pinned_malloc(4 * bytes[d]);
         tp[d].block = make_uint3(128, 1, 1);
         tp[d].grid = make_uint3((faceVolumeCB[d] + tp[d].block.x - 1) / tp[d].block.x, 1, 1);
       }
-      cudaStreamCreate(&GFStream[8]);
       for ( int d = 0; d < 4; d++ ) {
         if ( !commDimPartitioned(d)) continue;
         recv[d] = hostbuffer_h[d];
@@ -648,7 +644,7 @@ public:
     GaugeFixInteriorPointsArg<Float, Gauge> argInt(dataOr, data, relax_boost);
     GaugeFixInteriorPoints<Float,Gauge, gauge_dir> gfixIntPoints(argInt, data);
 
-    GaugeFixQuality.apply(0);
+    GaugeFixQuality.apply(device::get_default_stream());
     flop += (double)GaugeFixQuality.flops();
     byte += (double)GaugeFixQuality.bytes();
     double action0 = argQ.getAction();
@@ -668,13 +664,13 @@ public:
       for ( int p = 0; p < 2; p++ ) {
         if ( !comm_partitioned() ) {
           gaugeFix.setParity(p);
-          gaugeFix.apply(0);
+          gaugeFix.apply(device::get_default_stream());
           flop += (double)gaugeFix.flops();
           byte += (double)gaugeFix.bytes();
         } else {
           gfixIntPoints.setParity(p);
           gfixBorderPoints.setParity(p); //compute border points
-          gfixBorderPoints.apply(0);
+          gfixBorderPoints.apply(device::get_default_stream());
           flop += (double)gfixBorderPoints.flops();
           byte += (double)gfixBorderPoints.bytes();
           flop += (double)gfixIntPoints.flops();
@@ -689,59 +685,59 @@ public:
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
             //extract top face
-            qudaLaunchKernel(Kernel_UnPackTop<Float, true, decltype(dataexarg)>, tp[d], GFStream[d],
+            qudaLaunchKernel(Kernel_UnPackTop<Float, true, decltype(dataexarg)>, tp[d], device::get_stream(d),
                              faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(send_d[d]), p, d, d);
             //extract bottom ghost
-            qudaLaunchKernel(Kernel_UnPackGhost<Float, true, decltype(dataexarg)>, tp[d], GFStream[4 + d],
+            qudaLaunchKernel(Kernel_UnPackGhost<Float, true, decltype(dataexarg)>, tp[d], device::get_stream(4 + d),
                              faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(sendg_d[d]), 1 - p, d, d);
           }
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
-            qudaMemcpyAsync(send[d], send_d[d], bytes[d], cudaMemcpyDeviceToHost, GFStream[d]);
+            qudaMemcpyAsync(send[d], send_d[d], bytes[d], cudaMemcpyDeviceToHost, device::get_stream(d));
           }
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
-            qudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], cudaMemcpyDeviceToHost, GFStream[4 + d]);
+            qudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], cudaMemcpyDeviceToHost, device::get_stream(4 + d));
           }
           //compute interior points
-          gfixIntPoints.apply(GFStream[8]);
+          gfixIntPoints.apply(device::get_stream(8));
 
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
-            qudaStreamSynchronize(GFStream[d]);
+            qudaStreamSynchronize(device::get_stream(d));
             comm_start(mh_send_fwd[d]);
-            qudaStreamSynchronize(GFStream[4 + d]);
+            qudaStreamSynchronize(device::get_stream(4 + d));
             comm_start(mh_send_back[d]);
           }
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
             comm_wait(mh_recv_back[d]);
-            qudaMemcpyAsync(recv_d[d], recv[d], bytes[d], cudaMemcpyHostToDevice, GFStream[d]);
+            qudaMemcpyAsync(recv_d[d], recv[d], bytes[d], cudaMemcpyHostToDevice, device::get_stream(d));
           }
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
             comm_wait(mh_recv_fwd[d]);
-            qudaMemcpyAsync(recvg_d[d], recvg[d], bytes[d], cudaMemcpyHostToDevice, GFStream[4 + d]);
+            qudaMemcpyAsync(recvg_d[d], recvg[d], bytes[d], cudaMemcpyHostToDevice, device::get_stream(4 + d));
           }
 
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
-            qudaLaunchKernel(Kernel_UnPackGhost<Float, false, decltype(dataexarg)>, tp[d], GFStream[d],
+            qudaLaunchKernel(Kernel_UnPackGhost<Float, false, decltype(dataexarg)>, tp[d], device::get_stream(d),
                              faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recv_d[d]), p, d, d);
           }
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
-            qudaLaunchKernel(Kernel_UnPackTop<Float, false, decltype(dataexarg)>, tp[d], GFStream[4 + d],
+            qudaLaunchKernel(Kernel_UnPackTop<Float, false, decltype(dataexarg)>, tp[d], device::get_stream(4 + d),
                              faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recvg_d[d]), 1 - p, d, d);
           }
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
             comm_wait(mh_send_back[d]);
             comm_wait(mh_send_fwd[d]);
-            qudaStreamSynchronize(GFStream[d]);
-            qudaStreamSynchronize(GFStream[4 + d]);
+            qudaStreamSynchronize(device::get_stream(d));
+            qudaStreamSynchronize(device::get_stream(4 + d));
           }
-          qudaStreamSynchronize(GFStream[8]);
+          qudaStreamSynchronize(device::get_stream(8));
         }
       }
       if ((iter % reunit_interval) == (reunit_interval - 1)) {
@@ -752,7 +748,7 @@ public:
         flop += 4588.0 * data.X()[0]*data.X()[1]*data.X()[2]*data.X()[3];
         byte += 8.0 * data.X()[0]*data.X()[1]*data.X()[2]*data.X()[3] * dataOr.Bytes();
       }
-      GaugeFixQuality.apply(0);
+      GaugeFixQuality.apply(device::get_default_stream());
       flop += (double)GaugeFixQuality.flops();
       byte += (double)GaugeFixQuality.bytes();
       double action = argQ.getAction();
@@ -776,7 +772,7 @@ public:
       byte += 8.0 * data.X()[0]*data.X()[1]*data.X()[2]*data.X()[3] * dataOr.Bytes();
     }
     if ((iter % verbose_interval) != 0 ) {
-      GaugeFixQuality.apply(0);
+      GaugeFixQuality.apply(device::get_default_stream());
       flop += (double)GaugeFixQuality.flops();
       byte += (double)GaugeFixQuality.bytes();
       double action = argQ.getAction();
@@ -797,12 +793,9 @@ public:
           device_free(recv_d[d]);
           device_free(sendg_d[d]);
           device_free(recvg_d[d]);
-          cudaStreamDestroy(GFStream[d]);
-          cudaStreamDestroy(GFStream[4 + d]);
           host_free(hostbuffer_h[d]);
         }
       }
-      cudaStreamDestroy(GFStream[8]);
     }
 
     qudaDeviceSynchronize();

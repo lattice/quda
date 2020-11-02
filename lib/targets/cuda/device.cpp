@@ -12,7 +12,8 @@
 #endif
 
 static cudaDeviceProp deviceProp;
-qudaStream_t *streams;
+static cudaStream_t *streams;
+static const int Nstream = 9;
 
 namespace quda
 {
@@ -118,7 +119,7 @@ namespace quda
 
     void create_context()
     {
-      streams = new qudaStream_t[Nstream];
+      streams = new cudaStream_t[Nstream];
 
       int greatestPriority;
       int leastPriority;
@@ -145,6 +146,35 @@ namespace quda
         // end this CUDA context
         cudaDeviceReset();
       }
+    }
+
+    cudaStream_t get_cuda_stream(const qudaStream_t &stream)
+    {
+      return streams[stream.idx];
+    }
+
+    qudaStream_t get_stream(unsigned int i)
+    {
+      if (i > Nstream) errorQuda("Invalid stream index %u", i);
+      qudaStream_t stream;
+      stream.idx = i;
+      return stream;
+      //return qudaStream_t(i);
+      // return streams[i];
+    }
+
+    qudaStream_t get_default_stream()
+    {
+      qudaStream_t stream;
+      stream.idx = Nstream - 1;
+      return stream;
+      //return qudaStream_t(Nstream - 1);
+      //return streams[Nstream - 1];
+    }
+
+    unsigned int get_default_stream_idx()
+    {
+      return Nstream - 1;
     }
 
     bool managed_memory_supported()

@@ -23,8 +23,7 @@ namespace quda {
       alpha(static_cast<Float>(alpha))
     {
       strcat(aux, comm_dim_partitioned_string());
-      apply(0);
-      qudaDeviceSynchronize();
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)

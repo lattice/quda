@@ -45,7 +45,7 @@ namespace quda
         using namespace jitify::reflection;
         error = program->kernel("quda::CalculateYhatGPU")
                   .instantiate(compute_max_only, Type<Arg>())
-                  .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+                  .configure(tp.grid, tp.block, tp.shared_bytes, device::get_cuda_stream(stream))
                   .launch(arg);
       }
 #else
@@ -140,7 +140,7 @@ namespace quda
 
         constexpr bool compute_max_only_dummy = true;
         constexpr bool query_max = true;
-        int max = mma::template launch_yhat_kernel<compute_max_only_dummy, query_max>(arg, 1, param, 0);
+        int max = mma::template launch_yhat_kernel<compute_max_only_dummy, query_max>(arg, 1, param, device::get_default_stream());
         if (param.aux.x < max) {
           param.aux.x++;
           return true;
@@ -281,7 +281,7 @@ namespace quda
         CalculateYhat<location, yHatArg> yHat(arg, Y, use_mma);
         if (Yhat.Precision() == QUDA_HALF_PRECISION || Yhat.Precision() == QUDA_QUARTER_PRECISION) {
           yHat.setComputeMaxOnly(true);
-          yHat.apply(0);
+          yHat.apply(device::get_default_stream());
 
           double max_h_double = *arg.max_h;
           comm_allreduce_max(&max_h_double);
@@ -293,7 +293,7 @@ namespace quda
           arg.Yhat.resetScale(*arg.max_h);
         }
         yHat.setComputeMaxOnly(false);
-        yHat.apply(0);
+        yHat.apply(device::get_default_stream());
 
         if (&Y != Y_aos) { delete Y_aos; }
 
@@ -322,7 +322,7 @@ namespace quda
         CalculateYhat<location, yHatArg> yHat(arg, Y, use_mma);
         if (Yhat.Precision() == QUDA_HALF_PRECISION || Yhat.Precision() == QUDA_QUARTER_PRECISION) {
           yHat.setComputeMaxOnly(true);
-          yHat.apply(0);
+          yHat.apply(device::get_default_stream());
 
           double max_h_double = *arg.max_h;
           comm_allreduce_max(&max_h_double);
@@ -334,7 +334,7 @@ namespace quda
           arg.Yhat.resetScale(*arg.max_h);
         }
         yHat.setComputeMaxOnly(false);
-        yHat.apply(0);
+        yHat.apply(device::get_default_stream());
       }
 
       if (getVerbosity() >= QUDA_VERBOSE)

@@ -20,7 +20,7 @@ namespace quda {
       clover(clover),
       coeff(static_cast<Float>(coeff))
     {
-      apply(0);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream){

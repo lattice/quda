@@ -28,7 +28,7 @@ namespace quda {
         else printfQuda("Creating Gaussian distrbuted Lie algebra field\n");
       }
       strcat(aux, group ? ",lie_group" : "lie_algebra");
-      apply(0);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)

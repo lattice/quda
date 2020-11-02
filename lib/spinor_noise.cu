@@ -19,7 +19,7 @@ namespace quda {
       type(type)
     {
       strcat(aux, type == QUDA_NOISE_GAUSS ? ",gauss" : ",uniform");
-      apply(0);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream) {

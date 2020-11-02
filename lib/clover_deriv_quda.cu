@@ -46,7 +46,7 @@ namespace quda {
 	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
 	  CloverDerivArg<Float,F,G,O> arg(force, gauge, oprod, coeff, parity);
 	  DerivativeClover<decltype(arg)> deriv(arg, gauge);
-	  deriv.apply(0);
+	  deriv.apply(device::get_default_stream());
 	} else {
 	  errorQuda("Reconstruction type %d not supported",gauge.Reconstruct());
 	}
@@ -56,8 +56,6 @@ namespace quda {
     } else {
       errorQuda("Force order %d not supported", force.Order());
     } // force / oprod order
-
-    qudaDeviceSynchronize();
   }
 
   void cloverDerivative(GaugeField &force, GaugeField &gauge, GaugeField &oprod, double coeff, QudaParity parity)

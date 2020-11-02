@@ -115,7 +115,7 @@ namespace quda
       default: errorQuda("Unexpected Dslash5Type %d", type);
       }
 
-      apply(streams[Nstream - 1]);
+      apply(device::get_default_stream());
     }
 
     template <bool dagger, bool xpay, Dslash5Type type> using Arg = Dslash5Arg<Float, nColor, dagger, xpay, type>;

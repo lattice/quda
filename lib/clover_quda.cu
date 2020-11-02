@@ -21,8 +21,7 @@ namespace quda {
       meta(f)
     {
       checkNative(clover, f);
-      apply(0);
-      qudaDeviceSynchronize();
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)

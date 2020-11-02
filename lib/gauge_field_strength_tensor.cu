@@ -19,8 +19,7 @@ namespace quda
       u(u)
     {
       strcat(aux, comm_dim_partitioned_string());
-      apply(0);
-      qudaDeviceSynchronize();
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)

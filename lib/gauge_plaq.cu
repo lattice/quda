@@ -6,7 +6,7 @@
 namespace quda {
 
   template<typename Float, int nColor, QudaReconstructType recon>
-  class GaugePlaq : TunableReduction2D<> {
+  class GaugePlaq : public TunableReduction2D<> {
     const GaugeField &u;
     double2 &plq;
 
@@ -16,7 +16,7 @@ namespace quda {
       u(u),
       plq(plq)
     {
-      apply(0);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)

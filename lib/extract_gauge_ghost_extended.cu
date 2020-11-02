@@ -28,7 +28,7 @@ namespace quda {
       strcat(aux, extract ? ",extract" : ",inject");
       strcat(aux, ",dim=");
       u32toa(aux + strlen(aux) - 1, dim);
-      apply(0);
+      apply(device::get_default_stream());
     }
 
     template <int dim, bool extract> void Launch(const qudaStream_t &stream)

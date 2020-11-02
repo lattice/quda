@@ -24,7 +24,7 @@ namespace quda
       density(density)
     {
       if (!Fmunu.isNative()) errorQuda("Topological charge only supported on native ordered fields");
-      apply(0);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)
