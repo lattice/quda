@@ -134,7 +134,7 @@ namespace quda {
       ghost_face_bytes[i] = ghostFace[i] * geometry_comms * nInternal * ghost_precision;
       ghost_face_bytes_aligned[i] = ghost_face_bytes[i];
 
-      ghost_offset[i][0] = (i == 0) ? 0 : ghost_offset[i-1][1] + ghost_face_bytes_aligned[i-1];
+      ghost_offset[i][0] = (i == 0) ? 0 : ghost_offset[i - 1][1] + ghost_face_bytes_aligned[i - 1];
       ghost_offset[i][1] = (bidir ? ghost_offset[i][0] + ghost_face_bytes_aligned[i] : ghost_offset[i][0]);
 
       ghost_bytes += (bidir ? 2 : 1) * ghost_face_bytes_aligned[i]; // factor of two from direction
