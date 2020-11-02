@@ -297,7 +297,6 @@ namespace quda
       for (int d = 0; d < 4; d++) {
         commDim[d] = (comm_override[d] == 0) ? 0 : comm_dim_partitioned(d);
       }
-      // printfQuda("commDim = {%d, %d, %d, %d}.\n", commDim[0], commDim[1], commDim[2], commDim[3]);
 
       if (in.Location() == QUDA_CUDA_FIELD_LOCATION) {
         // create comms buffers - need to do this before we grab the dslash constants
