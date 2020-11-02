@@ -1,4 +1,5 @@
 #include <typeinfo>
+#include <quda_api.h>
 #include <gauge_field.h>
 #include <blas_lapack.h>
 #include <blas_quda.h>
@@ -7,7 +8,13 @@
 #include <jitify_helper.cuh>
 #include <kernels/coarse_op_preconditioned.cuh>
 
+#ifdef QUDA_TARGET_CUDA
 #include <coarse_op_preconditioned_mma_launch.h>
+#endif
+
+#ifndef JIFTFY
+using CUresult = bool;
+#endif
 
 namespace quda
 {
@@ -50,11 +57,15 @@ namespace quda
       }
 #else
       if (use_mma) {
+#if defined(QUDA_TARGET_CUDA)
         if (compute_max_only) {
           mma::launch_yhat_kernel<true>(arg, arg.Y.VolumeCB(), tp, stream);
         } else {
           mma::launch_yhat_kernel<false>(arg, arg.Y.VolumeCB(), tp, stream);
         }
+#else 
+	errorQuda("MMA Kernels can only be used in CUDA Builds, not this one");
+#endif
       } else {
         if (compute_max_only) {
           qudaLaunchKernel(CalculateYhatGPU<true, Arg>, tp, stream, arg);
@@ -137,7 +148,7 @@ namespace quda
 
     bool advanceTuneParam(TuneParam &param) const {
       if (use_mma) {
-
+#if defined(QUDA_TARGET_CUDA)
         constexpr bool compute_max_only_dummy = true;
         constexpr bool query_max = true;
         int max = mma::template launch_yhat_kernel<compute_max_only_dummy, query_max>(arg, 1, param, 0);
@@ -146,7 +157,10 @@ namespace quda
           return true;
         }
         return false;
-
+#else
+	errorQuda("MMA Kernels can only be used in CUDA Target");
+	return false;
+#endif
       } else {
 
         if (meta.Location() == QUDA_CUDA_FIELD_LOCATION && meta.MemType() == QUDA_MEMORY_DEVICE)

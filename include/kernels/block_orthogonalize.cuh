@@ -1,3 +1,16 @@
+#include "quda_define.h"
+#ifdef QUDA_TARGET_HIP
+#ifndef _HIP_DEVICE_COMPILE_
+inline double
+rsqrt(double x) { 
+  return 1.0/x;
+}
+#else
+#include <hip/math_functions.h>
+#endif
+
+#endif
+
 #include <multigrid_helper.cuh>
 #include <fast_intdiv.h>
 

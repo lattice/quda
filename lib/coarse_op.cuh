@@ -1,11 +1,19 @@
 #pragma once
-
+#include <quda_define.h>
 #include <tune_quda.h>
+
+#if defined(QUDA_TARGET_CUDA)
 #include <jitify_helper.cuh>
+#else
+using CUresult=bool;
+#endif
+
 #include <kernels/coarse_op_kernel.cuh>
 #include <uint_to_char.h>
 
+#if defined(QUDA_TARGET_CUDA)
 #include <coarse_op_mma_launch.h>
+#endif
 
 namespace quda {
 
@@ -149,11 +157,14 @@ namespace quda {
       using namespace jitify::reflection;
 #endif
       if (type == COMPUTE_UV) {
+
+#ifdef CUDA_TARGET_CUDA
         if (use_mma) {
 
           mma::launch_compute_uv_kernel<from_coarse>(tp, arg, arg.fineVolumeCB, stream);
 
         } else {
+#endif
 
           if (arg.dir != QUDA_BACKWARDS && arg.dir != QUDA_FORWARDS) errorQuda("Undefined direction %d", arg.dir);
 #ifdef JITIFY
@@ -173,7 +184,9 @@ namespace quda {
           else if (arg.dim==3) qudaLaunchKernel(ComputeUVGPU<from_coarse,Float,3,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
         }
 #endif
+#ifdef QUDA_TARGET_CUDA
         }
+#endif
       } else if (type == COMPUTE_AV) {
 
         if (from_coarse) errorQuda("ComputeAV should only be called from the fine grid");
@@ -273,12 +286,13 @@ namespace quda {
 
       } else if (type == COMPUTE_VUV) {
 
+#ifdef CUDA_TARGET_CUDA
         if (use_mma) {
 
           mma::launch_compute_vuv_kernel<from_coarse>(tp, arg, arg.fineVolumeCB, stream);
 
         } else {
-
+#endif
           // need to resize the grid since we don't tune over the entire coarseColor dimension
           // factor of two comes from parity onto different blocks (e.g. in the grid)
           tp.grid.y = (2 * arg.vuvTile.M_tiles + tp.block.y - 1) / tp.block.y;
@@ -363,7 +377,9 @@ namespace quda {
           tp.grid.x *= tp.aux.x;
         }
 
+#ifdef CUDA_TARGET_CUDA
         } // if use_mma
+#endif
 
       } else if (type == COMPUTE_COARSE_CLOVER) {
 
@@ -584,7 +600,6 @@ namespace quda {
                GaugeField &X_atomic, bool use_mma) :
       TunableVectorYZ(2, 1),
       arg(arg),
-      type(COMPUTE_INVALID),
       meta(meta),
       Y(Y),
       X(X),
@@ -592,6 +607,7 @@ namespace quda {
       X_atomic(X_atomic),
       dim(0),
       dir(QUDA_BACKWARDS),
+      type(COMPUTE_INVALID),
       use_mma(use_mma)
     {
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
@@ -717,7 +733,7 @@ namespace quda {
     }
 
     bool advanceTuneParam(TuneParam &param) const {
-
+#ifdef CUDA_TARGET_CUDA
       if (use_mma && (type == COMPUTE_UV || type == COMPUTE_VUV)) {
         constexpr bool query_max = true;
         int max;
@@ -734,7 +750,7 @@ namespace quda {
           return false;
         }
       }
-
+#endif
       // only do autotuning if we have device fields
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION && Y.MemType() == QUDA_MEMORY_DEVICE) return Tunable::advanceTuneParam(param);
       else return false;

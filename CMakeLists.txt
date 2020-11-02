@@ -326,7 +326,7 @@ set(CMAKE_CXX_FLAGS_DEVEL
     "-g -O3 -Wall"
     CACHE STRING "Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_CXX_FLAGS_STRICT
-    "-O3 -Wall -Werror"
+    "-O3 -Wall -Werror -Wno-error=unused-variable"
     CACHE STRING "Flags used by the C++ compiler during strict jenkins builds.")
 set(CMAKE_CXX_FLAGS_RELEASE
     "-O3 -w ${CXX_OPT} "
@@ -383,35 +383,38 @@ set(CMAKE_EXE_LINKER_FLAGS_SANITIZE
     "-fsanitize=address,undefined"
     CACHE STRING "Flags used by the linker during sanitizer debug builds.")
 
-# define CUDA flags
-set(CMAKE_CUDA_HOST_COMPILER
+#########################################
+if( QUDA_TARGET_CUDA ) 
+
+  # define CUDA flags
+  set(CMAKE_CUDA_HOST_COMPILER
     "${CMAKE_CXX_COMPILER}"
     CACHE FILEPATH "Host compiler to be used by nvcc")
-set(CMAKE_CUDA_STANDARD ${QUDA_CXX_STANDARD})
-set(CMAKE_CUDA_STANDARD_REQUIRED True)
-mark_as_advanced(CMAKE_CUDA_HOST_COMPILER)
+  set(CMAKE_CUDA_STANDARD ${QUDA_CXX_STANDARD})
+  set(CMAKE_CUDA_STANDARD_REQUIRED True)
+  mark_as_advanced(CMAKE_CUDA_HOST_COMPILER)
 
-include(CheckLanguage)
-check_language(CUDA)
-
-if(${CMAKE_CUDA_COMPILER} MATCHES "nvcc")
-  set(QUDA_CUDA_BUILD_TYPE "NVCC")
-  message(STATUS "CUDA Build Type: ${QUDA_CUDA_BUILD_TYPE}")
-endif()
-
-if(${CMAKE_CUDA_COMPILER} MATCHES "clang")
-  if(CMAKE_VERSION VERSION_LESS 3.18)
-    message(ERROR "Building QUDA with clang as CMAKE_CUDA_COMPILER requires CMake 3.18+")
+  include(CheckLanguage)
+  check_language(CUDA)
+  
+  if(${CMAKE_CUDA_COMPILER} MATCHES "nvcc")
+    set(QUDA_CUDA_BUILD_TYPE "NVCC")
+    message(STATUS "CUDA Build Type: ${QUDA_CUDA_BUILD_TYPE}")
   endif()
-  set(QUDA_CUDA_BUILD_TYPE "Clang")
-  message(STATUS "CUDA Build Type: ${QUDA_CUDA_BUILD_TYPE}")
-endif()
-
+  
+  if(${CMAKE_CUDA_COMPILER} MATCHES "clang")
+    if(CMAKE_VERSION VERSION_LESS 3.18)
+      message(ERROR "Building QUDA with clang as CMAKE_CUDA_COMPILER requires CMake 3.18+")
+    endif()
+    set(QUDA_CUDA_BUILD_TYPE "Clang")
+    message(STATUS "CUDA Build Type: ${QUDA_CUDA_BUILD_TYPE}")
+  endif()
+  
 set(CMAKE_CUDA_FLAGS_DEVEL
-    "-g -O3 "
-    CACHE STRING "Flags used by the CUDA compiler during regular development builds.")
+  "-g -O3 "
+  CACHE STRING "Flags used by the CUDA compiler during regular development builds.")
 set(CMAKE_CUDA_FLAGS_STRICT
-    "-g -O3"
+  "-g -O3"
     CACHE STRING "Flags used by the CUDA compiler during strict jenkins builds.")
 set(CMAKE_CUDA_FLAGS_RELEASE
     "-O3 -w"
@@ -454,6 +457,12 @@ if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL "11.0" AND CMAKE_CUDA_COMPILER_ID M
 endif()
 include(CMakeDependentOption)
 CMAKE_DEPENDENT_OPTION(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support (CUDA >= 11.0)?" ON "QUDA_HETEROGENEOUS_ATOMIC_SUPPORT" OFF)
+
+elseif( QUDA_TARGET_HIP) 
+  find_package(HIP)
+else()
+  message(ERROR "Unknown QUDA_TARGET")
+endif()
 
 if(QUDA_HETEROGENEOUS_ATOMIC AND ${CMAKE_BUILD_TYPE} STREQUAL "SANITIZE")
   message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON does not support SANITIZE build)")
@@ -788,6 +797,7 @@ endif()
 
 # make the compiler flags an advanced option for all user defined build types (cmake defined build types are advanced by
 # default )
+if ( QUDA_TARGET_CUDA ) 
 mark_as_advanced(CMAKE_CUDA_FLAGS_DEVEL)
 mark_as_advanced(CMAKE_CUDA_FLAGS_STRICT)
 mark_as_advanced(CMAKE_CUDA_FLAGS_RELEASE)
@@ -795,6 +805,7 @@ mark_as_advanced(CMAKE_CUDA_FLAGS_DEBUG)
 mark_as_advanced(CMAKE_CUDA_FLAGS_HOSTDEBUG)
 mark_as_advanced(CMAKE_CUDA_FLAGS_DEVICEDEBUG)
 mark_as_advanced(CMAKE_CUDA_FLAGS_SANITIZE)
+endif(QUDA_TARGET_CUDA)
 
 mark_as_advanced(CMAKE_CXX_FLAGS_DEVEL)
 mark_as_advanced(CMAKE_CXX_FLAGS_STRICT)

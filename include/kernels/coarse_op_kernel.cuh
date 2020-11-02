@@ -701,7 +701,7 @@ namespace quda {
   inline __device__ __host__ void storeCoarseSharedAtomic(VUV &vuv, bool isDiagonal, int coarse_x_cb, int coarse_parity, int i0, int j0, int parity, Arg &arg)
   {
     using TileType = typename Arg::vuvTileType;
-#ifdef __CUDA_ARCH__
+#if defined(__CUDA_ARCH__) || defined( __HIP_DEVICE_COMPILE__ )
     const int dim_index = arg.dim_index % arg.Y_atomic.geometry;
     __shared__ complex<storeType> X[Arg::max_color_height_per_block][Arg::max_color_width_per_block][4][coarseSpin][coarseSpin];
     __shared__ complex<storeType> Y[Arg::max_color_height_per_block][Arg::max_color_width_per_block][4][coarseSpin][coarseSpin];
@@ -784,9 +784,9 @@ namespace quda {
       }
     }
 #else
-    errorQuda("Shared-memory atomic aggregation not supported on CPU");
+  errorQuda("Shared-memory atomic aggregation not supported on CPU");
 #endif
-  }
+}
 
   template <bool parity_flip, typename Float, QudaDirection dir, int coarseSpin, typename VUV, typename Arg>
   inline __device__ __host__ void storeCoarseGlobalAtomic(VUV &vuv, bool isDiagonal, int coarse_x_cb, int coarse_parity, int i0, int j0, Arg &arg)

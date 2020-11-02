@@ -1916,7 +1916,7 @@ public:
      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
      if (tp.aux.x >= static_cast<int>(policies.size())) errorQuda("Requested policy that is outside of range");
-     if (static_cast<QudaDslashPolicy>(tp.aux.x) == QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED)  errorQuda("Requested policy is disabled");
+     if (static_cast<QudaDslashPolicy>(int(tp.aux.x)) == QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED)  errorQuda("Requested policy is disabled");
 
      bool p2p_enabled = comm_peer2peer_enabled_global();
      if (p2p_policies[tp.aux.y] == QudaP2PPolicy::QUDA_P2P_DEFAULT) comm_enable_peer2peer(false); // disable p2p if using default policy
@@ -1924,7 +1924,7 @@ public:
 
      // switch on kernel packing for the policies that need it, save default kernel packing
      pushKernelPackT(getKernelPackT());
-     auto p = static_cast<QudaDslashPolicy>(tp.aux.x);
+     auto p = static_cast<QudaDslashPolicy>(int(tp.aux.x));
      if (p == QudaDslashPolicy::QUDA_GDR_DSLASH || p == QudaDslashPolicy::QUDA_FUSED_GDR_DSLASH
          || p == QudaDslashPolicy::QUDA_ZERO_COPY_PACK_DSLASH || p == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_DSLASH
          || p == QudaDslashPolicy::QUDA_ZERO_COPY_PACK_GDR_RECV_DSLASH
@@ -1936,7 +1936,7 @@ public:
        setKernelPackT(true);
      }
 
-     DslashPolicyImp<Dslash> *dslashImp = DslashFactory<Dslash>::create(static_cast<QudaDslashPolicy>(tp.aux.x));
+     DslashPolicyImp<Dslash> *dslashImp = DslashFactory<Dslash>::create(static_cast<QudaDslashPolicy>(int(tp.aux.x)));
      (*dslashImp)(dslash, in, volume, ghostFace, profile);
      delete dslashImp;
 

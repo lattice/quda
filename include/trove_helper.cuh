@@ -4,8 +4,12 @@
 #include <quda_define.h>
 
 // trove requires the warp shuffle instructions introduced with Kepler and has issues with device debug
+#if QUDA_TARGET_CUDA
 #if __COMPUTE_CAPABILITY__ >= 300 && !defined(DEVICE_DEBUG)
 #include <trove/ptr.h>
+#else
+#define DISABLE_TROVE
+#endif
 #else
 #define DISABLE_TROVE
 #endif

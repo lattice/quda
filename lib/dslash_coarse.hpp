@@ -254,7 +254,7 @@ namespace quda {
                              stream, arg);
             break;
           default:
-            errorQuda("Color column stride %d not valid", tp.aux.x);
+            errorQuda("Color column stride %d not valid", int(tp.aux.x));
           }
           break;
         case 2:
@@ -276,7 +276,7 @@ namespace quda {
                              stream, arg);
             break;
           default:
-            errorQuda("Color column stride %d not valid", tp.aux.x);
+            errorQuda("Color column stride %d not valid", int(tp.aux.x));
           }
           break;
         case 4:
@@ -298,11 +298,11 @@ namespace quda {
                              stream, arg);
             break;
           default:
-            errorQuda("Color column stride %d not valid", tp.aux.x);
+            errorQuda("Color column stride %d not valid", int(tp.aux.x));
           }
           break;
         default:
-          errorQuda("Invalid dimension thread splitting %d", tp.aux.y);
+          errorQuda("Invalid dimension thread splitting %d", int(tp.aux.y));
         }
 #endif // !JITIFY
       }

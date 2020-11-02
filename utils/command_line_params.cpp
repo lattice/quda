@@ -1,3 +1,4 @@
+#include "quda_define.h"
 #include "command_line_params.h"
 #include <comm_quda.h>
 
@@ -138,12 +139,15 @@ bool mg_evolve_thin_updates = false;
 // we only actually support 4 here currently
 quda::mgarray<std::array<int, 4>> geo_block_size = {};
 
+#ifdef QUDA_TARGET_CUDA
 #if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
 bool mg_use_mma = true;
 #else
 bool mg_use_mma = false;
 #endif
-
+#else // QUDA_TARGET_CUDA
+bool mg_use_mma = false;
+#endif // QUDA_TARGET_CUDA
 int n_ev = 8;
 int max_search_dim = 64;
 int deflation_grid = 16;

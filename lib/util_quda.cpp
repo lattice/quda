@@ -20,7 +20,7 @@ static const int MAX_BUFFER_SIZE = 1000;
 static char buffer_[MAX_BUFFER_SIZE] = "";
 
 QudaVerbosity getVerbosity() { return verbosity_; }
-char *getOutputPrefix() { return prefix_; }
+__host__ __device__  char *getOutputPrefix() { return prefix_; }
 FILE *getOutputFile() { return outfile_; }
 
 void setVerbosity(QudaVerbosity verbosity)

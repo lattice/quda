@@ -54,11 +54,11 @@ namespace quda {
 	 @param[in] parity Parity we are accessing
        */
       __device__ __host__ inline gauge_wrapper<Float, T>(T &gauge, int dim, int x_cb, int parity, Float phase = 1.0) :
-          gauge(gauge),
           dim(dim),
           x_cb(x_cb),
           parity(parity),
-          phase(phase)
+          phase(phase),
+	  gauge(gauge)
       {
       }
 
@@ -120,11 +120,11 @@ namespace quda {
        */
       __device__ __host__ inline gauge_ghost_wrapper<Float, T>(
           T &gauge, int dim, int ghost_idx, int parity, Float phase = 1.0) :
-          gauge(gauge),
           dim(dim),
           ghost_idx(ghost_idx),
           parity(parity),
-          phase(phase)
+          phase(phase),
+	  gauge(gauge)
       {
       }
 

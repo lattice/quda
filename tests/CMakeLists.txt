@@ -21,7 +21,9 @@ set(TEST_LIBS quda quda_test quda_reference quda_utils)
 
 macro(QUDA_CHECKBUILDTEST mytarget qudabuildtests)
   # adding the linker language here as a workaround -- was not needed for cmake 3.16
-  set_target_properties(${mytarget} PROPERTIES LINKER_LANGUAGE CUDA)
+  if( QUDA_TARGET_CUDA )
+    set_target_properties(${mytarget} PROPERTIES LINKER_LANGUAGE CUDA)
+  endif()
   if(NOT ${qudabuildtests})
     set_property(TARGET ${mytarget} PROPERTY EXCLUDE_FROM_ALL 1)
     set(QUDA_EXCLUDE_FROM_INSTALL "EXCLUDE_FROM_ALL")

@@ -3,7 +3,7 @@
 
 #include <enum_quda.h>
 #include <quda.h>
-
+#include <quda_define.h>
 /**
  * @file    quda_milc_interface.h
  *
@@ -12,8 +12,10 @@
  * The header file defines the milc interface to enable easy
  * interfacing between QUDA and the MILC software packed.
  */
+#ifdef QUDA_TARGET_CUDA
 #if __COMPUTE_CAPABILITY__ >= 600
 #define USE_QUDA_MANAGED 1
+#endif
 #endif
 
 #ifdef __cplusplus

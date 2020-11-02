@@ -9,7 +9,24 @@
  */
 
 #include <quda_matrix.h>
+#include<quda_define.h>
+#if defined(QUDA_TARGET_HIP)
+#include <hip/math_functions.h>
+#include <cmath>
 
+__host__ __device__
+inline
+void h_sincos(float  x, float* sin_res, float *cos_res) {
+        *sin_res = std::sin(x);
+        *cos_res = std::cos(x);
+}
+__host__ __device__
+inline
+void h_sincos(double  x, double* sin_res, double *cos_res) {
+	*sin_res = std::sin(x);
+	*cos_res = std::cos(x);
+}
+#endif
 namespace quda {
 
   /**
@@ -104,7 +121,18 @@ namespace quda {
     Float angle = arg(det);
 
     complex<Float> cTemp;
+
+#if defined(QUDA_TARGET_CUDA)
     sincos(negative_third * angle, &cTemp.y, &cTemp.x);
+#elif defined(QUDA_TARGET_HIP)
+#if defined(_HIP_DEVICE_COMPILE_)
+    sincos(negative_third * angle, &cTemp.y, &cTemp.x);
+#else
+    h_sincos(negative_third * angle, &cTemp.y, &cTemp.x);
+#endif // _HIP_DEVICE_COMPILE_ 
+#else
+#error "Must have QUDA_TARGET enabled"
+#endif
 
     in = (mod*cTemp)*out;
   }

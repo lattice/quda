@@ -8,7 +8,7 @@
 #include <malloc_quda.h>
 #include <quda_define.h>
 #if defined(QUDA_TARGET_HIP)
-#include "hip/hip_runtime.h"
+#include "hip/hip_runtime_api.h"
 #endif
 
 
@@ -19,7 +19,7 @@
 QudaTune getTuning();
 
 QudaVerbosity getVerbosity();
-char *getOutputPrefix();
+__host__ __device__ char *getOutputPrefix();
 FILE *getOutputFile();
 
 void setVerbosity(QudaVerbosity verbosity);
@@ -66,11 +66,25 @@ char* getOmpThreadStr();
 
 void errorQuda_(const char *func, const char *file, int line, ...);
 
+#if defined(QUDA_TARGET_CUDA)
 #define errorQuda(...) do {                                             \
     fprintf(getOutputFile(), "%sERROR: ", getOutputPrefix());           \
     fprintf(getOutputFile(), __VA_ARGS__);                              \
     errorQuda_(__func__, quda::file_name(__FILE__), __LINE__, __VA_ARGS__); \
   } while(0)
+
+#elif defined(QUDA_TARGET_HIP)
+
+#define errorQuda(...) do {                                             \
+    printf("%sERROR: ", getOutputPrefix());           \
+    printf(__VA_ARGS__);                              \
+    errorQuda_(__func__, quda::file_name(__FILE__), __LINE__, __VA_ARGS__); \
+  } while(0)
+
+#else 
+#error "Unknown QUDA Target"
+#endif
+
 
 #define zeroThread (threadIdx.x + blockDim.x*blockIdx.x==0 &&		\
 		    threadIdx.y + blockDim.y*blockIdx.y==0 &&		\
@@ -82,6 +96,7 @@ void errorQuda_(const char *func, const char *file, int line, ...);
 
 #ifdef MULTI_GPU
 
+#if defined QUDA_TARGET_CUDA
 #define printfQuda(...) do {                           \
   sprintf(getPrintBuffer(), __VA_ARGS__);	       \
   if (getRankVerbosity()) {			       \
@@ -102,9 +117,34 @@ void errorQuda_(const char *func, const char *file, int line, ...);
     }									\
   }									\
 } while (0)
+#elif defined(QUDA_TARGET_HIP)
+
+#define printfQuda(...) do {                           \
+  sprintf(getPrintBuffer(), __VA_ARGS__);              \
+  if (getRankVerbosity()) {                            \
+    printf("%s", getOutputPrefix()); \
+    printf("%s", getPrintBuffer());  \
+  }                                                    \
+} while (0)
+
+#define warningQuda(...) do {                                   \
+  if (getVerbosity() > QUDA_SILENT) {                           \
+    sprintf(getPrintBuffer(), __VA_ARGS__);                     \
+    if (getRankVerbosity()) {                                           \
+      printf("%sWARNING: ", getOutputPrefix());       \
+      printf("%s", getPrintBuffer());                 \
+      printf("\n");                                   \
+    }                                                                   \
+  }                                                                     \
+} while (0)
+
+#else
+#error "Unknown QUDA Target"
+#endif
 
 #else
 
+#if defined(QUDA_TARGET_CUDA)
 #define printfQuda(...) do {                         \
   fprintf(getOutputFile(), "%s", getOutputPrefix()); \
   fprintf(getOutputFile(), __VA_ARGS__);             \
@@ -120,6 +160,25 @@ void errorQuda_(const char *func, const char *file, int line, ...);
   }								\
 } while (0)
 
+#elif defined(QUDA_TARGET_HIP)
+
+#define printfQuda(...) do {                         \
+  printf("%s", getOutputPrefix()); \
+  printf( __VA_ARGS__);             \
+} while (0)
+
+#define warningQuda(...) do {                                 \
+  if (getVerbosity() > QUDA_SILENT) {                         \
+    printf("%sWARNING: ", getOutputPrefix()); \
+    printf( __VA_ARGS__);                      \
+    printf( "\n");                             \
+  }                                                             \
+} while (0)
+
+
+#else
+#error "Unknown QUDA_TARGET"
+#endif
 #endif // MULTI_GPU
 
 

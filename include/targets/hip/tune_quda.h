@@ -8,17 +8,9 @@
 #include <tune_key.h>
 #include <quda_internal.h>
 #include <device.h>
-
-// this file has some workarounds to allow compilation using nvrtc of kernels that include this file
-#ifndef __CUDACC_RTC__
-#include <cstdarg>
-#include <iomanip>
-#include <typeinfo>
 #include <map>
-#else
-#define CUresult bool
-#define CUDA_SUCCESS true
-#endif
+#include <iomanip>
+#include <hip/hip_runtime_api.h>
 
 namespace quda {
 
@@ -266,16 +258,12 @@ namespace quda {
       return n;
     }
 
-    /** This is the return result from kernels launched using jitify */
-    CUresult jitify_error;
-
     /**
        @brief Whether the present instance has already been tuned or not
        @return True if tuned, false if not
     */
     bool tuned()
     {
-#ifndef __CUDACC_RTC__
       // not tuning is equivalent to already tuned
       if (!getTuning()) return true;
 
@@ -283,13 +271,10 @@ namespace quda {
       if (use_managed_memory()) strcat(key.aux, ",managed");
       // if key is present in cache then already tuned
       return getTuneCache().find(key) != getTuneCache().end();
-#else
-      return true;
-#endif
     }
-
+    bool jitify_error;
   public:
-    Tunable() : jitify_error(CUDA_SUCCESS) { aux[0] = '\0'; }
+    Tunable() : jitify_error(false ){ aux[0] = '\0'; }
     virtual ~Tunable() { }
     virtual TuneKey tuneKey() const = 0;
     virtual void apply(const qudaStream_t &stream) = 0;
@@ -297,7 +282,6 @@ namespace quda {
     virtual void postTune() { }
     virtual int tuningIter() const { return 1; }
 
-#ifndef __CUDACC_RTC__
     virtual std::string paramString(const TuneParam &param) const
     {
       std::stringstream ps;
@@ -314,7 +298,6 @@ namespace quda {
       ss << gbytes << " GB/s";
       return ss.str();
     }
-#endif
 
     virtual void initTuneParam(TuneParam &param) const
     {
@@ -387,8 +370,6 @@ namespace quda {
 		  param.grid.z, deviceProp.maxGridSize[2]);
     }
 
-    CUresult jitifyError() const { return jitify_error; }
-    CUresult& jitifyError() { return jitify_error; }
   };
 
   /**
@@ -555,11 +536,5 @@ namespace quda {
   void setPolicyTuning(bool);
 
 } // namespace quda
-
-// undo jit-safe modifications
-#ifdef __CUDACC_RTC__
-#undef CUresult
-#undef CUDA_SUCCESS
-#endif
 
 #define postTrace() quda::postTrace_(__func__, quda::file_name(__FILE__), __LINE__)

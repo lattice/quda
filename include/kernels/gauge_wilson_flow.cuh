@@ -41,12 +41,12 @@ namespace quda
 
     GaugeWFlowArg(GaugeField &out, GaugeField &temp, const GaugeField &in, const real epsilon) :
       out(out),
-      in(in),
       temp(temp),
+      in(in),
       threads(in.LocalVolumeCB(), 2, wflow_dim),
+      epsilon(epsilon),
       coeff1x1(5.0/3.0),
-      coeff2x1(-1.0/12.0),
-      epsilon(epsilon)
+      coeff2x1(-1.0/12.0)
     {
       for (int dir = 0; dir < 4; ++dir) {
         border[dir] = in.R()[dir];

@@ -8,11 +8,19 @@
  *
  */
 
+#include <quda_define.h>
 #include <quda_internal.h>
-#include <generics/ldg.h>
-#include <complex_quda.h>
-#include <inline_ptx.h>
 
+#include <complex_quda.h>
+
+#if defined(QUDA_TARGET_CUDA)
+#include <generics/ldg.h>
+#include <inline_ptx.h>
+#endif
+
+#if defined(QUDA_TARGET_HIP)
+#include <hip/math_functions.h>
+#endif
 namespace quda {
 
   /*
@@ -369,7 +377,22 @@ namespace quda {
       __device__ __host__ static T Atan2( const T &a, const T &b) { return atan2(a,b); }
       __device__ __host__ static T Sin( const T &a ) { return sin(a); }
       __device__ __host__ static T Cos( const T &a ) { return cos(a); }
-      __device__ __host__ static void SinCos(const T &a, T *s, T *c) { sincos(a, s, c); }
+      __device__ __host__ static void SinCos(const T &a, T *s, T *c) { 
+#if defined(QUDA_TARGET_CUDA)
+	      sincos(a, s, c); 
+#elif defined(QUDA_TARGET_HIP)
+#if defined(__HIP_DEVICE_COMPILE__)
+	sincos(a,s,c);
+#else
+	*s = sin(a);
+	*c = cos(a);
+#endif
+
+#else
+	*s = sin(a);
+	*c = cos(a);
+#endif
+      }
     };
   
   /**

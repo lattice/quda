@@ -1,4 +1,5 @@
 // check_params.h
+#include "quda_define.h"
 
 // This file defines functions to either initialize, check, or print
 // the QUDA gauge and inverter parameters.  It gets included in
@@ -862,12 +863,16 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
 #ifdef INIT_PARAM
+#if defined(QUDA_CUDA_TARGET)
 #if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
   P(use_mma, QUDA_BOOLEAN_TRUE);
 #else
   P(use_mma, QUDA_BOOLEAN_FALSE);
 #endif
-#else
+#else // QUDA_CUDA_TARGET
+  P(use_mma, QUDA_BOOLEAN_FALSE);
+#endif // QUDA_CUDA_TARGET
+#else // INIT_PARAM
   P(use_mma, QUDA_BOOLEAN_INVALID);
 #endif
 

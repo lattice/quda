@@ -1,7 +1,7 @@
 #pragma once
 
 #include <reduce_helper.h>
-
+#include <cub_helper.cuh>
 namespace quda {
 
   /**
@@ -74,7 +74,7 @@ namespace quda {
 
     reduce_t value = t(block, i, j);
 
-    using BlockReduce = cub::BlockReduce<reduce_t, block_size, cub::BLOCK_REDUCE_WARP_REDUCTIONS>;
+    using BlockReduce = QudaCub::BlockReduce<reduce_t, block_size, QudaCub::BLOCK_REDUCE_WARP_REDUCTIONS>;
     __shared__ typename BlockReduce::TempStorage temp_storage;
     value = BlockReduce(temp_storage).Sum(value);
 

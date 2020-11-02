@@ -47,10 +47,13 @@ namespace quda {
   template <typename Float, int Ns, int Ms, int Nc, int Mc, typename Arg>
   __device__ __host__ __forceinline__ Float compute_site_max(Arg &arg, int x_cb, int parity, int spinor_parity, int spin_block, int color_block, bool active) {
 
-    Float thread_max = 0.0;
+
+
     Float site_max = active ? 0.0 : 1.0;
 
-#ifdef __CUDA_ARCH__
+#if defined (__CUDA_ARCH__) || defined( __HIP_DEVICE_COMPILE__)
+    Float thread_max = 0.0;
+
     // workout how big a shared-memory allocation we need
     // just statically compute the largest size needed to avoid templating on block size
     constexpr int bank_width = 32; // shared memory has 32 banks

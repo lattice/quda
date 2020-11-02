@@ -30,7 +30,6 @@ constexpr qudaMemcpyKind  qudaMemcpyDefault = cudaMemcpyDefault;
 
 #elif defined(QUDA_TARGET_HIP)
 
-#include <hip/hip_runtime.h>
 #include <hip/hip_runtime_api.h>
 
 using qudaDeviceProp_t = hipDeviceProp_t;
@@ -48,7 +47,7 @@ constexpr qudaMemcpyKind  qudaMemcpyDeviceToDevice = hipMemcpyDeviceToDevice;
 constexpr qudaMemcpyKind  qudaMemcpyDefault = hipMemcpyDefault;
 
 #define QUDA_DYNAMIC_SHARED( type, var )        \
-        extern HIP_DYNAMIC_SHARED(type, var);
+        HIP_DYNAMIC_SHARED(type, var);
 
 #endif
 
@@ -138,7 +137,7 @@ namespace quda
      @param[in] kind Type of memory copy
   */
   void qudaMemcpy2D_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
-                     cudaMemcpyKind kind, const char *func, const char *file, const char *line);
+                     qudaMemcpyKind kind, const char *func, const char *file, const char *line);
 
   /**
      @brief Wrapper around cudaMemcpy2DAsync or driver API equivalent
@@ -152,7 +151,7 @@ namespace quda
      @param[in] stream Stream to issue copy
   */
   void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
-                          cudaMemcpyKind kind, const qudaStream_t &stream, const char *func, const char *file,
+                          qudaMemcpyKind kind, const qudaStream_t &stream, const char *func, const char *file,
                           const char *line);
 
   /**

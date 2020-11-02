@@ -1,8 +1,13 @@
+#include <quda_define.h>
+
 #include <gauge_field_order.h>
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
 #include <float_vector.h>
+#ifdef QUDA_TARGET_CUDA
 #include <generics/shfl.h>
+#endif
+
 #include "quda_api.h"
 
 namespace quda {
@@ -315,7 +320,7 @@ namespace quda {
 
     if (dir==0 && dim==0) {
       const int my_spinor_parity = (arg.nParity == 2) ? parity : 0;
-#if __CUDA_ARCH__ >= 300 // only have warp shuffle on Kepler and above
+#if _HIP_DEVICE_COMPILE_ || __CUDA_ARCH__ >= 300 // only have warp shuffle on Kepler and above
 
 #pragma unroll
       for (int color_local=0; color_local<Mc; color_local++) {
@@ -324,7 +329,14 @@ namespace quda {
 #pragma unroll
 	for (int offset = warp_size/2; offset >= warp_size/color_stride; offset /= 2)
 #define WARP_CONVERGED 0xffffffff // we know warp should be converged here
+
+#ifdef QUDA_TARGET_CUDA
 	  out[color_local] += __shfl_down_sync(WARP_CONVERGED, out[color_local], offset);
+#elif QUDA_TARGET_HIP
+	  out[color_local] += __shfl_down(WARP_CONVERGED,out[color_local],offset);
+#else
+#error "This file needs some kind of shiffle
+#endif
       }
 
 #endif // __CUDA_ARCH__ >= 300

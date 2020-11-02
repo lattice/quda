@@ -790,7 +790,7 @@ namespace quda
           if (verbosity >= QUDA_DEBUG_VERBOSE) {
             printfQuda("About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d)\n",
                        param.block.x, param.block.y, param.block.z, param.grid.x, param.grid.y, param.grid.z,
-                       param.shared_bytes, param.aux.x, param.aux.y, param.aux.z);
+                       param.shared_bytes, int(param.aux.x), int(param.aux.y), int(param.aux.z));
           }
 
           hipEventRecord(start, 0);
@@ -820,23 +820,8 @@ namespace quda
                          tunable.perfString(elapsed_time).c_str());
             } else {
 
-#if 0 
-	      // BJoo: OLD CODE  which checks whether the error is a jitify error or not
-	      // Since we are currently not considering JITIFY I am replacing this with 
-	      // just the recular success case
-              if (tunable.jitifyError() == hipSuccess) {
-                // if not jitify error must be regular error
-                printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), hipGetErrorString(error));
-              } else {
-                // else is a jitify error
-                const char *str;
-                cuGetErrorString(tunable.jitifyError(), &str);
-                printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), str);
-              }
-#else
 	      // BJoo: must be regular error
 	      printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), hipGetErrorString(error));
-#endif
             }
           }
           tuning = tunable.advanceTuneParam(param);

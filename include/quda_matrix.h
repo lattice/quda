@@ -3,9 +3,11 @@
 #include <cstdio>
 #include <iostream>
 
+
 #include <register_traits.h>
 #include <float_vector.h>
 #include <complex_quda.h>
+#include <quda_sincos.h>
 
 namespace quda {
 
@@ -992,9 +994,16 @@ namespace quda {
       // Equation numbers in the paper are referenced by [eq_no].
 
       //Declarations
+#if defined(QUDA_TARGET_CUDA)
       typedef decltype(Q(0, 0).x) matType;
+#elif defined(QUDA_TARGET_HIP)
+      using matType = typename T::value_type; // This is painful and obscure.
+#else 
+#error "Must have target type"
+#endif
 
-      matType inv3 = 1.0 / 3.0;
+
+      matType inv3 = matType{1.0 / 3.0};
       matType c0, c1, c0_max, Tr_re;
       matType f0_re, f0_im, f1_re, f1_im, f2_re, f2_im;
       matType theta;
@@ -1022,25 +1031,25 @@ namespace quda {
       //[25]
       theta  = acos(c0/c0_max);
 
-      sincos(theta * inv3, &w_p, &u_p);
+      quda_sincos(theta * inv3, &w_p, &u_p);
       //[23]
       u_p *= sqrt_c1_inv3;
 
       //[24]
-      w_p *= sqrt(c1);
+      w_p *= sqrt(static_cast<matType>(c1));
 
       //[29] Construct objects for fj = hj/(9u^2 - w^2).
-      matType u_sq = u_p * u_p;
-      matType w_sq = w_p * w_p;
-      matType denom_inv = 1.0 / (9 * u_sq - w_sq);
+      matType u_sq =  matType{u_p * u_p};
+      matType w_sq =  matType{ w_p * w_p};
+      matType denom_inv =  1.0 / (9 * u_sq - w_sq);
       matType exp_iu_re, exp_iu_im;
-      sincos(u_p, &exp_iu_im, &exp_iu_re);
-      matType exp_2iu_re = exp_iu_re * exp_iu_re - exp_iu_im * exp_iu_im;
-      matType exp_2iu_im = 2 * exp_iu_re * exp_iu_im;
+      quda_sincos(u_p, &exp_iu_im, &exp_iu_re);
+      matType exp_2iu_re = matType{ exp_iu_re * exp_iu_re - exp_iu_im * exp_iu_im};
+      matType exp_2iu_im = matType{ 2 * exp_iu_re * exp_iu_im} ;
       matType cos_w = cos(w_p);
       matType sinc_w;
-      matType hj_re = 0.0;
-      matType hj_im = 0.0;
+      matType hj_re = matType{0.0};
+      matType hj_im = matType{0.0};
 
       //[33] Added one more term to the series given in the paper.
       if (w_p < 0.05 && w_p > -0.05) {
