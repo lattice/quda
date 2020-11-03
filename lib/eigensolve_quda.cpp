@@ -118,20 +118,21 @@ namespace quda
     // If the operator is non-hermitian, and the eigensolver can only solve
     // hermitian systems, we must error out.
     if (!mat.hermitian() && !eig_solver->solves_non_hermitian()) {
-      
+
       // Operators with gamma5 hermiticity are rendered hermitian
-      // with a gamma5 post multiplication. We exempt them here:
-      if((eig_param->invert_param->dslash_type == QUDA_WILSON_DSLASH ||
-	  eig_param->invert_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH)
-	 && eig_param->compute_gamma5) {
-	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using gamma5 * OP\n");
-      } else {	 
-	errorQuda("Cannot solve non-Hermitian system with Hermitian eigensolver %d, %d", (int)!mat.hermitian(), (int)eig_solver->solves_non_hermitian());
+      // with a gamma5 pre multiplication. We exempt them here:
+      if ((eig_param->invert_param->dslash_type == QUDA_WILSON_DSLASH
+           || eig_param->invert_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH)
+          && eig_param->compute_gamma5) {
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using gamma5 * OP\n");
+      } else {
+        errorQuda("Cannot solve non-Hermitian system with Hermitian eigensolver %d, %d", (int)!mat.hermitian(),
+                  (int)eig_solver->solves_non_hermitian());
       }
     }
     return eig_solver;
   }
-  
+
   // Utilities and functions common to all Eigensolver instances
   //------------------------------------------------------------------------------
   void EigenSolver::prepareInitialGuess(std::vector<ColorSpinorField *> &kSpace)
