@@ -614,7 +614,7 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   opgroup->add_option("--eig-compute-gamma5", eig_compute_gamma5,
                       "Solve the gamma5 OP problem. Solve for OP then multiply by gamma_5 (default false)");
-  
+
   opgroup->add_option("--eig-max-restarts", eig_max_restarts, "Perform n iterations of the restart in the eigensolver");
   opgroup->add_option("--eig-block-size", eig_block_size, "The block size to use in the block variant eigensolver");
   opgroup->add_option(
