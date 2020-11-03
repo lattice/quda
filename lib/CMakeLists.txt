@@ -154,7 +154,7 @@ endif()
 
 if( QUDA_TARGET_HIP )
 set_source_files_properties( ${QUDA_CU_OBJS} PROPERTIES LANGUAGE CXX)
-set_source_files_properties( ${QUDA_CU_OBJS} PROPERTIES COMPILE_FLAGS "-x hip" COMPILE_FLAGS "-Wno-unused-function -Wno-pass-failed -Wno-unused-local-typedef") 
+set_source_files_properties( ${QUDA_CU_OBJS} PROPERTIES COMPILE_FLAGS "-x hip -Wno-unused-function -Wno-pass-failed -Wno-unused-local-typedef") 
 endif()
 
 # make one library

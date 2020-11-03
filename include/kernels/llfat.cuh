@@ -30,10 +30,10 @@ namespace quda {
     int odd_bit;
 
     LinkArg(GaugeField &link, const GaugeField &u, Float coeff) :
-      threads(link.VolumeCB(), 2, 4),
       link(link),
       u(u),
-      coeff(coeff)
+      coeff(coeff),
+      threads(link.VolumeCB(), 2, 4)
     {
       if (u.StaggeredPhase() != QUDA_STAGGERED_PHASE_MILC && u.Reconstruct() != QUDA_RECONSTRUCT_NO)
         errorQuda("Staggered phase type %d not supported", u.StaggeredPhase());

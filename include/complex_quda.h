@@ -27,6 +27,11 @@
 #include <sstream>
 //#include <cuComplex.h>
 
+#include <quda_define.h>
+#ifdef QUDA_TARGET_HIP
+#include <hip/hip_runtime.h>
+#endif
+
 namespace quda {
   namespace gauge {
     template<typename Float, typename storeFloat> struct fieldorder_wrapper;

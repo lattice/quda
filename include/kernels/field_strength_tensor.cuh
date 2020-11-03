@@ -23,9 +23,9 @@ namespace quda
     int border[4];
 
     FmunuArg(GaugeField &f, const GaugeField &u) :
-      threads(f.VolumeCB(), 2, 6),
+      u(u),
       f(f),
-      u(u)
+      threads(f.VolumeCB(), 2, 6)
     {
       for (int dir = 0; dir < 4; ++dir) {
         X[dir] = f.X()[dir];

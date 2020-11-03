@@ -3,6 +3,7 @@
 #include <index_helper.cuh>
 #include <random_quda.h>
 #include <kernel.h>
+#include <quda_sincos.h>
 
 namespace quda {
 
@@ -52,7 +53,7 @@ namespace quda {
     for (int i = 0; i < 4; ++i) {
       phi[i] = 2.0 * M_PI * rand1[i];
       radius[i] = sqrt(-log(rand2[i]));
-      sincos(phi[i], &temp2[i], &temp1[i]);
+      quda_sincos(phi[i], &temp2[i], &temp1[i]);
       temp1[i] *= radius[i];
       temp2[i] *= radius[i];
     }

@@ -40,8 +40,8 @@ namespace quda
       DslashArg<Float, nDim>(in, U, parity, dagger, a != 0.0 ? true : false, 1, spin_project, comm_override),
       out(out),
       in(in),
-      U(U),
       x(x),
+      U(U),
       a(a)
     {
       if (in.V() == out.V()) errorQuda("Aliasing pointers");

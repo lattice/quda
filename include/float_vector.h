@@ -1,3 +1,6 @@
+#pragma once
+#include <hip/hip_runtime_api.h>
+#include <hip/hcc_detail/hip_vector_types.h>
 #include <complex_quda.h>
 
 /**
@@ -7,7 +10,6 @@
    Inline device functions for elementary operations on short vectors, e.g., float4, etc.
 */
 
-#pragma once
 
 namespace quda {
 

@@ -113,9 +113,9 @@ public:
         Ls(in.X(4)),
         m_f(m_f),
         m_5(m_5),
-        a(a_),
         dagger(dagger),
         xpay(a_ == 0.0 ? false : true),
+	a(a_),
         type(type)
     {
       if (in.Nspin() != 4) errorQuda("nSpin = %d not support", in.Nspin());

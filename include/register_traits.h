@@ -461,7 +461,39 @@ namespace quda {
     }
   };
 
-  
+  template<typename Float>
+  __host__ __device__ Float Rsqrt(Float r);
+
+  template<>
+  __host__ __device__ float Rsqrt(float r) {
+#if defined(QUDA_TARGET_CUDA) 
+    return rsqrt(r);
+#elif defined(QUDA_TARGET_HIP)
+#if defined(__HIP_DEVICE_COMPILE__)
+    return rsqrt(r);
+#else
+    return 1.0/std::sqrt(r);
+#endif
+#else 
+    return 1.0/std::sqrt(r);
+#endif 
+  }
+
+  template<>
+  __host__ __device__ double  Rsqrt(double r) {
+#if defined(QUDA_TARGET_CUDA)
+    return rsqrt(r);
+#elif defined(QUDA_TARGET_HIP)
+#if defined(__HIP_DEVICE_COMPILE__)
+    return rsqrt(r);
+#else
+    return 1.0/std::sqrt(r);
+#endif
+#else
+    return 1.0/std::sqrt(r);
+#endif
+  }
+
   template <typename Float, int number> struct VectorType;
 
   // double precision

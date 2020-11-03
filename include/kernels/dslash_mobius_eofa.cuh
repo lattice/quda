@@ -76,14 +76,14 @@ namespace quda
         Ls(in.X(4)),
         m_f(m_f_),
         m_5(m_5_),
-        a(a_),
         dagger(dagger_),
         xpay(a_ == 0. ? false : true),
-        type(type_),
+	a(a_),
+	kappa(kappa_),
+	inv(inv_),
         eofa_pm(eofa_pm_),
-        inv(inv_),
-        kappa(kappa_),
-        sherman_morrison(sherman_morrison_)
+        sherman_morrison(sherman_morrison_),
+	type(type_)
       {
         if (in.Nspin() != 4) errorQuda("nSpin = %d not support", in.Nspin());
         if (!in.isNative() || !out.isNative())
