@@ -2,7 +2,8 @@
 
 #include <gauge_field.h>
 
-namespace quda {
+namespace quda
+{
 
   /**
      @brief Build the Kahler-Dirac inverse block for KD operators.
@@ -19,10 +20,10 @@ namespace quda {
      @param[in] in precision of Xinv field
      @return constructed Xinv, which needs to be deleted manually
   */
-  cudaGaugeField* AllocateAndBuildStaggeredKahlerDiracInverse(const cudaGaugeField &gauge, const double mass, const QudaPrecision override_prec);
+  cudaGaugeField *AllocateAndBuildStaggeredKahlerDiracInverse(const cudaGaugeField &gauge, const double mass,
+                                                              const QudaPrecision override_prec);
 
   // Note: see routine
-  // void ApplyStaggeredKahlerDiracInverse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Xinv, bool dagger);
-  // in dslash_quda.h as it is relevant for applying the above op.
-};
-
+  // void ApplyStaggeredKahlerDiracInverse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Xinv,
+  // bool dagger); in dslash_quda.h as it is relevant for applying the above op.
+}; // namespace quda

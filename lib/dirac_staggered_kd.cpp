@@ -3,20 +3,16 @@
 #include <multigrid.h>
 #include <staggered_kd_build_xinv.h>
 
-namespace quda {
+namespace quda
+{
 
-  DiracStaggeredKD::DiracStaggeredKD(const DiracParam &param) : DiracStaggered(param),
-    Xinv(param.xInvKD)
-  { }
+  DiracStaggeredKD::DiracStaggeredKD(const DiracParam &param) : DiracStaggered(param), Xinv(param.xInvKD) {}
 
-  DiracStaggeredKD::DiracStaggeredKD(const DiracStaggeredKD &dirac)
-    : DiracStaggered(dirac),
-    Xinv(dirac.Xinv)
-  { }
+  DiracStaggeredKD::DiracStaggeredKD(const DiracStaggeredKD &dirac) : DiracStaggered(dirac), Xinv(dirac.Xinv) {}
 
-  DiracStaggeredKD::~DiracStaggeredKD() { }
+  DiracStaggeredKD::~DiracStaggeredKD() {}
 
-  DiracStaggeredKD& DiracStaggeredKD::operator=(const DiracStaggeredKD &dirac)
+  DiracStaggeredKD &DiracStaggeredKD::operator=(const DiracStaggeredKD &dirac)
   {
     if (&dirac != this) {
       DiracStaggered::operator=(dirac);
@@ -27,36 +23,30 @@ namespace quda {
 
   void DiracStaggeredKD::checkParitySpinor(const ColorSpinorField &in, const ColorSpinorField &out) const
   {
-    if (in.Ndim() != 5 || out.Ndim() != 5) {
-      errorQuda("Staggered dslash requires 5-d fermion fields");
-    }
+    if (in.Ndim() != 5 || out.Ndim() != 5) { errorQuda("Staggered dslash requires 5-d fermion fields"); }
 
     if (in.Precision() != out.Precision()) {
       errorQuda("Input and output spinor precisions don't match in dslash_quda");
     }
 
     if (in.SiteSubset() != QUDA_FULL_SITE_SUBSET || out.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
-      errorQuda("ColorSpinorFields are not full parity, in = %d, out = %d", 
-            		in.SiteSubset(), out.SiteSubset());
+      errorQuda("ColorSpinorFields are not full parity, in = %d, out = %d", in.SiteSubset(), out.SiteSubset());
     }
 
-    if (out.Volume()/out.X(4) != 2*gauge->VolumeCB() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
+    if (out.Volume() / out.X(4) != 2 * gauge->VolumeCB() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
       errorQuda("Spinor volume %lu doesn't match gauge volume %lu", out.Volume(), gauge->VolumeCB());
     }
   }
 
-
-  void DiracStaggeredKD::Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
-			      const QudaParity parity) const
+  void DiracStaggeredKD::Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
     errorQuda("The staggered Kahler-Dirac operator does not have a single parity form");
   }
 
-  void DiracStaggeredKD::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
-				  const QudaParity parity, const ColorSpinorField &x,
-				  const double &k) const
+  void DiracStaggeredKD::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                                    const ColorSpinorField &x, const double &k) const
   {
-    errorQuda("The staggered Kahler-Dirac operator does not have a single parity form");    
+    errorQuda("The staggered Kahler-Dirac operator does not have a single parity form");
   }
 
   // Full staggered operator
@@ -101,7 +91,7 @@ namespace quda {
       }
     } else { // left preconditioned
       if (dagger == QUDA_DAG_NO) {
-        
+
         if (mass == 0.) {
           ApplyStaggered(*tmp2, in, *gauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim, profile);
           flops += 570ll * in.Volume();
@@ -124,24 +114,21 @@ namespace quda {
           ApplyStaggered(out, *tmp2, *gauge, 2. * mass, *tmp2, QUDA_INVALID_PARITY, dagger, commDim, profile);
           flops += 582ll * in.Volume();
         }
-        
       }
     }
-
 
     deleteTmp(&tmp2, reset);
   }
 
   void DiracStaggeredKD::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    
+
     bool reset = newTmp(&tmp1, in);
 
     M(*tmp1, in);
     Mdag(out, *tmp1);
 
     deleteTmp(&tmp1, reset);
-
   }
 
   void DiracStaggeredKD::KahlerDiracInv(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -149,9 +136,8 @@ namespace quda {
     ApplyStaggeredKahlerDiracInverse(out, in, *Xinv, dagger == QUDA_DAG_YES);
   }
 
-  void DiracStaggeredKD::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			       ColorSpinorField &x, ColorSpinorField &b, 
-			       const QudaSolutionType solType) const
+  void DiracStaggeredKD::prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x,
+                                 ColorSpinorField &b, const QudaSolutionType solType) const
   {
     // TODO: technically KD is a different type of preconditioning.
     // Should we support "preparing" and "reconstructing"?
@@ -161,12 +147,10 @@ namespace quda {
 
     sol = &x;
     src = &b;
-
   }
 
-  void DiracStaggeredKD::prepareSpecialMG(ColorSpinorField* &src, ColorSpinorField* &sol,
-             ColorSpinorField &x, ColorSpinorField &b, 
-             const QudaSolutionType solType) const
+  void DiracStaggeredKD::prepareSpecialMG(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x,
+                                          ColorSpinorField &b, const QudaSolutionType solType) const
   {
     // TODO: technically KD is a different type of preconditioning.
     // Should we support "preparing" and "reconstructing"?
@@ -193,21 +177,18 @@ namespace quda {
       sol = &x;
       src = &b;
     }
-
   }
 
-  void DiracStaggeredKD::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-				   const QudaSolutionType solType) const
+  void DiracStaggeredKD::reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType solType) const
   {
     // do nothing
 
     // TODO: technically KD is a different type of preconditioning.
     // Should we support "preparing" and "reconstructing"?
-
   }
 
   void DiracStaggeredKD::reconstructSpecialMG(ColorSpinorField &x, const ColorSpinorField &b,
-           const QudaSolutionType solType) const
+                                              const QudaSolutionType solType) const
   {
     // do nothing
 
@@ -225,27 +206,27 @@ namespace quda {
       x = *tmp1;
 
       deleteTmp(&tmp1, reset);
-    } 
+    }
     // nothing required for left block preconditioning
-
   }
 
-  void DiracStaggeredKD::updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
-                              cudaCloverField *clover_in)
+  void DiracStaggeredKD::updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in,
+                                      cudaGaugeField *long_gauge_in, cudaCloverField *clover_in)
   {
     Dirac::updateFields(gauge_in, nullptr, nullptr, nullptr);
-    
+
     // Recompute Xinv (I guess we should do that here?)
     BuildStaggeredKahlerDiracInverse(*Xinv, *gauge, mass);
   }
 
-  void DiracStaggeredKD::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-           double kappa, double mass, double mu, double mu_factor) const {
+  void DiracStaggeredKD::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass,
+                                        double mu, double mu_factor) const
+  {
     errorQuda("Staggered KD operators do not support MG coarsening yet");
 
-    //if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
+    // if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
     //  errorQuda("Staggered KD operators only support aggregation coarsening");
-    //StaggeredCoarseOp(Y, X, T, *gauge, Xinv, mass, QUDA_STAGGEREDKD_DIRAC, QUDA_MATPC_INVALID);
+    // StaggeredCoarseOp(Y, X, T, *gauge, Xinv, mass, QUDA_STAGGEREDKD_DIRAC, QUDA_MATPC_INVALID);
   }
 
   void DiracStaggeredKD::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const

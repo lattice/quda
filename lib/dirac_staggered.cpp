@@ -133,7 +133,7 @@ namespace quda {
       errorQuda("The optimized Kahler-Dirac operator is not built through createCoarseOp");
 
     // nullptr == no Kahler-Dirac Xinv
-    const cudaGaugeField* XinvKD = nullptr; 
+    const cudaGaugeField *XinvKD = nullptr;
     StaggeredCoarseOp(Y, X, T, *gauge, XinvKD, mass, QUDA_STAGGERED_DIRAC, QUDA_MATPC_INVALID);
   }
 

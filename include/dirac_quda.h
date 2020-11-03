@@ -43,8 +43,8 @@ namespace quda {
     cudaGaugeField *longGauge; // used by staggered only
     int laplace3D;
     cudaCloverField *clover;
-    cudaGaugeField* xInvKD; // used for the Kahler-Dirac operator only
-  
+    cudaGaugeField *xInvKD; // used for the Kahler-Dirac operator only
+
     double mu; // used by twisted mass only
     double mu_factor; // used by multigrid only
     double epsilon; //2nd tm parameter (used by twisted mass only)
@@ -243,19 +243,20 @@ namespace quda {
     void MMdag(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     // required methods to use e-o preconditioning for solving full system
-    virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			 ColorSpinorField &x, ColorSpinorField &b,
-			 const QudaSolutionType solType) const = 0;
-    virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-			     const QudaSolutionType solType) const = 0;
+    virtual void prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x, ColorSpinorField &b,
+                         const QudaSolutionType solType) const = 0;
+    virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType solType) const = 0;
 
     // special prepare/recon methods that go into PreconditionedSolve in MG
-    virtual void prepareSpecialMG(ColorSpinorField* &src, ColorSpinorField* &sol,
-       ColorSpinorField &x, ColorSpinorField &b,
-       const QudaSolutionType solType) const { prepare(src, sol, x, b, solType); }
-    virtual void reconstructSpecialMG(ColorSpinorField &x, const ColorSpinorField &b,
-           const QudaSolutionType solType) const { reconstruct(x, b, solType); }
-
+    virtual void prepareSpecialMG(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x,
+                                  ColorSpinorField &b, const QudaSolutionType solType) const
+    {
+      prepare(src, sol, x, b, solType);
+    }
+    virtual void reconstructSpecialMG(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType solType) const
+    {
+      reconstruct(x, b, solType);
+    }
 
     void setMass(double mass){ this->mass = mass;}
 
@@ -883,7 +884,6 @@ public:
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
 
     virtual QudaDiracType getDiracType() const { return QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC; }
-
   };
 
   // 4d Even-odd preconditioned Mobius domain wall with EOFA
@@ -992,14 +992,15 @@ public:
 
     virtual QudaDiracType getDiracType() const { return QUDA_TWISTED_MASSPC_DIRAC; }
 
-   /**
+    /**
      * @brief Create the coarse even-odd preconditioned twisted-mass
      *        operator
      * @param T[in] Transfer operator defining the coarse grid
      * @param Y[out] Coarse link field
      * @param X[out] Coarse clover field
      * @param kappa Kappa parameter for the coarse operator
-     * @param mass Mass parameter for the coarse operator (gets explicitly built into clover, hard coded to zero for non-staggered ops)
+     * @param mass Mass parameter for the coarse operator (gets explicitly built into clover, hard coded to zero for
+     * non-staggered ops)
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
      */
@@ -1181,7 +1182,7 @@ public:
      *
      * @return gauge field
      */
-    virtual const cudaGaugeField* getGaugeField() const { return gauge; }
+    virtual const cudaGaugeField *getGaugeField() const { return gauge; }
 
     /**
      * @brief Create the coarse staggered operator.
@@ -1233,7 +1234,8 @@ public:
   };
 
   // Kahler-Dirac preconditioned staggered
-  class DiracStaggeredKD : public DiracStaggered {
+  class DiracStaggeredKD : public DiracStaggered
+  {
 
   protected:
     mutable cudaGaugeField *Xinv; /** inverse Kahler-Dirac matrix */
@@ -1243,32 +1245,28 @@ public:
     DiracStaggeredKD(const DiracStaggeredKD &dirac);
 
     virtual ~DiracStaggeredKD();
-    DiracStaggeredKD& operator=(const DiracStaggeredKD &dirac);
+    DiracStaggeredKD &operator=(const DiracStaggeredKD &dirac);
 
     virtual void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
 
     virtual bool hasDslash() const { return false; }
 
-    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
-      const QudaParity parity) const;
-    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
-          const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                            const ColorSpinorField &x, const double &k) const;
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     void KahlerDiracInv(ColorSpinorField &out, const ColorSpinorField &in) const;
 
-    virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-       ColorSpinorField &x, ColorSpinorField &b,
-       const QudaSolutionType) const;
-    virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-           const QudaSolutionType) const;
+    virtual void prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x, ColorSpinorField &b,
+                         const QudaSolutionType) const;
+    virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
 
-    virtual void prepareSpecialMG(ColorSpinorField* &src, ColorSpinorField* &sol,
-       ColorSpinorField &x, ColorSpinorField &b,
-       const QudaSolutionType solType) const;
+    virtual void prepareSpecialMG(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x,
+                                  ColorSpinorField &b, const QudaSolutionType solType) const;
     virtual void reconstructSpecialMG(ColorSpinorField &x, const ColorSpinorField &b,
-           const QudaSolutionType solType) const;
+                                      const QudaSolutionType solType) const;
 
     virtual QudaDiracType getDiracType() const { return QUDA_STAGGEREDKD_DIRAC; }
 
@@ -1315,7 +1313,6 @@ public:
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
     virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
-
   };
 
   // Full staggered
@@ -1353,14 +1350,14 @@ public:
      *
      * @return fat link field
      */
-    virtual const cudaGaugeField* getFatLinkField() const { return fatGauge; }
+    virtual const cudaGaugeField *getFatLinkField() const { return fatGauge; }
 
     /**
      * @brief Get the long link field for MG setup.
      *
      * @return long link field
      */
-    virtual const cudaGaugeField* getLongLinkField() const { return longGauge; }
+    virtual const cudaGaugeField *getLongLinkField() const { return longGauge; }
 
     /**
      *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
@@ -1411,7 +1408,6 @@ public:
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
     virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
-
   };
 
   // Even-odd preconditioned staggered
@@ -1440,42 +1436,39 @@ public:
   };
 
   // Kahler-Dirac preconditioned staggered
-  class DiracImprovedStaggeredKD : public DiracImprovedStaggered {
+  class DiracImprovedStaggeredKD : public DiracImprovedStaggered
+  {
 
   protected:
     mutable cudaGaugeField *Xinv; /** inverse Kahler-Dirac matrix */
-    bool own_xinv; /** determine if we own our own Xinv---if so we need to delete on destructor */
+    bool own_xinv;                /** determine if we own our own Xinv---if so we need to delete on destructor */
 
   public:
     DiracImprovedStaggeredKD(const DiracParam &param);
     DiracImprovedStaggeredKD(const DiracImprovedStaggeredKD &dirac);
     virtual ~DiracImprovedStaggeredKD();
-    DiracImprovedStaggeredKD& operator=(const DiracImprovedStaggeredKD &dirac);
+    DiracImprovedStaggeredKD &operator=(const DiracImprovedStaggeredKD &dirac);
 
     virtual void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
 
     virtual bool hasDslash() const { return false; }
 
-    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
-      const QudaParity parity) const;
-    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
-          const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                            const ColorSpinorField &x, const double &k) const;
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     void KahlerDiracInv(ColorSpinorField &out, const ColorSpinorField &in) const;
 
-    virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-       ColorSpinorField &x, ColorSpinorField &b,
-       const QudaSolutionType) const;
-    virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-           const QudaSolutionType) const;
+    virtual void prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x, ColorSpinorField &b,
+                         const QudaSolutionType) const;
+    virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
 
-    virtual void prepareSpecialMG(ColorSpinorField* &src, ColorSpinorField* &sol,
-       ColorSpinorField &x, ColorSpinorField &b,
-       const QudaSolutionType solType) const;
+    virtual void prepareSpecialMG(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x,
+                                  ColorSpinorField &b, const QudaSolutionType solType) const;
     virtual void reconstructSpecialMG(ColorSpinorField &x, const ColorSpinorField &b,
-           const QudaSolutionType solType) const;
+                                      const QudaSolutionType solType) const;
 
     virtual QudaDiracType getDiracType() const { return QUDA_ASQTADKD_DIRAC; }
 
@@ -1522,7 +1515,6 @@ public:
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
     virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
-
   };
 
   /**
@@ -1855,7 +1847,6 @@ public:
 			     const QudaSolutionType) const;
 
     virtual QudaDiracType getDiracType() const { return QUDA_GAUGE_COVDEV_DIRAC; }
-
   };
 
   // Functor base class for applying a given Dirac matrix (M, MdagM, etc.)
@@ -1892,12 +1883,11 @@ public:
     std::string Type() const { return typeid(*dirac).name(); }
     
     bool isStaggered() const {
-      return (Type() == typeid(DiracStaggeredPC).name() ||
-	      Type() == typeid(DiracStaggered).name()   ||
-	      Type() == typeid(DiracImprovedStaggeredPC).name() ||
-	      Type() == typeid(DiracImprovedStaggered).name() ||
-        Type() == typeid(DiracStaggeredKD).name() ||
-        Type() == typeid(DiracImprovedStaggeredKD).name()) ? true : false;
+      return (Type() == typeid(DiracStaggeredPC).name() || Type() == typeid(DiracStaggered).name()
+              || Type() == typeid(DiracImprovedStaggeredPC).name() || Type() == typeid(DiracImprovedStaggered).name()
+              || Type() == typeid(DiracStaggeredKD).name() || Type() == typeid(DiracImprovedStaggeredKD).name()) ?
+        true :
+        false;
     }
 
     virtual bool hermitian() const { return dirac->hermitian(); }
@@ -1977,10 +1967,16 @@ public:
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
     {
       bool reset1 = false;
-      if (!dirac->tmp1) { dirac->tmp1 = &tmp; reset1 = true; }
+      if (!dirac->tmp1) {
+        dirac->tmp1 = &tmp;
+        reset1 = true;
+      }
       dirac->MdagM(out, in);
       if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
-      if (reset1) { dirac->tmp1 = NULL; reset1 = false; }
+      if (reset1) {
+        dirac->tmp1 = NULL;
+        reset1 = false;
+      }
     }
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
@@ -1988,12 +1984,24 @@ public:
     {
       bool reset1 = false;
       bool reset2 = false;
-      if (!dirac->tmp1) { dirac->tmp1 = &Tmp1; reset1 = true; }
-      if (!dirac->tmp2) { dirac->tmp2 = &Tmp2; reset2 = true; }
+      if (!dirac->tmp1) {
+        dirac->tmp1 = &Tmp1;
+        reset1 = true;
+      }
+      if (!dirac->tmp2) {
+        dirac->tmp2 = &Tmp2;
+        reset2 = true;
+      }
       dirac->MdagM(out, in);
       if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
-      if (reset2) { dirac->tmp2 = NULL; reset2 = false; }
-      if (reset1) { dirac->tmp1 = NULL; reset1 = false; }
+      if (reset2) {
+        dirac->tmp2 = NULL;
+        reset2 = false;
+      }
+      if (reset1) {
+        dirac->tmp1 = NULL;
+        reset1 = false;
+      }
     }
  
     int getStencilSteps() const
@@ -2017,22 +2025,40 @@ public:
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
     {
       bool reset1 = false;
-      if (!dirac->tmp1) { dirac->tmp1 = &tmp; reset1 = true; }
+      if (!dirac->tmp1) {
+        dirac->tmp1 = &tmp;
+        reset1 = true;
+      }
       dirac->MdagMLocal(out, in);
       if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
-      if (reset1) { dirac->tmp1 = NULL; reset1 = false; }
+      if (reset1) {
+        dirac->tmp1 = NULL;
+        reset1 = false;
+      }
     }
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
     {
       bool reset1 = false;
       bool reset2 = false;
-      if (!dirac->tmp1) { dirac->tmp1 = &Tmp1; reset1 = true; }
-      if (!dirac->tmp2) { dirac->tmp2 = &Tmp2; reset2 = true; }
+      if (!dirac->tmp1) {
+        dirac->tmp1 = &Tmp1;
+        reset1 = true;
+      }
+      if (!dirac->tmp2) {
+        dirac->tmp2 = &Tmp2;
+        reset2 = true;
+      }
       dirac->MdagMLocal(out, in);
       if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
-      if (reset2) { dirac->tmp2 = NULL; reset2 = false; }
-      if (reset1) { dirac->tmp1 = NULL; reset1 = false; }
+      if (reset2) {
+        dirac->tmp2 = NULL;
+        reset2 = false;
+      }
+      if (reset1) {
+        dirac->tmp1 = NULL;
+        reset1 = false;
+      }
     }
 
     int getStencilSteps() const
@@ -2058,10 +2084,16 @@ public:
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
     {
       bool reset1 = false;
-      if (!dirac->tmp1) { dirac->tmp1 = &tmp; reset1 = true; }
+      if (!dirac->tmp1) {
+        dirac->tmp1 = &tmp;
+        reset1 = true;
+      }
       dirac->MMdag(out, in);
       if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
-      if (reset1) { dirac->tmp1 = NULL; reset1 = false; }
+      if (reset1) {
+        dirac->tmp1 = NULL;
+        reset1 = false;
+      }
     }
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
@@ -2069,12 +2101,24 @@ public:
     {
       bool reset1 = false;
       bool reset2 = false;
-      if (!dirac->tmp1) { dirac->tmp1 = &Tmp1; reset1 = true; }
-      if (!dirac->tmp2) { dirac->tmp2 = &Tmp2; reset2 = true; }
+      if (!dirac->tmp1) {
+        dirac->tmp1 = &Tmp1;
+        reset1 = true;
+      }
+      if (!dirac->tmp2) {
+        dirac->tmp2 = &Tmp2;
+        reset2 = true;
+      }
       dirac->MMdag(out, in);
       if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
-      if (reset2) { dirac->tmp2 = NULL; reset2 = false; }
-      if (reset1) { dirac->tmp1 = NULL; reset1 = false; }
+      if (reset2) {
+        dirac->tmp2 = NULL;
+        reset2 = false;
+      }
+      if (reset1) {
+        dirac->tmp1 = NULL;
+        reset1 = false;
+      }
     }
 
     int getStencilSteps() const
@@ -2101,10 +2145,16 @@ public:
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
     {
       bool reset1 = false;
-      if (!dirac->tmp1) { dirac->tmp1 = &tmp; reset1 = true; }
+      if (!dirac->tmp1) {
+        dirac->tmp1 = &tmp;
+        reset1 = true;
+      }
       dirac->Mdag(out, in);
       if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
-      if (reset1) { dirac->tmp1 = NULL; reset1 = false; }
+      if (reset1) {
+        dirac->tmp1 = NULL;
+        reset1 = false;
+      }
     }
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
@@ -2112,12 +2162,24 @@ public:
     {
       bool reset1 = false;
       bool reset2 = false;
-      if (!dirac->tmp1) { dirac->tmp1 = &Tmp1; reset1 = true; }
-      if (!dirac->tmp2) { dirac->tmp2 = &Tmp2; reset2 = true; }
+      if (!dirac->tmp1) {
+        dirac->tmp1 = &Tmp1;
+        reset1 = true;
+      }
+      if (!dirac->tmp2) {
+        dirac->tmp2 = &Tmp2;
+        reset2 = true;
+      }
       dirac->Mdag(out, in);
       if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
-      if (reset2) { dirac->tmp2 = NULL; reset2 = false; }
-      if (reset1) { dirac->tmp1 = NULL; reset1 = false; }
+      if (reset2) {
+        dirac->tmp2 = NULL;
+        reset2 = false;
+      }
+      if (reset1) {
+        dirac->tmp1 = NULL;
+        reset1 = false;
+      }
     }
 
     int getStencilSteps() const

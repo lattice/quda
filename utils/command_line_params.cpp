@@ -317,8 +317,8 @@ namespace
                                                  {"blkiram", QUDA_EIG_BLK_IR_ARNOLDI}};
 
   CLI::TransformPairs<QudaTransferType> transfer_type_map {{"aggregate", QUDA_TRANSFER_AGGREGATE},
-                                                 {"kd-coarse", QUDA_TRANSFER_COARSE_KD},
-                                                 {"kd-optimized", QUDA_TRANSFER_OPTIMIZED_KD}};
+                                                           {"kd-coarse", QUDA_TRANSFER_COARSE_KD},
+                                                           {"kd-optimized", QUDA_TRANSFER_OPTIMIZED_KD}};
 
   CLI::TransformPairs<QudaTboundary> fermion_t_boundary_map {{"periodic", QUDA_PERIODIC_T},
                                                              {"anti-periodic", QUDA_ANTI_PERIODIC_T}};
@@ -858,10 +858,12 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--mg-setup-type", setup_type, "The type of setup to use for the multigrid (default null)")
     ->transform(CLI::QUDACheckedTransformer(setup_type_map));
 
-    // FIXME: default should become kd-optimized
-  opgroup->add_option("--mg-staggered-coarsen-type", staggered_transfer_type,
-                        "The type of coarsening to use for the top level staggered operator (aggregate, kd-coarse (default), kd-optimized)")
-                        ->transform(CLI::QUDACheckedTransformer(transfer_type_map));
+  // FIXME: default should become kd-optimized
+  opgroup
+    ->add_option(
+      "--mg-staggered-coarsen-type",
+      staggered_transfer_type, "The type of coarsening to use for the top level staggered operator (aggregate, kd-coarse (default), kd-optimized)")
+    ->transform(CLI::QUDACheckedTransformer(transfer_type_map));
 
   quda_app->add_mgoption(opgroup, "--mg-smoother", smoother_type, solver_trans,
                          "The smoother to use for multigrid (default mr)");

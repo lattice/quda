@@ -606,7 +606,7 @@ namespace quda {
      * @param[in] x_cb checkerboard index
      * @param[in] parity site parity
      */
-    void PrintVector(unsigned int x_cb, unsigned int parity) const { PrintVector(2*x_cb + parity); }
+    void PrintVector(unsigned int x_cb, unsigned int parity) const { PrintVector(2 * x_cb + parity); }
 
     /**
      * Compute the n-dimensional site index given the 1-d offset index

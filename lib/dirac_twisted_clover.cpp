@@ -134,7 +134,7 @@ namespace quda {
 					  double kappa, double mass, double mu, double mu_factor) const {
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Wilson-type operators only support aggregation coarsening");
-    
+
     double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
     CoarseOp(Y, X, T, *gauge, clover, kappa, mass, a, mu_factor, QUDA_TWISTED_CLOVER_DIRAC, QUDA_MATPC_INVALID);
   }

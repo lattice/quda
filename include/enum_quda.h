@@ -451,11 +451,11 @@ typedef enum QudaSetupType_s {
 } QudaSetupType;
 
 typedef enum QudaTransferType_s {
-    QUDA_TRANSFER_AGGREGATE,
-    QUDA_TRANSFER_COARSE_KD,
-    QUDA_TRANSFER_OPTIMIZED_KD,
-    QUDA_TRANSFER_INVALID = QUDA_INVALID_ENUM
-  } QudaTransferType; 
+  QUDA_TRANSFER_AGGREGATE,
+  QUDA_TRANSFER_COARSE_KD,
+  QUDA_TRANSFER_OPTIMIZED_KD,
+  QUDA_TRANSFER_INVALID = QUDA_INVALID_ENUM
+} QudaTransferType;
 
 typedef enum QudaBoolean_s {
   QUDA_BOOLEAN_FALSE = 0,

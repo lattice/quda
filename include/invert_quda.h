@@ -1198,7 +1198,8 @@ public:
       ColorSpinorField *out=nullptr;
       ColorSpinorField *in=nullptr;
 
-      bool special_prepare_recon = (dirac.getDiracType() == QUDA_STAGGEREDKD_DIRAC || dirac.getDiracType() == QUDA_ASQTADKD_DIRAC);
+      bool special_prepare_recon
+        = (dirac.getDiracType() == QUDA_STAGGEREDKD_DIRAC || dirac.getDiracType() == QUDA_ASQTADKD_DIRAC);
 
       if (special_prepare_recon) {
         dirac.prepareSpecialMG(in, out, x, b, solution_type);

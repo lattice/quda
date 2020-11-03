@@ -779,7 +779,7 @@ namespace quda {
 
     int geoBlockVolume = 1;
     for (int d = 0; d < nDim; d++) { geoBlockVolume *= geoBlockSize[d]; }
-    
+
     // Detect if the "coarse" op is the Kahler-Dirac op or something else
     // that still acts on a fine staggered ColorSpinorField
     if (geoBlockVolume == 1 && Nvec == nColor && nSpin == 1) {

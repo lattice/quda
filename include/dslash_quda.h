@@ -632,7 +632,8 @@ namespace quda {
      @param[in] Xinv Kahler-Dirac inverse field
      @param[in] dagger Whether we are applying the dagger or not
   */
-  void ApplyStaggeredKahlerDiracInverse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Xinv, bool dagger);
+  void ApplyStaggeredKahlerDiracInverse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Xinv,
+                                        bool dagger);
 
   /**
      @brief Apply the twisted-mass gamma operator to a color-spinor field.

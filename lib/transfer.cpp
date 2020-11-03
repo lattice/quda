@@ -80,12 +80,14 @@ namespace quda {
     }
 
     // Aggregation size is "technically" 1 for optimized KD
-    if (total_block_size != 1 && transfer_type == QUDA_TRANSFER_OPTIMIZED_KD) errorQuda("Total geometric block size must be 1 for transfer type optimized-kd");
+    if (total_block_size != 1 && transfer_type == QUDA_TRANSFER_OPTIMIZED_KD)
+      errorQuda("Total geometric block size must be 1 for transfer type optimized-kd");
     if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD) {
-      if (total_block_size != 1) errorQuda("Invalid geometric block size %d for optimized-kd aggregation, must be 1", total_block_size);
-      if (Nvec != B[0]->Ncolor()) errorQuda("Invalid Nvec %d for optimized-kd aggregation, must be fine color %d", Nvec, B[0]->Ncolor());
+      if (total_block_size != 1)
+        errorQuda("Invalid geometric block size %d for optimized-kd aggregation, must be 1", total_block_size);
+      if (Nvec != B[0]->Ncolor())
+        errorQuda("Invalid Nvec %d for optimized-kd aggregation, must be fine color %d", Nvec, B[0]->Ncolor());
     }
-
 
     std::string block_str = std::to_string(geo_bs[0]);
     for (int d = 1; d < ndim; d++) block_str += " x " + std::to_string(geo_bs[d]);
@@ -93,8 +95,7 @@ namespace quda {
 
     if (transfer_type == QUDA_TRANSFER_COARSE_KD) {
       for (int d = 0; d < 4; d++) {
-        if (geo_bs[d] != 2)
-          errorQuda("Invalid staggered KD block size %d for dimension %d, must be 2", geo_bs[d], d);
+        if (geo_bs[d] != 2) errorQuda("Invalid staggered KD block size %d for dimension %d, must be 2", geo_bs[d], d);
       }
       if (Nvec != 24) errorQuda("Invalid number of coarse vectors %d for staggered KD multigrid, must be 24", Nvec);
     }
@@ -169,7 +170,10 @@ namespace quda {
   void Transfer::createTmp(QudaFieldLocation location) const
   {
     // The CPU temporaries are needed for creating geometry mappings.
-    if ((transfer_type == QUDA_TRANSFER_COARSE_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD) && location != QUDA_CPU_FIELD_LOCATION) { return; }
+    if ((transfer_type == QUDA_TRANSFER_COARSE_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD)
+        && location != QUDA_CPU_FIELD_LOCATION) {
+      return;
+    }
 
     postTrace();
     ColorSpinorParam param(*B[0]);
@@ -354,11 +358,9 @@ namespace quda {
       flops_ += 0; // it's only a permutation
     } else if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD) {
 
-      if (in.SiteSubset() != QUDA_FULL_SITE_SUBSET)
-        errorQuda("Optimized KD op only supports full-parity spinors");
+      if (in.SiteSubset() != QUDA_FULL_SITE_SUBSET) errorQuda("Optimized KD op only supports full-parity spinors");
 
-      if (output->VolumeCB() != input->VolumeCB())
-        errorQuda("Optimized KD transfer is only between equal volumes");
+      if (output->VolumeCB() != input->VolumeCB()) errorQuda("Optimized KD transfer is only between equal volumes");
 
       // the optimized KD op acts on fine spinors
       if (out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) {
@@ -368,7 +370,7 @@ namespace quda {
       }
       flops_ += 0;
 
-    } else if (transfer_type == QUDA_TRANSFER_AGGREGATE ) {
+    } else if (transfer_type == QUDA_TRANSFER_AGGREGATE) {
 
       const ColorSpinorField *V = use_gpu ? V_d : V_h;
 
@@ -420,11 +422,9 @@ namespace quda {
       flops_ += 0; // it's only a permutation
     } else if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD) {
 
-      if (out.SiteSubset() != QUDA_FULL_SITE_SUBSET)
-        errorQuda("Optimized KD op only supports full-parity spinors");
+      if (out.SiteSubset() != QUDA_FULL_SITE_SUBSET) errorQuda("Optimized KD op only supports full-parity spinors");
 
-      if (output->VolumeCB() != input->VolumeCB())
-        errorQuda("Optimized KD transfer is only between equal volumes");
+      if (output->VolumeCB() != input->VolumeCB()) errorQuda("Optimized KD transfer is only between equal volumes");
 
       // the optimized KD op acts on fine spinors
       if (in.SiteSubset() == QUDA_PARITY_SITE_SUBSET) {

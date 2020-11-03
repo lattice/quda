@@ -440,9 +440,9 @@ public:
      matpc==QUDA_MATPC_INVALID then we assume the operator is not
      even-odd preconditioned and we coarsen the full operator.
    */
-  void CoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-		const cudaGaugeField &gauge, const cudaCloverField *clover,
-		double kappa, double mass, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc);
+  void CoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge,
+                const cudaCloverField *clover, double kappa, double mass, double mu, double mu_factor,
+                QudaDiracType dirac, QudaMatPCType matpc);
 
   /**
      @brief Coarse operator construction from a fine-grid operator (Staggered)
@@ -456,8 +456,8 @@ public:
      operator we are constructing the coarse grid operator from.
      For staggered, should always be QUDA_MATPC_INVALID.
    */
-  void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge, const cudaGaugeField* XinvKD, double mass,
-                         QudaDiracType dirac, QudaMatPCType matpc);
+  void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge,
+                         const cudaGaugeField *XinvKD, double mass, QudaDiracType dirac, QudaMatPCType matpc);
 
   /**
      @brief Coarse operator construction from an intermediate-grid operator (Coarse)
@@ -480,8 +480,8 @@ public:
      preconditioned, we've violated that symmetry.
      @param use_mma[in] Whether or not use MMA (tensor core) to do the calculation, default to false
    */
-  void CoarseCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
-                      const GaugeField &clover, const GaugeField &cloverInv, double kappa, double mass, double mu, double mu_factor,
+  void CoarseCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge, const GaugeField &clover,
+                      const GaugeField &cloverInv, double kappa, double mass, double mu, double mu_factor,
                       QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional, bool use_mma = false);
 
   /**

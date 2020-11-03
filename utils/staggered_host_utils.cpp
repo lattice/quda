@@ -145,7 +145,8 @@ void constructFatLongGaugeField(void **fatlink, void **longlink, int type, QudaP
 
     applyGaugeFieldScaling_long(fatlink, Vh, param, QUDA_STAGGERED_DSLASH, precision);
 
-    if (dslash_type == QUDA_ASQTAD_DSLASH && !compute_fatlong) applyGaugeFieldScaling_long(longlink, Vh, param, QUDA_STAGGERED_DSLASH, precision);
+    if (dslash_type == QUDA_ASQTAD_DSLASH && !compute_fatlong)
+      applyGaugeFieldScaling_long(longlink, Vh, param, QUDA_STAGGERED_DSLASH, precision);
 
   } else {
     if (precision == QUDA_DOUBLE_PRECISION) {
