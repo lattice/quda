@@ -733,7 +733,6 @@ namespace quda
 
     ColorSpinorParam csParamClone(*evecs[0]);
     std::vector<ColorSpinorField *> temp;
-    std::vector<ColorSpinorField *> temp_g5;
     temp.push_back(ColorSpinorField::Create(csParamClone));
 
     for (int i = 0; i < size; i++) {
