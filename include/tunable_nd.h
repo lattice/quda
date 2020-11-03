@@ -118,7 +118,7 @@ namespace quda {
        Since we are not grid-size tuning, we require any derivations
        to specify the minimum thread count.
      */
-    unsigned int minThreads() const = 0;
+    virtual unsigned int minThreads() const = 0;
 
   public:
     TunableKernel1D(const LatticeField &field, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
@@ -238,16 +238,23 @@ namespace quda {
 	return true;
       } else { // block.x (spacetime) was reset
 
+        auto next = param;
+        next.block.y += step_y;
+        auto shared_bytes = std::max(this->sharedBytesPerThread() * next.block.x * next.block.y * next.block.z, this->sharedBytesPerBlock(next));
+
 	// we can advance spin/block-color since this is valid
 	if (param.block.y < vector_length_y && param.block.y < device::max_threads_per_block_dim(1) &&
-	    param.block.x*(param.block.y+step_y)*param.block.z <= device::max_threads_per_block()) {
+	    param.block.x*(param.block.y+step_y)*param.block.z <= device::max_threads_per_block() &&
+            shared_bytes <= this->maxSharedBytesPerBlock()) {
 	  param.block.y += step_y;
 	  param.grid.y = (vector_length_y + param.block.y - 1) / param.block.y;
-	  return true;
+          param.shared_bytes = shared_bytes;
+          return true;
 	} else { // we have run off the end so let's reset
 	  param.block.y = step_y;
 	  param.grid.y = (vector_length_y + param.block.y - 1) / param.block.y;
-	  return false;
+
+          return false;
 	}
       }
     }
@@ -257,6 +264,7 @@ namespace quda {
       Tunable::initTuneParam(param);
       param.block.y = step_y;
       param.grid.y = (vector_length_y + step_y - 1) / step_y;
+      param.shared_bytes = std::max(this->sharedBytesPerThread() * param.block.x * param.block.y * param.block.z, this->sharedBytesPerBlock(param));
     }
 
     /** sets default values for when tuning is disabled */
@@ -265,6 +273,7 @@ namespace quda {
       Tunable::defaultTuneParam(param);
       param.block.y = step_y;
       param.grid.y = (vector_length_y + step_y - 1) / step_y;
+      param.shared_bytes = std::max(this->sharedBytesPerThread() * param.block.x * param.block.y * param.block.z, this->sharedBytesPerBlock(param));
     }
 
     void resizeVector(int y) const { vector_length_y = y; }
@@ -279,7 +288,7 @@ namespace quda {
        Since we are not grid-size tuning, we require any derivations
        to specify the minimum thread count.
      */
-    unsigned int minThreads() const = 0;
+    virtual unsigned int minThreads() const = 0;
 
   public:
     TunableKernel2D(const LatticeField &field, unsigned int vector_length_y,
@@ -407,11 +416,17 @@ namespace quda {
 	return true;
       } else { // block.x/block.y (spacetime) was reset
 
-	// we can advance spin/block-color since this is valid
+        auto next = param;
+        next.block.z += step_z;
+        auto shared_bytes = std::max(this->sharedBytesPerThread() * next.block.x * next.block.y * next.block.z, this->sharedBytesPerBlock(next));
+
+        // we can advance spin/block-color since this is valid
 	if (param.block.z < vector_length_z && param.block.z < device::max_threads_per_block_dim(2) &&
-	    param.block.x*param.block.y*(param.block.z+step_z) <= device::max_threads_per_block()) {
+	    param.block.x*param.block.y*(param.block.z+step_z) <= device::max_threads_per_block() &&
+            shared_bytes <= this->maxSharedBytesPerBlock()) {
 	  param.block.z += step_z;
 	  param.grid.z = (vector_length_z + param.block.z - 1) / param.block.z;
+          param.shared_bytes = shared_bytes;
 	  return true;
 	} else { // we have run off the end so let's reset
 	  param.block.z = step_z;
@@ -426,6 +441,7 @@ namespace quda {
       TunableKernel2D_base<grid_stride>::initTuneParam(param);
       param.block.z = step_z;
       param.grid.z = (vector_length_z + step_z - 1) / step_z;
+      param.shared_bytes = std::max(this->sharedBytesPerThread() * param.block.x * param.block.y * param.block.z, this->sharedBytesPerBlock(param));
     }
 
     /** sets default values for when tuning is disabled */
@@ -434,6 +450,7 @@ namespace quda {
       TunableKernel2D_base<grid_stride>::defaultTuneParam(param);
       param.block.z = step_z;
       param.grid.z = (vector_length_z + step_z - 1) / step_z;
+      param.shared_bytes = std::max(this->sharedBytesPerThread() * param.block.x * param.block.y * param.block.z, this->sharedBytesPerBlock(param));
     }
 
     void resizeVector(int y, int z) const { vector_length_z = z;  TunableKernel2D_base<grid_stride>::resizeVector(y); }
@@ -448,7 +465,7 @@ namespace quda {
        Since we are not grid-size tuning, we require any derivations
        to specify the minimum thread count.
      */
-    unsigned int minThreads() const = 0;
+    virtual unsigned int minThreads() const = 0;
 
   public:
     TunableKernel3D(const LatticeField &field, unsigned int vector_length_y, unsigned int vector_length_z,

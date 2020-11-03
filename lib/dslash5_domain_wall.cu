@@ -103,6 +103,10 @@ namespace quda
       xpay(a == 0.0 ? false : true),
       type(type)
     {
+      if (shared() && (type == M5_INV_DWF || type == M5_INV_MOBIUS || type == M5_INV_ZMOBIUS)) {
+        TunableKernel2D_base<false>::resizeStep(in.X(4)); // Ls must be contained in the block
+      }
+
       if (dagger) strcat(aux, ",Dagger");
       if (xpay) strcat(aux, ",xpay");
       switch (type) {
@@ -149,26 +153,6 @@ namespace quda
       case M5_INV_MOBIUS:      Launch<M5_INV_MOBIUS, dslash5inv>(tp, stream); break;
       case M5_INV_ZMOBIUS:     Launch<M5_INV_ZMOBIUS, dslash5inv>(tp, stream); break;
       default: errorQuda("Unexpected Dslash5Type %d", type);
-      }
-    }
-
-    void initTuneParam(TuneParam &param) const
-    {
-      TunableKernel3D::initTuneParam(param);
-      if (shared() && (type == M5_INV_DWF || type == M5_INV_MOBIUS || type == M5_INV_ZMOBIUS)) {
-        param.block.y = in.X(4); // Ls must be contained in the block
-        param.grid.y = 1;
-        param.shared_bytes = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
-      }
-    }
-
-    void defaultTuneParam(TuneParam &param) const
-    {
-      TunableKernel3D::defaultTuneParam(param);
-      if (shared() && (type == M5_INV_DWF || type == M5_INV_MOBIUS || type == M5_INV_ZMOBIUS)) {
-        param.block.y = in.X(4); // Ls must be contained in the block
-        param.grid.y = 1;
-        param.shared_bytes = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
       }
     }
   };

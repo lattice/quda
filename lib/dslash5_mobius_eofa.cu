@@ -108,7 +108,8 @@ namespace quda
         xpay(a == 0.0 ? false : true),
         type(type)
       {
-        TunableKernel2D_base<false>::resizeStep(in.X(4));
+        TunableKernel2D_base<false>::resizeStep(in.X(4)); // Ls must be contained in the block
+
         if (dagger) strcat(aux, ",Dagger");
         if (xpay) strcat(aux, ",xpay");
         if (eofa_pm) {
@@ -165,17 +166,7 @@ namespace quda
         default: errorQuda("Unknown Dslash5Type %d", type);
         }
       }
-
-      void initTuneParam(TuneParam &param) const
-      {
-        TunableKernel3D::initTuneParam(param);
-        param.block.y = in.X(4); // Ls must be contained in the block
-        param.grid.y = 1;
-        param.shared_bytes = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
-      }
-
-      void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }
-      };
+    };
 
     // Apply the 5th dimension dslash operator to a colorspinor field
     // out = Dslash5*in

@@ -28,7 +28,7 @@ namespace quda {
   public:
     dim3 block;
     dim3 grid;
-    int shared_bytes;
+    unsigned int shared_bytes;
     bool set_max_shared_bytes; // whether to opt in to max shared bytes per thread block
     int4 aux; // free parameter that can be used as an arbitrary autotuning dimension outside of launch parameters
 
@@ -200,7 +200,7 @@ namespace quda {
     virtual bool advanceSharedBytes(TuneParam &param) const
     {
       if (tuneSharedBytes()) {
-        const int max_shared = maxSharedBytesPerBlock();
+        const auto max_shared = maxSharedBytesPerBlock();
         const int max_blocks_per_sm = std::min(device::max_threads_per_processor() / (param.block.x*param.block.y*param.block.z), device::max_blocks_per_processor());
 	int blocks_per_sm = max_shared / (param.shared_bytes ? param.shared_bytes : 1);
 	if (blocks_per_sm > max_blocks_per_sm) blocks_per_sm = max_blocks_per_sm;
@@ -210,9 +210,7 @@ namespace quda {
 	  TuneParam next(param);
 	  advanceBlockDim(next); // to get next blockDim
 	  int nthreads = next.block.x * next.block.y * next.block.z;
-          param.shared_bytes = sharedBytesPerThread() * nthreads > sharedBytesPerBlock(next) ?
-              sharedBytesPerThread() * nthreads :
-              sharedBytesPerBlock(next);
+          param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(next));
           return false;
 	} else {
 	  return true;
