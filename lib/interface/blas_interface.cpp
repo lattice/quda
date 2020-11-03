@@ -1,5 +1,4 @@
 #include <quda.h>
-#include <quda_internal.h>
 #include <blas_lapack.h>
 #include <tune_quda.h>
 
