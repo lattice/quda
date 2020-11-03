@@ -444,6 +444,10 @@ extern "C" {
     /** Performs an MdagM solve, then constructs the left and right SVD. **/
     QudaBoolean compute_svd;
 
+    /** Performs the \gamma_5 OP solve by Post multipling the eignvectors with 
+	\gamma_5 before computing the eigenvalues */
+    QudaBoolean compute_gamma5;
+    
     /** If true, the solver will error out if the convergence criteria are not met **/
     QudaBoolean require_convergence;
 

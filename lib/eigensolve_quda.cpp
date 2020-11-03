@@ -294,6 +294,9 @@ namespace quda
     }
     mat(out, in, *tmp1, *tmp2);
 
+    // If we are computing \gamma5 * OP, multiply here
+    if(eig_param->compute_gamma5 == QUDA_BOOLEAN_TRUE) gamma5(out, out);
+    
     // Save mattrix * vector tuning
     saveTuneCache();
   }
@@ -716,11 +719,13 @@ namespace quda
 
     ColorSpinorParam csParamClone(*evecs[0]);
     std::vector<ColorSpinorField *> temp;
+    std::vector<ColorSpinorField *> temp_g5;
     temp.push_back(ColorSpinorField::Create(csParamClone));
-
+    
     for (int i = 0; i < size; i++) {
       // r = A * v_i
       matVec(mat, *temp[0], *evecs[i]);
+
       // lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
       evals[i] = blas::cDotProduct(*evecs[i], *temp[0]) / sqrt(blas::norm2(*evecs[i]));
       // Measure ||lambda_i*v_i - A*v_i||

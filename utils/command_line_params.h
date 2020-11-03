@@ -306,6 +306,7 @@ extern double eig_amax;
 extern bool eig_use_normop;
 extern bool eig_use_dagger;
 extern bool eig_compute_svd;
+extern bool eig_compute_gamma5;
 extern QudaEigSpectrumType eig_spectrum;
 extern QudaEigType eig_type;
 extern bool eig_arpack_check;
