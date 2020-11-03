@@ -3,6 +3,7 @@
 #include <color_spinor_field.h>
 #include <register_traits.h>
 #include <dslash_quda.h>
+#include <instantiate.h>
 
 #include <jitify_helper.cuh>
 #include <kernels/staggered_kd_apply_xinv_kernel.cuh>
@@ -183,31 +184,32 @@ namespace quda {
   }
 
   // template on Xinv precision (only half and single for now)
-  template <typename vFloatSpinor>
-  void applyStaggeredKDBlock(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Xinv, bool dagger)
-  {
+  template <typename vFloatSpinor> struct StaggeredKDBlockApply {
+    StaggeredKDBlockApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Xinv, bool dagger)
+    {
 
 #if QUDA_PRECISION & 4
-    if (Xinv.Precision() == QUDA_SINGLE_PRECISION) {
-      applyStaggeredKDBlock<vFloatSpinor, float>(out, in, Xinv, dagger);
-    } else
+      if (Xinv.Precision() == QUDA_SINGLE_PRECISION) {
+        applyStaggeredKDBlock<vFloatSpinor, float>(out, in, Xinv, dagger);
+      } else
 #endif
 #if QUDA_PRECISION & 2
-    if (Xinv.Precision() == QUDA_HALF_PRECISION) {
-      applyStaggeredKDBlock<vFloatSpinor, short>(out, in, Xinv, dagger);
-    } else
+      if (Xinv.Precision() == QUDA_HALF_PRECISION) {
+        applyStaggeredKDBlock<vFloatSpinor, short>(out, in, Xinv, dagger);
+      } else
 #endif
-    {
-      errorQuda("Unsupported precision %d", Xinv.Precision());
+      {
+        errorQuda("Unsupported precision %d", Xinv.Precision());
+      }
     }
-  }
+  };
+
+
 
   // Applies the staggered KD block inverse to a staggered ColorSpinor
   void ApplyStaggeredKahlerDiracInverse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Xinv, bool dagger)
   {
 #if defined(GPU_STAGGERED_DIRAC)
-    // FIXME: This will eventually get replaced by a custom instantiate
-    // I just don't want to think about it for now.
     auto location = checkLocation(out, in, Xinv);
 
     if (location == QUDA_CPU_FIELD_LOCATION)
@@ -216,35 +218,13 @@ namespace quda {
     // the staggered KD block inverse can only be applied to a full field
     if (out.SiteSubset() != QUDA_FULL_SITE_SUBSET || out.SiteSubset() != QUDA_FULL_SITE_SUBSET)
       errorQuda("There is no meaning to applying the KD inverse to a single parity field");
+    
+    checkPrecision(out, in);
 
     // Instantiate based on ColorSpinor precision
     // We don't have a constraint on the precision of Xinv matching
     // the precision of the spinors.
-    auto precision = checkPrecision(out, in);
-
-#if QUDA_PRECISION & 8
-    if (precision == QUDA_DOUBLE_PRECISION) {
-      applyStaggeredKDBlock<double>(out, in, Xinv, dagger);
-    } else
-#endif
-#if QUDA_PRECISION & 4
-    if (precision == QUDA_SINGLE_PRECISION) {
-      applyStaggeredKDBlock<float>(out, in, Xinv, dagger);
-    } else
-#endif
-#if QUDA_PRECISION & 2
-    if (precision == QUDA_HALF_PRECISION) {
-      applyStaggeredKDBlock<short>(out, in, Xinv, dagger);
-    } else
-#endif
-#if QUDA_PRECISION & 1
-    if (precision == QUDA_QUARTER_PRECISION) {
-      applyStaggeredKDBlock<int8_t>(out, in, Xinv, dagger);
-    } else
-#endif
-    {
-      errorQuda("Unsupported precision %d\n", precision);
-    }
+    instantiatePrecision<StaggeredKDBlockApply>(out, in, Xinv, dagger);
 
 #else
     errorQuda("Staggered fermion support has not been built");

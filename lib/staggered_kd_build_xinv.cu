@@ -62,15 +62,15 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_VERBOSE);
 
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-        ComputeStaggeredKDBlockCPU<Float,fineColor,coarseSpin,coarseColor>(arg);
+        ComputeStaggeredKDBlockCPU(arg);
       } else {
 #ifdef JITIFY
         using namespace jitify::reflection;
         jitify_error = program->kernel("quda::ComputeStaggeredKDBlockGPU")
-          .instantiate(Type<Float>(),fineColor,coarseSpin,coarseColor,Type<Arg>())
+          .instantiate(Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else // not jitify
-        qudaLaunchKernel(ComputeStaggeredKDBlockGPU<Float,fineColor,coarseSpin,coarseColor,Arg>, tp, stream, arg);
+        qudaLaunchKernel(ComputeStaggeredKDBlockGPU<Arg>, tp, stream, arg);
 #endif // JITIFY
       }
     }

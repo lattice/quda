@@ -129,7 +129,7 @@ namespace quda {
         AddCoarseDiagonalCPU<Float,coarseSpin,coarseColor>(arg);
       } else if (type == COMPUTE_STAGGEREDMASS) {
 #if defined(STAGGEREDCOARSE)
-        AddCoarseStaggeredMassCPU<Float,coarseSpin,coarseColor>(arg);
+        AddCoarseStaggeredMassCPU(arg);
 #else
         errorQuda("AddCoarseStaggeredMass not enabled for non-staggered coarsenings");
 #endif
@@ -408,11 +408,11 @@ namespace quda {
 
 #ifdef JITIFY
         error = program->kernel("quda::AddCoarseStaggeredMassGPU")
-          .instantiate(Type<Float>(),coarseSpin,coarseColor,Type<Arg>())
+          .instantiate(Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
 #if defined(STAGGEREDCOARSE)
-        qudaLaunchKernel(AddCoarseStaggeredMassGPU<Float,coarseSpin,coarseColor,Arg>, tp, stream, arg);
+        qudaLaunchKernel(AddCoarseStaggeredMassGPU<Arg>, tp, stream, arg);
 #else
         errorQuda("AddCoarseStaggeredMass not enabled for non-staggered coarsenings");
 #endif

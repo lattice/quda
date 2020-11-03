@@ -491,9 +491,6 @@ namespace quda {
     QudaPrecision precision = Y.Precision();
     QudaFieldLocation location = checkLocation(Y, X);
 
-    if (XinvKD && XinvKD->Location() != location)
-      errorQuda("Invalid location %d", XinvKD->Location());
-
     GaugeField *U = location == QUDA_CUDA_FIELD_LOCATION ? const_cast<cudaGaugeField*>(&gauge) : nullptr;
     GaugeField *Xinv = location == QUDA_CUDA_FIELD_LOCATION ? const_cast<cudaGaugeField*>(XinvKD) : nullptr;
 

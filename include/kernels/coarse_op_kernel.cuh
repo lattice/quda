@@ -1211,14 +1211,15 @@ namespace quda {
     } //Spin
   }
 
-  template<typename Float, int nSpin, int nColor, typename Arg>
+  template<typename Arg>
   void AddCoarseStaggeredMassCPU(Arg &arg) {
+    using Float = typename Arg::Float;
     for (int parity=0; parity<2; parity++) {
 #pragma omp parallel for
       for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
-        for(int s = 0; s < nSpin; s++) { //Spin
-          for(int c = 0; c < nColor; c++) { //Color
-            arg.X_atomic(0,parity,x_cb,s,s,c,c) += complex<Float>(2.*arg.mass,0.0);
+        for(int s = 0; s < Arg::coarseSpin; s++) { //Spin
+          for(int c = 0; c < Arg::coarseColor; c++) { //Color
+            arg.X_atomic(0,parity,x_cb,s,s,c,c) += complex<Float>(static_cast<Float>(2.)*arg.mass,0.0);
           } //Color
         } //Spin
       } // x_cb
@@ -1226,15 +1227,17 @@ namespace quda {
   }
 
   // Adds the staggered mass to the coarse local term.
-  template<typename Float, int nSpin, int nColor, typename Arg>
+  template<typename Arg>
   __global__ void AddCoarseStaggeredMassGPU(Arg arg) {
+    using Float = typename Arg::Float;
+
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.coarseVolumeCB) return;
     int parity = blockDim.y*blockIdx.y + threadIdx.y;
 
-    for(int s = 0; s < nSpin; s++) { //Spin
-      for(int c = 0; c < nColor; c++) { //Color
-        arg.X_atomic(0,parity,x_cb,s,s,c,c) += complex<Float>(2.*arg.mass,0.0);
+    for(int s = 0; s < Arg::coarseSpin; s++) { //Spin
+      for(int c = 0; c < Arg::coarseColor; c++) { //Color
+        arg.X_atomic(0,parity,x_cb,s,s,c,c) += complex<Float>(static_cast<Float>(2.)*arg.mass,0.0);
       } //Color
     } //Spin
   }

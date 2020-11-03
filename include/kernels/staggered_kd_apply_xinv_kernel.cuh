@@ -22,7 +22,7 @@ namespace quda {
     static constexpr bool dagger = dagger_;
 
     static constexpr int blockSizeKD = 16; /** Elements per KD block */
-    static constexpr int paddedSpinorSizeKD = blockSizeKD; // padding is currently broken + 1; /** Padded size */
+    static constexpr int paddedSpinorSizeKD = blockSizeKD + 1; // padding is currently broken + 1; /** Padded size */
 
     static constexpr int xinvRowTileSize = 16; /** Length of a tile for KD */
     static constexpr int xinvColTileSize = 16; /** Length of a tile for KD */
@@ -70,7 +70,7 @@ namespace quda {
     extern __shared__ complex cs_buffer[];
 
     // For each "dot product" in the mat-vec
-    using WarpReduce16 = cub::WarpReduce<real,16>;
+    using WarpReduce16 = cub::WarpReduce<complex,16>;
     __shared__ typename WarpReduce16::TempStorage temp_storage_16;
 
     /////////////////////////////////
@@ -157,7 +157,7 @@ namespace quda {
 
     // ♫ do you believe in bank conflicts ♫
     for (int c_f = 0; c_f < Arg::fineColor; c_f++) {
-      in_buffer[buffer_index + 8 * c_f] = static_cast<complex>(in(0,c_f)); // { (real)(in_spinor.real()), (real)(in_spinor.imag()) };
+      in_buffer[buffer_index + 8 * c_f] = static_cast<complex>(in(0,c_f)); 
     }
 
     // in reality we only need to sync over my chunk of 256 threads
@@ -190,24 +190,18 @@ namespace quda {
           }
         }
 
-        __syncwarp();
-
         // do the tile multiplication
         #pragma unroll
         for (int row = 0; row < Arg::xinvRowTileSize; row++) {
           const complex xinv_elem = xinv_buffer[row * Arg::xinvPaddedColTileSize + fast_idx];
-          const complex cs_component = in_buffer[Arg::coarseDof * mid_idx + Arg::xinvColTileSize * tile_col + fast_idx];
+          const complex cs_component = in_buffer[Arg::paddedSpinorSizeKD * Arg::fineColor * mid_idx + Arg::xinvColTileSize * tile_col + fast_idx];
           const complex prod = cmul(xinv_elem, cs_component);
 
-          const real re_sum = WarpReduce16(temp_storage_16).Sum(prod.real());
-          const real im_sum = WarpReduce16(temp_storage_16).Sum(prod.imag());
-
-          __syncwarp();
+          const complex the_sum = WarpReduce16(temp_storage_16).Sum(prod);
 
           if (fast_idx == 0)
           {
-            out_buffer[Arg::paddedSpinorSizeKD * Arg::fineColor * mid_idx + Arg::xinvRowTileSize * tile_row + row].x += re_sum; 
-            out_buffer[Arg::paddedSpinorSizeKD * Arg::fineColor * mid_idx + Arg::xinvRowTileSize * tile_row + row].y += im_sum; 
+            out_buffer[Arg::paddedSpinorSizeKD * Arg::fineColor * mid_idx + Arg::xinvRowTileSize * tile_row + row] += the_sum;
           }
         }
       }

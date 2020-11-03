@@ -80,7 +80,7 @@ namespace quda {
     }
 
     // Aggregation size is "technically" 1 for optimized KD
-    if (total_block_size == 1 && transfer_type != QUDA_TRANSFER_OPTIMIZED_KD) errorQuda("Total geometric block size is 1 but transfer type isn't optimized-kd");
+    if (total_block_size != 1 && transfer_type == QUDA_TRANSFER_OPTIMIZED_KD) errorQuda("Total geometric block size must be 1 for transfer type optimized-kd");
     if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD) {
       if (total_block_size != 1) errorQuda("Invalid geometric block size %d for optimized-kd aggregation, must be 1", total_block_size);
       if (Nvec != B[0]->Ncolor()) errorQuda("Invalid Nvec %d for optimized-kd aggregation, must be fine color %d", Nvec, B[0]->Ncolor());

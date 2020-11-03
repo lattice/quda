@@ -5,13 +5,20 @@
 
 namespace quda {
 
-  template <typename Float, int coarseSpin, int fineColor, int coarseColor,
+  template <typename Float_, int coarseSpin_, int fineColor_, int coarseColor_,
             typename xGauge, typename fineGauge>
   struct CalculateStaggeredKDBlockArg {
 
     // FIXME: this can probably be merged into the same 
     // code as staggered_coarse_op_kernel.cuh, we just need
     // a templated version that builds vs doesn't build Y.
+
+    using Float = Float_;
+    static constexpr int coarseSpin = coarseSpin_;
+    static_assert(coarseSpin == 2, "Only coarseSpin == 2 is supported");
+    static constexpr int fineColor = fineColor_;
+    static constexpr int coarseColor = coarseColor_;
+    static_assert(8 * fineColor == coarseColor, "KD blocking requires 8 * fineColor == coarseColor");
 
     xGauge X;           /** Computed Kahler-Dirac (coarse clover) field */
 
@@ -46,9 +53,10 @@ namespace quda {
 
   };
 
-  template <typename Float, int fineColor, int coarseSpin, int coarseColor, typename Arg>
+  template <typename Arg>
   __device__ __host__ void ComputeStaggeredKDBlock(Arg &arg, int parity, int x_cb, int ic_f, int jc_f)
   {
+    using Float = typename Arg::Float;
     constexpr int nDim = 4;
     int coord[nDim];
     int coord_coarse[nDim];
@@ -97,44 +105,44 @@ namespace quda {
     // add staggered mass term to diagonal
     if (ic_f == 0 && jc_f == 0 && x_cb < arg.coarseVolumeCB) {
 #pragma unroll
-      for (int s = 0; s < coarseSpin; s++) {
+      for (int s = 0; s < Arg::coarseSpin; s++) {
 #pragma unroll
-        for (int c = 0; c < coarseColor; c++) {
-          arg.X(0,parity,x_cb,s,s,c,c) = static_cast<Float>(2.0) * complex<Float>(arg.mass,0.0); // staggered conventions. No need to +=
+        for (int c = 0; c < Arg::coarseColor; c++) {
+          arg.X(0,parity,x_cb,s,s,c,c) = complex<Float>(static_cast<Float>(2.0) * arg.mass,0.0); // staggered conventions. No need to +=
         } //Color
       } //Spin
     }
   }
 
-  template<typename Float, int fineColor, int coarseSpin, int coarseColor, typename Arg>
+  template<typename Arg>
   void ComputeStaggeredKDBlockCPU(Arg arg)
   {
     for (int parity=0; parity<2; parity++) {
 #pragma omp parallel for
       for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) { // Loop over fine volume
-        for (int ic_f=0; ic_f<fineColor; ic_f++) {
-          for (int jc_f=0; jc_f<fineColor; jc_f++) {
-            ComputeStaggeredKDBlock<Float,fineColor,coarseSpin,coarseColor>(arg, parity, x_cb, ic_f, jc_f);
+        for (int ic_f=0; ic_f<Arg::fineColor; ic_f++) {
+          for (int jc_f=0; jc_f<Arg::fineColor; jc_f++) {
+            ComputeStaggeredKDBlock(arg, parity, x_cb, ic_f, jc_f);
           } // coarse color columns
         } // coarse color rows
       } // c/b volume
     } // parity
   }
 
-  template<typename Float, int fineColor, int coarseSpin, int coarseColor, typename Arg>
+  template<typename Arg>
   __global__ void ComputeStaggeredKDBlockGPU(Arg arg)
   {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.fineVolumeCB) return;
 
     int c = blockDim.y*blockIdx.y + threadIdx.y; // fine color
-    if (c >= fineColor*fineColor) return;
-    int ic_f = c / fineColor;
-    int jc_f = c % fineColor;
+    if (c >= Arg::fineColor*Arg::fineColor) return;
+    int ic_f = c / Arg::fineColor;
+    int jc_f = c % Arg::fineColor;
     
     int parity = blockDim.z*blockIdx.z + threadIdx.z;
 
-    ComputeStaggeredKDBlock<Float,fineColor,coarseSpin,coarseColor>(arg, parity, x_cb, ic_f, jc_f);
+    ComputeStaggeredKDBlock(arg, parity, x_cb, ic_f, jc_f);
   }
 
 } // namespace quda

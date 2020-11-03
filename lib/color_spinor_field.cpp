@@ -777,14 +777,12 @@ namespace quda {
     ColorSpinorParam coarseParam(*this);
     for (int d=0; d<nDim; d++) coarseParam.x[d] = x[d]/geoBlockSize[d];
 
-    // check for optimized-KD build by seeing if total geoBlockSize == 1
-    bool is_optimized_kd = false;
     int geoBlockVolume = 1;
     for (int d = 0; d < nDim; d++) { geoBlockVolume *= geoBlockSize[d]; }
-    if (geoBlockVolume == 1) is_optimized_kd = true;
-
-    if (is_optimized_kd) {
-      // the "coarse" op is actually a fine staggered ColorSpinorField
+    
+    // Detect if the "coarse" op is the Kahler-Dirac op or something else
+    // that still acts on a fine staggered ColorSpinorField
+    if (geoBlockVolume == 1 && Nvec == nColor && nSpin == 1) {
       coarseParam.nSpin = nSpin;
       coarseParam.nColor = nColor;
     } else {
