@@ -1312,8 +1312,6 @@ namespace quda {
 
     PrintStats("CAeigCG", k, nu, b2, heavy_quark_res);
 
-    cudaProfilerStart();
-
     while ((!converged && k < param.maxiter) || (args.restarts < 3)) {
       // Update search space
       PipelinedSearchSpaceUpdate(lanczos_diag, lanczos_offdiag, beta, sqrt(nu));
@@ -1361,8 +1359,6 @@ namespace quda {
                    or convergence(nu, heavy_quark_res, local_stop, param.tol_hq))
         or convergence(rel_r2, heavy_quark_res, local_rel_stop, param.tol_hq);
     }
-
-    cudaProfilerStop();
 
     // blas::zero(*args.V2k);
     if (args.is_host_location) {
