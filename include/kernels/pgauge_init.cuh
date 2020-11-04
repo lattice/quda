@@ -55,8 +55,8 @@ namespace quda {
     Gauge U;
     dim3 threads; // number of active threads required
     InitGaugeHotArg(const GaugeField &U, RNG &rng) :
-      U(U),
       rng(rng),
+      U(U),
       //the optimal number of RNG states in rngstate array must be equal to half the lattice volume
       //this number is the same used in heatbath...
       threads(U.LocalVolumeCB(), 1, 1)

@@ -132,12 +132,14 @@ namespace quda
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
           const int ghost_idx = arg.improved ? ghostFaceIndexStaggered<0>(coord, arg.dim, d, 3) : ghost_idx2;
-          const int back_idx = linkIndexM1(coord, arg.dim, d);
+	  // Reported as unused variable
+          //const int back_idx = linkIndexM1(coord, arg.dim, d);
           const Link U = arg.improved ? arg.U.Ghost(d, ghost_idx2, 1 - parity) :
             arg.U.Ghost(d, ghost_idx2, 1 - parity, StaggeredPhase(coord, d, -1, arg));
           Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
           out -= (conj(U) * in);
         } else if (doBulk<kernel_type>() && !ghost) {
+	   // Reported as unused variable
           const int back_idx = linkIndexM1(coord, arg.dim, d);
           const int gauge_idx = back_idx;
           const Link U = arg.improved ? arg.U(d, gauge_idx, 1 - parity) :

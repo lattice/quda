@@ -152,7 +152,7 @@ namespace quda {
           case 2: qudaLaunchKernel(multiBlasKernel<device_real_t, M, NXZ, 2, decltype(arg)>, tp, stream, arg); break;
           case 4: qudaLaunchKernel(multiBlasKernel<device_real_t, M, NXZ, 4, decltype(arg)>, tp, stream, arg); break;
 #endif
-          default: errorQuda("warp-split factor %d not instantiated", tp.aux.x);
+          default: errorQuda("warp-split factor %d not instantiated", int{tp.aux.x});
           }
 #endif
 

@@ -947,15 +947,17 @@ namespace quda {
   template<class Cmplx>
     __host__ __device__ inline
     void printLink(const Matrix<Cmplx,3>& link){
-      printf("(%lf, %lf)\t", link(0,0).x, link(0,0).y);
-      printf("(%lf, %lf)\t", link(0,1).x, link(0,1).y);
-      printf("(%lf, %lf)\n", link(0,2).x, link(0,2).y);
-      printf("(%lf, %lf)\t", link(1,0).x, link(1,0).y);
-      printf("(%lf, %lf)\t", link(1,1).x, link(1,1).y);
-      printf("(%lf, %lf)\n", link(1,2).x, link(1,2).y);
-      printf("(%lf, %lf)\t", link(2,0).x, link(2,0).y);
-      printf("(%lf, %lf)\t", link(2,1).x, link(2,1).y);
-      printf("(%lf, %lf)\n", link(2,2).x, link(2,2).y);
+      using R=typename Cmplx::value_type;
+
+      printf("(%lf, %lf)\t", R{link(0,0).x}, R{link(0,0).y});
+      printf("(%lf, %lf)\t", R{link(0,1).x}, R{link(0,1).y});
+      printf("(%lf, %lf)\n", R{link(0,2).x}, R{link(0,2).y});
+      printf("(%lf, %lf)\t", R{link(1,0).x}, R{link(1,0).y});
+      printf("(%lf, %lf)\t", R{link(1,1).x}, R{link(1,1).y});
+      printf("(%lf, %lf)\n", R{link(1,2).x}, R{link(1,2).y});
+      printf("(%lf, %lf)\t", R{link(2,0).x}, R{link(2,0).y});
+      printf("(%lf, %lf)\t", R{link(2,1).x}, R{link(2,1).y});
+      printf("(%lf, %lf)\n", R{link(2,2).x}, R{link(2,2).y});
       printf("\n");
     }
 

@@ -59,7 +59,7 @@ namespace quda {
 
   public:
     CopySpinor(OutOrder &out, const InOrder &in, const ColorSpinorField &meta, QudaFieldLocation location)
-      : out(out), in(in), meta(meta), location(location) { }
+      : in(in), out(out), meta(meta), location(location) { }
     virtual ~CopySpinor() { ; }
 
     void apply(const qudaStream_t &stream) {

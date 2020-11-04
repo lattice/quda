@@ -21,8 +21,8 @@ namespace quda
 
     QChargeArg(const GaugeField &Fmunu, Float *qDensity = nullptr) :
       ReduceArg<double3>(),
-      f(Fmunu),
       threads(Fmunu.VolumeCB(), 2, 1),
+      f(Fmunu),
       qDensity(qDensity)
     {
     }

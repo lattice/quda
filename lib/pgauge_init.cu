@@ -41,8 +41,8 @@ namespace quda {
   public:
     InitGaugeHot(GaugeField &U, RNG &rng) :
       TunableKernel1D(U),
-      rng(rng),
-      U(U)
+      U(U),
+      rng(rng)
     {
       apply(0);
       qudaDeviceSynchronize();

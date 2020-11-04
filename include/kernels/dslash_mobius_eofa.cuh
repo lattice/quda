@@ -28,7 +28,7 @@ namespace quda
      */
     template <typename real> inline __device__ __host__ const eofa_coeff<real> *get_eofa_coeff()
     {
-#ifdef __CUDA_ARCH__
+#if defined(__HIP_DEVICE_COMPILE__) || defined(__CUDA_ARCH__)
       return reinterpret_cast<const eofa_coeff<real> *>(mobius_eofa_d);
 #else
       return reinterpret_cast<const eofa_coeff<real> *>(mobius_eofa_h);

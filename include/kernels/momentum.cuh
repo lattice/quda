@@ -74,8 +74,8 @@ namespace quda {
     UpdateMomArg(GaugeField &mom, const Float &coeff, GaugeField &force) :
       BaseArg<Float, nColor, recon>(mom),
       mom(mom),
-      coeff(coeff),
-      force(force) {
+      force(force),
+      coeff(coeff) {
       for (int dir=0; dir<4; ++dir) {
         X[dir] = mom.X()[dir];
         E[dir] = force.X()[dir];

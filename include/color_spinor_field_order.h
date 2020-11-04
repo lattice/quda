@@ -1027,7 +1027,8 @@ namespace quda {
   __device__ __host__ inline void load(complex out[length / 2], int x, int parity = 0) const
   {
     real v[length];
-    norm_type nrm;
+    norm_type nrm{0}; // For fixed prec types nrm will be loaded.
+                      // For non fiexd types it will be ignored in copy_and_scale
     if (isFixed<Float>::value) {
       nrm = vector_load<float>(norm, x + parity * norm_offset);
     }
@@ -1116,7 +1117,7 @@ namespace quda {
   __device__ __host__ inline void loadGhost(complex out[length_ghost / 2], int x, int dim, int dir, int parity = 0) const
   {
     real v[length_ghost];
-    norm_type nrm;
+    norm_type nrm{0}; // For fixed prec types nrm will be loaded. For non-fixed types it will be ignored in copy_and_scale
     if (isFixed<Float>::value) { nrm = vector_load<float>(ghost_norm[2 * dim + dir], parity * faceVolumeCB[dim] + x); }
 
 #pragma unroll

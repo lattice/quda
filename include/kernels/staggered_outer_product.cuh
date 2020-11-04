@@ -32,10 +32,10 @@ namespace quda {
 
     StaggeredOprodArg(GaugeField &U, GaugeField &L, const ColorSpinorField &inA, const ColorSpinorField &inB,
                       int parity, int displacement, int nFace, const real coeff[2]) :
-      inA(inA),
-      inB(inB, nFace),
       U(U),
       L(L),
+      inA(inA),
+      inB(inB, nFace),
       parity(parity),
       displacement(displacement),
       nFace(nFace),

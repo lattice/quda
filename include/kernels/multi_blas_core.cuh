@@ -6,9 +6,12 @@
 #include <multi_blas_helper.cuh>
 #include <float_vector.h>
 
+#include <quda_define.h>
+#if defined(QUDA_TARGET_CUDA)
 #if (__COMPUTE_CAPABILITY__ >= 300 || __CUDA_ARCH__ >= 300) && !defined(QUDA_FAST_COMPILE_REDUCE)
 #define WARP_SPLIT
 #include <generics/shfl.h>
+#endif
 #endif
 
 namespace quda
@@ -154,7 +157,7 @@ namespace quda
 
       __device__ __host__ inline coeff_t a(int i, int j) const
       {
-#ifdef __CUDA_ARCH__
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
         return reinterpret_cast<coeff_t *>(Amatrix_d)[i * NYW + j];
 #else
         return reinterpret_cast<coeff_t *>(Amatrix_h)[i * NYW + j];
@@ -163,7 +166,7 @@ namespace quda
 
       __device__ __host__ inline coeff_t b(int i, int j) const
       {
-#ifdef __CUDA_ARCH__
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
         return reinterpret_cast<coeff_t *>(Bmatrix_d)[i * NYW + j];
 #else
         return reinterpret_cast<coeff_t *>(Bmatrix_h)[i * NYW + j];

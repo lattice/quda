@@ -1,7 +1,7 @@
 #include <blas_lapack.h>
 #ifdef NATIVE_LAPACK_LIB
 #include <hipblas.h>
-#include <hip/hip_complex.h>
+//#include <hip/hip_complex.h>
 #include <malloc_quda.h>
 #endif
 

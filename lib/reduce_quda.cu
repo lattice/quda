@@ -88,6 +88,7 @@ namespace quda {
              ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v, host_reduce_t &result) :
         r(a, b),
         nParity((x.IsComposite() ? x.CompositeDim() : 1) * (x.SiteSubset())),
+	result(result),
         a(a),
         b(b),
         x(x),
@@ -95,7 +96,6 @@ namespace quda {
         z(z),
         w(w),
         v(v),
-        result(result),
         location(checkLocation(x, y, z, w, v))
       {
         checkLength(x, y, z, w, v);

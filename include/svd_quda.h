@@ -11,9 +11,9 @@ namespace quda {
 
   // FIXME replace this with hypot
   template <class Cmplx>
-  inline DEVICEHOST typename std::remove_reference<decltype(Cmplx::x)>::type cabs(const Cmplx & z)
+  inline DEVICEHOST typename Cmplx::value_type  cabs(const Cmplx & z)
   {
-    typedef typename std::remove_reference<decltype(Cmplx::x)>::type real;
+    typedef typename Cmplx::value_type  real;
     real max, ratio, square;
     if(fabs(z.x) > fabs(z.y)){ max = z.x; ratio = z.y/max; }else{ max=z.y; ratio = z.x/max; }
     square = (max != 0.0) ? max*max*(1.0 + ratio*ratio) : 0.0;

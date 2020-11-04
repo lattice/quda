@@ -16,6 +16,8 @@ using count_t = cuda::atomic<unsigned int, cuda::thread_scope_device>;
 using count_t = unsigned int;
 #endif
 
+#include <quda_define.h>
+
 namespace quda
 {
 
@@ -31,20 +33,39 @@ namespace quda
     qudaEvent_t &get_event();
   } // namespace reducer
 
-  template <typename T> struct plus {
-    __device__ __host__ T operator()(T a, T b) { return a + b; }
+  template <typename T> struct plus;
+
+#if defined(QUDA_TARGET_HIP) 
+  // For some reason HIP finds ambiguity with the more general operator
+  // So to be sure I am being very specific.
+  template<>
+  struct plus<HIP_vector_type<double,2>> {
+    using Double2 = HIP_vector_type<double,2>;
+
+    __device__ __host__ inline Double2 operator()( Double2 a, Double2 b ) {
+	    Double2 ret_val{0,0};
+	    ret_val.x = a.x + b.x;
+	    ret_val.y = a.y + b.y;
+	    return ret_val;
+    }
   };
+#endif
+
+  template <typename T> struct plus {
+    __device__ __host__ T operator()( T a, const T b){ return a + b; }
+  };
+
 
   template <typename T> struct maximum {
     __device__ __host__ T operator()(T a, T b) { return a > b ? a : b; }
   };
 
   template <typename T> struct minimum {
-    __device__ __host__ T operator()(T a, T b) { return a < b ? a : b; }
+    __device__ __host__ T operator()(T a, T b) { return a < b ? a : b ; }
   };
 
   template <typename T> struct identity {
-    __device__ __host__ T operator()(T a) { return a; }
+    __device__ __host__ T operator()(const T& a) { return T(a); }
   };
 
   constexpr int max_n_reduce() { return QUDA_MAX_MULTI_REDUCE; }

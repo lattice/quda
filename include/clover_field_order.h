@@ -604,7 +604,7 @@ namespace quda {
 	 */
 	__device__ __host__ inline void load(real v[block], int x, int parity, int chirality) const
         {
-          norm_type nrm;
+          norm_type nrm{0};
           if (isFixed<Float>::value) {
             nrm = vector_load<float>(norm, parity * norm_offset + chirality * stride + x);
           }

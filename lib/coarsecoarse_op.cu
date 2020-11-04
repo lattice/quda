@@ -310,7 +310,8 @@ namespace quda {
                       const GaugeField &clover, const GaugeField &cloverInv, double kappa, double mu, double mu_factor,
                       QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional, bool use_mma)
   {
-    QudaPrecision precision = Y.Precision();
+    // Reported as unused variable
+    // QudaPrecision precision = Y.Precision(); 
     QudaFieldLocation location = checkLocation(X, Y, gauge, clover, cloverInv);
 
     //Create a field UV which holds U*V.  Has the same similar

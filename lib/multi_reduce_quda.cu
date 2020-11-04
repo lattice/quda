@@ -643,7 +643,7 @@ namespace quda {
 
           delete[] result_trans;
         } else {
-          errorQuda("Unexpected transpose parameter %d", tp.aux.x);
+          errorQuda("Unexpected transpose parameter %d", int(tp.aux.x));
         }
       }
 
