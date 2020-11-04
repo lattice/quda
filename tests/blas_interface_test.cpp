@@ -18,6 +18,13 @@
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
 
+// If you add a new contraction type, this must be updated++
+constexpr int NcontractType = 2;
+// For googletest, names must be non-empty, unique, and may only contain ASCII
+// alphanumeric characters or underscore.
+const char *data_type_str[] = {"realSingle", "realDouble", "complexSingle",
+			       "complexDouble", };
+
 namespace quda
 {
   extern void setTransferGPU(bool);
@@ -53,6 +60,10 @@ int main(int argc, char **argv)
   // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
 
+  // Ensure gtest prints only from rank 0
+  ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
+  if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
+  
   // call srand() with a rank-dependent seed
   initRand();
   setQudaPrecisions();
@@ -61,8 +72,46 @@ int main(int argc, char **argv)
 
   // initialize the QUDA library
   initQuda(device_ordinal);
+  int X[4] = {xdim, ydim, zdim, tdim};
+  setDims(X);
+  setSpinorSiteSize(24);
   //-----------------------------------------------------------------------------
 
+  // Start Google Test Suite
+  //-----------------------------------------------------------------------------
+  ::testing::InitGoogleTest(&argc, argv);
+
+  prec = QUDA_INVALID_PRECISION;
+
+  // Check for correctness
+  if (verify_results) {
+    ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
+    if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
+    int result = RUN_ALL_TESTS();
+    if (result) warningQuda("Google tests for QUDA contraction failed!");
+  }
+  //-----------------------------------------------------------------------------
+
+  // finalize the QUDA library
+  endQuda();
+
+  // finalize the communications layer
+  finalizeComms();
+
+  return 0;
+}
+
+void test(int data_type) {
+  
+  QudaBLASDataType test_data_type = QUDA_BLAS_DATATYPE_INVALID;
+  switch (data_type) {
+  case 0: test_data_type = QUDA_BLAS_DATATYPE_S; break;
+  case 1: test_data_type = QUDA_BLAS_DATATYPE_S; break;
+  case 2: test_data_type = QUDA_BLAS_DATATYPE_C; break;
+  case 3: test_data_type = QUDA_BLAS_DATATYPE_Z; break;
+  default: errorQuda("Undefined QUDA BLAS data type %d\n", data_type);
+  }  
+  
   QudaBLASParam blas_param = newQudaBLASParam();
   blas_param.trans_a = blas_trans_a;
   blas_param.trans_b = blas_trans_b;
@@ -81,7 +130,7 @@ int main(int argc, char **argv)
   blas_param.alpha = (__complex__ double)blas_alpha_re_im[0];
   blas_param.beta = (__complex__ double)blas_beta_re_im[0];
   blas_param.data_order = blas_data_order;
-  blas_param.data_type = blas_data_type;
+  blas_param.data_type = test_data_type;
   blas_param.batch_count = blas_batch;
 
   // Reference data is always in complex double
@@ -139,7 +188,7 @@ int main(int argc, char **argv)
   }
 
   // Populate the imaginary part with rands if needed
-  if (blas_param.data_type == QUDA_BLAS_DATATYPE_C || blas_param.data_type == QUDA_BLAS_DATATYPE_Z) {
+  if (test_data_type == QUDA_BLAS_DATATYPE_C || test_data_type == QUDA_BLAS_DATATYPE_Z) {
     for (uint64_t i = 1; i < 2 * refA_size * batches; i += 2) { ((double *)refA)[i] = rand() / (double)RAND_MAX; }
     for (uint64_t i = 1; i < 2 * refB_size * batches; i += 2) { ((double *)refB)[i] = rand() / (double)RAND_MAX; }
     for (uint64_t i = 1; i < 2 * refC_size * batches; i += 2) {
@@ -154,7 +203,7 @@ int main(int argc, char **argv)
   void *arrayC = nullptr;
   void *arrayCcopy = nullptr;
 
-  switch (blas_param.data_type) {
+  switch (test_data_type) {
   case QUDA_BLAS_DATATYPE_S:
     arrayA = pinned_malloc(batches * refA_size * sizeof(float));
     arrayB = pinned_malloc(batches * refB_size * sizeof(float));
@@ -207,7 +256,7 @@ int main(int argc, char **argv)
       ((double *)arrayCcopy)[i] = ((double *)refC)[i];
     }
     break;
-  default: errorQuda("Unrecognised data type %d\n", blas_param.data_type);
+  default: errorQuda("Unrecognised data type %d\n", test_data_type);
   }
 
   // Perform device GEMM Blas operation
@@ -227,12 +276,39 @@ int main(int argc, char **argv)
   host_free(arrayB);
   host_free(arrayC);
   host_free(arrayCcopy);
-
-  // finalize the QUDA library
-  endQuda();
-
-  // finalize the communications layer
-  finalizeComms();
-
-  return 0;
 }
+
+// The following tests gets each contraction type and precision using google testing framework
+using ::testing::Bool;
+using ::testing::Combine;
+using ::testing::Range;
+using ::testing::TestWithParam;
+using ::testing::Values;
+
+class BLASTest : public ::testing::TestWithParam<int>
+{
+  protected:
+  int param;
+
+  public:
+  virtual ~BLASTest() {}
+  virtual void SetUp() { param = GetParam(); }
+};
+
+// Sets up the Google test
+TEST_P(BLASTest, verify)
+{
+  int data_type = GetParam();
+  test(data_type);
+}
+
+// Helper function to construct the test name
+std::string getBLASName(testing::TestParamInfo<int> param)
+{
+  int data_type = param.param;
+  std::string str(data_type_str[data_type]);
+  return str;
+}
+
+// Instantiate all test cases
+INSTANTIATE_TEST_SUITE_P(QUDA, BLASTest, Range(0, 4), getBLASName);

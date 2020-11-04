@@ -297,6 +297,7 @@ if(QUDA_DIRAC_STAGGERED)
                    --gtest_output=xml:blas_test_full.xml)
 endif()
 
+
 # BLAS interface test
 if(QUDA_BUILD_NATIVE_LAPACK)
   add_test(NAME blas_interface_test
