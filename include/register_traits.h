@@ -462,10 +462,11 @@ namespace quda {
   };
 
   template<typename Float>
-  __host__ __device__ Float Rsqrt(Float r);
+  __host__ __device__ inline Float Rsqrt(Float r);
 
   template<>
-  __host__ __device__ float Rsqrt(float r) {
+
+  __host__ __device__ inline float Rsqrt<float>(float r) {
 #if defined(QUDA_TARGET_CUDA) 
     return rsqrt(r);
 #elif defined(QUDA_TARGET_HIP)
@@ -480,7 +481,7 @@ namespace quda {
   }
 
   template<>
-  __host__ __device__ double  Rsqrt(double r) {
+  __host__ __device__ inline double  Rsqrt<double>(double r) {
 #if defined(QUDA_TARGET_CUDA)
     return rsqrt(r);
 #elif defined(QUDA_TARGET_HIP)
