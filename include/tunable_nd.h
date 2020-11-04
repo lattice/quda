@@ -60,6 +60,36 @@ namespace quda {
     }
 
     template <template <typename> class Functor, typename Arg>
+    void launch_cuda(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
+    {
+#ifdef JITIFY
+      std::string kernel_file(std::string("kernels/") + Functor<Arg>::filename());
+      create_jitify_program(kernel_file);
+      using namespace jitify::reflection;
+
+      // we need this hackery to get the naked unbound template class parameters
+      auto Functor_instance = reflect<Functor<Arg>>();
+      auto Functor_naked = Functor_instance.substr(0, Functor_instance.find("<"));
+
+      auto instance = program->kernel("quda::raw_kernel")
+        .instantiate({Functor_naked, reflect<Arg>()});
+
+      if (tp.set_max_shared_bytes && device::max_dynamic_shared_memory() > device::max_default_shared_memory()) set_max_shared_bytes(instance);
+
+      for (unsigned int i=0; i < param.size(); i++) {
+        auto device_ptr = instance.get_constant_ptr(param[i].device_name);
+        qudaMemcpyAsync((void*)device_ptr, param[i].host, param[i].bytes, cudaMemcpyHostToDevice, stream);
+      }
+
+      jitify_error = instance.configure(tp.grid,tp.block,tp.shared_bytes,device::get_cuda_stream(stream)).launch(arg);
+#else
+      for (unsigned int i = 0; i < param.size(); i++)
+        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, cudaMemcpyHostToDevice, stream);
+      qudaLaunchKernel(raw_kernel<Functor, Arg>, tp, stream, arg);
+#endif
+    }
+
+    template <template <typename> class Functor, typename Arg>
     void launch_host(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
     {
       Functor<Arg> f(const_cast<Arg &>(arg));
