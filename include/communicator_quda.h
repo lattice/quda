@@ -533,9 +533,6 @@ struct Communicator {
 
   void comm_enable_intranode(bool enable) { enable_intranode = enable; }
 
-  // FIXME: The following routines rely on a "default" topology.
-  // They should probably be reworked or eliminated eventually.
-
   Topology *default_topo = nullptr;
 
   void comm_set_default_topology(Topology *topo) { default_topo = topo; }

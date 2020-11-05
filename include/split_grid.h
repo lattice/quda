@@ -30,7 +30,7 @@ namespace quda
     copyOffsetColorSpinor(out, in, offset);
   }
 
-  auto inline product(const CommKey &input) { return input[0] * input[1] * input[2] * input[3]; }
+  int inline product(const CommKey &input) { return input[0] * input[1] * input[2] * input[3]; }
 
   CommKey inline operator+(const CommKey &lhs, const CommKey &rhs)
   {
@@ -175,14 +175,13 @@ namespace quda
     for (int i = 0; i < n_replicates; i++) {
       auto grid_idx = coordinate_from_index(i, comm_key);
       auto block_idx = full_idx / block_dim;
-      // auto thread_idx = full_idx % block_dim;
 
       auto dst_idx = grid_idx * grid_dim + block_idx;
 
       int dst_rank = comm_rank_from_coords(dst_idx.data());
       int tag = rank * total_rank + dst_rank; // tag = src_rank * total_rank + dst_rank
 
-      // TODO: For now only the cpu-gpu communication is implemented.
+      // TODO: For now only the non-GDR communication is implemented.
       // THIS IS A COMMENT: printf("rank %4d -> rank %4d: tag = %4d\n", comm_rank(), dst_rank, tag);
 
       size_t bytes = meta->Bytes();
@@ -310,7 +309,6 @@ namespace quda
 
       auto grid_idx = coordinate_from_index(i, comm_key);
       auto block_idx = full_idx / block_dim;
-      // auto thread_idx = full_idx % block_dim;
 
       auto src_idx = grid_idx * grid_dim + block_idx;
 

@@ -14,8 +14,6 @@
 #include <command_line_params.h>
 #include <dslash_reference.h>
 
-#include <split_grid.h>
-
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 void display_test_info()

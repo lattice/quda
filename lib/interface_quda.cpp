@@ -790,11 +790,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
   if (extendedGaugeResident) {
     // updated the resident gauge field if needed
-#if 0
-    const int *R_ = extendedGaugeResident->R();
-#else
     const int R[] = {commDimPartitioned(0), commDimPartitioned(1), commDimPartitioned(2), commDimPartitioned(3)};
-#endif
     QudaReconstructType recon = extendedGaugeResident->Reconstruct();
     delete extendedGaugeResident;
 

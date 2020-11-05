@@ -2,6 +2,8 @@
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
 
+#include <lattice_field.h>
+
 #include <instantiate.h>
 
 namespace quda
@@ -29,7 +31,8 @@ namespace quda
 
     int volume_cb;
 
-    bool collect_disperse; // Whether we are collecting (true) or dispersing (false)
+    QudaOffsetCopyMode mode; // Whether we are collecting (true) or dispersing (false)
+    // bool collect_disperse; // Whether we are collecting (true) or dispersing (false)
 
     CopyGaugeOffsetArg(GaugeField &out, const GaugeField &in, const int *offset) : out(out), in(in)
     {
@@ -41,10 +44,10 @@ namespace quda
 
       if (out.VolumeCB() > in.VolumeCB()) {
         volume_cb = in.VolumeCB();
-        collect_disperse = true;
+        mode = QudaOffsetCopyMode::COLLECT;
       } else {
         volume_cb = out.VolumeCB();
-        collect_disperse = false;
+        mode = QudaOffsetCopyMode::DISPERSE;
       }
     }
   };
@@ -52,7 +55,7 @@ namespace quda
   /**
      Copy a regular/extended gauge field into an extended/regular gauge field
   */
-  template <bool collect_disperse, class Arg> __device__ __host__ void copyGaugeOffset(Arg &arg, int x_cb, int parity)
+  template <QudaOffsetCopyMode mode, class Arg> __device__ __host__ void copyGaugeOffset(Arg &arg, int x_cb, int parity)
   {
 
     using Matrix = typename Arg::Matrix;
@@ -60,7 +63,7 @@ namespace quda
     int coordinate[4];
     int x_in;
     int x_out;
-    if (collect_disperse) {
+    if (mode == QudaOffsetCopyMode::COLLECT) {
       // we are collecting so x_cb is the index for the input.
       x_in = x_cb;
       getCoordsExtended(coordinate, x_cb, arg.Xin, parity, arg.offset);
@@ -79,19 +82,19 @@ namespace quda
     } // dir
   }
 
-  template <bool collect_disperse, class Arg> void copyGaugeOffsetCpu(Arg arg)
+  template <QudaOffsetCopyMode mode, class Arg> void copyGaugeOffsetCpu(Arg arg)
   {
     for (int x_cb = 0; x_cb < arg.volume_cb; x_cb++) {
-      for (int parity = 0; parity < 2; parity++) { copyGaugeOffset<collect_disperse>(arg, x_cb, parity); }
+      for (int parity = 0; parity < 2; parity++) { copyGaugeOffset<mode>(arg, x_cb, parity); }
     }
   }
 
-  template <bool collect_disperse, class Arg> __global__ void copyGaugeOffsetKernel(Arg arg)
+  template <QudaOffsetCopyMode mode, class Arg> __global__ void copyGaugeOffsetKernel(Arg arg)
   {
     int x_cb = blockIdx.x * blockDim.x + threadIdx.x;
     if (x_cb >= arg.volume_cb) return;
 #pragma unroll
-    for (int parity = 0; parity < 2; parity++) { copyGaugeOffset<collect_disperse>(arg, x_cb, parity); }
+    for (int parity = 0; parity < 2; parity++) { copyGaugeOffset<mode>(arg, x_cb, parity); }
   }
 
   template <class Float, int nColor, class Arg> class CopyGaugeOffset : Tunable
@@ -112,7 +115,7 @@ namespace quda
     CopyGaugeOffset(GaugeField &out, const GaugeField &in, const Arg &arg) : arg(arg), meta(in), location(in.Location())
     {
       writeAuxString("volumn_out=%d,volume_in=%d,%s,offset=%d%d%d%d,location=%s", out.VolumeCB(), in.VolumeCB(),
-                     arg.collect_disperse ? "collect" : "disperse", arg.offset[0], arg.offset[1], arg.offset[2],
+                     arg.mode == QudaOffsetCopyMode::COLLECT ? "collect" : "disperse", arg.offset[0], arg.offset[1], arg.offset[2],
                      arg.offset[3], location == QUDA_CPU_FIELD_LOCATION ? "cpu" : "gpu");
       apply(0);
     }
@@ -121,16 +124,16 @@ namespace quda
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (location == QUDA_CPU_FIELD_LOCATION) {
-        if (arg.collect_disperse) {
-          copyGaugeOffsetCpu<true>(arg);
+        if (arg.mode == QudaOffsetCopyMode::COLLECT) {
+          copyGaugeOffsetCpu<QudaOffsetCopyMode::COLLECT>(arg);
         } else {
-          copyGaugeOffsetCpu<false>(arg);
+          copyGaugeOffsetCpu<QudaOffsetCopyMode::DISPERSE>(arg);
         }
       } else if (location == QUDA_CUDA_FIELD_LOCATION) {
-        if (arg.collect_disperse) {
-          copyGaugeOffsetKernel<true><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+        if (arg.mode == QudaOffsetCopyMode::COLLECT) {
+          copyGaugeOffsetKernel<QudaOffsetCopyMode::COLLECT><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
         } else {
-          copyGaugeOffsetKernel<false><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          copyGaugeOffsetKernel<QudaOffsetCopyMode::DISPERSE><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
         }
       }
     }
@@ -202,7 +205,6 @@ namespace quda
 #endif
 
     } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
-
 #ifdef BUILD_MILC_INTERFACE
       using G = typename gauge_order_mapper<Float, QUDA_MILC_GAUGE_ORDER, nColor>::type;
       using Arg = CopyGaugeOffsetArg<Float, nColor, G>;

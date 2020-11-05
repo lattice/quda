@@ -43,6 +43,11 @@ namespace quda {
   class cudaCloverField;
   class cpuCloverField;
 
+  enum class QudaOffsetCopyMode {
+    COLLECT,
+    DISPERSE
+  };
+
   struct LatticeFieldParam {
 
   protected:
