@@ -12,9 +12,6 @@ int comm_rank_from_coords(const int *coords);
 namespace quda
 {
 
-  void copyFieldOffset(GaugeField &out, const GaugeField &in, const int offset[4]);
-  void copyFieldOffset(ColorSpinorField &out, const ColorSpinorField &in, const int offset[4]);
-
   int inline product(const CommKey &input) { return input[0] * input[1] * input[2] * input[3]; }
 
   CommKey inline operator+(const CommKey &lhs, const CommKey &rhs)

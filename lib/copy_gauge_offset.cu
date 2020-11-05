@@ -59,7 +59,7 @@ namespace quda
       } else {
         errorQuda("Reconstruction %d and order %d not supported", in.Reconstruct(), in.Order());
       }
-    } else if (in.Order() == QUDA_QDP_GAUGE_ORDER) { // TODO: Add other gauge field orders.
+    } else if (in.Order() == QUDA_QDP_GAUGE_ORDER) {
 #ifdef BUILD_QDP_INTERFACE
       using G = typename gauge_order_mapper<Float, QUDA_QDP_GAUGE_ORDER, nColor>::type;
       using Arg = CopyFieldOffsetArg<Field, Element, G>;
@@ -68,6 +68,16 @@ namespace quda
 #else
       errorQuda("QDP interface has not been built\n");
 #endif
+    } else if (in.Order() == QUDA_QDPJIT_GAUGE_ORDER) {
+#ifdef BUILD_QDPJIT_INTERFACE
+      using G = typename gauge_order_mapper<Float, QUDA_QDPJIT_GAUGE_ORDER, nColor>::type;
+      using Arg = CopyFieldOffsetArg<Field, Element, G>;
+      Arg arg(out, in, offset);
+      CopyFieldOffset<Arg> copier(arg, in);
+#else
+      errorQuda("QDP interface has not been built\n");
+#endif
+
     } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
 #ifdef BUILD_MILC_INTERFACE
       using G = typename gauge_order_mapper<Float, QUDA_MILC_GAUGE_ORDER, nColor>::type;
@@ -76,6 +86,33 @@ namespace quda
       CopyFieldOffset<Arg> copier(arg, in);
 #else
       errorQuda("MILC interface has not been built\n");
+#endif
+    } else if (in.Order() == QUDA_CPS_WILSON_GAUGE_ORDER) {
+#ifdef BUILD_CPS_INTERFACE
+      using G = typename gauge_order_mapper<Float, QUDA_CPS_WILSON_GAUGE_ORDER, nColor>::type;
+      using Arg = CopyFieldOffsetArg<Field, Element, G>;
+      Arg arg(out, in, offset);
+      CopyFieldOffset<Arg> copier(arg, in);
+#else
+      errorQuda("CPS interface has not been built\n");
+#endif
+    } else if (in.Order() == QUDA_BQCD_GAUGE_ORDER) {
+#ifdef BUILD_BQCD_INTERFACE
+      using G = typename gauge_order_mapper<Float, QUDA_BQCD_GAUGE_ORDER, nColor>::type;
+      using Arg = CopyFieldOffsetArg<Field, Element, G>;
+      Arg arg(out, in, offset);
+      CopyFieldOffset<Arg> copier(arg, in);
+#else
+      errorQuda("BQCD interface has not been built\n");
+#endif
+    } else if (in.Order() == QUDA_TIFR_GAUGE_ORDER) {
+#ifdef BUILD_TIFR_INTERFACE
+      using G = typename gauge_order_mapper<Float, QUDA_TIFR_GAUGE_ORDER, nColor>::type;
+      using Arg = CopyFieldOffsetArg<Field, Element, G>;
+      Arg arg(out, in, offset);
+      CopyFieldOffset<Arg> copier(arg, in);
+#else
+      errorQuda("TIFR interface has not been built\n");
 #endif
     } else {
       errorQuda("Gauge field %d order not supported", in.Order());
