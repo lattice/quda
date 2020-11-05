@@ -9,8 +9,6 @@ std::map<CommKey, Communicator> communicator_stack;
 
 Communicator *current_communicator = nullptr;
 
-static void print(const CommKey &key) { printf("%3dx%3dx%3dx%3d", key[0], key[1], key[2], key[3]); }
-
 constexpr CommKey default_key = {1, 1, 1, 1};
 
 CommKey current_key = {-1, -1, -1, -1};
@@ -50,20 +48,9 @@ Communicator &get_current_communicator()
 void push_communicator(const CommKey &split_key)
 {
   auto search = communicator_stack.find(split_key);
-  if (search != communicator_stack.end()) {
-
-    printf("Found communicator for key ");
-    print(split_key);
-    printf(".\n");
-
-  } else {
-
+  if (search == communicator_stack.end()) {
     communicator_stack.emplace(std::piecewise_construct, std::forward_as_tuple(split_key),
                                std::forward_as_tuple(get_default_communicator(), split_key.data()));
-
-    printf("Communicator for key ");
-    print(split_key);
-    printf(" added.\n");
   }
 
   quda::LatticeField::destroyIPCComms(); // Destroy the IPC Comm buffers with the old communicator.
