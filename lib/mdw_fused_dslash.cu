@@ -6,9 +6,9 @@
 namespace quda
 {
 
-#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
-
   namespace mobius_tensor_core {
+
+#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
 
     template <class store_t, int nColor, QudaReconstructType recon> class FusedDslash : public TunableGridStrideKernel2D
     {

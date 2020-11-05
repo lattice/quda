@@ -39,7 +39,7 @@ namespace quda {
 
   double3 plaquette(const GaugeField &U)
   {
-    double2 plq;
+    double2 plq = zero<double2>();
     instantiate<GaugePlaq>(U, plq);
     double3 plaq = make_double3(0.5*(plq.x + plq.y), plq.x, plq.y);
     return plaq;
