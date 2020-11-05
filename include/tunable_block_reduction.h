@@ -60,17 +60,7 @@ namespace quda {
     void launch_device(const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
 #ifdef JITIFY
-      std::string kernel_file(std::string("kernels/") + Transformer<Arg>::filename());
-      create_jitify_program(kernel_file);
-      using namespace jitify::reflection;
-
-      // we need this hackery to get the naked unbound template class parameters
-      auto Transformer_instance = reflect<Transformer<Arg>>();
-      auto Transformer_naked = Transformer_instance.substr(0, Transformer_instance.find("<"));
-
-      jitify_error = program->kernel("quda::BlockReductionKernel2D")
-        .instantiate({reflect((int)tp.block.x), Transformer_naked, reflect<Arg>()})
-        .configure(tp.grid,tp.block,tp.shared_bytes,device::get_cuda_stream(stream)).launch(arg);
+      jitify_error = launch_jitify_block("quda::BlockReductionKernel2D", tp, stream, arg);
 #else
       launch<Block::block.size() - 1, Block, Transformer>(arg, tp, stream);
 #endif

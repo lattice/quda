@@ -8,7 +8,7 @@
 #include <register_traits.h>
 
 #ifdef JITIFY
-#include <jitify_helper.cuh>
+#include <jitify_helper2.cuh>
 #endif
 
 namespace quda {
@@ -74,28 +74,7 @@ namespace quda {
                        const std::vector<constant_param_t> &param = dummy_param)
     {
 #ifdef JITIFY
-      std::string kernel_file(std::string("kernels/") + Transformer<Arg>::filename());
-      create_jitify_program(kernel_file);
-      using namespace jitify::reflection;
-
-      // we need this hackery to get the naked unbound template class parameters
-      auto Transformer_instance = reflect<Transformer<Arg>>();
-      auto Transformer_naked = Transformer_instance.substr(0, Transformer_instance.find("<"));
-      auto Reducer_instance = reflect<Reducer<Arg>>();
-      auto Reducer_naked = Reducer_instance.substr(0, Reducer_instance.find("<"));
-
-      auto instance = program->kernel("quda::Reduction2D")
-      .instantiate({reflect((int)tp.block.x), reflect((int)tp.block.y),
-            Transformer_naked, Reducer_naked, reflect<Arg>()});
-
-      if (tp.set_max_shared_bytes && device::max_dynamic_shared_memory() > device::max_default_shared_memory()) set_max_shared_bytes(instance);
-
-      for (unsigned int i=0; i < param.size(); i++) {
-        auto device_ptr = instance.get_constant_ptr(param[i].device_name);
-        qudaMemcpyAsync((void*)device_ptr, param[i].host, param[i].bytes, cudaMemcpyHostToDevice, stream);
-      }
-
-      jitify_error = instance.configure(tp.grid, tp.block, tp.shared_bytes, device::get_cuda_stream(stream)).launch(arg);
+      jitify_error = launch_jitify<Transformer, Reducer>("quda::Reduction2D", tp, stream, arg, param);
       arg.launch_error = jitify_error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
 #else
       for (unsigned int i = 0; i < param.size(); i++)
@@ -308,28 +287,7 @@ namespace quda {
                        const std::vector<constant_param_t> &param = dummy_param)
     {
 #ifdef JITIFY
-      std::string kernel_file(std::string("kernels/") + Transformer<Arg>::filename());
-      create_jitify_program(kernel_file);
-      using namespace jitify::reflection;
-
-      // we need this hackery to get the naked unbound template class parameters
-      auto Transformer_instance = reflect<Transformer<Arg>>();
-      auto Transformer_naked = Transformer_instance.substr(0, Transformer_instance.find("<"));
-      auto Reducer_instance = reflect<Reducer<Arg>>();
-      auto Reducer_naked = Reducer_instance.substr(0, Reducer_instance.find("<"));
-
-      auto instance = program->kernel("quda::MultiReduction")
-      .instantiate({reflect((int)tp.block.x), reflect((int)tp.block.y),
-            Transformer_naked, Reducer_naked, reflect<Arg>()});
-
-      if (tp.set_max_shared_bytes && device::max_dynamic_shared_memory() > device::max_default_shared_memory()) set_max_shared_bytes(instance);
-
-      for (unsigned int i=0; i < param.size(); i++) {
-        auto device_ptr = instance.get_constant_ptr(param[i].device_name);
-        qudaMemcpyAsync((void*)device_ptr, param[i].host, param[i].bytes, cudaMemcpyHostToDevice, stream);
-      }
-
-      jitify_error = instance.configure(tp.grid,tp.block,tp.shared_bytes,device::get_cuda_stream(stream)).launch(arg);
+      jitify_error = launch_jitify<Transformer, Reducer>("quda::MultiReducerion", tp, stream, arg, param);
       arg.launch_error = jitify_error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
 #else
       for (unsigned int i = 0; i < param.size(); i++)
