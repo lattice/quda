@@ -713,8 +713,8 @@ namespace quda {
 
     void copy(const cudaColorSpinorField &);
 
-    virtual void copy_to_buffer(void *buffer) const override;
-    virtual void copy_from_buffer(void *buffer) override;
+    virtual void copy_to_buffer(void *buffer) const;
+    virtual void copy_from_buffer(void *buffer);
 
     void switchBufferPinned();
 
@@ -1012,8 +1012,8 @@ namespace quda {
     void copy(const cpuColorSpinorField&);
     void zero();
 
-    virtual void copy_to_buffer(void *buffer) const override;
-    virtual void copy_from_buffer(void *buffer) override;
+    virtual void copy_to_buffer(void *buffer) const;
+    virtual void copy_from_buffer(void *buffer);
 
     /**
        @brief This is a unified ghost exchange function for doing a complete
