@@ -499,6 +499,9 @@ namespace quda {
     const void* Norm() const {return norm;}
     virtual const void* Ghost2() const { return nullptr; }
 
+    virtual void copy_to_buffer(void *buffer) const = 0;
+    virtual void copy_from_buffer(void *buffer) = 0;
+
     /**
        Do the exchange between neighbouring nodes of the data in
        sendbuf storing the result in recvbuf.  The arrays are ordered
@@ -709,6 +712,9 @@ namespace quda {
     cudaColorSpinorField& operator=(const cpuColorSpinorField&);
 
     void copy(const cudaColorSpinorField &);
+
+    virtual void copy_to_buffer(void *buffer) const override;
+    virtual void copy_from_buffer(void *buffer) override;
 
     void switchBufferPinned();
 
@@ -1006,6 +1012,9 @@ namespace quda {
     void copy(const cpuColorSpinorField&);
     void zero();
 
+    virtual void copy_to_buffer(void *buffer) const override;
+    virtual void copy_from_buffer(void *buffer) override;
+
     /**
        @brief This is a unified ghost exchange function for doing a complete
        halo exchange regardless of the type of field.  All dimensions
@@ -1041,7 +1050,14 @@ namespace quda {
   void genericSource(cpuColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c);
   int genericCompare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, int tol);
 
-  void copyOffsetColorSpinor(ColorSpinorField &out, const ColorSpinorField &in, const int offset[4]);
+  /**
+    This function is used for copying from a source colorspinor field to a destination field
+      with an offset.
+    @param out The output field to which we are copying
+    @param in The input field from which we are copying
+    @param offset The offset for the larger field between out and in.
+  */
+  void copyFieldOffset(ColorSpinorField &out, const ColorSpinorField &in, const int offset[4]);
 
   void genericPrintVector(const cpuColorSpinorField &a, unsigned int x);
   void genericCudaPrintVector(const cudaColorSpinorField &a, unsigned x);

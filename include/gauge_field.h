@@ -354,6 +354,9 @@ namespace quda {
     virtual const void* Even_p() const { errorQuda("Not implemented"); return (void*)0;}
     virtual const void* Odd_p() const { errorQuda("Not implemented"); return (void*)0;}
 
+    virtual void copy_to_buffer(void *buffer) const = 0;
+    virtual void copy_from_buffer(void *buffer) = 0;
+
     const void** Ghost() const {
       if ( isNative() ) errorQuda("No ghost zone pointer for quda-native gauge fields");
       return (const void**)ghost;
@@ -574,6 +577,9 @@ namespace quda {
     const void* Even_p() const { return even; }
     const void *Odd_p() const { return odd; }
 
+    virtual void copy_to_buffer(void *buffer) const override;
+    virtual void copy_from_buffer(void *buffer) override;
+
     void setGauge(void* _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
 
     /**
@@ -665,6 +671,9 @@ namespace quda {
     void* Gauge_p() { return gauge; }
     const void* Gauge_p() const { return gauge; }
 
+    virtual void copy_to_buffer(void *buffer) const override;
+    virtual void copy_from_buffer(void *buffer) override;
+
     void setGauge(void** _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
 
     /**
@@ -728,7 +737,7 @@ namespace quda {
     @param in The input field from which we are copying
     @param offset The offset for the larger field between out and in.
  */
-  void copyOffsetGauge(GaugeField &out, const GaugeField &in, const int offset[4]);
+  void copyFieldOffset(GaugeField &out, const GaugeField &in, const int offset[4]);
 
   /**
      This function is used for copying the gauge field into an

@@ -330,4 +330,12 @@ namespace quda {
     host_free(sendbuf);
   }
 
+  void cpuColorSpinorField::copy_to_buffer(void *buffer) const {
+    std::memcpy(buffer, V(), Bytes());
+  }
+
+  void cpuColorSpinorField::copy_from_buffer(void *buffer) {
+    std::memcpy(V(), buffer, Bytes());
+  }
+
 } // namespace quda
