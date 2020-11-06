@@ -717,7 +717,7 @@ namespace quda {
 
         size_t Bytes() const
         {
-          size_t bytes = length*sizeof(Float);
+          size_t bytes = length * sizeof(Float);
           if (isFixed<Float>::value) bytes += 2 * sizeof(norm_type);
           return bytes;
         }

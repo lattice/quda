@@ -20,8 +20,12 @@
 
 // For googletest, names must be non-empty, unique, and may only contain ASCII
 // alphanumeric characters or underscore.
-const char *data_type_str[] = {"realSingle", "realDouble", "complexSingle",
-			       "complexDouble", };
+const char *data_type_str[] = {
+  "realSingle",
+  "realDouble",
+  "complexSingle",
+  "complexDouble",
+};
 
 namespace quda
 {
@@ -38,8 +42,9 @@ void display_test_info()
   return;
 }
 
-void test(int data_type) {
-  
+void test(int data_type)
+{
+
   QudaBLASDataType test_data_type = QUDA_BLAS_DATATYPE_INVALID;
   switch (data_type) {
   case 0: test_data_type = QUDA_BLAS_DATATYPE_S; break;
@@ -47,8 +52,8 @@ void test(int data_type) {
   case 2: test_data_type = QUDA_BLAS_DATATYPE_C; break;
   case 3: test_data_type = QUDA_BLAS_DATATYPE_Z; break;
   default: errorQuda("Undefined QUDA BLAS data type %d\n", data_type);
-  }  
-  
+  }
+
   QudaBLASParam blas_param = newQudaBLASParam();
   blas_param.trans_a = blas_trans_a;
   blas_param.trans_b = blas_trans_b;
@@ -77,53 +82,63 @@ void test(int data_type) {
   if (min_dim <= 0) {
     errorQuda("BLAS dims must be positive: m=%d, n=%d, k=%d", blas_param.m, blas_param.n, blas_param.k);
   }
-  
+
   // If the user passes a negative stride, we error out as this has no meaning.
   int min_stride = std::min(std::min(blas_param.strideA, blas_param.strideB), blas_param.strideC);
   if (min_stride < 0) {
-    errorQuda("BLAS strides must be positive or zero: strideA=%d, strideB=%d, strideC=%d", blas_param.strideA, blas_param.strideB, blas_param.strideC);
+    errorQuda("BLAS strides must be positive or zero: strideA=%d, strideB=%d, strideC=%d", blas_param.strideA,
+              blas_param.strideB, blas_param.strideC);
   }
 
   // If the user passes a negative offset, we error out as this has no meaning.
   int min_offset = std::min(std::min(blas_param.a_offset, blas_param.b_offset), blas_param.c_offset);
   if (min_offset < 0) {
-    errorQuda("BLAS offsets must be positive or zero: a_offset=%d, b_offset=%d, c_offset=%d", blas_param.a_offset, blas_param.b_offset, blas_param.c_offset);
-  }  
+    errorQuda("BLAS offsets must be positive or zero: a_offset=%d, b_offset=%d, c_offset=%d", blas_param.a_offset,
+              blas_param.b_offset, blas_param.c_offset);
+  }
 
   // Leading dims are dependendent on the matrix op type.
   if (blas_param.data_order == QUDA_BLAS_DATAORDER_COL) {
     if (blas_param.trans_a == QUDA_BLAS_OP_N) {
-      if(blas_param.lda < std::max(1,blas_param.m)) errorQuda("lda=%d must be >= max(1,m=%d)", blas_param.lda, blas_param.m);
+      if (blas_param.lda < std::max(1, blas_param.m))
+        errorQuda("lda=%d must be >= max(1,m=%d)", blas_param.lda, blas_param.m);
     } else {
-      if(blas_param.lda < std::max(1,blas_param.k)) errorQuda("lda=%d must be >= max(1,k=%d)", blas_param.lda, blas_param.k);
+      if (blas_param.lda < std::max(1, blas_param.k))
+        errorQuda("lda=%d must be >= max(1,k=%d)", blas_param.lda, blas_param.k);
     }
-    
+
     if (blas_param.trans_b == QUDA_BLAS_OP_N) {
-      if(blas_param.ldb < std::max(1,blas_param.k)) errorQuda("ldb=%d must be >= max(1,k=%d)", blas_param.ldb, blas_param.k);
+      if (blas_param.ldb < std::max(1, blas_param.k))
+        errorQuda("ldb=%d must be >= max(1,k=%d)", blas_param.ldb, blas_param.k);
     } else {
-      if(blas_param.ldb < std::max(1,blas_param.n)) errorQuda("ldb=%d must be >= max(1,n=%d)", blas_param.ldb, blas_param.n);
+      if (blas_param.ldb < std::max(1, blas_param.n))
+        errorQuda("ldb=%d must be >= max(1,n=%d)", blas_param.ldb, blas_param.n);
     }
-    if(blas_param.ldc < std::max(1,blas_param.m)) errorQuda("ldc=%d must be >= max(1,m=%d)", blas_param.ldc, blas_param.m);
+    if (blas_param.ldc < std::max(1, blas_param.m))
+      errorQuda("ldc=%d must be >= max(1,m=%d)", blas_param.ldc, blas_param.m);
   } else {
     if (blas_param.trans_a == QUDA_BLAS_OP_N) {
-      if(blas_param.lda < std::max(1,blas_param.k)) errorQuda("lda=%d must be >= max(1,k=%d)", blas_param.lda, blas_param.k);
+      if (blas_param.lda < std::max(1, blas_param.k))
+        errorQuda("lda=%d must be >= max(1,k=%d)", blas_param.lda, blas_param.k);
     } else {
-      if(blas_param.lda < std::max(1,blas_param.m)) errorQuda("lda=%d must be >= max(1,m=%d)", blas_param.lda, blas_param.m);
+      if (blas_param.lda < std::max(1, blas_param.m))
+        errorQuda("lda=%d must be >= max(1,m=%d)", blas_param.lda, blas_param.m);
     }
     if (blas_param.trans_b == QUDA_BLAS_OP_N) {
-      if(blas_param.ldb < std::max(1,blas_param.n)) errorQuda("ldb=%d must be >= max(1,n=%d)", blas_param.ldb, blas_param.n);
+      if (blas_param.ldb < std::max(1, blas_param.n))
+        errorQuda("ldb=%d must be >= max(1,n=%d)", blas_param.ldb, blas_param.n);
     } else {
-      if(blas_param.ldb < std::max(1,blas_param.k)) errorQuda("ldb=%d must be >= max(1,k=%d)", blas_param.ldb, blas_param.k);
+      if (blas_param.ldb < std::max(1, blas_param.k))
+        errorQuda("ldb=%d must be >= max(1,k=%d)", blas_param.ldb, blas_param.k);
     }
-    if(blas_param.ldc < std::max(1,blas_param.n)) errorQuda("ldc=%d must be >= max(1,n=%d)", blas_param.ldc, blas_param.n);
+    if (blas_param.ldc < std::max(1, blas_param.n))
+      errorQuda("ldc=%d must be >= max(1,n=%d)", blas_param.ldc, blas_param.n);
   }
-  
+
   // If the batch value is non-positve, we error out
-  if(blas_param.batch_count <= 0) {
-    errorQuda("Batches must be positive: batches=%d", blas_param.batch_count);
-  }
+  if (blas_param.batch_count <= 0) { errorQuda("Batches must be positive: batches=%d", blas_param.batch_count); }
   //-------------------------------------------------------------------------
-  
+
   // Reference data is always in complex double
   size_t data_size = sizeof(double);
   int re_im = 2;
@@ -137,7 +152,7 @@ void test(int data_type) {
     } else {
       refA_size = blas_param.lda * blas_param.m; // A_km
     }
-    
+
     if (blas_param.trans_b == QUDA_BLAS_OP_N) {
       refB_size = blas_param.ldb * blas_param.n; // B_kn
     } else {
@@ -252,7 +267,7 @@ void test(int data_type) {
 
   // Perform device GEMM Blas operation
   blasGEMMQuda(arrayA, arrayB, arrayC, native_blas_lapack, &blas_param);
-  
+
   if (verify_results) {
     blasGEMMQudaVerify(arrayA, arrayB, arrayC, arrayCcopy, refA_size, refB_size, refC_size, re_im, data_size,
                        &blas_param);
@@ -278,11 +293,11 @@ using ::testing::Values;
 
 class BLASTest : public ::testing::TestWithParam<int>
 {
-  protected:
+protected:
   int param;
 
-  public:
-  virtual ~BLASTest() {}
+public:
+  virtual ~BLASTest() { }
   virtual void SetUp() { param = GetParam(); }
 };
 
@@ -322,7 +337,7 @@ int main(int argc, char **argv)
   // Ensure gtest prints only from rank 0
   ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
   if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
-  
+
   // call srand() with a rank-dependent seed
   initRand();
   setQudaPrecisions();
@@ -347,8 +362,8 @@ int main(int argc, char **argv)
   case QUDA_BLAS_DATATYPE_C: test(2); break;
   case QUDA_BLAS_DATATYPE_Z: test(3); break;
   default: errorQuda("Undefined QUDA BLAS data type %d\n", blas_data_type);
-  }    
-  
+  }
+
   // Check for correctness
   if (verify_results) {
     ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
@@ -366,4 +381,3 @@ int main(int argc, char **argv)
 
   return 0;
 }
-

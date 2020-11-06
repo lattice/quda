@@ -13,7 +13,7 @@ void blasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, bool use_native, Qud
 {
   getProfileBLAS().TPSTART(QUDA_PROFILE_TOTAL);
   checkBLASParam(*blas_param);
-  
+
   // cuBLAS works exclusively in column major order. If the input data is in
   // row major order, we may treat the A and B and C arrays as A^T, B^T, and C^T.
   // We swap the order of the A * B multiplication and swap the
@@ -51,7 +51,7 @@ void blasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, bool use_native, Qud
     getProfileBLAS().TPSTOP(QUDA_PROFILE_COMPUTE);
   } else {
     getProfileBLAS().TPSTART(QUDA_PROFILE_INIT);
-    
+
     // The data in the arrays is on the host. We transfer the data to the device here
     // for timing purposes. One can pass host pointers to the BatchGEMM function
     // and it will handle the data movement for the user.
