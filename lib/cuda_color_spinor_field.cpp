@@ -1286,11 +1286,11 @@ namespace quda {
   void cudaColorSpinorField::PrintVector(unsigned int i) const { genericCudaPrintVector(*this, i); }
 
   void cudaColorSpinorField::copy_to_buffer(void *buffer) const {
-    std::memcpy(buffer, V(), Bytes());
+    qudaMemcpy(buffer, V(), Bytes(), cudaMemcpyDeviceToHost);
   }
 
   void cudaColorSpinorField::copy_from_buffer(void *buffer) {
-    std::memcpy(V(), buffer, Bytes());
+    qudaMemcpy(V(), buffer, Bytes(), cudaMemcpyHostToDevice);
   }
 
 } // namespace quda

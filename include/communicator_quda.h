@@ -344,7 +344,6 @@ struct Communicator {
   /** sets whether we cap which peers can use peer-to-peer */
   int enable_p2p_max_access_rank = std::numeric_limits<int>::max();
 
-  // TODO: Check this.
   void comm_peer2peer_init(const char *hostname_recv_buf)
   {
     if (peer2peer_init) return;

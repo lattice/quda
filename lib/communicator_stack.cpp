@@ -102,15 +102,7 @@ void comm_gather_hostname(char *hostname_recv_buf)
 
 void comm_gather_gpuid(int *gpuid_recv_buf) { get_current_communicator().comm_gather_gpuid(gpuid_recv_buf); }
 
-#if 0
-
-  /**
-     Enabled peer-to-peer communication.
-     @param hostname_buf Array that holds all process hostnames
-   */
-  void comm_peer2peer_init(const char *hostname_recv_buf);
-
-#endif
+void comm_peer2peer_init(const char *hostname_recv_buf) { get_current_communicator().comm_peer2peer_init(hostname_recv_buf); }
 
 bool comm_peer2peer_present() { return get_current_communicator().comm_peer2peer_present(); }
 

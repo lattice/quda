@@ -577,8 +577,8 @@ namespace quda {
     const void* Even_p() const { return even; }
     const void *Odd_p() const { return odd; }
 
-    virtual void copy_to_buffer(void *buffer) const override;
-    virtual void copy_from_buffer(void *buffer) override;
+    virtual void copy_to_buffer(void *buffer) const;
+    virtual void copy_from_buffer(void *buffer);
 
     void setGauge(void* _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
 
@@ -671,8 +671,8 @@ namespace quda {
     void* Gauge_p() { return gauge; }
     const void* Gauge_p() const { return gauge; }
 
-    virtual void copy_to_buffer(void *buffer) const override;
-    virtual void copy_from_buffer(void *buffer) override;
+    virtual void copy_to_buffer(void *buffer) const;
+    virtual void copy_from_buffer(void *buffer);
 
     void setGauge(void** _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
 
