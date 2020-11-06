@@ -7,12 +7,19 @@
     guarded by the CMake variable QUDA_ENABLE_P2P. HIP builds should invoke CMake wiht -DQUDA_ENABLE_P2P=OFF. QUDA
     builds can use -DQUDA_ENABLE_P2P=ON (FIXME: Ensure this is default for CUDA)
 * At last trial enabling the autotuner on HIP gave segfaults. This may be due to a poor choice for tuning params and needs debugging
+* currently multi_blas_quda.cu throws an error with: 
+``` 
+hipErrorInvalidSymbol
+ (multi_blas_quda.cu:146 in compute())
+ (rank 0, host node003, quda_api.cpp:446 in qudaGetSymbolAddress_())
+```
 
 ### To Do Tasks:
 * Recheck I Have not broken CUDA version
 * CMake improvements so HIP builds can automatically choose hiprand, hipfft, hipcub and hipblas (also if needed rocrand, rocfft, rocblas)
 * Figure out about P2P linkage issues
 * Figure out about autotuner
+* Fix multiblas
 * Ensure currently not enabled kernels work (Staggered, DWF, TM, etc.)
 * Ensure multigrid functions
 * Optimize on H/W
