@@ -580,7 +580,7 @@ namespace quda {
             src.Order() == QUDA_BQCD_GAUGE_ORDER      ||
             src.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
 	  // special case where we use zero-copy memory to read/write directly from application's array
-	  void *src_d = get_mapped_device_pointer(src.Gauge_p());
+	  void *src_d = const_cast<void*>(src.Gauge_p()); // due to managed mem hack //get_mapped_device_pointer(src.Gauge_p());
 
 	  if (src.GhostExchange() == QUDA_GHOST_EXCHANGE_NO) {
 	    copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, src_d);

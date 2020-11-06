@@ -508,6 +508,7 @@ namespace quda
 
   void *get_mapped_device_pointer_(const char *func, const char *file, int line, const void *host)
   {
+    return const_cast<void*>(host); // hack b/c we hacked replacing host pinned memory w/managed memory
     void *device;
     auto error = cudaHostGetDevicePointer(&device, const_cast<void *>(host), 0);
     if (error != cudaSuccess) {
