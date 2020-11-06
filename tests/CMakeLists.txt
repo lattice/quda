@@ -297,8 +297,7 @@ if(QUDA_DIRAC_STAGGERED)
                    --gtest_output=xml:blas_test_full.xml)
 endif()
 
-
-# BLAS interface test
+#BLAS interface test
 if(QUDA_BUILD_NATIVE_LAPACK)
   add_test(NAME blas_interface_test
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:blas_interface_test> ${MPIEXEC_POSTFLAGS}

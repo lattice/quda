@@ -48,18 +48,19 @@ void blasGEMMEigenVerify(void *arrayA, void *arrayB, void *arrayCcopy, void *arr
   int m = blas_param->m;
   int n = blas_param->n;
   int k = blas_param->k;
+
   int lda = blas_param->lda;
   int ldb = blas_param->ldb;
   int ldc = blas_param->ldc;
 
-  // If the user did not set any stride values, we default them to 1
-  // as batch size 0 is an option.
-  int a_stride = blas_param->strideA == -1 ? 1 : blas_param->strideA;
-  int b_stride = blas_param->strideB == -1 ? 1 : blas_param->strideB;
-  int c_stride = blas_param->strideC == -1 ? 1 : blas_param->strideC;
+  int a_stride = blas_param->strideA;
+  int b_stride = blas_param->strideB;
+  int c_stride = blas_param->strideC;
+  
   int a_offset = blas_param->a_offset;
   int b_offset = blas_param->b_offset;
   int c_offset = blas_param->c_offset;
+  
   int batches = blas_param->batch_count;
 
   complex<double> alpha = blas_param->alpha;
@@ -78,15 +79,74 @@ void blasGEMMEigenVerify(void *arrayA, void *arrayB, void *arrayCcopy, void *arr
   complex<double> *C_ptr = (complex<double> *)(&arrayC)[0];
   complex<double> *Ccopy_ptr = (complex<double> *)(&arrayCcopy)[0];
 
-  printfQuda("Computing Eigen matrix opertaion a * A_{%lu,%lu} * B_{%lu,%lu} + b * C_{%lu,%lu} = C_{%lu,%lu}\n",
-             A.rows(), A.cols(), B.rows(), B.cols(), C_eigen.rows(), C_eigen.cols(), C_eigen.rows(), C_eigen.cols());
+  // Sanity checks on parameters
+  //-------------------------------------------------------------------------
+  // If the user passes non positive M,N, or K, we error out
+  int min_dim = std::min(m, std::min(n, k));
+  if (min_dim <= 0) {
+    errorQuda("BLAS dims must be positive: m=%d, n=%d, k=%d", m, n, k);
+  }
 
+  // If the user passes a negative stride, we error out as this has no meaning.
+  int min_stride = std::min(std::min(a_stride, b_stride), c_stride);
+  if (min_stride < 0) {
+    errorQuda("BLAS strides must be positive or zero: strideA=%d, strideB=%d, strideC=%d", a_stride, b_stride, c_stride);
+  }
+
+  // If the user passes a negative offset, we error out as this has no meaning.
+  int min_offset = std::min(std::min(a_offset, b_offset), c_offset);
+  if (min_offset < 0) {
+    errorQuda("BLAS offsets must be positive or zero: a_offset=%d, b_offset=%d, c_offset=%d", a_offset, b_offset, c_offset);
+  }  
+  
+  // If the batch value is non-positve, we error out
+  if(batches <= 0) {
+    errorQuda("Batches must be positive: batches=%d", batches);
+  }
+
+  // Leading dims are dependendent on the matrix op type.
+  if (blas_param->data_order == QUDA_BLAS_DATAORDER_COL) {
+    if (blas_param->trans_a == QUDA_BLAS_OP_N) {
+      if(lda < std::max(1,m)) errorQuda("lda=%d must be >= max(1,m=%d)", lda, m);
+    } else {
+      if(lda < std::max(1,k)) errorQuda("lda=%d must be >= max(1,k=%d)", lda, k);
+    }    
+    if (blas_param->trans_b == QUDA_BLAS_OP_N) {
+      if(ldb < std::max(1,k)) errorQuda("ldb=%d must be >= max(1,k=%d)", ldb, k);
+    } else {
+      if(ldb < std::max(1,n)) errorQuda("ldb=%d must be >= max(1,n=%d)", ldb, n);
+    }
+    if(ldc < std::max(1,m)) errorQuda("ldc=%d must be >= max(1,m=%d)", ldc, m);
+  } else {
+    if (blas_param->trans_a == QUDA_BLAS_OP_N) {
+      if(lda < std::max(1,k)) errorQuda("lda=%d must be >= max(1,k=%d)", lda, k);
+    } else {
+      if(lda < std::max(1,m)) errorQuda("lda=%d must be >= max(1,m=%d)", lda, m);
+    }
+    if (blas_param->trans_b == QUDA_BLAS_OP_N) {
+      if(ldb < std::max(1,n)) errorQuda("ldb=%d must be >= max(1,n=%d)", ldb, n);
+    } else {
+      if(ldb < std::max(1,k)) errorQuda("ldb=%d must be >= max(1,k=%d)", ldb, k);
+    }
+    if(ldc < std::max(1,n)) errorQuda("ldc=%d must be >= max(1,n=%d)", ldc, n);
+  }
+  //-------------------------------------------------------------------------
+  
   // Get maximum stride length to deduce the number of batches in the
   // computation
   int max_stride = std::max(std::max(a_stride, b_stride), c_stride);
 
+  // If the user gives strides of 0 for all arrays, we are essentially performing
+  // a GEMM on the first matrices in the array N_{batch} times.
+  // Give them what they ask for, YMMV...
+  // If the strides have not been set, we are just using strides of 1.
+  if (max_stride <= 0) max_stride = 1;
+  
+  printfQuda("Computing Eigen matrix opertaion a * A_{%lu,%lu} * B_{%lu,%lu} + b * C_{%lu,%lu} = C_{%lu,%lu}\n",
+             A.rows(), A.cols(), B.rows(), B.cols(), C_eigen.rows(), C_eigen.cols(), C_eigen.rows(), C_eigen.cols());
+  
   for (int batch = 0; batch < batches; batch += max_stride) {
-
+    
     // Populate Eigen objects
     if (blas_param->data_order == QUDA_BLAS_DATAORDER_COL) {
       fillEigenArrayColMaj(A, A_ptr, m, k, lda, a_offset);

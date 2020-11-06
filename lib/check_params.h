@@ -943,9 +943,9 @@ void printQudaBLASParam(QudaBLASParam *param)
   P(a_offset, 0);
   P(b_offset, 0);
   P(c_offset, 0);
-  P(strideA, -1);
-  P(strideB, -1);
-  P(strideC, -1);
+  P(strideA, 1);
+  P(strideB, 1);
+  P(strideC, 1);
   P(batch_count, 1);
   P(data_type, QUDA_BLAS_DATATYPE_S);
   P(data_order, QUDA_BLAS_DATAORDER_ROW);

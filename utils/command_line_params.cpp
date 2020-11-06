@@ -260,7 +260,7 @@ auto &blas_a_offset = blas_offsets[0];
 auto &blas_b_offset = blas_offsets[1];
 auto &blas_c_offset = blas_offsets[2];
 
-std::array<int, 3> blas_strides = {-1, -1, -1};
+std::array<int, 3> blas_strides = {1, 1, 1};
 auto &blas_a_stride = blas_strides[0];
 auto &blas_b_stride = blas_strides[1];
 auto &blas_c_stride = blas_strides[2];
@@ -462,7 +462,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--blas-offsets", blas_offsets, "Set the offsets for matrices A, B, and C (default 0 0 0)")
     ->expected(3);
 
-  quda_app->add_option("--blas-strides", blas_strides, "Set the strides for matrices A, B, and C (default -1 -1 -1)")
+  quda_app->add_option("--blas-strides", blas_strides, "Set the strides for matrices A, B, and C (default 1 1 1)")
     ->expected(3);
 
   quda_app->add_option("--blas-batch", blas_batch, "Set the number of batches for GEMM (default 16)");
