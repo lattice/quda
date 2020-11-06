@@ -40,10 +40,10 @@ void blasGEMMEigenVerify(void *A_data, void *B_data, void *C_data_copy, void *C_
   }
 
   // If the user passes a negative stride, we error out as this has no meaning.
-  int min_stride = std::min(std::min(blas_param->strideA, blas_param->strideB), blas_param->strideC);
+  int min_stride = std::min(std::min(blas_param->a_stride, blas_param->b_stride), blas_param->c_stride);
   if (min_stride < 0) {
-    errorQuda("BLAS strides must be positive or zero: strideA=%d, strideB=%d, strideC=%d", blas_param->strideA,
-	      blas_param->strideB, blas_param->strideC);
+    errorQuda("BLAS strides must be positive or zero: a_stride=%d, b_stride=%d, c_stride=%d", blas_param->a_stride,
+	      blas_param->b_stride, blas_param->c_stride);
   }
 
   // If the user passes a negative offset, we error out as this has no meaning.
@@ -103,7 +103,7 @@ void blasGEMMEigenVerify(void *A_data, void *B_data, void *C_data_copy, void *C_
     std::swap(blas_param->lda, blas_param->ldb);
     std::swap(blas_param->trans_a, blas_param->trans_b);
     std::swap(blas_param->a_offset, blas_param->b_offset);
-    std::swap(blas_param->strideA, blas_param->strideB);
+    std::swap(blas_param->a_stride, blas_param->b_stride);
     std::swap(A_data, B_data);
   }
   
@@ -116,9 +116,9 @@ void blasGEMMEigenVerify(void *A_data, void *B_data, void *C_data_copy, void *C_
   int ldb = blas_param->ldb;
   int ldc = blas_param->ldc;
 
-  int a_stride = blas_param->strideA;
-  int b_stride = blas_param->strideB;
-  int c_stride = blas_param->strideC;
+  int a_stride = blas_param->a_stride;
+  int b_stride = blas_param->b_stride;
+  int c_stride = blas_param->c_stride;
 
   int a_offset = blas_param->a_offset;
   int b_offset = blas_param->b_offset;
@@ -198,7 +198,7 @@ void blasGEMMEigenVerify(void *A_data, void *B_data, void *C_data_copy, void *C_
     std::swap(blas_param->lda, blas_param->ldb);
     std::swap(blas_param->trans_a, blas_param->trans_b);
     std::swap(blas_param->a_offset, blas_param->b_offset);
-    std::swap(blas_param->strideA, blas_param->strideB);
+    std::swap(blas_param->a_stride, blas_param->b_stride);
     std::swap(A_data, B_data);
   }
 }

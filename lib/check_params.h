@@ -943,9 +943,9 @@ void printQudaBLASParam(QudaBLASParam *param)
   P(a_offset, 0);
   P(b_offset, 0);
   P(c_offset, 0);
-  P(strideA, 1);
-  P(strideB, 1);
-  P(strideC, 1);
+  P(a_stride, 1);
+  P(b_stride, 1);
+  P(c_stride, 1);
   P(batch_count, 1);
   P(data_type, QUDA_BLAS_DATATYPE_S);
   P(data_order, QUDA_BLAS_DATAORDER_ROW);
@@ -961,9 +961,9 @@ void printQudaBLASParam(QudaBLASParam *param)
   P(a_offset, INVALID_INT);
   P(b_offset, INVALID_INT);
   P(c_offset, INVALID_INT);
-  P(strideA, INVALID_INT);
-  P(strideB, INVALID_INT);
-  P(strideC, INVALID_INT);
+  P(a_stride, INVALID_INT);
+  P(b_stride, INVALID_INT);
+  P(c_stride, INVALID_INT);
   P(batch_count, INVALID_INT);
   P(data_type, QUDA_BLAS_DATATYPE_INVALID);
   P(data_order, QUDA_BLAS_DATAORDER_INVALID);

@@ -73,7 +73,7 @@ namespace quda
 
          Example: If the user passes
 
-         strideA = 0
+         a_stride = 0
 
          the routine will use only the first matrix in the A array and compute
 
@@ -136,7 +136,7 @@ namespace quda
 
          Example: If the user passes
 
-         strideA = 0
+         a_stride = 0
 
          the routine will use only the first matrix in the A array and compute
 

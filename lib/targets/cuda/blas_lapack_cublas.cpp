@@ -206,10 +206,10 @@ namespace quda
         }
 
         // If the user passes a negative stride, we error out as this has no meaning.
-        int min_stride = std::min(std::min(blas_param.strideA, blas_param.strideB), blas_param.strideC);
+        int min_stride = std::min(std::min(blas_param.a_stride, blas_param.b_stride), blas_param.c_stride);
         if (min_stride < 0) {
-          errorQuda("BLAS strides must be positive or zero: strideA=%d, strideB=%d, strideC=%d", blas_param.strideA,
-                    blas_param.strideB, blas_param.strideC);
+          errorQuda("BLAS strides must be positive or zero: a_stride=%d, b_stride=%d, c_stride=%d", blas_param.a_stride,
+                    blas_param.b_stride, blas_param.c_stride);
         }
 
         // If the user passes a negative offset, we error out as this has no meaning.
@@ -269,13 +269,13 @@ namespace quda
           std::swap(blas_param.lda, blas_param.ldb);
           std::swap(blas_param.trans_a, blas_param.trans_b);
           std::swap(blas_param.a_offset, blas_param.b_offset);
-          std::swap(blas_param.strideA, blas_param.strideB);
+          std::swap(blas_param.a_stride, blas_param.b_stride);
           std::swap(A_data, B_data);
         }
 
         // Get maximum stride length to deduce the number of batches in the
         // computation
-        int max_stride = std::max(std::max(blas_param.strideA, blas_param.strideB), blas_param.strideC);
+        int max_stride = std::max(std::max(blas_param.a_stride, blas_param.b_stride), blas_param.c_stride);
 
         // If the user gives strides of 0 for all arrays, we are essentially performing
         // a GEMM on the first matrices in the array N_{batch} times.
@@ -303,9 +303,9 @@ namespace quda
         // Strides in the cublas param are defaulted to -1. If that remains unchanged,
         // the stride will be the regular batch size, else the user specified value
         // is used.
-        unsigned int strideA = blas_param.strideA == 0 ? A_batch_size : A_batch_size * blas_param.strideA;
-        unsigned int strideB = blas_param.strideB == 0 ? B_batch_size : B_batch_size * blas_param.strideB;
-        unsigned int strideC = blas_param.strideC == 0 ? C_batch_size : C_batch_size * blas_param.strideC;
+        unsigned int a_stride = blas_param.a_stride == 0 ? A_batch_size : A_batch_size * blas_param.a_stride;
+        unsigned int b_stride = blas_param.b_stride == 0 ? B_batch_size : B_batch_size * blas_param.b_stride;
+        unsigned int c_stride = blas_param.c_stride == 0 ? C_batch_size : C_batch_size * blas_param.c_stride;
 
         // Data size of the entire array
         size_t sizeAarr = A_batch_size * data_size * batch;
@@ -355,9 +355,9 @@ namespace quda
           cublasStatus_t error;
           if (batch > 1) {
             error = cublasZgemmStridedBatched(handle, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k,
-                                              &alpha, (Z *)A_d + blas_param.a_offset, blas_param.lda, strideA,
-                                              (Z *)B_d + blas_param.b_offset, blas_param.ldb, strideB, &beta,
-                                              (Z *)C_d + blas_param.c_offset, blas_param.ldc, strideC, batch);
+                                              &alpha, (Z *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
+                                              (Z *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, &beta,
+                                              (Z *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
 
             if (error != CUBLAS_STATUS_SUCCESS)
               errorQuda("\nError in cuBLASZGEMMStridedBatched, error code = %d\n", error);
@@ -381,9 +381,9 @@ namespace quda
           cublasStatus_t error;
           if (batch > 1) {
             error = cublasCgemmStridedBatched(handle, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k,
-                                              &alpha, (C *)A_d + blas_param.a_offset, blas_param.lda, strideA,
-                                              (C *)B_d + blas_param.b_offset, blas_param.ldb, strideB, &beta,
-                                              (C *)C_d + blas_param.c_offset, blas_param.ldc, strideC, batch);
+                                              &alpha, (C *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
+                                              (C *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, &beta,
+                                              (C *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
 
             if (error != CUBLAS_STATUS_SUCCESS)
               errorQuda("\nError in cuBLASCGEMMStridedBatched, error code = %d\n", error);
@@ -404,9 +404,9 @@ namespace quda
           cublasStatus_t error;
           if (batch > 1) {
             error = cublasDgemmStridedBatched(handle, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k,
-                                              &alpha, (D *)A_d + blas_param.a_offset, blas_param.lda, strideA,
-                                              (D *)B_d + blas_param.b_offset, blas_param.ldb, strideB, &beta,
-                                              (D *)C_d + blas_param.c_offset, blas_param.ldc, strideC, batch);
+                                              &alpha, (D *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
+                                              (D *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, &beta,
+                                              (D *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
 
             if (error != CUBLAS_STATUS_SUCCESS)
               errorQuda("\nError in cuBLASDGEMMStridedBatched, error code = %d\n", error);
@@ -427,9 +427,9 @@ namespace quda
           cublasStatus_t error;
           if (batch > 1) {
             error = cublasSgemmStridedBatched(handle, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k,
-                                              &alpha, (S *)A_d + blas_param.a_offset, blas_param.lda, strideA,
-                                              (S *)B_d + blas_param.b_offset, blas_param.ldb, strideB, &beta,
-                                              (S *)C_d + blas_param.c_offset, blas_param.ldc, strideC, batch);
+                                              &alpha, (S *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
+                                              (S *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, &beta,
+                                              (S *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
 
             if (error != CUBLAS_STATUS_SUCCESS)
               errorQuda("\nError in cuBLASSGEMMStridedBatched, error code = %d\n", error);
@@ -452,7 +452,7 @@ namespace quda
           std::swap(blas_param.lda, blas_param.ldb);
           std::swap(blas_param.trans_a, blas_param.trans_b);
           std::swap(blas_param.a_offset, blas_param.b_offset);
-          std::swap(blas_param.strideA, blas_param.strideB);
+          std::swap(blas_param.a_stride, blas_param.b_stride);
           std::swap(A_data, B_data);
         }
 

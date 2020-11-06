@@ -66,9 +66,9 @@ void test(int data_type)
   blas_param.a_offset = blas_offsets[0];
   blas_param.b_offset = blas_offsets[1];
   blas_param.c_offset = blas_offsets[2];
-  blas_param.strideA = blas_strides[0];
-  blas_param.strideB = blas_strides[1];
-  blas_param.strideC = blas_strides[2];
+  blas_param.a_stride = blas_strides[0];
+  blas_param.b_stride = blas_strides[1];
+  blas_param.c_stride = blas_strides[2];
   blas_param.alpha = (__complex__ double)blas_alpha_re_im[0];
   blas_param.beta = (__complex__ double)blas_beta_re_im[0];
   blas_param.data_order = blas_data_order;
@@ -84,10 +84,10 @@ void test(int data_type)
   }
 
   // If the user passes a negative stride, we error out as this has no meaning.
-  int min_stride = std::min(std::min(blas_param.strideA, blas_param.strideB), blas_param.strideC);
+  int min_stride = std::min(std::min(blas_param.a_stride, blas_param.b_stride), blas_param.c_stride);
   if (min_stride < 0) {
-    errorQuda("BLAS strides must be positive or zero: strideA=%d, strideB=%d, strideC=%d", blas_param.strideA,
-              blas_param.strideB, blas_param.strideC);
+    errorQuda("BLAS strides must be positive or zero: a_stride=%d, b_stride=%d, c_stride=%d", blas_param.a_stride,
+              blas_param.b_stride, blas_param.c_stride);
   }
 
   // If the user passes a negative offset, we error out as this has no meaning.
