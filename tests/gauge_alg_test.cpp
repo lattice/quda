@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <quda_define.h>
 #include <quda.h>
 #include <quda_internal.h>
 #include <gauge_field.h>
@@ -163,7 +164,7 @@ class GaugeAlgTest : public ::testing::Test {
   virtual void TearDown() {
     detu = getLinkDeterminant(*U);
     double2 tru = getLinkTrace(*U);
-    printfQuda("Det: %.16e:%.16e\n", detu.x, detu.y);
+    printfQuda("Det: %.16e:%.16e\n", double(detu.x), double(detu.y));
     printfQuda("Tr: %.16e:%.16e\n", tru.x/3.0, tru.y/3.0);
 
     delete U;
@@ -202,6 +203,7 @@ TEST_F(GaugeAlgTest, Generation)
   if (testgen) { ASSERT_TRUE(CheckDeterminant(detu)); }
 }
 
+#if defined(QUDA_TARGET_CUDA)
 TEST_F(GaugeAlgTest, Landau_Overrelaxation)
 {
   const int reunit_interval = 10;
@@ -221,6 +223,7 @@ TEST_F(GaugeAlgTest, Coulomb_Overrelaxation)
   printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
   ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
 }
+#endif
 
 TEST_F(GaugeAlgTest, Landau_FFT)
 {
