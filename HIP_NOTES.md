@@ -9,6 +9,7 @@
 * At last trial enabling the autotuner on HIP gave segfaults. This may be due to a poor choice for tuning params and needs debugging
 
 ### To Do Tasks:
+* Recheck I Have not broken CUDA version
 * CMake improvements so HIP builds can automatically choose hiprand, hipfft, hipcub and hipblas (also if needed rocrand, rocfft, rocblas)
 * Figure out about P2P linkage issues
 * Figure out about autotuner
