@@ -411,12 +411,12 @@ namespace quda
           int b1_tmp = arg.Gamma.gm_i[G_idx][s1];
           // only contributes if we're at the correct b1 from the outer loop
           if (b1_tmp == b1) {
-	    //propagator_product = arg.Gamma.gm_z[G_idx][b2] * innerProduct(x, y, b2, s2) * arg.Gamma.gm_z[G_idx][b1];
-	    //result_all_channels[G_idx].x += propagator_product.real()*phase_real - propagator_product.imag()*phase_imag;
-            //result_all_channels[G_idx].y += propagator_product.imag()*phase_real + propagator_product.real()*phase_imag;
+	    propagator_product = arg.Gamma.gm_z[G_idx][b2] * innerProduct(x, y, b2, s2) * arg.Gamma.gm_z[G_idx][b1];
+	    result_all_channels[G_idx].x += propagator_product.real()*phase_real - propagator_product.imag()*phase_imag;
+            result_all_channels[G_idx].y += propagator_product.imag()*phase_real + propagator_product.real()*phase_imag;
 	    
-            result_all_channels[G_idx].x += 1.0 * ((t + arg.t_offset) + 1);
-            result_all_channels[G_idx].y += 2.0 * ((t + arg.t_offset) + 1);
+            //result_all_channels[G_idx].x += 1.0 * ((t + arg.t_offset) + 1);
+            //result_all_channels[G_idx].y += 2.0 * ((t + arg.t_offset) + 1);
 	    
 	    //if(xyz == 0) printf("Yes Comp\n");
           } else {
