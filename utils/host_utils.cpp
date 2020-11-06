@@ -267,12 +267,11 @@ void constructPointSpinorSource(void *v, int nSpin, int nColor, QudaPrecision pr
   int parity = local_idx % 2;
 
   size_t bytes = V * my_spinor_site_size * host_spinor_data_type_size;
-  //memset(v, bytes, 0.0);
   memset(v, 0, bytes);
 
   // Deduce where to place the point source. If the following is satisfied,
   // we have isolated the MPI rank that contains the point source posistion.
-  if ((comm_coord(0) * X[0] <= source_position[0] && source_position[0] < (comm_coord(0) + 1) * X[0])
+  if (   (comm_coord(0) * X[0] <= source_position[0] && source_position[0] < (comm_coord(0) + 1) * X[0])
       && (comm_coord(1) * X[1] <= source_position[1] && source_position[1] < (comm_coord(1) + 1) * X[1])
       && (comm_coord(2) * X[2] <= source_position[2] && source_position[2] < (comm_coord(2) + 1) * X[2])
       && (comm_coord(3) * X[3] <= source_position[3] && source_position[3] < (comm_coord(3) + 1) * X[3])) {
@@ -285,7 +284,7 @@ void constructPointSpinorSource(void *v, int nSpin, int nColor, QudaPrecision pr
   }
 }
 
-void constructWallSpinorSource(void *v, QudaPrecision precision, const int dil)
+void constructWallSpinorSource(void *v, QudaPrecision precision, const int dil, const int *const x, const int timeslice)
 {
   size_t bytes = V * my_spinor_site_size * host_spinor_data_type_size;
   memset(v, bytes, 0.0);

@@ -109,7 +109,7 @@ void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision p
 void constructPointSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x,
                                 const int dil, const int *const src);
 
-void constructWallSpinorSource(void *v, QudaPrecision precision, const int dil);
+void constructWallSpinorSource(void *v, QudaPrecision precision, const int dil, const int *const x, const int timeslice);
 //------------------------------------------------------
 
 void performanceStats(std::vector<double> &time, std::vector<double> &gflops, std::vector<int> &iter);

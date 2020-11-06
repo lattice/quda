@@ -211,8 +211,8 @@ namespace quda
 
     int s1, b1;
     int source_position[4];
-    int pxpypzpt[4];
-    int NxNyNzNt[4];
+    int mom_mode[4];
+    int global_lat_dim[4];
     typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
     F x;
     F y;
@@ -221,7 +221,7 @@ namespace quda
     int t_offset;
     int offsets[4];
     ContractionSummedArg(const ColorSpinorField &x, const ColorSpinorField &y,
-                         const int _source_position[4], const int _pxpypzpt[4], const int s1, const int b1) :
+                         const int _source_position[4], const int _mom_mode[4], const int s1, const int b1) :
       ReduceArg<spinor_array>(comm_dim(reduction_dim) * x.X(reduction_dim)), // n_reduce = global_dim_t
       threads(x.VolumeCB() / x.X(reduction_dim)),
       x(x),
@@ -232,11 +232,11 @@ namespace quda
       t_offset(comm_coord(reduction_dim) * x.X(reduction_dim)) // offset of the slice we are doing reduction on
     {
       for (int i = 0; i < 4; i++) {
-        X[i] = x.X()[i];
-        pxpypzpt[i]=_pxpypzpt[i];
-        source_position[i]=_source_position[i];
-        offsets[i]=comm_coord(i) * x.X(i);
-        NxNyNzNt[i]=comm_dim(i) * x.X(i);
+        X[i] = x.X()[i]; //Local coordinate
+        mom_mode[i] = _mom_mode[i]; // momentum mode
+        source_position[i] = _source_position[i]; //Global source position
+        offsets[i]  = comm_coord(i) * x.X(i); // Positive Distance from 0 MPI node 
+        global_lat_dim[i] = comm_dim(i) * x.X(i); // Global lattice dims
       }
     }
   };
@@ -358,15 +358,16 @@ namespace quda
     int s1 = arg.s1;
     int b1 = arg.b1;
 
-    int pxpypzpt[4];
+    int mom_mode[4];
     int source_position[4];
     int offsets[4];
-    int NxNyNzNt[4];
-    for(int i=0;i<4;i++) {
-      source_position[i] = arg.source_position[i];
-      offsets[i] = arg.offsets[i];
-      pxpypzpt[i] = arg.pxpypzpt[i];
-      NxNyNzNt[i] = arg.NxNyNzNt[i];
+    int global_lat_dim[4];
+    
+    for(int i=0; i<4; i++) {
+      source_position[i] = arg.source_position[i]; //Global source position
+      offsets[i] = arg.offsets[i];   // Distance from 0 MPI node 
+      mom_mode[i] = arg.mom_mode[i]; // momentum mode
+      global_lat_dim[i] = arg.global_lat_dim[i]; // Global lattice dims
     }
 
     using real = typename Arg::Float;
@@ -387,15 +388,17 @@ namespace quda
       // This function calculates the index_cb assuming t is the coordinate in
       // direction reduction_dim, and xyz is the linearized index_cb excluding reduction_dim.
       // So this will work for reduction_dim < 3 as well.
-      sink=get_sink<Arg::reduction_dim>(t, xyz, arg.X, parity);
+      sink = get_sink<Arg::reduction_dim>(t, xyz, arg.X, parity);
+      //printf("(%d,%d,%d) (%d,%d,%d,%d)\n", xyz, t, parity, sink[0], sink[1], sink[2], sink[3]);
       int idx_cb = x_cb_from_sink(arg.X, sink);
-      //calculate exp(-i*x*p)
-      Sum_dXi_dot_Pi=(double)((source_position[0]-sink[0]-offsets[0])*pxpypzpt[0]*1./NxNyNzNt[0]+
-                     (source_position[1]-sink[1]-offsets[1])*pxpypzpt[1]*1./NxNyNzNt[1]+
-                     (source_position[2]-sink[2]-offsets[2])*pxpypzpt[2]*1./NxNyNzNt[2]+
-                     (source_position[3]-sink[3]-offsets[3])*pxpypzpt[3]*1./NxNyNzNt[3]);
-      phase_real=cos(Sum_dXi_dot_Pi*2.*M_PI);
-      phase_imag=-sin(Sum_dXi_dot_Pi*2.*M_PI);
+      //calculate exp(-i*(x-x_0)*p) relative to the source position
+      Sum_dXi_dot_Pi = (double)((source_position[0] - (sink[0] + offsets[0])) * mom_mode[0] * 1.0/global_lat_dim[0]+
+				(source_position[1] - (sink[1] + offsets[1])) * mom_mode[1] * 1.0/global_lat_dim[1]+
+				(source_position[2] - (sink[2] + offsets[2])) * mom_mode[2] * 1.0/global_lat_dim[2]+
+				(source_position[3] - (sink[3] + offsets[3])) * mom_mode[3] * 1.0/global_lat_dim[3]);
+      
+      phase_real =  cos(Sum_dXi_dot_Pi * 2.0 * M_PI);
+      phase_imag = -sin(Sum_dXi_dot_Pi * 2.0 * M_PI);
       
       ColorSpinor<real, nColor, nSpin> x = arg.x(idx_cb, parity);
       ColorSpinor<real, nColor, nSpin> y = arg.y(idx_cb, parity);
@@ -408,12 +411,12 @@ namespace quda
           int b1_tmp = arg.Gamma.gm_i[G_idx][s1];
           // only contributes if we're at the correct b1 from the outer loop
           if (b1_tmp == b1) {
-	    propagator_product = arg.Gamma.gm_z[G_idx][b2] * innerProduct(x, y, b2, s2) * arg.Gamma.gm_z[G_idx][b1];
-	    result_all_channels[G_idx].x += propagator_product.real()*phase_real-propagator_product.imag()*phase_imag;
-            result_all_channels[G_idx].y += propagator_product.imag()*phase_real+propagator_product.real()*phase_imag;
+	    //propagator_product = arg.Gamma.gm_z[G_idx][b2] * innerProduct(x, y, b2, s2) * arg.Gamma.gm_z[G_idx][b1];
+	    //result_all_channels[G_idx].x += propagator_product.real()*phase_real - propagator_product.imag()*phase_imag;
+            //result_all_channels[G_idx].y += propagator_product.imag()*phase_real + propagator_product.real()*phase_imag;
 	    
-            //result_all_channels[G_idx].x += 1.0 * ((t + arg.t_offset) + 1);
-            //result_all_channels[G_idx].y += 2.0 * ((t + arg.t_offset) + 1);
+            result_all_channels[G_idx].x += 1.0 * ((t + arg.t_offset) + 1);
+            result_all_channels[G_idx].y += 2.0 * ((t + arg.t_offset) + 1);
 	    
 	    //if(xyz == 0) printf("Yes Comp\n");
           } else {
@@ -426,7 +429,7 @@ namespace quda
     
     // This function reduces the data in result_all_channels in all threads -
     // different threads reduce result to different index t + arg.t_offset
-    arg.template reduce2d<blockSize, 2>(result_all_channels, (t + arg.t_offset));
+    arg.template reduce2d<blockSize, 2>(result_all_channels, (t + arg.t_offset)%global_lat_dim[3]);
     //arg.template reduce2d<blockSize, 2>(result_all_channels, t);
   }
 

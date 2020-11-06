@@ -5614,7 +5614,8 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
   profileWuppertal.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-#if 1
+// This is my attempt at emulating CHROMA's gaussian smearing...
+#if 0
 void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned int n_steps)
 {
   profileGaussianSmear.TPSTART(QUDA_PROFILE_TOTAL);
@@ -5674,24 +5675,21 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned 
   DiracM laplace_op(dirac);
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_INIT);
 
-  // massRescale(*static_cast<cudaColorSpinorField*>(in_h), *inv_param);
-
   // Copy host data to device
   profileGaussianSmear.TPSTART(QUDA_PROFILE_H2D);
   *chi = *in_h;
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_H2D);
 
-  // Scale up the source to prevent underflow
   profileGaussianSmear.TPSTART(QUDA_PROFILE_COMPUTE);
-  //blas::ax(1e6, *in);
 
-  double ftempi = - (inv_param->mass * inv_param->mass) / (4 * n_steps);  
+  double ftempi = inv_param->mass;  
   double ftemp = 1.0 / ftempi;
   
-  // Computes out(x) = (in(x) + (\omega/(4N) * \sum_mu (U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))))
-
-  // Chroma's smearing function
-
+  for (unsigned int i = 0; i < n_steps; i++) {
+        
+    // Chroma's smearing iteration. chi is supplied, and returned smeared.
+    // psi is a temp.
+    
     // Real ftmp = - (width*width) / Real(4*ItrGaus);
     // // The Klein-Gordon operator is (Lapl + mass_sq), where Lapl = -d^2/dx^2.. 
     // // We want (1 + ftmp * Lapl ) = (Lapl + 1/ftmp)*ftmp 
@@ -5701,24 +5699,16 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned 
     // {
     //   psi = chi * ftmp;
     //   klein_gord(u, psi, chi, ftmpi, j_decay);
-    // }    
-
-
-  //*out = *in;
-  for (unsigned int i = 0; i < n_steps; i++) {
-    // If performing an iteration greater that i=0, swap the `out` and `in` pointers.
-    // This will feed the previous iteration's result into the loop, and
-    // overwrite the previous `in`.
-    //if (i > 0) std::swap(in, out);
+    // }      
     
-    // Emulate the CHROMA worklow
-    // Scale `out` with ftemp and copy to in
-    // psi = chi * ftmp;
+    // We have alreasy set the mass to be the inverse of
+    // - (width*width) / Real(4*ItrGaus);
+    
+    // Emulate the CHROMA worklow.
+    // copy chi into psi and scale by ftemp
     *psi = *chi;
     blas::ax(ftemp, *psi);
     
-    //printfQuda("Step %d, vector norm in %e\n", i, blas::norm2(*in));
-
     // Apply klein_gord
     // klein_gord(u, psi, chi, ftmpi, j_decay);
     // in CHROMA's KG op, we have (with mass_sq = ftempi)
@@ -5735,36 +5725,32 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned 
     //   chi = psi * ftmp;
 
     //   for(int mu = 0; mu < Nd; ++mu )
-    // 	if( mu != j_decay )
-    // 	  {
-    // 	    chi -= u[mu]*shift(psi, FORWARD, mu) + shift(adj(u[mu])*psi, BACKWARD, mu);
-    // 	  }
+    // 	   if( mu != j_decay )
+    // 	    {
+    // 	      chi -= u[mu]*shift(psi, FORWARD, mu) + shift(adj(u[mu])*psi, BACKWARD, mu);
+    // 	    }
     // }
 
-    // To emulate this with QUDA functions, we multiply `psi` with ((2*Nd-2) + ftempi) 
+    // Note that in the above function the value of `mass_sq` is ftempi.    
+    // To emulate this with QUDA functions, we scale psi with ((2*Nd-2) + ftempi) 
     // and copy to chi 
     *chi = *psi;
     blas::ax(ftempi + 6, *chi);
-
+    
     // chi = chi - KGOP * psi.
 
     // Now we apply the Dslash to `out` and remove the extra part QUDA adds
     laplace_op.Expose()->Dslash(*temp1, *psi, QUDA_INVALID_PARITY);
     
     // QUDA added a vector 1.0 * psi to temp1. We remove it.
-    //blas::axpy(-1.0, *psi, *temp1);
+    blas::axpy(-1.0, *psi, *temp1);
 
     // temp1 now contains KGOP * psi.
     blas::axpy(-1.0, *temp1, *chi);
-	       
-    //printfQuda("Step %d, vector norm %e\n", i, blas::norm2(*out));
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-      //printfQuda("Step %d, vector norm %e\n", i, blas::norm2(*out));
+      printfQuda("Step %d, vector norm %e\n", i, blas::norm2(*chi));
     }
   }
-
-  // Rescale back down
-  //blas::ax(1e-6, *out);
 
   // Normalise the source
   double nout = blas::norm2(*chi);
@@ -5794,7 +5780,8 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned 
 }
 #endif
 
-#if 0
+// This is the original QUDA smearing. It disagrees with CHROMA's by O(1e-3) or so
+#if 1
 void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned int n_steps)
 {
   profileGaussianSmear.TPSTART(QUDA_PROFILE_TOTAL);
@@ -5854,8 +5841,6 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned 
   DiracM laplace_op(dirac);
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_INIT);
 
-  // massRescale(*static_cast<cudaColorSpinorField*>(in_h), *inv_param);
-
   // Copy host data to device
   profileGaussianSmear.TPSTART(QUDA_PROFILE_H2D);
   *in = *in_h;
@@ -5865,15 +5850,19 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned 
   profileGaussianSmear.TPSTART(QUDA_PROFILE_COMPUTE);
   blas::ax(1e6, *in);
 
-  // Computes out(x) = (in(x) + (\omega/(4N) * \sum_mu (U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))))
+  double coeff = 1.0 / inv_param->mass;
+  
+  // Computes out(x) = (in(x) + (\omega/(4N) * \sum_mu [ U_{-\mu}(x) * in(x+mu) + U^\dagger_mu(x-mu) * in(x-mu) ])
   if (n_steps == 0) std::swap(in, out);
   for (unsigned int i = 0; i < n_steps; i++) {
     // If performing an iteration greater that i=0, swap the `out` and `in` pointers.
     // This will feed the previous iteration's result into the loop, and
     // overwrite the previous `in`.
     if (i > 0) std::swap(in, out);
+    
     laplace_op.Expose()->M(*out, *in);
-    blas::ax(1.0 / inv_param->mass, *out);
+    blas::ax(coeff, *out);
+    
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       double norm = blas::norm2(*out);
       printfQuda("Step %d, vector norm %e\n", i, norm);
@@ -5881,8 +5870,7 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned 
   }
 
   // Normalise the source
-  double nout = blas::norm2(*out);
-  blas::ax(1.0 / sqrt(nout), *out);
+  blas::ax(1.0 / sqrt(blas::norm2(*out)), *out);
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   // Copy device data to host.

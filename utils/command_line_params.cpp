@@ -243,6 +243,8 @@ double prop_source_smear_coeff = 2.0;
 double prop_sink_smear_coeff = 2.0;
 bool prop_read_sources = false;
 int prop_n_sources = 1;
+QudaFermionSmearType prop_smear_type = QUDA_FERMION_SMEAR_TYPE_GAUSSIAN;
+QudaSourceType prop_source_type = QUDA_POINT_SOURCE;
 QudaPrecision prop_save_prec = QUDA_SINGLE_PRECISION;
 
 // SU(3) smearing options
@@ -255,8 +257,6 @@ int wflow_steps = 100;
 QudaWFlowType wflow_type = QUDA_WFLOW_TYPE_WILSON;
 int measurement_interval = 5;
 QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_TYPE_STOUT;
-
-QudaFermionSmearType prop_smear_type = QUDA_FERMION_SMEAR_TYPE_GAUSSIAN;
 
 QudaContractType contract_type = QUDA_CONTRACT_TYPE_DR_FT_T;
 
@@ -388,8 +388,11 @@ namespace
   CLI::TransformPairs<QudaFermionSmearType> fermion_smear_type_map {{"gaussian", QUDA_FERMION_SMEAR_TYPE_GAUSSIAN},
                                                                     {"wuppertal", QUDA_FERMION_SMEAR_TYPE_WUPPERTAL}};
 
+  CLI::TransformPairs<QudaSourceType> fermion_source_type_map {{"point", QUDA_POINT_SOURCE},
+      {"wall", QUDA_CONSTANT_SOURCE}};
+  
   CLI::TransformPairs<QudaSetupType> setup_type_map {{"test", QUDA_TEST_VECTOR_SETUP}, {"null", QUDA_TEST_VECTOR_SETUP}};
-
+  
   CLI::TransformPairs<QudaExtLibType> extlib_map {{"eigen", QUDA_EIGEN_EXTLIB}, {"magma", QUDA_MAGMA_EXTLIB}};
 
 } // namespace
@@ -998,6 +1001,9 @@ void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--prop-smear-type", prop_smear_type, "Type of fermion smearing to employ (default gaussian)")
     ->transform(CLI::QUDACheckedTransformer(fermion_smear_type_map));
 
+  opgroup->add_option("--prop-source-type", prop_source_type, "Type of fermion source to employ (default point)")
+    ->transform(CLI::QUDACheckedTransformer(fermion_source_type_map));
+  
   quda_app->add_psoption(opgroup, "--prop-source-position", prop_source_position, CLI::Validator(),
                          "Set the position of the nth point source <Nth source> (X Y Z T) (default(0,0,0,0))");
   quda_app->add_option("--momentum", momentum, "Set momentum for correlators (px py pz pt) (default(0,0,0,0))")->expected(4);;

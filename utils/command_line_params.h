@@ -447,6 +447,7 @@ extern int prop_source_smear_steps;
 extern int prop_sink_smear_steps;
 extern double prop_source_smear_coeff;
 extern double prop_sink_smear_coueff;
+extern QudaSourceType prop_source_type;
 extern QudaFermionSmearType prop_smear_type;
 extern bool prop_read_sources;
 extern int prop_n_sources;

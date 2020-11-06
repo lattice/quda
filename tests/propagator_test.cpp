@@ -330,15 +330,16 @@ int main(int argc, char **argv)
   // Borrow problem 4D parameters, then adjust
   QudaInvertParam inv_param_smear = newQudaInvertParam();
   dslash_type = QUDA_LAPLACE_DSLASH;
-  double coeff = -(prop_source_smear_coeff * prop_source_smear_coeff) / (4 * prop_source_smear_steps);
+  double coeff = - (prop_source_smear_coeff * prop_source_smear_coeff) / (4 * prop_source_smear_steps);
   double kappa_orig = kappa;
   double mass_orig = mass;
   int laplace3D_orig = laplace3D;
   mass = 1.0 / coeff;
   kappa = -1.0;
   laplace3D = 3; // Omit t-dim
-  setInvertParam(inv_param_smear);
 
+  // Construct smearing parameters
+  setInvertParam(inv_param_smear);
   inv_param_smear.mass_normalization = QUDA_KAPPA_NORMALIZATION;
   inv_param_smear.solution_type = QUDA_MAT_SOLUTION;
   inv_param_smear.solve_type = QUDA_DIRECT_SOLVE;
@@ -430,16 +431,16 @@ int main(int argc, char **argv)
         // If we loaded a source, copy it in
         memcpy(in->V(), qudaSource4D[i]->V(), vol_bytes);
       } else {
-        // Construct a point source	
-        constructPointSpinorSource(qudaSource4D[i]->V(), 4, 3, inv_param.cpu_prec, gauge_param.X, i, source);
+	if(prop_source_type == QUDA_POINT_SOURCE) {
+	  // Construct a point source	
+	  constructPointSpinorSource(qudaSource4D[i]->V(), 4, 3, inv_param.cpu_prec, gauge_param.X, i, source);
+	} else if (prop_source_type == QUDA_CONSTANT_SOURCE) {
+	  // Construct a wall source	
+	  constructWallSpinorSource(qudaSource4D[i]->V(), inv_param.cpu_prec, i, gauge_param.X, 0);
+	}
 	
-        // Gaussian smear the point source.
+        // Gaussian smear the source.
         performGaussianSmearNStep(qudaSource4D[i]->V(), &inv_param_smear, prop_source_smear_steps);
-
-        // Debugging...
-        for (int i = 0; i < 5; i++) {
-          // qudaSource4D[i]->PrintVector(i);
-        }
 
         // Copy the smeared source into the input vector
         memcpy(in->V(), qudaSource4D[i]->V(), vol_bytes);
@@ -476,12 +477,7 @@ int main(int argc, char **argv)
       }
       
       // Gaussian smear the sink.
-      performGaussianSmearNStep(qudaSink4D[i]->V(), &inv_param_smear, prop_sink_smear_steps);
-      
-      // Debugging...
-      for (int i = 0; i < 5; i++) {
-        // qudaSink4D[i]->PrintVector(i);
-      }
+      performGaussianSmearNStep(qudaSink4D[i]->V(), &inv_param_smear, prop_sink_smear_steps);      
     }
     
     // Zero out the result array
@@ -499,7 +495,7 @@ int main(int argc, char **argv)
                 int index_real = (px+py*(Mom[0]+1)+pz*(Mom[0]+1)*(Mom[1]+1)+pt*(Mom[0]+1)*(Mom[1]+1)*(Mom[2]+1))
                     *n_numbers_per_slice * global_corr_length+n_numbers_per_slice * ((t + overall_shift_dim) % global_corr_length) + 2 * G_idx;
                 int index_imag = index_real+1;
-                printfQuda("sum: prop_n=%d px=%d py=%d pz=%d pt=%d g=%d t=%lu %.16f %.16f (from %d, %d)\n", n, px, py, pz, pt, G_idx, t,
+                printfQuda("sum: prop_n=%d px=%d py=%d pz=%d pt=%d g=%d t=%lu %.16e %.16e (from %d, %d)\n", n, px, py, pz, pt, G_idx, t,
 			   ((double *)correlation_function_sum)[index_real],
 			   ((double *)correlation_function_sum)[index_imag],
 			   index_real, index_imag);
