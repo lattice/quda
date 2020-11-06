@@ -23,4 +23,4 @@ void blasGEMMEigenVerify(void *arrayA, void *arrayB, void *arrayCcopy, void *arr
                          uint64_t refB_size, uint64_t refC_size, QudaBLASParam *blas_param);
 
 void blasGEMMQudaVerify(void *arrayA, void *arrayB, void *arrayC, void *arrayCcopy, uint64_t refA_size,
-                        uint64_t refB_size, uint64_t refC_size, int re_im, size_t data_size, QudaBLASParam *blas_param);
+                        uint64_t refB_size, uint64_t refC_size, QudaBLASParam *blas_param);

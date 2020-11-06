@@ -142,6 +142,8 @@ void test(int data_type)
   // Reference data is always in complex double
   size_t data_size = sizeof(double);
   int re_im = 2;
+  data_size *= re_im;
+  
   int batches = blas_param.batch_count;
   uint64_t refA_size = 0, refB_size = 0, refC_size = 0;
   if (blas_param.data_order == QUDA_BLAS_DATAORDER_COL) {
@@ -175,15 +177,15 @@ void test(int data_type)
     refC_size = blas_param.ldc * blas_param.m; // C_mn
   }
 
-  void *refA = pinned_malloc(batches * refA_size * re_im * data_size);
-  void *refB = pinned_malloc(batches * refB_size * re_im * data_size);
-  void *refC = pinned_malloc(batches * refC_size * re_im * data_size);
-  void *refCcopy = pinned_malloc(batches * refC_size * re_im * data_size);
+  void *refA = pinned_malloc(batches * refA_size * data_size);
+  void *refB = pinned_malloc(batches * refB_size * data_size);
+  void *refC = pinned_malloc(batches * refC_size * data_size);
+  void *refCcopy = pinned_malloc(batches * refC_size * data_size);
 
-  memset(refA, 0, batches * refA_size * re_im * data_size);
-  memset(refB, 0, batches * refB_size * re_im * data_size);
-  memset(refC, 0, batches * refC_size * re_im * data_size);
-  memset(refCcopy, 0, batches * refC_size * re_im * data_size);
+  memset(refA, 0, batches * refA_size * data_size);
+  memset(refB, 0, batches * refB_size * data_size);
+  memset(refC, 0, batches * refC_size * data_size);
+  memset(refCcopy, 0, batches * refC_size * data_size);
 
   // Populate the real part with rands
   for (uint64_t i = 0; i < 2 * refA_size * batches; i += 2) { ((double *)refA)[i] = rand() / (double)RAND_MAX; }
@@ -269,10 +271,9 @@ void test(int data_type)
   blasGEMMQuda(arrayA, arrayB, arrayC, native_blas_lapack, &blas_param);
 
   if (verify_results) {
-    blasGEMMQudaVerify(arrayA, arrayB, arrayC, arrayCcopy, refA_size, refB_size, refC_size, re_im, data_size,
-                       &blas_param);
+    blasGEMMQudaVerify(arrayA, arrayB, arrayC, arrayCcopy, refA_size, refB_size, refC_size, &blas_param);
   }
-
+  
   host_free(refA);
   host_free(refB);
   host_free(refC);

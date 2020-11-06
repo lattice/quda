@@ -16,19 +16,7 @@ using namespace std;
 #include <Eigen/Dense>
 using namespace Eigen;
 
-void fillEigenArrayColMaj(MatrixXcd &EigenArr, complex<double> *arr, int rows, int cols, int ld, int offset)
-{
-  int counter = offset;
-  for (int j = 0; j < cols; j++) {
-    for (int i = 0; i < rows; i++) {
-      EigenArr(i, j) = arr[counter];
-      counter++;
-    }
-    counter += (ld - rows);
-  }
-}
-
-void fillEigenArrayRowMaj(MatrixXcd &EigenArr, complex<double> *arr, int rows, int cols, int ld, int offset)
+void fillEigenArray(MatrixXcd &EigenArr, complex<double> *arr, int rows, int cols, int ld, int offset)
 {
   int counter = offset;
   for (int i = 0; i < rows; i++) {
@@ -40,10 +28,85 @@ void fillEigenArrayRowMaj(MatrixXcd &EigenArr, complex<double> *arr, int rows, i
   }
 }
 
-void blasGEMMEigenVerify(void *arrayA, void *arrayB, void *arrayCcopy, void *arrayC, uint64_t refA_size,
+void blasGEMMEigenVerify(void *A_data, void *B_data, void *C_data_copy, void *C_data, uint64_t refA_size,
                          uint64_t refB_size, uint64_t refC_size, QudaBLASParam *blas_param)
 {
+  // Sanity checks on parameters
+  //-------------------------------------------------------------------------
+  // If the user passes non positive M,N, or K, we error out
+  int min_dim = std::min(blas_param->m, std::min(blas_param->n, blas_param->k));
+  if (min_dim <= 0) {
+    errorQuda("BLAS dims must be positive: m=%d, n=%d, k=%d", blas_param->m, blas_param->n, blas_param->k);
+  }
 
+  // If the user passes a negative stride, we error out as this has no meaning.
+  int min_stride = std::min(std::min(blas_param->strideA, blas_param->strideB), blas_param->strideC);
+  if (min_stride < 0) {
+    errorQuda("BLAS strides must be positive or zero: strideA=%d, strideB=%d, strideC=%d", blas_param->strideA,
+	      blas_param->strideB, blas_param->strideC);
+  }
+
+  // If the user passes a negative offset, we error out as this has no meaning.
+  int min_offset = std::min(std::min(blas_param->a_offset, blas_param->b_offset), blas_param->c_offset);
+  if (min_offset < 0) {
+    errorQuda("BLAS offsets must be positive or zero: a_offset=%d, b_offset=%d, c_offset=%d", blas_param->a_offset,
+	      blas_param->b_offset, blas_param->c_offset);
+  }
+
+  // If the batch value is non-positve, we error out
+  if (blas_param->batch_count <= 0) { errorQuda("Batches must be positive: batches=%d", blas_param->batch_count); }
+
+  // Leading dims are dependendent on the matrix op type.
+  if (blas_param->data_order == QUDA_BLAS_DATAORDER_COL) {
+    if (blas_param->trans_a == QUDA_BLAS_OP_N) {
+      if (blas_param->lda < std::max(1, blas_param->m))
+	errorQuda("lda=%d must be >= max(1,m=%d)", blas_param->lda, blas_param->m);
+    } else {
+      if (blas_param->lda < std::max(1, blas_param->k))
+	errorQuda("lda=%d must be >= max(1,k=%d)", blas_param->lda, blas_param->k);
+    }
+
+    if (blas_param->trans_b == QUDA_BLAS_OP_N) {
+      if (blas_param->ldb < std::max(1, blas_param->k))
+	errorQuda("ldb=%d must be >= max(1,k=%d)", blas_param->ldb, blas_param->k);
+    } else {
+      if (blas_param->ldb < std::max(1, blas_param->n))
+	errorQuda("ldb=%d must be >= max(1,n=%d)", blas_param->ldb, blas_param->n);
+    }
+    if (blas_param->ldc < std::max(1, blas_param->m))
+      errorQuda("ldc=%d must be >= max(1,m=%d)", blas_param->ldc, blas_param->m);
+  } else {
+    if (blas_param->trans_a == QUDA_BLAS_OP_N) {
+      if (blas_param->lda < std::max(1, blas_param->k))
+	errorQuda("lda=%d must be >= max(1,k=%d)", blas_param->lda, blas_param->k);
+    } else {
+      if (blas_param->lda < std::max(1, blas_param->m))
+	errorQuda("lda=%d must be >= max(1,m=%d)", blas_param->lda, blas_param->m);
+    }
+    if (blas_param->trans_b == QUDA_BLAS_OP_N) {
+      if (blas_param->ldb < std::max(1, blas_param->n))
+	errorQuda("ldb=%d must be >= max(1,n=%d)", blas_param->ldb, blas_param->n);
+    } else {
+      if (blas_param->ldb < std::max(1, blas_param->k))
+	errorQuda("ldb=%d must be >= max(1,k=%d)", blas_param->ldb, blas_param->k);
+    }
+    if (blas_param->ldc < std::max(1, blas_param->n))
+      errorQuda("ldc=%d must be >= max(1,n=%d)", blas_param->ldc, blas_param->n);
+  }
+  //-------------------------------------------------------------------------
+
+  // Parse parameters for Eigen
+  //-------------------------------------------------------------------------
+  // Swap A and B if in column order
+  if (blas_param->data_order == QUDA_BLAS_DATAORDER_COL) {
+    std::swap(blas_param->m, blas_param->n);
+    std::swap(blas_param->lda, blas_param->ldb);
+    std::swap(blas_param->trans_a, blas_param->trans_b);
+    std::swap(blas_param->a_offset, blas_param->b_offset);
+    std::swap(blas_param->strideA, blas_param->strideB);
+    std::swap(A_data, B_data);
+  }
+  
   // Problem parameters
   int m = blas_param->m;
   int n = blas_param->n;
@@ -74,61 +137,11 @@ void blasGEMMEigenVerify(void *arrayA, void *arrayB, void *arrayCcopy, void *arr
   MatrixXcd C_resid = MatrixXd::Zero(m, n);
 
   // Pointers to data
-  complex<double> *A_ptr = (complex<double> *)(&arrayA)[0];
-  complex<double> *B_ptr = (complex<double> *)(&arrayB)[0];
-  complex<double> *C_ptr = (complex<double> *)(&arrayC)[0];
-  complex<double> *Ccopy_ptr = (complex<double> *)(&arrayCcopy)[0];
-
-  // Sanity checks on parameters
-  //-------------------------------------------------------------------------
-  // If the user passes non positive M,N, or K, we error out
-  int min_dim = std::min(m, std::min(n, k));
-  if (min_dim <= 0) { errorQuda("BLAS dims must be positive: m=%d, n=%d, k=%d", m, n, k); }
-
-  // If the user passes a negative stride, we error out as this has no meaning.
-  int min_stride = std::min(std::min(a_stride, b_stride), c_stride);
-  if (min_stride < 0) {
-    errorQuda("BLAS strides must be positive or zero: strideA=%d, strideB=%d, strideC=%d", a_stride, b_stride, c_stride);
-  }
-
-  // If the user passes a negative offset, we error out as this has no meaning.
-  int min_offset = std::min(std::min(a_offset, b_offset), c_offset);
-  if (min_offset < 0) {
-    errorQuda("BLAS offsets must be positive or zero: a_offset=%d, b_offset=%d, c_offset=%d", a_offset, b_offset,
-              c_offset);
-  }
-
-  // If the batch value is non-positve, we error out
-  if (batches <= 0) { errorQuda("Batches must be positive: batches=%d", batches); }
-
-  // Leading dims are dependendent on the matrix op type.
-  if (blas_param->data_order == QUDA_BLAS_DATAORDER_COL) {
-    if (blas_param->trans_a == QUDA_BLAS_OP_N) {
-      if (lda < std::max(1, m)) errorQuda("lda=%d must be >= max(1,m=%d)", lda, m);
-    } else {
-      if (lda < std::max(1, k)) errorQuda("lda=%d must be >= max(1,k=%d)", lda, k);
-    }
-    if (blas_param->trans_b == QUDA_BLAS_OP_N) {
-      if (ldb < std::max(1, k)) errorQuda("ldb=%d must be >= max(1,k=%d)", ldb, k);
-    } else {
-      if (ldb < std::max(1, n)) errorQuda("ldb=%d must be >= max(1,n=%d)", ldb, n);
-    }
-    if (ldc < std::max(1, m)) errorQuda("ldc=%d must be >= max(1,m=%d)", ldc, m);
-  } else {
-    if (blas_param->trans_a == QUDA_BLAS_OP_N) {
-      if (lda < std::max(1, k)) errorQuda("lda=%d must be >= max(1,k=%d)", lda, k);
-    } else {
-      if (lda < std::max(1, m)) errorQuda("lda=%d must be >= max(1,m=%d)", lda, m);
-    }
-    if (blas_param->trans_b == QUDA_BLAS_OP_N) {
-      if (ldb < std::max(1, n)) errorQuda("ldb=%d must be >= max(1,n=%d)", ldb, n);
-    } else {
-      if (ldb < std::max(1, k)) errorQuda("ldb=%d must be >= max(1,k=%d)", ldb, k);
-    }
-    if (ldc < std::max(1, n)) errorQuda("ldc=%d must be >= max(1,n=%d)", ldc, n);
-  }
-  //-------------------------------------------------------------------------
-
+  complex<double> *A_ptr = (complex<double> *)(&A_data)[0];
+  complex<double> *B_ptr = (complex<double> *)(&B_data)[0];
+  complex<double> *C_ptr = (complex<double> *)(&C_data)[0];
+  complex<double> *Ccopy_ptr = (complex<double> *)(&C_data_copy)[0];
+  
   // Get maximum stride length to deduce the number of batches in the
   // computation
   int max_stride = std::max(std::max(a_stride, b_stride), c_stride);
@@ -145,17 +158,10 @@ void blasGEMMEigenVerify(void *arrayA, void *arrayB, void *arrayCcopy, void *arr
   for (int batch = 0; batch < batches; batch += max_stride) {
 
     // Populate Eigen objects
-    if (blas_param->data_order == QUDA_BLAS_DATAORDER_COL) {
-      fillEigenArrayColMaj(A, A_ptr, m, k, lda, a_offset);
-      fillEigenArrayColMaj(B, B_ptr, k, n, ldb, b_offset);
-      fillEigenArrayColMaj(C_eigen, Ccopy_ptr, m, n, ldc, c_offset);
-      fillEigenArrayColMaj(C_gpu, C_ptr, m, n, ldc, c_offset);
-    } else {
-      fillEigenArrayRowMaj(A, A_ptr, m, k, lda, a_offset);
-      fillEigenArrayRowMaj(B, B_ptr, k, n, ldb, b_offset);
-      fillEigenArrayRowMaj(C_eigen, Ccopy_ptr, m, n, ldc, c_offset);
-      fillEigenArrayRowMaj(C_gpu, C_ptr, m, n, ldc, c_offset);
-    }
+    fillEigenArray(A, A_ptr, m, k, lda, a_offset);
+    fillEigenArray(B, B_ptr, k, n, ldb, b_offset);
+    fillEigenArray(C_eigen, Ccopy_ptr, m, n, ldc, c_offset);
+    fillEigenArray(C_gpu, C_ptr, m, n, ldc, c_offset);
 
     // Apply op(A) and op(B)
     switch (blas_param->trans_a) {
@@ -185,24 +191,38 @@ void blasGEMMEigenVerify(void *arrayA, void *arrayB, void *arrayCcopy, void *arr
     b_offset += refB_size * b_stride;
     c_offset += refC_size * c_stride;
   }
+  
+  // Restore the blas parameters to their original values
+  if (blas_param->data_order == QUDA_BLAS_DATAORDER_COL) {
+    std::swap(blas_param->m, blas_param->n);
+    std::swap(blas_param->lda, blas_param->ldb);
+    std::swap(blas_param->trans_a, blas_param->trans_b);
+    std::swap(blas_param->a_offset, blas_param->b_offset);
+    std::swap(blas_param->strideA, blas_param->strideB);
+    std::swap(A_data, B_data);
+  }
 }
 
 void blasGEMMQudaVerify(void *arrayA, void *arrayB, void *arrayC, void *arrayCcopy, uint64_t refA_size,
-                        uint64_t refB_size, uint64_t refC_size, int re_im, size_t data_size, QudaBLASParam *blas_param)
+                        uint64_t refB_size, uint64_t refC_size, QudaBLASParam *blas_param)
 {
-
+  // Reference data is always in complex double
+  size_t data_size = sizeof(double);
+  int re_im = 2;
+  data_size *= re_im;
+  
   int batches = blas_param->batch_count;
   // Copy data from problem sized array to reference sized array.
   // Include A and B to ensure no data corruption occurred
-  void *checkA = pinned_malloc(refA_size * re_im * data_size * batches);
-  void *checkB = pinned_malloc(refB_size * re_im * data_size * batches);
-  void *checkC = pinned_malloc(refC_size * re_im * data_size * batches);
-  void *checkCcopy = pinned_malloc(refC_size * re_im * data_size * batches);
+  void *checkA = pinned_malloc(refA_size * data_size * batches);
+  void *checkB = pinned_malloc(refB_size * data_size * batches);
+  void *checkC = pinned_malloc(refC_size * data_size * batches);
+  void *checkCcopy = pinned_malloc(refC_size * data_size * batches);
 
-  memset(checkA, 0, batches * refA_size * re_im * data_size);
-  memset(checkB, 0, batches * refB_size * re_im * data_size);
-  memset(checkC, 0, batches * refC_size * re_im * data_size);
-  memset(checkCcopy, 0, batches * refC_size * re_im * data_size);
+  memset(checkA, 0, batches * refA_size * data_size);
+  memset(checkB, 0, batches * refB_size * data_size);
+  memset(checkC, 0, batches * refC_size * data_size);
+  memset(checkCcopy, 0, batches * refC_size * data_size);
 
   switch (blas_param->data_type) {
   case QUDA_BLAS_DATATYPE_S:
