@@ -67,7 +67,7 @@ namespace quda {
 #ifdef JITIFY
         std::string function_name;
         switch (cType) {
-	case QUDA_CONTRACT_TYPE_OPEN_SUM_T: function_name = "quda::computeColorContractionSummed"; break;
+	case QUDA_CONTRACT_TYPE_OPEN_SUM_T: 
 	case QUDA_CONTRACT_TYPE_OPEN_SUM_Z: function_name = "quda::computeColorContractionSummed"; break;
         default: errorQuda("Unexpected contraction type %d", cType);
         }

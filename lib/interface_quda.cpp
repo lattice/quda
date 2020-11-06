@@ -6256,7 +6256,7 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
 
                 for (size_t G_idx = 0; G_idx < nSpin * nSpin; G_idx++) {
                   for (size_t t = 0; t < global_corr_length; t++) {
-                    int index_real = (px+py*(Mom[0]+1) + pz*(Mom[0]+1)*(Mom[1]+1) + pt*(Mom[0]+1)*(Mom[1]+1)*(Mom[2]+1))*n_numbers_per_slice * global_corr_length+
+                    int index_real = (px + py*(Mom[0]+1) + pz*(Mom[0]+1)*(Mom[1]+1) + pt*(Mom[0]+1)*(Mom[1]+1)*(Mom[2]+1))*n_numbers_per_slice * global_corr_length +
 		      n_numbers_per_slice * t + 2 * G_idx;
                     int index_imag = index_real+1;
 
@@ -6266,6 +6266,7 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
                       += h_result_tmp_global[(n_numbers_per_slice * t) / 2 + G_idx].imag();
                   }
                 }
+		for(int n=0; n<(n_numbers_per_slice * global_corr_length) / 2; n++) h_result_tmp_global[n] = 0.0;
                 profileContractFT.TPSTOP(QUDA_PROFILE_COMPUTE);
               }
             }
@@ -6360,8 +6361,6 @@ void contractSummedQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, 
         profileContractSummed.TPSTART(QUDA_PROFILE_COMPUTE);
 	contractSummedQuda(*d_prop_array_flavor_1[s1 * nColor + c1], *d_prop_array_flavor_2[b1 * nColor + c1],
 			   h_result_tmp_global, cType, mom, source, s1, b1);
-        //contractSummedQuda(*d_prop_array_flavor_1[s1 * nColor + c1], *d_prop_array_flavor_2[b1 * nColor + c1],
-	//h_result_tmp_global, cType, {0,0,0,0}, {0,0,0,0}, s1, b1);
 	
         comm_allreduce_array((double *)&h_result_tmp_global[0], n_numbers_per_slice * global_corr_length);
 	
@@ -6448,6 +6447,7 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
   profileContract.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
+// WIP Compute the nSpin * nColor propagator for a given set of sources  
 void propagatorQuda(void **prop_array, void **source_array, QudaInvertParam *param, void *correlation_function_sum, const QudaContractType cType, void *cs_param_)
 {
   profilePropagator.TPSTART(QUDA_PROFILE_TOTAL);
@@ -6787,6 +6787,7 @@ void gaugeObservablesQuda(QudaGaugeObservableParam *param)
   profileGaugeObs.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
+// WIP Domain Wall contraction functions
 void make4DMidPointProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_param5D, QudaInvertParam *inv_param4D,
                         const int *X)
 {

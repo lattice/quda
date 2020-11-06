@@ -295,60 +295,6 @@ namespace quda
     return (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) / 2;
   }
 
-
- /* template <int blockSize, typename Arg> __global__ void computeDegrandRossiContractionSummed(Arg arg)
-  {
-    int t = blockIdx.z; // map t to z block index
-    int xyz = threadIdx.x + blockIdx.x * blockDim.x;
-    int parity = threadIdx.y;
-
-    int s1 = arg.s1;
-    int b1 = arg.b1;
-
-    using real = typename Arg::Float;
-    constexpr int nSpin = Arg::nSpin;
-    constexpr int nColor = Arg::nColor;
-
-    complex<real> propagator_product;
-
-    // result array needs to be a spinor_array type object because of the reduce function at the end
-    vector_type<double2, 16> result_all_channels;
-
-    while (xyz < arg.threads) {
-      // extract current ColorSpinor at xyzt from ColorSpinorField      
-      // This function calculates the index_cb assuming t is the coordinate in
-      // direction reduction_dim, and xyz is the linearized index_cb excluding reduction_dim.
-      // So this will work for reduction_dim < 3 as well.
-      int idx_cb = x_cb_from_t_xyz_d<Arg::reduction_dim>(t, xyz, arg.X, parity);
-      
-      ColorSpinor<real, nColor, nSpin> x = arg.x(idx_cb, parity);
-      ColorSpinor<real, nColor, nSpin> y = arg.y(idx_cb, parity);
-      
-      // loop over channels
-      for (int G_idx = 0; G_idx < 16; G_idx++) {
-        for (int s2 = 0; s2 < nSpin; s2++) {
-          int b2 = arg.Gamma.gm_i[G_idx][s2];
-          // get non-zero column index for current s1
-          int b1_tmp = arg.Gamma.gm_i[G_idx][s1];
-          // only contributes if we're at the correct b1 from the outer loop
-          if (b1_tmp == b1) {
-            propagator_product = arg.Gamma.gm_z[G_idx][b2] * innerProduct(x, y, b2, s2) * arg.Gamma.gm_z[G_idx][b1];
-            result_all_channels[G_idx].x += propagator_product.real();
-            result_all_channels[G_idx].y += propagator_product.imag();
-	    //if(xyz == 0) printf("Yes Comp\n");
-          } else {
-	    //if(xyz == 0) printf("No Comp\n");  
-	  }
-	}
-      }      
-      xyz += blockDim.x * gridDim.x;
-    }
-
-    // This function reduces the data in result_all_channels in all threads -
-    // different threads reduce result to different index t + arg.t_offset
-    arg.template reduce2d<blockSize, 2>(result_all_channels, t + arg.t_offset);
-  }
-*/
   template <int blockSize, typename Arg> __global__ void computeDegrandRossiContractionFT(Arg arg)
   {
     int t = blockIdx.z; // map t to z block index
@@ -389,7 +335,7 @@ namespace quda
       // direction reduction_dim, and xyz is the linearized index_cb excluding reduction_dim.
       // So this will work for reduction_dim < 3 as well.
       sink = get_sink<Arg::reduction_dim>(t, xyz, arg.X, parity);
-      //printf("(%d,%d,%d) (%d,%d,%d,%d)\n", xyz, t, parity, sink[0], sink[1], sink[2], sink[3]);
+
       int idx_cb = x_cb_from_sink(arg.X, sink);
       //calculate exp(-i*(x-x_0)*p) relative to the source position
       Sum_dXi_dot_Pi = (double)((source_position[0] - (sink[0] + offsets[0])) * mom_mode[0] * 1.0/global_lat_dim[0]+
@@ -430,7 +376,6 @@ namespace quda
     // This function reduces the data in result_all_channels in all threads -
     // different threads reduce result to different index t + arg.t_offset
     arg.template reduce2d<blockSize, 2>(result_all_channels, (t + arg.t_offset)%global_lat_dim[3]);
-    //arg.template reduce2d<blockSize, 2>(result_all_channels, t);
   }
 
   
