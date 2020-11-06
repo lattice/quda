@@ -1,5 +1,5 @@
 # generate an object library for all target specific files
-add_library(quda_hip_target OBJECT device.cpp malloc.cpp tune.cpp blas_lapack_hipblas.cpp quda_api.cpp)
+add_library(quda_hip_target OBJECT device.cpp malloc.cpp tune.cpp blas_lapack_hipblas.cpp quda_api.cpp comm_common.cpp)
 if(QUDA_BUILD_SHAREDLIB)
   set_target_properties(quda_hip_target PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
 endif()

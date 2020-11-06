@@ -3,7 +3,6 @@ add_library(quda_cuda_target OBJECT quda_api.cpp device.cpp malloc.cpp tune.cpp 
 comm_common.cpp
 # CUDA specific kernels that need to be generalized
 gauge_fix_ovr.cu
-
 )
 
 

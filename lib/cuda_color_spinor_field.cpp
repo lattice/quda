@@ -660,8 +660,11 @@ namespace quda {
       ghost_precision_reset = false;
     }
 
+#if defined(QUDA_ENABLE_P2P)
     if (ghost_field_reset) destroyIPCComms();
     createIPCComms();
+#endif
+
   }
 
   void cudaColorSpinorField::streamInit(qudaStream_t *stream_p) { stream = stream_p; }

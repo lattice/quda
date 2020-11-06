@@ -274,7 +274,7 @@ namespace quda
    */
   void qudaEventSynchronize_(qudaEvent_t &event, const char *func, const char *file, const char *line);
 
-
+#if defined(QUDA_ENABLE_P2P)
   /** 
       @brief Wrapper aroud cudaIpcGetEventHandle or cuIpcGetEventHandle with built in error checking
       @param[in,out] the handle
@@ -313,6 +313,7 @@ namespace quda
      @param[in,out] the device pointer
   */
   void qudaIpcCloseMemHandle_(void *devPtr, const char *func, const char *file, const char *line);
+#endif
 
   
   /**

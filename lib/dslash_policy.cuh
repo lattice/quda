@@ -251,14 +251,15 @@ namespace quda
 
     PROFILE(int comms_test = dslash_comms ? in.commsQuery(dslash.Nface()/2, 2*dim+dir, dslash.Dagger(), stream, gdr_send, gdr_recv) : 1, profile, QUDA_PROFILE_COMMS_QUERY);
     if (comms_test) {
-      // now we are receive centric
-      int dir2 = 1-dir;
-
       // if peer-2-peer in a given direction then we need to insert a wait on that copy event
+#if defined(QUDA_ENABLE_P2P)
+
+       // now we are receive centric
+      int dir2 = 1-dir;
       if (comm_peer2peer_enabled(dir2,dim)) {
 	PROFILE(qudaStreamWaitEvent(streams[Nstream-1], in.getIPCRemoteCopyEvent(dir2,dim), 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
       } else {
-
+#endif
 	if (!gdr_recv && !zero_copy_recv) { // Issue CPU->GPU copy if not GDR
           // note the ColorSpinorField::scatter transforms from
           // scatter centric to gather centric (e.g., flips
@@ -266,8 +267,9 @@ namespace quda
           if (scatterIndex == -1) scatterIndex = 2*dim+dir;
           PROFILE(if (dslash_copy) in.scatter(dslash.Nface()/2, dslash.Dagger(), 2*dim+dir, streams+scatterIndex), profile, QUDA_PROFILE_SCATTER);
 	}
-
+#if defined(QUDA_ENABLE_P2P)
       }
+#endif
 
     }
     return comms_test;
@@ -289,9 +291,12 @@ namespace quda
     for (int dim=3; dim>=0; dim--) {
       if (!dslashParam.commDim[dim]) continue;
       for (int dir=0; dir<2; dir++) {
+#if defined(QUDA_ENABLE_P2P)
 	if (comm_peer2peer_enabled(dir,dim)) {
 	  PROFILE(qudaStreamWaitEvent(streams[Nstream-1], in.getIPCCopyEvent(dir,dim), 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
 	}
+#endif
+
       }
     }
   }

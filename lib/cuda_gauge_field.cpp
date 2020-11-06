@@ -295,8 +295,11 @@ namespace quda {
 
     if (!initComms || comms_reset) LatticeField::createComms(no_comms_fill, bidir);
 
+#if defined(QUDA_ENABLE_P2P)
     if (ghost_field_reset) destroyIPCComms();
     createIPCComms();
+#endif
+
   }
 
   void cudaGaugeField::recvStart(int dim, int dir)

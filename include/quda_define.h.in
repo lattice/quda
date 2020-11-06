@@ -62,3 +62,5 @@
  * @brief THis macro is set by CMake if the HIP Build target is selected
  */
 #cmakedefine QUDA_TARGET_HIP @QUDA_TARGET_HIP@
+
+#cmakedefine QUDA_ENABLE_P2P @QUDA_ENABLE_P2P@

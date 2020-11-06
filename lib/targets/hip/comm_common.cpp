@@ -5,13 +5,7 @@
 #include <quda_internal.h>
 #include <comm_quda.h>
 #include <csignal>
-
-#ifdef QUDA_BACKWARDSCPP
-#include "backward.hpp"
-namespace backward {
-  static backward::SignalHandling sh;
-} // namespace backward
-#endif 
+#include <hip/hip_runtime_api.h>
 
 struct Topology_s {
   int ndim;
@@ -174,6 +168,8 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
 {
   if (peer2peer_init) return;
 
+#if 0
+  /** DONT KNOW IF AMD DOES GDR */
   // set gdr enablement
   if (comm_gdr_enabled()) {
     if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling GPU-Direct RDMA access\n");
@@ -185,6 +181,10 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
   } else {
     if (getVerbosity() > QUDA_SILENT) printfQuda("Disabling GPU-Direct RDMA access\n");
   }
+#endif
+  
+  // This is AMD MI specific code... I don't know if GDR is an option. I am keeping it above
+  if (getVerbosity() > QUDA_SILENT) printfQuda("Disabling GPU-Direct RDMA access\n");
 
   char *enable_peer_to_peer_env = getenv("QUDA_ENABLE_P2P");
 
@@ -231,11 +231,20 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
           enable_p2p_max_access_rank);
     }
 
-    // first check that the local GPU supports UVA
+    // first check that the local GPU supports UVA -- This is LEGACY Code from old windows
+    // builds, and should not be needed for AMD Server Parts. However, AMD Does make Client
+    // Cards and in that case it may be that things don't work. The option to check is
+    // whether we can map host memory.  unified addressing implies can map host memory but not vice
+    // versa. So this may be overkill
+    
     const int gpuid = comm_gpuid();
     hipDeviceProp_t prop;
-    hipGetDeviceProperties(&prop, gpuid);
-    if (!prop.unifiedAddressing) return;
+    {
+      hipError_t error = hipGetDeviceProperties(&prop, gpuid);
+      if ( error != hipSuccess ) errorQuda("hipGetDeviceProperties() failed: %s", hipGetErrorString(error));
+    }
+    
+    if (!prop.canMapHostMemory) return;
 
     comm_set_neighbor_ranks();
 
@@ -257,13 +266,19 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
 	if (!strncmp(hostname, &hostname_recv_buf[128*neighbor_rank], 128)) {
 	  int neighbor_gpuid = gpuid_recv_buf[neighbor_rank];
 	  int canAccessPeer[2];
-	  hipDeviceCanAccessPeer(&canAccessPeer[0], gpuid, neighbor_gpuid);
-	  hipDeviceCanAccessPeer(&canAccessPeer[1], neighbor_gpuid, gpuid);
-
+	  {
+	    hipError_t error = hipDeviceCanAccessPeer(&canAccessPeer[0], gpuid, neighbor_gpuid);
+	    if (error != hipSuccess) errorQuda("hipDeviceCanAccessPeer failed for canAccessPeer[0]: %s", hipGetErrorString(error));
+	    error = hipDeviceCanAccessPeer(&canAccessPeer[1], neighbor_gpuid, gpuid);
+	    if (error != hipSuccess) errorQuda("hipDeviceCanAccessPeer failed for canAccessPeer[1]: %s", hipGetErrorString(error));
+	  }
 	  int accessRank[2] = { };
 	  if (canAccessPeer[0]*canAccessPeer[1] != 0) {
-	    cudaDeviceGetP2PAttribute(&accessRank[0], cudaDevP2PAttrPerformanceRank, gpuid, neighbor_gpuid);
-	    cudaDeviceGetP2PAttribute(&accessRank[1], cudaDevP2PAttrPerformanceRank, neighbor_gpuid, gpuid);
+	    hipError_t error = hipDeviceGetP2PAttribute(&accessRank[0], hipDevP2PAttrPerformanceRank, gpuid, neighbor_gpuid);
+	    if ( error != hipSuccess) errorQuda("hipDeviceGetP2PAttribute failed for accessRank[0]: %s", hipGetErrorString(error));
+	    
+	    error = hipDeviceGetP2PAttribute(&accessRank[1], hipDevP2PAttrPerformanceRank, neighbor_gpuid, gpuid);
+	    if ( error != hipSuccess) errorQuda("hipDeviceGetP2PAttribute failed for accessRank[1]: %s", hipGetErrorString(error));
 	  }
 
 	  // enable P2P if we can access the peer or if peer is self
@@ -305,10 +320,15 @@ bool comm_peer2peer_present() { return peer2peer_present; }
 static bool enable_p2p = true;
 
 bool comm_peer2peer_enabled(int dir, int dim){
+#ifdef QUDA_ENABLE_P2P
   return enable_p2p ? peer2peer_enabled[dir][dim] : false;
+#else
+  return false;
+#endif
 }
 
 int comm_peer2peer_enabled_global() {
+#ifdef QUDA_ENABLE_P2P
   if (!enable_p2p) return false;
 
   static bool init = false;
@@ -325,20 +345,35 @@ int comm_peer2peer_enabled_global() {
     p2p_global = p2p > 0 ? true : false;
   }
   return p2p_global * enable_peer_to_peer;
+#else
+  return false;
+#endif
 }
 
 void comm_enable_peer2peer(bool enable) {
+#ifdef QUDA_ENABLE_P2P
   enable_p2p = enable;
+#else
+  enable_p2p = false;
+#endif
 }
 
 static bool enable_intranode = true;
 
 bool comm_intranode_enabled(int dir, int dim){
+#ifdef QUDA_ENABLE_P2P
   return enable_intranode ? intranode_enabled[dir][dim] : false;
+#else
+  return false;
+#endif
 }
 
 void comm_enable_intranode(bool enable) {
+#ifdef QUDA_ENABLE_P2P
   enable_intranode = enable;
+#else
+  enable_intranode = false;
+#endif
 }
 
 int comm_ndim(const Topology *topo)
@@ -454,24 +489,42 @@ int comm_coord(int dim)
 
 inline bool isHost(const void *buffer)
 {
-  hipMemoryType memType;
-  void *attrdata[] = {(void *)&memType};
-  CUpointer_attribute attributes[2] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE};
-  hipError_t err = cuPointerGetAttributes(1, attributes, attrdata, (hipDeviceptr_t)buffer);
-  if (err != hipSuccess) {
-    const char *str;
-    cuGetErrorName(err, &str);
-    errorQuda("cuPointerGetAttributes returned error %s", str);
-  }
-
-  switch (memType) {
-  case hipMemoryTypeDevice: return false;
-  case hipMemoryTypeArray: errorQuda("Using array memory for communications buffer is not supported");
-  case hipMemoryTypeUnified: errorQuda("Using unified memory for communications buffer is not supported");
+  hipPointerAttribute_t attributes;
+  hipError_t error = hipPointerGetAttributes(&attributes, buffer);
+  if( error != hipSuccess ) errorQuda(" hipPointerGetAttributes failed: %s", hipGetErrorString(error));
+  bool ret_val=false;
+  switch (attributes.memoryType) {
+  case hipMemoryTypeDevice :
+    {
+      ret_val = false;
+    }
+    break;
+  case hipMemoryTypeArray  :
+    {
+      ret_val = false;
+      errorQuda("Using array memory for communications buffer is not supported");
+    }
+    break;
+  case hipMemoryTypeUnified :
+    {
+      ret_val = false;
+      errorQuda("Using unified memory for communications buffer is not supported");
+    }
+    break;
   case hipMemoryTypeHost:
-  default: // memory not allocated by CUDA allocaters will default to being host memory
-    return true;
-  }
+    {
+      ret_val = true;
+    }
+    break;
+  default:
+    {
+      // memory not allocated by CUDA allocaters will default to being host memory
+      ret_val = true;
+    }
+    break;
+  };
+  return ret_val;
+  
 }
 
 /**
@@ -648,7 +701,11 @@ int comm_partitioned()
 }
 
 bool comm_gdr_enabled() {
-  static bool gdr_enabled = false;
+   static bool gdr_enabled = false;
+#if 0
+  /* AFAIK AMD Does not have GDR. SO Just return false.
+   * Keeping this code unless I am wrong
+   */
 #ifdef MULTI_GPU
   static bool gdr_init = false;
 
@@ -660,6 +717,7 @@ bool comm_gdr_enabled() {
     gdr_init = true;
   }
 #endif
+#endif // If 0
   return gdr_enabled;
 }
 
@@ -674,8 +732,11 @@ bool comm_gdr_blacklist() {
       std::stringstream blacklist_list(blacklist_env);
 
       int device_count;
-      hipGetDeviceCount(&device_count);
-
+      {
+	hipError_t error = hipGetDeviceCount(&device_count);
+	if( error != hipSuccess) errorQuda("hipGetDeviceCount failed in comm_gdr_blacklist(): %s ", hipGetErrorString(error));
+      }
+      
       int excluded_device;
       while (blacklist_list >> excluded_device) {
 	// check this is a valid device
@@ -713,19 +774,20 @@ void comm_init_common(int ndim, const int *dims, QudaCommsMap rank_from_coords, 
   }
 
   int device_count;
-  hipGetDeviceCount(&device_count);
-  if (device_count == 0) { errorQuda("No CUDA devices found"); }
+  {
+    hipError_t error = hipGetDeviceCount(&device_count);
+    if ( error != hipSuccess ) errorQuda(" hipGetDeviceCount failed in comm_init_common: %s", hipGetErrorString(error));
+  }
+  
+  if (device_count == 0) { errorQuda("No HIP devices found"); }
   if (gpuid >= device_count) {
-    char *enable_mps_env = getenv("QUDA_ENABLE_MPS");
-    if (enable_mps_env && strcmp(enable_mps_env, "1") == 0) {
-      gpuid = gpuid % device_count;
-      printf("MPS enabled, rank=%d -> gpu=%d\n", comm_rank(), gpuid);
-    } else {
-      errorQuda("Too few GPUs available on %s", comm_hostname());
-    }
+    /* Hip Doesn't do MPS AFAIK */
+    errorQuda("Too few GPUs available on %s", comm_hostname());
   }
 
+#ifdef QUDA_ENABLE_P2P
   comm_peer2peer_init(hostname_recv_buf);
+#endif
 
   host_free(hostname_recv_buf);
 
@@ -736,7 +798,7 @@ void comm_init_common(int ndim, const int *dims, QudaCommsMap rank_from_coords, 
            comm_dim_partitioned(2), comm_dim_partitioned(3));
 
   // if CUDA_VISIBLE_DEVICES is set, we include this information in the topology_string
-  char *device_order_env = getenv("CUDA_VISIBLE_DEVICES");
+  char *device_order_env = getenv("HIP_VISIBLE_DEVICES");
   if (device_order_env) {
 
     // to ensure we have process consistency define using rank 0
@@ -746,10 +808,14 @@ void comm_init_common(int ndim, const int *dims, QudaCommsMap rank_from_coords, 
 
       int device;
       int deviceCount;
-      hipGetDeviceCount(&deviceCount);
+      {
+	hipError_t error = hipGetDeviceCount(&deviceCount);
+	if ( error != hipSuccess ) errorQuda("hipGetDeviceCount failed: %s\n", hipGetErrorString(error));
+      }
+      
       while (device_list_raw >> device) {
         // check this is a valid policy choice
-        if (device < 0) { errorQuda("Invalid CUDA_VISIBLE_DEVICE ordinal %d", device); }
+        if (device < 0) { errorQuda("Invalid HIP_VISIBLE_DEVICE ordinal %d", device); }
 
         device_list << device;
         if (device_list_raw.peek() == ',') device_list_raw.ignore();

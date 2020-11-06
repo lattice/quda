@@ -48,7 +48,6 @@ namespace quda {
       return *this;
     }
 
-#ifndef __CUDACC_RTC__
     friend std::ostream& operator<<(std::ostream& output, const TuneParam& param) {
       output << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
       output << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
@@ -56,16 +55,13 @@ namespace quda {
       output << ", aux=(" << param.aux.x << "," << param.aux.y << "," << param.aux.z << "," << param.aux.w << ")";
       return output;
     }
-#endif
   };
 
-#ifndef __CUDACC_RTC__
   /**
    * @brief Returns a reference to the tunecache map
    * @return tunecache reference
    */
   const std::map<TuneKey, TuneParam> &getTuneCache();
-#endif
 
   class Tunable {
 
@@ -160,33 +156,7 @@ namespace quda {
      */
     unsigned int maxBlocksPerSM() const
     {
-#if CUDA_VERSION >= 11000
-      static int max_blocks_per_sm = 0;
-#ifndef __CUDACC_RTC__
-      if (!max_blocks_per_sm) cudaDeviceGetAttribute(&max_blocks_per_sm, cudaDevAttrMaxBlocksPerMultiprocessor, comm_gpuid());
-#endif
-      return max_blocks_per_sm;
-#else
-      // these variables are taken from Table 14 of the CUDA 10.2 prgramming guide
-      switch (deviceProp.major) {
-      case 2:
-	return 8;
-      case 3:
-	return 16;
-      case 5:
-      case 6: return 32;
-      case 7:
-        switch (deviceProp.minor) {
-        case 0: return 32;
-        case 2: return 32;
-        case 5: return 16;
-        }
-      default:
-        warningQuda("Unknown SM architecture %d.%d - assuming limit of 32 blocks per SM\n",
-                    deviceProp.major, deviceProp.minor);
-        return 32;
-      }
-#endif
+	    return 40;
     }
 
     /**
@@ -249,12 +219,10 @@ namespace quda {
 
     int writeAuxString(const char *format, ...) {
       int n = 0;
-#ifndef __CUDACC_RTC__
       va_list arguments;
       va_start(arguments, format);
       n = vsnprintf(aux, TuneKey::aux_n, format, arguments);
       if (n < 0 || n >= TuneKey::aux_n) errorQuda("Error writing auxiliary string");
-#endif
       return n;
     }
 

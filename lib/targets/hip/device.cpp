@@ -89,6 +89,12 @@ namespace quda
       }
     }
 
+    size_t max_dynamic_shared_memory()
+    {
+      static int max_shared_bytes = 0;
+      if (!max_shared_bytes) hipDeviceGetAttribute(&max_shared_bytes,  hipDeviceAttributeMaxSharedMemoryPerBlock, comm_gpuid());
+      return max_shared_bytes;
+    }
     namespace profile {
 
       void start()
