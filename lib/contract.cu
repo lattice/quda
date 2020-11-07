@@ -87,23 +87,19 @@ public:
     unsigned int minThreads() const { return x.VolumeCB(); }
     
     // These need to be set accordingly in the new base class
-    /*
-      private:
     bool staticGridDim() const { return true; } // Maintain grid dims set in this class.
-    unsigned int minThreads() const { return arg.threads; }
     bool tuneSharedBytes() const { return false; }
     void initTuneParam(TuneParam &param) const {
       TunableKernel2D::initTuneParam(param);
       param.block.y = 2;
       //param.grid.z = x.X(Arg::reduction_dim); // Reduction dimension is mapped to different blocks in the Z dimension
     }
-
+    
     void defaultTuneParam(TuneParam &param) const {
       TunableKernel2D::defaultTuneParam(param);
       param.block.y = 2;
       //param.grid.z = x.X(Arg::reduction_dim); // Reduction dimension is mapped to different blocks in the Z dimension
-    }
-    */
+    }    
     
   public:
     ContractionSlicedFT(const ColorSpinorField &x, const ColorSpinorField &y, const QudaContractType cType,

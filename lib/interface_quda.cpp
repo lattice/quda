@@ -6182,9 +6182,9 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
   return 0;
 }
 
-void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void **h_result,
-		    const QudaContractType cType, QudaInvertParam *param, void *cs_param_,
-		    const int *X, const int *const source_position, int* Mom)
+void contractSlicedFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void **h_result,
+			  const QudaContractType cType, QudaInvertParam *param, void *cs_param_,
+			  const int *X, const int *const source_position, int* Mom)
 {
   profileContractSlicedFT.TPSTART(QUDA_PROFILE_TOTAL);
   profileContractSlicedFT.TPSTART(QUDA_PROFILE_INIT);
