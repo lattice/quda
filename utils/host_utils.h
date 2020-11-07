@@ -1,9 +1,10 @@
 #pragma once
 
-#include <vector>
 #include <array>
+
 #include <quda.h>
 #include <random_quda.h>
+#include <vector>
 #include <color_spinor_field.h>
 
 #define gauge_site_size 18      // real numbers per link
@@ -103,10 +104,14 @@ template <typename Float> void applyGaugeFieldScaling(Float **gauge, int Vh, Qud
 
 // Spinor utils
 //------------------------------------------------------
-void constructWilsonTestSpinorParam(quda::ColorSpinorParam *csParam, const QudaInvertParam *inv_param,
-                                    const QudaGaugeParam *gauge_param);
+void constructWilsonSpinorParam(quda::ColorSpinorParam *csParam, const QudaInvertParam *inv_param,
+                                const QudaGaugeParam *gauge_param);
 void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x,
                                  quda::RNG &rng);
+void constructPointSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x,
+                                const int dil, const int *const src);
+
+void constructWallSpinorSource(void *v, QudaPrecision precision, const int dil, const int *const x, const int timeslice);
 //------------------------------------------------------
 
 void performanceStats(std::vector<double> &time, std::vector<double> &gflops, std::vector<int> &iter);

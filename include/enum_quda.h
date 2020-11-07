@@ -111,6 +111,7 @@ typedef enum QudaInverterType_s {
   QUDA_MR_INVERTER,
   QUDA_MPBICGSTAB_INVERTER,
   QUDA_SD_INVERTER,
+  QUDA_XSD_INVERTER,
   QUDA_PCG_INVERTER,
   QUDA_MPCG_INVERTER,
   QUDA_EIGCG_INVERTER,
@@ -493,8 +494,14 @@ typedef enum QudaBoolean_s {
   } QudaStaggeredPhase;
 
   typedef enum QudaContractType_s {
-    QUDA_CONTRACT_TYPE_OPEN, // Open spin elementals
-    QUDA_CONTRACT_TYPE_DR,   // DegrandRossi
+    QUDA_CONTRACT_TYPE_OPEN,       // Open spin elementals, no summation
+    QUDA_CONTRACT_TYPE_OPEN_SUM_T, // Open spin elementals, spatially summed over tdim
+    QUDA_CONTRACT_TYPE_OPEN_SUM_Z, // Open spin elementals, spatially summed over zdim
+    QUDA_CONTRACT_TYPE_OPEN_FT_T,  // Open spin elementals, FT in tdim
+    QUDA_CONTRACT_TYPE_OPEN_FT_Z,  // Open spin elementals, FT in zdim
+    QUDA_CONTRACT_TYPE_DR,         // DegrandRossi insertion, no summation
+    QUDA_CONTRACT_TYPE_DR_FT_T,   // DegrandRossi insertion, FT in tdim
+    QUDA_CONTRACT_TYPE_DR_FT_Z,   // DegrandRossi insertion, FT in zdim
     QUDA_CONTRACT_TYPE_INVALID = QUDA_INVALID_ENUM
   } QudaContractType;
 
@@ -523,6 +530,19 @@ typedef enum QudaBoolean_s {
     QUDA_WFLOW_TYPE_SYMANZIK,
     QUDA_WFLOW_TYPE_INVALID = QUDA_INVALID_ENUM
   } QudaWFlowType;
+
+  typedef enum QudaGaugeSmearType_s {
+    QUDA_GAUGE_SMEAR_TYPE_APE,
+    QUDA_GAUGE_SMEAR_TYPE_STOUT,
+    QUDA_GAUGE_SMEAR_TYPE_OVR_IMP_STOUT,
+    QUDA_GAUGE_SMEAR_TYPE_INVALID = QUDA_INVALID_ENUM
+  } QudaGaugeSmearType;
+
+  typedef enum QudaFermionSmearType_s {
+    QUDA_FERMION_SMEAR_TYPE_GAUSSIAN,
+    QUDA_FERMION_SMEAR_TYPE_WUPPERTAL,
+    QUDA_FERMION_SMEAR_TYPE_INVALID = QUDA_INVALID_ENUM
+  } QudaFermionSmearType;
 
   // Allows to choose an appropriate external library
   typedef enum QudaExtLibType_s {

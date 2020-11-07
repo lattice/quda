@@ -256,7 +256,7 @@ int main(int argc, char **argv)
   quda::ColorSpinorField *out;
   quda::ColorSpinorField *check;
   quda::ColorSpinorParam cs_param;
-  constructWilsonTestSpinorParam(&cs_param, &inv_param, &gauge_param);
+  constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
   in = quda::ColorSpinorField::Create(cs_param);
   out = quda::ColorSpinorField::Create(cs_param);
   check = quda::ColorSpinorField::Create(cs_param);

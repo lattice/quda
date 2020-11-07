@@ -7,9 +7,14 @@
 // for compatibility while porting - remove later
 extern void usage(char **);
 
+// Put this is quda_constants.h?
+#define QUDA_MAX_SOURCES 128
+
 namespace quda
 {
   template <typename T> using mgarray = std::array<T, QUDA_MAX_MG_LEVEL>;
+  template <typename T> using file_array = std::array<T, QUDA_MAX_SOURCES>;
+  template <typename T> using source_array = std::array<T, QUDA_MAX_SOURCES>;
 }
 
 class QUDAApp : public CLI::App
@@ -125,6 +130,80 @@ public:
     group->add_option(opt);
     return opt;
   }
+
+  // Add option to parse multiple point source locations
+  template <typename T>
+  CLI::Option *add_psoption(CLI::Option_group *group, std::string option_name,
+                            std::array<std::array<T, 4>, QUDA_MAX_SOURCES> &variable, CLI::Validator trans,
+                            std::string option_description = "", bool defaulted = false)
+  {
+
+    CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {
+      size_t l;
+      T j; // results_t is just a vector of strings
+      bool worked = true;
+
+      CLI::Range validsource(0, QUDA_MAX_SOURCES);
+      for (size_t i {0}; i < vals.size() / (4 + 1); ++i) {
+        auto sourceok = validsource(vals.at((4 + 1) * i));
+
+        if (!sourceok.empty()) throw CLI::ValidationError(option_name, sourceok);
+        worked = worked and CLI::detail::lexical_cast(vals.at((4 + 1) * i), l);
+
+        for (int k = 0; k < 4; k++) {
+          auto transformok = trans(vals.at((4 + 1) * i + k + 1));
+          if (!transformok.empty()) throw CLI::ValidationError(option_name, transformok);
+          worked = worked and CLI::detail::lexical_cast(vals.at((4 + 1) * i + k + 1), j);
+          if (worked) variable[l][k] = j;
+        }
+      }
+      return worked;
+    };
+    CLI::Option *opt = add_option(option_name, f, option_description);
+    auto valuename = std::string("SOURCE ") + std::string(CLI::detail::type_name<T>());
+    opt->type_name(valuename)->type_size(-4 - 1);
+    opt->expected(-1);
+    opt->check(CLI::Validator(trans.get_description()));
+
+    group->add_option(opt);
+    return opt;
+  }
+
+  // Add option to parse multiple files.
+  template <typename T>
+  CLI::Option *add_fileoption(CLI::Option_group *group, std::string option_name,
+                              std::array<T, QUDA_MAX_SOURCES> &variable, CLI::Validator trans,
+                              std::string option_description = "", bool defaulted = false)
+  {
+
+    CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {
+      size_t l;
+      // T j; // results_t is just a vector of strings
+      bool worked = true;
+
+      CLI::Range validsource(0, QUDA_MAX_SOURCES);
+      for (size_t i {0}; i < vals.size() / 2; ++i) { // will always be a multiple of 2
+        auto sourceok = validsource(vals.at(2 * i));
+        auto transformok = trans(vals.at(2 * i + 1));
+        if (!sourceok.empty()) throw CLI::ValidationError(option_name, sourceok);
+        if (!transformok.empty()) throw CLI::ValidationError(option_name, transformok);
+        worked = worked and CLI::detail::lexical_cast(vals.at(2 * i), l);
+        auto &j = variable[l];
+        worked = worked and CLI::detail::lexical_cast(vals.at(2 * i + 1), j);
+
+        // if (worked) variable[l] = j;
+      }
+      return worked;
+    };
+    CLI::Option *opt = add_option(option_name, f, option_description);
+    auto valuename = std::string("SOURCE ") + std::string(CLI::detail::type_name<T>());
+    opt->type_name(valuename)->type_size(-2);
+    opt->expected(-1);
+    opt->check(CLI::Validator(trans.get_description()));
+
+    group->add_option(opt);
+    return opt;
+  }
 };
 
 std::shared_ptr<QUDAApp> make_app(std::string app_description = "QUDA internal test", std::string app_name = "");
@@ -133,6 +212,7 @@ void add_deflation_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app);
+void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app);
 
 template <typename T> std::string inline get_string(CLI::TransformPairs<T> &map, T val)
 {
@@ -357,6 +437,23 @@ extern double eofa_mq1;
 extern double eofa_mq2;
 extern double eofa_mq3;
 
+extern quda::file_array<char[256]> prop_source_infile;
+extern quda::file_array<char[256]> prop_source_outfile;
+extern quda::file_array<char[256]> prop_sink_infile;
+extern quda::file_array<char[256]> prop_sink_outfile;
+extern quda::source_array<std::array<int, 4>> prop_source_position;
+extern std::array<int, 4> momentum;
+extern int prop_source_smear_steps;
+extern int prop_sink_smear_steps;
+extern double prop_source_smear_coeff;
+extern double prop_sink_smear_coueff;
+extern QudaSourceType prop_source_type;
+extern QudaFermionSmearType prop_smear_type;
+extern bool prop_read_sources;
+extern int prop_n_sources;
+extern QudaPrecision prop_save_prec;
+
+// SU(3) smearing options
 extern double stout_smear_rho;
 extern double stout_smear_epsilon;
 extern double ape_smear_rho;

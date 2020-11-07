@@ -212,4 +212,23 @@ namespace quda
 #endif
   }
 
+  void VectorIO::downPrec(const std::vector<ColorSpinorField *> &vecs_high_prec,
+                          std::vector<ColorSpinorField *> &vecs_low_prec, const QudaPrecision low_prec)
+  {
+    if (low_prec >= vecs_high_prec[0]->Precision()) {
+      errorQuda("Attempting to down-prec from precision %d to %d", vecs_high_prec[0]->Precision(), low_prec);
+    }
+
+    ColorSpinorParam csParamClone(*vecs_high_prec[0]);
+    csParamClone.create = QUDA_REFERENCE_FIELD_CREATE;
+    csParamClone.setPrecision(low_prec);
+    for (unsigned int i = 0; i < vecs_high_prec.size(); i++) {
+      vecs_low_prec.push_back(vecs_high_prec[i]->CreateAlias(csParamClone));
+    }
+    if (getVerbosity() >= QUDA_SUMMARIZE) {
+      printfQuda("Vector space successfully down copied from prec %d to prec %d\n", vecs_high_prec[0]->Precision(),
+                 vecs_low_prec[0]->Precision());
+    }
+  }
+
 } // namespace quda

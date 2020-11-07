@@ -229,6 +229,25 @@ double eofa_mq1 = 1.0;
 double eofa_mq2 = 0.085;
 double eofa_mq3 = 1.0;
 
+// Propagator options
+quda::file_array<char[256]> prop_source_infile;
+quda::file_array<char[256]> prop_source_outfile;
+quda::file_array<char[256]> prop_sink_infile;
+quda::file_array<char[256]> prop_sink_outfile;
+quda::source_array<std::array<int, 4>> prop_source_position = {0, 0, 0, 0};
+std::array<int, 4> momentum = {0, 0, 0, 0};
+
+int prop_source_smear_steps = 20;
+int prop_sink_smear_steps = 20;
+double prop_source_smear_coeff = 2.0;
+double prop_sink_smear_coeff = 2.0;
+bool prop_read_sources = false;
+int prop_n_sources = 1;
+QudaFermionSmearType prop_smear_type = QUDA_FERMION_SMEAR_TYPE_GAUSSIAN;
+QudaSourceType prop_source_type = QUDA_POINT_SOURCE;
+QudaPrecision prop_save_prec = QUDA_SINGLE_PRECISION;
+
+// SU(3) smearing options
 double stout_smear_rho = 0.1;
 double stout_smear_epsilon = -0.25;
 double ape_smear_rho = 0.6;
@@ -237,15 +256,24 @@ double wflow_epsilon = 0.01;
 int wflow_steps = 100;
 QudaWFlowType wflow_type = QUDA_WFLOW_TYPE_WILSON;
 int measurement_interval = 5;
+QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_TYPE_STOUT;
 
-QudaContractType contract_type = QUDA_CONTRACT_TYPE_OPEN;
+QudaContractType contract_type = QUDA_CONTRACT_TYPE_DR_FT_T;
 
 namespace
 {
   CLI::TransformPairs<QudaCABasis> ca_basis_map {{"power", QUDA_POWER_BASIS}, {"chebyshev", QUDA_CHEBYSHEV_BASIS}};
 
   CLI::TransformPairs<QudaContractType> contract_type_map {{"open", QUDA_CONTRACT_TYPE_OPEN},
-                                                           {"dr", QUDA_CONTRACT_TYPE_DR}};
+                                                           {"open-sum-t", QUDA_CONTRACT_TYPE_OPEN_SUM_T},
+                                                           {"open-sum-z", QUDA_CONTRACT_TYPE_OPEN_SUM_Z},
+							   {"open-ft-t", QUDA_CONTRACT_TYPE_OPEN_FT_T},
+                                                           {"open-ft-z", QUDA_CONTRACT_TYPE_OPEN_FT_Z},
+                                                           {"dr", QUDA_CONTRACT_TYPE_DR},
+							   {"dr-ft-t", QUDA_CONTRACT_TYPE_DR_FT_T},
+                                                           {"dr-ft-z", QUDA_CONTRACT_TYPE_DR_FT_Z}
+
+  };
 
   CLI::TransformPairs<QudaDslashType> dslash_type_map {{"wilson", QUDA_WILSON_DSLASH},
                                                        {"clover", QUDA_CLOVER_WILSON_DSLASH},
@@ -353,8 +381,18 @@ namespace
   CLI::TransformPairs<QudaWFlowType> wflow_type_map {{"wilson", QUDA_WFLOW_TYPE_WILSON},
                                                      {"symanzik", QUDA_WFLOW_TYPE_SYMANZIK}};
 
-  CLI::TransformPairs<QudaSetupType> setup_type_map {{"test", QUDA_TEST_VECTOR_SETUP}, {"null", QUDA_TEST_VECTOR_SETUP}};
+  CLI::TransformPairs<QudaGaugeSmearType> gauge_smear_type_map {{"ape", QUDA_GAUGE_SMEAR_TYPE_APE},
+                                                                {"stout", QUDA_GAUGE_SMEAR_TYPE_STOUT},
+                                                                {"ovr-imp-stout", QUDA_GAUGE_SMEAR_TYPE_OVR_IMP_STOUT}};
 
+  CLI::TransformPairs<QudaFermionSmearType> fermion_smear_type_map {{"gaussian", QUDA_FERMION_SMEAR_TYPE_GAUSSIAN},
+                                                                    {"wuppertal", QUDA_FERMION_SMEAR_TYPE_WUPPERTAL}};
+
+  CLI::TransformPairs<QudaSourceType> fermion_source_type_map {{"point", QUDA_POINT_SOURCE},
+      {"wall", QUDA_CONSTANT_SOURCE}};
+  
+  CLI::TransformPairs<QudaSetupType> setup_type_map {{"test", QUDA_TEST_VECTOR_SETUP}, {"null", QUDA_TEST_VECTOR_SETUP}};
+  
   CLI::TransformPairs<QudaExtLibType> extlib_map {{"eigen", QUDA_EIGEN_EXTLIB}, {"magma", QUDA_MAGMA_EXTLIB}};
 
 } // namespace
@@ -381,8 +419,10 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
                        "Compute the fat/long field or use random numbers (default false)");
 
   quda_app
-    ->add_option("--contraction-type", contract_type,
-                 "Whether to leave spin elemental open, or use a gamma basis and contract on spin (default open)")
+    ->add_option(
+      "--contraction-type", contract_type,
+      "Whether to leave spin elemental open or insert a gamma basis, and whether to sum in t,z, or not at all"
+      "(default dr-sum-t)")
     ->transform(CLI::QUDACheckedTransformer(contract_type_map));
   ;
   quda_app->add_flag("--dagger", dagger, "Set the dagger to 1 (default 0)");
@@ -686,7 +726,7 @@ void add_deflation_option_group(std::shared_ptr<QUDAApp> quda_app)
 
 void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
-  auto opgroup = quda_app->add_option_group("MultiGrid", "Options controlling deflation");
+  auto opgroup = quda_app->add_option_group("MultiGrid", "Options controlling multigrid");
 
   // MWTODO: clean this up - code duplication
 
@@ -887,6 +927,8 @@ void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app)
 
 void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
+  CLI::QUDACheckedTransformer gauge_smear_transform(gauge_smear_type_map);
+  CLI::QUDACheckedTransformer wflow_type_transform(wflow_type_map);
 
   // Option group for SU(3) related options
   auto opgroup = quda_app->add_option_group("SU(3)", "Options controlling SU(3) tests");
@@ -907,8 +949,66 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   opgroup->add_option("--su3-wflow-type", wflow_type, "The type of action to use in the wilson flow (default wilson)")
     ->transform(CLI::QUDACheckedTransformer(wflow_type_map));
-  ;
+
+  opgroup->add_option("--su3-smear-type", gauge_smear_type, "The type of gauge smearing to use (default stout)")
+    ->transform(CLI::QUDACheckedTransformer(gauge_smear_type_map));
 
   opgroup->add_option("--su3-measurement-interval", measurement_interval,
                       "Measure the field energy and topological charge every Nth step (default 5) ");
+}
+
+void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+
+  CLI::QUDACheckedTransformer fermion_smear_transform(fermion_smear_type_map);
+
+  // Option group for propagator related options
+  auto opgroup = quda_app->add_option_group("Propagator", "Options controlling propagator construction");
+
+  opgroup->add_option("--prop-read-sources", prop_read_sources,
+                      "Read all sources from file. There will be one propagator for each source (default false)");
+
+  opgroup->add_option("--prop-n-sources", prop_n_sources, "The number of point sources to construct (default 1)");
+
+  quda_app->add_fileoption(opgroup, "--prop-save-sink-file", prop_sink_outfile, CLI::Validator(),
+                           "Save propagators to <file> (requires QIO)");
+
+  quda_app
+    ->add_fileoption(opgroup, "--prop-load-sink-file", prop_sink_infile, CLI::Validator(),
+                     "Load propagators from <file> (requires QIO)")
+    ->check(CLI::ExistingFile);
+
+  quda_app->add_fileoption(opgroup, "--prop-save-source-file", prop_source_outfile, CLI::Validator(),
+                           "Save source to <file> (requires QIO)");
+
+  // Do not check for an existing file as QUDA will append any
+  // string with a dilution index: "string_<dilution_index>"
+  quda_app->add_fileoption(opgroup, "--prop-load-source-file", prop_source_infile, CLI::Validator(),
+                           "Load source to <file> (requires QIO)");
+
+  opgroup->add_option("--prop-source-smear-coeff", prop_source_smear_coeff,
+                      "Set the alpha(Wuppertal) or omega(Gaussian) source smearing value (default 0.2)");
+
+  opgroup->add_option("--prop-source-smear-steps", prop_source_smear_steps,
+                      "Set the number of source smearing steps (default 50)");
+
+  opgroup->add_option("--prop-sink-smear-coeff", prop_sink_smear_coeff,
+                      "Set the alpha(Wuppertal) or omega(Gaussian) sink smearing value (default 0.2)");
+
+  opgroup->add_option("--prop-sink-smear-steps", prop_sink_smear_steps,
+                      "Set the number of sink smearing steps (default 50)");
+
+  opgroup->add_option("--prop-smear-type", prop_smear_type, "Type of fermion smearing to employ (default gaussian)")
+    ->transform(CLI::QUDACheckedTransformer(fermion_smear_type_map));
+
+  opgroup->add_option("--prop-source-type", prop_source_type, "Type of fermion source to employ (default point)")
+    ->transform(CLI::QUDACheckedTransformer(fermion_source_type_map));
+  
+  quda_app->add_psoption(opgroup, "--prop-source-position", prop_source_position, CLI::Validator(),
+                         "Set the position of the nth point source <Nth source> (X Y Z T) (default(0,0,0,0))");
+  quda_app->add_option("--momentum", momentum, "Set momentum for correlators (px py pz pt) (default(0,0,0,0))")->expected(4);;
+
+  CLI::QUDACheckedTransformer prec_transform(precision_map);
+  opgroup->add_option("--prop-save-prec", prop_save_prec, "Precision with which to save propagators (default single)")
+    ->transform(prec_transform);
 }
