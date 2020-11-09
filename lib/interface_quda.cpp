@@ -1437,11 +1437,21 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
 void freeSloppyCloverQuda()
 {
   if (!initialized) errorQuda("QUDA not initialized");
+
+  // Delete cloverRefinement if it does not alias gaugeSloppy.
   if (cloverRefinement != cloverSloppy && cloverRefinement) delete cloverRefinement;
-  if (cloverPrecondition != cloverSloppy && cloverPrecondition != cloverPrecise && cloverPrecondition)
+
+  // Delete cloverPrecondition if it does not alias cloverPrecise, cloverSloppy, or cloverEigensolver.
+  if (cloverPrecondition != cloverSloppy && cloverPrecondition != cloverPrecise && cloverPrecondition != cloverEigensolver && cloverPrecondition)
     delete cloverPrecondition;
+
+    // Delete cloverEigensolver if it does not alias cloverPrecise or cloverSloppy.
+  if (cloverEigensolver != cloverSloppy && cloverEigensolver != cloverPrecise && cloverEigensolver) delete cloverEigensolver;
+
+  // Delete cloverSloppy if it does not alias cloverPrecise.
   if (cloverSloppy != cloverPrecise && cloverSloppy) delete cloverSloppy;
 
+  cloverEigensolver = nullptr;
   cloverRefinement = nullptr;
   cloverPrecondition = nullptr;
   cloverSloppy = nullptr;
