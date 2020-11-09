@@ -331,11 +331,17 @@ namespace quda {
   }
 
   void cpuColorSpinorField::copy_to_buffer(void *buffer) const {
-    std::memcpy(buffer, V(), Bytes());
+    std::memcpy(buffer, v, bytes);
+    if (precision < QUDA_SINGLE_PRECISION) {
+      std::memcpy(static_cast<char *>(buffer) + bytes, norm, norm_bytes);
+    }
   }
 
   void cpuColorSpinorField::copy_from_buffer(void *buffer) {
-    std::memcpy(V(), buffer, Bytes());
+    std::memcpy(v, buffer, bytes);
+    if (precision < QUDA_SINGLE_PRECISION) {
+      std::memcpy(norm, static_cast<char *>(buffer) + bytes, norm_bytes);
+    }
   }
 
 } // namespace quda

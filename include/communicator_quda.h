@@ -184,137 +184,6 @@ inline bool isHost(const void *buffer)
   }
 }
 
-/**
- * Send to the "dir" direction in the "dim" dimension
- */
-inline MsgHandle *comm_declare_send_relative_(const char *func, const char *file, int line, void *buffer, int dim,
-                                              int dir, size_t nbytes)
-{
-#ifdef HOST_DEBUG
-  checkCudaError(); // check and clear error state first
-
-  if (isHost(buffer)) {
-    // test this memory allocation is ok by doing a memcpy from it
-    void *tmp = safe_malloc(nbytes);
-    try {
-      std::copy(static_cast<char *>(buffer), static_cast<char *>(buffer) + nbytes, static_cast<char *>(tmp));
-    } catch (std::exception &e) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir,
-                 nbytes);
-      errorQuda("aborting");
-    }
-    host_free(tmp);
-  } else {
-    // test this memory allocation is ok by doing a memcpy from it
-    void *tmp = device_malloc(nbytes);
-    qudaMemcpy(tmp, buffer, nbytes, cudaMemcpyDeviceToDevice);
-    device_free(tmp);
-  }
-#endif
-
-  int disp[QUDA_MAX_DIM] = {0};
-  disp[dim] = dir;
-
-  return comm_declare_send_displaced(buffer, disp, nbytes);
-}
-
-/**
- * Receive from the "dir" direction in the "dim" dimension
- */
-inline MsgHandle *comm_declare_receive_relative_(const char *func, const char *file, int line, void *buffer, int dim,
-                                                 int dir, size_t nbytes)
-{
-#ifdef HOST_DEBUG
-  checkCudaError(); // check and clear error state first
-
-  if (isHost(buffer)) {
-    // test this memory allocation is ok by filling it
-    try {
-      std::fill(static_cast<char *>(buffer), static_cast<char *>(buffer) + nbytes, 0);
-    } catch (std::exception &e) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir,
-                 nbytes);
-      errorQuda("aborting");
-    }
-  } else {
-    // test this memory allocation is ok by doing a memset
-    qudaMemset(buffer, 0, nbytes);
-  }
-#endif
-
-  int disp[QUDA_MAX_DIM] = {0};
-  disp[dim] = dir;
-
-  return comm_declare_receive_displaced(buffer, disp, nbytes);
-}
-
-/**
- * Strided send to the "dir" direction in the "dim" dimension
- */
-inline MsgHandle *comm_declare_strided_send_relative_(const char *func, const char *file, int line, void *buffer,
-                                                      int dim, int dir, size_t blksize, int nblocks, size_t stride)
-{
-#ifdef HOST_DEBUG
-  checkCudaError(); // check and clear error state first
-
-  if (isHost(buffer)) {
-    // test this memory allocation is ok by doing a memcpy from it
-    void *tmp = safe_malloc(blksize * nblocks);
-    try {
-      for (int i = 0; i < nblocks; i++)
-        std::copy(static_cast<char *>(buffer) + i * stride, static_cast<char *>(buffer) + i * stride + blksize,
-                  static_cast<char *>(tmp));
-    } catch (std::exception &e) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n", file,
-                 line, func, dim, dir, blksize, nblocks, stride);
-      errorQuda("aborting");
-    }
-    host_free(tmp);
-  } else {
-    // test this memory allocation is ok by doing a memcpy from it
-    void *tmp = device_malloc(blksize * nblocks);
-    qudaMemcpy2D(tmp, blksize, buffer, stride, blksize, nblocks, cudaMemcpyDeviceToDevice);
-    device_free(tmp);
-  }
-#endif
-
-  int disp[QUDA_MAX_DIM] = {0};
-  disp[dim] = dir;
-
-  return comm_declare_strided_send_displaced(buffer, disp, blksize, nblocks, stride);
-}
-
-/**
- * Strided receive from the "dir" direction in the "dim" dimension
- */
-inline MsgHandle *comm_declare_strided_receive_relative_(const char *func, const char *file, int line, void *buffer,
-                                                         int dim, int dir, size_t blksize, int nblocks, size_t stride)
-{
-#ifdef HOST_DEBUG
-  checkCudaError(); // check and clear error state first
-
-  if (isHost(buffer)) {
-    // test this memory allocation is ok by filling it
-    try {
-      for (int i = 0; i < nblocks; i++)
-        std::fill(static_cast<char *>(buffer) + i * stride, static_cast<char *>(buffer) + i * stride + blksize, 0);
-    } catch (std::exception &e) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n", file,
-                 line, func, dim, dir, blksize, nblocks, stride);
-      errorQuda("aborting");
-    }
-  } else {
-    // test this memory allocation is ok by doing a memset
-    qudaMemset2D(buffer, stride, 0, blksize, nblocks);
-  }
-#endif
-
-  int disp[QUDA_MAX_DIM] = {0};
-  disp[dim] = dir;
-
-  return comm_declare_strided_receive_displaced(buffer, disp, blksize, nblocks, stride);
-}
-
 inline void check_displacement(const int displacement[], int ndim)
 {
   for (int i = 0; i < ndim; i++) {
@@ -326,8 +195,16 @@ inline void check_displacement(const int displacement[], int ndim)
 
 struct Communicator {
 
+  /**
+    The gpuid is static, and it's set when the default communicator is initialized.
+  */
   static int gpuid;
   static int comm_gpuid() { return gpuid; }
+
+  /**
+    Whether or not the MPI_COMM_HANDLE is created by user, in which case we should not free it.
+  */
+  bool user_set_comm_handle;
 
   bool peer2peer_enabled[2][4] = {{false, false, false, false}, {false, false, false, false}};
   bool peer2peer_init = false;
@@ -865,7 +742,7 @@ struct Communicator {
   Communicator(int nDim, const int *commDims, QudaCommsMap rank_from_coords, void *map_data,
                bool user_set_comm_handle = false, void *user_comm = nullptr);
 
-  ~Communicator() { comm_finalize(); }
+  ~Communicator();
 
   void comm_gather_hostname(char *hostname_recv_buf);
 

@@ -8,6 +8,16 @@
 namespace quda
 {
 
+  template <class Field, class Element, class F>
+  void copy_color_spinor_offset(Field &out, const Field &in, const int offset[4])
+  {
+    using Arg = CopyFieldOffsetArg<Field, Element, F>;
+    F out_accessor(out);
+    F in_accessor(in);
+    Arg arg(out_accessor, out, in_accessor, in, offset);
+    CopyFieldOffset<Arg> copier(arg, in);
+  }
+
   template <class Float, int nColor> struct CopyColorSpinorOffset {
     CopyColorSpinorOffset(ColorSpinorField &out, const ColorSpinorField &in, const int offset[4])
     {
@@ -17,15 +27,11 @@ namespace quda
 
       if (in.Location() == QUDA_CPU_FIELD_LOCATION) {
         if (in.FieldOrder() == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
-          using Accessor = typename colorspinor_order_mapper<Float, QUDA_SPACE_COLOR_SPIN_FIELD_ORDER, 4, nColor>::type;
-          using Arg = CopyFieldOffsetArg<Field, Element, Accessor>;
-          Arg arg(out, in, offset);
-          CopyFieldOffset<Arg> dummy(arg, in);
+          using F = typename colorspinor_order_mapper<Float, QUDA_SPACE_COLOR_SPIN_FIELD_ORDER, 4, nColor>::type;
+          copy_color_spinor_offset<Field, Element, F>(out, in, offset);
         } else if (in.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-          using Accessor = typename colorspinor_order_mapper<Float, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER, 4, nColor>::type;
-          using ArgType = CopyFieldOffsetArg<Field, Element, Accessor>;
-          ArgType arg(out, in, offset);
-          CopyFieldOffset<ArgType> dummy(arg, in);
+          using F = typename colorspinor_order_mapper<Float, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER, 4, nColor>::type;
+          copy_color_spinor_offset<Field, Element, F>(out, in, offset);
         } else {
           errorQuda("Unsupported field order = %d.", in.FieldOrder());
         }
@@ -33,16 +39,15 @@ namespace quda
 
         if (!in.isNative() || !out.isNative()) { errorQuda("CUDA field has be in native order."); }
 
-        using Accessor = typename colorspinor_mapper<Float, 4, nColor>::type;
-        using ArgType = CopyFieldOffsetArg<Field, Element, Accessor>;
-        ArgType arg(out, in, offset);
-        CopyFieldOffset<ArgType> dummy(arg, in);
+        using F = typename colorspinor_mapper<Float, 4, nColor>::type;
+        copy_color_spinor_offset<Field, Element, F>(out, in, offset);
       }
     }
   };
 
   void copyFieldOffset(ColorSpinorField &out, const ColorSpinorField &in, const int offset[4])
   {
+    checkPrecision(out, in);
     checkLocation(out, in); // check all locations match
     instantiate<CopyColorSpinorOffset>(out, in, offset);
   }

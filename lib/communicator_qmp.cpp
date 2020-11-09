@@ -34,8 +34,9 @@ struct MsgHandle_s {
 #endif
 
 Communicator::Communicator(int nDim, const int *commDims, QudaCommsMap rank_from_coords, void *map_data,
-                           bool user_set_comm_handle, void *user_comm)
+                           bool user_set_comm_handle_, void *user_comm)
 {
+  user_set_comm_handle = user_set_comm_handle_;
 
   int initialized;
   MPI_CHECK(MPI_Initialized(&initialized));
@@ -43,6 +44,8 @@ Communicator::Communicator(int nDim, const int *commDims, QudaCommsMap rank_from
   if (!initialized) { assert(false); }
 
   if (user_set_comm_handle) {
+    // The logic here being: previouly all QMP calls are based on QMP_comm_get_default(), and user can
+    // feed in their own MPI_COMM_HANDLE. Now with the following this behavior should remain the same.
     QMP_COMM_HANDLE = QMP_comm_get_default();
     MPI_COMM_HANDLE = *((MPI_Comm *)user_comm);
   } else {
@@ -59,6 +62,7 @@ Communicator::Communicator(int nDim, const int *commDims, QudaCommsMap rank_from
 
 Communicator::Communicator(Communicator &other, const int *comm_split)
 {
+  user_set_comm_handle = false;
 
   constexpr int nDim = 4;
 
@@ -91,6 +95,11 @@ Communicator::Communicator(Communicator &other, const int *comm_split)
 
   printf("Creating split communicator, base_rank = %5d, key = %5d, color = %5d, split_rank = %5d, gpuid = %d\n",
          other.comm_rank(), key, color, my_rank_, comm_gpuid());
+}
+
+Communicator::~Communicator() {
+  comm_finalize();
+  if (!user_set_comm_handle) { QMP_comm_free(QMP_COMM_HANDLE); }
 }
 
 // There are more efficient ways to do the following,

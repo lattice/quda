@@ -10,8 +10,10 @@ namespace quda
   template <class Field, class Element, class G>
   void copy_gauge_offset(Field &out, const Field &in, const int offset[4])
   {
+    G out_accessor(out);
+    G in_accessor(in);
     using Arg = CopyFieldOffsetArg<Field, Element, G>;
-    Arg arg(out, in, offset);
+    Arg arg(out_accessor, out, in_accessor, in, offset);
     CopyFieldOffset<Arg> copier(arg, in);
   }
 
@@ -111,6 +113,7 @@ namespace quda
   void copyFieldOffset(GaugeField &out, const GaugeField &in, const int offset[4])
   {
     checkPrecision(out, in);
+    checkLocation(out, in); // check all locations match
     checkReconstruct(out, in);
 
     if (out.Geometry() != in.Geometry()) {

@@ -3,6 +3,7 @@
 #include <limits>
 
 #include <quda_internal.h>
+#include <communicator_quda.h>
 #include <comm_quda.h>
 #include <csignal>
 

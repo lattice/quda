@@ -33,8 +33,9 @@ struct MsgHandle_s {
 };
 
 Communicator::Communicator(int nDim, const int *commDims, QudaCommsMap rank_from_coords, void *map_data,
-                           bool user_set_comm_handle, void *user_comm)
+                           bool user_set_comm_handle_, void *user_comm)
 {
+  user_set_comm_handle = user_set_comm_handle_;
 
   int initialized;
   MPI_CHECK(MPI_Initialized(&initialized));
@@ -54,6 +55,7 @@ Communicator::Communicator(int nDim, const int *commDims, QudaCommsMap rank_from
 
 Communicator::Communicator(Communicator &other, const int *comm_split)
 {
+  user_set_comm_handle = false;
 
   constexpr int nDim = 4;
 
@@ -80,9 +82,12 @@ Communicator::Communicator(Communicator &other, const int *comm_split)
   comm_init(nDim, comm_dims_split.data(), func, comm_dims_split.data());
 
   std::srand(17 * other.comm_rank() + 137);
+}
 
-  printf("Creating split communicator, base_rank = %5d, key = %5d, color = %5d, split_rank = %5d, gpuid = %d\n",
-         other.comm_rank(), key, color, my_rank_, comm_gpuid());
+Communicator::~Communicator()
+{
+  comm_finalize();
+  if (!user_set_comm_handle) { MPI_Comm_free(&MPI_COMM_HANDLE); }
 }
 
 void Communicator::comm_gather_hostname(char *hostname_recv_buf)

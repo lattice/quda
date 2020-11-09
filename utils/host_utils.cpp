@@ -288,6 +288,7 @@ void initComms(int argc, char **argv, int *const commDims)
 
 void finalizeComms()
 {
+  comm_finalize();
 #if defined(QMP_COMMS)
   QMP_finalize_msg_passing();
 #elif defined(MPI_COMMS)

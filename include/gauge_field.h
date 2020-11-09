@@ -346,6 +346,8 @@ namespace quda {
     size_t PhaseBytes() const { return phase_bytes; }
     size_t PhaseOffset() const { return phase_offset; }
 
+    size_t TotalBytes() const { return bytes; }
+
     virtual void* Gauge_p() { errorQuda("Not implemented"); return (void*)0;}
     virtual void* Even_p() { errorQuda("Not implemented"); return (void*)0;}
     virtual void* Odd_p() { errorQuda("Not implemented"); return (void*)0;}

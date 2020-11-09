@@ -3223,12 +3223,12 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, voi
     errorQuda("Split Grid does NOT support 5d even-odd preconditioned DWF yet, because of, well, its 5d even-odd "
               "checker-boarding. :(");
   }
-  if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    errorQuda("Split Grid does NOT work with clover yet.");
-  }
+
   if (param->inv_type_precondition == QUDA_MG_INVERTER) {
     errorQuda("Split Grid does NOT work with MG yet.");
   }
+
+  checkInvertParam(param, _hp_x[0], _hp_b[0]);
 
   GaugeFieldParam gf_param(h_gauge, *gauge_param);
   if (gf_param.order <= 4) { gf_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO; }
@@ -3266,6 +3266,34 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, voi
     gf_param.pad *= split_key[d];
     gauge_param->X[d] *= split_key[d];
     gauge_param->ga_pad *= split_key[d];
+  }
+
+  quda::cudaCloverField *original_clover = nullptr;
+
+  if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    CloverFieldParam clover_param(*cloverPrecise);
+
+    // Make a copy of the original clover field.
+    original_clover = static_cast<cudaCloverField *>(CloverField::Create(clover_param));
+    if (cloverPrecise->V(false)) { original_clover->copy(*cloverPrecise, false); }
+    if (cloverPrecise->V(true)) { original_clover->copy(*cloverPrecise, true); }
+
+    for (int d = 0; d < nDim; d++) {
+      clover_param.x[d] *= split_key[d];
+    }
+    quda::CloverField *collected_clover = new quda::cudaCloverField(clover_param);
+    std::vector<quda::CloverField *> v_c(1);
+    v_c[0] = cloverPrecise;
+    quda::split_field(*collected_clover, v_c, split_key);
+
+    // Free the original clover fields all together.
+    freeCloverQuda();
+
+    // Set up the new re-distributed clover fields.
+    cloverPrecise = static_cast<quda::cudaCloverField *>(collected_clover);
+    QudaPrecision prec[] = {param->clover_cuda_prec_sloppy, param->clover_cuda_prec_precondition,
+                          param->clover_cuda_prec_refinement_sloppy, param->clover_cuda_prec_eigensolver};
+    loadSloppyCloverQuda(prec);
   }
 
   gf_param.create = QUDA_NULL_FIELD_CREATE;
@@ -3328,6 +3356,15 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, voi
 
   delete in;
   delete collected_gauge;
+
+  if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    freeCloverQuda();
+    // Restore the original clover field
+    cloverPrecise = original_clover;
+    QudaPrecision prec[] = {param->clover_cuda_prec_sloppy, param->clover_cuda_prec_precondition,
+                          param->clover_cuda_prec_refinement_sloppy, param->clover_cuda_prec_eigensolver};
+    loadSloppyCloverQuda(prec);
+  }
 
   freeGaugeQuda();
   profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_EPILOGUE);

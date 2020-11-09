@@ -35,13 +35,14 @@ namespace quda
 
     QudaOffsetCopyMode mode;
 
-    CopyFieldOffsetArg(Field &out, const Field &in, const int offset[4]) :
-      out(out), in(in), nParity(in.SiteSubset())
+    CopyFieldOffsetArg(Accessor &out_accessor, Field &out_field, const Accessor &in_accessor, const Field &in_field,
+                       const int offset[4]) :
+      out(out_accessor), in(in_accessor), nParity(in_field.SiteSubset())
     {
-      const int *X_in = in.X();
-      const int *X_out = out.X();
+      const int *X_in = in_field.X();
+      const int *X_out = out_field.X();
 
-      Ls = in.Ndim() == 4 ? 1 : X_in[4];
+      Ls = in_field.Ndim() == 4 ? 1 : X_in[4];
 
       if (Ls > 1 && X_out[4] != Ls) { errorQuda("Ls mismatch: in: %d, out: %d", X_out[4], Ls); }
 
@@ -51,8 +52,8 @@ namespace quda
         this->offset[d] = offset[d];
       }
 
-      volume_cb_in = in.VolumeCB();
-      volume_cb_out = out.VolumeCB();
+      volume_cb_in = in_field.VolumeCB();
+      volume_cb_out = out_field.VolumeCB();
 
       if (volume_cb_out > volume_cb_in) {
         volume_cb = volume_cb_in;
@@ -66,11 +67,12 @@ namespace quda
       volume_4d_cb_out = volume_cb_out / Ls;
       volume_4d_cb = volume_cb / Ls;
     }
-
   };
 
   template <class Arg>
-  __device__ __host__ inline typename std::enable_if<std::is_same<typename Arg::Field, ColorSpinorField>::value, void>::type copy_field(int out, int in, int parity, Arg &arg)
+  __device__ __host__ inline
+    typename std::enable_if<std::is_same<typename Arg::Field, ColorSpinorField>::value, void>::type
+    copy_field(int out, int in, int parity, Arg &arg)
   {
     using Element = typename Arg::Element;
 
@@ -79,7 +81,21 @@ namespace quda
   }
 
   template <class Arg>
-  __device__ __host__ inline typename std::enable_if<std::is_same<typename Arg::Field, GaugeField>::value, void>::type copy_field(int out, int in, int parity, Arg &arg)
+  __device__ __host__ inline typename std::enable_if<std::is_same<typename Arg::Field, CloverField>::value, void>::type
+  copy_field(int out, int in, int parity, Arg &arg)
+  {
+    using Element = typename Arg::Element;
+    constexpr int length = 72;
+    Element reg_in[length];
+    Element reg_out[length];
+    arg.in.load(reg_in, in, parity);
+    for (int i = 0; i < length; i++) { reg_out[i] = reg_in[i]; }
+    arg.out.save(reg_out, out, parity);
+  }
+
+  template <class Arg>
+  __device__ __host__ inline typename std::enable_if<std::is_same<typename Arg::Field, GaugeField>::value, void>::type
+  copy_field(int out, int in, int parity, Arg &arg)
   {
     using Element = typename Arg::Element;
 #pragma unroll
@@ -127,9 +143,7 @@ namespace quda
   {
     for (int parity = 0; parity < arg.nParity; parity++) {
       for (int s = 0; s < arg.Ls; s++) {
-        for (int x_cb = 0; x_cb < arg.volume_4d_cb; x_cb++) {
-          copy_field_offset<mode>(x_cb, s, parity, arg);
-        }
+        for (int x_cb = 0; x_cb < arg.volume_4d_cb; x_cb++) { copy_field_offset<mode>(x_cb, s, parity, arg); }
       }
     }
   }
@@ -138,13 +152,17 @@ namespace quda
   {
 
     using Field = typename Arg::Field;
+
   protected:
     Arg &arg;
     const Field &meta;
     QudaFieldLocation location;
 
     long long flops() const { return 0; }
-    long long bytes() const { return 2ll * (arg.mode == QudaOffsetCopyMode::COLLECT ? arg.in.Bytes() : arg.out.Bytes()); }
+    long long bytes() const
+    {
+      return 2ll * (arg.mode == QudaOffsetCopyMode::COLLECT ? arg.in.Bytes() : arg.out.Bytes());
+    }
 
     bool tuneGridDim() const { return false; }
     unsigned int minThreads() const { return arg.volume_4d_cb; }
@@ -156,10 +174,10 @@ namespace quda
     CopyFieldOffset(Arg &arg, const Field &meta) :
       TunableVectorYZ(arg.Ls, arg.nParity), arg(arg), meta(meta), location(meta.Location())
     {
-      writeAuxString("(%d,%d,%d,%d)->(%d,%d,%d,%d),Ls=%d,nParity=%d,%s,offset=%d%d%d%d,location=%s", arg.Xin[0], arg.Xin[1],
-                     arg.Xin[2], arg.Xin[3], arg.Xout[0], arg.Xout[1], arg.Xout[2], arg.Xout[3], arg.Ls, arg.nParity,
-                     arg.mode == QudaOffsetCopyMode::COLLECT ? "COLLECT" : "DISPERSE", arg.offset[0], arg.offset[1], arg.offset[2],
-                     arg.offset[3], location == QUDA_CPU_FIELD_LOCATION ? "CPU" : "GPU");
+      writeAuxString("(%d,%d,%d,%d)->(%d,%d,%d,%d),Ls=%d,nParity=%d,%s,offset=%d%d%d%d,location=%s", arg.Xin[0],
+                     arg.Xin[1], arg.Xin[2], arg.Xin[3], arg.Xout[0], arg.Xout[1], arg.Xout[2], arg.Xout[3], arg.Ls,
+                     arg.nParity, arg.mode == QudaOffsetCopyMode::COLLECT ? "COLLECT" : "DISPERSE", arg.offset[0],
+                     arg.offset[1], arg.offset[2], arg.offset[3], location == QUDA_CPU_FIELD_LOCATION ? "CPU" : "GPU");
       apply(0);
     }
 
@@ -175,8 +193,9 @@ namespace quda
           copy_field_offset_cpu<QudaOffsetCopyMode::DISPERSE>(arg);
         }
       } else {
-        auto kernel = arg.mode == QudaOffsetCopyMode::COLLECT ? copy_field_offset_kernel<QudaOffsetCopyMode::COLLECT, Arg> :
-                                 copy_field_offset_kernel<QudaOffsetCopyMode::DISPERSE, Arg>;
+        auto kernel = arg.mode == QudaOffsetCopyMode::COLLECT ?
+          copy_field_offset_kernel<QudaOffsetCopyMode::COLLECT, Arg> :
+          copy_field_offset_kernel<QudaOffsetCopyMode::DISPERSE, Arg>;
         kernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
       }
     }

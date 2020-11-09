@@ -229,7 +229,6 @@ int main(int argc, char **argv)
   void *clover_inv = nullptr;
   // Allocate space on the host (always best to allocate and free in the same scope)
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    if (use_split_grid) { errorQuda("Split grid does not work with clover yet."); }
     clover = malloc(V * clover_site_size * host_clover_data_type_size);
     clover_inv = malloc(V * clover_site_size * host_spinor_data_type_size);
     constructHostCloverField(clover, clover_inv, inv_param);
