@@ -31,8 +31,6 @@ char *comm_hostname(void)
 
 static unsigned long int rand_seed = 137;
 
-void set_rand_seed(unsigned long int seed) { rand_seed = seed; }
-
 /**
  * We provide our own random number generator to avoid re-seeding
  * rand(), which might also be used by the calling application.  This

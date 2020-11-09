@@ -123,8 +123,8 @@ inline Topology *comm_create_topology(int ndim, const int *dims, QudaCommsMap ra
   topo->my_rank = my_rank;
   for (int i = 0; i < ndim; i++) { topo->my_coords[i] = topo->coords[my_rank][i]; }
 
-  // initialize the random number generator with a rank-dependent seed
-  set_rand_seed(17 * my_rank + 137);
+  // initialize the random number generator with a rank-dependent seed and initialized it only once.
+  if (gpuid < 0) { rand_seed = 17 * my_rank + 137; }
 
   return topo;
 }

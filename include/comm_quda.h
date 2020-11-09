@@ -11,10 +11,6 @@ extern "C" {
   /* defined in quda.h; redefining here to avoid circular references */
   typedef int (*QudaCommsMap)(const int *coords, void *fdata);
 
-  /* implemented in comm_common.cpp */
-
-  void set_rand_seed(unsigned long int seed);
-
   char *comm_hostname(void);
   double comm_drand(void);
   Topology *comm_create_topology(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data);

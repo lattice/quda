@@ -49,8 +49,6 @@ Communicator::Communicator(int nDim, const int *commDims, QudaCommsMap rank_from
   }
 
   comm_init(nDim, commDims, rank_from_coords, map_data);
-
-  std::srand(17 * rank + 137);
 }
 
 Communicator::Communicator(Communicator &other, const int *comm_split)
@@ -80,8 +78,6 @@ Communicator::Communicator(Communicator &other, const int *comm_split)
 
   QudaCommsMap func = lex_rank_from_coords_dim_t;
   comm_init(nDim, comm_dims_split.data(), func, comm_dims_split.data());
-
-  std::srand(17 * other.comm_rank() + 137);
 }
 
 Communicator::~Communicator()
