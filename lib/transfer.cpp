@@ -79,12 +79,14 @@ namespace quda {
       total_block_size *= geo_bs[d];
     }
 
-    // Aggregation size is "technically" 1 for optimized KD
-    if (total_block_size != 1 && transfer_type == QUDA_TRANSFER_OPTIMIZED_KD)
-      errorQuda("Total geometric block size must be 1 for transfer type optimized-kd");
+    // Various consistency checks for optimized KD "transfers"
     if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD) {
+
+      // Aggregation size is "technically" 1 for optimized KD
       if (total_block_size != 1)
-        errorQuda("Invalid geometric block size %d for optimized-kd aggregation, must be 1", total_block_size);
+        errorQuda("Invalid total geometric block size %d for transfer type optimized-kd, must be 1", total_block_size);
+
+      // The number of coarse dof is technically fineColor for optimized KD
       if (Nvec != B[0]->Ncolor())
         errorQuda("Invalid Nvec %d for optimized-kd aggregation, must be fine color %d", Nvec, B[0]->Ncolor());
     }

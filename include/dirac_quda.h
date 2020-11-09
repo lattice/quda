@@ -258,6 +258,14 @@ namespace quda {
       reconstruct(x, b, solType);
     }
 
+    /**
+       @brief specifies whether or not there's a specialized prepare/reconstruct
+              used before/after transfering to/from the coarse level in MG
+
+       @return whether or not a specialized routine should be used
+    */
+    virtual bool hasSpecialMG() const { return false; }
+
     void setMass(double mass){ this->mass = mass;}
 
     // Dirac operator factory
@@ -1268,6 +1276,8 @@ public:
     virtual void reconstructSpecialMG(ColorSpinorField &x, const ColorSpinorField &b,
                                       const QudaSolutionType solType) const;
 
+    virtual bool hasSpecialMG() const { return true; }
+
     virtual QudaDiracType getDiracType() const { return QUDA_STAGGEREDKD_DIRAC; }
 
     /**
@@ -1468,6 +1478,8 @@ public:
                                   ColorSpinorField &b, const QudaSolutionType solType) const;
     virtual void reconstructSpecialMG(ColorSpinorField &x, const ColorSpinorField &b,
                                       const QudaSolutionType solType) const;
+
+    virtual bool hasSpecialMG() const { return true; }
 
     virtual QudaDiracType getDiracType() const { return QUDA_ASQTADKD_DIRAC; }
 
