@@ -214,6 +214,7 @@ extern double eps_naik;
 extern int n_naiks;
 extern double clover_coeff;
 extern bool compute_clover;
+extern bool compute_clover_trlog;
 extern bool compute_fatlong;
 extern double tol;
 extern double tol_precondition;

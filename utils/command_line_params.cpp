@@ -81,6 +81,7 @@ double eps_naik = 0.0;
 int n_naiks = 1;
 double clover_coeff = 0.1;
 bool compute_clover = false;
+bool compute_clover_trlog = false;
 bool compute_fatlong = false;
 double tol = 1e-7;
 double tol_precondition = 1e-1;
@@ -377,9 +378,11 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--clover-coeff", clover_coeff, "Clover coefficient")->capture_default_str();
   quda_app->add_option("--compute-clover", compute_clover,
                        "Compute the clover field or use random numbers (default false)");
+  quda_app->add_option("--compute-clover-trlog", compute_clover_trlog,
+                       "Compute the clover inverse trace log to check for singularity (default false)");
   quda_app->add_option("--compute-fat-long", compute_fatlong,
                        "Compute the fat/long field or use random numbers (default false)");
-
+  
   quda_app
     ->add_option("--contraction-type", contract_type,
                  "Whether to leave spin elemental open, or use a gamma basis and contract on spin (default open)")
