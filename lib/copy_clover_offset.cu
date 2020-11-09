@@ -13,11 +13,9 @@ namespace quda
       constexpr int length = 72;
       using Field = CloverField;
       using real = typename mapper<Float>::type;
-      constexpr int N = 3 * 4 / 2; // nColor * nSpin / 2
       using Element = typename mapper<Float>::type;
 
       if (in.isNative()) {
-        const bool override = true;
         using C = typename clover_mapper<Float>::type;
         using Arg = CopyFieldOffsetArg<Field, Element, C>;
         C out_accessor(out, inverse);

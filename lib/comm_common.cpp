@@ -185,6 +185,42 @@ void comm_dim_partitioned_reset();
 
 int get_enable_p2p_max_access_rank();
 
+Topology *comm_create_topology(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data,
+                                      int my_rank)
+{
+  if (ndim > QUDA_MAX_DIM) { errorQuda("ndim exceeds QUDA_MAX_DIM"); }
+
+  Topology *topo = (Topology *)safe_malloc(sizeof(Topology));
+
+  topo->ndim = ndim;
+
+  int nodes = 1;
+  for (int i = 0; i < ndim; i++) {
+    topo->dims[i] = dims[i];
+    nodes *= dims[i];
+  }
+
+  topo->ranks = (int *)safe_malloc(nodes * sizeof(int));
+  topo->coords = (int(*)[QUDA_MAX_DIM])safe_malloc(nodes * sizeof(int[QUDA_MAX_DIM]));
+
+  int x[QUDA_MAX_DIM];
+  for (int i = 0; i < QUDA_MAX_DIM; i++) x[i] = 0;
+
+  do {
+    int rank = rank_from_coords(x, map_data);
+    topo->ranks[index(ndim, dims, x)] = rank;
+    for (int i = 0; i < ndim; i++) { topo->coords[rank][i] = x[i]; }
+  } while (advance_coords(ndim, dims, x));
+
+  topo->my_rank = my_rank;
+  for (int i = 0; i < ndim; i++) { topo->my_coords[i] = topo->coords[my_rank][i]; }
+
+  // initialize the random number generator with a rank-dependent seed and initialized it only once.
+  if (comm_gpuid() < 0) { rand_seed = 17 * my_rank + 137; }
+
+  return topo;
+}
+
 const char *comm_config_string()
 {
   static char config_string[64];

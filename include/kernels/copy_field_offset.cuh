@@ -1,12 +1,14 @@
 #include <lattice_field.h>
 #include <index_helper.cuh>
+#include <fast_intdiv.h>
 
 namespace quda
 {
 
-  template <class Field_, class Element_, class Accessor_> struct CopyFieldOffsetArg {
+  template <class Field_, class Element_, class Accessor_, QudaPCType pc_type_ = QUDA_4D_PC> struct CopyFieldOffsetArg {
 
     static constexpr int nDim = 4; // No matter what the underlying field is, the dimension is 4
+    static constexpr QudaPCType pc_type = pc_type_;
 
     using Field = Field_;
     using Element = Element_;
@@ -15,8 +17,10 @@ namespace quda
     Accessor out;      // output field
     const Accessor in; // input field
 
-    int Xin[nDim];
-    int Xout[nDim];
+    int_fastdiv X0h_in;
+    int_fastdiv X0h_out;
+    int_fastdiv dim_in[nDim];  // full lattice dimensions
+    int_fastdiv dim_out[nDim]; // full lattice dimensions
 
     int offset[nDim];
 
@@ -46,9 +50,16 @@ namespace quda
 
       if (Ls > 1 && X_out[4] != Ls) { errorQuda("Ls mismatch: in: %d, out: %d", X_out[4], Ls); }
 
-      for (int d = 0; d < nDim; d++) {
-        this->Xout[d] = X_out[d];
-        this->Xin[d] = X_in[d];
+      dim_out[0] = nParity == 2 ? X_out[0] : X_out[0] * 2;
+      dim_in[0] = nParity == 2 ? X_in[0] : X_in[0] * 2;
+
+      X0h_out = nParity == 2 ? X_out[0] / 2 : X_out[0];
+      X0h_in = nParity == 2 ? X_in[0] / 2 : X_in[0];
+      this->offset[0] = offset[0];
+
+      for (int d = 1; d < nDim; d++) {
+        dim_out[d] = X_out[d];
+        dim_in[d] = X_in[d];
         this->offset[d] = offset[d];
       }
 
@@ -108,22 +119,43 @@ namespace quda
   template <QudaOffsetCopyMode mode, class Arg>
   __device__ __host__ void copy_field_offset(int x_cb, int s, int parity, Arg &arg)
   {
-    int coordinate[4];
-    int x_in;
-    int x_out;
-    if (mode == QudaOffsetCopyMode::COLLECT) {
-      // we are collecting so x_cb is the index for the input.
-      x_in = x_cb;
-      getCoordsExtended(coordinate, x_cb, arg.Xin, parity, arg.offset);
-      x_out = linkIndex(coordinate, arg.Xout);
-    } else {
-      // we are dispersing so x_cb is the index for the output.
-      x_out = x_cb;
-      getCoordsExtended(coordinate, x_cb, arg.Xout, parity, arg.offset);
-      x_in = linkIndex(coordinate, arg.Xin);
+    if (Arg::pc_type == QUDA_4D_PC) { // 4d even-odd preconditioning, works for most fermions
+      int coordinate[4];
+      int idx_in;
+      int idx_out;
+      if (mode == QudaOffsetCopyMode::COLLECT) {
+        // we are collecting so x_cb is the index for the input.
+        idx_in = x_cb;
+        getCoordsExtended(coordinate, x_cb, arg.dim_in, parity, arg.offset);
+        idx_out = linkIndex(coordinate, arg.dim_out);
+      } else {
+        // we are dispersing so x_cb is the index for the output.
+        idx_out = x_cb;
+        getCoordsExtended(coordinate, x_cb, arg.dim_out, parity, arg.offset);
+        idx_in = linkIndex(coordinate, arg.dim_in);
+      }
+      copy_field(s * arg.volume_4d_cb_out + idx_out, s * arg.volume_4d_cb_in + idx_in, parity, arg);
+    } else { // 5d even-odd preconditioning, works for 5d DWF
+      int coordinate[5];
+      int idx_in;
+      int idx_out;
+      if (mode == QudaOffsetCopyMode::COLLECT) {
+        // we are collecting so x_cb is the index for the input.
+        idx_in = x_cb + arg.volume_4d_cb * s;
+        getCoords5CB(coordinate, idx_in, arg.dim_in, arg.X0h_in, parity, QUDA_5D_PC);
+#pragma unroll
+        for (int d = 0; d < 4; d++) { coordinate[d] += arg.offset[d]; }
+        idx_out = linkIndex(coordinate, arg.dim_out) + arg.volume_4d_cb * coordinate[4];
+      } else {
+        // we are dispersing so x_cb is the index for the output.
+        idx_out = x_cb + arg.volume_4d_cb * s;
+        getCoords5CB(coordinate, idx_out, arg.dim_out, arg.X0h_out, parity, QUDA_5D_PC);
+#pragma unroll
+        for (int d = 0; d < 4; d++) { coordinate[d] += arg.offset[d]; }
+        idx_in = linkIndex(coordinate, arg.dim_in) + arg.volume_4d_cb * coordinate[4];
+      }
+      copy_field(idx_out, idx_in, parity, arg);
     }
-
-    copy_field(s * arg.volume_4d_cb_out + x_out, s * arg.volume_4d_cb_in + x_in, parity, arg);
   }
 
   template <QudaOffsetCopyMode mode, class Arg> __global__ void copy_field_offset_kernel(Arg arg)
@@ -174,8 +206,8 @@ namespace quda
     CopyFieldOffset(Arg &arg, const Field &meta) :
       TunableVectorYZ(arg.Ls, arg.nParity), arg(arg), meta(meta), location(meta.Location())
     {
-      writeAuxString("(%d,%d,%d,%d)->(%d,%d,%d,%d),Ls=%d,nParity=%d,%s,offset=%d%d%d%d,location=%s", arg.Xin[0],
-                     arg.Xin[1], arg.Xin[2], arg.Xin[3], arg.Xout[0], arg.Xout[1], arg.Xout[2], arg.Xout[3], arg.Ls,
+      writeAuxString("(%d,%d,%d,%d)->(%d,%d,%d,%d),Ls=%d,nParity=%d,%s,offset=%d%d%d%d,location=%s", (int)arg.dim_in[0],
+                     (int)arg.dim_in[1], (int)arg.dim_in[2], (int)arg.dim_in[3], (int)arg.dim_out[0], (int)arg.dim_out[1], (int)arg.dim_out[2], (int)arg.dim_out[3], arg.Ls,
                      arg.nParity, arg.mode == QudaOffsetCopyMode::COLLECT ? "COLLECT" : "DISPERSE", arg.offset[0],
                      arg.offset[1], arg.offset[2], arg.offset[3], location == QUDA_CPU_FIELD_LOCATION ? "CPU" : "GPU");
       apply(0);
