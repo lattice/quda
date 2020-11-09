@@ -146,6 +146,13 @@ void setQudaDefaultMgTestParams()
   }
 }
 
+bool isPCSolution(QudaSolutionType solution_type) {
+  return (solution_type == QUDA_MATPC_SOLUTION ||
+	  solution_type == QUDA_MATPC_DAG_SOLUTION || 
+	  solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+}
+
+
 void constructQudaGaugeField(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param)
 {
   if (type == 0) {
@@ -221,9 +228,7 @@ void constructWilsonTestSpinorParam(quda::ColorSpinorParam *cs_param, const Quda
     cs_param->nDim = 4;
   }
   for (int d = 0; d < 4; d++) cs_param->x[d] = gauge_param->X[d];
-  bool pc = (inv_param->solution_type == QUDA_MATPC_SOLUTION ||
-	     inv_param->solution_type == QUDA_MATPC_DAG_SOLUTION || 
-	     inv_param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+  bool pc = isPCSolution(inv_param->solution_type);
   if (pc) cs_param->x[0] /= 2;
   cs_param->siteSubset = pc ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
   
@@ -248,7 +253,7 @@ void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision p
   param.create = QUDA_REFERENCE_FIELD_CREATE;
   param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   param.nDim = 4;
-  param.siteSubset = (sol_type == QUDA_MAT_SOLUTION || sol_type == QUDA_MATDAG_MAT_SOLUTION)? QUDA_FULL_SITE_SUBSET : QUDA_PARITY_SITE_SUBSET;
+  param.siteSubset = isPCSolution(sol_type) ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
   param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   param.location = QUDA_CPU_FIELD_LOCATION; // DMH FIXME so one can construct device noise
   for (int d = 0; d < 4; d++) param.x[d] = x[d];

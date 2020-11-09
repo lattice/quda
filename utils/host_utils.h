@@ -108,6 +108,11 @@ void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision p
 				 const int *const x, quda::RNG &rng);
 //------------------------------------------------------
 
+// Helper functions
+//------------------------------------------------------
+bool isPCSolution(QudaSolutionType solution_type);
+//------------------------------------------------------
+
 void performanceStats(std::vector<double> &time, std::vector<double> &gflops, std::vector<int> &iter);
 
 void initComms(int argc, char **argv, std::array<int, 4> &commDims);
