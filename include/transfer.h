@@ -199,7 +199,7 @@ namespace quda {
     QudaPrecision NullPrecision(QudaFieldLocation location) const
     {
       return location == QUDA_CUDA_FIELD_LOCATION ? null_precision : std::max(B[0]->Precision(), QUDA_SINGLE_PRECISION);
-      }
+    }
 
     /**
      * Returns a const reference to the V field

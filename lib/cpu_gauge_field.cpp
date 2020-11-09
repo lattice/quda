@@ -50,10 +50,10 @@ namespace quda {
           gauge[d] = nbytes ? safe_malloc(nbytes) : nullptr;
           if (create == QUDA_ZERO_FIELD_CREATE && nbytes) memset(gauge[d], 0, nbytes);
         } else if (create == QUDA_REFERENCE_FIELD_CREATE) {
-	  gauge[d] = ((void**)param.gauge)[d];
-	} else {
-	  errorQuda("Unsupported creation type %d", create);
-	}
+          gauge[d] = ((void**)param.gauge)[d];
+        } else {
+          errorQuda("Unsupported creation type %d", create);
+        }
       }
     
     } else if (order == QUDA_CPS_WILSON_GAUGE_ORDER || order == QUDA_MILC_GAUGE_ORDER  ||
