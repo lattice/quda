@@ -104,8 +104,8 @@ template <typename Float> void applyGaugeFieldScaling(Float **gauge, int Vh, Qud
 //------------------------------------------------------
 void constructWilsonTestSpinorParam(quda::ColorSpinorParam *csParam, const QudaInvertParam *inv_param,
                                     const QudaGaugeParam *gauge_param);
-void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x,
-                                 quda::RNG &rng);
+void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, QudaSolutionType sol_type,
+				 const int *const x, quda::RNG &rng);
 //------------------------------------------------------
 
 void performanceStats(std::vector<double> &time, std::vector<double> &gflops, std::vector<int> &iter);

@@ -221,10 +221,12 @@ void constructWilsonTestSpinorParam(quda::ColorSpinorParam *cs_param, const Quda
     cs_param->nDim = 4;
   }
   for (int d = 0; d < 4; d++) cs_param->x[d] = gauge_param->X[d];
-  bool pc = (inv_param->solution_type == QUDA_MATPC_SOLUTION || inv_param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+  bool pc = (inv_param->solution_type == QUDA_MATPC_SOLUTION ||
+	     inv_param->solution_type == QUDA_MATPC_DAG_SOLUTION || 
+	     inv_param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
   if (pc) cs_param->x[0] /= 2;
   cs_param->siteSubset = pc ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
-
+  
   // Lattice vector data properties
   cs_param->setPrecision(inv_param->cpu_prec);
   cs_param->pad = 0;
@@ -235,7 +237,7 @@ void constructWilsonTestSpinorParam(quda::ColorSpinorParam *cs_param, const Quda
   cs_param->location = QUDA_CPU_FIELD_LOCATION;
 }
 
-void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x,
+void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, QudaSolutionType sol_type, const int *const x,
                                  quda::RNG &rng)
 {
   quda::ColorSpinorParam param;
@@ -246,7 +248,7 @@ void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision p
   param.create = QUDA_REFERENCE_FIELD_CREATE;
   param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   param.nDim = 4;
-  param.siteSubset = QUDA_FULL_SITE_SUBSET;
+  param.siteSubset = (sol_type == QUDA_MAT_SOLUTION || sol_type == QUDA_MATDAG_MAT_SOLUTION)? QUDA_FULL_SITE_SUBSET : QUDA_PARITY_SITE_SUBSET;
   param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   param.location = QUDA_CPU_FIELD_LOCATION; // DMH FIXME so one can construct device noise
   for (int d = 0; d < 4; d++) param.x[d] = x[d];
