@@ -891,7 +891,7 @@ namespace quda {
       static constexpr int length = 2 * Ns * Nc;
       static constexpr int length_ghost = spin_project ? length / 2 : length;
       static constexpr int N = N_;
-      static constexpr int M = length / N;
+      static constexpr int M = length/N ;
       // if spin projecting, check that short vector length is compatible, if not halve the vector length
       static constexpr int N_ghost = !spin_project ? N : (Ns * Nc) % N == 0 ? N : N / 2;
       static constexpr int M_ghost = length_ghost / N_ghost;
@@ -945,8 +945,11 @@ namespace quda {
       }
     }
   }
-
-  __device__ __host__ inline void load(complex out[length / 2], int x, int parity = 0) const
+#if defined(__HIP_PLATFORM_HCC__)
+   __host__ inline void load(complex out[length / 2], int x, int parity = 0) const
+#else
+   __device__ __host__ inline void load(complex out[length / 2], int x, int parity = 0) const
+#endif
   {
     real v[length];
     norm_type nrm;
@@ -966,8 +969,34 @@ namespace quda {
 #pragma unroll
     for (int i = 0; i < length / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
   }
+#if defined(__HIP_PLATFORM_HCC__)
+  __device__  inline void load(complex out[length / 2], int x, int parity = 0) const
+  {
+    real v[length];
+    norm_type nrm;
+    if (isFixed<Float>::value) {
+      nrm = vector_load<float>(norm, x + parity * norm_offset);
+    }
 
-  __device__ __host__ inline void save(const complex in[length / 2], int x, int parity = 0)
+    __attribute__((address_space(1))) Float  * field_s = (__attribute__((address_space(1))) Float *)field;
+
+#pragma unroll
+    for (int i=0; i< M ; i++) {
+#pragma unroll
+       for (int j = 0; j < N; j++) copy_and_scale(v[i*N + j], field_s[(parity * offset + x + stride * i)*N + j ] , nrm);
+    }
+      
+#pragma unroll
+    for (int i = 0; i < length / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
+   }
+#endif
+
+
+#if defined(__HIP_PLATFORM_HCC__)
+     __host__ inline void save(const complex in[length / 2], int x, int parity = 0)
+#else
+     __device__ __host__ inline void save(const complex in[length / 2], int x, int parity = 0)   
+#endif
   {
     real v[length];
 
@@ -1006,6 +1035,45 @@ namespace quda {
       vector_store(field, parity * offset + x + stride * i, vecTmp);
     }
   }
+#if defined(__HIP_PLATFORM_HCC__)
+  __device__ inline void save(const complex in[length / 2], int x, int parity = 0)
+  {
+    real v[length];
+
+#pragma unroll
+    for (int i = 0; i < length / 2; i++) {
+      v[2 * i + 0] = in[i].real();
+      v[2 * i + 1] = in[i].imag();
+    }
+
+    if (isFixed<Float>::value) {
+      norm_type max_[length / 2];
+     //  two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
+#pragma unroll
+    for (int i = 0; i < length / 2; i++) max_[i] = fmaxf(fabsf((norm_type)v[i]), fabsf((norm_type)v[i + length / 2]));
+      norm_type scale = 0.0;
+#pragma unroll
+    for (int i = 0; i < length / 2; i++) scale = fmaxf(max_[i], scale);
+      norm[x+parity*norm_offset] = scale;
+      
+#ifdef __HIP_DEVICE_COMPILE__
+      real scale_inv = __fdividef(fixedMaxValue<Float>::value, scale);
+#else
+      real scale_inv = fixedMaxValue<Float>::value / scale;
+#endif
+#pragma unroll
+    for (int i = 0; i < length; i++) v[i] = v[i] * scale_inv;
+                                }
+      
+    __attribute__((address_space(1))) Float  * field_s = (__attribute__((address_space(1))) Float *)field;
+
+#pragma unroll
+    for (int i=0; i<M; i++) {
+#pragma unroll
+        for (int j = 0; j < N; j++) copy_scaled(field_s[(parity * offset + x + stride * i)*N + j ], v[i * N + j]);
+    }                                 
+  }	
+#endif
 
   /**
      @brief This accessor routine returns a colorspinor_wrapper to this object,
@@ -1186,7 +1254,7 @@ namespace quda {
     }
   }
 
-  __device__ __host__ inline void load(complex v[length / 2], int x, int parity = 0) const
+   __host__ inline void load(complex v[length / 2], int x, int parity = 0) const
   {
 #if defined( __HIP_DEVICE_COMPILE__) && !defined(DISABLE_TROVE)
     typedef S<Float,length> structure;
@@ -1204,6 +1272,29 @@ namespace quda {
     }
 #endif
   }
+
+  __device__  inline void load(complex v[length / 2], int x, int parity = 0) const
+  {
+
+__attribute__((address_space(1))) Float  * field_s = (__attribute__((address_space(1))) Float *)field;
+
+#if defined( __HIP_DEVICE_COMPILE__) && !defined(DISABLE_TROVE)
+    typedef S<Float,length> structure;
+    trove::coalesced_ptr<structure> field_((structure*)field_s);
+    structure v_ = field_[parity*volumeCB + x];
+    for (int s=0; s<Ns; s++) {
+      for (int c = 0; c < Nc; c++) { v[s * Nc + c] = complex(v_.v[(c * Ns + s) * 2 + 0], v_.v[(c * Ns + s) * 2 + 1]); }
+    }
+#else
+    for (int s=0; s<Ns; s++) {
+      for (int c=0; c<Nc; c++) {
+        v[s * Nc + c] = complex(field_s[parity * offset + ((x * Nc + c) * Ns + s) * 2 + 0],
+                                field_s[parity * offset + ((x * Nc + c) * Ns + s) * 2 + 1]);
+      }
+    }
+#endif
+  }
+
 
   __device__ __host__ inline void save(const complex v[length / 2], int x, int parity = 0)
   {
@@ -1304,7 +1395,7 @@ namespace quda {
     }
   }
 
-  __device__ __host__ inline void load(complex v[length / 2], int x, int parity = 0) const
+   __host__ inline void load(complex v[length / 2], int x, int parity = 0) const
   {
 #if defined( __HIP_DEVICE_COMPILE__) && !defined(DISABLE_TROVE)
     typedef S<Float,length> structure;
@@ -1322,6 +1413,30 @@ namespace quda {
     }
 #endif
   }
+
+  __device__ inline void load(complex v[length / 2], int x, int parity = 0) const
+  {
+
+__attribute__((address_space(1))) Float  * field_s = (__attribute__((address_space(1))) Float *)field;
+
+#if defined( __HIP_DEVICE_COMPILE__) && !defined(DISABLE_TROVE)
+    typedef S<Float,length> structure;
+    trove::coalesced_ptr<structure> field_((structure*)field_s);
+    structure v_ = field_[parity*volumeCB + x];
+    for (int s=0; s<Ns; s++) {
+      for (int c = 0; c < Nc; c++) { v[s * Nc + c] = complex(v_.v[(s * Nc + c) * 2 + 0], v_.v[(s * Nc + c) * 2 + 1]); }
+    }
+#else
+    for (int s=0; s<Ns; s++) {
+      for (int c=0; c<Nc; c++) {
+        v[s * Nc + c] = complex(field_s[parity * offset + ((x * Ns + s) * Nc + c) * 2 + 0],
+                                field_s[parity * offset + ((x * Ns + s) * Nc + c) * 2 + 1]);
+      }
+    }
+#endif
+  }
+
+
 
   __device__ __host__ inline void save(const complex v[length / 2], int x, int parity = 0)
   {
@@ -1447,7 +1562,7 @@ namespace quda {
     return linkIndex(coord, exDim);
   }
 
-  __device__ __host__ inline void load(complex v[length / 2], int x, int parity = 0) const
+  __host__ inline void load(complex v[length / 2], int x, int parity = 0) const
   {
     int y = getPaddedIndex(x, parity);
 
@@ -1467,6 +1582,31 @@ namespace quda {
     }
 #endif
   }
+
+  __device__ inline void load(complex v[length / 2], int x, int parity = 0) const
+  {
+
+__attribute__((address_space(1))) Float  * field_s = (__attribute__((address_space(1))) Float *)field;
+
+    int y = getPaddedIndex(x, parity);
+
+#if defined( __HIP_DEVICE_COMPILE__) && !defined(DISABLE_TROVE)
+    typedef S<Float,length> structure;
+    trove::coalesced_ptr<structure> field_((structure*)field_s);
+    structure v_ = field_[parity*exVolumeCB + y];
+    for (int s=0; s<Ns; s++) {
+      for (int c = 0; c < Nc; c++) { v[s * Nc + c] = complex(v_.v[(s * Nc + c) * 2 + 0], v_.v[(s * Nc + c) * 2 + 1]); }
+    }
+#else
+    for (int s=0; s<Ns; s++) {
+      for (int c=0; c<Nc; c++) {
+        v[s * Nc + c] = complex(field_s[parity * offset + ((y * Ns + s) * Nc + c) * 2 + 0],
+                                field_s[parity * offset + ((y * Ns + s) * Nc + c) * 2 + 1]);
+      }
+    }
+#endif
+  }
+
 
   __device__ __host__ inline void save(const complex v[length / 2], int x, int parity = 0)
   {

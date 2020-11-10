@@ -1913,7 +1913,10 @@ public:
    virtual ~DslashPolicyTune() { setPolicyTuning(false); }
 
    void apply(const qudaStream_t &stream) {
+	int maxThreadsPerBlock_tmp=deviceProp.maxThreadsPerBlock;
+        deviceProp.maxThreadsPerBlock=768;
      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+	deviceProp.maxThreadsPerBlock=maxThreadsPerBlock_tmp;
 
      if (tp.aux.x >= static_cast<int>(policies.size())) errorQuda("Requested policy that is outside of range");
      if (static_cast<QudaDslashPolicy>(tp.aux.x) == QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED)  errorQuda("Requested policy is disabled");

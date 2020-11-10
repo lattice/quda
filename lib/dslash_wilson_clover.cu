@@ -25,7 +25,11 @@ namespace quda
 
     void apply(const qudaStream_t &stream)
     {
+
+	int maxThreadsPerBlock_tmp=deviceProp.maxThreadsPerBlock;
+        deviceProp.maxThreadsPerBlock=512;
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+	deviceProp.maxThreadsPerBlock=maxThreadsPerBlock_tmp;
       Dslash::setParam(tp);
       if (arg.xpay)
         Dslash::template instantiate<packShmem, true>(tp, stream);

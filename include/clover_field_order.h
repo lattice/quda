@@ -601,7 +601,11 @@ namespace quda {
 	   @param[in] parity Field parity
 	   @param[in] chirality Chiral block index
 	 */
-	__device__ __host__ inline void load(real v[block], int x, int parity, int chirality) const
+#if defined(__HIP_PLATFORM_HCC__)
+	__host__ inline void load(real v[block], int x, int parity, int chirality) const
+#else
+        __host__ __device__ inline void load(real v[block], int x, int parity, int chirality) const
+#endif
         {
           norm_type nrm;
           if (isFixed<Float>::value) {
@@ -619,7 +623,25 @@ namespace quda {
 
           if (add_rho) for (int i=0; i<6; i++) v[i] += rho;
         }
-  
+#if defined(__HIP_PLATFORM_HCC__)
+	__device__ inline void load(real v[block], int x, int parity, int chirality) const
+        {
+          norm_type nrm;
+          if (isFixed<Float>::value) {
+            nrm = vector_load<float>(norm, parity * norm_offset + chirality * stride + x);
+          }
+
+          __attribute__((address_space(1))) Float  * clover_s = (__attribute__((address_space(1))) Float *)clover;
+
+#pragma unroll
+	  for (int i=0; i<M; i++) {
+#pragma unroll
+            for (int j = 0; j < N; j++) {  copy_and_scale(v[i*N + j], clover_s[(parity * offset + x + stride * (chirality * M + i))*N + j ] , nrm); }
+          }
+
+          if (add_rho) for (int i=0; i<6; i++) v[i] += rho;
+        }
+#endif
 	/**
 	   @brief Store accessor for a single chiral block
 	   @param[out] v Vector of elements to be stored

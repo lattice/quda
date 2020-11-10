@@ -1723,20 +1723,22 @@ namespace quda {
 	}
       }
 
-      __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
+#if defined(__HIP_PLATFORM_HCC__)
+       __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
+#else
+       __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
+#endif
       {
         const int M = reconLen / N;
         real tmp[reconLen];
 
 #pragma unroll
         for (int i=0; i<M; i++){
-          // first load from memory
-          Vector vecTmp = vector_load<Vector>(gauge, parity * offset + (dir * M + i) * stride + x);
-          // second do copy converting into register type
-#pragma unroll
-          for (int j = 0; j < N; j++) copy(tmp[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j]);
-        }
+              Vector vecTmp = vector_load<Vector>(gauge, parity * offset + (dir * M + i) * stride + x);     
 
+#pragma unroll
+        for (int j = 0; j < N; j++) copy(tmp[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j]);
+                               }  
         real phase = 0.;
         if (hasPhase) {
           if (static_phase<stag_phase>() && (reconLen == 13 || use_inphase)) {
@@ -1749,6 +1751,33 @@ namespace quda {
 
         reconstruct.Unpack(v, tmp, x, dir, phase, X, R);
       }
+#if defined(__HIP_PLATFORM_HCC__)       	                              
+      __device__ inline void load(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
+      {
+        const int M = reconLen / N;
+        real tmp[reconLen];
+
+	__attribute__((address_space(1))) Float  * gauge_t = (__attribute__((address_space(1))) Float *)gauge;
+
+#pragma unroll
+        for (int i=0; i<M; i++){
+#pragma unroll
+         for (int j = 0; j < N; j++) copy( tmp[i*N + j], gauge_t[(parity * offset + (dir * M + i) * stride + x)*N + j ] );
+        }
+
+        real phase = 0.;
+        if (hasPhase) {
+          if (static_phase<stag_phase>() && (reconLen == 13 || use_inphase)) {
+            phase = inphase;
+          } else {
+            copy(phase, gauge_t[parity * offset * N + phaseOffset + stride * dir + x]);
+            phase *= static_cast<real>(2.0) * static_cast<real>(M_PI);
+          }
+        }
+
+        reconstruct.Unpack(v, tmp, x, dir, phase, X, R);
+      }
+#endif
 
       __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity)
       {

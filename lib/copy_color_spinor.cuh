@@ -184,7 +184,14 @@ namespace quda {
       if (location == QUDA_CPU_FIELD_LOCATION) {
 	copyColorSpinor(arg, PreserveBasis<Arg>());
       } else {
+	
+	int maxThreadsPerBlock_tmp=deviceProp.maxThreadsPerBlock;
+        deviceProp.maxThreadsPerBlock=512;
+
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+
+	deviceProp.maxThreadsPerBlock=maxThreadsPerBlock_tmp;
+
 	copyColorSpinorKernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg, PreserveBasis<Arg>());
       }
     }
@@ -243,7 +250,10 @@ namespace quda {
 	  copyColorSpinor(arg, NonRelToChiralBasis<Arg>());
 	}
       } else {
+	int maxThreadsPerBlock_tmp=deviceProp.maxThreadsPerBlock;
+	deviceProp.maxThreadsPerBlock=512;
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+	deviceProp.maxThreadsPerBlock=maxThreadsPerBlock_tmp;
 	if (out.GammaBasis()==in.GammaBasis()) {
 	  copyColorSpinorKernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>> (arg, PreserveBasis<Arg>());
 	} else if (out.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {

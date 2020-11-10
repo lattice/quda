@@ -27,7 +27,13 @@ namespace quda
 
     void apply(const qudaStream_t &stream)
     {
+
+	int maxThreadsPerBlock_tmp=deviceProp.maxThreadsPerBlock;
+        deviceProp.maxThreadsPerBlock=512;
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+	deviceProp.maxThreadsPerBlock=maxThreadsPerBlock_tmp;
+
+
       Dslash::setParam(tp);
       // specialize here to constrain the template instantiation
       if (arg.nParity == 1) {
