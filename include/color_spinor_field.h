@@ -10,6 +10,8 @@
 #include <random_quda.h>
 #include <fast_intdiv.h>
 
+#include <comm_key.h>
+
 namespace quda {
 
   namespace colorspinor
@@ -1059,7 +1061,7 @@ namespace quda {
     @param offset The offset for the larger field between out and in.
     @param pc_type Whether the field order uses 4d or 5d even-odd preconditioning.
   */
-  void copyFieldOffset(ColorSpinorField &out, const ColorSpinorField &in, const int offset[4], QudaPCType pc_type);
+  void copyFieldOffset(ColorSpinorField &out, const ColorSpinorField &in, CommKey offset, QudaPCType pc_type);
 
   void genericPrintVector(const cpuColorSpinorField &a, unsigned int x);
   void genericCudaPrintVector(const cudaColorSpinorField &a, unsigned x);

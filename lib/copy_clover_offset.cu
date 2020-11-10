@@ -8,7 +8,7 @@ namespace quda
   using namespace clover;
 
   template <typename Float> struct CopyCloverOffset {
-    CopyCloverOffset(CloverField &out, const CloverField &in, const int offset[4], bool inverse)
+    CopyCloverOffset(CloverField &out, const CloverField &in, CommKey offset, bool inverse)
     {
       constexpr int length = 72;
       using Field = CloverField;
@@ -55,7 +55,7 @@ namespace quda
     }
   };
 
-  void copyFieldOffset(CloverField &out, const CloverField &in, const int offset[4], QudaPCType pc_type)
+  void copyFieldOffset(CloverField &out, const CloverField &in, CommKey offset, QudaPCType pc_type)
   {
 #ifdef GPU_CLOVER_DIRAC
     if (out.Precision() < QUDA_SINGLE_PRECISION && out.Order() > 4) {

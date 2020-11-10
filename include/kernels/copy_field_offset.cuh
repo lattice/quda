@@ -2,6 +2,8 @@
 #include <index_helper.cuh>
 #include <fast_intdiv.h>
 
+#include <comm_key.h>
+
 namespace quda
 {
 
@@ -22,7 +24,7 @@ namespace quda
     int_fastdiv dim_in[nDim];  // full lattice dimensions
     int_fastdiv dim_out[nDim]; // full lattice dimensions
 
-    int offset[nDim];
+    CommKey offset;
 
     int nParity;
 
@@ -40,8 +42,8 @@ namespace quda
     QudaOffsetCopyMode mode;
 
     CopyFieldOffsetArg(Accessor &out_accessor, Field &out_field, const Accessor &in_accessor, const Field &in_field,
-                       const int offset[4]) :
-      out(out_accessor), in(in_accessor), nParity(in_field.SiteSubset())
+                       CommKey offset) :
+      out(out_accessor), in(in_accessor), nParity(in_field.SiteSubset()), offset(offset)
     {
       const int *X_in = in_field.X();
       const int *X_out = out_field.X();
@@ -55,12 +57,10 @@ namespace quda
 
       X0h_out = nParity == 2 ? X_out[0] / 2 : X_out[0];
       X0h_in = nParity == 2 ? X_in[0] / 2 : X_in[0];
-      this->offset[0] = offset[0];
 
       for (int d = 1; d < nDim; d++) {
         dim_out[d] = X_out[d];
         dim_in[d] = X_in[d];
-        this->offset[d] = offset[d];
       }
 
       volume_cb_in = in_field.VolumeCB();
@@ -127,12 +127,12 @@ namespace quda
       if (mode == QudaOffsetCopyMode::COLLECT) {
         // we are collecting so x_cb is the index for the input.
         idx_in = x_cb;
-        getCoordsExtended(coordinate, x_cb, arg.dim_in, parity, arg.offset);
+        getCoordsExtended(coordinate, x_cb, arg.dim_in, parity, arg.offset.array);
         idx_out = linkIndex(coordinate, arg.dim_out);
       } else {
         // we are dispersing so x_cb is the index for the output.
         idx_out = x_cb;
-        getCoordsExtended(coordinate, x_cb, arg.dim_out, parity, arg.offset);
+        getCoordsExtended(coordinate, x_cb, arg.dim_out, parity, arg.offset.array);
         idx_in = linkIndex(coordinate, arg.dim_in);
       }
       copy_field(s * arg.volume_4d_cb_out + idx_out, s * arg.volume_4d_cb_in + idx_in, parity, arg);

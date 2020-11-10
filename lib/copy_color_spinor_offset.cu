@@ -9,7 +9,7 @@ namespace quda
 {
 
   template <class Field, class Element, class F>
-  void copy_color_spinor_offset(Field &out, const Field &in, const int offset[4], QudaPCType pc_type)
+  void copy_color_spinor_offset(Field &out, const Field &in, CommKey offset, QudaPCType pc_type)
   {
     F out_accessor(out);
     F in_accessor(in);
@@ -25,7 +25,7 @@ namespace quda
   }
 
   template <class Float, int nColor> struct CopyColorSpinorOffset {
-    CopyColorSpinorOffset(ColorSpinorField &out, const ColorSpinorField &in, const int offset[4], QudaPCType pc_type)
+    CopyColorSpinorOffset(ColorSpinorField &out, const ColorSpinorField &in, CommKey offset, QudaPCType pc_type)
     {
       using Field = ColorSpinorField;
       using real = typename mapper<Float>::type;
@@ -51,7 +51,7 @@ namespace quda
     }
   };
 
-  void copyFieldOffset(ColorSpinorField &out, const ColorSpinorField &in, const int offset[4], QudaPCType pc_type)
+  void copyFieldOffset(ColorSpinorField &out, const ColorSpinorField &in, CommKey offset, QudaPCType pc_type)
   {
     checkPrecision(out, in);
     checkLocation(out, in); // check all locations match

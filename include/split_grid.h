@@ -12,7 +12,7 @@ int comm_rank_from_coords(const int *coords);
 
 namespace quda
 {
-
+/**
   int inline product(const CommKey &input) { return input[0] * input[1] * input[2] * input[3]; }
 
   CommKey inline operator+(const CommKey &lhs, const CommKey &rhs)
@@ -57,7 +57,7 @@ namespace quda
   {
     return ((coord[3] * dim[2] + coord[2]) * dim[1] + coord[1]) * dim[0] + coord[0];
   }
-
+*/
   template <class F> struct param_mapper {
   };
 
@@ -148,7 +148,7 @@ namespace quda
 
       auto offset = thread_idx * thread_dim;
 
-      quda::copyFieldOffset(collect_field, *buffer_field, offset.data(), pc_type);
+      quda::copyFieldOffset(collect_field, *buffer_field, offset, pc_type);
     }
 
     delete buffer_field;
@@ -201,7 +201,7 @@ namespace quda
       size_t bytes = meta.TotalBytes();
 
       auto offset = thread_idx * thread_dim;
-      quda::copyFieldOffset(*buffer_field, collect_field, offset.data(), pc_type);
+      quda::copyFieldOffset(*buffer_field, collect_field, offset, pc_type);
 
       v_send_buffer_h[i] = pinned_malloc(bytes);
       buffer_field->copy_to_buffer(v_send_buffer_h[i]);

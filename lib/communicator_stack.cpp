@@ -5,13 +5,13 @@
 
 int Communicator::gpuid = -1;
 
-std::map<CommKey, Communicator> communicator_stack;
+std::map<quda::CommKey, Communicator> communicator_stack;
 
 Communicator *current_communicator = nullptr;
 
-constexpr CommKey default_key = {1, 1, 1, 1};
+constexpr quda::CommKey default_key = {1, 1, 1, 1};
 
-CommKey current_key = {-1, -1, -1, -1};
+quda::CommKey current_key = {-1, -1, -1, -1};
 
 void init_communicator_stack(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data,
                              bool user_set_comm_handle, void *user_comm)
@@ -45,7 +45,7 @@ Communicator &get_current_communicator()
   }
 }
 
-void push_communicator(const CommKey &split_key)
+void push_communicator(const quda::CommKey &split_key)
 {
   auto search = communicator_stack.find(split_key);
   if (search == communicator_stack.end()) {

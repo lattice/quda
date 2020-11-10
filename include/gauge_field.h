@@ -5,6 +5,8 @@
 #include <quda.h>
 #include <lattice_field.h>
 
+#include <comm_key.h>
+
 namespace quda {
 
   namespace gauge
@@ -740,7 +742,7 @@ namespace quda {
     @param offset The offset for the larger field between out and in.
     @param pc_type Whether the field order uses 4d or 5d even-odd preconditioning.
  */
-  void copyFieldOffset(GaugeField &out, const GaugeField &in, const int offset[4], QudaPCType pc_type);
+  void copyFieldOffset(GaugeField &out, const GaugeField &in, CommKey offset, QudaPCType pc_type);
 
   /**
      This function is used for copying the gauge field into an

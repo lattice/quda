@@ -3259,7 +3259,7 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, voi
 
   printfQuda("Spliting the grid into sub-partitions: (%2d,%2d,%2d,%2d) / (%2d,%2d,%2d,%2d).\n", comm_dim(0),
              comm_dim(1), comm_dim(2), comm_dim(3), split_key[0], split_key[1], split_key[2], split_key[3]);
-  for (int d = 0; d < nDim; d++) {
+  for (int d = 0; d < CommKey::n_dim; d++) {
     if (comm_dim(d) % split_key[d] != 0) { errorQuda("Split not possible."); }
     gf_param.x[d] *= split_key[d];
     gf_param.pad *= split_key[d];
@@ -3277,7 +3277,7 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, voi
     if (cloverPrecise->V(false)) { original_clover->copy(*cloverPrecise, false); }
     if (cloverPrecise->V(true)) { original_clover->copy(*cloverPrecise, true); }
 
-    for (int d = 0; d < nDim; d++) {
+    for (int d = 0; d < CommKey::n_dim; d++) {
       clover_param.x[d] *= split_key[d];
     }
     quda::CloverField *collected_clover = new quda::cudaCloverField(clover_param);
@@ -3308,7 +3308,7 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, voi
 
   // Split input fermion field
   quda::ColorSpinorParam cpu_cs_param_split(*_h_x[0]);
-  for (int d = 0; d < nDim; d++) { cpu_cs_param_split.x[d] *= split_key[d]; }
+  for (int d = 0; d < CommKey::n_dim; d++) { cpu_cs_param_split.x[d] *= split_key[d]; }
   quda::ColorSpinorField *collect_b = new quda::cpuColorSpinorField(cpu_cs_param_split);
   quda::ColorSpinorField *collect_x = new quda::cpuColorSpinorField(cpu_cs_param_split);
 
@@ -3331,7 +3331,7 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, voi
   push_communicator({1, 1, 1, 1});
   updateR();
 
-  for (int d = 0; d < nDim; d++) {
+  for (int d = 0; d < CommKey::n_dim; d++) {
     gauge_param->X[d] /= split_key[d];
     gauge_param->ga_pad /= split_key[d];
   }

@@ -8,6 +8,8 @@
 #include <comm_quda.h>
 #include <csignal>
 
+#include <comm_key.h>
+
 #include <algorithm>
 #include <numeric>
 
@@ -794,9 +796,4 @@ struct Communicator {
   void comm_abort_(int status);
 };
 
-#include <array>
-
-constexpr int nDim = 4;
-using CommKey = std::array<int, nDim>;
-
-void push_communicator(const CommKey &split_key);
+void push_communicator(const quda::CommKey &split_key);

@@ -8,7 +8,7 @@ namespace quda
 {
 
   template <class Field, class Element, class G>
-  void copy_gauge_offset(Field &out, const Field &in, const int offset[4])
+  void copy_gauge_offset(Field &out, const Field &in, CommKey offset)
   {
     G out_accessor(out);
     G in_accessor(in);
@@ -18,7 +18,7 @@ namespace quda
   }
 
   template <typename Float, int nColor> struct CopyGaugeOffset {
-    CopyGaugeOffset(GaugeField &out, const GaugeField &in, const int offset[4])
+    CopyGaugeOffset(GaugeField &out, const GaugeField &in, CommKey offset)
     {
       using Field = GaugeField;
       using real = typename mapper<Float>::type;
@@ -110,7 +110,7 @@ namespace quda
     }
   };
 
-  void copyFieldOffset(GaugeField &out, const GaugeField &in, const int offset[4], QudaPCType pc_type)
+  void copyFieldOffset(GaugeField &out, const GaugeField &in, CommKey offset, QudaPCType pc_type)
   {
     checkPrecision(out, in);
     checkLocation(out, in); // check all locations match
@@ -121,6 +121,9 @@ namespace quda
     if (out.Geometry() != in.Geometry()) {
       errorQuda("Field geometries %d %d do not match", out.Geometry(), in.Geometry());
     }
+
+    int parity_change = offset[0] + offset[1] + offset[2] + offset[3];
+    if (parity_change % 2 == 1) { errorQuda("This offset changes site parity and is not supported (yet).\n"); }
 
     instantiate<CopyGaugeOffset>(out, in, offset);
   }
