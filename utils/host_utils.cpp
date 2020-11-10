@@ -146,13 +146,6 @@ void setQudaDefaultMgTestParams()
   }
 }
 
-bool isPCSolution(QudaSolutionType solution_type) {
-  return (solution_type == QUDA_MATPC_SOLUTION ||
-	  solution_type == QUDA_MATPC_DAG_SOLUTION || 
-	  solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
-}
-
-
 void constructQudaGaugeField(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param)
 {
   if (type == 0) {
