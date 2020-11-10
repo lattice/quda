@@ -44,15 +44,15 @@ namespace quda {
 
       if (type == COMPUTE_UV) {
         if (arg.dir == QUDA_BACKWARDS) {
-          if      (arg.dim==0) ComputeUVCPU<from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,coarseSpin>(arg);
-          else if (arg.dim==1) ComputeUVCPU<from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,coarseSpin>(arg);
-          else if (arg.dim==2) ComputeUVCPU<from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,coarseSpin>(arg);
-          else if (arg.dim==3) ComputeUVCPU<from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,coarseSpin>(arg);
+          if      (arg.dim==0) ComputeUVCPU<Float,0,QUDA_BACKWARDS,fineSpin,coarseSpin>(arg);
+          else if (arg.dim==1) ComputeUVCPU<Float,1,QUDA_BACKWARDS,fineSpin,coarseSpin>(arg);
+          else if (arg.dim==2) ComputeUVCPU<Float,2,QUDA_BACKWARDS,fineSpin,coarseSpin>(arg);
+          else if (arg.dim==3) ComputeUVCPU<Float,3,QUDA_BACKWARDS,fineSpin,coarseSpin>(arg);
         } else if (arg.dir == QUDA_FORWARDS) {
-          if      (arg.dim==0) ComputeUVCPU<from_coarse,Float,0,QUDA_FORWARDS,fineSpin,coarseSpin>(arg);
-          else if (arg.dim==1) ComputeUVCPU<from_coarse,Float,1,QUDA_FORWARDS,fineSpin,coarseSpin>(arg);
-          else if (arg.dim==2) ComputeUVCPU<from_coarse,Float,2,QUDA_FORWARDS,fineSpin,coarseSpin>(arg);
-          else if (arg.dim==3) ComputeUVCPU<from_coarse,Float,3,QUDA_FORWARDS,fineSpin,coarseSpin>(arg);
+          if      (arg.dim==0) ComputeUVCPU<Float,0,QUDA_FORWARDS,fineSpin,coarseSpin>(arg);
+          else if (arg.dim==1) ComputeUVCPU<Float,1,QUDA_FORWARDS,fineSpin,coarseSpin>(arg);
+          else if (arg.dim==2) ComputeUVCPU<Float,2,QUDA_FORWARDS,fineSpin,coarseSpin>(arg);
+          else if (arg.dim==3) ComputeUVCPU<Float,3,QUDA_FORWARDS,fineSpin,coarseSpin>(arg);
         } else {
           errorQuda("Undefined direction %d", arg.dir);
         }
@@ -109,20 +109,20 @@ namespace quda {
 
       } else if (type == COMPUTE_VUV) {
         if (arg.dir == QUDA_BACKWARDS) {
-          if      (arg.dim==0) ComputeVUVCPU<from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,coarseSpin>(arg);
-          else if (arg.dim==1) ComputeVUVCPU<from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,coarseSpin>(arg);
-          else if (arg.dim==2) ComputeVUVCPU<from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,coarseSpin>(arg);
-          else if (arg.dim==3) ComputeVUVCPU<from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,coarseSpin>(arg);
+          if      (arg.dim==0) ComputeVUVCPU<Float,0,QUDA_BACKWARDS,fineSpin,coarseSpin>(arg);
+          else if (arg.dim==1) ComputeVUVCPU<Float,1,QUDA_BACKWARDS,fineSpin,coarseSpin>(arg);
+          else if (arg.dim==2) ComputeVUVCPU<Float,2,QUDA_BACKWARDS,fineSpin,coarseSpin>(arg);
+          else if (arg.dim==3) ComputeVUVCPU<Float,3,QUDA_BACKWARDS,fineSpin,coarseSpin>(arg);
         } else if (arg.dir == QUDA_FORWARDS) {
-          if      (arg.dim==0) ComputeVUVCPU<from_coarse,Float,0,QUDA_FORWARDS,fineSpin,coarseSpin>(arg);
-          else if (arg.dim==1) ComputeVUVCPU<from_coarse,Float,1,QUDA_FORWARDS,fineSpin,coarseSpin>(arg);
-          else if (arg.dim==2) ComputeVUVCPU<from_coarse,Float,2,QUDA_FORWARDS,fineSpin,coarseSpin>(arg);
-          else if (arg.dim==3) ComputeVUVCPU<from_coarse,Float,3,QUDA_FORWARDS,fineSpin,coarseSpin>(arg);
+          if      (arg.dim==0) ComputeVUVCPU<Float,0,QUDA_FORWARDS,fineSpin,coarseSpin>(arg);
+          else if (arg.dim==1) ComputeVUVCPU<Float,1,QUDA_FORWARDS,fineSpin,coarseSpin>(arg);
+          else if (arg.dim==2) ComputeVUVCPU<Float,2,QUDA_FORWARDS,fineSpin,coarseSpin>(arg);
+          else if (arg.dim==3) ComputeVUVCPU<Float,3,QUDA_FORWARDS,fineSpin,coarseSpin>(arg);
         } else {
           errorQuda("Undefined direction %d", arg.dir);
         }
       } else if (type == COMPUTE_COARSE_CLOVER) {
-        ComputeCoarseCloverCPU<from_coarse,Float,fineSpin,coarseSpin,fineColor,coarseColor>(arg);
+        ComputeCoarseCloverCPU<Float,fineSpin,coarseSpin,fineColor,coarseColor>(arg);
       } else if (type == COMPUTE_REVERSE_Y) {
         ComputeYReverseCPU<Float,coarseSpin,coarseColor>(arg);
       } else if (type == COMPUTE_DIAGONAL) {
@@ -165,19 +165,19 @@ namespace quda {
           if (arg.dir != QUDA_BACKWARDS && arg.dir != QUDA_FORWARDS) errorQuda("Undefined direction %d", arg.dir);
 #ifdef JITIFY
         error = program->kernel("quda::ComputeUVGPU")
-          .instantiate(from_coarse,Type<Float>(),arg.dim,arg.dir,fineSpin,coarseSpin,Type<Arg>())
+          .instantiate(Type<Float>(),arg.dim,arg.dir,fineSpin,coarseSpin,Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
         if (arg.dir == QUDA_BACKWARDS) {
-          if      (arg.dim==0) qudaLaunchKernel(ComputeUVGPU<from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
-          else if (arg.dim==1) qudaLaunchKernel(ComputeUVGPU<from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
-          else if (arg.dim==2) qudaLaunchKernel(ComputeUVGPU<from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
-          else if (arg.dim==3) qudaLaunchKernel(ComputeUVGPU<from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+          if      (arg.dim==0) qudaLaunchKernel(ComputeUVGPU<Float,0,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+          else if (arg.dim==1) qudaLaunchKernel(ComputeUVGPU<Float,1,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+          else if (arg.dim==2) qudaLaunchKernel(ComputeUVGPU<Float,2,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+          else if (arg.dim==3) qudaLaunchKernel(ComputeUVGPU<Float,3,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
         } else if (arg.dir == QUDA_FORWARDS) {
-          if      (arg.dim==0) qudaLaunchKernel(ComputeUVGPU<from_coarse,Float,0,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
-          else if (arg.dim==1) qudaLaunchKernel(ComputeUVGPU<from_coarse,Float,1,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
-          else if (arg.dim==2) qudaLaunchKernel(ComputeUVGPU<from_coarse,Float,2,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
-          else if (arg.dim==3) qudaLaunchKernel(ComputeUVGPU<from_coarse,Float,3,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+          if      (arg.dim==0) qudaLaunchKernel(ComputeUVGPU<Float,0,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+          else if (arg.dim==1) qudaLaunchKernel(ComputeUVGPU<Float,1,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+          else if (arg.dim==2) qudaLaunchKernel(ComputeUVGPU<Float,2,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+          else if (arg.dim==3) qudaLaunchKernel(ComputeUVGPU<Float,3,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
         }
 #endif
         }
@@ -318,7 +318,7 @@ namespace quda {
 
 #ifdef JITIFY
         error = program->kernel("quda::ComputeVUVGPU")
-          .instantiate(arg.shared_atomic,arg.parity_flip,from_coarse,Type<Float>(),arg.dim,arg.dir,fineSpin,coarseSpin,Type<Arg>())
+          .instantiate(arg.shared_atomic,arg.parity_flip,Type<Float>(),arg.dim,arg.dir,fineSpin,coarseSpin,Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
         if (arg.shared_atomic) {
@@ -326,15 +326,15 @@ namespace quda {
           constexpr bool parity_flip = true;
 
           if (arg.dir == QUDA_BACKWARDS) {
-            if      (arg.dim==0) qudaLaunchKernel(ComputeVUVGPU<true,parity_flip,from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
-            else if (arg.dim==1) qudaLaunchKernel(ComputeVUVGPU<true,parity_flip,from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
-            else if (arg.dim==2) qudaLaunchKernel(ComputeVUVGPU<true,parity_flip,from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
-            else if (arg.dim==3) qudaLaunchKernel(ComputeVUVGPU<true,parity_flip,from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+            if      (arg.dim==0) qudaLaunchKernel(ComputeVUVGPU<true,parity_flip,Float,0,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+            else if (arg.dim==1) qudaLaunchKernel(ComputeVUVGPU<true,parity_flip,Float,1,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+            else if (arg.dim==2) qudaLaunchKernel(ComputeVUVGPU<true,parity_flip,Float,2,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+            else if (arg.dim==3) qudaLaunchKernel(ComputeVUVGPU<true,parity_flip,Float,3,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
           } else if (arg.dir == QUDA_FORWARDS) {
-            if      (arg.dim==0) qudaLaunchKernel(ComputeVUVGPU<true,parity_flip,from_coarse,Float,0,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
-            else if (arg.dim==1) qudaLaunchKernel(ComputeVUVGPU<true,parity_flip,from_coarse,Float,1,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
-            else if (arg.dim==2) qudaLaunchKernel(ComputeVUVGPU<true,parity_flip,from_coarse,Float,2,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
-            else if (arg.dim==3) qudaLaunchKernel(ComputeVUVGPU<true,parity_flip,from_coarse,Float,3,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+            if      (arg.dim==0) qudaLaunchKernel(ComputeVUVGPU<true,parity_flip,Float,0,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+            else if (arg.dim==1) qudaLaunchKernel(ComputeVUVGPU<true,parity_flip,Float,1,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+            else if (arg.dim==2) qudaLaunchKernel(ComputeVUVGPU<true,parity_flip,Float,2,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+            else if (arg.dim==3) qudaLaunchKernel(ComputeVUVGPU<true,parity_flip,Float,3,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
           } else {
             errorQuda("Undefined direction %d", arg.dir);
           }
@@ -343,15 +343,15 @@ namespace quda {
           constexpr bool parity_flip = false;
 
           if (arg.dir == QUDA_BACKWARDS) {
-            if      (arg.dim==0) qudaLaunchKernel(ComputeVUVGPU<false,parity_flip,from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
-            else if (arg.dim==1) qudaLaunchKernel(ComputeVUVGPU<false,parity_flip,from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
-            else if (arg.dim==2) qudaLaunchKernel(ComputeVUVGPU<false,parity_flip,from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
-            else if (arg.dim==3) qudaLaunchKernel(ComputeVUVGPU<false,parity_flip,from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+            if      (arg.dim==0) qudaLaunchKernel(ComputeVUVGPU<false,parity_flip,Float,0,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+            else if (arg.dim==1) qudaLaunchKernel(ComputeVUVGPU<false,parity_flip,Float,1,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+            else if (arg.dim==2) qudaLaunchKernel(ComputeVUVGPU<false,parity_flip,Float,2,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+            else if (arg.dim==3) qudaLaunchKernel(ComputeVUVGPU<false,parity_flip,Float,3,QUDA_BACKWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
           } else if (arg.dir == QUDA_FORWARDS) {
-            if      (arg.dim==0) qudaLaunchKernel(ComputeVUVGPU<false,parity_flip,from_coarse,Float,0,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
-            else if (arg.dim==1) qudaLaunchKernel(ComputeVUVGPU<false,parity_flip,from_coarse,Float,1,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
-            else if (arg.dim==2) qudaLaunchKernel(ComputeVUVGPU<false,parity_flip,from_coarse,Float,2,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
-            else if (arg.dim==3) qudaLaunchKernel(ComputeVUVGPU<false,parity_flip,from_coarse,Float,3,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+            if      (arg.dim==0) qudaLaunchKernel(ComputeVUVGPU<false,parity_flip,Float,0,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+            else if (arg.dim==1) qudaLaunchKernel(ComputeVUVGPU<false,parity_flip,Float,1,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+            else if (arg.dim==2) qudaLaunchKernel(ComputeVUVGPU<false,parity_flip,Float,2,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
+            else if (arg.dim==3) qudaLaunchKernel(ComputeVUVGPU<false,parity_flip,Float,3,QUDA_FORWARDS,fineSpin,coarseSpin,Arg>, tp, stream, arg);
           } else {
             errorQuda("Undefined direction %d", arg.dir);
           }
@@ -376,11 +376,11 @@ namespace quda {
 
 #ifdef JITIFY
         error = program->kernel("quda::ComputeCoarseCloverGPU")
-          .instantiate(from_coarse,Type<Float>(),fineSpin,coarseSpin,fineColor,coarseColor,Type<Arg>())
+          .instantiate(Type<Float>(),fineSpin,coarseSpin,fineColor,coarseColor,Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
 #if !defined(STAGGEREDCOARSE)
-        qudaLaunchKernel(ComputeCoarseCloverGPU<from_coarse,Float,fineSpin,coarseSpin,fineColor,coarseColor,Arg>, tp, stream, arg);
+        qudaLaunchKernel(ComputeCoarseCloverGPU<Float,fineSpin,coarseSpin,fineColor,coarseColor,Arg>, tp, stream, arg);
 #else
         errorQuda("ComputeCoarseClover not enabled for staggered coarsenings");
 #endif
@@ -1015,7 +1015,7 @@ namespace quda {
 
     //Calculate UV and then VUV for each dimension, accumulating directly into the coarse gauge field Y
 
-    typedef CalculateYArg<Float,fineSpin,coarseSpin,fineColor,coarseColor,coarseGauge,coarseGaugeAtomic,fineGauge,F,Ftmp,Vt,fineClover> Arg;
+    using Arg = CalculateYArg<from_coarse, Float,fineSpin,coarseSpin,fineColor,coarseColor,coarseGauge,coarseGaugeAtomic,fineGauge,F,Ftmp,Vt,fineClover>;
     Arg arg(Y, X, Y_atomic, X_atomic, UV, AV, G, V, C, Cinv, kappa, mass,
 	    mu, mu_factor, x_size, xc_size, geo_bs, spin_bs, fine_to_coarse, coarse_to_fine, bidirectional_links);
     CalculateY<location, from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> y(

@@ -15,7 +15,7 @@ namespace quda {
   // by using integers we have deterministic atomics
   typedef int storeType;
 
-  template <typename Float_, int fineSpin_, int coarseSpin_, int fineColor_, int coarseColor_, typename coarseGauge,
+  template <bool from_coarse_, typename Float_, int fineSpin_, int coarseSpin_, int fineColor_, int coarseColor_, typename coarseGauge,
             typename coarseGaugeAtomic, typename fineGauge, typename fineSpinor, typename fineSpinorTmp,
             typename fineSpinorV, typename fineClover>
   struct CalculateYArg {
@@ -30,6 +30,7 @@ namespace quda {
     static constexpr int fineDof = fineSpin * fineColor;
     static constexpr int coarseDof = coarseSpin * coarseColor;
 
+    static constexpr bool from_coarse = from_coarse_;
     static constexpr bool is_mma_compatible = coarseGauge::is_mma_compatible;
 
     coarseGauge Y;           /** Computed coarse link field */
@@ -149,13 +150,13 @@ namespace quda {
      Calculates the matrix UV^{s,c'}_mu(x) = \sum_c U^{c}_mu(x) * V^{s,c}_mu(x+mu)
      Where: mu = dir, s = fine spin, c' = coarse color, c = fine color
   */
-  template<bool from_coarse, int dim, QudaDirection dir, int fineSpin, int coarseSpin, typename Wtype, typename Arg>
+  template<int dim, QudaDirection dir, int fineSpin, int coarseSpin, typename Wtype, typename Arg>
   __device__ __host__ inline void computeUV(Arg &arg, const Wtype &Wacc, int parity, int x_cb, int i0, int j0)
   {
     int coord[4];
     getCoords(coord, x_cb, arg.x_size, parity);
 
-    constexpr int uvSpin = fineSpin * (from_coarse ? 2 : 1);
+    constexpr int uvSpin = fineSpin * (Arg::from_coarse ? 2 : 1);
     constexpr int nFace = 1; // to do: nFace == 3 version for long links
 
     using complex = complex<typename Arg::Float>;
@@ -167,7 +168,7 @@ namespace quda {
     if ( arg.comm_dim[dim] && (coord[dim] + nFace >= arg.x_size[dim]) ) {
       int ghost_idx = ghostFaceIndex<1>(coord, arg.x_size, dim, nFace);
 
-      if (!from_coarse) {
+      if (!Arg::from_coarse) {
 
         for (int k = 0; k < TileType::k; k += TileType::K) { // Fine Color columns of gauge field
           auto U = make_tile_A<complex, false>(tile);
@@ -195,12 +196,12 @@ namespace quda {
           }  //Fine color columns
         }    // Fine Spin
 
-      } // from_coarse
+      } // Arg::from_coarse
 
     } else {
       int y_cb = linkIndexP1(coord, arg.x_size, dim);
 
-      if (!from_coarse) {
+      if (!Arg::from_coarse) {
 
         for (int k = 0; k < TileType::k; k += TileType::K) { // Fine Color columns of gauge field
           auto U = make_tile_A<complex, false>(tile);
@@ -234,7 +235,7 @@ namespace quda {
     for (int s = 0; s < uvSpin; s++) UV[s].saveCS(arg.UV, 0, 0, parity, x_cb, s, i0, j0);
   } // computeUV
 
-  template<bool from_coarse, typename Float, int dim, QudaDirection dir, int fineSpin, int coarseSpin, typename Arg>
+  template<typename Float, int dim, QudaDirection dir, int fineSpin, int coarseSpin, typename Arg>
   void ComputeUVCPU(Arg &arg)
   {
     using TileType = typename Arg::uvTileType;
@@ -244,14 +245,14 @@ namespace quda {
         for (int ic = 0; ic < TileType::m; ic += TileType::M)   // fine color
           for (int jc = 0; jc < TileType::n; jc += TileType::N) // coarse color
             if (dir == QUDA_FORWARDS) // only for preconditioned clover is V != AV, will need extra logic for staggered KD
-              computeUV<from_coarse,dim,dir,fineSpin,coarseSpin>(arg, arg.V, parity, x_cb, ic, jc);
+              computeUV<dim,dir,fineSpin,coarseSpin>(arg, arg.V, parity, x_cb, ic, jc);
             else
-              computeUV<from_coarse,dim,dir,fineSpin,coarseSpin>(arg, arg.AV, parity, x_cb, ic, jc);
+              computeUV<dim,dir,fineSpin,coarseSpin>(arg, arg.AV, parity, x_cb, ic, jc);
       } // c/b volume
     }   // parity
   }
 
-  template<bool from_coarse, typename Float, int dim, QudaDirection dir, int fineSpin, int coarseSpin, typename Arg>
+  template<typename Float, int dim, QudaDirection dir, int fineSpin, int coarseSpin, typename Arg>
   __global__ void ComputeUVGPU(Arg arg)
   {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
@@ -266,9 +267,9 @@ namespace quda {
     if (jc >= arg.uvTile.N_tiles) return;
 
     if (dir == QUDA_FORWARDS) // only for preconditioned clover is V != AV, will need extra logic for staggered KD
-      computeUV<from_coarse,dim,dir,fineSpin,coarseSpin>(arg, arg.V, parity, x_cb, ic * arg.uvTile.M, jc * arg.uvTile.N);
+      computeUV<dim,dir,fineSpin,coarseSpin>(arg, arg.V, parity, x_cb, ic * arg.uvTile.M, jc * arg.uvTile.N);
     else
-      computeUV<from_coarse,dim,dir,fineSpin,coarseSpin>(arg, arg.AV, parity, x_cb, ic * arg.uvTile.M, jc * arg.uvTile.N);
+      computeUV<dim,dir,fineSpin,coarseSpin>(arg, arg.AV, parity, x_cb, ic * arg.uvTile.M, jc * arg.uvTile.N);
   }
 
   /**
@@ -605,14 +606,14 @@ namespace quda {
      @param[in] Fine grid parity we're working on
      @param[in] x_cb Checkboarded x dimension
    */
-  template <bool from_coarse, typename Float, int dim, QudaDirection dir, int fineSpin, int coarseSpin, typename Arg, typename Gamma, typename Out>
+  template <typename Float, int dim, QudaDirection dir, int fineSpin, int coarseSpin, typename Arg, typename Gamma, typename Out>
   __device__ __host__ inline void multiplyVUV(Out &vuv, const Arg &arg, const Gamma &gamma, int parity, int x_cb, int i0, int j0)
   {
     using complex = complex<Float>;
     using TileType = typename Arg::vuvTileType;
     auto &tile = arg.vuvTile;
 
-    if (!from_coarse) {
+    if (!Arg::from_coarse) {
      
       if (fineSpin == 4) { // fine grid is top level Wilson type
 
@@ -728,7 +729,7 @@ namespace quda {
         } //Fine spin
       }
 
-    } // from_coarse
+    } // Arg::from_coarse
 
   }
 
@@ -902,7 +903,7 @@ namespace quda {
   }
 
 
-  template<bool shared_atomic, bool parity_flip, bool from_coarse, typename Float, int dim, QudaDirection dir,
+  template<bool shared_atomic, bool parity_flip, typename Float, int dim, QudaDirection dir,
            int fineSpin, int coarseSpin, typename Arg, typename Gamma>
   __device__ __host__ void computeVUV(Arg &arg, const Gamma &gamma, int parity, int x_cb, int i0, int j0, int parity_coarse_, int coarse_x_cb_)
   {
@@ -927,7 +928,7 @@ namespace quda {
 
     using Ctype = decltype(make_tile_C<complex<Float>, false>(arg.vuvTile));
     Ctype vuv[coarseSpin * coarseSpin];
-    multiplyVUV<from_coarse,Float,dim,dir,fineSpin,coarseSpin,Arg>(vuv, arg, gamma, parity, x_cb, i0, j0);
+    multiplyVUV<Float,dim,dir,fineSpin,coarseSpin,Arg>(vuv, arg, gamma, parity, x_cb, i0, j0);
 
     if (isDiagonal) {
 #pragma unroll
@@ -988,7 +989,7 @@ namespace quda {
     }
   }
 
-  template<bool from_coarse, typename Float, int dim, QudaDirection dir, int fineSpin, int coarseSpin, typename Arg>
+  template<typename Float, int dim, QudaDirection dir, int fineSpin, int coarseSpin, typename Arg>
   void ComputeVUVCPU(Arg &arg)
   {
     Gamma<Float, QUDA_DEGRAND_ROSSI_GAMMA_BASIS, dim> gamma;
@@ -1000,12 +1001,12 @@ namespace quda {
       for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) { // Loop over fine volume
 	for (int ic=0; ic<arg.vuvTile.m; ic+=arg.vuvTile.M)
 	  for (int jc=0; jc<arg.vuvTile.n; jc+=arg.vuvTile.N)
-	    computeVUV<shared_atomic,parity_flip,from_coarse,Float,dim,dir,fineSpin,coarseSpin>(arg, gamma, parity, x_cb, ic, jc, 0, 0);
+	    computeVUV<shared_atomic,parity_flip,Float,dim,dir,fineSpin,coarseSpin>(arg, gamma, parity, x_cb, ic, jc, 0, 0);
       } // c/b volume
     } // parity
   }
 
-  template<bool shared_atomic, bool parity_flip, bool from_coarse, typename Float, int dim, QudaDirection dir,
+  template<bool shared_atomic, bool parity_flip, typename Float, int dim, QudaDirection dir,
            int fineSpin, int coarseSpin, typename Arg>
   __global__ void ComputeVUVGPU(Arg arg)
   {
@@ -1018,7 +1019,7 @@ namespace quda {
     if (c_col >= arg.vuvTile.N_tiles) return;
     if (!shared_atomic && x_cb >= arg.fineVolumeCB) return;
 
-    computeVUV<shared_atomic,parity_flip,from_coarse,Float,dim,dir,fineSpin,coarseSpin>
+    computeVUV<shared_atomic,parity_flip,Float,dim,dir,fineSpin,coarseSpin>
       (arg, gamma, parity, x_cb, c_row * arg.vuvTile.M, c_col * arg.vuvTile.N, parity_coarse, x_coarse_cb);
   }
 
@@ -1078,7 +1079,7 @@ namespace quda {
     computeYreverse<Float,nSpin,nColor,Arg>(arg, parity, x_cb, ic_c, jc_c);
   }
 
-  template<bool from_coarse, typename Float, int fineSpin, int coarseSpin, int fineColor, int coarseColor, typename Arg>
+  template<typename Float, int fineSpin, int coarseSpin, int fineColor, int coarseColor, typename Arg>
   __device__ __host__ void computeCoarseClover(Arg &arg, int parity, int x_cb, int ic_c, int jc_c) {
 
     const int nDim = 4;
@@ -1100,7 +1101,7 @@ namespace quda {
     complex<Float> X[coarseSpin*coarseSpin];
     for (int i=0; i<coarseSpin*coarseSpin; i++) X[i] = 0.0;
 
-    if (!from_coarse) {
+    if (!Arg::from_coarse) {
       //If Nspin = 4, then the clover term has structure C_{\mu\nu} = \gamma_{\mu\nu}C^{\mu\nu}
 #pragma unroll
       for (int s = 0; s < fineSpin; s++) { //Loop over fine spin row
@@ -1150,21 +1151,21 @@ namespace quda {
 
   }
 
-  template <bool from_coarse, typename Float, int fineSpin, int coarseSpin, int fineColor, int coarseColor, typename Arg>
+  template <typename Float, int fineSpin, int coarseSpin, int fineColor, int coarseColor, typename Arg>
   void ComputeCoarseCloverCPU(Arg &arg) {
     for (int parity=0; parity<2; parity++) {
 #pragma omp parallel for
       for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) {
         for (int jc_c=0; jc_c<coarseColor; jc_c++) {
           for (int ic_c=0; ic_c<coarseColor; ic_c++) {
-            computeCoarseClover<from_coarse,Float,fineSpin,coarseSpin,fineColor,coarseColor>(arg, parity, x_cb, ic_c, jc_c);
+            computeCoarseClover<Float,fineSpin,coarseSpin,fineColor,coarseColor>(arg, parity, x_cb, ic_c, jc_c);
           }
         }
       } // c/b volume
     } // parity
   }
 
-  template <bool from_coarse, typename Float, int fineSpin, int coarseSpin, int fineColor, int coarseColor, typename Arg>
+  template <typename Float, int fineSpin, int coarseSpin, int fineColor, int coarseColor, typename Arg>
   __global__ void ComputeCoarseCloverGPU(Arg arg) {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.fineVolumeCB) return;
@@ -1176,7 +1177,7 @@ namespace quda {
 
     int ic_c = blockDim.z*blockIdx.z + threadIdx.z; // coarse color
     if (ic_c >= coarseColor) return;
-    computeCoarseClover<from_coarse,Float,fineSpin,coarseSpin,fineColor,coarseColor>(arg, parity, x_cb, ic_c, jc_c);
+    computeCoarseClover<Float,fineSpin,coarseSpin,fineColor,coarseColor>(arg, parity, x_cb, ic_c, jc_c);
   }
 
 
