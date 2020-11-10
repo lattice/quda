@@ -379,7 +379,7 @@ namespace quda {
 
   } // computeTMAV
 
-  template<typename Float, typename Arg>
+  template<typename Arg>
   void ComputeTMAVCPU(Arg &arg) {
     for (int parity=0; parity<2; parity++) {
 #pragma omp parallel for
@@ -462,7 +462,8 @@ namespace quda {
     arg.max_h = max;
   }
 
-  template <typename Float, bool twist, typename Arg> __global__ void ComputeCloverInvMaxGPU(Arg arg)
+  template <bool twist, typename Arg>
+  __global__ void ComputeCloverInvMaxGPU(Arg arg)
   {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.fineVolumeCB) return;
