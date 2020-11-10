@@ -1967,6 +1967,11 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
     cudaColorSpinorField tmp1(in, cudaParam);
     ((DiracTwistedCloverPC*) dirac)->TwistCloverInv(tmp1, in, (parity+1)%2); // apply the clover-twist
     dirac->Dslash(out, tmp1, parity); // apply the operator
+  } else if (
+    inv_param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
+    inv_param->dslash_type == QUDA_MOBIUS_DWF_DSLASH ||
+    inv_param->dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH ) {
+    dirac->Dslash4(out, in, parity);
   } else {
     dirac->Dslash(out, in, parity); // apply the operator
   }
@@ -3209,8 +3214,17 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   profilerStop(__func__);
 }
 
-void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge, QudaGaugeParam *gauge_param)
+template <class Interface, class ...Args>
+void callSplitGridQuda(Interface op, void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge, QudaGaugeParam *gauge_param, Args... args)
 {
+  /**
+    Here we first re-distribute gauge, color spinor, and clover field to sub-partitions, then call either invertQuda or dslashQuda.
+
+    - For clover field, we re-distribute cloverPrecise directly, after restore it after invertQuda/dslashQuda is called.
+    - For gauge field, we re-distribute the host side field, and restore it after.
+    - For color spinor field, we re-distribute the host side fields, and re-collect the host side fields.
+  */
+  
   profilerStart(__func__);
   profileInvertSplitGrid.TPSTART(QUDA_PROFILE_TOTAL);
   profileInvertSplitGrid.TPSTART(QUDA_PROFILE_INIT);
@@ -3232,11 +3246,8 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, voi
   GaugeFieldParam gf_param(h_gauge, *gauge_param);
   if (gf_param.order <= 4) { gf_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO; }
   GaugeField *in = GaugeField::Create(gf_param);
-  loadGaugeQuda(in->Gauge_p(), gauge_param);
 
   double plaq[3];
-  plaqQuda(plaq);
-  printfQuda("Computed plaquette is %12.8e: (spatial = %12.8e, temporal = %12.8e)\n", plaq[0], plaq[1], plaq[2]);
 
   bool pc_solution
     = (param->solution_type == QUDA_MATPC_SOLUTION) || (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
@@ -3247,7 +3258,6 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, voi
   for (int i = 0; i < num_src; i++) {
     cpuParam.v = _hp_b[i];
     _h_b[i] = ColorSpinorField::Create(cpuParam);
-    printfQuda("_h_b[%2d] norm = %12.8e (no split)\n", i, quda::blas::norm2(*_h_b[i]));
   }
 
   cpuParam.location = param->output_location;
@@ -3319,12 +3329,10 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, voi
   updateR();
   comm_barrier();
 
-  plaqQuda(plaq);
-
   profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_PREAMBLE);
   profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_TOTAL);
 
-  invertQuda(collect_x->V(), collect_b->V(), param);
+  op(collect_x->V(), collect_b->V(), param, args...);
 
   profileInvertSplitGrid.TPSTART(QUDA_PROFILE_TOTAL);
   profileInvertSplitGrid.TPSTART(QUDA_PROFILE_EPILOGUE);
@@ -3336,14 +3344,7 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, voi
     gauge_param->ga_pad /= split_key[d];
   }
 
-  printf("Split plaquette rank %d is %12.8e: (spatial = %12.8e, temporal = %12.8e)\n", comm_rank(), plaq[0], plaq[1],
-         plaq[2]);
-
   join_field(_h_x, *collect_x, split_key, pc_type);
-
-  for (int i = 0; i < num_src; i++) {
-    printfQuda("_h_x[%2d] norm = %12.8e (no split)\n", i, quda::blas::norm2(*_h_x[i]));
-  }
 
   delete collect_b;
   delete collect_x;
@@ -3363,10 +3364,28 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, voi
     loadSloppyCloverQuda(prec);
   }
 
-  freeGaugeQuda();
+  // freeGaugeQuda();
+  loadGaugeQuda(h_gauge, gauge_param); 
+
   profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_EPILOGUE);
   profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_TOTAL);
   profilerStop(__func__);
+}
+
+void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge, QudaGaugeParam *gauge_param)
+{
+  auto op = [](void *_x, void *_b, QudaInvertParam *param) {
+    invertQuda(_x, _b, param);
+  };
+  callSplitGridQuda(op, _hp_x, _hp_b, param, h_gauge, gauge_param);
+}
+
+void dslashSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity, void *h_gauge, QudaGaugeParam *gauge_param)
+{
+  auto op = [](void *_x, void *_b, QudaInvertParam *param, QudaParity parity) {
+    dslashQuda(_x, _b, param, parity);
+  };
+  callSplitGridQuda(op, _hp_x, _hp_b, param, h_gauge, gauge_param, parity);
 }
 
 /*!

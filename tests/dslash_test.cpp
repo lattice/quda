@@ -40,6 +40,10 @@ Dirac *dirac = nullptr;
 
 QudaDagType not_dagger;
 
+bool test_split_grid = false;
+std::vector<cpuColorSpinorField *> vp_spinor, vp_spinorOut, vp_spinorRef;
+int num_src = 1;
+
 dslash_test_type dtest_type = dslash_test_type::Dslash;
 CLI::TransformPairs<dslash_test_type> dtest_type_map {{"Dslash", dslash_test_type::Dslash},
                                                       {"MatPC", dslash_test_type::MatPC},
@@ -173,6 +177,26 @@ void init(int argc, char **argv)
 
   spinor->Source(QUDA_RANDOM_SOURCE);
 
+  inv_param.split_grid[0] = grid_partition[0];
+  inv_param.split_grid[1] = grid_partition[1];
+  inv_param.split_grid[2] = grid_partition[2];
+  inv_param.split_grid[3] = grid_partition[3];
+
+  if (test_split_grid) {
+    inv_param.num_src = num_src;
+    for (int n = 0; n < num_src; n++) {
+      vp_spinor.push_back(new cpuColorSpinorField(csParam));
+      vp_spinorOut.push_back(new cpuColorSpinorField(csParam));
+      vp_spinorRef.push_back(new cpuColorSpinorField(csParam));
+    }
+  }
+
+  if (test_split_grid) {
+    for (int n = 0; n < num_src; n++) {
+      *vp_spinor[n] = *spinor;
+    }
+  }
+
   csParam.x[0] = gauge_param.X[0];
 
   // set verbosity prior to loadGaugeQuda
@@ -268,6 +292,12 @@ void end()
   delete spinorRef;
   delete spinorTmp;
 
+  if (test_split_grid) {
+    for (auto p : vp_spinor) { delete p; }
+    for (auto p : vp_spinorOut) { delete p; }
+    for (auto p : vp_spinorRef) { delete p; }
+  }
+
   for (int dir = 0; dir < 4; dir++) free(hostGauge[dir]);
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
       || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
@@ -298,6 +328,22 @@ DslashTime dslashCUDA(int niter) {
 
   comm_barrier();
   cudaEventRecord(start, 0);
+
+  if (test_split_grid) {
+
+    void **_hp_x = (void **)malloc(num_src * sizeof(void *));
+    void **_hp_b = (void **)malloc(num_src * sizeof(void *));
+    for (int i = 0; i < num_src; i++) {
+      _hp_x[i] = vp_spinorOut[i]->V();
+      _hp_b[i] = vp_spinor[i]->V();
+    }
+
+    dslashSplitGridQuda(_hp_x, _hp_b, &inv_param, parity, hostGauge, &gauge_param);
+
+    free(_hp_x);
+    free(_hp_b);
+
+  } else {
 
   for (int i = 0; i < niter; i++) {
 
@@ -505,7 +551,9 @@ DslashTime dslashCUDA(int niter) {
       if (elapsed > dslash_time.cpu_max) dslash_time.cpu_max = elapsed;
     }
   }
-    
+
+  }
+
   cudaEventRecord(end, 0);
   cudaEventSynchronize(end);
   float runTime;
@@ -957,12 +1005,27 @@ void display_test_info()
 	     dimPartitioned(2),
 	     dimPartitioned(3));
 
+  if (test_split_grid) {
+    printfQuda("Testing with split grid: %d  %d  %d  %d\n", grid_partition[0], grid_partition[1], grid_partition[2], grid_partition[3]);
+  }
+  
   return ;
     
 }
 
 TEST(dslash, verify) {
-  double deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
+  double deviation = 1e-14;
+  if (test_split_grid) {
+    for (int n = 0; n < num_src; n++) {
+      double norm2_cpu = blas::norm2(*spinorRef);
+      double norm2_cpu_cuda = blas::norm2(*vp_spinorOut[n]);
+      printfQuda("Result: CPU = %f, CPU-QUDA = %f\n",  norm2_cpu, norm2_cpu_cuda);
+      deviation = std::max(deviation, pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *vp_spinorOut[n]))));
+    }
+  } else {
+    deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
+  }
+
   double tol = getTolerance(inv_param.cuda_prec);
   // If we are using tensor core we tolerate a greater deviation
   if (dslash_type == QUDA_MOBIUS_DWF_DSLASH && dtest_type == dslash_test_type::MatPCDagMatPCLocal) tol *= 10;
@@ -982,6 +1045,7 @@ int main(int argc, char **argv)
   auto app = make_app();
   app->add_option("--test", dtest_type, "Test method")->transform(CLI::CheckedTransformer(dtest_type_map));
   add_eofa_option_group(app);
+  add_split_grid_option_group(app);
 
   try {
     app->parse(argc, argv);
@@ -994,6 +1058,12 @@ int main(int argc, char **argv)
   // Ensure gtest prints only from rank 0
   ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
   if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
+  
+  num_src = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3];
+  test_split_grid = num_src > 1;
+  if (test_split_grid) {
+    dtest_type = dslash_test_type::Dslash;
+  }
 
   display_test_info();
 
@@ -1012,30 +1082,34 @@ int main(int argc, char **argv)
     DslashTime dslash_time = dslashCUDA(niter);
     printfQuda("done.\n\n");
 
-    if (!transfer) *spinorOut = *cudaSpinorOut;
+    if (!test_split_grid) {
 
-    // print timing information
-    printfQuda("%fus per kernel call\n", 1e6*dslash_time.event_time / niter);
-    //FIXME No flops count for twisted-clover yet
-    unsigned long long flops = 0;
-    if (!transfer) flops = dirac->Flops();
-    printfQuda(
-        "%llu flops per kernel call, %llu flops per site\n", flops / niter, (flops / niter) / cudaSpinor->Volume());
-    printfQuda("GFLOPS = %f\n", 1.0e-9*flops/dslash_time.event_time);
+      if (!transfer) *spinorOut = *cudaSpinorOut;
 
-    printfQuda("Effective halo bi-directional bandwidth (GB/s) GPU = %f ( CPU = %f, min = %f , max = %f ) for aggregate message size %lu bytes\n",
-	       1.0e-9*2*cudaSpinor->GhostBytes()*niter/dslash_time.event_time, 1.0e-9*2*cudaSpinor->GhostBytes()*niter/dslash_time.cpu_time,
-	       1.0e-9*2*cudaSpinor->GhostBytes()/dslash_time.cpu_max, 1.0e-9*2*cudaSpinor->GhostBytes()/dslash_time.cpu_min,
-	       2*cudaSpinor->GhostBytes());
+      // print timing information
+      printfQuda("%fus per kernel call\n", 1e6*dslash_time.event_time / niter);
+      //FIXME No flops count for twisted-clover yet
+      unsigned long long flops = 0;
+      if (!transfer) flops = dirac->Flops();
+      printfQuda(
+          "%llu flops per kernel call, %llu flops per site\n", flops / niter, (flops / niter) / cudaSpinor->Volume());
+      printfQuda("GFLOPS = %f\n", 1.0e-9*flops/dslash_time.event_time);
 
-    double norm2_cpu = blas::norm2(*spinorRef);
-    double norm2_cpu_cuda = blas::norm2(*spinorOut);
+      printfQuda("Effective halo bi-directional bandwidth (GB/s) GPU = %f ( CPU = %f, min = %f , max = %f ) for aggregate message size %lu bytes\n",
+          1.0e-9*2*cudaSpinor->GhostBytes()*niter/dslash_time.event_time, 1.0e-9*2*cudaSpinor->GhostBytes()*niter/dslash_time.cpu_time,
+          1.0e-9*2*cudaSpinor->GhostBytes()/dslash_time.cpu_max, 1.0e-9*2*cudaSpinor->GhostBytes()/dslash_time.cpu_min,
+          2*cudaSpinor->GhostBytes());
 
-    if (!transfer) {
-      double norm2_cuda = blas::norm2(*cudaSpinorOut);
-      printfQuda("Results: CPU = %f, CUDA=%f, CPU-CUDA = %f\n", norm2_cpu, norm2_cuda, norm2_cpu_cuda);
-    } else {
-      printfQuda("Result: CPU = %f, CPU-QUDA = %f\n",  norm2_cpu, norm2_cpu_cuda);
+      double norm2_cpu = blas::norm2(*spinorRef);
+      double norm2_cpu_cuda = blas::norm2(*spinorOut);
+
+      if (!transfer) {
+        double norm2_cuda = blas::norm2(*cudaSpinorOut);
+        printfQuda("Results: CPU = %f, CUDA=%f, CPU-CUDA = %f\n", norm2_cpu, norm2_cuda, norm2_cpu_cuda);
+      } else {
+        printfQuda("Result: CPU = %f, CPU-QUDA = %f\n",  norm2_cpu, norm2_cpu_cuda);
+      }
+
     }
 
     if (verify_results) {

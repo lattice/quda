@@ -1077,6 +1077,9 @@ extern "C" {
    * @param parity The destination parity of the field
    */
   void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity);
+  
+  void dslashSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity, void *h_gauge,
+                           QudaGaugeParam *gauge_param);
 
   /**
    * Apply the clover operator or its inverse.
