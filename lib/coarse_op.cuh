@@ -60,7 +60,7 @@ namespace quda {
         if (from_coarse) errorQuda("ComputeAV should only be called from the fine grid");
 
 #if defined(GPU_CLOVER_DIRAC) && defined(WILSONCOARSE)
-        ComputeAVCPU<Float,fineColor,coarseColor>(arg);
+        ComputeAVCPU<Float>(arg);
 #else
         errorQuda("Clover dslash has not been built");
 #endif
@@ -69,7 +69,7 @@ namespace quda {
         if (from_coarse) errorQuda("ComputeTMAV should only be called from the fine grid");
 
 #if defined(GPU_TWISTED_MASS_DIRAC) && defined(WILSONCOARSE)
-        ComputeTMAVCPU<Float,fineColor,coarseColor>(arg);
+        ComputeTMAVCPU<Float>(arg);
 #else
         errorQuda("Twisted mass dslash has not been built");
 #endif
@@ -78,7 +78,7 @@ namespace quda {
         if (from_coarse) errorQuda("ComputeTMCAV should only be called from the fine grid");
 
 #if defined(GPU_TWISTED_CLOVER_DIRAC) && defined(WILSONCOARSE)
-        ComputeTMCAVCPU<Float,fineColor,coarseColor>(arg);
+        ComputeTMCAVCPU<Float>(arg);
 #else
         errorQuda("Twisted clover dslash has not been built");
 #endif
@@ -122,11 +122,11 @@ namespace quda {
           errorQuda("Undefined direction %d", arg.dir);
         }
       } else if (type == COMPUTE_COARSE_CLOVER) {
-        ComputeCoarseCloverCPU<Float,fineColor,coarseColor>(arg);
+        ComputeCoarseCloverCPU<Float>(arg);
       } else if (type == COMPUTE_REVERSE_Y) {
-        ComputeYReverseCPU<Float,coarseColor>(arg);
+        ComputeYReverseCPU<Float>(arg);
       } else if (type == COMPUTE_DIAGONAL) {
-        AddCoarseDiagonalCPU<Float,coarseColor>(arg);
+        AddCoarseDiagonalCPU<Float>(arg);
       } else if (type == COMPUTE_STAGGEREDMASS) {
 #if defined(STAGGEREDCOARSE)
         AddCoarseStaggeredMassCPU(arg);
@@ -134,11 +134,11 @@ namespace quda {
         errorQuda("AddCoarseStaggeredMass not enabled for non-staggered coarsenings");
 #endif
       } else if (type == COMPUTE_TMDIAGONAL) {
-        AddCoarseTmDiagonalCPU<Float,coarseColor>(arg);
+        AddCoarseTmDiagonalCPU<Float>(arg);
       } else if (type == COMPUTE_CONVERT) {
-        ConvertCPU<Float,coarseColor>(arg);
+        ConvertCPU<Float>(arg);
       } else if (type == COMPUTE_RESCALE) {
-        RescaleYCPU<Float,coarseColor>(arg);
+        RescaleYCPU<Float>(arg);
       } else {
         errorQuda("Undefined compute type %d", type);
       }
@@ -186,11 +186,11 @@ namespace quda {
         if (from_coarse) errorQuda("ComputeAV should only be called from the fine grid");
 #ifdef JITIFY
         error = program->kernel("quda::ComputeAVGPU")
-          .instantiate(Type<Float>(),fineColor,coarseColor,Type<Arg>())
+          .instantiate(Type<Float>(),Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
 #if defined(GPU_CLOVER_DIRAC) && defined(WILSONCOARSE)
-        qudaLaunchKernel(ComputeAVGPU<Float,fineColor,coarseColor,Arg>, tp, stream, arg);
+        qudaLaunchKernel(ComputeAVGPU<Float,Arg>, tp, stream, arg);
 #else
           errorQuda("Clover dslash has not been built");
 #endif
@@ -201,11 +201,11 @@ namespace quda {
         if (from_coarse) errorQuda("ComputeTMAV should only be called from the fine grid");
 #ifdef JITIFY
         error = program->kernel("quda::ComputeTMAVGPU")
-          .instantiate(Type<Float>(),fineColor,coarseColor,Type<Arg>())
+          .instantiate(Type<Float>(),Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
 #if defined(GPU_TWISTED_MASS_DIRAC) && defined(WILSONCOARSE)
-        qudaLaunchKernel(ComputeTMAVGPU<Float,fineColor,coarseColor,Arg>, tp, stream, arg);
+        qudaLaunchKernel(ComputeTMAVGPU<Float,Arg>, tp, stream, arg);
 #else
         errorQuda("Twisted mass dslash has not been built");
 #endif
@@ -216,11 +216,11 @@ namespace quda {
         if (from_coarse) errorQuda("ComputeTMCAV should only be called from the fine grid");
 #ifdef JITIFY
         error = program->kernel("quda::ComputeTMCAVGPU")
-          .instantiate(Type<Float>(),fineColor,coarseColor,Type<Arg>())
+          .instantiate(Type<Float>(),Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
 #if defined(GPU_TWISTED_CLOVER_DIRAC) && defined(WILSONCOARSE)
-        qudaLaunchKernel(ComputeTMCAVGPU<Float,fineColor,coarseColor,Arg>, tp, stream, arg);
+        qudaLaunchKernel(ComputeTMCAVGPU<Float,Arg>, tp, stream, arg);
 #else
         errorQuda("Twisted clover dslash has not been built");
 #endif
@@ -376,11 +376,11 @@ namespace quda {
 
 #ifdef JITIFY
         error = program->kernel("quda::ComputeCoarseCloverGPU")
-          .instantiate(Type<Float>(),fineColor,coarseColor,Type<Arg>())
+          .instantiate(Type<Float>(),Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
 #if !defined(STAGGEREDCOARSE)
-        qudaLaunchKernel(ComputeCoarseCloverGPU<Float,fineColor,coarseColor,Arg>, tp, stream, arg);
+        qudaLaunchKernel(ComputeCoarseCloverGPU<Float,Arg>, tp, stream, arg);
 #else
         errorQuda("ComputeCoarseClover not enabled for staggered coarsenings");
 #endif
@@ -390,19 +390,19 @@ namespace quda {
 
 #ifdef JITIFY
         error = program->kernel("quda::ComputeYReverseGPU")
-          .instantiate(Type<Float>(),coarseColor,Type<Arg>())
+          .instantiate(Type<Float>(),Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
-        qudaLaunchKernel(ComputeYReverseGPU<Float,coarseColor,Arg>, tp, stream, arg);
+        qudaLaunchKernel(ComputeYReverseGPU<Float,Arg>, tp, stream, arg);
 #endif
       } else if (type == COMPUTE_DIAGONAL) {
 
 #ifdef JITIFY
         error = program->kernel("quda::AddCoarseDiagonalGPU")
-          .instantiate(Type<Float>(),coarseColor,Type<Arg>())
+          .instantiate(Type<Float>(),Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
-        qudaLaunchKernel(AddCoarseDiagonalGPU<Float,coarseColor,Arg>, tp, stream, arg);
+        qudaLaunchKernel(AddCoarseDiagonalGPU<Float,Arg>, tp, stream, arg);
 #endif
       } else if (type == COMPUTE_STAGGEREDMASS) {
 
@@ -422,28 +422,28 @@ namespace quda {
 
 #ifdef JITIFY
         error = program->kernel("quda::AddCoarseTmDiagonalGPU")
-          .instantiate(Type<Float>(),coarseColor,Type<Arg>())
+          .instantiate(Type<Float>(),Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
-        qudaLaunchKernel(AddCoarseTmDiagonalGPU<Float,coarseColor,Arg>, tp, stream, arg);
+        qudaLaunchKernel(AddCoarseTmDiagonalGPU<Float,Arg>, tp, stream, arg);
 #endif
       } else if (type == COMPUTE_CONVERT) {
 
 #ifdef JITIFY
         error = program->kernel("quda::ConvertGPU")
-          .instantiate(Type<Float>(),coarseColor,Type<Arg>())
+          .instantiate(Type<Float>(),Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
-        qudaLaunchKernel(ConvertGPU<Float,coarseColor,Arg>, tp, stream, arg);
+        qudaLaunchKernel(ConvertGPU<Float,Arg>, tp, stream, arg);
 #endif
       } else if (type == COMPUTE_RESCALE) {
 
 #ifdef JITIFY
         error = program->kernel("quda::RescaleYGPU")
-          .instantiate(Type<Float>(),coarseColor,Type<Arg>())
+          .instantiate(Type<Float>(),Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
-        qudaLaunchKernel(RescaleYGPU<Float,coarseColor,Arg>, tp, stream, arg);
+        qudaLaunchKernel(RescaleYGPU<Float,Arg>, tp, stream, arg);
 #endif
 
       } else {
