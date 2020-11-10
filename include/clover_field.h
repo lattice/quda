@@ -464,8 +464,9 @@ namespace quda {
     @param out The output field to which we are copying
     @param in The input field from which we are copying
     @param offset The offset for the larger field between out and in.
+    @param pc_type Whether the field order uses 4d or 5d even-odd preconditioning.
  */
-  void copyFieldOffset(CloverField &out, const CloverField &in, const int offset[4]);
+  void copyFieldOffset(CloverField &out, const CloverField &in, const int offset[4], QudaPCType pc_type);
 
   /**
      @brief Helper function that returns whether we have enabled

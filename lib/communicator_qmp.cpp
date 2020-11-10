@@ -97,7 +97,8 @@ Communicator::Communicator(Communicator &other, const int *comm_split)
          other.comm_rank(), key, color, my_rank_, comm_gpuid());
 }
 
-Communicator::~Communicator() {
+Communicator::~Communicator()
+{
   comm_finalize();
   if (!user_set_comm_handle) { QMP_comm_free(QMP_COMM_HANDLE); }
 }

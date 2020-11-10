@@ -74,7 +74,7 @@ namespace quda
   };
 
   template <class Field>
-  void inline split_field(Field &collect_field, std::vector<Field *> &v_base_field, const CommKey &comm_key)
+  void inline split_field(Field &collect_field, std::vector<Field *> &v_base_field, const CommKey &comm_key, QudaPCType pc_type = QUDA_4D_PC)
   {
     CommKey full_dim = {comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3)};
     CommKey full_idx = {comm_coord(0), comm_coord(1), comm_coord(2), comm_coord(3)};
@@ -148,7 +148,7 @@ namespace quda
 
       auto offset = thread_idx * thread_dim;
 
-      quda::copyFieldOffset(collect_field, *buffer_field, offset.data());
+      quda::copyFieldOffset(collect_field, *buffer_field, offset.data(), pc_type);
     }
 
     delete buffer_field;
@@ -160,7 +160,7 @@ namespace quda
   }
 
   template <class Field>
-  void inline join_field(std::vector<Field *> &v_base_field, const Field &collect_field, const CommKey &comm_key)
+  void inline join_field(std::vector<Field *> &v_base_field, const Field &collect_field, const CommKey &comm_key, QudaPCType pc_type = QUDA_4D_PC)
   {
     CommKey full_dim = {comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3)};
     CommKey full_idx = {comm_coord(0), comm_coord(1), comm_coord(2), comm_coord(3)};
@@ -201,7 +201,7 @@ namespace quda
       size_t bytes = meta.TotalBytes();
 
       auto offset = thread_idx * thread_dim;
-      quda::copyFieldOffset(*buffer_field, collect_field, offset.data());
+      quda::copyFieldOffset(*buffer_field, collect_field, offset.data(), pc_type);
 
       v_send_buffer_h[i] = pinned_malloc(bytes);
       buffer_field->copy_to_buffer(v_send_buffer_h[i]);

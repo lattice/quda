@@ -3218,11 +3218,10 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, voi
   CommKey split_key = {_split_key[0], _split_key[1], _split_key[2], _split_key[3]};
   int num_src = quda::product(split_key);
 
+  QudaPCType pc_type = QUDA_4D_PC;
+  if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) { pc_type = QUDA_5D_PC; }
+
   if (param->num_src != num_src) { errorQuda("Number of rhs should be equal to the number of sub-partitions."); }
-  if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
-    errorQuda("Split Grid does NOT support 5d even-odd preconditioned DWF yet, because of, well, its 5d even-odd "
-              "checker-boarding. :(");
-  }
 
   if (param->inv_type_precondition == QUDA_MG_INVERTER) {
     errorQuda("Split Grid does NOT work with MG yet.");
@@ -3284,8 +3283,7 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, voi
     quda::CloverField *collected_clover = new quda::cudaCloverField(clover_param);
     std::vector<quda::CloverField *> v_c(1);
     v_c[0] = cloverPrecise;
-    quda::split_field(*collected_clover, v_c, split_key);
-
+    quda::split_field(*collected_clover, v_c, split_key); // Clover uses 4d even-odd preconditioning.
     // Free the original clover fields all together.
     freeCloverQuda();
 
@@ -3304,7 +3302,6 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, voi
   profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_INIT);
   profileInvertSplitGrid.TPSTART(QUDA_PROFILE_PREAMBLE);
   quda::split_field(*collected_gauge, v_g, split_key);
-
   loadGaugeQuda(collected_gauge->Gauge_p(), gauge_param);
 
   comm_barrier();
@@ -3315,8 +3312,7 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, voi
   quda::ColorSpinorField *collect_b = new quda::cpuColorSpinorField(cpu_cs_param_split);
   quda::ColorSpinorField *collect_x = new quda::cpuColorSpinorField(cpu_cs_param_split);
 
-  split_field(*collect_b, _h_b, split_key);
-
+  split_field(*collect_b, _h_b, split_key, pc_type);
   comm_barrier();
 
   push_communicator(split_key);
@@ -3343,7 +3339,8 @@ void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, voi
   printf("Split plaquette rank %d is %12.8e: (spatial = %12.8e, temporal = %12.8e)\n", comm_rank(), plaq[0], plaq[1],
          plaq[2]);
 
-  join_field(_h_x, *collect_x, split_key);
+  join_field(_h_x, *collect_x, split_key, pc_type);
+
   for (int i = 0; i < num_src; i++) {
     printfQuda("_h_x[%2d] norm = %12.8e (no split)\n", i, quda::blas::norm2(*_h_x[i]));
   }

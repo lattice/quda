@@ -119,6 +119,7 @@ namespace quda
   template <QudaOffsetCopyMode mode, class Arg>
   __device__ __host__ void copy_field_offset(int x_cb, int s, int parity, Arg &arg)
   {
+    // XXX: This code assumes parity if NOT changed when offset is added.
     if (Arg::pc_type == QUDA_4D_PC) { // 4d even-odd preconditioning, works for most fermions
       int coordinate[4];
       int idx_in;
@@ -141,18 +142,18 @@ namespace quda
       int idx_out;
       if (mode == QudaOffsetCopyMode::COLLECT) {
         // we are collecting so x_cb is the index for the input.
-        idx_in = x_cb + arg.volume_4d_cb * s;
+        idx_in = x_cb + arg.volume_4d_cb_in * s;
         getCoords5CB(coordinate, idx_in, arg.dim_in, arg.X0h_in, parity, QUDA_5D_PC);
 #pragma unroll
         for (int d = 0; d < 4; d++) { coordinate[d] += arg.offset[d]; }
-        idx_out = linkIndex(coordinate, arg.dim_out) + arg.volume_4d_cb * coordinate[4];
+        idx_out = linkIndex(coordinate, arg.dim_out) + arg.volume_4d_cb_out * coordinate[4];
       } else {
         // we are dispersing so x_cb is the index for the output.
-        idx_out = x_cb + arg.volume_4d_cb * s;
+        idx_out = x_cb + arg.volume_4d_cb_out * s;
         getCoords5CB(coordinate, idx_out, arg.dim_out, arg.X0h_out, parity, QUDA_5D_PC);
 #pragma unroll
         for (int d = 0; d < 4; d++) { coordinate[d] += arg.offset[d]; }
-        idx_in = linkIndex(coordinate, arg.dim_in) + arg.volume_4d_cb * coordinate[4];
+        idx_in = linkIndex(coordinate, arg.dim_in) + arg.volume_4d_cb_in * coordinate[4];
       }
       copy_field(idx_out, idx_in, parity, arg);
     }

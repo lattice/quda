@@ -15,7 +15,6 @@ Communicator::Communicator(int nDim, const int *commDims, QudaCommsMap rank_from
 
 Communicator::Communicator(Communicator &other, const int *comm_split)
 {
-
   constexpr int nDim = 4;
 
   std::array<int, nDim> comm_dims_split;
@@ -35,6 +34,8 @@ Communicator::Communicator(Communicator &other, const int *comm_split)
 
   printf("Creating a split communicator for a single build, which doesn't really make sense.\n");
 }
+
+Communicator::~Communicator() { comm_finalize(); }
 
 void Communicator::comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
 {

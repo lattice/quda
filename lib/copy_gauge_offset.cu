@@ -110,11 +110,13 @@ namespace quda
     }
   };
 
-  void copyFieldOffset(GaugeField &out, const GaugeField &in, const int offset[4])
+  void copyFieldOffset(GaugeField &out, const GaugeField &in, const int offset[4], QudaPCType pc_type)
   {
     checkPrecision(out, in);
     checkLocation(out, in); // check all locations match
     checkReconstruct(out, in);
+
+    if (pc_type != QUDA_4D_PC) { errorQuda("Gauge field copy must use 4d even-odd preconditioning."); }
 
     if (out.Geometry() != in.Geometry()) {
       errorQuda("Field geometries %d %d do not match", out.Geometry(), in.Geometry());

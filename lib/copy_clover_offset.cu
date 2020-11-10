@@ -55,7 +55,7 @@ namespace quda
     }
   };
 
-  void copyFieldOffset(CloverField &out, const CloverField &in, const int offset[4])
+  void copyFieldOffset(CloverField &out, const CloverField &in, const int offset[4], QudaPCType pc_type)
   {
 #ifdef GPU_CLOVER_DIRAC
     if (out.Precision() < QUDA_SINGLE_PRECISION && out.Order() > 4) {
@@ -70,6 +70,8 @@ namespace quda
       errorQuda("Precision mismatch: %d (out) vs %d (in)", out.Precision(), in.Precision());
     }
     if (out.Order() != in.Order()) { errorQuda("Order mismatch: %d (out) vs %d (in)", out.Order(), in.Order()); }
+
+    if (pc_type != QUDA_4D_PC) { errorQuda("Gauge field copy must use 4d even-odd preconditioning."); }
 
     if (in.V(true)) { instantiate<CopyCloverOffset>(out, in, offset, true); }
     if (in.V(false)) { instantiate<CopyCloverOffset>(out, in, offset, false); }
