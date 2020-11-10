@@ -35,8 +35,10 @@ namespace quda {
   /**
      @brief Launcher for CPU instantiations of coarse-link construction
    */
-  template <QudaFieldLocation location, bool from_coarse, typename Float, int fineSpin,
-            int fineColor, int coarseSpin, int coarseColor, typename Arg> struct Launch {
+  template <QudaFieldLocation location, typename Arg> struct Launch {
+
+    static constexpr bool from_coarse = Arg::from_coarse;
+
     Launch(Arg &arg, CUresult &error, TuneParam &tp, ComputeType type, bool use_mma, const qudaStream_t &stream)
     {
 
@@ -148,8 +150,11 @@ namespace quda {
   /**
      @brief Launcher for GPU instantiations of coarse-link construction
   */
-  template <bool from_coarse, typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
-  struct Launch<QUDA_CUDA_FIELD_LOCATION, from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> {
+  template <typename Arg>
+  struct Launch<QUDA_CUDA_FIELD_LOCATION, Arg> {
+    using Float = typename Arg::Float;
+    static constexpr bool from_coarse = Arg::from_coarse;
+
     Launch(Arg &arg, CUresult &error, TuneParam &tp, ComputeType type, bool use_mma, const qudaStream_t &stream)
     {
 #ifdef JITIFY
@@ -298,7 +303,7 @@ namespace quda {
             // check we have a valid problem size for shared atomics
             // constraint is due to how shared memory initialization and global store are done
             int block_size = arg.fineVolumeCB / arg.coarseVolumeCB;
-            if (block_size / 2 < coarseSpin * coarseSpin)
+            if (block_size / 2 < Arg::coarseSpin * Arg::coarseSpin)
               errorQuda("Block size %d not supported in shared-memory atomic coarsening", block_size);
 
             arg.aggregates_per_block = tp.aux.x;
@@ -452,10 +457,19 @@ namespace quda {
     }
   };
 
-  template <QudaFieldLocation location, bool from_coarse, typename Float, int fineSpin,
-	    int fineColor, int coarseSpin, int coarseColor, typename Arg>
+  template <QudaFieldLocation location, typename Arg>
   class CalculateY : public TunableVectorYZ {
   public:
+
+    static constexpr bool from_coarse = Arg::from_coarse;
+
+    using Float = typename Arg::Float;
+
+    static constexpr int fineSpin = Arg::fineSpin;
+    static constexpr int coarseSpin = Arg::coarseSpin;
+    static constexpr int fineColor = Arg::fineColor;
+    static constexpr int coarseColor = Arg::coarseColor;
+
 
   protected:
     Arg &arg;
@@ -645,7 +659,7 @@ namespace quda {
       if (type == COMPUTE_VUV || type == COMPUTE_CONVERT || type == COMPUTE_RESCALE) arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
 
       if (type == COMPUTE_VUV) tp.shared_bytes -= sharedBytesPerBlock(tp); // shared memory is static so don't include it in launch
-      Launch<location, from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg>(arg, jitify_error, tp,
+      Launch<location, Arg>(arg, jitify_error, tp,
                                                                                               type, use_mma, stream);
       if (type == COMPUTE_VUV) tp.shared_bytes += sharedBytesPerBlock(tp); // restore shared memory
     };
@@ -1018,8 +1032,7 @@ namespace quda {
     using Arg = CalculateYArg<from_coarse, Float,fineSpin,coarseSpin,fineColor,coarseColor,coarseGauge,coarseGaugeAtomic,fineGauge,F,Ftmp,Vt,fineClover>;
     Arg arg(Y, X, Y_atomic, X_atomic, UV, AV, G, V, C, Cinv, kappa, mass,
 	    mu, mu_factor, x_size, xc_size, geo_bs, spin_bs, fine_to_coarse, coarse_to_fine, bidirectional_links);
-    CalculateY<location, from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> y(
-      arg, v, Y_, X_, Y_atomic_, X_atomic_, use_mma);
+    CalculateY<location, Arg> y(arg, v, Y_, X_, Y_atomic_, X_atomic_, use_mma);
 
     QudaFieldLocation location_ = checkLocation(Y_, X_, av, v);
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Running link coarsening on the %s\n", location_ == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
