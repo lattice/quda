@@ -945,7 +945,10 @@ namespace quda {
       }
     }
   }
-#if defined(__HIP_PLATFORM_HCC__)
+
+#define __io_hack__
+
+#if defined(__HIP_PLATFORM_HCC__) && defined(__io_hack__)
    __host__ inline void load(complex out[length / 2], int x, int parity = 0) const
 #else
    __device__ __host__ inline void load(complex out[length / 2], int x, int parity = 0) const
@@ -969,7 +972,7 @@ namespace quda {
 #pragma unroll
     for (int i = 0; i < length / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
   }
-#if defined(__HIP_PLATFORM_HCC__)
+#if defined(__HIP_PLATFORM_HCC__) && defined(__io_hack__)
   __device__  inline void load(complex out[length / 2], int x, int parity = 0) const
   {
     real v[length];
@@ -982,8 +985,9 @@ namespace quda {
 
 #pragma unroll
     for (int i=0; i< M ; i++) {
+       Vector vecTmp=((const Vector *)field_s)[parity * offset + x + stride * i];
 #pragma unroll
-       for (int j = 0; j < N; j++) copy_and_scale(v[i*N + j], field_s[(parity * offset + x + stride * i)*N + j ] , nrm);
+       for (int j = 0; j < N; j++) copy_and_scale(v[i*N + j], reinterpret_cast<Float *>(&vecTmp)[j] , nrm);
     }
       
 #pragma unroll
@@ -991,8 +995,7 @@ namespace quda {
    }
 #endif
 
-
-#if defined(__HIP_PLATFORM_HCC__)
+#if defined(__HIP_PLATFORM_HCC__) && defined(__io_hack__)
      __host__ inline void save(const complex in[length / 2], int x, int parity = 0)
 #else
      __device__ __host__ inline void save(const complex in[length / 2], int x, int parity = 0)   
@@ -1035,7 +1038,7 @@ namespace quda {
       vector_store(field, parity * offset + x + stride * i, vecTmp);
     }
   }
-#if defined(__HIP_PLATFORM_HCC__)
+#if defined(__HIP_PLATFORM_HCC__) && defined(__io_hack__)
   __device__ inline void save(const complex in[length / 2], int x, int parity = 0)
   {
     real v[length];
@@ -1069,8 +1072,10 @@ namespace quda {
 
 #pragma unroll
     for (int i=0; i<M; i++) {
+        Vector vecTmp;
 #pragma unroll
-        for (int j = 0; j < N; j++) copy_scaled(field_s[(parity * offset + x + stride * i)*N + j ], v[i * N + j]);
+        for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], v[i * N + j]);
+        ((const Vector *)field_s)[parity * offset + x + stride * i]=vecTmp;
     }                                 
   }	
 #endif

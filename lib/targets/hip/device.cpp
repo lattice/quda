@@ -61,6 +61,9 @@ namespace quda
       }
 
       hipGetDeviceProperties(&deviceProp, dev);
+      deviceProp.maxThreadsPerBlock=768;
+      for(int i=0;i<3;i++)
+           deviceProp.maxThreadsDim[i]=768;
       checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
       if (deviceProp.major < 1) {
         errorQuda("Device %d does not support CUDA", dev);

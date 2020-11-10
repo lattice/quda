@@ -2723,7 +2723,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   double nb = blas::norm2(*b);
   if (nb==0.0) errorQuda("Source has zero norm");
 
-  if (getVerbosity() >= QUDA_VERBOSE) {
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
     double nh_b = blas::norm2(*h_b);
     printfQuda("Source: CPU = %g, CUDA copy = %g\n", nh_b, nb);
     if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) {
@@ -2732,6 +2732,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       printfQuda("Solution: CPU = %g, CUDA copy = %g\n", nh_x, nx);
     }
   }
+  else
+    printfQuda("Source: CUDA copy = %g\n", nb);
 
   // rescale the source and solution vectors to help prevent the onset of underflow
   if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
@@ -2986,8 +2988,15 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   if (getVerbosity() >= QUDA_VERBOSE){
     double nx = blas::norm2(*x);
-    double nh_x = blas::norm2(*h_x);
-    printfQuda("Reconstructed: CUDA solution = %g, CPU copy = %g\n", nx, nh_x);
+    printfQuda("Reconstructed: CUDA solution = %g", nx);
+    if(getVerbosity() >= QUDA_DEBUG_VERBOSE)
+    {
+       double nh_x = blas::norm2(*h_x);
+       printfQuda(", CPU copy = %g\n", nh_x);
+    }
+    else
+       printfQuda("\n");
+
   }
   profileInvert.TPSTOP(QUDA_PROFILE_EPILOGUE);
 

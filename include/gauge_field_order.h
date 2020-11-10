@@ -1761,8 +1761,9 @@ namespace quda {
 
 #pragma unroll
         for (int i=0; i<M; i++){
+         Vector vecTmp=((const Vector *)gauge_t)[parity * offset + x + stride * (dir*M+i)];
 #pragma unroll
-         for (int j = 0; j < N; j++) copy( tmp[i*N + j], gauge_t[(parity * offset + (dir * M + i) * stride + x)*N + j ] );
+         for (int j = 0; j < N; j++) copy( tmp[i*N + j], reinterpret_cast<Float *>(&vecTmp)[j]);
         }
 
         real phase = 0.;
