@@ -41,17 +41,15 @@ namespace quda {
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
       switch(mem_type) {
-      case QUDA_MEMORY_DEVICE:
-	gauge = pool_device_malloc(bytes);
-	break;
+      case QUDA_MEMORY_DEVICE: gauge = bytes ? pool_device_malloc(bytes) : nullptr; break;
       case QUDA_MEMORY_MAPPED:
-        gauge_h = mapped_malloc(bytes);
-	gauge = get_mapped_device_pointer(gauge_h); // set the matching device pointer
-	break;
+        gauge_h = bytes ? mapped_malloc(bytes) : nullptr;
+        gauge = bytes ? get_mapped_device_pointer(gauge_h) : nullptr; // set the matching device pointer
+        break;
       default:
 	errorQuda("Unsupported memory type %d", mem_type);
       }
-      if (create == QUDA_ZERO_FIELD_CREATE) qudaMemset(gauge, 0, bytes);
+      if (create == QUDA_ZERO_FIELD_CREATE && bytes) qudaMemset(gauge, 0, bytes);
     } else {
       gauge = param.gauge;
     }

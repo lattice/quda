@@ -46,8 +46,8 @@ set (QUDA_OBJS
   cpu_gauge_field.cpp cuda_gauge_field.cpp extract_gauge_ghost.cu
   extract_gauge_ghost_mg.cu max_gauge.cu gauge_update_quda.cu
   max_clover.cu dirac_clover.cpp dirac_wilson.cpp dirac_staggered.cpp
-  dirac_clover_hasenbusch_twist.cpp
-  dirac_improved_staggered.cpp dirac_domain_wall.cpp
+  dirac_staggered_kd.cpp dirac_clover_hasenbusch_twist.cpp
+  dirac_improved_staggered.cpp dirac_improved_staggered_kd.cpp dirac_domain_wall.cpp
   dirac_domain_wall_4d.cpp dirac_mobius.cpp dirac_twisted_clover.cpp
   dirac_twisted_mass.cpp 
   llfat_quda.cu gauge_force.cu gauge_random.cu
@@ -62,7 +62,7 @@ set (QUDA_OBJS
   dslash_wilson_clover_hasenbusch_twist_preconditioned.cu
   dslash_domain_wall_4d.cu  dslash_domain_wall_5d.cu
   mdw_fused_dslash.cu dslash5_mobius_eofa.cu
-  dslash_pack2.cu
+  dslash_pack2.cu staggered_kd_build_xinv.cu staggered_kd_apply_xinv.cu
   blas_quda.cu multi_blas_quda.cu reduce_quda.cu
   multi_reduce_quda.cu reduce_helper.cu
   contract.cu comm_common.cpp

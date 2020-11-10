@@ -706,8 +706,8 @@ extern "C" {
     /** Multiplicative factor for the mu parameter */
     double mu_factor[QUDA_MAX_MG_LEVEL];
 
-    /** Boolean for if this is a staggered solve or not */
-    QudaBoolean is_staggered;
+    /** Boolean for aggregation type, implies staggered or not */
+    QudaTransferType transfer_type[QUDA_MAX_MG_LEVEL];
 
     /** Whether to use tensor cores (if available) */
     QudaBoolean use_mma;

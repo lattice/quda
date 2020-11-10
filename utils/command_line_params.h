@@ -267,6 +267,7 @@ extern bool generate_all_levels;
 extern quda::mgarray<QudaSchwarzType> mg_schwarz_type;
 extern quda::mgarray<int> mg_schwarz_cycle;
 extern bool mg_evolve_thin_updates;
+extern QudaTransferType staggered_transfer_type;
 
 extern quda::mgarray<std::array<int, 4>> geo_block_size;
 extern bool mg_use_mma;

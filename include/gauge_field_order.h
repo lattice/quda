@@ -905,16 +905,21 @@ namespace quda {
        deploy for a specifc field ordering, the two operator()
        accessors have to be specialized for that ordering.
 
-       @tparam Float Underlying type returned by the accessors
+       @tparam Float_ Underlying type returned by the accessors
        @tparam nColor Number of colors for the field
        @tparam nSpinCoarse Number of "spin degrees of freedom" (for coarse-link fields only)
        @tparam order Storage order of the field
        @tparam native_ghost Whether to use native ghosts (inlined into
+       @tparam storeFloat_ Underlying storage type for the field
        the padded area for internal-order fields or use a separate array if false)
      */
-    template <typename Float, int nColor, int nSpinCoarse, QudaGaugeFieldOrder order, bool native_ghost = true,
-              typename storeFloat = Float>
+    template <typename Float_, int nColor, int nSpinCoarse, QudaGaugeFieldOrder order, bool native_ghost = true,
+              typename storeFloat_ = Float_>
     struct FieldOrder {
+
+      /** Convenient types */
+      using Float = Float_;
+      using storeFloat = storeFloat_;
 
       /** An internal reference to the actual field we are accessing */
       const int volumeCB;

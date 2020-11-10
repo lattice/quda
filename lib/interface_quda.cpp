@@ -2560,7 +2560,7 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   csParam.mem_type = mg_param.setup_minimize_memory == QUDA_BOOLEAN_TRUE ? QUDA_MEMORY_MAPPED : QUDA_MEMORY_DEVICE;
   B.resize(mg_param.n_vec[0]);
 
-  if (mg_param.is_staggered == QUDA_BOOLEAN_TRUE) {
+  if (mg_param.transfer_type[0] == QUDA_TRANSFER_COARSE_KD || mg_param.transfer_type[0] == QUDA_TRANSFER_OPTIMIZED_KD) {
     // Create the ColorSpinorField as a "container" for metadata.
     csParam.create = QUDA_REFERENCE_FIELD_CREATE;
 

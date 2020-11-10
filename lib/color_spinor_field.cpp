@@ -776,9 +776,20 @@ namespace quda {
                                                    QudaMemoryType new_mem_type) {
     ColorSpinorParam coarseParam(*this);
     for (int d=0; d<nDim; d++) coarseParam.x[d] = x[d]/geoBlockSize[d];
-    coarseParam.nSpin = (nSpin == 1) ? 2 : (nSpin / spinBlockSize); // coarsening staggered check
 
-    coarseParam.nColor = Nvec;
+    int geoBlockVolume = 1;
+    for (int d = 0; d < nDim; d++) { geoBlockVolume *= geoBlockSize[d]; }
+
+    // Detect if the "coarse" op is the Kahler-Dirac op or something else
+    // that still acts on a fine staggered ColorSpinorField
+    if (geoBlockVolume == 1 && Nvec == nColor && nSpin == 1) {
+      coarseParam.nSpin = nSpin;
+      coarseParam.nColor = nColor;
+    } else {
+      coarseParam.nSpin = (nSpin == 1) ? 2 : (nSpin / spinBlockSize); // coarsening staggered check
+      coarseParam.nColor = Nvec;
+    }
+
     coarseParam.siteSubset = QUDA_FULL_SITE_SUBSET; // coarse grid is always full
     coarseParam.create = QUDA_ZERO_FIELD_CREATE;
 
