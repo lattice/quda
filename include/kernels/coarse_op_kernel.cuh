@@ -150,13 +150,13 @@ namespace quda {
      Calculates the matrix UV^{s,c'}_mu(x) = \sum_c U^{c}_mu(x) * V^{s,c}_mu(x+mu)
      Where: mu = dir, s = fine spin, c' = coarse color, c = fine color
   */
-  template<int dim, QudaDirection dir, int fineSpin, int coarseSpin, typename Wtype, typename Arg>
+  template<int dim, QudaDirection dir, typename Wtype, typename Arg>
   __device__ __host__ inline void computeUV(Arg &arg, const Wtype &Wacc, int parity, int x_cb, int i0, int j0)
   {
     int coord[4];
     getCoords(coord, x_cb, arg.x_size, parity);
 
-    constexpr int uvSpin = fineSpin * (Arg::from_coarse ? 2 : 1);
+    constexpr int uvSpin = Arg::fineSpin * (Arg::from_coarse ? 2 : 1);
     constexpr int nFace = 1; // to do: nFace == 3 version for long links
 
     using complex = complex<typename Arg::Float>;
@@ -173,7 +173,7 @@ namespace quda {
         for (int k = 0; k < TileType::k; k += TileType::K) { // Fine Color columns of gauge field
           auto U = make_tile_A<complex, false>(tile);
           U.load(arg.U, dim, parity, x_cb, i0, k);
-          for (int s = 0; s < fineSpin; s++) {  //Fine Spin
+          for (int s = 0; s < Arg::fineSpin; s++) {  //Fine Spin
             auto W = make_tile_B<complex, true>(tile);
             W.loadCS(Wacc, dim, 1, (parity+1)&1, ghost_idx, s, k, j0);
             UV[s].mma_nn(U, W);
@@ -183,15 +183,15 @@ namespace quda {
       } else {
 
         for (int k = 0; k < TileType::k; k += TileType::K) { // Fine Color columns of gauge field
-          for (int s_col=0; s_col<fineSpin; s_col++) {
+          for (int s_col=0; s_col<Arg::fineSpin; s_col++) {
             auto W = make_tile_B<complex, true>(tile);
             W.loadCS(Wacc, dim, 1, (parity+1)&1, ghost_idx, s_col, k, j0);
-            for (int s = 0; s < fineSpin; s++) {  //Fine Spin
+            for (int s = 0; s < Arg::fineSpin; s++) {  //Fine Spin
               // on coarse lattice, if forwards then use forwards links
               auto U = make_tile_A<complex, false>(tile);
               U.load(arg.U, dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, s, s_col, i0, k);
 
-              UV[s_col * fineSpin + s].mma_nn(U, W);
+              UV[s_col * Arg::fineSpin + s].mma_nn(U, W);
             } // which chiral block
           }  //Fine color columns
         }    // Fine Spin
@@ -206,7 +206,7 @@ namespace quda {
         for (int k = 0; k < TileType::k; k += TileType::K) { // Fine Color columns of gauge field
           auto U = make_tile_A<complex, false>(tile);
           U.load(arg.U, dim, parity, x_cb, i0, k);
-          for (int s = 0; s < fineSpin; s++) {  //Fine Spin
+          for (int s = 0; s < Arg::fineSpin; s++) {  //Fine Spin
             auto W = make_tile_B<complex, false>(tile);
             W.loadCS(Wacc, 0, 0, (parity+1)&1, y_cb, s, k, j0);
             UV[s].mma_nn(U, W);
@@ -216,15 +216,15 @@ namespace quda {
       } else {
 
         for (int k = 0; k < TileType::k; k += TileType::K) { // Fine Color columns of gauge field
-          for (int s_col = 0; s_col < fineSpin; s_col++) {
+          for (int s_col = 0; s_col < Arg::fineSpin; s_col++) {
             auto W = make_tile_B<complex, false>(tile);
             W.loadCS(Wacc, 0, 0, (parity+1)&1, y_cb, s_col, k, j0);
-            for (int s = 0; s < fineSpin; s++) {  //Fine Spin
+            for (int s = 0; s < Arg::fineSpin; s++) {  //Fine Spin
               // on coarse lattice, if forwards then use forwards links
               auto U = make_tile_A<complex, false>(tile);
               U.load(arg.U, dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, s, s_col, i0, k);
 
-              UV[s_col * fineSpin + s].mma_nn(U, W);
+              UV[s_col * Arg::fineSpin + s].mma_nn(U, W);
             } // which chiral block
           }  //Fine Spin
         }    // Fine color columns
@@ -235,7 +235,7 @@ namespace quda {
     for (int s = 0; s < uvSpin; s++) UV[s].saveCS(arg.UV, 0, 0, parity, x_cb, s, i0, j0);
   } // computeUV
 
-  template<typename Float, int dim, QudaDirection dir, int fineSpin, int coarseSpin, typename Arg>
+  template<typename Float, int dim, QudaDirection dir, typename Arg>
   void ComputeUVCPU(Arg &arg)
   {
     using TileType = typename Arg::uvTileType;
@@ -245,14 +245,14 @@ namespace quda {
         for (int ic = 0; ic < TileType::m; ic += TileType::M)   // fine color
           for (int jc = 0; jc < TileType::n; jc += TileType::N) // coarse color
             if (dir == QUDA_FORWARDS) // only for preconditioned clover is V != AV, will need extra logic for staggered KD
-              computeUV<dim,dir,fineSpin,coarseSpin>(arg, arg.V, parity, x_cb, ic, jc);
+              computeUV<dim,dir>(arg, arg.V, parity, x_cb, ic, jc);
             else
-              computeUV<dim,dir,fineSpin,coarseSpin>(arg, arg.AV, parity, x_cb, ic, jc);
+              computeUV<dim,dir>(arg, arg.AV, parity, x_cb, ic, jc);
       } // c/b volume
     }   // parity
   }
 
-  template<typename Float, int dim, QudaDirection dir, int fineSpin, int coarseSpin, typename Arg>
+  template<typename Float, int dim, QudaDirection dir, typename Arg>
   __global__ void ComputeUVGPU(Arg arg)
   {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
@@ -267,19 +267,19 @@ namespace quda {
     if (jc >= arg.uvTile.N_tiles) return;
 
     if (dir == QUDA_FORWARDS) // only for preconditioned clover is V != AV, will need extra logic for staggered KD
-      computeUV<dim,dir,fineSpin,coarseSpin>(arg, arg.V, parity, x_cb, ic * arg.uvTile.M, jc * arg.uvTile.N);
+      computeUV<dim,dir>(arg, arg.V, parity, x_cb, ic * arg.uvTile.M, jc * arg.uvTile.N);
     else
-      computeUV<dim,dir,fineSpin,coarseSpin>(arg, arg.AV, parity, x_cb, ic * arg.uvTile.M, jc * arg.uvTile.N);
+      computeUV<dim,dir>(arg, arg.AV, parity, x_cb, ic * arg.uvTile.M, jc * arg.uvTile.N);
   }
 
   /**
      Calculates the matrix A V^{s,c'}(x) = \sum_c A^{c}(x) * V^{s,c}(x)
      Where: s = fine spin, c' = coarse color, c = fine color
   */
-  template <typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
+  template <typename Float, int fineColor, int coarseColor, typename Arg>
   __device__ __host__ inline void computeAV(Arg &arg, int parity, int x_cb, int ch, int ic_c)
   {
-    constexpr int N = fineSpin * fineColor / 2;
+    constexpr int N = Arg::fineSpin * fineColor / 2;
     HMatrix<Float, N> A;
 
 #pragma unroll
@@ -298,8 +298,8 @@ namespace quda {
       }
     }
 
-    ColorSpinor<Float, fineColor, fineSpin / 2> V;
-    for (int s = 0; s < fineSpin / 2; s++) {
+    ColorSpinor<Float, fineColor, Arg::fineSpin / 2> V;
+    for (int s = 0; s < Arg::fineSpin / 2; s++) {
       for (int c = 0; c < fineColor; c++) { V(s, c) = arg.V(parity, x_cb, 2 * ch + s, c, ic_c); }
     }
 
@@ -312,14 +312,14 @@ namespace quda {
 #endif
 
 #pragma unroll
-    for (int s = 0; s < fineSpin / 2; s++) {
+    for (int s = 0; s < Arg::fineSpin / 2; s++) {
 #pragma unroll
       for (int ic = 0; ic < fineColor; ic++) { arg.AV(parity, x_cb, 2 * ch + s, ic, ic_c) = AV(s, ic); }
     }
 
   } // computeAV
 
-  template <typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg> void ComputeAVCPU(Arg &arg)
+  template <typename Float, int fineColor, int coarseColor, typename Arg> void ComputeAVCPU(Arg &arg)
   {
     for (int parity=0; parity<2; parity++) {
 #pragma omp parallel for
@@ -327,14 +327,14 @@ namespace quda {
         for (int ch = 0; ch < 2; ch++) { // Loop over chiral blocks
 
           for (int ic_c = 0; ic_c < coarseColor; ic_c++) { // coarse color
-            computeAV<Float, fineSpin, fineColor, coarseColor>(arg, parity, x_cb, ch, ic_c);
+            computeAV<Float, fineColor, coarseColor>(arg, parity, x_cb, ch, ic_c);
           }
         }
       } // c/b volume
     }   // parity
   }
 
-  template <typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
+  template <typename Float, int fineColor, int coarseColor, typename Arg>
   __global__ void ComputeAVGPU(Arg arg)
   {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
@@ -349,47 +349,47 @@ namespace quda {
     if (ic_c >= coarseColor) return;
 
     if (ch == 0)
-      computeAV<Float, fineSpin, fineColor, coarseColor>(arg, parity, x_cb, 0, ic_c);
+      computeAV<Float, fineColor, coarseColor>(arg, parity, x_cb, 0, ic_c);
     else
-      computeAV<Float, fineSpin, fineColor, coarseColor>(arg, parity, x_cb, 1, ic_c);
+      computeAV<Float, fineColor, coarseColor>(arg, parity, x_cb, 1, ic_c);
   }
 
   /**
      Calculates the matrix A V^{s,c'}(x) = \sum_c A^{c}(x) * V^{s,c}(x) for twisted-mass fermions
      Where: s = fine spin, c' = coarse color, c = fine color
   */
-  template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
+  template<typename Float, int fineColor, int coarseColor, typename Arg>
   __device__ __host__ inline void computeTMAV(Arg &arg, int parity, int x_cb, int v) {
 
     complex<Float> fp(1./(1.+arg.mu*arg.mu),-arg.mu/(1.+arg.mu*arg.mu));
     complex<Float> fm(1./(1.+arg.mu*arg.mu),+arg.mu/(1.+arg.mu*arg.mu));
 
-    for(int s = 0; s < fineSpin/2; s++) {
+    for(int s = 0; s < Arg::fineSpin/2; s++) {
       for(int c = 0; c < fineColor; c++) {
-	arg.AV(parity,x_cb,s,c,v) = arg.V(parity,x_cb,s,c,v)*fp;
+        arg.AV(parity,x_cb,s,c,v) = arg.V(parity,x_cb,s,c,v)*fp;
       }
     }
 
-    for(int s = fineSpin/2; s < fineSpin; s++) {
+    for(int s = Arg::fineSpin/2; s < Arg::fineSpin; s++) {
       for(int c = 0; c < fineColor; c++) {
-	arg.AV(parity,x_cb,s,c,v) = arg.V(parity,x_cb,s,c,v)*fm;
+        arg.AV(parity,x_cb,s,c,v) = arg.V(parity,x_cb,s,c,v)*fm;
       }
     }
 
   } // computeTMAV
 
-  template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
+  template<typename Float, int fineColor, int coarseColor, typename Arg>
   void ComputeTMAVCPU(Arg &arg) {
     for (int parity=0; parity<2; parity++) {
 #pragma omp parallel for
       for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) {
-	for (int v=0; v<coarseColor; v++) // coarse color
-	  computeTMAV<Float,fineSpin,fineColor,coarseColor,Arg>(arg, parity, x_cb, v);
+        for (int v=0; v<coarseColor; v++) // coarse color
+          computeTMAV<Float,fineColor,coarseColor,Arg>(arg, parity, x_cb, v);
       } // c/b volume
     }   // parity
   }
 
-  template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
+  template<typename Float, int fineColor, int coarseColor, typename Arg>
   __global__ void ComputeTMAVGPU(Arg arg) {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.fineVolumeCB) return;
@@ -398,7 +398,7 @@ namespace quda {
     int v = blockDim.z*blockIdx.z + threadIdx.z; // coarse color
     if (v >= coarseColor) return;
 
-    computeTMAV<Float,fineSpin,fineColor,coarseColor,Arg>(arg, parity, x_cb, v);
+    computeTMAV<Float,fineColor,coarseColor,Arg>(arg, parity, x_cb, v);
   }
 
 #ifdef DYNAMIC_CLOVER
@@ -476,10 +476,10 @@ namespace quda {
      Calculates the matrix A V^{s,c'}(x) = \sum_c A^{c}(x) * V^{s,c}(x) for twisted-clover fermions
      Where: s = fine spin, c' = coarse color, c = fine color
   */
-  template <typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
+  template <typename Float, int fineColor, int coarseColor, typename Arg>
   __device__ __host__ inline void computeTMCAV(Arg &arg, int parity, int x_cb, int ch, int ic_c)
   {
-    constexpr int N = fineSpin * fineColor / 2;
+    constexpr int N = Arg::fineSpin * fineColor / 2;
     HMatrix<Float, N> A;
 
 #pragma unroll
@@ -497,9 +497,9 @@ namespace quda {
     complex<Float> mu(0., arg.mu);
     if (ch == 0) mu *= static_cast<Float>(-1.0);
 
-    ColorSpinor<Float, fineColor, fineSpin / 2> V;
+    ColorSpinor<Float, fineColor, Arg::fineSpin / 2> V;
 
-    for (int s = 0; s < fineSpin / 2; s++) {
+    for (int s = 0; s < Arg::fineSpin / 2; s++) {
       for (int c = 0; c < fineColor; c++) { V(s, c) = arg.V(parity, x_cb, 2 * ch + s, c, ic_c); }
     }
 
@@ -534,25 +534,25 @@ namespace quda {
     const auto AV = cholesky.backward(cholesky.forward(UV));
 #endif
 
-    for (int s = 0; s < fineSpin / 2; s++)
+    for (int s = 0; s < Arg::fineSpin / 2; s++)
       for (int c = 0; c < fineColor; c++) arg.AV(parity, x_cb, 2 * ch + s, c, ic_c) = AV(s, c);
   } // computeTMCAV
 
-  template <typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg> void ComputeTMCAVCPU(Arg &arg)
+  template <typename Float, int fineColor, int coarseColor, typename Arg> void ComputeTMCAVCPU(Arg &arg)
   {
     for (int parity = 0; parity < 2; parity++) {
 #pragma omp parallel for
       for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) {
         for (int ch = 0; ch < 2; ch++) {
           for (int ic_c = 0; ic_c < coarseColor; ic_c++) { // coarse color
-            computeTMCAV<Float, fineSpin, fineColor, coarseColor, Arg>(arg, parity, x_cb, ch, ic_c);
+            computeTMCAV<Float, fineColor, coarseColor, Arg>(arg, parity, x_cb, ch, ic_c);
           }
         }
       } // c/b volume
     }   // parity
   }
 
-  template <typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
+  template <typename Float, int fineColor, int coarseColor, typename Arg>
   __global__ void ComputeTMCAVGPU(Arg arg)
   {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
@@ -567,9 +567,9 @@ namespace quda {
     if (ic_c >= coarseColor) return;
 
     if (ch == 0)
-      computeTMCAV<Float, fineSpin, fineColor, coarseColor, Arg>(arg, parity, x_cb, 0, ic_c);
+      computeTMCAV<Float, fineColor, coarseColor, Arg>(arg, parity, x_cb, 0, ic_c);
     else
-      computeTMCAV<Float, fineSpin, fineColor, coarseColor, Arg>(arg, parity, x_cb, 1, ic_c);
+      computeTMCAV<Float, fineColor, coarseColor, Arg>(arg, parity, x_cb, 1, ic_c);
   }
 
   template<typename Arg>
@@ -606,7 +606,7 @@ namespace quda {
      @param[in] Fine grid parity we're working on
      @param[in] x_cb Checkboarded x dimension
    */
-  template <typename Float, int dim, QudaDirection dir, int fineSpin, int coarseSpin, typename Arg, typename Gamma, typename Out>
+  template <typename Float, int dim, QudaDirection dir, typename Arg, typename Gamma, typename Out>
   __device__ __host__ inline void multiplyVUV(Out &vuv, const Arg &arg, const Gamma &gamma, int parity, int x_cb, int i0, int j0)
   {
     using complex = complex<Float>;
@@ -615,10 +615,10 @@ namespace quda {
 
     if (!Arg::from_coarse) {
      
-      if (fineSpin == 4) { // fine grid is top level Wilson type
+      if (Arg::fineSpin == 4) { // fine grid is top level Wilson type
 
 #pragma unroll
-        for (int s = 0; s < fineSpin; s++) { // Loop over fine spin
+        for (int s = 0; s < Arg::fineSpin; s++) { // Loop over fine spin
 
           //Spin part of the color matrix.  Will always consist
           //of two terms - diagonal and off-diagonal part of
@@ -644,14 +644,14 @@ namespace quda {
               //Diagonal Spin
               auto UV = make_tile_B<complex, false>(tile);
               UV.loadCS(arg.UV, 0, 0, parity, x_cb, s, k, j0);
-              vuv[s_c_row*coarseSpin+s_c_row].mma_tn(V, UV);
+              vuv[s_c_row*Arg::coarseSpin+s_c_row].mma_tn(V, UV);
 
               //Off-diagonal Spin (backward link / positive projector applied)
               auto gammaV = make_tile_A<complex, false>(tile);
               for (int i = 0; i < TileType::K; i++)
                 for (int j = 0; j < TileType::M; j++) { gammaV(j, i) = gamma.apply(s, conj(V(i, j))); }
               UV.loadCS(arg.UV, 0, 0, parity, x_cb, s_col, k, j0);
-              vuv[s_c_row*coarseSpin+s_c_col].mma_nn(gammaV, UV);
+              vuv[s_c_row*Arg::coarseSpin+s_c_col].mma_nn(gammaV, UV);
             } else {
               auto AV = make_tile_At<complex, false>(tile);
               AV.loadCS(arg.AV, 0, 0, parity, x_cb, s, k, i0);
@@ -660,7 +660,7 @@ namespace quda {
               UV.loadCS(arg.UV, 0, 0, parity, x_cb, s, k, j0);
 
               //Diagonal Spin
-              vuv[s_c_row*coarseSpin+s_c_row].mma_tn(AV, UV);
+              vuv[s_c_row*Arg::coarseSpin+s_c_row].mma_tn(AV, UV);
 
               //Off-diagonal Spin (forward link / negative projector applied)
               auto gammaAV = make_tile_A<complex, false>(tile);
@@ -668,11 +668,11 @@ namespace quda {
               for (int i = 0; i < TileType::K; i++)
                 for (int j = 0; j < TileType::M; j++) { gammaAV(j, i) = -gamma.apply(s, conj(AV(i, j))); }
               UV.loadCS(arg.UV, 0, 0, parity, x_cb, s_col, k, j0);
-              vuv[s_c_row*coarseSpin+s_c_col].mma_nn(gammaAV, UV);
+              vuv[s_c_row*Arg::coarseSpin+s_c_col].mma_nn(gammaAV, UV);
             }
           } // Fine color
         }
-      } else { // fineSpin == 1
+      } else { // Arg::fineSpin == 1
         
         // This is for staggered/asqtad only
         // the KD op will even to even, odd to odd terms
@@ -694,7 +694,7 @@ namespace quda {
             auto UV = make_tile_B<complex, false>(tile);
             UV.loadCS(arg.UV, 0, 0, parity, x_cb, 0, k, j0);
 
-            vuv[s_c_row*coarseSpin+s_c_col].mma_tn(V, UV);
+            vuv[s_c_row*Arg::coarseSpin+s_c_col].mma_tn(V, UV);
 
           } else {
 
@@ -705,26 +705,26 @@ namespace quda {
             auto UV = make_tile_B<complex, false>(tile);
             UV.loadCS(arg.UV, 0, 0, parity, x_cb, 0, k, j0);
 
-            vuv[s_c_row*coarseSpin+s_c_col].mma_tn(AV, UV);
+            vuv[s_c_row*Arg::coarseSpin+s_c_col].mma_tn(AV, UV);
 
           }
 
         }
-      } // fineSpin == 4 or 1
+      } // Arg::fineSpin == 4 or 1
 
     } else { // fine grid operator is a coarse operator
 
 #pragma unroll
       for (int k = 0; k < TileType::k; k += TileType::K) { // Sum over fine color
 #pragma unroll
-        for (int s = 0; s < fineSpin; s++) {
+        for (int s = 0; s < Arg::fineSpin; s++) {
           auto AV = make_tile_At<complex, false>(tile);
           AV.loadCS(arg.AV, 0, 0, parity, x_cb, s, k, i0);
 #pragma unroll
-          for (int s_col=0; s_col<fineSpin; s_col++) { // which chiral block
+          for (int s_col=0; s_col<Arg::fineSpin; s_col++) { // which chiral block
             auto UV = make_tile_B<complex, false>(tile);
-            UV.loadCS(arg.UV, 0, 0, parity, x_cb, s_col*fineSpin+s, k, j0);
-            vuv[s*coarseSpin+s_col].mma_tn(AV, UV);
+            UV.loadCS(arg.UV, 0, 0, parity, x_cb, s_col*Arg::fineSpin+s, k, j0);
+            vuv[s*Arg::coarseSpin+s_col].mma_tn(AV, UV);
           } //Fine color
         } //Fine spin
       }
@@ -745,19 +745,19 @@ namespace quda {
     }
   }
 
-  template <bool parity_flip, typename Float, QudaDirection dir, int coarseSpin, typename VUV, typename Arg>
+  template <bool parity_flip, typename Float, QudaDirection dir, typename VUV, typename Arg>
   inline __device__ __host__ void storeCoarseSharedAtomic(VUV &vuv, bool isDiagonal, int coarse_x_cb, int coarse_parity, int i0, int j0, int parity, Arg &arg)
   {
     using TileType = typename Arg::vuvTileType;
 #ifdef __CUDA_ARCH__
     const int dim_index = arg.dim_index % arg.Y_atomic.geometry;
-    __shared__ complex<storeType> X[Arg::max_color_height_per_block][Arg::max_color_width_per_block][4][coarseSpin][coarseSpin];
-    __shared__ complex<storeType> Y[Arg::max_color_height_per_block][Arg::max_color_width_per_block][4][coarseSpin][coarseSpin];
+    __shared__ complex<storeType> X[Arg::max_color_height_per_block][Arg::max_color_width_per_block][4][Arg::coarseSpin][Arg::coarseSpin];
+    __shared__ complex<storeType> Y[Arg::max_color_height_per_block][Arg::max_color_width_per_block][4][Arg::coarseSpin][Arg::coarseSpin];
 
     int x_ = coarse_x_cb%arg.aggregates_per_block;
     int tx = virtualThreadIdx(arg);
-    int s_col = tx / coarseSpin;
-    int s_row = tx % coarseSpin;
+    int s_col = tx / Arg::coarseSpin;
+    int s_row = tx % Arg::coarseSpin;
 
     // this relies on the indexing as used in getIndices
     int i_block0 = threadIdx.y * TileType::M * (!parity_flip ? 2 : 1);
@@ -767,7 +767,7 @@ namespace quda {
     for (int i = 0; i < TileType::M; i++) {
 #pragma unroll
       for (int j = 0; j < TileType::N; j++) {
-        if (tx < coarseSpin*coarseSpin) {
+        if (tx < Arg::coarseSpin*Arg::coarseSpin) {
           Y[i_block0+i][j_block0+j][x_][s_row][s_col] = 0;
           X[i_block0+i][j_block0+j][x_][s_row][s_col] = 0;
         }
@@ -783,20 +783,20 @@ namespace quda {
 
         if (!isDiagonal) {
 #pragma unroll
-          for (int s_row = 0; s_row < coarseSpin; s_row++) { // Chiral row block
+          for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { // Chiral row block
 #pragma unroll
-            for (int s_col = 0; s_col < coarseSpin; s_col++) { // Chiral column block
+            for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { // Chiral column block
               atomic_helper<Float, storeType>(&Y[i_block0+i][j_block0+j][x_][s_row][s_col],
-                                              arg.Y_atomic, vuv[s_row*coarseSpin+s_col](i,j));
+                                              arg.Y_atomic, vuv[s_row*Arg::coarseSpin+s_col](i,j));
             }
           }
         } else {
 #pragma unroll
-          for (int s_row = 0; s_row < coarseSpin; s_row++) { // Chiral row block
+          for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { // Chiral row block
 #pragma unroll
-            for (int s_col = 0; s_col < coarseSpin; s_col++) { // Chiral column block
+            for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { // Chiral column block
               atomic_helper<Float, storeType>(&X[i_block0+i][j_block0+j][x_][s_row][s_col],
-                                              arg.X_atomic, vuv[s_row*coarseSpin+s_col](i,j));
+                                              arg.X_atomic, vuv[s_row*Arg::coarseSpin+s_col](i,j));
             }
           }
         }
@@ -805,7 +805,7 @@ namespace quda {
 
     __syncthreads();
 
-    if (tx < coarseSpin*coarseSpin && (parity == 0 || parity_flip == 1) ) {
+    if (tx < Arg::coarseSpin*Arg::coarseSpin && (parity == 0 || parity_flip == 1) ) {
 
 #pragma unroll
       for (int i = 0; i < TileType::M; i++) {
@@ -836,7 +836,7 @@ namespace quda {
 #endif
   }
 
-  template <bool parity_flip, typename Float, QudaDirection dir, int coarseSpin, typename VUV, typename Arg>
+  template <bool parity_flip, typename Float, QudaDirection dir, typename VUV, typename Arg>
   inline __device__ __host__ void storeCoarseGlobalAtomic(VUV &vuv, bool isDiagonal, int coarse_x_cb, int coarse_parity, int i0, int j0, Arg &arg)
   {
     const int dim_index = arg.dim_index % arg.Y_atomic.geometry;
@@ -844,56 +844,56 @@ namespace quda {
 
     if (!isDiagonal) {
 #pragma unroll
-      for (int s_row = 0; s_row < coarseSpin; s_row++) { // Chiral row block
+      for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { // Chiral row block
 #pragma unroll
-        for (int s_col = 0; s_col < coarseSpin; s_col++) { // Chiral column block
+        for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { // Chiral column block
 #pragma unroll
           for (int i = 0; i < TileType::M; i++)
 #pragma unroll
             for (int j = 0; j < TileType::N; j++)
-              arg.Y_atomic.atomicAdd(dim_index,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,vuv[s_row*coarseSpin+s_col](i,j));
+              arg.Y_atomic.atomicAdd(dim_index,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,vuv[s_row*Arg::coarseSpin+s_col](i,j));
         }
       }
     } else {
 
       if (dir == QUDA_BACKWARDS) {
 #pragma unroll
-        for (int s_row = 0; s_row < coarseSpin; s_row++) { // Chiral row block
+        for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { // Chiral row block
 #pragma unroll
-          for (int s_col = 0; s_col < coarseSpin; s_col++) { // Chiral column block
+          for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { // Chiral column block
 #pragma unroll
             for (int i = 0; i < TileType::M; i++)
 #pragma unroll
               for (int j = 0; j < TileType::N; j++)
-                arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_col,s_row,j0+j,i0+i,conj(vuv[s_row*coarseSpin+s_col](i,j)));
+                arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_col,s_row,j0+j,i0+i,conj(vuv[s_row*Arg::coarseSpin+s_col](i,j)));
           }
         }
       } else {
 #pragma unroll
-        for (int s_row = 0; s_row < coarseSpin; s_row++) { // Chiral row block
+        for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { // Chiral row block
 #pragma unroll
-          for (int s_col = 0; s_col < coarseSpin; s_col++) { // Chiral column block
+          for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { // Chiral column block
 #pragma unroll
             for (int i = 0; i < TileType::M; i++)
 #pragma unroll
               for (int j = 0; j < TileType::N; j++)
-                arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,vuv[s_row*coarseSpin+s_col](i,j));
+                arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,vuv[s_row*Arg::coarseSpin+s_col](i,j));
           }
         }
       }
 
       if (!arg.bidirectional) {
 #pragma unroll
-        for (int s_row = 0; s_row < coarseSpin; s_row++) { // Chiral row block
+        for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { // Chiral row block
 #pragma unroll
-          for (int s_col = 0; s_col < coarseSpin; s_col++) { // Chiral column block
-            if (s_row != s_col) vuv[s_row * coarseSpin + s_col] *= static_cast<Float>(-1.0);
+          for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { // Chiral column block
+            if (s_row != s_col) vuv[s_row * Arg::coarseSpin + s_col] *= static_cast<Float>(-1.0);
             if (Arg::fineSpin != 1 || s_row != s_col) {
 #pragma unroll
               for (int i = 0; i < TileType::M; i++)
 #pragma unroll
                 for (int j = 0; j < TileType::N; j++)
-                  arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,vuv[s_row*coarseSpin+s_col](i,j));
+                  arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,vuv[s_row*Arg::coarseSpin+s_col](i,j));
             }
           }
         }
@@ -904,7 +904,7 @@ namespace quda {
 
 
   template<bool shared_atomic, bool parity_flip, typename Float, int dim, QudaDirection dir,
-           int fineSpin, int coarseSpin, typename Arg, typename Gamma>
+           typename Arg, typename Gamma>
   __device__ __host__ void computeVUV(Arg &arg, const Gamma &gamma, int parity, int x_cb, int i0, int j0, int parity_coarse_, int coarse_x_cb_)
   {
     constexpr int nDim = 4;
@@ -927,18 +927,18 @@ namespace quda {
     int coarse_x_cb = shared_atomic ? coarse_x_cb_ : ((coord_coarse[3]*arg.xc_size[2]+coord_coarse[2])*arg.xc_size[1]+coord_coarse[1])*(arg.xc_size[0]/2) + coord_coarse[0];
 
     using Ctype = decltype(make_tile_C<complex<Float>, false>(arg.vuvTile));
-    Ctype vuv[coarseSpin * coarseSpin];
-    multiplyVUV<Float,dim,dir,fineSpin,coarseSpin,Arg>(vuv, arg, gamma, parity, x_cb, i0, j0);
+    Ctype vuv[Arg::coarseSpin * Arg::coarseSpin];
+    multiplyVUV<Float,dim,dir,Arg>(vuv, arg, gamma, parity, x_cb, i0, j0);
 
     if (isDiagonal) {
 #pragma unroll
-      for (int s2=0; s2<coarseSpin*coarseSpin; s2++) vuv[s2] *= -arg.kappa;
+      for (int s2=0; s2<Arg::coarseSpin*Arg::coarseSpin; s2++) vuv[s2] *= -arg.kappa;
     }
 
     if (shared_atomic)
-      storeCoarseSharedAtomic<parity_flip, Float, dir, coarseSpin>(vuv, isDiagonal, coarse_x_cb, coarse_parity, i0, j0, parity, arg);
+      storeCoarseSharedAtomic<parity_flip, Float, dir>(vuv, isDiagonal, coarse_x_cb, coarse_parity, i0, j0, parity, arg);
     else
-      storeCoarseGlobalAtomic<parity_flip, Float, dir, coarseSpin>(vuv, isDiagonal, coarse_x_cb, coarse_parity, i0, j0, arg);
+      storeCoarseGlobalAtomic<parity_flip, Float, dir>(vuv, isDiagonal, coarse_x_cb, coarse_parity, i0, j0, arg);
   }
 
   // compute indices for global-atomic kernel
@@ -989,7 +989,7 @@ namespace quda {
     }
   }
 
-  template<typename Float, int dim, QudaDirection dir, int fineSpin, int coarseSpin, typename Arg>
+  template<typename Float, int dim, QudaDirection dir, typename Arg>
   void ComputeVUVCPU(Arg &arg)
   {
     Gamma<Float, QUDA_DEGRAND_ROSSI_GAMMA_BASIS, dim> gamma;
@@ -1001,13 +1001,13 @@ namespace quda {
       for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) { // Loop over fine volume
 	for (int ic=0; ic<arg.vuvTile.m; ic+=arg.vuvTile.M)
 	  for (int jc=0; jc<arg.vuvTile.n; jc+=arg.vuvTile.N)
-	    computeVUV<shared_atomic,parity_flip,Float,dim,dir,fineSpin,coarseSpin>(arg, gamma, parity, x_cb, ic, jc, 0, 0);
+	    computeVUV<shared_atomic,parity_flip,Float,dim,dir>(arg, gamma, parity, x_cb, ic, jc, 0, 0);
       } // c/b volume
     } // parity
   }
 
   template<bool shared_atomic, bool parity_flip, typename Float, int dim, QudaDirection dir,
-           int fineSpin, int coarseSpin, typename Arg>
+           typename Arg>
   __global__ void ComputeVUVGPU(Arg arg)
   {
     Gamma<Float, QUDA_DEGRAND_ROSSI_GAMMA_BASIS, dim> gamma;
@@ -1019,7 +1019,7 @@ namespace quda {
     if (c_col >= arg.vuvTile.N_tiles) return;
     if (!shared_atomic && x_cb >= arg.fineVolumeCB) return;
 
-    computeVUV<shared_atomic,parity_flip,Float,dim,dir,fineSpin,coarseSpin>
+    computeVUV<shared_atomic,parity_flip,Float,dim,dir>
       (arg, gamma, parity, x_cb, c_row * arg.vuvTile.M, c_col * arg.vuvTile.N, parity_coarse, x_coarse_cb);
   }
 
@@ -1028,17 +1028,17 @@ namespace quda {
    * sign of the spin projector
    * Staggered-type: there's no spin-diagonal term, only flip off-spin term
    */
-  template<typename Float, int nSpin, int nColor, typename Arg>
+  template<typename Float, int coarseColor, typename Arg>
   __device__ __host__ void computeYreverse(Arg &arg, int parity, int x_cb, int ic_c, int jc_c) {
     auto &Y = arg.Y;
 
 #pragma unroll
     for (int d=0; d<4; d++) {
 #pragma unroll
-      for (int s_row = 0; s_row < nSpin; s_row++) { //Spin row
+      for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { //Spin row
 #pragma unroll
-        for (int s_col = 0; s_col < nSpin; s_col++) { //Spin column
-          if (s_row == s_col && nSpin != 1) 
+        for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { //Spin column
+          if (s_row == s_col && Arg::coarseSpin != 1) 
             Y(d+4,parity,x_cb,s_row,s_col,ic_c,jc_c) = Y(d,parity,x_cb,s_row,s_col,ic_c,jc_c);
           else
             Y(d+4,parity,x_cb,s_row,s_col,ic_c,jc_c) = -Y(d,parity,x_cb,s_row,s_col,ic_c,jc_c);
@@ -1049,37 +1049,37 @@ namespace quda {
 
   }
 
-  template<typename Float, int nSpin, int nColor, typename Arg>
+  template<typename Float, int coarseColor, typename Arg>
   void ComputeYReverseCPU(Arg &arg) {
     for (int parity=0; parity<2; parity++) {
 #pragma omp parallel for
       for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
-        for (int ic_c = 0; ic_c < nColor; ic_c++) { //Color row
-          for (int jc_c = 0; jc_c < nColor; jc_c++) { //Color col
-            computeYreverse<Float,nSpin,nColor,Arg>(arg, parity, x_cb, ic_c, jc_c);
+        for (int ic_c = 0; ic_c < coarseColor; ic_c++) { //Color row
+          for (int jc_c = 0; jc_c < coarseColor; jc_c++) { //Color col
+            computeYreverse<Float,coarseColor,Arg>(arg, parity, x_cb, ic_c, jc_c);
           }
         }
       } // c/b volume
     } // parity
   }
 
-  template<typename Float, int nSpin, int nColor, typename Arg>
+  template<typename Float, int coarseColor, typename Arg>
   __global__ void ComputeYReverseGPU(Arg arg) {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.coarseVolumeCB) return;
 
     int parity_jc_c = blockDim.y*blockIdx.y + threadIdx.y; // parity and color col
-    if (parity_jc_c >= 2*nColor) return;
-    int parity = parity_jc_c / nColor;
-    int jc_c = parity_jc_c % nColor;
+    if (parity_jc_c >= 2*coarseColor) return;
+    int parity = parity_jc_c / coarseColor;
+    int jc_c = parity_jc_c % coarseColor;
 
     int ic_c = blockDim.z*blockIdx.z + threadIdx.z; // color row
-    if (ic_c >= nColor) return;
+    if (ic_c >= coarseColor) return;
 
-    computeYreverse<Float,nSpin,nColor,Arg>(arg, parity, x_cb, ic_c, jc_c);
+    computeYreverse<Float,coarseColor,Arg>(arg, parity, x_cb, ic_c, jc_c);
   }
 
-  template<typename Float, int fineSpin, int coarseSpin, int fineColor, int coarseColor, typename Arg>
+  template<typename Float, int fineColor, int coarseColor, typename Arg>
   __device__ __host__ void computeCoarseClover(Arg &arg, int parity, int x_cb, int ic_c, int jc_c) {
 
     const int nDim = 4;
@@ -1098,13 +1098,13 @@ namespace quda {
 
     coord[0] /= 2;
 
-    complex<Float> X[coarseSpin*coarseSpin];
-    for (int i=0; i<coarseSpin*coarseSpin; i++) X[i] = 0.0;
+    complex<Float> X[Arg::coarseSpin*Arg::coarseSpin];
+    for (int i=0; i<Arg::coarseSpin*Arg::coarseSpin; i++) X[i] = 0.0;
 
     if (!Arg::from_coarse) {
       //If Nspin = 4, then the clover term has structure C_{\mu\nu} = \gamma_{\mu\nu}C^{\mu\nu}
 #pragma unroll
-      for (int s = 0; s < fineSpin; s++) { //Loop over fine spin row
+      for (int s = 0; s < Arg::fineSpin; s++) { //Loop over fine spin row
 	const int s_c = arg.spin_map(s,parity);
 	//On the fine lattice, the clover field is chirally blocked, so loop over rows/columns
 	//in the same chiral block.
@@ -1117,7 +1117,7 @@ namespace quda {
             for (int jc = 0; jc < fineColor; jc++) {  //Sum over fine color column
               CV = cmac(arg.C(0, parity, x_cb, s, s_col, ic, jc), arg.V(parity, x_cb, s_col, jc, jc_c), CV);
             } //Fine color column
-            X[s_c*coarseSpin + s_c] = cmac(conj(arg.V(parity, x_cb, s, ic, ic_c)), CV, X[s_c*coarseSpin + s_c]);
+            X[s_c*Arg::coarseSpin + s_c] = cmac(conj(arg.V(parity, x_cb, s, ic, ic_c)), CV, X[s_c*Arg::coarseSpin + s_c]);
           }  //Fine color row
 	}  //Fine spin column
       } //Fine spin
@@ -1125,9 +1125,9 @@ namespace quda {
       //If Nspin != 4, then spin structure is a dense matrix and there is now spin aggregation
       //N.B. assumes that no further spin blocking is done in this case.
 #pragma unroll
-      for (int s = 0; s < fineSpin; s++) { //Loop over spin row
+      for (int s = 0; s < Arg::fineSpin; s++) { //Loop over spin row
 #pragma unroll
-	for (int s_col = 0; s_col < fineSpin; s_col++) { //Loop over spin column
+	for (int s_col = 0; s_col < Arg::fineSpin; s_col++) { //Loop over spin column
 #pragma unroll
           for (int ic = 0; ic < fineColor; ic++) { //Sum over fine color row
             complex<Float> CV = 0.0;
@@ -1135,37 +1135,37 @@ namespace quda {
             for (int jc = 0; jc < fineColor; jc++) {  //Sum over fine color column
               CV = cmac(arg.C(0, parity, x_cb, s, s_col, ic, jc), arg.V(parity, x_cb, s_col, jc, jc_c), CV);;
             } //Fine color column
-            X[s*coarseSpin + s_col] = cmac(conj(arg.V(parity, x_cb, s, ic, ic_c)), CV, X[s*coarseSpin + s_col]);
+            X[s*Arg::coarseSpin + s_col] = cmac(conj(arg.V(parity, x_cb, s, ic, ic_c)), CV, X[s*Arg::coarseSpin + s_col]);
           }  //Fine color row
 	}  //Fine spin column
       } //Fine spin
     }
 
 #pragma unroll
-    for (int si = 0; si < coarseSpin; si++) {
+    for (int si = 0; si < Arg::coarseSpin; si++) {
 #pragma unroll
-      for (int sj = 0; sj < coarseSpin; sj++) {
-        arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,si,sj,ic_c,jc_c,X[si*coarseSpin+sj]);
+      for (int sj = 0; sj < Arg::coarseSpin; sj++) {
+        arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,si,sj,ic_c,jc_c,X[si*Arg::coarseSpin+sj]);
       }
     }
 
   }
 
-  template <typename Float, int fineSpin, int coarseSpin, int fineColor, int coarseColor, typename Arg>
+  template <typename Float, int fineColor, int coarseColor, typename Arg>
   void ComputeCoarseCloverCPU(Arg &arg) {
     for (int parity=0; parity<2; parity++) {
 #pragma omp parallel for
       for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) {
         for (int jc_c=0; jc_c<coarseColor; jc_c++) {
           for (int ic_c=0; ic_c<coarseColor; ic_c++) {
-            computeCoarseClover<Float,fineSpin,coarseSpin,fineColor,coarseColor>(arg, parity, x_cb, ic_c, jc_c);
+            computeCoarseClover<Float,fineColor,coarseColor>(arg, parity, x_cb, ic_c, jc_c);
           }
         }
       } // c/b volume
     } // parity
   }
 
-  template <typename Float, int fineSpin, int coarseSpin, int fineColor, int coarseColor, typename Arg>
+  template <typename Float, int fineColor, int coarseColor, typename Arg>
   __global__ void ComputeCoarseCloverGPU(Arg arg) {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.fineVolumeCB) return;
@@ -1177,19 +1177,19 @@ namespace quda {
 
     int ic_c = blockDim.z*blockIdx.z + threadIdx.z; // coarse color
     if (ic_c >= coarseColor) return;
-    computeCoarseClover<Float,fineSpin,coarseSpin,fineColor,coarseColor>(arg, parity, x_cb, ic_c, jc_c);
+    computeCoarseClover<Float,fineColor,coarseColor>(arg, parity, x_cb, ic_c, jc_c);
   }
 
 
 
   //Adds the identity matrix to the coarse local term.
-  template<typename Float, int nSpin, int nColor, typename Arg>
+  template<typename Float, int coarseColor, typename Arg>
   void AddCoarseDiagonalCPU(Arg &arg) {
     for (int parity=0; parity<2; parity++) {
 #pragma omp parallel for
       for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
-        for(int s = 0; s < nSpin; s++) { //Spin
-         for(int c = 0; c < nColor; c++) { //Color
+        for(int s = 0; s < Arg::coarseSpin; s++) { //Spin
+         for(int c = 0; c < coarseColor; c++) { //Color
 	   arg.X_atomic(0,parity,x_cb,s,s,c,c) += complex<Float>(1.0,0.0);
          } //Color
         } //Spin
@@ -1199,14 +1199,14 @@ namespace quda {
 
 
   //Adds the identity matrix to the coarse local term.
-  template<typename Float, int nSpin, int nColor, typename Arg>
+  template<typename Float, int coarseColor, typename Arg>
   __global__ void AddCoarseDiagonalGPU(Arg arg) {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.coarseVolumeCB) return;
     int parity = blockDim.y*blockIdx.y + threadIdx.y;
 
-    for(int s = 0; s < nSpin; s++) { //Spin
-      for(int c = 0; c < nColor; c++) { //Color
+    for(int s = 0; s < Arg::coarseSpin; s++) { //Spin
+      for(int c = 0; c < coarseColor; c++) { //Color
         arg.X_atomic(0,parity,x_cb,s,s,c,c) += complex<Float>(1.0,0.0);
       } //Color
     } //Spin
@@ -1244,7 +1244,7 @@ namespace quda {
   }
 
   //Adds the twisted-mass term to the coarse local term.
-  template<typename Float, int nSpin, int nColor, typename Arg>
+  template<typename Float, int coarseColor, typename Arg>
   void AddCoarseTmDiagonalCPU(Arg &arg) {
 
     const complex<Float> mu(0., arg.mu*arg.mu_factor);
@@ -1252,13 +1252,13 @@ namespace quda {
     for (int parity=0; parity<2; parity++) {
 #pragma omp parallel for
       for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
-	for(int s = 0; s < nSpin/2; s++) { //Spin
-          for(int c = 0; c < nColor; c++) { //Color
+	for(int s = 0; s < Arg::coarseSpin/2; s++) { //Spin
+          for(int c = 0; c < coarseColor; c++) { //Color
             arg.X_atomic(0,parity,x_cb,s,s,c,c) += mu;
           } //Color
 	} //Spin
-	for(int s = nSpin/2; s < nSpin; s++) { //Spin
-          for(int c = 0; c < nColor; c++) { //Color
+	for(int s = Arg::coarseSpin/2; s < Arg::coarseSpin; s++) { //Spin
+          for(int c = 0; c < coarseColor; c++) { //Color
             arg.X_atomic(0,parity,x_cb,s,s,c,c) -= mu;
           } //Color
 	} //Spin
@@ -1267,7 +1267,7 @@ namespace quda {
   }
 
   //Adds the twisted-mass term to the coarse local term.
-  template<typename Float, int nSpin, int nColor, typename Arg>
+  template<typename Float, int coarseColor, typename Arg>
   __global__ void AddCoarseTmDiagonalGPU(Arg arg) {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.coarseVolumeCB) return;
@@ -1275,13 +1275,13 @@ namespace quda {
 
     const complex<Float> mu(0., arg.mu*arg.mu_factor);
 
-    for(int s = 0; s < nSpin/2; s++) { //Spin
-      for(int ic_c = 0; ic_c < nColor; ic_c++) { //Color
+    for(int s = 0; s < Arg::coarseSpin/2; s++) { //Spin
+      for(int ic_c = 0; ic_c < coarseColor; ic_c++) { //Color
        arg.X_atomic(0,parity,x_cb,s,s,ic_c,ic_c) += mu;
       } //Color
     } //Spin
-    for(int s = nSpin/2; s < nSpin; s++) { //Spin
-      for(int ic_c = 0; ic_c < nColor; ic_c++) { //Color
+    for(int s = Arg::coarseSpin/2; s < Arg::coarseSpin; s++) { //Spin
+      for(int ic_c = 0; ic_c < coarseColor; ic_c++) { //Color
        arg.X_atomic(0,parity,x_cb,s,s,ic_c,ic_c) -= mu;
       } //Color
     } //Spin
@@ -1290,7 +1290,7 @@ namespace quda {
   /**
    * Convert the field from the atomic format to the required computation format, e.g. fixed point to floating point
    */
-  template<typename Float, int nSpin, int nColor, typename Arg>
+  template<typename Float, int coarseColor, typename Arg>
   __device__ __host__ void convert(Arg &arg, int parity, int x_cb, int c_row, int c_col) {
 
     if (arg.dim_index < 8) {
@@ -1300,9 +1300,9 @@ namespace quda {
       int d_out = arg.dim_index % arg.Y.geometry;
 
 #pragma unroll
-      for (int s_row = 0; s_row < nSpin; s_row++) { //Spin row
+      for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { //Spin row
 #pragma unroll
-        for (int s_col = 0; s_col < nSpin; s_col++) { //Spin column
+        for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { //Spin column
           complex<Float> M = in(d_in,parity,x_cb,s_row,s_col,c_row,c_col);
           arg.Y(d_out,parity,x_cb,s_row,s_col,c_row,c_col) = M;
         } //Spin column
@@ -1315,9 +1315,9 @@ namespace quda {
       int d_out = arg.dim_index % arg.X.geometry;
 
 #pragma unroll
-      for (int s_row = 0; s_row < nSpin; s_row++) { //Spin row
+      for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { //Spin row
 #pragma unroll
-        for (int s_col = 0; s_col < nSpin; s_col++) { //Spin column
+        for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { //Spin column
           complex<Float> M = in(d_in,parity,x_cb,s_row,s_col,c_row,c_col);
           arg.X(d_out,parity,x_cb,s_row,s_col,c_row,c_col) = M;
         } //Spin column
@@ -1327,47 +1327,47 @@ namespace quda {
 
   }
 
-  template<typename Float, int nSpin, int nColor, typename Arg>
+  template<typename Float, int coarseColor, typename Arg>
   void ConvertCPU(Arg &arg) {
     for (int parity=0; parity<2; parity++) {
 #pragma omp parallel for
       for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
-	for(int c_row = 0; c_row < nColor; c_row++) { //Color row
-	  for(int c_col = 0; c_col < nColor; c_col++) { //Color column
-	    convert<Float,nSpin,nColor,Arg>(arg, parity, x_cb, c_row, c_col);
+	for(int c_row = 0; c_row < coarseColor; c_row++) { //Color row
+	  for(int c_col = 0; c_col < coarseColor; c_col++) { //Color column
+	    convert<Float,coarseColor,Arg>(arg, parity, x_cb, c_row, c_col);
 	  }
 	}
       } // c/b volume
     } // parity
   }
 
-  template<typename Float, int nSpin, int nColor, typename Arg>
+  template<typename Float, int coarseColor, typename Arg>
   __global__ void ConvertGPU(Arg arg) {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.coarseVolumeCB) return;
 
     int parity_c_col = blockDim.y*blockIdx.y + threadIdx.y;
-    if (parity_c_col >= 2*nColor) return;
+    if (parity_c_col >= 2*coarseColor) return;
 
-    int c_col = parity_c_col % nColor; // color col index
-    int parity = parity_c_col / nColor;
+    int c_col = parity_c_col % coarseColor; // color col index
+    int parity = parity_c_col / coarseColor;
 
     int c_row = blockDim.z*blockIdx.z + threadIdx.z; // color row index
-    if (c_row >= nColor) return;
+    if (c_row >= coarseColor) return;
 
-    convert<Float,nSpin,nColor,Arg>(arg, parity, x_cb, c_row, c_col);
+    convert<Float,coarseColor,Arg>(arg, parity, x_cb, c_row, c_col);
   }
 
   /**
    * Rescale the matrix elements by arg.rescale
    */
-  template<typename Float, int nSpin, int nColor, typename Arg>
+  template<typename Float, int coarseColor, typename Arg>
   __device__ __host__ void rescaleY(Arg &arg, int parity, int x_cb, int c_row, int c_col) {
 
 #pragma unroll
-    for (int s_row = 0; s_row < nSpin; s_row++) { //Spin row
+    for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { //Spin row
 #pragma unroll
-      for (int s_col = 0; s_col < nSpin; s_col++) { //Spin column
+      for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { //Spin column
         complex<Float> M = arg.Y(arg.dim_index,parity,x_cb,s_row,s_col,c_row,c_col);
         arg.Y(arg.dim_index,parity,x_cb,s_row,s_col,c_row,c_col) = arg.rescale*M;
       } //Spin column
@@ -1375,35 +1375,35 @@ namespace quda {
 
   }
 
-  template<typename Float, int nSpin, int nColor, typename Arg>
+  template<typename Float, int coarseColor, typename Arg>
   void RescaleYCPU(Arg &arg) {
     for (int parity=0; parity<2; parity++) {
 #pragma omp parallel for
       for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
-	for(int c_row = 0; c_row < nColor; c_row++) { //Color row
-	  for(int c_col = 0; c_col < nColor; c_col++) { //Color column
-	    rescaleY<Float,nSpin,nColor,Arg>(arg, parity, x_cb, c_row, c_col);
+	for(int c_row = 0; c_row < coarseColor; c_row++) { //Color row
+	  for(int c_col = 0; c_col < coarseColor; c_col++) { //Color column
+	    rescaleY<Float,coarseColor,Arg>(arg, parity, x_cb, c_row, c_col);
 	  }
 	}
       } // c/b volume
     } // parity
   }
 
-  template<typename Float, int nSpin, int nColor, typename Arg>
+  template<typename Float, int coarseColor, typename Arg>
   __global__ void RescaleYGPU(Arg arg) {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.coarseVolumeCB) return;
 
     int parity_c_col = blockDim.y*blockIdx.y + threadIdx.y;
-    if (parity_c_col >= 2*nColor) return;
+    if (parity_c_col >= 2*coarseColor) return;
 
-    int c_col = parity_c_col % nColor; // color col index
-    int parity = parity_c_col / nColor;
+    int c_col = parity_c_col % coarseColor; // color col index
+    int parity = parity_c_col / coarseColor;
 
     int c_row = blockDim.z*blockIdx.z + threadIdx.z; // color row index
-    if (c_row >= nColor) return;
+    if (c_row >= coarseColor) return;
 
-    rescaleY<Float,nSpin,nColor,Arg>(arg, parity, x_cb, c_row, c_col);
+    rescaleY<Float,coarseColor,Arg>(arg, parity, x_cb, c_row, c_col);
   }
 
 } // namespace quda
