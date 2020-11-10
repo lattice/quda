@@ -224,7 +224,7 @@ void constructWilsonTestSpinorParam(quda::ColorSpinorParam *cs_param, const Quda
   bool pc = isPCSolution(inv_param->solution_type);
   if (pc) cs_param->x[0] /= 2;
   cs_param->siteSubset = pc ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
-  
+
   // Lattice vector data properties
   cs_param->setPrecision(inv_param->cpu_prec);
   cs_param->pad = 0;
@@ -235,8 +235,8 @@ void constructWilsonTestSpinorParam(quda::ColorSpinorParam *cs_param, const Quda
   cs_param->location = QUDA_CPU_FIELD_LOCATION;
 }
 
-void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, QudaSolutionType sol_type, const int *const x,
-                                 quda::RNG &rng)
+void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, QudaSolutionType sol_type,
+                                 const int *const x, quda::RNG &rng)
 {
   quda::ColorSpinorParam param;
   param.v = v;

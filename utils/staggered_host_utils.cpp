@@ -684,7 +684,7 @@ void constructStaggeredTestSpinorParam(quda::ColorSpinorParam *cs_param, const Q
   cs_param->nSpin = 1;
   cs_param->nDim = 5;
   for (int d = 0; d < 4; d++) cs_param->x[d] = gauge_param->X[d];
-  bool pc = isPCSolution(inv_param->solution_type); 
+  bool pc = isPCSolution(inv_param->solution_type);
   if (pc) cs_param->x[0] /= 2;
   cs_param->x[4] = 1;
   cs_param->siteSubset = pc ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;

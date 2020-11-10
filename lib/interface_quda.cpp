@@ -1442,11 +1442,13 @@ void freeSloppyCloverQuda()
   if (cloverRefinement != cloverSloppy && cloverRefinement) delete cloverRefinement;
 
   // Delete cloverPrecondition if it does not alias cloverPrecise, cloverSloppy, or cloverEigensolver.
-  if (cloverPrecondition != cloverSloppy && cloverPrecondition != cloverPrecise && cloverPrecondition != cloverEigensolver && cloverPrecondition)
+  if (cloverPrecondition != cloverSloppy && cloverPrecondition != cloverPrecise
+      && cloverPrecondition != cloverEigensolver && cloverPrecondition)
     delete cloverPrecondition;
 
-    // Delete cloverEigensolver if it does not alias cloverPrecise or cloverSloppy.
-  if (cloverEigensolver != cloverSloppy && cloverEigensolver != cloverPrecise && cloverEigensolver) delete cloverEigensolver;
+  // Delete cloverEigensolver if it does not alias cloverPrecise or cloverSloppy.
+  if (cloverEigensolver != cloverSloppy && cloverEigensolver != cloverPrecise && cloverEigensolver)
+    delete cloverEigensolver;
 
   // Delete cloverSloppy if it does not alias cloverPrecise.
   if (cloverSloppy != cloverPrecise && cloverSloppy) delete cloverSloppy;

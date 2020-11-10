@@ -105,15 +105,15 @@ template <typename Float> void applyGaugeFieldScaling(Float **gauge, int Vh, Qud
 void constructWilsonTestSpinorParam(quda::ColorSpinorParam *csParam, const QudaInvertParam *inv_param,
                                     const QudaGaugeParam *gauge_param);
 void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, QudaSolutionType sol_type,
-				 const int *const x, quda::RNG &rng);
+                                 const int *const x, quda::RNG &rng);
 //------------------------------------------------------
 
 // Helper functions
 //------------------------------------------------------
-inline bool isPCSolution(QudaSolutionType solution_type) {
-  return (solution_type == QUDA_MATPC_SOLUTION ||
-	  solution_type == QUDA_MATPC_DAG_SOLUTION || 
-	  solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+inline bool isPCSolution(QudaSolutionType solution_type)
+{
+  return (solution_type == QUDA_MATPC_SOLUTION || solution_type == QUDA_MATPC_DAG_SOLUTION
+          || solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
 };
 //------------------------------------------------------
 
