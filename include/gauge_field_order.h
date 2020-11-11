@@ -1606,15 +1606,19 @@ namespace quda {
         {
         }
 
+        // Pack and unpack are described in https://arxiv.org/pdf/0911.3191.pdf
+        // Method was modified to avoid the singularity at unit gauge by
+        // compressing the matrix {{b1,b2,b3},{a1,a2,a3},{-c1,-c2,-c3}}
+        // instead of {{a1,a2,a3},{b1,b2,b3},{c1,c2,c3}}
+
         __device__ __host__ inline void Pack(real out[8], const complex in[9], int idx) const
         {
-          out[0] = Trig<isFixed<Float>::value, real>::Atan2(in[0].imag(), in[0].real());
-          out[1] = Trig<isFixed<Float>::value, real>::Atan2(in[6].imag(), in[6].real());
-#pragma unroll
-          for (int i = 1; i < 4; i++) {
-            out[2 * i + 0] = in[i].real();
-            out[2 * i + 1] = in[i].imag();
-          }
+          out[0] = Trig<isFixed<Float>::value, real>::Atan2(in[3].imag(), in[3].real()); // a1 -> b1
+          out[1] = Trig<isFixed<Float>::value, real>::Atan2(-in[6].imag(), -in[6].real()); // c1 -> -c1
+
+          out[2] = in[4].real(); out[3] = in[4].imag(); // a2 -> b2
+          out[4] = in[5].real(); out[5] = in[5].imag(); // a3 -> b3
+          out[6] = in[0].real(); out[7] = in[0].imag(); // b1 -> a1
         }
 
         template <typename I>
@@ -1687,6 +1691,15 @@ namespace quda {
             out[8] = cmac(u0 * A, out[2], out[8]);
             out[8] = -r_inv2 * out[8];
           }
+
+          // Rearrange {{b1,b2,b3},{a1,a2,a3},{-c1,-c2,-c3}} back
+          // to {{a1,a2,a3},{b1,b2,b3},{c1,c2,c3}}
+#pragma unroll
+          for (int i = 0; i < 3; i++) {
+            const auto tmp = out[i]; out[i] = out[i+3]; out[i+3] = tmp;
+            out[i+6] = -out[i+6];
+          }
+          
         }
 
         template <typename I>
