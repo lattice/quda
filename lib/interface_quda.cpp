@@ -3247,8 +3247,6 @@ void callSplitGridQuda(Interface op, void **_hp_x, void **_hp_b, QudaInvertParam
   if (gf_param.order <= 4) { gf_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO; }
   GaugeField *in = GaugeField::Create(gf_param);
 
-  double plaq[3];
-
   bool pc_solution
     = (param->solution_type == QUDA_MATPC_SOLUTION) || (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
 

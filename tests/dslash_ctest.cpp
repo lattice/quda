@@ -42,6 +42,10 @@ DiracDomainWall4DPC *dirac_4dpc = nullptr; // create the 4d preconditioned DWF D
 
 QudaDagType not_dagger;
 
+bool test_split_grid = false;
+std::vector<cpuColorSpinorField *> vp_spinor, vp_spinorOut, vp_spinorRef;
+int num_src = 1;
+
 // For loading the gauge fields
 int argc_copy;
 char **argv_copy;
@@ -198,6 +202,25 @@ void init(int precision, QudaReconstructType link_recon)
   spinorRef = new cpuColorSpinorField(csParam);
   spinorTmp = new cpuColorSpinorField(csParam);
 
+  if (test_split_grid) {
+    dtest_type = dslash_test_type::Dslash;
+  }
+
+  inv_param.split_grid[0] = grid_partition[0];
+  inv_param.split_grid[1] = grid_partition[1];
+  inv_param.split_grid[2] = grid_partition[2];
+  inv_param.split_grid[3] = grid_partition[3];
+
+  if (test_split_grid) {
+    inv_param.num_src = num_src;
+    for (int n = 0; n < num_src; n++) {
+      vp_spinor.push_back(new cpuColorSpinorField(csParam));
+      vp_spinorOut.push_back(new cpuColorSpinorField(csParam));
+      vp_spinorRef.push_back(new cpuColorSpinorField(csParam));
+    }
+  }
+
+
   csParam.x[0] = gauge_param.X[0];
 
   constructHostGaugeField(hostGauge, gauge_param, argc_copy, argv_copy);
@@ -211,6 +234,13 @@ void init(int precision, QudaReconstructType link_recon)
   }
 
   spinor->Source(QUDA_RANDOM_SOURCE);
+
+  if (test_split_grid) {
+    for (int n = 0; n < num_src; n++) {
+      *vp_spinor[n] = *spinor;
+    }
+  }
+  
 
   // set verbosity prior to loadGaugeQuda
   setVerbosity(verbosity);
@@ -295,6 +325,15 @@ void end() {
   delete spinorRef;
   delete spinorTmp;
 
+  if (test_split_grid) {
+    for (auto p : vp_spinor) { delete p; }
+    for (auto p : vp_spinorOut) { delete p; }
+    for (auto p : vp_spinorRef) { delete p; }
+    vp_spinor.clear();
+    vp_spinorOut.clear();
+    vp_spinorRef.clear();
+  }
+
   freeGaugeQuda();
 
   for (int dir = 0; dir < 4; dir++) free(hostGauge[dir]);
@@ -328,6 +367,22 @@ DslashTime dslashCUDA(int niter)
 
   comm_barrier();
   cudaEventRecord(start, 0);
+
+  if (test_split_grid) {
+
+    void **_hp_x = (void **)malloc(num_src * sizeof(void *));
+    void **_hp_b = (void **)malloc(num_src * sizeof(void *));
+    for (int i = 0; i < num_src; i++) {
+      _hp_x[i] = vp_spinorOut[i]->V();
+      _hp_b[i] = vp_spinor[i]->V();
+    }
+
+    dslashSplitGridQuda(_hp_x, _hp_b, &inv_param, parity, hostGauge, &gauge_param);
+
+    free(_hp_x);
+    free(_hp_b);
+
+  } else {
 
   for (int i = 0; i < niter; i++) {
 
@@ -534,6 +589,8 @@ DslashTime dslashCUDA(int niter)
       if (elapsed < dslash_time.cpu_min) dslash_time.cpu_min = elapsed;
       if (elapsed > dslash_time.cpu_max) dslash_time.cpu_max = elapsed;
     }
+  }
+
   }
 
   cudaEventRecord(end, 0);
@@ -997,6 +1054,10 @@ void display_test_info(int precision, QudaReconstructType link_recon)
   //   dimPartitioned(2),
   //   dimPartitioned(3));
 
+  if (test_split_grid) {
+    printfQuda("Testing with split grid: %d  %d  %d  %d\n", grid_partition[0], grid_partition[1], grid_partition[2], grid_partition[3]);
+  }
+
   return ;
 
 }
@@ -1028,6 +1089,8 @@ protected:
       return true;
     }
 
+    if (::testing::get<2>(GetParam()) > 0 && test_split_grid) { return true; }
+
     return false;
   }
 
@@ -1036,6 +1099,9 @@ public:
   virtual void SetUp() {
     int prec = ::testing::get<0>(GetParam());
     QudaReconstructType recon = static_cast<QudaReconstructType>(::testing::get<1>(GetParam()));
+
+    num_src = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3];
+    test_split_grid = num_src > 1;
 
     if (skip()) GTEST_SKIP();
 
@@ -1076,17 +1142,30 @@ TEST_P(DslashTest, verify)
   dslashCUDA(1); // warm-up run
   dslashCUDA(2);
 
-  if (!transfer) *spinorOut = *cudaSpinorOut;
-
-  double norm2_cpu = blas::norm2(*spinorRef);
-  double norm2_cpu_cuda= blas::norm2(*spinorOut);
-  if (!transfer) {
-    double norm2_cuda= blas::norm2(*cudaSpinorOut);
-    printfQuda("Results: CPU = %f, CUDA=%f, CPU-CUDA = %f\n", norm2_cpu, norm2_cuda, norm2_cpu_cuda);
+  double deviation = 1e-14;
+  if (test_split_grid) {
+    for (int n = 0; n < num_src; n++) {
+      double norm2_cpu = blas::norm2(*spinorRef);
+      double norm2_cpu_cuda = blas::norm2(*vp_spinorOut[n]);
+      printfQuda("Result: CPU = %f, CPU-QUDA = %f\n",  norm2_cpu, norm2_cpu_cuda);
+      deviation = std::max(deviation, pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *vp_spinorOut[n]))));
+    }
   } else {
-    printfQuda("Result: CPU = %f, CPU-QUDA = %f\n", norm2_cpu, norm2_cpu_cuda);
+
+    if (!transfer) *spinorOut = *cudaSpinorOut;
+
+    double norm2_cpu = blas::norm2(*spinorRef);
+    double norm2_cpu_cuda= blas::norm2(*spinorOut);
+    if (!transfer) {
+      double norm2_cuda= blas::norm2(*cudaSpinorOut);
+      printfQuda("Results: CPU = %f, CUDA=%f, CPU-CUDA = %f\n", norm2_cpu, norm2_cuda, norm2_cpu_cuda);
+    } else {
+      printfQuda("Result: CPU = %f, CPU-QUDA = %f\n", norm2_cpu, norm2_cpu_cuda);
+    }
+    deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
+
   }
-  double deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
+
   double tol = getTolerance(inv_param.cuda_prec);
   // If we are using tensor core we tolerate a greater deviation
   if (dslash_type == QUDA_MOBIUS_DWF_DSLASH && dtest_type == dslash_test_type::MatPCDagMatPCLocal) tol *= 10;
@@ -1132,6 +1211,7 @@ int main(int argc, char **argv)
   // command line options
   auto app = make_app();
   app->add_option("--test", dtest_type, "Test method")->transform(CLI::CheckedTransformer(dtest_type_map));
+  add_split_grid_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -1151,6 +1231,9 @@ int main(int argc, char **argv)
   ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
   if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
   test_rc = RUN_ALL_TESTS();
+  
+  num_src = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3];
+  test_split_grid = num_src > 1;
 
   finalizeComms();
   return test_rc;
