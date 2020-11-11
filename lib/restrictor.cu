@@ -8,6 +8,8 @@ namespace quda {
     static constexpr std::array<unsigned int, 36> block = {4, 8, 9, 12, 16, 18, 24, 27, 32, 36, 48, 54, 64, 72, 81, 96, 100, 108, 128, 144, 162, 192, 200, 216, 384, 250, 256, 288, 400, 432, 500, 512, 576, 864, 1000, 1024};
   };
 
+  constexpr std::array<unsigned int, 36> Aggregates::block;  // this line here is needed for HOST_DEBUG
+
   template <typename Float, typename vFloat, int fineSpin, int fineColor, int coarseSpin, int coarseColor>
   class RestrictLaunch : public TunableBlockReduction2D {
     template <QudaFieldOrder order = QUDA_FLOAT2_FIELD_ORDER> using Arg =
