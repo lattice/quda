@@ -758,12 +758,22 @@ namespace quda {
     int Npad = Nint/Nvec;
 
     if (!comm_peer2peer_enabled(dir,dim)) {
-      if (dir == 0)
-	if (gdr) comm_start(mh_send_rdma_back[bufferIndex][dim]);
-	else comm_start(mh_send_back[bufferIndex][dim]);
-      else
-	if (gdr) comm_start(mh_send_rdma_fwd[bufferIndex][dim]);
-	else comm_start(mh_send_fwd[bufferIndex][dim]);
+      if (dir == 0) { 
+	if (gdr) {
+	  comm_start(mh_send_rdma_back[bufferIndex][dim]);
+	}
+	else { 
+ 	  comm_start(mh_send_back[bufferIndex][dim]);
+	}
+      }
+      else {
+	if (gdr) {
+          comm_start(mh_send_rdma_fwd[bufferIndex][dim]);
+	}
+	else { 
+	  comm_start(mh_send_fwd[bufferIndex][dim]); 
+	}
+      }
     } else { // doing peer-to-peer
       qudaStream_t *copy_stream = (stream_p) ? stream_p : stream + d;
 

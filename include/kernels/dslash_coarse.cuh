@@ -341,7 +341,7 @@ namespace quda {
 	
 	  out[color_local] += complex<Float>{ __shfl_down(sh_r,offset) , __shfl_down(sh_i,offset) };
 #else
-#error "This file needs some kind of shiffle
+#error "This file needs some kind of shiffle"
 #endif
 	}
       }

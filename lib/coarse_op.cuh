@@ -158,7 +158,7 @@ namespace quda {
 #endif
       if (type == COMPUTE_UV) {
 
-#ifdef CUDA_TARGET_CUDA
+#ifdef QUDA_TARGET_CUDA
         if (use_mma) {
 
           mma::launch_compute_uv_kernel<from_coarse>(tp, arg, arg.fineVolumeCB, stream);

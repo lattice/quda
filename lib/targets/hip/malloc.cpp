@@ -227,7 +227,7 @@ namespace quda
     }
     track_malloc(DEVICE, a, ptr);
 #ifdef HOST_DEBUG
-    hipMemset(ptr, 0xff, size);
+    //hipMemset(ptr, 0xff, size);
 #endif
     return ptr;
 #else
@@ -266,7 +266,7 @@ namespace quda
     }
     track_malloc(DEVICE_PINNED, a, ptr);
 #ifdef HOST_DEBUG
-    hipMemset(ptr, 0xff, size);
+    //hipMemset(ptr, 0xff, size);
 #endif
     return ptr;
   }
@@ -285,7 +285,7 @@ namespace quda
     if (!ptr) { errorQuda("Failed to allocate host memory of size %zu (%s:%d in %s())\n", size, file, line, func); }
     track_malloc(HOST, a, ptr);
 #ifdef HOST_DEBUG
-    memset(ptr, 0xff, size);
+   //memset(ptr, 0xff, size);
 #endif
     return ptr;
   }
@@ -310,7 +310,7 @@ namespace quda
     }
     track_malloc(PINNED, a, ptr);
 #ifdef HOST_DEBUG
-    memset(ptr, 0xff, a.base_size);
+    //memset(ptr, 0xff, a.base_size);
 #endif
     return ptr;
   }
@@ -332,7 +332,7 @@ namespace quda
 
     track_malloc(MAPPED, a, ptr);
 #ifdef HOST_DEBUG
-    memset(ptr, 0xff, a.base_size);
+   // memset(ptr, 0xff, a.base_size);
 #endif
     return ptr;
   }
@@ -355,7 +355,7 @@ namespace quda
     }
     track_malloc(MANAGED, a, ptr);
 #ifdef HOST_DEBUG
-    hipMemset(ptr, 0xff, size);
+    //hipMemset(ptr, 0xff, size);
 #endif
     return ptr;
   }

@@ -19,7 +19,7 @@
 QudaTune getTuning();
 
 QudaVerbosity getVerbosity();
-__host__ __device__ char *getOutputPrefix();
+char *getOutputPrefix();
 FILE *getOutputFile();
 
 void setVerbosity(QudaVerbosity verbosity);
@@ -194,7 +194,7 @@ void errorQuda_(const char *func, const char *file, int line, ...);
 #define checkCudaErrorNoSync() do {                    \
   hipError_t error = hipGetLastError();              \
   if (error != hipSuccess)                            \
-    errorQuda("(CUDA) %s", hipGetErrorString(error))  \
+    errorQuda("(HIP) %s", hipGetErrorString(error))  \
     ;\
 } while (0)
 

@@ -10,9 +10,7 @@
 
 #ifdef QUDA_TARGET_CUDA
 #include <coarse_op_preconditioned_mma_launch.h>
-#endif
-
-#ifndef JIFTFY
+#else
 using CUresult = bool;
 #endif
 

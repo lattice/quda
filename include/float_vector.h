@@ -1,6 +1,15 @@
 #pragma once
+#include <quda_define.h>
+
+#if defined(QUDA_TARGET_CUDA)
+#include <cuda_runtime.h>
+#endif
+
+#if defined(QUDA_TARGET_HIP)
 #include <hip/hip_runtime_api.h>
 #include <hip/hcc_detail/hip_vector_types.h>
+#endif
+
 #include <complex_quda.h>
 
 /**
@@ -133,8 +142,13 @@ namespace quda {
 
   __host__ __device__ inline float8 operator+=(float8 &x, const float8 &y)
   {
+#if defined(QUDA_TARGET_HIP)
     static_cast<float4>(x.x) += static_cast<float4>(y.x);
     static_cast<float4>(x.y) += static_cast<float4>(y.y);
+#else
+    x.x += y.x;
+    x.y += y.y;
+#endif
     return x;
   }
 
@@ -180,8 +194,14 @@ namespace quda {
 
   __host__ __device__ inline float8 operator-=(float8 &x, const float8 &y)
   {
+#if defined(QUDA_TARGET_HIP)
     static_cast<float4>(x.x) -= static_cast<const float4>(y.x);
     static_cast<float4>(x.y) -= static_cast<const float4>(y.y);
+#else
+    x.x -= y.x;
+    x.y -= y.y;
+#endif
+
     return x;
   }
 
