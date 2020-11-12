@@ -571,7 +571,7 @@ protected:
        @return Whether the solver is only for Hermitian systems
     */
     virtual bool hermitian() { return false; } /** IRAM is for any linear system */
-    
+
     /**
        @brief Destructor for Thick Restarted Eigensolver class
     */

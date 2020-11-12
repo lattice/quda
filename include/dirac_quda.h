@@ -138,7 +138,7 @@ namespace quda {
     friend class DiracMMdag;
     friend class DiracMdag;
     friend class DiracG5M;
-    
+
   protected:
     cudaGaugeField *gauge;
     double kappa;
@@ -245,7 +245,7 @@ namespace quda {
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const = 0;
     void setMass(double mass){ this->mass = mass;}
-    
+
     // Dirac operator factory
     /**
        @brief Creates a subclass from parameters
@@ -256,12 +256,12 @@ namespace quda {
        @brief accessor for Kappa (mass parameter)
     */
     double Kappa() const { return kappa; }
-    
+
     /**
        @brief accessor for Mass (in case of a factor of 2 for staggered)
     */
     virtual double Mass() const { return mass; } // in case of factor of 2 convention for staggered
-    
+
     /**
        @brief accessor for twist parameter -- overrride can return better value
     */
@@ -271,7 +271,7 @@ namespace quda {
        @brief accessor for mu factoo for MG/ -- override can return a better value
     */
     virtual double MuFactor() const { return 0.; }
-    
+
     /**
        @brief  returns and then zeroes flopcount
     */
@@ -281,27 +281,27 @@ namespace quda {
        @brief returns preconditioning type
     */
     QudaMatPCType getMatPCType() const { return matpcType; }
-    
+
     /**
        @brief  I have no idea what this does
     */
     int getStencilSteps() const;
-    
+
     /**
-       @brief sets whether operator is daggered or not 
+       @brief sets whether operator is daggered or not
     */
     void Dagger(QudaDagType dag) const { dagger = dag; }
-    
+
     /**
-       @breif Flips value of daggered 
+       @brief Flips value of daggered
     */
     void flipDagger() const { dagger = (dagger == QUDA_DAG_YES) ? QUDA_DAG_NO : QUDA_DAG_YES; }
-    
+
     /**
        @brief is operator hermitian
     */
     virtual bool hermitian() const { return false; }
-    
+
     /**
      *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
      *  These are pointers as opposed to references to support passing in `nullptr`.
@@ -316,7 +316,7 @@ namespace quda {
     {
       gauge = gauge_in;
     }
-    
+
     /**
      * @brief Create the coarse operator (virtual parent)
      *
@@ -347,7 +347,7 @@ namespace quda {
 
   // Full Wilson
   class DiracWilson : public Dirac {
-    
+
   protected:
     void initConstants();
 
@@ -1616,8 +1616,8 @@ public:
 
     QudaMatPCType getMatPCType() const { return dirac->getMatPCType(); }
 
-    virtual int getStencilSteps() const = 0; 
-    
+    virtual int getStencilSteps() const = 0;
+
     std::string Type() const { return typeid(*dirac).name(); }
     
     bool isStaggered() const {
@@ -1626,7 +1626,7 @@ public:
 	      Type() == typeid(DiracImprovedStaggeredPC).name() ||
 	      Type() == typeid(DiracImprovedStaggered).name()) ? true : false;
     }
-    
+
     virtual bool hermitian() const { return dirac->hermitian(); }
 
     const Dirac *Expose() const { return dirac; }
@@ -1881,18 +1881,19 @@ public:
   };
 
   /**
-     Gloms onto a DiracMatrix and provides an operator() for its G5M method 
+     Gloms onto a DiracMatrix and provides an operator() for its G5M method
   */
-  class DiracG5M : public DiracMatrix {
+  class DiracG5M : public DiracMatrix
+  {
 
   public:
-  DiracG5M(const Dirac &d) : DiracMatrix(d) { }
-  DiracG5M(const Dirac *d) : DiracMatrix(d) { }
-    
+    DiracG5M(const Dirac &d) : DiracMatrix(d) { }
+    DiracG5M(const Dirac *d) : DiracMatrix(d) { }
+
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
     {
       dirac->M(out, in);
-      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
+      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
       gamma5(out, out);
     }
 
@@ -1900,31 +1901,27 @@ public:
     {
       dirac->tmp1 = &tmp;
       dirac->M(out, in);
-      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
+      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
       gamma5(out, out);
       dirac->tmp1 = NULL;
     }
 
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
-		    ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
     {
       dirac->tmp1 = &Tmp1;
       dirac->tmp2 = &Tmp2;
       dirac->M(out, in);
-      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
+      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
       gamma5(out, out);
       dirac->tmp2 = NULL;
       dirac->tmp1 = NULL;
     }
 
-    int getStencilSteps() const
-    {
-      return dirac->getStencilSteps(); 
-    }
+    int getStencilSteps() const { return dirac->getStencilSteps(); }
 
     virtual bool hermitian() const { return true; } // gamma5 op is always Hermitian
   };
-    
+
   /**
    * Create the Dirac operator. By default, we also create operators with possibly different
    * precisions: Sloppy, and Preconditioner.

@@ -2415,7 +2415,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
       errorQuda("Polynomial acceleration with non-symmetric matrices not supported");
     }
   }
-  
+
   // If you attempt to compute part of the imaginary spectrum of a symmetric matrix,
   // the solver will fail.
   if ((eig_param->spectrum == QUDA_SPECTRUM_LI_EIG || eig_param->spectrum == QUDA_SPECTRUM_SI_EIG)
@@ -2427,18 +2427,19 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
 
   // Gamma5 premultiplication is only supported for the M type operator
   if (eig_param->compute_gamma5) {
-    if(eig_param->use_norm_op || eig_param->use_dagger) {
-      errorQuda("gamma5 premultiplication is only supported for M type operators: dag = %s, normop = %s", eig_param->use_dagger ? "true" : "false", eig_param->use_norm_op ? "true" : "false");
+    if (eig_param->use_norm_op || eig_param->use_dagger) {
+      errorQuda("gamma5 premultiplication is only supported for M type operators: dag = %s, normop = %s",
+                eig_param->use_dagger ? "true" : "false", eig_param->use_norm_op ? "true" : "false");
     }
-    if(cudaParam.nSpin == 1) {
+    if (cudaParam.nSpin == 1) {
       errorQuda("gamma5 premultiplication is only supported Wilson type operators: Nspin = %d", cudaParam.nSpin);
     }
   }
-  
+
   profileEigensolve.TPSTOP(QUDA_PROFILE_INIT);
-  
+
   if (!eig_param->use_norm_op && !eig_param->use_dagger && eig_param->compute_gamma5) {
-    DiracG5M m(dirac);          
+    DiracG5M m(dirac);
     if (eig_param->arpack_check) {
       arpack_solve(host_evecs_, evals, m, eig_param, profileEigensolve);
     } else {
@@ -2447,7 +2448,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
       delete eig_solve;
     }
   } else if (!eig_param->use_norm_op && !eig_param->use_dagger && !eig_param->compute_gamma5) {
-    DiracM m(dirac);          
+    DiracM m(dirac);
     if (eig_param->arpack_check) {
       arpack_solve(host_evecs_, evals, m, eig_param, profileEigensolve);
     } else {
