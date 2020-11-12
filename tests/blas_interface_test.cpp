@@ -145,9 +145,7 @@ double test(int data_type)
   // If the user passes non-zero offsets, add one extra
   // matrix to the test data.
   int batches_extra = 0;
-  if (blas_param.a_offset + blas_param.b_offset + blas_param.c_offset > 0) {
-    batches_extra++;
-  }
+  if (blas_param.a_offset + blas_param.b_offset + blas_param.c_offset > 0) { batches_extra++; }
   int batches = blas_param.batch_count + batches_extra;
   uint64_t refA_size = 0, refB_size = 0, refC_size = 0;
   if (blas_param.data_order == QUDA_BLAS_DATAORDER_COL) {
@@ -278,7 +276,7 @@ double test(int data_type)
   if (verify_results) {
     deviation = blasGEMMQudaVerify(arrayA, arrayB, arrayC, arrayCcopy, refA_size, refB_size, refC_size, &blas_param);
   }
-  
+
   host_free(refA);
   host_free(refB);
   host_free(refC);
@@ -317,13 +315,9 @@ TEST_P(BLASTest, verify)
   decltype(deviation) tol;
   switch (data_type) {
   case 0:
-  case 2:
-    tol = 10 * std::numeric_limits<float>::epsilon();
-    break;
+  case 2: tol = 10 * std::numeric_limits<float>::epsilon(); break;
   case 1:
-  case 3:
-    tol = 10 * std::numeric_limits<double>::epsilon();
-    break;
+  case 3: tol = 10 * std::numeric_limits<double>::epsilon(); break;
   }
   EXPECT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
 }

@@ -50,7 +50,7 @@ int main(int argc, char **argv)
   // Start Google Test Suite
   //-----------------------------------------------------------------------------
   ::testing::InitGoogleTest(&argc, argv);
-  
+
   // QUDA initialise
   //-----------------------------------------------------------------------------
   // command line options

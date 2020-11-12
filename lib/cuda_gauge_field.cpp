@@ -451,9 +451,9 @@ namespace quda {
 
         // if we pass a stream to sendStart then we must ensure that stream is synchronized
         for (int dir = 0; dir < 2; dir++) sendStart(dim, dir, &streams[dir]);
-        for (int dir=0; dir<2; dir++) commsComplete(dim, dir);
+        for (int dir = 0; dir < 2; dir++) commsComplete(dim, dir);
 
-	for (int dir=0; dir<2; dir++) {
+        for (int dir=0; dir<2; dir++) {
 	  // issue host-to-device copies if needed
 	  if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) {
             qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][dim][dir], from_face_dim_dir_h[bufferIndex][dim][dir],

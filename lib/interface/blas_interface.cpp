@@ -108,11 +108,9 @@ void blasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, bool use_native, Qud
     // If the user passes non-zero offsets, add one extra
     // matrix to the device array to accomodate it.
     int batches_extra = 0;
-    if (blas_param->a_offset + blas_param->b_offset + blas_param->c_offset > 0) {
-      batches_extra++;
-    }
+    if (blas_param->a_offset + blas_param->b_offset + blas_param->c_offset > 0) { batches_extra++; }
     int batches = blas_param->batch_count + batches_extra;
-    
+
     size_t A_bytes = batches * arrayA_size * re_im * data_size;
     size_t B_bytes = batches * arrayB_size * re_im * data_size;
     size_t C_bytes = batches * arrayC_size * re_im * data_size;

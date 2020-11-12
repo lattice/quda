@@ -43,14 +43,14 @@ double blasGEMMEigenVerify(void *A_data, void *B_data, void *C_data_copy, void *
   int min_stride = std::min(std::min(blas_param->a_stride, blas_param->b_stride), blas_param->c_stride);
   if (min_stride < 0) {
     errorQuda("BLAS strides must be positive or zero: a_stride=%d, b_stride=%d, c_stride=%d", blas_param->a_stride,
-	      blas_param->b_stride, blas_param->c_stride);
+              blas_param->b_stride, blas_param->c_stride);
   }
 
   // If the user passes a negative offset, we error out as this has no meaning.
   int min_offset = std::min(std::min(blas_param->a_offset, blas_param->b_offset), blas_param->c_offset);
   if (min_offset < 0) {
     errorQuda("BLAS offsets must be positive or zero: a_offset=%d, b_offset=%d, c_offset=%d", blas_param->a_offset,
-	      blas_param->b_offset, blas_param->c_offset);
+              blas_param->b_offset, blas_param->c_offset);
   }
 
   // If the batch value is non-positve, we error out
@@ -60,35 +60,35 @@ double blasGEMMEigenVerify(void *A_data, void *B_data, void *C_data_copy, void *
   if (blas_param->data_order == QUDA_BLAS_DATAORDER_COL) {
     if (blas_param->trans_a == QUDA_BLAS_OP_N) {
       if (blas_param->lda < std::max(1, blas_param->m))
-	errorQuda("lda=%d must be >= max(1,m=%d)", blas_param->lda, blas_param->m);
+        errorQuda("lda=%d must be >= max(1,m=%d)", blas_param->lda, blas_param->m);
     } else {
       if (blas_param->lda < std::max(1, blas_param->k))
-	errorQuda("lda=%d must be >= max(1,k=%d)", blas_param->lda, blas_param->k);
+        errorQuda("lda=%d must be >= max(1,k=%d)", blas_param->lda, blas_param->k);
     }
 
     if (blas_param->trans_b == QUDA_BLAS_OP_N) {
       if (blas_param->ldb < std::max(1, blas_param->k))
-	errorQuda("ldb=%d must be >= max(1,k=%d)", blas_param->ldb, blas_param->k);
+        errorQuda("ldb=%d must be >= max(1,k=%d)", blas_param->ldb, blas_param->k);
     } else {
       if (blas_param->ldb < std::max(1, blas_param->n))
-	errorQuda("ldb=%d must be >= max(1,n=%d)", blas_param->ldb, blas_param->n);
+        errorQuda("ldb=%d must be >= max(1,n=%d)", blas_param->ldb, blas_param->n);
     }
     if (blas_param->ldc < std::max(1, blas_param->m))
       errorQuda("ldc=%d must be >= max(1,m=%d)", blas_param->ldc, blas_param->m);
   } else {
     if (blas_param->trans_a == QUDA_BLAS_OP_N) {
       if (blas_param->lda < std::max(1, blas_param->k))
-	errorQuda("lda=%d must be >= max(1,k=%d)", blas_param->lda, blas_param->k);
+        errorQuda("lda=%d must be >= max(1,k=%d)", blas_param->lda, blas_param->k);
     } else {
       if (blas_param->lda < std::max(1, blas_param->m))
-	errorQuda("lda=%d must be >= max(1,m=%d)", blas_param->lda, blas_param->m);
+        errorQuda("lda=%d must be >= max(1,m=%d)", blas_param->lda, blas_param->m);
     }
     if (blas_param->trans_b == QUDA_BLAS_OP_N) {
       if (blas_param->ldb < std::max(1, blas_param->n))
-	errorQuda("ldb=%d must be >= max(1,n=%d)", blas_param->ldb, blas_param->n);
+        errorQuda("ldb=%d must be >= max(1,n=%d)", blas_param->ldb, blas_param->n);
     } else {
       if (blas_param->ldb < std::max(1, blas_param->k))
-	errorQuda("ldb=%d must be >= max(1,k=%d)", blas_param->ldb, blas_param->k);
+        errorQuda("ldb=%d must be >= max(1,k=%d)", blas_param->ldb, blas_param->k);
     }
     if (blas_param->ldc < std::max(1, blas_param->n))
       errorQuda("ldc=%d must be >= max(1,n=%d)", blas_param->ldc, blas_param->n);
@@ -106,7 +106,7 @@ double blasGEMMEigenVerify(void *A_data, void *B_data, void *C_data_copy, void *
     std::swap(blas_param->a_stride, blas_param->b_stride);
     std::swap(A_data, B_data);
   }
-  
+
   // Problem parameters
   int m = blas_param->m;
   int n = blas_param->n;
@@ -141,7 +141,7 @@ double blasGEMMEigenVerify(void *A_data, void *B_data, void *C_data_copy, void *
   complex<double> *B_ptr = (complex<double> *)(&B_data)[0];
   complex<double> *C_ptr = (complex<double> *)(&C_data)[0];
   complex<double> *Ccopy_ptr = (complex<double> *)(&C_data_copy)[0];
-  
+
   // Get maximum stride length to deduce the number of batches in the
   // computation
   int max_stride = std::max(std::max(a_stride, b_stride), c_stride);
@@ -188,14 +188,14 @@ double blasGEMMEigenVerify(void *A_data, void *B_data, void *C_data_copy, void *
     double relative_deviation = deviation / C_eigen.norm();
     max_relative_deviation = std::max(max_relative_deviation, relative_deviation);
 
-    printfQuda("batch %d: (C_host - C_gpu) Frobenius norm = %e. Relative deviation = %e\n",
-               batch, deviation, relative_deviation);
+    printfQuda("batch %d: (C_host - C_gpu) Frobenius norm = %e. Relative deviation = %e\n", batch, deviation,
+               relative_deviation);
 
     a_offset += refA_size * a_stride;
     b_offset += refB_size * b_stride;
     c_offset += refC_size * c_stride;
   }
-  
+
   // Restore the blas parameters to their original values
   if (blas_param->data_order == QUDA_BLAS_DATAORDER_COL) {
     std::swap(blas_param->m, blas_param->n);
@@ -220,11 +220,9 @@ double blasGEMMQudaVerify(void *arrayA, void *arrayB, void *arrayC, void *arrayC
   // If the user passes non-zero offsets, add one extra
   // matrix to the test data.
   int batches_extra = 0;
-  if (blas_param->a_offset + blas_param->b_offset + blas_param->c_offset > 0) {
-    batches_extra++;
-  }
+  if (blas_param->a_offset + blas_param->b_offset + blas_param->c_offset > 0) { batches_extra++; }
   int batches = blas_param->batch_count + batches_extra;
-  
+
   // Copy data from problem sized array to reference sized array.
   // Include A and B to ensure no data corruption occurred
   void *checkA = pinned_malloc(refA_size * data_size * batches);
