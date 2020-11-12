@@ -73,7 +73,7 @@ protected:
     /**
        @return Whether the solver is only for Hermitian systems
      */
-    virtual bool solves_non_hermitian() = 0;
+    virtual bool hermitian() = 0;
 
     /**
        @brief Computes the eigen decomposition for the operator passed to create.
@@ -437,7 +437,7 @@ protected:
     /**
        @return Whether the solver is only for Hermitian systems
     */
-    virtual bool solves_non_hermitian() { return false; } /** TRLM is only for Hermitian systems */
+    virtual bool hermitian() { return true; } /** TRLM is only for Hermitian systems */
 
     // Variable size matrix
     std::vector<double> ritz_mat;
@@ -498,7 +498,7 @@ protected:
     */
     virtual ~BLKTRLM();
 
-    virtual bool solves_non_hermitian() { return false; } /** (BLOCK)TRLM is only for Hermitian systems */
+    virtual bool hermitian() { return true; } /** (BLOCK)TRLM is only for Hermitian systems */
 
     // Variable size matrix
     std::vector<Complex> block_ritz_mat;
@@ -567,8 +567,11 @@ protected:
     */
     IRAM(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile);
 
-    virtual bool solves_non_hermitian() { return true; } /** IRAM is for any linear system */
-
+    /**
+       @return Whether the solver is only for Hermitian systems
+    */
+    virtual bool hermitian() { return false; } /** IRAM is for any linear system */
+    
     /**
        @brief Destructor for Thick Restarted Eigensolver class
     */
