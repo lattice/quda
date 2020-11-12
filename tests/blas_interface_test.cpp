@@ -369,11 +369,12 @@ int main(int argc, char **argv)
   setSpinorSiteSize(24);
   //-----------------------------------------------------------------------------
 
+  int result = 0;
   if (verify_results) {
     // Run full set of test if we're doing a verification run
     ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
     if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
-    int result = RUN_ALL_TESTS();
+    result = RUN_ALL_TESTS();
     if (result) warningQuda("Google tests for QUDA BLAS failed.");
   } else {
     // Perform the BLAS op specified by the command line
@@ -394,5 +395,5 @@ int main(int argc, char **argv)
   // finalize the communications layer
   finalizeComms();
 
-  return 0;
+  return result;
 }
