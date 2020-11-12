@@ -59,7 +59,6 @@ static bool create_quda_gauge = false;
 
 static bool have_resident_gauge = false;
 
-
 static bool invalidate_quda_mom = true;
 
 static bool invalidate_quda_mg = true;
@@ -306,7 +305,7 @@ void qudaHisqForce(int prec, int num_terms, int num_naik_terms, double dt, doubl
                        w_link, v_link, u_link,
                        quark_field, num_terms, num_naik_terms, coeff,
                        &gParam);
-  
+
   have_resident_gauge = false;
   qudamilc_called<false>(__func__);
   return;
@@ -369,10 +368,12 @@ void qudaUpdateUPhasedPipeline(int prec, double eps, QudaMILCSiteArg_t *arg, int
   return;
 }
 
-void qudaUpdateUPhased(int prec, double eps, QudaMILCSiteArg_t *arg, int phase_in){ qudaUpdateUPhasedPipeline(prec, eps, arg, 0, 0);}
+void qudaUpdateUPhased(int prec, double eps, QudaMILCSiteArg_t *arg, int phase_in)
+{
+  qudaUpdateUPhasedPipeline(prec, eps, arg, 0, 0);
+}
 
 void qudaUpdateU(int prec, double eps, QudaMILCSiteArg_t *arg) { qudaUpdateUPhased(prec, eps, arg, 0); }
-
 
 void qudaRephase(int prec, void *gauge, int flag, double i_mu)
 {
@@ -405,7 +406,7 @@ void qudaUnitarizeSU3Phased(int prec, double tol, QudaMILCSiteArg_t *arg, int ph
   // when we take care of phases in QUDA we need to respect MILC boundary conditions.
   if (phase_in) qudaGaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
 
-  if(!have_resident_gauge) {
+  if (!have_resident_gauge) {
     qudaGaugeParam.make_resident_gauge = false;
     qudaGaugeParam.use_resident_gauge = false;
   } else {
@@ -583,7 +584,7 @@ void qudaGaugeForcePhased(int precision, int num_loop_types, double milc_loop_co
   if (phase_in) qudaGaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
   if (phase_in) qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
 
-  if(!have_resident_gauge) {
+  if (!have_resident_gauge) {
     qudaGaugeParam.make_resident_gauge = true;
     qudaGaugeParam.use_resident_gauge = false;
     // have_resident_gauge = true;
@@ -591,7 +592,6 @@ void qudaGaugeForcePhased(int precision, int num_loop_types, double milc_loop_co
     qudaGaugeParam.make_resident_gauge = true;
     qudaGaugeParam.use_resident_gauge = true;
   }
-
 
   double *loop_coeff = static_cast<double*>(safe_malloc(numPaths*sizeof(double)));
   int *length = static_cast<int*>(safe_malloc(numPaths*sizeof(int)));

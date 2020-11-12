@@ -40,7 +40,7 @@ namespace quda
      @param[in] stream Stream identifier
   */
   template <typename T, typename... Arg>
-  qudaError_t qudaLaunchKernel(T *func, const TuneParam &tp, qudaStream_t stream, const Arg &... arg)
+  qudaError_t qudaLaunchKernel(T *func, const TuneParam &tp, qudaStream_t stream, const Arg &...arg)
   {
     const void *args[] = {&arg...};
     return qudaLaunchKernel(reinterpret_cast<const void *>(func), tp, const_cast<void **>(args), stream);

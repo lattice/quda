@@ -1,3 +1,5 @@
+#pragma once
+
 #/*
 # enum_quda_fortran.h
 #
@@ -8,9 +10,6 @@
 #   instead (this requires Fortran 2003, but this is covered by 
 #   gfortran).
 #*/
-
-#ifndef _ENUM_FORTRAN_QUDA_H
-#define _ENUM_FORTRAN_QUDA_H
 
 #/* can't include limits.h in a Fortran program */
 #define QUDA_INVALID_ENUM (-2147483647 - 1) 
@@ -426,6 +425,24 @@
 #define QUDA_BOOLEAN_NO QUDA_BOOLEAN_FALSE // backwards compatibility
 #define QUDA_BOOLEAN_YES QUDA_BOOLEAN_TRUE // backwards compatibility
 
+#define QudaBLASOperation integer(4)
+#define QUDA_BLAS_OP_N = 0 // No transpose
+#define QUDA_BLAS_OP_T = 1 // Transpose only
+#define QUDA_BLAS_OP_C = 2 // Conjugate transpose
+#define QUDA_BLAS_OP_INVALID QUDA_INVALID_ENUM
+
+#define QudaBLASDataType integer(4)
+#define QUDA_BLAS_DATATYPE_S 0 // Single
+#define QUDA_BLAS_DATATYPE_D 1 // Double
+#define QUDA_BLAS_DATATYPE_C 2 // Complex(single)
+#define QUDA_BLAS_DATATYPE_Z 3 // Complex(double)
+#define QUDA_BLAS_DATATYPE_INVALID QUDA_INVALID_ENUM
+
+#define QudaBLASDataOrder integer(4)
+#define QUDA_BLAS_DATAORDER_ROW 0
+#define QUDA_BLAS_DATAORDER_COL 1
+#define QUDA_BLAS_DATAORDER_INVALID QUDA_INVALID_ENUM
+
 #define QudaDirection integer(4)
 #define QUDA_BACKWARDS -1
 #define QUDA_FORWARDS  +1
@@ -486,5 +503,3 @@
 #define QUDA_EIGEN_EXTLIB 1
 #define QUDA_MAGMA_EXTLIB 2
 #define QUDA_EXTLIB_INVALID QUDA_INVALID_ENUM
-
-#endif 
