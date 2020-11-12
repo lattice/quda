@@ -314,6 +314,14 @@ if(QUDA_BUILD_NATIVE_LAPACK)
     --gtest_output=xml:blas_interface_test.xml)
 endif()
 
+#Contraction test
+if(QUDA_CONTRACT)
+  add_test(NAME contract_test
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:contract_test> ${MPIEXEC_POSTFLAGS}
+    --dim 2 4 6 8
+    --gtest_output=xml:contract_test.xml)
+endif()
+
 # loop over Dslash policies
 if(QUDA_CTEST_SEP_DSLASH_POLICIES)
   set(DSLASH_POLICIES 0 1 6 7 8 9 12 13 -1)

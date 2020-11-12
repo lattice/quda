@@ -47,7 +47,10 @@ void display_test_info()
 
 int main(int argc, char **argv)
 {
-
+  // Start Google Test Suite
+  //-----------------------------------------------------------------------------
+  ::testing::InitGoogleTest(&argc, argv);
+  
   // QUDA initialise
   //-----------------------------------------------------------------------------
   // command line options
@@ -75,10 +78,6 @@ int main(int argc, char **argv)
   setDims(X);
   setSpinorSiteSize(24);
   //-----------------------------------------------------------------------------
-
-  // Start Google Test Suite
-  //-----------------------------------------------------------------------------
-  ::testing::InitGoogleTest(&argc, argv);
 
   prec = QUDA_INVALID_PRECISION;
 

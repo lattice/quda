@@ -292,7 +292,7 @@ double test(int data_type)
   return deviation;
 }
 
-// The following tests gets each contraction type and precision using google testing framework
+// The following tests gets each BLAS type and precision using google testing framework
 using ::testing::Bool;
 using ::testing::Combine;
 using ::testing::Range;
