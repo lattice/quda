@@ -27,7 +27,7 @@ namespace quda {
     float time;
     long long n_calls;
 
-    inline TuneParam() : block(32, 1, 1), grid(1, 1, 1), shared_bytes(0), set_max_shared_bytes(false), aux(), time(FLT_MAX), n_calls(0) {
+    inline TuneParam() : block(64, 1, 1), grid(1, 1, 1), shared_bytes(0), set_max_shared_bytes(false), aux(), time(FLT_MAX), n_calls(0) {
       aux = make_int4(1,1,1,1);
     }
 
@@ -97,7 +97,7 @@ namespace quda {
       }
     }
 
-    virtual unsigned int maxBlockSize(const TuneParam &param) const { return deviceProp.maxThreadsPerBlock / (param.block.y*param.block.z); }
+    virtual unsigned int maxBlockSize(const TuneParam &param) const { return 256 / (param.block.y*param.block.z); }
     virtual unsigned int maxGridSize() const { return 2*deviceProp.multiProcessorCount; }
     virtual unsigned int minGridSize() const { return 1; }
 
@@ -156,7 +156,7 @@ namespace quda {
      */
     unsigned int maxBlocksPerSM() const
     {
-	    return 40;
+	    return 32;
     }
 
     /**
