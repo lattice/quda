@@ -152,7 +152,7 @@ double blasGEMMEigenVerify(void *A_data, void *B_data, void *C_data_copy, void *
   // If the strides have not been set, we are just using strides of 1.
   if (max_stride <= 0) max_stride = 1;
 
-  printfQuda("Computing Eigen matrix opertaion a * A_{%lu,%lu} * B_{%lu,%lu} + b * C_{%lu,%lu} = C_{%lu,%lu}\n",
+  printfQuda("Computing Eigen matrix operation a * A_{%lu,%lu} * B_{%lu,%lu} + b * C_{%lu,%lu} = C_{%lu,%lu}\n",
              A.rows(), A.cols(), B.rows(), B.cols(), C_eigen.rows(), C_eigen.cols(), C_eigen.rows(), C_eigen.cols());
 
   double max_relative_deviation = 0.0;

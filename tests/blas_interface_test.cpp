@@ -312,11 +312,11 @@ TEST_P(BLASTest, verify)
   switch (data_type) {
   case 0:
   case 2:
-    tol = 2 * std::numeric_limits<float>::epsilon();
+    tol = 10 * std::numeric_limits<float>::epsilon();
     break;
   case 1:
   case 3:
-    tol = 2 * std::numeric_limits<double>::epsilon();
+    tol = 10 * std::numeric_limits<double>::epsilon();
     break;
   }
   EXPECT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
