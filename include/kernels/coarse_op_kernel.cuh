@@ -27,6 +27,9 @@ namespace quda {
     static constexpr int fineColor = fineColor_;
     static constexpr int coarseColor = coarseColor_;
 
+    static constexpr int fineDof = fineSpin * fineColor;
+    static constexpr int coarseDof = coarseSpin * coarseColor;
+
     static constexpr bool is_mma_compatible = coarseGauge::is_mma_compatible;
 
     coarseGauge Y;           /** Computed coarse link field */
@@ -40,8 +43,8 @@ namespace quda {
 
     const fineGauge U;       /** Fine grid link field */
     const fineSpinorV V;     /** Fine grid spinor field */
-    const fineClover C;      /** Fine grid clover field */
-    const fineClover Cinv;   /** Fine grid clover field */
+    const fineClover C;      /** Fine grid clover field, or Xinv for coarsening the optimized KD op */
+    const fineClover Cinv;   /** Fine grid clover field, or Xinv for coarsening the optimize KD op */
 
     int_fastdiv x_size[QUDA_MAX_DIM];   /** Dimensions of fine grid */
     int xc_size[QUDA_MAX_DIM];  /** Dimensions of coarse grid */
@@ -53,6 +56,7 @@ namespace quda {
     int comm_dim[QUDA_MAX_DIM]; /** Node parition array */
 
     Float kappa;                /** kappa value */
+    Float mass;                 /** mass value */
     Float mu;                   /** mu value */
     Float mu_factor;            /** multiplicative factor for mu applied when mu is added to the operator */
     Float rescale;              /** rescaling factor used when rescaling the Y links if the maximum increases */
@@ -115,28 +119,28 @@ namespace quda {
     static_assert(max_color_height_per_block % tile_height_vuv == 0, "max_color_height_per_block must be divisible by tile height");
     static_assert(max_color_width_per_block % tile_width_vuv == 0, "max_color_width_per_block must be divisible by tile width");
 
-    CalculateYArg(coarseGauge &Y, coarseGauge &X,
-		  coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic,
-		  fineSpinorTmp &UV, fineSpinor &AV, const fineGauge &U, const fineSpinorV &V,
-		  const fineClover &C, const fineClover &Cinv, double kappa, double mu, double mu_factor,
-		  const int *x_size_, const int *xc_size_, int *geo_bs_, int spin_bs_,
-		  const int *fine_to_coarse, const int *coarse_to_fine, bool bidirectional)
+    CalculateYArg(coarseGauge &Y, coarseGauge &X, 
+      coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic,
+      fineSpinorTmp &UV, fineSpinor &AV, const fineGauge &U, const fineSpinorV &V,
+      const fineClover &C, const fineClover &Cinv, double kappa, double mass, double mu, double mu_factor,
+      const int *x_size_, const int *xc_size_, int *geo_bs_, int spin_bs_,
+      const int *fine_to_coarse, const int *coarse_to_fine, bool bidirectional)
       : Y(Y), X(X), Y_atomic(Y_atomic), X_atomic(X_atomic),
-	UV(UV), AV(AV), U(U), V(V), C(C), Cinv(Cinv), spin_bs(spin_bs_), spin_map(),
-	kappa(static_cast<Float>(kappa)), mu(static_cast<Float>(mu)), mu_factor(static_cast<Float>(mu_factor)),
-        fineVolumeCB(V.VolumeCB()), coarseVolumeCB(X.VolumeCB()),
-        fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
-        bidirectional(bidirectional), shared_atomic(false), parity_flip(shared_atomic ? true : false),
-        aggregates_per_block(1), max_d(nullptr)
+      UV(UV), AV(AV), U(U), V(V), C(C), Cinv(Cinv), spin_bs(spin_bs_), spin_map(),
+      kappa(static_cast<Float>(kappa)), mass(static_cast<Float>(mass)), mu(static_cast<Float>(mu)), mu_factor(static_cast<Float>(mu_factor)),
+      fineVolumeCB(V.VolumeCB()), coarseVolumeCB(X.VolumeCB()),
+      fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
+      bidirectional(bidirectional), shared_atomic(false), parity_flip(shared_atomic ? true : false),
+      aggregates_per_block(1), max_d(nullptr)
     {
       if (V.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS)
-	errorQuda("Gamma basis %d not supported", V.GammaBasis());
+        errorQuda("Gamma basis %d not supported", V.GammaBasis());
 
       for (int i=0; i<QUDA_MAX_DIM; i++) {
-	x_size[i] = x_size_[i];
-	xc_size[i] = xc_size_[i];
-	geo_bs[i] = geo_bs_[i];
-	comm_dim[i] = comm_dim_partitioned(i);
+        x_size[i] = x_size_[i];
+        xc_size[i] = xc_size_[i];
+        geo_bs[i] = geo_bs_[i];
+        comm_dim[i] = comm_dim_partitioned(i);
       }
     }
   };
@@ -152,7 +156,7 @@ namespace quda {
     getCoords(coord, x_cb, arg.x_size, parity);
 
     constexpr int uvSpin = fineSpin * (from_coarse ? 2 : 1);
-    constexpr int nFace = 1;
+    constexpr int nFace = 1; // to do: nFace == 3 version for long links
 
     using complex = complex<typename Arg::Float>;
     using TileType = typename Arg::uvTileType;
@@ -239,7 +243,7 @@ namespace quda {
       for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) {
         for (int ic = 0; ic < TileType::m; ic += TileType::M)   // fine color
           for (int jc = 0; jc < TileType::n; jc += TileType::N) // coarse color
-            if (dir == QUDA_FORWARDS) // only for preconditioned clover is V != AV
+            if (dir == QUDA_FORWARDS) // only for preconditioned clover is V != AV, will need extra logic for staggered KD
               computeUV<from_coarse,dim,dir,fineSpin,coarseSpin>(arg, arg.V, parity, x_cb, ic, jc);
             else
               computeUV<from_coarse,dim,dir,fineSpin,coarseSpin>(arg, arg.AV, parity, x_cb, ic, jc);
@@ -261,7 +265,7 @@ namespace quda {
     int jc = blockDim.z*blockIdx.z + threadIdx.z; // tiled coarse color
     if (jc >= arg.uvTile.N_tiles) return;
 
-    if (dir == QUDA_FORWARDS) // only for preconditioned clover is V != AV
+    if (dir == QUDA_FORWARDS) // only for preconditioned clover is V != AV, will need extra logic for staggered KD
       computeUV<from_coarse,dim,dir,fineSpin,coarseSpin>(arg, arg.V, parity, x_cb, ic * arg.uvTile.M, jc * arg.uvTile.N);
     else
       computeUV<from_coarse,dim,dir,fineSpin,coarseSpin>(arg, arg.AV, parity, x_cb, ic * arg.uvTile.M, jc * arg.uvTile.N);
@@ -608,63 +612,104 @@ namespace quda {
     using TileType = typename Arg::vuvTileType;
     auto &tile = arg.vuvTile;
 
-    if (!from_coarse) { // fine grid is top level
+    if (!from_coarse) {
+     
+      if (fineSpin == 4) { // fine grid is top level Wilson type
 
 #pragma unroll
-      for (int s = 0; s < fineSpin; s++) { // Loop over fine spin
+        for (int s = 0; s < fineSpin; s++) { // Loop over fine spin
 
-	//Spin part of the color matrix.  Will always consist
-	//of two terms - diagonal and off-diagonal part of
-	//P_mu = (1+/-\gamma_mu)
+          //Spin part of the color matrix.  Will always consist
+          //of two terms - diagonal and off-diagonal part of
+          //P_mu = (1+/-\gamma_mu)
 
-	const int s_c_row = arg.spin_map(s,parity); // Coarse spin row index
+          const int s_c_row = arg.spin_map(s,parity); // Coarse spin row index
 
-	// Use Gamma to calculate off-diagonal coupling and
-	// column index.  Diagonal coupling is always 1.
-	// If computing the backwards (forwards) direction link then
-	// we desire the positive (negative) projector
+          // Use Gamma to calculate off-diagonal coupling and
+          // column index.  Diagonal coupling is always 1.
+          // If computing the backwards (forwards) direction link then
+          // we desire the positive (negative) projector
 
-	const int s_col = gamma.getcol(s);
-	const int s_c_col = arg.spin_map(s_col,parity); // Coarse spin col index
+          const int s_col = gamma.getcol(s);
+          const int s_c_col = arg.spin_map(s_col,parity); // Coarse spin col index
 
 #pragma unroll
-        for (int k = 0; k < TileType::k; k += TileType::K) { // Sum over fine color
+          for (int k = 0; k < TileType::k; k += TileType::K) { // Sum over fine color
+            if (dir == QUDA_BACKWARDS) {
+              auto V = make_tile_At<complex, false>(tile);
+              V.loadCS(arg.V, 0, 0, parity, x_cb, s, k, i0);
+
+              // here UV is really UAV
+              //Diagonal Spin
+              auto UV = make_tile_B<complex, false>(tile);
+              UV.loadCS(arg.UV, 0, 0, parity, x_cb, s, k, j0);
+              vuv[s_c_row*coarseSpin+s_c_row].mma_tn(V, UV);
+
+              //Off-diagonal Spin (backward link / positive projector applied)
+              auto gammaV = make_tile_A<complex, false>(tile);
+              for (int i = 0; i < TileType::K; i++)
+                for (int j = 0; j < TileType::M; j++) { gammaV(j, i) = gamma.apply(s, conj(V(i, j))); }
+              UV.loadCS(arg.UV, 0, 0, parity, x_cb, s_col, k, j0);
+              vuv[s_c_row*coarseSpin+s_c_col].mma_nn(gammaV, UV);
+            } else {
+              auto AV = make_tile_At<complex, false>(tile);
+              AV.loadCS(arg.AV, 0, 0, parity, x_cb, s, k, i0);
+
+              auto UV = make_tile_B<complex, false>(tile);
+              UV.loadCS(arg.UV, 0, 0, parity, x_cb, s, k, j0);
+
+              //Diagonal Spin
+              vuv[s_c_row*coarseSpin+s_c_row].mma_tn(AV, UV);
+
+              //Off-diagonal Spin (forward link / negative projector applied)
+              auto gammaAV = make_tile_A<complex, false>(tile);
+
+              for (int i = 0; i < TileType::K; i++)
+                for (int j = 0; j < TileType::M; j++) { gammaAV(j, i) = -gamma.apply(s, conj(AV(i, j))); }
+              UV.loadCS(arg.UV, 0, 0, parity, x_cb, s_col, k, j0);
+              vuv[s_c_row*coarseSpin+s_c_col].mma_nn(gammaAV, UV);
+            }
+          } // Fine color
+        }
+      } else { // fineSpin == 1
+        
+        // This is for staggered/asqtad only
+        // the KD op will even to even, odd to odd terms
+
+        const int s_c_row = arg.spin_map(0, parity);
+
+        // the column is the opposite contribution
+        const int s_c_col = arg.spin_map(0, 1-parity);
+
+        for (int k = 0; k < TileType::k; k += TileType::K) { // Sum over fine color 
+
+
           if (dir == QUDA_BACKWARDS) {
+
             auto V = make_tile_At<complex, false>(tile);
-            V.loadCS(arg.V, 0, 0, parity, x_cb, s, k, i0);
+            V.loadCS(arg.V, 0, 0, parity, x_cb, 0, k, i0);
 
             // here UV is really UAV
-	    //Diagonal Spin
             auto UV = make_tile_B<complex, false>(tile);
-            UV.loadCS(arg.UV, 0, 0, parity, x_cb, s, k, j0);
-            vuv[s_c_row*coarseSpin+s_c_row].mma_tn(V, UV);
+            UV.loadCS(arg.UV, 0, 0, parity, x_cb, 0, k, j0);
 
-	    //Off-diagonal Spin (backward link / positive projector applied)
-            auto gammaV = make_tile_A<complex, false>(tile);
-            for (int i = 0; i < TileType::K; i++)
-              for (int j = 0; j < TileType::M; j++) { gammaV(j, i) = gamma.apply(s, conj(V(i, j))); }
-            UV.loadCS(arg.UV, 0, 0, parity, x_cb, s_col, k, j0);
-            vuv[s_c_row*coarseSpin+s_c_col].mma_nn(gammaV, UV);
+            vuv[s_c_row*coarseSpin+s_c_col].mma_tn(V, UV);
+
           } else {
+
             auto AV = make_tile_At<complex, false>(tile);
-            AV.loadCS(arg.AV, 0, 0, parity, x_cb, s, k, i0);
+            AV.loadCS(arg.AV, 0, 0, parity, x_cb, 0, k, i0);
+            AV *= static_cast<Float>(-1.);
 
             auto UV = make_tile_B<complex, false>(tile);
-            UV.loadCS(arg.UV, 0, 0, parity, x_cb, s, k, j0);
+            UV.loadCS(arg.UV, 0, 0, parity, x_cb, 0, k, j0);
 
-            //Diagonal Spin
-            vuv[s_c_row*coarseSpin+s_c_row].mma_tn(AV, UV);
+            vuv[s_c_row*coarseSpin+s_c_col].mma_tn(AV, UV);
 
-	    //Off-diagonal Spin (forward link / negative projector applied)
-            auto gammaAV = make_tile_A<complex, false>(tile);
+          }
 
-            for (int i = 0; i < TileType::K; i++)
-              for (int j = 0; j < TileType::M; j++) { gammaAV(j, i) = -gamma.apply(s, conj(AV(i, j))); }
-            UV.loadCS(arg.UV, 0, 0, parity, x_cb, s_col, k, j0);
-            vuv[s_c_row*coarseSpin+s_c_col].mma_nn(gammaAV, UV);
-	  }
-        } // Fine color
-      }
+        }
+      } // fineSpin == 4 or 1
 
     } else { // fine grid operator is a coarse operator
 
@@ -777,8 +822,8 @@ namespace quda {
           }
 
           if (!arg.bidirectional) {
-            if (s_row == s_col) arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,
-                                                       X[i_block0+i][j_block0+j][x_][s_row][s_col]);
+            if (Arg::fineSpin != 1 && s_row == s_col) arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,
+                                                                     X[i_block0+i][j_block0+j][x_][s_row][s_col]);
             else arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,
                                         -X[i_block0+i][j_block0+j][x_][s_row][s_col]);
           }
@@ -842,11 +887,13 @@ namespace quda {
 #pragma unroll
           for (int s_col = 0; s_col < coarseSpin; s_col++) { // Chiral column block
             if (s_row != s_col) vuv[s_row * coarseSpin + s_col] *= static_cast<Float>(-1.0);
+            if (Arg::fineSpin != 1 || s_row != s_col) {
 #pragma unroll
-            for (int i = 0; i < TileType::M; i++)
+              for (int i = 0; i < TileType::M; i++)
 #pragma unroll
-              for (int j = 0; j < TileType::N; j++)
-                arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,vuv[s_row*coarseSpin+s_col](i,j));
+                for (int j = 0; j < TileType::N; j++)
+                  arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,vuv[s_row*coarseSpin+s_col](i,j));
+            }
           }
         }
       }
@@ -912,6 +959,9 @@ namespace quda {
       c_col = blockDim.z*blockIdx.z + threadIdx.z; // coarse color col index
     }
 
+    // if (parity > 1 && shared_atomic), you can go outside the bounds of arg.coarse_to_fine below
+    if (parity > 1) return;
+
     if (!shared_atomic) {
       x_cb = blockDim.x*(arg.coarse_color_wave ? blockIdx.y : blockIdx.x) + threadIdx.x;
       x_coarse_cb = 0;
@@ -973,8 +1023,9 @@ namespace quda {
   }
 
   /**
-   * Compute the forward links from backwards links by flipping the
+   * Wilson-type: Compute the forward links from backwards links by flipping the
    * sign of the spin projector
+   * Staggered-type: there's no spin-diagonal term, only flip off-spin term
    */
   template<typename Float, int nSpin, int nColor, typename Arg>
   __device__ __host__ void computeYreverse(Arg &arg, int parity, int x_cb, int ic_c, int jc_c) {
@@ -985,12 +1036,12 @@ namespace quda {
 #pragma unroll
       for (int s_row = 0; s_row < nSpin; s_row++) { //Spin row
 #pragma unroll
-	for (int s_col = 0; s_col < nSpin; s_col++) { //Spin column
-	if (s_row == s_col)
-	  Y(d+4,parity,x_cb,s_row,s_col,ic_c,jc_c) = Y(d,parity,x_cb,s_row,s_col,ic_c,jc_c);
-	else
-	  Y(d+4,parity,x_cb,s_row,s_col,ic_c,jc_c) = -Y(d,parity,x_cb,s_row,s_col,ic_c,jc_c);
-	} //Spin column
+        for (int s_col = 0; s_col < nSpin; s_col++) { //Spin column
+          if (s_row == s_col && nSpin != 1) 
+            Y(d+4,parity,x_cb,s_row,s_col,ic_c,jc_c) = Y(d,parity,x_cb,s_row,s_col,ic_c,jc_c);
+          else
+            Y(d+4,parity,x_cb,s_row,s_col,ic_c,jc_c) = -Y(d,parity,x_cb,s_row,s_col,ic_c,jc_c);
+        } //Spin column
       } //Spin row
 
     } // dimension
@@ -1002,11 +1053,11 @@ namespace quda {
     for (int parity=0; parity<2; parity++) {
 #pragma omp parallel for
       for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
-	for (int ic_c = 0; ic_c < nColor; ic_c++) { //Color row
-	  for (int jc_c = 0; jc_c < nColor; jc_c++) { //Color col
-	    computeYreverse<Float,nSpin,nColor,Arg>(arg, parity, x_cb, ic_c, jc_c);
-	  }
-	}
+        for (int ic_c = 0; ic_c < nColor; ic_c++) { //Color row
+          for (int jc_c = 0; jc_c < nColor; jc_c++) { //Color col
+            computeYreverse<Float,nSpin,nColor,Arg>(arg, parity, x_cb, ic_c, jc_c);
+          }
+        }
       } // c/b volume
     } // parity
   }
@@ -1155,10 +1206,41 @@ namespace quda {
 
     for(int s = 0; s < nSpin; s++) { //Spin
       for(int c = 0; c < nColor; c++) { //Color
-	arg.X_atomic(0,parity,x_cb,s,s,c,c) += complex<Float>(1.0,0.0);
+        arg.X_atomic(0,parity,x_cb,s,s,c,c) += complex<Float>(1.0,0.0);
       } //Color
     } //Spin
-   }
+  }
+
+  template<typename Arg>
+  void AddCoarseStaggeredMassCPU(Arg &arg) {
+    using Float = typename Arg::Float;
+    for (int parity=0; parity<2; parity++) {
+#pragma omp parallel for
+      for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
+        for(int s = 0; s < Arg::coarseSpin; s++) { //Spin
+          for(int c = 0; c < Arg::coarseColor; c++) { //Color
+            arg.X_atomic(0,parity,x_cb,s,s,c,c) += complex<Float>(static_cast<Float>(2.)*arg.mass,0.0);
+          } //Color
+        } //Spin
+      } // x_cb
+    } //parity
+  }
+
+  // Adds the staggered mass to the coarse local term.
+  template<typename Arg>
+  __global__ void AddCoarseStaggeredMassGPU(Arg arg) {
+    using Float = typename Arg::Float;
+
+    int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
+    if (x_cb >= arg.coarseVolumeCB) return;
+    int parity = blockDim.y*blockIdx.y + threadIdx.y;
+
+    for(int s = 0; s < Arg::coarseSpin; s++) { //Spin
+      for(int c = 0; c < Arg::coarseColor; c++) { //Color
+        arg.X_atomic(0,parity,x_cb,s,s,c,c) += complex<Float>(static_cast<Float>(2.)*arg.mass,0.0);
+      } //Color
+    } //Spin
+  }
 
   //Adds the twisted-mass term to the coarse local term.
   template<typename Float, int nSpin, int nColor, typename Arg>

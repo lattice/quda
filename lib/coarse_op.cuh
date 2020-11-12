@@ -25,6 +25,7 @@ namespace quda {
     COMPUTE_COARSE_CLOVER,
     COMPUTE_REVERSE_Y,
     COMPUTE_DIAGONAL,
+    COMPUTE_STAGGEREDMASS,
     COMPUTE_TMDIAGONAL,
     COMPUTE_CONVERT,
     COMPUTE_RESCALE,
@@ -58,7 +59,7 @@ namespace quda {
       } else if (type == COMPUTE_AV) {
         if (from_coarse) errorQuda("ComputeAV should only be called from the fine grid");
 
-#if defined(GPU_CLOVER_DIRAC) && !defined(COARSECOARSE)
+#if defined(GPU_CLOVER_DIRAC) && defined(WILSONCOARSE)
         ComputeAVCPU<Float,fineSpin,fineColor,coarseColor>(arg);
 #else
         errorQuda("Clover dslash has not been built");
@@ -67,7 +68,7 @@ namespace quda {
       } else if (type == COMPUTE_TMAV) {
         if (from_coarse) errorQuda("ComputeTMAV should only be called from the fine grid");
 
-#if defined(GPU_TWISTED_MASS_DIRAC) && !defined(COARSECOARSE)
+#if defined(GPU_TWISTED_MASS_DIRAC) && defined(WILSONCOARSE)
         ComputeTMAVCPU<Float,fineSpin,fineColor,coarseColor>(arg);
 #else
         errorQuda("Twisted mass dslash has not been built");
@@ -76,7 +77,7 @@ namespace quda {
       } else if (type == COMPUTE_TMCAV) {
         if (from_coarse) errorQuda("ComputeTMCAV should only be called from the fine grid");
 
-#if defined(GPU_TWISTED_CLOVER_DIRAC) && !defined(COARSECOARSE)
+#if defined(GPU_TWISTED_CLOVER_DIRAC) && defined(WILSONCOARSE)
         ComputeTMCAVCPU<Float,fineSpin,fineColor,coarseColor>(arg);
 #else
         errorQuda("Twisted clover dslash has not been built");
@@ -85,7 +86,7 @@ namespace quda {
       } else if (type == COMPUTE_CLOVER_INV_MAX) {
         if (from_coarse) errorQuda("ComputeInvCloverMax should only be called from the fine grid");
 
-#if defined(DYNAMIC_CLOVER) && !defined(COARSECOARSE)
+#if defined(DYNAMIC_CLOVER) && defined(WILSONCOARSE)
         ComputeCloverInvMaxCPU<Float, false>(arg);
         double max = arg.max_h;
         comm_allreduce_max(&max);
@@ -97,7 +98,7 @@ namespace quda {
       } else if (type == COMPUTE_TWISTED_CLOVER_INV_MAX) {
         if (from_coarse) errorQuda("ComputeInvCloverMax should only be called from the fine grid");
 
-#if defined(DYNAMIC_CLOVER) && !defined(COARSECOARSE)
+#if defined(DYNAMIC_CLOVER) && defined(WILSONCOARSE)
         ComputeCloverInvMaxCPU<Float, true>(arg);
         double max = arg.max_h;
         comm_allreduce_max(&max);
@@ -126,6 +127,12 @@ namespace quda {
         ComputeYReverseCPU<Float,coarseSpin,coarseColor>(arg);
       } else if (type == COMPUTE_DIAGONAL) {
         AddCoarseDiagonalCPU<Float,coarseSpin,coarseColor>(arg);
+      } else if (type == COMPUTE_STAGGEREDMASS) {
+#if defined(STAGGEREDCOARSE)
+        AddCoarseStaggeredMassCPU(arg);
+#else
+        errorQuda("AddCoarseStaggeredMass not enabled for non-staggered coarsenings");
+#endif
       } else if (type == COMPUTE_TMDIAGONAL) {
         AddCoarseTmDiagonalCPU<Float,coarseSpin,coarseColor>(arg);
       } else if (type == COMPUTE_CONVERT) {
@@ -182,7 +189,7 @@ namespace quda {
           .instantiate(Type<Float>(),fineSpin,fineColor,coarseColor,Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
-#if defined(GPU_CLOVER_DIRAC) && !defined(COARSECOARSE)
+#if defined(GPU_CLOVER_DIRAC) && defined(WILSONCOARSE)
         qudaLaunchKernel(ComputeAVGPU<Float,fineSpin,fineColor,coarseColor,Arg>, tp, stream, arg);
 #else
           errorQuda("Clover dslash has not been built");
@@ -197,7 +204,7 @@ namespace quda {
           .instantiate(Type<Float>(),fineSpin,fineColor,coarseColor,Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
-#if defined(GPU_TWISTED_MASS_DIRAC) && !defined(COARSECOARSE)
+#if defined(GPU_TWISTED_MASS_DIRAC) && defined(WILSONCOARSE)
         qudaLaunchKernel(ComputeTMAVGPU<Float,fineSpin,fineColor,coarseColor,Arg>, tp, stream, arg);
 #else
         errorQuda("Twisted mass dslash has not been built");
@@ -212,7 +219,7 @@ namespace quda {
           .instantiate(Type<Float>(),fineSpin,fineColor,coarseColor,Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
-#if defined(GPU_TWISTED_CLOVER_DIRAC) && !defined(COARSECOARSE)
+#if defined(GPU_TWISTED_CLOVER_DIRAC) && defined(WILSONCOARSE)
         qudaLaunchKernel(ComputeTMCAVGPU<Float,fineSpin,fineColor,coarseColor,Arg>, tp, stream, arg);
 #else
         errorQuda("Twisted clover dslash has not been built");
@@ -230,7 +237,7 @@ namespace quda {
           .configure(tp.grid, tp.block, tp.shared_bytes, stream)
           .launch(arg);
 #else
-#if defined(DYNAMIC_CLOVER) && !defined(COARSECOARSE)
+#if defined(DYNAMIC_CLOVER) && defined(WILSONCOARSE)
         qudaLaunchKernel(ComputeCloverInvMaxGPU<Float, false, Arg>, tp, stream, arg);
 #else
         errorQuda("ComputeCloverInvMax only enabled with dynamic clover");
@@ -256,7 +263,7 @@ namespace quda {
           .configure(tp.grid, tp.block, tp.shared_bytes, stream)
           .launch(arg);
 #else
-#if defined(DYNAMIC_CLOVER) && !defined(COARSECOARSE)
+#if defined(DYNAMIC_CLOVER) && defined(WILSONCOARSE)
         qudaLaunchKernel(ComputeCloverInvMaxGPU<Float, true, Arg>, tp, stream, arg);
 #else
         errorQuda("ComputeCloverInvMax only enabled with dynamic clover");
@@ -372,9 +379,13 @@ namespace quda {
           .instantiate(from_coarse,Type<Float>(),fineSpin,coarseSpin,fineColor,coarseColor,Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
+#if !defined(STAGGEREDCOARSE)
         qudaLaunchKernel(ComputeCoarseCloverGPU<from_coarse,Float,fineSpin,coarseSpin,fineColor,coarseColor,Arg>, tp, stream, arg);
+#else
+        errorQuda("ComputeCoarseClover not enabled for staggered coarsenings");
 #endif
-
+        
+#endif
       } else if (type == COMPUTE_REVERSE_Y) {
 
 #ifdef JITIFY
@@ -392,6 +403,20 @@ namespace quda {
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
         qudaLaunchKernel(AddCoarseDiagonalGPU<Float,coarseSpin,coarseColor,Arg>, tp, stream, arg);
+#endif
+      } else if (type == COMPUTE_STAGGEREDMASS) {
+
+#ifdef JITIFY
+        error = program->kernel("quda::AddCoarseStaggeredMassGPU")
+          .instantiate(Type<Arg>())
+          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+#else
+#if defined(STAGGEREDCOARSE)
+        qudaLaunchKernel(AddCoarseStaggeredMassGPU<Arg>, tp, stream, arg);
+#else
+        errorQuda("AddCoarseStaggeredMass not enabled for non-staggered coarsenings");
+#endif
+
 #endif
       } else if (type == COMPUTE_TMDIAGONAL) {
 
@@ -451,8 +476,8 @@ namespace quda {
       long long flops_ = 0;
       switch (type) {
       case COMPUTE_UV:
-	// when fine operator is coarse take into account that the link matrix has spin dependence
-	flops_ = 2l * arg.fineVolumeCB * 8 * fineSpin * coarseColor * fineColor * fineColor * (!from_coarse ? 1 : fineSpin);
+      // when fine operator is coarse take into account that the link matrix has spin dependence
+      flops_ = 2l * arg.fineVolumeCB * 8 * fineSpin * coarseColor * fineColor * fineColor * (!from_coarse ? 1 : fineSpin);
 	break;
       case COMPUTE_AV:
       case COMPUTE_TMAV:
@@ -464,8 +489,8 @@ namespace quda {
 	flops_ = 4l * arg.fineVolumeCB * 8 * (fineSpin/2) * (fineSpin/2) * (fineSpin/2) * fineColor * fineColor * coarseColor;
 	break;
       case COMPUTE_VUV:
-	// when the fine operator is truly fine the VUV multiplication is block sparse which halves the number of operations
-	flops_ = 2l * arg.fineVolumeCB * 8 * fineSpin * fineSpin * coarseColor * coarseColor * fineColor / (!from_coarse ? coarseSpin : 1);
+      // when the fine operator is truly fine the VUV multiplication is block sparse which halves the number of operations
+      flops_ = 2l * arg.fineVolumeCB * 8 * fineSpin * fineSpin * coarseColor * coarseColor * fineColor / (!from_coarse ? coarseSpin : 1);
 	break;
       case COMPUTE_COARSE_CLOVER:
 	// when the fine operator is truly fine the clover multiplication is block sparse which halves the number of operations
@@ -480,6 +505,7 @@ namespace quda {
         flops_ = 0;
 	break;
       case COMPUTE_DIAGONAL:
+      case COMPUTE_STAGGEREDMASS:
       case COMPUTE_TMDIAGONAL:
 	// read addition on the diagonal
 	flops_ = 2l * arg.coarseVolumeCB*coarseSpin*coarseColor;
@@ -529,8 +555,9 @@ namespace quda {
       case COMPUTE_REVERSE_Y:
 	bytes_ = 4*2*2*arg.Y.Bytes(); // 4 from direction, 2 from i/o, 2 from parity
       case COMPUTE_DIAGONAL:
+      case COMPUTE_STAGGEREDMASS:
       case COMPUTE_TMDIAGONAL:
-	bytes_ = 2*2*arg.X.Bytes(); // 2 from i/o, 2 from parity
+	bytes_ = 2*2*arg.X.Bytes()/(coarseSpin*coarseColor); // 2 from i/o, 2 from parity, division because of diagonal
 	break;
       case COMPUTE_CONVERT:
 	bytes_ = dim == 4 ? 2*(arg.X.Bytes() + arg.X_atomic.Bytes()) : 2*(arg.Y.Bytes() + arg.Y_atomic.Bytes());
@@ -559,6 +586,7 @@ namespace quda {
 	break;
       case COMPUTE_REVERSE_Y:
       case COMPUTE_DIAGONAL:
+      case COMPUTE_STAGGEREDMASS:
       case COMPUTE_TMDIAGONAL:
       case COMPUTE_CONVERT:
       case COMPUTE_RESCALE:
@@ -577,6 +605,10 @@ namespace quda {
       if (arg.shared_atomic && type == COMPUTE_VUV)
         return 4*sizeof(storeType)*arg.max_color_height_per_block*arg.max_color_width_per_block*4*coarseSpin*coarseSpin;
       return TunableVectorYZ::sharedBytesPerBlock(param);
+    }
+
+    unsigned int sharedBytesPerThread() const {
+      return TunableVectorYZ::sharedBytesPerThread();
     }
 
   public:
@@ -792,6 +824,7 @@ namespace quda {
         strcat(Aux, ",computeCoarseClover");
       else if (type == COMPUTE_REVERSE_Y)          strcat(Aux,",computeYreverse");
       else if (type == COMPUTE_DIAGONAL)           strcat(Aux,",computeCoarseDiagonal");
+      else if (type == COMPUTE_STAGGEREDMASS)      strcat(Aux,",computeCoarseStaggeredMass");
       else if (type == COMPUTE_TMDIAGONAL)         strcat(Aux,",computeCoarseTmDiagonal");
       else if (type == COMPUTE_CONVERT)            strcat(Aux,",computeConvert");
       else if (type == COMPUTE_RESCALE)            strcat(Aux,",computeRescale");
@@ -827,7 +860,7 @@ namespace quda {
         if (arg.bidirectional && type == COMPUTE_VUV) strcat(Aux,",bidirectional");
       }
 
-      const char *vol_str = (type == COMPUTE_REVERSE_Y || type == COMPUTE_DIAGONAL || type == COMPUTE_TMDIAGONAL ||
+      const char *vol_str = (type == COMPUTE_REVERSE_Y || type == COMPUTE_DIAGONAL || type == COMPUTE_STAGGEREDMASS || type == COMPUTE_TMDIAGONAL ||
                              type == COMPUTE_CONVERT || type == COMPUTE_RESCALE) ? X.VolString () : meta.VolString();
 
       if (type == COMPUTE_VUV || type == COMPUTE_COARSE_CLOVER) {
@@ -848,6 +881,7 @@ namespace quda {
       case COMPUTE_VUV:
         Y_atomic.backup();
       case COMPUTE_DIAGONAL:
+      case COMPUTE_STAGGEREDMASS:
       case COMPUTE_TMDIAGONAL:
       case COMPUTE_COARSE_CLOVER:
 	X_atomic.backup();
@@ -876,6 +910,7 @@ namespace quda {
       case COMPUTE_VUV:
 	Y_atomic.restore();
       case COMPUTE_DIAGONAL:
+      case COMPUTE_STAGGEREDMASS:
       case COMPUTE_TMDIAGONAL:
       case COMPUTE_COARSE_CLOVER:
 	X_atomic.restore();
@@ -911,13 +946,14 @@ namespace quda {
      preconditioned clover operator else in general this just aliases V
      @param V[in] Packed null-space vector accessor
      @param G[in] Fine grid link / gauge field accessor
-     @param C[in] Fine grid clover field accessor
-     @param Cinv[in] Fine grid clover inverse field accessor
+     @param C[in] Fine grid clover field accessor, or Xinv accessor for the KD operator
+     @param Cinv[in] Fine grid clover inverse field accessor, or Xinv accessor for the KD operator
      @param Y_[out] Coarse link field
      @param X_[out] Coarse clover field
      @param X_[out] Coarse clover inverese field (used as temporary here)
      @param v[in] Packed null-space vectors
      @param kappa[in] Kappa parameter
+     @param mass[in] mass parameter
      @param mu[in] Twisted-mass parameter
      @param matpc[in] The type of preconditioning of the source fine-grid operator
      @param need_bidirectional[in] If we need to force bi-directional build or not. Required
@@ -929,7 +965,7 @@ namespace quda {
   void calculateY(coarseGauge &Y, coarseGauge &X, coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic, Ftmp &UV,
                   F &AV, Vt &V, fineGauge &G, fineClover &C, fineClover &Cinv, GaugeField &Y_, GaugeField &X_,
                   GaugeField &Y_atomic_, GaugeField &X_atomic_, ColorSpinorField &uv, ColorSpinorField &av,
-                  const ColorSpinorField &v, const GaugeField &G_, const CloverField &C_, double kappa, double mu,
+                  const ColorSpinorField &v, const GaugeField &G_, const CloverField &C_, double kappa, double mass, double mu,
                   double mu_factor, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional,
                   const int *fine_to_coarse, const int *coarse_to_fine, bool use_mma = false)
   {
@@ -939,10 +975,16 @@ namespace quda {
       errorQuda("Unsupported coarsening of matpc = %d", matpc);
 
     bool is_dirac_coarse = (dirac == QUDA_COARSE_DIRAC || dirac == QUDA_COARSEPC_DIRAC) ? true : false;
+    bool is_dirac_staggered = (dirac == QUDA_STAGGERED_DIRAC || dirac == QUDA_STAGGEREDPC_DIRAC || 
+                               dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC || dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC);
+
+    bool is_dirac_wilson = !is_dirac_coarse && !is_dirac_staggered;
     if (is_dirac_coarse && fineSpin != 2)
       errorQuda("Input Dirac operator %d should have nSpin=2, not nSpin=%d\n", dirac, fineSpin);
-    if (!is_dirac_coarse && fineSpin != 4)
+    if (is_dirac_wilson && fineSpin != 4)
       errorQuda("Input Dirac operator %d should have nSpin=4, not nSpin=%d\n", dirac, fineSpin);
+    if (is_dirac_staggered && fineSpin != 1)
+      errorQuda("Input Dirac operator %d should have nSpin=1, not nSpin=%d\n", dirac, fineSpin);
     if (!is_dirac_coarse && fineColor != 3)
       errorQuda("Input Dirac operator %d should have nColor=3, not nColor=%d\n", dirac, fineColor);
 
@@ -964,7 +1006,7 @@ namespace quda {
     // If doing a preconditioned operator with a clover term then we
     // have bi-directional links, though we can do the bidirectional setup for all operators for debugging
     bool bidirectional_links = (dirac == QUDA_CLOVERPC_DIRAC || dirac == QUDA_COARSEPC_DIRAC || bidirectional_debug ||
-				dirac == QUDA_TWISTED_MASSPC_DIRAC || dirac == QUDA_TWISTED_CLOVERPC_DIRAC || need_bidirectional);
+				dirac == QUDA_TWISTED_MASSPC_DIRAC || dirac == QUDA_TWISTED_CLOVERPC_DIRAC || dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC || need_bidirectional);
 
     if (getVerbosity() >= QUDA_VERBOSE) {
       if (bidirectional_links) printfQuda("Doing bi-directional link coarsening\n");
@@ -974,7 +1016,7 @@ namespace quda {
     //Calculate UV and then VUV for each dimension, accumulating directly into the coarse gauge field Y
 
     typedef CalculateYArg<Float,fineSpin,coarseSpin,fineColor,coarseColor,coarseGauge,coarseGaugeAtomic,fineGauge,F,Ftmp,Vt,fineClover> Arg;
-    Arg arg(Y, X, Y_atomic, X_atomic, UV, AV, G, V, C, Cinv, kappa,
+    Arg arg(Y, X, Y_atomic, X_atomic, UV, AV, G, V, C, Cinv, kappa, mass,
 	    mu, mu_factor, x_size, xc_size, geo_bs, spin_bs, fine_to_coarse, coarse_to_fine, bidirectional_links);
     CalculateY<location, from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> y(
       arg, v, Y_, X_, Y_atomic_, X_atomic_, use_mma);
@@ -1083,21 +1125,22 @@ namespace quda {
     if (bidirectional_links) {
       for (int d = 0; d < nDim; d++) {
         y.setDimension(d);
-	y.setDirection(QUDA_FORWARDS);
-	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing forward %d UV and VUV\n", d);
+      	y.setDirection(QUDA_FORWARDS);
+      	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing forward %d UV and VUV\n", d);
 
-	if (uv.Precision() == QUDA_HALF_PRECISION) {
-	  double U_max = 3.0*G_.abs_max(from_coarse ? d+4 : d);
-	  double uv_max = U_max * v.Scale();
-	  uv.Scale(uv_max);
-	  arg.UV.resetScale(uv_max);
+        if (uv.Precision() == QUDA_HALF_PRECISION) {
+          double U_max = 3.0*G_.abs_max(from_coarse ? d+4 : d);
+          double uv_max = U_max * v.Scale();
+          uv.Scale(uv_max);
+          arg.UV.resetScale(uv_max);
 
-	  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%d U_max = %e v_max = %e uv_max = %e\n", d, U_max, v.Scale(), uv_max);
-	}
+          if (getVerbosity() >= QUDA_VERBOSE) printfQuda("%d U_max = %e v_max = %e uv_max = %e\n", from_coarse ? d+4 : d, U_max, v.Scale(), uv_max);
+        }
 
-	y.setComputeType(COMPUTE_UV);  // compute U*V product
-	y.apply(0);
-	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("UV2[%d] = %e\n", d, arg.UV.norm2());
+        y.setComputeType(COMPUTE_UV);  // compute U*V product
+        y.apply(0);
+
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("UV2[%d] = %e\n", d, arg.UV.norm2());
 
         // if we are writing to a temporary, we need to zero it before each computation
         if (Y_atomic.Geometry() == 1) Y_atomic_.zero();
@@ -1143,8 +1186,8 @@ namespace quda {
       }
     }
 
-    if ( (dirac == QUDA_CLOVERPC_DIRAC || dirac == QUDA_TWISTED_MASSPC_DIRAC || dirac == QUDA_TWISTED_CLOVERPC_DIRAC) &&
-	 (matpc == QUDA_MATPC_EVEN_EVEN || matpc == QUDA_MATPC_ODD_ODD) ) {
+    if ( ((dirac == QUDA_CLOVERPC_DIRAC || dirac == QUDA_TWISTED_MASSPC_DIRAC || dirac == QUDA_TWISTED_CLOVERPC_DIRAC) &&
+	 (matpc == QUDA_MATPC_EVEN_EVEN || matpc == QUDA_MATPC_ODD_ODD)) || (dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) ) {
       av.exchangeGhost(QUDA_INVALID_PARITY, nFace, 0);
       arg.AV.resetGhost(av, av.Ghost());  // make sure we point to the correct pointer in the accessor
       LatticeField::bufferIndex = (1 - LatticeField::bufferIndex); // update ghost bufferIndex for next exchange
@@ -1157,12 +1200,12 @@ namespace quda {
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing backward %d UV and VUV\n", d);
 
       if (uv.Precision() == QUDA_HALF_PRECISION) {
-	double U_max = 3.0*G_.abs_max(d);
-	double uv_max = U_max * av.Scale();
-	uv.Scale(uv_max);
-	arg.UV.resetScale(uv_max);
+        double U_max = 3.0*G_.abs_max(d);
+        double uv_max = U_max * av.Scale();
+        uv.Scale(uv_max);
+        arg.UV.resetScale(uv_max);
 
-	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%d U_max = %e av_max = %e uv_max = %e\n", d, U_max, av.Scale(), uv_max);
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("%d U_max = %e av_max = %e uv_max = %e\n", d, U_max, av.Scale(), uv_max);
       }
 
       y.setComputeType(COMPUTE_UV);  // compute U*A*V product
@@ -1236,6 +1279,10 @@ namespace quda {
     if (dirac == QUDA_CLOVER_DIRAC || dirac == QUDA_COARSE_DIRAC || dirac == QUDA_TWISTED_CLOVER_DIRAC) {
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing fine->coarse clover term\n");
       y.setComputeType(COMPUTE_COARSE_CLOVER);
+      y.apply(0);
+    } else if (dirac == QUDA_STAGGERED_DIRAC || dirac == QUDA_STAGGEREDPC_DIRAC || dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC) { 
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Summing staggered mass contribution to coarse clover\n");
+      y.setComputeType(COMPUTE_STAGGEREDMASS);
       y.apply(0);
     } else {  //Otherwise, we just have to add the identity matrix
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Summing diagonal contribution to coarse clover\n");

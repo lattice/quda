@@ -122,13 +122,7 @@ namespace quda
   public:
     TransformReduce(QudaFieldLocation location, std::vector<reduce_t> &result, const std::vector<T *> &v, I n_items,
                     transformer &h, reduce_t init, reducer &r) :
-      location(location),
-      result(result),
-      v(v),
-      n_items(n_items),
-      h(h),
-      init(init),
-      r(r)
+      location(location), result(result), v(v), n_items(n_items), h(h), init(init), r(r)
     {
       strcpy(aux, "batch_size=");
       u32toa(aux + 11, v.size());

@@ -44,6 +44,11 @@ namespace quda {
       }
     }
 
+    /**
+     * @brief MMA of an mxk matrix with a kxn matrix
+     * @param[in] a input mxk matrix
+     * @param[in] b input kxn matrix
+     */
     template <int k, bool ghost_a, bool ghost_b>
     inline __device__ __host__ void mma_nn(const MatrixTile<T, m, k, ghost_a> &a, const MatrixTile<T, k, n, ghost_b> &b)
     {
@@ -59,6 +64,11 @@ namespace quda {
       }
     }
 
+    /**
+     * @brief MMA of an mxk matrix with the conjugate transpose of an nxk matrix
+     * @param[in] a input mxk matrix
+     * @param[in] b input nxk matrix
+     */
     template <int k, bool ghost_a, bool ghost_b>
     inline __device__ __host__ void mma_nt(const MatrixTile<T, m, k, ghost_a> &a, const MatrixTile<T, n, k, ghost_b> &b)
     {
@@ -74,6 +84,11 @@ namespace quda {
       }
     }
 
+    /**
+     * @brief MMA of a the conjugate transpose of a kxm matrix with a kxn matrix
+     * @param[in] a input kxm matrix
+     * @param[in] b input kxn matrix
+     */
     template <int k, bool ghost_a, bool ghost_b>
     inline __device__ __host__ void mma_tn(const MatrixTile<T, k, m, ghost_a> &a, const MatrixTile<T, k, n, ghost_b> &b)
     {

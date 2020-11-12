@@ -135,7 +135,7 @@ namespace quda
 #else
       auto event = reducer::get_event();
       qudaEventRecord(event, stream);
-      while (!qudaEventQuery(event)) {}
+      while (!qudaEventQuery(event)) { }
 #endif
       // copy back result element by element and convert if necessary to host reduce type
       // unit size here may differ from system_atomic_t size, e.g., if doing double-double
