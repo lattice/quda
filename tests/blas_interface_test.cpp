@@ -39,12 +39,10 @@ void display_test_info()
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
-  return;
 }
 
-void test(int data_type)
+double test(int data_type)
 {
-
   QudaBLASDataType test_data_type = QUDA_BLAS_DATATYPE_INVALID;
   switch (data_type) {
   case 0: test_data_type = QUDA_BLAS_DATATYPE_S; break;
@@ -270,8 +268,9 @@ void test(int data_type)
   // Perform device GEMM Blas operation
   blasGEMMQuda(arrayA, arrayB, arrayC, native_blas_lapack, &blas_param);
 
+  double deviation = 0.0;
   if (verify_results) {
-    blasGEMMQudaVerify(arrayA, arrayB, arrayC, arrayCcopy, refA_size, refB_size, refC_size, &blas_param);
+    deviation = blasGEMMQudaVerify(arrayA, arrayB, arrayC, arrayCcopy, refA_size, refB_size, refC_size, &blas_param);
   }
   
   host_free(refA);
@@ -283,6 +282,8 @@ void test(int data_type)
   host_free(arrayB);
   host_free(arrayC);
   host_free(arrayCcopy);
+
+  return deviation;
 }
 
 // The following tests gets each contraction type and precision using google testing framework
@@ -305,8 +306,20 @@ public:
 // Sets up the Google test
 TEST_P(BLASTest, verify)
 {
-  int data_type = GetParam();
-  test(data_type);
+  auto data_type = GetParam();
+  auto deviation = test(data_type);
+  decltype(deviation) tol;
+  switch (data_type) {
+  case 0:
+  case 2:
+    tol = 2 * std::numeric_limits<float>::epsilon();
+    break;
+  case 1:
+  case 3:
+    tol = 2 * std::numeric_limits<double>::epsilon();
+    break;
+  }
+  EXPECT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
 }
 
 // Helper function to construct the test name
@@ -322,6 +335,10 @@ INSTANTIATE_TEST_SUITE_P(QUDA, BLASTest, Range(0, 4), getBLASName);
 
 int main(int argc, char **argv)
 {
+  // Start Google Test Suite
+  //-----------------------------------------------------------------------------
+  ::testing::InitGoogleTest(&argc, argv);
+
   // QUDA initialise
   //-----------------------------------------------------------------------------
   // command line options
@@ -352,26 +369,23 @@ int main(int argc, char **argv)
   setSpinorSiteSize(24);
   //-----------------------------------------------------------------------------
 
-  // Start Google Test Suite
-  //-----------------------------------------------------------------------------
-  ::testing::InitGoogleTest(&argc, argv);
-
-  // Perfrom the BLAS op specified by the command line
-  switch (blas_data_type) {
-  case QUDA_BLAS_DATATYPE_S: test(0); break;
-  case QUDA_BLAS_DATATYPE_D: test(1); break;
-  case QUDA_BLAS_DATATYPE_C: test(2); break;
-  case QUDA_BLAS_DATATYPE_Z: test(3); break;
-  default: errorQuda("Undefined QUDA BLAS data type %d\n", blas_data_type);
-  }
-
-  // Check for correctness
   if (verify_results) {
+    // Run full set of test if we're doing a verification run
     ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
     if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
     int result = RUN_ALL_TESTS();
     if (result) warningQuda("Google tests for QUDA BLAS failed.");
+  } else {
+    // Perform the BLAS op specified by the command line
+    switch (blas_data_type) {
+    case QUDA_BLAS_DATATYPE_S: test(0); break;
+    case QUDA_BLAS_DATATYPE_D: test(1); break;
+    case QUDA_BLAS_DATATYPE_C: test(2); break;
+    case QUDA_BLAS_DATATYPE_Z: test(3); break;
+    default: errorQuda("Undefined QUDA BLAS data type %d\n", blas_data_type);
+    }
   }
+
   //-----------------------------------------------------------------------------
 
   // finalize the QUDA library

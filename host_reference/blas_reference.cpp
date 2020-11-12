@@ -28,8 +28,8 @@ void fillEigenArray(MatrixXcd &EigenArr, complex<double> *arr, int rows, int col
   }
 }
 
-void blasGEMMEigenVerify(void *A_data, void *B_data, void *C_data_copy, void *C_data, uint64_t refA_size,
-                         uint64_t refB_size, uint64_t refC_size, QudaBLASParam *blas_param)
+double blasGEMMEigenVerify(void *A_data, void *B_data, void *C_data_copy, void *C_data, uint64_t refA_size,
+                           uint64_t refB_size, uint64_t refC_size, QudaBLASParam *blas_param)
 {
   // Sanity checks on parameters
   //-------------------------------------------------------------------------
@@ -155,6 +155,7 @@ void blasGEMMEigenVerify(void *A_data, void *B_data, void *C_data_copy, void *C_
   printfQuda("Computing Eigen matrix opertaion a * A_{%lu,%lu} * B_{%lu,%lu} + b * C_{%lu,%lu} = C_{%lu,%lu}\n",
              A.rows(), A.cols(), B.rows(), B.cols(), C_eigen.rows(), C_eigen.cols(), C_eigen.rows(), C_eigen.cols());
 
+  double max_relative_deviation = 0.0;
   for (int batch = 0; batch < batches; batch += max_stride) {
 
     // Populate Eigen objects
@@ -183,9 +184,12 @@ void blasGEMMEigenVerify(void *A_data, void *B_data, void *C_data_copy, void *C_
 
     // Check Eigen result against blas
     C_resid = C_gpu - C_eigen;
+    double deviation = C_resid.norm();
+    double relative_deviation = deviation / C_eigen.norm();
+    max_relative_deviation = std::max(max_relative_deviation, relative_deviation);
 
-    printfQuda("batch %d: (C_host - C_gpu) Frobenius norm = %e. Relative deviation = %e\n", batch, C_resid.norm(),
-               C_resid.norm() / (C_resid.rows() * C_resid.cols()));
+    printfQuda("batch %d: (C_host - C_gpu) Frobenius norm = %e. Relative deviation = %e\n",
+               batch, deviation, relative_deviation);
 
     a_offset += refA_size * a_stride;
     b_offset += refB_size * b_stride;
@@ -201,10 +205,12 @@ void blasGEMMEigenVerify(void *A_data, void *B_data, void *C_data_copy, void *C_
     std::swap(blas_param->a_stride, blas_param->b_stride);
     std::swap(A_data, B_data);
   }
+
+  return max_relative_deviation;
 }
 
-void blasGEMMQudaVerify(void *arrayA, void *arrayB, void *arrayC, void *arrayCcopy, uint64_t refA_size,
-                        uint64_t refB_size, uint64_t refC_size, QudaBLASParam *blas_param)
+double blasGEMMQudaVerify(void *arrayA, void *arrayB, void *arrayC, void *arrayCcopy, uint64_t refA_size,
+                          uint64_t refB_size, uint64_t refC_size, QudaBLASParam *blas_param)
 {
   // Reference data is always in complex double
   size_t data_size = sizeof(double);
@@ -260,10 +266,12 @@ void blasGEMMQudaVerify(void *arrayA, void *arrayB, void *arrayC, void *arrayCco
   default: errorQuda("Unrecognised data type %d\n", blas_param->data_type);
   }
 
-  blasGEMMEigenVerify(checkA, checkB, checkCcopy, checkC, refA_size, refB_size, refC_size, blas_param);
+  auto deviation = blasGEMMEigenVerify(checkA, checkB, checkCcopy, checkC, refA_size, refB_size, refC_size, blas_param);
 
   host_free(checkA);
   host_free(checkB);
   host_free(checkC);
   host_free(checkCcopy);
+
+  return deviation;
 }
