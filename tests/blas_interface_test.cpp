@@ -141,8 +141,14 @@ double test(int data_type)
   size_t data_size = sizeof(double);
   int re_im = 2;
   data_size *= re_im;
-  
-  int batches = blas_param.batch_count;
+
+  // If the user passes non-zero offsets, add one extra
+  // matrix to the test data.
+  int batches_extra = 0;
+  if (blas_param.a_offset + blas_param.b_offset + blas_param.c_offset > 0) {
+    batches_extra++;
+  }
+  int batches = blas_param.batch_count + batches_extra;
   uint64_t refA_size = 0, refB_size = 0, refC_size = 0;
   if (blas_param.data_order == QUDA_BLAS_DATAORDER_COL) {
     // leading dimension is in terms of consecutive data

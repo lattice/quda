@@ -216,8 +216,15 @@ double blasGEMMQudaVerify(void *arrayA, void *arrayB, void *arrayC, void *arrayC
   size_t data_size = sizeof(double);
   int re_im = 2;
   data_size *= re_im;
+
+  // If the user passes non-zero offsets, add one extra
+  // matrix to the test data.
+  int batches_extra = 0;
+  if (blas_param->a_offset + blas_param->b_offset + blas_param->c_offset > 0) {
+    batches_extra++;
+  }
+  int batches = blas_param->batch_count + batches_extra;
   
-  int batches = blas_param->batch_count;
   // Copy data from problem sized array to reference sized array.
   // Include A and B to ensure no data corruption occurred
   void *checkA = pinned_malloc(refA_size * data_size * batches);
