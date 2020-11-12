@@ -2424,17 +2424,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   std::vector<Complex> evals(eig_param->n_conv, 0.0);
   std::vector<ColorSpinorField *> kSpace;
   for (int i = 0; i < eig_param->n_conv; i++) { kSpace.push_back(ColorSpinorField::Create(cudaParam)); }
-
-  // If you use polynomial acceleration on a non-symmetric matrix,
-  // the solver will fail.
-  if (eig_param->use_poly_acc && !eig_param->use_norm_op && !(inv_param->dslash_type == QUDA_LAPLACE_DSLASH)) {
-    // Breaking up the boolean check a little bit. If it's a staggered dslash type and a PC type, we can use poly acceleration.
-    if (!((inv_param->dslash_type == QUDA_STAGGERED_DSLASH || inv_param->dslash_type == QUDA_ASQTAD_DSLASH)
-          && inv_param->solve_type == QUDA_DIRECT_PC_SOLVE)) {
-      errorQuda("Polynomial acceleration with non-symmetric matrices not supported");
-    }
-  }
-
+  
   // If you attempt to compute part of the imaginary spectrum of a symmetric matrix,
   // the solver will fail.
   if ((eig_param->spectrum == QUDA_SPECTRUM_LI_EIG || eig_param->spectrum == QUDA_SPECTRUM_SI_EIG)
@@ -2444,7 +2434,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
     errorQuda("Cannot compute imaginary spectra with a hermitian operator");
   }
 
-  // Gamma5 premultiplication is only supported for the M type operator
+  // Gamma5 pre-multiplication is only supported for the M type operator
   if (eig_param->compute_gamma5) {
     if (eig_param->use_norm_op || eig_param->use_dagger) {
       errorQuda("gamma5 premultiplication is only supported for M type operators: dag = %s, normop = %s",

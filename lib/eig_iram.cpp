@@ -55,7 +55,7 @@ namespace quda
 
     // r_{j} = M * v_{j};
     matVec(mat, *r[0], *v[j]);
-
+    
     double beta_pre = sqrt(blas::norm2(*r[0]));
 
     // Compute the j-th residual corresponding
