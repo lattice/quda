@@ -445,13 +445,13 @@ namespace quda {
         }
 
         // if either direction is not peer-to-peer then we need to synchronize
-	if (!comm_peer2peer_enabled(0,dim) || !comm_peer2peer_enabled(1,dim)) qudaDeviceSynchronize();
+        if (!comm_peer2peer_enabled(0, dim) || !comm_peer2peer_enabled(1, dim)) qudaDeviceSynchronize();
 
-	// if we pass a stream to sendStart then we must ensure that stream is synchronized
-	for (int dir=0; dir<2; dir++) sendStart(dim, dir, &streams[dir]);
-	for (int dir=0; dir<2; dir++) commsComplete(dim, dir);
+        // if we pass a stream to sendStart then we must ensure that stream is synchronized
+        for (int dir = 0; dir < 2; dir++) sendStart(dim, dir, &streams[dir]);
+        for (int dir = 0; dir < 2; dir++) commsComplete(dim, dir);
 
-	for (int dir=0; dir<2; dir++) {
+        for (int dir=0; dir<2; dir++) {
 	  // issue host-to-device copies if needed
 	  if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) {
             qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][dim][dir], from_face_dim_dir_h[bufferIndex][dim][dir],
@@ -597,25 +597,26 @@ namespace quda {
 	    for (int d=0; d<geometry; d++) {
               qudaMemcpy(((void **)buffer)[d], ((void **)src.Gauge_p())[d], src.Bytes() / geometry, cudaMemcpyDefault);
             }
-	  } else {
+          } else {
             qudaMemcpy(buffer, src.Gauge_p(), src.Bytes(), cudaMemcpyDefault);
           }
 
-	  if (src.Order() > 4 && GhostExchange() == QUDA_GHOST_EXCHANGE_PAD &&
-	      src.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
-	    for (int d=0; d<geometry; d++)
+          if (src.Order() > 4 && GhostExchange() == QUDA_GHOST_EXCHANGE_PAD
+              && src.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
+            for (int d = 0; d < geometry; d++)
               qudaMemcpy(ghost_buffer[d], src.Ghost()[d], ghost_bytes[d], cudaMemcpyDefault);
 
           if (ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED && src.GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
-	    copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer, 0, ghost_buffer);
-	    if (geometry == QUDA_COARSE_GEOMETRY) copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer, 0, ghost_buffer, 3);
-	  } else {
-	    copyExtendedGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer);
+            copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer, 0, ghost_buffer);
+            if (geometry == QUDA_COARSE_GEOMETRY)
+              copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer, 0, ghost_buffer, 3);
+          } else {
+            copyExtendedGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer);
             if (geometry == QUDA_COARSE_GEOMETRY) errorQuda("Extended gauge copy for coarse geometry not supported");
-	  }
-	  free_gauge_buffer(buffer, src.Order(), src.Geometry());
-	  if (nFace > 0) free_ghost_buffer(ghost_buffer, src.Order(), geometry);
-	}
+          }
+          free_gauge_buffer(buffer, src.Order(), src.Geometry());
+          if (nFace > 0) free_ghost_buffer(ghost_buffer, src.Order(), geometry);
+        }
       } // reorder_location
     } else {
       errorQuda("Invalid gauge field type");
@@ -681,13 +682,13 @@ namespace quda {
           qudaMemcpy(cpu.gauge, buffer, cpu.Bytes(), cudaMemcpyDefault);
         }
 
-	if (cpu.Order() > 4 && GhostExchange() == QUDA_GHOST_EXCHANGE_PAD &&
-	    cpu.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
-	  for (int d=0; d<geometry; d++)
+        if (cpu.Order() > 4 && GhostExchange() == QUDA_GHOST_EXCHANGE_PAD
+            && cpu.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
+          for (int d = 0; d < geometry; d++)
             qudaMemcpy(cpu.Ghost()[d], ghost_buffer[d], ghost_bytes[d], cudaMemcpyDefault);
 
         free_gauge_buffer(buffer, cpu.Order(), cpu.Geometry());
-	if (nFace > 0) free_ghost_buffer(ghost_buffer, cpu.Order(), geometry);
+        if (nFace > 0) free_ghost_buffer(ghost_buffer, cpu.Order(), geometry);
       }
     } else if (reorder_location() == QUDA_CPU_FIELD_LOCATION) { // do copy then host-side reorder
 

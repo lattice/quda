@@ -3,7 +3,7 @@ set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_FULL_LIBDIR})
 
 # enable tests build a common library for all test utilities
 add_library(quda_test STATIC googletest/src/gtest-all.cc)
-target_include_directories(quda_test PUBLIC googletest/include googletest)
+target_include_directories(quda_test PUBLIC googletest/include googletest ${CMAKE_BINARY_DIR}/externals/eigen/src/Eigen)
 
 if(QUDA_QIO
    AND QUDA_DOWNLOAD_USQCD
@@ -162,6 +162,13 @@ if(QUDA_MULTIGRID)
 
 endif()
 
+if(QUDA_BUILD_NATIVE_LAPACK)
+  add_executable(blas_interface_test blas_interface_test.cpp)
+  target_link_libraries(blas_interface_test ${TEST_LIBS})
+  quda_checkbuildtest(blas_interface_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS blas_interface_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
+
 add_executable(plaq_test plaq_test.cpp)
 target_link_libraries(plaq_test ${TEST_LIBS})
 quda_checkbuildtest(plaq_test QUDA_BUILD_ALL_TESTS)
@@ -252,8 +259,7 @@ if(QUDA_MPI OR QUDA_QMP)
   endif()
 endif()
 
-# BLAS test
-
+# BLAS tests
 if(QUDA_DIRAC_WILSON
    OR QUDA_DIRAC_CLOVER
    OR QUDA_DIRAC_TWISTED_MASS
@@ -289,6 +295,31 @@ if(QUDA_DIRAC_STAGGERED)
                    --dslash-type staggered
                    --solve-type direct
                    --gtest_output=xml:blas_test_full.xml)
+endif()
+
+#BLAS interface test
+if(QUDA_BUILD_NATIVE_LAPACK)
+  add_test(NAME blas_interface_test
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:blas_interface_test> ${MPIEXEC_POSTFLAGS}
+    --blas-mnk 64 64 64
+    --blas-leading-dims 128 128 128
+    --blas-offsets 16 16 16
+    --blas-data-type Z
+    --blas-data-order row
+    --blas-batch 20
+    --blas-alpha 1.0 2.0
+    --blas-beta -3.0 1.5
+    --blas-trans-a T
+    --blas-trans-b C
+    --gtest_output=xml:blas_interface_test.xml)
+endif()
+
+#Contraction test
+if(QUDA_CONTRACT)
+  add_test(NAME contract_test
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:contract_test> ${MPIEXEC_POSTFLAGS}
+    --dim 2 4 6 8
+    --gtest_output=xml:contract_test.xml)
 endif()
 
 # loop over Dslash policies
