@@ -363,6 +363,11 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     }
   }
 
+  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+    inv_param.m5 = m5;
+    inv_param.Ls = Lsdim;
+  }
+
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
 
@@ -408,8 +413,8 @@ void setMultigridParam(QudaMultigridParam &mg_param)
 
     mg_param.cycle_type[i] = QUDA_MG_CYCLE_RECURSIVE;
 
-    // Is not a staggered solve, always aggregate
-    mg_param.transfer_type[i] = QUDA_TRANSFER_AGGREGATE;
+    // may be an "optimize kd" transfer type if it's dwf
+    mg_param.transfer_type[i] = (i == 0) ? staggered_transfer_type : QUDA_TRANSFER_AGGREGATE;
 
     // set the coarse solver wrappers including bottom solver
     mg_param.coarse_solver[i] = coarse_solver[i];
@@ -524,6 +529,10 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   // only coarsen the spin on the first restriction
   mg_param.spin_block_size[0] = 2;
 
+  if (staggered_transfer_type == QUDA_TRANSFER_OPTIMIZED_KD) {
+    mg_param.spin_block_size[0] = 1; // we're coarsening the optimized KD op
+  }
+
   mg_param.setup_type = setup_type;
   mg_param.pre_orthonormalize = pre_orthonormalize ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_param.post_orthonormalize = post_orthonormalize ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -612,6 +621,11 @@ void setMultigridInvertParam(QudaInvertParam &inv_param)
       printfQuda("Twisted-mass doublet non supported (yet)\n");
       exit(0);
     }
+  }
+
+  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+    inv_param.m5 = m5;
+    inv_param.Ls = Lsdim;
   }
 
   inv_param.clover_coeff = clover_coeff;

@@ -782,7 +782,7 @@ namespace quda {
 
     // Detect if the "coarse" op is the Kahler-Dirac op or something else
     // that still acts on a fine staggered ColorSpinorField
-    if (geoBlockVolume == 1 && Nvec == nColor && nSpin == 1) {
+    if (geoBlockVolume == 1 && Nvec == nColor && (nSpin == 1 || x[4] > 1)) {
       coarseParam.nSpin = nSpin;
       coarseParam.nColor = nColor;
     } else {
@@ -802,6 +802,11 @@ namespace quda {
     // for GPU fields, always use native ordering to ensure coalescing
     if (new_location == QUDA_CUDA_FIELD_LOCATION) coarseParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
     else coarseParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+
+    // check for dwf
+    if (new_location == QUDA_CUDA_FIELD_LOCATION && geoBlockVolume == 1 && Nvec == nColor && nSpin == 4) {
+      coarseParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
+    }
 
     coarseParam.setPrecision(new_precision);
 

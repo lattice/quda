@@ -385,42 +385,67 @@ namespace quda
       if (dirac_type == QUDA_ASQTAD_DIRAC || dirac_type == QUDA_ASQTADPC_DIRAC)
         fine_gauge = const_cast<cudaGaugeField *>(
           reinterpret_cast<const DiracImprovedStaggered *>(diracSmoother)->getFatLinkField());
+      if (dirac_type == QUDA_DOMAIN_WALL_DIRAC)
+        fine_gauge
+          = const_cast<cudaGaugeField *>(reinterpret_cast<const DiracDomainWall *>(diracSmoother)->getGaugeField());
 
-      xInvKD = AllocateAndBuildStaggeredKahlerDiracInverse(*fine_gauge, diracSmoother->Mass(),
-                                                           param.mg_global.invert_param->cuda_prec_precondition);
+      if (dirac_type == QUDA_STAGGERED_DIRAC || dirac_type == QUDA_STAGGEREDPC_DIRAC || dirac_type == QUDA_ASQTAD_DIRAC || dirac_type == QUDA_ASQTADPC_DIRAC) {
 
-      DiracParam diracParamKD;
-      diracParamKD.kappa
-        = -1.0; // Cancels automatic kappa in Y field application, which may be relevant if it propagates down
-      diracParamKD.mass = diracSmoother->Mass();
-      diracParamKD.mu = diracSmoother->Mu(); // doesn't matter
-      diracParamKD.mu_factor = 1.0;          // doesn't matter
-      diracParamKD.dagger = QUDA_DAG_NO;
-      diracParamKD.matpcType = QUDA_MATPC_EVEN_EVEN; // I guess we could hack this for left vs right block Jacobi?
-      diracParamKD.gauge = const_cast<cudaGaugeField *>(fine_gauge);
-      diracParamKD.xInvKD = xInvKD;
+        xInvKD = AllocateAndBuildStaggeredKahlerDiracInverse(*fine_gauge, diracSmoother->Mass(),
+                                                             param.mg_global.invert_param->cuda_prec_precondition);
 
-      diracParamKD.tmp1 = tmp_coarse;
-      diracParamKD.tmp2 = tmp2_coarse;
+        DiracParam diracParamKD;
+        diracParamKD.kappa
+          = -1.0; // Cancels automatic kappa in Y field application, which may be relevant if it propagates down
+        diracParamKD.mass = diracSmoother->Mass();
+        diracParamKD.mu = diracSmoother->Mu(); // doesn't matter
+        diracParamKD.mu_factor = 1.0;          // doesn't matter
+        diracParamKD.dagger = QUDA_DAG_NO;
+        diracParamKD.matpcType = QUDA_MATPC_EVEN_EVEN; // I guess we could hack this for left vs right block Jacobi?
+        diracParamKD.gauge = const_cast<cudaGaugeField *>(fine_gauge);
+        diracParamKD.xInvKD = xInvKD;
 
-      if (dirac_type == QUDA_STAGGERED_DIRAC || dirac_type == QUDA_STAGGEREDPC_DIRAC) {
-        diracParamKD.type = QUDA_STAGGEREDKD_DIRAC;
+        diracParamKD.tmp1 = tmp_coarse;
+        diracParamKD.tmp2 = tmp2_coarse;
 
-        diracCoarseResidual = new DiracStaggeredKD(diracParamKD);
-        diracCoarseSmoother = new DiracStaggeredKD(diracParamKD);
-        diracCoarseSmootherSloppy = new DiracStaggeredKD(diracParamKD);
-      } else if (dirac_type == QUDA_ASQTAD_DIRAC || dirac_type == QUDA_ASQTADPC_DIRAC) {
-        diracParamKD.type = QUDA_ASQTADKD_DIRAC;
+        if (dirac_type == QUDA_STAGGERED_DIRAC || dirac_type == QUDA_STAGGEREDPC_DIRAC) {
+          diracParamKD.type = QUDA_STAGGEREDKD_DIRAC;
 
-        diracParamKD.fatGauge = fine_gauge;
-        diracParamKD.longGauge = const_cast<cudaGaugeField *>(
-          reinterpret_cast<const DiracImprovedStaggered *>(diracSmoother)->getLongLinkField());
+          diracCoarseResidual = new DiracStaggeredKD(diracParamKD);
+          diracCoarseSmoother = new DiracStaggeredKD(diracParamKD);
+          diracCoarseSmootherSloppy = new DiracStaggeredKD(diracParamKD);
+        } else if (dirac_type == QUDA_ASQTAD_DIRAC || dirac_type == QUDA_ASQTADPC_DIRAC) {
+          diracParamKD.type = QUDA_ASQTADKD_DIRAC;
 
-        diracCoarseResidual = new DiracImprovedStaggeredKD(diracParamKD);
-        diracCoarseSmoother = new DiracImprovedStaggeredKD(diracParamKD);
-        diracCoarseSmootherSloppy = new DiracImprovedStaggeredKD(diracParamKD);
-      } else {
-        errorQuda("Invalid dirac_type %d", dirac_type);
+          diracParamKD.fatGauge = fine_gauge;
+          diracParamKD.longGauge = const_cast<cudaGaugeField *>(
+            reinterpret_cast<const DiracImprovedStaggered *>(diracSmoother)->getLongLinkField());
+
+          diracCoarseResidual = new DiracImprovedStaggeredKD(diracParamKD);
+          diracCoarseSmoother = new DiracImprovedStaggeredKD(diracParamKD);
+          diracCoarseSmootherSloppy = new DiracImprovedStaggeredKD(diracParamKD);
+        } else {
+          errorQuda("Invalid dirac_type %d", dirac_type);
+        }
+      } else if (dirac_type == QUDA_DOMAIN_WALL_DIRAC) {
+        DiracParam diracParamPV;
+        diracParamPV.kappa = diracSmoother->Kappa();
+        diracParamPV.mass = diracSmoother->Mass();
+        diracParamPV.mu = diracSmoother->Mu(); // doesn't matter
+        diracParamPV.mu_factor = diracSmoother->MuFactor(); // doesn't matter
+        diracParamPV.m5 = reinterpret_cast<const DiracDomainWall*>(diracSmoother)->M5();
+        diracParamPV.Ls = reinterpret_cast<const DiracDomainWall*>(diracSmoother)->getLs();
+
+        diracParamPV.dagger = QUDA_DAG_NO;
+        diracParamPV.matpcType = QUDA_MATPC_EVEN_EVEN; // I guess we could hack this for left vs right block Jacobi?
+        diracParamPV.gauge = const_cast<cudaGaugeField *>(fine_gauge);
+
+        diracParamPV.type = QUDA_DOMAIN_WALLPV_DIRAC;
+
+        diracCoarseResidual = new DiracDomainWallPV(diracParamPV);
+        diracCoarseSmoother = new DiracDomainWallPV(diracParamPV);
+        diracCoarseSmootherSloppy = new DiracDomainWallPV(diracParamPV);
+
       }
 
     } else {

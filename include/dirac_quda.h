@@ -691,6 +691,11 @@ public:
     virtual ~DiracDomainWall();
     DiracDomainWall& operator=(const DiracDomainWall &dirac);
 
+    virtual const double M5() const { return m5; }
+    virtual const double getLs() const { return Ls; }
+
+    virtual const cudaGaugeField *getGaugeField() const { return gauge; }
+
     void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
 		const QudaParity parity) const;
     void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
@@ -706,6 +711,46 @@ public:
 			     const QudaSolutionType) const;
 
     virtual QudaDiracType getDiracType() const { return QUDA_DOMAIN_WALL_DIRAC; }
+  };
+
+  class DiracDomainWallPV : public DiracDomainWall {
+
+
+public:
+    DiracDomainWallPV(const DiracParam &param);
+    DiracDomainWallPV(const DiracDomainWallPV &dirac);
+    virtual ~DiracDomainWallPV();
+    DiracDomainWallPV& operator=(const DiracDomainWallPV &dirac);
+
+    virtual void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
+
+    virtual bool hasDslash() const { return false; }
+
+    void Dslash(ColorSpinorField &out, const ColorSpinorField &in,
+                const QudaParity parity) const;
+    void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in,
+                    const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+
+    virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+    virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    void ApplyPVDagger(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+                         ColorSpinorField &x, ColorSpinorField &b,
+                         const QudaSolutionType) const;
+    virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
+                             const QudaSolutionType) const;
+
+    virtual bool hasSpecialMG() const { return true; }
+
+    virtual void prepareSpecialMG(ColorSpinorField* &src, ColorSpinorField* &sol,
+                         ColorSpinorField &x, ColorSpinorField &b,
+                         const QudaSolutionType) const;
+    virtual void reconstructSpecialMG(ColorSpinorField &x, const ColorSpinorField &b,
+                             const QudaSolutionType) const;
+
+    virtual QudaDiracType getDiracType() const { return QUDA_DOMAIN_WALLPV_DIRAC; }
   };
 
   // 5d Even-odd preconditioned domain wall
