@@ -2424,7 +2424,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   std::vector<Complex> evals(eig_param->n_conv, 0.0);
   std::vector<ColorSpinorField *> kSpace;
   for (int i = 0; i < eig_param->n_conv; i++) { kSpace.push_back(ColorSpinorField::Create(cudaParam)); }
-  
+
   // If you attempt to compute part of the imaginary spectrum of a symmetric matrix,
   // the solver will fail.
   if ((eig_param->spectrum == QUDA_SPECTRUM_LI_EIG || eig_param->spectrum == QUDA_SPECTRUM_SI_EIG)

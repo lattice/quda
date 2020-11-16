@@ -120,23 +120,20 @@ namespace quda
     if (!mat.hermitian() && eig_solver->hermitian())
       errorQuda("Cannot solve non-Hermitian system with strictly Hermitian eigensolver %d, %d", (int)!mat.hermitian(),
                 (int)eig_solver->hermitian());
-    
+
     // Support for Chebyshev only in strictly Hermitian solvers
-    if(eig_param->use_poly_acc) {
-      if(!mat.hermitian()) 
-	errorQuda("Cannot use polynomial acceleration with non-Hermitian operator");
-      if(!eig_solver->hermitian())
-	errorQuda("Polynomial acceleration not supported with non-Hermitian solver");
+    if (eig_param->use_poly_acc) {
+      if (!mat.hermitian()) errorQuda("Cannot use polynomial acceleration with non-Hermitian operator");
+      if (!eig_solver->hermitian()) errorQuda("Polynomial acceleration not supported with non-Hermitian solver");
     }
-    
-    if (mat.hermitian() && !(eig_param->spectrum == QUDA_SPECTRUM_LR_EIG ||
-			     eig_param->spectrum == QUDA_SPECTRUM_SR_EIG))
+
+    if (mat.hermitian() && !(eig_param->spectrum == QUDA_SPECTRUM_LR_EIG || eig_param->spectrum == QUDA_SPECTRUM_SR_EIG))
       errorQuda("Only the real spectrum of a Hermitian operator may be computed");
     //--------------------------------------------------------------------------
-    
+
     return eig_solver;
   }
-  
+
   // Utilities and functions common to all Eigensolver instances
   //------------------------------------------------------------------------------
   void EigenSolver::prepareInitialGuess(std::vector<ColorSpinorField *> &kSpace)
