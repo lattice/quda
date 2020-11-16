@@ -453,7 +453,7 @@ namespace quda {
 
         for (int dir = 0; dir < 2; dir++) {
           // issue host-to-device copies if needed
-	  if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) {
+          if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) {
             qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][dim][dir], from_face_dim_dir_h[bufferIndex][dim][dir],
                             ghost_face_bytes[dim], cudaMemcpyHostToDevice, streams[dir]);
           }

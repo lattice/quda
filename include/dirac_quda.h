@@ -2296,7 +2296,7 @@ public:
         reset2 = true;
       }
       dirac->M(out, in);
-      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
+      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
       gamma5(out, out);
       if (reset2) {
         dirac->tmp2 = NULL;
@@ -2309,7 +2309,7 @@ public:
     }
 
     int getStencilSteps() const { return dirac->getStencilSteps(); }
-    
+
     virtual bool hermitian() const { return true; } // gamma5 op is always Hermitian
   };
 
