@@ -30,7 +30,10 @@ namespace quda
 
     void apply(const qudaStream_t &stream)
     {
+      int maxThreadsPerBlock_tmp=deviceProp.maxThreadsPerBlock;
+      deviceProp.maxThreadsPerBlock=256;
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      deviceProp.maxThreadsPerBlock=maxThreadsPerBlock_tmp;
       Dslash::setParam(tp);
       typedef typename mapper<typename Arg::Float>::type real;
 #ifdef JITIFY

@@ -126,7 +126,10 @@ public:
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
         errorQuda("CPU variant not instantiated");
       } else {
+        int maxThreadsPerBlock_tmp=deviceProp.maxThreadsPerBlock;
+        deviceProp.maxThreadsPerBlock=512;
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        deviceProp.maxThreadsPerBlock=maxThreadsPerBlock_tmp;
         if (arg.type == DSLASH5_DWF) {
           if (arg.xpay)
             arg.dagger ? launch(dslash5GPU<Float, nColor, true, true, DSLASH5_DWF, Arg>, tp, arg, stream) :
