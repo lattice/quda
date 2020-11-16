@@ -2269,26 +2269,47 @@ public:
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
     {
-      dirac->tmp1 = &tmp;
+      bool reset1 = false;
+      if (!dirac->tmp1) {
+        dirac->tmp1 = &tmp;
+        reset1 = true;
+      }
       dirac->M(out, in);
-      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
+      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
       gamma5(out, out);
-      dirac->tmp1 = NULL;
+      if (reset1) {
+        dirac->tmp1 = NULL;
+        reset1 = false;
+      }
     }
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
     {
-      dirac->tmp1 = &Tmp1;
-      dirac->tmp2 = &Tmp2;
+      bool reset1 = false;
+      bool reset2 = false;
+      if (!dirac->tmp1) {
+        dirac->tmp1 = &Tmp1;
+        reset1 = true;
+      }
+      if (!dirac->tmp2) {
+        dirac->tmp2 = &Tmp2;
+        reset2 = true;
+      }
       dirac->M(out, in);
-      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
+      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
       gamma5(out, out);
-      dirac->tmp2 = NULL;
-      dirac->tmp1 = NULL;
+      if (reset2) {
+        dirac->tmp2 = NULL;
+        reset2 = false;
+      }
+      if (reset1) {
+        dirac->tmp1 = NULL;
+        reset1 = false;
+      }
     }
-
+    
     int getStencilSteps() const { return dirac->getStencilSteps(); }
-
+    
     virtual bool hermitian() const { return true; } // gamma5 op is always Hermitian
   };
 
