@@ -73,7 +73,7 @@ namespace quda {
     long long Ls = in.X(4);
     long long bulk = (Ls - 2) * (in.Volume() / Ls);
     long long wall = 2 * in.Volume() / Ls;
-    flops += 2 * (1320LL + 48LL) * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
+    flops += 2LL * (1320LL + 48LL) * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
   }
 
   void DiracDomainWallPV::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const

@@ -34,6 +34,39 @@ namespace quda {
     if (zMobius) { errorQuda("zMobius has NOT been fully tested in QUDA.\n"); }
   }
 
+  DiracMobius::DiracMobius(const DiracMobius &dirac) :
+    DiracDomainWall(dirac),
+    zMobius(dirac.zMobius),
+    mobius_kappa_b(dirac.mobius_kappa_b),
+    mobius_kappa_c(dirac.mobius_kappa_c),
+    mobius_kappa(dirac.mobius_kappa)
+  {
+    memcpy(b_5, dirac.b_5, sizeof(Complex) * dirac.Ls);
+    memcpy(c_5, dirac.c_5, sizeof(Complex) * dirac.Ls);
+
+    if (zMobius) { errorQuda("zMobius has NOT been fully tested in QUDA.\n"); }
+  }
+
+  DiracMobius::~DiracMobius()
+  {
+
+  }
+
+  DiracMobius &DiracMobius::operator=(const DiracMobius &dirac)
+  {
+    if (&dirac != this) {
+      DiracDomainWall::operator=(dirac);
+      zMobius = dirac.zMobius;
+      mobius_kappa_b = dirac.mobius_kappa_b;
+      mobius_kappa_c = dirac.mobius_kappa_c;
+      memcpy(b_5, dirac.b_5, sizeof(Complex) * dirac.Ls);
+      memcpy(c_5, dirac.c_5, sizeof(Complex) * dirac.Ls);
+
+      if (zMobius) { errorQuda("zMobius has NOT been fully tested in QUDA.\n"); }
+    }
+    return *this;
+  }
+
   // Modification for the 4D preconditioned Mobius domain wall operator
   void DiracMobius::Dslash4(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {

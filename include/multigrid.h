@@ -245,6 +245,9 @@ namespace quda {
     /** Coarse temporary vector */
     ColorSpinorField *tmp2_coarse;
 
+    /** Coarse temporary vector */
+    ColorSpinorField *tmp3_coarse;
+
     /** Kahler-Dirac Xinv */
     cudaGaugeField *xInvKD;
 

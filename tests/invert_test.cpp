@@ -142,7 +142,7 @@ int main(int argc, char **argv)
     // Only these fermions are supported with MG
     if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH
         && dslash_type != QUDA_TWISTED_MASS_DSLASH && dslash_type != QUDA_TWISTED_CLOVER_DSLASH
-        && dslash_type != QUDA_DOMAIN_WALL_DSLASH) {
+        && dslash_type != QUDA_DOMAIN_WALL_DSLASH && dslash_type != QUDA_MOBIUS_DWF_DSLASH) {
       printfQuda("dslash_type %d not supported for MG\n", dslash_type);
       exit(0);
     }

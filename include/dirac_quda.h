@@ -8,6 +8,7 @@
 #include <blas_quda.h>
 
 #include <typeinfo>
+#include <memory> // for shared_ptr
 
 namespace quda {
 
@@ -51,6 +52,7 @@ namespace quda {
 
     ColorSpinorField *tmp1;
     ColorSpinorField *tmp2; // used by Wilson-like kernels only
+    ColorSpinorField *tmp3; // used for Mobius PV only
 
     int commDim[QUDA_MAX_DIM]; // whether to do comms or not
 
@@ -76,6 +78,7 @@ namespace quda {
       epsilon(0.0),
       tmp1(0),
       tmp2(0),
+      tmp3(0),
       halo_precision(QUDA_INVALID_PRECISION),
       need_bidirectional(false),
 #if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
@@ -148,6 +151,7 @@ namespace quda {
     mutable unsigned long long flops;
     mutable ColorSpinorField *tmp1; // temporary hack
     mutable ColorSpinorField *tmp2; // temporary hack
+    mutable ColorSpinorField *tmp3; // temporary hack
     QudaDiracType type; 
     mutable QudaPrecision halo_precision; // only does something for DiracCoarse at present
 
@@ -713,8 +717,31 @@ public:
     virtual QudaDiracType getDiracType() const { return QUDA_DOMAIN_WALL_DIRAC; }
   };
 
-  class DiracDomainWallPV : public DiracDomainWall {
+  // 5d Even-odd preconditioned domain wall
+  class DiracDomainWallPC : public DiracDomainWall {
 
+  private:
+
+  public:
+    DiracDomainWallPC(const DiracParam &param);
+    DiracDomainWallPC(const DiracDomainWallPC &dirac);
+    virtual ~DiracDomainWallPC();
+    DiracDomainWallPC& operator=(const DiracDomainWallPC &dirac);
+
+    void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+    void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+		 ColorSpinorField &x, ColorSpinorField &b,
+		 const QudaSolutionType) const;
+    void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
+		     const QudaSolutionType) const;
+
+    virtual QudaDiracType getDiracType() const { return QUDA_DOMAIN_WALLPC_DIRAC; }
+  };
+
+  // Pauli-Villars dagger preconditioned DWF operator
+  class DiracDomainWallPV : public DiracDomainWall {
 
 public:
     DiracDomainWallPV(const DiracParam &param);
@@ -751,29 +778,6 @@ public:
                              const QudaSolutionType) const;
 
     virtual QudaDiracType getDiracType() const { return QUDA_DOMAIN_WALLPV_DIRAC; }
-  };
-
-  // 5d Even-odd preconditioned domain wall
-  class DiracDomainWallPC : public DiracDomainWall {
-
-  private:
-
-  public:
-    DiracDomainWallPC(const DiracParam &param);
-    DiracDomainWallPC(const DiracDomainWallPC &dirac);
-    virtual ~DiracDomainWallPC();
-    DiracDomainWallPC& operator=(const DiracDomainWallPC &dirac);
-
-    void M(ColorSpinorField &out, const ColorSpinorField &in) const;
-    void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
-
-    void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-		 ColorSpinorField &x, ColorSpinorField &b,
-		 const QudaSolutionType) const;
-    void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-		     const QudaSolutionType) const;
-
-    virtual QudaDiracType getDiracType() const { return QUDA_DOMAIN_WALLPC_DIRAC; }
   };
 
   // Full domain wall, but with 4-d parity ordered fields
@@ -853,9 +857,12 @@ public:
 
     public:
       DiracMobius(const DiracParam &param);
-      // DiracMobius(const DiracMobius &dirac);
-      // virtual ~DiracMobius();
-      // DiracMobius& operator=(const DiracMobius &dirac);
+      DiracMobius(const DiracMobius &dirac);
+      virtual ~DiracMobius();
+      DiracMobius& operator=(const DiracMobius &dirac);
+
+      virtual const void getB5(Complex* out) const { memcpy(out, b_5, sizeof(Complex) * Ls); }
+      virtual const void getC5(Complex* out) const { memcpy(out, c_5, sizeof(Complex) * Ls); }
 
       void Dslash4(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
       void Dslash4pre(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
@@ -904,6 +911,58 @@ public:
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
 
     virtual QudaDiracType getDiracType() const { return QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC; }
+  };
+
+  // Pauli-Villars dagger preconditioned Mobius operator
+  class DiracMobiusPV : public DiracMobius {
+
+  protected:
+
+  public:
+    DiracMobiusPV(const DiracParam &param);
+    DiracMobiusPV(const DiracMobiusPV &dirac);
+    virtual ~DiracMobiusPV();
+    DiracMobiusPV& operator=(const DiracMobiusPV &dirac);
+
+    void checkParitySpinor(const ColorSpinorField &in, const ColorSpinorField &out) const;
+
+    virtual bool hasDslash() const { return false; }
+
+    void Dslash(ColorSpinorField &out, const ColorSpinorField &in,
+                const QudaParity parity) const;
+    void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in,
+                    const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+
+    void Dslash4(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+    void Dslash4pre(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+    void Dslash5(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+
+    void Dslash4Xpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                     const ColorSpinorField &x, const double &k) const;
+    void Dslash4preXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                        const ColorSpinorField &x, const double &k) const;
+    void Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                     const ColorSpinorField &x, const double &k) const;
+
+    virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+    virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+
+    void ApplyPVDagger(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    virtual void prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x, ColorSpinorField &b,
+                         const QudaSolutionType) const;
+    virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
+
+    virtual bool hasSpecialMG() const { return true; }
+
+    virtual void prepareSpecialMG(ColorSpinorField* &src, ColorSpinorField* &sol,
+                         ColorSpinorField &x, ColorSpinorField &b,
+                         const QudaSolutionType) const;
+    virtual void reconstructSpecialMG(ColorSpinorField &x, const ColorSpinorField &b,
+                             const QudaSolutionType) const;
+
+    virtual QudaDiracType getDiracType() const { return QUDA_MOBIUS_DOMAIN_WALLPV_DIRAC; }
   };
 
   // Full Mobius EOFA

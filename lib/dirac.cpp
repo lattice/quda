@@ -19,6 +19,7 @@ namespace quda {
     flops(0),
     tmp1(param.tmp1),
     tmp2(param.tmp2),
+    tmp3(param.tmp3),
     type(param.type),
     halo_precision(param.halo_precision),
     profile("Dirac", false)
@@ -35,6 +36,7 @@ namespace quda {
     flops(0),
     tmp1(dirac.tmp1),
     tmp2(dirac.tmp2),
+    tmp3(dirac.tmp3),
     type(dirac.type),
     halo_precision(dirac.halo_precision),
     profile("Dirac", false)
@@ -59,6 +61,7 @@ namespace quda {
       flops = 0;
       tmp1 = dirac.tmp1;
       tmp2 = dirac.tmp2;
+      tmp3 = dirac.tmp3;
 
       for (int i=0; i<4; i++) commDim[i] = dirac.commDim[i];
 
@@ -189,6 +192,9 @@ namespace quda {
     } else if (param.type == QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracMobiusPC operator\n");
       return new DiracMobiusPC(param);
+    } else if (param.type == QUDA_MOBIUS_DOMAIN_WALLPV_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracMobiusPV operator\n");
+      return new DiracMobiusPV(param);
     } else if (param.type == QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracMobiusEofa operator\n");
       return new DiracMobiusEofa(param);
