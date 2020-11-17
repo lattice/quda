@@ -42,6 +42,6 @@ public:
   ~thrust_allocator() { }
 
   char *allocate(std::ptrdiff_t num_bytes) { return reinterpret_cast<char*>(pool_device_malloc(num_bytes)); }
-  void deallocate(char *ptr, size_t n) { pool_device_free(ptr); }
+  void deallocate(char *ptr, size_t) { pool_device_free(ptr); }
 
 };

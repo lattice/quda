@@ -160,9 +160,9 @@ void test(int contractionType, int Prec)
   // It returns the number of faults it detects.
   int faults = 0;
   if (test_prec == QUDA_DOUBLE_PRECISION) {
-    faults = contraction_reference((double *)spinorX, (double *)spinorY, (double *)d_result, cType, X);
+    faults = contraction_reference((double *)spinorX, (double *)spinorY, (double *)d_result, cType);
   } else {
-    faults = contraction_reference((float *)spinorX, (float *)spinorY, (float *)d_result, cType, X);
+    faults = contraction_reference((float *)spinorX, (float *)spinorY, (float *)d_result, cType);
   }
 
   printfQuda("Contraction comparison for contraction type %s complete with %d/%d faults\n", get_contract_str(cType),

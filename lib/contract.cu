@@ -55,17 +55,21 @@ public:
     }
   };
 
+#ifdef GPU_CONTRACT
   void contractQuda(const ColorSpinorField &x, const ColorSpinorField &y, void *result, const QudaContractType cType)
   {
-#ifdef GPU_CONTRACT
     checkPrecision(x, y);
     if (x.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS || y.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS)
       errorQuda("Unexpected gamma basis x=%d y=%d", x.GammaBasis(), y.GammaBasis());
     if (x.Nspin() != 4 || y.Nspin() != 4) errorQuda("Unexpected number of spins x=%d y=%d", x.Nspin(), y.Nspin());
 
     instantiate<Contraction>(x, y, result, cType);
-#else
-    errorQuda("Contraction code has not been built");
-#endif
   }
+#else
+  void contractQuda(const ColorSpinorField &, const ColorSpinorField &, void *, const QudaContractType)
+  {
+    errorQuda("Contraction code has not been built");
+  }
+#endif
+
 } // namespace quda

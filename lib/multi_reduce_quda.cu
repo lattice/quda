@@ -32,7 +32,7 @@ namespace quda {
       }
 
     public:
-      MultiReduce(const T &a, const T &b, const T &c, const ColorSpinorField &x_meta, const ColorSpinorField &y_meta,
+      MultiReduce(const T &a, const T &b, const T &c, const ColorSpinorField &, const ColorSpinorField &,
                   std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
                   std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
                   host_reduce_t *result) :
@@ -124,7 +124,7 @@ namespace quda {
           constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
           const int length = x[0]->Length() / M;
 
-          MultiReduceArg<device_real_t, M, NXZ, device_store_t, N, device_y_store_t, Ny, decltype(r_)> arg(x, y, z, w, r_, NYW, length, nParity, tp);
+          MultiReduceArg<device_real_t, M, NXZ, device_store_t, N, device_y_store_t, Ny, decltype(r_)> arg(x, y, z, w, r_, NYW, length, nParity);
 
           std::vector<host_reduce_t> result_(NXZ * arg.NYW);
 
@@ -316,7 +316,7 @@ namespace quda {
       bool Anorm;
 
       unsigned int sharedBytesPerThread() const { return 0; }
-      unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+      unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
       int NYW_max;
       uint2 max_tile_size;
@@ -401,7 +401,7 @@ namespace quda {
 
       virtual ~TileSizeTune() { setPolicyTuning(false); }
 
-      void apply(const qudaStream_t &stream) {
+      void apply(const qudaStream_t &) {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
         // tp.aux.x is where the tile size is stored. "tp" is the tuning struct.
@@ -488,7 +488,7 @@ namespace quda {
       bool Anorm;
 
       unsigned int sharedBytesPerThread() const { return 0; }
-      unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+      unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
     public:
       TransposeTune(T *result, vec &x, vec &y, int coeff_width, bool hermitian, bool Anorm = false) :
@@ -548,7 +548,7 @@ namespace quda {
 
       virtual ~TransposeTune() { setPolicyTuning(false); }
 
-      void apply(const qudaStream_t &stream)
+      void apply(const qudaStream_t &)
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
@@ -770,9 +770,9 @@ namespace quda {
     }
 
     // takes the outer product of inner products between and y and copies y into z
-    void cDotProductCopy(Complex* result, std::vector<ColorSpinorField*>& x, std::vector<ColorSpinorField*>& y,
-			 std::vector<ColorSpinorField*>&z){
-
+    void cDotProductCopy(Complex* , std::vector<ColorSpinorField*>&, std::vector<ColorSpinorField*>&,
+			 std::vector<ColorSpinorField*>&)
+    {
 #if 0
       // FIXME - if this is enabled we need to ensure that use_w is
       // enabled above.  Also, I think this might break if the diagonal

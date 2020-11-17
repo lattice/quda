@@ -33,9 +33,7 @@
 #include <deflation.h>
 #include <ks_force_quda.h>
 
-#ifdef GPU_GAUGE_FORCE
 #include <gauge_force_quda.h>
-#endif
 #include <gauge_update_quda.h>
 
 #define MAX(a,b) ((a)>(b)? (a):(b))
@@ -334,7 +332,7 @@ static int lex_rank_from_coords(const int *coords, void *fdata)
 /**
  * For QMP, we use the existing logical topology if already declared.
  */
-static int qmp_rank_from_coords(const int *coords, void *fdata)
+static int qmp_rank_from_coords(const int *coords, void *)
 {
   return QMP_get_node_number_from(coords);
 }
@@ -348,13 +346,15 @@ MPI_Comm MPI_COMM_HANDLE;
 static int user_set_comm_handle = 0;
 #endif
 
+#if defined(QMP_COMMS) || defined(MPI_COMMS)
 void setMPICommHandleQuda(void *mycomm)
 {
-#if defined(QMP_COMMS) || defined(MPI_COMMS)
   MPI_COMM_HANDLE = *((MPI_Comm *)mycomm);
   user_set_comm_handle = 1;
-#endif
 }
+#else
+void setMPICommHandleQuda(void *) {}
+#endif
 
 #ifdef QMP_COMMS
 static void initQMPComms(void)
@@ -3987,7 +3987,6 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
 void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink, double *path_coeff, QudaGaugeParam *param)
 {
-#ifdef GPU_FATLINK
   profileFatLink.TPSTART(QUDA_PROFILE_TOTAL);
   profileFatLink.TPSTART(QUDA_PROFILE_INIT);
 
@@ -4067,27 +4066,11 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
   profileFatLink.TPSTOP(QUDA_PROFILE_FREE);
 
   profileFatLink.TPSTOP(QUDA_PROFILE_TOTAL);
-#else
-  errorQuda("Fat-link has not been built");
-#endif // GPU_FATLINK
-}
-
-int getGaugePadding(GaugeFieldParam& param){
-  int pad = 0;
-#ifdef MULTI_GPU
-  int volume = param.x[0]*param.x[1]*param.x[2]*param.x[3];
-  int face_size[4];
-  for(int dir=0; dir<4; ++dir) face_size[dir] = (volume/param.x[dir])/2;
-  pad = *std::max_element(face_size, face_size+4);
-#endif
-
-  return pad;
 }
 
 int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int* path_length,
 			  double* loop_coeff, int num_paths, int max_length, double eb3, QudaGaugeParam* qudaGaugeParam)
 {
-#ifdef GPU_GAUGE_FORCE
   profileGaugeForce.TPSTART(QUDA_PROFILE_TOTAL);
   profileGaugeForce.TPSTART(QUDA_PROFILE_INIT);
 
@@ -4201,10 +4184,6 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   profileGaugeForce.TPSTOP(QUDA_PROFILE_FREE);
 
   profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
-
-#else
-  errorQuda("Gauge force has not been built");
-#endif // GPU_GAUGE_FORCE
   return 0;
 }
 
@@ -4334,7 +4313,7 @@ void destroyGaugeFieldQuda(void* gauge){
 }
 
 
-void computeStaggeredForceQuda(void* h_mom, double dt, double delta, void *h_force, void **x,
+void computeStaggeredForceQuda(void* h_mom, double dt, double delta, void *h_force, void **,
 			       QudaGaugeParam *gauge_param, QudaInvertParam *inv_param)
 {
   profileStaggeredForce.TPSTART(QUDA_PROFILE_TOTAL);
@@ -4507,7 +4486,6 @@ void computeHISQForceQuda(void* const milc_momentum,
                           double **coeff,
                           QudaGaugeParam* gParam)
 {
-#ifdef  GPU_STAGGERED_OPROD
   using namespace quda;
   using namespace quda::fermion_force;
   profileHISQForce.TPSTART(QUDA_PROFILE_TOTAL);
@@ -4739,17 +4717,13 @@ void computeHISQForceQuda(void* const milc_momentum,
   profileHISQForce.TPSTOP(QUDA_PROFILE_FREE);
 
   profileHISQForce.TPSTOP(QUDA_PROFILE_TOTAL);
-
-#else
-  errorQuda("HISQ force has not been built");
-#endif
 }
 
-void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
+void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **,
 			    double *coeff, double kappa2, double ck,
-			    int nvector, double multiplicity, void *gauge,
-			    QudaGaugeParam *gauge_param, QudaInvertParam *inv_param) {
-
+			    int nvector, double multiplicity, void *,
+			    QudaGaugeParam *gauge_param, QudaInvertParam *inv_param)
+{
   using namespace quda;
   profileCloverForce.TPSTART(QUDA_PROFILE_TOTAL);
   profileCloverForce.TPSTART(QUDA_PROFILE_INIT);
@@ -5418,7 +5392,6 @@ void kinetic_quda_(double *kin, void* momentum, QudaGaugeParam* param) {
 /**
  * BQCD wants a node mapping with x varying fastest.
  */
-#ifdef MULTI_GPU
 static int bqcd_rank_from_coords(const int *coords, void *fdata)
 {
   int *dims = static_cast<int *>(fdata);
@@ -5429,13 +5402,10 @@ static int bqcd_rank_from_coords(const int *coords, void *fdata)
   }
   return rank;
 }
-#endif
 
 void comm_set_gridsize_(int *grid)
 {
-#ifdef MULTI_GPU
   initCommsGridQuda(4, grid, bqcd_rank_from_coords, static_cast<void *>(grid));
-#endif
 }
 
 /**
@@ -5465,7 +5435,7 @@ void gaussGaugeQuda(unsigned long long seed, double sigma)
   profileGauss.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   if (extendedGaugeResident) {
-    *extendedGaugeResident = *gaugePrecise;
+    extendedGaugeResident->copy(*gaugePrecise);
     extendedGaugeResident->exchangeExtendedGhost(R, profileGauss, redundant_comms);
   }
 

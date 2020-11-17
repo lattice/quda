@@ -103,12 +103,12 @@ namespace quda
         }
       }
 
-      arg.in.resetGhost(in, ghost);
+      arg.in.resetGhost(ghost);
 
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) {
         arg.blocks_per_dir = tp.aux.x;
         arg.setPack(true); // need to recompute for updated block_per_dir
-        arg.in.resetGhost(in, this->packBuffer);
+        arg.in.resetGhost(this->packBuffer);
         tp.grid.x += arg.pack_blocks;
       }
     }
@@ -431,7 +431,6 @@ namespace quda
         break;
       }
       case INTERIOR_KERNEL:
-        if (arg.pack_threads) { flops_ += pack_flops * arg.nParity * in.getDslashConstant().Ls * arg.pack_threads; }
       case KERNEL_POLICY: {
         long long sites = in.Volume();
         flops_ = (num_dir * (in.Nspin() / 4) * in.Ncolor() * in.Nspin() + // spin project (=0 for staggered)
@@ -447,6 +446,8 @@ namespace quda
           if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
         flops_ -= ghost_flops * ghost_sites;
 
+        if (arg.kernel_type == INTERIOR_KERNEL && arg.pack_threads)
+          flops_ += pack_flops * arg.nParity * in.getDslashConstant().Ls * arg.pack_threads;
         break;
       }
       }
@@ -477,7 +478,6 @@ namespace quda
         break;
       }
       case INTERIOR_KERNEL:
-        if (arg.pack_threads) { bytes_ += pack_bytes * arg.nParity * in.getDslashConstant().Ls * arg.pack_threads; }
       case KERNEL_POLICY: {
         long long sites = in.Volume();
         bytes_ = (num_dir * gauge_bytes + ((num_dir - 2) * spinor_bytes + 2 * proj_spinor_bytes) + spinor_bytes) * sites;
@@ -490,6 +490,8 @@ namespace quda
           if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
         bytes_ -= ghost_bytes * ghost_sites;
 
+        if (arg.kernel_type == INTERIOR_KERNEL && arg.pack_threads)
+          bytes_ += pack_bytes * arg.nParity * in.getDslashConstant().Ls * arg.pack_threads;
         break;
       }
       }
@@ -597,6 +599,7 @@ namespace quda
      @param[in] U Gauge field
      @param[in] args Additional arguments for different dslash kernels
   */
+#if (QUDA_PRECISION & 2) || (QUDA_PRECISION & 1)
   template <template <typename, int, QudaReconstructType> class Apply, typename Recon = WilsonReconstruct, typename... Args>
   inline void instantiatePreconditioner(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
                                         Args &&... args)
@@ -617,5 +620,18 @@ namespace quda
       errorQuda("Unsupported precision %d\n", U.Precision());
     }
   }
+#else
+  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = WilsonReconstruct, typename... Args>
+  inline void instantiatePreconditioner(ColorSpinorField &, const ColorSpinorField &, const GaugeField &U, Args &&...)
+  {
+    if (U.Precision() == QUDA_HALF_PRECISION) {
+      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+    } else if (U.Precision() == QUDA_QUARTER_PRECISION) {
+      errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+    } else {
+      errorQuda("Unsupported precision %d\n", U.Precision());
+    }
+  }
+#endif
 
 } // namespace quda

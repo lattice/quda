@@ -314,9 +314,13 @@ namespace quda {
   template<> struct spin_order_mapper<1,QUDA_FLOAT4_FIELD_ORDER> { static constexpr QudaFieldOrder order = QUDA_FLOAT2_FIELD_ORDER; };
 
   template <typename Float, typename ghostFloat, QudaFieldOrder order>
+#if defined(NSPIN1) || defined(NSPIN2) || defined(NSPIN4)
   inline void genericPackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity,
-			       int nFace, int dagger, MemoryLocation *destination) {
-
+			       int nFace, int dagger, MemoryLocation *destination)
+#else
+  inline void genericPackGhost(void **, const ColorSpinorField &a, QudaParity, int, int, MemoryLocation *)
+#endif
+  {
     if (a.Nspin() == 4) {
 #ifdef NSPIN4
       genericPackGhost<Float,ghostFloat,order,4>(ghost, a, parity, nFace, dagger, destination);

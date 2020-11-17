@@ -60,7 +60,7 @@ namespace quda {
   };
 
   template <int nColor, typename sumType, typename real>
-  inline __device__ __host__ void colorInnerProduct(complex<sumType> &dot, int i, complex<real> v[nColor],
+  inline __device__ __host__ void colorInnerProduct(complex<sumType> &dot, complex<real> v[nColor],
                                                     complex<real> w[nColor])
   {
 #pragma unroll
@@ -149,7 +149,7 @@ namespace quda {
                 for (int s = 0; s < nSpin; s++) {
                   complex<Float> vis[nColor];
                   for (int c = 0; c < nColor; c++) vis[c] = arg.V(parity, x_cb, s, c, i);
-                  colorInnerProduct<nColor>(dot[arg.spin_map(s, parity)], i, v[s], vis);
+                  colorInnerProduct<nColor>(dot[arg.spin_map(s, parity)], v[s], vis);
                 }
               }
             }
@@ -292,7 +292,7 @@ namespace quda {
             for (int c = 0; c < nColor; c++) vi[s][c] = arg.V(parity, x_cb, chirality * spinBlock + s, c, i);
 
 #pragma unroll
-          for (int s = 0; s < spinBlock; s++) { colorInnerProduct<nColor>(dot, i, v[s], vi[s]); }
+          for (int s = 0; s < spinBlock; s++) { colorInnerProduct<nColor>(dot, v[s], vi[s]); }
 
           __syncthreads();
           dot = dotReduce(dot_storage).Sum(dot);

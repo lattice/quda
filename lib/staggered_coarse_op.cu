@@ -246,11 +246,11 @@ namespace quda {
     }
   }
 
+#if defined(GPU_MULTIGRID) && defined(GPU_STAGGERED_DIRAC)
   //Does the heavy lifting of creating the coarse color matrices Y
   void calculateStaggeredY(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &g,
                            double mass, QudaDiracType dirac, QudaMatPCType matpc)
   {
-#if defined(GPU_MULTIGRID) && defined(GPU_STAGGERED_DIRAC)
     checkPrecision(T.Vectors(X.Location()), X, Y);
 
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing Y field......\n");
@@ -281,12 +281,16 @@ namespace quda {
       errorQuda("Unsupported precision %d\n", Y.Precision());
     }
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("....done computing Y field\n");
-#else
-    errorQuda("Staggered multigrid has not been built");
-#endif
   }
+#else
+  void calculateStaggeredY(GaugeField &, GaugeField &, const Transfer &, const GaugeField &,
+                           double, QudaDiracType, QudaMatPCType)
+  {
+    errorQuda("Staggered multigrid has not been built");
+  }
+#endif
 
-  //Calculates the coarse color matrix and puts the result in Y.
+//Calculates the coarse color matrix and puts the result in Y.
   //N.B. Assumes Y, X have been allocated.
   void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge,
                          double mass, QudaDiracType dirac, QudaMatPCType matpc)

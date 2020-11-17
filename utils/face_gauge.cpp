@@ -512,7 +512,7 @@ exchange_sitelink(int*X, Float** sitelink, Float** ghost_sitelink, Float** ghost
 void exchange_cpu_sitelink(int* X,
 			   void** sitelink, void** ghost_sitelink,
 			   void** ghost_sitelink_diag,
-			   QudaPrecision gPrecision, QudaGaugeParam* param, int optflag)
+			   QudaPrecision gPrecision, QudaGaugeParam*, int optflag)
 {  
   setup_dims(X);
   static void*  sitelink_fwd_sendbuf[4];

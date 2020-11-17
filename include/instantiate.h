@@ -68,7 +68,7 @@ namespace quda
   template <template <typename, int, QudaReconstructType> class Apply, typename Float, int nColor,
             QudaReconstructType recon, typename G, typename... Args>
   struct instantiateApply<false, Apply, Float, nColor, recon, G, Args...> {
-    instantiateApply(G &U, Args &&... args)
+    instantiateApply(G &, Args &&...)
     {
       errorQuda("QUDA_RECONSTRUCT=%d does not enable %d", QUDA_RECONSTRUCT, recon);
     }

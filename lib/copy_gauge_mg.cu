@@ -121,12 +121,12 @@ namespace quda {
 
   }
 
+#ifdef GPU_MULTIGRID
   template <typename FloatOut, typename FloatIn>
   void copyGaugeMG(GaugeField &out, const GaugeField &in, QudaFieldLocation location, FloatOut *Out, 
 		   FloatIn *In, FloatOut **outGhost, FloatIn **inGhost, int type)
   {
     switch (in.Ncolor()) {
-#ifdef GPU_MULTIGRID
     case 48: copyGaugeMG<FloatOut,FloatIn,48>(out, in, location, Out, In, outGhost, inGhost, type); break;
 #ifdef NSPIN4
     case 12: copyGaugeMG<FloatOut,FloatIn,12>(out, in, location, Out, In, outGhost, inGhost, type); break;
@@ -136,10 +136,16 @@ namespace quda {
     case 128: copyGaugeMG<FloatOut,FloatIn,128>(out, in, location, Out, In, outGhost, inGhost, type); break;
     case 192: copyGaugeMG<FloatOut,FloatIn,192>(out, in, location, Out, In, outGhost, inGhost, type); break;
 #endif
-#endif // GPU_MULTIGRID
     default: errorQuda("Unsupported number of colors; out.Nc=%d, in.Nc=%d", out.Ncolor(), in.Ncolor());
     }
   }
+#else
+  template <typename FloatOut, typename FloatIn>
+  void copyGaugeMG(GaugeField &, const GaugeField &, QudaFieldLocation, FloatOut *, FloatIn *, FloatOut **, FloatIn **, int)
+  {
+    errorQuda("Multigrid has not been enabled");
+  }
+#endif // GPU_MULTIGRID
 
   // this is the function that is actually called, from here on down we instantiate all required templates
   void copyGenericGaugeMG(GaugeField &out, const GaugeField &in, QudaFieldLocation location,

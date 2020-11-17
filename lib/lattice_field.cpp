@@ -303,7 +303,7 @@ namespace quda {
     initGhostFaceBuffer = false;
   }
 
-  void LatticeField::createComms(bool no_comms_fill, bool bidir)
+  void LatticeField::createComms(bool no_comms_fill)
   {
     destroyComms(); // if we are requesting a new number of faces destroy and start over
 
@@ -693,11 +693,11 @@ namespace quda {
     return location;
   }
 
-  void LatticeField::read(char *filename) {
+  void LatticeField::read(char *) {
     errorQuda("Not implemented");
   }
   
-  void LatticeField::write(char *filename) {
+  void LatticeField::write(char *) {
     errorQuda("Not implemented");
   }
 

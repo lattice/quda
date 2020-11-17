@@ -26,7 +26,7 @@ namespace quda {
       unsigned int minGridSize() const { return maxGridSize(); }
 
     public:
-      MultiBlas(const T &a, const T &b, const T &c, const ColorSpinorField &x_meta, const ColorSpinorField &y_meta,
+      MultiBlas(const T &a, const T &b, const T &c, const ColorSpinorField &, const ColorSpinorField &,
                 std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
                 std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w) :
         TunableGridStrideKernel3D(*x[0], y.size(), x[0]->SiteSubset()),
@@ -214,9 +214,9 @@ namespace quda {
         }
       }
 
+#ifdef WARP_SPLIT
       bool advanceAux(TuneParam &param) const
       {
-#ifdef WARP_SPLIT
         if (2 * param.aux.x <= max_warp_split) {
           param.aux.x *= 2;
           warp_split = param.aux.x;
@@ -228,11 +228,14 @@ namespace quda {
           resetBlockDim(param);
           return false;
         }
+      }
 #else
+      bool advanceAux(TuneParam &) const
+      {
         warp_split = 1;
         return false;
-#endif
       }
+#endif
 
       int blockStep() const { return device::warp_size() / warp_split; }
       int blockMin() const { return device::warp_size() / warp_split; }

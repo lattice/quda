@@ -33,7 +33,7 @@ namespace quda {
     bool tune_block_x;
 
     unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
     /**
        Block reduction kernels do not use grid-size tuning, so disable this, and

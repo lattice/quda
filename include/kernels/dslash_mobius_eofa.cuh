@@ -53,7 +53,7 @@ namespace quda
       dim3 threads;
 
       Dslash5Arg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const double m_f_,
-                 const double m_5_, const Complex *b_5_, const Complex *c_5_, double a_, double inv_, double kappa_,
+                 const double m_5_, const Complex */*b_5_*/, const Complex */*c_5_*/, double a_, double inv_, double kappa_,
                  const double *eofa_u, const double *eofa_x, const double *eofa_y, double sherman_morrison_) :
         out(out),
         in(in),

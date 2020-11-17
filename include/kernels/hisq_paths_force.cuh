@@ -169,7 +169,7 @@ namespace quda {
       { if (type != FORCE_SIDE_LINK_SHORT) errorQuda("This constructor is for FORCE_SIDE_LINK_SHORT"); }
 
       FatLinkArg(GaugeField &newOprod, GaugeField &shortP, const GaugeField &oProd, const GaugeField &qPrev,
-                 const GaugeField &link, real coeff, real accumu_coeff, int overlap, HisqForceType type, bool dummy)
+                 const GaugeField &link, real coeff, real accumu_coeff, int overlap, HisqForceType type, bool)
         : BaseForceArg(link, overlap), outA(newOprod), outB(shortP), oProd(oProd), qPrev(qPrev),
         pMu(shortP), p3(shortP), qMu(qPrev), qProd(qPrev), // dummy
         coeff(coeff), accumu_coeff(accumu_coeff), p_mu(false), q_mu(false), q_prev(false)

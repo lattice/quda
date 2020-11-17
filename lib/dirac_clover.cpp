@@ -80,14 +80,13 @@ namespace quda {
     sol = &x;
   }
 
-  void DiracClover::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-				const QudaSolutionType solType) const
+  void DiracClover::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
   {
     // do nothing
   }
 
   void DiracClover::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-				   double kappa, double mass, double mu, double mu_factor) const {
+				   double kappa, double, double mu, double mu_factor) const {
     double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
     CoarseOp(Y, X, T, *gauge, clover, kappa, a, mu_factor, QUDA_CLOVER_DIRAC, QUDA_MATPC_INVALID);
   }
@@ -292,7 +291,7 @@ namespace quda {
   }
 
   void DiracCloverPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-				     double kappa, double mass, double mu, double mu_factor) const {
+				     double kappa, double, double mu, double mu_factor) const {
     double a = - 2.0 * kappa * mu * T.Vectors().TwistFlavor();
     CoarseOp(Y, X, T, *gauge, clover, kappa, a, -mu_factor, QUDA_CLOVERPC_DIRAC, matpcType);
   }

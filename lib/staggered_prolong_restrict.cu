@@ -107,24 +107,21 @@ namespace quda {
     StaggeredProlongRestrict<fineSpin,fineColor,coarseSpin,coarseColor,transferType>(out, in, fine_to_coarse, parity);
   }
 
+#if defined(GPU_MULTIGRID) && defined(GPU_STAGGERED_DIRAC)
   void StaggeredProlongate(ColorSpinorField &out, const ColorSpinorField &in,
                            const int *fine_to_coarse, const int * const * spin_map, int parity)
   {
-#if defined(GPU_MULTIGRID) && defined(GPU_STAGGERED_DIRAC)
     StaggeredProlongRestrict<StaggeredTransferType::STAGGERED_TRANSFER_PROLONG>(out, in, fine_to_coarse, spin_map, parity);
-#else
-    errorQuda("Staggered multigrid has not been build");
-#endif
   }
 
   void StaggeredRestrict(ColorSpinorField &out, const ColorSpinorField &in,
                          const int *fine_to_coarse, const int * const * spin_map, int parity)
   {
-#if defined(GPU_MULTIGRID) && defined(GPU_STAGGERED_DIRAC)
     StaggeredProlongRestrict<StaggeredTransferType::STAGGERED_TRANSFER_RESTRICT>(out, in, fine_to_coarse, spin_map, parity);
-#else
-    errorQuda("Staggered multigrid has not been build");
-#endif
   }
+#else
+  void StaggeredProlongate(ColorSpinorField &, const ColorSpinorField &, const int *, const int * const *, int) { errorQuda("Staggered multigrid has not been build");  }
+  void StaggeredRestrict(ColorSpinorField &, const ColorSpinorField &, const int *, const int * const *, int) { errorQuda("Staggered multigrid has not been build"); }
+#endif
 
 } // end namespace quda

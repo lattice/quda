@@ -262,47 +262,40 @@
 
 #endif // MAGMA_LIB
 
- void magma_Xgesv(void* sol, const int ldn, const int n, void* Mat, const int ldm, const int prec)
-  {
 #ifdef MAGMA_LIB
+  void magma_Xgesv(void* sol, const int ldn, const int n, void* Mat, const int ldm, const int prec)
+  {
     if      (prec == sizeof(std::complex< double >)) magma_gesv<magmaDoubleComplex>(sol, ldn, n, Mat, ldm);
     else if (prec == sizeof(std::complex< float  >)) magma_gesv<magmaFloatComplex >(sol, ldn, n, Mat, ldm);
     else errorQuda("\nPrecision is not supported.\n");
-#endif
-    return;
   }
 
   void magma_Xgeev(void *Mat, const int m, const int ldm, void *vr, void *evalues, const int ldv, const int prec)
   {
-#ifdef MAGMA_LIB
     if      (prec == sizeof(std::complex< double >)) magma_geev<magmaDoubleComplex>(Mat, m, ldm, vr, evalues, ldv);
     else if (prec == sizeof(std::complex< float  >)) magma_geev<magmaFloatComplex >(Mat, m, ldm, vr, evalues, ldv);
     else errorQuda("\nPrecision is not supported.\n");
-#endif
-    return;
   }
-
 
   void magma_Xgels(void *Mat, void *c, int rows, int cols, int ldm, const int prec)
   {
-#ifdef MAGMA_LIB
     if      (prec == sizeof(std::complex< double >)) magma_gels<magmaDoubleComplex>(Mat, c, rows, cols, ldm);
     else if (prec == sizeof(std::complex< float  >)) magma_gels<magmaFloatComplex >(Mat, c, rows, cols, ldm);
     else errorQuda("\nPrecision is not supported.\n");
-#endif
-    return;
   }
 
   void magma_Xheev(void *Mat, const int m, const int ldm, void *evalues, const int prec)
   {
-#ifdef MAGMA_LIB
     if      (prec == sizeof(std::complex< double >)) magma_heev<magmaDoubleComplex>(Mat, m, ldm, evalues);
     else if (prec == sizeof(std::complex< float  >)) magma_heev<magmaFloatComplex >(Mat, m, ldm, evalues);
     else errorQuda("\nPrecision is not supported.\n");
-#endif
-    return;
   }
-
+#else
+  void magma_Xgesv(void *, const int, const int, void *, const int, const int) {}
+  void magma_Xgeev(void *, const int, const int, void *, void *, const int, const int) {}
+  void magma_Xgels(void *, void *, int, int, int, const int) {}
+  void magma_Xheev(void *, const int, const int, void *, const int) {}
+#endif
 
   void OpenMagma(){
 #ifdef MAGMA_LIB

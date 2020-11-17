@@ -175,9 +175,10 @@ namespace quda {
     }
   }
 
-  void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-                  int Nvec, const int *fine_to_coarse, const int * const * spin_map, int parity) {
 #ifdef GPU_MULTIGRID
+  void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
+                  int Nvec, const int *fine_to_coarse, const int * const * spin_map, int parity)
+  {
     if (out.FieldOrder() != in.FieldOrder() || out.FieldOrder() != v.FieldOrder())
       errorQuda("Field orders do not match (out=%d, in=%d, v=%d)", 
                 out.FieldOrder(), in.FieldOrder(), v.FieldOrder());
@@ -195,9 +196,13 @@ namespace quda {
     } else {
       errorQuda("Unsupported precision %d", out.Precision());
     }
-#else
-    errorQuda("Multigrid has not been built");
-#endif
   }
+#else
+  void Prolongate(ColorSpinorField &, const ColorSpinorField &, const ColorSpinorField &,
+                  int, const int *, const int * const *, int)
+  {
+    errorQuda("Multigrid has not been built");
+  }
+#endif
 
 } // end namespace quda

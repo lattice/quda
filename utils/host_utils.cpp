@@ -168,7 +168,6 @@ void constructQudaGaugeField(void **gauge, int type, QudaPrecision precision, Qu
 
 void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc, char **argv)
 {
-
   // 0 = unit gauge
   // 1 = random SU(3)
   // 2 = supplied field
@@ -186,7 +185,7 @@ void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc
   constructQudaGaugeField(gauge, construct_type, gauge_param.cpu_prec, &gauge_param);
 }
 
-void constructHostCloverField(void *clover, void *clover_inv, QudaInvertParam &inv_param)
+void constructHostCloverField(void *clover, void *, QudaInvertParam &inv_param)
 {
   double norm = 0.01; // clover components are random numbers in the range (-norm, norm)
   double diag = 1.0;  // constant added to the diagonal
@@ -256,7 +255,11 @@ void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision p
 
 void initComms(int argc, char **argv, std::array<int, 4> &commDims) { initComms(argc, argv, commDims.data()); }
 
+#if defined(QMP_COMMS) || defined(MPI_COMMS)
 void initComms(int argc, char **argv, int *const commDims)
+#else
+void initComms(int, char **, int *const commDims)
+#endif
 {
   if (getenv("QUDA_TEST_GRID_SIZE")) get_gridsize_from_env(commDims);
 
@@ -654,14 +657,14 @@ void get_gridsize_from_env(int *const dims)
   }
 }
 
-int lex_rank_from_coords_t(const int *coords, void *fdata)
+int lex_rank_from_coords_t(const int *coords, void *)
 {
   int rank = coords[0];
   for (int i = 1; i < 4; i++) { rank = gridsize_from_cmdline[i] * rank + coords[i]; }
   return rank;
 }
 
-int lex_rank_from_coords_x(const int *coords, void *fdata)
+int lex_rank_from_coords_x(const int *coords, void *)
 {
   int rank = coords[3];
   for (int i = 2; i >= 0; i--) { rank = gridsize_from_cmdline[i] * rank + coords[i]; }

@@ -30,9 +30,9 @@ namespace quda {
     svd_abs_error = svd_abs_error_;
   }
 
+#ifdef GPU_UNITARIZE
   void unitarizeLinksCPU(GaugeField &outfield, const GaugeField& infield)
   {
-#ifdef GPU_UNITARIZE
     if (checkLocation(outfield, infield) != QUDA_CPU_FIELD_LOCATION) errorQuda("Location must be CPU");
     checkPrecision(outfield, infield);
 
@@ -52,15 +52,18 @@ namespace quda {
 	} // precision?
       } // dir
     }   // loop over volume
-#else
-    errorQuda("Unitarization has not been built");
-#endif
   }
+#else
+  void unitarizeLinksCPU(GaugeField &, const GaugeField &)
+  {
+    errorQuda("Unitarization has not been built");
+  }
+#endif
 
   // CPU function which checks that the gauge field is unitary
+#ifdef GPU_UNITARIZE
   bool isUnitary(const GaugeField& field, double max_error)
   {
-#ifdef GPU_UNITARIZE
     if (field.Location() != QUDA_CPU_FIELD_LOCATION) errorQuda("Location must be CPU");
     Matrix<complex<double>,3> link, identity;
 
@@ -84,11 +87,14 @@ namespace quda {
       } // dir
     }   // i
     return true;
+  }
 #else
+  bool isUnitary(const GaugeField &, double)
+  {
     errorQuda("Unitarization has not been built");
     return false;
+  }
 #endif
-  } // is unitary
 
   template <typename Float, int nColor, QudaReconstructType recon>
   class UnitarizeLinks : TunableKernel3D {
@@ -126,15 +132,18 @@ namespace quda {
     long long bytes() const { return in.Bytes() + out.Bytes(); }
   };
 
+#ifdef GPU_UNITARIZE
   void unitarizeLinks(GaugeField& out, const GaugeField &in, int* fails)
   {
-#ifdef GPU_UNITARIZE
     checkPrecision(out, in);
     instantiate<UnitarizeLinks, ReconstructWilson>(out, in, fails);
-#else
-    errorQuda("Unitarization has not been built");
-#endif
   }
+#else
+  void unitarizeLinks(GaugeField &, const GaugeField &, int*)
+  {
+    errorQuda("Unitarization has not been built");
+  }
+#endif
 
   void unitarizeLinks(GaugeField &links, int* fails) { unitarizeLinks(links, links, fails); }
 
@@ -171,17 +180,20 @@ namespace quda {
     long long bytes() const { return 2 * u.Bytes(); }
   };
 
+#ifdef GPU_GAUGE_TOOLS
   void projectSU3(GaugeField &u, double tol, int *fails)
   {
-#ifdef GPU_GAUGE_TOOLS
     // check the the field doesn't have staggered phases applied
     if (u.StaggeredPhaseApplied())
       errorQuda("Cannot project gauge field with staggered phases applied");
 
     instantiate<ProjectSU3, ReconstructWilson>(u, tol, fails);
-#else
-    errorQuda("Gauge tools have not been built");
-#endif
   }
+#else
+  void projectSU3(GaugeField &, double, int *)
+  {
+    errorQuda("Gauge tools have not been built");
+  }
+#endif
 
 } // namespace quda

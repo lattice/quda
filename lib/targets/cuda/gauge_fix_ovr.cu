@@ -466,8 +466,7 @@ public:
    * @brief Pre-calculate lattice border points used by the gauge
    * fixing with overrelaxation in multi-GPU implementation
    */
-  void PreCalculateLatticeIndices(size_t faceVolume[4], size_t faceVolumeCB[4], int X[4], int border[4],
-                                  int &threads, int *borderpoints[2])
+  void PreCalculateLatticeIndices(size_t faceVolume[4], int X[4], int border[4], int &threads, int *borderpoints[2])
   {
     BorderIdArg arg(X, border);
     int nlinksfaces = 0;
@@ -835,14 +834,17 @@ public:
    * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
    * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
    */
+#ifdef GPU_GAUGE_ALG
   void gaugeFixingOVR(GaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval, const double relax_boost,
                       const double tolerance, const int reunit_interval, const int stopWtheta)
   {
-#ifdef GPU_GAUGE_ALG
     instantiate<GaugeFixingOVR>(data, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
-#else
-    errorQuda("Gauge fixing has not been built");
-#endif // GPU_GAUGE_ALG
   }
+#else
+  void gaugeFixingOVR(GaugeField&, const int, const int, const int, const double, const double, const int, const int)
+  {
+    errorQuda("Gauge fixing has not been built");
+  }
+#endif
 
 }   //namespace quda

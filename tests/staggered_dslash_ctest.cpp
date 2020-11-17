@@ -76,7 +76,7 @@ CLI::TransformPairs<dslash_test_type> dtest_type_map {{"Dslash", dslash_test_typ
                                                       // {"Dslash4pre", dslash_test_type::Dslash4pre}
                                                     };
 
-void init(int precision, QudaReconstructType link_recon, int partition)
+void init(int precision, QudaReconstructType link_recon)
 {
   auto prec = getPrecision(precision);
 
@@ -436,12 +436,11 @@ public:
 
     if (skip()) GTEST_SKIP();
 
-    int value = ::testing::get<2>(GetParam());
-    for(int j=0; j < 4;j++){
-      if (value &  (1 << j)){
+    int partition = ::testing::get<2>(GetParam());
+    for(int j=0; j < 4;j++) {
+      if (partition & (1 << j)) {
         commDimPartitionedSet(j);
       }
-
     }
     updateR();
 
@@ -460,7 +459,7 @@ public:
     spinorRef = nullptr;
     tmpCpu = nullptr;
 
-    init(prec, recon, value);
+    init(prec, recon);
     display_test_info(prec, recon);
   }
 

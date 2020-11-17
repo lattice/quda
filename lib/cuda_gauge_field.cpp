@@ -304,7 +304,7 @@ namespace quda {
       (from_face_h[0] != ghost_pinned_recv_buffer_h[0]) || (from_face_h[1] != ghost_pinned_recv_buffer_h[1]) ||
       ghost_bytes != ghost_bytes_old; // ghost buffer has been resized (e.g., bidir to unidir)
 
-    if (!initComms || comms_reset) LatticeField::createComms(no_comms_fill, bidir);
+    if (!initComms || comms_reset) LatticeField::createComms(no_comms_fill);
 
     if (ghost_field_reset) destroyIPCComms();
     createIPCComms();

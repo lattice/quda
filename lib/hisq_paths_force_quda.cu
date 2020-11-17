@@ -134,12 +134,17 @@ namespace quda {
         case FORCE_MIDDLE_LINK:
           arg.pMu.save();
           arg.qMu.save();
+          arg.outA.save();
+          arg.p3.save();
+          break;
         case FORCE_LEPAGE_MIDDLE_LINK:
           arg.outA.save();
           arg.p3.save();
           break;
         case FORCE_SIDE_LINK:
           arg.outB.save();
+          arg.outA.save();
+          break;
         case FORCE_SIDE_LINK_SHORT:
           arg.outA.save();
           break;
@@ -159,12 +164,17 @@ namespace quda {
         case FORCE_MIDDLE_LINK:
           arg.pMu.load();
           arg.qMu.load();
+          arg.outA.load();
+          arg.p3.load();
+          break;
         case FORCE_LEPAGE_MIDDLE_LINK:
           arg.outA.load();
           arg.p3.load();
           break;
         case FORCE_SIDE_LINK:
           arg.outB.load();
+          arg.outA.load();
+          break;
         case FORCE_SIDE_LINK_SHORT:
           arg.outA.load();
           break;
@@ -297,9 +307,9 @@ namespace quda {
       }
     };
 
+#ifdef GPU_HISQ_FORCE
     void hisqStaplesForce(GaugeField &newOprod, const GaugeField &oprod, const GaugeField &link, const double path_coeff_array[6])
     {
-#ifdef GPU_HISQ_FORCE
       checkNative(link, oprod, newOprod);
       checkLocation(newOprod, oprod, link);
 
@@ -325,10 +335,13 @@ namespace quda {
       delete Pnumu;
       delete Qmu;
       delete Qnumu;
-#else
-      errorQuda("HISQ force not enabled");
-#endif
     }
+#else
+    void hisqStaplesForce(GaugeField &, const GaugeField &, const GaugeField &, const double[6])
+    {
+      errorQuda("HISQ force not enabled");
+    }
+#endif
 
     template <typename Arg>
     class HisqForce : public TunableKernel2D {
@@ -416,17 +429,20 @@ namespace quda {
       }
     };
 
+#ifdef GPU_HISQ_FORCE
     void hisqLongLinkForce(GaugeField &newOprod, const GaugeField &oldOprod, const GaugeField &link, double coeff)
     {
-#ifdef GPU_HISQ_FORCE
       checkNative(link, oldOprod, newOprod);
       checkLocation(newOprod, oldOprod, link);
       checkPrecision(newOprod, link, oldOprod);
       instantiate<HisqLongLinkForce, ReconstructNone>(newOprod, oldOprod, link, coeff);
-#else
-      errorQuda("HISQ force not enabled");
-#endif
     }
+#else
+    void hisqLongLinkForce(GaugeField &, const GaugeField &, const GaugeField &, double)
+    {
+      errorQuda("HISQ force not enabled");
+    }
+#endif
 
     template <typename real, int nColor, QudaReconstructType recon>
     struct HisqCompleteForce {
@@ -437,17 +453,20 @@ namespace quda {
       }
     };
 
+#ifdef GPU_HISQ_FORCE
     void hisqCompleteForce(GaugeField &force, const GaugeField &link)
     {
-#ifdef GPU_HISQ_FORCE
       checkNative(link, force);
       checkLocation(force, link);
       checkPrecision(link, force);
       instantiate<HisqCompleteForce, ReconstructNone>(force, link);
-#else
-      errorQuda("HISQ force not enabled");
-#endif
     }
+#else
+    void hisqCompleteForce(GaugeField &, const GaugeField &)
+    {
+      errorQuda("HISQ force not enabled");
+    }
+#endif
 
   } // namespace fermion_force
 

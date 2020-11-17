@@ -346,14 +346,14 @@ DslashTime dslashCUDA(int niter)
         if (transfer) {
           dslashQuda_4dpc(spinorOut->V(), spinor->V(), &inv_param, parity, dtest_type);
         } else {
-          static_cast<DiracDomainWall4DPC *>(dirac)->Dslash5(*cudaSpinorOut, *cudaSpinor, parity);
+          static_cast<DiracDomainWall4DPC *>(dirac)->Dslash5(*cudaSpinorOut, *cudaSpinor);
         }
         break;
       case dslash_test_type::M5inv:
         if (transfer) {
           dslashQuda_4dpc(spinorOut->V(), spinor->V(), &inv_param, parity, dtest_type);
         } else {
-          static_cast<DiracDomainWall4DPC *>(dirac)->Dslash5inv(*cudaSpinorOut, *cudaSpinor, parity, kappa5);
+          static_cast<DiracDomainWall4DPC *>(dirac)->M5inv(*cudaSpinorOut, *cudaSpinor);
         }
         break;
       case dslash_test_type::MatPC:
@@ -387,21 +387,21 @@ DslashTime dslashCUDA(int niter)
         if (transfer) {
           dslashQuda_mdwf(spinorOut->V(), spinor->V(), &inv_param, parity, dtest_type);
         } else {
-          static_cast<DiracMobiusPC *>(dirac)->Dslash5(*cudaSpinorOut, *cudaSpinor, parity);
+          static_cast<DiracMobiusPC *>(dirac)->Dslash5(*cudaSpinorOut, *cudaSpinor);
         }
         break;
       case dslash_test_type::Dslash4pre:
         if (transfer) {
           dslashQuda_mdwf(spinorOut->V(), spinor->V(), &inv_param, parity, dtest_type);
         } else {
-          static_cast<DiracMobiusPC *>(dirac)->Dslash4pre(*cudaSpinorOut, *cudaSpinor, parity);
+          static_cast<DiracMobiusPC *>(dirac)->Dslash4pre(*cudaSpinorOut, *cudaSpinor);
         }
         break;
       case dslash_test_type::M5inv:
         if (transfer) {
           dslashQuda_mdwf(spinorOut->V(), spinor->V(), &inv_param, parity, dtest_type);
         } else {
-          static_cast<DiracMobiusPC *>(dirac)->Dslash5inv(*cudaSpinorOut, *cudaSpinor, parity);
+          static_cast<DiracMobiusPC *>(dirac)->M5inv(*cudaSpinorOut, *cudaSpinor);
         }
         break;
       case dslash_test_type::MatPC:
@@ -449,7 +449,7 @@ DslashTime dslashCUDA(int niter)
         if (transfer) {
           errorQuda("(transfer == true) version NOT yet available!\n");
         } else {
-          static_cast<DiracMobiusEofaPC *>(dirac)->Dslash4pre(*cudaSpinorOut, *cudaSpinor, parity);
+          static_cast<DiracMobiusEofaPC *>(dirac)->Dslash4pre(*cudaSpinorOut, *cudaSpinor);
         }
         break;
       case dslash_test_type::M5inv:

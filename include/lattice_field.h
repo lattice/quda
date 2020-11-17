@@ -440,11 +440,8 @@ namespace quda {
        Create the communication handlers (both host and device)
        @param[in] no_comms_fill Whether to allocate halo buffers for
        dimensions that are not partitioned
-       @param[in] bidir Whether to allocate communication buffers to
-       allow for simultaneous bi-directional exchange.  If false, then
-       the forwards and backwards buffers will alias (saving memory).
     */
-    void createComms(bool no_comms_fill=false, bool bidir=true);
+    void createComms(bool no_comms_fill=false);
 
     /**
        Destroy the communication handlers
@@ -656,22 +653,15 @@ namespace quda {
     */
     void *remoteFace_d(int dir, int dim) const;
 
-    virtual void gather(int nFace, int dagger, int dir, const qudaStream_t &stream) { errorQuda("Not implemented"); }
+    virtual void gather(int, int, int, const qudaStream_t &) { errorQuda("Not implemented"); }
 
-    virtual void commsStart(int nFace, int dir, int dagger, const qudaStream_t &stream, bool gdr_send = false,
-                            bool gdr_recv = true)
-    { errorQuda("Not implemented"); }
+    virtual void commsStart(int, int, int, const qudaStream_t &, bool, bool) { errorQuda("Not implemented"); }
 
-    virtual int commsQuery(int nFace, int dir, int dagger, const qudaStream_t &stream, bool gdr_send = false,
-                           bool gdr_recv = true)
-    { errorQuda("Not implemented"); return 0; }
+    virtual int commsQuery(int, const qudaStream_t &, bool, bool) { errorQuda("Not implemented"); return 0; }
 
-    virtual void commsWait(int nFace, int dir, int dagger, const qudaStream_t &stream, bool gdr_send = false,
-                           bool gdr_recv = true)
-    { errorQuda("Not implemented"); }
+    virtual void commsWait(int, const qudaStream_t &, bool, bool) { errorQuda("Not implemented"); }
 
-    virtual void scatter(int nFace, int dagger, int dir, const qudaStream_t &stream)
-    { errorQuda("Not implemented"); }
+    virtual void scatter(int, const qudaStream_t &) { errorQuda("Not implemented"); }
 
     /** Return the volume string used by the autotuner */
     inline const char *VolString() const { return vol_string; }
@@ -690,7 +680,7 @@ namespace quda {
       all relevant memory fields to the current device or to the CPU.
       @param[in] mem_space Memory space we are prefetching to
     */
-    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const { ; }
+    virtual void prefetch(QudaFieldLocation, qudaStream_t = device::get_default_stream()) const { ; }
 
     virtual bool isNative() const = 0;
 

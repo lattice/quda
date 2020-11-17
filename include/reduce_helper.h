@@ -151,22 +151,17 @@ namespace quda
        @param[out] result The reduction result is copied here
        @param[in] stream The stream on which we the reduction is being done
      */
+#ifdef HETEROGENEOUS_ATOMIC
     template <typename host_t, typename device_t = host_t>
-        void complete(std::vector<host_t> &result, const qudaStream_t stream = device::get_default_stream())
+    void complete(std::vector<host_t> &result, const qudaStream_t = device::get_default_stream())
     {
       if (launch_error == QUDA_ERROR) return; // kernel launch failed so return
       if (launch_error == QUDA_ERROR_UNINITIALIZED) errorQuda("No reduction kernel appears to have been launched");
-#ifdef HETEROGENEOUS_ATOMIC
       if (consumed) errorQuda("Cannot call complete more than once for each construction");
 
       for (int i = 0; i < n_reduce * n_item; i++) {
         result_h[i].wait(init_value<system_atomic_t>(), cuda::std::memory_order_relaxed);
       }
-#else
-      auto event = reducer::get_event();
-      qudaEventRecord(event, stream);
-      while (!qudaEventQuery(event)) {}
-#endif
       // copy back result element by element and convert if necessary to host reduce type
       // unit size here may differ from system_atomic_t size, e.g., if doing double-double
       const int n_element = n_reduce * sizeof(T) / sizeof(device_t);
@@ -174,7 +169,6 @@ namespace quda
         errorQuda("result vector length %lu does not match n_reduce %d", result.size(), n_element);
       for (int i = 0; i < n_element; i++) result[i] = reinterpret_cast<device_t *>(result_h)[i];
 
-#ifdef HETEROGENEOUS_ATOMIC
       if (!reset) {
         consumed = true;
       } else {
@@ -184,8 +178,25 @@ namespace quda
         }
         std::atomic_thread_fence(std::memory_order_release);
       }
-#endif
     }
+#else
+    template <typename host_t, typename device_t = host_t>
+    void complete(std::vector<host_t> &result, const qudaStream_t stream = device::get_default_stream())
+    {
+      if (launch_error == QUDA_ERROR) return; // kernel launch failed so return
+      if (launch_error == QUDA_ERROR_UNINITIALIZED) errorQuda("No reduction kernel appears to have been launched");
+      auto event = reducer::get_event();
+      qudaEventRecord(event, stream);
+      while (!qudaEventQuery(event)) {}
+
+      // copy back result element by element and convert if necessary to host reduce type
+      // unit size here may differ from system_atomic_t size, e.g., if doing double-double
+      const int n_element = n_reduce * sizeof(T) / sizeof(device_t);
+      if (result.size() != (unsigned)n_element)
+        errorQuda("result vector length %lu does not match n_reduce %d", result.size(), n_element);
+      for (int i = 0; i < n_element; i++) result[i] = reinterpret_cast<device_t *>(result_h)[i];
+    }
+#endif
   };
 
 #ifdef HETEROGENEOUS_ATOMIC

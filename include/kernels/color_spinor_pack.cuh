@@ -45,19 +45,11 @@ namespace quda {
      Compute the max element over the spin-color components of a given site.
    */
   template <typename Float, int Ns, int Ms, int Nc, int Mc, typename Arg>
-  __device__ __host__ __forceinline__ Float compute_site_max(Arg &arg, int x_cb, int parity, int spinor_parity, int spin_block, int color_block, bool active) {
-
+  __device__ __host__ __forceinline__ Float compute_site_max(Arg &arg, int x_cb, int spinor_parity, int spin_block, int color_block, bool active)
+  {
     Float thread_max = 0.0;
     Float site_max = active ? 0.0 : 1.0;
 
-#ifdef __CUDA_ARCH__
-    // workout how big a shared-memory allocation we need
-    // just statically compute the largest size needed to avoid templating on block size
-    constexpr int bank_width = 32; // shared memory has 32 banks
-    constexpr int color_spin_threads = Nc <= max_block_float_nc ? (Ns/Ms) * (Nc/Mc) : 1;
-    // this is the largest size of blockDim.x (rounded up to multiples of bank_width)
-    constexpr int thread_width_x = ( (device::max_block_size() / color_spin_threads + bank_width-1) / bank_width) * bank_width;
-    __shared__ Float v[ (Ns/Ms) * (Nc/Mc) * thread_width_x];
     const auto &rhs = arg.field;
     if (active) {
 #pragma unroll
@@ -71,9 +63,17 @@ namespace quda {
 	  thread_max = thread_max > fabs(z.imag()) ? thread_max : fabs(z.imag());
 	}
       }
-      v[ ( (spin_block/Ms) * (Nc/Mc) + (color_block/Mc)) * blockDim.x + threadIdx.x ] = thread_max;
     }
 
+#ifdef __CUDA_ARCH__
+    // workout how big a shared-memory allocation we need
+    // just statically compute the largest size needed to avoid templating on block size
+    constexpr int bank_width = 32; // shared memory has 32 banks
+    constexpr int color_spin_threads = Nc <= max_block_float_nc ? (Ns/Ms) * (Nc/Mc) : 1;
+    // this is the largest size of blockDim.x (rounded up to multiples of bank_width)
+    constexpr int thread_width_x = ( (device::max_block_size() / color_spin_threads + bank_width-1) / bank_width) * bank_width;
+    __shared__ Float v[ (Ns/Ms) * (Nc/Mc) * thread_width_x];
+    if (active) v[ ( (spin_block/Ms) * (Nc/Mc) + (color_block/Mc)) * blockDim.x + threadIdx.x ] = thread_max;
     __syncthreads();
    
     if (active) {
@@ -103,7 +103,7 @@ namespace quda {
       Float max = 1.0;
       if (block_float) {
         bool active = ( arg.commDim[dim] && ( (dir == 0 && x[dim] < arg.nFace) || (dir == 1 && x[dim] >= arg.X[dim] - arg.nFace) ) );
-        max = compute_site_max<Float,Ns,Ms,Nc,Mc>(arg, x_cb, parity, spinor_parity, spin_block, color_block, active);
+        max = compute_site_max<Float,Ns,Ms,Nc,Mc>(arg, x_cb, spinor_parity, spin_block, color_block, active);
       }      
 
       if (dir == 0 && arg.commDim[dim] && x[dim] < arg.nFace) {

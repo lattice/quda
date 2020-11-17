@@ -80,7 +80,7 @@ namespace quda {
 
     if (arg.pack) {
       arg.U.load(data, id, arg.dir, arg.parity);
-      arg.U.reconstruct.Pack(tmp, data, id);
+      arg.U.reconstruct.Pack(tmp, data);
       for (int i = 0; i < Arg::recon / 2; i++)
         arg.array[idx + arg.size * i] = complex<real>(tmp[2*i+0], tmp[2*i+1]);
     } else {

@@ -169,11 +169,16 @@ void dslashReference(sFloat *res, gFloat **gaugeFull,  gFloat **ghostGauge, sFlo
 
 #endif
 
+#ifndef MULTI_GPU
 // this actually applies the preconditioned dslash, e.g., D_ee^{-1} D_eo or D_oo^{-1} D_oe
 void wil_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit,
-		QudaPrecision precision, QudaGaugeParam &gauge_param) {
-  
-#ifndef MULTI_GPU  
+		QudaPrecision precision, QudaGaugeParam &)
+#else
+void wil_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit,
+		QudaPrecision precision, QudaGaugeParam &gauge_param)
+#endif
+{
+#ifndef MULTI_GPU
   if (precision == QUDA_DOUBLE_PRECISION)
     dslashReference((double*)out, (double**)gauge, (double*)in, oddBit, daggerBit);
   else

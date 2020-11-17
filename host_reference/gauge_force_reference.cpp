@@ -268,8 +268,7 @@ int gf_neighborIndexFullLattice(int i, int dx4, int dx3, int dx2, int dx1)
 
 // this functon compute one path for all lattice sites
 template <typename su3_matrix, typename Float>
-static void compute_path_product(su3_matrix *staple, su3_matrix **sitelink, su3_matrix **sitelink_ex_2d, int *path,
-                                 int len, Float loop_coeff, int dir)
+static void compute_path_product(su3_matrix *staple, su3_matrix **sitelink, int *path, int len, Float loop_coeff, int dir)
 {
   su3_matrix prev_matrix, curr_matrix, tmat;
   int dx[4];
@@ -296,11 +295,8 @@ static void compute_path_product(su3_matrix *staple, su3_matrix **sitelink, su3_
       }
 
       int nbr_idx = gf_neighborIndexFullLattice(i, dx[3], dx[2], dx[1], dx[0]);
-#ifdef MULTI_GPU
-      su3_matrix *lnk = sitelink_ex_2d[lnkdir] + nbr_idx;
-#else
       su3_matrix *lnk = sitelink[lnkdir] + nbr_idx;
-#endif
+
       if (GOES_FORWARDS(path[j])) {
         mult_su3_nn(&prev_matrix, lnk, &curr_matrix);
       } else {
@@ -343,7 +339,7 @@ static void update_mom(anti_hermitmat *momentum, int dir, su3_matrix **sitelink,
 /* This function only computes one direction @dir
  *
  */
-void gauge_force_reference_dir(void *refMom, int dir, double eb3, void **sitelink, void **sitelink_ex_2d,
+void gauge_force_reference_dir(void *refMom, int dir, double eb3, void **sitelink, void **sitelink_ex,
                                QudaPrecision prec, int **path_dir, int *length, void *loop_coeff, int num_paths)
 {
   void *staple;
@@ -360,12 +356,10 @@ void gauge_force_reference_dir(void *refMom, int dir, double eb3, void **sitelin
   for (int i = 0; i < num_paths; i++) {
     if (prec == QUDA_DOUBLE_PRECISION) {
       double *my_loop_coeff = (double *)loop_coeff;
-      compute_path_product((dsu3_matrix *)staple, (dsu3_matrix **)sitelink, (dsu3_matrix **)sitelink_ex_2d, path_dir[i],
-                           length[i], my_loop_coeff[i], dir);
+      compute_path_product((dsu3_matrix *)staple, (dsu3_matrix **)sitelink_ex, path_dir[i], length[i], my_loop_coeff[i], dir);
     } else {
       float *my_loop_coeff = (float *)loop_coeff;
-      compute_path_product((fsu3_matrix *)staple, (fsu3_matrix **)sitelink, (fsu3_matrix **)sitelink_ex_2d, path_dir[i],
-                           length[i], my_loop_coeff[i], dir);
+      compute_path_product((fsu3_matrix *)staple, (fsu3_matrix **)sitelink_ex, path_dir[i], length[i], my_loop_coeff[i], dir);
     }
   }
 
@@ -391,8 +385,7 @@ void gauge_force_reference(void *refMom, double eb3, void **sitelink, QudaPrecis
   auto qdp_ex = quda::createExtendedGauge((void **)sitelink, param, R);
 
   for (int dir = 0; dir < 4; dir++) {
-    gauge_force_reference_dir(refMom, dir, eb3, sitelink, (void **)qdp_ex->Gauge_p(), prec, path_dir[dir], length,
-                              loop_coeff, num_paths);
+    gauge_force_reference_dir(refMom, dir, eb3, sitelink, (void **)qdp_ex->Gauge_p(), prec, path_dir[dir], length, loop_coeff, num_paths);
   }
 
   delete qdp_ex;

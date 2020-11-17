@@ -134,18 +134,21 @@ namespace quda {
     long long bytes() const { return 4*2*arg.threads.x*(2*arg.mom.Bytes()+arg.force.Bytes()); }
   };
 
+#ifdef GPU_GAUGE_TOOLS
   void updateMomentum(GaugeField &mom, double coeff, GaugeField &force, const char *fname)
   {
-#ifdef GPU_GAUGE_TOOLS
     if (mom.Reconstruct() != QUDA_RECONSTRUCT_10)
       errorQuda("Momentum field with reconstruct %d not supported", mom.Reconstruct());
 
     checkPrecision(mom, force);
     instantiate<UpdateMom, ReconstructMom>(force, mom, coeff, fname);
-#else
-    errorQuda("%s not built", __func__);
-#endif // GPU_GAUGE_TOOLS
   }
+#else
+  void updateMomentum(GaugeField &, double, GaugeField &, const char *)
+  {
+    errorQuda("%s not built", __func__);
+  }
+#endif // GPU_GAUGE_TOOLS
 
   template <typename Float, int nColor, QudaReconstructType recon>
   class UApply : TunableKernel2D {
@@ -179,15 +182,18 @@ namespace quda {
     long long bytes() const { return 2 * force.Bytes() + U.Bytes(); }
   };
 
+#ifdef GPU_GAUGE_TOOLS
   void applyU(GaugeField &force, GaugeField &U)
   {
-#ifdef GPU_GAUGE_TOOLS
     if (!force.isNative()) errorQuda("Unsupported output ordering: %d\n", force.Order());
     checkPrecision(force, U);
     instantiate<UApply, ReconstructNo12>(U, force);
-#else
-    errorQuda("%s not built", __func__);
-#endif // GPU_GAUGE_TOOLS
   }
+#else
+  void applyU(GaugeField &, GaugeField &)
+  {
+    errorQuda("%s not built", __func__);
+  }
+#endif // GPU_GAUGE_TOOLS
 
 } // namespace quda

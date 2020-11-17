@@ -55,8 +55,8 @@ void dslashQuda_4dpc(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaPa
   printfQuda("kappa for QUDA input : %e\n", inv_param->kappa);
   switch (test_type) {
   case dslash_test_type::Dslash: dirac.Dslash4(out, in, parity); break;
-  case dslash_test_type::M5: dirac.Dslash5(out, in, parity); break;
-  case dslash_test_type::M5inv: dirac.Dslash5inv(out, in, parity, inv_param->kappa); break;
+  case dslash_test_type::M5: dirac.Dslash5(out, in); break;
+  case dslash_test_type::M5inv: dirac.M5inv(out, in); break;
   default: errorQuda("Unsupported dslash_test_type in dslashQuda_4dpc.");
   }
 
@@ -119,9 +119,9 @@ void dslashQuda_mdwf(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaPa
   DiracMobiusPC dirac(diracParam); // create the Dirac operator
   switch (test_type) {
   case dslash_test_type::Dslash: dirac.Dslash4(out, in, parity); break;
-  case dslash_test_type::M5: dirac.Dslash5(out, in, parity); break;
-  case dslash_test_type::Dslash4pre: dirac.Dslash4pre(out, in, parity); break;
-  case dslash_test_type::M5inv: dirac.Dslash5inv(out, in, parity); break;
+  case dslash_test_type::M5: dirac.Dslash5(out, in); break;
+  case dslash_test_type::Dslash4pre: dirac.Dslash4pre(out, in); break;
+  case dslash_test_type::M5inv: dirac.M5inv(out, in); break;
   default: errorQuda("Unsupported dslash_test_type in dslashQuda_mdwf.");
   }
 
@@ -160,6 +160,8 @@ void dslashQuda_mobius_eofa(void *h_out, void *h_in, QudaInvertParam *inv_param,
 
   ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), precondition_output, inv_param->input_location);
   ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
+  cpuParam.v = h_out;
+  ColorSpinorField *out_h = ColorSpinorField::Create(cpuParam);
 
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
   cudaColorSpinorField in(*in_h, cudaParam);
@@ -193,4 +195,9 @@ void dslashQuda_mobius_eofa(void *h_out, void *h_in, QudaInvertParam *inv_param,
   case dslash_test_type::M5inv: dirac.m5inv_eofa(out, in); break;
   default: errorQuda("test_type(=%d) NOT defined for M\"obius EOFA! :( \n", static_cast<int>(test_type));
   }
+
+  *out_h = out;
+
+  delete out_h;
+  delete in_h;
 }

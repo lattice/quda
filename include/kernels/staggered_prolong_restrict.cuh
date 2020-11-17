@@ -44,13 +44,13 @@ namespace quda {
 
   // on prolong, the out vector is the fine vector
   template<>
-  inline const ColorSpinorField& fineColorSpinorField<StaggeredTransferType::STAGGERED_TRANSFER_PROLONG>(const ColorSpinorField& quoteIn, const ColorSpinorField& quoteOut) {
+  inline const ColorSpinorField& fineColorSpinorField<StaggeredTransferType::STAGGERED_TRANSFER_PROLONG>(const ColorSpinorField&, const ColorSpinorField& quoteOut) {
     return quoteOut;
   }
 
   // on restrict, the in vector is the fine vector
   template<>
-  inline const ColorSpinorField& fineColorSpinorField<StaggeredTransferType::STAGGERED_TRANSFER_RESTRICT>(const ColorSpinorField& quoteIn, const ColorSpinorField& quoteOut) {
+  inline const ColorSpinorField& fineColorSpinorField<StaggeredTransferType::STAGGERED_TRANSFER_RESTRICT>(const ColorSpinorField& quoteIn, const ColorSpinorField&) {
     return quoteIn;
   }
 
@@ -63,13 +63,13 @@ namespace quda {
 
   // on prolong, the out vector is the fine vector
   template<>
-  inline const ColorSpinorField& coarseColorSpinorField<StaggeredTransferType::STAGGERED_TRANSFER_PROLONG>(const ColorSpinorField& quoteIn, const ColorSpinorField& quoteOut) {
+  inline const ColorSpinorField& coarseColorSpinorField<StaggeredTransferType::STAGGERED_TRANSFER_PROLONG>(const ColorSpinorField& quoteIn, const ColorSpinorField&) {
     return quoteIn;
   }
 
   // on restrict, the in vector is the fine vector
   template<>
-  inline const ColorSpinorField& coarseColorSpinorField<StaggeredTransferType::STAGGERED_TRANSFER_RESTRICT>(const ColorSpinorField& quoteIn, const ColorSpinorField& quoteOut) {
+  inline const ColorSpinorField& coarseColorSpinorField<StaggeredTransferType::STAGGERED_TRANSFER_RESTRICT>(const ColorSpinorField&, const ColorSpinorField& quoteOut) {
     return quoteOut;
   }
 

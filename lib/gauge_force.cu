@@ -36,6 +36,7 @@ namespace quda {
     long long bytes() const { return ((arg.p.count + 1ll) * arg.u.Bytes() + 2ll*arg.mom.Bytes()) * 2 * arg.mom.volumeCB * 4; }
   };
 
+#ifdef GPU_GAUGE_FORCE
   void gaugeForce(GaugeField& mom, const GaugeField& u, double epsilon, int ***input_path,
                   int *length_h, double *path_coeff_h, int num_paths, int path_max_length)
   {
@@ -48,13 +49,15 @@ namespace quda {
     void *buffer = pool_device_malloc(bytes);
     paths p(buffer, bytes, input_path, length_h, path_coeff_h, num_paths, path_max_length);
 
-#ifdef GPU_GAUGE_FORCE
     // gauge field must be passed as first argument so we peel off its reconstruct type
     instantiate<ForceGauge,ReconstructNo12>(u, mom, epsilon, p);
-#else
-    errorQuda("Gauge force has not been built");
-#endif // GPU_GAUGE_FORCE
     pool_device_free(buffer);
   }
+#else
+  void gaugeForce(GaugeField&, const GaugeField&, double, int ***, int *, double *, int, int)
+  {
+    errorQuda("Gauge force has not been built");
+  }
+#endif
 
 } // namespace quda

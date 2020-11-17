@@ -124,14 +124,13 @@ namespace quda {
     sol = &x;  
   }
 
-  void DiracImprovedStaggered::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-				   const QudaSolutionType solType) const
+  void DiracImprovedStaggered::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
   {
     // do nothing
   }
 
-  void DiracImprovedStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa,
-                                              double mass, double mu, double mu_factor) const
+  void DiracImprovedStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double,
+                                              double mass, double, double) const
   {
     StaggeredCoarseOp(Y, X, T, *fatGauge, mass, QUDA_ASQTAD_DIRAC, QUDA_MATPC_INVALID);
   }
@@ -200,7 +199,7 @@ namespace quda {
     deleteTmp(&tmp1, reset);
   }
 
-  void DiracImprovedStaggeredPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracImprovedStaggeredPC::MdagM(ColorSpinorField &, const ColorSpinorField &) const
   {
     errorQuda("MdagM is no longer defined for DiracImprovedStaggeredPC. Use M instead.\n");
     /*

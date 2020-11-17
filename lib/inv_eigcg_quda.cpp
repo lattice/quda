@@ -174,10 +174,10 @@ namespace quda {
      return;
    }
 
+#ifdef MAGMA_LIB
    //(supposed to be a pure) magma version: 
    template <> void ComputeRitz<libtype::magma_lib>(EigCGArgs &args)
    {
-#ifdef MAGMA_LIB
      const int m = args.m;
      const int k = args.k;
      //Solve m dim eigenproblem:
@@ -214,11 +214,10 @@ namespace quda {
 //?
      cudaHostUnregister(evecm);
      cudaHostUnregister(evecm1);
+   }
 #else
-     errorQuda("Magma library was not built.");
+  template <> void ComputeRitz<libtype::magma_lib>(EigCGArgs &) { errorQuda("Magma library was not built."); }
 #endif
-     return;
-  }
 
   // set the required parameters for the inner solver
   static void fillEigCGInnerSolverParam(SolverParam &inner, const SolverParam &outer, bool use_sloppy_partial_accumulator = true)

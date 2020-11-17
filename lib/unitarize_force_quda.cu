@@ -52,10 +52,10 @@ namespace quda {
       long long bytes() const { return 4ll * meta.Volume() * (arg.force.Bytes() + arg.force_old.Bytes() + arg.u.Bytes()); }
     }; // UnitarizeForce
 
+#ifdef GPU_HISQ_FORCE
     void unitarizeForce(GaugeField &newForce, const GaugeField &oldForce, const GaugeField &u,
 			int* fails)
     {
-#ifdef GPU_HISQ_FORCE
       checkReconstruct(u, oldForce, newForce);
       checkPrecision(u, oldForce, newForce);
 
@@ -63,14 +63,16 @@ namespace quda {
         errorQuda("Only native order supported");
 
       instantiate<ForceUnitarize, ReconstructNone>(newForce, oldForce, u, fails);
-#else
-      errorQuda("HISQ force has not been built");
-#endif
     }
+#else
+    void unitarizeForce(GaugeField &, const GaugeField &, const GaugeField &, int*)
+    {
+      errorQuda("HISQ force has not been built");
+    }
+#endif
 
     template <typename Float, typename Arg> void unitarizeForceCPU(Arg &arg)
     {
-#ifdef GPU_HISQ_FORCE
       Matrix<complex<double>, 3> v, result, oprod;
       Matrix<complex<Float>, 3> v_tmp, result_tmp, oprod_tmp;
 
@@ -89,11 +91,9 @@ namespace quda {
           }
         }
       }
-#else
-      errorQuda("HISQ force has not been built");
-#endif
     }
 
+#ifdef GPU_HISQ_FORCE
     void unitarizeForceCPU(GaugeField &newForce, const GaugeField &oldForce, const GaugeField &u)
     {
       if (checkLocation(newForce, oldForce, u) != QUDA_CPU_FIELD_LOCATION) errorQuda("Location must be CPU");
@@ -133,6 +133,12 @@ namespace quda {
       }
       if (num_failures) errorQuda("Unitarization failed, failures = %d", num_failures);
     } // unitarize_force_cpu
+#else
+    void unitarizeForceCPU(GaugeField &, const GaugeField &, const GaugeField &)
+    {
+      errorQuda("HISQ force has not been built");
+    }
+#endif
 
   } // namespace fermion_force
 

@@ -165,9 +165,9 @@ namespace quda {
     instantiate<Staple, ReconstructNo12>(u, fat, staple, mulink, nu, dir1, dir2, coeff, save_staple);
   }
 
+#ifdef GPU_FATLINK
   void fatLongKSLink(GaugeField *fat, GaugeField *lng, const GaugeField& u, const double *coeff)
   {
-#ifdef GPU_FATLINK
     GaugeFieldParam gParam(u);
     gParam.reconstruct = QUDA_RECONSTRUCT_NO;
     gParam.setPrecision(gParam.Precision());
@@ -214,10 +214,13 @@ namespace quda {
 
     delete staple;
     delete staple1;
-#else
-    errorQuda("Fat-link computation not enabled");
-#endif
   }
+#else
+  void fatLongKSLink(GaugeField *, GaugeField *, const GaugeField&, const double *)
+  {
+    errorQuda("Fat-link computation not enabled");
+  }
+#endif
 
 #undef MIN_COEFF
 

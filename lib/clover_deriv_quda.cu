@@ -58,9 +58,9 @@ namespace quda {
     } // force / oprod order
   }
 
+#ifdef GPU_CLOVER_DIRAC
   void cloverDerivative(GaugeField &force, GaugeField &gauge, GaugeField &oprod, double coeff, QudaParity parity)
   {
-#ifdef GPU_CLOVER_DIRAC
     assert(oprod.Geometry() == QUDA_TENSOR_GEOMETRY);
     assert(force.Geometry() == QUDA_VECTOR_GEOMETRY);
 
@@ -76,9 +76,12 @@ namespace quda {
     } else {
       errorQuda("Precision %d not supported", force.Precision());
     }
-#else
-    errorQuda("Clover has not been built");
-#endif
   }
+#else
+  void cloverDerivative(GaugeField &, GaugeField &, GaugeField &, double, QudaParity)
+  {
+    errorQuda("Clover has not been built");
+  }
+#endif
 
 } // namespace quda

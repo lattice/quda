@@ -143,12 +143,12 @@ namespace quda {
     }
   }
 
+#ifdef GPU_MULTIGRID
   //Does the heavy lifting of creating the coarse color matrices Y
   void calculateY(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic,
                   ColorSpinorField &uv, ColorSpinorField &av, const Transfer &T, const GaugeField &g,
                   const CloverField &c, double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc)
   {
-#ifdef GPU_MULTIGRID
     checkPrecision(Xatomic, Yatomic, g);
     checkPrecision(uv, av, T.Vectors(X.Location()), X, Y);
 
@@ -180,10 +180,16 @@ namespace quda {
       errorQuda("Unsupported precision %d\n", Y.Precision());
     }
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("....done computing Y field\n");
-#else
-    errorQuda("Multigrid has not been built");
-#endif // GPU_MULTIGRID
   }
+#else
+  //Does the heavy lifting of creating the coarse color matrices Y
+  void calculateY(GaugeField &, GaugeField &, GaugeField &, GaugeField &,
+                  ColorSpinorField &, ColorSpinorField &, const Transfer &, const GaugeField &,
+                  const CloverField &, double, double, double, QudaDiracType, QudaMatPCType)
+  {
+    errorQuda("Multigrid has not been built");
+  }
+#endif // GPU_MULTIGRID
 
   //Calculates the coarse color matrix and puts the result in Y.
   //N.B. Assumes Y, X have been allocated.

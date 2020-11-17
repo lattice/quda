@@ -29,7 +29,7 @@ namespace quda
       dim3 threads;
 
       ReductionArg(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w,
-                   ColorSpinorField &v, Reducer r, int length, int nParity, TuneParam &tp) :
+                   ColorSpinorField &v, Reducer r, int length, int nParity) :
         X(x),
         Y(y),
         Z(z),
@@ -97,7 +97,7 @@ namespace quda
       virtual __device__ __host__ void pre() { ; }
 
       //! post-computation routine called after the "M-loop"
-      virtual __device__ __host__ void post(reduce_t &sum) { ; }
+      virtual __device__ __host__ void post(reduce_t &) { ; }
     };
 
     /**
@@ -112,8 +112,8 @@ namespace quda
     struct Norm1 : public ReduceFunctor<reduce_t> {
       static constexpr memory_access<1> read{ };
       static constexpr memory_access<> write{ };
-      Norm1(const real &a, const real &b) { ; }
-      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
+      Norm1(const real &, const real &) { ; }
+      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &, T &, T &, T &)
       {
 #pragma unroll
         for (int i=0; i < x.size(); i++) sum += norm1_<reduce_t, real>(x[i]);
@@ -134,8 +134,8 @@ namespace quda
     struct Norm2 : public ReduceFunctor<reduce_t> {
       static constexpr memory_access<1> read{ };
       static constexpr memory_access<> write{ };
-      Norm2(const real &a, const real &b) { ; }
-      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
+      Norm2(const real &, const real &) { ; }
+      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &, T &, T &, T &)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) norm2_<reduce_t,real>(sum, x[i]);
@@ -157,8 +157,8 @@ namespace quda
     struct Dot : public ReduceFunctor<reduce_t> {
       static constexpr memory_access<1,1> read{ };
       static constexpr memory_access<> write{ };
-      Dot(const real &a, const real &b) { ; }
-      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
+      Dot(const real &, const real &) { ; }
+      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &, T &, T &)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) dot_<reduce_t, real>(sum, x[i], y[i]);
@@ -177,7 +177,7 @@ namespace quda
       const real a;
       const real b;
       axpbyzNorm2(const real &a, const real &b) : a(a), b(b) { ; }
-      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
+      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &, T &)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
@@ -197,8 +197,8 @@ namespace quda
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<0, 1> write{ };
       const real a;
-      AxpyReDot(const real &a, const real &b) : a(a) { ; }
-      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
+      AxpyReDot(const real &a, const real &) : a(a) { ; }
+      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &, T &, T &)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
@@ -218,8 +218,8 @@ namespace quda
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<0, 1> write{ };
       const complex<real> a;
-      caxpyNorm2(const complex<real> &a, const complex<real> &b) : a(a) { ; }
-      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
+      caxpyNorm2(const complex<real> &a, const complex<real> &) : a(a) { ; }
+      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &, T &, T &)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
@@ -241,8 +241,8 @@ namespace quda
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<1, 1> write{ };
       const complex<real> a;
-      caxpyxmaznormx(const complex<real> &a, const complex<real> &b) : a(a) { ; }
-      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
+      caxpyxmaznormx(const complex<real> &a, const complex<real> &) : a(a) { ; }
+      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &, T &)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
@@ -267,7 +267,7 @@ namespace quda
       const real a;
       const complex<real> b;
       cabxpyzaxnorm(const complex<real> &a, const complex<real> &b) : a(a.real()), b(b) { ; }
-      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
+      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &, T &)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
@@ -297,8 +297,8 @@ namespace quda
       using reduce_t = typename VectorType<real_reduce_t, 2>::type;
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<> write{ };
-      Cdot(const complex<real> &a, const complex<real> &b) { ; }
-      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
+      Cdot(const complex<real> &, const complex<real> &) { ; }
+      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &, T &, T &)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) cdot_<reduce_t, real>(sum, x[i], y[i]);
@@ -317,8 +317,8 @@ namespace quda
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<0, 1> write{ };
       const complex<real> a;
-      caxpydotzy(const complex<real> &a, const complex<real> &b) : a(a) { ; }
-      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
+      caxpydotzy(const complex<real> &a, const complex<real> &) : a(a) { ; }
+      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &, T &)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
@@ -360,8 +360,8 @@ namespace quda
       using reduce_t = typename VectorType<real_reduce_t, 3>::type;
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<> write{ };
-      CdotNormA(const real &a, const real &b) { ; }
-      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
+      CdotNormA(const real &, const real &) { ; }
+      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &, T &, T &)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) cdotNormA_<reduce_t>(sum, x[i], y[i]);
@@ -406,8 +406,8 @@ namespace quda
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<0, 1> write{ };
       const real a;
-      axpyCGNorm2(const real &a, const real &b) : a(a) { ; }
-      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
+      axpyCGNorm2(const real &a, const real &) : a(a) { ; }
+      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &, T &, T &)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
@@ -434,7 +434,7 @@ namespace quda
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<> write{ };
       reduce_t aux;
-      HeavyQuarkResidualNorm_(const real &a, const real &b) : aux {} { ; }
+      HeavyQuarkResidualNorm_(const real &, const real &) : aux {} { ; }
 
       __device__ __host__ void pre()
       {
@@ -442,7 +442,7 @@ namespace quda
         aux.y = 0;
       }
 
-      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
+      template <typename T> __device__ __host__ void operator()(reduce_t &, T &x, T &y, T &, T &, T &)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
@@ -477,7 +477,7 @@ namespace quda
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<> write{ };
       reduce_t aux;
-      xpyHeavyQuarkResidualNorm_(const real &a, const real &b) : aux {} { ; }
+      xpyHeavyQuarkResidualNorm_(const real &, const real &) : aux {} { ; }
 
       __device__ __host__ void pre()
       {
@@ -485,7 +485,7 @@ namespace quda
         aux.y = 0;
       }
 
-      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
+      template <typename T> __device__ __host__ void operator()(reduce_t &, T &x, T &y, T &z, T &, T &)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
@@ -517,8 +517,8 @@ namespace quda
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<> write{ };
       using scalar = typename scalar<reduce_t>::type;
-      tripleCGReduction_(const real &a, const real &b) { ; }
-      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
+      tripleCGReduction_(const real &, const real &) { ; }
+      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &, T &)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
@@ -542,8 +542,8 @@ namespace quda
       using reduce_t = typename VectorType<real_reduce_t, 4>::type;
       static constexpr memory_access<1, 1, 1, 1> read{ };
       static constexpr memory_access<> write{ };
-      quadrupleCGReduction_(const real &a, const real &b) { ; }
-      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
+      quadrupleCGReduction_(const real &, const real &) { ; }
+      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
@@ -569,7 +569,7 @@ namespace quda
       static constexpr memory_access<1, 1, 0, 0, 1> read{ };
       static constexpr memory_access<1, 1, 1, 1> write{ };
       const real a;
-      quadrupleCG3InitNorm_(const real &a, const real &b) : a(a) { ; }
+      quadrupleCG3InitNorm_(const real &a, const real &) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
       {
 #pragma unroll

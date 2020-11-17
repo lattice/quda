@@ -26,23 +26,6 @@ using namespace std;
 
 // Staggered gauge field utils
 //------------------------------------------------------
-void constructStaggeredHostGhostGaugeField(quda::GaugeField *cpuFat, quda::GaugeField *cpuLong, void *milc_fatlink,
-                                           void *milc_longlink, QudaGaugeParam &gauge_param)
-{
-
-  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
-  gauge_param.location = QUDA_CPU_FIELD_LOCATION;
-
-  GaugeFieldParam cpuFatParam(milc_fatlink, gauge_param);
-  cpuFatParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-  cpuFat = GaugeField::Create(cpuFatParam);
-
-  gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
-  GaugeFieldParam cpuLongParam(milc_longlink, gauge_param);
-  cpuLongParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-  cpuLong = GaugeField::Create(cpuLongParam);
-}
-
 void constructStaggeredHostDeviceGaugeField(void **qdp_inlink, void **qdp_longlink_cpu, void **qdp_longlink_gpu,
                                             void **qdp_fatlink_cpu, void **qdp_fatlink_gpu, QudaGaugeParam &gauge_param,
                                             int argc, char **argv, bool &gauge_loaded)

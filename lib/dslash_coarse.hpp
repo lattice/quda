@@ -38,7 +38,7 @@ namespace quda {
        nSrc*nParity*(dslash*Y.Bytes()*Y.VolumeCB()/(2*Y.Stride()) + clover*X.Bytes()/2);
     }
     unsigned int sharedBytesPerThread() const { return (sizeof(complex<Float>) * Mc); }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions
     bool tuneAuxDim() const { return true; } // Do tune the aux dimensions
     unsigned int minThreads() const { return color_col_stride * X.VolumeCB(); } // 4-d volume since this x threads only
@@ -560,7 +560,7 @@ namespace quda {
    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
    bool tuneAuxDim() const { return true; } // Do tune the aux dimensions.
    unsigned int sharedBytesPerThread() const { return 0; }
-   unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+   unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
  public:
    inline DslashCoarsePolicyTune(Launch &dslash) : dslash(dslash)
@@ -648,7 +648,7 @@ namespace quda {
 
    virtual ~DslashCoarsePolicyTune() { setPolicyTuning(false); }
 
-   inline void apply(const qudaStream_t &stream)
+   inline void apply(const qudaStream_t &)
    {
      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 

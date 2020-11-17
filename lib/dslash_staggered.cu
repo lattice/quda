@@ -87,14 +87,18 @@ namespace quda
     }
   };
 
+#ifdef GPU_STAGGERED_DIRAC
   void ApplyStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
                       const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
-#ifdef GPU_STAGGERED_DIRAC
     instantiate<StaggeredApply, StaggeredReconstruct>(out, in, U, a, x, parity, dagger, comm_override, profile);
-#else
-    errorQuda("Staggered dslash has not been built");
-#endif
   }
+#else
+  void ApplyStaggered(ColorSpinorField &, const ColorSpinorField &, const GaugeField &,  double,
+                      const ColorSpinorField &, int, bool, const int *, TimeProfile &)
+  {
+    errorQuda("Staggered dslash has not been built");
+  }
+#endif
 
 } // namespace quda

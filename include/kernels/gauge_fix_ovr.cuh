@@ -295,8 +295,7 @@ namespace quda {
     }
   }
 
-  void PreCalculateLatticeIndices(size_t faceVolume[4], size_t faceVolumeCB[4], int X[4], int border[4],
-                                  int &threads, int *borderpoints[2]);
+  void PreCalculateLatticeIndices(size_t faceVolume[4], int X[4], int border[4], int &threads, int *borderpoints[2]);
 
   template <typename Float, typename Gauge>
   struct GaugeFixBorderPointsArg {
@@ -323,7 +322,7 @@ namespace quda {
         faceVolume[dir] = faceVolume_[dir];
         faceVolumeCB[dir] = faceVolumeCB_[dir];
       }
-      if (comm_partitioned()) PreCalculateLatticeIndices(faceVolume, faceVolumeCB, X, border, threads, borderpoints);
+      if (comm_partitioned()) PreCalculateLatticeIndices(faceVolume, X, border, threads, borderpoints);
     }
   };
 
@@ -465,7 +464,7 @@ namespace quda {
     Cmplx data[9];
     if ( pack ) {
       arg.dataOr.load(data, id, dir, parity);
-      arg.dataOr.reconstruct.Pack(tmp, data, id);
+      arg.dataOr.reconstruct.Pack(tmp, data);
       for ( int i = 0; i < Arg::NElems / 2; ++i ) {
         array[idx + size * i] = Cmplx(tmp[2*i+0], tmp[2*i+1]);
       }
@@ -534,7 +533,7 @@ namespace quda {
     Cmplx data[9];
     if ( pack ) {
       arg.dataOr.load(data, id, dir, parity);
-      arg.dataOr.reconstruct.Pack(tmp, data, id);
+      arg.dataOr.reconstruct.Pack(tmp, data);
       for ( int i = 0; i < Arg::NElems / 2; ++i ) array[idx + size * i] = Cmplx(tmp[2*i+0], tmp[2*i+1]);
     }
     else{

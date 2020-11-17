@@ -42,7 +42,7 @@ namespace quda
 
       MultiReduceArg(std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
                      std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
-                     Reducer f, int NYW, int length, int nParity, TuneParam &tp) :
+                     Reducer f, int NYW, int length, int nParity) :
         // we have NYW * nParity reductions each of length NXZ
         ReduceArg<reduce_t>(NYW),
         NYW(NYW),

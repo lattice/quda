@@ -66,15 +66,19 @@ namespace quda
     }
   };
 
+#ifdef GPU_NDEG_TWISTED_MASS_DIRAC
   void ApplyNdegTwistedMass(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double b,
                             double c, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
                             TimeProfile &profile)
   {
-#ifdef GPU_NDEG_TWISTED_MASS_DIRAC
     instantiate<NdegTwistedMassApply>(out, in, U, a, b, c, x, parity, dagger, comm_override, profile);
-#else
-    errorQuda("Non-degenerate twisted-mass dslash has not been built");
-#endif // GPU_NDEG_TWISTED_MASS_DIRAC
   }
+#else
+  void ApplyNdegTwistedMass(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, double, double,
+                            double, const ColorSpinorField &, int, bool, const int *, TimeProfile &)
+  {
+    errorQuda("Non-degenerate twisted-mass dslash has not been built");
+  }
+#endif // GPU_NDEG_TWISTED_MASS_DIRAC
 
 } // namespace quda

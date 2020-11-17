@@ -115,12 +115,12 @@ namespace quda
      @param[in] gdr Whether we are using GPU Direct RDMA or not
   */
   template <typename Dslash>
-  inline void issueRecv(cudaColorSpinorField &input, const Dslash &dslash, qudaStream_t *stream, bool gdr)
+  inline void issueRecv(cudaColorSpinorField &input, const Dslash &dslash, bool gdr)
   {
     for(int i=3; i>=0; i--){
       if (!dslash.dslashParam.commDim[i]) continue;
       for(int dir=1; dir>=0; dir--) {
-        PROFILE(if (dslash_comms) input.recvStart(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), device::get_stream(2*i+dir), gdr), profile, QUDA_PROFILE_COMMS_START);
+        PROFILE(if (dslash_comms) input.recvStart(2*i+dir, device::get_stream(2*i+dir), gdr), profile, QUDA_PROFILE_COMMS_START);
       }
     }
   }
@@ -237,7 +237,7 @@ namespace quda
      - if basic staging, we post the scatter (host to device memory copy)
 
      @param[in,out] in Field being commicated
-     @param[in] dslash The dslash object
+     @param[in] dslash The dslash object (unused)
      @param[in] dim Dimension we are working on
      @param[in] dir Direction we are working on
      @param[in] gdr_send Whether GPU Direct RDMA is being used for sending
@@ -247,10 +247,10 @@ namespace quda
      @param[in] scatterIndex The stream index used for posting the host-to-device memory copy in
    */
   template <typename Dslash>
-  inline bool commsComplete(cudaColorSpinorField &in, const Dslash &dslash, int dim, int dir, bool gdr_send,
+  inline bool commsComplete(cudaColorSpinorField &in, const Dslash &, int dim, int dir, bool gdr_send,
                             bool gdr_recv, bool zero_copy_recv, int scatterIndex = -1)
   {
-    PROFILE(int comms_test = dslash_comms ? in.commsQuery(dslash.Nface()/2, 2*dim+dir, dslash.Dagger(), device::get_stream(2*dim+dir), gdr_send, gdr_recv) : 1, profile, QUDA_PROFILE_COMMS_QUERY);
+    PROFILE(int comms_test = dslash_comms ? in.commsQuery(2*dim+dir, device::get_stream(2*dim+dir), gdr_send, gdr_recv) : 1, profile, QUDA_PROFILE_COMMS_QUERY);
     if (comms_test) {
       // now we are receive centric
       int dir2 = 1-dir;
@@ -266,7 +266,7 @@ namespace quda
           // note the ColorSpinorField::scatter transforms from
           // scatter centric to gather centric (e.g., flips
           // direction) so here just use dir not dir2
-          PROFILE(if (dslash_copy) in.scatter(dslash.Nface()/2, dslash.Dagger(), 2*dim+dir, device::get_stream(scatterIndex)), profile, QUDA_PROFILE_SCATTER);
+          PROFILE(if (dslash_copy) in.scatter(2*dim+dir, device::get_stream(scatterIndex)), profile, QUDA_PROFILE_SCATTER);
 	}
 
       }
@@ -362,7 +362,7 @@ namespace quda
         PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], device::get_default_stream()), profile, QUDA_PROFILE_EVENT_RECORD);
       }
 
-      issueRecv(*in, dslash, 0, false); // Prepost receives
+      issueRecv(*in, dslash, false); // Prepost receives
 
             qudaDeviceSynchronize(); // debug
       const int packIndex = device::get_default_stream_idx();
@@ -466,7 +466,7 @@ namespace quda
         PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], device::get_default_stream()), profile, QUDA_PROFILE_EVENT_RECORD);
       }
 
-      issueRecv(*in, dslash, 0, false); // Prepost receives
+      issueRecv(*in, dslash, false); // Prepost receives
 
       const int packIndex = device::get_default_stream_idx();
       const int parity_src = (in->SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
@@ -550,7 +550,7 @@ namespace quda
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
 
-      issueRecv(*in, dslash, 0, true); // Prepost receives
+      issueRecv(*in, dslash, true); // Prepost receives
 
       const int packIndex = device::get_default_stream_idx();
       const int parity_src = (in->SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
@@ -633,7 +633,7 @@ namespace quda
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
 
-      issueRecv(*in, dslash, 0, true); // Prepost receives
+      issueRecv(*in, dslash, true); // Prepost receives
 
       const int packIndex = device::get_default_stream_idx();
       const int parity_src = (in->SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
@@ -714,7 +714,7 @@ namespace quda
         PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], device::get_default_stream()), profile, QUDA_PROFILE_EVENT_RECORD);
       }
 
-      issueRecv(*in, dslash, 0, true); // Prepost receives
+      issueRecv(*in, dslash, true); // Prepost receives
 
       const int packIndex = device::get_default_stream_idx();
       const int parity_src = (in->SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
@@ -797,7 +797,7 @@ namespace quda
         PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], device::get_default_stream()), profile, QUDA_PROFILE_EVENT_RECORD);
       }
 
-      issueRecv(*in, dslash, 0, true); // Prepost receives
+      issueRecv(*in, dslash, true); // Prepost receives
 
       const int packIndex = device::get_default_stream_idx();
       const int parity_src = (in->SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
@@ -873,7 +873,7 @@ namespace quda
       // record start of the dslash
       PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], device::get_default_stream()), profile, QUDA_PROFILE_EVENT_RECORD);
 
-      issueRecv(*in, dslash, 0, false); // Prepost receives
+      issueRecv(*in, dslash, false); // Prepost receives
 
       const int packIndex = getStreamIndex(dslashParam);
       PROFILE(qudaStreamWaitEvent(device::get_stream(packIndex), dslashStart[in->bufferIndex], 0), profile,
@@ -982,7 +982,7 @@ namespace quda
       issuePack(*in, dslash, parity_src, static_cast<MemoryLocation>(Host | (Remote * dslashParam.remote_write)),
                 packScatterIndex);
 
-      issueRecv(*in, dslash, 0, false); // Prepost receives
+      issueRecv(*in, dslash, false); // Prepost receives
 
       PROFILE(if (dslash_interior_compute) dslash.apply(device::get_default_stream()), profile, QUDA_PROFILE_DSLASH_KERNEL);
       if (aux_worker) aux_worker->apply(device::get_default_stream());
@@ -1070,7 +1070,7 @@ namespace quda
       // record start of the dslash
       PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], device::get_default_stream()), profile, QUDA_PROFILE_EVENT_RECORD);
 
-      issueRecv(*in, dslash, 0, true); // Prepost receives
+      issueRecv(*in, dslash, true); // Prepost receives
 
       const int packIndex = getStreamIndex(dslashParam);
       PROFILE(qudaStreamWaitEvent(device::get_stream(packIndex), dslashStart[in->bufferIndex], 0), profile,
@@ -1168,7 +1168,7 @@ namespace quda
       issuePack(*in, dslash, parity_src, static_cast<MemoryLocation>(Host | (Remote * dslashParam.remote_write)),
                 packIndex);
 
-      issueRecv(*in, dslash, 0, true); // Prepost receives
+      issueRecv(*in, dslash, true); // Prepost receives
 
       PROFILE(if (dslash_interior_compute) dslash.apply(device::get_default_stream()), profile, QUDA_PROFILE_DSLASH_KERNEL);
       if (aux_worker) aux_worker->apply(device::get_default_stream());
@@ -1246,7 +1246,7 @@ namespace quda
       // record start of the dslash
       PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], device::get_default_stream()), profile, QUDA_PROFILE_EVENT_RECORD);
 
-      issueRecv(*in, dslash, 0, false); // Prepost receives
+      issueRecv(*in, dslash, false); // Prepost receives
 
       const int packIndex = getStreamIndex(dslashParam);
       PROFILE(qudaStreamWaitEvent(device::get_stream(packIndex), dslashStart[in->bufferIndex], 0), profile,
@@ -1337,7 +1337,7 @@ namespace quda
       // record start of the dslash
       PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], device::get_default_stream()), profile, QUDA_PROFILE_EVENT_RECORD);
 
-      issueRecv(*in, dslash, 0, false); // Prepost receives
+      issueRecv(*in, dslash, false); // Prepost receives
 
       const int packIndex = getStreamIndex(dslashParam);
       PROFILE(qudaStreamWaitEvent(device::get_stream(packIndex), dslashStart[in->bufferIndex], 0), profile,
@@ -1424,7 +1424,7 @@ namespace quda
       // record start of the dslash
       PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], device::get_default_stream()), profile, QUDA_PROFILE_EVENT_RECORD);
 
-      issueRecv(*in, dslash, 0, false); // Prepost receives
+      issueRecv(*in, dslash, false); // Prepost receives
 
       MemoryLocation location = static_cast<MemoryLocation>(Host | (Remote * dslashParam.remote_write));
       dslash.setPack(true, location); // enable fused kernel packing
@@ -1515,7 +1515,7 @@ namespace quda
       // record start of the dslash
       PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], device::get_default_stream()), profile, QUDA_PROFILE_EVENT_RECORD);
 
-      issueRecv(*in, dslash, 0, false); // Prepost receives
+      issueRecv(*in, dslash, false); // Prepost receives
 
       MemoryLocation location = static_cast<MemoryLocation>(Host | (Remote * dslashParam.remote_write));
       dslash.setPack(true, location); // enable fused kernel packing
@@ -1581,24 +1581,6 @@ namespace quda
     }
   };
 
-  template <typename Dslash> struct DslashNC : DslashPolicyImp<Dslash> {
-
-    void operator()(
-        Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile)
-    {
-
-      profile.TPSTART(QUDA_PROFILE_TOTAL);
-
-      auto &dslashParam = dslash.dslashParam;
-      dslashParam.kernel_type = INTERIOR_KERNEL;
-      dslashParam.threads = volume;
-
-      PROFILE(if (dslash_interior_compute) dslash.apply(device::get_default_stream()), profile, QUDA_PROFILE_DSLASH_KERNEL);
-
-      profile.TPSTOP(QUDA_PROFILE_TOTAL);
-    }
-  };
-
   // whether we have initialized the dslash policy tuner
   extern bool dslash_policy_init;
 
@@ -1621,7 +1603,6 @@ namespace quda
     QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH,
     QUDA_DSLASH_FUSED_PACK,
     QUDA_DSLASH_FUSED_PACK_FUSED_HALO,
-    QUDA_DSLASH_NC,
     QUDA_DSLASH_POLICY_DISABLED // this MUST be the last element
   };
 
@@ -1692,7 +1673,6 @@ namespace quda
       case QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_DSLASH: result = new DslashFusedZeroCopy<Dslash>; break;
       case QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK: result = new DslashFusedPack<Dslash>; break;
       case QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK_FUSED_HALO: result = new DslashFusedPackFusedHalo<Dslash>; break;
-      case QudaDslashPolicy::QUDA_DSLASH_NC: result = new DslashNC<Dslash>; break;
       default: errorQuda("Dslash policy %d not recognized", static_cast<int>(dslashPolicy)); break;
       }
       return result; // default
@@ -1718,7 +1698,7 @@ namespace quda
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
     bool tuneAuxDim() const { return true; }   // Do tune the aux dimensions.
     unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
   public:
     DslashPolicyTune(
@@ -1929,7 +1909,7 @@ namespace quda
 
    virtual ~DslashPolicyTune() { setPolicyTuning(false); }
 
-   void apply(const qudaStream_t &stream) {
+   void apply(const qudaStream_t &) {
      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
      if (tp.aux.x >= static_cast<int>(policies.size())) errorQuda("Requested policy that is outside of range");

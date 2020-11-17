@@ -159,16 +159,20 @@ namespace quda
 
   // Apply the 5th dimension dslash operator to a colorspinor field
   // out = Dslash5*in
+#ifdef GPU_DOMAIN_WALL_DIRAC
   void ApplyDslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f,
                     double m_5, const Complex *b_5, const Complex *c_5, double a, bool dagger, Dslash5Type type)
   {
-#ifdef GPU_DOMAIN_WALL_DIRAC
     if (in.PCType() != QUDA_4D_PC) errorQuda("Only 4-d preconditioned fields are supported");
     checkLocation(out, in, x); // check all locations match
     instantiate<Dslash5>(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type);
-#else
-    errorQuda("Domain wall dslash has not been built");
-#endif
   }
+#else
+  void ApplyDslash5(ColorSpinorField &, const ColorSpinorField &, const ColorSpinorField &, double,
+                    double, const Complex *, const Complex *, double, bool, Dslash5Type)
+  {
+    errorQuda("Domain wall dslash has not been built");
+  }
+#endif
 
 } // namespace quda

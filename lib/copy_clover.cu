@@ -13,7 +13,7 @@ namespace quda {
     const CloverField &in;
 
     unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0 ;}
+    unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0 ;}
 
     unsigned int minThreads() const { return arg.threads.x; }
 
@@ -95,10 +95,10 @@ namespace quda {
     }
   };
 
+#ifdef GPU_CLOVER_DIRAC
   void copyGenericClover(CloverField &out, const CloverField &in, bool inverse, QudaFieldLocation location,
                          void *Out, void *In, void *outNorm, void *inNorm)
   {
-#ifdef GPU_CLOVER_DIRAC
     if (out.Precision() < QUDA_SINGLE_PRECISION && out.Order() > 4) 
       errorQuda("Fixed-point precision not supported for order %d", out.Order());
     if (in.Precision() < QUDA_SINGLE_PRECISION && in.Order() > 4) 
@@ -107,9 +107,12 @@ namespace quda {
     // swizzle in/out since we first want to instantiate precision
     instantiatePrecision<CloverCopyIn>(in, out, inverse, location, Out, In,
                                        reinterpret_cast<float*>(outNorm), reinterpret_cast<float*>(inNorm));
-#else
-    errorQuda("Clover has not been built");
-#endif
   }
+#else
+  void copyGenericClover(CloverField &, const CloverField &, bool, QudaFieldLocation, void *, void *, void *, void *)
+  {
+    errorQuda("Clover has not been built");
+  }
+#endif
 
 } // namespace quda

@@ -49,8 +49,6 @@ void setQudaStaggeredInvTestParams();
 
 // Staggered gauge field utils
 //------------------------------------------------------
-void constructStaggeredHostGhostGaugeField(quda::GaugeField *cpuFat, quda::GaugeField *cpuLong, void *milc_fatlink,
-                                           void *milc_longlink, QudaGaugeParam &gauge_param);
 void constructStaggeredHostDeviceGaugeField(void **qdp_inlink, void **qdp_longlink_cpu, void **qdp_longlink_gpu,
                                             void **qdp_fatlink_cpu, void **qdp_fatlink_gpu, QudaGaugeParam &gauge_param,
                                             int argc, char **argv, bool &gauge_loaded);

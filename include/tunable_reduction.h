@@ -28,7 +28,7 @@ namespace quda {
     QudaFieldLocation location;
 
     unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
     /**
        Reduction kernels require grid-size tuning, so enable this, and
@@ -46,7 +46,7 @@ namespace quda {
        parity is local to the thread block in the y dimension, half
        the max threads in the x dimension.
      */
-    virtual unsigned int maxBlockSize(const TuneParam &param) const { return device::max_reduce_block_size<block_size_y>(); }
+    virtual unsigned int maxBlockSize(const TuneParam &) const { return device::max_reduce_block_size<block_size_y>(); }
 
     template <int block_size_x, template <typename> class Transformer, template <typename> class Reducer, typename Arg>
     typename std::enable_if<block_size_x != device::warp_size(), qudaError_t>::type
@@ -102,8 +102,8 @@ namespace quda {
     }
 
     template <template <typename> class Transformer, template <typename> class Reducer = plus, typename Arg, typename T>
-    void launch_host(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg,
-                     const std::vector<constant_param_t> &param = dummy_param)
+    void launch_host(std::vector<T> &result, const TuneParam &, const qudaStream_t &, Arg &arg,
+                     const std::vector<constant_param_t> & = dummy_param)
     {
       using reduce_t = typename Transformer<Arg>::reduce_t;
       Transformer<Arg> t(arg);
@@ -259,7 +259,7 @@ namespace quda {
        parity is local to the thread block in the y dimension, half
        the max threads in the x dimension.
      */
-    unsigned int maxBlockSize(const TuneParam &param) const { return device::max_multi_reduce_block_size(); }
+    unsigned int maxBlockSize(const TuneParam &) const { return device::max_multi_reduce_block_size(); }
 
     template <int block_size_x, template <typename> class Transformer, template <typename> class Reducer, typename Arg>
     typename std::enable_if<block_size_x != device::warp_size(), qudaError_t>::type

@@ -329,8 +329,8 @@ namespace quda {
     return true;
   }
 
-  bool Solver::convergenceHQ(double r2, double hq2, double r2_tol, double hq_tol) {
-
+  bool Solver::convergenceHQ(double, double hq2, double, double hq_tol)
+  {
     // check the heavy quark residual norm if necessary
     if ( (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) && (hq2 > hq_tol) )
       return false;
@@ -338,8 +338,8 @@ namespace quda {
     return true;
   }
 
-  bool Solver::convergenceL2(double r2, double hq2, double r2_tol, double hq_tol) {
-
+  bool Solver::convergenceL2(double r2, double, double r2_tol, double)
+  {
     // check the L2 relative residual norm if necessary
     if ( ((param.residual_type & QUDA_L2_RELATIVE_RESIDUAL) ||
     (param.residual_type & QUDA_L2_ABSOLUTE_RESIDUAL)) && (r2 > r2_tol) )

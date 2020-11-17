@@ -780,11 +780,15 @@ namespace quda {
 // use BlockCGrQ algortithm or BlockCG (with / without GS, see BLOCKCG_GS option)
 #define BCGRQ 1
 #if BCGRQ
-void CG::blocksolve(ColorSpinorField& x, ColorSpinorField& b) {
-  #ifndef BLOCKSOLVER
-  errorQuda("QUDA_BLOCKSOLVER not built.");
-  #else
 
+#ifndef BLOCKSOLVER
+
+void CG::blocksolve(ColorSpinorField&, ColorSpinorField&) { errorQuda("QUDA_BLOCKSOLVER not built."); }
+
+#else
+
+void CG::blocksolve(ColorSpinorField& x, ColorSpinorField& b)
+{
   if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
   errorQuda("Not supported");
 
@@ -1148,8 +1152,8 @@ void CG::blocksolve(ColorSpinorField& x, ColorSpinorField& b) {
 
   return;
 
-  #endif
 }
+#endif
 
 #else
 

@@ -60,21 +60,28 @@ namespace quda
     long long bytes() const { return Fmunu.Bytes() + Fmunu.Volume() * (density * Fmunu.Precision()); }
   }; // QChargeCompute
 
+#ifdef GPU_GAUGE_TOOLS
   void computeQCharge(double energy[3], double &qcharge, const GaugeField &Fmunu)
   {
-#ifdef GPU_GAUGE_TOOLS
     instantiate<QCharge,ReconstructNone>(Fmunu, energy, qcharge, nullptr, false);
-#else
-    errorQuda("Gauge tools are not built");
-#endif // GPU_GAUGE_TOOLS
   }
+#else
+  void computeQCharge(double [3], double &, const GaugeField &)
+  {
+    errorQuda("Gauge tools are not built");
+  }
+#endif // GPU_GAUGE_TOOLS
 
+#ifdef GPU_GAUGE_TOOLS
   void computeQChargeDensity(double energy[3], double &qcharge, void *qdensity, const GaugeField &Fmunu)
   {
-#ifdef GPU_GAUGE_TOOLS
     instantiate<QCharge,ReconstructNone>(Fmunu, energy, qcharge, qdensity, true);
-#else
-    errorQuda("Gauge tools are not built");
-#endif // GPU_GAUGE_TOOLS
   }
+#else
+  void computeQChargeDensity(double [3], double &, void *, const GaugeField &)
+  {
+    errorQuda("Gauge tools are not built");
+  }
+#endif // GPU_GAUGE_TOOLS
+
 } // namespace quda

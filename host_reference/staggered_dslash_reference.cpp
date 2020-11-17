@@ -35,9 +35,15 @@ template <typename Float> void display_link_internal(Float *link)
 // if daggerBit is zero: perform ordinary dslash operator
 // if daggerBit is one:  perform hermitian conjugate of dslash
 template <typename sFloat, typename gFloat>
+#ifdef MULTI_GPU
 void staggeredDslashReference(sFloat *res, gFloat **fatlink, gFloat **longlink, gFloat **ghostFatlink,
                               gFloat **ghostLonglink, sFloat *spinorField, sFloat **fwd_nbr_spinor,
                               sFloat **back_nbr_spinor, int oddBit, int daggerBit, int nSrc, QudaDslashType dslash_type)
+#else
+void staggeredDslashReference(sFloat *res, gFloat **fatlink, gFloat **longlink, gFloat **,
+                              gFloat **, sFloat *spinorField, sFloat **,
+                              sFloat **, int oddBit, int daggerBit, int nSrc, QudaDslashType dslash_type)
+#endif
 {
   for (int i = 0; i < Vh * my_spinor_site_size * nSrc; i++) res[i] = 0.0;
 

@@ -221,14 +221,17 @@ namespace quda {
 
   //Apply the Gamma matrix to a colorspinor field
   //out(x) = gamma_d*in
+#ifdef GPU_TWISTED_MASS_DIRAC
   void ApplyTwistGamma(ColorSpinorField &out, const ColorSpinorField &in, int d, double kappa, double mu, double epsilon, int dagger, QudaTwistGamma5Type type)
   {
-#ifdef GPU_TWISTED_MASS_DIRAC
     instantiate<TwistGammaApply>(out, in, d, kappa, mu, epsilon, dagger, type);
-#else
-    errorQuda("Twisted mass dslash has not been built");
-#endif // GPU_TWISTED_MASS_DIRAC
   }
+#else
+  void ApplyTwistGamma(ColorSpinorField &, const ColorSpinorField &, int, double, double, double, int, QudaTwistGamma5Type)
+  {
+    errorQuda("Twisted mass dslash has not been built");
+  }
+#endif // GPU_TWISTED_MASS_DIRAC
 
   // Applies a gamma5 matrix to a spinor (wrapper to ApplyGamma)
   void gamma5(ColorSpinorField &out, const ColorSpinorField &in) { ApplyGamma(out,in,4); }
@@ -267,16 +270,19 @@ namespace quda {
     long long bytes() const { return out.Bytes() + in.Bytes() + clover.Bytes() / (3 - in.SiteSubset()); }
   };
 
+#ifdef GPU_CLOVER_DIRAC
   //Apply the clover matrix field to a colorspinor field
   //out(x) = clover*in
   void ApplyClover(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover, bool inverse, int parity)
   {
-#ifdef GPU_CLOVER_DIRAC
     instantiate<Clover>(out, in, clover, inverse, parity);
-#else
-    errorQuda("Clover dslash has not been built");
-#endif // GPU_TWISTED_MASS_DIRAC
   }
+#else
+  void ApplyClover(ColorSpinorField &, const ColorSpinorField &, const CloverField &, bool, int)
+  {
+    errorQuda("Clover dslash has not been built");
+  }
+#endif // GPU_TWISTED_MASS_DIRAC
 
   template <typename Float, int nColor> class TwistClover : public TunableKernel2D {
     ColorSpinorField &out;
@@ -303,6 +309,7 @@ namespace quda {
       epsilon(epsilon),
       parity(parity),
       inverse(twist != QUDA_TWIST_GAMMA5_DIRECT),
+      dagger(dagger),
       twist(twist)
     {
       if (in.Nspin() != 4 || out.Nspin() != 4) errorQuda("Unsupported nSpin=%d %d", out.Nspin(), in.Nspin());
@@ -333,15 +340,19 @@ namespace quda {
     }
   };
 
+#ifdef GPU_CLOVER_DIRAC
   //Apply the twisted-clover matrix field to a colorspinor field
   void ApplyTwistClover(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover,
 			double kappa, double mu, double epsilon, int parity, int dagger, QudaTwistGamma5Type twist)
   {
-#ifdef GPU_CLOVER_DIRAC
     instantiate<TwistClover>(out, in, clover, kappa, mu, epsilon, parity, dagger, twist);
-#else
-    errorQuda("Clover dslash has not been built");
-#endif // GPU_TWISTED_MASS_DIRAC
   }
+#else
+  void ApplyTwistClover(ColorSpinorField &, const ColorSpinorField &, const CloverField &,
+			double, double, double, int, int, QudaTwistGamma5Type)
+  {
+    errorQuda("Clover dslash has not been built");
+  }
+#endif // GPU_TWISTED_MASS_DIRAC
 
 } // namespace quda

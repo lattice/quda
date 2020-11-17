@@ -20,7 +20,7 @@ namespace quda {
     QudaFieldLocation location;
 
     virtual unsigned int sharedBytesPerThread() const { return 0; }
-    virtual unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+    virtual unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
     /**
        Kernel1D (and its derivations Kernel2D and Kernel3D) do not
@@ -54,7 +54,7 @@ namespace quda {
     }
 
     template <template <typename> class Functor, typename Arg>
-    void launch_host(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
+    void launch_host(const TuneParam &, const qudaStream_t &, const Arg &arg, const std::vector<constant_param_t> & = dummy_param)
     {
       Functor<Arg> f(const_cast<Arg &>(arg));
       for (int i = 0; i < (int)arg.threads.x; i++) {
@@ -157,7 +157,7 @@ namespace quda {
     }
 
     template <template <typename> class Functor, typename Arg>
-    void launch_host(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
+    void launch_host(const TuneParam &, const qudaStream_t &, const Arg &arg, const std::vector<constant_param_t> & = dummy_param)
     {
       Functor<Arg> f(const_cast<Arg &>(arg));
       for (int i = 0; i < (int)arg.threads.x; i++) {
@@ -312,7 +312,7 @@ namespace quda {
     }
 
     template <template <typename> class Functor, typename Arg>
-    void launch_host(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
+    void launch_host(const TuneParam &, const qudaStream_t &, const Arg &arg, const std::vector<constant_param_t> & = dummy_param)
     {
       Functor<Arg> f(const_cast<Arg &>(arg));
       for (int i = 0; i < (int)arg.threads.x; i++) {

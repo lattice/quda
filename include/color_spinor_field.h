@@ -14,7 +14,7 @@ namespace quda {
   namespace colorspinor
   {
 
-    inline bool isNative(QudaFieldOrder order, QudaPrecision precision, int nSpin, int nColor)
+    inline bool isNative(QudaFieldOrder order, QudaPrecision precision, int nSpin, int )
     {
       if (precision == QUDA_DOUBLE_PRECISION) {
         if (order == QUDA_FLOAT2_FIELD_ORDER) return true;
@@ -729,8 +729,6 @@ namespace quda {
        @brief Packs the cudaColorSpinorField's ghost zone
        @param[in] nFace How many faces to pack (depth)
        @param[in] parity Parity of the field
-       @param[in] dim Labels space-time dimensions
-       @param[in] dir Pack data to send in forward of backward directions, or both
        @param[in] dagger Whether the operator is the Hermitian conjugate or not
        @param[in] stream Which stream to use for the kernel
        @param[out] buffer Optional parameter where the ghost should be
@@ -743,7 +741,7 @@ namespace quda {
        @param[in] b Twisted mass parameter (flavor twist factor, default=0)
        @param[in] c Twisted mass parameter (chiral twist factor, default=0)
       */
-    void packGhost(const int nFace, const QudaParity parity, const int dim, const QudaDirection dir, const int dagger,
+    void packGhost(const int nFace, const QudaParity parity, const int dagger,
                    qudaStream_t stream, MemoryLocation location[2 * QUDA_MAX_DIM], MemoryLocation location_label,
                    bool spin_project, double a = 0, double b = 0, double c = 0);
 
@@ -762,14 +760,11 @@ namespace quda {
     /**
       Initiate the cpu to gpu send of the ghost zone (halo)
       @param ghost_spinor Source of the ghost zone
-      @param nFace Number of face to send
       @param dim The lattice dimension we are sending
       @param dir The direction (QUDA_BACKWARDS or QUDA_FORWARDS)
-      @param dagger Whether the operator is daggerer or not
       @param stream The array of streams to use
       */
-    void unpackGhost(const void *ghost_spinor, const int nFace, const int dim, const QudaDirection dir,
-                     const int dagger, qudaStream_t stream);
+    void unpackGhost(const void *ghost_spinor, const int dim, const QudaDirection dir, qudaStream_t stream);
 
     /**
        Pack the field halos in preparation for halo exchange, e.g., for Dslash
@@ -803,14 +798,12 @@ namespace quda {
 
     /**
        @brief Initiate halo communication receive
-       @param[in] Depth of face exchange
        @param[in] d d=[2*dim+dir], where dim is dimension and dir is
        the scatter-centric direction (0=backwards,1=forwards)
-       @param[in] dagger Whether this exchange is for the conjugate operator
        @param[in] stream (presently unused)
        @param[in] gdr Whether we are using GDR on the receive side
     */
-    void recvStart(int nFace, int dir, int dagger, const qudaStream_t &stream, bool gdr = false);
+    void recvStart(int dir, const qudaStream_t &stream, bool gdr = false);
 
     /**
        @brief Initiate halo communication sending
@@ -841,20 +834,16 @@ namespace quda {
 
     /**
        @brief Non-blocking query if the halo communication has completed
-       @param[in] Depth of face exchange
        @param[in] d d=[2*dim+dir], where dim is dimension and dir is
        the scatter-centric direction (0=backwards,1=forwards)
-       @param[in] dagger Whether this exchange is for the conjugate operator
        @param[in] stream (presently unused)
        @param[in] gdr_send Whether we are using GDR on the send side
        @param[in] gdr_recv Whether we are using GDR on the receive side
     */
-    int commsQuery(int nFace, int d, int dagger, const qudaStream_t &stream, bool gdr_send = false,
-                   bool gdr_recv = false);
+    int commsQuery(int d, const qudaStream_t &stream, bool gdr_send = false, bool gdr_recv = false);
 
     /**
        @brief Wait on halo communication to complete
-       @param[in] Depth of face exchange
        @param[in] d d=[2*dim+dir], where dim is dimension and dir is
        the scatter-centric direction (0=backwards,1=forwards)
        @param[in] dagger Whether this exchange is for the conjugate operator
@@ -862,20 +851,17 @@ namespace quda {
        @param[in] gdr_send Whether we are using GDR on the send side
        @param[in] gdr_recv Whether we are using GDR on the receive side
     */
-    void commsWait(int nFace, int d, int dagger, const qudaStream_t &stream, bool gdr_send = false,
-                   bool gdr_recv = false);
+    void commsWait(int d, const qudaStream_t &stream, bool gdr_send = false, bool gdr_recv = false);
 
     /**
        @brief Unpacks the ghost from host to device after
        communication has finished.
-       @param[in] nFace Depth of face exchange
-       @param[in] dagger Whether this exchange is for the conjugate operator
        @param[in] d d=[2*dim+dir], where dim is dimension and dir is
        the scatter-centric direction (0=backwards,1=forwards)
        @param[in] stream The stream in which to do the copy.  If
        -1 is passed then the copy will be issied to the d^th stream
      */
-    void scatter(int nFace, int dagger, int d, const qudaStream_t &stream);
+    void scatter(int d, const qudaStream_t &stream);
 
     const void* Ghost2() const;
 
@@ -987,8 +973,7 @@ namespace quda {
     static void freeGhostBuffer(void);
 
     void packGhost(void **ghost, const QudaParity parity, const int nFace, const int dagger) const;
-    void unpackGhost(void* ghost_spinor, const int dim,
-		     const QudaDirection dir, const int dagger);
+    void unpackGhost(void* ghost_spinor, const int dim, const QudaDirection dir);
 
     void copy(const cpuColorSpinorField&);
     void zero();

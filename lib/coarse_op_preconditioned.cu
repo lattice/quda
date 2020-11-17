@@ -17,7 +17,7 @@ namespace quda
   */
   template <QudaFieldLocation location, typename Arg>
   struct Launch {
-    Launch(Arg &arg, CUresult &error, bool compute_max_only, TuneParam &tp, bool use_mma, const qudaStream_t &stream)
+    Launch(Arg &arg, CUresult &, bool compute_max_only, TuneParam &, bool, const qudaStream_t &)
     {
       if (compute_max_only)
         CalculateYhatCPU<true, Arg>(arg);
@@ -33,6 +33,7 @@ namespace quda
   struct Launch<QUDA_CUDA_FIELD_LOCATION, Arg> {
     Launch(Arg &arg, CUresult &error, bool compute_max_only, TuneParam &tp, bool use_mma, const qudaStream_t &stream)
     {
+      error = CUDA_SUCCESS;
       if (compute_max_only) {
         if (!activeTuning()) {
           qudaMemsetAsync(arg.max_d, 0, sizeof(typename Arg::Float), stream);
@@ -93,7 +94,7 @@ namespace quda
     // all the tuning done is only in matrix tile size (Y/Z block.grid)
     int blockMin() const { return 8; }
     int blockStep() const { return 8; }
-    unsigned int maxBlockSize(const TuneParam &param) const { return 8u; }
+    unsigned int maxBlockSize(const TuneParam &) const { return 8u; }
 
   public:
     CalculateYhat(Arg &arg, const LatticeField &meta, bool use_mma) :
@@ -133,7 +134,7 @@ namespace quda
     */
     void setComputeMaxOnly(bool compute_max_only_) { compute_max_only = compute_max_only_; }
 
-    bool advanceSharedBytes(TuneParam &param) const { return false; }
+    bool advanceSharedBytes(TuneParam &) const { return false; }
 
     bool advanceTuneParam(TuneParam &param) const {
       if (use_mma) {
@@ -387,10 +388,9 @@ namespace quda
   }
 
   //Does the heavy lifting of creating the coarse color matrices Y
+#ifdef GPU_MULTIGRID
   void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X, bool use_mma)
   {
-
-#ifdef GPU_MULTIGRID
     QudaPrecision precision = checkPrecision(Xinv, Y, X);
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing Yhat field......\n");
 
@@ -419,9 +419,9 @@ namespace quda
     }
 
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("....done computing Yhat field\n");
-#else
-    errorQuda("Multigrid has not been built");
-#endif
   }
+#else
+  void calculateYhat(GaugeField &, GaugeField &, const GaugeField &, const GaugeField &, bool) { errorQuda("Multigrid has not been built"); }
+#endif
 
 } // namespace quda

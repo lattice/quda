@@ -36,9 +36,8 @@ namespace quda {
    */
   template <QudaFieldLocation location, bool from_coarse, typename Float, int fineSpin,
             int fineColor, int coarseSpin, int coarseColor, typename Arg> struct Launch {
-    Launch(Arg &arg, CUresult &error, TuneParam &tp, ComputeType type, bool use_mma, const qudaStream_t &stream)
+    Launch(Arg &arg, CUresult &, TuneParam &, ComputeType type, bool use_mma, const qudaStream_t &)
     {
-
       if (use_mma) { errorQuda("MMA intructions are not supported on the host."); }
 
       if (type == COMPUTE_UV) {
@@ -148,6 +147,7 @@ namespace quda {
 #ifdef JITIFY
       using namespace jitify::reflection;
 #endif
+      error = CUDA_SUCCESS;
       if (type == COMPUTE_UV) {
         if (use_mma) {
 
@@ -528,6 +528,8 @@ namespace quda {
 	break;
       case COMPUTE_REVERSE_Y:
 	bytes_ = 4*2*2*arg.Y.Bytes(); // 4 from direction, 2 from i/o, 2 from parity
+	bytes_ = 2*2*arg.X.Bytes(); // 2 from i/o, 2 from parity
+	break;
       case COMPUTE_DIAGONAL:
       case COMPUTE_TMDIAGONAL:
 	bytes_ = 2*2*arg.X.Bytes(); // 2 from i/o, 2 from parity
@@ -847,6 +849,8 @@ namespace quda {
       switch (type) {
       case COMPUTE_VUV:
         Y_atomic.backup();
+	X_atomic.backup();
+        break;
       case COMPUTE_DIAGONAL:
       case COMPUTE_TMDIAGONAL:
       case COMPUTE_COARSE_CLOVER:
@@ -858,6 +862,7 @@ namespace quda {
         break;
       case COMPUTE_RESCALE:
         Y.backup();
+        break;
       case COMPUTE_UV:
       case COMPUTE_AV:
       case COMPUTE_TMAV:
@@ -875,6 +880,8 @@ namespace quda {
       switch (type) {
       case COMPUTE_VUV:
 	Y_atomic.restore();
+	X_atomic.restore();
+        break;
       case COMPUTE_DIAGONAL:
       case COMPUTE_TMDIAGONAL:
       case COMPUTE_COARSE_CLOVER:
@@ -886,6 +893,7 @@ namespace quda {
         break;
       case COMPUTE_RESCALE:
         Y.restore();
+        break;
       case COMPUTE_UV:
       case COMPUTE_AV:
       case COMPUTE_TMAV:
@@ -985,8 +993,8 @@ namespace quda {
     // do exchange of null-space vectors
     const int nFace = 1;
     v.exchangeGhost(QUDA_INVALID_PARITY, nFace, 0);
-    arg.V.resetGhost(v, v.Ghost());  // point the accessor to the correct ghost buffer
-    if (&v == &av) arg.AV.resetGhost(av, av.Ghost());
+    arg.V.resetGhost(v.Ghost());  // point the accessor to the correct ghost buffer
+    if (&v == &av) arg.AV.resetGhost(av.Ghost());
     LatticeField::bufferIndex = (1 - LatticeField::bufferIndex); // update ghost bufferIndex for next exchange
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("V2 = %e\n", arg.V.norm2());
@@ -1146,7 +1154,7 @@ namespace quda {
     if ( (dirac == QUDA_CLOVERPC_DIRAC || dirac == QUDA_TWISTED_MASSPC_DIRAC || dirac == QUDA_TWISTED_CLOVERPC_DIRAC) &&
 	 (matpc == QUDA_MATPC_EVEN_EVEN || matpc == QUDA_MATPC_ODD_ODD) ) {
       av.exchangeGhost(QUDA_INVALID_PARITY, nFace, 0);
-      arg.AV.resetGhost(av, av.Ghost());  // make sure we point to the correct pointer in the accessor
+      arg.AV.resetGhost(av.Ghost());  // make sure we point to the correct pointer in the accessor
       LatticeField::bufferIndex = (1 - LatticeField::bufferIndex); // update ghost bufferIndex for next exchange
     }
 

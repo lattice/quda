@@ -53,26 +53,32 @@ namespace quda {
     long long bytes() const { return u.Bytes(); }
   };
 
+#ifdef GPU_GAUGE_ALG
   double2 getLinkDeterminant(GaugeField& data)
   {
     double2 det = make_double2(0.0,0.0);
-#ifdef GPU_GAUGE_ALG
     instantiate<CalcFunc>(data, det, 0);
-#else
-    errorQuda("Pure gauge code has not been built");
-#endif // GPU_GAUGE_ALG
     return det;
   }
 
   double2 getLinkTrace(GaugeField& data)
   {
     double2 det = make_double2(0.0,0.0);
-#ifdef GPU_GAUGE_ALG
     instantiate<CalcFunc>(data, det, 1);
-#else
-    errorQuda("Pure gauge code has not been built");
-#endif // GPU_GAUGE_ALG
     return det;
   }
+#else
+  double2 getLinkDeterminant(GaugeField&)
+  {
+    errorQuda("Pure gauge code has not been built");
+    return make_double2(0.0,0.0);
+  }
+
+  double2 getLinkTrace(GaugeField&)
+  {
+    errorQuda("Pure gauge code has not been built");
+    return make_double2(0.0,0.0);
+  }
+#endif
 
 } // namespace quda

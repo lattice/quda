@@ -23,43 +23,41 @@ void comm_gather_gpuid(int *gpuid_recv_buf) {
   gpuid_recv_buf[0] = comm_gpuid();
 }
 
-MsgHandle *comm_declare_send_displaced(void *buffer, const int displacement[], size_t nbytes)
+MsgHandle *comm_declare_send_displaced(void *, const int [], size_t)
 { return NULL; }
 
-MsgHandle *comm_declare_receive_displaced(void *buffer, const int displacement[], size_t nbytes)
+MsgHandle *comm_declare_receive_displaced(void *, const int [], size_t)
 { return NULL; }
 
-MsgHandle *comm_declare_strided_send_displaced(void *buffer, const int displacement[],
-					       size_t blksize, int nblocks, size_t stride)
+MsgHandle *comm_declare_strided_send_displaced(void *, const int [], size_t, int, size_t)
 { return NULL; }
 
-MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displacement[],
-						  size_t blksize, int nblocks, size_t stride)
+MsgHandle *comm_declare_strided_receive_displaced(void *, const int [], size_t, int, size_t)
 { return NULL; }
 
-void comm_free(MsgHandle *&mh) {}
+void comm_free(MsgHandle *&) {}
 
-void comm_start(MsgHandle *mh) {}
+void comm_start(MsgHandle *) {}
 
-void comm_wait(MsgHandle *mh) {}
+void comm_wait(MsgHandle *) {}
 
-int comm_query(MsgHandle *mh) { return 1; }
+int comm_query(MsgHandle *) { return 1; }
 
-void comm_allreduce(double* data) {}
+void comm_allreduce(double*) {}
 
-void comm_allreduce_max(double* data) {}
+void comm_allreduce_max(double*) {}
 
-void comm_allreduce_min(double* data) {}
+void comm_allreduce_min(double*) {}
 
-void comm_allreduce_array(double* data, size_t size) {}
+void comm_allreduce_array(double*, size_t) {}
 
-void comm_allreduce_max_array(double* data, size_t size) {}
+void comm_allreduce_max_array(double*, size_t) {}
 
-void comm_allreduce_int(int* data) {}
+void comm_allreduce_int(int*) {}
 
-void comm_allreduce_xor(uint64_t *data) {}
+void comm_allreduce_xor(uint64_t *) {}
 
-void comm_broadcast(void *data, size_t nbytes) {}
+void comm_broadcast(void *, size_t) {}
 
 void comm_barrier(void) {}
 

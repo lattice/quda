@@ -41,13 +41,16 @@ namespace quda {
     void postTune() { if (clover.V(true) == clover.V(false)) clover.restore(); }
   };
 
+#ifdef GPU_CLOVER_DIRAC
   void cloverInvert(CloverField &clover, bool computeTraceLog)
   {
-#ifdef GPU_CLOVER_DIRAC
     instantiate<CloverInvert>(clover, computeTraceLog);
-#else
-    errorQuda("Clover has not been built");
-#endif
   }
+#else
+  void cloverInvert(CloverField &, bool)
+  {
+    errorQuda("Clover has not been built");
+  }
+#endif
 
 } // namespace quda

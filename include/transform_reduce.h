@@ -87,9 +87,9 @@ namespace quda
 
     bool tuneSharedBytes() const { return false; }
     unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
     int blockMin() const { return Arg::block_size; }
-    unsigned int maxBlockSize(const TuneParam &param) const { return Arg::block_size; }
+    unsigned int maxBlockSize(const TuneParam &) const { return Arg::block_size; }
 
     bool advanceTuneParam(TuneParam &param) const // only do autotuning if we have device fields
     {

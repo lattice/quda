@@ -220,7 +220,7 @@ namespace quda {
       }
     }
 
-    virtual bool advanceAux(TuneParam &param) const { return false; }
+    virtual bool advanceAux(TuneParam &) const { return false; }
 
     char vol[TuneKey::volume_n];
     char aux[TuneKey::aux_n];
@@ -373,7 +373,7 @@ namespace quda {
 
   protected:
     virtual unsigned int sharedBytesPerThread() const { return 0; }
-    virtual unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+    virtual unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
     mutable unsigned int vector_length_y;
     mutable unsigned int step_y;

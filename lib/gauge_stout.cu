@@ -56,9 +56,9 @@ namespace quda {
               out.Reconstruct() * out.Precision()) * stoutDim * in.LocalVolume();    }
   };
 
+#ifdef GPU_GAUGE_TOOLS
   void STOUTStep(GaugeField &out, GaugeField &in, double rho)
   {
-#ifdef GPU_GAUGE_TOOLS
     checkPrecision(out, in);
     checkReconstruct(out, in);
     checkNative(out, in);
@@ -67,14 +67,17 @@ namespace quda {
     in.exchangeExtendedGhost(in.R(), false);
     instantiate<GaugeSTOUT>(out, in, false, rho);
     out.exchangeExtendedGhost(out.R(), false);
-#else
-    errorQuda("Gauge tools are not built");
-#endif
   }
+#else
+  void STOUTStep(GaugeField &, GaugeField &, double)
+  {
+    errorQuda("Gauge tools are not built");
+  }
+#endif
 
+#ifdef GPU_GAUGE_TOOLS
   void OvrImpSTOUTStep(GaugeField &out, GaugeField& in, double rho, double epsilon)
   {
-#ifdef GPU_GAUGE_TOOLS
     checkPrecision(out, in);
     checkReconstruct(out, in);
     checkNative(out, in);
@@ -83,8 +86,12 @@ namespace quda {
     in.exchangeExtendedGhost(in.R(), false);
     instantiate<GaugeSTOUT>(out, in, true, rho, epsilon);
     out.exchangeExtendedGhost(out.R(), false);
-#else
-    errorQuda("Gauge tools are not built");
-#endif
   }
+#else
+  void OvrImpSTOUTStep(GaugeField &, GaugeField &, double, double)
+  {
+    errorQuda("Gauge tools are not built");
+  }
+#endif
+
 }

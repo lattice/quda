@@ -89,7 +89,7 @@ namespace quda {
     const bool active_tuning;
 
     unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
   public:
     inline QudaMem(void *dst, const void *src, size_t count, cudaMemcpyKind kind, const qudaStream_t &stream,
@@ -209,7 +209,7 @@ namespace quda {
       }
     }
 
-    bool advanceTuneParam(TuneParam &param) const { return false; }
+    bool advanceTuneParam(TuneParam &) const { return false; }
 
     TuneKey tuneKey() const {
       char vol[128];
@@ -267,7 +267,9 @@ namespace quda {
                            const char *func, const char *file, const char *line)
   {
     if (count == 0) return;
-    cudaMemcpyAsync(dst, src, count, cudaMemcpyDeviceToDevice, device::get_cuda_stream(stream));
+    auto error = cudaMemcpyAsync(dst, src, count, cudaMemcpyDeviceToDevice, device::get_cuda_stream(stream));
+    if (error != cudaSuccess)
+      errorQuda("cudaMemcpyAsync returned %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
   void qudaMemcpy2D_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
@@ -293,9 +295,16 @@ namespace quda {
       break;
     default: errorQuda("Unsupported cuMemcpyType2DAsync %d", kind);
     }
-    PROFILE(cuMemcpy2D(&param), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
+    PROFILE(auto error = cuMemcpy2D(&param), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
+    if (error != CUDA_SUCCESS) {
+      const char *str;
+      cuGetErrorName(error, &str);
+      errorQuda("cuMemcpy2D returned error %s\n (%s:%s in %s())", str, file, line, func);
+    }
 #else
-    PROFILE(cudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
+    PROFILE(auto error = cudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
+    if (error != cudaSuccess)
+      errorQuda("cudaMemcpy2D returned error %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
 #endif
   }
 
@@ -324,16 +333,25 @@ namespace quda {
     default:
       errorQuda("Unsupported cuMemcpyType2DAsync %d", kind);
     }
-    PROFILE(cuMemcpy2DAsync(&param, device::get_cuda_stream(stream)), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
+    PROFILE(auto error = cuMemcpy2DAsync(&param, device::get_cuda_stream(stream)), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
+    if (error != CUDA_SUCCESS) {
+      const char *str;
+      cuGetErrorName(error, &str);
+      errorQuda("cuMemcpy2DAsync returned error %s\n (%s:%s in %s())", str, file, line, func);
+    }
 #else
-    PROFILE(cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, device::get_cuda_stream(stream)), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
+    PROFILE(auto error = cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, device::get_cuda_stream(stream)), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
+    if (error != cudaSuccess)
+      errorQuda("cudaMemcpy2DAsync returned error %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
 #endif
   }
 
   void qudaMemcpy2DP2PAsync_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
                              const qudaStream_t &stream, const char *func, const char *file, const char *line)
   {
-    cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, cudaMemcpyDeviceToDevice, device::get_cuda_stream(stream));
+    auto error = cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, cudaMemcpyDeviceToDevice, device::get_cuda_stream(stream));
+    if (error != cudaSuccess)
+      errorQuda("cudaMemcpy2DAsync returned %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
   void qudaMemset_(void *ptr, int value, size_t count, const char *func, const char *file, const char *line)

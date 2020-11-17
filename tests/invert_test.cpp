@@ -252,14 +252,12 @@ int main(int argc, char **argv)
 
   // Vector construct START
   //-----------------------------------------------------------------------------------
-  quda::ColorSpinorField *in;
-  quda::ColorSpinorField *out;
-  quda::ColorSpinorField *check;
   quda::ColorSpinorParam cs_param;
   constructWilsonTestSpinorParam(&cs_param, &inv_param, &gauge_param);
-  in = quda::ColorSpinorField::Create(cs_param);
-  out = quda::ColorSpinorField::Create(cs_param);
-  check = quda::ColorSpinorField::Create(cs_param);
+  auto in = quda::ColorSpinorField::Create(cs_param);
+  auto out = quda::ColorSpinorField::Create(cs_param);
+  auto check = quda::ColorSpinorField::Create(cs_param);
+
   // Host array for solutions
   void **outMulti = (void **)malloc(multishift * sizeof(void *));
   // QUDA host array for internal checks and malloc

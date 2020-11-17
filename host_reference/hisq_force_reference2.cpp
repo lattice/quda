@@ -135,7 +135,8 @@ extern int Vh_ex;
 	
     public: 
       Matrix(); // default constructor
-      Matrix(const Matrix<N,T>& mat); // copy constructor	
+      Matrix(const Matrix<N,T>& mat) = default;
+      Matrix& operator=(const Matrix<N,T>& mat) = default;
       Matrix & operator += (const Matrix<N,T>& mat);
       Matrix & operator -= (const Matrix<N,T>& mat);
       const T& operator()(int i, int j) const;
@@ -148,16 +149,6 @@ extern int Vh_ex;
     for(int i=0; i<N; ++i){
       for(int j=0; j<N; ++j){
 	data[i][j] = static_cast<T>(0);
-      }
-    }
-  }
-
-  template<int N, class T>
-  Matrix<N,T>::Matrix(const Matrix<N,T>& mat)
-  {
-    for(int i=0; i<N; ++i){
-      for(int j=0; j<N; ++j){
-	data[i][j] = mat.data[i][j];
       }
     }
   }
@@ -774,7 +765,12 @@ struct ColorMatrix
 };
 
   template<class Real, int oddBit> 
-  void computeOneLinkSite(const int dim[4], 
+  void computeOneLinkSite(
+#ifdef MULTI_GPU
+                          const int dim[4],
+#else
+                          const int[],
+#endif
 			  int half_lattice_index, 		
 			   const Real* const oprod,
 		           int sig, Real coeff,	
@@ -1540,7 +1536,11 @@ struct ColorMatrix
 
 template<class Real, int oddBit>
 void completeForceSite(int half_lattice_index,
+#ifdef MULTI_GPU
 		       const int dim[4],
+#else
+                       const int [],
+#endif
 		       const Real* const oprod,
 		       const Real* const link,
 		       int sig,

@@ -75,7 +75,11 @@ namespace quda {
   }
 
   template <typename real>
+#if defined(NSPIN1) || defined(NSPIN2) || defined(NSPIN4)
   void spinorNoise(ColorSpinorField &src, RNG& randstates, QudaNoiseType type)
+#else
+  void spinorNoise(ColorSpinorField &src, RNG &, QudaNoiseType)
+#endif
   {
     if (src.Nspin() == 4) {
 #ifdef NSPIN4

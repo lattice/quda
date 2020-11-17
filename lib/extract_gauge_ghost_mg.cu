@@ -71,13 +71,16 @@ namespace quda {
     }
   };
 
+#ifdef GPU_MULTIGRID
   void extractGaugeGhostMG(const GaugeField &u, void **ghost, bool extract, int offset)
   {
-#ifdef GPU_MULTIGRID
     instantiatePrecisionMG<GhostExtractMG>(u, ghost, extract, offset);
-#else
-    errorQuda("Multigrid has not been enabled");
-#endif
   }
+#else
+  void extractGaugeGhostMG(const GaugeField &, void **, bool, int)
+  {
+    errorQuda("Multigrid has not been enabled");
+  }
+#endif
 
 } // namespace quda

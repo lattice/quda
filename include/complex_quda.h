@@ -464,11 +464,13 @@ public:
       imag(im);
     }
 
-  // For some reason having the following constructor
-  // explicitly makes things faster with at least g++
-  __host__ __device__
-    complex<float>(const complex<float> & z)
-    : float2(z){}
+  __host__ __device__ complex<float>(const complex<float> & z) : float2(z) {}
+  __host__ __device__ complex<float>& operator=(const complex<float> &z)
+    {
+      x = z.x;
+      y = z.y;
+      return *this;
+    }
 
   __host__ __device__
     complex<float>(float2 z)
@@ -586,11 +588,13 @@ public:
       imag(im);
     }
 
-  // For some reason having the following constructor
-  // explicitly makes things faster with at least g++
-  __host__ __device__
-    inline complex<double>(const complex<double> & z)
-    : double2(z) {}
+  __host__ __device__ complex<double>(const complex<double> & z) : double2(z) {}
+  __host__ __device__ complex<double>& operator=(const complex<double> &z)
+    {
+      x = z.x;
+      y = z.y;
+      return *this;
+    }
 
   __host__ __device__
     inline complex<double>(double2 z)
@@ -714,7 +718,13 @@ public:
     imag(im);
   }
 
-  __host__ __device__ inline complex<int8_t>(const complex<int8_t> &z) : char2(z) { }
+  __host__ __device__ complex<int8_t>(const complex<int8_t> & z) : char2(z) {}
+  __host__ __device__ complex<int8_t>& operator=(const complex<int8_t> &z)
+    {
+      x = z.x;
+      y = z.y;
+      return *this;
+    }
 
   __host__ __device__ inline complex<int8_t> &operator+=(const complex<int8_t> z)
   {
@@ -761,7 +771,13 @@ public:
       imag(im);
     }
 
-  __host__ __device__ inline complex<short>(const complex<short> & z) : short2(z){}
+  __host__ __device__ complex<short>(const complex<short> & z) : short2(z) {}
+  __host__ __device__ complex<short>& operator=(const complex<short> &z)
+    {
+      x = z.x;
+      y = z.y;
+      return *this;
+    }
 
   __host__ __device__ inline complex<short>& operator+=(const complex<short> z)
     {

@@ -19,6 +19,7 @@
 #include <color_spinor_field.h>
 #include <trove_helper.cuh>
 #include <transform_reduce.h>
+#include <typeinfo>
 
 namespace quda {
 
@@ -185,7 +186,7 @@ namespace quda {
   namespace colorspinor {
 
     template<typename ReduceType, typename Float> struct square_ {
-      square_(ReduceType scale) { }
+      square_(ReduceType) { }
       __host__ __device__ inline ReduceType operator()(const quda::complex<Float> &x)
       { return static_cast<ReduceType>(norm(x)); }
     };
@@ -205,7 +206,7 @@ namespace quda {
     };
 
     template<typename Float, typename storeFloat> struct abs_ {
-      abs_(const Float scale) { }
+      abs_(const Float) { }
       __host__ __device__ Float operator()(const quda::complex<storeFloat> &x) { return abs(x); }
     };
 
@@ -226,13 +227,13 @@ namespace quda {
     template <typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order> struct AccessorCB {
       AccessorCB(const ColorSpinorField &) { errorQuda("Not implemented"); }
       AccessorCB() { errorQuda("Not implemented"); }
-      __device__ __host__ inline int index(int parity, int x_cb, int s, int c, int v) const { return 0; }
+      __device__ __host__ inline int index(int, int, int, int, int) const { return 0; }
     };
 
     template<typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order> struct GhostAccessorCB {
       GhostAccessorCB(const ColorSpinorField &) { errorQuda("Not implemented"); }
       GhostAccessorCB() { errorQuda("Not implemented"); }
-      __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const
+      __device__ __host__ inline int index(int, int, int, int, int, int, int) const
       { return 0; }
     };
 
@@ -271,7 +272,7 @@ namespace quda {
         }
       }
       GhostAccessorCB() : ghostOffset{ } { }
-      __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const
+      __device__ __host__ inline int index(int dim, int parity, int x_cb, int s, int c, int v) const
       { return parity*ghostOffset[dim] + ((x_cb*nSpin+s)*nColor+c)*nVec+v; }
 
       /**
@@ -330,7 +331,7 @@ namespace quda {
         }
       }
       GhostAccessorCB() : faceVolumeCB{ }, ghostOffset{ } { }
-      __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const
+      __device__ __host__ inline int index(int dim, int parity, int x_cb, int s, int c, int v) const
       { return parity*ghostOffset[dim] + ((s*nColor+c)*nVec+v)*faceVolumeCB[dim] + x_cb; }
     };
 
@@ -373,7 +374,7 @@ namespace quda {
         }
       }
       GhostAccessorCB() : faceVolumeCB{ }, ghostOffset{ } { }
-      __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const
+      __device__ __host__ inline int index(int dim, int parity, int x_cb, int s, int c, int v) const
       { return parity*ghostOffset[dim] + indexFloatN<nSpin,nColor,nVec,4>(x_cb, s, c, v, faceVolumeCB[dim]); }
     };
 
@@ -424,7 +425,7 @@ namespace quda {
         }
       }
       GhostAccessorCB() : faceVolumeCB{ }, ghostOffset{ } { }
-      __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const
+      __device__ __host__ inline int index(int dim, int parity, int x_cb, int s, int c, int v) const
       { return parity*ghostOffset[dim] + indexFloatN<nSpin,nColor,nVec,8>(x_cb, s, c, v, faceVolumeCB[dim]); }
     };
 
@@ -464,8 +465,7 @@ namespace quda {
       */
       __device__ __host__ inline fieldorder_wrapper(complex<storeFloat> *v, int idx, Float scale, Float scale_inv) :
         v(v), idx(idx), scale(scale), scale_inv(scale_inv)
-      {
-      }
+      { }
 
   __device__ __host__ inline Float real() const {
     if (!fixed) {
@@ -606,11 +606,17 @@ namespace quda {
       static constexpr bool block_float_ghost = !fixed && ghost_fixed;
 
     public:
+      using real = Float;
+
       /**
        * Constructor for the FieldOrderCB class
        * @param field The field that we are accessing
        */
-    FieldOrderCB(const ColorSpinorField &field, int nFace=1, void *v_=0, void **ghost_=0)
+#ifndef DISABLE_GHOST
+      FieldOrderCB(const ColorSpinorField &field, int nFace = 1, void *v_ = 0, void **ghost_ = 0)
+#else
+      FieldOrderCB(const ColorSpinorField &field, int = 1, void *v_ = 0, void ** = 0)
+#endif
       : v(v_? static_cast<complex<storeFloat>*>(const_cast<void*>(v_))
 	  : static_cast<complex<storeFloat>*>(const_cast<void*>(field.V()))),
         accessor(field), scale(static_cast<Float>(1.0)), scale_inv(static_cast<Float>(1.0))
@@ -623,7 +629,7 @@ namespace quda {
       {
 #ifndef DISABLE_GHOST
         for (int d=0; d<QUDA_MAX_DIM; d++) x[d]=field.X(d);
-        resetGhost(field, ghost_ ? ghost_ : field.Ghost());
+        resetGhost(ghost_ ? ghost_ : field.Ghost());
 #endif
         resetScale(field.Scale());
 
@@ -639,7 +645,7 @@ namespace quda {
       }
 
 #ifndef DISABLE_GHOST
-      void resetGhost(const ColorSpinorField &a, void * const *ghost_) const
+      void resetGhost(void * const *ghost_) const
       {
         for (int dim=0; dim<4; dim++) {
           for (int dir=0; dir<2; dir++) {
@@ -778,23 +784,23 @@ namespace quda {
       {
 #if (__CUDA_ARCH__ >= 320 && __CUDA_ARCH__ < 520)
         if (!ghost_fixed) {
-          auto v_ = __ldg(ghost[2 * dim + dir] + ghostAccessor.index(dim, dir, parity, x_cb, s, c, n));
+          auto v_ = __ldg(ghost[2 * dim + dir] + ghostAccessor.index(dim, parity, x_cb, s, c, n));
           return complex<Float>(v_.x, v_.y);
         } else {
           Float scale = ghost_scale_inv;
           if (block_float_ghost)
             scale *= __ldg(ghost_norm[2 * dim + dir] + parity * ghostAccessor.faceVolumeCB[dim] + x_cb);
-          auto v_ = __ldg(ghost[2 * dim + dir] + ghostAccessor.index(dim, dir, parity, x_cb, s, c, n));
+          auto v_ = __ldg(ghost[2 * dim + dir] + ghostAccessor.index(dim, parity, x_cb, s, c, n));
           complex<ghostFloat> tmp(v_.x, v_.y);
           return scale*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
         }
 #else
         if (!ghost_fixed) {
-          return complex<Float>( ghost[2*dim+dir][ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)] );
+          return complex<Float>( ghost[2*dim+dir][ghostAccessor.index(dim,parity,x_cb,s,c,n)] );
         } else {
           Float scale = ghost_scale_inv;
           if (block_float_ghost) scale *= ghost_norm[2*dim+dir][parity*ghostAccessor.faceVolumeCB[dim] + x_cb];
-          complex<ghostFloat> tmp = ghost[2*dim+dir][ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)];
+          complex<ghostFloat> tmp = ghost[2*dim+dir][ghostAccessor.index(dim,parity,x_cb,s,c,n)];
           return scale*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
         }
 #endif
@@ -813,7 +819,7 @@ namespace quda {
 	__device__ __host__ inline fieldorder_wrapper<Float,ghostFloat> Ghost(int dim, int dir, int parity, int x_cb, int s, int c, int n=0, Float max=0)
       {
         if (block_float_ghost && s==0 && c==0 && n==0) ghost_norm[2*dim+dir][parity*ghostAccessor.faceVolumeCB[dim] + x_cb] = max;
-        const int idx = ghostAccessor.index(dim,dir,parity,x_cb,s,c,n);
+        const int idx = ghostAccessor.index(dim,parity,x_cb,s,c,n);
         return fieldorder_wrapper<Float,ghostFloat>(ghost[2*dim+dir], idx,
               block_float_ghost ? ghost_scale/max : ghost_scale,
               block_float_ghost ? ghost_scale_inv*max : ghost_scale_inv);
@@ -1009,10 +1015,10 @@ namespace quda {
     for (int i=0; i<4; i++) {
       faceVolumeCB[i] = a.SurfaceCB(i)*nFace;
     }
-    resetGhost(a, ghost_ ? (void **)ghost_ : a.Ghost());
+    resetGhost(ghost_ ? (void **)ghost_ : a.Ghost());
   }
 
-  void resetGhost(const ColorSpinorField &a, void *const *ghost_) const
+  void resetGhost(void *const *ghost_) const
   {
     for (int dim = 0; dim < 4; dim++) {
       for (int dir = 0; dir < 2; dir++) {
@@ -1251,7 +1257,7 @@ namespace quda {
       int faceVolumeCB[4];
       int stride;
       int nParity;
-      SpaceColorSpinorOrder(const ColorSpinorField &a, int nFace=1, Float *field_=0, float *dummy=0, Float **ghost_=0)
+      SpaceColorSpinorOrder(const ColorSpinorField &a, int nFace=1, Float *field_=0, float * = 0, Float **ghost_=0)
       : field(field_ ? field_ : (Float*)a.V()), offset(a.Bytes()/(2*sizeof(Float))),
     volumeCB(a.VolumeCB()), stride(a.Stride()), nParity(a.SiteSubset())
   {
@@ -1369,7 +1375,7 @@ namespace quda {
       int faceVolumeCB[4];
       int stride;
       int nParity;
-      SpaceSpinorColorOrder(const ColorSpinorField &a, int nFace=1, Float *field_=0, float *dummy=0, Float **ghost_=0)
+      SpaceSpinorColorOrder(const ColorSpinorField &a, int nFace=1, Float *field_=0, float * = 0, Float **ghost_=0)
       : field(field_ ? field_ : (Float*)a.V()), offset(a.Bytes()/(2*sizeof(Float))),
     volumeCB(a.VolumeCB()), stride(a.Stride()), nParity(a.SiteSubset())
   {
@@ -1491,7 +1497,7 @@ namespace quda {
       int nParity;
       int dim[4];   // full field dimensions
       int exDim[4]; // full field dimensions
-      PaddedSpaceSpinorColorOrder(const ColorSpinorField &a, int nFace=1, Float *field_=0, float *dummy=0, Float **ghost_=0)
+      PaddedSpaceSpinorColorOrder(const ColorSpinorField &a, int nFace=1, Float *field_=0, float * = 0, Float **ghost_=0)
       : field(field_ ? field_ : (Float*)a.V()),
     volumeCB(a.VolumeCB()), exVolumeCB(1), stride(a.Stride()), nParity(a.SiteSubset()),
     dim{ a.X(0), a.X(1), a.X(2), a.X(3)}, exDim{ a.X(0), a.X(1), a.X(2) + 4, a.X(3)}
@@ -1631,7 +1637,7 @@ namespace quda {
       int volumeCB;
       int stride;
       int nParity;
-      QDPJITDiracOrder(const ColorSpinorField &a, int nFace=1, Float *field_=0, float *dummy = 0)
+      QDPJITDiracOrder(const ColorSpinorField &a, int = 1, Float *field_=0, float * = 0)
       : field(field_ ? field_ : (Float*)a.V()), volumeCB(a.VolumeCB()), stride(a.Stride()), nParity(a.SiteSubset())
   { if (volumeCB != stride) errorQuda("Stride must equal volume for this field order"); }
 

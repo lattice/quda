@@ -38,7 +38,7 @@ namespace quda {
     int nBlock;
 
     unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
     unsigned int minThreads() const { return V.VolumeCB(); } // fine parity is the block y dimension
 
   public:
@@ -141,9 +141,9 @@ namespace quda {
       }
     }
 
+#ifdef SWIZZLE
     bool advanceAux(TuneParam &param) const
     {
-#ifdef SWIZZLE
       if (param.aux.x < 2 * device::processor_count()) {
         param.aux.x++;
 	return true;
@@ -151,10 +151,10 @@ namespace quda {
         param.aux.x = 1;
 	return false;
       }
-#else
-      return false;
-#endif
     }
+#else
+    bool advanceAux(TuneParam &) const { return false; }
+#endif
 
     bool advanceTuneParam(TuneParam &param) const {
       if (V.Location() == QUDA_CUDA_FIELD_LOCATION) {
@@ -313,10 +313,10 @@ namespace quda {
     } // Nc != 3
   }
 
+#ifdef GPU_MULTIGRID
   void BlockOrthogonalize(ColorSpinorField &V, const std::vector<ColorSpinorField *> &B, const int *fine_to_coarse,
                           const int *coarse_to_fine, const int *geo_bs, const int spin_bs, const int n_block_ortho)
   {
-#ifdef GPU_MULTIGRID
     if (B[0]->V() == nullptr) {
       warningQuda("Trying to BlockOrthogonalize staggered transform, skipping...");
       return;
@@ -344,9 +344,13 @@ namespace quda {
     } else {
       errorQuda("Unsupported precision combination V=%d B=%d\n", V.Precision(), B[0]->Precision());
     }
-#else
-    errorQuda("Multigrid has not been built");
-#endif // GPU_MULTIGRID
   }
+#else
+  void BlockOrthogonalize(ColorSpinorField &, const std::vector<ColorSpinorField *> &, const int *,
+                          const int *, const int *, const int, const int)
+  {
+    errorQuda("Multigrid has not been built");
+  }
+#endif // GPU_MULTIGRID
 
 } // namespace quda

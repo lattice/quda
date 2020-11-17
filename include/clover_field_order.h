@@ -419,7 +419,7 @@ namespace quda {
 	 * @param s_col col spin index
 	 * @param c_col col color index
 	 */
-	__device__ __host__ inline complex<Float> operator()(int dummy, int parity, int x, int s_row,
+	__device__ __host__ inline complex<Float> operator()(int, int parity, int x, int s_row,
 							     int s_col, int c_row, int c_col) const {
 	  return accessor(parity,x,s_row,s_col,c_row,c_col);
 	}
@@ -463,7 +463,7 @@ namespace quda {
 	 * @param[in] dim Which dimension we are taking the norm of (dummy for clover)
 	 * @return L1 norm
 	 */
-	__host__ double norm1(int dim=-1, bool global=true) const {
+	__host__ double norm1(int =-1, bool global=true) const {
           double nrm1 = accessor.transform_reduce(location, abs_<double, Float>(), 0.0, plus<double>());
           if (global) comm_allreduce(&nrm1);
           return nrm1;
@@ -474,7 +474,7 @@ namespace quda {
 	 * @param[in] dim Which dimension we are taking the norm of (dummy for clover)
 	 * @return L1 norm
 	 */
-	__host__ double norm2(int dim=-1, bool global=true) const {
+	__host__ double norm2(int =-1, bool global=true) const {
           double nrm2 = accessor.transform_reduce(location, square_<double, Float>(), 0.0, plus<double>());
           if (global) comm_allreduce(&nrm2);
           return nrm2;
@@ -485,7 +485,7 @@ namespace quda {
 	 * @param[in] dim Which dimension we are taking the Linfinity norm of (dummy for clover)
 	 * @return Linfinity norm
 	 */
-	__host__ double abs_max(int dim=-1, bool global=true) const {
+	__host__ double abs_max(int =-1, bool global=true) const {
           double absmax = accessor.transform_reduce(location, abs_<Float, Float>(), 0.0, maximum<Float>());
           if (global) comm_allreduce_max(&absmax);
           return absmax;
@@ -496,7 +496,7 @@ namespace quda {
 	 * @param[in] dim Which dimension we are taking the minimum abs of (dummy for clover)
 	 * @return Minimum norm
 	 */
-	__host__ double abs_min(int dim=-1, bool global=true) const {
+	__host__ double abs_min(int =-1, bool global=true) const {
           double absmax = accessor.transform_reduce(location, abs_<Float, Float>(), std::numeric_limits<double>::max(),
                                                     minimum<Float>());
           if (global) comm_allreduce_min(&absmax);
@@ -741,7 +741,7 @@ namespace quda {
 	const bool twisted;
 	const Float mu2;
 
-        QDPOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void *norm_ = nullptr) :
+        QDPOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void * = nullptr) :
          volumeCB(clover.VolumeCB()), stride(volumeCB), offset(clover.Bytes()/(2*sizeof(Float))),
 	twisted(clover.Twisted()), mu2(clover.Mu2()) {
         if (clover.Order() != QUDA_PACKED_CLOVER_ORDER) {
@@ -794,7 +794,7 @@ namespace quda {
 	const bool twisted;
 	const Float mu2;
 
-        QDPJITOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void *norm_ = nullptr) :
+        QDPJITOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void * = nullptr) :
           volumeCB(clover.VolumeCB()), stride(volumeCB), twisted(clover.Twisted()), mu2(clover.Mu2()) {
         if (clover.Order() != QUDA_QDPJIT_CLOVER_ORDER) {
           errorQuda("Invalid clover order %d for this accessor", clover.Order());
@@ -863,7 +863,7 @@ namespace quda {
 	const bool twisted;
 	const Float mu2;
 
-        BQCDOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void *norm_ = nullptr) :
+        BQCDOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void * = nullptr) :
           volumeCB(clover.Stride()), stride(volumeCB), twisted(clover.Twisted()), mu2(clover.Mu2()) {
         if (clover.Order() != QUDA_BQCD_CLOVER_ORDER) {
           errorQuda("Invalid clover order %d for this accessor", clover.Order());

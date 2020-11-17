@@ -80,7 +80,7 @@ namespace quda
 
       int blockStep() const { return 16; }
       int blockMin() const { return 16; }
-      unsigned int maxBlockSize(const TuneParam &param) const { return 32; }
+      unsigned int maxBlockSize(const TuneParam &) const { return 32; }
 
       int gridStep() const { return device::processor_count(); }
       unsigned int maxGridSize() const { return (volume_4d_cb_active + blockMin() - 1) / blockMin(); }
@@ -242,17 +242,22 @@ namespace quda
 
 #endif // #if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
 
+#if defined(GPU_DOMAIN_WALL_DIRAC) && (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
     void apply_fused_dslash(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, ColorSpinorField &y,
                             const ColorSpinorField &x, double m_f, double m_5, const Complex *b_5, const Complex *c_5,
                             bool dagger, int parity, int shift[4], int halo_shift[4], MdwfFusedDslashType type)
     {
-#if defined(GPU_DOMAIN_WALL_DIRAC) && (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
       checkLocation(out, in); // check all locations match
       instantiatePreconditioner<FusedDslash>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift,
                                              type);
-#else
-      errorQuda("Domain wall dslash with tensor cores has not been built");
-#endif
     }
+#else
+    void apply_fused_dslash(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, ColorSpinorField &,
+                            const ColorSpinorField &, double, double, const Complex *, const Complex *,
+                            bool, int, int [4], int [4], MdwfFusedDslashType)
+    {
+      errorQuda("Domain wall dslash with tensor cores has not been built");
+    }
+#endif
   } // namespace mobius_tensor_core
 } // namespace quda

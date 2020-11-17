@@ -18,7 +18,7 @@ namespace quda
     static char *Cmatrix_h;
 
     template <bool multi_1d = false, typename Arg, typename T> typename std::enable_if<multi_1d, void>::type
-    set_param(std::vector<constant_param_t> &params, Arg &arg, char select, const T &h)
+    set_param(std::vector<constant_param_t> &, Arg &arg, char select, const T &h)
     {
       using coeff_t = typename decltype(arg.f)::coeff_t;
       coeff_t *buf_arg = nullptr;
@@ -78,7 +78,7 @@ namespace quda
        when we have a multi-1d kernel and the coefficients are stored
        in the functor.
     */
-    constexpr int max_N_multi_1d() { return 32; }
+    constexpr int max_N_multi_1d() { return 24; }
 
     /**
        @brief Return the maximum power of two enabled by default for
@@ -143,18 +143,18 @@ namespace quda
       using SpinorW = SpinorX;
 
       // compute the size remaining for the Y and W accessors
-      constexpr int arg_size = (device::max_kernel_arg_size() - sizeof(int)                                    // NYW parameter
-                                - sizeof(SpinorX[NXZ])                                        // SpinorX array
-                                - (Functor::use_z ? sizeof(SpinorZ[NXZ]) : sizeof(SpinorZ *)) // SpinorZ array
-                                - sizeof(Functor)                                             // functor
-                                - sizeof(int)                                                 // length parameter
-                                - (!Functor::use_w ? sizeof(SpinorW *) : 0)   // subtract pointer if not using W
-                                - (Functor::reducer ? sizeof(ReduceArg<device_reduce_t>) : 0) // reduction buffers
-                                - 16) // there seems to be 16 bytes other argument space we need
+      constexpr auto arg_size = (device::max_kernel_arg_size() - sizeof(int)                                    // NYW parameter
+                                 - sizeof(SpinorX[NXZ])                                        // SpinorX array
+                                 - (Functor::use_z ? sizeof(SpinorZ[NXZ]) : sizeof(SpinorZ *)) // SpinorZ array
+                                 - sizeof(Functor)                                             // functor
+                                 - sizeof(int)                                                 // length parameter
+                                 - (!Functor::use_w ? sizeof(SpinorW *) : 0)   // subtract pointer if not using W
+                                 - (Functor::reducer ? sizeof(ReduceArg<device_reduce_t>) : 0) // reduction buffers
+                                 - 16) // there seems to be 16 bytes other argument space we need
         / (sizeof(SpinorY) + (Functor::use_w ? sizeof(SpinorW) : 0));
 
       // this is the maximum size limit imposed by the coefficient arrays
-      constexpr int coeff_size = Functor::coeff_mul ? device::max_constant_param_size() / (NXZ * sizeof(typename Functor::coeff_t)) : arg_size;
+      constexpr auto coeff_size = Functor::coeff_mul ? device::max_constant_param_size() / (NXZ * sizeof(typename Functor::coeff_t)) : arg_size;
 
       return std::min(arg_size, coeff_size);
     }
@@ -182,19 +182,19 @@ namespace quda
       size_t spinor_w_size = x_fixed ? sizeof(Spinor<short, 4>) : sizeof(Spinor<float, 4>);
 
       // compute the size remaining for the Y and W accessors
-      int arg_size = (device::max_kernel_arg_size() - sizeof(int)                       // NYW parameter
-                      - NXZ * spinor_x_size                            // SpinorX array
-                      - (use_z ? NXZ * spinor_z_size : sizeof(void *)) // SpinorZ array (else dummy pointer)
-                      - 2 * sizeof(int)                                // functor NXZ/NYW members
-                      - (multi_1d ? scalar_size * 3 * max_N_multi_1d() : 0) // multi_1d coefficient arrays
-                      - sizeof(int)                                    // length parameter
-                      - (!use_w ? sizeof(void *) : 0)                  // subtract dummy pointer if not using W
-                      - (reduce ? sizeof(ReduceArg<device_reduce_t>) : 0)        // reduction buffers
-                      - 16) // there seems to be 16 bytes other argument space we need
+      const auto arg_size = (device::max_kernel_arg_size() - sizeof(int)                       // NYW parameter
+                             - NXZ * spinor_x_size                            // SpinorX array
+                             - (use_z ? NXZ * spinor_z_size : sizeof(void *)) // SpinorZ array (else dummy pointer)
+                             - 2 * sizeof(int)                                // functor NXZ/NYW members
+                             - (multi_1d ? scalar_size * 3 * max_N_multi_1d() : 0) // multi_1d coefficient arrays
+                             - sizeof(int)                                    // length parameter
+                             - (!use_w ? sizeof(void *) : 0)                  // subtract dummy pointer if not using W
+                             - (reduce ? sizeof(ReduceArg<device_reduce_t>) : 0)        // reduction buffers
+                             - 16) // there seems to be 16 bytes other argument space we need
         / (spinor_y_size + (use_w ? spinor_w_size : 0));
 
       // this is the maximum size limit imposed by the coefficient arrays
-      int coeff_size = scalar_width > 0 ? device::max_constant_param_size() / (NXZ * scalar_size) : arg_size;
+      const auto coeff_size = scalar_width > 0 ? device::max_constant_param_size() / (NXZ * scalar_size) : arg_size;
 
       return std::min(arg_size, coeff_size);
     }
