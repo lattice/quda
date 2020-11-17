@@ -372,6 +372,7 @@ namespace quda {
       gParamEx.x[d] += 2 * R[d];
       gParamEx.r[d] = R[d];
     }
+    if (recon != QUDA_RECONSTRUCT_INVALID) gParamEx.reconstruct = recon;
 
     auto *out = new cudaGaugeField(gParamEx);
 
