@@ -160,6 +160,7 @@ void setInvertParam(QudaInvertParam &inv_param)
     inv_param.clover_cuda_prec_refinement_sloppy = cuda_prec_sloppy;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
     inv_param.clover_coeff = clover_coeff;
+    inv_param.compute_clover_trlog = compute_clover_trlog ? 1 : 0;
   }
 
   // General parameter setup
@@ -336,8 +337,9 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     inv_param.clover_cuda_prec_refinement_sloppy = cuda_prec_sloppy;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
     inv_param.clover_coeff = clover_coeff;
+    inv_param.compute_clover_trlog = compute_clover_trlog ? 1 : 0;
   }
-
+  
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 
@@ -587,6 +589,7 @@ void setMultigridInvertParam(QudaInvertParam &inv_param)
     inv_param.clover_cuda_prec_eigensolver = cuda_prec_eigensolver;
     inv_param.clover_cuda_prec_refinement_sloppy = cuda_prec_sloppy;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
+    inv_param.compute_clover_trlog = compute_clover_trlog ? 1 : 0;
   }
 
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
@@ -1144,6 +1147,7 @@ void setDeflatedInvertParam(QudaInvertParam &inv_param)
     inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
     inv_param.clover_cuda_prec_precondition = cuda_prec_precondition;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
+    inv_param.compute_clover_trlog = compute_clover_trlog ? 1 : 0;
   }
 
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;

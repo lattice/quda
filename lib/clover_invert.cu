@@ -33,8 +33,12 @@ namespace quda {
         CloverInvertArg<store_t, false> arg(clover, compute_tr_log);
         launch<InvertClover>(clover.TrLog(), tp, stream, arg);
       }
+      if(compute_tr_log && (std::isnan(clover.TrLog()[0]) || std::isnan(clover.TrLog()[1]))) {
+	printfQuda("clover.TrLog()[0]=%e, clover.TrLog()[1]=%e\n", clover.TrLog()[0], clover.TrLog()[1]);
+	errorQuda("Clover trlog has returned -nan, likey due to the clover matrix being singular.");
+      }
     }
-
+    
     long long flops() const { return 0; }
     long long bytes() const { return 2 * clover.Bytes(); }
     void preTune() { if (clover.V(true) == clover.V(false)) clover.backup(); }
