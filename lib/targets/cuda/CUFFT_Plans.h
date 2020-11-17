@@ -97,6 +97,7 @@ inline void SetPlanFFTMany(FFTPlanHandle &plan, int4 size, int dim, QudaPrecisio
     CUFFT_SAFE_CALL(cufftPlanMany(&plan, 3, n, NULL, 1, 0, NULL, 1, 0, type, size.w));
   }
   break;
+  }
 }
 
 /**
