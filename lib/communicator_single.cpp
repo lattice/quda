@@ -17,10 +17,10 @@ Communicator::Communicator(Communicator &other, const int *comm_split)
 {
   constexpr int nDim = 4;
 
-  CommKey comm_dims_split;
+  quda::CommKey comm_dims_split;
 
-  CommKey comm_key_split;
-  CommKey comm_color_split;
+  quda::CommKey comm_key_split;
+  quda::CommKey comm_color_split;
 
   for (int d = 0; d < nDim; d++) {
     assert(other.comm_dim(d) % comm_split[d] == 0);
