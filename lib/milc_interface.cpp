@@ -169,11 +169,15 @@ void *qudaAllocateManaged(size_t bytes) { return managed_malloc(bytes); }
 
 void qudaFreeManaged(void *ptr) { managed_free(ptr); }
 
+#if defined(GPU_HISQ_FORCE) || defined(GPU_UNITARIZE)
 void qudaHisqParamsInit(QudaHisqParams_t params)
+#else
+void qudaHisqParamsInit(QudaHisqParams_t)
+#endif
 {
   static bool initialized = false;
 
-  if(initialized) return;
+  if (initialized) return;
   qudamilc_called<true>(__func__);
 
 #if defined(GPU_HISQ_FORCE) || defined(GPU_UNITARIZE)

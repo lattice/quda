@@ -68,11 +68,11 @@ namespace quda
       }
 #endif
 
+#ifdef NATIVE_LAPACK_LIB
       // FIXME do this in pipelined fashion to reduce memory overhead.
       long long BatchInvertMatrix(void *Ainv, void *A, const int n, const uint64_t batch, QudaPrecision prec,
                                   QudaFieldLocation location)
       {
-#ifdef NATIVE_LAPACK_LIB
         init();
         if (getVerbosity() >= QUDA_VERBOSE)
           printfQuda("BatchInvertMatrix (native - cuBLAS): Nc = %d, batch = %lu\n", n, batch);
@@ -180,11 +180,14 @@ namespace quda
           printfQuda("Batched matrix inversion completed in %f seconds with GFLOPS = %f\n", time, 1e-9 * flops / time);
 
         return flops;
+      }
 #else
+      long long BatchInvertMatrix(void *, void *, const int, const uint64_t, QudaPrecision, QudaFieldLocation)
+      {
         errorQuda("Native BLAS not built. Please build and use native BLAS or use generic BLAS");
         return 0; // Stops a compiler warning
-#endif
       }
+#endif
 
     } // namespace native
   }   // namespace blas_lapack
