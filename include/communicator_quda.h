@@ -94,8 +94,7 @@ static inline bool advance_coords(int ndim, const int *dims, int *x)
 
 // QudaCommsMap is declared in quda.h:
 //   typedef int (*QudaCommsMap)(const int *coords, void *fdata);
-Topology *comm_create_topology(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data,
-                                      int my_rank);
+Topology *comm_create_topology(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data, int my_rank);
 
 inline void comm_destroy_topology(Topology *topo)
 {
@@ -397,9 +396,7 @@ struct Communicator {
     if (neighbors_cached) return;
 
     Topology *topology = topo ? topo : default_topo; // use default topology if topo is NULL
-    if (!topology) {
-      errorQuda("Topology not specified");
-    }
+    if (!topology) { errorQuda("Topology not specified"); }
 
     for (int d = 0; d < 4; ++d) {
       int pos_displacement[QUDA_MAX_DIM] = {};
@@ -410,7 +407,6 @@ struct Communicator {
       neighbor_rank[1][d] = comm_rank_displaced(topology, pos_displacement);
     }
     neighbors_cached = true;
-
   }
 
   int comm_neighbor_rank(int dir, int dim)

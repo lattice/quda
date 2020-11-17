@@ -383,10 +383,11 @@ namespace quda {
     }
   }
 
-  void cpuGaugeField::copy_to_buffer(void *buffer) const {
+  void cpuGaugeField::copy_to_buffer(void *buffer) const
+  {
 
     if (Order() == QUDA_QDP_GAUGE_ORDER || Order() == QUDA_QDPJIT_GAUGE_ORDER) {
-      void * const *p = static_cast<void * const *>(Gauge_p());
+      void *const *p = static_cast<void *const *>(Gauge_p());
       int dbytes = Bytes() / 4;
       static_assert(sizeof(char) == 1, "Assuming sizeof(char) == 1");
       char *dst_buffer = reinterpret_cast<char *>(buffer);
@@ -400,10 +401,10 @@ namespace quda {
     } else {
       errorQuda("Unsupported order = %d\n", Order());
     }
-
   }
 
-  void cpuGaugeField::copy_from_buffer(void *buffer) {
+  void cpuGaugeField::copy_from_buffer(void *buffer)
+  {
 
     if (Order() == QUDA_QDP_GAUGE_ORDER || Order() == QUDA_QDPJIT_GAUGE_ORDER) {
       void **p = static_cast<void **>(Gauge_p());
@@ -420,9 +421,7 @@ namespace quda {
     } else {
       errorQuda("Unsupported order = %d\n", Order());
     }
-
   }
-
 
 /*template <typename Float>
 void print_matrix(const Float &m, unsigned int x) {

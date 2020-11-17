@@ -185,8 +185,7 @@ void comm_dim_partitioned_reset();
 
 int get_enable_p2p_max_access_rank();
 
-Topology *comm_create_topology(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data,
-                                      int my_rank)
+Topology *comm_create_topology(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data, int my_rank)
 {
   if (ndim > QUDA_MAX_DIM) { errorQuda("ndim exceeds QUDA_MAX_DIM"); }
 

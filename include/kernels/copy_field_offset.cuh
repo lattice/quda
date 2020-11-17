@@ -208,9 +208,10 @@ namespace quda
       TunableVectorYZ(arg.Ls, arg.nParity), arg(arg), meta(meta), location(meta.Location())
     {
       writeAuxString("(%d,%d,%d,%d)->(%d,%d,%d,%d),Ls=%d,nParity=%d,%s,offset=%d%d%d%d,location=%s", (int)arg.dim_in[0],
-                     (int)arg.dim_in[1], (int)arg.dim_in[2], (int)arg.dim_in[3], (int)arg.dim_out[0], (int)arg.dim_out[1], (int)arg.dim_out[2], (int)arg.dim_out[3], arg.Ls,
-                     arg.nParity, arg.mode == QudaOffsetCopyMode::COLLECT ? "COLLECT" : "DISPERSE", arg.offset[0],
-                     arg.offset[1], arg.offset[2], arg.offset[3], location == QUDA_CPU_FIELD_LOCATION ? "CPU" : "GPU");
+                     (int)arg.dim_in[1], (int)arg.dim_in[2], (int)arg.dim_in[3], (int)arg.dim_out[0],
+                     (int)arg.dim_out[1], (int)arg.dim_out[2], (int)arg.dim_out[3], arg.Ls, arg.nParity,
+                     arg.mode == QudaOffsetCopyMode::COLLECT ? "COLLECT" : "DISPERSE", arg.offset[0], arg.offset[1],
+                     arg.offset[2], arg.offset[3], location == QUDA_CPU_FIELD_LOCATION ? "CPU" : "GPU");
       apply(0);
     }
 

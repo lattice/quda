@@ -28,18 +28,14 @@ void finalize_communicator_stack() { communicator_stack.clear(); }
 static Communicator &get_default_communicator()
 {
   auto search = communicator_stack.find(default_key);
-  if (search == communicator_stack.end()) {
-    errorQuda("Default communicator can't be found.");
-  }
+  if (search == communicator_stack.end()) { errorQuda("Default communicator can't be found."); }
   return search->second;
 }
 
 Communicator &get_current_communicator()
 {
   auto search = communicator_stack.find(current_key);
-  if (search == communicator_stack.end()) {
-    errorQuda("Current communicator can't be found.");
-  }
+  if (search == communicator_stack.end()) { errorQuda("Current communicator can't be found."); }
   return search->second;
 }
 
@@ -100,7 +96,10 @@ void comm_gather_hostname(char *hostname_recv_buf)
 
 void comm_gather_gpuid(int *gpuid_recv_buf) { get_current_communicator().comm_gather_gpuid(gpuid_recv_buf); }
 
-void comm_peer2peer_init(const char *hostname_recv_buf) { get_current_communicator().comm_peer2peer_init(hostname_recv_buf); }
+void comm_peer2peer_init(const char *hostname_recv_buf)
+{
+  get_current_communicator().comm_peer2peer_init(hostname_recv_buf);
+}
 
 bool comm_peer2peer_present() { return get_current_communicator().comm_peer2peer_present(); }
 

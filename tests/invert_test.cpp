@@ -328,7 +328,7 @@ int main(int argc, char **argv)
       gflops[i] = inv_param.gflops / inv_param.secs;
       iter[i] = inv_param.iter;
       printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
-          inv_param.gflops / inv_param.secs);
+                 inv_param.gflops / inv_param.secs);
     }
 
   } else {
@@ -352,7 +352,6 @@ int main(int argc, char **argv)
     invertSplitGridQuda(_hp_x.data(), _hp_b.data(), &inv_param, (void *)gauge, &gauge_param);
   }
 
-
   // QUDA invert test COMPLETE
   //----------------------------------------------------------------------------
 
@@ -368,13 +367,14 @@ int main(int argc, char **argv)
   // Perform host side verification of inversion if requested
   if (verify_results) {
     if (!use_split_grid) {
-      verifyInversion(out->V(), (void **)outMulti, in->V(), check->V(), gauge_param, inv_param, gauge, clover, clover_inv);
+      verifyInversion(out->V(), (void **)outMulti, in->V(), check->V(), gauge_param, inv_param, gauge, clover,
+                      clover_inv);
     } else {
       for (int i = 0; i < Nsrc; i++) {
-        verifyInversion(_h_x[i]->V(), nullptr, _h_b[i]->V(), check->V(), gauge_param, inv_param, gauge, clover, clover_inv);
+        verifyInversion(_h_x[i]->V(), nullptr, _h_b[i]->V(), check->V(), gauge_param, inv_param, gauge, clover,
+                        clover_inv);
       }
     }
-
   }
 
   // Clean up memory allocations

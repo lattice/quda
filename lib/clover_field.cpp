@@ -13,20 +13,20 @@
 namespace quda {
 
   CloverFieldParam::CloverFieldParam(const CloverField &a) :
-      LatticeFieldParam(a),
-      direct(a.V(/** inverse = */false)),
-      inverse(a.V(/** inverse = */true)),
-      clover(nullptr),
-      norm(nullptr),
-      cloverInv(nullptr),
-      invNorm(nullptr),
-      csw(a.Csw()),
-      twisted(a.Twisted()),
-      mu2(a.Mu2()),
-      rho(a.Rho()),
-      order(a.Order()),
-      create(QUDA_NULL_FIELD_CREATE),
-      location(a.Location())
+    LatticeFieldParam(a),
+    direct(a.V(/** inverse = */ false)),
+    inverse(a.V(/** inverse = */ true)),
+    clover(nullptr),
+    norm(nullptr),
+    cloverInv(nullptr),
+    invNorm(nullptr),
+    csw(a.Csw()),
+    twisted(a.Twisted()),
+    mu2(a.Mu2()),
+    rho(a.Rho()),
+    order(a.Order()),
+    create(QUDA_NULL_FIELD_CREATE),
+    location(a.Location())
   {
     precision = a.Precision();
     nDim = a.Ndim();
@@ -61,12 +61,13 @@ namespace quda {
 
   CloverField::~CloverField() { }
 
-  CloverField* CloverField::Create(const CloverFieldParam &param) {
+  CloverField *CloverField::Create(const CloverFieldParam &param)
+  {
 
     CloverField *field = nullptr;
     if (param.location == QUDA_CPU_FIELD_LOCATION) {
       field = new cpuCloverField(param);
-    } else if (param.location== QUDA_CUDA_FIELD_LOCATION) {
+    } else if (param.location == QUDA_CUDA_FIELD_LOCATION) {
       field = new cudaCloverField(param);
     } else {
       errorQuda("Invalid field location %d", param.location);
@@ -262,13 +263,14 @@ namespace quda {
     qudaDeviceSynchronize();
   }
 
-  void cudaCloverField::copy_to_buffer(void *buffer) const {
+  void cudaCloverField::copy_to_buffer(void *buffer) const
+  {
 
     size_t buffer_offset = 0;
     if (V(false)) { // direct
       qudaMemcpy(buffer, clover, bytes, cudaMemcpyDeviceToHost);
       if (precision < QUDA_SINGLE_PRECISION) {
-	      qudaMemcpy(static_cast<char *>(buffer) + bytes, norm, norm_bytes, cudaMemcpyDeviceToHost);
+        qudaMemcpy(static_cast<char *>(buffer) + bytes, norm, norm_bytes, cudaMemcpyDeviceToHost);
       }
       buffer_offset += bytes + norm_bytes;
     }
@@ -276,19 +278,19 @@ namespace quda {
     if (V(true)) { // inverse
       qudaMemcpy(static_cast<char *>(buffer) + buffer_offset, cloverInv, bytes, cudaMemcpyDeviceToHost);
       if (precision < QUDA_SINGLE_PRECISION) {
-	      qudaMemcpy(static_cast<char *>(buffer) + buffer_offset + bytes, invNorm, norm_bytes, cudaMemcpyDeviceToHost);
+        qudaMemcpy(static_cast<char *>(buffer) + buffer_offset + bytes, invNorm, norm_bytes, cudaMemcpyDeviceToHost);
       }
     }
-
   }
 
-  void cudaCloverField::copy_from_buffer(void *buffer) {
+  void cudaCloverField::copy_from_buffer(void *buffer)
+  {
 
     size_t buffer_offset = 0;
     if (V(false)) { // direct
       qudaMemcpy(clover, static_cast<char *>(buffer), bytes, cudaMemcpyHostToDevice);
       if (precision < QUDA_SINGLE_PRECISION) {
-	      qudaMemcpy(norm, static_cast<char *>(buffer) + bytes, norm_bytes, cudaMemcpyHostToDevice);
+        qudaMemcpy(norm, static_cast<char *>(buffer) + bytes, norm_bytes, cudaMemcpyHostToDevice);
       }
       buffer_offset += bytes + norm_bytes;
     }
@@ -296,10 +298,9 @@ namespace quda {
     if (V(true)) { // inverse
       qudaMemcpy(cloverInv, static_cast<char *>(buffer) + buffer_offset, bytes, cudaMemcpyHostToDevice);
       if (precision < QUDA_SINGLE_PRECISION) {
-	      qudaMemcpy(invNorm, static_cast<char *>(buffer) + buffer_offset + bytes, norm_bytes, cudaMemcpyHostToDevice);
+        qudaMemcpy(invNorm, static_cast<char *>(buffer) + buffer_offset + bytes, norm_bytes, cudaMemcpyHostToDevice);
       }
     }
-
   }
 
   void cudaCloverField::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
@@ -392,7 +393,8 @@ namespace quda {
     if (param.pad != 0) errorQuda("%s pad must be zero", __func__);
   }
 
-  cpuCloverField::~cpuCloverField() {
+  cpuCloverField::~cpuCloverField()
+  {
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
       if (clover) host_free(clover);
       if (norm) host_free(norm);
@@ -401,13 +403,14 @@ namespace quda {
     }
   }
 
-  void cpuCloverField::copy_to_buffer(void *buffer) const {
+  void cpuCloverField::copy_to_buffer(void *buffer) const
+  {
 
     size_t buffer_offset = 0;
     if (V(false)) { // direct
       qudaMemcpy(static_cast<char *>(buffer), clover, bytes, cudaMemcpyDeviceToHost);
       if (precision < QUDA_SINGLE_PRECISION) {
-	      qudaMemcpy(static_cast<char *>(buffer) + bytes, norm, norm_bytes, cudaMemcpyDeviceToHost);
+        qudaMemcpy(static_cast<char *>(buffer) + bytes, norm, norm_bytes, cudaMemcpyDeviceToHost);
       }
       buffer_offset += bytes + norm_bytes;
     }
@@ -415,30 +418,27 @@ namespace quda {
     if (V(true)) { // inverse
       qudaMemcpy(static_cast<char *>(buffer) + buffer_offset, cloverInv, bytes, cudaMemcpyDeviceToHost);
       if (precision < QUDA_SINGLE_PRECISION) {
-	      qudaMemcpy(static_cast<char *>(buffer) + buffer_offset + bytes, invNorm, norm_bytes, cudaMemcpyDeviceToHost);
+        qudaMemcpy(static_cast<char *>(buffer) + buffer_offset + bytes, invNorm, norm_bytes, cudaMemcpyDeviceToHost);
       }
     }
-
   }
 
-  void cpuCloverField::copy_from_buffer(void *buffer) {
+  void cpuCloverField::copy_from_buffer(void *buffer)
+  {
 
     size_t buffer_offset = 0;
     if (V(false)) { // direct
       std::memcpy(clover, static_cast<char *>(buffer), bytes);
-      if (precision < QUDA_SINGLE_PRECISION) {
-	      std::memcpy(norm, static_cast<char *>(buffer) + bytes, norm_bytes);
-      }
+      if (precision < QUDA_SINGLE_PRECISION) { std::memcpy(norm, static_cast<char *>(buffer) + bytes, norm_bytes); }
       buffer_offset += bytes + norm_bytes;
     }
 
     if (V(true)) { // inverse
       std::memcpy(cloverInv, static_cast<char *>(buffer) + buffer_offset, bytes);
       if (precision < QUDA_SINGLE_PRECISION) {
-	      std::memcpy(invNorm, static_cast<char *>(buffer) + buffer_offset + bytes, norm_bytes);
+        std::memcpy(invNorm, static_cast<char *>(buffer) + buffer_offset + bytes, norm_bytes);
       }
     }
-
   }
 
   // This doesn't really live here, but is fine for the moment

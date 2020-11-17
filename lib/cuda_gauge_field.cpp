@@ -751,11 +751,13 @@ namespace quda {
 
   void cudaGaugeField::zero() { qudaMemset(gauge, 0, bytes); }
 
-  void cudaGaugeField::copy_to_buffer(void *buffer) const {
+  void cudaGaugeField::copy_to_buffer(void *buffer) const
+  {
     qudaMemcpy(buffer, Gauge_p(), Bytes(), cudaMemcpyDeviceToHost);
   }
 
-  void cudaGaugeField::copy_from_buffer(void *buffer) {
+  void cudaGaugeField::copy_from_buffer(void *buffer)
+  {
     qudaMemcpy(Gauge_p(), buffer, Bytes(), cudaMemcpyHostToDevice);
   }
 

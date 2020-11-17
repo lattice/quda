@@ -1,6 +1,7 @@
 #pragma once
 
-namespace quda {
+namespace quda
+{
 
   struct CommKey {
 
@@ -10,24 +11,15 @@ namespace quda {
 
     __device__ __host__ inline int product() { return array[0] * array[1] * array[2] * array[3]; }
 
-    __device__ __host__ inline int &operator[](int d) {
-      return array[d];
-    }
+    __device__ __host__ inline int &operator[](int d) { return array[d]; }
 
-    __device__ __host__ inline const int &operator[](int d) const {
-      return array[d];
-    }
+    __device__ __host__ inline const int &operator[](int d) const { return array[d]; }
 
-    __device__ __host__ inline int *data() {
-      return array;
-    }
+    __device__ __host__ inline int *data() { return array; }
 
-    __device__ __host__ inline const int *data() const {
-      return array;
-    }
-
+    __device__ __host__ inline const int *data() const { return array; }
   };
-  
+
   __device__ __host__ int inline product(const CommKey &input) { return input[0] * input[1] * input[2] * input[3]; }
 
   __device__ __host__ CommKey inline operator+(const CommKey &lhs, const CommKey &rhs)

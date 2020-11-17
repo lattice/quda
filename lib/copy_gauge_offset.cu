@@ -7,8 +7,7 @@
 namespace quda
 {
 
-  template <class Field, class Element, class G>
-  void copy_gauge_offset(Field &out, const Field &in, CommKey offset)
+  template <class Field, class Element, class G> void copy_gauge_offset(Field &out, const Field &in, CommKey offset)
   {
     G out_accessor(out);
     G in_accessor(in);

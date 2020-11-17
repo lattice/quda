@@ -12,52 +12,52 @@ int comm_rank_from_coords(const int *coords);
 
 namespace quda
 {
-/**
-  int inline product(const CommKey &input) { return input[0] * input[1] * input[2] * input[3]; }
+  /**
+    int inline product(const CommKey &input) { return input[0] * input[1] * input[2] * input[3]; }
 
-  CommKey inline operator+(const CommKey &lhs, const CommKey &rhs)
-  {
-    CommKey sum;
-    for (int d = 0; d < nDim; d++) { sum[d] = lhs[d] + rhs[d]; }
-    return sum;
-  }
-
-  CommKey inline operator*(const CommKey &lhs, const CommKey &rhs)
-  {
-    CommKey product;
-    for (int d = 0; d < nDim; d++) { product[d] = lhs[d] * rhs[d]; }
-    return product;
-  }
-
-  CommKey inline operator/(const CommKey &lhs, const CommKey &rhs)
-  {
-    CommKey quotient;
-    for (int d = 0; d < nDim; d++) { quotient[d] = lhs[d] / rhs[d]; }
-    return quotient;
-  }
-
-  CommKey inline operator%(const CommKey &lhs, const CommKey &rhs)
-  {
-    CommKey mod;
-    for (int d = 0; d < nDim; d++) { mod[d] = lhs[d] % rhs[d]; }
-    return mod;
-  }
-
-  CommKey inline coordinate_from_index(int index, CommKey dim)
-  {
-    CommKey coord;
-    for (int d = 0; d < nDim; d++) {
-      coord[d] = index % dim[d];
-      index /= dim[d];
+    CommKey inline operator+(const CommKey &lhs, const CommKey &rhs)
+    {
+      CommKey sum;
+      for (int d = 0; d < nDim; d++) { sum[d] = lhs[d] + rhs[d]; }
+      return sum;
     }
-    return coord;
-  }
 
-  int inline index_from_coordinate(CommKey coord, CommKey dim)
-  {
-    return ((coord[3] * dim[2] + coord[2]) * dim[1] + coord[1]) * dim[0] + coord[0];
-  }
-*/
+    CommKey inline operator*(const CommKey &lhs, const CommKey &rhs)
+    {
+      CommKey product;
+      for (int d = 0; d < nDim; d++) { product[d] = lhs[d] * rhs[d]; }
+      return product;
+    }
+
+    CommKey inline operator/(const CommKey &lhs, const CommKey &rhs)
+    {
+      CommKey quotient;
+      for (int d = 0; d < nDim; d++) { quotient[d] = lhs[d] / rhs[d]; }
+      return quotient;
+    }
+
+    CommKey inline operator%(const CommKey &lhs, const CommKey &rhs)
+    {
+      CommKey mod;
+      for (int d = 0; d < nDim; d++) { mod[d] = lhs[d] % rhs[d]; }
+      return mod;
+    }
+
+    CommKey inline coordinate_from_index(int index, CommKey dim)
+    {
+      CommKey coord;
+      for (int d = 0; d < nDim; d++) {
+        coord[d] = index % dim[d];
+        index /= dim[d];
+      }
+      return coord;
+    }
+
+    int inline index_from_coordinate(CommKey coord, CommKey dim)
+    {
+      return ((coord[3] * dim[2] + coord[2]) * dim[1] + coord[1]) * dim[0] + coord[0];
+    }
+  */
   template <class F> struct param_mapper {
   };
 
@@ -74,7 +74,8 @@ namespace quda
   };
 
   template <class Field>
-  void inline split_field(Field &collect_field, std::vector<Field *> &v_base_field, const CommKey &comm_key, QudaPCType pc_type = QUDA_4D_PC)
+  void inline split_field(Field &collect_field, std::vector<Field *> &v_base_field, const CommKey &comm_key,
+                          QudaPCType pc_type = QUDA_4D_PC)
   {
     CommKey full_dim = {comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3)};
     CommKey full_idx = {comm_coord(0), comm_coord(1), comm_coord(2), comm_coord(3)};
@@ -122,7 +123,8 @@ namespace quda
 
     const int *X = meta->X();
     constexpr bool is_color_spinor_field = std::is_same<Field, ColorSpinorField>::value;
-    CommKey thread_dim = {(meta->SiteSubset() == QUDA_PARITY_SITE_SUBSET && is_color_spinor_field) ? X[0] * 2 : X[0], X[1], X[2], X[3]};
+    CommKey thread_dim
+      = {(meta->SiteSubset() == QUDA_PARITY_SITE_SUBSET && is_color_spinor_field) ? X[0] * 2 : X[0], X[1], X[2], X[3]};
 
     // Receive cycles
     for (int i = 0; i < n_replicates; i++) {
@@ -156,12 +158,17 @@ namespace quda
 
     comm_barrier();
 
-    for (auto &p : v_send_buffer_h) { if (p) { host_free(p); } };
-    for (auto &p : v_mh_send) { if (p) { comm_free(p); } };
+    for (auto &p : v_send_buffer_h) {
+      if (p) { host_free(p); }
+    };
+    for (auto &p : v_mh_send) {
+      if (p) { comm_free(p); }
+    };
   }
 
   template <class Field>
-  void inline join_field(std::vector<Field *> &v_base_field, const Field &collect_field, const CommKey &comm_key, QudaPCType pc_type = QUDA_4D_PC)
+  void inline join_field(std::vector<Field *> &v_base_field, const Field &collect_field, const CommKey &comm_key,
+                         QudaPCType pc_type = QUDA_4D_PC)
   {
     CommKey full_dim = {comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3)};
     CommKey full_idx = {comm_coord(0), comm_coord(1), comm_coord(2), comm_coord(3)};
@@ -188,7 +195,8 @@ namespace quda
 
     const int *X = meta.X();
     constexpr bool is_color_spinor_field = std::is_same<Field, ColorSpinorField>::value;
-    CommKey thread_dim = {(meta.SiteSubset() == QUDA_PARITY_SITE_SUBSET && is_color_spinor_field) ? X[0] * 2 : X[0], X[1], X[2], X[3]};
+    CommKey thread_dim
+      = {(meta.SiteSubset() == QUDA_PARITY_SITE_SUBSET && is_color_spinor_field) ? X[0] * 2 : X[0], X[1], X[2], X[3]};
 
     // Send cycles
     for (int i = 0; i < n_replicates; i++) {
