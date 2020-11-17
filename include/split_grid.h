@@ -121,7 +121,8 @@ namespace quda
     Field *buffer_field = Field::Create(param);
 
     const int *X = meta->X();
-    CommKey thread_dim = {X[0], X[1], X[2], X[3]};
+    constexpr bool is_color_spinor_field = std::is_same<Field, ColorSpinorField>::value;
+    CommKey thread_dim = {(meta->SiteSubset() == QUDA_PARITY_SITE_SUBSET && is_color_spinor_field) ? X[0] * 2 : X[0], X[1], X[2], X[3]};
 
     // Receive cycles
     for (int i = 0; i < n_replicates; i++) {
@@ -186,7 +187,8 @@ namespace quda
     Field *buffer_field = Field::Create(param);
 
     const int *X = meta.X();
-    CommKey thread_dim = {X[0], X[1], X[2], X[3]};
+    constexpr bool is_color_spinor_field = std::is_same<Field, ColorSpinorField>::value;
+    CommKey thread_dim = {(meta.SiteSubset() == QUDA_PARITY_SITE_SUBSET && is_color_spinor_field) ? X[0] * 2 : X[0], X[1], X[2], X[3]};
 
     // Send cycles
     for (int i = 0; i < n_replicates; i++) {

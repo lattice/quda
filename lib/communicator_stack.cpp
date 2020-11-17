@@ -28,21 +28,19 @@ void finalize_communicator_stack() { communicator_stack.clear(); }
 static Communicator &get_default_communicator()
 {
   auto search = communicator_stack.find(default_key);
-  if (search != communicator_stack.end()) {
-    return search->second;
-  } else {
-    assert(false);
+  if (search == communicator_stack.end()) {
+    errorQuda("Default communicator can't be found.");
   }
+  return search->second;
 }
 
 Communicator &get_current_communicator()
 {
   auto search = communicator_stack.find(current_key);
-  if (search != communicator_stack.end()) {
-    return search->second;
-  } else {
-    assert(false);
+  if (search == communicator_stack.end()) {
+    errorQuda("Current communicator can't be found.");
   }
+  return search->second;
 }
 
 void push_communicator(const quda::CommKey &split_key)
@@ -53,7 +51,7 @@ void push_communicator(const quda::CommKey &split_key)
                                std::forward_as_tuple(get_default_communicator(), split_key.data()));
   }
 
-  quda::LatticeField::destroyIPCComms(); // Destroy the IPC Comm buffers with the old communicator.
+  quda::LatticeField::freeGhostBuffer(); // Destroy the (IPC) Comm buffers with the old communicator.
 
   current_key = split_key;
 }

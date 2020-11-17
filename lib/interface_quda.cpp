@@ -3268,7 +3268,7 @@ void callSplitGridQuda(Interface op, void **_hp_x, void **_hp_b, QudaInvertParam
   printfQuda("Spliting the grid into sub-partitions: (%2d,%2d,%2d,%2d) / (%2d,%2d,%2d,%2d).\n", comm_dim(0),
              comm_dim(1), comm_dim(2), comm_dim(3), split_key[0], split_key[1], split_key[2], split_key[3]);
   for (int d = 0; d < CommKey::n_dim; d++) {
-    if (comm_dim(d) % split_key[d] != 0) { errorQuda("Split not possible."); }
+    if (comm_dim(d) % split_key[d] != 0) { errorQuda("Split not possible: %2d %% %2d != 0.", comm_dim(d), split_key[d]); }
     gf_param.x[d] *= split_key[d];
     gf_param.pad *= split_key[d];
     gauge_param->X[d] *= split_key[d];
@@ -3310,7 +3310,6 @@ void callSplitGridQuda(Interface op, void **_hp_x, void **_hp_b, QudaInvertParam
   profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_INIT);
   profileInvertSplitGrid.TPSTART(QUDA_PROFILE_PREAMBLE);
   quda::split_field(*collected_gauge, v_g, split_key);
-  loadGaugeQuda(collected_gauge->Gauge_p(), gauge_param);
 
   comm_barrier();
 
@@ -3326,6 +3325,17 @@ void callSplitGridQuda(Interface op, void **_hp_x, void **_hp_b, QudaInvertParam
   push_communicator(split_key);
   updateR();
   comm_barrier();
+
+  // Load gauge field after pushing the split communicator so the comm buffers, etc are setup according to
+  // the split topology.
+  loadGaugeQuda(collected_gauge->Gauge_p(), gauge_param);
+
+/** For debug
+  // Compute plaquette as a sanity check
+  double plaq[3];
+  plaqQuda(plaq);
+  printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+*/
 
   profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_PREAMBLE);
   profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_TOTAL);

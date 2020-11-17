@@ -213,6 +213,7 @@ int main(int argc, char **argv)
   // Allocate space on the host (always best to allocate and free in the same scope)
   for (int dir = 0; dir < 4; dir++) gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
   constructHostGaugeField(gauge, gauge_param, argc, argv);
+
   // Load the gauge field to the device
   loadGaugeQuda((void *)gauge, &gauge_param);
 
@@ -305,8 +306,6 @@ int main(int argc, char **argv)
   auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
   rng->Init();
 
-  void **_hp_x = nullptr;
-  void **_hp_b = nullptr;
   std::vector<quda::ColorSpinorField *> _h_b(Nsrc, nullptr);
   std::vector<quda::ColorSpinorField *> _h_x(Nsrc, nullptr);
 
@@ -315,7 +314,7 @@ int main(int argc, char **argv)
     for (int i = 0; i < Nsrc; i++) {
 
       // Populate the host spinor with random numbers.
-      constructRandomSpinorSource(in->V(), 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
+      in->Source(QUDA_RANDOM_SOURCE);
       // If deflating, preserve the deflation space between solves
       if (inv_deflate) eig_param.preserve_deflation = i < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
       // Perform QUDA inversions
@@ -337,20 +336,20 @@ int main(int argc, char **argv)
 
     for (auto &p : _h_b) {
       p = new quda::cpuColorSpinorField(cs_param);
-      constructRandomSpinorSource(p->V(), 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
+      p->Source(QUDA_RANDOM_SOURCE);
     }
     for (auto &p : _h_x) { p = new quda::cpuColorSpinorField(cs_param); }
 
     // Host arrays for solutions, sources, and check
-    _hp_x = (void **)malloc(Nsrc * sizeof(void *));
-    _hp_b = (void **)malloc(Nsrc * sizeof(void *));
+    std::vector<void *> _hp_x(Nsrc);
+    std::vector<void *> _hp_b(Nsrc);
     for (int i = 0; i < Nsrc; i++) {
       _hp_x[i] = _h_x[i]->V();
       _hp_b[i] = _h_b[i]->V();
     }
 
     // Run split grid
-    invertSplitGridQuda(_hp_x, _hp_b, &inv_param, (void *)gauge, &gauge_param);
+    invertSplitGridQuda(_hp_x.data(), _hp_b.data(), &inv_param, (void *)gauge, &gauge_param);
   }
 
 
@@ -388,8 +387,6 @@ int main(int argc, char **argv)
   }
 
   if (use_split_grid) {
-    free(_hp_x);
-    free(_hp_b);
     for (auto p : _h_b) { delete p; }
     for (auto p : _h_x) { delete p; }
   }
