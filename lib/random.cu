@@ -44,7 +44,7 @@ namespace quda {
       int idd
         = (((x[3] * arg.commDim[2] * arg.X[2] + x[2]) * arg.commDim[1] * arg.X[1]) + x[1]) * arg.commDim[0] * arg.X[0]
         + x[0];
-      curand_init(seed, idd, 0, &state[parity * size_cb + id]);
+      random_init(seed, idd, 0, &state[parity * size_cb + id]); 
     }
   }
 
@@ -74,11 +74,11 @@ namespace quda {
     state = nullptr;
     for (int i = 0; i < 4; i++) X[i] = meta.X()[i];
 #if defined(XORWOW)
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using curandStateXORWOW\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using randStateXORWOW\n");
 #elif defined(RG32k3a)
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using curandStateMRG32k3a\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using randStateMRG32k3a\n");
 #else
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using curandStateMRG32k3a\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using randStateMRG32k3a\n");
 #endif
   }
 

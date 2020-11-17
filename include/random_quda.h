@@ -1,18 +1,17 @@
 #pragma once
 
+#include <quda_define.h>
 #include <lattice_field.h>
 
-#include <curand_kernel.h>
+/* Define templated methods and cuRNGState */
+#if defined(QUDA_TARGET_CUDA)
+#include "targets/cuda/random_quda_impl.h"
+#elif defined(QUDA_TARGET_HIP) 
+#include "targets/hip/random_quda_impl.h"
+#endif
 
 namespace quda {
 
-#if defined(XORWOW)
-typedef struct curandStateXORWOW cuRNGState;
-#elif defined(MRG32k3a)
-typedef struct curandStateMRG32k3a cuRNGState;
-#else
-typedef struct curandStateMRG32k3a cuRNGState;
-#endif
 
 /**
    @brief Class declaration to initialize and hold CURAND RNG states
@@ -61,86 +60,6 @@ class RNG {
 };
 
 
-/**
-   @brief Return a random number between a and b
-   @param state curand rng state
-   @param a lower range
-   @param b upper range
-   @return  random number in range a,b
-*/
-template<class Real>
-inline  __device__ Real Random(cuRNGState &state, Real a, Real b){
-    Real res;
-    return res;
-}
-
-template<>
-inline  __device__ float Random<float>(cuRNGState &state, float a, float b){
-    return a + (b - a) * curand_uniform(&state);
-}
-
-template<>
-inline  __device__ double Random<double>(cuRNGState &state, double a, double b){
-    return a + (b - a) * curand_uniform_double(&state);
-}
-
-/**
-   @brief Return a random number between 0 and 1
-   @param state curand rng state
-   @return  random number in range 0,1
-*/
-template<class Real>
-inline  __device__ Real Random(cuRNGState &state){
-    Real res;
-    return res;
-}
-
-template<>
-inline  __device__ float Random<float>(cuRNGState &state){
-    return curand_uniform(&state);
-}
-
-template<>
-inline  __device__ double Random<double>(cuRNGState &state){
-    return curand_uniform_double(&state);
-}
-
-
-template<class Real>
-struct uniform { };
-template<>
-struct uniform<float> {
-    __device__
-        static inline float rand(cuRNGState &state) {
-        return curand_uniform(&state);
-    }
-};
-template<>
-struct uniform<double> {
-    __device__
-        static inline double rand(cuRNGState &state) {
-        return curand_uniform_double(&state);
-    }
-};
-
-
-
-template<class Real>
-struct normal { };
-template<>
-struct normal<float> {
-    __device__
-        static inline float rand(cuRNGState &state) {
-        return curand_normal(&state);
-    }
-};
-template<>
-struct normal<double> {
-    __device__
-        static inline double rand(cuRNGState &state) {
-        return curand_normal_double(&state);
-    }
-};
 
 
 }

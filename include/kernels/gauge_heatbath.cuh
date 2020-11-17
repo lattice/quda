@@ -83,12 +83,12 @@ namespace quda {
   __device__ static inline Matrix<T,2> generate_su2_matrix_milc(T al, cuRNGState& localState){
     T xr1, xr2, xr3, xr4, d, r;
     int k;
-    xr1 = Random<T>(localState);
+    xr1 = uniform<T>::rand(localState);
     xr1 = (log((xr1 + 1.e-10)));
-    xr2 = Random<T>(localState);
+    xr2 = uniform<T>::rand(localState);
     xr2 = (log((xr2 + 1.e-10)));
-    xr3 = Random<T>(localState);
-    xr4 = Random<T>(localState);
+    xr3 = uniform<T>::rand(localState);
+    xr4 = uniform<T>::rand(localState);
     xr3 = cos(PII * xr3);
     d = -(xr2  + xr1 * xr3 * xr3 ) / al;
     //now  beat each  site into submission
@@ -97,12 +97,12 @@ namespace quda {
     if ( nacd == 0 && al > 2.0 ) { //k-p algorithm
       for ( k = 0; k < 20; k++ ) {
         //get four random numbers (add a small increment to prevent taking log(0.)
-        xr1 = Random<T>(localState);
+        xr1 = uniform<T>::rand(localState);
         xr1 = (log((xr1 + 1.e-10)));
-        xr2 = Random<T>(localState);
+        xr2 = uniform<T>::rand(localState);
         xr2 = (log((xr2 + 1.e-10)));
-        xr3 = Random<T>(localState);
-        xr4 = Random<T>(localState);
+        xr3 = uniform<T>::rand(localState);
+        xr4 = uniform<T>::rand(localState);
         xr3 = cos(PII * xr3);
         d = -(xr2 + xr1 * xr3 * xr3) / al;
         if ((1.00 - 0.5 * d) > xr4 * xr4 ) break;
@@ -114,8 +114,8 @@ namespace quda {
       xr4 = 1.0 - xr3;
       for ( k = 0; k < 20; k++ ) {
         //get two random numbers
-        xr1 = Random<T>(localState);
-        xr2 = Random<T>(localState);
+        xr1 = uniform<T>::rand(localState);
+        xr2 = uniform<T>::rand(localState);
         r = xr3 + xr4 * xr1;
         a(0,0) = 1.00 + log(r) / al;
         if ((1.0 - a(0,0) * a(0,0)) > xr2 * xr2 ) break;
@@ -130,13 +130,13 @@ namespace quda {
     xr3 = abs(xr3);
     r = sqrt(xr3);
     //compute a3
-    a(1,1) = (2.0 * Random<T>(localState) - 1.0) * r;
+    a(1,1) = (2.0 * uniform<T>::rand(localState) - 1.0) * r;
     //compute a1 and a2
     xr1 = xr3 - a(1,1) * a(1,1);
     xr1 = abs(xr1);
     xr1 = sqrt(xr1);
     //xr2 is a random number between 0 and 2*pi
-    xr2 = PII * Random<T>(localState);
+    xr2 = PII * uniform<T>::rand(localState);
     a(0,1) = xr1 * cos(xr2);
     a(1,0) = xr1 * sin(xr2);
     return a;

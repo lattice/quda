@@ -117,11 +117,15 @@ namespace quda {
   __device__ static inline Matrix<T,2> randomSU2(cuRNGState& localState){
     Matrix<T,2> a;
     T aabs, ctheta, stheta, phi;
-    a(0,0) = Random<T>(localState, (T)-1.0, (T)1.0);
+    a(0,0) = uniform<T>::rand(localState, (T)-1.0, (T)1.0);
     aabs = sqrt( 1.0 - a(0,0) * a(0,0));
-    ctheta = Random<T>(localState, (T)-1.0, (T)1.0);
-    phi = PII * Random<T>(localState);
-    stheta = ( curand(&localState) & 1 ? 1 : -1 ) * sqrt( (T)1.0 - ctheta * ctheta );
+    ctheta = uniform<T>::rand(localState, (T)-1.0, (T)1.0);
+    phi = PII * uniform<T>::rand(localState);
+
+    // Was   xurand(*localState>& 1 ? 1 : -1
+    // which presumably just selects when the lowest bit is 1 or 0 with 50% probability each
+    // so this should do the same, without an appeal to the bit swizzle, but may end up being slower.
+    stheta = ( uniform<T>::rand(localState) < static_cast<T>(0.5) ? 1 : -1 ) * sqrt( (T)1.0 - ctheta * ctheta );
     a(0,1) = aabs * stheta * cos( phi );
     a(1,0) = aabs * stheta * sin( phi );
     a(1,1) = aabs * ctheta;
@@ -182,7 +186,7 @@ namespace quda {
 
     for ( int i = 0; i < NCOLORS; i++ )
       for ( int j = 0; j < NCOLORS; j++ )
-        U(i,j) = complex<Float>( (Float)(Random<Float>(localState) - 0.5), (Float)(Random<Float>(localState) - 0.5) );
+        U(i,j) = complex<Float>( (Float)(uniform<Float>::rand(localState) - 0.5), (Float)(uniform<Float>::rand(localState) - 0.5) );
     reunit_link<Float>(U);
     return U;
 
