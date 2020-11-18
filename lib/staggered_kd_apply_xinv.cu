@@ -134,7 +134,6 @@ namespace quda {
   template <typename vFloatSpinor, typename vFloatGauge, int fineColor, int fineSpin, int coarseDof>
   void applyStaggeredKDBlock(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Xinv, bool dagger)
   {
-
     // Create the accessor for Xinv
     constexpr QudaGaugeFieldOrder xOrder = QUDA_MILC_GAUGE_ORDER;
     if (Xinv.FieldOrder() != xOrder) errorQuda("Unsupported field order %d\n", Xinv.FieldOrder());
@@ -187,7 +186,6 @@ namespace quda {
   template <typename vFloatSpinor> struct StaggeredKDBlockApply {
     StaggeredKDBlockApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Xinv, bool dagger)
     {
-
 #if QUDA_PRECISION & 4
       if (Xinv.Precision() == QUDA_SINGLE_PRECISION) {
         applyStaggeredKDBlock<vFloatSpinor, float>(out, in, Xinv, dagger);
@@ -204,12 +202,10 @@ namespace quda {
     }
   };
 
-
-
+#if defined(GPU_STAGGERED_DIRAC)
   // Applies the staggered KD block inverse to a staggered ColorSpinor
   void ApplyStaggeredKahlerDiracInverse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Xinv, bool dagger)
   {
-#if defined(GPU_STAGGERED_DIRAC)
     auto location = checkLocation(out, in, Xinv);
 
     if (location == QUDA_CPU_FIELD_LOCATION)
@@ -225,10 +221,13 @@ namespace quda {
     // We don't have a constraint on the precision of Xinv matching
     // the precision of the spinors.
     instantiatePrecision<StaggeredKDBlockApply>(out, in, Xinv, dagger);
-
-#else
-    errorQuda("Staggered fermion support has not been built");
-#endif
   }
+#else
+  // Applies the staggered KD block inverse to a staggered ColorSpinor
+  void ApplyStaggeredKahlerDiracInverse(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, bool)
+  {
+    errorQuda("Staggered fermion support has not been built");
+  }
+#endif
 
 } //namespace quda

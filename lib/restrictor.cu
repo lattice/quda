@@ -130,9 +130,9 @@ namespace quda {
 
     // Template over fine color
     if (in.Ncolor() == 3) { // standard QCD
-      constexpr int fineColor = 3;
 #ifdef NSPIN4
       if (in.Nspin() == 4) {
+        constexpr int fineColor = 3;
         constexpr int fineSpin = 4;
 
         // first check that the spin_map matches the spin_mapper
@@ -154,6 +154,7 @@ namespace quda {
 #endif // NSPIN4
 #ifdef NSPIN1
       if (in.Nspin() == 1) {
+        constexpr int fineColor = 3;
         constexpr int fineSpin = 1;
 
         // first check that the spin_map matches the spin_mapper

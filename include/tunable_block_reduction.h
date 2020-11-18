@@ -7,7 +7,7 @@
 #include <block_reduction_kernel.h>
 
 #ifdef JITIFY
-#include <jitify_helper.cuh>
+#include <jitify_helper2.cuh>
 #endif
 
 namespace quda {
@@ -60,7 +60,7 @@ namespace quda {
     void launch_device(const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
 #ifdef JITIFY
-      jitify_error = launch_jitify_block("quda::BlockReductionKernel2D", tp, stream, arg);
+      jitify_error = launch_jitify_block<Transformer>("quda::BlockReductionKernel2D", tp, stream, arg);
 #else
       launch<Block::block.size() - 1, Block, Transformer>(arg, tp, stream);
 #endif

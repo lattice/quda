@@ -412,7 +412,7 @@ namespace quda {
 #ifdef JITIFY
         error = program->kernel("quda::AddCoarseStaggeredMassGPU")
           .instantiate(Type<Arg>())
-          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+          .configure(tp.grid,tp.block,tp.shared_bytes,device::get_cuda_stream(stream)).launch(arg);
 #else
 #if defined(STAGGEREDCOARSE)
         qudaLaunchKernel(AddCoarseStaggeredMassGPU<Arg>, tp, stream, arg);

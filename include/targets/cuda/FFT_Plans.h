@@ -11,28 +11,29 @@ using FFTPlanHandle = cufftHandle;
 #ifndef GPU_GAUGE_ALG
 
 #define CUFFT_SAFE_CALL(call)
-void SetPlanFFTMany(cufftHandle &plan, int4 size, int dim, QudaPrecision precision);
-void SetPlanFFT2DMany(cufftHandle &plan, int4 size, int dim, QudaPrecision precision);
 
-inline void ApplyFFT(FFTPlanHandle &plan, float2 *data_in, float2 *data_out, int direction){
+inline void ApplyFFT(FFTPlanHandle &, float2 *, float2 *, int)
+{
   errorQuda("CPU_GAUGE_ALG is disabled so FFTs are also disabled");
 }
-inline void ApplyFFT(FFTPlanHandle &plan, double2 *data_in, double2 *data_out, int direction){
+
+inline void ApplyFFT(FFTPlanHandle &, double2 *, double2 *, int)
+{
   errorQuda("CPU_GAUGE_ALG is disabled so FFTs are also disabled");
 }
-void SetPlanFFTMany( FFTPlanHandle &plan, int4 size, int dim, float2 *data){
+
+inline void SetPlanFFTMany(FFTPlanHandle &, int4, int, QudaPrecision)
+{
   errorQuda("CPU_GAUGE_ALG is disabled so FFTs are also disabled");
 }
-inline void SetPlanFFTMany( FFTPlanHandle &plan, int4 size, int dim, double2 *data){
+
+inline void SetPlanFFT2DMany(FFTPlanHandle &, int4, int, QudaPrecision)
+{
   errorQuda("CPU_GAUGE_ALG is disabled so FFTs are also disabled");
 }
-inline void SetPlanFFT2DMany( FFTPlanHandle &plan, int4 size, int dim, float2 *data){
-  errorQuda("CPU_GAUGE_ALG is disabled so FFTs are also disabled");
-}
-inline void SetPlanFFT2DMany( FFTPlanHandle &plan, int4 size, int dim, double2 *data){
-  errorQuda("CPU_GAUGE_ALG is disabled so FFTs are also disabled");
-}
-inline void FFTDestroyPlan( FFTPlanHandle &plan){
+
+inline void FFTDestroyPlan(FFTPlanHandle &)
+{
   errorQuda("CPU_GAUGE_ALG is disabled so FFTs are also disabled");
 }
 

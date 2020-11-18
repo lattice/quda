@@ -99,9 +99,15 @@ namespace quda {
 
   // template on the number of coarse degrees of freedom
   template <typename Float, typename vFloat, int fineColor, int fineSpin>
+#ifdef NSPIN4
   void calculateY(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic,
                   ColorSpinorField &uv, ColorSpinorField &av, const Transfer &T, const GaugeField &g, const CloverField &c,
                   double kappa, double mass, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc)
+#else
+  void calculateY(GaugeField &Y, GaugeField &, GaugeField &, GaugeField &,
+                  ColorSpinorField &, ColorSpinorField &, const Transfer &T, const GaugeField &, const CloverField &,
+                  double, double, double, double, QudaDiracType, QudaMatPCType)
+#endif
   {
     if (T.Vectors().Nspin()/T.Spin_bs() != 2)
       errorQuda("Unsupported number of coarse spins %d\n",T.Vectors().Nspin()/T.Spin_bs());

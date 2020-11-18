@@ -204,10 +204,9 @@ namespace quda {
   }
 
   //Does the heavy lifting of building X
+#if defined(GPU_STAGGERED_DIRAC)
   void calculateStaggeredKDBlock(GaugeField &X, const GaugeField &g, const double mass)
   {
-#if defined(GPU_STAGGERED_DIRAC)
-
     // FIXME remove when done
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing X for StaggeredKD...\n");
 
@@ -236,10 +235,13 @@ namespace quda {
     }
 
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("....done computing X for StaggeredKD\n");
-#else
-    errorQuda("Staggered fermion support has not been built");
-#endif
   }
+#else
+  void calculateStaggeredKDBlock(GaugeField &, const GaugeField &, const double)
+  {
+    errorQuda("Staggered fermion support has not been built");
+  }
+#endif
 
   // Calculates the inverse KD block and puts the result in Xinv. Assumes Xinv has been allocated, in MILC data order
   void BuildStaggeredKahlerDiracInverse(GaugeField &Xinv, const cudaGaugeField &gauge, const double mass)

@@ -192,11 +192,11 @@ namespace quda
       }
 #endif
 
+#ifdef NATIVE_LAPACK_LIB
       long long stridedBatchGEMM(void *A_data, void *B_data, void *C_data, QudaBLASParam blas_param,
                                  QudaFieldLocation location)
       {
         long long flops = 0;
-#ifdef NATIVE_LAPACK_LIB
         timeval start, stop;
         gettimeofday(&start, NULL);
 
@@ -476,11 +476,15 @@ namespace quda
         //-------------------------------------------------------------------------
 
         return flops;
-#else
-        errorQuda("Native BLAS not built. Please build and use native BLAS or use generic BLAS");
-        return 0; // Stops a compiler warning
-#endif
       }
+#else
+      long long stridedBatchGEMM(void *, void *, void *, QudaBLASParam, QudaFieldLocation)
+      {
+        errorQuda("Native BLAS not built. Please build and use native BLAS or use generic BLAS");
+        return 0;
+      }
+#endif
+
     } // namespace native
   }   // namespace blas_lapack
 } // namespace quda
