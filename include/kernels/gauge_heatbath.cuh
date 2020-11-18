@@ -2,7 +2,7 @@
 #include <gauge_field_order.h>
 #include <index_helper.cuh>
 #include <atomic.cuh>
-#include <random_quda.h>
+#include <random_helper.h>
 #include <kernel.h>
 
 #ifndef PI
@@ -80,7 +80,7 @@ namespace quda {
     @param localstate CURAND rng state
  */
   template <class T>
-  __device__ static inline Matrix<T,2> generate_su2_matrix_milc(T al, cuRNGState& localState){
+  __device__ static inline Matrix<T,2> generate_su2_matrix_milc(T al, RNGState& localState){
     T xr1, xr2, xr3, xr4, d, r;
     int k;
     xr1 = uniform<T>::rand(localState);
@@ -290,7 +290,7 @@ namespace quda {
   */
   template <class Float, int NCOLORS>
   __device__ inline void heatBathSUN( Matrix<complex<Float>,NCOLORS>& U, Matrix<complex<Float>,NCOLORS> F,
-                                      cuRNGState& localState, Float BetaOverNc ){
+                                      RNGState& localState, Float BetaOverNc ){
 
     if ( NCOLORS == 3 ) {
       //////////////////////////////////////////////////////////////////
@@ -639,7 +639,7 @@ namespace quda {
         }
       U = arg.dataOr(mu, e_cb, parity);
       if (Arg::heatbath) {
-        cuRNGState localState = arg.rngstate.State()[x_cb];
+        RNGState localState = arg.rngstate.State()[x_cb];
         heatBathSUN( U, conj(staple), localState, arg.BetaOverNc );
         arg.rngstate.State()[x_cb] = localState;
       } else {

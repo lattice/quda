@@ -4,7 +4,7 @@
 
 #include <quda_internal.h>
 #include <tune_quda.h>
-#include <random_quda.h>
+#include <random_helper.h>
 #include <comm_quda.h>
 #include <index_helper.cuh>
 
@@ -32,7 +32,7 @@ namespace quda {
      @param size size of the CURAND RNG state array
      @param arg Metadata needed for computing multi-gpu offsets
   */
-  __global__ void kernel_random(cuRNGState *state, unsigned long long seed, int size_cb, rngArg arg)
+  __global__ void kernel_random(RNGState *state, unsigned long long seed, int size_cb, rngArg arg)
   {
     int id = blockIdx.x * blockDim.x + threadIdx.x;
     int parity = blockIdx.y * blockDim.y + threadIdx.y;
@@ -44,7 +44,7 @@ namespace quda {
       int idd
         = (((x[3] * arg.commDim[2] * arg.X[2] + x[2]) * arg.commDim[1] * arg.X[1]) + x[1]) * arg.commDim[0] * arg.X[0]
         + x[0];
-      random_init(seed, idd, 0, &state[parity * size_cb + id]); 
+      random_init(seed, idd, 0, state[parity * size_cb + id]);
     }
   }
 
@@ -56,7 +56,7 @@ namespace quda {
      @param n_parity Number of parities (1 or 2)
      @param X array of lattice dimensions
   */
-  void launch_kernel_random(cuRNGState *state, unsigned long long seed, int size_cb, int n_parity, int X[4])
+  void launch_kernel_random(RNGState *state, unsigned long long seed, int size_cb, int n_parity, int X[4])
   {
     TuneParam tp;
     tp.block = dim3(128, 1, 1);
@@ -113,11 +113,11 @@ namespace quda {
   */
   void RNG::AllocateRNG() {
     if (size > 0 && state == nullptr) {
-      state = (cuRNGState *)device_malloc(size * sizeof(cuRNGState));
-      qudaMemset(state, 0, size * sizeof(cuRNGState));
+      state = (RNGState *)device_malloc(size * sizeof(RNGState));
+      qudaMemset(state, 0, size * sizeof(RNGState));
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
         printfQuda("Allocated array of random numbers with size: %.2f MB\n",
-                   size * sizeof(cuRNGState) / (float)(1048576));
+                   size * sizeof(RNGState) / (float)(1048576));
     } else {
       errorQuda("Array of random numbers not allocated, array size: %d !\nExiting...\n", size);
     }
@@ -130,7 +130,7 @@ namespace quda {
     if (size > 0 && state != nullptr) {
       device_free(state);
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-        printfQuda("Free array of random numbers with size: %.2f MB\n", size * sizeof(cuRNGState) / (float)(1048576));
+        printfQuda("Free array of random numbers with size: %.2f MB\n", size * sizeof(RNGState) / (float)(1048576));
       size = 0;
       state = NULL;
     }
@@ -139,14 +139,14 @@ namespace quda {
   /*! @brief Backup CURAND array states initialization */
   void RNG::backup()
   {
-    backup_state = (cuRNGState *)safe_malloc(size * sizeof(cuRNGState));
-    qudaMemcpy(backup_state, state, size * sizeof(cuRNGState), cudaMemcpyDeviceToHost);
+    backup_state = (RNGState *)safe_malloc(size * sizeof(RNGState));
+    qudaMemcpy(backup_state, state, size * sizeof(RNGState), cudaMemcpyDeviceToHost);
   }
 
   /*! @brief Restore CURAND array states initialization */
   void RNG::restore()
   {
-    qudaMemcpy(state, backup_state, size * sizeof(cuRNGState), cudaMemcpyHostToDevice);
+    qudaMemcpy(state, backup_state, size * sizeof(RNGState), cudaMemcpyHostToDevice);
     host_free(backup_state);
   }
 

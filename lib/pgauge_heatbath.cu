@@ -94,12 +94,12 @@ namespace quda {
       //NEED TO CHECK THIS!!!!!!
       if ( nColor == 3 ) {
         long long byte = 20LL * recon * sizeof(Float);
-        if (heatbath) byte += 2LL * sizeof(cuRNGState);
+        if (heatbath) byte += 2LL * sizeof(RNGState);
         byte *= U.LocalVolumeCB();
         return byte;
       } else {
         long long byte = 20LL * nColor * nColor * 2 * sizeof(Float);
-        if (heatbath) byte += 2LL * sizeof(cuRNGState);
+        if (heatbath) byte += 2LL * sizeof(RNGState);
         byte *= U.LocalVolumeCB();
         return byte;
       }
