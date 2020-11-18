@@ -8,7 +8,8 @@
    directly.
 */
 
-#if defined(JITIFY) && !defined(TARGET_CUDA)
+#include <quda_define.h>
+#if defined(JITIFY) && !defined(QUDA_TARGET_CUDA)
 #error "Jitify compilation cannot be enabled unless targeting CUDA"
 #endif
 

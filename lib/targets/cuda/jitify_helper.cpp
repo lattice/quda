@@ -30,7 +30,6 @@
 #endif // !HOST_DEBUG
 
 #include "jitify_options.hpp"
-#define TARGET_CUDA
 #include <jitify_helper2.cuh>
 
 namespace quda {
