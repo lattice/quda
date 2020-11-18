@@ -94,6 +94,12 @@ namespace quda {
       } else if (nVec == 32) {
         Prolongate<Float,fineSpin,fineColor,coarseSpin,32>(out, in, v, fine_to_coarse, parity);
 #endif // NSPIN4
+#ifdef NSPIN1
+      } else if (nVec == 64) {
+        Prolongate<Float,fineSpin,fineColor,coarseSpin,64>(out, in, v, fine_to_coarse, parity);
+      } else if (nVec == 96) {
+        Prolongate<Float,fineSpin,fineColor,coarseSpin,96>(out, in, v, fine_to_coarse, parity);
+#endif // NSPIN1
       } else {
         errorQuda("Unsupported nVec %d", nVec);
       }
@@ -165,8 +171,7 @@ namespace quda {
     } else if (out.Nspin() == 4) {
       Prolongate<Float,4>(out, in, v, Nvec, fine_to_coarse, spin_map, parity);
 #endif
-#if 0 // Not needed until we have Laplace MG or staggered MG Lanczos
-//#ifdef NSPIN1
+#ifdef NSPIN1
     } else if (out.Nspin() == 1) {
       Prolongate<Float,1>(out, in, v, Nvec, fine_to_coarse, spin_map, parity);
 #endif

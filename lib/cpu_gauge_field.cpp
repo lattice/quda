@@ -47,13 +47,13 @@ namespace quda {
       for (int d=0; d<siteDim; d++) {
 	size_t nbytes = volume * nInternal * precision;
 	if (create == QUDA_NULL_FIELD_CREATE || create == QUDA_ZERO_FIELD_CREATE) {
-	  gauge[d] = safe_malloc(nbytes);
-	  if (create == QUDA_ZERO_FIELD_CREATE) memset(gauge[d], 0, nbytes);
-	} else if (create == QUDA_REFERENCE_FIELD_CREATE) {
-	  gauge[d] = ((void**)param.gauge)[d];
-	} else {
-	  errorQuda("Unsupported creation type %d", create);
-	}
+          gauge[d] = nbytes ? safe_malloc(nbytes) : nullptr;
+          if (create == QUDA_ZERO_FIELD_CREATE && nbytes) memset(gauge[d], 0, nbytes);
+        } else if (create == QUDA_REFERENCE_FIELD_CREATE) {
+          gauge[d] = ((void**)param.gauge)[d];
+        } else {
+          errorQuda("Unsupported creation type %d", create);
+        }
       }
     
     } else if (order == QUDA_CPS_WILSON_GAUGE_ORDER || order == QUDA_MILC_GAUGE_ORDER  ||
@@ -65,8 +65,8 @@ namespace quda {
       }
 
       if (create == QUDA_NULL_FIELD_CREATE || create == QUDA_ZERO_FIELD_CREATE) {
-	gauge = (void **) safe_malloc(bytes);
-	if(create == QUDA_ZERO_FIELD_CREATE) memset(gauge, 0, bytes);
+        gauge = bytes ? (void **)safe_malloc(bytes) : nullptr;
+        if (create == QUDA_ZERO_FIELD_CREATE && bytes) memset(gauge, 0, bytes);
       } else if (create == QUDA_REFERENCE_FIELD_CREATE) {
 	gauge = (void**) param.gauge;
       } else {

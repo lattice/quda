@@ -699,9 +699,10 @@ namespace quda {
         }
 
         /**
-	   @brief Restore the field from the host after tuning
-	*/
-	void load() {
+           @brief Restore the field from the host after tuning
+        */
+        void load()
+        {
           qudaMemcpy(clover, backup_h, bytes, cudaMemcpyHostToDevice);
           host_free(backup_h);
           backup_h = nullptr;
@@ -710,13 +711,14 @@ namespace quda {
             host_free(backup_norm_h);
             backup_norm_h = nullptr;
           }
-	}
+        }
 
-	size_t Bytes() const {
-	  size_t bytes = length*sizeof(Float);
+        size_t Bytes() const
+        {
+          size_t bytes = length * sizeof(Float);
           if (isFixed<Float>::value) bytes += 2 * sizeof(norm_type);
           return bytes;
-	}
+        }
       };
 
     /**

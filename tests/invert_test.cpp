@@ -296,7 +296,7 @@ int main(int argc, char **argv)
   for (int i = 0; i < Nsrc; i++) {
 
     // Populate the host spinor with random numbers.
-    constructRandomSpinorSource(in->V(), 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
+    constructRandomSpinorSource(in->V(), 4, 3, inv_param.cpu_prec, inv_param.solution_type, gauge_param.X, *rng);
     // If deflating, preserve the deflation space between solves
     if (inv_deflate) eig_param.preserve_deflation = i < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     // Perform QUDA inversions

@@ -130,27 +130,52 @@ namespace quda {
 
     // Template over fine color
     if (in.Ncolor() == 3) { // standard QCD
-      if (in.Nspin() != 4) errorQuda("Unexpected nSpin = %d", in.Nspin());
-#ifdef NSPIN4
-      constexpr int fineSpin = 4;
       constexpr int fineColor = 3;
+#ifdef NSPIN4
+      if (in.Nspin() == 4) {
+        constexpr int fineSpin = 4;
 
-      // first check that the spin_map matches the spin_mapper
-      spin_mapper<fineSpin,coarseSpin> mapper;
-      for (int s=0; s<fineSpin; s++)
-        for (int p=0; p<2; p++)
-          if (mapper(s,p) != spin_map[s][p]) errorQuda("Spin map does not match spin_mapper");
+        // first check that the spin_map matches the spin_mapper
+        spin_mapper<fineSpin,coarseSpin> mapper;
+        for (int s=0; s<fineSpin; s++)
+          for (int p=0; p<2; p++)
+            if (mapper(s,p) != spin_map[s][p]) errorQuda("Spin map does not match spin_mapper");
 
-      if (nVec == 6) { // free field Wilson
-        Restrict<Float,fineSpin,fineColor,coarseSpin,6>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
-      } else if (nVec == 24) {
-        Restrict<Float,fineSpin,fineColor,coarseSpin,24>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
-      } else if (nVec == 32) {
-        Restrict<Float,fineSpin,fineColor,coarseSpin,32>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
-      } else {
-        errorQuda("Unsupported nVec %d", nVec);
-      }
+        if (nVec == 6) { // free field Wilson
+          Restrict<Float,fineSpin,fineColor,coarseSpin,6>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        } else if (nVec == 24) {
+          Restrict<Float,fineSpin,fineColor,coarseSpin,24>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        } else if (nVec == 32) {
+          Restrict<Float,fineSpin,fineColor,coarseSpin,32>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        } else {
+          errorQuda("Unsupported nVec %d", nVec);
+        }
+      } else
 #endif // NSPIN4
+#ifdef NSPIN1
+      if (in.Nspin() == 1) {
+        constexpr int fineSpin = 1;
+
+        // first check that the spin_map matches the spin_mapper
+        spin_mapper<fineSpin,coarseSpin> mapper;
+        for (int s=0; s<fineSpin; s++)
+          for (int p=0; p<2; p++)
+            if (mapper(s,p) != spin_map[s][p]) errorQuda("Spin map does not match spin_mapper");
+
+        if (nVec == 24) { // free field staggered
+          Restrict<Float,fineSpin,fineColor,coarseSpin,24>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        } else if (nVec == 64) {
+          Restrict<Float,fineSpin,fineColor,coarseSpin,64>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        } else if (nVec == 96) {
+          Restrict<Float,fineSpin,fineColor,coarseSpin,96>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        } else {
+          errorQuda("Unsupported nVec %d", nVec);
+        }
+      } else
+#endif
+      {
+        errorQuda("Unexpected nSpin = %d", in.Nspin());
+      }
 
     } else { // Nc != 3
 

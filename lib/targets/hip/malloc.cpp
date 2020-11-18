@@ -469,7 +469,7 @@ namespace quda
 
   QudaFieldLocation get_pointer_location(const void *ptr)
   {
-    
+
     // Unsupported in HIP
     /*
     CUpointer_attribute attribute[] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE};
@@ -493,18 +493,17 @@ namespace quda
     }
     */
   }
-  
+
   void *get_mapped_device_pointer_(const char *func, const char *file, int line, const void *host)
   {
     void *device;
     auto error = hipHostGetDevicePointer(&device, const_cast<void *>(host), 0);
     if (error != hipSuccess) {
-      errorQuda("hipHostGetDevicePointer failed with error %s (%s:%d in %s()",
-                hipGetErrorString(error), file, line, func);
+      errorQuda("hipHostGetDevicePointer failed with error %s (%s:%d in %s()", hipGetErrorString(error), file, line,
+                func);
     }
     return device;
   }
-
 
   namespace pool
   {

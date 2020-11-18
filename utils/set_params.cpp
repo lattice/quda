@@ -410,6 +410,9 @@ void setMultigridParam(QudaMultigridParam &mg_param)
 
     mg_param.cycle_type[i] = QUDA_MG_CYCLE_RECURSIVE;
 
+    // Is not a staggered solve, always aggregate
+    mg_param.transfer_type[i] = QUDA_TRANSFER_AGGREGATE;
+
     // set the coarse solver wrappers including bottom solver
     mg_param.coarse_solver[i] = coarse_solver[i];
     mg_param.coarse_solver_tol[i] = coarse_solver_tol[i];
@@ -534,9 +537,6 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   mg_param.run_verify = verify_results ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_param.run_low_mode_check = low_mode_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_param.run_oblique_proj_check = oblique_proj_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-
-  // Is NOT a staggered solve
-  mg_param.is_staggered = QUDA_BOOLEAN_FALSE;
 
   mg_param.use_mma = mg_use_mma ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   // Whether or not to use thin restarts in the evolve tests
@@ -768,8 +768,7 @@ void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
 
   /* ESW HACK: comment this out to do a non-MG solve. */
   inv_param.inv_type_precondition = QUDA_MG_INVERTER;
-  // inv_param.verbosity_precondition = mg_verbosity[0];
-  inv_param.verbosity_precondition = QUDA_SUMMARIZE; // ESW HACK
+  inv_param.verbosity_precondition = mg_verbosity[0];
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
   inv_param.cuda_prec_eigensolver = cuda_prec_eigensolver;
 
@@ -935,8 +934,6 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 
   inv_param.solve_type = QUDA_DIRECT_SOLVE;
 
-  mg_param.is_staggered = QUDA_BOOLEAN_TRUE;
-
   mg_param.use_mma = mg_use_mma ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   mg_param.invert_param = &inv_param;
@@ -964,13 +961,15 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
     mg_param.setup_ca_lambda_max[i] = setup_ca_lambda_max[i];
 
     mg_param.spin_block_size[i] = 1;
-    mg_param.n_vec[i] = (i == 0) ? 24 : nvec[i] == 0 ? 96 : nvec[i]; // default to 96 vectors if not set
+    mg_param.n_vec[i] = nvec[i] == 0 ? 64 : nvec[i];                 // default to 64 vectors if not set
     mg_param.n_block_ortho[i] = n_block_ortho[i];                    // number of times to Gram-Schmidt
     mg_param.precision_null[i] = prec_null;                          // precision to store the null-space basis
     mg_param.smoother_halo_precision[i] = smoother_halo_prec;        // precision of the halo exchange in the smoother
     mg_param.nu_pre[i] = nu_pre[i];
     mg_param.nu_post[i] = nu_post[i];
     mg_param.mu_factor[i] = mu_factor[i];
+
+    mg_param.transfer_type[i] = (i == 0) ? staggered_transfer_type : QUDA_TRANSFER_AGGREGATE;
 
     mg_param.cycle_type[i] = QUDA_MG_CYCLE_RECURSIVE;
 
@@ -1088,6 +1087,10 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 
   // coarsening the spin on the first restriction is undefined for staggered fields.
   mg_param.spin_block_size[0] = 0;
+
+  if (staggered_transfer_type == QUDA_TRANSFER_OPTIMIZED_KD) {
+    mg_param.spin_block_size[1] = 0; // we're coarsening the optimized KD op
+  }
 
   mg_param.setup_type = setup_type;
   mg_param.pre_orthonormalize = pre_orthonormalize ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;

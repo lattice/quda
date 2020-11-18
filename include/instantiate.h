@@ -262,7 +262,7 @@ namespace quda
      computation at hand
   */
   template <template <typename> class Apply, typename F, typename... Args>
-  constexpr void instantiatePrecision(F &field, Args &&... args)
+  constexpr void instantiatePrecision(F &field, Args &&...args)
   {
     if (field.Precision() == QUDA_DOUBLE_PRECISION) {
       // always instantiate double precision
@@ -307,7 +307,7 @@ namespace quda
      computation at hand
   */
   template <template <typename, typename> class Apply, typename T, typename F, typename... Args>
-  constexpr void instantiatePrecision2(F &field, Args &&... args)
+  constexpr void instantiatePrecision2(F &field, Args &&...args)
   {
     if (field.Precision() == QUDA_DOUBLE_PRECISION) {
       // always instantiate double precision
@@ -343,7 +343,7 @@ namespace quda
      computation at hand
   */
   template <template <typename> class Apply, typename F, typename... Args>
-  constexpr void instantiatePrecisionMG(F &field, Args &&... args)
+  constexpr void instantiatePrecisionMG(F &field, Args &&...args)
   {
     if (field.Precision() == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE

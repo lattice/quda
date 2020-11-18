@@ -101,7 +101,6 @@ namespace quda {
 	for (int k=0; k<color_unroll; k++) out[s*coarse_color_per_thread + coarse_color_local] += partial[k];
       }
     }
-
   }
 
   template <typename Arg> struct Restrictor {
@@ -153,7 +152,6 @@ namespace quda {
         }
       }
     }
-
   };
 
 }

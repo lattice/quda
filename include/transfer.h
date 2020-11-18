@@ -110,9 +110,9 @@ namespace quda {
 	enable_gpu=true in the constructor) */
     mutable bool use_gpu;
 
-    /** Whether or not the fine level is a staggered operator, in which
+    /** Implies whether or not the fine level is a staggered operator, in which
     case we don't actually need to allocate any memory. */
-    mutable bool is_staggered;
+    mutable QudaTransferType transfer_type;
 
     /**
      * @brief Allocate V field
@@ -168,38 +168,38 @@ namespace quda {
        * @param null_precision The precision to store the null-space basis vectors in
        * @param enable_gpu Whether to enable this to run on GPU (as well as CPU)
        */
-      Transfer(const std::vector<ColorSpinorField *> &B, int Nvec, int NblockOrtho, int *geo_bs, int spin_bs,
-               QudaPrecision null_precision, TimeProfile &profile);
+    Transfer(const std::vector<ColorSpinorField *> &B, int Nvec, int NblockOrtho, int *geo_bs, int spin_bs,
+             QudaPrecision null_precision, const QudaTransferType transfer_type, TimeProfile &profile);
 
-      /** The destructor for Transfer */
-      virtual ~Transfer();
+    /** The destructor for Transfer */
+    virtual ~Transfer();
 
-      /**
-       @brief for resetting the Transfer when the null vectors have changed
-       */
-      void reset();
+    /**
+     @brief for resetting the Transfer when the null vectors have changed
+     */
+    void reset();
 
-      /**
-       * Apply the prolongator
-       * @param out The resulting field on the fine lattice
-       * @param in The input field on the coarse lattice
-       */
-      void P(ColorSpinorField &out, const ColorSpinorField &in) const;
+    /**
+     * Apply the prolongator
+     * @param out The resulting field on the fine lattice
+     * @param in The input field on the coarse lattice
+     */
+    void P(ColorSpinorField &out, const ColorSpinorField &in) const;
 
-      /**
-       * Apply the restrictor
-       * @param out The resulting field on the coarse lattice
-       * @param in The input field on the fine lattice
-       */
-      void R(ColorSpinorField &out, const ColorSpinorField &in) const;
+    /**
+     * Apply the restrictor
+     * @param out The resulting field on the coarse lattice
+     * @param in The input field on the fine lattice
+     */
+    void R(ColorSpinorField &out, const ColorSpinorField &in) const;
 
-      /**
-       * @brief The precision of the packed null-space vectors
-       */
-      QudaPrecision NullPrecision(QudaFieldLocation location) const
-      {
-        return location == QUDA_CUDA_FIELD_LOCATION ? null_precision : std::max(B[0]->Precision(), QUDA_SINGLE_PRECISION);
-      }
+    /**
+     * @brief The precision of the packed null-space vectors
+     */
+    QudaPrecision NullPrecision(QudaFieldLocation location) const
+    {
+      return location == QUDA_CUDA_FIELD_LOCATION ? null_precision : std::max(B[0]->Precision(), QUDA_SINGLE_PRECISION);
+    }
 
     /**
      * Returns a const reference to the V field
@@ -232,7 +232,13 @@ namespace quda {
      * @return geo_bs
      */
     const int *Geo_bs() const {return geo_bs;}
-    
+
+    /**
+     * Returns the transfer type; used to inform staggered-type coarsenings
+     * @return transfer_type
+     */
+    QudaTransferType getTransferType() const { return transfer_type; }
+
     /**
        @return Pointer to the lookup table to the fine-to-coarse map
     */

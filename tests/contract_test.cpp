@@ -47,6 +47,9 @@ void display_test_info()
 
 int main(int argc, char **argv)
 {
+  // Start Google Test Suite
+  //-----------------------------------------------------------------------------
+  ::testing::InitGoogleTest(&argc, argv);
 
   // QUDA initialise
   //-----------------------------------------------------------------------------
@@ -76,17 +79,14 @@ int main(int argc, char **argv)
   setSpinorSiteSize(24);
   //-----------------------------------------------------------------------------
 
-  // Start Google Test Suite
-  //-----------------------------------------------------------------------------
-  ::testing::InitGoogleTest(&argc, argv);
-
   prec = QUDA_INVALID_PRECISION;
 
   // Check for correctness
+  int result = 0;
   if (verify_results) {
     ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
     if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
-    int result = RUN_ALL_TESTS();
+    result = RUN_ALL_TESTS();
     if (result) warningQuda("Google tests for QUDA contraction failed!");
   }
   //-----------------------------------------------------------------------------
@@ -97,14 +97,14 @@ int main(int argc, char **argv)
   // finalize the communications layer
   finalizeComms();
 
-  return 0;
+  return result;
 }
 
 // Functions used for Google testing
 //-----------------------------------------------------------------------------
 
 // Performs the CPU GPU comparison with the given parameters
-void test(int contractionType, int Prec)
+int test(int contractionType, int Prec)
 {
   QudaPrecision test_prec = QUDA_INVALID_PRECISION;
   switch (Prec) {
@@ -168,11 +168,11 @@ void test(int contractionType, int Prec)
   printfQuda("Contraction comparison for contraction type %s complete with %d/%d faults\n", get_contract_str(cType),
              faults, V * 16 * 2);
 
-  EXPECT_LE(faults, 0) << "CPU and GPU implementations do not agree";
-
   free(spinorX);
   free(spinorY);
   free(d_result);
+
+  return faults;
 }
 
 // The following tests gets each contraction type and precision using google testing framework
@@ -197,7 +197,8 @@ TEST_P(ContractionTest, verify)
 {
   int prec = ::testing::get<0>(GetParam());
   int contractionType = ::testing::get<1>(GetParam());
-  test(contractionType, prec);
+  auto faults = test(contractionType, prec);
+  EXPECT_EQ(faults, 0) << "CPU and GPU implementations do not agree";
 }
 
 // Helper function to construct the test name

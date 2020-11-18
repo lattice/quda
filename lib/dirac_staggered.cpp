@@ -127,10 +127,15 @@ namespace quda {
   }
 
   void DiracStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-                                      double, double mass, double, double) const {
-    StaggeredCoarseOp(Y, X, T, *gauge, mass, QUDA_STAGGERED_DIRAC, QUDA_MATPC_INVALID);
-  }
+                                      double, double mass, double, double) const
+  {
+    if (T.getTransferType() == QUDA_TRANSFER_OPTIMIZED_KD)
+      errorQuda("The optimized Kahler-Dirac operator is not built through createCoarseOp");
 
+    // nullptr == no Kahler-Dirac Xinv
+    const cudaGaugeField *XinvKD = nullptr;
+    StaggeredCoarseOp(Y, X, T, *gauge, XinvKD, mass, QUDA_STAGGERED_DIRAC, QUDA_MATPC_INVALID);
+  }
 
   DiracStaggeredPC::DiracStaggeredPC(const DiracParam &param)
     : DiracStaggered(param)
