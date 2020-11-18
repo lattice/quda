@@ -68,7 +68,7 @@ namespace quda {
         using namespace jitify::reflection;
         jitify_error = program->kernel("quda::ComputeStaggeredKDBlockGPU")
           .instantiate(Type<Arg>())
-          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+          .configure(tp.grid,tp.block,tp.shared_bytes,device::get_cuda_stream(stream)).launch(arg);
 #else // not jitify
         qudaLaunchKernel(ComputeStaggeredKDBlockGPU<Arg>, tp, stream, arg);
 #endif // JITIFY
@@ -136,7 +136,7 @@ namespace quda {
     }
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing KD block\n");
-    y.apply(0);
+    y.apply(device::get_default_stream());
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("X2 = %e\n", X_.norm2(0));
   }

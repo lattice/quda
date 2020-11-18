@@ -287,7 +287,7 @@ namespace quda {
                        const std::vector<constant_param_t> &param = dummy_param)
     {
 #ifdef JITIFY
-      jitify_error = launch_jitify<Transformer, Reducer>("quda::MultiReducerion", tp, stream, arg, param);
+      jitify_error = launch_jitify<Transformer, Reducer>("quda::MultiReduction", tp, stream, arg, param);
       arg.launch_error = jitify_error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
 #else
       for (unsigned int i = 0; i < param.size(); i++)

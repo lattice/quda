@@ -74,7 +74,7 @@ namespace quda {
         using namespace jitify::reflection;
         jitify_error = program->kernel("quda::ApplyStaggeredKDBlockGPU")
           .instantiate(Type<Arg>())
-          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+          .configure(tp.grid,tp.block,tp.shared_bytes,device::get_cuda_stream(stream)).launch(arg);
 #else // not jitify
         qudaLaunchKernel(ApplyStaggeredKDBlockGPU<Arg>, tp, stream, arg);
 #endif // JITIFY
@@ -91,12 +91,12 @@ namespace quda {
      @param in[in] input staggered spinor accessor
      @param Xinv[in] KD block inverse accessor
      @param out_[out] output staggered spinor
-     @param in_[in] input staggered spinor
+     @param in_[in] input staggered spinor (unused)
      @param Xinv_[in] KD block inverse
   */
   template<typename vFloatSpinor, typename vFloatGauge, int fineColor, int coarseDof, bool dagger, typename fineColorSpinor, typename xInvGauge>
   void applyStaggeredKDBlock(fineColorSpinor &out, const fineColorSpinor &in, const xInvGauge &Xinv,
-        ColorSpinorField &out_, const ColorSpinorField &in_, const GaugeField &Xinv_)
+        ColorSpinorField &out_, const ColorSpinorField &, const GaugeField &Xinv_)
   {
     // sanity checks
     if (fineColor != 3)
@@ -125,7 +125,7 @@ namespace quda {
     ApplyStaggeredKDBlock<Arg> y(arg, out_, Xinv_);
 
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Applying KD block...\n");
-    y.apply(0);
+    y.apply(device::get_default_stream());
 
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("... done applying KD block\n");
   }
