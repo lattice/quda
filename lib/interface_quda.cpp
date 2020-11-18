@@ -2605,6 +2605,9 @@ void destroyDeflationQuda(void *df) {
 
 void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {
+  saveTuneCache();
+  printfQuda("TuneCache saved\n");
+  
   profilerStart(__func__);
 
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH || param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH

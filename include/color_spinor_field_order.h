@@ -985,9 +985,7 @@ namespace quda {
 
 #pragma unroll
     for (int i=0; i< M ; i++) {
-//       Vector vecTmp=((const Vector *)field_s)[parity * offset + x + stride * i];
 #pragma unroll
-//       for (int j = 0; j < N; j++) copy_and_scale(v[i*N + j], reinterpret_cast<Float *>(&vecTmp)[j] , nrm);
         for (int j = 0; j < N; j++) copy_and_scale(v[i*N + j], field_s[(parity * offset + x + stride * i)*N+j] , nrm);
     }
       
@@ -1075,9 +1073,10 @@ namespace quda {
     for (int i=0; i<M; i++) {
         Vector vecTmp;
 #pragma unroll
-//        for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], v[i * N + j]);
-//        ((const Vector *)field_s)[parity * offset + x + stride * i]=vecTmp;
-        for (int j = 0; j < N; j++) copy_scaled(field_s[(parity * offset + x + stride * i)*N+j], v[i * N + j]);       
+      for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], v[i * N + j]);
+      // second do vectorized copy into memory
+       vector_store(field, parity * offset + x + stride * i, vecTmp);
+//        for (int j = 0; j < N; j++) copy_scaled(field_s[(parity * offset + x + stride * i)*N+j], v[i * N + j]);       
     }                                 
   }	
 #endif

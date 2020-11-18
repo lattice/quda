@@ -94,10 +94,13 @@ namespace quda {
         if (site_unroll_check && (x.Ncolor() != 3 || x.Nspin() == 2))
           errorQuda("site unroll not supported for nSpin = %d nColor = %d", x.Nspin(), x.Ncolor());
 
-        int maxThreadsPerBlock_tmp=deviceProp.maxThreadsPerBlock;
+        int tmp1=deviceProp.maxThreadsPerBlock;
         deviceProp.maxThreadsPerBlock=256;
+        int tmp2=deviceProp.maxThreadsDim[0];
+        deviceProp.maxThreadsDim[0]=256;
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        deviceProp.maxThreadsPerBlock=maxThreadsPerBlock_tmp;
+        deviceProp.maxThreadsPerBlock=tmp1;
+        deviceProp.maxThreadsDim[0]=tmp2;
 
         if (location == QUDA_CUDA_FIELD_LOCATION) {
           if (site_unroll_check) checkNative(x, y, z, w, v); // require native order when using site_unroll

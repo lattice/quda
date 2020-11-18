@@ -469,6 +469,8 @@ namespace quda {
       d = dinit;
     }
 
+    int tune_info_saved=0;
+
     while ( !converged && k < param.maxiter ) {
       matSloppy(Ap, *p[j], tmp, tmp2);  // tmp as tmp
       double sigma;
@@ -733,6 +735,9 @@ namespace quda {
       }
 
       j = steps_since_reliable == 0 ? 0 : (j+1)%Np; // if just done a reliable update then reset j
+      if(tune_info_saved<2) saveTuneCache();
+      tune_info_saved++;
+
     }
 
     blas::copy(x, xSloppy);

@@ -635,9 +635,7 @@ namespace quda {
 
 #pragma unroll
 	  for (int i=0; i<M; i++) {
-//            Vector vecTmp = ((const Vector *)clover_s)[parity * offset + x + stride * (chirality * M + i)];
 #pragma unroll
-//            for (int j = 0; j < N; j++) {  copy_and_scale(v[i*N + j], reinterpret_cast<Float *>(&vecTmp)[j] , nrm); }
             for (int j = 0; j < N; j++) {  copy_and_scale(v[i*N + j], clover_s[(parity * offset + x + stride * (chirality * M + i))*N+j] , nrm); }
           }
 
