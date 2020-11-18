@@ -488,21 +488,46 @@ namespace quda
 
   QudaFieldLocation get_pointer_location(const void *ptr)
   {
+    // This is slow/incomplete
+    if ( alloc[DEVICE].find(const_cast<void*>(ptr)) != alloc[DEVICE].end() ) return QUDA_CUDA_FIELD_LOCATION;
+    if ( alloc[DEVICE_PINNED].find(const_cast<void*>(ptr)) != alloc[DEVICE_PINNED].end() ) return QUDA_CUDA_FIELD_LOCATION;
+    if ( alloc[HOST].find(const_cast<void *>(ptr)) != alloc[HOST].end()) return QUDA_CPU_FIELD_LOCATION;
+    if ( alloc[PINNED].find(const_cast<void *>(ptr)) != alloc[PINNED].end()) return QUDA_CPU_FIELD_LOCATION;
 
+    errorQuda("ptr %lx  not found in either host or device maps\n", (unsigned long)ptr);
+    return QUDA_INVALID_FIELD_LOCATION;
+
+#if 0
+    // This doesn't work if the pointer was not known to HIP, e.g. if it came from MALLOC
     hipPointerAttribute_t pointer_attributes;
     hipError_t err = hipPointerGetAttributes(&pointer_attributes, ptr);
+    QudaFieldLocation ret_val = QUDA_INVALID_FIELD_LOCATION;
+    printfQuda("ret_val is good: %d ret val = %d ret_val_string = %s\n", err==hipSuccess, err, hipGetErrorString(err));
     if ( err == hipSuccess ) {
       hipMemoryType mem_type = pointer_attributes.memoryType;
       switch (mem_type) {
-        case hipMemoryTypeDevice: return QUDA_CUDA_FIELD_LOCATION; break;
-        case hipMemoryTypeHost: return QUDA_CPU_FIELD_LOCATION; break;
-        default: errorQuda("Unknown memory type %d", mem_type); return QUDA_INVALID_FIELD_LOCATION;
-      };
+        case hipMemoryTypeDevice: 
+ 	{
+	 ret_val = QUDA_CUDA_FIELD_LOCATION;
+	 break;
+        }
+        case hipMemoryTypeHost: 
+	{ 
+	  ret_val =  QUDA_CPU_FIELD_LOCATION; 
+	  break;
+	}
+        default: 
+	{
+	   errorQuda("Unknown memory type %d", mem_type);
+	   break;
+	}
+     };
     }
     else {
-      errorQuda("hipPointerGetAttributes() failed with %d (%s:%d in %s()\n)",err, __FILE__, __LINE__, __FUNCTION__);
-      return QUDA_INVALID_FIELD_LOCATION;
+      errorQuda("hipPointerGetAttributes() failed with %s (%s:%d in %s()\n)",hipGetErrorString(err), __FILE__, __LINE__, __FUNCTION__);
     }
+    return ret_val;
+#endif
   }
   
   void *get_mapped_device_pointer_(const char *func, const char *file, int line, const void *host)

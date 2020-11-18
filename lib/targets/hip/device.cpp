@@ -44,18 +44,18 @@ namespace quda
         }
       }
 
+      
       if (getVerbosity() >= QUDA_SUMMARIZE) {
         printfQuda("Using device %d: %s\n", dev, deviceProp.name);
       }
-#ifndef USE_QDPJIT
       hipSetDevice(dev);
       checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
-#endif
 
 
       hipDeviceSetCacheConfig(hipFuncCachePreferL1);
       //hipDeviceSetSharedMemConfig(hipSharedMemBankSizeEightByte);
-      // hipGetDeviceProperties(&deviceProp, dev);
+      hipGetDeviceProperties(&deviceProp, dev);
+      checkCudaErrorNoSync();
     }
 
     void create_context()

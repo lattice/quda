@@ -200,7 +200,7 @@ namespace quda {
   void qudaMemcpyToSymbolAsync_(const void *symbol, const void *src, size_t count, size_t offset,  qudaMemcpyKind kind, const qudaStream_t &stream,
                                 const char *func, const char *file, const char *line)
   {
-    hipError_t error = hipMemcpyToSymbolAsync(HIP_SYMBOL(symbol),src,count,offset,kind,stream);
+    hipError_t error = hipMemcpyToSymbolAsync(symbol,src,count,offset,kind,stream);
     if( error != hipSuccess ) {
       errorQuda("(CUDA) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
     }
@@ -441,7 +441,7 @@ namespace quda {
   void* qudaGetSymbolAddress_(const char *symbol, const char *func, const char *file, const char *line)
   {
     void *ptr;
-    hipError_t error = hipGetSymbolAddress(&ptr, HIP_SYMBOL(symbol));
+    hipError_t error = hipGetSymbolAddress(&ptr, HIP_SYMBOL((const void *)symbol));
     if (error != hipSuccess)
       errorQuda("(CUDA) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
     return ptr;

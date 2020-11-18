@@ -1,3 +1,4 @@
+#pragma once 
 #include <algorithm>
 #include <register_traits.h>
 #include <blas_helper.cuh>
