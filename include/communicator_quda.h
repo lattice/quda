@@ -313,14 +313,14 @@ struct Communicator {
                 || gpuid == neighbor_gpuid) {
               peer2peer_enabled[dir][dim] = true;
               if (getVerbosity() > QUDA_SILENT) {
-                printf("Peer-to-peer enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d, "
-                       "access rank = (%d, %d)\n",
+                printf("Peer-to-peer enabled for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, dim=%d, "
+                       "access rank = (%3d, %3d)\n",
                        comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim, accessRank[0], accessRank[1]);
               }
             } else {
               intranode_enabled[dir][dim] = true;
               if (getVerbosity() > QUDA_SILENT) {
-                printf("Intra-node (non peer-to-peer) enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, "
+                printf("Intra-node (non peer-to-peer) enabled for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, "
                        "dim=%d\n",
                        comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
               }
@@ -547,7 +547,7 @@ struct Communicator {
         char *enable_mps_env = getenv("QUDA_ENABLE_MPS");
         if (enable_mps_env && strcmp(enable_mps_env, "1") == 0) {
           gpuid = gpuid % device_count;
-          printf("MPS enabled, rank=%d -> gpu=%d\n", comm_rank(), gpuid);
+          printf("MPS enabled, rank=%3d -> gpu=%d\n", comm_rank(), gpuid);
         } else {
           errorQuda("Too few GPUs available on %s", comm_hostname());
         }

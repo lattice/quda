@@ -158,7 +158,7 @@ void verifyDomainWallTypeInversion(void *spinorOut, void **spinorOutMulti, void 
   double src2 = norm_2(spinorIn, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
   double l2r = sqrt(nrm2 / src2);
 
-  printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g\n", inv_param.tol,
+  printfQuda("Residuals: (L2 relative) tol %9.6e, QUDA = %9.6e, host = %9.6e; (heavy-quark) tol %9.6e, QUDA = %9.6e\n", inv_param.tol,
              inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq);
 }
 
@@ -227,7 +227,7 @@ void verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spi
       double src2 = norm_2(spinorIn, Vh * spinor_site_size, inv_param.cpu_prec);
       double l2r = sqrt(nrm2 / src2);
 
-      printfQuda("Shift %d residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g\n", i,
+      printfQuda("Shift %2d residuals: (L2 relative) tol %9.6e, QUDA = %9.6e, host = %9.6e; (heavy-quark) tol %9.6e, QUDA = %9.6e\n", i,
                  inv_param.tol_offset[i], inv_param.true_res_offset[i], l2r, inv_param.tol_hq_offset[i],
                  inv_param.true_res_hq_offset[i]);
     }
@@ -368,7 +368,7 @@ void verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spi
     double src2 = norm_2(spinorIn, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
     double l2r = sqrt(nrm2 / src2);
 
-    printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g\n",
+    printfQuda("Residuals: (L2 relative) tol %9.6e, QUDA = %9.6e, host = %9.6e; (heavy-quark) tol %9.6e, QUDA = %9.6e\n",
                inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq);
   }
 }
@@ -428,16 +428,16 @@ void verifyStaggeredInversion(quda::ColorSpinorField *tmp, quda::ColorSpinorFiel
   double l2r = sqrt(nrm2 / src2);
 
   if (multishift == 1) {
-    printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",
+    printfQuda("Residuals: (L2 relative) tol %9.6e, QUDA = %9.6e, host = %9.6e; (heavy-quark) tol %9.6e, QUDA = %9.6e, host = %9.6e\n",
                inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq, hqr);
   } else {
     printfQuda(
-      "Shift %d residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",
+      "Shift %2d residuals: (L2 relative) tol %9.6e, QUDA = %9.6e, host = %9.6e; (heavy-quark) tol %9.6e, QUDA = %9.6e, host = %9.6e\n",
       shift, inv_param.tol_offset[shift], inv_param.true_res_offset[shift], l2r, inv_param.tol_hq_offset[shift],
       inv_param.true_res_hq_offset[shift], hqr);
     // Empirical: if the cpu residue is more than 1 order the target accuracy, then it fails to converge
     if (sqrt(nrm2 / src2) > 10 * inv_param.tol_offset[shift]) {
-      printfQuda("Shift %d has empirically failed to converge\n", shift);
+      printfQuda("Shift %2d has empirically failed to converge\n", shift);
     }
   }
 }
