@@ -19,7 +19,6 @@
 #include <color_spinor_field.h>
 #include <trove_helper.cuh>
 #include <transform_reduce.h>
-#include <typeinfo>
 
 namespace quda {
 
