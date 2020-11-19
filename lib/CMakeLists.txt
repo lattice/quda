@@ -46,8 +46,8 @@ set (QUDA_OBJS
   cpu_gauge_field.cpp cuda_gauge_field.cpp extract_gauge_ghost.cu
   extract_gauge_ghost_mg.cu max_gauge.cu gauge_update_quda.cu
   max_clover.cu dirac_clover.cpp dirac_wilson.cpp dirac_staggered.cpp
-  dirac_clover_hasenbusch_twist.cpp
-  dirac_improved_staggered.cpp dirac_domain_wall.cpp
+  dirac_staggered_kd.cpp dirac_clover_hasenbusch_twist.cpp
+  dirac_improved_staggered.cpp dirac_improved_staggered_kd.cpp dirac_domain_wall.cpp
   dirac_domain_wall_4d.cpp dirac_mobius.cpp dirac_twisted_clover.cpp
   dirac_twisted_mass.cpp 
   llfat_quda.cu gauge_force.cu gauge_random.cu
@@ -62,7 +62,7 @@ set (QUDA_OBJS
   dslash_wilson_clover_hasenbusch_twist_preconditioned.cu
   dslash_domain_wall_4d.cu  dslash_domain_wall_5d.cu
   mdw_fused_dslash.cu dslash5_mobius_eofa.cu
-  dslash_pack2.cu
+  dslash_pack2.cu staggered_kd_build_xinv.cu staggered_kd_apply_xinv.cu
   blas_quda.cu multi_blas_quda.cu reduce_quda.cu
   multi_reduce_quda.cu reduce_helper.cu
   contract.cu comm_common.cpp communicator_stack.cpp
@@ -225,6 +225,9 @@ target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_target>)
 
 add_subdirectory(targets/generic)
 target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_generic>)
+
+add_subdirectory(interface)
+target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_interface>)
 
 # propagate CXX flags to CUDA host compiler
 #TODO: Do we still need that? 
@@ -415,6 +418,7 @@ if(QUDA_QMP)
     # TODO: need to figure out how to propagate that cleanly
     add_dependencies(${QUDA_TARGET_LIBRARY} QMP)
     add_dependencies(quda_generic_target QMP)
+    add_dependencies(quda_blas_interface QMP)
   endif()
   target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_QMPHOME}/include>)
   target_compile_definitions(quda PUBLIC QMP_COMMS)
@@ -429,6 +433,7 @@ if(QUDA_QIO)
     # TODO: need to figure out how to propagate that cleanly
     add_dependencies(${QUDA_TARGET_LIBRARY} QIO)
     add_dependencies(quda_generic_target QIO)
+    add_dependencies(quda_blas_interface QIO)
   endif()
   target_compile_definitions(quda PUBLIC HAVE_QIO)
   target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_QIOHOME}/include>)
@@ -568,6 +573,7 @@ if(QUDA_DOWNLOAD_EIGEN)
   add_dependencies(quda Eigen)
   add_dependencies(${QUDA_TARGET_LIBRARY} Eigen)
   add_dependencies(quda_generic_target Eigen)
+  add_dependencies(quda_blas_interface Eigen)
 endif()
 
 configure_file(../include/quda_define.h.in ../include/quda_define.h @ONLY)

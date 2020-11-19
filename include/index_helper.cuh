@@ -336,6 +336,29 @@ namespace quda {
     return 2 * cb_index + x1odd;
   }
 
+  /** Compute the 1-d checkerboard index and parity from
+      the full linear lattice (not what's used for
+      indexing into fields, re:padding argument for getIndexFull).
+
+      @param[out] out_parity Output site parity
+      @param[in] X full lattice dimensions
+      @param[in] full_index full linear lattice index
+      @return 1-d checkerboard index
+   */
+  template <typename I>
+  __device__ __host__ inline int getParityCBFromFull(int& out_parity, const I X[4], const int full_index) {
+
+    const int za = (full_index / X[0]);
+    const int x0 = full_index % X[0];
+    const int zb =  (za / X[1]);
+    const int x1 = (za - zb * X[1]);
+    const int x3 = (zb / X[2]);
+    const int x2 = (zb - x3 * X[2]);
+    out_parity = (x0 + x1 + x2 + x3) & 1;
+
+    return full_index >> 1;
+  }
+
   /**
      Compute the checkerboarded index into the ghost field
      corresponding to full (local) site index x[]

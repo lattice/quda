@@ -790,6 +790,12 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
 #ifdef INIT_PARAM
+    P(transfer_type[i], QUDA_TRANSFER_AGGREGATE);
+#else
+    P(transfer_type[i], QUDA_TRANSFER_INVALID);
+#endif
+
+#ifdef INIT_PARAM
     P(mu_factor[i], 1);
 #else
     P(mu_factor[i], INVALID_DOUBLE);
@@ -865,12 +871,6 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
 #ifdef INIT_PARAM
-  P(is_staggered, QUDA_BOOLEAN_FALSE);
-#else
-  P(is_staggered, QUDA_BOOLEAN_INVALID);
-#endif
-
-#ifdef INIT_PARAM
 #if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
   P(use_mma, QUDA_BOOLEAN_TRUE);
 #else
@@ -916,6 +916,62 @@ void printQudaGaugeObservableParam(QudaGaugeObservableParam *param)
   P(compute_plaquette, QUDA_BOOLEAN_INVALID);
   P(compute_qcharge, QUDA_BOOLEAN_INVALID);
   P(compute_qcharge_density, QUDA_BOOLEAN_INVALID);
+#endif
+
+#ifdef INIT_PARAM
+  return ret;
+#endif
+}
+
+#if defined INIT_PARAM
+QudaBLASParam newQudaBLASParam(void)
+{
+  QudaBLASParam ret;
+#elif defined CHECK_PARAM
+static void checkBLASParam(QudaBLASParam *param)
+{
+#else
+void printQudaBLASParam(QudaBLASParam *param)
+{
+  printfQuda("QUDA blas parameters:\n");
+#endif
+
+#ifdef INIT_PARAM
+  P(trans_a, QUDA_BLAS_OP_N);
+  P(trans_b, QUDA_BLAS_OP_N);
+  P(m, INVALID_INT);
+  P(n, INVALID_INT);
+  P(k, INVALID_INT);
+  P(lda, INVALID_INT);
+  P(ldb, INVALID_INT);
+  P(ldc, INVALID_INT);
+  P(a_offset, 0);
+  P(b_offset, 0);
+  P(c_offset, 0);
+  P(a_stride, 1);
+  P(b_stride, 1);
+  P(c_stride, 1);
+  P(batch_count, 1);
+  P(data_type, QUDA_BLAS_DATATYPE_S);
+  P(data_order, QUDA_BLAS_DATAORDER_ROW);
+#else
+  P(trans_a, QUDA_BLAS_OP_INVALID);
+  P(trans_b, QUDA_BLAS_OP_INVALID);
+  P(m, INVALID_INT);
+  P(n, INVALID_INT);
+  P(k, INVALID_INT);
+  P(lda, INVALID_INT);
+  P(ldb, INVALID_INT);
+  P(ldc, INVALID_INT);
+  P(a_offset, INVALID_INT);
+  P(b_offset, INVALID_INT);
+  P(c_offset, INVALID_INT);
+  P(a_stride, INVALID_INT);
+  P(b_stride, INVALID_INT);
+  P(c_stride, INVALID_INT);
+  P(batch_count, INVALID_INT);
+  P(data_type, QUDA_BLAS_DATATYPE_INVALID);
+  P(data_order, QUDA_BLAS_DATAORDER_INVALID);
 #endif
 
 #ifdef INIT_PARAM

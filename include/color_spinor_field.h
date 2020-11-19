@@ -607,6 +607,14 @@ namespace quda {
     virtual void PrintVector(unsigned int x) const = 0;
 
     /**
+     * @brief Thin wrapper around PrintVector that takes in a checkerboard index and
+     * a parity instead of a full index
+     * @param[in] x_cb checkerboard index
+     * @param[in] parity site parity
+     */
+    void PrintVector(unsigned int x_cb, unsigned int parity) const { PrintVector(2 * x_cb + parity); }
+
+    /**
      * Compute the n-dimensional site index given the 1-d offset index
      * @param y n-dimensional site index
      * @param i 1-dimensional site index

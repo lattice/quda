@@ -57,10 +57,11 @@ void constructStaggeredHostDeviceGaugeField(void **qdp_inlink, void **qdp_longli
       gauge_loaded = true;
     } // else it's already been loaded
   } else {
+    int construct_type = (unit_gauge) ? 0 : 1;
     if (dslash_type == QUDA_LAPLACE_DSLASH) {
-      constructQudaGaugeField(qdp_inlink, 1, gauge_param.cpu_prec, &gauge_param);
+      constructQudaGaugeField(qdp_inlink, construct_type, gauge_param.cpu_prec, &gauge_param);
     } else {
-      constructFatLongGaugeField(qdp_inlink, qdp_longlink_cpu, 1, gauge_param.cpu_prec, &gauge_param,
+      constructFatLongGaugeField(qdp_inlink, qdp_longlink_cpu, construct_type, gauge_param.cpu_prec, &gauge_param,
                                  compute_fatlong ? QUDA_STAGGERED_DSLASH : dslash_type);
     }
   }
@@ -102,10 +103,11 @@ void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, vo
       applyGaugeFieldScaling_long(qdp_inlink, Vh, &gauge_param, QUDA_STAGGERED_DSLASH, gauge_param.cpu_prec);
     }
   } else {
+    int construct_type = (unit_gauge) ? 0 : 1;
     if (dslash_type == QUDA_LAPLACE_DSLASH) {
-      constructQudaGaugeField(qdp_inlink, 1, gauge_param.cpu_prec, &gauge_param);
+      constructQudaGaugeField(qdp_inlink, construct_type, gauge_param.cpu_prec, &gauge_param);
     } else {
-      constructFatLongGaugeField(qdp_inlink, qdp_longlink, 1, gauge_param.cpu_prec, &gauge_param,
+      constructFatLongGaugeField(qdp_inlink, qdp_longlink, construct_type, gauge_param.cpu_prec, &gauge_param,
                                  compute_fatlong ? QUDA_STAGGERED_DSLASH : dslash_type);
     }
   }
@@ -139,7 +141,13 @@ void constructFatLongGaugeField(void **fatlink, void **longlink, int type, QudaP
     } else {
       constructUnitGaugeField((float **)fatlink, param);
       constructUnitGaugeField((float **)longlink, param);
-    }
+    } // apply phases
+
+    applyGaugeFieldScaling_long(fatlink, Vh, param, QUDA_STAGGERED_DSLASH, precision);
+
+    if (dslash_type == QUDA_ASQTAD_DSLASH && !compute_fatlong)
+      applyGaugeFieldScaling_long(longlink, Vh, param, QUDA_STAGGERED_DSLASH, precision);
+
   } else {
     if (precision == QUDA_DOUBLE_PRECISION) {
       // if doing naive staggered then set to long links so that the staggered phase is applied
@@ -191,19 +199,20 @@ void constructFatLongGaugeField(void **fatlink, void **longlink, int type, QudaP
     }
 
     if (type == 3) return;
+  }
 
-    // set all links to zero to emulate the 1-link operator (needed for host comparison)
-    if (dslash_type == QUDA_STAGGERED_DSLASH) {
-      for (int dir = 0; dir < 4; ++dir) {
-        for (int i = 0; i < V; ++i) {
-          for (int j = 0; j < gauge_site_size; j += 2) {
-            if (precision == QUDA_DOUBLE_PRECISION) {
-              ((double *)longlink[dir])[i * gauge_site_size + j] = 0.0;
-              ((double *)longlink[dir])[i * gauge_site_size + j + 1] = 0.0;
-            } else {
-              ((float *)longlink[dir])[i * gauge_site_size + j] = 0.0;
-              ((float *)longlink[dir])[i * gauge_site_size + j + 1] = 0.0;
-            }
+  // set all links to zero to emulate the 1-link operator (needed for host comparison)
+  // FIXME: may break host comparison
+  if (dslash_type == QUDA_STAGGERED_DSLASH) {
+    for (int dir = 0; dir < 4; ++dir) {
+      for (int i = 0; i < V; ++i) {
+        for (int j = 0; j < gauge_site_size; j += 2) {
+          if (precision == QUDA_DOUBLE_PRECISION) {
+            ((double *)longlink[dir])[i * gauge_site_size + j] = 0.0;
+            ((double *)longlink[dir])[i * gauge_site_size + j + 1] = 0.0;
+          } else {
+            ((float *)longlink[dir])[i * gauge_site_size + j] = 0.0;
+            ((float *)longlink[dir])[i * gauge_site_size + j + 1] = 0.0;
           }
         }
       }
@@ -684,7 +693,7 @@ void constructStaggeredTestSpinorParam(quda::ColorSpinorParam *cs_param, const Q
   cs_param->nSpin = 1;
   cs_param->nDim = 5;
   for (int d = 0; d < 4; d++) cs_param->x[d] = gauge_param->X[d];
-  bool pc = (inv_param->solution_type == QUDA_MATPC_SOLUTION || inv_param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+  bool pc = isPCSolution(inv_param->solution_type);
   if (pc) cs_param->x[0] /= 2;
   cs_param->x[4] = 1;
   cs_param->siteSubset = pc ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
