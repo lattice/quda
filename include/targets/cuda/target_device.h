@@ -5,6 +5,32 @@ namespace quda {
   namespace device {
 
     /**
+       @brief Helper function that returns if the current execution
+       region is on the device
+    */
+    constexpr bool is_device()
+    {
+#ifdef __CUDA_ARCH__
+      return true;
+#else
+      return false;
+#endif
+    }
+
+    /**
+       @brief Helper function that returns if the current execution
+       region is on the host
+    */
+    constexpr bool is_host()
+    {
+#ifdef __CUDA_ARCH__
+      return false;
+#else
+      return true;
+#endif
+    }
+
+    /**
        @brief Helper function that returns the warp-size of the
        architecture we are running on.
     */
