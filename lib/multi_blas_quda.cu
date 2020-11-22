@@ -158,7 +158,10 @@ namespace quda {
         if (site_unroll_check && (x[0]->Ncolor() != 3 || x[0]->Nspin() == 2))
           errorQuda("site unroll not supported for nSpin = %d nColor = %d", x[0]->Nspin(), x[0]->Ncolor());
 
+        int tmp1=deviceProp.maxThreadsPerBlock;
+	deviceProp.maxThreadsPerBlock=512;
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+	deviceProp.maxThreadsPerBlock=tmp1;
 
         if (location == QUDA_CUDA_FIELD_LOCATION) {
           if (site_unroll_check) checkNative(*x[0], *y[0], *z[0], *w[0]); // require native order when using site_unroll
