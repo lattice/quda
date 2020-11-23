@@ -1,7 +1,9 @@
+#include <cassert>
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
 #include <fast_intdiv.h>
 #include <kernel.h>
+#include <shared_memory_cache_helper.cuh>
 
 namespace quda {
 
@@ -94,61 +96,53 @@ namespace quda {
 
   /**
      Compute the max element over the spin-color components of a given site.
-   */
+  */
   template <int Ms, int Mc, typename Arg>
-  __device__ __host__ auto compute_thread_max(Arg &arg, int x_cb, int spinor_parity, int spin_block, int color_block)
+  __device__ __host__ inline auto compute_site_max(Arg &arg, int x_cb, int spinor_parity, int spin_block, int color_block, bool active)
   {
     using real = typename Arg::real;
     real thread_max = 0.0;
 
-    const auto &rhs = arg.field;
-#pragma unroll
-    for (int spin_local=0; spin_local<Ms; spin_local++) {
-      int s = spin_block + spin_local;
-#pragma unroll
-      for (int color_local=0; color_local<Mc; color_local++) {
-        int c = color_block + color_local;
-        complex<real> z = rhs(spinor_parity, x_cb, s, c);
-        thread_max = thread_max > fabs(z.real()) ? thread_max : fabs(z.real());
-        thread_max = thread_max > fabs(z.imag()) ? thread_max : fabs(z.imag());
-      }
-    }
-    return thread_max;
-  }
-
-  template <int Ms, int Mc, typename Arg, typename real>
-  __device__ __host__ __forceinline__ auto compute_site_max(real thread_max, int spin_block, int color_block, bool active)
-  {
-    real site_max = thread_max;
-
-#ifdef __CUDA_ARCH__
-    // workout how big a shared-memory allocation we need
-    // just statically compute the largest size needed to avoid templating on block size
-    constexpr int bank_width = 32; // shared memory has 32 banks
-    constexpr int color_spin_threads = Arg::nColor <= max_block_float_nc ? (Arg::nSpin/Ms) * (Arg::nColor/Mc) : 1;
-    // this is the largest size of blockDim.x (rounded up to multiples of bank_width)
-    constexpr int thread_width_x = ( (device::max_block_size() / color_spin_threads + bank_width-1) / bank_width) * bank_width;
-    __shared__ real v[color_spin_threads * thread_width_x];
-    if (active) v[ ( (spin_block/Ms) * (Arg::nColor/Mc) + (color_block/Mc)) * blockDim.x + threadIdx.x ] = thread_max;
-    __syncthreads();
-
     if (active) {
+      const auto &rhs = arg.field;
 #pragma unroll
-      for (int sc = 0; sc < color_spin_threads; sc++) {
-	site_max = site_max > v[sc*blockDim.x + threadIdx.x] ? site_max : v[sc*blockDim.x + threadIdx.x];
+      for (int spin_local=0; spin_local<Ms; spin_local++) {
+        int s = spin_block + spin_local;
+#pragma unroll
+        for (int color_local=0; color_local<Mc; color_local++) {
+          int c = color_block + color_local;
+          complex<real> z = rhs(spinor_parity, x_cb, s, c);
+          thread_max = thread_max > fabs(z.real()) ? thread_max : fabs(z.real());
+          thread_max = thread_max > fabs(z.imag()) ? thread_max : fabs(z.imag());
+        }
       }
     }
-#else
-    // on the CPU we require that both spin and color are fully thread local
-    static_assert(Ms == Arg::nSpin);
-    static_assert(Mc == Arg::nColor);
-#endif
+
+    real site_max = thread_max;
+    if (device::is_device()) { // if on the device we need to reduce across threads in the block
+      constexpr int color_spin_threads = Arg::nColor <= max_block_float_nc ? (Arg::nSpin/Ms) * (Arg::nColor/Mc) : 1;
+      SharedMemoryCache<real, color_spin_threads, 2> cache;
+      if (active) cache.save(thread_max);
+      cache.sync();
+      if (active) {
+#pragma unroll
+        for (int sc = 0; sc < color_spin_threads; sc++) {
+          auto sc_max = cache.load_y(sc);
+          site_max = site_max > sc_max ? site_max : sc_max;
+        }
+      }
+    } else {
+      // on the CPU we require that both spin and color are fully thread local
+      // when we move to C++17 we can make this static_assert with a constexpr if/else
+      assert(Ms == Arg::nSpin);
+      assert(Mc == Arg::nColor);
+    }
 
     return site_max;
   }
 
   template <int dim, int dir, typename Arg>
-  __device__ __host__ __forceinline__ void packGhost(Arg &arg, int x_cb, int parity, int spinor_parity, int spin_block, int color_block)
+  __device__ __host__ inline void packGhost(Arg &arg, int x_cb, int parity, int spinor_parity, int spin_block, int color_block)
   {
     using real = typename Arg::real;
     constexpr int Ms = spins_per_thread<Arg::nSpin>();
@@ -164,9 +158,7 @@ namespace quda {
       real max = 1.0;
       if (Arg::block_float) {
         bool active = ( arg.commDim[dim] && ( (dir == 0 && x[dim] < arg.nFace) || (dir == 1 && x[dim] >= arg.X[dim] - arg.nFace) ) );
-        // first compute the thread max
-        if (active) max = compute_thread_max<Ms, Mc>(arg, x_cb, spinor_parity, spin_block, color_block);
-        max = compute_site_max<Ms, Mc, Arg>(max, spin_block, color_block, active);
+        max = compute_site_max<Ms, Mc, Arg>(arg, x_cb, spinor_parity, spin_block, color_block, active);
       }
 
       if (dir == 0 && arg.commDim[dim] && x[dim] < arg.nFace) {

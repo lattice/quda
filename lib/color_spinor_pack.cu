@@ -48,6 +48,19 @@ namespace quda {
     const int nFace;
     const int dagger;
     static constexpr bool block_float = sizeof(store_t) == QUDA_SINGLE_PRECISION && isFixed<ghost_store_t>::value;
+
+    unsigned int sharedBytesPerBlock(const TuneParam &) const
+    {
+      if (block_float) {
+        auto max_block_size_x = device::max_threads_per_block() / (vector_length_y * vector_length_z);
+        auto thread_width_x = ((max_block_size_x + device::shared_memory_bank_width() - 1) /
+                               device::shared_memory_bank_width()) * device::shared_memory_bank_width();
+        return sizeof(store_t) * thread_width_x * vector_length_y * vector_length_z;
+      } else {
+        return 0;
+      }
+    }
+
     bool tuneSharedBytes() const { return false; }
     unsigned int minThreads() const { return a.VolumeCB(); }
 
