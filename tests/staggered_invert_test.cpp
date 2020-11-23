@@ -173,13 +173,8 @@ int main(int argc, char **argv)
     setStaggeredMGInvertParam(inv_param);
     // Set sub structures
     mg_param.invert_param = &mg_inv_param;
-    // Since the top level is just a unitary rotation, we manually
-    // set mg_eig[0] to false (and throw a warning if a user set it to true)
-    if (mg_eig[0]) {
-      printfQuda("Warning: Cannot specify near-null vectors for top level.\n");
-      mg_eig[0] = false;
-    }
-    for (int i = 1; i < mg_levels; i++) {
+
+    for (int i = 0; i < mg_levels; i++) {
       if (mg_eig[i]) {
         mg_eig_param[i] = newQudaEigParam();
         setMultigridEigParam(mg_eig_param[i], i);

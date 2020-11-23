@@ -207,6 +207,7 @@ namespace quda
       return -1;
     }
 
+    // note --- currently unused, may be revisited in the future
     template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 24 && Arg::coarseColor == 96 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
                             int>::type
@@ -295,6 +296,7 @@ namespace quda
       return -1;
     }
 
+    // note --- currently unused, may be revisited in the future
     template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 96 && Arg::coarseColor == 96 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
                             int>::type
@@ -495,6 +497,7 @@ namespace quda
       return -1;
     }
 
+    // note -- currently unused, may be used in the future
     template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 24 && Arg::coarseColor == 96 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
                             int>::type
@@ -579,6 +582,7 @@ namespace quda
       return -1;
     }
 
+    // note -- currently unused, may be revisited in the future
     template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 96 && Arg::coarseColor == 96 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
                             int>::type

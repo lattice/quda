@@ -135,6 +135,10 @@ quda::mgarray<QudaSchwarzType> mg_schwarz_type = {};
 quda::mgarray<int> mg_schwarz_cycle = {};
 bool mg_evolve_thin_updates = false;
 
+// Aggregation type for the top level of staggered
+// FIXME: replace with QUDA_TRANSFER_OPTIMIZED_KD when ready
+QudaTransferType staggered_transfer_type = QUDA_TRANSFER_COARSE_KD;
+
 // we only actually support 4 here currently
 quda::mgarray<std::array<int, 4>> geo_block_size = {};
 
@@ -234,9 +238,46 @@ int measurement_interval = 5;
 
 QudaContractType contract_type = QUDA_CONTRACT_TYPE_OPEN;
 
+QudaBLASOperation blas_trans_a = QUDA_BLAS_OP_N;
+QudaBLASOperation blas_trans_b = QUDA_BLAS_OP_N;
+QudaBLASDataType blas_data_type = QUDA_BLAS_DATATYPE_C;
+QudaBLASDataOrder blas_data_order = QUDA_BLAS_DATAORDER_COL;
+
+std::array<int, 3> blas_mnk = {64, 64, 64};
+auto &blas_m = blas_mnk[0];
+auto &blas_n = blas_mnk[1];
+auto &blas_k = blas_mnk[2];
+
+std::array<int, 3> blas_leading_dims = {128, 128, 128};
+auto &blas_lda = blas_leading_dims[0];
+auto &blas_ldb = blas_leading_dims[1];
+auto &blas_ldc = blas_leading_dims[2];
+
+std::array<int, 3> blas_offsets = {0, 0, 0};
+auto &blas_a_offset = blas_offsets[0];
+auto &blas_b_offset = blas_offsets[1];
+auto &blas_c_offset = blas_offsets[2];
+
+std::array<int, 3> blas_strides = {1, 1, 1};
+auto &blas_a_stride = blas_strides[0];
+auto &blas_b_stride = blas_strides[1];
+auto &blas_c_stride = blas_strides[2];
+
+std::array<double, 2> blas_alpha_re_im = {1.0, 0.0};
+std::array<double, 2> blas_beta_re_im = {1.0, 0.0};
+int blas_batch = 16;
+
 namespace
 {
   CLI::TransformPairs<QudaCABasis> ca_basis_map {{"power", QUDA_POWER_BASIS}, {"chebyshev", QUDA_CHEBYSHEV_BASIS}};
+
+  CLI::TransformPairs<QudaBLASDataType> blas_dt_map {
+    {"C", QUDA_BLAS_DATATYPE_C}, {"Z", QUDA_BLAS_DATATYPE_Z}, {"S", QUDA_BLAS_DATATYPE_S}, {"D", QUDA_BLAS_DATATYPE_D}};
+
+  CLI::TransformPairs<QudaBLASDataOrder> blas_data_order_map {{"row", QUDA_BLAS_DATAORDER_ROW},
+                                                              {"col", QUDA_BLAS_DATAORDER_COL}};
+
+  CLI::TransformPairs<QudaBLASOperation> blas_op_map {{"N", QUDA_BLAS_OP_N}, {"T", QUDA_BLAS_OP_T}, {"C", QUDA_BLAS_OP_C}};
 
   CLI::TransformPairs<QudaContractType> contract_type_map {{"open", QUDA_CONTRACT_TYPE_OPEN},
                                                            {"dr", QUDA_CONTRACT_TYPE_DR}};
@@ -303,6 +344,10 @@ namespace
                                                  {"blktrlm", QUDA_EIG_BLK_TR_LANCZOS},
                                                  {"iram", QUDA_EIG_IR_ARNOLDI},
                                                  {"blkiram", QUDA_EIG_BLK_IR_ARNOLDI}};
+
+  CLI::TransformPairs<QudaTransferType> transfer_type_map {{"aggregate", QUDA_TRANSFER_AGGREGATE},
+                                                           {"kd-coarse", QUDA_TRANSFER_COARSE_KD},
+                                                           {"kd-optimized", QUDA_TRANSFER_OPTIMIZED_KD}};
 
   CLI::TransformPairs<QudaTboundary> fermion_t_boundary_map {{"periodic", QUDA_PERIODIC_T},
                                                              {"anti-periodic", QUDA_ANTI_PERIODIC_T}};
@@ -374,9 +419,54 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
 
   quda_app
     ->add_option("--contraction-type", contract_type,
-                 "Whether to leave spin elemental open, or use a gamma basis and contract on spin (default open)")
+                 "Whether to leave spin elemental open, or use a gamma basis and contract on "
+                 "spin (default open)")
     ->transform(CLI::QUDACheckedTransformer(contract_type_map));
-  ;
+
+  quda_app
+    ->add_option("--blas-data-type", blas_data_type,
+                 "Whether to use single(S), double(D), and/or complex(C/Z) data types (default C)")
+    ->transform(CLI::QUDACheckedTransformer(blas_dt_map));
+
+  quda_app
+    ->add_option("--blas-data-order", blas_data_order, "Whether data is in row major or column major order (default row)")
+    ->transform(CLI::QUDACheckedTransformer(blas_data_order_map));
+
+  quda_app
+    ->add_option(
+      "--blas-trans-a", blas_trans_a,
+      "Whether to leave the A GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")
+    ->transform(CLI::QUDACheckedTransformer(blas_op_map));
+
+  quda_app
+    ->add_option(
+      "--blas-trans-b", blas_trans_b,
+      "Whether to leave the B GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")
+    ->transform(CLI::QUDACheckedTransformer(blas_op_map));
+
+  quda_app->add_option("--blas-alpha", blas_alpha_re_im, "Set the complex value of alpha for GEMM (default {1.0,0.0}")
+    ->expected(2);
+
+  quda_app->add_option("--blas-beta", blas_beta_re_im, "Set the complex value of beta for GEMM (default {1.0,0.0}")
+    ->expected(2);
+
+  quda_app
+    ->add_option("--blas-mnk", blas_mnk, "Set the dimensions of the A, B, and C matrices GEMM (default 128 128 128)")
+    ->expected(3);
+
+  quda_app
+    ->add_option("--blas-leading-dims", blas_leading_dims,
+                 "Set the leading dimensions A, B, and C matrices GEMM (default 128 128 128) ")
+    ->expected(3);
+
+  quda_app->add_option("--blas-offsets", blas_offsets, "Set the offsets for matrices A, B, and C (default 0 0 0)")
+    ->expected(3);
+
+  quda_app->add_option("--blas-strides", blas_strides, "Set the strides for matrices A, B, and C (default 1 1 1)")
+    ->expected(3);
+
+  quda_app->add_option("--blas-batch", blas_batch, "Set the number of batches for GEMM (default 16)");
+
   quda_app->add_flag("--dagger", dagger, "Set the dagger to 1 (default 0)");
   quda_app->add_option("--device", device_ordinal, "Set the CUDA device to use (default 0, single GPU only)")
     ->check(CLI::Range(0, 16));
@@ -829,6 +919,14 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   opgroup->add_option("--mg-setup-type", setup_type, "The type of setup to use for the multigrid (default null)")
     ->transform(CLI::QUDACheckedTransformer(setup_type_map));
+
+  // FIXME: default should become kd-optimized
+  opgroup
+    ->add_option(
+      "--mg-staggered-coarsen-type",
+      staggered_transfer_type, "The type of coarsening to use for the top level staggered operator (aggregate, kd-coarse (default), kd-optimized)")
+    ->transform(CLI::QUDACheckedTransformer(transfer_type_map));
+
   quda_app->add_mgoption(opgroup, "--mg-smoother", smoother_type, solver_trans,
                          "The smoother to use for multigrid (default mr)");
 

@@ -433,7 +433,7 @@ namespace quda
        @brief Destructor for Thick Restarted Eigensolver class
     */
     virtual ~TRLM();
-    
+
     /**
        @return Whether the solver is only for Hermitian systems
     */
@@ -554,7 +554,6 @@ namespace quda
   {
 
   public:
-
     Complex **upperHess;
     Complex **Qmat;
     Complex **Rmat;

@@ -1,3 +1,5 @@
+#pragma once
+
 #/*
 # enum_quda_fortran.h
 #
@@ -8,9 +10,6 @@
 #   instead (this requires Fortran 2003, but this is covered by 
 #   gfortran).
 #*/
-
-#ifndef _ENUM_FORTRAN_QUDA_H
-#define _ENUM_FORTRAN_QUDA_H
 
 #/* can't include limits.h in a Fortran program */
 #define QUDA_INVALID_ENUM (-2147483647 - 1) 
@@ -290,17 +289,19 @@
 #define QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC 11
 #define QUDA_STAGGERED_DIRAC 12
 #define QUDA_STAGGEREDPC_DIRAC 13
-#define QUDA_ASQTAD_DIRAC 14
-#define QUDA_ASQTADPC_DIRAC 15
-#define QUDA_TWISTED_MASS_DIRAC 16
-#define QUDA_TWISTED_MASSPC_DIRAC 17
-#define QUDA_TWISTED_CLOVER_DIRAC 18
-#define QUDA_TWISTED_CLOVERPC_DIRAC 19
-#define QUDA_COARSE_DIRAC 20
-#define QUDA_COARSEPC_DIRAC 21
-#define QUDA_GAUGE_LAPLACE_DIRAC 22
-#define QUDA_GAUGE_LAPLACEPC_DIRAC 23
-#define QUDA_GAUGE_COVDEV_DIRAC 24
+#define QUDA_STAGGEREDKD_DIRAC 14
+#define QUDA_ASQTAD_DIRAC 15
+#define QUDA_ASQTADPC_DIRAC 16
+#define QUDA_ASQTADKD_DIRAC 17
+#define QUDA_TWISTED_MASS_DIRAC 18
+#define QUDA_TWISTED_MASSPC_DIRAC 19
+#define QUDA_TWISTED_CLOVER_DIRAC 20
+#define QUDA_TWISTED_CLOVERPC_DIRAC 21
+#define QUDA_COARSE_DIRAC 22
+#define QUDA_COARSEPC_DIRAC 23
+#define QUDA_GAUGE_LAPLACE_DIRAC 24
+#define QUDA_GAUGE_LAPLACEPC_DIRAC 25
+#define QUDA_GAUGE_COVDEV_DIRAC 26
 #define QUDA_INVALID_DIRAC QUDA_INVALID_ENUM
 
 ! Where the field is stored
@@ -411,12 +412,36 @@
 #define QUDA_TEST_VECTOR_SETUP 1
 #define QUDA_INVALID_SETUP_TYPE QUDA_INVALID_ENUM
 
+#define QudaTransferType integer(4)
+#define QUDA_TRANSFER_AGGREGATE 0
+#define QUDA_TRANSFER_COARSE_KD 1
+#define QUDA_TRANSFER_OPTIMIZED_KD 2
+#define QUDA_TRANSFER_INVALID QUDA_INVALID_ENUM
+
 #define QudaBoolean integer(4)
 #define QUDA_BOOLEAN_FALSE 0
 #define QUDA_BOOLEAN_TRUE 1
 #define QUDA_BOOLEAN_INVALID QUDA_INVALID_ENUM
 #define QUDA_BOOLEAN_NO QUDA_BOOLEAN_FALSE // backwards compatibility
 #define QUDA_BOOLEAN_YES QUDA_BOOLEAN_TRUE // backwards compatibility
+
+#define QudaBLASOperation integer(4)
+#define QUDA_BLAS_OP_N = 0 // No transpose
+#define QUDA_BLAS_OP_T = 1 // Transpose only
+#define QUDA_BLAS_OP_C = 2 // Conjugate transpose
+#define QUDA_BLAS_OP_INVALID QUDA_INVALID_ENUM
+
+#define QudaBLASDataType integer(4)
+#define QUDA_BLAS_DATATYPE_S 0 // Single
+#define QUDA_BLAS_DATATYPE_D 1 // Double
+#define QUDA_BLAS_DATATYPE_C 2 // Complex(single)
+#define QUDA_BLAS_DATATYPE_Z 3 // Complex(double)
+#define QUDA_BLAS_DATATYPE_INVALID QUDA_INVALID_ENUM
+
+#define QudaBLASDataOrder integer(4)
+#define QUDA_BLAS_DATAORDER_ROW 0
+#define QUDA_BLAS_DATAORDER_COL 1
+#define QUDA_BLAS_DATAORDER_INVALID QUDA_INVALID_ENUM
 
 #define QudaDirection integer(4)
 #define QUDA_BACKWARDS -1
@@ -478,5 +503,3 @@
 #define QUDA_EIGEN_EXTLIB 1
 #define QUDA_MAGMA_EXTLIB 2
 #define QUDA_EXTLIB_INVALID QUDA_INVALID_ENUM
-
-#endif 

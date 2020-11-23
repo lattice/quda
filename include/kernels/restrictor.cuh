@@ -57,7 +57,7 @@ namespace quda {
     for (int s=0; s<fineSpin; s++)
 #pragma unroll
       for (int coarse_color_local=0; coarse_color_local<coarse_colors_per_thread; coarse_color_local++) {
-	out[s*coarse_colors_per_thread+coarse_color_local] = 0.0;
+        out[s*coarse_colors_per_thread+coarse_color_local] = 0.0;
       }
 
 #pragma unroll

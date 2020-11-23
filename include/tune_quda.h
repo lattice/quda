@@ -62,7 +62,7 @@ namespace quda {
         aux = param.aux;
         comment = param.comment;
         time = param.time;
-	n_calls = param.n_calls;
+        n_calls = param.n_calls;
       }
       return *this;
     }
