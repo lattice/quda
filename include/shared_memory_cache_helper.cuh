@@ -94,6 +94,14 @@ namespace quda
 
   public:
     /**
+       @brief Grab the raw base address to shared memory
+    */
+    __device__ inline T* data()
+    {
+      return cache();
+    }
+
+    /**
        @brief Save the value into the 3-d shared memory cache.
        Implicitly store the vector at coordinates given by threadIdx.
        @param[in] a The vector to store in the shared memory cache
