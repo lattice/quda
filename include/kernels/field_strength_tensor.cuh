@@ -18,14 +18,14 @@ namespace quda
     G u;
     F f;
 
-    dim3 threads; // number of active threads required
     int X[4];    // grid dimensions
     int border[4];
+    dim3 threads; // number of active threads required
 
     FmunuArg(GaugeField &f, const GaugeField &u) :
-      threads(f.VolumeCB(), 2, 6),
+      u(u),
       f(f),
-      u(u)
+      threads(f.VolumeCB(), 2, 6)
     {
       for (int dir = 0; dir < 4; ++dir) {
         X[dir] = f.X()[dir];

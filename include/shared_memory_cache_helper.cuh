@@ -128,7 +128,11 @@ namespace quda
        @param[in] z The z index to use
        @return The value at coordinates (x,y,z)
     */
+#ifdef __CUDA_ARCH__
     __device__ __host__ inline T load(int x = threadIdx.x, int y = threadIdx.y, int z = threadIdx.z)
+#else
+    __device__ __host__ inline T load(int = 0, int = 0, int = 0)
+#endif
     {
 #ifdef __CUDA_ARCH__
       int j = (z * block_size_y + y) * thread_width_x + x;
@@ -145,7 +149,11 @@ namespace quda
        @param[in] z The z index to use
        @return The value at coordinates (x,y,z)
     */
+#ifdef __CUDA_ARCH__
     __device__ __host__ inline T load_x(int x = threadIdx.x)
+#else
+    __device__ __host__ inline T load_x(int = 0)
+#endif
     {
 #ifdef __CUDA_ARCH__
       int j = (threadIdx.z * block_size_y + threadIdx.y) * thread_width_x + x;
@@ -162,7 +170,11 @@ namespace quda
        @param[in] z The z index to use
        @return The value at coordinates (x,y,z)
     */
+#ifdef __CUDA_ARCH__
     __device__ __host__ inline T load_y(int y = threadIdx.y)
+#else
+    __device__ __host__ inline T load_y(int = 0)
+#endif
     {
 #ifdef __CUDA_ARCH__
       int j = (threadIdx.z * block_size_y + y) * thread_width_x + threadIdx.x;
@@ -179,7 +191,11 @@ namespace quda
        @param[in] z The z index to use
        @return The value at coordinates (x,y,z)
     */
+#ifdef __CUDA_ARCH__
     __device__ __host__ inline T load_z(int z = threadIdx.z)
+#else
+    __device__ __host__ inline T load_z(int = 0)
+#endif
     {
 #ifdef __CUDA_ARCH__
       int j = (z * block_size_y + threadIdx.y) * thread_width_x + threadIdx.x;

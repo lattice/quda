@@ -33,7 +33,6 @@ namespace quda {
       const F force_old;
       const G u;
       int *fails;
-      dim3 threads;
       const double unitarize_eps;
       const double force_filter;
       const double max_det_error;
@@ -41,6 +40,7 @@ namespace quda {
       const int svd_only;
       const double svd_rel_error;
       const double svd_abs_error;
+      dim3 threads;
 
       UnitarizeForceArg(GaugeField &force, const GaugeField &force_old, const GaugeField &u, int *fails,
 			double unitarize_eps, double force_filter, double max_det_error, int allow_svd,

@@ -43,11 +43,11 @@ namespace quda
       DslashArg<Float, nDim>(in, U, parity, dagger, a != 0.0 ? true : false, 1, false, comm_override),
       out(out),
       in(in),
-      U(U),
-      dir(dir),
       x(x),
+      U(U),
       a(a),
-      b(b)
+      b(b),
+      dir(dir)
     {
       if (in.V() == out.V()) errorQuda("Aliasing pointers");
       checkOrder(out, in, x);        // check all orders match

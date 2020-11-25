@@ -630,7 +630,6 @@ namespace quda {
                GaugeField &X_atomic, bool use_mma) :
       TunableVectorYZ(2, 1),
       arg(arg),
-      type(COMPUTE_INVALID),
       meta(meta),
       Y(Y),
       X(X),
@@ -638,6 +637,7 @@ namespace quda {
       X_atomic(X_atomic),
       dim(0),
       dir(QUDA_BACKWARDS),
+      type(COMPUTE_INVALID),
       use_mma(use_mma)
     {
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {

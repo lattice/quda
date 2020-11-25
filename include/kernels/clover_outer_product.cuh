@@ -35,11 +35,11 @@ namespace quda {
     CloverForceArg(GaugeField &force, const GaugeField &U, const ColorSpinorField &inA, const ColorSpinorField &inB,
                    const ColorSpinorField &inC, const ColorSpinorField &inD, const unsigned int parity, const double coeff) :
       force(force),
-      U(U),
       inA(inA),
       inB(inB),
       inC(inC),
       inD(inD),
+      U(U),
       parity(parity),
       displacement(1),
       coeff(coeff),

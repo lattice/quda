@@ -57,6 +57,9 @@ namespace quda {
       const int volume_cb;    // checkerboarded volume
       const int volume_4d_cb; // 4-d checkerboarded volume
 
+      const real m_f; // fermion mass parameter
+      const real m_5; // Wilson mass shift
+
       const int dim[4];
       const int shift[4];      // sites where we actually calculate.
       const int halo_shift[4]; // halo means zero. When we are expanding we have halo of cs-field where values are zero.
@@ -66,9 +69,6 @@ namespace quda {
       // partial kernel and expansion parameters
       const int volume_4d_cb_shift; // number of 4d sites we need calculate
       // const int volume_4d_cb_expansive; //
-
-      const real m_f; // fermion mass parameter
-      const real m_5; // Wilson mass shift
 
       //    const bool xpay;        // whether we are doing xpay or not
 
@@ -94,20 +94,20 @@ namespace quda {
                      int parity, int shift_[4], int halo_shift_[4]) :
         out(out),
         in(in),
-        U(U),
         y(y),
         x(x),
+        U(U),
         nParity(in.SiteSubset()),
         parity(parity),
         volume_cb(in.VolumeCB() > out.VolumeCB() ? in.VolumeCB() : out.VolumeCB()),
         volume_4d_cb(volume_cb / Ls_),
         m_f(m_f_),
         m_5(m_5_),
-        shift {shift_[0], shift_[1], shift_[2], shift_[3]},
-        halo_shift {halo_shift_[0], halo_shift_[1], halo_shift_[2], halo_shift_[3]},
         dim {(3 - nParity) * (in.VolumeCB() > out.VolumeCB() ? in.X(0) : out.X(0)),
              in.VolumeCB() > out.VolumeCB() ? in.X(1) : out.X(1), in.VolumeCB() > out.VolumeCB() ? in.X(2) : out.X(2),
              in.VolumeCB() > out.VolumeCB() ? in.X(3) : out.X(3)},
+        shift {shift_[0], shift_[1], shift_[2], shift_[3]},
+        halo_shift {halo_shift_[0], halo_shift_[1], halo_shift_[2], halo_shift_[3]},
         shrunk_dim {dim[0] - 2 * shift[0], dim[1] - 2 * shift[1], dim[2] - 2 * shift[2], dim[3] - 2 * shift[3]},
         volume_4d_cb_shift(shrunk_dim[0] * shrunk_dim[1] * shrunk_dim[2] * shrunk_dim[3] / 2),
         comm {static_cast<bool>(comm_dim_partitioned(0)), static_cast<bool>(comm_dim_partitioned(1)),

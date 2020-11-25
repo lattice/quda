@@ -15,10 +15,10 @@ namespace quda {
       using host_reduce_t = typename Reducer<double, real>::reduce_t;
       Reducer<device_reduce_t, real> r;
       const int nParity; // for composite fields this includes the number of composites
-      host_reduce_t &result;
 
       const coeff_t &a, &b;
       ColorSpinorField &x, &y, &z, &w, &v;
+      host_reduce_t &result;
 
       bool advanceSharedBytes(TuneParam &param) const
       {

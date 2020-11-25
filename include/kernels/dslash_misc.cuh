@@ -150,9 +150,9 @@ namespace quda {
     CloverArg(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover,
 	      int parity, real kappa=0.0, real mu=0.0, real /*epsilon*/ = 0.0,
 	      bool dagger = false, QudaTwistGamma5Type twist=QUDA_TWIST_GAMMA5_INVALID)
-      : out(out), clover(clover, twist == QUDA_TWIST_GAMMA5_INVALID ? inverse : false),
+      : out(out), in(in), clover(clover, twist == QUDA_TWIST_GAMMA5_INVALID ? inverse : false),
 	cloverInv(clover, (twist != QUDA_TWIST_GAMMA5_INVALID && !dynamic_clover) ? true : false),
-	in(in), nParity(in.SiteSubset()), parity(parity),
+	nParity(in.SiteSubset()), parity(parity),
 	doublet(in.TwistFlavor() == QUDA_TWIST_DEG_DOUBLET || in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
         threads(doublet ? in.VolumeCB()/2 : in.VolumeCB(), in.SiteSubset(), 1),
         volumeCB(doublet ? in.VolumeCB()/2 : in.VolumeCB()), a(0.0), b(0.0), c(0.0), twist(twist)

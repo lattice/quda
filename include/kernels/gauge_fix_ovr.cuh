@@ -26,8 +26,8 @@ namespace quda {
 
     GaugeFixQualityOVRArg(const GaugeField &data) :
       ReduceArg<double2>(1, true), // reset = true
-      threads(data.LocalVolumeCB(), 2, 1),
-      data(data)
+      data(data),
+      threads(data.LocalVolumeCB(), 2, 1)
     {
       for ( int dir = 0; dir < 4; ++dir ) {
         X[dir] = data.X()[dir] - data.R()[dir] * 2;

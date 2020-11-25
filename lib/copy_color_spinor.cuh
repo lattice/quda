@@ -23,12 +23,12 @@ namespace quda {
   public:
     CopyColorSpinor(ColorSpinorField &out, const ColorSpinorField &in, const param_t &param) :
       TunableKernel2D(in, in.SiteSubset(), std::get<2>(param)),
-      out(out),
-      in(in),
       Out_(std::get<3>(param)),
       In_(std::get<4>(param)),
       outNorm(std::get<5>(param)),
-      inNorm(std::get<6>(param))
+      inNorm(std::get<6>(param)),
+      out(out),
+      in(in)
     {
       strcat(aux, out.AuxString());
       if (out.GammaBasis()==in.GammaBasis()) strcat(aux, ",PreserveBasis");

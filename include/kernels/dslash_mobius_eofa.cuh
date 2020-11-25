@@ -65,8 +65,8 @@ namespace quda
         m_f(m_f_),
         m_5(m_5_),
         a(a_),
-        inv(inv_),
         kappa(kappa_),
+        inv(inv_),
         sherman_morrison(sherman_morrison_),
         threads(volume_4d_cb, Ls, nParity)
       {

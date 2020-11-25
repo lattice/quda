@@ -15,15 +15,15 @@ namespace quda
     static constexpr bool density = density_;
     typedef typename gauge_mapper<Float,recon>::type F;
 
-    dim3 threads; // number of active threads required
     F f;
     Float *qDensity;
+    dim3 threads; // number of active threads required
 
     QChargeArg(const GaugeField &Fmunu, Float *qDensity = nullptr) :
       ReduceArg<double3>(),
       f(Fmunu),
-      threads(Fmunu.VolumeCB(), 2, 1),
-      qDensity(qDensity) {}
+      qDensity(qDensity),
+      threads(Fmunu.VolumeCB(), 2, 1) {}
 
     __device__ __host__ double3 init() const { return zero<double3>(); }
   };

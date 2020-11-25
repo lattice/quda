@@ -103,10 +103,10 @@ namespace quda
         eofa_u(eofa_u),
         eofa_x(eofa_x),
         eofa_y(eofa_y),
-        sherman_morrison(sherman_morrison),
         dagger(dagger),
         xpay(a == 0.0 ? false : true),
-        type(type)
+        type(type),
+        sherman_morrison(sherman_morrison)
       {
         TunableKernel2D_base<false>::resizeStep(in.X(4)); // Ls must be contained in the block
 

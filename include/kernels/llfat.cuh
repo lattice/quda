@@ -18,7 +18,6 @@ namespace quda {
     Gauge u;
     Float coeff;
 
-    dim3 threads;
     int_fastdiv X[4];
     int_fastdiv E[4];
     int border[4];
@@ -29,11 +28,13 @@ namespace quda {
     partitioned then we have to correct for this when computing the local index */
     int odd_bit;
 
+    dim3 threads;
+
     LinkArg(GaugeField &link, const GaugeField &u, Float coeff) :
-      threads(link.VolumeCB(), 2, 4),
       link(link),
       u(u),
-      coeff(coeff)
+      coeff(coeff),
+      threads(link.VolumeCB(), 2, 4)
     {
       if (u.StaggeredPhase() != QUDA_STAGGERED_PHASE_MILC && u.Reconstruct() != QUDA_RECONSTRUCT_NO)
         errorQuda("Staggered phase type %d not supported", u.StaggeredPhase());

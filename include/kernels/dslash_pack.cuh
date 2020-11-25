@@ -54,13 +54,13 @@ namespace quda
       dagger(dagger),
       parity(parity),
       nParity(in.SiteSubset()),
-      threads(threads),
       pc_type(in.PCType()),
       dc(in.getDslashConstant()),
       twist_a(a),
       twist_b(b),
       twist_c(c),
-      twist((a != 0.0 && b != 0.0) ? (c != 0.0 ? 2 : 1) : 0)
+      twist((a != 0.0 && b != 0.0) ? (c != 0.0 ? 2 : 1) : 0),
+      threads(threads)
     {
       if (!in.isNative()) errorQuda("Unsupported field order colorspinor=%d\n", in.FieldOrder());
 

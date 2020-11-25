@@ -126,11 +126,11 @@ namespace quda {
       */
       __device__ __host__ inline colorspinor_ghost_wrapper<Float, T>(
           T &field, int dim, int dir, int ghost_idx, int parity) :
-          field(field),
           dim(dim),
           dir(dir),
           ghost_idx(ghost_idx),
-          parity(parity)
+          parity(parity),
+          field(field)
       {
       }
 
@@ -1002,8 +1002,8 @@ namespace quda {
 
       FloatNOrder(const ColorSpinorField &a, int nFace = 1, Float *field_ = 0, norm_type *norm_ = 0, Float **ghost_ = 0) :
         field(field_ ? field_ : (Float *)a.V()),
-        offset(a.Bytes() / (2 * sizeof(Float) * N)),
         norm(norm_ ? norm_ : (norm_type *)a.Norm()),
+        offset(a.Bytes() / (2 * sizeof(Float) * N)),
         norm_offset(a.NormBytes() / (2 * sizeof(norm_type))),
         volumeCB(a.VolumeCB()),
         stride(a.Stride()),

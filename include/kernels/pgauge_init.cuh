@@ -50,9 +50,9 @@ namespace quda {
     using real = typename mapper<Float>::type;
     using Gauge = typename gauge_mapper<real, recon>::type;
     int X[4]; // grid dimensions
+    Gauge U;
     RNG rng;
     int border[4];
-    Gauge U;
     dim3 threads; // number of active threads required
     InitGaugeHotArg(const GaugeField &U, RNG &rng) :
       U(U),
