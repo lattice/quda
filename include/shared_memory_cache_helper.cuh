@@ -115,8 +115,10 @@ namespace quda
     {
 #ifdef __CUDA_ARCH__
       int j = (threadIdx.z * block_size_y + threadIdx.y) * thread_width_x + threadIdx.x;
-      cache()[j] = a;
+#else
+      int j = 0;
 #endif
+      cache()[j] = a;
     }
 
     /**

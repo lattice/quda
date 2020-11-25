@@ -308,8 +308,8 @@ namespace quda {
 
     template <template <typename> class Transformer, template <typename> class Reducer = plus,
               typename Arg, typename T>
-    void launch_host(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg,
-                     const std::vector<constant_param_t> &param = dummy_param)
+    void launch_host(std::vector<T> &, const TuneParam &, const qudaStream_t &, Arg &,
+                     const std::vector<constant_param_t> & = dummy_param)
     {
       errorQuda("CPU not supported yet");
     }
