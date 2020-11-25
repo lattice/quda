@@ -50,7 +50,7 @@ namespace quda {
       for (int i=0; i<QUDA_MAX_DIM; i++) {
         x_size[i] = x_size_[i];
         xc_size[i] = xc_size_[i];
-        geo_bs[i] = geo_bs_[i];
+        geo_bs[i] = geo_bs_ ? geo_bs_[i] : 2;
       }
     }
 
