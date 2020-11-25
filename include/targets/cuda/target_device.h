@@ -31,6 +31,42 @@ namespace quda {
     }
 
     /**
+       @brief Helper function that returns the thread block
+       dimensions.  On CUDA this returns the intrinsic blockDim,
+       whereas on the host this grabs the dimensions from the kernel
+       argument struct
+       @param[in] arg Kernel argument struct
+    */
+    template <typename Arg>
+    constexpr dim3 block_dim(const Arg &arg)
+    {
+#ifdef __CUDA_ARCH__
+      return dim3(blockDim.x, blockDim.y, blockDim.z);
+#else
+      return arg.block_dim;
+#endif
+    }
+
+    /**
+       @brief Helper function that returns the thread block
+       dimensions.  On CUDA this returns the intrinsic blockDim,
+       whereas on the host this grabs the dimensions from the kernel
+       argument struct
+       @param[in] arg Kernel argument struct
+    */
+    template <typename Arg>
+    constexpr dim3 thread_idx(const dim3 &global_idx, const Arg &arg)
+    {
+#ifdef __CUDA_ARCH__
+      return dim3(threadIdx.x, threadIdx.y, threadIdx.z);
+#else
+      return dim3(global_idx.x % arg.block_dim.x,
+                  global_idx.y % arg.block_dim.y,
+                  global_idx.z % arg.block_dim.z);
+#endif
+    }
+
+    /**
        @brief Helper function that returns the warp-size of the
        architecture we are running on.
     */
