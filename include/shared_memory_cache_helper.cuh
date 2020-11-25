@@ -113,11 +113,8 @@ namespace quda
      */
     __device__ __host__ inline void save(const T &a)
     {
-#ifdef __CUDA_ARCH__
-      int j = (threadIdx.z * block_size_y + threadIdx.y) * thread_width_x + threadIdx.x;
-#else
-      int j = 0;
-#endif
+      auto tid = device::thread_idx();
+      int j = (tid.z * block_size_y + tid.y) * thread_width_x + tid.x;
       cache()[j] = a;
     }
 
@@ -128,17 +125,13 @@ namespace quda
        @param[in] z The z index to use
        @return The value at coordinates (x,y,z)
     */
-#ifdef __CUDA_ARCH__
-    __device__ __host__ inline T load(int x = threadIdx.x, int y = threadIdx.y, int z = threadIdx.z)
-#else
-    __device__ __host__ inline T load(int = 0, int = 0, int = 0)
-#endif
+    __device__ __host__ inline T load(int x = -1, int y = -1, int z = -1)
     {
-#ifdef __CUDA_ARCH__
+      auto tid = device::thread_idx();
+      x = (x == -1) ? tid.x : x;
+      y = (y == -1) ? tid.y : y;
+      z = (z == -1) ? tid.z : z;
       int j = (z * block_size_y + y) * thread_width_x + x;
-#else
-      int j = 0;
-#endif
       return cache()[j];
     }
 
@@ -149,17 +142,11 @@ namespace quda
        @param[in] z The z index to use
        @return The value at coordinates (x,y,z)
     */
-#ifdef __CUDA_ARCH__
-    __device__ __host__ inline T load_x(int x = threadIdx.x)
-#else
-    __device__ __host__ inline T load_x(int = 0)
-#endif
+    __device__ __host__ inline T load_x(int x = -1)
     {
-#ifdef __CUDA_ARCH__
-      int j = (threadIdx.z * block_size_y + threadIdx.y) * thread_width_x + x;
-#else
-      int j = 0;
-#endif
+      auto tid = device::thread_idx();
+      x = (x == -1) ? tid.x : x;
+      int j = (tid.z * block_size_y + tid.y) * thread_width_x + x;
       return cache()[j];
     }
 
@@ -170,17 +157,11 @@ namespace quda
        @param[in] z The z index to use
        @return The value at coordinates (x,y,z)
     */
-#ifdef __CUDA_ARCH__
-    __device__ __host__ inline T load_y(int y = threadIdx.y)
-#else
-    __device__ __host__ inline T load_y(int = 0)
-#endif
+    __device__ __host__ inline T load_y(int y = -1)
     {
-#ifdef __CUDA_ARCH__
-      int j = (threadIdx.z * block_size_y + y) * thread_width_x + threadIdx.x;
-#else
-      int j = 0;
-#endif
+      auto tid = device::thread_idx();
+      y = (y == -1) ? tid.y : y;
+      int j = (tid.z * block_size_y + y) * thread_width_x + tid.x;
       return cache()[j];
     }
 
@@ -191,17 +172,11 @@ namespace quda
        @param[in] z The z index to use
        @return The value at coordinates (x,y,z)
     */
-#ifdef __CUDA_ARCH__
-    __device__ __host__ inline T load_z(int z = threadIdx.z)
-#else
-    __device__ __host__ inline T load_z(int = 0)
-#endif
+    __device__ __host__ inline T load_z(int z = -1)
     {
-#ifdef __CUDA_ARCH__
-      int j = (z * block_size_y + threadIdx.y) * thread_width_x + threadIdx.x;
-#else
-      int j = 0;
-#endif
+      auto tid = device::thread_idx();
+      z = (z == -1) ? tid.z : z;
+      int j = (z * block_size_y + tid.y) * thread_width_x + tid.x;
       return cache()[j];
     }
 
