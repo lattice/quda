@@ -92,7 +92,7 @@ namespace quda {
     }
   };
 
-  template <libtype which_lib> void ComputeHarmonicRitz(GMResDRArgs &args) { errorQuda("\nUnknown library type.\n"); }
+  template <libtype which_lib> void ComputeHarmonicRitz(GMResDRArgs &) { errorQuda("\nUnknown library type.\n"); }
 
 #ifdef MAGMA_LIB
   template <> void ComputeHarmonicRitz<libtype::magma_lib>(GMResDRArgs &args)
@@ -161,7 +161,7 @@ namespace quda {
     return;
   }
 
-  template <libtype which_lib> void ComputeEta(GMResDRArgs &args) { errorQuda("\nUnknown library type.\n"); }
+  template <libtype which_lib> void ComputeEta(GMResDRArgs &) { errorQuda("\nUnknown library type.\n"); }
 
 #ifdef MAGMA_LIB
   template <> void ComputeEta<libtype::magma_lib>(GMResDRArgs &args)

@@ -293,7 +293,6 @@ namespace quda
 
   template <bool dagger, int twist, QudaPCType pc, typename Arg> __global__ void packShmemKernel(Arg arg)
   {
-
     int s = blockDim.y * blockIdx.y + threadIdx.y;
     if (s >= arg.dc.Ls) return;
 

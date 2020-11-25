@@ -144,7 +144,7 @@ namespace quda {
    };
 
    //Rayleigh Ritz procedure:
-   template <libtype which_lib> void ComputeRitz(EigCGArgs &args) { errorQuda("\nUnknown library type."); }
+   template <libtype which_lib> void ComputeRitz(EigCGArgs &) { errorQuda("\nUnknown library type."); }
 
    //pure eigen version: 
    template <> void ComputeRitz<libtype::eigen_lib>(EigCGArgs &args)

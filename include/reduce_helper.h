@@ -328,7 +328,7 @@ namespace quda
      */
     template <typename T, int width> struct WarpReduce
     {
-      static_assert(width <= device::warp_size());
+      static_assert(width <= device::warp_size(), "WarpReduce logical width must not be greater than the warp size");
       cub::WarpReduce<T, width> warp_reduce;
       typename decltype(warp_reduce)::TempStorage dummy;
 

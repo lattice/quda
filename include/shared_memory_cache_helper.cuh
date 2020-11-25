@@ -86,9 +86,14 @@ namespace quda
        @brief This is the handle to the shared memory
        @return Shared memory pointer
      */
-    __device__ inline T *cache()
+    __device__ __host__ inline T *cache()
     {
+#ifdef __CUDA_ARCH__
       extern __shared__ int cache_[];
+#else
+      // dummy code path to keep clang happy
+      static int *cache_;
+#endif
       return reinterpret_cast<T*>(cache_);
     }
 
@@ -96,7 +101,7 @@ namespace quda
     /**
        @brief Grab the raw base address to shared memory
     */
-    __device__ inline T* data()
+    __device__ __host__ inline T* data()
     {
       return cache();
     }
@@ -106,10 +111,12 @@ namespace quda
        Implicitly store the vector at coordinates given by threadIdx.
        @param[in] a The vector to store in the shared memory cache
      */
-    __device__ inline void save(const T &a)
+    __device__ __host__ inline void save(const T &a)
     {
+#ifdef __CUDA_ARCH__
       int j = (threadIdx.z * block_size_y + threadIdx.y) * thread_width_x + threadIdx.x;
       cache()[j] = a;
+#endif
     }
 
     /**
@@ -119,9 +126,13 @@ namespace quda
        @param[in] z The z index to use
        @return The value at coordinates (x,y,z)
     */
-    __device__ inline T load(int x = threadIdx.x, int y = threadIdx.y, int z = threadIdx.z)
+    __device__ __host__ inline T load(int x = threadIdx.x, int y = threadIdx.y, int z = threadIdx.z)
     {
+#ifdef __CUDA_ARCH__
       int j = (z * block_size_y + y) * thread_width_x + x;
+#else
+      int j = 0;
+#endif
       return cache()[j];
     }
 
@@ -132,9 +143,13 @@ namespace quda
        @param[in] z The z index to use
        @return The value at coordinates (x,y,z)
     */
-    __device__ inline T load_x(int x = threadIdx.x)
+    __device__ __host__ inline T load_x(int x = threadIdx.x)
     {
+#ifdef __CUDA_ARCH__
       int j = (threadIdx.z * block_size_y + threadIdx.y) * thread_width_x + x;
+#else
+      int j = 0;
+#endif
       return cache()[j];
     }
 
@@ -145,9 +160,13 @@ namespace quda
        @param[in] z The z index to use
        @return The value at coordinates (x,y,z)
     */
-    __device__ inline T load_y(int y = threadIdx.y)
+    __device__ __host__ inline T load_y(int y = threadIdx.y)
     {
+#ifdef __CUDA_ARCH__
       int j = (threadIdx.z * block_size_y + y) * thread_width_x + threadIdx.x;
+#else
+      int j = 0;
+#endif
       return cache()[j];
     }
 
@@ -158,16 +177,25 @@ namespace quda
        @param[in] z The z index to use
        @return The value at coordinates (x,y,z)
     */
-    __device__ inline T load_z(int z = threadIdx.z)
+    __device__ __host__ inline T load_z(int z = threadIdx.z)
     {
+#ifdef __CUDA_ARCH__
       int j = (z * block_size_y + threadIdx.y) * thread_width_x + threadIdx.x;
+#else
+      int j = 0;
+#endif
       return cache()[j];
     }
 
     /**
        @brief Synchronize the cache
     */
-    __device__ inline void sync() { __syncthreads(); }
+    __device__ __host__ inline void sync()
+    {
+#ifdef __CUDA_ARCH__
+      __syncthreads();
+#endif
+    }
   };
 
 } // namespace quda
