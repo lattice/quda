@@ -869,9 +869,9 @@ namespace quda {
      @return Swizzled block index
   */
   //#define SWIZZLE
+#ifdef SWIZZLE
   template <typename T> __device__ inline int block_idx(const T &swizzle)
   {
-#ifdef SWIZZLE
     // the portion of the grid that is exactly divisible by the number of SMs
     const int gridp = gridDim.x - gridDim.x % swizzle;
 
@@ -885,10 +885,13 @@ namespace quda {
       block_idx = i * (gridp / swizzle) + j;
     }
     return block_idx;
-#else
-    return blockIdx.x;
-#endif
   }
+#else
+  template <typename T> __device__ inline int block_idx(const T &)
+  {
+    return blockIdx.x;
+  }
+#endif
 
   /**
      @brief Compute the staggered phase factor at unit shift from the

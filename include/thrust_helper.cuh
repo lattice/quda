@@ -15,6 +15,7 @@
 
 // hack required to silence a thrust complaint with clang-11
 #if defined(__clang__) && defined(__CUDA__)
+#undef _CubLog
 #define _CubLog(...)
 #endif
 
