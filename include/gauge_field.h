@@ -296,6 +296,11 @@ namespace quda {
     bool StaggeredPhaseApplied() const { return staggeredPhaseApplied; }
 
     /**
+     * Define the parameter type for this field.
+     */
+    using param_type = GaugeFieldParam;
+
+    /**
        Apply the staggered phase factors to the gauge field.
        @param[in] phase The phase we will apply to the field.  If this
        is QUDA_STAGGERED_PHASE_INVALID, the default value, then apply

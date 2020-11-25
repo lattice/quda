@@ -139,6 +139,11 @@ namespace quda {
     const void* Norm(bool inverse=false) const { return inverse ? invNorm : norm; }
 
     /**
+     * Define the parameter type for this field.
+     */
+    using param_type = CloverFieldParam;
+
+    /**
        @return True if the field is stored in an internal field order
        for the given precision.
     */

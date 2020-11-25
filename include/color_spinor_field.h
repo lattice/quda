@@ -506,6 +506,11 @@ namespace quda {
     virtual void copy_from_buffer(void *buffer) = 0;
 
     /**
+     * Define the parameter type for this field.
+     */
+    using param_type = ColorSpinorParam;
+
+    /**
        Do the exchange between neighbouring nodes of the data in
        sendbuf storing the result in recvbuf.  The arrays are ordered
        (2*dim + dir).

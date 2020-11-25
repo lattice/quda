@@ -12,66 +12,6 @@ int comm_rank_from_coords(const int *coords);
 
 namespace quda
 {
-  /**
-    int inline product(const CommKey &input) { return input[0] * input[1] * input[2] * input[3]; }
-
-    CommKey inline operator+(const CommKey &lhs, const CommKey &rhs)
-    {
-      CommKey sum;
-      for (int d = 0; d < nDim; d++) { sum[d] = lhs[d] + rhs[d]; }
-      return sum;
-    }
-
-    CommKey inline operator*(const CommKey &lhs, const CommKey &rhs)
-    {
-      CommKey product;
-      for (int d = 0; d < nDim; d++) { product[d] = lhs[d] * rhs[d]; }
-      return product;
-    }
-
-    CommKey inline operator/(const CommKey &lhs, const CommKey &rhs)
-    {
-      CommKey quotient;
-      for (int d = 0; d < nDim; d++) { quotient[d] = lhs[d] / rhs[d]; }
-      return quotient;
-    }
-
-    CommKey inline operator%(const CommKey &lhs, const CommKey &rhs)
-    {
-      CommKey mod;
-      for (int d = 0; d < nDim; d++) { mod[d] = lhs[d] % rhs[d]; }
-      return mod;
-    }
-
-    CommKey inline coordinate_from_index(int index, CommKey dim)
-    {
-      CommKey coord;
-      for (int d = 0; d < nDim; d++) {
-        coord[d] = index % dim[d];
-        index /= dim[d];
-      }
-      return coord;
-    }
-
-    int inline index_from_coordinate(CommKey coord, CommKey dim)
-    {
-      return ((coord[3] * dim[2] + coord[2]) * dim[1] + coord[1]) * dim[0] + coord[0];
-    }
-  */
-  template <class F> struct param_mapper {
-  };
-
-  template <> struct param_mapper<GaugeField> {
-    using type = GaugeFieldParam;
-  };
-
-  template <> struct param_mapper<ColorSpinorField> {
-    using type = ColorSpinorParam;
-  };
-
-  template <> struct param_mapper<CloverField> {
-    using type = CloverFieldParam;
-  };
 
   template <class Field>
   void inline split_field(Field &collect_field, std::vector<Field *> &v_base_field, const CommKey &comm_key,
@@ -116,7 +56,7 @@ namespace quda
       comm_start(v_mh_send[i]);
     }
 
-    using param_type = typename param_mapper<Field>::type;
+    using param_type = typename Field::param_type;
 
     param_type param(*meta);
     Field *buffer_field = Field::Create(param);
@@ -188,7 +128,7 @@ namespace quda
 
     const auto &meta = *(v_base_field[0]);
 
-    using param_type = typename param_mapper<Field>::type;
+    using param_type = typename Field::param_type;
 
     param_type param(meta);
     Field *buffer_field = Field::Create(param);
