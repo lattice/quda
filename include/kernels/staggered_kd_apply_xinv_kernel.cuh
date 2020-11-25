@@ -62,6 +62,7 @@ namespace quda {
   template<typename Arg> struct StaggeredKDBlock {
     Arg &arg;
     constexpr StaggeredKDBlock(Arg &arg) : arg(arg) {}
+    static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ inline void operator()(int tid)
     {
