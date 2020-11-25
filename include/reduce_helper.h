@@ -2,7 +2,7 @@
 
 #include <float_vector.h>
 #include <cub_helper.cuh>
-#include <device.h>
+#include <target_device.h>
 
 #ifdef QUAD_SUM
 using device_reduce_t = doubledouble;
@@ -321,5 +321,19 @@ namespace quda
       }
     }
 #endif
+
+    /**
+       @brief This is a convenience wrapper that allows to perform
+       reductions at the warp or sub-warp level
+     */
+    template <typename T, int width> struct WarpReduce
+    {
+      static_assert(width <= device::warp_size());
+      cub::WarpReduce<T, width> warp_reduce;
+      typename decltype(warp_reduce)::TempStorage dummy;
+
+      __device__ WarpReduce() : warp_reduce(dummy) {}
+      __device__ T Sum(const T &value) { return warp_reduce.Sum(value); }
+    };
 
 } // namespace quda
