@@ -1,17 +1,16 @@
-#include <tune_quda.h>
 #include <gauge_field.h>
 #include <color_spinor_field.h>
 #include <register_traits.h>
 #include <dslash_quda.h>
 #include <instantiate.h>
 
-#include <jitify_helper.cuh>
+#include <tunable_nd.h>
 #include <kernels/staggered_kd_apply_xinv_kernel.cuh>
 
 namespace quda {
 
   template <typename Arg>
-  class ApplyStaggeredKDBlock : public TunableVectorY {
+  class ApplyStaggeredKDBlock : public TunableKernel1D {
 
     Arg &arg;
     const ColorSpinorField &meta;
@@ -34,54 +33,35 @@ namespace quda {
       // plus some padding to avoid bank conflicts: each KD block stores
       // 17 ColorVectors. (2 * 16 threads * 51 complex * 8 bytes per complex) / 256 threads
       // -> each thread needs 51 bytes
-      return 2 * Arg::fineColor * 16 * Arg::paddedSpinorSizeKD * sizeof(complex<typename Arg::Float>) / 256 +
-              Arg::xinvPaddedColTileSize * sizeof(complex<typename Arg::Float>);
+      return 2 * Arg::fineColor * 16 * Arg::paddedSpinorSizeKD * sizeof(complex<typename Arg::real>) / 256 +
+              Arg::xinvPaddedColTileSize * sizeof(complex<typename Arg::real>);
     }
 
     int blockStep() const { return 256; }
     int blockMin() const { return 256; }
 
     unsigned int minThreads() const { return 2 * arg.fineVolumeCB; }
-    bool tuneGridDim() const { return false; } // don't tune the grid dimension
 
   public:
     ApplyStaggeredKDBlock(Arg &arg, const ColorSpinorField &meta, const GaugeField &Xinv) :
-      TunableVectorY(1),
+      TunableKernel1D(meta),
       arg(arg),
       meta(meta),
       Xinv(Xinv)
     {
-#ifdef JITIFY
-      create_jitify_program("kernels/staggered_kd_apply_xinv_kernel.cuh");
-#endif
-      strcpy(aux, compile_type_str(meta));
-      strcat(aux, "out:");
-      strcat(aux, meta.AuxString());
-      strcat(aux, ",applyStaggeredKDBlock");
       strcat(aux, ",Xinv:coarse_");
       strcat(aux, Xinv.AuxString());
-      // should be all we need?
     }
 
     void apply(const qudaStream_t &stream)
     {
-      TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_VERBOSE);
-
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-        //ComputeStaggeredKDBlockCPU<Float,fineColor,coarseSpin,coarseColor>(arg);
+        errorQuda("Not implemented");
       } else {
-#ifdef JITIFY
-        using namespace jitify::reflection;
-        jitify_error = program->kernel("quda::ApplyStaggeredKDBlockGPU")
-          .instantiate(Type<Arg>())
-          .configure(tp.grid,tp.block,tp.shared_bytes,device::get_cuda_stream(stream)).launch(arg);
-#else // not jitify
-        qudaLaunchKernel(ApplyStaggeredKDBlockGPU<Arg>, tp, stream, arg);
-#endif // JITIFY
+        launch_device<StaggeredKDBlock>(tp, stream, arg);
       }
     }
-
-    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
   };
 
   /**
@@ -96,7 +76,7 @@ namespace quda {
   */
   template<typename vFloatSpinor, typename vFloatGauge, int fineColor, int coarseDof, bool dagger, typename fineColorSpinor, typename xInvGauge>
   void applyStaggeredKDBlock(fineColorSpinor &out, const fineColorSpinor &in, const xInvGauge &Xinv,
-        ColorSpinorField &out_, const ColorSpinorField &, const GaugeField &Xinv_)
+                             ColorSpinorField &out_, const ColorSpinorField &, const GaugeField &Xinv_)
   {
     // sanity checks
     if (fineColor != 3)
