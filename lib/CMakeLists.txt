@@ -91,7 +91,7 @@ set (QUDA_OBJS
   blas_magma.cu
   inv_mpcg_quda.cpp inv_mpbicgstab_quda.cpp inv_gmresdr_quda.cpp
   pgauge_exchange.cu pgauge_init.cu pgauge_heatbath.cu random.cu
-  gauge_fix_fft.cu
+  gauge_fix_fft.cu gauge_fix_ovr.cu
   pgauge_det_trace.cu clover_outer_product.cu
   clover_sigma_outer_product.cu momentum.cu gauge_qcharge.cu
   deflation.cpp checksum.cu
@@ -198,16 +198,19 @@ if(CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA"
 endif()
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:--cuda-path=${CUDAToolkit_TARGET_DIR}>)
 
-target_include_directories(quda SYSTEM PRIVATE ../include/externals)
+
 target_include_directories(quda PRIVATE .)
 target_include_directories(quda PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(quda SYSTEM PRIVATE ../include/externals)
 target_include_directories(quda SYSTEM PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
+target_include_directories(quda SYSTEM PRIVATE ${EIGEN_INCLUDE_DIRS})
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/>
                                        $<INSTALL_INTERFACE:include/>)
-
-target_include_directories(quda SYSTEM PRIVATE ${EIGEN_INCLUDE_DIRS})
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include> $<INSTALL_INTERFACE:include>)
 
+target_include_directories(quda_cpp SYSTEM PRIVATE ../include/externals)
+target_include_directories(quda_cpp SYSTEM PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
+target_include_directories(quda_cpp SYSTEM PRIVATE ${EIGEN_INCLUDE_DIRS})
 target_compile_definitions(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,COMPILE_DEFINITIONS>)
 target_include_directories(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,INCLUDE_DIRECTORIES>)
 target_compile_options(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,COMPILE_OPTIONS>)
@@ -222,13 +225,10 @@ if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
   add_subdirectory(targets/hip)
   target_include_directories(quda PRIVATE ../include/targets/hip)
 endif()
-target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_target>)
 
 add_subdirectory(targets/generic)
-target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_generic>)
 
 add_subdirectory(interface)
-target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_interface>)
 
 # propagate CXX flags to CUDA host compiler
 #TODO: Do we still need that? 
@@ -416,10 +416,6 @@ if(QUDA_QMP)
   if(QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
     add_dependencies(quda QMP)
     add_dependencies(quda_cpp QMP)
-    # TODO: need to figure out how to propagate that cleanly
-    add_dependencies(${QUDA_TARGET_LIBRARY} QMP)
-    add_dependencies(quda_generic_target QMP)
-    add_dependencies(quda_blas_interface QMP)
   endif()
   target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_QMPHOME}/include>)
   target_compile_definitions(quda PUBLIC QMP_COMMS)
@@ -431,10 +427,6 @@ if(QUDA_QIO)
   if(QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
     add_dependencies(quda QIO)
     add_dependencies(quda_cpp QIO)
-    # TODO: need to figure out how to propagate that cleanly
-    add_dependencies(${QUDA_TARGET_LIBRARY} QIO)
-    add_dependencies(quda_generic_target QIO)
-    add_dependencies(quda_blas_interface QIO)
   endif()
   target_compile_definitions(quda PUBLIC HAVE_QIO)
   target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_QIOHOME}/include>)
@@ -572,9 +564,6 @@ endif()
 if(QUDA_DOWNLOAD_EIGEN)
   add_dependencies(quda_cpp Eigen)
   add_dependencies(quda Eigen)
-  add_dependencies(${QUDA_TARGET_LIBRARY} Eigen)
-  add_dependencies(quda_generic_target Eigen)
-  add_dependencies(quda_blas_interface Eigen)
 endif()
 
 configure_file(../include/quda_define.h.in ../include/quda_define.h @ONLY)
