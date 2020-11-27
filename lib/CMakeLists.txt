@@ -261,7 +261,7 @@ endif()
 
 # Specific config dependent warning suppressions and lineinfo forwarding
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
-                            -lineinfo -Wreorder -Wdefault-stream-launch -Wext-lambda-captures-this
+                            -lineinfo -Wreorder -Wext-lambda-captures-this
                             -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function
                             $<$<CONFIG:STRICT>:-Werror=all-warnings>
                             $<$<CONFIG:SANITIZE>:-Xcompiler -fsanitize=address,-fsanitize=undefined>
@@ -272,7 +272,7 @@ target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
                             $<$<CONFIG:STRICT>:-Werror -Wno-error=pass-failed>
                             $<$<CONFIG:SANITIZE>:-fsanitize=address,-fsanitize=undefined>
                             >)
-#-Werror,-Wpass-failed=transform-warning
+
 # some clang warnings should be warning even when turning warnings into errors
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   target_compile_options(quda_cpp PUBLIC $<$<COMPILE_LANGUAGE:CXX>: -Wno-error=unused-function>)
