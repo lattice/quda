@@ -259,37 +259,22 @@ if(${QUDA_PROPAGATE_CXX_FLAGS})
   endforeach()
 endif()
 
-# Specific comnfig dependent warning suppressions and lineinfo forwarding
-target_compile_options(
-  quda
-  PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
-          $<$<CONFIG:DEVEL>:-lineinfo
-          -Xcompiler
-          -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field>
-          $<$<CONFIG:STRICT>:
-          -Xcompiler
-          -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field>
-          $<$<CONFIG:HOSTDEBUG>:-lineinfo>
-          $<$<CONFIG:SANITIZE>:-lineinfo
-          -Xcompiler
-          -fsanitize=address,-fsanitize=undefined>>
-          $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
-          $<$<CONFIG:DEVEL>:-Wno-unknown-pragmas
-          -Wno-unused-function
-          -Wno-unused-local-typedef
-          -Wno-unused-private-field>
-          $<$<CONFIG:STRICT>:-Wno-unknown-pragmas
-          -Wno-unused-function
-          -Wno-unused-local-typedef
-          -Wno-unused-private-field>
-          $<$<CONFIG:HOSTDEBUG>:>
-          $<$<CONFIG:SANITIZE>:-fsanitize=address,-fsanitize=undefined>
-          >)
+# Specific config dependent warning suppressions and lineinfo forwarding
+target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
+                            -lineinfo -Wall -Wextra -Wreorder
+                            -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function
+                            $<$<CONFIG:SANITIZE>:-Xcompiler -fsanitize=address,-fsanitize=undefined>
+                            >)
 
+target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
+                            -Wall -Wextra -Wno-unknown-pragmas -Wno-unused-function
+                            $<$<CONFIG:STRICT>:-Werror -Wno-error=pass-failed>
+                            $<$<CONFIG:SANITIZE>:-fsanitize=address,-fsanitize=undefined>
+                            >)
+#-Werror,-Wpass-failed=transform-warning
 # some clang warnings should be warning even when turning warnings into errors
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  target_compile_options(quda_cpp PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Wno-error=unused-private-field
-                                         -Wno-error=unused-function>)
+  target_compile_options(quda_cpp PUBLIC $<$<COMPILE_LANGUAGE:CXX>: -Wno-error=unused-function>)
 
   # this is a hack to get colored diagnostics back when using Ninja and clang
   if(CMAKE_GENERATOR MATCHES "Ninja")

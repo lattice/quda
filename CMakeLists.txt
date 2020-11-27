@@ -330,50 +330,50 @@ endif()
 set(CMAKE_CXX_STANDARD ${QUDA_CXX_STANDARD})
 # define CXX FLAGS
 set(CMAKE_CXX_FLAGS_DEVEL
-    "-g -O3 -Wall"
+    "-g -O3 -Wall -Wextra"
     CACHE STRING "Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_CXX_FLAGS_STRICT
-    "-O3 -Wall -Werror"
+    "-O3 -Werror -Wall -Wextra"
     CACHE STRING "Flags used by the C++ compiler during strict jenkins builds.")
 set(CMAKE_CXX_FLAGS_RELEASE
     "-O3 -w ${CXX_OPT} "
     CACHE STRING "Flags used by the C++ compiler during release builds.")
 set(CMAKE_CXX_FLAGS_HOSTDEBUG
-    "-Wall -Wno-unknown-pragmas -g -fno-inline"
+    "-Wall -Wextra -Wno-unknown-pragmas -g -fno-inline"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
 set(CMAKE_CXX_FLAGS_DEVICEDEBUG
-    "-Wall -Wno-unknown-pragmas"
+    "-Wall -Wextra -Wno-unknown-pragmas"
     CACHE STRING "Flags used by the C++ compiler during device-debug builds.")
 set(CMAKE_CXX_FLAGS_DEBUG
-    "-Wall -Wno-unknown-pragmas -g -fno-inline"
+    "-Wall -Wextra -Wno-unknown-pragmas -g -fno-inline"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(CMAKE_CXX_FLAGS_SANITIZE
-    "-Wall -Wno-unknown-pragmas -g -fno-inline -fsanitize=address,undefined"
+    "-Wall -Wextra -Wno-unknown-pragmas -g -fno-inline -fsanitize=address,undefined"
     CACHE STRING "Flags used by the C++ compiler during santizer debug builds.")
 
 enable_language(CXX)
 
 # define C FLAGS
 set(CMAKE_C_FLAGS_DEVEL
-    "-Wall -g -O3"
+    "-g -O3 -Wall -Wextra"
     CACHE STRING "Flags used by the C compiler during regular development builds.")
 set(CMAKE_C_FLAGS_STRICT
-    "-Wall -O3 -Werror -Wno-error=unused-private-field"
+    "-O3 -Werror -Wall -Wextra"
     CACHE STRING "Flags used by the C compiler during strict jenkins builds.")
 set(CMAKE_C_FLAGS_RELEASE
-    "-Wall -O3 -w"
+    "-O3 -w"
     CACHE STRING "Flags used by the C compiler during release builds.")
 set(CMAKE_C_FLAGS_HOSTDEBUG
-    "-Wall -Wno-unknown-pragmas -g -fno-inline"
+    "-Wall -Wextra -Wno-unknown-pragmas -g -fno-inline"
     CACHE STRING "Flags used by the C compiler during host-debug builds.")
 set(CMAKE_C_FLAGS_DEVICEDEBUG
-    "-Wall"
+    "-Wall -Wextra"
     CACHE STRING "Flags used by the C compiler during device-debug builds.")
 set(CMAKE_C_FLAGS_DEBUG
-    "-Wall -g -fno-inline"
+    "-Wall -Wextra -g -fno-inline"
     CACHE STRING "Flags used by the C compiler during full (host+device) debug builds.")
 set(CMAKE_C_FLAGS_SANITIZE
-    "-Wall -g -fno-inline -fsanitize=address,undefined"
+    "-Wall -Wextra -g -fno-inline -fsanitize=address,undefined"
     CACHE STRING "Flags used by the C compiler during sanitizer debug builds.")
 
 enable_language(C)
