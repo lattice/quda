@@ -261,8 +261,9 @@ endif()
 
 # Specific config dependent warning suppressions and lineinfo forwarding
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
-                            -lineinfo -Wall -Wextra -Wreorder
+                            -lineinfo -Wreorder -Wdefault-stream-launch -Wext-lambda-captures-this
                             -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function
+                            $<$<CONFIG:STRICT>:-Werror=all-warnings>
                             $<$<CONFIG:SANITIZE>:-Xcompiler -fsanitize=address,-fsanitize=undefined>
                             >)
 
