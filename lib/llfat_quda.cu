@@ -114,7 +114,7 @@ namespace quda {
         if (i==nu || i==dir1 || i==dir2) continue; // skip these dimensions
         mu_map[j++] = i;
       }
-      assert(j == threads().z);
+      assert((unsigned)j == threads().z);
 
       if (mulink.Reconstruct() != QUDA_RECONSTRUCT_12) strcat(aux, ",mulink_recon=12");
       strcat(aux, comm_dim_partitioned_string());

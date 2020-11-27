@@ -48,17 +48,16 @@ static inline __device__ double atomicAdd(double* address, double val)
    @param addr Address that stores the atomic variable to be updated
    @param val Value to be added to the atomic
 */
-static inline __device__ double2 atomicAdd(double2 *addr, double2 val){
+static inline __device__ double2 atomicAdd(double2 *addr, double2 val)
+{
   double2 old = *addr;
   // This is a necessary evil to avoid conflicts between the atomicAdd
   // declared in the CUDA headers which are visible for host
   // compilation, which cause a conflict when compiled on clang-cuda.
   // As a result we do not support any architecture without native
   // double precision atomics on clang-cuda.
-#if defined(__CUDA_ARCH__)
   old.x = atomicAdd((double*)addr, val.x);
   old.y = atomicAdd((double*)addr + 1, val.y);
-#endif
   return old;
 }
 

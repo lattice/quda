@@ -50,9 +50,9 @@ namespace quda
   {
     const Arg &arg;
     __device__ __host__ coeff_type(const Arg &arg) : arg(arg) {}
-    __device__ __host__ real a(int s) { return arg.a; }
-    __device__ __host__ real b(int s) { return arg.b; }
-    __device__ __host__ real c(int s) { return arg.c; }
+    __device__ __host__ real a(int) { return arg.a; }
+    __device__ __host__ real b(int) { return arg.b; }
+    __device__ __host__ real c(int) { return arg.c; }
   };
 
   /**

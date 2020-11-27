@@ -67,7 +67,7 @@ namespace quda {
     }
 
     template <template <typename> class Transformer, typename Block, typename Arg>
-    void launch_host(const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
+    void launch_host(const TuneParam &, const qudaStream_t &, Arg &arg)
     {
       using reduce_t = typename Transformer<Arg>::reduce_t;
       Transformer<Arg> t(arg);

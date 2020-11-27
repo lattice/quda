@@ -302,10 +302,9 @@ namespace quda {
         for (int i = 0; i < N * N; i++) data[i] = (T)0.0;
       }
 
-      __device__ __host__ inline HMatrix(const HMatrix<T,N> &a) {
-#pragma unroll
-	for (int i=0; i<N*N; i++) data[i] = a.data[i];
-      }
+      HMatrix(const HMatrix<T,N> &a) = default;
+      HMatrix(HMatrix<T,N> &&a) = default;
+      HMatrix& operator=(const HMatrix<T,N> &a) = default;
 
       __device__ __host__ inline HMatrix(const T data_[]) {
 #pragma unroll

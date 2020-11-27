@@ -50,7 +50,6 @@ namespace quda
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)
     {
       using real = typename Arg::Float;
-      typedef complex<real> Complex;
       typedef Matrix<complex<real>, Arg::nColor> Link;
 
       // compute spacetime and local coords

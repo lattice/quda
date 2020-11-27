@@ -353,8 +353,8 @@ namespace quda {
 	    errorQuda("Gauge field orders %d not supported", in.Order());
 	  }
 	} else if (out.Order() == QUDA_QDP_GAUGE_ORDER) {
-	  typedef QDPOrder<FloatOut,10> momOut;
 #ifdef BUILD_QDP_INTERFACE
+	  typedef QDPOrder<FloatOut,10> momOut;
 	  if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
 	    typedef FloatNOrder<FloatIn,10,2,10> momIn;
 	    CopyGaugeArg<FloatOut, FloatIn, 10, momOut, momIn> arg(momOut(out, Out), momIn(in, In, 0), in);
@@ -370,8 +370,8 @@ namespace quda {
 	  errorQuda("QDP interface has not been built\n");
 #endif
 	} else if (out.Order() == QUDA_MILC_GAUGE_ORDER) {
-	  typedef MILCOrder<FloatOut,10> momOut;
 #ifdef BUILD_MILC_INTERFACE
+	  typedef MILCOrder<FloatOut,10> momOut;
 	  if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
 	    typedef FloatNOrder<FloatIn,10,2,10> momIn;
 	    CopyGaugeArg<FloatOut, FloatIn, 10, momOut, momIn> arg(momOut(out, Out), momIn(in, In, 0), in);
@@ -391,8 +391,8 @@ namespace quda {
 	  errorQuda("MILC interface has not been built\n");
 #endif
 	} else if (out.Order() == QUDA_MILC_SITE_GAUGE_ORDER) {
-	  typedef MILCSiteOrder<FloatOut,10> momOut;
 #ifdef BUILD_MILC_INTERFACE
+	  typedef MILCSiteOrder<FloatOut,10> momOut;
 	  if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
 	    typedef FloatNOrder<FloatIn,10,2,10> momIn;
 	    CopyGaugeArg<FloatOut, FloatIn, 10, momOut, momIn> arg(momOut(out, Out), momIn(in, In, 0), in);
@@ -408,8 +408,8 @@ namespace quda {
 	  errorQuda("MILC interface has not been built\n");
 #endif
 	} else if (out.Order() == QUDA_TIFR_GAUGE_ORDER) {
-	  typedef TIFROrder<FloatOut,18> momOut;
 #ifdef BUILD_TIFR_INTERFACE
+	  typedef TIFROrder<FloatOut,18> momOut;
 	  if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
 	    // FIX ME - 11 is a misnomer to avoid confusion in template instantiation
 	    typedef FloatNOrder<FloatIn,18,2,11> momIn;
@@ -426,8 +426,8 @@ namespace quda {
 	  errorQuda("TIFR interface has not been built\n");
 #endif
 	} else if (out.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
-	  typedef TIFRPaddedOrder<FloatOut,18> momOut;
 #ifdef BUILD_TIFR_INTERFACE
+	  typedef TIFRPaddedOrder<FloatOut,18> momOut;
 	  if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
 	    // FIX ME - 11 is a misnomer to avoid confusion in template instantiation
 	    typedef FloatNOrder<FloatIn,18,2,11> momIn;

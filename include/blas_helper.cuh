@@ -159,8 +159,8 @@ namespace quda
       {
         return 1.0;
       }
-      void backup(char **norm_h, size_t norm_bytes) {}
-      void restore(char **norm_h, size_t norm_bytes) {}
+      void backup(char **, size_t) {}
+      void restore(char **, size_t) {}
       norm_t *Norm() { return nullptr; }
     };
 

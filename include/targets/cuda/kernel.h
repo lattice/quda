@@ -7,7 +7,7 @@ namespace quda {
   {
     Functor<Arg> f(arg);
 
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    auto i = threadIdx.x + blockIdx.x * blockDim.x;
 
     while (i < arg.threads.x) {
       f(i);
@@ -20,8 +20,8 @@ namespace quda {
   {
     Functor<Arg> f(arg);
 
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    int j = threadIdx.y + blockIdx.y * blockDim.y;
+    auto i = threadIdx.x + blockIdx.x * blockDim.x;
+    auto j = threadIdx.y + blockIdx.y * blockDim.y;
     if (j >= arg.threads.y) return;
 
     while (i < arg.threads.x) {
@@ -35,9 +35,9 @@ namespace quda {
   {
     Functor<Arg> f(arg);
 
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    int j = threadIdx.y + blockIdx.y * blockDim.y;
-    int k = threadIdx.z + blockIdx.z * blockDim.z;
+    auto i = threadIdx.x + blockIdx.x * blockDim.x;
+    auto j = threadIdx.y + blockIdx.y * blockDim.y;
+    auto k = threadIdx.z + blockIdx.z * blockDim.z;
     if (j >= arg.threads.y) return;
     if (k >= arg.threads.z) return;
 

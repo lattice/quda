@@ -68,7 +68,6 @@ namespace quda
 
     template <int warp_split, typename T> __device__ __host__ void warp_combine(T &x)
     {
-#ifdef WARP_SPLIT
       constexpr int warp_size = device::warp_size();
       if (warp_split > 1) {
 #pragma unroll
@@ -81,8 +80,6 @@ namespace quda
           }
         }
       }
-
-#endif // WARP_SPLIT
     }
 
     /**
@@ -191,7 +188,7 @@ namespace quda
       using MultiBlasFunctor<real>::a;
       multiaxpy_(int NXZ, int NYW) : MultiBlasFunctor<real>(NXZ, NYW) {}
 
-      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &z, T &w, int i, int j)
+      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &, T &, int i, int j)
       {
 #pragma unroll
         for (int k = 0; k < x.size(); k++) y[k] += a(j, i) * x[k];
@@ -213,7 +210,7 @@ namespace quda
       using MultiBlasFunctor<complex<real>>::a;
       multicaxpy_(int NXZ, int NYW) : MultiBlasFunctor<complex<real>>(NXZ, NYW) {}
 
-      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &z, T &w, int i, int j)
+      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &, T &, int i, int j)
       {
 #pragma unroll
         for (int k = 0; k < x.size(); k++) y[k] = cmac(a(j, i), x[k], y[k]);
@@ -235,7 +232,7 @@ namespace quda
       using MultiBlasFunctor<complex<real>>::a;
       multicaxpyz_(int NXZ, int NYW) : MultiBlasFunctor<complex<real>>(NXZ, NYW) {}
 
-      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &z, T &w, int i, int j)
+      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &, T &w, int i, int j)
       {
 #pragma unroll
         for (int k = 0; k < x.size(); k++) {
@@ -265,7 +262,7 @@ namespace quda
       real c[N];
       multi_axpyBzpcx_(int NXZ, int NYW) : MultiBlasFunctor<real, true>(NXZ, NYW) {}
 
-      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &z, T &w, int i, int j)
+      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &, T &w, int i, int)
       {
 #pragma unroll
         for (int k = 0; k < x.size(); k++) {
@@ -294,7 +291,7 @@ namespace quda
       multi_caxpyBxpz_(int NXZ, int NYW) : MultiBlasFunctor<complex<real>, true>(NXZ, NYW) {}
 
       // i loops over NYW, j loops over NXZ
-      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &z, T &w, int i, int j)
+      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &, T &w, int, int j)
       {
 #pragma unroll
         for (int k = 0; k < x.size(); k++) {

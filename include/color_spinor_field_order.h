@@ -277,7 +277,7 @@ namespace quda {
       /**
        * @brief This `wrap_index` method for ghost.
        */
-      __device__ __host__ inline int wrap_index(int dim, int dir, int parity, int x_cb, int s) const
+      __device__ __host__ inline int wrap_index(int dim, int parity, int x_cb, int s) const
       {
         return parity * ghostOffset[dim] + (x_cb * nSpin + s) * nColor * nVec;
       }
@@ -447,124 +447,118 @@ namespace quda {
     */
     template <typename Float, typename storeFloat>
       struct fieldorder_wrapper {
-      /**
-       * computing type and storage types that can be inferred from this object.
-       */
-      using type = Float;
-      using store_type = storeFloat;
-      complex<storeFloat> *v;
-      const int idx;
-      const Float scale;
-      const Float scale_inv;
-      static constexpr bool fixed = fixed_point<Float, storeFloat>();
+        /**
+         * computing type and storage types that can be inferred from this object.
+         */
+        using type = Float;
+        using store_type = storeFloat;
+        complex<storeFloat> *v;
+        const int idx;
+        const Float scale;
+        const Float scale_inv;
+        static constexpr bool fixed = fixed_point<Float, storeFloat>();
 
-      /**
-         @brief fieldorder_wrapper constructor
-         @param idx Field index
-      */
-      __device__ __host__ inline fieldorder_wrapper(complex<storeFloat> *v, int idx, Float scale, Float scale_inv) :
-        v(v), idx(idx), scale(scale), scale_inv(scale_inv)
-      { }
+        /**
+           @brief fieldorder_wrapper constructor
+           @param idx Field index
+        */
+        __device__ __host__ inline fieldorder_wrapper(complex<storeFloat> *v, int idx, Float scale, Float scale_inv) :
+          v(v), idx(idx), scale(scale), scale_inv(scale_inv)
+        { }
 
-  __device__ __host__ inline Float real() const {
-    if (!fixed) {
-      return v[idx].real();
-    } else {
-      return scale_inv*static_cast<Float>(v[idx].real());
-    }
-  }
+        fieldorder_wrapper(const fieldorder_wrapper<Float,storeFloat> &a) = default;
 
-  __device__ __host__ inline Float imag() const {
-    if (!fixed) {
-      return v[idx].imag();
-    } else {
-      return scale_inv*static_cast<Float>(v[idx].imag());
-    }
-  }
+        __device__ __host__ inline Float real() const
+        {
+          return fixed ? scale_inv*static_cast<Float>(v[idx].real()) : v[idx].real();
+        }
 
-  __device__ __host__ inline void real(const Float &a) {
-    if (!fixed) {
-      v[idx].real(storeFloat(a));
-    } else { // we need to scale and then round
-      v[idx].real(storeFloat(round(scale * a)));
-    }
-  }
-  __device__ __host__ inline void imag(const Float &a) {
-    if (!fixed) {
-      v[idx].imag(storeFloat(a));
-    } else { // we need to scale and then round
-      v[idx].imag(storeFloat(round(scale * a)));
-    }
-  }
+        __device__ __host__ inline Float imag() const
+        {
+          return fixed ? scale_inv*static_cast<Float>(v[idx].imag()) : v[idx].imag();
+        }
 
-  /**
-   * @brief returns the pointor of this wrapper object
-   */
-  __device__ __host__ inline auto data() { return &v[idx]; }
+        __device__ __host__ inline void real(const Float &a)
+        {
+          return fixed ? v[idx].real(storeFloat(round(scale * a))) : v[idx].real(storeFloat(a));
+        }
 
-  __device__ __host__ inline const auto data() const { return &v[idx]; }
+        __device__ __host__ inline void imag(const Float &a)
+        {
+          return fixed ? v[idx].imag(storeFloat(round(scale * a))) : v[idx].imag(storeFloat(a));
+        }
 
-  /**
-     @brief negation operator
-     @return negation of this complex number
-  */
-  __device__ __host__ inline complex<Float> operator-() const {
-    return fixed ? -scale_inv*static_cast<complex<Float> >(v[idx]) : -static_cast<complex<Float> >(v[idx]);
-  }
+        /**
+         * @brief returns the pointer of this wrapper object
+         */
+        __device__ __host__ inline auto data() const { return &v[idx]; }
 
-  /**
-     @brief Assignment operator with fieldorder_wrapper instance as input
-     @param a fieldorder_wrapper we are copying from
-  */
-  __device__ __host__ inline void operator=(const fieldorder_wrapper<Float,storeFloat> &a) {
-    v[idx] = fixed ? complex<storeFloat>(round(scale * a.real()), round(scale * a.imag())) : a.v[a.idx];
-  }
+        /**
+           @brief negation operator
+           @return negation of this complex number
+        */
+        __device__ __host__ inline complex<Float> operator-() const
+        {
+          return fixed ? -scale_inv*static_cast<complex<Float> >(v[idx]) : -static_cast<complex<Float> >(v[idx]);
+        }
 
-  /**
-     @brief Assignment operator with complex number instance as input
-     @param a Complex number we want to store in this accessor
-  */
+        /**
+           @brief Assignment operator with fieldorder_wrapper instance as input
+           @param a fieldorder_wrapper we are copying from
+        */
+        __device__ __host__ inline void operator=(const fieldorder_wrapper<Float,storeFloat> &a)
+        {
+          v[idx] = fixed ? complex<storeFloat>(round(scale * a.real()), round(scale * a.imag())) : a.v[a.idx];
+        }
+
+        /**
+           @brief Assignment operator with complex number instance as input
+           @param a Complex number we want to store in this accessor
+        */
         template<typename theirFloat>
-  __device__ __host__ inline void operator=(const complex<theirFloat> &a) {
-    if (match<storeFloat,theirFloat>()) {
-      v[idx] = complex<storeFloat>(a.x, a.y);
-    } else {
-      v[idx] = fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
-    }
-  }
+        __device__ __host__ inline void operator=(const complex<theirFloat> &a)
+        {
+          if (match<storeFloat,theirFloat>()) {
+            v[idx] = complex<storeFloat>(a.x, a.y);
+          } else {
+            v[idx] = fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
+          }
+        }
 
-  /**
-     @brief Assignment operator with real number instance as input
-     @param a real number we want to store in this accessor
-  */
+        /**
+           @brief Assignment operator with real number instance as input
+           @param a real number we want to store in this accessor
+        */
         template<typename theirFloat>
-  __device__ __host__ inline void operator=(const theirFloat &a) { *this = complex<theirFloat>(a,static_cast<theirFloat>(0.0)); }
+        __device__ __host__ inline void operator=(const theirFloat &a) { *this = complex<theirFloat>(a,static_cast<theirFloat>(0.0)); }
 
-  /**
-     @brief Operator+= with complex number instance as input
-     @param a Complex number we want to add to this accessor
-  */
+        /**
+           @brief Operator+= with complex number instance as input
+           @param a Complex number we want to add to this accessor
+        */
         template<typename theirFloat>
-  __device__ __host__ inline void operator+=(const complex<theirFloat> &a) {
-    if (match<storeFloat,theirFloat>()) {
-      v[idx] += complex<storeFloat>(a.x, a.y);
-    } else {
-      v[idx] += fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
-    }
-  }
+        __device__ __host__ inline void operator+=(const complex<theirFloat> &a)
+        {
+          if (match<storeFloat,theirFloat>()) {
+            v[idx] += complex<storeFloat>(a.x, a.y);
+          } else {
+            v[idx] += fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
+          }
+        }
 
-  /**
-     @brief Operator-= with complex number instance as input
-     @param a Complex number we want to subtract from this accessor
-  */
-  template<typename theirFloat>
-  __device__ __host__ inline void operator-=(const complex<theirFloat> &a) {
-    if (match<storeFloat,theirFloat>()) {
-      v[idx] -= complex<storeFloat>(a.x, a.y);
-    } else {
-      v[idx] -= fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
-    }
-  }
+        /**
+           @brief Operator-= with complex number instance as input
+           @param a Complex number we want to subtract from this accessor
+        */
+        template<typename theirFloat>
+        __device__ __host__ inline void operator-=(const complex<theirFloat> &a)
+        {
+          if (match<storeFloat,theirFloat>()) {
+            v[idx] -= complex<storeFloat>(a.x, a.y);
+          } else {
+            v[idx] -= fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
+          }
+        }
 
       };
 
@@ -756,15 +750,7 @@ namespace quda {
    * @param x_cb 1-d checkboarding site index
    * @param s spin index
    */
-  __device__ __host__ inline const auto wrap(int parity, int x_cb, int s) const
-  {
-    return fieldorder_wrapper<Float, storeFloat>(v, accessor.wrap_index(parity, x_cb, s), scale, scale_inv);
-  }
-
-  /**
-   * The non-const `wrap` method.
-   */
-  __device__ __host__ inline auto wrap(int parity, int x_cb, int s)
+  __device__ __host__ inline auto wrap(int parity, int x_cb, int s) const
   {
     return fieldorder_wrapper<Float, storeFloat>(v, accessor.wrap_index(parity, x_cb, s), scale, scale_inv);
   }
@@ -835,26 +821,17 @@ namespace quda {
        * @param x_cb 1-d checkboarding site index
        * @param s spin index
        */
-      __device__ __host__ inline const auto wrap_ghost(int dim, int dir, int parity, int x_cb, int s) const
+      __device__ __host__ inline auto wrap_ghost(int dim, int dir, int parity, int x_cb, int s) const
       {
-        const int idx = ghostAccessor.wrap_index(dim, dir, parity, x_cb, s);
+        const int idx = ghostAccessor.wrap_index(dim, parity, x_cb, s);
         return fieldorder_wrapper<Float, ghostFloat>(ghost[2 * dim + dir], idx, ghost_scale, ghost_scale_inv);
       }
 
       /**
-       * @brief the non-const `wrap_ghost` method
-       */
-      __device__ __host__ inline auto wrap_ghost(int dim, int dir, int parity, int x_cb, int s)
-      {
-        const int idx = ghostAccessor.wrap_index(dim, dir, parity, x_cb, s);
-        return fieldorder_wrapper<Float, ghostFloat>(ghost[2 * dim + dir], idx, ghost_scale, ghost_scale_inv);
-      }
-
-      /**
-   Convert from 1-dimensional index to the n-dimensional spatial index.
-   With full fields, we assume that the field is even-odd ordered.  The
-   lattice coordinates that are computed here are full-field
-   coordinates.
+         @brief Convert from 1-dimensional index to the n-dimensional
+         spatial index.  With full fields, we assume that the field is
+         even-odd ordered.  The lattice coordinates that are computed
+         here are full-field coordinates.
       */
       __device__ __host__ inline void LatticeIndex(int y[QUDA_MAX_DIM], int i) const {
         if (siteSubset == QUDA_FULL_SITE_SUBSET) x[0] /= 2;
@@ -1033,10 +1010,7 @@ namespace quda {
   __device__ __host__ inline void load(complex out[length / 2], int x, int parity = 0) const
   {
     real v[length];
-    norm_type nrm;
-    if (isFixed<Float>::value) {
-      nrm = vector_load<float>(norm, x + parity * norm_offset);
-    }
+    norm_type nrm = isFixed<Float>::value ? vector_load<float>(norm, x + parity * norm_offset) : 0.0;
 
 #pragma unroll
     for (int i=0; i<M; i++) {
@@ -1122,8 +1096,7 @@ namespace quda {
   __device__ __host__ inline void loadGhost(complex out[length_ghost / 2], int x, int dim, int dir, int parity = 0) const
   {
     real v[length_ghost];
-    norm_type nrm;
-    if (isFixed<Float>::value) { nrm = vector_load<float>(ghost_norm[2 * dim + dir], parity * faceVolumeCB[dim] + x); }
+    norm_type nrm = isFixed<Float>::value ? vector_load<float>(ghost_norm[2 * dim + dir], parity * faceVolumeCB[dim] + x) : 0.0;
 
 #pragma unroll
     for (int i = 0; i < M_ghost; i++) {

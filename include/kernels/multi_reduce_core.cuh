@@ -176,7 +176,7 @@ namespace quda
       static constexpr bool use_w = false;
       multiDot(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, real>(NXZ, NYW) { }
 
-      template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, const int i, const int j)
+      template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &, T &, int, int)
       {
 #pragma unroll
         for (int k=0; k < x.size(); k++) dot_<reduce_t, real>(sum, x[k], y[k]);
@@ -207,7 +207,7 @@ namespace quda
       static constexpr bool use_w = false;
       multiCdot(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, complex<real>>(NXZ, NYW) { }
 
-      template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, const int i, const int j)
+      template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &, T &, int, int)
       {
 #pragma unroll
         for (int k=0; k < x.size(); k++) cdot_<reduce_t, real>(sum, x[k], y[k]);
@@ -225,7 +225,7 @@ namespace quda
       static constexpr bool use_w = true;
       multiCdotCopy(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, complex<real>>(NXZ, NYW) { }
 
-      template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, const int i, const int j)
+      template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &, T &w, int i, int j)
       {
 #pragma unroll
         for (int k = 0; k < x.size(); k++) {

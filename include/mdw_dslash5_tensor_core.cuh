@@ -47,7 +47,6 @@ namespace quda
   template <int block_dim_x, int Ls, int M_sm, class compute_type>
   __device__ inline void construct_matrix_a_generic(half *sm_a, compute_type *generic)
   {
-
     int offset_k = threadIdx.y * 4;
     int x = threadIdx.x;
 
@@ -93,7 +92,7 @@ namespace quda
   __device__ inline void construct_matrix_a_m5inv(Arg &arg, half *sm_a, const float *mp = nullptr,
                                                   const float *mm = nullptr)
   {
-    auto Ls = Arg::Ls;
+    constexpr int Ls = Arg::Ls;
     const float k = arg.kappa;
     // if we rescale, then the actual matrix is alpha*m5inv+beta.
     // Otherwise a = 1., b = 0.;
@@ -101,8 +100,8 @@ namespace quda
 
     const float inv = arg.alpha * arg.fac_inv;
 
-    int offset_k = threadIdx.y * 4;
-    int x = threadIdx.x;
+    auto offset_k = threadIdx.y * 4;
+    auto x = threadIdx.x;
 
     while (x < Ls) {
       int offset_m = x * 2;
@@ -163,13 +162,13 @@ namespace quda
   template <int M_sm, bool dagger, class Arg>
   __device__ inline void construct_matrix_a_d5(Arg &arg, half *sm_a)
   {
-    auto Ls = Arg::Ls;
+    constexpr int Ls = Arg::Ls;
     // if we rescale, then the actual matrix is alpha*m5inv+beta.
     // Otherwise a = 1., b = 0.;
     const float b = arg.beta;
 
-    int offset_k = threadIdx.y * 4;
-    int x = threadIdx.x;
+    auto offset_k = threadIdx.y * 4;
+    auto x = threadIdx.x;
 
     while (x < Ls) {
       int offset_m = x * 2;

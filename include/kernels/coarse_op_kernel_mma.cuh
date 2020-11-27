@@ -104,8 +104,6 @@ namespace quda
       template <int dim, QudaDirection dir, int bM, int bN, int bK, int block_y, int block_z, typename Arg>
       __device__ void computeVUV(Arg &arg, int parity, int x_cb)
       {
-        using Float = typename Arg::Float;
-
         constexpr int fineSpin = Arg::fineSpin;
         constexpr int coarseSpin = Arg::coarseSpin;
 

@@ -69,7 +69,7 @@ namespace quda
   */
   template <int nParity, bool dagger, KernelType kernel_type, int mu, typename Coord, typename Arg, typename Vector>
   __device__ __host__ inline void applyCovDev(Vector &out, Arg &arg, Coord &coord, int parity,
-                                              int idx, int thread_dim, bool &active)
+                                              int, int thread_dim, bool &active)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef Matrix<complex<real>, Arg::nColor> Link;

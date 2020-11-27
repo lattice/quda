@@ -47,9 +47,10 @@ namespace quda
 
   template <typename Float, int nColor, QudaReconstructType recon_u> struct StaggeredApply {
 
-    inline StaggeredApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-                          const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
-                          TimeProfile &profile)
+#if defined(BUILD_MILC_INTERFACE) || defined(BUILD_TIFR_INTERFACE)
+    StaggeredApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
+                   const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
+                   TimeProfile &profile)
     {
       if (U.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC) {
 #ifdef BUILD_MILC_INTERFACE
@@ -85,6 +86,13 @@ namespace quda
         errorQuda("Unsupported staggered phase type %d", U.StaggeredPhase());
       }
     }
+#else
+    StaggeredApply(ColorSpinorField &, const ColorSpinorField &, const GaugeField &U, double,
+                   const ColorSpinorField &, int, bool, const int *, TimeProfile &)
+    {
+      errorQuda("Unsupported staggered phase type %d", U.StaggeredPhase());
+    }
+#endif
   };
 
 #ifdef GPU_STAGGERED_DIRAC

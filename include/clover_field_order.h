@@ -166,17 +166,17 @@ namespace quda {
 
     template<typename Float, int nColor, int nSpin, QudaCloverFieldOrder order> struct Accessor {
       mutable complex<Float> dummy;
-      Accessor(const CloverField &A, bool inverse=false) {
+      Accessor(const CloverField &, bool = false) {
 	errorQuda("Not implemented for order %d", order);
       }
 
-      __device__ __host__ inline complex<Float>& operator()(int parity, int x, int s_row, int s_col,
-							    int c_row, int c_col) const {
+      __device__ __host__ inline complex<Float>& operator()(int, int, int, int, int, int) const
+      {
 	return dummy;
       }
 
       template <typename helper, typename reducer>
-      __host__ double transform_reduce(QudaFieldLocation location, helper h, double i, reducer r) const
+      __host__ double transform_reduce(QudaFieldLocation, helper, double, reducer) const
       {
         return 0.0;
       }
@@ -325,7 +325,7 @@ namespace quda {
       }
 
       template <typename helper, typename reducer>
-      __host__ double transform_reduce(QudaFieldLocation location, helper h, double init, reducer r) const
+      __host__ double transform_reduce(QudaFieldLocation, helper, double, reducer) const
       {
         errorQuda("Not implemented");
 	return 0.0;
@@ -604,10 +604,7 @@ namespace quda {
 	 */
 	__device__ __host__ inline void load(real v[block], int x, int parity, int chirality) const
         {
-          norm_type nrm;
-          if (isFixed<Float>::value) {
-            nrm = vector_load<float>(norm, parity * norm_offset + chirality * stride + x);
-          }
+          norm_type nrm = isFixed<Float>::value ? vector_load<float>(norm, parity * norm_offset + chirality * stride + x) : 0;
 
 #pragma unroll
 	  for (int i=0; i<M; i++) {
@@ -907,9 +904,7 @@ namespace quda {
 	}
   
 	// FIXME implement the save routine for BQCD ordered fields
-	__device__ __host__ inline void save(RegType v[length], int x, int parity) {
-
-	};
+	__device__ __host__ inline void save(RegType [length], int, int) { }
 
 	size_t Bytes() const { return length*sizeof(Float); }
       };

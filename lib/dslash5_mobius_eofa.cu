@@ -53,7 +53,6 @@ namespace quda
 
       long long bytes() const
       {
-        long long Ls = in.X(4);
         switch (type) {
         case M5_EOFA:
         case M5INV_EOFA: return out.Bytes() + 2 * in.Bytes() + (xpay ? x.Bytes() : 0);

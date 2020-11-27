@@ -12,8 +12,8 @@ namespace quda {
     Transformer<Arg> t(arg);
     Reducer<reduce_t> r;
 
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    int j = threadIdx.y;
+    auto idx = threadIdx.x + blockIdx.x * blockDim.x;
+    auto j = threadIdx.y;
 
     reduce_t value = arg.init();
 
@@ -34,9 +34,9 @@ namespace quda {
     Transformer<Arg> t(arg);
     Reducer<reduce_t> r;
 
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    int j = threadIdx.y + blockIdx.y * blockDim.y;
-    int k = threadIdx.z;
+    auto idx = threadIdx.x + blockIdx.x * blockDim.x;
+    auto j = threadIdx.y + blockIdx.y * blockDim.y;
+    auto k = threadIdx.z;
 
     if (j >= arg.threads.y) return;
 

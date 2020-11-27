@@ -343,7 +343,7 @@ namespace quda
 
   template <bool dagger, QudaPCType pc, typename Arg> struct packStaggeredShmem {
 
-    __device__ inline void operator()(Arg &arg, int s, int parity, int twist_pack = 0)
+    __device__ inline void operator()(Arg &arg, int s, int parity, int = 0)
     {
       // (active_dims * 2 + dir) * blocks_per_dir + local_block_idx
       int local_block_idx = blockIdx.x % arg.blocks_per_dir;

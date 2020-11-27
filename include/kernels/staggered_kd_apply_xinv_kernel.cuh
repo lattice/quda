@@ -165,8 +165,8 @@ namespace quda {
 
       // Zero the shared memory buffer, which is 48 components
 #pragma unroll
-      for (int coarse_row = fast_idx; coarse_row < Arg::coarseDof; coarse_row += Arg::blockSizeKD) {
-        out_buffer[Arg::paddedSpinorSizeKD * Arg::fineColor * mid_idx + coarse_row] = { 0, 0 };
+      for (unsigned int coarse_row = 0; coarse_row < Arg::coarseDof; coarse_row += Arg::blockSizeKD) {
+        out_buffer[Arg::paddedSpinorSizeKD * Arg::fineColor * mid_idx + fast_idx + coarse_row] = { 0, 0 };
       }
 
 #pragma unroll

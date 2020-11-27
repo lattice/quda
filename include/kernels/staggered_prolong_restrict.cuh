@@ -37,7 +37,8 @@ namespace quda {
 
   // Function to return the fine ColorSpinorField
   template<StaggeredTransferType transferType>
-  inline const ColorSpinorField& fineColorSpinorField(const ColorSpinorField& quoteIn, const ColorSpinorField& quoteOut) {
+  inline const ColorSpinorField& fineColorSpinorField(const ColorSpinorField& quoteIn, const ColorSpinorField&)
+  {
     errorQuda("Invalid transfer type %d for fineColorSpinorField", (int)transferType);
     return quoteIn;
   }
@@ -56,7 +57,8 @@ namespace quda {
 
   // Function to return the coarse ColorSpinorField
   template<StaggeredTransferType transferType>
-  inline const ColorSpinorField& coarseColorSpinorField(const ColorSpinorField& quoteIn, const ColorSpinorField& quoteOut) {
+  inline const ColorSpinorField& coarseColorSpinorField(const ColorSpinorField& quoteIn, const ColorSpinorField&)
+  {
     errorQuda("Invalid transfer type %d for coarseColorSpinorField", (int)transferType);
     return quoteIn;
   }
