@@ -57,16 +57,13 @@ namespace quda
         errorQuda("Offset (%d,%d,%d,%d) not supported", offset[0], offset[1], offset[2], offset[3]);
       }
 
-      dim_out[0] = nParity == 2 ? X_out[0] : X_out[0] * 2;
-      dim_in[0] = nParity == 2 ? X_in[0] : X_in[0] * 2;
-
-      X0h_out = nParity == 2 ? X_out[0] / 2 : X_out[0];
-      X0h_in = nParity == 2 ? X_in[0] / 2 : X_in[0];
-
-      for (int d = 1; d < nDim; d++) {
-        dim_out[d] = X_out[d];
-        dim_in[d] = X_in[d];
+      for (int d = 0; d < nDim; d++) {
+        dim_out[d] = out_field.full_dim(d);
+        dim_in[d] = in_field.full_dim(d);
       }
+
+      X0h_out = dim_out[0] / 2;
+      X0h_in = dim_in[0] / 2;
 
       volume_cb_in = in_field.VolumeCB();
       volume_cb_out = out_field.VolumeCB();

@@ -505,6 +505,11 @@ namespace quda {
     const int* X() const { return x; }
 
     /**
+       @return The pointer to the **full** lattice-dimension array
+    */
+    virtual int full_dim(int d) const = 0;
+
+    /**
        @return The full-field volume
     */
     size_t Volume() const { return volume; }

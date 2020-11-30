@@ -363,6 +363,8 @@ namespace quda {
     virtual const void* Even_p() const { errorQuda("Not implemented"); return (void*)0;}
     virtual const void* Odd_p() const { errorQuda("Not implemented"); return (void*)0;}
 
+    virtual int full_dim(int d) const { return x[d]; }
+
     virtual void copy_to_buffer(void *buffer) const = 0;
     virtual void copy_from_buffer(void *buffer) = 0;
 

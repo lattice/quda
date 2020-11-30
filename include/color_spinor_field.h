@@ -502,6 +502,8 @@ namespace quda {
     const void* Norm() const {return norm;}
     virtual const void* Ghost2() const { return nullptr; }
 
+    virtual int full_dim(int d) const { return (d == 0 && siteSubset == 1) ? x[d] * 2 : x[d]; }
+
     virtual void copy_to_buffer(void *buffer) const = 0;
     virtual void copy_from_buffer(void *buffer) = 0;
 

@@ -240,6 +240,8 @@ namespace quda {
      */
     double abs_min(bool inverse = false) const;
 
+    virtual int full_dim(int d) const { return x[d]; }
+
     virtual void copy_to_buffer(void *buffer) const = 0;
     virtual void copy_from_buffer(void *buffer) = 0;
   };
