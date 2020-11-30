@@ -1287,6 +1287,7 @@ struct mgInputStruct {
 
   int mg_levels;
   bool verify_results;
+  QudaPrecision preconditioner_precision; // precision for near-nulls, coarse links
 
   // Setup
   int nvec[QUDA_MAX_MG_LEVEL];                   // ignored on first level, if non-zero on last level we deflate
@@ -1321,6 +1322,7 @@ struct mgInputStruct {
   mgInputStruct() :
     mg_levels(4),
     verify_results(true),
+    preconditioner_precision(QUDA_HALF_PRECISION),
     deflate_n_ev(66),
     deflate_n_kr(128),
     deflate_max_restarts(50),
@@ -1429,6 +1431,17 @@ struct mgInputStruct {
     }
   }
 
+  QudaPrecision getQudaPrecision(const char *name)
+  {
+    if (strcmp(name, "single") == 0) {
+      return QUDA_SINGLE_PRECISION;
+    } else if (strcmp(name, "half") == 0) {
+      return QUDA_HALF_PRECISION;
+    } else {
+      return QUDA_INVALID_PRECISION;
+    }
+  }
+
   // parse out a line
   bool update(std::vector<std::string> &input_line)
   {
@@ -1448,6 +1461,13 @@ struct mgInputStruct {
         error_code = 1;
       } else {
         verify_results = input_line[1][0] == 't' ? true : false;
+      }
+
+    } else if (strcmp(input_line[0].c_str(), "preconditioner_precision") == 0) {
+      if (input_line.size() < 2) {
+        error_code = 1;
+      } else {
+        preconditioner_precision = getQudaPrecision(input_line[1].c_str());
       }
 
     } else if (strcmp(input_line[0].c_str(), "mg_verbosity") == 0) {
@@ -1622,6 +1642,7 @@ struct milcMultigridPack {
   QudaMultigridParam mg_param;
   QudaInvertParam mg_inv_param;
   QudaEigParam mg_eig_param[QUDA_MAX_MG_LEVEL];
+  QudaPrecision preconditioner_precision;
   double last_mass;
   void *mg_preconditioner;
 };
@@ -1740,7 +1761,7 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
   inv_param.cpu_prec = host_precision;
   inv_param.cuda_prec = device_precision;
   inv_param.cuda_prec_sloppy = device_precision_sloppy;
-  inv_param.cuda_prec_precondition = QUDA_HALF_PRECISION; // cuda_prec_precondition;
+  inv_param.cuda_prec_precondition = input_struct.preconditioner_precision;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
@@ -1807,11 +1828,9 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
     // change this to refresh fields when mass or links change
     mg_param.setup_maxiter_refresh[i] = 0; // setup_maxiter_refresh[i];
     mg_param.n_vec[i] = (i == 0) ? 24 : input_struct.nvec[i];
-    mg_param.n_block_ortho[i] = 2; // n_block_ortho[i];                    // number of times to Gram-Schmidt
-    mg_param.precision_null[i]
-      = QUDA_HALF_PRECISION; // prec_null;                          // precision to store the null-space basis
-    mg_param.smoother_halo_precision[i]
-      = QUDA_HALF_PRECISION; // smoother_halo_prec;        // precision of the halo exchange in the smoother
+    mg_param.n_block_ortho[i] = 2; // n_block_ortho[i];                          // number of times to Gram-Schmidt
+    mg_param.precision_null[i] = input_struct.preconditioner_precision;          // precision to store the null-space basis
+    mg_param.smoother_halo_precision[i] = input_struct.preconditioner_precision; // precision of the halo exchange in the smoother
     mg_param.nu_pre[i] = input_struct.nu_pre[i];
     mg_param.nu_post[i] = input_struct.nu_post[i];
     mg_param.mu_factor[i] = 1.; // mu_factor[i];
@@ -1972,7 +1991,10 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
 
   inv_param.verbosity = verbosity;
 
-  inv_param.verbosity_precondition = verbosity;
+  inv_param.verbosity = input_struct.mg_verbosity[0] ? QUDA_VERBOSE : QUDA_SUMMARIZE;
+
+  // We need to pass this back to the fat/long links for the outer-most level.
+  mg_pack->preconditioner_precision = input_struct.preconditioner_precision;
 }
 
 void *qudaMultigridCreate(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
@@ -1998,12 +2020,10 @@ void *qudaMultigridCreate(int external_precision, int quda_precision, double mas
   // Set some other smart defaults
   fat_param.type = QUDA_ASQTAD_FAT_LINKS;
   fat_param.cuda_prec_refinement_sloppy = fat_param.cuda_prec_sloppy;
-  fat_param.cuda_prec_precondition = QUDA_HALF_PRECISION; // override
   fat_param.reconstruct_refinement_sloppy = QUDA_RECONSTRUCT_NO;
 
   long_param.type = QUDA_ASQTAD_LONG_LINKS;
   long_param.cuda_prec_refinement_sloppy = long_param.cuda_prec_sloppy;
-  long_param.cuda_prec_precondition = QUDA_HALF_PRECISION; // override
   long_param.reconstruct_refinement_sloppy = long_param.reconstruct_sloppy;
 
   // Prepare a multigrid pack
@@ -2011,6 +2031,9 @@ void *qudaMultigridCreate(int external_precision, int quda_precision, double mas
 
   // Set parameters incl. loading from the parameter file here.
   milcSetMultigridParam(mg_pack, host_precision, device_precision, device_precision_sloppy, mass, mg_param_file);
+
+  fat_param.cuda_prec_precondition = mg_pack->preconditioner_precision;
+  long_param.cuda_prec_precondition = mg_pack->preconditioner_precision;
 
   // dirty hack to invalidate the cached gauge field without breaking interface compatability
   // compounding hack: *num_iters == 1 is always true here
@@ -2062,12 +2085,12 @@ void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaI
                  device_precision_sloppy, inv_args.tadpole, inv_args.naik_epsilon);
 
   fat_param.cuda_prec_refinement_sloppy = fat_param.cuda_prec_sloppy;
-  fat_param.cuda_prec_precondition = QUDA_HALF_PRECISION; // override
+  fat_param.cuda_prec_precondition = mg_pack->preconditioner_precision;
   fat_param.reconstruct_refinement_sloppy = QUDA_RECONSTRUCT_NO;
 
   long_param.type = QUDA_ASQTAD_LONG_LINKS;
   long_param.cuda_prec_refinement_sloppy = long_param.cuda_prec_sloppy;
-  long_param.cuda_prec_precondition = QUDA_HALF_PRECISION; // override
+  long_param.cuda_prec_precondition = mg_pack->preconditioner_precision;
   long_param.reconstruct_refinement_sloppy = QUDA_RECONSTRUCT_NO;
 
   QudaInvertParam invertParam = newQudaInvertParam();
@@ -2087,7 +2110,7 @@ void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaI
   invertParam.verbosity_precondition = QUDA_VERBOSE;
 
   invertParam.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;     // req'd
-  invertParam.cuda_prec_precondition = QUDA_HALF_PRECISION; // can set via input
+  invertParam.cuda_prec_precondition = mg_pack->preconditioner_precision;
   invertParam.gcrNkrylov = 15;
   invertParam.pipeline = 16; // pipeline, get from file
 
