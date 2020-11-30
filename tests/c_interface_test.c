@@ -1,6 +1,7 @@
 #include <quda.h>
 
-int main(){
+int main()
+{
   initQuda(0);
   endQuda();
 }

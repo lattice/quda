@@ -1549,8 +1549,7 @@ struct mgInputStruct {
         coarse_solve_type[atoi(input_line[1].c_str())] = getQudaSolveType(input_line[2].c_str());
       }
 
-    } else
-      if (strcmp(input_line[0].c_str(), "coarse_solver") == 0) {
+    } else if (strcmp(input_line[0].c_str(), "coarse_solver") == 0) {
       if (input_line.size() < 3) {
         error_code = 1;
       } else {
@@ -1851,8 +1850,9 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
     mg_param.setup_maxiter_refresh[i] = 0; // setup_maxiter_refresh[i];
     mg_param.n_vec[i] = (i == 0) ? 24 : input_struct.nvec[i];
     mg_param.n_block_ortho[i] = 2; // n_block_ortho[i];                          // number of times to Gram-Schmidt
-    mg_param.precision_null[i] = input_struct.preconditioner_precision;          // precision to store the null-space basis
-    mg_param.smoother_halo_precision[i] = input_struct.preconditioner_precision; // precision of the halo exchange in the smoother
+    mg_param.precision_null[i] = input_struct.preconditioner_precision; // precision to store the null-space basis
+    mg_param.smoother_halo_precision[i]
+      = input_struct.preconditioner_precision; // precision of the halo exchange in the smoother
     mg_param.nu_pre[i] = input_struct.nu_pre[i];
     mg_param.nu_post[i] = input_struct.nu_post[i];
     mg_param.mu_factor[i] = 1.; // mu_factor[i];
@@ -1887,9 +1887,9 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
     // set to QUDA_DIRECT_PC_SOLVE for to enable even/odd preconditioning on the smoother
     // from test routines: // smoother_solve_type[i];
     switch (i) {
-      case 0: mg_param.smoother_solve_type[0] = QUDA_DIRECT_SOLVE; break;
-      case 1: mg_param.smoother_solve_type[1] = QUDA_DIRECT_PC_SOLVE; break;
-      default: mg_param.smoother_solve_type[i] = input_struct.coarse_solve_type[i]; break;
+    case 0: mg_param.smoother_solve_type[0] = QUDA_DIRECT_SOLVE; break;
+    case 1: mg_param.smoother_solve_type[1] = QUDA_DIRECT_PC_SOLVE; break;
+    default: mg_param.smoother_solve_type[i] = input_struct.coarse_solve_type[i]; break;
     }
 
     // set to QUDA_ADDITIVE_SCHWARZ for Additive Schwarz precondioned smoother (presently only impelemented for MR)
@@ -1980,7 +1980,6 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
       //  errorQuda("Unexpected solve_type = %d\n", coarse_solve_type[i]);
       //}
     }
-
 
     mg_param.omega[i] = 0.85; // ignored // omega; // over/under relaxation factor
 
