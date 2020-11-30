@@ -81,15 +81,14 @@ namespace quda
     typedef Matrix<complex<real>, Arg::nColor> Link;
     const int their_spinor_parity = (arg.nParity == 2) ? 1 - parity : 0;
 
-#pragma unroll
     for (int d = 0; d < Arg::nDim; d++) { // loop over dimension
       if (d != dir) {
         {
           // Forward gather - compute fwd offset for vector fetch
           const bool ghost = (coord[d] + 1 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
-
+	  
           if (doHalo<kernel_type>(d) && ghost) {
-
+	    
             // const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, 1);
             const int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
             const Link U = arg.U(d, coord.x_cb, parity);
@@ -120,7 +119,7 @@ namespace quda
 
             const Link U = arg.U.Ghost(d, ghost_idx, 1 - parity);
             const Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
-
+	    
             out += conj(U) * in;
           } else if (doBulk<kernel_type>() && !ghost) {
 
@@ -133,7 +132,7 @@ namespace quda
       }
     }
   }
-
+  
   // out(x) = M*in
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct laplace : dslash_default {
 

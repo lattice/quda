@@ -355,22 +355,22 @@ namespace quda {
       if (!commDimPartitioned(i) && no_comms_fill==false) continue;
 
       for (int b=0; b<2; ++b) {
-	my_face_dim_dir_h[b][i][0] = static_cast<char*>(my_face_h[b]) + ghost_offset[i][0];
-	from_face_dim_dir_h[b][i][0] = static_cast<char*>(from_face_h[b]) + ghost_offset[i][0];
+        my_face_dim_dir_h[b][i][0] = static_cast<char *>(my_face_h[b]) + ghost_offset[i][0];
+        from_face_dim_dir_h[b][i][0] = static_cast<char *>(from_face_h[b]) + ghost_offset[i][0];
 
-	my_face_dim_dir_hd[b][i][0] = static_cast<char*>(my_face_hd[b]) + ghost_offset[i][0];
-	from_face_dim_dir_hd[b][i][0] = static_cast<char*>(from_face_hd[b]) + ghost_offset[i][0];
+        my_face_dim_dir_hd[b][i][0] = static_cast<char *>(my_face_hd[b]) + ghost_offset[i][0];
+        from_face_dim_dir_hd[b][i][0] = static_cast<char *>(from_face_hd[b]) + ghost_offset[i][0];
 
         my_face_dim_dir_d[b][i][0] = static_cast<char *>(my_face_d[b]) + ghost_offset[i][0];
         from_face_dim_dir_d[b][i][0] = static_cast<char *>(from_face_d[b]) + ghost_offset[i][0];
       } // loop over b
 
       for (int b=0; b<2; ++b) {
-	my_face_dim_dir_h[b][i][1] = static_cast<char*>(my_face_h[b]) + ghost_offset[i][1];
-	from_face_dim_dir_h[b][i][1] = static_cast<char*>(from_face_h[b]) + ghost_offset[i][1];
+        my_face_dim_dir_h[b][i][1] = static_cast<char *>(my_face_h[b]) + ghost_offset[i][1];
+        from_face_dim_dir_h[b][i][1] = static_cast<char *>(from_face_h[b]) + ghost_offset[i][1];
 
-	my_face_dim_dir_hd[b][i][1] = static_cast<char*>(my_face_hd[b]) + ghost_offset[i][1];
-	from_face_dim_dir_hd[b][i][1] = static_cast<char*>(from_face_hd[b]) + ghost_offset[i][1];
+        my_face_dim_dir_hd[b][i][1] = static_cast<char *>(my_face_hd[b]) + ghost_offset[i][1];
+        from_face_dim_dir_hd[b][i][1] = static_cast<char *>(from_face_hd[b]) + ghost_offset[i][1];
 
         my_face_dim_dir_d[b][i][1] = static_cast<char *>(my_face_d[b]) + ghost_offset[i][1];
         from_face_dim_dir_d[b][i][1] = static_cast<char *>(from_face_d[b]) + ghost_offset[i][1];

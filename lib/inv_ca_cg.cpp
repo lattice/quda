@@ -1,6 +1,6 @@
 #include <invert_quda.h>
 #include <blas_quda.h>
-#include <Eigen/Dense>
+#include <eigen_helper.h>
 
 /**
    @file inv_ca_cg.cpp
@@ -297,7 +297,6 @@ namespace quda {
   template <int N>
   void compute_alpha_N(Complex* Q_AQandg, Complex* alpha)
   {
-    using namespace Eigen;
     typedef Matrix<Complex, N, N, RowMajor> matrix;
     typedef Matrix<Complex, N, 1> vector;
 
@@ -342,7 +341,6 @@ namespace quda {
       case 12: compute_alpha_N<12>(Q_AQandg, alpha); break;
 #endif
       default: // failsafe
-        using namespace Eigen;
         typedef Matrix<Complex, Dynamic, Dynamic, RowMajor> matrix;
         typedef Matrix<Complex, Dynamic, 1> vector;
 
@@ -375,7 +373,6 @@ namespace quda {
   template <int N>
   void compute_beta_N(Complex* Q_AQandg, Complex* Q_AS, Complex* beta)
   {
-    using namespace Eigen;
     typedef Matrix<Complex, N, N, RowMajor> matrix;
 
     matrix matQ_AQ(N,N);
@@ -418,7 +415,6 @@ namespace quda {
       case 12: compute_beta_N<12>(Q_AQandg, Q_AS, beta); break;
 #endif
       default: // failsafe
-        using namespace Eigen;
         typedef Matrix<Complex, Dynamic, Dynamic, RowMajor> matrix;
 
         const int N = Q.size();

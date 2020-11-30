@@ -267,6 +267,7 @@ extern bool generate_all_levels;
 extern quda::mgarray<QudaSchwarzType> mg_schwarz_type;
 extern quda::mgarray<int> mg_schwarz_cycle;
 extern bool mg_evolve_thin_updates;
+extern QudaTransferType staggered_transfer_type;
 
 extern quda::mgarray<std::array<int, 4>> geo_block_size;
 extern bool mg_use_mma;
@@ -297,6 +298,8 @@ extern bool eig_require_convergence;
 extern int eig_check_interval;
 extern int eig_max_restarts;
 extern double eig_tol;
+extern double eig_qr_tol;
+extern bool eig_use_eigen_qr;
 extern bool eig_use_poly_acc;
 extern int eig_poly_deg;
 extern double eig_amin;
@@ -327,6 +330,8 @@ extern quda::mgarray<bool> mg_eig_require_convergence;
 extern quda::mgarray<int> mg_eig_check_interval;
 extern quda::mgarray<int> mg_eig_max_restarts;
 extern quda::mgarray<double> mg_eig_tol;
+extern quda::mgarray<double> mg_eig_qr_tol;
+extern quda::mgarray<bool> mg_eig_use_eigen_qr;
 extern quda::mgarray<bool> mg_eig_use_poly_acc;
 extern quda::mgarray<int> mg_eig_poly_deg;
 extern quda::mgarray<double> mg_eig_amin;
@@ -363,3 +368,16 @@ extern QudaWFlowType wflow_type;
 extern int measurement_interval;
 
 extern QudaContractType contract_type;
+
+extern QudaBLASOperation blas_trans_a;
+extern QudaBLASOperation blas_trans_b;
+extern QudaBLASDataType blas_data_type;
+extern QudaBLASDataOrder blas_data_order;
+
+extern std::array<int, 3> blas_mnk;
+extern std::array<int, 3> blas_leading_dims;
+extern std::array<int, 3> blas_offsets;
+extern std::array<int, 3> blas_strides;
+extern std::array<double, 2> blas_alpha_re_im;
+extern std::array<double, 2> blas_beta_re_im;
+extern int blas_batch;

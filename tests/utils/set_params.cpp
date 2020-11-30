@@ -250,7 +250,7 @@ void setEigParam(QudaEigParam &eig_param)
 {
   eig_param.eig_type = eig_type;
   eig_param.spectrum = eig_spectrum;
-  if ((eig_type == QUDA_EIG_TR_LANCZOS || eig_type == QUDA_EIG_IR_LANCZOS)
+  if ((eig_type == QUDA_EIG_TR_LANCZOS || eig_type == QUDA_EIG_BLK_TR_LANCZOS)
       && !(eig_spectrum == QUDA_SPECTRUM_LR_EIG || eig_spectrum == QUDA_SPECTRUM_SR_EIG)) {
     errorQuda("Only real spectrum type (LR or SR) can be passed to Lanczos type solver.");
   }
@@ -272,10 +272,12 @@ void setEigParam(QudaEigParam &eig_param)
     eig_param.n_ev_deflate = eig_n_ev_deflate;
   }
 
-  eig_param.block_size = eig_param.eig_type == QUDA_EIG_TR_LANCZOS ? 1 : eig_block_size;
+  eig_param.block_size
+    = (eig_param.eig_type == QUDA_EIG_TR_LANCZOS || eig_param.eig_type == QUDA_EIG_IR_ARNOLDI) ? 1 : eig_block_size;
   eig_param.n_ev = eig_n_ev;
   eig_param.n_kr = eig_n_kr;
   eig_param.tol = eig_tol;
+  eig_param.qr_tol = eig_qr_tol;
   eig_param.batched_rotate = eig_batched_rotate;
   eig_param.require_convergence = eig_require_convergence ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   eig_param.check_interval = eig_check_interval;
@@ -289,6 +291,7 @@ void setEigParam(QudaEigParam &eig_param)
     eig_param.use_norm_op = QUDA_BOOLEAN_TRUE;
   }
 
+  eig_param.use_eigen_qr = eig_use_eigen_qr ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   eig_param.use_poly_acc = eig_use_poly_acc ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   eig_param.poly_deg = eig_poly_deg;
   eig_param.a_min = eig_amin;
@@ -296,7 +299,6 @@ void setEigParam(QudaEigParam &eig_param)
 
   eig_param.arpack_check = eig_arpack_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   strcpy(eig_param.arpack_logfile, eig_arpack_logfile);
-  strcpy(eig_param.QUDA_logfile, eig_QUDA_logfile);
 
   strcpy(eig_param.vec_infile, eig_vec_infile);
   strcpy(eig_param.vec_outfile, eig_vec_outfile);
@@ -405,6 +407,9 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     mg_param.mu_factor[i] = mu_factor[i];
 
     mg_param.cycle_type[i] = QUDA_MG_CYCLE_RECURSIVE;
+
+    // Is not a staggered solve, always aggregate
+    mg_param.transfer_type[i] = QUDA_TRANSFER_AGGREGATE;
 
     // set the coarse solver wrappers including bottom solver
     mg_param.coarse_solver[i] = coarse_solver[i];
@@ -530,9 +535,6 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   mg_param.run_verify = verify_results ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_param.run_low_mode_check = low_mode_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_param.run_oblique_proj_check = oblique_proj_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-
-  // Is NOT a staggered solve
-  mg_param.is_staggered = QUDA_BOOLEAN_FALSE;
 
   mg_param.use_mma = mg_use_mma ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   // Whether or not to use thin restarts in the evolve tests
@@ -666,30 +668,34 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
 {
   mg_eig_param.eig_type = mg_eig_type[level];
   mg_eig_param.spectrum = mg_eig_spectrum[level];
-  if ((mg_eig_type[level] == QUDA_EIG_TR_LANCZOS || mg_eig_type[level] == QUDA_EIG_IR_LANCZOS)
+  if ((mg_eig_type[level] == QUDA_EIG_TR_LANCZOS || mg_eig_type[level] == QUDA_EIG_BLK_TR_LANCZOS)
       && !(mg_eig_spectrum[level] == QUDA_SPECTRUM_LR_EIG || mg_eig_spectrum[level] == QUDA_SPECTRUM_SR_EIG)) {
     errorQuda("Only real spectrum type (LR or SR) can be passed to the a Lanczos type solver");
   }
 
-  mg_eig_param.block_size = mg_eig_param.eig_type == QUDA_EIG_TR_LANCZOS ? 1 : mg_eig_block_size[level];
+  mg_eig_param.block_size
+    = (mg_eig_param.eig_type == QUDA_EIG_TR_LANCZOS || mg_eig_param.eig_type == QUDA_EIG_IR_ARNOLDI) ?
+    1 :
+    mg_eig_block_size[level];
   mg_eig_param.n_ev = mg_eig_n_ev[level];
   mg_eig_param.n_kr = mg_eig_n_kr[level];
   mg_eig_param.n_conv = nvec[level];
 
   // Inverters will deflate only this number of vectors.
-  if (mg_eig_n_ev_deflate[level] < 0) {
+  if (mg_eig_n_ev_deflate[level] > 0 && mg_eig_n_ev_deflate[level] < mg_eig_param.n_conv)
+    mg_eig_param.n_ev_deflate = mg_eig_n_ev_deflate[level];
+  else if (mg_eig_n_ev_deflate[level] > mg_eig_param.n_conv)
+    errorQuda("Can not deflate more than nvec[%d] eigenvectors.", mg_eig_param.n_conv);
+  else {
     mg_eig_param.n_ev_deflate = mg_eig_param.n_conv;
     mg_eig_n_ev_deflate[level] = mg_eig_param.n_conv;
-  } else {
-    if (mg_eig_n_ev_deflate[level] > mg_eig_param.n_conv)
-      errorQuda("Can not deflate more than nvec[%d] eigenvectors.", nvec[level]);
-    mg_eig_param.n_ev_deflate = mg_eig_n_ev_deflate[level];
   }
 
   mg_eig_param.batched_rotate = mg_eig_batched_rotate[level];
   mg_eig_param.require_convergence = mg_eig_require_convergence[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   mg_eig_param.tol = mg_eig_tol[level];
+  mg_eig_param.qr_tol = mg_eig_qr_tol[level];
   mg_eig_param.check_interval = mg_eig_check_interval[level];
   mg_eig_param.max_restarts = mg_eig_max_restarts[level];
 
@@ -697,6 +703,7 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
   mg_eig_param.use_norm_op = mg_eig_use_normop[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_eig_param.use_dagger = mg_eig_use_dagger[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
+  mg_eig_param.use_eigen_qr = mg_eig_use_eigen_qr[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_eig_param.use_poly_acc = mg_eig_use_poly_acc[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_eig_param.poly_deg = mg_eig_poly_deg[level];
   mg_eig_param.a_min = mg_eig_amin[level];
@@ -708,7 +715,6 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
   strcpy(mg_eig_param.vec_outfile, "");
   mg_eig_param.save_prec = mg_eig_save_prec[level];
   mg_eig_param.io_parity_inflate = QUDA_BOOLEAN_FALSE;
-  strcpy(mg_eig_param.QUDA_logfile, eig_QUDA_logfile);
 }
 
 void setContractInvertParam(QudaInvertParam &inv_param)
@@ -759,8 +765,7 @@ void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
 
   /* ESW HACK: comment this out to do a non-MG solve. */
   inv_param.inv_type_precondition = QUDA_MG_INVERTER;
-  // inv_param.verbosity_precondition = mg_verbosity[0];
-  inv_param.verbosity_precondition = QUDA_SUMMARIZE; // ESW HACK
+  inv_param.verbosity_precondition = mg_verbosity[0];
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
   inv_param.cuda_prec_eigensolver = cuda_prec_eigensolver;
 
@@ -926,8 +931,6 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 
   inv_param.solve_type = QUDA_DIRECT_SOLVE;
 
-  mg_param.is_staggered = QUDA_BOOLEAN_TRUE;
-
   mg_param.use_mma = mg_use_mma ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   mg_param.invert_param = &inv_param;
@@ -955,13 +958,15 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
     mg_param.setup_ca_lambda_max[i] = setup_ca_lambda_max[i];
 
     mg_param.spin_block_size[i] = 1;
-    mg_param.n_vec[i] = (i == 0) ? 24 : nvec[i] == 0 ? 96 : nvec[i]; // default to 96 vectors if not set
+    mg_param.n_vec[i] = nvec[i] == 0 ? 64 : nvec[i];                 // default to 64 vectors if not set
     mg_param.n_block_ortho[i] = n_block_ortho[i];                    // number of times to Gram-Schmidt
     mg_param.precision_null[i] = prec_null;                          // precision to store the null-space basis
     mg_param.smoother_halo_precision[i] = smoother_halo_prec;        // precision of the halo exchange in the smoother
     mg_param.nu_pre[i] = nu_pre[i];
     mg_param.nu_post[i] = nu_post[i];
     mg_param.mu_factor[i] = mu_factor[i];
+
+    mg_param.transfer_type[i] = (i == 0) ? staggered_transfer_type : QUDA_TRANSFER_AGGREGATE;
 
     mg_param.cycle_type[i] = QUDA_MG_CYCLE_RECURSIVE;
 
@@ -1079,6 +1084,10 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 
   // coarsening the spin on the first restriction is undefined for staggered fields.
   mg_param.spin_block_size[0] = 0;
+
+  if (staggered_transfer_type == QUDA_TRANSFER_OPTIMIZED_KD) {
+    mg_param.spin_block_size[1] = 0; // we're coarsening the optimized KD op
+  }
 
   mg_param.setup_type = setup_type;
   mg_param.pre_orthonormalize = pre_orthonormalize ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;

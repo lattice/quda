@@ -346,7 +346,7 @@ extern "C" {
     int n_ev;
     /** EeigCG  : Search space dimension
      *  gmresdr : Krylov subspace dimension
-    */
+     */
     int max_search_dim;
     /** For systems with many RHS: current RHS index */
     int rhs_idx;
@@ -438,6 +438,9 @@ extern "C" {
     QudaBoolean use_dagger;
     QudaBoolean use_norm_op;
 
+    /** Use Eigen routines to eigensolve the upper Hessenberg via QR **/
+    QudaBoolean use_eigen_qr;
+
     /** Performs an MdagM solve, then constructs the left and right SVD. **/
     QudaBoolean compute_svd;
 
@@ -459,6 +462,8 @@ extern "C" {
     int n_ev_deflate;
     /** Tolerance on the least well known eigenvalue's residual **/
     double tol;
+    /** Tolerance on the QR iteration **/
+    double qr_tol;
     /** For IRLM/IRAM, check every nth restart **/
     int check_interval;
     /** For IRLM/IRAM, quit after n restarts **/
@@ -701,8 +706,8 @@ extern "C" {
     /** Multiplicative factor for the mu parameter */
     double mu_factor[QUDA_MAX_MG_LEVEL];
 
-    /** Boolean for if this is a staggered solve or not */
-    QudaBoolean is_staggered;
+    /** Boolean for aggregation type, implies staggered or not */
+    QudaTransferType transfer_type[QUDA_MAX_MG_LEVEL];
 
     /** Whether to use tensor cores (if available) */
     QudaBoolean use_mma;
@@ -722,6 +727,33 @@ extern "C" {
     QudaBoolean compute_qcharge_density; /**< Whether to compute the topological charge density */
     void *qcharge_density; /**< Pointer to host array of length volume where the q-charge density will be copied */
   } QudaGaugeObservableParam;
+
+  typedef struct QudaBLASParam_s {
+
+    QudaBLASOperation trans_a; /**< operation op(A) that is non- or (conj.) transpose. */
+    QudaBLASOperation trans_b; /**< operation op(B) that is non- or (conj.) transpose. */
+    int m;                     /**< number of rows of matrix op(A) and C. */
+    int n;                     /**< number of columns of matrix op(B) and C. */
+    int k;                     /**< number of columns of op(A) and rows of op(B). */
+    int lda;                   /**< leading dimension of two-dimensional array used to store the matrix A. */
+    int ldb;                   /**< leading dimension of two-dimensional array used to store matrix B. */
+    int ldc;                   /**< leading dimension of two-dimensional array used to store matrix C. */
+    int a_offset;              /**< position of the A array from which begin read/write. */
+    int b_offset;              /**< position of the B array from which begin read/write. */
+    int c_offset;              /**< position of the C array from which begin read/write. */
+    int a_stride;              /**< stride of the A array in strided(batched) mode */
+    int b_stride;              /**< stride of the B array in strided(batched) mode */
+    int c_stride;              /**< stride of the C array in strided(batched) mode */
+
+    double_complex alpha; /**< scalar used for multiplication. */
+    double_complex beta;  /**< scalar used for multiplication. If beta==0, C does not have to be a valid input. */
+
+    int batch_count; /**< number of pointers contained in arrayA, arrayB and arrayC. */
+
+    QudaBLASDataType data_type;   /**< Specifies if using S(C) or D(Z) BLAS type */
+    QudaBLASDataOrder data_order; /**< Specifies if using Row or Column major */
+
+  } QudaBLASParam;
 
   /*
    * Interface functions, found in interface_quda.cpp
@@ -891,6 +923,15 @@ extern "C" {
   QudaGaugeObservableParam newQudaGaugeObservableParam(void);
 
   /**
+   * A new QudaBLASParam should always be initialized immediately
+   * after it's defined (and prior to explicitly setting its members)
+   * using this function.  Typical usage is as follows:
+   *
+   *   QudaBLASParam blas_param = newQudaBLASParam();
+   */
+  QudaBLASParam newQudaBLASParam(void);
+
+  /**
    * Print the members of QudaGaugeParam.
    * @param param The QudaGaugeParam whose elements we are to print.
    */
@@ -919,6 +960,12 @@ extern "C" {
    * @param param The QudaGaugeObservableParam whose elements we are to print.
    */
   void printQudaGaugeObservableParam(QudaGaugeObservableParam *param);
+
+  /**
+   * Print the members of QudaBLASParam.
+   * @param param The QudaBLASParam whose elements we are to print.
+   */
+  void printQudaBLASParam(QudaBLASParam *param);
 
   /**
    * Load the gauge field from the host.
@@ -1370,16 +1417,10 @@ extern "C" {
    * @param[in] param The parameters of the external fields and the computation settings
    * @param[out] timeinfo
    */
-  int computeGaugeFixingOVRQuda(void* gauge,
-                      const unsigned int gauge_dir,
-                      const unsigned int Nsteps,
-                      const unsigned int verbose_interval,
-                      const double relax_boost,
-                      const double tolerance,
-                      const unsigned int reunit_interval,
-                      const unsigned int stopWtheta,
-                      QudaGaugeParam* param,
-                      double* timeinfo);
+  int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
+                                const unsigned int verbose_interval, const double relax_boost, const double tolerance,
+                                const unsigned int reunit_interval, const unsigned int stopWtheta,
+                                QudaGaugeParam *param, double *timeinfo);
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
    * @param[in,out] gauge, gauge field to be fixed
@@ -1388,28 +1429,32 @@ extern "C" {
    * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
    * @param[in] alpha, gauge fixing parameter of the method, most common value is 0.08
    * @param[in] autotune, 1 to autotune the method, i.e., if the Fg inverts its tendency we decrease the alpha value
-   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
+   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when
+   * iteration reachs the maximum number of steps defined by Nsteps
    * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
    * @param[in] param The parameters of the external fields and the computation settings
    * @param[out] timeinfo
    */
-  int computeGaugeFixingFFTQuda(void* gauge,
-                      const unsigned int gauge_dir,
-                      const unsigned int Nsteps,
-                      const unsigned int verbose_interval,
-                      const double alpha,
-                      const unsigned int autotune,
-                      const double tolerance,
-                      const unsigned int stopWtheta,
-                      QudaGaugeParam* param,
-                      double* timeinfo);
+  int computeGaugeFixingFFTQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
+                                const unsigned int verbose_interval, const double alpha, const unsigned int autotune,
+                                const double tolerance, const unsigned int stopWtheta, QudaGaugeParam *param,
+                                double *timeinfo);
+
+  /**
+   * @brief Strided Batched GEMM
+   * @param[in] arrayA The array containing the A matrix data
+   * @param[in] arrayB The array containing the A matrix data
+   * @param[in] arrayC The array containing the A matrix data
+   * @param[in] native boolean to use either the native or generic version
+   * @param[in] param The data defining the problem execution.
+   */
+  void blasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, bool native, QudaBLASParam *param);
 
   /**
    * @brief Flush the chronological history for the given index
    * @param[in] index Index for which we are flushing
    */
   void flushChronoQuda(int index);
-
 
   /**
   * Open/Close MAGMA library

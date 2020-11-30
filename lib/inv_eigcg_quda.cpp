@@ -16,9 +16,7 @@
 #include <blas_magma.h>
 #endif
 
-
-#include <Eigen/Dense>
-
+#include <eigen_helper.h>
 #include <deflation.h>
 
 /*
@@ -29,7 +27,6 @@ A. Stathopolous and K. Orginos, arXiv:0707.0131
 namespace quda {
 
    using namespace blas;
-   using namespace Eigen;
 
    using DynamicStride   = Stride<Dynamic, Dynamic>;
    using DenseMatrix     = MatrixXcd;
@@ -745,14 +742,14 @@ namespace quda {
 
        bool update_ritz = !dcg_cycle && (eigcg_args->restarts > 1) && !defl.is_complete(); //too uglyyy
 
-       if( update_ritz ) {
+       if (update_ritz) {
 
          defl.increment(*Vm, param.n_ev);
          logical_rhs_id += 1;
 
          dcg_cycle = (logical_rhs_id >= max_eigcg_cycles);
 
-       } else { //run DCG instead
+       } else { // run DCG instead
          dcg_cycle = true;
        }
 

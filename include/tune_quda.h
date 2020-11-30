@@ -35,12 +35,23 @@ namespace quda {
     float time;
     long long n_calls;
 
-    inline TuneParam() : block(32, 1, 1), grid(1, 1, 1), shared_bytes(0), set_max_shared_bytes(false), aux(), time(FLT_MAX), n_calls(0) {
+    inline TuneParam() :
+      block(32, 1, 1), grid(1, 1, 1), shared_bytes(0), set_max_shared_bytes(false), aux(), time(FLT_MAX), n_calls(0)
+    {
       aux = make_int4(1,1,1,1);
     }
 
-    inline TuneParam(const TuneParam &param)
-      : block(param.block), grid(param.grid), shared_bytes(param.shared_bytes), set_max_shared_bytes(param.set_max_shared_bytes), aux(param.aux), comment(param.comment), time(param.time), n_calls(param.n_calls) { }
+    inline TuneParam(const TuneParam &param) :
+      block(param.block),
+      grid(param.grid),
+      shared_bytes(param.shared_bytes),
+      set_max_shared_bytes(param.set_max_shared_bytes),
+      aux(param.aux),
+      comment(param.comment),
+      time(param.time),
+      n_calls(param.n_calls)
+    {
+    }
 
     inline TuneParam& operator=(const TuneParam &param) {
       if (&param != this) {
@@ -48,10 +59,10 @@ namespace quda {
 	grid = param.grid;
 	shared_bytes = param.shared_bytes;
         set_max_shared_bytes = param.set_max_shared_bytes;
-	aux = param.aux;
-	comment = param.comment;
-	time = param.time;
-	n_calls = param.n_calls;
+        aux = param.aux;
+        comment = param.comment;
+        time = param.time;
+        n_calls = param.n_calls;
       }
       return *this;
     }
@@ -199,10 +210,7 @@ namespace quda {
      * @brief Returns the maximum dynamic shared memory per block.
      * @return The maximum dynamic shared memory to CUDA thread block
      */
-    unsigned int maxDynamicSharedBytesPerBlock() const
-    {
-      return device::max_dynamic_shared_memory();
-    }
+    unsigned int maxDynamicSharedBytesPerBlock() const { return device::max_dynamic_shared_memory(); }
 
     /**
      * @brief The maximum shared memory that a CUDA thread block can

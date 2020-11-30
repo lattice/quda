@@ -263,78 +263,78 @@ namespace quda {
         }
       }
 
-        __device__ __host__ inline Float imag() const {
-          if (!fixed) {
-            return v[idx].imag();
-          } else {
-            return scale_inv*static_cast<Float>(v[idx].imag());
-          }
+      __device__ __host__ inline Float imag() const
+      {
+        if (!fixed) {
+          return v[idx].imag();
+        } else {
+          return scale_inv * static_cast<Float>(v[idx].imag());
         }
+      }
 
-        /**
-         * @brief returns the pointor of this wrapper object
-         */
-        __device__ __host__ inline auto data() { return &v[idx]; }
+      /**
+       * @brief returns the pointor of this wrapper object
+       */
+      __device__ __host__ inline auto data() { return &v[idx]; }
 
-        __device__ __host__ inline const auto data() const { return &v[idx]; }
+      __device__ __host__ inline const auto data() const { return &v[idx]; }
 
-        /**
-           @brief negation operator
-           @return negation of this complex number
-        */
-        __device__ __host__ inline complex<Float> operator-() const
-        {
-          return fixed ? -scale_inv * static_cast<complex<Float>>(v[idx]) : -static_cast<complex<Float>>(v[idx]);
+      /**
+         @brief negation operator
+         @return negation of this complex number
+      */
+      __device__ __host__ inline complex<Float> operator-() const
+      {
+        return fixed ? -scale_inv * static_cast<complex<Float>>(v[idx]) : -static_cast<complex<Float>>(v[idx]);
+      }
+
+      /**
+         @brief Assignment operator with fieldorder_wrapper instance as input
+         @param a fieldorder_wrapper we are copying from
+      */
+      __device__ __host__ inline void operator=(const fieldorder_wrapper<Float, storeFloat> &a)
+      {
+        v[idx] = fixed ? complex<storeFloat>(round(scale * a.real()), round(scale * a.imag())) : a.v[a.idx];
+      }
+
+      /**
+         @brief Assignment operator with complex number instance as input
+         @param a Complex number we want to store in this accessor
+      */
+      template <typename theirFloat> __device__ __host__ inline void operator=(const complex<theirFloat> &a)
+      {
+        if (match<storeFloat, theirFloat>()) {
+          v[idx] = complex<storeFloat>(a.x, a.y);
+        } else {
+          v[idx] = fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
         }
+      }
 
-        /**
-           @brief Assignment operator with fieldorder_wrapper instance as input
-           @param a fieldorder_wrapper we are copying from
-        */
-        __device__ __host__ inline void operator=(const fieldorder_wrapper<Float, storeFloat> &a)
-        {
-          v[idx] = fixed ? complex<storeFloat>(round(scale * a.real()), round(scale * a.imag())) : a.v[a.idx];
+      /**
+         @brief Operator+= with complex number instance as input
+         @param a Complex number we want to add to this accessor
+      */
+      template <typename theirFloat> __device__ __host__ inline void operator+=(const complex<theirFloat> &a)
+      {
+        if (match<storeFloat, theirFloat>()) {
+          v[idx] += complex<storeFloat>(a.x, a.y);
+        } else {
+          v[idx] += fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
         }
+      }
 
-        /**
-	   @brief Assignment operator with complex number instance as input
-	   @param a Complex number we want to store in this accessor
-	*/
-        template<typename theirFloat>
-	__device__ __host__ inline void operator=(const complex<theirFloat> &a) {
-	  if (match<storeFloat,theirFloat>()) {
-	    v[idx] = complex<storeFloat>(a.x, a.y);
-	  } else {
-	    v[idx] = fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
-	  }
-	}
-
-	/**
-	   @brief Operator+= with complex number instance as input
-	   @param a Complex number we want to add to this accessor
-	*/
-        template<typename theirFloat>
-	__device__ __host__ inline void operator+=(const complex<theirFloat> &a) {
-	  if (match<storeFloat,theirFloat>()) {
-	    v[idx] += complex<storeFloat>(a.x, a.y);
-	  } else {
-	    v[idx] += fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
-	  }
-	}
-
-	/**
-	   @brief Operator-= with complex number instance as input
-	   @param a Complex number we want to subtract from this accessor
-	*/
-	template<typename theirFloat>
-	__device__ __host__ inline void operator-=(const complex<theirFloat> &a) {
-	  if (match<storeFloat,theirFloat>()) {
-	    v[idx] -= complex<storeFloat>(a.x, a.y);
-	  } else {
-	    v[idx] -= fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
-	  }
-	}
-
+      /**
+         @brief Operator-= with complex number instance as input
+         @param a Complex number we want to subtract from this accessor
+      */
+      template <typename theirFloat> __device__ __host__ inline void operator-=(const complex<theirFloat> &a)
+      {
+        if (match<storeFloat, theirFloat>()) {
+          v[idx] -= complex<storeFloat>(a.x, a.y);
+        } else {
+          v[idx] -= fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
+        }
+      }
       };
 
     template<typename Float, typename storeFloat>
@@ -904,16 +904,21 @@ namespace quda {
        deploy for a specifc field ordering, the two operator()
        accessors have to be specialized for that ordering.
 
-       @tparam Float Underlying type returned by the accessors
+       @tparam Float_ Underlying type returned by the accessors
        @tparam nColor Number of colors for the field
        @tparam nSpinCoarse Number of "spin degrees of freedom" (for coarse-link fields only)
        @tparam order Storage order of the field
        @tparam native_ghost Whether to use native ghosts (inlined into
+       @tparam storeFloat_ Underlying storage type for the field
        the padded area for internal-order fields or use a separate array if false)
      */
-    template <typename Float, int nColor, int nSpinCoarse, QudaGaugeFieldOrder order, bool native_ghost = true,
-              typename storeFloat = Float>
+    template <typename Float_, int nColor, int nSpinCoarse, QudaGaugeFieldOrder order, bool native_ghost = true,
+              typename storeFloat_ = Float_>
     struct FieldOrder {
+
+      /** Convenient types */
+      using Float = Float_;
+      using storeFloat = storeFloat_;
 
       /** An internal reference to the actual field we are accessing */
       const int volumeCB;
@@ -1112,23 +1117,24 @@ namespace quda {
         __device__ __host__ inline complex<Float> Ghost(int d, int parity, int x, int s_row, int s_col, int c_row,
                                                         int c_col) const
         {
-          return Ghost(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
+          return Ghost(d, parity, x, s_row * nColorCoarse + c_row, s_col * nColorCoarse + c_col);
         }
 
         /**
-	 * Specialized read-only complex-member accessor function (for coarse gauge field ghost zone)
-	 * @param d dimension index
-	 * @param parity Parity index
-	 * @param x 1-d site index
-	 * @param s_row row spin index
-	 * @param c_row row color index
-	 * @param s_col col spin index
-	 * @param c_col col color index
-	 */
-	__device__ __host__ inline fieldorder_wrapper<Float,storeFloat>
-	  Ghost(int d, int parity, int x, int s_row, int s_col, int c_row, int c_col) {
-	  return Ghost(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
-	}
+         * Specialized read-only complex-member accessor function (for coarse gauge field ghost zone)
+         * @param d dimension index
+         * @param parity Parity index
+         * @param x 1-d site index
+         * @param s_row row spin index
+         * @param c_row row color index
+         * @param s_col col spin index
+         * @param c_col col color index
+         */
+        __device__ __host__ inline fieldorder_wrapper<Float, storeFloat> Ghost(int d, int parity, int x, int s_row,
+                                                                               int s_col, int c_row, int c_col)
+        {
+          return Ghost(d, parity, x, s_row * nColorCoarse + c_row, s_col * nColorCoarse + c_col);
+        }
         /**
          * @brief This and the following method (eventually) creates a fieldorder_wrapper object whose pointer points to
          * the start of the memory chunk corresponds to the matrix at d, parity, x, s_row, s_col. Only available for the
@@ -1599,15 +1605,22 @@ namespace quda {
         {
         }
 
+        // Pack and unpack are described in https://arxiv.org/pdf/0911.3191.pdf
+        // Method was modified to avoid the singularity at unit gauge by
+        // compressing the matrix {{b1,b2,b3},{a1,a2,a3},{-c1,-c2,-c3}}
+        // instead of {{a1,a2,a3},{b1,b2,b3},{c1,c2,c3}}
+
         __device__ __host__ inline void Pack(real out[8], const complex in[9], int idx) const
         {
-          out[0] = Trig<isFixed<Float>::value, real>::Atan2(in[0].imag(), in[0].real());
-          out[1] = Trig<isFixed<Float>::value, real>::Atan2(in[6].imag(), in[6].real());
-#pragma unroll
-          for (int i = 1; i < 4; i++) {
-            out[2 * i + 0] = in[i].real();
-            out[2 * i + 1] = in[i].imag();
-          }
+          out[0] = Trig<isFixed<Float>::value, real>::Atan2(in[3].imag(), in[3].real());   // a1 -> b1
+          out[1] = Trig<isFixed<Float>::value, real>::Atan2(-in[6].imag(), -in[6].real()); // c1 -> -c1
+
+          out[2] = in[4].real();
+          out[3] = in[4].imag(); // a2 -> b2
+          out[4] = in[5].real();
+          out[5] = in[5].imag(); // a3 -> b3
+          out[6] = in[0].real();
+          out[7] = in[0].imag(); // b1 -> a1
         }
 
         template <typename I>
@@ -1679,6 +1692,16 @@ namespace quda {
             out[8] = cmul(conj(out[3]), conj(out[1]));
             out[8] = cmac(u0 * A, out[2], out[8]);
             out[8] = -r_inv2 * out[8];
+          }
+
+          // Rearrange {{b1,b2,b3},{a1,a2,a3},{-c1,-c2,-c3}} back
+          // to {{a1,a2,a3},{b1,b2,b3},{c1,c2,c3}}
+#pragma unroll
+          for (int i = 0; i < 3; i++) {
+            const auto tmp = out[i];
+            out[i] = out[i + 3];
+            out[i + 3] = tmp;
+            out[i + 6] = -out[i + 6];
           }
         }
 
@@ -2110,17 +2133,18 @@ namespace quda {
       */
       void save() {
 	if (backup_h) errorQuda("Already allocated host backup");
-	backup_h = safe_malloc(bytes);
-	qudaMemcpy(backup_h, gauge, bytes, cudaMemcpyDeviceToHost);
+        backup_h = safe_malloc(bytes);
+        qudaMemcpy(backup_h, gauge, bytes, cudaMemcpyDeviceToHost);
       }
 
       /**
 	 @brief Restore the field from the host after tuning
       */
-      void load() {
-	qudaMemcpy(gauge, backup_h, bytes, cudaMemcpyHostToDevice);
-	host_free(backup_h);
-	backup_h = nullptr;
+      void load()
+      {
+        qudaMemcpy(gauge, backup_h, bytes, cudaMemcpyHostToDevice);
+        host_free(backup_h);
+        backup_h = nullptr;
       }
 
       size_t Bytes() const { return reconLen * sizeof(Float); }

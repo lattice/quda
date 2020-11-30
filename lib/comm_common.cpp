@@ -279,11 +279,11 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
           } else {
             intranode_enabled[dir][dim] = true;
             if (getVerbosity() > QUDA_SILENT) {
-	      printf("Intra-node (non peer-to-peer) enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d\n",
-		     comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
-	    }
+              printf(
+                "Intra-node (non peer-to-peer) enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d\n",
+                comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
+            }
           }
-
         } // on the same node
       } // different dimensions - x, y, z, t
     } // different directions - forward/backward
@@ -421,7 +421,7 @@ void comm_set_neighbor_ranks(Topology *topo)
 
   Topology *topology = topo ? topo : default_topo; // use default topology if topo is NULL
   if (!topology) errorQuda("Topology not specified");
-     
+
   for(int d=0; d<4; ++d){
     int pos_displacement[QUDA_MAX_DIM] = { };
     int neg_displacement[QUDA_MAX_DIM] = { };

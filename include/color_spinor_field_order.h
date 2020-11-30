@@ -645,10 +645,12 @@ namespace quda {
       {
         for (int dim=0; dim<4; dim++) {
           for (int dir=0; dir<2; dir++) {
-            ghost[2*dim+dir] = static_cast<complex<ghostFloat>*>(ghost_[2*dim+dir]);
-            ghost_norm[2 * dim + dir] = !block_float_ghost ? nullptr :
-            reinterpret_cast<norm_type *>(static_cast<char *>(ghost_[2 * dim + dir]) +
-                                          nParity * nColor * nSpin * nVec * 2 * ghostAccessor.faceVolumeCB[dim] * sizeof(ghostFloat));
+            ghost[2 * dim + dir] = static_cast<complex<ghostFloat> *>(ghost_[2 * dim + dir]);
+            ghost_norm[2 * dim + dir] = !block_float_ghost ?
+              nullptr :
+              reinterpret_cast<norm_type *>(static_cast<char *>(ghost_[2 * dim + dir])
+                                            + nParity * nColor * nSpin * nVec * 2 * ghostAccessor.faceVolumeCB[dim]
+                                              * sizeof(ghostFloat));
           }
         }
       }

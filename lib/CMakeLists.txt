@@ -27,7 +27,7 @@ set (QUDA_OBJS
   dirac_coarse.cpp dslash_coarse.cu dslash_coarse_dagger.cu
   coarse_op.cu coarsecoarse_op.cu
   coarse_op_preconditioned.cu staggered_coarse_op.cu
-  eig_trlm.cpp eig_block_trlm.cpp vector_io.cpp
+  eig_iram.cpp eig_trlm.cpp eig_block_trlm.cpp vector_io.cpp
   eigensolve_quda.cpp quda_arpack_interface.cpp
   multigrid.cpp transfer.cpp block_orthogonalize.cu inv_bicgstab_quda.cpp
   prolongator.cu restrictor.cu staggered_prolong_restrict.cu
@@ -46,12 +46,13 @@ set (QUDA_OBJS
   cpu_gauge_field.cpp cuda_gauge_field.cpp extract_gauge_ghost.cu
   extract_gauge_ghost_mg.cu max_gauge.cu gauge_update_quda.cu
   max_clover.cu dirac_clover.cpp dirac_wilson.cpp dirac_staggered.cpp
-  dirac_clover_hasenbusch_twist.cpp
-  dirac_improved_staggered.cpp dirac_domain_wall.cpp
+  dirac_staggered_kd.cpp dirac_clover_hasenbusch_twist.cpp
+  dirac_improved_staggered.cpp dirac_improved_staggered_kd.cpp dirac_domain_wall.cpp
   dirac_domain_wall_4d.cpp dirac_mobius.cpp dirac_twisted_clover.cpp
   dirac_twisted_mass.cpp 
   llfat_quda.cu gauge_force.cu gauge_random.cu
   gauge_field_strength_tensor.cu clover_quda.cu dslash_quda.cu
+  staggered_kd_build_xinv.cu staggered_kd_apply_xinv.cu
   blas_quda.cu multi_blas_quda.cu reduce_quda.cu
   multi_reduce_quda.cu reduce_helper.cu
   contract.cu comm_common.cpp
@@ -207,16 +208,18 @@ if(CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA"
 endif()
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:--cuda-path=${CUDAToolkit_TARGET_DIR}>)
 
-target_include_directories(quda SYSTEM PRIVATE ../include/externals)
 target_include_directories(quda PRIVATE .)
 target_include_directories(quda PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(quda SYSTEM PRIVATE ../include/externals)
 target_include_directories(quda SYSTEM PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
+target_include_directories(quda SYSTEM PRIVATE ${EIGEN_INCLUDE_DIRS})
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/>
                                        $<INSTALL_INTERFACE:include/>)
-
-target_include_directories(quda SYSTEM PRIVATE ${EIGEN_INCLUDE_DIRS})
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include> $<INSTALL_INTERFACE:include>)
 
+target_include_directories(quda_cpp SYSTEM PRIVATE ../include/externals)
+target_include_directories(quda_cpp SYSTEM PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
+target_include_directories(quda_cpp SYSTEM PRIVATE ${EIGEN_INCLUDE_DIRS})
 target_compile_definitions(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,COMPILE_DEFINITIONS>)
 target_include_directories(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,INCLUDE_DIRECTORIES>)
 target_compile_options(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,COMPILE_OPTIONS>)
@@ -243,11 +246,11 @@ if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")
 endif()		
 if(${QUDA_TARGET_TYPE} STREQUAL "HIP")		
   add_subdirectory(targets/hip)
-endif()		
-target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_target>)
- 
+endif()
+
 add_subdirectory(targets/generic)
-target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_generic>)
+
+add_subdirectory(interface)
 
 # propagate CXX flags to CUDA host compiler
 #TODO: Do we still need that? 
@@ -435,9 +438,6 @@ if(QUDA_QMP)
   if(QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
     add_dependencies(quda QMP)
     add_dependencies(quda_cpp QMP)
-    #TODO: need to figure out how to propagate that cleanly
-    add_dependencies(${QUDA_TARGET_LIBRARY} QMP)
-    add_dependencies(quda_generic_target QMP)
   endif()
   target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_QMPHOME}/include>)
   target_compile_definitions(quda PUBLIC QMP_COMMS)
@@ -462,9 +462,6 @@ if(QUDA_QIO)
   if(QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
     add_dependencies(quda QIO)
     add_dependencies(quda_cpp QIO)
-    #TODO: need to figure out how to propagate that cleanly
-    add_dependencies(${QUDA_TARGET_LIBRARY} QIO)
-    add_dependencies(quda_generic_target QIO)
   endif()
   target_compile_definitions(quda PUBLIC HAVE_QIO)
   target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_QIOHOME}/include>)
@@ -509,6 +506,17 @@ if(QUDA_ARPACK)
     if(QUDA_MPI OR QUDA_QMP)
       target_link_libraries(quda INTERFACE ${PARPACK} MPI::MPI_Fortran)
     endif()
+  endif()
+endif()
+
+if(QUDA_OPENBLAS)
+  target_compile_definitions(quda PRIVATE OPENBLAS_LIB)
+  
+  if(QUDA_DOWNLOAD_OPENBLAS)
+    target_link_libraries(quda PUBLIC openblas)
+    target_link_libraries(quda_cpp PUBLIC openblas)
+  else()
+    target_link_libraries(quda INTERFACE ${OPENBLAS})
   endif()
 endif()
 
@@ -591,8 +599,6 @@ endif()
 if(QUDA_DOWNLOAD_EIGEN)
   add_dependencies(quda_cpp Eigen)
   add_dependencies(quda Eigen)
-  add_dependencies(${QUDA_TARGET_LIBRARY} Eigen)
-  add_dependencies(quda_generic_target Eigen)
 endif()
 
 configure_file(../include/quda_define.h.in ../include/quda_define.h @ONLY)

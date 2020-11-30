@@ -172,10 +172,10 @@ void verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spi
       errorQuda("Mass normalization %s not implemented", get_mass_normalization_str(inv_param.mass_normalization));
     }
 
-    void *spinorTmp = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
+    void *spinorTmp = malloc(Vh * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
     printfQuda("Host residuum checks: \n");
     for (int i = 0; i < inv_param.num_offset; i++) {
-      ax(0, spinorCheck, V * spinor_site_size, inv_param.cpu_prec);
+      ax(0, spinorCheck, Vh * spinor_site_size, inv_param.cpu_prec);
 
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
         if (inv_param.twist_flavor != QUDA_TWIST_SINGLET) {

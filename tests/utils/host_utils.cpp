@@ -70,7 +70,7 @@ size_t host_clover_data_type_size = (cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof
 void setQudaPrecisions()
 {
   if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
-  if (prec_eigensolver == QUDA_INVALID_PRECISION) prec_eigensolver = prec;
+  if (prec_eigensolver == QUDA_INVALID_PRECISION) prec_eigensolver = prec_sloppy;
   if (prec_precondition == QUDA_INVALID_PRECISION) prec_precondition = prec_sloppy;
   if (prec_null == QUDA_INVALID_PRECISION) prec_null = prec_precondition;
   if (smoother_halo_prec == QUDA_INVALID_PRECISION) smoother_halo_prec = prec_null;
@@ -221,7 +221,7 @@ void constructWilsonTestSpinorParam(quda::ColorSpinorParam *cs_param, const Quda
     cs_param->nDim = 4;
   }
   for (int d = 0; d < 4; d++) cs_param->x[d] = gauge_param->X[d];
-  bool pc = (inv_param->solution_type == QUDA_MATPC_SOLUTION || inv_param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+  bool pc = isPCSolution(inv_param->solution_type);
   if (pc) cs_param->x[0] /= 2;
   cs_param->siteSubset = pc ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
 
@@ -235,8 +235,8 @@ void constructWilsonTestSpinorParam(quda::ColorSpinorParam *cs_param, const Quda
   cs_param->location = QUDA_CPU_FIELD_LOCATION;
 }
 
-void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x,
-                                 quda::RNG &rng)
+void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, QudaSolutionType sol_type,
+                                 const int *const x, quda::RNG &rng)
 {
   quda::ColorSpinorParam param;
   param.v = v;
@@ -246,10 +246,11 @@ void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision p
   param.create = QUDA_REFERENCE_FIELD_CREATE;
   param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   param.nDim = 4;
-  param.siteSubset = QUDA_FULL_SITE_SUBSET;
+  param.siteSubset = isPCSolution(sol_type) ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
   param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   param.location = QUDA_CPU_FIELD_LOCATION; // DMH FIXME so one can construct device noise
   for (int d = 0; d < 4; d++) param.x[d] = x[d];
+  if (isPCSolution(sol_type)) param.x[0] /= 2;
   quda::cpuColorSpinorField spinor_in(param);
   quda::spinorNoise(spinor_in, rng, QUDA_NOISE_UNIFORM);
 }

@@ -30,6 +30,8 @@ namespace quda
     cudaEvent_t &get_event();
   } // namespace reducer
 
+  constexpr int max_n_reduce() { return QUDA_MAX_MULTI_REDUCE; }
+
   /**
      @brief The initialization value we used to check for completion
    */
@@ -133,7 +135,7 @@ namespace quda
 #else
       auto event = reducer::get_event();
       qudaEventRecord(event, stream);
-      while (!qudaEventQuery(event)) {}
+      while (!qudaEventQuery(event)) { }
 #endif
       // copy back result element by element and convert if necessary to host reduce type
       // unit size here may differ from system_atomic_t size, e.g., if doing double-double
