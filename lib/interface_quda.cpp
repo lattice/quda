@@ -3247,12 +3247,15 @@ void callSplitGridQuda(Interface op, void **_hp_x, void **_hp_b, QudaInvertParam
   profileInvertSplitGrid.TPSTART(QUDA_PROFILE_INIT);
   const int *_split_key = param->split_grid;
   CommKey split_key = {_split_key[0], _split_key[1], _split_key[2], _split_key[3]};
-  int num_src = quda::product(split_key);
+  int num_sub_partition = quda::product(split_key);
 
   QudaPCType pc_type = QUDA_4D_PC;
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) { pc_type = QUDA_5D_PC; }
 
-  if (param->num_src != num_src) { errorQuda("Number of rhs should be equal to the number of sub-partitions."); }
+  if (param->num_src_per_sub_partition * num_sub_partition != param->num_src) {
+    errorQuda("We need to have split_grid[0](=%d) * split_grid[1](=%d) * split_grid[2](=%d) * split_grid[3](=%d) * num_src_per_sub_partition(=%d) == num_src(=%d).",
+    split_key[0], split_key[1], split_key[2], split_key[3], param->num_src_per_sub_partition, param->num_src);
+  }
 
   if (param->inv_type_precondition == QUDA_MG_INVERTER) { errorQuda("Split Grid does NOT work with MG yet."); }
 
@@ -3267,15 +3270,15 @@ void callSplitGridQuda(Interface op, void **_hp_x, void **_hp_b, QudaInvertParam
 
   const int *X = gauge_param->X;
   ColorSpinorParam cpuParam(_hp_b[0], *param, X, pc_solution, param->input_location);
-  std::vector<ColorSpinorField *> _h_b(num_src);
-  for (int i = 0; i < num_src; i++) {
+  std::vector<ColorSpinorField *> _h_b(param->num_src);
+  for (int i = 0; i < param->num_src; i++) {
     cpuParam.v = _hp_b[i];
     _h_b[i] = ColorSpinorField::Create(cpuParam);
   }
 
   cpuParam.location = param->output_location;
-  std::vector<ColorSpinorField *> _h_x(num_src);
-  for (int i = 0; i < num_src; i++) {
+  std::vector<ColorSpinorField *> _h_x(param->num_src);
+  for (int i = 0; i < param->num_src; i++) {
     cpuParam.v = _hp_x[i];
     _h_x[i] = ColorSpinorField::Create(cpuParam);
   }
@@ -3331,10 +3334,16 @@ void callSplitGridQuda(Interface op, void **_hp_x, void **_hp_b, QudaInvertParam
   // Split input fermion field
   quda::ColorSpinorParam cpu_cs_param_split(*_h_x[0]);
   for (int d = 0; d < CommKey::n_dim; d++) { cpu_cs_param_split.x[d] *= split_key[d]; }
-  quda::ColorSpinorField *collect_b = new quda::cpuColorSpinorField(cpu_cs_param_split);
-  quda::ColorSpinorField *collect_x = new quda::cpuColorSpinorField(cpu_cs_param_split);
-
-  split_field(*collect_b, _h_b, split_key, pc_type);
+  std::vector<quda::ColorSpinorField *> _collect_b(param->num_src_per_sub_partition, nullptr);
+  std::vector<quda::ColorSpinorField *> _collect_x(param->num_src_per_sub_partition, nullptr);
+  for (int n = 0; n < param->num_src_per_sub_partition; n++) {
+    _collect_b[n] = new quda::cpuColorSpinorField(cpu_cs_param_split);
+    _collect_x[n] = new quda::cpuColorSpinorField(cpu_cs_param_split);
+    auto first = _h_b.begin() + n * num_sub_partition;
+    auto last = _h_b.begin() + (n + 1) * num_sub_partition;
+    std::vector<ColorSpinorField *> _v_b(first, last);
+    split_field(*_collect_b[n], _v_b, split_key, pc_type);
+  }
   comm_barrier();
 
   push_communicator(split_key);
@@ -3355,7 +3364,9 @@ void callSplitGridQuda(Interface op, void **_hp_x, void **_hp_b, QudaInvertParam
   profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_PREAMBLE);
   profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_TOTAL);
 
-  op(collect_x->V(), collect_b->V(), param, args...);
+  for (int n = 0; n < param->num_src_per_sub_partition; n++) {
+    op(_collect_x[n]->V(), _collect_b[n]->V(), param, args...);
+  }
 
   profileInvertSplitGrid.TPSTART(QUDA_PROFILE_TOTAL);
   profileInvertSplitGrid.TPSTART(QUDA_PROFILE_EPILOGUE);
@@ -3367,10 +3378,15 @@ void callSplitGridQuda(Interface op, void **_hp_x, void **_hp_b, QudaInvertParam
     gauge_param->ga_pad /= split_key[d];
   }
 
-  join_field(_h_x, *collect_x, split_key, pc_type);
+  for (int n = 0; n < param->num_src_per_sub_partition; n++) {
+    auto first = _h_x.begin() + n * num_sub_partition;
+    auto last = _h_x.begin() + (n + 1) * num_sub_partition;
+    std::vector<ColorSpinorField *> _v_x(first, last);
+    join_field(_v_x, *_collect_x[n], split_key, pc_type);
+  }
 
-  delete collect_b;
-  delete collect_x;
+  for (auto p: _collect_b) { delete p; }
+  for (auto p: _collect_x) { delete p; }
 
   for (auto p : _h_x) { delete p; }
   for (auto p : _h_b) { delete p; }

@@ -185,8 +185,11 @@ extern "C" {
 
     int num_src; /**< Number of sources in the multiple source solver */
 
-    /**< The grid of sub-partition according to which the processor grid will be partitioned
-    The product of the four integers should be equal to `num_src`. */
+    int num_src_per_sub_partition; /**< Number of sources in the multiple source solver, but per sub-partition */
+
+    /**< The grid of sub-partition according to which the processor grid will be partitioned.
+    Should have:
+      split_grid[0] * split_grid[1] * split_grid[2] * split_grid[3] * num_src_per_sub_partition == num_src. **/
     int split_grid[QUDA_MAX_DIM];
 
     int overlap; /**< Width of domain overlaps */

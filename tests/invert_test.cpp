@@ -222,7 +222,8 @@ int main(int argc, char **argv)
   inv_param.split_grid[2] = grid_partition[2];
   inv_param.split_grid[3] = grid_partition[3];
 
-  bool use_split_grid = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3] > 1;
+  int num_sub_partition = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3];
+  bool use_split_grid = num_sub_partition > 1;
 
   // Allocate host side memory for clover terms if needed.
   //----------------------------------------------------------------------------
@@ -333,6 +334,7 @@ int main(int argc, char **argv)
 
   } else {
     inv_param.num_src = Nsrc;
+    inv_param.num_src_per_sub_partition = Nsrc / num_sub_partition;
 
     for (auto &p : _h_b) {
       p = new quda::cpuColorSpinorField(cs_param);

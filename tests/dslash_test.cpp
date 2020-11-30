@@ -184,6 +184,7 @@ void init(int argc, char **argv)
 
   if (test_split_grid) {
     inv_param.num_src = num_src;
+    inv_param.num_src_per_sub_partition = 1;
     for (int n = 0; n < num_src; n++) {
       vp_spinor.push_back(new cpuColorSpinorField(csParam));
       vp_spinorOut.push_back(new cpuColorSpinorField(csParam));
