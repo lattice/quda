@@ -365,7 +365,16 @@ namespace quda {
 
     virtual int full_dim(int d) const { return x[d]; }
 
+    /**
+      @brief Copy all contents of the field to a host buffer.
+      @param[in] the host buffer to copy to.
+    */
     virtual void copy_to_buffer(void *buffer) const = 0;
+
+    /**
+      @brief Copy all contents of the field from a host buffer to this field.
+      @param[in] the host buffer to copy from.
+    */
     virtual void copy_from_buffer(void *buffer) = 0;
 
     const void** Ghost() const {
@@ -588,7 +597,16 @@ namespace quda {
     const void* Even_p() const { return even; }
     const void *Odd_p() const { return odd; }
 
+    /**
+      @brief Copy all contents of the field to a host buffer.
+      @param[in] the host buffer to copy to.
+    */
     virtual void copy_to_buffer(void *buffer) const;
+
+    /**
+      @brief Copy all contents of the field from a host buffer to this field.
+      @param[in] the host buffer to copy from.
+    */
     virtual void copy_from_buffer(void *buffer);
 
     void setGauge(void* _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
@@ -682,7 +700,16 @@ namespace quda {
     void* Gauge_p() { return gauge; }
     const void* Gauge_p() const { return gauge; }
 
+    /**
+      @brief Copy all contents of the field to a host buffer.
+      @param[in] the host buffer to copy to.
+    */
     virtual void copy_to_buffer(void *buffer) const;
+
+    /**
+      @brief Copy all contents of the field from a host buffer to this field.
+      @param[in] the host buffer to copy from.
+    */
     virtual void copy_from_buffer(void *buffer);
 
     void setGauge(void** _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
@@ -742,7 +769,7 @@ namespace quda {
                         void **ghostOut = 0, void **ghostIn = 0, int type = 0);
 
   /**
-    This function is used for copying from a source gauge field to a destination gauge field
+    @brief This function is used for copying from a source gauge field to a destination gauge field
       with an offset.
     @param out The output field to which we are copying
     @param in The input field from which we are copying

@@ -242,7 +242,16 @@ namespace quda {
 
     virtual int full_dim(int d) const { return x[d]; }
 
+    /**
+      @brief Copy all contents of the field to a host buffer.
+      @param[in] the host buffer to copy to.
+    */
     virtual void copy_to_buffer(void *buffer) const = 0;
+
+    /**
+      @brief Copy all contents of the field from a host buffer to this field.
+      @param[in] the host buffer to copy from.
+    */
     virtual void copy_from_buffer(void *buffer) = 0;
   };
 
@@ -304,13 +313,16 @@ namespace quda {
     */
     void prefetch(QudaFieldLocation mem_space, qudaStream_t stream, CloverPrefetchType type,
                   QudaParity parity = QUDA_INVALID_PARITY) const;
+
     /**
-      TODO: Doxygen
+      @brief Copy all contents of the field to a host buffer.
+      @param[in] the host buffer to copy to.
     */
     virtual void copy_to_buffer(void *buffer) const;
 
     /**
-      TODO: Doxygen
+      @brief Copy all contents of the field from a host buffer to this field.
+      @param[in] the host buffer to copy from.
     */
     virtual void copy_from_buffer(void *buffer);
 
@@ -330,7 +342,16 @@ namespace quda {
     cpuCloverField(const CloverFieldParam &param);
     virtual ~cpuCloverField();
 
+    /**
+      @brief Copy all contents of the field to a host buffer.
+      @param[in] the host buffer to copy to.
+    */
     virtual void copy_to_buffer(void *buffer) const;
+
+    /**
+      @brief Copy all contents of the field from a host buffer to this field.
+      @param[in] the host buffer to copy from.
+    */
     virtual void copy_from_buffer(void *buffer);
   };
 
@@ -487,7 +508,7 @@ namespace quda {
   void cloverDerivative(cudaGaugeField &force, cudaGaugeField& gauge, cudaGaugeField& oprod, double coeff, QudaParity parity);
 
   /**
-    This function is used for copying from a source clover field to a destination clover field
+    @brief This function is used for copying from a source clover field to a destination clover field
       with an offset.
     @param out The output field to which we are copying
     @param in The input field from which we are copying
