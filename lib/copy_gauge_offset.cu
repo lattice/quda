@@ -121,9 +121,6 @@ namespace quda
       errorQuda("Field geometries %d %d do not match", out.Geometry(), in.Geometry());
     }
 
-    int parity_change = offset[0] + offset[1] + offset[2] + offset[3];
-    if (parity_change % 2 == 1) { errorQuda("This offset changes site parity and is not supported (yet).\n"); }
-
     instantiate<CopyGaugeOffset>(out, in, offset);
   }
 

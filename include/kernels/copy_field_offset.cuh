@@ -52,6 +52,11 @@ namespace quda
 
       if (Ls > 1 && X_out[4] != Ls) { errorQuda("Ls mismatch: in: %d, out: %d", X_out[4], Ls); }
 
+      if ((offset[0] + offset[1] + offset[2] + offset[3]) % 2 == 1) {
+        // This offset would change the parity between the input and output fields.
+        errorQuda("Offset (%d,%d,%d,%d) not supported", offset[0], offset[1], offset[2], offset[3]);
+      }
+
       dim_out[0] = nParity == 2 ? X_out[0] : X_out[0] * 2;
       dim_in[0] = nParity == 2 ? X_in[0] : X_in[0] * 2;
 
