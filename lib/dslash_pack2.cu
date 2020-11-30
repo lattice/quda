@@ -5,9 +5,6 @@
 // if not STRIPED then this means we assign one thread block per direction / dimension
 
 #ifdef NVSHMEM_COMMS
-#include <nvshmem.h>
-#include <nvshmemx.h>
-#else
 // MWTODO: how to handle striped ...
 #define STRIPED 1
 #endif
@@ -18,8 +15,6 @@
 
 namespace quda
 {
-
-  // static int commDim[QUDA_MAX_DIM];
 
   int* getPackComms() { return commDim; }
 

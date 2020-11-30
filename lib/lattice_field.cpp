@@ -5,9 +5,8 @@
 #include <gauge_field.h>
 #include <clover_field.h>
 
-#ifdef NVSHMEM_COMMS
-#include <nvshmem.h>
-#endif
+#include <shmem_helper.cuh>
+
 
 namespace quda {
 
@@ -240,13 +239,8 @@ namespace quda {
           qudaDeviceSynchronize();
           comm_barrier();
           for (int b=0; b<2; b++) {
-#ifndef NVSHMEM_COMMS
-            device_pinned_free(ghost_recv_buffer_d[b]);
-            device_pinned_free(ghost_send_buffer_d[b]);
-#else
-            shmem_pinned_free(ghost_recv_buffer_d[b]);
-            shmem_pinned_free(ghost_send_buffer_d[b]);
-#endif
+            device_comms_pinned_free(ghost_recv_buffer_d[b]);
+            device_comms_pinned_free(ghost_send_buffer_d[b]);
             host_free(ghost_pinned_send_buffer_h[b]);
             host_free(ghost_pinned_recv_buffer_h[b]);
           }
@@ -256,26 +250,18 @@ namespace quda {
       if (ghost_bytes > 0) {
         for (int b = 0; b < 2; ++b) {
           // gpu receive buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
-#ifndef NVSHMEM_COMMS
-          ghost_recv_buffer_d[b] = device_pinned_malloc(ghost_bytes);
-#else
-          ghost_recv_buffer_d[b] = shmem_pinned_malloc(ghost_bytes);
-#endif
+          ghost_recv_buffer_d[b] = device_comms_pinned_malloc(ghost_bytes);
 
           // gpu send buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
-          // /MWTODO: This is a NVSHMEM_IPC_HACK
-#ifndef NVSHMEM_COMMS
-          ghost_send_buffer_d[b] = device_pinned_malloc(ghost_bytes);
-#else
-          ghost_send_buffer_d[b] = shmem_pinned_malloc(ghost_bytes);
-#endif
+          ghost_send_buffer_d[b] = device_comms_pinned_malloc(ghost_bytes);
+
 
           // pinned buffer used for sending
           ghost_pinned_send_buffer_h[b] = mapped_malloc(ghost_bytes);
 
           // set the matching device-mapped pointer
-          cudaHostGetDevicePointer(&ghost_pinned_send_buffer_hd[b], ghost_pinned_send_buffer_h[b], 0);
-
+          ghost_pinned_send_buffer_hd[b] = get_mapped_device_pointer(ghost_pinned_send_buffer_h[b]);
+         
           // pinned buffer used for receiving
           ghost_pinned_recv_buffer_h[b] = mapped_malloc(ghost_bytes);
 
@@ -300,20 +286,11 @@ namespace quda {
 
     for (int b=0; b<2; b++) {
 // free receive buffer
-#ifndef NVSHMEM_COMMS
-      if (ghost_recv_buffer_d[b]) device_pinned_free(ghost_recv_buffer_d[b]);
-#else
-      if (ghost_recv_buffer_d[b]) shmem_pinned_free(ghost_recv_buffer_d[b]);
-#endif
+      if (ghost_recv_buffer_d[b]) device_comms_pinned_free(ghost_recv_buffer_d[b]);
       ghost_recv_buffer_d[b] = nullptr;
 
 // free send buffer
-// MWTODO: This is a NVSHMEM_IPC_HACK
-#ifndef NVSHMEM_COMMS
-      if (ghost_send_buffer_d[b]) device_pinned_free(ghost_send_buffer_d[b]);
-#else
-      if (ghost_send_buffer_d[b]) shmem_pinned_free(ghost_send_buffer_d[b]);
-#endif
+      if (ghost_send_buffer_d[b]) device_comms_pinned_free(ghost_send_buffer_d[b]);
       ghost_send_buffer_d[b] = nullptr;
 
       // free pinned send memory buffer

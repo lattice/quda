@@ -702,10 +702,6 @@ bool comm_nvshmem_enabled()
 {
 #if (defined MULTI_GPU) && (defined NVSHMEM_COMMS)
   static bool nvshmem_enabled = true;
-#else
-  static bool nvshmem_enabled = false;
-#endif
-#ifdef MULTI_GPU
   static bool nvshmem_init = false;
   if (!nvshmem_init) {
     char *enable_nvshmem_env = getenv("QUDA_ENABLE_NVSHMEM");
@@ -713,6 +709,8 @@ bool comm_nvshmem_enabled()
     if (enable_nvshmem_env && strcmp(enable_nvshmem_env, "0") == 0) { nvshmem_enabled = false; }
     nvshmem_init = true;
   }
+#else
+  static bool nvshmem_enabled = false;
 #endif
   return nvshmem_enabled;
 }

@@ -4,11 +4,10 @@
 #include <color_spinor.h>
 #include <index_helper.cuh>
 #include <dslash_helper.cuh>
+#include <shmem_helper.cuh>
 
 #ifdef NVSHMEM_COMMS
-#include <nvshmem.h>
-#include <nvshmemx.h>
-#include <cuda/atomic>
+
 
 namespace
 {

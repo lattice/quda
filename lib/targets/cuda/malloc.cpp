@@ -5,6 +5,8 @@
 #include <unistd.h>   // for getpagesize()
 #include <execinfo.h> // for backtrace
 #include <quda_internal.h>
+#include <shmem_helper.cuh>
+
 
 #ifdef USE_QDPJIT
 #include "qdp_quda.h"
@@ -15,9 +17,6 @@
 #include "backward.hpp"
 #endif
 
-#ifdef NVSHMEM_COMMS
-#include <nvshmem.h>
-#endif
 
 namespace quda
 {
@@ -414,6 +413,18 @@ namespace quda
   }
 #endif
 
+/**
+ * TODO 
+ */
+  void *device_comms_pinned_malloc_(const char *func, const char *file, int line, size_t size)
+  {
+#ifdef NVSHMEM_COMMS
+    return shmem_malloc_(func, file, line, size);
+#else
+    return device_pinned_malloc_(func, file, line, size);
+#endif
+  }
+
   /**
    * Free device memory allocated with device_malloc().  This function
    * should only be called via the device_free() macro, defined in
@@ -527,6 +538,15 @@ namespace quda
   }
 #endif
 
+  void device_comms_pinned_free_(const char *func, const char *file, int line, void *ptr)
+  {
+#ifdef NVSHMEM_COMMS
+    shmem_free_(func, file, line, ptr);
+#else
+    device_pinned_free_(func, file, line, ptr);
+#endif
+  }
+
   void printPeakMemUsage()
   {
     printfQuda("Device memory used = %.1f MB\n", max_total_bytes[DEVICE] / (double)(1 << 20));
@@ -632,7 +652,7 @@ namespace quda
     static bool pinned_memory_pool = true;
 #ifdef NVSHMEM_COMMS
     /** whether to use a memory pool allocator for shmem memory */
-    static bool shmem_memory_pool = true;
+  static bool shmem_memory_pool = true;
 #endif
 
     void init()
@@ -659,6 +679,13 @@ namespace quda
         }
         pool_init = true;
       }
+#if defined(NVSHMEM_COMMS)
+      MPI_Comm tmp = MPI_COMM_WORLD;
+      warningQuda("Init NVSHMEM");
+      nvshmemx_init_attr_t attr;
+      attr.mpi_comm = &tmp;
+      nvshmemx_init_attr(NVSHMEMX_INIT_WITH_MPI_COMM, &attr);
+#endif
     }
 
     void *pinned_malloc_(const char *func, const char *file, int line, size_t nbytes)

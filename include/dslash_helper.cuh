@@ -4,11 +4,10 @@
 #include <gauge_field.h>
 #include <register_traits.h>
 #include <index_helper.cuh>
+#include <shmem_helper.cuh>
+
 
 #ifdef NVSHMEM_COMMS
-#include <nvshmem.h>
-#include <cuda/atomic>
-
 namespace
 {
   __device__ cuda::atomic<long, cuda::thread_scope_system> intersync {0};
