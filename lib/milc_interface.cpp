@@ -1299,12 +1299,13 @@ struct mgInputStruct {
   int geo_block_size[QUDA_MAX_MG_LEVEL][4];      // ignored on first and last level (first is 2 2 2 2)
 
   // Solve
-  QudaInverterType coarse_solver[QUDA_MAX_MG_LEVEL]; // ignored on first level
-  double coarse_solver_tol[QUDA_MAX_MG_LEVEL];       // ignored on first level
-  int coarse_solver_maxiter[QUDA_MAX_MG_LEVEL];      // ignored on first level
-  QudaInverterType smoother_type[QUDA_MAX_MG_LEVEL]; // all but last level
-  int nu_pre[QUDA_MAX_MG_LEVEL];                     // all but last level
-  int nu_post[QUDA_MAX_MG_LEVEL];                    // all but last level
+  QudaSolveType coarse_solve_type[QUDA_MAX_MG_LEVEL]; // ignored on first and second level
+  QudaInverterType coarse_solver[QUDA_MAX_MG_LEVEL];  // ignored on first level
+  double coarse_solver_tol[QUDA_MAX_MG_LEVEL];        // ignored on first level
+  int coarse_solver_maxiter[QUDA_MAX_MG_LEVEL];       // ignored on first level
+  QudaInverterType smoother_type[QUDA_MAX_MG_LEVEL];  // all but last level
+  int nu_pre[QUDA_MAX_MG_LEVEL];                      // all but last level
+  int nu_post[QUDA_MAX_MG_LEVEL];                     // all but last level
 
   // Misc
   bool mg_verbosity[QUDA_MAX_MG_LEVEL]; // all levels
@@ -1383,6 +1384,7 @@ struct mgInputStruct {
     nu_post[1] = 2;
 
     /* Level 2 */
+    coarse_solve_type[2] = QUDA_DIRECT_PC_SOLVE;
     coarse_solver[2] = QUDA_GCR_INVERTER;
     coarse_solver_tol[2] = 0.25;
     coarse_solver_maxiter[2] = 4;
@@ -1391,6 +1393,7 @@ struct mgInputStruct {
     nu_post[2] = 2;
 
     /* Level 3 */
+    coarse_solve_type[3] = QUDA_DIRECT_PC_SOLVE;
     coarse_solver[3] = QUDA_CA_GCR_INVERTER; // use CGNR for non-deflated... sometimes
     coarse_solver_tol[3] = 0.25;
     coarse_solver_maxiter[3] = 16; // use larger for non-deflated
@@ -1439,6 +1442,17 @@ struct mgInputStruct {
       return QUDA_HALF_PRECISION;
     } else {
       return QUDA_INVALID_PRECISION;
+    }
+  }
+
+  QudaSolveType getQudaSolveType(const char *name)
+  {
+    if (strcmp(name, "direct") == 0) {
+      return QUDA_DIRECT_SOLVE;
+    } else if (strcmp(name, "direct-pc") == 0) {
+      return QUDA_DIRECT_PC_SOLVE;
+    } else {
+      return QUDA_INVALID_SOLVE;
     }
   }
 
@@ -1528,6 +1542,14 @@ struct mgInputStruct {
       }
 
     } else /* Begin Solvers */
+      if (strcmp(input_line[0].c_str(), "coarse_solve_type") == 0) {
+      if (input_line.size() < 3) {
+        error_code = 1;
+      } else {
+        coarse_solve_type[atoi(input_line[1].c_str())] = getQudaSolveType(input_line[2].c_str());
+      }
+
+    } else
       if (strcmp(input_line[0].c_str(), "coarse_solver") == 0) {
       if (input_line.size() < 3) {
         error_code = 1;
@@ -1863,7 +1885,12 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
 
     // set to QUDA_DIRECT_SOLVE for no even/odd preconditioning on the smoother
     // set to QUDA_DIRECT_PC_SOLVE for to enable even/odd preconditioning on the smoother
-    mg_param.smoother_solve_type[i] = (i == 0) ? QUDA_DIRECT_SOLVE : QUDA_DIRECT_PC_SOLVE; // smoother_solve_type[i];
+    // from test routines: // smoother_solve_type[i];
+    switch (i) {
+      case 0: mg_param.smoother_solve_type[0] = QUDA_DIRECT_SOLVE; break;
+      case 1: mg_param.smoother_solve_type[1] = QUDA_DIRECT_PC_SOLVE; break;
+      default: mg_param.smoother_solve_type[i] = input_struct.coarse_solve_type[i]; break;
+    }
 
     // set to QUDA_ADDITIVE_SCHWARZ for Additive Schwarz precondioned smoother (presently only impelemented for MR)
     mg_param.smoother_schwarz_type[i] = QUDA_INVALID_SCHWARZ; // schwarz_type[i];
@@ -1930,10 +1957,19 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
         errorQuda("Unexpected solve_type = %d\n", solve_type);
       }
 
+    } else if (i == 1) {
+
+      // Always this for now.
+      mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION;
     } else {
 
-      // Always this for now. Will be tunable.
-      mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION;
+      if (input_struct.coarse_solve_type[i] == QUDA_DIRECT_SOLVE) {
+        mg_param.coarse_grid_solution_type[i] = QUDA_MAT_SOLUTION;
+      } else if (input_struct.coarse_solve_type[i] == QUDA_DIRECT_PC_SOLVE) {
+        mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION;
+      } else {
+        errorQuda("unexpected solve type = %d\n", input_struct.coarse_solve_type[i]);
+      }
 
       // solve
       // if (coarse_solve_type[i] == QUDA_DIRECT_SOLVE) {
@@ -1944,6 +1980,7 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
       //  errorQuda("Unexpected solve_type = %d\n", coarse_solve_type[i]);
       //}
     }
+
 
     mg_param.omega[i] = 0.85; // ignored // omega; // over/under relaxation factor
 
