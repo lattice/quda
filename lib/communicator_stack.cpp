@@ -7,27 +7,23 @@ int Communicator::gpuid = -1;
 
 std::map<quda::CommKey, Communicator> communicator_stack;
 
-Communicator *current_communicator = nullptr;
-
-constexpr quda::CommKey default_key = {1, 1, 1, 1};
-
 quda::CommKey current_key = {-1, -1, -1, -1};
 
 void init_communicator_stack(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data,
                              bool user_set_comm_handle, void *user_comm)
 {
   communicator_stack.emplace(
-    std::piecewise_construct, std::forward_as_tuple(default_key),
+    std::piecewise_construct, std::forward_as_tuple(default_comm_key),
     std::forward_as_tuple(ndim, dims, rank_from_coords, map_data, user_set_comm_handle, user_comm));
 
-  current_key = default_key;
+  current_key = default_comm_key;
 }
 
 void finalize_communicator_stack() { communicator_stack.clear(); }
 
 static Communicator &get_default_communicator()
 {
-  auto search = communicator_stack.find(default_key);
+  auto search = communicator_stack.find(default_comm_key);
   if (search == communicator_stack.end()) { errorQuda("Default communicator can't be found."); }
   return search->second;
 }
@@ -79,6 +75,8 @@ int comm_partitioned() { return get_current_communicator().comm_partitioned(); }
 const char *comm_dim_topology_string() { return get_current_communicator().topology_string; }
 
 int comm_rank(void) { return get_current_communicator().comm_rank(); }
+
+int comm_rank_global(void) { return get_default_communicator().comm_rank(); }
 
 int comm_size(void) { return get_current_communicator().comm_size(); }
 
@@ -176,6 +174,8 @@ void comm_allreduce_int(int *data) { get_current_communicator().comm_allreduce_i
 void comm_allreduce_xor(uint64_t *data) { get_current_communicator().comm_allreduce_xor(data); }
 
 void comm_broadcast(void *data, size_t nbytes) { get_current_communicator().comm_broadcast(data, nbytes); }
+
+void comm_broadcast_global(void *data, size_t nbytes) { get_default_communicator().comm_broadcast(data, nbytes); }
 
 void comm_barrier(void) { get_current_communicator().comm_barrier(); }
 

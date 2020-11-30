@@ -3359,7 +3359,7 @@ void callSplitGridQuda(Interface op, void **_hp_x, void **_hp_b, QudaInvertParam
 
   profileInvertSplitGrid.TPSTART(QUDA_PROFILE_TOTAL);
   profileInvertSplitGrid.TPSTART(QUDA_PROFILE_EPILOGUE);
-  push_communicator({1, 1, 1, 1});
+  push_communicator(default_comm_key);
   updateR();
 
   for (int d = 0; d < CommKey::n_dim; d++) {

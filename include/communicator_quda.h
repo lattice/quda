@@ -792,4 +792,12 @@ struct Communicator {
   void comm_abort_(int status);
 };
 
+constexpr quda::CommKey default_comm_key = {1, 1, 1, 1};
+
 void push_communicator(const quda::CommKey &split_key);
+
+/** @brief These routine returns the global rank, i.e. the rank with respect of the default communicator */
+int comm_rank_global();
+
+/** @brief These routine broadcast the data according to the default communicator */
+void comm_broadcast_global(void *data, size_t nbytes);
