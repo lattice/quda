@@ -232,7 +232,7 @@ namespace quda
         auto kernel = arg.mode == QudaOffsetCopyMode::COLLECT ?
           copy_field_offset_kernel<QudaOffsetCopyMode::COLLECT, Arg> :
           copy_field_offset_kernel<QudaOffsetCopyMode::DISPERSE, Arg>;
-        kernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+        qudaLaunchKernel(kernel, tp, stream, arg);
       }
     }
 

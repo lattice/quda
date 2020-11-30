@@ -45,7 +45,6 @@ namespace quda
       int dst_rank = comm_rank_from_coords(dst_idx.data());
       int tag = rank * total_rank + dst_rank; // tag = src_rank * total_rank + dst_rank
 
-      // THIS IS A COMMENT: printf("rank %4d -> rank %4d: tag = %4d\n", comm_rank(), dst_rank, tag);
       size_t bytes = meta->TotalBytes();
 
       v_send_buffer_h[i] = pinned_malloc(bytes);
@@ -71,7 +70,6 @@ namespace quda
       int src_rank = comm_rank_from_coords(src_idx.data());
       int tag = src_rank * total_rank + rank;
 
-      // THIS IS A COMMENT: printf("rank %4d <- rank %4d: tag = %4d\n", comm_rank(), src_rank, tag);
       size_t bytes = buffer_field->TotalBytes();
 
       void *recv_buffer_h = pinned_malloc(bytes);
@@ -141,7 +139,6 @@ namespace quda
       int dst_rank = comm_rank_from_coords(dst_idx.data());
       int tag = rank * total_rank + dst_rank;
 
-      // THIS IS A COMMENT: printf("rank %4d -> rank %4d: tag = %4d\n", comm_rank(), dst_rank, tag);
       size_t bytes = meta.TotalBytes();
 
       auto offset = thread_idx * thread_dim;
@@ -166,7 +163,6 @@ namespace quda
       int src_rank = comm_rank_from_coords(src_idx.data());
       int tag = src_rank * total_rank + rank;
 
-      // THIS IS A COMMENT: printf("rank %4d <- rank %4d: tag = %4d\n", comm_rank(), src_rank, tag);
       size_t bytes = buffer_field->TotalBytes();
 
       void *recv_buffer_h = pinned_malloc(bytes);
