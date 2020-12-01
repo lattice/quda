@@ -1970,15 +1970,6 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
       } else {
         errorQuda("unexpected solve type = %d\n", input_struct.coarse_solve_type[i]);
       }
-
-      // solve
-      // if (coarse_solve_type[i] == QUDA_DIRECT_SOLVE) {
-      //  mg_param.coarse_grid_solution_type[i] = QUDA_MAT_SOLUTION;
-      //} else if (coarse_solve_type[i] == QUDA_DIRECT_PC_SOLVE) {
-      //  mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION;
-      //} else {
-      //  errorQuda("Unexpected solve_type = %d\n", coarse_solve_type[i]);
-      //}
     }
 
     mg_param.omega[i] = 0.85; // ignored // omega; // over/under relaxation factor
