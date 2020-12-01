@@ -464,8 +464,8 @@ namespace quda {
         // even if comm_dim(2) == 2, we might not have p2p enabled in both directions, so check this
         const int num_dir = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0,dim) && comm_peer2peer_enabled(1,dim)) ? 1 : 2;
 	for (int dir=0; dir<num_dir; ++dir) {
-	  if (!comm_peer2peer_enabled(dir,dim)) continue;
 #ifndef NVSHMEM_COMMS
+	  if (!comm_peer2peer_enabled(dir,dim)) continue;
           void **ghostDest = &(ghost_remote_send_buffer_d[b][dim][dir]);
           cudaIpcOpenMemHandle(ghostDest, ipcRemoteGhostDestHandle[b][dir][dim], cudaIpcMemLazyEnablePeerAccess);
 #else

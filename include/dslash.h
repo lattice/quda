@@ -388,10 +388,10 @@ namespace quda
           } else if (location & Host && !comm_peer2peer_enabled(dir, dim)) { // pack to cpu memory
             packBuffer[2 * dim + dir] = in.myFace_hd(dir, dim);
           } else if (location & Shmem) {
-            packBuffer[2 * dim + dir] = comm_peer2peer_possible(dir, dim) ?
+            packBuffer[2 * dim + dir] = in.remoteFace_d(dir, dim) ?
               static_cast<char *>(in.remoteFace_d(dir, dim)) + in.GhostOffset(dim, 1 - dir) :
               in.myFace_d(dir, dim);
-            packBuffer[2 * QUDA_MAX_DIM + 2 * dim + dir] = comm_peer2peer_possible(dir, dim) ?
+            packBuffer[2 * QUDA_MAX_DIM + 2 * dim + dir] = in.remoteFace_d(dir, dim) ?
               nullptr :
               static_cast<char *>(in.remoteFace_r()) + in.GhostOffset(dim, 1 - dir);
           } else { // pack to local gpu memory

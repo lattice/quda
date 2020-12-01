@@ -519,10 +519,10 @@ namespace quda {
           break;
         case Shmem:
           // this is the remote buffer when using shmem ...
-          packBuffer[2 * dim + dir] = comm_peer2peer_possible(dir, dim) ?
+          packBuffer[2 * dim + dir] = ghost_remote_send_buffer_d[bufferIndex][dim][dir] != nullptr ?
             static_cast<char *>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + ghost_offset[dim][1 - dir] :
             my_face_dim_dir_d[bufferIndex][dim][dir];
-          packBuffer[2 * QUDA_MAX_DIM + 2 * dim + dir] = comm_peer2peer_possible(dir, dim) ?
+          packBuffer[2 * QUDA_MAX_DIM + 2 * dim + dir] = ghost_remote_send_buffer_d[bufferIndex][dim][dir] != nullptr ?
             nullptr :
             static_cast<char *>(ghost_recv_buffer_d[bufferIndex]) + ghost_offset[dim][1 - dir];
           break;
