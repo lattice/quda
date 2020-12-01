@@ -56,7 +56,7 @@ namespace quda {
           else if (arg.dim==2) ComputeUVCPU<2,QUDA_FORWARDS>(arg);
           else if (arg.dim==3) ComputeUVCPU<3,QUDA_FORWARDS>(arg);
         } else if (arg.dir == QUDA_IN_PLACE) {
-          ComputeUVCPU<-1,QUDA_IN_PLACE>(arg);
+          ComputeUVCPU<0,QUDA_IN_PLACE>(arg);
         } else {
           errorQuda("Undefined direction %d", arg.dir);
         }
@@ -123,7 +123,7 @@ namespace quda {
           else if (arg.dim==2) ComputeVUVCPU<2,QUDA_FORWARDS>(arg);
           else if (arg.dim==3) ComputeVUVCPU<3,QUDA_FORWARDS>(arg);
         } else if (arg.dir == QUDA_IN_PLACE) {
-          ComputeVUVCPU<-1,QUDA_IN_PLACE>(arg);
+          ComputeVUVCPU<0,QUDA_IN_PLACE>(arg);
         } else {
           errorQuda("Undefined direction %d", arg.dir);
         }
@@ -192,7 +192,7 @@ namespace quda {
           else if (arg.dim==2) qudaLaunchKernel(ComputeUVGPU<2,QUDA_FORWARDS,Arg>, tp, stream, arg);
           else if (arg.dim==3) qudaLaunchKernel(ComputeUVGPU<3,QUDA_FORWARDS,Arg>, tp, stream, arg);
         } else if (arg.dir == QUDA_IN_PLACE) {
-          qudaLaunchKernel(ComputeUVGPU<-1,QUDA_IN_PLACE,Arg>, tp, stream, arg);
+          qudaLaunchKernel(ComputeUVGPU<0,QUDA_IN_PLACE,Arg>, tp, stream, arg);
         }
 #endif
         }
@@ -352,7 +352,7 @@ namespace quda {
             else if (arg.dim==2) qudaLaunchKernel(ComputeVUVGPU<true,parity_flip,2,QUDA_FORWARDS,Arg>, tp, stream, arg);
             else if (arg.dim==3) qudaLaunchKernel(ComputeVUVGPU<true,parity_flip,3,QUDA_FORWARDS,Arg>, tp, stream, arg);
           } else if (arg.dir == QUDA_IN_PLACE) {
-            qudaLaunchKernel(ComputeVUVGPU<true,parity_flip,-1,QUDA_IN_PLACE,Arg>, tp, stream, arg);
+            qudaLaunchKernel(ComputeVUVGPU<true,parity_flip,0,QUDA_IN_PLACE,Arg>, tp, stream, arg);
           } else {
             errorQuda("Undefined direction %d", arg.dir);
           }
@@ -371,7 +371,7 @@ namespace quda {
             else if (arg.dim==2) qudaLaunchKernel(ComputeVUVGPU<false,parity_flip,2,QUDA_FORWARDS,Arg>, tp, stream, arg);
             else if (arg.dim==3) qudaLaunchKernel(ComputeVUVGPU<false,parity_flip,3,QUDA_FORWARDS,Arg>, tp, stream, arg);
           } else if (arg.dir == QUDA_IN_PLACE) {
-            qudaLaunchKernel(ComputeVUVGPU<false,parity_flip,-1,QUDA_IN_PLACE,Arg>, tp, stream, arg);
+            qudaLaunchKernel(ComputeVUVGPU<false,parity_flip,0,QUDA_IN_PLACE,Arg>, tp, stream, arg);
           } else {
             errorQuda("Undefined direction %d", arg.dir);
           }
@@ -1317,7 +1317,8 @@ namespace quda {
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing coarse CV and VCV via UV and VUV\n");
 
       if (uv.Precision() == QUDA_HALF_PRECISION) {
-        double U_max = 3.0*G_.abs_max(0); // use G as a proxy for the coarse clover
+        // use G as a proxy for the coarse clover because `C_` is a dummy object on the coarse level
+        double U_max = 3.0*G_.abs_max(0);
         double uv_max = U_max * v.Scale();
         uv.Scale(uv_max);
         arg.UV.resetScale(uv_max);

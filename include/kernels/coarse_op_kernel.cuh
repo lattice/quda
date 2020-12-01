@@ -1128,6 +1128,8 @@ namespace quda {
     using Float = typename Arg::Float;
     const int nDim = 4;
 
+    static_assert(!Arg::from_coarse, "computeCoarseClover is only defined on the fine grid");
+
     int coord[QUDA_MAX_DIM];
     int coord_coarse[QUDA_MAX_DIM];
 
@@ -1145,45 +1147,25 @@ namespace quda {
     complex<Float> X[Arg::coarseSpin*Arg::coarseSpin];
     for (int i=0; i<Arg::coarseSpin*Arg::coarseSpin; i++) X[i] = 0.0;
 
-    if (!Arg::from_coarse) {
-      //If Nspin = 4, then the clover term has structure C_{\mu\nu} = \gamma_{\mu\nu}C^{\mu\nu}
+    // If Nspin = 4, then the clover term has structure C_{\mu\nu} = \gamma_{\mu\nu}C^{\mu\nu}
 #pragma unroll
-      for (int s = 0; s < Arg::fineSpin; s++) { //Loop over fine spin row
-	const int s_c = arg.spin_map(s,parity);
-	//On the fine lattice, the clover field is chirally blocked, so loop over rows/columns
-	//in the same chiral block.
+    for (int s = 0; s < Arg::fineSpin; s++) { // Loop over fine spin row
+      const int s_c = arg.spin_map(s,parity);
+      // On the fine lattice, the clover field is chirally blocked, so loop over rows/columns
+      // in the same chiral block.
 #pragma unroll
-	for (int s_col = s_c*arg.spin_bs; s_col < (s_c+1)*arg.spin_bs; s_col++) { //Loop over fine spin column
+      for (int s_col = s_c*arg.spin_bs; s_col < (s_c+1)*arg.spin_bs; s_col++) { // Loop over fine spin column
 #pragma unroll
-          for (int ic = 0; ic < Arg::fineColor; ic++) { //Sum over fine color row
-            complex<Float> CV = 0.0;
+        for (int ic = 0; ic < Arg::fineColor; ic++) { // Sum over fine color row
+          complex<Float> CV = 0.0;
 #pragma unroll
-            for (int jc = 0; jc < Arg::fineColor; jc++) {  //Sum over fine color column
-              CV = cmac(arg.C(0, parity, x_cb, s, s_col, ic, jc), arg.V(parity, x_cb, s_col, jc, jc_c), CV);
-            } //Fine color column
-            X[s_c*Arg::coarseSpin + s_c] = cmac(conj(arg.V(parity, x_cb, s, ic, ic_c)), CV, X[s_c*Arg::coarseSpin + s_c]);
-          }  //Fine color row
-	}  //Fine spin column
-      } //Fine spin
-    } else {
-      //If Nspin != 4, then spin structure is a dense matrix and there is now spin aggregation
-      //N.B. assumes that no further spin blocking is done in this case.
-#pragma unroll
-      for (int s = 0; s < Arg::fineSpin; s++) { //Loop over spin row
-#pragma unroll
-	for (int s_col = 0; s_col < Arg::fineSpin; s_col++) { //Loop over spin column
-#pragma unroll
-          for (int ic = 0; ic < Arg::fineColor; ic++) { //Sum over fine color row
-            complex<Float> CV = 0.0;
-#pragma unroll
-            for (int jc = 0; jc < Arg::fineColor; jc++) {  //Sum over fine color column
-              CV = cmac(arg.C(0, parity, x_cb, s, s_col, ic, jc), arg.V(parity, x_cb, s_col, jc, jc_c), CV);;
-            } //Fine color column
-            X[s*Arg::coarseSpin + s_col] = cmac(conj(arg.V(parity, x_cb, s, ic, ic_c)), CV, X[s*Arg::coarseSpin + s_col]);
-          }  //Fine color row
-	}  //Fine spin column
-      } //Fine spin
-    }
+          for (int jc = 0; jc < Arg::fineColor; jc++) {  // Sum over fine color column
+            CV = cmac(arg.C(0, parity, x_cb, s, s_col, ic, jc), arg.V(parity, x_cb, s_col, jc, jc_c), CV);
+          } // Fine color column
+          X[s_c*Arg::coarseSpin + s_c] = cmac(conj(arg.V(parity, x_cb, s, ic, ic_c)), CV, X[s_c*Arg::coarseSpin + s_c]);
+        }  // Fine color row
+      }  // Fine spin column
+    } // Fine spin
 
 #pragma unroll
     for (int si = 0; si < Arg::coarseSpin; si++) {
