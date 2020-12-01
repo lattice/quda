@@ -879,7 +879,7 @@ namespace quda {
           for (int i = 0; i < TileType::M; i++)
 #pragma unroll
             for (int j = 0; j < TileType::N; j++)
-              arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_col,s_row,j0+j,i0+i,conj(vuv[s_row*Arg::coarseSpin+s_col](i,j)));
+              arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,vuv[s_row*Arg::coarseSpin+s_col](i,j));
         }
       }
     } else if (!isDiagonal) {
@@ -957,7 +957,8 @@ namespace quda {
 
     //Check to see if we are on the edge of a block.  If adjacent site
     //is in same block, M = X, else M = Y
-    const bool isDiagonal = (dir == QUDA_IN_PLACE || ((coord[dim]+1)%arg.x_size[dim])/arg.geo_bs[dim] == coord_coarse[dim]) ? true : false;
+    constexpr bool isFromCoarseClover = Arg::fineSpin == 2 && dir == QUDA_IN_PLACE;
+    const bool isDiagonal = (isFromCoarseClover || ((coord[dim]+1)%arg.x_size[dim])/arg.geo_bs[dim] == coord_coarse[dim]) ? true : false;
 
     int coarse_parity = shared_atomic ? parity_coarse_ : 0;
     if (!shared_atomic) {
@@ -971,7 +972,7 @@ namespace quda {
     Ctype vuv[Arg::coarseSpin * Arg::coarseSpin];
     multiplyVUV<dim,dir,Arg>(vuv, arg, gamma, parity, x_cb, i0, j0);
 
-    if (isDiagonal) {
+    if (isDiagonal && !isFromCoarseClover) {
 #pragma unroll
       for (int s2=0; s2<Arg::coarseSpin*Arg::coarseSpin; s2++) vuv[s2] *= -arg.kappa;
     }

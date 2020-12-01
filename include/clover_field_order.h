@@ -372,6 +372,9 @@ namespace quda {
     template <typename Float, int nColor, int nSpin, QudaCloverFieldOrder order>
       struct FieldOrder {
 
+      /** Does this field type support ghost zones? */
+      static constexpr bool supports_ghost_zone = false;
+
       protected:
 	/** An internal reference to the actual field we are accessing */
 	CloverField &A;
