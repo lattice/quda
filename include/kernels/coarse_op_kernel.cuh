@@ -149,6 +149,7 @@ namespace quda {
   /**
      Calculates the matrix UV^{s,c'}_mu(x) = \sum_c U^{c}_mu(x) * V^{s,c}_mu(x+mu)
      Where: mu = dir, s = fine spin, c' = coarse color, c = fine color
+     or, if dir == QUDA_IN_PLACE, UV^{s,c'}(x) = \sum_c C^{c}_mu(x) * V^{s,c}_mu(x+mu)
   */
   template<int dim, QudaDirection dir, typename Wtype, typename Arg>
   __device__ __host__ inline void computeUV(Arg &arg, const Wtype &Wacc, int parity, int x_cb, int i0, int j0)
@@ -165,7 +166,21 @@ namespace quda {
     using Ctype = decltype(make_tile_C<complex, false>(tile));
     Ctype UV[uvSpin];
 
-    if ( arg.comm_dim[dim] && (coord[dim] + nFace >= arg.x_size[dim]) ) {
+    if (dir == QUDA_IN_PLACE) {
+      for (int k = 0; k < TileType::k; k += TileType::K) { // Fine Color columns of coarse clover field
+        for (int s_col = 0; s_col < Arg::fineSpin; s_col++) {
+          auto W = make_tile_B<complex, false>(tile);
+          W.loadCS(Wacc, 0, 0, parity, x_cb, s_col, k, j0);
+          for (int s = 0; s < Arg::fineSpin; s++) {  //Fine Spin
+            
+            auto C = make_tile_A<complex, false>(tile);
+            C.load(arg.C, 0, parity, x_cb, s, s_col, i0, k);
+
+            UV[s_col * Arg::fineSpin + s].mma_nn(C, W);
+          } // which chiral block
+        }  //Fine Spin
+      }    // Fine color columns
+    } else if ( arg.comm_dim[dim] && (coord[dim] + nFace >= arg.x_size[dim]) ) {
       int ghost_idx = ghostFaceIndex<1>(coord, arg.x_size, dim, nFace);
 
       if (!Arg::from_coarse) {
@@ -244,7 +259,7 @@ namespace quda {
       for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) {
         for (int ic = 0; ic < TileType::m; ic += TileType::M)   // fine color
           for (int jc = 0; jc < TileType::n; jc += TileType::N) // coarse color
-            if (dir == QUDA_FORWARDS) // only for preconditioned clover is V != AV, will need extra logic for staggered KD
+            if (dir == QUDA_FORWARDS || dir == QUDA_IN_PLACE) // only for preconditioned clover is V != AV, will need extra logic for staggered KD
               computeUV<dim,dir>(arg, arg.V, parity, x_cb, ic, jc);
             else
               computeUV<dim,dir>(arg, arg.AV, parity, x_cb, ic, jc);
@@ -266,7 +281,7 @@ namespace quda {
     int jc = blockDim.z*blockIdx.z + threadIdx.z; // tiled coarse color
     if (jc >= arg.uvTile.N_tiles) return;
 
-    if (dir == QUDA_FORWARDS) // only for preconditioned clover is V != AV, will need extra logic for staggered KD
+    if (dir == QUDA_FORWARDS || dir == QUDA_IN_PLACE) // only for preconditioned clover is V != AV, will need extra logic for staggered KD
       computeUV<dim,dir>(arg, arg.V, parity, x_cb, ic * arg.uvTile.M, jc * arg.uvTile.N);
     else
       computeUV<dim,dir>(arg, arg.AV, parity, x_cb, ic * arg.uvTile.M, jc * arg.uvTile.N);
@@ -773,7 +788,7 @@ namespace quda {
 #pragma unroll
       for (int j = 0; j < TileType::N; j++) {
         if (tx < Arg::coarseSpin*Arg::coarseSpin) {
-          Y[i_block0+i][j_block0+j][x_][s_row][s_col] = 0;
+          if (dir != QUDA_IN_PLACE) Y[i_block0+i][j_block0+j][x_][s_row][s_col] = 0;
           X[i_block0+i][j_block0+j][x_][s_row][s_col] = 0;
         }
       }
@@ -786,13 +801,13 @@ namespace quda {
 #pragma unroll
       for (int j = 0; j < TileType::N; j++) {
 
-        if (!isDiagonal) {
+        if (dir == QUDA_IN_PLACE || isDiagonal) {
 #pragma unroll
           for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { // Chiral row block
 #pragma unroll
             for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { // Chiral column block
-              atomic_helper<Float, storeType>(&Y[i_block0+i][j_block0+j][x_][s_row][s_col],
-                                              arg.Y_atomic, vuv[s_row*Arg::coarseSpin+s_col](i,j));
+              atomic_helper<Float, storeType>(&X[i_block0+i][j_block0+j][x_][s_row][s_col],
+                                              arg.X_atomic, vuv[s_row*Arg::coarseSpin+s_col](i,j));
             }
           }
         } else {
@@ -800,8 +815,8 @@ namespace quda {
           for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { // Chiral row block
 #pragma unroll
             for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { // Chiral column block
-              atomic_helper<Float, storeType>(&X[i_block0+i][j_block0+j][x_][s_row][s_col],
-                                              arg.X_atomic, vuv[s_row*Arg::coarseSpin+s_col](i,j));
+              atomic_helper<Float, storeType>(&Y[i_block0+i][j_block0+j][x_][s_row][s_col],
+                                              arg.Y_atomic, vuv[s_row*Arg::coarseSpin+s_col](i,j));
             }
           }
         }
@@ -816,23 +831,29 @@ namespace quda {
       for (int i = 0; i < TileType::M; i++) {
 #pragma unroll
         for (int j = 0; j < TileType::N; j++) {
-          arg.Y_atomic.atomicAdd(dim_index,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,
-                                 Y[i_block0+i][j_block0+j][x_][s_row][s_col]);
-
-          if (dir == QUDA_BACKWARDS) {
-            arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_col,s_row,j0+j,i0+i,
-                                   conj(X[i_block0+i][j_block0+j][x_][s_row][s_col]));
-          } else {
+          if (dir == QUDA_IN_PLACE) {
+            // same as dir == QUDA_FORWARDS
             arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,
                                    X[i_block0+i][j_block0+j][x_][s_row][s_col]);
-          }
+          } else {
+            arg.Y_atomic.atomicAdd(dim_index,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,
+                                   Y[i_block0+i][j_block0+j][x_][s_row][s_col]);
 
-          if (!arg.bidirectional) {
-            if (Arg::fineSpin != 1 && s_row == s_col) arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,
-                                                                     X[i_block0+i][j_block0+j][x_][s_row][s_col]);
-            else arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,
-                                        -X[i_block0+i][j_block0+j][x_][s_row][s_col]);
-          }
+            if (dir == QUDA_BACKWARDS) {
+              arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_col,s_row,j0+j,i0+i,
+                                     conj(X[i_block0+i][j_block0+j][x_][s_row][s_col]));
+            } else {
+              arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,
+                                     X[i_block0+i][j_block0+j][x_][s_row][s_col]);
+            }
+
+            if (!arg.bidirectional) {
+              if (Arg::fineSpin != 1 && s_row == s_col) arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,
+                                                                       X[i_block0+i][j_block0+j][x_][s_row][s_col]);
+              else arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,
+                                          -X[i_block0+i][j_block0+j][x_][s_row][s_col]);
+            }
+          } // dir == QUDA_IN_PLACE
         }
       }
     }
@@ -848,7 +869,20 @@ namespace quda {
     const int dim_index = arg.dim_index % arg.Y_atomic.geometry;
     using TileType = typename Arg::vuvTileType;
 
-    if (!isDiagonal) {
+    if (dir == QUDA_IN_PLACE) {
+      // same as dir == QUDA_FORWARDS
+#pragma unroll
+      for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { // Chiral row block
+#pragma unroll
+        for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { // Chiral column block
+#pragma unroll
+          for (int i = 0; i < TileType::M; i++)
+#pragma unroll
+            for (int j = 0; j < TileType::N; j++)
+              arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_col,s_row,j0+j,i0+i,conj(vuv[s_row*Arg::coarseSpin+s_col](i,j)));
+        }
+      }
+    } else if (!isDiagonal) {
 #pragma unroll
       for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { // Chiral row block
 #pragma unroll
@@ -923,7 +957,7 @@ namespace quda {
 
     //Check to see if we are on the edge of a block.  If adjacent site
     //is in same block, M = X, else M = Y
-    const bool isDiagonal = ((coord[dim]+1)%arg.x_size[dim])/arg.geo_bs[dim] == coord_coarse[dim] ? true : false;
+    const bool isDiagonal = (dir == QUDA_IN_PLACE || ((coord[dim]+1)%arg.x_size[dim])/arg.geo_bs[dim] == coord_coarse[dim]) ? true : false;
 
     int coarse_parity = shared_atomic ? parity_coarse_ : 0;
     if (!shared_atomic) {
