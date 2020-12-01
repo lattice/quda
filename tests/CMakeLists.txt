@@ -7,6 +7,7 @@ target_include_directories(quda_test SYSTEM PUBLIC  googletest/include googletes
 target_include_directories(quda_test SYSTEM PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
 target_include_directories(quda_test SYSTEM PUBLIC ${EIGEN_INCLUDE_DIRS})
 target_link_libraries(quda_test PUBLIC quda)
+target_compile_options(quda_test PUBLIC -fPIC)
 add_subdirectory(utils)
 add_subdirectory(host_reference)
 
