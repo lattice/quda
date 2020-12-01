@@ -36,15 +36,6 @@ namespace quda {
 //special types needed for compatibility with QUDA blas:
     using RowMajorDenseMatrix = Matrix<Complex, Dynamic, Dynamic, RowMajor>;
 
-    struct SortedEvals{
-
-      double _val;
-      int    _idx;
-
-      SortedEvals(double val, int idx) : _val(val), _idx(idx) {};
-      static bool SelectSmall (SortedEvals v1, SortedEvals v2) { return (v1._val < v2._val);}
-    };
-
     // helper for a smart pointer creation
 
     std::shared_ptr<ColorSpinorField> MakeSharedPtr2(const ColorSpinorParam &param)
@@ -198,14 +189,15 @@ namespace quda {
       harVecs = es.eigenvectors();
       harVals = es.eigenvalues();
 
-      std::vector<SortedEvals> sorted_evals;
-      sorted_evals.reserve(args.m);
+      std::vector<std::pair<double, Complex*>> sort_ev(args.m);
 
-      for (int e = 0; e < args.m; e++) sorted_evals.push_back(SortedEvals(abs(harVals.data()[e]), e));
-      std::stable_sort(sorted_evals.begin(), sorted_evals.end(), SortedEvals::SelectSmall);
+      for(int i = 0; i < args.m; i++) sort_ev[i] = std::make_pair(abs(harVals.data()[i]), harVecs.col(i).data()); 
 
-      for (int e = 0; e < args.k; e++)
-        memcpy(args.ritzVecs.col(e).data(), harVecs.col(sorted_evals[e]._idx).data(), (args.m) * sizeof(Complex));
+      std::sort(sort_ev.begin(), sort_ev.end(),
+                       [](const std::pair<double, Complex *> &x1, const std::pair<double, Complex *> &x2) {
+                            return (x1.first < x2.first);} );
+
+      for(int i = 0; i < args.k; i++) memcpy(args.ritzVecs.col(i).data(), sort_ev[i].second, (args.m) * sizeof(Complex));
 
       return;
    }
