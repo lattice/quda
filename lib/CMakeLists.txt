@@ -264,7 +264,7 @@ target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
                             -lineinfo -Wreorder
                             -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function
                             $<$<CONFIG:STRICT>:-Werror=all-warnings>
-                            $<$<CONFIG:SANITIZE>:-Xcompiler -fsanitize=address,-fsanitize=undefined>
+                            $<$<CONFIG:SANITIZE>:-Xcompiler -fsanitize=address,undefined>
                             >)
 
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
