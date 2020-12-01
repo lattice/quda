@@ -375,19 +375,19 @@ namespace quda {
       /** Does this field type support ghost zones? */
       static constexpr bool supports_ghost_zone = false;
 
-      protected:
-	/** An internal reference to the actual field we are accessing */
-	CloverField &A;
-	const int volumeCB;
-	const Accessor<Float,nColor,nSpin,order> accessor;
-	bool inverse;
-	const QudaFieldLocation location;
+    protected:
+      /** An internal reference to the actual field we are accessing */
+      CloverField &A;
+      const int volumeCB;
+      const Accessor<Float, nColor, nSpin, order> accessor;
+      bool inverse;
+      const QudaFieldLocation location;
 
-      public:
-	/** 
-	 * Constructor for the FieldOrder class
-	 * @param field The field that we are accessing
-	 */
+    public:
+      /**
+       * Constructor for the FieldOrder class
+       * @param field The field that we are accessing
+       */
       FieldOrder(CloverField &A, bool inverse=false)
       : A(A), volumeCB(A.VolumeCB()), accessor(A,inverse), inverse(inverse), location(A.Location())
 	{ }
