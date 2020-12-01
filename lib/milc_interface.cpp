@@ -1308,7 +1308,7 @@ struct mgInputStruct {
   int nu_post[QUDA_MAX_MG_LEVEL];                     // all but last level
 
   // Misc
-  bool mg_verbosity[QUDA_MAX_MG_LEVEL]; // all levels
+  QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL]; // all levels
 
   // Coarsest level deflation
   int deflate_n_ev;
@@ -1399,10 +1399,10 @@ struct mgInputStruct {
     coarse_solver_maxiter[3] = 16; // use larger for non-deflated
 
     /* Misc */
-    mg_verbosity[0] = false;
-    mg_verbosity[1] = false;
-    mg_verbosity[2] = false;
-    mg_verbosity[3] = false;
+    mg_verbosity[0] = QUDA_SUMMARIZE;
+    mg_verbosity[1] = QUDA_SUMMARIZE;
+    mg_verbosity[2] = QUDA_SUMMARIZE;
+    mg_verbosity[3] = QUDA_SUMMARIZE;
 
     /* Deflation */
     nvec[3] = 0; // 64; // do not deflate
@@ -1456,6 +1456,23 @@ struct mgInputStruct {
     }
   }
 
+  QudaVerbosity getQudaVerbosity(const char *name)
+  {
+    if (strcmp(name, "silent") == 0) {
+      return QUDA_SILENT;
+    } else if (strcmp(name, "summarize") == 0 || strcmp(name, "false") == 0) {
+      // false == summary is for backwards compatibility
+      return QUDA_SUMMARIZE;
+    } else if (strcmp(name, "verbose") == 0 || strcmp(name, "true") == 0) {
+      // true == verbose is for backwards compatibility
+      return QUDA_VERBOSE;
+    } else if (strcmp(name, "debug") == 0) {
+      return QUDA_DEBUG_VERBOSE;
+    } else {
+      return QUDA_INVALID_VERBOSITY;
+    }
+  }
+
   // parse out a line
   bool update(std::vector<std::string> &input_line)
   {
@@ -1488,7 +1505,7 @@ struct mgInputStruct {
       if (input_line.size() < 3) {
         error_code = 1;
       } else {
-        mg_verbosity[atoi(input_line[1].c_str())] = input_line[2][0] == 't' ? true : false;
+        mg_verbosity[atoi(input_line[1].c_str())] = getQudaVerbosity(input_line[2].c_str());
       }
 
     } else /* Begin Setup */
@@ -1829,7 +1846,7 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
       mg_param.use_eig_solver[i] = QUDA_BOOLEAN_FALSE;
     }
 
-    mg_param.verbosity[i] = input_struct.mg_verbosity[i] ? QUDA_VERBOSE : QUDA_SUMMARIZE; // mg_verbosity[i];
+    mg_param.verbosity[i] = input_struct.mg_verbosity[i];
     mg_param.setup_inv_type[i] = input_struct.setup_inv[i];
     mg_param.num_setup_iter[i] = 1; // num_setup_iter[i];
     mg_param.setup_tol[i] = input_struct.setup_tol[i];
@@ -2018,7 +2035,7 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
 
   inv_param.verbosity = verbosity;
 
-  inv_param.verbosity = input_struct.mg_verbosity[0] ? QUDA_VERBOSE : QUDA_SUMMARIZE;
+  inv_param.verbosity = input_struct.mg_verbosity[0];
 
   // We need to pass this back to the fat/long links for the outer-most level.
   mg_pack->preconditioner_precision = input_struct.preconditioner_precision;
