@@ -24,29 +24,40 @@ namespace quda
     }
   }
 
+  template <class Float, int nColor, int nSpin>
+  void copy_color_spinor_offset(ColorSpinorField &out, const ColorSpinorField &in, CommKey offset, QudaPCType pc_type)
+  {
+    using Field = ColorSpinorField;
+    using real = typename mapper<Float>::type;
+    using Element = ColorSpinor<real, nColor, nSpin>;
+
+    if (in.Location() == QUDA_CPU_FIELD_LOCATION) {
+      if (in.FieldOrder() == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
+        using F = typename colorspinor_order_mapper<Float, QUDA_SPACE_COLOR_SPIN_FIELD_ORDER, nSpin, nColor>::type;
+        copy_color_spinor_offset<Field, Element, F>(out, in, offset, pc_type);
+      } else if (in.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
+        using F = typename colorspinor_order_mapper<Float, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER, nSpin, nColor>::type;
+        copy_color_spinor_offset<Field, Element, F>(out, in, offset, pc_type);
+      } else {
+        errorQuda("Unsupported field order = %d.", in.FieldOrder());
+      }
+    } else {
+      if (!in.isNative() || !out.isNative()) { errorQuda("CUDA field has be in native order."); }
+
+      using F = typename colorspinor_mapper<Float, nSpin, nColor>::type;
+      copy_color_spinor_offset<Field, Element, F>(out, in, offset, pc_type);
+    }
+  }
+
   template <class Float, int nColor> struct CopyColorSpinorOffset {
     CopyColorSpinorOffset(ColorSpinorField &out, const ColorSpinorField &in, CommKey offset, QudaPCType pc_type)
     {
-      using Field = ColorSpinorField;
-      using real = typename mapper<Float>::type;
-      using Element = ColorSpinor<real, nColor, 4>;
-
-      if (in.Location() == QUDA_CPU_FIELD_LOCATION) {
-        if (in.FieldOrder() == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
-          using F = typename colorspinor_order_mapper<Float, QUDA_SPACE_COLOR_SPIN_FIELD_ORDER, 4, nColor>::type;
-          copy_color_spinor_offset<Field, Element, F>(out, in, offset, pc_type);
-        } else if (in.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-          using F = typename colorspinor_order_mapper<Float, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER, 4, nColor>::type;
-          copy_color_spinor_offset<Field, Element, F>(out, in, offset, pc_type);
-        } else {
-          errorQuda("Unsupported field order = %d.", in.FieldOrder());
-        }
+      if (in.Nspin() == 4) {
+        copy_color_spinor_offset<Float, nColor, 4>(out, in, offset, pc_type);
+      } else if (in.Nspin() == 1) {
+        copy_color_spinor_offset<Float, nColor, 1>(out, in, offset, pc_type);
       } else {
-
-        if (!in.isNative() || !out.isNative()) { errorQuda("CUDA field has be in native order."); }
-
-        using F = typename colorspinor_mapper<Float, 4, nColor>::type;
-        copy_color_spinor_offset<Field, Element, F>(out, in, offset, pc_type);
+        errorQuda("Unsupported spin = %d.\n", in.Nspin());
       }
     }
   };

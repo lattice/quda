@@ -1067,6 +1067,9 @@ extern "C" {
   void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge,
                            QudaGaugeParam *gauge_param);
 
+  void invertSplitGridStaggeredQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *milc_fatlinks,
+                                    void *milc_longlinks, QudaGaugeParam *gauge_param);
+
   /**
    * Solve for multiple shifts (e.g., masses).
    * @param _hp_x    Array of solution spinor fields

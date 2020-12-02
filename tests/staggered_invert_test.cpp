@@ -110,6 +110,7 @@ int main(int argc, char **argv)
   add_eigen_option_group(app);
   add_deflation_option_group(app);
   add_multigrid_option_group(app);
+  add_split_grid_option_group(app);
   CLI::TransformPairs<int> test_type_map {{"full", 0}, {"full_ee_prec", 1}, {"full_oo_prec", 2}, {"even", 3},
                                           {"odd", 4},  {"mcg_even", 5},     {"mcg_odd", 6}};
   app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
@@ -257,12 +258,21 @@ int main(int argc, char **argv)
 
   loadFatLongGaugeQuda(milc_fatlink, milc_longlink, gauge_param);
 
+  inv_param.split_grid[0] = grid_partition[0];
+  inv_param.split_grid[1] = grid_partition[1];
+  inv_param.split_grid[2] = grid_partition[2];
+  inv_param.split_grid[3] = grid_partition[3];
+
+  int num_sub_partition = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3];
+  bool use_split_grid = num_sub_partition > 1;
+
   // Staggered Gauge construct END
   //-----------------------------------------------------------------------------------
 
   // Setup the multigrid preconditioner
   void *mg_preconditioner = nullptr;
   if (inv_multigrid) {
+    if (use_split_grid) { errorQuda("Split grid does not work with MG yet."); }
     mg_preconditioner = newMultigridQuda(&mg_param);
     inv_param.preconditioner = mg_preconditioner;
   }
@@ -299,6 +309,9 @@ int main(int argc, char **argv)
   // QUDA host array for internal checks and malloc
   std::vector<ColorSpinorField *> qudaOutArray(multishift);
 
+  std::vector<quda::ColorSpinorField *> _h_b(Nsrc, nullptr);
+  std::vector<quda::ColorSpinorField *> _h_x(Nsrc, nullptr);
+
   // QUDA invert test
   //----------------------------------------------------------------------------
   switch (test_type) {
@@ -307,27 +320,55 @@ int main(int argc, char **argv)
   case 2: // full parity solution, solving ODD ODD prec system
   case 3: // even parity solution, solving EVEN system
   case 4: // odd parity solution, solving ODD system
-
     if (multishift != 1) {
+      if (use_split_grid) { errorQuda("Split grid does not work with multishift yet."); }
       printfQuda("Multishift not supported for test %d\n", test_type);
       exit(0);
     }
 
-    for (int k = 0; k < Nsrc; k++) {
-      quda::spinorNoise(*in, *rng, QUDA_NOISE_UNIFORM);
-      if (inv_deflate) eig_param.preserve_deflation = k < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-      invertQuda(out->V(), in->V(), &inv_param);
+    if (!use_split_grid) {
+      for (int k = 0; k < Nsrc; k++) {
+        quda::spinorNoise(*in, *rng, QUDA_NOISE_UNIFORM);
+        if (inv_deflate) eig_param.preserve_deflation = k < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+        invertQuda(out->V(), in->V(), &inv_param);
 
-      time[k] = inv_param.secs;
-      gflops[k] = inv_param.gflops / inv_param.secs;
-      iter[k] = inv_param.iter;
-      printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
-                 inv_param.gflops / inv_param.secs);
-      if (verify_results)
-        verifyStaggeredInversion(tmp, ref, in, out, mass, qdp_fatlink, qdp_longlink, (void **)cpuFat->Ghost(),
-                                 (void **)cpuLong->Ghost(), gauge_param, inv_param, 0);
+        time[k] = inv_param.secs;
+        gflops[k] = inv_param.gflops / inv_param.secs;
+        iter[k] = inv_param.iter;
+        printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
+            inv_param.gflops / inv_param.secs);
+        if (verify_results)
+          verifyStaggeredInversion(tmp, ref, in, out, mass, qdp_fatlink, qdp_longlink, (void **)cpuFat->Ghost(),
+              (void **)cpuLong->Ghost(), gauge_param, inv_param, 0);
+      }
+    } else {
+      inv_param.num_src = Nsrc;
+      inv_param.num_src_per_sub_partition = Nsrc / num_sub_partition;
+
+      for (auto &p : _h_b) {
+        p = new quda::cpuColorSpinorField(cs_param);
+        quda::spinorNoise(*p, *rng, QUDA_NOISE_UNIFORM);
+        // p->Source(QUDA_RANDOM_SOURCE);
+      }
+      for (auto &p : _h_x) { p = new quda::cpuColorSpinorField(cs_param); }
+
+      // Host arrays for solutions, sources, and check
+      std::vector<void *> _hp_x(Nsrc);
+      std::vector<void *> _hp_b(Nsrc);
+      for (int i = 0; i < Nsrc; i++) {
+        _hp_x[i] = _h_x[i]->V();
+        _hp_b[i] = _h_b[i]->V();
+      }
+
+      invertSplitGridStaggeredQuda(_hp_x.data(), _hp_b.data(), &inv_param, (void *)milc_fatlink, (void *)milc_longlink, &gauge_param);
+      if (verify_results) {
+        for (int i = 0; i < Nsrc; i++) {
+          // invertQuda(_h_x[i]->V(), _h_b[i]->V(), &inv_param);
+          verifyStaggeredInversion(tmp, ref, _h_b[i], _h_x[i], mass, qdp_fatlink, qdp_longlink, (void **)cpuFat->Ghost(),
+              (void **)cpuLong->Ghost(), gauge_param, inv_param, 0);
+        }
+      }
     }
-
     // Compute timings
     if (Nsrc > 1) performanceStats(time, gflops, iter);
     break;
