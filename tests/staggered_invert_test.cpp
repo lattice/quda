@@ -321,7 +321,6 @@ int main(int argc, char **argv)
   case 3: // even parity solution, solving EVEN system
   case 4: // odd parity solution, solving ODD system
     if (multishift != 1) {
-      if (use_split_grid) { errorQuda("Split grid does not work with multishift yet."); }
       printfQuda("Multishift not supported for test %d\n", test_type);
       exit(0);
     }
@@ -342,13 +341,13 @@ int main(int argc, char **argv)
               (void **)cpuLong->Ghost(), gauge_param, inv_param, 0);
       }
     } else {
+
       inv_param.num_src = Nsrc;
       inv_param.num_src_per_sub_partition = Nsrc / num_sub_partition;
 
       for (auto &p : _h_b) {
         p = new quda::cpuColorSpinorField(cs_param);
         quda::spinorNoise(*p, *rng, QUDA_NOISE_UNIFORM);
-        // p->Source(QUDA_RANDOM_SOURCE);
       }
       for (auto &p : _h_x) { p = new quda::cpuColorSpinorField(cs_param); }
 
@@ -363,7 +362,6 @@ int main(int argc, char **argv)
       invertSplitGridStaggeredQuda(_hp_x.data(), _hp_b.data(), &inv_param, (void *)milc_fatlink, (void *)milc_longlink, &gauge_param);
       if (verify_results) {
         for (int i = 0; i < Nsrc; i++) {
-          // invertQuda(_h_x[i]->V(), _h_b[i]->V(), &inv_param);
           verifyStaggeredInversion(tmp, ref, _h_b[i], _h_x[i], mass, qdp_fatlink, qdp_longlink, (void **)cpuFat->Ghost(),
               (void **)cpuLong->Ghost(), gauge_param, inv_param, 0);
         }
@@ -446,6 +444,11 @@ int main(int argc, char **argv)
   delete ref;
   delete tmp;
   free(outArray);
+
+  if (use_split_grid) {
+    for (auto p : _h_b) { delete p; }
+    for (auto p : _h_x) { delete p; }
+  }
 
   // Finalize the QUDA library
   endQuda();

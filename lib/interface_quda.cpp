@@ -3230,6 +3230,57 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   profilerStop(__func__);
 }
 
+void loadFatLongGaugeQuda(QudaInvertParam *inv_param, QudaGaugeParam *gauge_param, void *milc_fatlinks, void *milc_longlinks)
+{
+  auto link_recon = gauge_param->reconstruct;
+  auto link_recon_sloppy = gauge_param->reconstruct_sloppy;
+  auto link_recon_precondition = gauge_param->reconstruct_precondition;
+
+  // Specific gauge parameters for MILC
+  int pad_size = 0;
+#ifdef MULTI_GPU
+  int x_face_size = gauge_param->X[1] * gauge_param->X[2] * gauge_param->X[3] / 2;
+  int y_face_size = gauge_param->X[0] * gauge_param->X[2] * gauge_param->X[3] / 2;
+  int z_face_size = gauge_param->X[0] * gauge_param->X[1] * gauge_param->X[3] / 2;
+  int t_face_size = gauge_param->X[0] * gauge_param->X[1] * gauge_param->X[2] / 2;
+  pad_size = MAX(x_face_size, y_face_size);
+  pad_size = MAX(pad_size, z_face_size);
+  pad_size = MAX(pad_size, t_face_size);
+#endif
+
+  int fat_pad = pad_size;
+  int link_pad = 3 * pad_size;
+
+  gauge_param->type = (inv_param->dslash_type == QUDA_STAGGERED_DSLASH || inv_param->dslash_type == QUDA_LAPLACE_DSLASH) ?
+    QUDA_SU3_LINKS :
+    QUDA_ASQTAD_FAT_LINKS;
+
+  gauge_param->ga_pad = fat_pad;
+  if (inv_param->dslash_type == QUDA_STAGGERED_DSLASH || inv_param->dslash_type == QUDA_LAPLACE_DSLASH) {
+    gauge_param->reconstruct = link_recon;
+    gauge_param->reconstruct_sloppy = link_recon_sloppy;
+    gauge_param->reconstruct_refinement_sloppy = link_recon_sloppy;
+  } else {
+    gauge_param->reconstruct = QUDA_RECONSTRUCT_NO;
+    gauge_param->reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+    gauge_param->reconstruct_refinement_sloppy = QUDA_RECONSTRUCT_NO;
+  }
+  gauge_param->reconstruct_precondition = QUDA_RECONSTRUCT_NO;
+
+  loadGaugeQuda(milc_fatlinks, gauge_param);
+
+  if (inv_param->dslash_type == QUDA_ASQTAD_DSLASH) {
+    gauge_param->type = QUDA_ASQTAD_LONG_LINKS;
+    gauge_param->ga_pad = link_pad;
+    gauge_param->staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
+    gauge_param->reconstruct = link_recon;
+    gauge_param->reconstruct_sloppy = link_recon_sloppy;
+    gauge_param->reconstruct_refinement_sloppy = link_recon_sloppy;
+    gauge_param->reconstruct_precondition = link_recon_precondition;
+    loadGaugeQuda(milc_longlinks, gauge_param);
+  }
+}
+
 template <class Interface, class... Args>
 void callSplitGridQuda(Interface op, void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge,
                        void *milc_fatlinks, void *milc_longlinks, QudaGaugeParam *gauge_param, Args... args)
@@ -3271,6 +3322,7 @@ void callSplitGridQuda(Interface op, void **_hp_x, void **_hp_b, QudaInvertParam
     is_staggered = true;
   } else {
     errorQuda("Both h_gauge and milc_fatlinks are null.");
+    is_staggered = true; // to suppress compiler warning/error.
   }
 
   // Gauge fields/params
@@ -3288,12 +3340,11 @@ void callSplitGridQuda(Interface op, void **_hp_x, void **_hp_b, QudaInvertParam
     if (gf_param->order <= 4) { gf_param->ghostExchange = QUDA_GHOST_EXCHANGE_NO; }
     in = GaugeField::Create(*gf_param);
   } else { // staggered
-    // This is essentially what's in loadFatLongGaugeQuda
     milc_fatlink_param = new GaugeFieldParam(milc_fatlinks, *gauge_param);
-    // if (gf_param.order <= 4) { gf_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO; }
+    if (milc_fatlink_param->order <= 4) { milc_fatlink_param->ghostExchange = QUDA_GHOST_EXCHANGE_NO; }
     milc_fatlink_field = GaugeField::Create(*milc_fatlink_param);
     milc_longlink_param = new GaugeFieldParam(milc_longlinks, *gauge_param);
-    // if (gf_param.order <= 4) { gf_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO; }
+    if (milc_longlink_param->order <= 4) { milc_longlink_param->ghostExchange = QUDA_GHOST_EXCHANGE_NO; }
     milc_longlink_field = GaugeField::Create(*milc_longlink_param);
   }
 
@@ -3377,10 +3428,8 @@ void callSplitGridQuda(Interface op, void **_hp_x, void **_hp_b, QudaInvertParam
     collected_milc_fatlink_field = new quda::cpuGaugeField(*milc_fatlink_param);
     collected_milc_longlink_field = new quda::cpuGaugeField(*milc_longlink_param);
     std::vector<quda::GaugeField *> v_g(1);
-    printfQuda("spliting fat links...\n");
     v_g[0] = milc_fatlink_field;
     quda::split_field(*collected_milc_fatlink_field, v_g, split_key);
-    printfQuda("spliting long links...\n");
     v_g[0] = milc_longlink_field;
     quda::split_field(*collected_milc_longlink_field, v_g, split_key);
   }
@@ -3414,56 +3463,7 @@ void callSplitGridQuda(Interface op, void **_hp_x, void **_hp_b, QudaInvertParam
   if (!is_staggered) {
     loadGaugeQuda(collected_gauge->Gauge_p(), gauge_param);
   } else {
-
-    auto link_recon = gauge_param->reconstruct;
-    auto link_recon_sloppy = gauge_param->reconstruct_sloppy;
-    auto link_recon_precondition = gauge_param->reconstruct_precondition;
-
-    // Specific gauge parameters for MILC
-    int pad_size = 0;
-#ifdef MULTI_GPU
-    int x_face_size = gauge_param->X[1] * gauge_param->X[2] * gauge_param->X[3] / 2;
-    int y_face_size = gauge_param->X[0] * gauge_param->X[2] * gauge_param->X[3] / 2;
-    int z_face_size = gauge_param->X[0] * gauge_param->X[1] * gauge_param->X[3] / 2;
-    int t_face_size = gauge_param->X[0] * gauge_param->X[1] * gauge_param->X[2] / 2;
-    pad_size = MAX(x_face_size, y_face_size);
-    pad_size = MAX(pad_size, z_face_size);
-    pad_size = MAX(pad_size, t_face_size);
-#endif
-
-    int fat_pad = pad_size;
-    int link_pad = 3 * pad_size;
-
-    gauge_param->type = (param->dslash_type == QUDA_STAGGERED_DSLASH || param->dslash_type == QUDA_LAPLACE_DSLASH) ?
-      QUDA_SU3_LINKS :
-      QUDA_ASQTAD_FAT_LINKS;
-
-    gauge_param->ga_pad = fat_pad;
-    if (param->dslash_type == QUDA_STAGGERED_DSLASH || param->dslash_type == QUDA_LAPLACE_DSLASH) {
-      gauge_param->reconstruct = link_recon;
-      gauge_param->reconstruct_sloppy = link_recon_sloppy;
-      gauge_param->reconstruct_refinement_sloppy = link_recon_sloppy;
-    } else {
-      gauge_param->reconstruct = QUDA_RECONSTRUCT_NO;
-      gauge_param->reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-      gauge_param->reconstruct_refinement_sloppy = QUDA_RECONSTRUCT_NO;
-    }
-    gauge_param->reconstruct_precondition = QUDA_RECONSTRUCT_NO;
-
-    loadGaugeQuda(collected_milc_fatlink_field->Gauge_p(), gauge_param);
-    // loadGaugeQuda(milc_fatlink, &gauge_param);
-
-    if (param->dslash_type == QUDA_ASQTAD_DSLASH) {
-      gauge_param->type = QUDA_ASQTAD_LONG_LINKS;
-      gauge_param->ga_pad = link_pad;
-      gauge_param->staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
-      gauge_param->reconstruct = link_recon;
-      gauge_param->reconstruct_sloppy = link_recon_sloppy;
-      gauge_param->reconstruct_refinement_sloppy = link_recon_sloppy;
-      gauge_param->reconstruct_precondition = link_recon_precondition;
-      loadGaugeQuda(collected_milc_longlink_field->Gauge_p(), gauge_param);
-      // loadGaugeQuda(milc_longlink, &gauge_param);
-    }
+    loadFatLongGaugeQuda(param, gauge_param, collected_milc_fatlink_field->Gauge_p(), collected_milc_longlink_field->Gauge_p());
   }
 
   /** For debug
@@ -3522,8 +3522,12 @@ void callSplitGridQuda(Interface op, void **_hp_x, void **_hp_b, QudaInvertParam
     loadSloppyCloverQuda(prec);
   }
 
-  // freeGaugeQuda();
-  loadGaugeQuda(h_gauge, gauge_param);
+  // Restore the gauge field
+  if (!is_staggered) {
+    loadGaugeQuda(h_gauge, gauge_param);
+  } else { 
+    loadFatLongGaugeQuda(param, gauge_param, milc_fatlinks, milc_longlinks);
+  }
 
   profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_EPILOGUE);
   profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_TOTAL);
