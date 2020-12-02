@@ -7,6 +7,7 @@ target_include_directories(quda_test SYSTEM PUBLIC  googletest/include googletes
 target_include_directories(quda_test SYSTEM PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
 target_include_directories(quda_test SYSTEM PUBLIC ${EIGEN_INCLUDE_DIRS})
 target_link_libraries(quda_test PUBLIC quda)
+target_compile_options(quda_test PUBLIC -fPIC)
 add_subdirectory(utils)
 add_subdirectory(host_reference)
 
@@ -57,6 +58,9 @@ if(QUDA_ARPACK)
 endif()
 
 # define tests
+add_executable(c_interface_test c_interface_test.c)
+target_link_libraries(c_interface_test ${TEST_LIBS})
+quda_checkbuildtest(c_interface_test QUDA_BUILD_ALL_TESTS)
 
 # if we build with QDP JIT the tests cannot run anyway
 if(QUDA_QDPJIT)
