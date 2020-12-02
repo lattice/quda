@@ -674,20 +674,6 @@ struct Communicator {
 
   void commAsyncReductionSet(bool async_reduction) { asyncReduce = async_reduction; }
 
-  void comm_abort(int status)
-  {
-#ifdef HOST_DEBUG
-    raise(SIGABRT);
-#endif
-#ifdef QUDA_BACKWARDSCPP
-    backward::StackTrace st;
-    st.load_here(32);
-    backward::Printer p;
-    p.print(st, getOutputFile());
-#endif
-    comm_abort_(status);
-  }
-
 #if defined(QMP_COMMS) || defined(MPI_COMMS)
   MPI_Comm MPI_COMM_HANDLE;
 #endif

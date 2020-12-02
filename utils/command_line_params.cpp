@@ -664,7 +664,6 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
       auto retval = CLI::detail::lexical_cast(res[0], p);
       for (int j = 0; j < 4; j++) {
         if (p & (1 << j)) {
-          commDimPartitionedSet(j);
           dim_partitioned[j] = 1;
         }
       }

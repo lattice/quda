@@ -74,6 +74,14 @@ int comm_partitioned() { return get_current_communicator().comm_partitioned(); }
 
 const char *comm_dim_topology_string() { return get_current_communicator().topology_string; }
 
+const char *comm_config_string() {
+  return get_current_communicator().comm_config_string();
+}
+
+const char *comm_dim_partitioned_string(const int *comm_dim_override) {
+  return get_current_communicator().comm_dim_partitioned_string(comm_dim_override);
+}
+
 int comm_rank(void) { return get_current_communicator().comm_rank(); }
 
 int comm_rank_global(void) { return get_default_communicator().comm_rank(); }
@@ -195,7 +203,7 @@ int commDimPartitioned(int dir) { return get_current_communicator().commDimParti
 
 void commDimPartitionedSet(int dir) { get_current_communicator().commDimPartitionedSet(dir); }
 
-void commDimPartitionedReset() { get_current_communicator().commDimPartitionedReset(); }
+void commDimPartitionedReset() { get_current_communicator().comm_dim_partitioned_reset(); }
 
 bool commGlobalReduction() { return get_current_communicator().commGlobalReduction(); }
 

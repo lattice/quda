@@ -1067,6 +1067,16 @@ extern "C" {
   void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge,
                            QudaGaugeParam *gauge_param);
 
+  /**
+   * @brief Really the same with @invertSplitGridQuda but for staggered-style fermions, by accepting pointers
+   * to fat links and long links.
+   * @param _hp_x       Array of solution spinor fields
+   * @param _hp_b       Array of source spinor fields
+   * @param param       Contains all metadata regarding host and device storage and solver parameters
+   * @param milc_fatlinks     Base pointer to host **fat** gauge field (regardless of dimensionality)
+   * @param milc_longlinks    Base pointer to host **long** gauge field (regardless of dimensionality)
+   * @param gauge_param Contains all metadata regarding host and device storage for gauge field
+   */
   void invertSplitGridStaggeredQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *milc_fatlinks,
                                     void *milc_longlinks, QudaGaugeParam *gauge_param);
 

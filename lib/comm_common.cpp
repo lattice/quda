@@ -178,13 +178,6 @@ MsgHandle *comm_declare_strided_receive_relative_(const char *func, const char *
   return comm_declare_strided_receive_displaced(buffer, disp, blksize, nblocks, stride);
 }
 
-static char partition_string[16];          /** string that contains the job partitioning */
-static char partition_override_string[16]; /** string that contains any overridden partitioning */
-
-void comm_dim_partitioned_reset();
-
-int get_enable_p2p_max_access_rank();
-
 Topology *comm_create_topology(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data, int my_rank)
 {
   if (ndim > QUDA_MAX_DIM) { errorQuda("ndim exceeds QUDA_MAX_DIM"); }
@@ -218,41 +211,6 @@ Topology *comm_create_topology(int ndim, const int *dims, QudaCommsMap rank_from
   if (comm_gpuid() < 0) { rand_seed = 17 * my_rank + 137; }
 
   return topo;
-}
-
-const char *comm_config_string()
-{
-  static char config_string[64];
-  static bool config_init = false;
-
-  if (!config_init) {
-    strcpy(config_string, ",p2p=");
-    strcat(config_string, std::to_string(comm_peer2peer_enabled_global()).c_str());
-    if (get_enable_p2p_max_access_rank() != std::numeric_limits<int>::max()) {
-      strcat(config_string, ",p2p_max_access_rank=");
-      strcat(config_string, std::to_string(get_enable_p2p_max_access_rank()).c_str());
-    }
-    strcat(config_string, ",gdr=");
-    strcat(config_string, std::to_string(comm_gdr_enabled()).c_str());
-    config_init = true;
-  }
-
-  return config_string;
-}
-
-const char *comm_dim_partitioned_string(const int *comm_dim_override)
-{
-  if (comm_dim_override) {
-    char comm[5] = {(!comm_dim_partitioned(0) ? '0' : comm_dim_override[0] ? '1' : '0'),
-                    (!comm_dim_partitioned(1) ? '0' : comm_dim_override[1] ? '1' : '0'),
-                    (!comm_dim_partitioned(2) ? '0' : comm_dim_override[2] ? '1' : '0'),
-                    (!comm_dim_partitioned(3) ? '0' : comm_dim_override[3] ? '1' : '0'), '\0'};
-    strcpy(partition_override_string, ",comm=");
-    strcat(partition_override_string, comm);
-    return partition_override_string;
-  } else {
-    return partition_string;
-  }
 }
 
 void comm_abort(int status)
