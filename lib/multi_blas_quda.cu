@@ -143,9 +143,17 @@ namespace quda {
 
           jitify_error = instance.configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
 #else
+
+#if defined(QUDA_TARGET_CUDA)
           if (a.data) set_param<decltype(f_)::multi_1d>(qudaGetSymbolAddress(Amatrix_d), arg, 'a', a, stream);
           if (b.data) set_param<decltype(f_)::multi_1d>(qudaGetSymbolAddress(Bmatrix_d), arg, 'b', b, stream);
           if (c.data) set_param<decltype(f_)::multi_1d>(qudaGetSymbolAddress(Cmatrix_d), arg, 'c', c, stream);
+#else
+	  if (a.data) set_param<decltype(f_)::multi_1d>(Amatrix_d, arg, 'a', a, stream);
+          if (b.data) set_param<decltype(f_)::multi_1d>(Bmatrix_d, arg, 'b', b, stream);
+          if (c.data) set_param<decltype(f_)::multi_1d>(Cmatrix_d, arg, 'c', c, stream);
+
+#endif 
           switch (tp.aux.x) {
           case 1: qudaLaunchKernel(multiBlasKernel<device_real_t, M, NXZ, 1, decltype(arg)>, tp, stream, arg); break;
 #ifdef WARP_SPLIT

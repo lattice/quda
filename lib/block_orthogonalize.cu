@@ -115,7 +115,11 @@ namespace quda {
       cuMemcpyHtoDAsync(instance.get_constant_ptr("quda::B_array_d"), B_array_h, MAX_MATRIX_SIZE, stream);
       jitify_error = instance.configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
+#if defined(QUDA_TARGET_CUDA)
       qudaMemcpyToSymbolAsync(B_array_d, B_array_h, MAX_MATRIX_SIZE, 0, qudaMemcpyHostToDevice, stream);
+#else
+      qudaMemcpyAsync(B_array_d, B_array_h, MAX_MATRIX_SIZE, qudaMemcpyHostToDevice, stream);
+#endif
       LAUNCH_KERNEL_MG_BLOCK_SIZE(blockOrthoGPU,tp,stream,arg,sumType,RegType,nSpin,spinBlockSize,nColor,coarseSpin,nVec,Arg);
 #endif
     }

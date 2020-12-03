@@ -12,9 +12,16 @@ namespace quda
     // storage for matrix coefficients
 #define MAX_MATRIX_SIZE 8192
 #define MAX_ARG_SIZE 4096
+
+#if defined QUDA_TARGET_CUDA
     __constant__ char Amatrix_d[MAX_MATRIX_SIZE];
     __constant__ char Bmatrix_d[MAX_MATRIX_SIZE];
     __constant__ char Cmatrix_d[MAX_MATRIX_SIZE];
+#else
+    __device__ char Amatrix_d[MAX_MATRIX_SIZE];
+    __device__ char Bmatrix_d[MAX_MATRIX_SIZE];
+    __device__ char Cmatrix_d[MAX_MATRIX_SIZE];
+#endif
 
     static char *Amatrix_h;
     static char *Bmatrix_h;
