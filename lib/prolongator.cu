@@ -14,7 +14,6 @@ namespace quda {
     const int *fine_to_coarse;
     int parity;
     QudaFieldLocation location;
-    char vol[TuneKey::volume_n];
 
     unsigned int minThreads() const { return out.VolumeCB(); } // fine parity is the block y dimension
 
@@ -24,10 +23,12 @@ namespace quda {
       : TunableKernel3D(in, out.SiteSubset(), fineColor/fine_colors_per_thread), out(out), in(in), V(V),
         fine_to_coarse(fine_to_coarse), parity(parity), location(checkLocation(out, in, V))
     {
-      strcpy(vol, out.VolString());
       strcat(vol, ",");
-      strcat(vol, in.VolString());
+      strcat(vol, out.VolString());
+      strcat(aux, ",");
       strcat(aux, out.AuxString());
+
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream) {
@@ -38,8 +39,6 @@ namespace quda {
         errorQuda("Unsupported field order %d", out.FieldOrder());
       }
     }
-
-    TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
 
     long long flops() const { return 8 * fineSpin * fineColor * coarseColor * out.SiteSubset()*(long long)out.VolumeCB(); }
 
@@ -57,15 +56,13 @@ namespace quda {
     if (v.Precision() == QUDA_HALF_PRECISION) {
 #if QUDA_PRECISION & 2
       ProlongateLaunch<Float, short, fineSpin, fineColor, coarseSpin, coarseColor>
-      prolongator(out, in, v, fine_to_coarse, parity);
-      prolongator.apply(0);
+        prolongator(out, in, v, fine_to_coarse, parity);
 #else
       errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
 #endif
     } else if (v.Precision() == in.Precision()) {
       ProlongateLaunch<Float, Float, fineSpin, fineColor, coarseSpin, coarseColor>
-      prolongator(out, in, v, fine_to_coarse, parity);
-      prolongator.apply(0);
+        prolongator(out, in, v, fine_to_coarse, parity);
     } else {
       errorQuda("Unsupported V precision %d", v.Precision());
     }
@@ -97,6 +94,12 @@ namespace quda {
       } else if (nVec == 32) {
         Prolongate<Float,fineSpin,fineColor,coarseSpin,32>(out, in, v, fine_to_coarse, parity);
 #endif // NSPIN4
+#ifdef NSPIN1
+      } else if (nVec == 64) {
+        Prolongate<Float,fineSpin,fineColor,coarseSpin,64>(out, in, v, fine_to_coarse, parity);
+      } else if (nVec == 96) {
+        Prolongate<Float,fineSpin,fineColor,coarseSpin,96>(out, in, v, fine_to_coarse, parity);
+#endif // NSPIN1
       } else {
         errorQuda("Unsupported nVec %d", nVec);
       }
@@ -168,8 +171,7 @@ namespace quda {
     } else if (out.Nspin() == 4) {
       Prolongate<Float,4>(out, in, v, Nvec, fine_to_coarse, spin_map, parity);
 #endif
-#if 0 // Not needed until we have Laplace MG or staggered MG Lanczos
-//#ifdef NSPIN1
+#ifdef NSPIN1
     } else if (out.Nspin() == 1) {
       Prolongate<Float,1>(out, in, v, Nvec, fine_to_coarse, spin_map, parity);
 #endif
@@ -178,9 +180,10 @@ namespace quda {
     }
   }
 
-  void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-                  int Nvec, const int *fine_to_coarse, const int * const * spin_map, int parity) {
 #ifdef GPU_MULTIGRID
+  void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
+                  int Nvec, const int *fine_to_coarse, const int * const * spin_map, int parity)
+  {
     if (out.FieldOrder() != in.FieldOrder() || out.FieldOrder() != v.FieldOrder())
       errorQuda("Field orders do not match (out=%d, in=%d, v=%d)", 
                 out.FieldOrder(), in.FieldOrder(), v.FieldOrder());
@@ -198,9 +201,13 @@ namespace quda {
     } else {
       errorQuda("Unsupported precision %d", out.Precision());
     }
-#else
-    errorQuda("Multigrid has not been built");
-#endif
   }
+#else
+  void Prolongate(ColorSpinorField &, const ColorSpinorField &, const ColorSpinorField &,
+                  int, const int *, const int * const *, int)
+  {
+    errorQuda("Multigrid has not been built");
+  }
+#endif
 
 } // end namespace quda

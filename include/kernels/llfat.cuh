@@ -18,7 +18,6 @@ namespace quda {
     Gauge u;
     Float coeff;
 
-    dim3 threads;
     int_fastdiv X[4];
     int_fastdiv E[4];
     int border[4];
@@ -28,6 +27,8 @@ namespace quda {
     such an extension, and if an odd number of dimensions are
     partitioned then we have to correct for this when computing the local index */
     int odd_bit;
+
+    dim3 threads;
 
     LinkArg(GaugeField &link, const GaugeField &u, Float coeff) :
       link(link),

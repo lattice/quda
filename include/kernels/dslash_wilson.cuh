@@ -144,7 +144,7 @@ namespace quda
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     // out(x) = M*in = (-D + m) * in(x-mu)
-    __device__ __host__ inline void operator()(int idx, int s, int parity)
+    __device__ __host__ inline void operator()(int idx, int, int parity)
     {
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;

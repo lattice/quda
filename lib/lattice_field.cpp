@@ -306,7 +306,7 @@ namespace quda {
     initGhostFaceBuffer = false;
   }
 
-  void LatticeField::createComms(bool no_comms_fill, bool bidir)
+  void LatticeField::createComms(bool no_comms_fill)
   {
     destroyComms(); // if we are requesting a new number of faces destroy and start over
 
@@ -331,22 +331,22 @@ namespace quda {
       if (!commDimPartitioned(i) && no_comms_fill==false) continue;
 
       for (int b=0; b<2; ++b) {
-	my_face_dim_dir_h[b][i][0] = static_cast<char*>(my_face_h[b]) + ghost_offset[i][0];
-	from_face_dim_dir_h[b][i][0] = static_cast<char*>(from_face_h[b]) + ghost_offset[i][0];
+        my_face_dim_dir_h[b][i][0] = static_cast<char *>(my_face_h[b]) + ghost_offset[i][0];
+        from_face_dim_dir_h[b][i][0] = static_cast<char *>(from_face_h[b]) + ghost_offset[i][0];
 
-	my_face_dim_dir_hd[b][i][0] = static_cast<char*>(my_face_hd[b]) + ghost_offset[i][0];
-	from_face_dim_dir_hd[b][i][0] = static_cast<char*>(from_face_hd[b]) + ghost_offset[i][0];
+        my_face_dim_dir_hd[b][i][0] = static_cast<char *>(my_face_hd[b]) + ghost_offset[i][0];
+        from_face_dim_dir_hd[b][i][0] = static_cast<char *>(from_face_hd[b]) + ghost_offset[i][0];
 
         my_face_dim_dir_d[b][i][0] = static_cast<char *>(my_face_d[b]) + ghost_offset[i][0];
         from_face_dim_dir_d[b][i][0] = static_cast<char *>(from_face_d[b]) + ghost_offset[i][0];
       } // loop over b
 
       for (int b=0; b<2; ++b) {
-	my_face_dim_dir_h[b][i][1] = static_cast<char*>(my_face_h[b]) + ghost_offset[i][1];
-	from_face_dim_dir_h[b][i][1] = static_cast<char*>(from_face_h[b]) + ghost_offset[i][1];
+        my_face_dim_dir_h[b][i][1] = static_cast<char *>(my_face_h[b]) + ghost_offset[i][1];
+        from_face_dim_dir_h[b][i][1] = static_cast<char *>(from_face_h[b]) + ghost_offset[i][1];
 
-	my_face_dim_dir_hd[b][i][1] = static_cast<char*>(my_face_hd[b]) + ghost_offset[i][1];
-	from_face_dim_dir_hd[b][i][1] = static_cast<char*>(from_face_hd[b]) + ghost_offset[i][1];
+        my_face_dim_dir_hd[b][i][1] = static_cast<char *>(my_face_hd[b]) + ghost_offset[i][1];
+        from_face_dim_dir_hd[b][i][1] = static_cast<char *>(from_face_hd[b]) + ghost_offset[i][1];
 
         my_face_dim_dir_d[b][i][1] = static_cast<char *>(my_face_d[b]) + ghost_offset[i][1];
         from_face_dim_dir_d[b][i][1] = static_cast<char *>(from_face_d[b]) + ghost_offset[i][1];
@@ -621,6 +621,26 @@ namespace quda {
   }
 #endif
 
+  void* LatticeField::myFace_h(int dir, int dim) const
+  {
+    return my_face_dim_dir_h[bufferIndex][dim][dir];
+  }
+
+  void* LatticeField::myFace_hd(int dir, int dim) const
+  {
+    return my_face_dim_dir_hd[bufferIndex][dim][dir];
+  }
+
+  void* LatticeField::myFace_d(int dir, int dim) const
+  {
+    return my_face_dim_dir_d[bufferIndex][dim][dir];
+  }
+
+  void* LatticeField::remoteFace_d(int dir, int dim) const
+  {
+    return ghost_remote_send_buffer_d[bufferIndex][dim][dir];
+  }
+
   void LatticeField::setTuningString() {
     char vol_tmp[TuneKey::volume_n];
     int check  = snprintf(vol_string, TuneKey::volume_n, "%d", x[0]);
@@ -678,11 +698,11 @@ namespace quda {
     return location;
   }
 
-  void LatticeField::read(char *filename) {
+  void LatticeField::read(char *) {
     errorQuda("Not implemented");
   }
   
-  void LatticeField::write(char *filename) {
+  void LatticeField::write(char *) {
     errorQuda("Not implemented");
   }
 

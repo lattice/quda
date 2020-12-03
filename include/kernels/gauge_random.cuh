@@ -1,7 +1,7 @@
 #include <quda_matrix.h>
 #include <gauge_field_order.h>
 #include <index_helper.cuh>
-#include <random_quda.h>
+#include <random_helper.h>
 #include <kernel.h>
 #include <quda_sincos.h>
 
@@ -40,14 +40,14 @@ namespace quda {
     }
   };
 
-  template <typename real, typename Link> __device__ __host__ Link gauss_su3(cuRNGState &localState)
+  template <typename real, typename Link> __device__ __host__ Link gauss_su3(RNGState &localState)
   {
     Link ret;
     real rand1[4], rand2[4], phi[4], radius[4], temp1[4], temp2[4];
 
     for (int i = 0; i < 4; ++i) {
-      rand1[i] = Random<real>(localState);
-      rand2[i] = Random<real>(localState);
+      rand1[i] = uniform<real>::rand(localState);
+      rand2[i] = uniform<real>::rand(localState);
     }
 
     for (int i = 0; i < 4; ++i) {
@@ -94,7 +94,7 @@ namespace quda {
         for (int mu = 0; mu < 4; mu++) arg.U(mu, linkIndex(x, arg.E), parity) = I;
       } else {
         for (int mu = 0; mu < 4; mu++) {
-          cuRNGState localState = arg.rng.State()[parity * arg.threads.x + x_cb];
+          RNGState localState = arg.rng.State()[parity * arg.threads.x + x_cb];
 
           // generate Gaussian distributed su(n) fiueld
           Link u = gauss_su3<real, Link>(localState);

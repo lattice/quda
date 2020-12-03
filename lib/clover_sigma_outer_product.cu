@@ -30,7 +30,7 @@ namespace quda {
       coeff(coeff)
     {
       writeAuxString(",nvector=%d", (int)inA.size());
-      apply(0);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)
@@ -55,10 +55,10 @@ namespace quda {
     }
   }; // CloverSigmaOprod
 
+#ifdef GPU_CLOVER_DIRAC
   void computeCloverSigmaOprod(GaugeField& oprod, std::vector<ColorSpinorField*> &x,
 			       std::vector<ColorSpinorField*> &p, std::vector<std::vector<double> > &coeff)
   {
-#ifdef GPU_CLOVER_DIRAC
     if (x.size() > MAX_NVECTOR) {
       // divide and conquer
       std::vector<ColorSpinorField*> x0(x.begin(), x.begin()+x.size()/2);
@@ -81,9 +81,13 @@ namespace quda {
     }
 
     instantiate<CloverSigmaOprod>(oprod, x, p, coeff);
+  }
 #else // GPU_CLOVER_DIRAC not defined
+  void computeCloverSigmaOprod(GaugeField &, std::vector<ColorSpinorField*> &,
+			       std::vector<ColorSpinorField*> &, std::vector<std::vector<double> > &)
+  {
     errorQuda("Clover Dirac operator has not been built!");
+  }
 #endif
-  } // computeCloverForce
 
 } // namespace quda

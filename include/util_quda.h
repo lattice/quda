@@ -221,10 +221,3 @@ void errorQuda_(const char *func, const char *file, int line, ...);
 #define checkCudaError() checkCudaErrorNoSync()
 
 #endif // HOST_DEBUG
-
-#ifdef __CUDA_ARCH__
-// hide from device code
-#undef errorQuda
-#define errorQuda(...)
-
-#endif

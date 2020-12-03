@@ -62,22 +62,21 @@ namespace quda {
   template<class T, int N>
     class Matrix
     {
-      typedef typename RealType<T>::type real;
+      using real = typename RealType<T>::type;
 
     private:
         __device__ __host__ inline int index(int i, int j) const { return i*N + j; }
 
-      public:
+    public:
         T data[N*N];
 
         __device__ __host__ constexpr int size() const { return N; }
 
         __device__ __host__ inline Matrix() { setZero(this); }
 
-        __device__ __host__ inline Matrix(const Matrix<T,N> &a) {
-#pragma unroll
-	  for (int i=0; i<N*N; i++) data[i] = a.data[i];
-	}
+        Matrix(const Matrix<T,N> &a) = default;
+        Matrix(Matrix<T,N> &&a) = default;
+        Matrix& operator=(const Matrix<T,N> &a) = default;
 
         template <class U> __device__ __host__ inline Matrix(const Matrix<U, N> &a)
         {
@@ -305,10 +304,9 @@ namespace quda {
         for (int i = 0; i < N * N; i++) data[i] = (T)0.0;
       }
 
-      __device__ __host__ inline HMatrix(const HMatrix<T,N> &a) {
-#pragma unroll
-	for (int i=0; i<N*N; i++) data[i] = a.data[i];
-      }
+      HMatrix(const HMatrix<T,N> &a) = default;
+      HMatrix(HMatrix<T,N> &&a) = default;
+      HMatrix& operator=(const HMatrix<T,N> &a) = default;
 
       __device__ __host__ inline HMatrix(const T data_[]) {
 #pragma unroll

@@ -46,12 +46,25 @@ namespace quda {
   namespace dslash {
     int it = 0;
 
+<<<<<<< HEAD
     qudaEvent_t packEnd[2];
     qudaEvent_t gatherStart[Nstream];
     qudaEvent_t gatherEnd[Nstream];
     qudaEvent_t scatterStart[Nstream];
     qudaEvent_t scatterEnd[Nstream];
     qudaEvent_t dslashStart[2];
+=======
+    static constexpr int nDim = 4;
+    static constexpr int nDir = 2;
+    static constexpr int nStream = nDim * nDir + 1;
+
+    cudaEvent_t packEnd[2];
+    cudaEvent_t gatherStart[nStream];
+    cudaEvent_t gatherEnd[nStream];
+    cudaEvent_t scatterStart[nStream];
+    cudaEvent_t scatterEnd[nStream];
+    cudaEvent_t dslashStart[2];
+>>>>>>> feature/generic_kernel
 
     // these variables are used for benchmarking the dslash components in isolation
     bool dslash_pack_compute;
@@ -85,11 +98,19 @@ namespace quda {
   {
     using namespace dslash;
     // add cudaEventDisableTiming for lower sync overhead
+<<<<<<< HEAD
     for (int i=0; i<Nstream; i++) {
       qudaEventCreateDisableTiming(&gatherStart[i]);
       qudaEventCreateDisableTiming(&gatherEnd[i]);
       qudaEventCreateDisableTiming(&scatterStart[i]);
       qudaEventCreateDisableTiming(&scatterEnd[i]);
+=======
+    for (int i=0; i<nStream; i++) {
+      cudaEventCreateWithFlags(&gatherStart[i], cudaEventDisableTiming);
+      cudaEventCreateWithFlags(&gatherEnd[i], cudaEventDisableTiming);
+      cudaEventCreateWithFlags(&scatterStart[i], cudaEventDisableTiming);
+      cudaEventCreateWithFlags(&scatterEnd[i], cudaEventDisableTiming);
+>>>>>>> feature/generic_kernel
     }
     for (int i=0; i<2; i++) {
       qudaEventCreateDisableTiming(&packEnd[i]);
@@ -126,11 +147,19 @@ namespace quda {
   {
     using namespace dslash;
 
+<<<<<<< HEAD
     for (int i=0; i<Nstream; i++) {
       qudaEventDestroy(gatherStart[i]);
       qudaEventDestroy(gatherEnd[i]);
       qudaEventDestroy(scatterStart[i]);
       qudaEventDestroy(scatterEnd[i]);
+=======
+    for (int i=0; i<nStream; i++) {
+      cudaEventDestroy(gatherStart[i]);
+      cudaEventDestroy(gatherEnd[i]);
+      cudaEventDestroy(scatterStart[i]);
+      cudaEventDestroy(scatterEnd[i]);
+>>>>>>> feature/generic_kernel
     }
 
     for (int i=0; i<2; i++) {
@@ -154,7 +183,7 @@ namespace quda {
       in(in),
       d(d)
     {
-      apply(streams[Nstream-1]);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream) {
@@ -200,7 +229,7 @@ namespace quda {
       type(type)
     {
       if (d != 4) errorQuda("Unexpected d=%d", d);
-      apply(streams[Nstream-1]);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)
@@ -217,14 +246,17 @@ namespace quda {
 
   //Apply the Gamma matrix to a colorspinor field
   //out(x) = gamma_d*in
+#ifdef GPU_TWISTED_MASS_DIRAC
   void ApplyTwistGamma(ColorSpinorField &out, const ColorSpinorField &in, int d, double kappa, double mu, double epsilon, int dagger, QudaTwistGamma5Type type)
   {
-#ifdef GPU_TWISTED_MASS_DIRAC
     instantiate<TwistGammaApply>(out, in, d, kappa, mu, epsilon, dagger, type);
-#else
-    errorQuda("Twisted mass dslash has not been built");
-#endif // GPU_TWISTED_MASS_DIRAC
   }
+#else
+  void ApplyTwistGamma(ColorSpinorField &, const ColorSpinorField &, int, double, double, double, int, QudaTwistGamma5Type)
+  {
+    errorQuda("Twisted mass dslash has not been built");
+  }
+#endif // GPU_TWISTED_MASS_DIRAC
 
   // Applies a gamma5 matrix to a spinor (wrapper to ApplyGamma)
   void gamma5(ColorSpinorField &out, const ColorSpinorField &in) { ApplyGamma(out,in,4); }
@@ -248,7 +280,7 @@ namespace quda {
     {
       if (in.Nspin() != 4 || out.Nspin() != 4) errorQuda("Unsupported nSpin=%d %d", out.Nspin(), in.Nspin());
       if (!inverse) errorQuda("Unsupported direct application");
-      apply(streams[Nstream-1]);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)
@@ -263,16 +295,19 @@ namespace quda {
     long long bytes() const { return out.Bytes() + in.Bytes() + clover.Bytes() / (3 - in.SiteSubset()); }
   };
 
+#ifdef GPU_CLOVER_DIRAC
   //Apply the clover matrix field to a colorspinor field
   //out(x) = clover*in
   void ApplyClover(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover, bool inverse, int parity)
   {
-#ifdef GPU_CLOVER_DIRAC
     instantiate<Clover>(out, in, clover, inverse, parity);
-#else
-    errorQuda("Clover dslash has not been built");
-#endif // GPU_TWISTED_MASS_DIRAC
   }
+#else
+  void ApplyClover(ColorSpinorField &, const ColorSpinorField &, const CloverField &, bool, int)
+  {
+    errorQuda("Clover dslash has not been built");
+  }
+#endif // GPU_TWISTED_MASS_DIRAC
 
   template <typename Float, int nColor> class TwistClover : public TunableKernel2D {
     ColorSpinorField &out;
@@ -299,11 +334,12 @@ namespace quda {
       epsilon(epsilon),
       parity(parity),
       inverse(twist != QUDA_TWIST_GAMMA5_DIRECT),
+      dagger(dagger),
       twist(twist)
     {
       if (in.Nspin() != 4 || out.Nspin() != 4) errorQuda("Unsupported nSpin=%d %d", out.Nspin(), in.Nspin());
       strcat(aux, inverse ? ",inverse" : ",direct");
-      apply(streams[Nstream-1]);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)
@@ -329,15 +365,19 @@ namespace quda {
     }
   };
 
+#ifdef GPU_CLOVER_DIRAC
   //Apply the twisted-clover matrix field to a colorspinor field
   void ApplyTwistClover(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover,
 			double kappa, double mu, double epsilon, int parity, int dagger, QudaTwistGamma5Type twist)
   {
-#ifdef GPU_CLOVER_DIRAC
     instantiate<TwistClover>(out, in, clover, kappa, mu, epsilon, parity, dagger, twist);
-#else
-    errorQuda("Clover dslash has not been built");
-#endif // GPU_TWISTED_MASS_DIRAC
   }
+#else
+  void ApplyTwistClover(ColorSpinorField &, const ColorSpinorField &, const CloverField &,
+			double, double, double, int, int, QudaTwistGamma5Type)
+  {
+    errorQuda("Clover dslash has not been built");
+  }
+#endif // GPU_TWISTED_MASS_DIRAC
 
 } // namespace quda

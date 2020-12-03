@@ -66,9 +66,7 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<FixQualityFFT>(tp, stream, arg);
-      auto reset = true; // apply called multiple times with the same arg so need to reset
-      arg.complete(arg.result, stream, reset);
+      launch<FixQualityFFT>(arg.result, tp, stream, arg);
       if (!activeTuning()) {
         arg.result.x /= (double)(3 * Arg::gauge_dir * meta.Volume());
         arg.result.y /= (double)(3 * meta.Volume());
@@ -206,18 +204,18 @@ namespace quda {
     FFTPlanHandle plan_zt;
 
     GaugeFixArg<Float, recon> arg(data, alpha0);
-    SetPlanFFT2DMany( plan_zt, size, 0, arg.delta);     //for space and time ZT
-    SetPlanFFT2DMany( plan_xy, size, 1, arg.delta);    //with space only XY
+    SetPlanFFT2DMany(plan_zt, size, 0, data.Precision());     //for space and time ZT
+    SetPlanFFT2DMany(plan_xy, size, 1, data.Precision());    //with space only XY
 
     GaugeFixFFTRotate<Float> GFRotate(data);
 
     GaugeFixerFFT<decltype(arg)> gfix(arg, data);
     gfix.set_type(KERNEL_SET_INVPSQ);
-    gfix.apply(0);
+    gfix.apply(device::get_default_stream());
 
     GaugeFixQualityFFTArg<Float, recon, gauge_dir> argQ(data, arg.delta);
     GaugeFixQuality<decltype(argQ)> gfixquality(argQ, data);
-    gfixquality.apply(0);
+    gfixquality.apply(device::get_default_stream());
     double action0 = argQ.getAction();
     printf("Step: %d\tAction: %.16e\ttheta: %.16e\n", 0, argQ.getAction(), argQ.getTheta());
 
@@ -240,7 +238,7 @@ namespace quda {
         // Rotate hypercube, xyzt -> ztxy
         //------------------------------------------------------------------------
         GFRotate.setDirection(0, arg.gx, _array);
-        GFRotate.apply(0);
+        GFRotate.apply(device::get_default_stream());
         //------------------------------------------------------------------------
         // Perform FFT on zt plane
         //------------------------------------------------------------------------
@@ -249,7 +247,7 @@ namespace quda {
         // Normalize FFT and apply pmax^2/p^2
         //------------------------------------------------------------------------
         gfix.set_type(KERNEL_NORMALIZE);
-        gfix.apply(0);
+        gfix.apply(device::get_default_stream());
         //------------------------------------------------------------------------
         // Perform IFFT on zt plane
         //------------------------------------------------------------------------
@@ -258,7 +256,7 @@ namespace quda {
         // Rotate hypercube, ztxy -> xyzt
         //------------------------------------------------------------------------
         GFRotate.setDirection(1, _array, arg.gx);
-        GFRotate.apply(0);
+        GFRotate.apply(device::get_default_stream());
         //------------------------------------------------------------------------
         // Perform IFFT on xy plane
         //------------------------------------------------------------------------
@@ -272,18 +270,18 @@ namespace quda {
       // (using GX - else without using GX, gx will be created only
       // for plane rotation but with less size)
       gfix.set_type(KERNEL_GX);
-      gfix.apply(0);
+      gfix.apply(device::get_default_stream());
 #endif
       //------------------------------------------------------------------------
       // Apply gauge fix to current gauge field
       //------------------------------------------------------------------------
       gfix.set_type(KERNEL_UEO);
-      gfix.apply(0);
+      gfix.apply(device::get_default_stream());
 
       //------------------------------------------------------------------------
       // Measure gauge quality and recalculate new Delta(x)
       //------------------------------------------------------------------------
-      gfixquality.apply(0);
+      gfixquality.apply(device::get_default_stream());
       double action = argQ.getAction();
       diff = abs(action0 - action);
       if ((iter % verbose_interval) == (verbose_interval - 1))
@@ -392,18 +390,22 @@ namespace quda {
    * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
    * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
    */
+#if defined(GPU_GAUGE_ALG) && !defined(MULTI_GPU)
   void gaugeFixingFFT(GaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval, const double alpha,
                       const int autotune, const double tolerance, const int stopWtheta)
   {
-#ifdef GPU_GAUGE_ALG
+    instantiate<GaugeFixingFFT, ReconstructNo12>(data, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
+  }
+#else
+  void gaugeFixingFFT(GaugeField&, const int, const int, const int, const double, const int, const double, const int)
+  {
 #ifdef MULTI_GPU
     if (comm_dim_partitioned(0) || comm_dim_partitioned(1) || comm_dim_partitioned(2) || comm_dim_partitioned(3))
       errorQuda("Gauge Fixing with FFTs in multi-GPU support NOT implemented yet!\n");
-#endif
-    instantiate<GaugeFixingFFT, ReconstructNo12>(data, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
 #else
     errorQuda("Gauge fixing has bot been built");
 #endif
   }
+#endif
 
 }

@@ -38,7 +38,7 @@ namespace quda {
     int nBlock;
 
     unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
     unsigned int minThreads() const { return V.VolumeCB(); } // fine parity is the block y dimension
 
   public:
@@ -112,13 +112,13 @@ namespace quda {
       using namespace jitify::reflection;
       auto instance = program->kernel("quda::blockOrthoGPU")
         .instantiate((int)tp.block.x,Type<sumType>(),Type<RegType>(),nSpin,spinBlockSize,nColor,coarseSpin,nVec,Type<Arg>());
-      cuMemcpyHtoDAsync(instance.get_constant_ptr("quda::B_array_d"), B_array_h, MAX_MATRIX_SIZE, stream);
-      jitify_error = instance.configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+      cuMemcpyHtoDAsync(instance.get_constant_ptr("quda::B_array_d"), B_array_h, device::max_constant_param_size(), device::get_cuda_stream(stream));
+      jitify_error = instance.configure(tp.grid,tp.block,tp.shared_bytes,device::get_cuda_stream(stream)).launch(arg);
 #else
 #if defined(QUDA_TARGET_CUDA)
-      qudaMemcpyToSymbolAsync(B_array_d, B_array_h, MAX_MATRIX_SIZE, 0, qudaMemcpyHostToDevice, stream);
+      qudaMemcpyToSymbolAsync(B_array_d, B_array_h, device::max_constant_param_size(), 0, qudaMemcpyHostToDevice, device::get_cuda_stream(stream));
 #else
-      qudaMemcpyAsync(B_array_d, B_array_h, MAX_MATRIX_SIZE, qudaMemcpyHostToDevice, stream);
+      qudaMemcpyAsync(B_array_d, B_array_h, device::max_constant_param_size(), qudaMemcpyHostToDevice, device::get_cuda_stream(stream));;
 #endif
       LAUNCH_KERNEL_MG_BLOCK_SIZE(blockOrthoGPU,tp,stream,arg,sumType,RegType,nSpin,spinBlockSize,nColor,coarseSpin,nVec,Arg);
 #endif
@@ -145,20 +145,20 @@ namespace quda {
       }
     }
 
+#ifdef SWIZZLE
     bool advanceAux(TuneParam &param) const
     {
-#ifdef SWIZZLE
-      if (param.aux.x < 2*deviceProp.multiProcessorCount) {
+      if (param.aux.x < 2 * device::processor_count()) {
         param.aux.x++;
 	return true;
       } else {
         param.aux.x = 1;
 	return false;
       }
-#else
-      return false;
-#endif
     }
+#else
+    bool advanceAux(TuneParam &) const { return false; }
+#endif
 
     bool advanceTuneParam(TuneParam &param) const {
       if (V.Location() == QUDA_CUDA_FIELD_LOCATION) {
@@ -182,6 +182,7 @@ namespace quda {
 
     long long flops() const
     {
+      // FIXME: verify for staggered
       return n_block_ortho * nBlock * (geoBlockSize / 2) * (spinBlockSize == 0 ? 1 : 2 * spinBlockSize) / 2 * nColor
         * (nVec * ((nVec - 1) * (8l + 8l)) + 6l);
     }
@@ -220,7 +221,7 @@ namespace quda {
     V.Scale(1.0); // by definition this is true
     BlockOrtho<double, vFloat, bFloat, nSpin, spinBlockSize, nColor, coarseSpin, nVec> ortho(
       V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
-    ortho.apply(0);
+    ortho.apply(device::get_default_stream());
   }
 
   template <typename vFloat, typename bFloat>
@@ -229,26 +230,51 @@ namespace quda {
   {
     const int Nvec = B.size();
     if (V.Ncolor()/Nvec == 3) {
-      if (V.Nspin() != 4) errorQuda("Unexpected nSpin = %d", V.Nspin());
-#ifdef NSPIN4
-      constexpr int nSpin = 4;
-      if (spin_bs != 2) errorQuda("Unexpected spin block size = %d", spin_bs);
-      constexpr int spinBlockSize = 2;
       constexpr int nColor = 3;
+#ifdef NSPIN4
+      if (V.Nspin() == 4) {
+        constexpr int nSpin = 4;
+        if (spin_bs != 2) errorQuda("Unexpected spin block size = %d", spin_bs);
+        constexpr int spinBlockSize = 2;
 
-      if (Nvec == 6) { // for Wilson free field
-        BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 6>(V, B, fine_to_coarse, coarse_to_fine,
-                                                                            geo_bs, n_block_ortho);
-      } else if (Nvec == 24) {
-        BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 24>(V, B, fine_to_coarse, coarse_to_fine,
-                                                                             geo_bs, n_block_ortho);
-      } else if (Nvec == 32) {
-        BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 32>(V, B, fine_to_coarse, coarse_to_fine,
-                                                                             geo_bs, n_block_ortho);
-      } else {
-        errorQuda("Unsupported nVec %d\n", Nvec);
-      }
+        if (Nvec == 6) { // for Wilson free field
+          BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 6>(V, B, fine_to_coarse, coarse_to_fine,
+                                                                              geo_bs, n_block_ortho);
+        } else if (Nvec == 24) {
+          BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 24>(V, B, fine_to_coarse, coarse_to_fine,
+                                                                               geo_bs, n_block_ortho);
+        } else if (Nvec == 32) {
+          BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 32>(V, B, fine_to_coarse, coarse_to_fine,
+                                                                               geo_bs, n_block_ortho);
+        } else {
+          errorQuda("Unsupported nVec %d\n", Nvec);
+        }
+      } else
 #endif // NSPIN4
+#ifdef NSPIN1
+      if (V.Nspin() == 1) {
+        constexpr int nSpin = 1;
+        if (spin_bs != 0) errorQuda("Unexpected spin block size = %d", spin_bs);
+        constexpr int spinBlockSize = 0;
+
+        if (Nvec == 24) {
+          BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 24>(V, B, fine_to_coarse, coarse_to_fine,
+                                                                               geo_bs, n_block_ortho);
+        } else if (Nvec == 64) {
+          BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 64>(V, B, fine_to_coarse, coarse_to_fine,
+                                                                               geo_bs, n_block_ortho);
+        } else if (Nvec == 96) {
+          BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 96>(V, B, fine_to_coarse, coarse_to_fine,
+                                                                               geo_bs, n_block_ortho);
+        } else {
+          errorQuda("Unsupported nVec %d\n", Nvec);
+        }
+
+      } else
+#endif // NSPIN1
+      {
+        errorQuda("Unexpected nSpin = %d", V.Nspin());
+      }
 
     } else { // Nc != 3
       if (V.Nspin() != 2) errorQuda("Unexpected nSpin = %d", V.Nspin());
@@ -317,10 +343,10 @@ namespace quda {
     } // Nc != 3
   }
 
+#ifdef GPU_MULTIGRID
   void BlockOrthogonalize(ColorSpinorField &V, const std::vector<ColorSpinorField *> &B, const int *fine_to_coarse,
                           const int *coarse_to_fine, const int *geo_bs, const int spin_bs, const int n_block_ortho)
   {
-#ifdef GPU_MULTIGRID
     if (B[0]->V() == nullptr) {
       warningQuda("Trying to BlockOrthogonalize staggered transform, skipping...");
       return;
@@ -348,9 +374,13 @@ namespace quda {
     } else {
       errorQuda("Unsupported precision combination V=%d B=%d\n", V.Precision(), B[0]->Precision());
     }
-#else
-    errorQuda("Multigrid has not been built");
-#endif // GPU_MULTIGRID
   }
+#else
+  void BlockOrthogonalize(ColorSpinorField &, const std::vector<ColorSpinorField *> &, const int *,
+                          const int *, const int *, const int, const int)
+  {
+    errorQuda("Multigrid has not been built");
+  }
+#endif // GPU_MULTIGRID
 
 } // namespace quda

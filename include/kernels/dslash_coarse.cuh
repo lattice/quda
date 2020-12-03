@@ -4,15 +4,11 @@
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
 #include <float_vector.h>
-#ifdef QUDA_TARGET_CUDA
-#include <generics/shfl.h>
-#endif
 
 #ifdef QUDA_TARGET_HIP
 #include <hip/hip_runtime.h>
 #endif
 
-#include "quda_api.h"
 
 namespace quda {
 
@@ -331,17 +327,16 @@ namespace quda {
 	constexpr int warp_size = device::warp_size(); // FIXME - this is buggy when x-dim * color_stride < 32
 #pragma unroll
 	for (int offset = warp_size/2; offset >= warp_size/color_stride; offset /= 2) {
-#define WARP_CONVERGED 0xffffffff // we know warp should be converged here
 
 #if defined(QUDA_TARGET_CUDA)
-	  out[color_local] += __shfl_down_sync(WARP_CONVERGED, out[color_local], offset);
+	  out[color_local] += __shfl_down_sync(device::warp_converged_mask(), out[color_local], offset);
 #elif defined(QUDA_TARGET_HIP)
 	  Float sh_r = Float(out[color_local].x);
 	  Float sh_i = Float(out[color_local].y);
 	
 	  out[color_local] += complex<Float>{ __shfl_down(sh_r,offset) , __shfl_down(sh_i,offset) };
 #else
-#error "This file needs some kind of shiffle"
+#error "This file needs some kind of shuffle"
 #endif
 	}
       }

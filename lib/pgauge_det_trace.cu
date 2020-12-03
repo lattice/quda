@@ -24,7 +24,7 @@ namespace quda {
       type(type)
     {
       strcat(aux, type == 0 ? ",det" : ",trace");
-      apply(0);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)
@@ -32,16 +32,13 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (type == 0) {
         KernelArg<Float, nColor, recon, 0> arg(u);
-        launch<DetTrace>(tp, stream, arg);
-        arg.complete(result, stream);
+        launch<DetTrace>(result, tp, stream, arg);
       } else {
         KernelArg<Float, nColor, recon, 1> arg(u);
-        launch<DetTrace>(tp, stream, arg);
-        arg.complete(result, stream);
+        launch<DetTrace>(result, tp, stream, arg);
       }
 
       if (!activeTuning()) {
-        comm_allreduce_array((double*)&result, 2);
         result.x /= (double)(4*u.LocalVolume()*comm_size());
         result.y /= (double)(4*u.LocalVolume()*comm_size());
       }
@@ -56,26 +53,32 @@ namespace quda {
     long long bytes() const { return u.Bytes(); }
   };
 
+#ifdef GPU_GAUGE_ALG
   double2 getLinkDeterminant(GaugeField& data)
   {
     double2 det = make_double2(0.0,0.0);
-#ifdef GPU_GAUGE_ALG
     instantiate<CalcFunc>(data, det, 0);
-#else
-    errorQuda("Pure gauge code has not been built");
-#endif // GPU_GAUGE_ALG
     return det;
   }
 
   double2 getLinkTrace(GaugeField& data)
   {
     double2 det = make_double2(0.0,0.0);
-#ifdef GPU_GAUGE_ALG
     instantiate<CalcFunc>(data, det, 1);
-#else
-    errorQuda("Pure gauge code has not been built");
-#endif // GPU_GAUGE_ALG
     return det;
   }
+#else
+  double2 getLinkDeterminant(GaugeField&)
+  {
+    errorQuda("Pure gauge code has not been built");
+    return make_double2(0.0,0.0);
+  }
+
+  double2 getLinkTrace(GaugeField&)
+  {
+    errorQuda("Pure gauge code has not been built");
+    return make_double2(0.0,0.0);
+  }
+#endif
 
 } // namespace quda

@@ -134,12 +134,17 @@ namespace quda {
         case FORCE_MIDDLE_LINK:
           arg.pMu.save();
           arg.qMu.save();
+          arg.outA.save();
+          arg.p3.save();
+          break;
         case FORCE_LEPAGE_MIDDLE_LINK:
           arg.outA.save();
           arg.p3.save();
           break;
         case FORCE_SIDE_LINK:
           arg.outB.save();
+          arg.outA.save();
+          break;
         case FORCE_SIDE_LINK_SHORT:
           arg.outA.save();
           break;
@@ -159,12 +164,17 @@ namespace quda {
         case FORCE_MIDDLE_LINK:
           arg.pMu.load();
           arg.qMu.load();
+          arg.outA.load();
+          arg.p3.load();
+          break;
         case FORCE_LEPAGE_MIDDLE_LINK:
           arg.outA.load();
           arg.p3.load();
           break;
         case FORCE_SIDE_LINK:
           arg.outB.load();
+          arg.outA.load();
+          break;
         case FORCE_SIDE_LINK_SHORT:
           arg.outA.load();
           break;
@@ -238,7 +248,7 @@ namespace quda {
           FatLinkArg<real, nColor> arg(newOprod, oprod, link, OneLink, FORCE_ONE_LINK);
           arg.threads.z = 4;
           FatLinkForce<decltype(arg)> oneLink(arg, link, 0, 0, FORCE_ONE_LINK);
-          oneLink.apply(0);
+          oneLink.apply(device::get_default_stream());
         }
 
         for (int sig=0; sig<8; sig++) {
@@ -249,7 +259,7 @@ namespace quda {
             //Kernel A: middle link
             FatLinkArg<real, nColor> middleLinkArg(newOprod, Pmu, P3, Qmu, oprod, link, mThreeSt, 2, FORCE_MIDDLE_LINK);
             FatLinkForce<decltype(middleLinkArg)> middleLink(middleLinkArg, link, sig, mu, FORCE_MIDDLE_LINK);
-            middleLink.apply(0);
+            middleLink.apply(device::get_default_stream());
 
             for (int nu=0; nu < 8; nu++) {
               if (nu == sig || nu == opp_dir(sig) || nu == mu || nu == opp_dir(mu)) continue;
@@ -258,7 +268,7 @@ namespace quda {
               //Kernel B
               FatLinkArg<real, nColor> middleLinkArg( newOprod, Pnumu, P5, Qnumu, Pmu, Qmu, link, FiveSt, 1, FORCE_MIDDLE_LINK);
               FatLinkForce<decltype(middleLinkArg)> middleLink(middleLinkArg, link, sig, nu, FORCE_MIDDLE_LINK);
-              middleLink.apply(0);
+              middleLink.apply(device::get_default_stream());
 
               for (int rho = 0; rho < 8; rho++) {
                 if (rho == sig || rho == opp_dir(sig) || rho == mu || rho == opp_dir(mu) || rho == nu || rho == opp_dir(nu)) continue;
@@ -266,14 +276,14 @@ namespace quda {
                 //7-link: middle link and side link
                 FatLinkArg<real, nColor> arg(newOprod, P5, Pnumu, Qnumu, link, SevenSt, FiveSt != 0 ? SevenSt/FiveSt : 0, 1, FORCE_ALL_LINK, true);
                 FatLinkForce<decltype(arg)> all(arg, link, sig, rho, FORCE_ALL_LINK);
-                all.apply(0);
+                all.apply(device::get_default_stream());
 
               }//rho
 
               //5-link: side link
               FatLinkArg<real, nColor> arg(newOprod, P3, P5, Qmu, link, mFiveSt, (ThreeSt != 0 ? FiveSt/ThreeSt : 0), 1, FORCE_SIDE_LINK);
               FatLinkForce<decltype(arg)> side(arg, link, sig, nu, FORCE_SIDE_LINK);
-              side.apply(0);
+              side.apply(device::get_default_stream());
 
             } //nu
 
@@ -281,25 +291,25 @@ namespace quda {
             if (Lepage != 0.) {
               FatLinkArg<real, nColor> middleLinkArg(newOprod, P5, Pmu, Qmu, link, Lepage, 2, FORCE_LEPAGE_MIDDLE_LINK);
               FatLinkForce<decltype(middleLinkArg)> middleLink(middleLinkArg, link, sig, mu, FORCE_LEPAGE_MIDDLE_LINK);
-              middleLink.apply(0);
+              middleLink.apply(device::get_default_stream());
 
               FatLinkArg<real, nColor> arg(newOprod, P3, P5, Qmu, link, mLepage, (ThreeSt != 0 ? Lepage/ThreeSt : 0), 2, FORCE_SIDE_LINK);
               FatLinkForce<decltype(arg)> side(arg, link, sig, mu, FORCE_SIDE_LINK);
-              side.apply(0);
+              side.apply(device::get_default_stream());
             } // Lepage != 0.0
 
             // 3-link side link
             FatLinkArg<real, nColor> arg(newOprod, P3, link, ThreeSt, 1, FORCE_SIDE_LINK_SHORT);
             FatLinkForce<decltype(arg)> side(arg, P3, sig, mu, FORCE_SIDE_LINK_SHORT);
-            side.apply(0);
+            side.apply(device::get_default_stream());
           }//mu
         }//sig
       }
     };
 
+#ifdef GPU_HISQ_FORCE
     void hisqStaplesForce(GaugeField &newOprod, const GaugeField &oprod, const GaugeField &link, const double path_coeff_array[6])
     {
-#ifdef GPU_HISQ_FORCE
       checkNative(link, oprod, newOprod);
       checkLocation(newOprod, oprod, link);
 
@@ -318,7 +328,6 @@ namespace quda {
 
       QudaPrecision precision = checkPrecision(oprod, link, newOprod);
       instantiate<HisqStaplesForce, ReconstructNone>(*Pmu, *P3, *P5, *Pnumu, *Qmu, *Qnumu, newOprod, oprod, link, path_coeff_array);
-      qudaDeviceSynchronize();
 
       delete Pmu;
       delete P3;
@@ -326,10 +335,13 @@ namespace quda {
       delete Pnumu;
       delete Qmu;
       delete Qnumu;
-#else
-      errorQuda("HISQ force not enabled");
-#endif
     }
+#else
+    void hisqStaplesForce(GaugeField &, const GaugeField &, const GaugeField &, const double[6])
+    {
+      errorQuda("HISQ force not enabled");
+    }
+#endif
 
     template <typename Arg>
     class HisqForce : public TunableKernel2D {
@@ -348,7 +360,7 @@ namespace quda {
       {
         arg.sig = sig;
         arg.mu = mu;
-        apply(0);
+        apply(device::get_default_stream());
       }
 
       void apply(const qudaStream_t &stream) {
@@ -414,21 +426,23 @@ namespace quda {
       {
         LongLinkArg<real, nColor, recon> arg(newOprod, link, oldOprod, coeff);
         HisqForce<decltype(arg)> longLink(arg, link, 0, 0, FORCE_LONG_LINK);
-        qudaDeviceSynchronize();
       }
     };
 
+#ifdef GPU_HISQ_FORCE
     void hisqLongLinkForce(GaugeField &newOprod, const GaugeField &oldOprod, const GaugeField &link, double coeff)
     {
-#ifdef GPU_HISQ_FORCE
       checkNative(link, oldOprod, newOprod);
       checkLocation(newOprod, oldOprod, link);
       checkPrecision(newOprod, link, oldOprod);
       instantiate<HisqLongLinkForce, ReconstructNone>(newOprod, oldOprod, link, coeff);
-#else
-      errorQuda("HISQ force not enabled");
-#endif
     }
+#else
+    void hisqLongLinkForce(GaugeField &, const GaugeField &, const GaugeField &, double)
+    {
+      errorQuda("HISQ force not enabled");
+    }
+#endif
 
     template <typename real, int nColor, QudaReconstructType recon>
     struct HisqCompleteForce {
@@ -436,21 +450,23 @@ namespace quda {
       {
         CompleteForceArg<real, nColor, recon> arg(force, link);
         HisqForce<decltype(arg)> completeForce(arg, link, 0, 0, FORCE_COMPLETE);
-        qudaDeviceSynchronize();
       }
     };
 
+#ifdef GPU_HISQ_FORCE
     void hisqCompleteForce(GaugeField &force, const GaugeField &link)
     {
-#ifdef GPU_HISQ_FORCE
       checkNative(link, force);
       checkLocation(force, link);
       checkPrecision(link, force);
       instantiate<HisqCompleteForce, ReconstructNone>(force, link);
-#else
-      errorQuda("HISQ force not enabled");
-#endif
     }
+#else
+    void hisqCompleteForce(GaugeField &, const GaugeField &)
+    {
+      errorQuda("HISQ force not enabled");
+    }
+#endif
 
   } // namespace fermion_force
 

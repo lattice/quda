@@ -46,7 +46,7 @@ namespace quda {
 	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
 	  CloverDerivArg<Float,F,G,O> arg(force, gauge, oprod, coeff, parity);
 	  DerivativeClover<decltype(arg)> deriv(arg, gauge);
-	  deriv.apply(0);
+	  deriv.apply(device::get_default_stream());
 	} else {
 	  errorQuda("Reconstruction type %d not supported",gauge.Reconstruct());
 	}
@@ -56,13 +56,11 @@ namespace quda {
     } else {
       errorQuda("Force order %d not supported", force.Order());
     } // force / oprod order
-
-    qudaDeviceSynchronize();
   }
 
+#ifdef GPU_CLOVER_DIRAC
   void cloverDerivative(GaugeField &force, GaugeField &gauge, GaugeField &oprod, double coeff, QudaParity parity)
   {
-#ifdef GPU_CLOVER_DIRAC
     assert(oprod.Geometry() == QUDA_TENSOR_GEOMETRY);
     assert(force.Geometry() == QUDA_VECTOR_GEOMETRY);
 
@@ -78,9 +76,12 @@ namespace quda {
     } else {
       errorQuda("Precision %d not supported", force.Precision());
     }
-#else
-    errorQuda("Clover has not been built");
-#endif
   }
+#else
+  void cloverDerivative(GaugeField &, GaugeField &, GaugeField &, double, QudaParity)
+  {
+    errorQuda("Clover has not been built");
+  }
+#endif
 
 } // namespace quda

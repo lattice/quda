@@ -9,8 +9,6 @@
 
 namespace quda {
 
-#ifdef GPU_MULTIGRID
-
   template <typename Float, typename yFloat, typename ghostFloat, int nDim, int Ns, int Nc, int Mc, bool dslash, bool clover, bool dagger, DslashType type>
   class DslashCoarse : public TunableVectorY {
 
@@ -40,7 +38,7 @@ namespace quda {
        nSrc*nParity*(dslash*Y.Bytes()*Y.VolumeCB()/(2*Y.Stride()) + clover*X.Bytes()/2);
     }
     unsigned int sharedBytesPerThread() const { return (sizeof(complex<Float>) * Mc); }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions
     bool tuneAuxDim() const { return true; } // Do tune the aux dimensions
     unsigned int minThreads() const { return color_col_stride * X.VolumeCB(); } // 4-d volume since this x threads only
@@ -66,8 +64,8 @@ namespace quda {
 
         // we can advance spin/block-color since this is valid
         if (param.block.z <= (unsigned int)(dim_threads * 2 * 2 * (Nc/Mc)) &&
-            param.block.z <= (unsigned int)deviceProp.maxThreadsDim[2] &&
-            param.block.x*param.block.y*param.block.z <= (unsigned int)deviceProp.maxThreadsPerBlock ) { //
+            param.block.z <= device::max_threads_per_block_dim(2) &&
+            param.block.x*param.block.y*param.block.z <= device::max_threads_per_block()) { //
           return true;
         } else { // we have run off the end so let's reset
           param.block.z = dim_threads * 2;
@@ -78,14 +76,14 @@ namespace quda {
     }
 
     // FIXME: understand why this leads to slower perf and variable correctness
-    //int blockStep() const { return deviceProp.warpSize/4; }
-    //int blockMin() const { return deviceProp.warpSize/4; }
+    //int blockStep() const { return device::warp_size()/4; }
+    //int blockMin() const { return device::warp_size()/4; }
 
     // Experimental autotuning of the color column stride
     bool advanceAux(TuneParam &param) const
     {
       if (2*param.aux.x <= max_color_col_stride && Nc % (2*param.aux.x) == 0 &&
-	  param.block.x % deviceProp.warpSize == 0) {
+	  param.block.x % device::warp_size() == 0) {
 	// An x-dimension block size that is not a multiple of the
 	// warp size is incompatible with splitting the dot product
 	// across the warp so we must skip this
@@ -97,7 +95,7 @@ namespace quda {
 	param.grid.x = (minThreads()+param.block.x-1)/param.block.x;
 
 	// check this grid size is valid before returning
-	if (param.grid.x < (unsigned int)deviceProp.maxGridSize[0]) return true;
+	if (param.grid.x < device::max_grid_size(0)) return true;
       }
 
       // reset color column stride if too large or not divisible
@@ -108,7 +106,7 @@ namespace quda {
       param.grid.x = (minThreads()+param.block.x-1)/param.block.x;
 
       if (2*param.aux.y <= nDim &&
-          param.block.x*param.block.y*dim_threads*2 <= (unsigned int)deviceProp.maxThreadsPerBlock) {
+          param.block.x*param.block.y*dim_threads*2 <= device::max_threads_per_block()) {
 	param.aux.y *= 2;
 	dim_threads = param.aux.y;
 
@@ -160,7 +158,7 @@ namespace quda {
 
       TunableVectorY::defaultTuneParam(param);
       // ensure that the default x block size is divisible by the warpSize
-      param.block.x = deviceProp.warpSize;
+      param.block.x = device::warp_size();
       param.grid.x = (minThreads()+param.block.x-1)/param.block.x;
       param.block.z = dim_threads * 2;
       param.grid.z = 2*(Nc/Mc);
@@ -232,7 +230,7 @@ namespace quda {
         using namespace jitify::reflection;
         jitify_error = program->kernel("quda::coarseDslashKernel")
           .instantiate(Type<Float>(),nDim,Ns,Nc,Mc,(int)tp.aux.x,(int)tp.aux.y,dslash,clover,dagger,type,Type<Arg>())
-          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+          .configure(tp.grid,tp.block,tp.shared_bytes,device::get_cuda_stream(stream)).launch(arg);
 #else // !JITIFY
         switch (tp.aux.y) { // dimension gather parallelisation
         case 1:
@@ -340,14 +338,14 @@ namespace quda {
 
         if (type == DSLASH_FULL) {
           DslashCoarse<Float,yFloat,ghostFloat,nDim,coarseSpin,coarseColor,colors_per_thread,true,true,dagger,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
-          dslash.apply(0);
+          dslash.apply(device::get_default_stream());
         } else { errorQuda("Dslash type %d not instantiated", type); }
 
       } else { // plain dslash
 
         if (type == DSLASH_FULL) {
           DslashCoarse<Float,yFloat,ghostFloat,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,dagger,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
-          dslash.apply(0);
+          dslash.apply(device::get_default_stream());
         } else { errorQuda("Dslash type %d not instantiated", type); }
 
       }
@@ -356,7 +354,7 @@ namespace quda {
       if (type == DSLASH_EXTERIOR) errorQuda("Cannot call halo on pure clover kernel");
       if (clover) {
         DslashCoarse<Float,yFloat,ghostFloat,nDim,coarseSpin,coarseColor,colors_per_thread,false,true,dagger,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
-        dslash.apply(0);
+        dslash.apply(device::get_default_stream());
       } else {
         errorQuda("Unsupported dslash=false clover=false");
       }
@@ -407,8 +405,6 @@ namespace quda {
     extern Worker* aux_worker;
   }
 
-#endif // GPU_MULTIGRID
-
   enum class DslashCoarsePolicy {
     DSLASH_COARSE_BASIC,          // stage both sends and recvs in host memory using memcpys
     DSLASH_COARSE_ZERO_COPY_PACK, // zero copy write pack buffers
@@ -447,8 +443,8 @@ namespace quda {
     /**
        @brief Execute the coarse dslash using the given policy
      */
-    inline void operator()(DslashCoarsePolicy policy) {
-#ifdef GPU_MULTIGRID
+    inline void operator()(DslashCoarsePolicy policy)
+    {
       if (inA.V() == out.V()) errorQuda("Aliasing pointers");
 
       // check all precisions match
@@ -489,7 +485,7 @@ namespace quda {
                           pack_destination, halo_location, gdr_send, gdr_recv, halo_precision);
       }
 
-      if (dslash::aux_worker) dslash::aux_worker->apply(0);
+      if (dslash::aux_worker) dslash::aux_worker->apply(device::get_default_stream());
 
       if (precision == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
@@ -537,9 +533,6 @@ namespace quda {
 
       if (dslash && comm_partitioned() && comms) inA.bufferIndex = (1 - inA.bufferIndex);
       comm_enable_peer2peer(true);
-#else
-      errorQuda("Multigrid has not been built");
-#endif
     }
 
   };
@@ -567,7 +560,7 @@ namespace quda {
    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
    bool tuneAuxDim() const { return true; } // Do tune the aux dimensions.
    unsigned int sharedBytesPerThread() const { return 0; }
-   unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+   unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
  public:
    inline DslashCoarsePolicyTune(Launch &dslash) : dslash(dslash)
@@ -655,7 +648,7 @@ namespace quda {
 
    virtual ~DslashCoarsePolicyTune() { setPolicyTuning(false); }
 
-   inline void apply(const qudaStream_t &stream)
+   inline void apply(const qudaStream_t &)
    {
      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 

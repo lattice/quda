@@ -23,6 +23,8 @@ namespace quda {
     MomActionArg(const GaugeField &mom) :
       BaseArg<Float, nColor, recon>(mom),
       mom(mom) {}
+
+    __device__ __host__ double init() const { return 0.0; }
   };
 
   template <typename Arg> struct MomAction {
@@ -34,16 +36,16 @@ namespace quda {
     // calculate the momentum contribution to the action.  This uses the
     // MILC convention where we subtract 4.0 from each matrix norm in
     // order to increase stability
-    __device__ __host__ inline reduce_t operator()(int x_cb, int parity)
+    template <typename Reducer>
+    __device__ __host__ inline reduce_t operator()(reduce_t &action, Reducer &r, int x_cb, int parity)
     {
       using matrix = Matrix<complex<typename Arg::Float>, Arg::nColor>;
 
-      double action = 0.0;
       // loop over direction
       for (int mu=0; mu<4; mu++) {
 	const matrix mom = arg.mom(mu, x_cb, parity);
 
-        double local_sum = 0.0;
+        reduce_t local_sum;
         local_sum  = 0.5 * mom(0,0).imag() * mom(0,0).imag();
         local_sum += 0.5 * mom(1,1).imag() * mom(1,1).imag();
         local_sum += 0.5 * mom(2,2).imag() * mom(2,2).imag();
@@ -55,7 +57,7 @@ namespace quda {
         local_sum += mom(1,2).imag() * mom(1,2).imag();
 	local_sum -= 4.0;
 
-	action += local_sum;
+	action = r(action, local_sum);
       }
       return action;
     }
@@ -71,17 +73,21 @@ namespace quda {
     int X[4]; // grid dimensions on mom
     int E[4]; // grid dimensions on force (possibly extended)
     int border[4]; //
+
     UpdateMomArg(GaugeField &mom, const Float &coeff, GaugeField &force) :
       BaseArg<Float, nColor, recon>(mom),
       mom(mom),
       force(force),
-      coeff(coeff) {
+      coeff(coeff)
+    {
       for (int dir=0; dir<4; ++dir) {
         X[dir] = mom.X()[dir];
         E[dir] = force.X()[dir];
         border[dir] = force.R()[dir];
       }
     }
+
+    __device__ __host__ double2 init() const{ return zero<double2>(); }
   };
 
   /**
@@ -90,7 +96,9 @@ namespace quda {
    */
   template <typename T>
   struct max_reducer2 {
-    __device__ __host__ inline T operator()(const T &a, const T &b) {
+    static constexpr bool do_sum = false;
+
+    __device__ __host__ inline T operator()(const T &a, const T &b) const {
       auto c = a;
       if (b.x > a.x) c.x = b.x;
       if (b.y > a.y) c.y = b.y;
@@ -107,11 +115,9 @@ namespace quda {
     // calculate the momentum contribution to the action.  This uses the
     // MILC convention where we subtract 4.0 from each matrix norm in
     // order to increase stability
-    __device__ __host__ inline reduce_t operator()(int x_cb, int parity)
+    template <typename Reducer>
+    __device__ __host__ inline reduce_t operator()(reduce_t &norm, Reducer &r, int x_cb, int parity)
     {
-      double2 norm = make_double2(0.0,0.0);
-      max_reducer2<double2> r;
-
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
       for (int d=0; d<4; d++) x[d] += arg.border[d];

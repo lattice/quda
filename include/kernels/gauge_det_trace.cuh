@@ -12,10 +12,10 @@ namespace quda {
     static constexpr int type = type_;
     using real = typename mapper<Float>::type;
     using Gauge = typename gauge_mapper<real, recon>::type;
-    dim3 threads; // number of active threads required
     int X[4]; // grid dimensions
     int border[4];
     Gauge u;
+    dim3 threads; // number of active threads required
 
     KernelArg(const GaugeField &u) :
       ReduceArg<double2>(),
@@ -27,6 +27,8 @@ namespace quda {
         X[dir] = u.X()[dir] - border[dir]*2;
       }
     }
+
+    __device__ __host__ auto init() const { return zero<double2>(); }
   };
 
   template <typename Arg> struct DetTrace {
@@ -37,9 +39,9 @@ namespace quda {
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     // return the determinant or trace at site (x_cb, parity)
-    __device__ __host__ inline reduce_t operator()(int x_cb, int parity)
+    template <typename Reducer>
+    __device__ __host__ inline reduce_t operator()(reduce_t &value, Reducer &r, int x_cb, int parity)
     {
-      complex<double> val(0.0, 0.0);
       int X[4];
 #pragma unroll
       for(int dr=0; dr<4; ++dr) X[dr] = arg.X[dr];
@@ -54,10 +56,10 @@ namespace quda {
 #pragma unroll
       for (int mu = 0; mu < 4; mu++) {
         Matrix<complex<typename Arg::real>, Arg::nColor> U = arg.u(mu, linkIndex(x, X), parity);
-        if (Arg::type == 0) val += getDeterminant(U);
-        else if (Arg::type == 1) val += getTrace(U);
+        complex<double> local = Arg::type == 0 ? getDeterminant(U) : getTrace(U);
+        value = r(value, static_cast<reduce_t&>(local));
       }
-      return static_cast<double2&>(val);
+      return value;
     }
   };
 

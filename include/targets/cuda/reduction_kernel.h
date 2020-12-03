@@ -12,20 +12,43 @@ namespace quda {
     Transformer<Arg> t(arg);
     Reducer<reduce_t> r;
 
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    int parity = threadIdx.y;
+    auto idx = threadIdx.x + blockIdx.x * blockDim.x;
+    auto j = threadIdx.y;
 
-    reduce_t reduced_value;
-    zero(reduced_value);
+    reduce_t value = arg.init();
 
     while (idx < arg.threads.x) {
-      auto value = t(idx, parity);
-      reduced_value = r(value, reduced_value);
+      value = t(value, r, idx, j);
       idx += blockDim.x * gridDim.x;
     }
 
     // perform final inter-block reduction and write out result
-    arg.template reduce2d<block_size_x, block_size_y, false, decltype(r)>(reduced_value);
+    reduce<block_size_x, block_size_y, decltype(r)>(arg, value);
+  }
+
+  template <int block_size_x, int block_size_y, template <typename> class Transformer,
+            template <typename> class Reducer, typename Arg>
+  __global__ void MultiReduction(Arg arg)
+  {
+    using reduce_t = typename Transformer<Arg>::reduce_t;
+    Transformer<Arg> t(arg);
+    Reducer<reduce_t> r;
+
+    auto idx = threadIdx.x + blockIdx.x * blockDim.x;
+    auto j = threadIdx.y + blockIdx.y * blockDim.y;
+    auto k = threadIdx.z;
+
+    if (j >= arg.threads.y) return;
+
+    reduce_t value = arg.init();
+
+    while (idx < arg.threads.x) {
+      value = t(value, r, idx, j, k);
+      idx += blockDim.x * gridDim.x;
+    }
+
+    // perform final inter-block reduction and write out result
+    reduce<block_size_x, block_size_y, decltype(r)>(arg, value, j);
   }
 
 }

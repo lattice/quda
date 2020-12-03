@@ -22,7 +22,7 @@ namespace quda
   */
   template <QudaFieldLocation location, typename Arg>
   struct Launch {
-    Launch(Arg &arg, CUresult &error, bool compute_max_only, TuneParam &tp, bool use_mma, const qudaStream_t &stream)
+    Launch(Arg &arg, CUresult &, bool compute_max_only, TuneParam &, bool, const qudaStream_t &)
     {
       if (compute_max_only)
         CalculateYhatCPU<true, Arg>(arg);
@@ -38,6 +38,7 @@ namespace quda
   struct Launch<QUDA_CUDA_FIELD_LOCATION, Arg> {
     Launch(Arg &arg, CUresult &error, bool compute_max_only, TuneParam &tp, bool use_mma, const qudaStream_t &stream)
     {
+      error = CUDA_SUCCESS;
       if (compute_max_only) {
         if (!activeTuning()) {
           qudaMemsetAsync(arg.max_d, 0, sizeof(typename Arg::Float), stream);
@@ -50,7 +51,7 @@ namespace quda
         using namespace jitify::reflection;
         error = program->kernel("quda::CalculateYhatGPU")
                   .instantiate(compute_max_only, Type<Arg>())
-                  .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+                  .configure(tp.grid, tp.block, tp.shared_bytes, device::get_cuda_stream(stream))
                   .launch(arg);
       }
 #else
@@ -102,7 +103,7 @@ namespace quda
     // all the tuning done is only in matrix tile size (Y/Z block.grid)
     int blockMin() const { return 8; }
     int blockStep() const { return 8; }
-    unsigned int maxBlockSize(const TuneParam &param) const { return 8u; }
+    unsigned int maxBlockSize(const TuneParam &) const { return 8u; }
 
   public:
     CalculateYhat(Arg &arg, const LatticeField &meta, bool use_mma) :
@@ -142,14 +143,14 @@ namespace quda
     */
     void setComputeMaxOnly(bool compute_max_only_) { compute_max_only = compute_max_only_; }
 
-    bool advanceSharedBytes(TuneParam &param) const { return false; }
+    bool advanceSharedBytes(TuneParam &) const { return false; }
 
     bool advanceTuneParam(TuneParam &param) const {
       if (use_mma) {
 #if defined(QUDA_TARGET_CUDA)
         constexpr bool compute_max_only_dummy = true;
         constexpr bool query_max = true;
-        int max = mma::template launch_yhat_kernel<compute_max_only_dummy, query_max>(arg, 1, param, 0);
+        int max = mma::template launch_yhat_kernel<compute_max_only_dummy, query_max>(arg, 1, param, device::get_default_stream());
         if (param.aux.x < max) {
           param.aux.x++;
           return true;
@@ -293,7 +294,7 @@ namespace quda
         CalculateYhat<location, yHatArg> yHat(arg, Y, use_mma);
         if (Yhat.Precision() == QUDA_HALF_PRECISION || Yhat.Precision() == QUDA_QUARTER_PRECISION) {
           yHat.setComputeMaxOnly(true);
-          yHat.apply(0);
+          yHat.apply(device::get_default_stream());
 
           double max_h_double = *arg.max_h;
           comm_allreduce_max(&max_h_double);
@@ -305,7 +306,7 @@ namespace quda
           arg.Yhat.resetScale(*arg.max_h);
         }
         yHat.setComputeMaxOnly(false);
-        yHat.apply(0);
+        yHat.apply(device::get_default_stream());
 
         if (&Y != Y_aos) { delete Y_aos; }
 
@@ -334,7 +335,7 @@ namespace quda
         CalculateYhat<location, yHatArg> yHat(arg, Y, use_mma);
         if (Yhat.Precision() == QUDA_HALF_PRECISION || Yhat.Precision() == QUDA_QUARTER_PRECISION) {
           yHat.setComputeMaxOnly(true);
-          yHat.apply(0);
+          yHat.apply(device::get_default_stream());
 
           double max_h_double = *arg.max_h;
           comm_allreduce_max(&max_h_double);
@@ -346,7 +347,7 @@ namespace quda
           arg.Yhat.resetScale(*arg.max_h);
         }
         yHat.setComputeMaxOnly(false);
-        yHat.apply(0);
+        yHat.apply(device::get_default_stream());
       }
 
       if (getVerbosity() >= QUDA_VERBOSE)
@@ -399,10 +400,9 @@ namespace quda
   }
 
   //Does the heavy lifting of creating the coarse color matrices Y
+#ifdef GPU_MULTIGRID
   void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X, bool use_mma)
   {
-
-#ifdef GPU_MULTIGRID
     QudaPrecision precision = checkPrecision(Xinv, Y, X);
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing Yhat field......\n");
 
@@ -431,9 +431,9 @@ namespace quda
     }
 
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("....done computing Yhat field\n");
-#else
-    errorQuda("Multigrid has not been built");
-#endif
   }
+#else
+  void calculateYhat(GaugeField &, GaugeField &, const GaugeField &, const GaugeField &, bool) { errorQuda("Multigrid has not been built"); }
+#endif
 
 } // namespace quda

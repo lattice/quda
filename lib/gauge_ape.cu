@@ -23,8 +23,7 @@ namespace quda {
       alpha(static_cast<Float>(alpha))
     {
       strcat(aux, comm_dim_partitioned_string());
-      apply(0);
-      qudaDeviceSynchronize();
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)
@@ -50,9 +49,9 @@ namespace quda {
 
   }; // GaugeAPE
 
+#ifdef GPU_GAUGE_TOOLS
   void APEStep(GaugeField &out, GaugeField& in, double alpha)
   {
-#ifdef GPU_GAUGE_TOOLS
     checkPrecision(out, in);
     checkReconstruct(out, in);
     checkNative(out, in);
@@ -61,8 +60,12 @@ namespace quda {
     in.exchangeExtendedGhost(in.R(), false);
     instantiate<GaugeAPE>(out, in, alpha);
     out.exchangeExtendedGhost(out.R(), false);
-#else
-    errorQuda("Gauge tools are not built");
-#endif
   }
+#else
+  void APEStep(GaugeField &, GaugeField &, double)
+  {
+    errorQuda("Gauge tools are not built");
+  }
+#endif
+
 }

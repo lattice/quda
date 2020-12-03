@@ -114,11 +114,7 @@ namespace quda
   template <typename ValueType, typename ExponentType>
     __host__ __device__
     inline ValueType pow(ValueType x, ExponentType e){
-#if (CUDA_VERSION < 7050)
     return std::pow(x,static_cast<ValueType>(e));
-#else
-    return std::pow(x,e);
-#endif
   }
   template <typename ValueType>
     __host__ __device__
@@ -473,11 +469,13 @@ public:
       imag(im);
     }
 
-  // For some reason having the following constructor
-  // explicitly makes things faster with at least g++
-  __host__ __device__
-    complex<float>(const complex<float> & z)
-    : float2(z){}
+  __host__ __device__ complex<float>(const complex<float> & z) : float2(z) {}
+  __host__ __device__ complex<float>& operator=(const complex<float> &z)
+    {
+      x = z.x;
+      y = z.y;
+      return *this;
+    }
 
   __host__ __device__
     complex<float>(float2 z)
@@ -595,11 +593,13 @@ public:
       imag(im);
     }
 
-  // For some reason having the following constructor
-  // explicitly makes things faster with at least g++
-  __host__ __device__
-    inline complex<double>(const complex<double> & z)
-    : double2(z) {}
+  __host__ __device__ complex<double>(const complex<double> & z) : double2(z) {}
+  __host__ __device__ complex<double>& operator=(const complex<double> &z)
+    {
+      x = z.x;
+      y = z.y;
+      return *this;
+    }
 
   __host__ __device__
     inline complex<double>(double2 z)
@@ -723,37 +723,43 @@ public:
     imag(im);
   }
 
-  __host__ __device__ inline complex<int8_t>(const complex<int8_t> &z) : char2(z) {}
+  __host__ __device__ complex<int8_t>(const complex<int8_t> & z) : char2(z) {}
+  __host__ __device__ complex<int8_t>& operator=(const complex<int8_t> &z)
+    {
+      x = z.x;
+      y = z.y;
+      return *this;
+    }
 
   __host__ __device__ inline complex<int8_t> &operator+=(const complex<int8_t> z)
   {
     real(real() + z.real());
     imag(imag() + z.imag());
     return *this;
-    }
+  }
 
-    __host__ __device__ inline complex<int8_t> &operator-=(const complex<int8_t> z)
-    {
-      real(real()-z.real());
-      imag(imag()-z.imag());
-      return *this;
-    }
+  __host__ __device__ inline complex<int8_t> &operator-=(const complex<int8_t> z)
+  {
+    real(real() - z.real());
+    imag(imag() - z.imag());
+    return *this;
+  }
 
-    __host__ __device__ inline int8_t real() const volatile { return x; }
-    __host__ __device__ inline int8_t imag() const volatile { return y; }
-    __host__ __device__ inline int8_t real() const { return x; }
-    __host__ __device__ inline int8_t imag() const { return y; }
-    __host__ __device__ inline void real(int8_t re) volatile { x = re; }
-    __host__ __device__ inline void imag(int8_t im) volatile { y = im; }
-    __host__ __device__ inline void real(int8_t re) { x = re; }
-    __host__ __device__ inline void imag(int8_t im) { y = im; }
+  __host__ __device__ inline int8_t real() const volatile { return x; }
+  __host__ __device__ inline int8_t imag() const volatile { return y; }
+  __host__ __device__ inline int8_t real() const { return x; }
+  __host__ __device__ inline int8_t imag() const { return y; }
+  __host__ __device__ inline void real(int8_t re) volatile { x = re; }
+  __host__ __device__ inline void imag(int8_t im) volatile { y = im; }
+  __host__ __device__ inline void real(int8_t re) { x = re; }
+  __host__ __device__ inline void imag(int8_t im) { y = im; }
 
-    // cast operators
-    inline operator std::complex<int8_t>() const { return std::complex<int8_t>(real(), imag()); }
-    template <typename T> inline __host__ __device__ operator complex<T>() const
-    {
-      return complex<T>(static_cast<T>(real()), static_cast<T>(imag()));
-    }
+  // cast operators
+  inline operator std::complex<int8_t>() const { return std::complex<int8_t>(real(), imag()); }
+  template <typename T> inline __host__ __device__ operator complex<T>() const
+  {
+    return complex<T>(static_cast<T>(real()), static_cast<T>(imag()));
+  }
 };
 
 template<>
@@ -770,7 +776,13 @@ public:
       imag(im);
     }
 
-  __host__ __device__ inline complex<short>(const complex<short> & z) : short2(z){}
+  __host__ __device__ complex<short>(const complex<short> & z) : short2(z) {}
+  __host__ __device__ complex<short>& operator=(const complex<short> &z)
+    {
+      x = z.x;
+      y = z.y;
+      return *this;
+    }
 
   __host__ __device__ inline complex<short>& operator+=(const complex<short> z)
     {

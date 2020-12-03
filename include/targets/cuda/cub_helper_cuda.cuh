@@ -2,6 +2,7 @@
 
 using namespace quda;
 
+
 /**
    @file cub_helper.cuh
 
@@ -11,7 +12,7 @@ using namespace quda;
  */
 
 // ensures we use shfl_sync and not shfl when compiling with clang
-#if defined(__clang__) && defined(__CUDA__) && CUDA_VERSION >= 9000
+#if defined(__clang__) && defined(__CUDA__)
 #define CUB_USE_COOPERATIVE_GROUPS
 #endif
 

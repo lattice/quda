@@ -18,8 +18,7 @@
 #include <algorithm>
 #include <memory>
 
-#include <Eigen/Dense>
-#include <Eigen/Eigenvalues>
+#include <eigen_helper.h>
 
 /*
   GMRES-DR algorithm:
@@ -31,8 +30,6 @@ namespace quda {
 
   using namespace blas;
   using namespace std;
-
-  using namespace Eigen;
 
   using DynamicStride = Stride<Dynamic, Dynamic>;
 
@@ -95,11 +92,11 @@ namespace quda {
     }
   };
 
-  template <libtype which_lib> void ComputeHarmonicRitz(GMResDRArgs &args) { errorQuda("\nUnknown library type.\n"); }
+  template <libtype which_lib> void ComputeHarmonicRitz(GMResDRArgs &) { errorQuda("\nUnknown library type.\n"); }
 
+#ifdef MAGMA_LIB
   template <> void ComputeHarmonicRitz<libtype::magma_lib>(GMResDRArgs &args)
   {
-#ifdef MAGMA_LIB
     DenseMatrix cH = args.H.block(0, 0, args.m, args.m).adjoint();
     DenseMatrix Gk = args.H.block(0, 0, args.m, args.m);
 
@@ -129,11 +126,10 @@ namespace quda {
 
     for (int e = 0; e < args.k; e++)
       memcpy(args.ritzVecs.col(e).data(), harVecs.col(sorted_evals[e]._idx).data(), (args.m) * sizeof(Complex));
-#else
-    errorQuda("Magma library was not built.\n");
-#endif
-    return;
   }
+#else
+  template <> void ComputeHarmonicRitz<libtype::magma_lib>(GMResDRArgs &) { errorQuda("Magma library was not built"); }
+#endif
 
   template <> void ComputeHarmonicRitz<libtype::eigen_lib>(GMResDRArgs &args)
   {
@@ -165,11 +161,11 @@ namespace quda {
     return;
   }
 
-  template <libtype which_lib> void ComputeEta(GMResDRArgs &args) { errorQuda("\nUnknown library type.\n"); }
+  template <libtype which_lib> void ComputeEta(GMResDRArgs &) { errorQuda("\nUnknown library type.\n"); }
 
+#ifdef MAGMA_LIB
   template <> void ComputeEta<libtype::magma_lib>(GMResDRArgs &args)
   {
-#ifdef MAGMA_LIB
     DenseMatrix Htemp(DenseMatrix::Zero(args.m + 1, args.m));
     Htemp = args.H;
 
@@ -182,11 +178,10 @@ namespace quda {
 
     memcpy(args.eta.data(), ctemp, args.m * sizeof(Complex));
     memset(ctemp, 0, (args.m + 1) * sizeof(Complex));
-#else
-    errorQuda("MAGMA library was not built.\n");
-#endif
-    return;
   }
+#else
+  template <> void ComputeEta<libtype::magma_lib>(GMResDRArgs &) { errorQuda("MAGMA library was not built"); }
+#endif
 
   template <> void ComputeEta<libtype::eigen_lib>(GMResDRArgs &args)
   {

@@ -58,7 +58,7 @@ namespace quda {
           x_cb(x_cb),
           parity(parity),
           phase(phase),
-	  gauge(gauge)
+          gauge(gauge)
       {
       }
 
@@ -124,7 +124,7 @@ namespace quda {
           ghost_idx(ghost_idx),
           parity(parity),
           phase(phase),
-	  gauge(gauge)
+          gauge(gauge)
       {
       }
 
@@ -161,7 +161,7 @@ namespace quda {
   namespace gauge {
 
     template<typename ReduceType, typename Float> struct square_ {
-      square_(ReduceType scale) { }
+      square_(ReduceType) { }
       __host__ __device__ inline ReduceType operator()(const quda::complex<Float> &x)
       { return static_cast<ReduceType>(norm(x)); }
     };
@@ -188,7 +188,7 @@ namespace quda {
     };
 
     template<typename Float, typename storeFloat> struct abs_ {
-      abs_(const Float scale) { }
+      abs_(const Float) { }
       __host__ __device__ Float operator()(const quda::complex<storeFloat> &x) { return abs(x); }
     };
 
@@ -231,50 +231,37 @@ namespace quda {
     */
     template <typename Float, typename storeFloat>
       struct fieldorder_wrapper {
+        using type = Float;
+        using store_type = storeFloat;
+        complex<storeFloat> *v;
+        const int idx;
+        const Float scale;
+        const Float scale_inv;
+        static constexpr bool fixed = fixed_point<Float, storeFloat>();
 
-      /**
-       * Computing type and storage types that can be inferred from this object.
-       */
-      using type = Float;
-      using store_type = storeFloat;
-      complex<storeFloat> *v;
-      const int idx;
-      const Float scale;
-      const Float scale_inv;
-      static constexpr bool fixed = fixed_point<Float, storeFloat>();
+        /**
+           @brief fieldorder_wrapper constructor
+           @param idx Field index
+        */
+        __device__ __host__ inline fieldorder_wrapper(complex<storeFloat> *v, int idx, Float scale, Float scale_inv) :
+          v(v), idx(idx), scale(scale), scale_inv(scale_inv) {}
 
-      /**
-         @brief fieldorder_wrapper constructor
-         @param idx Field index
-      */
-      __device__ __host__ inline fieldorder_wrapper(complex<storeFloat> *v, int idx, Float scale, Float scale_inv) :
-        v(v), idx(idx), scale(scale), scale_inv(scale_inv)
-      {
-      }
+        fieldorder_wrapper(const fieldorder_wrapper<Float, storeFloat> &a) = default;
 
-      __device__ __host__ inline Float real() const
-      {
-        if (!fixed) {
-          return v[idx].real();
-        } else {
-          return scale_inv * static_cast<Float>(v[idx].real());
+        __device__ __host__ inline Float real() const
+        {
+          return fixed ? scale_inv * static_cast<Float>(v[idx].real()) : v[idx].real();
         }
-      }
 
-        __device__ __host__ inline Float imag() const {
-          if (!fixed) {
-            return v[idx].imag();
-          } else {
-            return scale_inv*static_cast<Float>(v[idx].imag());
-          }
+        __device__ __host__ inline Float imag() const
+        {
+          return fixed ? scale_inv * static_cast<Float>(v[idx].imag()) : v[idx].imag();
         }
 
         /**
-         * @brief returns the pointor of this wrapper object
+         * @brief returns the pointer of this wrapper object
          */
-        __device__ __host__ inline auto data() { return &v[idx]; }
-
-        __device__ __host__ inline const auto data() const { return &v[idx]; }
+        __device__ __host__ inline auto data() const { return &v[idx]; }
 
         /**
            @brief negation operator
@@ -295,44 +282,43 @@ namespace quda {
         }
 
         /**
-	   @brief Assignment operator with complex number instance as input
-	   @param a Complex number we want to store in this accessor
-	*/
-        template<typename theirFloat>
-	__device__ __host__ inline void operator=(const complex<theirFloat> &a) {
-	  if (match<storeFloat,theirFloat>()) {
-	    v[idx] = complex<storeFloat>(a.x, a.y);
-	  } else {
-	    v[idx] = fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
-	  }
-	}
+           @brief Assignment operator with complex number instance as input
+           @param a Complex number we want to store in this accessor
+        */
+        template <typename theirFloat> __device__ __host__ inline void operator=(const complex<theirFloat> &a)
+        {
+          if (match<storeFloat, theirFloat>()) {
+            v[idx] = complex<storeFloat>(a.x, a.y);
+          } else {
+            v[idx] = fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
+          }
+        }
 
-	/**
-	   @brief Operator+= with complex number instance as input
-	   @param a Complex number we want to add to this accessor
-	*/
-        template<typename theirFloat>
-	__device__ __host__ inline void operator+=(const complex<theirFloat> &a) {
-	  if (match<storeFloat,theirFloat>()) {
-	    v[idx] += complex<storeFloat>(a.x, a.y);
-	  } else {
-	    v[idx] += fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
-	  }
-	}
+        /**
+           @brief Operator+= with complex number instance as input
+             @param a Complex number we want to add to this accessor
+        */
+        template <typename theirFloat> __device__ __host__ inline void operator+=(const complex<theirFloat> &a)
+        {
+          if (match<storeFloat, theirFloat>()) {
+            v[idx] += complex<storeFloat>(a.x, a.y);
+          } else {
+            v[idx] += fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
+          }
+        }
 
-	/**
-	   @brief Operator-= with complex number instance as input
-	   @param a Complex number we want to subtract from this accessor
-	*/
-	template<typename theirFloat>
-	__device__ __host__ inline void operator-=(const complex<theirFloat> &a) {
-	  if (match<storeFloat,theirFloat>()) {
-	    v[idx] -= complex<storeFloat>(a.x, a.y);
-	  } else {
-	    v[idx] -= fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
-	  }
-	}
-
+        /**
+           @brief Operator-= with complex number instance as input
+           @param a Complex number we want to subtract from this accessor
+        */
+        template <typename theirFloat> __device__ __host__ inline void operator-=(const complex<theirFloat> &a)
+        {
+          if (match<storeFloat, theirFloat>()) {
+            v[idx] -= complex<storeFloat>(a.x, a.y);
+          } else {
+            v[idx] -= fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
+          }
+        }
       };
 
     template<typename Float, typename storeFloat>
@@ -357,13 +343,13 @@ namespace quda {
     template <typename Float, int nColor, QudaGaugeFieldOrder order, typename storeFloat> struct Accessor {
       static constexpr bool is_mma_compatible = false;
       mutable complex<Float> dummy;
-      Accessor(const GaugeField &, void *gauge_=0, void **ghost_=0) {
+      Accessor(const GaugeField &, void * = nullptr, void ** = nullptr) {
 	errorQuda("Not implemented for order=%d", order);
       }
 
-      void resetScale(Float dummy) { }
+      void resetScale(Float) { }
 
-      __device__ __host__ complex<Float>& operator()(int d, int parity, int x, int row, int col) const {
+      __device__ __host__ complex<Float>& operator()(int, int, int, int, int) const {
 	return dummy;
       }
     };
@@ -371,13 +357,13 @@ namespace quda {
     template <typename Float, int nColor, QudaGaugeFieldOrder order, bool native_ghost, typename storeFloat>
     struct GhostAccessor {
       mutable complex<Float> dummy;
-      GhostAccessor(const GaugeField &, void *gauge_=0, void **ghost_=0) {
+      GhostAccessor(const GaugeField &, void * = nullptr, void ** = nullptr) {
 	errorQuda("Not implemented for order=%d", order);
       }
 
-      void resetScale(Float dummy) { }
+      void resetScale(Float) { }
 
-      __device__ __host__ complex<Float>& operator()(int d, int parity, int x, int row, int col) const {
+      __device__ __host__ complex<Float>& operator()(int, int, int, int, int) const {
 	return dummy;
       }
     };
@@ -393,7 +379,7 @@ namespace quda {
       Float scale_inv;
       static constexpr bool fixed = fixed_point<Float,storeFloat>();
 
-      Accessor(const GaugeField &U, void *gauge_=0, void **ghost_=0)
+      Accessor(const GaugeField &U, void *gauge_=0, void ** = 0)
 	: volumeCB(U.VolumeCB()), geometry(U.Geometry()), cb_offset((U.Bytes()>>1) / (sizeof(complex<storeFloat>)*U.Geometry())),
 	scale(static_cast<Float>(1.0)), scale_inv(static_cast<Float>(1.0))
       {
@@ -488,7 +474,7 @@ namespace quda {
       Float scale_inv;
       static constexpr bool fixed = fixed_point<Float,storeFloat>();
 
-      GhostAccessor(const GaugeField &U, void *gauge_=0, void **ghost_=0)
+      GhostAccessor(const GaugeField &U, void* = nullptr, void **ghost_= nullptr)
 	: scale(static_cast<Float>(1.0)), scale_inv(static_cast<Float>(1.0)) {
 	for (int d=0; d<4; d++) {
 	  ghost[d] = ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d]) :
@@ -546,7 +532,7 @@ namespace quda {
       Float scale_inv;
       static constexpr bool fixed = fixed_point<Float,storeFloat>();
 
-      Accessor(const GaugeField &U, void *gauge_=0, void **ghost_=0)
+      Accessor(const GaugeField &U, void *gauge_ = nullptr, void ** = nullptr)
       : u(gauge_ ? static_cast<complex<storeFloat>*>(gauge_) :
 	  static_cast<complex<storeFloat>*>(const_cast<void *>(U.Gauge_p()))),
 	volumeCB(U.VolumeCB()), geometry(U.Geometry()),
@@ -585,16 +571,7 @@ namespace quda {
        * `wrap_ghost`, `wrap_index`) are only available for the AoS orders, such as the QUDA_MILC_GAUGE_ORDER order, for
        * the reason that the concept of memory chunk only applyies to these orders.
        */
-      __device__ __host__ inline const auto wrap(int d, int parity, int x, int row, int col) const
-      {
-        return fieldorder_wrapper<Float, storeFloat>(
-          u, (((parity * volumeCB + x) * geometry + d) * nColor + row) * nColor + col, scale, scale_inv);
-      }
-
-      /**
-       * bried The non-const `wrap` method.
-       */
-      __device__ __host__ inline auto wrap(int d, int parity, int x, int row, int col)
+      __device__ __host__ inline auto wrap(int d, int parity, int x, int row, int col) const
       {
         return fieldorder_wrapper<Float, storeFloat>(
           u, (((parity * volumeCB + x) * geometry + d) * nColor + row) * nColor + col, scale, scale_inv);
@@ -653,7 +630,7 @@ namespace quda {
       Float scale_inv;
       static constexpr bool fixed = fixed_point<Float,storeFloat>();
 
-      GhostAccessor(const GaugeField &U, void *gauge_=0, void **ghost_=0)
+      GhostAccessor(const GaugeField &U, void * = nullptr, void **ghost_ = nullptr)
 	: scale(static_cast<Float>(1.0)), scale_inv(static_cast<Float>(1.0)) {
 	for (int d=0; d<4; d++) {
 	  ghost[d] = ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d]) :
@@ -700,16 +677,7 @@ namespace quda {
        * @brief The method similar to Accessor<Float, nColor, QUDA_MILC_GAUGE_ORDER, storeFloat>::wrap: this method and the following
        * creates a fieldorder_wrapper object with the pointer that points to the memory chunk at d, parity, x, row, col
        */
-      __device__ __host__ inline const auto wrap(int d, int parity, int x, int row, int col) const
-      {
-        return fieldorder_wrapper<Float, storeFloat>(
-          ghost[d], parity * ghostOffset[d] + (x * nColor + row) * nColor + col, scale, scale_inv);
-      }
-
-      /**
-       * @brief the non-const `wrap` method.
-       */
-      __device__ __host__ inline auto wrap(int d, int parity, int x, int row, int col)
+      __device__ __host__ inline auto wrap(int d, int parity, int x, int row, int col) const
       {
         return fieldorder_wrapper<Float, storeFloat>(
           ghost[d], parity * ghostOffset[d] + (x * nColor + row) * nColor + col, scale, scale_inv);
@@ -743,8 +711,8 @@ namespace quda {
       Float scale_inv;
       static constexpr bool fixed = fixed_point<Float,storeFloat>();
 
-    Accessor(const GaugeField &U, void *gauge_=0, void **ghost_=0, bool override=false)
-      : u(gauge_ ? static_cast<complex<storeFloat>*>(gauge_) :
+      Accessor(const GaugeField &U, void * gauge_ = nullptr, void ** = nullptr) :
+        u(gauge_ ? static_cast<complex<storeFloat>*>(gauge_) :
 	  static_cast<complex<storeFloat>*>(const_cast<void*>(U.Gauge_p()))),
 	offset_cb( (U.Bytes()>>1) / sizeof(complex<storeFloat>)),
         volumeCB(U.VolumeCB()), stride(U.Stride()), geometry(U.Geometry()),
@@ -902,16 +870,21 @@ namespace quda {
        deploy for a specifc field ordering, the two operator()
        accessors have to be specialized for that ordering.
 
-       @tparam Float Underlying type returned by the accessors
+       @tparam Float_ Underlying type returned by the accessors
        @tparam nColor Number of colors for the field
        @tparam nSpinCoarse Number of "spin degrees of freedom" (for coarse-link fields only)
        @tparam order Storage order of the field
        @tparam native_ghost Whether to use native ghosts (inlined into
+       @tparam storeFloat_ Underlying storage type for the field
        the padded area for internal-order fields or use a separate array if false)
      */
-    template <typename Float, int nColor, int nSpinCoarse, QudaGaugeFieldOrder order, bool native_ghost = true,
-              typename storeFloat = Float>
+    template <typename Float_, int nColor, int nSpinCoarse, QudaGaugeFieldOrder order, bool native_ghost = true,
+              typename storeFloat_ = Float_>
     struct FieldOrder {
+
+      /** Convenient types */
+      using Float = Float_;
+      using storeFloat = storeFloat_;
 
       /** An internal reference to the actual field we are accessing */
       const int volumeCB;
@@ -929,10 +902,10 @@ namespace quda {
        * Constructor for the FieldOrder class
        * @param field The field that we are accessing
        */
-      FieldOrder(GaugeField &U, void *gauge_=0, void **ghost_=0)
+      FieldOrder(const GaugeField &U, storeFloat *gauge_=0, storeFloat **ghost_=0)
       : volumeCB(U.VolumeCB()), nDim(U.Ndim()), geometry(U.Geometry()),
 	  location(U.Location()),
-	  accessor(U, gauge_, ghost_), ghostAccessor(U, gauge_, ghost_)
+        accessor(U, (void*)gauge_, (void**)ghost_), ghostAccessor(U, (void*)gauge_, (void**)ghost_)
 	{
 	  if (U.Reconstruct() != QUDA_RECONSTRUCT_NO)
 	    errorQuda("GaugeField ordering not supported with reconstruction");
@@ -972,15 +945,10 @@ namespace quda {
          * @param parity Parity index
          * @param x 1-d site index
          */
-        __device__ __host__ const auto wrap(int d, int parity, int x) const
+        __device__ __host__ auto wrap(int d, int parity, int x) const
         {
           return accessor.wrap(d, parity, x, 0, 0);
         }
-
-        /**
-         * @brief the non-const `wrap` method.
-         */
-        __device__ __host__ auto wrap(int d, int parity, int x) { return accessor.wrap(d, parity, x, 0, 0); }
 
         /**
          * Writable complex-member accessor function
@@ -1031,16 +999,10 @@ namespace quda {
          * @param parity Parity index
          * @param x 1-d site index
          */
-
-        __device__ __host__ const auto wrap_ghost(int d, int parity, int x) const
+        __device__ __host__ auto wrap_ghost(int d, int parity, int x) const
         {
           return ghostAccessor.wrap(d, parity, x, 0, 0);
         }
-
-        /**
-         * @brief the non-const `wrap_ghost` method.
-         */
-        __device__ __host__ auto wrap_ghost(int d, int parity, int x) { return ghostAccessor.wrap(d, parity, x, 0, 0); }
 
         /**
          * Specialized read-only complex-member accessor function (for coarse gauge field)
@@ -1084,15 +1046,7 @@ namespace quda {
          * @param s_row row spin index
          * @param s_col col spin index
          */
-        __device__ __host__ inline const auto wrap(int d, int parity, int x, int s_row, int s_col) const
-        {
-          return accessor.wrap(d, parity, x, s_row * nColorCoarse, s_col * nColorCoarse);
-        }
-
-        /**
-         * @brief the non-const `wrap` method.
-         */
-        __device__ __host__ inline auto wrap(int d, int parity, int x, int s_row, int s_col)
+        __device__ __host__ inline auto wrap(int d, int parity, int x, int s_row, int s_col) const
         {
           return accessor.wrap(d, parity, x, s_row * nColorCoarse, s_col * nColorCoarse);
         }
@@ -1110,23 +1064,24 @@ namespace quda {
         __device__ __host__ inline complex<Float> Ghost(int d, int parity, int x, int s_row, int s_col, int c_row,
                                                         int c_col) const
         {
-          return Ghost(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
+          return Ghost(d, parity, x, s_row * nColorCoarse + c_row, s_col * nColorCoarse + c_col);
         }
 
         /**
-	 * Specialized read-only complex-member accessor function (for coarse gauge field ghost zone)
-	 * @param d dimension index
-	 * @param parity Parity index
-	 * @param x 1-d site index
-	 * @param s_row row spin index
-	 * @param c_row row color index
-	 * @param s_col col spin index
-	 * @param c_col col color index
-	 */
-	__device__ __host__ inline fieldorder_wrapper<Float,storeFloat>
-	  Ghost(int d, int parity, int x, int s_row, int s_col, int c_row, int c_col) {
-	  return Ghost(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
-	}
+         * Specialized read-only complex-member accessor function (for coarse gauge field ghost zone)
+         * @param d dimension index
+         * @param parity Parity index
+         * @param x 1-d site index
+         * @param s_row row spin index
+         * @param c_row row color index
+         * @param s_col col spin index
+         * @param c_col col color index
+         */
+        __device__ __host__ inline fieldorder_wrapper<Float, storeFloat> Ghost(int d, int parity, int x, int s_row,
+                                                                               int s_col, int c_row, int c_col)
+        {
+          return Ghost(d, parity, x, s_row * nColorCoarse + c_row, s_col * nColorCoarse + c_col);
+        }
         /**
          * @brief This and the following method (eventually) creates a fieldorder_wrapper object whose pointer points to
          * the start of the memory chunk corresponds to the matrix at d, parity, x, s_row, s_col. Only available for the
@@ -1137,15 +1092,7 @@ namespace quda {
          * @param s_row row spin index
          * @param s_col col spin index
          */
-        __device__ __host__ inline const auto wrap_ghost(int d, int parity, int x, int s_row, int s_col) const
-        {
-          return ghostAccessor.wrap(d, parity, x, s_row * nColorCoarse, s_col * nColorCoarse);
-        }
-
-        /**
-         * @brief the non-const `wrap_ghost` method.
-         */
-        __device__ __host__ inline auto wrap_ghost(int d, int parity, int x, int s_row, int s_col)
+        __device__ __host__ inline auto wrap_ghost(int d, int parity, int x, int s_row, int s_col) const
         {
           return ghostAccessor.wrap(d, parity, x, s_row * nColorCoarse, s_col * nColorCoarse);
         }
@@ -1253,7 +1200,7 @@ namespace quda {
         {
         }
 
-        __device__ __host__ inline void Pack(real out[N], const complex in[N / 2], int idx) const
+        __device__ __host__ inline void Pack(real out[N], const complex in[N / 2]) const
         {
           if (isFixed<Float>::value) {
 #pragma unroll
@@ -1271,8 +1218,8 @@ namespace quda {
         }
 
         template <typename I>
-        __device__ __host__ inline void Unpack(complex out[N / 2], const real in[N], int idx, int dir, real phase,
-                                               const I *X, const int *R) const
+        __device__ __host__ inline void Unpack(complex out[N / 2], const real in[N], int, int, real,
+                                               const I *, const int *) const
         {
           if (isFixed<Float>::value) {
 #pragma unroll
@@ -1282,7 +1229,7 @@ namespace quda {
             for (int i = 0; i < N / 2; i++) { out[i] = complex(in[2 * i + 0], in[2 * i + 1]); }
           }
         }
-        __device__ __host__ inline real getPhase(const complex in[N / 2]) const { return 0; }
+        __device__ __host__ inline real getPhase(const complex []) const { return 0; }
       };
 
       /**
@@ -1381,7 +1328,7 @@ namespace quda {
         {
         }
 
-        __device__ __host__ inline void Pack(real out[12], const complex in[9], int idx) const
+        __device__ __host__ inline void Pack(real out[12], const complex in[9]) const
         {
 #pragma unroll
           for (int i = 0; i < 6; i++) {
@@ -1391,7 +1338,7 @@ namespace quda {
         }
 
         template <typename I>
-        __device__ __host__ inline void Unpack(complex out[9], const real in[12], int idx, int dir, real phase,
+        __device__ __host__ inline void Unpack(complex out[9], const real in[12], int idx, int dir, real,
                                                const I *X, const int *R) const
         {
 #pragma unroll
@@ -1418,7 +1365,7 @@ namespace quda {
           out[8] = u0 * conj(out[8]);
         }
 
-        __device__ __host__ inline real getPhase(const complex in[9]) { return 0; }
+        __device__ __host__ inline real getPhase(const complex []) { return 0; }
       };
 
       /**
@@ -1435,10 +1382,10 @@ namespace quda {
         using real = typename mapper<Float>::type;
         using complex = complex<real>;
 
-        Reconstruct(const GaugeField &u) { ; }
-        Reconstruct(const Reconstruct<11, Float, ghostExchange_> &recon) {}
+        Reconstruct(const GaugeField &) { ; }
+        Reconstruct(const Reconstruct<11, Float, ghostExchange_> &) {}
 
-        __device__ __host__ inline void Pack(real out[10], const complex in[9], int idx) const
+        __device__ __host__ inline void Pack(real out[10], const complex in[9]) const
         {
 #pragma unroll
           for (int i = 0; i < 2; i++) {
@@ -1454,8 +1401,8 @@ namespace quda {
         }
 
         template <typename I>
-        __device__ __host__ inline void Unpack(complex out[9], const real in[10], int idx, int dir, real phase,
-                                               const I *X, const int *R) const
+        __device__ __host__ inline void Unpack(complex out[9], const real in[10], int, int, real,
+                                               const I *, const int *) const
         {
           out[0] = complex(0.0, in[6]);
           out[1] = complex(in[0], in[1]);
@@ -1468,7 +1415,7 @@ namespace quda {
           out[8] = complex(0.0, in[8]);
         }
 
-        __device__ __host__ inline real getPhase(const complex in[9]) { return 0; }
+        __device__ __host__ inline real getPhase(const complex []) { return 0; }
       };
 
       /**
@@ -1495,14 +1442,14 @@ namespace quda {
         {
         }
 
-        __device__ __host__ inline void Pack(real out[12], const complex in[9], int idx) const
+        __device__ __host__ inline void Pack(real out[12], const complex in[9]) const
         {
-          reconstruct_12.Pack(out, in, idx);
+          reconstruct_12.Pack(out, in);
         }
 
         template <typename I>
-        __device__ __host__ inline void Unpack(complex out[9], const real in[12], int idx, int dir, real phase,
-                                               const I *X, const int *R) const
+        __device__ __host__ inline void Unpack(complex out[9], const real in[12], int, int, real phase,
+                                               const I *, const int *) const
         {
 #pragma unroll
           for (int i = 0; i < 6; i++) out[i] = complex(in[2 * i + 0], in[2 * i + 1]);
@@ -1583,8 +1530,7 @@ namespace quda {
           isFirstTimeSlice(comm_coord(3) == 0 ? true : false),
           isLastTimeSlice(comm_coord(3) == comm_dim(3) - 1 ? true : false),
           ghostExchange(u.GhostExchange())
-        {
-        }
+        { }
 
         Reconstruct(const Reconstruct<8, Float, ghostExchange_> &recon) :
             anisotropy(recon.anisotropy),
@@ -1594,23 +1540,29 @@ namespace quda {
             isFirstTimeSlice(recon.isFirstTimeSlice),
             isLastTimeSlice(recon.isLastTimeSlice),
             ghostExchange(recon.ghostExchange)
-        {
-        }
+        { }
 
-        __device__ __host__ inline void Pack(real out[8], const complex in[9], int idx) const
+        // Pack and unpack are described in https://arxiv.org/pdf/0911.3191.pdf
+        // Method was modified to avoid the singularity at unit gauge by
+        // compressing the matrix {{b1,b2,b3},{a1,a2,a3},{-c1,-c2,-c3}}
+        // instead of {{a1,a2,a3},{b1,b2,b3},{c1,c2,c3}}
+
+        __device__ __host__ inline void Pack(real out[8], const complex in[9]) const
         {
-          out[0] = Trig<isFixed<Float>::value, real>::Atan2(in[0].imag(), in[0].real());
-          out[1] = Trig<isFixed<Float>::value, real>::Atan2(in[6].imag(), in[6].real());
-#pragma unroll
-          for (int i = 1; i < 4; i++) {
-            out[2 * i + 0] = in[i].real();
-            out[2 * i + 1] = in[i].imag();
-          }
+          out[0] = Trig<isFixed<Float>::value, real>::Atan2(in[3].imag(), in[3].real());   // a1 -> b1
+          out[1] = Trig<isFixed<Float>::value, real>::Atan2(-in[6].imag(), -in[6].real()); // c1 -> -c1
+
+          out[2] = in[4].real();
+          out[3] = in[4].imag(); // a2 -> b2
+          out[4] = in[5].real();
+          out[5] = in[5].imag(); // a3 -> b3
+          out[6] = in[0].real();
+          out[7] = in[0].imag(); // b1 -> a1
         }
 
         template <typename I>
-        __device__ __host__ inline void Unpack(complex out[9], const real in[8], int idx, int dir, real phase,
-                                               const I *X, const int *R, const complex scale, const complex u) const
+        __device__ __host__ inline void Unpack(complex out[9], const real in[8], int, int, real,
+                                               const I *, const int *, const complex, const complex u) const
         {
           real u0 = u.real();
           real u0_inv = u.imag();
@@ -1678,6 +1630,16 @@ namespace quda {
             out[8] = cmac(u0 * A, out[2], out[8]);
             out[8] = -r_inv2 * out[8];
           }
+
+          // Rearrange {{b1,b2,b3},{a1,a2,a3},{-c1,-c2,-c3}} back
+          // to {{a1,a2,a3},{b1,b2,b3},{c1,c2,c3}}
+#pragma unroll
+          for (int i = 0; i < 3; i++) {
+            const auto tmp = out[i];
+            out[i] = out[i + 3];
+            out[i + 3] = tmp;
+            out[i + 6] = -out[i + 6];
+          }
         }
 
         template <typename I>
@@ -1689,10 +1651,11 @@ namespace quda {
             anisotropy :
             timeBoundary<ghostExchange_>(idx, X, R, tBoundary, scale, firstTimeSliceBound, lastTimeSliceBound,
                                          isFirstTimeSlice, isLastTimeSlice, ghostExchange);
+
           Unpack(out, in, idx, dir, phase, X, R, scale, u);
         }
 
-        __device__ __host__ inline real getPhase(const complex in[9]) { return 0; }
+        __device__ __host__ inline real getPhase(const complex []) { return 0; }
       };
 
       /**
@@ -1742,7 +1705,7 @@ namespace quda {
         }
 
         // Rescale the U3 input matrix by exp(-I*phase) to obtain an SU3 matrix multiplied by a real scale factor,
-        __device__ __host__ inline void Pack(real out[8], const complex in[9], int idx) const
+        __device__ __host__ inline void Pack(real out[8], const complex in[9]) const
         {
           real phase = getPhase(in);
           complex su3[9];
@@ -1758,7 +1721,7 @@ namespace quda {
 #pragma unroll
             for (int i = 0; i < 9; i++) { su3[i] = phase * in[i]; }
           }
-          reconstruct_8.Pack(out, su3, idx);
+          reconstruct_8.Pack(out, su3);
         }
 
         template <typename I>
@@ -1807,13 +1770,15 @@ namespace quda {
         }
       }
 
-      template <typename Float, int length, int N, int reconLenParam,
+      template <typename Float, int length_, int N, int reconLenParam,
           QudaStaggeredPhase stag_phase = QUDA_STAGGERED_PHASE_NO, bool huge_alloc = default_huge_alloc,
           QudaGhostExchange ghostExchange_ = QUDA_GHOST_EXCHANGE_INVALID, bool use_inphase = false>
       struct FloatNOrder {
         using Accessor
-            = FloatNOrder<Float, length, N, reconLenParam, stag_phase, huge_alloc, ghostExchange_, use_inphase>;
+            = FloatNOrder<Float, length_, N, reconLenParam, stag_phase, huge_alloc, ghostExchange_, use_inphase>;
 
+        using store_t = Float;
+        static constexpr int length = length_;
         using real = typename mapper<Float>::type;
         using complex = complex<real>;
         typedef typename VectorType<Float, N>::type Vector;
@@ -1836,7 +1801,7 @@ namespace quda {
         void *backup_h; //! host memory for backing up the field when tuning
         size_t bytes;
 
-        FloatNOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0, bool override = false) :
+        FloatNOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
           reconstruct(u),
           gauge(gauge_ ? gauge_ : (Float *)u.Gauge_p()),
           offset(u.Bytes() / (2 * sizeof(Float) * N)),
@@ -1912,7 +1877,7 @@ namespace quda {
       {
         const int M = reconLen / N;
         real tmp[reconLen];
-        reconstruct.Pack(tmp, v, x);
+        reconstruct.Pack(tmp, v);
 
 #pragma unroll
         for (int i=0; i<M; i++){
@@ -2000,7 +1965,7 @@ namespace quda {
         } else {
           const int M = reconLen / N;
           real tmp[reconLen];
-          reconstruct.Pack(tmp, v, x);
+          reconstruct.Pack(tmp, v);
 
 #pragma unroll
           for (int i=0; i<M; i++) {
@@ -2077,13 +2042,12 @@ namespace quda {
         reconstruct.Unpack(v, tmp, extended_idx, g, 2. * M_PI * phase, X, R);
       }
 
-      __device__ __host__ inline void saveGhostEx(const complex v[length / 2], int buff_idx, int extended_idx, int dir,
+      __device__ __host__ inline void saveGhostEx(const complex v[length / 2], int buff_idx, int, int dir,
                                                   int dim, int g, int parity, const int R[])
       {
         const int M = reconLen / N;
         real tmp[reconLen];
-        // use the extended_idx to determine the boundary condition
-        reconstruct.Pack(tmp, v, extended_idx);
+        reconstruct.Pack(tmp, v);
 
 #pragma unroll
 	  for (int i=0; i<M; i++) {
@@ -2108,17 +2072,18 @@ namespace quda {
       */
       void save() {
 	if (backup_h) errorQuda("Already allocated host backup");
-	backup_h = safe_malloc(bytes);
-	qudaMemcpy(backup_h, gauge, bytes, qudaMemcpyDeviceToHost);
+        backup_h = safe_malloc(bytes);
+        qudaMemcpy(backup_h, gauge, bytes, cudaMemcpyDeviceToHost);
       }
 
       /**
 	 @brief Restore the field from the host after tuning
       */
-      void load() {
-	qudaMemcpy(gauge, backup_h, bytes, qudaMemcpyHostToDevice);
-	host_free(backup_h);
-	backup_h = nullptr;
+      void load()
+      {
+        qudaMemcpy(gauge, backup_h, bytes, cudaMemcpyHostToDevice);
+        host_free(backup_h);
+        backup_h = nullptr;
       }
 
       size_t Bytes() const { return reconLen * sizeof(Float); }
@@ -2140,8 +2105,10 @@ namespace quda {
          @brief The LegacyOrder defines the ghost zone storage and ordering for
          all cpuGaugeFields, which use the same ghost zone storage.
       */
-      template <typename Float, int length> struct LegacyOrder {
+      template <typename Float, int length_> struct LegacyOrder {
+        static constexpr int length = length_;
         using Accessor = LegacyOrder<Float, length>;
+        using store_t = Float;
         using real = typename mapper<Float>::type;
         using complex = complex<real>;
         Float *ghost[QUDA_MAX_DIM];
@@ -2178,7 +2145,7 @@ namespace quda {
           }
         }
 
-        __device__ __host__ inline void loadGhost(complex v[length / 2], int x, int dir, int parity, real phase = 1.0) const
+        __device__ __host__ inline void loadGhost(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
         {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
           typedef S<Float, length> structure;
@@ -2242,7 +2209,7 @@ namespace quda {
           return gauge_ghost_wrapper<real, Accessor>(const_cast<Accessor &>(*this), dim, ghost_idx, parity, phase);
         }
 
-        __device__ __host__ inline void loadGhostEx(complex v[length / 2], int x, int dummy, int dir, int dim, int g,
+        __device__ __host__ inline void loadGhostEx(complex v[length / 2], int x, int, int dir, int dim, int g,
                                                     int parity, const int R[]) const
         {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
@@ -2255,7 +2222,7 @@ namespace quda {
         for (int i = 0; i < length / 2; i++) v[i] = complex(v_[2 * i + 0], v_[2 * i + 1]);
         }
 
-        __device__ __host__ inline void saveGhostEx(const complex v[length / 2], int x, int dummy, int dir, int dim,
+        __device__ __host__ inline void saveGhostEx(const complex v[length / 2], int x, int, int dir, int dim,
                                                     int g, int parity, const int R[])
         {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
@@ -2294,7 +2261,7 @@ namespace quda {
 	for(int i=0; i<4; i++) gauge[i] = order.gauge[i];
       }
 
-      __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
+      __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
       {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
 	typedef S<Float,length> structure;
@@ -2376,7 +2343,7 @@ namespace quda {
 	for(int i=0; i<4; i++) gauge[i] = order.gauge[i];
       }
 
-      __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
+      __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
       {
         for (int i = 0; i < length / 2; i++) {
           v[i].real((real)gauge[dir][((0 * (length / 2) + i) * 2 + parity) * volumeCB + x]);
@@ -2443,7 +2410,7 @@ namespace quda {
       gauge(order.gauge), volumeCB(order.volumeCB), geometry(order.geometry)
       { ; }
 
-      __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
+      __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
       {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
       typedef S<Float,length> structure;
@@ -2553,7 +2520,7 @@ namespace quda {
     {
     }
 
-    __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
+    __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
     {
       // get base pointer
       const Float *gauge0 = reinterpret_cast<const Float*>(reinterpret_cast<const char*>(gauge) + (parity*volumeCB+x)*size + offset);
@@ -2660,7 +2627,7 @@ namespace quda {
     }
 
     // we need to transpose and scale for CPS ordering
-    __device__ __host__ inline void load(complex v[9], int x, int dir, int parity, Float inphase = 1.0) const
+    __device__ __host__ inline void load(complex v[9], int x, int dir, int parity, Float = 1.0) const
     {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
       typedef S<Float,length> structure;
@@ -2767,7 +2734,7 @@ namespace quda {
       }
 
       // we need to transpose for BQCD ordering
-      __device__ __host__ inline void load(complex v[9], int x, int dir, int parity, real inphase = 1.0) const
+      __device__ __host__ inline void load(complex v[9], int x, int dir, int parity, real = 1.0) const
       {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
         typedef S<Float, length> structure;
@@ -2870,7 +2837,7 @@ namespace quda {
       }
 
       // we need to transpose for TIFR ordering
-      __device__ __host__ inline void load(complex v[9], int x, int dir, int parity, real inphase = 1.0) const
+      __device__ __host__ inline void load(complex v[9], int x, int dir, int parity, real = 1.0) const
       {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
         typedef S<Float, length> structure;
@@ -3003,7 +2970,7 @@ namespace quda {
       }
 
       // we need to transpose for TIFR ordering
-      __device__ __host__ inline void load(complex v[9], int x, int dir, int parity, real inphase = 1.0) const
+      __device__ __host__ inline void load(complex v[9], int x, int dir, int parity, real = 1.0) const
       {
         int y = getPaddedIndex(x, parity);
 

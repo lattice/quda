@@ -6,7 +6,7 @@
 namespace quda {
 
   template<typename Float, int nColor, QudaReconstructType recon>
-  class GaugePlaq : TunableReduction2D<> {
+  class GaugePlaq : public TunableReduction2D<> {
     const GaugeField &u;
     double2 &plq;
 
@@ -16,17 +16,15 @@ namespace quda {
       u(u),
       plq(plq)
     {
-      apply(0);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       GaugePlaqArg<Float, nColor, recon> arg(u);
-      launch<Plaquette>(tp, stream, arg);
-      arg.complete(plq);
+      launch<Plaquette>(plq, tp, stream, arg);
       if (!activeTuning()) {
-        comm_allreduce_array((double*)&plq, 2);
         for (int i = 0; i < 2; i++) ((double*)&plq)[i] /= 9.*2*arg.threads.x*comm_size();
       }
     }
@@ -41,7 +39,7 @@ namespace quda {
 
   double3 plaquette(const GaugeField &U)
   {
-    double2 plq;
+    double2 plq = zero<double2>();
     instantiate<GaugePlaq>(U, plq);
     double3 plaq = make_double3(0.5*(plq.x + plq.y), plq.x, plq.y);
     return plaq;

@@ -84,28 +84,44 @@ namespace quda {
 
   double GaugeField::norm1(int d, bool fixed) const {
     if (reconstruct != QUDA_RECONSTRUCT_NO) errorQuda("Unsupported reconstruct=%d", reconstruct);
+<<<<<<< HEAD
     double nrm=0;
+=======
+    double nrm = 0.0;
+>>>>>>> feature/generic_kernel
     instantiatePrecision<Norm>(*this, nrm, d, fixed, NORM1);
     return nrm;
   }
 
   double GaugeField::norm2(int d, bool fixed) const {
     if (reconstruct != QUDA_RECONSTRUCT_NO) errorQuda("Unsupported reconstruct=%d", reconstruct);
+<<<<<<< HEAD
     double nrm=0;
+=======
+    double nrm = 0.0;
+>>>>>>> feature/generic_kernel
     instantiatePrecision<Norm>(*this, nrm, d, fixed, NORM2);
     return nrm;
   }
 
   double GaugeField::abs_max(int d, bool fixed) const {
     if (reconstruct != QUDA_RECONSTRUCT_NO) errorQuda("Unsupported reconstruct=%d", reconstruct);
+<<<<<<< HEAD
     double nrm=0;
+=======
+    double nrm = 0.0;
+>>>>>>> feature/generic_kernel
     instantiatePrecision<Norm>(*this, nrm, d, fixed, ABS_MAX);
     return nrm;
   }
 
   double GaugeField::abs_min(int d, bool fixed) const {
     if (reconstruct != QUDA_RECONSTRUCT_NO) errorQuda("Unsupported reconstruct=%d", reconstruct);
+<<<<<<< HEAD
     double nrm=0;
+=======
+    double nrm = std::numeric_limits<double>::infinity();
+>>>>>>> feature/generic_kernel
     instantiatePrecision<Norm>(*this, nrm, d, fixed, ABS_MIN);
     return nrm;
   }

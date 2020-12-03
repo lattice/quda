@@ -56,13 +56,13 @@ namespace quda {
     count++;
   }
 
-  void forceRecord(double2 &force, double dt, const char *fname) {
-    qudaDeviceSynchronize();
-    comm_allreduce_max_array((double*)&force, 2);
+  void forceRecord(std::vector<double> &force, double dt, const char *fname)
+  {
+    comm_allreduce_max_array(force.data(), 2); // FIXME - this needs to be subsumed into the reduction launch
 
     if (comm_rank()==0) {
-      force_stream << fname << "\t" << std::setprecision(5) << force.x << "\t"
-                   << std::setprecision(5) << force.y << "\t"
+      force_stream << fname << "\t" << std::setprecision(5) << force[0] << "\t"
+                   << std::setprecision(5) << force[1] << "\t"
                    << std::setprecision(5) << dt << std::endl;
       if (++force_count % force_flush == 0) flushForceMonitor();
     }
@@ -72,22 +72,22 @@ namespace quda {
   class ActionMom : TunableReduction2D<> {
     MomActionArg<Float, nColor, recon> arg;
     const GaugeField &meta;
+    double &action;
 
   public:
     ActionMom(const GaugeField &mom, double &action) :
       TunableReduction2D(mom),
       arg(mom),
-      meta(mom)
+      meta(mom),
+      action(action)
     {
-      apply(0);
-      arg.complete(action);
-      comm_allreduce(&action);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<MomAction>(tp, stream, arg);
+      launch<MomAction>(action, tp, stream, arg);
     }
 
     long long flops() const { return 4*2*arg.threads.x*23; }
@@ -109,25 +109,23 @@ namespace quda {
   class UpdateMom : TunableReduction2D<> {
     UpdateMomArg<Float, nColor, recon> arg;
     const GaugeField &meta;
+    std::vector<double> force_max;
 
   public:
     UpdateMom(GaugeField &force, GaugeField &mom, double coeff, const char *fname) :
       TunableReduction2D(mom),
       arg(mom, coeff, force),
-      meta(force)
+      meta(force),
+      force_max(2)
     {
-      double2 force_max;
-      apply(0);
-      if (forceMonitor()) {
-        arg.complete(force_max);
-        forceRecord(force_max, arg.coeff, fname);
-      }
+      apply(device::get_default_stream());
+      if (forceMonitor()) forceRecord(force_max, arg.coeff, fname);
     }
 
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<MomUpdate, max_reducer2>(tp, stream, arg);
+      launch<MomUpdate, max_reducer2>(force_max, tp, stream, arg);
     }
 
     void preTune() { arg.mom.save();}
@@ -136,18 +134,21 @@ namespace quda {
     long long bytes() const { return 4*2*arg.threads.x*(2*arg.mom.Bytes()+arg.force.Bytes()); }
   };
 
+#ifdef GPU_GAUGE_TOOLS
   void updateMomentum(GaugeField &mom, double coeff, GaugeField &force, const char *fname)
   {
-#ifdef GPU_GAUGE_TOOLS
     if (mom.Reconstruct() != QUDA_RECONSTRUCT_10)
       errorQuda("Momentum field with reconstruct %d not supported", mom.Reconstruct());
 
     checkPrecision(mom, force);
     instantiate<UpdateMom, ReconstructMom>(force, mom, coeff, fname);
-#else
-    errorQuda("%s not built", __func__);
-#endif // GPU_GAUGE_TOOLS
   }
+#else
+  void updateMomentum(GaugeField &, double, GaugeField &, const char *)
+  {
+    errorQuda("%s not built", __func__);
+  }
+#endif // GPU_GAUGE_TOOLS
 
   template <typename Float, int nColor, QudaReconstructType recon>
   class UApply : TunableKernel2D {
@@ -161,7 +162,7 @@ namespace quda {
       U(U),
       force(force)
     {
-      apply(0);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)
@@ -181,15 +182,18 @@ namespace quda {
     long long bytes() const { return 2 * force.Bytes() + U.Bytes(); }
   };
 
+#ifdef GPU_GAUGE_TOOLS
   void applyU(GaugeField &force, GaugeField &U)
   {
-#ifdef GPU_GAUGE_TOOLS
     if (!force.isNative()) errorQuda("Unsupported output ordering: %d\n", force.Order());
     checkPrecision(force, U);
     instantiate<UApply, ReconstructNo12>(U, force);
-#else
-    errorQuda("%s not built", __func__);
-#endif // GPU_GAUGE_TOOLS
   }
+#else
+  void applyU(GaugeField &, GaugeField &)
+  {
+    errorQuda("%s not built", __func__);
+  }
+#endif // GPU_GAUGE_TOOLS
 
 } // namespace quda

@@ -24,7 +24,7 @@ namespace quda
       density(density)
     {
       if (!Fmunu.isNative()) errorQuda("Topological charge only supported on native ordered fields");
-      apply(0);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)
@@ -34,16 +34,13 @@ namespace quda
       std::vector<double> result(3);
       if (density) {
         QChargeArg<Float, nColor, recon, true> arg(Fmunu, (Float*)qdensity);
-        launch<qCharge>(tp, stream, arg);
-        arg.complete(result);
+        launch<qCharge>(result, tp, stream, arg);
       } else {
         QChargeArg<Float, nColor, recon, false> arg(Fmunu, (Float*)qdensity);
-        launch<qCharge>(tp, stream, arg);
-        arg.complete(result);
+        launch<qCharge>(result, tp, stream, arg);
       }
 
       if (!activeTuning()) {
-        comm_allreduce_array(result.data(), 3);
         for (int i=0; i<2; i++) energy[i+1] = result[i] / (Fmunu.Volume() * comm_size());
         energy[0] = energy[1] + energy[2];
         qcharge = result[2];
@@ -63,21 +60,28 @@ namespace quda
     long long bytes() const { return Fmunu.Bytes() + Fmunu.Volume() * (density * Fmunu.Precision()); }
   }; // QChargeCompute
 
+#ifdef GPU_GAUGE_TOOLS
   void computeQCharge(double energy[3], double &qcharge, const GaugeField &Fmunu)
   {
-#ifdef GPU_GAUGE_TOOLS
     instantiate<QCharge,ReconstructNone>(Fmunu, energy, qcharge, nullptr, false);
-#else
-    errorQuda("Gauge tools are not built");
-#endif // GPU_GAUGE_TOOLS
   }
+#else
+  void computeQCharge(double [3], double &, const GaugeField &)
+  {
+    errorQuda("Gauge tools are not built");
+  }
+#endif // GPU_GAUGE_TOOLS
 
+#ifdef GPU_GAUGE_TOOLS
   void computeQChargeDensity(double energy[3], double &qcharge, void *qdensity, const GaugeField &Fmunu)
   {
-#ifdef GPU_GAUGE_TOOLS
     instantiate<QCharge,ReconstructNone>(Fmunu, energy, qcharge, qdensity, true);
-#else
-    errorQuda("Gauge tools are not built");
-#endif // GPU_GAUGE_TOOLS
   }
+#else
+  void computeQChargeDensity(double [3], double &, void *, const GaugeField &)
+  {
+    errorQuda("Gauge tools are not built");
+  }
+#endif // GPU_GAUGE_TOOLS
+
 } // namespace quda

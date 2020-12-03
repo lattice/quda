@@ -19,7 +19,7 @@ namespace quda {
 
     bool tuneSharedBytes() const { return false; }
     unsigned int minThreads() const { return in.LocalVolumeCB(); }
-    unsigned int maxBlockSize(const TuneParam &param) const { return 32; }
+    unsigned int maxBlockSize(const TuneParam &) const { return 32; }
     int blockStep() const { return 8; }
     int blockMin() const { return 8; }
 
@@ -46,8 +46,7 @@ namespace quda {
       default : errorQuda("Unknown Wilson Flow step type %d", step_type);
       }
 
-      apply(0);
-      qudaDeviceSynchronize();
+      apply(device::get_default_stream());
     }
 
     template <QudaWFlowType wflow_type, WFlowStepType step_type> using Arg =
@@ -118,9 +117,9 @@ namespace quda {
     }
   }; // GaugeWFlowStep
 
+#ifdef GPU_GAUGE_TOOLS
   void WFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, const double epsilon, const QudaWFlowType wflow_type)
   {
-#ifdef GPU_GAUGE_TOOLS
     checkPrecision(out, temp, in);
     checkReconstruct(out, in);
     checkNative(out, in);
@@ -138,8 +137,12 @@ namespace quda {
     // Step Vt
     instantiate<GaugeWFlowStep,WilsonReconstruct>(out, temp, in, epsilon, wflow_type, WFLOW_STEP_VT);
     out.exchangeExtendedGhost(out.R(), false);
-#else
-    errorQuda("Gauge tools are not built");
-#endif
   }
+#else
+  void WFlowStep(GaugeField &, GaugeField &, GaugeField &, const double, const QudaWFlowType)
+  {
+    errorQuda("Gauge tools are not built");
+  }
+#endif
+
 }

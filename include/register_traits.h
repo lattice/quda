@@ -1,5 +1,4 @@
-#ifndef _REGISTER_TRAITS_H
-#define _REGISTER_TRAITS_H
+#pragma once
 
 /**
  * @file  register_traits.h
@@ -10,7 +9,6 @@
 
 #include <quda_define.h>
 #include <quda_internal.h>
-
 #include <complex_quda.h>
 
 #if defined(QUDA_TARGET_CUDA)
@@ -665,5 +663,3 @@ namespace quda {
   template<> struct AllocType<false> { typedef int type; };
 
 } // namespace quda
-
-#endif // _REGISTER_TRAITS_H

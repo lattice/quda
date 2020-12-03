@@ -21,31 +21,32 @@ namespace quda
     const T *v[n_batch_max];
     count_t n_items;
     int n_batch;
-    reduce_t init;
+    reduce_t init_value;
     reduce_t result[n_batch_max];
     transformer h;
     reducer r;
-    TransformReduceArg(const std::vector<T *> &v, count_t n_items, transformer h, reduce_t init, reducer r) :
+    TransformReduceArg(const std::vector<T *> &v, count_t n_items, transformer h, reduce_t init_value, reducer r) :
       ReduceArg<reduce_t>(v.size()),
       n_items(n_items),
       n_batch(v.size()),
-      init(init),
+      init_value(init_value),
       h(h),
       r(r)
     {
       if (n_batch > n_batch_max) errorQuda("Requested batch %d greater than max supported %d", n_batch, n_batch_max);
       for (size_t j = 0; j < v.size(); j++) this->v[j] = v[j];
     }
+
+    __device__ __host__ reduce_t init() const { return init_value; }
   };
 
   template <typename Arg> void transform_reduce(Arg &arg)
   {
     using count_t = decltype(arg.n_items);
-    using reduce_t = decltype(arg.init);
 
     for (int j = 0; j < arg.n_batch; j++) {
       auto v = arg.v[j];
-      reduce_t r_ = arg.init;
+      auto r_ = arg.init();
       for (count_t i = 0; i < arg.n_items; i++) {
         auto v_ = arg.h(v[i]);
         r_ = arg.r(r_, v_);
@@ -57,12 +58,11 @@ namespace quda
   template <typename Arg> __launch_bounds__(Arg::block_size) __global__ void transform_reduce_kernel(Arg arg)
   {
     using count_t = decltype(arg.n_items);
-    using reduce_t = decltype(arg.init);
 
     count_t i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y;
     auto v = arg.v[j];
-    reduce_t r_ = arg.init;
+    auto r_ = arg.init();
 
     while (i < arg.n_items) {
       auto v_ = arg.h(v[i]);
@@ -70,7 +70,7 @@ namespace quda
       i += blockDim.x * gridDim.x;
     }
 
-    arg.template reduce<Arg::block_size, false, decltype(arg.r)>(r_, j);
+    reduce<Arg::block_size, 1, decltype(arg.r)>(arg, r_, j);
   }
 
   template <typename reduce_t, typename T, typename I, typename transformer, typename reducer>
@@ -87,9 +87,9 @@ namespace quda
 
     bool tuneSharedBytes() const { return false; }
     unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
     int blockMin() const { return Arg::block_size; }
-    unsigned int maxBlockSize(const TuneParam &param) const { return Arg::block_size; }
+    unsigned int maxBlockSize(const TuneParam &) const { return Arg::block_size; }
 
     bool advanceTuneParam(TuneParam &param) const // only do autotuning if we have device fields
     {
@@ -105,18 +105,12 @@ namespace quda
   public:
     TransformReduce(QudaFieldLocation location, std::vector<reduce_t> &result, const std::vector<T *> &v, I n_items,
                     transformer &h, reduce_t init, reducer &r) :
-      location(location),
-      result(result),
-      v(v),
-      n_items(n_items),
-      h(h),
-      init(init),
-      r(r)
+      location(location), result(result), v(v), n_items(n_items), h(h), init(init), r(r)
     {
       strcpy(aux, "batch_size=");
       u32toa(aux + 11, v.size());
       if (location == QUDA_CPU_FIELD_LOCATION) strcat(aux, ",cpu");
-      apply(0);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)

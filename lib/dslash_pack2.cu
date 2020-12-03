@@ -203,7 +203,7 @@ public:
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       // enable max shared memory mode on GPUs that support it
-      if (deviceProp.major >= 7) tp.set_max_shared_bytes = true;
+      tp.set_max_shared_bytes = true;
 
       if (in.Nspin() == 4) {
         using Arg = PackArg<Float, nColor, 4, spin_project>;

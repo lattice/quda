@@ -5,6 +5,7 @@
 #include <unistd.h>   // for getpagesize()
 #include <execinfo.h> // for backtrace
 #include <quda_internal.h>
+#include <device.h>
 
 #ifdef USE_QDPJIT
 #include "qdp_quda.h"
@@ -42,20 +43,10 @@ namespace quda
 #endif
     }
 
-    MemAlloc &operator=(const MemAlloc &a)
-    {
-      if (&a != this) {
-        func = a.func;
-        file = a.file;
-        line = a.line;
-        size = a.size;
-        base_size = a.base_size;
-#ifdef QUDA_BACKWARDSCPP
-        st = a.st;
-#endif
-      }
-      return *this;
-    }
+    MemAlloc(const MemAlloc &a) = default;
+    MemAlloc(MemAlloc &&a) = default;
+    virtual ~MemAlloc() = default;
+    MemAlloc &operator=(const MemAlloc &a) = default;
   };
 
   static std::map<void *, MemAlloc> alloc[N_ALLOC_TYPE];
@@ -147,12 +138,12 @@ namespace quda
 
     a.size = size;
 
-#if (CUDA_VERSION > 4000)                                                                                              \
-  && 0 // we need to manually align to page boundaries to allow us to bind a texture to mapped memory
+#if 0
     a.base_size = size;
     ptr = malloc(size);
     if (!ptr) {
 #else
+    // we need to manually align to page boundaries to allow us to bind a texture to mapped memory
     static int page_size = 2 * getpagesize();
     a.base_size = ((size + page_size - 1) / page_size) * page_size; // round up to the nearest multiple of page_size
     int align = posix_memalign(&ptr, page_size, a.base_size);
@@ -175,7 +166,8 @@ namespace quda
         warningQuda("Using managed memory for CUDA allocations");
         managed = true;
 
-        if (deviceProp.major < 6) warningQuda("Using managed memory on pre-Pascal architecture is limited");
+        if (!device::managed_memory_supported())
+          warningQuda("Target device does not report supporting managed memory");
       }
 
       init = true;

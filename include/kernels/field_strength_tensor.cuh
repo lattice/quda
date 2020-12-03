@@ -18,9 +18,9 @@ namespace quda
     G u;
     F f;
 
-    dim3 threads; // number of active threads required
     int X[4];    // grid dimensions
     int border[4];
+    dim3 threads; // number of active threads required
 
     FmunuArg(GaugeField &f, const GaugeField &u) :
       u(u),

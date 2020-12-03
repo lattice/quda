@@ -18,23 +18,24 @@ namespace quda {
     using Gauge = typename gauge_mapper<store_t, recon>::type;
     static constexpr int gauge_dir = gauge_dir_;
 
-    dim3 threads; // number of active threads required
     int X[4]; // grid dimensions
     int border[4];
     Gauge data;
     double2 result;
+    dim3 threads; // number of active threads required
+
     GaugeFixQualityOVRArg(const GaugeField &data) :
-      ReduceArg<double2>(),
-      threads(1, 2, 1),
-      data(data)
+      ReduceArg<double2>(1, true), // reset = true
+      data(data),
+      threads(data.LocalVolumeCB(), 2, 1)
     {
       for ( int dir = 0; dir < 4; ++dir ) {
         X[dir] = data.X()[dir] - data.R()[dir] * 2;
         border[dir] = data.R()[dir];
       }
-      threads.x = X[0]*X[1]*X[2]*X[3]/2;
     }
 
+    __device__ __host__ double2 init() const { return zero<double2>(); }
     double getAction(){ return result.x; }
     double getTheta(){ return result.y; }
   };
@@ -49,9 +50,10 @@ namespace quda {
     /**
      * @brief Measure gauge fixing quality
      */
-    __device__ __host__ inline reduce_t operator()(int x_cb, int parity)
+    template <typename Reducer>
+    __device__ __host__ inline reduce_t operator()(reduce_t &value, Reducer &r, int x_cb, int parity)
     {
-      reduce_t data = make_double2(0.0,0.0);
+      reduce_t data;
       using Link = Matrix<complex<typename Arg::real>, 3>;
 
       int X[4];
@@ -73,7 +75,7 @@ namespace quda {
         delta -= U;
       }
       //18*gauge_dir
-      data.x += -delta(0, 0).x - delta(1, 1).x - delta(2, 2).x;
+      data.x = -delta(0, 0).real() - delta(1, 1).real() - delta(2, 2).real();
       //2
       //load downward links
       for (int mu = 0; mu < Arg::gauge_dir; mu++) {
@@ -85,45 +87,12 @@ namespace quda {
       //18
       SubTraceUnit(delta);
       //12
-      data.y += getRealTraceUVdagger(delta, delta);
+      data.y = getRealTraceUVdagger(delta, delta);
       //35
       //T=36*gauge_dir+65
 
-      return data;
+      return r(data, value);
     }
-  };
-
-  /**
-   * @brief Tunable object for the gauge fixing quality kernel
-   */
-  template <typename Arg>
-  class GaugeFixQuality : TunableReduction2D<> {
-    Arg &arg;
-    const GaugeField &meta;
-
-  public:
-    GaugeFixQuality(Arg &arg, const GaugeField &meta) :
-      TunableReduction2D(meta),
-      arg(arg),
-      meta(meta)
-    { }
-
-    void apply(const qudaStream_t &stream)
-    {
-      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<FixQualityOVR>(tp, stream, arg);
-      auto reset = true; // apply is called multiple times with the same arg instance so we need to reset
-      arg.complete(arg.result, stream, reset);
-      if (!activeTuning()) {
-        comm_allreduce_array((double*)&arg.result, 2);
-        arg.result.x /= (double)(3 * Arg::gauge_dir * 2 * arg.threads.x * comm_size());
-        arg.result.y /= (double)(3 * 2 * arg.threads.x * comm_size());
-      }
-    }
-
-    long long flops() const { return (36LL * Arg::gauge_dir + 65LL) * meta.Volume(); }
-    //long long bytes() const { return (1)*2*gauge_dir*arg.Bytes(); }
-    long long bytes() const { return 2LL * Arg::gauge_dir * meta.Volume() * meta.Reconstruct() * meta.Precision(); }
   };
 
   /**
@@ -326,8 +295,7 @@ namespace quda {
     }
   }
 
-  void PreCalculateLatticeIndices(size_t faceVolume[4], size_t faceVolumeCB[4], int X[4], int border[4],
-                                  int &threads, int *borderpoints[2]);
+  void PreCalculateLatticeIndices(size_t faceVolume[4], int X[4], int border[4], int &threads, int *borderpoints[2]);
 
   template <typename Float, typename Gauge>
   struct GaugeFixBorderPointsArg {
@@ -354,7 +322,7 @@ namespace quda {
         faceVolume[dir] = faceVolume_[dir];
         faceVolumeCB[dir] = faceVolumeCB_[dir];
       }
-      if (comm_partitioned()) PreCalculateLatticeIndices(faceVolume, faceVolumeCB, X, border, threads, borderpoints);
+      if (comm_partitioned()) PreCalculateLatticeIndices(faceVolume, X, border, threads, borderpoints);
     }
   };
 
@@ -496,7 +464,7 @@ namespace quda {
     Cmplx data[9];
     if ( pack ) {
       arg.dataOr.load(data, id, dir, parity);
-      arg.dataOr.reconstruct.Pack(tmp, data, id);
+      arg.dataOr.reconstruct.Pack(tmp, data);
       for ( int i = 0; i < Arg::NElems / 2; ++i ) {
         array[idx + size * i] = Cmplx(tmp[2*i+0], tmp[2*i+1]);
       }
@@ -565,7 +533,7 @@ namespace quda {
     Cmplx data[9];
     if ( pack ) {
       arg.dataOr.load(data, id, dir, parity);
-      arg.dataOr.reconstruct.Pack(tmp, data, id);
+      arg.dataOr.reconstruct.Pack(tmp, data);
       for ( int i = 0; i < Arg::NElems / 2; ++i ) array[idx + size * i] = Cmplx(tmp[2*i+0], tmp[2*i+1]);
     }
     else{

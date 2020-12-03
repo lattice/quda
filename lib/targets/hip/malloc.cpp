@@ -5,6 +5,7 @@
 #include <unistd.h>   // for getpagesize()
 #include <execinfo.h> // for backtrace
 #include <quda_internal.h>
+#include <device.h>
 
 #include <hip/hip_runtime.h>
 #ifdef USE_QDPJIT
@@ -169,9 +170,14 @@ namespace quda
         warningQuda("Using managed memory for HIP allocations");
         managed = true;
 
+<<<<<<< HEAD
 	// Managed memory is nor really recommended on HIP. It is a compatibility feature
 	// presently
 	warningQuda("Managed memory in HIP is a currently inefficient compatibility feature");
+=======
+        if (!device::managed_memory_supported())
+          warningQuda("Target device does not report supporting managed memory");
+>>>>>>> feature/generic_kernel
       }
 
       init = true;
@@ -488,6 +494,7 @@ namespace quda
 
   QudaFieldLocation get_pointer_location(const void *ptr)
   {
+<<<<<<< HEAD
     // This is slow/incomplete
     if ( alloc[DEVICE].find(const_cast<void*>(ptr)) != alloc[DEVICE].end() ) return QUDA_CUDA_FIELD_LOCATION;
     if ( alloc[DEVICE_PINNED].find(const_cast<void*>(ptr)) != alloc[DEVICE_PINNED].end() ) return QUDA_CUDA_FIELD_LOCATION;
@@ -522,6 +529,19 @@ namespace quda
 	   break;
 	}
      };
+=======
+
+    // Unsupported in HIP
+    /*
+    CUpointer_attribute attribute[] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE};
+    CUmemorytype mem_type;
+    void *data[] = {&mem_type};
+    CUresult error = cuPointerGetAttributes(1, attribute, data, reinterpret_cast<CUdeviceptr>(ptr));
+    if (error != CUDA_SUCCESS) {
+      const char *string;
+      cuGetErrorString(error, &string);
+      errorQuda("cuPointerGetAttributes failed with error %s", string);
+>>>>>>> feature/generic_kernel
     }
     else {
       errorQuda("hipPointerGetAttributes() failed with %s (%s:%d in %s()\n)",hipGetErrorString(err), __FILE__, __LINE__, __FUNCTION__);
@@ -529,18 +549,17 @@ namespace quda
     return ret_val;
 #endif
   }
-  
+
   void *get_mapped_device_pointer_(const char *func, const char *file, int line, const void *host)
   {
     void *device;
     auto error = hipHostGetDevicePointer(&device, const_cast<void *>(host), 0);
     if (error != hipSuccess) {
-      errorQuda("hipHostGetDevicePointer failed with error %s (%s:%d in %s()",
-                hipGetErrorString(error), file, line, func);
+      errorQuda("hipHostGetDevicePointer failed with error %s (%s:%d in %s()", hipGetErrorString(error), file, line,
+                func);
     }
     return device;
   }
-
 
   namespace pool
   {

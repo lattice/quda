@@ -40,7 +40,7 @@ namespace quda {
       strcpy(aux2, aux);
       strcat(aux, ",interior");
       kernel = INTERIOR;
-      apply(0);
+      apply(device::get_default_stream());
 
       for (int i=3; i>=0; i--) {
         if (!commDimPartitioned(i)) continue;
@@ -52,7 +52,7 @@ namespace quda {
         else if (dir==3) strcat(aux, ",dir=3");
         kernel = EXTERIOR;
         dir = i;
-        apply(0);
+        apply(device::get_default_stream());
       }
     }
 
@@ -103,14 +103,14 @@ namespace quda {
     qudaDeviceSynchronize();
 
     MemoryLocation location[2*QUDA_MAX_DIM] = {Device, Device, Device, Device, Device, Device, Device, Device};
-    a.pack(1, 1-parity, dag, Nstream-1, location, Device);
+    a.pack(1, 1-parity, dag, device::get_default_stream(), location, Device);
 
     qudaDeviceSynchronize();
 
     for (int i=3; i>=0; i--) {
       if (commDimPartitioned(i)) {
 	// Initialize the host transfer from the source spinor
-	a.gather(1, dag, 2*i);
+	a.gather(1, dag, 2*i, device::get_stream(2*i));
       } // commDim(i)
     } // i=3,..,0
 
@@ -118,14 +118,14 @@ namespace quda {
 
     for (int i=3; i>=0; i--) {
       if (commDimPartitioned(i)) {
-	a.commsStart(1, 2*i, dag);
+	a.commsStart(1, 2*i, dag, device::get_stream(2 * i));
       }
     }
 
     for (int i=3; i>=0; i--) {
       if (commDimPartitioned(i)) {
-	a.commsWait(1, 2*i, dag);
-	a.scatter(1, dag, 2*i);
+	a.commsWait(2*i, device::get_stream(2*i));
+	a.scatter(2*i, device::get_stream(2*i));
       }
     }
 
@@ -136,10 +136,10 @@ namespace quda {
     comm_barrier();
   }
 
+#ifdef GPU_CLOVER_DIRAC
   void computeCloverForce(GaugeField &force, const GaugeField &U, std::vector<ColorSpinorField *> &x,
                           std::vector<ColorSpinorField *> &p, std::vector<double> &coeff)
   {
-#ifdef GPU_CLOVER_DIRAC
     checkNative(*x[0], *p[0], force, U);
     checkPrecision(*x[0], *p[0], force, U);
 
@@ -163,10 +163,13 @@ namespace quda {
         instantiate<CloverForce, ReconstructNo12>(U, force, inA, inB, inC, inD, parity, coeff[i]);
       }
     }
+  }
 #else // GPU_CLOVER_DIRAC not defined
-   errorQuda("Clover Dirac operator has not been built!");
+  void computeCloverForce(GaugeField &, const GaugeField &, std::vector<ColorSpinorField *> &,
+                          std::vector<ColorSpinorField *> &, std::vector<double> &)
+  {
+    errorQuda("Clover Dirac operator has not been built!");
+  }
 #endif
-
-  } // computeCloverForce
 
 } // namespace quda

@@ -165,7 +165,7 @@ namespace quda {
     dim3 threads;     // number of active threads required
 
     GaugeFixQualityFFTArg(const GaugeField &data, complex<real> *delta) :
-      ReduceArg<double2>(),
+      ReduceArg<double2>(1, true), // reset = true
       data(data),
       delta(delta),
       volume(data.Volume()),
@@ -173,6 +173,8 @@ namespace quda {
     {
       for (int dir = 0; dir < 4; dir++) X[dir] = data.X()[dir];
     }
+
+    __device__ __host__ double2 init() const { return zero<double2>(); }
     double getAction() { return result.x; }
     double getTheta() { return result.y; }
   };
@@ -187,9 +189,10 @@ namespace quda {
     /**
      * @brief Measure gauge fixing quality
      */
-    __device__ __host__ inline reduce_t operator()(int x_cb, int parity)
+    template <typename Reducer>
+    __device__ __host__ inline reduce_t operator()(reduce_t &value, Reducer &r, int x_cb, int parity)
     {
-      reduce_t data = make_double2(0.0,0.0);
+      reduce_t data;
       using matrix = Matrix<complex<typename Arg::real>, 3>;
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
@@ -201,7 +204,7 @@ namespace quda {
         delta -= U;
       }
       //18*gauge_dir
-      data.x += -delta(0, 0).x - delta(1, 1).x - delta(2, 2).x;
+      data.x = -delta(0, 0).x - delta(1, 1).x - delta(2, 2).x;
       //2
       for (int mu = 0; mu < Arg::gauge_dir; mu++) {
         matrix U = arg.data(mu, linkIndexM1(x, arg.X, mu), 1 - parity);
@@ -223,11 +226,11 @@ namespace quda {
       arg.delta[idx + 5 * arg.volume] = delta(2,2);
 
       //12
-      data.y += getRealTraceUVdagger(delta, delta);
+      data.y = getRealTraceUVdagger(delta, delta);
 
       //35
       //T=36*gauge_dir+65
-      return data;
+      return r(data, value);
     }
   };
 

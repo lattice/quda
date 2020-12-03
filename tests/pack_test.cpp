@@ -2,10 +2,7 @@
 #include <stdlib.h>
 #include <iostream>
 
-#include <quda_internal.h>
 #include <gauge_field.h>
-#include <util_quda.h>
-
 #include <host_utils.h>
 #include <command_line_params.h>
 #include <dslash_reference.h>

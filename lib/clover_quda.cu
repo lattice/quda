@@ -21,8 +21,7 @@ namespace quda {
       meta(f)
     {
       checkNative(clover, f);
-      apply(0);
-      qudaDeviceSynchronize();
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)
@@ -35,14 +34,17 @@ namespace quda {
     long long bytes() const { return 2*arg.threads.x*(6*arg.f.Bytes() + arg.clover.Bytes()); }
   };
 
+#ifdef GPU_CLOVER_DIRAC
   void computeClover(CloverField &clover, const GaugeField& f, double coeff)
   {
-#ifdef GPU_CLOVER_DIRAC
     instantiate<ComputeClover>(clover, f, coeff);
-#else
-    errorQuda("Clover has not been built");
-#endif
   }
+#else
+  void computeClover(CloverField &, const GaugeField &, double)
+  {
+    errorQuda("Clover has not been built");
+  }
+#endif
 
 } // namespace quda
 

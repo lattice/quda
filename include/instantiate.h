@@ -68,7 +68,7 @@ namespace quda
   template <template <typename, int, QudaReconstructType> class Apply, typename Float, int nColor,
             QudaReconstructType recon, typename G, typename... Args>
   struct instantiateApply<false, Apply, Float, nColor, recon, G, Args...> {
-    instantiateApply(G &U, Args &&... args)
+    instantiateApply(G &, Args &&...)
     {
       errorQuda("QUDA_RECONSTRUCT=%d does not enable %d", QUDA_RECONSTRUCT, recon);
     }
@@ -150,10 +150,6 @@ namespace quda
     }
   }
 
-#if defined(__CUDA_ARCH__) && __CUDACC_VER_MAJOR__ <= 9
-#define constexpr
-#endif
-
   /**
      @brief This instantiate function is used to instantiate the clover precision
      @param[in] c CloverField we wish to instantiate
@@ -207,11 +203,6 @@ namespace quda
     }
   }
 
-#if defined(__CUDA_ARCH__) && __CUDACC_VER_MAJOR__ <= 9
-#undef constexpr
-#define constexpr constexpr
-#endif
-
   /**
      @brief This instantiate function is used to instantiate the
      precision and number of colors
@@ -262,7 +253,7 @@ namespace quda
      computation at hand
   */
   template <template <typename> class Apply, typename F, typename... Args>
-  constexpr void instantiatePrecision(F &field, Args &&... args)
+  constexpr void instantiatePrecision(F &field, Args &&...args)
   {
     if (field.Precision() == QUDA_DOUBLE_PRECISION) {
       // always instantiate double precision
@@ -307,7 +298,7 @@ namespace quda
      computation at hand
   */
   template <template <typename, typename> class Apply, typename T, typename F, typename... Args>
-  constexpr void instantiatePrecision2(F &field, Args &&... args)
+  constexpr void instantiatePrecision2(F &field, Args &&...args)
   {
     if (field.Precision() == QUDA_DOUBLE_PRECISION) {
       // always instantiate double precision
@@ -343,7 +334,7 @@ namespace quda
      computation at hand
   */
   template <template <typename> class Apply, typename F, typename... Args>
-  constexpr void instantiatePrecisionMG(F &field, Args &&... args)
+  constexpr void instantiatePrecisionMG(F &field, Args &&...args)
   {
     if (field.Precision() == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE

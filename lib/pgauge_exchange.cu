@@ -14,7 +14,6 @@ namespace quda {
   static void *sendg_d[4];
   static void *recvg_d[4];
   static void *hostbuffer_h[4];
-  static qudaStream_t GFStream[2];
   static MsgHandle *mh_recv_back[4];
   static MsgHandle *mh_recv_fwd[4];
   static MsgHandle *mh_send_fwd[4];
@@ -29,8 +28,11 @@ namespace quda {
   {
     if (comm_partitioned()) {
       if (init) {
+<<<<<<< HEAD
         qudaStreamDestroy(GFStream[0]);
         qudaStreamDestroy(GFStream[1]);
+=======
+>>>>>>> feature/generic_kernel
         for (int d = 0; d < 4; d++ ) {
           if (commDimPartitioned(d)) {
             comm_free(mh_send_fwd[d]);
@@ -86,8 +88,11 @@ namespace quda {
         X = (int*)safe_malloc(4 * sizeof(int));
         for (int d = 0; d < 4; d++) X[d] = U.X()[d];
 
+<<<<<<< HEAD
         qudaStreamCreate(&GFStream[0]);
         qudaStreamCreate(&GFStream[1]);
+=======
+>>>>>>> feature/generic_kernel
         for (int d = 0; d < 4; d++ ) {
           if (!commDimPartitioned(d)) continue;
           // store both parities and directions in each
@@ -117,6 +122,7 @@ namespace quda {
         }
       }
 
+      qudaDeviceSynchronize();
       for (int d = 0; d < 4; d++) {
         if (!commDimPartitioned(d)) continue;
         comm_start(mh_recv_back[d]);
@@ -131,42 +137,55 @@ namespace quda {
         arg.pack = true;
         arg.array = reinterpret_cast<complex<Float>*>(send_d[d]); 
         arg.borderid = X[d] - U.R()[d] - 1;
-        apply(GFStream[0]);
+        apply(device::get_stream(0));
 
         //extract bottom
         arg.array = reinterpret_cast<complex<Float>*>(sendg_d[d]);
         arg.borderid = U.R()[d];
-        apply(GFStream[1]);
+        apply(device::get_stream(1));
 
+<<<<<<< HEAD
         qudaMemcpyAsync(send[d], send_d[d], bytes[d], qudaMemcpyDeviceToHost, GFStream[0]);
         qudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], qudaMemcpyDeviceToHost, GFStream[1]);
+=======
+        qudaMemcpyAsync(send[d], send_d[d], bytes[d], cudaMemcpyDeviceToHost, device::get_stream(0));
+        qudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], cudaMemcpyDeviceToHost, device::get_stream(1));
+>>>>>>> feature/generic_kernel
 
-        qudaStreamSynchronize(GFStream[0]);
+        qudaStreamSynchronize(device::get_stream(0));
         comm_start(mh_send_fwd[d]);
 
-        qudaStreamSynchronize(GFStream[1]);
+        qudaStreamSynchronize(device::get_stream(1));
         comm_start(mh_send_back[d]);
 
         comm_wait(mh_recv_back[d]);
+<<<<<<< HEAD
         qudaMemcpyAsync(recv_d[d], recv[d], bytes[d], qudaMemcpyHostToDevice, GFStream[0]);
+=======
+        qudaMemcpyAsync(recv_d[d], recv[d], bytes[d], cudaMemcpyHostToDevice, device::get_stream(0));
+>>>>>>> feature/generic_kernel
 
         // insert
         arg.pack = false;
         arg.array = reinterpret_cast<complex<Float>*>(recv_d[d]);
         arg.borderid = U.R()[d] - 1;
-        apply(GFStream[0]);
+        apply(device::get_stream(0));
 
         comm_wait(mh_recv_fwd[d]);
+<<<<<<< HEAD
         qudaMemcpyAsync(recvg_d[d], recvg[d], bytes[d], qudaMemcpyHostToDevice, GFStream[1]);
+=======
+        qudaMemcpyAsync(recvg_d[d], recvg[d], bytes[d], cudaMemcpyHostToDevice, device::get_stream(1));
+>>>>>>> feature/generic_kernel
 
         arg.array = reinterpret_cast<complex<Float>*>(recvg_d[d]);
         arg.borderid = X[d] - U.R()[d];
-        apply(GFStream[1]);
+        apply(device::get_stream(1));
 
         comm_wait(mh_send_back[d]);
         comm_wait(mh_send_fwd[d]);
-        qudaStreamSynchronize(GFStream[0]);
-        qudaStreamSynchronize(GFStream[1]);
+        qudaStreamSynchronize(device::get_stream(0));
+        qudaStreamSynchronize(device::get_stream(1));
       }
       qudaDeviceSynchronize();
     }
@@ -175,7 +194,7 @@ namespace quda {
     {
       std::stringstream aux2(aux);
       aux2 << aux << ",dim=" << dim_str[arg.face] << ",geo_dir=" << dim_str[arg.dir] << (arg.pack ? ",extract" : ",insert");
-      return TuneKey(field.VolString(), typeid(*this).name(), aux2.str().c_str());
+      return TuneKey(vol, typeid(*this).name(), aux2.str().c_str());
     }
 
     void apply(const qudaStream_t &stream)
@@ -188,12 +207,16 @@ namespace quda {
     long long bytes() const { return 2 * U.SurfaceCB(arg.face) * U.Reconstruct() * U.Precision(); }
   };
 
+#ifdef GPU_GAUGE_ALG
   void PGaugeExchange(GaugeField& U, const int dir, const int parity)
   {
-#ifdef GPU_GAUGE_ALG
     if (comm_partitioned()) instantiate<PGaugeExchanger>(U, dir, parity);
-#else
-    errorQuda("Pure gauge code has not been built");
-#endif
   }
+#else
+  void PGaugeExchange(GaugeField&, const int, const int)
+  {
+    errorQuda("Pure gauge code has not been built");
+  }
+#endif
+
 }

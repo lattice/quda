@@ -22,7 +22,7 @@ namespace quda {
       arg(lng, u, coeff)
     {
       strcat(aux, comm_dim_partitioned_string());
-      apply(0);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream) {
@@ -50,7 +50,7 @@ namespace quda {
       arg(fat, u, coeff)
     {
       strcat(aux, comm_dim_partitioned_string());
-      apply(0);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream) {
@@ -114,7 +114,7 @@ namespace quda {
         if (i==nu || i==dir1 || i==dir2) continue; // skip these dimensions
         mu_map[j++] = i;
       }
-      assert(j == threads().z);
+      assert((unsigned)j == threads().z);
 
       if (mulink.Reconstruct() != QUDA_RECONSTRUCT_12) strcat(aux, ",mulink_recon=12");
       strcat(aux, comm_dim_partitioned_string());
@@ -122,7 +122,7 @@ namespace quda {
       aux_ << ",nu=" << nu << ",dir1=" << dir1 << ",dir2=" << dir2 << ",save=" << save_staple;
       strcat(aux, aux_.str().c_str());
 
-      apply(0);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream) {
@@ -165,9 +165,9 @@ namespace quda {
     instantiate<Staple, ReconstructNo12>(u, fat, staple, mulink, nu, dir1, dir2, coeff, save_staple);
   }
 
+#ifdef GPU_FATLINK
   void fatLongKSLink(GaugeField *fat, GaugeField *lng, const GaugeField& u, const double *coeff)
   {
-#ifdef GPU_FATLINK
     GaugeFieldParam gParam(u);
     gParam.reconstruct = QUDA_RECONSTRUCT_NO;
     gParam.setPrecision(gParam.Precision());
@@ -212,14 +212,15 @@ namespace quda {
       } //nu
     }
 
-    qudaDeviceSynchronize();
-
     delete staple;
     delete staple1;
-#else
-    errorQuda("Fat-link computation not enabled");
-#endif
   }
+#else
+  void fatLongKSLink(GaugeField *, GaugeField *, const GaugeField&, const double *)
+  {
+    errorQuda("Fat-link computation not enabled");
+  }
+#endif
 
 #undef MIN_COEFF
 

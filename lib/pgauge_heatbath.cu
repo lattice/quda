@@ -94,12 +94,12 @@ namespace quda {
       //NEED TO CHECK THIS!!!!!!
       if ( nColor == 3 ) {
         long long byte = 20LL * recon * sizeof(Float);
-        if (heatbath) byte += 2LL * sizeof(cuRNGState);
+        if (heatbath) byte += 2LL * sizeof(RNGState);
         byte *= U.LocalVolumeCB();
         return byte;
       } else {
         long long byte = 20LL * nColor * nColor * 2 * sizeof(Float);
-        if (heatbath) byte += 2LL * sizeof(cuRNGState);
+        if (heatbath) byte += 2LL * sizeof(RNGState);
         byte *= U.LocalVolumeCB();
         return byte;
       }
@@ -118,7 +118,7 @@ namespace quda {
         for ( int parity = 0; parity < 2; ++parity ) {
           for ( int mu = 0; mu < 4; ++mu ) {
             hb.set_param(mu, parity, true);
-            hb.apply(0);
+            hb.apply(device::get_default_stream());
             PGaugeExchange(data, mu, parity);
           }
         }
@@ -138,7 +138,7 @@ namespace quda {
         for ( int parity = 0; parity < 2; ++parity ) {
           for ( int mu = 0; mu < 4; ++mu ) {
             relax.set_param(mu, parity, false);
-            relax.apply(0);
+            relax.apply(device::get_default_stream());
             PGaugeExchange(data, mu, parity);
           }
         }
@@ -162,12 +162,16 @@ namespace quda {
    * @param[in] nhb number of heatbath steps
    * @param[in] nover number of overrelaxation steps
    */
-  void Monte(GaugeField& data, RNG &rngstate, double Beta, int nhb, int nover) {
 #ifdef GPU_GAUGE_ALG
+  void Monte(GaugeField& data, RNG &rngstate, double Beta, int nhb, int nover)
+  {
     instantiate<MonteAlg>(data, rngstate, (float)Beta, nhb, nover);
-#else
-    errorQuda("Pure gauge code has not been built");
-#endif // GPU_GAUGE_ALG
   }
+#else
+  void Monte(GaugeField &, RNG &, double, int, int)
+  {
+    errorQuda("Pure gauge code has not been built");
+  }
+#endif // GPU_GAUGE_ALG
 
 }

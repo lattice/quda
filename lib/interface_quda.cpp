@@ -33,9 +33,7 @@
 #include <deflation.h>
 #include <ks_force_quda.h>
 
-#ifdef GPU_GAUGE_FORCE
 #include <gauge_force_quda.h>
-#endif
 #include <gauge_update_quda.h>
 
 #define MAX(a,b) ((a)>(b)? (a):(b))
@@ -50,6 +48,7 @@
 #define CHECK_PARAM
 #include "check_params.h"
 #undef CHECK_PARAM
+void checkBLASParam(QudaBLASParam &param) { checkBLASParam(&param); }
 
 // define printQudaGaugeParam() and printQudaInvertParam()
 #define PRINT_PARAM
@@ -58,7 +57,6 @@
 
 #include <gauge_tools.h>
 #include <contract_quda.h>
-
 #include <momentum.h>
 
 using namespace quda;
@@ -217,6 +215,10 @@ static TimeProfile profilePhase("staggeredPhaseQuda");
 //!< Profiler for contractions
 static TimeProfile profileContract("contractQuda");
 
+//!< Profiler for GEMM and other BLAS
+static TimeProfile profileBLAS("blasQuda");
+TimeProfile &getProfileBLAS() { return profileBLAS; }
+
 //!< Profiler for covariant derivative
 static TimeProfile profileCovDev("covDevQuda");
 
@@ -339,7 +341,7 @@ static int lex_rank_from_coords(const int *coords, void *fdata)
 /**
  * For QMP, we use the existing logical topology if already declared.
  */
-static int qmp_rank_from_coords(const int *coords, void *fdata)
+static int qmp_rank_from_coords(const int *coords, void *)
 {
   return QMP_get_node_number_from(coords);
 }
@@ -353,13 +355,15 @@ MPI_Comm MPI_COMM_HANDLE;
 static int user_set_comm_handle = 0;
 #endif
 
+#if defined(QMP_COMMS) || defined(MPI_COMMS)
 void setMPICommHandleQuda(void *mycomm)
 {
-#if defined(QMP_COMMS) || defined(MPI_COMMS)
   MPI_COMM_HANDLE = *((MPI_Comm *)mycomm);
   user_set_comm_handle = 1;
-#endif
 }
+#else
+void setMPICommHandleQuda(void *) {}
+#endif
 
 #ifdef QMP_COMMS
 static void initQMPComms(void)
@@ -528,6 +532,7 @@ void initQudaMemory()
   device::create_context();
   createDslashEvents();
 
+  blas_lapack::native::init();
   blas::init();
 
   // initalize the memory pool allocators
@@ -1148,7 +1153,7 @@ void freeSloppyGaugeQuda()
 
   // Delete gaugeSloppy if it does not alias gaugePrecise.
   if (gaugeSloppy != gaugePrecise && gaugeSloppy) delete gaugeSloppy;
-  
+
   gaugeEigensolver = nullptr;
   gaugeRefinement = nullptr;
   gaugePrecondition = nullptr;
@@ -1442,11 +1447,23 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
 void freeSloppyCloverQuda()
 {
   if (!initialized) errorQuda("QUDA not initialized");
+
+  // Delete cloverRefinement if it does not alias gaugeSloppy.
   if (cloverRefinement != cloverSloppy && cloverRefinement) delete cloverRefinement;
-  if (cloverPrecondition != cloverSloppy && cloverPrecondition != cloverPrecise && cloverPrecondition)
+
+  // Delete cloverPrecondition if it does not alias cloverPrecise, cloverSloppy, or cloverEigensolver.
+  if (cloverPrecondition != cloverSloppy && cloverPrecondition != cloverPrecise
+      && cloverPrecondition != cloverEigensolver && cloverPrecondition)
     delete cloverPrecondition;
+
+  // Delete cloverEigensolver if it does not alias cloverPrecise or cloverSloppy.
+  if (cloverEigensolver != cloverSloppy && cloverEigensolver != cloverPrecise && cloverEigensolver)
+    delete cloverEigensolver;
+
+  // Delete cloverSloppy if it does not alias cloverPrecise.
   if (cloverSloppy != cloverPrecise && cloverSloppy) delete cloverSloppy;
 
+  cloverEigensolver = nullptr;
   cloverRefinement = nullptr;
   cloverPrecondition = nullptr;
   cloverSloppy = nullptr;
@@ -1482,7 +1499,7 @@ void endQuda(void)
   freeGaugeQuda();
   freeCloverQuda();
 
-  for (int i=0; i<QUDA_MAX_CHRONO; i++) flushChronoQuda(i);
+  for (int i = 0; i < QUDA_MAX_CHRONO; i++) flushChronoQuda(i);
 
   for (auto v : solutionResident) if (v) delete v;
   solutionResident.clear();
@@ -1536,6 +1553,7 @@ void endQuda(void)
     profileStaggeredForce.Print();
     profileHISQForce.Print();
     profileContract.Print();
+    profileBLAS.Print();
     profileCovDev.Print();
     profilePlaq.Print();
     profileGaugeObs.Print();
@@ -2406,7 +2424,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   cudaParam.create = QUDA_ZERO_FIELD_CREATE;
   cudaParam.setPrecision(inv_param->cuda_prec_eigensolver, inv_param->cuda_prec_eigensolver, true);
   // Ensure device vectors qre in UKQCD basis for Wilson type fermions
-  if(cudaParam.nSpin != 1) cudaParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+  if (cudaParam.nSpin != 1) cudaParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 
   std::vector<Complex> evals(eig_param->n_conv, 0.0);
   std::vector<ColorSpinorField *> kSpace;
@@ -2415,10 +2433,19 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   // If you use polynomial acceleration on a non-symmetric matrix,
   // the solver will fail.
   if (eig_param->use_poly_acc && !eig_param->use_norm_op && !(inv_param->dslash_type == QUDA_LAPLACE_DSLASH)) {
-    // Breaking up the boolean check a little bit. If it's a staggered dslash type and a PC type, we can use poly accel.
+    // Breaking up the boolean check a little bit. If it's a staggered dslash type and a PC type, we can use poly acceleration.
     if (!((inv_param->dslash_type == QUDA_STAGGERED_DSLASH || inv_param->dslash_type == QUDA_ASQTAD_DSLASH) && inv_param->solve_type == QUDA_DIRECT_PC_SOLVE)) {
       errorQuda("Polynomial acceleration with non-symmetric matrices not supported");
     }
+  }
+
+  // If you attempt to compute part of the the imaginary spectrum of a symmetric matrix,
+  // the solver will fail.
+  if ((eig_param->spectrum == QUDA_SPECTRUM_LI_EIG || eig_param->spectrum == QUDA_SPECTRUM_SI_EIG)
+      && ((eig_param->use_norm_op || (inv_param->dslash_type == QUDA_LAPLACE_DSLASH))
+          || ((inv_param->dslash_type == QUDA_STAGGERED_DSLASH || inv_param->dslash_type == QUDA_ASQTAD_DSLASH)
+              && inv_param->solve_type == QUDA_DIRECT_PC_SOLVE))) {
+    errorQuda("Cannot compute imaginary spectra with a hermitian operator");
   }
 
   profileEigensolve.TPSTOP(QUDA_PROFILE_INIT);
@@ -2556,7 +2583,7 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   csParam.mem_type = mg_param.setup_minimize_memory == QUDA_BOOLEAN_TRUE ? QUDA_MEMORY_MAPPED : QUDA_MEMORY_DEVICE;
   B.resize(mg_param.n_vec[0]);
 
-  if (mg_param.is_staggered == QUDA_BOOLEAN_TRUE) {
+  if (mg_param.transfer_type[0] == QUDA_TRANSFER_COARSE_KD || mg_param.transfer_type[0] == QUDA_TRANSFER_OPTIMIZED_KD) {
     // Create the ColorSpinorField as a "container" for metadata.
     csParam.create = QUDA_REFERENCE_FIELD_CREATE;
 
@@ -3981,9 +4008,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   profilerStop(__func__);
 }
 
-void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink, double *path_coeff, QudaGaugeParam *param) {
-
-#ifdef GPU_FATLINK
+void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink, double *path_coeff, QudaGaugeParam *param)
+{
   profileFatLink.TPSTART(QUDA_PROFILE_TOTAL);
   profileFatLink.TPSTART(QUDA_PROFILE_INIT);
 
@@ -4063,27 +4089,11 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
   profileFatLink.TPSTOP(QUDA_PROFILE_FREE);
 
   profileFatLink.TPSTOP(QUDA_PROFILE_TOTAL);
-#else
-  errorQuda("Fat-link has not been built");
-#endif // GPU_FATLINK
-}
-
-int getGaugePadding(GaugeFieldParam& param){
-  int pad = 0;
-#ifdef MULTI_GPU
-  int volume = param.x[0]*param.x[1]*param.x[2]*param.x[3];
-  int face_size[4];
-  for(int dir=0; dir<4; ++dir) face_size[dir] = (volume/param.x[dir])/2;
-  pad = *std::max_element(face_size, face_size+4);
-#endif
-
-  return pad;
 }
 
 int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int* path_length,
 			  double* loop_coeff, int num_paths, int max_length, double eb3, QudaGaugeParam* qudaGaugeParam)
 {
-#ifdef GPU_GAUGE_FORCE
   profileGaugeForce.TPSTART(QUDA_PROFILE_TOTAL);
   profileGaugeForce.TPSTART(QUDA_PROFILE_INIT);
 
@@ -4197,10 +4207,6 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   profileGaugeForce.TPSTOP(QUDA_PROFILE_FREE);
 
   profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
-
-#else
-  errorQuda("Gauge force has not been built");
-#endif // GPU_GAUGE_FORCE
   return 0;
 }
 
@@ -4330,7 +4336,7 @@ void destroyGaugeFieldQuda(void* gauge){
 }
 
 
-void computeStaggeredForceQuda(void* h_mom, double dt, double delta, void *h_force, void **x,
+void computeStaggeredForceQuda(void* h_mom, double dt, double delta, void *h_force, void **,
 			       QudaGaugeParam *gauge_param, QudaInvertParam *inv_param)
 {
   profileStaggeredForce.TPSTART(QUDA_PROFILE_TOTAL);
@@ -4503,7 +4509,6 @@ void computeHISQForceQuda(void* const milc_momentum,
                           double **coeff,
                           QudaGaugeParam* gParam)
 {
-#ifdef  GPU_STAGGERED_OPROD
   using namespace quda;
   using namespace quda::fermion_force;
   profileHISQForce.TPSTART(QUDA_PROFILE_TOTAL);
@@ -4735,17 +4740,13 @@ void computeHISQForceQuda(void* const milc_momentum,
   profileHISQForce.TPSTOP(QUDA_PROFILE_FREE);
 
   profileHISQForce.TPSTOP(QUDA_PROFILE_TOTAL);
-
-#else
-  errorQuda("HISQ force has not been built");
-#endif
 }
 
-void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
+void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **,
 			    double *coeff, double kappa2, double ck,
-			    int nvector, double multiplicity, void *gauge,
-			    QudaGaugeParam *gauge_param, QudaInvertParam *inv_param) {
-
+			    int nvector, double multiplicity, void *,
+			    QudaGaugeParam *gauge_param, QudaInvertParam *inv_param)
+{
   using namespace quda;
   profileCloverForce.TPSTART(QUDA_PROFILE_TOTAL);
   profileCloverForce.TPSTART(QUDA_PROFILE_INIT);
@@ -5048,6 +5049,7 @@ void updateGaugeFieldQuda(void* gauge,
    if (param->use_resident_gauge) {
      if (!gaugePrecise) errorQuda("No resident gauge field to use");
      cudaGauge = gaugePrecise;
+     gaugePrecise = nullptr;
    } else {
      profileProject.TPSTART(QUDA_PROFILE_H2D);
      cudaGauge->loadCPUField(*cpuGauge);
@@ -5403,7 +5405,6 @@ void kinetic_quda_(double *kin, void* momentum, QudaGaugeParam* param) {
 /**
  * BQCD wants a node mapping with x varying fastest.
  */
-#ifdef MULTI_GPU
 static int bqcd_rank_from_coords(const int *coords, void *fdata)
 {
   int *dims = static_cast<int *>(fdata);
@@ -5414,13 +5415,10 @@ static int bqcd_rank_from_coords(const int *coords, void *fdata)
   }
   return rank;
 }
-#endif
 
 void comm_set_gridsize_(int *grid)
 {
-#ifdef MULTI_GPU
   initCommsGridQuda(4, grid, bqcd_rank_from_coords, static_cast<void *>(grid));
-#endif
 }
 
 /**
@@ -5450,7 +5448,7 @@ void gaussGaugeQuda(unsigned long long seed, double sigma)
   profileGauss.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   if (extendedGaugeResident) {
-    *extendedGaugeResident = *gaugePrecise;
+    extendedGaugeResident->copy(*gaugePrecise);
     extendedGaugeResident->exchangeExtendedGhost(R, profileGauss, redundant_comms);
   }
 
@@ -5866,7 +5864,7 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
     delete cudaInGauge;
   }
 
-  if(timeinfo){
+  if (timeinfo) {
     timeinfo[0] = GaugeFixFFTQuda.Last(QUDA_PROFILE_H2D);
     timeinfo[1] = GaugeFixFFTQuda.Last(QUDA_PROFILE_COMPUTE);
     timeinfo[2] = GaugeFixFFTQuda.Last(QUDA_PROFILE_D2H);

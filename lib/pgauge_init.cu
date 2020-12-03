@@ -19,7 +19,7 @@ namespace quda {
       TunableKernel2D(U, 2),
       U(U)
     {
-      apply(0);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)
@@ -44,7 +44,7 @@ namespace quda {
       U(U),
       rng(rng)
     {
-      apply(0);
+      apply(device::get_default_stream());
       qudaDeviceSynchronize();
       U.exchangeExtendedGhost(U.R(),false);
     }
@@ -61,6 +61,7 @@ namespace quda {
     long long bytes() const { return U.Bytes(); }
   };
 
+#ifdef GPU_GAUGE_ALG
   /**
    * @brief Perform a cold start to the gauge field, identity SU(3)
    * matrix, also fills the ghost links in multi-GPU case (no need to
@@ -70,11 +71,7 @@ namespace quda {
    */
   void InitGaugeField(GaugeField& data)
   {
-#ifdef GPU_GAUGE_ALG
     instantiate<InitGaugeCold>(data);
-#else
-    errorQuda("Pure gauge code has not been built");
-#endif
   }
 
   /** @brief Perform a hot start to the gauge field, random SU(3)
@@ -86,11 +83,11 @@ namespace quda {
    */
   void InitGaugeField(GaugeField& data, RNG &rngstate)
   {
-#ifdef GPU_GAUGE_ALG
     instantiate<InitGaugeHot>(data, rngstate);
-#else
-    errorQuda("Pure gauge code has not been built");
-#endif
   }
+#else
+  void InitGaugeField(GaugeField&) { errorQuda("Pure gauge code not built"); }
+  void InitGaugeField(GaugeField&, RNG &) { errorQuda("Pure gauge code not built"); }
+#endif
 
 }

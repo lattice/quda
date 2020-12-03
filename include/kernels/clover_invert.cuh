@@ -30,6 +30,8 @@ namespace quda
     {
       if (!field.isNative()) errorQuda("Clover field %d order not supported", field.Order());
     }
+
+    __device__ __host__ auto init() const { return zero<double2>(); }
   };
 
   template <typename Arg> struct InvertClover {
@@ -42,7 +44,8 @@ namespace quda
     /**
        Use a Cholesky decomposition and invert the clover matrix
     */
-    __device__ __host__ inline reduce_t operator()(int x_cb, int parity)
+    template <typename Reducer>
+    __device__ __host__ inline reduce_t operator()(reduce_t &value, Reducer &r, int x_cb, int parity)
     {
       using real = typename Arg::real;
       constexpr int N = Arg::nColor * Arg::nSpin / 2;
@@ -71,7 +74,7 @@ namespace quda
 
       reduce_t result;
       parity ? result.y = trLogA : result.x = trLogA;
-      return result;
+      return r(result, value);
     }
 
   };

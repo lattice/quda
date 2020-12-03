@@ -1,6 +1,6 @@
 #include <quda_matrix.h>
 #include <gauge_field_order.h>
-#include <random_quda.h>
+#include <random_helper.h>
 #include <index_helper.cuh>
 #include <kernel.h>
 
@@ -50,9 +50,9 @@ namespace quda {
     using real = typename mapper<Float>::type;
     using Gauge = typename gauge_mapper<real, recon>::type;
     int X[4]; // grid dimensions
+    Gauge U;
     RNG rng;
     int border[4];
-    Gauge U;
     dim3 threads; // number of active threads required
     InitGaugeHotArg(const GaugeField &U, RNG &rng) :
       rng(rng),
@@ -114,13 +114,13 @@ namespace quda {
      @return four real numbers of the SU(2) matrix
   */
   template <class T>
-  __device__ static inline Matrix<T,2> randomSU2(cuRNGState& localState){
+  __device__ static inline Matrix<T,2> randomSU2(RNGState& localState){
     Matrix<T,2> a;
     T aabs, ctheta, stheta, phi;
-    a(0,0) = Random<T>(localState, (T)-1.0, (T)1.0);
+    a(0,0) = uniform<T>::rand(localState, (T)-1.0, (T)1.0);
     aabs = sqrt( 1.0 - a(0,0) * a(0,0));
-    ctheta = Random<T>(localState, (T)-1.0, (T)1.0);
-    phi = PII * Random<T>(localState);
+    ctheta = uniform<T>::rand(localState, (T)-1.0, (T)1.0);
+    phi = PII * uniform<T>::rand(localState);
 
     // Was   xurand(*localState>& 1 ? 1 : -1
     // which presumably just selects when the lowest bit is 1 or 0 with 50% probability each
@@ -180,13 +180,13 @@ namespace quda {
      @return SU(Nc) matrix
   */
   template <class Float, int NCOLORS>
-  __device__ inline Matrix<complex<Float>,NCOLORS> randomize( cuRNGState& localState )
+  __device__ inline Matrix<complex<Float>,NCOLORS> randomize( RNGState& localState )
   {
     Matrix<complex<Float>,NCOLORS> U;
 
     for ( int i = 0; i < NCOLORS; i++ )
       for ( int j = 0; j < NCOLORS; j++ )
-        U(i,j) = complex<Float>( (Float)(Random<Float>(localState) - 0.5), (Float)(Random<Float>(localState) - 0.5) );
+        U(i,j) = complex<Float>( (Float)(uniform<Float>::rand(localState) - 0.5), (Float)(uniform<Float>::rand(localState) - 0.5) );
     reunit_link<Float>(U);
     return U;
 
@@ -210,7 +210,7 @@ namespace quda {
       int X[4], x[4];
       for ( int dr = 0; dr < 4; ++dr ) X[dr] = arg.X[dr];
       for ( int dr = 0; dr < 4; ++dr ) X[dr] += 2 * arg.border[dr];
-      cuRNGState localState = arg.rng.State()[x_cb];
+      RNGState localState = arg.rng.State()[x_cb];
       for (int parity = 0; parity < 2; parity++) {
         getCoords(x, x_cb, arg.X, parity);
         for (int dr = 0; dr < 4; dr++) x[dr] += arg.border[dr];

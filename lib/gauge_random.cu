@@ -25,12 +25,16 @@ namespace quda {
     {
       if (getVerbosity() >= QUDA_SUMMARIZE) {
         if (group) printfQuda("Creating Gaussian distrbuted Lie group field with sigma = %e\n", sigma);
+<<<<<<< HEAD
         else {
   	  printfQuda("Creating Gaussian distrbuted Lie algebra field\n");
         }
+=======
+        else printfQuda("Creating Gaussian distrbuted Lie algebra field\n");
+>>>>>>> feature/generic_kernel
       }
       strcat(aux, group ? ",lie_group" : "lie_algebra");
-      apply(0);
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)

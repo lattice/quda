@@ -73,8 +73,8 @@ namespace quda {
     deleteTmp(&tmp1, reset);
   }
 
-  void DiracCloverHasenbuschTwist::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa,
-                                                  double mass, double mu, double mu_factor) const
+  void DiracCloverHasenbuschTwist::createCoarseOp(GaugeField &, GaugeField &, const Transfer &, double,
+                                                  double, double, double) const
   {
     // double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
     // CoarseOp(Y, X, T, *gauge, &clover, kappa, a, mu_factor, QUDA_CLOVER_DIRAC, QUDA_MATPC_INVALID);
@@ -190,8 +190,8 @@ namespace quda {
     deleteTmp(&tmp2, reset);
   }
 
-  void DiracCloverHasenbuschTwistPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa,
-                                                    double mass, double mu, double mu_factor) const
+  void DiracCloverHasenbuschTwistPC::createCoarseOp(GaugeField &, GaugeField &, const Transfer &, double,
+                                                    double, double, double) const
   {
     // double a = - 2.0 * kappa * mu * T.Vectors().TwistFlavor();
     // CoarseOp(Y, X, T, *gauge, &clover, kappa, a, -mu_factor,QUDA_CLOVERPC_DIRAC, matpcType);

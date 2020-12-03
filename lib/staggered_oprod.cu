@@ -41,7 +41,7 @@ namespace quda {
       char aux2[TuneKey::aux_n];
       strcpy(aux2, aux);
       kernel = INTERIOR;
-      apply(0);
+      apply(device::get_default_stream());
 
       for (int i = 3; i >= 0; i--) {
         if (commDimPartitioned(i)) {
@@ -61,7 +61,7 @@ namespace quda {
             strcat(aux, ",displacement=");
             u32toa(tmp, displacement);
             strcat(aux, tmp);
-            apply(0);
+            apply(device::get_default_stream());
           }
         }
       } // i=3,..,0
@@ -105,9 +105,9 @@ namespace quda {
     inB.bufferIndex = (1 - inB.bufferIndex);
   }
 
+#ifdef GPU_STAGGERED_DIRAC
   void computeStaggeredOprod(GaugeField *out[], ColorSpinorField& in, const double coeff[], int nFace)
   {
-#ifdef GPU_STAGGERED_DIRAC
     if (nFace == 1) {
       computeStaggeredOprod(*out[0], *out[0], in.Even(), in.Odd(), 0, coeff, nFace);
       double coeff_[2] = {-coeff[0],0.0}; // need to multiply by -1 on odd sites
@@ -118,9 +118,12 @@ namespace quda {
     } else {
       errorQuda("Invalid nFace=%d", nFace);
     }
-#else // GPU_STAGGERED_DIRAC not defined
-    errorQuda("Staggered Outer Product has not been built!");
-#endif
   }
+#else // GPU_STAGGERED_DIRAC not defined
+  void computeStaggeredOprod(GaugeField *[], ColorSpinorField &, const double [], int)
+  {
+    errorQuda("Staggered Outer Product has not been built!");
+  }
+#endif
 
 } // namespace quda

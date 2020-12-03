@@ -31,22 +31,22 @@ namespace quda
     Matrix temp;
     const Gauge in;
 
-    dim3 threads; // number of active threads required
     int_fastdiv X[4];    // grid dimensions
     int border[4];
     int_fastdiv E[4];
     const real epsilon;
     const real coeff1x1;
     const real coeff2x1;
+    dim3 threads; // number of active threads required
 
     GaugeWFlowArg(GaugeField &out, GaugeField &temp, const GaugeField &in, const real epsilon) :
       out(out),
       temp(temp),
       in(in),
-      threads(in.LocalVolumeCB(), 2, wflow_dim),
       epsilon(epsilon),
       coeff1x1(5.0/3.0),
-      coeff2x1(-1.0/12.0)
+      coeff2x1(-1.0/12.0),
+      threads(in.LocalVolumeCB(), 2, wflow_dim)
     {
       for (int dir = 0; dir < 4; ++dir) {
         border[dir] = in.R()[dir];

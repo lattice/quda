@@ -149,18 +149,18 @@ namespace quda
     template <typename store_type_t> struct SpinorNorm<store_type_t, false> {
       using norm_t = float;
       SpinorNorm() {}
-      SpinorNorm(const ColorSpinorField &x) {}
-      SpinorNorm(const SpinorNorm &sn) {}
-      SpinorNorm &operator=(const SpinorNorm &src) { return *this; }
-      void set(const ColorSpinorField &x) {}
-      __device__ __host__ inline norm_t load_norm(const int i, const int parity = 0) const { return 1.0; }
+      SpinorNorm(const ColorSpinorField &) {}
+      SpinorNorm(const SpinorNorm &) {}
+      SpinorNorm &operator=(const SpinorNorm &) { return *this; }
+      void set(const ColorSpinorField &) {}
+      __device__ __host__ inline norm_t load_norm(const int, const int = 0) const { return 1.0; }
       template <typename real, int n>
-      __device__ __host__ inline norm_t store_norm(const vector_type<complex<real>, n> &v, int x, int parity)
+      __device__ __host__ inline norm_t store_norm(const vector_type<complex<real>, n> &, int, int)
       {
         return 1.0;
       }
-      void backup(char **norm_h, size_t norm_bytes) {}
-      void restore(char **norm_h, size_t norm_bytes) {}
+      void backup(char **, size_t) {}
+      void restore(char **, size_t) {}
       norm_t *Norm() { return nullptr; }
     };
 
@@ -310,13 +310,10 @@ namespace quda
     template <> constexpr int n_vector<int8_t, false, 4, true>() { return 24; }
     template <> constexpr int n_vector<int8_t, false, 1, true>() { return 6; }
 
-#if defined(__CUDA_ARCH__) && __CUDACC_VER_MAJOR__ <= 9
-#define constexpr
-#endif
-
     template <template <typename...> class Functor,
               template <template <typename...> class, typename store_t, typename y_store_t, int, typename> class Blas,
               typename T, typename store_t, typename y_store_t, typename V, typename... Args>
+#if defined(NSPIN1) || defined(NSPIN2) || defined(NSPIN4)
     constexpr void instantiate(const T &a, const T &b, const T &c, V &x, Args &&... args)
     {
       if (x.Nspin() == 4 || x.Nspin() == 2) {
@@ -334,10 +331,11 @@ namespace quda
 #endif
       }
     }
-
-#if defined(__CUDA_ARCH__) && __CUDACC_VER_MAJOR__ <= 9
-#undef constexpr
-#define constexpr constexpr
+#else
+    constexpr void instantiate(const T &, const T &, const T &, V &x, Args &&...)
+    {
+      errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+    }
 #endif
 
     // The instantiate helpers are used to instantiate the precision

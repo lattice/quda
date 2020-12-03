@@ -100,7 +100,7 @@ namespace quda {
     QudaCloverFieldOrder order;
     QudaFieldCreate create;
 
-    mutable double trlog[2];
+    mutable std::vector<double> trlog;
 
     /**
        @brief Set the vol_string and aux_string for use in tuning
@@ -125,7 +125,7 @@ namespace quda {
     /**
        @return Pointer to array storing trlog on each parity
     */
-    double* TrLog() const { return trlog; }
+    std::vector<double>& TrLog() const { return trlog; }
     
     /**
        @return The order of the field
@@ -259,7 +259,7 @@ namespace quda {
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
+    void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
 
     /**
       @brief If managed memory and prefetch is enabled, prefetch

@@ -23,15 +23,14 @@ namespace quda
 #if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
 
     template <bool compute_max_only, int bM, int bN, int bK, int block_y, int block_z, int min_block_cta = 1, class Arg>
-    typename std::enable_if<!Arg::is_mma_compatible, void>::type launch_kernel(Arg &arg, int min_threads, TuneParam &tp,
-                                                                               const cudaStream_t &stream)
+    typename std::enable_if<!Arg::is_mma_compatible, void>::type launch_kernel(Arg &, int, TuneParam &, const qudaStream_t &)
     {
       errorQuda("MMA implementation is ONLY built for AoS order.");
     }
 
     template <bool compute_max_only, int bM, int bN, int bK, int block_y, int block_z, int min_block_cta = 1, class Arg>
     typename std::enable_if<Arg::is_mma_compatible, void>::type launch_kernel(Arg &arg, int min_threads, TuneParam &tp,
-                                                                              const cudaStream_t &stream)
+                                                                              const qudaStream_t &stream)
     {
       tp.block.x = 1;
       tp.block.y = block_y;
@@ -58,7 +57,7 @@ namespace quda
      */
     template <bool compute_max_only, bool query_max = false, class Arg>
     typename std::enable_if<Arg::N == 48, int>::type launch_yhat_kernel(Arg &arg, int min_threads, TuneParam &tp,
-                                                                        const cudaStream_t &stream)
+                                                                        const qudaStream_t &stream)
     {
       if (query_max) return 2;
       // clang-format off
@@ -74,7 +73,7 @@ namespace quda
 
     template <bool compute_max_only, bool query_max = false, class Arg>
     typename std::enable_if<Arg::N == 12, int>::type launch_yhat_kernel(Arg &arg, int min_threads, TuneParam &tp,
-                                                                        const cudaStream_t &stream)
+                                                                        const qudaStream_t &stream)
     {
       if (query_max) return 1;
       // clang-format off
@@ -89,7 +88,7 @@ namespace quda
 
     template <bool compute_max_only, bool query_max = false, class Arg>
     typename std::enable_if<Arg::N == 64, int>::type launch_yhat_kernel(Arg &arg, int min_threads, TuneParam &tp,
-                                                                        const cudaStream_t &stream)
+                                                                        const qudaStream_t &stream)
     {
       if (query_max) return 6;
       // clang-format off
@@ -109,7 +108,7 @@ namespace quda
 
     template <bool compute_max_only, bool query_max = false, class Arg>
     typename std::enable_if<Arg::N == 128, int>::type launch_yhat_kernel(Arg &arg, int min_threads, TuneParam &tp,
-                                                                         const cudaStream_t &stream)
+                                                                         const qudaStream_t &stream)
     {
       if (query_max) return 7;
       // clang-format off
@@ -134,7 +133,7 @@ namespace quda
 
     template <bool compute_max_only, bool query_max = false, class Arg>
     typename std::enable_if<Arg::N == 192, int>::type launch_yhat_kernel(Arg &arg, int min_threads, TuneParam &tp,
-                                                                         const cudaStream_t &stream)
+                                                                         const qudaStream_t &stream)
     {
       if (query_max) return 4;
       // clang-format off
@@ -157,7 +156,7 @@ namespace quda
 #else
 
     template <bool compute_max_only, bool query_max = false, class Arg>
-    int launch_yhat_kernel(Arg &arg, int min_threads, TuneParam &tp, const cudaStream_t &stream)
+    int launch_yhat_kernel(Arg &arg, int min_threads, TuneParam &tp, const qudaStream_t &stream)
     {
       errorQuda("MMA multigrid is not available for this setup.");
       return -1;

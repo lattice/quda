@@ -11,7 +11,7 @@
 namespace backward {
   static backward::SignalHandling sh;
 } // namespace backward
-#endif 
+#endif
 
 struct Topology_s {
   int ndim;
@@ -249,7 +249,9 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
 	int neighbor_rank = comm_neighbor_rank(dir,dim);
 	if(neighbor_rank == comm_rank()) continue;
 
-	// disable peer-to-peer comms in one direction
+        if (neighbor_rank >= comm_size()) errorQuda("neighbor rank %d > number of ranks %d", neighbor_rank, comm_size());
+
+        // disable peer-to-peer comms in one direction
 	if ( ((comm_rank() > neighbor_rank && dir == 0) || (comm_rank() < neighbor_rank && dir == 1)) &&
 	     disable_peer_to_peer_bidir && comm_dim(dim) == 2 ) continue;
 
@@ -279,11 +281,11 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
           } else {
             intranode_enabled[dir][dim] = true;
             if (getVerbosity() > QUDA_SILENT) {
-	      printf("Intra-node (non peer-to-peer) enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d\n",
-		     comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
-	    }
+              printf(
+                "Intra-node (non peer-to-peer) enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d\n",
+                comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
+            }
           }
-
         } // on the same node
       } // different dimensions - x, y, z, t
     } // different directions - forward/backward
@@ -381,13 +383,12 @@ int comm_rank_displaced(const Topology *topo, const int displacement[])
   int coords[QUDA_MAX_DIM];
 
   for (int i = 0; i < QUDA_MAX_DIM; i++) {
-    coords[i] = (i < topo->ndim) ? 
+    coords[i] = (i < topo->ndim) ?
       mod(comm_coords(topo)[i] + displacement[i], comm_dims(topo)[i]) : 0;
   }
 
   return comm_rank_from_coords(topo, coords);
 }
-
 
 // FIXME: The following routines rely on a "default" topology.
 // They should probably be reworked or eliminated eventually.
@@ -419,7 +420,7 @@ void comm_set_neighbor_ranks(Topology *topo)
 
   Topology *topology = topo ? topo : default_topo; // use default topology if topo is NULL
   if (!topology) errorQuda("Topology not specified");
-     
+
   for(int d=0; d<4; ++d){
     int pos_displacement[QUDA_MAX_DIM] = { };
     int neg_displacement[QUDA_MAX_DIM] = { };
@@ -466,8 +467,12 @@ inline bool isHost(const void *buffer)
 
   switch (memType) {
   case CU_MEMORYTYPE_DEVICE: return false;
-  case CU_MEMORYTYPE_ARRAY: errorQuda("Using array memory for communications buffer is not supported");
-  case CU_MEMORYTYPE_UNIFIED: errorQuda("Using unified memory for communications buffer is not supported");
+  case CU_MEMORYTYPE_ARRAY:
+    errorQuda("Using array memory for communications buffer is not supported");
+    return false;
+  case CU_MEMORYTYPE_UNIFIED:
+    errorQuda("Using unified memory for communications buffer is not supported");
+    return false;
   case CU_MEMORYTYPE_HOST:
   default: // memory not allocated by CUDA allocaters will default to being host memory
     return true;
@@ -480,6 +485,7 @@ inline bool isHost(const void *buffer)
 MsgHandle *comm_declare_send_relative_(const char *func, const char *file, int line,
 				       void *buffer, int dim, int dir, size_t nbytes)
 {
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%s called (%s:%d in %s())\n", __func__, file, line, func);
 #ifdef HOST_DEBUG
   checkCudaError(); // check and clear error state first
 
@@ -513,6 +519,7 @@ MsgHandle *comm_declare_send_relative_(const char *func, const char *file, int l
 MsgHandle *comm_declare_receive_relative_(const char *func, const char *file, int line,
 					  void *buffer, int dim, int dir, size_t nbytes)
 {
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%s called (%s:%d in %s())\n", __func__, file, line, func);
 #ifdef HOST_DEBUG
   checkCudaError(); // check and clear error state first
 
@@ -542,6 +549,7 @@ MsgHandle *comm_declare_receive_relative_(const char *func, const char *file, in
 MsgHandle *comm_declare_strided_send_relative_(const char *func, const char *file, int line,
 					       void *buffer, int dim, int dir, size_t blksize, int nblocks, size_t stride)
 {
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%s called (%s:%d in %s())\n", __func__, file, line, func);
 #ifdef HOST_DEBUG
   checkCudaError(); // check and clear error state first
 
@@ -578,6 +586,7 @@ MsgHandle *comm_declare_strided_send_relative_(const char *func, const char *fil
 MsgHandle *comm_declare_strided_receive_relative_(const char *func, const char *file, int line,
 						  void *buffer, int dim, int dir, size_t blksize, int nblocks, size_t stride)
 {
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%s called (%s:%d in %s())\n", __func__, file, line, func);
 #ifdef HOST_DEBUG
   checkCudaError(); // check and clear error state first
 
@@ -616,17 +625,24 @@ static char partition_override_string[16]; /** string that contains any overridd
 
 static int manual_set_partition[QUDA_MAX_DIM] = {0};
 
-void comm_dim_partitioned_set(int dim)
-{ 
 #ifdef MULTI_GPU
+void comm_dim_partitioned_set(int dim)
+{
   manual_set_partition[dim] = 1;
-#endif
 
   snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0),
            comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3));
 }
+#else
+void comm_dim_partitioned_set(int)
+{
+  snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0),
+           comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3));
+}
+#endif
 
-void comm_dim_partitioned_reset(){
+void comm_dim_partitioned_reset()
+{
   for (int i = 0; i < QUDA_MAX_DIM; i++) manual_set_partition[i] = 0;
 
   snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0),
@@ -837,9 +853,9 @@ void comm_abort(int status)
   raise(SIGABRT);
 #endif
 #ifdef QUDA_BACKWARDSCPP
-  backward::StackTrace st; 
+  backward::StackTrace st;
   st.load_here(32);
-  backward::Printer p; 
+  backward::Printer p;
   p.print(st, getOutputFile());
 #endif
   comm_abort_(status);

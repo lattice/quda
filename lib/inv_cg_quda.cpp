@@ -5,10 +5,6 @@
 #include <memory>
 #include <iostream>
 
-#ifdef BLOCKSOLVER
-#include <Eigen/Dense>
-#endif
-
 #include <quda_internal.h>
 #include <color_spinor_field.h>
 #include <blas_quda.h>
@@ -16,6 +12,7 @@
 #include <invert_quda.h>
 #include <util_quda.h>
 #include <eigensolve_quda.h>
+#include <eigen_helper.h>
 
 namespace quda {
 
@@ -783,11 +780,15 @@ namespace quda {
 // use BlockCGrQ algortithm or BlockCG (with / without GS, see BLOCKCG_GS option)
 #define BCGRQ 1
 #if BCGRQ
-void CG::blocksolve(ColorSpinorField& x, ColorSpinorField& b) {
-  #ifndef BLOCKSOLVER
-  errorQuda("QUDA_BLOCKSOLVER not built.");
-  #else
 
+#ifndef BLOCKSOLVER
+
+void CG::blocksolve(ColorSpinorField&, ColorSpinorField&) { errorQuda("QUDA_BLOCKSOLVER not built."); }
+
+#else
+
+void CG::blocksolve(ColorSpinorField& x, ColorSpinorField& b)
+{
   if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
   errorQuda("Not supported");
 
@@ -1151,8 +1152,8 @@ void CG::blocksolve(ColorSpinorField& x, ColorSpinorField& b) {
 
   return;
 
-  #endif
 }
+#endif
 
 #else
 

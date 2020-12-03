@@ -166,17 +166,17 @@ namespace quda {
 
     template<typename Float, int nColor, int nSpin, QudaCloverFieldOrder order> struct Accessor {
       mutable complex<Float> dummy;
-      Accessor(const CloverField &A, bool inverse=false) {
+      Accessor(const CloverField &, bool = false) {
 	errorQuda("Not implemented for order %d", order);
       }
 
-      __device__ __host__ inline complex<Float>& operator()(int parity, int x, int s_row, int s_col,
-							    int c_row, int c_col) const {
+      __device__ __host__ inline complex<Float>& operator()(int, int, int, int, int, int) const
+      {
 	return dummy;
       }
 
       template <typename helper, typename reducer>
-      __host__ double transform_reduce(QudaFieldLocation location, helper h, double i, reducer r) const
+      __host__ double transform_reduce(QudaFieldLocation, helper, double, reducer) const
       {
         return 0.0;
       }
@@ -325,7 +325,7 @@ namespace quda {
       }
 
       template <typename helper, typename reducer>
-      __host__ double transform_reduce(QudaFieldLocation location, helper h, double init, reducer r) const
+      __host__ double transform_reduce(QudaFieldLocation, helper, double, reducer) const
       {
         errorQuda("Not implemented");
 	return 0.0;
@@ -419,7 +419,7 @@ namespace quda {
 	 * @param s_col col spin index
 	 * @param c_col col color index
 	 */
-	__device__ __host__ inline complex<Float> operator()(int dummy, int parity, int x, int s_row,
+	__device__ __host__ inline complex<Float> operator()(int, int parity, int x, int s_row,
 							     int s_col, int c_row, int c_col) const {
 	  return accessor(parity,x,s_row,s_col,c_row,c_col);
 	}
@@ -463,7 +463,7 @@ namespace quda {
 	 * @param[in] dim Which dimension we are taking the norm of (dummy for clover)
 	 * @return L1 norm
 	 */
-	__host__ double norm1(int dim=-1, bool global=true) const {
+	__host__ double norm1(int =-1, bool global=true) const {
           double nrm1 = accessor.transform_reduce(location, abs_<double, Float>(), 0.0, plus<double>());
           if (global) comm_allreduce(&nrm1);
           return nrm1;
@@ -474,7 +474,7 @@ namespace quda {
 	 * @param[in] dim Which dimension we are taking the norm of (dummy for clover)
 	 * @return L1 norm
 	 */
-	__host__ double norm2(int dim=-1, bool global=true) const {
+	__host__ double norm2(int =-1, bool global=true) const {
           double nrm2 = accessor.transform_reduce(location, square_<double, Float>(), 0.0, plus<double>());
           if (global) comm_allreduce(&nrm2);
           return nrm2;
@@ -485,7 +485,7 @@ namespace quda {
 	 * @param[in] dim Which dimension we are taking the Linfinity norm of (dummy for clover)
 	 * @return Linfinity norm
 	 */
-	__host__ double abs_max(int dim=-1, bool global=true) const {
+	__host__ double abs_max(int =-1, bool global=true) const {
           double absmax = accessor.transform_reduce(location, abs_<Float, Float>(), 0.0, maximum<Float>());
           if (global) comm_allreduce_max(&absmax);
           return absmax;
@@ -496,7 +496,7 @@ namespace quda {
 	 * @param[in] dim Which dimension we are taking the minimum abs of (dummy for clover)
 	 * @return Minimum norm
 	 */
-	__host__ double abs_min(int dim=-1, bool global=true) const {
+	__host__ double abs_min(int =-1, bool global=true) const {
           double absmax = accessor.transform_reduce(location, abs_<Float, Float>(), std::numeric_limits<double>::max(),
                                                     minimum<Float>());
           if (global) comm_allreduce_min(&absmax);
@@ -604,10 +604,7 @@ namespace quda {
 	 */
 	__device__ __host__ inline void load(real v[block], int x, int parity, int chirality) const
         {
-          norm_type nrm{0};
-          if (isFixed<Float>::value) {
-            nrm = vector_load<float>(norm, parity * norm_offset + chirality * stride + x);
-          }
+          norm_type nrm = isFixed<Float>::value ? vector_load<float>(norm, parity * norm_offset + chirality * stride + x) : 0;
 
 #pragma unroll
 	  for (int i=0; i<M; i++) {
@@ -691,32 +688,34 @@ namespace quda {
 	void save() {
 	  if (backup_h) errorQuda("Already allocated host backup");
 	  backup_h = safe_malloc(bytes);
-	  qudaMemcpy(backup_h, clover, bytes, qudaMemcpyDeviceToHost);
-	  if (norm_bytes) {
-	    backup_norm_h = safe_malloc(norm_bytes);
-	    qudaMemcpy(backup_norm_h, norm, norm_bytes, qudaMemcpyDeviceToHost);
-	  }
-	}
+          qudaMemcpy(backup_h, clover, bytes, cudaMemcpyDeviceToHost);
+          if (norm_bytes) {
+            backup_norm_h = safe_malloc(norm_bytes);
+            qudaMemcpy(backup_norm_h, norm, norm_bytes, cudaMemcpyDeviceToHost);
+          }
+        }
 
-	/**
-	   @brief Restore the field from the host after tuning
-	*/
-	void load() {
-	  qudaMemcpy(clover, backup_h, bytes, qudaMemcpyHostToDevice);
-	  host_free(backup_h);
-	  backup_h = nullptr;
-	  if (norm_bytes) {
-	    qudaMemcpy(norm, backup_norm_h, norm_bytes, qudaMemcpyHostToDevice);
-	    host_free(backup_norm_h);
-	    backup_norm_h = nullptr;
-	  }
-	}
+        /**
+           @brief Restore the field from the host after tuning
+        */
+        void load()
+        {
+          qudaMemcpy(clover, backup_h, bytes, cudaMemcpyHostToDevice);
+          host_free(backup_h);
+          backup_h = nullptr;
+          if (norm_bytes) {
+            qudaMemcpy(norm, backup_norm_h, norm_bytes, cudaMemcpyHostToDevice);
+            host_free(backup_norm_h);
+            backup_norm_h = nullptr;
+          }
+        }
 
-	size_t Bytes() const {
-	  size_t bytes = length*sizeof(Float);
+        size_t Bytes() const
+        {
+          size_t bytes = length * sizeof(Float);
           if (isFixed<Float>::value) bytes += 2 * sizeof(norm_type);
           return bytes;
-	}
+        }
       };
 
     /**
@@ -741,7 +740,7 @@ namespace quda {
 	const bool twisted;
 	const Float mu2;
 
-        QDPOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void *norm_ = nullptr) :
+        QDPOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void * = nullptr) :
          volumeCB(clover.VolumeCB()), stride(volumeCB), offset(clover.Bytes()/(2*sizeof(Float))),
 	twisted(clover.Twisted()), mu2(clover.Mu2()) {
         if (clover.Order() != QUDA_PACKED_CLOVER_ORDER) {
@@ -794,7 +793,7 @@ namespace quda {
 	const bool twisted;
 	const Float mu2;
 
-        QDPJITOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void *norm_ = nullptr) :
+        QDPJITOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void * = nullptr) :
           volumeCB(clover.VolumeCB()), stride(volumeCB), twisted(clover.Twisted()), mu2(clover.Mu2()) {
         if (clover.Order() != QUDA_QDPJIT_CLOVER_ORDER) {
           errorQuda("Invalid clover order %d for this accessor", clover.Order());
@@ -863,7 +862,7 @@ namespace quda {
 	const bool twisted;
 	const Float mu2;
 
-        BQCDOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void *norm_ = nullptr) :
+        BQCDOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void * = nullptr) :
           volumeCB(clover.Stride()), stride(volumeCB), twisted(clover.Twisted()), mu2(clover.Mu2()) {
         if (clover.Order() != QUDA_BQCD_CLOVER_ORDER) {
           errorQuda("Invalid clover order %d for this accessor", clover.Order());
@@ -905,9 +904,7 @@ namespace quda {
 	}
   
 	// FIXME implement the save routine for BQCD ordered fields
-	__device__ __host__ inline void save(RegType v[length], int x, int parity) {
-
-	};
+	__device__ __host__ inline void save(RegType [length], int, int) { }
 
 	size_t Bytes() const { return length*sizeof(Float); }
       };

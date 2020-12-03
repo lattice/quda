@@ -90,7 +90,8 @@ namespace quda
         for (int nu = 0; nu < nSpin; nu++) { spin_elem[mu][nu] = innerProduct(x, y, mu, nu); }
       }
 
-      complex<real> A[nSpin * nSpin];
+      Matrix<complex<real>, nSpin> A_;
+      auto A = A_.data;
 
       // Spin contract: <\phi(x)_{\mu} \Gamma_{mu,nu}^{rho,tau} \phi(y)_{\nu}>
       // The rho index runs slowest.
@@ -233,7 +234,7 @@ namespace quda
       result_local += spin_elem[3][3];
       A[G_idx++] = result_local;
 
-      arg.s.save(A, x_cb, parity);
+      arg.s.save(A_, x_cb, parity);
     }
   };
 } // namespace quda

@@ -2,11 +2,12 @@
 
 #include <tune_quda.h>
 #include <device.h>
+#include <kernel_helper.h>
 #include <reduce_helper.h>
 #include <block_reduction_kernel.h>
 
 #ifdef JITIFY
-#include <jitify_helper.cuh>
+#include <jitify_helper2.cuh>
 #endif
 
 namespace quda {
@@ -25,12 +26,14 @@ namespace quda {
   {
   protected:
     const LatticeField &field;
+    QudaFieldLocation location;
     mutable unsigned int vector_length_y;
     mutable unsigned int step_y;
+    const unsigned int max_block_y;
     bool tune_block_x;
 
     unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
     /**
        Block reduction kernels do not use grid-size tuning, so disable this, and
@@ -54,39 +57,75 @@ namespace quda {
     }
 
     template <template <typename> class Transformer, typename Block, typename Arg>
-    void launch(const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
+    void launch_device(const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
-      if (field.Location() == QUDA_CUDA_FIELD_LOCATION) {
 #ifdef JITIFY
-        std::string kernel_file(std::string("kernels/") + Transformer<Arg>::filename());
-        if (field.Location() == QUDA_CUDA_FIELD_LOCATION) create_jitify_program(kernel_file);
-        using namespace jitify::reflection;
-
-        // we need this hackery to get the naked unbound template class parameters
-        auto Transformer_instance = reflect<Transformer<Arg>>();
-        auto Transformer_naked = Transformer_instance.substr(0, Transformer_instance.find("<"));
-
-        jitify_error = program->kernel("quda::BlockReductionKernel2D")
-        .instantiate({reflect((int)tp.block.x), Transformer_naked, reflect<Arg>()})
-          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+      jitify_error = launch_jitify_block<Transformer>("quda::BlockReductionKernel2D", tp, stream, arg);
 #else
-        launch<Block::block.size() - 1, Block, Transformer>(arg, tp, stream);
+      launch<Block::block.size() - 1, Block, Transformer>(arg, tp, stream);
 #endif
+    }
+
+    template <template <typename> class Transformer, typename Block, typename Arg>
+    void launch_host(const TuneParam &, const qudaStream_t &, Arg &arg)
+    {
+      using reduce_t = typename Transformer<Arg>::reduce_t;
+      Transformer<Arg> t(arg);
+
+      for (int block = 0; block < arg.n_block; block++) {
+        for (int j = 0; j < (int)arg.threads.y; j++) {
+          reduce_t value;
+          for (int i = 0; i < (int)arg.threads.x; i++) value += t(block, i, j);
+
+          t.store(value, block, j);
+        }
+      }
+    }
+
+    /**
+       @brief Launch function for BlockReductionKernel2D.
+       @tparam Transformer Class which performs any pre-reduction
+       transformation (defined as ternary operator) as well as a store
+       method for writing out the result.
+       @tparam Block Class that must contain a static std::array of
+       block sizes "block" we wish to instantiate
+       @param[in] tp Kernel launch parameters
+       @param[in] stream Stream in which to execute
+       @param[in,out] arg Algorithm meta data
+     */
+    template <template <typename> class Transformer, typename Block, bool enable_host = false, typename Arg>
+    typename std::enable_if<!enable_host, void>::type launch(const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
+    {
+      if (location == QUDA_CUDA_FIELD_LOCATION) {
+        launch_device<Transformer, Block>(tp, stream, arg);
       } else {
 	errorQuda("CPU not supported yet");
       }
     }
 
+    template <template <typename> class Transformer, typename Block, bool enable_host = false, typename Arg>
+    typename std::enable_if<enable_host, void>::type launch(const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
+    {
+      if (location == QUDA_CUDA_FIELD_LOCATION) {
+        launch_device<Transformer, Block>(tp, stream ,arg);
+      } else {
+        launch_host<Transformer, Block>(tp, stream, arg);
+      }
+    }
+
   public:
-    TunableBlockReduction2D(const LatticeField &field, unsigned int vector_length_y) :
+    TunableBlockReduction2D(const LatticeField &field, unsigned int vector_length_y,
+                            unsigned int max_block_y = 0, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
       field(field),
+      location(location != QUDA_INVALID_FIELD_LOCATION ? location : field.Location()),
       vector_length_y(vector_length_y),
       step_y(1),
+      max_block_y(max_block_y == 0 ? vector_length_y : max_block_y),
       tune_block_x(false)
     {
-      strcpy(aux, compile_type_str(field));
+      strcpy(vol, field.VolString());
+      strcpy(aux, compile_type_str(field, location));
       strcat(aux, field.AuxString());
-      strcat(aux, field.Location() == QUDA_CPU_FIELD_LOCATION ? ",CPU" : ",GPU");
     }
 
     bool advanceBlockDim(TuneParam &param) const
@@ -102,8 +141,9 @@ namespace quda {
       } else { // block.x (spacetime) was reset
 
 	// we can advance spin/block-color since this is valid
-	if (param.block.y < vector_length_y && param.block.y < (unsigned int)deviceProp.maxThreadsDim[1] &&
-	    param.block.x*(param.block.y+step_y)*param.block.z <= (unsigned int)deviceProp.maxThreadsPerBlock) {
+	if (param.block.y < vector_length_y && param.block.y < device::max_threads_per_block_dim(1) &&
+	    param.block.x*(param.block.y+step_y)*param.block.z <= device::max_threads_per_block() &&
+            ((param.block.y + step_y) <= max_block_y)) {
 	  param.block.y += step_y;
 	  param.grid.y = (vector_length_y + param.block.y - 1) / param.block.y;
 	  return true;
@@ -133,7 +173,7 @@ namespace quda {
     void resizeVector(int y) const { vector_length_y = y; }
     void resizeStep(int y) const { step_y = y; }
 
-    TuneKey tuneKey() const { return TuneKey(field.VolString(), typeid(*this).name(), aux); }
+    TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
   };
 
 }

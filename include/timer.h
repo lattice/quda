@@ -101,18 +101,22 @@ namespace quda {
 
   /**< Enumeration type used for writing a simple but extensible profiling framework. */
   enum QudaProfileType {
-    QUDA_PROFILE_H2D,      /**< host -> device transfers */
-    QUDA_PROFILE_D2H,      /**< The time in seconds for device -> host transfers */
-    QUDA_PROFILE_INIT,     /**< The time in seconds taken for initiation */
-    QUDA_PROFILE_PREAMBLE, /**< The time in seconds taken for any preamble */
-    QUDA_PROFILE_COMPUTE,  /**< The time in seconds taken for the actual computation */
-    QUDA_PROFILE_COMMS,    /**< synchronous communication */
-    QUDA_PROFILE_EPILOGUE, /**< The time in seconds taken for any epilogue */
-    QUDA_PROFILE_FREE,     /**< The time in seconds for freeing resources */
-    QUDA_PROFILE_IO,       /**< time spent on file i/o */
-    QUDA_PROFILE_CHRONO,   /**< time spent on chronology */
-    QUDA_PROFILE_EIGEN,    /**< time spent on host-side Eigen */
-    QUDA_PROFILE_ARPACK,   /**< time spent on host-side ARPACK */
+    QUDA_PROFILE_H2D,          /**< host -> device transfers */
+    QUDA_PROFILE_D2H,          /**< The time in seconds for device -> host transfers */
+    QUDA_PROFILE_INIT,         /**< The time in seconds taken for initiation */
+    QUDA_PROFILE_PREAMBLE,     /**< The time in seconds taken for any preamble */
+    QUDA_PROFILE_COMPUTE,      /**< The time in seconds taken for the actual computation */
+    QUDA_PROFILE_COMMS,        /**< synchronous communication */
+    QUDA_PROFILE_EPILOGUE,     /**< The time in seconds taken for any epilogue */
+    QUDA_PROFILE_FREE,         /**< The time in seconds for freeing resources */
+    QUDA_PROFILE_IO,           /**< time spent on file i/o */
+    QUDA_PROFILE_CHRONO,       /**< time spent on chronology */
+    QUDA_PROFILE_EIGEN,        /**< time spent on host-side Eigen */
+    QUDA_PROFILE_EIGENLU,      /**< time spent on host-side Eigen LU */
+    QUDA_PROFILE_EIGENEV,      /**< time spent on host-side Eigen EV */
+    QUDA_PROFILE_EIGENQR,      /**< time spent on host-side Eigen QR */
+    QUDA_PROFILE_ARPACK,       /**< time spent on host-side ARPACK */
+    QUDA_PROFILE_HOST_COMPUTE, /**< time spent on miscellaneous host-side computation */
 
     // lower level counters used in the dslash and api profiling
     QUDA_PROFILE_LOWER_LEVEL, /**< dummy timer to mark beginning of lower level timers which do not count towrads global time */

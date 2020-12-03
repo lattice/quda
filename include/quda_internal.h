@@ -45,6 +45,7 @@
 #include <util_quda.h>
 #include <malloc_quda.h>
 #include <object.h>
+#include <device.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -53,9 +54,6 @@ extern "C" {
   struct QUDA_DiracField{
     void *field; /**< Pointer to a ColorSpinorField */
   };
-
-  //extern cudaDeviceProp deviceProp;
-  extern qudaStream_t *streams;
 
 #ifdef __cplusplus
 }
@@ -129,8 +127,6 @@ namespace quda {
   template <> struct fixedInvMaxValue<char8> {
     static constexpr float value = 7.874015748031e-3f;
   };
-
-  const int Nstream = 9;
 
   /**
    * Check that the resident gauge field is compatible with the requested inv_param

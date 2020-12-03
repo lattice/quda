@@ -338,6 +338,29 @@ namespace quda {
     return 2 * cb_index + x1odd;
   }
 
+  /** Compute the 1-d checkerboard index and parity from
+      the full linear lattice (not what's used for
+      indexing into fields, re:padding argument for getIndexFull).
+
+      @param[out] out_parity Output site parity
+      @param[in] X full lattice dimensions
+      @param[in] full_index full linear lattice index
+      @return 1-d checkerboard index
+   */
+  template <typename I>
+  __device__ __host__ inline int getParityCBFromFull(int& out_parity, const I X[4], const int full_index) {
+
+    const int za = (full_index / X[0]);
+    const int x0 = full_index % X[0];
+    const int zb =  (za / X[1]);
+    const int x1 = (za - zb * X[1]);
+    const int x3 = (zb / X[2]);
+    const int x2 = (zb - x3 * X[2]);
+    out_parity = (x0 + x1 + x2 + x3) & 1;
+
+    return full_index >> 1;
+  }
+
   /**
      Compute the checkerboarded index into the ghost field
      corresponding to full (local) site index x[]
@@ -846,9 +869,9 @@ namespace quda {
      @return Swizzled block index
   */
   //#define SWIZZLE
+#ifdef SWIZZLE
   template <typename T> __device__ inline int block_idx(const T &swizzle)
   {
-#ifdef SWIZZLE
     // the portion of the grid that is exactly divisible by the number of SMs
     const int gridp = gridDim.x - gridDim.x % swizzle;
 
@@ -862,10 +885,13 @@ namespace quda {
       block_idx = i * (gridp / swizzle) + j;
     }
     return block_idx;
-#else
-    return blockIdx.x;
-#endif
   }
+#else
+  template <typename T> __device__ inline int block_idx(const T &)
+  {
+    return blockIdx.x;
+  }
+#endif
 
   /**
      @brief Compute the staggered phase factor at unit shift from the

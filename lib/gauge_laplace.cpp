@@ -77,8 +77,7 @@ namespace quda {
     sol = &x;
   }
 
-  void GaugeLaplace::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-				const QudaSolutionType solType) const
+  void GaugeLaplace::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
   {
     // do nothing
   }

@@ -5,10 +5,19 @@
 namespace quda {
 
   struct Aggregates {
-    static constexpr std::array<unsigned int, 36> block = {4, 8, 9, 12, 16, 18, 24, 27, 32, 36, 48, 54, 64, 72, 81, 96, 100, 108, 128, 144, 162, 192, 200, 216, 384, 250, 256, 288, 400, 432, 500, 512, 576, 864, 1000, 1024};
+    // List of block sizes we wish to instantiate.  The required block
+    // size is equal to number of fine points per aggregate, rounded
+    // up to whole multiples of the warp size.  So for example,
+    // 2x2x2x2 and 3x3x3x1 aggregation would both use the same block
+    // size 32
+    static constexpr std::array<unsigned int, 16> block = {32, 64, 96, 128, 160, 192, 224, 256, 288, 384, 416, 448, 512, 576, 864, 1024};
   };
 
+<<<<<<< HEAD
   constexpr std::array<unsigned int, 36> Aggregates::block;  // this line here is needed for HOST_DEBUG
+=======
+  constexpr std::array<unsigned int, 16> Aggregates::block;
+>>>>>>> feature/generic_kernel
 
   template <typename Float, typename vFloat, int fineSpin, int fineColor, int coarseSpin, int coarseColor>
   class RestrictLaunch : public TunableBlockReduction2D {
@@ -20,23 +29,24 @@ namespace quda {
     const int *fine_to_coarse;
     const int *coarse_to_fine;
     const int parity;
-    char vol[TuneKey::volume_n];
 
+    bool tuneSharedBytes() const { return false; }
     bool tuneAuxDim() const { return true; }
     unsigned int minThreads() const { return in.Volume(); } // fine parity is the block y dimension
 
   public:
     RestrictLaunch(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
                    const int *fine_to_coarse, const int *coarse_to_fine, int parity) :
-      TunableBlockReduction2D(in, coarseColor / coarse_colors_per_thread<fineColor, coarseColor>()),
+      TunableBlockReduction2D(in, coarseColor / coarse_colors_per_thread<fineColor, coarseColor>(), max_y_block()),
       out(out), in(in), v(v), fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
       parity(parity)
     {
+      strcat(vol, ",");
+      strcat(vol, out.VolString());
       strcat(aux, ",");
       strcat(aux, out.AuxString());
-      strcpy(vol, out.VolString());
-      strcat(vol, ",");
-      strcat(vol, in.VolString());
+
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)
@@ -56,7 +66,7 @@ namespace quda {
     bool advanceAux(TuneParam &param) const
     {
       if (Arg<>::swizzle) {
-        if (param.aux.x < 2*deviceProp.multiProcessorCount) {
+        if (param.aux.x < 2 * (int)device::processor_count()) {
           param.aux.x++;
           return true;
         } else {
@@ -68,20 +78,21 @@ namespace quda {
       }
     }
 
-    // Only tune shared memory per thread and aux tuning since
-    // blockDim.y > 1 gives incorrect results due to cub reductions
-    // being unable to do independent sliced reductions along
-    // blockDim.y.  So for now we only split between colors per thread
-    // and grid.y.  Moreover, the x and y block sizes are fixed.
-    bool advanceTuneParam(TuneParam &param) const { return advanceSharedBytes(param) || advanceAux(param); }
+    // round up the block size to be a multiple of the warp_size
+    constexpr int block_mapper(int block) const { return ((block + device::warp_size() - 1) / device::warp_size()) * device::warp_size(); }
 
-    TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
-
-    void initTuneParam(TuneParam &param) const { defaultTuneParam(param); }
+    void initTuneParam(TuneParam &param) const {
+      TunableBlockReduction2D::initTuneParam(param);
+      param.block.x = block_mapper(in.Volume() / out.Volume());
+      param.grid.x = out.Volume();
+      param.shared_bytes = 0;
+      param.aux.x = 1; // swizzle factor
+    }
 
     void defaultTuneParam(TuneParam &param) const {
-      param.block = dim3(in.Volume() / out.Volume(), 1, 1);
-      param.grid = dim3(out.Volume(), coarseColor / coarse_colors_per_thread<fineColor, coarseColor>(), 1);
+      TunableBlockReduction2D::defaultTuneParam(param);
+      param.block.x = block_mapper(in.Volume() / out.Volume());
+      param.grid.x = out.Volume();
       param.shared_bytes = 0;
       param.aux.x = 1; // swizzle factor
     }
@@ -103,14 +114,12 @@ namespace quda {
 #if QUDA_PRECISION & 2
       RestrictLaunch<Float, short, fineSpin, fineColor, coarseSpin, coarseColor>
         restrictor(out, in, v, fine_to_coarse, coarse_to_fine, parity);
-      restrictor.apply(0);
 #else
       errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
 #endif
     } else if (v.Precision() == in.Precision()) {
       RestrictLaunch<Float, Float, fineSpin, fineColor, coarseSpin, coarseColor>
         restrictor(out, in, v, fine_to_coarse, coarse_to_fine, parity);
-      restrictor.apply(0);
     } else {
       errorQuda("Unsupported V precision %d", v.Precision());
     }
@@ -125,27 +134,53 @@ namespace quda {
 
     // Template over fine color
     if (in.Ncolor() == 3) { // standard QCD
-      if (in.Nspin() != 4) errorQuda("Unexpected nSpin = %d", in.Nspin());
 #ifdef NSPIN4
-      constexpr int fineSpin = 4;
-      constexpr int fineColor = 3;
+      if (in.Nspin() == 4) {
+        constexpr int fineColor = 3;
+        constexpr int fineSpin = 4;
 
-      // first check that the spin_map matches the spin_mapper
-      spin_mapper<fineSpin,coarseSpin> mapper;
-      for (int s=0; s<fineSpin; s++)
-        for (int p=0; p<2; p++)
-          if (mapper(s,p) != spin_map[s][p]) errorQuda("Spin map does not match spin_mapper");
+        // first check that the spin_map matches the spin_mapper
+        spin_mapper<fineSpin,coarseSpin> mapper;
+        for (int s=0; s<fineSpin; s++)
+          for (int p=0; p<2; p++)
+            if (mapper(s,p) != spin_map[s][p]) errorQuda("Spin map does not match spin_mapper");
 
-      if (nVec == 6) { // free field Wilson
-        Restrict<Float,fineSpin,fineColor,coarseSpin,6>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
-      } else if (nVec == 24) {
-        Restrict<Float,fineSpin,fineColor,coarseSpin,24>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
-      } else if (nVec == 32) {
-        Restrict<Float,fineSpin,fineColor,coarseSpin,32>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
-      } else {
-        errorQuda("Unsupported nVec %d", nVec);
-      }
+        if (nVec == 6) { // free field Wilson
+          Restrict<Float,fineSpin,fineColor,coarseSpin,6>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        } else if (nVec == 24) {
+          Restrict<Float,fineSpin,fineColor,coarseSpin,24>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        } else if (nVec == 32) {
+          Restrict<Float,fineSpin,fineColor,coarseSpin,32>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        } else {
+          errorQuda("Unsupported nVec %d", nVec);
+        }
+      } else
 #endif // NSPIN4
+#ifdef NSPIN1
+      if (in.Nspin() == 1) {
+        constexpr int fineColor = 3;
+        constexpr int fineSpin = 1;
+
+        // first check that the spin_map matches the spin_mapper
+        spin_mapper<fineSpin,coarseSpin> mapper;
+        for (int s=0; s<fineSpin; s++)
+          for (int p=0; p<2; p++)
+            if (mapper(s,p) != spin_map[s][p]) errorQuda("Spin map does not match spin_mapper");
+
+        if (nVec == 24) { // free field staggered
+          Restrict<Float,fineSpin,fineColor,coarseSpin,24>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        } else if (nVec == 64) {
+          Restrict<Float,fineSpin,fineColor,coarseSpin,64>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        } else if (nVec == 96) {
+          Restrict<Float,fineSpin,fineColor,coarseSpin,96>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        } else {
+          errorQuda("Unsupported nVec %d", nVec);
+        }
+      } else
+#endif
+      {
+        errorQuda("Unexpected nSpin = %d", in.Nspin());
+      }
 
     } else { // Nc != 3
 
@@ -218,10 +253,10 @@ namespace quda {
     } // Nc != 3
   }
 
+#ifdef GPU_MULTIGRID
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
                 int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int * const * spin_map, int parity)
   {
-#ifdef GPU_MULTIGRID
     checkOrder(out, in, v);
     checkLocation(out, in, v);
     QudaPrecision precision = checkPrecision(out, in);
@@ -237,9 +272,13 @@ namespace quda {
     } else {
       errorQuda("Unsupported precision %d", out.Precision());
     }
-#else
-    errorQuda("Multigrid has not been built");
-#endif
   }
+#else
+  void Restrict(ColorSpinorField &, const ColorSpinorField &, const ColorSpinorField &,
+                int, const int *, const int *, const int * const *, int)
+  {
+    errorQuda("Multigrid has not been built");
+  }
+#endif
 
 } // namespace quda

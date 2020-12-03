@@ -1,6 +1,6 @@
 #include "quda_define.h"
 #ifdef QUDA_TARGET_HIP
-#ifndef _HIP_DEVICE_COMPILE_
+#ifndef __HIP_DEVICE_COMPILE__
 inline double
 rsqrt(double x) { 
   return 1.0/x;
@@ -8,7 +8,6 @@ rsqrt(double x) {
 #else
 #include <hip/math_functions.h>
 #endif
-
 #endif
 
 #include <multigrid_helper.cuh>
@@ -26,11 +25,10 @@ rsqrt(double x) {
 
 namespace quda {
 
-#define MAX_MATRIX_SIZE 4096
-  __constant__ signed char B_array_d[MAX_MATRIX_SIZE];
+  __constant__ signed char B_array_d[device::max_constant_param_size()];
 
   // to avoid overflowing the parameter space we put the B array into a separate constant memory buffer
-  static signed char B_array_h[MAX_MATRIX_SIZE];
+  static signed char B_array_h[device::max_constant_param_size()];
 
   /**
       Kernel argument struct
@@ -62,7 +60,8 @@ namespace quda {
       B(V.Location() == QUDA_CPU_FIELD_LOCATION ? reinterpret_cast<Vector *>(B_array_h) : nullptr)
     {
       const Vector Btmp[nVec]{*B...};
-      if (sizeof(Btmp) > MAX_MATRIX_SIZE) errorQuda("B array size (%lu) is larger than maximum allowed (%d)\n", sizeof(Btmp), MAX_MATRIX_SIZE);
+      if (sizeof(Btmp) > device::max_constant_param_size())
+        errorQuda("B array size (%lu) is larger than maximum allowed (%lu)\n", sizeof(Btmp), device::max_constant_param_size());
       memcpy(B_array_h, (void *)Btmp, sizeof(Btmp));
       int geoBlockSize = 1;
       for (int d = 0; d < V.Ndim(); d++) geoBlockSize *= geo_bs[d];
@@ -74,7 +73,7 @@ namespace quda {
   };
 
   template <int nColor, typename sumType, typename real>
-  inline __device__ __host__ void colorInnerProduct(complex<sumType> &dot, int i, complex<real> v[nColor],
+  inline __device__ __host__ void colorInnerProduct(complex<sumType> &dot, complex<real> v[nColor],
                                                     complex<real> w[nColor])
   {
 #pragma unroll
@@ -163,7 +162,7 @@ namespace quda {
                 for (int s = 0; s < nSpin; s++) {
                   complex<Float> vis[nColor];
                   for (int c = 0; c < nColor; c++) vis[c] = arg.V(parity, x_cb, s, c, i);
-                  colorInnerProduct<nColor>(dot[arg.spin_map(s, parity)], i, v[s], vis);
+                  colorInnerProduct<nColor>(dot[arg.spin_map(s, parity)], v[s], vis);
                 }
               }
             }
@@ -263,9 +262,9 @@ namespace quda {
     if (x_cb >= arg.fineVolumeCB) return;
     int chirality = blockIdx.z; // which chiral block we're working on (if chirality is present)
 
-    constexpr int spinBlock = nSpin / coarseSpin; // size of spin block
-    typedef QudaCub::BlockReduce<complex<sumFloat>, block_size, QudaCub::BLOCK_REDUCE_WARP_REDUCTIONS, 2> dotReduce;
-    typedef QudaCub::BlockReduce<sumFloat, block_size, QudaCub::BLOCK_REDUCE_WARP_REDUCTIONS, 2> normReduce;
+    constexpr int spinBlock = (nSpin == 1) ? 1 : nSpin / coarseSpin; // size of spin block
+    typedef QudaCub::BlockReduce<complex<sumFloat>, block_size, cub::BLOCK_REDUCE_WARP_REDUCTIONS, 2> dotReduce;
+    typedef QudaCub::BlockReduce<sumFloat, block_size, cub::BLOCK_REDUCE_WARP_REDUCTIONS, 2> normReduce;
 
     __shared__ typename dotReduce::TempStorage dot_storage;
     typename normReduce::TempStorage *norm_storage = (typename normReduce::TempStorage *)&dot_storage;
@@ -282,16 +281,21 @@ namespace quda {
         complex<Float> v[spinBlock][nColor];
         if (n == 0) { // load from B on first Gram-Schmidt, otherwise V.
           complex<Float> v_[spinBlock * nColor];
-          B[j].template load<spinBlock>(v_, parity, x_cb, chirality);
+          B[j].template load<spinBlock>(v_, parity, x_cb, (nSpin == 1) ? 0 : chirality);
 #pragma unroll
           for (int s = 0; s < spinBlock; s++)
+          {
+            const int s_idx = (nSpin == 1) ? 0 : (s * nColor);
 #pragma unroll
-            for (int c = 0; c < nColor; c++) v[s][c] = v_[s * nColor + c];
+            for (int c = 0; c < nColor; c++) v[s][c] = (nSpin == 1 && parity != chirality) ? complex<Float>(0) : v_[s_idx + c];
+          }
         } else {
 #pragma unroll
-          for (int s = 0; s < spinBlock; s++)
+          for (int s = 0; s < spinBlock; s++) {
+            const int s_idx = (nSpin == 1) ? 0 : (chirality * spinBlock + s);
 #pragma unroll
-            for (int c = 0; c < nColor; c++) v[s][c] = arg.V(parity, x_cb, chirality * spinBlock + s, c, j);
+            for (int c = 0; c < nColor; c++) v[s][c] = (nSpin == 1 && parity != chirality) ? complex<Float>(0) : arg.V(parity, x_cb, s_idx, c, j);
+          }
         }
 
         for (int i = 0; i < j; i++) {
@@ -301,12 +305,14 @@ namespace quda {
           // compute (j,i) block inner products
           complex<Float> vi[spinBlock][nColor];
 #pragma unroll
-          for (int s = 0; s < spinBlock; s++)
+          for (int s = 0; s < spinBlock; s++) {
+            const int s_idx = (nSpin == 1) ? 0 : (chirality * spinBlock + s);
 #pragma unroll
-            for (int c = 0; c < nColor; c++) vi[s][c] = arg.V(parity, x_cb, chirality * spinBlock + s, c, i);
+            for (int c = 0; c < nColor; c++) vi[s][c] = (nSpin == 1 && parity != chirality) ? complex<Float>(0) : arg.V(parity, x_cb, s_idx, c, i);
+          }
 
 #pragma unroll
-          for (int s = 0; s < spinBlock; s++) { colorInnerProduct<nColor>(dot, i, v[s], vi[s]); }
+          for (int s = 0; s < spinBlock; s++) { colorInnerProduct<nColor>(dot, v[s], vi[s]); }
 
           __syncthreads();
           dot = dotReduce(dot_storage).Sum(dot);
@@ -337,10 +343,16 @@ namespace quda {
 #pragma unroll
         for (int s = 0; s < spinBlock; s++) { colorScale<Float, nColor>(v[s], nrm); }
 
+        if (nSpin == 1) {
+          if (parity == chirality)
 #pragma unroll
-        for (int s = 0; s < spinBlock; s++)
+            for (int c = 0; c < nColor; c++) arg.V(parity, x_cb, 0, c, j) = v[0][c];
+        } else {
 #pragma unroll
-          for (int c = 0; c < nColor; c++) arg.V(parity, x_cb, chirality * spinBlock + s, c, j) = v[s][c];
+          for (int s = 0; s < spinBlock; s++)
+#pragma unroll
+            for (int c = 0; c < nColor; c++) arg.V(parity, x_cb, chirality * spinBlock + s, c, j) = v[s][c];
+        }
 
       } // j
     }   // n
