@@ -10,6 +10,17 @@
    avoid confusion when resolving the native atomicAdd functions.
  */
 
+#ifdef QUDA_BACKEND_OMPTARGET
+template<typename T>
+static inline T atomicAdd(T*x,T v)
+{
+  T z;
+#pragma omp atomic capture
+  {z=*x; *x+=v;}
+  return z;
+}
+#endif
+
 #if defined(__CUDA_ARCH__) 
 
 #if __COMPUTE_CAPABILITY__ < 600
@@ -98,6 +109,7 @@ union uint32_short2 { unsigned int i; short2 s; };
    @param addr Address that stores the atomic variable to be updated
    @param val Value to be added to the atomic
 */
+#ifndef QUDA_BACKEND_OMPTARGET
 static inline __device__ short2 atomicAdd(short2 *addr, short2 val){
   uint32_short2 old, assumed, incremented;
   old.s = *addr;
@@ -167,3 +179,4 @@ static inline __device__ float atomicAbsMax(float *addr, float val){
   uint32_t *addr_ = reinterpret_cast<uint32_t*>(addr);
   return atomicMax(addr_, val_);
 }
+#endif

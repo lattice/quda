@@ -9,7 +9,9 @@
 
 #include <quda_internal.h>
 #include <complex_quda.h>
+#ifndef QUDA_BACKEND_OMPTARGET
 #include <inline_ptx.h>
+#endif
 
 namespace quda {
 

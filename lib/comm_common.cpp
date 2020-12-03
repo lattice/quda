@@ -6,6 +6,21 @@
 #include <comm_quda.h>
 #include <csignal>
 
+#ifdef QUDA_BACKEND_OMPTARGET
+#define CUDA_SUCCESS QUDA_SUCCESS
+struct cudaDeviceProp{int unifiedAddressing;};
+enum {cudaDevP2PAttrPerformanceRank};
+enum CUpointer_attribute {CU_POINTER_ATTRIBUTE_MEMORY_TYPE};
+using CUdeviceptr = void *;
+#define cudaGetDeviceProperties(a,b) ompwip([&](){(a)->unifiedAddressing=0;})
+#define cudaDeviceCanAccessPeer(a,b,c) ompwip([&](){(*(a))=0;})
+#define cudaDeviceGetP2PAttribute(a,b,c,d) ompwip([&](){(*(a))=0;})
+#define cudaGetDeviceCount(a) ompwip([&](){(*(a))=omp_get_num_devices();})
+enum CUmemorytype {CU_MEMORYTYPE_DEVICE,CU_MEMORYTYPE_ARRAY,CU_MEMORYTYPE_UNIFIED,CU_MEMORYTYPE_HOST};
+#define cuPointerGetAttributes(a,b,c,d) ompwip([=](){*((CUmemorytype *)(c[0]))=CU_MEMORYTYPE_HOST;})
+
+#endif  // QUDA_BACKEND_OMPTARGET
+
 #ifdef QUDA_BACKWARDSCPP
 #include "backward.hpp"
 namespace backward {
@@ -730,14 +745,14 @@ void comm_init_common(int ndim, const int *dims, QudaCommsMap rank_from_coords, 
 
   int device_count;
   cudaGetDeviceCount(&device_count);
-  if (device_count == 0) { errorQuda("No CUDA devices found"); }
+  if (device_count == 0) { warningQuda("No CUDA devices found"); }
   if (gpuid >= device_count) {
     char *enable_mps_env = getenv("QUDA_ENABLE_MPS");
     if (enable_mps_env && strcmp(enable_mps_env, "1") == 0) {
       gpuid = gpuid % device_count;
       printf("MPS enabled, rank=%d -> gpu=%d\n", comm_rank(), gpuid);
     } else {
-      errorQuda("Too few GPUs available on %s", comm_hostname());
+      warningQuda("Too few GPUs available on %s", comm_hostname());
     }
   }
 

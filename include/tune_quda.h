@@ -16,6 +16,10 @@
 #include <iomanip>
 #include <typeinfo>
 #include <map>
+#ifdef QUDA_BACKEND_OMPTARGET
+#define CUresult bool
+#define CUDA_SUCCESS true
+#endif
 #else
 #define CUresult bool
 #define CUDA_SUCCESS true

@@ -1,7 +1,9 @@
 #pragma once
 
 #include <float_vector.h>
+#ifndef QUDA_BACKEND_OMPTARGET
 #include <cub_helper.cuh>
+#endif
 #include <target_device.h>
 
 #ifdef QUAD_SUM
@@ -282,6 +284,9 @@ namespace quda
     template <int block_size_x, int block_size_y = 1, typename Reducer, typename Arg, typename T>
     __device__ inline void reduce(Arg &arg, const T &in, const int idx = 0)
     {
+#ifdef QUDA_BACKEND_OMPTARGET
+      ompwip("unimplemented");
+#else
       using BlockReduce = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y>;
       __shared__ typename BlockReduce::TempStorage cub_tmp;
       __shared__ bool isLastBlockDone;
@@ -319,6 +324,7 @@ namespace quda
           arg.count[idx] = 0; // set to zero for next time
         }
       }
+#endif
     }
 #endif
 
@@ -328,12 +334,16 @@ namespace quda
      */
     template <typename T, int width> struct WarpReduce
     {
+#ifdef QUDA_BACKEND_OMPTARGET
+      WarpReduce() {ompwip("unimplemented");}
+#else
       static_assert(width <= device::warp_size(), "WarpReduce logical width must not be greater than the warp size");
       cub::WarpReduce<T, width> warp_reduce;
       typename decltype(warp_reduce)::TempStorage dummy;
 
       __device__ WarpReduce() : warp_reduce(dummy) {}
       __device__ T Sum(const T &value) { return warp_reduce.Sum(value); }
+#endif
     };
 
 } // namespace quda

@@ -4,7 +4,9 @@
 #include <comm_quda.h>
 #include <gauge_fix_ovr_hit_devf.cuh>
 #include <reduce_helper.h>
+#ifndef QUDA_BACKEND_OMPTARGET
 #include <thrust_helper.cuh>
+#endif
 #include <instantiate.h>
 #include <tunable_reduction.h>
 #include <tunable_nd.h>
@@ -468,6 +470,9 @@ public:
    */
   void PreCalculateLatticeIndices(size_t faceVolume[4], int X[4], int border[4], int &threads, int *borderpoints[2])
   {
+#ifdef QUDA_BACKEND_OMPTARGET
+    ompwip("unimplemented");
+#else
     BorderIdArg arg(X, border);
     int nlinksfaces = 0;
     for (int dir = 0; dir < 4; dir++)
@@ -505,6 +510,7 @@ public:
     }
     if (size[0] == size[1]) threads = size[0];
     else errorQuda("BORDER: Even and Odd sizes does not match, not supported!!!!, %d:%d", size[0], size[1]);
+#endif
   }
 
   /**
@@ -622,8 +628,8 @@ public:
         sendg_d[d] = device_malloc(bytes[d]);
         recvg_d[d] = device_malloc(bytes[d]);
         hostbuffer_h[d] = (void*)pinned_malloc(4 * bytes[d]);
-        tp[d].block = make_uint3(128, 1, 1);
-        tp[d].grid = make_uint3((faceVolumeCB[d] + tp[d].block.x - 1) / tp[d].block.x, 1, 1);
+        tp[d].block = dim3(128, 1, 1);
+        tp[d].grid = dim3((faceVolumeCB[d] + tp[d].block.x - 1) / tp[d].block.x, 1, 1);
       }
       for ( int d = 0; d < 4; d++ ) {
         if ( !commDimPartitioned(d)) continue;

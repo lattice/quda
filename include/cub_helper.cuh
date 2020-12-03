@@ -15,4 +15,6 @@ using namespace quda;
 #define CUB_USE_COOPERATIVE_GROUPS
 #endif
 
+#ifndef QUDA_BACKEND_OMPTARGET
 #include <cub/block/block_reduce.cuh>
+#endif

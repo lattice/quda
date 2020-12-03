@@ -1,6 +1,9 @@
 #pragma once
 
 #include <enum_quda.h>
+#ifdef QUDA_BACKEND_OMPTARGET
+#include <omp.h>
+#endif
 
 namespace quda {
   /**
@@ -889,7 +892,11 @@ namespace quda {
 #else
   template <typename T> __device__ inline int block_idx(const T &)
   {
+#ifdef QUDA_BACKEND_OMPTARGET
+    return omp_get_thread_num();
+#else
     return blockIdx.x;
+#endif
   }
 #endif
 

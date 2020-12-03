@@ -7,10 +7,14 @@
  */
 
 // trove requires the warp shuffle instructions introduced with Kepler
+#ifdef QUDA_BACKEND_OMPTARGET
+#define DISABLE_TROVE
+#else
 #if __COMPUTE_CAPABILITY__ >= 300
 #include <trove/ptr.h>
 #else
 #define DISABLE_TROVE
+#endif
 #endif
 
 #include <quda_matrix.h>
