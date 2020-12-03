@@ -97,7 +97,7 @@ namespace quda {
       }
     }
 
-    virtual unsigned int maxBlockSize(const TuneParam &param) const { return 1024 / (param.block.y*param.block.z); }
+    virtual unsigned int maxBlockSize(const TuneParam &param) const { return 256 / (param.block.y*param.block.z); }
     virtual unsigned int maxGridSize() const { return 2*deviceProp.multiProcessorCount; }
     virtual unsigned int minGridSize() const { return 1; }
 
