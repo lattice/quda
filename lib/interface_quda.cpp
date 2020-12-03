@@ -1856,9 +1856,7 @@ namespace quda {
     dEig = Dirac::create(diracEigParam);
   }
 
-  static double unscaled_shifts[QUDA_MAX_MULTI_SHIFT];
-
-  void massRescale(cudaColorSpinorField &b, QudaInvertParam &param) {
+  void massRescale(cudaColorSpinorField &b, QudaInvertParam &param, bool for_multishift) {
 
     double kappa5 = (0.5/(5.0 + param.m5));
     double kappa = (param.dslash_type == QUDA_DOMAIN_WALL_DSLASH || param.dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
@@ -1890,46 +1888,45 @@ namespace quda {
       return;
     }
 
-    for(int i=0; i<param.num_offset; i++) {
-      unscaled_shifts[i] = param.offset[i];
-    }
-
-    // multiply the source to compensate for normalization of the Dirac operator, if necessary
-    switch (param.solution_type) {
-      case QUDA_MAT_SOLUTION:
-        if (param.mass_normalization == QUDA_MASS_NORMALIZATION ||
-            param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
-	  blas::ax(2.0*kappa, b);
-	  for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 2.0*kappa;
-        }
-        break;
-      case QUDA_MATDAG_MAT_SOLUTION:
-        if (param.mass_normalization == QUDA_MASS_NORMALIZATION ||
-            param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
-	  blas::ax(4.0*kappa*kappa, b);
-	  for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 4.0*kappa*kappa;
-        }
-        break;
-      case QUDA_MATPC_SOLUTION:
-        if (param.mass_normalization == QUDA_MASS_NORMALIZATION) {
-	  blas::ax(4.0*kappa*kappa, b);
-	  for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 4.0*kappa*kappa;
-        } else if (param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
-	  blas::ax(2.0*kappa, b);
-	  for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 2.0*kappa;
-        }
-        break;
-      case QUDA_MATPCDAG_MATPC_SOLUTION:
-        if (param.mass_normalization == QUDA_MASS_NORMALIZATION) {
-	  blas::ax(16.0*std::pow(kappa,4), b);
-	  for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 16.0*std::pow(kappa,4);
-        } else if (param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
-	  blas::ax(4.0*kappa*kappa, b);
-	  for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 4.0*kappa*kappa;
-        }
-        break;
-      default:
-        errorQuda("Solution type %d not supported", param.solution_type);
+    if (for_multishift) {
+      // multiply the source to compensate for normalization of the Dirac operator, if necessary
+      // you are responsible for restoring what's in param.offset
+      switch (param.solution_type) {
+        case QUDA_MAT_SOLUTION:
+          if (param.mass_normalization == QUDA_MASS_NORMALIZATION ||
+              param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
+  	  blas::ax(2.0*kappa, b);
+  	  for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 2.0*kappa;
+          }
+          break;
+        case QUDA_MATDAG_MAT_SOLUTION:
+          if (param.mass_normalization == QUDA_MASS_NORMALIZATION ||
+              param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
+  	  blas::ax(4.0*kappa*kappa, b);
+  	  for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 4.0*kappa*kappa;
+          }
+          break;
+        case QUDA_MATPC_SOLUTION:
+          if (param.mass_normalization == QUDA_MASS_NORMALIZATION) {
+  	  blas::ax(4.0*kappa*kappa, b);
+  	  for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 4.0*kappa*kappa;
+          } else if (param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
+  	  blas::ax(2.0*kappa, b);
+  	  for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 2.0*kappa;
+          }
+          break;
+        case QUDA_MATPCDAG_MATPC_SOLUTION:
+          if (param.mass_normalization == QUDA_MASS_NORMALIZATION) {
+  	  blas::ax(16.0*std::pow(kappa,4), b);
+  	  for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 16.0*std::pow(kappa,4);
+          } else if (param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
+  	  blas::ax(4.0*kappa*kappa, b);
+  	  for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 4.0*kappa*kappa;
+          }
+          break;
+        default:
+          errorQuda("Solution type %d not supported", param.solution_type);
+      }
     }
 
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Mass rescale done\n");
@@ -2969,7 +2966,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     blas::ax(1.0/sqrt(nb), *x);
   }
 
-  massRescale(*static_cast<cudaColorSpinorField*>(b), *param);
+  massRescale(*static_cast<cudaColorSpinorField*>(b), *param, false);
 
   dirac.prepare(in, out, *x, *b, param->solution_type);
 
@@ -3429,7 +3426,7 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
   }
 
   for(int i=0; i < param->num_src; i++) {
-    massRescale(dynamic_cast<cudaColorSpinorField&>( b->Component(i) ), *param);
+    massRescale(dynamic_cast<cudaColorSpinorField&>( b->Component(i) ), *param, false);
   }
 
   // MW: need to check what dirac.prepare does
@@ -3780,7 +3777,14 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
     blas::ax(1.0/sqrt(nb), *b);
   }
 
-  massRescale(*b, *param);
+  // backup shifts
+  double unscaled_shifts[QUDA_MAX_MULTI_SHIFT];
+  for (int i = 0; i < param->num_offset; i++) {
+    unscaled_shifts[i] = param->offset[i];
+  }
+
+  // rescale
+  massRescale(*b, *param, true);
   profileMulti.TPSTOP(QUDA_PROFILE_PREAMBLE);
 
   DiracMatrix *m, *mSloppy;
@@ -3937,7 +3941,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
     }
   }
 
-  // restore shifts -- avoid side effects
+  // restore shifts
   for(int i=0; i < param->num_offset; i++) {
     param->offset[i] = unscaled_shifts[i];
   }

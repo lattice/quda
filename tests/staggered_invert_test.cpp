@@ -331,8 +331,6 @@ int main(int argc, char **argv)
                                  (void **)cpuLong->Ghost(), gauge_param, inv_param, 0);
     }
 
-    // Compute timings
-    if (Nsrc > 1) performanceStats(time, gflops, iter);
     break;
 
   case 5: // multi mass CG, even parity solution, solving EVEN system
@@ -356,16 +354,22 @@ int main(int argc, char **argv)
       qudaOutArray[i] = ColorSpinorField::Create(cs_param);
       outArray[i] = qudaOutArray[i]->V();
     }
-    quda::spinorNoise(*in[0], *rng, QUDA_NOISE_UNIFORM);
-    invertMultiShiftQuda((void **)outArray, in[0]->V(), &inv_param);
 
-    printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
-               inv_param.gflops / inv_param.secs);
+    for (int k = 0; k < Nsrc; k++) {
+      quda::spinorNoise(*in[k], *rng, QUDA_NOISE_UNIFORM);
+      invertMultiShiftQuda((void **)outArray, in[k]->V(), &inv_param);
 
-    for (int i = 0; i < multishift; i++) {
-      printfQuda("%dth solution: mass=%f, ", i, masses[i]);
-      verifyStaggeredInversion(tmp, ref, in[0], qudaOutArray[i], masses[i], qdp_fatlink, qdp_longlink,
-                               (void **)cpuFat->Ghost(), (void **)cpuLong->Ghost(), gauge_param, inv_param, i);
+      time[k] = inv_param.secs;
+      gflops[k] = inv_param.gflops / inv_param.secs;
+      iter[k] = inv_param.iter;
+      printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
+                 inv_param.gflops / inv_param.secs);
+
+      for (int i = 0; i < multishift; i++) {
+        printfQuda("%dth solution: mass=%f, ", i, masses[i]);
+        verifyStaggeredInversion(tmp, ref, in[k], qudaOutArray[i], masses[i], qdp_fatlink, qdp_longlink,
+                                 (void **)cpuFat->Ghost(), (void **)cpuLong->Ghost(), gauge_param, inv_param, i);
+      }
     }
 
     for (int i = 0; i < multishift; i++) delete qudaOutArray[i];
@@ -374,6 +378,9 @@ int main(int argc, char **argv)
   default: errorQuda("Unsupported test type");
 
   } // switch
+
+  // Compute timings
+  if (Nsrc > 1) performanceStats(time, gflops, iter);
 
   // Free RNG
   rng->Release();
