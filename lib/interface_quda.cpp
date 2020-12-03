@@ -795,10 +795,9 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
   if (extendedGaugeResident) {
     // updated the resident gauge field if needed
-    const int R[] = {commDimPartitioned(0), commDimPartitioned(1), commDimPartitioned(2), commDimPartitioned(3)};
     QudaReconstructType recon = extendedGaugeResident->Reconstruct();
     delete extendedGaugeResident;
-
+    // Use the static R here
     extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileGauge, false, recon);
   }
 
@@ -3465,13 +3464,6 @@ void callSplitGridQuda(Interface op, void **_hp_x, void **_hp_b, QudaInvertParam
   } else {
     loadFatLongGaugeQuda(param, gauge_param, collected_milc_fatlink_field->Gauge_p(), collected_milc_longlink_field->Gauge_p());
   }
-
-  /** For debug
-    // Compute plaquette as a sanity check
-    double plaq[3];
-    plaqQuda(plaq);
-    printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
-  */
 
   profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_PREAMBLE);
   profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_TOTAL);
