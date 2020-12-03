@@ -1856,7 +1856,8 @@ namespace quda {
     dEig = Dirac::create(diracEigParam);
   }
 
-  void massRescale(cudaColorSpinorField &b, QudaInvertParam &param, bool for_multishift) {
+  void massRescale(cudaColorSpinorField &b, QudaInvertParam &param, bool for_multishift)
+  {
 
     double kappa5 = (0.5/(5.0 + param.m5));
     double kappa = (param.dslash_type == QUDA_DOMAIN_WALL_DSLASH || param.dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
@@ -1895,32 +1896,38 @@ namespace quda {
         if (param.mass_normalization == QUDA_MASS_NORMALIZATION ||
             param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
 	  blas::ax(2.0*kappa, b);
-	  if (for_multishift) for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 2.0*kappa;
+          if (for_multishift)
+            for (int i = 0; i < param.num_offset; i++) param.offset[i] *= 2.0 * kappa;
         }
         break;
       case QUDA_MATDAG_MAT_SOLUTION:
         if (param.mass_normalization == QUDA_MASS_NORMALIZATION ||
             param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
 	  blas::ax(4.0*kappa*kappa, b);
-	  if (for_multishift) for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 4.0*kappa*kappa;
+          if (for_multishift)
+            for (int i = 0; i < param.num_offset; i++) param.offset[i] *= 4.0 * kappa * kappa;
         }
         break;
       case QUDA_MATPC_SOLUTION:
         if (param.mass_normalization == QUDA_MASS_NORMALIZATION) {
 	  blas::ax(4.0*kappa*kappa, b);
-	  if (for_multishift) for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 4.0*kappa*kappa;
+          if (for_multishift)
+            for (int i = 0; i < param.num_offset; i++) param.offset[i] *= 4.0 * kappa * kappa;
         } else if (param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
 	  blas::ax(2.0*kappa, b);
-	  if (for_multishift) for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 2.0*kappa;
+          if (for_multishift)
+            for (int i = 0; i < param.num_offset; i++) param.offset[i] *= 2.0 * kappa;
         }
         break;
       case QUDA_MATPCDAG_MATPC_SOLUTION:
         if (param.mass_normalization == QUDA_MASS_NORMALIZATION) {
 	  blas::ax(16.0*std::pow(kappa,4), b);
-	  if (for_multishift) for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 16.0*std::pow(kappa,4);
+          if (for_multishift)
+            for (int i = 0; i < param.num_offset; i++) param.offset[i] *= 16.0 * std::pow(kappa, 4);
         } else if (param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
 	  blas::ax(4.0*kappa*kappa, b);
-	  if (for_multishift) for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 4.0*kappa*kappa;
+          if (for_multishift)
+            for (int i = 0; i < param.num_offset; i++) param.offset[i] *= 4.0 * kappa * kappa;
         }
         break;
       default:
@@ -1934,7 +1941,6 @@ namespace quda {
       double nin = blas::norm2(b);
       printfQuda("Mass rescale: norm of source out = %g\n", nin);
     }
-
   }
 }
 
@@ -2964,7 +2970,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     blas::ax(1.0/sqrt(nb), *x);
   }
 
-  massRescale(*static_cast<cudaColorSpinorField*>(b), *param, false);
+  massRescale(*static_cast<cudaColorSpinorField *>(b), *param, false);
 
   dirac.prepare(in, out, *x, *b, param->solution_type);
 
@@ -3424,7 +3430,7 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
   }
 
   for(int i=0; i < param->num_src; i++) {
-    massRescale(dynamic_cast<cudaColorSpinorField&>( b->Component(i) ), *param, false);
+    massRescale(dynamic_cast<cudaColorSpinorField &>(b->Component(i)), *param, false);
   }
 
   // MW: need to check what dirac.prepare does
@@ -3777,9 +3783,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   // backup shifts
   double unscaled_shifts[QUDA_MAX_MULTI_SHIFT];
-  for (int i = 0; i < param->num_offset; i++) {
-    unscaled_shifts[i] = param->offset[i];
-  }
+  for (int i = 0; i < param->num_offset; i++) { unscaled_shifts[i] = param->offset[i]; }
 
   // rescale
   massRescale(*b, *param, true);
