@@ -1,4 +1,5 @@
 *.o
+*.d
 *.f90
 *.mod
 *.a
@@ -10,6 +11,7 @@ milc_interface/*
 *.pyc
 tunecache.tsv
 profile.tsv
+profile_*.tsv
 config.log
 CMakeCache.txt
 CMakeFiles
