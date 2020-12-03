@@ -243,7 +243,9 @@ int main(int argc, char **argv)
   }
 
   // Create ghost gauge fields in case of multi GPU builds.
-  gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ? QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;
+  gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ?
+    QUDA_SU3_LINKS :
+    QUDA_ASQTAD_FAT_LINKS;
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
   gauge_param.location = QUDA_CPU_FIELD_LOCATION;
 
@@ -276,9 +278,7 @@ int main(int argc, char **argv)
   quda::ColorSpinorField *tmp;
   quda::ColorSpinorParam cs_param;
   constructStaggeredTestSpinorParam(&cs_param, &inv_param, &gauge_param);
-  for (int k = 0; k < Nsrc; k++) {
-    in.emplace_back(quda::ColorSpinorField::Create(cs_param));
-  }
+  for (int k = 0; k < Nsrc; k++) { in.emplace_back(quda::ColorSpinorField::Create(cs_param)); }
   out = quda::ColorSpinorField::Create(cs_param);
   ref = quda::ColorSpinorField::Create(cs_param);
   tmp = quda::ColorSpinorField::Create(cs_param);
