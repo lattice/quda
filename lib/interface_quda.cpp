@@ -1888,7 +1888,6 @@ namespace quda {
       return;
     }
 
-    if (for_multishift) {
     // multiply the source to compensate for normalization of the Dirac operator, if necessary
     // you are responsible for restoring what's in param.offset
     switch (param.solution_type) {
@@ -1896,37 +1895,36 @@ namespace quda {
         if (param.mass_normalization == QUDA_MASS_NORMALIZATION ||
             param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
 	  blas::ax(2.0*kappa, b);
-	  for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 2.0*kappa;
+	  if (for_multishift) for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 2.0*kappa;
         }
         break;
       case QUDA_MATDAG_MAT_SOLUTION:
         if (param.mass_normalization == QUDA_MASS_NORMALIZATION ||
             param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
 	  blas::ax(4.0*kappa*kappa, b);
-	  for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 4.0*kappa*kappa;
+	  if (for_multishift) for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 4.0*kappa*kappa;
         }
         break;
       case QUDA_MATPC_SOLUTION:
         if (param.mass_normalization == QUDA_MASS_NORMALIZATION) {
 	  blas::ax(4.0*kappa*kappa, b);
-	  for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 4.0*kappa*kappa;
+	  if (for_multishift) for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 4.0*kappa*kappa;
         } else if (param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
 	  blas::ax(2.0*kappa, b);
-	  for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 2.0*kappa;
+	  if (for_multishift) for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 2.0*kappa;
         }
         break;
       case QUDA_MATPCDAG_MATPC_SOLUTION:
         if (param.mass_normalization == QUDA_MASS_NORMALIZATION) {
 	  blas::ax(16.0*std::pow(kappa,4), b);
-	  for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 16.0*std::pow(kappa,4);
+	  if (for_multishift) for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 16.0*std::pow(kappa,4);
         } else if (param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
 	  blas::ax(4.0*kappa*kappa, b);
-	  for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 4.0*kappa*kappa;
+	  if (for_multishift) for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 4.0*kappa*kappa;
         }
         break;
       default:
         errorQuda("Solution type %d not supported", param.solution_type);
-    }
     }
 
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Mass rescale done\n");
