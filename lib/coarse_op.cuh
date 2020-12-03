@@ -885,6 +885,7 @@ namespace quda {
 
 	if (dir == QUDA_BACKWARDS) strcat(Aux,",dir=back");
 	else if (dir == QUDA_FORWARDS) strcat(Aux,",dir=fwd");
+        else if (dir == QUDA_IN_PLACE) strcat(Aux,",dir=clover");
 
         if (arg.bidirectional && type == COMPUTE_VUV) strcat(Aux,",bidirectional");
       }
