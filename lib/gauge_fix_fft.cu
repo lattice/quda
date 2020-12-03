@@ -185,6 +185,9 @@ namespace quda {
   void gaugeFixingFFT(GaugeField& data, int Nsteps, int verbose_interval,
                       double alpha0, int autotune, double tolerance, int stopWtheta)
   {
+#ifdef QUDA_BACKEND_OMPTARGET
+    ompwip("unimplemented");
+#else
     TimeProfile profileInternalGaugeFixFFT("InternalGaugeFixQudaFFT", false);
 
     profileInternalGaugeFixFFT.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -363,6 +366,7 @@ namespace quda {
       gbytes = gbytes / (secs * 1e9);
       printfQuda("Time: %6.6f s, Gflop/s = %6.1f, GB/s = %6.1f\n", secs, gflops, gbytes);
     }
+#endif
   }
 
   template<typename Float, int nColors, QudaReconstructType recon> struct GaugeFixingFFT {

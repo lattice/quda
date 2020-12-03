@@ -57,6 +57,7 @@ namespace quda
 
   template <typename Arg> __launch_bounds__(Arg::block_size) __global__ void transform_reduce_kernel(Arg arg)
   {
+    QUDA_RT_CONSTS;
     using count_t = decltype(arg.n_items);
 
     count_t i = blockIdx.x * blockDim.x + threadIdx.x;

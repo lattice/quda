@@ -252,6 +252,7 @@ namespace quda
   template <typename Vector, typename Arg>
   __device__ __host__ inline Vector constantInv(Arg &arg, int parity, int x_cb, int s_)
   {
+    QUDA_RT_CONSTS;
     using real = typename Arg::real;
     const auto k = arg.b;
     const auto inv = arg.c;
@@ -307,6 +308,7 @@ namespace quda
   template <typename Vector, typename Arg>
   __device__ __host__ inline Vector variableInv(Arg &arg, int parity, int x_cb, int s_)
   {
+    QUDA_RT_CONSTS;
     constexpr int nSpin = 4;
     using real = typename Arg::real;
     typedef ColorSpinor<real, Arg::nColor, nSpin / 2> HalfVector;

@@ -125,6 +125,7 @@ namespace quda {
   template<int ImplementationType, int blockSize, typename Float, typename Gauge, int gauge_dir>
   __global__ void computeFix(GaugeFixArg<Float, Gauge> arg, int parity)
   {
+    QUDA_RT_CONSTS;
     typedef complex<Float> Cmplx;
     int tid = (threadIdx.x + blockSize) % blockSize;
     int idx = blockIdx.x * blockSize + tid;
@@ -226,6 +227,7 @@ namespace quda {
    */
   template<int ImplementationType, int blockSize, typename Float, typename Gauge, int gauge_dir>
   __global__ void computeFixInteriorPoints(GaugeFixInteriorPointsArg<Float, Gauge> arg, int parity){
+    QUDA_RT_CONSTS;
     int tid = (threadIdx.x + blockSize) % blockSize;
     int idx = blockIdx.x * blockSize + tid;
     if ( idx >= arg.threads ) return;
@@ -331,6 +333,7 @@ namespace quda {
   */
   template<int ImplementationType, int blockSize, typename Float, typename Gauge, int gauge_dir>
   __global__ void computeFixBorderPoints(GaugeFixBorderPointsArg<Float, Gauge> arg, int parity){
+    QUDA_RT_CONSTS;
     typedef complex<Float> Cmplx;
 
     int tid = (threadIdx.x + blockSize) % blockSize;
@@ -409,6 +412,7 @@ namespace quda {
   template <typename Float, bool pack, typename Arg>
   __global__ void Kernel_UnPackGhost(int size, Arg arg, complex<Float> *array, int parity, int face, int dir)
   {
+    QUDA_RT_CONSTS;
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if ( idx >= size ) return;
     int X[4];
@@ -481,6 +485,7 @@ namespace quda {
   template <typename Float, bool pack, typename Arg>
   __global__ void Kernel_UnPackTop(int size, Arg arg, complex<Float> *array, int parity, int face, int dir)
   {
+    QUDA_RT_CONSTS;
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if ( idx >= size ) return;
     int X[4];
@@ -557,6 +562,7 @@ namespace quda {
 
   __global__ void ComputeBorderPointsActiveFaceIndex(BorderIdArg arg, int *faceindices, int facesize, int faceid, int parity)
   {
+    QUDA_RT_CONSTS;
     int idd = blockDim.x * blockIdx.x + threadIdx.x;
     if ( idd < facesize ) {
       int borderid = 0;

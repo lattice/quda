@@ -34,6 +34,7 @@ namespace quda {
   */
   __global__ void kernel_random(RNGState *state, unsigned long long seed, int size_cb, rngArg arg)
   {
+    QUDA_RT_CONSTS;
     int id = blockIdx.x * blockDim.x + threadIdx.x;
     int parity = blockIdx.y * blockDim.y + threadIdx.y;
     if (id < size_cb) {

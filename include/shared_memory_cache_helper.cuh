@@ -41,6 +41,7 @@ namespace quda
      */
     __device__ inline void save(const Vector &a)
     {
+      QUDA_RT_CONSTS;
       int j = (threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x;
 #pragma unroll
       for (int i = 0; i < 2 * a.size; i++) {
@@ -58,6 +59,7 @@ namespace quda
      */
     __device__ inline Vector load(int x, int y, int z)
     {
+      QUDA_RT_CONSTS;
       Vector a;
       int j = (z * blockDim.y + y) * blockDim.x + x;
 #pragma unroll

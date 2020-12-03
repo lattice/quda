@@ -229,6 +229,9 @@ namespace quda {
             int nVec, typename Arg>
   __launch_bounds__(2 * block_size) __global__ void blockOrthoGPU(Arg arg)
   {
+#ifdef QUDA_BACKEND_OMPTARGET
+    ompwip("unimplemented");
+#else
     int x_coarse = blockIdx.x;
 #ifdef SWIZZLE
     // the portion of the grid that is exactly divisible by the number of SMs
@@ -343,6 +346,7 @@ namespace quda {
 
       } // j
     }   // n
+#endif
   }
 
 } // namespace quda

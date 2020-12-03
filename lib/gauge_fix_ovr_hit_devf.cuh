@@ -67,6 +67,7 @@ namespace quda {
    */
   template<int blockSize, typename Float, int gauge_dir, int NCOLORS>
   __forceinline__ __device__ void GaugeFixHit_AtomicAdd(Matrix<complex<Float>,NCOLORS> &link, const Float relax_boost, const int tid){
+    QUDA_RT_CONSTS;
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     //__shared__ Float elems[blockSize * 4];
@@ -157,6 +158,7 @@ namespace quda {
    */
   template<int blockSize, typename Float, int gauge_dir, int NCOLORS>
   __forceinline__ __device__ void GaugeFixHit_NoAtomicAdd(Matrix<complex<Float>,NCOLORS> &link, const Float relax_boost, const int tid){
+    QUDA_RT_CONSTS;
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     //__shared__ Float elems[blockSize * 4 * 8];
@@ -252,6 +254,7 @@ namespace quda {
    */
   template<int blockSize, typename Float, int gauge_dir, int NCOLORS>
   __forceinline__ __device__ void GaugeFixHit_NoAtomicAdd_LessSM(Matrix<complex<Float>,NCOLORS> &link, const Float relax_boost, const int tid){
+    QUDA_RT_CONSTS;
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     //__shared__ Float elems[blockSize * 4 * 8];
@@ -391,6 +394,7 @@ namespace quda {
   template<int blockSize, typename Float, int gauge_dir, int NCOLORS>
   __forceinline__ __device__ void GaugeFixHit_AtomicAdd(Matrix<complex<Float>,NCOLORS> &link, Matrix<complex<Float>,NCOLORS> &link1,
 							const Float relax_boost, const int tid){
+    QUDA_RT_CONSTS;
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     //__shared__ Float elems[blockSize * 4];
@@ -485,6 +489,7 @@ namespace quda {
   template<int blockSize, typename Float, int gauge_dir, int NCOLORS>
   __forceinline__ __device__ void GaugeFixHit_NoAtomicAdd(Matrix<complex<Float>,NCOLORS> &link, Matrix<complex<Float>,NCOLORS> &link1,
 							  const Float relax_boost, const int tid){
+    QUDA_RT_CONSTS;
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     //__shared__ Float elems[blockSize * 4 * 8];
@@ -561,6 +566,7 @@ namespace quda {
    */
   template<int blockSize, typename Float, int gauge_dir, int NCOLORS>
   __forceinline__ __device__ void GaugeFixHit_NoAtomicAdd_LessSM(Matrix<complex<Float>,NCOLORS> &link, Matrix<complex<Float>,NCOLORS> &link1, const Float relax_boost, const int tid){
+    QUDA_RT_CONSTS;
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     //__shared__ Float elems[blockSize * 4 * 8];

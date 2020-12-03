@@ -139,6 +139,7 @@ namespace quda {
 
   template <bool compute_max_only, typename Arg> __global__ void CalculateYhatGPU(Arg arg)
   {
+    QUDA_RT_CONSTS;
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.Y.VolumeCB()) return;
     int i_parity = blockDim.y*blockIdx.y + threadIdx.y;

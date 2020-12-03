@@ -371,6 +371,7 @@ namespace quda {
   template <typename Float, int nDim, int Ns, int Nc, int Mc, int color_stride, int dim_thread_split, bool dslash, bool clover, bool dagger, DslashType type, typename Arg>
   __global__ void coarseDslashKernel(Arg arg)
   {
+    QUDA_RT_CONSTS;
     constexpr int warp_size = device::warp_size();
     const int lane_id = threadIdx.x % warp_size;
     const int warp_id = threadIdx.x / warp_size;

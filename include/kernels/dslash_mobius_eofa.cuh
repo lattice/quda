@@ -104,6 +104,7 @@ namespace quda
 
       __device__ __host__ inline void operator()(int x_cb, int s, int parity)
       {
+        QUDA_RT_CONSTS;
         using real = typename Arg::real;
         typedef ColorSpinor<real, Arg::nColor, 4> Vector;
 
@@ -181,6 +182,7 @@ namespace quda
 
       __device__ __host__ inline void operator()(int x_cb, int s, int parity)
       {
+        QUDA_RT_CONSTS;
         using real = typename Arg::real;
         typedef ColorSpinor<real, Arg::nColor, 4> Vector;
 

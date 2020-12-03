@@ -211,6 +211,8 @@ static inline double4 make_double4(double x,double y,double z,double w){return d
 
 #else  // QUDA_BACKEND_OMPTARGET
 
+#define QUDA_RT_CONSTS
+
 #ifndef __CUDACC_RTC__
 #include <cuda.h>
 #include <cuda_runtime.h>

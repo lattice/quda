@@ -255,6 +255,7 @@ namespace quda {
   template<int dim, QudaDirection dir, typename Arg>
   __global__ void ComputeUVGPU(Arg arg)
   {
+    QUDA_RT_CONSTS;
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.fineVolumeCB) return;
 
@@ -338,6 +339,7 @@ namespace quda {
   template <typename Arg>
   __global__ void ComputeAVGPU(Arg arg)
   {
+    QUDA_RT_CONSTS;
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.fineVolumeCB) return;
 
@@ -392,6 +394,7 @@ namespace quda {
 
   template<typename Arg>
   __global__ void ComputeTMAVGPU(Arg arg) {
+    QUDA_RT_CONSTS;
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.fineVolumeCB) return;
 
@@ -558,6 +561,7 @@ namespace quda {
   template <typename Arg>
   __global__ void ComputeTMCAVGPU(Arg arg)
   {
+    QUDA_RT_CONSTS;
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.fineVolumeCB) return;
 
@@ -577,6 +581,7 @@ namespace quda {
 
   template<typename Arg>
   __device__ __host__ inline int virtualThreadIdx(const Arg &arg) {
+    QUDA_RT_CONSTS;
     int warp_id = threadIdx.x / device::warp_size();
     int warp_lane = threadIdx.x % device::warp_size();
     int tx = warp_id * (device::warp_size() / arg.aggregates_per_block) + warp_lane / arg.aggregates_per_block;
@@ -585,12 +590,14 @@ namespace quda {
 
   template<typename Arg>
   __device__ __host__ inline int virtualBlockDim(const Arg &arg) {
+    QUDA_RT_CONSTS;
     int block_dim_x = blockDim.x / arg.aggregates_per_block;
     return block_dim_x;
   }
 
   template<typename Arg>
   __device__ __host__ inline int coarseIndex(const Arg &arg) {
+    QUDA_RT_CONSTS;
     int warp_lane = threadIdx.x % device::warp_size();
     int x_coarse = (arg.coarse_color_wave ? blockIdx.y : blockIdx.x)*arg.aggregates_per_block + warp_lane % arg.aggregates_per_block;
     return x_coarse;
@@ -955,6 +962,7 @@ namespace quda {
   __device__ inline void getIndices(const Arg &arg, int &parity, int &x_cb, int &parity_coarse,
                                     int &x_coarse_cb, int &c_row, int &c_col)
   {
+    QUDA_RT_CONSTS;
     if (arg.coarse_color_wave) {
       int parity_c_row_block_idx_z = blockDim.y*blockIdx.x + threadIdx.y;
       int c_row_block_idx_z = parity_flip ? (parity_c_row_block_idx_z % arg.coarse_color_grid_z ) : (parity_c_row_block_idx_z / 2); // coarse color row index
@@ -1076,6 +1084,7 @@ namespace quda {
 
   template<typename Arg>
   __global__ void ComputeYReverseGPU(Arg arg) {
+    QUDA_RT_CONSTS;
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.coarseVolumeCB) return;
 
@@ -1178,6 +1187,7 @@ namespace quda {
 
   template <typename Arg>
   __global__ void ComputeCoarseCloverGPU(Arg arg) {
+    QUDA_RT_CONSTS;
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.fineVolumeCB) return;
 
@@ -1214,6 +1224,7 @@ namespace quda {
   //Adds the identity matrix to the coarse local term.
   template<typename Arg>
   __global__ void AddCoarseDiagonalGPU(Arg arg) {
+    QUDA_RT_CONSTS;
     using Float = typename Arg::Float;
 
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
@@ -1245,6 +1256,7 @@ namespace quda {
   // Adds the staggered mass to the coarse local term.
   template<typename Arg>
   __global__ void AddCoarseStaggeredMassGPU(Arg arg) {
+    QUDA_RT_CONSTS;
     using Float = typename Arg::Float;
 
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
@@ -1285,6 +1297,7 @@ namespace quda {
   //Adds the twisted-mass term to the coarse local term.
   template<typename Arg>
   __global__ void AddCoarseTmDiagonalGPU(Arg arg) {
+    QUDA_RT_CONSTS;
     using Float = typename Arg::Float;
 
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
@@ -1362,6 +1375,7 @@ namespace quda {
 
   template<typename Arg>
   __global__ void ConvertGPU(Arg arg) {
+    QUDA_RT_CONSTS;
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.coarseVolumeCB) return;
 
@@ -1411,6 +1425,7 @@ namespace quda {
 
   template<typename Arg>
   __global__ void RescaleYGPU(Arg arg) {
+    QUDA_RT_CONSTS;
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.coarseVolumeCB) return;
 

@@ -183,6 +183,7 @@ namespace quda
 
   template <bool dagger, int twist, QudaPCType pc, typename Arg> __global__ void packKernel(Arg arg)
   {
+    QUDA_RT_CONSTS;
     const int sites_per_block = arg.sites_per_block;
     int local_tid = threadIdx.x;
     int tid = sites_per_block * blockIdx.x + local_tid;
@@ -223,6 +224,7 @@ namespace quda
 
     template <int twist> __device__ inline void operator()(Arg &arg, int s, int parity)
     {
+      QUDA_RT_CONSTS;
       // (active_dims * 2 + dir) * blocks_per_dir + local_block_idx
       int local_block_idx = blockIdx.x % arg.blocks_per_dir;
       int dim_dir = blockIdx.x / arg.blocks_per_dir;
@@ -293,6 +295,8 @@ namespace quda
 
   template <bool dagger, int twist, QudaPCType pc, typename Arg> __global__ void packShmemKernel(Arg arg)
   {
+    QUDA_RT_CONSTS;
+
     int s = blockDim.y * blockIdx.y + threadIdx.y;
     if (s >= arg.dc.Ls) return;
 
@@ -306,6 +310,7 @@ namespace quda
 
   template <typename Arg> __global__ void packStaggeredKernel(Arg arg)
   {
+    QUDA_RT_CONSTS;
     const int sites_per_block = arg.sites_per_block;
     int local_tid = threadIdx.x;
     int tid = sites_per_block * blockIdx.x + local_tid;
@@ -345,6 +350,7 @@ namespace quda
 
     __device__ inline void operator()(Arg &arg, int s, int parity, int = 0)
     {
+      QUDA_RT_CONSTS;
       // (active_dims * 2 + dir) * blocks_per_dir + local_block_idx
       int local_block_idx = blockIdx.x % arg.blocks_per_dir;
       int dim_dir = blockIdx.x / arg.blocks_per_dir;
@@ -406,6 +412,7 @@ namespace quda
 
   template <typename Arg> __global__ void packStaggeredShmemKernel(Arg arg)
   {
+    QUDA_RT_CONSTS;
 
     int s = blockDim.y * blockIdx.y + threadIdx.y;
     if (s >= arg.dc.Ls) return;

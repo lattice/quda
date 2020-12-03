@@ -417,6 +417,7 @@ namespace quda
             KernelType kernel_type, typename Arg>
   __global__ void dslashGPU(Arg arg)
   {
+    QUDA_RT_CONSTS;
     D<nParity, dagger, xpay, kernel_type, Arg> dslash(arg);
 
     int s = blockDim.y * blockIdx.y + threadIdx.y;
