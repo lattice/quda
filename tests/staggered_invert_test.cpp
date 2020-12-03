@@ -270,13 +270,15 @@ int main(int argc, char **argv)
 
   // Staggered vector construct START
   //-----------------------------------------------------------------------------------
-  quda::ColorSpinorField *in;
+  std::vector<quda::ColorSpinorField *> in;
   quda::ColorSpinorField *out;
   quda::ColorSpinorField *ref;
   quda::ColorSpinorField *tmp;
   quda::ColorSpinorParam cs_param;
   constructStaggeredTestSpinorParam(&cs_param, &inv_param, &gauge_param);
-  in = quda::ColorSpinorField::Create(cs_param);
+  for (int k = 0; k < Nsrc; k++) {
+    in.emplace_back(quda::ColorSpinorField::Create(cs_param));
+  }
   out = quda::ColorSpinorField::Create(cs_param);
   ref = quda::ColorSpinorField::Create(cs_param);
   tmp = quda::ColorSpinorField::Create(cs_param);
@@ -315,9 +317,9 @@ int main(int argc, char **argv)
     }
 
     for (int k = 0; k < Nsrc; k++) {
-      quda::spinorNoise(*in, *rng, QUDA_NOISE_UNIFORM);
+      quda::spinorNoise(*in[k], *rng, QUDA_NOISE_UNIFORM);
       if (inv_deflate) eig_param.preserve_deflation = k < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-      invertQuda(out->V(), in->V(), &inv_param);
+      invertQuda(out->V(), in[k]->V(), &inv_param);
 
       time[k] = inv_param.secs;
       gflops[k] = inv_param.gflops / inv_param.secs;
@@ -325,7 +327,7 @@ int main(int argc, char **argv)
       printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
                  inv_param.gflops / inv_param.secs);
       if (verify_results)
-        verifyStaggeredInversion(tmp, ref, in, out, mass, qdp_fatlink, qdp_longlink, (void **)cpuFat->Ghost(),
+        verifyStaggeredInversion(tmp, ref, in[k], out, mass, qdp_fatlink, qdp_longlink, (void **)cpuFat->Ghost(),
                                  (void **)cpuLong->Ghost(), gauge_param, inv_param, 0);
     }
 
@@ -354,15 +356,15 @@ int main(int argc, char **argv)
       qudaOutArray[i] = ColorSpinorField::Create(cs_param);
       outArray[i] = qudaOutArray[i]->V();
     }
-    quda::spinorNoise(*in, *rng, QUDA_NOISE_UNIFORM);
-    invertMultiShiftQuda((void **)outArray, in->V(), &inv_param);
+    quda::spinorNoise(*in[0], *rng, QUDA_NOISE_UNIFORM);
+    invertMultiShiftQuda((void **)outArray, in[0]->V(), &inv_param);
 
     printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
                inv_param.gflops / inv_param.secs);
 
     for (int i = 0; i < multishift; i++) {
       printfQuda("%dth solution: mass=%f, ", i, masses[i]);
-      verifyStaggeredInversion(tmp, ref, in, qudaOutArray[i], masses[i], qdp_fatlink, qdp_longlink,
+      verifyStaggeredInversion(tmp, ref, in[0], qudaOutArray[i], masses[i], qdp_fatlink, qdp_longlink,
                                (void **)cpuFat->Ghost(), (void **)cpuLong->Ghost(), gauge_param, inv_param, i);
     }
 
@@ -401,7 +403,7 @@ int main(int argc, char **argv)
   if (cpuFat != nullptr) { delete cpuFat; cpuFat = nullptr; }
   if (cpuLong != nullptr) { delete cpuLong; cpuLong = nullptr; }
 
-  delete in;
+  for (auto in_vec : in) { delete in_vec; }
   delete out;
   delete ref;
   delete tmp;
