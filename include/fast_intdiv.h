@@ -111,28 +111,26 @@ class int_fastdiv
   }
 
   __host__ __device__ __forceinline__
-    friend int operator/(const int divident, const int_fastdiv& divisor);
+  friend int operator/(const int n, const int_fastdiv& divisor)
+  {
+    int q;
+  #ifdef __CUDA_ARCH__
+    asm("mul.hi.s32 %0, %1, %2;" : "=r"(q) : "r"(divisor.M), "r"(n));
+  #else
+    q = (((unsigned long long)((long long)divisor.M * (long long)n)) >> 32);
+  #endif
+    q += n * divisor.n_add_sign;
+    if (divisor.s >= 0)
+      {
+        q >>= divisor.s; // we rely on this to be implemented as arithmetic shift
+        q += (((unsigned int)q) >> 31);
+      }
+    return q;
+  }
+
 };
 
-__host__ __device__ __forceinline__
-int operator/(const int n, const int_fastdiv& divisor)
-{
-  int q;
-#ifdef __CUDA_ARCH__
-  asm("mul.hi.s32 %0, %1, %2;" : "=r"(q) : "r"(divisor.M), "r"(n));
-#else
-  q = (((unsigned long long)((long long)divisor.M * (long long)n)) >> 32);
-#endif
-  q += n * divisor.n_add_sign;
-  if (divisor.s >= 0)
-    {
-      q >>= divisor.s; // we rely on this to be implemented as arithmetic shift
-      q += (((unsigned int)q) >> 31);
-    }
-  return q;
-}
-
-__host__ __device__ __forceinline__
+__host__ __device__ __forceinline__ static
 int operator%(const int n, const int_fastdiv& divisor)
 {
   int quotient = n / divisor;
@@ -140,61 +138,61 @@ int operator%(const int n, const int_fastdiv& divisor)
   return remainder;
 }
 
-__host__ __device__ __forceinline__
+__host__ __device__ __forceinline__ static
 int operator/(const unsigned int n, const int_fastdiv& divisor)
 {
   return ((int)n) / divisor;
 }
 
-__host__ __device__ __forceinline__
+__host__ __device__ __forceinline__ static
 int operator%(const unsigned int n, const int_fastdiv& divisor)
 {
   return ((int)n) % divisor;
 }
 
-__host__ __device__ __forceinline__
+__host__ __device__ __forceinline__ static
 int operator/(const short n, const int_fastdiv& divisor)
 {
   return ((int)n) / divisor;
 }
 
-__host__ __device__ __forceinline__
+__host__ __device__ __forceinline__ static
 int operator%(const short n, const int_fastdiv& divisor)
 {
   return ((int)n) % divisor;
 }
 
-__host__ __device__ __forceinline__
+__host__ __device__ __forceinline__ static
 int operator/(const unsigned short n, const int_fastdiv& divisor)
 {
   return ((int)n) / divisor;
 }
 
-__host__ __device__ __forceinline__
+__host__ __device__ __forceinline__ static
 int operator%(const unsigned short n, const int_fastdiv& divisor)
 {
   return ((int)n) % divisor;
 }
 
-__host__ __device__ __forceinline__
+__host__ __device__ __forceinline__ static
 int operator/(const char n, const int_fastdiv& divisor)
 {
   return ((int)n) / divisor;
 }
 
-__host__ __device__ __forceinline__
+__host__ __device__ __forceinline__ static
 int operator%(const char n, const int_fastdiv& divisor)
 {
   return ((int)n) % divisor;
 }
 
-__host__ __device__ __forceinline__
+__host__ __device__ __forceinline__ static
 int operator/(const unsigned char n, const int_fastdiv& divisor)
 {
   return ((int)n) / divisor;
 }
 
-__host__ __device__ __forceinline__
+__host__ __device__ __forceinline__ static
 int operator%(const unsigned char n, const int_fastdiv& divisor)
 {
   return ((int)n) % divisor;
