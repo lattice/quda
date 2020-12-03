@@ -5,9 +5,9 @@
 
 int Communicator::gpuid = -1;
 
-std::map<quda::CommKey, Communicator> communicator_stack;
+static std::map<quda::CommKey, Communicator> communicator_stack;
 
-quda::CommKey current_key = {-1, -1, -1, -1};
+static quda::CommKey current_key = {-1, -1, -1, -1};
 
 void init_communicator_stack(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data,
                              bool user_set_comm_handle, void *user_comm)
