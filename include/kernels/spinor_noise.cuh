@@ -28,7 +28,9 @@ namespace quda {
     real radius = uniform<real>::rand(localState);
     radius = sqrt(-log(radius));
     real phi_sin, phi_cos;
-    sincos(phi, &phi_sin, &phi_cos);
+    // sincos(phi, &phi_sin, &phi_cos);
+    phi_sin = sin(phi);
+    phi_cos = cos(phi);
     arg.v(parity, x_cb, s, c) = radius * complex<real>(phi_cos, phi_sin);
   }
 

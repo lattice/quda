@@ -369,7 +369,7 @@ namespace quda {
       __device__ __host__ static T Atan2( const T &a, const T &b) { return atan2(a,b); }
       __device__ __host__ static T Sin( const T &a ) { return sin(a); }
       __device__ __host__ static T Cos( const T &a ) { return cos(a); }
-      __device__ __host__ static void SinCos(const T &a, T *s, T *c) { sincos(a, s, c); }
+      __device__ __host__ static void SinCos(const T &a, T *s, T *c) { /*sincos(a, s, c);*/ *s=sin(a);*c=cos(a); }
     };
   
   /**
@@ -400,7 +400,9 @@ namespace quda {
 #ifdef __CUDA_ARCH__
        __sincosf(a, s, c);
 #else
-       sincosf(a, s, c);
+       // sincosf(a, s, c);
+       *s = sinf(a);
+       *c = cosf(a);
 #endif
     }
   };
@@ -433,7 +435,9 @@ namespace quda {
 #ifdef __CUDA_ARCH__
       __sincosf(a * static_cast<float>(M_PI), s, c);
 #else
-      sincosf(a * static_cast<float>(M_PI), s, c);
+      // sincosf(a * static_cast<float>(M_PI), s, c);
+      *s = sinf(a);
+      *c = cosf(a);
 #endif
     }
   };
