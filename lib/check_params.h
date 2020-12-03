@@ -395,14 +395,15 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(pipeline, 0); /** Whether to use a pipelined solver */
   P(num_offset, 0); /**< Number of offsets in the multi-shift solver */
   P(num_src, 1); /**< Number of offsets in the multi-shift solver */
-  P(num_src_per_sub_partition, 0); /**< Number of sources per sub-partitions */
-  for (int d = 0; d < 4; d++) { P(split_grid[d], 0); } /**< Grid of sub-partitions */
   P(overlap, 0); /**< width of domain overlaps */
 #endif
 
 #ifdef INIT_PARAM
   for (int d = 0; d < 4; d++) { P(split_grid[d], 1); } /**< Grid of sub-partitions */
   P(num_src_per_sub_partition, 1); /**< Number of sources per sub-partitions */
+#else
+  for (int d = 0; d < 4; d++) { P(split_grid[d], INVALID_INT); } /**< Grid of sub-partitions */
+  P(num_src_per_sub_partition, INVALID_INT); /**< Number of sources per sub-partitions */
 #endif
 
 #ifdef INIT_PARAM
