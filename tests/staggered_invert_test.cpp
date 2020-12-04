@@ -166,6 +166,15 @@ int main(int argc, char **argv)
   QudaMultigridParam mg_param = newQudaMultigridParam();
   QudaEigParam mg_eig_param[mg_levels];
 
+  // params related to split grid.
+  inv_param.split_grid[0] = grid_partition[0];
+  inv_param.split_grid[1] = grid_partition[1];
+  inv_param.split_grid[2] = grid_partition[2];
+  inv_param.split_grid[3] = grid_partition[3];
+
+  int num_sub_partition = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3];
+  bool use_split_grid = num_sub_partition > 1;
+
   if (inv_multigrid) {
 
     // Set some default values for MG solve types
@@ -191,6 +200,9 @@ int main(int argc, char **argv)
   if (inv_deflate) {
     setEigParam(eig_param);
     inv_param.eig_param = &eig_param;
+    if (use_split_grid) {
+      errorQuda("Split grid does not work with deflation yet.\n");
+    }
   } else {
     inv_param.eig_param = nullptr;
   }
@@ -261,16 +273,8 @@ int main(int argc, char **argv)
 
   loadFatLongGaugeQuda(milc_fatlink, milc_longlink, gauge_param);
 
-  inv_param.split_grid[0] = grid_partition[0];
-  inv_param.split_grid[1] = grid_partition[1];
-  inv_param.split_grid[2] = grid_partition[2];
-  inv_param.split_grid[3] = grid_partition[3];
-
   // Staggered Gauge construct END
   //-----------------------------------------------------------------------------------
-
-  int num_sub_partition = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3];
-  bool use_split_grid = num_sub_partition > 1;
 
   // Setup the multigrid preconditioner
   void *mg_preconditioner = nullptr;

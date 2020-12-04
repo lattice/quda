@@ -198,6 +198,15 @@ int main(int argc, char **argv)
   // Initialize the QUDA library
   initQuda(device_ordinal);
 
+  // params corresponds to split grid
+  inv_param.split_grid[0] = grid_partition[0];
+  inv_param.split_grid[1] = grid_partition[1];
+  inv_param.split_grid[2] = grid_partition[2];
+  inv_param.split_grid[3] = grid_partition[3];
+
+  int num_sub_partition = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3];
+  bool use_split_grid = num_sub_partition > 1;
+
   // set parameters for the reference Dslash, and prepare fields to be loaded
   if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
       || dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
@@ -213,17 +222,8 @@ int main(int argc, char **argv)
   // Allocate space on the host (always best to allocate and free in the same scope)
   for (int dir = 0; dir < 4; dir++) gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
   constructHostGaugeField(gauge, gauge_param, argc, argv);
-
   // Load the gauge field to the device
   loadGaugeQuda((void *)gauge, &gauge_param);
-
-  inv_param.split_grid[0] = grid_partition[0];
-  inv_param.split_grid[1] = grid_partition[1];
-  inv_param.split_grid[2] = grid_partition[2];
-  inv_param.split_grid[3] = grid_partition[3];
-
-  int num_sub_partition = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3];
-  bool use_split_grid = num_sub_partition > 1;
 
   // Allocate host side memory for clover terms if needed.
   //----------------------------------------------------------------------------
@@ -263,18 +263,16 @@ int main(int argc, char **argv)
 
   // Vector construct START
   //-----------------------------------------------------------------------------------
-  quda::ColorSpinorField *in;
-  quda::ColorSpinorField *out;
+  std::vector<quda::ColorSpinorField *> in(Nsrc);
+  std::vector<quda::ColorSpinorField *> out(Nsrc);
+  std::vector<quda::ColorSpinorField *> out_multishift(multishift * Nsrc);
   quda::ColorSpinorField *check;
   quda::ColorSpinorParam cs_param;
   constructWilsonTestSpinorParam(&cs_param, &inv_param, &gauge_param);
-  in = quda::ColorSpinorField::Create(cs_param);
-  out = quda::ColorSpinorField::Create(cs_param);
   check = quda::ColorSpinorField::Create(cs_param);
-  // Host array for solutions
-  void **outMulti = (void **)malloc(multishift * sizeof(void *));
+  std::vector<std::vector<void *>> _hp_multi_x(Nsrc, std::vector<void *>(multishift));
+
   // QUDA host array for internal checks and malloc
-  std::vector<quda::ColorSpinorField *> qudaOutMulti(multishift);
   // Vector construct END
   //-----------------------------------------------------------------------------------
 
@@ -295,8 +293,10 @@ int main(int argc, char **argv)
       inv_param.tol_offset[i] = inv_param.tol;
       inv_param.tol_hq_offset[i] = inv_param.tol_hq;
       // Allocate memory and set pointers
-      qudaOutMulti[i] = quda::ColorSpinorField::Create(cs_param);
-      outMulti[i] = qudaOutMulti[i]->V();
+      for (int n = 0; n < Nsrc; n++) {
+        out_multishift[n * multishift + i] = quda::ColorSpinorField::Create(cs_param);
+        _hp_multi_x[n][i] = out_multishift[n * multishift + i]->V();
+      }
     }
   }
 
@@ -310,19 +310,23 @@ int main(int argc, char **argv)
   std::vector<quda::ColorSpinorField *> _h_b(Nsrc, nullptr);
   std::vector<quda::ColorSpinorField *> _h_x(Nsrc, nullptr);
 
+  for (int i = 0; i < Nsrc; i++) {
+    // Populate the host spinor with random numbers.
+    in[i] = quda::ColorSpinorField::Create(cs_param);
+    in[i]->Source(QUDA_RANDOM_SOURCE);
+    out[i] = quda::ColorSpinorField::Create(cs_param);
+  }
+
   if (!use_split_grid) {
 
     for (int i = 0; i < Nsrc; i++) {
-
-      // Populate the host spinor with random numbers.
-      in->Source(QUDA_RANDOM_SOURCE);
       // If deflating, preserve the deflation space between solves
       if (inv_deflate) eig_param.preserve_deflation = i < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
       // Perform QUDA inversions
       if (multishift > 1) {
-        invertMultiShiftQuda((void **)outMulti, in->V(), &inv_param);
+        invertMultiShiftQuda(_hp_multi_x[i].data(), in[i]->V(), &inv_param);
       } else {
-        invertQuda(out->V(), in->V(), &inv_param);
+        invertQuda(out[i]->V(), in[i]->V(), &inv_param);
       }
 
       time[i] = inv_param.secs;
@@ -331,27 +335,22 @@ int main(int argc, char **argv)
       printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
                  inv_param.gflops / inv_param.secs);
     }
-
   } else {
     inv_param.num_src = Nsrc;
     inv_param.num_src_per_sub_partition = Nsrc / num_sub_partition;
-
-    for (auto &p : _h_b) {
-      p = new quda::cpuColorSpinorField(cs_param);
-      p->Source(QUDA_RANDOM_SOURCE);
-    }
-    for (auto &p : _h_x) { p = new quda::cpuColorSpinorField(cs_param); }
-
     // Host arrays for solutions, sources, and check
     std::vector<void *> _hp_x(Nsrc);
     std::vector<void *> _hp_b(Nsrc);
     for (int i = 0; i < Nsrc; i++) {
-      _hp_x[i] = _h_x[i]->V();
-      _hp_b[i] = _h_b[i]->V();
+      _hp_x[i] = out[i]->V();
+      _hp_b[i] = in[i]->V();
     }
-
     // Run split grid
-    invertSplitGridQuda(_hp_x.data(), _hp_b.data(), &inv_param, (void *)gauge, &gauge_param);
+    if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+      invertSplitGridCloverQuda(_hp_x.data(), _hp_b.data(), &inv_param, (void *)gauge, &gauge_param, clover, clover_inv);
+    } else {
+      invertSplitGridQuda(_hp_x.data(), _hp_b.data(), &inv_param, (void *)gauge, &gauge_param);
+    }
   }
 
   // QUDA invert test COMPLETE
@@ -368,30 +367,21 @@ int main(int argc, char **argv)
 
   // Perform host side verification of inversion if requested
   if (verify_results) {
-    if (!use_split_grid) {
-      verifyInversion(out->V(), (void **)outMulti, in->V(), check->V(), gauge_param, inv_param, gauge, clover,
-                      clover_inv);
-    } else {
-      for (int i = 0; i < Nsrc; i++) {
-        verifyInversion(_h_x[i]->V(), nullptr, _h_b[i]->V(), check->V(), gauge_param, inv_param, gauge, clover,
-                        clover_inv);
-      }
+    for (int i = 0; i < Nsrc; i++) {
+      verifyInversion(out[i]->V(), _hp_multi_x[i].data(), in[i]->V(), check->V(), gauge_param, inv_param, gauge, clover,
+          clover_inv);
     }
   }
 
   // Clean up memory allocations
-  delete in;
-  delete out;
   delete check;
-  free(outMulti);
   if (multishift > 1) {
-    for (int i = 0; i < multishift; i++) delete qudaOutMulti[i];
+    for (auto p : out_multishift) { delete p; }
   }
 
-  if (use_split_grid) {
-    for (auto p : _h_b) { delete p; }
-    for (auto p : _h_x) { delete p; }
-  }
+  for (auto p : in) { delete p; }
+  for (auto p : out) { delete p; }
+  for (auto p : out_multishift) { if (p) { delete p; } }
 
   freeGaugeQuda();
   for (int dir = 0; dir < 4; dir++) free(gauge[dir]);

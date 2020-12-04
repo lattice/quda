@@ -336,9 +336,12 @@ DslashTime dslashCUDA(int niter) {
       _hp_x[i] = vp_spinorOut[i]->V();
       _hp_b[i] = vp_spinor[i]->V();
     }
-
-    dslashSplitGridQuda(_hp_x, _hp_b, &inv_param, parity, hostGauge, &gauge_param);
-
+    if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
+      || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
+      dslashSplitGridCloverQuda(_hp_x, _hp_b, &inv_param, parity, hostGauge, &gauge_param, hostClover, hostCloverInv);
+    } else {
+      dslashSplitGridQuda(_hp_x, _hp_b, &inv_param, parity, hostGauge, &gauge_param);
+    }
     free(_hp_x);
     free(_hp_b);
 

@@ -3282,14 +3282,15 @@ void loadFatLongGaugeQuda(QudaInvertParam *inv_param, QudaGaugeParam *gauge_para
 }
 
 template <class Interface, class... Args>
-void callSplitGridQuda(Interface op, void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge,
-                       void *milc_fatlinks, void *milc_longlinks, QudaGaugeParam *gauge_param, Args... args)
+void callSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // color spinor field pointers, and inv_param
+                       void *h_gauge, void *milc_fatlinks, void *milc_longlinks, QudaGaugeParam *gauge_param, // gauge field pointers
+                       void *h_clover, void *h_clovinv, // clover field pointers
+                       Interface op, Args... args)
 {
   /**
     Here we first re-distribute gauge, color spinor, and clover field to sub-partitions, then call either invertQuda or dslashQuda.
-    - For clover field, we re-distribute cloverPrecise directly, after restore it after invertQuda/dslashQuda is called.
-    - For gauge field, we re-distribute the host side field, and restore it after.
-    - For color spinor field, we re-distribute the host side fields, and re-collect the host side fields.
+    - For clover and gauge field, we re-distribute the host clover side fields, restore them after.
+    - For color spinor field, we re-distribute the host side source fields, and re-collect the host side solution fields.
   */
 
   profilerStart(__func__);
@@ -3353,6 +3354,7 @@ void callSplitGridQuda(Interface op, void **_hp_x, void **_hp_b, QudaInvertParam
     = (param->solution_type == QUDA_MATPC_SOLUTION) || (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
 
   const int *X = gauge_param->X;
+  quda::CommKey field_dim = {X[0], X[1], X[2], X[3]};
   ColorSpinorParam cpuParam(_hp_b[0], *param, X, pc_solution, param->input_location);
   std::vector<ColorSpinorField *> _h_b(param->num_src);
   for (int i = 0; i < param->num_src; i++) {
@@ -3388,28 +3390,39 @@ void callSplitGridQuda(Interface op, void **_hp_x, void **_hp_b, QudaInvertParam
   }
 
   // Deal with clover field
-  quda::cudaCloverField *original_clover = nullptr;
+  quda::CloverField *input_clover = nullptr;
+  quda::CloverField *collected_clover = nullptr;
   if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    CloverFieldParam clover_param(*cloverPrecise);
+    if (h_clover || h_clovinv) {
+      CloverFieldParam clover_param;
+      clover_param.nDim = 4;
+      clover_param.csw = param->clover_coeff;
+      clover_param.twisted = param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH;
+      clover_param.mu2 = clover_param.twisted ? 4.0 * param->kappa * param->kappa * param->mu * param->mu : 0.0;
+      clover_param.siteSubset = QUDA_FULL_SITE_SUBSET;
+      for (int d = 0; d < 4; d++) { clover_param.x[d] = field_dim[d]; }
+      clover_param.pad = param->cl_pad;
+      clover_param.create = QUDA_REFERENCE_FIELD_CREATE;
+      clover_param.norm = nullptr;
+      clover_param.invNorm = nullptr;
+      clover_param.setPrecision(param->clover_cpu_prec);
+      clover_param.direct = h_clover ? true : false;
+      clover_param.inverse = h_clovinv ? true : false;
+      clover_param.clover = h_clover;
+      clover_param.cloverInv = h_clovinv;
+      clover_param.order = param->clover_order;
+      clover_param.location = param->clover_location;
 
-    // Make a copy of the original clover field.
-    original_clover = static_cast<cudaCloverField *>(CloverField::Create(clover_param));
-    if (cloverPrecise->V(false)) { original_clover->copy(*cloverPrecise, false); }
-    if (cloverPrecise->V(true)) { original_clover->copy(*cloverPrecise, true); }
+      input_clover = CloverField::Create(clover_param);
 
-    for (int d = 0; d < CommKey::n_dim; d++) { clover_param.x[d] *= split_key[d]; }
-    quda::CloverField *collected_clover = new quda::cudaCloverField(clover_param);
-    std::vector<quda::CloverField *> v_c(1);
-    v_c[0] = cloverPrecise;
-    quda::split_field(*collected_clover, v_c, split_key); // Clover uses 4d even-odd preconditioning.
-    // Free the original clover fields all together.
-    freeCloverQuda();
+      for (int d = 0; d < CommKey::n_dim; d++) { clover_param.x[d] *= split_key[d]; }
+      clover_param.create = QUDA_NULL_FIELD_CREATE;
+      collected_clover = CloverField::Create(clover_param);
 
-    // Set up the new re-distributed clover fields.
-    cloverPrecise = static_cast<quda::cudaCloverField *>(collected_clover);
-    QudaPrecision prec[] = {param->clover_cuda_prec_sloppy, param->clover_cuda_prec_precondition,
-                            param->clover_cuda_prec_refinement_sloppy, param->clover_cuda_prec_eigensolver};
-    loadSloppyCloverQuda(prec);
+      std::vector<quda::CloverField *> v_c(1);
+      v_c[0] = input_clover;
+      quda::split_field(*collected_clover, v_c, split_key); // Clover uses 4d even-odd preconditioning.
+    }
   }
 
   quda::GaugeField *collected_gauge = nullptr;
@@ -3466,6 +3479,14 @@ void callSplitGridQuda(Interface op, void **_hp_x, void **_hp_b, QudaInvertParam
     loadFatLongGaugeQuda(param, gauge_param, collected_milc_fatlink_field->Gauge_p(), collected_milc_longlink_field->Gauge_p());
   }
 
+  if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    if (collected_clover) {
+      loadCloverQuda(collected_clover->V(false), collected_clover->V(true), param);
+    } else {
+      loadCloverQuda(nullptr, nullptr, param);
+    }
+  }
+
   profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_PREAMBLE);
   profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_TOTAL);
 
@@ -3506,20 +3527,18 @@ void callSplitGridQuda(Interface op, void **_hp_x, void **_hp_b, QudaInvertParam
     delete collected_milc_longlink_field;
   }
 
-  if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    freeCloverQuda();
-    // Restore the original clover field
-    cloverPrecise = original_clover;
-    QudaPrecision prec[] = {param->clover_cuda_prec_sloppy, param->clover_cuda_prec_precondition,
-                            param->clover_cuda_prec_refinement_sloppy, param->clover_cuda_prec_eigensolver};
-    loadSloppyCloverQuda(prec);
-  }
+  if (input_clover) { delete input_clover; }
+  if (collected_clover) { delete collected_clover; }
 
   // Restore the gauge field
   if (!is_staggered) {
     loadGaugeQuda(h_gauge, gauge_param);
   } else { 
     loadFatLongGaugeQuda(param, gauge_param, milc_fatlinks, milc_longlinks);
+  }
+
+  if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    loadCloverQuda(h_clover, h_clovinv, param);
   }
 
   profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_EPILOGUE);
@@ -3530,29 +3549,40 @@ void callSplitGridQuda(Interface op, void **_hp_x, void **_hp_b, QudaInvertParam
 void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge, QudaGaugeParam *gauge_param)
 {
   auto op = [](void *_x, void *_b, QudaInvertParam *param) { invertQuda(_x, _b, param); };
-  callSplitGridQuda(op, _hp_x, _hp_b, param, h_gauge, nullptr, nullptr, gauge_param);
+  callSplitGridQuda(_hp_x, _hp_b, param, h_gauge, nullptr, nullptr, gauge_param, nullptr, nullptr, op);
 }
 
 void invertSplitGridStaggeredQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *milc_fatlinks, void *milc_longlinks, QudaGaugeParam *gauge_param)
 {
   auto op = [](void *_x, void *_b, QudaInvertParam *param) { invertQuda(_x, _b, param); };
-  callSplitGridQuda(op, _hp_x, _hp_b, param, nullptr, milc_fatlinks, milc_longlinks, gauge_param);
+  callSplitGridQuda(_hp_x, _hp_b, param, nullptr, milc_fatlinks, milc_longlinks, gauge_param, nullptr, nullptr, op);
+}
+
+void invertSplitGridCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge, QudaGaugeParam *gauge_param, void *h_clover, void *h_clovinv)
+{
+  auto op = [](void *_x, void *_b, QudaInvertParam *param) { invertQuda(_x, _b, param); };
+  callSplitGridQuda(_hp_x, _hp_b, param, h_gauge, nullptr, nullptr, gauge_param, h_clover, h_clovinv, op);
 }
 
 void dslashSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity, void *h_gauge,
                          QudaGaugeParam *gauge_param)
 {
   auto op = [](void *_x, void *_b, QudaInvertParam *param, QudaParity parity) { dslashQuda(_x, _b, param, parity); };
-  callSplitGridQuda(op, _hp_x, _hp_b, param, h_gauge, nullptr, nullptr, gauge_param, parity);
+  callSplitGridQuda(_hp_x, _hp_b, param, h_gauge, nullptr, nullptr, gauge_param, nullptr, nullptr, op, parity);
 }
 
 void dslashSplitGridStaggeredQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity, void *milc_fatlinks,
                                     void *milc_longlinks, QudaGaugeParam *gauge_param)
 {
   auto op = [](void *_x, void *_b, QudaInvertParam *param, QudaParity parity) { dslashQuda(_x, _b, param, parity); };
-  callSplitGridQuda(op, _hp_x, _hp_b, param, nullptr, milc_fatlinks, milc_longlinks, gauge_param, parity);
+  callSplitGridQuda(_hp_x, _hp_b, param, nullptr, milc_fatlinks, milc_longlinks, gauge_param, nullptr, nullptr, op, parity);
 }
 
+void dslashSplitGridCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity, void *h_gauge, QudaGaugeParam *gauge_param, void *h_clover, void *h_clovinv)
+{
+  auto op = [](void *_x, void *_b, QudaInvertParam *param, QudaParity parity) { dslashQuda(_x, _b, param, parity); };
+  callSplitGridQuda(_hp_x, _hp_b, param, h_gauge, nullptr, nullptr, gauge_param, h_clover, h_clovinv, op, parity);
+}
 
 /*!
  * Generic version of the multi-shift solver. Should work for

@@ -1080,6 +1080,9 @@ extern "C" {
   void invertSplitGridStaggeredQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *milc_fatlinks,
                                     void *milc_longlinks, QudaGaugeParam *gauge_param);
 
+  void invertSplitGridCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param,
+                                 void *h_gauge, QudaGaugeParam *gauge_param, void *h_clover, void *h_clovinv);
+
   /**
    * Solve for multiple shifts (e.g., masses).
    * @param _hp_x    Array of solution spinor fields
@@ -1139,6 +1142,8 @@ extern "C" {
 
   void dslashSplitGridStaggeredQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity, void *milc_fatlinks,
                                     void *milc_longlinks, QudaGaugeParam *gauge_param);
+
+  void dslashSplitGridCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity, void *h_gauge, QudaGaugeParam *gauge_param, void *h_clover, void *h_clovinv);
 
   /**
    * Apply the clover operator or its inverse.

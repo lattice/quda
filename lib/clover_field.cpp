@@ -408,17 +408,17 @@ namespace quda {
 
     size_t buffer_offset = 0;
     if (V(false)) { // direct
-      qudaMemcpy(static_cast<char *>(buffer), clover, bytes, cudaMemcpyDeviceToHost);
+      std::memcpy(static_cast<char *>(buffer), clover, bytes);
       if (precision < QUDA_SINGLE_PRECISION) {
-        qudaMemcpy(static_cast<char *>(buffer) + bytes, norm, norm_bytes, cudaMemcpyDeviceToHost);
+        std::memcpy(static_cast<char *>(buffer) + bytes, norm, norm_bytes);
       }
       buffer_offset += bytes + norm_bytes;
     }
 
     if (V(true)) { // inverse
-      qudaMemcpy(static_cast<char *>(buffer) + buffer_offset, cloverInv, bytes, cudaMemcpyDeviceToHost);
+      std::memcpy(static_cast<char *>(buffer) + buffer_offset, cloverInv, bytes);
       if (precision < QUDA_SINGLE_PRECISION) {
-        qudaMemcpy(static_cast<char *>(buffer) + buffer_offset + bytes, invNorm, norm_bytes, cudaMemcpyDeviceToHost);
+        std::memcpy(static_cast<char *>(buffer) + buffer_offset + bytes, invNorm, norm_bytes);
       }
     }
   }
