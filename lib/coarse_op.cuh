@@ -55,6 +55,8 @@ namespace quda {
           else if (arg.dim==1) ComputeUVCPU<1,QUDA_FORWARDS>(arg);
           else if (arg.dim==2) ComputeUVCPU<2,QUDA_FORWARDS>(arg);
           else if (arg.dim==3) ComputeUVCPU<3,QUDA_FORWARDS>(arg);
+        } else if (arg.dir == QUDA_IN_PLACE) {
+          ComputeUVCPU<0,QUDA_IN_PLACE>(arg);
         } else {
           errorQuda("Undefined direction %d", arg.dir);
         }
@@ -120,11 +122,17 @@ namespace quda {
           else if (arg.dim==1) ComputeVUVCPU<1,QUDA_FORWARDS>(arg);
           else if (arg.dim==2) ComputeVUVCPU<2,QUDA_FORWARDS>(arg);
           else if (arg.dim==3) ComputeVUVCPU<3,QUDA_FORWARDS>(arg);
+        } else if (arg.dir == QUDA_IN_PLACE) {
+          ComputeVUVCPU<0,QUDA_IN_PLACE>(arg);
         } else {
           errorQuda("Undefined direction %d", arg.dir);
         }
       } else if (type == COMPUTE_COARSE_CLOVER) {
+#if defined(WILSONCOARSE)
         ComputeCoarseCloverCPU(arg);
+#else
+        errorQuda("ComputeCoarseClover not enabled for non-Wilson coarsenings");
+#endif
       } else if (type == COMPUTE_REVERSE_Y) {
         ComputeYReverseCPU(arg);
       } else if (type == COMPUTE_DIAGONAL) {
@@ -161,13 +169,13 @@ namespace quda {
       using namespace jitify::reflection;
 #endif
       if (type == COMPUTE_UV) {
-        if (use_mma) {
+        if (use_mma && arg.dir != QUDA_IN_PLACE) {
 
           mma::launch_compute_uv_kernel<from_coarse>(tp, arg, arg.fineVolumeCB, stream);
 
         } else {
 
-          if (arg.dir != QUDA_BACKWARDS && arg.dir != QUDA_FORWARDS) errorQuda("Undefined direction %d", arg.dir);
+          if (arg.dir != QUDA_BACKWARDS && arg.dir != QUDA_FORWARDS && arg.dir != QUDA_IN_PLACE) errorQuda("Undefined direction %d", arg.dir);
 #ifdef JITIFY
         error = program->kernel("quda::ComputeUVGPU")
           .instantiate(arg.dim,arg.dir,Type<Arg>())
@@ -183,6 +191,8 @@ namespace quda {
           else if (arg.dim==1) qudaLaunchKernel(ComputeUVGPU<1,QUDA_FORWARDS,Arg>, tp, stream, arg);
           else if (arg.dim==2) qudaLaunchKernel(ComputeUVGPU<2,QUDA_FORWARDS,Arg>, tp, stream, arg);
           else if (arg.dim==3) qudaLaunchKernel(ComputeUVGPU<3,QUDA_FORWARDS,Arg>, tp, stream, arg);
+        } else if (arg.dir == QUDA_IN_PLACE) {
+          qudaLaunchKernel(ComputeUVGPU<0,QUDA_IN_PLACE,Arg>, tp, stream, arg);
         }
 #endif
         }
@@ -285,7 +295,7 @@ namespace quda {
 
       } else if (type == COMPUTE_VUV) {
 
-        if (use_mma) {
+        if (use_mma && arg.dir != QUDA_IN_PLACE) {
 
           mma::launch_compute_vuv_kernel<from_coarse>(tp, arg, arg.fineVolumeCB, stream);
 
@@ -321,6 +331,7 @@ namespace quda {
             tp.grid.z = 1;
           }
 
+          if (arg.dir != QUDA_BACKWARDS && arg.dir != QUDA_FORWARDS && arg.dir != QUDA_IN_PLACE) errorQuda("Undefined direction %d", arg.dir);
 #ifdef JITIFY
         error = program->kernel("quda::ComputeVUVGPU")
           .instantiate(arg.shared_atomic,arg.parity_flip,arg.dim,arg.dir,Type<Arg>())
@@ -340,6 +351,8 @@ namespace quda {
             else if (arg.dim==1) qudaLaunchKernel(ComputeVUVGPU<true,parity_flip,1,QUDA_FORWARDS,Arg>, tp, stream, arg);
             else if (arg.dim==2) qudaLaunchKernel(ComputeVUVGPU<true,parity_flip,2,QUDA_FORWARDS,Arg>, tp, stream, arg);
             else if (arg.dim==3) qudaLaunchKernel(ComputeVUVGPU<true,parity_flip,3,QUDA_FORWARDS,Arg>, tp, stream, arg);
+          } else if (arg.dir == QUDA_IN_PLACE) {
+            qudaLaunchKernel(ComputeVUVGPU<true,parity_flip,0,QUDA_IN_PLACE,Arg>, tp, stream, arg);
           } else {
             errorQuda("Undefined direction %d", arg.dir);
           }
@@ -357,6 +370,8 @@ namespace quda {
             else if (arg.dim==1) qudaLaunchKernel(ComputeVUVGPU<false,parity_flip,1,QUDA_FORWARDS,Arg>, tp, stream, arg);
             else if (arg.dim==2) qudaLaunchKernel(ComputeVUVGPU<false,parity_flip,2,QUDA_FORWARDS,Arg>, tp, stream, arg);
             else if (arg.dim==3) qudaLaunchKernel(ComputeVUVGPU<false,parity_flip,3,QUDA_FORWARDS,Arg>, tp, stream, arg);
+          } else if (arg.dir == QUDA_IN_PLACE) {
+            qudaLaunchKernel(ComputeVUVGPU<false,parity_flip,0,QUDA_IN_PLACE,Arg>, tp, stream, arg);
           } else {
             errorQuda("Undefined direction %d", arg.dir);
           }
@@ -384,7 +399,7 @@ namespace quda {
           .instantiate(Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
-#if !defined(STAGGEREDCOARSE)
+#if defined(WILSONCOARSE)
         qudaLaunchKernel(ComputeCoarseCloverGPU<Arg>, tp, stream, arg);
 #else
         errorQuda("ComputeCoarseClover not enabled for staggered coarsenings");
@@ -764,7 +779,7 @@ namespace quda {
 
     bool advanceTuneParam(TuneParam &param) const {
 
-      if (use_mma && (type == COMPUTE_UV || type == COMPUTE_VUV)) {
+      if (use_mma && (type == COMPUTE_UV || type == COMPUTE_VUV) && dir != QUDA_IN_PLACE) {
         constexpr bool query_max = true;
         int max;
         if (type == COMPUTE_UV) {
@@ -789,7 +804,7 @@ namespace quda {
     void initTuneParam(TuneParam &param) const
     {
       TunableVectorYZ::initTuneParam(param);
-      param.aux.x = ((type == COMPUTE_VUV || type == COMPUTE_UV) && use_mma) ? 0 : 1; // aggregates per block
+      param.aux.x = ((type == COMPUTE_VUV || type == COMPUTE_UV) && use_mma && dir != QUDA_IN_PLACE) ? 0 : 1; // aggregates per block
       param.aux.y = arg.shared_atomic;
       param.aux.z = arg.parity_flip; // not actually tuned over at present
 
@@ -804,7 +819,7 @@ namespace quda {
     void defaultTuneParam(TuneParam &param) const
     {
       TunableVectorYZ::defaultTuneParam(param);
-      param.aux.x = ((type == COMPUTE_VUV || type == COMPUTE_UV) && use_mma) ? 0 : 1; // aggregates per block
+      param.aux.x = ((type == COMPUTE_VUV || type == COMPUTE_UV) && use_mma && dir != QUDA_IN_PLACE) ? 0 : 1; // aggregates per block
       // param.aux.x = 1; // aggregates per block
       param.aux.y = arg.shared_atomic;
       param.aux.z = arg.parity_flip; // not actually tuned over at present
@@ -822,7 +837,7 @@ namespace quda {
 
       if (type == COMPUTE_UV) {
         strcat(Aux, ",computeUV");
-        if (use_mma) strcat(Aux, ",MMA");
+        if (use_mma && dir != QUDA_IN_PLACE) strcat(Aux, ",MMA");
       } else if (type == COMPUTE_AV)
         strcat(Aux, ",computeAV");
       else if (type == COMPUTE_TMAV)               strcat(Aux,",computeTmAV");
@@ -833,7 +848,7 @@ namespace quda {
         strcat(Aux, ",computeTwistedCloverInverseMax");
       else if (type == COMPUTE_VUV) {
         strcat(Aux, ",computeVUV");
-        if (use_mma) strcat(Aux, ",MMA");
+        if (use_mma && dir != QUDA_IN_PLACE) strcat(Aux, ",MMA");
       } else if (type == COMPUTE_COARSE_CLOVER)
         strcat(Aux, ",computeCoarseClover");
       else if (type == COMPUTE_REVERSE_Y)          strcat(Aux,",computeYreverse");
@@ -870,6 +885,7 @@ namespace quda {
 
 	if (dir == QUDA_BACKWARDS) strcat(Aux,",dir=back");
 	else if (dir == QUDA_FORWARDS) strcat(Aux,",dir=fwd");
+        else if (dir == QUDA_IN_PLACE) strcat(Aux,",dir=clover");
 
         if (arg.bidirectional && type == COMPUTE_VUV) strcat(Aux,",bidirectional");
       }
@@ -1288,11 +1304,39 @@ namespace quda {
       y.apply(0);
     }
 
-    // Check if we have a clover term that needs to be coarsened
-    if (dirac == QUDA_CLOVER_DIRAC || dirac == QUDA_COARSE_DIRAC || dirac == QUDA_TWISTED_CLOVER_DIRAC) {
+    // Check if we have a fine or coarse clover term that needs to be coarsened
+    if (dirac == QUDA_CLOVER_DIRAC || dirac == QUDA_TWISTED_CLOVER_DIRAC) {
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing fine->coarse clover term\n");
       y.setComputeType(COMPUTE_COARSE_CLOVER);
       y.apply(0);
+    } else if (dirac == QUDA_COARSE_DIRAC) {
+
+      // We can write coarsening the coarse clover as a UV, VUV sequence where `U` is replaced with `C`
+      y.setDimension(-1);
+      y.setDirection(QUDA_IN_PLACE);
+
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing coarse CV and VCV via UV and VUV\n");
+
+      if (uv.Precision() == QUDA_HALF_PRECISION) {
+        // use G as a proxy for the coarse clover because `C_` is a dummy object on the coarse level
+        double U_max = 3.0*G_.abs_max(0);
+        double uv_max = U_max * v.Scale();
+        uv.Scale(uv_max);
+        arg.UV.resetScale(uv_max);
+
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("C_max (U[0] as proxy) = %e v_max = %e cv_max = %e\n", U_max, v.Scale(), uv_max);
+      }
+
+      y.setComputeType(COMPUTE_UV);  // compute C*V product
+      y.apply(0);
+
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("CV2 = %e\n", arg.UV.norm2());
+
+      y.setComputeType(COMPUTE_VUV); // compute X += VCV
+      y.apply(0);
+      if (getVerbosity() >= QUDA_VERBOSE)
+        printfQuda("X2 (atomic) = %e\n", X_atomic_.norm2(0, coarseGaugeAtomic::fixedPoint()));
+
     } else if (dirac == QUDA_STAGGERED_DIRAC || dirac == QUDA_STAGGEREDPC_DIRAC || dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC) { 
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Summing staggered mass contribution to coarse clover\n");
       y.setComputeType(COMPUTE_STAGGEREDMASS);
