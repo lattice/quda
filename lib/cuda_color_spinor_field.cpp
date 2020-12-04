@@ -519,6 +519,8 @@ namespace quda {
           break;
         case Shmem:
           // this is the remote buffer when using shmem ...
+          // if the ghost_remote_send_buffer_d exists we can directly use it
+          // - else we need pack locally and send data to the recv buffer
           packBuffer[2 * dim + dir] = ghost_remote_send_buffer_d[bufferIndex][dim][dir] != nullptr ?
             static_cast<char *>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + ghost_offset[dim][1 - dir] :
             my_face_dim_dir_d[bufferIndex][dim][dir];
