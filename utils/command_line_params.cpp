@@ -107,6 +107,9 @@ QudaTboundary fermion_t_boundary = QUDA_ANTI_PERIODIC_T;
 
 int mg_levels = 2;
 
+int max_res_increase = 1;
+int max_res_increase_total = 10;
+
 quda::mgarray<QudaFieldLocation> solver_location = {};
 quda::mgarray<QudaFieldLocation> setup_location = {};
 
@@ -455,6 +458,8 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--ngcrkrylov", gcrNkrylov,
                        "The number of inner iterations to use for GCR, BiCGstab-l, CA-CG (default 10)");
   quda_app->add_option("--niter", niter, "The number of iterations to perform (default 100)");
+  quda_app->add_option("--max-res-increase", max_res_increase, "The number of consecutive true residual incrases allowed (default 1)");
+  quda_app->add_option("--max-res-increase-total", max_res_increase_total, "The total number of true residual incrases allowed (default 10)");
   quda_app->add_option("--native-blas-lapack", native_blas_lapack,
                        "Use the native or generic BLAS LAPACK implementation (default true)");
   quda_app->add_option("--maxiter-precondition", maxiter_precondition,

@@ -209,7 +209,8 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.use_alternative_reliable = alternative_reliable;
   inv_param.use_sloppy_partial_accumulator = 0;
   inv_param.solution_accumulator_pipeline = solution_accumulator_pipeline;
-  inv_param.max_res_increase = 1;
+  inv_param.max_res_increase = max_res_increase;
+  inv_param.max_res_increase_total = max_res_increase_total;
 
   // domain decomposition preconditioner parameters
   inv_param.inv_type_precondition = precon_type;

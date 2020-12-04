@@ -240,6 +240,9 @@ extern QudaTboundary fermion_t_boundary;
 
 extern int mg_levels;
 
+extern int max_res_increase = 1;
+extern int max_res_increase_total = 10;
+
 extern quda::mgarray<QudaFieldLocation> solver_location;
 extern quda::mgarray<QudaFieldLocation> setup_location;
 
