@@ -28,11 +28,6 @@ namespace quda {
   {
     if (comm_partitioned()) {
       if (init) {
-<<<<<<< HEAD
-        qudaStreamDestroy(GFStream[0]);
-        qudaStreamDestroy(GFStream[1]);
-=======
->>>>>>> feature/generic_kernel
         for (int d = 0; d < 4; d++ ) {
           if (commDimPartitioned(d)) {
             comm_free(mh_send_fwd[d]);
@@ -88,11 +83,6 @@ namespace quda {
         X = (int*)safe_malloc(4 * sizeof(int));
         for (int d = 0; d < 4; d++) X[d] = U.X()[d];
 
-<<<<<<< HEAD
-        qudaStreamCreate(&GFStream[0]);
-        qudaStreamCreate(&GFStream[1]);
-=======
->>>>>>> feature/generic_kernel
         for (int d = 0; d < 4; d++ ) {
           if (!commDimPartitioned(d)) continue;
           // store both parities and directions in each
@@ -144,13 +134,8 @@ namespace quda {
         arg.borderid = U.R()[d];
         apply(device::get_stream(1));
 
-<<<<<<< HEAD
-        qudaMemcpyAsync(send[d], send_d[d], bytes[d], qudaMemcpyDeviceToHost, GFStream[0]);
-        qudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], qudaMemcpyDeviceToHost, GFStream[1]);
-=======
-        qudaMemcpyAsync(send[d], send_d[d], bytes[d], cudaMemcpyDeviceToHost, device::get_stream(0));
-        qudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], cudaMemcpyDeviceToHost, device::get_stream(1));
->>>>>>> feature/generic_kernel
+        qudaMemcpyAsync(send[d], send_d[d], bytes[d], qudaMemcpyDeviceToHost, device::get_stream(0));
+        qudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], qudaMemcpyDeviceToHost, device::get_stream(1));
 
         qudaStreamSynchronize(device::get_stream(0));
         comm_start(mh_send_fwd[d]);
@@ -159,11 +144,7 @@ namespace quda {
         comm_start(mh_send_back[d]);
 
         comm_wait(mh_recv_back[d]);
-<<<<<<< HEAD
-        qudaMemcpyAsync(recv_d[d], recv[d], bytes[d], qudaMemcpyHostToDevice, GFStream[0]);
-=======
-        qudaMemcpyAsync(recv_d[d], recv[d], bytes[d], cudaMemcpyHostToDevice, device::get_stream(0));
->>>>>>> feature/generic_kernel
+        qudaMemcpyAsync(recv_d[d], recv[d], bytes[d], qudaMemcpyHostToDevice, device::get_stream(0));
 
         // insert
         arg.pack = false;
@@ -172,11 +153,7 @@ namespace quda {
         apply(device::get_stream(0));
 
         comm_wait(mh_recv_fwd[d]);
-<<<<<<< HEAD
-        qudaMemcpyAsync(recvg_d[d], recvg[d], bytes[d], qudaMemcpyHostToDevice, GFStream[1]);
-=======
-        qudaMemcpyAsync(recvg_d[d], recvg[d], bytes[d], cudaMemcpyHostToDevice, device::get_stream(1));
->>>>>>> feature/generic_kernel
+        qudaMemcpyAsync(recvg_d[d], recvg[d], bytes[d], qudaMemcpyHostToDevice, device::get_stream(1));
 
         arg.array = reinterpret_cast<complex<Float>*>(recvg_d[d]);
         arg.borderid = X[d] - U.R()[d];

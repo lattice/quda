@@ -32,19 +32,6 @@ namespace quda
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
-<<<<<<< HEAD
-      typedef typename mapper<typename Arg::Float>::type real;
-#ifdef JITIFY
-      // we need to break the dslash launch abstraction here to get a handle on the constant memory pointer in the kernel module
-      auto instance = Dslash::template kernel_instance<packShmem>();
-      cuMemcpyHtoDAsync(instance.get_constant_ptr("quda::mobius_d"), arg.a_5, QUDA_MAX_DWF_LS * sizeof(complex<real>),
-                        stream);
-      Tunable::jitify_error = instance.configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
-#else
-      qudaMemcpyToSymbolAsync(mobius_d, arg.a_5, QUDA_MAX_DWF_LS * sizeof(complex<real>), 0, qudaMemcpyHostToDevice,
-                              streams[Nstream - 1]);
-=======
->>>>>>> feature/generic_kernel
       Dslash::template instantiate<packShmem>(tp, stream);
     }
   };

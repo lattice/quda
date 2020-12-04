@@ -9,21 +9,12 @@ namespace quda
 
     extern int it;
 
-<<<<<<< HEAD
-    extern qudaEvent_t packEnd[2]; // double buffered
-    extern qudaEvent_t gatherStart[Nstream];
-    extern qudaEvent_t gatherEnd[Nstream];
-    extern qudaEvent_t scatterStart[Nstream];
-    extern qudaEvent_t scatterEnd[Nstream];
-    extern qudaEvent_t dslashStart[2]; // double buffered
-=======
-    extern cudaEvent_t packEnd[]; // double buffered
-    extern cudaEvent_t gatherStart[];
-    extern cudaEvent_t gatherEnd[];
-    extern cudaEvent_t scatterStart[];
-    extern cudaEvent_t scatterEnd[];
-    extern cudaEvent_t dslashStart[]; // double buffered
->>>>>>> feature/generic_kernel
+    extern qudaEvent_t packEnd[]; // double buffered
+    extern qudaEvent_t gatherStart[];
+    extern qudaEvent_t gatherEnd[];
+    extern qudaEvent_t scatterStart[];
+    extern qudaEvent_t scatterEnd[];
+    extern qudaEvent_t dslashStart[]; // double buffered
 
     // FIX this is a hack from hell
     // Auxiliary work that can be done while waiting on comms to finish
@@ -269,15 +260,10 @@ namespace quda
       if (comm_peer2peer_enabled(dir2,dim)) {
 	PROFILE(qudaStreamWaitEvent(device::get_default_stream(), in.getIPCRemoteCopyEvent(dir2,dim), 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
       } else {
-<<<<<<< HEAD
-#endif
-	if (!gdr_recv && !zero_copy_recv) { // Issue CPU->GPU copy if not GDR
-=======
 
         if (scatterIndex == -1) scatterIndex = 2 * dim + dir;
 
         if (!gdr_recv && !zero_copy_recv) { // Issue CPU->GPU copy if not GDR
->>>>>>> feature/generic_kernel
           // note the ColorSpinorField::scatter transforms from
           // scatter centric to gather centric (e.g., flips
           // direction) so here just use dir not dir2

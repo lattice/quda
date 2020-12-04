@@ -170,14 +170,9 @@ namespace quda
         warningQuda("Using managed memory for HIP allocations");
         managed = true;
 
-<<<<<<< HEAD
 	// Managed memory is nor really recommended on HIP. It is a compatibility feature
 	// presently
 	warningQuda("Managed memory in HIP is a currently inefficient compatibility feature");
-=======
-        if (!device::managed_memory_supported())
-          warningQuda("Target device does not report supporting managed memory");
->>>>>>> feature/generic_kernel
       }
 
       init = true;
@@ -494,7 +489,6 @@ namespace quda
 
   QudaFieldLocation get_pointer_location(const void *ptr)
   {
-<<<<<<< HEAD
     // This is slow/incomplete
     if ( alloc[DEVICE].find(const_cast<void*>(ptr)) != alloc[DEVICE].end() ) return QUDA_CUDA_FIELD_LOCATION;
     if ( alloc[DEVICE_PINNED].find(const_cast<void*>(ptr)) != alloc[DEVICE_PINNED].end() ) return QUDA_CUDA_FIELD_LOCATION;
@@ -503,51 +497,6 @@ namespace quda
 
     errorQuda("ptr %lx  not found in either host or device maps\n", (unsigned long)ptr);
     return QUDA_INVALID_FIELD_LOCATION;
-
-#if 0
-    // This doesn't work if the pointer was not known to HIP, e.g. if it came from MALLOC
-    hipPointerAttribute_t pointer_attributes;
-    hipError_t err = hipPointerGetAttributes(&pointer_attributes, ptr);
-    QudaFieldLocation ret_val = QUDA_INVALID_FIELD_LOCATION;
-    printfQuda("ret_val is good: %d ret val = %d ret_val_string = %s\n", err==hipSuccess, err, hipGetErrorString(err));
-    if ( err == hipSuccess ) {
-      hipMemoryType mem_type = pointer_attributes.memoryType;
-      switch (mem_type) {
-        case hipMemoryTypeDevice: 
- 	{
-	 ret_val = QUDA_CUDA_FIELD_LOCATION;
-	 break;
-        }
-        case hipMemoryTypeHost: 
-	{ 
-	  ret_val =  QUDA_CPU_FIELD_LOCATION; 
-	  break;
-	}
-        default: 
-	{
-	   errorQuda("Unknown memory type %d", mem_type);
-	   break;
-	}
-     };
-=======
-
-    // Unsupported in HIP
-    /*
-    CUpointer_attribute attribute[] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE};
-    CUmemorytype mem_type;
-    void *data[] = {&mem_type};
-    CUresult error = cuPointerGetAttributes(1, attribute, data, reinterpret_cast<CUdeviceptr>(ptr));
-    if (error != CUDA_SUCCESS) {
-      const char *string;
-      cuGetErrorString(error, &string);
-      errorQuda("cuPointerGetAttributes failed with error %s", string);
->>>>>>> feature/generic_kernel
-    }
-    else {
-      errorQuda("hipPointerGetAttributes() failed with %s (%s:%d in %s()\n)",hipGetErrorString(err), __FILE__, __LINE__, __FUNCTION__);
-    }
-    return ret_val;
-#endif
   }
 
   void *get_mapped_device_pointer_(const char *func, const char *file, int line, const void *host)

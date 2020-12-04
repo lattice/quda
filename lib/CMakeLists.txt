@@ -220,23 +220,16 @@ endif(QUDA_TARGET_CUDA)
 
 target_include_directories(quda PRIVATE .)
 target_include_directories(quda PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-<<<<<<< HEAD
 
-if( QUDA_TARGET_CUDA )
+if (QUDA_TARGET_CUDA )
+  target_include_directories(quda SYSTEM PRIVATE ../include/externals)
   target_include_directories(quda SYSTEM PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
-endif(QUDA_TARGET_CUDA)
+endif()
 
-target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/>
-  $<INSTALL_INTERFACE:include/>)
-
-target_include_directories(quda SYSTEM PRIVATE ${EIGEN_INCLUDE_DIRS})
-=======
-target_include_directories(quda SYSTEM PRIVATE ../include/externals)
-target_include_directories(quda SYSTEM PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
 target_include_directories(quda SYSTEM PRIVATE ${EIGEN_INCLUDE_DIRS})
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/>
                                        $<INSTALL_INTERFACE:include/>)
->>>>>>> feature/generic_kernel
+
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include> $<INSTALL_INTERFACE:include>)
 
 target_include_directories(quda_cpp SYSTEM PRIVATE ../include/externals)
@@ -256,14 +249,8 @@ if(QUDA_TARGET_HIP)
   add_subdirectory(targets/hip)
   target_include_directories(quda PRIVATE ../include/targets/hip)
 endif()
-<<<<<<< HEAD
-
-target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_target>)
-=======
->>>>>>> feature/generic_kernel
 
 add_subdirectory(targets/generic)
-
 add_subdirectory(interface)
 
 # propagate CXX flags to CUDA host compiler
@@ -295,37 +282,6 @@ if(QUDA_TARGET_CUDA)
     endforeach()
   endif()
 
-<<<<<<< HEAD
-  # Specific comnfig dependent warning suppressions and lineinfo forwarding
-  target_compile_options(
-    quda
-    PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
-    $<$<CONFIG:DEVEL>:-lineinfo
-    -Xcompiler
-    -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field>
-    $<$<CONFIG:STRICT>:
-    -Xcompiler
-    -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field,-Wno-unused-but-set-variable>
-    $<$<CONFIG:HOSTDEBUG>:-lineinfo>
-    $<$<CONFIG:SANITIZE>:-lineinfo
-    -Xcompiler
-    -fsanitize=address,-fsanitize=undefined>>
-    $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
-    $<$<CONFIG:DEVEL>:-Wno-unknown-pragmas
-    -Wno-unused-function
-    -Wno-unused-local-typedef
-    -Wno-unused-private-field>
-    $<$<CONFIG:STRICT>:-Wno-unknown-pragmas
-    -Wno-unused-function
-    -Wno-unused-local-typedef
-    -Wno-unused-private-field>
-    $<$<CONFIG:HOSTDEBUG>:>
-    $<$<CONFIG:SANITIZE>:-fsanitize=address,-fsanitize=undefined>
-    >)
-  
-endif( QUDA_TARGET_CUDA)
-      
-=======
   # Turne the flags into a CMAKE list
   string(REPLACE " " ";" PROPAGATED_FLAG_LIST ${PROPAGATED_FLAGS})
 
@@ -348,7 +304,6 @@ target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
                             $<$<CONFIG:SANITIZE>:-fsanitize=address,-fsanitize=undefined>
                             >)
 
->>>>>>> feature/generic_kernel
 # some clang warnings should be warning even when turning warnings into errors
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   target_compile_options(quda_cpp PUBLIC $<$<COMPILE_LANGUAGE:CXX>: -Wno-error=unused-function>)

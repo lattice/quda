@@ -44,11 +44,7 @@ namespace quda {
       int idd
         = (((x[3] * arg.commDim[2] * arg.X[2] + x[2]) * arg.commDim[1] * arg.X[1]) + x[1]) * arg.commDim[0] * arg.X[0]
         + x[0];
-<<<<<<< HEAD
-      random_init(seed, idd, 0, &state[parity * size_cb + id]); 
-=======
       random_init(seed, idd, 0, state[parity * size_cb + id]);
->>>>>>> feature/generic_kernel
     }
   }
 
@@ -143,23 +139,14 @@ namespace quda {
   /*! @brief Backup CURAND array states initialization */
   void RNG::backup()
   {
-<<<<<<< HEAD
-    backup_state = (cuRNGState *)safe_malloc(size * sizeof(cuRNGState));
-    qudaMemcpy(backup_state, state, size * sizeof(cuRNGState), qudaMemcpyDeviceToHost);
-=======
     backup_state = (RNGState *)safe_malloc(size * sizeof(RNGState));
-    qudaMemcpy(backup_state, state, size * sizeof(RNGState), cudaMemcpyDeviceToHost);
->>>>>>> feature/generic_kernel
+    qudaMemcpy(backup_state, state, size * sizeof(RNGState), qudaMemcpyDeviceToHost);
   }
 
   /*! @brief Restore CURAND array states initialization */
   void RNG::restore()
   {
-<<<<<<< HEAD
-    qudaMemcpy(state, backup_state, size * sizeof(cuRNGState), qudaMemcpyHostToDevice);
-=======
-    qudaMemcpy(state, backup_state, size * sizeof(RNGState), cudaMemcpyHostToDevice);
->>>>>>> feature/generic_kernel
+    qudaMemcpy(state, backup_state, size * sizeof(RNGState), qudaMemcpyHostToDevice);
     host_free(backup_state);
   }
 

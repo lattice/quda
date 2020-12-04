@@ -692,19 +692,11 @@ public:
           }
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
-<<<<<<< HEAD:lib/targets/cuda/gauge_fix_ovr.cu
-            qudaMemcpyAsync(send[d], send_d[d], bytes[d], qudaMemcpyDeviceToHost, GFStream[d]);
+            qudaMemcpyAsync(send[d], send_d[d], bytes[d], qudaMemcpyDeviceToHost, device::get_stream(d));
           }
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
-            qudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], qudaMemcpyDeviceToHost, GFStream[4 + d]);
-=======
-            qudaMemcpyAsync(send[d], send_d[d], bytes[d], cudaMemcpyDeviceToHost, device::get_stream(d));
-          }
-          for ( int d = 0; d < 4; d++ ) {
-            if ( !commDimPartitioned(d)) continue;
-            qudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], cudaMemcpyDeviceToHost, device::get_stream(4 + d));
->>>>>>> feature/generic_kernel:lib/gauge_fix_ovr.cu
+            qudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], qudaMemcpyDeviceToHost, device::get_stream(4 + d));
           }
           //compute interior points
           gfixIntPoints.apply(device::get_stream(8));
@@ -719,20 +711,12 @@ public:
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
             comm_wait(mh_recv_back[d]);
-<<<<<<< HEAD:lib/targets/cuda/gauge_fix_ovr.cu
-            qudaMemcpyAsync(recv_d[d], recv[d], bytes[d], qudaMemcpyHostToDevice, GFStream[d]);
-=======
-            qudaMemcpyAsync(recv_d[d], recv[d], bytes[d], cudaMemcpyHostToDevice, device::get_stream(d));
->>>>>>> feature/generic_kernel:lib/gauge_fix_ovr.cu
+            qudaMemcpyAsync(recv_d[d], recv[d], bytes[d], qudaMemcpyHostToDevice, device::get_stream(d));
           }
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
             comm_wait(mh_recv_fwd[d]);
-<<<<<<< HEAD:lib/targets/cuda/gauge_fix_ovr.cu
-            qudaMemcpyAsync(recvg_d[d], recvg[d], bytes[d], qudaMemcpyHostToDevice, GFStream[4 + d]);
-=======
-            qudaMemcpyAsync(recvg_d[d], recvg[d], bytes[d], cudaMemcpyHostToDevice, device::get_stream(4 + d));
->>>>>>> feature/generic_kernel:lib/gauge_fix_ovr.cu
+            qudaMemcpyAsync(recvg_d[d], recvg[d], bytes[d], qudaMemcpyHostToDevice, device::get_stream(4 + d));
           }
 
           for ( int d = 0; d < 4; d++ ) {

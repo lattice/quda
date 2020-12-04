@@ -46,25 +46,16 @@ namespace quda {
   namespace dslash {
     int it = 0;
 
-<<<<<<< HEAD
-    qudaEvent_t packEnd[2];
-    qudaEvent_t gatherStart[Nstream];
-    qudaEvent_t gatherEnd[Nstream];
-    qudaEvent_t scatterStart[Nstream];
-    qudaEvent_t scatterEnd[Nstream];
-    qudaEvent_t dslashStart[2];
-=======
     static constexpr int nDim = 4;
     static constexpr int nDir = 2;
     static constexpr int nStream = nDim * nDir + 1;
 
-    cudaEvent_t packEnd[2];
-    cudaEvent_t gatherStart[nStream];
-    cudaEvent_t gatherEnd[nStream];
-    cudaEvent_t scatterStart[nStream];
-    cudaEvent_t scatterEnd[nStream];
-    cudaEvent_t dslashStart[2];
->>>>>>> feature/generic_kernel
+    qudaEvent_t packEnd[2];
+    qudaEvent_t gatherStart[nStream];
+    qudaEvent_t gatherEnd[nStream];
+    qudaEvent_t scatterStart[nStream];
+    qudaEvent_t scatterEnd[nStream];
+    qudaEvent_t dslashStart[2];
 
     // these variables are used for benchmarking the dslash components in isolation
     bool dslash_pack_compute;
@@ -98,19 +89,11 @@ namespace quda {
   {
     using namespace dslash;
     // add cudaEventDisableTiming for lower sync overhead
-<<<<<<< HEAD
     for (int i=0; i<Nstream; i++) {
       qudaEventCreateDisableTiming(&gatherStart[i]);
       qudaEventCreateDisableTiming(&gatherEnd[i]);
       qudaEventCreateDisableTiming(&scatterStart[i]);
       qudaEventCreateDisableTiming(&scatterEnd[i]);
-=======
-    for (int i=0; i<nStream; i++) {
-      cudaEventCreateWithFlags(&gatherStart[i], cudaEventDisableTiming);
-      cudaEventCreateWithFlags(&gatherEnd[i], cudaEventDisableTiming);
-      cudaEventCreateWithFlags(&scatterStart[i], cudaEventDisableTiming);
-      cudaEventCreateWithFlags(&scatterEnd[i], cudaEventDisableTiming);
->>>>>>> feature/generic_kernel
     }
     for (int i=0; i<2; i++) {
       qudaEventCreateDisableTiming(&packEnd[i]);
@@ -147,19 +130,11 @@ namespace quda {
   {
     using namespace dslash;
 
-<<<<<<< HEAD
     for (int i=0; i<Nstream; i++) {
       qudaEventDestroy(gatherStart[i]);
       qudaEventDestroy(gatherEnd[i]);
       qudaEventDestroy(scatterStart[i]);
       qudaEventDestroy(scatterEnd[i]);
-=======
-    for (int i=0; i<nStream; i++) {
-      cudaEventDestroy(gatherStart[i]);
-      cudaEventDestroy(gatherEnd[i]);
-      cudaEventDestroy(scatterStart[i]);
-      cudaEventDestroy(scatterEnd[i]);
->>>>>>> feature/generic_kernel
     }
 
     for (int i=0; i<2; i++) {

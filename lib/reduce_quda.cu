@@ -47,11 +47,7 @@ namespace quda {
         z(z),
         w(w),
         v(v),
-<<<<<<< HEAD
-        location(checkLocation(x, y, z, w, v))
-=======
         result(result)
->>>>>>> feature/generic_kernel
       {
         checkLocation(x, y, z, w, v);
         checkLength(x, y, z, w, v);

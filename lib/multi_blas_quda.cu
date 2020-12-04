@@ -128,32 +128,6 @@ namespace quda {
 
           tp.block.x *= tp.aux.x; // include warp-split factor
 
-<<<<<<< HEAD
-          MultiBlasArg<NXZ, device_store_t, N, device_y_store_t, Ny, decltype(f_)> arg(x, y, z, w, f_, NYW, length);
-#ifdef JITIFY
-          using namespace jitify::reflection;
-          auto instance = program->kernel("quda::blas::multiBlasKernel")
-            .instantiate(Type<device_real_t>(), M, NXZ, tp.aux.x, Type<decltype(arg)>());
-
-          if (a.data) set_param<decltype(f_)::multi_1d>((void*)instance.get_constant_ptr("quda::blas::Amatrix_d"), arg, 'a', a, stream);
-          if (b.data) set_param<decltype(f_)::multi_1d>((void*)instance.get_constant_ptr("quda::blas::Bmatrix_d"), arg, 'b', b, stream);
-          if (c.data) set_param<decltype(f_)::multi_1d>((void*)instance.get_constant_ptr("quda::blas::Cmatrix_d"), arg, 'c', c, stream);
-
-          jitify_error = instance.configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
-#else
-
-#if defined(QUDA_TARGET_CUDA)
-          if (a.data) set_param<decltype(f_)::multi_1d>(qudaGetSymbolAddress(Amatrix_d), arg, 'a', a, stream);
-          if (b.data) set_param<decltype(f_)::multi_1d>(qudaGetSymbolAddress(Bmatrix_d), arg, 'b', b, stream);
-          if (c.data) set_param<decltype(f_)::multi_1d>(qudaGetSymbolAddress(Cmatrix_d), arg, 'c', c, stream);
-#else
-	  if (a.data) set_param<decltype(f_)::multi_1d>(Amatrix_d, arg, 'a', a, stream);
-          if (b.data) set_param<decltype(f_)::multi_1d>(Bmatrix_d, arg, 'b', b, stream);
-          if (c.data) set_param<decltype(f_)::multi_1d>(Cmatrix_d, arg, 'c', c, stream);
-
-#endif 
-=======
->>>>>>> feature/generic_kernel
           switch (tp.aux.x) {
           case 1:
             Launch(tp, stream, MultiBlasArg<1, device_real_t, M, NXZ, device_store_t, N,

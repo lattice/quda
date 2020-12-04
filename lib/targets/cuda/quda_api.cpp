@@ -21,9 +21,6 @@
 #endif
 
 namespace quda {
-
-<<<<<<< HEAD
-=======
   // No need to abstract these across the library so keep these definitions local to CUDA target
 
   /**
@@ -266,31 +263,6 @@ namespace quda {
     }
   }
 
-<<<<<<< HEAD
-
-
-
-   /**
-     @brief Wrapper around cudaMemcpyToSymbolAsync or driver API equivalent
-     @param[out] symbol   Destination symbol
-     @param[in] src      Source pointer
-     @param[in] count    Size of transfer
-     @param[in] offset   Offset from start of symbol
-     @param[in] kind     Type of memory copy
-     @param[in] stream   Stream to issue copy
-  */
-  void qudaMemcpyToSymbolAsync_(const void *symbol, const void *src, size_t count, size_t offset,  qudaMemcpyKind kind, const qudaStream_t &stream,
-                                const char *func, const char *file, const char *line)
-  {
-    cudaError_t error = cudaMemcpyToSymbolAsync(symbol,src,count,offset,kind,stream);
-    if( error != cudaSuccess ) {
-      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
-    }
-
-  }
-
-  
-=======
   void qudaMemcpyP2PAsync_(void *dst, const void *src, size_t count, const qudaStream_t &stream,
                            const char *func, const char *file, const char *line)
   {
@@ -300,7 +272,6 @@ namespace quda {
       errorQuda("cudaMemcpyAsync returned %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
->>>>>>> feature/generic_kernel
   void qudaMemcpy2D_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
                      cudaMemcpyKind kind, const char *func, const char *file, const char *line)
   {
@@ -589,7 +560,6 @@ namespace quda {
 #endif
   }
 
-<<<<<<< HEAD
   void qudaIpcGetEventHandle_(qudaIpcEventHandle_t *handle, qudaEvent_t event, const char *func, const char *file,
                               const char *line)
   {
@@ -630,10 +600,7 @@ namespace quda {
     if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
-  void qudaStreamSynchronize_(qudaStream_t &stream, const char *func, const char *file, const char *line)
-=======
   void qudaStreamSynchronize_(const qudaStream_t &stream, const char *func, const char *file, const char *line)
->>>>>>> feature/generic_kernel
   {
 #ifdef USE_DRIVER_API
     PROFILE(CUresult error = cuStreamSynchronize(device::get_cuda_stream(stream)), QUDA_PROFILE_STREAM_SYNCHRONIZE);

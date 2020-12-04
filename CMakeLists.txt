@@ -335,11 +335,7 @@ set(CMAKE_CXX_FLAGS_DEVEL
     "-g -O3 -Wall -Wextra"
     CACHE STRING "Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_CXX_FLAGS_STRICT
-<<<<<<< HEAD
-    "-O3 -Wall -Werror -Wno-error=unused-variable"
-=======
     "-O3 -Werror -Wall -Wextra"
->>>>>>> feature/generic_kernel
     CACHE STRING "Flags used by the C++ compiler during strict jenkins builds.")
 set(CMAKE_CXX_FLAGS_RELEASE
     "-O3 -w ${CXX_OPT} "
