@@ -297,8 +297,6 @@ mark_as_advanced(QUDA_OPENMP)
 
 mark_as_advanced(QUDA_BACKWARDS)
 
-mark_as_advanced(QUDA_NVSHMEM)
-mark_as_advanced(QUDA_NVSHMEM_HOME)
 mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM)
 mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM_TAR)
 
@@ -569,9 +567,6 @@ if(QUDA_DOWNLOAD_USQCD)
 endif()
 
 if(QUDA_NVSHMEM)
- 
-  add_definitions(-DNVSHMEM_COMMS -DNVSHMEM_TARGET)
-
   if(QUDA_DOWNLOAD_NVSHMEM)
     ExternalProject_Add(NVSHMEM
                         URL ${QUDA_DOWNLOAD_NVSHMEM_TAR}
