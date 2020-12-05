@@ -1,4 +1,8 @@
 # HIP Release notes
+## 12/5/2020: Merged feature/generic_kernel and ensured compilation on NVIDIA
+* HIP Build doesn't work yet. Need to transfer NV Changes
+
+
 ## 11/5/2020: First running Dslash on HIP
 
 ### Missing features: 
