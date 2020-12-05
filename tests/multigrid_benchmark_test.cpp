@@ -169,7 +169,7 @@ double benchmark(int test, const int niter) {
   qudaEvent_t start, end;
   qudaEventCreate(&start);
   qudaEventCreate(&end);
-  qudaEventRecord(start, 0);
+  qudaEventRecord(start, device::get_default_stream());
 
   switch(test) {
   case 0:
@@ -185,7 +185,7 @@ double benchmark(int test, const int niter) {
     errorQuda("Undefined test %d", test);
   }
 
-  qudaEventRecord(end, 0);
+  qudaEventRecord(end, device::get_default_stream());
   qudaEventSynchronize(end);
   float runTime;
   qudaEventElapsedTime(&runTime, start, end);
