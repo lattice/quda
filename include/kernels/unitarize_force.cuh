@@ -49,14 +49,14 @@ namespace quda {
         force_old(force_old),
         u(u),
         fails(fails),
-	threads(u.VolumeCB(), 2, 1),
         unitarize_eps(unitarize_eps),
         force_filter(force_filter),
         max_det_error(max_det_error),
         allow_svd(allow_svd),
         svd_only(svd_only),
         svd_rel_error(svd_rel_error),
-        svd_abs_error(svd_abs_error) { }
+        svd_abs_error(svd_abs_error), 
+	threads(u.VolumeCB(), 2, 1) { }
     };
 
     template <class Real> class DerivativeCoefficients {

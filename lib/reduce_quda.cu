@@ -39,7 +39,6 @@ namespace quda {
         TunableReduction2D(x),
         r(a, b),
         nParity((x.IsComposite() ? x.CompositeDim() : 1) * (x.SiteSubset())),
-	result(result),
         a(a),
         b(b),
         x(x),

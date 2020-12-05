@@ -45,7 +45,6 @@ namespace quda {
 
 #define qudaFuncGetAttributes(attr, kernel)                                                                            \
   ::quda::qudaFuncGetAttributes_(attr, kernel, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
->>>>>>> feature/generic_kernel
 
 #ifdef USE_DRIVER_API
   static TimeProfile apiTimer("CUDA API calls (driver)");
@@ -668,7 +667,7 @@ namespace quda {
    * @brief Create a QUDA Stream
    *
    */
-  void qudaStreamCreate_(qudaStream_t* stream, const char *func, const char *file, const char *line)
+  void qudaAPIStreamCreate_(qudaAPIStream_t* stream, const char *func, const char *file, const char *line)
   {
         cudaError_t error = cudaStreamCreate( stream );
         if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
@@ -678,7 +677,7 @@ namespace quda {
    * @brief Destroy a QUDA Stream
    *
    */
-  void qudaStreamDestroy_(qudaStream_t stream, const char *func, const char *file, const char *line)
+  void qudaAPIStreamDestroy_(qudaAPIStream_t stream, const char *func, const char *file, const char *line)
   {
 	cudaError_t error = cudaStreamDestroy( stream );
 	if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);

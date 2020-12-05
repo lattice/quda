@@ -9,6 +9,3 @@
 #else
 #define DISABLE_TROVE
 #endif
-#else
-#define DISABLE_TROVE
-#endif

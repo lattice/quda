@@ -92,7 +92,6 @@ namespace quda {
   double GaugeField::norm2(int d, bool fixed) const {
     if (reconstruct != QUDA_RECONSTRUCT_NO) errorQuda("Unsupported reconstruct=%d", reconstruct);
     double nrm = 0.0;
->>>>>>> feature/generic_kernel
     instantiatePrecision<Norm>(*this, nrm, d, fixed, NORM2);
     return nrm;
   }

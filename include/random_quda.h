@@ -54,4 +54,3 @@ namespace quda {
   };
 
 }
->>>>>>> feature/generic_kernel

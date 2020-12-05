@@ -19,8 +19,8 @@ namespace quda {
 
     KernelArg(const GaugeField &u) :
       ReduceArg<double2>(),
-      threads(u.LocalVolumeCB(), 2, 1),
-      u(u)
+      u(u),
+      threads(u.LocalVolumeCB(), 2, 1)
     {
       for (int dir=0; dir<4; ++dir) {
         border[dir] = u.R()[dir];

@@ -89,7 +89,7 @@ namespace quda {
   {
     using namespace dslash;
     // add cudaEventDisableTiming for lower sync overhead
-    for (int i=0; i<Nstream; i++) {
+    for (int i=0; i< nStream; i++) {
       qudaEventCreateDisableTiming(&gatherStart[i]);
       qudaEventCreateDisableTiming(&gatherEnd[i]);
       qudaEventCreateDisableTiming(&scatterStart[i]);
@@ -130,7 +130,7 @@ namespace quda {
   {
     using namespace dslash;
 
-    for (int i=0; i<Nstream; i++) {
+    for (int i=0; i< nStream; i++) {
       qudaEventDestroy(gatherStart[i]);
       qudaEventDestroy(gatherEnd[i]);
       qudaEventDestroy(scatterStart[i]);

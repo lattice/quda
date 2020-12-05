@@ -1,5 +1,4 @@
 #pragma once
-
 #if 0
 #ifndef __CUDACC_RTC__
 #include <cuda.h>
@@ -10,10 +9,11 @@
 #include "quda_define.h"
 
 #if defined(QUDA_TARGET_CUDA)
+
 #include <cuda.h>
 #include <cuda_runtime.h>
 using qudaDeviceProp_t = cudaDeviceProp;
-using qudaStream_t = cudaStream_t;
+using qudaAPIStream_t = cudaStream_t;
 using qudaMemcpyKind = cudaMemcpyKind;
 
 using qudaEvent_t = cudaEvent_t;
@@ -33,7 +33,7 @@ constexpr qudaMemcpyKind  qudaMemcpyDefault = cudaMemcpyDefault;
 #include <hip/hip_runtime_api.h>
 
 using qudaDeviceProp_t = hipDeviceProp_t;
-using qudaStream_t = hipStream_t;
+// using qudaStream_t = hipStream_t;
 using qudaMemcpyKind = hipMemcpyKind;
 
 using qudaEvent_t = hipEvent_t;
@@ -48,10 +48,10 @@ constexpr qudaMemcpyKind  qudaMemcpyDefault = hipMemcpyDefault;
 
 #define QUDA_DYNAMIC_SHARED( type, var )        \
         HIP_DYNAMIC_SHARED(type, var);
+
 #endif
 
-extern qudaDeviceProp_t deviceProp;
-#endif
+//extern qudaDeviceProp_t deviceProp;
 
 
 #include <enum_quda.h>
@@ -129,7 +129,7 @@ namespace quda
      @param[in] kind     Type of memory copy
      @param[in] stream   Stream to issue copy  
   */
-  void qudaMemcpyToSymbolAsync_(const void *symbol, const void *src, size_t count, size_t offset,  qudaMemcpyKind kind, const qudaStream_t &stream, 
+  void qudaMemcpyToSymbolAsync_(const void *symbol, const void *src, size_t count, size_t offset,  qudaMemcpyKind kind, const qudaAPIStream_t &stream, 
 			        const char *func, const char *file, const char *line);
 
   /**
@@ -429,6 +429,11 @@ namespace quda
 #define qudaMemPrefetchAsync(ptr, count, mem_space, stream)                                                            \
   ::quda::qudaMemPrefetchAsync_(ptr, count, mem_space, stream, __func__, quda::file_name(__FILE__),                    \
                                 __STRINGIFY__(__LINE__))
+
+// IN HERE BECAUSE OF BLOCK ORTHOGONALIZE
+#define qudaMemcpyToSymbolAsync(symbol, src, count,offset,kind,stream)                                           \
+  ::quda::qudaMemcpyToSymbolAsync_(symbol,src, count, offset, kind, stream, __func__, quda::file_name(__FILE__), \
+		  __STRINGIFY__(__LINE__))
 
 #define qudaEventCreate(event)                                                                                         \
   ::quda::qudaEventCreate_(event, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
