@@ -657,6 +657,16 @@ namespace quda {
   }
 
 
+  void qudaMemcpyToSymbolAsync_(const void *symbol, const void *src, size_t count, size_t offset,  qudaMemcpyKind kind, const qudaAPIStream_t &stream,
+                                const char *func, const char *file, const char *line) 
+  {
+    cudaError_t error = cudaMemcpyToSymbolAsync(symbol,src,count,offset,kind,stream);
+    if( error != cudaSuccess ) {
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    }
+
+  }
+
   void printAPIProfile() {
 #ifdef API_PROFILE
     apiTimer.Print();
