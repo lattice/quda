@@ -46,7 +46,7 @@ cmake <path-to-parent-dir-of-your-quda-source>/quda \
         -G "Unix Makefiles" \
 	-DQUDA_TARGET_TYPE="HIP" \
         -DQUDA_DIRAC_CLOVER=ON \
-        -QUDA_DIRAC_CLOVER_HASENBUSCH=ON \
+        -DQUDA_DIRAC_CLOVER_HASENBUSCH=ON \
         -DQUDA_DIRAC_DOMAIN_WALL=ON \
         -DQUDA_DIRAC_NDEG_TWISTED_MASS=OFF \
         -DQUDA_DIRAC_STAGGERED=OFF \
