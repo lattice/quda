@@ -365,7 +365,7 @@ double benchmark(Kernel kernel, const int niter)
   qudaEvent_t start, end;
   qudaEventCreate(&start);
   qudaEventCreate(&end);
-  qudaEventRecord(start, 0);
+  qudaEventRecord(start, device::get_default_stream());
 
   {
     switch (kernel) {
@@ -529,7 +529,7 @@ double benchmark(Kernel kernel, const int niter)
     }
   }
 
-  qudaEventRecord(end, 0);
+  qudaEventRecord(end, device::get_default_stream());
   qudaEventSynchronize(end);
   float runTime;
   qudaEventElapsedTime(&runTime, start, end);

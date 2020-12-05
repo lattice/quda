@@ -544,7 +544,7 @@ namespace quda {
 #endif
   }
 
-  void qudaEventSynchronize_(const cudaEvent_t &event, const char *func, const char *file, const char *line)
+  void qudaEventSynchronize_(cudaEvent_t event, const char *func, const char *file, const char *line)
   {
 #ifdef USE_DRIVER_API
     PROFILE(CUresult error = cuEventSynchronize(event), QUDA_PROFILE_EVENT_SYNCHRONIZE);
@@ -661,26 +661,6 @@ namespace quda {
 #ifdef API_PROFILE
     apiTimer.Print();
 #endif
-  }
-
-  /**
-   * @brief Create a QUDA Stream
-   *
-   */
-  void qudaAPIStreamCreate_(qudaAPIStream_t* stream, const char *func, const char *file, const char *line)
-  {
-        cudaError_t error = cudaStreamCreate( stream );
-        if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
-  }
-
-  /**
-   * @brief Destroy a QUDA Stream
-   *
-   */
-  void qudaAPIStreamDestroy_(qudaAPIStream_t stream, const char *func, const char *file, const char *line)
-  {
-	cudaError_t error = cudaStreamDestroy( stream );
-	if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
 } // namespace quda
