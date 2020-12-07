@@ -4,18 +4,17 @@
 #include <assert.h>
 #include <utility>
 
-#include <tunable_nd.h>
+#include <tunable_block_reduction.h>
 #include <kernels/block_orthogonalize.cuh>
 
 namespace quda {
 
   struct OrthoAggregates {
     // List of block sizes we wish to instantiate.  The required block
-    // size is equal to number of checkerboard fine points per
-    // aggregate, rounded up to a whole power of two.  So for example,
-    // 2x2x2x2 and 3x3x3x1 aggregation would both use the same block
-    // size 32
-    static constexpr std::array<unsigned int, 5> block = {32, 64, 128, 256, 512};
+    // size is equal to number of fine points per aggregate, rounded
+    // up to a whole power of two.  So for example, 2x2x2x2 and
+    // 3x3x3x1 aggregation would both use the same block size 32
+    static constexpr std::array<unsigned int, 6> block = {32, 64, 128, 256, 512, 1024};
 
     /**
        @brief Return the first power of two block that is larger than the required size
@@ -28,7 +27,7 @@ namespace quda {
     }
   };
 
-  constexpr std::array<unsigned int, 5> OrthoAggregates::block;
+  constexpr std::array<unsigned int, 6> OrthoAggregates::block;
 
   using namespace quda::colorspinor;
 
@@ -42,12 +41,13 @@ namespace quda {
 #endif
 
   template <typename vFloat, typename bFloat, int nSpin, int spinBlockSize, int nColor_, int coarseSpin, int nVec>
-  class BlockOrtho : public TunableKernel3D {
+  class BlockOrtho : public TunableBlock2D {
 
     using real = typename mapper<vFloat>::type;
     // we only support block-format on fine grid where Ncolor=3
     static constexpr int nColor = isFixed<bFloat>::value ? 3 : nColor_;
     static constexpr int chiral_blocks = nSpin == 1 ? 2 : nSpin / spinBlockSize;
+    template <typename Rotator, typename Vector> using Arg = BlockOrthoArg<vFloat, Rotator, Vector, nSpin, nColor, coarseSpin, nVec>;
 
     ColorSpinorField &V;
     const std::vector<ColorSpinorField*> B;
@@ -55,15 +55,13 @@ namespace quda {
     const int *coarse_to_fine;
     const int *geo_bs;
     const int n_block_ortho;
-    int geoBlockSize;
+    int aggregate_size;
     int nBlock;
-
-    unsigned int minThreads() const { return V.VolumeCB(); } // fine parity is the block y dimension
 
   public:
     BlockOrtho(ColorSpinorField &V, const std::vector<ColorSpinorField *> B, const int *fine_to_coarse,
                const int *coarse_to_fine, const int *geo_bs, const int n_block_ortho) :
-      TunableKernel3D(V, nSpin == 1 ? 1 : V.SiteSubset(), chiral_blocks),
+      TunableBlock2D(V, chiral_blocks),
       V(V),
       B(B),
       fine_to_coarse(fine_to_coarse),
@@ -76,15 +74,15 @@ namespace quda {
 
       strcat(aux,",block_size=");
 
-      geoBlockSize = 1;
+      aggregate_size = 1;
       char geo_str[16];
       for (int d = 0; d < V.Ndim(); d++) {
-        geoBlockSize *= geo_bs[d];
+        aggregate_size *= geo_bs[d];
         i32toa(geo_str, geo_bs[d]);
         strcat(aux, geo_str);
         if (d < V.Ndim() - 1) strcat(aux, "x");
       }
-      nBlock = (V.Volume()/geoBlockSize) * chiral_blocks;
+      nBlock = (V.Volume()/aggregate_size) * chiral_blocks;
 
       strcat(aux, ",n_block_ortho=");
       char n_ortho_str[2];
@@ -92,51 +90,27 @@ namespace quda {
       strcat(aux, n_ortho_str);
       strcat(aux, ",mVec=");
       char mvec_str[3];
-      i32toa(mvec_str, tile_size<nColor, nVec>());
+      int active_x_threads = (aggregate_size / 2) * (nSpin == 1 ? 1 : V.SiteSubset());
+      i32toa(mvec_str, tile_size<nColor, nVec>(OrthoAggregates::block_mapper(active_x_threads)));
       strcat(aux, mvec_str);
-
-      if (V.Location() == QUDA_CPU_FIELD_LOCATION) strcat(aux, getOmpThreadStr());
     }
 
-    /**
-       @brief Helper function for expanding the std::vector into a
-       parameter pack that we can use to instantiate the const arrays
-       in BlockOrthoArg and then call the CPU variant of the block
-       orthogonalization.
-     */
     template <typename Rotator, typename Vector, std::size_t... S>
-    void CPU(const std::vector<ColorSpinorField*> &B, std::index_sequence<S...>) {
-      using Arg = BlockOrthoArg<vFloat, Rotator, Vector, nSpin, nColor, coarseSpin, nVec>;
-      Arg arg(V, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V, B[S]...);
-      //blockOrthoCPU<Arg>(arg);
-    }
-
-    template <int idx, typename Block, template <int, typename> class Transformer, typename Arg>
-    typename std::enable_if<idx != 0, void>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+    void CPU(const TuneParam &tp, const qudaStream_t &stream,
+             const std::vector<ColorSpinorField*> &B, std::index_sequence<S...>)
     {
-      if (tp.block.x == Block::block[idx]) qudaLaunchKernel(blockOrthoGPU<Block::block[idx], Transformer, Arg>, tp, stream, arg);
-      else launch<idx - 1, Block, Transformer>(arg, tp, stream);
+      Arg<Rotator, Vector> arg(V, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V, B[S]...);
+      arg.n_block = tp.grid.x;
+      launch_host<BlockOrtho_, OrthoAggregates>(tp, stream, arg);
     }
 
-    template <int idx, typename Block, template <int, typename> class Transformer, typename Arg>
-    typename std::enable_if<idx == 0, void>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
-    {
-      if (tp.block.x == Block::block[idx]) qudaLaunchKernel(blockOrthoGPU<Block::block[idx], Transformer, Arg>, tp, stream, arg);
-      else errorQuda("Unexpected block size %d\n", tp.block.x);
-    }
-
-    /**
-       @brief Helper function for expanding the std::vector into a
-       parameter pack that we can use to instantiate the const arrays
-       in BlockOrthoArg and then call the GPU variant of the block
-       orthogonalization.
-     */
     template <typename Rotator, typename Vector, std::size_t... S>
-    void GPU(const TuneParam &tp, const qudaStream_t &stream, const std::vector<ColorSpinorField*> &B, std::index_sequence<S...>) {
-      using Arg = BlockOrthoArg<vFloat, Rotator, Vector, nSpin, nColor, coarseSpin, nVec>;
-      Arg arg(V, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V, B[S]...);
-      arg.swizzle = tp.aux.x;
-      launch<OrthoAggregates::block.size() - 1, OrthoAggregates, BlockOrtho_>(arg, tp, stream);
+    void GPU(const TuneParam &tp, const qudaStream_t &stream,
+             const std::vector<ColorSpinorField*> &B, std::index_sequence<S...>)
+    {
+      Arg<Rotator, Vector> arg(V, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V, B[S]...);
+      arg.swizzle_factor = tp.aux.x;
+      launch_device<BlockOrtho_, OrthoAggregates>(tp, stream, arg);
     }
 
     void apply(const qudaStream_t &stream)
@@ -146,7 +120,7 @@ namespace quda {
         if (V.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER && B[0]->FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
           typedef FieldOrderCB<real,nSpin,nColor,nVec,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,vFloat,vFloat,DISABLE_GHOST> Rotator;
           typedef FieldOrderCB<real,nSpin,nColor,1,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,bFloat,bFloat,DISABLE_GHOST> Vector;
-          CPU<Rotator,Vector>(B, std::make_index_sequence<nVec>());
+          CPU<Rotator,Vector>(tp, stream, B, std::make_index_sequence<nVec>());
         } else {
           errorQuda("Unsupported field order %d\n", V.FieldOrder());
         }
@@ -154,7 +128,7 @@ namespace quda {
         if (V.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && B[0]->FieldOrder() == BOrder<bFloat,nSpin,nColor>::order) {
           typedef FieldOrderCB<real,nSpin,nColor,nVec,QUDA_FLOAT2_FIELD_ORDER,vFloat,vFloat,DISABLE_GHOST> Rotator;
           typedef FieldOrderCB<real,nSpin,nColor,1,BOrder<bFloat,nSpin,nColor>::order,bFloat,bFloat,DISABLE_GHOST,isFixed<bFloat>::value> Vector;
-          GPU<Rotator,Vector>(tp,stream,B,std::make_index_sequence<nVec>());
+          GPU<Rotator,Vector>(tp, stream, B, std::make_index_sequence<nVec>());
         } else {
           errorQuda("Unsupported field order V=%d B=%d\n", V.FieldOrder(), B[0]->FieldOrder());
         }
@@ -188,9 +162,10 @@ namespace quda {
     /** sets default values for when tuning is disabled */
     void initTuneParam(TuneParam &param) const
     {
-      TunableKernel3D::initTuneParam(param);
-      param.block = dim3(OrthoAggregates::block_mapper(geoBlockSize/2), nSpin == 1 ? 1 : V.SiteSubset(), 1);
-      param.grid = dim3(V.VolumeCB() / (geoBlockSize/2), 1, chiral_blocks);
+      TunableBlock2D::initTuneParam(param);
+      int active_x_threads = (aggregate_size / 2) * (nSpin == 1 ? 1 : V.SiteSubset());
+      param.block = dim3(OrthoAggregates::block_mapper(active_x_threads), 1, 1);
+      param.grid = dim3(V.Volume() / (nSpin == 1 ? 2 : active_x_threads), chiral_blocks, 1);
       param.aux.x = 1; // swizzle factor
     }
 
@@ -198,9 +173,11 @@ namespace quda {
 
     long long flops() const
     {
-      // FIXME: verify for staggered
-      return n_block_ortho * nBlock * (geoBlockSize / 2) * (spinBlockSize == 0 ? 1 : 2 * spinBlockSize) / 2 * nColor
-        * (nVec * ((nVec - 1) * (8l + 8l)) + 6l);
+      auto n = nVec;
+      auto k = (aggregate_size / 2) * (spinBlockSize == 0 ? 1 : 2 * spinBlockSize) * nColor;
+      auto L = 8l + 8l; // dot + caxpy
+      auto D = 4l + 2l; // norm + scale
+      return n_block_ortho * nBlock * k * ((n - 1) * n / 2 * L + n * D);
     }
 
     long long bytes() const

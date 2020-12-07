@@ -65,4 +65,22 @@ namespace quda {
     if (i == 0) t.store(value, block, j);
   }
 
+  /**
+     @brief Generic block kernel.  Here, we split the block and thread
+     indices in the x dimension and pass these indices separately to
+     the transform functor.  The y thread dimension is a trivial
+     vectorizable dimension.
+  */
+  template <int block_size, template <int, typename> class Transformer, typename Arg>
+  __launch_bounds__(block_size) __global__ void BlockKernel2D(Arg arg)
+  {
+    const int block = virtual_block_idx(arg);
+    const int i = threadIdx.x;
+    const int j = blockDim.y*blockIdx.y + threadIdx.y;
+    if (j >= arg.threads.y) return;
+
+    Transformer<block_size, Arg> t(arg);
+    t(block, i, j);
+  }
+
 }
