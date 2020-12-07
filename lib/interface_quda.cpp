@@ -3473,18 +3473,24 @@ void callSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // co
 
   // Load gauge field after pushing the split communicator so the comm buffers, etc are setup according to
   // the split topology.
+  printfQuda("Split grid loading gauge field...\n");
   if (!is_staggered) {
     loadGaugeQuda(collected_gauge->Gauge_p(), gauge_param);
   } else {
     loadFatLongGaugeQuda(param, gauge_param, collected_milc_fatlink_field->Gauge_p(), collected_milc_longlink_field->Gauge_p());
   }
+  printfQuda("Split grid loaded gauge field...\n");
 
   if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    printfQuda("Split grid loading clover field...\n");
     if (collected_clover) {
+      printfQuda("clover prec = %d %d\n", param->clover_cpu_prec, param->clover_cuda_prec);
       loadCloverQuda(collected_clover->V(false), collected_clover->V(true), param);
     } else {
+      printfQuda("clover prec = %d %d!\n", param->clover_cpu_prec, param->clover_cuda_prec);
       loadCloverQuda(nullptr, nullptr, param);
     }
+    printfQuda("Split grid loaded clover field...\n");
   }
 
   profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_PREAMBLE);
