@@ -100,7 +100,8 @@ int main(int argc, char **argv)
   ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
   if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
 
-  dslash_test_wrapper.init(argc, argv);
+  initQuda(device_ordinal);
+  dslash_test_wrapper.init_test(argc, argv);
 
   display_test_info();
 

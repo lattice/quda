@@ -64,9 +64,14 @@ struct DslashTestWrapper {
 
   const bool transfer = false;
 
-  void init(int argc, char **argv, int precision, QudaReconstructType link_recon)
+  void init_ctest(int argc, char **argv, int precision, QudaReconstructType link_recon)
   {
     cuda_prec = getPrecision(precision);
+
+    gauge_param = newQudaGaugeParam();
+    inv_param = newQudaInvertParam();
+    setWilsonGaugeParam(gauge_param);
+    setInvertParam(inv_param);
     
     gauge_param.cuda_prec = cuda_prec;                                                              
     gauge_param.cuda_prec_sloppy = cuda_prec;                                                         
@@ -80,25 +85,24 @@ struct DslashTestWrapper {
   
     inv_param.cuda_prec = cuda_prec;
 
-    init_test(argc, argv);
-  }
-
-  void init(int argc, char **argv)
-  {
-    initQuda(device_ordinal);
-    init_test(argc, argv);
+    init(argc, argv);
   }
 
   void init_test(int argc, char **argv)
   {
+    gauge_param = newQudaGaugeParam();
+    inv_param = newQudaInvertParam();
+    setWilsonGaugeParam(gauge_param);
+    setInvertParam(inv_param);
+
+    init(argc, argv);
+  }
+
+  void init(int argc, char **argv)
+  {
     num_src = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3];
     test_split_grid = num_src > 1;
     if (test_split_grid) { dtest_type = dslash_test_type::Dslash; }
-
-    gauge_param = newQudaGaugeParam();
-    inv_param = newQudaInvertParam();
-
-    setWilsonGaugeParam(gauge_param);
 
     if (dslash_type == QUDA_ASQTAD_DSLASH || dslash_type == QUDA_STAGGERED_DSLASH) {
       errorQuda("Asqtad not supported.  Please try staggered_dslash_test instead");
@@ -113,7 +117,6 @@ struct DslashTestWrapper {
 
     setSpinorSiteSize(24);
 
-    setInvertParam(inv_param);
     inv_param.dagger = dagger ? QUDA_DAG_YES : QUDA_DAG_NO;
     not_dagger = dagger ? QUDA_DAG_NO : QUDA_DAG_YES;
 
@@ -256,7 +259,6 @@ struct DslashTestWrapper {
       inv_param.compute_clover_inverse = true;
       inv_param.return_clover_inverse = true;
 
-      printfQuda("clover prec = %d %d!\n", inv_param.clover_cpu_prec, inv_param.clover_cuda_prec);
       loadCloverQuda(hostClover, hostCloverInv, &inv_param);
     }
 

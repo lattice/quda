@@ -111,7 +111,7 @@ public:
     }
     updateR();
 
-    dslash_test_wrapper.init(argc_copy, argv_copy, prec, recon);
+    dslash_test_wrapper.init_ctest(argc_copy, argv_copy, prec, recon);
     display_test_info(prec, recon);
   }
 

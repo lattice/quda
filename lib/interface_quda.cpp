@@ -3484,10 +3484,8 @@ void callSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // co
   if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     printfQuda("Split grid loading clover field...\n");
     if (collected_clover) {
-      printfQuda("clover prec = %d %d\n", param->clover_cpu_prec, param->clover_cuda_prec);
       loadCloverQuda(collected_clover->V(false), collected_clover->V(true), param);
     } else {
-      printfQuda("clover prec = %d %d!\n", param->clover_cpu_prec, param->clover_cuda_prec);
       loadCloverQuda(nullptr, nullptr, param);
     }
     printfQuda("Split grid loaded clover field...\n");
