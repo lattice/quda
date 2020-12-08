@@ -497,7 +497,7 @@ namespace quda {
     return false;
   }
 
-  void qudaEventRecord_(cudaEvent_t &event, qudaStream_t stream, const char *func, const char *file, const char *line)
+  void qudaEventRecord_(qudaEvent_t &event, qudaStream_t stream, const char *func, const char *file, const char *line)
   {
 #ifdef USE_DRIVER_API
     PROFILE(CUresult error = cuEventRecord(event, device::get_cuda_stream(stream)), QUDA_PROFILE_EVENT_RECORD);
@@ -657,10 +657,10 @@ namespace quda {
   }
 
 
-  void qudaMemcpyToSymbolAsync_(const void *symbol, const void *src, size_t count, size_t offset,  qudaMemcpyKind kind, const qudaAPIStream_t &stream,
+  void qudaMemcpyToSymbolAsync_(const void *symbol, const void *src, size_t count, size_t offset,  qudaMemcpyKind kind, const qudaStream_t &stream,
                                 const char *func, const char *file, const char *line) 
   {
-    cudaError_t error = cudaMemcpyToSymbolAsync(symbol,src,count,offset,kind,stream);
+    cudaError_t error = cudaMemcpyToSymbolAsync(symbol,src,count,offset,kind,device::get_cuda_stream(stream));
     if( error != cudaSuccess ) {
       errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
     }

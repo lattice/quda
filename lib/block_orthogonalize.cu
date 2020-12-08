@@ -116,9 +116,9 @@ namespace quda {
       jitify_error = instance.configure(tp.grid,tp.block,tp.shared_bytes,device::get_cuda_stream(stream)).launch(arg);
 #else
 #if defined(QUDA_TARGET_CUDA)
-      qudaMemcpyToSymbolAsync(B_array_d, B_array_h, device::max_constant_param_size(), 0, qudaMemcpyHostToDevice, device::get_cuda_stream(stream));
+      qudaMemcpyToSymbolAsync(B_array_d, B_array_h, device::max_constant_param_size(), 0, qudaMemcpyHostToDevice, stream);
 #else
-      qudaMemcpyAsync(B_array_d, B_array_h, device::max_constant_param_size(), qudaMemcpyHostToDevice, device::get_cuda_stream(stream));;
+      qudaMemcpyAsync(B_array_d, B_array_h, device::max_constant_param_size(), qudaMemcpyHostToDevice, stream);
 #endif
       LAUNCH_KERNEL_MG_BLOCK_SIZE(blockOrthoGPU,tp,stream,arg,sumType,RegType,nSpin,spinBlockSize,nColor,coarseSpin,nVec,Arg);
 #endif
