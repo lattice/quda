@@ -104,7 +104,7 @@ struct DslashTestWrapper {
     test_split_grid = num_src > 1;
     if (test_split_grid) { dtest_type = dslash_test_type::Dslash; }
 
-    if (dslash_type == QUDA_ASQTAD_DSLASH || dslash_type == QUDA_STAGGERED_DSLASH) {
+    if (dslash_type == QUDA_ASQTAD_DSLASH || dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
       errorQuda("Asqtad not supported.  Please try staggered_dslash_test instead");
     } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
         || dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {

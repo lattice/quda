@@ -27,6 +27,8 @@ struct DslashTime {
 
 struct StaggeredDslashTestWrapper {
 
+  bool is_ctest = false; // Added to distinguish from being used in dslash_test.
+
   void *qdp_inlink[4] = { nullptr, nullptr, nullptr, nullptr };
 
   QudaGaugeParam gauge_param;
@@ -82,7 +84,7 @@ struct StaggeredDslashTestWrapper {
             mass, 0, inv_param.cpu_prec, gauge_param.cpu_prec, tmpCpu, parity, dslash_type);
         break;
       case dslash_test_type::Mat:
-        // Not sure about the !dagger...
+        // the !dagger is to reconcile the QUDA convention of D_stag = {{ 2m, -D_{eo}}, -D_{oe}, 2m}} vs the host convention without the minus signs
         staggeredDslash(reinterpret_cast<cpuColorSpinorField *>(&spinorRef->Even()), qdp_fatlink_cpu, qdp_longlink_cpu,
             ghost_fatlink_cpu, ghost_longlink_cpu, reinterpret_cast<cpuColorSpinorField *>(&spinor->Odd()),
             QUDA_EVEN_PARITY, !dagger, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
@@ -98,6 +100,51 @@ struct StaggeredDslashTestWrapper {
       default:
         errorQuda("Test type not defined");
     }
+  }
+
+  void init_ctest_once()
+  {
+    static bool has_been_called = false;
+    if (has_been_called) { errorQuda("This function is not supposed to be called twice.\n"); }
+    // initialize CPU field backup
+    int pmax = 1;
+#ifdef MULTI_GPU
+    pmax = 16;
+#endif
+    for (int p = 0; p < pmax; p++) {
+      for (int d = 0; d < 4; d++) {
+        qdp_fatlink_cpu_backup[p][d] = nullptr;
+        qdp_longlink_cpu_backup[p][d] = nullptr;
+        qdp_inlink_backup[p][d] = nullptr;
+      }
+    }
+    is_ctest = true; // Is being used in dslash_ctest.
+    has_been_called = true;
+  }
+
+  void end_ctest_once()
+  {
+    static bool has_been_called = false;
+    if (has_been_called) { errorQuda("This function is not supposed to be called twice.\n"); }
+    // Clean up per-partition backup
+    int pmax = 1;
+#ifdef MULTI_GPU
+    pmax = 16;
+#endif
+    for (int p = 0; p < pmax; p++) {
+      for (int d = 0; d < 4; d++) {
+        if (qdp_inlink_backup[p][d] != nullptr) { free(qdp_inlink_backup[p][d]); qdp_inlink_backup[p][d] = nullptr; }
+        if (qdp_fatlink_cpu_backup[p][d] != nullptr) {
+          free(qdp_fatlink_cpu_backup[p][d]);
+          qdp_fatlink_cpu_backup[p][d] = nullptr;
+        }
+        if (qdp_longlink_cpu_backup[p][d] != nullptr) {
+          free(qdp_longlink_cpu_backup[p][d]);
+          qdp_longlink_cpu_backup[p][d] = nullptr;
+        }
+      }
+    }
+    has_been_called = true;
   }
 
   void init_ctest(int precision, QudaReconstructType link_recon_, int partition)

@@ -205,18 +205,7 @@ TEST_P(StaggeredDslashTest, benchmark) {
     wrapper.argc_copy = argc;
     wrapper.argv_copy = argv;
 
-    // initialize CPU field backup
-    int pmax = 1;
-#ifdef MULTI_GPU
-    pmax = 16;
-#endif
-    for (int p = 0; p < pmax; p++) {
-      for (int d = 0; d < 4; d++) {
-        wrapper.qdp_fatlink_cpu_backup[p][d] = nullptr;
-        wrapper.qdp_longlink_cpu_backup[p][d] = nullptr;
-        wrapper.qdp_inlink_backup[p][d] = nullptr;
-      }
-    }
+    wrapper.init_ctest_once();
 
     // initalize google test
     ::testing::InitGoogleTest(&argc, argv);
@@ -277,20 +266,7 @@ TEST_P(StaggeredDslashTest, benchmark) {
       if (wrapper.qdp_inlink[dir] != nullptr) { free(wrapper.qdp_inlink[dir]); wrapper.qdp_inlink[dir] = nullptr; }
     }
 
-    // Clean up per-partition backup
-    for (int p = 0; p < pmax; p++) {
-      for (int d = 0; d < 4; d++) {
-        if (wrapper.qdp_inlink_backup[p][d] != nullptr) { free(wrapper.qdp_inlink_backup[p][d]); wrapper.qdp_inlink_backup[p][d] = nullptr; }
-        if (wrapper.qdp_fatlink_cpu_backup[p][d] != nullptr) {
-          free(wrapper.qdp_fatlink_cpu_backup[p][d]);
-          wrapper.qdp_fatlink_cpu_backup[p][d] = nullptr;
-        }
-        if (wrapper.qdp_longlink_cpu_backup[p][d] != nullptr) {
-          free(wrapper.qdp_longlink_cpu_backup[p][d]);
-          wrapper.qdp_longlink_cpu_backup[p][d] = nullptr;
-        }
-      }
-    }
+    wrapper.end_ctest_once();
 
     finalizeComms();
 
