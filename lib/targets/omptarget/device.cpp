@@ -340,16 +340,26 @@ namespace quda
       switch (deviceProp.major) {
       case 2:
 	return 8;
+	break;
       case 3:
 	return 16;
+	break;
       case 5:
-      case 6: return 32;
+	 return 32;
+	 break;
+      case 6: 
+	 return 32;
+	 break;
       case 7:
-        switch (deviceProp.minor) {
-        case 0: return 32;
-        case 2: return 32;
-        case 5: return 16;
+	{
+          switch (deviceProp.minor) {
+            case 0: return 32; break;
+            case 2: return 32; break;
+            case 5: return 16; break;
+	    default: return 32; break;
+	  };
         }
+	break;
       default:
         warningQuda("Unknown SM architecture %d.%d - assuming limit of 32 blocks per SM\n",
                     deviceProp.major, deviceProp.minor);
