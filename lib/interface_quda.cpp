@@ -3471,12 +3471,16 @@ void callSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // co
   updateR();
   comm_barrier();
 
+  profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_PREAMBLE);
+  profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_TOTAL);
+
   // Load gauge field after pushing the split communicator so the comm buffers, etc are setup according to
   // the split topology.
   printfQuda("Split grid loading gauge field...\n");
   if (!is_staggered) {
     loadGaugeQuda(collected_gauge->Gauge_p(), gauge_param);
   } else {
+    freeGaugeQuda();
     loadFatLongGaugeQuda(param, gauge_param, collected_milc_fatlink_field->Gauge_p(), collected_milc_longlink_field->Gauge_p());
   }
   printfQuda("Split grid loaded gauge field...\n");
@@ -3490,9 +3494,6 @@ void callSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // co
     }
     printfQuda("Split grid loaded clover field...\n");
   }
-
-  profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_PREAMBLE);
-  profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_TOTAL);
 
   for (int n = 0; n < param->num_src_per_sub_partition; n++) {
     op(_collect_x[n]->V(), _collect_b[n]->V(), param, args...);
@@ -3534,10 +3535,14 @@ void callSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // co
   if (input_clover) { delete input_clover; }
   if (collected_clover) { delete collected_clover; }
 
+  profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_EPILOGUE);
+  profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_TOTAL);
+
   // Restore the gauge field
   if (!is_staggered) {
     loadGaugeQuda(h_gauge, gauge_param);
   } else { 
+    freeGaugeQuda();
     loadFatLongGaugeQuda(param, gauge_param, milc_fatlinks, milc_longlinks);
   }
 
@@ -3545,8 +3550,6 @@ void callSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // co
     loadCloverQuda(h_clover, h_clovinv, param);
   }
 
-  profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_EPILOGUE);
-  profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_TOTAL);
   profilerStop(__func__);
 }
 

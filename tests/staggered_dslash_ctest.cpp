@@ -87,6 +87,8 @@ protected:
       warningQuda("Fixed precision unsupported for Laplace operator, skipping...");
       return true;
     }
+
+    if (::testing::get<2>(GetParam()) > 0 && wrapper.test_split_grid) { return true; }
     return false;
   }
 
@@ -125,78 +127,19 @@ public:
   static void TearDownTestCase() { endQuda(); }
 };
 
- TEST_P(StaggeredDslashTest, verify) {
-   double deviation = 1.0;
-   double tol = getTolerance(wrapper.inv_param.cuda_prec);
-
-   bool failed = false; // for the nan catch
-
-   // check for skip_kernel
-   if (wrapper.spinorRef != nullptr) {
-
-     { // warm-up run
-       // printfQuda("Tuning...\n");
-       wrapper.dslashCUDA(1);
-     }
-
-     wrapper.dslashCUDA(2);
-
-     *wrapper.spinorOut = *wrapper.cudaSpinorOut;
-
-     wrapper.staggeredDslashRef();
-
-     double spinor_ref_norm2 = blas::norm2(*wrapper.spinorRef);
-     double spinor_out_norm2 = blas::norm2(*wrapper.spinorOut);
-
-     // for verification
-     // printfQuda("\n\nCUDA: %f\n\n", ((double*)(spinorOut->V()))[0]);
-     // printfQuda("\n\nCPU:  %f\n\n", ((double*)(spinorRef->V()))[0]);
-
-     // Catching nans is weird.
-     if (std::isnan(spinor_ref_norm2)) { failed = true; }
-     if (std::isnan(spinor_out_norm2)) { failed = true; }
-
-     double cuda_spinor_out_norm2 = blas::norm2(*wrapper.cudaSpinorOut);
-     printfQuda("Results: CPU=%f, CUDA=%f, CPU-CUDA=%f\n", spinor_ref_norm2, cuda_spinor_out_norm2, spinor_out_norm2);
-     deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*wrapper.spinorRef, *wrapper.spinorOut)));
-     if (failed) { deviation = 1.0; }
-   }
-    ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
+TEST_P(StaggeredDslashTest, verify) {
+  double deviation = 1.0;
+  double tol = getTolerance(wrapper.inv_param.cuda_prec);
+  // check for skip_kernel
+  if (wrapper.spinorRef != nullptr) {
+    wrapper.run_test(/**niter =*/2);
+    deviation = wrapper.verify();
   }
+  ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
+}
 
 TEST_P(StaggeredDslashTest, benchmark) {
-
-  { // warm-up run
-    // printfQuda("Tuning...\n");
-    wrapper.dslashCUDA(1);
-  }
-
-  // reset flop counter
-  wrapper.dirac->Flops();
-
-  DslashTime dslash_time = wrapper.dslashCUDA(niter);
-
-  *wrapper.spinorOut = *wrapper.cudaSpinorOut;
-
-  printfQuda("%fus per kernel call\n", 1e6 * dslash_time.event_time / niter);
-
-  unsigned long long flops = wrapper.dirac->Flops();
-  double gflops = 1.0e-9 * flops / dslash_time.event_time;
-  printfQuda("GFLOPS = %f\n", gflops);
-  RecordProperty("Gflops", std::to_string(gflops));
-
-  RecordProperty("Halo_bidirectitonal_BW_GPU", 1.0e-9 * 2 * wrapper.cudaSpinor->GhostBytes() * niter / dslash_time.event_time);
-  RecordProperty("Halo_bidirectitonal_BW_CPU", 1.0e-9 * 2 * wrapper.cudaSpinor->GhostBytes() * niter / dslash_time.cpu_time);
-  RecordProperty("Halo_bidirectitonal_BW_CPU_min", 1.0e-9 * 2 * wrapper.cudaSpinor->GhostBytes() / dslash_time.cpu_max);
-  RecordProperty("Halo_bidirectitonal_BW_CPU_max", 1.0e-9 * 2 * wrapper.cudaSpinor->GhostBytes() / dslash_time.cpu_min);
-  RecordProperty("Halo_message_size_bytes", 2 * wrapper.cudaSpinor->GhostBytes());
-
-  printfQuda("Effective halo bi-directional bandwidth (GB/s) GPU = %f ( CPU = %f, min = %f , max = %f ) for aggregate "
-             "message size %lu bytes\n",
-      1.0e-9 * 2 * wrapper.cudaSpinor->GhostBytes() * niter / dslash_time.event_time,
-      1.0e-9 * 2 * wrapper.cudaSpinor->GhostBytes() * niter / dslash_time.cpu_time,
-      1.0e-9 * 2 * wrapper.cudaSpinor->GhostBytes() / dslash_time.cpu_max,
-      1.0e-9 * 2 * wrapper.cudaSpinor->GhostBytes() / dslash_time.cpu_min, 2 * wrapper.cudaSpinor->GhostBytes());
+  wrapper.run_test(niter, /**print_metrics =*/true);
 }
 
   int main(int argc, char **argv)
@@ -211,6 +154,7 @@ TEST_P(StaggeredDslashTest, benchmark) {
     ::testing::InitGoogleTest(&argc, argv);
     auto app = make_app();
     app->add_option("--test", dtest_type, "Test method")->transform(CLI::CheckedTransformer(dtest_type_map));
+    add_split_grid_option_group(app);
     try {
       app->parse(argc, argv);
     } catch (const CLI::ParseError &e) {

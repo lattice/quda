@@ -33,58 +33,16 @@ StaggeredDslashTestWrapper wrapper;
 
 static int dslashTest()
 {
-
-  bool failed = false;
-
   // return code for google test
   int test_rc = 0;
   wrapper.init_test();
 
   int attempts = 1;
-
-  for (int i=0; i<attempts; i++) {
-
-    { // warm-up run
-      printfQuda("Tuning...\n");
-      wrapper.dslashCUDA(1);
-    }
-    printfQuda("Executing %d kernel loops...", niter);
-
-    // reset flop counter
-    wrapper.dirac->Flops();
-
-    DslashTime dslash_time = wrapper.dslashCUDA(niter);
-
-    *wrapper.spinorOut = *wrapper.cudaSpinorOut;
-
-    printfQuda("%fus per kernel call\n", 1e6*dslash_time.event_time / niter);
-    wrapper.staggeredDslashRef();
-
-    double spinor_ref_norm2 = blas::norm2(*wrapper.spinorRef);
-    double spinor_out_norm2 = blas::norm2(*wrapper.spinorOut);
-
-    // Catching nans is weird.
-    if (std::isnan(spinor_ref_norm2)) { failed = true; }
-    if (std::isnan(spinor_out_norm2)) { failed = true; }
-
-    unsigned long long flops = wrapper.dirac->Flops();
-    printfQuda("GFLOPS = %f\n", 1.0e-9*flops/dslash_time.event_time);
-
-    if (niter > 2) { // only print this if valid
-      printfQuda("Effective halo bi-directional bandwidth (GB/s) GPU = %f ( CPU = %f, min = %f , max = %f ) for "
-                 "aggregate message size %lu bytes\n",
-                 1.0e-9 * 2 * wrapper.cudaSpinor->GhostBytes() * niter / dslash_time.event_time,
-                 1.0e-9 * 2 * wrapper.cudaSpinor->GhostBytes() * niter / dslash_time.cpu_time,
-                 1.0e-9 * 2 * wrapper.cudaSpinor->GhostBytes() / dslash_time.cpu_max,
-                 1.0e-9 * 2 * wrapper.cudaSpinor->GhostBytes() / dslash_time.cpu_min, 2 * wrapper.cudaSpinor->GhostBytes());
-    }
-
-    double cuda_spinor_out_norm2 = blas::norm2(*wrapper.cudaSpinorOut);
-    printfQuda("Results: CPU=%f, CUDA=%f, CPU-CUDA=%f\n", spinor_ref_norm2, cuda_spinor_out_norm2, spinor_out_norm2);
-
+  for (int i = 0; i < attempts; i++) {
+    wrapper.run_test(niter, /**print_metrics =*/true);
     if (verify_results) {
       test_rc = RUN_ALL_TESTS();
-      if (test_rc != 0 || failed) warningQuda("Tests failed");
+      if (test_rc != 0) warningQuda("Tests failed");
     }
   }
   wrapper.end();
@@ -93,7 +51,7 @@ static int dslashTest()
 }
 
 TEST(dslash, verify) {
-  double deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*wrapper.spinorRef, *wrapper.spinorOut)));
+  double deviation = wrapper.verify();
   double tol = getTolerance(prec);
   ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
 }
@@ -121,6 +79,7 @@ int main(int argc, char **argv)
   // command line options
   auto app = make_app();
   app->add_option("--test", dtest_type, "Test method")->transform(CLI::CheckedTransformer(dtest_type_map));
+  add_split_grid_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
