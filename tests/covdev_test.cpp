@@ -163,13 +163,13 @@ double dslashCUDA(int niter, int mu)
 {
   cudaEvent_t start, end;
   cudaEventCreate(&start);
-  cudaEventRecord(start, 0);
+  cudaEventRecord(start, device::get_cuda_stream(device::get_default_stream()));
   cudaEventSynchronize(start);
 
   for (int i = 0; i < niter; i++) dirac->MCD(*cudaSpinorOut, *cudaSpinor, mu);
 
   cudaEventCreate(&end);
-  cudaEventRecord(end, 0);
+  cudaEventRecord(end, device::get_cuda_stream(device::get_default_stream()));
   cudaEventSynchronize(end);
   float runTime;
   cudaEventElapsedTime(&runTime, start, end);

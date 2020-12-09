@@ -40,7 +40,7 @@ namespace quda {
 #ifdef __CUDA_ARCH__
       return dim3(blockDim.x, blockDim.y, blockDim.z);
 #else
-      return dim3(0, 0, 0);
+      return dim3(1, 1, 1);
 #endif
     }
 

@@ -169,7 +169,7 @@ double benchmark(int test, const int niter) {
   cudaEvent_t start, end;
   cudaEventCreate(&start);
   cudaEventCreate(&end);
-  cudaEventRecord(start, 0);
+  cudaEventRecord(start, device::get_cuda_stream(device::get_default_stream()));
 
   switch(test) {
   case 0:
@@ -185,7 +185,7 @@ double benchmark(int test, const int niter) {
     errorQuda("Undefined test %d", test);
   }
 
-  cudaEventRecord(end, 0);
+  cudaEventRecord(end, device::get_cuda_stream(device::get_default_stream()));
   cudaEventSynchronize(end);
   float runTime;
   cudaEventElapsedTime(&runTime, start, end);

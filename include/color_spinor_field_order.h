@@ -239,25 +239,37 @@ namespace quda {
     template <typename Float, int nSpin, int nColor, int nVec>
     struct AccessorCB<Float, nSpin, nColor, nVec, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> {
       const int offset_cb;
-    AccessorCB(const ColorSpinorField &field) : offset_cb((field.Bytes()>>1) / sizeof(complex<Float>)) { }
-    AccessorCB() : offset_cb(0) { }
-    __device__ __host__ inline int index(int parity, int x_cb, int s, int c, int v) const
-    {
-      return parity * offset_cb + ((x_cb * nSpin + s) * nColor + c) * nVec + v;
-    }
+      AccessorCB(const ColorSpinorField &field) : offset_cb((field.Bytes()>>1) / sizeof(complex<Float>)) { }
+      AccessorCB() : offset_cb(0) { }
+      __device__ __host__ inline int index(int parity, int x_cb, int s, int c, int v) const
+      {
+        return parity * offset_cb + ((x_cb * nSpin + s) * nColor + c) * nVec + v;
+      }
 
-    /**
-     * @brief This and the following `wrap_index` method returns the index for the pointer that points to
-     * the start of the memory chunk corresponds to the matrix at parity, x_cb, s. Only available for the
-     * QUDA_SPACE_SPIN_COLOR_FIELD_ORDER order.
-     * @param parity Parity index
-     * @param x_cb 1-d checkboarding site index
-     * @param s spin index
-     */
-    __device__ __host__ inline int wrap_index(int parity, int x_cb, int s) const
-    {
-      return parity * offset_cb + (x_cb * nSpin + s) * nColor * nVec;
-    }
+      template <int nSpinBlock>
+      __device__ __host__ inline void load(complex<Float> out[nSpinBlock * nColor * nVec], complex<Float> *in,
+                                           int parity, int x_cb, int chi) const
+      {
+        using vec_t = typename VectorType<Float, 2>::type;
+        int N = nSpin * nColor * nVec;
+        int M = nSpinBlock * nColor * nVec;
+        for (int i = 0; i < M; i++) {
+          ((vec_t *)out)[i] = vector_load<vec_t>((vec_t *)(in + parity * offset_cb), x_cb * N + chi * M + i);
+        }
+      }
+
+      /**
+       * @brief This and the following `wrap_index` method returns the index for the pointer that points to
+       * the start of the memory chunk corresponds to the matrix at parity, x_cb, s. Only available for the
+       * QUDA_SPACE_SPIN_COLOR_FIELD_ORDER order.
+       * @param parity Parity index
+       * @param x_cb 1-d checkboarding site index
+       * @param s spin index
+       */
+      __device__ __host__ inline int wrap_index(int parity, int x_cb, int s) const
+      {
+        return parity * offset_cb + (x_cb * nSpin + s) * nColor * nVec;
+      }
     };
 
     template<typename Float, int nSpin, int nColor, int nVec>
