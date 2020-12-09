@@ -32,7 +32,7 @@ namespace quda {
 
     __device__ inline auto& shared_state()
     {
-      typename warp_reduce_t::TempStorage dummy;
+      static typename warp_reduce_t::TempStorage dummy;
       return dummy;
     }
 
