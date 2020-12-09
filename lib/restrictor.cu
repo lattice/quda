@@ -7,16 +7,25 @@ namespace quda {
   struct Aggregates {
     // List of block sizes we wish to instantiate.  The required block
     // size is equal to number of fine points per aggregate, rounded
-    // up to whole multiples of the warp size.  So for example,
-    // 2x2x2x2 and 3x3x3x1 aggregation would both use the same block
-    // size 32
-    static constexpr std::array<unsigned int, 16> block = {32, 64, 96, 128, 160, 192, 224, 256, 288, 384, 416, 448, 512, 576, 864, 1024};
+    // up to a whole power of two.  So for example, 2x2x2x2 and
+    // 3x3x3x1 aggregation would both use the same block size 32
+    static constexpr std::array<unsigned int, 6> block = {32, 64, 128, 256, 512, 1024};
+
+    /**
+       @brief Return the first power of two block that is larger than the required size
+    */
+    static unsigned int block_mapper(unsigned int raw_block)
+    {
+      for (auto block_ : block) if (raw_block <= block_) return block_;
+      errorQuda("Invalid raw block size %d\n", raw_block);
+      return 0;
+    }
   };
 
-  constexpr std::array<unsigned int, 16> Aggregates::block;
+  constexpr std::array<unsigned int, 6> Aggregates::block;
 
   template <typename Float, typename vFloat, int fineSpin, int fineColor, int coarseSpin, int coarseColor>
-  class RestrictLaunch : public TunableBlockReduction2D {
+  class RestrictLaunch : public TunableBlock2D {
     template <QudaFieldOrder order = QUDA_FLOAT2_FIELD_ORDER> using Arg =
       RestrictArg<Float, vFloat, fineSpin, fineColor, coarseSpin, coarseColor, order>;
     ColorSpinorField &out;
@@ -33,7 +42,7 @@ namespace quda {
   public:
     RestrictLaunch(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
                    const int *fine_to_coarse, const int *coarse_to_fine, int parity) :
-      TunableBlockReduction2D(in, coarseColor / coarse_colors_per_thread<fineColor, coarseColor>(), max_y_block()),
+      TunableBlock2D(in, coarseColor / coarse_colors_per_thread<fineColor, coarseColor>(), max_y_block()),
       out(out), in(in), v(v), fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
       parity(parity)
     {
@@ -74,20 +83,17 @@ namespace quda {
       }
     }
 
-    // round up the block size to be a multiple of the warp_size
-    constexpr int block_mapper(int block) const { return ((block + device::warp_size() - 1) / device::warp_size()) * device::warp_size(); }
-
     void initTuneParam(TuneParam &param) const {
-      TunableBlockReduction2D::initTuneParam(param);
-      param.block.x = block_mapper(in.Volume() / out.Volume());
+      TunableBlock2D::initTuneParam(param);
+      param.block.x = Aggregates::block_mapper(in.Volume() / out.Volume());
       param.grid.x = out.Volume();
       param.shared_bytes = 0;
       param.aux.x = 1; // swizzle factor
     }
 
     void defaultTuneParam(TuneParam &param) const {
-      TunableBlockReduction2D::defaultTuneParam(param);
-      param.block.x = block_mapper(in.Volume() / out.Volume());
+      TunableBlock2D::defaultTuneParam(param);
+      param.block.x = Aggregates::block_mapper(in.Volume() / out.Volume());
       param.grid.x = out.Volume();
       param.shared_bytes = 0;
       param.aux.x = 1; // swizzle factor

@@ -53,30 +53,42 @@ namespace quda {
      @brief This is a convenience wrapper that allows us to perform
      reductions at the block level
   */
-  template <typename T, int block_size_x, int block_size_y = 1> struct BlockReduce
+  template <typename T, int block_size_x, int batch_size = 1> struct BlockReduce
   {
-    using block_reduce_t = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y>;
+    const int batch;
+
+    using block_reduce_t = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS>;
 
     __device__ inline auto& shared_state()
     {
-      static __shared__ typename block_reduce_t::TempStorage storage;
-      return storage;
+      static __shared__ typename block_reduce_t::TempStorage storage[batch_size];
+      return storage[batch];
     }
 
-    __device__ __host__ inline BlockReduce() {}
+    __device__ __host__ inline BlockReduce(int batch = 0) : batch(batch) {}
 
+    template <bool pipeline = false>
     __device__ __host__ inline T Sum(const T &value_)
     {
 #ifdef __CUDA_ARCH__
       block_reduce_t block_reduce(shared_state());
-      T &value_shared = (T&)shared_state();
-      __syncthreads();
+      if (!pipeline) __syncthreads(); // only need to synchronize if we are not pipelining
       T value = block_reduce.Sum(value_);
+#else
+      T value = value_;
+#endif
+      return value;
+    }
+
+    template <bool pipeline = false>
+    __device__ __host__ inline T AllSum(const T &value_)
+    {
+      T value = Sum<pipeline>(value_);
+#ifdef __CUDA_ARCH__
+      T &value_shared = reinterpret_cast<T&>(shared_state());
       if (threadIdx.x == 0 && threadIdx.y == 0) value_shared = value;
       __syncthreads();
       value = value_shared;
-#else
-      T value = value_;
 #endif
       return value;
     }

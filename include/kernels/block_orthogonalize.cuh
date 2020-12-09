@@ -51,7 +51,9 @@ namespace quda {
 
     const Vector B[nVec];
 
-    int n_block;
+    static constexpr bool launch_bounds = true;
+    dim3 grid_dim;
+    dim3 block_dim;
     dim3 threads;
 
     template <typename... T>
@@ -66,7 +68,8 @@ namespace quda {
       nBlockOrtho(n_block_ortho),
       fineVolumeCB(meta.VolumeCB()),
       B{*B...},
-      n_block(),
+      grid_dim(),
+      block_dim(),
       threads(fineVolumeCB * (fineSpin > 1 ? nParity : 1), chiral_blocks, 1)
     {
       int aggregate_size = 1;
@@ -119,8 +122,12 @@ namespace quda {
         for (int c = 0; c < nColor; c++) arg.V(parity, x_cb, chirality * spinBlock + s, c, i) = v(s, c);
     }
 
-    __device__ __host__ inline void operator()(int x_coarse, int x_fine_offset, int chirality)
+    __device__ __host__ inline void operator()(dim3 block, dim3 thread)
     {
+      int x_coarse = block.x;
+      int x_fine_offset = thread.x;
+      int chirality = block.y;
+
       int parity[n_sites_per_thread];
       int x_offset_cb[n_sites_per_thread];
       int x_cb[n_sites_per_thread];
@@ -172,7 +179,7 @@ namespace quda {
               for (int m = 0; m < mVec; m++) dot[m] += innerProduct(vi[tx], v[m][tx]);
             }
 
-            dot = dot_reducer.Sum(dot);
+            dot = dot_reducer.AllSum(dot);
 
             // subtract the blocks to orthogonalise
 #pragma unroll
@@ -195,7 +202,7 @@ namespace quda {
               for (int i = 0; i < m; i++) dot[i] += innerProduct(v[i][tx], v[m][tx]);
             }
             
-            dot = dot_reducer.Sum(dot);
+            dot = dot_reducer.AllSum(dot);
             
             sum_t nrm = 0.0;
 #pragma unroll
@@ -206,7 +213,7 @@ namespace quda {
               nrm += norm2(v[m][tx]);
             }
 
-            nrm = norm_reducer.Sum(nrm);
+            nrm = norm_reducer.AllSum(nrm);
             auto nrm_inv = nrm > 0.0 ? rsqrt(nrm) : 0.0;
 
 #pragma unroll

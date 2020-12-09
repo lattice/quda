@@ -100,7 +100,6 @@ namespace quda {
              const std::vector<ColorSpinorField*> &B, std::index_sequence<S...>)
     {
       Arg<Rotator, Vector> arg(V, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V, B[S]...);
-      arg.n_block = tp.grid.x;
       launch_host<BlockOrtho_, OrthoAggregates>(tp, stream, arg);
     }
 
