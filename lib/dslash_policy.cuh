@@ -1,3 +1,4 @@
+#include <array>
 #include <tune_quda.h>
 #include <index_helper.cuh>
 

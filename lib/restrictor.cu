@@ -1,3 +1,5 @@
+#include <array>
+
 #include <color_spinor_field.h>
 #include <tunable_block_reduction.h>
 #include <kernels/restrictor.cuh>

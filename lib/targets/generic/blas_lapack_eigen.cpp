@@ -1,3 +1,4 @@
+#include <complex>
 #include <blas_lapack.h>
 #include <eigen_helper.h>
 
@@ -53,7 +54,7 @@ namespace quda
                                   QudaFieldLocation location)
       {
         if (getVerbosity() >= QUDA_VERBOSE)
-          printfQuda("BatchInvertMatrix (generic - Eigen): Nc = %d, batch = %lu\n", n, batch);
+          printfQuda("BatchInvertMatrix (generic - Eigen): Nc = %d, batch = %llu\n", n, batch);
 
         size_t size = 2 * n * n * batch * prec;
         void *A_h = (location == QUDA_CUDA_FIELD_LOCATION ? pool_pinned_malloc(size) : A);
@@ -330,29 +331,29 @@ namespace quda
         if (blas_param.data_type == QUDA_BLAS_DATATYPE_Z) {
 
           typedef std::complex<double> Z;
-          const Z alpha = blas_param.alpha;
-          const Z beta = blas_param.beta;
+          const Z alpha = reinterpret_cast<std::complex<double>&>(blas_param.alpha);
+          const Z beta = reinterpret_cast<std::complex<double>&>(blas_param.beta);
           GEMM<MatrixXcd, Z>(A_h, B_h, C_h, alpha, beta, max_stride, blas_param);
 
         } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_C) {
 
           typedef std::complex<float> C;
-          const C alpha = blas_param.alpha;
-          const C beta = blas_param.beta;
+          const C alpha(reinterpret_cast<std::complex<double>&>(blas_param.alpha).real(),reinterpret_cast<std::complex<double>&>(blas_param.alpha).imag());
+          const C beta(reinterpret_cast<std::complex<double>&>(blas_param.beta).real(),reinterpret_cast<std::complex<double>&>(blas_param.beta).imag());
           GEMM<MatrixXcf, C>(A_h, B_h, C_h, alpha, beta, max_stride, blas_param);
 
         } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_D) {
 
           typedef double D;
-          const D alpha = (D)(static_cast<std::complex<double>>(blas_param.alpha).real());
-          const D beta = (D)(static_cast<std::complex<double>>(blas_param.beta).real());
+          const D alpha = (D)(static_cast<std::complex<double>>(reinterpret_cast<std::complex<double>&>(blas_param.alpha)).real());
+          const D beta = (D)(static_cast<std::complex<double>>(reinterpret_cast<std::complex<double>&>(blas_param.beta)).real());
           GEMM<MatrixXd, D>(A_h, B_h, C_h, alpha, beta, max_stride, blas_param);
 
         } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_S) {
 
           typedef float S;
-          const S alpha = (S)(static_cast<std::complex<float>>(blas_param.alpha).real());
-          const S beta = (S)(static_cast<std::complex<float>>(blas_param.beta).real());
+          const S alpha = (S)(static_cast<std::complex<float>>(reinterpret_cast<std::complex<double>&>(blas_param.alpha)).real());
+          const S beta = (S)(static_cast<std::complex<float>>(reinterpret_cast<std::complex<double>&>(blas_param.beta)).real());
           GEMM<MatrixXf, S>(A_h, B_h, C_h, alpha, beta, max_stride, blas_param);
 
         } else {

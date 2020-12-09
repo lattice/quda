@@ -215,7 +215,7 @@ namespace quda
       ptr = omp_target_alloc(size, omp_get_default_device());
     else{
       warningQuda("%s:%d %s() allocate on host instead of device", file, line, func);
-      ptr = std::aligned_alloc(64, size);
+      ptr = aligned_alloc(64, size);
     }
     if (!ptr) {
       errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
