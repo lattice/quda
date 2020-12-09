@@ -169,7 +169,7 @@ namespace quda {
        // csParam.mem_type      = solver_param.pipeline != 0 ? QUDA_MEMORY_MAPPED : QUDA_MEMORY_DEVICE;
        // csParam.setPrecision(solver_param.eig_param.cuda_prec_ritz);
        // csParam.setPrecision(solver_param.precision);
-       csParam.setPrecision(!is_host_location ? solver_param.precision : solver_param.precision_sloppy);
+       csParam.setPrecision(is_host_location ? (solver_param.precision_sloppy == QUDA_HALF_PRECISION ? QUDA_SINGLE_PRECISION : solver_param.precision_sloppy) : solver_param.precision);
        csParam.composite_dim = (2 * k);
        // Create a search vector set:
        V2k = ColorSpinorField::Create(csParam);
@@ -202,10 +202,9 @@ namespace quda {
          printfQuda("\nPipeline shift parameters : Lm = % d, L2kO = %d, L2kE = %d\n", Lm, L2kO, L2kE);
 
          csParam.composite_dim = m;
-         // csParam.setPrecision(solver_param.eig_param.cuda_prec_ritz);//eigCG internal search space precision may not
-         // coincide with the solver precision!
-         csParam.setPrecision(
-           solver_param.precision_sloppy); // eigCG internal search space precision may not coincide with the solver precision!
+         // csParam.setPrecision(solver_param.eig_param.cuda_prec_ritz);
+         // eigCG internal search space precision may not coincide with the solver precision
+	 csParam.setPrecision(solver_param.precision_sloppy == QUDA_HALF_PRECISION ? QUDA_SINGLE_PRECISION : solver_param.precision_sloppy);
          // Create a search vector set:
          hVm = ColorSpinorField::Create(csParam);
          //
@@ -862,8 +861,6 @@ namespace quda {
     std::unique_ptr<double[]> devals(new double[param.eig_param.n_conv]);
     std::unique_ptr<Complex[]> projm(new Complex[param.eig_param.n_ev * param.eig_param.n_conv]);
 
-    ColorSpinorFieldSet &vk = *args.V2k; //!
-
     memcpy(projm.get(), args.projMat, param.eig_param.n_ev * param.eig_param.n_conv * sizeof(Complex)); //!
 
     Map<MatrixXcd, Unaligned, DynamicStride> projm_(projm.get(), param.eig_param.n_conv, param.eig_param.n_conv,
@@ -882,6 +879,7 @@ namespace quda {
 
     csParam.setPrecision(QUDA_DOUBLE_PRECISION);
     std::unique_ptr<ColorSpinorField> r(ColorSpinorField::Create(csParam));
+    std::unique_ptr<ColorSpinorField> t(ColorSpinorField::Create(csParam));
 
     csParam.is_composite = true;
     csParam.composite_dim = max_nev;
@@ -908,18 +906,12 @@ namespace quda {
 
       if (do_residual_check) // if tol=0.0 then disable relative residual norm check
       {
-        //*r_sloppy = *r;
-        // matDefl(vk[0], *r_sloppy);
-        *args.Az = *r;
-        mat(vk[0], *args.Az);
+        mat(*t, *r);
 
-        // double3 dotnorm = cDotProductNormA(*r_sloppy, vk[0]);
-        double3 dotnorm = cDotProductNormA(*r, vk[0]);
+        double3 dotnorm = cDotProductNormA(*r, *t);
         double curr_eval = dotnorm.x / dotnorm.z;
 
-        // blas::xpay(vk[0], -curr_eval, *r_sloppy);
-        // relerr = sqrt(norm2(*r_sloppy) / dotnorm.z);
-        blas::xpay(vk[0], -curr_eval, *r);
+        blas::xpay(*t, -curr_eval, *r);
         relerr = sqrt(norm2(*r) / dotnorm.z);
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Eigenvalue: %1.12e Residual: %1.12e\n", curr_eval, relerr);
       }
