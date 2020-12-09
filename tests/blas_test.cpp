@@ -365,7 +365,7 @@ double benchmark(Kernel kernel, const int niter)
   cudaEvent_t start, end;
   cudaEventCreate(&start);
   cudaEventCreate(&end);
-  cudaEventRecord(start, 0);
+  cudaEventRecord(start, device::get_cuda_stream(device::get_default_stream()));
 
   {
     switch (kernel) {
@@ -529,7 +529,7 @@ double benchmark(Kernel kernel, const int niter)
     }
   }
 
-  cudaEventRecord(end, 0);
+  cudaEventRecord(end, device::get_cuda_stream(device::get_default_stream()));
   cudaEventSynchronize(end);
   float runTime;
   cudaEventElapsedTime(&runTime, start, end);
