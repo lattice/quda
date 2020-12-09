@@ -356,22 +356,22 @@ set(CMAKE_C_FLAGS_DEVEL
     "-Wall -g -O3"
     CACHE STRING "Flags used by the C compiler during regular development builds.")
 set(CMAKE_C_FLAGS_STRICT
-    "-Wall -O3 -Werror -Wno-error=unused-private-field"
+    "-Wall -O3 -Werror"
     CACHE STRING "Flags used by the C compiler during strict jenkins builds.")
 set(CMAKE_C_FLAGS_RELEASE
-    "-Wall -O3 -w"
+    "-Wall -O3"
     CACHE STRING "Flags used by the C compiler during release builds.")
 set(CMAKE_C_FLAGS_HOSTDEBUG
     "-Wall -Wno-unknown-pragmas -g -fno-inline"
     CACHE STRING "Flags used by the C compiler during host-debug builds.")
 set(CMAKE_C_FLAGS_DEVICEDEBUG
-    "-Wall"
+    "-Wall -Wno-unknown-pragmas"
     CACHE STRING "Flags used by the C compiler during device-debug builds.")
 set(CMAKE_C_FLAGS_DEBUG
-    "-Wall -g -fno-inline"
+    "-Wall -Wno-unknown-pragmas -g -fno-inline"
     CACHE STRING "Flags used by the C compiler during full (host+device) debug builds.")
 set(CMAKE_C_FLAGS_SANITIZE
-    "-Wall -g -fno-inline -fsanitize=address,undefined"
+    "-Wall -Wno-unknown-pragmas -g -fno-inline -fsanitize=address,undefined"
     CACHE STRING "Flags used by the C compiler during sanitizer debug builds.")
 
 enable_language(C)
