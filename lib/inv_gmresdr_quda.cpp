@@ -150,13 +150,13 @@ namespace quda {
            printfQuda("Last cycle residual %le :: %le \n", c[m].real(), c[m - 1].imag());
 
            memcpy(eta.data(), c, m * sizeof(Complex));
-           memset(c, 0, (m + 1) * sizeof(Complex));
+           memset(c, 0, (m + 1) * sizeof(c[0]));
            c[0] = c0;
 
            givensH.block(0, 0, m, m).triangularView<Upper>().solveInPlace<OnTheLeft>(eta);
 
          } else {
-           memset(c, 0, (m + 1) * sizeof(Complex));
+           memset(c, 0, (m + 1) * sizeof(c[0]));
 
            std::vector<ColorSpinorField *> v_(const_cast<ColorSpinorField &>(vm)(0, k + 1));
            std::vector<ColorSpinorField *> r_;
