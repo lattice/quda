@@ -7,8 +7,8 @@ namespace quda
 {
 
   namespace mobius_tensor_core {
-
-#if defined(QUDA_TARGET_CUDA) && (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
+#if defined( QUDA_TARGET_CUDA )
+#if  (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
 
     template <class store_t, int nColor, QudaReconstructType recon> class FusedDslash : public TunableGridStrideKernel2D
     {
@@ -240,9 +240,6 @@ namespace quda
       void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }
     };
 
-#endif // #if defined(QUDA_TARGET_CUDA) && (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
-
-#if defined(QUDA_TARGET_CUDA) && defined(GPU_DOMAIN_WALL_DIRAC) && (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
     void apply_fused_dslash(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, ColorSpinorField &y,
                             const ColorSpinorField &x, double m_f, double m_5, const Complex *b_5, const Complex *c_5,
                             bool dagger, int parity, int shift[4], int halo_shift[4], MdwfFusedDslashType type)
@@ -251,6 +248,14 @@ namespace quda
       instantiatePreconditioner<FusedDslash>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift,
                                              type);
     }
+#else
+    void apply_fused_dslash(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, ColorSpinorField &,
+                            const ColorSpinorField &, double, double, const Complex *, const Complex *,
+                            bool, int, int [4], int [4], MdwfFusedDslashType)
+    {
+      errorQuda("Domain wall dslash with tensor cores has not been built");
+    }
+#endif
 #else
     void apply_fused_dslash(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, ColorSpinorField &,
                             const ColorSpinorField &, double, double, const Complex *, const Complex *,

@@ -748,7 +748,7 @@ namespace quda {
   }
 
   template <bool parity_flip, QudaDirection dir, typename VUV, typename Arg>
-#ifdef __CUDA_ARCH__
+#if defined(__CUDA_ARCH__) || defined( __HIP_DEVICE_COMPILE__ )
   inline __device__ __host__ void storeCoarseSharedAtomic(VUV &vuv, bool isDiagonal, int coarse_x_cb, int coarse_parity, int i0, int j0, int parity, Arg &arg)
 #else
   inline __device__ __host__ void storeCoarseSharedAtomic(VUV &, bool, int, int, int, int, int, Arg &)

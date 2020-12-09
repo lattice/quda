@@ -3,43 +3,56 @@
 
 namespace quda {
 
-  template <template <typename> class Functor, typename Arg>
+  template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   __global__ void Kernel1D(Arg arg)
   {
     Functor<Arg> f(arg);
 
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    if (i >= arg.threads.x) return;
+    auto i = threadIdx.x + blockIdx.x * blockDim.x;
 
-    f(i);
+    while (i < arg.threads.x) {
+      f(i);
+      if (grid_stride) i += gridDim.x * blockDim.x; else break;
+    }
   }
 
-  template <template <typename> class Functor, typename Arg>
+  template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   __global__ void Kernel2D(Arg arg)
   {
     Functor<Arg> f(arg);
 
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    int j = threadIdx.y + blockIdx.y * blockDim.y;
-    if (i >= arg.threads.x) return;
+    auto i = threadIdx.x + blockIdx.x * blockDim.x;
+    auto j = threadIdx.y + blockIdx.y * blockDim.y;
     if (j >= arg.threads.y) return;
 
-    f(i, j);
+    while (i < arg.threads.x) {
+      f(i, j);
+      if (grid_stride) i += gridDim.x * blockDim.x; else break;
+    }
   }
 
-  template <template <typename> class Functor, typename Arg>
+  template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   __global__ void Kernel3D(Arg arg)
   {
     Functor<Arg> f(arg);
 
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    int j = threadIdx.y + blockIdx.y * blockDim.y;
-    int k = threadIdx.z + blockIdx.z * blockDim.z;
-    if (i >= arg.threads.x) return;
+    auto i = threadIdx.x + blockIdx.x * blockDim.x;
+    auto j = threadIdx.y + blockIdx.y * blockDim.y;
+    auto k = threadIdx.z + blockIdx.z * blockDim.z;
     if (j >= arg.threads.y) return;
     if (k >= arg.threads.z) return;
 
-    f(i, j, k);
+    while (i < arg.threads.x) {
+      f(i, j, k);
+      if (grid_stride) i += gridDim.x * blockDim.x; else break;
+    }
+  }
+
+  template <template <typename> class Functor, typename Arg>
+  __launch_bounds__(Arg::block_dim, Arg::min_blocks) __global__ void raw_kernel(Arg arg)
+  {
+    Functor<Arg> f(arg);
+    f();
   }
 
 }

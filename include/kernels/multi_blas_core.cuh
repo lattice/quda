@@ -75,8 +75,16 @@ namespace quda
           // reduce down to the first group of column-split threads
 #pragma unroll
           for (int offset = warp_size / 2; offset >= warp_size / warp_split; offset /= 2) {
+#if defined(QUDA_TARGET_CUDA)
             x[i].real(x[i].real() + __shfl_down_sync(device::warp_converged_mask(), x[i].real(), offset));
             x[i].imag(x[i].imag() + __shfl_down_sync(device::warp_converged_mask(), x[i].imag(), offset));
+#elif defined(QUDA_TARGET_HIP)
+           x[i].real(x[i].real() + __shfl_down(x[i].real(), offset));
+           x[i].imag(x[i].imag() + __shfl_down(x[i].imag(), offset));
+#else
+	#error "You need to have iether QUDA_TARGET_CUDA or QUDA_TARGTE_HIP defined for warp shuffling"
+#endif 
+	  
           }
         }
       }

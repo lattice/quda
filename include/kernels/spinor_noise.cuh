@@ -1,4 +1,5 @@
 #include <color_spinor_field_order.h>
+#include <quda_sincos.h>
 #include <random_helper.h>
 #include <kernel.h>
 
@@ -28,7 +29,7 @@ namespace quda {
     real radius = uniform<real>::rand(localState);
     radius = sqrt(-log(radius));
     real phi_sin, phi_cos;
-    sincos(phi, &phi_sin, &phi_cos);
+    quda_sincos(phi, &phi_sin, &phi_cos);
     arg.v(parity, x_cb, s, c) = radius * complex<real>(phi_cos, phi_sin);
   }
 

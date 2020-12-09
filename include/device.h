@@ -1,3 +1,13 @@
+#include "quda_define.h"
+
+#if defined(QUDA_TARGET_CUDA)
+using qudaAPIStream_t = cudaStream_t;
+#elif defined(QUDA_TARGET_HIP)
+using qudaAPIStream_t = hipStream_t;
+#else
+#error "Unknown or unset QUDA_TARGET_ARCH "
+#endif
+
 namespace quda
 {
 
@@ -51,7 +61,7 @@ namespace quda
        @param stream QUDA stream we which to convert to CUDA stream
        @return CUDA stream
      */
-    cudaStream_t get_cuda_stream(const qudaStream_t &stream);
+    qudaAPIStream_t get_cuda_stream(const qudaStream_t &stream);
 
     /**
        @brief Report if the target device supports managed memory

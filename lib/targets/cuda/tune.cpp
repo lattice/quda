@@ -779,11 +779,11 @@ namespace quda
           }
           tunable.apply(); // do initial call in case we need to jit compile for these parameters or if policy tuning
 
-          cudaEventRecord(start, 0);
+          cudaEventRecord(start, device::get_cuda_stream(device::get_default_stream()));
           for (int i = 0; i < tunable.tuningIter(); i++) {
             tunable.apply(); // calls tuneLaunch() again, which simply returns the currently active param
           }
-          cudaEventRecord(end, 0);
+          cudaEventRecord(end, device::get_cuda_stream(device::get_default_stream()));
           cudaEventSynchronize(end);
           cudaEventElapsedTime(&elapsed_time, start, end);
           cudaDeviceSynchronize();

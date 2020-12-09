@@ -36,7 +36,7 @@ namespace quda {
       jitify_error = launch_jitify<Functor>("quda::Kernel1D", tp, stream, arg, param);
 #else
       for (unsigned int i = 0; i < param.size(); i++)
-        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, cudaMemcpyHostToDevice, stream);
+        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
       qudaLaunchKernel(Kernel1D<Functor, Arg, grid_stride>, tp, stream, arg);
 #endif
     }
@@ -48,7 +48,7 @@ namespace quda {
       jitify_error = launch_jitify<Functor>("quda::raw_kernel", tp, stream, arg, param);
 #else
       for (unsigned int i = 0; i < param.size(); i++)
-        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, cudaMemcpyHostToDevice, stream);
+        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
       qudaLaunchKernel(raw_kernel<Functor, Arg>, tp, stream, arg);
 #endif
     }
@@ -139,7 +139,10 @@ namespace quda {
   class TunableKernel2D_base : public TunableKernel1D_base<grid_stride>
   {
   protected:
+#ifdef JITIFY
     using Tunable::jitify_error;
+#endif
+
     mutable unsigned int vector_length_y;
     mutable unsigned int step_y;
     bool tune_block_x;
@@ -151,7 +154,7 @@ namespace quda {
       jitify_error = launch_jitify<Functor>("quda::Kernel2D", tp, stream, arg, param);
 #else
       for (unsigned int i = 0; i < param.size(); i++)
-        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, cudaMemcpyHostToDevice, stream);
+        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
       qudaLaunchKernel(Kernel2D<Functor, Arg, grid_stride>, tp, stream, arg);
 #endif
     }
@@ -293,6 +296,7 @@ namespace quda {
   class TunableKernel3D_base : public TunableKernel2D_base<grid_stride>
   {
   protected:
+
     using Tunable::jitify_error;
     using TunableKernel2D_base<grid_stride>::vector_length_y;
     mutable unsigned vector_length_z;
@@ -306,7 +310,7 @@ namespace quda {
       jitify_error = launch_jitify<Functor>("quda::Kernel3D", tp, stream, arg, param);
 #else
       for (unsigned int i = 0; i < param.size(); i++)
-        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, cudaMemcpyHostToDevice, stream);
+        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
       qudaLaunchKernel(Kernel3D<Functor, Arg, grid_stride>, tp, stream, arg);
 #endif
     }

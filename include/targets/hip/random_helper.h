@@ -6,9 +6,9 @@
 namespace quda {
 
 #if defined(XORWOW)
-  using rng_state_t = hiprandStateXORWOW;
+  using rng_state_t = hipandStateXORWOW;
 #elif defined(MRG32k3a)
-  using rng_state_t = hiprandStateMRG32k3a;
+  using rng_state_t = hipandStateMRG32k3a;
 #else
   using rng_state_t = hiprandStateMRG32k3a;
 #endif
@@ -96,10 +96,10 @@ namespace quda {
 
   template<>
     struct normal<double> {
-     /**
-      * \brief return a gaussian (normal) deviate with a mean of 0
-      * @param [in,out] state
-      */
+    /**
+     * \brief return a gaussian (normal) deviate with a mean of 0
+     * @param [in,out] state
+     */
     __device__ static inline double rand(RNGState &state)
     {
       return hiprand_normal_double(&state.state);

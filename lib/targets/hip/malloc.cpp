@@ -30,34 +30,13 @@ namespace quda
     int line;
     size_t size;
     size_t base_size;
-#ifdef QUDA_BACKWARDSCPP
-    backward::StackTrace st;
-#endif
 
     MemAlloc() : line(-1), size(0), base_size(0) {}
 
     MemAlloc(std::string func, std::string file, int line) : func(func), file(file), line(line), size(0), base_size(0)
     {
-#ifdef QUDA_BACKWARDSCPP
-      st.load_here(32);
-      st.skip_n_firsts(1);
-#endif
     }
 
-    MemAlloc &operator=(const MemAlloc &a)
-    {
-      if (&a != this) {
-        func = a.func;
-        file = a.file;
-        line = a.line;
-        size = a.size;
-        base_size = a.base_size;
-#ifdef QUDA_BACKWARDSCPP
-        st = a.st;
-#endif
-      }
-      return *this;
-    }
   };
 
   static std::map<void *, MemAlloc> alloc[N_ALLOC_TYPE];
@@ -104,12 +83,6 @@ namespace quda
       MemAlloc a = entry->second;
       printfQuda("%s  %15p  %15lu  %s(), %s:%d\n", type_str[type], ptr, (unsigned long)a.base_size, a.func.c_str(),
                  a.file.c_str(), a.line);
-#ifdef QUDA_BACKWARDSCPP
-      if (getRankVerbosity()) {
-        backward::Printer p;
-        p.print(a.st);
-      }
-#endif
     }
   }
 

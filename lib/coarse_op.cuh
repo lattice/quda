@@ -168,13 +168,13 @@ namespace quda {
       error = CUDA_SUCCESS;
       if (type == COMPUTE_UV) {
 
-#ifdef QUDA_TARGET_CUDA
         if (use_mma) {
-
+#if defined(QUDA_TARGET_CUDA)
           mma::launch_compute_uv_kernel<from_coarse>(tp, arg, arg.fineVolumeCB, stream);
-
-        } else {
+#else
+	  errorQuda("Cannot use MMA unless compiling for CUDA Target");
 #endif
+        } else {
 
           if (arg.dir != QUDA_BACKWARDS && arg.dir != QUDA_FORWARDS) errorQuda("Undefined direction %d", arg.dir);
 #ifdef JITIFY
@@ -194,9 +194,7 @@ namespace quda {
           else if (arg.dim==3) qudaLaunchKernel(ComputeUVGPU<3,QUDA_FORWARDS,Arg>, tp, stream, arg);
         }
 #endif
-#ifdef QUDA_TARGET_CUDA
         }
-#endif
       } else if (type == COMPUTE_AV) {
 
         if (from_coarse) errorQuda("ComputeAV should only be called from the fine grid");
@@ -469,6 +467,7 @@ namespace quda {
         errorQuda("Undefined compute type %d", type);
       }
     }
+
   };
 
   template <QudaFieldLocation location, typename Arg>
@@ -675,8 +674,7 @@ namespace quda {
       if (type == COMPUTE_VUV || type == COMPUTE_CONVERT || type == COMPUTE_RESCALE) arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
 
       if (type == COMPUTE_VUV) tp.shared_bytes -= sharedBytesPerBlock(tp); // shared memory is static so don't include it in launch
-      Launch<location, Arg>(arg, jitify_error, tp,
-                                                                                              type, use_mma, stream);
+      Launch<location, Arg>(arg, jitify_error, tp, type, use_mma, stream);
       if (type == COMPUTE_VUV) tp.shared_bytes += sharedBytesPerBlock(tp); // restore shared memory
     };
 

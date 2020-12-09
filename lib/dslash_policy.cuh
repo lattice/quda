@@ -286,6 +286,12 @@ namespace quda
      updating the local buffers on a subsequent computation before we
      have finished sending.
   */
+#ifndef QUDA_ENABLE_P2P
+#ifdef QUDA_TARGET_HIP
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#endif
+#endif
   template <typename T>
   inline void completeDslash(const ColorSpinorField &in, const T&dslashParam) {
     // this ensures that the p2p sending is completed before any
@@ -302,6 +308,11 @@ namespace quda
       }
     }
   }
+#ifndef QUDA_ENABLE_P2P
+#ifdef QUDA_TARGET_HIP
+#pragma clang diagnostic pop
+#endif
+#endif
 
   /**
      @brief Set the ghosts to the mapped CPU ghost buffer, or unsets

@@ -2,7 +2,6 @@
 #include <quda_define.h>
 
 #if defined(QUDA_TARGET_CUDA)
-
 inline
 __host__ __device__ void quda_sincos(double x, double *s, double *c) { sincos(x,s,c); }
 

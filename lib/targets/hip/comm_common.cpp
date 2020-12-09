@@ -317,15 +317,18 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
 
 bool comm_peer2peer_present() { return peer2peer_present; }
 
-static bool enable_p2p = true;
+static bool enable_p2p = false;
 
-bool comm_peer2peer_enabled(int dir, int dim){
 #ifdef QUDA_ENABLE_P2P
+bool comm_peer2peer_enabled(int dir, int dim){
   return enable_p2p ? peer2peer_enabled[dir][dim] : false;
-#else
-  return false;
-#endif
 }
+#else
+// Without named parameters to stop unused-parameter warning
+bool comm_peer2peer_enabled(int, int) { 
+  return false;
+}
+#endif
 
 int comm_peer2peer_enabled_global() {
 #ifdef QUDA_ENABLE_P2P
@@ -336,6 +339,7 @@ int comm_peer2peer_enabled_global() {
 
   if (!init) {
     int p2p = 0;
+
     for (int dim=0; dim<4; dim++)
       for (int dir=0; dir<2; dir++)
 	p2p += (int)comm_peer2peer_enabled(dir,dim);
@@ -350,31 +354,38 @@ int comm_peer2peer_enabled_global() {
 #endif
 }
 
+#ifdef QUDA_ENABLE_P2P
 void comm_enable_peer2peer(bool enable) {
-#ifdef QUDA_ENABLE_P2P
   enable_p2p = enable;
+}
 #else
+void comm_enable_peer2peer(bool) {
   enable_p2p = false;
-#endif
 }
+#endif
 
-static bool enable_intranode = true;
 
+static bool enable_intranode = false;
+
+#ifdef QUDA_ENABLE_P2P
 bool comm_intranode_enabled(int dir, int dim){
-#ifdef QUDA_ENABLE_P2P
   return enable_intranode ? intranode_enabled[dir][dim] : false;
+}
 #else
+bool comm_intranode_enabled(int, int) {
   return false;
-#endif
 }
+#endif
 
-void comm_enable_intranode(bool enable) {
 #ifdef QUDA_ENABLE_P2P
+void comm_enable_intranode(bool enable) {
   enable_intranode = enable;
-#else
-  enable_intranode = false;
-#endif
 }
+#else 
+void comm_enable_intranode(bool) {
+  enable_intranode = false;
+}
+#endif
 
 int comm_ndim(const Topology *topo)
 {
@@ -533,6 +544,7 @@ inline bool isHost(const void *buffer)
 MsgHandle *comm_declare_send_relative_(const char *func, const char *file, int line,
 				       void *buffer, int dim, int dir, size_t nbytes)
 {
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%s called (%s:%d in %s())\n", __func__, file, line, func);
 #ifdef HOST_DEBUG
   checkCudaError(); // check and clear error state first
 
@@ -566,6 +578,7 @@ MsgHandle *comm_declare_send_relative_(const char *func, const char *file, int l
 MsgHandle *comm_declare_receive_relative_(const char *func, const char *file, int line,
 					  void *buffer, int dim, int dir, size_t nbytes)
 {
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%s called (%s:%d in %s())\n", __func__, file, line, func);
 #ifdef HOST_DEBUG
   checkCudaError(); // check and clear error state first
 
@@ -595,6 +608,7 @@ MsgHandle *comm_declare_receive_relative_(const char *func, const char *file, in
 MsgHandle *comm_declare_strided_send_relative_(const char *func, const char *file, int line,
 					       void *buffer, int dim, int dir, size_t blksize, int nblocks, size_t stride)
 {
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%s called (%s:%d in %s())\n", __func__, file, line, func);
 #ifdef HOST_DEBUG
   checkCudaError(); // check and clear error state first
 
@@ -631,6 +645,7 @@ MsgHandle *comm_declare_strided_send_relative_(const char *func, const char *fil
 MsgHandle *comm_declare_strided_receive_relative_(const char *func, const char *file, int line,
 						  void *buffer, int dim, int dir, size_t blksize, int nblocks, size_t stride)
 {
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%s called (%s:%d in %s())\n", __func__, file, line, func);
 #ifdef HOST_DEBUG
   checkCudaError(); // check and clear error state first
 
@@ -669,15 +684,21 @@ static char partition_override_string[16]; /** string that contains any overridd
 
 static int manual_set_partition[QUDA_MAX_DIM] = {0};
 
-void comm_dim_partitioned_set(int dim)
-{ 
 #ifdef MULTI_GPU
+void comm_dim_partitioned_set(int dim)
+{
   manual_set_partition[dim] = 1;
-#endif
 
   snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0),
            comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3));
 }
+#else
+void comm_dim_partitioned_set(int)
+{
+  snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0),
+           comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3));
+}
+#endif
 
 void comm_dim_partitioned_reset(){
   for (int i = 0; i < QUDA_MAX_DIM; i++) manual_set_partition[i] = 0;

@@ -263,8 +263,8 @@ namespace quda {
     int chirality = blockIdx.z; // which chiral block we're working on (if chirality is present)
 
     constexpr int spinBlock = (nSpin == 1) ? 1 : nSpin / coarseSpin; // size of spin block
-    typedef QudaCub::BlockReduce<complex<sumFloat>, block_size, cub::BLOCK_REDUCE_WARP_REDUCTIONS, 2> dotReduce;
-    typedef QudaCub::BlockReduce<sumFloat, block_size, cub::BLOCK_REDUCE_WARP_REDUCTIONS, 2> normReduce;
+    typedef QudaCub::BlockReduce<complex<sumFloat>, block_size, QudaCub::BLOCK_REDUCE_WARP_REDUCTIONS, 2> dotReduce;
+    typedef QudaCub::BlockReduce<sumFloat, block_size, QudaCub::BLOCK_REDUCE_WARP_REDUCTIONS, 2> normReduce;
 
     __shared__ typename dotReduce::TempStorage dot_storage;
     typename normReduce::TempStorage *norm_storage = (typename normReduce::TempStorage *)&dot_storage;

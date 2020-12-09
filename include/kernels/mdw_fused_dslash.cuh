@@ -1,7 +1,11 @@
 #include <gauge_field_order.h>
+#ifdef QUDA_TARGET_CUDA
+
 #if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
 #include <mdw_dslash5_tensor_core.cuh>
 #endif
+
+
 #include <kernel.h>
 
 namespace quda {
@@ -443,9 +447,9 @@ namespace quda {
           s4_shift_base += gridDim.x * blockDim.x;
         } // while
       }
-    };
-    
-#endif // #if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
-  }
+    }; // class
+#endif
 
-}
+  }// namespace mobius tensor core
+} // namespace quda 
+#endif

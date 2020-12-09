@@ -41,6 +41,7 @@ namespace quda
   // So to be sure I am being very specific.
   template<>
   struct plus<HIP_vector_type<double,2>> {
+    static constexpr bool do_sum = true; 
     using Double2 = HIP_vector_type<double,2>;
 
     __device__ __host__ inline Double2 operator()( Double2 a, Double2 b ) {
@@ -350,7 +351,7 @@ namespace quda
     template <typename T, int width> struct WarpReduce
     {
       static_assert(width <= device::warp_size(), "WarpReduce logical width must not be greater than the warp size");
-      cub::WarpReduce<T, width> warp_reduce;
+      QudaCub::WarpReduce<T, width> warp_reduce;
       typename decltype(warp_reduce)::TempStorage dummy;
 
       __device__ WarpReduce() : warp_reduce(dummy) {}

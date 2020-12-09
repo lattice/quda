@@ -8,6 +8,7 @@
 #include <fstream>
 #include <typeinfo>
 #include <map>
+#include <iomanip>
 #include <list>
 #include <unistd.h>
 #include <uint_to_char.h>
@@ -786,18 +787,18 @@ namespace quda
           hipDeviceSynchronize();
           hipGetLastError(); // clear error counter
           tunable.checkLaunchParam(param);
-          tunable.apply(); // do initial call in case we need to jit compile for these parameters or if policy tuning
-          if (verbosity >= QUDA_DEBUG_VERBOSE) {
+	  if (verbosity >= QUDA_DEBUG_VERBOSE) {
             printfQuda("About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d)\n",
-                       param.block.x, param.block.y, param.block.z, param.grid.x, param.grid.y, param.grid.z,
-                       param.shared_bytes, int(param.aux.x), int(param.aux.y), int(param.aux.z));
+                       int(param.block.x), int(param.block.y), int(param.block.z), int(param.grid.x), int(param.grid.y), 
+		       int(param.grid.z), int(param.shared_bytes), int(param.aux.x), int(param.aux.y), int(param.aux.z));
           }
+          tunable.apply(); // do initial call in case we need to jit compile for these parameters or if policy tuning
 
-          hipEventRecord(start, 0);
+          hipEventRecord(start, device::get_cuda_stream(device::get_default_stream()));
           for (int i = 0; i < tunable.tuningIter(); i++) {
             tunable.apply(); // calls tuneLaunch() again, which simply returns the currently active param
           }
-          hipEventRecord(end, 0);
+          hipEventRecord(end,  device::get_cuda_stream(device::get_default_stream()));
           hipEventSynchronize(end);
           hipEventElapsedTime(&elapsed_time, start, end);
           hipDeviceSynchronize();
@@ -847,7 +848,9 @@ namespace quda
         hipEventDestroy(end);
 
         if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("PostTune %s\n", key.name);
+	tuning = true; 
         tunable.postTune();
+	tuning = false;
         param = best_param;
         tunecache[key] = best_param;
       }
