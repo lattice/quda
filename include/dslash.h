@@ -345,8 +345,6 @@ namespace quda
 
       // this sets the communications pattern for the packing kernel
       setPackComms(arg.commDim);
-      setUberTuning(true);
-
       // strcpy(aux, in.AuxString());
       fillAuxBase();
 #ifdef MULTI_GPU
@@ -372,6 +370,11 @@ namespace quda
 #ifdef JITIFY
       create_jitify_program(kernel_file);
 #endif
+    }
+
+    void setShmem(int shmem_){
+      arg.shmem = shmem_;
+      setUberTuning(arg.shmem & 64);
     }
 
     void setPack(bool pack, MemoryLocation location)
