@@ -48,7 +48,7 @@ void push_communicator(const quda::CommKey &split_key)
   current_key = split_key;
 }
 
-int comm_neighbor_rank(int dir, int dim) { return get_default_communicator().comm_neighbor_rank(dir, dim); }
+int comm_neighbor_rank(int dir, int dim) { return get_current_communicator().comm_neighbor_rank(dir, dim); }
 
 int comm_dim(int dim) { return get_current_communicator().comm_dim(dim); }
 

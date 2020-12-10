@@ -701,6 +701,18 @@ namespace quda {
     virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const { ; }
 
     virtual bool isNative() const = 0;
+
+    /**
+      @brief Copy all contents of the field to a host buffer.
+      @param[in] the host buffer to copy to.
+    */
+    virtual void copy_to_buffer(void *buffer) const = 0;
+
+    /**
+      @brief Copy all contents of the field from a host buffer to this field.
+      @param[in] the host buffer to copy from.
+    */
+    virtual void copy_from_buffer(void *buffer) = 0;
   };
   
   /**

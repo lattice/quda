@@ -17,10 +17,12 @@ namespace quda
       using Arg = CopyFieldOffsetArg<Field, Element, F, QUDA_4D_PC>;
       Arg arg(out_accessor, out, in_accessor, in, offset);
       CopyFieldOffset<Arg> copier(arg, in);
-    } else {
+    } else if (pc_type == QUDA_5D_PC) {
       using Arg = CopyFieldOffsetArg<Field, Element, F, QUDA_5D_PC>;
       Arg arg(out_accessor, out, in_accessor, in, offset);
       CopyFieldOffset<Arg> copier(arg, in);
+    } else {
+      errorQuda("pc_type should either be QUDA_4D_PC or QUDA_5D_PC.\n");
     }
   }
 

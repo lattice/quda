@@ -797,7 +797,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     // updated the resident gauge field if needed
     QudaReconstructType recon = extendedGaugeResident->Reconstruct();
     delete extendedGaugeResident;
-    // Use the static R here
+    // Use the static R (which is defined at the very beginning of lib/interface_quda.cpp) here
     extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileGauge, false, recon);
   }
 

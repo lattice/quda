@@ -505,18 +505,6 @@ namespace quda {
     virtual int full_dim(int d) const { return (d == 0 && siteSubset == 1) ? x[d] * 2 : x[d]; }
 
     /**
-      @brief Copy all contents of the field to a host buffer.
-      @param[in] the host buffer to copy to.
-    */
-    virtual void copy_to_buffer(void *buffer) const = 0;
-
-    /**
-      @brief Copy all contents of the field from a host buffer to this field.
-      @param[in] the host buffer to copy from.
-    */
-    virtual void copy_from_buffer(void *buffer) = 0;
-
-    /**
      * Define the parameter type for this field.
      */
     using param_type = ColorSpinorParam;
