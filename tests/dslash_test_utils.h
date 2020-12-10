@@ -815,9 +815,9 @@ DslashTime dslashCUDA(int niter)
 
     if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH
         || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-      dslashSplitGridCloverQuda(_hp_x.data(), _hp_b.data(), &inv_param, parity, hostGauge, &gauge_param, hostClover, hostCloverInv);
+      dslashMultiSrcCloverQuda(_hp_x.data(), _hp_b.data(), &inv_param, parity, hostGauge, &gauge_param, hostClover, hostCloverInv);
     } else {
-      dslashSplitGridQuda(_hp_x.data(), _hp_b.data(), &inv_param, parity, hostGauge, &gauge_param);
+      dslashMultiSrcQuda(_hp_x.data(), _hp_b.data(), &inv_param, parity, hostGauge, &gauge_param);
     }
 
   } else {

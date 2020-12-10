@@ -159,8 +159,8 @@ static TimeProfile profileDslash("dslashQuda");
 //!< Profiler for invertQuda
 static TimeProfile profileInvert("invertQuda");
 
-//!< Profiler for invertSplitGridQuda
-static TimeProfile profileInvertSplitGrid("invertSplitGridQuda");
+//!< Profiler for invertMultiSrcQuda
+static TimeProfile profileInvertMultiSrc("invertMultiSrcQuda");
 
 //!< Profiler for invertMultiShiftQuda
 static TimeProfile profileMulti("invertMultiShiftQuda");
@@ -1512,7 +1512,7 @@ void endQuda(void)
     profileClover.Print();
     profileDslash.Print();
     profileInvert.Print();
-    profileInvertSplitGrid.Print();
+    profileInvertMultiSrc.Print();
     profileMulti.Print();
     profileEigensolve.Print();
     profileFatLink.Print();
@@ -3282,7 +3282,7 @@ void loadFatLongGaugeQuda(QudaInvertParam *inv_param, QudaGaugeParam *gauge_para
 }
 
 template <class Interface, class... Args>
-void callSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // color spinor field pointers, and inv_param
+void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // color spinor field pointers, and inv_param
                        void *h_gauge, void *milc_fatlinks, void *milc_longlinks, QudaGaugeParam *gauge_param, // gauge field pointers
                        void *h_clover, void *h_clovinv, // clover field pointers
                        Interface op, Args... args)
@@ -3294,8 +3294,8 @@ void callSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // co
   */
 
   profilerStart(__func__);
-  profileInvertSplitGrid.TPSTART(QUDA_PROFILE_TOTAL);
-  profileInvertSplitGrid.TPSTART(QUDA_PROFILE_INIT);
+  profileInvertMultiSrc.TPSTART(QUDA_PROFILE_TOTAL);
+  profileInvertMultiSrc.TPSTART(QUDA_PROFILE_INIT);
 
   // Doing the sub-partition arithmatics
   const int *_split_key = param->split_grid;
@@ -3447,8 +3447,8 @@ void callSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // co
     quda::split_field(*collected_milc_longlink_field, v_g, split_key);
   }
 
-  profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_INIT);
-  profileInvertSplitGrid.TPSTART(QUDA_PROFILE_PREAMBLE);
+  profileInvertMultiSrc.TPSTOP(QUDA_PROFILE_INIT);
+  profileInvertMultiSrc.TPSTART(QUDA_PROFILE_PREAMBLE);
 
   comm_barrier();
 
@@ -3471,8 +3471,8 @@ void callSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // co
   updateR();
   comm_barrier();
 
-  profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_PREAMBLE);
-  profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_TOTAL);
+  profileInvertMultiSrc.TPSTOP(QUDA_PROFILE_PREAMBLE);
+  profileInvertMultiSrc.TPSTOP(QUDA_PROFILE_TOTAL);
 
   // Load gauge field after pushing the split communicator so the comm buffers, etc are setup according to
   // the split topology.
@@ -3499,8 +3499,8 @@ void callSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // co
     op(_collect_x[n]->V(), _collect_b[n]->V(), param, args...);
   }
 
-  profileInvertSplitGrid.TPSTART(QUDA_PROFILE_TOTAL);
-  profileInvertSplitGrid.TPSTART(QUDA_PROFILE_EPILOGUE);
+  profileInvertMultiSrc.TPSTART(QUDA_PROFILE_TOTAL);
+  profileInvertMultiSrc.TPSTART(QUDA_PROFILE_EPILOGUE);
   push_communicator(default_comm_key);
   updateR();
 
@@ -3535,8 +3535,8 @@ void callSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // co
   if (input_clover) { delete input_clover; }
   if (collected_clover) { delete collected_clover; }
 
-  profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_EPILOGUE);
-  profileInvertSplitGrid.TPSTOP(QUDA_PROFILE_TOTAL);
+  profileInvertMultiSrc.TPSTOP(QUDA_PROFILE_EPILOGUE);
+  profileInvertMultiSrc.TPSTOP(QUDA_PROFILE_TOTAL);
 
   // Restore the gauge field
   if (!is_staggered) {
@@ -3553,42 +3553,42 @@ void callSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // co
   profilerStop(__func__);
 }
 
-void invertSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge, QudaGaugeParam *gauge_param)
+void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge, QudaGaugeParam *gauge_param)
 {
   auto op = [](void *_x, void *_b, QudaInvertParam *param) { invertQuda(_x, _b, param); };
-  callSplitGridQuda(_hp_x, _hp_b, param, h_gauge, nullptr, nullptr, gauge_param, nullptr, nullptr, op);
+  callMultiSrcQuda(_hp_x, _hp_b, param, h_gauge, nullptr, nullptr, gauge_param, nullptr, nullptr, op);
 }
 
-void invertSplitGridStaggeredQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *milc_fatlinks, void *milc_longlinks, QudaGaugeParam *gauge_param)
+void invertMultiSrcStaggeredQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *milc_fatlinks, void *milc_longlinks, QudaGaugeParam *gauge_param)
 {
   auto op = [](void *_x, void *_b, QudaInvertParam *param) { invertQuda(_x, _b, param); };
-  callSplitGridQuda(_hp_x, _hp_b, param, nullptr, milc_fatlinks, milc_longlinks, gauge_param, nullptr, nullptr, op);
+  callMultiSrcQuda(_hp_x, _hp_b, param, nullptr, milc_fatlinks, milc_longlinks, gauge_param, nullptr, nullptr, op);
 }
 
-void invertSplitGridCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge, QudaGaugeParam *gauge_param, void *h_clover, void *h_clovinv)
+void invertMultiSrcCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge, QudaGaugeParam *gauge_param, void *h_clover, void *h_clovinv)
 {
   auto op = [](void *_x, void *_b, QudaInvertParam *param) { invertQuda(_x, _b, param); };
-  callSplitGridQuda(_hp_x, _hp_b, param, h_gauge, nullptr, nullptr, gauge_param, h_clover, h_clovinv, op);
+  callMultiSrcQuda(_hp_x, _hp_b, param, h_gauge, nullptr, nullptr, gauge_param, h_clover, h_clovinv, op);
 }
 
-void dslashSplitGridQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity, void *h_gauge,
+void dslashMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity, void *h_gauge,
                          QudaGaugeParam *gauge_param)
 {
   auto op = [](void *_x, void *_b, QudaInvertParam *param, QudaParity parity) { dslashQuda(_x, _b, param, parity); };
-  callSplitGridQuda(_hp_x, _hp_b, param, h_gauge, nullptr, nullptr, gauge_param, nullptr, nullptr, op, parity);
+  callMultiSrcQuda(_hp_x, _hp_b, param, h_gauge, nullptr, nullptr, gauge_param, nullptr, nullptr, op, parity);
 }
 
-void dslashSplitGridStaggeredQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity, void *milc_fatlinks,
+void dslashMultiSrcStaggeredQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity, void *milc_fatlinks,
                                     void *milc_longlinks, QudaGaugeParam *gauge_param)
 {
   auto op = [](void *_x, void *_b, QudaInvertParam *param, QudaParity parity) { dslashQuda(_x, _b, param, parity); };
-  callSplitGridQuda(_hp_x, _hp_b, param, nullptr, milc_fatlinks, milc_longlinks, gauge_param, nullptr, nullptr, op, parity);
+  callMultiSrcQuda(_hp_x, _hp_b, param, nullptr, milc_fatlinks, milc_longlinks, gauge_param, nullptr, nullptr, op, parity);
 }
 
-void dslashSplitGridCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity, void *h_gauge, QudaGaugeParam *gauge_param, void *h_clover, void *h_clovinv)
+void dslashMultiSrcCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity, void *h_gauge, QudaGaugeParam *gauge_param, void *h_clover, void *h_clovinv)
 {
   auto op = [](void *_x, void *_b, QudaInvertParam *param, QudaParity parity) { dslashQuda(_x, _b, param, parity); };
-  callSplitGridQuda(_hp_x, _hp_b, param, h_gauge, nullptr, nullptr, gauge_param, h_clover, h_clovinv, op, parity);
+  callMultiSrcQuda(_hp_x, _hp_b, param, h_gauge, nullptr, nullptr, gauge_param, h_clover, h_clovinv, op, parity);
 }
 
 /*!

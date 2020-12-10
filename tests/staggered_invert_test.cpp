@@ -357,7 +357,7 @@ int main(int argc, char **argv)
       }
       inv_param.num_src = Nsrc;
       inv_param.num_src_per_sub_partition = Nsrc / num_sub_partition;
-      invertSplitGridStaggeredQuda(_hp_x.data(), _hp_b.data(), &inv_param, (void *)milc_fatlink, (void *)milc_longlink, &gauge_param);
+      invertMultiSrcStaggeredQuda(_hp_x.data(), _hp_b.data(), &inv_param, (void *)milc_fatlink, (void *)milc_longlink, &gauge_param);
       // TODO: collect the gflops, etc on all sub-partitions.
     }
 
