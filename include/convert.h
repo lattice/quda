@@ -33,7 +33,7 @@ namespace quda
   // Fast float to integer round
   __device__ __host__ inline int f2i(float f)
   {
-#ifdef __CUDA_ARCH__
+#if defined( __CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
     f += 12582912.0f;
     return reinterpret_cast<int &>(f);
 #else
@@ -44,7 +44,7 @@ namespace quda
   // Fast double to integer round
   __device__ __host__ inline int d2i(double d)
   {
-#ifdef __CUDA_ARCH__
+#if defined( __CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
     d += 6755399441055744.0;
     return reinterpret_cast<int &>(d);
 #else

@@ -14,7 +14,7 @@ namespace quda
   */
   template <typename real> __device__ __host__ inline real __fast_pow(real a, int b)
   {
-#ifdef __CUDA_ARCH__
+#if defined( __CUDA_ARCH__ ) || defined( __HIP_DEVICE_COMPILE__ )
     if (sizeof(real) == sizeof(double)) {
       return pow(a, b);
     } else {

@@ -1045,7 +1045,7 @@ namespace quda {
       for (int i = 0; i < length / 2; i++) scale = fmaxf(max_[i], scale);
       norm[x+parity*norm_offset] = scale;
 
-#ifdef __CUDA_ARCH__
+#if defined(__CUDA_ARCH__ ) || defined(__HIP_DEVICE_COMPILE__)
       real scale_inv = __fdividef(fixedMaxValue<Float>::value, scale);
 #else
       real scale_inv = fixedMaxValue<Float>::value / scale;
@@ -1132,7 +1132,7 @@ namespace quda {
       for (int i = 0; i < length_ghost / 2; i++) scale = fmaxf(max_[i], scale);
       ghost_norm[2 * dim + dir][parity * faceVolumeCB[dim] + x] = scale;
 
-#ifdef __CUDA_ARCH__
+#if defined( __CUDA_ARCH__) || defined( __HIP_DEVICE_COMPILE__ )
       real scale_inv = __fdividef(fixedMaxValue<Float>::value, scale);
 #else
       real scale_inv = fixedMaxValue<Float>::value / scale;

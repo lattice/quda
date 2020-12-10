@@ -88,7 +88,7 @@ namespace quda {
 
   // this ensures that array elements are held in cache
   template <typename T> constexpr T cache(const T *ptr, int idx) {
-#ifdef __CUDA_ARCH__
+#if defined( __CUDA_ARCH__ ) || defined( __HIP_DEVICE_COMPILE__) // No hip unless it has _ldg intrinsic
     return __ldg(ptr+idx);
 #else
     return ptr[idx];
@@ -109,7 +109,7 @@ namespace quda {
     //linkB: the loaded matrix in this round
     Link linkA, linkB, staple;
 
-#ifdef __CUDA_ARCH__
+#if defined(_CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
     QUDA_DYNAMIC_SHARED(int, s);
     int tid = (threadIdx.z*blockDim.y + threadIdx.y)*blockDim.x + threadIdx.x;
     s[tid] = 0;

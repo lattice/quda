@@ -401,7 +401,7 @@ namespace quda {
     __device__ __host__ static float Atan2( const float &a, const float &b) { return atan2f(a,b); }
     __device__ __host__ static float Sin(const float &a)
     {
-#ifdef __CUDA_ARCH__
+#if defined( __CUDA_ARCH__ ) || defined( __HIP_DEVICE_COMPILE__ )
       return __sinf(a); 
 #else
       return sinf(a);
@@ -409,7 +409,7 @@ namespace quda {
     }
     __device__ __host__ static float Cos(const float &a)
     {
-#ifdef __CUDA_ARCH__
+#if defined( __CUDA_ARCH__ ) || defined( __HIP_DEVICE_COMPILE__ )
       return __cosf(a); 
 #else
       return cosf(a); 
@@ -418,7 +418,7 @@ namespace quda {
 
     __device__ __host__ static void SinCos(const float &a, float *s, float *c)
     {
-#ifdef __CUDA_ARCH__
+#if defined( __CUDA_ARCH__) || defined( __HIP_DEVICE_COMPILE__ )
        __sincosf(a, s, c);
 #else
        sincosf(a, s, c);
@@ -434,7 +434,7 @@ namespace quda {
     __device__ __host__ static float Atan2( const float &a, const float &b) { return atan2f(a,b)/M_PI; }
     __device__ __host__ static float Sin(const float &a)
     {
-#ifdef __CUDA_ARCH__
+#if defined( __CUDA_ARCH__ ) || defined( __HIP_DEVICE_COMPILE__ )
       return __sinf(a * static_cast<float>(M_PI));
 #else
       return sinf(a * static_cast<float>(M_PI));
@@ -442,7 +442,7 @@ namespace quda {
     }
     __device__ __host__ static float Cos(const float &a)
     {
-#ifdef __CUDA_ARCH__
+#if defined( __CUDA_ARCH__ ) || defined( __HIP_DEVICE_COMPILE__ )
       return __cosf(a * static_cast<float>(M_PI));
 #else
       return cosf(a * static_cast<float>(M_PI));
@@ -451,7 +451,7 @@ namespace quda {
 
     __device__ __host__ static void SinCos(const float &a, float *s, float *c)
     {
-#ifdef __CUDA_ARCH__
+#if defined( __CUDA_ARCH__ ) || defined( __HIP_DEVICE_COMPILE__ )
       __sincosf(a * static_cast<float>(M_PI), s, c);
 #else
       sincosf(a * static_cast<float>(M_PI), s, c);

@@ -32,7 +32,7 @@ namespace quda
     __device__ __host__ inline void load(Matrix<T, n> &A, int x_cb, int parity) const
     {
       int idx = parity * volume_cb + x_cb;
-#ifdef __CUDA_ARCH__
+#if defined( __CUDA_ARCH__ ) && !defined(DISABLE_TROVE)
       const trove::coalesced_ptr<Matrix<T, n>> field_((Matrix<T, n> *)field);
       A = field_[idx];
 #else
@@ -46,7 +46,7 @@ namespace quda
     __device__ __host__ inline void save(const Matrix<T, n> &A, int x_cb, int parity)
     {
       int idx = parity * volume_cb + x_cb;
-#ifdef __CUDA_ARCH__
+#if defined( __CUDA_ARCH__ ) && !defined(DISABLE_TROVE)
       trove::coalesced_ptr<Matrix<T, n>> field_((Matrix<T, n> *)field);
       field_[idx] = A;
 #else

@@ -136,7 +136,7 @@ namespace quda
         for (int i = 0; i < n; i++) scale = fmaxf(max_[i], scale);
         norm[x + parity * cb_norm_offset] = scale;
 
-#ifdef __CUDA_ARCH__
+#if defined( __CUDA_ARCH__ ) || defined( _HIP_DEVICE_COMPILE__ )
         return __fdividef(fixedMaxValue<store_t>::value, scale);
 #else
         return fixedMaxValue<store_t>::value / scale;
