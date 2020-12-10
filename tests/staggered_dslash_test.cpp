@@ -1,30 +1,3 @@
-#include <iostream>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <algorithm>
-
-#include <quda.h>
-#include <quda_internal.h>
-#include <dirac_quda.h>
-#include <dslash_quda.h>
-#include <invert_quda.h>
-#include <util_quda.h>
-#include <blas_quda.h>
-
-#include <misc.h>
-#include <host_utils.h>
-#include <command_line_params.h>
-#include <dslash_reference.h>
-#include <staggered_dslash_reference.h>
-#include <staggered_gauge_utils.h>
-#include <gauge_field.h>
-#include <unitarization_links.h>
-
-#include "dslash_test_helpers.h"
-#include <assert.h>
-#include <gtest/gtest.h>
-
 #include "staggered_dslash_test_utils.h"
 
 using namespace quda;
@@ -50,7 +23,8 @@ static int dslashTest()
   return test_rc;
 }
 
-TEST(dslash, verify) {
+TEST(dslash, verify)
+{
   double deviation = wrapper.verify();
   double tol = getTolerance(prec);
   ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
@@ -61,10 +35,10 @@ void display_test_info()
   printfQuda("running the following test:\n");
   printfQuda("prec recon   test_type     dagger   S_dim         T_dimension\n");
   printfQuda("%s   %s       %s           %d       %d/%d/%d        %d \n", get_prec_str(prec), get_recon_str(link_recon),
-      get_string(dtest_type_map, dtest_type).c_str(), dagger, xdim, ydim, zdim, tdim);
+             get_string(dtest_type_map, dtest_type).c_str(), dagger, xdim, ydim, zdim, tdim);
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
-      dimPartitioned(3));
+             dimPartitioned(3));
 }
 
 int main(int argc, char **argv)

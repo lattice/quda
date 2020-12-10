@@ -1045,16 +1045,18 @@ extern "C" {
    * @brief Perform the solve like @invertQuda but for multiple rhs by spliting the comm grid into
    * sub-partitions: each sub-partition invert one or more rhs'.
    * The QudaInvertParam object specifies how the solve should be performed on each sub-partition.
-   * Unlike @invertQuda and @invertMultiSrcQuda, the interface also takes the host side gauge as
-   * input - gauge field is not required to be loaded beforehand.
+   * Unlike @invertQuda, the interface also takes the host side gauge as input. The gauge pointer and
+   * gauge_param are used if for inv_param split_grid[0] * split_grid[1] * split_grid[2] * split_grid[3]
+   * is larger than 1, in which case gauge field is not required to be loaded beforehand; otherwise
+   * this interface would just work as @invertQuda, which requires gauge field to be loaded beforehand,
+   * and the gauge field pointer and gauge_param are not used.
    * @param _hp_x       Array of solution spinor fields
    * @param _hp_b       Array of source spinor fields
    * @param param       Contains all metadata regarding host and device storage and solver parameters
    * @param h_gauge     Base pointer to host gauge field (regardless of dimensionality)
    * @param gauge_param Contains all metadata regarding host and device storage for gauge field
    */
-  void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge,
-                           QudaGaugeParam *gauge_param);
+  void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge, QudaGaugeParam *gauge_param);
 
   /**
    * @brief Really the same with @invertMultiSrcQuda but for staggered-style fermions, by accepting pointers
@@ -1067,7 +1069,7 @@ extern "C" {
    * @param gauge_param Contains all metadata regarding host and device storage for gauge field
    */
   void invertMultiSrcStaggeredQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *milc_fatlinks,
-                                    void *milc_longlinks, QudaGaugeParam *gauge_param);
+                                   void *milc_longlinks, QudaGaugeParam *gauge_param);
 
   /**
    * @brief Really the same with @invertMultiSrcQuda but for clover-style fermions, by accepting pointers
@@ -1080,8 +1082,8 @@ extern "C" {
    * @param h_clover    Base pointer to the direct clover field
    * @param h_clovinv   Base pointer to the inverse clover field
    */
-  void invertMultiSrcCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param,
-                                 void *h_gauge, QudaGaugeParam *gauge_param, void *h_clover, void *h_clovinv);
+  void invertMultiSrcCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge,
+                                QudaGaugeParam *gauge_param, void *h_clover, void *h_clovinv);
 
   /**
    * Solve for multiple shifts (e.g., masses).
@@ -1151,7 +1153,7 @@ extern "C" {
    * @param gauge_param Contains all metadata regarding host and device storage for gauge field
    */
   void dslashMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity, void *h_gauge,
-                           QudaGaugeParam *gauge_param);
+                          QudaGaugeParam *gauge_param);
   /**
    * @brief Really the same with @dslashMultiSrcQuda but for staggered-style fermions, by accepting pointers
    * to fat links and long links.
@@ -1164,8 +1166,8 @@ extern "C" {
    * @param gauge_param Contains all metadata regarding host and device storage for gauge field
    */
 
-  void dslashMultiSrcStaggeredQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity, void *milc_fatlinks,
-                                    void *milc_longlinks, QudaGaugeParam *gauge_param);
+  void dslashMultiSrcStaggeredQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity,
+                                   void *milc_fatlinks, void *milc_longlinks, QudaGaugeParam *gauge_param);
 
   /**
    * @brief Really the same with @dslashMultiSrcQuda but for clover-style fermions, by accepting pointers
@@ -1179,7 +1181,8 @@ extern "C" {
    * @param h_clover    Base pointer to the direct clover field
    * @param h_clovinv   Base pointer to the inverse clover field
    */
-  void dslashMultiSrcCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity, void *h_gauge, QudaGaugeParam *gauge_param, void *h_clover, void *h_clovinv);
+  void dslashMultiSrcCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity, void *h_gauge,
+                                QudaGaugeParam *gauge_param, void *h_clover, void *h_clovinv);
 
   /**
    * Apply the clover operator or its inverse.

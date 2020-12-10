@@ -346,7 +346,8 @@ int main(int argc, char **argv)
       _hp_b[i] = in[i]->V();
     }
     // Run split grid
-    if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
+    if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
+        || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
       invertMultiSrcCloverQuda(_hp_x.data(), _hp_b.data(), &inv_param, (void *)gauge, &gauge_param, clover, clover_inv);
     } else {
       invertMultiSrcQuda(_hp_x.data(), _hp_b.data(), &inv_param, (void *)gauge, &gauge_param);
@@ -369,7 +370,7 @@ int main(int argc, char **argv)
   if (verify_results) {
     for (int i = 0; i < Nsrc; i++) {
       verifyInversion(out[i]->V(), _hp_multi_x[i].data(), in[i]->V(), check->V(), gauge_param, inv_param, gauge, clover,
-          clover_inv);
+                      clover_inv);
     }
   }
 
@@ -381,7 +382,9 @@ int main(int argc, char **argv)
 
   for (auto p : in) { delete p; }
   for (auto p : out) { delete p; }
-  for (auto p : out_multishift) { if (p) { delete p; } }
+  for (auto p : out_multishift) {
+    if (p) { delete p; }
+  }
 
   freeGaugeQuda();
   for (int dir = 0; dir < 4; dir++) free(gauge[dir]);

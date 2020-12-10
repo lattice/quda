@@ -371,11 +371,10 @@ namespace quda {
   void Solver::PrintStats(const char* name, int k, double r2, double b2, double hq2) {
     if (getVerbosity() >= QUDA_VERBOSE) {
       if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
-	printfQuda("%s: %5d iterations, <r,r> = %9.6e, |r|/|b| = %9.6e, heavy-quark residual = %9.6e\n",
-		   name, k, r2, sqrt(r2/b2), hq2);
+        printfQuda("%s: %5d iterations, <r,r> = %9.6e, |r|/|b| = %9.6e, heavy-quark residual = %9.6e\n", name, k, r2,
+                   sqrt(r2 / b2), hq2);
       } else {
-	printfQuda("%s: %5d iterations, <r,r> = %9.6e, |r|/|b| = %9.6e\n",
-		   name, k, r2, sqrt(r2/b2));
+        printfQuda("%s: %5d iterations, <r,r> = %9.6e, |r|/|b| = %9.6e\n", name, k, r2, sqrt(r2 / b2));
       }
     }
 
@@ -387,22 +386,23 @@ namespace quda {
     if (getVerbosity() >= QUDA_SUMMARIZE) {
       if (param.compute_true_res) {
 	if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
-	  printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %9.6e, true = %9.6e "
+          printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %9.6e, true = %9.6e "
                      "(requested = %9.6e), heavy-quark residual = %9.6e (requested = %9.6e)\n",
-		     name, k, sqrt(r2/b2), param.true_res, sqrt(r2_tol/b2), param.true_res_hq, hq_tol);
-	} else {
-	  printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %9.6e, true = %9.6e (requested = %9.6e)\n",
-		     name, k, sqrt(r2/b2), param.true_res, sqrt(r2_tol/b2));
-	}
+                     name, k, sqrt(r2 / b2), param.true_res, sqrt(r2_tol / b2), param.true_res_hq, hq_tol);
+        } else {
+          printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %9.6e, true = %9.6e "
+                     "(requested = %9.6e)\n",
+                     name, k, sqrt(r2 / b2), param.true_res, sqrt(r2_tol / b2));
+        }
       } else {
 	if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
-	  printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %9.6e "
+          printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %9.6e "
                      "(requested = %9.6e), heavy-quark residual = %9.6e (requested = %9.6e)\n",
-		     name, k, sqrt(r2/b2), sqrt(r2_tol/b2), param.true_res_hq, hq_tol);
-	} else {
-	  printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %9.6e (requested = %9.6e)\n",
-                     name, k, sqrt(r2/b2), sqrt(r2_tol/b2));
-	}
+                     name, k, sqrt(r2 / b2), sqrt(r2_tol / b2), param.true_res_hq, hq_tol);
+        } else {
+          printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %9.6e (requested = %9.6e)\n",
+                     name, k, sqrt(r2 / b2), sqrt(r2_tol / b2));
+        }
       }
     }
   }

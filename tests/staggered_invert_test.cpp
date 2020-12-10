@@ -200,9 +200,7 @@ int main(int argc, char **argv)
   if (inv_deflate) {
     setEigParam(eig_param);
     inv_param.eig_param = &eig_param;
-    if (use_split_grid) {
-      errorQuda("Split grid does not work with deflation yet.\n");
-    }
+    if (use_split_grid) { errorQuda("Split grid does not work with deflation yet.\n"); }
   } else {
     inv_param.eig_param = nullptr;
   }
@@ -334,10 +332,8 @@ int main(int argc, char **argv)
       exit(0);
     }
 
-    for (int k = 0; k < Nsrc; k++) {
-      quda::spinorNoise(*in[k], *rng, QUDA_NOISE_UNIFORM);
-    }
-    
+    for (int k = 0; k < Nsrc; k++) { quda::spinorNoise(*in[k], *rng, QUDA_NOISE_UNIFORM); }
+
     if (!use_split_grid) {
       for (int k = 0; k < Nsrc; k++) {
         if (inv_deflate) eig_param.preserve_deflation = k < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -346,7 +342,7 @@ int main(int argc, char **argv)
         gflops[k] = inv_param.gflops / inv_param.secs;
         iter[k] = inv_param.iter;
         printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
-            inv_param.gflops / inv_param.secs);
+                   inv_param.gflops / inv_param.secs);
       }
     } else {
       std::vector<void *> _hp_x(Nsrc);
@@ -357,7 +353,8 @@ int main(int argc, char **argv)
       }
       inv_param.num_src = Nsrc;
       inv_param.num_src_per_sub_partition = Nsrc / num_sub_partition;
-      invertMultiSrcStaggeredQuda(_hp_x.data(), _hp_b.data(), &inv_param, (void *)milc_fatlink, (void *)milc_longlink, &gauge_param);
+      invertMultiSrcStaggeredQuda(_hp_x.data(), _hp_b.data(), &inv_param, (void *)milc_fatlink, (void *)milc_longlink,
+                                  &gauge_param);
       // TODO: collect the gflops, etc on all sub-partitions.
     }
 

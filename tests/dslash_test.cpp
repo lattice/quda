@@ -1,28 +1,3 @@
-#include <iostream>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <algorithm>
-
-#include <quda.h>
-#include <quda_internal.h>
-#include <dirac_quda.h>
-#include <dslash_quda.h>
-#include <invert_quda.h>
-#include <util_quda.h>
-#include <blas_quda.h>
-
-#include <host_utils.h>
-#include <command_line_params.h>
-#include <dslash_reference.h>
-#include <wilson_dslash_reference.h>
-#include <domain_wall_dslash_reference.h>
-#include "misc.h"
-#include "dslash_test_helpers.h"
-
-// google test frame work
-#include <gtest/gtest.h>
-
 #include "dslash_test_utils.h"
 
 using namespace quda;
@@ -34,25 +9,22 @@ void display_test_info()
   printfQuda("running the following test:\n");
 
   printfQuda("prec    recon   dtest_type     matpc_type   dagger   S_dim         T_dimension   Ls_dimension "
-      "dslash_type    niter\n");
+             "dslash_type    niter\n");
   printfQuda("%6s   %2s       %s           %12s    %d    %3d/%3d/%3d        %3d             %2d   %14s   %d\n",
-      get_prec_str(prec), get_recon_str(link_recon), get_string(dtest_type_map, wrapper.dtest_type).c_str(),
-      get_matpc_str(matpc_type), dagger, xdim, ydim, zdim, tdim, Lsdim, get_dslash_str(dslash_type), niter);
-  printfQuda("Grid partition info:     X  Y  Z  T\n"); 
-  printfQuda("                         %d  %d  %d  %d\n", 
-      dimPartitioned(0),
-      dimPartitioned(1),
-      dimPartitioned(2),
-      dimPartitioned(3));
+             get_prec_str(prec), get_recon_str(link_recon), get_string(dtest_type_map, wrapper.dtest_type).c_str(),
+             get_matpc_str(matpc_type), dagger, xdim, ydim, zdim, tdim, Lsdim, get_dslash_str(dslash_type), niter);
+  printfQuda("Grid partition info:     X  Y  Z  T\n");
+  printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
+             dimPartitioned(3));
 
   if (wrapper.test_split_grid) {
     printfQuda("Testing with split grid: %d  %d  %d  %d\n", grid_partition[0], grid_partition[1], grid_partition[2],
-        grid_partition[3]);
+               grid_partition[3]);
   }
 }
 
-
-TEST(dslash, verify) {
+TEST(dslash, verify)
+{
   double deviation = wrapper.verify();
   double tol = getTolerance(wrapper.inv_param.cuda_prec);
   // If we are using tensor core we tolerate a greater deviation
@@ -103,7 +75,7 @@ int main(int argc, char **argv)
       test_rc = RUN_ALL_TESTS();
       if (test_rc != 0) warningQuda("Tests failed");
     }
-  }    
+  }
   wrapper.end();
 
   endQuda();

@@ -74,11 +74,10 @@ int comm_partitioned() { return get_current_communicator().comm_partitioned(); }
 
 const char *comm_dim_topology_string() { return get_current_communicator().topology_string; }
 
-const char *comm_config_string() {
-  return get_current_communicator().comm_config_string();
-}
+const char *comm_config_string() { return get_current_communicator().comm_config_string(); }
 
-const char *comm_dim_partitioned_string(const int *comm_dim_override) {
+const char *comm_dim_partitioned_string(const int *comm_dim_override)
+{
   return get_current_communicator().comm_dim_partitioned_string(comm_dim_override);
 }
 

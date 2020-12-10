@@ -409,9 +409,7 @@ namespace quda {
     size_t buffer_offset = 0;
     if (V(false)) { // direct
       std::memcpy(static_cast<char *>(buffer), clover, bytes);
-      if (precision < QUDA_SINGLE_PRECISION) {
-        std::memcpy(static_cast<char *>(buffer) + bytes, norm, norm_bytes);
-      }
+      if (precision < QUDA_SINGLE_PRECISION) { std::memcpy(static_cast<char *>(buffer) + bytes, norm, norm_bytes); }
       buffer_offset += bytes + norm_bytes;
     }
 

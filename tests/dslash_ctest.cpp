@@ -1,28 +1,3 @@
-#include <iostream>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <algorithm>
-
-#include <quda.h>
-#include <quda_internal.h>
-#include <dirac_quda.h>
-#include <dslash_quda.h>
-#include <invert_quda.h>
-#include <util_quda.h>
-#include <blas_quda.h>
-
-#include <host_utils.h>
-#include <command_line_params.h>
-#include <dslash_reference.h>
-#include <wilson_dslash_reference.h>
-#include <domain_wall_dslash_reference.h>
-#include "misc.h"
-#include "dslash_test_helpers.h"
-
-// google test frame work
-#include <gtest/gtest.h>
-
 #include "dslash_test_utils.h"
 
 using namespace quda;
@@ -46,8 +21,9 @@ void display_test_info(int precision, QudaReconstructType link_recon)
 
   printfQuda("prec    recon   test_type     matpc_type   dagger   S_dim         T_dimension   Ls_dimension dslash_type    niter\n");
   printfQuda("%6s   %2s       %s           %12s    %d    %3d/%3d/%3d        %3d             %2d   %14s   %d\n",
-             get_prec_str(prec), get_recon_str(link_recon), get_string(dtest_type_map, dslash_test_wrapper.dtest_type).c_str(),
-             get_matpc_str(matpc_type), dagger, xdim, ydim, zdim, tdim, Lsdim, get_dslash_str(dslash_type), niter);
+             get_prec_str(prec), get_recon_str(link_recon),
+             get_string(dtest_type_map, dslash_test_wrapper.dtest_type).c_str(), get_matpc_str(matpc_type), dagger,
+             xdim, ydim, zdim, tdim, Lsdim, get_dslash_str(dslash_type), niter);
   // printfQuda("Grid partition info:     X  Y  Z  T\n");
   // printfQuda("                         %d  %d  %d  %d\n",
   //   dimPartitioned(0),
@@ -70,7 +46,8 @@ using ::testing::Values;
 using ::testing::Range;
 using ::testing::Combine;
 
-class DslashTest : public ::testing::TestWithParam<::testing::tuple<int, int, int>> {
+class DslashTest : public ::testing::TestWithParam<::testing::tuple<int, int, int>>
+{
 protected:
   ::testing::tuple<int, int, int> param;
 
@@ -107,7 +84,6 @@ public:
       if (value &  (1 << j)){
         commDimPartitionedSet(j);
       }
-
     }
     updateR();
 
@@ -130,7 +106,6 @@ public:
   static void TearDownTestCase() {
     endQuda();
   }
-
 };
 
 TEST_P(DslashTest, verify)
@@ -140,17 +115,16 @@ TEST_P(DslashTest, verify)
   double deviation = dslash_test_wrapper.verify();
   double tol = getTolerance(dslash_test_wrapper.inv_param.cuda_prec);
   // If we are using tensor core we tolerate a greater deviation
-  if (dslash_type == QUDA_MOBIUS_DWF_DSLASH && dslash_test_wrapper.dtest_type == dslash_test_type::MatPCDagMatPCLocal) tol *= 10;
-  if (dslash_test_wrapper.gauge_param.reconstruct == QUDA_RECONSTRUCT_8 && dslash_test_wrapper.inv_param.cuda_prec >= QUDA_HALF_PRECISION)
+  if (dslash_type == QUDA_MOBIUS_DWF_DSLASH && dslash_test_wrapper.dtest_type == dslash_test_type::MatPCDagMatPCLocal)
+    tol *= 10;
+  if (dslash_test_wrapper.gauge_param.reconstruct == QUDA_RECONSTRUCT_8
+      && dslash_test_wrapper.inv_param.cuda_prec >= QUDA_HALF_PRECISION)
     tol *= 10; // if recon 8, we tolerate a greater deviation
 
   ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
 }
 
-TEST_P(DslashTest, benchmark)
-{  
-  dslash_test_wrapper.run_test(niter, /**show_metrics =*/true);
-}
+TEST_P(DslashTest, benchmark) { dslash_test_wrapper.run_test(niter, /**show_metrics =*/true); }
 
 int main(int argc, char **argv)
 {
@@ -160,7 +134,8 @@ int main(int argc, char **argv)
   int test_rc = 0;
   // command line options
   auto app = make_app();
-  app->add_option("--test", dslash_test_wrapper.dtest_type, "Test method")->transform(CLI::CheckedTransformer(dtest_type_map));
+  app->add_option("--test", dslash_test_wrapper.dtest_type, "Test method")
+    ->transform(CLI::CheckedTransformer(dtest_type_map));
   add_split_grid_option_group(app);
   try {
     app->parse(argc, argv);
