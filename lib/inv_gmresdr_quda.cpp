@@ -64,8 +64,6 @@ namespace quda {
        int k;
        int restarts;
 
-       Complex      *c;
-
        std::shared_ptr<ColorSpinorFieldSet> Vkp1; // high-precision accumulation array
 
        GMResDRArgs(ColorSpinorField &meta, int m, int nev) :
@@ -80,8 +78,6 @@ namespace quda {
          restarts(0),
          Vkp1(nullptr)
        {
-         c = static_cast<Complex *>(ritzVecs.col(k).data());
-
          ColorSpinorParam csParam(meta);
 
          csParam.composite_dim = (k + 1);
@@ -105,6 +101,8 @@ namespace quda {
 
        void Givens(const int j)
        {
+         Ref<VectorXcd> c = ritzVecs.col(k);       
+         
          Complex h0 = H(0, j - 1);
 
          for (int i = 1; i < j; i++) {
@@ -118,10 +116,10 @@ namespace quda {
          sn(j - 1) = H(j, j - 1).real() * inv_denom;
          givensH(j - 1, j - 1) = conj(cn(j - 1)) * h0 + sn(j - 1) * H(j, j - 1);
 
-         c[j] = -sn(j - 1) * c[j - 1];
-         c[j - 1] *= conj(cn(j - 1));
+         c(j) = -sn(j - 1) * c(j - 1);
+         c(j - 1) *= conj(cn(j - 1));
          //
-         printfQuda("Residual %le :: %le \n", c[j].real(), c[j].imag());
+         printfQuda("Residual %le :: %le \n", c(j).real(), c(j).imag());
 
          return;
        }
@@ -131,6 +129,8 @@ namespace quda {
        {
          if (do_givens) {
            // recosntruct the last col
+           Ref<VectorXcd> c = ritzVecs.col(k);           
+           
            Complex h0 = H(0, m - 1);
 
            for (int i = 1; i <= m - 1; i++) {
@@ -144,25 +144,25 @@ namespace quda {
            sn(m - 1) = H(m, m - 1).real() * inv_denom;
            givensH(m - 1, m - 1) = conj(cn(m - 1)) * h0 + sn(m - 1) * H(m, m - 1);
 
-           c[m] = -sn(m - 1) * c[m - 1];
-           c[m - 1] *= conj(cn(m - 1));
+           c(m) = -sn(m - 1) * c(m - 1);
+           c(m - 1) *= conj(cn(m - 1));
            //
-           printfQuda("Last cycle residual %le :: %le \n", c[m].real(), c[m - 1].imag());
+           printfQuda("Last cycle residual %le :: %le \n", c(m).real(), c(m).imag());
 
-           memcpy(eta.data(), c, m * sizeof(Complex));
-           memset(c, 0, (m + 1) * sizeof(c[0]));
-           c[0] = c0;
+           memcpy(eta.data(), c.data(), m * sizeof(Complex));
+           c.setZero();
+           c(0) = c0;
 
            givensH.block(0, 0, m, m).triangularView<Upper>().solveInPlace<OnTheLeft>(eta);
 
          } else {
-           memset(c, 0, (m + 1) * sizeof(c[0]));
+           c.setZero();
 
            std::vector<ColorSpinorField *> v_(const_cast<ColorSpinorField &>(vm)(0, k + 1));
            std::vector<ColorSpinorField *> r_;
            r_.push_back(const_cast<ColorSpinorField *>(&r_sloppy));
 
-           blas::cDotProduct(c, v_, r_);
+           blas::cDotProduct(c.data(), v_, r_);
          }
 
          return;
@@ -205,8 +205,8 @@ namespace quda {
    void ComputeEta(GMResDRArgs &args)
    {
 
-     Map<VectorXcd, Unaligned> c_(args.c, args.m + 1);
-     args.eta = args.H.jacobiSvd(ComputeThinU | ComputeThinV).solve(c_);
+     Ref<VectorXcd> c = ritzVecs.col(k);
+     args.eta = args.H.jacobiSvd(ComputeThinU | ComputeThinV).solve(c);
 
      return;
    }
@@ -317,8 +317,8 @@ namespace quda {
    blas::caxpy(static_cast<Complex *>(args.eta.data()), zm, x_);
 
    VectorXcd minusHeta = - (args.H * args.eta);
-   Map<VectorXcd, Unaligned> c_(args.c, args.m+1);
-   c_ += minusHeta;
+   Ref<VectorXcd> c = ritzVecs.col(k);
+   c += minusHeta;
 
    blas::caxpy(static_cast<Complex *>(minusHeta.data()), vm, r_);
 
@@ -407,8 +407,6 @@ namespace quda {
      args.cn.setZero();
      args.sn.setZero();
    }
-
-   Complex c0 = args.c[0];
 
 #ifdef CAOPT_ORTH
    // Advanced Ortho objects:
@@ -526,6 +524,9 @@ namespace quda {
      j += 1;
    }
 #endif
+   Ref<VectorXcd> c = ritzVecs.col(k);
+   Complex c0 = c(0);
+   
    args.LeastSquaresSolve(c0, *r_sloppy, *Vm, do_givens);
 
    return (j-start_idx);
@@ -581,6 +582,7 @@ namespace quda {
     }
 
     GMResDRArgs &args = *gmresdr_args;
+    Ref<VectorXcd> c  = args.ritzVecs.col(args.k);
 
     ColorSpinorField &r   = *rp;
     ColorSpinorField &y   = *yp;
@@ -602,18 +604,18 @@ namespace quda {
 
     double r2 = xmyNorm(b, r);
     double b2 = r2;
-    args.c[0] = Complex(sqrt(r2), 0.0);
+    c(0) = Complex(sqrt(r2), 0.0);
 
     printfQuda("\nInitial residual squared: %1.16e, source %1.16e, tolerance %1.16e\n", r2, sqrt(normb), param.tol);
 
     rSloppy = r;
 
     if(param.precision_sloppy != param.precision) {
-      blas::axpy(1.0 / args.c[0].real(), r, y);
+      blas::axpy(1.0 / c(0).real(), r, y);
       Vm->Component(0) = y;
       blas::zero(y);
     } else {
-      blas::axpy(1.0 / args.c[0].real(), r, Vm->Component(0));
+      blas::axpy(1.0 / c(0).real(), r, Vm->Component(0));
     }
 
     if (!param.is_preconditioner) {
@@ -684,9 +686,9 @@ namespace quda {
         r = y;
         zero(e);
 
-        args.c[0] = Complex(sqrt(ext_r2), 0.0);
+        c(0) = Complex(sqrt(ext_r2), 0.0);
         blas::zero(Vm->Component(0));
-        blas::axpy(1.0 / args.c[0].real(), rSloppy, Vm->Component(0));
+        blas::axpy(1.0 / c(0).real(), rSloppy, Vm->Component(0));
 
         j = 0;
       }
