@@ -30,18 +30,13 @@ namespace quda {
     static_assert(width <= device::warp_size(), "WarpReduce logical width must not be greater than the warp size");
     using warp_reduce_t = cub::WarpReduce<T, width>;
 
-    __device__ inline auto& shared_state()
-    {
-      static typename warp_reduce_t::TempStorage dummy;
-      return dummy;
-    }
-
     __device__ __host__ inline WarpReduce() {}
 
     __device__ __host__ inline T Sum(const T &value)
     {
 #ifdef __CUDA_ARCH__
-      warp_reduce_t warp_reduce(shared_state());
+      typename warp_reduce_t::TempStorage dummy;
+      warp_reduce_t warp_reduce(dummy);
       return warp_reduce.Sum(value);
 #else
       return value;
