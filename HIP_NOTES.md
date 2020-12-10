@@ -1,5 +1,13 @@
 # HIP Release notes
 
+## Tidyed up feature/hip-compile-fixes
+* 12/10/2020: Builds on HIP
+* Half prec blas_test ran correctly 
+* Single prec blas_test ran correctly
+* Double prec blas_test segfaults
+* dslash_test runs, verification has issue with a runtime check (block/grid sized related)
+* using rocm-3.10.0
+ 
 ## Merged feature/generic_kernel and ensured compilation on NVIDIA
 * 12/5/2020: HIP Build doesn't work yet. Need to transfer NV Changes
 * 12/8/2020: Green team merge completed, and works, Issue #1089 persists even for feature/generic_kernel
@@ -41,7 +49,7 @@ module load cmake/3.18.2
 export SM="sm_70" # not actually used
 export INSTALLDIR=$HOME/install/quda
 export HIP_CXXFLAGS="-D__gfx906__ -I${ROCM_PATH}/hiprand/include -I${ROCM_PATH}/rocrand/include -I${ROCM_PATH}/hipblas/include -I${ROCM_PATH}/hipcub/include -I${ROCM_PATH}/rocprim/include --amdgpu-target=gfx906" 
-export HIP_LDFLAGS="-D__gfx906 --amdgpu-target=gfx906 -Wl,-rpath=${ROCM_PATH}/hiprand/lib -L${ROCM_PATH}/hiprand/lib -Wl,-rpath=${ROCM_PATH}/rocfft/lib -L${ROCM_PATH}/rocfft/lib -lhiprand -lrocfft -lrocfft-device -Wl,-rpath=${ROCM_PATH}/hipblas/lib -L${ROCM_PATH}/hipblas/lib -lhipblas -Wl,-rpath=${ROCM_PATH}/rocblas/lib -L${ROCM_PATH}/rocblas/lib -lrocblas -Wl,-rpath=${ROCMP_PATH}/hip/lib -Wl,-rpath=${ROCM_PATH}/rccl/lib -L${ROCM_PATH}/rccl/lib -lrccl"
+export HIP_LDFLAGS="-D__gfx906 --amdgpu-target=gfx906 -Wl,-rpath=${ROCM_PATH}/hiprand/lib -L${ROCM_PATH}/hiprand/lib -Wl,-rpath=${ROCM_PATH}/rocfft/lib -L${ROCM_PATH}/rocfft/lib -lhiprand -lrocfft -lrocfft-device -Wl,-rpath=${ROCM_PATH}/hipblas/lib -L${ROCM_PATH}/hipblas/lib -lhipblas -Wl,-rpath=${ROCM_PATH}/rocblas/lib -L${ROCM_PATH}/rocblas/lib -lrocblas -Wl,-rpath=${ROCM_PATH}/hip/lib"
 
 cmake <path-to-parent-dir-of-your-quda-source>/quda \
         -G "Unix Makefiles" \
