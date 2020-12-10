@@ -1045,4 +1045,71 @@ DslashTime dslashCUDA(int niter)
   return dslash_time;
 }
 
+void run_test(int niter, bool print_metrics = false)
+{
+  {
+    printfQuda("Tuning...\n");
+    dslashCUDA(1); // warm-up run
+  }
+  printfQuda("Executing %d kernel loops...\n", niter);
+  if (!transfer) dirac->Flops();
+  DslashTime dslash_time = dslashCUDA(niter);
+  printfQuda("done.\n\n");
+
+  if (!test_split_grid) {
+
+    if (!transfer) *spinorOut = *cudaSpinorOut;
+
+    // print timing information
+    printfQuda("%fus per kernel call\n", 1e6 * dslash_time.event_time / niter);
+    // FIXME No flops count for twisted-clover yet
+    unsigned long long flops = 0;
+    if (!transfer) flops = dirac->Flops();
+    printfQuda("%llu flops per kernel call, %llu flops per site\n", flops / niter,
+        (flops / niter) / cudaSpinor->Volume());
+    printfQuda("GFLOPS = %f\n", 1.0e-9 * flops / dslash_time.event_time);
+
+    size_t ghost_bytes = cudaSpinor->GhostBytes();
+
+    printfQuda("Effective halo bi-directional bandwidth (GB/s) GPU = %f ( CPU = %f, min = %f , max = %f ) for "
+        "aggregate message size %lu bytes\n",
+        1.0e-9 * 2 * ghost_bytes * niter / dslash_time.event_time,
+        1.0e-9 * 2 * ghost_bytes * niter / dslash_time.cpu_time,
+        1.0e-9 * 2 * ghost_bytes / dslash_time.cpu_max,
+        1.0e-9 * 2 * ghost_bytes / dslash_time.cpu_min, 2 * ghost_bytes);
+
+    ::testing::Test::RecordProperty("Gflops", std::to_string(1.0e-9 * flops / dslash_time.event_time));
+    ::testing::Test::RecordProperty("Halo_bidirectitonal_BW_GPU", 1.0e-9 * 2 * ghost_bytes * niter / dslash_time.event_time);
+    ::testing::Test::RecordProperty("Halo_bidirectitonal_BW_CPU", 1.0e-9 * 2 * ghost_bytes * niter / dslash_time.cpu_time);
+    ::testing::Test::RecordProperty("Halo_bidirectitonal_BW_CPU_min", 1.0e-9 * 2 * ghost_bytes / dslash_time.cpu_max);
+    ::testing::Test::RecordProperty("Halo_bidirectitonal_BW_CPU_max", 1.0e-9 * 2 * ghost_bytes / dslash_time.cpu_min);
+    ::testing::Test::RecordProperty("Halo_message_size_bytes", 2 * ghost_bytes);
+  }
+
+}
+
+double verify()
+{
+  double deviation;
+  if (test_split_grid) {
+    for (int n = 0; n < num_src; n++) {
+      double norm2_cpu = blas::norm2(*spinorRef);
+      double norm2_cpu_cuda = blas::norm2(*vp_spinorOut[n]);
+      printfQuda("Result: CPU = %f, CPU-QUDA = %f\n", norm2_cpu, norm2_cpu_cuda);
+      deviation = std::max(deviation, pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *vp_spinorOut[n]))));
+    }
+  } else {
+    double norm2_cpu = blas::norm2(*spinorRef);
+    double norm2_cpu_cuda = blas::norm2(*spinorOut);
+    if (!transfer) {
+      double norm2_cuda = blas::norm2(*cudaSpinorOut);
+      printfQuda("Results: CPU = %f, CUDA=%f, CPU-CUDA = %f\n", norm2_cpu, norm2_cuda, norm2_cpu_cuda);
+    } else {
+      printfQuda("Result: CPU = %f, CPU-QUDA = %f\n", norm2_cpu, norm2_cpu_cuda);
+    }
+    deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
+  }
+  return deviation;
+}
+
 };

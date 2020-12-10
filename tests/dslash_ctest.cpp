@@ -20,10 +20,10 @@
 #include "misc.h"
 #include "dslash_test_helpers.h"
 
-#include "dslash_test_utils.h"
-
 // google test frame work
 #include <gtest/gtest.h>
+
+#include "dslash_test_utils.h"
 
 using namespace quda;
 
@@ -135,34 +135,9 @@ public:
 
 TEST_P(DslashTest, verify)
 {
-  dslash_test_wrapper.dslashRef();
+  dslash_test_wrapper.run_test(2);
 
-  dslash_test_wrapper.dslashCUDA(1);
-  dslash_test_wrapper.dslashCUDA(2);
-
-  double deviation = 1e-14;
-  if (dslash_test_wrapper.test_split_grid) {
-    for (int n = 0; n < dslash_test_wrapper.num_src; n++) {
-      double norm2_cpu = blas::norm2(*dslash_test_wrapper.spinorRef);
-      double norm2_cpu_cuda = blas::norm2(*dslash_test_wrapper.vp_spinorOut[n]);
-      printfQuda("Result: CPU = %f, CPU-QUDA = %f\n", norm2_cpu, norm2_cpu_cuda);
-      deviation = std::max(deviation, pow(10, -(double)(cpuColorSpinorField::Compare(*dslash_test_wrapper.spinorRef, *dslash_test_wrapper.vp_spinorOut[n]))));
-    }
-  } else {
-
-    if (!dslash_test_wrapper.transfer) *dslash_test_wrapper.spinorOut = *dslash_test_wrapper.cudaSpinorOut;
-
-    double norm2_cpu = blas::norm2(*dslash_test_wrapper.spinorRef);
-    double norm2_cpu_cuda = blas::norm2(*dslash_test_wrapper.spinorOut);
-    if (!dslash_test_wrapper.transfer) {
-      double norm2_cuda = blas::norm2(*dslash_test_wrapper.cudaSpinorOut);
-      printfQuda("Results: CPU = %f, CUDA=%f, CPU-CUDA = %f\n", norm2_cpu, norm2_cuda, norm2_cpu_cuda);
-    } else {
-      printfQuda("Result: CPU = %f, CPU-QUDA = %f\n", norm2_cpu, norm2_cpu_cuda);
-    }
-    deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*dslash_test_wrapper.spinorRef, *dslash_test_wrapper.spinorOut)));
-  }
-
+  double deviation = dslash_test_wrapper.verify();
   double tol = getTolerance(dslash_test_wrapper.inv_param.cuda_prec);
   // If we are using tensor core we tolerate a greater deviation
   if (dslash_type == QUDA_MOBIUS_DWF_DSLASH && dslash_test_wrapper.dtest_type == dslash_test_type::MatPCDagMatPCLocal) tol *= 10;
@@ -174,29 +149,7 @@ TEST_P(DslashTest, verify)
 
 TEST_P(DslashTest, benchmark)
 {  
-  dslash_test_wrapper.dslashCUDA(1); // warm-up run
-  if (!dslash_test_wrapper.transfer) dslash_test_wrapper.dirac->Flops();
-  auto dslash_time = dslash_test_wrapper.dslashCUDA(niter);
-
-  printfQuda("%fus per kernel call\n", 1e6 * dslash_time.event_time / niter);
-  // FIXME No flops count for twisted-clover yet
-  unsigned long long flops = 0;
-  if (!dslash_test_wrapper.transfer) flops = dslash_test_wrapper.dirac->Flops();
-  double gflops = 1.0e-9 * flops / dslash_time.event_time;
-  printfQuda("GFLOPS = %f\n", gflops);
-  RecordProperty("Gflops", std::to_string(gflops));
-  RecordProperty("Halo_bidirectitonal_BW_GPU", 1.0e-9 * 2 * dslash_test_wrapper.cudaSpinor->GhostBytes() * niter / dslash_time.event_time);
-  RecordProperty("Halo_bidirectitonal_BW_CPU", 1.0e-9 * 2 * dslash_test_wrapper.cudaSpinor->GhostBytes() * niter / dslash_time.cpu_time);
-  RecordProperty("Halo_bidirectitonal_BW_CPU_min", 1.0e-9 * 2 * dslash_test_wrapper.cudaSpinor->GhostBytes() / dslash_time.cpu_max);
-  RecordProperty("Halo_bidirectitonal_BW_CPU_max", 1.0e-9 * 2 * dslash_test_wrapper.cudaSpinor->GhostBytes() / dslash_time.cpu_min);
-  RecordProperty("Halo_message_size_bytes", 2 * dslash_test_wrapper.cudaSpinor->GhostBytes());
-
-  printfQuda("Effective halo bi-directional bandwidth (GB/s) GPU = %f ( CPU = %f, min = %f , max = %f ) for aggregate "
-             "message size %lu bytes\n",
-             1.0e-9 * 2 * dslash_test_wrapper.cudaSpinor->GhostBytes() * niter / dslash_time.event_time,
-             1.0e-9 * 2 * dslash_test_wrapper.cudaSpinor->GhostBytes() * niter / dslash_time.cpu_time,
-             1.0e-9 * 2 * dslash_test_wrapper.cudaSpinor->GhostBytes() / dslash_time.cpu_max,
-             1.0e-9 * 2 * dslash_test_wrapper.cudaSpinor->GhostBytes() / dslash_time.cpu_min, 2 * dslash_test_wrapper.cudaSpinor->GhostBytes());
+  dslash_test_wrapper.run_test(niter, /**show_metrics =*/true);
 }
 
 int main(int argc, char **argv)

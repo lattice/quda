@@ -500,20 +500,20 @@ struct StaggeredDslashTestWrapper {
       printfQuda("GFLOPS = %f\n", gflops);
       ::testing::Test::RecordProperty("Gflops", std::to_string(gflops));
 
-      long int bytes = cudaSpinor->GhostBytes();
+      size_t ghost_bytes = cudaSpinor->GhostBytes();
 
-      ::testing::Test::RecordProperty("Halo_bidirectitonal_BW_GPU", 1.0e-9 * 2 * bytes * niter / dslash_time.event_time);
-      ::testing::Test::RecordProperty("Halo_bidirectitonal_BW_CPU", 1.0e-9 * 2 * bytes * niter / dslash_time.cpu_time);
-      ::testing::Test::RecordProperty("Halo_bidirectitonal_BW_CPU_min", 1.0e-9 * 2 * bytes / dslash_time.cpu_max);
-      ::testing::Test::RecordProperty("Halo_bidirectitonal_BW_CPU_max", 1.0e-9 * 2 * bytes / dslash_time.cpu_min);
-      ::testing::Test::RecordProperty("Halo_message_size_bytes", 2 * bytes);
+      ::testing::Test::RecordProperty("Halo_bidirectitonal_BW_GPU", 1.0e-9 * 2 * ghost_bytes * niter / dslash_time.event_time);
+      ::testing::Test::RecordProperty("Halo_bidirectitonal_BW_CPU", 1.0e-9 * 2 * ghost_bytes * niter / dslash_time.cpu_time);
+      ::testing::Test::RecordProperty("Halo_bidirectitonal_BW_CPU_min", 1.0e-9 * 2 * ghost_bytes / dslash_time.cpu_max);
+      ::testing::Test::RecordProperty("Halo_bidirectitonal_BW_CPU_max", 1.0e-9 * 2 * ghost_bytes / dslash_time.cpu_min);
+      ::testing::Test::RecordProperty("Halo_message_size_bytes", 2 * ghost_bytes);
 
       printfQuda("Effective halo bi-directional bandwidth (GB/s) GPU = %f ( CPU = %f, min = %f , max = %f ) for aggregate "
           "message size %lu bytes\n",
-          1.0e-9 * 2 * bytes * niter / dslash_time.event_time,
-          1.0e-9 * 2 * bytes * niter / dslash_time.cpu_time,
-          1.0e-9 * 2 * bytes / dslash_time.cpu_max,
-          1.0e-9 * 2 * bytes / dslash_time.cpu_min, 2 * bytes);
+          1.0e-9 * 2 * ghost_bytes * niter / dslash_time.event_time,
+          1.0e-9 * 2 * ghost_bytes * niter / dslash_time.cpu_time,
+          1.0e-9 * 2 * ghost_bytes / dslash_time.cpu_max,
+          1.0e-9 * 2 * ghost_bytes / dslash_time.cpu_min, 2 * ghost_bytes);
     }
   }
 
