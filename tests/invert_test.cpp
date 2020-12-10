@@ -346,7 +346,7 @@ int main(int argc, char **argv)
       _hp_b[i] = in[i]->V();
     }
     // Run split grid
-    if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
       invertMultiSrcCloverQuda(_hp_x.data(), _hp_b.data(), &inv_param, (void *)gauge, &gauge_param, clover, clover_inv);
     } else {
       invertMultiSrcQuda(_hp_x.data(), _hp_b.data(), &inv_param, (void *)gauge, &gauge_param);

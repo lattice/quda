@@ -3392,7 +3392,7 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
   // Deal with clover field
   quda::CloverField *input_clover = nullptr;
   quda::CloverField *collected_clover = nullptr;
-  if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+  if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH || param->dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
     if (h_clover || h_clovinv) {
       CloverFieldParam clover_param;
       clover_param.nDim = 4;
@@ -3485,7 +3485,7 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
   }
   printfQuda("Split grid loaded gauge field...\n");
 
-  if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+  if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH || param->dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
     printfQuda("Split grid loading clover field...\n");
     if (collected_clover) {
       loadCloverQuda(collected_clover->V(false), collected_clover->V(true), param);
