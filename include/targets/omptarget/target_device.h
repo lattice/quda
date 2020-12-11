@@ -30,8 +30,8 @@ namespace quda {
 
     /**
        @brief Helper function that returns the thread block
-       dimensions.  On CUDA this returns the intrinsic blockDim.
-       @param[in] arg Kernel argument struct
+       dimensions.  On CUDA this returns the intrinsic blockDim,
+       whereas on the host this returns (1, 1, 1).
     */
     __device__ __host__ inline dim3 block_dim()
     {
@@ -46,11 +46,26 @@ namespace quda {
     }
 
     /**
-       @brief Helper function that returns the thread block
-       dimensions.  On CUDA this returns the intrinsic blockDim,
-       whereas on the host this grabs the dimensions from the kernel
-       argument struct
-       @param[in] arg Kernel argument struct
+       @brief Helper function that returns the thread indices within a
+       thread block.  On CUDA this returns the intrinsic
+       blockIdx, whereas on the host this just returns (0, 0, 0).
+    */
+    __device__ __host__ inline dim3 block_idx()
+    {
+      return dim3(omp_get_team_num(),0,0);
+/*
+#ifdef __CUDA_ARCH__
+      return dim3(blockIdx.x, blockIdx.y, blockIdx.z);
+#else
+      return dim3(0, 0, 0);
+#endif
+*/
+    }
+
+    /**
+       @brief Helper function that returns the thread indices within a
+       thread block.  On CUDA this returns the intrinsic
+       threadIdx, whereas on the host this just returns (0, 0, 0).
     */
     __device__ __host__ inline dim3 thread_idx()
     {
