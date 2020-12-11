@@ -1,15 +1,8 @@
-#include <quda_define.h>
-
 #include <gauge_field_order.h>
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
 #include <float_vector.h>
 #include <shared_memory_cache_helper.cuh>
-
-#ifdef QUDA_TARGET_HIP
-#include <hip/hip_runtime.h>
-#endif
-
 
 namespace quda {
 
@@ -339,15 +332,6 @@ namespace quda {
 #pragma unroll
 	for (int offset = warp_size/2; offset >= warp_size/Arg::color_stride; offset /= 2)
 	  out[color_local] += __shfl_down_sync(device::warp_converged_mask(), out[color_local], offset);
-#elif defined(QUDA_TARGET_HIP)
-	  Float sh_r = Float(out[color_local].x);
-	  Float sh_i = Float(out[color_local].y);
-	
-	  out[color_local] += complex<Float>{ __shfl_down(sh_r,offset) , __shfl_down(sh_i,offset) };
-#else
-#error "This file needs some kind of shuffle"
-#endif
-	}
       }
 
 #pragma unroll
