@@ -1,7 +1,5 @@
 #pragma once
 
-using namespace quda;
-
 /**
    @file cub_helper.cuh
 
@@ -10,6 +8,10 @@ using namespace quda;
    correct compilation with clang and nvrtc
  */
 
-// ensures we use shfl_sync and not shfl when compiling with clang
-#include <hipcub/hipcub.hpp>
+
+using namespace quda;
+
+#include <hipcub/block/block_reduce.cuh>
 namespace QudaCub = hipcub;
+#include <cub_helper_shared.h>
+
