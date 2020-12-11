@@ -2,7 +2,6 @@
 
 #include <cuda.h>
 #include <cuda_runtime.h>
-using qudaDeviceProp_t = cudaDeviceProp;
 
 using qudaEvent_t = cudaEvent_t;
 using qudaIpcEventHandle_t = cudaIpcEventHandle_t;
