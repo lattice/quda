@@ -122,7 +122,7 @@ namespace quda
   __device__ __host__ void copy_field_offset(int x_cb, int s, int parity, Arg &arg)
   {
     // XXX: This code assumes parity if NOT changed when offset is added.
-    static_assert(Arg::pc_type == QUDA_4D_PC || Arg::pc_type == QUDA_5D_PC);
+    static_assert(Arg::pc_type == QUDA_4D_PC || Arg::pc_type == QUDA_5D_PC, "pc_type should either be QUDA_4D_PC or QUDA_5D_PC.");
     if (Arg::pc_type == QUDA_4D_PC) { // 4d even-odd preconditioning, works for most fermions
       int coordinate[4];
       int idx_in;
