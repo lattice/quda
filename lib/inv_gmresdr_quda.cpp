@@ -127,10 +127,10 @@ namespace quda {
        void LeastSquaresSolve(const Complex c0, const ColorSpinorField &r_sloppy, const ColorSpinorFieldSet &vm,
                               const bool do_givens)
        {
+	 Ref<VectorXcd> c = ritzVecs.col(k);
+
          if (do_givens) {
            // recosntruct the last col
-           Ref<VectorXcd> c = ritzVecs.col(k);           
-           
            Complex h0 = H(0, m - 1);
 
            for (int i = 1; i <= m - 1; i++) {
@@ -205,7 +205,7 @@ namespace quda {
    void ComputeEta(GMResDRArgs &args)
    {
 
-     Ref<VectorXcd> c = ritzVecs.col(k);
+     Ref<VectorXcd> c = args.ritzVecs.col(args.k);
      args.eta = args.H.jacobiSvd(ComputeThinU | ComputeThinV).solve(c);
 
      return;
@@ -317,7 +317,7 @@ namespace quda {
    blas::caxpy(static_cast<Complex *>(args.eta.data()), zm, x_);
 
    VectorXcd minusHeta = - (args.H * args.eta);
-   Ref<VectorXcd> c = ritzVecs.col(k);
+   Ref<VectorXcd> c = args.ritzVecs.col(args.k);
    c += minusHeta;
 
    blas::caxpy(static_cast<Complex *>(minusHeta.data()), vm, r_);
@@ -524,7 +524,7 @@ namespace quda {
      j += 1;
    }
 #endif
-   Ref<VectorXcd> c = ritzVecs.col(k);
+   Ref<VectorXcd> c = args.ritzVecs.col(args.k);
    Complex c0 = c(0);
    
    args.LeastSquaresSolve(c0, *r_sloppy, *Vm, do_givens);
