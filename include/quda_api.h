@@ -1,56 +1,21 @@
 #pragma once
-#if 0
-#ifndef __CUDACC_RTC__
-#include <cuda.h>
-#include <cuda_runtime.h>
-#endif
-#endif
 
-#include "quda_define.h"
+// Target specific definitions in include/targets/XXX/quda_api_target.h
+// The correct targets/ directory is set by the build system
+// Eventually we want to shrink the contents of that
+#include <quda_define.h>
+
+enum qudaMemcpyKind { qudaMemcpyHostToHost, 
+	              qudaMemcpyHostToDevice,
+		      qudaMemcpyDeviceToHost,
+		      qudaMemcpyDeviceToDevice,
+		      qudaMemcpyDefault };
 
 #if defined(QUDA_TARGET_CUDA)
-
-#include <cuda.h>
-#include <cuda_runtime.h>
-using qudaDeviceProp_t = cudaDeviceProp;
-using qudaMemcpyKind = cudaMemcpyKind;
-
-using qudaEvent_t = cudaEvent_t;
-using qudaIpcEventHandle_t = cudaIpcEventHandle_t;
-using qudaIpcMemHandle_t = cudaIpcMemHandle_t;
-
-constexpr qudaMemcpyKind  qudaMemcpyDeviceToHost = cudaMemcpyDeviceToHost;
-constexpr qudaMemcpyKind  qudaMemcpyHostToDevice = cudaMemcpyHostToDevice;
-constexpr qudaMemcpyKind  qudaMemcpyDeviceToDevice = cudaMemcpyDeviceToDevice;
-constexpr qudaMemcpyKind  qudaMemcpyDefault = cudaMemcpyDefault;
-
-#define QUDA_DYNAMIC_SHARED( type, var )	\
-	extern __shared__ type var[] ;
-
+#include "targets/cuda/quda_api_target.h"
 #elif defined(QUDA_TARGET_HIP)
-
-#include <hip/hip_runtime_api.h>
-
-using qudaDeviceProp_t = hipDeviceProp_t;
-// using qudaStream_t = hipStream_t;
-using qudaMemcpyKind = hipMemcpyKind;
-
-using qudaEvent_t = hipEvent_t;
-using qudaIpcEventHandle_t = hipIpcEventHandle_t;
-using qudaIpcMemHandle_t = hipIpcMemHandle_t;
-
-
-constexpr qudaMemcpyKind  qudaMemcpyDeviceToHost = hipMemcpyDeviceToHost;
-constexpr qudaMemcpyKind  qudaMemcpyHostToDevice = hipMemcpyHostToDevice;
-constexpr qudaMemcpyKind  qudaMemcpyDeviceToDevice = hipMemcpyDeviceToDevice;
-constexpr qudaMemcpyKind  qudaMemcpyDefault = hipMemcpyDefault;
-
-#define QUDA_DYNAMIC_SHARED( type, var )        \
-        HIP_DYNAMIC_SHARED(type, var);
-
+#include "targets/hip/quda_api_target.h"
 #endif
-
-//extern qudaDeviceProp_t deviceProp;
 
 
 #include <enum_quda.h>

@@ -1,3 +1,4 @@
+#include <quda_api.h>
 #include <unordered_set>
 #include <tune_quda.h>
 #include <uint_to_char.h>
@@ -19,6 +20,20 @@
 
 namespace quda {
 
+  inline 
+  hipMemcpyKind	 qudaMemcpyKindToAPI( const qudaMemcpyKind& k) 
+  {
+    switch(k) { 
+     case qudaMemcpyHostToHost : return hipMemcpyHostToHost; break; 
+     case qudaMemcpyHostToDevice : return hipMemcpyHostToDevice; break;
+     case qudaMemcpyDeviceToHost : return hipMemcpyDeviceToHost; break;
+     case qudaMemcpyDeviceToDevice : return hipMemcpyDeviceToDevice; break;
+     case qudaMemcpyDefault : return hipMemcpyDefault; break;
+     default: 
+	errorQuda(" unknown value for qudaMemcpyKind %d", static_cast<int>(k));
+	return hipMemcpyDefault; // keep warnings away
+     }
+  }
 
   static TimeProfile apiTimer("CUDA API calls (runtime)");
 
@@ -162,24 +177,24 @@ namespace quda {
     long long bytes() const { return kind == hipMemcpyDeviceToDevice ? 2*count : count; }
   };
 
-  void qudaMemcpy_(void *dst, const void *src, size_t count, hipMemcpyKind kind,
+  void qudaMemcpy_(void *dst, const void *src, size_t count, qudaMemcpyKind kind,
                    const char *func, const char *file, const char *line) {
     if (count == 0) return;
-    QudaMem copy(dst, src, count, kind, device::get_default_stream(), false, func, file, line);
+    QudaMem copy(dst, src, count, qudaMemcpyKindToAPI(kind), device::get_default_stream(), false, func, file, line);
     hipError_t error = hipGetLastError();
     if (error != hipSuccess)
       errorQuda("(CUDA) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
   }
 
-  void qudaMemcpyAsync_(void *dst, const void *src, size_t count, hipMemcpyKind kind, const qudaStream_t &stream,
+  void qudaMemcpyAsync_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const qudaStream_t &stream,
                         const char *func, const char *file, const char *line)
   {
     if (count == 0) return;
 
-    if (kind == hipMemcpyDeviceToDevice) {
-      QudaMem copy(dst, src, count, kind, stream, true, func, file, line);
+    if (kind == qudaMemcpyDeviceToDevice) {
+      QudaMem copy(dst, src, count, qudaMemcpyKindToAPI(kind), stream, true, func, file, line);
     } else {
-      PROFILE(hipMemcpyAsync(dst, src, count, kind, device::get_cuda_stream(stream)),
+      PROFILE(hipMemcpyAsync(dst, src, count, qudaMemcpyKindToAPI(kind), device::get_cuda_stream(stream)),
               kind == hipMemcpyDeviceToHost ? QUDA_PROFILE_MEMCPY_D2H_ASYNC : QUDA_PROFILE_MEMCPY_H2D_ASYNC);
     }
   }
@@ -206,7 +221,7 @@ namespace quda {
   void qudaMemcpyToSymbolAsync_(const void *symbol, const void *src, size_t count, size_t offset,  qudaMemcpyKind kind, const qudaStream_t &stream,
                                 const char *func, const char *file, const char *line)
   {
-    hipError_t error = hipMemcpyToSymbolAsync(symbol,src,count,offset,kind,device::get_cuda_stream(stream));
+    hipError_t error = hipMemcpyToSymbolAsync(symbol,src,count,offset,qudaMemcpyKindToAPI(kind),device::get_cuda_stream(stream));
     if( error != hipSuccess ) {
       errorQuda("(CUDA) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
     }
@@ -217,7 +232,7 @@ namespace quda {
   void qudaMemcpy2D_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
                      qudaMemcpyKind kind, const char *func, const char *file, const char *line)
   {
-    PROFILE(hipError_t error = hipMemcpy2D(dst, dpitch, src, spitch, width, height, kind), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
+    PROFILE(hipError_t error = hipMemcpy2D(dst, dpitch, src, spitch, width, height, qudaMemcpyKindToAPI(kind)), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
     if (error != hipSuccess)
       errorQuda("hipMemcpy2D returned error %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
   }
@@ -226,7 +241,7 @@ namespace quda {
                           qudaMemcpyKind kind, const qudaStream_t &stream, const char *func, const char *file,
                           const char *line)
   {
-    PROFILE(hipError_t error = hipMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, device::get_cuda_stream(stream)), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
+    PROFILE(hipError_t error = hipMemcpy2DAsync(dst, dpitch, src, spitch, width, height, qudaMemcpyKindToAPI(kind), device::get_cuda_stream(stream)), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
     if (error != hipSuccess)
       errorQuda("hipMemcpy2DAsync returned error %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
   }

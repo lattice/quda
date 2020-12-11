@@ -321,9 +321,9 @@ namespace quda
         void *B_d = location == QUDA_CUDA_FIELD_LOCATION ? B_data : pool_device_malloc(sizeBarr);
         void *C_d = location == QUDA_CUDA_FIELD_LOCATION ? C_data : pool_device_malloc(sizeCarr);
         if (location == QUDA_CPU_FIELD_LOCATION) {
-          qudaMemcpy(A_d, A_data, sizeAarr, cudaMemcpyHostToDevice);
-          qudaMemcpy(B_d, B_data, sizeBarr, cudaMemcpyHostToDevice);
-          qudaMemcpy(C_d, C_data, sizeCarr, cudaMemcpyHostToDevice);
+          qudaMemcpy(A_d, A_data, sizeAarr, qudaMemcpyHostToDevice);
+          qudaMemcpy(B_d, B_data, sizeBarr, qudaMemcpyHostToDevice);
+          qudaMemcpy(C_d, C_data, sizeCarr, qudaMemcpyHostToDevice);
         }
 
         cublasOperation_t trans_a = CUBLAS_OP_N;
@@ -460,7 +460,7 @@ namespace quda
         }
 
         if (location == QUDA_CPU_FIELD_LOCATION) {
-          qudaMemcpy(C_data, C_d, sizeCarr, cudaMemcpyDeviceToHost);
+          qudaMemcpy(C_data, C_d, sizeCarr, qudaMemcpyDeviceToHost);
           pool_device_free(A_d);
           pool_device_free(B_d);
           pool_device_free(C_d);
