@@ -38,18 +38,13 @@ namespace quda {
     using warp_reduce_t = cub::WarpReduce<T, width>;
 #endif
 
-    __device__ inline auto& shared_state()
-    {
-      typename warp_reduce_t::TempStorage dummy;
-      return dummy;
-    }
-
     __device__ __host__ inline WarpReduce() {}
 
     __device__ __host__ inline T Sum(const T &value)
     {
 #ifdef __CUDA_ARCH__
-      warp_reduce_t warp_reduce(shared_state());
+      typename warp_reduce_t::TempStorage dummy;
+      warp_reduce_t warp_reduce(dummy);
       return warp_reduce.Sum(value);
 #else
       return value;

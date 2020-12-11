@@ -89,7 +89,7 @@ namespace quda {
     // on the device we rely on thread parallelism, where as on the host we assign a vector of block_size to each thread
     static constexpr int n_sites_per_thread = device::is_device() ? 1 : block_size;
 
-    // on the device we expect number of active threads equal to block_size, and on the host just a signle thread 
+    // on the device we expect number of active threads equal to block_size, and on the host just a single thread
     static constexpr int n_threads_per_block = device::is_device() ? block_size : 1;
 
     static_assert(n_sites_per_thread * n_threads_per_block == block_size,

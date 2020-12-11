@@ -162,10 +162,13 @@ namespace quda {
       bool ret;
 
       param.block.x += blockStep();
-      int nthreads = param.block.x*param.block.y*param.block.z;
-      if (param.block.x > max_threads || sharedBytesPerThread() * nthreads > max_shared
-          || sharedBytesPerBlock(param) > max_shared) {
+      int nthreads = param.block.x * param.block.y * param.block.z;
+      param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(param));
+
+      if (param.block.x > max_threads || param.shared_bytes > max_shared) {
         resetBlockDim(param);
+        int nthreads = param.block.x * param.block.y * param.block.z;
+        param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(param));
 	ret = false;
       } else {
         ret = true;
@@ -311,8 +314,7 @@ namespace quda {
 	param.grid = dim3((minThreads()+param.block.x-1)/param.block.x, 1, 1);
       }
       int nthreads = param.block.x*param.block.y*param.block.z;
-      param.shared_bytes = sharedBytesPerThread()*nthreads > sharedBytesPerBlock(param) ?
-	sharedBytesPerThread()*nthreads : sharedBytesPerBlock(param);
+      param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(param));
     }
 
     /** sets default values for when tuning is disabled */
