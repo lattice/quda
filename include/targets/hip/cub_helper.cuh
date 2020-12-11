@@ -11,7 +11,8 @@
 
 using namespace quda;
 
-#include <hipcub/block/block_reduce.cuh>
+#include <hipcub/hipcub.hpp>
+#include <hipcub/block/block_reduce.hpp>
 namespace QudaCub = hipcub;
-#include <cub_helper_shared.h>
+#include <cub_helper_shared.cuh>
 

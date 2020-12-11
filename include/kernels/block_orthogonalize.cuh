@@ -3,9 +3,10 @@
 
 // this removes ghost accessor reducing the parameter space needed
 #define DISABLE_GHOST true // do not rename this (it is both a template parameter and a macro)
-
+#include <register_traits.h>
 #include <color_spinor_field_order.h>
 #include <block_reduction_kernel.h>
+#include <cub_helper.cuh>
 
 // enabling CTA swizzling improves spatial locality of MG blocks reducing cache line wastage
 //#define SWIZZLE
@@ -214,7 +215,7 @@ namespace quda {
             }
 
             nrm = norm_reducer.AllSum(nrm);
-            auto nrm_inv = nrm > 0.0 ? rsqrt(nrm) : 0.0;
+            auto nrm_inv = nrm > 0.0 ? Rsqrt(nrm) : 0.0;
 
 #pragma unroll
             for (int tx = 0; tx < n_sites_per_thread; tx++) {

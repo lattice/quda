@@ -84,18 +84,6 @@ namespace quda
                         const char *func, const char *file, const char *line);
 
 
-  /** 
-     @brief Wrapper around cudaMemcpyToSymbolAsync or driver API equivalent
-     @param[out] symbol   Destination symbol 
-     @param[in] src      Source pointer
-     @param[in] count    Size of transfer
-     @param[in] offset   Offset from start of symbol
-     @param[in] kind     Type of memory copy
-     @param[in] stream   Stream to issue copy  
-  */
-  void qudaMemcpyToSymbolAsync_(const void *symbol, const void *src, size_t count, size_t offset,  qudaMemcpyKind kind, const qudaStream_t &stream, 
-			        const char *func, const char *file, const char *line);
-
   /**
      @brief Wrapper around cudaMemcpyAsync or driver API equivalent for peer-to-peer copies
      @param[out] dst Destination pointer

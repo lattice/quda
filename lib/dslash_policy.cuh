@@ -286,12 +286,7 @@ namespace quda
      updating the local buffers on a subsequent computation before we
      have finished sending.
   */
-#ifndef QUDA_ENABLE_P2P
-#ifdef QUDA_TARGET_HIP
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-parameter"
-#endif
-#endif
+#if defined(QUDA_ENNABLE_P2P)
   template <typename T>
   inline void completeDslash(const ColorSpinorField &in, const T&dslashParam) {
     // this ensures that the p2p sending is completed before any
@@ -299,19 +294,17 @@ namespace quda
     for (int dim=3; dim>=0; dim--) {
       if (!dslashParam.commDim[dim]) continue;
       for (int dir=0; dir<2; dir++) {
-#if defined(QUDA_ENABLE_P2P)
 	if (comm_peer2peer_enabled(dir,dim)) {
 	  PROFILE(qudaStreamWaitEvent(device::get_default_stream(), in.getIPCCopyEvent(dir,dim), 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
 	}
-#endif
-
       }
     }
   }
-#ifndef QUDA_ENABLE_P2P
-#ifdef QUDA_TARGET_HIP
-#pragma clang diagnostic pop
-#endif
+#else
+  // This version is if there is no IPC. Then the function is effecitvely empty
+  // we removed named arguments to stop the compiler complaining about unused arguments
+  template <typename T>
+  inline void completeDslash(const ColorSpinorField &, const T&) { }
 #endif
 
   /**

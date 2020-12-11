@@ -33,24 +33,36 @@ namespace quda {
 
     /**
        @brief Helper function that returns the thread block
-       dimensions.  On CUDA this returns the intrinsic blockDim.
-       @param[in] arg Kernel argument struct
+       dimensions.  On CUDA this returns the intrinsic blockDim,
+       whereas on the host this returns (1, 1, 1).
     */
     __device__ __host__ inline dim3 block_dim()
     {
 #ifdef __HIP_DEVICE_COMPILE__
       return dim3(blockDim.x, blockDim.y, blockDim.z);
 #else
+      return dim3(1, 1, 1);
+#endif
+    }
+
+    /**
+       @brief Helper function that returns the thread indices within a
+       thread block.  On CUDA this returns the intrinsic
+       blockIdx, whereas on the host this just returns (0, 0, 0).
+    */
+    __device__ __host__ inline dim3 block_idx()
+    {
+#ifdef __HIP_DEVICE_COMPILE__
+      return dim3(blockIdx.x, blockIdx.y, blockIdx.z);
+#else
       return dim3(0, 0, 0);
 #endif
     }
 
     /**
-       @brief Helper function that returns the thread block
-       dimensions.  On CUDA this returns the intrinsic blockDim,
-       whereas on the host this grabs the dimensions from the kernel
-       argument struct
-       @param[in] arg Kernel argument struct
+       @brief Helper function that returns the thread indices within a
+       thread block.  On CUDA this returns the intrinsic
+       threadIdx, whereas on the host this just returns (0, 0, 0).
     */
     __device__ __host__ inline dim3 thread_idx()
     {
@@ -79,7 +91,7 @@ namespace quda {
     template <int block_size_y = 1, int block_size_z = 1>
       constexpr unsigned int max_block_size()
       {
-        return std::max(warp_size(), 256 / (block_size_y * block_size_z));
+        return std::max(warp_size(), 1024 / (block_size_y * block_size_z));
       }
 
     /**
@@ -107,7 +119,7 @@ namespace quda {
       // This is the specialized variant used when we have fast-compilation mode enabled
       return warp_size();
 #else
-      return 64;
+      return 128;
 #endif
     }
 

@@ -1,8 +1,10 @@
+#include <quda_define.h>
 #include <gauge_field_order.h>
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
 #include <float_vector.h>
 #include <shared_memory_cache_helper.cuh>
+#include <target_device.h>
 
 namespace quda {
 
@@ -318,21 +320,36 @@ namespace quda {
   __device__ __host__ inline void coarseDslash(Arg &arg, int x_cb, int parity, int s, int color_block, int color_offset)
   {
     constexpr int src_idx = 0;
-    vector_type<complex <typename Arg::real>, Mc> out;
+    using Float = typename Arg::real;
+    vector_type<complex <Float>, Mc> out;
     if (Arg::dslash) applyDslash<Mc,dir,dim>(out.data, arg, x_cb, src_idx, parity, s, color_block, color_offset);
     if (doBulk<Arg::type>() && Arg::clover && dir==0 && dim==0) applyClover<Mc>(out.data, arg, x_cb, src_idx, parity, s, color_block, color_offset);
 
     if (dir==0 && dim==0) {
       const int my_spinor_parity = (arg.nParity == 2) ? parity : 0;
 
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
+
 #pragma unroll
       for (int color_local=0; color_local<Mc; color_local++) {
 	// reduce down to the first group of column-split threads
 	constexpr int warp_size = device::warp_size(); // FIXME - this is buggy when x-dim * color_stride < 32
 #pragma unroll
-	for (int offset = warp_size/2; offset >= warp_size/Arg::color_stride; offset /= 2)
-	  out[color_local] += __shfl_down_sync(device::warp_converged_mask(), out[color_local], offset);
-      }
+	  for (int offset = warp_size/2; offset >= warp_size/Arg::color_stride; offset /= 2) {
+            // THIS LOOP DOES NOT GET EXECUTED on CPUs since there the Arg::color_stride = 1 
+#if defined(QUDA_TARGET_CUDA) 
+            out[color_local] += __shfl_down_sync(device::warp_converged_mask(), out[color_local], offset);
+#elif defined(QUDA_TARGET_HIP)
+            Float sh_r = Float(out[color_local].x);
+            Float sh_i = Float(out[color_local].y);
+
+            out[color_local] += complex<Float>{ __shfl_down(sh_r,offset) , __shfl_down(sh_i,offset) };
+#else
+#error "This file needs some kind of shuffle"
+#endif
+	  } // warp reduction loop
+      } // color local loop
+#endif // __CUDA_ARCH__ || __HIP_DEVICE_COMPILE__
 
 #pragma unroll
       for (int color_local=0; color_local<Mc; color_local++) {

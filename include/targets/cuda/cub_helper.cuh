@@ -19,5 +19,5 @@ using namespace quda;
 namespace QudaCub = cub;
 
 // Stuff shared between CUDA and HIP
-#include <cub_helper_shared.h>
+#include <cub_helper_shared.cuh>
 
