@@ -72,7 +72,7 @@ namespace quda
         arg.inverse(x_cb, parity, ch) = Ainv;
       }
 
-      reduce_t result;
+      reduce_t result = zero<reduce_t>();
       parity ? result.y = trLogA : result.x = trLogA;
       return r(result, value);
     }

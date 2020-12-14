@@ -21,6 +21,11 @@ namespace quda {
                      clover.Twisted() ? "true" : "false");
 
       apply(device::get_default_stream());
+
+      if (compute_tr_log && (std::isnan(clover.TrLog()[0]) || std::isnan(clover.TrLog()[1]))) {
+	printfQuda("clover.TrLog()[0]=%e, clover.TrLog()[1]=%e\n", clover.TrLog()[0], clover.TrLog()[1]);
+	errorQuda("Clover trlog has returned -nan, likey due to the clover matrix being singular.");
+      }
     }
 
     void apply(const qudaStream_t &stream)
@@ -32,10 +37,6 @@ namespace quda {
       } else {
         CloverInvertArg<store_t, false> arg(clover, compute_tr_log);
         launch<InvertClover>(clover.TrLog(), tp, stream, arg);
-      }
-      if(compute_tr_log && (std::isnan(clover.TrLog()[0]) || std::isnan(clover.TrLog()[1]))) {
-	printfQuda("clover.TrLog()[0]=%e, clover.TrLog()[1]=%e\n", clover.TrLog()[0], clover.TrLog()[1]);
-	errorQuda("Clover trlog has returned -nan, likey due to the clover matrix being singular.");
       }
     }
     
