@@ -36,37 +36,16 @@ namespace quda {
     float time;
     long long n_calls;
 
-    inline TuneParam() :
+    TuneParam() :
       block(device::warp_size(), 1, 1), grid(1, 1, 1), shared_bytes(0), set_max_shared_bytes(false), aux(), time(FLT_MAX), n_calls(0)
     {
       aux = make_int4(1,1,1,1);
     }
 
-    inline TuneParam(const TuneParam &param) :
-      block(param.block),
-      grid(param.grid),
-      shared_bytes(param.shared_bytes),
-      set_max_shared_bytes(param.set_max_shared_bytes),
-      aux(param.aux),
-      comment(param.comment),
-      time(param.time),
-      n_calls(param.n_calls)
-    {
-    }
-
-    inline TuneParam& operator=(const TuneParam &param) {
-      if (&param != this) {
-	block = param.block;
-	grid = param.grid;
-	shared_bytes = param.shared_bytes;
-        set_max_shared_bytes = param.set_max_shared_bytes;
-        aux = param.aux;
-        comment = param.comment;
-        time = param.time;
-        n_calls = param.n_calls;
-      }
-      return *this;
-    }
+    TuneParam(const TuneParam &) = default;
+    TuneParam(TuneParam &&) = default;
+    TuneParam& operator=(const TuneParam &) = default;
+    TuneParam& operator=(TuneParam &&) = default;
 
 #ifndef __CUDACC_RTC__
     friend std::ostream& operator<<(std::ostream& output, const TuneParam& param) {

@@ -22,13 +22,9 @@ extern char *gitversion;
 namespace quda
 {
   static TuneKey last_key;
-}
 
-// intentionally leave this outside of the namespace for now
-quda::TuneKey getLastTuneKey() { return quda::last_key; }
+  TuneKey getLastTuneKey() { return quda::last_key; }
 
-namespace quda
-{
   typedef std::map<TuneKey, TuneParam> map;
 
   struct TraceKey {

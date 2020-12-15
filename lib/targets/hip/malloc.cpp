@@ -43,20 +43,11 @@ namespace quda
 #endif
     }
 
-    MemAlloc &operator=(const MemAlloc &a)
-    {
-      if (&a != this) {
-        func = a.func;
-        file = a.file;
-        line = a.line;
-        size = a.size;
-        base_size = a.base_size;
-#ifdef QUDA_BACKWARDSCPP
-        st = a.st;
-#endif
-      }
-      return *this;
-    }
+    MemAlloc(const MemAlloc &) = default;
+    MemAlloc(MemAlloc &&) = default;
+    virtual ~MemAlloc() = default;
+    MemAlloc &operator=(const MemAlloc &) = default;
+    MemAlloc &operator=(MemAlloc &&) = default;
   };
 
   static std::map<void *, MemAlloc> alloc[N_ALLOC_TYPE];

@@ -149,8 +149,8 @@ void errorQuda_(const char *func, const char *file, int line, ...)
   fprintf(getOutputFile(), " (rank %d, host %s, %s:%d in %s())\n",
           comm_rank(), comm_hostname(), file, line, func);
   fprintf(getOutputFile(), "%s       last kernel called was (name=%s,volume=%s,aux=%s)\n",
-	  getOutputPrefix(), getLastTuneKey().name,
-	  getLastTuneKey().volume, getLastTuneKey().aux);
+	  getOutputPrefix(), quda::getLastTuneKey().name,
+	  quda::getLastTuneKey().volume, quda::getLastTuneKey().aux);
   fflush(getOutputFile());
   quda::saveTuneCache(true);
   comm_abort(1);

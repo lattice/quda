@@ -72,9 +72,10 @@ namespace quda {
 
         __device__ __host__ inline Matrix() { setZero(this); }
 
-        Matrix(const Matrix<T,N> &a) = default;
-        Matrix(Matrix<T,N> &&a) = default;
-        Matrix& operator=(const Matrix<T,N> &a) = default;
+        Matrix(const Matrix<T,N> &) = default;
+        Matrix(Matrix<T,N> &&) = default;
+        Matrix& operator=(const Matrix<T,N> &) = default;
+        Matrix& operator=(Matrix<T,N> &&) = default;
 
         template <class U> __device__ __host__ inline Matrix(const Matrix<U, N> &a)
         {
@@ -302,9 +303,10 @@ namespace quda {
         for (int i = 0; i < N * N; i++) data[i] = (T)0.0;
       }
 
-      HMatrix(const HMatrix<T,N> &a) = default;
-      HMatrix(HMatrix<T,N> &&a) = default;
-      HMatrix& operator=(const HMatrix<T,N> &a) = default;
+      HMatrix(const HMatrix<T,N> &) = default;
+      HMatrix(HMatrix<T,N> &&) = default;
+      HMatrix& operator=(const HMatrix<T,N> &) = default;
+      HMatrix& operator=(HMatrix<T,N> &&) = default;
 
       __device__ __host__ inline HMatrix(const T data_[]) {
 #pragma unroll
