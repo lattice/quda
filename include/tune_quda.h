@@ -16,9 +16,6 @@
 #include <iomanip>
 #include <typeinfo>
 #include <map>
-#else
-#define CUresult bool
-#define CUDA_SUCCESS true
 #endif
 
 namespace quda {
@@ -218,8 +215,10 @@ namespace quda {
       return n;
     }
 
-    /** This is the return result from kernels launched using jitify */
-    CUresult jitify_error;
+    /** This is the return result from kernels launched using jitify,
+        and can also be used to allow user invalidation of a tuning
+        configuration */
+    qudaError_t launch_error;
 
     /**
        @brief Whether the present instance has already been tuned or not
@@ -241,7 +240,7 @@ namespace quda {
     }
 
   public:
-    Tunable() : jitify_error(CUDA_SUCCESS) { aux[0] = '\0'; }
+    Tunable() : launch_error(QUDA_SUCCESS) { aux[0] = '\0'; }
     virtual ~Tunable() { }
     virtual TuneKey tuneKey() const = 0;
     virtual void apply(const qudaStream_t &stream) = 0;
@@ -340,8 +339,8 @@ namespace quda {
                   tp.grid.z, device::max_grid_size(2));
     }
 
-    CUresult jitifyError() const { return jitify_error; }
-    CUresult& jitifyError() { return jitify_error; }
+    qudaError_t launchError() const { return launch_error; }
+    qudaError_t& launchError() { return launch_error; }
   };
 
   /**
@@ -508,11 +507,5 @@ namespace quda {
   void setPolicyTuning(bool);
 
 } // namespace quda
-
-// undo jit-safe modifications
-#ifdef __CUDACC_RTC__
-#undef CUresult
-#undef CUDA_SUCCESS
-#endif
 
 #define postTrace() quda::postTrace_(__func__, quda::file_name(__FILE__), __LINE__)

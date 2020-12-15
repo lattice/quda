@@ -74,8 +74,7 @@ namespace quda {
                        const std::vector<constant_param_t> &param = dummy_param)
     {
 #ifdef JITIFY
-      jitify_error = launch_jitify<Transformer, Reducer>("quda::Reduction2D", tp, stream, arg, param);
-      arg.launch_error = jitify_error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
+      arg.launch_error = launch_jitify<Transformer, Reducer>("quda::Reduction2D", tp, stream, arg, param);
 #else
       for (unsigned int i = 0; i < param.size(); i++)
         qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, cudaMemcpyHostToDevice, stream);
@@ -232,7 +231,6 @@ namespace quda {
     // for now we do not support anything other than block_size_y = 1
     static_assert(block_size_y == 1, "only block_size_y = 1 supported");
     using Tunable::apply;
-    using Tunable::jitify_error;
     using TunableReduction2D<block_size_y>::field;
     using TunableReduction2D<block_size_y>::location;
 
@@ -287,8 +285,7 @@ namespace quda {
                        const std::vector<constant_param_t> &param = dummy_param)
     {
 #ifdef JITIFY
-      jitify_error = launch_jitify<Transformer, Reducer>("quda::MultiReduction", tp, stream, arg, param);
-      arg.launch_error = jitify_error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
+      arg.launch_error = launch_jitify<Transformer, Reducer>("quda::MultiReduction", tp, stream, arg, param);
 #else
       for (unsigned int i = 0; i < param.size(); i++)
         qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, cudaMemcpyHostToDevice, stream);

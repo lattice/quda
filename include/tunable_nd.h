@@ -33,7 +33,7 @@ namespace quda {
     void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
     {
 #ifdef JITIFY
-      jitify_error = launch_jitify<Functor>("quda::Kernel1D", tp, stream, arg, param);
+      launch_error = launch_jitify<Functor>("quda::Kernel1D", tp, stream, arg, param);
 #else
       for (unsigned int i = 0; i < param.size(); i++)
         qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, cudaMemcpyHostToDevice, stream);
@@ -45,7 +45,7 @@ namespace quda {
     void launch_cuda(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
     {
 #ifdef JITIFY
-      jitify_error = launch_jitify<Functor>("quda::raw_kernel", tp, stream, arg, param);
+      launch_error = launch_jitify<Functor>("quda::raw_kernel", tp, stream, arg, param);
 #else
       for (unsigned int i = 0; i < param.size(); i++)
         qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, cudaMemcpyHostToDevice, stream);
@@ -139,7 +139,7 @@ namespace quda {
   class TunableKernel2D_base : public TunableKernel1D_base<grid_stride>
   {
   protected:
-    using Tunable::jitify_error;
+    using Tunable::launch_error;
     mutable unsigned int vector_length_y;
     mutable unsigned int step_y;
     bool tune_block_x;
@@ -148,7 +148,7 @@ namespace quda {
     void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
     {
 #ifdef JITIFY
-      jitify_error = launch_jitify<Functor>("quda::Kernel2D", tp, stream, arg, param);
+      launch_error = launch_jitify<Functor>("quda::Kernel2D", tp, stream, arg, param);
 #else
       for (unsigned int i = 0; i < param.size(); i++)
         qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, cudaMemcpyHostToDevice, stream);
@@ -293,7 +293,7 @@ namespace quda {
   class TunableKernel3D_base : public TunableKernel2D_base<grid_stride>
   {
   protected:
-    using Tunable::jitify_error;
+    using Tunable::launch_error;
     using TunableKernel2D_base<grid_stride>::vector_length_y;
     mutable unsigned vector_length_z;
     mutable unsigned step_z;
@@ -303,7 +303,7 @@ namespace quda {
     void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
     {
 #ifdef JITIFY
-      jitify_error = launch_jitify<Functor>("quda::Kernel3D", tp, stream, arg, param);
+      launch_error = launch_jitify<Functor>("quda::Kernel3D", tp, stream, arg, param);
 #else
       for (unsigned int i = 0; i < param.size(); i++)
         qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, cudaMemcpyHostToDevice, stream);

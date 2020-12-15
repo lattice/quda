@@ -37,7 +37,7 @@ namespace quda {
    */
   template <QudaFieldLocation location, typename Arg> struct Launch {
     static constexpr bool from_coarse = Arg::from_coarse;
-    Launch(Arg &arg, CUresult &, TuneParam &, ComputeType type, bool use_mma, const qudaStream_t &)
+    Launch(Arg &arg, qudaError_t &, TuneParam &, ComputeType type, bool use_mma, const qudaStream_t &)
     {
       if (use_mma) { errorQuda("MMA intructions are not supported on the host."); }
 
@@ -160,12 +160,12 @@ namespace quda {
     using Float = typename Arg::Float;
     static constexpr bool from_coarse = Arg::from_coarse;
 
-    Launch(Arg &arg, CUresult &error, TuneParam &tp, ComputeType type, bool use_mma, const qudaStream_t &stream)
+    Launch(Arg &arg, qudaError_t &qerror, TuneParam &tp, ComputeType type, bool use_mma, const qudaStream_t &stream)
     {
 #ifdef JITIFY
       using namespace jitify::reflection;
 #endif
-      error = CUDA_SUCCESS;
+      CUresult error = CUDA_SUCCESS;
       if (type == COMPUTE_UV) {
         if (use_mma && arg.dir != QUDA_IN_PLACE) {
 
@@ -467,6 +467,9 @@ namespace quda {
       } else {
         errorQuda("Undefined compute type %d", type);
       }
+
+      // convert Jitify return error into QUDA error
+      qerror = error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
     }
   };
 
@@ -674,8 +677,7 @@ namespace quda {
       if (type == COMPUTE_VUV || type == COMPUTE_CONVERT || type == COMPUTE_RESCALE) arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
 
       if (type == COMPUTE_VUV) tp.shared_bytes -= sharedBytesPerBlock(tp); // shared memory is static so don't include it in launch
-      Launch<location, Arg>(arg, jitify_error, tp,
-                                                                                              type, use_mma, stream);
+      Launch<location, Arg>(arg, launch_error, tp, type, use_mma, stream);
       if (type == COMPUTE_VUV) tp.shared_bytes += sharedBytesPerBlock(tp); // restore shared memory
     };
 
