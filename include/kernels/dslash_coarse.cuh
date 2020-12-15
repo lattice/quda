@@ -105,8 +105,8 @@ namespace quda {
      @param parity The site parity
      @param x_cb The checkerboarded site index
    */
-  template <int Mc, int thread_dir, int thread_dim, typename Arg>
-  __device__ __host__ inline void applyDslash(complex<typename Arg::real> out[], Arg &arg, int x_cb, int src_idx, int parity, int s_row, int color_block, int color_offset)
+  template <int Mc, int thread_dir, int thread_dim, typename V, typename Arg>
+  __device__ __host__ inline void applyDslash(V &out, Arg &arg, int x_cb, int src_idx, int parity, int s_row, int color_block, int color_offset)
   {
     const int their_spinor_parity = (arg.nParity == 2) ? 1-parity : 0;
 
@@ -114,8 +114,7 @@ namespace quda {
     getCoordsCB(coord, x_cb, arg.dim, arg.X0h, parity);
     coord[4] = src_idx;
 
-    SharedMemoryCache<complex<typename Arg::real>> cache;
-    auto shared_sum = cache.data();
+    SharedMemoryCache<V> cache(device::block_dim());
 
     if (!thread_dir || device::is_host()) {
 
@@ -171,12 +170,8 @@ namespace quda {
 
       } // nDim
 
-      if (device::is_device() && thread_dim > 0) { // only need to write to shared memory if not master thread
-#pragma unroll
-	for (int color_local=0; color_local < Mc; color_local++) {
-	  shared_sum[((color_local * device::block_dim().z + device::thread_idx().z) * device::block_dim().y + device::thread_idx().y) * device::block_dim().x + device::thread_idx().x] = out[color_local];
-	}
-      }
+      // only need to write to shared memory if not master thread
+      if (device::is_device() && thread_dim > 0) cache.save(out);
     }
 
     if (thread_dir || device::is_host()) {
@@ -230,13 +225,7 @@ namespace quda {
 
       } //nDim
 
-      if (device::is_device()) {
-#pragma unroll
-        for (int color_local=0; color_local < Mc; color_local++) {
-          shared_sum[ ((color_local * device::block_dim().z + device::thread_idx().z ) * device::block_dim().y + device::thread_idx().y) * device::block_dim().x + device::thread_idx().x] = out[color_local];
-        }
-      }
-
+      if (device::is_device()) cache.save(out);
     } // forwards / backwards thread split
 
     if (device::is_device()) cache.sync(); // device path has to recombine the foward and backward results
@@ -249,29 +238,19 @@ namespace quda {
       for (int d=1; d < Arg::dim_stride; d++) { // get remaining forward fathers (if any)
 	// 4-way 1,2,3  (stride = 4)
 	// 2-way 1      (stride = 2)
-#pragma unroll
-	for (int color_local=0; color_local < Mc; color_local++) {
-	  out[color_local] +=
-	    shared_sum[(((color_local * device::block_dim().z/(2*Arg::dim_stride) + device::thread_idx().z/(2*Arg::dim_stride)) * 2 * Arg::dim_stride + d * 2 + 0) * device::block_dim().y+device::thread_idx().y) * device::block_dim().x + device::thread_idx().x];
-	}
+        out += cache.load_z((device::thread_idx().z / (2 * Arg::dim_stride)) * (2 * Arg::dim_stride) + d * 2 + 0);
       }
 
 #pragma unroll
       for (int d=0; d < Arg::dim_stride; d++) { // get all backward gathers
-#pragma unroll
-	for (int color_local=0; color_local < Mc; color_local++) {
-	  out[color_local] +=
-	    shared_sum[(((color_local * device::block_dim().z/(2*Arg::dim_stride) + device::thread_idx().z/(2*Arg::dim_stride)) * 2 * Arg::dim_stride + d * 2 + 1) * device::block_dim().y + device::thread_idx().y) * device::block_dim().x + device::thread_idx().x];
-	}
+        out += cache.load_z((device::thread_idx().z / (2 * Arg::dim_stride)) * (2 * Arg::dim_stride) + d * 2 + 1);
       }
 
-      // apply kappa
-#pragma unroll
-      for (int color_local=0; color_local<Mc; color_local++) out[color_local] *= -arg.kappa;
+      out *= -arg.kappa;
 
     } else if (device::is_host()) {
 
-      for (int color_local=0; color_local<Mc; color_local++) out[color_local] *= -arg.kappa;
+      out *= -arg.kappa;
 
     }
   }
@@ -286,8 +265,8 @@ namespace quda {
      @param parity The site parity
      @param x_cb The checkerboarded site index
    */
-  template <int Mc, typename Arg>
-  __device__ __host__ inline void applyClover(complex<typename Arg::real> out[], Arg &arg, int x_cb, int src_idx, int parity, int s, int color_block, int color_offset) {
+  template <int Mc, typename V, typename Arg>
+  __device__ __host__ inline void applyClover(V &out, Arg &arg, int x_cb, int src_idx, int parity, int s, int color_block, int color_offset) {
     const int spinor_parity = (arg.nParity == 2) ? parity : 0;
 
     // M is number of colors per thread
@@ -319,8 +298,8 @@ namespace quda {
   {
     constexpr int src_idx = 0;
     vector_type<complex <typename Arg::real>, Mc> out;
-    if (Arg::dslash) applyDslash<Mc,dir,dim>(out.data, arg, x_cb, src_idx, parity, s, color_block, color_offset);
-    if (doBulk<Arg::type>() && Arg::clover && dir==0 && dim==0) applyClover<Mc>(out.data, arg, x_cb, src_idx, parity, s, color_block, color_offset);
+    if (Arg::dslash) applyDslash<Mc,dir,dim>(out, arg, x_cb, src_idx, parity, s, color_block, color_offset);
+    if (doBulk<Arg::type>() && Arg::clover && dir==0 && dim==0) applyClover<Mc>(out, arg, x_cb, src_idx, parity, s, color_block, color_offset);
 
     if (dir==0 && dim==0) {
       const int my_spinor_parity = (arg.nParity == 2) ? parity : 0;
@@ -354,16 +333,16 @@ namespace quda {
 
     __device__ __host__ inline void operator()(int x_cb_color_offset, int parity, int sMd)
     {
+      using namespace device;
       int x_cb = x_cb_color_offset;
       int color_offset = 0;
 
-      if (device::is_device() && Arg::color_stride > 1) { // on the device we support warp fission of the inner product
-        constexpr int warp_size = device::warp_size();
-        const int lane_id = device::thread_idx().x % warp_size;
-        const int warp_id = device::thread_idx().x / warp_size;
-        const int vector_site_width = warp_size / Arg::color_stride; // number of sites per warp
+      if (is_device() && Arg::color_stride > 1) { // on the device we support warp fission of the inner product
+        const int lane_id = thread_idx().x % warp_size();
+        const int warp_id = thread_idx().x / warp_size();
+        const int vector_site_width = warp_size() / Arg::color_stride; // number of sites per warp
 
-        x_cb = device::block_idx().x * (device::block_dim().x / Arg::color_stride) + warp_id * (warp_size / Arg::color_stride) + lane_id % vector_site_width;
+        x_cb = block_idx().x * (block_dim().x / Arg::color_stride) + warp_id * (warp_size() / Arg::color_stride) + lane_id % vector_site_width;
         color_offset = lane_id / vector_site_width;
       }
 
