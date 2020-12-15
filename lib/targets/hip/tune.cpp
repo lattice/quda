@@ -203,8 +203,8 @@ namespace quda
       TuneKey key = entry->first;
       TuneParam param = entry->second;
 
-      char tmp[14] = {};
-      strncpy(tmp, key.aux, 13);
+      char tmp[TuneKey::aux_n] = {};
+      strncpy(tmp, key.aux, TuneKey::aux_n);
       bool is_policy_kernel = strncmp(tmp, "policy_kernel", 13) == 0 ? true : false;
       bool is_policy = (strncmp(tmp, "policy", 6) == 0 && !is_policy_kernel) ? true : false;
       if (param.n_calls > 0 && !is_policy) total_time += param.n_calls * param.time;
@@ -647,7 +647,6 @@ namespace quda
    */
   TuneParam &tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity)
   {
-
 #ifdef LAUNCH_TIMER
     launchTimer.TPSTART(QUDA_PROFILE_TOTAL);
     launchTimer.TPSTART(QUDA_PROFILE_INIT);
@@ -750,12 +749,12 @@ namespace quda
           cudaDeviceSynchronize();
           cudaGetLastError(); // clear error counter
           tunable.checkLaunchParam(param);
-          tunable.apply(); // do initial call in case we need to jit compile for these parameters or if policy tuning
           if (verbosity >= QUDA_DEBUG_VERBOSE) {
             printfQuda("About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d)\n",
                        param.block.x, param.block.y, param.block.z, param.grid.x, param.grid.y, param.grid.z,
                        param.shared_bytes, param.aux.x, param.aux.y, param.aux.z);
           }
+          tunable.apply(); // do initial call in case we need to jit compile for these parameters or if policy tuning
 
           cudaEventRecord(start, 0);
           for (int i = 0; i < tunable.tuningIter(); i++) {
@@ -817,7 +816,9 @@ namespace quda
         cudaEventDestroy(end);
 
         if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("PostTune %s\n", key.name);
+        tuning = true;
         tunable.postTune();
+        tuning = false;
         param = best_param;
         tunecache[key] = best_param;
       }
