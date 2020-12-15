@@ -270,7 +270,7 @@ double test(int data_type)
   }
 
   // Perform device GEMM Blas operation
-  blasGEMMQuda(arrayA, arrayB, arrayC, native_blas_lapack, &blas_param);
+  blasGEMMQuda(arrayA, arrayB, arrayC, native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE, &blas_param);
 
   double deviation = 0.0;
   if (verify_results) {

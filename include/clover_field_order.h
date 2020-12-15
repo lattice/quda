@@ -371,19 +371,22 @@ namespace quda {
     template <typename Float, int nColor, int nSpin, QudaCloverFieldOrder order>
       struct FieldOrder {
 
-      protected:
-	/** An internal reference to the actual field we are accessing */
-	CloverField &A;
-	const int volumeCB;
-	const Accessor<Float,nColor,nSpin,order> accessor;
-	bool inverse;
-	const QudaFieldLocation location;
+      /** Does this field type support ghost zones? */
+      static constexpr bool supports_ghost_zone = false;
 
-      public:
-	/** 
-	 * Constructor for the FieldOrder class
-	 * @param field The field that we are accessing
-	 */
+    protected:
+      /** An internal reference to the actual field we are accessing */
+      CloverField &A;
+      const int volumeCB;
+      const Accessor<Float, nColor, nSpin, order> accessor;
+      bool inverse;
+      const QudaFieldLocation location;
+
+    public:
+      /**
+       * Constructor for the FieldOrder class
+       * @param field The field that we are accessing
+       */
       FieldOrder(CloverField &A, bool inverse=false)
       : A(A), volumeCB(A.VolumeCB()), accessor(A,inverse), inverse(inverse), location(A.Location())
 	{ }
