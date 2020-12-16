@@ -218,10 +218,9 @@ static inline double4 make_double4(double x,double y,double z,double w){return d
 #include <cuda_runtime.h>
 #endif
 
-using qudaStream_t = cudaStream_t;
-
 #endif  // QUDA_BACKEND_OMPTARGET
 
+#include <string>
 #include <enum_quda.h>
 
 /**
@@ -442,6 +441,11 @@ namespace quda
      @return Return device pointer associated with symbol
   */
   void* qudaGetSymbolAddress_(const char *symbol, const char *func, const char *file, const char *line);
+
+  /**
+     @brief Get the last error string recorded
+  */
+  std::string qudaGetLastErrorString();
 
   /**
      @brief Print out the timer profile for CUDA API calls

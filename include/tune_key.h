@@ -1,5 +1,4 @@
-#ifndef _TUNE_KEY_H
-#define _TUNE_KEY_H
+#pragma once
 
 #include <cstring>
 
@@ -20,20 +19,11 @@ namespace quda {
       strcpy(name, n);
       strcpy(aux, a);
     } 
-    TuneKey(const TuneKey &key) {
-      strcpy(volume,key.volume);
-      strcpy(name,key.name);
-      strcpy(aux,key.aux);
-    }
 
-    TuneKey& operator=(const TuneKey &key) {
-      if (&key != this) {
-	strcpy(volume,key.volume);
-	strcpy(name,key.name);
-	strcpy(aux,key.aux);
-      }
-      return *this;
-    }
+    TuneKey(const TuneKey &) = default;
+    TuneKey(TuneKey &&) = default;
+    TuneKey& operator=(const TuneKey &) = default;
+    TuneKey& operator=(TuneKey &&) = default;
 
     bool operator<(const TuneKey &other) const {
       int vc = std::strcmp(volume, other.volume);
@@ -52,9 +42,7 @@ namespace quda {
   
   };
 
-}
+  /** Return the key of the last kernel that has been tuned / called.*/
+  TuneKey getLastTuneKey();
 
-/** Return the key of the last kernel that has been tuned / called.*/
-quda::TuneKey getLastTuneKey();
- 
-#endif
+}

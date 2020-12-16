@@ -17,7 +17,7 @@ namespace quda
   */
   template <QudaFieldLocation location, typename Arg>
   struct Launch {
-    Launch(Arg &arg, CUresult &, bool compute_max_only, TuneParam &, bool, const qudaStream_t &)
+    Launch(Arg &arg, qudaError_t &, bool compute_max_only, TuneParam &, bool, const qudaStream_t &)
     {
       if (compute_max_only)
         CalculateYhatCPU<true, Arg>(arg);
@@ -31,9 +31,9 @@ namespace quda
   */
   template <typename Arg>
   struct Launch<QUDA_CUDA_FIELD_LOCATION, Arg> {
-    Launch(Arg &arg, CUresult &error, bool compute_max_only, TuneParam &tp, bool use_mma, const qudaStream_t &stream)
+    Launch(Arg &arg, qudaError_t &qerror, bool compute_max_only, TuneParam &tp, bool use_mma, const qudaStream_t &stream)
     {
-      error = CUDA_SUCCESS;
+      CUresult error = CUDA_SUCCESS;
       if (compute_max_only) {
         if (!activeTuning()) {
           qudaMemsetAsync(arg.max_d, 0, sizeof(typename Arg::Float), stream);
@@ -70,6 +70,8 @@ namespace quda
           qudaStreamSynchronize(const_cast<qudaStream_t&>(stream));
         }
       }
+      // convert Jitify return error into QUDA error
+      qerror = error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
     }
   };
 
@@ -126,7 +128,7 @@ namespace quda
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Launch<location, Arg>(arg, jitify_error, compute_max_only, tp, use_mma, stream);
+      Launch<location, Arg>(arg, launch_error, compute_max_only, tp, use_mma, stream);
     }
 
     /**

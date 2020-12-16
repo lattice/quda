@@ -9,7 +9,7 @@ using namespace quda;
 TimeProfile &getProfileBLAS();
 void checkBLASParam(QudaBLASParam &param);
 
-void blasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, bool use_native, QudaBLASParam *blas_param)
+void blasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaBoolean use_native, QudaBLASParam *blas_param)
 {
   getProfileBLAS().TPSTART(QUDA_PROFILE_TOTAL);
   checkBLASParam(*blas_param);
@@ -45,7 +45,7 @@ void blasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, bool use_native, Qud
   // BatchGEMM function, and before function exit all pointers and values are
   // restored to the values they had on entry.
 
-  if (!use_native) {
+  if (use_native == QUDA_BOOLEAN_FALSE) {
     getProfileBLAS().TPSTART(QUDA_PROFILE_COMPUTE);
     blas_lapack::generic::stridedBatchGEMM(arrayA, arrayB, arrayC, *blas_param, QUDA_CPU_FIELD_LOCATION);
     getProfileBLAS().TPSTOP(QUDA_PROFILE_COMPUTE);

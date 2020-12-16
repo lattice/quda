@@ -258,7 +258,7 @@ namespace quda
     const auto inv = arg.c;
 
     // if using shared-memory caching then load spinor field for my site into cache
-    VectorCache<real, Vector> cache;
+    SharedMemoryCache<Vector> cache(device::block_dim());
     if (shared()) {
       cache.save(arg.in(s_ * arg.volume_4d_cb + x_cb, parity));
       cache.sync();
@@ -316,7 +316,7 @@ namespace quda
     Vector in = arg.in(s_ * arg.volume_4d_cb + x_cb, parity);
     Vector out;
 
-    VectorCache<real, HalfVector> cache;
+    SharedMemoryCache<HalfVector> cache(device::block_dim());
 
     { // first do R
       constexpr int proj_dir = Arg::dagger ? -1 : +1;

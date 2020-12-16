@@ -43,10 +43,11 @@ namespace quda
 #endif
     }
 
-    MemAlloc(const MemAlloc &a) = default;
-    MemAlloc(MemAlloc &&a) = default;
+    MemAlloc(const MemAlloc &) = default;
+    MemAlloc(MemAlloc &&) = default;
     virtual ~MemAlloc() = default;
-    MemAlloc &operator=(const MemAlloc &a) = default;
+    MemAlloc &operator=(const MemAlloc &) = default;
+    MemAlloc &operator=(MemAlloc &&) = default;
   };
 
   static std::map<void *, MemAlloc> alloc[N_ALLOC_TYPE];

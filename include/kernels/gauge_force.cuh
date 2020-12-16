@@ -4,6 +4,7 @@
 #include <quda_matrix.h>
 #include <index_helper.cuh>
 #include <kernel.h>
+#include <shared_memory_cache_helper.cuh>
 
 namespace quda {
 
@@ -86,14 +87,23 @@ namespace quda {
   constexpr int flipDir(int dir) { return (7-dir); }
   constexpr bool isForwards(int dir) { return (dir <= 3); }
 
-  // this ensures that array elements are held in cache
-  template <typename T> constexpr T cache(const T *ptr, int idx) {
-#ifdef __CUDA_ARCH__
-    return __ldg(ptr+idx);
-#else
-    return ptr[idx];
-#endif
-  }
+  template <typename T, int n>
+  struct thread_array {
+    SharedMemoryCache<vector_type<T, n>> device_array;
+    int offset;
+    vector_type<T, n> host_array;
+    vector_type<T, n> &array;
+
+    __device__ __host__ constexpr thread_array() :
+      offset((device::thread_idx().z * device::block_dim().y + device::thread_idx().y) * device::block_dim().x + device::thread_idx().x),
+      array(device::is_device() ? *(device_array.data() + offset) : host_array)
+    {
+      array = vector_type<T, n>(); // call default constructor
+    }
+
+    __device__ __host__ T& operator[](int i) { return array[i]; }
+    __device__ __host__ const T& operator[](int i) const { return array[i]; }
+  };
 
   template <typename Arg, int dir>
   __device__ __host__ inline void GaugeForceKernel(Arg &arg, int idx, int parity)
@@ -108,18 +118,10 @@ namespace quda {
     //linkA: current matrix
     //linkB: the loaded matrix in this round
     Link linkA, linkB, staple;
-
-#ifdef __CUDA_ARCH__
-    extern __shared__ int s[];
-    int tid = (threadIdx.z*blockDim.y + threadIdx.y)*blockDim.x + threadIdx.x;
-    s[tid] = 0;
-    signed char *dx = (signed char*)&s[tid];
-#else
-    int dx[4] = {0, 0, 0, 0};
-#endif
+    thread_array<int, 4> dx;
 
     for (int i=0; i<arg.p.num_paths; i++) {
-      real coeff = cache(arg.p.path_coeff, i);
+      real coeff = arg.p.path_coeff[i];
       if (coeff == 0) continue;
 
       const int* path = arg.p.input_path[dir] + i*arg.p.max_length;
@@ -128,7 +130,7 @@ namespace quda {
       int nbr_oddbit = (parity^1);
       dx[dir]++;
 
-      int path0 = cache(path,0);
+      int path0 = path[0];
       int lnkdir = isForwards(path0) ? path0 : flipDir(path0);
 
       if (isForwards(path0)) {
@@ -143,9 +145,9 @@ namespace quda {
         linkA = conj(linkB);
       }
 
-      for (int j=1; j<cache(arg.p.length,i); j++) {
+      for (int j=1; j<arg.p.length[i]; j++) {
 
-        int pathj = cache(path,j);
+        int pathj = path[j];
         int lnkdir = isForwards(pathj) ? pathj : flipDir(pathj);
 
         if (isForwards(pathj)) {
