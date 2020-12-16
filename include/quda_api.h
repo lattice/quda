@@ -64,6 +64,8 @@ T * to_device(const T& x) {
 #define __launch_bounds__(x)
 #define __syncthreads() _Pragma("omp barrier")
 
+#define CUDA_SUCCESS QUDA_SUCCESS
+
 using size_t = std::size_t;
 
 #define __forceinline__ inline __attribute__((always_inline))
