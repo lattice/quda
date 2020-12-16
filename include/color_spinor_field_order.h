@@ -580,6 +580,10 @@ namespace quda {
       {
         typedef float norm_type;
 
+      public:
+        /** Does this field type support ghost zones? */
+        static constexpr bool supports_ghost_zone = true;
+
       protected:
         complex<storeFloat> *v;
         const AccessorCB<storeFloat, nSpin, nColor, nVec, order> accessor;

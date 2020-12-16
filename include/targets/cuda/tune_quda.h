@@ -15,8 +15,6 @@
 #include <iomanip>
 #include <typeinfo>
 #include <map>
-#else
-#error "Neither QUDA_TARGET_CUDA nor QUDA_TARGET_HIP are defined"
 #endif
 
 namespace quda {
@@ -34,37 +32,16 @@ namespace quda {
     float time;
     long long n_calls;
 
-    inline TuneParam() :
+    TuneParam() :
       block(device::warp_size(), 1, 1), grid(1, 1, 1), shared_bytes(0), set_max_shared_bytes(false), aux(), time(FLT_MAX), n_calls(0)
     {
       aux = make_int4(1,1,1,1);
     }
 
-    inline TuneParam(const TuneParam &param) :
-      block(param.block),
-      grid(param.grid),
-      shared_bytes(param.shared_bytes),
-      set_max_shared_bytes(param.set_max_shared_bytes),
-      aux(param.aux),
-      comment(param.comment),
-      time(param.time),
-      n_calls(param.n_calls)
-    {
-    }
-
-    inline TuneParam& operator=(const TuneParam &param) {
-      if (&param != this) {
-	block = param.block;
-	grid = param.grid;
-	shared_bytes = param.shared_bytes;
-        set_max_shared_bytes = param.set_max_shared_bytes;
-        aux = param.aux;
-        comment = param.comment;
-        time = param.time;
-        n_calls = param.n_calls;
-      }
-      return *this;
-    }
+    TuneParam(const TuneParam &) = default;
+    TuneParam(TuneParam &&) = default;
+    TuneParam& operator=(const TuneParam &) = default;
+    TuneParam& operator=(TuneParam &&) = default;
 
 #ifndef __CUDACC_RTC__
     friend std::ostream& operator<<(std::ostream& output, const TuneParam& param) {
@@ -237,8 +214,10 @@ namespace quda {
       return n;
     }
 
-    /** This is the return result from kernels launched using jitify */
-    CUresult jitify_error;
+    /** This is the return result from kernels launched using jitify,
+        and can also be used to allow user invalidation of a tuning
+        configuration */
+    qudaError_t launch_error;
 
     /**
        @brief Whether the present instance has already been tuned or not
@@ -260,7 +239,7 @@ namespace quda {
     }
 
   public:
-    Tunable() : jitify_error(CUDA_SUCCESS) { aux[0] = '\0'; }
+    Tunable() : launch_error(QUDA_SUCCESS) { aux[0] = '\0'; }
     virtual ~Tunable() { }
     virtual TuneKey tuneKey() const = 0;
     virtual void apply(const qudaStream_t &stream) = 0;
@@ -359,8 +338,8 @@ namespace quda {
                   tp.grid.z, device::max_grid_size(2));
     }
 
-    CUresult jitifyError() const { return jitify_error; }
-    CUresult& jitifyError() { return jitify_error; }
+    qudaError_t launchError() const { return launch_error; }
+    qudaError_t& launchError() { return launch_error; }
   };
 
   /**
@@ -527,11 +506,5 @@ namespace quda {
   void setPolicyTuning(bool);
 
 } // namespace quda
-
-// undo jit-safe modifications
-#ifdef __CUDACC_RTC__
-#undef CUresult
-#undef CUDA_SUCCESS
-#endif
 
 #define postTrace() quda::postTrace_(__func__, quda::file_name(__FILE__), __LINE__)

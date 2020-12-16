@@ -486,7 +486,12 @@ typedef enum QudaBLASDataOrder_s {
   QUDA_BLAS_DATAORDER_INVALID = QUDA_INVALID_ENUM
 } QudaBLASDataOrder;
 
-typedef enum QudaDirection_s { QUDA_BACKWARDS = -1, QUDA_FORWARDS = +1, QUDA_BOTH_DIRS = 2 } QudaDirection;
+typedef enum QudaDirection_s {
+  QUDA_BACKWARDS = -1,
+  QUDA_IN_PLACE = 0,
+  QUDA_FORWARDS = +1,
+  QUDA_BOTH_DIRS = 2
+} QudaDirection;
 
 typedef enum QudaLinkDirection_s { QUDA_LINK_BACKWARDS, QUDA_LINK_FORWARDS, QUDA_LINK_BIDIRECTIONAL } QudaLinkDirection;
 

@@ -1289,6 +1289,7 @@ struct mgInputStruct {
 
   int mg_levels;
   bool verify_results;
+  QudaPrecision preconditioner_precision; // precision for near-nulls, coarse links
 
   // Setup
   int nvec[QUDA_MAX_MG_LEVEL];                   // ignored on first level, if non-zero on last level we deflate
@@ -1300,15 +1301,16 @@ struct mgInputStruct {
   int geo_block_size[QUDA_MAX_MG_LEVEL][4];      // ignored on first and last level (first is 2 2 2 2)
 
   // Solve
-  QudaInverterType coarse_solver[QUDA_MAX_MG_LEVEL]; // ignored on first level
-  double coarse_solver_tol[QUDA_MAX_MG_LEVEL];       // ignored on first level
-  int coarse_solver_maxiter[QUDA_MAX_MG_LEVEL];      // ignored on first level
-  QudaInverterType smoother_type[QUDA_MAX_MG_LEVEL]; // all but last level
-  int nu_pre[QUDA_MAX_MG_LEVEL];                     // all but last level
-  int nu_post[QUDA_MAX_MG_LEVEL];                    // all but last level
+  QudaSolveType coarse_solve_type[QUDA_MAX_MG_LEVEL]; // ignored on first and second level
+  QudaInverterType coarse_solver[QUDA_MAX_MG_LEVEL];  // ignored on first level
+  double coarse_solver_tol[QUDA_MAX_MG_LEVEL];        // ignored on first level
+  int coarse_solver_maxiter[QUDA_MAX_MG_LEVEL];       // ignored on first level
+  QudaInverterType smoother_type[QUDA_MAX_MG_LEVEL];  // all but last level
+  int nu_pre[QUDA_MAX_MG_LEVEL];                      // all but last level
+  int nu_post[QUDA_MAX_MG_LEVEL];                     // all but last level
 
   // Misc
-  bool mg_verbosity[QUDA_MAX_MG_LEVEL]; // all levels
+  QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL]; // all levels
 
   // Coarsest level deflation
   int deflate_n_ev;
@@ -1323,6 +1325,7 @@ struct mgInputStruct {
   mgInputStruct() :
     mg_levels(4),
     verify_results(true),
+    preconditioner_precision(QUDA_HALF_PRECISION),
     deflate_n_ev(66),
     deflate_n_kr(128),
     deflate_max_restarts(50),
@@ -1383,6 +1386,7 @@ struct mgInputStruct {
     nu_post[1] = 2;
 
     /* Level 2 */
+    coarse_solve_type[2] = QUDA_DIRECT_PC_SOLVE;
     coarse_solver[2] = QUDA_GCR_INVERTER;
     coarse_solver_tol[2] = 0.25;
     coarse_solver_maxiter[2] = 4;
@@ -1391,15 +1395,16 @@ struct mgInputStruct {
     nu_post[2] = 2;
 
     /* Level 3 */
+    coarse_solve_type[3] = QUDA_DIRECT_PC_SOLVE;
     coarse_solver[3] = QUDA_CA_GCR_INVERTER; // use CGNR for non-deflated... sometimes
     coarse_solver_tol[3] = 0.25;
     coarse_solver_maxiter[3] = 16; // use larger for non-deflated
 
     /* Misc */
-    mg_verbosity[0] = false;
-    mg_verbosity[1] = false;
-    mg_verbosity[2] = false;
-    mg_verbosity[3] = false;
+    mg_verbosity[0] = QUDA_SUMMARIZE;
+    mg_verbosity[1] = QUDA_SUMMARIZE;
+    mg_verbosity[2] = QUDA_SUMMARIZE;
+    mg_verbosity[3] = QUDA_SUMMARIZE;
 
     /* Deflation */
     nvec[3] = 0; // 64; // do not deflate
@@ -1431,6 +1436,45 @@ struct mgInputStruct {
     }
   }
 
+  QudaPrecision getQudaPrecision(const char *name)
+  {
+    if (strcmp(name, "single") == 0) {
+      return QUDA_SINGLE_PRECISION;
+    } else if (strcmp(name, "half") == 0) {
+      return QUDA_HALF_PRECISION;
+    } else {
+      return QUDA_INVALID_PRECISION;
+    }
+  }
+
+  QudaSolveType getQudaSolveType(const char *name)
+  {
+    if (strcmp(name, "direct") == 0) {
+      return QUDA_DIRECT_SOLVE;
+    } else if (strcmp(name, "direct-pc") == 0) {
+      return QUDA_DIRECT_PC_SOLVE;
+    } else {
+      return QUDA_INVALID_SOLVE;
+    }
+  }
+
+  QudaVerbosity getQudaVerbosity(const char *name)
+  {
+    if (strcmp(name, "silent") == 0) {
+      return QUDA_SILENT;
+    } else if (strcmp(name, "summarize") == 0 || strcmp(name, "false") == 0) {
+      // false == summary is for backwards compatibility
+      return QUDA_SUMMARIZE;
+    } else if (strcmp(name, "verbose") == 0 || strcmp(name, "true") == 0) {
+      // true == verbose is for backwards compatibility
+      return QUDA_VERBOSE;
+    } else if (strcmp(name, "debug") == 0) {
+      return QUDA_DEBUG_VERBOSE;
+    } else {
+      return QUDA_INVALID_VERBOSITY;
+    }
+  }
+
   // parse out a line
   bool update(std::vector<std::string> &input_line)
   {
@@ -1452,11 +1496,18 @@ struct mgInputStruct {
         verify_results = input_line[1][0] == 't' ? true : false;
       }
 
+    } else if (strcmp(input_line[0].c_str(), "preconditioner_precision") == 0) {
+      if (input_line.size() < 2) {
+        error_code = 1;
+      } else {
+        preconditioner_precision = getQudaPrecision(input_line[1].c_str());
+      }
+
     } else if (strcmp(input_line[0].c_str(), "mg_verbosity") == 0) {
       if (input_line.size() < 3) {
         error_code = 1;
       } else {
-        mg_verbosity[atoi(input_line[1].c_str())] = input_line[2][0] == 't' ? true : false;
+        mg_verbosity[atoi(input_line[1].c_str())] = getQudaVerbosity(input_line[2].c_str());
       }
 
     } else /* Begin Setup */
@@ -1510,7 +1561,14 @@ struct mgInputStruct {
       }
 
     } else /* Begin Solvers */
-      if (strcmp(input_line[0].c_str(), "coarse_solver") == 0) {
+      if (strcmp(input_line[0].c_str(), "coarse_solve_type") == 0) {
+      if (input_line.size() < 3) {
+        error_code = 1;
+      } else {
+        coarse_solve_type[atoi(input_line[1].c_str())] = getQudaSolveType(input_line[2].c_str());
+      }
+
+    } else if (strcmp(input_line[0].c_str(), "coarse_solver") == 0) {
       if (input_line.size() < 3) {
         error_code = 1;
       } else {
@@ -1624,6 +1682,7 @@ struct milcMultigridPack {
   QudaMultigridParam mg_param;
   QudaInvertParam mg_inv_param;
   QudaEigParam mg_eig_param[QUDA_MAX_MG_LEVEL];
+  QudaPrecision preconditioner_precision;
   double last_mass;
   void *mg_preconditioner;
 };
@@ -1742,7 +1801,7 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
   inv_param.cpu_prec = host_precision;
   inv_param.cuda_prec = device_precision;
   inv_param.cuda_prec_sloppy = device_precision_sloppy;
-  inv_param.cuda_prec_precondition = QUDA_HALF_PRECISION; // cuda_prec_precondition;
+  inv_param.cuda_prec_precondition = input_struct.preconditioner_precision;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
@@ -1789,7 +1848,7 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
       mg_param.use_eig_solver[i] = QUDA_BOOLEAN_FALSE;
     }
 
-    mg_param.verbosity[i] = input_struct.mg_verbosity[i] ? QUDA_VERBOSE : QUDA_SUMMARIZE; // mg_verbosity[i];
+    mg_param.verbosity[i] = input_struct.mg_verbosity[i];
     mg_param.setup_inv_type[i] = input_struct.setup_inv[i];
     mg_param.num_setup_iter[i] = 1; // num_setup_iter[i];
     mg_param.setup_tol[i] = input_struct.setup_tol[i];
@@ -1809,11 +1868,10 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
     // change this to refresh fields when mass or links change
     mg_param.setup_maxiter_refresh[i] = 0; // setup_maxiter_refresh[i];
     mg_param.n_vec[i] = (i == 0) ? 24 : input_struct.nvec[i];
-    mg_param.n_block_ortho[i] = 2; // n_block_ortho[i];                    // number of times to Gram-Schmidt
-    mg_param.precision_null[i]
-      = QUDA_HALF_PRECISION; // prec_null;                          // precision to store the null-space basis
+    mg_param.n_block_ortho[i] = 2; // n_block_ortho[i];                          // number of times to Gram-Schmidt
+    mg_param.precision_null[i] = input_struct.preconditioner_precision; // precision to store the null-space basis
     mg_param.smoother_halo_precision[i]
-      = QUDA_HALF_PRECISION; // smoother_halo_prec;        // precision of the halo exchange in the smoother
+      = input_struct.preconditioner_precision; // precision of the halo exchange in the smoother
     mg_param.nu_pre[i] = input_struct.nu_pre[i];
     mg_param.nu_post[i] = input_struct.nu_post[i];
     mg_param.mu_factor[i] = 1.; // mu_factor[i];
@@ -1846,7 +1904,12 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
 
     // set to QUDA_DIRECT_SOLVE for no even/odd preconditioning on the smoother
     // set to QUDA_DIRECT_PC_SOLVE for to enable even/odd preconditioning on the smoother
-    mg_param.smoother_solve_type[i] = (i == 0) ? QUDA_DIRECT_SOLVE : QUDA_DIRECT_PC_SOLVE; // smoother_solve_type[i];
+    // from test routines: // smoother_solve_type[i];
+    switch (i) {
+    case 0: mg_param.smoother_solve_type[0] = QUDA_DIRECT_SOLVE; break;
+    case 1: mg_param.smoother_solve_type[1] = QUDA_DIRECT_PC_SOLVE; break;
+    default: mg_param.smoother_solve_type[i] = input_struct.coarse_solve_type[i]; break;
+    }
 
     // set to QUDA_ADDITIVE_SCHWARZ for Additive Schwarz precondioned smoother (presently only impelemented for MR)
     mg_param.smoother_schwarz_type[i] = QUDA_INVALID_SCHWARZ; // schwarz_type[i];
@@ -1913,19 +1976,19 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
         errorQuda("Unexpected solve_type = %d\n", solve_type);
       }
 
+    } else if (i == 1) {
+
+      // Always this for now.
+      mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION;
     } else {
 
-      // Always this for now. Will be tunable.
-      mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION;
-
-      // solve
-      // if (coarse_solve_type[i] == QUDA_DIRECT_SOLVE) {
-      //  mg_param.coarse_grid_solution_type[i] = QUDA_MAT_SOLUTION;
-      //} else if (coarse_solve_type[i] == QUDA_DIRECT_PC_SOLVE) {
-      //  mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION;
-      //} else {
-      //  errorQuda("Unexpected solve_type = %d\n", coarse_solve_type[i]);
-      //}
+      if (input_struct.coarse_solve_type[i] == QUDA_DIRECT_SOLVE) {
+        mg_param.coarse_grid_solution_type[i] = QUDA_MAT_SOLUTION;
+      } else if (input_struct.coarse_solve_type[i] == QUDA_DIRECT_PC_SOLVE) {
+        mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION;
+      } else {
+        errorQuda("unexpected solve type = %d\n", input_struct.coarse_solve_type[i]);
+      }
     }
 
     mg_param.omega[i] = 0.85; // ignored // omega; // over/under relaxation factor
@@ -1974,7 +2037,10 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
 
   inv_param.verbosity = verbosity;
 
-  inv_param.verbosity_precondition = verbosity;
+  inv_param.verbosity = input_struct.mg_verbosity[0];
+
+  // We need to pass this back to the fat/long links for the outer-most level.
+  mg_pack->preconditioner_precision = input_struct.preconditioner_precision;
 }
 
 void *qudaMultigridCreate(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
@@ -2000,12 +2066,10 @@ void *qudaMultigridCreate(int external_precision, int quda_precision, double mas
   // Set some other smart defaults
   fat_param.type = QUDA_ASQTAD_FAT_LINKS;
   fat_param.cuda_prec_refinement_sloppy = fat_param.cuda_prec_sloppy;
-  fat_param.cuda_prec_precondition = QUDA_HALF_PRECISION; // override
   fat_param.reconstruct_refinement_sloppy = QUDA_RECONSTRUCT_NO;
 
   long_param.type = QUDA_ASQTAD_LONG_LINKS;
   long_param.cuda_prec_refinement_sloppy = long_param.cuda_prec_sloppy;
-  long_param.cuda_prec_precondition = QUDA_HALF_PRECISION; // override
   long_param.reconstruct_refinement_sloppy = long_param.reconstruct_sloppy;
 
   // Prepare a multigrid pack
@@ -2013,6 +2077,9 @@ void *qudaMultigridCreate(int external_precision, int quda_precision, double mas
 
   // Set parameters incl. loading from the parameter file here.
   milcSetMultigridParam(mg_pack, host_precision, device_precision, device_precision_sloppy, mass, mg_param_file);
+
+  fat_param.cuda_prec_precondition = mg_pack->preconditioner_precision;
+  long_param.cuda_prec_precondition = mg_pack->preconditioner_precision;
 
   // dirty hack to invalidate the cached gauge field without breaking interface compatability
   // compounding hack: *num_iters == 1 is always true here
@@ -2064,12 +2131,12 @@ void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaI
                  device_precision_sloppy, inv_args.tadpole, inv_args.naik_epsilon);
 
   fat_param.cuda_prec_refinement_sloppy = fat_param.cuda_prec_sloppy;
-  fat_param.cuda_prec_precondition = QUDA_HALF_PRECISION; // override
+  fat_param.cuda_prec_precondition = mg_pack->preconditioner_precision;
   fat_param.reconstruct_refinement_sloppy = QUDA_RECONSTRUCT_NO;
 
   long_param.type = QUDA_ASQTAD_LONG_LINKS;
   long_param.cuda_prec_refinement_sloppy = long_param.cuda_prec_sloppy;
-  long_param.cuda_prec_precondition = QUDA_HALF_PRECISION; // override
+  long_param.cuda_prec_precondition = mg_pack->preconditioner_precision;
   long_param.reconstruct_refinement_sloppy = QUDA_RECONSTRUCT_NO;
 
   QudaInvertParam invertParam = newQudaInvertParam();
@@ -2089,7 +2156,7 @@ void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaI
   invertParam.verbosity_precondition = QUDA_VERBOSE;
 
   invertParam.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;     // req'd
-  invertParam.cuda_prec_precondition = QUDA_HALF_PRECISION; // can set via input
+  invertParam.cuda_prec_precondition = mg_pack->preconditioner_precision;
   invertParam.gcrNkrylov = 15;
   invertParam.pipeline = 16; // pipeline, get from file
 

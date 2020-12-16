@@ -62,7 +62,7 @@ namespace quda {
       arg.grid_dim = tp.grid;
       arg.block_dim = tp.block;
 #ifdef JITIFY
-      jitify_error = launch_jitify_block<Transformer>("quda::BlockKernel2D", tp, stream, arg);
+      launch_error = launch_jitify_block<Transformer>("quda::BlockKernel2D", tp, stream, arg);
 #else
       launch_device<Block::block.size() - 1, Block, Transformer>(arg, tp, stream);
 #endif

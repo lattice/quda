@@ -898,6 +898,9 @@ namespace quda {
       accessor_type accessor;
       GhostAccessor<Float, nColor, order, native_ghost, storeFloat> ghostAccessor;
 
+      /** Does this field type support ghost zones? */
+      static constexpr bool supports_ghost_zone = true;
+
       /**
        * Constructor for the FieldOrder class
        * @param field The field that we are accessing
