@@ -1,11 +1,7 @@
 #pragma once
 
-#ifndef __CUDACC_RTC__
-#include <cuda.h>
-#include <cuda_runtime.h>
-#endif
-
 #include <enum_quda.h>
+#include <quda_target.h>
 
 /**
    @file quda_api.h

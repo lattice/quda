@@ -58,7 +58,7 @@ namespace quda
   template <typename Arg> __launch_bounds__(Arg::block_size) __global__ void transform_reduce_kernel(Arg arg)
   {
     using count_t = decltype(arg.n_items);
-
+#if 0
     count_t i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y;
     auto v = arg.v[j];
@@ -71,6 +71,7 @@ namespace quda
     }
 
     reduce<Arg::block_size, 1, decltype(arg.r)>(arg, r_, j);
+#endif
   }
 
   template <typename reduce_t, typename T, typename I, typename transformer, typename reducer>

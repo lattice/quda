@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+using size_t = std::size_t;
 
 #ifdef __cplusplus
 extern "C" {
@@ -27,7 +28,7 @@ extern "C" {
   Topology *comm_default_topology(void);
 
   // routines related to direct peer-2-peer access
-  void comm_set_neighbor_ranks(Topology *topo=NULL);
+  void comm_set_neighbor_ranks(Topology *topo=nullptr);
   int comm_neighbor_rank(int dir, int dim);
 
   /**

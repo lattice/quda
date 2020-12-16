@@ -62,11 +62,11 @@ namespace quda {
         //Check that RV is a composite field:
         if(RV->IsComposite() == false) errorQuda("\nRitz vectors must be contained in a composite field.\n");
 
-        cudaHostRegister(matProj,ld*tot_dim*sizeof(Complex),cudaHostRegisterDefault);
+        //cudaHostRegister(matProj,ld*tot_dim*sizeof(Complex),cudaHostRegisterDefault);
      }
 
      ~DeflationParam(){
-        cudaHostUnregister(matProj);
+       //cudaHostUnregister(matProj);
         if(matProj) delete[]  matProj;
         if(invRitzVals)       delete[]  invRitzVals;
      }
