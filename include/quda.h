@@ -1448,7 +1448,7 @@ extern "C" {
    * @param[in] native boolean to use either the native or generic version
    * @param[in] param The data defining the problem execution.
    */
-  void blasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, bool native, QudaBLASParam *param);
+  void blasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaBoolean native, QudaBLASParam *param);
 
   /**
    * @brief Flush the chronological history for the given index

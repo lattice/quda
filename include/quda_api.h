@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <enum_quda.h>
 #include <quda_target.h>
 
@@ -221,6 +222,11 @@ namespace quda
      @return Return device pointer associated with symbol
   */
   void* qudaGetSymbolAddress_(const char *symbol, const char *func, const char *file, const char *line);
+
+  /**
+     @brief Get the last error string recorded
+  */
+  std::string qudaGetLastErrorString();
 
   /**
      @brief Print out the timer profile for CUDA API calls

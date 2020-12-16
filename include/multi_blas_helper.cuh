@@ -64,7 +64,7 @@ namespace quda
       default: errorQuda("Unknown buffer %c", select);
       }
 
-      coeff_t *host = (coeff_t*)(param.host);
+      coeff_t *host = reinterpret_cast<coeff_t*>(param.host);
       for (int i = 0; i < arg.NXZ; i++)
         for (int j = 0; j < arg.NYW; j++) host[arg.NYW * i + j] = coeff_t(h.data[arg.NYW * i + j]);
 
