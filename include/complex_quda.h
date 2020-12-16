@@ -27,11 +27,6 @@
 #include <sstream>
 //#include <cuComplex.h>
 
-#include <quda_define.h>
-#ifdef QUDA_TARGET_HIP
-#include <hip/hip_runtime.h>
-#endif
-
 namespace quda {
   namespace gauge {
     template<typename Float, typename storeFloat> struct fieldorder_wrapper;
@@ -472,8 +467,8 @@ public:
   __host__ __device__ complex<float>(const complex<float> & z) : float2(z) {}
   __host__ __device__ complex<float>& operator=(const complex<float> &z)
     {
-      x = z.x;
-      y = z.y;
+      real(z.real());
+      imag(z.imag());;
       return *this;
     }
 
@@ -481,12 +476,8 @@ public:
     complex<float>(float2 z)
     : float2(z){}
   
-  template <class X>
-    inline complex<float>(const std::complex<X> & z)
-    {
-      real(z.real());
-      imag(z.imag());
-    }  
+  template <typename X>
+  inline complex<float>(const std::complex<X> & z) : float2{ static_cast<float>(z.real()), static_cast<float>(z.imag()) } {}
 
   // Member operators
   template <typename T>
@@ -828,7 +819,7 @@ public:
       imag(im);
     }
 
-  //__host__ __device__ inline complex<int>(const complex<int> & z) : int2(z){}
+  __host__ __device__ inline complex<int>(const complex<int> & z) : int2(z){}
 
   __host__ __device__ inline complex<int>& operator+=(const complex<int> z)
     {

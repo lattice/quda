@@ -299,7 +299,7 @@ namespace quda {
   __device__ __host__ inline void coarseDslash(Arg &arg, int x_cb, int parity, int s, int color_block, int color_offset)
   {
     constexpr int src_idx = 0;
-    using Float = typename Arg::real>;
+    using Float = typename Arg::real;
     vector_type<complex <Float>, Mc> out;
     if (Arg::dslash) applyDslash<Mc,dir,dim>(out, arg, x_cb, src_idx, parity, s, color_block, color_offset);
     if (doBulk<Arg::type>() && Arg::clover && dir==0 && dim==0) applyClover<Mc>(out, arg, x_cb, src_idx, parity, s, color_block, color_offset);

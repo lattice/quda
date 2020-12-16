@@ -425,7 +425,7 @@ namespace quda {
       template<typename theirFloat>
       __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col,
                                                  const complex<theirFloat> &val) const {
-#if defined( __CUDA_ARCH__ ) || defined( __HIP_DEVICE_COMPILE__ )
+#ifdef __CUDA_ARCH__
 	typedef typename vector<storeFloat,2>::type vec2;
 	vec2 *u2 = reinterpret_cast<vec2*>(u[dim] + parity*cb_offset + (x_cb*nColor + row)*nColor + col);
 	if (fixed && !match<storeFloat,theirFloat>()) {
@@ -583,7 +583,7 @@ namespace quda {
 
       template <typename theirFloat>
       __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col, const complex<theirFloat> &val) const {
-#if defined( __CUDA_ARCH__ ) || defined( __HIP_DEVICE_COMPILE__ )
+#ifdef __CUDA_ARCH__
 	typedef typename vector<storeFloat,2>::type vec2;
 	vec2 *u2 = reinterpret_cast<vec2*>(u + (((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col);
 	if (fixed && !match<storeFloat,theirFloat>()) {
@@ -759,7 +759,7 @@ namespace quda {
 
       template <typename theirFloat>
       __device__ __host__ void atomic_add(int dim, int parity, int x_cb, int row, int col, const complex<theirFloat> &val) const {
-#if defined( __CUDA_ARCH__ ) || defined( __HIP_DEVICE_COMPILE__ )
+#ifdef __CUDA_ARCH__
 	typedef typename vector<storeFloat,2>::type vec2;
 	vec2 *u2 = reinterpret_cast<vec2*>(u + parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb);
 	if (fixed && !match<storeFloat,theirFloat>()) {
@@ -1589,7 +1589,7 @@ namespace quda {
           real row_sum_inv = static_cast<real>(1.0) / row_sum;
 
           real diff = u0_inv * u0_inv - row_sum;
-          real U00_mag = diff > 0.0 ? diff * Rsqrt<real>(diff) : static_cast<real>(0.0);
+          real U00_mag = diff > 0.0 ? diff * rsqrt(diff) : static_cast<real>(0.0);
 
           out[0] *= U00_mag;
 
@@ -1600,7 +1600,7 @@ namespace quda {
           column_sum += out[3].imag() * out[3].imag();
 
           diff = u0_inv * u0_inv - column_sum;
-          real U20_mag = diff > 0.0 ? diff * Rsqrt<real>(diff) : static_cast<real>(0.0);
+          real U20_mag = diff > 0.0 ? diff * rsqrt(diff) : static_cast<real>(0.0);
 
           out[6] *= U20_mag;
 

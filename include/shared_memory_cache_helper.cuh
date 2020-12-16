@@ -1,4 +1,6 @@
 #pragma once
+
+
 #include <target_device.h>
 
 /**
@@ -56,8 +58,10 @@ namespace quda
      */
     __device__ __host__ inline atom_t *cache()
     {
-#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__) 
-      QUDA_DYNAMIC_SHARED( atom_t , cache_);
+#if defined( __CUDA_ARCH__ )
+      extern __shared__ atom_t cache_[];
+#elif defined ( __HIP_DEVICE_COMPILE__ )
+      HIP_DYNAMIC_SHARED( atom_t, cache_ );
 #else
       static atom_t *cache_;
 #endif
@@ -82,7 +86,6 @@ namespace quda
       T a;
       memcpy((void*)&a, tmp, sizeof(T));
       return a;
->>>>>>> feature/generic_kernel
     }
 
   public:
@@ -193,8 +196,8 @@ namespace quda
      */
     __device__ __host__ inline T *cache()
     {
-#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
-     QUDA_DYNAMIC_SHARED(int, cache_);
+#ifdef __CUDA_ARCH__
+      extern __shared__ int cache_[];
 #else
       // dummy code path to keep clang happy
       static int *cache_;
@@ -290,7 +293,7 @@ namespace quda
     */
     __device__ __host__ inline void sync()
     {
-#if defined( __CUDA_ARCH__ ) || defined( __HIP_DEVICE_COMPILE__ )
+#ifdef __CUDA_ARCH__
       __syncthreads();
 #endif
     }
