@@ -1,6 +1,6 @@
 #include "quda_define.h"
 #ifdef QUDA_TARGET_HIP
-#ifndef __HIP_DEVICE_COMPILE__
+#if !defined(__HIP_DEVICE_COMPILE__)
 inline double
 rsqrt(double x) { 
   return 1.0/sqrt(x);

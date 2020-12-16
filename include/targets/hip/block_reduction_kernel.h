@@ -18,8 +18,8 @@ namespace quda {
     int block_idx = blockIdx.x;
     if (arg.swizzle) {
       // the portion of the grid that is exactly divisible by the number of SMs
-      const int gridp = gridDim.x - gridDim.x % arg.swizzle_factor;
-
+      const auto gridp = gridDim.x - gridDim.x % arg.swizzle_factor;
+      
       block_idx = blockIdx.x;
       if (blockIdx.x < gridp) {
         // this is the portion of the block that we are going to transpose
@@ -47,10 +47,10 @@ namespace quda {
     using reduce_t = typename Transformer<Arg>::reduce_t;
     Transformer<Arg> t(arg);
 
-    const int block = virtual_block_idx(arg);
-    const int i = threadIdx.x;
-    const int j = blockDim.y*blockIdx.y + threadIdx.y;
-    const int j_local = threadIdx.y;
+    const auto block = virtual_block_idx(arg);
+    const auto i = threadIdx.x;
+    const auto j = blockDim.y*blockIdx.y + threadIdx.y;
+    const auto j_local = threadIdx.y;
     if (j >= arg.threads.y) return;
 
     reduce_t value; // implicitly we assume here that default constructor zeros reduce_t

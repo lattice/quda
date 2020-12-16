@@ -11,7 +11,7 @@ namespace quda {
     */
     constexpr bool is_device()
     {
-#ifdef __HIP_DEVICE_COMPILE__
+#if defined(__HIP_DEVICE_COMPILE__)
       return true;
 #else
       return false;
@@ -24,7 +24,7 @@ namespace quda {
     */
     constexpr bool is_host()
     {
-#ifdef __HIP_DEVICE_COMPILE__
+#if defined(__HIP_DEVICE_COMPILE__)
       return false;
 #else
       return true;
@@ -38,7 +38,7 @@ namespace quda {
     */
     __device__ __host__ inline dim3 block_dim()
     {
-#ifdef __HIP_DEVICE_COMPILE__
+#if defined(__HIP_DEVICE_COMPILE__)
       return dim3(blockDim.x, blockDim.y, blockDim.z);
 #else
       return dim3(0, 0, 0);
@@ -54,7 +54,7 @@ namespace quda {
     */
     __device__ __host__ inline dim3 thread_idx()
     {
-#ifdef __HIP_DEVICE_COMPILE__
+#if defined(__HIP_DEVICE_COMPILE__)
       return dim3(threadIdx.x, threadIdx.y, threadIdx.z);
 #else
       return dim3(0, 0, 0);
