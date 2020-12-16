@@ -176,10 +176,10 @@ using cudaIpcEventHandle_t = int;
 using cudaEvent_t = int;
 
 struct dim3 {unsigned int x,y,z;
-  dim3():x(1u),y(1u),z(1u){}
-  dim3(unsigned int x):x(x),y(1u),z(1u){}
-  dim3(unsigned int x,unsigned int y):x(x),y(y),z(1u){}
-  dim3(unsigned int x,unsigned int y,unsigned int z):x(x),y(y),z(z){}
+  constexpr dim3():x(1u),y(1u),z(1u){}
+  constexpr dim3(unsigned int x):x(x),y(1u),z(1u){}
+  constexpr dim3(unsigned int x,unsigned int y):x(x),y(y),z(1u){}
+  constexpr dim3(unsigned int x,unsigned int y,unsigned int z):x(x),y(y),z(z){}
 };
 struct int2 {int x,y;};
 struct int4 {int x,y,z,w;};
