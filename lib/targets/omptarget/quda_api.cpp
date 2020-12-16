@@ -540,6 +540,18 @@ namespace quda {
     if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
+  static std::string error_str("CUDA_SUCCESS");
+
+  void qudaSetErrorString(const std::string &error_str_)
+  {
+    error_str = error_str_;
+  }
+
+  std::string qudaGetLastErrorString()
+  {
+    return error_str;
+  }
+
   void printAPIProfile() {
 #ifdef API_PROFILE
     apiTimer.Print();
