@@ -1,5 +1,16 @@
 # HIP Release notes
 
+## Another rset of refactor merges
+* Latest from feature/genric_kernel
+* include/quda_api.h refactored
+  + qudaMemoryKind abstracted (indep. of API)
+  + qudaDeviceProp_t eliminated
+  + qudaMemcpyToSymbolAsync removed
+  + most recent abstractions (block_reduction etc) merged
+* CUDA and HIP Builds work
+* CUDA build  passes tests
+* HIP build has bugs (in the autotuner)
+
 ## Tidyed up feature/hip-compile-fixes
 * 12/10/2020: Builds on HIP
 * Half prec blas_test ran correctly 

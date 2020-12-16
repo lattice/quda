@@ -69,11 +69,13 @@ namespace quda {
     }
   }
 
-  CUresult launch_jitify(const std::string &file, const std::string &kernel,
-                         const std::vector<std::string> &template_args,
-                         const TuneParam &tp, const qudaStream_t &stream,
-                         const std::vector<constant_param_t> &param,
-                         std::vector<void*> arg_ptrs, jitify::detail::vector<std::string> arg_types)
+  void qudaSetErrorString(const std::string &);
+
+  qudaError_t launch_jitify(const std::string &file, const std::string &kernel,
+                            const std::vector<std::string> &template_args,
+                            const TuneParam &tp, const qudaStream_t &stream,
+                            const std::vector<constant_param_t> &param,
+                            std::vector<void*> arg_ptrs, jitify::detail::vector<std::string> arg_types)
   {
     std::string kernel_file(std::string("kernels/") + file);
     create_jitify_program_v2(kernel_file);
@@ -93,7 +95,18 @@ namespace quda {
     }
 
     auto configured_instance = instance.configure(tp.grid, tp.block, tp.shared_bytes, device::get_cuda_stream(stream));
-    return configured_instance.launch(arg_ptrs, arg_types);
+    auto error = configured_instance.launch(arg_ptrs, arg_types);
+
+    if (error != CUDA_SUCCESS) {
+      const char *str;
+      cuGetErrorString(error, &str);
+      qudaSetErrorString(std::string(str));
+      if (!activeTuning()) { // error only if not tuning
+        errorQuda("jitify returned error %s", str);
+      }
+    }
+
+    return error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
   }
 
 #endif

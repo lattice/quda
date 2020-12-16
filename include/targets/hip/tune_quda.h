@@ -224,9 +224,11 @@ namespace quda {
       return n;
     }
 
-    //  A dummy boolean
-    bool jitify_error;
-
+    /** This is the return result from kernels launched using jitify,
+        and can also be used to allow user invalidation of a tuning
+        configuration */
+    qudaError_t launch_error;
+    
     /**
        @brief Whether the present instance has already been tuned or not
        @return True if tuned, false if not
@@ -243,7 +245,7 @@ namespace quda {
     }
 
   public:
-    Tunable() : jitify_error(false) { aux[0] = '\0'; }
+    Tunable() : launch_error(QUDA_SUCCESS) { aux[0] = '\0'; }
     virtual ~Tunable() { }
     virtual TuneKey tuneKey() const = 0;
     virtual void apply(const qudaStream_t &stream) = 0;
@@ -341,8 +343,8 @@ namespace quda {
                   tp.grid.z, device::max_grid_size(2));
     }
 
-    bool jitifyError() const { return jitify_error; }
-    bool jitifyError() { return jitify_error; }
+    qudaError_t launchError() const { return launch_error; }
+    qudaError_t& launchError() { return launch_error; }
   };
 
   /**

@@ -121,7 +121,7 @@ namespace quda {
     real site_max = thread_max;
     if (device::is_device()) { // if on the device we need to reduce across threads in the block
       constexpr int color_spin_threads = Arg::nColor <= max_block_float_nc ? (Arg::nSpin/Ms) * (Arg::nColor/Mc) : 1;
-      SharedMemoryCache<real, color_spin_threads, 2> cache;
+      SharedMemoryCache<real, color_spin_threads, 2, true> cache;
       if (active) cache.save(thread_max);
       cache.sync();
       if (active) {

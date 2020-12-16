@@ -24,13 +24,9 @@ extern char *gitversion;
 namespace quda
 {
   static TuneKey last_key;
-}
 
-// intentionally leave this outside of the namespace for now
-quda::TuneKey getLastTuneKey() { return quda::last_key; }
+  TuneKey getLastTuneKey() { return quda::last_key; }
 
-namespace quda
-{
   typedef std::map<TuneKey, TuneParam> map;
 
   struct TraceKey {
@@ -55,28 +51,10 @@ namespace quda
     {
     }
 
-    TraceKey(const TraceKey &trace) :
-      key(trace.key),
-      time(trace.time),
-      device_bytes(trace.device_bytes),
-      pinned_bytes(trace.pinned_bytes),
-      mapped_bytes(trace.mapped_bytes),
-      host_bytes(trace.host_bytes)
-    {
-    }
-
-    TraceKey &operator=(const TraceKey &trace)
-    {
-      if (&trace != this) {
-        key = trace.key;
-        time = trace.time;
-        device_bytes = trace.device_bytes;
-        pinned_bytes = trace.pinned_bytes;
-        mapped_bytes = trace.mapped_bytes;
-        host_bytes = trace.host_bytes;
-      }
-      return *this;
-    }
+    TraceKey(const TraceKey &) = default;
+    TraceKey(TraceKey &&) = default;
+    TraceKey &operator=(const TraceKey &) = default;
+    TraceKey &operator=(TraceKey &&) = default;
   };
 
   // linked list that is augmented each time we call a kernel
@@ -227,21 +205,8 @@ namespace quda
       TuneKey key = entry->first;
       TuneParam param = entry->second;
 
-      char tmp[14] = {};
-#if 0 
-      /* BJOO:
-	This throws a warning for me: 
-	error: ‘char* strncpy(char*, const char*, size_t)’ output may be 
-	truncated copying 13 bytes from a string of length 25
-
-	and if warnings are errors this is an error 
-      */
-      strncpy(tmp, key.aux, 13);
-#else
-      // BJOO: Hackaround
-      for(int i=0; i < 13; ++i) tmp[i] = key.aux[i];
-      tmp[13]='\0';
-#endif
+      char tmp[TuneKey::aux_n] = {};
+      strncpy(tmp, key.aux, TuneKey::aux_n);
       bool is_policy_kernel = strncmp(tmp, "policy_kernel", 13) == 0 ? true : false;
       bool is_policy = (strncmp(tmp, "policy", 6) == 0 && !is_policy_kernel) ? true : false;
       if (param.n_calls > 0 && !is_policy) total_time += param.n_calls * param.time;
@@ -684,7 +649,6 @@ namespace quda
    */
   TuneParam &tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity)
   {
-
 #ifdef LAUNCH_TIMER
     launchTimer.TPSTART(QUDA_PROFILE_TOTAL);
     launchTimer.TPSTART(QUDA_PROFILE_INIT);
@@ -787,7 +751,7 @@ namespace quda
           hipDeviceSynchronize();
           hipGetLastError(); // clear error counter
           tunable.checkLaunchParam(param);
-	  if (verbosity >= QUDA_DEBUG_VERBOSE) {
+          if (verbosity >= QUDA_DEBUG_VERBOSE) {
             printfQuda("About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d)\n",
                        int(param.block.x), int(param.block.y), int(param.block.z), int(param.grid.x), int(param.grid.y), 
 		       int(param.grid.z), int(param.shared_bytes), int(param.aux.x), int(param.aux.y), int(param.aux.z));
@@ -811,22 +775,24 @@ namespace quda
           }
 
           elapsed_time /= (1e3 * tunable.tuningIter());
-          if ((elapsed_time < best_time) && (error == hipSuccess) /* && (tunable.jitifyError() == hipSuccess) */) {
+          if ((elapsed_time < best_time) && (error == hipSuccess) && (tunable.launchError() == QUDA_SUCCESS)) {
             best_time = elapsed_time;
             best_param = param;
           }
           if ((verbosity >= QUDA_DEBUG_VERBOSE)) {
-            if (error == hipSuccess /* && tunable.jitifyError() == hipSuccess */) {
+            if (error == hipSuccess && tunable.launchError() == QUDA_SUCCESS) {
               printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(),
                          tunable.perfString(elapsed_time).c_str());
             } else {
-
-	      // BJoo: must be regular error
-	      printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), hipGetErrorString(error));
+              if (tunable.launchError() == QUDA_SUCCESS) { // must be regular error
+                printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), hipGetErrorString(error));
+              } else { // else must be a manually thrown error
+                printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), qudaGetLastErrorString().c_str());
+              }
             }
           }
           tuning = tunable.advanceTuneParam(param);
-          /* tunable.jitifyError() = hipSuccess; */
+          tunable.launchError() = QUDA_SUCCESS;
         }
 
         tune_timer.Stop(__func__, __FILE__, __LINE__);
@@ -848,9 +814,9 @@ namespace quda
         hipEventDestroy(end);
 
         if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("PostTune %s\n", key.name);
-	tuning = true; 
+        tuning = true;
         tunable.postTune();
-	tuning = false;
+        tuning = false;
         param = best_param;
         tunecache[key] = best_param;
       }

@@ -34,35 +34,22 @@ namespace quda {
   }
 
   /**
-     @brief Generic block reduction kernel.  Here, we ensure that each
-     thread block maps exactly to a logical block to be reduced, with
-     number of threads equal to the number of sites per block.  The y
+     @brief Generic block kernel.  Here, we split the block and thread
+     indices in the x and y dimension and pass these indices
+     separately to the transform functor.  The x thread dimension is
+     templated, e.g., for efficient reductions, and typically the y
      thread dimension is a trivial vectorizable dimension.
-
-     TODO: add a Reducer class for non summation reductions
   */
-  template <int block_size, template <typename> class Transformer, typename Arg>
-  __global__ void BlockReductionKernel2D(Arg arg)
+  template <int block_size, template <int, typename> class Transformer, typename Arg>
+  __launch_bounds__(Arg::launch_bounds ? block_size : 0) __global__ void BlockKernel2D(Arg arg)
   {
-    using reduce_t = typename Transformer<Arg>::reduce_t;
-    Transformer<Arg> t(arg);
-
-    const int block = virtual_block_idx(arg);
-    const int i = threadIdx.x;
+    const dim3 block_idx(virtual_block_idx(arg), blockIdx.y, 0);
+    const dim3 thread_idx(threadIdx.x, threadIdx.y, 0);
     const int j = blockDim.y*blockIdx.y + threadIdx.y;
-    const int j_local = threadIdx.y;
     if (j >= arg.threads.y) return;
 
-    reduce_t value; // implicitly we assume here that default constructor zeros reduce_t
-    // only active threads call the transformer
-    if (i < arg.threads.x) value = t(block, i, j);
-
-    // but all threads take part in the reduction
-    using BlockReduce = cub::BlockReduce<reduce_t, block_size, cub::BLOCK_REDUCE_WARP_REDUCTIONS>;
-    __shared__ typename BlockReduce::TempStorage temp_storage[Arg::n_vector_y];
-    value = BlockReduce(temp_storage[j_local]).Sum(value);
-
-    if (i == 0) t.store(value, block, j);
+    Transformer<block_size, Arg> t(arg);
+    t(block_idx, thread_idx);
   }
 
 }

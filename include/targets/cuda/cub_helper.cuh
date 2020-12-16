@@ -1,8 +1,5 @@
 #pragma once
 
-using namespace quda;
-
-
 /**
    @file cub_helper.cuh
 
@@ -16,5 +13,11 @@ using namespace quda;
 #define CUB_USE_COOPERATIVE_GROUPS
 #endif
 
+using namespace quda;
+
 #include <cub/block/block_reduce.cuh>
 namespace QudaCub = cub;
+
+// Stuff shared between CUDA and HIP
+#include <cub_helper_shared.cuh>
+

@@ -674,15 +674,16 @@ namespace quda {
     if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
+  static std::string error_str("CUDA_SUCCESS");
 
-  void qudaMemcpyToSymbolAsync_(const void *symbol, const void *src, size_t count, size_t offset,  qudaMemcpyKind kind, const qudaStream_t &stream,
-                                const char *func, const char *file, const char *line) 
+  void qudaSetErrorString(const std::string &error_str_)
   {
-    cudaError_t error = cudaMemcpyToSymbolAsync(symbol,src,count,offset,qudaMemcpyKindToAPI(kind),device::get_cuda_stream(stream));
-    if( error != cudaSuccess ) {
-      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
-    }
+    error_str = error_str_;
+  }
 
+  std::string qudaGetLastErrorString()
+  {
+    return error_str;
   }
 
   void printAPIProfile() {

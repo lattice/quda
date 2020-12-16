@@ -77,7 +77,11 @@ void init()
   inv_param.dagger = dagger ? QUDA_DAG_YES : QUDA_DAG_NO;
 
   setDims(gauge_param.X);
-  dw_setDims(gauge_param.X, Nsrc); // so we can use 5-d indexing from dwf
+  dw_setDims(gauge_param.X, 1);
+  if (Nsrc != 1) {
+    warningQuda("Ignoring Nsrc = %d, setting to 1.", Nsrc);
+    Nsrc = 1;
+  }
   setSpinorSiteSize(staggeredSpinorSiteSize);
 
   // Allocate a lot of memory because I'm very confused
@@ -171,7 +175,7 @@ void init()
   csParam.nSpin = 1;
   csParam.nDim = 5;
   for (int d = 0; d < 4; d++) { csParam.x[d] = gauge_param.X[d]; }
-  csParam.x[4] = Nsrc; // number of sources becomes the fifth dimension
+  csParam.x[4] = 1;
 
   csParam.setPrecision(inv_param.cpu_prec);
   inv_param.solution_type = QUDA_MAT_SOLUTION;
