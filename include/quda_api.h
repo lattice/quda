@@ -17,7 +17,7 @@ enum qudaMemcpyKind { qudaMemcpyHostToHost,
 #include "targets/hip/quda_api_target.h"
 #endif
 
-
+#include <string>
 #include <enum_quda.h>
 
 /**
@@ -320,6 +320,11 @@ namespace quda
   */
   void* qudaGetSymbolAddress_(const char *symbol, const char *func, const char *file, const char *line);
 
+
+  /**
+     @brief Get the last error string recorded
+  */
+  std::string qudaGetLastErrorString();
 
   /**
      @brief Print out the timer profile for CUDA API calls

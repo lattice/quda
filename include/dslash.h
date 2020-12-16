@@ -204,7 +204,8 @@ namespace quda
         errorQuda("Not implemented");
       } else {
 #ifdef JITIFY
-        Tunable::jitify_error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, device::get_cuda_stream(stream)).launch(arg);
+        auto error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, device::get_cuda_stream(stream)).launch(arg);
+        Tunable::launch_error = error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
 #else
         switch (arg.kernel_type) {
         case INTERIOR_KERNEL: launch<P, nParity, dagger, xpay, INTERIOR_KERNEL>(tp, stream); break;
@@ -233,7 +234,8 @@ namespace quda
     inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
     {
 #ifdef JITIFY
-      Tunable::jitify_error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, device::get_cuda_stream(stream)).launch(arg);
+      auto error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, device::get_cuda_stream(stream)).launch(arg);
+      Tunable::launch_error = error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
 #else
       if (arg.dagger)
         instantiate<P, nParity, true, xpay>(tp, stream);
@@ -252,7 +254,8 @@ namespace quda
     inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
     {
 #ifdef JITIFY
-      Tunable::jitify_error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, device::get_cuda_stream(stream)).launch(arg);
+      auto error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, device::get_cuda_stream(stream)).launch(arg);
+      Tunable::launch_error = error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
 #else
       switch (arg.nParity) {
       case 1: instantiate<P, 1, xpay>(tp, stream); break;
@@ -272,7 +275,8 @@ namespace quda
     inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
     {
 #ifdef JITIFY
-      Tunable::jitify_error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, device::get_cuda_stream(stream)).launch(arg);
+      auto error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, device::get_cuda_stream(stream)).launch(arg);
+      Tunable::launch_error = error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
 #else
       if (arg.xpay)
         instantiate<P, true>(tp, stream);

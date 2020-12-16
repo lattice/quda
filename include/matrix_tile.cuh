@@ -104,13 +104,16 @@ namespace quda {
       }
     }
 
-    template <typename Accessor> inline __device__ __host__ void load(const Accessor &a, int d, int parity, int x_cb, int i0, int j0)
+    /**
+     * @brief Load accessor for fields supporting ghost zones; we could avoid this with `if constexpr`
+     */
+    template <typename Accessor> inline __device__ __host__ typename std::enable_if<Accessor::supports_ghost_zone, void>::type load(const Accessor &a, int d, int parity, int x_cb, int i0, int j0)
     {
 #pragma unroll
       for (int i=0; i<m; i++) {
 #pragma unroll
         for (int j=0; j<n; j++) {
-          if (ghost)
+          if (ghost) // ideally `if constexpr`, if we had this we could avoid this whole `supports_ghost_zone` thing.
             tile[i*n+j] = a.Ghost(d, parity, x_cb, i0 + i, j0 + j);
           else
             tile[i*n+j] = a(d, parity, x_cb, i0 + i, j0 + j);
@@ -118,7 +121,22 @@ namespace quda {
       }
     }
 
-    template <typename Accessor> inline __device__ __host__ void load(const Accessor &a, int d, int parity, int x_cb, int si, int sj, int i0, int j0)
+    /**
+     * @brief Load accessor for fields without ghost zones (fine clover fields)
+     */
+    template <typename Accessor> inline __device__ __host__ typename std::enable_if<!Accessor::supports_ghost_zone, void>::type load(const Accessor &a, int d, int parity, int x_cb, int i0, int j0)
+    {
+      static_assert(!ghost, "Cannot use ghost MatrixTile with field that doesn't support ghost zones");
+#pragma unroll
+      for (int i=0; i<m; i++) {
+#pragma unroll
+        for (int j=0; j<n; j++) {
+          tile[i*n+j] = a(d, parity, x_cb, i0 + i, j0 + j);
+        }
+      }
+    }
+
+    template <typename Accessor> inline __device__ __host__ typename std::enable_if<Accessor::supports_ghost_zone, void>::type load(const Accessor &a, int d, int parity, int x_cb, int si, int sj, int i0, int j0)
     {
 #pragma unroll
       for (int i=0; i<m; i++) {
@@ -128,6 +146,18 @@ namespace quda {
             tile[i*n+j] = a.Ghost(d, parity, x_cb, si, sj, i0 + i, j0 + j);
           else
             tile[i*n+j] = a(d, parity, x_cb, si, sj, i0 + i, j0 + j);
+        }
+      }
+    }
+
+    template <typename Accessor> inline __device__ __host__ typename std::enable_if<!Accessor::supports_ghost_zone, void>::type load(const Accessor &a, int d, int parity, int x_cb, int si, int sj, int i0, int j0)
+    {
+      static_assert(!ghost, "Cannot use ghost MatrixTile with field that doesn't support ghost zones");
+#pragma unroll
+      for (int i=0; i<m; i++) {
+#pragma unroll
+        for (int j=0; j<n; j++) {
+          tile[i*n+j] = a(d, parity, x_cb, si, sj, i0 + i, j0 + j);
         }
       }
     }

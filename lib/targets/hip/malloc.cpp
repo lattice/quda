@@ -37,6 +37,11 @@ namespace quda
     {
     }
 
+    MemAlloc(const MemAlloc &) = default;
+    MemAlloc(MemAlloc &&) = default;
+    virtual ~MemAlloc() = default;
+    MemAlloc &operator=(const MemAlloc &) = default;
+    MemAlloc &operator=(MemAlloc &&) = default;
   };
 
   static std::map<void *, MemAlloc> alloc[N_ALLOC_TYPE];

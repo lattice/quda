@@ -53,15 +53,15 @@ namespace quda {
 
 #ifdef JITIFY
 
-  CUresult launch_jitify(const std::string &file, const std::string &kernel,
-                         const std::vector<std::string> &template_args,
-                         const TuneParam &tp, const qudaStream_t &stream,
-                         const std::vector<constant_param_t> &param,
-                         std::vector<void*> arg_ptrs, jitify::detail::vector<std::string> arg_types);
+  qudaError_t launch_jitify(const std::string &file, const std::string &kernel,
+                            const std::vector<std::string> &template_args,
+                            const TuneParam &tp, const qudaStream_t &stream,
+                            const std::vector<constant_param_t> &param,
+                            std::vector<void*> arg_ptrs, jitify::detail::vector<std::string> arg_types);
 
   template <template <typename> class Functor, typename Arg>
-  CUresult launch_jitify(const std::string &kernel, const TuneParam &tp, const qudaStream_t &stream,
-                         const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
+  qudaError_t launch_jitify(const std::string &kernel, const TuneParam &tp, const qudaStream_t &stream,
+                            const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
   {
     // we need this hackery to get the naked unbound template class parameters
     using namespace jitify::reflection;
@@ -77,8 +77,8 @@ namespace quda {
   }
 
   template <template <typename> class Functor, template <typename> class Reducer, typename Arg>
-  CUresult launch_jitify(const std::string &kernel, const TuneParam &tp, const qudaStream_t &stream,
-                         const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
+  qudaError_t launch_jitify(const std::string &kernel, const TuneParam &tp, const qudaStream_t &stream,
+                            const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
   {
     // we need this hackery to get the naked unbound template class parameters
     using namespace jitify::reflection;
@@ -98,8 +98,8 @@ namespace quda {
 
   // FIXME merge the functionality of these launchers
   template <template <typename> class Functor, typename Arg>
-  CUresult launch_jitify_block(const std::string &kernel, const TuneParam &tp, const qudaStream_t &stream,
-                               const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
+  qudaError_t launch_jitify_block(const std::string &kernel, const TuneParam &tp, const qudaStream_t &stream,
+                                  const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
   {
     // we need this hackery to get the naked unbound template class parameters
     using namespace jitify::reflection;
