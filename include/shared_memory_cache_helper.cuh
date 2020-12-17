@@ -37,7 +37,7 @@ namespace quda
     static constexpr int max_block_size_x = device::max_block_size<block_size_y, block_size_z>();
 
     /** pad in the x dimension width if requested to ensure that it isn't a multiple of the bank width */
-    static constexpr int block_size_x = pad ? max_block_size_x :
+    static constexpr int block_size_x = !pad ? max_block_size_x :
       ((max_block_size_x + device::shared_memory_bank_width() - 1) /
        device::shared_memory_bank_width()) * device::shared_memory_bank_width();
 
