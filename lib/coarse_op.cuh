@@ -159,28 +159,32 @@ namespace quda {
   struct Launch<QUDA_CUDA_FIELD_LOCATION, Arg> {
     using Float = typename Arg::Float;
     static constexpr bool from_coarse = Arg::from_coarse;
-
+    
     Launch(Arg &arg, qudaError_t &qerror, TuneParam &tp, ComputeType type, bool use_mma, const qudaStream_t &stream)
     {
 #ifdef JITIFY
       using namespace jitify::reflection;
 #endif
-      CUresult error = CUDA_SUCCESS;
+      
+      //CUresult error = CUDA_SUCCESS;
+      qudaError_t error = QUDA_SUCCESS;
       if (type == COMPUTE_UV) {
         if (use_mma && arg.dir != QUDA_IN_PLACE) {
-
+#if defined(QUDA_TARGET_CUDA)
+#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
           mma::launch_compute_uv_kernel<from_coarse>(tp, arg, arg.fineVolumeCB, stream);
-
+#endif
+#endif
         } else {
-
+	  
           if (arg.dir != QUDA_BACKWARDS && arg.dir != QUDA_FORWARDS && arg.dir != QUDA_IN_PLACE) errorQuda("Undefined direction %d", arg.dir);
 #ifdef JITIFY
-        error = program->kernel("quda::ComputeUVGPU")
-          .instantiate(arg.dim,arg.dir,Type<Arg>())
-          .configure(tp.grid,tp.block,tp.shared_bytes,device::get_cuda_stream(stream)).launch(arg);
+	  error = program->kernel("quda::ComputeUVGPU")
+	    .instantiate(arg.dim,arg.dir,Type<Arg>())
+	    .configure(tp.grid,tp.block,tp.shared_bytes,device::get_cuda_stream(stream)).launch(arg);
 #else
-        if (arg.dir == QUDA_BACKWARDS) {
-          if      (arg.dim==0) qudaLaunchKernel(ComputeUVGPU<0,QUDA_BACKWARDS,Arg>, tp, stream, arg);
+	  if (arg.dir == QUDA_BACKWARDS) {
+	    if      (arg.dim==0) qudaLaunchKernel(ComputeUVGPU<0,QUDA_BACKWARDS,Arg>, tp, stream, arg);
           else if (arg.dim==1) qudaLaunchKernel(ComputeUVGPU<1,QUDA_BACKWARDS,Arg>, tp, stream, arg);
           else if (arg.dim==2) qudaLaunchKernel(ComputeUVGPU<2,QUDA_BACKWARDS,Arg>, tp, stream, arg);
           else if (arg.dim==3) qudaLaunchKernel(ComputeUVGPU<3,QUDA_BACKWARDS,Arg>, tp, stream, arg);
@@ -294,9 +298,11 @@ namespace quda {
       } else if (type == COMPUTE_VUV) {
 
         if (use_mma && arg.dir != QUDA_IN_PLACE) {
-
+#if defined(QUDA_TARGET_CUDA)
+#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
           mma::launch_compute_vuv_kernel<from_coarse>(tp, arg, arg.fineVolumeCB, stream);
-
+#endif
+#endif
         } else {
 
           // need to resize the grid since we don't tune over the entire coarseColor dimension
@@ -469,7 +475,7 @@ namespace quda {
       }
 
       // convert Jitify return error into QUDA error
-      qerror = error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
+      qerror = error == QUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
     }
   };
 
@@ -782,12 +788,24 @@ namespace quda {
     bool advanceTuneParam(TuneParam &param) const {
 
       if (use_mma && (type == COMPUTE_UV || type == COMPUTE_VUV) && dir != QUDA_IN_PLACE) {
+#if defined(QUDA_TARGET_CUDA)
+#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
         constexpr bool query_max = true;
+#endif
+#endif
         int max;
         if (type == COMPUTE_UV) {
+#if defined(QUDA_TARGET_CUDA)
+#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
           max = mma::launch_compute_uv_kernel<from_coarse, query_max>(param, arg, 1, device::get_default_stream());
+#endif
+#endif
         } else if (type == COMPUTE_VUV) {
+#if defined(QUDA_TARGET_CUDA)
+#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
           max = mma::launch_compute_vuv_kernel<from_coarse, query_max>(param, arg, 1, device::get_default_stream());
+#endif
+#endif	  
         }
 
         if (param.aux.x < max) {

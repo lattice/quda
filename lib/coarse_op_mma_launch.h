@@ -2,10 +2,12 @@
 
 #include <tune_quda.h>
 
+#if defined(QUDA_TARGET_CUDA)
 #if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
 
 #include <kernels/coarse_op_kernel_mma.cuh>
 
+#endif
 #endif
 
 /**
@@ -20,6 +22,7 @@ namespace quda
   namespace mma
   {
 
+#if defined(QUDA_TARGET_CUDA)    
 #if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
 
     template <bool from_coarse, int dim, QudaDirection dir, int bM, int bN, int bK, int block_y, int block_z, class Arg>
@@ -623,7 +626,7 @@ namespace quda
     }
 
 #endif // compute capability >= 700, CUDA >= 10.1
-
+#endif // QUDA_TARGET_CUDA
   } // namespace mma
 
 } // namespace quda
