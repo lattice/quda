@@ -254,7 +254,7 @@ set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 14 17)
 option(QUDA_BACKWARDS "Enable stacktrace generation using backwards-cpp")
 
 # QIO largefile support
-option(QUDA_QIOLARGEFILE "use feature/largefile branch of QIO" OFF)
+option(QUDA_QIO_LARGE_FILE "use feature/largefile branch of QIO" OFF)
 
 # NVTX options
 option(QUDA_MPI_NVTX "add NVTX markup to MPI API calls" OFF)
@@ -294,7 +294,7 @@ mark_as_advanced(QUDA_OPENMP)
 
 mark_as_advanced(QUDA_BACKWARDS)
 
-mark_as_advanced(QUDA_QIOLARGEFILE)
+mark_as_advanced(QUDA_QIO_LARGE_FILE)
 
 mark_as_advanced(QUDA_MPI_NVTX)
 mark_as_advanced(QUDA_INTERFACE_NVTX)
@@ -635,7 +635,7 @@ if(QUDA_QIO)
   if(QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
     set(QIO_BRANCH
         "qio2-5-0")
-    if(QUDA_QIOLARGEFILE)
+    if(QUDA_QIO_LARGE_FILE)
       set(QIO_BRANCH
           "feature/largefile")
     endif()
