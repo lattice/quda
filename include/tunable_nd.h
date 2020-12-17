@@ -32,6 +32,7 @@ namespace quda {
     template <template <typename> class Functor, typename Arg>
     void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
     {
+      ompwip();
 #ifdef JITIFY
       launch_error = launch_jitify<Functor>("quda::Kernel1D", tp, stream, arg, param);
 #else
@@ -44,6 +45,7 @@ namespace quda {
     template <template <typename> class Functor, typename Arg>
     void launch_cuda(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
     {
+      ompwip();
 #ifdef JITIFY
       launch_error = launch_jitify<Functor>("quda::raw_kernel", tp, stream, arg, param);
 #else
@@ -56,6 +58,7 @@ namespace quda {
     template <template <typename> class Functor, typename Arg>
     void launch_host(const TuneParam &, const qudaStream_t &, const Arg &arg, const std::vector<constant_param_t> & = dummy_param)
     {
+      ompwip();
       Functor<Arg> f(const_cast<Arg &>(arg));
       for (int i = 0; i < (int)arg.threads.x; i++) {
         f(i);
@@ -67,6 +70,7 @@ namespace quda {
       launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
              const std::vector<constant_param_t> &param = dummy_param)
     {
+      ompwip();
       if (location == QUDA_CUDA_FIELD_LOCATION) {
         launch_device<Functor, Arg>(tp, stream, arg, param);
       } else {
@@ -79,6 +83,7 @@ namespace quda {
       launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
              const std::vector<constant_param_t> &param = dummy_param)
     {
+      ompwip();
       if (location == QUDA_CUDA_FIELD_LOCATION) {
         launch_device<Functor, Arg>(tp, stream, arg, param);
       } else {
@@ -147,18 +152,34 @@ namespace quda {
     template <template <typename> class Functor, typename Arg>
     void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
     {
+      ompwip("OFFLOADING...");
 #ifdef JITIFY
       launch_error = launch_jitify<Functor>("quda::Kernel2D", tp, stream, arg, param);
 #else
       for (unsigned int i = 0; i < param.size(); i++)
         qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, cudaMemcpyHostToDevice, stream);
+#ifdef QUDA_BACKEND_OMPTARGET
+      const int gd = tp.grid.x*tp.grid.y*tp.grid.z;
+      const int ld = tp.block.x*tp.block.y*tp.grid.z;
+      const int tx = arg.threads.x;
+      const int ty = arg.threads.y;
+      Functor<Arg> f(const_cast<Arg &>(arg));
+#pragma omp target teams distribute parallel for simd collapse(2) num_teams(gd) thread_limit(ld) num_threads(ld)
+      for (int i = 0; i < tx; i++) {
+        for (int j = 0; j < ty; j++) {
+          f(i, j);
+        }
+      }
+#else
       qudaLaunchKernel(Kernel2D<Functor, Arg, grid_stride>, tp, stream, arg);
+#endif
 #endif
     }
 
     template <template <typename> class Functor, typename Arg>
     void launch_host(const TuneParam &, const qudaStream_t &, const Arg &arg, const std::vector<constant_param_t> & = dummy_param)
     {
+      ompwip();
       Functor<Arg> f(const_cast<Arg &>(arg));
       for (int i = 0; i < (int)arg.threads.x; i++) {
         for (int j = 0; j < (int)arg.threads.y; j++) {
@@ -172,6 +193,7 @@ namespace quda {
       launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
              const std::vector<constant_param_t> &param = dummy_param)
     {
+      ompwip();
       const_cast<Arg &>(arg).threads.y = vector_length_y;
       if (TunableKernel1D_base<grid_stride>::location == QUDA_CUDA_FIELD_LOCATION) {
         launch_device<Functor, Arg>(tp, stream, arg, param);
@@ -185,6 +207,7 @@ namespace quda {
       launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
              const std::vector<constant_param_t> &param = dummy_param)
     {
+      ompwip();
       const_cast<Arg &>(arg).threads.y = vector_length_y;
       if (TunableKernel1D_base<grid_stride>::location == QUDA_CUDA_FIELD_LOCATION) {
         launch_device<Functor, Arg>(tp, stream, arg, param);
@@ -302,6 +325,7 @@ namespace quda {
     template <template <typename> class Functor, typename Arg>
     void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
     {
+      ompwip();
 #ifdef JITIFY
       launch_error = launch_jitify<Functor>("quda::Kernel3D", tp, stream, arg, param);
 #else
@@ -314,6 +338,7 @@ namespace quda {
     template <template <typename> class Functor, typename Arg>
     void launch_host(const TuneParam &, const qudaStream_t &, const Arg &arg, const std::vector<constant_param_t> & = dummy_param)
     {
+      ompwip();
       Functor<Arg> f(const_cast<Arg &>(arg));
       for (int i = 0; i < (int)arg.threads.x; i++) {
         for (int j = 0; j < (int)arg.threads.y; j++) {
@@ -329,6 +354,7 @@ namespace quda {
       launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
              const std::vector<constant_param_t> &param = dummy_param)
     {
+      ompwip();
       const_cast<Arg &>(arg).threads.y = vector_length_y;
       const_cast<Arg &>(arg).threads.z = vector_length_z;
       if (TunableKernel2D_base<grid_stride>::location == QUDA_CUDA_FIELD_LOCATION) {
@@ -343,6 +369,7 @@ namespace quda {
       launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
              const std::vector<constant_param_t> &param = dummy_param)
     {
+      ompwip();
       const_cast<Arg &>(arg).threads.y = vector_length_y;
       const_cast<Arg &>(arg).threads.z = vector_length_z;
       if (TunableKernel2D_base<grid_stride>::location == QUDA_CUDA_FIELD_LOCATION) {

@@ -203,7 +203,28 @@ namespace quda {
           default: errorQuda("Unsupported cudaMemcpyType %d", kind);
           }
 #else
-          cudaMemcpy(dst, src, count, kind);
+          printfQuda("memcpy %p <- %p\n",dst,src);
+          switch (kind) {
+          case cudaMemcpyHostToHost: memcpy(dst,(void*)src,count); break;
+          case cudaMemcpyHostToDevice:
+            if(0<omp_get_num_devices()) omp_target_memcpy(dst,(void*)src,count,0,0,omp_get_default_device(),omp_get_initial_device());
+            else{warningQuda("cudaMemcpyHostToDevice without a device"); memcpy(dst,(void*)src,count);}
+            break;
+          case cudaMemcpyDeviceToHost:
+            if(0<omp_get_num_devices()) omp_target_memcpy(dst,(void*)src,count,0,0,omp_get_initial_device(),omp_get_default_device());
+            else{warningQuda("cudaMemcpyDeviceToHost without a device"); memcpy(dst,(void*)src,count);}
+            break;
+          case cudaMemcpyDeviceToDevice:
+            warningQuda("unimplemented for cudaMemcpyDeviceToDevice");
+            break;
+          case cudaMemcpyDefault:
+            warningQuda("OMP treating cudaMemcpyDefault as cudaMemcpyHostToDevice");
+            if(0<omp_get_num_devices()) omp_target_memcpy(dst,(void*)src,count,0,0,omp_get_default_device(),omp_get_initial_device());
+            else{warningQuda("cudaMemcpyHostToDevice without a device"); memcpy(dst,(void*)src,count);}
+            break;
+          default: errorQuda("Unsupported cudaMemcpyType %d", kind);
+          }
+          // cudaMemcpy(dst, src, count, kind);
 #endif
         }
       } else {
