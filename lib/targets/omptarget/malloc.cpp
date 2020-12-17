@@ -331,7 +331,7 @@ namespace quda
       ompwip("require special memcpy",[=](){printfQuda("mapped_malloc_ device: %p\n",dp);});
       if(!dp)
         errorQuda("%s:%d %s() Failed to allocate device memory of size %zu for mapped malloc\n", file, line, func, size);
-      if(!omp_target_associate_ptr(ptr, dp, a.base_size, 0, d))
+      if(omp_target_associate_ptr(ptr, dp, a.base_size, 0, d))
         errorQuda("%s:%d %s() Failed to assocaite device memory to host pointer\n", file, line, func);
     }else
       warningQuda("%s:%d %s() mapped malloc without a device", file, line, func);
