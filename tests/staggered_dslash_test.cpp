@@ -67,7 +67,7 @@ CLI::TransformPairs<dslash_test_type> dtest_type_map {{"Dslash", dslash_test_typ
 
 void init()
 {
-  initQuda(device);
+  initQuda(device_ordinal);
 
   gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
@@ -77,7 +77,11 @@ void init()
   inv_param.dagger = dagger ? QUDA_DAG_YES : QUDA_DAG_NO;
 
   setDims(gauge_param.X);
-  dw_setDims(gauge_param.X, Nsrc); // so we can use 5-d indexing from dwf
+  dw_setDims(gauge_param.X, 1);
+  if (Nsrc != 1) {
+    warningQuda("Ignoring Nsrc = %d, setting to 1.", Nsrc);
+    Nsrc = 1;
+  }
   setSpinorSiteSize(staggeredSpinorSiteSize);
 
   // Allocate a lot of memory because I'm very confused
@@ -171,7 +175,7 @@ void init()
   csParam.nSpin = 1;
   csParam.nDim = 5;
   for (int d = 0; d < 4; d++) { csParam.x[d] = gauge_param.X[d]; }
-  csParam.x[4] = Nsrc; // number of sources becomes the fifth dimension
+  csParam.x[4] = 1;
 
   csParam.setPrecision(inv_param.cpu_prec);
   inv_param.solution_type = QUDA_MAT_SOLUTION;
@@ -508,9 +512,7 @@ int main(int argc, char **argv)
   // If we're building fat/long links, there are some
   // tests we have to skip.
   if (dslash_type == QUDA_ASQTAD_DSLASH && compute_fatlong) {
-    if (prec < QUDA_SINGLE_PRECISION /* half */) {
-      errorQuda("Half precision unsupported in fat/long compute");
-    }
+    if (prec < QUDA_SINGLE_PRECISION /* half */) { errorQuda("Half precision unsupported in fat/long compute"); }
   }
 
   display_test_info();

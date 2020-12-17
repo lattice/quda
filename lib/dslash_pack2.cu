@@ -196,16 +196,14 @@ public:
     template <typename T, typename Arg>
     inline void launch(T *f, const TuneParam &tp, Arg &arg, const qudaStream_t &stream)
     {
-      if (deviceProp.major >= 7) { // enable max shared memory mode on GPUs that support it
-        this->setMaxDynamicSharedBytesPerBlock(f);
-      }
-
       qudaLaunchKernel(f, tp, stream, arg);
     }
 
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      // enable max shared memory mode on GPUs that support it
+      if (deviceProp.major >= 7) tp.set_max_shared_bytes = true;
 
       if (in.Nspin() == 4) {
         using Arg = PackArg<Float, nColor, 4, spin_project>;
@@ -247,7 +245,7 @@ public:
                   tp, arg, stream);
               break;
             case 1:
-              launch(location & Host ? packShmemKernel<true, 1, QUDA_4D_PC, Arg> : packKernel<true, 0, QUDA_4D_PC, Arg>,
+              launch(location & Host ? packShmemKernel<true, 1, QUDA_4D_PC, Arg> : packKernel<true, 1, QUDA_4D_PC, Arg>,
                   tp, arg, stream);
               break;
             case 2:

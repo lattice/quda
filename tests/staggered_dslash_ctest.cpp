@@ -5,21 +5,14 @@
 #include <algorithm>
 
 #include <quda.h>
-#include <quda_internal.h>
+#include <gauge_field.h>
 #include <dirac_quda.h>
-#include <dslash_quda.h>
-#include <invert_quda.h>
-#include <util_quda.h>
-#include <blas_quda.h>
-
 #include <misc.h>
 #include <host_utils.h>
 #include <command_line_params.h>
 #include <dslash_reference.h>
 #include <staggered_dslash_reference.h>
 #include <staggered_gauge_utils.h>
-#include <gauge_field.h>
-#include <unitarization_links.h>
 
 #include "dslash_test_helpers.h"
 #include <assert.h>
@@ -99,7 +92,11 @@ void init(int precision, QudaReconstructType link_recon, int partition)
   gauge_param.cuda_prec_refinement_sloppy = prec;
 
   setDims(gauge_param.X);
-  dw_setDims(gauge_param.X, Nsrc); // so we can use 5-d indexing from dwf
+  dw_setDims(gauge_param.X, 1);
+  if (Nsrc != 1) {
+    warningQuda("Ignoring Nsrc = %d, setting to 1.", Nsrc);
+    Nsrc = 1;
+  }
   setSpinorSiteSize(6);
 
   setStaggeredInvertParam(inv_param);
@@ -191,7 +188,7 @@ void init(int precision, QudaReconstructType link_recon, int partition)
   csParam.nSpin = 1;
   csParam.nDim = 5;
   for (int d = 0; d < 4; d++) { csParam.x[d] = gauge_param.X[d]; }
-  csParam.x[4] = Nsrc; // number of sources becomes the fifth dimension
+  csParam.x[4] = 1;
 
   csParam.setPrecision(inv_param.cpu_prec);
   inv_param.solution_type = QUDA_MAT_SOLUTION;
@@ -477,7 +474,7 @@ public:
     end();
   }
 
-  static void SetUpTestCase() { initQuda(device); }
+  static void SetUpTestCase() { initQuda(device_ordinal); }
 
   // Per-test-case tear-down.
   // Called after the last test in this test case.

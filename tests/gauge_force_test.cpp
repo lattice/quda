@@ -241,7 +241,7 @@ void gauge_force_test(void)
 {
   int max_length = 6;
 
-  initQuda(device);
+  initQuda(device_ordinal);
   setVerbosityQuda(QUDA_VERBOSE,"",stdout);
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
@@ -273,9 +273,12 @@ void gauge_force_test(void)
       input_path_buf[dir][i] = (int*)safe_malloc(length[i]*sizeof(int));
       if (dir == 0)
         memcpy(input_path_buf[dir][i], path_dir_x[i], length[i] * sizeof(int));
-      else if (dir ==1) memcpy(input_path_buf[dir][i], path_dir_y[i], length[i]*sizeof(int));
-      else if (dir ==2) memcpy(input_path_buf[dir][i], path_dir_z[i], length[i]*sizeof(int));
-      else if (dir ==3) memcpy(input_path_buf[dir][i], path_dir_t[i], length[i]*sizeof(int));
+      else if (dir == 1)
+        memcpy(input_path_buf[dir][i], path_dir_y[i], length[i] * sizeof(int));
+      else if (dir == 2)
+        memcpy(input_path_buf[dir][i], path_dir_z[i], length[i] * sizeof(int));
+      else if (dir == 3)
+        memcpy(input_path_buf[dir][i], path_dir_t[i], length[i] * sizeof(int));
     }
   }
 
@@ -340,7 +343,8 @@ void gauge_force_test(void)
   if (verify_results) {
     gauge_force_reference(refmom, eb3, (void **)U_qdp->Gauge_p(), gauge_param.cpu_prec, input_path_buf, length,
                           loop_coeff, num_paths);
-    force_check = compare_floats(Mom_milc->Gauge_p(), refmom, 4 * V * mom_site_size, getTolerance(cuda_prec), gauge_param.cpu_prec);
+    force_check = compare_floats(Mom_milc->Gauge_p(), refmom, 4 * V * mom_site_size, getTolerance(cuda_prec),
+                                 gauge_param.cpu_prec);
     strong_check_mom(Mom_milc->Gauge_p(), refmom, 4 * V, gauge_param.cpu_prec);
   }
 
@@ -351,7 +355,7 @@ void gauge_force_test(void)
   printfQuda("QUDA action = %e, reference = %e relative deviation = %e\n", action_quda, action_ref, deviation);
 
   double perf = 1.0*niter*flops*V/(total_time*1e+9);
-  printfQuda("total time = %.2f ms\n", total_time*1e+3);
+  printfQuda("total time = %.2f ms\n", total_time * 1e+3);
   printfQuda("overall performance : %.2f GFLOPS\n",perf);
 
   for(int dir = 0; dir < 4; dir++){
@@ -368,15 +372,9 @@ void gauge_force_test(void)
   endQuda();
 }
 
-TEST(force, verify)
-{
-  ASSERT_EQ(force_check, 1) << "CPU and QUDA implementations do not agree";
-}
+TEST(force, verify) { ASSERT_EQ(force_check, 1) << "CPU and QUDA implementations do not agree"; }
 
-TEST(action, verify)
-{
-  ASSERT_LE(deviation, getTolerance(cuda_prec)) << "CPU and QUDA implementations do not agree";
-}
+TEST(action, verify) { ASSERT_LE(deviation, getTolerance(cuda_prec)) << "CPU and QUDA implementations do not agree"; }
 
 static void display_test_info()
 {

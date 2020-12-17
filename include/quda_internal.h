@@ -54,7 +54,7 @@ extern "C" {
     void *field; /**< Pointer to a ColorSpinorField */
   };
 
-  //extern cudaDeviceProp deviceProp;
+  // extern cudaDeviceProp deviceProp;
   extern qudaStream_t *streams;
 
 #ifdef __cplusplus
@@ -95,7 +95,9 @@ namespace quda {
   template<> struct fixedMaxValue<short2>{ static constexpr float value = 32767.0f; };
   template<> struct fixedMaxValue<short4>{ static constexpr float value = 32767.0f; };
   template<> struct fixedMaxValue<short8>{ static constexpr float value = 32767.0f; };
-  template<> struct fixedMaxValue<int8_t>{ static constexpr float value = 127.0f; };
+  template <> struct fixedMaxValue<int8_t> {
+    static constexpr float value = 127.0f;
+  };
   template<> struct fixedMaxValue<char2>{ static constexpr float value = 127.0f; };
   template<> struct fixedMaxValue<char4>{ static constexpr float value = 127.0f; };
   template<> struct fixedMaxValue<char8>{ static constexpr float value = 127.0f; };

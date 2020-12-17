@@ -30,6 +30,8 @@ namespace quda
     cudaEvent_t &get_event();
   } // namespace reducer
 
+  constexpr int max_n_reduce() { return QUDA_MAX_MULTI_REDUCE; }
+
   /**
      @brief The initialization value we used to check for completion
    */
@@ -133,12 +135,13 @@ namespace quda
 #else
       auto event = reducer::get_event();
       qudaEventRecord(event, stream);
-      while (!qudaEventQuery(event)) {}
+      while (!qudaEventQuery(event)) { }
 #endif
       // copy back result element by element and convert if necessary to host reduce type
       // unit size here may differ from system_atomic_t size, e.g., if doing double-double
       const int n_element = n_reduce * sizeof(T) / sizeof(device_t);
-      if (result.size() != (unsigned)n_element) errorQuda("result vector length %lu does not match n_reduce %d", result.size(), n_reduce);
+      if (result.size() != (unsigned)n_element)
+        errorQuda("result vector length %lu does not match n_reduce %d", result.size(), n_reduce);
       for (int i = 0; i < n_element; i++) result[i] = reinterpret_cast<device_t *>(result_h)[i];
 
 #ifdef HETEROGENEOUS_ATOMIC
@@ -299,7 +302,6 @@ namespace quda
     {
       reduce2d<block_size, 1, do_sum, Reducer>(in, idx);
     }
-
   };
 
 } // namespace quda

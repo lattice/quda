@@ -559,10 +559,14 @@ namespace quda {
 
     const int *GhostFace() const { return ghostFace; }
     const int *GhostFaceCB() const { return ghostFaceCB; }
-    int GhostOffset(const int i) const { return ghostOffset[i][0]; }
-    int GhostOffset(const int i, const int j) const { return ghostOffset[i][j]; }
-    int GhostNormOffset(const int i ) const { return ghostNormOffset[i][0]; }
-    int GhostNormOffset(const int i, const int j) const { return ghostNormOffset[i][j]; }
+
+    /**
+       Return the offset in bytes to the start of the ghost zone in a
+       given dimension and direction
+       @param[in] dim The dimension of the ghost
+       @param[in] dir The direction of the ghost
+     */
+    size_t GhostOffset(const int dim, const int dir) const { return ghost_offset[dim][dir]; }
 
     void* Ghost(const int i);
     const void* Ghost(const int i) const;
@@ -595,6 +599,14 @@ namespace quda {
     virtual void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0) = 0;
 
     virtual void PrintVector(unsigned int x) const = 0;
+
+    /**
+     * @brief Thin wrapper around PrintVector that takes in a checkerboard index and
+     * a parity instead of a full index
+     * @param[in] x_cb checkerboard index
+     * @param[in] parity site parity
+     */
+    void PrintVector(unsigned int x_cb, unsigned int parity) const { PrintVector(2 * x_cb + parity); }
 
     /**
      * Compute the n-dimensional site index given the 1-d offset index

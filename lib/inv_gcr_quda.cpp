@@ -161,10 +161,10 @@ namespace quda {
     delete []delta;
   }
 
-  GCR::GCR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
-           TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, param, profile),
-    matMdagM(DiracMdagM(matPrecon.Expose())),
+  GCR::GCR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+           const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
+    Solver(mat, matSloppy, matPrecon, matEig, param, profile),
+    matMdagM(DiracMdagM(matEig.Expose())),
     K(0),
     Kparam(param),
     n_krylov(param.Nkrylov),
@@ -177,15 +177,15 @@ namespace quda {
     fillInnerSolveParam(Kparam, param);
 
     if (param.inv_type_precondition == QUDA_CG_INVERTER) // inner CG solver
-      K = new CG(matSloppy, matPrecon, matPrecon, Kparam, profile);
+      K = new CG(matSloppy, matPrecon, matPrecon, matEig, Kparam, profile);
     else if (param.inv_type_precondition == QUDA_BICGSTAB_INVERTER) // inner BiCGstab solver
-      K = new BiCGstab(matSloppy, matPrecon, matPrecon, Kparam, profile);
+      K = new BiCGstab(matSloppy, matPrecon, matPrecon, matEig, Kparam, profile);
     else if (param.inv_type_precondition == QUDA_MR_INVERTER) // inner MR solver
       K = new MR(matSloppy, matPrecon, Kparam, profile);
     else if (param.inv_type_precondition == QUDA_SD_INVERTER) // inner SD solver
       K = new SD(matSloppy, Kparam, profile);
     else if (param.inv_type_precondition == QUDA_CA_GCR_INVERTER) // inner CA-GCR solver
-      K = new CAGCR(matSloppy, matPrecon, matPrecon, Kparam, profile);
+      K = new CAGCR(matSloppy, matPrecon, matPrecon, matEig, Kparam, profile);
     else if (param.inv_type_precondition == QUDA_INVALID_INVERTER) // unsupported
       K = NULL;
     else 
@@ -201,9 +201,9 @@ namespace quda {
   }
 
   GCR::GCR(const DiracMatrix &mat, Solver &K, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-           SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, param, profile),
-    matMdagM(matPrecon.Expose()),
+           const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
+    Solver(mat, matSloppy, matPrecon, matEig, param, profile),
+    matMdagM(matEig.Expose()),
     K(&K),
     Kparam(param),
     n_krylov(param.Nkrylov),
@@ -292,15 +292,23 @@ namespace quda {
 
     if (param.deflate) {
       // Construct the eigensolver and deflation space if requested.
-      constructDeflationSpace(b, matMdagM);
+      if (param.eig_param.eig_type == QUDA_EIG_TR_LANCZOS || param.eig_param.eig_type == QUDA_EIG_BLK_TR_LANCZOS) {
+        constructDeflationSpace(b, matMdagM);
+      } else {
+        // Use Arnoldi to inspect the space only and turn off deflation
+        constructDeflationSpace(b, mat);
+        param.deflate = false;
+      }
       if (deflate_compute) {
         // compute the deflation space.
         profile.TPSTOP(QUDA_PROFILE_INIT);
         (*eig_solve)(evecs, evals);
-        // double the size of the Krylov space
-        extendSVDDeflationSpace();
-        // populate extra memory with L/R singular vectors
-        eig_solve->computeSVD(matMdagM, evecs, evals);
+        if (param.deflate) {
+          // double the size of the Krylov space
+          extendSVDDeflationSpace();
+          // populate extra memory with L/R singular vectors
+          eig_solve->computeSVD(matMdagM, evecs, evals);
+        }
         profile.TPSTART(QUDA_PROFILE_INIT);
         deflate_compute = false;
       }
@@ -448,7 +456,7 @@ namespace quda {
         r2 = blas::xmyNorm(b, r);
 
         if (param.deflate && sqrt(r2) < maxr_deflate * param.tol_restart) {
-          // Deflate and accumulate to solution vector
+          // Deflate: Hardcoded to SVD.
           eig_solve->deflateSVD(x, r, evecs, evals, true);
 
           // Compute r_defl = RHS - A * LHS

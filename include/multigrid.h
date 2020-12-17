@@ -99,7 +99,10 @@ namespace quda {
     char filename[100];
 
     /** Whether or not this is a staggered solve or not */
-    bool is_staggered;
+    QudaTransferType transfer_type;
+
+    /** Whether to use tensor cores (if available) */
+    bool use_mma;
 
     /**
        This is top level instantiation done when we start creating the multigrid operator.
@@ -127,7 +130,8 @@ namespace quda {
       smoother_solve_type(param.smoother_solve_type[level]),
       location(param.location[level]),
       setup_location(param.setup_location[level]),
-      is_staggered(param.is_staggered == QUDA_BOOLEAN_YES)
+      transfer_type(param.transfer_type[level]),
+      use_mma(param.use_mma == QUDA_BOOLEAN_TRUE)
     {
       // set the block size
       for (int i = 0; i < QUDA_MAX_DIM; i++) geoBlockSize[i] = param.geo_block_size[level][i];
@@ -161,7 +165,8 @@ namespace quda {
       smoother_solve_type(param.mg_global.smoother_solve_type[level]),
       location(param.mg_global.location[level]),
       setup_location(param.mg_global.setup_location[level]),
-      is_staggered(param.is_staggered == QUDA_BOOLEAN_YES)
+      transfer_type(param.mg_global.transfer_type[level]),
+      use_mma(param.use_mma)
     {
       // set the block size
       for (int i = 0; i < QUDA_MAX_DIM; i++) geoBlockSize[i] = param.mg_global.geo_block_size[level][i];
@@ -239,6 +244,9 @@ namespace quda {
 
     /** Coarse temporary vector */
     ColorSpinorField *tmp2_coarse;
+
+    /** Kahler-Dirac Xinv */
+    cudaGaugeField *xInvKD;
 
     /** The fine operator used for computing inter-grid residuals */
     const Dirac *diracResidual;
@@ -424,6 +432,7 @@ public:
      @param gauge[in] Gauge field from fine grid
      @param clover[in] Clover field on fine grid (optional)
      @param kappa[in] Kappa parameter
+     @param mass[in] Mass parameter
      @param mu[in] Mu parameter (set to non-zero for twisted-mass/twisted-clover)
      @param mu_factor[in] Multiplicative factor for the mu parameter
      @param matpc[in] The type of even-odd preconditioned fine-grid
@@ -431,9 +440,9 @@ public:
      matpc==QUDA_MATPC_INVALID then we assume the operator is not
      even-odd preconditioned and we coarsen the full operator.
    */
-  void CoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-		const cudaGaugeField &gauge, const cudaCloverField *clover,
-		double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc);
+  void CoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge,
+                const cudaCloverField *clover, double kappa, double mass, double mu, double mu_factor,
+                QudaDiracType dirac, QudaMatPCType matpc);
 
   /**
      @brief Coarse operator construction from a fine-grid operator (Staggered)
@@ -441,13 +450,14 @@ public:
      @param X[out] Coarse clover field
      @param T[in] Transfer operator that defines the coarse space
      @param gauge[in] Gauge field from fine grid, needs to be generalized for long link.
+     @param XinvKD[in] Inverse Kahler-Dirac block
      @param mass[in] Mass parameter
      @param matpc[in] The type of even-odd preconditioned fine-grid
      operator we are constructing the coarse grid operator from.
      For staggered, should always be QUDA_MATPC_INVALID.
    */
-  void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge, double mass,
-                         QudaDiracType dirac, QudaMatPCType matpc);
+  void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge,
+                         const cudaGaugeField *XinvKD, double mass, QudaDiracType dirac, QudaMatPCType matpc);
 
   /**
      @brief Coarse operator construction from an intermediate-grid operator (Coarse)
@@ -458,6 +468,7 @@ public:
      @param clover[in] Clover field on fine grid
      @param cloverInv[in] Clover inverse field on fine grid
      @param kappa[in] Kappa parameter
+     @param mass[in] Mass parameter
      @param mu[in] Mu parameter (set to non-zero for twisted-mass/twisted-clover)
      @param mu_factor[in] Multiplicative factor for the mu parameter
      @param matpc[in] The type of even-odd preconditioned fine-grid
@@ -467,10 +478,11 @@ public:
      @param need_bidirectional[in] Whether or not we need to force a bi-directional
      build, even if the given level isn't preconditioned---if any previous level is
      preconditioned, we've violated that symmetry.
+     @param use_mma[in] Whether or not use MMA (tensor core) to do the calculation, default to false
    */
-  void CoarseCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
-                      const GaugeField &clover, const GaugeField &cloverInv, double kappa, double mu, double mu_factor,
-                      QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional);
+  void CoarseCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge, const GaugeField &clover,
+                      const GaugeField &cloverInv, double kappa, double mass, double mu, double mu_factor,
+                      QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional, bool use_mma = false);
 
   /**
      @brief Calculate preconditioned coarse links and coarse clover inverse field
@@ -478,8 +490,9 @@ public:
      @param Xinv[out] Coarse clover inverse field
      @param Y[in] Coarse link field
      @param X[in] Coarse clover field
+     @param use_mma[in] Whether or not use MMA (tensor core) to do the calculation, default to false
    */
-  void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X);
+  void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X, bool use_mma = false);
 
   /**
      This is an object that captures an entire MG preconditioner

@@ -222,7 +222,6 @@ namespace quda {
       }
     } // i=3,..,0
 
-    checkCudaError();
   } // computeStaggeredOprod
 
   void computeStaggeredOprod(GaugeField &U, GaugeField &L, ColorSpinorField &inEven, ColorSpinorField &inOdd,

@@ -67,14 +67,14 @@ struct use_direct {
 template<typename T>
 __device__ typename enable_if<detail::use_shfl<T>::value, T>::type
 load_warp_contiguous(const T* src) {
-    int warp_id = threadIdx.x & WARP_MASK;
-    const T* warp_begin_src = src - warp_id;
-    typedef typename detail::dismember_type<T>::type U;
-    const U* as_int_src = (const U*)warp_begin_src;
-    typedef array<U, detail::aliased_size<T, U>::value> int_store;
-    int_store loaded = warp_load<int_store>(as_int_src, warp_id);
-    r2c_warp_transpose(loaded);
-    return detail::fuse<T>(loaded);
+  int warp_id = ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) & WARP_MASK;
+  const T *warp_begin_src = src - warp_id;
+  typedef typename detail::dismember_type<T>::type U;
+  const U *as_int_src = (const U *)warp_begin_src;
+  typedef array<U, detail::aliased_size<T, U>::value> int_store;
+  int_store loaded = warp_load<int_store>(as_int_src, warp_id);
+  r2c_warp_transpose(loaded);
+  return detail::fuse<T>(loaded);
 }
 
 template<typename T>
@@ -87,14 +87,14 @@ load_warp_contiguous(const T* src) {
 template<typename T>
 __device__ typename enable_if<detail::use_shfl<T>::value>::type
 store_warp_contiguous(const T& data, T* dest) {
-    int warp_id = threadIdx.x & WARP_MASK;
-    T* warp_begin_dest = dest - warp_id;
-    typedef typename detail::dismember_type<T>::type U;
-    U* as_int_dest = (U*)warp_begin_dest;
-    typedef array<U, detail::aliased_size<T, U>::value> int_store;
-    int_store lysed = detail::lyse<U>(data);
-    c2r_warp_transpose(lysed);
-    warp_store(lysed, as_int_dest, warp_id);
+  int warp_id = ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) & WARP_MASK;
+  T *warp_begin_dest = dest - warp_id;
+  typedef typename detail::dismember_type<T>::type U;
+  U *as_int_dest = (U *)warp_begin_dest;
+  typedef array<U, detail::aliased_size<T, U>::value> int_store;
+  int_store lysed = detail::lyse<U>(data);
+  c2r_warp_transpose(lysed);
+  warp_store(lysed, as_int_dest, warp_id);
 }
 
 template<typename T>
@@ -205,20 +205,17 @@ bool is_contiguous(int warp_id, const T* ptr) {
 template<typename T>
 __device__ typename enable_if<use_shfl<T>::value, T>::type
 load_dispatch(const T* src) {
-    int warp_id = threadIdx.x & WARP_MASK;
-    // if (detail::is_contiguous(warp_id, src)) {
-    //     return detail::load_warp_contiguous(src);
-    // } else {
-        typedef typename detail::dismember_type<T>::type U;
-        typedef array<U, detail::aliased_size<T, U>::value> u_store;
-        u_store loaded =
-            detail::indexed_load<detail::aliased_size<T, U>::value, T>::impl(
-                src,
-                warp_id / address_constants<T>::m,
-                warp_id % address_constants<T>::m);
-        r2c_warp_transpose(loaded);
-        return detail::fuse<T>(loaded);
-    // }   
+  int warp_id = ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) & WARP_MASK;
+  // if (detail::is_contiguous(warp_id, src)) {
+  //     return detail::load_warp_contiguous(src);
+  // } else {
+  typedef typename detail::dismember_type<T>::type U;
+  typedef array<U, detail::aliased_size<T, U>::value> u_store;
+  u_store loaded = detail::indexed_load<detail::aliased_size<T, U>::value, T>::impl(
+    src, warp_id / address_constants<T>::m, warp_id % address_constants<T>::m);
+  r2c_warp_transpose(loaded);
+  return detail::fuse<T>(loaded);
+  // }
 }
 
 
@@ -233,19 +230,17 @@ load_dispatch(const T* src) {
 template<typename T>
 __device__ typename enable_if<use_shfl<T>::value>::type
 store_dispatch(const T& data, T* dest) {
-    int warp_id = threadIdx.x & WARP_MASK;
-    // if (detail::is_contiguous(warp_id, dest)) {
-    //     detail::store_warp_contiguous(data, dest);
-    // } else {
-        typedef typename detail::dismember_type<T>::type U;
-        typedef array<U, detail::aliased_size<T, U>::value> u_store;
-        u_store lysed = detail::lyse<U>(data);
-        c2r_warp_transpose(lysed);
-        detail::indexed_store<detail::aliased_size<T, U>::value, T>::impl(
-            lysed, dest,
-            warp_id / address_constants<T>::m,
-            warp_id % address_constants<T>::m);
-    // }
+  int warp_id = ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) & WARP_MASK;
+  // if (detail::is_contiguous(warp_id, dest)) {
+  //     detail::store_warp_contiguous(data, dest);
+  // } else {
+  typedef typename detail::dismember_type<T>::type U;
+  typedef array<U, detail::aliased_size<T, U>::value> u_store;
+  u_store lysed = detail::lyse<U>(data);
+  c2r_warp_transpose(lysed);
+  detail::indexed_store<detail::aliased_size<T, U>::value, T>::impl(lysed, dest, warp_id / address_constants<T>::m,
+                                                                    warp_id % address_constants<T>::m);
+  // }
 }
 
 template<typename T>

@@ -172,6 +172,9 @@ option(QUDA_MAGMA "build magma interface" OFF)
 option(QUDA_ARPACK "build arpack interface" OFF)
 option(QUDA_ARPACK_LOGGING "enable ARPACK logging (not availible for NG)" OFF)
 
+# OpenBLAS
+option(QUDA_OPENBLAS "enable OpenBLAS" OFF)
+
 # Interface options
 option(QUDA_INTERFACE_QDP "build qdp interface" ON)
 option(QUDA_INTERFACE_MILC "build milc interface" ON)
@@ -199,6 +202,9 @@ set(QUDA_QDPJITHOME
 set(QUDA_ARPACK_HOME
     ""
     CACHE PATH "path to arpack / parpack")
+set(QUDA_OPENBLAS_HOME
+    ""
+    CACHE PATH "path to OpenBLAS")
 set(QUDA_MAGMAHOME
     ""
     CACHE PATH "path to MAGMA, if not set, pkg-config will be attempted")
@@ -258,10 +264,11 @@ option(QUDA_INTERFACE_NVTX "add NVTC markup to interface calls" OFF)
 option(QUDA_SSTEP "build s-step linear solvers" OFF)
 option(QUDA_MULTIGRID "build multigrid solvers" OFF)
 option(QUDA_BLOCKSOLVER "build block solvers" OFF)
-option(QUDA_USE_EIGEN "use EIGEN library (where optional)" OFF)
+option(QUDA_USE_EIGEN "use EIGEN library (where optional)" ON)
 option(QUDA_DOWNLOAD_EIGEN "Download Eigen" ON)
 option(QUDA_DOWNLOAD_USQCD "Download USQCD software as requested by QUDA_QMP / QUDA_QIO" OFF)
 option(QUDA_DOWNLOAD_ARPACK "Download ARPACK-NG software as requested by QUDA_ARPACK" OFF)
+option(QUDA_DOWNLOAD_OPENBLAS "Download OpenBLAS software as requested by QUDA_OPENBLAS" OFF)
 option(QUDA_JITIFY "build QUDA using Jitify" OFF)
 
 option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
@@ -354,29 +361,30 @@ set(CMAKE_C_FLAGS_DEVEL
     "-Wall -g -O3"
     CACHE STRING "Flags used by the C compiler during regular development builds.")
 set(CMAKE_C_FLAGS_STRICT
-    "-Wall -O3 -Werror -Wno-error=unused-private-field"
+    "-Wall -O3 -Werror"
     CACHE STRING "Flags used by the C compiler during strict jenkins builds.")
 set(CMAKE_C_FLAGS_RELEASE
-    "-Wall -O3 -w"
+    "-Wall -O3"
     CACHE STRING "Flags used by the C compiler during release builds.")
 set(CMAKE_C_FLAGS_HOSTDEBUG
     "-Wall -Wno-unknown-pragmas -g -fno-inline"
     CACHE STRING "Flags used by the C compiler during host-debug builds.")
 set(CMAKE_C_FLAGS_DEVICEDEBUG
-    "-Wall"
+    "-Wall -Wno-unknown-pragmas"
     CACHE STRING "Flags used by the C compiler during device-debug builds.")
 set(CMAKE_C_FLAGS_DEBUG
-    "-Wall -g -fno-inline"
+    "-Wall -Wno-unknown-pragmas -g -fno-inline"
     CACHE STRING "Flags used by the C compiler during full (host+device) debug builds.")
 set(CMAKE_C_FLAGS_SANITIZE
-    "-Wall -g -fno-inline -fsanitize=address,undefined"
+    "-Wall -Wno-unknown-pragmas -g -fno-inline -fsanitize=address,undefined"
     CACHE STRING "Flags used by the C compiler during sanitizer debug builds.")
 
 enable_language(C)
 
 if(QUDA_INTERFACE_TIFR
    OR QUDA_INTERFACE_BQCD
-   OR QUDA_ARPACK)
+   OR QUDA_ARPACK
+   OR QUDA_OPENBLAS)
   set(BUILD_FORTRAN_INTERFACE ON)
   enable_language(Fortran)
 endif()
@@ -536,7 +544,7 @@ if(QUDA_MPI OR QUDA_QMP)
     )
   endif()
   # we need to enable Fortran if we want to detect MPI_Fortran_COMPILER
-  if(QUDA_ARPACK)
+  if(QUDA_ARPACK OR QUDA_OPENBLAS)
     enable_language(Fortran)
   endif()
   find_package(MPI)
@@ -776,6 +784,40 @@ if(QUDA_ARPACK)
   endif(QUDA_DOWNLOAD_ARPACK)
 endif(QUDA_ARPACK)
 
+if(QUDA_OPENBLAS)
+  enable_language(Fortran)
+
+  if(QUDA_DOWNLOAD_OPENBLAS)
+    include(GNUInstallDirs)
+    ExternalProject_Add(
+      OPENBLAS
+      GIT_REPOSITORY https://github.com/xianyi/OpenBLAS.git
+      GIT_TAG v0.3.10
+      GIT_SHALLOW YES
+      PREFIX openblas
+      CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR> 
+      CMAKE_GENERATOR "Unix Makefiles")
+    ExternalProject_Get_Property(OPENBLAS INSTALL_DIR)
+    set(QUDA_OPENBLAS_HOME ${INSTALL_DIR})
+    add_library(openblas STATIC IMPORTED)
+    add_dependencies(openblas OPENBLAS)
+    set_target_properties(openblas PROPERTIES IMPORTED_LINK_INTERFACE_LANGUAGES Fortran)
+    set_target_properties(openblas PROPERTIES IMPORTED_LOCATION
+                                               ${QUDA_OPENBLAS_HOME}/${CMAKE_INSTALL_LIBDIR}/libopenblas.a)
+
+  else(QUDA_DOWNLOAD_OPENBLAS)
+    find_package(PkgConfig REQUIRED)
+
+    pkg_check_modules(OPENBLAS QUIET openblas)
+    if(NOT OPENBLAS_FOUND OR QUDA_OPENBLAS_HOME)
+      find_library(OPENBLAS openblas PATH ${QUDA_OPENBLAS_HOME})
+    else()
+      find_library(OPENBLAS ${OPENBLAS_LIBRARIES} PATH ${OPENBLAS_LIBRARY_DIRS})
+    endif()    
+  endif(QUDA_DOWNLOAD_OPENBLAS)
+endif(QUDA_OPENBLAS)
+
+
 # BACKWARDS
 if(QUDA_BACKWARDS)
   include(FetchContent)
@@ -831,6 +873,4 @@ include(CTest)
 # add tests, utils, reference, and quda library
 add_subdirectory(lib)
 add_subdirectory(tests)
-add_subdirectory(utils)
-add_subdirectory(host_reference)
 add_subdirectory(doc)

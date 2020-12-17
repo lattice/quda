@@ -5,10 +5,6 @@
 #include <memory>
 #include <iostream>
 
-#ifdef BLOCKSOLVER
-#include <Eigen/Dense>
-#endif
-
 #include <quda_internal.h>
 #include <color_spinor_field.h>
 #include <blas_quda.h>
@@ -16,11 +12,13 @@
 #include <invert_quda.h>
 #include <util_quda.h>
 #include <eigensolve_quda.h>
+#include <eigen_helper.h>
 
 namespace quda {
 
-  CG::CG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, param, profile),
+  CG::CG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
+         SolverParam &param, TimeProfile &profile) :
+    Solver(mat, matSloppy, matPrecon, matEig, param, profile),
     yp(nullptr),
     rp(nullptr),
     rnewp(nullptr),
@@ -61,11 +59,13 @@ namespace quda {
     if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
-  CGNE::CGNE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
-    CG(mmdag, mmdagSloppy, mmdagPrecon, param, profile),
+  CGNE::CGNE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+             const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
+    CG(mmdag, mmdagSloppy, mmdagPrecon, mmdagEig, param, profile),
     mmdag(mat.Expose()),
     mmdagSloppy(matSloppy.Expose()),
     mmdagPrecon(matPrecon.Expose()),
+    mmdagEig(matEig.Expose()),
     xp(nullptr),
     yp(nullptr),
     init(false)
@@ -149,11 +149,13 @@ namespace quda {
 
   }
 
-  CGNR::CGNR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
-    CG(mdagm, mdagmSloppy, mdagmPrecon, param, profile),
+  CGNR::CGNR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+             const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
+    CG(mdagm, mdagmSloppy, mdagmPrecon, mdagmEig, param, profile),
     mdagm(mat.Expose()),
     mdagmSloppy(matSloppy.Expose()),
     mdagmPrecon(matPrecon.Expose()),
+    mdagmEig(matEig.Expose()),
     bp(nullptr),
     init(false)
   {
@@ -287,7 +289,7 @@ namespace quda {
 
     if (param.deflate) {
       // Construct the eigensolver and deflation space if requested.
-      constructDeflationSpace(b, matPrecon);
+      constructDeflationSpace(b, matEig);
       if (deflate_compute) {
         // compute the deflation space.
         if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_INIT);
@@ -296,7 +298,7 @@ namespace quda {
         deflate_compute = false;
       }
       if (recompute_evals) {
-        eig_solve->computeEvals(matPrecon, evecs, evals);
+        eig_solve->computeEvals(matEig, evecs, evals);
         recompute_evals = false;
       }
     }
@@ -743,7 +745,7 @@ namespace quda {
       profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
       param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-      double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops()) * 1e-9;
+      double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops() + matEig.flops()) * 1e-9;
       param.gflops = gflops;
       param.iter += k;
 

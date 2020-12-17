@@ -11,8 +11,13 @@ namespace quda
     void init(int dev);
 
     /**
+       @brief Query and print to stdout device properties of all GPUs
+    */
+    void print_device_properties();
+
+    /**
        @brief Create the streams associated with parallel execution.
-     */
+    */
     void create_context();
 
     /**
@@ -20,6 +25,12 @@ namespace quda
        tearing down the library.
      */
     void destroy();
+
+    /**
+     * @brief Returns the maximum dynamic shared memory per block.
+     * @return The maximum dynamic shared memory to each block of threads
+     */
+    size_t max_dynamic_shared_memory();
 
     namespace profile
     {

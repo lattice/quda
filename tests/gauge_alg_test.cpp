@@ -127,13 +127,13 @@ class GaugeAlgTest : public ::testing::Test {
     a0.Start(__func__, __FILE__, __LINE__);
     a1.Start(__func__, __FILE__, __LINE__);
 
-    int *num_failures_h = (int*)mapped_malloc(sizeof(int));
-    int *num_failures_d = (int*)get_mapped_device_pointer(num_failures_h);
+    int *num_failures_h = (int *)mapped_malloc(sizeof(int));
+    int *num_failures_d = (int *)get_mapped_device_pointer(num_failures_h);
 
     if (link_recon != QUDA_RECONSTRUCT_8 && coldstart)
       InitGaugeField(*U);
     else
-      InitGaugeField(*U, *randstates );
+      InitGaugeField(*U, *randstates);
 
     // Reunitarization setup
     SetReunitarizationConsts();
@@ -266,7 +266,7 @@ int main(int argc, char **argv)
   ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
   if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
 
-  initQuda(device);
+  initQuda(device_ordinal);
   test_rc = RUN_ALL_TESTS();
   endQuda();
 

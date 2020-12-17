@@ -25,13 +25,14 @@ namespace quda {
     template <int block_size, typename real, int len, int NXZ, typename Arg>
     typename std::enable_if<block_size==32, qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
+      if (block_size != tp.block.x) errorQuda("Unexpected block size %d\n", tp.block.x);
       return qudaLaunchKernel(multiReduceKernel<block_size, real, len, NXZ, Arg>, tp, stream, arg);
     }
 
 #ifdef QUDA_FAST_COMPILE_REDUCE
-    constexpr unsigned int max_block_size() { return 32; }
+    constexpr static unsigned int max_block_size() { return 32; }
 #else
-    constexpr unsigned int max_block_size() { return 128; }
+    constexpr static unsigned int max_block_size() { return 128; }
 #endif
 
     template <typename real, int len, int NXZ, typename Arg, typename T>
@@ -147,7 +148,6 @@ namespace quda {
 #endif
 
         apply(*blas::getStream());
-        checkCudaError();
 
         blas::bytes += bytes();
         blas::flops += flops();
@@ -348,7 +348,7 @@ namespace quda {
 
         coeff_array<T> a, b, c;
 
-        if (x.size() <= tile_size.x && is_valid_NXZ(x.size(), true)) {
+        if (x.size() <= tile_size.x && is_valid_NXZ(x.size(), true) && x.size() * y.size() <= max_n_reduce()) {
           // problem will fit, so do the computation
           multiReduce<ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
         } else {
