@@ -467,22 +467,18 @@ public:
   __host__ __device__ complex<float>(const complex<float> & z) : float2(z) {}
   __host__ __device__ complex<float>& operator=(const complex<float> &z)
     {
-      x = z.x;
-      y = z.y;
+      real(z.real());
+      imag(z.imag());
       return *this;
     }
 
   __host__ __device__
     complex<float>(float2 z)
     : float2(z){}
-  
-  template <class X>
-    inline complex<float>(const std::complex<X> & z)
-    {
-      real(z.real());
-      imag(z.imag());
-    }  
 
+  template <typename X>
+    inline complex<float>(const std::complex<X> & z) : float2{ static_cast<float>(z.real()), static_cast<float>(z.imag()) } {}
+  
   // Member operators
   template <typename T>
     __host__ __device__
@@ -825,6 +821,9 @@ public:
 
   __host__ __device__ inline complex<int>(const complex<int> & z) : int2(z){}
 
+  template <typename X>
+  inline complex<int>(const std::complex<X> & z) : int2{static_cast<int>(z.x), static_cast<int>(z.y)} {}
+  
   __host__ __device__ inline complex<int>& operator+=(const complex<int> z)
     {
       real(real()+z.real());
