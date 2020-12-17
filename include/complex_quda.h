@@ -819,8 +819,11 @@ public:
       imag(im);
     }
 
-  __host__ __device__ inline complex<int>(const complex<int> & z) : int2(z){}
+  //__host__ __device__ inline complex<int>(const complex<int> & z) : int2(z) {}
 
+  template <typename X>
+  inline complex<int>(const std::complex<X> & z) : int2{static_cast<int>(z.x), static_cast<int>(z.y)} {}
+  
   __host__ __device__ inline complex<int>& operator+=(const complex<int> z)
     {
       real(real()+z.real());

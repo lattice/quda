@@ -3,7 +3,7 @@
 #include <invert_quda.h>
 #include <transfer.h>
 #include <vector>
-#include <complex_quda.h>
+//#include <complex_quda.h>
 
 // at the moment double-precision multigrid is only enabled when debugging
 #ifdef HOST_DEBUG

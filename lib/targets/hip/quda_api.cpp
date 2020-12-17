@@ -6,7 +6,7 @@
 #include <device.h>
 #include <hip/hip_runtime.h>
 
-// if this macro is defined then we profile the CUDA API calls
+// if this macro is defined then we profile the HIP API calls
 //#define API_PROFILE
 
 #ifdef API_PROFILE
@@ -35,7 +35,7 @@ namespace quda {
      }
   }
 
-  static TimeProfile apiTimer("CUDA API calls (runtime)");
+  static TimeProfile apiTimer("HIP API calls (runtime)");
 
   qudaError_t qudaLaunchKernel(const void *func, const TuneParam &tp, void **args, qudaStream_t stream)
   {
@@ -57,7 +57,7 @@ namespace quda {
     // no driver API variant here since we have C++ functions
     PROFILE(hipError_t error = hipLaunchKernel(func, tp.grid, tp.block, args, tp.shared_bytes, device::get_cuda_stream(stream)),
             QUDA_PROFILE_LAUNCH_KERNEL);
-    if (error != hipSuccess && !activeTuning()) errorQuda("(CUDA) %s", hipGetErrorString(error));
+    if (error != hipSuccess && !activeTuning()) errorQuda("(HIP) %s", hipGetErrorString(error));
     return error == hipSuccess ? QUDA_SUCCESS : QUDA_ERROR;
   }
 
@@ -183,7 +183,7 @@ namespace quda {
     QudaMem copy(dst, src, count, qudaMemcpyKindToAPI(kind), device::get_default_stream(), false, func, file, line);
     hipError_t error = hipGetLastError();
     if (error != hipSuccess)
-      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
+      errorQuda("(HIP) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
   }
 
   void qudaMemcpyAsync_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const qudaStream_t &stream,
@@ -240,7 +240,7 @@ namespace quda {
     if (count == 0) return;
     QudaMem set(ptr, value, count, device::get_default_stream(), false, func, file, line);
     hipError_t error = hipGetLastError();
-    if (error != hipSuccess && !activeTuning()) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
+    if (error != hipSuccess && !activeTuning()) errorQuda("(HIP) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
   }
 
   void qudaMemsetAsync_(void *ptr, int value, size_t count, const qudaStream_t &stream, const char *func,
@@ -249,21 +249,21 @@ namespace quda {
     if (count == 0) return;
     QudaMem copy(ptr, value, count, stream, true, func, file, line);
     hipError_t error = hipGetLastError();
-    if (error != hipSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
+    if (error != hipSuccess) errorQuda("(HIP) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
   }
 
   void qudaMemset2D_(void *ptr, size_t pitch, int value, size_t width, size_t height,
                      const char *func, const char *file, const char *line)
   {
     hipError_t error = hipMemset2D(ptr, pitch, value, width, height);
-    if (error != hipSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
+    if (error != hipSuccess) errorQuda("(HIP) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
   }
 
   void qudaMemset2DAsync_(void *ptr, size_t pitch, int value, size_t width, size_t height,
                           const qudaStream_t &stream, const char *func, const char *file, const char *line)
   {
     hipError_t error = hipMemset2DAsync(ptr, pitch, value, width, height, device::get_cuda_stream(stream));
-    if (error != hipSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
+    if (error != hipSuccess) errorQuda("(HIP) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
   }
 
   void qudaMemPrefetchAsync_(void *, size_t, QudaFieldLocation, const qudaStream_t &,
@@ -277,7 +277,7 @@ namespace quda {
 
     PROFILE(hipError_t error = hipEventCreate(event), QUDA_PROFILE_EVENT_CREATE);
     if( error != hipSuccess ) {
-      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
+      errorQuda("(HIP) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
     }
     return;
   }
@@ -305,7 +305,7 @@ namespace quda {
   {
     PROFILE(hipError_t error = hipEventDestroy(event), QUDA_PROFILE_EVENT_DESTROY);
     if( error != hipSuccess ) {
-      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
+      errorQuda("(HIP) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
     }
     return;
   }
@@ -317,7 +317,7 @@ namespace quda {
     switch (error) {
     case hipSuccess: return true;
     case hipErrorNotReady: return false;
-    default: errorQuda("(CUDA) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
+    default: errorQuda("(HIP) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
     }
     return false;
   }
@@ -325,13 +325,13 @@ namespace quda {
   void qudaEventRecord_(hipEvent_t &event, qudaStream_t stream, const char *func, const char *file, const char *line)
   {
     PROFILE(hipError_t error = hipEventRecord(event, device::get_cuda_stream(stream)), QUDA_PROFILE_EVENT_RECORD);
-    if (error != hipSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
+    if (error != hipSuccess) errorQuda("(HIP) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
   }
 
   void qudaEventElapsedTime_(float *ms, qudaEvent_t start, qudaEvent_t end, const char *func, const char *file, const char *line)
   {
     PROFILE(hipError_t error = hipEventElapsedTime(ms,start,end), QUDA_PROFILE_EVENT_ELAPSED_TIME);
-    if (error != hipSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
+    if (error != hipSuccess) errorQuda("(HIP) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
   }
 
   
@@ -339,13 +339,13 @@ namespace quda {
                             const char *file, const char *line)
   {
     PROFILE(hipError_t error = hipStreamWaitEvent(device::get_cuda_stream(stream), event, flags), QUDA_PROFILE_STREAM_WAIT_EVENT);
-    if (error != hipSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
+    if (error != hipSuccess) errorQuda("(HIP) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
   }
 
   void qudaEventSynchronize_(qudaEvent_t event, const char *func, const char *file, const char *line)
   {
     PROFILE(hipError_t error = hipEventSynchronize(event), QUDA_PROFILE_EVENT_SYNCHRONIZE);
-    if (error != hipSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
+    if (error != hipSuccess) errorQuda("(HIP) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
   }
 
 #if defined(QUDA_ENABLE_P2P)
@@ -354,7 +354,7 @@ namespace quda {
   {
     // qudaIpcEventHandle_t doesn't convert nicely to ihipIpcEventHandle_t so no driver API
     PROFILE(hipError_t error = hipIpcGetEventHandle(handle,event), QUDA_PROFILE_IPC_GET_EVENT_HANDLE);
-    if (error != hipSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
+    if (error != hipSuccess) errorQuda("(HIP) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
   }
 
   void qudaIpcGetMemHandle_(qudaIpcMemHandle_t *handle, void *ptr, const char *func, const char *file,
@@ -362,7 +362,7 @@ namespace quda {
   {
     // qudaIpcEventHandle_t doesn't convert nicely to ihipIpcEventHandle_t so no driver API
     PROFILE(hipError_t error = hipIpcGetMemHandle(handle,ptr), QUDA_PROFILE_IPC_GET_MEM_HANDLE);
-    if (error != hipSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
+    if (error != hipSuccess) errorQuda("(HIP) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
   }
 
   void qudaIpcOpenEventHandle_(qudaEvent_t *event, qudaIpcEventHandle_t handle, const char *func, const char *file,
@@ -370,7 +370,7 @@ namespace quda {
   {
     // qudaIpcEventHandle_t doesn't convert nicely to ihipIpcEventHandle_t so no driver API
     PROFILE(hipError_t error = hipIpcOpenEventHandle(event,handle), QUDA_PROFILE_IPC_OPEN_EVENT_HANDLE);
-    if (error != hipSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
+    if (error != hipSuccess) errorQuda("(HIP) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
   }
 
   void qudaIpcOpenMemHandle_(void **devPtr, qudaIpcMemHandle_t handle, const char *func, const char *file,
@@ -379,14 +379,14 @@ namespace quda {
     // qudaIpcEventHandle_t doesn't convert nicely to ihipIpcEventHandle_t so no driver API
     PROFILE(hipError_t error = hipIpcOpenMemHandle(devPtr,handle,hipIpcMemLazyEnablePeerAccess),
 	    QUDA_PROFILE_IPC_OPEN_MEM_HANDLE);
-    if (error != hipSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
+    if (error != hipSuccess) errorQuda("(HIP) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
   }
   
   void qudaIpcCloseMemHandle_(void *devPtr, const char *func, const char *file, const char *line)
   {
     // qudaIpcEventHandle_t doesn't convert nicely to ihipIpcEventHandle_t so no driver API
     PROFILE(hipError_t error = hipIpcCloseMemHandle(devPtr),QUDA_PROFILE_IPC_CLOSE_MEM_HANDLE);
-    if (error != hipSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
+    if (error != hipSuccess) errorQuda("(HIP) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
   }
 #endif
 
@@ -394,14 +394,14 @@ namespace quda {
   {
     PROFILE(hipError_t error = hipStreamSynchronize(device::get_cuda_stream(stream)), QUDA_PROFILE_STREAM_SYNCHRONIZE);
     if (error != hipSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", hipGetErrorString(error), file, line, func);
+      errorQuda("(HIP) %s\n (%s:%s in %s())", hipGetErrorString(error), file, line, func);
   }
 
   void qudaDeviceSynchronize_(const char *func, const char *file, const char *line)
   {
     PROFILE(hipError_t error = hipDeviceSynchronize(), QUDA_PROFILE_DEVICE_SYNCHRONIZE);
     if (error != hipSuccess)
-      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
+      errorQuda("(HIP) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
   }
 
   void* qudaGetSymbolAddress_(const char *symbol, const char *func, const char *file, const char *line)
@@ -409,7 +409,7 @@ namespace quda {
     void *ptr;
     hipError_t error = hipGetSymbolAddress(&ptr, HIP_SYMBOL((const void *)symbol));
     if (error != hipSuccess)
-      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
+      errorQuda("(HIP) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
     return ptr;
   }
 
@@ -418,7 +418,7 @@ namespace quda {
   {
     // no driver API variant here since we have C++ functions
     PROFILE(hipError_t error = hipFuncSetAttribute(kernel, attr, value), QUDA_PROFILE_FUNC_SET_ATTRIBUTE);
-    if (error != hipSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
+    if (error != hipSuccess) errorQuda("(HIP) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
   }
 
   void qudaFuncGetAttributes_(hipFuncAttributes &attr, const void *kernel, const char *func, const char *file,
@@ -426,10 +426,21 @@ namespace quda {
   {
     // no driver API variant here since we have C++ functions
     PROFILE(hipError_t error = hipFuncGetAttributes(&attr, reinterpret_cast<const void*>(kernel)), QUDA_PROFILE_FUNC_SET_ATTRIBUTE);
-    if (error != hipSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
+    if (error != hipSuccess) errorQuda("(HIP) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
   }
 
+  static std::string error_str("HIP_SUCCESS");
 
+  void qudaSetErrorString(const std::string &error_str_)
+  {
+    error_str = error_str_;
+  }
+
+  std::string qudaGetLastErrorString()
+  {
+    return error_str;
+  }
+  
   void printAPIProfile() {
 #ifdef API_PROFILE
     apiTimer.Print();

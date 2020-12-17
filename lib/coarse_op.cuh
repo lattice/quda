@@ -793,7 +793,7 @@ namespace quda {
         constexpr bool query_max = true;
 #endif
 #endif
-        int max;
+        int max = 0;
         if (type == COMPUTE_UV) {
 #if defined(QUDA_TARGET_CUDA)
 #if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)

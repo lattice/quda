@@ -1,5 +1,18 @@
 #pragma once
 
+#include "quda_define.h"		
+#ifdef QUDA_TARGET_HIP		
+#ifndef __HIP_DEVICE_COMPILE__		
+inline double		
+rsqrt(double x) { 		
+  return 1.0/sqrt(x);		
+}		
+#else		
+#include <hip/math_functions.h>		
+#endif		
+#endif
+
+
 /**
  * @file  gauge_field_order.h
  * @brief Main header file for host and device accessors to GaugeFields
