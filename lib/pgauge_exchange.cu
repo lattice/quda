@@ -133,8 +133,8 @@ namespace quda {
         arg.borderid = U.R()[d];
         apply(device::get_stream(1));
 
-        qudaMemcpyAsync(send[d], send_d[d], bytes[d], cudaMemcpyDeviceToHost, device::get_stream(0));
-        qudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], cudaMemcpyDeviceToHost, device::get_stream(1));
+        qudaMemcpyAsync(send[d], send_d[d], bytes[d], qudaMemcpyDeviceToHost, device::get_stream(0));
+        qudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], qudaMemcpyDeviceToHost, device::get_stream(1));
 
         qudaStreamSynchronize(device::get_stream(0));
         comm_start(mh_send_fwd[d]);
@@ -143,7 +143,7 @@ namespace quda {
         comm_start(mh_send_back[d]);
 
         comm_wait(mh_recv_back[d]);
-        qudaMemcpyAsync(recv_d[d], recv[d], bytes[d], cudaMemcpyHostToDevice, device::get_stream(0));
+        qudaMemcpyAsync(recv_d[d], recv[d], bytes[d], qudaMemcpyHostToDevice, device::get_stream(0));
 
         // insert
         arg.pack = false;
@@ -152,7 +152,7 @@ namespace quda {
         apply(device::get_stream(0));
 
         comm_wait(mh_recv_fwd[d]);
-        qudaMemcpyAsync(recvg_d[d], recvg[d], bytes[d], cudaMemcpyHostToDevice, device::get_stream(1));
+        qudaMemcpyAsync(recvg_d[d], recvg[d], bytes[d], qudaMemcpyHostToDevice, device::get_stream(1));
 
         arg.array = reinterpret_cast<complex<Float>*>(recvg_d[d]);
         arg.borderid = X[d] - U.R()[d];

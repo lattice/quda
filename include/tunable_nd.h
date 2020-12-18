@@ -36,7 +36,7 @@ namespace quda {
       launch_error = launch_jitify<Functor>("quda::Kernel1D", tp, stream, arg, param);
 #else
       for (unsigned int i = 0; i < param.size(); i++)
-        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, cudaMemcpyHostToDevice, stream);
+        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
       qudaLaunchKernel(Kernel1D<Functor, Arg, grid_stride>, tp, stream, arg);
 #endif
     }
@@ -48,7 +48,7 @@ namespace quda {
       launch_error = launch_jitify<Functor>("quda::raw_kernel", tp, stream, arg, param);
 #else
       for (unsigned int i = 0; i < param.size(); i++)
-        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, cudaMemcpyHostToDevice, stream);
+        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
       qudaLaunchKernel(raw_kernel<Functor, Arg>, tp, stream, arg);
 #endif
     }
@@ -151,7 +151,7 @@ namespace quda {
       launch_error = launch_jitify<Functor>("quda::Kernel2D", tp, stream, arg, param);
 #else
       for (unsigned int i = 0; i < param.size(); i++)
-        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, cudaMemcpyHostToDevice, stream);
+        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
       qudaLaunchKernel(Kernel2D<Functor, Arg, grid_stride>, tp, stream, arg);
 #endif
     }
@@ -306,7 +306,7 @@ namespace quda {
       launch_error = launch_jitify<Functor>("quda::Kernel3D", tp, stream, arg, param);
 #else
       for (unsigned int i = 0; i < param.size(); i++)
-        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, cudaMemcpyHostToDevice, stream);
+        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
       qudaLaunchKernel(Kernel3D<Functor, Arg, grid_stride>, tp, stream, arg);
 #endif
     }

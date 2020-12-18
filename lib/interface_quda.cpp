@@ -1041,10 +1041,10 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     // copy the field into the host application's clover field
     profileClover.TPSTART(QUDA_PROFILE_D2H);
     if (inv_param->return_clover) {
-      qudaMemcpy((char*)(in->V(false)), (char*)(hack->V(false)), in->Bytes(), cudaMemcpyDeviceToHost);
+      qudaMemcpy((char*)(in->V(false)), (char*)(hack->V(false)), in->Bytes(), qudaMemcpyDeviceToHost);
     }
     if (inv_param->return_clover_inverse) {
-      qudaMemcpy((char*)(in->V(true)), (char*)(hack->V(true)), in->Bytes(), cudaMemcpyDeviceToHost);
+      qudaMemcpy((char*)(in->V(true)), (char*)(hack->V(true)), in->Bytes(), qudaMemcpyDeviceToHost);
     }
 
     profileClover.TPSTOP(QUDA_PROFILE_D2H);
@@ -5925,7 +5925,7 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
   profileContract.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   profileContract.TPSTART(QUDA_PROFILE_D2H);
-  qudaMemcpy(h_result, d_result, data_bytes, cudaMemcpyDeviceToHost);
+  qudaMemcpy(h_result, d_result, data_bytes, qudaMemcpyDeviceToHost);
   profileContract.TPSTOP(QUDA_PROFILE_D2H);
 
   profileContract.TPSTART(QUDA_PROFILE_FREE);

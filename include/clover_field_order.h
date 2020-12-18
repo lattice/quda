@@ -691,10 +691,10 @@ namespace quda {
 	void save() {
 	  if (backup_h) errorQuda("Already allocated host backup");
 	  backup_h = safe_malloc(bytes);
-          qudaMemcpy(backup_h, clover, bytes, cudaMemcpyDeviceToHost);
+          qudaMemcpy(backup_h, clover, bytes, qudaMemcpyDeviceToHost);
           if (norm_bytes) {
             backup_norm_h = safe_malloc(norm_bytes);
-            qudaMemcpy(backup_norm_h, norm, norm_bytes, cudaMemcpyDeviceToHost);
+            qudaMemcpy(backup_norm_h, norm, norm_bytes, qudaMemcpyDeviceToHost);
           }
         }
 
@@ -703,11 +703,11 @@ namespace quda {
         */
         void load()
         {
-          qudaMemcpy(clover, backup_h, bytes, cudaMemcpyHostToDevice);
+          qudaMemcpy(clover, backup_h, bytes, qudaMemcpyHostToDevice);
           host_free(backup_h);
           backup_h = nullptr;
           if (norm_bytes) {
-            qudaMemcpy(norm, backup_norm_h, norm_bytes, cudaMemcpyHostToDevice);
+            qudaMemcpy(norm, backup_norm_h, norm_bytes, qudaMemcpyHostToDevice);
             host_free(backup_norm_h);
             backup_norm_h = nullptr;
           }

@@ -84,14 +84,14 @@ namespace quda
         size_t size = 2 * n * n * prec * batch;
         void *A_d = location == QUDA_CUDA_FIELD_LOCATION ? A : pool_device_malloc(size);
         void *Ainv_d = location == QUDA_CUDA_FIELD_LOCATION ? Ainv : pool_device_malloc(size);
-        if (location == QUDA_CPU_FIELD_LOCATION) qudaMemcpy(A_d, A, size, cudaMemcpyHostToDevice);
+        if (location == QUDA_CPU_FIELD_LOCATION) qudaMemcpy(A_d, A, size, qudaMemcpyHostToDevice);
 
 #ifdef _DEBUG
         // Debug code: Copy original A matrix to host
         std::complex<float> *A_h
           = (location == QUDA_CUDA_FIELD_LOCATION ? static_cast<std::complex<float> *>(pool_pinned_malloc(size)) :
                                                     static_cast<std::complex<float> *>(A_d));
-        if (location == QUDA_CUDA_FIELD_LOCATION) qudaMemcpy((void *)A_h, A_d, size, cudaMemcpyDeviceToHost);
+        if (location == QUDA_CUDA_FIELD_LOCATION) qudaMemcpy((void *)A_h, A_d, size, qudaMemcpyDeviceToHost);
 #endif
 
         int *dipiv = static_cast<int *>(pool_device_malloc(batch * n * sizeof(int)));
@@ -109,7 +109,7 @@ namespace quda
             A_array_h[i] = static_cast<C *>(A_d) + i * n * n;
             Ainv_array_h[i] = static_cast<C *>(Ainv_d) + i * n * n;
           }
-          qudaMemcpy(A_array, A_array_h, 2 * batch * sizeof(C *), cudaMemcpyHostToDevice);
+          qudaMemcpy(A_array, A_array_h, 2 * batch * sizeof(C *), qudaMemcpyHostToDevice);
 
           cublasStatus_t error = cublasCgetrfBatched(handle, n, A_array, n, dipiv, dinfo_array, batch);
           flops += batch * FLOPS_CGETRF(n, n);
@@ -117,7 +117,7 @@ namespace quda
           if (error != CUBLAS_STATUS_SUCCESS)
             errorQuda("\nError in LU decomposition (cublasCgetrfBatched), error code = %d\n", error);
 
-          qudaMemcpy(info_array, dinfo_array, batch * sizeof(int), cudaMemcpyDeviceToHost);
+          qudaMemcpy(info_array, dinfo_array, batch * sizeof(int), qudaMemcpyDeviceToHost);
           for (uint64_t i = 0; i < batch; i++) {
             if (info_array[i] < 0) {
               errorQuda("%lu argument had an illegal value or another error occured, such as memory allocation failed",
@@ -133,7 +133,7 @@ namespace quda
           if (error != CUBLAS_STATUS_SUCCESS)
             errorQuda("\nError in matrix inversion (cublasCgetriBatched), error code = %d\n", error);
 
-          qudaMemcpy(info_array, dinfo_array, batch * sizeof(int), cudaMemcpyDeviceToHost);
+          qudaMemcpy(info_array, dinfo_array, batch * sizeof(int), qudaMemcpyDeviceToHost);
 
           for (uint64_t i = 0; i < batch; i++) {
             if (info_array[i] < 0) {
@@ -150,7 +150,7 @@ namespace quda
 #ifdef _DEBUG
           // Debug code: Copy computed Ainv to host
           std::complex<float> *Ainv_h = static_cast<std::complex<float> *>(pool_pinned_malloc(size));
-          qudaMemcpy((void *)Ainv_h, Ainv_d, size, cudaMemcpyDeviceToHost);
+          qudaMemcpy((void *)Ainv_h, Ainv_d, size, qudaMemcpyDeviceToHost);
 
           for (uint64_t i = 0; i < batch; i++) { checkEigen<MatrixXcf, float>(A_h, Ainv_h, n, i); }
           pool_pinned_free(Ainv_h);
@@ -161,7 +161,7 @@ namespace quda
         }
 
         if (location == QUDA_CPU_FIELD_LOCATION) {
-          qudaMemcpy(Ainv, Ainv_d, size, cudaMemcpyDeviceToHost);
+          qudaMemcpy(Ainv, Ainv_d, size, qudaMemcpyDeviceToHost);
           pool_device_free(Ainv_d);
           pool_device_free(A_d);
         }
