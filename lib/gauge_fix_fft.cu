@@ -320,7 +320,7 @@ namespace quda {
     int* num_failures_dev = static_cast<int*>(pool_device_malloc(sizeof(int)));
     qudaMemset(num_failures_dev, 0, sizeof(int));
     unitarizeLinks(data, data, num_failures_dev);
-    qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
+    qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), qudaMemcpyDeviceToHost);
 
     pool_device_free(num_failures_dev);
     if ( num_failures > 0 ) {

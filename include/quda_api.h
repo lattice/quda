@@ -222,6 +222,17 @@ static inline double4 make_double4(double x,double y,double z,double w){return d
 
 #endif  // QUDA_BACKEND_OMPTARGET
 
+// Target specific definitions in include/targets/XXX/quda_api_target.h
+// The correct targets/ directory is set by the build system
+// Eventually we want to shrink the contents of that
+#include <quda_define.h>
+
+enum qudaMemcpyKind { qudaMemcpyHostToHost, 
+	              qudaMemcpyHostToDevice,
+		      qudaMemcpyDeviceToHost,
+		      qudaMemcpyDeviceToDevice,
+		      qudaMemcpyDefault };
+
 #include <string>
 #include <enum_quda.h>
 
@@ -274,7 +285,7 @@ namespace quda
      @param[in] count Size of transfer
      @param[in] kind Type of memory copy
   */
-  void qudaMemcpy_(void *dst, const void *src, size_t count, cudaMemcpyKind kind, const char *func, const char *file,
+  void qudaMemcpy_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const char *func, const char *file,
                    const char *line);
 
   /**
@@ -285,7 +296,7 @@ namespace quda
      @param[in] kind Type of memory copy
      @param[in] stream Stream to issue copy
   */
-  void qudaMemcpyAsync_(void *dst, const void *src, size_t count, cudaMemcpyKind kind, const qudaStream_t &stream,
+  void qudaMemcpyAsync_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const qudaStream_t &stream,
                         const char *func, const char *file, const char *line);
 
   /**
@@ -309,7 +320,7 @@ namespace quda
      @param[in] kind Type of memory copy
   */
   void qudaMemcpy2D_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
-                     cudaMemcpyKind kind, const char *func, const char *file, const char *line);
+                     qudaMemcpyKind kind, const char *func, const char *file, const char *line);
 
   /**
      @brief Wrapper around cudaMemcpy2DAsync or driver API equivalent
@@ -323,7 +334,7 @@ namespace quda
      @param[in] stream Stream to issue copy
   */
   void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
-                          cudaMemcpyKind kind, const qudaStream_t &stream, const char *func, const char *file,
+                          qudaMemcpyKind kind, const qudaStream_t &stream, const char *func, const char *file,
                           const char *line);
 
   /**

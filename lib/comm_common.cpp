@@ -517,7 +517,7 @@ MsgHandle *comm_declare_send_relative_(const char *func, const char *file, int l
   } else {
     // test this memory allocation is ok by doing a memcpy from it
     void *tmp = device_malloc(nbytes);
-    qudaMemcpy(tmp, buffer, nbytes, cudaMemcpyDeviceToDevice);
+    qudaMemcpy(tmp, buffer, nbytes, qudaMemcpyDeviceToDevice);
     device_free(tmp);
   }
 #endif
@@ -583,7 +583,7 @@ MsgHandle *comm_declare_strided_send_relative_(const char *func, const char *fil
   } else {
     // test this memory allocation is ok by doing a memcpy from it
     void *tmp = device_malloc(blksize*nblocks);
-    qudaMemcpy2D(tmp, blksize, buffer, stride, blksize, nblocks, cudaMemcpyDeviceToDevice);
+    qudaMemcpy2D(tmp, blksize, buffer, stride, blksize, nblocks, qudaMemcpyDeviceToDevice);
     device_free(tmp);
   }
 #endif

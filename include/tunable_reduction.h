@@ -77,7 +77,7 @@ namespace quda {
       arg.launch_error = launch_jitify<Transformer, Reducer>("quda::Reduction2D", tp, stream, arg, param);
 #else
       for (unsigned int i = 0; i < param.size(); i++)
-        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, cudaMemcpyHostToDevice, stream);
+        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
       arg.launch_error = launch<device::max_reduce_block_size<block_size_y>(), Transformer, Reducer>(arg, tp, stream);
 #endif
 
@@ -288,7 +288,7 @@ namespace quda {
       arg.launch_error = launch_jitify<Transformer, Reducer>("quda::MultiReduction", tp, stream, arg, param);
 #else
       for (unsigned int i = 0; i < param.size(); i++)
-        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, cudaMemcpyHostToDevice, stream);
+        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
       arg.launch_error = launch<device::max_multi_reduce_block_size(), Transformer, Reducer>(arg, tp, stream);
 #endif
 
