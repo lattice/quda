@@ -22,6 +22,24 @@
 
 namespace quda {
 
+  // Agnostic way to return a cuda API flag
+  namespace {
+    inline
+    cudaMemcpyKind qudaMemcpyKindToAPI( const qudaMemcpyKind& k)
+    {
+      switch(k) {
+      case qudaMemcpyHostToHost : return cudaMemcpyHostToHost; break;
+      case qudaMemcpyHostToDevice : return cudaMemcpyHostToDevice; break;
+      case qudaMemcpyDeviceToHost : return cudaMemcpyDeviceToHost; break;
+      case qudaMemcpyDeviceToDevice : return cudaMemcpyDeviceToDevice; break;
+      case qudaMemcpyDefault : return cudaMemcpyDefault; break;
+      default:
+	errorQuda(" unknown value for qudaMemcpyKind %d", static_cast<int>(k));
+	return cudaMemcpyDefault; // keep warnings away
+      }
+    }
+  }
+  
   // No need to abstract these across the library so keep these definitions local to CUDA target
 
   /**
@@ -237,7 +255,7 @@ namespace quda {
     if (count == 0) return;
 
     if (kind == cudaMemcpyDeviceToDevice) {
-      QudaMem copy(dst, src, count, kind, stream, true, func, file, line);
+      QudaMem copy(dst, src, count, qudaMemcpyKindToAPI(kind), stream, true, func, file, line);
     } else {
 #ifdef USE_DRIVER_API
       switch (kind) {
@@ -257,7 +275,7 @@ namespace quda {
         errorQuda("Unsupported cuMemcpyTypeAsync %d", kind);
       }
 #else
-      PROFILE(cudaMemcpyAsync(dst, src, count, kind, device::get_cuda_stream(stream)),
+      PROFILE(cudaMemcpyAsync(dst, src, count, qudaMemcpyKindToAPI(kind), device::get_cuda_stream(stream)),
               kind == cudaMemcpyDeviceToHost ? QUDA_PROFILE_MEMCPY_D2H_ASYNC : QUDA_PROFILE_MEMCPY_H2D_ASYNC);
 #endif
     }
@@ -293,7 +311,7 @@ namespace quda {
       param.dstHost = dst;
       param.dstMemoryType = CU_MEMORYTYPE_HOST;
       break;
-    default: errorQuda("Unsupported cuMemcpyType2DAsync %d", kind);
+    default: errorQuda("Unsupported cuMemcpyType2DAsync %d", qudaMemcpyKindToAPI(kind));
     }
     PROFILE(auto error = cuMemcpy2D(&param), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
     if (error != CUDA_SUCCESS) {
@@ -302,7 +320,7 @@ namespace quda {
       errorQuda("cuMemcpy2D returned error %s\n (%s:%s in %s())", str, file, line, func);
     }
 #else
-    PROFILE(auto error = cudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
+    PROFILE(auto error = cudaMemcpy2D(dst, dpitch, src, spitch, width, height, qudaMemcpyKindToAPI(kind)), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
     if (error != cudaSuccess)
       errorQuda("cudaMemcpy2D returned error %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
 #endif
