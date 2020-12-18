@@ -305,7 +305,7 @@ namespace quda {
     param.Height = height;
 
     switch (kind) {
-    case cudaMemcpyDeviceToHost:
+    case qudaMemcpyDeviceToHost:
       param.srcDevice = (CUdeviceptr)src;
       param.srcMemoryType = CU_MEMORYTYPE_DEVICE;
       param.dstHost = dst;
@@ -342,7 +342,7 @@ namespace quda {
     param.Height = height;
 
     switch (kind) {
-    case cudaMemcpyDeviceToHost:
+    case qudaMemcpyDeviceToHost:
       param.srcDevice = (CUdeviceptr)src;
       param.srcMemoryType = CU_MEMORYTYPE_DEVICE;
       param.dstHost = dst;
