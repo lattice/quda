@@ -91,7 +91,7 @@ namespace quda {
 
     for (unsigned int i=0; i < param.size(); i++) {
       auto device_ptr = instance.get_constant_ptr(param[i].device_name);
-      qudaMemcpyAsync((void*)device_ptr, param[i].host, param[i].bytes, cudaMemcpyHostToDevice, stream);
+      qudaMemcpyAsync((void*)device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
     }
 
     auto configured_instance = instance.configure(tp.grid, tp.block, tp.shared_bytes, device::get_cuda_stream(stream));

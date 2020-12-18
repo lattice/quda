@@ -431,7 +431,7 @@ namespace quda {
 
     // If this is set to false, then we are assuming that the send and
     // ghost buffers are in a single contiguous memory space.  Setting
-    // to false means we aggregate all cudaMemcpys which reduces
+    // to false means we aggregate all qudaMemcpys which reduces
     // latency.
     bool fine_grained_memcpy = false;
 
@@ -462,12 +462,12 @@ namespace quda {
 	  recv_fwd[i] = static_cast<char*>(total_recv) + offset;
 	  offset += bytes[i];
 	  if (fine_grained_memcpy) {
-	    qudaMemcpy(send_back[i], sendbuf[2*i + 0], bytes[i], cudaMemcpyDeviceToHost);
-	    qudaMemcpy(send_fwd[i],  sendbuf[2*i + 1], bytes[i], cudaMemcpyDeviceToHost);
+	    qudaMemcpy(send_back[i], sendbuf[2*i + 0], bytes[i], qudaMemcpyDeviceToHost);
+	    qudaMemcpy(send_fwd[i],  sendbuf[2*i + 1], bytes[i], qudaMemcpyDeviceToHost);
 	  }
 	} else if (no_comms_fill) {
-	  qudaMemcpy(ghost[2*i+1], sendbuf[2*i+0], bytes[i], cudaMemcpyDeviceToDevice);
-	  qudaMemcpy(ghost[2*i+0], sendbuf[2*i+1], bytes[i], cudaMemcpyDeviceToDevice);
+	  qudaMemcpy(ghost[2*i+1], sendbuf[2*i+0], bytes[i], qudaMemcpyDeviceToDevice);
+	  qudaMemcpy(ghost[2*i+0], sendbuf[2*i+1], bytes[i], qudaMemcpyDeviceToDevice);
 	}
       }
       if (!fine_grained_memcpy && total_bytes) {
@@ -479,7 +479,7 @@ namespace quda {
 	    break;
 	  }
 	}
-	qudaMemcpy(total_send, send_ptr, total_bytes, cudaMemcpyDeviceToHost);
+	qudaMemcpy(total_send, send_ptr, total_bytes, qudaMemcpyDeviceToHost);
       }
     }
 
@@ -512,8 +512,8 @@ namespace quda {
       for (int i=0; i<nDimComms; i++) {
 	if (!comm_dim_partitioned(i)) continue;
 	if (fine_grained_memcpy) {
-	  qudaMemcpy(ghost[2*i+0], recv_back[i], bytes[i], cudaMemcpyHostToDevice);
-	  qudaMemcpy(ghost[2*i+1], recv_fwd[i], bytes[i], cudaMemcpyHostToDevice);
+	  qudaMemcpy(ghost[2*i+0], recv_back[i], bytes[i], qudaMemcpyHostToDevice);
+	  qudaMemcpy(ghost[2*i+1], recv_fwd[i], bytes[i], qudaMemcpyHostToDevice);
 	}
       }
 
@@ -526,7 +526,7 @@ namespace quda {
 	    break;
 	  }
 	}
-	qudaMemcpy(ghost_ptr, total_recv, total_bytes, cudaMemcpyHostToDevice);
+	qudaMemcpy(ghost_ptr, total_recv, total_bytes, qudaMemcpyHostToDevice);
       }
 
       if (total_bytes) {
