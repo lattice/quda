@@ -45,6 +45,7 @@
 #include <util_quda.h>
 #include <malloc_quda.h>
 #include <object.h>
+#include <quda_target.h>
 #include <device.h>
 
 #ifdef __cplusplus

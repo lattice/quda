@@ -2,7 +2,7 @@
 
 #include <string>
 #include <enum_quda.h>
-#include <quda_target.h>
+#include <quda_target_x.h>
 
 /**
    @file quda_api.h
