@@ -1360,6 +1360,7 @@ namespace quda {
     blas::destroyAuxBlasStream();
 
     args.CleanArgs();
+    if (comm_size() > 1) comm_free( iallreduce_request_handle );
 
     blas::xpy(y, x);
 

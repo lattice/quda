@@ -36,7 +36,7 @@ struct MsgHandle_s {
   QMP_msgmem_t mem;
   QMP_msghandle_t handle;
 #ifdef USE_MPI_GATHER
-  MPI_Request request;
+  MPI_Request *request;
 #endif
 };
 
@@ -132,6 +132,10 @@ MsgHandle *comm_declare_send_displaced(void *buffer, const int displacement[], s
   mh->handle = QMP_declare_send_to(mh->mem, rank, 0);
   if (mh->handle == NULL) errorQuda("Unable to allocate QMP message handle");
 
+#ifdef USE_MPI_GATHER
+  mh->request = nullptr;//for nonblocking allreduce
+#endif
+
   return mh;
 }
 
@@ -150,6 +154,10 @@ MsgHandle *comm_declare_receive_displaced(void *buffer, const int displacement[]
 
   mh->handle = QMP_declare_receive_from(mh->mem, rank, 0);
   if (mh->handle == NULL) errorQuda("Unable to allocate QMP message handle");
+
+#ifdef USE_MPI_GATHER
+  mh->request = nullptr;//for nonblocking allreduce
+#endif  
 
   return mh;
 }
@@ -173,6 +181,10 @@ MsgHandle *comm_declare_strided_send_displaced(void *buffer, const int displacem
   mh->handle = QMP_declare_send_to(mh->mem, rank, 0);
   if (mh->handle == NULL) errorQuda("Unable to allocate QMP message handle");
 
+#ifdef USE_MPI_GATHER
+  mh->request = nullptr;//for nonblocking allreduce
+#endif
+
   return mh;
 }
 
@@ -194,14 +206,22 @@ MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displa
   mh->handle = QMP_declare_receive_from(mh->mem, rank, 0);
   if (mh->handle == NULL) errorQuda("Unable to allocate QMP message handle");
 
+#ifdef USE_MPI_GATHER
+  mh->request = nullptr;//for nonblocking allreduce
+#endif  
+
   return mh;
 }
 
 void comm_free(MsgHandle *&mh)
 {
+#ifdef USE_MPI_GATHER
+  if(mh->request) host_free(mh->request);//for nonblocking allreduce
+#else
   QMP_free_msghandle(mh->handle);
-  QMP_free_msgmem(mh->mem);
-  host_free(mh);
+  QMP_free_msgmem(mh->mem);  
+#endif  
+  host_free(mh);  
   mh = nullptr;
 }
 
@@ -214,7 +234,15 @@ void comm_start(MsgHandle *mh)
 
 void comm_wait(MsgHandle *mh)
 {
-  QMP_CHECK( QMP_wait(mh->handle) );
+#ifdef USE_MPI_GATHER  
+  if (mh->request) {
+    MPI_CHECK( MPI_Wait(mh->request, MPI_STATUS_IGNORE) );  
+  } else {
+#endif	  
+    QMP_CHECK( QMP_wait(mh->handle) );	  
+#ifdef USE_MPI_GATHER    
+  }
+#endif  
 }
 
 
@@ -277,11 +305,15 @@ void comm_allreduce_array(double* data, size_t size)
   }
 }
 
-void comm_nonblocking_allreduce_array(MsgHandle *mh, double *outdata, double *indata, size_t size)
+void comm_nonblocking_allreduce_array(MsgHandle *&mh, double *outdata, double *indata, size_t size)
 {
   // we need to break out of QMP for nonblocking all reduce
 #ifdef USE_MPI_GATHER
-  MPI_CHECK(MPI_Iallreduce(outdata, indata, size, MPI_DOUBLE, MPI_SUM, MPI_COMM_HANDLE, &mh->request));
+  if(mh == nullptr) {
+    mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
+    mh->request = (MPI_Request *)safe_malloc(sizeof(MPI_Request));    
+  }
+  MPI_CHECK(MPI_Iallreduce(outdata, indata, size, MPI_DOUBLE, MPI_SUM, MPI_COMM_HANDLE, mh->request));
 #endif
   return;
 }
