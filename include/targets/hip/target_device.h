@@ -77,7 +77,7 @@ namespace quda {
        @brief Helper function that returns the warp-size of the
        architecture we are running on.
     */
-    constexpr int warp_size() { return 32; }
+    constexpr int warp_size() { return warpSize; }
 
     /**
        @brief Return the thread mask for a converged warp.
@@ -91,8 +91,17 @@ namespace quda {
     template <int block_size_y = 1, int block_size_z = 1>
       constexpr unsigned int max_block_size()
       {
-        return std::max(warp_size(), 1024 / (block_size_y * block_size_z));
+        return std::max(warp_size(), 256 / (block_size_y * block_size_z));
       }
+
+
+    /**
+     * @brief Helper function for the transform reduce blocksize
+     */
+    constexpr unsigned int transform_reduce_block_size()
+    {
+            return 256;
+    }
 
     /**
        @brief Helper function that returns the maximum number of threads
@@ -119,7 +128,7 @@ namespace quda {
       // This is the specialized variant used when we have fast-compilation mode enabled
       return warp_size();
 #else
-      return 128;
+      return 64;
 #endif
     }
 

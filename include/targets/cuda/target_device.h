@@ -93,6 +93,14 @@ namespace quda {
         return std::max(warp_size(), 1024 / (block_size_y * block_size_z));
       }
 
+    /** 
+     * @brief Helper function for the transform reduce blocksize 
+     */
+    constexpr unsigned int transform_reduce_block_size()
+    {
+	    return 512;
+    }
+
     /**
        @brief Helper function that returns the maximum number of threads
        in a block in the x dimension for reduction kernels.

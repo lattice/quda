@@ -3,7 +3,7 @@
 #include <reduce_helper.h>
 #include <uint_to_char.h>
 #include <tune_quda.h>
-
+#include <target_device.h>
 /**
    @file transform_reduce.h
 
@@ -16,7 +16,7 @@ namespace quda
 
   template <typename reduce_t, typename T, typename count_t, typename transformer, typename reducer>
   struct TransformReduceArg : public ReduceArg<reduce_t> {
-    static constexpr int block_size = 512;
+    static constexpr int block_size = static_cast<int>(device::transform_reduce_block_size());
     static constexpr int n_batch_max = 8;
     const T *v[n_batch_max];
     count_t n_items;
