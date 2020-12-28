@@ -253,8 +253,8 @@ set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 14 17)
 
 option(QUDA_BACKWARDS "Enable stacktrace generation using backwards-cpp")
 
-# QIO largefile support
-option(QUDA_QIO_LARGE_FILE "use feature/largefile branch of QIO" OFF)
+# QIO legacy support
+option(QUDA_DOWNLOAD_QIO_LEGACY "download qio2-5-0 branch of QIO instead of extended (API compatible) branch" OFF)
 
 # NVTX options
 option(QUDA_MPI_NVTX "add NVTX markup to MPI API calls" OFF)
@@ -294,7 +294,7 @@ mark_as_advanced(QUDA_OPENMP)
 
 mark_as_advanced(QUDA_BACKWARDS)
 
-mark_as_advanced(QUDA_QIO_LARGE_FILE)
+mark_as_advanced(QUDA_DOWNLOAD_QIO_LEGACY)
 
 mark_as_advanced(QUDA_MPI_NVTX)
 mark_as_advanced(QUDA_INTERFACE_NVTX)
@@ -634,10 +634,10 @@ if(QUDA_QIO)
   set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${QIO_FOUND})
   if(QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
     set(QIO_BRANCH
-        "qio2-5-0")
-    if(QUDA_QIO_LARGE_FILE)
+        "extended")
+    if(QUDA_DOWNLOAD_QIO_LEGACY)
       set(QIO_BRANCH
-          "feature/largefile")
+          "qio2-5-0")
     endif()
     ExternalProject_Add(
       QIO
@@ -646,7 +646,7 @@ if(QUDA_QIO)
       GIT_SHALLOW YES
       PREFIX usqcd
       CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure "INSTALL=${INSTALL_EXE} -C"
-                        "CFLAGS=-Wall -O3 -std=c99 -DHAVE_BGL -g" --with-qmp=${QUDA_QMPHOME} --prefix=<INSTALL_DIR>
+                        "CFLAGS=-Wall -O3 -std=c99 -DHAVE_BGL " --with-qmp=${QUDA_QMPHOME} --prefix=<INSTALL_DIR>
                         --enable-largefile --disable-qmp-route --enable-dml-output-buffering
       BUILD_COMMAND make
       INSTALL_COMMAND make install

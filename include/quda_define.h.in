@@ -50,17 +50,3 @@
 #define FLOAT8
 #undef QUDA_FLOAT8
 #endif
-
-#cmakedefine QUDA_QIO_LARGE_FILE
-#ifdef QUDA_QIO_LARGE_FILE
-/**
- * @def qio_size_t
- * @brief This typedef sets the type qio_size_t to int or size_t
- * depending on if the QIO largefile branch is used or not
- */
-typedef size_t qio_size_t;
-#undef QUDA_QIO_LARGE_FILE
-#else
-typedef int qio_size_t;
-#endif
-

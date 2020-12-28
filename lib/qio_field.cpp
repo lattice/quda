@@ -216,17 +216,32 @@ void set_layout(const int *X, QudaSiteSubset subset = QUDA_FULL_SITE_SUBSET)
     errorQuda("Setup layout failed\n");
   }
   printfQuda("%s layout set for %d nodes\n", __func__, QMP_get_number_of_nodes());
-  int sites_on_node = quda_num_sites(quda_this_node);
 
   /* Build the layout structure */
+#ifdef QIO_HAS_EXTENDED_LAYOUT
+  // members for smaller lattices are not used here
+  layout.node_number = NULL;
+  layout.node_index = NULL;
+  layout.get_coords = NULL;
+  layout.num_sites = NULL;
+  // members using the extended layout for large lattice support
+  layout.node_number_ext = quda_node_number_ext;
+  layout.node_index_ext = quda_node_index_ext;
+  layout.get_coords_ext = quda_get_coords_ext;
+  layout.num_sites_ext = quda_num_sites_ext;
+  layout.arg = NULL;
+  layout.sites_on_node = quda_num_sites_ext(quda_this_node, nullptr);
+#else
+  // legacy API
   layout.node_number = quda_node_number;
   layout.node_index = quda_node_index;
   layout.get_coords = quda_get_coords;
   layout.num_sites = quda_num_sites;
+  layout.sites_on_node = quda_num_sites(quda_this_node);
+#endif // QIO_HAS_EXTENDED_LAYOUT
   layout.latsize         = lattice_size;
   layout.latdim          = lattice_dim;
   layout.volume          = lattice_volume;
-  layout.sites_on_node   = sites_on_node;
   layout.this_node = quda_this_node;
   layout.number_of_nodes = QMP_get_number_of_nodes();
 }
