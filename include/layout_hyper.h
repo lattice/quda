@@ -12,10 +12,10 @@ int quda_setup_layout(int len[], int nd, int numnodes, int single_parity);
 extern int quda_this_node;
 
 #ifdef QIO_HAS_EXTENDED_LAYOUT
-int quda_node_number_ext(const int x[], void* arg);
-QIO_Index quda_node_index_ext(const int x[], void* arg);
-void quda_get_coords_ext(int x[], int node, QIO_Index index, void* arg);
-QIO_Index quda_num_sites_ext(int node, void* arg);
+int quda_node_number_ext(const int x[], void *arg);
+QIO_Index quda_node_index_ext(const int x[], void *arg);
+void quda_get_coords_ext(int x[], int node, QIO_Index index, void *arg);
+QIO_Index quda_num_sites_ext(int node, void *arg);
 #else
 int quda_node_number(const int x[]);
 int quda_node_index(const int x[]);

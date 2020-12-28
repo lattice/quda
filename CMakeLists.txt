@@ -581,7 +581,7 @@ if(QUDA_QMP)
       GIT_SHALLOW YES
       PREFIX usqcd
       CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure "INSTALL=${INSTALL_EXE} -C"
-                        "CFLAGS=-Wall -O3 -std=c99 -g" --with-qmp-comms-type=MPI --prefix=<INSTALL_DIR>
+                        "CFLAGS=-Wall -O3 -std=c99 " --with-qmp-comms-type=MPI --prefix=<INSTALL_DIR>
       BUILD_COMMAND ${MAKE_EXE}
       INSTALL_COMMAND ${MAKE_EXE} install
       LOG_INSTALL ON

@@ -83,7 +83,7 @@ int quda_node_number(const int x[])
 }
 
 #ifdef QIO_HAS_EXTENDED_LAYOUT
-int quda_node_number_ext(const int x[], void* arg)
+int quda_node_number_ext(const int x[], void *arg)
 {
   (void)arg;
   return quda_node_number(x);
@@ -111,7 +111,7 @@ size_t quda_node_index_helper(const int x[])
 }
 
 #ifdef QIO_HAS_EXTENDED_LAYOUT
-QIO_Index quda_node_index_ext(const int x[], void* arg)
+QIO_Index quda_node_index_ext(const int x[], void *arg)
 {
   (void)arg;
   return static_cast<QIO_Index>(quda_node_index_helper(x));
@@ -177,7 +177,9 @@ void quda_get_coords_helper(int x[], int node, size_t index)
   if (node_index != si) {
     if (quda_this_node == 0) {
       fprintf(stderr, "get_coords: error in layout!\n");
-      for (int i = 0; i < ndim; i++) { fprintf(stderr, "%lu\t%lu\t%lu\n", (size_t)size1[0][i], (size_t)size1[1][i], (size_t)size2[i]); }
+      for (int i = 0; i < ndim; i++) {
+        fprintf(stderr, "%lu\t%lu\t%lu\n", (size_t)size1[0][i], (size_t)size1[1][i], (size_t)size2[i]);
+      }
       fprintf(stderr, "%i\tindex=%lu\tx=(", node, (size_t)si);
       for (int i = 0; i < ndim; i++) fprintf(stderr, i < ndim - 1 ? "%i, " : "%i)\n", x[i]);
     }
@@ -187,7 +189,7 @@ void quda_get_coords_helper(int x[], int node, size_t index)
 }
 
 #ifdef QIO_HAS_EXTENDED_LAYOUT
-void quda_get_coords_ext(int x[], int node, QIO_Index index, void* arg)
+void quda_get_coords_ext(int x[], int node, QIO_Index index, void *arg)
 {
   (void)arg;
 
@@ -196,16 +198,13 @@ void quda_get_coords_ext(int x[], int node, QIO_Index index, void* arg)
   quda_get_coords_helper(x, node, static_cast<size_t>(index));
 }
 #else
-void quda_get_coords(int x[], int node, int index)
-{
-  quda_get_coords_helper(x, node, static_cast<size_t>(index));
-}
+void quda_get_coords(int x[], int node, int index) { quda_get_coords_helper(x, node, static_cast<size_t>(index)); }
 #endif // QIO_HAS_EXTENDED_LAYOUT
 
 /* The number of sites on the specified node */
 #ifdef QIO_HAS_EXTENDED_LAYOUT
-QIO_Index quda_num_sites_ext(int node, void* arg)
-{ 
+QIO_Index quda_num_sites_ext(int node, void *arg)
+{
   (void)arg;
   return sites_on_node;
 }
