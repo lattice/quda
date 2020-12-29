@@ -36,9 +36,13 @@ namespace quda {
 
   /**
    * Use this for recording a fine-grained profile of a QUDA
-   * algorithm.  This uses host-side measurement, so should be used
-   * for timing fully host-device synchronous algorithms.
+   * algorithm.  This can be used for either host-side or device side
+   * measurement.  When using host-side measurement, the execution
+   * should host-device synchronous.  For device-side measurement, the
+   * measurement will be done on the default stream unless specified
+   * otherwise in the constructor.
    */
+  template <bool device = false>
   struct Timer {
     /**< The cumulative sum of time */
     double time;
@@ -47,38 +51,84 @@ namespace quda {
     double last;
 
     /**< Used to store when the timer was last started */
-    timeval start;
+    timeval host_start;
 
     /**< Used to store when the timer was last stopped */
-    timeval stop;
+    timeval host_stop;
+
+    /**< Used to store when the timer was last started */
+    qudaEvent_t device_start;
+
+    /**< Used to store when the timer was last stopped */
+    qudaEvent_t device_stop;
+
+    /**< Which stream are we recording on */
+    qudaStream_t stream;
 
     /**< Are we currently timing? */
     bool running;
-    
+
     /**< Keep track of number of calls */
     int count;
 
-  Timer() : time(0.0), last(0.0), running(false), count(0) { ; } 
+    Timer(qudaStream_t stream = device::get_default_stream()) :
+      time(0.0),
+      last(0.0),
+      stream(stream),
+      running(false),
+      count(0)
+    {
+      if (device) {
+        cudaEvent_t start_;
+        cudaEvent_t end_;
+        cudaEventCreate(&start_);
+        cudaEventCreate(&end_);
+        device_start.event = reinterpret_cast<void*>(start_);
+        device_stop.event = reinterpret_cast<void*>(end_);
+      }
+    }
 
-    void Start(const char *func, const char *file, int line) {
+    ~Timer()
+    {
+      if (device) {
+        cudaEventDestroy(reinterpret_cast<cudaEvent_t>(device_start.event));
+        cudaEventDestroy(reinterpret_cast<cudaEvent_t>(device_stop.event));
+      }
+    }
+
+    void Start(const char *func = nullptr, const char *file = nullptr, int line = 0)
+    {
       if (running) {
 	printfQuda("ERROR: Cannot start an already running timer (%s:%d in %s())\n", file, line, func);
 	errorQuda("Aborting");
       }
-      gettimeofday(&start, NULL);
+      if (!device) {
+        gettimeofday(&host_start, NULL);
+      } else {
+        qudaEventRecord(device_start, stream);
+      }
       running = true;
     }
 
-    void Stop(const char *func, const char *file, int line) {
+    void Stop(const char *func = nullptr, const char *file = nullptr, int line = 0)
+    {
       if (!running) {
 	printfQuda("ERROR: Cannot stop an unstarted timer (%s:%d in %s())\n", file, line, func);
 	errorQuda("Aborting");
       }
-      gettimeofday(&stop, NULL);
-
-      long ds = stop.tv_sec - start.tv_sec;
-      long dus = stop.tv_usec - start.tv_usec;
-      last = ds + 0.000001*dus;
+      if (!device) {
+        gettimeofday(&host_stop, NULL);
+        long ds = host_stop.tv_sec - host_start.tv_sec;
+        long dus = host_stop.tv_usec - host_start.tv_usec;
+        last = ds + 0.000001*dus;
+      } else {
+        qudaEventRecord(device_stop, stream);
+        qudaEventSynchronize(device_stop);
+        float elapsed_time;
+        cudaEventElapsedTime(&elapsed_time, reinterpret_cast<cudaEvent_t>(device_start.event),
+                             reinterpret_cast<cudaEvent_t>(device_stop.event));
+        last = elapsed_time / 1000;
+      }
       time += last;
       count++;
 
@@ -96,7 +146,6 @@ namespace quda {
       last = 0.0;
       count = 0;
     }
-
   };
 
   /**< Enumeration type used for writing a simple but extensible profiling framework. */
@@ -177,14 +226,14 @@ namespace quda {
     static const uint32_t nvtx_colors[];// = { 0x0000ff00, 0x000000ff, 0x00ffff00, 0x00ff00ff, 0x0000ffff, 0x00ff0000, 0x00ffffff };
     static const int nvtx_num_colors;// = sizeof(nvtx_colors)/sizeof(uint32_t);
 #endif
-    Timer profile[QUDA_PROFILE_COUNT];
+    Timer<> profile[QUDA_PROFILE_COUNT];
     static std::string pname[];
 
     bool switchOff;
     bool use_global;
 
     // global timer
-    static Timer global_profile[QUDA_PROFILE_COUNT];
+    static Timer<> global_profile[QUDA_PROFILE_COUNT];
     static bool global_switchOff[QUDA_PROFILE_COUNT];
     static int global_total_level[QUDA_PROFILE_COUNT]; // zero initialize
 
@@ -221,21 +270,21 @@ namespace quda {
     /**< Print out the profile information */
     void Print();
 
-    void Start_(const char *func, const char *file, int line, QudaProfileType idx) { 
+    void Start_(const char *func, const char *file, int line, QudaProfileType idx) {
       // if total timer isn't running, then start it running
       if (!profile[QUDA_PROFILE_TOTAL].running && idx != QUDA_PROFILE_TOTAL) {
 	profile[QUDA_PROFILE_TOTAL].Start(func,file,line);
         switchOff = true;
       }
 
-      profile[idx].Start(func, file, line); 
+      profile[idx].Start(func, file, line);
       PUSH_RANGE(fname.c_str(),idx)
 	if (use_global) StartGlobal(func,file,line,idx);
     }
 
 
     void Stop_(const char *func, const char *file, int line, QudaProfileType idx) {
-      profile[idx].Stop(func, file, line); 
+      profile[idx].Stop(func, file, line);
       POP_RANGE
 
       // switch off total timer if we need to
@@ -251,7 +300,7 @@ namespace quda {
 	profile[idx].Reset(func, file, line);
     }
 
-    double Last(QudaProfileType idx) { 
+    double Last(QudaProfileType idx) {
       return profile[idx].last;
     }
 
@@ -272,4 +321,3 @@ namespace quda {
 #define TPSTART(idx) Start_(__func__, __FILE__, __LINE__, idx)
 #define TPSTOP(idx) Stop_(__func__, __FILE__, __LINE__, idx)
 #define TPRESET() Reset_(__func__, __FILE__, __LINE__)
-

@@ -9,7 +9,7 @@ static device_reduce_t *h_reduce = nullptr;
 static device_reduce_t *hd_reduce = nullptr;
 
 static count_t *reduce_count = nullptr;
-static cudaEvent_t reduceEnd;
+static qudaEvent_t reduceEnd;
 
 namespace quda
 {
@@ -22,7 +22,7 @@ namespace quda
     void *get_mapped_buffer() { return hd_reduce; }
     void *get_host_buffer() { return h_reduce; }
     count_t *get_count() { return reduce_count; }
-    cudaEvent_t &get_event() { return reduceEnd; }
+    qudaEvent_t &get_event() { return reduceEnd; }
 
     size_t buffer_size()
     {
@@ -85,14 +85,12 @@ namespace quda
         qudaLaunchKernel(init_count<count_t>, tp, device::get_default_stream(), reduce_count);
       }
 
-      cudaEventCreateWithFlags(&reduceEnd, cudaEventDisableTiming);
-
-      checkCudaError();
+      reduceEnd = qudaEventCreate();
     }
 
     void destroy()
     {
-      cudaEventDestroy(reduceEnd);
+      qudaEventDestroy(reduceEnd);
 
       if (reduce_count) {
         device_free(reduce_count);

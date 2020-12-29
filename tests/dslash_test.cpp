@@ -290,18 +290,16 @@ struct DslashTime {
 DslashTime dslashCUDA(int niter) {
 
   DslashTime dslash_time;
-  timeval tstart, tstop;
 
-  cudaEvent_t start, end;
-  cudaEventCreate(&start);
-  cudaEventCreate(&end);
+  Timer<false> host_timer;
+  Timer<true> device_timer;
 
   comm_barrier();
-  cudaEventRecord(start, device::get_cuda_stream(device::get_default_stream()));
+  device_timer.Start();
 
   for (int i = 0; i < niter; i++) {
 
-    gettimeofday(&tstart, nullptr);
+    host_timer.Start();
 
     if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH){
       switch (dtest_type) {
@@ -493,27 +491,18 @@ DslashTime dslashCUDA(int niter) {
       }
     }
 
-    gettimeofday(&tstop, nullptr);
-    long ds = tstop.tv_sec - tstart.tv_sec;
-    long dus = tstop.tv_usec - tstart.tv_usec;
-    double elapsed = ds + 0.000001*dus;
+    host_timer.Stop();
 
-    dslash_time.cpu_time += elapsed;
+    dslash_time.cpu_time += host_timer.Last();
     // skip first and last iterations since they may skew these metrics if comms are not synchronous
     if (i>0 && i<niter) {
-      if (elapsed < dslash_time.cpu_min) dslash_time.cpu_min = elapsed;
-      if (elapsed > dslash_time.cpu_max) dslash_time.cpu_max = elapsed;
+      dslash_time.cpu_min = std::min(dslash_time.cpu_min, host_timer.Last());
+      dslash_time.cpu_max = std::max(dslash_time.cpu_max, host_timer.Last());
     }
   }
-    
-  cudaEventRecord(end, device::get_cuda_stream(device::get_default_stream()));
-  cudaEventSynchronize(end);
-  float runTime;
-  cudaEventElapsedTime(&runTime, start, end);
-  cudaEventDestroy(start);
-  cudaEventDestroy(end);
 
-  dslash_time.event_time = runTime / 1000;
+  device_timer.Stop();
+  dslash_time.event_time = device_timer.Last();
 
   return dslash_time;
 }

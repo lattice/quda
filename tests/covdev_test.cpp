@@ -161,24 +161,13 @@ void end(void)
 
 double dslashCUDA(int niter, int mu)
 {
-  cudaEvent_t start, end;
-  cudaEventCreate(&start);
-  cudaEventRecord(start, device::get_cuda_stream(device::get_default_stream()));
-  cudaEventSynchronize(start);
+  Timer<true> timer;
+  timer.Start();
 
   for (int i = 0; i < niter; i++) dirac->MCD(*cudaSpinorOut, *cudaSpinor, mu);
 
-  cudaEventCreate(&end);
-  cudaEventRecord(end, device::get_cuda_stream(device::get_default_stream()));
-  cudaEventSynchronize(end);
-  float runTime;
-  cudaEventElapsedTime(&runTime, start, end);
-  cudaEventDestroy(start);
-  cudaEventDestroy(end);
-
-  double secs = runTime / 1000; //stopwatchReadSeconds();
-
-  return secs;
+  timer.Stop();
+  return timer.Last();
 }
 
 void covdevRef(int mu)

@@ -1,6 +1,12 @@
 #pragma once
 
 #include <quda_api.h>
+
+#if defined(QUDA_TARGET_CUDA)
+#include <cuda.h>
+#include <cuda_runtime.h>
+#endif
+
 #include <string>
 #include <complex>
 #include <vector>

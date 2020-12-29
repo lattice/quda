@@ -453,32 +453,6 @@ int comm_coord(int dim)
   return comm_coords(topo)[dim];
 }
 
-inline bool isHost(const void *buffer)
-{
-  CUmemorytype memType;
-  void *attrdata[] = {(void *)&memType};
-  CUpointer_attribute attributes[2] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE};
-  CUresult err = cuPointerGetAttributes(1, attributes, attrdata, (CUdeviceptr)buffer);
-  if (err != CUDA_SUCCESS) {
-    const char *str;
-    cuGetErrorName(err, &str);
-    errorQuda("cuPointerGetAttributes returned error %s", str);
-  }
-
-  switch (memType) {
-  case CU_MEMORYTYPE_DEVICE: return false;
-  case CU_MEMORYTYPE_ARRAY:
-    errorQuda("Using array memory for communications buffer is not supported");
-    return false;
-  case CU_MEMORYTYPE_UNIFIED:
-    errorQuda("Using unified memory for communications buffer is not supported");
-    return false;
-  case CU_MEMORYTYPE_HOST:
-  default: // memory not allocated by CUDA allocaters will default to being host memory
-    return true;
-  }
-}
-
 /**
  * Send to the "dir" direction in the "dim" dimension
  */
@@ -487,18 +461,8 @@ MsgHandle *comm_declare_send_relative_(const char *func, const char *file, int l
 {
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%s called (%s:%d in %s())\n", __func__, file, line, func);
 #ifdef HOST_DEBUG
-  checkCudaError(); // check and clear error state first
-
-  if (isHost(buffer)) {
-    // test this memory allocation is ok by doing a memcpy from it
-    void *tmp = safe_malloc(nbytes);
-    try {
-      std::copy(static_cast<char*>(buffer), static_cast<char*>(buffer)+nbytes, static_cast<char*>(tmp));
-    } catch(std::exception &e) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir, nbytes);
-      errorQuda("aborting");
-    }
-    host_free(tmp);
+  if (quda::is_host(buffer)) {
+    // no reliable analogue on host
   } else {
     // test this memory allocation is ok by doing a memcpy from it
     void *tmp = device_malloc(nbytes);
@@ -521,16 +485,8 @@ MsgHandle *comm_declare_receive_relative_(const char *func, const char *file, in
 {
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%s called (%s:%d in %s())\n", __func__, file, line, func);
 #ifdef HOST_DEBUG
-  checkCudaError(); // check and clear error state first
-
-  if (isHost(buffer)) {
-    // test this memory allocation is ok by filling it
-    try {
-      std::fill(static_cast<char*>(buffer), static_cast<char*>(buffer)+nbytes, 0);
-    } catch(std::exception &e) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir, nbytes);
-      errorQuda("aborting");
-    }
+  if (quda::is_host(buffer)) {
+    // no reliable analogue on host
   } else {
     // test this memory allocation is ok by doing a memset
     qudaMemset(buffer, 0, nbytes);
@@ -551,20 +507,8 @@ MsgHandle *comm_declare_strided_send_relative_(const char *func, const char *fil
 {
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%s called (%s:%d in %s())\n", __func__, file, line, func);
 #ifdef HOST_DEBUG
-  checkCudaError(); // check and clear error state first
-
-  if (isHost(buffer)) {
-    // test this memory allocation is ok by doing a memcpy from it
-    void *tmp = safe_malloc(blksize*nblocks);
-    try {
-      for (int i=0; i<nblocks; i++)
-	std::copy(static_cast<char*>(buffer)+i*stride, static_cast<char*>(buffer)+i*stride+blksize, static_cast<char*>(tmp));
-    } catch(std::exception &e) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n",
-		 file, line, func, dim, dir, blksize, nblocks, stride);
-      errorQuda("aborting");
-    }
-    host_free(tmp);
+  if (quda::is_host(buffer)) {
+    // no reliable analogue on host
   } else {
     // test this memory allocation is ok by doing a memcpy from it
     void *tmp = device_malloc(blksize*nblocks);
@@ -588,18 +532,8 @@ MsgHandle *comm_declare_strided_receive_relative_(const char *func, const char *
 {
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%s called (%s:%d in %s())\n", __func__, file, line, func);
 #ifdef HOST_DEBUG
-  checkCudaError(); // check and clear error state first
-
-  if (isHost(buffer)) {
-    // test this memory allocation is ok by filling it
-    try {
-      for (int i=0; i<nblocks; i++)
-	std::fill(static_cast<char*>(buffer)+i*stride, static_cast<char*>(buffer)+i*stride+blksize, 0);
-    } catch(std::exception &e) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n",
-		 file, line, func, dim, dir, blksize, nblocks, stride);
-      errorQuda("aborting");
-    }
+  if (quda::is_host(buffer)) {
+    // no reliable analogue on host
   } else {
     // test this memory allocation is ok by doing a memset
     qudaMemset2D(buffer, stride, 0, blksize, nblocks);
@@ -689,13 +623,10 @@ bool comm_gdr_blacklist() {
     if (blacklist_env) { // set the policies to tune for explicitly
       std::stringstream blacklist_list(blacklist_env);
 
-      int device_count;
-      cudaGetDeviceCount(&device_count);
-
       int excluded_device;
       while (blacklist_list >> excluded_device) {
 	// check this is a valid device
-	if ( excluded_device < 0 || excluded_device >= device_count ) {
+	if ( excluded_device < 0 || excluded_device >= quda::device::get_device_count() ) {
 	  errorQuda("Cannot blacklist invalid GPU device ordinal %d", excluded_device);
 	}
 
@@ -728,9 +659,8 @@ void comm_init_common(int ndim, const int *dims, QudaCommsMap rank_from_coords, 
     if (!strncmp(comm_hostname(), &hostname_recv_buf[128 * i], 128)) { gpuid++; }
   }
 
-  int device_count;
-  cudaGetDeviceCount(&device_count);
-  if (device_count == 0) { errorQuda("No CUDA devices found"); }
+  int device_count = quda::device::get_device_count();
+  if (device_count == 0) { errorQuda("No devices found"); }
   if (gpuid >= device_count) {
     char *enable_mps_env = getenv("QUDA_ENABLE_MPS");
     if (enable_mps_env && strcmp(enable_mps_env, "1") == 0) {
@@ -761,8 +691,6 @@ void comm_init_common(int ndim, const int *dims, QudaCommsMap rank_from_coords, 
       std::stringstream device_list;                       // formatted (no commas)
 
       int device;
-      int deviceCount;
-      cudaGetDeviceCount(&deviceCount);
       while (device_list_raw >> device) {
         // check this is a valid policy choice
         if (device < 0) { errorQuda("Invalid CUDA_VISIBLE_DEVICE ordinal %d", device); }

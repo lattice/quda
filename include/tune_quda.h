@@ -244,7 +244,6 @@ namespace quda {
     virtual ~Tunable() { }
     virtual TuneKey tuneKey() const = 0;
     virtual void apply(const qudaStream_t &stream) = 0;
-    void apply() { apply(device::get_default_stream()); }
     virtual void preTune() { }
     virtual void postTune() { }
     virtual int tuningIter() const { return 1; }

@@ -54,12 +54,6 @@ namespace quda {
   void managed_free_(const char *func, const char *file, int line, void *ptr);
   void host_free_(const char *func, const char *file, int line, void *ptr);
 
-  // strip path from __FILE__
-  inline constexpr const char* str_end(const char *str) { return *str ? str_end(str + 1) : str; }
-  inline constexpr bool str_slant(const char *str) { return *str == '/' ? true : (*str ? str_slant(str + 1) : false); }
-  inline constexpr const char* r_slant(const char* str) { return *str == '/' ? (str + 1) : r_slant(str - 1); }
-  inline constexpr const char* file_name(const char* str) { return str_slant(str) ? r_slant(str_end(str)) : str; }
-
   QudaFieldLocation get_pointer_location(const void *ptr);
 
   /*
@@ -74,6 +68,11 @@ namespace quda {
   {
     return (reinterpret_cast<std::uintptr_t>(ptr) & (alignment - 1)) == 0;
   }
+
+  /**
+     @brief Returns true if pointer is on host
+  */
+  bool is_host(const void *ptr);
 
 } // namespace quda
 

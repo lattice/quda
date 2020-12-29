@@ -7,6 +7,14 @@
 #include <tune_key.h>
 #include <malloc_quda.h>
 
+namespace quda {
+  // strip path from __FILE__
+  constexpr const char* str_end(const char *str) { return *str ? str_end(str + 1) : str; }
+  constexpr bool str_slant(const char *str) { return *str == '/' ? true : (*str ? str_slant(str + 1) : false); }
+  constexpr const char* r_slant(const char* str) { return *str == '/' ? (str + 1) : r_slant(str - 1); }
+  constexpr const char* file_name(const char* str) { return str_slant(str) ? r_slant(str_end(str)) : str; }
+}
+
 /**
    @brief Query whether autotuning is enabled or not.  Default is enabled but can be overridden by setting QUDA_ENABLE_TUNING=0.
    @return If autotuning is enabled
