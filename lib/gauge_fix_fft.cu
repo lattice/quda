@@ -4,8 +4,7 @@
 #include <gauge_field.h>
 #include <gauge_field_order.h>
 #include <unitarization_links.h>
-#include <atomic.cuh>
-#include <index_helper.cuh>
+#include <gauge_tools.h>
 
 #include <FFT_Plans.h>
 #include <instantiate.h>

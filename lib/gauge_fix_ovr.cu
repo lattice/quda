@@ -1,5 +1,6 @@
 #include <quda_internal.h>
 #include <gauge_field.h>
+#include <gauge_tools.h>
 #include <unitarization_links.h>
 #include <comm_quda.h>
 #include <gauge_fix_ovr_hit_devf.cuh>
