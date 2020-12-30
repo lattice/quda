@@ -1,6 +1,7 @@
 #include <tune_quda.h>
 #include <comm_quda.h>
 #include <quda.h>     // for QUDA_VERSION_STRING
+#include <timer.h>
 #include <sys/stat.h> // for stat()
 #include <fcntl.h>
 #include <cfloat> // for FLT_MAX

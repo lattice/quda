@@ -2,6 +2,7 @@
 #include <tune_quda.h>
 #include <uint_to_char.h>
 #include <quda_internal.h>
+#include <timer.h>
 #include <device.h>
 
 // if this macro is defined then we use the driver API, else use the

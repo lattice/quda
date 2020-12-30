@@ -1,27 +1,5 @@
 #pragma once
 
-#ifdef __CUDACC_RTC__
-
-namespace quda {
-  // dummy Implementation that can safely be parsed by nvrtc
-  enum QudaProfileType { };
-
-  class TimeProfile {
-  public:
-    TimeProfile(std::string fname);
-    TimeProfile(std::string fname, bool use_global);
-    void Print();
-    void Start_(const char *func, const char *file, int line, QudaProfileType idx);
-    void Stop_(const char *func, const char *file, int line, QudaProfileType idx);
-    void Reset_(const char *func, const char *file, int line);
-    double Last(QudaProfileType idx);
-    void PrintGlobal();
-    bool isRunning(QudaProfileType idx);
-  };
-}
-
-#else
-
 #include <sys/time.h>
 
 #ifdef INTERFACE_NVTX
@@ -31,6 +9,10 @@ namespace quda {
 #include "nvToolsExt.h"
 #endif
 #endif
+
+#include <quda_internal.h>
+#include <util_quda.h>
+#include <device.h>
 
 namespace quda {
 
@@ -311,9 +293,6 @@ namespace quda {
   };
 
 } // namespace quda
-
-#endif
-
 
 #undef PUSH_RANGE
 #undef POP_RANGE

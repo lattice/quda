@@ -140,7 +140,7 @@ namespace quda {
    */
   bool canReuseResidentGauge(QudaInvertParam *inv_param);
 
-}
+  struct TimeProfile;
 
-#include <timer.h>
+}
 
