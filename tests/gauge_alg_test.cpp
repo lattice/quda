@@ -4,6 +4,7 @@
 
 #include <quda.h>
 #include <quda_internal.h>
+#include <timer.h>
 #include <gauge_field.h>
 
 #include <comm_quda.h>
@@ -178,7 +179,7 @@ class GaugeAlgTest : public ::testing::Test {
 
   QudaGaugeParam param;
 
-  Timer a0,a1;
+  Timer<false> a0,a1;
   double2 detu;
   double3 plaq;
   cudaGaugeField *U;

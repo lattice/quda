@@ -323,8 +323,8 @@ DslashTime dslashCUDA(int niter) {
     dslash_time.cpu_time += host_timer.Last();
     // skip first and last iterations since they may skew these metrics if comms are not synchronous
     if (i>0 && i<niter) {
-      dslash_time.cpu_min = std::min(elapsed, host_timer.Last());
-      dslash_time.cpu_max = std::max(elapsed, host_timer.Last());
+      dslash_time.cpu_min = std::min(dslash_time.cpu_min, host_timer.Last());
+      dslash_time.cpu_max = std::max(dslash_time.cpu_max, host_timer.Last());
     }
   }
 
