@@ -218,7 +218,7 @@ namespace quda {
       if (copy) {
         if (async) {
 #ifdef USE_DRIVER_API
-          CUresult error;
+          CUresult error = CUDA_SUCCESS;
           switch (kind) {
           case cudaMemcpyDeviceToHost:
             PROFILE(error = cuMemcpyDtoHAsync(dst, (CUdeviceptr)src, count, device::get_cuda_stream(stream)), QUDA_PROFILE_MEMCPY_D2H_ASYNC);
@@ -252,7 +252,7 @@ namespace quda {
 #endif
         } else {
 #ifdef USE_DRIVER_API
-          CUresult error;
+          CUresult error = CUDA_SUCCESS;
           switch (kind) {
           case cudaMemcpyDeviceToHost: error = cuMemcpyDtoH(dst, (CUdeviceptr)src, count); break;
           case cudaMemcpyHostToDevice: error = cuMemcpyHtoD((CUdeviceptr)dst, src, count); break;
