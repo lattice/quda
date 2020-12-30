@@ -112,7 +112,6 @@ int test(int contractionType, int Prec)
   case 1: test_prec = QUDA_DOUBLE_PRECISION; break;
   default: errorQuda("Undefined QUDA precision type %d\n", Prec);
   }
-  if ((test_prec & QUDA_PRECISION) == 0) GTEST_SKIP();
 
   int X[4] = {xdim, ydim, zdim, tdim};
 
@@ -197,6 +196,7 @@ TEST_P(ContractionTest, verify)
 {
   int prec = ::testing::get<0>(GetParam());
   int contractionType = ::testing::get<1>(GetParam());
+  if ((QUDA_PRECISION & getPrecision(::testing::get<0>(GetParam()))) == 0) GTEST_SKIP();
   auto faults = test(contractionType, prec);
   EXPECT_EQ(faults, 0) << "CPU and GPU implementations do not agree";
 }
