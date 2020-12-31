@@ -1,4 +1,3 @@
-
 # cmake-format: off
 
 # QUDA_HASH for tunecache
@@ -9,9 +8,11 @@ endif()
 ### HACK FOR NOW
 #
 if( QUDA_TARGET_CUDA )
-set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CMAKE_CUDA_COMPILER_VERSION})
+  set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},
+    cuda_version=${CMAKE_CUDA_COMPILER_VERSION})
 else()
-set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH})
+  set(HASH cpu_arch=${CPU_ARCH})
+  #,gpu_arch=${QUDA_GPU_ARCH})
 endif(QUDA_TARGET_CUDA)
 
 # this allows simplified running of clang-tidy
@@ -151,8 +152,8 @@ if(GITVERSION)
 endif()
 
 if( QUDA_TARGET_HIP )
-set_source_files_properties( ${QUDA_CU_OBJS} PROPERTIES LANGUAGE CXX)
-set_source_files_properties( ${QUDA_CU_OBJS} PROPERTIES COMPILE_FLAGS "-x hip -Wno-unused-function -Wno-pass-failed -Wno-unused-local-typedef") 
+  set_source_files_properties( ${QUDA_CU_OBJS} PROPERTIES LANGUAGE CXX)
+  set_source_files_properties( ${QUDA_CU_OBJS} PROPERTIES COMPILE_FLAGS "-x hip -Wno-unused-function -Wno-pass-failed -Wno-unused-local-typedef") 
 endif()
 
 # make one library
@@ -168,18 +169,17 @@ else()
   add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
 endif()
 
-# malloc.cpp uses both the driver and runtime api So we need to find the CUDA_CUDA_LIBRARY (driver api) or the stub
-# version for cmake 3.8 and later this has been integrated into  FindCUDALibs.cmake
-if (QUDA_TARGET_CUDA) 
-  target_link_libraries(quda PUBLIC ${CUDA_cuda_driver_LIBRARY})
-endif()
-
 # set up QUDA compile options
 target_compile_definitions(
   quda PRIVATE $<$<CONFIG:DEVEL>:DEVEL> $<$<CONFIG:HOSTDEBUG>:HOST_DEBUG> $<$<CONFIG:DEVICEDEBUG>:DEVICE_DEBUG>
-               $<$<CONFIG:DEBUG>:HOST_DEBUGDEVICE_DEBUG> $<$<CONFIG:SANITIZE>:HOST_DEBUG>)
+  $<$<CONFIG:DEBUG>:HOST_DEBUGDEVICE_DEBUG> $<$<CONFIG:SANITIZE>:HOST_DEBUG>)
 
-if ( QUDA_TARGET_CUDA )
+if (QUDA_TARGET_CUDA)
+  # malloc.cpp uses both the driver and runtime api So we need to find the
+  # CUDA_CUDA_LIBRARY (driver api) or the stub version for cmake 3.8 and later this
+  # has been integrated into  FindCUDALibs.cmake
+  target_link_libraries(quda PUBLIC ${CUDA_cuda_driver_LIBRARY})
+  
   target_compile_options(
     quda
     PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
@@ -220,7 +220,7 @@ endif(QUDA_TARGET_CUDA)
 target_include_directories(quda PRIVATE .)
 target_include_directories(quda PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
-if (QUDA_TARGET_CUDA )
+if (QUDA_TARGET_CUDA)
   target_include_directories(quda SYSTEM PRIVATE ../include/externals)
   target_include_directories(quda SYSTEM PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
 endif()
@@ -244,6 +244,7 @@ if(QUDA_TARGET_CUDA)
   target_include_directories(quda PRIVATE ../include/targets/cuda)
   target_include_directories(quda SYSTEM PRIVATE ../include/targets/cuda/externals)
 endif()
+
 if(QUDA_TARGET_HIP)
   add_subdirectory(targets/hip)
   target_include_directories(quda PRIVATE ../include/targets/hip)
@@ -306,7 +307,7 @@ target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
 # some clang warnings should be warning even when turning warnings into errors
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   target_compile_options(quda_cpp PUBLIC $<$<COMPILE_LANGUAGE:CXX>: -Wno-error=unused-function>)
-
+  
   # this is a hack to get colored diagnostics back when using Ninja and clang
   if(CMAKE_GENERATOR MATCHES "Ninja")
     target_compile_options(quda PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-fcolor-diagnostics>)
@@ -349,7 +350,9 @@ if(QUDA_DIRAC_NDEG_TWISTED_MASS)
 endif(QUDA_DIRAC_NDEG_TWISTED_MASS)
 
 if(${QUDA_BUILD_NATIVE_LAPACK} STREQUAL "ON")
-  target_link_libraries(quda PUBLIC ${CUDA_cublas_LIBRARY})
+  if(QUDA_TARGET_CUDA)
+    target_link_libraries(quda PUBLIC ${CUDA_cublas_LIBRARY})
+  endif()
   target_compile_definitions(quda PRIVATE NATIVE_LAPACK_LIB)
 endif()
 
@@ -359,7 +362,9 @@ endif(QUDA_MULTIGRID)
 
 if(QUDA_GAUGE_ALG)
   target_compile_definitions(quda PUBLIC GPU_GAUGE_ALG GPU_GAUGE_TOOLS GPU_UNITARIZE)
-  target_link_libraries(quda PUBLIC ${CUDA_cufft_LIBRARY})
+  if(QUDA_TARGET_CUDA)
+    target_link_libraries(quda PUBLIC ${CUDA_cufft_LIBRARY})
+  endif()
 endif(QUDA_GAUGE_ALG)
 
 if(QUDA_SSTEP)
