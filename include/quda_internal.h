@@ -1,5 +1,6 @@
 #pragma once
 
+#include <quda_define.h>
 #include <quda_api.h>
 
 #if defined(QUDA_TARGET_CUDA)
