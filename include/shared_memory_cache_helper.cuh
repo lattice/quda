@@ -183,7 +183,7 @@ namespace quda
     */
     __device__ __host__ inline void sync()
     {
-#ifdef __CUDA_ARCH__
+#if defined( __CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
       __syncthreads();
 #endif
     }
@@ -302,7 +302,7 @@ namespace quda
     */
     __device__ __host__ inline void sync()
     {
-#ifdef __CUDA_ARCH__
+#if defined( __CUDA_ARCH__ ) || defined(__HIP_DEVICE_COMPILE__)
       __syncthreads();
 #endif
     }
