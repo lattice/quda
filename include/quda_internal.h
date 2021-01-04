@@ -3,7 +3,7 @@
 #include <quda_define.h>
 #include <quda_api.h>
 
-#if defined(QUDA_TARGET_CUDA)
+#if defined(QUDA_TARGET_CUDA) || 1 // hack for Jenkins for now
 #include <cuda.h>
 #include <cuda_runtime.h>
 #endif
