@@ -81,7 +81,8 @@ namespace quda {
     void Start(const char *func = nullptr, const char *file = nullptr, int line = 0)
     {
       if (running) {
-	printfQuda("ERROR: Cannot start an already running timer (%s:%d in %s())\n", file, line, func);
+	printfQuda("ERROR: Cannot start an already running timer (%s:%d in %s())",
+                   file ? file : "", line, func ? func : "");
 	errorQuda("Aborting");
       }
       if (!device) {
@@ -95,7 +96,8 @@ namespace quda {
     void Stop(const char *func = nullptr, const char *file = nullptr, int line = 0)
     {
       if (!running) {
-	printfQuda("ERROR: Cannot stop an unstarted timer (%s:%d in %s())\n", file, line, func);
+	printfQuda("ERROR: Cannot stop an unstarted timer (%s:%d in %s())",
+                   file ? file : "", line, func ? func : "");
 	errorQuda("Aborting");
       }
       if (!device) {
@@ -121,7 +123,8 @@ namespace quda {
 
     void Reset(const char *func, const char *file, int line) {
       if (running) {
-	printfQuda("ERROR: Cannot reset a started timer (%s:%d in %s())\n", file, line, func);
+	printfQuda("ERROR: Cannot reset a started timer (%s:%d in %s())",
+                   file ? file : "", line, func ? func : "");
 	errorQuda("Aborting");
       }
       time = 0.0;
