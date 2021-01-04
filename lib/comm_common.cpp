@@ -247,9 +247,9 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
     for(int dir=0; dir<2; ++dir){ // forward/backward directions
       for(int dim=0; dim<4; ++dim){
 	int neighbor_rank = comm_neighbor_rank(dir,dim);
-	if(neighbor_rank == comm_rank()) continue;
+	if (neighbor_rank == comm_rank()) continue;
 
-        if (neighbor_rank >= comm_size()) errorQuda("neighbor rank %d > number of ranks %d", neighbor_rank, comm_size());
+        if ((unsigned)neighbor_rank >= comm_size()) errorQuda("neighbor rank %d > number of ranks %lu", neighbor_rank, comm_size());
 
         // disable peer-to-peer comms in one direction
 	if ( ((comm_rank() > neighbor_rank && dir == 0) || (comm_rank() < neighbor_rank && dir == 1)) &&
