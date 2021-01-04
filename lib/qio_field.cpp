@@ -204,11 +204,11 @@ int read_su3_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecisio
 void set_layout(const int *X, QudaSiteSubset subset = QUDA_FULL_SITE_SUBSET)
 {
   /* Lattice dimensions */
-  int lattice_dim = 4; // assume the comms topology is 4-d
-  int lattice_volume = 1;
+  size_t lattice_dim = 4; // assume the comms topology is 4-d
+  size_t lattice_volume = 1;
   for (int d=0; d<4; d++) {
     lattice_size[d] = comm_dim(d)*X[d];
-    lattice_volume *= lattice_size[d];
+    lattice_volume *= (size_t)lattice_size[d];
   }
 
   /* Set the mapping of coordinates to nodes */
