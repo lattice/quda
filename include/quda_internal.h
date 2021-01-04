@@ -141,7 +141,7 @@ namespace quda {
    */
   bool canReuseResidentGauge(QudaInvertParam *inv_param);
 
-  struct TimeProfile;
+  class TimeProfile;
 
 }
 
