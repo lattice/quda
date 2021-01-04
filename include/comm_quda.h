@@ -168,7 +168,7 @@ extern "C" {
   /**
      @return Number of processes
   */
-  int comm_size(void);
+  size_t comm_size(void);
 
   /**
      @return GPU id associated with this process
