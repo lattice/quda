@@ -820,6 +820,12 @@ public:
     }
 
   __host__ __device__ inline complex<int>(const complex<int> & z) : int2(z){}
+  __host__ __device__ complex<int>& operator=(const complex<int> &z)
+    {
+      x = z.x;
+      y = z.y;
+      return *this;
+    }
 
   template <typename X>
   inline complex<int>(const std::complex<X> & z) : int2{static_cast<int>(z.x), static_cast<int>(z.y)} {}

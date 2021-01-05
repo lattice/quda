@@ -783,7 +783,7 @@ namespace quda {
 
       if (use_mma && (type == COMPUTE_UV || type == COMPUTE_VUV) && dir != QUDA_IN_PLACE) {
         constexpr bool query_max = true;
-        int max;
+        int max = 0;
         if (type == COMPUTE_UV) {
           max = mma::launch_compute_uv_kernel<from_coarse, query_max>(param, arg, 1, device::get_default_stream());
         } else if (type == COMPUTE_VUV) {
