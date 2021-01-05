@@ -220,16 +220,16 @@ void set_layout(const int *X, QudaSiteSubset subset = QUDA_FULL_SITE_SUBSET)
   /* Build the layout structure */
 #ifdef QIO_HAS_EXTENDED_LAYOUT
   // members for smaller lattices are not used here
-  layout.node_number = NULL;
-  layout.node_index = NULL;
-  layout.get_coords = NULL;
-  layout.num_sites = NULL;
+  layout.node_number = nullptr;
+  layout.node_index = nullptr;
+  layout.get_coords = nullptr;
+  layout.num_sites = nullptr;
   // members using the extended layout for large lattice support
   layout.node_number_ext = quda_node_number_ext;
   layout.node_index_ext = quda_node_index_ext;
   layout.get_coords_ext = quda_get_coords_ext;
   layout.num_sites_ext = quda_num_sites_ext;
-  layout.arg = NULL;
+  layout.arg = nullptr;
   layout.sites_on_node = quda_num_sites_ext(quda_this_node, nullptr);
 #else
   // legacy API
