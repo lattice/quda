@@ -41,8 +41,9 @@ namespace quda {
 #endif
     }
 
+  public:
     template <template <typename> class Functor, typename Arg>
-    void launch_cuda(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
+    void launch_cuda(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param) const
     {
 #ifdef JITIFY
       launch_error = launch_jitify<Functor>("quda::raw_kernel", tp, stream, arg, param);
@@ -53,6 +54,7 @@ namespace quda {
 #endif
     }
 
+  protected:
     template <template <typename> class Functor, typename Arg>
     void launch_host(const TuneParam &, const qudaStream_t &, const Arg &arg, const std::vector<constant_param_t> & = dummy_param)
     {
