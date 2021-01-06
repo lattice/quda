@@ -47,7 +47,7 @@ namespace quda {
     }
   }
 
-  template <template <typename> class Functor, typename Arg>
+  template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   __launch_bounds__(Arg::block_dim, Arg::min_blocks) __global__ void raw_kernel(Arg arg)
   {
     Functor<Arg> f(arg);

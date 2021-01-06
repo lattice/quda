@@ -79,7 +79,8 @@ namespace quda {
     std::string kernel_file(std::string("kernels/") + file);
     create_jitify_program_v2(kernel_file);
 
-    auto instance = program_map[kernel_file]->kernel(kernel).instantiate(template_args);
+    std::string kernel_name(std::string("quda::") + kernel);
+    auto instance = program_map[kernel_file]->kernel(kernel_name).instantiate(template_args);
 
     if (tp.set_max_shared_bytes && device::max_dynamic_shared_memory() > device::max_default_shared_memory()) {
       instance.set_func_attribute(CU_FUNC_ATTRIBUTE_PREFERRED_SHARED_MEMORY_CARVEOUT, 100);

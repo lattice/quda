@@ -2,7 +2,7 @@
 
 #include <tune_quda.h>
 #include <lattice_field.h>
-#include <device.h>
+#include <target_device.h>
 #include <kernel_helper.h>
 #include <kernel.h>
 
@@ -11,6 +11,23 @@
 #endif
 
 namespace quda {
+
+  namespace device {
+
+    template <template <typename> class Functor, bool grid_stride = false, typename Arg>
+    qudaError_t launch(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
+                       const std::vector<constant_param_t> &param = dummy_param)
+    {
+#ifdef JITIFY
+      return launch_jitify<Functor, grid_stride, Arg>(kernel.name, tp, stream, arg, param);
+#else
+      for (unsigned int i = 0; i < param.size(); i++)
+        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
+      return qudaLaunchKernel(kernel.func, tp, stream, arg);
+#endif
+    }
+
+  }
 
   template <bool grid_stride>
   class TunableKernel1D_base : public Tunable
@@ -32,26 +49,14 @@ namespace quda {
     template <template <typename> class Functor, typename Arg>
     void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
     {
-#ifdef JITIFY
-      launch_error = launch_jitify<Functor>("quda::Kernel1D", tp, stream, arg, param);
-#else
-      for (unsigned int i = 0; i < param.size(); i++)
-        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
-      qudaLaunchKernel(Kernel1D<Functor, Arg, grid_stride>, tp, stream, arg);
-#endif
+      device::launch<Functor, grid_stride>(KERNEL(Kernel1D), tp, stream, arg, param);
     }
 
   public:
     template <template <typename> class Functor, typename Arg>
     void launch_cuda(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param) const
     {
-#ifdef JITIFY
-      launch_error = launch_jitify<Functor>("quda::raw_kernel", tp, stream, arg, param);
-#else
-      for (unsigned int i = 0; i < param.size(); i++)
-        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
-      qudaLaunchKernel(raw_kernel<Functor, Arg>, tp, stream, arg);
-#endif
+      device::launch<Functor>(KERNEL(raw_kernel), tp, stream, arg, param);
     }
 
   protected:
@@ -130,7 +135,6 @@ namespace quda {
       TunableKernel1D_base<true>(field, location) {}
   };
 
-
   /**
      @brief This derived class is for algorithms that deploy a vector
      of computations across the y dimension of both the threads block
@@ -149,13 +153,7 @@ namespace quda {
     template <template <typename> class Functor, typename Arg>
     void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
     {
-#ifdef JITIFY
-      launch_error = launch_jitify<Functor>("quda::Kernel2D", tp, stream, arg, param);
-#else
-      for (unsigned int i = 0; i < param.size(); i++)
-        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
-      qudaLaunchKernel(Kernel2D<Functor, Arg, grid_stride>, tp, stream, arg);
-#endif
+      device::launch<Functor, grid_stride>(KERNEL(Kernel2D), tp, stream, arg, param);
     }
 
     template <template <typename> class Functor, typename Arg>
@@ -304,13 +302,7 @@ namespace quda {
     template <template <typename> class Functor, typename Arg>
     void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
     {
-#ifdef JITIFY
-      launch_error = launch_jitify<Functor>("quda::Kernel3D", tp, stream, arg, param);
-#else
-      for (unsigned int i = 0; i < param.size(); i++)
-        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
-      qudaLaunchKernel(Kernel3D<Functor, Arg, grid_stride>, tp, stream, arg);
-#endif
+      device::launch<Functor, grid_stride>(KERNEL(Kernel3D), tp, stream, arg, param);
     }
 
     template <template <typename> class Functor, typename Arg>
