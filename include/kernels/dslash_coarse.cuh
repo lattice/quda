@@ -3,6 +3,7 @@
 #include <index_helper.cuh>
 #include <float_vector.h>
 #include <shared_memory_cache_helper.cuh>
+#include <kernel.h>
 
 namespace quda {
 
@@ -329,7 +330,7 @@ namespace quda {
   template <typename Arg> struct CoarseDslash {
     Arg &arg;
     constexpr CoarseDslash(Arg &arg) : arg(arg) {}
-    constexpr const char *filename() { return KERNEL_FILE; }
+    static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb_color_offset, int parity, int sMd)
     {

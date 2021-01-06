@@ -2,12 +2,10 @@
 
 #include <gauge_field_order.h>
 #include <index_helper.cuh>
-
 #include <mma_tensor_op/gemm.cuh>
-
-#include <type_traits>
-
 #include <cub_helper.cuh>
+#include <kernel.h>
+#include <kernels/coarse_op_preconditioned.cuh>
 
 // This is MMA implementation of the computeYhat kernels.
 
