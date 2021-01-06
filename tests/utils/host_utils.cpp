@@ -1018,6 +1018,9 @@ template <typename Float> void constructUnitGaugeField(Float **res, QudaGaugePar
   applyGaugeFieldScaling(res, Vh, param);
 }
 
+template void constructUnitGaugeField(float **res, QudaGaugeParam *param);
+template void constructUnitGaugeField(double **res, QudaGaugeParam *param);
+
 // normalize the vector a
 template <typename Float>
 static void normalize(complex<Float> *a, int len) {
@@ -1110,6 +1113,9 @@ template <typename Float> void constructRandomGaugeField(Float **res, QudaGaugeP
     }
   }
 }
+
+template void constructRandomGaugeField(float **res, QudaGaugeParam *param, QudaDslashType dslash_type);
+template void constructRandomGaugeField(double **res, QudaGaugeParam *param, QudaDslashType dslash_type);
 
 template <typename Float> void constructUnitaryGaugeField(Float **res)
 {
