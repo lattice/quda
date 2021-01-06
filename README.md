@@ -1,4 +1,4 @@
-# QUDA 1.0.0
+# QUDA 1.0.1
 
 ## Overview
 
@@ -59,7 +59,7 @@ capability" of your card, either from NVIDIA's documentation or by
 running the deviceQuery example in the CUDA SDK, and pass the
 appropriate value to the `QUDA_GPU_ARCH` variable in cmake.
 
-QUDA 1.0.0, supports devices of compute capability 3.0 or greater.
+QUDA 1.0.1, supports devices of compute capability 3.0 or greater.
 While QUDA is no longer supported on the older Fermi architecture, it
 may continue to work (assuming the user disables the use of textures
 (QUDA_TEX=OFF).
@@ -113,7 +113,7 @@ details).  MAGMA is available from
 http://icl.cs.utk.edu/magma/index.html.  MAGMA is enabled using the
 cmake option `QUDA_MAGMA=ON`.
 
-Version 1.0.0 of QUDA includes interface for the external (P)ARPACK
+Version 1.0.1 of QUDA includes interface for the external (P)ARPACK
 library for eigenvector computing. (P)ARPACK is available, e.g., from
 https://github.com/opencollab/arpack-ng.  (P)ARPACK is enabled using
 CMake option `QUDA_ARPACK=ON`. Note that with a multi-GPU option, the
