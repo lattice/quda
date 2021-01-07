@@ -103,3 +103,5 @@ void Communicator::comm_broadcast(void *data, size_t nbytes) { }
 void Communicator::comm_barrier(void) { }
 
 void Communicator::comm_abort_(int status) { exit(status); }
+
+int Communicator::comm_rank_global() { return 0; }
