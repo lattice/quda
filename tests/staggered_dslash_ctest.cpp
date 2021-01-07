@@ -191,7 +191,7 @@ int main(int argc, char **argv)
     finalizeComms();
 
     return test_rc;
-  }
+}
 
   std::string getstaggereddslashtestname(testing::TestParamInfo<::testing::tuple<int, int, int>> param){
    const int prec = ::testing::get<0>(param.param);

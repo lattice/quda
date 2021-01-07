@@ -778,7 +778,6 @@ struct Communicator {
   static void comm_abort_(int status);
 
   static int comm_rank_global();
-
 };
 
 constexpr quda::CommKey default_comm_key = {1, 1, 1, 1};

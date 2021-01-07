@@ -51,7 +51,7 @@ namespace quda
     // Send cycles
     for (int i = 0; i < n_replicates; i++) {
       auto partition_idx = coordinate_from_index(i, comm_key); // Which partition to send to?
-      auto processor_idx = comm_grid_idx / partition_dim;           // Which processor in that partition to send to?
+      auto processor_idx = comm_grid_idx / partition_dim;      // Which processor in that partition to send to?
 
       auto dst_idx = partition_idx * processor_dim + processor_idx;
 
