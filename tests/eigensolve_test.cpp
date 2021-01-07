@@ -154,15 +154,15 @@ int main(int argc, char **argv)
   // requested data, at the requested prec. All the information needed to perfom the
   // solve is in the eig_param container. If eig_param.arpack_check == true and
   // precision is double, the routine will use ARPACK rather than the GPU.
-  Timer<false> host_timer;
-  host_timer.Start();
+  host_timer_t host_timer;
+  host_timer.start();
   if (eig_param.arpack_check && !(eig_inv_param.cpu_prec == QUDA_DOUBLE_PRECISION)) {
     errorQuda("ARPACK check only available in double precision");
   }
 
   eigensolveQuda(host_evecs, host_evals, &eig_param);
-  host_timer.Stop();
-  printfQuda("Time for %s solution = %f\n", eig_param.arpack_check ? "ARPACK" : "QUDA", host_timer.Last());
+  host_timer.stop();
+  printfQuda("Time for %s solution = %f\n", eig_param.arpack_check ? "ARPACK" : "QUDA", host_timer.last());
   // QUDA eigensolver test COMPLETE
   //----------------------------------------------------------------------------
 

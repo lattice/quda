@@ -738,10 +738,10 @@ namespace quda
         }
 
         const auto &stream = device::get_default_stream();
-        Timer<true> timer(stream);
+        device_timer_t timer(stream);
 
-        Timer<false> tune_timer;
-        tune_timer.Start(__func__, __FILE__, __LINE__);
+        host_timer_t tune_timer;
+        tune_timer.start(__func__, __FILE__, __LINE__);
 
         tunable.initTuneParam(param);
         while (tuning) {
@@ -755,11 +755,11 @@ namespace quda
 
           tunable.apply(stream); // do initial call in case we need to jit compile for these parameters or if policy tuning
 
-          timer.Start();
+          timer.start();
           for (int i = 0; i < tunable.tuningIter(); i++) {
             tunable.apply(stream); // calls tuneLaunch() again, which simply returns the currently active param
           }
-          timer.Stop();
+          timer.stop();
           qudaDeviceSynchronize();
           auto error = qudaGetLastError();
 
@@ -769,7 +769,7 @@ namespace quda
               errorQuda("Failed to clear error state %s\n", qudaGetLastErrorString().c_str());
           }
 
-          float elapsed_time = timer.Last() / tunable.tuningIter();
+          float elapsed_time = timer.last() / tunable.tuningIter();
           if ((elapsed_time < best_time) && (error == QUDA_SUCCESS) && (tunable.launchError() == QUDA_SUCCESS)) {
             best_time = elapsed_time;
             best_param = param;
@@ -790,7 +790,7 @@ namespace quda
           tunable.launchError() = QUDA_SUCCESS;
         }
 
-        tune_timer.Stop(__func__, __FILE__, __LINE__);
+        tune_timer.stop(__func__, __FILE__, __LINE__);
 
         if (best_time == FLT_MAX) {
           errorQuda("Auto-tuning failed for %s with %s at vol=%s", key.name, key.aux, key.volume);
@@ -801,7 +801,7 @@ namespace quda
         }
         time(&now);
         best_param.comment = "# " + tunable.perfString(best_time);
-        best_param.comment += ", tuning took " + std::to_string(tune_timer.Last()) + " seconds at ";
+        best_param.comment += ", tuning took " + std::to_string(tune_timer.last()) + " seconds at ";
         best_param.comment += ctime(&now); // includes a newline
         best_param.time = best_time;
 

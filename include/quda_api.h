@@ -24,7 +24,6 @@ namespace quda
 
   struct qudaStream_t {
     int idx;
-    //qudaStream_t(int idx) : idx(idx) {}
   };
 
   struct qudaEvent_t {
@@ -184,6 +183,17 @@ namespace quda
   qudaEvent_t qudaEventCreate_(const char *func, const char *file, const char *line);
 
   /**
+     @brief Return instance of an event that can be used for timing.
+  */
+  qudaEvent_t qudaChronoEventCreate_(const char *func, const char *file, const char *line);
+
+  /**
+     @brief Return elapsed time in seconds between two events
+  */
+  float qudaEventElapsedTime_(const qudaEvent_t &start, const qudaEvent_t &stop,
+                              const char *func, const char *file, const char *line);
+
+  /**
      @brief Destroy the event
   */
   void qudaEventDestroy_(qudaEvent_t &event, const char *func, const char *file, const char *line);
@@ -305,6 +315,12 @@ namespace quda
 
 #define qudaEventCreate()                                               \
   ::quda::qudaEventCreate_( __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
+#define qudaChronoEventCreate()                                               \
+  ::quda::qudaChronoEventCreate_( __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
+#define qudaEventElapsedTime(start, stop)                               \
+  ::quda::qudaEventElapsedTime_(start, stop, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
 
 #define qudaEventDestroy(event)                                         \
   ::quda::qudaEventDestroy_(event, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))

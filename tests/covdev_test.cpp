@@ -161,13 +161,13 @@ void end(void)
 
 double dslashCUDA(int niter, int mu)
 {
-  Timer<true> timer;
-  timer.Start();
+  device_timer_t timer;
+  timer.start();
 
   for (int i = 0; i < niter; i++) dirac->MCD(*cudaSpinorOut, *cudaSpinor, mu);
 
-  timer.Stop();
-  return timer.Last();
+  timer.stop();
+  return timer.last();
 }
 
 void covdevRef(int mu)

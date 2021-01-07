@@ -516,6 +516,26 @@ namespace quda {
     return quda_event;
   }
 
+  qudaEvent_t qudaChronoEventCreate_(const char *func, const char *file, const char *line)
+  {
+    cudaEvent_t cuda_event;
+    cudaError_t error = cudaEventCreate(&cuda_event);
+    set_runtime_error(error, __func__, func, file, line);
+    qudaEvent_t quda_event;
+    quda_event.event = reinterpret_cast<void*>(cuda_event);
+    return quda_event;
+  }
+
+  float qudaEventElapsedTime_(const qudaEvent_t &start, const qudaEvent_t &stop,
+                              const char *func, const char *file, const char *line)
+  {
+    float elapsed_time;
+    cudaError_t error = cudaEventElapsedTime(&elapsed_time, reinterpret_cast<cudaEvent_t>(start.event),
+                                             reinterpret_cast<cudaEvent_t>(stop.event));
+    set_runtime_error(error, __func__, func, file, line);
+    return elapsed_time / 1000;
+  }
+
   void qudaEventDestroy_(qudaEvent_t &event, const char *func, const char *file, const char *line)
   {
     cudaError_t error = cudaEventDestroy(reinterpret_cast<cudaEvent_t&>(event.event));

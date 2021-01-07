@@ -166,8 +166,8 @@ DiracCoarse *dirac;
 
 double benchmark(int test, const int niter)
 {
-  Timer<true> device_timer;
-  device_timer.Start();
+  device_timer_t device_timer;
+  device_timer.start();
 
   switch(test) {
   case 0:
@@ -183,10 +183,9 @@ double benchmark(int test, const int niter)
     errorQuda("Undefined test %d", test);
   }
 
-  device_timer.Stop();
-  return device_timer.Last();
+  device_timer.stop();
+  return device_timer.last();
 }
-
 
 const char *names[] = {
   "Dslash",

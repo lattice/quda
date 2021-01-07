@@ -30,7 +30,7 @@ namespace quda {
     double time;
 
     /**< The last recorded time interval */
-    double last;
+    double last_interval;
 
     /**< Used to store when the timer was last started */
     timeval host_start;
@@ -55,30 +55,26 @@ namespace quda {
 
     Timer(qudaStream_t stream = device::get_default_stream()) :
       time(0.0),
-      last(0.0),
+      last_interval(0.0),
       stream(stream),
       running(false),
       count(0)
     {
       if (device) {
-        cudaEvent_t start_;
-        cudaEvent_t end_;
-        cudaEventCreate(&start_);
-        cudaEventCreate(&end_);
-        device_start.event = reinterpret_cast<void*>(start_);
-        device_stop.event = reinterpret_cast<void*>(end_);
+        device_start = qudaChronoEventCreate();
+        device_stop = qudaChronoEventCreate();
       }
     }
 
     ~Timer()
     {
       if (device) {
-        cudaEventDestroy(reinterpret_cast<cudaEvent_t>(device_start.event));
-        cudaEventDestroy(reinterpret_cast<cudaEvent_t>(device_stop.event));
+        qudaEventDestroy(device_start);
+        qudaEventDestroy(device_stop);
       }
     }
 
-    void Start(const char *func = nullptr, const char *file = nullptr, int line = 0)
+    void start(const char *func = nullptr, const char *file = nullptr, int line = 0)
     {
       if (running) {
 	printfQuda("ERROR: Cannot start an already running timer (%s:%d in %s())",
@@ -93,7 +89,7 @@ namespace quda {
       running = true;
     }
 
-    void Stop(const char *func = nullptr, const char *file = nullptr, int line = 0)
+    void stop(const char *func = nullptr, const char *file = nullptr, int line = 0)
     {
       if (!running) {
 	printfQuda("ERROR: Cannot stop an unstarted timer (%s:%d in %s())",
@@ -104,34 +100,34 @@ namespace quda {
         gettimeofday(&host_stop, NULL);
         long ds = host_stop.tv_sec - host_start.tv_sec;
         long dus = host_stop.tv_usec - host_start.tv_usec;
-        last = ds + 0.000001*dus;
+        last_interval = ds + 0.000001*dus;
       } else {
         qudaEventRecord(device_stop, stream);
         qudaEventSynchronize(device_stop);
-        float elapsed_time;
-        cudaEventElapsedTime(&elapsed_time, reinterpret_cast<cudaEvent_t>(device_start.event),
-                             reinterpret_cast<cudaEvent_t>(device_stop.event));
-        last = elapsed_time / 1000;
+        last_interval = qudaEventElapsedTime(device_start, device_stop);
       }
-      time += last;
+      time += last_interval;
       count++;
 
       running = false;
     }
 
-    double Last() { return last; }
+    double last() { return last_interval; }
 
-    void Reset(const char *func, const char *file, int line) {
+    void reset(const char *func, const char *file, int line) {
       if (running) {
 	printfQuda("ERROR: Cannot reset a started timer (%s:%d in %s())",
                    file ? file : "", line, func ? func : "");
 	errorQuda("Aborting");
       }
       time = 0.0;
-      last = 0.0;
+      last_interval = 0.0;
       count = 0;
     }
   };
+
+  using device_timer_t = Timer<true>;
+  using host_timer_t = Timer<false>;
 
   /**< Enumeration type used for writing a simple but extensible profiling framework. */
   enum QudaProfileType {
@@ -211,26 +207,26 @@ namespace quda {
     static const uint32_t nvtx_colors[];// = { 0x0000ff00, 0x000000ff, 0x00ffff00, 0x00ff00ff, 0x0000ffff, 0x00ff0000, 0x00ffffff };
     static const int nvtx_num_colors;// = sizeof(nvtx_colors)/sizeof(uint32_t);
 #endif
-    Timer<> profile[QUDA_PROFILE_COUNT];
+    host_timer_t profile[QUDA_PROFILE_COUNT];
     static std::string pname[];
 
     bool switchOff;
     bool use_global;
 
     // global timer
-    static Timer<> global_profile[QUDA_PROFILE_COUNT];
+    static host_timer_t global_profile[QUDA_PROFILE_COUNT];
     static bool global_switchOff[QUDA_PROFILE_COUNT];
     static int global_total_level[QUDA_PROFILE_COUNT]; // zero initialize
 
     static void StopGlobal(const char *func, const char *file, int line, QudaProfileType idx) {
 
       global_total_level[idx]--;
-      if (global_total_level[idx]==0) global_profile[idx].Stop(func,file,line);
+      if (global_total_level[idx]==0) global_profile[idx].stop(func,file,line);
 
       // switch off total timer if we need to
       if (global_switchOff[idx]) {
         global_total_level[idx]--;
-        if (global_total_level[idx]==0) global_profile[idx].Stop(func,file,line);
+        if (global_total_level[idx]==0) global_profile[idx].stop(func,file,line);
         global_switchOff[idx] = false;
       }
     }
@@ -238,12 +234,12 @@ namespace quda {
     static void StartGlobal(const char *func, const char *file, int line, QudaProfileType idx) {
       // if total timer isn't running, then start it running
       if (!global_profile[idx].running) {
-        global_profile[idx].Start(func,file,line);
+        global_profile[idx].start(func,file,line);
         global_total_level[idx]++;
         global_switchOff[idx] = true;
       }
 
-      if (global_total_level[idx]==0) global_profile[idx].Start(func,file,line);
+      if (global_total_level[idx]==0) global_profile[idx].start(func,file,line);
       global_total_level[idx]++;
     }
 
@@ -258,23 +254,23 @@ namespace quda {
     void Start_(const char *func, const char *file, int line, QudaProfileType idx) {
       // if total timer isn't running, then start it running
       if (!profile[QUDA_PROFILE_TOTAL].running && idx != QUDA_PROFILE_TOTAL) {
-	profile[QUDA_PROFILE_TOTAL].Start(func,file,line);
+	profile[QUDA_PROFILE_TOTAL].start(func,file,line);
         switchOff = true;
       }
 
-      profile[idx].Start(func, file, line);
+      profile[idx].start(func, file, line);
       PUSH_RANGE(fname.c_str(),idx)
 	if (use_global) StartGlobal(func,file,line,idx);
     }
 
 
     void Stop_(const char *func, const char *file, int line, QudaProfileType idx) {
-      profile[idx].Stop(func, file, line);
+      profile[idx].stop(func, file, line);
       POP_RANGE
 
       // switch off total timer if we need to
       if (switchOff && idx != QUDA_PROFILE_TOTAL) {
-        profile[QUDA_PROFILE_TOTAL].Stop(func,file,line);
+        profile[QUDA_PROFILE_TOTAL].stop(func,file,line);
         switchOff = false;
       }
       if (use_global) StopGlobal(func,file,line,idx);
@@ -282,11 +278,11 @@ namespace quda {
 
     void Reset_(const char *func, const char *file, int line) {
       for (int idx=0; idx<QUDA_PROFILE_COUNT; idx++)
-	profile[idx].Reset(func, file, line);
+	profile[idx].reset(func, file, line);
     }
 
     double Last(QudaProfileType idx) {
-      return profile[idx].last;
+      return profile[idx].last_interval;
     }
 
     static void PrintGlobal();

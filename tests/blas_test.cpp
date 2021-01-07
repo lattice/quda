@@ -363,8 +363,8 @@ double benchmark(Kernel kernel, const int niter)
   quda::Complex * A2 = new quda::Complex[Nsrc*Nsrc]; // for the block cDotProductNorm test
   double *Ar = new double[Nsrc * Msrc];
 
-  Timer<true> timer;
-  timer.Start();
+  device_timer_t timer;
+  timer.start();
 
   {
     switch (kernel) {
@@ -528,7 +528,7 @@ double benchmark(Kernel kernel, const int niter)
     }
   }
 
-  timer.Stop();
+  timer.stop();
 
   delete[] A;
   delete[] B;
@@ -536,7 +536,7 @@ double benchmark(Kernel kernel, const int niter)
   delete[] A2;
   delete[] Ar;
 
-  return timer.Last();
+  return timer.last();
 }
 
 #define ERROR(a) fabs(blas::norm2(*a##D) - blas::norm2(*a##H)) / blas::norm2(*a##H)

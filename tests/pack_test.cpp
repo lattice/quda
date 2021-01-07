@@ -96,7 +96,7 @@ void end() {
 
 void packTest()
 {
-  Timer<false> host_timer;
+  host_timer_t host_timer;
 
   printfQuda("Sending fields to GPU...\n");
 
@@ -112,15 +112,15 @@ void packTest()
     cpsParam.pad = param.ga_pad;
     cudaGaugeField cudaCpsGauge(cpsParam);
 
-    host_timer.Start();
+    host_timer.start();
     cudaCpsGauge.loadCPUField(cpsCpuGauge);
-    host_timer.Stop();
-    printfQuda("CPS Gauge send time = %e seconds\n", host_timer.Last());
+    host_timer.stop();
+    printfQuda("CPS Gauge send time = %e seconds\n", host_timer.last());
 
-    host_timer.Start();
+    host_timer.start();
     cudaCpsGauge.saveCPUField(cpsCpuGauge);
-    host_timer.Stop();
-    printfQuda("CPS Gauge restore time = %e seconds\n", host_timer.Last());
+    host_timer.stop();
+    printfQuda("CPS Gauge restore time = %e seconds\n", host_timer.last());
   }
 #endif
 
@@ -136,27 +136,27 @@ void packTest()
     qdpParam.pad = param.ga_pad;
     cudaGaugeField cudaQdpGauge(qdpParam);
 
-    host_timer.Start();
+    host_timer.start();
     cudaQdpGauge.loadCPUField(qdpCpuGauge);
-    host_timer.Stop();
-    printfQuda("QDP Gauge send time = %e seconds\n", host_timer.Last());
+    host_timer.stop();
+    printfQuda("QDP Gauge send time = %e seconds\n", host_timer.last());
 
-    host_timer.Start();
+    host_timer.start();
     cudaQdpGauge.saveCPUField(qdpCpuGauge);
-    host_timer.Stop();
-    printfQuda("QDP Gauge restore time = %e seconds\n", host_timer.Last());
+    host_timer.stop();
+    printfQuda("QDP Gauge restore time = %e seconds\n", host_timer.last());
   }
 #endif
 
-  host_timer.Start();
+  host_timer.start();
   *cudaSpinor = *spinor;
-  host_timer.Stop();
-  printfQuda("Spinor send time = %e seconds\n", host_timer.Last());
+  host_timer.stop();
+  printfQuda("Spinor send time = %e seconds\n", host_timer.last());
 
-  host_timer.Start();
+  host_timer.start();
   *spinor2 = *cudaSpinor;
-  host_timer.Stop();
-  printfQuda("Spinor receive time = %e seconds\n", host_timer.Last());
+  host_timer.stop();
+  printfQuda("Spinor receive time = %e seconds\n", host_timer.last());
 
   double spinor_norm = blas::norm2(*spinor);
   double cuda_spinor_norm = blas::norm2(*cudaSpinor);

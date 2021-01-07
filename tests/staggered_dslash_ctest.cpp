@@ -301,15 +301,15 @@ DslashTime dslashCUDA(int niter) {
 
   DslashTime dslash_time;
 
-  Timer<false> host_timer;
-  Timer<true> device_timer;
+  host_timer_t host_timer;
+  device_timer_t device_timer;
 
   comm_barrier();
-  device_timer.Start();
+  device_timer.start();
 
   for (int i = 0; i < niter; i++) {
 
-    host_timer.Start();
+    host_timer.start();
 
     switch (dtest_type) {
     case dslash_test_type::Dslash: dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity); break;
@@ -318,18 +318,18 @@ DslashTime dslashCUDA(int niter) {
     default: errorQuda("Test type %d not defined on staggered dslash.\n", static_cast<int>(dtest_type));
     }
 
-    host_timer.Stop();
+    host_timer.stop();
 
-    dslash_time.cpu_time += host_timer.Last();
+    dslash_time.cpu_time += host_timer.last();
     // skip first and last iterations since they may skew these metrics if comms are not synchronous
     if (i>0 && i<niter) {
-      dslash_time.cpu_min = std::min(dslash_time.cpu_min, host_timer.Last());
-      dslash_time.cpu_max = std::max(dslash_time.cpu_max, host_timer.Last());
+      dslash_time.cpu_min = std::min(dslash_time.cpu_min, host_timer.last());
+      dslash_time.cpu_max = std::max(dslash_time.cpu_max, host_timer.last());
     }
   }
 
-  device_timer.Stop();
-  dslash_time.event_time = device_timer.Last();
+  device_timer.stop();
+  dslash_time.event_time = device_timer.last();
 
   return dslash_time;
 }
