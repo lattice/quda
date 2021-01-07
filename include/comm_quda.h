@@ -171,6 +171,12 @@ extern "C" {
   int comm_rank(void);
 
   /**
+     @return the default rank id of this process.
+     This doesn't go through the communicator route, so it can be called without initializing the communicator stack.
+  */
+  int comm_rank_global(void);
+
+  /**
      @return Number of processes
   */
   int comm_size(void);

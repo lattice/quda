@@ -355,7 +355,11 @@ int main(int argc, char **argv)
       inv_param.num_src_per_sub_partition = Nsrc / num_sub_partition;
       invertMultiSrcStaggeredQuda(_hp_x.data(), _hp_b.data(), &inv_param, (void *)milc_fatlink, (void *)milc_longlink,
                                   &gauge_param);
-      // TODO: collect the gflops, etc on all sub-partitions.
+      comm_allreduce_int(&inv_param.iter); inv_param.iter /= comm_size() / num_sub_partition;
+      comm_allreduce(&inv_param.gflops); inv_param.gflops /= comm_size() / num_sub_partition;
+      comm_allreduce_max(&inv_param.secs);
+      printfQuda("Done: %d sub-partitions - %i iter / %g secs = %g Gflops\n\n", num_sub_partition, inv_param.iter, inv_param.secs,
+                   inv_param.gflops / inv_param.secs);
     }
 
     for (int k = 0; k < Nsrc; k++) {
@@ -414,7 +418,7 @@ int main(int argc, char **argv)
   } // switch
 
   // Compute timings
-  if (Nsrc > 1) performanceStats(time, gflops, iter);
+  if (Nsrc > 1 && !use_split_grid) performanceStats(time, gflops, iter);
 
   // Free RNG
   rng->Release();

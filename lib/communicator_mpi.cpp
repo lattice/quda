@@ -352,4 +352,10 @@ void Communicator::comm_broadcast(void *data, size_t nbytes)
 
 void Communicator::comm_barrier(void) { MPI_CHECK(MPI_Barrier(MPI_COMM_HANDLE)); }
 
-void Communicator::comm_abort_(int status) { MPI_Abort(MPI_COMM_HANDLE, status); }
+void Communicator::comm_abort_(int status) { MPI_Abort(MPI_COMM_WORLD, status); }
+
+int Communicator::comm_rank_global() {
+  int rank;
+  MPI_CHECK(MPI_Comm_rank(MPI_COMM_WORLD, &rank));
+  return rank;
+}

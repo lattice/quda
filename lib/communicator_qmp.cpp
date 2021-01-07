@@ -56,8 +56,6 @@ Communicator::Communicator(int nDim, const int *commDims, QudaCommsMap rank_from
   }
 
   comm_init(nDim, commDims, rank_from_coords, map_data);
-
-  std::srand(17 * rank + 137);
 }
 
 Communicator::Communicator(Communicator &other, const int *comm_split)
@@ -90,8 +88,6 @@ Communicator::Communicator(Communicator &other, const int *comm_split)
 
   QudaCommsMap func = lex_rank_from_coords_dim_t;
   comm_init(nDim, comm_dims_split.data(), func, comm_dims_split.data());
-
-  std::srand(17 * rank + 137);
 
   printf("Creating split communicator, base_rank = %5d, key = %5d, color = %5d, split_rank = %5d, gpuid = %d\n",
          other.comm_rank(), key, color, my_rank_, comm_gpuid());
@@ -355,3 +351,5 @@ void Communicator::comm_broadcast(void *data, size_t nbytes)
 void Communicator::comm_barrier(void) { QMP_CHECK(QMP_comm_barrier(QMP_COMM_HANDLE)); }
 
 void Communicator::comm_abort_(int status) { QMP_abort(status); }
+
+int Communicator::comm_rank_global() { return QMP_get_node_number(); }

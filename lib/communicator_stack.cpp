@@ -83,7 +83,7 @@ const char *comm_dim_partitioned_string(const int *comm_dim_override)
 
 int comm_rank(void) { return get_current_communicator().comm_rank(); }
 
-int comm_rank_global(void) { return get_default_communicator().comm_rank(); }
+int comm_rank_global(void) { return Communicator::comm_rank_global(); }
 
 int comm_size(void) { return get_current_communicator().comm_size(); }
 
@@ -186,7 +186,7 @@ void comm_broadcast_global(void *data, size_t nbytes) { get_default_communicator
 
 void comm_barrier(void) { get_current_communicator().comm_barrier(); }
 
-void comm_abort_(int status) { get_current_communicator().comm_abort_(status); };
+void comm_abort_(int status) { Communicator::comm_abort_(status); };
 
 void reduceMaxDouble(double &max) { get_current_communicator().reduceMaxDouble(max); }
 
