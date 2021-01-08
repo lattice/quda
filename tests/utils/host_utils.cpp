@@ -259,7 +259,7 @@ void initComms(int argc, char **argv, std::array<int, 4> &commDims) { initComms(
 
 void initComms(int argc, char **argv, int *const commDims)
 {
-  if (getenv("QUDA_TEST_GRID_SIZE")) get_gridsize_from_env(commDims);
+  if (getenv("QUDA_TEST_GRID_SIZE")) { get_size_from_env(commDims, "QUDA_TEST_GRID_SIZE"); }
   if (getenv("QUDA_TEST_GRID_PARTITION")) { get_size_from_env(grid_partition.data(), "QUDA_TEST_GRID_PARTITION"); }
 
 #if defined(QMP_COMMS)
@@ -654,11 +654,6 @@ void get_size_from_env(int *const dims, const char env[])
       i++;
     }
   }
-}
-
-void get_gridsize_from_env(int *const dims)
-{
-  get_size_from_env(dims, "QUDA_TEST_GRID_SIZE");
 }
 
 int lex_rank_from_coords_t(const int *coords, void *fdata)
