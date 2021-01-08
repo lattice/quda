@@ -12,25 +12,42 @@
 
 namespace quda {
 
-  namespace device {
+  class TunableKernel : public Tunable
+  {
 
+  protected:
     template <template <typename> class Functor, bool grid_stride = false, typename Arg>
-    qudaError_t launch(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
+    void launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
                        const std::vector<constant_param_t> &param = dummy_param)
     {
 #ifdef JITIFY
-      return launch_jitify<Functor, grid_stride, Arg>(kernel.name, tp, stream, arg, param);
+      launch_error = launch_jitify<Functor, grid_stride, Arg>(kernel.name, tp, stream, arg, param);
 #else
       for (unsigned int i = 0; i < param.size(); i++)
         qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
-      return qudaLaunchKernel(kernel.func, tp, stream, arg);
+      launch_error = qudaLaunchKernel(kernel.func, tp, stream, arg);
 #endif
     }
 
-  }
+  public:
+    /**
+       @brief Special kernel launcher used for raw CUDA kernels with no
+       assumption made about shape of parallelism.  Kernels launched
+       using this must take responsibility of bounds checking and
+       assignment of threads.
+     */
+    template <template <typename> class Functor, typename Arg>
+    void launch_cuda(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
+                     const std::vector<constant_param_t> &param = dummy_param) const
+    {
+      constexpr bool grid_stride = false;
+      const_cast<TunableKernel*>(this)->launch_device<Functor>(KERNEL(raw_kernel), tp, stream, arg, param);
+    }
+
+  };
 
   template <bool grid_stride>
-  class TunableKernel1D_base : public Tunable
+  class TunableKernel1D_base : public TunableKernel
   {
   protected:
     const LatticeField &field;
@@ -49,17 +66,9 @@ namespace quda {
     template <template <typename> class Functor, typename Arg>
     void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
     {
-      device::launch<Functor, grid_stride>(KERNEL(Kernel1D), tp, stream, arg, param);
+      TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Kernel1D), tp, stream, arg, param);
     }
 
-  public:
-    template <template <typename> class Functor, typename Arg>
-    void launch_cuda(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param) const
-    {
-      device::launch<Functor>(KERNEL(raw_kernel), tp, stream, arg, param);
-    }
-
-  protected:
     template <template <typename> class Functor, typename Arg>
     void launch_host(const TuneParam &, const qudaStream_t &, const Arg &arg, const std::vector<constant_param_t> & = dummy_param)
     {
@@ -145,7 +154,6 @@ namespace quda {
   class TunableKernel2D_base : public TunableKernel1D_base<grid_stride>
   {
   protected:
-    using Tunable::launch_error;
     mutable unsigned int vector_length_y;
     mutable unsigned int step_y;
     bool tune_block_x;
@@ -153,7 +161,7 @@ namespace quda {
     template <template <typename> class Functor, typename Arg>
     void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
     {
-      device::launch<Functor, grid_stride>(KERNEL(Kernel2D), tp, stream, arg, param);
+      TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Kernel2D), tp, stream, arg, param);
     }
 
     template <template <typename> class Functor, typename Arg>
@@ -293,7 +301,6 @@ namespace quda {
   class TunableKernel3D_base : public TunableKernel2D_base<grid_stride>
   {
   protected:
-    using Tunable::launch_error;
     using TunableKernel2D_base<grid_stride>::vector_length_y;
     mutable unsigned vector_length_z;
     mutable unsigned step_z;
@@ -302,7 +309,7 @@ namespace quda {
     template <template <typename> class Functor, typename Arg>
     void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
     {
-      device::launch<Functor, grid_stride>(KERNEL(Kernel3D), tp, stream, arg, param);
+      TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Kernel3D), tp, stream, arg, param);
     }
 
     template <template <typename> class Functor, typename Arg>
