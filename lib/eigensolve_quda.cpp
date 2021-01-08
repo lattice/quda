@@ -127,8 +127,8 @@ namespace quda
       if (!eig_solver->hermitian()) errorQuda("Polynomial acceleration not supported with non-Hermitian solver");
     }
 
-    if (mat.hermitian() && !(eig_param->spectrum == QUDA_SPECTRUM_LR_EIG || eig_param->spectrum == QUDA_SPECTRUM_SR_EIG))
-      errorQuda("Only the real spectrum of a Hermitian operator may be computed");
+    if (mat.hermitian() && (eig_param->spectrum == QUDA_SPECTRUM_SI_EIG || eig_param->spectrum == QUDA_SPECTRUM_LI_EIG))
+      errorQuda("The imaginary spectrum of a Hermitian operator cannot be computed");
     //--------------------------------------------------------------------------
 
     return eig_solver;

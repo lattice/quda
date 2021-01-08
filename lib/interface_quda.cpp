@@ -2441,9 +2441,6 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
       errorQuda("gamma5 premultiplication is only supported for M type operators: dag = %s, normop = %s",
                 eig_param->use_dagger ? "true" : "false", eig_param->use_norm_op ? "true" : "false");
     }
-    if (cudaParam.nSpin == 1) {
-      errorQuda("gamma5 premultiplication is only supported Wilson type operators: Nspin = %d", cudaParam.nSpin);
-    }
   }
 
   profileEigensolve.TPSTOP(QUDA_PROFILE_INIT);
