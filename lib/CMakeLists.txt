@@ -594,6 +594,12 @@ install(
 
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include)
 
+# If the USQCD stack was automatically downloaded, this will copy the usqcd library
+# to the install path
+if(QUDA_DOWNLOAD_USQCD) 
+  install(DIRECTORY ${CMAKE_BINARY_DIR}/usqcd DESTINATION ${CMAKE_INSTALL_PREFIX})
+endif()
+
 include(CMakePackageConfigHelpers)
 write_basic_package_version_file(
   "${CMAKE_CURRENT_BINARY_DIR}/qudaConfigVersion.cmake"
