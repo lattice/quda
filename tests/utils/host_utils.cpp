@@ -260,6 +260,7 @@ void initComms(int argc, char **argv, std::array<int, 4> &commDims) { initComms(
 void initComms(int argc, char **argv, int *const commDims)
 {
   if (getenv("QUDA_TEST_GRID_SIZE")) get_gridsize_from_env(commDims);
+  if (getenv("QUDA_TEST_GRID_PARTITION")) { get_size_from_env(grid_partition.data(), "QUDA_TEST_GRID_PARTITION"); }
 
 #if defined(QMP_COMMS)
   QMP_thread_level_t tl;
@@ -638,9 +639,9 @@ const char *__asan_default_options() { return "protect_shadow_gap=0"; }
  * For MPI, the default node mapping is lexicographical with t varying fastest.
  */
 
-void get_gridsize_from_env(int *const dims)
+void get_size_from_env(int *const dims, const char env[])
 {
-  char *grid_size_env = getenv("QUDA_TEST_GRID_SIZE");
+  char *grid_size_env = getenv(env);
   if (grid_size_env) {
     std::stringstream grid_list(grid_size_env);
 
@@ -653,6 +654,11 @@ void get_gridsize_from_env(int *const dims)
       i++;
     }
   }
+}
+
+void get_gridsize_from_env(int *const dims)
+{
+  get_size_from_env(dims, "QUDA_TEST_GRID_SIZE");
 }
 
 int lex_rank_from_coords_t(const int *coords, void *fdata)

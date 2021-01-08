@@ -348,10 +348,7 @@ else()
   set(DSLASH_POLICIES -1)
 endif()
 
-set(SPLIT_GRID_POLICIES 0 1) # whether or not split the grid
-
 foreach(pol IN LISTS DSLASH_POLICIES)
-  foreach(sp IN LISTS SPLIT_GRID_POLICIES)
 
   if(${pol} LESS 0)
     set(pol2 "tune")
@@ -361,284 +358,274 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     set(polenv ON)
   endif()
 
-  if(${sp} EQUAL 0)
-    set(sp_grid_string "")
-    set(sp_name_string "")
-  else()
-    set(sp_grid_string "--grid-partition" "1" "1" "2" "1")
-    set(sp_name_string "-split-grid")
-  endif()
-
   if(QUDA_DIRAC_WILSON)
-    add_test(NAME dslash_wilson-policy${pol2}${sp_name_string}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS} ${sp_grid_string}
+    add_test(NAME dslash_wilson-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type wilson
                      --test MatPCDagMatPC
                      --dim 2 4 6 8
-                     --gtest_output=xml:dslash_wilson_test_pol${pol2}${sp_name_string}.xml)
+                     --gtest_output=xml:dslash_wilson_test_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_wilson-policy${pol2}${sp_name_string} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+      set_tests_properties(dslash_wilson-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
   endif()
 
   if(QUDA_DIRAC_CLOVER)
     # symmetric preconditioning
-    add_test(NAME dslash_clover-sym-policy${pol2}${sp_name_string}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS} ${sp_grid_string}
+    add_test(NAME dslash_clover-sym-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type clover
                      --test MatPCDagMatPC
                      --matpc even-even
                      --dim 2 4 6 8
-                     --gtest_output=xml:dslash_clover_test_pol${pol2}${sp_name_string}.xml)
+                     --gtest_output=xml:dslash_clover_test_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_clover-sym-policy${pol2}${sp_name_string} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+      set_tests_properties(dslash_clover-sym-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
     # asymmetric preconditioning
-    add_test(NAME dslash_clover-asym-policy${pol2}${sp_name_string}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS} ${sp_grid_string}
+    add_test(NAME dslash_clover-asym-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type clover
                      --test MatPCDagMatPC
                      --matpc even-even-asym
                      --dim 2 4 6 8
-                     --gtest_output=xml:dslash_clover_test_pol${pol2}${sp_name_string}.xml)
+                     --gtest_output=xml:dslash_clover_test_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_clover-asym-policy${pol2}${sp_name_string} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+      set_tests_properties(dslash_clover-asym-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
   endif()
 
   if(QUDA_DIRAC_CLOVER_HASENBUSCH_TWIST)
     # symmetric preconditioning
-    add_test(NAME dslash_clover_hasenbusch_twist-sym-policy${pol2}${sp_name_string}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS} ${sp_grid_string}
+    add_test(NAME dslash_clover_hasenbusch_twist-sym-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type clover-hasenbusch-twist
                      --test MatPCDagMatPC
                      --matpc even-even
                      --dim 2 4 6 8
-                     --gtest_output=xml:dslash_clover_test_sym_pol${pol2}${sp_name_string}.xml)
+                     --gtest_output=xml:dslash_clover_test_sym_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_clover_hasenbusch_twist-sym-policy${pol2}${sp_name_string} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+      set_tests_properties(dslash_clover_hasenbusch_twist-sym-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
     # asymmetric preconditioning
-    add_test(NAME dslash_clover_hasenbusch_twist-asym-policy${pol2}${sp_name_string}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS} ${sp_grid_string}
+    add_test(NAME dslash_clover_hasenbusch_twist-asym-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type clover-hasenbusch-twist
                      --test MatPCDagMatPC
                      --matpc even-even-asym
                      --dim 2 4 6 8
-                     --gtest_output=xml:dslash_clover_test_pol${pol2}${sp_name_string}.xml)
+                     --gtest_output=xml:dslash_clover_test_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_clover_hasenbusch_twist-asym-policy${pol2}${sp_name_string} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+      set_tests_properties(dslash_clover_hasenbusch_twist-asym-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
   endif()
 
   if(QUDA_DIRAC_TWISTED_MASS)
-    add_test(NAME dslash_twisted-mass-sym-policy${pol2}${sp_name_string}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS} ${sp_grid_string}
+    add_test(NAME dslash_twisted-mass-sym-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type twisted-mass
                      --test MatPCDagMatPC
                      --matpc even-even
                      --dim 2 4 6 8
-                     --gtest_output=xml:dslash_twisted-mass_test_pol${pol2}${sp_name_string}.xml)
+                     --gtest_output=xml:dslash_twisted-mass_test_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_twisted-mass-sym-policy${pol2}${sp_name_string}
+      set_tests_properties(dslash_twisted-mass-sym-policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
     # asymmetric preconditioning
-    add_test(NAME dslash_twisted-mass-asym-policy${pol2}${sp_name_string}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS} ${sp_grid_string}
+    add_test(NAME dslash_twisted-mass-asym-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type twisted-mass
                      --test MatPCDagMatPC
                      --matpc even-even-asym
                      --dim 2 4 6 8
-                     --gtest_output=xml:dslash_twisted-mass_test_pol${pol2}${sp_name_string}.xml)
+                     --gtest_output=xml:dslash_twisted-mass_test_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_twisted-mass-asym-policy${pol2}${sp_name_string}
+      set_tests_properties(dslash_twisted-mass-asym-policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
   endif()
 
   if(QUDA_DIRAC_NDEG_TWISTED_MASS)
     # symmetric preconditioning
-    add_test(NAME dslash_ndeg-twisted-mass-sym-policy${pol2}${sp_name_string}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS} ${sp_grid_string}
+    add_test(NAME dslash_ndeg-twisted-mass-sym-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type twisted-mass
                      --test MatPCDagMatPC
                      --matpc even-even
                      --flavor nondeg-doublet
                      --dim 2 4 6 8
-        --gtest_output=xml:dslash_ndeg-twisted-mass_test_pol${pol2}${sp_name_string}.xml)
+        --gtest_output=xml:dslash_ndeg-twisted-mass_test_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_ndeg-twisted-mass-sym-policy${pol2}${sp_name_string}
+      set_tests_properties(dslash_ndeg-twisted-mass-sym-policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
     # asymmetric preconditioning
-    add_test(NAME dslash_ndeg-twisted-mass-asym-policy${pol2}${sp_name_string}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS} ${sp_grid_string}
+    add_test(NAME dslash_ndeg-twisted-mass-asym-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type twisted-mass
                      --test MatPCDagMatPC
                      --matpc even-even-asym
                      --flavor nondeg-doublet
                      --dim 2 4 6 8
-        --gtest_output=xml:dslash_ndeg-twisted-mass_test_pol${pol2}${sp_name_string}.xml)
+        --gtest_output=xml:dslash_ndeg-twisted-mass_test_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_ndeg-twisted-mass-asym-policy${pol2}${sp_name_string}
+      set_tests_properties(dslash_ndeg-twisted-mass-asym-policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
   endif()
 
   if(QUDA_DIRAC_TWISTED_CLOVER)
     # symmetric preconditioning
-    add_test(NAME dslash_twisted-clover-sym-policy${pol2}${sp_name_string}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS} ${sp_grid_string}
+    add_test(NAME dslash_twisted-clover-sym-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type twisted-clover
                      --test MatPCDagMatPC
                      --matpc even-even
                      --dim 2 4 6 8
-                     --gtest_output=xml:dslash_twisted-clover_test_pol${pol2}${sp_name_string}.xml)
+                     --gtest_output=xml:dslash_twisted-clover_test_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_twisted-clover-sym-policy${pol2}${sp_name_string}
+      set_tests_properties(dslash_twisted-clover-sym-policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
     # asymmetric preconditioning
-    add_test(NAME dslash_twisted-clover-asym-policy${pol2}${sp_name_string}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS} ${sp_grid_string}
+    add_test(NAME dslash_twisted-clover-asym-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type twisted-clover
                      --test MatPCDagMatPC
                      --matpc even-even-asym
                      --dim 2 4 6 8
-                     --gtest_output=xml:dslash_twisted-clover_test_pol${pol2}${sp_name_string}.xml)
+                     --gtest_output=xml:dslash_twisted-clover_test_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_twisted-clover-asym-policy${pol2}${sp_name_string}
+      set_tests_properties(dslash_twisted-clover-asym-policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
   endif()
 
   if(QUDA_DIRAC_DOMAIN_WALL)
-    add_test(NAME dslash_domain-wall-sym-policy${pol2}${sp_name_string}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS} ${sp_grid_string}
+    add_test(NAME dslash_domain-wall-sym-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type domain-wall
                      --test MatPCDagMatPC
                      --matpc even-even
                      --dim 2 4 6 8
                      --Lsdim 4
-        --gtest_output=xml:dslash_domain-wall_test_pol${pol2}${sp_name_string}.xml)
+        --gtest_output=xml:dslash_domain-wall_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_domain-wall-sym-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
     # symmetric 4-d preconditioning
-    add_test(NAME dslash_domain-wall-4d-sym-policy${pol2}${sp_name_string}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS} ${sp_grid_string}
+    add_test(NAME dslash_domain-wall-4d-sym-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type domain-wall-4d
                      --test MatPCDagMatPC
                      --matpc even-even
                      --dim 2 4 6 8
                      --Lsdim 4
-        --gtest_output=xml:dslash_domain-wall-4d_test_pol${pol2}${sp_name_string}.xml)
-    add_test(NAME dslash_mobius-sym-policy${pol2}${sp_name_string}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS} ${sp_grid_string}
+        --gtest_output=xml:dslash_domain-wall-4d_test_pol${pol2}.xml)
+    add_test(NAME dslash_mobius-sym-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type mobius
                      --test MatPCDagMatPC
                      --matpc even-even
                      --dim 2 4 6 8
                      --Lsdim 4
-                     --gtest_output=xml:dslash_mobius_test_pol${pol2}${sp_name_string}.xml)
-    add_test(NAME dslash_mobius_eofa-sym-policy${pol2}${sp_name_string}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS} ${sp_grid_string}
+                     --gtest_output=xml:dslash_mobius_test_pol${pol2}.xml)
+    add_test(NAME dslash_mobius_eofa-sym-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type mobius-eofa
                      --test MatPCDagMatPC
                      --matpc even-even
                      --dim 2 4 6 8
                      --Lsdim 4
-        --gtest_output=xml:dslash_mobius_eofa_test_pol${pol2}${sp_name_string}.xml)
+        --gtest_output=xml:dslash_mobius_eofa_test_pol${pol2}.xml)
 
     if(polenv)
-      set_tests_properties(dslash_domain-wall-4d-sym-policy${pol2}${sp_name_string}
+      set_tests_properties(dslash_domain-wall-4d-sym-policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
-      set_tests_properties(dslash_mobius-sym-policy${pol2}${sp_name_string} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
-      set_tests_properties(dslash_mobius_eofa-sym-policy${pol2}${sp_name_string} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+      set_tests_properties(dslash_mobius-sym-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
     # asymmetric 4-d preconditioning
-    add_test(NAME dslash_domain-wall-4d-asym-policy${pol2}${sp_name_string}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS} ${sp_grid_string}
+    add_test(NAME dslash_domain-wall-4d-asym-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type domain-wall-4d
                      --test MatPCDagMatPC
                      --matpc even-even-asym
                      --dim 2 4 6 8
                      --Lsdim 4
-        --gtest_output=xml:dslash_domain-wall-4d_test_pol${pol2}${sp_name_string}.xml)
-    add_test(NAME dslash_mobius-asym-policy${pol2}${sp_name_string}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS} ${sp_grid_string}
+        --gtest_output=xml:dslash_domain-wall-4d_test_pol${pol2}.xml)
+    add_test(NAME dslash_mobius-asym-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type mobius
                      --test MatPCDagMatPC
                      --matpc even-even-asym
                      --dim 2 4 6 8
                      --Lsdim 4
-                     --gtest_output=xml:dslash_mobius_test_pol${pol2}${sp_name_string}.xml)
-    add_test(NAME dslash_mobius_eofa-asym-policy${pol2}${sp_name_string}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS} ${sp_grid_string}
+                     --gtest_output=xml:dslash_mobius_test_pol${pol2}.xml)
+    add_test(NAME dslash_mobius_eofa-asym-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type mobius-eofa
                      --test MatPCDagMatPC
                      --matpc even-even-asym
                      --dim 2 4 6 8
                      --Lsdim 4
-        --gtest_output=xml:dslash_mobius_eofa_test_pol${pol2}${sp_name_string}.xml)
+        --gtest_output=xml:dslash_mobius_eofa_test_pol${pol2}.xml)
 
     # MdagM local operator
-    add_test(NAME dslash_mobius_local-policy${pol2}${sp_name_string}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS} ${sp_grid_string}
+    add_test(NAME dslash_mobius_local-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type mobius
                      --test MatPCDagMatPCLocal
                      --matpc even-even
                      --dim 2 4 6 8
                      --Lsdim 4
-                     --gtest_output=xml:dslash_mobius_local{pol2}${sp_name_string}.xml)
+                     --gtest_output=xml:dslash_mobius_local{pol2}.xml)
 
     if(polenv)
-      set_tests_properties(dslash_domain-wall-4d-asym-policy${pol2}${sp_name_string}
+      set_tests_properties(dslash_domain-wall-4d-asym-policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
-      set_tests_properties(dslash_mobius-asym-policy${pol2}${sp_name_string} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
-      set_tests_properties(dslash_mobius_eofa-asym-policy${pol2}${sp_name_string} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+      set_tests_properties(dslash_mobius-asym-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
   endif()
 
   if(QUDA_DIRAC_STAGGERED)
-    add_test(NAME dslash_improved_staggered-policy${pol2}${sp_name_string}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS} ${sp_grid_string}
+    add_test(NAME dslash_improved_staggered-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type asqtad
                      --test MatPC
                      --dim 6 8 10 12
-                     --gtest_output=xml:dslash_improved_staggered_test_pol${pol2}${sp_name_string}.xml)
-    add_test(NAME dslash_naive_staggered-policy${pol2}${sp_name_string}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS} ${sp_grid_string}
+                     --gtest_output=xml:dslash_improved_staggered_test_pol${pol2}.xml)
+    add_test(NAME dslash_naive_staggered-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type staggered
                      --test MatPC
                      --dim 2 4 6 8
-                     --gtest_output=xml:dslash_naive_staggered_test_pol${pol2}${sp_name_string}.xml)
+                     --gtest_output=xml:dslash_naive_staggered_test_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_improved_staggered-policy${pol2}${sp_name_string}
+      set_tests_properties(dslash_improved_staggered-policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
-      set_tests_properties(dslash_naive_staggered-policy${pol2}${sp_name_string}
+      set_tests_properties(dslash_naive_staggered-policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
     endif()
 
-    add_test(NAME dslash_improved_staggered_build-policy${pol2}${sp_name_string}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS} ${sp_grid_string}
+    add_test(NAME dslash_improved_staggered_build-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type asqtad
                      --test MatPC
                      --dim 6 8 10 12
                      --compute-fat-long true
                      --epsilon-naik -0.01
                      --tadpole-coeff 0.9
-        --gtest_output=xml:dslash_improved_staggered_build_test_pol${pol2}${sp_name_string}.xml)
+        --gtest_output=xml:dslash_improved_staggered_build_test_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_improved_staggered_build-policy${pol2}${sp_name_string}
+      set_tests_properties(dslash_improved_staggered_build-policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
     endif()
   endif()
@@ -650,7 +637,6 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                      --gtest_output=xml:covdev_test_pol${pol2}.xml)
   endif()
 
-endforeach(sp)
 endforeach(pol)
 
 # enable the precisions that are compiled
