@@ -218,7 +218,7 @@ public:
     {
       unsigned int blockx = param.block.x / 8;
       if (param.aux.x > 2) blockx = param.block.x / 4;
-      unsigned int gx  = (arg.threads + blockx - 1) / blockx;
+      unsigned int gx  = std::max((arg.threads + blockx - 1) / blockx, 1u);
       return dim3(gx, 1, 1);
     }
 
@@ -700,7 +700,7 @@ public:
             qudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], qudaMemcpyDeviceToHost, device::get_stream(4 + d));
           }
           //compute interior points
-          gfixIntPoints.apply(device::get_stream(8));
+          gfixIntPoints.apply(device::get_default_stream());
 
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
