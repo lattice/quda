@@ -1086,6 +1086,8 @@ struct DslashTestWrapper {
     DslashTime dslash_time = dslashCUDA(niter);
     printfQuda("done.\n\n");
 
+    dslashRef();
+
     if (!test_split_grid) {
 
       if (!transfer) *spinorOut = *cudaSpinorOut;
