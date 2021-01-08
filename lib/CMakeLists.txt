@@ -263,6 +263,7 @@ endif()
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
                             -lineinfo -Wreorder
                             -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function
+                            $<$<CONFIG:DEVEL>:-Xptxas -warn-lmem-usage,-warn-spills>
                             $<$<CONFIG:STRICT>:-Werror=all-warnings>
                             $<$<CONFIG:SANITIZE>:-Xcompiler -fsanitize=address,undefined>
                             >)
