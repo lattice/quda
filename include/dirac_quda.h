@@ -1903,6 +1903,23 @@ public:
 
     std::string Type() const { return typeid(*dirac).name(); }
 
+    /**
+       @brief return if the operator is a Wilson-type 4-d operator
+    */
+    bool isWilsonType() const
+    {
+      return (Type() == typeid(DiracWilson).name() || Type() == typeid(DiracWilsonPC).name()
+              || Type() == typeid(DiracClover).name() || Type() == typeid(DiracCloverPC).name()
+              || Type() == typeid(DiracCloverHasenbuschTwist).name() || Type() == typeid(DiracCloverHasenbuschTwistPC).name()
+              || Type() == typeid(DiracTwistedMass).name() || Type() == typeid(DiracTwistedMassPC).name()
+              || Type() == typeid(DiracTwistedClover).name() || Type() == typeid(DiracTwistedCloverPC).name()) ?
+        true :
+        false;
+    }
+
+    /**
+       @brief return if the operator is a staggered operator
+    */
     bool isStaggered() const
     {
       return (Type() == typeid(DiracStaggeredPC).name() || Type() == typeid(DiracStaggered).name()
@@ -1910,6 +1927,27 @@ public:
               || Type() == typeid(DiracStaggeredKD).name() || Type() == typeid(DiracImprovedStaggeredKD).name()) ?
         true :
         false;
+    }
+
+    /**
+       @brief return if the operator is a domain wall operator, that is, 5-dimensional
+    */
+    bool isDwf() const
+    {
+      return (Type() == typeid(DiracDomainWall).name() || Type() == typeid(DiracDomainWallPC).name()
+              || Type() == typeid(DiracDomainWall4D).name() || Type() == typeid(DiracDomainWall4DPC).name()
+              || Type() == typeid(DiracMobius).name() || Type() == typeid(DiracMobiusPC).name()
+              || Type() == typeid(DiracMobiusEofa).name() || Type() == typeid(DiracMobiusEofaPC).name()) ?
+        true :
+        false;
+    }
+
+    /**
+       @brief return if the operator is a coarse operator
+    */
+    bool isCoarse() const
+    {
+      return dirac->isCoarse();
     }
 
     virtual bool hermitian() const { return dirac->hermitian(); }
@@ -2260,11 +2298,37 @@ public:
     DiracG5M(const Dirac &d) : DiracMatrix(d) { }
     DiracG5M(const Dirac *d) : DiracMatrix(d) { }
 
+    /**
+      @brief Left-apply gamma5 as appropriate for the operator
+
+      @param vec[in,out] vector to which gamma5 is applied in place
+    */
+    void applyGamma5(ColorSpinorField &vec) const
+    {
+      // FIXME: look more carefully at if op is preconditioned or not,
+      // how it's preconditioned (symmetric vs asymmetric), etc
+      if (isWilsonType()) {
+        gamma5(vec, vec);
+      } else if (isStaggered()) {
+        // Gamma5 is (-1)^(x+y+z+t)
+        blas::ax(-1.0, vec.Odd());
+      } else if (isDwf()) {
+        // needs 5th dimension reversal, Mobius needs that inversion...
+        errorQuda("Support for Hermitian DWF operators does not exist yet");
+      } else if (isCoarse()) {
+        // more complicated, need to see if it's a repeated coarsening
+        // of the coarse op
+        errorQuda("Support for Hermitian coarse operators does not exist yet");
+      } else {
+        errorQuda("Unexpected operator type");
+      }
+    }
+
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
     {
       dirac->M(out, in);
       if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
-      gamma5(out, out);
+      applyGamma5(out);
     }
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
@@ -2276,7 +2340,7 @@ public:
       }
       dirac->M(out, in);
       if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
-      gamma5(out, out);
+      applyGamma5(out);
       if (reset1) {
         dirac->tmp1 = NULL;
         reset1 = false;
@@ -2297,7 +2361,7 @@ public:
       }
       dirac->M(out, in);
       if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
-      gamma5(out, out);
+      applyGamma5(out);
       if (reset2) {
         dirac->tmp2 = NULL;
         reset2 = false;
