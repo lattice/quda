@@ -1,9 +1,32 @@
 #include <comm_quda.h>
 #include <quda_api.h>
 #include <quda_cuda_api.h>
+#include <algorithm>
 
 #define CHECK_CUDA_ERROR(func)                                          \
   quda::cuda::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
+
+bool comm_peer2peer_possible(int local_gpuid, int neighbor_gpuid)
+{
+  int canAccessPeer[2];
+  CHECK_CUDA_ERROR(cudaDeviceCanAccessPeer(&canAccessPeer[0], local_gpuid, neighbor_gpuid));
+  CHECK_CUDA_ERROR(cudaDeviceCanAccessPeer(&canAccessPeer[1], neighbor_gpuid, local_gpuid));
+
+  // require symmetric peer-to-peer access to enable peer-to-peer
+  return canAccessPeer[0] && canAccessPeer[1];
+}
+
+int comm_peer2peer_performance(int local_gpuid, int neighbor_gpuid)
+{
+  int accessRank[2] = { };
+  if (comm_peer2peer_possible(local_gpuid, neighbor_gpuid)) {
+    CHECK_CUDA_ERROR(cudaDeviceGetP2PAttribute(&accessRank[0], cudaDevP2PAttrPerformanceRank, local_gpuid, neighbor_gpuid));
+    CHECK_CUDA_ERROR(cudaDeviceGetP2PAttribute(&accessRank[1], cudaDevP2PAttrPerformanceRank, neighbor_gpuid, local_gpuid));
+  }
+
+  // return the slowest direction of access (lower is faster)
+  return std::max(accessRank[0], accessRank[1]);
+}
 
 void comm_create_neighbor_memory(void *remote[QUDA_MAX_DIM][2], void *local)
 {

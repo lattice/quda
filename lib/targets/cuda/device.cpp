@@ -90,6 +90,8 @@ namespace quda
         warningQuda("** Running on a device with compute capability %i.%i but QUDA was compiled for %i.%i. **\n -- This might result in a lower performance. Please consider adjusting QUDA_GPU_ARCH when running cmake.\n", deviceProp.major, deviceProp.minor, my_major, my_minor);
       }
 
+      if (!deviceProp.unifiedAddressing) errorQuda("Device %d does not support unified addressing", dev);
+
       if (getVerbosity() >= QUDA_SUMMARIZE) {
         printfQuda("Using device %d: %s\n", dev, deviceProp.name);
       }

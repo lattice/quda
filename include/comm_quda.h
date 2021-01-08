@@ -202,6 +202,24 @@ extern "C" {
   void comm_peer2peer_init(const char *hostname_recv_buf);
 
   /**
+     @brief Query if peer-to-peer communication is possible between two GPUs
+     @param[in] local_gpuid GPU associated with this process
+     @param[in] neighbor_gpuid GPU associated with neighboring process
+     (assumed on same node)
+     @return True/false if peer-to-peer is possible
+  */
+  bool comm_peer2peer_possible(int local_gpuid, int neighbor_gpuid);
+
+  /**
+     @brief Query the performance of peer-to-peer communication between two GPUs
+     @param[in] local_gpuid GPU associated with this process
+     @param[in] neighbor_gpuid GPU associated with neighboring process
+     (assumed on same node)
+     @return Relative performance ranking between this pair of GPUs
+  */
+  int comm_peer2peer_performance(int local_gpuid, int neighbor_gpuid);
+
+   /**
      @brief Symmetric exchange of local memory addresses between
      logically neighboring processes on the lattice.  The remote
      addresses that are returned are directly addressable by the local

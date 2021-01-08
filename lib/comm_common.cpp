@@ -233,9 +233,6 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
 
     // first check that the local GPU supports UVA
     const int gpuid = comm_gpuid();
-    cudaDeviceProp prop;
-    cudaGetDeviceProperties(&prop, gpuid);
-    if (!prop.unifiedAddressing) return;
 
     comm_set_neighbor_ranks();
 
@@ -258,25 +255,17 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
 	// if the neighbors are on the same
 	if (!strncmp(hostname, &hostname_recv_buf[128*neighbor_rank], 128)) {
 	  int neighbor_gpuid = gpuid_recv_buf[neighbor_rank];
-	  int canAccessPeer[2];
-	  cudaDeviceCanAccessPeer(&canAccessPeer[0], gpuid, neighbor_gpuid);
-	  cudaDeviceCanAccessPeer(&canAccessPeer[1], neighbor_gpuid, gpuid);
 
-	  int accessRank[2] = { };
-	  if (canAccessPeer[0]*canAccessPeer[1] != 0) {
-	    cudaDeviceGetP2PAttribute(&accessRank[0], cudaDevP2PAttrPerformanceRank, gpuid, neighbor_gpuid);
-	    cudaDeviceGetP2PAttribute(&accessRank[1], cudaDevP2PAttrPerformanceRank, neighbor_gpuid, gpuid);
-	  }
+          bool can_access_peer = comm_peer2peer_possible(gpuid, neighbor_gpuid);
+          int access_rank = comm_peer2peer_performance(gpuid, neighbor_gpuid);
 
-	  // enable P2P if we can access the peer or if peer is self
-          if ((canAccessPeer[0] * canAccessPeer[1] != 0 && accessRank[0] <= enable_p2p_max_access_rank
-               && accessRank[1] <= enable_p2p_max_access_rank)
-              || gpuid == neighbor_gpuid) {
+	  // enable P2P if we can access the peer
+          if ((can_access_peer && access_rank <= enable_p2p_max_access_rank) || gpuid == neighbor_gpuid) {
             peer2peer_enabled[dir][dim] = true;
             if (getVerbosity() > QUDA_SILENT) {
               printf("Peer-to-peer enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d, access rank "
-                     "= (%d, %d)\n",
-                     comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim, accessRank[0], accessRank[1]);
+                     "= %d\n",
+                     comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim, access_rank);
             }
           } else {
             intranode_enabled[dir][dim] = true;
@@ -298,8 +287,6 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
   comm_barrier();
 
   peer2peer_present = comm_peer2peer_enabled_global();
-
-  checkCudaErrorNoSync();
 }
 
 bool comm_peer2peer_present() { return peer2peer_present; }
