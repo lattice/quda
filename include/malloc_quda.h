@@ -53,6 +53,8 @@ namespace quda {
   void device_pinned_free_(const char *func, const char *file, int line, void *ptr);
   void managed_free_(const char *func, const char *file, int line, void *ptr);
   void host_free_(const char *func, const char *file, int line, void *ptr);
+  void register_pinned_(const char *func, const char *file, int line, void *ptr, size_t bytes);
+  void unregister_pinned_(const char *func, const char *file, int line, void *ptr);
 
   QudaFieldLocation get_pointer_location(const void *ptr);
 
@@ -87,6 +89,8 @@ namespace quda {
 #define managed_free(ptr) quda::managed_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 #define host_free(ptr) quda::host_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 #define get_mapped_device_pointer(ptr) quda::get_mapped_device_pointer_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
+#define register_pinned(ptr, bytes) quda::register_pinned_(__func__, quda::file_name(__FILE__), __LINE__, ptr, bytes)
+#define unregister_pinned(size) quda::unregister_pinned_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 
 namespace quda {
 
