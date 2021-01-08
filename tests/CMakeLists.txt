@@ -3,7 +3,13 @@ set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_FULL_LIBDIR})
 
 # enable tests build a common library for all test utilities
 add_library(quda_test STATIC googletest/src/gtest-all.cc)
-target_include_directories(quda_test PUBLIC googletest/include googletest ${CMAKE_BINARY_DIR}/externals/eigen/src/Eigen)
+target_include_directories(quda_test SYSTEM PUBLIC  googletest/include googletest)
+target_include_directories(quda_test SYSTEM PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
+target_include_directories(quda_test SYSTEM PUBLIC ${EIGEN_INCLUDE_DIRS})
+target_link_libraries(quda_test PUBLIC quda)
+target_compile_options(quda_test PUBLIC -fPIC)
+add_subdirectory(utils)
+add_subdirectory(host_reference)
 
 if(QUDA_QIO
    AND QUDA_DOWNLOAD_USQCD
@@ -17,7 +23,7 @@ if(QUDA_QMP
   add_dependencies(quda_test QMP)
 endif()
 
-set(TEST_LIBS quda quda_test quda_reference quda_utils)
+set(TEST_LIBS quda_test)
 
 macro(QUDA_CHECKBUILDTEST mytarget qudabuildtests)
   # adding the linker language here as a workaround -- was not needed for cmake 3.16
@@ -52,6 +58,9 @@ if(QUDA_ARPACK)
 endif()
 
 # define tests
+add_executable(c_interface_test c_interface_test.c)
+target_link_libraries(c_interface_test ${TEST_LIBS})
+quda_checkbuildtest(c_interface_test QUDA_BUILD_ALL_TESTS)
 
 # if we build with QDP JIT the tests cannot run anyway
 if(QUDA_QDPJIT)
