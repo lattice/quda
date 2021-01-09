@@ -124,25 +124,3 @@ void errorQuda_(const char *func, const char *file, int line, ...);
 } while (0)
 
 #endif // MULTI_GPU
-
-
-#define checkCudaErrorNoSync() do {                    \
-  cudaError_t error = cudaGetLastError();              \
-  if (error != cudaSuccess)                            \
-    errorQuda("(CUDA) %s", cudaGetErrorString(error))  \
-    ;\
-} while (0)
-
-
-#ifdef HOST_DEBUG
-
-#define checkCudaError() do {  \
-  cudaDeviceSynchronize();     \
-  checkCudaErrorNoSync();      \
-} while (0)
-
-#else
-
-#define checkCudaError() checkCudaErrorNoSync()
-
-#endif // HOST_DEBUG
