@@ -447,16 +447,6 @@ MsgHandle *comm_declare_send_relative_(const char *func, const char *file, int l
 				       void *buffer, int dim, int dir, size_t nbytes)
 {
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%s called (%s:%d in %s())\n", __func__, file, line, func);
-#ifdef HOST_DEBUG
-  if (quda::is_host(buffer)) {
-    // no reliable analogue on host
-  } else {
-    // test this memory allocation is ok by doing a memcpy from it
-    void *tmp = device_malloc(nbytes);
-    qudaMemcpy(tmp, buffer, nbytes, qudaMemcpyDeviceToDevice);
-    device_free(tmp);
-  }
-#endif
 
   int disp[QUDA_MAX_DIM] = {0};
   disp[dim] = dir;
@@ -471,14 +461,6 @@ MsgHandle *comm_declare_receive_relative_(const char *func, const char *file, in
 					  void *buffer, int dim, int dir, size_t nbytes)
 {
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%s called (%s:%d in %s())\n", __func__, file, line, func);
-#ifdef HOST_DEBUG
-  if (quda::is_host(buffer)) {
-    // no reliable analogue on host
-  } else {
-    // test this memory allocation is ok by doing a memset
-    qudaMemset(buffer, 0, nbytes);
-  }
-#endif
 
   int disp[QUDA_MAX_DIM] = {0};
   disp[dim] = dir;
@@ -493,16 +475,6 @@ MsgHandle *comm_declare_strided_send_relative_(const char *func, const char *fil
 					       void *buffer, int dim, int dir, size_t blksize, int nblocks, size_t stride)
 {
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%s called (%s:%d in %s())\n", __func__, file, line, func);
-#ifdef HOST_DEBUG
-  if (quda::is_host(buffer)) {
-    // no reliable analogue on host
-  } else {
-    // test this memory allocation is ok by doing a memcpy from it
-    void *tmp = device_malloc(blksize*nblocks);
-    qudaMemcpy2D(tmp, blksize, buffer, stride, blksize, nblocks, qudaMemcpyDeviceToDevice);
-    device_free(tmp);
-  }
-#endif
 
   int disp[QUDA_MAX_DIM] = {0};
   disp[dim] = dir;
@@ -518,14 +490,6 @@ MsgHandle *comm_declare_strided_receive_relative_(const char *func, const char *
 						  void *buffer, int dim, int dir, size_t blksize, int nblocks, size_t stride)
 {
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%s called (%s:%d in %s())\n", __func__, file, line, func);
-#ifdef HOST_DEBUG
-  if (quda::is_host(buffer)) {
-    // no reliable analogue on host
-  } else {
-    // test this memory allocation is ok by doing a memset
-    qudaMemset2D(buffer, stride, 0, blksize, nblocks);
-  }
-#endif
 
   int disp[QUDA_MAX_DIM] = {0};
   disp[dim] = dir;

@@ -71,11 +71,6 @@ namespace quda {
     return (reinterpret_cast<std::uintptr_t>(ptr) & (alignment - 1)) == 0;
   }
 
-  /**
-     @brief Returns true if pointer is on host
-  */
-  bool is_host(const void *ptr);
-
 } // namespace quda
 
 #define device_malloc(size) quda::device_malloc_(__func__, quda::file_name(__FILE__), __LINE__, size)
