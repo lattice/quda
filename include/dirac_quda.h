@@ -1910,9 +1910,10 @@ public:
     {
       return (Type() == typeid(DiracWilson).name() || Type() == typeid(DiracWilsonPC).name()
               || Type() == typeid(DiracClover).name() || Type() == typeid(DiracCloverPC).name()
-              || Type() == typeid(DiracCloverHasenbuschTwist).name() || Type() == typeid(DiracCloverHasenbuschTwistPC).name()
-              || Type() == typeid(DiracTwistedMass).name() || Type() == typeid(DiracTwistedMassPC).name()
-              || Type() == typeid(DiracTwistedClover).name() || Type() == typeid(DiracTwistedCloverPC).name()) ?
+              || Type() == typeid(DiracCloverHasenbuschTwist).name()
+              || Type() == typeid(DiracCloverHasenbuschTwistPC).name() || Type() == typeid(DiracTwistedMass).name()
+              || Type() == typeid(DiracTwistedMassPC).name() || Type() == typeid(DiracTwistedClover).name()
+              || Type() == typeid(DiracTwistedCloverPC).name()) ?
         true :
         false;
     }
@@ -1945,10 +1946,7 @@ public:
     /**
        @brief return if the operator is a coarse operator
     */
-    bool isCoarse() const
-    {
-      return dirac->isCoarse();
-    }
+    bool isCoarse() const { return dirac->isCoarse(); }
 
     virtual bool hermitian() const { return dirac->hermitian(); }
 
@@ -2286,7 +2284,6 @@ public:
     {
       return mat.getStencilSteps(); 
     }
-
   };
 
   /**
@@ -2309,69 +2306,67 @@ public:
       auto dirac_type = dirac->getDiracType();
       auto pc_type = dirac->getMatPCType();
       switch (dirac_type) {
-        case QUDA_WILSON_DIRAC:
-        case QUDA_CLOVER_DIRAC:
-        case QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC:
-        case QUDA_TWISTED_MASS_DIRAC:
-        case QUDA_TWISTED_CLOVER_DIRAC:
+      case QUDA_WILSON_DIRAC:
+      case QUDA_CLOVER_DIRAC:
+      case QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC:
+      case QUDA_TWISTED_MASS_DIRAC:
+      case QUDA_TWISTED_CLOVER_DIRAC:
         // while the twisted ops don't have a Hermitian indefinite spectrum, they
         // do have a spectrum of the form (real) + i mu
         gamma5(vec, vec);
         break;
-        case QUDA_WILSONPC_DIRAC:
-        case QUDA_CLOVERPC_DIRAC:
-        case QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC:
-        case QUDA_TWISTED_MASSPC_DIRAC:
-        case QUDA_TWISTED_CLOVERPC_DIRAC:
+      case QUDA_WILSONPC_DIRAC:
+      case QUDA_CLOVERPC_DIRAC:
+      case QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC:
+      case QUDA_TWISTED_MASSPC_DIRAC:
+      case QUDA_TWISTED_CLOVERPC_DIRAC:
         if (pc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || pc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
           gamma5(vec, vec);
         } else {
           errorQuda("Invalid matpc type for Hermitian gamma5 version of %d", dirac_type);
         }
         break;
-        case QUDA_DOMAIN_WALL_DIRAC:
-        case QUDA_DOMAIN_WALLPC_DIRAC:
-        case QUDA_DOMAIN_WALL_4D_DIRAC:
-        case QUDA_DOMAIN_WALL_4DPC_DIRAC:
-        case QUDA_MOBIUS_DOMAIN_WALL_DIRAC:
-        case QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC:
-        case QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC:
-        case QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC:
+      case QUDA_DOMAIN_WALL_DIRAC:
+      case QUDA_DOMAIN_WALLPC_DIRAC:
+      case QUDA_DOMAIN_WALL_4D_DIRAC:
+      case QUDA_DOMAIN_WALL_4DPC_DIRAC:
+      case QUDA_MOBIUS_DOMAIN_WALL_DIRAC:
+      case QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC:
+      case QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC:
+      case QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC:
         // needs 5th dimension reversal, Mobius needs that inversion...
         errorQuda("Support for Hermitian DWF operator %d does not exist yet", dirac_type);
         break;
-        case QUDA_STAGGERED_DIRAC:
-        case QUDA_ASQTAD_DIRAC:
+      case QUDA_STAGGERED_DIRAC:
+      case QUDA_ASQTAD_DIRAC:
         // Gamma5 is (-1)^(x+y+z+t)
         blas::ax(-1.0, vec.Odd());
         break;
-        case QUDA_STAGGEREDPC_DIRAC:
-        case QUDA_ASQTADPC_DIRAC:
+      case QUDA_STAGGEREDPC_DIRAC:
+      case QUDA_ASQTADPC_DIRAC:
         // even is unchanged
-        if (pc_type == QUDA_MATPC_ODD_ODD || pc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC)
-        {
+        if (pc_type == QUDA_MATPC_ODD_ODD || pc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
           blas::ax(-1.0, vec); // technically correct
         } else if (pc_type == QUDA_MATPC_INVALID) {
           errorQuda("Invalid pc_type %d for operator %d", pc_type, dirac_type);
         }
         break;
-        case QUDA_STAGGEREDKD_DIRAC:
-        case QUDA_ASQTADKD_DIRAC:
+      case QUDA_STAGGEREDKD_DIRAC:
+      case QUDA_ASQTADKD_DIRAC:
         errorQuda("Kahler-Dirac preconditioned type %d does not have a Hermitian g5 operator", dirac_type);
         break;
-        case QUDA_COARSE_DIRAC:
-        case QUDA_COARSEPC_DIRAC:
+      case QUDA_COARSE_DIRAC:
+      case QUDA_COARSEPC_DIRAC:
         // more complicated, need to see if it's a repeated coarsening
         // of the coarse op
         errorQuda("Support for Hermitian coarse operator %d does not exist yet", dirac_type);
         break;
-        case QUDA_GAUGE_LAPLACE_DIRAC:
-        case QUDA_GAUGE_LAPLACEPC_DIRAC:
-        case QUDA_GAUGE_COVDEV_DIRAC:
+      case QUDA_GAUGE_LAPLACE_DIRAC:
+      case QUDA_GAUGE_LAPLACEPC_DIRAC:
+      case QUDA_GAUGE_COVDEV_DIRAC:
         // do nothing, technically correct, there is no gamma5
         break;
-        default:
-        errorQuda("Invalid Dirac type %d", dirac_type);
+      default: errorQuda("Invalid Dirac type %d", dirac_type);
       }
     }
 
@@ -2428,21 +2423,22 @@ public:
     /**
        @brief return if the operator is HPD
     */
-    virtual bool hermitian() const {
+    virtual bool hermitian() const
+    {
       auto dirac_type = dirac->getDiracType();
       auto pc_type = dirac->getMatPCType();
 
-      if (dirac_type == QUDA_GAUGE_LAPLACE_DIRAC || dirac_type == QUDA_GAUGE_LAPLACEPC_DIRAC || dirac_type == QUDA_GAUGE_COVDEV_DIRAC)
+      if (dirac_type == QUDA_GAUGE_LAPLACE_DIRAC || dirac_type == QUDA_GAUGE_LAPLACEPC_DIRAC
+          || dirac_type == QUDA_GAUGE_COVDEV_DIRAC)
         return true;
 
       // subtle: odd operator gets a minus sign
-      if ((dirac_type == QUDA_STAGGEREDPC_DIRAC || dirac_type == QUDA_ASQTADPC_DIRAC) &&
-          (pc_type == QUDA_MATPC_EVEN_EVEN || pc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC))
+      if ((dirac_type == QUDA_STAGGEREDPC_DIRAC || dirac_type == QUDA_ASQTADPC_DIRAC)
+          && (pc_type == QUDA_MATPC_EVEN_EVEN || pc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC))
         return true;
 
       return false;
     }
-
   };
 
   /**
