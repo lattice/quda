@@ -115,9 +115,22 @@ namespace quda
     default: errorQuda("Invalid eig solver type");
     }
 
-    if (!mat.hermitian() && !eig_solver->hermitian())
-      errorQuda("Cannot solve non-Hermitian system with Hermitian eigensolver %d, %d", (int)!mat.hermitian(),
+    // Sanity checks
+    //--------------------------------------------------------------------------
+    if (!mat.hermitian() && eig_solver->hermitian())
+      errorQuda("Cannot solve non-Hermitian system with strictly Hermitian eigensolver %d, %d", (int)!mat.hermitian(),
                 (int)eig_solver->hermitian());
+
+    // Support for Chebyshev only in strictly Hermitian solvers
+    if (eig_param->use_poly_acc) {
+      if (!mat.hermitian()) errorQuda("Cannot use polynomial acceleration with non-Hermitian operator");
+      if (!eig_solver->hermitian()) errorQuda("Polynomial acceleration not supported with non-Hermitian solver");
+    }
+
+    if (mat.hermitian() && (eig_param->spectrum == QUDA_SPECTRUM_SI_EIG || eig_param->spectrum == QUDA_SPECTRUM_LI_EIG))
+      errorQuda("The imaginary spectrum of a Hermitian operator cannot be computed");
+    //--------------------------------------------------------------------------
+
     return eig_solver;
   }
 
@@ -296,7 +309,7 @@ namespace quda
     }
     mat(out, in, *tmp1, *tmp2);
 
-    // Save mattrix * vector tuning
+    // Save matrix * vector tuning
     saveTuneCache();
   }
 
@@ -723,6 +736,7 @@ namespace quda
     for (int i = 0; i < size; i++) {
       // r = A * v_i
       matVec(mat, *temp[0], *evecs[i]);
+
       // lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
       evals[i] = blas::cDotProduct(*evecs[i], *temp[0]) / sqrt(blas::norm2(*evecs[i]));
       // Measure ||lambda_i*v_i - A*v_i||

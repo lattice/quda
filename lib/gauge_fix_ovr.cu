@@ -319,7 +319,7 @@ namespace quda {
     {
       unsigned int blockx = param.block.x / 8;
       if (param.aux.x > 2) blockx = param.block.x / 4;
-      unsigned int gx  = (arg.threads + blockx - 1) / blockx;
+      unsigned int gx  = std::max((arg.threads + blockx - 1) / blockx, 1u);
       return dim3(gx, 1, 1);
     }
 
