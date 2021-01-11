@@ -53,12 +53,8 @@ namespace quda {
   void device_pinned_free_(const char *func, const char *file, int line, void *ptr);
   void managed_free_(const char *func, const char *file, int line, void *ptr);
   void host_free_(const char *func, const char *file, int line, void *ptr);
-
-  // strip path from __FILE__
-  inline constexpr const char* str_end(const char *str) { return *str ? str_end(str + 1) : str; }
-  inline constexpr bool str_slant(const char *str) { return *str == '/' ? true : (*str ? str_slant(str + 1) : false); }
-  inline constexpr const char* r_slant(const char* str) { return *str == '/' ? (str + 1) : r_slant(str - 1); }
-  inline constexpr const char* file_name(const char* str) { return str_slant(str) ? r_slant(str_end(str)) : str; }
+  void register_pinned_(const char *func, const char *file, int line, void *ptr, size_t bytes);
+  void unregister_pinned_(const char *func, const char *file, int line, void *ptr);
 
   QudaFieldLocation get_pointer_location(const void *ptr);
 
@@ -88,6 +84,8 @@ namespace quda {
 #define managed_free(ptr) quda::managed_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 #define host_free(ptr) quda::host_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 #define get_mapped_device_pointer(ptr) quda::get_mapped_device_pointer_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
+#define register_pinned(ptr, bytes) quda::register_pinned_(__func__, quda::file_name(__FILE__), __LINE__, ptr, bytes)
+#define unregister_pinned(size) quda::unregister_pinned_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 
 namespace quda {
 

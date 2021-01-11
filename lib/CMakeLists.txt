@@ -88,7 +88,7 @@ set (QUDA_OBJS
   staggered_oprod.cu clover_trace_quda.cu
   hisq_paths_force_quda.cu
   unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp
-  blas_magma.cu
+  blas_magma.cu tune.cpp
   inv_mpcg_quda.cpp inv_mpbicgstab_quda.cpp inv_gmresdr_quda.cpp
   pgauge_exchange.cu pgauge_init.cu pgauge_heatbath.cu random.cu
   gauge_fix_fft.cu gauge_fix_ovr.cu
@@ -263,6 +263,7 @@ endif()
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
                             -lineinfo -Wreorder
                             -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function
+                            $<$<CONFIG:DEVEL>:-Xptxas -warn-lmem-usage,-warn-spills>
                             $<$<CONFIG:STRICT>:-Werror=all-warnings>
                             $<$<CONFIG:SANITIZE>:-Xcompiler -fsanitize=address,undefined>
                             >)

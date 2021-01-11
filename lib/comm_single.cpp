@@ -13,7 +13,7 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
 
 int comm_rank(void) { return 0; }
 
-int comm_size(void) { return 1; }
+size_t comm_size(void) { return 1; }
 
 void comm_gather_hostname(char *hostname_recv_buf) {
   strncpy(hostname_recv_buf, comm_hostname(), 128);

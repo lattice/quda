@@ -1,4 +1,5 @@
 #include <quda_internal.h>
+#include <timer.h>
 #include <tune_quda.h>
 #include <gauge_field.h>
 #include <comm_quda.h>

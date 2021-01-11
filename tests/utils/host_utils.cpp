@@ -1607,20 +1607,6 @@ double mom_action(void *mom, QudaPrecision prec, int len)
   return action;
 }
 
-static struct timeval startTime;
-
-void stopwatchStart() { gettimeofday(&startTime, NULL); }
-
-double stopwatchReadSeconds()
-{
-  struct timeval endTime;
-  gettimeofday(&endTime, NULL);
-
-  long ds = endTime.tv_sec - startTime.tv_sec;
-  long dus = endTime.tv_usec - startTime.tv_usec;
-  return ds + 0.000001*dus;
-}
-
 void performanceStats(std::vector<double> &time, std::vector<double> &gflops, std::vector<int> &iter)
 {
   auto mean_time = 0.0;

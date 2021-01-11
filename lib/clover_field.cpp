@@ -73,7 +73,8 @@ namespace quda {
   /**
      @brief Backup the field to the host when tuning
   */
-  void CloverField::backup() const {
+  void CloverField::backup() const
+  {
     if (backup_h) errorQuda("Already allocated host backup");
     backup_h = static_cast<char*>(safe_malloc(2 * bytes));
     if (norm_bytes) backup_norm_h = static_cast<char*>(safe_malloc(2 * norm_bytes));
@@ -85,7 +86,6 @@ namespace quda {
         qudaMemcpy(backup_norm_h, norm, norm_bytes, qudaMemcpyDeviceToHost);
         qudaMemcpy(backup_norm_h + norm_bytes, invNorm, norm_bytes, qudaMemcpyDeviceToHost);
       }
-      checkCudaError();
     } else {
       memcpy(backup_h, clover, bytes);
       memcpy(backup_h + bytes, cloverInv, bytes);
@@ -99,7 +99,8 @@ namespace quda {
   /**
      @brief Restore the field from the host after tuning
   */
-  void CloverField::restore() const {
+  void CloverField::restore() const
+  {
     if (Location() == QUDA_CUDA_FIELD_LOCATION) {
       qudaMemcpy(clover, backup_h, bytes, qudaMemcpyHostToDevice);
       qudaMemcpy(cloverInv, backup_h + bytes, bytes, qudaMemcpyHostToDevice);
@@ -107,7 +108,6 @@ namespace quda {
         qudaMemcpy(norm, backup_norm_h, norm_bytes, qudaMemcpyHostToDevice);
         qudaMemcpy(invNorm, backup_norm_h + norm_bytes, norm_bytes, qudaMemcpyHostToDevice);
       }
-      checkCudaError();
     } else {
       memcpy(clover, backup_h, bytes);
       memcpy(cloverInv, backup_h + bytes, bytes);

@@ -1,16 +1,6 @@
 #pragma once
 
-// Target specific definitions in include/targets/XXX/quda_api_target.h
-// The correct targets/ directory is set by the build system
-// Eventually we want to shrink the contents of that
 #include <quda_define.h>
-
-enum qudaMemcpyKind { qudaMemcpyHostToHost, 
-	              qudaMemcpyHostToDevice,
-		      qudaMemcpyDeviceToHost,
-		      qudaMemcpyDeviceToDevice,
-		      qudaMemcpyDefault };
-
 #include <string>
 #include <enum_quda.h>
 
@@ -21,6 +11,12 @@ enum qudaMemcpyKind { qudaMemcpyHostToHost,
    profile and switch between using the CUDA runtime and driver APIs.
  */
 
+enum qudaMemcpyKind { qudaMemcpyHostToHost,
+	              qudaMemcpyHostToDevice,
+		      qudaMemcpyDeviceToHost,
+		      qudaMemcpyDeviceToDevice,
+		      qudaMemcpyDefault };
+
 namespace quda
 {
 
@@ -28,7 +24,10 @@ namespace quda
 
   struct qudaStream_t {
     int idx;
-    //qudaStream_t(int idx) : idx(idx) {}
+  };
+
+  struct qudaEvent_t {
+    void *event;
   };
 
   /**
@@ -179,11 +178,32 @@ namespace quda
                              const char *func, const char *file, const char *line);
 
   /**
+     @brief Return instance of an event.
+  */
+  qudaEvent_t qudaEventCreate_(const char *func, const char *file, const char *line);
+
+  /**
+     @brief Return instance of an event that can be used for timing.
+  */
+  qudaEvent_t qudaChronoEventCreate_(const char *func, const char *file, const char *line);
+
+  /**
+     @brief Return elapsed time in seconds between two events
+  */
+  float qudaEventElapsedTime_(const qudaEvent_t &start, const qudaEvent_t &stop,
+                              const char *func, const char *file, const char *line);
+
+  /**
+     @brief Destroy the event
+  */
+  void qudaEventDestroy_(qudaEvent_t &event, const char *func, const char *file, const char *line);
+
+  /**
      @brief Wrapper around cudaEventQuery or cuEventQuery with built-in error checking
      @param[in] event Event we are querying
      @return true if event has been reached
    */
-  bool qudaEventQuery_(cudaEvent_t &event, const char *func, const char *file, const char *line);
+  bool qudaEventQuery_(qudaEvent_t &event, const char *func, const char *file, const char *line);
 
   /**
      @brief Wrapper around cudaEventRecord or cuEventRecord with
@@ -191,7 +211,7 @@ namespace quda
      @param[in,out] event Event we are recording
      @param[in,out] stream Stream where to record the event
    */
-  void qudaEventRecord_(cudaEvent_t &event, qudaStream_t stream, const char *func, const char *file, const char *line);
+  void qudaEventRecord_(qudaEvent_t &event, qudaStream_t stream, const char *func, const char *file, const char *line);
 
   /**
      @brief Wrapper around cudaStreamWaitEvent or cuStreamWaitEvent
@@ -200,7 +220,7 @@ namespace quda
      @param[in] event Event we are waiting on
      @param[in] flags Flags to pass to function
    */
-  void qudaStreamWaitEvent_(qudaStream_t stream, cudaEvent_t event, unsigned int flags, const char *func,
+  void qudaStreamWaitEvent_(qudaStream_t stream, qudaEvent_t event, unsigned int flags, const char *func,
                             const char *file, const char *line);
 
   /**
@@ -208,7 +228,7 @@ namespace quda
      with built-in error checking
      @param[in] event Event which we are synchronizing with respect to
    */
-  void qudaEventSynchronize_(const cudaEvent_t &event, const char *func, const char *file, const char *line);
+  void qudaEventSynchronize_(const qudaEvent_t &event, const char *func, const char *file, const char *line);
 
   /**
      @brief Wrapper around cudaStreamSynchronize or
@@ -234,7 +254,14 @@ namespace quda
   void* qudaGetSymbolAddress_(const char *symbol, const char *func, const char *file, const char *line);
 
   /**
-     @brief Get the last error string recorded
+     @brief Get the last error recorded by the target runtime.  By
+     calling this, we reset the last error.
+  */
+  qudaError_t qudaGetLastError();
+
+  /**
+     @brief Get the error string associated with the last error that
+     was thrown by the target runtime
   */
   std::string qudaGetLastErrorString();
 
@@ -285,6 +312,18 @@ namespace quda
 #define qudaMemPrefetchAsync(ptr, count, mem_space, stream)                                                            \
   ::quda::qudaMemPrefetchAsync_(ptr, count, mem_space, stream, __func__, quda::file_name(__FILE__),                    \
                                 __STRINGIFY__(__LINE__))
+
+#define qudaEventCreate()                                               \
+  ::quda::qudaEventCreate_( __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
+#define qudaChronoEventCreate()                                               \
+  ::quda::qudaChronoEventCreate_( __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
+#define qudaEventElapsedTime(start, stop)                               \
+  ::quda::qudaEventElapsedTime_(start, stop, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
+#define qudaEventDestroy(event)                                         \
+  ::quda::qudaEventDestroy_(event, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
 
 #define qudaEventQuery(event)                                                                                          \
   ::quda::qudaEventQuery_(event, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))

@@ -59,7 +59,7 @@ namespace quda {
                             const std::vector<constant_param_t> &param,
                             std::vector<void*> arg_ptrs, jitify::detail::vector<std::string> arg_types);
 
-  template <template <typename> class Functor, typename Arg>
+  template <template <typename> class Functor, bool grid_stride, typename Arg>
   qudaError_t launch_jitify(const std::string &kernel, const TuneParam &tp, const qudaStream_t &stream,
                             const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
   {
@@ -72,8 +72,8 @@ namespace quda {
     std::vector<void*> arg_ptrs{(void*)&arg};
     jitify::detail::vector<std::string> arg_types{Arg_reflect};
 
-    return launch_jitify(Functor<Arg>::filename(), kernel, {Functor_naked, Arg_reflect},
-                         tp, stream, param, arg_ptrs, arg_types);    
+    return launch_jitify(Functor<Arg>::filename(), kernel, {Functor_naked, Arg_reflect, reflect(grid_stride)},
+                         tp, stream, param, arg_ptrs, arg_types);
   }
 
   template <template <typename> class Functor, template <typename> class Reducer, typename Arg>
@@ -97,20 +97,20 @@ namespace quda {
   }
 
   // FIXME merge the functionality of these launchers
-  template <template <typename> class Functor, typename Arg>
+  template <template <int, typename> class Functor, typename Arg>
   qudaError_t launch_jitify_block(const std::string &kernel, const TuneParam &tp, const qudaStream_t &stream,
                                   const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
   {
     // we need this hackery to get the naked unbound template class parameters
     using namespace jitify::reflection;
-    auto Functor_instance = reflect<Functor<Arg>>();
+    auto Functor_instance = reflect<Functor<1, Arg>>();
     auto Functor_naked = Functor_instance.substr(0, Functor_instance.find("<"));
     auto Arg_reflect = reflect<Arg>();
 
     std::vector<void*> arg_ptrs{(void*)&arg};
     jitify::detail::vector<std::string> arg_types{Arg_reflect};
 
-    return launch_jitify(Functor<Arg>::filename(), kernel,
+    return launch_jitify(Functor<1, Arg>::filename(), kernel,
                          {reflect((int)tp.block.x), Functor_naked, Arg_reflect},
                          tp, stream, param, arg_ptrs, arg_types);
   }
