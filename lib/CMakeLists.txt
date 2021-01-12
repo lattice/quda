@@ -261,11 +261,12 @@ endif()
 
 # Specific config dependent warning suppressions and lineinfo forwarding
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
-                            -lineinfo -Wreorder
+                            -Wreorder
                             -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function
-                            $<$<CONFIG:DEVEL>:-Xptxas -warn-lmem-usage,-warn-spills>
-                            $<$<CONFIG:STRICT>:-Werror=all-warnings>
-                            $<$<CONFIG:SANITIZE>:-Xcompiler -fsanitize=address,undefined>
+                            $<$<CONFIG:DEVEL>:-Xptxas -warn-lmem-usage,-warn-spills -lineinfo>
+                            $<$<CONFIG:STRICT>: -Werror=all-warnings -lineinfo>
+                            $<$<CONFIG:HOSTDEBUG>:-lineinfo>
+                            $<$<CONFIG:SANITIZE>:-Xcompiler -fsanitize=address,undefined -lineinfo>
                             >)
 
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
