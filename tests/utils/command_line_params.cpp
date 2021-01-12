@@ -177,6 +177,7 @@ double eig_amax = 0.0; // If zero is passed to the solver, an estimate will be c
 bool eig_use_normop = true;
 bool eig_use_dagger = false;
 bool eig_compute_svd = false;
+bool eig_compute_gamma5 = false;
 QudaEigSpectrumType eig_spectrum = QUDA_SPECTRUM_LR_EIG;
 QudaEigType eig_type = QUDA_EIG_TR_LANCZOS;
 bool eig_arpack_check = false;
@@ -692,6 +693,10 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
                       "Use Eigen to eigensolve the upper Hessenberg in IRAM, else use QUDA's QR code. (default true)");
   opgroup->add_option("--eig-compute-svd", eig_compute_svd,
                       "Solve the MdagM problem, use to compute SVD of M (default false)");
+
+  opgroup->add_option("--eig-compute-gamma5", eig_compute_gamma5,
+                      "Solve the gamma5 OP problem. Solve for OP then multiply by gamma_5 (default false)");
+
   opgroup->add_option("--eig-max-restarts", eig_max_restarts, "Perform n iterations of the restart in the eigensolver");
   opgroup->add_option("--eig-block-size", eig_block_size, "The block size to use in the block variant eigensolver");
   opgroup->add_option(
