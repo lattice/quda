@@ -310,8 +310,10 @@ namespace quda {
 	// reduce down to the first group of column-split threads
 	constexpr int warp_size = device::warp_size(); // FIXME - this is buggy when x-dim * color_stride < 32
 #pragma unroll
-	for (int offset = warp_size/2; offset >= warp_size/Arg::color_stride; offset /= 2)
-	  out[color_local] += __shfl_down_sync(device::warp_converged_mask(), out[color_local], offset);
+	for (int offset = warp_size/2; offset >= warp_size/Arg::color_stride; offset /= 2) {
+          out[color_local].real(out[color_local].real() + __shfl_down_sync(device::warp_converged_mask(), out[color_local].real(), offset));
+          out[color_local].imag(out[color_local].imag() + __shfl_down_sync(device::warp_converged_mask(), out[color_local].imag(), offset));
+        }
       }
 
 #pragma unroll
