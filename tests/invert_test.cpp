@@ -389,9 +389,6 @@ int main(int argc, char **argv)
 
   for (auto p : in) { delete p; }
   for (auto p : out) { delete p; }
-  for (auto p : out_multishift) {
-    if (p) { delete p; }
-  }
 
   freeGaugeQuda();
   for (int dir = 0; dir < 4; dir++) free(gauge[dir]);
