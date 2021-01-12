@@ -1011,8 +1011,8 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
                       "Measure the field energy and topological charge every Nth step (default 5) ");
 }
 
-void add_split_grid_option_group(std::shared_ptr<QUDAApp> quda_app)
+void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
-  auto opgroup = quda_app->add_option_group("Split Grid", "Options controlling Split Grid parameteres");
+  auto opgroup = quda_app->add_option_group("Communication", "Options controlling communication (split grid) parameteres");
   opgroup->add_option("--grid-partition", grid_partition, "Set the grid partition (default 1 1 1 1)")->expected(4);
 }

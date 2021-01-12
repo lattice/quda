@@ -110,7 +110,7 @@ int main(int argc, char **argv)
   add_eigen_option_group(app);
   add_deflation_option_group(app);
   add_multigrid_option_group(app);
-  add_split_grid_option_group(app);
+  add_comms_option_group(app);
   CLI::TransformPairs<int> test_type_map {{"full", 0}, {"full_ee_prec", 1}, {"full_oo_prec", 2}, {"even", 3},
                                           {"odd", 4},  {"mcg_even", 5},     {"mcg_odd", 6}};
   app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
