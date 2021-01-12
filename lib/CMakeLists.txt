@@ -8,8 +8,7 @@ endif()
 ### HACK FOR NOW
 #
 if( QUDA_TARGET_CUDA )
-  set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},
-    cuda_version=${CMAKE_CUDA_COMPILER_VERSION})
+  set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CMAKE_CUDA_COMPILER_VERSION})
 else()
   set(HASH cpu_arch=${CPU_ARCH})
 endif(QUDA_TARGET_CUDA)
