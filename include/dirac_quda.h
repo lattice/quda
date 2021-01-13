@@ -235,6 +235,17 @@ namespace quda {
     }
 
     /**
+       @brief Apply the local MdagM operator: equivalent to applying zero Dirichlet
+              boundary condition to MdagM on each rank. Depending on the number of
+              stencil steps of the fermion type, this may require additional effort
+              to include the terms that hop out of the boundary and then hop back.
+    */
+    virtual void Dslash4(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
+    {
+      errorQuda("Not implemented!\n");
+    }
+
+    /**
         @brief Apply Mdag (daggered operator of M
     */
     void Mdag(ColorSpinorField &out, const ColorSpinorField &in) const;

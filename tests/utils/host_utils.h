@@ -127,7 +127,7 @@ void initRand();
 int lex_rank_from_coords_t(const int *coords, void *fdata);
 int lex_rank_from_coords_x(const int *coords, void *fdata);
 
-void get_gridsize_from_env(int *const dims);
+void get_size_from_env(int *const dims, const char env[]);
 void setDims(int *X);
 void dw_setDims(int *X, const int L5);
 void setSpinorSiteSize(int n);
