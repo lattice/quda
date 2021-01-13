@@ -12,9 +12,9 @@ enum qudaMemcpyKind { qudaMemcpyHostToHost,
 		      qudaMemcpyDefault };
 
 #if defined(QUDA_TARGET_CUDA)
-#include "targets/cuda/quda_api_target.h"
+//#include "targets/cuda/quda_api_target.h"
 #elif defined(QUDA_TARGET_HIP)
-#include "targets/hip/quda_api_target.h"
+//#include "targets/hip/quda_api_target.h"
 #endif
 
 #include <string>
@@ -26,12 +26,6 @@ enum qudaMemcpyKind { qudaMemcpyHostToHost,
    Wrappers around CUDA API function calls allowing us to easily
    profile and switch between using the CUDA runtime and driver APIs.
  */
-
-enum qudaMemcpyKind { qudaMemcpyHostToHost,
-	              qudaMemcpyHostToDevice,
-		      qudaMemcpyDeviceToHost,
-		      qudaMemcpyDeviceToDevice,
-		      qudaMemcpyDefault };
 
 namespace quda
 {
@@ -231,15 +225,6 @@ namespace quda
      @param[in,out] stream Stream where to record the event
    */
   void qudaEventRecord_(qudaEvent_t &event, qudaStream_t stream, const char *func, const char *file, const char *line);
-
-  /**
-     @brief Wrapper around cudaEventElapsedTime or cuEventElapsedTime
-     built-in error checking
-     @param[in,out] ms the elapsed time in milliseconds
-     @param[in] start the event at the start of the time period
-     @param[in] end   the event at the end of the time period
-   */
-  void qudaEventElapsedTime_(float *ms, qudaEvent_t start, qudaEvent_t end, const char *func, const char *file, const char *line);
   
   /**
      @brief Wrapper around cudaStreamWaitEvent or cuStreamWaitEvent
@@ -362,9 +347,6 @@ namespace quda
 
 #define qudaEventRecord(event, stream)                                                                                 \
   ::quda::qudaEventRecord_(event, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
-
-#define qudaEventElapsedTime(ms, start,end)                                                                            \
-  ::quda::qudaEventElapsedTime_(ms,start,end, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
 
 #define qudaIpcGetEventHandle(handle,event)                                                                            \
   ::quda::qudaIpcGetEventHandle_(handle,event, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
