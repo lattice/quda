@@ -408,7 +408,7 @@ namespace quda {
 
     if (Order() == QUDA_QDP_GAUGE_ORDER || Order() == QUDA_QDPJIT_GAUGE_ORDER) {
       void **p = static_cast<void **>(Gauge_p());
-      int dbytes = Bytes() / 4;
+      size_t dbytes = Bytes() / 4;
       static_assert(sizeof(char) == 1, "Assuming sizeof(char) == 1");
       const char *dst_buffer = reinterpret_cast<const char *>(buffer);
       for (int d = 0; d < 4; d++) { std::memcpy(p[d], &dst_buffer[d * dbytes], dbytes); }
@@ -416,7 +416,7 @@ namespace quda {
                || Order() == QUDA_MILC_SITE_GAUGE_ORDER || Order() == QUDA_BQCD_GAUGE_ORDER
                || Order() == QUDA_TIFR_GAUGE_ORDER || Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
       void *p = Gauge_p();
-      int bytes = Bytes();
+      size_t bytes = Bytes();
       std::memcpy(p, buffer, bytes);
     } else {
       errorQuda("Unsupported order = %d\n", Order());

@@ -14,13 +14,11 @@ namespace quda
     F out_accessor(out);
     F in_accessor(in);
     if (pc_type == QUDA_4D_PC) {
-      using Arg = CopyFieldOffsetArg<Field, Element, F, QUDA_4D_PC>;
-      Arg arg(out_accessor, out, in_accessor, in, offset);
-      CopyFieldOffset<Arg> copier(arg, in);
+      CopyFieldOffsetArg<Field, Element, F, QUDA_4D_PC> arg(out_accessor, out, in_accessor, in, offset);
+      CopyFieldOffset<decltype(arg)> copier(arg, in);
     } else if (pc_type == QUDA_5D_PC) {
-      using Arg = CopyFieldOffsetArg<Field, Element, F, QUDA_5D_PC>;
-      Arg arg(out_accessor, out, in_accessor, in, offset);
-      CopyFieldOffset<Arg> copier(arg, in);
+      CopyFieldOffsetArg<Field, Element, F, QUDA_5D_PC> arg(out_accessor, out, in_accessor, in, offset);
+      CopyFieldOffset<decltype(arg)> copier(arg, in);
     } else {
       errorQuda("pc_type should either be QUDA_4D_PC or QUDA_5D_PC.\n");
     }

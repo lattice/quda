@@ -11,9 +11,8 @@ namespace quda
   {
     G out_accessor(out);
     G in_accessor(in);
-    using Arg = CopyFieldOffsetArg<Field, Element, G>;
-    Arg arg(out_accessor, out, in_accessor, in, offset);
-    CopyFieldOffset<Arg> copier(arg, in);
+    CopyFieldOffsetArg<Field, Element, G> arg(out_accessor, out, in_accessor, in, offset);
+    CopyFieldOffset<decltype(arg)> copier(arg, in);
   }
 
   template <typename Float, int nColor> struct CopyGaugeOffset {

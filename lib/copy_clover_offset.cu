@@ -17,35 +17,33 @@ namespace quda
 
       if (in.isNative()) {
         using C = typename clover_mapper<Float>::type;
-        using Arg = CopyFieldOffsetArg<Field, Element, C>;
         C out_accessor(out, inverse);
         C in_accessor(in, inverse);
-        Arg arg(out_accessor, out, in_accessor, in, offset);
-        CopyFieldOffset<Arg> copier(arg, in);
+        CopyFieldOffsetArg<Field, Element, C> arg(out_accessor, out, in_accessor, in, offset);
+        CopyFieldOffset<decltype(arg)> copier(arg, in);
       } else if (in.Order() == QUDA_PACKED_CLOVER_ORDER) {
         using C = QDPOrder<Float, length>;
-        using Arg = CopyFieldOffsetArg<Field, Element, C>;
         C out_accessor(out, inverse);
         C in_accessor(in, inverse);
-        Arg arg(out_accessor, out, in_accessor, in, offset);
-        CopyFieldOffset<Arg> copier(arg, in);
+        CopyFieldOffsetArg<Field, Element, C> arg(out_accessor, out, in_accessor, in, offset);
+        CopyFieldOffset<decltype(arg)> copier(arg, in);
       } else if (in.Order() == QUDA_QDPJIT_CLOVER_ORDER) {
 #ifdef BUILD_QDPJIT_INTERFACE
         using C = QDPJITOrder<Float, length>;
-        using Arg = CopyFieldOffsetArg<Field, Element, C>;
         C out_accessor(out, inverse, Out);
         C in_accessor(in, inverse, In);
-        Arg arg(out_accessor, out, in_accessor, in, offset);
+        CopyFieldOffsetArg<Field, Element, C> arg(out_accessor, out, in_accessor, in, offset);
+        CopyFieldOffset<decltype(arg)> copier(arg, in);
 #else
         errorQuda("QDPJIT interface has not been built\n");
 #endif
       } else if (in.Order() == QUDA_BQCD_CLOVER_ORDER) {
 #ifdef BUILD_BQCD_INTERFACE
         using C = BQCDOrder<Float, length>;
-        using Arg = CopyFieldOffsetArg<Field, Element, C>;
         C out_accessor(out, inverse, Out);
         C in_accessor(in, inverse, In);
-        Arg arg(out_accessor, out, in_accessor, in, offset);
+        CopyFieldOffsetArg<Field, Element, C> arg(out_accessor, out, in_accessor, in, offset);
+        CopyFieldOffset<decltype(arg)> copier(arg, in);
 #else
         errorQuda("BQCD interface has not been built\n");
 #endif

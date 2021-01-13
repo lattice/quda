@@ -14,8 +14,8 @@ namespace quda {
 
   CloverFieldParam::CloverFieldParam(const CloverField &a) :
     LatticeFieldParam(a),
-    direct(a.V(/** inverse = */ false)),
-    inverse(a.V(/** inverse = */ true)),
+    direct(a.V(false)),
+    inverse(a.V(true)),
     clover(nullptr),
     norm(nullptr),
     cloverInv(nullptr),

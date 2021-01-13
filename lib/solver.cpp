@@ -335,7 +335,7 @@ namespace quda {
 
     // check the L2 relative residual norm if necessary
     if ((param.residual_type & QUDA_L2_RELATIVE_RESIDUAL) || (param.residual_type & QUDA_L2_ABSOLUTE_RESIDUAL)) {
-      if (std::isnan(r2) || std::isinf(r2)) errorQuda("Solver appears to have diverged with residual %9.6e", hq2);
+      if (std::isnan(r2) || std::isinf(r2)) errorQuda("Solver appears to have diverged with residual %9.6e", r2);
 
       if (r2 > r2_tol) return false;
     }
