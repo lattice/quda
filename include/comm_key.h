@@ -19,10 +19,10 @@ namespace quda
 
     constexpr inline const int *data() const { return array; }
 
-    constexpr inline bool is_valid() const {
+    constexpr inline bool is_valid() const
+    {
       return (array[0] > 0) && (array[1] > 0) && (array[2] > 0) && (array[3] > 0);
     }
-
   };
 
   constexpr int inline product(const CommKey &input) { return input[0] * input[1] * input[2] * input[3]; }

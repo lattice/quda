@@ -36,8 +36,9 @@ namespace quda
       things and the extension to 4d is trivial.
     */
 
-    auto processor_dim = comm_grid_dim / comm_key;      // How many processors are there in a processor grid sub-parititon?
-    auto partition_dim = comm_grid_dim / processor_dim; // How many such sub-partitions are there? partition_dim == comm_key
+    auto processor_dim = comm_grid_dim / comm_key; // How many processors are there in a processor grid sub-parititon?
+    auto partition_dim
+      = comm_grid_dim / processor_dim; // How many such sub-partitions are there? partition_dim == comm_key
 
     int n_replicates = product(comm_key);
     std::vector<void *> v_send_buffer_h(n_replicates, nullptr);

@@ -3300,7 +3300,9 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
   CommKey split_key = {param->split_grid[0], param->split_grid[1], param->split_grid[2], param->split_grid[3]};
   int num_sub_partition = quda::product(split_key);
 
-  if (!split_key.is_valid()) { errorQuda("split_key = [%d,%d,%d,%d] is not valid.\n", split_key[0], split_key[1], split_key[2], split_key[3]); }
+  if (!split_key.is_valid()) {
+    errorQuda("split_key = [%d,%d,%d,%d] is not valid.\n", split_key[0], split_key[1], split_key[2], split_key[3]);
+  }
 
   if (num_sub_partition == 1) { // In this case we don't split the grid.
 
@@ -3385,7 +3387,7 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     // Make the gauge param dimensions larger
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("Spliting the grid into sub-partitions: (%2d,%2d,%2d,%2d) / (%2d,%2d,%2d,%2d).\n", comm_dim(0),
-               comm_dim(1), comm_dim(2), comm_dim(3), split_key[0], split_key[1], split_key[2], split_key[3]);
+                 comm_dim(1), comm_dim(2), comm_dim(3), split_key[0], split_key[1], split_key[2], split_key[3]);
     }
     for (int d = 0; d < CommKey::n_dim; d++) {
       if (comm_dim(d) % split_key[d] != 0) {
