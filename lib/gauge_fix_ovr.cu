@@ -5,7 +5,7 @@
 #include <comm_quda.h>
 #include <gauge_fix_ovr_hit_devf.cuh>
 #include <reduce_helper.h>
-#include <thrust_helper.cuh>
+//#include <thrust_helper.cuh>
 #include <instantiate.h>
 #include <tunable_reduction.h>
 #include <tunable_nd.h>
@@ -474,6 +474,7 @@ public:
     for (int dir = 0; dir < 4; dir++)
       if (comm_dim_partitioned(dir)) nlinksfaces += faceVolume[dir];
 
+#if 0
     thrust::device_ptr<int> array_faceT[2];
     thrust::device_ptr<int> array_interiorT[2];
 
@@ -506,6 +507,7 @@ public:
     }
     if (size[0] == size[1]) threads = size[0];
     else errorQuda("BORDER: Even and Odd sizes does not match, not supported!!!!, %d:%d", size[0], size[1]);
+#endif
   }
 
   /**
