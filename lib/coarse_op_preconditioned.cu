@@ -76,9 +76,15 @@ namespace quda
         qudaMemsetAsync(arg.max_d, 0, sizeof(typename Arg::Float), stream);
       }
 
-      if (use_mma) mma::launch_yhat_kernel(tp, stream, arg, *this);
+      if (use_mma) {
+#if defined(QUDA_TARGET_CUDA)
+	mma::launch_yhat_kernel(tp, stream, arg, *this);
+#else
+	errorQuda("MMA Kernels can only be used in CUDA Target");
+#endif
+      }
       else launch<ComputeYhat>(tp, stream, arg);
-
+      
       if (Arg::compute_max && !activeTuning()) { // only do copy once tuning is done
         qudaMemcpyAsync(arg.max_h, arg.max_d, sizeof(typename Arg::Float), qudaMemcpyDeviceToHost, stream);
         qudaStreamSynchronize(const_cast<qudaStream_t&>(stream));

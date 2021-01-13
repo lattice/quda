@@ -1,12 +1,17 @@
 #include <hip/hip_runtime.h>
 #include <util_quda.h>
 #include <quda_internal.h>
+#include <quda_hip_api.h>
 
 #include <hip/hip_runtime_api.h>
 
 static hipDeviceProp_t deviceProp;
 static hipStream_t *streams;
 static const int Nstream = 9;
+static int device_count = 0;
+
+#define CHECK_HIP_ERROR(func)						\
+  hip::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
 
 namespace quda
 {
@@ -24,68 +29,74 @@ namespace quda
       printfQuda("*** HIP BACKEND ***\n");
 
       int driver_version=0;
-      hipDriverGetVersion(&driver_version);
+      CHECK_HIP_ERROR(hipDriverGetVersion(&driver_version));
       printfQuda("HIP Driver version = %d\n", driver_version);
 
       int runtime_version=0;
-      hipRuntimeGetVersion(&runtime_version);
+      CHECK_HIP_ERROR(hipRuntimeGetVersion(&runtime_version));
       printfQuda("HIP Runtime version = %d\n", runtime_version);
 
-      int deviceCount;
-      hipGetDeviceCount(&deviceCount);
-      if (deviceCount == 0) {
-        errorQuda("No HIP devices found");
-      }
+      //int deviceCount;
+      //hipGetDeviceCount(&deviceCount);
+      //if (deviceCount == 0) {
+      //errorQuda("No HIP devices found");
+      //}
 
-      for (int i = 0; i < deviceCount; i++) {
-        hipGetDeviceProperties(&deviceProp, i);
-        checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
-        if (getVerbosity() >= QUDA_SUMMARIZE) { printfQuda("Found device %d: %s\n", i, deviceProp.name); }
+      for (int i = 0; i < device_count; i++) {
+        CHECK_HIP_ERROR(hipGetDeviceProperties(&deviceProp, i));
+        if (getVerbosity() >= QUDA_SUMMARIZE) {
+	  printfQuda("Found device %d: %s\n", i, deviceProp.name); }
       }
 
       
       if (getVerbosity() >= QUDA_SUMMARIZE) {
         printfQuda("Using device %d: %s\n", dev, deviceProp.name);
       }
-      hipSetDevice(dev);
-      checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
+      
+      CHECK_HIP_ERROR(hipSetDevice(dev));
 
-
-      hipDeviceSetCacheConfig(hipFuncCachePreferL1);
+      CHECK_HIP_ERROR(hipDeviceSetCacheConfig(hipFuncCachePreferL1));
       //hipDeviceSetSharedMemConfig(hipSharedMemBankSizeEightByte);
-      hipGetDeviceProperties(&deviceProp, dev);
-      checkCudaErrorNoSync();
+      CHECK_HIP_ERROR(hipGetDeviceProperties(&deviceProp, dev));
     }
 
+    int get_device_count()
+    {
+      if (device_count == 0) {
+        CHECK_HIP_ERROR(hipGetDeviceCount(&device_count));
+        if (device_count == 0) errorQuda("No HIP devices found");
+      }
+      return device_count;
+    }
+    
+    
     void create_context()
     {
       streams = new hipStream_t[Nstream];
 
       int greatestPriority;
       int leastPriority;
-      hipDeviceGetStreamPriorityRange(&leastPriority, &greatestPriority);
+      CHECK_HIP_ERROR(hipDeviceGetStreamPriorityRange(&leastPriority, &greatestPriority));
       for (int i=0; i<Nstream-1; i++) {
-        hipStreamCreateWithPriority(&streams[i], hipStreamDefault, greatestPriority);
+        CHECK_HIP_ERROR(hipStreamCreateWithPriority(&streams[i], hipStreamDefault, greatestPriority));
       }
-      hipStreamCreateWithPriority(&streams[Nstream-1], hipStreamDefault, leastPriority);
-      checkCudaError();
+      CHECK_HIP_ERROR(hipStreamCreateWithPriority(&streams[Nstream-1], hipStreamDefault, leastPriority));
     }
 
     void destroy()
     {
       if (streams) {
-        for (int i=0; i<Nstream; i++) hipStreamDestroy(streams[i]);
+        for (int i=0; i<Nstream; i++) CHECK_HIP_ERROR(hipStreamDestroy(streams[i]));
         delete []streams;
         streams = nullptr;
       }
 
       char *device_reset_env = getenv("QUDA_DEVICE_RESET");
       if (device_reset_env && strcmp(device_reset_env, "1") == 0) {
-        // end this CUDA context
-        hipDeviceReset();
+        // end this HIP context
+        CHECK_HIP_ERROR(hipDeviceReset());
       }
     }
-
 
     hipStream_t get_cuda_stream(const qudaStream_t &stream)
     {

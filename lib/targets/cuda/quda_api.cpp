@@ -190,8 +190,8 @@ namespace quda {
       apply(stream);
     }
 
-    inline QudaMem(void *dst, int value, size_t count, const qudaStream_t &stream, bool async, const char *func,
-                   const char *file, const char *line) :
+    inline QudaMem(void *dst, int value, size_t count, const qudaStream_t &stream, bool async,
+		   const char *func, const char *file, const char *line) :
       dst(dst),
       src(nullptr),
       count(count),
@@ -338,8 +338,7 @@ namespace quda {
   {
     if (count == 0) return;
     auto error = cudaMemcpyAsync(dst, src, count, cudaMemcpyDeviceToDevice, device::get_cuda_stream(stream));
-    if (error != cudaSuccess)
-      errorQuda("cudaMemcpyAsync returned %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    set_runtime_error(error, "cudaMemcpyAsync", func, file, line);
   }
 
   void qudaMemcpy2D_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,

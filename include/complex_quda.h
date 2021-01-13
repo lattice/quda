@@ -474,9 +474,6 @@ public:
     : float2(z){}
   
   template <typename X>
-  inline complex<float>(const std::complex<X> & z) : float2{ static_cast<float>(z.real()), static_cast<float>(z.imag()) } {}
-
-  template <typename X>
     inline complex<float>(const std::complex<X> & z) : float2{ static_cast<float>(z.real()), static_cast<float>(z.imag()) } {}
   
   // Member operators
