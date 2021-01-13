@@ -15,7 +15,6 @@
 static cudaDeviceProp deviceProp;
 static cudaStream_t *streams;
 static const int Nstream = 9;
-static int device_count = 0;
 
 #define CHECK_CUDA_ERROR(func)                                          \
   cuda::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
@@ -53,7 +52,7 @@ namespace quda
       if (NVML_SUCCESS != result) errorQuda("NVML Shutdown failed with error %d", result);
 #endif
 
-      for (int i = 0; i < device_count; i++) {
+      for (int i = 0; i < get_device_count(); i++) {
         CHECK_CUDA_ERROR(cudaGetDeviceProperties(&deviceProp, i));
         if (getVerbosity() >= QUDA_SUMMARIZE) {
           printfQuda("Found device %d: %s\n", i, deviceProp.name);
@@ -115,6 +114,7 @@ namespace quda
 
     int get_device_count()
     {
+      static int device_count = 0;
       if (device_count == 0) {
         CHECK_CUDA_ERROR(cudaGetDeviceCount(&device_count));
         if (device_count == 0) errorQuda("No CUDA devices found");
@@ -124,7 +124,7 @@ namespace quda
 
     void print_device_properties()
     {
-      for (int device = 0; device < device_count; device++) {
+      for (int device = 0; device < get_device_count(); device++) {
 
         // cudaDeviceProp deviceProp;
         CHECK_CUDA_ERROR(cudaGetDeviceProperties(&deviceProp, device));
