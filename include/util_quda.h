@@ -12,6 +12,14 @@
 #endif
 
 
+namespace quda {
+  // strip path from __FILE__
+  constexpr const char* str_end(const char *str) { return *str ? str_end(str + 1) : str; }
+  constexpr bool str_slant(const char *str) { return *str == '/' ? true : (*str ? str_slant(str + 1) : false); }
+  constexpr const char* r_slant(const char* str) { return *str == '/' ? (str + 1) : r_slant(str - 1); }
+  constexpr const char* file_name(const char* str) { return str_slant(str) ? r_slant(str_end(str)) : str; }
+}
+
 /**
    @brief Query whether autotuning is enabled or not.  Default is enabled but can be overridden by setting QUDA_ENABLE_TUNING=0.
    @return If autotuning is enabled
@@ -180,44 +188,3 @@ void errorQuda_(const char *func, const char *file, int line, ...);
 #error "Unknown QUDA_TARGET"
 #endif
 #endif // MULTI_GPU
-
-
-#if defined(QUDA_TARGET_CUDA)
-#define checkCudaErrorNoSync() do {                    \
-  cudaError_t error = cudaGetLastError();              \
-  if (error != cudaSuccess)                            \
-    errorQuda("(CUDA) %s", cudaGetErrorString(error))  \
-    ;\
-} while (0)
-#elif defined(QUDA_TARGET_HIP)
-
-#define checkCudaErrorNoSync() do {                    \
-  hipError_t error = hipGetLastError();              \
-  if (error != hipSuccess)                            \
-    errorQuda("(HIP) %s", hipGetErrorString(error))  \
-    ;\
-} while (0)
-
-#endif
-
-#ifdef HOST_DEBUG
-#if defined(QUDA_TARGET_CUDA)
-
-#define checkCudaError() do {  \
-  cudaDeviceSynchronize();     \
-  checkCudaErrorNoSync();      \
-} while (0)
-
-#elif defined(QUDA_TARGET_HIP)
-
-#define checkCudaError() do {  \
-  hipDeviceSynchronize();     \
-  checkCudaErrorNoSync();      \
-} while (0)
-
-#endif
-#else
-
-#define checkCudaError() checkCudaErrorNoSync()
-
-#endif // HOST_DEBUG

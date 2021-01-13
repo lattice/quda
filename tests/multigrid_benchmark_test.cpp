@@ -164,12 +164,10 @@ void freeFields()
 
 DiracCoarse *dirac;
 
-double benchmark(int test, const int niter) {
-
-  qudaEvent_t start, end;
-  qudaEventCreate(&start);
-  qudaEventCreate(&end);
-  qudaEventRecord(start, device::get_default_stream());
+double benchmark(int test, const int niter)
+{
+  device_timer_t device_timer;
+  device_timer.start();
 
   switch(test) {
   case 0:
@@ -185,17 +183,9 @@ double benchmark(int test, const int niter) {
     errorQuda("Undefined test %d", test);
   }
 
-  qudaEventRecord(end, device::get_default_stream());
-  qudaEventSynchronize(end);
-  float runTime;
-  qudaEventElapsedTime(&runTime, start, end);
-  qudaEventDestroy(start);
-  qudaEventDestroy(end);
-
-  double secs = runTime / 1000;
-  return secs;
+  device_timer.stop();
+  return device_timer.last();
 }
-
 
 const char *names[] = {
   "Dslash",

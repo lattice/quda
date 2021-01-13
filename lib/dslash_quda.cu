@@ -51,9 +51,7 @@ namespace quda {
     static constexpr int nStream = nDim * nDir + 1;
 
     qudaEvent_t packEnd[2];
-    qudaEvent_t gatherStart[nStream];
     qudaEvent_t gatherEnd[nStream];
-    qudaEvent_t scatterStart[nStream];
     qudaEvent_t scatterEnd[nStream];
     qudaEvent_t dslashStart[2];
 
@@ -88,21 +86,16 @@ namespace quda {
   void createDslashEvents()
   {
     using namespace dslash;
-    // add cudaEventDisableTiming for lower sync overhead
-    for (int i=0; i< nStream; i++) {
-      qudaEventCreateDisableTiming(&gatherStart[i]);
-      qudaEventCreateDisableTiming(&gatherEnd[i]);
-      qudaEventCreateDisableTiming(&scatterStart[i]);
-      qudaEventCreateDisableTiming(&scatterEnd[i]);
+    for (int i=0; i<nStream; i++) {
+      gatherEnd[i] = qudaEventCreate();
+      scatterEnd[i] = qudaEventCreate();
     }
     for (int i=0; i<2; i++) {
-      qudaEventCreateDisableTiming(&packEnd[i]);
-      qudaEventCreateDisableTiming(&dslashStart[i]);
+      packEnd[i] = qudaEventCreate();
+      dslashStart[i] = qudaEventCreate();
     }
 
     aux_worker = NULL;
-
-    checkCudaError();
 
     dslash_pack_compute = true;
     dslash_interior_compute = true;
@@ -125,15 +118,12 @@ namespace quda {
     strcat(policy_string, ",pol=");
   }
 
-
   void destroyDslashEvents()
   {
     using namespace dslash;
 
-    for (int i=0; i< nStream; i++) {
-      qudaEventDestroy(gatherStart[i]);
+    for (int i=0; i<nStream; i++) {
       qudaEventDestroy(gatherEnd[i]);
-      qudaEventDestroy(scatterStart[i]);
       qudaEventDestroy(scatterEnd[i]);
     }
 
@@ -141,8 +131,6 @@ namespace quda {
       qudaEventDestroy(packEnd[i]);
       qudaEventDestroy(dslashStart[i]);
     }
-
-    checkCudaError();
   }
 
   template <typename Float, int nColor> class GammaApply : public TunableKernel2D {

@@ -9,11 +9,55 @@
  */
 
 #include <type_traits>
-#include <quda_internal.h> // for maximum short, char traits.
 #include <register_traits.h>
 
 namespace quda
 {
+
+  /**
+   * Traits for determining the maximum and inverse maximum
+   * value of a (signed) char and short. Relevant for
+   * fixed-precision types.
+   */
+  template< typename T > struct fixedMaxValue{ static constexpr float value = 0.0f; };
+  template<> struct fixedMaxValue<short>{ static constexpr float value = 32767.0f; };
+  template<> struct fixedMaxValue<short2>{ static constexpr float value = 32767.0f; };
+  template<> struct fixedMaxValue<short4>{ static constexpr float value = 32767.0f; };
+  template<> struct fixedMaxValue<short8>{ static constexpr float value = 32767.0f; };
+  template <> struct fixedMaxValue<int8_t> {
+    static constexpr float value = 127.0f;
+  };
+  template<> struct fixedMaxValue<char2>{ static constexpr float value = 127.0f; };
+  template<> struct fixedMaxValue<char4>{ static constexpr float value = 127.0f; };
+  template<> struct fixedMaxValue<char8>{ static constexpr float value = 127.0f; };
+
+  template <typename T> struct fixedInvMaxValue {
+    static constexpr float value = 3.402823e+38f;
+  };
+  template <> struct fixedInvMaxValue<short> {
+    static constexpr float value = 3.0518509476e-5f;
+  };
+  template <> struct fixedInvMaxValue<short2> {
+    static constexpr float value = 3.0518509476e-5f;
+  };
+  template <> struct fixedInvMaxValue<short4> {
+    static constexpr float value = 3.0518509476e-5f;
+  };
+  template <> struct fixedInvMaxValue<short8> {
+    static constexpr float value = 3.0518509476e-5f;
+  };
+  template <> struct fixedInvMaxValue<int8_t> {
+    static constexpr float value = 7.874015748031e-3f;
+  };
+  template <> struct fixedInvMaxValue<char2> {
+    static constexpr float value = 7.874015748031e-3f;
+  };
+  template <> struct fixedInvMaxValue<char4> {
+    static constexpr float value = 7.874015748031e-3f;
+  };
+  template <> struct fixedInvMaxValue<char8> {
+    static constexpr float value = 7.874015748031e-3f;
+  };
 
   template <typename T> __host__ __device__ inline float i2f(T a)
   {

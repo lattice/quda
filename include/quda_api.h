@@ -27,6 +27,12 @@ enum qudaMemcpyKind { qudaMemcpyHostToHost,
    profile and switch between using the CUDA runtime and driver APIs.
  */
 
+enum qudaMemcpyKind { qudaMemcpyHostToHost,
+	              qudaMemcpyHostToDevice,
+		      qudaMemcpyDeviceToHost,
+		      qudaMemcpyDeviceToDevice,
+		      qudaMemcpyDefault };
+
 namespace quda
 {
 
@@ -34,7 +40,10 @@ namespace quda
 
   struct qudaStream_t {
     int idx;
-    //qudaStream_t(int idx) : idx(idx) {}
+  };
+
+  struct qudaEvent_t {
+    void *event;
   };
 
   /**
@@ -187,31 +196,26 @@ namespace quda
                              const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around cudaEventCreate or cuEventCreate  with built-in error checking
-     @param[in] pointer to event we are creating
-   */
-  void qudaEventCreate_(qudaEvent_t *event, const char *func, const char *file, const char *line);
-
-
-   /**
-     @brief Wrapper around cudaEventCreateWithFlags (or cuEventCreate) with disabled timing with built-in error checking
-     @param[in] pointer to event we are creating
-   */
-  void qudaEventCreateDisableTiming_(qudaEvent_t *event, const char *func, const char *file, const char *line);
-
+     @brief Return instance of an event.
+  */
+  qudaEvent_t qudaEventCreate_(const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around cudaEventCreateWithFlags (or cuEventCreate) with disabled timing with built-in error checking
-     @param[in] pointer to event we are creating
-   */
-  void qudaEventCreateIpcDisableTiming_(qudaEvent_t *event, const char *func, const char *file, const char *line);
-  
-   /**
-     @brief Wrapper around cudaEventDestroy or cuEventDestroy with built-in error checking
-     @param[in] pointer to event we are desroying
-   */
-  void qudaEventDestroy_(qudaEvent_t event, const char *func, const char *file, const char *line);
-  
+     @brief Return instance of an event that can be used for timing.
+  */
+  qudaEvent_t qudaChronoEventCreate_(const char *func, const char *file, const char *line);
+
+  /**
+     @brief Return elapsed time in seconds between two events
+  */
+  float qudaEventElapsedTime_(const qudaEvent_t &start, const qudaEvent_t &stop,
+                              const char *func, const char *file, const char *line);
+
+  /**
+     @brief Destroy the event
+  */
+  void qudaEventDestroy_(qudaEvent_t &event, const char *func, const char *file, const char *line);
+
   /**
      @brief Wrapper around cudaEventQuery or cuEventQuery with built-in error checking
      @param[in] event Event we are querying
@@ -227,7 +231,6 @@ namespace quda
      @param[in,out] stream Stream where to record the event
    */
   void qudaEventRecord_(qudaEvent_t &event, qudaStream_t stream, const char *func, const char *file, const char *line);
-
 
   /**
      @brief Wrapper around cudaEventElapsedTime or cuEventElapsedTime
@@ -253,49 +256,7 @@ namespace quda
      with built-in error checking
      @param[in] event Event which we are synchronizing with respect to
    */
-  void qudaEventSynchronize_(qudaEvent_t event, const char *func, const char *file, const char *line);
-
-#if defined(QUDA_ENABLE_P2P)
-  /** 
-      @brief Wrapper aroud cudaIpcGetEventHandle or cuIpcGetEventHandle with built in error checking
-      @param[in,out] the handle
-      @param[in] the event
-  */
-  void qudaIpcGetEventHandle_(qudaIpcEventHandle_t *handle, qudaEvent_t event, const char *func, const char *file,
-			      const char *line);
-
-
- /**
-      @brief Wrapper aroud cudaIpcGetMemHandle with built in error checking
-      @param[in,out] the handle
-      @param[in] the ptr 
-  */
-  void qudaIpcGetMemHandle_(qudaIpcMemHandle_t *handle, void *devPtr, const char *func, const char *file,
-                              const char *line);
-
-
-   /**
-      @brief Wrapper aroud cudaIpcOpenEventHandle or cuIpcOpenEventHandle  with built in error checking
-      @param[in,out] the event
-      @param[in] the handle
-  */
-  void qudaIpcOpenEventHandle_(qudaEvent_t *event, qudaIpcEventHandle_t handle, const char *func, const char *file,
-                              const char *line);
-
-  /**
-     @brief Wrapper aroud cudaIpcOpenMemHandle with built in error checking for lazyPeer2Peer access
-     @param[in,out] the device pointer
-     @param[in] the handle
-  */
-  void qudaIpcOpenMemHandle_(void **devPtr, qudaIpcMemHandle_t handle, const char *func, const char *file,
-                              const char *line);
-  /**
-     @brief Wrapper aroud cudaIpcCloseMemHandle with built in error checking for lazyPeer2Peer access
-     @param[in,out] the device pointer
-  */
-  void qudaIpcCloseMemHandle_(void *devPtr, const char *func, const char *file, const char *line);
-#endif
-
+  void qudaEventSynchronize_(const qudaEvent_t &event, const char *func, const char *file, const char *line);
   
   /**
      @brief Wrapper around cudaStreamSynchronize or
@@ -320,9 +281,15 @@ namespace quda
   */
   void* qudaGetSymbolAddress_(const char *symbol, const char *func, const char *file, const char *line);
 
+  /**
+     @brief Get the last error recorded by the target runtime.  By
+     calling this, we reset the last error.
+  */
+  qudaError_t qudaGetLastError();
 
   /**
-     @brief Get the last error string recorded
+     @brief Get the error string associated with the last error that
+     was thrown by the target runtime
   */
   std::string qudaGetLastErrorString();
 
@@ -330,7 +297,7 @@ namespace quda
      @brief Print out the timer profile for CUDA API calls
    */
   void printAPIProfile();
-
+  
 } // namespace quda
 
 #define STRINGIFY__(x) #x
@@ -378,17 +345,16 @@ namespace quda
 #define qudaMemcpyToSymbolAsync(symbol, src, count,offset,kind,stream)                                           \
   ::quda::qudaMemcpyToSymbolAsync_(symbol,src, count, offset, kind, stream, __func__, quda::file_name(__FILE__), \
 		  __STRINGIFY__(__LINE__))
+#define qudaEventCreate()                                               \
+  ::quda::qudaEventCreate_( __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
 
-#define qudaEventCreate(event)                                                                                         \
-  ::quda::qudaEventCreate_(event, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+#define qudaChronoEventCreate()                                               \
+  ::quda::qudaChronoEventCreate_( __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
 
-#define qudaEventCreateDisableTiming(event)				\
-  ::quda::qudaEventCreateDisableTiming_(event, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+#define qudaEventElapsedTime(start, stop)                               \
+  ::quda::qudaEventElapsedTime_(start, stop, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
 
-#define qudaEventCreateIpcDisableTiming(event)                           \
-  ::quda::qudaEventCreateIpcDisableTiming_(event, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))  
-
-#define qudaEventDestroy(event)				\
+#define qudaEventDestroy(event)                                         \
   ::quda::qudaEventDestroy_(event, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
 
 #define qudaEventQuery(event)                                                                                          \

@@ -1,3 +1,4 @@
+#include <timer.h>
 #include <blas_lapack.h>
 #include <eigen_helper.h>
 #include <quda_define.h>

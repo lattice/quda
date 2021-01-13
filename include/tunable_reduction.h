@@ -74,7 +74,7 @@ namespace quda {
                        const std::vector<constant_param_t> &param = dummy_param)
     {
 #ifdef JITIFY
-      arg.launch_error = launch_jitify<Transformer, Reducer>("quda::Reduction2D", tp, stream, arg, param);
+      arg.launch_error = launch_jitify<Transformer, Reducer>("Reduction2D", tp, stream, arg, param);
 #else
       for (unsigned int i = 0; i < param.size(); i++)
         qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
@@ -270,7 +270,7 @@ namespace quda {
     }
 
     template <int block_size_x, template <typename> class Transformer, template <typename> class Reducer, typename Arg>
-      typename std::enable_if<block_size_x == device::warp_size(), qudaError_t>::type
+    typename std::enable_if<block_size_x == device::warp_size(), qudaError_t>::type
       launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
       if (tp.block.x == block_size_x)
@@ -285,7 +285,7 @@ namespace quda {
                        const std::vector<constant_param_t> &param = dummy_param)
     {
 #ifdef JITIFY
-      arg.launch_error = launch_jitify<Transformer, Reducer>("quda::MultiReduction", tp, stream, arg, param);
+      arg.launch_error = launch_jitify<Transformer, Reducer>("MultiReduction", tp, stream, arg, param);
 #else
       for (unsigned int i = 0; i < param.size(); i++)
         qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);

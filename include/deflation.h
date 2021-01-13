@@ -61,18 +61,16 @@ namespace quda {
         tot_dim      = param.np;
         ld           = ((tot_dim+15) / 16) * tot_dim;
         //allocate deflation resources:
-        
+        matProj      = static_cast<Complex*>(pool_pinned_malloc(ld * tot_dim * sizeof(Complex)));
         invRitzVals  = new double[tot_dim];
 
-	//matProj      = new Complex[ld*tot_dim];
-        // hostRegister(matProj,ld*tot_dim*sizeof(Complex),cudaHostRegisterDefault);
-	matProj = (Complex*)pinned_malloc(ld*tot_dim*sizeof(Complex));
-	  
+        //Check that RV is a composite field:
+        if(RV->IsComposite() == false) errorQuda("\nRitz vectors must be contained in a composite field.\n");
      }
-
+    
      ~DeflationParam(){
-       if(matProj) host_free(matProj);
-       if(invRitzVals)       delete[]  invRitzVals;
+       pool_pinned_free(matProj);
+        if(invRitzVals)       delete[]  invRitzVals;
      }
   };
 

@@ -216,8 +216,6 @@ void cpu_xpy(QudaPrecision prec, void *x, void *y, int size);
 #endif
 
 // Use for profiling
-void stopwatchStart();
-double stopwatchReadSeconds();
 void performanceStats(double *time, double *gflops);
 
 inline QudaPrecision getPrecision(int i)

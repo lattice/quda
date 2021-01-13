@@ -107,9 +107,9 @@ int comm_rank(void)
 }
 
 
-int comm_size(void)
+size_t comm_size(void)
 {
-  return QMP_get_number_of_nodes();
+  return static_cast<size_t>(QMP_get_number_of_nodes());
 }
 
 

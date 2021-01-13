@@ -1,6 +1,7 @@
-#include <string.h>
-#include <gauge_field.h>
+#include <cstring>
 #include <typeinfo>
+#include <gauge_field.h>
+#include <timer.h>
 #include <blas_quda.h>
 #include <device.h>
 
@@ -149,9 +150,9 @@ namespace quda {
 	if (!comm_dim_partitioned(dim)) continue;
 	recvStart(dim, dir); // prepost the receive
 	if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) {
-	  qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][dim][dir], my_face_dim_dir_d[bufferIndex][dim][dir],
-			  ghost_face_bytes[dim], qudaMemcpyDeviceToHost, device::get_stream(2*dim+dir));
-	}
+          qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][dim][dir], my_face_dim_dir_d[bufferIndex][dim][dir],
+                          ghost_face_bytes[dim], qudaMemcpyDeviceToHost, device::get_stream(2 * dim + dir));
+        }
       }
 
       // if gdr enabled then synchronize
@@ -169,9 +170,9 @@ namespace quda {
 	if (!comm_dim_partitioned(dim)) continue;
 	commsComplete(dim, dir);
 	if (!comm_peer2peer_enabled(1-dir,dim) && !comm_gdr_enabled()) {
-	  qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][dim][1-dir], from_face_dim_dir_h[bufferIndex][dim][1-dir],
-			  ghost_face_bytes[dim], qudaMemcpyHostToDevice, device::get_stream(2*dim + dir));
-	}
+          qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][dim][1 - dir], from_face_dim_dir_h[bufferIndex][dim][1 - dir],
+                          ghost_face_bytes[dim], qudaMemcpyHostToDevice, device::get_stream(2 * dim + dir));
+        }
       }
 
       qudaDeviceSynchronize(); // synchronize before issuing kernels / copies in default stream - could replace with event post and wait
@@ -613,11 +614,10 @@ namespace quda {
           }
 
           if (src.Order() > 4 && GhostExchange() == QUDA_GHOST_EXCHANGE_PAD
-              && src.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace) {
-            for (int d = 0; d < geometry; d++) {
+              && src.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
+            for (int d = 0; d < geometry; d++)
               qudaMemcpy(ghost_buffer[d], src.Ghost()[d], ghost_bytes[d], qudaMemcpyDefault);
-	    }
-	  }
+	  
           if (ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED && src.GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
             copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer, 0, ghost_buffer);
             if (geometry == QUDA_COARSE_GEOMETRY)
@@ -695,11 +695,10 @@ namespace quda {
         }
 
         if (cpu.Order() > 4 && GhostExchange() == QUDA_GHOST_EXCHANGE_PAD
-            && cpu.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace) {
-          for (int d = 0; d < geometry; d++) {
+            && cpu.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
+          for (int d = 0; d < geometry; d++)
             qudaMemcpy(cpu.Ghost()[d], ghost_buffer[d], ghost_bytes[d], qudaMemcpyDefault);
-	  }
-	}
+
         free_gauge_buffer(buffer, cpu.Order(), cpu.Geometry());
         if (nFace > 0) free_ghost_buffer(ghost_buffer, cpu.Order(), geometry);
       }

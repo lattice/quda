@@ -4,7 +4,7 @@
 #include <index_helper.cuh>
 #include <float_vector.h>
 #include <shared_memory_cache_helper.cuh>
-#include <target_device.h>
+#include <kernel.h>
 
 namespace quda {
 
@@ -314,22 +314,24 @@ namespace quda {
 	// reduce down to the first group of column-split threads
 	constexpr int warp_size = device::warp_size(); // FIXME - this is buggy when x-dim * color_stride < 32
 #pragma unroll
-	  for (int offset = warp_size/2; offset >= warp_size/Arg::color_stride; offset /= 2) {
-            // THIS LOOP DOES NOT GET EXECUTED on CPUs since there the Arg::color_stride = 1 
-#if defined(QUDA_TARGET_CUDA) 
-            out[color_local] += __shfl_down_sync(device::warp_converged_mask(), out[color_local], offset);
+	
+	for (int offset = warp_size/2; offset >= warp_size/Arg::color_stride; offset /= 2) {
+	  // THIS LOOP DOES NOT GET EXECUTED on CPUs since there the Arg::color_stride = 1 
+#if defined(QUDA_TARGET_CUDA)
+	  out[color_local].real(out[color_local].real() + __shfl_down_sync(device::warp_converged_mask(), out[color_local].real(), offset));
+	  out[color_local].imag(out[color_local].imag() + __shfl_down_sync(device::warp_converged_mask(), out[color_local].imag(), offset));
 #elif defined(QUDA_TARGET_HIP)
-            Float sh_r = Float(out[color_local].x);
-            Float sh_i = Float(out[color_local].y);
-
-            out[color_local] += complex<Float>{ __shfl_down(sh_r,offset) , __shfl_down(sh_i,offset) };
+	  Float sh_r = Float(out[color_local].x);
+	  Float sh_i = Float(out[color_local].y);
+	  
+	  out[color_local] += complex<Float>{ __shfl_down(sh_r,offset) , __shfl_down(sh_i,offset) };
 #else
 #error "This file needs some kind of shuffle"
 #endif
-	  } // warp reduction loop
+	} // warp reduction loop
       } // color local loop
 #endif // __CUDA_ARCH__ || __HIP_DEVICE_COMPILE__
-
+      
 #pragma unroll
       for (int color_local=0; color_local<Mc; color_local++) {
 	int c = color_block + color_local; // global color index
@@ -346,7 +348,7 @@ namespace quda {
   template <typename Arg> struct CoarseDslash {
     Arg &arg;
     constexpr CoarseDslash(Arg &arg) : arg(arg) {}
-    constexpr const char *filename() { return KERNEL_FILE; }
+    static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb_color_offset, int parity, int sMd)
     {

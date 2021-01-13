@@ -135,8 +135,10 @@ extern int Vh_ex;
 	
     public: 
       Matrix(); // default constructor
-      Matrix(const Matrix<N,T>& mat) = default;
-      Matrix& operator=(const Matrix<N,T>& mat) = default;
+      Matrix(const Matrix<N,T> &) = default;
+      Matrix(Matrix<N,T> &&) = default;
+      Matrix& operator=(const Matrix<N,T> &) = default;
+      Matrix& operator=(Matrix<N,T> &&) = default;
       Matrix & operator += (const Matrix<N,T>& mat);
       Matrix & operator -= (const Matrix<N,T>& mat);
       const T& operator()(int i, int j) const;

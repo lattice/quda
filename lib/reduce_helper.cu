@@ -85,9 +85,7 @@ namespace quda
         qudaLaunchKernel(init_count<count_t>, tp, device::get_default_stream(), reduce_count);
       }
 
-      qudaEventCreateDisableTiming(&reduceEnd);
-
-      checkCudaError();
+      reduceEnd = qudaEventCreate();
     }
 
     void destroy()

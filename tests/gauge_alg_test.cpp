@@ -5,6 +5,7 @@
 #include <quda_define.h>
 #include <quda.h>
 #include <quda_internal.h>
+#include <timer.h>
 #include <gauge_field.h>
 
 #include <comm_quda.h>
@@ -23,7 +24,16 @@
 using namespace quda;
 
 class GaugeAlgTest : public ::testing::Test {
- protected:
+
+  QudaGaugeParam param;
+  host_timer_t a0;
+  host_timer_t a1;
+  RNG * randstates;
+
+protected:
+  cudaGaugeField *U;
+  double3 plaq;
+
   void SetReunitarizationConsts(){
     const double unitarize_eps = 1e-14;
     const double max_error = 1e-10;
@@ -119,14 +129,14 @@ class GaugeAlgTest : public ::testing::Test {
     randstates = new RNG(gParam, 1234);
     randstates->Init();
 
-    nsteps = 10;
-    nhbsteps = 4;
-    novrsteps = 4;
-    coldstart = false;
-    beta_value = 6.2;
+    int nsteps = 10;
+    int nhbsteps = 4;
+    int novrsteps = 4;
+    bool coldstart = false;
+    double beta_value = 6.2;
 
-    a0.Start(__func__, __FILE__, __LINE__);
-    a1.Start(__func__, __FILE__, __LINE__);
+    a0.start();
+    a1.start();
 
     int *num_failures_h = (int *)mapped_malloc(sizeof(int));
     int *num_failures_d = (int *)get_mapped_device_pointer(num_failures_h);
@@ -152,9 +162,9 @@ class GaugeAlgTest : public ::testing::Test {
 
       plaquette(*U);
     }
-    a1.Stop(__func__, __FILE__, __LINE__);
+    a1.stop();
 
-    printfQuda("Time Monte -> %.6f s\n", a1.Last());
+    printfQuda("Time Monte -> %.6f s\n", a1.last());
     plaq = plaquette(*U);
     printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
 
@@ -162,7 +172,7 @@ class GaugeAlgTest : public ::testing::Test {
   }
 
   virtual void TearDown() {
-    detu = getLinkDeterminant(*U);
+    auto detu = getLinkDeterminant(*U);
     double2 tru = getLinkTrace(*U);
     printfQuda("Det: %.16e:%.16e\n", double(detu.x), double(detu.y));
     printfQuda("Tr: %.16e:%.16e\n", tru.x/3.0, tru.y/3.0);
@@ -171,30 +181,17 @@ class GaugeAlgTest : public ::testing::Test {
     //Release all temporary memory used for data exchange between GPUs in multi-GPU mode
     PGaugeExchangeFree();
 
-    a0.Stop(__func__, __FILE__, __LINE__);
-    printfQuda("Time -> %.6f s\n", a0.Last());
+    a0.stop();
+    printfQuda("Time -> %.6f s\n", a0.last());
     randstates->Release();
     delete randstates;
   }
-
-  QudaGaugeParam param;
-
-  Timer a0,a1;
-  double2 detu;
-  double3 plaq;
-  cudaGaugeField *U;
-  int nsteps;
-  int nhbsteps;
-  int novrsteps;
-  bool coldstart;
-  double beta_value;
-  RNG * randstates;
 
 };
 
 TEST_F(GaugeAlgTest, Generation)
 {
-  detu = getLinkDeterminant(*U);
+  auto detu = getLinkDeterminant(*U);
   plaq = plaquette(*U);
   bool testgen = false;
   //check plaquette value for beta = 6.2

@@ -1,5 +1,6 @@
 #include <complex.h>
 #include <blas_lapack.h>
+#include <timer.h>
 #ifdef NATIVE_LAPACK_LIB
 #include <cublas_v2.h>
 #include <malloc_quda.h>

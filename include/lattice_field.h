@@ -481,7 +481,8 @@ namespace quda {
        Handle to remote copy event used for peer-to-peer synchronization
     */
     const qudaEvent_t& getIPCRemoteCopyEvent(int dir, int dim) const;
-#endif
+
+#endif //QUDA_ENABLE_P2P
 
     /**
        Static variable that is determined which ghost buffer we are using
