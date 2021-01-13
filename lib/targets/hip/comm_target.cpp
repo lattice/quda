@@ -2,7 +2,7 @@
 #include <quda_api.h>
 #include <quda_hip_api.h>
 #include <quda_hip_api.h>
-#include <hip/hcc_detail/hip_runtime_api.h>
+#include <hip/hip_runtime_api.h>
 #include <algorithm>
 
 
@@ -121,7 +121,8 @@ void comm_create_neighbor_event(qudaEvent_t remote[2][QUDA_MAX_DIM], qudaEvent_t
       if (comm_peer2peer_enabled(dir,dim)) {
         hipEvent_t event;
         CHECK_HIP_ERROR(hipEventCreateWithFlags(&event, hipEventDisableTiming | hipEventInterprocess));
-        local[dir][dim].event = reinterpret_cast<void*>(event);
+        local[dir][dim].event = event;
+	//DMH: FIXME
         //CHECK_HIP_ERROR(hipIpcGetEventHandle(&handle, event));
         sendHandle = comm_declare_send_relative(&handle, dim, disp, sizeof(handle));
       }
