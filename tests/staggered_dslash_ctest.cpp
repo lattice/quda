@@ -2,7 +2,7 @@
 
 using namespace quda;
 
-StaggeredDslashTestWrapper wrapper;
+StaggeredDslashTestWrapper dslash_test_wrapper;
 
 bool gauge_loaded = false;
 
@@ -11,10 +11,10 @@ const char *recon_str[] = {"r18", "r13", "r9"};
 
 void init(int precision, QudaReconstructType link_recon, int partition)
 {
-  wrapper.init_ctest(precision, link_recon, partition);
+  dslash_test_wrapper.init_ctest(precision, link_recon, partition);
 }
 
-void end() { wrapper.end(); }
+void end() { dslash_test_wrapper.end(); }
 
 void display_test_info(int precision, QudaReconstructType link_recon)
 {
@@ -61,7 +61,7 @@ protected:
       return true;
     }
 
-    if (::testing::get<2>(GetParam()) > 0 && wrapper.test_split_grid) { return true; }
+    if (::testing::get<2>(GetParam()) > 0 && dslash_test_wrapper.test_split_grid) { return true; }
     return false;
   }
 
@@ -103,24 +103,24 @@ public:
 TEST_P(StaggeredDslashTest, verify)
 {
   double deviation = 1.0;
-  double tol = getTolerance(wrapper.inv_param.cuda_prec);
+  double tol = getTolerance(dslash_test_wrapper.inv_param.cuda_prec);
   // check for skip_kernel
-  if (wrapper.spinorRef != nullptr) {
-    wrapper.run_test(/**niter =*/2);
-    deviation = wrapper.verify();
+  if (dslash_test_wrapper.spinorRef != nullptr) {
+    dslash_test_wrapper.run_test(2);
+    deviation = dslash_test_wrapper.verify();
   }
   ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
 }
 
-TEST_P(StaggeredDslashTest, benchmark) { wrapper.run_test(niter, /**print_metrics =*/true); }
+TEST_P(StaggeredDslashTest, benchmark) { dslash_test_wrapper.run_test(niter, true); }
 
 int main(int argc, char **argv)
 {
   // hack for loading gauge fields
-  wrapper.argc_copy = argc;
-  wrapper.argv_copy = argv;
+  dslash_test_wrapper.argc_copy = argc;
+  dslash_test_wrapper.argv_copy = argv;
 
-  wrapper.init_ctest_once();
+  dslash_test_wrapper.init_ctest_once();
 
   // initalize google test
   ::testing::InitGoogleTest(&argc, argv);
@@ -180,13 +180,13 @@ int main(int argc, char **argv)
 
     // Clean up loaded gauge field
     for (int dir = 0; dir < 4; dir++) {
-      if (wrapper.qdp_inlink[dir] != nullptr) {
-        free(wrapper.qdp_inlink[dir]);
-        wrapper.qdp_inlink[dir] = nullptr;
+      if (dslash_test_wrapper.qdp_inlink[dir] != nullptr) {
+        free(dslash_test_wrapper.qdp_inlink[dir]);
+        dslash_test_wrapper.qdp_inlink[dir] = nullptr;
       }
     }
 
-    wrapper.end_ctest_once();
+    dslash_test_wrapper.end_ctest_once();
 
     finalizeComms();
 

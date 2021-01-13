@@ -3297,13 +3297,10 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
 
   profilerStart(__func__);
 
-  const int *_split_key = param->split_grid;
-  CommKey split_key = {_split_key[0], _split_key[1], _split_key[2], _split_key[3]};
+  CommKey split_key = {param->split_grid[0], param->split_grid[1], param->split_grid[2], param->split_grid[3]};
   int num_sub_partition = quda::product(split_key);
 
-  for (int d = 0; d < CommKey::n_dim; d++) {
-    if (split_key[d] < 1) { errorQuda("split_key[%d] = %d is non-positive.\n", d, split_key[d]); }
-  }
+  if (!split_key.is_valid()) { errorQuda("split_key = [%d,%d,%d,%d] is not valid.\n", split_key[0], split_key[1], split_key[2], split_key[3]); }
 
   if (num_sub_partition == 1) { // In this case we don't split the grid.
 
@@ -3386,8 +3383,10 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     }
 
     // Make the gauge param dimensions larger
-    printfQuda("Spliting the grid into sub-partitions: (%2d,%2d,%2d,%2d) / (%2d,%2d,%2d,%2d).\n", comm_dim(0),
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+      printfQuda("Spliting the grid into sub-partitions: (%2d,%2d,%2d,%2d) / (%2d,%2d,%2d,%2d).\n", comm_dim(0),
                comm_dim(1), comm_dim(2), comm_dim(3), split_key[0], split_key[1], split_key[2], split_key[3]);
+    }
     for (int d = 0; d < CommKey::n_dim; d++) {
       if (comm_dim(d) % split_key[d] != 0) {
         errorQuda("Split not possible: %2d %% %2d != 0.", comm_dim(d), split_key[d]);
@@ -3493,25 +3492,25 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
 
     // Load gauge field after pushing the split communicator so the comm buffers, etc are setup according to
     // the split topology.
-    printfQuda("Split grid loading gauge field...\n");
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) { printfQuda("Split grid loading gauge field...\n"); }
     if (!is_staggered) {
       loadGaugeQuda(collected_gauge->Gauge_p(), gauge_param);
     } else {
-      freeGaugeQuda();
+      // freeGaugeQuda();
       loadFatLongGaugeQuda(param, gauge_param, collected_milc_fatlink_field->Gauge_p(),
                            collected_milc_longlink_field->Gauge_p());
     }
-    printfQuda("Split grid loaded gauge field...\n");
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) { printfQuda("Split grid loaded gauge field...\n"); }
 
     if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH
         || param->dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
-      printfQuda("Split grid loading clover field...\n");
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) { printfQuda("Split grid loading clover field...\n"); }
       if (collected_clover) {
         loadCloverQuda(collected_clover->V(false), collected_clover->V(true), param);
       } else {
         loadCloverQuda(nullptr, nullptr, param);
       }
-      printfQuda("Split grid loaded clover field...\n");
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) { printfQuda("Split grid loaded clover field...\n"); }
     }
 
     for (int n = 0; n < param->num_src_per_sub_partition; n++) {
@@ -3522,6 +3521,7 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     profileInvertMultiSrc.TPSTART(QUDA_PROFILE_EPILOGUE);
     push_communicator(default_comm_key);
     updateR();
+    comm_barrier();
 
     for (int d = 0; d < CommKey::n_dim; d++) {
       gauge_param->X[d] /= split_key[d];

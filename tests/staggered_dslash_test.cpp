@@ -2,30 +2,30 @@
 
 using namespace quda;
 
-StaggeredDslashTestWrapper wrapper;
+StaggeredDslashTestWrapper dslash_test_wrapper;
 
 static int dslashTest()
 {
   // return code for google test
   int test_rc = 0;
-  wrapper.init_test();
+  dslash_test_wrapper.init_test();
 
   int attempts = 1;
   for (int i = 0; i < attempts; i++) {
-    wrapper.run_test(niter, /**print_metrics =*/true);
+    dslash_test_wrapper.run_test(niter, /**print_metrics =*/true);
     if (verify_results) {
       test_rc = RUN_ALL_TESTS();
       if (test_rc != 0) warningQuda("Tests failed");
     }
   }
-  wrapper.end();
+  dslash_test_wrapper.end();
 
   return test_rc;
 }
 
 TEST(dslash, verify)
 {
-  double deviation = wrapper.verify();
+  double deviation = dslash_test_wrapper.verify();
   double tol = getTolerance(prec);
   ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
 }
@@ -44,8 +44,8 @@ void display_test_info()
 int main(int argc, char **argv)
 {
   // hack for loading gauge fields
-  wrapper.argc_copy = argc;
-  wrapper.argv_copy = argv;
+  dslash_test_wrapper.argc_copy = argc;
+  dslash_test_wrapper.argv_copy = argv;
 
   // initalize google test
   ::testing::InitGoogleTest(&argc, argv);
