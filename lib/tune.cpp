@@ -12,6 +12,7 @@
 #include <list>
 #include <unistd.h>
 #include <uint_to_char.h>
+#include <target_device.h> // for device::warp_size
 
 #include <deque>
 #include <queue>
@@ -639,6 +640,21 @@ namespace quda
     }
 #endif
   }
+
+  TuneParam::TuneParam() :
+    block(device::warp_size(), 1, 1),
+    grid(1, 1, 1),
+    shared_bytes(0),
+    set_max_shared_bytes(false),
+    aux(),
+    time(FLT_MAX),
+    n_calls(0)
+    {
+      aux = make_int4(1,1,1,1);
+    }
+
+  int Tunable::blockStep() const { return device::warp_size(); }
+  int Tunable::blockMin() const { return device::warp_size(); }
 
   static TimeProfile launchTimer("tuneLaunch");
 
