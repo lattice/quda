@@ -104,7 +104,7 @@ void errorQuda_(const char *func, const char *file, int line, ...);
 
 #ifdef MULTI_GPU
 
-#if defined QUDA_TARGET_CUDA
+#if defined(QUDA_TARGET_CUDA)
 #define printfQuda(...) do {                           \
   sprintf(getPrintBuffer(), __VA_ARGS__);	       \
   if (getRankVerbosity()) {			       \

@@ -10,7 +10,7 @@ endif()
 if( QUDA_TARGET_CUDA )
   set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CMAKE_CUDA_COMPILER_VERSION})
 else()
-  set(HASH cpu_arch=${CPU_ARCH})
+  set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH})
 endif(QUDA_TARGET_CUDA)
 
 # this allows simplified running of clang-tidy
