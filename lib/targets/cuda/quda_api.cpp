@@ -552,47 +552,7 @@ namespace quda {
     set_runtime_error(error, __func__, func, file, line);
 #endif
   }
-
-  void qudaIpcGetEventHandle_(qudaIpcEventHandle_t *handle, qudaEvent_t event, const char *func, const char *file,
-                              const char *line)
-  {
-    // qudaIpcEventHandle_t doesn't convert nicely to CUipcEventHandle so no driver API
-    PROFILE(cudaError_t error = cudaIpcGetEventHandle(handle,event), QUDA_PROFILE_IPC_GET_EVENT_HANDLE);
-    if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
-  }
-
-  void qudaIpcGetMemHandle_(qudaIpcMemHandle_t *handle, void *ptr, const char *func, const char *file,
-                              const char *line)
-  {
-    // qudaIpcEventHandle_t doesn't convert nicely to CUipcEventHandle so no driver API
-    PROFILE(cudaError_t error = cudaIpcGetMemHandle(handle,ptr), QUDA_PROFILE_IPC_GET_MEM_HANDLE);
-    if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
-  }
-
-  void qudaIpcOpenEventHandle_(qudaEvent_t *event, qudaIpcEventHandle_t handle, const char *func, const char *file,
-                              const char *line)
-  {
-    // qudaIpcEventHandle_t doesn't convert nicely to CUipcEventHandle so no driver API
-    PROFILE(cudaError_t error = cudaIpcOpenEventHandle(event,handle), QUDA_PROFILE_IPC_OPEN_EVENT_HANDLE);
-    if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
-  }
-
-  void qudaIpcOpenMemHandle_(void **devPtr, qudaIpcMemHandle_t handle, const char *func, const char *file,
-			     const char *line)
-  {
-    // qudaIpcEventHandle_t doesn't convert nicely to CUipcEventHandle so no driver API
-    PROFILE(cudaError_t error = cudaIpcOpenMemHandle(devPtr,handle,cudaIpcMemLazyEnablePeerAccess),
-	    QUDA_PROFILE_IPC_OPEN_MEM_HANDLE);
-    if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
-  }
   
-  void qudaIpcCloseMemHandle_(void *devPtr, const char *func, const char *file, const char *line)
-  {
-    // qudaIpcEventHandle_t doesn't convert nicely to CUipcEventHandle so no driver API
-    PROFILE(cudaError_t error = cudaIpcCloseMemHandle(devPtr),QUDA_PROFILE_IPC_CLOSE_MEM_HANDLE);
-    if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
-  }
-
   void qudaStreamSynchronize_(const qudaStream_t &stream, const char *func, const char *file, const char *line)
   {
 #ifdef USE_DRIVER_API
