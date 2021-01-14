@@ -75,7 +75,7 @@ namespace quda {
     default: errorQuda("%s not implemented for %d threads", #kernel, tp.block.x);                                      \
     }                                                                                                                  \
   } else {                                                                                                             \
-    errorQuda("Not implemented for %d", tp.aux.x);                                                                     \
+    errorQuda("Not implemented for %d", (int)tp.aux.x);			\
   }
 
   /**
@@ -500,7 +500,11 @@ public:
     for (int i = 0; i < 2; i++) {
       //sort and remove duplicated lattice indices
       thrust_allocator alloc;
+#if defined(QUDA_TARGET_CUDA)
       thrust::sort(thrust::cuda::par(alloc), array_faceT[i], array_faceT[i] + nlinksfaces);
+#elif defined(QUDA_TARGET_HIP)
+      thrust::sort(thrust::hip::par(alloc), array_faceT[i], array_faceT[i] + nlinksfaces);
+#endif
       thrust::device_ptr<int> new_end = thrust::unique(array_faceT[i], array_faceT[i] + nlinksfaces);
       size[i] = thrust::raw_pointer_cast(new_end) - thrust::raw_pointer_cast(array_faceT[i]);
     }
@@ -623,8 +627,13 @@ public:
         sendg_d[d] = device_malloc(bytes[d]);
         recvg_d[d] = device_malloc(bytes[d]);
         hostbuffer_h[d] = (void*)pinned_malloc(4 * bytes[d]);
+#ifdef QUDA_TARGET_CUDA	
         tp[d].block = make_uint3(128, 1, 1);
         tp[d].grid = make_uint3((faceVolumeCB[d] + tp[d].block.x - 1) / tp[d].block.x, 1, 1);
+#else
+        tp[d].block = dim3(128, 1, 1);
+        tp[d].grid = dim3((faceVolumeCB[d] + tp[d].block.x - 1) / tp[d].block.x, 1, 1);	
+#endif
       }
       for ( int d = 0; d < 4; d++ ) {
         if ( !commDimPartitioned(d)) continue;

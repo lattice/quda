@@ -19,8 +19,14 @@
 #define _CubLog(...)
 #endif
 
+#if defined(QUDA_TARGET_CUDA)
 #include <thrust/system/cuda/vector.h>
 #include <thrust/system/cuda/execution_policy.h>
+#elif defined(QUDA_TARGET_HIP)
+#include <thrust/system/hip/vector.h>
+#include <thrust/system/hip/execution_policy.h>
+#endif
+
 #include <thrust/transform_reduce.h>
 #include <thrust/device_ptr.h>
 #include <thrust/device_vector.h>
