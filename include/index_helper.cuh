@@ -1,6 +1,6 @@
 #pragma once
 #include "quda_define.h"
-#ifdef QUDA_TARGET_HIP
+#if defined (QUDA_TARGET_HIP)
 #include "hip/hip_runtime.h"
 #endif
 

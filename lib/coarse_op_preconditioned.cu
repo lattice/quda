@@ -6,7 +6,7 @@
 #include <tunable_nd.h>
 #include <kernels/coarse_op_preconditioned.cuh>
 
-#ifdef QUDA_TARGET_CUDA
+#if defined (QUDA_TARGET_CUDA)
 #include <coarse_op_preconditioned_mma_launch.h>
 #else
 using CUresult = bool;
@@ -97,7 +97,6 @@ namespace quda
     {
       if (use_mma) {
 #if defined(QUDA_TARGET_CUDA)
-        constexpr bool compute_max_only_dummy = true;
         constexpr bool query_max = true;
         int max = mma::launch_yhat_kernel<query_max>(param, device::get_default_stream(), arg, *this);
         if (param.aux.x < max) {

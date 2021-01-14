@@ -98,7 +98,7 @@ namespace quda
 
        @param[in] block Block dimensions for the 3-d shared memory object 
     */
-#ifdef QUDA_TARGET_CUDA
+#if defined (QUDA_TARGET_CUDA)
     constexpr SharedMemoryCache(dim3 block = dim3(block_size_x, block_size_y, block_size_z)) :
     block(block),
       stride(block.x * block.y * block.z) {}
