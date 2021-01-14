@@ -27,6 +27,9 @@
 
 using namespace std;
 
+#include <Eigen/Dense>
+using namespace Eigen;
+
 #define XUP 0
 #define YUP 1
 #define ZUP 2
@@ -1043,55 +1046,91 @@ template <typename Float> void constructRandomGaugeField(Float **res, QudaGaugeP
     resOdd[dir] = res[dir] + Vh * gauge_site_size;
   }
 
-  for (int dir = 0; dir < 4; dir++) {
-    for (int i = 0; i < Vh; i++) {
-      for (int m = 1; m < 3; m++) { // last 2 rows
-	for (int n = 0; n < 3; n++) { // 3 columns
-	  resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = rand() / (Float)RAND_MAX;
-	  resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = rand() / (Float)RAND_MAX;
-	  resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = rand() / (Float)RAND_MAX;
-          resOdd[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = rand() / (Float)RAND_MAX;
-        }
+  const int Nc = N_COLORS;
+
+  if(Nc == 3) {
+    for (int dir = 0; dir < 4; dir++) {
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static, 32)
+#endif
+      for (int n = 0; n < V; n++) {
+	
+	// Construct a unitary matrix from a random matrix
+	MatrixXcd Q = MatrixXcd::Identity(Nc, Nc);
+	MatrixXcd R = MatrixXcd::Zero(Nc, Nc);
+	for (int i = 0; i < Nc; i++) {
+	  for (int j = 0; j < Nc; j++) {
+	    R(i, j).real(rand() / (Float)RAND_MAX);
+	    R(i, j).imag(rand() / (Float)RAND_MAX);
+	  }
+	}
+	
+	// QR the random matrix
+	Eigen::HouseholderQR<MatrixXcd> qr(R);
+	Q = qr.householderQ();
+	
+	// Q is now an element of U(Nc), make it an element of SU(Nc)      
+	Q *= pow(Q.determinant(), -1.0/Nc);
+	
+	// Populate array
+	for (int i = 0; i < Nc; i++) {
+	  for (int j = 0; j < Nc; j++) {
+	    res[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 0] = Q(i,j).real();
+	    res[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 1] = Q(i,j).imag();
+	  }
+	}	
       }
-      normalize((complex<Float>*)(resEven[dir] + (i*3+1)*3*2), 3);
-      orthogonalize((complex<Float>*)(resEven[dir] + (i*3+1)*3*2), (complex<Float>*)(resEven[dir] + (i*3+2)*3*2), 3);
-      normalize((complex<Float>*)(resEven[dir] + (i*3 + 2)*3*2), 3);
+    }
+  } else {
+    for (int dir = 0; dir < 4; dir++) {
+      for (int i = 0; i < Vh; i++) {
+	for (int m = 1; m < 3; m++) { // last 2 rows
+	  for (int n = 0; n < 3; n++) { // 3 columns
+	    resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = rand() / (Float)RAND_MAX;
+	    resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = rand() / (Float)RAND_MAX;
+	    resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = rand() / (Float)RAND_MAX;
+	    resOdd[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = rand() / (Float)RAND_MAX;
+	  }
+	}
+	normalize((complex<Float>*)(resEven[dir] + (i*3+1)*3*2), 3);
+	orthogonalize((complex<Float>*)(resEven[dir] + (i*3+1)*3*2), (complex<Float>*)(resEven[dir] + (i*3+2)*3*2), 3);
+	normalize((complex<Float>*)(resEven[dir] + (i*3 + 2)*3*2), 3);
 
-      normalize((complex<Float>*)(resOdd[dir] + (i*3+1)*3*2), 3);
-      orthogonalize((complex<Float>*)(resOdd[dir] + (i*3+1)*3*2), (complex<Float>*)(resOdd[dir] + (i*3+2)*3*2), 3);
-      normalize((complex<Float>*)(resOdd[dir] + (i*3 + 2)*3*2), 3);
+	normalize((complex<Float>*)(resOdd[dir] + (i*3+1)*3*2), 3);
+	orthogonalize((complex<Float>*)(resOdd[dir] + (i*3+1)*3*2), (complex<Float>*)(resOdd[dir] + (i*3+2)*3*2), 3);
+	normalize((complex<Float>*)(resOdd[dir] + (i*3 + 2)*3*2), 3);
 
-      {
-	Float *w = resEven[dir]+(i*3+0)*3*2;
-	Float *u = resEven[dir]+(i*3+1)*3*2;
-	Float *v = resEven[dir]+(i*3+2)*3*2;
+	{
+	  Float *w = resEven[dir]+(i*3+0)*3*2;
+	  Float *u = resEven[dir]+(i*3+1)*3*2;
+	  Float *v = resEven[dir]+(i*3+2)*3*2;
 
-        for (int n = 0; n < 6; n++) w[n] = 0.0;
-	accumulateConjugateProduct(w+0*(2), u+1*(2), v+2*(2), +1);
-	accumulateConjugateProduct(w+0*(2), u+2*(2), v+1*(2), -1);
-	accumulateConjugateProduct(w+1*(2), u+2*(2), v+0*(2), +1);
-	accumulateConjugateProduct(w+1*(2), u+0*(2), v+2*(2), -1);
-	accumulateConjugateProduct(w+2*(2), u+0*(2), v+1*(2), +1);
-	accumulateConjugateProduct(w+2*(2), u+1*(2), v+0*(2), -1);
+	  for (int n = 0; n < 6; n++) w[n] = 0.0;
+	  accumulateConjugateProduct(w+0*(2), u+1*(2), v+2*(2), +1);
+	  accumulateConjugateProduct(w+0*(2), u+2*(2), v+1*(2), -1);
+	  accumulateConjugateProduct(w+1*(2), u+2*(2), v+0*(2), +1);
+	  accumulateConjugateProduct(w+1*(2), u+0*(2), v+2*(2), -1);
+	  accumulateConjugateProduct(w+2*(2), u+0*(2), v+1*(2), +1);
+	  accumulateConjugateProduct(w+2*(2), u+1*(2), v+0*(2), -1);
+	}
+
+	{
+	  Float *w = resOdd[dir]+(i*3+0)*3*2;
+	  Float *u = resOdd[dir]+(i*3+1)*3*2;
+	  Float *v = resOdd[dir]+(i*3+2)*3*2;
+
+	  for (int n = 0; n < 6; n++) w[n] = 0.0;
+	  accumulateConjugateProduct(w+0*(2), u+1*(2), v+2*(2), +1);
+	  accumulateConjugateProduct(w+0*(2), u+2*(2), v+1*(2), -1);
+	  accumulateConjugateProduct(w+1*(2), u+2*(2), v+0*(2), +1);
+	  accumulateConjugateProduct(w+1*(2), u+0*(2), v+2*(2), -1);
+	  accumulateConjugateProduct(w+2*(2), u+0*(2), v+1*(2), +1);
+	  accumulateConjugateProduct(w+2*(2), u+1*(2), v+0*(2), -1);
+	}
       }
-
-      {
-	Float *w = resOdd[dir]+(i*3+0)*3*2;
-	Float *u = resOdd[dir]+(i*3+1)*3*2;
-	Float *v = resOdd[dir]+(i*3+2)*3*2;
-
-        for (int n = 0; n < 6; n++) w[n] = 0.0;
-	accumulateConjugateProduct(w+0*(2), u+1*(2), v+2*(2), +1);
-	accumulateConjugateProduct(w+0*(2), u+2*(2), v+1*(2), -1);
-	accumulateConjugateProduct(w+1*(2), u+2*(2), v+0*(2), +1);
-	accumulateConjugateProduct(w+1*(2), u+0*(2), v+2*(2), -1);
-	accumulateConjugateProduct(w+2*(2), u+0*(2), v+1*(2), +1);
-	accumulateConjugateProduct(w+2*(2), u+1*(2), v+0*(2), -1);
-      }
-
     }
   }
-
+  
   if (param->type == QUDA_WILSON_LINKS) {
     applyGaugeFieldScaling(res, Vh, param);
   } else if (param->type == QUDA_ASQTAD_LONG_LINKS) {

@@ -112,17 +112,6 @@ project(
   VERSION 1.0.0
   LANGUAGES)
 
-message(STATUS "")
-message(STATUS "${PROJECT_NAME} ${PROJECT_VERSION} (${GITVERSION}) **")
-message(STATUS "cmake version: ${CMAKE_VERSION}")
-message(STATUS "Source location: ${CMAKE_SOURCE_DIR}")
-message(STATUS "Build location: ${CMAKE_BINARY_DIR}")
-message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
-message(STATUS "QUDA target: ${QUDA_TARGET_TYPE}")
-
-# ######################################################################################################################
-# QUDA OPTIONS likely to be changed by users
-# ######################################################################################################################
 if(DEFINED ENV{QUDA_GPU_ARCH})
   set(QUDA_DEFAULT_GPU_ARCH $ENV{QUDA_GPU_ARCH})
 else()
@@ -133,9 +122,31 @@ if(NOT QUDA_GPU_ARCH)
 endif()
 
 set(QUDA_GPU_ARCH
-    ${QUDA_DEFAULT_GPU_ARCH}
-    CACHE STRING "set the GPU architecture (sm_35, sm_37, sm_60, sm_70, sm_80)")
+  ${QUDA_DEFAULT_GPU_ARCH}
+  CACHE STRING "set the GPU architecture (sm_35, sm_37, sm_60, sm_70, sm_80)")
 set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_35 sm_37 sm_60 sm_70 sm_80)
+
+set(QUDA_N_COLORS
+  "3"
+  CACHE STRING "Set the SU(N) (1 2 3 4 5)")
+if(QUDA_N_COLORS GREATER 5)
+  message(SEND_ERROR "Maximum QUDA_N_COLORS is 5.")
+endif()
+
+message(STATUS "")
+message(STATUS "${PROJECT_NAME} ${PROJECT_VERSION} (${GITVERSION}) **")
+message(STATUS "cmake version: ${CMAKE_VERSION}")
+message(STATUS "Source location: ${CMAKE_SOURCE_DIR}")
+message(STATUS "Build location: ${CMAKE_BINARY_DIR}")
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "QUDA target: ${QUDA_TARGET_TYPE}")
+message(STATUS "QUDA arch: ${QUDA_GPU_ARCH}")
+message(STATUS "SU(N): ${QUDA_N_COLORS}")
+
+# ######################################################################################################################
+# QUDA OPTIONS likely to be changed by users
+# ######################################################################################################################
+  
 # build options
 option(QUDA_DIRAC_DEFAULT_OFF "default value for QUDA_DIRAC_<TYPE> setting" $ENV{QUDA_DIRAC_DEFAULT_OFF})
 mark_as_advanced(QUDA_DIRAC_DEFAULT_OFF)
