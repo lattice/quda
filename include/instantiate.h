@@ -116,12 +116,12 @@ namespace quda
             typename... Args>
   constexpr void instantiate(G &U, Args &&... args)
   {
-    if (U.Ncolor() == 3) {
-      constexpr int i = Recon::recon.size() - 1;
-      instantiateReconstruct<Apply, Float, 3, Recon, i, G, Args...>(U, args...);
-    } else {
-      errorQuda("Unsupported number of colors %d\n", U.Ncolor());
-    }
+    //if (U.Ncolor() == 3) {
+    constexpr int i = Recon::recon.size() - 1;
+    instantiateReconstruct<Apply, Float, N_COLORS, Recon, i, G, Args...>(U, args...);
+    //} else {
+    //errorQuda("Unsupported number of colors %d\n", U.Ncolor());
+    //}
   }
 
   /**

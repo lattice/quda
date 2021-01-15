@@ -82,7 +82,7 @@ namespace quda {
     GaugeFieldParam(void *const h_gauge = NULL) :
       LatticeFieldParam(),
       location(QUDA_INVALID_FIELD_LOCATION),
-      nColor(3),
+      nColor(N_COLORS),
       nFace(0),
       reconstruct(QUDA_RECONSTRUCT_NO),
       order(QUDA_INVALID_GAUGE_ORDER),
@@ -109,7 +109,7 @@ namespace quda {
                     const QudaFieldGeometry geometry, const QudaGhostExchange ghostExchange = QUDA_GHOST_EXCHANGE_PAD) :
       LatticeFieldParam(4, x, pad, precision, ghostExchange),
       location(QUDA_INVALID_FIELD_LOCATION),
-      nColor(3),
+      nColor(N_COLORS),
       nFace(0),
       reconstruct(reconstruct),
       order(QUDA_INVALID_GAUGE_ORDER),
@@ -133,7 +133,7 @@ namespace quda {
     GaugeFieldParam(void *h_gauge, const QudaGaugeParam &param, QudaLinkType link_type_ = QUDA_INVALID_LINKS) :
       LatticeFieldParam(param),
       location(QUDA_CPU_FIELD_LOCATION),
-      nColor(3),
+      nColor(N_COLORS),
       nFace(0),
       reconstruct(QUDA_RECONSTRUCT_NO),
       order(param.gauge_order),

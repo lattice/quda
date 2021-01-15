@@ -28,10 +28,6 @@ enum {
   XDOWN = 7
 };
 
-
-//FIXME remove this legacy macro
-#define gauge_site_size 18 // real numbers per gauge field
-
 static void* fwd_nbr_staple[4];
 static void* back_nbr_staple[4];
 static void* fwd_nbr_staple_sendbuf[4];

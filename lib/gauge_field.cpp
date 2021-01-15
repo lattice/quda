@@ -55,8 +55,9 @@ namespace quda {
     if (order == QUDA_NATIVE_GAUGE_ORDER) errorQuda("Invalid gauge order %d", order);
     if (ghost_precision != precision) ghost_precision = precision; // gauge fields require matching precision
 
-    if (link_type != QUDA_COARSE_LINKS && nColor != 3)
-      errorQuda("nColor must be 3, not %d for this link type", nColor);
+    // DMH: deleting the error below
+    //if (link_type != QUDA_COARSE_LINKS && nColor != 3)
+    //errorQuda("nColor must be 3, not %d for this link type", nColor);
     if (nDim != 4)
       errorQuda("Number of dimensions must be 4 not %d", nDim);
     if (link_type != QUDA_WILSON_LINKS && anisotropy != 1.0)

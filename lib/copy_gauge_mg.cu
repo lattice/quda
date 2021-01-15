@@ -4,6 +4,8 @@
 
 #include <copy_gauge_helper.cuh>
 
+#define GPU_MULTIGRID_DOUBLE
+
 namespace quda {
   
   template <typename sFloatOut, typename FloatIn, int Nc, typename InOrder>
@@ -125,6 +127,7 @@ namespace quda {
 		   FloatIn *In, FloatOut **outGhost, FloatIn **inGhost, int type)
   {
     switch (in.Ncolor()) {
+    case 4: copyGaugeMG<FloatOut,FloatIn,4>(out, in, location, Out, In, outGhost, inGhost, type); break;
     case 48: copyGaugeMG<FloatOut,FloatIn,48>(out, in, location, Out, In, outGhost, inGhost, type); break;
 #ifdef NSPIN4
     case 12: copyGaugeMG<FloatOut,FloatIn,12>(out, in, location, Out, In, outGhost, inGhost, type); break;
@@ -170,7 +173,7 @@ namespace quda {
 #endif
     } else if (out.Precision() == QUDA_SINGLE_PRECISION) {
       if (in.Precision() == QUDA_DOUBLE_PRECISION) {
-#ifdef GPU_MULTIGRID_DOUBLE
+#ifdef GPU_MULTIGRID_DOUBLE 
 	copyGaugeMG(out, in, location, (float*)Out, (double*)In, (float**)ghostOut, (double**)ghostIn, type);
 #else
 	errorQuda("Double precision multigrid has not been enabled");

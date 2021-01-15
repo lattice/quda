@@ -213,7 +213,7 @@ void constructWilsonTestSpinorParam(quda::ColorSpinorParam *cs_param, const Quda
                                     const QudaGaugeParam *gauge_param)
 {
   // Lattice vector spacetime/colour/spin/parity properties
-  cs_param->nColor = 3;
+  cs_param->nColor = N_COLORS;
   cs_param->nSpin = 4;
   if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH || inv_param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
       || inv_param->dslash_type == QUDA_MOBIUS_DWF_DSLASH || inv_param->dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
@@ -978,19 +978,20 @@ template <typename Float> void applyGaugeFieldScaling(Float **gauge, int Vh, Qud
   }
 
   if (param->gauge_fix) {
+    const int Nc = N_COLORS;
     // set all gauge links (except for the last Z[0]*Z[1]*Z[2]/2) to the identity,
     // to simulate fixing to the temporal gauge.
     int iMax = (last_node_in_t() ? (Z[0] / 2) * Z[1] * Z[2] * (Z[3] - 1) : Vh);
     int dir = 3; // time direction only
     Float *even = gauge[dir];
     Float *odd = gauge[dir] + Vh * gauge_site_size;
-    for (int i = 0; i< iMax; i++) {
-      for (int m = 0; m < 3; m++) {
-	for (int n = 0; n < 3; n++) {
-	  even[i*(3*3*2) + m*(3*2) + n*(2) + 0] = (m==n) ? 1 : 0;
-	  even[i*(3*3*2) + m*(3*2) + n*(2) + 1] = 0.0;
-	  odd [i*(3*3*2) + m*(3*2) + n*(2) + 0] = (m==n) ? 1 : 0;
-	  odd [i*(3*3*2) + m*(3*2) + n*(2) + 1] = 0.0;
+    for (int i = 0; i < iMax; i++) {
+      for (int m = 0; m < Nc; m++) {
+	for (int n = 0; n < Nc; n++) {
+	  even[i*(Nc*Nc*2) + m*(Nc*2) + n*(2) + 0] = (m==n) ? 1 : 0;
+	  even[i*(Nc*Nc*2) + m*(Nc*2) + n*(2) + 1] = 0.0;
+	  odd [i*(Nc*Nc*2) + m*(Nc*2) + n*(2) + 0] = (m==n) ? 1 : 0;
+	  odd [i*(Nc*Nc*2) + m*(Nc*2) + n*(2) + 1] = 0.0;
 	}
       }
     }
@@ -1000,6 +1001,7 @@ template <typename Float> void applyGaugeFieldScaling(Float **gauge, int Vh, Qud
 // static void constructUnitGaugeField(Float **res, QudaGaugeParam *param) {
 template <typename Float> void constructUnitGaugeField(Float **res, QudaGaugeParam *param)
 {
+  const int Nc = N_COLORS;  
   Float *resOdd[4], *resEven[4];
   for (int dir = 0; dir < 4; dir++) {
     resEven[dir] = res[dir];
@@ -1008,12 +1010,12 @@ template <typename Float> void constructUnitGaugeField(Float **res, QudaGaugePar
 
   for (int dir = 0; dir < 4; dir++) {
     for (int i = 0; i < Vh; i++) {
-      for (int m = 0; m < 3; m++) {
-	for (int n = 0; n < 3; n++) {
-	  resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = (m==n) ? 1 : 0;
-	  resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = 0.0;
-	  resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = (m==n) ? 1 : 0;
-	  resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = 0.0;
+      for (int m = 0; m < Nc; m++) {
+	for (int n = 0; n < Nc; n++) {
+	  resEven[dir][i*(Nc*Nc*2) + m*(Nc*2) + n*(2) + 0] = (m==n) ? 1 : 0;
+	  resEven[dir][i*(Nc*Nc*2) + m*(Nc*2) + n*(2) + 1] = 0.0;
+	  resOdd[dir][i*(Nc*Nc*2) + m*(Nc*2) + n*(2) + 0] = (m==n) ? 1 : 0;
+	  resOdd[dir][i*(Nc*Nc*2) + m*(Nc*2) + n*(2) + 1] = 0.0;
 	}
       }
     }
@@ -1048,15 +1050,14 @@ template <typename Float> void constructRandomGaugeField(Float **res, QudaGaugeP
 
   const int Nc = N_COLORS;
 
-  if(Nc == 3) {
+  if(Nc != 3) {
     for (int dir = 0; dir < 4; dir++) {
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static, 32)
 #endif
-      for (int n = 0; n < V; n++) {
+      for (int n = 0; n < Vh; n++) {
 	
 	// Construct a unitary matrix from a random matrix
-	MatrixXcd Q = MatrixXcd::Identity(Nc, Nc);
 	MatrixXcd R = MatrixXcd::Zero(Nc, Nc);
 	for (int i = 0; i < Nc; i++) {
 	  for (int j = 0; j < Nc; j++) {
@@ -1067,6 +1068,29 @@ template <typename Float> void constructRandomGaugeField(Float **res, QudaGaugeP
 	
 	// QR the random matrix
 	Eigen::HouseholderQR<MatrixXcd> qr(R);
+	MatrixXcd Q = qr.householderQ();
+	
+	// Q is now an element of U(Nc), make it an element of SU(Nc)      
+	Q *= pow(Q.determinant(), -1.0/Nc);
+	
+	// Populate array
+	for (int i = 0; i < Nc; i++) {
+	  for (int j = 0; j < Nc; j++) {
+	    resEven[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 0] = Q(i,j).real();
+	    resEven[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 1] = Q(i,j).imag();
+	  }
+	}
+
+	// Construct a unitary matrix from a random matrix
+	for (int i = 0; i < Nc; i++) {
+	  for (int j = 0; j < Nc; j++) {
+	    R(i, j).real(rand() / (Float)RAND_MAX);
+	    R(i, j).imag(rand() / (Float)RAND_MAX);
+	  }
+	}
+	
+	// QR the random matrix
+	qr.compute(R);
 	Q = qr.householderQ();
 	
 	// Q is now an element of U(Nc), make it an element of SU(Nc)      
@@ -1075,10 +1099,10 @@ template <typename Float> void constructRandomGaugeField(Float **res, QudaGaugeP
 	// Populate array
 	for (int i = 0; i < Nc; i++) {
 	  for (int j = 0; j < Nc; j++) {
-	    res[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 0] = Q(i,j).real();
-	    res[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 1] = Q(i,j).imag();
+	    resOdd[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 0] = Q(i,j).real();
+	    resOdd[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 1] = Q(i,j).imag();
 	  }
-	}	
+	}
       }
     }
   } else {
@@ -1450,11 +1474,11 @@ compare_link(void **linkA, void **linkB, int len, QudaPrecision precision)
 static void printLinkElement(void *link, int X, QudaPrecision precision)
 {
   if (precision == QUDA_DOUBLE_PRECISION){
-    for (int i = 0; i < 3; i++) { printVector((double *)link + X * gauge_site_size + i * 6); }
+    for (int i = 0; i < N_COLORS; i++) { printVector((double *)link + X * gauge_site_size + i * 2*N_COLORS); }
 
   }
   else{
-    for (int i = 0; i < 3; i++) { printVector((float *)link + X * gauge_site_size + i * 6); }
+    for (int i = 0; i < N_COLORS; i++) { printVector((float *)link + X * gauge_site_size + i * 2*N_COLORS); }
   }
 }
 
