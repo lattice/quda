@@ -19,7 +19,7 @@ namespace quda {
   }
 
   struct rngArg {
-    int commDim[QUDA_MAX_DIM];
+    size_t commDim[QUDA_MAX_DIM];
     int commCoord[QUDA_MAX_DIM];
     int X[QUDA_MAX_DIM];
     rngArg(const int X_[]) {
@@ -47,7 +47,7 @@ namespace quda {
       int x[4];
       getCoords(x, id, arg.X, parity);
       for (int i = 0; i < 4; i++) x[i] += arg.commCoord[i] * arg.X[i];
-      int idd
+      size_t idd
         = (((x[3] * arg.commDim[2] * arg.X[2] + x[2]) * arg.commDim[1] * arg.X[1]) + x[1]) * arg.commDim[0] * arg.X[0]
         + x[0];
       curand_init(seed, idd, 0, &state[parity * size_cb + id]);
