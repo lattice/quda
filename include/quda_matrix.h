@@ -7,6 +7,9 @@
 #include <float_vector.h>
 #include <complex_quda.h>
 
+//#include <Eigen/Dense>
+//using namespace Eigen;
+
 namespace quda {
 
   template <typename T> constexpr bool is_nan(T x) { return x != x; }
@@ -413,18 +416,82 @@ namespace quda {
     for(int i=1; i<Nc; i++) result += a(i,i);
     return result;
   }
+
+  template<class T, int N>
+    __device__ __host__ inline  Matrix<T,N-1> getSubMat(const Matrix<T,N> &a, int p, int q)
+    {
+      int i = 0, j = 0;
+      
+      Matrix<T, N-1> subMat;
+      setZero(&subMat);
+      // To prevent a sub matrix from being defective, place
+      // unit value last diagonals.
+      //subMat(N-1,N-1) = static_cast<typename T::value_type>(1.0);
+      // Looping for each element of the matrix
+      for (int row = 0; row < N; row++) {
+	for (int col = 0; col < N; col++) {
+	  if (row != p && col != q) {
+	    subMat(i,j) = a(row,col);
+	    j++;
+	    // Row is filled, so increase row index and reset col index
+	    if (j == N - 1) {
+	      j = 0;
+	      i++;
+	    }
+	  }
+	}
+      }
+      return subMat;
+    }
   
+  template<class T, int N>
+    __device__ __host__ inline T det4helper(const Matrix<T,N> &a, int j, int k, int m, int n)
+    {
+      return ((a(j,0) * a(k,1) - a(k,0) * a(j,1)) *
+	      (a(m,2) * a(n,3) - a(n,2) * a(m,3)));
+    }
   
-  template< template<typename,int> class Mat, class T>
-    __device__ __host__ inline  T getDeterminant(const Mat<T,3> & a){
-    
+  template<class T, int N>
+    __device__ __host__ inline T getDeterminant(const Matrix<T,N> &a)
+  {
     T result;
-    result =   a(0,0)*(a(1,1)*a(2,2) - a(2,1)*a(1,2))
-      - a(0,1)*(a(1,0)*a(2,2) - a(1,2)*a(2,0))
-      + a(0,2)*(a(1,0)*a(2,1) - a(1,1)*a(2,0));
-    
+    if(N == 1) {
+      result = a(0,0);
+    } else if(N == 2) {
+      result = a(0,0)*a(1,1) - a(1,0) * a(0,1);
+    } else if(N == 3) {      
+      result = (a(0,0)*(a(1,1)*a(2,2) - a(2,1)*a(1,2)) -
+		a(0,1)*(a(1,0)*a(2,2) - a(1,2)*a(2,0)) + 
+		a(0,2)*(a(1,0)*a(2,1) - a(1,1)*a(2,0)));
+    } else if(N == 4) {
+      result = (det4helper(a,0,1,2,3) -
+		det4helper(a,0,2,1,3) +
+		det4helper(a,0,3,1,2) +
+		det4helper(a,1,2,0,3) -
+		det4helper(a,1,3,0,2) +
+		det4helper(a,2,3,0,1));      
+    } else {
+      /*
+      // Move along the top row, recursively get the determinant
+      // of the submatrix and multiply with the relevant sign.
+      Matrix<T,N> sub_mat;
+      result = static_cast<typename T::value_type>(0.0);
+      int sign = 1;
+      T temp;
+      for (int i=0; i<N; i++) {
+	temp = a(0,i);
+	setZero(&sub_mat);
+	sub_mat = getSubMat(a,0,i);
+	temp *= getDeterminant(sub_mat);
+	temp *= sign;
+	result += temp;
+	sign *= -1;
+      }      
+      */
+    }
     return result;
   }
+  
   
   template< template<typename,int> class Mat, class T, int N>
     __device__ __host__ inline Mat<T,N> operator+(const Mat<T,N> & a, const Mat<T,N> & b)
@@ -601,50 +668,74 @@ namespace quda {
       }
       return result;
     }
+  
 
-
-  template<class T>
+  template<class T, int N>
     __device__  __host__ inline
-    Matrix<T,3> inverse(const Matrix<T,3> &u)
+    Matrix<T,N> inverse(const Matrix<T,N> &u)
     {
+      Matrix<T,N> uinv;
+      if(N == 1) {
+	uinv(0,0) = static_cast<typename T::value_type>(1.0)/u(0,0);
+	return uinv;
+      }
+      
       const T det = getDeterminant(u);
       const T det_inv = static_cast<typename T::value_type>(1.0)/det;
-      Matrix<T,3> uinv;
-
       T temp;
+      if(N == 2) {
+	uinv(0,0) = det_inv*u(1,1);
+	uinv(0,1) = det_inv*u(1,0);
+	uinv(1,0) = det_inv*u(0,1);
+	uinv(1,1) = det_inv*u(0,0);
+	
+      } else if(N == 3) {
+	temp = u(1,1)*u(2,2) - u(1,2)*u(2,1);
+	uinv(0,0) = (det_inv*temp);
+	
+	temp = u(0,2)*u(2,1) - u(0,1)*u(2,2);
+	uinv(0,1) = (temp*det_inv);
+	
+	temp = u(0,1)*u(1,2)  - u(0,2)*u(1,1);
+	uinv(0,2) = (temp*det_inv);
+	
+	temp = u(1,2)*u(2,0) - u(1,0)*u(2,2);
+	uinv(1,0) = (det_inv*temp);
+	
+	temp = u(0,0)*u(2,2) - u(0,2)*u(2,0);
+	uinv(1,1) = (temp*det_inv);
+	
+	temp = u(0,2)*u(1,0) - u(0,0)*u(1,2);
+	uinv(1,2) = (temp*det_inv);
+	
+	temp = u(1,0)*u(2,1) - u(1,1)*u(2,0);
+	uinv(2,0) = (det_inv*temp);
+	
+	temp = u(0,1)*u(2,0) - u(0,0)*u(2,1);
+	uinv(2,1) = (temp*det_inv);
+	
+	temp = u(0,0)*u(1,1) - u(0,1)*u(1,0);
+	uinv(2,2) = (temp*det_inv);       
+      }
+      else if(N == 4){	
+	Matrix<T,3> sub_mat;
+	for (int i=0; i<4; i++){
+	  for (int j=0; j<4; j++){
+	    setZero(&sub_mat);
+	    sub_mat = getSubMat(u,i,j);
+	    temp = getDeterminant(sub_mat);
+	    uinv(i,j) = (temp*det_inv);
+	  }
+	}	    
+      }
+      else {
 
-      temp = u(1,1)*u(2,2) - u(1,2)*u(2,1);
-      uinv(0,0) = (det_inv*temp);
-
-      temp = u(0,2)*u(2,1) - u(0,1)*u(2,2);
-      uinv(0,1) = (temp*det_inv);
-
-      temp = u(0,1)*u(1,2)  - u(0,2)*u(1,1);
-      uinv(0,2) = (temp*det_inv);
-
-      temp = u(1,2)*u(2,0) - u(1,0)*u(2,2);
-      uinv(1,0) = (det_inv*temp);
-
-      temp = u(0,0)*u(2,2) - u(0,2)*u(2,0);
-      uinv(1,1) = (temp*det_inv);
-
-      temp = u(0,2)*u(1,0) - u(0,0)*u(1,2);
-      uinv(1,2) = (temp*det_inv);
-
-      temp = u(1,0)*u(2,1) - u(1,1)*u(2,0);
-      uinv(2,0) = (det_inv*temp);
-
-      temp = u(0,1)*u(2,0) - u(0,0)*u(2,1);
-      uinv(2,1) = (temp*det_inv);
-
-      temp = u(0,0)*u(1,1) - u(0,1)*u(1,0);
-      uinv(2,2) = (temp*det_inv);
-
+      }
       return uinv;
     }
-
-
-
+  
+  
+  
   template<class T, int N>
     __device__ __host__ inline
     void setIdentity(Matrix<T,N>* m){
@@ -828,43 +919,47 @@ namespace quda {
       return os;
     }
 
-  template<class Cmplx>
+  // This is cruft, no function calls it.
+  /*
+  template<class Cmplx, int N>
     __device__  __host__ inline
-    void computeLinkInverse(Matrix<Cmplx,3>* uinv, const Matrix<Cmplx,3>& u)
+    void computeLinkInverse(Matrix<Cmplx,N>* uinv, const Matrix<Cmplx,N>& u)
     {
-      const Cmplx & det = getDeterminant(u);
-      const Cmplx & det_inv = static_cast<typename Cmplx::value_type>(1.0)/det;
-
-      Cmplx temp;
-
-      temp = u(1,1)*u(2,2) - u(1,2)*u(2,1);
-      (*uinv)(0,0) = (det_inv*temp);
-
-      temp = u(0,2)*u(2,1) - u(0,1)*u(2,2);
-      (*uinv)(0,1) = (temp*det_inv);
-
-      temp = u(0,1)*u(1,2)  - u(0,2)*u(1,1);
-      (*uinv)(0,2) = (temp*det_inv);
-
-      temp = u(1,2)*u(2,0) - u(1,0)*u(2,2);
-      (*uinv)(1,0) = (det_inv*temp);
-
-      temp = u(0,0)*u(2,2) - u(0,2)*u(2,0);
-      (*uinv)(1,1) = (temp*det_inv);
-
-      temp = u(0,2)*u(1,0) - u(0,0)*u(1,2);
-      (*uinv)(1,2) = (temp*det_inv);
-
-      temp = u(1,0)*u(2,1) - u(1,1)*u(2,0);
-      (*uinv)(2,0) = (det_inv*temp);
-
-      temp = u(0,1)*u(2,0) - u(0,0)*u(2,1);
-      (*uinv)(2,1) = (temp*det_inv);
-
-      temp = u(0,0)*u(1,1) - u(0,1)*u(1,0);
-      (*uinv)(2,2) = (temp*det_inv);
+      if(N == 3) {
+	const Cmplx & det = getDeterminant(u);
+	const Cmplx & det_inv = static_cast<typename Cmplx::value_type>(1.0)/det;
+	
+	Cmplx temp;
+	
+	temp = u(1,1)*u(2,2) - u(1,2)*u(2,1);
+	(*uinv)(0,0) = (det_inv*temp);
+	
+	temp = u(0,2)*u(2,1) - u(0,1)*u(2,2);
+	(*uinv)(0,1) = (temp*det_inv);
+	
+	temp = u(0,1)*u(1,2)  - u(0,2)*u(1,1);
+	(*uinv)(0,2) = (temp*det_inv);
+	
+	temp = u(1,2)*u(2,0) - u(1,0)*u(2,2);
+	(*uinv)(1,0) = (det_inv*temp);
+	
+	temp = u(0,0)*u(2,2) - u(0,2)*u(2,0);
+	(*uinv)(1,1) = (temp*det_inv);
+	
+	temp = u(0,2)*u(1,0) - u(0,0)*u(1,2);
+	(*uinv)(1,2) = (temp*det_inv);
+	
+	temp = u(1,0)*u(2,1) - u(1,1)*u(2,0);
+	(*uinv)(2,0) = (det_inv*temp);
+	
+	temp = u(0,1)*u(2,0) - u(0,0)*u(2,1);
+	(*uinv)(2,1) = (temp*det_inv);
+	
+	temp = u(0,0)*u(1,1) - u(0,1)*u(1,0);
+	(*uinv)(2,2) = (temp*det_inv);
+      }
     }
-
+  */
   /*
   // template this!
   template<class Float>
@@ -993,236 +1088,262 @@ namespace quda {
       return error;
     }
 
-  template <typename Float> __device__ __host__ void expsuNTaylor12th(Matrix<complex<Float>, N_COLORS> &q)
-    {
-      // DMH TODO: add a 12th order exponentiation here 
-    }
-  
-    template <class T> __device__ __host__ inline auto exponentiate_iQ(const Matrix<T, 3> &Q)
-    {
-
-      // The return matrix
-      Matrix<T,3> exp_iQ;
+  /**
+     @brief Perfrom a 12th order Taylor expansion of exp(iq) to approximate SU(N) matrix 
+     exponentiation
+     @param[in/out] q The matrix to be exponentiated
+  */  
+  template <class T, int Nc> __device__ __host__ void expsuNTaylor12th(Matrix<T, Nc> &q)
+  {
+    // Port of the CHROMA implementation
+    // In place  q = 1 + q + (1/2)*q^2 + ...+ (1/n!)*(a_)^n up to n = 12
+    typedef decltype(q(0, 0).x) RealType;
+    
+    Matrix<T,Nc> temp1 = q;
+    Matrix<T,Nc> temp2 = q;
+    Matrix<T,Nc> temp3;
+    Matrix<T,Nc> Id;
+    setIdentity(&Id);
+    
+    q += Id;
+    
+    // Do a 12th order exponentiation
+    for(int i = 2; i <= 12; i++) {
       
-      if(N_COLORS == 3) {
-	
-	// Use Cayley-Hamilton Theorem for SU(3) exp{iQ}.
-	// This algorithm is outlined in
-	// http://arxiv.org/pdf/hep-lat/0311018v1.pdf
-	// Equation numbers in the paper are referenced by [eq_no].
-	
-	//Declarations
-	typedef decltype(Q(0, 0).x) matType;
-	
-	matType inv3 = 1.0 / 3.0;
-	matType c0, c1, c0_max, Tr_re;
-	matType f0_re, f0_im, f1_re, f1_im, f2_re, f2_im;
-	matType theta;
-	matType u_p, w_p; // u, w parameters.
-	Matrix<T,3> temp1;
-	Matrix<T,3> temp2;
-	//[14] c0 = det(Q) = 1/3Tr(Q^3)
-	const T & det_Q = getDeterminant(Q);
-	c0 = det_Q.x;
-	//[15] c1 = 1/2Tr(Q^2)
-	// Q = Q^dag => Tr(Q^2) = Tr(QQ^dag) = sum_ab [Q_ab * Q_ab^*]
-	temp1 = Q;
-	temp1 = temp1 * Q;
-	Tr_re = getTrace(temp1).x;
-	c1 = 0.5*Tr_re;
-
-	//We now have the coeffiecients c0 and c1.
-	//We now find: exp(iQ) = f0*I + f1*Q + f2*Q^2
-	//      where       fj = fj(c0,c1), j=0,1,2.
-	
-	//[17]
-	auto sqrt_c1_inv3 = sqrt(c1 * inv3);
-	c0_max = 2 * (c1 * inv3 * sqrt_c1_inv3); // reuse the sqrt factor for a fast 1.5 power
-	
-	//[25]
-	theta  = acos(c0/c0_max);
-
-	sincos(theta * inv3, &w_p, &u_p);
-	//[23]
-	u_p *= sqrt_c1_inv3;
-	
-	//[24]
-	w_p *= sqrt(c1);
-	
-	//[29] Construct objects for fj = hj/(9u^2 - w^2).
-	matType u_sq = u_p * u_p;
-	matType w_sq = w_p * w_p;
-	matType denom_inv = 1.0 / (9 * u_sq - w_sq);
-	matType exp_iu_re, exp_iu_im;
-	sincos(u_p, &exp_iu_im, &exp_iu_re);
-	matType exp_2iu_re = exp_iu_re * exp_iu_re - exp_iu_im * exp_iu_im;
-	matType exp_2iu_im = 2 * exp_iu_re * exp_iu_im;
-	matType cos_w = cos(w_p);
-	matType sinc_w;
-	matType hj_re = 0.0;
-	matType hj_im = 0.0;
-	
-	//[33] Added one more term to the series given in the paper.
-	if (w_p < 0.05 && w_p > -0.05) {
-	  //1 - 1/6 x^2 (1 - 1/20 x^2 (1 - 1/42 x^2(1 - 1/72*x^2)))
-	  sinc_w = 1.0 - (w_sq/6.0)*(1 - (w_sq*0.05)*(1 - (w_sq/42.0)*(1 - (w_sq/72.0))));
-	}
-	else sinc_w = sin(w_p)/w_p;
-	
-	//[34] Test for c0 < 0.
-	int parity = 0;
-	if(c0 < 0) {
-	  c0 *= -1.0;
-	  parity = 1;
-	  //calculate fj with c0 > 0 and then convert all fj.
-	}
-	
-	//Get all the numerators for fj,
-	//[30] f0
-	hj_re = (u_sq - w_sq)*exp_2iu_re + 8*u_sq*cos_w*exp_iu_re + 2*u_p*(3*u_sq + w_sq)*sinc_w*exp_iu_im;
-	hj_im = (u_sq - w_sq)*exp_2iu_im - 8*u_sq*cos_w*exp_iu_im + 2*u_p*(3*u_sq + w_sq)*sinc_w*exp_iu_re;
-	f0_re = hj_re*denom_inv;
-	f0_im = hj_im*denom_inv;
-
-	//[31] f1
-	hj_re = 2*u_p*exp_2iu_re - 2*u_p*cos_w*exp_iu_re + (3*u_sq - w_sq)*sinc_w*exp_iu_im;
-	hj_im = 2*u_p*exp_2iu_im + 2*u_p*cos_w*exp_iu_im + (3*u_sq - w_sq)*sinc_w*exp_iu_re;
-	f1_re = hj_re*denom_inv;
-	f1_im = hj_im*denom_inv;
-	
-	//[32] f2
-	hj_re = exp_2iu_re - cos_w*exp_iu_re - 3*u_p*sinc_w*exp_iu_im;
-	hj_im = exp_2iu_im + cos_w*exp_iu_im - 3*u_p*sinc_w*exp_iu_re;
-	f2_re = hj_re*denom_inv;
-	f2_im = hj_im*denom_inv;
-	
-	//[34] If c0 < 0, apply tranformation  fj(-c0,c1) = (-1)^j f^*j(c0,c1)
-	if (parity == 1) {
-	  f0_im *= -1.0;
-	  f1_re *= -1.0;
-	  f2_im *= -1.0;
-	}
-	
-	T f0_c;
-	T f1_c;
-	T f2_c;
-	
-	f0_c.x = f0_re;
-	f0_c.y = f0_im;
-	
-	f1_c.x = f1_re;
-	f1_c.y = f1_im;
-	
-	f2_c.x = f2_re;
-	f2_c.y = f2_im;
-	
-	//[19] Construct exp{iQ}
-	setZero(&exp_iQ);
-	Matrix<T,3> UnitM;
-	setIdentity(&UnitM);
-	// +f0*I
-	temp1 = f0_c * UnitM;
-	exp_iQ = temp1;
-	
-	// +f1*Q
-	temp1 = f1_c * Q;
-	exp_iQ += temp1;
-	
-	// +f2*Q^2
-	temp1 = Q * Q;
-	temp2 = f2_c * temp1;
-	exp_iQ += temp2;	
-	//exp(iQ) is now defined.
-      }
-      else {
-	exp_iQ = Q;
-	expsuNTaylor12th(exp_iQ);
-      }     
-      return exp_iQ;
+      RealType coeff = 1.0/i;
+      
+      temp3 = temp2 * temp1;
+      temp2 = temp3 * coeff;
+      q += temp2;
     }
+  }
+  
+  /**
+     @brief For SU(3), use Cayley-Hamilton Theorem for SU(3) exp{iQ}. This algorithm is outlined in
+     http://arxiv.org/pdf/hep-lat/0311018v1.pdf. Equation numbers in the paper are referenced by [eq_no].
+     For SU(N), use the 12th order taylor series fallback.
+     @param[in] Q The matrix to be exponentiated
+     @out The exponentiated matrix
+  */
+  template <class T, int Nc> __device__ __host__ inline auto exponentiate_iQ(const Matrix<T, Nc> &Q)
+  {
+    // The return matrix
+    Matrix<T,Nc> exp_iQ;
+    
+    if(Nc == 3) {
+      
+      //Declarations
+      typedef decltype(Q(0, 0).x) realType;
+      
+      realType inv3 = 1.0 / 3.0;
+      realType c0, c1, c0_max, Tr_re;
+      realType f0_re, f0_im, f1_re, f1_im, f2_re, f2_im;
+      realType theta;
+      realType u_p, w_p; // u, w parameters.
+      Matrix<T,Nc> temp1;
+      Matrix<T,Nc> temp2;
+      //[14] c0 = det(Q) = 1/3Tr(Q^3)
+      const T & det_Q = getDeterminant(Q);
+      c0 = det_Q.x;
+      //[15] c1 = 1/2Tr(Q^2)
+      // Q = Q^dag => Tr(Q^2) = Tr(QQ^dag) = sum_ab [Q_ab * Q_ab^*]
+      temp1 = Q;
+      temp1 = temp1 * Q;
+      Tr_re = getTrace(temp1).x;
+      c1 = 0.5*Tr_re;
 
-    /**
-       @brief Direct port of the TIFR expsu3 algorithm
-    */
-    template <typename Float> __device__ __host__ void expsu3(Matrix<complex<Float>, N_COLORS> &q)
-    {
-      if(N_COLORS == 3) {
-	typedef complex<Float> Complex;
-
-	Complex a2 = (q(3) * q(1) + q(7) * q(5) + q(6) * q(2) - (q(0) * q(4) + (q(0) + q(4)) * q(8))) / (Float)3.0;
-	Complex a3 = q(0) * q(4) * q(8) + q(1) * q(5) * q(6) + q(2) * q(3) * q(7) - q(6) * q(4) * q(2)
-	  - q(3) * q(1) * q(8) - q(0) * q(7) * q(5);
-
-	Complex sg2h3 = sqrt(a3 * a3 - (Float)4. * a2 * a2 * a2);
-	Complex cp = exp(log((Float)0.5 * (a3 + sg2h3)) / (Float)3.0);
-	Complex cm = a2 / cp;
-
-	Complex r1 = exp(Complex(0.0, 1.0) * (Float)(2.0 * M_PI / 3.0));
-	Complex r2 = exp(-Complex(0.0, 1.0) * (Float)(2.0 * M_PI / 3.0));
-
-	Complex w1[3];
-
-	w1[0] = cm + cp;
-	w1[1] = r1 * cp + r2 * cm;
-	w1[2] = r2 * cp + r1 * cm;
-	Complex z1 = q(1) * q(6) - q(0) * q(7);
-	Complex z2 = q(3) * q(7) - q(4) * q(6);
-
-	Complex al = w1[0];
-	Complex wr21 = (z1 + al * q(7)) / (z2 + al * q(6));
-	Complex wr31 = (al - q(0) - wr21 * q(3)) / q(6);
-
-	al = w1[1];
-	Complex wr22 = (z1 + al * q(7)) / (z2 + al * q(6));
-	Complex wr32 = (al - q(0) - wr22 * q(3)) / q(6);
-
-	al = w1[2];
-	Complex wr23 = (z1 + al * q(7)) / (z2 + al * q(6));
-	Complex wr33 = (al - q(0) - wr23 * q(3)) / q(6);
-
-	z1 = q(3) * q(2) - q(0) * q(5);
-	z2 = q(1) * q(5) - q(4) * q(2);
-
-	al = w1[0];
-	Complex wl21 = conj((z1 + al * q(5)) / (z2 + al * q(2)));
-	Complex wl31 = conj((al - q(0) - conj(wl21) * q(1)) / q(2));
-
-	al = w1[1];
-	Complex wl22 = conj((z1 + al * q(5)) / (z2 + al * q(2)));
-	Complex wl32 = conj((al - q(0) - conj(wl22) * q(1)) / q(2));
-
-	al = w1[2];
-	Complex wl23 = conj((z1 + al * q(5)) / (z2 + al * q(2)));
-	Complex wl33 = conj((al - q(0) - conj(wl23) * q(1)) / q(2));
-
-	Complex xn1 = (Float)1. + wr21 * conj(wl21) + wr31 * conj(wl31);
-	Complex xn2 = (Float)1. + wr22 * conj(wl22) + wr32 * conj(wl32);
-	Complex xn3 = (Float)1. + wr23 * conj(wl23) + wr33 * conj(wl33);
-
-	Complex d1 = exp(w1[0]);
-	Complex d2 = exp(w1[1]);
-	Complex d3 = exp(w1[2]);
-	Complex y11 = d1 / xn1;
-	Complex y12 = d2 / xn2;
-	Complex y13 = d3 / xn3;
-	Complex y21 = wr21 * d1 / xn1;
-	Complex y22 = wr22 * d2 / xn2;
-	Complex y23 = wr23 * d3 / xn3;
-	Complex y31 = wr31 * d1 / xn1;
-	Complex y32 = wr32 * d2 / xn2;
-	Complex y33 = wr33 * d3 / xn3;
-	q(0) = y11 + y12 + y13;
-	q(1) = y21 + y22 + y23;
-	q(2) = y31 + y32 + y33;
-	q(3) = y11 * conj(wl21) + y12 * conj(wl22) + y13 * conj(wl23);
-	q(4) = y21 * conj(wl21) + y22 * conj(wl22) + y23 * conj(wl23);
-	q(5) = y31 * conj(wl21) + y32 * conj(wl22) + y33 * conj(wl23);
-	q(6) = y11 * conj(wl31) + y12 * conj(wl32) + y13 * conj(wl33);
-	q(7) = y21 * conj(wl31) + y22 * conj(wl32) + y23 * conj(wl33);
-	q(8) = y31 * conj(wl31) + y32 * conj(wl32) + y33 * conj(wl33);
+      //We now have the coeffiecients c0 and c1.
+      //We now find: exp(iQ) = f0*I + f1*Q + f2*Q^2
+      //      where       fj = fj(c0,c1), j=0,1,2.
+      
+      //[17]
+      auto sqrt_c1_inv3 = sqrt(c1 * inv3);
+      c0_max = 2 * (c1 * inv3 * sqrt_c1_inv3); // reuse the sqrt factor for a fast 1.5 power
+      
+      //[25]
+      theta  = acos(c0/c0_max);
+      
+      sincos(theta * inv3, &w_p, &u_p);
+      //[23]
+      u_p *= sqrt_c1_inv3;
+      
+      //[24]
+      w_p *= sqrt(c1);
+      
+      //[29] Construct objects for fj = hj/(9u^2 - w^2).
+      realType u_sq = u_p * u_p;
+      realType w_sq = w_p * w_p;
+      realType denom_inv = 1.0 / (9 * u_sq - w_sq);
+      realType exp_iu_re, exp_iu_im;
+      sincos(u_p, &exp_iu_im, &exp_iu_re);
+      realType exp_2iu_re = exp_iu_re * exp_iu_re - exp_iu_im * exp_iu_im;
+      realType exp_2iu_im = 2 * exp_iu_re * exp_iu_im;
+      realType cos_w = cos(w_p);
+      realType sinc_w;
+      realType hj_re = 0.0;
+      realType hj_im = 0.0;
+      
+      //[33] Added one more term to the series given in the paper.
+      if (w_p < 0.05 && w_p > -0.05) {
+	//1 - 1/6 x^2 (1 - 1/20 x^2 (1 - 1/42 x^2(1 - 1/72*x^2)))
+	sinc_w = 1.0 - (w_sq/6.0)*(1 - (w_sq*0.05)*(1 - (w_sq/42.0)*(1 - (w_sq/72.0))));
       }
-      else {
-	expsuNTaylor12th(q);
+      else sinc_w = sin(w_p)/w_p;
+      
+      //[34] Test for c0 < 0.
+      int parity = 0;
+      if(c0 < 0) {
+	c0 *= -1.0;
+	parity = 1;
+	//calculate fj with c0 > 0 and then convert all fj.
       }
+	
+      //Get all the numerators for fj,
+      //[30] f0
+      hj_re = (u_sq - w_sq)*exp_2iu_re + 8*u_sq*cos_w*exp_iu_re + 2*u_p*(3*u_sq + w_sq)*sinc_w*exp_iu_im;
+      hj_im = (u_sq - w_sq)*exp_2iu_im - 8*u_sq*cos_w*exp_iu_im + 2*u_p*(3*u_sq + w_sq)*sinc_w*exp_iu_re;
+      f0_re = hj_re*denom_inv;
+      f0_im = hj_im*denom_inv;
+      
+      //[31] f1
+      hj_re = 2*u_p*exp_2iu_re - 2*u_p*cos_w*exp_iu_re + (3*u_sq - w_sq)*sinc_w*exp_iu_im;
+      hj_im = 2*u_p*exp_2iu_im + 2*u_p*cos_w*exp_iu_im + (3*u_sq - w_sq)*sinc_w*exp_iu_re;
+      f1_re = hj_re*denom_inv;
+      f1_im = hj_im*denom_inv;
+      
+      //[32] f2
+      hj_re = exp_2iu_re - cos_w*exp_iu_re - 3*u_p*sinc_w*exp_iu_im;
+      hj_im = exp_2iu_im + cos_w*exp_iu_im - 3*u_p*sinc_w*exp_iu_re;
+      f2_re = hj_re*denom_inv;
+      f2_im = hj_im*denom_inv;
+      
+      //[34] If c0 < 0, apply tranformation  fj(-c0,c1) = (-1)^j f^*j(c0,c1)
+      if (parity == 1) {
+	f0_im *= -1.0;
+	f1_re *= -1.0;
+	f2_im *= -1.0;
+      }
+      
+      T f0_c;
+      T f1_c;
+      T f2_c;
+      
+      f0_c.x = f0_re;
+      f0_c.y = f0_im;
+      
+      f1_c.x = f1_re;
+      f1_c.y = f1_im;
+      
+      f2_c.x = f2_re;
+      f2_c.y = f2_im;
+      
+      //[19] Construct exp{iQ}
+      setZero(&exp_iQ);
+      Matrix<T,Nc> UnitM;
+      setIdentity(&UnitM);
+      // +f0*I
+      temp1 = f0_c * UnitM;
+      exp_iQ = temp1;
+      
+      // +f1*Q
+      temp1 = f1_c * Q;
+      exp_iQ += temp1;
+      
+      // +f2*Q^2
+      temp1 = Q * Q;
+      temp2 = f2_c * temp1;
+      exp_iQ += temp2;	
+      //exp(iQ) is now defined.
     }
+    else {
+      exp_iQ = Q;
+      expsuNTaylor12th(exp_iQ);
+    }     
+    return exp_iQ;
+  }
+  
+  /**
+     @brief Direct port of the TIFR expsu3 algorithm
+  */
+  template <typename Float, int Nc> __device__ __host__ void expsuN(Matrix<complex<Float>, Nc> &q)
+  {
+    if(Nc == 3) {
+      typedef complex<Float> Complex;
+      
+      Complex a2 = (q(3) * q(1) + q(7) * q(5) + q(6) * q(2) - (q(0) * q(4) + (q(0) + q(4)) * q(8))) / (Float)3.0;
+      Complex a3 = q(0) * q(4) * q(8) + q(1) * q(5) * q(6) + q(2) * q(3) * q(7) - q(6) * q(4) * q(2)
+	- q(3) * q(1) * q(8) - q(0) * q(7) * q(5);
+
+      Complex sg2h3 = sqrt(a3 * a3 - (Float)4. * a2 * a2 * a2);
+      Complex cp = exp(log((Float)0.5 * (a3 + sg2h3)) / (Float)3.0);
+      Complex cm = a2 / cp;
+
+      Complex r1 = exp(Complex(0.0, 1.0) * (Float)(2.0 * M_PI / 3.0));
+      Complex r2 = exp(-Complex(0.0, 1.0) * (Float)(2.0 * M_PI / 3.0));
+
+      Complex w1[3];
+
+      w1[0] = cm + cp;
+      w1[1] = r1 * cp + r2 * cm;
+      w1[2] = r2 * cp + r1 * cm;
+      Complex z1 = q(1) * q(6) - q(0) * q(7);
+      Complex z2 = q(3) * q(7) - q(4) * q(6);
+
+      Complex al = w1[0];
+      Complex wr21 = (z1 + al * q(7)) / (z2 + al * q(6));
+      Complex wr31 = (al - q(0) - wr21 * q(3)) / q(6);
+
+      al = w1[1];
+      Complex wr22 = (z1 + al * q(7)) / (z2 + al * q(6));
+      Complex wr32 = (al - q(0) - wr22 * q(3)) / q(6);
+
+      al = w1[2];
+      Complex wr23 = (z1 + al * q(7)) / (z2 + al * q(6));
+      Complex wr33 = (al - q(0) - wr23 * q(3)) / q(6);
+
+      z1 = q(3) * q(2) - q(0) * q(5);
+      z2 = q(1) * q(5) - q(4) * q(2);
+
+      al = w1[0];
+      Complex wl21 = conj((z1 + al * q(5)) / (z2 + al * q(2)));
+      Complex wl31 = conj((al - q(0) - conj(wl21) * q(1)) / q(2));
+
+      al = w1[1];
+      Complex wl22 = conj((z1 + al * q(5)) / (z2 + al * q(2)));
+      Complex wl32 = conj((al - q(0) - conj(wl22) * q(1)) / q(2));
+
+      al = w1[2];
+      Complex wl23 = conj((z1 + al * q(5)) / (z2 + al * q(2)));
+      Complex wl33 = conj((al - q(0) - conj(wl23) * q(1)) / q(2));
+
+      Complex xn1 = (Float)1. + wr21 * conj(wl21) + wr31 * conj(wl31);
+      Complex xn2 = (Float)1. + wr22 * conj(wl22) + wr32 * conj(wl32);
+      Complex xn3 = (Float)1. + wr23 * conj(wl23) + wr33 * conj(wl33);
+
+      Complex d1 = exp(w1[0]);
+      Complex d2 = exp(w1[1]);
+      Complex d3 = exp(w1[2]);
+      Complex y11 = d1 / xn1;
+      Complex y12 = d2 / xn2;
+      Complex y13 = d3 / xn3;
+      Complex y21 = wr21 * d1 / xn1;
+      Complex y22 = wr22 * d2 / xn2;
+      Complex y23 = wr23 * d3 / xn3;
+      Complex y31 = wr31 * d1 / xn1;
+      Complex y32 = wr32 * d2 / xn2;
+      Complex y33 = wr33 * d3 / xn3;
+      q(0) = y11 + y12 + y13;
+      q(1) = y21 + y22 + y23;
+      q(2) = y31 + y32 + y33;
+      q(3) = y11 * conj(wl21) + y12 * conj(wl22) + y13 * conj(wl23);
+      q(4) = y21 * conj(wl21) + y22 * conj(wl22) + y23 * conj(wl23);
+      q(5) = y31 * conj(wl21) + y32 * conj(wl22) + y33 * conj(wl23);
+      q(6) = y11 * conj(wl31) + y12 * conj(wl32) + y13 * conj(wl33);
+      q(7) = y21 * conj(wl31) + y22 * conj(wl32) + y23 * conj(wl33);
+      q(8) = y31 * conj(wl31) + y32 * conj(wl32) + y33 * conj(wl33);
+    }
+    else {
+      expsuNTaylor12th(q);
+    }
+  }
 } // end namespace quda

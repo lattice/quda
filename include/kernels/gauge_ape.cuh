@@ -1,7 +1,7 @@
 #include <gauge_field_order.h>
 #include <index_helper.cuh>
 #include <quda_matrix.h>
-#include <su3_project.cuh>
+#include <suN_project.cuh>
 #include <kernel.h>
 #include <kernels/gauge_utils.cuh>
 
@@ -14,20 +14,21 @@ namespace quda
   template <typename Float_, int nColor_, QudaReconstructType recon_, int apeDim_> struct GaugeAPEArg {
     using Float = Float_;
     static constexpr int nColor = nColor_;
-    static_assert(nColor == 3, "Only nColor=3 enabled at this time");
+    // DMH FIXME
+    static_assert(nColor == N_COLORS, "GaugeAPEArg instantiated incorrectly");
     static constexpr QudaReconstructType recon = recon_;
     static constexpr int apeDim = apeDim_;
     typedef typename gauge_mapper<Float,recon>::type Gauge;
-
+    
     Gauge out;
     const Gauge in;
-
+    
     dim3 threads; // number of active threads required
     int X[4];    // grid dimensions
     int border[4];
     const Float alpha;
     const Float tolerance;
-
+    
     GaugeAPEArg(GaugeField &out, const GaugeField &in, double alpha) :
       out(out),
       in(in),
@@ -70,11 +71,11 @@ namespace quda
       // Get link U
       U = arg.in(dir, linkIndexShift(x, dx, X), parity);
     
-      Stap = Stap * (arg.alpha / ((real)(2. * (3. - 1.))));
+      Stap = Stap * (arg.alpha / ((real)(2. * (3. - 1.)))); // DMH: color dependence here?
       setIdentity(&I);
 
       TestU = I * (1. - arg.alpha) + Stap * conj(U);
-      polarSu3<real>(TestU, arg.tolerance);
+      polarSUN<real>(TestU, arg.tolerance);
       U = TestU * U;
     
       arg.out(dir, linkIndexShift(x, dx, X), parity) = U;

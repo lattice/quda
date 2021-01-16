@@ -416,7 +416,7 @@ void qudaUnitarizeSU3Phased(int prec, double tol, QudaMILCSiteArg_t *arg, int ph
   qudaGaugeParam.return_result_gauge = true;
   have_resident_gauge = false;
 
-  projectSU3Quda(gauge, tol, &qudaGaugeParam);
+  projectSUNQuda(gauge, tol, &qudaGaugeParam);
   invalidateGaugeQuda();
   qudamilc_called<false>(__func__);
   return;

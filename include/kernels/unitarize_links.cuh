@@ -2,7 +2,7 @@
 
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
-#include <su3_project.cuh>
+#include <suN_project.cuh>
 #include <index_helper.cuh>
 #include <color_spinor.h>
 #include <svd_quda.h>
@@ -239,7 +239,7 @@ namespace quda {
   };
 
   template <typename Float, int nColor_, QudaReconstructType recon_>
-  struct ProjectSU3Arg {
+  struct ProjectSUNArg {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;
@@ -249,7 +249,7 @@ namespace quda {
     real tol;
     int *fails;
     dim3 threads;
-    ProjectSU3Arg(GaugeField &u, real tol, int *fails) :
+    ProjectSUNArg(GaugeField &u, real tol, int *fails) :
       u(u),
       tol(tol),
       fails(fails),
@@ -266,7 +266,7 @@ namespace quda {
     {
       Matrix<complex<typename Arg::real>, Arg::nColor> u = arg.u(mu, x_cb, parity);
 
-      polarSu3<typename Arg::real>(u, arg.tol);
+      polarSUN<typename Arg::real>(u, arg.tol);
 
       // count number of failures
       if (u.isUnitary(arg.tol) == false) atomicAdd(arg.fails, 1);

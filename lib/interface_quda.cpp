@@ -205,8 +205,8 @@ static TimeProfile profileOvrImpSTOUT("OvrImpSTOUTQuda");
 //!< Profiler for wFlowQuda
 static TimeProfile profileWFlow("wFlowQuda");
 
-//!< Profiler for projectSU3Quda
-static TimeProfile profileProject("projectSU3Quda");
+//!< Profiler for projectSUNQuda
+static TimeProfile profileProject("projectSUNQuda");
 
 //!< Profiler for staggeredPhaseQuda
 static TimeProfile profilePhase("staggeredPhaseQuda");
@@ -1236,7 +1236,7 @@ void freeGaugeQuda(void)
 
 void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *recon)
 {
-  // first do SU3 links (if they exist)
+  // first do SU(N) links (if they exist)
   if (gaugePrecise) {
     GaugeFieldParam gauge_param(*gaugePrecise);
     // switch the parameters for creating the mirror sloppy cuda gauge field
@@ -5030,7 +5030,7 @@ void updateGaugeFieldQuda(void* gauge,
   profileGaugeUpdate.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
- void projectSU3Quda(void *gauge_h, double tol, QudaGaugeParam *param) {
+ void projectSUNQuda(void *gauge_h, double tol, QudaGaugeParam *param) {
    profileProject.TPSTART(QUDA_PROFILE_TOTAL);
 
    profileProject.TPSTART(QUDA_PROFILE_INIT);
@@ -5065,7 +5065,7 @@ void updateGaugeFieldQuda(void* gauge,
 
    // project onto SU(3)
    if (cudaGauge->StaggeredPhaseApplied()) cudaGauge->removeStaggeredPhase();
-   projectSU3(*cudaGauge, tol, num_failures_d);
+   projectSUN(*cudaGauge, tol, num_failures_d);
    if (!cudaGauge->StaggeredPhaseApplied() && param->staggered_phase_applied) cudaGauge->applyStaggeredPhase();
 
    profileProject.TPSTOP(QUDA_PROFILE_COMPUTE);

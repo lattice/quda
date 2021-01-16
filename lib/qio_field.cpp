@@ -242,7 +242,7 @@ void read_gauge_field(const char *filename, void *gauge[], QudaPrecision precisi
   if (infile == NULL) { errorQuda("Open file failed\n"); }
 
   /* Read the suN field record */
-  printfQuda("%s: reading suN field\n",__func__); fflush(stdout);
+  printfQuda("%s: reading SU(%d) field\n",__func__, N_COLORS); fflush(stdout);
   int status = read_suN_field(infile, 4, gauge, precision);
   if (status) { errorQuda("read_suN_field failed %d\n", status); }
 
@@ -424,7 +424,7 @@ void write_gauge_field(const char *filename, void *gauge[], QudaPrecision precis
   if (outfile == NULL) { errorQuda("Open file failed\n"); }
 
   /* Write the gauge field record */
-  printfQuda("%s: writing the suN gauge field\n", __func__); fflush(stdout);
+  printfQuda("%s: writing the SU(%d) gauge field\n", __func__, N_COLORS); fflush(stdout);
   int status = write_suN_field(outfile, 4, gauge, precision, precision, type);
   if (status) { errorQuda("write suN gauge field failed %d\n", status); }
 

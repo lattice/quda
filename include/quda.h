@@ -1194,14 +1194,14 @@ extern "C" {
   void staggeredPhaseQuda(void *gauge_h, QudaGaugeParam *param);
 
   /**
-   * Project the input field on the SU(3) group.  If the target
+   * Project the input field on the SU(N) group.  If the target
    * tolerance is not met, this routine will give a runtime error.
    *
    * @param gauge_h The gauge field to be updated
    * @param tol The tolerance to which we iterate
    * @param param The parameters of the gauge field
    */
-  void projectSU3Quda(void *gauge_h, double tol, QudaGaugeParam *param);
+  void projectSUNQuda(void *gauge_h, double tol, QudaGaugeParam *param);
 
   /**
    * Evaluate the momentum contribution to the Hybrid Monte Carlo
@@ -1290,7 +1290,7 @@ extern "C" {
    * @param fat7_coeff      The coefficients for the first level of smearing (fat7) in the quark action.
    * @param w_link          Unitarized link variables obtained by applying fat7 smearing and unitarization to the original links.
    * @param v_link          Fat7 link variables.
-   * @param u_link          SU(3) think link variables.
+   * @param u_link          SU(N) think link variables.
    * @param quark           The input fermion field.
    * @param num             The number of quark fields
    * @param num_naik        The number of naik contributions

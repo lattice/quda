@@ -147,7 +147,7 @@ namespace quda {
 
   void unitarizeLinks(GaugeField &links, int* fails) { unitarizeLinks(links, links, fails); }
 
-  template <typename Float, int nColor, QudaReconstructType recon> class ProjectSU3 : TunableKernel3D {
+  template <typename Float, int nColor, QudaReconstructType recon> class ProjectSUN : TunableKernel3D {
     using real = typename mapper<Float>::type;
     GaugeField &u;
     real tol;
@@ -155,7 +155,7 @@ namespace quda {
     unsigned int minThreads() const { return u.VolumeCB(); }
 
   public:
-    ProjectSU3(GaugeField &u, double tol, int *fails) :
+    ProjectSUN(GaugeField &u, double tol, int *fails) :
       TunableKernel3D(u, 2, 4),
       u(u),
       tol(tol),
@@ -167,7 +167,7 @@ namespace quda {
 
     void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<Projector>(tp, stream, ProjectSU3Arg<Float, nColor, recon>(u, tol, fails));
+      launch<Projector>(tp, stream, ProjectSUNArg<Float, nColor, recon>(u, tol, fails));
     }
 
     void preTune() { u.backup(); }
@@ -181,16 +181,16 @@ namespace quda {
   };
 
 #ifdef GPU_GAUGE_TOOLS
-  void projectSU3(GaugeField &u, double tol, int *fails)
+  void projectSUN(GaugeField &u, double tol, int *fails)
   {
     // check the the field doesn't have staggered phases applied
     if (u.StaggeredPhaseApplied())
       errorQuda("Cannot project gauge field with staggered phases applied");
 
-    instantiate<ProjectSU3, ReconstructWilson>(u, tol, fails);
+    instantiate<ProjectSUN, ReconstructWilson>(u, tol, fails);
   }
 #else
-  void projectSU3(GaugeField &, double, int *)
+  void projectSUN(GaugeField &, double, int *)
   {
     errorQuda("Gauge tools have not been built");
   }
