@@ -215,8 +215,6 @@ int main(int argc, char **argv)
   // Load the gauge field to the device
   loadGaugeQuda((void *)gauge, &gauge_param);
 
-  printfQuda("gauge_site_size = %d host_gauge_data_type_size = %lu\n", gauge_site_size, host_gauge_data_type_size);
-  
   // Allocate host side memory for clover terms if needed.
   //----------------------------------------------------------------------------
   void *clover = nullptr;
