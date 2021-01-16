@@ -2,7 +2,7 @@
 
 #include <tune_quda.h>
 #include <lattice_field.h>
-#include <target_device.h>
+#include <device.h>
 #include <kernel_helper.h>
 #include <kernel.h>
 
