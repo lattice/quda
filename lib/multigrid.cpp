@@ -79,7 +79,6 @@ namespace quda
     }
 
     rng = new RNG(*param.B[0], 1234);
-    rng->Init();
 
     if (param.transfer_type == QUDA_TRANSFER_AGGREGATE) {
       if (param.level < param.Nlevel - 1) {
@@ -699,7 +698,6 @@ namespace quda
     }
 
     if (rng) {
-      rng->Release();
       delete rng;
     }
 

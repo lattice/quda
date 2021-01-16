@@ -135,11 +135,9 @@ namespace quda
       }
     } else {
       RNG *rng = new RNG(*kSpace[0], 1234);
-      rng->Init();
       for (int b = 0; b < block_size; b++) {
         if (sqrt(blas::norm2(*kSpace[b])) == 0.0) { spinorNoise(*kSpace[b], *rng, QUDA_NOISE_UNIFORM); }
       }
-      rng->Release();
       delete rng;
     }
     bool orthed = false;
@@ -382,9 +380,7 @@ namespace quda
       in.Source(QUDA_RANDOM_SOURCE);
     } else {
       RNG *rng = new RNG(in, 1234);
-      rng->Init();
       spinorNoise(in, *rng, QUDA_NOISE_UNIFORM);
-      rng->Release();
       delete rng;
     }
 
