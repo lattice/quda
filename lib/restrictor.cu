@@ -135,10 +135,10 @@ namespace quda {
     constexpr int coarseSpin = 2;
 
     // Template over fine color
-    if (in.Ncolor() == 3) { // standard QCD
+    if (in.Ncolor() == N_COLORS) { 
 #ifdef NSPIN4
       if (in.Nspin() == 4) {
-        constexpr int fineColor = 3;
+        constexpr int fineColor = N_COLORS;
         constexpr int fineSpin = 4;
 
         // first check that the spin_map matches the spin_mapper
@@ -160,7 +160,7 @@ namespace quda {
 #endif // NSPIN4
 #ifdef NSPIN1
       if (in.Nspin() == 1) {
-        constexpr int fineColor = 3;
+        constexpr int fineColor = N_COLORS;
         constexpr int fineSpin = 1;
 
         // first check that the spin_map matches the spin_mapper
@@ -184,7 +184,7 @@ namespace quda {
         errorQuda("Unexpected nSpin = %d", in.Nspin());
       }
 
-    } else { // Nc != 3
+    } else { // Nc != N_COLORS
 
       if (in.Nspin() != 2) errorQuda("Unexpected nSpin = %d", in.Nspin());
       constexpr int fineSpin = 2;
@@ -252,7 +252,7 @@ namespace quda {
       } else {
         errorQuda("Unsupported nColor %d", in.Ncolor());
       }
-    } // Nc != 3
+    } // Nc != N_COLORS
   }
 
 #ifdef GPU_MULTIGRID

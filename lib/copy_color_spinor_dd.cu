@@ -4,7 +4,7 @@ namespace quda {
   
   void copyGenericColorSpinorDD(const copy_pack_t &pack)
   {
-    CopyGenericColorSpinor<3, double, double>(pack);
+    CopyGenericColorSpinor<N_COLORS, double, double>(pack);
   }  
 
 } // namespace quda

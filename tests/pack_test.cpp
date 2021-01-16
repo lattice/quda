@@ -54,7 +54,7 @@ void init() {
   for (int dir = 0; dir < 4; dir++) { qdpCpuGauge_p[dir] = malloc(V * gauge_site_size * param.cpu_prec); }
   cpsCpuGauge_p = malloc(4 * V * gauge_site_size * param.cpu_prec);
 
-  csParam.nColor = 3;
+  csParam.nColor = N_COLORS;
   csParam.nSpin = 4;
   csParam.nDim = 4;
   for (int d=0; d<4; d++) csParam.x[d] = param.X[d];

@@ -54,7 +54,7 @@ static inline void negx(Float *x, int len) {
 template <typename sFloat, typename gFloat>
 static inline void dot(sFloat* res, gFloat* a, sFloat* b) {
   res[0] = res[1] = 0;
-  for (int m = 0; m < 3; m++) {
+  for (int m = 0; m < N_COLORS; m++) {
     sFloat a_re = a[2*m+0];
     sFloat a_im = a[2*m+1];
     sFloat b_re = b[2*m+0];
@@ -66,23 +66,24 @@ static inline void dot(sFloat* res, gFloat* a, sFloat* b) {
 
 template <typename Float>
 static inline void su3Transpose(Float *res, Float *mat) {
-  for (int m = 0; m < 3; m++) {
-    for (int n = 0; n < 3; n++) {
-      res[m*(3*2) + n*(2) + 0] = + mat[n*(3*2) + m*(2) + 0];
-      res[m*(3*2) + n*(2) + 1] = - mat[n*(3*2) + m*(2) + 1];
+  int Nc = N_COLORS;
+  for (int m = 0; m < Nc; m++) {
+    for (int n = 0; n < Nc; n++) {
+      res[m*(Nc*2) + n*(2) + 0] = + mat[n*(Nc*2) + m*(2) + 0];
+      res[m*(Nc*2) + n*(2) + 1] = - mat[n*(Nc*2) + m*(2) + 1];
     }
   }
 }
 
 
 template <typename sFloat, typename gFloat>
-static inline void su3Mul(sFloat *res, gFloat *mat, sFloat *vec) {
-  for (int n = 0; n < 3; n++) dot(&res[n*(2)], &mat[n*(3*2)], vec);
+  static inline void su3Mul(sFloat *res, gFloat *mat, sFloat *vec) {
+  for (int n = 0; n < N_COLORS; n++) dot(&res[n*(2)], &mat[n*(N_COLORS*2)], vec);
 }
 
 template <typename sFloat, typename gFloat>
-static inline void su3Tmul(sFloat *res, gFloat *mat, sFloat *vec) {
-  gFloat matT[3*3*2];
+  static inline void su3Tmul(sFloat *res, gFloat *mat, sFloat *vec) {
+  gFloat matT[gauge_site_size];
   su3Transpose(matT, mat);
   su3Mul(res, matT, vec);
 }
@@ -137,7 +138,7 @@ static inline Float *gaugeLink(int i, int dir, int oddBit, Float **gaugeEven, Fl
     gaugeField = (oddBit ? gaugeEven : gaugeOdd);
   }
   
-  return &gaugeField[dir/2][j*(3*3*2)];
+  return &gaugeField[dir/2][j*(gauge_site_size)];
 }
 
 template <typename Float>
@@ -301,7 +302,7 @@ static inline Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeE
 
   }
 
-  return &gaugeField[dir/2][j*(3*3*2)];
+  return &gaugeField[dir/2][j*(gauge_site_size)];
 }
 
 template <typename Float>

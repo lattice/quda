@@ -579,15 +579,15 @@ void printGaugeElement(void *gauge, int X, QudaPrecision precision)
 {
   if (getOddBit(X) == 0) {
     if (precision == QUDA_DOUBLE_PRECISION)
-      for (int m = 0; m < 3; m++) printVector((double *)gauge + (X / 2) * gauge_site_size + m * 3 * 2);
+      for (int m = 0; m < N_COLORS; m++) printVector((double *)gauge + (X / 2) * gauge_site_size + m * N_COLORS * 2);
     else
-      for (int m = 0; m < 3; m++) printVector((float *)gauge + (X / 2) * gauge_site_size + m * 3 * 2);
+      for (int m = 0; m < N_COLORS; m++) printVector((float *)gauge + (X / 2) * gauge_site_size + m * N_COLORS * 2);
 
   } else {
     if (precision == QUDA_DOUBLE_PRECISION)
-      for (int m = 0; m < 3; m++) printVector((double *)gauge + (X / 2 + Vh) * gauge_site_size + m * 3 * 2);
+      for (int m = 0; m < N_COLORS; m++) printVector((double *)gauge + (X / 2 + Vh) * gauge_site_size + m * N_COLORS * 2);
     else
-      for (int m = 0; m < 3; m++) printVector((float *)gauge + (X / 2 + Vh) * gauge_site_size + m * 3 * 2);
+      for (int m = 0; m < N_COLORS; m++) printVector((float *)gauge + (X / 2 + Vh) * gauge_site_size + m * N_COLORS * 2);
   }
 }
 

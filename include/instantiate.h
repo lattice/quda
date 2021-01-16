@@ -114,14 +114,14 @@ namespace quda
   */
   template <template <typename, int, QudaReconstructType> class Apply, typename Recon, typename Float, typename G,
             typename... Args>
-  constexpr void instantiate(G &U, Args &&... args)
+   constexpr void instantiate(G &U, Args &&... args)
   {
-    //if (U.Ncolor() == 3) {
-    constexpr int i = Recon::recon.size() - 1;
-    instantiateReconstruct<Apply, Float, N_COLORS, Recon, i, G, Args...>(U, args...);
-    //} else {
-    //errorQuda("Unsupported number of colors %d\n", U.Ncolor());
-    //}
+    if (U.Ncolor() == N_COLORS) {
+      constexpr int i = Recon::recon.size() - 1;
+      instantiateReconstruct<Apply, Float, N_COLORS, Recon, i, G, Args...>(U, args...);
+    } else {
+      errorQuda("Unsupported number of colors %d\n", U.Ncolor());
+    }
   }
 
   /**
@@ -196,8 +196,8 @@ namespace quda
             typename... Args>
   constexpr void instantiate(F &field, Args &&... args)
   {
-    if (field.Ncolor() == 3) {
-      Apply<store_t, 3>(field, args...);
+    if (field.Ncolor() == N_COLORS) {
+      Apply<store_t, N_COLORS>(field, args...);
     } else {
       errorQuda("Unsupported number of colors %d\n", field.Ncolor());
     }

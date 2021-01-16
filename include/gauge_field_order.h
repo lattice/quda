@@ -2606,7 +2606,7 @@ namespace quda {
     const int volumeCB;
     const real anisotropy;
     const real anisotropy_inv;
-    static constexpr int Nc = 3;
+    static constexpr int Nc = N_COLORS;
     const int geometry;
     CPSOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
       LegacyOrder<Float, length>(u, ghost_),
@@ -2716,7 +2716,7 @@ namespace quda {
       Float *gauge;
       const int volumeCB;
       int exVolumeCB; // extended checkerboard volume
-      static constexpr int Nc = 3;
+      static constexpr int Nc = N_COLORS;
       BQCDOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
         LegacyOrder<Float, length>(u, ghost_),
         gauge(gauge_ ? gauge_ : (Float *)u.Gauge_p()),
@@ -2817,7 +2817,7 @@ namespace quda {
       using complex = complex<real>;
       Float *gauge;
       const int volumeCB;
-      static constexpr int Nc = 3;
+      static constexpr int Nc = N_COLORS;
       const real scale;
       const real scale_inv;
       TIFROrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
@@ -2923,7 +2923,7 @@ namespace quda {
       Float *gauge;
       const int volumeCB;
       int exVolumeCB;
-      static constexpr int Nc = 3;
+      static constexpr int Nc = N_COLORS;
       const real scale;
       const real scale_inv;
       const int dim[4];

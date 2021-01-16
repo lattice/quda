@@ -213,7 +213,7 @@ namespace quda {
         QudaFieldLocation location = QUDA_CPU_FIELD_LOCATION) :
         LatticeFieldParam(4, X, 0, inv_param.cpu_prec),
         location(location),
-        nColor(3),
+        nColor(N_COLORS),
         nSpin((inv_param.dslash_type == QUDA_ASQTAD_DSLASH || inv_param.dslash_type == QUDA_STAGGERED_DSLASH
                   || inv_param.dslash_type == QUDA_LAPLACE_DSLASH) ?
                 1 :

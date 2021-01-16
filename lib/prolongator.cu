@@ -81,8 +81,8 @@ namespace quda {
       for (int p=0; p<2; p++)
         if (mapper(s,p) != spin_map[s][p]) errorQuda("Spin map does not match spin_mapper");
 
-    if (out.Ncolor() == 3) {
-      const int fineColor = 3;
+    if (out.Ncolor() == N_COLORS) {
+      const int fineColor = N_COLORS;
 #ifdef NSPIN4
       if (nVec == 6) { // Free field Wilson
         Prolongate<Float,fineSpin,fineColor,coarseSpin,6>(out, in, v, fine_to_coarse, parity);

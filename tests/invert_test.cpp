@@ -204,8 +204,8 @@ int main(int argc, char **argv)
   } else {
     setDims(gauge_param.X);
   }
-  setSpinorSiteSize(24);
-
+  setSpinorSiteSize(2*4*N_COLORS);
+  
   // Allocate host side memory for the gauge field.
   //----------------------------------------------------------------------------
   void *gauge[4];
@@ -215,6 +215,8 @@ int main(int argc, char **argv)
   // Load the gauge field to the device
   loadGaugeQuda((void *)gauge, &gauge_param);
 
+  printfQuda("gauge_site_size = %d host_gauge_data_type_size = %lu\n", gauge_site_size, host_gauge_data_type_size);
+  
   // Allocate host side memory for clover terms if needed.
   //----------------------------------------------------------------------------
   void *clover = nullptr;
@@ -296,7 +298,7 @@ int main(int argc, char **argv)
   for (int i = 0; i < Nsrc; i++) {
 
     // Populate the host spinor with random numbers.
-    constructRandomSpinorSource(in->V(), 4, 3, inv_param.cpu_prec, inv_param.solution_type, gauge_param.X, *rng);
+    constructRandomSpinorSource(in->V(), 4, N_COLORS, inv_param.cpu_prec, inv_param.solution_type, gauge_param.X, *rng);
     // If deflating, preserve the deflation space between solves
     if (inv_deflate) eig_param.preserve_deflation = i < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     // Perform QUDA inversions

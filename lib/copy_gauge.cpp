@@ -53,7 +53,7 @@ namespace quda {
     if (out.Geometry() != in.Geometry())
       errorQuda("Field geometries %d %d do not match", out.Geometry(), in.Geometry());
 
-    if (in.Ncolor() != 3) {
+    if (in.Ncolor() != N_COLORS) {
       copyGenericGaugeMG(out, in, location, Out, In, ghostOut, ghostIn, type);
     } else if (in.Precision() == QUDA_DOUBLE_PRECISION) {
       copyGenericGaugeDoubleIn(out, in, location, Out, In, ghostOut, ghostIn, type);

@@ -280,7 +280,7 @@ namespace quda {
       FloatOut **outGhost = reinterpret_cast<FloatOut**>(outGhost_);
       FloatIn **inGhost = reinterpret_cast<FloatIn**>(inGhost_);
 
-      if (in.Ncolor() != 3 && out.Ncolor() != 3) {
+      if (in.Ncolor() != N_COLORS && out.Ncolor() != N_COLORS) {
         errorQuda("Unsupported number of colors; out.Nc=%d, in.Nc=%d", out.Ncolor(), in.Ncolor());
       }
 

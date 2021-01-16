@@ -33,19 +33,19 @@ namespace quda {
 
   // B fields in general use float2 ordering except for fine-grid Wilson
   template <typename store_t, int nSpin, int nColor> struct BOrder { static constexpr QudaFieldOrder order = QUDA_FLOAT2_FIELD_ORDER; };
-  template<> struct BOrder<float, 4, 3> { static constexpr QudaFieldOrder order = QUDA_FLOAT4_FIELD_ORDER; };
+  template<> struct BOrder<float, 4, N_COLORS> { static constexpr QudaFieldOrder order = QUDA_FLOAT4_FIELD_ORDER; };
 #ifdef FLOAT8
-  template<> struct BOrder<short, 4, 3> { static constexpr QudaFieldOrder order = QUDA_FLOAT8_FIELD_ORDER; };
+  template<> struct BOrder<short, 4, N_COLORS> { static constexpr QudaFieldOrder order = QUDA_FLOAT8_FIELD_ORDER; };
 #else
-  template<> struct BOrder<short, 4, 3> { static constexpr QudaFieldOrder order = QUDA_FLOAT4_FIELD_ORDER; };
+  template<> struct BOrder<short, 4, N_COLORS> { static constexpr QudaFieldOrder order = QUDA_FLOAT4_FIELD_ORDER; };
 #endif
 
   template <typename vFloat, typename bFloat, int nSpin, int spinBlockSize, int nColor_, int coarseSpin, int nVec>
   class BlockOrtho : public TunableBlock2D {
 
     using real = typename mapper<vFloat>::type;
-    // we only support block-format on fine grid where Ncolor=3
-    static constexpr int nColor = isFixed<bFloat>::value ? 3 : nColor_;
+    // we only support block-format on fine grid where Ncolor=N_COLORS
+    static constexpr int nColor = isFixed<bFloat>::value ? N_COLORS : nColor_;
     static constexpr int chiral_blocks = nSpin == 1 ? 2 : nSpin / spinBlockSize;
     template <typename Rotator, typename Vector> using Arg = BlockOrthoArg<vFloat, Rotator, Vector, nSpin, nColor, coarseSpin, nVec>;
 
@@ -217,8 +217,8 @@ namespace quda {
                           const int *coarse_to_fine, const int *geo_bs, int spin_bs, int n_block_ortho)
   {
     const int Nvec = B.size();
-    if (V.Ncolor()/Nvec == 3) {
-      constexpr int nColor = 3;
+    if (V.Ncolor()/Nvec == N_COLORS) {
+      constexpr int nColor = N_COLORS;
 #ifdef NSPIN4
       if (V.Nspin() == 4) {
         constexpr int nSpin = 4;

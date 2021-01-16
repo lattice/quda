@@ -618,7 +618,7 @@ namespace quda {
   }
 
 
-  // This is so that I can multiply real and complex matrice
+  // This is so that I can multiply real and complex matrices
   template <class T, class U, int N>
   __device__ __host__ inline Matrix<typename PromoteTypeId<T, U>::type, N> operator*(const Matrix<T, N> &a,
                                                                                      const Matrix<U, N> &b)
@@ -639,6 +639,8 @@ namespace quda {
     }
 
 
+  // For Nc = 2, this template clashes with the abstract template class
+  /*
   template<class T>
     __device__ __host__ inline
     Matrix<T,2> operator*(const Matrix<T,2> & a, const Matrix<T,2> & b)
@@ -650,7 +652,7 @@ namespace quda {
       result(1,1) = a(1,0)*b(0,1) + a(1,1)*b(1,1);
       return result;
     }
-
+  */
 
   template<class T, int N>
     __device__ __host__ inline

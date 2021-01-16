@@ -57,8 +57,14 @@ namespace quda {
   template <typename real, int Ns>
   void spinorNoise(ColorSpinorField &src, RNG& randstates, QudaNoiseType type)
   {
-    if (src.Ncolor() == 3) {
+    if (src.Ncolor() == 2) {
+      spinorNoise<real,Ns,2>(src, randstates, type);
+    } else if (src.Ncolor() == 3) {
       spinorNoise<real,Ns,3>(src, randstates, type);
+    } else if (src.Ncolor() == 4) {
+      spinorNoise<real,Ns,4>(src, randstates, type);
+    } else if (src.Ncolor() == 5) {
+      spinorNoise<real,Ns,5>(src, randstates, type);
     } else if (src.Ncolor() == 6) {
       spinorNoise<real,Ns,6>(src, randstates, type);
     } else if (src.Ncolor() == 24) {
