@@ -127,7 +127,7 @@ namespace quda {
 		   FloatIn *In, FloatOut **outGhost, FloatIn **inGhost, int type)
   {
     switch (in.Ncolor()) {
-    case 4: copyGaugeMG<FloatOut,FloatIn,4>(out, in, location, Out, In, outGhost, inGhost, type); break;
+    case N_COLORS: copyGaugeMG<FloatOut,FloatIn,N_COLORS>(out, in, location, Out, In, outGhost, inGhost, type); break;
     case 48: copyGaugeMG<FloatOut,FloatIn,48>(out, in, location, Out, In, outGhost, inGhost, type); break;
 #ifdef NSPIN4
     case 12: copyGaugeMG<FloatOut,FloatIn,12>(out, in, location, Out, In, outGhost, inGhost, type); break;

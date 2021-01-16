@@ -418,16 +418,13 @@ namespace quda {
   }
 
   template<class T, int N>
-    __device__ __host__ inline  Matrix<T,N-1> getSubMat(const Matrix<T,N> &a, int p, int q)
+    __device__ __host__ inline  Matrix<T,N> getSubMat(const Matrix<T,N> &a, int p, int q)
     {
       int i = 0, j = 0;
       
-      Matrix<T, N-1> subMat;
+      Matrix<T, N> subMat;
       setZero(&subMat);
-      // To prevent a sub matrix from being defective, place
-      // unit value last diagonals.
-      //subMat(N-1,N-1) = static_cast<typename T::value_type>(1.0);
-      // Looping for each element of the matrix
+      subMat(N-1,N-1) = static_cast<typename T::value_type>(1.0);          
       for (int row = 0; row < N; row++) {
 	for (int col = 0; col < N; col++) {
 	  if (row != p && col != q) {
@@ -474,7 +471,7 @@ namespace quda {
       /*
       // Move along the top row, recursively get the determinant
       // of the submatrix and multiply with the relevant sign.
-      Matrix<T,N> sub_mat;
+      Matrix<T,N-1> sub_mat;
       result = static_cast<typename T::value_type>(0.0);
       int sign = 1;
       T temp;
@@ -486,9 +483,9 @@ namespace quda {
 	temp *= sign;
 	result += temp;
 	sign *= -1;
-      }      
+      }
       */
-    }
+    }    
     return result;
   }
   
@@ -717,10 +714,10 @@ namespace quda {
 	temp = u(0,0)*u(1,1) - u(0,1)*u(1,0);
 	uinv(2,2) = (temp*det_inv);       
       }
-      else if(N == 4){	
-	Matrix<T,3> sub_mat;
-	for (int i=0; i<4; i++){
-	  for (int j=0; j<4; j++){
+      else if(N == 4) {	
+	Matrix<T,N> sub_mat;
+	for (int i=0; i<N; i++){
+	  for (int j=0; j<N; j++){
 	    setZero(&sub_mat);
 	    sub_mat = getSubMat(u,i,j);
 	    temp = getDeterminant(sub_mat);
@@ -729,11 +726,10 @@ namespace quda {
 	}	    
       }
       else {
-
+	// ?
       }
       return uinv;
     }
-  
   
   
   template<class T, int N>
@@ -918,62 +914,6 @@ namespace quda {
       }
       return os;
     }
-
-  // This is cruft, no function calls it.
-  /*
-  template<class Cmplx, int N>
-    __device__  __host__ inline
-    void computeLinkInverse(Matrix<Cmplx,N>* uinv, const Matrix<Cmplx,N>& u)
-    {
-      if(N == 3) {
-	const Cmplx & det = getDeterminant(u);
-	const Cmplx & det_inv = static_cast<typename Cmplx::value_type>(1.0)/det;
-	
-	Cmplx temp;
-	
-	temp = u(1,1)*u(2,2) - u(1,2)*u(2,1);
-	(*uinv)(0,0) = (det_inv*temp);
-	
-	temp = u(0,2)*u(2,1) - u(0,1)*u(2,2);
-	(*uinv)(0,1) = (temp*det_inv);
-	
-	temp = u(0,1)*u(1,2)  - u(0,2)*u(1,1);
-	(*uinv)(0,2) = (temp*det_inv);
-	
-	temp = u(1,2)*u(2,0) - u(1,0)*u(2,2);
-	(*uinv)(1,0) = (det_inv*temp);
-	
-	temp = u(0,0)*u(2,2) - u(0,2)*u(2,0);
-	(*uinv)(1,1) = (temp*det_inv);
-	
-	temp = u(0,2)*u(1,0) - u(0,0)*u(1,2);
-	(*uinv)(1,2) = (temp*det_inv);
-	
-	temp = u(1,0)*u(2,1) - u(1,1)*u(2,0);
-	(*uinv)(2,0) = (det_inv*temp);
-	
-	temp = u(0,1)*u(2,0) - u(0,0)*u(2,1);
-	(*uinv)(2,1) = (temp*det_inv);
-	
-	temp = u(0,0)*u(1,1) - u(0,1)*u(1,0);
-	(*uinv)(2,2) = (temp*det_inv);
-      }
-    }
-  */
-  /*
-  // template this!
-  template<class Float>
-    __device__ __host__ inline void copyArrayToLink(Matrix<float2,Nc>* link, Float* array){    
-#pragma unroll
-    for (int i=0; i<Nc; ++i){
-#pragma unroll
-      for (int j=0; j<Nc; ++j){
-        (*link)(i,j).x = array[(i*Nc+j)*2];
-        (*link)(i,j).y = array[(i*Nc+j)*2 + 1];
-      }
-    }
-  }
-  */
   
   template<class Cmplx, class Real, int Nc>
     inline void copyArrayToLink(Matrix<Cmplx,Nc>* link, Real* array)
@@ -988,21 +928,6 @@ namespace quda {
     }
   }  
 
-  /*
-  // and this!
-  inline void copyLinkToArray(float* array, const Matrix<float2,Nc>& link){
-#pragma unroll
-    for (int i=0; i<Nc; ++i){
-#pragma unroll
-      for (int j=0; j<Nc; ++j){
-        array[(i*Nc+j)*2] = link(i,j).x;
-        array[(i*Nc+j)*2 + 1] = link(i,j).y;
-      }
-    }
-  }
-  */
-  
-  // and this!
   template<class Cmplx, class Real, int Nc>
     inline void copyLinkToArray(Real* array, const Matrix<Cmplx,Nc>& link){
 #pragma unroll
