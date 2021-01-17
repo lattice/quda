@@ -42,7 +42,7 @@ namespace quda {
         } else if (u.Reconstruct() == QUDA_RECONSTRUCT_9) {
 #if QUDA_RECONSTRUCT & 1
           if (u.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC) {
-            using G = typename gauge_mapper<Float, QUDA_RECONSTRUCT_9, 18, QUDA_STAGGERED_PHASE_MILC>::type;
+            using G = typename gauge_mapper<Float, QUDA_RECONSTRUCT_9, 2*N_COLORS*N_COLORS, QUDA_STAGGERED_PHASE_MILC>::type;
             ExtractGhost<Float, nColor, G>(u, Ghost, extract, offset);
           } else if (u.StaggeredPhase() == QUDA_STAGGERED_PHASE_NO) {
             using G = typename gauge_mapper<Float, QUDA_RECONSTRUCT_9>::type;

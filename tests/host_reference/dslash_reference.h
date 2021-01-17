@@ -198,7 +198,7 @@ template <QudaPCType type> int neighborIndex_5d(int i, int oddBit, int dxs, int 
 }
 
 template <QudaPCType type, typename Float>
-Float *spinorNeighbor_5d(int i, int dir, int oddBit, Float *spinorField, int neighbor_distance = 1, int siteSize = 24)
+Float *spinorNeighbor_5d(int i, int dir, int oddBit, Float *spinorField, int neighbor_distance = 1, int siteSize = 2*4*N_COLORS)
 {
   int nb = neighbor_distance;
   int j;
@@ -256,7 +256,7 @@ static inline Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeE
         if (x1 -d < 0 && comm_dim_partitioned(0)){
 	  ghostGaugeField = (oddBit?ghostGaugeEven[0]: ghostGaugeOdd[0]);
 	  int offset = (n_ghost_faces + x1 -d)*X4*X3*X2/2 + (x4*X3*X2 + x3*X2+x2)/2;
-	  return &ghostGaugeField[offset*(3*3*2)];
+	  return &ghostGaugeField[offset*(2*N_COLORS*N_COLORS)];
         }
         j = (x4*X3*X2*X1 + x3*X2*X1 + x2*X1 + new_x1) / 2;
         break;
@@ -267,7 +267,7 @@ static inline Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeE
         if (x2 -d < 0 && comm_dim_partitioned(1)){
           ghostGaugeField = (oddBit?ghostGaugeEven[1]: ghostGaugeOdd[1]);
           int offset = (n_ghost_faces + x2 -d)*X4*X3*X1/2 + (x4*X3*X1 + x3*X1+x1)/2;
-          return &ghostGaugeField[offset*(3*3*2)];
+          return &ghostGaugeField[offset*(2*N_COLORS*N_COLORS)];
         }
         j = (x4*X3*X2*X1 + x3*X2*X1 + new_x2*X1 + x1) / 2;
         break;
@@ -279,7 +279,7 @@ static inline Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeE
         if (x3 -d < 0 && comm_dim_partitioned(2)){
           ghostGaugeField = (oddBit?ghostGaugeEven[2]: ghostGaugeOdd[2]);
           int offset = (n_ghost_faces + x3 -d)*X4*X2*X1/2 + (x4*X2*X1 + x2*X1+x1)/2;
-          return &ghostGaugeField[offset*(3*3*2)];
+          return &ghostGaugeField[offset*(2*N_COLORS*N_COLORS)];
         }
         j = (x4*X3*X2*X1 + new_x3*X2*X1 + x2*X1 + x1) / 2;
         break;
@@ -290,7 +290,7 @@ static inline Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeE
         if (x4 -d < 0 && comm_dim_partitioned(3)){
           ghostGaugeField = (oddBit?ghostGaugeEven[3]: ghostGaugeOdd[3]);
           int offset = (n_ghost_faces + x4 -d)*X1*X2*X3/2 + (x3*X2*X1 + x2*X1+x1)/2;
-          return &ghostGaugeField[offset*(3*3*2)];
+          return &ghostGaugeField[offset*(2*N_COLORS*N_COLORS)];
         }
         j = (new_x4*(X3*X2*X1) + x3*(X2*X1) + x2*(X1) + x1) / 2;
         break;
@@ -444,7 +444,7 @@ template <QudaPCType type> int x4_5d_mgpu(int i, int oddBit)
 
 template <QudaPCType type, typename Float>
 Float *spinorNeighbor_5d_mgpu(int i, int dir, int oddBit, Float *spinorField, Float **fwd_nbr_spinor,
-    Float **back_nbr_spinor, int neighbor_distance, int nFace, int spinorSize = 24)
+    Float **back_nbr_spinor, int neighbor_distance, int nFace, int spinorSize = 2*4*N_COLORS)
 {
   int j;
   int nb = neighbor_distance;

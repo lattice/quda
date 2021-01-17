@@ -81,6 +81,7 @@ namespace quda {
     };
 
     /**
+       SU(3):
        The internal ordering for each clover matrix has chirality as the
        slowest running dimension, with the internal 36 degrees of
        freedom stored as follows (s=spin, c = color)
@@ -124,7 +125,7 @@ namespace quda {
        34  1   2   1   1   0
        35  1   2   1   1   1
 
-       For each chirality the first 6 entires are the pure real
+       For each chirality the first 6 entries are the pure real
        diagonal entries.  The following 30 entries correspond to the
        15 complex numbers on the strictly lower triangular.
 
@@ -618,7 +619,7 @@ namespace quda {
             for (int j = 0; j < N; j++) { copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm); }
           }
 
-          if (add_rho) for (int i=0; i<6; i++) v[i] += rho;
+          if (add_rho) for (int i=0; i<2*N_COLORS; i++) v[i] += rho;
         }
   
 	/**
@@ -732,7 +733,7 @@ namespace quda {
     /**
        QDP ordering for clover fields
     */
-    template <typename Float, int length = 72>
+    template <typename Float, int length = (4*4*N_COLORS*N_COLORS)/2>
       struct QDPOrder {
 	typedef typename mapper<Float>::type RegType;
 	Float *clover;
@@ -785,7 +786,7 @@ namespace quda {
     /**
        QDPJIT ordering for clover fields
     */
-    template <typename Float, int length = 72>
+    template <typename Float, int length = (4*4*N_COLORS*N_COLORS)/2>
       struct QDPJITOrder {
 	typedef typename mapper<Float>::type RegType;
 	Float *diag; 	   /**< Pointers to the off-diagonal terms (two parities) */
@@ -795,52 +796,53 @@ namespace quda {
 
 	const bool twisted;
 	const Float mu2;
-
-        QDPJITOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void * = nullptr) :
-          volumeCB(clover.VolumeCB()), stride(volumeCB), twisted(clover.Twisted()), mu2(clover.Mu2()) {
-        if (clover.Order() != QUDA_QDPJIT_CLOVER_ORDER) {
-          errorQuda("Invalid clover order %d for this accessor", clover.Order());
-        }
-        offdiag = clover_ ? ((Float **)clover_)[0] : ((Float **)clover.V(inverse))[0];
-        diag = clover_ ? ((Float **)clover_)[1] : ((Float **)clover.V(inverse))[1];
-      }
 	
-      bool  Twisted()	const	{return twisted;}
-      Float Mu2()	const	{return mu2;}
-
+      QDPJITOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void * = nullptr) :
+	volumeCB(clover.VolumeCB()), stride(volumeCB), twisted(clover.Twisted()), mu2(clover.Mu2()) {
+	  if (clover.Order() != QUDA_QDPJIT_CLOVER_ORDER) {
+	    errorQuda("Invalid clover order %d for this accessor", clover.Order());
+	  }
+	  offdiag = clover_ ? ((Float **)clover_)[0] : ((Float **)clover.V(inverse))[0];
+	  diag = clover_ ? ((Float **)clover_)[1] : ((Float **)clover.V(inverse))[1];
+	}
+	
+	bool  Twisted()	const	{return twisted;}
+	Float Mu2()	const	{return mu2;}
+	
 	__device__ __host__ inline void load(RegType v[length], int x, int parity) const {
 	  // the factor of 0.5 comes from a basis change
 	  for (int chirality=0; chirality<2; chirality++) {
 	    // set diagonal elements
-	    for (int i=0; i<6; i++) {
-	      v[chirality*36 + i] = 0.5*diag[((i*2 + chirality)*2 + parity)*volumeCB + x];
+	    for (int i=0; i<2*N_COLORS; i++) {
+	      v[chirality*(length/2) + i] = 0.5*diag[((i*2 + chirality)*2 + parity)*volumeCB + x];
 	    }
-
+	    
 	    // the off diagonal elements
-	    for (int i=0; i<30; i++) {
+	    for (int i=0; i<(length/2) - 2*N_COLORS; i++) {
 	      int z = i%2;
 	      int off = i/2;
+	      // DMH: IDTAB MAKE GENERIC
 	      const int idtab[15]={0,1,3,6,10,2,4,7,11,5,8,12,9,13,14};
-	      v[chirality*36 + 6 + i] = 0.5*offdiag[(((z*15 + idtab[off])*2 + chirality)*2 + parity)*volumeCB + x];
-	    }
-
+	      v[chirality*(length/2) + 2*N_COLORS + i] = 0.5*offdiag[(((z*15 + idtab[off])*2 + chirality)*2 + parity)*volumeCB + x];
+	    }	    
 	  }
 	}
-  
+	
 	__device__ __host__ inline void save(const RegType v[length], int x, int parity) {
 	  // the factor of 2.0 comes from undoing the basis change
 	  for (int chirality=0; chirality<2; chirality++) {
 	    // set diagonal elements
-	    for (int i=0; i<6; i++) {
-	      diag[((i*2 + chirality)*2 + parity)*volumeCB + x] = 2.0*v[chirality*36 + i];
+	    for (int i=0; i<2*N_COLORS; i++) {
+	      diag[((i*2 + chirality)*2 + parity)*volumeCB + x] = 2.0*v[chirality*(length/2) + i];
 	    }
 
 	    // the off diagonal elements
 	    for (int i=0; i<30; i++) {
 	      int z = i%2;
 	      int off = i/2;
+	      // DMH: IDTAB MAKE GENERIC
 	      const int idtab[15]={0,1,3,6,10,2,4,7,11,5,8,12,9,13,14};
-	      offdiag[(((z*15 + idtab[off])*2 + chirality)*2 + parity)*volumeCB + x] = 2.0*v[chirality*36 + 6 + i];
+	      offdiag[(((z*15 + idtab[off])*2 + chirality)*2 + parity)*volumeCB + x] = 2.0*v[chirality*(length/2) + 2*N_COLORS + i];
 	    }
 	  }
 	}
@@ -855,7 +857,7 @@ namespace quda {
        expected by QUDA.  As well as reordering the clover matrix
        elements, we are also changing basis.
     */
-    template <typename Float, int length = 72>
+    template <typename Float, int length = (4*4*N_COLORS*N_COLORS)/2>
       struct BQCDOrder {
 	typedef typename mapper<Float>::type RegType;
 	Float *clover[2];
@@ -884,17 +886,18 @@ namespace quda {
 	   @param parity The parity of the lattice site
 	*/
 	__device__ __host__ inline void load(RegType v[length], int x, int parity) const {
-	  int bq[36] = { 21, 32, 33, 0,  1, 20,                   // diagonal
-			 28, 29, 30, 31, 6, 7,  14, 15, 22, 23,   // column 1  6
-			 34, 35, 8, 9, 16, 17, 24, 25,            // column 2  16
-			 10, 11, 18, 19, 26, 27,                  // column 3  24
-			 2,  3,  4,  5,                           // column 4  30
-			 12, 13};
+	  int bq[length/2] = { 21, 32, 33, 0,  1, 20,                   // diagonal
+			       28, 29, 30, 31, 6, 7,  14, 15, 22, 23,   // column 1  6
+			       34, 35, 8, 9, 16, 17, 24, 25,            // column 2  16
+			       10, 11, 18, 19, 26, 27,                  // column 3  24
+			       2,  3,  4,  5,                           // column 4  30
+			       12, 13};
 	  
 	  // flip the sign of the imaginary components
-	  int sign[36];
-	  for (int i=0; i<6; i++) sign[i] = 1;
-	  for (int i=6; i<36; i+=2) {
+	  int sign[length/2];
+	  for (int i=0; i<2*N_COLORS; i++) sign[i] = 1;
+	  for (int i=6; i<length/2; i+=2) {
+	    // DMH ...
 	    if ( (i >= 10 && i<= 15) || (i >= 18 && i <= 29) )  { sign[i] = -1; sign[i+1] = -1; }
 	    else { sign[i] = 1; sign[i+1] = -1; }
 	  }
@@ -905,7 +908,7 @@ namespace quda {
 	      v[chirality*M+i] = sign[i] * clover[parity][x*length+chirality*M+bq[i]];
 	
 	}
-  
+	
 	// FIXME implement the save routine for BQCD ordered fields
 	__device__ __host__ inline void save(RegType [length], int, int) { }
 
@@ -915,7 +918,7 @@ namespace quda {
   } // namespace clover
 
   // Use traits to reduce the template explosion
-  template<typename Float,int N=72, bool add_rho=false> struct clover_mapper { };
+  template<typename Float,int N=(4*4*N_COLORS*N_COLORS)/2, bool add_rho=false> struct clover_mapper { };
 
   // double precision uses Float2
   template<int N, bool add_rho> struct clover_mapper<double,N,add_rho> { typedef clover::FloatNOrder<double, N, 2, add_rho> type; };

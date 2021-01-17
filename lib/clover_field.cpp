@@ -35,7 +35,7 @@ namespace quda {
   }
 
   CloverField::CloverField(const CloverFieldParam &param) :
-    LatticeField(param), bytes(0), norm_bytes(0), nColor(3), nSpin(4), 
+    LatticeField(param), bytes(0), norm_bytes(0), nColor(N_COLORS), nSpin(4), 
     clover(0), norm(0), cloverInv(0), invNorm(0), csw(param.csw), rho(param.rho),
     order(param.order), create(param.create), trlog{0, 0}
   {
@@ -44,7 +44,7 @@ namespace quda {
     if (order == QUDA_QDPJIT_CLOVER_ORDER && create != QUDA_REFERENCE_FIELD_CREATE)
       errorQuda("QDPJIT ordered clover fields only supported for reference fields");
 
-    real_length = 2 * ((size_t)volumeCB) * nColor * nColor * nSpin * nSpin / 2; // block-diagonal Hermitian (72 reals)
+    real_length = 2 * ((size_t)volumeCB) * nColor * nColor * nSpin * nSpin / 2; // block-diagonal Hermitian (Nc=2->32 reals : Nc=3->72 reals : Nc=4->128 reals)
     length = 2 * ((size_t)stride) * nColor * nColor * nSpin * nSpin / 2;
 
     bytes = length * precision;

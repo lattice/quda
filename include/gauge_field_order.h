@@ -1741,7 +1741,7 @@ namespace quda {
             z *= scale;
 #pragma unroll
             for (int i = 0; i < 9; i++) out[i] = cmul(z, out[i]);
-          } else { // stagic phase
+          } else { // static phase
 #pragma unroll
             for (int i = 0; i < 18; i++) { out[i] *= phase; }
           }
@@ -2616,7 +2616,7 @@ namespace quda {
       anisotropy_inv(1.0 / anisotropy),
       geometry(u.Geometry())
     {
-      if (length != 18) errorQuda("Gauge length %d not supported", length);
+      if (length != 2*N_COLORS*N_COLORS) errorQuda("Gauge length %d not supported", length);
     }
     CPSOrder(const CPSOrder &order) :
       LegacyOrder<Float, length>(order),
@@ -2722,7 +2722,7 @@ namespace quda {
         gauge(gauge_ ? gauge_ : (Float *)u.Gauge_p()),
         volumeCB(u.VolumeCB())
       {
-        if (length != 18) errorQuda("Gauge length %d not supported", length);
+        if (length != 2*N_COLORS*N_COLORS) errorQuda("Gauge length %d not supported", length);
         // compute volumeCB + halo region
         exVolumeCB = u.X()[0]/2 + 2;
 	for (int i=1; i<4; i++) exVolumeCB *= u.X()[i] + 2;
@@ -2733,7 +2733,7 @@ namespace quda {
         volumeCB(order.volumeCB),
         exVolumeCB(order.exVolumeCB)
       {
-        if (length != 18) errorQuda("Gauge length %d not supported", length);
+        if (length != 2*N_COLORS*N_COLORS) errorQuda("Gauge length %d not supported", length);
       }
 
       // we need to transpose for BQCD ordering
@@ -2827,7 +2827,7 @@ namespace quda {
         scale(u.Scale()),
         scale_inv(1.0 / scale)
       {
-        if (length != 18) errorQuda("Gauge length %d not supported", length);
+        if (length != 2*N_COLORS*N_COLORS) errorQuda("Gauge length %d not supported", length);
       }
       TIFROrder(const TIFROrder &order) :
         LegacyOrder<Float, length>(order),
@@ -2836,7 +2836,7 @@ namespace quda {
         scale(order.scale),
         scale_inv(1.0 / scale)
       {
-        if (length != 18) errorQuda("Gauge length %d not supported", length);
+        if (length != 2*N_COLORS*N_COLORS) errorQuda("Gauge length %d not supported", length);
       }
 
       // we need to transpose for TIFR ordering
@@ -2938,7 +2938,7 @@ namespace quda {
         dim {u.X()[0], u.X()[1], u.X()[2], u.X()[3]},
         exDim {u.X()[0], u.X()[1], u.X()[2] + 4, u.X()[3]}
       {
-        if (length != 18) errorQuda("Gauge length %d not supported", length);
+        if (length != 2*N_COLORS*N_COLORS) errorQuda("Gauge length %d not supported", length);
 
         // exVolumeCB is the padded checkboard volume
         for (int i=0; i<4; i++) exVolumeCB *= exDim[i];
@@ -2955,7 +2955,7 @@ namespace quda {
         dim {order.dim[0], order.dim[1], order.dim[2], order.dim[3]},
         exDim {order.exDim[0], order.exDim[1], order.exDim[2], order.exDim[3]}
       {
-        if (length != 18) errorQuda("Gauge length %d not supported", length);
+        if (length != 2*N_COLORS*N_COLORS) errorQuda("Gauge length %d not supported", length);
       }
 
       /**

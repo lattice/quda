@@ -569,9 +569,9 @@ int neighborIndexFullLattice_mg(int i, int dx4, int dx3, int dx2, int dx1)
 void printSpinorElement(void *spinor, int X, QudaPrecision precision)
 {
   if (precision == QUDA_DOUBLE_PRECISION)
-    for (int s = 0; s < 4; s++) printVector((double *)spinor + X * 24 + s * 6);
+    for (int s = 0; s < 4; s++) printVector((double *)spinor + X * spinor_site_size + s * 2*N_COLORS);
   else
-    for (int s = 0; s < 4; s++) printVector((float *)spinor + X * 24 + s * 6);
+    for (int s = 0; s < 4; s++) printVector((float *)spinor + X * spinor_site_size + s * 2*N_COLORS);
 }
 
 // X indexes the full lattice
@@ -1095,7 +1095,7 @@ template <typename Float> void constructRandomGaugeField(Float **res, QudaGaugeP
 	
 	// Q is now an element of U(Nc), make it an element of SU(Nc)      
 	Q *= pow(Q.determinant(), -1.0/Nc);
-	
+
 	// Populate array
 	for (int i = 0; i < Nc; i++) {
 	  for (int j = 0; j < Nc; j++) {
@@ -1265,18 +1265,18 @@ template <typename Float> void constructCloverField(Float *res, double norm, dou
 template <typename Float>
 static void checkGauge(Float **oldG, Float **newG, double epsilon) {
 
-  const int fail_check = 17;
+  const int fail_check = 2*N_COLORS*N_COLORS-1;
   int fail[4][fail_check];
-  int iter[4][18];
+  int iter[4][2*N_COLORS*N_COLORS];
   for (int d=0; d<4; d++) for (int i=0; i<fail_check; i++) fail[d][i] = 0;
-  for (int d=0; d<4; d++) for (int i=0; i<18; i++) iter[d][i] = 0;
+  for (int d=0; d<4; d++) for (int i=0; i<2*N_COLORS*N_COLORS; i++) iter[d][i] = 0;
 
   for (int d=0; d<4; d++) {
     for (int eo=0; eo<2; eo++) {
       for (int i=0; i<Vh; i++) {
 	int ga_idx = (eo*Vh+i);
-	for (int j=0; j<18; j++) {
-	  double diff = fabs(newG[d][ga_idx*18+j] - oldG[d][ga_idx*18+j]);/// fabs(oldG[d][ga_idx*18+j]);
+	for (int j=0; j<2*N_COLORS*N_COLORS; j++) {
+	  double diff = fabs(newG[d][ga_idx*2*N_COLORS*N_COLORS+j] - oldG[d][ga_idx*2*N_COLORS*N_COLORS+j]);/// fabs(oldG[d][ga_idx*18+j]);
 
 	  for (int f=0; f<fail_check; f++) if (diff > pow(10.0,-(f+1))) fail[d][f]++;
 	  if (diff > epsilon) iter[d][j]++;
@@ -1286,13 +1286,13 @@ static void checkGauge(Float **oldG, Float **newG, double epsilon) {
   }
 
   printf("Component fails (X, Y, Z, T)\n");
-  for (int i=0; i<18; i++) printf("%d fails = (%8d, %8d, %8d, %8d)\n", i, iter[0][i], iter[1][i], iter[2][i], iter[3][i]);
+  for (int i=0; i<2*N_COLORS*N_COLORS; i++) printf("%d fails = (%8d, %8d, %8d, %8d)\n", i, iter[0][i], iter[1][i], iter[2][i], iter[3][i]);
 
   printf("\nDeviation Failures = (X, Y, Z, T)\n");
   for (int f=0; f<fail_check; f++) {
     printf("%e Failures = (%9d, %9d, %9d, %9d) = (%6.5f, %6.5f, %6.5f, %6.5f)\n", pow(10.0, -(f + 1)), fail[0][f],
-           fail[1][f], fail[2][f], fail[3][f], fail[0][f] / (double)(V * 18), fail[1][f] / (double)(V * 18),
-           fail[2][f] / (double)(V * 18), fail[3][f] / (double)(V * 18));
+           fail[1][f], fail[2][f], fail[3][f], fail[0][f] / (double)(V * 2*N_COLORS*N_COLORS), fail[1][f] / (double)(V * 2*N_COLORS*N_COLORS),
+           fail[2][f] / (double)(V * 2*N_COLORS*N_COLORS), fail[3][f] / (double)(V * 2*N_COLORS*N_COLORS));
   }
 
 }
@@ -1419,17 +1419,17 @@ void createSiteLinkCPU(void **link, QudaPrecision precision, int phase)
 
 template <typename Float>
 int compareLink(Float **linkA, Float **linkB, int len) {
-  const int fail_check = 16;
+  const int fail_check = 2*N_COLORS*N_COLORS-2;
   int fail[fail_check];
   for (int f=0; f<fail_check; f++) fail[f] = 0;
 
-  int iter[18];
-  for (int i=0; i<18; i++) iter[i] = 0;
+  int iter[2*N_COLORS*N_COLORS];
+  for (int i=0; i<2*N_COLORS*N_COLORS; i++) iter[i] = 0;
 
   for(int dir=0;dir < 4; dir++){
     for (int i=0; i<len; i++) {
-      for (int j=0; j<18; j++) {
-	int is = i*18+j;
+      for (int j=0; j<2*N_COLORS*N_COLORS; j++) {
+	int is = i*2*N_COLORS*N_COLORS+j;
 	double diff = fabs(linkA[dir][is]-linkB[dir][is]);
 	for (int f=0; f<fail_check; f++)
 	  if (diff > pow(10.0,-(f+1))) fail[f]++;
@@ -1439,7 +1439,7 @@ int compareLink(Float **linkA, Float **linkB, int len) {
     }
   }
 
-  for (int i=0; i<18; i++) printfQuda("%d fails = %d\n", i, iter[i]);
+  for (int i=0; i<2*N_COLORS*N_COLORS; i++) printfQuda("%d fails = %d\n", i, iter[i]);
 
   int accuracy_level = 0;
   for(int f =0; f < fail_check; f++){
@@ -1449,7 +1449,7 @@ int compareLink(Float **linkA, Float **linkB, int len) {
   }
 
   for (int f=0; f<fail_check; f++) {
-    printfQuda("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)), fail[f], 4*len*18, fail[f] / (double)(4*len*18));
+    printfQuda("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)), fail[f], 4*len*2*N_COLORS*N_COLORS, fail[f] / (double)(4*len*2*N_COLORS*N_COLORS));
   }
 
   return accuracy_level;

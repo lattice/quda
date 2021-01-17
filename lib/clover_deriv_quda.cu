@@ -26,8 +26,8 @@ namespace quda {
     void preTune() { arg.force.save(); }
     void postTune() { arg.force.load(); }
 
-    long long flops() const { return 16 * 198 * 3 * 4 * meta.LocalVolume(); }
-    long long bytes() const { return ((8*arg.gauge.Bytes() + 4*arg.oprod.Bytes())*3 + 2*arg.force.Bytes()) * 4 * meta.LocalVolume(); }
+    long long flops() const { return 16 * 198 * N_COLORS * 4 * meta.LocalVolume(); }
+    long long bytes() const { return ((8*arg.gauge.Bytes() + 4*arg.oprod.Bytes())*N_COLORS + 2*arg.force.Bytes()) * 4 * meta.LocalVolume(); }
   };
 
   template<typename Float>
@@ -38,8 +38,8 @@ namespace quda {
     if (force.Reconstruct() != QUDA_RECONSTRUCT_NO) errorQuda("Force field does not support reconstruction");
 
     if (force.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
-      typedef gauge::FloatNOrder<Float, 18, 2, 18> F;
-      typedef gauge::FloatNOrder<Float, 18, 2, 18> O;
+      typedef gauge::FloatNOrder<Float, 2*N_COLORS*N_COLORS, 2, 18> F;
+      typedef gauge::FloatNOrder<Float, 2*N_COLORS*N_COLORS, 2, 18> O;
 
       if (gauge.isNative()) {
 	if (gauge.Reconstruct() == QUDA_RECONSTRUCT_NO) {
