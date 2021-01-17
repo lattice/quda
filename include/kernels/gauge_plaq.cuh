@@ -53,7 +53,7 @@ namespace quda {
     dx[nu]--;
     Link U4 = arg.U(nu, linkIndexShift(x,dx,arg.E), parity);
 
-    if(N_COLORS == 2) {
+    if(N_COLORS == 1) {
       //complex<typename Arg::Float> tr(0.0,0.0);
       Link test1 = U1;
       Link test2 = conj(U1);

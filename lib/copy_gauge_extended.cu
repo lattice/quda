@@ -194,8 +194,6 @@ namespace quda {
   void copyGaugeEx(GaugeField &out, const GaugeField &in, QudaFieldLocation location,
 		   FloatOut *Out, FloatIn *In) {
 
-    // DMH: replacing line
-    //if (in.Ncolor() != 3 && out.Ncolor() != 3) {
     if (in.Ncolor() != N_COLORS && out.Ncolor() != N_COLORS) {
       errorQuda("Unsupported number of colors; out.Nc=%d, in.Nc=%d", out.Ncolor(), in.Ncolor());
     }

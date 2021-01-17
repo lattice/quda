@@ -1265,7 +1265,7 @@ template <typename Float> void constructCloverField(Float *res, double norm, dou
 template <typename Float>
 static void checkGauge(Float **oldG, Float **newG, double epsilon) {
 
-  const int fail_check = 2*N_COLORS*N_COLORS-1;
+  const int fail_check = 16;
   int fail[4][fail_check];
   int iter[4][2*N_COLORS*N_COLORS];
   for (int d=0; d<4; d++) for (int i=0; i<fail_check; i++) fail[d][i] = 0;
@@ -1419,7 +1419,7 @@ void createSiteLinkCPU(void **link, QudaPrecision precision, int phase)
 
 template <typename Float>
 int compareLink(Float **linkA, Float **linkB, int len) {
-  const int fail_check = 2*N_COLORS*N_COLORS-2;
+  const int fail_check = 16;
   int fail[fail_check];
   for (int f=0; f<fail_check; f++) fail[f] = 0;
 

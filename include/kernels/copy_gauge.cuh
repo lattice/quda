@@ -14,7 +14,7 @@ namespace quda {
     using real_out_t  = typename mapper<store_out_t>::type;
     using real_in_t  = typename mapper<store_in_t>::type;
     static constexpr int length = length_;
-    static constexpr int nColor = Ncolor(length);
+    static constexpr int nColor = gauge::Ncolor(length);
     OutOrder out;
     const InOrder in;
     int volume;

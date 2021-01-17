@@ -896,7 +896,7 @@ namespace quda {
 	  // flip the sign of the imaginary components
 	  int sign[length/2];
 	  for (int i=0; i<2*N_COLORS; i++) sign[i] = 1;
-	  for (int i=6; i<length/2; i+=2) {
+	  for (int i=2*N_COLORS; i<length/2; i+=2) {
 	    // DMH ...
 	    if ( (i >= 10 && i<= 15) || (i >= 18 && i <= 29) )  { sign[i] = -1; sign[i+1] = -1; }
 	    else { sign[i] = 1; sign[i+1] = -1; }
