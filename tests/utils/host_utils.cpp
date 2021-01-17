@@ -1234,30 +1234,45 @@ template <typename Float> void constructUnitaryGaugeField(Float **res)
 
 template <typename Float> void constructCloverField(Float *res, double norm, double diag)
 {
-
   Float c = 2.0 * norm / RAND_MAX;
-
+  int len = (N_COLORS * N_COLORS * 4 * 2);
   for(int i = 0; i < V; i++) {
-    for (int j = 0; j < 72; j++) {
-      res[i*72 + j] = c*rand() - norm;
+    for (int j = 0; j < len; j++) {
+      res[i*len + j] = c*rand() - norm;
     }
 
     //impose clover symmetry on each chiral block
     for (int ch=0; ch<2; ch++) {
-      res[i*72 + 3 + 36*ch] = -res[i*72 + 0 + 36*ch];
-      res[i*72 + 4 + 36*ch] = -res[i*72 + 1 + 36*ch];
-      res[i*72 + 5 + 36*ch] = -res[i*72 + 2 + 36*ch];
-      res[i*72 + 30 + 36*ch] = -res[i*72 + 6 + 36*ch];
-      res[i*72 + 31 + 36*ch] = -res[i*72 + 7 + 36*ch];
-      res[i*72 + 32 + 36*ch] = -res[i*72 + 8 + 36*ch];
-      res[i*72 + 33 + 36*ch] = -res[i*72 + 9 + 36*ch];
-      res[i*72 + 34 + 36*ch] = -res[i*72 + 16 + 36*ch];
-      res[i*72 + 35 + 36*ch] = -res[i*72 + 17 + 36*ch];
+
+      //The diagons are first in the array
+      for(int k=0; k<N_COLORS; k++) {
+	res[i*len + N_COLORS + k + (len/2)*ch] = -res[i*len + k + (len/2)*ch];
+      }
+      
+      //res[i*len + 3 + (len/2)*ch] = -res[i*len + 0 + (len/2)*ch];
+      //res[i*len + 4 + (len/2)*ch] = -res[i*len + 1 + (len/2)*ch];
+      //res[i*len + 5 + (len/2)*ch] = -res[i*len + 2 + (len/2)*ch];
+
+      for(int k=2*N_COLORS; k<N_COLORS*N_COLORS+1; k++) {
+	res[i*len + (len/2) - k + (len/2)*ch] = -res[i*len + k + (len/2)*ch];
+      }
+      
+      //res[i*len + 30 + (len/2)*ch] = -res[i*len + 6 + (len/2)*ch];
+      //res[i*len + 31 + (len/2)*ch] = -res[i*len + 7 + (len/2)*ch];
+      //res[i*len + 32 + (len/2)*ch] = -res[i*len + 8 + (len/2)*ch];
+      //res[i*len + 33 + (len/2)*ch] = -res[i*len + 9 + (len/2)*ch];
+
+      for(int k=1; k<N_COLORS; k++) {
+	res[i*len + (len/2) - N_COLORS + k + (len/2)*ch] = -res[i*len + (N_COLORS+1)*(N_COLORS+1) + k - 1 + (len/2)*ch];
+      }
+      
+      //res[i*len + 34 + (len/2)*ch] = -res[i*len + 16 + (len/2)*ch];
+      //res[i*len + 35 + (len/2)*ch] = -res[i*len + 17 + (len/2)*ch];
     }
 
-    for (int j = 0; j<6; j++) {
-      res[i*72 + j] += diag;
-      res[i*72 + j+36] += diag;
+    for (int j = 0; j<2*N_COLORS; j++) {
+      res[i*len + j]           += diag;
+      res[i*len + j + (len/2)] += diag;
     }
   }
 }

@@ -4374,7 +4374,7 @@ void computeStaggeredForceQuda(void* h_mom, double dt, double delta, void *h_for
 
   ColorSpinorParam qParam;
   qParam.location = QUDA_CUDA_FIELD_LOCATION;
-  qParam.nColor = 3;
+  qParam.nColor = N_COLORS;
   qParam.nSpin = 1;
   qParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   qParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
@@ -4589,7 +4589,7 @@ void computeHISQForceQuda(void* const milc_momentum,
 
   { // do outer-product computation
     ColorSpinorParam qParam;
-    qParam.nColor = 3;
+    qParam.nColor = N_COLORS;
     qParam.nSpin = 1;
     qParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     qParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
@@ -4778,7 +4778,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **,
 
   ColorSpinorParam qParam;
   qParam.location = QUDA_CUDA_FIELD_LOCATION;
-  qParam.nColor = 3;
+  qParam.nColor = N_COLORS;
   qParam.nSpin = 4;
   qParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   qParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;

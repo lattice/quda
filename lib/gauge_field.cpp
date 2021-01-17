@@ -56,8 +56,8 @@ namespace quda {
     if (ghost_precision != precision) ghost_precision = precision; // gauge fields require matching precision
 
     // DMH: deleting the error below
-    //if (link_type != QUDA_COARSE_LINKS && nColor != 3)
-    //errorQuda("nColor must be 3, not %d for this link type", nColor);
+    if (link_type != QUDA_COARSE_LINKS && nColor != N_COLORS)
+      errorQuda("nColor must be N_COLORS=%d, not %d for this link type", N_COLORS, nColor);
     if (nDim != 4)
       errorQuda("Number of dimensions must be 4 not %d", nDim);
     if (link_type != QUDA_WILSON_LINKS && anisotropy != 1.0)

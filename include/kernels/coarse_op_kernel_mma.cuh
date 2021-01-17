@@ -150,6 +150,8 @@ namespace quda
         constexpr int m_offset = 0;
         constexpr int n_offset = 0;
 
+	printf("M = %d, N = %d, K = %d, bM = %d, bN = %d, bK = %d\n", M, N, K, bM, bN, bK);
+	
         static_assert(M <= bM, "Dividing M has NOT been implemented yet.\n");
         static_assert(N <= bN, "Dividing N has NOT been implemented yet.\n");
         static_assert(K <= bK, "Dividing K has NOT been implemented yet.\n");

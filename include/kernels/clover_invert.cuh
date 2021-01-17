@@ -10,7 +10,7 @@ namespace quda
     using store_t = store_t_;
     using real = typename mapper<store_t>::type;
     static constexpr bool twist = twist_;
-    static constexpr int nColor = 3;
+    static constexpr int nColor = N_COLORS;
     static constexpr int nSpin = 4;
     using Clover = typename clover_mapper<store_t>::type;
 
@@ -48,7 +48,7 @@ namespace quda
     __device__ __host__ inline reduce_t operator()(reduce_t &value, Reducer &r, int x_cb, int parity)
     {
       using real = typename Arg::real;
-      constexpr int N = Arg::nColor * Arg::nSpin / 2;
+      constexpr int N = (Arg::nColor * Arg::nSpin) / 2;
       using Mat = HMatrix<real, N>;
       double trLogA = 0.0;
 
