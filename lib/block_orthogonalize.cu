@@ -225,9 +225,9 @@ namespace quda {
         if (spin_bs != 2) errorQuda("Unexpected spin block size = %d", spin_bs);
         constexpr int spinBlockSize = 2;
 
-        if (Nvec == 6) { // for Wilson free field
-          BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 6>(V, B, fine_to_coarse, coarse_to_fine,
-                                                                              geo_bs, n_block_ortho);
+        if (Nvec == 2*N_COLORS) { // for Wilson free field
+          BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 2*N_COLORS>(V, B, fine_to_coarse, coarse_to_fine,
+										       geo_bs, n_block_ortho);
         } else if (Nvec == 24) {
           BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 24>(V, B, fine_to_coarse, coarse_to_fine,
                                                                                geo_bs, n_block_ortho);

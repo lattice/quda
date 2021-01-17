@@ -111,7 +111,7 @@ namespace quda
      */
 
     template <bool from_coarse, bool query_max = false, class Arg>
-    typename std::enable_if<Arg::fineColor == 6 && Arg::coarseColor == 6 && Arg::fineSpin == 2 && Arg::coarseSpin == 2, int>::type
+    typename std::enable_if<Arg::fineColor == 2*N_COLORS && Arg::coarseColor == 2*N_COLORS && Arg::fineSpin == 2 && Arg::coarseSpin == 2, int>::type
     launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream)
     {
       if (query_max) return 1;
@@ -402,7 +402,7 @@ namespace quda
     }
 
     template <bool from_coarse, bool query_max = false, class Arg>
-    typename std::enable_if<Arg::fineColor == 6 && Arg::coarseColor == 6 && Arg::fineSpin == 2 && Arg::coarseSpin == 2, int>::type
+    typename std::enable_if<Arg::fineColor == 2*N_COLORS && Arg::coarseColor == 2*N_COLORS && Arg::fineSpin == 2 && Arg::coarseSpin == 2, int>::type
     launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream)
     {
       if (query_max) return 2;
