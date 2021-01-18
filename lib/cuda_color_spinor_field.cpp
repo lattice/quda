@@ -1010,7 +1010,6 @@ namespace quda {
     // Error if zero-copy and p2p for now
     if ( (pack_host || halo_host) && comm_peer2peer_enabled_global()) errorQuda("Cannot use zero-copy memory with peer-to-peer comms yet");
 
-    printfQuda("cudaColorSpinorField::packGhost called\n");
     genericPackGhost(send, *this, parity, nFace, dagger, pack_destination); // FIXME - need support for asymmetric topologies
 
     size_t total_bytes = 0;

@@ -171,7 +171,7 @@ namespace quda
         /**
           Here we directly put the implementation of the MMA kernel here because computeVUV uses more
           atomic for storing output data, and the shared memory loaded for operand A can be reused for
-          various spin compoents
+          various spin components
         */
 
         // Not unrolling to lift regiter pressure

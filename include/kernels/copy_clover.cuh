@@ -12,7 +12,7 @@ namespace quda {
   struct CopyCloverArg {
     using store_out_t = store_out_t_;
     using store_in_t = store_in_t_;
-    static constexpr int length = 72;
+    static constexpr int length = N_COLORS * N_COLORS * 4 * 2;
     Out out;
     const In in;
     dim3 threads;
@@ -21,7 +21,7 @@ namespace quda {
       in(in),
       threads(meta.VolumeCB(), 2, 1) { }
   };
-
+  
   /** 
       Generic clover reordering and packing
   */

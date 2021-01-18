@@ -105,7 +105,7 @@ namespace quda
     }
 
     /**
-        The following functions have switch's that list computeUV and computeVUV MMA kernels instantiations.
+        The following functions have switches that list computeUV and computeVUV MMA kernels instantiations.
         if query_max = true, it will simply return how many instantiations there are; if query_max = false,
         the MMA kernel is launched with the corresponding configuration.
      */
@@ -408,8 +408,10 @@ namespace quda
       if (query_max) return 2;
       switch (tp.aux.x) {
       // clang-format off
-      case 0: launch_compute_vuv_kernel<from_coarse,  16,  16,   8,   8,   4>(tp, arg, min_threads, stream); break;
-      case 1: launch_compute_vuv_kernel<from_coarse,  16,  16,   8,   4,   8>(tp, arg, min_threads, stream); break;
+      //case 0: launch_compute_vuv_kernel<from_coarse,  16,  16,   8,   8,   4>(tp, arg, min_threads, stream); break;
+      //case 1: launch_compute_vuv_kernel<from_coarse,  16,  16,   8,   4,   8>(tp, arg, min_threads, stream); break;
+      case 0: launch_compute_vuv_kernel<from_coarse,  16,  16,   12,   8,   4>(tp, arg, min_threads, stream); break;
+      case 1: launch_compute_vuv_kernel<from_coarse,  16,  16,   12,   4,   8>(tp, arg, min_threads, stream); break;
       // clang-format on
       default:
         errorQuda("tp.aux.x(=%d) is NOT supported by (%d, %d, %d, %d).", tp.aux.x, Arg::fineSpin, Arg::coarseSpin,

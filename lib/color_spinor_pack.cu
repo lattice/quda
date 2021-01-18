@@ -209,6 +209,8 @@ namespace quda {
       PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,72>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 96) { // wilson 3 -> 32 nvec, or staggered Nc = 96
       PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,96>::nColor>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == 120) { // wilson 5 -> 120 nvec, or staggered Nc = 120
+      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,120>::nColor>(ghost, a, parity, nFace, dagger, destination);
 #ifdef NSPIN1
     } else if (a.Ncolor() == 192) { // staggered 3 -> 64 Nvec
       PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,192>::nColor>(ghost, a, parity, nFace, dagger, destination);
