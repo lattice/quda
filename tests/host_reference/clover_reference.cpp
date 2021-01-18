@@ -137,7 +137,7 @@ void clover_matpc(void *out, void **gauge, void *clover, void *clover_inv, void 
     xpay(tmp, kappa2, out, Vh * spinor_site_size, precision);
     break;
   default:
-    errorQuda("Unsupoorted matpc=%d", matpc_type);
+    errorQuda("Unsupported matpc=%d", matpc_type);
   }
 
   free(tmp);

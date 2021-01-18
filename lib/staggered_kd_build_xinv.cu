@@ -164,8 +164,8 @@ namespace quda {
     constexpr int coarseSpin = 2;
     const int coarseColor = X.Ncolor() / coarseSpin;
 
-    if (coarseColor == 24) { // half the dof w/in a KD-block
-      calculateStaggeredKDBlock<Float,vFloat,fineColor,24,coarseSpin>(X, g, mass);
+    if (coarseColor == 8 * N_COLORS) { // half the dof w/in a KD-block
+      calculateStaggeredKDBlock<Float,vFloat,fineColor,8*N_COLORS,coarseSpin>(X, g, mass);
     } else {
       errorQuda("Unsupported number of Kahler-Dirac dof %d\n", X.Ncolor());
     }

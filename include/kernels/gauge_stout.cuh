@@ -99,10 +99,10 @@ namespace quda
       error = getTrace(Q_diff).real();
       printf("Herm test %d %d %.15e\n", x_cb, dir, error);
       //Test for expiQ unitarity:
-      error = ErrorSU3(exp_iQ);
+      error = ErrorSUN(exp_iQ);
       printf("expiQ test %d %d %.15e\n", x_cb, dir, error);
       //Test for expiQ*U unitarity:
-      error = ErrorSU3(U);
+      error = ErrorSUN(U);
       printf("expiQ*u test %d %d %.15e\n", x_cb, dir, error);
 #endif
     }
@@ -173,10 +173,10 @@ namespace quda
       error = getTrace(Q_diff).real();
       printf("Herm test %d %d %.15e\n", x_cb, dir, error);
       //Test for expiQ unitarity:
-      error = ErrorSU3(exp_iQ);
+      error = ErrorSUN(exp_iQ);
       printf("expiQ test %d %d %.15e\n", x_cb, dir, error);
       //Test for expiQ*U unitarity:
-      error = ErrorSU3(U);
+      error = ErrorSUN(U);
       printf("expiQ*u test %d %d %.15e\n", x_cb, dir, error);
 #endif
     }

@@ -48,9 +48,9 @@ namespace quda {
 	    for (int j=0; j<Arg::nColor; j++) {
               complex<typename Arg::real_in_t> u = arg.in(d, parity, x, i, j);
 	      if (isnan(u.real()))
-	        errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, 2*(i*Ncolor(Arg::length)+j));
+	        errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, 2*(i*Arg::nColor+j));
 	      if (isnan(u.imag()))
-		errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, 2*(i*Ncolor(Arg::length)+j+1));
+		errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, 2*(i*Arg::nColor+j+1));
             }
 #else
 	  Matrix<complex<typename Arg::real_in_t>, Arg::nColor> u = arg.in(d, x, parity);

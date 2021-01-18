@@ -188,12 +188,16 @@ namespace quda {
     // If we've got this far, then the Caley-Hamilton unitarization
     // has failed. If SVD is not allowed, the unitarization has failed.
     if (!arg.reunit_allow_svd) return false;
-
+#if (N_COLORS == 3)
     mat v;
     real singular_values[3];
-    computeSVD<real>(in, u, v, singular_values);
+    computeSVD<real>(in, u, v, singular_values);    
     out = u * conj(v);
     return true;
+#else
+    return false;
+#endif
+    
   } // unitarizeMILC
 
   template <typename mat>

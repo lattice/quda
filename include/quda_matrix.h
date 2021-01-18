@@ -973,26 +973,23 @@ namespace quda {
   }
 
   // and this!
-  template<class Cmplx>
+  template<class Cmplx, int N>
     __host__ __device__ inline
-    void printLink(const Matrix<Cmplx,3>& link){
-      printf("(%lf, %lf)\t", link(0,0).x, link(0,0).y);
-      printf("(%lf, %lf)\t", link(0,1).x, link(0,1).y);
-      printf("(%lf, %lf)\n", link(0,2).x, link(0,2).y);
-      printf("(%lf, %lf)\t", link(1,0).x, link(1,0).y);
-      printf("(%lf, %lf)\t", link(1,1).x, link(1,1).y);
-      printf("(%lf, %lf)\n", link(1,2).x, link(1,2).y);
-      printf("(%lf, %lf)\t", link(2,0).x, link(2,0).y);
-      printf("(%lf, %lf)\t", link(2,1).x, link(2,1).y);
-      printf("(%lf, %lf)\n", link(2,2).x, link(2,2).y);
-      printf("\n");
+    void printLink(const Matrix<Cmplx,N>& link)
+  {
+    for(int i=0; i<N; i++) {
+      for(int j=0; j<N; j++) {      
+	printf("(%lf, %lf)\t", link(i,j).x, link(i,j).y);
+      }
     }
-
-  template<class Cmplx>
+    printf("\n");
+  }
+  
+  template<class Cmplx, int N>
   __device__ __host__
-    double ErrorSU3(const Matrix<Cmplx,3>& matrix)
+    double ErrorSUN(const Matrix<Cmplx,N>& matrix)
     {
-      const Matrix<Cmplx,3> identity_comp = conj(matrix)*matrix;
+      const Matrix<Cmplx,N> identity_comp = conj(matrix)*matrix;
       double error = 0.0;
       Cmplx temp(0,0);
       int i=0;
@@ -1000,9 +997,9 @@ namespace quda {
 
       //error = ||U^dagger U - I||_L2
 #pragma unroll
-      for (i=0; i<3; ++i)
+      for (i=0; i<N; ++i)
 #pragma unroll
-	for (j=0; j<3; ++j)
+	for (j=0; j<N; ++j)
 	  if(i==j) {
 	    temp = identity_comp(i,j);
 	    temp -= 1.0;
@@ -1014,7 +1011,7 @@ namespace quda {
       //error is L2 norm, should be (very close) to zero.
       return error;
     }
-
+  
   /**
      @brief Perfrom a 12th order Taylor expansion of exp(iq) to approximate SU(N) matrix 
      exponentiation
