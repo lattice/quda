@@ -1466,7 +1466,7 @@ namespace quda
   }
 
   // generate a full span of free vectors.
-  // FIXME: Assumes fine level is SU(3).
+  // FIXME: Assumes fine level is SU(N).
   void MG::buildFreeVectors(std::vector<ColorSpinorField *> &B)
   {
     pushLevel(param.level);

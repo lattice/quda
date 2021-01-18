@@ -123,6 +123,7 @@ namespace quda {
 
     // if number of colors doesn't equal three then we must have
     // coarse-gauge field
+    //printfQuda("Here colors = %d\n", u.Ncolor());
     if (u.Ncolor() != N_COLORS) {
       extractGaugeGhostMG(u, ghost, extract, offset);
     } else {

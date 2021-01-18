@@ -37,18 +37,18 @@ namespace quda {
     checkPrecision(outfield, infield);
 
     int num_failures = 0;
-    Matrix<complex<double>,3> inlink, outlink;
+    Matrix<complex<double>,N_COLORS> inlink, outlink;
 
     for (unsigned int i = 0; i < infield.Volume(); ++i) {
       for (int dir=0; dir<4; ++dir){
 	if (infield.Precision() == QUDA_SINGLE_PRECISION) {
-	  copyArrayToLink(&inlink, ((float*)(infield.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
+	  copyArrayToLink(&inlink, ((float*)(infield.Gauge_p()) + (i*4 + dir)*(2*N_COLORS*N_COLORS))); // order of arguments?
 	  if (unitarizeLinkNewton(outlink, inlink, max_iter_newton) == false ) num_failures++;
-	  copyLinkToArray(((float*)(outfield.Gauge_p()) + (i*4 + dir)*18), outlink);
+	  copyLinkToArray(((float*)(outfield.Gauge_p()) + (i*4 + dir)*(2*N_COLORS*N_COLORS)), outlink);
 	} else if (infield.Precision() == QUDA_DOUBLE_PRECISION) {
-	  copyArrayToLink(&inlink, ((double*)(infield.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
+	  copyArrayToLink(&inlink, ((double*)(infield.Gauge_p()) + (i*4 + dir)*(2*N_COLORS*N_COLORS))); // order of arguments?
 	  if (unitarizeLinkNewton(outlink, inlink, max_iter_newton) == false ) num_failures++;
-	  copyLinkToArray(((double*)(outfield.Gauge_p()) + (i*4 + dir)*18), outlink);
+	  copyLinkToArray(((double*)(outfield.Gauge_p()) + (i*4 + dir)*(2*N_COLORS*N_COLORS)), outlink);
 	} // precision?
       } // dir
     }   // loop over volume
@@ -65,14 +65,14 @@ namespace quda {
   bool isUnitary(const GaugeField& field, double max_error)
   {
     if (field.Location() != QUDA_CPU_FIELD_LOCATION) errorQuda("Location must be CPU");
-    Matrix<complex<double>,3> link, identity;
+    Matrix<complex<double>,N_COLORS> link, identity;
 
     for (unsigned int i = 0; i < field.Volume(); ++i) {
       for (int dir=0; dir<4; ++dir) {
 	if (field.Precision() == QUDA_SINGLE_PRECISION) {
-	  copyArrayToLink(&link, ((float*)(field.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
+	  copyArrayToLink(&link, ((float*)(field.Gauge_p()) + (i*4 + dir)*(2*N_COLORS*N_COLORS))); // order of arguments?
 	} else if (field.Precision() == QUDA_DOUBLE_PRECISION) {
-	  copyArrayToLink(&link, ((double*)(field.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
+	  copyArrayToLink(&link, ((double*)(field.Gauge_p()) + (i*4 + dir)*(2*N_COLORS*N_COLORS))); // order of arguments?
 	} else {
 	  errorQuda("Unsupported precision\n");
 	}

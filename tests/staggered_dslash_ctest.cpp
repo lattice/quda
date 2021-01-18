@@ -144,7 +144,7 @@ void init(int precision, QudaReconstructType link_recon)
   // prepare and load the GPU fields
 
 #ifdef MULTI_GPU
-  gauge_param.type = (dslash_type == QUDA_ASQTAD_DSLASH) ? QUDA_ASQTAD_FAT_LINKS : QUDA_SU3_LINKS;
+  gauge_param.type = (dslash_type == QUDA_ASQTAD_DSLASH) ? QUDA_ASQTAD_FAT_LINKS : QUDA_SUN_LINKS;
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
   GaugeFieldParam cpuFatParam(milc_fatlink_cpu, gauge_param);
   cpuFatParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
@@ -158,7 +158,7 @@ void init(int precision, QudaReconstructType link_recon)
   ghost_longlink_cpu = cpuLong->Ghost();
 #endif
 
-  gauge_param.type = (dslash_type == QUDA_ASQTAD_DSLASH) ? QUDA_ASQTAD_FAT_LINKS : QUDA_SU3_LINKS;
+  gauge_param.type = (dslash_type == QUDA_ASQTAD_DSLASH) ? QUDA_ASQTAD_FAT_LINKS : QUDA_SUN_LINKS;
   if (dslash_type == QUDA_STAGGERED_DSLASH) {
     gauge_param.reconstruct = gauge_param.reconstruct_sloppy = (link_recon == QUDA_RECONSTRUCT_12) ?
       QUDA_RECONSTRUCT_13 :

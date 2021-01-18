@@ -5,7 +5,7 @@
 
 void setGaugeParam(QudaGaugeParam &gauge_param)
 {
-  gauge_param.type = QUDA_SU3_LINKS;
+  gauge_param.type = QUDA_SUN_LINKS;
 
   gauge_param.X[0] = xdim;
   gauge_param.X[1] = ydim;

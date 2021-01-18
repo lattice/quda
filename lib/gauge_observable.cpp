@@ -13,7 +13,7 @@ namespace quda
       *num_failures_h = 0;
       auto tol = u.Precision() == QUDA_DOUBLE_PRECISION ? 1e-14 : 1e-6;
       projectSUN(u, tol, num_failures_d);
-      if (*num_failures_h > 0) errorQuda("Error in the SU(3) unitarization: %d failures\n", *num_failures_h);
+      if (*num_failures_h > 0) errorQuda("Error in the SU(%d) unitarization: %d failures\n", N_COLORS, *num_failures_h);
       pool_pinned_free(num_failures_h);
     }
 

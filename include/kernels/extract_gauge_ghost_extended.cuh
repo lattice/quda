@@ -11,8 +11,6 @@ namespace quda {
     static constexpr int nDim = 4;
     static constexpr int dim = dim_;
     static constexpr bool extract = extract_;
-    //DMH BUG?
-    //static constexpr int nColor = Gauge::length;
     static constexpr int nColor = gauge::Ncolor(Gauge::length);
     using real = typename Gauge::real;
     Gauge u;

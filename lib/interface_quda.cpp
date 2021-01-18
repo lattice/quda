@@ -4944,7 +4944,7 @@ void updateGaugeFieldQuda(void* gauge,
   profileGaugeUpdate.TPSTART(QUDA_PROFILE_INIT);
 
   // create the host fields
-  GaugeFieldParam gParam(gauge, *param, QUDA_SU3_LINKS);
+  GaugeFieldParam gParam(gauge, *param, QUDA_SUN_LINKS);
   gParam.site_offset = param->gauge_offset;
   gParam.site_size = param->site_size;
   bool need_cpu = !param->use_resident_gauge || param->return_result_gauge;
@@ -4967,7 +4967,7 @@ void updateGaugeFieldQuda(void* gauge,
   gParam.pad = 0;
   cudaGaugeField *cudaMom = !param->use_resident_mom ? new cudaGaugeField(gParam) : nullptr;
 
-  gParam.link_type = QUDA_SU3_LINKS;
+  gParam.link_type = QUDA_SUN_LINKS;
   gParam.reconstruct = param->reconstruct;
   cudaGaugeField *cudaInGauge = !param->use_resident_gauge ? new cudaGaugeField(gParam) : nullptr;
   auto *cudaOutGauge = new cudaGaugeField(gParam);
@@ -5063,7 +5063,7 @@ void updateGaugeFieldQuda(void* gauge,
    profileProject.TPSTART(QUDA_PROFILE_COMPUTE);
    *num_failures_h = 0;
 
-   // project onto SU(3)
+   // project onto SU(N)
    if (cudaGauge->StaggeredPhaseApplied()) cudaGauge->removeStaggeredPhase();
    projectSUN(*cudaGauge, tol, num_failures_d);
    if (!cudaGauge->StaggeredPhaseApplied() && param->staggered_phase_applied) cudaGauge->applyStaggeredPhase();
@@ -5071,7 +5071,7 @@ void updateGaugeFieldQuda(void* gauge,
    profileProject.TPSTOP(QUDA_PROFILE_COMPUTE);
 
    if(*num_failures_h>0)
-     errorQuda("Error in the SU(3) unitarization: %d failures\n", *num_failures_h);
+     errorQuda("Error in the SU(%d) unitarization: %d failures\n", N_COLORS, *num_failures_h);
 
    profileProject.TPSTART(QUDA_PROFILE_D2H);
    if (param->return_result_gauge) cudaGauge->saveCPUField(*cpuGauge);

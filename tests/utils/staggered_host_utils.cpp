@@ -221,7 +221,7 @@ void loadFatLongGaugeQuda(void *milc_fatlink, void *milc_longlink, QudaGaugePara
   int link_pad = 3 * pad_size;
 
   gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ?
-    QUDA_SU3_LINKS :
+    QUDA_SUN_LINKS :
     QUDA_ASQTAD_FAT_LINKS;
 
   gauge_param.ga_pad = fat_pad;

@@ -264,17 +264,17 @@ namespace quda {
         errorQuda("Unexpected nSpin = %d", V.Nspin());
       }
 
-    } else { // Nc != 3
+    } else { // Nc != N_COLORS
       if (V.Nspin() != 2) errorQuda("Unexpected nSpin = %d", V.Nspin());
       constexpr int nSpin = 2;
       if (spin_bs != 1) errorQuda("Unexpected spin block size = %d", spin_bs);
       constexpr int spinBlockSize = 1;
 
 #ifdef NSPIN4
-      if (V.Ncolor()/Nvec == 6) {
-        constexpr int nColor = 6;
-        if (Nvec == 6) {
-          BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 6>(V, B, fine_to_coarse, coarse_to_fine,
+      if (V.Ncolor()/Nvec == 2*N_COLORS) {
+        constexpr int nColor = 2*N_COLORS;
+        if (Nvec == 2*N_COLORS) {
+          BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 2*N_COLORS>(V, B, fine_to_coarse, coarse_to_fine,
                                                                               geo_bs, n_block_ortho);
         } else {
           errorQuda("Unsupported nVec %d\n", Nvec);
@@ -328,7 +328,7 @@ namespace quda {
       } else {
         errorQuda("Unsupported nColor %d\n", V.Ncolor()/Nvec);
       }
-    } // Nc != 3
+    } // Nc != N_COLORS
   }
 
 #ifdef GPU_MULTIGRID

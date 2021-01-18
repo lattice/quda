@@ -189,8 +189,8 @@ namespace quda {
     if (a.Ncolor() == N_COLORS) {
       PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,N_COLORS>::nColor>(ghost, a, parity, nFace, dagger, destination);
 #ifdef GPU_MULTIGRID
-    } else if (a.Ncolor() == 6) {
-      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,6>::nColor>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == 2*N_COLORS) {
+      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,2*N_COLORS>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 18) { // Needed for two level free field Wilson
       PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,18>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 24) { // Needed for K-D staggered Wilson

@@ -153,7 +153,7 @@ namespace quda {
       site_size(param.site_size)
     {
       switch (link_type) {
-      case QUDA_SU3_LINKS:
+      case QUDA_SUN_LINKS:
       case QUDA_GENERAL_LINKS:
       case QUDA_SMEARED_LINKS:
       case QUDA_MOMENTUM_LINKS: nFace = 1; break;

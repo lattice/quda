@@ -173,7 +173,7 @@ namespace quda {
   void instantiateColor(const ColorSpinorField &field, const param_t &param)
   {
     switch (field.Ncolor()) {
-    case N_COLORS_: CopyGenericColorSpinor<N_COLORS, dst_t, src_t>(param); break;
+    case N_COLORS: CopyGenericColorSpinor<N_COLORS, dst_t, src_t>(param); break;
     case 6: CopyGenericColorSpinor<6, dst_t, src_t>(param); break;
     case 18: CopyGenericColorSpinor<18, dst_t, src_t>(param); break;
     case 24: CopyGenericColorSpinor<24, dst_t, src_t>(param); break;

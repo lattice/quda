@@ -77,7 +77,7 @@ Float *gaugeLink_sgpu(int i, int dir, int oddBit, Float **gaugeEven,
     gaugeField = (oddBit ? gaugeEven : gaugeOdd);
   }
   
-  return &gaugeField[dir/2][j*(3*3*2)];
+  return &gaugeField[dir/2][j*gauge_site_size];
 }
 
 
@@ -113,7 +113,7 @@ Float *gaugeLink_mgpu(int i, int dir, int oddBit, Float **gaugeEven, Float **gau
         if (x1 -d < 0 && comm_dim_partitioned(0)){
 	  ghostGaugeField = (oddBit?ghostGaugeEven[0]: ghostGaugeOdd[0]);
 	  int offset = (n_ghost_faces + x1 -d)*X4*X3*X2/2 + (x4*X3*X2 + x3*X2+x2)/2;
-	  return &ghostGaugeField[offset*(3*3*2)];
+	  return &ghostGaugeField[offset*gauge_site_size];
         }
         j = (x4*X3*X2*X1 + x3*X2*X1 + x2*X1 + new_x1) / 2;
         break;
@@ -124,7 +124,7 @@ Float *gaugeLink_mgpu(int i, int dir, int oddBit, Float **gaugeEven, Float **gau
         if (x2 -d < 0 && comm_dim_partitioned(1)){
           ghostGaugeField = (oddBit?ghostGaugeEven[1]: ghostGaugeOdd[1]);
           int offset = (n_ghost_faces + x2 -d)*X4*X3*X1/2 + (x4*X3*X1 + x3*X1+x1)/2;
-          return &ghostGaugeField[offset*(3*3*2)];
+          return &ghostGaugeField[offset*gauge_site_size];
         }
         j = (x4*X3*X2*X1 + x3*X2*X1 + new_x2*X1 + x1) / 2;
         break;
@@ -136,7 +136,7 @@ Float *gaugeLink_mgpu(int i, int dir, int oddBit, Float **gaugeEven, Float **gau
         if (x3 -d < 0 && comm_dim_partitioned(2)){
           ghostGaugeField = (oddBit?ghostGaugeEven[2]: ghostGaugeOdd[2]);
           int offset = (n_ghost_faces + x3 -d)*X4*X2*X1/2 + (x4*X2*X1 + x2*X1+x1)/2;
-          return &ghostGaugeField[offset*(3*3*2)];
+          return &ghostGaugeField[offset*gauge_site_size];
         }
         j = (x4*X3*X2*X1 + new_x3*X2*X1 + x2*X1 + x1) / 2;
         break;
@@ -147,7 +147,7 @@ Float *gaugeLink_mgpu(int i, int dir, int oddBit, Float **gaugeEven, Float **gau
         if (x4 -d < 0 && comm_dim_partitioned(3)){
           ghostGaugeField = (oddBit?ghostGaugeEven[3]: ghostGaugeOdd[3]);
           int offset = (n_ghost_faces + x4 -d)*X1*X2*X3/2 + (x3*X2*X1 + x2*X1+x1)/2;
-          return &ghostGaugeField[offset*(3*3*2)];
+          return &ghostGaugeField[offset*gauge_site_size];
         }
         j = (new_x4*(X3*X2*X1) + x3*(X2*X1) + x2*(X1) + x1) / 2;
         break;
@@ -159,7 +159,7 @@ Float *gaugeLink_mgpu(int i, int dir, int oddBit, Float **gaugeEven, Float **gau
 
   }
 
-  return &gaugeField[dir/2][j*(3*3*2)];
+  return &gaugeField[dir/2][j*gauge_site_size];
 }
 
 
@@ -234,19 +234,21 @@ const double projector[10][4][4][2] = {
 
 // todo pass projector
 template <typename Float>
-void multiplySpinorByDiracProjector5(Float *res, int projIdx, Float *spinorIn) {
-  for (int i=0; i<4*3*2; i++) res[i] = 0.0;
+void multiplySpinorByDiracProjector5(Float *res, int projIdx, Float *spinorIn)
+{
+  int Nc = N_COLORS;
+  for (int i=0; i<spinor_site_size; i++) res[i] = 0.0;
 
   for (int s = 0; s < 4; s++) {
     for (int t = 0; t < 4; t++) {
       Float projRe = projector[projIdx][s][t][0];
       Float projIm = projector[projIdx][s][t][1];
-
-      for (int m = 0; m < 3; m++) {
-	Float spinorRe = spinorIn[t*(3*2) + m*(2) + 0];
-	Float spinorIm = spinorIn[t*(3*2) + m*(2) + 1];
-	res[s*(3*2) + m*(2) + 0] += projRe*spinorRe - projIm*spinorIm;
-	res[s*(3*2) + m*(2) + 1] += projRe*spinorIm + projIm*spinorRe;
+      
+      for (int m = 0; m < Nc; m++) {
+	Float spinorRe = spinorIn[t*(Nc*2) + m*(2) + 0];
+	Float spinorIm = spinorIn[t*(Nc*2) + m*(2) + 1];
+	res[s*(Nc*2) + m*(2) + 0] += projRe*spinorRe - projIm*spinorIm;
+	res[s*(Nc*2) + m*(2) + 1] += projRe*spinorIm + projIm*spinorRe;
       }
     }
   }
@@ -273,7 +275,7 @@ void dslashReference_4d_sgpu(sFloat *res, gFloat **gaugeFull, sFloat *spinorFiel
 
   // Initialize the return half-spinor to zero.  Note that it is a
   // 5d spinor, hence the use of V5h.
-  for (int i=0; i<V5h*4*3*2; i++) res[i] = 0.0;
+  for (int i=0; i<V5h*4*N_COLORS*2; i++) res[i] = 0.0;
   
   // Some pointers that we use to march through arrays.
   gFloat *gaugeEven[4], *gaugeOdd[4];
@@ -301,24 +303,24 @@ void dslashReference_4d_sgpu(sFloat *res, gFloat **gaugeFull, sFloat *spinorFiel
         // Even though we're doing the 4d part of the dslash, we need
         // to use a 5d neighbor function, to get the offsets right.
         sFloat *spinor = spinorNeighbor_5d<type>(sp_idx, dir, oddBit, spinorField);
-        sFloat projectedSpinor[4*3*2], gaugedSpinor[4*3*2];
+        sFloat projectedSpinor[spinor_site_size], gaugedSpinor[spinor_site_size];
         int projIdx = 2*(dir/2)+(dir+daggerBit)%2;
         multiplySpinorByDiracProjector5(projectedSpinor, projIdx, spinor);
       
         for (int s = 0; s < 4; s++) {
 	  if (dir % 2 == 0) {
-	    su3Mul(&gaugedSpinor[s*(3*2)], gauge, &projectedSpinor[s*(3*2)]);
+	    su3Mul(&gaugedSpinor[s*(N_COLORS*2)], gauge, &projectedSpinor[s*(N_COLORS*2)]);
 #ifdef DBUG_VERBOSE            
 	    std::cout << "spinor:" << std::endl;
-	    printSpinorElement(&projectedSpinor[s*(3*2)],0,QUDA_DOUBLE_PRECISION);
+	    printSpinorElement(&projectedSpinor[s*(N_COLORS*2)],0,QUDA_DOUBLE_PRECISION);
 	    std::cout << "gauge:" << std::endl;
 #endif
           } else {
-	    su3Tmul(&gaugedSpinor[s*(3*2)], gauge, &projectedSpinor[s*(3*2)]);
+	    su3Tmul(&gaugedSpinor[s*(N_COLORS*2)], gauge, &projectedSpinor[s*(N_COLORS*2)]);
           }
         }
       
-        sum(&res[sp_idx*(4*3*2)], &res[sp_idx*(4*3*2)], gaugedSpinor, 4*3*2);
+        sum(&res[sp_idx*spinor_site_size], &res[sp_idx*spinor_site_size], gaugedSpinor, spinor_site_size);
       }
     }
   }
@@ -362,11 +364,11 @@ void dslashReference_4d_mgpu(sFloat *res, gFloat **gaugeFull, gFloat **ghostGaug
 
         for (int s = 0; s < 4; s++) {
           if (dir % 2 == 0)
-            su3Mul(&gaugedSpinor[s * (3 * 2)], gauge, &projectedSpinor[s * (3 * 2)]);
+            su3Mul(&gaugedSpinor[s * (N_COLORS * 2)], gauge, &projectedSpinor[s * (N_COLORS * 2)]);
           else
-            su3Tmul(&gaugedSpinor[s * (3 * 2)], gauge, &projectedSpinor[s * (3 * 2)]);
+            su3Tmul(&gaugedSpinor[s * (N_COLORS * 2)], gauge, &projectedSpinor[s * (N_COLORS * 2)]);
         }
-        sum(&res[sp_idx * (4 * 3 * 2)], &res[sp_idx * (4 * 3 * 2)], gaugedSpinor, 4 * 3 * 2);
+        sum(&res[sp_idx * spinor_site_size], &res[sp_idx * spinor_site_size], gaugedSpinor, spinor_site_size);
       }
     }
   }
@@ -410,7 +412,7 @@ void mdw_eofa_m5_ref(sFloat *res, sFloat *spinorField, int oddBit, int daggerBit
 
   sFloat kappa = 0.5 * (c * (4. + m5) - 1.) / (b * (4. + m5) + 1.);
 
-  constexpr int spinor_size = 4 * 3 * 2;
+  constexpr int spinor_size = spinor_site_size;
   for (int i = 0; i < V5h; i++) {
     for (int one_site = 0; one_site < 24; one_site++) { res[i * spinor_size + one_site] = 0.; }
     for (int dir = 8; dir < 10; dir++) {
@@ -488,13 +490,13 @@ void dslashReference_5th(sFloat *res, sFloat *spinorField, int oddBit, int dagge
 {
   for (int i = 0; i < V5h; i++) {
     if (zero_initialize) for(int one_site = 0 ; one_site < 24 ; one_site++)
-      res[i*(4*3*2)+one_site] = 0.0;
+      res[i*(spinor_site_size)+one_site] = 0.0;
     for (int dir = 8; dir < 10; dir++) {
       // Calls for an extension of the original function.
       // 8 is forward hop, which wants P_+, 9 is backward hop,
       // which wants P_-.  Dagger reverses these.
       sFloat *spinor = spinorNeighbor_5d<type>(i, dir, oddBit, spinorField);
-      sFloat projectedSpinor[4*3*2];
+      sFloat projectedSpinor[spinor_site_size];
       int projIdx = 2*(dir/2)+(dir+daggerBit)%2;
       multiplySpinorByDiracProjector5(projectedSpinor, projIdx, spinor);
       //J  Need a conditional here for s=0 and s=Ls-1.
@@ -502,9 +504,9 @@ void dslashReference_5th(sFloat *res, sFloat *spinorField, int oddBit, int dagge
       int xs = X/(Z[3]*Z[2]*Z[1]*Z[0]);
 
       if ( (xs == 0 && dir == 9) || (xs == Ls-1 && dir == 8) ) {
-        ax(projectedSpinor,(sFloat)(-mferm),projectedSpinor,4*3*2);
+        ax(projectedSpinor,(sFloat)(-mferm),projectedSpinor,spinor_site_size);
       } 
-      sum(&res[i*(4*3*2)], &res[i*(4*3*2)], projectedSpinor, 4*3*2);
+      sum(&res[i*spinor_site_size], &res[i*spinor_site_size], projectedSpinor, spinor_site_size);
     }
   }
 }
@@ -821,7 +823,7 @@ void dw_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit, Qud
   // First wrap the input spinor into a ColorSpinorField
   ColorSpinorParam csParam;
   csParam.v = in;
-  csParam.nColor = 3;
+  csParam.nColor = N_COLORS;
   csParam.nSpin = 4;
   csParam.nDim = 5; //for DW dslash
   for (int d=0; d<4; d++) csParam.x[d] = Z[d];
@@ -881,7 +883,7 @@ void dslash_4_4d(void *out, void **gauge, void *in, int oddBit, int daggerBit, Q
   // First wrap the input spinor into a ColorSpinorField
   ColorSpinorParam csParam;
   csParam.v = in;
-  csParam.nColor = 3;
+  csParam.nColor = N_COLORS;
   csParam.nSpin = 4;
   csParam.nDim = 5; //for DW dslash
   for (int d=0; d<4; d++) csParam.x[d] = Z[d];
