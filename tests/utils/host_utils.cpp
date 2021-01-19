@@ -259,7 +259,8 @@ void initComms(int argc, char **argv, std::array<int, 4> &commDims) { initComms(
 
 void initComms(int argc, char **argv, int *const commDims)
 {
-  if (getenv("QUDA_TEST_GRID_SIZE")) get_gridsize_from_env(commDims);
+  if (getenv("QUDA_TEST_GRID_SIZE")) { get_size_from_env(commDims, "QUDA_TEST_GRID_SIZE"); }
+  if (getenv("QUDA_TEST_GRID_PARTITION")) { get_size_from_env(grid_partition.data(), "QUDA_TEST_GRID_PARTITION"); }
 
 #if defined(QMP_COMMS)
   QMP_thread_level_t tl;
@@ -289,6 +290,7 @@ void initComms(int argc, char **argv, int *const commDims)
 
 void finalizeComms()
 {
+  comm_finalize();
 #if defined(QMP_COMMS)
   QMP_finalize_msg_passing();
 #elif defined(MPI_COMMS)
@@ -637,9 +639,9 @@ const char *__asan_default_options() { return "protect_shadow_gap=0"; }
  * For MPI, the default node mapping is lexicographical with t varying fastest.
  */
 
-void get_gridsize_from_env(int *const dims)
+void get_size_from_env(int *const dims, const char env[])
 {
-  char *grid_size_env = getenv("QUDA_TEST_GRID_SIZE");
+  char *grid_size_env = getenv(env);
   if (grid_size_env) {
     std::stringstream grid_list(grid_size_env);
 
@@ -1015,6 +1017,9 @@ template <typename Float> void constructUnitGaugeField(Float **res, QudaGaugePar
   applyGaugeFieldScaling(res, Vh, param);
 }
 
+template void constructUnitGaugeField(float **res, QudaGaugeParam *param);
+template void constructUnitGaugeField(double **res, QudaGaugeParam *param);
+
 // normalize the vector a
 template <typename Float>
 static void normalize(complex<Float> *a, int len) {
@@ -1107,6 +1112,9 @@ template <typename Float> void constructRandomGaugeField(Float **res, QudaGaugeP
     }
   }
 }
+
+template void constructRandomGaugeField(float **res, QudaGaugeParam *param, QudaDslashType dslash_type);
+template void constructRandomGaugeField(double **res, QudaGaugeParam *param, QudaDslashType dslash_type);
 
 template <typename Float> void constructUnitaryGaugeField(Float **res)
 {

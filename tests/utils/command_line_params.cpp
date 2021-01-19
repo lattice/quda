@@ -239,6 +239,7 @@ int measurement_interval = 5;
 
 QudaContractType contract_type = QUDA_CONTRACT_TYPE_OPEN;
 
+std::array<int, 4> grid_partition = {1, 1, 1, 1};
 QudaBLASOperation blas_trans_a = QUDA_BLAS_OP_N;
 QudaBLASOperation blas_trans_b = QUDA_BLAS_OP_N;
 QudaBLASDataType blas_data_type = QUDA_BLAS_DATATYPE_C;
@@ -656,7 +657,6 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
       auto retval = CLI::detail::lexical_cast(res[0], p);
       for (int j = 0; j < 4; j++) {
         if (p & (1 << j)) {
-          commDimPartitionedSet(j);
           dim_partitioned[j] = 1;
         }
       }
@@ -994,4 +994,11 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   opgroup->add_option("--su3-measurement-interval", measurement_interval,
                       "Measure the field energy and topological charge every Nth step (default 5) ");
+}
+
+void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  auto opgroup
+    = quda_app->add_option_group("Communication", "Options controlling communication (split grid) parameteres");
+  opgroup->add_option("--grid-partition", grid_partition, "Set the grid partition (default 1 1 1 1)")->expected(4);
 }

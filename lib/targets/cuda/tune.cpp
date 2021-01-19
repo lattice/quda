@@ -16,6 +16,8 @@
 #include <queue>
 #include <functional>
 
+#include <communicator_quda.h>
+
 //#define LAUNCH_TIMER
 extern char *gitversion;
 
@@ -308,18 +310,18 @@ namespace quda
     std::stringstream serialized;
     size_t size;
 
-    if (comm_rank() == 0) {
+    if (comm_rank_global() == 0) {
       serializeTuneCache(serialized);
       size = serialized.str().length();
     }
-    comm_broadcast(&size, sizeof(size_t));
+    comm_broadcast_global(&size, sizeof(size_t));
 
     if (size > 0) {
-      if (comm_rank() == 0) {
-        comm_broadcast(const_cast<char *>(serialized.str().c_str()), size);
+      if (comm_rank_global() == 0) {
+        comm_broadcast_global(const_cast<char *>(serialized.str().c_str()), size);
       } else {
         char *serstr = new char[size + 1];
-        comm_broadcast(serstr, size);
+        comm_broadcast_global(serstr, size);
         serstr[size] = '\0'; // null-terminate
         serialized.str(serstr);
         deserializeTuneCache(serialized);
@@ -367,7 +369,7 @@ namespace quda
     }
 
 #ifdef MULTI_GPU
-    if (comm_rank() == 0) {
+    if (comm_rank_global() == 0) {
 #endif
 
       cache_path = resource_path;
@@ -448,7 +450,7 @@ namespace quda
       //       ever support different subvolumes per GPU (as might be convenient for lattice volumes that don't divide evenly).
 
 #ifdef MULTI_GPU
-    if (comm_rank() == 0) {
+    if (comm_rank_global() == 0) {
 #endif
 
       if (tunecache.size() == initial_cache_size && !error) return;
@@ -532,7 +534,7 @@ namespace quda
     if (resource_path.empty()) return;
 
 #ifdef MULTI_GPU
-    if (comm_rank() == 0) {
+    if (comm_rank_global() == 0) { // Make sure only one rank is writing to disk
 #endif
 
       // Acquire lock.  Note that this is only robust if the filesystem supports flock() semantics, which is true for
@@ -743,7 +745,8 @@ namespace quda
       /* As long as global reductions are not disabled, only do the
          tuning on node 0, else do the tuning on all nodes since we
          can't guarantee that all nodes are partaking */
-      if (comm_rank() == 0 || !commGlobalReduction() || policyTuning()) {
+      if (comm_rank_global() == 0 || !commGlobalReduction() || policyTuning()) {
+
         TuneParam best_param;
         cudaError_t error = cudaSuccess;
         cudaEvent_t start, end;
@@ -845,7 +848,8 @@ namespace quda
         param = best_param;
         tunecache[key] = best_param;
       }
-      if (commGlobalReduction() || policyTuning()) broadcastTuneCache();
+
+      if (commGlobalReduction() || policyTuning()) { broadcastTuneCache(); }
 
       // check this process is getting the key that is expected
       if (tunecache.find(key) == tunecache.end()) {
