@@ -171,6 +171,8 @@ void comm_allreduce_min(double *data) { get_current_communicator().comm_allreduc
 
 void comm_allreduce_array(double *data, size_t size) { get_current_communicator().comm_allreduce_array(data, size); }
 
+void comm_nonblocking_allreduce_array(MsgHandle *&mh, double *outdata, double *indata, size_t size) {get_current_communicator().comm_nonblocking_allreduce_array(mh, outdata, indata, size);}
+
 void comm_allreduce_max_array(double *data, size_t size)
 {
   get_current_communicator().comm_allreduce_max_array(data, size);
