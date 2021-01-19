@@ -2,6 +2,7 @@
 
 #include <multigrid.h>
 #include <tune_quda.h>
+#include <random_quda.h>
 #include <vector_io.h>
 
 // for building the KD inverse op

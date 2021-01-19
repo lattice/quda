@@ -8,15 +8,15 @@ namespace quda {
 
   class RNGInit : public TunableKernel2D {
 
-    RNGState *state;
+    RNG &rng;
     unsigned long long seed;
     unsigned int minThreads() const { return field.VolumeCB(); }
     bool tuneSharedBytes() const { return false; }
 
   public:
-    RNGInit(const LatticeField &meta, RNGState *state, unsigned long long seed) :
+    RNGInit(const LatticeField &meta, RNG &rng, unsigned long long seed) :
       TunableKernel2D(meta, meta.SiteSubset()),
-      state(state),
+      rng(rng),
       seed(seed)
     {
       apply(device::get_default_stream());
@@ -25,7 +25,7 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch_device<init_random>(tp, stream, rngArg(state, seed, field));
+      launch_device<init_random>(tp, stream, rngArg(rng.State(), seed, field));
     }
 
     long long flops() const { return 0; }
@@ -35,9 +35,8 @@ namespace quda {
   RNG::RNG(const LatticeField &meta, unsigned long long seedin) :
     meta(meta),
     size(meta.Volume()),
-    state((RNGState *)device_malloc(size * sizeof(RNGState))),
-    seed(seedin),
-    master(true)
+    state((RNGState *)device_malloc(size * sizeof(RNGState)), [](RNGState *ptr){ device_free(ptr); } ),
+    seed(seedin)
   {
 #if defined(XORWOW)
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using randStateXORWOW\n");
@@ -51,36 +50,20 @@ namespace quda {
       printfQuda("Allocated array of random numbers with size: %.2f MB\n",
                  size * sizeof(RNGState) / (float)(1048576));
 
-    RNGInit(meta, state, seed);
-  }
-
-  RNG::RNG(const RNG &rng) :
-    meta(rng.meta),
-    size(rng.size),
-    state(rng.state),
-    seed(rng.seed),
-    master(false) {}
-
-  RNG::~RNG()
-  {
-    if (master) {
-      device_free(state);
-      if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-        printfQuda("Free array of random numbers with size: %.2f MB\n", size * sizeof(RNGState) / (float)(1048576));
-    }
+    RNGInit(meta, *this, seed);
   }
 
   /*! @brief Backup CURAND array states initialization */
   void RNG::backup()
   {
     backup_state = (RNGState *)safe_malloc(size * sizeof(RNGState));
-    qudaMemcpy(backup_state, state, size * sizeof(RNGState), qudaMemcpyDeviceToHost);
+    qudaMemcpy(backup_state, state.get(), size * sizeof(RNGState), qudaMemcpyDeviceToHost);
   }
 
   /*! @brief Restore CURAND array states initialization */
   void RNG::restore()
   {
-    qudaMemcpy(state, backup_state, size * sizeof(RNGState), qudaMemcpyHostToDevice);
+    qudaMemcpy(state.get(), backup_state, size * sizeof(RNGState), qudaMemcpyHostToDevice);
     host_free(backup_state);
   }
 

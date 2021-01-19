@@ -1,5 +1,6 @@
 #include <quda_internal.h>
 #include <gauge_field.h>
+#include <random_quda.h>
 #include <instantiate.h>
 #include <tunable_nd.h>
 #include <kernels/gauge_random.cuh>
@@ -35,9 +36,9 @@ namespace quda {
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (group) {
-        launch<GaussGauge>(tp, stream, GaugeGaussArg<Float, nColor, recon, true>(U, rng, sigma));
+        launch<GaussGauge>(tp, stream, GaugeGaussArg<Float, nColor, recon, true>(U, rng.State(), sigma));
       } else {
-        launch<GaussGauge>(tp, stream, GaugeGaussArg<Float, nColor, recon, false>(U, rng, sigma));
+        launch<GaussGauge>(tp, stream, GaugeGaussArg<Float, nColor, recon, false>(U, rng.State(), sigma));
       }
     }
 

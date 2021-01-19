@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <quda_define.h>
 #include <lattice_field.h>
 
@@ -14,11 +15,10 @@ namespace quda {
   class RNG {
 
     const LatticeField &meta;
-    size_t size;             /*! @brief number of curand states */
-    RNGState *state;         /*! array with current curand rng state */
-    RNGState *backup_state;  /*! array for backup of current curand rng state */
-    unsigned long long seed; /*! initial rng seed */
-    bool master;             /*! ideally state would be a shared_ptr and we wouldn't need this */
+    size_t size;                     /*! @brief number of curand states */
+    std::shared_ptr<RNGState> state; /*! array with current curand rng state */
+    RNGState *backup_state;          /*! array for backup of current curand rng state */
+    unsigned long long seed;         /*! initial rng seed */
 
   public:
     /**
@@ -29,18 +29,6 @@ namespace quda {
     */
     RNG(const LatticeField &meta, unsigned long long seedin);
 
-    /**
-       @brief Copy constructor that does not allocate any new state
-       and merely aliases another.
-       @param[in] rng Prexisting state we are aliasing
-    */
-    RNG(const RNG &rng);
-
-    /**
-       @brief Release Device memory for CURAND RNG states
-    */
-    virtual ~RNG();
-
     unsigned long long Seed() { return seed; };
 
     /*! @brief Restore rng array states initialization */
@@ -49,7 +37,8 @@ namespace quda {
     /*! @brief Backup rng array states initialization */
     void backup();
 
-    constexpr RNGState *State() { return state; };
+    /*! @brief Get pointer to RNGState */
+    RNGState *State() { return state.get(); };
   };
 
 }

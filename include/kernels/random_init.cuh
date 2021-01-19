@@ -1,6 +1,7 @@
 #pragma once
 
 #include <random_helper.h>
+#include <lattice_field.h>
 #include <index_helper.cuh>
 #include <comm_quda.h>
 #include <kernel.h>
