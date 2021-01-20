@@ -1,6 +1,5 @@
 #pragma once
 
-//#include "/g/g90/howarth1/CORONA/QUDA_HIP/build/hip_runtime_api.h"
 #include <target_device.h>
 
 /**
