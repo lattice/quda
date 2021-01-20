@@ -5,7 +5,6 @@
 
 using namespace quda;
 
-using size_t = std::size_t;
 #ifdef __cplusplus
 extern "C" {
 #endif

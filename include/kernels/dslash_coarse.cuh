@@ -321,8 +321,9 @@ namespace quda {
 	  out[color_local].real(out[color_local].real() + __shfl_down_sync(device::warp_converged_mask(), out[color_local].real(), offset));
 	  out[color_local].imag(out[color_local].imag() + __shfl_down_sync(device::warp_converged_mask(), out[color_local].imag(), offset));
 #elif defined(QUDA_TARGET_HIP)
-	  Float sh_r = Float(out[color_local].x);
-	  Float sh_i = Float(out[color_local].y);
+	  Float sh_r = Float(out[color_local].real());
+	  Float sh_i = Float(out[color_local].imag());
+
 	  
 	  out[color_local] += complex<Float>{ __shfl_down(sh_r,offset) , __shfl_down(sh_i,offset) };
 #else

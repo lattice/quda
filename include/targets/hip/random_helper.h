@@ -5,10 +5,8 @@
 namespace quda {
 
 #if defined(XORWOW)
-  using rng_state_t = hipandStateXORWOW;
+  using rng_state_t = hiprandStateXORWOW;
 #elif defined(MRG32k3a)
-  using rng_state_t = hipandStateMRG32k3a;
-#else
   using rng_state_t = hiprandStateMRG32k3a;
 #endif
 

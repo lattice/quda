@@ -931,36 +931,33 @@ namespace quda {
 
   template<class T>
   __device__ __host__ inline double getRealTraceUVdagger(const Matrix<T,3>& a, const Matrix<T,3>& b){
-    double sum = (double)(a(0,0).x * b(0,0).x  + a(0,0).y * b(0,0).y);
-    sum += (double)(a(0,1).x * b(0,1).x  + a(0,1).y * b(0,1).y);
-    sum += (double)(a(0,2).x * b(0,2).x  + a(0,2).y * b(0,2).y);
-    sum += (double)(a(1,0).x * b(1,0).x  + a(1,0).y * b(1,0).y);
-    sum += (double)(a(1,1).x * b(1,1).x  + a(1,1).y * b(1,1).y);
-    sum += (double)(a(1,2).x * b(1,2).x  + a(1,2).y * b(1,2).y);
-    sum += (double)(a(2,0).x * b(2,0).x  + a(2,0).y * b(2,0).y);
-    sum += (double)(a(2,1).x * b(2,1).x  + a(2,1).y * b(2,1).y);
-    sum += (double)(a(2,2).x * b(2,2).x  + a(2,2).y * b(2,2).y);
+    double sum = (double)(a(0,0).real() * b(0,0).real()  + a(0,0).imag() * b(0,0).imag());
+    sum += (double)(a(0,1).real() * b(0,1).real()  + a(0,1).imag() * b(0,1).imag());
+    sum += (double)(a(0,2).real() * b(0,2).real()  + a(0,2).imag() * b(0,2).imag());
+    sum += (double)(a(1,0).real() * b(1,0).real()  + a(1,0).imag() * b(1,0).imag());
+    sum += (double)(a(1,1).real() * b(1,1).real()  + a(1,1).imag() * b(1,1).imag());
+    sum += (double)(a(1,2).real() * b(1,2).real()  + a(1,2).imag() * b(1,2).imag());
+    sum += (double)(a(2,0).real() * b(2,0).real()  + a(2,0).imag() * b(2,0).imag());
+    sum += (double)(a(2,1).real() * b(2,1).real()  + a(2,1).imag() * b(2,1).imag());
+    sum += (double)(a(2,2).real() * b(2,2).real()  + a(2,2).imag() * b(2,2).imag());
     return sum;
   }
-
-  // and this!
+  
   template<class Cmplx>
     __host__ __device__ inline
     void printLink(const Matrix<Cmplx,3>& link){
-      using R=typename Cmplx::value_type;
-
-      printf("(%lf, %lf)\t", R{link(0,0).x}, R{link(0,0).y});
-      printf("(%lf, %lf)\t", R{link(0,1).x}, R{link(0,1).y});
-      printf("(%lf, %lf)\n", R{link(0,2).x}, R{link(0,2).y});
-      printf("(%lf, %lf)\t", R{link(1,0).x}, R{link(1,0).y});
-      printf("(%lf, %lf)\t", R{link(1,1).x}, R{link(1,1).y});
-      printf("(%lf, %lf)\n", R{link(1,2).x}, R{link(1,2).y});
-      printf("(%lf, %lf)\t", R{link(2,0).x}, R{link(2,0).y});
-      printf("(%lf, %lf)\t", R{link(2,1).x}, R{link(2,1).y});
-      printf("(%lf, %lf)\n", R{link(2,2).x}, R{link(2,2).y});
-      printf("\n");
-    }
-
+    printf("(%lf, %lf)\t", link(0,0).real(), link(0,0).imag());
+    printf("(%lf, %lf)\t", link(0,1).real(), link(0,1).imag());
+    printf("(%lf, %lf)\n", link(0,2).real(), link(0,2).imag());
+    printf("(%lf, %lf)\t", link(1,0).real(), link(1,0).imag());
+    printf("(%lf, %lf)\t", link(1,1).real(), link(1,1).imag());
+    printf("(%lf, %lf)\n", link(1,2).real(), link(1,2).imag());
+    printf("(%lf, %lf)\t", link(2,0).real(), link(2,0).imag());
+    printf("(%lf, %lf)\t", link(2,1).real(), link(2,1).imag());
+    printf("(%lf, %lf)\n", link(2,2).real(), link(2,2).imag());
+    printf("\n");
+  }
+  
   template<class Cmplx>
   __device__ __host__
     double ErrorSU3(const Matrix<Cmplx,3>& matrix)
