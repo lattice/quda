@@ -126,8 +126,7 @@ protected:
     U = new cudaGaugeField(gParam);
 #endif
     // CURAND random generator initialization
-    randstates = new RNG(gParam, 1234);
-    randstates->Init();
+    randstates = new RNG(*U, 1234);
 
     int nsteps = 10;
     int nhbsteps = 4;
@@ -183,7 +182,6 @@ protected:
 
     a0.stop();
     printfQuda("Time -> %.6f s\n", a0.last());
-    randstates->Release();
     delete randstates;
   }
 

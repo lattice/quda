@@ -59,8 +59,8 @@ namespace quda {
   class Tunable {
 
   protected:
-    virtual long long flops() const = 0;
-    virtual long long bytes() const { return 0; } // FIXME
+    virtual long long flops() const { return 0; }
+    virtual long long bytes() const { return 0; }
 
     // the minimum number of shared bytes per thread
     virtual unsigned int sharedBytesPerThread() const = 0;

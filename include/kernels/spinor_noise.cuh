@@ -15,9 +15,9 @@ namespace quda {
     static constexpr QudaNoiseType noise = noise_;
     using V = typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, order>;
     V v;
-    RNG rng;
+    RNGState *rng;
     dim3 threads;
-    SpinorNoiseArg(ColorSpinorField &v, RNG &rng) :
+    SpinorNoiseArg(ColorSpinorField &v, RNGState *rng) :
       v(v),
       rng(rng),
       threads(v.VolumeCB(), v.SiteSubset(), 1) { }
@@ -47,14 +47,14 @@ namespace quda {
 
     __device__ __host__ void operator()(int x_cb, int parity)
     {
-      RNGState localState = arg.rng.State()[parity * arg.threads.x + x_cb];
+      RNGState localState = arg.rng[parity * arg.threads.x + x_cb];
       for (int s=0; s<Arg::nSpin; s++) {
         for (int c=0; c<Arg::nColor; c++) {
           if (Arg::noise == QUDA_NOISE_GAUSS) genGauss<typename Arg::real>(arg, localState, parity, x_cb, s, c);
           else if (Arg::noise == QUDA_NOISE_UNIFORM) genUniform<typename Arg::real>(arg, localState, parity, x_cb, s, c);
         }
       }
-      arg.rng.State()[parity * arg.threads.x + x_cb] = localState;
+      arg.rng[parity * arg.threads.x + x_cb] = localState;
     }
   };
 
