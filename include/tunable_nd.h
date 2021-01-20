@@ -16,6 +16,9 @@ namespace quda {
   {
 
   protected:
+    virtual unsigned int sharedBytesPerThread() const { return 0; }
+    virtual unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
+
     template <template <typename> class Functor, bool grid_stride = false, typename Arg>
     void launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
                        const std::vector<constant_param_t> &param = dummy_param)
@@ -52,9 +55,6 @@ namespace quda {
   protected:
     const LatticeField &field;
     QudaFieldLocation location;
-
-    virtual unsigned int sharedBytesPerThread() const { return 0; }
-    virtual unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
     /**
        Kernel1D (and its derivations Kernel2D and Kernel3D) do not
