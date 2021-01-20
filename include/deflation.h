@@ -2,7 +2,6 @@
 
 #include <invert_quda.h>
 #include <vector>
-//#include <complex_quda.h>
 #include "malloc_quda.h"
 
 namespace quda {
