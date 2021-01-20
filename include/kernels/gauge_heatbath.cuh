@@ -568,13 +568,13 @@ namespace quda {
     int border[4];
     Gauge dataOr;
     Float BetaOverNc;
-    RNG rngstate;
+    RNGState *rng;
     int mu;
     int parity;
     dim3 threads;   // number of active threads required
-    MonteArg(GaugeField &data, Float Beta, RNG &rngstate, int mu, int parity) :
+    MonteArg(GaugeField &data, Float Beta, RNGState *rng, int mu, int parity) :
       dataOr(data),
-      rngstate(rngstate),
+      rng(rng),
       mu(mu),
       parity(parity),
       threads(data.LocalVolumeCB(), 1, 1)
@@ -639,9 +639,9 @@ namespace quda {
         }
       U = arg.dataOr(mu, e_cb, parity);
       if (Arg::heatbath) {
-        RNGState localState = arg.rngstate.State()[x_cb];
+        RNGState localState = arg.rng[x_cb];
         heatBathSUN( U, conj(staple), localState, arg.BetaOverNc );
-        arg.rngstate.State()[x_cb] = localState;
+        arg.rng[x_cb] = localState;
       } else {
         overrelaxationSUN( U, conj(staple) );
       }

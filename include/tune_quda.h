@@ -8,7 +8,6 @@
 #include <tune_key.h>
 #include <quda_internal.h>
 #include <device.h>
-#include <target_device.h>
 
 // this file has some workarounds to allow compilation using nvrtc of kernels that include this file
 #ifndef __CUDACC_RTC__
@@ -33,12 +32,7 @@ namespace quda {
     float time;
     long long n_calls;
 
-    TuneParam() :
-      block(device::warp_size(), 1, 1), grid(1, 1, 1), shared_bytes(0), set_max_shared_bytes(false), aux(), time(FLT_MAX), n_calls(0)
-    {
-      aux = make_int4(1,1,1,1);
-    }
-
+    TuneParam();
     TuneParam(const TuneParam &) = default;
     TuneParam(TuneParam &&) = default;
     TuneParam& operator=(const TuneParam &) = default;
@@ -108,8 +102,8 @@ namespace quda {
     */
     virtual int gridStep() const { return 1; }
 
-    virtual int blockStep() const { return device::warp_size(); }
-    virtual int blockMin() const { return device::warp_size(); }
+    virtual int blockStep() const;
+    virtual int blockMin() const;
 
     virtual void resetBlockDim(TuneParam &param) const {
       if (tuneGridDim()) {
