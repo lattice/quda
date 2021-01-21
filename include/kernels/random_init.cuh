@@ -38,7 +38,7 @@ namespace quda {
   template <typename Arg>
   struct init_random {
     Arg &arg;
-    __device__ constexpr init_random(Arg arg) : arg(arg) {}
+    __device__ constexpr init_random(Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ inline void operator()(int id, int parity)
