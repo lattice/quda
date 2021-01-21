@@ -57,9 +57,9 @@
  */
 #cmakedefine QUDA_TARGET_CUDA @QUDA_TARGET_CUDA@
 
-/** 
+/**
  * @def QUDA_BUILD_TYPE_HIP
- * @brief THis macro is set by CMake if the HIP Build target is selected
+ * @brief This macro is set by CMake if the HIP Build target is selected
  */
 #cmakedefine QUDA_TARGET_HIP @QUDA_TARGET_HIP@
 

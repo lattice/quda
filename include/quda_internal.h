@@ -6,6 +6,10 @@
 #if defined(QUDA_TARGET_CUDA)
 #include <cuda.h>
 #include <cuda_runtime.h>
+#elif defined(QUDA_TARGET_HIP)
+#include "hip/hip_runtime_api.h"
+#else
+#error "Must have a QUDA target defined"
 #endif
 
 #include <string>
