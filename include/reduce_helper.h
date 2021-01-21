@@ -33,7 +33,7 @@ namespace quda
     count_t *get_count();
     qudaEvent_t &get_event();
   } // namespace reducer
-  
+
   template <typename T> struct plus;
 
 #if defined(QUDA_TARGET_HIP) 

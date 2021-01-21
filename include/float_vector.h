@@ -133,8 +133,8 @@ namespace quda {
   __host__ __device__ inline float8 operator+=(float8 &x, const float8 &y)
   {
 #if defined(QUDA_TARGET_HIP)
-    static_cast<float4>(x.x) += static_cast<float4>(y.x);
-    static_cast<float4>(x.y) += static_cast<float4>(y.y);
+    static_cast<float4>(x.x) += static_cast<const float4>(y.x);
+    static_cast<float4>(x.y) += static_cast<const float4>(y.y);
 #else
     x.x += y.x;
     x.y += y.y;
@@ -191,7 +191,6 @@ namespace quda {
     x.x -= y.x;
     x.y -= y.y;
 #endif
-
     return x;
   }
 
