@@ -70,10 +70,10 @@ namespace quda {
     }
   };
 
-  template <typename store_t, QudaReconstructType recon>
+  template <typename Float_, QudaReconstructType recon>
   struct GaugeFixArg {
-    using Float = typename mapper<store_t>::type;
-    using Gauge = typename gauge_mapper<store_t, recon>::type;
+    using Float = Float_;
+    using Gauge = typename gauge_mapper<Float, recon>::type;
     static constexpr int elems = recon / 2;
     Gauge data;
     int_fastdiv X[4];     // grid dimensions
@@ -150,11 +150,11 @@ namespace quda {
   /**
    * @brief container to pass parameters for the gauge fixing quality kernel
    */
-  template <typename store_t, QudaReconstructType recon_, int gauge_dir_>
+  template <typename Float_, QudaReconstructType recon_, int gauge_dir_>
   struct GaugeFixQualityFFTArg : public ReduceArg<double2> {
-    using real = typename mapper<store_t>::type;
+    using real = Float_;
     static constexpr QudaReconstructType recon = recon_;
-    using Gauge = typename gauge_mapper<store_t, recon>::type;
+    using Gauge = typename gauge_mapper<real, recon>::type;
     static constexpr int gauge_dir = gauge_dir_;
 
     int_fastdiv X[4];     // grid dimensions
@@ -183,16 +183,16 @@ namespace quda {
 
     using reduce_t = double2;
     Arg &arg;
-    static constexpr const char *filename() { return KERNEL_FILE; }
     constexpr FixQualityFFT(Arg &arg) : arg(arg) {}
-
+    static constexpr const char *filename() { return KERNEL_FILE; }
+    
     /**
      * @brief Measure gauge fixing quality
      */
     template <typename Reducer>
     __device__ __host__ inline reduce_t operator()(reduce_t &value, Reducer &r, int x_cb, int parity)
     {
-      reduce_t data;
+      reduce_t data = zero<reduce_t>(); 
       using matrix = Matrix<complex<typename Arg::real>, 3>;
       int x[4];
       getCoords(x, x_cb, arg.X, parity);

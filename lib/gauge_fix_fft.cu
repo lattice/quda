@@ -364,7 +364,7 @@ namespace quda {
     }
   }
 
-  template<typename Float, int nColors, QudaReconstructType recon> struct GaugeFixingFFT {
+  template<typename Float, int nColors, QudaReconstructType recon> class GaugeFixingFFT {
     GaugeFixingFFT(GaugeField& data, int gauge_dir, int Nsteps, int verbose_interval,
                    double alpha, int autotune, double tolerance, int stopWtheta)
     {
@@ -377,7 +377,8 @@ namespace quda {
       }
     }
   };
-
+  */
+  
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
    * @param[in,out] data, quda gauge field

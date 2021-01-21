@@ -17,6 +17,8 @@ using count_t = cuda::atomic<unsigned int, cuda::thread_scope_device>;
 using count_t = unsigned int;
 #endif
 
+#include <quda_define.h>
+
 namespace quda
 {
 
@@ -31,11 +33,34 @@ namespace quda
     count_t *get_count();
     qudaEvent_t &get_event();
   } // namespace reducer
+  
+  template <typename T> struct plus;
 
+#if defined(QUDA_TARGET_HIP) 
+  // For some reason HIP finds ambiguity with the more general operator
+  // So to be sure I am being very specific.
+  // DMH The issue comes from the gauge fixing templates, all the
+  // other gauge routines with reducers work fine. Give me another day
+  // and I'll work on it.
+  template<>
+  struct plus<double2> {
+    static constexpr bool do_sum = true; 
+    using Double2 = double2;
+
+    __device__ __host__ inline Double2 operator()( Double2 a, Double2 b ) {
+	    Double2 ret_val{0,0};
+	    ret_val.x = a.x + b.x;
+	    ret_val.y = a.y + b.y;
+	    return ret_val;
+    }
+  };
+#endif
+  
   template <typename T> struct plus {
     static constexpr bool do_sum = true;
     __device__ __host__ T operator()(T a, T b) const { return a + b; }
   };
+
 
   template <typename T> struct maximum {
     static constexpr bool do_sum = false;
