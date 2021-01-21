@@ -285,7 +285,7 @@ namespace quda
      updating the local buffers on a subsequent computation before we
      have finished sending.
   */
-#if defined(QUDA_ENNABLE_P2P)
+#if defined(QUDA_ENABLE_P2P)
   template <typename T>
   inline void completeDslash(const ColorSpinorField &in, const T&dslashParam) {
     // this ensures that the p2p sending is completed before any
