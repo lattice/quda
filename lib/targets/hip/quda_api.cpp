@@ -395,49 +395,6 @@ namespace quda {
     set_runtime_error(error, "hipEventSynchronize", func, file, line);
   }
 
-#if defined(QUDA_ENABLE_P2P)
-  void qudaIpcGetEventHandle_(qudaIpcEventHandle_t *handle, qudaEvent_t event, const char *func, const char *file,
-                              const char *line)
-  {
-    const hipEvent_t &hip_event = reinterpret_cast<const hipEvent_t&>(event.event);
-    //qudaIpcEventHandle_t doesn't convert nicely to ihipIpcEventHandle_t so no driver API
-    PROFILE(hipError_t error = hipIpcGetEventHandle((hipIpcEventHangle_t*)handle, hip_event), QUDA_PROFILE_IPC_GET_EVENT_HANDLE);
-    set_runtime_error(error, "hipIpcGetEventHandle", func, file, line);
-  }
-  
-  void qudaIpcGetMemHandle_(qudaIpcMemHandle_t *handle, void *ptr, const char *func, const char *file,
-			    const char *line)
-  {
-    // qudaIpcEventHandle_t doesn't convert nicely to ihipIpcEventHandle_t so no driver API
-    PROFILE(hipError_t error = hipIpcGetMemHandle(handle,ptr), QUDA_PROFILE_IPC_GET_MEM_HANDLE);
-    set_runtime_error(error, "hipIpcGetMemHandle", func, file, line);
-  }
-
-  void qudaIpcOpenEventHandle_(qudaEvent_t *event, qudaIpcEventHandle_t handle, const char *func, const char *file,
-                              const char *line)
-  {
-    // qudaIpcEventHandle_t doesn't convert nicely to ihipIpcEventHandle_t so no driver API
-    PROFILE(hipError_t error = hipIpcOpenEventHandle(event, handle), QUDA_PROFILE_IPC_OPEN_EVENT_HANDLE);
-    set_runtime_error(error, "hipIpcOpenEventHandle", func, file, line);
-  }
-
-  void qudaIpcOpenMemHandle_(void **devPtr, qudaIpcMemHandle_t handle, const char *func, const char *file,
-			     const char *line)
-  {
-    // qudaIpcEventHandle_t doesn't convert nicely to ihipIpcEventHandle_t so no driver API
-    PROFILE(hipError_t error = hipIpcOpenMemHandle(devPtr,handle,hipIpcMemLazyEnablePeerAccess),
-	    QUDA_PROFILE_IPC_OPEN_MEM_HANDLE);
-    set_runtime_error(error, "hipIpcOpenMemHandle", func, file, line);
-  }
-  
-  void qudaIpcCloseMemHandle_(void *devPtr, const char *func, const char *file, const char *line)
-  {
-    // qudaIpcEventHandle_t doesn't convert nicely to ihipIpcEventHandle_t so no driver API
-    PROFILE(hipError_t error = hipIpcCloseMemHandle(devPtr),QUDA_PROFILE_IPC_CLOSE_MEM_HANDLE);
-    set_runtime_error(error, "hipIpcCloseMemHandle", func, file, line);
-  }
-#endif
-
   void qudaStreamSynchronize_(const qudaStream_t &stream, const char *func, const char *file, const char *line)
   {
     PROFILE(hipError_t error = hipStreamSynchronize(device::get_cuda_stream(stream)), QUDA_PROFILE_STREAM_SYNCHRONIZE);
