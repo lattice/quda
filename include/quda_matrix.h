@@ -3,11 +3,9 @@
 #include <cstdio>
 #include <iostream>
 
-
 #include <register_traits.h>
 #include <float_vector.h>
 #include <complex_quda.h>
-#include <quda_sincos.h>
 
 namespace quda {
 
@@ -1023,7 +1021,7 @@ namespace quda {
       //[25]
       theta  = acos(c0/c0_max);
 
-      quda_sincos(theta * inv3, &w_p, &u_p);
+      Trig<isFixed<real>::value, real>::SinCos(theta * inv3, &w_p, &u_p);
       //[23]
       u_p *= sqrt_c1_inv3;
 
@@ -1035,7 +1033,7 @@ namespace quda {
       real w_sq =   w_p * w_p;
       real denom_inv =  1.0 / (9 * u_sq - w_sq);
       real exp_iu_re, exp_iu_im;
-      quda_sincos(u_p, &exp_iu_im, &exp_iu_re);
+      Trig<isFixed<real>::value, real>::SinCos(u_p, &exp_iu_im, &exp_iu_re);
       real exp_2iu_re =  exp_iu_re * exp_iu_re - exp_iu_im * exp_iu_im;
       real exp_2iu_im =  2 * exp_iu_re * exp_iu_im ;
       real cos_w = cos(w_p);

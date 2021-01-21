@@ -130,7 +130,7 @@ namespace quda {
 
 #if 0 // experimental version
       real as, ac;
-      sincos( theta*one_third, &as, &ac );
+      Trig<isFixed<real>::value, real>::SinCos( theta*one_third, &as, &ac );
       g[0] = c[0]*one_third + 2*sqrt_s*ac;
       //g[1] = c[0]*one_third + 2*sqrt_s*(ac*cos(1*FL_UNITARIZE_PI23) - as*sin(1*FL_UNITARIZE_PI23));
       g[1] = c[0]*one_third - 2*sqrt_s*(0.5*ac + as*0.8660254037844386467637);

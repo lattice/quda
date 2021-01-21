@@ -19,6 +19,7 @@
 #if defined(QUDA_TARGET_HIP)
 #include <hip/math_functions.h>
 #endif
+
 namespace quda {
 
   struct alignas(8) char8 {
@@ -395,27 +396,12 @@ namespace quda {
       __device__ __host__ static T Atan2( const T &a, const T &b) { return atan2(a,b); }
       __device__ __host__ static T Sin( const T &a ) { return sin(a); }
       __device__ __host__ static T Cos( const T &a ) { return cos(a); }
-      __device__ __host__ static void SinCos(const T &a, T *s, T *c) { 
-#if defined(QUDA_TARGET_CUDA)
-	      sincos(a, s, c); 
-#elif defined(QUDA_TARGET_HIP)
-#if defined(__HIP_DEVICE_COMPILE__)
-	sincos(a,s,c);
-#else
-	*s = sin(a);
-	*c = cos(a);
-#endif
-
-#else
-	*s = sin(a);
-	*c = cos(a);
-#endif
-      }
+      __device__ __host__ static void SinCos(const T &a, T *s, T *c) { sincos(a, s, c); }
     };
   
   /**
      Specialization of Trig functions using floats
-   */
+  */
   template <>
     struct Trig<false,float> {
     __device__ __host__ static float Atan2( const float &a, const float &b) { return atan2f(a,b); }
