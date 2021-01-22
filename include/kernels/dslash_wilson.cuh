@@ -77,6 +77,8 @@ namespace quda
     const int their_spinor_parity = nParity == 2 ? 1 - parity : 0;
 
     // parity for gauge field - include residual parity from 5-d => 4-d checkerboarding
+    // For 4d-domain-wall/Mobius, coord.x_cb is the 4d checkerboarded index, so gauge_parity = parity
+    // For 4d-domain-wall/Mobius, coord.x_cb is the 5d checkerboarded index
     const int gauge_parity = (Arg::nDim == 5 ? (coord.x_cb / arg.dc.volume_4d_cb + parity) % 2 : parity);
 
 #pragma unroll

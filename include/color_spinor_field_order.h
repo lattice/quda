@@ -97,6 +97,54 @@ namespace quda {
   }
 
   /**
+      TODO: Fix doc
+     @brief spinor_wrapper is an internal class that is used to
+     wrap instances of colorspinor accessors, currying in a specifc
+     location on the field.  The operator() accessors in
+     colorspinor-field accessors return instances to this class,
+     allowing us to then use operator overloading upon this class
+     to interact with the ColorSpinor class.  As a result we can
+     include colorspinor-field accessors directly in ColorSpinor
+     expressions in kernels without having to declare temporaries
+     with explicit calls to the load/save methods in the
+     colorspinor-field accessors.
+  */
+  template <typename Float, typename T>
+    struct spinor_wrapper {
+      T &field;
+      const int x_cb;
+      const int parity;
+      const int color;
+
+      /**
+        @brief colorspinor_wrapper constructor
+        @param[in] a colorspinor field accessor we are wrapping
+        @param[in] x_cb checkerboarded space-time index we are accessing
+        @param[in] parity Parity we are accessing
+       */
+      __device__ __host__ inline spinor_wrapper<Float, T>(T &field, int x_cb, int parity, int color) :
+        field(field),
+        x_cb(x_cb),
+        parity(parity),
+        color(color)
+      {
+      }
+
+    };
+
+  template <typename T, int Nc>
+    template <typename S>
+    __device__ __host__ inline void ColorSpinor<T, Nc, 4>::operator=(const spinor_wrapper<T, S> &a) {
+      a.field.load(data, a.x_cb, a.parity, a.color);
+    }
+
+  template <typename T, int Nc>
+    template <typename S>
+    __device__ __host__ inline ColorSpinor<T, Nc, 4>::ColorSpinor(const spinor_wrapper<T, S> &a) {
+      a.field.load(data, a.x_cb, a.parity, a.color);
+    }
+
+  /**
      @brief colorspinor_ghost_wrapper is an internal class that is
      used to wrap instances of colorspinor accessors, currying in a
      specifc location on the field.  The Ghost() accessors in
@@ -1041,6 +1089,24 @@ namespace quda {
     for (int i = 0; i < length / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
   }
 
+  /**
+   * The same as the `load` function above, but only load a spinor.
+   */
+  __device__ __host__ inline void load(complex out[Ns], int x, int parity, int color) const
+  {
+    real v[Ns * 2];
+    norm_type nrm = isFixed<Float>::value ? vector_load<float>(norm, x + parity * norm_offset) : 0.0;
+
+#pragma unroll
+    for (int spin = 0; spin < Ns; spin++) {
+      auto tmp = this->operator()(x, parity, spin, color);
+      copy_and_scale(v[spin * 2 + 0], tmp.real(), nrm);
+      copy_and_scale(v[spin * 2 + 1], tmp.imag(), nrm);
+    }
+#pragma unroll
+    for (int i = 0; i < Ns; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
+  }
+
   __device__ __host__ inline void save(const complex in[length / 2], int x, int parity = 0)
   {
     real v[length];
@@ -1107,6 +1173,52 @@ namespace quda {
   __device__ __host__ inline const colorspinor_wrapper<real, Accessor> operator()(int x_cb, int parity) const
   {
     return colorspinor_wrapper<real, Accessor>(const_cast<Accessor &>(*this), x_cb, parity);
+  }
+
+   /**
+     @brief This accessor routine returns a const spinor_wrapper to this object,
+     allowing us to overload various operators for manipulating at
+     the site level interms of matrix operations.
+     @param[in] x_cb Checkerboarded space-time index we are requesting
+     @param[in] parity Parity we are requesting
+     @return Instance of a colorspinor_wrapper that curries in access to
+     this field at the above coordinates.
+  */
+  __device__ __host__ inline const spinor_wrapper<real, Accessor> operator()(int x_cb, int parity, int color) const
+  {
+    return spinor_wrapper<real, Accessor>(const_cast<Accessor &>(*this), x_cb, parity, color);
+  }
+
+   /**
+     @brief This accessor routine returns a const spinor_wrapper to this object,
+     allowing us to overload various operators for manipulating at
+     the site level interms of matrix operations.
+     @param[in] x_cb Checkerboarded space-time index we are requesting
+     @param[in] parity Parity we are requesting
+     @return Instance of a colorspinor_wrapper that curries in access to
+     this field at the above coordinates.
+  */
+  __device__ __host__ inline const ::complex<Float> &operator()(int x_cb, int parity, int spin, int color) const
+  {
+    int i = (spin * Nc + color) * 2 / N;
+    int j = (spin * Nc + color) * 2 % N;
+    return reinterpret_cast<::complex<Float> *>(field)[((parity * offset + x_cb + stride * i) * N + j) / 2];
+  }
+
+   /**
+     @brief This accessor routine returns a const spinor_wrapper to this object,
+     allowing us to overload various operators for manipulating at
+     the site level interms of matrix operations.
+     @param[in] x_cb Checkerboarded space-time index we are requesting
+     @param[in] parity Parity we are requesting
+     @return Instance of a colorspinor_wrapper that curries in access to
+     this field at the above coordinates.
+  */
+  __device__ __host__ inline ::complex<Float> &operator()(int x_cb, int parity, int spin, int color)
+  {
+    int i = (spin * Nc + color) * 2 / N;
+    int j = (spin * Nc + color) * 2 % N;
+    return reinterpret_cast<::complex<Float> *>(field)[((parity * offset + x_cb + stride * i) * N + j) / 2];
   }
 
   __device__ __host__ inline void loadGhost(complex out[length_ghost / 2], int x, int dim, int dir, int parity = 0) const

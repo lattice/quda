@@ -11,6 +11,26 @@
 
 namespace quda
 {
+  template <template <int, bool, bool, KernelType, typename> class D, class Arg, template <bool, QudaPCType, typename> class P, int nParity, bool dagger, bool xpay, KernelType kernel_type>
+  inline typename std::enable_if<D<nParity, dagger, xpay, kernel_type, Arg>::has_alternative_kernel(), void>::type launch_dslash_kernel(TuneParam &tp, const qudaStream_t &stream, Arg &arg)
+  {
+    tp.set_max_shared_bytes = true;
+    if (tp.aux.y == 0) { // Launch with the one-thread-per-site strategy
+      auto kernel = dslashGPU<D, P, nParity, dagger, xpay, kernel_type, Arg>;
+      qudaLaunchKernel(kernel, tp, stream, arg);
+    } else { // Launch with the alternative strategy the `D` class provides
+      using DslashType = D<nParity, dagger, xpay, kernel_type, Arg>;
+      DslashType::launch(tp, stream, arg);
+    }
+  }
+
+  template <template <int, bool, bool, KernelType, typename> class D, class Arg, template <bool, QudaPCType, typename> class P, int nParity, bool dagger, bool xpay, KernelType kernel_type>
+  inline typename std::enable_if<!D<nParity, dagger, xpay, kernel_type, Arg>::has_alternative_kernel(), void>::type launch_dslash_kernel(TuneParam &tp, const qudaStream_t &stream, Arg &arg)
+  {
+    tp.set_max_shared_bytes = true;
+      auto kernel = dslashGPU<D, P, nParity, dagger, xpay, kernel_type, Arg>;
+      qudaLaunchKernel(kernel, tp, stream, arg);
+  }
 
   /**
      @brief This is the generic driver for launching Dslash kernels
@@ -133,6 +153,14 @@ namespace quda
           param.aux.x = 1;
           return false;
         }
+      } else if (arg.kernel_type == INTERIOR_KERNEL) {
+        if (param.aux.y == 0) {
+          param.aux.y++;
+          return true;
+        } else {
+          param.aux.y = 0;
+          return false;
+        }
       } else {
         return false;
       }
@@ -142,12 +170,14 @@ namespace quda
     {
       TunableVectorYZ::initTuneParam(param);
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1; // packing blocks per direction
+      param.aux.y = 1;
     }
 
     virtual void defaultTuneParam(TuneParam &param) const
     {
       TunableVectorYZ::defaultTuneParam(param);
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1; // packing blocks per direction
+      param.aux.y = 1;
     }
 
     /**
@@ -208,7 +238,9 @@ namespace quda
         Tunable::launch_error = error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
 #else
         switch (arg.kernel_type) {
-        case INTERIOR_KERNEL: launch<P, nParity, dagger, xpay, INTERIOR_KERNEL>(tp, stream); break;
+        // case INTERIOR_KERNEL: launch<P, nParity, dagger, xpay, INTERIOR_KERNEL>(tp, stream); break;
+        case INTERIOR_KERNEL: launch_dslash_kernel<D, Arg, P, nParity, dagger, xpay, INTERIOR_KERNEL>(tp, stream, arg);
+        break;
 #ifdef MULTI_GPU
         case EXTERIOR_KERNEL_X: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_X>(tp, stream); break;
         case EXTERIOR_KERNEL_Y: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_Y>(tp, stream); break;

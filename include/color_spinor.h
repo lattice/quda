@@ -16,6 +16,7 @@ namespace quda {
 
   template<typename Float, typename T> struct colorspinor_wrapper;
   template<typename Float, typename T> struct colorspinor_ghost_wrapper;
+  template<typename Float, typename T> struct spinor_wrapper;
 
   /**
      This is the generic declaration of ColorSpinor.
@@ -130,6 +131,7 @@ namespace quda {
       }
     };
 
+
     /**
        This is the specialization for Nspin=4.  For fields with four
        spins we can define a spin projection operation.
@@ -170,6 +172,12 @@ namespace quda {
       for (int i = 0; i < size; i++) { data[i] *= a; }
       return *this;
     }
+
+    template <typename S>
+    __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const spinor_wrapper<Float, S> &a);
+
+    template <typename S>
+    __device__ __host__ inline void operator=(const spinor_wrapper<Float, S> &a);
 
     /**
 	Return this application of gamma_dim to this spinor

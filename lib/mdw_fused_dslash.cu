@@ -205,8 +205,8 @@ namespace quda
       template <MdwfFusedDslashType type> void apply(const TuneParam &tp, const qudaStream_t &stream)
       {
         switch (tp.block.x) {
-        case 16: tp.aux.x ? apply<16, true, type>(tp, stream) : apply<16, false, type>(tp, stream); break;
-        case 32: tp.aux.x ? apply<32, true, type>(tp, stream) : apply<32, false, type>(tp, stream); break;
+        // case 16: tp.aux.x ? apply<16, true, type>(tp, stream) : apply<16, false, type>(tp, stream); break;
+        // case 32: tp.aux.x ? apply<32, true, type>(tp, stream) : apply<32, false, type>(tp, stream); break;
         default: errorQuda("Invalid tp.block.x(=%d)\n", tp.block.x);
         }
       }

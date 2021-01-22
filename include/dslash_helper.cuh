@@ -376,6 +376,7 @@ namespace quda
   struct dslash_default {
     constexpr QudaPCType pc_type() const { return QUDA_4D_PC; }
     constexpr int twist_pack() const { return 0; }
+    static constexpr bool has_alternative_kernel() { return false; }
   };
 
   /**
