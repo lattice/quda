@@ -86,7 +86,7 @@ namespace quda
       if (arg.kernel_type == EXTERIOR_KERNEL_ALL && arg.shmem > 0) {
         int nDimComms = 0;
         for (int d = 0; d < in.Ndim(); d++) nDimComms += arg.commDim[d];
-        return ((deviceProp.multiProcessorCount) / nDimComms) * nDimComms;
+        return ((deviceProp.multiProcessorCount) / (2*nDimComms)) * (2*nDimComms);
       } else {
         return TunableVectorYZ::minGridSize();
       }
@@ -97,7 +97,7 @@ namespace quda
       if (arg.kernel_type == EXTERIOR_KERNEL_ALL && arg.shmem > 0) {
         int nDimComms = 0;
         for (int d = 0; d < in.Ndim(); d++) nDimComms += arg.commDim[d];
-        return ((deviceProp.multiProcessorCount) / nDimComms) * nDimComms;
+        return ((deviceProp.multiProcessorCount) / (2*nDimComms)) * (2*nDimComms);
       } else {
         return TunableVectorYZ::gridStep();
       }

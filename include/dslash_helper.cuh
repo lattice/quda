@@ -506,8 +506,9 @@ namespace quda
       const int myblockidx = arg.ext_blocks > 0 ? blockIdx.x - (gridDim.x - arg.ext_blocks) : blockIdx.x;
       const int nComm = arg.commDim[0] + arg.commDim[1] + arg.commDim[2] + arg.commDim[3];
       const int blocks_per_dim = (arg.ext_blocks > 0 ? arg.ext_blocks : gridDim.x) / (nComm);
-
-      int dir = (myblockidx % blocks_per_dim) / (blocks_per_dim / 2);
+      const int blocks_per_dir = blocks_per_dim/2;
+  
+      int dir = (myblockidx % blocks_per_dim) / (blocks_per_dir);
       // this id the dimdir we are working on ...
       int dim;
       int threadl;
@@ -540,9 +541,7 @@ namespace quda
       default: threadl = 0; threads_my_dir = 0;
       }
       int dimdir = 2 * dim + dir;
-      int local_tid = threadIdx.x + blockDim.x * (myblockidx % (blocks_per_dim / 2)); // index within the block
-      int tid = local_tid + threadl + dir * threads_my_dir; // global index corresponfing to local_tid
-
+      
       constexpr bool shmembarrier = true; // always true for now (arg.shmem & 16);
 
       if (shmembarrier) {
@@ -594,6 +593,9 @@ namespace quda
         // do exterior
       }
       arg.kernel_type = EXTERIOR_KERNEL_ALL;
+      int local_tid = threadIdx.x + blockDim.x * (myblockidx % (blocks_per_dir)); // index within the block
+      int tid = local_tid + threadl + dir * threads_my_dir; // global index corresponfing to local_tid
+
       while (local_tid < threads_my_dir) {
         // for full fields set parity from z thread index else use arg setting
         int parity = nParity == 2 ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
@@ -605,8 +607,8 @@ namespace quda
         case 1: dslash.template operator()<EXTERIOR_KERNEL_ALL>(tid, s, 1); break;
         }
 #endif
-        local_tid += blockDim.x * blocks_per_dim / 2;
-        tid += blockDim.x * blocks_per_dim / 2;
+        local_tid += blockDim.x * blocks_per_dir;
+        tid += blockDim.x * blocks_per_dir;
       }
 #endif
     } else {
