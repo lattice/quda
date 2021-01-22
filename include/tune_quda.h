@@ -8,6 +8,7 @@
 #include <tune_key.h>
 #include <quda_internal.h>
 #include <device.h>
+#include <uint_to_char.h>
 
 // this file has some workarounds to allow compilation using nvrtc of kernels that include this file
 #ifndef __CUDACC_RTC__

@@ -3,6 +3,7 @@
 #include <float_vector.h>
 #include <cub_helper.cuh>
 #include <target_device.h>
+#include <reducer.h>
 
 #ifdef QUAD_SUM
 using device_reduce_t = doubledouble;
@@ -31,26 +32,6 @@ namespace quda
     count_t *get_count();
     qudaEvent_t &get_event();
   } // namespace reducer
-
-  template <typename T> struct plus {
-    static constexpr bool do_sum = true;
-    __device__ __host__ T operator()(T a, T b) const { return a + b; }
-  };
-
-  template <typename T> struct maximum {
-    static constexpr bool do_sum = false;
-    __device__ __host__ T operator()(T a, T b) const { return a > b ? a : b; }
-  };
-
-  template <typename T> struct minimum {
-    static constexpr bool do_sum = false;
-    __device__ __host__ T operator()(T a, T b) const { return a < b ? a : b; }
-  };
-
-  template <typename T> struct identity {
-    static constexpr bool do_sum = false;
-    __device__ __host__ T operator()(T a) const { return a; }
-  };
 
   constexpr int max_n_reduce() { return QUDA_MAX_MULTI_REDUCE; }
 

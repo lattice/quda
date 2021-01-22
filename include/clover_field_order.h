@@ -70,16 +70,6 @@ namespace quda {
 
   namespace clover {
 
-    template<typename ReduceType, typename Float> struct square_ {
-      __host__ __device__ inline ReduceType operator()(const quda::complex<Float> &x)
-      { return static_cast<ReduceType>(norm(x)); }
-    };
-
-    template<typename ReduceType, typename Float> struct abs_ {
-      __host__ __device__ inline ReduceType operator()(const quda::complex<Float> &x)
-      { return static_cast<ReduceType>(abs(x)); }
-    };
-
     /**
        The internal ordering for each clover matrix has chirality as the
        slowest running dimension, with the internal 36 degrees of
