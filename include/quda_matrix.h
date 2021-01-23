@@ -791,7 +791,7 @@ namespace quda {
 	uinv(2,3) = -cofactor4x4<T,3,2>(u);
 	uinv(3,3) =  cofactor4x4<T,3,3>(u);
 
-	// Scale the result by column 0
+	// Scale the result to lie on the U(N) manifold
 	temp = static_cast<typename T::value_type>(0.0);
 	for(int i=0; i<4; i++) {
 	  temp += u(i,0) * uinv(0,i);
@@ -814,7 +814,7 @@ namespace quda {
 	
 	double tol = 1e-10;
 	int i = 0, j = 0, k = 0, i_max = 0;
-	int pivots[N];
+	int pivots[N+1];
 	using Float = typename T::value_type;
 	Float max_u = 0.0, abs_u = 0.0;
 	T temp = static_cast<typename T::value_type>(0.0);
@@ -842,13 +842,17 @@ namespace quda {
             pivots[i_max] = j;
 	    
             //pivoting rows of u
+#pragma unroll
 	    for(int r=0; r<N; r++) {
 	      temp = u_cpy(i,r);
 	      u_cpy(i, r) = u_cpy(i_max, r);
 	      u_cpy(i_max,r) = temp;
 	    }
 	    
-            //counting pivots starting from N (for determinant)
+            //counting pivots starting from N
+	    // In a future implementation, we may wish
+	    // default to this methos for computing the
+	    // determinant of a large Nc matrix
             pivots[N]++;
 	  }
 	  

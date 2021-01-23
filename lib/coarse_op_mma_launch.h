@@ -402,28 +402,33 @@ namespace quda
     }
 
     template <bool from_coarse, bool query_max = false, class Arg>
-    typename std::enable_if<Arg::fineColor == 2*N_COLORS && Arg::coarseColor == 2*N_COLORS && Arg::fineSpin == 2 && Arg::coarseSpin == 2, int>::type
-    launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream)
-    {
-      if (query_max) return 2;
-      switch (tp.aux.x) {
-      // clang-format off
-      //case 0: launch_compute_vuv_kernel<from_coarse,  16,  16,   8,   8,   4>(tp, arg, min_threads, stream); break;
-      //case 1: launch_compute_vuv_kernel<from_coarse,  16,  16,   8,   4,   8>(tp, arg, min_threads, stream); break;
-      case 0: launch_compute_vuv_kernel<from_coarse,  16,  16,   12,   8,   4>(tp, arg, min_threads, stream); break;
-      case 1: launch_compute_vuv_kernel<from_coarse,  16,  16,   12,   4,   8>(tp, arg, min_threads, stream); break;
-      // clang-format on
-      default:
-        errorQuda("tp.aux.x(=%d) is NOT supported by (%d, %d, %d, %d).", tp.aux.x, Arg::fineSpin, Arg::coarseSpin,
-                  Arg::fineColor, Arg::coarseColor);
+      typename std::enable_if<Arg::fineColor == 2*N_COLORS && Arg::coarseColor == 2*N_COLORS && Arg::fineSpin == 2 && Arg::coarseSpin == 2, int>::type
+      launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream)
+      {
+#if (__COMPUTE_CAPABILITY__ < 750) && (2*N_COLORS <= 8)
+	  constexpr int k_tile = 8;
+#elif (__COMPUTE_CAPABILITY__ < 750) && (2*N_COLORS <= 12)
+	  constexpr int k_tile = 12;
+#elif (__COMPUTE_CAPABILITY__ < 750) && (2*N_COLORS <= 16)
+	constexpr int k_tile = 16;
+#endif
+	if (query_max) return 2;
+	switch (tp.aux.x) {
+	  // clang-format off
+	case 0: launch_compute_vuv_kernel<from_coarse,  16,  16,   k_tile,   8,   4>(tp, arg, min_threads, stream); break;
+	case 1: launch_compute_vuv_kernel<from_coarse,  16,  16,   k_tile,   4,   8>(tp, arg, min_threads, stream); break;
+	  // clang-format on
+	default:
+	  errorQuda("tp.aux.x(=%d) is NOT supported by (%d, %d, %d, %d).", tp.aux.x, Arg::fineSpin, Arg::coarseSpin,
+		    Arg::fineColor, Arg::coarseColor);
+	}
+	return -1;
       }
-      return -1;
-    }
 
     template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 24 && Arg::coarseColor == 24 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
                             int>::type
-    launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream)
+      launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream)
     {
 #if (__COMPUTE_CAPABILITY__ >= 750) // Turing or above
       if (query_max) return 1;
