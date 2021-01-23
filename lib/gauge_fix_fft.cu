@@ -364,7 +364,7 @@ namespace quda {
     }
   }
 
-  template<typename Float, int nColors, QudaReconstructType recon> class GaugeFixingFFT {
+  template<typename Float, int nColors, QudaReconstructType recon> struct GaugeFixingFFT {
     GaugeFixingFFT(GaugeField& data, int gauge_dir, int Nsteps, int verbose_interval,
                    double alpha, int autotune, double tolerance, int stopWtheta)
     {
