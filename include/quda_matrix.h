@@ -800,15 +800,85 @@ namespace quda {
 	return uinv;
       }
 
+    /**
+       @brief Compute the matrix inverse via LU decomposition
+       @param[in] u The matrix to be inverted
+       @return uinv The inverse of u 
+    */
     template<class T, int N, typename = std::enable_if_t<(N > 4)>>
       __device__  __host__ inline
       Matrix<T,N> inverse(const Matrix<T,N> &u)
       {
 	Matrix<T,N> uinv;
-	setZero(&uinv);
-	// LU?
+	Matrix<T,N> u_cpy = u;
+	
+	double tol = 1e-10;
+	int i = 0, j = 0, k = 0, i_max = 0;
+	int pivots[N];
+	using Float = typename T::value_type;
+	Float max_u = 0.0, abs_u = 0.0;
+	T temp = static_cast<typename T::value_type>(0.0);
+	
+	for (i = 0; i <= N; i++) pivots[i] = i; //Permutation matrix	
+	for (i = 0; i < N; i++) {
+	  max_u = 0.0;
+	  i_max = i;
+	  
+	  for (k = i; k < N; k++)
+            if ((abs_u = abs(u_cpy(k,i))) > max_u) { 
+	      max_u = abs_u;
+	      i_max = k;
+            }
+	  
+	  if (max_u < tol) {
+	    setZero(&uinv);
+	    return uinv; //failure, matrix is degenerate
+	  }
+	  
+	  if (i_max != i) {
+            //pivoting pivots
+            j = pivots[i];
+            pivots[i] = pivots[i_max];
+            pivots[i_max] = j;
+	    
+            //pivoting rows of u
+	    for(int r=0; r<N; r++) {
+	      temp = u_cpy(i,r);
+	      u_cpy(i, r) = u_cpy(i_max, r);
+	      u_cpy(i_max,r) = temp;
+	    }
+	    
+            //counting pivots starting from N (for determinant)
+            pivots[N]++;
+	  }
+	  
+	  for (j = i + 1; j < N; j++) {
+	    u_cpy(j,i) /= u_cpy(i,i);
+	    
+            for (k = i + 1; k < N; k++)
+	      u_cpy(j,k) -= u_cpy(j,i) * u_cpy(i,k);
+	  }
+	}
+
+	// Compute inverse
+	for (int j = 0; j < N; j++) {
+	  for (int i = 0; i < N; i++) {
+	    uinv(i,j) = pivots[i] == j ? 1.0 : 0.0;
+	    
+	    for (int k = 0; k < i; k++)
+	      uinv(i,j) -= u_cpy(i,k) * uinv(k,j);
+	  }
+	  
+	  for (int i = N - 1; i >= 0; i--) {
+	    for (int k = i + 1; k < N; k++)
+	      uinv(i,j) -= u_cpy(i,k) * uinv(k,j);
+	    
+	    uinv(i,j) /= u_cpy(i,i);
+	  }
+	}	
 	return uinv;
       }
+    
     
     
     template<class T, int N>
