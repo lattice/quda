@@ -73,7 +73,10 @@ namespace quda
   template <> struct VectorType<int8_t, 2*4*N_COLORS> {
     using type = vector_type<int8_t, 2*4*N_COLORS>;
   };
-  /*
+
+  // If Nc = 4 or 2, the code below is already instantated
+  // in quda/include/register_traits.h
+#if (N_COLORS != 2 && N_COLORS != 4)
   template <> struct VectorType<double, 2*N_COLORS> {
     using type = vector_type<double, 2*N_COLORS>;
   };
@@ -86,7 +89,8 @@ namespace quda
   template <> struct VectorType<int8_t, 2*N_COLORS> {
     using type = vector_type<int8_t, 2*N_COLORS>;
   };
-  */
+#endif
+  
   namespace blas
   {
 

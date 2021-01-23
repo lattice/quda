@@ -1040,6 +1040,62 @@ static void orthogonalize(complex<Float> *a, complex<Float> *b, int len) {
   for (int i=0; i<len; i++) b[i] -= (complex<Float>)dot*a[i];
 }
 
+/*
+complex<double> det3helper(MatrixXcd a, int i1, int i2, int i3, int j1, int j2, int j3)
+{
+  return a(i1,j1)
+    * (a(i2,j2) * a(i3,j3) - a(i2,j3) * a(i3,j2));
+}
+
+template<int i, int j>
+complex<double> cofactor4x4(MatrixXcd a)
+{
+  enum {
+    i1 = (i+1) % 4,
+    i2 = (i+2) % 4,
+    i3 = (i+3) % 4,
+    j1 = (j+1) % 4,
+    j2 = (j+2) % 4,
+    j3 = (j+3) % 4
+  };      
+  return (det3helper(a, i1, i2, i3, j1, j2, j3) +
+	  det3helper(a, i2, i3, i1, j1, j2, j3) +
+	  det3helper(a, i3, i1, i2, j1, j2, j3));
+}
+
+void inverse4x4(MatrixXcd u) {
+
+  MatrixXcd uinv = MatrixXcd::Zero(4, 4);
+  
+  uinv(0,0) =  cofactor4x4<0,0>(u);
+  uinv(1,0) = -cofactor4x4<0,1>(u);
+  uinv(2,0) =  cofactor4x4<0,2>(u);
+  uinv(3,0) = -cofactor4x4<0,3>(u);
+  uinv(0,2) =  cofactor4x4<2,0>(u);
+  uinv(1,2) = -cofactor4x4<2,1>(u);
+  uinv(2,2) =  cofactor4x4<2,2>(u);
+  uinv(3,2) = -cofactor4x4<2,3>(u);
+  uinv(0,1) = -cofactor4x4<1,0>(u);
+  uinv(1,1) =  cofactor4x4<1,1>(u);
+  uinv(2,1) = -cofactor4x4<1,2>(u);
+  uinv(3,1) =  cofactor4x4<1,3>(u);
+  uinv(0,3) = -cofactor4x4<3,0>(u);
+  uinv(1,3) =  cofactor4x4<3,1>(u);
+  uinv(2,3) = -cofactor4x4<3,2>(u);
+  uinv(3,3) =  cofactor4x4<3,3>(u);
+
+  // Scale the result by column 0
+  complex<double> temp = 0.0;
+  for(int i=0; i<4; i++) {
+    temp += u(i,0) * uinv(0,i);
+  }
+  temp = 1.0/temp;
+  uinv *= temp;
+  
+  cout << uinv * u << endl << endl;
+}
+*/
+
 template <typename Float> void constructRandomGaugeField(Float **res, QudaGaugeParam *param, QudaDslashType dslash_type)
 {
   Float *resOdd[4], *resEven[4];
@@ -1092,6 +1148,9 @@ template <typename Float> void constructRandomGaugeField(Float **res, QudaGaugeP
 	// QR the random matrix
 	qr.compute(R);
 	Q = qr.householderQ();
+
+	// Test for unitarity
+	//inverse4x4(Q);
 	
 	// Q is now an element of U(Nc), make it an element of SU(Nc)      
 	Q *= pow(Q.determinant(), -1.0/Nc);
@@ -1174,6 +1233,7 @@ template <typename Float> void constructRandomGaugeField(Float **res, QudaGaugeP
     }
   }
 }
+
 
 template <typename Float> void constructUnitaryGaugeField(Float **res)
 {

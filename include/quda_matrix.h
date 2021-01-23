@@ -7,9 +7,6 @@
 #include <float_vector.h>
 #include <complex_quda.h>
 
-//#include <Eigen/Dense>
-//using namespace Eigen;
-
 namespace quda {
 
   template <typename T> constexpr bool is_nan(T x) { return x != x; }
@@ -210,14 +207,23 @@ namespace quda {
 #pragma unroll
           for (int i=0; i<N; ++i){
             if( fabs(identity(i,i).real() - 1.0) > max_error ||
-                fabs(identity(i,i).imag()) > max_error) return false;
-
+                fabs(identity(i,i).imag()) > max_error) {
+	      for(int j=0; j<N; ++j) {
+		for(int k=0; k<N; ++k) {
+		  //printf("link (%d,%d) error = %e,%e\n", j, k, fabs(identity(j,k).real() - 1.0), fabs(identity(j,k).imag()));
+		}
+	      }
+	      return false;
+	    }							   
+	    
 #pragma unroll
             for (int j=i+1; j<N; ++j){
               if( fabs(identity(i,j).real()) > max_error ||
                   fabs(identity(i,j).imag()) > max_error ||
                   fabs(identity(j,i).real()) > max_error ||
                   fabs(identity(j,i).imag()) > max_error ){
+		//printf("off diag %d,%d error = %e,%e\n", i, j, fabs(identity(i,j).real()), fabs(identity(i,j).imag()));
+		//printf("off diag %d,%d error = %e,%e\n", j, i, fabs(identity(j,i).real()), fabs(identity(j,i).imag()));
                 return false;
               }
             }
@@ -228,10 +234,13 @@ namespace quda {
 #pragma unroll
             for (int j=0; j<N; j++) {
               if (is_nan((*this)(i,j).real()) ||
-                  is_nan((*this)(i,j).imag())) return false;
+                  is_nan((*this)(i,j).imag())) {
+		printf("off diag %d,%d nan error\n", j, i);
+		return false;
+	      }
             }
           }
-
+	  
           return true;
         }
 
@@ -417,14 +426,12 @@ namespace quda {
     return result;
   }
 
-  template<class T, int N>
-    __device__ __host__ inline  Matrix<T,N> getSubMat(const Matrix<T,N> &a, int p, int q)
+  template<class T, int N, typename = std::enable_if_t<(N > 1)>>
+    __device__ __host__ inline  Matrix<T,N-1> getSubMat(const Matrix<T,N> &a, int p, int q)
     {
-      int i = 0, j = 0;
-      
-      Matrix<T, N> subMat;
+      Matrix<T, N-1> subMat;
       setZero(&subMat);
-      subMat(N-1,N-1) = static_cast<typename T::value_type>(1.0);          
+      int i=0, j=0;
       for (int row = 0; row < N; row++) {
 	for (int col = 0; col < N; col++) {
 	  if (row != p && col != q) {
@@ -441,63 +448,107 @@ namespace quda {
       return subMat;
     }
   
-  template<class T, int N>
-    __device__ __host__ inline T det4helper(const Matrix<T,N> &a, int j, int k, int m, int n)
+  template<class T>
+    __device__ __host__ inline T det3helper(const Matrix<T,4> &a, int i1, int i2, int i3, int j1, int j2, int j3)
+    {
+      return a(i1,j1)
+	* (a(i2,j2) * a(i3,j3) - a(i2,j3) * a(i3,j2));
+    }
+  
+  template<class T, int i, int j>
+    __device__ __host__ inline T cofactor4x4(const Matrix<T,4> &a)
+  {
+      enum {
+	i1 = (i+1) % 4,
+	i2 = (i+2) % 4,
+	i3 = (i+3) % 4,
+	j1 = (j+1) % 4,
+	j2 = (j+2) % 4,
+	j3 = (j+3) % 4
+      };      
+      return (det3helper(a, i1, i2, i3, j1, j2, j3) +
+	      det3helper(a, i2, i3, i1, j1, j2, j3) +
+	      det3helper(a, i3, i1, i2, j1, j2, j3));
+    }
+  
+  
+  template<class T>
+    __device__ __host__ inline T det4helper(const Matrix<T,4> &a, int j, int k, int m, int n)
     {
       return ((a(j,0) * a(k,1) - a(k,0) * a(j,1)) *
 	      (a(m,2) * a(n,3) - a(n,2) * a(m,3)));
     }
   
-  template<class T, int N>
-    __device__ __host__ inline T getDeterminant(const Matrix<T,N> &a)
-  {
-    T result;
-    if(N == 1) {
-      result = a(0,0);
-    } else if(N == 2) {
-      result = a(0,0)*a(1,1) - a(1,0) * a(0,1);
-    } else if(N == 3) {      
-      result = (a(0,0)*(a(1,1)*a(2,2) - a(2,1)*a(1,2)) -
-		a(0,1)*(a(1,0)*a(2,2) - a(1,2)*a(2,0)) + 
-		a(0,2)*(a(1,0)*a(2,1) - a(1,1)*a(2,0)));
-    } else if(N == 4) {
-      result = (det4helper(a,0,1,2,3) -
-		det4helper(a,0,2,1,3) +
-		det4helper(a,0,3,1,2) +
-		det4helper(a,1,2,0,3) -
-		det4helper(a,1,3,0,2) +
-		det4helper(a,2,3,0,1));      
-    } else {
-      /*
-      // Move along the top row, recursively get the determinant
-      // of the submatrix and multiply with the relevant sign.
-      Matrix<T,N-1> sub_mat;
-      result = static_cast<typename T::value_type>(0.0);
-      int sign = 1;
-      T temp;
-      for (int i=0; i<N; i++) {
-	temp = a(0,i);
-	setZero(&sub_mat);
-	sub_mat = getSubMat(a,0,i);
-	temp *= getDeterminant(sub_mat);
-	temp *= sign;
-	result += temp;
-	sign *= -1;
-      }
-      */
-    }    
-    return result;
-  }
-  
-  
-  template< template<typename,int> class Mat, class T, int N>
-    __device__ __host__ inline Mat<T,N> operator+(const Mat<T,N> & a, const Mat<T,N> & b)
+  template<class T>
+    __device__ __host__ inline T getDeterminant(const Matrix<T,1> &a)
     {
-      Mat<T,N> result;
-#pragma unroll
-      for (int i=0; i<N*N; i++) result.data[i] = a.data[i] + b.data[i];
+      T result;
+      result = a(0,0);
       return result;
     }
+  
+  template<class T>
+    __device__ __host__ inline T getDeterminant(const Matrix<T,2> &a)
+    {
+      T result;    
+      result = a(0,0)*a(1,1) - a(1,0) * a(0,1);
+      return result;
+    }
+
+    template<class T>
+    __device__ __host__ inline T getDeterminant(const Matrix<T,3> &a)
+      {
+	T result;
+	result = (a(0,0)*(a(1,1)*a(2,2) - a(2,1)*a(1,2)) -
+		  a(0,1)*(a(1,0)*a(2,2) - a(1,2)*a(2,0)) + 
+		  a(0,2)*(a(1,0)*a(2,1) - a(1,1)*a(2,0)));
+	return result;
+      }
+
+    template<class T>
+      __device__ __host__ inline T getDeterminant(const Matrix<T,4> &a)
+      {
+	T result;	
+	result = (det4helper(a,0,1,2,3) -
+		  det4helper(a,0,2,1,3) +
+		  det4helper(a,0,3,1,2) +
+		  det4helper(a,1,2,0,3) -
+		  det4helper(a,1,3,0,2) +
+		  det4helper(a,2,3,0,1));
+	return result;
+      }
+    
+    template<class T, int N, typename = std::enable_if_t<(N > 4)>>
+      __device__ __host__ inline T getDeterminant(const Matrix<T,N> &a)
+      {
+	T result;	
+	// Move along the top row, recursively get the determinant
+	// of the submatrix and multiply with the relevant sign.
+	result = static_cast<typename T::value_type>(0.0);
+
+	Matrix<T,N-1> sub_mat;
+	int sign = 1;
+	T temp;
+	for (int i=0; i<N; i++) {
+	  temp = a(0,i);
+	  sub_mat = getSubMat(a,0,i);
+	  temp *= getDeterminant(sub_mat);
+	  temp *= sign;
+	  result += temp;
+	  sign *= -1;
+	}
+	return result;
+      }
+    
+    
+    template< template<typename,int> class Mat, class T, int N>
+      __device__ __host__ inline Mat<T,N> operator+(const Mat<T,N> & a, const Mat<T,N> & b)
+      {
+	Mat<T,N> result;
+#pragma unroll
+	for (int i=0; i<N*N; i++) result.data[i] = a.data[i] + b.data[i];
+	return result;
+      }
 
 
   template< template<typename,int> class Mat, class T, int N>
@@ -637,23 +688,7 @@ namespace quda {
       }
       return result;
     }
-
-
-  // For Nc = 2, this template clashes with the abstract template class
-  /*
-  template<class T>
-    __device__ __host__ inline
-    Matrix<T,2> operator*(const Matrix<T,2> & a, const Matrix<T,2> & b)
-    {
-      Matrix<T,2> result;
-      result(0,0) = a(0,0)*b(0,0) + a(0,1)*b(1,0);
-      result(0,1) = a(0,0)*b(0,1) + a(0,1)*b(1,1);
-      result(1,0) = a(1,0)*b(0,0) + a(1,1)*b(1,0);
-      result(1,1) = a(1,0)*b(0,1) + a(1,1)*b(1,1);
-      return result;
-    }
-  */
-
+  
   template<class T, int N>
     __device__ __host__ inline
     Matrix<T,N> conj(const Matrix<T,N> & other){
@@ -669,75 +704,117 @@ namespace quda {
     }
   
 
-  template<class T, int N>
+  template<class T>
     __device__  __host__ inline
-    Matrix<T,N> inverse(const Matrix<T,N> &u)
+    Matrix<T,1> inverse(const Matrix<T,1> &u)
     {
-      Matrix<T,N> uinv;
-      if(N == 1) {
-	uinv(0,0) = static_cast<typename T::value_type>(1.0)/u(0,0);
-	return uinv;
-      }
-      
-      const T det = getDeterminant(u);
-      const T det_inv = static_cast<typename T::value_type>(1.0)/det;
-      T temp;
-      if(N == 2) {
-	uinv(0,0) = det_inv*u(1,1);
-	uinv(0,1) = det_inv*u(1,0);
-	uinv(1,0) = det_inv*u(0,1);
-	uinv(1,1) = det_inv*u(0,0);
-	
-      } else if(N == 3) {
-	temp = u(1,1)*u(2,2) - u(1,2)*u(2,1);
-	uinv(0,0) = (det_inv*temp);
-	
-	temp = u(0,2)*u(2,1) - u(0,1)*u(2,2);
-	uinv(0,1) = (temp*det_inv);
-	
-	temp = u(0,1)*u(1,2)  - u(0,2)*u(1,1);
-	uinv(0,2) = (temp*det_inv);
-	
-	temp = u(1,2)*u(2,0) - u(1,0)*u(2,2);
-	uinv(1,0) = (det_inv*temp);
-	
-	temp = u(0,0)*u(2,2) - u(0,2)*u(2,0);
-	uinv(1,1) = (temp*det_inv);
-	
-	temp = u(0,2)*u(1,0) - u(0,0)*u(1,2);
-	uinv(1,2) = (temp*det_inv);
-	
-	temp = u(1,0)*u(2,1) - u(1,1)*u(2,0);
-	uinv(2,0) = (det_inv*temp);
-	
-	temp = u(0,1)*u(2,0) - u(0,0)*u(2,1);
-	uinv(2,1) = (temp*det_inv);
-	
-	temp = u(0,0)*u(1,1) - u(0,1)*u(1,0);
-	uinv(2,2) = (temp*det_inv);       
-      }
-      else if(N == 4) {	
-	Matrix<T,N> sub_mat;
-	for (int i=0; i<N; i++){
-	  for (int j=0; j<N; j++){
-	    setZero(&sub_mat);
-	    sub_mat = getSubMat(u,i,j);
-	    temp = getDeterminant(sub_mat);
-	    uinv(i,j) = (temp*det_inv);
-	  }
-	}	    
-      }
-      else {
-	// ?
-      }
+      Matrix<T,1> uinv;
+      uinv(0,0) = static_cast<typename T::value_type>(1.0)/u(0,0);
       return uinv;
     }
   
+  template<class T>
+    __device__  __host__ inline
+    Matrix<T,2> inverse(const Matrix<T,2> &u)
+    {
+      Matrix<T,2> uinv;
+      const T det = getDeterminant(u);
+      const T det_inv = static_cast<typename T::value_type>(1.0)/det;
+      T temp;
+      uinv(0,0) = det_inv*u(1,1);
+      uinv(0,1) = det_inv*u(1,0);
+      uinv(1,0) = det_inv*u(0,1);
+      uinv(1,1) = det_inv*u(0,0);
+      return uinv;
+    }
   
-  template<class T, int N>
-    __device__ __host__ inline
-    void setIdentity(Matrix<T,N>* m){
+  template<class T>
+    __device__  __host__ inline
+    Matrix<T,3> inverse(const Matrix<T,3> &u)
+    {
+      Matrix<T,3> uinv;
+      const T det = getDeterminant(u);
+      const T det_inv = static_cast<typename T::value_type>(1.0)/det;
+      T temp;
+      
+      temp = u(1,1)*u(2,2) - u(1,2)*u(2,1);
+      uinv(0,0) = (det_inv*temp);
+      
+      temp = u(0,2)*u(2,1) - u(0,1)*u(2,2);
+      uinv(0,1) = (temp*det_inv);
+      
+      temp = u(0,1)*u(1,2)  - u(0,2)*u(1,1);
+      uinv(0,2) = (temp*det_inv);
+      
+      temp = u(1,2)*u(2,0) - u(1,0)*u(2,2);
+      uinv(1,0) = (det_inv*temp);
+      
+      temp = u(0,0)*u(2,2) - u(0,2)*u(2,0);
+      uinv(1,1) = (temp*det_inv);
+      
+      temp = u(0,2)*u(1,0) - u(0,0)*u(1,2);
+      uinv(1,2) = (temp*det_inv);
+      
+      temp = u(1,0)*u(2,1) - u(1,1)*u(2,0);
+      uinv(2,0) = (det_inv*temp);
+      
+      temp = u(0,1)*u(2,0) - u(0,0)*u(2,1);
+      uinv(2,1) = (temp*det_inv);
+      
+      temp = u(0,0)*u(1,1) - u(0,1)*u(1,0);
+      uinv(2,2) = (temp*det_inv);
+      return uinv;
+    }
 
+    template<class T>
+      __device__  __host__ inline
+    Matrix<T,4> inverse(const Matrix<T,4> &u)
+      {
+	Matrix<T,4> uinv;
+	const T det = getDeterminant(u);
+	const T det_inv = static_cast<typename T::value_type>(1.0)/det;
+	T temp;	
+	uinv(0,0) =  cofactor4x4<T,0,0>(u);
+	uinv(1,0) = -cofactor4x4<T,0,1>(u);
+	uinv(2,0) =  cofactor4x4<T,0,2>(u);
+	uinv(3,0) = -cofactor4x4<T,0,3>(u);
+	uinv(0,2) =  cofactor4x4<T,2,0>(u);
+	uinv(1,2) = -cofactor4x4<T,2,1>(u);
+	uinv(2,2) =  cofactor4x4<T,2,2>(u);
+	uinv(3,2) = -cofactor4x4<T,2,3>(u);
+	uinv(0,1) = -cofactor4x4<T,1,0>(u);
+	uinv(1,1) =  cofactor4x4<T,1,1>(u);
+	uinv(2,1) = -cofactor4x4<T,1,2>(u);
+	uinv(3,1) =  cofactor4x4<T,1,3>(u);
+	uinv(0,3) = -cofactor4x4<T,3,0>(u);
+	uinv(1,3) =  cofactor4x4<T,3,1>(u);
+	uinv(2,3) = -cofactor4x4<T,3,2>(u);
+	uinv(3,3) =  cofactor4x4<T,3,3>(u);
+
+	// Scale the result by column 0
+	temp = static_cast<typename T::value_type>(0.0);
+	for(int i=0; i<4; i++) {
+	  temp += u(i,0) * uinv(0,i);
+	}
+	uinv *= static_cast<typename T::value_type>(1.0)/temp;
+	return uinv;
+      }
+
+    template<class T, int N, typename = std::enable_if_t<(N > 4)>>
+      __device__  __host__ inline
+      Matrix<T,N> inverse(const Matrix<T,N> &u)
+      {
+	Matrix<T,N> uinv;
+	setZero(&uinv);
+	// LU?
+	return uinv;
+      }
+    
+    
+    template<class T, int N>
+      __device__ __host__ inline
+      void setIdentity(Matrix<T,N>* m){
+      
 #pragma unroll
       for (int i=0; i<N; ++i){
         (*m)(i,i) = 1;

@@ -67,7 +67,11 @@ namespace quda {
 
     for (int i=0; i<n; ++i) {
       for (int j=0; j<n; ++j) {
-	if (fabs(temporary(i,j).x) > max_error || fabs(temporary(i,j).y) > max_error) {
+	if (fabs(temporary(i,j).x) > max_error ||
+	    fabs(temporary(i,j).y) > max_error ||
+	    temporary(i,j).x != temporary(i,j).x ||
+	    temporary(i,j).y != temporary(i,j).y ) {
+	  printf("is not consistent at %d,%d, %e, %e\n", i, j, temporary(i,j).x, temporary(i,j).y);
 	  return false;
 	}
       }
@@ -94,40 +98,40 @@ namespace quda {
   template <typename real, typename mat, typename Arg>
   __device__  __host__ bool reciprocalRoot(mat &res, const mat& q, Arg &arg)
   {
+    auto Nc = res.size();
     mat qsq, tempq;
-
     real c[3];
     real g[3];
-
+    
     const real one_third = 0.333333333333333333333;
     const real one_ninth = 0.111111111111111111111;
     const real one_eighteenth = 0.055555555555555555555;
-
+    
     qsq = q*q;
     tempq = qsq*q;
-
+    
     c[0] = getTrace(q).x;
     c[1] = getTrace(qsq).x * 0.5;
     c[2] = getTrace(tempq).x * one_third;;
-
+    
     g[0] = g[1] = g[2] = c[0] * one_third;
     real r,s,theta;
     s = c[1]*one_third - c[0]*c[0]*one_eighteenth;
-
+    
     real cosTheta;
     if (fabs(s) >= arg.unitarize_eps) { // faster when this conditional is removed?
       const real rsqrt_s = rsqrt(s);
       r = c[2]*0.5 - (c[0]*one_third)*(c[1] - c[0]*c[0]*one_ninth);
       cosTheta = r*rsqrt_s*rsqrt_s*rsqrt_s;
-
+      
       if(fabs(cosTheta) >= 1.0){
 	theta = (r > 0) ? 0.0 : FL_UNITARIZE_PI;
       }else{
 	theta = acos(cosTheta); // this is the primary performance limiter
       }
-
+      
       const real sqrt_s = s*rsqrt_s;
-
+      
 #if 0 // experimental version
       real as, ac;
       sincos( theta*one_third, &as, &ac );
@@ -142,41 +146,43 @@ namespace quda {
       g[2] = c[0]*one_third + 2*sqrt_s*cos( theta*one_third + 2*FL_UNITARIZE_PI23 );
 #endif
     }
-
+    
     // Check the eigenvalues, if the determinant does not match the product of the eigenvalues
     // return false. Then call SVD instead.
     real det = getDeterminant(q).x;
     if (fabs(det) < arg.svd_abs_error) return false;
     if (!checkRelativeError<double>(g[0]*g[1]*g[2], det, arg.svd_rel_error)) return false;
-
+      
     // At this point we have finished with the c's
     // use these to store sqrt(g)
     for(int i=0; i<3; ++i) c[i] = sqrt(g[i]);
-
+    
     // done with the g's, use these to store u, v, w
     g[0] = c[0]+c[1]+c[2];
     g[1] = c[0]*c[1] + c[0]*c[2] + c[1]*c[2];
     g[2] = c[0]*c[1]*c[2];
-
+    
     const real denominator = 1.0 / ( g[2]*(g[0]*g[1]-g[2]) );
     c[0] = (g[0]*g[1]*g[1] - g[2]*(g[0]*g[0]+g[1])) * denominator;
     c[1] = (-g[0]*g[0]*g[0] - g[2] + 2.*g[0]*g[1]) * denominator;
     c[2] = g[0] * denominator;
-
+    
     tempq = c[1]*q + c[2]*qsq;
     // Add a real scalar
     tempq(0,0).x += c[0];
     tempq(1,1).x += c[0];
     tempq(2,2).x += c[0];
-
+    
     res = tempq;
-
+    
     return true;
   }
-
+  
   template <typename real, typename mat, typename Arg>
   __host__ __device__ bool unitarizeLinkMILC(mat &out, const mat &in, Arg &arg)
   {
+    // Canonnical Nc = 3 strategy
+#if (N_COLORS == 3)
     mat u;
     if (!arg.reunit_svd_only) {
       if (reciprocalRoot<real>(u, conj(in)*in, arg) ) {
@@ -188,37 +194,42 @@ namespace quda {
     // If we've got this far, then the Caley-Hamilton unitarization
     // has failed. If SVD is not allowed, the unitarization has failed.
     if (!arg.reunit_allow_svd) return false;
-#if (N_COLORS == 3)
+
     mat v;
     real singular_values[3];
     computeSVD<real>(in, u, v, singular_values);    
     out = u * conj(v);
     return true;
 #else
-    return false;
+    // Brute force Nc != 3 strategy
+    return unitarizeLinkNewton(out, in, 1000);
 #endif
     
   } // unitarizeMILC
-
+  
   template <typename mat>
   __host__ __device__ bool unitarizeLinkNewton(mat &out, const mat& in, int max_iter)
   {
     mat u = in;
-
-    for (int i=0; i<max_iter; ++i) {
+    bool is_unitarized = false;
+    int i = 0;
+    while (!is_unitarized && i<max_iter) {
       mat uinv = inverse(u);
       u = 0.5*(u + conj(uinv));
+      if((i+1)%10 == 0) is_unitarized = isUnitarizedLinkConsistent(in, u, 1e-7);	
+      i++;
     }
-
-    if (isUnitarizedLinkConsistent(in,u,0.0000001)==false) {
-      printf("ERROR: Unitarized link is not consistent with incoming link\n");
+    
+    if (!is_unitarized) {
+      //printf("ERROR: Unitarized link is not consistent with incoming link with"
+      //"element tol %e and %d iterations\n", 1e-7, max_iter);
       return false;
     }
+    //printf("is %sunitary at %d\n", is_unitarized ? "" : "not ", i);
     out = u;
-
     return true;
   }
-
+  
   template <typename Arg> struct Unitarize
   {
     Arg &arg;
@@ -237,7 +248,6 @@ namespace quda {
         if (result.isUnitary(arg.max_error) == false) atomicAdd(arg.fails, 1);
       }
       tmp = result;
-
       arg.out(mu, x_cb, parity) = tmp;
     }
   };
@@ -273,8 +283,7 @@ namespace quda {
       polarSUN<typename Arg::real>(u, arg.tol);
 
       // count number of failures
-      if (u.isUnitary(arg.tol) == false) atomicAdd(arg.fails, 1);
-
+      if (u.isUnitary(arg.tol) == false) atomicAdd(arg.fails, 1);      
       arg.u(mu, x_cb, parity) = u;
     }
   };

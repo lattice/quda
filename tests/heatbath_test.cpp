@@ -17,9 +17,6 @@
 
 #include <qio_field.h>
 
-#define MAX(a,b) ((a)>(b)?(a):(b))
-#define DABS(a) ((a)<(0.)?(-(a)):(a))
-
 namespace quda {
   extern void setTransferGPU(bool);
 }
@@ -83,7 +80,7 @@ int main(int argc, char **argv)
 
   // *** Everything between here and the timer is  application specific.
   setDims(gauge_param.X);
-  setSpinorSiteSize(24);
+  setSpinorSiteSize(2*4*N_COLORS);
 
   void *load_gauge[4];
   // Allocate space on the host (always best to allocate and free in the same scope)
@@ -182,8 +179,9 @@ int main(int argc, char **argv)
       for (int step = 1; step <= nwarm; ++step) {
         Monte(*gaugeEx, *randstates, beta_value, nhbsteps, novrsteps);
 
-        quda::unitarizeLinks(*gaugeEx, num_failures_d);
-        if (*num_failures_h > 0) errorQuda("Error in the unitarization\n");
+	quda::unitarizeLinks(*gaugeEx, num_failures_d);
+	//quda::unitarizeLinksCPU(*gaugeEx, num_failures_d);
+        if (*num_failures_h > 0) errorQuda("%d errors detected in the unitarization", (int)(*num_failures_h));
       }
     }
 
@@ -205,7 +203,8 @@ int main(int argc, char **argv)
 
       //Reunitarize gauge links...
       quda::unitarizeLinks(*gaugeEx, num_failures_d);
-      if (*num_failures_h > 0) errorQuda("Error in the unitarization\n");
+      //quda::unitarizeLinksCPU(*gaugeEx, num_failures_d);
+      if (*num_failures_h > 0) errorQuda("%d errors detected in the unitarization", (int)(*num_failures_h));
 
       // copy into regular field
       copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);

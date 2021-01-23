@@ -10,7 +10,6 @@ namespace quda {
   // when we switch to C++17 consider [[maybe_unused]]
   __attribute__((unused)) static const int max_iter_newton = 20;
   __attribute__((unused))static const int max_iter = 20;
-
   __attribute__((unused)) static double unitarize_eps = 1e-14;
   __attribute__((unused)) static double max_error = 1e-10;
   __attribute__((unused)) static int reunit_allow_svd = 1;
