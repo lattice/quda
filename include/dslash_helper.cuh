@@ -6,7 +6,6 @@
 #include <index_helper.cuh>
 #include <shmem_helper.cuh>
 
-
 #ifdef NVSHMEM_COMMS
 namespace
 {
@@ -506,8 +505,8 @@ namespace quda
       const int myblockidx = arg.ext_blocks > 0 ? blockIdx.x - (gridDim.x - arg.ext_blocks) : blockIdx.x;
       const int nComm = arg.commDim[0] + arg.commDim[1] + arg.commDim[2] + arg.commDim[3];
       const int blocks_per_dim = (arg.ext_blocks > 0 ? arg.ext_blocks : gridDim.x) / (nComm);
-      const int blocks_per_dir = blocks_per_dim/2;
-  
+      const int blocks_per_dir = blocks_per_dim / 2;
+
       int dir = (myblockidx % blocks_per_dim) / (blocks_per_dir);
       // this id the dimdir we are working on ...
       int dim;
@@ -541,15 +540,16 @@ namespace quda
       default: threadl = 0; threads_my_dir = 0;
       }
       int dimdir = 2 * dim + dir;
-      
+
       constexpr bool shmembarrier = true; // always true for now (arg.shmem & 16);
 
       if (shmembarrier) {
 
         if (shmem_interiordone and threadIdx.x == blockDim.x - 1) {
           long tst_val = interior_done.load(cuda::std::memory_order_relaxed);
-          while(tst_val < arg.counter -1){
-            interior_done.compare_exchange_strong( tst_val, arg.counter -1, cuda::std::memory_order_relaxed ,cuda::std::memory_order_relaxed );
+          while (tst_val < arg.counter - 1) {
+            interior_done.compare_exchange_strong(tst_val, arg.counter - 1, cuda::std::memory_order_relaxed,
+                                                  cuda::std::memory_order_relaxed);
           }
           interior_done.wait(arg.counter - 1, cuda::std::memory_order_acquire);
         }

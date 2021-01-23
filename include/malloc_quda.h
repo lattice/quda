@@ -86,14 +86,16 @@ namespace quda {
 
 #define device_malloc(size) quda::device_malloc_(__func__, quda::file_name(__FILE__), __LINE__, size)
 #define device_pinned_malloc(size) quda::device_pinned_malloc_(__func__, quda::file_name(__FILE__), __LINE__, size)
-#define device_comms_pinned_malloc(size) quda::device_comms_pinned_malloc_(__func__, quda::file_name(__FILE__), __LINE__, size) 
+#define device_comms_pinned_malloc(size)                                                                               \
+  quda::device_comms_pinned_malloc_(__func__, quda::file_name(__FILE__), __LINE__, size)
 #define safe_malloc(size) quda::safe_malloc_(__func__, quda::file_name(__FILE__), __LINE__, size)
 #define pinned_malloc(size) quda::pinned_malloc_(__func__, quda::file_name(__FILE__), __LINE__, size)
 #define mapped_malloc(size) quda::mapped_malloc_(__func__, quda::file_name(__FILE__), __LINE__, size)
 #define managed_malloc(size) quda::managed_malloc_(__func__, quda::file_name(__FILE__), __LINE__, size)
 #define device_free(ptr) quda::device_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 #define device_pinned_free(ptr) quda::device_pinned_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
-#define device_comms_pinned_free(ptr) quda::device_comms_pinned_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
+#define device_comms_pinned_free(ptr)                                                                                  \
+  quda::device_comms_pinned_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 #define managed_free(ptr) quda::managed_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 #define host_free(ptr) quda::host_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 #define get_mapped_device_pointer(ptr) quda::get_mapped_device_pointer_(__func__, quda::file_name(__FILE__), __LINE__, ptr)

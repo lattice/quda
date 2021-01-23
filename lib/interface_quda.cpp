@@ -41,7 +41,6 @@
 #endif
 #include <gauge_update_quda.h>
 
-
 #define MAX(a,b) ((a)>(b)? (a):(b))
 #define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))
 
@@ -509,7 +508,7 @@ void initQudaMemory()
   if (!comms_initialized) init_default_comms();
 
   device::create_context();
-  
+
   // initalize the memory pool allocators
   pool::init();
 

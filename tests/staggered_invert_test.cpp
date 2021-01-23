@@ -119,7 +119,7 @@ int main(int argc, char **argv)
   } catch (const CLI::ParseError &e) {
     return app->exit(e);
   }
-setVerbosity(verbosity);
+  setVerbosity(verbosity);
   if (!inv_multigrid) solve_type = QUDA_INVALID_SOLVE;
 
   if (inv_deflate && inv_multigrid) {

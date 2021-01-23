@@ -7,7 +7,6 @@
 
 #include <shmem_helper.cuh>
 
-
 namespace quda {
 
   bool LatticeField::initIPCComms = false;
@@ -255,18 +254,17 @@ namespace quda {
           // gpu send buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
           ghost_send_buffer_d[b] = device_comms_pinned_malloc(ghost_bytes);
 
-
           // pinned buffer used for sending
           ghost_pinned_send_buffer_h[b] = mapped_malloc(ghost_bytes);
 
           // set the matching device-mapped pointer
           ghost_pinned_send_buffer_hd[b] = get_mapped_device_pointer(ghost_pinned_send_buffer_h[b]);
-         
+
           // pinned buffer used for receiving
           ghost_pinned_recv_buffer_h[b] = mapped_malloc(ghost_bytes);
 
           // set the matching device-mapped pointer
-	  ghost_pinned_recv_buffer_hd[b] = get_mapped_device_pointer(ghost_pinned_recv_buffer_h[b]);
+          ghost_pinned_recv_buffer_hd[b] = get_mapped_device_pointer(ghost_pinned_recv_buffer_h[b]);
         }
 
         initGhostFaceBuffer = true;
@@ -285,11 +283,11 @@ namespace quda {
     if (!initGhostFaceBuffer) return;
 
     for (int b=0; b<2; b++) {
-// free receive buffer
+      // free receive buffer
       if (ghost_recv_buffer_d[b]) device_comms_pinned_free(ghost_recv_buffer_d[b]);
       ghost_recv_buffer_d[b] = nullptr;
 
-// free send buffer
+      // free send buffer
       if (ghost_send_buffer_d[b]) device_comms_pinned_free(ghost_send_buffer_d[b]);
       ghost_send_buffer_d[b] = nullptr;
 
@@ -465,7 +463,7 @@ namespace quda {
         const int num_dir = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0,dim) && comm_peer2peer_enabled(1,dim)) ? 1 : 2;
 	for (int dir=0; dir<num_dir; ++dir) {
 #ifndef NVSHMEM_COMMS
-	  if (!comm_peer2peer_enabled(dir,dim)) continue;
+          if (!comm_peer2peer_enabled(dir,dim)) continue;
           void **ghostDest = &(ghost_remote_send_buffer_d[b][dim][dir]);
           cudaIpcOpenMemHandle(ghostDest, ipcRemoteGhostDestHandle[b][dir][dim], cudaIpcMemLazyEnablePeerAccess);
 #else

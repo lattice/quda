@@ -7,7 +7,6 @@
 #include <quda_internal.h>
 #include <shmem_helper.cuh>
 
-
 #ifdef USE_QDPJIT
 #include "qdp_quda.h"
 #include "qdp_config.h"
@@ -16,7 +15,6 @@
 #ifdef QUDA_BACKWARDSCPP
 #include "backward.hpp"
 #endif
-
 
 namespace quda
 {
@@ -413,9 +411,9 @@ namespace quda
   }
 #endif
 
-/**
- * TODO 
- */
+  /**
+   * TODO
+   */
   void *device_comms_pinned_malloc_(const char *func, const char *file, int line, size_t size)
   {
 #ifdef NVSHMEM_COMMS
@@ -652,7 +650,7 @@ namespace quda
     static bool pinned_memory_pool = true;
 #ifdef NVSHMEM_COMMS
     /** whether to use a memory pool allocator for shmem memory */
-  static bool shmem_memory_pool = true;
+    static bool shmem_memory_pool = true;
 #endif
 
     void init()

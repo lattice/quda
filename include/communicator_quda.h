@@ -520,22 +520,22 @@ struct Communicator {
     return blacklist;
   }
 
-bool comm_nvshmem_enabled()
-{
+  bool comm_nvshmem_enabled()
+  {
 #if (defined MULTI_GPU) && (defined NVSHMEM_COMMS)
-  static bool nvshmem_enabled = true;
-  static bool nvshmem_init = false;
-  if (!nvshmem_init) {
-    char *enable_nvshmem_env = getenv("QUDA_ENABLE_NVSHMEM");
-    if (enable_nvshmem_env && strcmp(enable_nvshmem_env, "1") == 0) { nvshmem_enabled = true; }
-    if (enable_nvshmem_env && strcmp(enable_nvshmem_env, "0") == 0) { nvshmem_enabled = false; }
-    nvshmem_init = true;
-  }
+    static bool nvshmem_enabled = true;
+    static bool nvshmem_init = false;
+    if (!nvshmem_init) {
+      char *enable_nvshmem_env = getenv("QUDA_ENABLE_NVSHMEM");
+      if (enable_nvshmem_env && strcmp(enable_nvshmem_env, "1") == 0) { nvshmem_enabled = true; }
+      if (enable_nvshmem_env && strcmp(enable_nvshmem_env, "0") == 0) { nvshmem_enabled = false; }
+      nvshmem_init = true;
+    }
 #else
-  static bool nvshmem_enabled = false;
+    static bool nvshmem_enabled = false;
 #endif
-  return nvshmem_enabled;
-}
+    return nvshmem_enabled;
+  }
 
   bool use_deterministic_reduce = false;
 

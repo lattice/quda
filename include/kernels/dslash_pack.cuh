@@ -10,19 +10,19 @@
 
 namespace
 {
-/**
- * @brief for each dim /dir (2* QUDA_MAX_DIM) define an atomic counter to check if all blocks 
- * working for that packing direction are finished for intra-node packing.
- */
+  /**
+   * @brief for each dim /dir (2* QUDA_MAX_DIM) define an atomic counter to check if all blocks
+   * working for that packing direction are finished for intra-node packing.
+   */
   __device__ cuda::atomic<int, cuda::thread_scope_system> retcount_intra[] {
     ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0),
     ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0),
     ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0)};
   /**
- * @brief for each dim /dir (2* QUDA_MAX_DIM) define an atomic counter to check if all blocks 
- * working for that packing direction are finished for inter-node packing.
- */
-    __device__ cuda::atomic<int, cuda::thread_scope_device> retcount_inter[] {
+   * @brief for each dim /dir (2* QUDA_MAX_DIM) define an atomic counter to check if all blocks
+   * working for that packing direction are finished for inter-node packing.
+   */
+  __device__ cuda::atomic<int, cuda::thread_scope_device> retcount_inter[] {
     ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0),
     ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0),
     ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0)};
