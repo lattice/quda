@@ -6,11 +6,11 @@
 namespace quda
 {
 
-  DiracStaggeredKD::DiracStaggeredKD(const DiracParam &param) : DiracStaggered(param), Xinv(param.xInvKD) {}
+  DiracStaggeredKD::DiracStaggeredKD(const DiracParam &param) : DiracStaggered(param), Xinv(param.xInvKD) { }
 
-  DiracStaggeredKD::DiracStaggeredKD(const DiracStaggeredKD &dirac) : DiracStaggered(dirac), Xinv(dirac.Xinv) {}
+  DiracStaggeredKD::DiracStaggeredKD(const DiracStaggeredKD &dirac) : DiracStaggered(dirac), Xinv(dirac.Xinv) { }
 
-  DiracStaggeredKD::~DiracStaggeredKD() {}
+  DiracStaggeredKD::~DiracStaggeredKD() { }
 
   DiracStaggeredKD &DiracStaggeredKD::operator=(const DiracStaggeredKD &dirac)
   {

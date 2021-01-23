@@ -1297,4 +1297,20 @@ namespace quda {
 
   void cudaColorSpinorField::PrintVector(unsigned int i) const { genericCudaPrintVector(*this, i); }
 
+  void cudaColorSpinorField::copy_to_buffer(void *buffer) const
+  {
+    qudaMemcpy(buffer, v, bytes, cudaMemcpyDeviceToHost);
+    if (precision < QUDA_SINGLE_PRECISION) {
+      qudaMemcpy(static_cast<char *>(buffer) + bytes, norm, norm_bytes, cudaMemcpyDeviceToHost);
+    }
+  }
+
+  void cudaColorSpinorField::copy_from_buffer(void *buffer)
+  {
+    qudaMemcpy(v, buffer, bytes, cudaMemcpyHostToDevice);
+    if (precision < QUDA_SINGLE_PRECISION) {
+      qudaMemcpy(norm, static_cast<char *>(buffer) + bytes, norm_bytes, cudaMemcpyHostToDevice);
+    }
+  }
+
 } // namespace quda

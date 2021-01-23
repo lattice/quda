@@ -43,6 +43,8 @@ namespace quda {
   class cudaCloverField;
   class cpuCloverField;
 
+  enum class QudaOffsetCopyMode { COLLECT, DISPERSE };
+
   struct LatticeFieldParam {
 
   protected:
@@ -503,6 +505,11 @@ namespace quda {
     const int* X() const { return x; }
 
     /**
+       @return The pointer to the **full** lattice-dimension array
+    */
+    virtual int full_dim(int d) const = 0;
+
+    /**
        @return The full-field volume
     */
     size_t Volume() const { return volume; }
@@ -696,6 +703,24 @@ namespace quda {
     virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const { ; }
 
     virtual bool isNative() const = 0;
+
+    /**
+      @brief Copy all contents of the field to a host buffer.
+      @param[in] the host buffer to copy to.
+
+      *** Currently `buffer` has to be a host pointer:
+            passing in UVM or device pointer leads to undefined behavior. ***
+    */
+    virtual void copy_to_buffer(void *buffer) const = 0;
+
+    /**
+      @brief Copy all contents of the field from a host buffer to this field.
+      @param[in] the host buffer to copy from.
+
+      *** Currently `buffer` has to be a host pointer:
+            passing in UVM or device pointer leads to undefined behavior. ***
+    */
+    virtual void copy_from_buffer(void *buffer) = 0;
   };
   
   /**

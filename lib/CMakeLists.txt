@@ -55,7 +55,7 @@ set (QUDA_OBJS
   staggered_kd_build_xinv.cu staggered_kd_apply_xinv.cu
   blas_quda.cu multi_blas_quda.cu reduce_quda.cu
   multi_reduce_quda.cu reduce_helper.cu
-  contract.cu comm_common.cpp
+  contract.cu comm_common.cpp communicator_stack.cpp
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cpp spinor_noise.cu
   copy_color_spinor_dd.cu copy_color_spinor_ds.cu
@@ -75,6 +75,7 @@ set (QUDA_OBJS
   copy_gauge_double.cu copy_gauge_single.cu
   copy_gauge_half.cu copy_gauge_quarter.cu
   copy_gauge.cpp copy_gauge_mg.cu copy_clover.cu
+  copy_gauge_offset.cu copy_color_spinor_offset.cu copy_clover_offset.cu
   staggered_oprod.cu clover_trace_quda.cu
   hisq_paths_force_quda.cu
   unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp
@@ -143,8 +144,8 @@ endif()
 add_library(quda_cpp OBJECT ${QUDA_OBJS})
 
 # add comms and QIO
-target_sources(quda_cpp
-               PRIVATE $<IF:$<BOOL:${QUDA_MPI}>,comm_mpi.cpp,$<IF:$<BOOL:${QUDA_QMP}>,comm_qmp.cpp,comm_single.cpp>>)
+target_sources(quda_cpp PRIVATE $<IF:$<BOOL:${QUDA_MPI}>,communicator_mpi.cpp,$<IF:$<BOOL:${QUDA_QMP}>,communicator_qmp.cpp,communicator_single.cpp>>)
+
 target_sources(quda_cpp PRIVATE $<$<BOOL:${QUDA_QIO}>:qio_field.cpp layout_hyper.cpp>)
 
 # add some deifnitions that cause issues with cmake 3.7 and nvcc only to cpp files
@@ -636,6 +637,14 @@ install(
   DESTINATION include)
 
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include)
+
+# If the USQCD stack was automatically downloaded, this will copy the usqcd library
+# to the install path
+if(QUDA_DOWNLOAD_USQCD)
+  if(QUDA_QMP OR QUDA_QIO)
+    install(DIRECTORY ${CMAKE_BINARY_DIR}/usqcd DESTINATION ".")
+  endif()
+endif()
 
 include(CMakePackageConfigHelpers)
 write_basic_package_version_file(

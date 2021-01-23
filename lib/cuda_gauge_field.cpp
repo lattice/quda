@@ -451,9 +451,9 @@ namespace quda {
         for (int dir = 0; dir < 2; dir++) sendStart(dim, dir, &streams[dir]);
         for (int dir = 0; dir < 2; dir++) commsComplete(dim, dir);
 
-        for (int dir=0; dir<2; dir++) {
-	  // issue host-to-device copies if needed
-	  if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) {
+        for (int dir = 0; dir < 2; dir++) {
+          // issue host-to-device copies if needed
+          if (!comm_peer2peer_enabled(dir, dim) && !comm_gdr_enabled()) {
             qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][dim][dir], from_face_dim_dir_h[bufferIndex][dim][dir],
                             ghost_face_bytes[dim], cudaMemcpyHostToDevice, streams[dir]);
           }
@@ -749,5 +749,15 @@ namespace quda {
   }
 
   void cudaGaugeField::zero() { qudaMemset(gauge, 0, bytes); }
+
+  void cudaGaugeField::copy_to_buffer(void *buffer) const
+  {
+    qudaMemcpy(buffer, Gauge_p(), Bytes(), cudaMemcpyDeviceToHost);
+  }
+
+  void cudaGaugeField::copy_from_buffer(void *buffer)
+  {
+    qudaMemcpy(Gauge_p(), buffer, Bytes(), cudaMemcpyHostToDevice);
+  }
 
 } // namespace quda

@@ -7,18 +7,16 @@ namespace quda
 {
 
   DiracImprovedStaggeredKD::DiracImprovedStaggeredKD(const DiracParam &param) :
-    DiracImprovedStaggered(param),
-    Xinv(param.xInvKD)
+    DiracImprovedStaggered(param), Xinv(param.xInvKD)
   {
   }
 
   DiracImprovedStaggeredKD::DiracImprovedStaggeredKD(const DiracImprovedStaggeredKD &dirac) :
-    DiracImprovedStaggered(dirac),
-    Xinv(dirac.Xinv)
+    DiracImprovedStaggered(dirac), Xinv(dirac.Xinv)
   {
   }
 
-  DiracImprovedStaggeredKD::~DiracImprovedStaggeredKD() {}
+  DiracImprovedStaggeredKD::~DiracImprovedStaggeredKD() { }
 
   DiracImprovedStaggeredKD &DiracImprovedStaggeredKD::operator=(const DiracImprovedStaggeredKD &dirac)
   {
