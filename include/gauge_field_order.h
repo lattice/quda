@@ -6,9 +6,7 @@
  *
  */
 
-#ifndef __CUDACC_RTC__
-#include <assert.h>
-#endif
+#include <cassert>
 #include <type_traits>
 
 #include <register_traits.h>

@@ -41,7 +41,6 @@ namespace quda {
       return false;
     }
   
-#ifndef __CUDACC_RTC__
     friend std::ostream& operator<<(std::ostream& output, const TuneKey& key)
     {
       output << "volume = " << key.volume << ", ";
@@ -49,7 +48,6 @@ namespace quda {
       output << "aux = " << key.aux;
       return output;
     }
-#endif
 
   };
 
