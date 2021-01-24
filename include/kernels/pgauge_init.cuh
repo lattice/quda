@@ -71,6 +71,45 @@ namespace quda {
   template <typename Float, int nColors>
   __host__ __device__ static inline void reunit_link( Matrix<complex<Float>,nColors> &U )
   {
+    // Apply optimal strategy
+#if (N_COLORS == 3)
+    complex<Float> t2((Float)0.0, (Float)0.0);
+    Float t1 = 0.0;
+    //first normalize first row
+    //sum of squares of row
+#pragma unroll
+    for ( int c = 0; c < 3; c++ ) t1 += norm(U(0,c));
+    t1 = (Float)1.0 / sqrt(t1);
+    //14
+    //used to normalize row
+#pragma unroll
+    for ( int c = 0; c < 3; c++ ) U(0,c) *= t1;
+    //6
+#pragma unroll
+    for ( int c = 0; c < 3; c++ ) t2 += conj(U(0,c)) * U(1,c);
+    //24
+#pragma unroll
+    for ( int c = 0; c < 3; c++ ) U(1,c) -= t2 * U(0,c);
+    //24
+    //normalize second row
+    //sum of squares of row
+    t1 = 0.0;
+#pragma unroll
+    for ( int c = 0; c < 3; c++ ) t1 += norm(U(1,c));
+    t1 = (Float)1.0 / sqrt(t1);
+    //14
+    //used to normalize row
+#pragma unroll
+    for ( int c = 0; c < 3; c++ ) U(1, c) *= t1;
+    //6
+    //Reconstruct lat row
+    U(2,0) = conj(U(0,1) * U(1,2) - U(0,2) * U(1,1));
+    U(2,1) = conj(U(0,2) * U(1,0) - U(0,0) * U(1,2));
+    U(2,2) = conj(U(0,0) * U(1,1) - U(0,1) * U(1,0));
+    //42
+    //T=130
+#else
+    // Apply general strategy
     complex<Float> t2((Float)0.0, (Float)0.0);
     Float t1 = 0.0;
     int Nc = nColors;
@@ -78,10 +117,10 @@ namespace quda {
     //first normalize first row
     //sum of squares of row
 #pragma unroll
-    for (int c = 0; c < Nc; c++) t1 += norm(U(0,c));
+    for (int c = 0; c < Nc; c++) t1 += (conj(U(c,0)) * U(c,0)).real();
     t1 = (Float)1.0/sqrt(t1);
 #pragma unroll
-    for (int c = 0; c < Nc; c++) U(0,c) *= t1;
+    for (int c = 0; c < Nc; c++) U(c,0) *= t1;
 
     // Perform Gramm-Schmidt    
     for (int i = 1; i < Nc; i++) {
@@ -90,20 +129,24 @@ namespace quda {
 	t2 = 0.0;
 #pragma unroll
 	for (int c = 0; c < Nc; c++)
-	  t2 += conj(U(j,c)) * U(i,c);
+	  t2 += conj(U(c,j)) * U(c,i);
 
 #pragma unroll
 	for (int c = 0; c < Nc; c++)
-	  U(i,c) -= t2 * U(j,c);      
+	  U(c,i) -= t2 * U(c,j);      
       }
       
       t1 = 0.0;
 #pragma unroll
-      for (int c = 0; c < Nc; c++) t1 += norm(U(i,c));
+      for (int c = 0; c < Nc; c++) t1 += (conj(U(c,i)) * U(c,i)).real();
       t1 = (Float)1.0/sqrt(t1);
 #pragma unroll
-      for (int c = 0; c < Nc; c++) U(i,c) *= t1;      
+      for (int c = 0; c < Nc; c++) U(c,i) *= t1;
     }
+
+    t2 = getDeterminant(U);
+    U *= pow(t2, -1.0/N_COLORS);    
+#endif
   }
   
   /**
