@@ -771,8 +771,6 @@ namespace quda {
     Matrix<T,4> inverse(const Matrix<T,4> &u)
       {
 	Matrix<T,4> uinv;
-	const T det = getDeterminant(u);
-	const T det_inv = static_cast<typename T::value_type>(1.0)/det;
 	T temp;	
 	uinv(0,0) =  cofactor4x4<T,0,0>(u);
 	uinv(1,0) = -cofactor4x4<T,0,1>(u);

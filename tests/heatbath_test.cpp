@@ -85,9 +85,6 @@ int main(int argc, char **argv)
   void *load_gauge[4];
   // Allocate space on the host (always best to allocate and free in the same scope)
   for (int dir = 0; dir < 4; dir++) { load_gauge[dir] = malloc(V * gauge_site_size * gauge_param.cpu_prec); }
-  constructHostGaugeField(load_gauge, gauge_param, argc, argv);
-  // Load the gauge field to the device
-  loadGaugeQuda((void *)load_gauge, &gauge_param);
 
   int *num_failures_h = (int *)mapped_malloc(sizeof(int));
   int *num_failures_d = (int *)get_mapped_device_pointer(num_failures_h);
@@ -180,7 +177,6 @@ int main(int argc, char **argv)
         Monte(*gaugeEx, *randstates, beta_value, nhbsteps, novrsteps);
 
 	quda::unitarizeLinks(*gaugeEx, num_failures_d);
-	//quda::unitarizeLinksCPU(*gaugeEx, num_failures_d);
         if (*num_failures_h > 0) errorQuda("%d errors detected in the unitarization", (int)(*num_failures_h));
       }
     }
@@ -203,7 +199,6 @@ int main(int argc, char **argv)
 
       //Reunitarize gauge links...
       quda::unitarizeLinks(*gaugeEx, num_failures_d);
-      //quda::unitarizeLinksCPU(*gaugeEx, num_failures_d);
       if (*num_failures_h > 0) errorQuda("%d errors detected in the unitarization", (int)(*num_failures_h));
 
       // copy into regular field

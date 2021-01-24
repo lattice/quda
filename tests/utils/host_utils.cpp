@@ -1114,13 +1114,7 @@ template <typename Float> void constructRandomGaugeField(Float **res, QudaGaugeP
       for (int n = 0; n < Vh; n++) {
 	
 	// Construct a unitary matrix from a random matrix
-	MatrixXcd R = MatrixXcd::Zero(Nc, Nc);
-	for (int i = 0; i < Nc; i++) {
-	  for (int j = 0; j < Nc; j++) {
-	    R(i, j).real(rand() / (Float)RAND_MAX);
-	    R(i, j).imag(rand() / (Float)RAND_MAX);
-	  }
-	}
+	MatrixXcd R = MatrixXcd::Random(Nc, Nc);
 	
 	// QR the random matrix
 	Eigen::HouseholderQR<MatrixXcd> qr(R);
@@ -1137,7 +1131,7 @@ template <typename Float> void constructRandomGaugeField(Float **res, QudaGaugeP
 	  }
 	}
 
-	// Construct a unitary matrix from a random matrix
+	// Construct a unitary matrix from a random matrix	
 	for (int i = 0; i < Nc; i++) {
 	  for (int j = 0; j < Nc; j++) {
 	    R(i, j).real(rand() / (Float)RAND_MAX);
