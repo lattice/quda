@@ -258,10 +258,12 @@ int read_field(QIO_Reader *infile, int Ninternal, int count, void *field_in[], Q
 {
   int status = 0;
   switch (Ninternal) {
-  case 6: status = read_field<6>(infile, count, field_in, cpu_prec, subset, parity, nSpin, nColor); break;
+  case 2*N_COLORS: status = read_field<2*N_COLORS>(infile, count, field_in, cpu_prec, subset, parity, nSpin, nColor); break;
   case 24: status = read_field<24>(infile, count, field_in, cpu_prec, subset, parity, nSpin, nColor); break;
   case 96: status = read_field<96>(infile, count, field_in, cpu_prec, subset, parity, nSpin, nColor); break;
+#if (N_COLORS != 8)
   case 128: status = read_field<128>(infile, count, field_in, cpu_prec, subset, parity, nSpin, nColor); break;
+#endif
   case 256: status = read_field<256>(infile, count, field_in, cpu_prec, subset, parity, nSpin, nColor); break;
   case 384: status = read_field<384>(infile, count, field_in, cpu_prec, subset, parity, nSpin, nColor); break;
   default:
@@ -307,7 +309,9 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
   }
     //case (2*4*N_COLORS): xml_record += "WilsonColorSpinorField>"; break;  // SU(N) Wilson
   case 96:
+#if (N_COLORS != 8)
   case 128:
+#endif
   case 256:
   case 384: xml_record += "MGColorSpinorField>"; break; // Color spinor vector
   default: errorQuda("Invalid element length for QIO writing."); break;
@@ -347,7 +351,9 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
   }
     //case (2*4*N_COLORS): xml_record += "WilsonColorSpinorField>"; break;  // SU(N) Wilson
   case 96:
+#if (N_COLORS != 8)
   case 128:
+#endif
   case 256:
   case 384: xml_record += "MGColorSpinorField>"; break; // Color spinor vector
   default: errorQuda("Invalid element length for QIO writing."); break;
@@ -440,8 +446,8 @@ int write_field(QIO_Writer *outfile, int Ninternal, int count, void *field_out[]
 {
   int status = 0;
   switch (Ninternal) {
-  case 6:
-    status = write_field<6>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
+  case 2*N_COLORS:
+    status = write_field<2*N_COLORS>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
     break;
   case 24:
     status = write_field<24>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
@@ -449,9 +455,11 @@ int write_field(QIO_Writer *outfile, int Ninternal, int count, void *field_out[]
   case 96:
     status = write_field<96>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
     break;
+#if (N_COLORS != 8)
   case 128:
     status = write_field<128>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
     break;
+#endif
   case 256:
     status = write_field<256>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
     break;
