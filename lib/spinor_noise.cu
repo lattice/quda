@@ -67,6 +67,10 @@ namespace quda {
       spinorNoise<real,Ns,5>(src, randstates, type);
     } else if (src.Ncolor() == 6) {
       spinorNoise<real,Ns,6>(src, randstates, type);
+    } else if (src.Ncolor() == 7) {
+      spinorNoise<real,Ns,7>(src, randstates, type);
+    } else if (src.Ncolor() == 8) {
+      spinorNoise<real,Ns,8>(src, randstates, type);
     } else if (src.Ncolor() == 24) {
       spinorNoise<real,Ns,24>(src, randstates, type);
     } else if (src.Ncolor() == 32) {

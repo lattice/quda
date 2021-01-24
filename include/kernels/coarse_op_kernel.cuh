@@ -100,7 +100,13 @@ namespace quda {
     int dim_index;     // which direction / dimension we are working on
 
     // tile used for computeUV
-    static constexpr int tile_height_uv = fineColor % 5 == 0 ? 5 : fineColor % 4 == 0 ? 4 : fineColor % 3 == 0 ? 3 : fineColor % 2 ? 2 : 1;
+    static constexpr int tile_height_uv = (fineColor % 8 == 0 ? 8 :
+					   fineColor % 7 == 0 ? 7 :
+					   fineColor % 6 == 0 ? 6 :
+					   fineColor % 5 == 0 ? 5 :
+					   fineColor % 4 == 0 ? 4 :
+					   fineColor % 3 == 0 ? 3 :
+					   fineColor % 2 ? 2 : 1);
     static constexpr int tile_width_uv = coarseColor % 2 == 0 ? 2 : 1;
     
     using uvTileType = TileSize<fineColor, coarseColor, fineColor, tile_height_uv, tile_width_uv, 1>;
