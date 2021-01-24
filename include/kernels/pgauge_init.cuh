@@ -108,10 +108,11 @@ namespace quda {
     U(2,2) = conj(U(0,0) * U(1,1) - U(0,1) * U(1,0));
     //42
     //T=130
+    
 #else
     // Apply general strategy
     complex<Float> t2((Float)0.0, (Float)0.0);
-    Float t1 = 0.0;
+    Float t1 = 0.0, t3 = 0.0, t4 = 0.0;
     int Nc = nColors;
     
     //first normalize first row
@@ -121,7 +122,7 @@ namespace quda {
     t1 = (Float)1.0/sqrt(t1);
 #pragma unroll
     for (int c = 0; c < Nc; c++) U(c,0) *= t1;
-
+    
     // Perform Gramm-Schmidt    
     for (int i = 1; i < Nc; i++) {
       for (int j = 0; j < i; j++) {
@@ -130,24 +131,30 @@ namespace quda {
 #pragma unroll
 	for (int c = 0; c < Nc; c++)
 	  t2 += conj(U(c,j)) * U(c,i);
-
+	
 #pragma unroll
 	for (int c = 0; c < Nc; c++)
 	  U(c,i) -= t2 * U(c,j);      
       }
       
-      t1 = 0.0;
+      t3 = 0.0;
 #pragma unroll
-      for (int c = 0; c < Nc; c++) t1 += (conj(U(c,i)) * U(c,i)).real();
-      t1 = (Float)1.0/sqrt(t1);
+      for (int c = 0; c < Nc; c++) t3 += (conj(U(c,i)) * U(c,i)).real();
+      t3 = (Float)1.0/sqrt(t3);
 #pragma unroll
-      for (int c = 0; c < Nc; c++) U(c,i) *= t1;
+      for (int c = 0; c < Nc; c++) U(c,i) *= t3;
     }
-
+      
     t2 = getDeterminant(U);
-    U *= pow(t2, -1.0/N_COLORS);    
+    t4 = atan2(t2.imag(), t1);
+    t2.real(cos(t4));
+    t2.imag(-sin(t4));
+#pragma unroll
+    for(int c = 0; c < Nc; ++c) 
+      U(c,Nc-1) *= t2;
 #endif
   }
+  
   
   /**
      @brief Generate the four random real elements of the SU(2) matrix
