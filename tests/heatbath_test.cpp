@@ -49,6 +49,32 @@ void display_test_info()
              dimPartitioned(3));
 }
 
+void saveGaugeField(int step, cudaGaugeField *gaugeEx, cudaGaugeField *gauge) {
+
+  char step_str[16];
+  
+  sprintf(step_str, "_step%d", step);
+  strcat(gauge_outfile,step_str);
+  printfQuda("Saving the gauge field to file %s\n", gauge_outfile);
+  
+  QudaGaugeParam gauge_param = newQudaGaugeParam();
+  setWilsonGaugeParam(gauge_param);
+  
+  void *cpu_gauge[4];
+  for (int dir = 0; dir < 4; dir++) { cpu_gauge[dir] = malloc(V * gauge_site_size * gauge_param.cpu_prec); }
+  
+  // copy into regular field
+  copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
+  
+  saveGaugeFieldQuda((void*)cpu_gauge, (void*)gauge, &gauge_param);
+  
+  write_gauge_field(gauge_outfile, cpu_gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char**)0);
+  
+  for (int dir = 0; dir<4; dir++) free(cpu_gauge[dir]);
+}
+
+
+
 int main(int argc, char **argv)
 {
   // command line options
@@ -87,7 +113,7 @@ int main(int argc, char **argv)
   for (int dir = 0; dir < 4; dir++) { load_gauge[dir] = malloc(V * gauge_site_size * gauge_param.cpu_prec); }
   constructHostGaugeField(load_gauge, gauge_param, argc, argv);
   // Load the gauge field to the device
-  loadGaugeQuda((void *)load_gauge, &gauge_param);
+  //loadGaugeQuda((void *)load_gauge, &gauge_param);
 
   int *num_failures_h = (int *)mapped_malloc(sizeof(int));
   int *num_failures_d = (int *)get_mapped_device_pointer(num_failures_h);
@@ -180,8 +206,7 @@ int main(int argc, char **argv)
         Monte(*gaugeEx, *randstates, beta_value, nhbsteps, novrsteps);
 
 	quda::unitarizeLinks(*gaugeEx, num_failures_d);
-	//quda::unitarizeLinksCPU(*gaugeEx, num_failures_d);
-        if (*num_failures_h > 0) errorQuda("%d errors detected in the unitarization", (int)(*num_failures_h));
+	if (*num_failures_h > 0) errorQuda("%d errors detected in the unitarization", (int)(*num_failures_h));
       }
     }
 
@@ -198,12 +223,11 @@ int main(int argc, char **argv)
 
     freeGaugeQuda();
 
-    for(int step=1; step<=nsteps; ++step){
+    for(int step=1; step <= nsteps; ++step){
       Monte( *gaugeEx, *randstates, beta_value, nhbsteps, novrsteps);
 
       //Reunitarize gauge links...
       quda::unitarizeLinks(*gaugeEx, num_failures_d);
-      //quda::unitarizeLinksCPU(*gaugeEx, num_failures_d);
       if (*num_failures_h > 0) errorQuda("%d errors detected in the unitarization", (int)(*num_failures_h));
 
       // copy into regular field
@@ -214,34 +238,15 @@ int main(int argc, char **argv)
       printfQuda("step=%d plaquette = %e topological charge = %e\n", step, param.plaquette[0], param.qcharge);
 
       freeGaugeQuda();
+      
+      // Save if output string is specified
+      if (strcmp(gauge_outfile,"")) {
+	saveGaugeField(step, gaugeEx, gauge);
+      }      
     }
-
-    // Save if output string is specified
-    if (strcmp(gauge_outfile,"")) {
-
-      printfQuda("Saving the gauge field to file %s\n", gauge_outfile);
-
-      QudaGaugeParam gauge_param = newQudaGaugeParam();
-      setWilsonGaugeParam(gauge_param);
-
-      void *cpu_gauge[4];
-      for (int dir = 0; dir < 4; dir++) { cpu_gauge[dir] = malloc(V * gauge_site_size * gauge_param.cpu_prec); }
-
-      // copy into regular field
-      copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
-
-      saveGaugeFieldQuda((void*)cpu_gauge, (void*)gauge, &gauge_param);
-
-      write_gauge_field(gauge_outfile, cpu_gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char**)0);
-
-      for (int dir = 0; dir<4; dir++) free(cpu_gauge[dir]);
-    } else {
-      printfQuda("No output file specified.\n");
-    }
-
+        
     delete gauge;
-    delete gaugeEx;
-    //Release all temporary memory used for data exchange between GPUs in multi-GPU mode
+    delete gaugeEx;   //Release all temporary memory used for data exchange between GPUs in multi-GPU mode
     PGaugeExchangeFree();
 
     randstates->Release();
