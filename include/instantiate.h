@@ -16,7 +16,9 @@ namespace quda
   template <> constexpr bool is_enabled<QUDA_RECONSTRUCT_12>() { return false; }
 #endif
 #if !(QUDA_RECONSTRUCT & 1)
+#if (N_COLORS > 2)
   template <> constexpr bool is_enabled<QUDA_RECONSTRUCT_9>() { return false; }
+#endif
   template <> constexpr bool is_enabled<QUDA_RECONSTRUCT_8>() { return false; }
 #endif
 

@@ -52,10 +52,12 @@ void display_test_info()
 void saveGaugeField(int step, cudaGaugeField *gaugeEx, cudaGaugeField *gauge) {
 
   char step_str[16];
+  char this_file_name[256];
   
-  sprintf(step_str, "_step%d", step);
-  strcat(gauge_outfile,step_str);
-  printfQuda("Saving the gauge field to file %s\n", gauge_outfile);
+  strcpy(this_file_name, gauge_outfile);  
+  sprintf(step_str, "_step%d.lime", step);
+  strcat(this_file_name, step_str);
+  printfQuda("Saving the gauge field to file %s\n", this_file_name);
   
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setWilsonGaugeParam(gauge_param);
@@ -68,7 +70,7 @@ void saveGaugeField(int step, cudaGaugeField *gaugeEx, cudaGaugeField *gauge) {
   
   saveGaugeFieldQuda((void*)cpu_gauge, (void*)gauge, &gauge_param);
   
-  write_gauge_field(gauge_outfile, cpu_gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char**)0);
+  write_gauge_field(this_file_name, cpu_gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char**)0);
   
   for (int dir = 0; dir<4; dir++) free(cpu_gauge[dir]);
 }
@@ -152,7 +154,7 @@ int main(int argc, char **argv)
     int nwarm = heatbath_warmup_steps;
     int nhbsteps = heatbath_num_heatbath_per_step;
     int novrsteps = heatbath_num_overrelax_per_step;
-    bool  coldstart = heatbath_coldstart;
+    bool coldstart = heatbath_coldstart;
     double beta_value = heatbath_beta_value;
 
     printfQuda("Starting heatbath for beta = %f from a %s start\n", beta_value, strcmp(latfile,"") ? "loaded" : (coldstart ? "cold" : "hot"));

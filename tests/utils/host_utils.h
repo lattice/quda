@@ -235,7 +235,9 @@ inline int getReconstructNibble(QudaReconstructType recon)
   case QUDA_RECONSTRUCT_NO: return 4;
   case QUDA_RECONSTRUCT_13:
   case QUDA_RECONSTRUCT_12: return 2;
+#if (N_COLORS > 2)
   case QUDA_RECONSTRUCT_9:
+#endif
   case QUDA_RECONSTRUCT_8: return 1;
   default: return 0;
   }

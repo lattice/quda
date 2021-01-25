@@ -3098,6 +3098,7 @@ namespace quda {
   struct gauge_mapper<double, QUDA_RECONSTRUCT_12, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
     typedef gauge::FloatNOrder<double, N, 2, 2*N_COLORS*(N_COLORS-1), stag, huge_alloc, ghostExchange, use_inphase> type;
   };
+#if (N_COLORS > 2)
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<double, QUDA_RECONSTRUCT_10, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
     typedef gauge::FloatNOrder<double, N, 2, 11, stag, huge_alloc, ghostExchange, use_inphase> type;
@@ -3106,6 +3107,7 @@ namespace quda {
   struct gauge_mapper<double, QUDA_RECONSTRUCT_9, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
     typedef gauge::FloatNOrder<double, N, 2, N_COLORS*N_COLORS, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
+#endif
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<double, QUDA_RECONSTRUCT_8, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
     typedef gauge::FloatNOrder<double, N, 2, N_COLORS*N_COLORS-1, stag, huge_alloc, ghostExchange, use_inphase> type;
@@ -3124,6 +3126,7 @@ namespace quda {
   struct gauge_mapper<float, QUDA_RECONSTRUCT_12, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
     typedef gauge::FloatNOrder<float, N, 4, 2*N_COLORS*(N_COLORS-1), stag, huge_alloc, ghostExchange, use_inphase> type;
   };
+#if (N_COLORS > 2)
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<float, QUDA_RECONSTRUCT_10, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
     typedef gauge::FloatNOrder<float, N, 2, 11, stag, huge_alloc, ghostExchange, use_inphase> type;
@@ -3132,6 +3135,7 @@ namespace quda {
   struct gauge_mapper<float, QUDA_RECONSTRUCT_9, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
     typedef gauge::FloatNOrder<float, N, 4, N_COLORS*N_COLORS, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
+#endif
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<float, QUDA_RECONSTRUCT_8, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
     typedef gauge::FloatNOrder<float, N, 4, N_COLORS*N_COLORS-1, stag, huge_alloc, ghostExchange, use_inphase> type;
@@ -3156,6 +3160,7 @@ namespace quda {
   struct gauge_mapper<short, QUDA_RECONSTRUCT_12, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
     typedef gauge::FloatNOrder<short, N, 4, 2*N_COLORS*(N_COLORS-1), stag, huge_alloc, ghostExchange, use_inphase> type;
   };
+#if (N_COLORS > 2)
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<short, QUDA_RECONSTRUCT_10, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
     typedef gauge::FloatNOrder<short, N, 2, 11, stag, huge_alloc, ghostExchange, use_inphase> type;
@@ -3164,6 +3169,7 @@ namespace quda {
   struct gauge_mapper<short, QUDA_RECONSTRUCT_9, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
     typedef gauge::FloatNOrder<short, N, N8, N_COLORS*N_COLORS, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
+#endif
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<short, QUDA_RECONSTRUCT_8, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
     typedef gauge::FloatNOrder<short, N, N8, N_COLORS*N_COLORS-1, stag, huge_alloc, ghostExchange, use_inphase> type;
@@ -3182,6 +3188,7 @@ namespace quda {
   struct gauge_mapper<int8_t, QUDA_RECONSTRUCT_12, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
     typedef gauge::FloatNOrder<int8_t, N, 4, 2*N_COLORS*(N_COLORS-1), stag, huge_alloc, ghostExchange, use_inphase> type;
   };
+#if (N_COLORS > 2)
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<int8_t, QUDA_RECONSTRUCT_10, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
     typedef gauge::FloatNOrder<int8_t, N, 2, 11, stag, huge_alloc, ghostExchange, use_inphase> type;
@@ -3190,6 +3197,7 @@ namespace quda {
   struct gauge_mapper<int8_t, QUDA_RECONSTRUCT_9, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
     typedef gauge::FloatNOrder<int8_t, N, N8, N_COLORS*N_COLORS, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
+#endif
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<int8_t, QUDA_RECONSTRUCT_8, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
     typedef gauge::FloatNOrder<int8_t, N, N8, N_COLORS*N_COLORS-1, stag, huge_alloc, ghostExchange, use_inphase> type;
