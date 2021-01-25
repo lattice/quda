@@ -37,7 +37,7 @@ namespace quda
   template <int mu, int nu, typename Arg>
   __device__ __host__ __forceinline__ void computeFmunuCore(Arg &arg, int idx, int parity)
   {
-    using Link = Matrix<complex<typename Arg::Float>, 3>;
+    using Link = Matrix<complex<typename Arg::Float>, N_COLORS>;
 
     int x[4];
     auto &X = arg.X;
