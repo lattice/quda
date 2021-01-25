@@ -102,7 +102,7 @@ namespace quda {
 #pragma unroll
     for ( int c = 0; c < 3; c++ ) U(1, c) *= t1;
     //6
-    //Reconstruct lat row
+    //Reconstruct last row
     U(2,0) = conj(U(0,1) * U(1,2) - U(0,2) * U(1,1));
     U(2,1) = conj(U(0,2) * U(1,0) - U(0,0) * U(1,2));
     U(2,2) = conj(U(0,0) * U(1,1) - U(0,1) * U(1,0));
@@ -112,46 +112,46 @@ namespace quda {
 #else
     // Apply general strategy
     complex<Float> t2((Float)0.0, (Float)0.0);
-    Float t1 = 0.0, t3 = 0.0, t4 = 0.0;
+    complex<Float> t4((Float)0.0, (Float)0.0);
+    Float t1 = 0.0, t3 = 0.0;
     int Nc = nColors;
     
-    //first normalize first row
-    //sum of squares of row
+    // Normalize the first row
 #pragma unroll
-    for (int c = 0; c < Nc; c++) t1 += (conj(U(c,0)) * U(c,0)).real();
+    for (int c = 0; c < Nc; c++) t1 += norm(U(0,c));
     t1 = (Float)1.0/sqrt(t1);
 #pragma unroll
-    for (int c = 0; c < Nc; c++) U(c,0) *= t1;
+    for (int c = 0; c < Nc; c++) U(0,c) *= t1;
     
     // Perform Gramm-Schmidt    
-    for (int i = 1; i < Nc; i++) {
+    for (int i = 1; i < Nc-1; i++) {
       for (int j = 0; j < i; j++) {
-	
+
+	// Project the ith row out away from the jth row 
+	// <j|i>
 	t2 = 0.0;
 #pragma unroll
-	for (int c = 0; c < Nc; c++)
-	  t2 += conj(U(c,j)) * U(c,i);
-	
+	for (int c = 0; c < Nc; c++) t2 += conj(U(i,c)) * U(j,c);
+	// i = i - <j|i>j 
 #pragma unroll
-	for (int c = 0; c < Nc; c++)
-	  U(c,i) -= t2 * U(c,j);      
+	for (int c = 0; c < Nc; c++) U(i,c) -= t2 * U(j,c);  
       }
-      
+
+      // Normalise the ith row
       t3 = 0.0;
 #pragma unroll
-      for (int c = 0; c < Nc; c++) t3 += (conj(U(c,i)) * U(c,i)).real();
+      for (int c = 0; c < Nc; c++) t3 += norm(U(i,c));
       t3 = (Float)1.0/sqrt(t3);
 #pragma unroll
-      for (int c = 0; c < Nc; c++) U(c,i) *= t3;
+      for (int c = 0; c < Nc; c++) U(i,c) *= t3;
     }
-      
-    t2 = getDeterminant(U);
-    t4 = atan2(t2.imag(), t1);
-    t2.real(cos(t4));
-    t2.imag(-sin(t4));
-#pragma unroll
-    for(int c = 0; c < Nc; ++c) 
-      U(c,Nc-1) *= t2;
+
+    //Reconstruct last row
+    int sign = 1;
+    for (int c = 0; c < Nc; c++) {
+      U(Nc-1,c) = -sign * conj(getDeterminant(getSubMat(U, Nc, c)));
+      sign *= -1;
+    }
 #endif
   }
   
