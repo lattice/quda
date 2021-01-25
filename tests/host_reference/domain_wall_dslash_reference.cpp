@@ -331,7 +331,6 @@ template <QudaPCType type, typename sFloat, typename gFloat>
 void dslashReference_4d_mgpu(sFloat *res, gFloat **gaugeFull, gFloat **ghostGauge, sFloat *spinorField,
     sFloat **fwdSpinor, sFloat **backSpinor, int oddBit, int daggerBit)
 {
-  // int my_spinor_site_size = 24;
   for (int i = 0; i < V5h * spinor_site_size; i++) res[i] = 0.0;
 
   gFloat *gaugeEven[4], *gaugeOdd[4];
@@ -383,14 +382,14 @@ void axpby_ssp_project(sFloat *z, sFloat a, sFloat *x, sFloat b, sFloat *y, int 
   // +1   0
   //  0  -1
   for (int spin = (plus ? 0 : 2); spin < (plus ? 2 : 4); spin++) {
-    for (int color_comp = 0; color_comp < 6; color_comp++) {
-      z[(s * Vh + idx_cb_4d) * 24 + spin * 6 + color_comp] = a * x[(s * Vh + idx_cb_4d) * 24 + spin * 6 + color_comp]
-        + b * y[(sp * Vh + idx_cb_4d) * 24 + spin * 6 + color_comp];
+    for (int color_comp = 0; color_comp < (hw_site_size/2); color_comp++) {
+      z[(s * Vh + idx_cb_4d) * spinor_site_size + spin * (hw_site_size/2) + color_comp] = a * x[(s * Vh + idx_cb_4d) * spinor_site_size + spin * (hw_site_size/2) + color_comp]
+        + b * y[(sp * Vh + idx_cb_4d) * spinor_site_size + spin * (hw_site_size/2) + color_comp];
     }
   }
   for (int spin = (plus ? 2 : 0); spin < (plus ? 4 : 2); spin++) {
-    for (int color_comp = 0; color_comp < 6; color_comp++) {
-      z[(s * Vh + idx_cb_4d) * 24 + spin * 6 + color_comp] = a * x[(s * Vh + idx_cb_4d) * 24 + spin * 6 + color_comp];
+    for (int color_comp = 0; color_comp < (hw_site_size/2); color_comp++) {
+      z[(s * Vh + idx_cb_4d) * spinor_site_size + spin * (hw_site_size/2) + color_comp] = a * x[(s * Vh + idx_cb_4d) * spinor_site_size + spin * (hw_site_size/2) + color_comp];
     }
   }
 }
@@ -414,7 +413,7 @@ void mdw_eofa_m5_ref(sFloat *res, sFloat *spinorField, int oddBit, int daggerBit
 
   constexpr int spinor_size = spinor_site_size;
   for (int i = 0; i < V5h; i++) {
-    for (int one_site = 0; one_site < 24; one_site++) { res[i * spinor_size + one_site] = 0.; }
+    for (int one_site = 0; one_site < spinor_site_size; one_site++) { res[i * spinor_size + one_site] = 0.; }
     for (int dir = 8; dir < 10; dir++) {
       // Calls for an extension of the original function.
       // 8 is forward hop, which wants P_+, 9 is backward hop,
@@ -489,7 +488,7 @@ template <QudaPCType type, bool zero_initialize = false, typename sFloat>
 void dslashReference_5th(sFloat *res, sFloat *spinorField, int oddBit, int daggerBit, sFloat mferm)
 {
   for (int i = 0; i < V5h; i++) {
-    if (zero_initialize) for(int one_site = 0 ; one_site < 24 ; one_site++)
+    if (zero_initialize) for(int one_site = 0 ; one_site < spinor_site_size ; one_site++)
       res[i*(spinor_site_size)+one_site] = 0.0;
     for (int dir = 8; dir < 10; dir++) {
       // Calls for an extension of the original function.
@@ -522,22 +521,22 @@ void dslashReference_5th_inv(sFloat *res, sFloat *spinorField, int, int daggerBi
     inv_Ftr[xs] = 1.0/(1.0+pow(2.0*kappa[xs], Ls)*mferm);
     Ftr[xs] = -2.0*kappa[xs]*mferm*inv_Ftr[xs]; 
     for (int i = 0; i < Vh; i++) {
-      memcpy(&res[24*(i+Vh*xs)], &spinorField[24*(i+Vh*xs)], 24*sizeof(sFloat));
+      memcpy(&res[spinor_site_size*(i+Vh*xs)], &spinorField[spinor_site_size*(i+Vh*xs)], spinor_site_size*sizeof(sFloat));
     }
   }
   if(daggerBit == 0)
   {
     // s = 0
     for (int i = 0; i < Vh; i++) {
-      ax(&res[12+24*(i+Vh*(Ls-1))],(sFloat)(inv_Ftr[0]), &spinorField[12+24*(i+Vh*(Ls-1))], 12);
+      ax(&res[hw_site_size+spinor_site_size*(i+Vh*(Ls-1))],(sFloat)(inv_Ftr[0]), &spinorField[hw_site_size + spinor_site_size*(i+Vh*(Ls-1))], hw_site_size);
     }
 
     // s = 1 ... ls-2
     for(int xs = 0 ; xs <= Ls-2 ; ++xs)
     {
       for (int i = 0; i < Vh; i++) {
-        axpy((sFloat)(2.0*kappa[xs]), &res[24*(i+Vh*xs)], &res[24*(i+Vh*(xs+1))], 12);
-        axpy((sFloat)Ftr[xs], &res[12+24*(i+Vh*xs)], &res[12+24*(i+Vh*(Ls-1))], 12);
+        axpy((sFloat)(2.0*kappa[xs]), &res[spinor_site_size*(i+Vh*xs)], &res[spinor_site_size*(i+Vh*(xs+1))], hw_site_size);
+        axpy((sFloat)Ftr[xs], &res[hw_site_size+spinor_site_size*(i+Vh*xs)], &res[hw_site_size+spinor_site_size*(i+Vh*(Ls-1))], spinor_site_size);
       }
       for (int tmp_s = 0 ; tmp_s < Ls ; tmp_s++)
         Ftr[tmp_s] *= 2.0*kappa[tmp_s];
@@ -550,30 +549,30 @@ void dslashReference_5th_inv(sFloat *res, sFloat *spinorField, int, int daggerBi
     for(int xs = Ls-2 ; xs >=0 ; --xs)
     {
       for (int i = 0; i < Vh; i++) {
-        axpy((sFloat)Ftr[xs], &res[24*(i+Vh*(Ls-1))], &res[24*(i+Vh*xs)], 12);
-        axpy((sFloat)(2.0*kappa[xs]), &res[12+24*(i+Vh*(xs+1))], &res[12+24*(i+Vh*xs)], 12);
+        axpy((sFloat)Ftr[xs], &res[spinor_site_size*(i+Vh*(Ls-1))], &res[spinor_site_size*(i+Vh*xs)], hw_site_size);
+        axpy((sFloat)(2.0*kappa[xs]), &res[hw_site_size+spinor_site_size*(i+Vh*(xs+1))], &res[hw_site_size+spinor_site_size*(i+Vh*xs)], hw_site_size);
       }
       for (int tmp_s = 0 ; tmp_s < Ls ; tmp_s++)
         Ftr[tmp_s] /= 2.0*kappa[tmp_s];
     }
     // s = ls -1
     for (int i = 0; i < Vh; i++) {
-      ax(&res[24*(i+Vh*(Ls-1))], (sFloat)(inv_Ftr[Ls-1]), &res[24*(i+Vh*(Ls-1))], 12);
+      ax(&res[spinor_site_size*(i+Vh*(Ls-1))], (sFloat)(inv_Ftr[Ls-1]), &res[spinor_site_size*(i+Vh*(Ls-1))], hw_site_size);
     }
   }
   else
   {
     // s = 0
     for (int i = 0; i < Vh; i++) {
-      ax(&res[24*(i+Vh*(Ls-1))],(sFloat)(inv_Ftr[0]), &spinorField[24*(i+Vh*(Ls-1))], 12);
+      ax(&res[spinor_site_size*(i+Vh*(Ls-1))],(sFloat)(inv_Ftr[0]), &spinorField[spinor_site_size*(i+Vh*(Ls-1))], hw_site_size);
     }
 
     // s = 1 ... ls-2
     for(int xs = 0 ; xs <= Ls-2 ; ++xs)
     {
       for (int i = 0; i < Vh; i++) {
-        axpy((sFloat)Ftr[xs], &res[24*(i+Vh*xs)], &res[24*(i+Vh*(Ls-1))], 12);
-        axpy((sFloat)(2.0*kappa[xs]), &res[12+24*(i+Vh*xs)], &res[12+24*(i+Vh*(xs+1))], 12);
+        axpy((sFloat)Ftr[xs], &res[spinor_site_size*(i+Vh*xs)], &res[spinor_site_size*(i+Vh*(Ls-1))], hw_site_size);
+        axpy((sFloat)(2.0*kappa[xs]), &res[hw_site_size+spinor_site_size*(i+Vh*xs)], &res[hw_site_size+spinor_site_size*(i+Vh*(xs+1))], hw_site_size);
       }
       for (int tmp_s = 0 ; tmp_s < Ls ; tmp_s++)
         Ftr[tmp_s] *= 2.0*kappa[tmp_s];
@@ -586,15 +585,15 @@ void dslashReference_5th_inv(sFloat *res, sFloat *spinorField, int, int daggerBi
     for(int xs = Ls-2 ; xs >=0 ; --xs)
     {
       for (int i = 0; i < Vh; i++) {
-        axpy((sFloat)(2.0*kappa[xs]), &res[24*(i+Vh*(xs+1))], &res[24*(i+Vh*xs)], 12);
-        axpy((sFloat)Ftr[xs], &res[12+24*(i+Vh*(Ls-1))], &res[12+24*(i+Vh*xs)], 12);
+        axpy((sFloat)(2.0*kappa[xs]), &res[spinor_site_size*(i+Vh*(xs+1))], &res[spinor_site_size*(i+Vh*xs)], hw_site_size);
+        axpy((sFloat)Ftr[xs], &res[hw_site_size+spinor_site_size*(i+Vh*(Ls-1))], &res[hw_site_size+spinor_site_size*(i+Vh*xs)], hw_site_size);
       }
       for (int tmp_s = 0 ; tmp_s < Ls ; tmp_s++)
         Ftr[tmp_s] /= 2.0*kappa[tmp_s];
     }
     // s = ls -1
     for (int i = 0; i < Vh; i++) {
-      ax(&res[12+24*(i+Vh*(Ls-1))], (sFloat)(inv_Ftr[Ls-1]), &res[12+24*(i+Vh*(Ls-1))], 12);
+      ax(&res[hw_site_size+spinor_site_size*(i+Vh*(Ls-1))], (sFloat)(inv_Ftr[Ls-1]), &res[hw_site_size+spinor_site_size*(i+Vh*(Ls-1))], hw_site_size);
     }
   }
   free(inv_Ftr);
@@ -622,21 +621,21 @@ void mdslashReference_5th_inv(sFloat *res, sFloat *spinorField, int , int dagger
     inv_Ftr[xs] = 1.0 / (1.0 + cpow(2.0 * kappa[xs], Ls) * mferm);
     Ftr[xs] = -2.0 * kappa[xs] * mferm * inv_Ftr[xs];
     for (int i = 0; i < Vh; i++) {
-      memcpy(&res[24 * (i + Vh * xs)], &spinorField[24 * (i + Vh * xs)], 24 * sizeof(sFloat));
+      memcpy(&res[spinor_site_size * (i + Vh * xs)], &spinorField[spinor_site_size * (i + Vh * xs)], spinor_site_size * sizeof(sFloat));
     }
   }
   if (daggerBit == 0) {
     // s = 0
     for (int i = 0; i < Vh; i++) {
-      ax((sComplex *)&res[12 + 24 * (i + Vh * (Ls - 1))], inv_Ftr[0],
-          (sComplex *)&spinorField[12 + 24 * (i + Vh * (Ls - 1))], 6);
+      ax((sComplex *)&res[hw_site_size + spinor_site_size * (i + Vh * (Ls - 1))], inv_Ftr[0],
+          (sComplex *)&spinorField[hw_site_size + spinor_site_size * (i + Vh * (Ls - 1))], hw_site_size/2);
     }
 
     // s = 1 ... ls-2
     for (int xs = 0; xs <= Ls - 2; ++xs) {
       for (int i = 0; i < Vh; i++) {
-        axpy((2.0 * kappa[xs]), (sComplex *)&res[24 * (i + Vh * xs)], (sComplex *)&res[24 * (i + Vh * (xs + 1))], 6);
-        axpy(Ftr[xs], (sComplex *)&res[12 + 24 * (i + Vh * xs)], (sComplex *)&res[12 + 24 * (i + Vh * (Ls - 1))], 6);
+        axpy((2.0 * kappa[xs]), (sComplex *)&res[spinor_site_size * (i + Vh * xs)], (sComplex *)&res[spinor_site_size * (i + Vh * (xs + 1))], hw_site_size/2);
+        axpy(Ftr[xs], (sComplex *)&res[hw_site_size + spinor_site_size * (i + Vh * xs)], (sComplex *)&res[hw_site_size + spinor_site_size * (i + Vh * (Ls - 1))], hw_site_size/2);
       }
       for (int tmp_s = 0; tmp_s < Ls; tmp_s++) Ftr[tmp_s] *= 2.0 * kappa[tmp_s];
     }
@@ -645,28 +644,28 @@ void mdslashReference_5th_inv(sFloat *res, sFloat *spinorField, int , int dagger
     // s = ls-2 ... 0
     for (int xs = Ls - 2; xs >= 0; --xs) {
       for (int i = 0; i < Vh; i++) {
-        axpy(Ftr[xs], (sComplex *)&res[24 * (i + Vh * (Ls - 1))], (sComplex *)&res[24 * (i + Vh * xs)], 6);
-        axpy((2.0 * kappa[xs]), (sComplex *)&res[12 + 24 * (i + Vh * (xs + 1))],
-            (sComplex *)&res[12 + 24 * (i + Vh * xs)], 6);
+        axpy(Ftr[xs], (sComplex *)&res[spinor_site_size * (i + Vh * (Ls - 1))], (sComplex *)&res[spinor_site_size * (i + Vh * xs)], hw_site_size/2);
+        axpy((2.0 * kappa[xs]), (sComplex *)&res[hw_site_size + spinor_site_size * (i + Vh * (xs + 1))],
+            (sComplex *)&res[hw_site_size + spinor_site_size * (i + Vh * xs)], hw_site_size/2);
       }
       for (int tmp_s = 0; tmp_s < Ls; tmp_s++) Ftr[tmp_s] /= 2.0 * kappa[tmp_s];
     }
     // s = ls -1
     for (int i = 0; i < Vh; i++) {
-      ax((sComplex *)&res[24 * (i + Vh * (Ls - 1))], inv_Ftr[Ls - 1], (sComplex *)&res[24 * (i + Vh * (Ls - 1))], 6);
+      ax((sComplex *)&res[spinor_site_size * (i + Vh * (Ls - 1))], inv_Ftr[Ls - 1], (sComplex *)&res[spinor_site_size * (i + Vh * (Ls - 1))], hw_site_size/2);
     }
   } else {
     // s = 0
     for (int i = 0; i < Vh; i++) {
-      ax((sComplex *)&res[24 * (i + Vh * (Ls - 1))], inv_Ftr[0], (sComplex *)&spinorField[24 * (i + Vh * (Ls - 1))], 6);
+      ax((sComplex *)&res[spinor_site_size * (i + Vh * (Ls - 1))], inv_Ftr[0], (sComplex *)&spinorField[spinor_site_size * (i + Vh * (Ls - 1))], hw_site_size/2);
     }
 
     // s = 1 ... ls-2
     for (int xs = 0; xs <= Ls - 2; ++xs) {
       for (int i = 0; i < Vh; i++) {
-        axpy(Ftr[xs], (sComplex *)&res[24 * (i + Vh * xs)], (sComplex *)&res[24 * (i + Vh * (Ls - 1))], 6);
-        axpy((2.0 * kappa[xs]), (sComplex *)&res[12 + 24 * (i + Vh * xs)],
-            (sComplex *)&res[12 + 24 * (i + Vh * (xs + 1))], 6);
+        axpy(Ftr[xs], (sComplex *)&res[spinor_site_size * (i + Vh * xs)], (sComplex *)&res[spinor_site_size * (i + Vh * (Ls - 1))], hw_site_size/2);
+        axpy((2.0 * kappa[xs]), (sComplex *)&res[hw_site_size + spinor_site_size * (i + Vh * xs)],
+            (sComplex *)&res[hw_site_size + spinor_site_size * (i + Vh * (xs + 1))], hw_site_size/2);
       }
       for (int tmp_s = 0; tmp_s < Ls; tmp_s++) Ftr[tmp_s] *= 2.0 * kappa[tmp_s];
     }
@@ -675,15 +674,15 @@ void mdslashReference_5th_inv(sFloat *res, sFloat *spinorField, int , int dagger
     // s = ls-2 ... 0
     for (int xs = Ls - 2; xs >= 0; --xs) {
       for (int i = 0; i < Vh; i++) {
-        axpy((2.0 * kappa[xs]), (sComplex *)&res[24 * (i + Vh * (xs + 1))], (sComplex *)&res[24 * (i + Vh * xs)], 6);
-        axpy(Ftr[xs], (sComplex *)&res[12 + 24 * (i + Vh * (Ls - 1))], (sComplex *)&res[12 + 24 * (i + Vh * xs)], 6);
+        axpy((2.0 * kappa[xs]), (sComplex *)&res[spinor_site_size * (i + Vh * (xs + 1))], (sComplex *)&res[spinor_site_size * (i + Vh * xs)], hw_site_size/2);
+        axpy(Ftr[xs], (sComplex *)&res[hw_site_size + spinor_site_size * (i + Vh * (Ls - 1))], (sComplex *)&res[hw_site_size + spinor_site_size * (i + Vh * xs)], hw_site_size/2);
       }
       for (int tmp_s = 0; tmp_s < Ls; tmp_s++) Ftr[tmp_s] /= 2.0 * kappa[tmp_s];
     }
     // s = ls -1
     for (int i = 0; i < Vh; i++) {
-      ax((sComplex *)&res[12 + 24 * (i + Vh * (Ls - 1))], inv_Ftr[Ls - 1],
-          (sComplex *)&res[12 + 24 * (i + Vh * (Ls - 1))], 6);
+      ax((sComplex *)&res[hw_site_size + spinor_site_size * (i + Vh * (Ls - 1))], inv_Ftr[Ls - 1],
+          (sComplex *)&res[hw_site_size + spinor_site_size * (i + Vh * (Ls - 1))], hw_site_size/2);
     }
   }
   free(inv_Ftr);

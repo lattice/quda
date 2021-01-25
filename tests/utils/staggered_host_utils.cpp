@@ -800,7 +800,7 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
         if ((i4 + i1 + i2) % 2 == 1) { sign = -1; }
       }
 
-      for (int j = 0; j < 18; j++) { gauge[d][i * gauge_site_size + j] *= sign; }
+      for (int j = 0; j < gauge_site_size; j++) { gauge[d][i * gauge_site_size + j] *= sign; }
     }
     // odd
     for (int i = 0; i < Vh; i++) {
@@ -822,7 +822,7 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
         if ((i4 + i1 + i2) % 2 == 1) { sign = -1; }
       }
 
-      for (int j = 0; j < 18; j++) { gauge[d][(Vh + i) * gauge_site_size + j] *= sign; }
+      for (int j = 0; j < gauge_site_size; j++) { gauge[d][(Vh + i) * gauge_site_size + j] *= sign; }
     }
   }
 
@@ -836,7 +836,7 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
         if (j >= (X4 - 1) * X1h * X2 * X3) { sign = -1; }
       }
 
-      for (int i = 0; i < 18; i++) {
+      for (int i = 0; i < gauge_site_size; i++) {
         gauge[3][j * gauge_site_size + i] *= sign;
         gauge[3][(Vh + j) * gauge_site_size + i] *= sign;
       }

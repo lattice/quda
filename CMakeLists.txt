@@ -254,9 +254,14 @@ set(QUDA_PRECISION
     "14"
     CACHE STRING "which precisions to instantiate in QUDA (4-bit number - double, single, half, quarter)")
 set(QUDA_RECONSTRUCT
-    "7"
-    CACHE STRING "which reconstructs to instantiate in QUDA (3-bit number - 18, 13/12, 9/8)")
+     "7"
+   CACHE STRING "which reconstructs to instantiate in QUDA (3-bit number - 18, 13/12, 9/8)")
+ 
+if(NOT QUDA_RECONSTRUCT STREQUAL 4 AND NOT QUDA_N_COLORS STREQUAL 3)
+  message(SEND_ERROR "Gauge reconstruction not enabled for Nc != 3. Please reconfigure with QUDA_RECONSTRUCT 4")
+endif()
 
+  
 # Set CTest options
 option(QUDA_CTEST_SEP_DSLASH_POLICIES "Test Dslash policies separately in ctest instead of only autotuning them." OFF)
 

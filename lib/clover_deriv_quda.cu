@@ -38,8 +38,8 @@ namespace quda {
     if (force.Reconstruct() != QUDA_RECONSTRUCT_NO) errorQuda("Force field does not support reconstruction");
 
     if (force.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
-      typedef gauge::FloatNOrder<Float, 2*N_COLORS*N_COLORS, 2, 18> F;
-      typedef gauge::FloatNOrder<Float, 2*N_COLORS*N_COLORS, 2, 18> O;
+      typedef gauge::FloatNOrder<Float, 2*N_COLORS*N_COLORS, 2, 2*N_COLORS*N_COLORS> F;
+      typedef gauge::FloatNOrder<Float, 2*N_COLORS*N_COLORS, 2, 2*N_COLORS*N_COLORS> O;
 
       if (gauge.isNative()) {
 	if (gauge.Reconstruct() == QUDA_RECONSTRUCT_NO) {

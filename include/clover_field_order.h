@@ -786,7 +786,9 @@ namespace quda {
     /**
        QDPJIT ordering for clover fields
     */
-    template <typename Float, int length = (4*4*N_COLORS*N_COLORS)/2>
+    //DMH hardcode this for Nc=3 until we find a solution
+    //template <typename Float, int length = (4*4*N_COLORS*N_COLORS)/2>
+    template <typename Float, int length = 72>
       struct QDPJITOrder {
 	typedef typename mapper<Float>::type RegType;
 	Float *diag; 	   /**< Pointers to the off-diagonal terms (two parities) */
@@ -857,7 +859,9 @@ namespace quda {
        expected by QUDA.  As well as reordering the clover matrix
        elements, we are also changing basis.
     */
-    template <typename Float, int length = (4*4*N_COLORS*N_COLORS)/2>
+    //DMH hardcode this for Nc=3 until we find a solution
+    //template <typename Float, int length = (4*4*N_COLORS*N_COLORS)/2>
+    template <typename Float, int length = 72>
       struct BQCDOrder {
 	typedef typename mapper<Float>::type RegType;
 	Float *clover[2];

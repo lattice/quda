@@ -1389,7 +1389,7 @@ namespace quda {
         Reconstruct(const GaugeField &) { ; }
         Reconstruct(const Reconstruct<11, Float, ghostExchange_> &) {}
 
-        __device__ __host__ inline void Pack(real out[10], const complex in[9]) const
+        __device__ __host__ inline void Pack(real out[N_COLORS*N_COLORS+1], const complex in[N_COLORS*N_COLORS]) const
         {
 #pragma unroll
           for (int i = 0; i < 2; i++) {
@@ -1405,7 +1405,7 @@ namespace quda {
         }
 
         template <typename I>
-        __device__ __host__ inline void Unpack(complex out[9], const real in[10], int, int, real,
+        __device__ __host__ inline void Unpack(complex out[N_COLORS*N_COLORS], const real in[N_COLORS*N_COLORS+1], int, int, real,
                                                const I *, const int *) const
         {
           out[0] = complex(0.0, in[6]);
@@ -1446,17 +1446,17 @@ namespace quda {
         {
         }
 
-        __device__ __host__ inline void Pack(real out[12], const complex in[9]) const
+	    __device__ __host__ inline void Pack(real out[2*N_COLORS*(N_COLORS-1)], const complex in[N_COLORS*N_COLORS]) const
         {
           reconstruct_12.Pack(out, in);
         }
 
         template <typename I>
-        __device__ __host__ inline void Unpack(complex out[9], const real in[12], int, int, real phase,
+        __device__ __host__ inline void Unpack(complex out[N_COLORS*N_COLORS], const real in[2*N_COLORS*(N_COLORS-1)], int, int, real phase,
                                                const I *, const int *) const
         {
 #pragma unroll
-          for (int i = 0; i < 6; i++) out[i] = complex(in[2 * i + 0], in[2 * i + 1]);
+          for (int i = 0; i < 2*N_COLORS; i++) out[i] = complex(in[2 * i + 0], in[2 * i + 1]);
 
           out[6] = cmul(out[2], out[4]);
           out[6] = cmac(out[1], out[5], -out[6]);
@@ -1485,7 +1485,7 @@ namespace quda {
           }
         }
 
-        __device__ __host__ inline real getPhase(const complex in[9]) const
+        __device__ __host__ inline real getPhase(const complex in[N_COLORS*N_COLORS]) const
         {
 #if 1 // phase from cross product
           // denominator = (U[0][0]*U[1][1] - U[0][1]*U[1][0])*
@@ -1498,11 +1498,11 @@ namespace quda {
             return expI3Phase.real() > 0 ? 1 : -1;
           }
 #else // phase from determinant
-          Matrix<complex, 3> a;
+          Matrix<complex, N_COLCORS> a;
 #pragma unroll
-          for (int i = 0; i < 9; i++) a(i) = scale_inv * in[i];
+          for (int i = 0; i < 2*N_COLORS*N_COLORS; i++) a(i) = scale_inv * in[i];
           const complex det = getDeterminant(a);
-          return phase = arg(det) / 3;
+          return phase = arg(det) / N_COLORS;
 #endif
         }
       };
@@ -1514,7 +1514,7 @@ namespace quda {
          @tparam ghostExchange_ optional template the ghostExchange type
          to avoid the run-time overhead
       */
-      template <typename Float, QudaGhostExchange ghostExchange_> struct Reconstruct<8, Float, ghostExchange_> {
+      template <typename Float, QudaGhostExchange ghostExchange_> struct Reconstruct<N_COLORS*N_COLORS-1, Float, ghostExchange_> {
         using real = typename mapper<Float>::type;
         using complex = complex<real>;
         const complex anisotropy; // imaginary value stores inverse
@@ -1536,7 +1536,7 @@ namespace quda {
           ghostExchange(u.GhostExchange())
         { }
 
-        Reconstruct(const Reconstruct<8, Float, ghostExchange_> &recon) :
+        Reconstruct(const Reconstruct<N_COLORS*N_COLORS, Float, ghostExchange_> &recon) :
             anisotropy(recon.anisotropy),
             tBoundary(recon.tBoundary),
             firstTimeSliceBound(recon.firstTimeSliceBound),
@@ -1551,7 +1551,7 @@ namespace quda {
         // compressing the matrix {{b1,b2,b3},{a1,a2,a3},{-c1,-c2,-c3}}
         // instead of {{a1,a2,a3},{b1,b2,b3},{c1,c2,c3}}
 
-        __device__ __host__ inline void Pack(real out[8], const complex in[9]) const
+        __device__ __host__ inline void Pack(real out[N_COLORS*N_COLORS-1], const complex in[N_COLORS*N_COLORS]) const
         {
           out[0] = Trig<isFixed<Float>::value, real>::Atan2(in[3].imag(), in[3].real());   // a1 -> b1
           out[1] = Trig<isFixed<Float>::value, real>::Atan2(-in[6].imag(), -in[6].real()); // c1 -> -c1
@@ -1565,7 +1565,7 @@ namespace quda {
         }
 
         template <typename I>
-        __device__ __host__ inline void Unpack(complex out[9], const real in[8], int, int, real,
+        __device__ __host__ inline void Unpack(complex out[N_COLORS*N_COLORS], const real in[N_COLORS*N_COLORS-1], int, int, real,
                                                const I *, const int *, const complex, const complex u) const
         {
           real u0 = u.real();
@@ -1648,7 +1648,7 @@ namespace quda {
 
         template <typename I>
         __device__ __host__ inline void
-        Unpack(complex out[9], const real in[8], int idx, int dir, real phase, const I *X, const int *R,
+        Unpack(complex out[N_COLORS*N_COLORS], const real in[N_COLORS*N_COLORS-1], int idx, int dir, real phase, const I *X, const int *R,
                const complex scale = complex(static_cast<real>(1.0), static_cast<real>(1.0))) const
         {
           complex u = dir < 3 ?
@@ -1671,48 +1671,48 @@ namespace quda {
          to avoid the run-time overhead
       */
       template <typename Float, QudaGhostExchange ghostExchange_, QudaStaggeredPhase stag_phase>
-      struct Reconstruct<9, Float, ghostExchange_, stag_phase> {
+      struct Reconstruct<N_COLORS*N_COLORS, Float, ghostExchange_, stag_phase> {
         using real = typename mapper<Float>::type;
         using complex = complex<real>;
-        const Reconstruct<8, Float, ghostExchange_> reconstruct_8;
+        const Reconstruct<N_COLORS*N_COLORS-1, Float, ghostExchange_> reconstruct_8;
         const real scale;
         const real scale_inv;
 
         Reconstruct(const GaugeField &u) : reconstruct_8(u), scale(u.Scale()), scale_inv(1.0 / scale) {}
 
-        Reconstruct(const Reconstruct<9, Float, ghostExchange_, stag_phase> &recon) :
+        Reconstruct(const Reconstruct<N_COLORS*N_COLORS, Float, ghostExchange_, stag_phase> &recon) :
             reconstruct_8(recon.reconstruct_8),
             scale(recon.scale),
             scale_inv(recon.scale_inv)
         {
         }
 
-        __device__ __host__ inline real getPhase(const complex in[9]) const
+        __device__ __host__ inline real getPhase(const complex in[N_COLORS*N_COLORS]) const
         {
 #if 1 // phase from cross product
           // denominator = (U[0][0]*U[1][1] - U[0][1]*U[1][0])*
           complex denom = conj(in[0] * in[4] - in[1] * in[3]) * scale_inv;
-          complex expI3Phase = in[8] / denom; // numerator = U[2][2]
+          complex expINPhase = in[8] / denom; // numerator = U[2][2]
           if (stag_phase == QUDA_STAGGERED_PHASE_NO) {
-            return arg(expI3Phase) / static_cast<real>(3.0);
+            return arg(expINPhase) / static_cast<real>(N_COLORS);
           } else {
-            return expI3Phase.real() > 0 ? 1 : -1;
+            return expINPhase.real() > 0 ? 1 : -1;
           }
 #else // phase from determinant
-          Matrix<complex, 3> a;
+          Matrix<complex, N_COLORS> a;
 #pragma unroll
-          for (int i = 0; i < 9; i++) a(i) = scale_inv * in[i];
+          for (int i = 0; i < N_COLORS*N_COLORS; i++) a(i) = scale_inv * in[i];
           const complex det = getDeterminant(a);
-          real phase = arg(det) / 3;
+          real phase = arg(det) / N_COLORS;
           return phase;
 #endif
         }
 
         // Rescale the U3 input matrix by exp(-I*phase) to obtain an SU3 matrix multiplied by a real scale factor,
-        __device__ __host__ inline void Pack(real out[8], const complex in[9]) const
+        __device__ __host__ inline void Pack(real out[N_COLORS*N_COLORS-1], const complex in[N_COLORS*N_COLORS]) const
         {
           real phase = getPhase(in);
-          complex su3[9];
+          complex suN[N_COLORS*N_COLORS];
 
           if (stag_phase == QUDA_STAGGERED_PHASE_NO) {
             real cos_sin[2];
@@ -1720,16 +1720,16 @@ namespace quda {
             complex z(cos_sin[0], cos_sin[1]);
             z *= scale_inv;
 #pragma unroll
-            for (int i = 0; i < 9; i++) su3[i] = cmul(z, in[i]);
+            for (int i = 0; i < N_COLORS*N_COLORS; i++) suN[i] = cmul(z, in[i]);
           } else {
 #pragma unroll
-            for (int i = 0; i < 9; i++) { su3[i] = phase * in[i]; }
+            for (int i = 0; i < N_COLORS*N_COLORS; i++) { suN[i] = phase * in[i]; }
           }
-          reconstruct_8.Pack(out, su3);
+          reconstruct_8.Pack(out, suN);
         }
 
         template <typename I>
-        __device__ __host__ inline void Unpack(complex out[9], const real in[8], int idx, int dir, real phase,
+        __device__ __host__ inline void Unpack(complex out[N_COLORS*N_COLORS], const real in[N_COLORS*N_COLORS-1], int idx, int dir, real phase,
                                                const I *X, const int *R) const
         {
           reconstruct_8.Unpack(out, in, idx, dir, phase, X, R, complex(static_cast<real>(1.0), static_cast<real>(1.0)),
@@ -1741,10 +1741,10 @@ namespace quda {
             complex z(cos_sin[0], cos_sin[1]);
             z *= scale;
 #pragma unroll
-            for (int i = 0; i < 9; i++) out[i] = cmul(z, out[i]);
+            for (int i = 0; i < N_COLORS*N_COLORS; i++) out[i] = cmul(z, out[i]);
           } else { // static phase
 #pragma unroll
-            for (int i = 0; i < 18; i++) { out[i] *= phase; }
+            for (int i = 0; i < 2*N_COLORS*N_COLORS; i++) { out[i] *= phase; }
           }
         }
       };
@@ -1788,8 +1788,8 @@ namespace quda {
         typedef typename VectorType<Float, N>::type Vector;
         typedef typename AllocType<huge_alloc>::type AllocInt;
         Reconstruct<reconLenParam, Float, ghostExchange_, stag_phase> reconstruct;
-        static constexpr int reconLen = (reconLenParam == 11) ? 10 : reconLenParam;
-        static constexpr int hasPhase = (reconLen == 9 || reconLen == 13) ? 1 : 0;
+        static constexpr int reconLen = (reconLenParam == 11) ? N_COLORS*N_COLORS+1 : reconLenParam;
+        static constexpr int hasPhase = (reconLen == N_COLORS*N_COLORS || reconLen == 2*N_COLORS*(N_COLORS-1)) ? 1 : 0;
         Float *gauge;
         const AllocInt offset;
         Float *ghost[4];
@@ -1866,7 +1866,7 @@ namespace quda {
 
         real phase = 0.;
         if (hasPhase) {
-          if (static_phase<stag_phase>() && (reconLen == 13 || use_inphase)) {
+          if (static_phase<stag_phase>() && (reconLen == 2*N_COLORS*(N_COLORS-1)+1 || use_inphase)) {
             phase = inphase;
           } else {
             copy(phase, gauge[parity * offset * N + phaseOffset + stride * dir + x]);
@@ -2617,7 +2617,7 @@ namespace quda {
       anisotropy_inv(1.0 / anisotropy),
       geometry(u.Geometry())
     {
-      if (length != 2*N_COLORS*N_COLORS) errorQuda("Gauge length %d not supported", length);
+      if (length != 2*Nc*Nc) errorQuda("Gauge length %d not supported", length);
     }
     CPSOrder(const CPSOrder &order) :
       LegacyOrder<Float, length>(order),
@@ -2631,7 +2631,7 @@ namespace quda {
     }
 
     // we need to transpose and scale for CPS ordering
-    __device__ __host__ inline void load(complex v[9], int x, int dir, int parity, Float = 1.0) const
+    __device__ __host__ inline void load(complex v[N_COLORS*N_COLORS], int x, int dir, int parity, Float = 1.0) const
     {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
       typedef S<Float,length> structure;
@@ -2647,7 +2647,7 @@ namespace quda {
       }
     }
 
-    __device__ __host__ inline void save(const complex v[9], int x, int dir, int parity)
+    __device__ __host__ inline void save(const complex v[N_COLORS*N_COLORS], int x, int dir, int parity)
     {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
       typedef S<Float,length> structure;
@@ -2723,7 +2723,7 @@ namespace quda {
         gauge(gauge_ ? gauge_ : (Float *)u.Gauge_p()),
         volumeCB(u.VolumeCB())
       {
-        if (length != 2*N_COLORS*N_COLORS) errorQuda("Gauge length %d not supported", length);
+        if (length != 2*Nc*Nc) errorQuda("Gauge length %d not supported", length);
         // compute volumeCB + halo region
         exVolumeCB = u.X()[0]/2 + 2;
 	for (int i=1; i<4; i++) exVolumeCB *= u.X()[i] + 2;
@@ -2734,11 +2734,11 @@ namespace quda {
         volumeCB(order.volumeCB),
         exVolumeCB(order.exVolumeCB)
       {
-        if (length != 2*N_COLORS*N_COLORS) errorQuda("Gauge length %d not supported", length);
+        if (length != 2*Nc*Nc) errorQuda("Gauge length %d not supported", length);
       }
 
       // we need to transpose for BQCD ordering
-      __device__ __host__ inline void load(complex v[9], int x, int dir, int parity, real = 1.0) const
+      __device__ __host__ inline void load(complex v[N_COLORS*N_COLORS], int x, int dir, int parity, real = 1.0) const
       {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
         typedef S<Float, length> structure;
@@ -2752,7 +2752,7 @@ namespace quda {
         }
       }
 
-      __device__ __host__ inline void save(const complex v[9], int x, int dir, int parity)
+      __device__ __host__ inline void save(const complex v[N_COLORS*N_COLORS], int x, int dir, int parity)
       {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
 	typedef S<Float,length> structure;
@@ -2828,7 +2828,7 @@ namespace quda {
         scale(u.Scale()),
         scale_inv(1.0 / scale)
       {
-        if (length != 2*N_COLORS*N_COLORS) errorQuda("Gauge length %d not supported", length);
+        if (length != 2*Nc*Nc) errorQuda("Gauge length %d not supported", length);
       }
       TIFROrder(const TIFROrder &order) :
         LegacyOrder<Float, length>(order),
@@ -2837,11 +2837,11 @@ namespace quda {
         scale(order.scale),
         scale_inv(1.0 / scale)
       {
-        if (length != 2*N_COLORS*N_COLORS) errorQuda("Gauge length %d not supported", length);
+        if (length != 2*Nc*Nc) errorQuda("Gauge length %d not supported", length);
       }
 
       // we need to transpose for TIFR ordering
-      __device__ __host__ inline void load(complex v[9], int x, int dir, int parity, real = 1.0) const
+      __device__ __host__ inline void load(complex v[N_COLORS*N_COLORS], int x, int dir, int parity, real = 1.0) const
       {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
         typedef S<Float, length> structure;
@@ -2857,7 +2857,7 @@ namespace quda {
         }
       }
 
-      __device__ __host__ inline void save(const complex v[9], int x, int dir, int parity)
+      __device__ __host__ inline void save(const complex v[N_COLORS*N_COLORS], int x, int dir, int parity)
       {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
 	typedef S<Float,length> structure;
@@ -2939,7 +2939,7 @@ namespace quda {
         dim {u.X()[0], u.X()[1], u.X()[2], u.X()[3]},
         exDim {u.X()[0], u.X()[1], u.X()[2] + 4, u.X()[3]}
       {
-        if (length != 2*N_COLORS*N_COLORS) errorQuda("Gauge length %d not supported", length);
+        if (length != 2*Nc*Nc) errorQuda("Gauge length %d not supported", length);
 
         // exVolumeCB is the padded checkboard volume
         for (int i=0; i<4; i++) exVolumeCB *= exDim[i];
@@ -2956,7 +2956,7 @@ namespace quda {
         dim {order.dim[0], order.dim[1], order.dim[2], order.dim[3]},
         exDim {order.exDim[0], order.exDim[1], order.exDim[2], order.exDim[3]}
       {
-        if (length != 2*N_COLORS*N_COLORS) errorQuda("Gauge length %d not supported", length);
+        if (length != 2*Nc*Nc) errorQuda("Gauge length %d not supported", length);
       }
 
       /**
@@ -2974,7 +2974,7 @@ namespace quda {
       }
 
       // we need to transpose for TIFR ordering
-      __device__ __host__ inline void load(complex v[9], int x, int dir, int parity, real = 1.0) const
+      __device__ __host__ inline void load(complex v[N_COLORS*N_COLORS], int x, int dir, int parity, real = 1.0) const
       {
         int y = getPaddedIndex(x, parity);
 
@@ -3092,11 +3092,11 @@ namespace quda {
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<double, QUDA_RECONSTRUCT_13, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<double, N, 2, 2*N*(N-1)+1, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<double, N, 2, 2*N_COLORS*(N_COLORS-1)+1, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<double, QUDA_RECONSTRUCT_12, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<double, N, 2, 2*N*(N-1), stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<double, N, 2, 2*N_COLORS*(N_COLORS-1), stag, huge_alloc, ghostExchange, use_inphase> type;
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<double, QUDA_RECONSTRUCT_10, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
@@ -3104,11 +3104,11 @@ namespace quda {
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<double, QUDA_RECONSTRUCT_9, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<double, N, 2, N*N, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<double, N, 2, N_COLORS*N_COLORS, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<double, QUDA_RECONSTRUCT_8, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<double, N, 2, N*N-1, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<double, N, 2, N_COLORS*N_COLORS-1, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
 
   // single precision
@@ -3118,11 +3118,11 @@ namespace quda {
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<float, QUDA_RECONSTRUCT_13, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<float, N, 4, 2*N*(N-1)+1, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<float, N, 4, 2*N_COLORS*(N_COLORS-1)+1, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<float, QUDA_RECONSTRUCT_12, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<float, N, 4, 2*N*(N-1), stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<float, N, 4, 2*N_COLORS*(N_COLORS-1), stag, huge_alloc, ghostExchange, use_inphase> type;
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<float, QUDA_RECONSTRUCT_10, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
@@ -3130,11 +3130,11 @@ namespace quda {
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<float, QUDA_RECONSTRUCT_9, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<float, N, 4, N*N, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<float, N, 4, N_COLORS*N_COLORS, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<float, QUDA_RECONSTRUCT_8, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<float, N, 4, N*N-1, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<float, N, 4, N_COLORS*N_COLORS-1, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
 
 #ifdef FLOAT8
@@ -3150,11 +3150,11 @@ namespace quda {
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<short, QUDA_RECONSTRUCT_13, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<short, N, 4, 2*N*(N-1)+1, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<short, N, 4, 2*N_COLORS*(N_COLORS-1)+1, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<short, QUDA_RECONSTRUCT_12, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<short, N, 4, 2*N*(N-1), stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<short, N, 4, 2*N_COLORS*(N_COLORS-1), stag, huge_alloc, ghostExchange, use_inphase> type;
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<short, QUDA_RECONSTRUCT_10, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
@@ -3162,11 +3162,11 @@ namespace quda {
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<short, QUDA_RECONSTRUCT_9, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<short, N, N8, N*N, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<short, N, N8, N_COLORS*N_COLORS, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<short, QUDA_RECONSTRUCT_8, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<short, N, N8, N*N-1, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<short, N, N8, N_COLORS*N_COLORS-1, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
 
   // quarter precision
@@ -3176,11 +3176,11 @@ namespace quda {
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<int8_t, QUDA_RECONSTRUCT_13, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<int8_t, N, 4, 2*N*(N-1)+1, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<int8_t, N, 4, 2*N_COLORS*(N_COLORS-1)+1, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<int8_t, QUDA_RECONSTRUCT_12, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<int8_t, N, 4, 2*N*(N-1), stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<int8_t, N, 4, 2*N_COLORS*(N_COLORS-1), stag, huge_alloc, ghostExchange, use_inphase> type;
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<int8_t, QUDA_RECONSTRUCT_10, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
@@ -3188,11 +3188,11 @@ namespace quda {
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<int8_t, QUDA_RECONSTRUCT_9, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<int8_t, N, N8, N*N, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<int8_t, N, N8, N_COLORS*N_COLORS, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<int8_t, QUDA_RECONSTRUCT_8, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<int8_t, N, N8, N*N-1, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<int8_t, N, N8, N_COLORS*N_COLORS-1, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
 
   template <typename T, QudaReconstructType recon, int N, QudaStaggeredPhase stag, bool huge_alloc,

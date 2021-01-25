@@ -461,7 +461,7 @@ namespace quda {
     typedef complex<Float> Cmplx;
     typedef typename mapper<Float>::type RegType;
     RegType tmp[Arg::NElems];
-    Cmplx data[9];
+    Cmplx data[N_COLORS*N_COLORS];
     if ( pack ) {
       arg.dataOr.load(data, id, dir, parity);
       arg.dataOr.reconstruct.Pack(tmp, data);
@@ -530,7 +530,7 @@ namespace quda {
     typedef complex<Float> Cmplx;
     typedef typename mapper<Float>::type RegType;
     RegType tmp[Arg::NElems];
-    Cmplx data[9];
+    Cmplx data[N_COLORS*N_COLORS];
     if ( pack ) {
       arg.dataOr.load(data, id, dir, parity);
       arg.dataOr.reconstruct.Pack(tmp, data);
