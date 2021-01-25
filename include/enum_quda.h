@@ -1,6 +1,7 @@
 #pragma once
 
 #include <limits.h>
+#include <quda_define.h>
 #define QUDA_INVALID_ENUM INT_MIN
 
 #ifdef __cplusplus
@@ -67,12 +68,12 @@ typedef enum QudaPrecision_s {
 } QudaPrecision;
 
 typedef enum QudaReconstructType_s {
-  QUDA_RECONSTRUCT_NO = 18, // store all 18 real numbers explicitly
-  QUDA_RECONSTRUCT_12 = 12, // reconstruct from 12 real numbers
-  QUDA_RECONSTRUCT_8 = 8,   // reconstruct from 8 real numbers
-  QUDA_RECONSTRUCT_9 = 9,   // used for storing HISQ long-link variables
-  QUDA_RECONSTRUCT_13 = 13, // used for storing HISQ long-link variables
-  QUDA_RECONSTRUCT_10 = 10, // 10-number parameterization used for storing the momentum field
+  QUDA_RECONSTRUCT_NO = 2*N_COLORS*N_COLORS,      // store all 2*Nc*Nc real numbers explicitly
+  QUDA_RECONSTRUCT_12 = 2*N_COLORS*(N_COLORS-1),  // reconstruct from 2*(Nc-1) real numbers
+  QUDA_RECONSTRUCT_8 = N_COLORS*N_COLORS-1,       // reconstruct from Nc*Nc-1 real numbers
+  QUDA_RECONSTRUCT_9 = N_COLORS*N_COLORS,         // used for storing HISQ long-link variables
+  QUDA_RECONSTRUCT_13 = 2*N_COLORS*(N_COLORS-1)+1,// used for storing HISQ long-link variables
+  QUDA_RECONSTRUCT_10 = N_COLORS*N_COLORS+1,      // Nc*Nc+1 number parameterization used for storing the momentum field
   QUDA_RECONSTRUCT_INVALID = QUDA_INVALID_ENUM
 } QudaReconstructType;
 

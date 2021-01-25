@@ -202,7 +202,7 @@ namespace quda {
     return true;
 #else
     // Brute force Nc != 3 strategy
-    return unitarizeLinkNewton(out, in, 1000);
+    return unitarizeLinkNewton(out, in, 10000);
 #endif
     
   } // unitarizeMILC
@@ -213,7 +213,7 @@ namespace quda {
     mat u = in;
     bool is_unitarized = false;
     int i = 0;
-    while (!is_unitarized && i<max_iter) {
+    while (!is_unitarized && i < max_iter) {
       mat uinv = inverse(u);
       u = 0.5*(u + conj(uinv));
       if((i+1)%10 == 0) is_unitarized = isUnitarizedLinkConsistent(in, u, 1e-7);	
@@ -221,8 +221,8 @@ namespace quda {
     }
     
     if (!is_unitarized) {
-      //printf("ERROR: Unitarized link is not consistent with incoming link with"
-      //"element tol %e and %d iterations\n", 1e-7, max_iter);
+      //printf("ERROR: Unitarized link is not consistent with incoming link"
+      //" tol %e and %d iterations\n", 1e-7, max_iter);
       return false;
     }
     //printf("is %sunitary at %d\n", is_unitarized ? "" : "not ", i);
