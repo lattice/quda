@@ -1,7 +1,8 @@
 #include <quda_internal.h>
 #include <malloc_quda.h>
 #include <reduce_helper.h>
-#include <tune_quda.h>
+#include <tunable_nd.h>
+#include <kernels/reduce_init.cuh>
 
 // These are used for reduction kernels
 static device_reduce_t *d_reduce = nullptr;
@@ -48,11 +49,22 @@ namespace quda
       return bytes;
     }
 
-    // need to use placement new constructor to initialize the atomic counters
-    template <typename T> __global__ void init_count(T *counter)
-    {
-      for (int i = 0; i < max_n_reduce(); i++) new (counter + i) T {0};
-    }
+    template <typename T>
+    struct init_reduce : public TunableKernel {
+      T *reduce_count;
+      long long bytes() const { return max_n_reduce() * sizeof(T); }
+      unsigned int minThreads() const { return max_n_reduce(); }
+      TuneKey tuneKey() const { return TuneKey(std::to_string(max_n_reduce()).c_str(), typeid(*this).name()); }
+
+      init_reduce(T *reduce_count) : reduce_count(reduce_count) { apply(device::get_default_stream()); }
+
+      void apply(const qudaStream_t &stream)
+      {
+        auto tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        launch_device<init_count>(kernel_t(reinterpret_cast<const void *>(Kernel1D<init_count, init_arg<T>>), "Kernel1D"),
+                                  tp, stream, init_arg<T>(reduce_count));
+      }
+    };
 
     void init()
     {
@@ -78,11 +90,7 @@ namespace quda
 
       if (!reduce_count) {
         reduce_count = static_cast<count_t *>(device_malloc(max_n_reduce() * sizeof(decltype(*reduce_count))));
-        TuneParam tp;
-        tp.grid = dim3(1, 1, 1);
-        tp.block = dim3(1, 1, 1);
-
-        qudaLaunchKernel(init_count<count_t>, tp, device::get_default_stream(), reduce_count);
+        init_reduce<count_t> init(reduce_count);
       }
 
       reduceEnd = qudaEventCreate();

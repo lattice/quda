@@ -1038,7 +1038,7 @@ namespace quda {
   /**
      @brief pre-declaration of RNG class (defined in non-device-safe random_quda.h)
   */
-  struct RNG;
+  class RNG;
 
   /**
      @brief Generate a random noise spinor.  This variant allows the user to manage the RNG state.

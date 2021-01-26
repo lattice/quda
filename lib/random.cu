@@ -33,7 +33,6 @@ namespace quda {
   };
 
   RNG::RNG(const LatticeField &meta, unsigned long long seedin) :
-    meta(meta),
     size(meta.Volume()),
     state((RNGState *)device_malloc(size * sizeof(RNGState)), [](RNGState *ptr){ device_free(ptr); } ),
     seed(seedin)
