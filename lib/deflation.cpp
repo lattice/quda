@@ -371,7 +371,8 @@ namespace quda
     }
 
     if (strcmp(vec_infile.c_str(),"")!=0) {
-      read_spinor_field(vec_infile.c_str(), &V[0], B[0]->Precision(), B[0]->X(),
+      QudaParity parity = (B[0]->SiteSubset() == QUDA_FULL_SITE_SUBSET ? QUDA_INVALID_PARITY : QUDA_EVEN_PARITY);
+      read_spinor_field(vec_infile.c_str(), &V[0], B[0]->Precision(), B[0]->X(), B[0]->SiteSubset(), parity,
 			B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0,  (char**)0);
     } else {
       errorQuda("No eigenspace file defined");
@@ -404,7 +405,9 @@ namespace quda
 	}
       }
 
-      write_spinor_field(vec_outfile.c_str(), &V[0], B[0]->Precision(), B[0]->X(),
+      // assumes even parity if a single-parity field...
+      QudaParity parity = (B[0]->SiteSubset() == QUDA_FULL_SITE_SUBSET ? QUDA_INVALID_PARITY : QUDA_EVEN_PARITY);
+      write_spinor_field(vec_outfile.c_str(), &V[0], B[0]->Precision(), B[0]->X(), B[0]->SiteSubset(), parity,
 			 B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0,  (char**)0);
 
       host_free(V);

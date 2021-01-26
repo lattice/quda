@@ -177,6 +177,9 @@ set(QUDA_OPENMP OFF CACHE BOOL "enable OpenMP")
 set(QUDA_CXX_STANDARD 11 CACHE STRING "set the CXX Standard (11 or 14)")
 set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 11 14)
 
+# QIO legacy support
+option(QUDA_DOWNLOAD_QIO_LEGACY "download qio2-5-0 branch of QIO instead of extended (API compatible) branch" OFF)
+
 # NVTX options
 set(QUDA_MPI_NVTX OFF CACHE BOOL "add nvtx markup to MPI API calls for the visual profiler")
 set(QUDA_INTERFACE_NVTX OFF CACHE BOOL "add nvtx markup to interface calls for the visual profiler")
@@ -208,6 +211,8 @@ mark_as_advanced(QUDA_CTEST_SEP_DSLASH_POLICIES)
 mark_as_advanced(QUDA_CTEST_LAUNCH)
 mark_as_advanced(QUDA_CTEST_LAUNCH_ARGS)
 mark_as_advanced(QUDA_OPENMP)
+
+mark_as_advanced(QUDA_DOWNLOAD_QIO_LEGACY)
 
 mark_as_advanced(QUDA_MPI_NVTX)
 mark_as_advanced(QUDA_INTERFACE_NVTX)
@@ -409,7 +414,7 @@ if(QUDA_QMP)
   if(QUDA_DOWNLOAD_USQCD)
     ExternalProject_Add(QMP
                         GIT_REPOSITORY https://github.com/usqcd-software/qmp.git
-                        GIT_TAG qmp2-5-1
+                        GIT_TAG qmp2-5-2
                         GIT_SHALLOW YES
                         PREFIX usqcd
                         CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure
@@ -468,15 +473,20 @@ if(QUDA_QIO)
     message(FATAL_ERROR "Use of QIO (via QUDA_QIO=ON) requires QMP. Please set QUDA_QMP=ON.")
   endif()
   if(QUDA_DOWNLOAD_USQCD)
+     set(QIO_BRANCH
+        "extended")
+    if(QUDA_DOWNLOAD_QIO_LEGACY)
+      set(QIO_BRANCH
+          "qio2-5-0")
+    endif()
     ExternalProject_Add(QIO
                         GIT_REPOSITORY https://github.com/usqcd-software/qio.git
-                        GIT_TAG qio2-5-0
+                        GIT_TAG "${QIO_BRANCH}"
                         GIT_SHALLOW YES
                         PREFIX usqcd
-                        CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure
-                                          "INSTALL=${INSTALL_EXE} -C"
-                                          --with-qmp=${QUDA_QMPHOME}
-                                          --prefix=<INSTALL_DIR>
+                        CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure "INSTALL=${INSTALL_EXE} -C"
+                        "CFLAGS=-Wall -O3 -std=c99 -DHAVE_BGL " --with-qmp=${QUDA_QMPHOME} --prefix=<INSTALL_DIR>
+                        --enable-largefile --disable-qmp-route --enable-dml-output-buffering
                         BUILD_COMMAND make
                         INSTALL_COMMAND make install
                         DEPENDS QMP
@@ -520,7 +530,7 @@ if(QUDA_QIO)
     set(QUDA_QIO_LIBS ${QUDA_QIO_LIBS_INTERNAL} CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
   endif()
   add_definitions(-DHAVE_QIO)
-  set(QIO_UTIL qio_util.cpp qio_field.cpp layout_hyper.c)
+  set(QIO_UTIL qio_field.cpp layout_hyper.cpp)
 
   include_directories(SYSTEM ${QUDA_QIOHOME}/include)
   include_directories(SYSTEM ${QUDA_LIMEHOME}/include)
