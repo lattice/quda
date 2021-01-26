@@ -116,6 +116,7 @@ cudaGaugeField *gaugeLongEigensolver = nullptr;
 cudaGaugeField *gaugeLongExtended = nullptr;
 
 cudaGaugeField *gaugeSmeared = nullptr;
+cudaGaugeField *gaugeEvolved = nullptr;
 
 cudaCloverField *cloverPrecise = nullptr;
 cudaCloverField *cloverSloppy = nullptr;
@@ -204,6 +205,9 @@ static TimeProfile profileOvrImpSTOUT("OvrImpSTOUTQuda");
 
 //!< Profiler for wFlowQuda
 static TimeProfile profileWFlow("wFlowQuda");
+
+//!< Profiler for heatbathQuda
+static TimeProfile profileHeatbath("heatbathQuda");
 
 //!< Profiler for projectSUNQuda
 static TimeProfile profileProject("projectSUNQuda");
@@ -1556,6 +1560,7 @@ void endQuda(void)
     profileSTOUT.Print();
     profileOvrImpSTOUT.Print();
     profileWFlow.Print();
+    profileHeatbath.Print();
     profileProject.Print();
     profilePhase.Print();
     profileMomAction.Print();
@@ -5499,6 +5504,39 @@ void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval
   delete gaugeAux;
   profileWFlow.TPSTOP(QUDA_PROFILE_TOTAL);
   popOutputPrefix();
+}
+
+void performHeatbath(double beta, unsigned int num_start, unsigned int num_steps, unsigned int num_warmup_steps, unsigned int num_heatbath_per_step, unsigned int num_overrelax_per_step, bool coldstart){
+  profileHeatbath.TPSTART(QUDA_PROFILE_TOTAL);
+
+  if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
+
+  if (gaugeEvolved != nullptr) delete gaugeEvolved;
+  gaugeEvolved = createExtendedGauge(*gaugePrecise, R, profileOvrImpSTOUT);
+
+  GaugeFieldParam gParam(*gaugeEvolved);
+  auto *cudaGaugeTemp = new cudaGaugeField(gParam);
+
+  QudaGaugeObservableParam param = newQudaGaugeObservableParam();
+  param.compute_qcharge = QUDA_BOOLEAN_TRUE;
+
+  if (getVerbosity() >= QUDA_SUMMARIZE) {
+    gaugeObservablesQuda(&param);
+    printfQuda("Heatbath Step %03d: Plaquette = %+.16e Qcharge = %+.16e\n", 0, param.plaquette[0], param.qcharge);
+  }
+
+  for (unsigned int i = 0; i < num_warmup_steps + num_steps; i++) {
+    profileHeatbath.TPSTART(QUDA_PROFILE_COMPUTE);
+    //heatbathStep(*gaugeSmeared, *cudaGaugeTemp, rho);
+    profileHeatbath.TPSTOP(QUDA_PROFILE_COMPUTE);
+    if(i >= num_warmup_steps) {
+      gaugeObservablesQuda(&param);
+      printfQuda("Heatbath Step %03d: Plaquette = %+.16e Qcharge = %+.16e\n", i, param.plaquette[0], param.qcharge);
+    }
+  }
+
+  delete cudaGaugeTemp;
+  profileHeatbath.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
 int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,

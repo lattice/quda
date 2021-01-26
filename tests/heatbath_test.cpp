@@ -113,7 +113,8 @@ int main(int argc, char **argv)
   void *load_gauge[4];
   // Allocate space on the host (always best to allocate and free in the same scope)
   for (int dir = 0; dir < 4; dir++) { load_gauge[dir] = malloc(V * gauge_site_size * gauge_param.cpu_prec); }
-
+  constructHostGaugeField(load_gauge, gauge_param, argc, argv);   
+  
   int *num_failures_h = (int *)mapped_malloc(sizeof(int));
   int *num_failures_d = (int *)get_mapped_device_pointer(num_failures_h);
   *num_failures_h = 0;

@@ -149,7 +149,7 @@ namespace quda {
     //Reconstruct last row
     int sign = 1;
     for (int c = 0; c < Nc; c++) {
-      U(Nc-1,c) = -sign * conj(getDeterminant(getSubMat(U, Nc, c)));
+      U(Nc-1,c) = sign * conj(getDeterminant(getSubMat(U, Nc, c)));
       sign *= -1;
     }
 #endif

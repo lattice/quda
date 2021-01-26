@@ -1383,6 +1383,18 @@ extern "C" {
   void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval, QudaWFlowType wflow_type);
 
   /**
+   * Performs Heatbath on gaugePrecise
+   * @param beta Beta simulation value 
+   * @param num_start Starting label for simulation
+   * @param num_steps Number of simulation steps after warm up
+   * @param num_warmup_steps Number of simulation steps to warm up
+   * @param num_heatbath_per_step Number of heatbath iterations per step
+   * @param num_overrelax_per_step Number of overrelaxation iterations per step
+   * @param coldstart Whether to do a coldstart (unit gauge) or hot start (random gauge)
+   */
+  void performHeatbath(double beta, unsigned int num_start, unsigned int num_steps, unsigned int num_warmup_steps, unsigned int num_heatbath_per_step, unsigned int num_overrelax_per_step, bool coldstart);
+  
+  /**
    * @brief Calculates a variety of gauge-field observables.  If a
    * smeared gauge field is presently loaded (in gaugeSmeared) the
    * observables are computed on this, else the resident gauge field
