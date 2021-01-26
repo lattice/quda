@@ -6,6 +6,7 @@
  *
  */
 
+#include <limits>
 #include <register_traits.h>
 #include <convert.h>
 #include <clover_field.h>
