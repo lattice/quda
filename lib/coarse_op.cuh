@@ -162,6 +162,7 @@ namespace quda {
 
     Launch(Arg &arg, qudaError_t &qerror, TuneParam &tp, ComputeType type, bool use_mma, const qudaStream_t &stream)
     {
+#if 0
 #ifdef JITIFY
       using namespace jitify::reflection;
 #endif
@@ -470,6 +471,7 @@ namespace quda {
 
       // convert Jitify return error into QUDA error
       qerror = error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
+#endif
     }
   };
 
