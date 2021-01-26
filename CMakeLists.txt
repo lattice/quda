@@ -823,8 +823,8 @@ if(QUDA_BACKWARDS)
   include(FetchContent)
   FetchContent_Declare(
     backward-cpp
-    GIT_REPOSITORY https://github.com/lattice/backward-cpp.git
-    GIT_TAG v1.4
+    GIT_REPOSITORY https://github.com/bombela/backward-cpp.git
+    GIT_TAG v1.5
     GIT_SHALLOW ON)
   FetchContent_GetProperties(backward-cpp)
   if(NOT backward-cpp_POPULATED)
