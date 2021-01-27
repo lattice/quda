@@ -44,7 +44,7 @@ namespace quda {
                      const std::vector<constant_param_t> &param = dummy_param) const
     {
       constexpr bool grid_stride = false;
-      const_cast<TunableKernel*>(this)->launch_device<Functor>(KERNEL(raw_kernel), tp, stream, arg, param);
+      const_cast<TunableKernel*>(this)->launch_device<Functor, grid_stride>(KERNEL(raw_kernel), tp, stream, arg, param);
     }
 
   };

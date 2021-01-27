@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstring>
+#include <ostream>
 
 namespace quda {
 
@@ -40,6 +41,14 @@ namespace quda {
       return false;
     }
   
+    friend std::ostream& operator<<(std::ostream& output, const TuneKey& key)
+    {
+      output << "volume = " << key.volume << ", ";
+      output << "name = " << key.name << ", ";
+      output << "aux = " << key.aux;
+      return output;
+    }
+
   };
 
   /** Return the key of the last kernel that has been tuned / called.*/

@@ -6,6 +6,7 @@
  *
  */
 
+#include <limits>
 #include <register_traits.h>
 #include <convert.h>
 #include <clover_field.h>
@@ -69,16 +70,6 @@ namespace quda {
   }
 
   namespace clover {
-
-    template<typename ReduceType, typename Float> struct square_ {
-      __host__ __device__ inline ReduceType operator()(const quda::complex<Float> &x)
-      { return static_cast<ReduceType>(norm(x)); }
-    };
-
-    template<typename ReduceType, typename Float> struct abs_ {
-      __host__ __device__ inline ReduceType operator()(const quda::complex<Float> &x)
-      { return static_cast<ReduceType>(abs(x)); }
-    };
 
     /**
        The internal ordering for each clover matrix has chirality as the

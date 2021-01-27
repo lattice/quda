@@ -832,6 +832,11 @@ namespace quda
 
       // check this process is getting the key that is expected
       if (tunecache.find(key) == tunecache.end()) {
+
+        // if we can't find the key, and debugging, then print out the entire map
+        if (verbosity >= QUDA_DEBUG_VERBOSE)
+          for (auto elem : tunecache) std::cout << elem.first << ": " << elem.second << std::endl;
+
         errorQuda("Failed to find key entry (%s:%s:%s)", key.name, key.volume, key.aux);
       }
       param = tunecache[key]; // read this now for all processes
