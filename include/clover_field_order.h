@@ -740,22 +740,22 @@ namespace quda {
 	const int volumeCB;
 	const int stride;
 	const int offset;
-
+	
 	const bool twisted;
 	const Float mu2;
-
-        QDPOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void * = nullptr) :
-         volumeCB(clover.VolumeCB()), stride(volumeCB), offset(clover.Bytes()/(2*sizeof(Float))),
-	twisted(clover.Twisted()), mu2(clover.Mu2()) {
-        if (clover.Order() != QUDA_PACKED_CLOVER_ORDER) {
-          errorQuda("Invalid clover order %d for this accessor", clover.Order());
-        }
-        this->clover = clover_ ? clover_ : (Float *)(clover.V(inverse));
-      }
-
+	
+      QDPOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void * = nullptr) :
+	volumeCB(clover.VolumeCB()), stride(volumeCB), offset(clover.Bytes()/(2*sizeof(Float))),
+	  twisted(clover.Twisted()), mu2(clover.Mu2()) {
+	  if (clover.Order() != QUDA_PACKED_CLOVER_ORDER) {
+	    errorQuda("Invalid clover order %d for this accessor", clover.Order());
+	  }
+	  this->clover = clover_ ? clover_ : (Float *)(clover.V(inverse));
+	}
+	
 	bool  Twisted()	const	{return twisted;}
 	Float Mu2()	const	{return mu2;}
-
+	
 	__device__ __host__ inline void load(RegType v[length], int x, int parity) const {
 	  // factor of 0.5 comes from basis change
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
@@ -767,7 +767,7 @@ namespace quda {
 	  for (int i=0; i<length; i++) v[i] = 0.5*clover[parity*offset + x*length+i];
 #endif
 	}
-  
+	
 	__device__ __host__ inline void save(const RegType v[length], int x, int parity) {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
 	  typedef S<Float,length> structure;
@@ -786,26 +786,42 @@ namespace quda {
     /**
        QDPJIT ordering for clover fields
     */
-    //DMH hardcode this for Nc=3 until we find a solution
-    //template <typename Float, int length = (4*4*N_COLORS*N_COLORS)/2>
-    template <typename Float, int length = 72>
+    template <typename Float, int length = (4*4*N_COLORS*N_COLORS)/2>
       struct QDPJITOrder {
 	typedef typename mapper<Float>::type RegType;
 	Float *diag; 	   /**< Pointers to the off-diagonal terms (two parities) */
 	Float *offdiag;   /**< Pointers to the diagonal terms (two parities) */
 	const int volumeCB;
 	const int stride;
-
+	const int Nc = N_COLORS;
 	const bool twisted;
-	const Float mu2;
-	
+	const Float mu2;		
+
       QDPJITOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void * = nullptr) :
 	volumeCB(clover.VolumeCB()), stride(volumeCB), twisted(clover.Twisted()), mu2(clover.Mu2()) {
 	  if (clover.Order() != QUDA_QDPJIT_CLOVER_ORDER) {
 	    errorQuda("Invalid clover order %d for this accessor", clover.Order());
 	  }
 	  offdiag = clover_ ? ((Float **)clover_)[0] : ((Float **)clover.V(inverse))[0];
-	  diag = clover_ ? ((Float **)clover_)[1] : ((Float **)clover.V(inverse))[1];
+	  diag = clover_ ? ((Float **)clover_)[1] : ((Float **)clover.V(inverse))[1];	  
+	}
+	
+	// Compute the off diagonal positions of the clover matric
+	constexpr int* idtab_array() const {
+	  int idtab[2*Nc*Nc-Nc];
+	  int idx = 0;
+	  const int L = 2*Nc-1;
+	  for(int col = 0; col<L; col++) {
+	    int id = col*(col+3)/2;
+	    idtab[idx] = id;
+	    idx++;
+	    for(int i=col+1; i<L; i++) {
+	      id += i;
+	      idtab[idx] = id;
+	      idx++;
+	    }
+	  }
+	  return idtab;
 	}
 	
 	bool  Twisted()	const	{return twisted;}
@@ -815,17 +831,16 @@ namespace quda {
 	  // the factor of 0.5 comes from a basis change
 	  for (int chirality=0; chirality<2; chirality++) {
 	    // set diagonal elements
-	    for (int i=0; i<2*N_COLORS; i++) {
+	    for (int i=0; i<2*Nc; i++) {
 	      v[chirality*(length/2) + i] = 0.5*diag[((i*2 + chirality)*2 + parity)*volumeCB + x];
 	    }
 	    
 	    // the off diagonal elements
-	    for (int i=0; i<(length/2) - 2*N_COLORS; i++) {
+	    for (int i=0; i<(length/2) - 2*Nc; i++) {
 	      int z = i%2;
 	      int off = i/2;
-	      // DMH: IDTAB MAKE GENERIC
-	      const int idtab[15]={0,1,3,6,10,2,4,7,11,5,8,12,9,13,14};
-	      v[chirality*(length/2) + 2*N_COLORS + i] = 0.5*offdiag[(((z*15 + idtab[off])*2 + chirality)*2 + parity)*volumeCB + x];
+	      const int *idtab = idtab_array();
+	      v[chirality*(length/2) + 2*Nc + i] = 0.5*offdiag[(((z*(2*Nc*Nc-Nc) + idtab[off])*2 + chirality)*2 + parity)*volumeCB + x];
 	    }	    
 	  }
 	}
@@ -834,17 +849,16 @@ namespace quda {
 	  // the factor of 2.0 comes from undoing the basis change
 	  for (int chirality=0; chirality<2; chirality++) {
 	    // set diagonal elements
-	    for (int i=0; i<2*N_COLORS; i++) {
+	    for (int i=0; i<2*Nc; i++) {
 	      diag[((i*2 + chirality)*2 + parity)*volumeCB + x] = 2.0*v[chirality*(length/2) + i];
 	    }
-
+	    
 	    // the off diagonal elements
-	    for (int i=0; i<30; i++) {
+	    for (int i=0; i<(length/2) - 2*Nc; i++) {
 	      int z = i%2;
 	      int off = i/2;
-	      // DMH: IDTAB MAKE GENERIC
-	      const int idtab[15]={0,1,3,6,10,2,4,7,11,5,8,12,9,13,14};
-	      offdiag[(((z*15 + idtab[off])*2 + chirality)*2 + parity)*volumeCB + x] = 2.0*v[chirality*(length/2) + 2*N_COLORS + i];
+	      const int *idtab = idtab_array();
+	      offdiag[(((z*(2*Nc*Nc-Nc) + idtab[off])*2 + chirality)*2 + parity)*volumeCB + x] = 2.0*v[chirality*(length/2) + 2*Nc + i];
 	    }
 	  }
 	}
