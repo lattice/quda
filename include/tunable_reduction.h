@@ -3,6 +3,8 @@
 #include <tune_quda.h>
 #include <device.h>
 #include <kernel_helper.h>
+#include <complex_quda.h>
+#include <reducer.h>
 #include <reduce_helper.h>
 #include <reduction_kernel.h>
 #include <register_traits.h>
