@@ -467,14 +467,17 @@ namespace quda
 
   QudaFieldLocation get_pointer_location(const void *ptr)
   {
-    // This is slow/incomplete
-    if ( alloc[DEVICE].find(const_cast<void*>(ptr)) != alloc[DEVICE].end() ) return QUDA_CUDA_FIELD_LOCATION;
-    if ( alloc[DEVICE_PINNED].find(const_cast<void*>(ptr)) != alloc[DEVICE_PINNED].end() ) return QUDA_CUDA_FIELD_LOCATION;
-    if ( alloc[HOST].find(const_cast<void *>(ptr)) != alloc[HOST].end()) return QUDA_CPU_FIELD_LOCATION;
-    if ( alloc[PINNED].find(const_cast<void *>(ptr)) != alloc[PINNED].end()) return QUDA_CPU_FIELD_LOCATION;
-
-    errorQuda("ptr %lx  not found in either host or device maps\n", (unsigned long)ptr);
-    return QUDA_INVALID_FIELD_LOCATION;
+     hipPointerAttribute_t attr;
+     hipPointerGetAttributes(&attr, ptr);
+     //printf("memoryType of ptr: %d\n", attr.memoryType);
+ 
+     switch (attr.memoryType) {
+       case hipMemoryTypeHost: return QUDA_CPU_FIELD_LOCATION;
+       case hipMemoryTypeDevice: return QUDA_CUDA_FIELD_LOCATION;
+       case hipMemoryTypeArray: return QUDA_CUDA_FIELD_LOCATION;
+       case hipMemoryTypeUnified: return QUDA_CUDA_FIELD_LOCATION; ///< Not used currently
+       default: errorQuda("Unknown memory type %d\n", attr.memoryType); return QUDA_INVALID_FIELD_LOCATION;
+    }
   }
 
   void *get_mapped_device_pointer_(const char *func, const char *file, int line, const void *host)
