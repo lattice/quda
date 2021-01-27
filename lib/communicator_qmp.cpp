@@ -306,10 +306,16 @@ MsgHandle *Communicator::comm_declare_strided_receive_displaced(void *buffer, co
 void Communicator::comm_free(MsgHandle *&mh)
 {
 #ifdef USE_MPI_GATHER
-  if(mh->request) host_free(mh->request);//for nonblocking allreduce 
-#endif 
+  if(mh->request) {
+     host_free(mh->request);//for nonblocking allreduce
+  } else {
+     QMP_free_msghandle(mh->handle);
+     QMP_free_msgmem(mh->mem); 
+  } 
+#else 
   QMP_free_msghandle(mh->handle);
   QMP_free_msgmem(mh->mem);
+#endif
   host_free(mh);
   mh = nullptr;
 }
