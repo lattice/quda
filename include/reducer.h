@@ -1,23 +1,27 @@
 #pragma once
 namespace quda {
 
-  template <typename T> struct plus;
+
+  template <typename T> struct plus {
+    static constexpr bool do_sum = true;
+    __device__ __host__ T operator()(T a, T b) const { return a + b; }
+  };
+
+#if 1
+  // Dumb tests suggest this is still needed for some reason
   template<>
   struct plus<double2> {
     static constexpr bool do_sum = true;
     using Double2 = double2;
 
     __device__ __host__ inline Double2 operator()( Double2 a, Double2 b ) {
-            Double2 ret_val{0,0};
-            ret_val.x = a.x + b.x;
-            ret_val.y = a.y + b.y;
-            return ret_val;
+	    Double2 ret_val{0,0};
+	    ret_val.x = a.x + b.x;
+	    ret_val.y = a.y + b.y;
+	    return ret_val;
     }
   };
-  template <typename T> struct plus {
-    static constexpr bool do_sum = true;
-    __device__ __host__ T operator()(T a, T b) const { return a + b; }
-  };
+#endif
 
   template <typename T> struct maximum {
     static constexpr bool do_sum = false;
