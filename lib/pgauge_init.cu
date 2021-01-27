@@ -52,7 +52,7 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<HotStart>(tp, stream, InitGaugeHotArg<Float, nColors, recon>(U, rng));
+      launch<HotStart>(tp, stream, InitGaugeHotArg<Float, nColors, recon>(U, rng.State()));
     }
 
     void preTune() { rng.backup(); }

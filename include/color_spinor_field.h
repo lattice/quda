@@ -6,7 +6,6 @@
 #include <iostream>
 
 #include <lattice_field.h>
-#include <random_quda.h>
 #include <fast_intdiv.h>
 
 namespace quda {
@@ -1035,6 +1034,11 @@ namespace quda {
   */
   void genericPackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity,
 			int nFace, int dagger, MemoryLocation *destination=nullptr);
+
+  /**
+     @brief pre-declaration of RNG class (defined in non-device-safe random_quda.h)
+  */
+  class RNG;
 
   /**
      @brief Generate a random noise spinor.  This variant allows the user to manage the RNG state.

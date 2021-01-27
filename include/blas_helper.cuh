@@ -1,6 +1,7 @@
 #pragma once
 
 #include <color_spinor_field.h>
+#include <reduce_helper.h>
 
 //#define QUAD_SUM
 #ifdef QUAD_SUM

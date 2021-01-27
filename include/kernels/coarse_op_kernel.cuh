@@ -8,6 +8,7 @@
 #include <gamma.cuh>
 #include <linalg.cuh>
 #include <matrix_tile.cuh>
+#include <target_device.h>
 
 namespace quda {
 

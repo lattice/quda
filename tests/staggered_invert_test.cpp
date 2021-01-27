@@ -286,8 +286,7 @@ int main(int argc, char **argv)
   //-----------------------------------------------------------------------------------
 
   // Prepare rng
-  auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
-  rng->Init();
+  auto *rng = new quda::RNG(*ref, 1234);
 
   // Performance measuring
   std::vector<double> time(Nsrc);
@@ -383,7 +382,6 @@ int main(int argc, char **argv)
   if (Nsrc > 1) performanceStats(time, gflops, iter);
 
   // Free RNG
-  rng->Release();
   delete rng;
 
   // Free the multigrid solver

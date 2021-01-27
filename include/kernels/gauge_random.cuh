@@ -19,11 +19,11 @@ namespace quda {
     int X[4]; // true grid dimensions
     int border[4];
     Gauge U;
-    RNG rng;
+    RNGState *rng;
     real sigma; // where U = exp(sigma * H)
     dim3 threads; // number of active threads required
 
-    GaugeGaussArg(const GaugeField &U, RNG &rng, double sigma) :
+    GaugeGaussArg(const GaugeField &U, RNGState *rng, double sigma) :
       U(U),
       rng(rng),
       sigma(sigma),
@@ -94,7 +94,7 @@ namespace quda {
         for (int mu = 0; mu < 4; mu++) arg.U(mu, linkIndex(x, arg.E), parity) = I;
       } else {
         for (int mu = 0; mu < 4; mu++) {
-          RNGState localState = arg.rng.State()[parity * arg.threads.x + x_cb];
+          RNGState localState = arg.rng[parity * arg.threads.x + x_cb];
 
           // generate Gaussian distributed su(n) field
           Link u = gauss_su3<real, Link>(localState);
@@ -104,7 +104,7 @@ namespace quda {
           }
           arg.U(mu, linkIndex(x, arg.E), parity) = u;
 
-          arg.rng.State()[parity * arg.threads.x + x_cb] = localState;
+          arg.rng[parity * arg.threads.x + x_cb] = localState;
         }
       }
     }

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <random_quda.h>
 #include <curand_kernel.h>
 
 namespace quda {

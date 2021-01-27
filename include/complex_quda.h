@@ -23,6 +23,7 @@
 #include <cmath>
 #include <complex>
 #include <sstream>
+#include <cstdint>
 
 namespace quda {
   namespace gauge {

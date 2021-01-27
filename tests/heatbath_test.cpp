@@ -149,7 +149,6 @@ int main(int argc, char **argv)
     cudaGaugeField *gaugeEx = new cudaGaugeField(gParamEx);
     // CURAND random generator initialization
     RNG *randstates = new RNG(*gauge, 1234);
-    randstates->Init();
 
     int nsteps = heatbath_num_steps;
     int nwarm = heatbath_warmup_steps;
@@ -249,7 +248,6 @@ int main(int argc, char **argv)
     delete gaugeEx;   //Release all temporary memory used for data exchange between GPUs in multi-GPU mode
     PGaugeExchangeFree();
 
-    randstates->Release();
     delete randstates;
   }
 

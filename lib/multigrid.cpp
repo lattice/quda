@@ -2,6 +2,7 @@
 
 #include <multigrid.h>
 #include <tune_quda.h>
+#include <random_quda.h>
 #include <vector_io.h>
 
 // for building the KD inverse op
@@ -79,7 +80,6 @@ namespace quda
     }
 
     rng = new RNG(*param.B[0], 1234);
-    rng->Init();
 
     if (param.transfer_type == QUDA_TRANSFER_AGGREGATE) {
       if (param.level < param.Nlevel - 1) {
@@ -699,7 +699,6 @@ namespace quda
     }
 
     if (rng) {
-      rng->Release();
       delete rng;
     }
 

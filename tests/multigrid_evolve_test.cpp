@@ -248,7 +248,6 @@ int main(int argc, char **argv)
 
     // CURAND random generator initialization
     RNG *randstates = new RNG(*gauge, 1234);
-    randstates->Init();
     int nsteps = 10;
     int nhbsteps = 1;
     int novrsteps = 1;
@@ -450,7 +449,6 @@ int main(int argc, char **argv)
     //Release all temporary memory used for data exchange between GPUs in multi-GPU mode
     PGaugeExchangeFree();
 
-    randstates->Release();
     delete randstates;
   }
 
