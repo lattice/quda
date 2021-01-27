@@ -4,17 +4,15 @@
 #include <cstring>
 #include <cfloat>
 #include <algorithm>
-#include <tune_key.h>
-#include <quda_internal.h>
-#include <device.h>
-
-// this file has some workarounds to allow compilation using nvrtc of kernels that include this file
-#ifndef __CUDACC_RTC__
 #include <cstdarg>
 #include <iomanip>
 #include <typeinfo>
 #include <map>
-#endif
+
+#include <tune_key.h>
+#include <quda_internal.h>
+#include <device.h>
+#include <uint_to_char.h>
 
 namespace quda {
 
@@ -37,7 +35,6 @@ namespace quda {
     TuneParam& operator=(const TuneParam &) = default;
     TuneParam& operator=(TuneParam &&) = default;
 
-#ifndef __CUDACC_RTC__
     friend std::ostream& operator<<(std::ostream& output, const TuneParam& param) {
       output << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
       output << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
@@ -45,16 +42,14 @@ namespace quda {
       output << ", aux=(" << param.aux.x << "," << param.aux.y << "," << param.aux.z << "," << param.aux.w << ")";
       return output;
     }
-#endif
+
   };
 
-#ifndef __CUDACC_RTC__
   /**
    * @brief Returns a reference to the tunecache map
    * @return tunecache reference
    */
   const std::map<TuneKey, TuneParam> &getTuneCache();
-#endif
 
   class Tunable {
 
@@ -199,12 +194,10 @@ namespace quda {
 
     int writeAuxString(const char *format, ...) {
       int n = 0;
-#ifndef __CUDACC_RTC__
       va_list arguments;
       va_start(arguments, format);
       n = vsnprintf(aux, TuneKey::aux_n, format, arguments);
       if (n < 0 || n >= TuneKey::aux_n) errorQuda("Error writing auxiliary string");
-#endif
       return n;
     }
 
@@ -219,7 +212,6 @@ namespace quda {
     */
     bool tuned()
     {
-#ifndef __CUDACC_RTC__
       // not tuning is equivalent to already tuned
       if (!getTuning()) return true;
 
@@ -227,9 +219,6 @@ namespace quda {
       if (use_managed_memory()) strcat(key.aux, ",managed");
       // if key is present in cache then already tuned
       return getTuneCache().find(key) != getTuneCache().end();
-#else
-      return true;
-#endif
     }
 
   public:
@@ -241,7 +230,6 @@ namespace quda {
     virtual void postTune() { }
     virtual int tuningIter() const { return 1; }
 
-#ifndef __CUDACC_RTC__
     virtual std::string paramString(const TuneParam &param) const
     {
       std::stringstream ps;
@@ -258,7 +246,6 @@ namespace quda {
       ss << gbytes << " GB/s";
       return ss.str();
     }
-#endif
 
     virtual void initTuneParam(TuneParam &param) const
     {

@@ -54,7 +54,7 @@ namespace quda
       T *reduce_count;
       long long bytes() const { return max_n_reduce() * sizeof(T); }
       unsigned int minThreads() const { return max_n_reduce(); }
-      TuneKey tuneKey() const { return TuneKey(std::to_string(max_n_reduce()).c_str(), typeid(*this).name(), aux); }
+      TuneKey tuneKey() const { return TuneKey(std::to_string(max_n_reduce()).c_str(), typeid(*this).name()); }
 
       init_reduce(T *reduce_count) : reduce_count(reduce_count) { apply(device::get_default_stream()); }
 

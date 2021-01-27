@@ -14,7 +14,6 @@ namespace quda {
   */
   class RNG {
 
-    const LatticeField &meta;
     size_t size;                     /*! @brief number of curand states */
     std::shared_ptr<RNGState> state; /*! array with current curand rng state */
     RNGState *backup_state;          /*! array for backup of current curand rng state */
