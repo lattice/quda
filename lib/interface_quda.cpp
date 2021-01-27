@@ -232,9 +232,7 @@ static TimeProfile profileEnd("endQuda");
 static TimeProfile GaugeFixFFTQuda("GaugeFixFFTQuda");
 
 // Too much CUB and Thrust here - so disabling it unless CUDA build
-#if defined(QUDA_TARGET_CUDA) 
 static TimeProfile GaugeFixOVRQuda("GaugeFixOVRQuda");
-#endif
 
 //!< Profiler for toal time spend between init and end
 static TimeProfile profileInit2End("initQuda-endQuda",false);
@@ -5506,7 +5504,6 @@ void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval
   popOutputPrefix();
 }
 
-#if defined(QUDA_TARGET_CUDA) 
 int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
                               const unsigned int verbose_interval, const double relax_boost, const double tolerance,
                               const unsigned int reunit_interval, const unsigned int stopWtheta, QudaGaugeParam *param,
@@ -5581,7 +5578,6 @@ int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const u
 
   return 0;
 }
-#endif  // defined QUDA_TARGET_CUDA
 
 int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const unsigned int Nsteps, \
   const unsigned int verbose_interval, const double alpha, const unsigned int autotune, const double tolerance, \
