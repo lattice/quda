@@ -830,7 +830,7 @@ namespace quda {
 	    for (int i=0; i<(length/2) - 2*Nc; i++) {
 	      int z = i%2;
 	      int off = i/2;
-	      const int *idtab = idtab_array();
+	      int *idtab = idtab_array();
 	      v[chirality*(length/2) + 2*Nc + i] = 0.5*offdiag[(((z*(2*Nc*Nc-Nc) + idtab[off])*2 + chirality)*2 + parity)*volumeCB + x];
 	    }	    
 	  }
@@ -848,7 +848,7 @@ namespace quda {
 	    for (int i=0; i<(length/2) - 2*Nc; i++) {
 	      int z = i%2;
 	      int off = i/2;
-	      const int *idtab = idtab_array();
+	      int *idtab = idtab_array();
 	      offdiag[(((z*(2*Nc*Nc-Nc) + idtab[off])*2 + chirality)*2 + parity)*volumeCB + x] = 2.0*v[chirality*(length/2) + 2*Nc + i];
 	    }
 	  }

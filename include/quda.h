@@ -1392,7 +1392,7 @@ extern "C" {
    * @param num_overrelax_per_step Number of overrelaxation iterations per step
    * @param coldstart Whether to do a coldstart (unit gauge) or hot start (random gauge)
    */
-  void performHeatbath(double beta, unsigned int num_start, unsigned int num_steps, unsigned int num_warmup_steps, unsigned int num_heatbath_per_step, unsigned int num_overrelax_per_step, bool coldstart);
+  //void performHeatbath(double beta, unsigned int num_start, unsigned int num_steps, unsigned int num_warmup_steps, unsigned int num_heatbath_per_step, unsigned int num_overrelax_per_step, bool coldstart);
   
   /**
    * @brief Calculates a variety of gauge-field observables.  If a

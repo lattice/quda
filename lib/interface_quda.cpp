@@ -5506,6 +5506,7 @@ void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval
   popOutputPrefix();
 }
 
+/*
 void performHeatbath(double beta, unsigned int num_start, unsigned int num_steps, unsigned int num_warmup_steps, unsigned int num_heatbath_per_step, unsigned int num_overrelax_per_step, bool coldstart){
   profileHeatbath.TPSTART(QUDA_PROFILE_TOTAL);
 
@@ -5538,6 +5539,7 @@ void performHeatbath(double beta, unsigned int num_start, unsigned int num_steps
   delete cudaGaugeTemp;
   profileHeatbath.TPSTOP(QUDA_PROFILE_TOTAL);
 }
+*/
 
 int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
                               const unsigned int verbose_interval, const double relax_boost, const double tolerance,
