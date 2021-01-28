@@ -11,6 +11,7 @@
  *  also.
  */
 
+#include <limits>
 #include <register_traits.h>
 #include <convert.h>
 #include <complex_quda.h>
