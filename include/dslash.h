@@ -142,14 +142,12 @@ namespace quda
     {
       TunableVectorYZ::initTuneParam(param);
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1; // packing blocks per direction
-      param.aux.y = 1;
     }
 
     virtual void defaultTuneParam(TuneParam &param) const
     {
       TunableVectorYZ::defaultTuneParam(param);
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1; // packing blocks per direction
-      param.aux.y = 1;
     }
 
     /**
