@@ -125,7 +125,7 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<MomUpdate, max_reducer2>(force_max, tp, stream, arg);
+      launch<MomUpdate>(force_max, tp, stream, arg);
     }
 
     void preTune() { arg.mom.save();}

@@ -807,4 +807,17 @@ namespace quda {
 #endif
   }
 
+  /**
+     @brief Helper function for setting auxilary string
+     @return String containing location and compilation type
+   */
+  inline const char *compile_type_str(QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION)
+  {
+#ifdef JITIFY
+    return location == QUDA_CUDA_FIELD_LOCATION ? "GPU-jitify," : "CPU,";
+#else
+    return location == QUDA_CUDA_FIELD_LOCATION ? "GPU-offline," : "CPU,";
+#endif
+  }
+
 } // namespace quda

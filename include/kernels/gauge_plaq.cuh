@@ -53,38 +53,18 @@ namespace quda {
     dx[nu]--;
     Link U4 = arg.U(nu, linkIndexShift(x,dx,arg.E), parity);
 
-    if(N_COLORS == 1) {
-      //complex<typename Arg::Float> tr(0.0,0.0);
-      Link test1 = U1;
-      Link test2 = conj(U1);
-      //for(int i=0; i<N_COLORS; i++) tr += Prod(i,i);
-      
-      for(int i=0; i<N_COLORS; i++) {
-	for(int j=0; j<N_COLORS; j++) {
-	  printf("test1 %d %d %d %d , (%d,%d %d) : %d %d (%.6f,%.6f) \n", x[0], x[1], x[2], x[3], mu, nu, parity, i, j, (test1)(i,j).x, (test1)(i,j).y);
-	}
-      }
-      
-      for(int i=0; i<N_COLORS; i++) {
-	for(int j=0; j<N_COLORS; j++) {
-	  printf("test2 %d %d %d %d , (%d,%d %d) : %d %d (%.6f,%.6f) \n", x[0], x[1], x[2], x[3], mu, nu, parity, j, i, (test2)(j,i).x, (test2)(j,i).y);
-	}
-      }
-    }
-    //printf("%d %d %d %d , (%d,%d %d) : Trace %.6f\n",  x[0], x[1], x[2], x[3], mu, nu, parity, tr.x);
     return getTrace( U1 * U2 * conj(U3) * conj(U4) ).real();
   }
-  
-  template <typename Arg> struct Plaquette {
 
+  template <typename Arg> struct Plaquette : plus<double2> {
     using reduce_t = double2;
+    using plus<reduce_t>::operator();
     Arg &arg;
     constexpr Plaquette(Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     // return the plaquette at site (x_cb, parity)
-    template <typename Reducer>
-    __device__ __host__ inline reduce_t operator()(reduce_t &value, Reducer &r, int x_cb, int parity)
+    __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
     {
       reduce_t plaq = zero<reduce_t>();
 
@@ -103,7 +83,7 @@ namespace quda {
         plaq.y += plaquette(arg, x, parity, mu, 3);
       }
 
-      return r(plaq, value);
+      return plus::operator()(plaq, value);
     }
 
   };

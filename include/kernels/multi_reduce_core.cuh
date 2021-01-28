@@ -77,15 +77,15 @@ namespace quda
     /**
        Generic multi-reduction functor with up to four loads and saves
     */
-    template <typename Arg> struct MultiReduce_ {
+    template <typename Arg> struct MultiReduce_ : plus<vector_type<typename Arg::Reducer::reduce_t, Arg::NXZ>> {
       using vec = vector_type<complex<typename Arg::real>, Arg::n/2>;
       using reduce_t = vector_type<typename Arg::Reducer::reduce_t, Arg::NXZ>;
+      using plus<reduce_t>::operator();
       Arg &arg;
       constexpr MultiReduce_(Arg &arg) : arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }
 
-      template <typename Reducer>
-      __device__ __host__ inline reduce_t operator()(reduce_t &sum, Reducer &, int tid, int k, int)
+      __device__ __host__ inline reduce_t operator()(reduce_t &sum, int tid, int k, int)
       {
         unsigned int parity = tid >= arg.length_cb ? 1 : 0;
         unsigned int i = tid - parity * arg.length_cb;
