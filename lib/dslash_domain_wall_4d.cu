@@ -16,6 +16,79 @@
 namespace quda
 {
 
+  template <class First, class Second>
+  struct TunePair: Tunable
+  {
+    First &first;
+    Second &second;
+
+    char vol_string[256];
+    char aux[TuneKey::aux_n];
+
+    long long flops_;
+    long long bytes_;
+
+    unsigned int sharedBytesPerThread() const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+
+    TunePair(First &first, Second &second, const char vol_string_[], const char aux_[], long long flops, long long bytes) : first(first), second(second), flops_(flops), bytes_(bytes){
+      strcpy(aux, aux_);
+      strcpy(vol_string, vol_string_);
+      if (!tuned()) {
+        disableProfileCount(); // purely for profiling reasons, don't want to profile tunings.
+
+        // before we do policy tuning we must ensure the kernel
+        // constituents have been tuned since we can't do nested tuning
+        first({0});
+        second({0});
+
+        enableProfileCount();
+        setPolicyTuning(true);
+      }
+    }
+
+    void apply(const qudaStream_t &stream) {
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      if (tp.aux.x == 0) {
+        // first(stream);
+        second(stream);
+      } else {
+        second(stream);
+      }
+    }
+
+    bool advanceAux(TuneParam &param) const
+    {
+      if (param.aux.x == 0) {
+        param.aux.x = 1;
+        return true;
+      } else {
+        param.aux.x = 0;
+        return false;
+      }
+    }
+
+    bool advanceTuneParam(TuneParam &param) const { return advanceAux(param); }
+
+    void initTuneParam(TuneParam &param) const
+    {
+      param.aux.x = 0;
+    }
+
+    void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }
+
+    TuneKey tuneKey() const { return TuneKey(vol_string, typeid(*this).name(), aux); }
+
+    long long flops() const { return flops_; }
+    long long bytes() const { return bytes_; }
+
+    void preTune() {}  // FIXME - use write to determine what needs to be saved
+    void postTune() {} // FIXME - use write to determine what needs to be saved
+  };
+
+  /**
+    Having a policy tuning for whether or not using the MMA to perform the stencil
+  */
   template <typename Arg> class DomainWall4D : public Dslash<domainWall4D, Arg>
   {
     using Dslash = Dslash<domainWall4D, Arg>;
@@ -30,9 +103,44 @@ namespace quda
 
     void apply(const qudaStream_t &stream)
     {
-      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash::setParam(tp);
-      Dslash::template instantiate<packShmem>(tp, stream);
+      static bool tuning = false;
+      if (arg.kernel_type == INTERIOR_KERNEL && !tuning) {
+
+        tuning = true;
+
+        auto strategy = [this] (const qudaStream_t &stream_) {
+          TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+          Dslash::setParam(tp);
+          Dslash::template instantiate<packShmem>(tp, stream_);
+        };
+
+        auto specialized_strategy = [this] (const qudaStream_t &stream_) {
+          TuneParam tp;
+          domainWall4D<1, false, false, INTERIOR_KERNEL, Arg>::specialized_launch(tp, stream_, arg); // nPairty = 1, dagger = false, xpay = false
+        };
+
+        char aux[TuneKey::aux_n];
+        char comm[5];
+        comm[0] = (arg.commDim[0] ? '1' : '0');
+        comm[1] = (arg.commDim[1] ? '1' : '0');
+        comm[2] = (arg.commDim[2] ? '1' : '0');
+        comm[3] = (arg.commDim[3] ? '1' : '0');
+        comm[4] = '\0';
+        strcpy(aux, "policy_kernel=interior,commDim=");
+        strcat(aux, comm);
+        if (arg.xpay) strcat(aux, ",xpay");
+        if (arg.dagger) strcat(aux, ",dagger");
+
+        TunePair<decltype(strategy), decltype(specialized_strategy)> pair(strategy, specialized_strategy, in.VolString(), aux, this->flops(), this->bytes());
+        pair.apply(stream);
+
+        tuning = false;
+
+      } else {
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        Dslash::setParam(tp);
+        Dslash::template instantiate<packShmem>(tp, stream);
+      }
     }
   };
 

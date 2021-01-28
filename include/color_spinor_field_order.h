@@ -135,13 +135,13 @@ namespace quda {
   template <typename T, int Nc>
     template <typename S>
     __device__ __host__ inline void ColorSpinor<T, Nc, 4>::operator=(const spinor_wrapper<T, S> &a) {
-      a.field.load(data, a.x_cb, a.parity, a.color);
+      a.field.load_spinor(data, a.x_cb, a.parity, a.color);
     }
 
   template <typename T, int Nc>
     template <typename S>
     __device__ __host__ inline ColorSpinor<T, Nc, 4>::ColorSpinor(const spinor_wrapper<T, S> &a) {
-      a.field.load(data, a.x_cb, a.parity, a.color);
+      a.field.load_spinor(data, a.x_cb, a.parity, a.color);
     }
 
   /**
@@ -1079,7 +1079,8 @@ namespace quda {
 #pragma unroll
     for (int i=0; i<M; i++) {
       // first load from memory
-      Vector vecTmp = vector_load<Vector>(field, parity * offset + x + stride * i);
+      int index = parity * offset + x + stride * i;
+      Vector vecTmp = vector_load<Vector>(field, index);
       // now copy into output and scale
 #pragma unroll
       for (int j = 0; j < N; j++) copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
@@ -1092,7 +1093,7 @@ namespace quda {
   /**
    * The same as the `load` function above, but only load a spinor.
    */
-  __device__ __host__ inline void load(complex out[Ns], int x, int parity, int color) const
+  __device__ __host__ inline void load_spinor(complex out[Ns], int x, int parity, int color) const
   {
     real v[Ns * 2];
     norm_type nrm = isFixed<Float>::value ? vector_load<float>(norm, x + parity * norm_offset) : 0.0;

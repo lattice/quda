@@ -37,8 +37,15 @@ namespace quda
     return false;
   }
 
+  __device__ float truncated_multiply(float a, float b) {
+    constexpr unsigned int mask = 0xFFFFE000; // 1111 1111 1111 1110 0000 0000 0000
+    float a_t = __uint_as_float(__float_as_uint(a) & mask);
+    float b_t = __uint_as_float(__float_as_uint(b) & mask);
+    return a_t * b_t;
+  }
+
   template <int Ls, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  __global__ void alternative_dslash_kernel(Arg arg)
+  __global__ void specialized_dslash_kernel(Arg arg)
   {
 
     static_assert(kernel_type == INTERIOR_KERNEL, "Currently only for interior kernel.");
@@ -67,14 +74,14 @@ namespace quda
 
     extern __shared__ float smem_ptr[];
 
-    mma::SharedMemoryObject<real, bM, bK, 1, bM> smem_obj_a(smem_ptr);
+    mma::SharedMemoryObject<real, bM, bK, 1, bM> smem_obj_a(reinterpret_cast<real *>(smem_ptr));
     mma::SharedMemoryObject<real, bN, bK, 1, bN> smem_obj_b(smem_obj_a.ptr + bK * bM);
     mma::SharedMemoryObject<real, bM, bN, bN, 1> smem_obj_c(smem_obj_b.ptr + bK * bN);
 
-    while (thread_idx < arg.Ls * K) {
+    while (thread_idx < Ls * K) {
 
-      int s = thread_idx % Ls;         // fifth dimension
-      int color_dir = thread_idx / Ls; // Joint idx for color and dir
+      int s = thread_idx / K;         // fifth dimension
+      int color_dir = thread_idx % K; // Joint idx for color and dir
       int color = color_dir % Nc;
       int dir = color_dir / Nc;
       int d = dir % 4;
@@ -158,7 +165,7 @@ namespace quda
     for (int m = threadIdx.x; m < bM; m += blockDim.x) {
       for (int n = threadIdx.y; n < bN; n += blockDim.y) {
         smem_obj_c(m, n) = 0;
-        for (int k = 0; k < bK; k++) smem_obj_c(m, n) += smem_obj_a(m, k) * smem_obj_b(n, k);
+        for (int k = 0; k < bK; k++) smem_obj_c(m, n) += truncated_multiply(smem_obj_a(m, k), smem_obj_b(n, k));
       }
     }
 #else
@@ -188,8 +195,8 @@ namespace quda
     if (thread_idx < Ls) { reduce_buffer[thread_idx] = 0; }
     __syncthreads();
     while (thread_idx < Ls * 12) {
-      int s = thread_idx % Ls;
-      int spin_color = thread_idx / Ls;
+      int s = thread_idx / 12;
+      int spin_color = thread_idx % 12;
       int spin = spin_color / 3;
       int color = spin_color % 3;
       real p_real = smem_obj_c(s * 8 + spin * 2 + 0, color * 2 + 0) - smem_obj_c(s * 8 + spin * 2 + 1, color * 2 + 1);
@@ -256,13 +263,13 @@ namespace quda
       if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(xs, my_spinor_parity) = out;
     }
 
-    static constexpr bool has_alternative_kernel() { return sizeof(typename Arg::Float) == 2; }
+    static constexpr bool has_specialized_kernel() { return sizeof(typename Arg::Float) == 2 && kernel_type == INTERIOR_KERNEL; }
 
     /** XXX: This is for testing only
        @brief This is a helper function to luanch the dslash kernel with strategy that is
        different from the "one-thread-per-site" one.
     */
-    static void launch(TuneParam &tp, const qudaStream_t &stream, Arg &arg)
+    static void specialized_launch(TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
       TuneParam tune_param(tp);
 
@@ -281,7 +288,7 @@ namespace quda
 
       tune_param.shared_bytes = (arg.dc.Ls * 8 * 24 + 8 * 24 + arg.dc.Ls * 8 * 8) * sizeof(float);
 
-      qudaLaunchKernel(alternative_dslash_kernel<12, nParity, dagger, xpay, kernel_type, Arg>, tune_param, stream, arg);
+      qudaLaunchKernel(specialized_dslash_kernel<12, nParity, dagger, xpay, kernel_type, Arg>, tune_param, stream, arg);
     }
   };
 

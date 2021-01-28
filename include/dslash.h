@@ -11,26 +11,6 @@
 
 namespace quda
 {
-  template <template <int, bool, bool, KernelType, typename> class D, class Arg, template <bool, QudaPCType, typename> class P, int nParity, bool dagger, bool xpay, KernelType kernel_type>
-  inline typename std::enable_if<D<nParity, dagger, xpay, kernel_type, Arg>::has_alternative_kernel(), void>::type launch_dslash_kernel(TuneParam &tp, const qudaStream_t &stream, Arg &arg)
-  {
-    tp.set_max_shared_bytes = true;
-    if (tp.aux.y == 0) { // Launch with the one-thread-per-site strategy
-      auto kernel = dslashGPU<D, P, nParity, dagger, xpay, kernel_type, Arg>;
-      qudaLaunchKernel(kernel, tp, stream, arg);
-    } else { // Launch with the alternative strategy the `D` class provides
-      using DslashType = D<nParity, dagger, xpay, kernel_type, Arg>;
-      DslashType::launch(tp, stream, arg);
-    }
-  }
-
-  template <template <int, bool, bool, KernelType, typename> class D, class Arg, template <bool, QudaPCType, typename> class P, int nParity, bool dagger, bool xpay, KernelType kernel_type>
-  inline typename std::enable_if<!D<nParity, dagger, xpay, kernel_type, Arg>::has_alternative_kernel(), void>::type launch_dslash_kernel(TuneParam &tp, const qudaStream_t &stream, Arg &arg)
-  {
-    tp.set_max_shared_bytes = true;
-      auto kernel = dslashGPU<D, P, nParity, dagger, xpay, kernel_type, Arg>;
-      qudaLaunchKernel(kernel, tp, stream, arg);
-  }
 
   /**
      @brief This is the generic driver for launching Dslash kernels
@@ -153,14 +133,6 @@ namespace quda
           param.aux.x = 1;
           return false;
         }
-      } else if (arg.kernel_type == INTERIOR_KERNEL) {
-        if (param.aux.y == 0) {
-          param.aux.y++;
-          return true;
-        } else {
-          param.aux.y = 0;
-          return false;
-        }
       } else {
         return false;
       }
@@ -238,15 +210,13 @@ namespace quda
         Tunable::launch_error = error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
 #else
         switch (arg.kernel_type) {
-        // case INTERIOR_KERNEL: launch<P, nParity, dagger, xpay, INTERIOR_KERNEL>(tp, stream); break;
-        case INTERIOR_KERNEL: launch_dslash_kernel<D, Arg, P, nParity, dagger, xpay, INTERIOR_KERNEL>(tp, stream, arg);
-        break;
+        case INTERIOR_KERNEL: launch<P, nParity, dagger, xpay, INTERIOR_KERNEL>(tp, stream); break;
 #ifdef MULTI_GPU
-        case EXTERIOR_KERNEL_X: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_X>(tp, stream); break;
-        case EXTERIOR_KERNEL_Y: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_Y>(tp, stream); break;
-        case EXTERIOR_KERNEL_Z: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_Z>(tp, stream); break;
-        case EXTERIOR_KERNEL_T: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_T>(tp, stream); break;
-        case EXTERIOR_KERNEL_ALL: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_ALL>(tp, stream); break;
+        // case EXTERIOR_KERNEL_X: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_X>(tp, stream); break;
+        // case EXTERIOR_KERNEL_Y: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_Y>(tp, stream); break;
+        // case EXTERIOR_KERNEL_Z: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_Z>(tp, stream); break;
+        // case EXTERIOR_KERNEL_T: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_T>(tp, stream); break;
+        // case EXTERIOR_KERNEL_ALL: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_ALL>(tp, stream); break;
         default: errorQuda("Unexpected kernel type %d", arg.kernel_type);
 #else
         default: errorQuda("Unexpected kernel type %d for single-GPU build", arg.kernel_type);
@@ -269,10 +239,11 @@ namespace quda
       auto error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, device::get_cuda_stream(stream)).launch(arg);
       Tunable::launch_error = error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
 #else
-      if (arg.dagger)
-        instantiate<P, nParity, true, xpay>(tp, stream);
-      else
+      if (arg.dagger) {
+        // instantiate<P, nParity, true, xpay>(tp, stream);
+      } else {
         instantiate<P, nParity, false, xpay>(tp, stream);
+      }
 #endif
     }
 
@@ -291,7 +262,7 @@ namespace quda
 #else
       switch (arg.nParity) {
       case 1: instantiate<P, 1, xpay>(tp, stream); break;
-      case 2: instantiate<P, 2, xpay>(tp, stream); break;
+      // case 2: instantiate<P, 2, xpay>(tp, stream); break;
       default: errorQuda("nParity = %d undefined\n", arg.nParity);
       }
 #endif
