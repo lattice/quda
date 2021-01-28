@@ -29,16 +29,15 @@ namespace quda
   };
 
   // Core routine for computing the topological charge from the field strength
-  template <typename Arg> struct qCharge {
-
+  template <typename Arg> struct qCharge : plus<double3> {
     using reduce_t = double3;
+    using plus<reduce_t>::operator();
     Arg &arg;
     constexpr qCharge(Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     // return the qcharge and field strength at site (x_cb, parity)
-    template <typename Reducer>
-    __device__ __host__ inline reduce_t operator()(reduce_t &E, Reducer &r, int x_cb, int parity)
+    __device__ __host__ inline reduce_t operator()(reduce_t &E, int x_cb, int parity)
     {
       using real = typename Arg::Float;
       using Link = Matrix<complex<real>, Arg::nColor>;
@@ -80,9 +79,8 @@ namespace quda
       for (int i=0; i<3; i++) i % 2 == 0 ? Q_idx += Qi[i]: Q_idx -= Qi[i];
       Q = Q_idx * q_norm;
       if (Arg::density) arg.qDensity[x_cb + parity * arg.threads.x] = Q;
-      E = r(E, E_local);
 
-      return E;
+      return plus::operator()(E, E_local);
     }
 
   };

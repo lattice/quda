@@ -60,8 +60,8 @@ namespace quda
 
   template <typename T> struct ReduceArg {
 
-    template <int, int, typename Reduce, typename Arg, typename I>
-    friend __device__  void reduce(Arg&, const I &, const int);
+    template <int, int, typename Reducer, typename Arg, typename I>
+    friend __device__  void reduce(Arg&, const Reducer &, const I &, const int);
     qudaError_t launch_error; // only do complete if no launch error to avoid hang
 
   private:
@@ -194,13 +194,12 @@ namespace quda
        will be constant along constant blockIdx.y and blockIdx.z.
     */
     template <int block_size_x, int block_size_y = 1, typename Reducer, typename Arg, typename T>
-    __device__ inline void reduce(Arg &arg, const T &in, const int idx = 0)
+    __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx = 0)
     {
       using BlockReduce = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y>;
       __shared__ typename BlockReduce::TempStorage cub_tmp;
       __shared__ bool isLastBlockDone;
 
-      Reducer r;
       T aggregate = Reducer::do_sum ? BlockReduce(cub_tmp).Sum(in) : BlockReduce(cub_tmp).Reduce(in, r);
 
       if (threadIdx.x == 0 && threadIdx.y == 0) {
@@ -261,13 +260,12 @@ namespace quda
        will be constant along constant blockIdx.y and blockIdx.z.
     */
     template <int block_size_x, int block_size_y = 1, typename Reducer, typename Arg, typename T>
-    __device__ inline void reduce(Arg &arg, const T &in, const int idx = 0)
+    __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx = 0)
     {
       using BlockReduce = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y>;
       __shared__ typename BlockReduce::TempStorage cub_tmp;
       __shared__ bool isLastBlockDone;
 
-      Reducer r;
       T aggregate = Reducer::do_sum ? BlockReduce(cub_tmp).Sum(in) : BlockReduce(cub_tmp).Reduce(in, r);
 
       if (threadIdx.x == 0 && threadIdx.y == 0) {
