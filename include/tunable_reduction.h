@@ -74,7 +74,7 @@ namespace quda {
                        const std::vector<constant_param_t> &param = dummy_param)
     {
 #ifdef JITIFY
-      arg.launch_error = launch_jitify<Transformer>("Reduction2D", tp, stream, arg, param);
+      arg.launch_error = launch_jitify<Transformer, true, Arg, true>("Reduction2D", tp, stream, arg, param);
 #else
       for (unsigned int i = 0; i < param.size(); i++)
         qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
@@ -287,7 +287,7 @@ namespace quda {
                        const std::vector<constant_param_t> &param = dummy_param)
     {
 #ifdef JITIFY
-      arg.launch_error = launch_jitify<Transformer>("MultiReduction", tp, stream, arg, param);
+      arg.launch_error = launch_jitify<Transformer, true, Arg, true>("MultiReduction", tp, stream, arg, param);
 #else
       for (unsigned int i = 0; i < param.size(); i++)
         qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
@@ -374,7 +374,7 @@ namespace quda {
     { }
 
     TunableMultiReduction(size_t n_items, int n_batch, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
-      TunableReduction2D<block_size_y>(location),
+      TunableReduction2D<block_size_y>(n_items, location),
       n_batch(n_batch)
     { }
 

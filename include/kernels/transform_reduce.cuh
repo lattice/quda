@@ -1,6 +1,7 @@
 #pragma once
 
 #include <reduction_kernel.h>
+#include <limits>
 
 namespace quda {
 
@@ -26,7 +27,10 @@ namespace quda {
       threads(n_items, n_batch, 1)
     {
       if (n_batch > n_batch_max) errorQuda("Requested batch %d greater than max supported %d", n_batch, n_batch_max);
-      memcpy(this->v, v.data(), sizeof(v));
+      if (n_items > std::numeric_limits<count_t>::max())
+        errorQuda("Requested size %lu greater than max supported %lu",
+                  (uint64_t)n_items, (uint64_t)std::numeric_limits<count_t>::max());
+      memcpy(this->v, v.data(), v.size() * sizeof(T*));
     }
 
     __device__ __host__ reduce_t init() const { return init_value; }
