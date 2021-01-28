@@ -24,7 +24,7 @@ namespace quda {
                        const std::vector<constant_param_t> &param = dummy_param)
     {
 #ifdef JITIFY
-      launch_error = launch_jitify<Functor, grid_stride, Arg>(kernel.name, tp, stream, arg, param);
+      launch_error = launch_jitify<Functor, grid_stride, Arg, false>(kernel.name, tp, stream, arg, param);
 #else
       for (unsigned int i = 0; i < param.size(); i++)
         qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);

@@ -4,7 +4,7 @@
 
 namespace quda {
 
-  template <int block_size_x, int block_size_y, template <typename> class Transformer, typename Arg>
+  template <int block_size_x, int block_size_y, template <typename> class Transformer, typename Arg, bool grid_stride = true>
   __global__ void Reduction2D(Arg arg)
   {
     using reduce_t = typename Transformer<Arg>::reduce_t;
@@ -17,14 +17,14 @@ namespace quda {
 
     while (idx < arg.threads.x) {
       value = t(value, idx, j);
-      idx += blockDim.x * gridDim.x;
+      if (grid_stride) idx += blockDim.x * gridDim.x; else break;
     }
 
     // perform final inter-block reduction and write out result
     reduce<block_size_x, block_size_y>(arg, t, value);
   }
 
-  template <int block_size_x, int block_size_y, template <typename> class Transformer, typename Arg>
+  template <int block_size_x, int block_size_y, template <typename> class Transformer, typename Arg, bool grid_stride = true>
   __global__ void MultiReduction(Arg arg)
   {
     using reduce_t = typename Transformer<Arg>::reduce_t;
@@ -40,7 +40,7 @@ namespace quda {
 
     while (idx < arg.threads.x) {
       value = t(value, idx, j, k);
-      idx += blockDim.x * gridDim.x;
+      if (grid_stride) idx += blockDim.x * gridDim.x; else break;
     }
 
     // perform final inter-block reduction and write out result
