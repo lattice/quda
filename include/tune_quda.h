@@ -514,6 +514,7 @@ namespace quda {
 
   class TunableVectorYZ : public TunableVectorY {
 
+  protected:
     mutable unsigned vector_length_z;
     mutable unsigned step_z;
     bool tune_block_y;

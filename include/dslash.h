@@ -185,6 +185,10 @@ namespace quda
 
     virtual void initTuneParam(TuneParam &param) const
     {
+      if(arg.shmem & 64){  //FIXME later: For the uber kernel temporarily limit the grid y anz dimension to 1
+        step_y = vector_length_y;
+        step_z = vector_length_z;
+      }
       TunableVectorYZ::initTuneParam(param);
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1; // packing blocks per direction
       if (arg.ext_dims && arg.kernel_type == INTERIOR_KERNEL) param.aux.y = 1;     // exterior blocks
@@ -192,6 +196,10 @@ namespace quda
 
     virtual void defaultTuneParam(TuneParam &param) const
     {
+      if(arg.shmem & 64){ //FIXME later: For the uber kernel temporarily limit the grid y anz dimension to 1
+        step_y = vector_length_y;
+        step_z = vector_length_z;
+      }
       TunableVectorYZ::defaultTuneParam(param);
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1; // packing blocks per direction
       if (arg.ext_dims && arg.kernel_type == INTERIOR_KERNEL) param.aux.y = 1;     // exterior blocks

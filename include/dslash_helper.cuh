@@ -545,7 +545,7 @@ namespace quda
 
       if (shmembarrier) {
 
-        if (shmem_interiordone and threadIdx.x == blockDim.x - 1) {
+        if (shmem_interiordone && threadIdx.x == blockDim.x - 1 && threadIdx.y == 0 && threadIdx.z == 0) {
           long tst_val = interior_done.load(cuda::std::memory_order_relaxed);
           while (tst_val < arg.counter - 1) {
             interior_done.compare_exchange_strong(tst_val, arg.counter - 1, cuda::std::memory_order_relaxed,
@@ -553,7 +553,7 @@ namespace quda
           }
           interior_done.wait(arg.counter - 1, cuda::std::memory_order_acquire);
         }
-        if (threadIdx.x < 8) {
+        if (threadIdx.x < 8 && threadIdx.y == 0 && threadIdx.z == 0) {
           // spin for my direction
           bool spin = threadIdx.x == dimdir ? true : false;
           // figure out which other directions also to spin for (to make corners work)
@@ -627,12 +627,11 @@ namespace quda
 #ifdef NVSHMEM_COMMS
       const bool shmem_interiordone = (arg.shmem & 64);
       if (shmem_interiordone) {
-        // put wait at end of interior kernel
         if (kernel_type == INTERIOR_KERNEL) {
           __syncthreads();
-          if (threadIdx.x == 0) {
+          if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
             int amlast = interior_count.fetch_add(1, cuda::std::memory_order_acq_rel); // ensure that my block is done
-            if (amlast == gridDim.x - arg.pack_blocks - arg.ext_blocks - 1) {
+            if (amlast == (gridDim.x - arg.pack_blocks - arg.ext_blocks) * gridDim.y * gridDim.z - 1) {
               interior_done.store(arg.counter, cuda::std::memory_order_release);
               interior_done.notify_all();
               interior_count.store(0, cuda::std::memory_order_relaxed);

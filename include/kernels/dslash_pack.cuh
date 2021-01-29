@@ -417,20 +417,20 @@ namespace quda
       if (!intranode && pack_internode) {
         __syncthreads(); // make sure all threads in this block arrived here
 
-        if (threadIdx.x == 0) {
+        if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z ==0) {
           int ticket = retcount_inter[shmemidx].fetch_add(1);
           // currently CST order -- want to make sure all stores are done before and for the last block we need that
           // all uses of that data are visible
-          amLast = (ticket == arg.blocks_per_dir - 1);
+          amLast = (ticket == arg.blocks_per_dir * gridDim.y * gridDim.z- 1);
         }
-        if (threadIdx.x == 0) {
+        if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z ==0) {
           if (amLast) {
             // send data over IB if necessary
             if (getShmemBuffer<1, decltype(arg)>(shmemidx, arg) != nullptr) shmem_putbuffer(shmemidx, arg);
             // is we are in the uber kernel signal here
             if (!arg.packkernel) {
               if (!(getNeighborRank(2 * dim + dir, arg) < 0))
-                nvshmem_long_atomic_set((long *)arg.sync_arr + 2 * dim + (1 - dir), arg.counter,
+              nvshmem_long_atomic_set((long *)arg.sync_arr + 2 * dim + (1 - dir), arg.counter,
                                         getNeighborRank(2 * dim + dir, arg));
             }
             retcount_inter[shmemidx].store(0); // this could probably be relaxed
@@ -439,7 +439,7 @@ namespace quda
       }
       // if we are not in the uber kernel
       if (!intranode && !arg.packkernel && (!(arg.shmem & 2))) {
-        if (local_tid == 0) {
+        if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z ==0) {
           if (!(getNeighborRank(2 * dim + dir, arg) < 0))
             nvshmem_long_atomic_set((long *)arg.sync_arr + 2 * dim + (1 - dir), arg.counter,
                                     getNeighborRank(2 * dim + dir, arg));
@@ -448,14 +448,14 @@ namespace quda
 
       if (intranode && pack_intranode) {
         __syncthreads(); // make sure all threads in this block arrived here
-        if (threadIdx.x == 0) {
+        if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z ==0) {
           // recount has system scope
           int ticket = retcount_intra[shmemidx].fetch_add(1);
           // currently CST order -- want to make sure all stores are done before (release) and check for ticket
           // acquires. For the last block we need that all uses of that data are visible
-          amLast = (ticket == arg.blocks_per_dir - 1);
+          amLast = (ticket == arg.blocks_per_dir * gridDim.y * gridDim.z- 1);
         }
-        if (threadIdx.x == 0) {
+        if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z ==0) {
           if (amLast) {
             if (arg.shmem & 8) {
               if (!(getNeighborRank(2 * dim + dir, arg) < 0))
@@ -608,13 +608,13 @@ namespace quda
 
         __syncthreads(); // make sure all threads in this block arrived here
 
-        if (threadIdx.x == 0) {
+        if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z ==0) {
           int ticket = retcount_inter[shmemidx].fetch_add(1);
           // currently CST order -- want to make sure all stores are done before and for the last block we need that
           // all uses of that data are visible
-          amLast = (ticket == arg.blocks_per_dir - 1);
+          amLast = (ticket == arg.blocks_per_dir * gridDim.y * gridDim.z- 1);
         }
-        if (threadIdx.x == 0) {
+        if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z ==0) {
           if (amLast) {
             // send data over IB if necessary
             if (getShmemBuffer<1, decltype(arg)>(shmemidx, arg) != nullptr) shmem_putbuffer(shmemidx, arg);
@@ -629,7 +629,7 @@ namespace quda
       }
       // if this direction has already been taken care of we just signal here
       if (!intranode && !arg.packkernel && (!(arg.shmem & 2))) {
-        if (local_tid == 0) {
+        if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z ==0) {
           if (!(getNeighborRank(2 * dim + dir, arg) < 0))
             nvshmem_long_atomic_set((long *)arg.sync_arr + 2 * dim + (1 - dir), arg.counter,
                                     getNeighborRank(2 * dim + dir, arg));
@@ -638,14 +638,14 @@ namespace quda
 
       if (intranode && pack_intranode) {
         __syncthreads(); // make sure all threads in this block arrived here
-        if (threadIdx.x == 0) {
+        if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z ==0) {
           // recount has system scope
           int ticket = retcount_intra[shmemidx].fetch_add(1);
           // currently CST order -- want to make sure all stores are done before (release) and check for ticket
           // acquires. For the last block we need that all uses of that data are visible
-          amLast = (ticket == arg.blocks_per_dir - 1);
+          amLast = (ticket == arg.blocks_per_dir * gridDim.y * gridDim.z- 1);
         }
-        if (threadIdx.x == 0) {
+        if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z ==0) {
           if (amLast) {
             if (arg.shmem & 8) {
               if (!(getNeighborRank(2 * dim + dir, arg) < 0))
