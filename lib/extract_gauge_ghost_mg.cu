@@ -1,6 +1,3 @@
-// trove cannot deal with the large matrices that MG uses so we need
-// to disable it (regardless we're using fine-grained access)
-#define DISABLE_TROVE
 #define FINE_GRAINED_ACCESS
 
 #include <gauge_field_order.h>
