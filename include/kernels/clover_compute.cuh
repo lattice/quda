@@ -80,7 +80,7 @@ namespace quda {
       Complex coeff(0.0, arg.coeff);
       Link block1[2], block2[2];
       // diagonal blocks
-      block1[0] = coeff*(F[0] - F[5]); // (2*Nc*Nc + 6*Nc*Nc=) 72 floating-point ops
+      block1[0] = coeff*(F[0] - F[5]); // (2*Nc*Nc+6*Nc*Nc=) 72 Nc=3 floating-point ops
       block1[1] = coeff*(F[0] + F[5]); // 72 floating-point ops
 
       // off-diagonal blocks
@@ -102,9 +102,8 @@ namespace quda {
         // Compute off diagonal components, populating the A matrix
 	// row by row
 
-	//if(N_COLORS == 4) {
-	  
 	// First nColor rows
+#pragma unroll
 	for(int c=1; c<Arg::nColor; c++) {
 	  for(int d=0; d<c; d++) {
 	    A(c,d) = - block1[ch](c,d);
@@ -112,83 +111,21 @@ namespace quda {
 	}
 	
 	// Second nColor rows
+#pragma unroll
 	for(int c=Arg::nColor; c<2*Arg::nColor; c++) {
 	  for(int d=0; d<Arg::nColor; d++) {
 	    A(c,d) = block2[ch](c - Arg::nColor,d);	      
-	    //printf("A(%d,%d)\n", c, d);
 	  }
 	  for(int d=Arg::nColor; d<c; d++) {
 	    A(c,d) = block1[ch](c - Arg::nColor,d - Arg::nColor);
-	    //printf("A(%d,%d)\n", c, d);
 	  }
 	}
 	
-	/*	  
-	  // First row
-	  A(1,0) = -block1[ch](1,0);
-	  // Second row
-	  A(2,0) = -block1[ch](2,0);
-	  A(2,1) = -block1[ch](2,1);
-	  // Third row	  
-	  A(3,0) = -block1[ch](3,0);
-	  A(3,1) = -block1[ch](3,1);
-	  A(3,2) = -block1[ch](3,2);
-	  
-	  // Fourth row
-	  A(4,0) =  block2[ch](0,0);
-	  A(4,1) =  block2[ch](0,1);
-	  A(4,2) =  block2[ch](0,2);
-	  A(4,3) =  block2[ch](0,0);
-	  // Fifth row
-	  A(5,0) =  block2[ch](1,0);
-	  A(5,1) =  block2[ch](1,1);
-	  A(5,2) =  block2[ch](1,2);
-	  A(5,3) =  block2[ch](1,3);
-	  A(5,4) =  block1[ch](1,0);
-	  // Sixth row
-	  A(6,0) =  block2[ch](2,0);
-	  A(6,1) =  block2[ch](2,1);
-	  A(6,2) =  block2[ch](2,2);
-	  A(6,3) =  block2[ch](2,3);
-	  A(6,4) =  block1[ch](2,0);
-	  A(6,5) =  block1[ch](2,1);
-	  // Seventh row
-	  A(7,0) =  block2[ch](3,0);
-	  A(7,1) =  block2[ch](3,1);
-	  A(7,2) =  block2[ch](3,2);
-	  A(7,3) =  block2[ch](3,3);
-	  A(7,4) =  block1[ch](3,0);
-	  A(7,5) =  block1[ch](3,1);
-	  A(7,6) =  block1[ch](3,2);
-	  */
-	  //}
-	/*
-        // First row
-        A(1,0) = -block1[ch](1,0);
-        // Second row
-        A(2,0) = -block1[ch](2,0);
-        A(2,1) = -block1[ch](2,1);
-        // Third row
-        A(3,0) =  block2[ch](0,0);
-        A(3,1) =  block2[ch](0,1);
-        A(3,2) =  block2[ch](0,2);
-        // Fourth row
-        A(4,0) =  block2[ch](1,0);
-        A(4,1) =  block2[ch](1,1);
-        A(4,2) =  block2[ch](1,2);
-        A(4,3) =  block1[ch](1,0);
-        // Fifth row
-        A(5,0) =  block2[ch](2,0);
-        A(5,1) =  block2[ch](2,1);
-        A(5,2) =  block2[ch](2,2);
-        A(5,3) =  block1[ch](2,0);
-        A(5,4) =  block1[ch](2,1);
-	*/
         A *= static_cast<real>(0.5);
 	
         arg.clover(x_cb, parity, ch) = A;
       } // ch
-      // 84 floating-point ops
+      // DMH FIXME 84 floating-point ops
     }
   };
 
