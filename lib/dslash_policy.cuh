@@ -90,6 +90,7 @@ namespace quda
         prev = i;
       }
 
+      param.ext_threads = param.threads;
       param.kernel_type = EXTERIOR_KERNEL_ALL;
     }
 
@@ -1860,9 +1861,6 @@ public:
               errorQuda("Cannot select a NVSHMEM policy %d when QUDA is not build with QUDA_NVSHMEM enabled.",
                         static_cast<int>(dslash_policy));
 #endif
-              if (in->X(4) > 1) {
-                errorQuda("Cannot select NVSHMEM policy %d for X(4) > 1.", static_cast<int>(dslash_policy));
-              }
             }
 
             enable_policy(static_cast<QudaDslashPolicy>(policy_));
@@ -1899,12 +1897,10 @@ public:
           enable_policy(QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK);
           enable_policy(QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK_FUSED_HALO);
 
-          if (comm_nvshmem_enabled() && !(in->X(4) > 1)) {
             enable_policy(QudaDslashPolicy::QUDA_SHMEM_UBER_PACKINTRA_DSLASH);
             enable_policy(QudaDslashPolicy::QUDA_SHMEM_UBER_PACKFULL_DSLASH);
             enable_policy(QudaDslashPolicy::QUDA_SHMEM_PACKINTRA_DSLASH);
             enable_policy(QudaDslashPolicy::QUDA_SHMEM_PACKFULL_DSLASH);
-          }
         }
         // construct string specifying which policies have been enabled
         for (int i = 0; i < (int)QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED; i++) {

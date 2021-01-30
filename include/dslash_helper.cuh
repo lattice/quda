@@ -268,6 +268,7 @@ namespace quda
     bool remote_write;      // used by the autotuner to switch on/off remote writing vs using copy engines
 
     int_fastdiv threads; // number of threads in x-thread dimension
+    int_fastdiv ext_threads; //  number of threads in x-thread dimension for fused exteriot dslash
     int threadDimMapLower[4];
     int threadDimMapUpper[4];
 
@@ -311,6 +312,7 @@ namespace quda
       xpay(xpay),
       kernel_type(INTERIOR_KERNEL),
       threads(in.VolumeCB()),
+      ext_threads(0),
       threadDimMapLower {},
       threadDimMapUpper {},
       spin_project(spin_project),
@@ -593,6 +595,7 @@ namespace quda
         // do exterior
       }
       arg.kernel_type = EXTERIOR_KERNEL_ALL;
+      arg.threads = arg.ext_threads;
       int local_tid = threadIdx.x + blockDim.x * (myblockidx % (blocks_per_dir)); // index within the block
       int tid = local_tid + threadl + dir * threads_my_dir; // global index corresponfing to local_tid
 
