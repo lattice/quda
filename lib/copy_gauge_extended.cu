@@ -12,7 +12,7 @@ namespace quda {
     FloatOut *Out;
     FloatIn *In;
 
-    unsigned int minThreads() const { return in.LocalVolumeCB(); }
+    unsigned int minThreads() const { return in.VolumeCB() == out.VolumeCB() ? in.VolumeCB() : in.LocalVolumeCB(); }
 
   public:
     CopyGaugeEx(GaugeField &out, const GaugeField &in, QudaFieldLocation location,

@@ -177,6 +177,7 @@ void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc
   int construct_type = 0;
   if (strcmp(latfile, "")) {
     // load in the command line supplied gauge field using QIO and LIME
+    if (getVerbosity() > QUDA_VERBOSE) printfQuda("Loading the gauge field in %s\n", latfile);
     read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
     construct_type = 2;
   } else {

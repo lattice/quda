@@ -1214,13 +1214,27 @@ namespace quda {
   __device__ __host__ inline void load(complex v[length / 2], int x, int parity = 0) const
   {
     auto in = &field[(parity * volumeCB + x) * length];
-    block_load<complex, length/2>(v, reinterpret_cast<const complex*>(in));
+    complex v_[length/2];
+    block_load<complex, length/2>(v_, reinterpret_cast<const complex*>(in));
+
+    for (int s=0; s<Ns; s++) {
+      for (int c=0; c<Nc; c++) {
+        v[s * Nc + c] = v_[c * Ns + s];
+      }
+    }
   }
 
   __device__ __host__ inline void save(const complex v[length / 2], int x, int parity = 0)
   {
     auto out = &field[(parity * volumeCB + x) * length];
-    block_store<complex, length/2>(reinterpret_cast<complex*>(out), v);
+    complex v_[length/2];
+    for (int s=0; s<Ns; s++) {
+      for (int c=0; c<Nc; c++) {
+        v_[c * Ns + s] = v[s * Nc + c];
+      }
+    }
+
+    block_store<complex, length/2>(reinterpret_cast<complex*>(out), v_);
   }
 
   /**
@@ -1302,27 +1316,13 @@ namespace quda {
   __device__ __host__ inline void load(complex v[length / 2], int x, int parity = 0) const
   {
     auto in = &field[(parity * volumeCB + x) * length];
-    complex v_[length/2];
-    block_load<complex, length/2>(v_, reinterpret_cast<const complex*>(in));
-
-    for (int s=0; s<Ns; s++) {
-      for (int c=0; c<Nc; c++) {
-        v[s * Nc + c] = v_[c * Ns + s];
-      }
-    }
+    block_load<complex, length/2>(v, reinterpret_cast<const complex*>(in));
   }
 
   __device__ __host__ inline void save(const complex v[length / 2], int x, int parity = 0)
   {
     auto out = &field[(parity * volumeCB + x) * length];
-    complex v_[length/2];
-    for (int s=0; s<Ns; s++) {
-      for (int c=0; c<Nc; c++) {
-        v_[c * Ns + s] = v[s * Nc + c];
-      }
-    }
-
-    block_store<complex, length/2>(reinterpret_cast<complex*>(out), v_);
+    block_store<complex, length/2>(reinterpret_cast<complex*>(out), v);
   }
 
   /**
