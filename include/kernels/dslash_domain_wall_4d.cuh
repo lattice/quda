@@ -4,6 +4,9 @@
 
 #include <mma_tensor_op/gemm.cuh>
 
+#include <cuda/barrier>
+#include <cooperative_groups.h>
+
 namespace quda
 {
 
@@ -26,17 +29,6 @@ namespace quda
     }
   };
 
-  template <class Coord, class Arg> __device__ bool is_out_of_bound(bool fwd, int d, Coord &coord, const Arg &arg)
-  {
-    switch (d) {
-    case 0: return fwd ? (coord[0] + arg.nFace >= arg.dim[0]) : (coord[0] - arg.nFace < 0); break;
-    case 1: return fwd ? (coord[1] + arg.nFace >= arg.dim[1]) : (coord[1] - arg.nFace < 0); break;
-    case 2: return fwd ? (coord[2] + arg.nFace >= arg.dim[2]) : (coord[2] - arg.nFace < 0); break;
-    case 3: return fwd ? (coord[3] + arg.nFace >= arg.dim[3]) : (coord[3] - arg.nFace < 0); break;
-    }
-    return false;
-  }
-
   __device__ float truncated_multiply(float a, float b) {
     constexpr unsigned int mask = 0xFFFFE000; // 1111 1111 1111 1110 0000 0000 0000
     float a_t = __uint_as_float(__float_as_uint(a) & mask);
@@ -44,6 +36,240 @@ namespace quda
     return a_t * b_t;
   }
 
+  /**
+     @brief Compute the checkerboard 1-d index for the nearest
+     neighbor
+     @param[in] lattice coordinates
+     @param[in] mu dimension in which to add 1
+     @param[in] dir direction (+1 or -1)
+     @param[in] arg parameter struct
+     @return 1-d checkboard index
+   */
+  template <typename Coord, typename Arg>
+  __device__ __host__ inline int getNeighborIndexCB_dyn(const Coord &x, int mu, int dir, const Arg &arg)
+  {
+    int rtn = (x[mu] == ((dir + 1) / 2) * (arg.X[mu] - 1) ? x.X - dir * arg.mZ[mu] : x.X + dir * arg.Z[mu]) >> 1;
+    return rtn;
+  }
+
+  using barrier = cuda::barrier<cuda::thread_scope_block>;
+
+  constexpr int warp_size = 32;
+
+  template <int Ls, int smem_buffer_size, int nParity, bool dagger, bool xpay, KernelType kernel_type, class A, class B, class C, typename Arg>
+  __device__ void data_movement(barrier ready[], barrier filled[], barrier computed[], A smem_obj_a, B smem_obj_b, C smem_obj_c, Arg &arg)
+  {
+    static_assert(kernel_type == INTERIOR_KERNEL, "Currently only for interior kernel.");
+
+    int thread_idx = threadIdx.x + blockDim.x * threadIdx.y;
+    int s = thread_idx % Ls;
+    int y = thread_idx / Ls;
+    int x_cb = y + blockIdx.x * blockDim.y;
+
+    constexpr int Ns = Arg::nSpin;
+    constexpr int Nc = Arg::nColor;
+
+    // if (blockIdx.x == 0) { printf("trd = %3d, x_cb = %5d, s = %2d\n", thread_idx, x_cb, s); }
+
+    using float_t = typename mapper<typename Arg::Float>::type;
+    using fixed_t = typename Arg::Float;
+    using colorspinor_t = ColorSpinor<float_t, Nc, Ns>;
+    using link_t = Matrix<complex<float_t>, Nc>;
+
+    int parity = nParity == 2 ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
+    int their_spinor_parity = nParity == 2 ? 1 - parity : 0;
+
+    const int gauge_parity = parity;
+
+    int thread_dim;
+    bool active;
+    auto coord = getCoords<QUDA_4D_PC, kernel_type>(arg, x_cb, s, parity, thread_dim);
+
+    int buffer_index = y % smem_buffer_size;
+    ready[y].arrive_and_wait(); // Wait until buffer for `x_cb` is ready to be filled.
+
+#pragma unroll
+    for (int d = 0; d < 4; d++) { // loop over dimension - 4 and not nDim since this is used for DWF as well
+      {                           // Forward gather - compute fwd offset for vector fetch
+        const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
+        const int gauge_idx = coord.x_cb;
+        constexpr int proj_dir = dagger ? +1 : -1;
+
+        const bool ghost
+          = (coord[d] + arg.nFace >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+
+        if (!ghost) { // TODO: zero the ghost ones.
+          if (s == 0) {
+            link_t U = arg.U(d, gauge_idx, gauge_parity);
+#pragma unroll
+            for (int ci = 0; ci < 3; ci++) {
+#pragma unroll
+              for (int cj = 0; cj < 3; cj++) { // ind_n, ind_k
+                smem_obj_b(cj * 2 + 0, ci + (d * 2 + 0) * 3 + buffer_index * 24) = +U(cj, ci).real();
+                smem_obj_b(cj * 2 + 1, ci + (d * 2 + 0) * 3 + buffer_index * 24) = +U(cj, ci).imag();
+              }
+            }
+          }
+          colorspinor_t in = arg.in(fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
+          colorspinor_t in_p = in.project(d, proj_dir).reconstruct(d, proj_dir);
+#pragma unroll
+          for (int spin = 0; spin < 4; spin++) {
+#pragma unroll
+            for (int color = 0; color < 3; color++) {
+              smem_obj_a(s * 8 + spin * 2 + 0, color + (d * 2 + 0) * 3 + buffer_index * 24) = in_p(spin, color).real();
+              smem_obj_a(s * 8 + spin * 2 + 1, color + (d * 2 + 0) * 3 + buffer_index * 24) = in_p(spin, color).imag();
+            }
+          }
+          // out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+        }
+      }
+
+      { // Backward gather - compute back offset for spinor and gauge fetch
+        const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
+        const int gauge_idx = back_idx;
+        constexpr int proj_dir = dagger ? -1 : +1;
+
+        const bool ghost = (coord[d] - arg.nFace < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+
+        if (!ghost) {
+          if (s == 0) {
+            link_t U = arg.U(d, gauge_idx, 1 - gauge_parity);
+#pragma unroll
+            for (int ci = 0; ci < 3; ci++) {
+#pragma unroll
+              for (int cj = 0; cj < 3; cj++) { // ind_n, ind_k
+                smem_obj_b(cj * 2 + 0, ci + (d * 2 + 1) * 3 + buffer_index * 24) = +U(ci, cj).real();
+                smem_obj_b(cj * 2 + 1, ci + (d * 2 + 1) * 3 + buffer_index * 24) = -U(ci, cj).imag();
+              }
+            }
+          }
+          colorspinor_t in = arg.in(back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
+          colorspinor_t in_p = in.project(d, proj_dir).reconstruct(d, proj_dir);
+#pragma unroll
+          for (int spin = 0; spin < 4; spin++) {
+#pragma unroll
+            for (int color = 0; color < 3; color++) {
+              smem_obj_a(s * 8 + spin * 2 + 0, color + (d * 2 + 1) * 3 + buffer_index * 24) = in_p(spin, color).real();
+              smem_obj_a(s * 8 + spin * 2 + 1, color + (d * 2 + 1) * 3 + buffer_index * 24) = in_p(spin, color).imag();
+            }
+          }
+          // out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+        }
+      }
+    } // nDim
+
+    filled[y].arrive(); // Signal that the op_a and op_b for this `x_cb` are now filled
+
+    computed[y].arrive_and_wait(); // Wait for the results for this `x_cb` have been computed.
+
+    // Write output
+    const int my_spinor_parity = nParity == 2 ? parity : 0;
+    colorspinor_t out;
+#pragma unroll
+    for (int spin = 0; spin < 4; spin++) {
+#pragma unroll
+      for (int color = 0; color < 3; color++) {
+        out(spin, color).real(smem_obj_c(s * 8 + spin * 2 + 0 + buffer_index * Ls * 8, color * 2 + 0) - smem_obj_c(s * 8 + spin * 2 + 1 + buffer_index * Ls * 8, color * 2 + 1));
+        out(spin, color).imag(smem_obj_c(s * 8 + spin * 2 + 0 + buffer_index * Ls * 8, color * 2 + 1) + smem_obj_c(s * 8 + spin * 2 + 1 + buffer_index * Ls * 8, color * 2 + 0));
+        // if (blockIdx.x == 0) { printf("trd = %3d, x_cb = %5d, s = %2d, f (%d,%d) = %f\n", thread_idx, x_cb, s, spin, color, out(spin, color).real()); }
+      }
+    }
+    arg.out(coord.x_cb + s * arg.dc.volume_4d_cb, my_spinor_parity) = out;
+  }
+
+  template <int smem_buffer_size, int Ls, int block_y, class A, class B, class C>
+  __device__ void compute(barrier ready[], barrier filled[], barrier computed[], A smem_obj_a, B smem_obj_b, C smem_obj_c)
+  {
+    constexpr int Nc = 3;
+    constexpr int Ns = 4;
+
+    constexpr int M = Ls * Ns * 2; // Ls * spin * complex
+    // constexpr int N = Nc * 2;     // Nc * complex
+    constexpr int K = Nc * 8; // Nc * 8-way stencil
+
+    constexpr int bM = M;
+    constexpr int bN = 8; // 8 -> 6
+    constexpr int bK = K; // TODO: Change this for MMA.
+
+#pragma unroll
+    for (int cycle = 0; cycle < block_y / smem_buffer_size; cycle++) {
+#pragma unroll
+      for (int b = 0; b < smem_buffer_size; b++) {
+        ready[b + cycle * smem_buffer_size].arrive(); // Note that the buffers are now ready to be filled
+                                                      // for these `x_cb`.
+      }
+#pragma unroll
+      for (int b = 0; b < smem_buffer_size; b++) {
+        filled[b + cycle * smem_buffer_size].arrive_and_wait(); // wait for the buffers to be filled
+
+        for (int m = threadIdx.x + blockDim.x * threadIdx.y - 3 * 32; m < bM; m += 1 * 32) {
+          for (int n = 0; n < bN; n++) {
+            // if (blockIdx.x == 0 && n == 0) { printf("trd = %2d, m = %2d, n = %2d, b = %d\n", threadIdx.x + blockDim.x * threadIdx.y - 96, m, n, b); }
+            float acc = 0;
+            for (int k = 0; k < bK; k++) { acc += smem_obj_a(m, k + bK * b) * smem_obj_b(n, k + bK * b); }
+            smem_obj_c(m + bM * b, n) = acc;
+          }
+        }
+        
+        computed[b + cycle * smem_buffer_size].arrive(); // wait for the buffers to be filled
+        if (cycle + 1 < block_y / smem_buffer_size) { ready[b + (cycle + 1) * smem_buffer_size].arrive(); }
+        // Note that the buffers are now ready to be filled
+      }
+    }
+  }
+
+  template <int Ls, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  __global__ void specialized_dslash_kernel(Arg arg)
+  {
+    constexpr int block_x = 12;         // How many 5th dimension sites are there
+    constexpr int block_y = 8;          // How many spatial sites are there in this block
+    constexpr int smem_buffer_size = 1; // How many buffers are there
+    constexpr int compute_warp = 1;     // How many compute/MMA warps are there
+
+    /**
+      block_y == blockDim.y
+      block_x * block_y == number of threads for data movement
+      (blockDim.x - block_x) * blockDim.y == number of threads for compute
+      blockDim.x * blockDim.y == total threads
+    */
+
+    __shared__ barrier ready[block_y];
+    __shared__ barrier filled[block_y];
+    __shared__ barrier computed[block_y];
+
+    constexpr int Nc = 3;
+    constexpr int Ns = 4;
+
+    constexpr int M = Ls * Ns * 2;  // Ls * spin * complex
+    constexpr int N = Nc * 2;       // Nc * complex
+    constexpr int K = Nc * 8;       // Nc * 8-way stencil
+
+    constexpr int bM = M;
+    constexpr int bN = 8; // 8 -> 6
+    constexpr int bK = K; // TODO: Change this for MMA.
+
+    extern __shared__ float smem_ptr[];
+    mma::SharedMemoryObject<float_t, bM, bK * smem_buffer_size, 1, bM> smem_obj_a(reinterpret_cast<float_t *>(smem_ptr));
+    mma::SharedMemoryObject<float_t, bN, bK * smem_buffer_size, 1, bN> smem_obj_b(smem_obj_a.ptr + bK * bM * smem_buffer_size);
+    mma::SharedMemoryObject<float_t, bM * smem_buffer_size, bN, bN, 1> smem_obj_c(smem_obj_b.ptr + bK * bN * smem_buffer_size);
+
+    int thread_idx = threadIdx.x + threadIdx.y * blockDim.x;
+
+    if (thread_idx < block_y) {
+      init(&ready[thread_idx], compute_warp * warp_size + block_x); // All of compute warps, and one `x_cb` of the data warps
+      init(&filled[thread_idx], compute_warp * warp_size + block_x);
+      init(&computed[thread_idx], compute_warp * warp_size + block_x);
+    }
+    __syncthreads();
+
+    if (thread_idx < block_x * block_y) {
+      data_movement<block_x, smem_buffer_size, nParity, dagger, xpay, kernel_type>(ready, filled, computed, smem_obj_a, smem_obj_b, smem_obj_c, arg);
+    } else {
+      compute<smem_buffer_size, block_x, block_y>(ready, filled, computed, smem_obj_a, smem_obj_b, smem_obj_c);
+    }
+  }
+
+#if 0
   template <int Ls, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   __global__ void specialized_dslash_kernel(Arg arg)
   {
@@ -63,8 +289,9 @@ namespace quda
     int thread_idx = threadIdx.y * blockDim.x + threadIdx.x;
 
     constexpr int Nc = 3;
+    constexpr int Ns = 4;
 
-    constexpr int M = Ls * 4 * 2; // Ls * spin * complex
+    constexpr int M = Ls * Ns * 2; // Ls * spin * complex
     // constexpr int N = Nc * 2;     // Nc * complex
     constexpr int K = Nc * 8; // Nc * 8-way stencil
 
@@ -72,41 +299,50 @@ namespace quda
     constexpr int bN = 8; // 8 -> 6
     constexpr int bK = K; // TODO: Change this for MMA.
 
+    int dim;
     extern __shared__ float smem_ptr[];
+    __shared__ Coord<Arg::nDim> coord;
+    if (thread_idx == 0) {
+      coord.x_cb = x_cb_4d;
+      coord.X = getCoordsCB(coord, x_cb_4d, arg.dim, arg.X0h, parity);
+    }
+    __syncthreads();
 
-    mma::SharedMemoryObject<real, bM, bK, 1, bM> smem_obj_a(reinterpret_cast<real *>(smem_ptr));
-    mma::SharedMemoryObject<real, bN, bK, 1, bN> smem_obj_b(smem_obj_a.ptr + bK * bM);
+    mma::SharedMemoryObject<real, bM, bK, 1, bM + 4> smem_obj_a(reinterpret_cast<real *>(smem_ptr));
+    mma::SharedMemoryObject<real, bN, bK, 1, bN> smem_obj_b(smem_obj_a.ptr + bK * (bM + 4));
     mma::SharedMemoryObject<real, bM, bN, bN, 1> smem_obj_c(smem_obj_b.ptr + bK * bN);
 
     while (thread_idx < Ls * K) {
 
-      int s = thread_idx / K;         // fifth dimension
-      int color_dir = thread_idx % K; // Joint idx for color and dir
-      int color = color_dir % Nc;
-      int dir = color_dir / Nc;
+      int s_dir = thread_idx / Nc;         // fifth dimension
+      int color = thread_idx % Nc; // Joint idx for color and dir
+      int s = s_dir % Ls;
+      int dir = s_dir / Ls;
       int d = dir % 4;
       bool fwd = dir < 4;
-      int fwd_bwd = 1 - (dir / 4) * 2; // +1 for fwd, -1 for bwd
-      int proj_dir = dagger ? +fwd_bwd : -fwd_bwd;
-      int dim;
+      int zero_one = dir / 4;
+      int fwd_bwd = 1 - zero_one * 2; // +1 for fwd, -1 for bwd
+      // int proj_dir = dagger ? +fwd_bwd : -fwd_bwd;
       bool active;
-      auto coord = getCoords<QUDA_4D_PC, kernel_type>(arg, x_cb_4d, s, parity, dim);
-      int cs_idx = getNeighborIndexCB(coord, d, fwd_bwd, arg.dc);
-      bool ghost = is_out_of_bound(fwd, d, coord, arg) && isActive<kernel_type>(active, dim, d, coord, arg);
+      int cs_idx = getNeighborIndexCB_dyn(coord, d, fwd_bwd, arg.dc);
+      bool ghost = isActive<kernel_type>(active, dim, d, coord, arg) && (arg.nFace + dir * coord[d] > (1 - zero_one) * (arg.dim[d] - 1));
+      // bool ghost = true;
       // parity for gauge field - include residual parity from 5-d => 4-d checkerboarding
       int gauge_parity = parity; // TODO: Change for 5d domain wall
 
-      int gauge_idx = fwd ? coord.x_cb : cs_idx; // TODO: Change for 5d domain wall
+      // int gauge_idx = fwd ? coord.x_cb : cs_idx; // TODO: Change for 5d domain wall
+      int gauge_idx = zero_one * cs_idx + (1 - zero_one) * coord.x_cb; // TODO: Change for 5d domain wall
 
       if (s == 0 && color == 0) {
         if (!ghost) {
-          Link U = arg.U(d, gauge_idx, fwd ? gauge_parity : 1 - gauge_parity);
+          // Link U = arg.U(d, gauge_idx, fwd ? gauge_parity : 1 - gauge_parity);
+          Link U = arg.U(d, gauge_idx, zero_one + fwd_bwd * gauge_parity);
 #pragma unroll
           for (int ci = 0; ci < 3; ci++) {
 #pragma unroll
             for (int cj = 0; cj < 3; cj++) { // ind_n, ind_k
-              smem_obj_b(cj * 2 + 0, ci * 8 + dir) = fwd ? +U(cj, ci).real() : +U(ci, cj).real();
-              smem_obj_b(cj * 2 + 1, ci * 8 + dir) = fwd ? +U(cj, ci).imag() : -U(ci, cj).imag();
+              smem_obj_b(cj * 2 + 0, ci + dir * 3) = fwd ? +U(cj, ci).real() : +U(ci, cj).real();
+              smem_obj_b(cj * 2 + 1, ci + dir * 3) = fwd ? +U(cj, ci).imag() : -U(ci, cj).imag();
             }
           }
         } else {
@@ -114,8 +350,8 @@ namespace quda
           for (int ci = 0; ci < 3; ci++) {
 #pragma unroll
             for (int cj = 0; cj < 3; cj++) { // ind_n, ind_k
-              smem_obj_b(cj * 2 + 0, ci * 8 + dir) = 0;
-              smem_obj_b(cj * 2 + 1, ci * 8 + dir) = 0;
+              smem_obj_b(cj * 2 + 0, ci + dir * 3) = 0;
+              smem_obj_b(cj * 2 + 1, ci + dir * 3) = 0;
             }
           }
         }
@@ -123,24 +359,24 @@ namespace quda
       }
 
       // Load one color component of the color-spinor: Vector = 4x2 real's, or a "spinor"
-      Spinor in = arg.in(cs_idx + s * arg.dc.volume_4d_cb, their_spinor_parity, color);
+      // Spinor in = arg.in(cs_idx + s * arg.dc.volume_4d_cb, their_spinor_parity, color);
+      Spinor in = arg.in(cs_idx * Ls + s, their_spinor_parity, color);
       // Spin project the coloror, and store to smem
-      Spinor projected_in = in.project(d, proj_dir).reconstruct(d, proj_dir);
+      // Spinor projected_in = in.project(d, proj_dir).reconstruct(d, proj_dir);
       if (!ghost) {
 #pragma unroll
         for (int spin = 0; spin < 4; spin++) {
           // m, k, color == 0
-          smem_obj_a(s * 8 + spin * 2 + 0, color * 8 + dir) = projected_in(spin, 0).real(); // real
-          smem_obj_a(s * 8 + spin * 2 + 1, color * 8 + dir) = projected_in(spin, 0).imag(); // imag
+          smem_obj_a(s * 8 + spin * 2 + 0, color + dir * 3) = in(spin, 0).real(); // real
+          smem_obj_a(s * 8 + spin * 2 + 1, color + dir * 3) = in(spin, 0).imag(); // imag
         }
       } else {
 #pragma unroll
         for (int spin = 0; spin < 4; spin++) {
-          smem_obj_a(s * 8 + spin * 2 + 0, color * 8 + dir) = 0; // real
-          smem_obj_a(s * 8 + spin * 2 + 1, color * 8 + dir) = 0; // imag
+          smem_obj_a(s * 8 + spin * 2 + 0, color + dir * 3) = 0; // real
+          smem_obj_a(s * 8 + spin * 2 + 1, color + dir * 3) = 0; // imag
         }
       }
-
       thread_idx += blockDim.x * blockDim.y;
     }
 
@@ -164,8 +400,9 @@ namespace quda
 #if 1
     for (int m = threadIdx.x; m < bM; m += blockDim.x) {
       for (int n = threadIdx.y; n < bN; n += blockDim.y) {
-        smem_obj_c(m, n) = 0;
-        for (int k = 0; k < bK; k++) smem_obj_c(m, n) += truncated_multiply(smem_obj_a(m, k), smem_obj_b(n, k));
+        // real acc = 0;
+        // for (int k = 0; k < bK; k++) { acc += smem_obj_a(m, k), smem_obj_b(n, k); }
+        // smem_obj_c(m, n) = acc;
       }
     }
 #else
@@ -194,41 +431,96 @@ namespace quda
     thread_idx = threadIdx.y * blockDim.x + threadIdx.x;
     if (thread_idx < Ls) { reduce_buffer[thread_idx] = 0; }
     __syncthreads();
-    while (thread_idx < Ls * 12) {
-      int s = thread_idx / 12;
-      int spin_color = thread_idx % 12;
-      int spin = spin_color / 3;
-      int color = spin_color % 3;
-      real p_real = smem_obj_c(s * 8 + spin * 2 + 0, color * 2 + 0) - smem_obj_c(s * 8 + spin * 2 + 1, color * 2 + 1);
-      real p_imag = smem_obj_c(s * 8 + spin * 2 + 1, color * 2 + 0) + smem_obj_c(s * 8 + spin * 2 + 0, color * 2 + 1);
 
-      atomicMax(reinterpret_cast<unsigned *>(&reduce_buffer[s]),
-                __float_as_uint(fabsf(p_real) > fabsf(p_imag) ? fabsf(p_real) : fabsf(p_imag)));
+    int s = thread_idx / Nc;
+    int color = thread_idx % Nc;
 
-      thread_idx += blockDim.x * blockDim.y;
+    real p[2 * Ns];
+    unsigned p_max = 0;
+    if (thread_idx < Ls * Nc) {
+#pragma unroll
+      for (int spin = 0; spin < 4; spin++) {
+        p[spin * 2 + 0] = smem_obj_c(s * 8 + spin * 2 + 0, color * 2 + 0) - smem_obj_c(s * 8 + spin * 2 + 1, color * 2 + 1);
+        p[spin * 2 + 1] = smem_obj_c(s * 8 + spin * 2 + 1, color * 2 + 0) + smem_obj_c(s * 8 + spin * 2 + 0, color * 2 + 1);
+        if (p_max < __float_as_uint(p[spin * 2 + 0])) { p_max = __float_as_uint(p[spin * 2 + 0]); }
+        if (p_max < __float_as_uint(p[spin * 2 + 1])) { p_max = __float_as_uint(p[spin * 2 + 1]); }
+      }
     }
+    atomicMax(reinterpret_cast<unsigned *>(&reduce_buffer[s]), p_max);
 
     __syncthreads();
-
-    thread_idx = threadIdx.y * blockDim.x + threadIdx.x;
-    if (thread_idx < Ls) { arg.out.norm[x_cb_4d + arg.dc.volume_4d_cb * thread_idx] = reduce_buffer[thread_idx]; }
-    while (thread_idx < Ls * 12) {
-      int s = thread_idx % Ls;
-      int spin_color = thread_idx / Ls;
-      int spin = spin_color / 3;
-      int color = spin_color % 3;
-      real fp_real = smem_obj_c(s * 8 + spin * 2 + 0, color * 2 + 0) - smem_obj_c(s * 8 + spin * 2 + 1, color * 2 + 1);
-      real fp_imag = smem_obj_c(s * 8 + spin * 2 + 1, color * 2 + 0) + smem_obj_c(s * 8 + spin * 2 + 0, color * 2 + 1);
-      fixed_point_t fixed_real
-        = static_cast<fixed_point_t>(fp_real * fixedMaxValue<fixed_point_t>::value / reduce_buffer[s]);
-      fixed_point_t fixed_imag
-        = static_cast<fixed_point_t>(fp_imag * fixedMaxValue<fixed_point_t>::value / reduce_buffer[s]);
-
-      arg.out(x_cb_4d + arg.dc.volume_4d_cb * s, parity, spin, color) = complex<fixed_point_t>(fixed_real, fixed_imag);
-
-      thread_idx += blockDim.x * blockDim.y;
+    if (thread_idx < Ls) { arg.out.norm[x_cb_4d * Ls + thread_idx] = reduce_buffer[thread_idx]; }
+    if (thread_idx < Ls * Nc) {
+      complex<fixed_point_t> fixed[4];
+      real scale = reduce_buffer[s];
+#pragma unroll
+      for (int spin = 0; spin < 4; spin++) {
+        fixed[spin].real(
+          static_cast<fixed_point_t>(p[spin * 2 + 0] * fixedMaxValue<fixed_point_t>::value / scale));
+        fixed[spin].imag(
+          static_cast<fixed_point_t>(p[spin * 2 + 1] * fixedMaxValue<fixed_point_t>::value / scale));
+      }
+      arg.out(x_cb_4d + arg.dc.volume_4d_cb * s, parity, color) = fixed;
     }
   }
+#endif
+
+  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct domainWall4D;
+
+  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  struct domainWall4DImpl: public Dslash<domainWall4D, Arg> {
+
+    using Dslash = Dslash<domainWall4D, Arg>;
+    using Dslash::arg;
+    using Dslash::in;
+    using Dslash::out;
+
+    domainWall4DImpl(const ColorSpinorField &out, const ColorSpinorField &in, Arg &arg): Dslash(arg, out, in) {}
+
+    void apply(const qudaStream_t &stream)
+    {
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      tp.set_max_shared_bytes = true;
+      qudaLaunchKernel(specialized_dslash_kernel<12, nParity, dagger, xpay, kernel_type, Arg>, tp, stream, arg);
+    }
+
+    unsigned int sharedBytesPerThread() const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return ((arg.dc.Ls * 8 + 4) * 24 + 8 * 24 + arg.dc.Ls * 8 * 8) * sizeof(float); }
+
+    bool advanceTuneParam(TuneParam &param) const {
+      if (param.block.x < blockMax()) {
+        param.block.x += blockStep();
+        return true;
+      } else {
+        return false;
+      }
+    }
+
+    virtual int blockStep() const { return 16; }
+    virtual int blockMin() const { return 16; }
+    virtual int blockMax() const { return 16; }
+
+    void initTuneParam(TuneParam &param) const
+    {
+      param.block.x = blockMin();
+      param.block.y = 8;
+      param.block.z = 1;
+
+      param.grid.x = arg.dc.volume_4d_cb / 8;
+      param.grid.y = 1;
+      param.grid.z = nParity;
+
+      param.shared_bytes = (arg.dc.Ls * 8 * 24 + 8 * 24 + arg.dc.Ls * 8 * 8) * sizeof(float) * 1;
+    }
+
+    void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }
+
+    TuneKey tuneKey() const { return TuneKey(in.VolString(), typeid(*this).name(), ","); }
+
+    void preTune() {}  // FIXME - use write to determine what needs to be saved
+    void postTune() {} // FIXME - use write to determine what needs to be saved
+ 
+  };
 
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct domainWall4D : dslash_default {
@@ -265,30 +557,9 @@ namespace quda
 
     static constexpr bool has_specialized_kernel() { return sizeof(typename Arg::Float) == 2 && kernel_type == INTERIOR_KERNEL; }
 
-    /** XXX: This is for testing only
-       @brief This is a helper function to luanch the dslash kernel with strategy that is
-       different from the "one-thread-per-site" one.
-    */
-    static void specialized_launch(TuneParam &tp, const qudaStream_t &stream, Arg &arg)
-    {
-      TuneParam tune_param(tp);
-
-      tune_param.set_max_shared_bytes = true;
-
-      // If Ls == 12, 12 * 8 =  96 = 3 warps.
-      // If Ls == 16, 16 * 8 = 128 = 4 warps.
-      // TODO: Tune block.x
-      tune_param.block.x = 8;
-      tune_param.block.y = arg.dc.Ls;
-      tune_param.block.z = 1;
-
-      tune_param.grid.x = arg.dc.volume_4d_cb;
-      tune_param.grid.y = 1;
-      tune_param.grid.z = nParity;
-
-      tune_param.shared_bytes = (arg.dc.Ls * 8 * 24 + 8 * 24 + arg.dc.Ls * 8 * 8) * sizeof(float);
-
-      qudaLaunchKernel(specialized_dslash_kernel<12, nParity, dagger, xpay, kernel_type, Arg>, tune_param, stream, arg);
+    static void specialized_launch(const qudaStream_t &stream, const ColorSpinorField &out, const ColorSpinorField &in, Arg &arg) {
+      domainWall4DImpl<nParity, dagger, xpay, kernel_type, Arg> impl(out, in, arg);
+      impl.apply(stream);
     }
   };
 

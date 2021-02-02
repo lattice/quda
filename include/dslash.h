@@ -115,8 +115,8 @@ namespace quda
 
     virtual int tuningIter() const { return 10; }
 
-    virtual int blockStep() const { return 16; }
-    virtual int blockMin() const { return 16; }
+    virtual int blockStep() const { return 8; }
+    virtual int blockMin() const { return 8; }
 
     unsigned int maxSharedBytesPerBlock() const { return maxDynamicSharedBytesPerBlock(); }
 

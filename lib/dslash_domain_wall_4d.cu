@@ -94,6 +94,7 @@ namespace quda
     using Dslash = Dslash<domainWall4D, Arg>;
     using Dslash::arg;
     using Dslash::in;
+    using Dslash::out;
 
   public:
     DomainWall4D(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in)
@@ -115,8 +116,7 @@ namespace quda
         };
 
         auto specialized_strategy = [this] (const qudaStream_t &stream_) {
-          TuneParam tp;
-          domainWall4D<1, false, false, INTERIOR_KERNEL, Arg>::specialized_launch(tp, stream_, arg); // nPairty = 1, dagger = false, xpay = false
+          domainWall4D<1, false, false, INTERIOR_KERNEL, Arg>::specialized_launch(stream_, out, in, arg); // nPairty = 1, dagger = false, xpay = false
         };
 
         char aux[TuneKey::aux_n];

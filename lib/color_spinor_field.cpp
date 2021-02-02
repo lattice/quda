@@ -121,6 +121,18 @@ namespace quda {
       dslash_constant.X5X4X3X2X1mX4X3X2X1 = (X[4] - 1) * X[3] * X[2] * X[1] * X[0];
       dslash_constant.X4X3X2X1hmX3X2X1h = dslash_constant.X4X3X2X1mX3X2X1/2;
 
+      dslash_constant.Z[0] = 1;
+      dslash_constant.Z[1] = X[0];
+      dslash_constant.Z[2] = dslash_constant.X2X1;
+      dslash_constant.Z[3] = dslash_constant.X3X2X1;
+      dslash_constant.Z[4] = dslash_constant.X4X3X2X1;
+
+      dslash_constant.mZ[0] = X[0] - 1;
+      dslash_constant.mZ[1] = dslash_constant.X2X1mX1;
+      dslash_constant.mZ[2] = dslash_constant.X3X2X1mX2X1;
+      dslash_constant.mZ[3] = dslash_constant.X4X3X2X1mX3X2X1;
+      dslash_constant.mZ[4] = dslash_constant.X5X4X3X2X1mX4X3X2X1;
+
       // used by indexFromFaceIndexStaggered
       dslash_constant.dims[0][0]=X[1];
       dslash_constant.dims[0][1]=X[2];

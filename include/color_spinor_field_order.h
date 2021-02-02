@@ -130,6 +130,11 @@ namespace quda {
       {
       }
 
+      /**
+         @brief Assignment operator with ColorSpinor instance as input
+         @param[in] C ColorSpinor we want to store in this accessor
+      */
+      template <typename C> __device__ __host__ inline void operator=(const C *a) { field.save_spinor(a, x_cb, parity); }
     };
 
   template <typename T, int Nc>
@@ -1097,14 +1102,23 @@ namespace quda {
   {
     real v[Ns * 2];
     norm_type nrm = isFixed<Float>::value ? vector_load<float>(norm, x + parity * norm_offset) : 0.0;
-
+    using vec_t = typename VectorType<Float, Ns * 2>::type;
+#if 1
+    int index = parity * offset * N / (Ns * 2) + x * Nc + color;
+    vec_t vecTmp = vector_load<vec_t>(field, index);
+#pragma unroll
+    for (int j = 0; j < 8; j++) copy_and_scale(v[j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
+#else
+#pragma unroll
+    for (int i = 0; i < length / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
 #pragma unroll
     for (int spin = 0; spin < Ns; spin++) {
       auto tmp = this->operator()(x, parity, spin, color);
       copy_and_scale(v[spin * 2 + 0], tmp.real(), nrm);
       copy_and_scale(v[spin * 2 + 1], tmp.imag(), nrm);
     }
-#pragma unroll
+#endif
+    #pragma unroll
     for (int i = 0; i < Ns; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
   }
 
@@ -1149,6 +1163,15 @@ namespace quda {
   }
 
   /**
+    Save spinor 
+  */
+  __device__ __host__ inline void save_spinor(const ::complex<Float> in[Ns], int x, int parity = 0)
+  {
+    using vec_t = typename VectorType<Float, Ns * 2>::type;
+    vector_store(field, parity * offset * N / (Ns * 2) + x * Nc, *reinterpret_cast<const vec_t *>(in));
+  }
+
+  /**
      @brief This accessor routine returns a colorspinor_wrapper to this object,
      allowing us to overload various operators for manipulating at
      the site level interms of matrix operations.
@@ -1185,6 +1208,20 @@ namespace quda {
      @return Instance of a colorspinor_wrapper that curries in access to
      this field at the above coordinates.
   */
+  __device__ __host__ inline spinor_wrapper<real, Accessor> operator()(int x_cb, int parity, int color)
+  {
+    return spinor_wrapper<real, Accessor>(*this, x_cb, parity, color);
+  }
+  
+  /**
+     @brief This accessor routine returns a const spinor_wrapper to this object,
+     allowing us to overload various operators for manipulating at
+     the site level interms of matrix operations.
+     @param[in] x_cb Checkerboarded space-time index we are requesting
+     @param[in] parity Parity we are requesting
+     @return Instance of a colorspinor_wrapper that curries in access to
+     this field at the above coordinates.
+  */
   __device__ __host__ inline const spinor_wrapper<real, Accessor> operator()(int x_cb, int parity, int color) const
   {
     return spinor_wrapper<real, Accessor>(const_cast<Accessor &>(*this), x_cb, parity, color);
@@ -1201,9 +1238,13 @@ namespace quda {
   */
   __device__ __host__ inline const ::complex<Float> &operator()(int x_cb, int parity, int spin, int color) const
   {
+#if 0
     int i = (spin * Nc + color) * 2 / N;
     int j = (spin * Nc + color) * 2 % N;
     return reinterpret_cast<::complex<Float> *>(field)[((parity * offset + x_cb + stride * i) * N + j) / 2];
+#else
+    return reinterpret_cast<::complex<Float> *>(field)[parity * offset * N / 2 + x_cb * Ns * Nc + color * Ns + spin];
+#endif
   }
 
    /**
