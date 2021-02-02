@@ -337,7 +337,6 @@ void setDims(int *X) {
   Vsh_z = Vs_z/2;
   Vsh_t = Vs_t/2;
 
-
   E1=X[0]+4; E2=X[1]+4; E3=X[2]+4; E4=X[3]+4;
   E1h=E1/2;
   E[0] = E1;
@@ -346,7 +345,6 @@ void setDims(int *X) {
   E[3] = E4;
   V_ex = E1*E2*E3*E4;
   Vh_ex = V_ex/2;
-
 }
 
 void dw_setDims(int *X, const int L5)
