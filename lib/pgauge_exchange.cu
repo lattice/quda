@@ -51,7 +51,7 @@ namespace quda {
     GaugeField &U;
     GaugeFixUnPackArg<Float, recon> arg;
     const char *dim_str[4] = { "0", "1", "2", "3" };
-    unsigned int minThreads() const { return arg.size; }
+    unsigned int minThreads() const { return arg.threads.x; }
 
     PGaugeExchanger(GaugeField& U, const int dir, const int parity) :
       TunableKernel1D(U),
@@ -117,14 +117,14 @@ namespace quda {
         comm_start(mh_recv_back[d]);
         comm_start(mh_recv_fwd[d]);
 
-        arg.size = U.SurfaceCB(d);
+        arg.threads.x = U.SurfaceCB(d);
         arg.parity = parity;
         arg.face = d;
         arg.dir = dir;
 
         //extract top face
         arg.pack = true;
-        arg.array = reinterpret_cast<complex<Float>*>(send_d[d]); 
+        arg.array = reinterpret_cast<complex<Float>*>(send_d[d]);
         arg.borderid = X[d] - U.R()[d] - 1;
         apply(device::get_stream(0));
 
@@ -168,18 +168,17 @@ namespace quda {
 
     TuneKey tuneKey() const
     {
-      std::stringstream aux2(aux);
-      aux2 << aux << ",dim=" << dim_str[arg.face] << ",geo_dir=" << dim_str[arg.dir] << (arg.pack ? ",extract" : ",insert");
-      return TuneKey(vol, typeid(*this).name(), aux2.str().c_str());
+      std::string aux2 = std::string(aux) + ",dim=" + dim_str[arg.face] + ",geo_dir=" + dim_str[arg.dir] +
+        (arg.pack ? ",extract" : ",insert");
+      return TuneKey(vol, typeid(*this).name(), aux2.c_str());
     }
 
     void apply(const qudaStream_t &stream)
     {
       auto tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      qudaLaunchKernel(Kernel_UnPack<decltype(arg)>, tp, stream, arg);
+      launch<unpacker>(tp, stream, arg);
     }
 
-    long long flops() const { return 0; }
     long long bytes() const { return 2 * U.SurfaceCB(arg.face) * U.Reconstruct() * U.Precision(); }
   };
 
