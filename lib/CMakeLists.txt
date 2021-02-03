@@ -425,6 +425,10 @@ if(QUDA_COVDEV)
   target_compile_definitions(quda PUBLIC GPU_COVDEV)
 endif(QUDA_COVDEV)
 
+if(QUDA_LAPLACE)
+  target_compile_definitions(quda PUBLIC GPU_LAPLACE)
+endif(QUDA_LAPLACE)
+
 # MULTI GPU AND USQCD
 if(QUDA_MPI OR QUDA_QMP)
   target_compile_definitions(quda PUBLIC MULTI_GPU)
