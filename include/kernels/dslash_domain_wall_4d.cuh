@@ -137,19 +137,25 @@ namespace quda
           = (coord[d] + arg.nFace >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if (!ghost) { // TODO: zero the ghost ones.
+          // colorspinor_t in = arg.in(fwd_idx * Ls + s, their_spinor_parity);
           colorspinor_t in = arg.in(fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
           colorspinor_t in_p = in.project(d, proj_dir).reconstruct(d, proj_dir);
+          link_t U;
+          if (s == 0) {
+            U = arg.U(d, gauge_idx, gauge_parity);
+          }
 
-          ready[y].arrive_and_wait(); // Wait until buffer for `x_cb` is ready to be filled.
+          if (d > 0) { __syncthreads(); } // "The buffers are filled."
+          // ready[y].arrive_and_wait(); // Wait until buffer for `x_cb` is ready to be filled.
 
           if (s == 0) {
-            link_t U = arg.U(d, gauge_idx, gauge_parity);
             store_link<false>(buffer_index, 0, smem_obj_b, U); // dagger = false
           }
           store_colorspinor(buffer_index, 0, s, 0, smem_obj_a, in_p);
           // out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
           
-          filled[y].arrive(); // Signal that the op_a and op_b for this `x_cb` are now filled
+          __syncthreads(); // "The buffers are filled."
+          // filled[y].arrive(); // Signal that the op_a and op_b for this `x_cb` are now filled
         }
       }
 
@@ -161,29 +167,37 @@ namespace quda
         const bool ghost = (coord[d] - arg.nFace < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if (!ghost) {
+          // colorspinor_t in = arg.in(back_idx * Ls + s, their_spinor_parity);
           colorspinor_t in = arg.in(back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
           colorspinor_t in_p = in.project(d, proj_dir).reconstruct(d, proj_dir);
+          link_t U;
+          if (s == 0) {
+            U = arg.U(d, gauge_idx, 1 - gauge_parity);
+          }
 
-          ready[y].arrive_and_wait(); // Wait until buffer for `x_cb` is ready to be filled.
+          __syncthreads(); // "The buffers are ready to be filled."
+          // ready[y].arrive_and_wait(); // Wait until buffer for `x_cb` is ready to be filled.
 
           if (s == 0) {
-            link_t U = arg.U(d, gauge_idx, 1 - gauge_parity);
             store_link<true>(buffer_index, 0, smem_obj_b, U); // dagger = true
           }
           store_colorspinor(buffer_index, 0, s, 0, smem_obj_a, in_p);
           // out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
 
-          filled[y].arrive(); // Signal that the op_a and op_b for this `x_cb` are now filled
+          __syncthreads(); // "The buffers are filled."
+          // filled[y].arrive(); // Signal that the op_a and op_b for this `x_cb` are now filled
         }
       }
     } // nDim
 
-    computed[y].arrive_and_wait(); // Wait for the results for this `x_cb` have been computed.
+    __syncthreads(); // "Compute is done."
+    // computed[y].arrive_and_wait(); // Wait for the results for this `x_cb` have been computed.
 
     // Write output
     const int my_spinor_parity = nParity == 2 ? parity : 0;
     colorspinor_t out;
     load_colorspinor<Ls>(buffer_index, s, out, smem_obj_c);
+    // arg.out(coord.x_cb * Ls + s, my_spinor_parity) = out;
     arg.out(coord.x_cb + s * arg.dc.volume_4d_cb, my_spinor_parity) = out;
   }
 
@@ -205,13 +219,15 @@ namespace quda
     for (int cycle = 0; cycle < block_y / smem_buffer_size; cycle++) {
 #pragma unroll
       for (int b = 0; b < smem_buffer_size; b++) {
-        ready[b + cycle * smem_buffer_size].arrive(); // Note that the buffers are now ready to be filled
-                                                      // for these `x_cb`.
+        // ready[b + cycle * smem_buffer_size].arrive(); // Note that the buffers are now ready to be filled for these `x_cb`.
       }
       for (int kk = 0; kk < K; kk += bK) {
+
+        __syncthreads(); // "The buffers are ready."
+
         for (int b = 0; b < smem_buffer_size; b++) {
 
-          filled[b + cycle * smem_buffer_size].arrive_and_wait(); // wait for the buffers to be filled
+          // filled[b + cycle * smem_buffer_size].arrive_and_wait(); // wait for the buffers to be filled
 
           for (int m = thread; m < bM; m += 1 * 32) {
             for (int n = 0; n < bN; n++) {
@@ -223,14 +239,13 @@ namespace quda
           }
 
           if (kk + bK < K) {
-            ready[b + cycle * smem_buffer_size].arrive();
+            // ready[b + cycle * smem_buffer_size].arrive();
           } else {
-            computed[b + cycle * smem_buffer_size].arrive(); // Signal that this part has been computed 
+            // computed[b + cycle * smem_buffer_size].arrive(); // Signal that this part has been computed 
           }
         }
 
-        // if (cycle + 1 < block_y / smem_buffer_size) { ready[b + (cycle + 1) * smem_buffer_size].arrive(); }
-        // Note that the buffers are now ready to be filled
+        __syncthreads(); // "The buffers are ready to be filled." or "Compute is done."
       }
     }
   }
