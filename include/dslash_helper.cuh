@@ -425,7 +425,7 @@ namespace quda
     out << std::endl;
     out << "active_dims = " << arg.active_dims << std::endl;
     out << "pack_blocks = " << arg.pack_blocks << std::endl;
-    out << "ext_dim = " << arg.ext_dim;
+    out << "ext_threads = " << arg.ext_threads;
     out << "ext_blocks " << arg.ext_blocks;
     return out;
   }
