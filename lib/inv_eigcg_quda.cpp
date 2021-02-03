@@ -40,8 +40,13 @@ namespace quda {
    using RowMajorRealMatrix = Matrix<double, Dynamic, Dynamic, RowMajor>;
    using RowMajorComplexMatrix = Matrix<Complex, Dynamic, Dynamic, RowMajor>;
 
-   static int max_eigcg_cycles = 4;//how many eigcg cycles do we allow?
+   constexpr int default_eigcg_cycles = 4;
+   static int max_eigcg_cycles = default_eigcg_cycles;//how many eigcg cycles do we allow?
+   static std::array<int, default_eigcg_cycles> search_space_restarts{4,4,3,3};//minimum number of the search space restarts
+
    constexpr bool host_flag = false;
+
+   static int init_k = 0;
 
    // helper for a smart pointer creation
 
@@ -108,6 +113,8 @@ namespace quda {
 
      SolverParam &solver_param;
 
+     int logical_rhs_id; //current eigcg cycle 
+
      EigCGArgs(ColorSpinorField &meta, SolverParam &solver_param, const bool is_host_location = false) :
        Tm(RealMatrix::Zero(solver_param.eig_param.n_kr, solver_param.eig_param.n_kr)),
        projMat(nullptr),
@@ -128,7 +135,8 @@ namespace quda {
        V2k(nullptr),
        hAz(nullptr),
        hVm(nullptr),
-       solver_param(solver_param)
+       solver_param(solver_param),
+       logical_rhs_id(0)	
      {
        const int m = solver_param.eig_param.n_kr;
        const int k = solver_param.eig_param.nLockedMax;
@@ -643,7 +651,6 @@ namespace quda {
       // launch async task (current hack for GPU based computing)
       args.rr_task
         = std::async(args.is_host_location ? std::launch::async : std::launch::deferred, &IncEigCG::EigenSolve, this);
-      printfQuda("Start RR task.\n");
 
       if (args.restarts == 0) args.UpdateShift();
 
@@ -653,7 +660,6 @@ namespace quda {
         args.rr_task.wait();
       else
         warningQuda("Tried to synchronize an invalid task...");
-      printfQuda("Stop RR task.\n");
       args.UpdateShift();
       //
       args.RestartArgs();
@@ -1282,7 +1288,7 @@ namespace quda {
 
     const double local_stop = x.Precision() == QUDA_DOUBLE_PRECISION ?
       b2 * param.tol * param.tol :
-      (x.Precision() == QUDA_SINGLE_PRECISION ? b2 * 1e-12 : b2 * 1e-8);
+      (x.Precision() == QUDA_SINGLE_PRECISION ? b2 * 1e-12 : b2 * 5e-10);
 
     const double local_rel_stop = param.delta;
 
@@ -1293,7 +1299,7 @@ namespace quda {
     constexpr int prediction_correction_interval = 4;
     int correction_count = 0;
 
-    printfQuda("\nRunning CA eigCG with %d correction interval\n", prediction_correction_interval);
+    printfQuda("\nRunning CA eigCG with %d correction interval, local relative tolerance %le, local stop %le, global stop %le.\n", prediction_correction_interval, local_rel_stop, local_stop, args.global_stop);
 
     if (comm_size() > 1) {
       comm_wait(iallreduce_request_handle);
@@ -1304,7 +1310,7 @@ namespace quda {
 
     PrintStats("CAeigCG", k, nu, b2, heavy_quark_res);
 
-    while ((!converged && k < param.maxiter) || (args.restarts < 3)) {
+    while ((!converged && k < param.maxiter) || (args.restarts < search_space_restarts[args.logical_rhs_id] )) {
       // Update search space
       PipelinedSearchSpaceUpdate(lanczos_diag, lanczos_offdiag, beta, sqrt(nu));
 
@@ -1404,7 +1410,7 @@ namespace quda {
     fillInitCGSolverParam(Kparam, param);
 
     const double full_tol = param.tol; // check for 5e-8
-    const int max_restart_num = param.max_restart_num;
+    const int max_restart_num = 5; //param.max_restart_num;
     double inc_tol = param.inc_tol;
     Kparam.tol = param.tol_restart; // Kparam.tol_restart;
     Kparam.deflate = false;
@@ -1434,7 +1440,7 @@ namespace quda {
     while ((Kparam.tol >= full_tol) && (restart_idx < max_restart_num)) {
       restart_idx += 1;
 
-      if (restart_idx > 1) warningQuda("Restart :: id %d.\n", restart_idx);
+      if (restart_idx > 1) warningQuda("\n\nRestart :: id %d (max restarts %d) with local tol %le.\n", restart_idx, max_restart_num,  Kparam.tol);
 
       Deflate(xProj, rProj);
       x = xProj;
@@ -1458,10 +1464,10 @@ namespace quda {
       inc_tol *= (inc_tol < 1e-1 ? 1e+1 : 1.0);
 
       if (Kparam.tol <= full_tol && (restart_idx < max_restart_num)) restart_idx = (max_restart_num - 1); // durty hack
-      if (restart_idx == (max_restart_num - 1))
+      if (restart_idx == (max_restart_num-1))
         Kparam.tol = full_tol; // do the last solve in the next cycle to full tolerance
 
-      warningQuda("Reset tol to %le and full  tol is %le\n", Kparam.tol, full_tol);
+      warningQuda("Reset tol to %le and full  tol is %le, inc tol %le \n", Kparam.tol, full_tol, inc_tol);
 
       param.secs   += Kparam.secs;
     }
@@ -1524,7 +1530,6 @@ namespace quda {
       if (eigcg_args == nullptr) eigcg_args = new EigCGArgs(in, param, host_computing);
 
       eigcg_args->global_stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
-
       init = true;
     }
 
@@ -1543,10 +1548,10 @@ namespace quda {
 
     const double stop = b2 * param.tol * param.tol;
     // start iterative refinement cycles (or just one eigcg call for full (solo) precision solver):
-    int logical_rhs_id = 0;
     bool dcg_cycle = false;
 
     do {
+printfQuda("Running logical RHS : %d with min search space restarts %d, %d, %d, %d \n", eigcg_args->logical_rhs_id, search_space_restarts[0], search_space_restarts[1], search_space_restarts[2], search_space_restarts[3] );	    
       blas::zero(e);
       Deflate(e, r);
       //
@@ -1559,9 +1564,9 @@ namespace quda {
       if (update_ritz) {
         Increment();
 
-        logical_rhs_id += 1;
+        eigcg_args->logical_rhs_id += 1;
 
-        dcg_cycle = (logical_rhs_id >= max_eigcg_cycles);
+        dcg_cycle = (eigcg_args->logical_rhs_id >= default_eigcg_cycles);
 
       } else { // run DCG instead
         dcg_cycle = true;
@@ -1584,12 +1589,22 @@ namespace quda {
         if (!dcg_cycle && (eigcg_args->restarts >= 1) && (param.eig_param.n_conv < param.eig_param.n_ev)) Verify();
       }
 
-    } while ((r2 > stop && logical_rhs_id < max_eigcg_cycles) /*&& mixed_prec*/);
+    } while ((r2 > stop && eigcg_args->logical_rhs_id < default_eigcg_cycles) /*&& mixed_prec*/);
+
+    // adjust search space restart number
+    if (param.rhs_idx == 0) init_k = param.iter;
+    else {
+      if(init_k / param.iter  >= 2) {
+        search_space_restarts = {3, 3, 3, 2};
+      } else if (init_k / param.iter >= 3) {
+        search_space_restarts = {2, 2, 2, 1};
+      }
+    }
 
     // we need to update rhs index and number of computed eigenvectors
     param.rhs_idx += 1;
 
-    if (logical_rhs_id == 0) {
+    if (eigcg_args->logical_rhs_id == 0) {
       warningQuda("Cannot expand the deflation space.\n");
       param.eig_param.n_ev = param.eig_param.n_conv;
     }
@@ -1602,23 +1617,19 @@ namespace quda {
       printfQuda("\nRequested to reserve %d eigenvectors (requested %d) with max tol %le.\n", param.eig_param.n_conv, param.eig_param.n_ev,  param.eig_param.tol);
       Reduce(param.eig_param.tol, param.eig_param.n_conv);
       param.eig_param.is_complete = QUDA_BOOLEAN_TRUE;
-      destroyDeflationSpace();//?
 
-      if(param.eig_param.n_conv == 0) {
-	// No eigenvectors found!
-	param.eig_param.preserve_deflation = QUDA_BOOLEAN_FALSE;
-      }
-      
-      if (getVerbosity() == QUDA_DEBUG_VERBOSE) {
-        blas::zero(out);
-        initCGsolve(out, in);
-      }
+      destroyDeflationSpace();
+
+      if(param.eig_param.n_conv == 0) param.eig_param.preserve_deflation = QUDA_BOOLEAN_FALSE; // No eigenvectors found!
+           
 
       delete eigcg_args; 
       eigcg_args = nullptr;
     }
 
-     return;
+    eigcg_args->logical_rhs_id = 0;
+
+    return;
   }
 
 } // namespace quda
