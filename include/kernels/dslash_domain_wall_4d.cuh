@@ -188,17 +188,17 @@ namespace quda
   }
 
   template <int smem_buffer_size, int Ls, int block_y, class A, class B, class C>
-  __device__ inline void compute(barrier ready[], barrier filled[], barrier computed[], A smem_obj_a, B smem_obj_b, C smem_obj_c)
+  __device__ inline void compute(int thread, barrier ready[], barrier filled[], barrier computed[], A smem_obj_a, B smem_obj_b, C smem_obj_c)
   {
     constexpr int Nc = 3;
     constexpr int Ns = 4;
 
     constexpr int M = Ls * Ns * 2; // Ls * spin * complex
-    // constexpr int N = Nc * 2;     // Nc * complex
+    constexpr int N = Nc * 2;     // Nc * complex
     constexpr int K = Nc * 8; // Nc * 8-way stencil
 
     constexpr int bM = M;
-    constexpr int bN = 8; // 8 -> 6
+    constexpr int bN = N; // 8 -> 6
     constexpr int bK = Nc; // TODO: Change this for MMA.
 
 #pragma unroll
@@ -208,13 +208,12 @@ namespace quda
         ready[b + cycle * smem_buffer_size].arrive(); // Note that the buffers are now ready to be filled
                                                       // for these `x_cb`.
       }
-        for (int kk = 0; kk < K; kk += bK) {
-#pragma unroll
-      for (int b = 0; b < smem_buffer_size; b++) {
+      for (int kk = 0; kk < K; kk += bK) {
+        for (int b = 0; b < smem_buffer_size; b++) {
 
           filled[b + cycle * smem_buffer_size].arrive_and_wait(); // wait for the buffers to be filled
 
-          for (int m = threadIdx.x + blockDim.x * threadIdx.y - 3 * 32; m < bM; m += 1 * 32) {
+          for (int m = thread; m < bM; m += 1 * 32) {
             for (int n = 0; n < bN; n++) {
               // if (blockIdx.x == 0 && n == 0) { printf("trd = %2d, m = %2d, n = %2d, b = %d\n", threadIdx.x + blockDim.x * threadIdx.y - 96, m, n, b); }
               float acc = kk == 0 ? 0 : smem_obj_c(m + bM * b, n);
@@ -263,7 +262,7 @@ namespace quda
     constexpr int K = Nc * 8;       // Nc * 8-way stencil
 
     constexpr int bM = M;
-    constexpr int bN = 8; // 8 -> 6
+    constexpr int bN = 6; // 8 -> 6
     constexpr int bK = Nc; // TODO: Change this for MMA.
 
     extern __shared__ float smem_ptr[];
@@ -283,7 +282,7 @@ namespace quda
     if (thread_idx < block_x * block_y) {
       data_movement<block_x, smem_buffer_size, nParity, dagger, xpay, kernel_type>(ready, filled, computed, smem_obj_a, smem_obj_b, smem_obj_c, arg);
     } else {
-      compute<smem_buffer_size, block_x, block_y>(ready, filled, computed, smem_obj_a, smem_obj_b, smem_obj_c);
+      compute<smem_buffer_size, block_x, block_y>(thread_idx - block_y * block_x, ready, filled, computed, smem_obj_a, smem_obj_b, smem_obj_c);
     }
   }
 
@@ -503,7 +502,7 @@ namespace quda
     }
 
     unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return (arg.dc.Ls * 8 * 3 + 8 * 3 + arg.dc.Ls * 8 * 8) * sizeof(float) * 8; }
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return (arg.dc.Ls * 8 * 3 + 6 * 3 + arg.dc.Ls * 8 * 6) * sizeof(float) * 8; }
 
     bool advanceTuneParam(TuneParam &param) const {
       if (param.block.x < blockMax()) {
