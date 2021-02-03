@@ -1277,7 +1277,7 @@ namespace quda {
 	  {
 	  }
 	  
-	  __device__ __host__ inline void Pack(real out[2*N_COLORS*(N_COLORS-1)], const complex in[2*N_COLORS*(N_COLORS-1)]) const
+	  __device__ __host__ inline void Pack(real out[2*Nc*(Nc-1)], const complex in[2*Nc*(Nc-1)]) const
         {
 #pragma unroll
           for (int i = 0; i < 2*Nc; i++) {
@@ -2464,7 +2464,7 @@ namespace quda {
     __device__ __host__ inline void load(complex v[N_COLORS*N_COLORS], int x, int dir, int parity, Float = 1.0) const
     {
       auto in = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
-      complex v_[9];
+      complex v_[N_COLORS*N_COLORS];
       block_load<complex, length/2>(v_, reinterpret_cast<complex*>(in));
 
       for (int i=0; i<Nc; i++) {
@@ -2477,7 +2477,7 @@ namespace quda {
     __device__ __host__ inline void save(const complex v[N_COLORS*N_COLORS], int x, int dir, int parity)
     {
       auto out = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
-      complex v_[9];
+      complex v_[N_COLORS*N_COLORS];
       for (int i=0; i<Nc; i++) {
 	for (int j=0; j<Nc; j++) {
           v_[i * Nc + j] = v[j * Nc + i] * anisotropy;
@@ -2558,8 +2558,8 @@ namespace quda {
       __device__ __host__ inline void load(complex v[N_COLORS*N_COLORS], int x, int dir, int parity, real = 1.0) const
       {
         auto in = &gauge[((dir * 2 + parity) * exVolumeCB + x) * length];
-        complex v_[9];
-        block_load<complex, 9>(v_, reinterpret_cast<complex*>(in));
+        complex v_[N_COLORS*N_COLORS];
+        block_load<complex, N_COLORS*N_COLORS>(v_, reinterpret_cast<complex*>(in));
 
         for (int i = 0; i < Nc; i++) {
           for (int j = 0; j < Nc; j++) {
@@ -2571,7 +2571,7 @@ namespace quda {
       __device__ __host__ inline void save(const complex v[N_COLORS*N_COLORS], int x, int dir, int parity)
       {
         auto out = &gauge[((dir * 2 + parity) * exVolumeCB + x) * length];
-        complex v_[9];
+        complex v_[N_COLORS*N_COLORS];
         for (int i = 0; i < Nc; i++) {
           for (int j = 0; j < Nc; j++) {
             v_[i * Nc + j] = v[j * Nc + i];
@@ -2650,8 +2650,8 @@ namespace quda {
       __device__ __host__ inline void load(complex v[N_COLORS*N_COLORS], int x, int dir, int parity, real = 1.0) const
       {
         auto in = &gauge[((dir * 2 + parity) * volumeCB + x) * length];
-        complex v_[9];
-        block_load<complex, 9>(v_, reinterpret_cast<complex*>(in));
+        complex v_[N_COLORS*N_COLORS];
+        block_load<complex, N_COLORS*N_COLORS>(v_, reinterpret_cast<complex*>(in));
 
         for (int i = 0; i < Nc; i++) {
           for (int j = 0; j < Nc; j++) {
@@ -2663,7 +2663,7 @@ namespace quda {
       __device__ __host__ inline void save(const complex v[N_COLORS*N_COLORS], int x, int dir, int parity)
       {
         auto out = &gauge[((dir * 2 + parity) * volumeCB + x) * length];
-        complex v_[9];
+        complex v_[N_COLORS*N_COLORS];
         for (int i = 0; i < Nc; i++) {
           for (int j = 0; j < Nc; j++) {
             v_[i * Nc + j] = v[j * Nc + i] * scale;
@@ -2771,8 +2771,8 @@ namespace quda {
       {
         int y = getPaddedIndex(x, parity);
         auto in = &gauge[((dir * 2 + parity) * exVolumeCB + y) * length];
-        complex v_[9];
-        block_load<complex, 9>(v_, reinterpret_cast<complex*>(in));
+        complex v_[N_COLORS*N_COLORS];
+        block_load<complex, N_COLORS*N_COLORS>(v_, reinterpret_cast<complex*>(in));
 
         for (int i = 0; i < Nc; i++) {
           for (int j = 0; j < Nc; j++) {
@@ -2786,14 +2786,14 @@ namespace quda {
         int y = getPaddedIndex(x, parity);
         auto out = &gauge[((dir * 2 + parity) * exVolumeCB + y) * length];
 
-        complex v_[9];
+        complex v_[N_COLORS*N_COLORS];
         for (int i = 0; i < Nc; i++) {
           for (int j = 0; j < Nc; j++) {
             v_[i * Nc + j] = v[j * Nc + i] * scale;
           }
         }
 
-        block_store<complex, 9>(reinterpret_cast<complex*>(out), v_);
+        block_store<complex, N_COLORS*N_COLORS>(reinterpret_cast<complex*>(out), v_);
       }
 
       /**
