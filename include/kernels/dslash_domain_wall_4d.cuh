@@ -56,8 +56,47 @@ namespace quda
 
   constexpr int warp_size = 32;
 
+  template <bool dagger, class S, class link_t>
+  __device__ void inline store_link(int buffer_index, int d, S smem_obj, const link_t &U)
+  {
+#pragma unroll
+    for (int ci = 0; ci < 3; ci++) {
+#pragma unroll
+      for (int cj = 0; cj < 3; cj++) { // ind_n, ind_k
+        smem_obj(cj * 2 + 0, ci + (d * 2 + (dagger ? 1 : 0)) * 3 + buffer_index * 24) = dagger ? +U(ci, cj).real() : +U(cj, ci).real();
+        smem_obj(cj * 2 + 1, ci + (d * 2 + (dagger ? 1 : 0)) * 3 + buffer_index * 24) = dagger ? -U(ci, cj).imag() : +U(cj, ci).imag();
+      }
+    }
+  }
+
+  template <class S, class colorspinor_t>
+    __device__ void inline store_colorspinor(int buffer_index, int d, int s, int fwd_bwd, S smem_obj, const colorspinor_t &in_p)
+    {
+#pragma unroll
+      for (int spin = 0; spin < 4; spin++) {
+#pragma unroll
+        for (int color = 0; color < 3; color++) {
+          smem_obj(s * 8 + spin * 2 + 0, color + (d * 2 + fwd_bwd) * 3 + buffer_index * 24) = in_p(spin, color).real();
+          smem_obj(s * 8 + spin * 2 + 1, color + (d * 2 + fwd_bwd) * 3 + buffer_index * 24) = in_p(spin, color).imag();
+        }
+      }
+    }
+
+  template <int Ls, class S, class colorspinor_t>
+    __device__ void inline load_colorspinor(int buffer_index, int s, colorspinor_t &out, const S smem_obj)
+  {
+#pragma unroll
+    for (int spin = 0; spin < 4; spin++) {
+#pragma unroll
+      for (int color = 0; color < 3; color++) {
+        out(spin, color).real(smem_obj(s * 8 + spin * 2 + 0 + buffer_index * Ls * 8, color * 2 + 0) - smem_obj(s * 8 + spin * 2 + 1 + buffer_index * Ls * 8, color * 2 + 1));
+        out(spin, color).imag(smem_obj(s * 8 + spin * 2 + 0 + buffer_index * Ls * 8, color * 2 + 1) + smem_obj(s * 8 + spin * 2 + 1 + buffer_index * Ls * 8, color * 2 + 0));
+      }
+    }
+  }
+
   template <int Ls, int smem_buffer_size, int nParity, bool dagger, bool xpay, KernelType kernel_type, class A, class B, class C, typename Arg>
-  __device__ void data_movement(barrier ready[], barrier filled[], barrier computed[], A smem_obj_a, B smem_obj_b, C smem_obj_c, Arg &arg)
+  __device__ inline void data_movement(barrier ready[], barrier filled[], barrier computed[], A smem_obj_a, B smem_obj_b, C smem_obj_c, Arg &arg)
   {
     static_assert(kernel_type == INTERIOR_KERNEL, "Currently only for interior kernel.");
 
@@ -86,6 +125,7 @@ namespace quda
     auto coord = getCoords<QUDA_4D_PC, kernel_type>(arg, x_cb, s, parity, thread_dim);
 
     int buffer_index = y % smem_buffer_size;
+
     ready[y].arrive_and_wait(); // Wait until buffer for `x_cb` is ready to be filled.
 
 #pragma unroll
@@ -101,25 +141,11 @@ namespace quda
         if (!ghost) { // TODO: zero the ghost ones.
           if (s == 0) {
             link_t U = arg.U(d, gauge_idx, gauge_parity);
-#pragma unroll
-            for (int ci = 0; ci < 3; ci++) {
-#pragma unroll
-              for (int cj = 0; cj < 3; cj++) { // ind_n, ind_k
-                smem_obj_b(cj * 2 + 0, ci + (d * 2 + 0) * 3 + buffer_index * 24) = +U(cj, ci).real();
-                smem_obj_b(cj * 2 + 1, ci + (d * 2 + 0) * 3 + buffer_index * 24) = +U(cj, ci).imag();
-              }
-            }
+            store_link<false>(buffer_index, d, smem_obj_b, U); // dagger = false
           }
           colorspinor_t in = arg.in(fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
           colorspinor_t in_p = in.project(d, proj_dir).reconstruct(d, proj_dir);
-#pragma unroll
-          for (int spin = 0; spin < 4; spin++) {
-#pragma unroll
-            for (int color = 0; color < 3; color++) {
-              smem_obj_a(s * 8 + spin * 2 + 0, color + (d * 2 + 0) * 3 + buffer_index * 24) = in_p(spin, color).real();
-              smem_obj_a(s * 8 + spin * 2 + 1, color + (d * 2 + 0) * 3 + buffer_index * 24) = in_p(spin, color).imag();
-            }
-          }
+          store_colorspinor(buffer_index, d, s, 0, smem_obj_a, in_p);
           // out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         }
       }
@@ -134,25 +160,11 @@ namespace quda
         if (!ghost) {
           if (s == 0) {
             link_t U = arg.U(d, gauge_idx, 1 - gauge_parity);
-#pragma unroll
-            for (int ci = 0; ci < 3; ci++) {
-#pragma unroll
-              for (int cj = 0; cj < 3; cj++) { // ind_n, ind_k
-                smem_obj_b(cj * 2 + 0, ci + (d * 2 + 1) * 3 + buffer_index * 24) = +U(ci, cj).real();
-                smem_obj_b(cj * 2 + 1, ci + (d * 2 + 1) * 3 + buffer_index * 24) = -U(ci, cj).imag();
-              }
-            }
+            store_link<true>(buffer_index, d, smem_obj_b, U); // dagger = true
           }
           colorspinor_t in = arg.in(back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
           colorspinor_t in_p = in.project(d, proj_dir).reconstruct(d, proj_dir);
-#pragma unroll
-          for (int spin = 0; spin < 4; spin++) {
-#pragma unroll
-            for (int color = 0; color < 3; color++) {
-              smem_obj_a(s * 8 + spin * 2 + 0, color + (d * 2 + 1) * 3 + buffer_index * 24) = in_p(spin, color).real();
-              smem_obj_a(s * 8 + spin * 2 + 1, color + (d * 2 + 1) * 3 + buffer_index * 24) = in_p(spin, color).imag();
-            }
-          }
+          store_colorspinor(buffer_index, d, s, 1, smem_obj_a, in_p);
           // out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         }
       }
@@ -165,20 +177,12 @@ namespace quda
     // Write output
     const int my_spinor_parity = nParity == 2 ? parity : 0;
     colorspinor_t out;
-#pragma unroll
-    for (int spin = 0; spin < 4; spin++) {
-#pragma unroll
-      for (int color = 0; color < 3; color++) {
-        out(spin, color).real(smem_obj_c(s * 8 + spin * 2 + 0 + buffer_index * Ls * 8, color * 2 + 0) - smem_obj_c(s * 8 + spin * 2 + 1 + buffer_index * Ls * 8, color * 2 + 1));
-        out(spin, color).imag(smem_obj_c(s * 8 + spin * 2 + 0 + buffer_index * Ls * 8, color * 2 + 1) + smem_obj_c(s * 8 + spin * 2 + 1 + buffer_index * Ls * 8, color * 2 + 0));
-        // if (blockIdx.x == 0) { printf("trd = %3d, x_cb = %5d, s = %2d, f (%d,%d) = %f\n", thread_idx, x_cb, s, spin, color, out(spin, color).real()); }
-      }
-    }
+    load_colorspinor<Ls>(buffer_index, s, out, smem_obj_c);
     arg.out(coord.x_cb + s * arg.dc.volume_4d_cb, my_spinor_parity) = out;
   }
 
   template <int smem_buffer_size, int Ls, int block_y, class A, class B, class C>
-  __device__ void compute(barrier ready[], barrier filled[], barrier computed[], A smem_obj_a, B smem_obj_b, C smem_obj_c)
+  __device__ inline void compute(barrier ready[], barrier filled[], barrier computed[], A smem_obj_a, B smem_obj_b, C smem_obj_c)
   {
     constexpr int Nc = 3;
     constexpr int Ns = 4;
@@ -223,7 +227,7 @@ namespace quda
   {
     constexpr int block_x = 12;         // How many 5th dimension sites are there
     constexpr int block_y = 8;          // How many spatial sites are there in this block
-    constexpr int smem_buffer_size = 1; // How many buffers are there
+    constexpr int smem_buffer_size = 4; // How many buffers are there
     constexpr int compute_warp = 1;     // How many compute/MMA warps are there
 
     /**
@@ -485,7 +489,7 @@ namespace quda
     }
 
     unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return ((arg.dc.Ls * 8 + 4) * 24 + 8 * 24 + arg.dc.Ls * 8 * 8) * sizeof(float); }
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return (arg.dc.Ls * 8 * 24 + 8 * 24 + arg.dc.Ls * 8 * 8) * sizeof(float) * 4; }
 
     bool advanceTuneParam(TuneParam &param) const {
       if (param.block.x < blockMax()) {
@@ -510,7 +514,7 @@ namespace quda
       param.grid.y = 1;
       param.grid.z = nParity;
 
-      param.shared_bytes = (arg.dc.Ls * 8 * 24 + 8 * 24 + arg.dc.Ls * 8 * 8) * sizeof(float) * 1;
+      param.shared_bytes = sharedBytesPerBlock(param);
     }
 
     void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }
