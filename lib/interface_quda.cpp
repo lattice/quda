@@ -6069,10 +6069,10 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
             for (size_t s1 = 0; s1 < nSpin; s1++) {
               for (size_t b1 = 0; b1 < nSpin; b1++) {
                 profileContractFT.TPSTART(QUDA_PROFILE_COMPUTE);
-		
+		/*
                 contractSummedQuda(*d_propagator_flavor1->Vectors()[s1 * nColor + c1], *d_propagator_flavor2->Vectors()[b1 * nColor + c1],
 				   h_result_tmp_global, cType, source_position, pxpypzpt, s1, b1);
-		
+		*/		
                 comm_allreduce_array((double *)&h_result_tmp_global[0], n_numbers_per_slice * global_corr_length);
 		
                 for (size_t G_idx = 0; G_idx < nSpin * nSpin; G_idx++) {
@@ -6108,6 +6108,7 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
   saveTuneCache();
 }
 
+/*
 void contractSummedQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void **h_result,
                         const QudaContractType cType, QudaInvertParam *param, void *cs_param_, const int *X)
 {
@@ -6212,6 +6213,7 @@ void contractSummedQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, 
   profileContractSummed.TPSTOP(QUDA_PROFILE_TOTAL);
   saveTuneCache();
 }
+*/
 
 void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const QudaContractType cType,
                   QudaInvertParam *param, const int *X)
