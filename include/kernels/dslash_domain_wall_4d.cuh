@@ -63,8 +63,8 @@ namespace quda
     for (int ci = 0; ci < 3; ci++) {
 #pragma unroll
       for (int cj = 0; cj < 3; cj++) { // ind_n, ind_k
-        smem_obj(cj * 2 + 0, ci + (d * 2 + (dagger ? 1 : 0)) * 3 + buffer_index * 24) = dagger ? +U(ci, cj).real() : +U(cj, ci).real();
-        smem_obj(cj * 2 + 1, ci + (d * 2 + (dagger ? 1 : 0)) * 3 + buffer_index * 24) = dagger ? -U(ci, cj).imag() : +U(cj, ci).imag();
+        smem_obj(cj * 2 + 0, ci + (d * 2 + (dagger ? 0 : 0)) * 3 + buffer_index * 3) = dagger ? +U(ci, cj).real() : +U(cj, ci).real();
+        smem_obj(cj * 2 + 1, ci + (d * 2 + (dagger ? 0 : 0)) * 3 + buffer_index * 3) = dagger ? -U(ci, cj).imag() : +U(cj, ci).imag();
       }
     }
   }
@@ -76,8 +76,8 @@ namespace quda
       for (int spin = 0; spin < 4; spin++) {
 #pragma unroll
         for (int color = 0; color < 3; color++) {
-          smem_obj(s * 8 + spin * 2 + 0, color + (d * 2 + fwd_bwd) * 3 + buffer_index * 24) = in_p(spin, color).real();
-          smem_obj(s * 8 + spin * 2 + 1, color + (d * 2 + fwd_bwd) * 3 + buffer_index * 24) = in_p(spin, color).imag();
+          smem_obj(s * 8 + spin * 2 + 0, color + (d * 2 + fwd_bwd) * 3 + buffer_index * 3) = in_p(spin, color).real();
+          smem_obj(s * 8 + spin * 2 + 1, color + (d * 2 + fwd_bwd) * 3 + buffer_index * 3) = in_p(spin, color).imag();
         }
       }
     }
@@ -126,8 +126,6 @@ namespace quda
 
     int buffer_index = y % smem_buffer_size;
 
-    ready[y].arrive_and_wait(); // Wait until buffer for `x_cb` is ready to be filled.
-
 #pragma unroll
     for (int d = 0; d < 4; d++) { // loop over dimension - 4 and not nDim since this is used for DWF as well
       {                           // Forward gather - compute fwd offset for vector fetch
@@ -139,14 +137,19 @@ namespace quda
           = (coord[d] + arg.nFace >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if (!ghost) { // TODO: zero the ghost ones.
-          if (s == 0) {
-            link_t U = arg.U(d, gauge_idx, gauge_parity);
-            store_link<false>(buffer_index, d, smem_obj_b, U); // dagger = false
-          }
           colorspinor_t in = arg.in(fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
           colorspinor_t in_p = in.project(d, proj_dir).reconstruct(d, proj_dir);
-          store_colorspinor(buffer_index, d, s, 0, smem_obj_a, in_p);
+
+          ready[y].arrive_and_wait(); // Wait until buffer for `x_cb` is ready to be filled.
+
+          if (s == 0) {
+            link_t U = arg.U(d, gauge_idx, gauge_parity);
+            store_link<false>(buffer_index, 0, smem_obj_b, U); // dagger = false
+          }
+          store_colorspinor(buffer_index, 0, s, 0, smem_obj_a, in_p);
           // out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+          
+          filled[y].arrive(); // Signal that the op_a and op_b for this `x_cb` are now filled
         }
       }
 
@@ -158,19 +161,22 @@ namespace quda
         const bool ghost = (coord[d] - arg.nFace < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if (!ghost) {
-          if (s == 0) {
-            link_t U = arg.U(d, gauge_idx, 1 - gauge_parity);
-            store_link<true>(buffer_index, d, smem_obj_b, U); // dagger = true
-          }
           colorspinor_t in = arg.in(back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
           colorspinor_t in_p = in.project(d, proj_dir).reconstruct(d, proj_dir);
-          store_colorspinor(buffer_index, d, s, 1, smem_obj_a, in_p);
+
+          ready[y].arrive_and_wait(); // Wait until buffer for `x_cb` is ready to be filled.
+
+          if (s == 0) {
+            link_t U = arg.U(d, gauge_idx, 1 - gauge_parity);
+            store_link<true>(buffer_index, 0, smem_obj_b, U); // dagger = true
+          }
+          store_colorspinor(buffer_index, 0, s, 0, smem_obj_a, in_p);
           // out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+
+          filled[y].arrive(); // Signal that the op_a and op_b for this `x_cb` are now filled
         }
       }
     } // nDim
-
-    filled[y].arrive(); // Signal that the op_a and op_b for this `x_cb` are now filled
 
     computed[y].arrive_and_wait(); // Wait for the results for this `x_cb` have been computed.
 
@@ -193,7 +199,7 @@ namespace quda
 
     constexpr int bM = M;
     constexpr int bN = 8; // 8 -> 6
-    constexpr int bK = K; // TODO: Change this for MMA.
+    constexpr int bK = Nc; // TODO: Change this for MMA.
 
 #pragma unroll
     for (int cycle = 0; cycle < block_y / smem_buffer_size; cycle++) {
@@ -202,21 +208,29 @@ namespace quda
         ready[b + cycle * smem_buffer_size].arrive(); // Note that the buffers are now ready to be filled
                                                       // for these `x_cb`.
       }
+        for (int kk = 0; kk < K; kk += bK) {
 #pragma unroll
       for (int b = 0; b < smem_buffer_size; b++) {
-        filled[b + cycle * smem_buffer_size].arrive_and_wait(); // wait for the buffers to be filled
 
-        for (int m = threadIdx.x + blockDim.x * threadIdx.y - 3 * 32; m < bM; m += 1 * 32) {
-          for (int n = 0; n < bN; n++) {
-            // if (blockIdx.x == 0 && n == 0) { printf("trd = %2d, m = %2d, n = %2d, b = %d\n", threadIdx.x + blockDim.x * threadIdx.y - 96, m, n, b); }
-            float acc = 0;
-            for (int k = 0; k < bK; k++) { acc += smem_obj_a(m, k + bK * b) * smem_obj_b(n, k + bK * b); }
-            smem_obj_c(m + bM * b, n) = acc;
+          filled[b + cycle * smem_buffer_size].arrive_and_wait(); // wait for the buffers to be filled
+
+          for (int m = threadIdx.x + blockDim.x * threadIdx.y - 3 * 32; m < bM; m += 1 * 32) {
+            for (int n = 0; n < bN; n++) {
+              // if (blockIdx.x == 0 && n == 0) { printf("trd = %2d, m = %2d, n = %2d, b = %d\n", threadIdx.x + blockDim.x * threadIdx.y - 96, m, n, b); }
+              float acc = kk == 0 ? 0 : smem_obj_c(m + bM * b, n);
+              for (int k = 0; k < bK; k++) { acc += smem_obj_a(m, k + bK * b) * smem_obj_b(n, k + bK * b); }
+              smem_obj_c(m + bM * b, n) = acc;
+            }
+          }
+
+          if (kk + bK < K) {
+            ready[b + cycle * smem_buffer_size].arrive();
+          } else {
+            computed[b + cycle * smem_buffer_size].arrive(); // Signal that this part has been computed 
           }
         }
-        
-        computed[b + cycle * smem_buffer_size].arrive(); // wait for the buffers to be filled
-        if (cycle + 1 < block_y / smem_buffer_size) { ready[b + (cycle + 1) * smem_buffer_size].arrive(); }
+
+        // if (cycle + 1 < block_y / smem_buffer_size) { ready[b + (cycle + 1) * smem_buffer_size].arrive(); }
         // Note that the buffers are now ready to be filled
       }
     }
@@ -227,7 +241,7 @@ namespace quda
   {
     constexpr int block_x = 12;         // How many 5th dimension sites are there
     constexpr int block_y = 8;          // How many spatial sites are there in this block
-    constexpr int smem_buffer_size = 4; // How many buffers are there
+    constexpr int smem_buffer_size = 8; // How many buffers are there
     constexpr int compute_warp = 1;     // How many compute/MMA warps are there
 
     /**
@@ -250,7 +264,7 @@ namespace quda
 
     constexpr int bM = M;
     constexpr int bN = 8; // 8 -> 6
-    constexpr int bK = K; // TODO: Change this for MMA.
+    constexpr int bK = Nc; // TODO: Change this for MMA.
 
     extern __shared__ float smem_ptr[];
     mma::SharedMemoryObject<float_t, bM, bK * smem_buffer_size, 1, bM> smem_obj_a(reinterpret_cast<float_t *>(smem_ptr));
@@ -489,7 +503,7 @@ namespace quda
     }
 
     unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return (arg.dc.Ls * 8 * 24 + 8 * 24 + arg.dc.Ls * 8 * 8) * sizeof(float) * 4; }
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return (arg.dc.Ls * 8 * 3 + 8 * 3 + arg.dc.Ls * 8 * 8) * sizeof(float) * 8; }
 
     bool advanceTuneParam(TuneParam &param) const {
       if (param.block.x < blockMax()) {
