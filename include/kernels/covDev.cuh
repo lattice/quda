@@ -48,10 +48,7 @@ namespace quda
       checkLocation(out, in, U);  // check all locations match
       if (!out.isNative() || !in.isNative() || !U.isNative())
         errorQuda("Unsupported field order colorspinor(in)=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
-      pushKernelPackT(true); // non-spin projection requires kernel packing
     }
-
-    virtual ~CovDevArg() { popKernelPackT(); }
   };
 
   /**
