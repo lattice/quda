@@ -130,7 +130,7 @@ namespace quda {
         double secs = profileHBOVR.Last(QUDA_PROFILE_COMPUTE);
         double gflops = (hb.flops() * 8 * nhb * 1e-9) / (secs);
         double gbytes = hb.bytes() * 8 * nhb / (secs * 1e9);
-        printfQuda("HB: Time = %6.6f s, Gflop/s = %6.1f, GB/s = %6.1f\n", secs, gflops * comm_size(), gbytes * comm_size());
+        printfQuda("HB:  Time = %6.6f s, Gflop/s = %6.1f, GB/s = %6.1f\n", secs, gflops * comm_size(), gbytes * comm_size());
       }
 
       if (getVerbosity() >= QUDA_VERBOSE) profileHBOVR.TPSTART(QUDA_PROFILE_COMPUTE);

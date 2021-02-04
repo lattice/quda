@@ -127,6 +127,13 @@ int main(int argc, char **argv)
   // Set the dimensions
   setDims(gauge_param.X);  
 
+  // Allocate space on the host
+  void *load_gauge[4];
+  for (int dir = 0; dir < 4; dir++) { load_gauge[dir] = malloc(V * gauge_site_size * gauge_param.cpu_prec); }
+  constructHostGaugeField(load_gauge, gauge_param, argc, argv);
+  // Load the gauge field to the device
+  loadGaugeQuda((void *)load_gauge, &gauge_param);
+  
   int nsteps = heatbath_num_steps;
   int nwarm = heatbath_warmup_steps;
   int checkpoint = heatbath_checkpoint;
@@ -216,6 +223,10 @@ int main(int argc, char **argv)
     if(step >= nwarm) {
       // copy into regular field
       copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
+
+      // load the gauge field from gauge
+      gauge_param.gauge_order = gauge->Order();
+      gauge_param.location = QUDA_CUDA_FIELD_LOCATION;
       
       loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
       gaugeObservablesQuda(&param);
@@ -240,6 +251,7 @@ int main(int argc, char **argv)
   delete gaugeEx;
   delete randstates;
   host_free(num_failures_h);
+  for (int dir = 0; dir<4; dir++) free(load_gauge[dir]);
   //--------------------------------------------------------------------------
   
   // Finalize the QUDA library
