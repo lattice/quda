@@ -201,6 +201,22 @@ void saveHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, QudaLinkType 
   }
 }
 
+void saveDeviceGaugeField(cudaGaugeField *gaugeEx, cudaGaugeField *gauge)
+{  
+  QudaGaugeParam gauge_param = newQudaGaugeParam();
+  setWilsonGaugeParam(gauge_param);
+
+  void *cpu_gauge[4];
+  for (int dir = 0; dir < 4; dir++) { cpu_gauge[dir] = malloc(V * gauge_site_size * gauge_param.cpu_prec); }
+
+  // copy into regular field
+  copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
+  saveGaugeFieldQuda((void*)cpu_gauge, (void*)gauge, &gauge_param);
+  write_gauge_field(gauge_outfile, cpu_gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char**)0);
+  for (int dir = 0; dir<4; dir++) free(cpu_gauge[dir]);
+}
+
+
 void constructHostCloverField(void *clover, void *, QudaInvertParam &inv_param)
 {
   double norm = 0.01; // clover components are random numbers in the range (-norm, norm)

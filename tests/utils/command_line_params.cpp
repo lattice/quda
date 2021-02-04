@@ -226,6 +226,7 @@ bool mg_eig_preserve_deflation = false;
 double heatbath_beta_value = 6.2;
 int heatbath_warmup_steps = 10;
 int heatbath_num_steps = 10;
+int heatbath_checkpoint = 5;
 int heatbath_num_heatbath_per_step = 5;
 int heatbath_num_overrelax_per_step = 5;
 bool heatbath_coldstart = false;
@@ -538,18 +539,6 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--gaussian-sigma", gaussian_sigma,
                        "Width of the Gaussian noise used for random gauge field contruction (default 0.2)");
 
-  quda_app->add_option("--heatbath-beta", heatbath_beta_value, "Beta value used in heatbath test (default 6.2)");
-  quda_app->add_option("--heatbath-coldstart", heatbath_coldstart,
-                       "Whether to use a cold or hot start in heatbath test (default false)");
-  quda_app->add_option("--heatbath-num-hb-per-step", heatbath_num_heatbath_per_step,
-                       "Number of heatbath hits per heatbath step (default 5)");
-  quda_app->add_option("--heatbath-num-or-per-step", heatbath_num_overrelax_per_step,
-                       "Number of overrelaxation hits per heatbath step (default 5)");
-  quda_app->add_option("--heatbath-num-steps", heatbath_num_steps,
-                       "Number of measurement steps in heatbath test (default 10)");
-  quda_app->add_option("--heatbath-warmup-steps", heatbath_warmup_steps,
-                       "Number of warmup steps in heatbath test (default 10)");
-
   quda_app->add_option("--inv-type", inv_type, "The type of solver to use (default cg)")
     ->transform(CLI::QUDACheckedTransformer(inverter_type_map));
   quda_app->add_option("--inv-deflate", inv_deflate, "Deflate the inverter using the eigensolver");
@@ -636,7 +625,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
 
   quda_app->add_option("--reliable-delta", reliable_delta, "Set reliable update delta factor");
   quda_app->add_option("--save-gauge", gauge_outfile,
-                       "Save gauge field \" file \" for the test (requires QIO, heatbath test only)");
+                       "Save gauge field \" file \" for the test (requires QIO)");
 
   quda_app->add_option("--solution-pipeline", solution_accumulator_pipeline,
                        "The pipeline length for fused solution accumulation (default 0, no pipelining)");
@@ -1028,6 +1017,26 @@ void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--eofa-mq1", eofa_mq1, "Set mq1 for EOFA operator (default 1.0)");
   opgroup->add_option("--eofa-mq2", eofa_mq1, "Set mq2 for EOFA operator (default 0.085)");
   opgroup->add_option("--eofa-mq3", eofa_mq1, "Set mq3 for EOFA operator (default 1.0)");
+}
+
+void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  // Option group for heatbath related options
+  auto opgroup = quda_app->add_option_group("heatbath", "Options controlling heatbath routines");
+  opgroup->add_option("--heatbath-beta", heatbath_beta_value, "Beta value used in heatbath test (default 6.2)");
+  opgroup->add_option("--heatbath-coldstart", heatbath_coldstart,
+                       "Whether to use a cold or hot start in heatbath test (default false)");
+  opgroup->add_option("--heatbath-num-hb-per-step", heatbath_num_heatbath_per_step,
+                       "Number of heatbath hits per heatbath step (default 5)");
+  opgroup->add_option("--heatbath-num-or-per-step", heatbath_num_overrelax_per_step,
+                       "Number of overrelaxation hits per heatbath step (default 5)");
+  opgroup->add_option("--heatbath-num-steps", heatbath_num_steps,
+                       "Number of measurement steps in heatbath test (default 10)");
+  opgroup->add_option("--heatbath-warmup-steps", heatbath_warmup_steps,
+                       "Number of warmup steps in heatbath test (default 10)");
+  opgroup->add_option("--heatbath-checkpoint", heatbath_checkpoint,
+                       "Number of measurement steps in heatbath before checkpointing (default 5)");
+
 }
 
 void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
