@@ -50,19 +50,20 @@ namespace quda
     }
 
     template <typename T>
-    struct init_reduce : public TunableKernel {
+    struct init_reduce : public TunableKernel1D {
       T *reduce_count;
       long long bytes() const { return max_n_reduce() * sizeof(T); }
       unsigned int minThreads() const { return max_n_reduce(); }
-      TuneKey tuneKey() const { return TuneKey(std::to_string(max_n_reduce()).c_str(), typeid(*this).name()); }
 
-      init_reduce(T *reduce_count) : reduce_count(reduce_count) { apply(device::get_default_stream()); }
+      init_reduce(T *reduce_count) :
+        TunableKernel1D(max_n_reduce()),
+        reduce_count(reduce_count)
+      { apply(device::get_default_stream()); }
 
       void apply(const qudaStream_t &stream)
       {
         auto tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        launch_device<init_count>(kernel_t(reinterpret_cast<const void *>(Kernel1D<init_count, init_arg<T>>), "Kernel1D"),
-                                  tp, stream, init_arg<T>(reduce_count));
+        launch_device<init_count>(tp, stream, init_arg<T>(reduce_count));
       }
     };
 
