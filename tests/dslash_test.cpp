@@ -73,7 +73,7 @@ int main(int argc, char **argv)
   int attempts = 1;
   dslash_test_wrapper.dslashRef();
   for (int i=0; i<attempts; i++) {
-    dslash_test_wrapper.run_test(2);
+    dslash_test_wrapper.run_test(niter);
     if (verify_results) {
       ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
       if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
