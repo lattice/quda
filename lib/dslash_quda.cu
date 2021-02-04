@@ -273,7 +273,6 @@ namespace quda {
 
 #ifdef GPU_CLOVER_DIRAC
   //Apply the clover matrix field to a colorspinor field
->>>>>>> origin/feature/generic_kernel
   //out(x) = clover*in
   void ApplyClover(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover, bool inverse, int parity)
   {
