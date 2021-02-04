@@ -67,7 +67,7 @@ CLI::TransformPairs<dslash_test_type> dtest_type_map {{"Dslash", dslash_test_typ
 
 void init()
 {
-  initQuda(device);
+  initQuda(device_ordinal);
 
   gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
@@ -77,7 +77,11 @@ void init()
   inv_param.dagger = dagger ? QUDA_DAG_YES : QUDA_DAG_NO;
 
   setDims(gauge_param.X);
-  dw_setDims(gauge_param.X, Nsrc); // so we can use 5-d indexing from dwf
+  dw_setDims(gauge_param.X, 1);
+  if (Nsrc != 1) {
+    warningQuda("Ignoring Nsrc = %d, setting to 1.", Nsrc);
+    Nsrc = 1;
+  }
   setSpinorSiteSize(staggeredSpinorSiteSize);
 
   // Allocate a lot of memory because I'm very confused
@@ -171,7 +175,7 @@ void init()
   csParam.nSpin = 1;
   csParam.nDim = 5;
   for (int d = 0; d < 4; d++) { csParam.x[d] = gauge_param.X[d]; }
-  csParam.x[4] = Nsrc; // number of sources becomes the fifth dimension
+  csParam.x[4] = 1;
 
   csParam.setPrecision(inv_param.cpu_prec);
   inv_param.solution_type = QUDA_MAT_SOLUTION;
@@ -273,19 +277,16 @@ struct DslashTime {
 DslashTime dslashCUDA(int niter) {
 
   DslashTime dslash_time;
-  timeval tstart, tstop;
 
-  cudaEvent_t start, end;
-  cudaEventCreate(&start);
-  cudaEventRecord(start, 0);
-  cudaEventSynchronize(start);
+  host_timer_t host_timer;
+  device_timer_t device_timer;
 
   comm_barrier();
-  cudaEventRecord(start, 0);
+  device_timer.start();
 
   for (int i = 0; i < niter; i++) {
 
-    gettimeofday(&tstart, NULL);
+    host_timer.start();
 
     switch (dtest_type) {
     case dslash_test_type::Dslash: dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity); break;
@@ -294,28 +295,18 @@ DslashTime dslashCUDA(int niter) {
     default: errorQuda("Test type %d not defined on staggered dslash.\n", static_cast<int>(dtest_type));
     }
 
-    gettimeofday(&tstop, NULL);
-    long ds = tstop.tv_sec - tstart.tv_sec;
-    long dus = tstop.tv_usec - tstart.tv_usec;
-    double elapsed = ds + 0.000001*dus;
+    host_timer.stop();
 
-    dslash_time.cpu_time += elapsed;
+    dslash_time.cpu_time += host_timer.last();
     // skip first and last iterations since they may skew these metrics if comms are not synchronous
     if (i>0 && i<niter) {
-      if (elapsed < dslash_time.cpu_min) dslash_time.cpu_min = elapsed;
-      if (elapsed > dslash_time.cpu_max) dslash_time.cpu_max = elapsed;
+      dslash_time.cpu_min = std::min(dslash_time.cpu_min, host_timer.last());
+      dslash_time.cpu_max = std::max(dslash_time.cpu_max, host_timer.last());
     }
   }
 
-  cudaEventCreate(&end);
-  cudaEventRecord(end, 0);
-  cudaEventSynchronize(end);
-  float runTime;
-  cudaEventElapsedTime(&runTime, start, end);
-  cudaEventDestroy(start);
-  cudaEventDestroy(end);
-
-  dslash_time.event_time = runTime / 1000;
+  device_timer.stop();
+  dslash_time.event_time = device_timer.last();
 
   return dslash_time;
 }
@@ -508,12 +499,7 @@ int main(int argc, char **argv)
   // If we're building fat/long links, there are some
   // tests we have to skip.
   if (dslash_type == QUDA_ASQTAD_DSLASH && compute_fatlong) {
-    if (prec == QUDA_HALF_PRECISION /* half */) {
-      errorQuda("Half precision unsupported in fat/long compute");
-    }
-  }
-  if (dslash_type == QUDA_LAPLACE_DSLASH && prec == QUDA_HALF_PRECISION) {
-    errorQuda("Half precision unsupported for Laplace operator.\n");
+    if (prec < QUDA_SINGLE_PRECISION /* half */) { errorQuda("Half precision unsupported in fat/long compute"); }
   }
 
   display_test_info();

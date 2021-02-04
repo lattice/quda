@@ -266,7 +266,7 @@ namespace quda
     int_fastdiv blocks_per_dir;
     int dim_map[4];
     int active_dims;
-    int pack_blocks; // total number of blocks used for packing in the dslash
+    unsigned int pack_blocks; // total number of blocks used for packing in the dslash
 
     // constructor needed for staggered to set xpay from derived class
     DslashArg(const ColorSpinorField &in, const GaugeField &U, int parity, bool dagger, bool xpay, int nFace,
@@ -434,7 +434,7 @@ namespace quda
       int x_cb = (blockIdx.x - dslash_block_offset) * blockDim.x + threadIdx.x;
       if (x_cb >= arg.threads) return;
 
-#ifdef QUDA_DSLASH_FAST_COMPILE
+#ifdef QUDA_FAST_COMPILE_DSLASH
       dslash(x_cb, s, parity);
 #else
       switch (parity) {

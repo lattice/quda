@@ -4,6 +4,7 @@
 #include <sys/time.h>
 
 #include "quda.h"
+#include "timer.h"
 #include "gauge_field.h"
 #include "host_utils.h"
 #include <command_line_params.h>
@@ -58,7 +59,7 @@ static int unitarize_link_test(int &test_rc)
 {
   QudaGaugeParam qudaGaugeParam = newQudaGaugeParam();
 
-  initQuda(device);
+  initQuda(device_ordinal);
 
   qudaGaugeParam.anisotropy = 1.0;
 

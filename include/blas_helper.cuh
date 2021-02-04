@@ -1,6 +1,7 @@
 #pragma once
 
 #include <color_spinor_field.h>
+#include <reduce_helper.h>
 
 //#define QUAD_SUM
 #ifdef QUAD_SUM
@@ -70,8 +71,8 @@ namespace quda
   template <> struct VectorType<short, 24> {
     using type = vector_type<short, 24>;
   };
-  template <> struct VectorType<char, 24> {
-    using type = vector_type<char, 24>;
+  template <> struct VectorType<int8_t, 24> {
+    using type = vector_type<int8_t, 24>;
   };
   template <> struct VectorType<double, 6> {
     using type = vector_type<double, 6>;
@@ -82,8 +83,8 @@ namespace quda
   template <> struct VectorType<short, 6> {
     using type = vector_type<short, 6>;
   };
-  template <> struct VectorType<char, 6> {
-    using type = vector_type<char, 6>;
+  template <> struct VectorType<int8_t, 6> {
+    using type = vector_type<int8_t, 6>;
   };
 
   namespace blas
@@ -149,18 +150,18 @@ namespace quda
     template <typename store_type_t> struct SpinorNorm<store_type_t, false> {
       using norm_t = float;
       SpinorNorm() {}
-      SpinorNorm(const ColorSpinorField &x) {}
-      SpinorNorm(const SpinorNorm &sn) {}
-      SpinorNorm &operator=(const SpinorNorm &src) { return *this; }
-      void set(const ColorSpinorField &x) {}
-      __device__ __host__ inline norm_t load_norm(const int i, const int parity = 0) const { return 1.0; }
+      SpinorNorm(const ColorSpinorField &) {}
+      SpinorNorm(const SpinorNorm &) {}
+      SpinorNorm &operator=(const SpinorNorm &) { return *this; }
+      void set(const ColorSpinorField &) {}
+      __device__ __host__ inline norm_t load_norm(const int, const int = 0) const { return 1.0; }
       template <typename real, int n>
-      __device__ __host__ inline norm_t store_norm(const vector_type<complex<real>, n> &v, int x, int parity)
+      __device__ __host__ inline norm_t store_norm(const vector_type<complex<real>, n> &, int, int)
       {
         return 1.0;
       }
-      void backup(char **norm_h, size_t norm_bytes) {}
-      void restore(char **norm_h, size_t norm_bytes) {}
+      void backup(char **, size_t) {}
+      void restore(char **, size_t) {}
       norm_t *Norm() { return nullptr; }
     };
 
@@ -288,11 +289,11 @@ namespace quda
     template <> constexpr int n_vector<short, true, 1, true>() { return 2; }
 
 #ifdef FLOAT8
-    template <> constexpr int n_vector<char, true, 4, true>() { return 8; }
+    template <> constexpr int n_vector<int8_t, true, 4, true>() { return 8; }
 #else
-    template <> constexpr int n_vector<char, true, 4, true>() { return 4; }
+    template <> constexpr int n_vector<int8_t, true, 4, true>() { return 4; }
 #endif
-    template <> constexpr int n_vector<char, true, 1, true>() { return 2; }
+    template <> constexpr int n_vector<int8_t, true, 1, true>() { return 2; }
 
     // Just use float-2/float-4 ordering on CPU when not site unrolling
     template <> constexpr int n_vector<double, false, 4, false>() { return 2; }
@@ -307,12 +308,13 @@ namespace quda
     template <> constexpr int n_vector<float, false, 1, true>() { return 6; }
     template <> constexpr int n_vector<short, false, 4, true>() { return 24; }
     template <> constexpr int n_vector<short, false, 1, true>() { return 6; }
-    template <> constexpr int n_vector<char, false, 4, true>() { return 24; }
-    template <> constexpr int n_vector<char, false, 1, true>() { return 6; }
+    template <> constexpr int n_vector<int8_t, false, 4, true>() { return 24; }
+    template <> constexpr int n_vector<int8_t, false, 1, true>() { return 6; }
 
     template <template <typename...> class Functor,
               template <template <typename...> class, typename store_t, typename y_store_t, int, typename> class Blas,
               typename T, typename store_t, typename y_store_t, typename V, typename... Args>
+#if defined(NSPIN1) || defined(NSPIN2) || defined(NSPIN4)
     constexpr void instantiate(const T &a, const T &b, const T &c, V &x, Args &&... args)
     {
       if (x.Nspin() == 4 || x.Nspin() == 2) {
@@ -330,6 +332,12 @@ namespace quda
 #endif
       }
     }
+#else
+    constexpr void instantiate(const T &, const T &, const T &, V &x, Args &&...)
+    {
+      errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+    }
+#endif
 
     // The instantiate helpers are used to instantiate the precision
     // and spin for the blas and reduce kernels
@@ -379,7 +387,7 @@ namespace quda
 #endif
       } else if (y.Precision() == QUDA_QUARTER_PRECISION) {
 #if QUDA_PRECISION & 1
-        instantiate<Functor, Blas, T, x_store_t, typename PromoteTypeId<x_store_t, char>::type>(a, b, c, x, y,
+        instantiate<Functor, Blas, T, x_store_t, typename PromoteTypeId<x_store_t, int8_t>::type>(a, b, c, x, y,
                                                                                                 args...);
 #else
         errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
@@ -417,7 +425,7 @@ namespace quda
 #endif
       } else if (x.Precision() == QUDA_QUARTER_PRECISION) {
 #if QUDA_PRECISION & 1
-        instantiate<Functor, Blas, mixed, T, char>(a, b, c, x, args...);
+        instantiate<Functor, Blas, mixed, T, int8_t>(a, b, c, x, args...);
 #else
         errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
 #endif
@@ -445,7 +453,7 @@ namespace quda
 #elif QUDA_PRECISION & 2
       using type = short;
 #elif QUDA_PRECISION & 1
-      using type = char;
+      using type = int8_t;
 #endif
     };
 
@@ -464,7 +472,7 @@ namespace quda
       using type = double;
 #endif
     };
-    template <> struct host_type_mapper<char> {
+    template <> struct host_type_mapper<int8_t> {
 #if QUDA_PRECISION & 4
       using type = float;
 #else

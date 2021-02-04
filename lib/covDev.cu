@@ -81,8 +81,8 @@ namespace quda
     long long bytes() const
     {
       int gauge_bytes = arg.reconstruct * in.Precision();
-      bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
-      int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed ? sizeof(float) : 0);
+      int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() +
+        (isFixed<typename Arg::Float>::value ? sizeof(float) : 0);
       int ghost_bytes = gauge_bytes + 3 * spinor_bytes; // 3 since we have to load the partial
       int dim = arg.mu % 4;
       long long bytes_ = 0;
@@ -144,22 +144,26 @@ namespace quda
       dslash::DslashPolicyTune<decltype(covDev)> policy(
         covDev, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
         in.GhostFaceCB(), profile);
-      policy.apply(0);
-
-      checkCudaError();
+      policy.apply(device::get_default_stream());
     }
   };
 
   // Apply the covariant derivative operator
   // out(x) = U_{\mu}(x)in(x+mu) for mu = 0...3
   // out(x) = U^\dagger_mu'(x-mu')in(x-mu') for mu = 4...7 and we set mu' = mu-4
+#ifdef GPU_COVDEV
   void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int mu, int parity,
                    bool dagger, const int *comm_override, TimeProfile &profile)
   {
-#ifdef GPU_COVDEV
+    pushKernelPackT(true); // non-spin projection requires kernel packing
     instantiate<CovDevApply>(out, in, U, mu, parity, dagger, comm_override, profile);
-#else
-    errorQuda("Covariant derivative kernels have not been built");
-#endif
+    popKernelPackT();
   }
+#else
+  void ApplyCovDev(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, int, int,
+                   bool, const int *, TimeProfile &)
+  {
+    errorQuda("Covariant derivative kernels have not been built");
+  }
+#endif
 } // namespace quda

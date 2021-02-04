@@ -2,16 +2,14 @@
 #include <stdlib.h>
 #include <iostream>
 
-#include <quda_internal.h>
 #include <gauge_field.h>
-#include <util_quda.h>
-
 #include <host_utils.h>
 #include <command_line_params.h>
 #include <dslash_reference.h>
 
 #include <color_spinor_field.h>
 #include <blas_quda.h>
+#include <timer.h>
 
 using namespace quda;
 
@@ -73,7 +71,7 @@ void init() {
 
   spinor->Source(QUDA_RANDOM_SOURCE);
 
-  initQuda(device);
+  initQuda(device_ordinal);
 
   setVerbosityQuda(QUDA_VERBOSE, "", stdout);
 
@@ -96,7 +94,9 @@ void end() {
   endQuda();
 }
 
-void packTest() {
+void packTest()
+{
+  host_timer_t host_timer;
 
   printfQuda("Sending fields to GPU...\n");
 
@@ -112,15 +112,15 @@ void packTest() {
     cpsParam.pad = param.ga_pad;
     cudaGaugeField cudaCpsGauge(cpsParam);
 
-    stopwatchStart();
+    host_timer.start();
     cudaCpsGauge.loadCPUField(cpsCpuGauge);
-    double cpsGtime = stopwatchReadSeconds();
-    printfQuda("CPS Gauge send time = %e seconds\n", cpsGtime);
+    host_timer.stop();
+    printfQuda("CPS Gauge send time = %e seconds\n", host_timer.last());
 
-    stopwatchStart();
+    host_timer.start();
     cudaCpsGauge.saveCPUField(cpsCpuGauge);
-    double cpsGRtime = stopwatchReadSeconds();
-    printfQuda("CPS Gauge restore time = %e seconds\n", cpsGRtime);
+    host_timer.stop();
+    printfQuda("CPS Gauge restore time = %e seconds\n", host_timer.last());
   }
 #endif
 
@@ -136,28 +136,27 @@ void packTest() {
     qdpParam.pad = param.ga_pad;
     cudaGaugeField cudaQdpGauge(qdpParam);
 
-    stopwatchStart();
+    host_timer.start();
     cudaQdpGauge.loadCPUField(qdpCpuGauge);
-    double qdpGtime = stopwatchReadSeconds();
-    printfQuda("QDP Gauge send time = %e seconds\n", qdpGtime);
+    host_timer.stop();
+    printfQuda("QDP Gauge send time = %e seconds\n", host_timer.last());
 
-    stopwatchStart();
+    host_timer.start();
     cudaQdpGauge.saveCPUField(qdpCpuGauge);
-    double qdpGRtime = stopwatchReadSeconds();
-    printfQuda("QDP Gauge restore time = %e seconds\n", qdpGRtime);
+    host_timer.stop();
+    printfQuda("QDP Gauge restore time = %e seconds\n", host_timer.last());
   }
 #endif
 
-  stopwatchStart();
-
+  host_timer.start();
   *cudaSpinor = *spinor;
-  double sSendTime = stopwatchReadSeconds();
-  printfQuda("Spinor send time = %e seconds\n", sSendTime);
+  host_timer.stop();
+  printfQuda("Spinor send time = %e seconds\n", host_timer.last());
 
-  stopwatchStart();
+  host_timer.start();
   *spinor2 = *cudaSpinor;
-  double sRecTime = stopwatchReadSeconds();
-  printfQuda("Spinor receive time = %e seconds\n", sRecTime);
+  host_timer.stop();
+  printfQuda("Spinor receive time = %e seconds\n", host_timer.last());
 
   double spinor_norm = blas::norm2(*spinor);
   double cuda_spinor_norm = blas::norm2(*cudaSpinor);

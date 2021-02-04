@@ -196,7 +196,7 @@ int main(int argc, char **argv)
   display_test_info();
 
   // Initialize the QUDA library
-  initQuda(device);
+  initQuda(device_ordinal);
 
   // set parameters for the reference Dslash, and prepare fields to be loaded
   if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
@@ -253,14 +253,12 @@ int main(int argc, char **argv)
 
   // Vector construct START
   //-----------------------------------------------------------------------------------
-  quda::ColorSpinorField *in;
-  quda::ColorSpinorField *out;
-  quda::ColorSpinorField *check;
   quda::ColorSpinorParam cs_param;
   constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
-  in = quda::ColorSpinorField::Create(cs_param);
-  out = quda::ColorSpinorField::Create(cs_param);
-  check = quda::ColorSpinorField::Create(cs_param);
+  auto in = quda::ColorSpinorField::Create(cs_param);
+  auto out = quda::ColorSpinorField::Create(cs_param);
+  auto check = quda::ColorSpinorField::Create(cs_param);
+
   // Host array for solutions
   void **outMulti = (void **)malloc(multishift * sizeof(void *));
   // QUDA host array for internal checks and malloc
@@ -289,15 +287,16 @@ int main(int argc, char **argv)
     }
   }
 
-  double *time = new double[Nsrc];
-  double *gflops = new double[Nsrc];
-  auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
-  rng->Init();
+  std::vector<double> time(Nsrc);
+  std::vector<double> gflops(Nsrc);
+  std::vector<int> iter(Nsrc);
+
+  auto *rng = new quda::RNG(*check, 1234);
 
   for (int i = 0; i < Nsrc; i++) {
 
     // Populate the host spinor with random numbers.
-    constructRandomSpinorSource(in->V(), 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
+    constructRandomSpinorSource(in->V(), 4, 3, inv_param.cpu_prec, inv_param.solution_type, gauge_param.X, *rng);
     // If deflating, preserve the deflation space between solves
     if (inv_deflate) eig_param.preserve_deflation = i < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     // Perform QUDA inversions
@@ -309,22 +308,20 @@ int main(int argc, char **argv)
 
     time[i] = inv_param.secs;
     gflops[i] = inv_param.gflops / inv_param.secs;
+    iter[i] = inv_param.iter;
     printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
                inv_param.gflops / inv_param.secs);
   }
   // QUDA invert test COMPLETE
   //----------------------------------------------------------------------------
 
-  rng->Release();
   delete rng;
 
   // free the multigrid solver
   if (inv_multigrid) destroyMultigridQuda(mg_preconditioner);
 
   // Compute performance statistics
-  if (Nsrc > 1) performanceStats(time, gflops);
-  delete[] time;
-  delete[] gflops;
+  if (Nsrc > 1) performanceStats(time, gflops, iter);
 
   // Perform host side verification of inversion if requested
   if (verify_results) {

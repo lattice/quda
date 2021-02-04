@@ -84,10 +84,11 @@ namespace quda
     size_t Dim() const { return prop_dim; };
     QudaFieldLocation Location() const { return prop_location; };
     QudaPrecision Precision() const { return prop_precision; };
-    std::vector<ColorSpinorField *> Vectors() const {
+    ColorSpinorField* Vectors(int i) const {
       if (!prop_init) errorQuda("Propgator not initialised");
       if (prop_vectors.size() == 0) errorQuda("Zero sized vector set in Propagator");
-      return prop_vectors;
+      if (i >= (int)prop_vectors.size()) errorQuda("Requesting vector %d from set of size %d in Propagator", i, (int)prop_vectors.size());
+      return prop_vectors[i];
     }    
     
     /**

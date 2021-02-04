@@ -2,6 +2,7 @@
 
 #include <quda.h>
 #include <quda_internal.h>
+#include <timer.h>
 #include <dirac_quda.h>
 #include <color_spinor_field.h>
 #include <qio_field.h>
@@ -1186,7 +1187,7 @@ public:
     dirac(dirac),
     prefix(prefix)
   {
-    }
+  }
 
     virtual ~PreconditionedSolver() { delete solver; }
 
@@ -1198,9 +1199,17 @@ public:
       ColorSpinorField *out=nullptr;
       ColorSpinorField *in=nullptr;
 
-      dirac.prepare(in, out, x, b, solution_type);
+      if (dirac.hasSpecialMG()) {
+        dirac.prepareSpecialMG(in, out, x, b, solution_type);
+      } else {
+        dirac.prepare(in, out, x, b, solution_type);
+      }
       (*solver)(*out, *in);
-      dirac.reconstruct(x, b, solution_type);
+      if (dirac.hasSpecialMG()) {
+        dirac.reconstructSpecialMG(x, b, solution_type);
+      } else {
+        dirac.reconstruct(x, b, solution_type);
+      }
 
       popOutputPrefix();
     }

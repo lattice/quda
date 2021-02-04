@@ -83,9 +83,9 @@ int comm_rank(void)
 }
 
 
-int comm_size(void)
+size_t comm_size(void)
 {
-  return size;
+  return static_cast<size_t>(size);
 }
 
 

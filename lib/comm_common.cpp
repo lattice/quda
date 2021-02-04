@@ -11,7 +11,7 @@
 namespace backward {
   static backward::SignalHandling sh;
 } // namespace backward
-#endif 
+#endif
 
 struct Topology_s {
   int ndim;
@@ -233,9 +233,6 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
 
     // first check that the local GPU supports UVA
     const int gpuid = comm_gpuid();
-    cudaDeviceProp prop;
-    cudaGetDeviceProperties(&prop, gpuid);
-    if(!prop.unifiedAddressing) return;
 
     comm_set_neighbor_ranks();
 
@@ -247,43 +244,37 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
     for(int dir=0; dir<2; ++dir){ // forward/backward directions
       for(int dim=0; dim<4; ++dim){
 	int neighbor_rank = comm_neighbor_rank(dir,dim);
-	if(neighbor_rank == comm_rank()) continue;
+	if (neighbor_rank == comm_rank()) continue;
 
-	// disable peer-to-peer comms in one direction
+        if ((unsigned)neighbor_rank >= comm_size()) errorQuda("neighbor rank %d > number of ranks %lu", neighbor_rank, comm_size());
+
+        // disable peer-to-peer comms in one direction
 	if ( ((comm_rank() > neighbor_rank && dir == 0) || (comm_rank() < neighbor_rank && dir == 1)) &&
 	     disable_peer_to_peer_bidir && comm_dim(dim) == 2 ) continue;
 
 	// if the neighbors are on the same
 	if (!strncmp(hostname, &hostname_recv_buf[128*neighbor_rank], 128)) {
 	  int neighbor_gpuid = gpuid_recv_buf[neighbor_rank];
-	  int canAccessPeer[2];
-	  cudaDeviceCanAccessPeer(&canAccessPeer[0], gpuid, neighbor_gpuid);
-	  cudaDeviceCanAccessPeer(&canAccessPeer[1], neighbor_gpuid, gpuid);
 
-	  int accessRank[2] = { };
-	  if (canAccessPeer[0]*canAccessPeer[1] != 0) {
-	    cudaDeviceGetP2PAttribute(&accessRank[0], cudaDevP2PAttrPerformanceRank, gpuid, neighbor_gpuid);
-	    cudaDeviceGetP2PAttribute(&accessRank[1], cudaDevP2PAttrPerformanceRank, neighbor_gpuid, gpuid);
-	  }
+          bool can_access_peer = comm_peer2peer_possible(gpuid, neighbor_gpuid);
+          int access_rank = comm_peer2peer_performance(gpuid, neighbor_gpuid);
 
-	  // enable P2P if we can access the peer or if peer is self
-          if ((canAccessPeer[0] * canAccessPeer[1] != 0 && accessRank[0] <= enable_p2p_max_access_rank
-               && accessRank[1] <= enable_p2p_max_access_rank)
-              || gpuid == neighbor_gpuid) {
+	  // enable P2P if we can access the peer
+          if ((can_access_peer && access_rank <= enable_p2p_max_access_rank) || gpuid == neighbor_gpuid) {
             peer2peer_enabled[dir][dim] = true;
             if (getVerbosity() > QUDA_SILENT) {
               printf("Peer-to-peer enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d, access rank "
-                     "= (%d, %d)\n",
-                     comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim, accessRank[0], accessRank[1]);
+                     "= %d\n",
+                     comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim, access_rank);
             }
           } else {
             intranode_enabled[dir][dim] = true;
             if (getVerbosity() > QUDA_SILENT) {
-	      printf("Intra-node (non peer-to-peer) enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d\n",
-		     comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
-	    }
+              printf(
+                "Intra-node (non peer-to-peer) enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d\n",
+                comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
+            }
           }
-
         } // on the same node
       } // different dimensions - x, y, z, t
     } // different directions - forward/backward
@@ -296,9 +287,6 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
   comm_barrier();
 
   peer2peer_present = comm_peer2peer_enabled_global();
-
-  checkCudaErrorNoSync();
-  return;
 }
 
 bool comm_peer2peer_present() { return peer2peer_present; }
@@ -382,13 +370,12 @@ int comm_rank_displaced(const Topology *topo, const int displacement[])
   int coords[QUDA_MAX_DIM];
 
   for (int i = 0; i < QUDA_MAX_DIM; i++) {
-    coords[i] = (i < topo->ndim) ? 
+    coords[i] = (i < topo->ndim) ?
       mod(comm_coords(topo)[i] + displacement[i], comm_dims(topo)[i]) : 0;
   }
 
   return comm_rank_from_coords(topo, coords);
 }
-
 
 // FIXME: The following routines rely on a "default" topology.
 // They should probably be reworked or eliminated eventually.
@@ -414,16 +401,13 @@ static int neighbor_rank[2][4] = { {-1,-1,-1,-1},
 
 static bool neighbors_cached = false;
 
-void comm_set_neighbor_ranks(Topology *topo){
-
+void comm_set_neighbor_ranks(Topology *topo)
+{
   if(neighbors_cached) return;
 
   Topology *topology = topo ? topo : default_topo; // use default topology if topo is NULL
-  if(!topology){
-    errorQuda("Topology not specified");
-    return;
-  }
-     
+  if (!topology) errorQuda("Topology not specified");
+
   for(int d=0; d<4; ++d){
     int pos_displacement[QUDA_MAX_DIM] = { };
     int neg_displacement[QUDA_MAX_DIM] = { };
@@ -433,7 +417,6 @@ void comm_set_neighbor_ranks(Topology *topo){
     neighbor_rank[1][d] = comm_rank_displaced(topology, pos_displacement);
   }
   neighbors_cached = true;
-  return;
 }
 
 int comm_neighbor_rank(int dir, int dim){
@@ -457,58 +440,13 @@ int comm_coord(int dim)
   return comm_coords(topo)[dim];
 }
 
-inline bool isHost(const void *buffer)
-{
-  CUmemorytype memType;
-  void *attrdata[] = {(void *)&memType};
-  CUpointer_attribute attributes[2] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE};
-  CUresult err = cuPointerGetAttributes(1, attributes, attrdata, (CUdeviceptr)buffer);
-  if (err != CUDA_SUCCESS) {
-    const char *str;
-    cuGetErrorName(err, &str);
-    errorQuda("cuPointerGetAttributes returned error %s", str);
-  }
-
-  switch (memType) {
-  case CU_MEMORYTYPE_DEVICE: return false;
-  case CU_MEMORYTYPE_ARRAY: errorQuda("Using array memory for communications buffer is not supported");
-  case CU_MEMORYTYPE_UNIFIED: errorQuda("Using unified memory for communications buffer is not supported");
-  case CU_MEMORYTYPE_HOST:
-  default: // memory not allocated by CUDA allocaters will default to being host memory
-    return true;
-  }
-}
-
 /**
  * Send to the "dir" direction in the "dim" dimension
  */
 MsgHandle *comm_declare_send_relative_(const char *func, const char *file, int line,
 				       void *buffer, int dim, int dir, size_t nbytes)
 {
-#ifdef HOST_DEBUG
-  checkCudaError(); // check and clear error state first
-
-  if (isHost(buffer)) {
-    // test this memory allocation is ok by doing a memcpy from it
-    void *tmp = safe_malloc(nbytes);
-    try {
-      std::copy(static_cast<char*>(buffer), static_cast<char*>(buffer)+nbytes, static_cast<char*>(tmp));
-    } catch(std::exception &e) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir, nbytes);
-      errorQuda("aborting");
-    }
-    host_free(tmp);
-  } else {
-    // test this memory allocation is ok by doing a memcpy from it
-    void *tmp = device_malloc(nbytes);
-    cudaError_t err = cudaMemcpy(tmp, buffer, nbytes, cudaMemcpyDeviceToDevice);
-    if (err != cudaSuccess) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir, nbytes);
-      errorQuda("aborting with error %s", cudaGetErrorString(err));
-    }
-    device_free(tmp);
-  }
-#endif
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%s called (%s:%d in %s())\n", __func__, file, line, func);
 
   int disp[QUDA_MAX_DIM] = {0};
   disp[dim] = dir;
@@ -522,26 +460,7 @@ MsgHandle *comm_declare_send_relative_(const char *func, const char *file, int l
 MsgHandle *comm_declare_receive_relative_(const char *func, const char *file, int line,
 					  void *buffer, int dim, int dir, size_t nbytes)
 {
-#ifdef HOST_DEBUG
-  checkCudaError(); // check and clear error state first
-
-  if (isHost(buffer)) {
-    // test this memory allocation is ok by filling it
-    try {
-      std::fill(static_cast<char*>(buffer), static_cast<char*>(buffer)+nbytes, 0);
-    } catch(std::exception &e) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir, nbytes);
-      errorQuda("aborting");
-    }
-  } else {
-    // test this memory allocation is ok by doing a memset
-    cudaError_t err = cudaMemset(buffer, 0, nbytes);
-    if (err != cudaSuccess) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir, nbytes);
-      errorQuda("aborting with error %s", cudaGetErrorString(err));
-    }
-  }
-#endif
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%s called (%s:%d in %s())\n", __func__, file, line, func);
 
   int disp[QUDA_MAX_DIM] = {0};
   disp[dim] = dir;
@@ -555,33 +474,7 @@ MsgHandle *comm_declare_receive_relative_(const char *func, const char *file, in
 MsgHandle *comm_declare_strided_send_relative_(const char *func, const char *file, int line,
 					       void *buffer, int dim, int dir, size_t blksize, int nblocks, size_t stride)
 {
-#ifdef HOST_DEBUG
-  checkCudaError(); // check and clear error state first
-
-  if (isHost(buffer)) {
-    // test this memory allocation is ok by doing a memcpy from it
-    void *tmp = safe_malloc(blksize*nblocks);
-    try {
-      for (int i=0; i<nblocks; i++)
-	std::copy(static_cast<char*>(buffer)+i*stride, static_cast<char*>(buffer)+i*stride+blksize, static_cast<char*>(tmp));
-    } catch(std::exception &e) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n",
-		 file, line, func, dim, dir, blksize, nblocks, stride);
-      errorQuda("aborting");
-    }
-    host_free(tmp);
-  } else {
-    // test this memory allocation is ok by doing a memcpy from it
-    void *tmp = device_malloc(blksize*nblocks);
-    cudaError_t err = cudaMemcpy2D(tmp, blksize, buffer, stride, blksize, nblocks, cudaMemcpyDeviceToDevice);
-    if (err != cudaSuccess) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n",
-		 file, line, func, dim, dir, blksize, nblocks, stride);
-      errorQuda("aborting with error %s", cudaGetErrorString(err));
-    }
-    device_free(tmp);
-  }
-#endif
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%s called (%s:%d in %s())\n", __func__, file, line, func);
 
   int disp[QUDA_MAX_DIM] = {0};
   disp[dim] = dir;
@@ -596,29 +489,7 @@ MsgHandle *comm_declare_strided_send_relative_(const char *func, const char *fil
 MsgHandle *comm_declare_strided_receive_relative_(const char *func, const char *file, int line,
 						  void *buffer, int dim, int dir, size_t blksize, int nblocks, size_t stride)
 {
-#ifdef HOST_DEBUG
-  checkCudaError(); // check and clear error state first
-
-  if (isHost(buffer)) {
-    // test this memory allocation is ok by filling it
-    try {
-      for (int i=0; i<nblocks; i++)
-	std::fill(static_cast<char*>(buffer)+i*stride, static_cast<char*>(buffer)+i*stride+blksize, 0);
-    } catch(std::exception &e) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n",
-		 file, line, func, dim, dir, blksize, nblocks, stride);
-      errorQuda("aborting");
-    }
-  } else {
-    // test this memory allocation is ok by doing a memset
-    cudaError_t err = cudaMemset2D(buffer, stride, 0, blksize, nblocks);
-    if (err != cudaSuccess) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n",
-		 file, line, func, dim, dir, blksize, nblocks, stride);
-      errorQuda("aborting with error %s", cudaGetErrorString(err));
-    }
-  }
-#endif
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%s called (%s:%d in %s())\n", __func__, file, line, func);
 
   int disp[QUDA_MAX_DIM] = {0};
   disp[dim] = dir;
@@ -639,17 +510,24 @@ static char partition_override_string[16]; /** string that contains any overridd
 
 static int manual_set_partition[QUDA_MAX_DIM] = {0};
 
-void comm_dim_partitioned_set(int dim)
-{ 
 #ifdef MULTI_GPU
+void comm_dim_partitioned_set(int dim)
+{
   manual_set_partition[dim] = 1;
-#endif
 
   snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0),
            comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3));
 }
+#else
+void comm_dim_partitioned_set(int)
+{
+  snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0),
+           comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3));
+}
+#endif
 
-void comm_dim_partitioned_reset(){
+void comm_dim_partitioned_reset()
+{
   for (int i = 0; i < QUDA_MAX_DIM; i++) manual_set_partition[i] = 0;
 
   snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0),
@@ -696,13 +574,10 @@ bool comm_gdr_blacklist() {
     if (blacklist_env) { // set the policies to tune for explicitly
       std::stringstream blacklist_list(blacklist_env);
 
-      int device_count;
-      cudaGetDeviceCount(&device_count);
-
       int excluded_device;
       while (blacklist_list >> excluded_device) {
 	// check this is a valid device
-	if ( excluded_device < 0 || excluded_device >= device_count ) {
+	if ( excluded_device < 0 || excluded_device >= quda::device::get_device_count() ) {
 	  errorQuda("Cannot blacklist invalid GPU device ordinal %d", excluded_device);
 	}
 
@@ -735,9 +610,8 @@ void comm_init_common(int ndim, const int *dims, QudaCommsMap rank_from_coords, 
     if (!strncmp(comm_hostname(), &hostname_recv_buf[128 * i], 128)) { gpuid++; }
   }
 
-  int device_count;
-  cudaGetDeviceCount(&device_count);
-  if (device_count == 0) { errorQuda("No CUDA devices found"); }
+  int device_count = quda::device::get_device_count();
+  if (device_count == 0) { errorQuda("No devices found"); }
   if (gpuid >= device_count) {
     char *enable_mps_env = getenv("QUDA_ENABLE_MPS");
     if (enable_mps_env && strcmp(enable_mps_env, "1") == 0) {
@@ -768,8 +642,6 @@ void comm_init_common(int ndim, const int *dims, QudaCommsMap rank_from_coords, 
       std::stringstream device_list;                       // formatted (no commas)
 
       int device;
-      int deviceCount;
-      cudaGetDeviceCount(&deviceCount);
       while (device_list_raw >> device) {
         // check this is a valid policy choice
         if (device < 0) { errorQuda("Invalid CUDA_VISIBLE_DEVICE ordinal %d", device); }
@@ -860,9 +732,9 @@ void comm_abort(int status)
   raise(SIGABRT);
 #endif
 #ifdef QUDA_BACKWARDSCPP
-  backward::StackTrace st; 
+  backward::StackTrace st;
   st.load_here(32);
-  backward::Printer p; 
+  backward::Printer p;
   p.print(st, getOutputFile());
 #endif
   comm_abort_(status);

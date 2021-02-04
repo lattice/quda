@@ -39,12 +39,9 @@ namespace quda {
     
     // Allocate memory on host or device.
     size_t prop_size_bytes = prop_dim * prop_dim * volume * 2 * prop_precision;
-    printfQuda("prop_size_bytes = %lu\n", prop_size_bytes); 
     prop_data = (prop_location == QUDA_CPU_FIELD_LOCATION ?
 		 (void *)malloc(prop_size_bytes) : (void *)device_malloc(prop_size_bytes));
 
-    printfQuda("Creating prop on the %s\n", prop_location == QUDA_CPU_FIELD_LOCATION ? "host" : "device");
-    
     param.create = QUDA_REFERENCE_FIELD_CREATE;
     prop_vectors.reserve(prop_dim);
     for (size_t i = 0; i < prop_dim; i++) {
@@ -84,10 +81,6 @@ namespace quda {
     prop_precision = param.Precision();
 
     // Use host memory provided
-    size_t prop_size_bytes = prop_dim * prop_dim * volume * 2 * prop_precision;
-    printfQuda("prop_size_bytes = %lu\n", prop_size_bytes); 
-    printfQuda("Creating prop on the host\n");
- 
     prop_vectors.reserve(prop_dim);
     for (size_t i = 0; i < prop_dim; i++) {
       param.v = host_data[i];
@@ -105,7 +98,7 @@ namespace quda {
     
     // Copy vectors from input
     for (size_t i = 0; i < prop_dim; i++) {
-      *prop_vectors[i] = *src.Vectors()[i];
+      *prop_vectors[i] = *src.Vectors(i);
     }
     
     // Update Propagator attributes

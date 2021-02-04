@@ -141,7 +141,7 @@ int main(int argc, char **argv)
   initComms(argc, argv, gridsize_from_cmdline);
 
   // Initialize the QUDA library
-  initQuda(device);
+  initQuda(device_ordinal);
 
   // Set verbosity
   setVerbosity(verbosity);
@@ -384,11 +384,12 @@ int main(int argc, char **argv)
 
   // QUDA propagator test BEGIN
   //-----------------------------------------------------------------------------------
-  auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
-  rng->Init();
+  auto *rng = new quda::RNG(*check, 1234);
 
-  double *time = new double[12];
-  double *gflops = new double[12];
+  int n_vecs = prop_n_sources * spinor_dim;
+  std::vector<double> time(n_vecs);
+  std::vector<double> gflops(n_vecs);
+  std::vector<int> iter(n_vecs);
 
   // Loop over the number of sources to use.
   for (int n = 0; n < prop_n_sources; n++) {
@@ -454,6 +455,7 @@ int main(int argc, char **argv)
       // Performance states
       time[i] = inv_param.secs;
       gflops[i] = inv_param.gflops / inv_param.secs;
+      iter[i] = inv_param.iter;
       printfQuda("Prop %d done: %d iter / %g secs = %g Gflops\n\n", i, inv_param.iter, inv_param.secs,
                  inv_param.gflops / inv_param.secs);
 
@@ -461,7 +463,7 @@ int main(int argc, char **argv)
           || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
         // If using a DWF type, we construct the 4D prop
         printfQuda("Constructing 4D prop from DWF prop\n");
-        make4DQuarkProp(qudaSink4D[i]->V(), out->V(), &inv_param, &inv_param4D, gauge_param.X);
+        make4DChiralProp(qudaSink4D[i]->V(), out->V(), &inv_param, &inv_param4D, gauge_param.X);
       } else {
         // Just copy the solution in to the propagator array
         memcpy(qudaSink4D[i]->V(), out->V(), vol_bytes);
@@ -483,7 +485,7 @@ int main(int argc, char **argv)
     
     // Zero out the result array
     memset(correlation_function_sum, 0, Nmom*corr_size_in_bytes);
-    contractFTQuda(prop_array_ptr, prop_array_ptr, &correlation_function_sum, contract_type, &inv_param,
+    contractFTQuda(prop_array_ptr, prop_array_ptr, &correlation_function_sum, contract_type,
 		   (void *)(&cs_param4D), gauge_param.X, source, Mom);
     
     for (int px=0; px <= Mom[0]; px++) {
@@ -508,8 +510,8 @@ int main(int argc, char **argv)
     }
     
     // Compute performance statistics for this propagator
-    Nsrc = 12;
-    performanceStats(time, gflops);
+    Nsrc = n_vecs;
+    performanceStats(time, gflops, iter);
 
     if (strcmp(prop_sink_outfile[n], "") != 0) {
       // Save the propagator if requested
@@ -539,11 +541,7 @@ int main(int argc, char **argv)
   if (inv_multigrid) destroyMultigridQuda(mg_preconditioner);
 
   // Clean up memory allocations
-  rng->Release();
   delete rng;
-
-  delete[] time;
-  delete[] gflops;
 
   delete in;
   delete out;

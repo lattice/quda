@@ -182,9 +182,9 @@ void invert_and_contract(void **source_array_ptr, void **prop_array_ptr_1, void 
     // *)cs_param_ptr, gauge_param.X);
 
     memset(correlation_function_sum, 0, corr_param.corr_size_in_bytes); // zero out the result array
-    contractFTQuda(prop_array_ptr_1, prop_array_ptr_2, &correlation_function_sum, contract_type, &inv_param,
+    contractFTQuda(prop_array_ptr_1, prop_array_ptr_2, &correlation_function_sum, contract_type,
                    (void *)&cs_param, gauge_param.X, source, momentum.begin());
-
+    
     // Print and save correlators for this source
     print_correlators(correlation_function_sum, corr_param, n);
     save_correlators_to_file(correlation_function_sum, corr_param, n);
@@ -230,7 +230,7 @@ int main(int argc, char **argv)
     }
   }
 
-  initQuda(device);
+  initQuda(device_ordinal);
 
   // Gauge Parameters
   QudaGaugeParam gauge_param = newQudaGaugeParam(); // create an instance of a class that can hold parameters

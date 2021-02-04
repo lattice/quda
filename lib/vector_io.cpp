@@ -14,12 +14,13 @@ namespace quda
     filename(filename)
 #endif
   {
-    if (strcmp(filename.c_str(), "") == 0) { errorQuda("No eigenspace input file defined."); }
+    if (strcmp(filename.c_str(), "") == 0)
+      errorQuda("No eigenspace input file defined (filename = %s, parity_inflate = %d", filename.c_str(), parity_inflate);
   }
 
+#ifdef HAVE_QIO
   void VectorIO::load(std::vector<ColorSpinorField *> &vecs)
   {
-#ifdef HAVE_QIO
     const int Nvec = vecs.size();
     auto spinor_parity = vecs[0]->SuggestedParity();
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Start loading %04d vectors from %s\n", Nvec, filename.c_str());
@@ -111,10 +112,10 @@ namespace quda
     }
 
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Done loading vectors\n");
-#else
-    errorQuda("\nQIO library was not built.\n");
-#endif
   }
+#else
+  void VectorIO::load(std::vector<ColorSpinorField *> &) { errorQuda("\nQIO library was not built.\n"); }
+#endif
 
   void VectorIO::loadProp(std::vector<ColorSpinorField *> &vecs)
   {
@@ -216,9 +217,9 @@ namespace quda
 #endif
   }
 
+#ifdef HAVE_QIO
   void VectorIO::save(const std::vector<ColorSpinorField *> &vecs)
   {
-#ifdef HAVE_QIO
     const int Nvec = vecs.size();
     std::vector<ColorSpinorField *> tmp;
     tmp.reserve(Nvec);
@@ -307,10 +308,10 @@ namespace quda
         || (vecs[0]->Location() == QUDA_CPU_FIELD_LOCATION && vecs[0]->SiteSubset() == QUDA_PARITY_SITE_SUBSET)) {
       for (int i = 0; i < Nvec; i++) delete tmp[i];
     }
-#else
-    errorQuda("\nQIO library was not built.\n");
-#endif
   }
+#else
+  void VectorIO::save(const std::vector<ColorSpinorField *> &) { errorQuda("\nQIO library was not built.\n"); }
+#endif
 
   void VectorIO::saveProp(const std::vector<ColorSpinorField *> &vecs)
   {

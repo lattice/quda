@@ -346,7 +346,7 @@ extern "C" {
     int n_ev;
     /** EeigCG  : Search space dimension
      *  gmresdr : Krylov subspace dimension
-    */
+     */
     int max_search_dim;
     /** For systems with many RHS: current RHS index */
     int rhs_idx;
@@ -438,6 +438,9 @@ extern "C" {
     QudaBoolean use_dagger;
     QudaBoolean use_norm_op;
 
+    /** Use Eigen routines to eigensolve the upper Hessenberg via QR **/
+    QudaBoolean use_eigen_qr;
+
     /** Performs an MdagM solve, then constructs the left and right SVD. **/
     QudaBoolean compute_svd;
 
@@ -459,6 +462,8 @@ extern "C" {
     int n_ev_deflate;
     /** Tolerance on the least well known eigenvalue's residual **/
     double tol;
+    /** Tolerance on the QR iteration **/
+    double qr_tol;
     /** For IRLM/IRAM, check every nth restart **/
     int check_interval;
     /** For IRLM/IRAM, quit after n restarts **/
@@ -701,8 +706,11 @@ extern "C" {
     /** Multiplicative factor for the mu parameter */
     double mu_factor[QUDA_MAX_MG_LEVEL];
 
-    /** Boolean for if this is a staggered solve or not */
-    QudaBoolean is_staggered;
+    /** Boolean for aggregation type, implies staggered or not */
+    QudaTransferType transfer_type[QUDA_MAX_MG_LEVEL];
+
+    /** Whether to use tensor cores (if available) */
+    QudaBoolean use_mma;
 
     /** Whether to do a full (false) or thin (true) update in the context of updateMultigridQuda */
     QudaBoolean thin_update_only;
@@ -730,6 +738,32 @@ extern "C" {
     QudaCorrelatorFlavors corr_flavors;
   } QudaCorrelatorParam;
 
+  typedef struct QudaBLASParam_s {
+
+    QudaBLASOperation trans_a; /**< operation op(A) that is non- or (conj.) transpose. */
+    QudaBLASOperation trans_b; /**< operation op(B) that is non- or (conj.) transpose. */
+    int m;                     /**< number of rows of matrix op(A) and C. */
+    int n;                     /**< number of columns of matrix op(B) and C. */
+    int k;                     /**< number of columns of op(A) and rows of op(B). */
+    int lda;                   /**< leading dimension of two-dimensional array used to store the matrix A. */
+    int ldb;                   /**< leading dimension of two-dimensional array used to store matrix B. */
+    int ldc;                   /**< leading dimension of two-dimensional array used to store matrix C. */
+    int a_offset;              /**< position of the A array from which begin read/write. */
+    int b_offset;              /**< position of the B array from which begin read/write. */
+    int c_offset;              /**< position of the C array from which begin read/write. */
+    int a_stride;              /**< stride of the A array in strided(batched) mode */
+    int b_stride;              /**< stride of the B array in strided(batched) mode */
+    int c_stride;              /**< stride of the C array in strided(batched) mode */
+
+    double_complex alpha; /**< scalar used for multiplication. */
+    double_complex beta;  /**< scalar used for multiplication. If beta==0, C does not have to be a valid input. */
+
+    int batch_count; /**< number of pointers contained in arrayA, arrayB and arrayC. */
+
+    QudaBLASDataType data_type;   /**< Specifies if using S(C) or D(Z) BLAS type */
+    QudaBLASDataOrder data_order; /**< Specifies if using Row or Column major */
+
+  } QudaBLASParam;
 
   /*
    * Interface functions, found in interface_quda.cpp
@@ -899,6 +933,15 @@ extern "C" {
   QudaGaugeObservableParam newQudaGaugeObservableParam(void);
 
   /**
+   * A new QudaBLASParam should always be initialized immediately
+   * after it's defined (and prior to explicitly setting its members)
+   * using this function.  Typical usage is as follows:
+   *
+   *   QudaBLASParam blas_param = newQudaBLASParam();
+   */
+  QudaBLASParam newQudaBLASParam(void);
+
+  /**
    * Print the members of QudaGaugeParam.
    * @param param The QudaGaugeParam whose elements we are to print.
    */
@@ -927,6 +970,12 @@ extern "C" {
    * @param param The QudaGaugeObservableParam whose elements we are to print.
    */
   void printQudaGaugeObservableParam(QudaGaugeObservableParam *param);
+
+  /**
+   * Print the members of QudaBLASParam.
+   * @param param The QudaBLASParam whose elements we are to print.
+   */
+  void printQudaBLASParam(QudaBLASParam *param);
 
   /**
    * Load the gauge field from the host.
@@ -1070,7 +1119,7 @@ extern "C" {
    * @param inverse Whether to apply the inverse of the clover term
    */
   void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param,
-      QudaParity *parity, int inverse);
+                  QudaParity parity, int inverse);
 
   /**
    * Apply the full Dslash matrix, possibly even/odd preconditioned.
@@ -1240,7 +1289,7 @@ extern "C" {
    * @param gauge_param Gauge field meta data
    * @param invert_param Dirac and solver meta data
    */
-  void computeStaggeredForceQuda(void* mom, double dt, double delta, void **x, void *gauge,
+  void computeStaggeredForceQuda(void* mom, double dt, double delta, void *gauge, void **x,
 				 QudaGaugeParam *gauge_param, QudaInvertParam *invert_param);
 
   /**
@@ -1292,10 +1341,9 @@ extern "C" {
 
   /**
    * Performs a deep copy from the internal extendedGaugeResident field.
-   * @param Pointer to externalGaugeResident cudaGaugeField
-   * @param Location of gauge field
+   * @param Pointer to externally allocated GaugeField
    */
-  void copyExtendedResidentGaugeQuda(void* resident_gauge, QudaFieldLocation loc);
+  void copyExtendedResidentGaugeQuda(void* resident_gauge);
 
   /**
    * Performs Wuppertal smearing on a given spinor using the gauge field
@@ -1372,13 +1420,12 @@ extern "C" {
    * @param[out] h_result adress of pointer to the 16*corr_dim complex numbers of the
    *            result correlators
    * @param[in] cType Which type of contraction (open, degrand-rossi, etc)
-   * @param[in] param meta data for construction of ColorSpinorFields.
-   * @param[in] colorspinorparam pointer to a ColorSpinorParam meta data for
+   * @param[in] cs_param_ptr Pointer to a ColorSpinorParam meta data for
    *            construction of ColorSpinorFields
    * @param[in] X spacetime data for construction of ColorSpinorFields
    */
   void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void **h_result,
-		      const QudaContractType cType, QudaInvertParam *param, void *cs_param_,
+		      const QudaContractType cType, void *cs_param_ptr,
 		      const int *X, const int *const source_position, int* Mom);
   
   /**
@@ -1395,19 +1442,7 @@ extern "C" {
    *            construction of ColorSpinorFields
    * @param[in] X spacetime data for construction of ColorSpinorFields
    */
-  void contractSummedQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavor_2, void **h_result,
-                          QudaContractType cType, QudaInvertParam *param, void *colorspinorparam, const int *X);
-
-  /**
-   * Public function to perform color contractions of the host spinors x and y. Does
-   * not sum the lattice data.
-   * @param[in] x pointer to host data
-   * @param[in] y pointer to host data
-   * @param[out] result pointer to the 16 spin projections per lattice site
-   * @param[in] cType Which type of contraction (open, degrand-rossi, etc)
-   * @param[in] param meta data for construction of ColorSpinorFields.
-   * @param[in] X spacetime data for construction of ColorSpinorFields.
-   */
+  
   void contractQuda(const void *x, const void *y, void *result, const QudaContractType cType, QudaInvertParam *param,
                     const int *X);
 
@@ -1424,16 +1459,10 @@ extern "C" {
    * @param[in] param The parameters of the external fields and the computation settings
    * @param[out] timeinfo
    */
-  int computeGaugeFixingOVRQuda(void* gauge,
-                      const unsigned int gauge_dir,
-                      const unsigned int Nsteps,
-                      const unsigned int verbose_interval,
-                      const double relax_boost,
-                      const double tolerance,
-                      const unsigned int reunit_interval,
-                      const unsigned int stopWtheta,
-                      QudaGaugeParam* param,
-                      double* timeinfo);
+  int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
+                                const unsigned int verbose_interval, const double relax_boost, const double tolerance,
+                                const unsigned int reunit_interval, const unsigned int stopWtheta,
+                                QudaGaugeParam *param, double *timeinfo);
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
    * @param[in,out] gauge, gauge field to be fixed
@@ -1442,30 +1471,33 @@ extern "C" {
    * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
    * @param[in] alpha, gauge fixing parameter of the method, most common value is 0.08
    * @param[in] autotune, 1 to autotune the method, i.e., if the Fg inverts its tendency we decrease the alpha value
-   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
+   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when
+   * iteration reachs the maximum number of steps defined by Nsteps
    * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
    * @param[in] param The parameters of the external fields and the computation settings
    * @param[out] timeinfo
    */
-  int computeGaugeFixingFFTQuda(void* gauge,
-                      const unsigned int gauge_dir,
-                      const unsigned int Nsteps,
-                      const unsigned int verbose_interval,
-                      const double alpha,
-                      const unsigned int autotune,
-                      const double tolerance,
-                      const unsigned int stopWtheta,
-                      QudaGaugeParam* param,
-                      double* timeinfo);
+  int computeGaugeFixingFFTQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
+                                const unsigned int verbose_interval, const double alpha, const unsigned int autotune,
+                                const double tolerance, const unsigned int stopWtheta, QudaGaugeParam *param,
+                                double *timeinfo);
 
-  void make4DQuarkProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_param5D, QudaInvertParam *inv_param4D,
-                       const int *X);
+  /**
+   * @brief Strided Batched GEMM
+   * @param[in] arrayA The array containing the A matrix data
+   * @param[in] arrayB The array containing the A matrix data
+   * @param[in] arrayC The array containing the A matrix data
+   * @param[in] native boolean to use either the native or generic version
+   * @param[in] param The data defining the problem execution.
+   */
+  void blasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaBoolean native, QudaBLASParam *param);
 
+  void make4DChiralProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_param5D, QudaInvertParam *inv_param4D,
+			const int *X);
+  
   void make4DMidPointProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_param5D, QudaInvertParam *inv_param4D,
                           const int *X);
 
-  void propagatorQuda(void **prop_array, void **source_array, QudaInvertParam *param, void *correlation_function_sum, const QudaContractType cType, void *cs_param_);
-  
   
   /**
    * @brief Flush the chronological history for the given index

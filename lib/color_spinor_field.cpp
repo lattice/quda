@@ -41,18 +41,21 @@ namespace quda {
     destroy();
   }
 
-  void ColorSpinorField::createGhostZone(int nFace, bool spin_project) const {
-
+  void ColorSpinorField::createGhostZone(int nFace, bool spin_project) const
+  {
     if ( typeid(*this) == typeid(cpuColorSpinorField) || ghost_precision_allocated == ghost_precision ) return;
 
-    // For Wilson we half the number of effective faces if the fields are spin projected.
-    int num_faces = ((nSpin == 4 && spin_project) ? 1 : 2) * nFace;
-    int num_norm_faces = 2*nFace;
+    bool is_fixed = (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION);
+    int nSpinGhost = (nSpin == 4 && spin_project) ? 2 : nSpin;
+    size_t site_size = nSpinGhost * nColor * 2 * ghost_precision + (is_fixed ? sizeof(float) : 0);
 
     // calculate size of ghost zone required
-    int ghostVolume = 0;
+    int ghost_volume = 0;
     int dims = nDim == 5 ? (nDim - 1) : nDim;
-    int x5   = nDim == 5 ? x[4] : 1; ///includes DW  and non-degenerate TM ghosts
+    int x5 = nDim == 5 ? x[4] : 1; /// includes DW and non-degenerate TM ghosts
+    const int ghost_align
+      = 1; // TODO perhaps in the future we should align each ghost dim/dir, e.g., along 32-byte boundaries
+    ghost_bytes = 0;
     for (int i=0; i<dims; i++) {
       ghostFace[i] = 0;
       if (comm_dim_partitioned(i)) {
@@ -61,50 +64,20 @@ namespace quda {
 	  if (i==j) continue;
 	  ghostFace[i] *= x[j];
 	}
-	ghostFace[i] *= x5; ///temporal hack : extra dimension for DW ghosts
-	if (i==0 && siteSubset != QUDA_FULL_SITE_SUBSET) ghostFace[i] /= 2;
-	ghostVolume += ghostFace[i];
-      }
-      if (i==0) {
-	ghostOffset[i][0] = 0;
-      } else {
-        if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) {
-          ghostOffset[i][0] = (ghostNormOffset[i-1][1] + num_norm_faces*ghostFace[i-1]/2)*sizeof(float)/ghost_precision;
-          // Ensure that start of ghostOffset is aligned on four word boundaries (check if this is needed)
-          ghostOffset[i][0] = 4*((ghostOffset[i][0] + 3)/4);
-        } else {
-	  ghostOffset[i][0] = ghostOffset[i-1][0] + num_faces*ghostFace[i-1]*nSpin*nColor*2;
-        }
+        ghostFace[i] *= x5; // temporary hack : extra dimension for DW ghosts
+        if (i == 0 && siteSubset != QUDA_FULL_SITE_SUBSET) ghostFace[i] /= 2;
+        ghost_volume += 2 * nFace * ghostFace[i];
       }
 
-      if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) {
-        ghostNormOffset[i][0] = (ghostOffset[i][0] + (num_faces*ghostFace[i]*nSpin*nColor*2/2))*ghost_precision/sizeof(float);
-        ghostOffset[i][1] = (ghostNormOffset[i][0] + num_norm_faces*ghostFace[i]/2)*sizeof(float)/ghost_precision;
-	// Ensure that start of ghostOffset is aligned on four word boundaries (check if this is needed)
-        ghostOffset[i][1] = 4*((ghostOffset[i][1] + 3)/4);
-        ghostNormOffset[i][1] = (ghostOffset[i][1] + (num_faces*ghostFace[i]*nSpin*nColor*2/2))*ghost_precision/sizeof(float);
-      } else {
-        ghostOffset[i][1] = ghostOffset[i][0] + num_faces*ghostFace[i]*nSpin*nColor*2/2;
-      }
-
-      int Nint = nColor * nSpin * 2 / (nSpin == 4 && spin_project ? 2 : 1); // number of internal degrees of freedom
-      ghost_face_bytes[i] = nFace*ghostFace[i]*Nint*ghost_precision;
-      if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) ghost_face_bytes[i] += nFace*ghostFace[i]*sizeof(float);
-
-      if(GhostOffset(i,0)%FieldOrder()) errorQuda("ghostOffset(%d,0) %d is not a multiple of FloatN\n", i, GhostOffset(i,0));
-      if(GhostOffset(i,1)%FieldOrder()) errorQuda("ghostOffset(%d,1) %d is not a multiple of FloatN\n", i, GhostOffset(i,1));
+      ghost_face_bytes[i] = nFace * ghostFace[i] * site_size;
+      ghost_face_bytes_aligned[i] = ((ghost_face_bytes[i] + ghost_align - 1) / ghost_align) * ghost_align;
+      ghost_offset[i][0] = i == 0 ? 0 : ghost_offset[i - 1][0] + 2 * ghost_face_bytes_aligned[i - 1];
+      ghost_offset[i][1] = ghost_offset[i][0] + ghost_face_bytes_aligned[i];
+      ghost_bytes += 2 * ghost_face_bytes_aligned[i];
 
       ghostFaceCB[i] = (siteSubset == QUDA_FULL_SITE_SUBSET ? ghostFace[i] / 2 : ghostFace[i]);
     } // dim
 
-    int ghostNormVolume = num_norm_faces * ghostVolume;
-    ghostVolume *= num_faces;
-
-    size_t ghost_length = ghostVolume*nColor*nSpin*2;
-    size_t ghost_norm_length = (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) ? ghostNormVolume : 0;
-
-    ghost_bytes = (size_t)ghost_length*ghost_precision;
-    if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) ghost_bytes += ghost_norm_length*sizeof(float);
     if (isNative()) ghost_bytes = ALIGNMENT_ADJUST(ghost_bytes);
 
     { // compute temporaries needed by dslash and packing kernels
@@ -458,7 +431,7 @@ namespace quda {
 
     // If this is set to false, then we are assuming that the send and
     // ghost buffers are in a single contiguous memory space.  Setting
-    // to false means we aggregate all cudaMemcpys which reduces
+    // to false means we aggregate all qudaMemcpys which reduces
     // latency.
     bool fine_grained_memcpy = false;
 
@@ -489,12 +462,12 @@ namespace quda {
 	  recv_fwd[i] = static_cast<char*>(total_recv) + offset;
 	  offset += bytes[i];
 	  if (fine_grained_memcpy) {
-	    qudaMemcpy(send_back[i], sendbuf[2*i + 0], bytes[i], cudaMemcpyDeviceToHost);
-	    qudaMemcpy(send_fwd[i],  sendbuf[2*i + 1], bytes[i], cudaMemcpyDeviceToHost);
+	    qudaMemcpy(send_back[i], sendbuf[2*i + 0], bytes[i], qudaMemcpyDeviceToHost);
+	    qudaMemcpy(send_fwd[i],  sendbuf[2*i + 1], bytes[i], qudaMemcpyDeviceToHost);
 	  }
 	} else if (no_comms_fill) {
-	  qudaMemcpy(ghost[2*i+1], sendbuf[2*i+0], bytes[i], cudaMemcpyDeviceToDevice);
-	  qudaMemcpy(ghost[2*i+0], sendbuf[2*i+1], bytes[i], cudaMemcpyDeviceToDevice);
+	  qudaMemcpy(ghost[2*i+1], sendbuf[2*i+0], bytes[i], qudaMemcpyDeviceToDevice);
+	  qudaMemcpy(ghost[2*i+0], sendbuf[2*i+1], bytes[i], qudaMemcpyDeviceToDevice);
 	}
       }
       if (!fine_grained_memcpy && total_bytes) {
@@ -506,7 +479,7 @@ namespace quda {
 	    break;
 	  }
 	}
-	qudaMemcpy(total_send, send_ptr, total_bytes, cudaMemcpyDeviceToHost);
+	qudaMemcpy(total_send, send_ptr, total_bytes, qudaMemcpyDeviceToHost);
       }
     }
 
@@ -539,8 +512,8 @@ namespace quda {
       for (int i=0; i<nDimComms; i++) {
 	if (!comm_dim_partitioned(i)) continue;
 	if (fine_grained_memcpy) {
-	  qudaMemcpy(ghost[2*i+0], recv_back[i], bytes[i], cudaMemcpyHostToDevice);
-	  qudaMemcpy(ghost[2*i+1], recv_fwd[i], bytes[i], cudaMemcpyHostToDevice);
+	  qudaMemcpy(ghost[2*i+0], recv_back[i], bytes[i], qudaMemcpyHostToDevice);
+	  qudaMemcpy(ghost[2*i+1], recv_fwd[i], bytes[i], qudaMemcpyHostToDevice);
 	}
       }
 
@@ -553,7 +526,7 @@ namespace quda {
 	    break;
 	  }
 	}
-	qudaMemcpy(ghost_ptr, total_recv, total_bytes, cudaMemcpyHostToDevice);
+	qudaMemcpy(ghost_ptr, total_recv, total_bytes, qudaMemcpyHostToDevice);
       }
 
       if (total_bytes) {
@@ -803,9 +776,20 @@ namespace quda {
                                                    QudaMemoryType new_mem_type) {
     ColorSpinorParam coarseParam(*this);
     for (int d=0; d<nDim; d++) coarseParam.x[d] = x[d]/geoBlockSize[d];
-    coarseParam.nSpin = (nSpin == 1) ? 2 : (nSpin / spinBlockSize); // coarsening staggered check
 
-    coarseParam.nColor = Nvec;
+    int geoBlockVolume = 1;
+    for (int d = 0; d < nDim; d++) { geoBlockVolume *= geoBlockSize[d]; }
+
+    // Detect if the "coarse" op is the Kahler-Dirac op or something else
+    // that still acts on a fine staggered ColorSpinorField
+    if (geoBlockVolume == 1 && Nvec == nColor && nSpin == 1) {
+      coarseParam.nSpin = nSpin;
+      coarseParam.nColor = nColor;
+    } else {
+      coarseParam.nSpin = (nSpin == 1) ? 2 : (nSpin / spinBlockSize); // coarsening staggered check
+      coarseParam.nColor = Nvec;
+    }
+
     coarseParam.siteSubset = QUDA_FULL_SITE_SUBSET; // coarse grid is always full
     coarseParam.create = QUDA_ZERO_FIELD_CREATE;
 

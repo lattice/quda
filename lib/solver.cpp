@@ -93,14 +93,6 @@ namespace quda {
       report("SD");
       solver = new SD(mat, param, profile);
       break;
-    case QUDA_XSD_INVERTER:
-#ifdef MULTI_GPU
-      report("XSD");
-      solver = new XSD(mat, param, profile);
-#else
-      errorQuda("Extended Steepest Descent is multi-gpu only");
-#endif
-      break;
     case QUDA_PCG_INVERTER:
       report("PCG");
       solver = new PreconCG(mat, matSloppy, matPrecon, matEig, param, profile);
@@ -326,32 +318,44 @@ namespace quda {
   bool Solver::convergence(double r2, double hq2, double r2_tol, double hq_tol) {
 
     // check the heavy quark residual norm if necessary
-    if ( (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) && (hq2 > hq_tol) )
-      return false;
+    if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
+      if (std::isnan(hq2) || std::isinf(hq2))
+        errorQuda("Solver appears to have diverged with heavy quark residual %e", hq2);
+
+      if (hq2 > hq_tol) return false;
+    }
 
     // check the L2 relative residual norm if necessary
-    if ( ((param.residual_type & QUDA_L2_RELATIVE_RESIDUAL) ||
-	  (param.residual_type & QUDA_L2_ABSOLUTE_RESIDUAL)) && (r2 > r2_tol) )
-      return false;
+    if ((param.residual_type & QUDA_L2_RELATIVE_RESIDUAL) || (param.residual_type & QUDA_L2_ABSOLUTE_RESIDUAL)) {
+      if (std::isnan(r2) || std::isinf(r2)) errorQuda("Solver appears to have diverged with residual %e", r2);
+
+      if (r2 > r2_tol) return false;
+    }
 
     return true;
   }
 
-  bool Solver::convergenceHQ(double r2, double hq2, double r2_tol, double hq_tol) {
-
+  bool Solver::convergenceHQ(double, double hq2, double, double hq_tol)
+  {
     // check the heavy quark residual norm if necessary
-    if ( (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) && (hq2 > hq_tol) )
-      return false;
+    if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
+      if (std::isnan(hq2) || std::isinf(hq2))
+        errorQuda("Solver appears to have diverged with heavy quark residual %e", hq2);
+
+      if (hq2 > hq_tol) return false;
+    }
 
     return true;
   }
 
-  bool Solver::convergenceL2(double r2, double hq2, double r2_tol, double hq_tol) {
-
+  bool Solver::convergenceL2(double r2, double, double r2_tol, double)
+  {
     // check the L2 relative residual norm if necessary
-    if ( ((param.residual_type & QUDA_L2_RELATIVE_RESIDUAL) ||
-    (param.residual_type & QUDA_L2_ABSOLUTE_RESIDUAL)) && (r2 > r2_tol) )
-      return false;
+    if ((param.residual_type & QUDA_L2_RELATIVE_RESIDUAL) || (param.residual_type & QUDA_L2_ABSOLUTE_RESIDUAL)) {
+      if (std::isnan(r2) || std::isinf(r2)) errorQuda("Solver appears to have diverged with residual %e", r2);
+
+      if (r2 > r2_tol) return false;
+    }
 
     return true;
   }
@@ -367,7 +371,7 @@ namespace quda {
       }
     }
 
-    if (std::isnan(r2)) errorQuda("Solver appears to have diverged");
+    if (std::isnan(r2) || std::isinf(r2)) errorQuda("Solver appears to have diverged");
   }
 
   void Solver::PrintSummary(const char *name, int k, double r2, double b2,
@@ -397,11 +401,14 @@ namespace quda {
 
   bool MultiShiftSolver::convergence(const double *r2, const double *r2_tol, int n) const {
 
-    for (int i=0; i<n; i++) {
-      // check the L2 relative residual norm if necessary
-      if ( ((param.residual_type & QUDA_L2_RELATIVE_RESIDUAL) ||
-	    (param.residual_type & QUDA_L2_ABSOLUTE_RESIDUAL)) && (r2[i] > r2_tol[i]) && r2_tol[i] != 0.0)
-	return false;
+    // check the L2 relative residual norm if necessary
+    if ((param.residual_type & QUDA_L2_RELATIVE_RESIDUAL) || (param.residual_type & QUDA_L2_ABSOLUTE_RESIDUAL)) {
+      for (int i = 0; i < n; i++) {
+        if (std::isnan(r2[i]) || std::isinf(r2[i]))
+          errorQuda("Multishift solver appears to have diverged on shift %d with residual %e", i, r2[i]);
+
+        if (r2[i] > r2_tol[i] && r2_tol[i] != 0.0) return false;
+      }
     }
 
     return true;

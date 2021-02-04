@@ -106,8 +106,7 @@ namespace quda {
     sol = &x;
   }
 
-  void DiracDomainWall::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-				    const QudaSolutionType solType) const
+  void DiracDomainWall::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
   {
     // do nothing
   }

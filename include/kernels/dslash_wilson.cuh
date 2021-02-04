@@ -40,8 +40,8 @@ namespace quda
       DslashArg<Float, nDim>(in, U, parity, dagger, a != 0.0 ? true : false, 1, spin_project, comm_override),
       out(out),
       in(in),
-      U(U),
       x(x),
+      U(U),
       a(a)
     {
       if (in.V() == out.V()) errorQuda("Aliasing pointers");
@@ -52,6 +52,18 @@ namespace quda
         errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
 
       if (F::N != F::N_ghost) pushKernelPackT(true); // must use packing kernel is ghost vector length is different than bulk
+    }
+
+    // defined the copy constructor to ensure we don't have an excess pop if the arg is copied
+    WilsonArg(const WilsonArg &arg) :
+      DslashArg<Float, nDim>(arg),
+      out(arg.out),
+      in(arg.in),
+      x(arg.x),
+      U(arg.U),
+      a(arg.a)
+    {
+      if (F::N != F::N_ghost) pushKernelPackT(true);
     }
 
     virtual ~WilsonArg() { if (F::N != F::N_ghost) popKernelPackT(); }
@@ -144,7 +156,7 @@ namespace quda
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     // out(x) = M*in = (-D + m) * in(x-mu)
-    __device__ __host__ inline void operator()(int idx, int s, int parity)
+    __device__ __host__ inline void operator()(int idx, int, int parity)
     {
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;

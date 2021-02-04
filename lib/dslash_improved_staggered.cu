@@ -100,8 +100,7 @@ namespace quda
     {
       int gauge_bytes_fat = QUDA_RECONSTRUCT_NO * in.Precision();
       int gauge_bytes_long = arg.reconstruct * in.Precision();
-      bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
-      int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed ? sizeof(float) : 0);
+      int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed<typename Arg::Float>::value ? sizeof(float) : 0);
       int ghost_bytes = 3 * (spinor_bytes + gauge_bytes_long) + (spinor_bytes + gauge_bytes_fat)
         + 3 * 2 * spinor_bytes; // last term is the accumulator load/store through the face
       int num_dir = 2 * 4;      // set to 4-d since we take care of 5-d fermions in derived classes where necessary
@@ -158,18 +157,14 @@ namespace quda
       dslash::DslashPolicyTune<decltype(staggered)> policy(
         staggered, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
         in.GhostFaceCB(), profile);
-      policy.apply(0);
-
-      checkCudaError();
     }
   };
 
+#ifdef GPU_STAGGERED_DIRAC
   void ApplyImprovedStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
                               const GaugeField &L, double a, const ColorSpinorField &x, int parity, bool dagger,
                               const int *comm_override, TimeProfile &profile)
   {
-
-#ifdef GPU_STAGGERED_DIRAC
     for (int i = 0; i < 4; i++) {
       if (comm_dim_partitioned(i) && (U.X()[i] < 6)) {
         errorQuda(
@@ -180,9 +175,13 @@ namespace quda
     // L must be first gauge field argument since we template on long reconstruct
     instantiate<ImprovedStaggeredApply, StaggeredReconstruct>(out, in, L, U, a, x, parity, dagger, comm_override,
                                                               profile);
-#else
-    errorQuda("Staggered dslash has not been built");
-#endif
   }
+#else
+  void ApplyImprovedStaggered(ColorSpinorField &, const ColorSpinorField &, const GaugeField &,
+                              const GaugeField &, double, const ColorSpinorField &, int, bool, const int *, TimeProfile &)
+  {
+    errorQuda("Staggered dslash has not been built");
+  }
+#endif
 
 } // namespace quda

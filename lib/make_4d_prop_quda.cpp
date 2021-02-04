@@ -40,14 +40,14 @@ namespace quda
     Ls2.push_back(ColorSpinorField::Create(param4D));
 
     // Ensure out is zeroed
-    qudaMemsetAsync(out.V(), 0, vol4D * spin * col * data_size, 0);
+    qudaMemsetAsync(out.V(), 0, vol4D * spin * col * data_size, device::get_default_stream());
 
     // out(x) = P_L L0(x) + P_R Lsm1(x)
-    chiralProject(out, *Ls2m1[0], 1);
-    chiralProject(out, *Ls2[0], -1);
+    ApplyChiralProj(out, *Ls2m1[0], 1);
+    ApplyChiralProj(out, *Ls2[0], -1);
   }
 
-  void make4DQuarkProp(ColorSpinorField &out, ColorSpinorField &in)
+  void make4DChiralProp(ColorSpinorField &out, ColorSpinorField &in)
   {
     if (in.Ndim() != 5) errorQuda("Can not make 4D quark propagator from %dD field\n", in.Ndim());
 
@@ -76,12 +76,12 @@ namespace quda
     Lsm1.push_back(ColorSpinorField::Create(param4D));
 
     // Ensure out is zeroed
-    qudaMemsetAsync(out.V(), 0, vol4D * spin * col * data_size, 0);
+    qudaMemsetAsync(out.V(), 0, vol4D * spin * col * data_size, device::get_default_stream());
 
     // out(x) = P_L L0(x) + P_R Lsm1(x)
-    chiralProject(out, *L0[0], -1);
-    chiralProject(out, *Lsm1[0], 1);
-
+    ApplyChiralProj(out, *L0[0], -1);
+    ApplyChiralProj(out, *Lsm1[0], 1);
+    
     delete Lsm1[0];
     delete L0[0];
   }

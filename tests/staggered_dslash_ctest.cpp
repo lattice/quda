@@ -5,21 +5,14 @@
 #include <algorithm>
 
 #include <quda.h>
-#include <quda_internal.h>
+#include <gauge_field.h>
 #include <dirac_quda.h>
-#include <dslash_quda.h>
-#include <invert_quda.h>
-#include <util_quda.h>
-#include <blas_quda.h>
-
 #include <misc.h>
 #include <host_utils.h>
 #include <command_line_params.h>
 #include <dslash_reference.h>
 #include <staggered_dslash_reference.h>
 #include <staggered_gauge_utils.h>
-#include <gauge_field.h>
-#include <unitarization_links.h>
 
 #include "dslash_test_helpers.h"
 #include <assert.h>
@@ -83,7 +76,7 @@ CLI::TransformPairs<dslash_test_type> dtest_type_map {{"Dslash", dslash_test_typ
                                                       // {"Dslash4pre", dslash_test_type::Dslash4pre}
                                                     };
 
-void init(int precision, QudaReconstructType link_recon, int partition)
+void init(int precision, QudaReconstructType link_recon)
 {
   auto prec = getPrecision(precision);
 
@@ -99,7 +92,11 @@ void init(int precision, QudaReconstructType link_recon, int partition)
   gauge_param.cuda_prec_refinement_sloppy = prec;
 
   setDims(gauge_param.X);
-  dw_setDims(gauge_param.X, Nsrc); // so we can use 5-d indexing from dwf
+  dw_setDims(gauge_param.X, 1);
+  if (Nsrc != 1) {
+    warningQuda("Ignoring Nsrc = %d, setting to 1.", Nsrc);
+    Nsrc = 1;
+  }
   setSpinorSiteSize(6);
 
   setStaggeredInvertParam(inv_param);
@@ -191,7 +188,7 @@ void init(int precision, QudaReconstructType link_recon, int partition)
   csParam.nSpin = 1;
   csParam.nDim = 5;
   for (int d = 0; d < 4; d++) { csParam.x[d] = gauge_param.X[d]; }
-  csParam.x[4] = Nsrc; // number of sources becomes the fifth dimension
+  csParam.x[4] = 1;
 
   csParam.setPrecision(inv_param.cpu_prec);
   inv_param.solution_type = QUDA_MAT_SOLUTION;
@@ -303,19 +300,16 @@ struct DslashTime {
 DslashTime dslashCUDA(int niter) {
 
   DslashTime dslash_time;
-  timeval tstart, tstop;
 
-  cudaEvent_t start, end;
-  cudaEventCreate(&start);
-  cudaEventRecord(start, 0);
-  cudaEventSynchronize(start);
+  host_timer_t host_timer;
+  device_timer_t device_timer;
 
   comm_barrier();
-  cudaEventRecord(start, 0);
+  device_timer.start();
 
   for (int i = 0; i < niter; i++) {
 
-    gettimeofday(&tstart, NULL);
+    host_timer.start();
 
     switch (dtest_type) {
     case dslash_test_type::Dslash: dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity); break;
@@ -324,28 +318,18 @@ DslashTime dslashCUDA(int niter) {
     default: errorQuda("Test type %d not defined on staggered dslash.\n", static_cast<int>(dtest_type));
     }
 
-    gettimeofday(&tstop, NULL);
-    long ds = tstop.tv_sec - tstart.tv_sec;
-    long dus = tstop.tv_usec - tstart.tv_usec;
-    double elapsed = ds + 0.000001*dus;
+    host_timer.stop();
 
-    dslash_time.cpu_time += elapsed;
+    dslash_time.cpu_time += host_timer.last();
     // skip first and last iterations since they may skew these metrics if comms are not synchronous
     if (i>0 && i<niter) {
-      if (elapsed < dslash_time.cpu_min) dslash_time.cpu_min = elapsed;
-      if (elapsed > dslash_time.cpu_max) dslash_time.cpu_max = elapsed;
+      dslash_time.cpu_min = std::min(dslash_time.cpu_min, host_timer.last());
+      dslash_time.cpu_max = std::max(dslash_time.cpu_max, host_timer.last());
     }
   }
 
-  cudaEventCreate(&end);
-  cudaEventRecord(end, 0);
-  cudaEventSynchronize(end);
-  float runTime;
-  cudaEventElapsedTime(&runTime, start, end);
-  cudaEventDestroy(start);
-  cudaEventDestroy(end);
-
-  dslash_time.event_time = runTime / 1000;
+  device_timer.stop();
+  dslash_time.event_time = device_timer.last();
 
   return dslash_time;
 }
@@ -443,12 +427,11 @@ public:
 
     if (skip()) GTEST_SKIP();
 
-    int value = ::testing::get<2>(GetParam());
-    for(int j=0; j < 4;j++){
-      if (value &  (1 << j)){
+    int partition = ::testing::get<2>(GetParam());
+    for(int j=0; j < 4;j++) {
+      if (partition & (1 << j)) {
         commDimPartitionedSet(j);
       }
-
     }
     updateR();
 
@@ -467,7 +450,7 @@ public:
     spinorRef = nullptr;
     tmpCpu = nullptr;
 
-    init(prec, recon, value);
+    init(prec, recon);
     display_test_info(prec, recon);
   }
 
@@ -477,7 +460,7 @@ public:
     end();
   }
 
-  static void SetUpTestCase() { initQuda(device); }
+  static void SetUpTestCase() { initQuda(device_ordinal); }
 
   // Per-test-case tear-down.
   // Called after the last test in this test case.

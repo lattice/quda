@@ -123,8 +123,8 @@ QIO_Writer *open_test_output(const char *filename, int volfmt, int serpar, int i
 }
 
 template <int len>
-int read_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cpu_prec, QudaSiteSubset subset,
-               QudaParity parity, int nSpin, int nColor)
+int read_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cpu_prec, QudaSiteSubset,
+               QudaParity, int nSpin, int nColor)
 {
   // Get the QIO record and string
   char dummy[100] = "";
@@ -231,7 +231,7 @@ void set_layout(const int *X, QudaSiteSubset subset = QUDA_FULL_SITE_SUBSET)
   layout.number_of_nodes = QMP_get_number_of_nodes();
 }
 
-void read_gauge_field(const char *filename, void *gauge[], QudaPrecision precision, const int *X, int argc, char *argv[])
+void read_gauge_field(const char *filename, void *gauge[], QudaPrecision precision, const int *X, int, char *[])
 {
   quda_this_node = QMP_get_node_number();
 
@@ -273,7 +273,7 @@ int read_field(QIO_Reader *infile, int Ninternal, int count, void *field_in[], Q
 }
 
 void read_spinor_field(const char *filename, void *V[], QudaPrecision precision, const int *X, QudaSiteSubset subset,
-                       QudaParity parity, int nColor, int nSpin, int Nvec, int argc, char *argv[])
+                       QudaParity parity, int nColor, int nSpin, int Nvec, int, char *[])
 {
   quda_this_node = QMP_get_node_number();
 
@@ -429,7 +429,7 @@ int write_su3_field(QIO_Writer *outfile, int count, void *field_out[],
                          3, type);
 }
 
-void write_gauge_field(const char *filename, void *gauge[], QudaPrecision precision, const int *X, int argc, char *argv[])
+void write_gauge_field(const char *filename, void *gauge[], QudaPrecision precision, const int *X, int, char *[])
 {
   quda_this_node = QMP_get_node_number();
 
@@ -492,7 +492,7 @@ int write_field(QIO_Writer *outfile, int Ninternal, int count, void *field_out[]
 }
 
 void write_spinor_field(const char *filename, void *V[], QudaPrecision precision, const int *X, QudaSiteSubset subset,
-                        QudaParity parity, int nColor, int nSpin, int Nvec, int argc, char *argv[])
+                        QudaParity parity, int nColor, int nSpin, int Nvec, int, char *[])
 {
   quda_this_node = QMP_get_node_number();
 

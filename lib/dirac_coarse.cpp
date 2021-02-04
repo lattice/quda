@@ -1,5 +1,6 @@
 #include <string.h>
 #include <multigrid.h>
+#include <tune_quda.h>
 #include <algorithm>
 
 namespace quda {
@@ -12,6 +13,7 @@ namespace quda {
     transfer(param.transfer),
     dirac(param.dirac),
     need_bidirectional(param.need_bidirectional),
+    use_mma(param.use_mma),
     Y_h(nullptr),
     X_h(nullptr),
     Xinv_h(nullptr),
@@ -42,6 +44,7 @@ namespace quda {
     transfer(nullptr),
     dirac(nullptr),
     need_bidirectional(false),
+    use_mma(param.use_mma),
     Y_h(Y_h),
     X_h(X_h),
     Xinv_h(Xinv_h),
@@ -68,6 +71,7 @@ namespace quda {
     transfer(param.transfer),
     dirac(param.dirac),
     need_bidirectional(param.need_bidirectional),
+    use_mma(param.use_mma),
     Y_h(dirac.Y_h),
     X_h(dirac.X_h),
     Xinv_h(dirac.Xinv_h),
@@ -190,21 +194,81 @@ namespace quda {
   {
     createY(gpu_setup, mapped);
 
-    if (gpu_setup) dirac->createCoarseOp(*Y_d,*X_d,*transfer,kappa,mass,Mu(),MuFactor());
-    else dirac->createCoarseOp(*Y_h,*X_h,*transfer,kappa,mass,Mu(),MuFactor());
+    if (!gpu_setup) {
 
-    // save the intermediate tunecache after the UV and VUV tune
-    saveTuneCache();
+      dirac->createCoarseOp(*Y_h, *X_h, *transfer, kappa, mass, Mu(), MuFactor());
+      // save the intermediate tunecache after the UV and VUV tune
+      saveTuneCache();
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("About to build the preconditioned coarse clover\n");
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("About to build the preconditioned coarse clover\n");
+      createYhat(gpu_setup);
 
-    createYhat(gpu_setup);
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Finished building the preconditioned coarse clover\n");
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("About to create the preconditioned coarse op\n");
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Finished building the preconditioned coarse clover\n");
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("About to create the preconditioned coarse op\n");
+      calculateYhat(*Yhat_h, *Xinv_h, *Y_h, *X_h, use_mma);
 
-    if (gpu_setup) createPreconditionedCoarseOp(*Yhat_d,*Xinv_d,*Y_d,*X_d);
-    else createPreconditionedCoarseOp(*Yhat_h,*Xinv_h,*Y_h,*X_h);
+    } else {
+
+      // The following fancy copies reduce the number of gauge field
+      // copies (from and to QUDA_MILC_GAUGE_ORDER) by 2: one for X
+      // and one for Y, both to QUDA_MILC_GAUGE_ORDER.
+      if (use_mma && dirac->isCoarse()) {
+
+        constexpr QudaGaugeFieldOrder gOrder = QUDA_MILC_GAUGE_ORDER;
+
+        GaugeFieldParam Y_param(*Y_d);
+        GaugeFieldParam X_param(*X_d);
+
+        Y_param.order = gOrder;
+        X_param.order = gOrder;
+
+        GaugeField *Y_order = cudaGaugeField::Create(Y_param);
+        GaugeField *X_order = cudaGaugeField::Create(X_param);
+
+        dirac->createCoarseOp(*Y_order, *X_order, *transfer, kappa, mass, Mu(), MuFactor());
+
+        // save the intermediate tunecache after the UV and VUV tune
+        saveTuneCache();
+
+        X_d->copy(*X_order);
+
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("About to build the preconditioned coarse clover\n");
+
+        createYhat(gpu_setup);
+
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Finished building the preconditioned coarse clover\n");
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("About to create the preconditioned coarse op\n");
+
+        calculateYhat(*Yhat_d, *Xinv_d, *Y_order, *X_order, use_mma);
+
+        Y_d->copy(*Y_order);
+
+        // this extra exchange shouldn't be needed, but at present the
+        // copy from Y_order to Y_d doesn't preserve the
+        // bi-directional halo (in_offset isn't set in the copy
+        // routine)
+        Y_d->exchangeGhost(QUDA_LINK_BIDIRECTIONAL);
+
+        delete Y_order;
+        delete X_order;
+
+      } else {
+        dirac->createCoarseOp(*Y_d, *X_d, *transfer, kappa, mass, Mu(), MuFactor());
+
+        // save the intermediate tunecache after the UV and VUV tune
+        saveTuneCache();
+
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("About to build the preconditioned coarse clover\n");
+
+        createYhat(gpu_setup);
+
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Finished building the preconditioned coarse clover\n");
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("About to create the preconditioned coarse op\n");
+
+        calculateYhat(*Yhat_d, *Xinv_d, *Y_d, *X_d, use_mma);
+      }
+    }
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Finished creating the preconditioned coarse op\n");
 
@@ -253,7 +317,7 @@ namespace quda {
   }
 
   void DiracCoarse::createPreconditionedCoarseOp(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X) {
-    calculateYhat(Yhat, Xinv, Y, X);
+    calculateYhat(Yhat, Xinv, Y, X, use_mma);
   }
 
   void DiracCoarse::Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
@@ -351,24 +415,26 @@ namespace quda {
     sol = &x;
   }
 
-  void DiracCoarse::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-				const QudaSolutionType solType) const
+  void DiracCoarse::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
   {
     /* do nothing */
   }
 
   //Make the coarse operator one level down.  Pass both the coarse gauge field and coarse clover field.
-  void DiracCoarse::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu, double mu_factor) const
+  void DiracCoarse::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double, double mu, double mu_factor) const
   {
+    if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
+      errorQuda("Coarse operators only support aggregation coarsening");
+
     double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
     if (checkLocation(Y, X) == QUDA_CPU_FIELD_LOCATION) {
       initializeLazy(QUDA_CPU_FIELD_LOCATION);
-      CoarseCoarseOp(Y, X, T, *(this->Y_h), *(this->X_h), *(this->Xinv_h), kappa, a, mu_factor, QUDA_COARSE_DIRAC,
+      CoarseCoarseOp(Y, X, T, *(this->Y_h), *(this->X_h), *(this->Xinv_h), kappa, mass, a, mu_factor, QUDA_COARSE_DIRAC,
                      QUDA_MATPC_INVALID, need_bidirectional);
     } else {
       initializeLazy(QUDA_CUDA_FIELD_LOCATION);
-      CoarseCoarseOp(Y, X, T, *(this->Y_d), *(this->X_d), *(this->Xinv_d), kappa, a, mu_factor, QUDA_COARSE_DIRAC,
-                     QUDA_MATPC_INVALID, need_bidirectional);
+      CoarseCoarseOp(Y, X, T, *(this->Y_d), *(this->X_d), *(this->Xinv_d), kappa, mass, a, mu_factor, QUDA_COARSE_DIRAC,
+                     QUDA_MATPC_INVALID, need_bidirectional, use_mma);
     }
   }
 
@@ -577,17 +643,20 @@ namespace quda {
   //Make the coarse operator one level down.  For the preconditioned
   //operator we are coarsening the Yhat links, not the Y links.  We
   //pass the fine clover fields, though they are actually ignored.
-  void DiracCoarsePC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu, double mu_factor) const
+  void DiracCoarsePC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double, double mu, double mu_factor) const
   {
+    if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
+      errorQuda("Coarse operators only support aggregation coarsening");
+
     double a = -2.0 * kappa * mu * T.Vectors().TwistFlavor();
     if (checkLocation(Y, X) == QUDA_CPU_FIELD_LOCATION) {
       initializeLazy(QUDA_CPU_FIELD_LOCATION);
-      CoarseCoarseOp(Y, X, T, *(this->Yhat_h), *(this->X_h), *(this->Xinv_h), kappa, a, -mu_factor, QUDA_COARSEPC_DIRAC,
-                     matpcType, true);
+      CoarseCoarseOp(Y, X, T, *(this->Yhat_h), *(this->X_h), *(this->Xinv_h), kappa, mass, a, -mu_factor,
+                     QUDA_COARSEPC_DIRAC, matpcType, true);
     } else {
       initializeLazy(QUDA_CUDA_FIELD_LOCATION);
-      CoarseCoarseOp(Y, X, T, *(this->Yhat_d), *(this->X_d), *(this->Xinv_d), kappa, a, -mu_factor, QUDA_COARSEPC_DIRAC,
-                     matpcType, true);
+      CoarseCoarseOp(Y, X, T, *(this->Yhat_d), *(this->X_d), *(this->Xinv_d), kappa, mass, a, -mu_factor,
+                     QUDA_COARSEPC_DIRAC, matpcType, true, use_mma);
     }
   }
 

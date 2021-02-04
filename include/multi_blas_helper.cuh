@@ -1,6 +1,10 @@
+#pragma once
+
 #include <algorithm>
 #include <register_traits.h>
 #include <blas_helper.cuh>
+#include <kernel_helper.h>
+#include <target_device.h>
 
 namespace quda
 {
@@ -9,15 +13,63 @@ namespace quda
   {
 
     // storage for matrix coefficients
-#define MAX_MATRIX_SIZE 8192
-#define MAX_ARG_SIZE 4096
-    __constant__ signed char Amatrix_d[MAX_MATRIX_SIZE];
-    __constant__ signed char Bmatrix_d[MAX_MATRIX_SIZE];
-    __constant__ signed char Cmatrix_d[MAX_MATRIX_SIZE];
+    __constant__ char Amatrix_d[device::max_constant_param_size()];
+    __constant__ char Bmatrix_d[device::max_constant_param_size()];
+    __constant__ char Cmatrix_d[device::max_constant_param_size()];
 
-    static signed char *Amatrix_h;
-    static signed char *Bmatrix_h;
-    static signed char *Cmatrix_h;
+    static char *Amatrix_h;
+    static char *Bmatrix_h;
+    static char *Cmatrix_h;
+
+    template <bool multi_1d = false, typename Arg, typename T> typename std::enable_if<multi_1d, void>::type
+    set_param(std::vector<constant_param_t> &, Arg &arg, char select, const T &h)
+    {
+      using coeff_t = typename decltype(arg.f)::coeff_t;
+      coeff_t *buf_arg = nullptr;
+      switch (select) {
+      case 'a': buf_arg = arg.f.a; break;
+      case 'b': buf_arg = arg.f.b; break;
+      case 'c': buf_arg = arg.f.c; break;
+      default: errorQuda("Unknown buffer %c", select);
+      }
+      const auto N = std::max(arg.NXZ, arg.NYW);
+      for (int i = 0; i < N; i++) buf_arg[i] = coeff_t(h.data[i]);
+    }
+
+    template <bool multi_1d = false, typename Arg, typename T> typename std::enable_if<!multi_1d, void>::type
+    set_param(std::vector<constant_param_t> &params, Arg &arg, char select, const T &h)
+    {
+      constant_param_t param;
+      using coeff_t = typename decltype(arg.f)::coeff_t;
+      if (arg.NXZ * arg.NYW * sizeof(coeff_t) > param.max_size)
+        printfQuda("Requested parameter size %lu larger than max %lu", arg.NXZ * arg.NYW * sizeof(coeff_t), param.max_size);
+      param.bytes = arg.NXZ * arg.NYW * sizeof(coeff_t);
+
+      switch (select) {
+      case 'a':
+        strcpy(param.device_name, "quda::blas::Amatrix_d");
+        param.device_ptr = qudaGetSymbolAddress(Amatrix_d);
+        Amatrix_h = param.host;
+        break;
+      case 'b':
+        strcpy(param.device_name, "quda::blas::Bmatrix_d");
+        param.device_ptr = qudaGetSymbolAddress(Bmatrix_d);
+        Bmatrix_h = param.host;
+        break;
+      case 'c':
+        strcpy(param.device_name, "quda::blas::Cmatrix_d");
+        param.device_ptr = qudaGetSymbolAddress(Cmatrix_d);
+        Cmatrix_h = param.host;
+        break;
+      default: errorQuda("Unknown buffer %c", select);
+      }
+
+      coeff_t *host = reinterpret_cast<coeff_t*>(param.host);
+      for (int i = 0; i < arg.NXZ; i++)
+        for (int j = 0; j < arg.NYW; j++) host[arg.NYW * i + j] = coeff_t(h.data[arg.NYW * i + j]);
+
+      params.push_back(param);
+    }
 
     /**
        @param[in] x Value we are testing
@@ -30,7 +82,7 @@ namespace quda
        when we have a multi-1d kernel and the coefficients are stored
        in the functor.
     */
-    constexpr int max_N_multi_1d() { return 32; }
+    constexpr int max_N_multi_1d() { return 24; }
 
     /**
        @brief Return the maximum power of two enabled by default for
@@ -95,18 +147,18 @@ namespace quda
       using SpinorW = SpinorX;
 
       // compute the size remaining for the Y and W accessors
-      constexpr int arg_size = (MAX_ARG_SIZE - sizeof(int)                                    // NYW parameter
-                                - sizeof(SpinorX[NXZ])                                        // SpinorX array
-                                - (Functor::use_z ? sizeof(SpinorZ[NXZ]) : sizeof(SpinorZ *)) // SpinorZ array
-                                - sizeof(Functor)                                             // functor
-                                - sizeof(int)                                                 // length parameter
-                                - (!Functor::use_w ? sizeof(SpinorW *) : 0)   // subtract pointer if not using W
-                                - (Functor::reducer ? sizeof(ReduceArg<device_reduce_t>) : 0) // reduction buffers
-                                - 16) // there seems to be 16 bytes other argument space we need
+      constexpr auto arg_size = (device::max_kernel_arg_size() - sizeof(int)                                    // NYW parameter
+                                 - sizeof(SpinorX[NXZ])                                        // SpinorX array
+                                 - (Functor::use_z ? sizeof(SpinorZ[NXZ]) : sizeof(SpinorZ *)) // SpinorZ array
+                                 - sizeof(Functor)                                             // functor
+                                 - sizeof(int)                                                 // length parameter
+                                 - (!Functor::use_w ? sizeof(SpinorW *) : 0)   // subtract pointer if not using W
+                                 - (Functor::reducer ? sizeof(ReduceArg<device_reduce_t>) : 0) // reduction buffers
+                                 - 16) // there seems to be 16 bytes other argument space we need
         / (sizeof(SpinorY) + (Functor::use_w ? sizeof(SpinorW) : 0));
 
       // this is the maximum size limit imposed by the coefficient arrays
-      constexpr int coeff_size = Functor::coeff_mul ? MAX_MATRIX_SIZE / (NXZ * sizeof(typename Functor::coeff_t)) : arg_size;
+      constexpr auto coeff_size = Functor::coeff_mul ? device::max_constant_param_size() / (NXZ * sizeof(typename Functor::coeff_t)) : arg_size;
 
       return std::min(arg_size, coeff_size);
     }
@@ -134,19 +186,19 @@ namespace quda
       size_t spinor_w_size = x_fixed ? sizeof(Spinor<short, 4>) : sizeof(Spinor<float, 4>);
 
       // compute the size remaining for the Y and W accessors
-      int arg_size = (MAX_ARG_SIZE - sizeof(int)                       // NYW parameter
-                      - NXZ * spinor_x_size                            // SpinorX array
-                      - (use_z ? NXZ * spinor_z_size : sizeof(void *)) // SpinorZ array (else dummy pointer)
-                      - 2 * sizeof(int)                                // functor NXZ/NYW members
-                      - (multi_1d ? scalar_size * 3 * max_N_multi_1d() : 0) // multi_1d coefficient arrays
-                      - sizeof(int)                                    // length parameter
-                      - (!use_w ? sizeof(void *) : 0)                  // subtract dummy pointer if not using W
-                      - (reduce ? sizeof(ReduceArg<device_reduce_t>) : 0)        // reduction buffers
-                      - 16) // there seems to be 16 bytes other argument space we need
+      const auto arg_size = (device::max_kernel_arg_size() - sizeof(int)                       // NYW parameter
+                             - NXZ * spinor_x_size                            // SpinorX array
+                             - (use_z ? NXZ * spinor_z_size : sizeof(void *)) // SpinorZ array (else dummy pointer)
+                             - 2 * sizeof(int)                                // functor NXZ/NYW members
+                             - (multi_1d ? scalar_size * 3 * max_N_multi_1d() : 0) // multi_1d coefficient arrays
+                             - sizeof(int)                                    // length parameter
+                             - (!use_w ? sizeof(void *) : 0)                  // subtract dummy pointer if not using W
+                             - (reduce ? sizeof(ReduceArg<device_reduce_t>) : 0)        // reduction buffers
+                             - 16) // there seems to be 16 bytes other argument space we need
         / (spinor_y_size + (use_w ? spinor_w_size : 0));
 
       // this is the maximum size limit imposed by the coefficient arrays
-      int coeff_size = scalar_width > 0 ? MAX_MATRIX_SIZE / (NXZ * scalar_size) : arg_size;
+      const auto coeff_size = scalar_width > 0 ? device::max_constant_param_size() / (NXZ * scalar_size) : arg_size;
 
       return std::min(arg_size, coeff_size);
     }
@@ -167,11 +219,11 @@ namespace quda
         errorQuda("NXZ=%d is not a valid size ( MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
       if (NYW_max != NYW_max_check) errorQuda("Compile-time %d and run-time %d limits disagree", NYW_max, NYW_max_check);
       if (f.NYW > NYW_max) errorQuda("NYW exceeds max size (%d > %d)", f.NYW, NYW_max);
-      if (NXZ * f.NYW * scalar_width > MAX_MATRIX_SIZE)
-        errorQuda("Coefficient matrix exceeds max size (%d > %d)", NXZ * f.NYW * scalar_width, MAX_MATRIX_SIZE);
-      if (f.reducer && NXZ * f.NYW > QUDA_MAX_MULTI_REDUCE)
+      if (NXZ * f.NYW * scalar_width > (int)device::max_constant_param_size())
+        errorQuda("Coefficient matrix exceeds max size (%d > %lu)", NXZ * f.NYW * scalar_width, device::max_constant_param_size());
+      if (f.reducer && NXZ * f.NYW > max_n_reduce())
         errorQuda("NXZ * NYW = %d exceeds maximum number of reductions %d * %d > %d",
-                  NXZ * f.NYW, NXZ, f.NYW, QUDA_MAX_MULTI_REDUCE);
+                  NXZ * f.NYW, NXZ, f.NYW, max_n_reduce());
       if (Functor::multi_1d && std::min(NXZ, f.NYW) != 1)
         errorQuda("Expected 1-d multi-blas but appears 2-d (NXZ = %d, NYW = %d)", NXZ, f.NYW);
       if (Functor::multi_1d && std::max(NXZ, f.NYW) > max_N_multi_1d())

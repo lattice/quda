@@ -1,4 +1,5 @@
 #include <quda_internal.h>
+#include <timer.h>
 #include <gauge_field.h>
 #include <assert.h>
 #include <string.h>
@@ -47,13 +48,13 @@ namespace quda {
       for (int d=0; d<siteDim; d++) {
 	size_t nbytes = volume * nInternal * precision;
 	if (create == QUDA_NULL_FIELD_CREATE || create == QUDA_ZERO_FIELD_CREATE) {
-	  gauge[d] = safe_malloc(nbytes);
-	  if (create == QUDA_ZERO_FIELD_CREATE) memset(gauge[d], 0, nbytes);
-	} else if (create == QUDA_REFERENCE_FIELD_CREATE) {
-	  gauge[d] = ((void**)param.gauge)[d];
-	} else {
-	  errorQuda("Unsupported creation type %d", create);
-	}
+          gauge[d] = nbytes ? safe_malloc(nbytes) : nullptr;
+          if (create == QUDA_ZERO_FIELD_CREATE && nbytes) memset(gauge[d], 0, nbytes);
+        } else if (create == QUDA_REFERENCE_FIELD_CREATE) {
+          gauge[d] = ((void**)param.gauge)[d];
+        } else {
+          errorQuda("Unsupported creation type %d", create);
+        }
       }
     
     } else if (order == QUDA_CPS_WILSON_GAUGE_ORDER || order == QUDA_MILC_GAUGE_ORDER  ||
@@ -65,8 +66,8 @@ namespace quda {
       }
 
       if (create == QUDA_NULL_FIELD_CREATE || create == QUDA_ZERO_FIELD_CREATE) {
-	gauge = (void **) safe_malloc(bytes);
-	if(create == QUDA_ZERO_FIELD_CREATE) memset(gauge, 0, bytes);
+        gauge = bytes ? (void **)safe_malloc(bytes) : nullptr;
+        if (create == QUDA_ZERO_FIELD_CREATE && bytes) memset(gauge, 0, bytes);
       } else if (create == QUDA_REFERENCE_FIELD_CREATE) {
 	gauge = (void**) param.gauge;
       } else {
@@ -278,7 +279,7 @@ namespace quda {
 	void *buffer = pool_pinned_malloc(src.Bytes());
 	// this copies over both even and odd
 	qudaMemcpy(buffer, static_cast<const cudaGaugeField&>(src).Gauge_p(),
-		   src.Bytes(), cudaMemcpyDeviceToHost);
+		   src.Bytes(), qudaMemcpyDeviceToHost);
 
 	copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, gauge, buffer);
 	pool_pinned_free(buffer);
@@ -300,15 +301,15 @@ namespace quda {
 
 	if (order == QUDA_QDP_GAUGE_ORDER) {
 	  for (int d=0; d<geometry; d++) {
-	    qudaMemcpy(((void**)gauge)[d], ((void**)buffer)[d], bytes/geometry, cudaMemcpyDeviceToHost);
+	    qudaMemcpy(((void**)gauge)[d], ((void**)buffer)[d], bytes/geometry, qudaMemcpyDeviceToHost);
 	  }
 	} else {
-	  qudaMemcpy(gauge, buffer, bytes, cudaMemcpyHostToDevice);
+	  qudaMemcpy(gauge, buffer, bytes, qudaMemcpyHostToDevice);
 	}
 
 	if (order > 4 && ghostExchange == QUDA_GHOST_EXCHANGE_PAD && src.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
 	  for (int d=0; d<geometry; d++)
-	    qudaMemcpy(Ghost()[d], ghost_buffer[d], ghost_bytes[d], cudaMemcpyDeviceToHost);
+	    qudaMemcpy(Ghost()[d], ghost_buffer[d], ghost_bytes[d], qudaMemcpyDeviceToHost);
 
 	free_gauge_buffer(buffer, order, geometry);
 	if (nFace > 0) free_ghost_buffer(ghost_buffer, order, geometry);
@@ -327,8 +328,6 @@ namespace quda {
 	src.GhostExchange() != QUDA_GHOST_EXCHANGE_PAD) {
       exchangeGhost(geometry == QUDA_VECTOR_GEOMETRY ? QUDA_LINK_BACKWARDS : QUDA_LINK_BIDIRECTIONAL);
     }
-
-    checkCudaError();
   }
 
   void cpuGaugeField::setGauge(void **gauge_)

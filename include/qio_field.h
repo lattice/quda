@@ -14,28 +14,24 @@ void write_propagator_field(const char *filename, void *V[], QudaPrecision preci
                             QudaParity parity, int nColor, int nSpin, int Nprop, int argc, char *argv[]);
 
 #else
-inline void read_gauge_field(const char *filename, void *gauge[], QudaPrecision prec, const int *X, int argc,
-                             char *argv[])
+inline void read_gauge_field(const char *, void *[], QudaPrecision, const int *, int, char *[])
 {
   printf("QIO support has not been enabled\n");
   exit(-1);
 }
-inline void write_gauge_field(const char *filename, void *gauge[], QudaPrecision prec, const int *X, int argc,
-                              char *argv[])
+inline void write_gauge_field(const char *, void *[], QudaPrecision, const int *, int, char *[])
 {
   printf("QIO support has not been enabled\n");
   exit(-1);
 }
-inline void read_spinor_field(const char *filename, void *V[], QudaPrecision precision, const int *X,
-                              QudaSiteSubset subset, QudaParity parity, int nColor, int nSpin, int Nvec, int argc,
-                              char *argv[])
+inline void read_spinor_field(const char *, void *[], QudaPrecision, const int *,
+                              QudaSiteSubset, QudaParity, int, int, int, int, char *[])
 {
   printf("QIO support has not been enabled\n");
   exit(-1);
 }
-inline void write_spinor_field(const char *filename, void *V[], QudaPrecision precision, const int *X,
-                               QudaSiteSubset subset, QudaParity parity, int nColor, int nSpin, int Nvec, int argc,
-                               char *argv[])
+inline void write_spinor_field(const char *, void *[], QudaPrecision, const int *,
+                               QudaSiteSubset, QudaParity, int, int, int, int, char *[])
 {
   printf("QIO support has not been enabled\n");
   exit(-1);

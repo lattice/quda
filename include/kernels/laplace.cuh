@@ -43,11 +43,11 @@ namespace quda
       DslashArg<Float, nDim>(in, U, parity, dagger, a != 0.0 ? true : false, 1, false, comm_override),
       out(out),
       in(in),
-      U(U),
-      dir(dir),
       x(x),
+      U(U),
       a(a),
-      b(b)
+      b(b),
+      dir(dir)
     {
       if (in.V() == out.V()) errorQuda("Aliasing pointers");
       checkOrder(out, in, x);        // check all orders match
@@ -73,7 +73,7 @@ namespace quda
   */
   template <int nParity, bool dagger, KernelType kernel_type, int dir, typename Coord, typename Arg, typename Vector>
   __device__ __host__ inline void applyLaplace(Vector &out, Arg &arg, Coord &coord, int parity,
-                                               int idx, int thread_dim, bool &active)
+                                               int, int thread_dim, bool &active)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef Matrix<complex<real>, Arg::nColor> Link;
@@ -85,9 +85,9 @@ namespace quda
         {
           // Forward gather - compute fwd offset for vector fetch
           const bool ghost = (coord[d] + 1 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
-
+	  
           if (doHalo<kernel_type>(d) && ghost) {
-
+	    
             // const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, 1);
             const int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
             const Link U = arg.U(d, coord.x_cb, parity);
@@ -118,7 +118,7 @@ namespace quda
 
             const Link U = arg.U.Ghost(d, ghost_idx, 1 - parity);
             const Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
-
+	    
             out += conj(U) * in;
           } else if (doBulk<kernel_type>() && !ghost) {
 
@@ -131,7 +131,7 @@ namespace quda
       }
     }
   }
-
+  
   // out(x) = M*in
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct laplace : dslash_default {
 

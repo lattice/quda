@@ -1,9 +1,7 @@
 #pragma once
 
 #include <cstdio>
-#include <cstdlib>
 #include <iostream>
-#include <iomanip>
 
 #include <register_traits.h>
 #include <float_vector.h>
@@ -11,6 +9,7 @@
 
 namespace quda {
 
+  template <typename T> constexpr bool is_nan(T x) { return x != x; }
 
   template<class T>
     struct Zero
@@ -61,23 +60,22 @@ namespace quda {
   template<class T, int N>
     class Matrix
     {
-      typedef typename RealType<T>::type real;
+      using real = typename RealType<T>::type;
 
     private:
         __device__ __host__ inline int index(int i, int j) const { return i*N + j; }
 
-      public:
+    public:
         T data[N*N];
 
         __device__ __host__ constexpr int size() const { return N; }
 
         __device__ __host__ inline Matrix() { setZero(this); }
 
-        __device__ __host__ inline Matrix(const Matrix<T, N> &a)
-        {
-#pragma unroll
-	  for (int i=0; i<N*N; i++) data[i] = a.data[i];
-        }
+        Matrix(const Matrix<T,N> &) = default;
+        Matrix(Matrix<T,N> &&) = default;
+        Matrix& operator=(const Matrix<T,N> &) = default;
+        Matrix& operator=(Matrix<T,N> &&) = default;
 
         template <class U> __device__ __host__ inline Matrix(const Matrix<U, N> &a)
         {
@@ -226,8 +224,8 @@ namespace quda {
           for (int i=0; i<N; i++) {
 #pragma unroll
             for (int j=0; j<N; j++) {
-              if (std::isnan((*this)(i,j).real()) ||
-                  std::isnan((*this)(i,j).imag())) return false;
+              if (is_nan((*this)(i,j).real()) ||
+                  is_nan((*this)(i,j).imag())) return false;
             }
           }
 
@@ -305,10 +303,10 @@ namespace quda {
         for (int i = 0; i < N * N; i++) data[i] = (T)0.0;
       }
 
-      __device__ __host__ inline HMatrix(const HMatrix<T,N> &a) {
-#pragma unroll
-	for (int i=0; i<N*N; i++) data[i] = a.data[i];
-      }
+      HMatrix(const HMatrix<T,N> &) = default;
+      HMatrix(HMatrix<T,N> &&) = default;
+      HMatrix& operator=(const HMatrix<T,N> &) = default;
+      HMatrix& operator=(HMatrix<T,N> &&) = default;
 
       __device__ __host__ inline HMatrix(const T data_[]) {
 #pragma unroll

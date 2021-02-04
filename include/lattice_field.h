@@ -1,8 +1,7 @@
 #pragma once
 
-#include <map>
-#include <quda.h>
 #include <iostream>
+#include <quda_internal.h>
 #include <comm_quda.h>
 #include <util_quda.h>
 #include <object.h>
@@ -256,14 +255,14 @@ namespace quda {
     mutable size_t ghost_face_bytes[QUDA_MAX_DIM];
 
     /**
-       Real-number offsets to each ghost zone
+       Actual allocated size in bytes of the ghost in each dimension
     */
-    mutable int ghostOffset[QUDA_MAX_DIM][2];
+    mutable size_t ghost_face_bytes_aligned[QUDA_MAX_DIM];
 
     /**
-       Real-number (in floats) offsets to each ghost zone for norm field
+       Byte offsets to each ghost zone
     */
-    mutable int ghostNormOffset[QUDA_MAX_DIM][2];
+    mutable size_t ghost_offset[QUDA_MAX_DIM][2];
 
     /**
        Pinned memory buffer used for sending messages
@@ -362,10 +361,10 @@ namespace quda {
     static int buffer_recv_p2p_back[2][QUDA_MAX_DIM];
 
     /** Local copy of event used for peer-to-peer synchronization */
-    static cudaEvent_t ipcCopyEvent[2][2][QUDA_MAX_DIM];
+    static qudaEvent_t ipcCopyEvent[2][2][QUDA_MAX_DIM];
 
     /** Remote copy of event used for peer-to-peer synchronization */
-    static cudaEvent_t ipcRemoteCopyEvent[2][2][QUDA_MAX_DIM];
+    static qudaEvent_t ipcRemoteCopyEvent[2][2][QUDA_MAX_DIM];
 
     /** Whether we have initialized communication for this field */
     bool initComms;
@@ -435,11 +434,8 @@ namespace quda {
        Create the communication handlers (both host and device)
        @param[in] no_comms_fill Whether to allocate halo buffers for
        dimensions that are not partitioned
-       @param[in] bidir Whether to allocate communication buffers to
-       allow for simultaneous bi-directional exchange.  If false, then
-       the forwards and backwards buffers will alias (saving memory).
     */
-    void createComms(bool no_comms_fill=false, bool bidir=true);
+    void createComms(bool no_comms_fill=false);
 
     /**
        Destroy the communication handlers
@@ -469,12 +465,12 @@ namespace quda {
     /**
        Handle to local copy event used for peer-to-peer synchronization
     */
-    const cudaEvent_t& getIPCCopyEvent(int dir, int dim) const;
+    const qudaEvent_t& getIPCCopyEvent(int dir, int dim) const;
 
     /**
        Handle to remote copy event used for peer-to-peer synchronization
     */
-    const cudaEvent_t& getIPCRemoteCopyEvent(int dir, int dim) const;
+    const qudaEvent_t& getIPCRemoteCopyEvent(int dir, int dim) const;
 
     /**
        Static variable that is determined which ghost buffer we are using
@@ -620,7 +616,7 @@ namespace quda {
        @param[in] dim Dimension we are requesting
        @return Pointer to pinned memory buffer
     */
-    void *myFace_h(int dir, int dim) const { return my_face_dim_dir_h[bufferIndex][dim][dir]; }
+    void *myFace_h(int dir, int dim) const;
 
     /**
        @brief Return pointer to the local mapped my_face buffer in a
@@ -629,7 +625,7 @@ namespace quda {
        @param[in] dim Dimension we are requesting
        @return Pointer to pinned memory buffer
     */
-    void *myFace_hd(int dir, int dim) const { return my_face_dim_dir_hd[bufferIndex][dim][dir]; }
+    void *myFace_hd(int dir, int dim) const;
 
     /**
        @brief Return pointer to the device send buffer in a given
@@ -638,7 +634,7 @@ namespace quda {
        @param[in] dim Dimension we are requesting
        @return Pointer to pinned memory buffer
     */
-    void *myFace_d(int dir, int dim) const { return my_face_dim_dir_d[bufferIndex][dim][dir]; }
+    void *myFace_d(int dir, int dim) const;
 
     /**
        @brief Return base pointer to a remote device buffer for direct
@@ -649,24 +645,17 @@ namespace quda {
        @param[in] dim Dimension we are requesting
        @return Pointer to remote memory buffer
     */
-    void *remoteFace_d(int dir, int dim) const { return ghost_remote_send_buffer_d[bufferIndex][dim][dir]; }
+    void *remoteFace_d(int dir, int dim) const;
 
-    virtual void gather(int nFace, int dagger, int dir, qudaStream_t *stream_p = NULL) { errorQuda("Not implemented"); }
+    virtual void gather(int, int, int, const qudaStream_t &) { errorQuda("Not implemented"); }
 
-    virtual void commsStart(int nFace, int dir, int dagger = 0, qudaStream_t *stream_p = NULL, bool gdr_send = false,
-                            bool gdr_recv = true)
-    { errorQuda("Not implemented"); }
+    virtual void commsStart(int, int, int, const qudaStream_t &, bool, bool) { errorQuda("Not implemented"); }
 
-    virtual int commsQuery(int nFace, int dir, int dagger = 0, qudaStream_t *stream_p = NULL, bool gdr_send = false,
-                           bool gdr_recv = true)
-    { errorQuda("Not implemented"); return 0; }
+    virtual int commsQuery(int, const qudaStream_t &, bool, bool) { errorQuda("Not implemented"); return 0; }
 
-    virtual void commsWait(int nFace, int dir, int dagger = 0, qudaStream_t *stream_p = NULL, bool gdr_send = false,
-                           bool gdr_recv = true)
-    { errorQuda("Not implemented"); }
+    virtual void commsWait(int, const qudaStream_t &, bool, bool) { errorQuda("Not implemented"); }
 
-    virtual void scatter(int nFace, int dagger, int dir)
-    { errorQuda("Not implemented"); }
+    virtual void scatter(int, const qudaStream_t &) { errorQuda("Not implemented"); }
 
     /** Return the volume string used by the autotuner */
     inline const char *VolString() const { return vol_string; }
@@ -685,9 +674,14 @@ namespace quda {
       all relevant memory fields to the current device or to the CPU.
       @param[in] mem_space Memory space we are prefetching to
     */
-    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const { ; }
+    virtual void prefetch(QudaFieldLocation, qudaStream_t = device::get_default_stream()) const { ; }
 
     virtual bool isNative() const = 0;
+
+    /**
+       @brief Return the number of bytes in the field allocation.
+     */
+    virtual size_t Bytes() const = 0;
   };
   
   /**
@@ -800,6 +794,19 @@ namespace quda {
   inline const char *compile_type_str(const LatticeField &meta, QudaFieldLocation location_ = QUDA_INVALID_FIELD_LOCATION)
   {
     QudaFieldLocation location = (location_ == QUDA_INVALID_FIELD_LOCATION ? meta.Location() : location_);
+#ifdef JITIFY
+    return location == QUDA_CUDA_FIELD_LOCATION ? "GPU-jitify," : "CPU,";
+#else
+    return location == QUDA_CUDA_FIELD_LOCATION ? "GPU-offline," : "CPU,";
+#endif
+  }
+
+  /**
+     @brief Helper function for setting auxilary string
+     @return String containing location and compilation type
+   */
+  inline const char *compile_type_str(QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION)
+  {
 #ifdef JITIFY
     return location == QUDA_CUDA_FIELD_LOCATION ? "GPU-jitify," : "CPU,";
 #else

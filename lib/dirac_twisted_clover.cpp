@@ -61,7 +61,7 @@ namespace quda {
     twistedCloverApply(out, in, QUDA_TWIST_GAMMA5_DIRECT, parity);
   }
 
-  void DiracTwistedClover::Dslash(ColorSpinorField &out, const ColorSpinorField &in, QudaParity parity) const
+  void DiracTwistedClover::Dslash(ColorSpinorField &, const ColorSpinorField &, QudaParity) const
   {
     // this would really just be a Wilson dslash (not actually instantiated at present)
     errorQuda("Not implemented");
@@ -118,8 +118,7 @@ namespace quda {
     sol = &x;
   }
 
-  void DiracTwistedClover::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-				       const QudaSolutionType solType) const
+  void DiracTwistedClover::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
   {
     // do nothing
   }
@@ -131,9 +130,13 @@ namespace quda {
   }
 
   void DiracTwistedClover::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-					  double kappa, double mass, double mu, double mu_factor) const {
+					  double kappa, double, double mu, double mu_factor) const
+  {
+    if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
+      errorQuda("Wilson-type operators only support aggregation coarsening");
+
     double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
-    CoarseOp(Y, X, T, *gauge, clover, kappa, a, mu_factor, QUDA_TWISTED_CLOVER_DIRAC, QUDA_MATPC_INVALID);
+    CoarseOp(Y, X, T, *gauge, clover, kappa, mass, a, mu_factor, QUDA_TWISTED_CLOVER_DIRAC, QUDA_MATPC_INVALID);
   }
 
   DiracTwistedCloverPC::DiracTwistedCloverPC(const DiracTwistedCloverPC &dirac) :
@@ -335,9 +338,13 @@ namespace quda {
   }
 
   void DiracTwistedCloverPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-					    double kappa, double mass, double mu, double mu_factor) const {
+					    double kappa, double, double mu, double mu_factor) const
+  {
+    if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
+      errorQuda("Wilson-type operators only support aggregation coarsening");
+
     double a = -2.0 * kappa * mu * T.Vectors().TwistFlavor();
-    CoarseOp(Y, X, T, *gauge, clover, kappa, a, -mu_factor, QUDA_TWISTED_CLOVERPC_DIRAC, matpcType);
+    CoarseOp(Y, X, T, *gauge, clover, kappa, mass, a, -mu_factor, QUDA_TWISTED_CLOVERPC_DIRAC, matpcType);
   }
 
   void DiracTwistedCloverPC::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const

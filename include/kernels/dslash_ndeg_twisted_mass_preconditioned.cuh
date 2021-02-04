@@ -55,7 +55,6 @@ namespace quda
     {
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
-      typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
 
       bool active
         = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
@@ -95,7 +94,7 @@ namespace quda
 
       if (isComplete<kernel_type>(arg, coord) && active) {
         if (!dagger || Arg::asymmetric) { // apply A^{-1} to D*in
-          VectorCache<real, Vector> cache;
+          SharedMemoryCache<Vector> cache(device::block_dim());
           // to apply the preconditioner we need to put "out" in shared memory so the other flavor can access it
           cache.save(out);
           cache.sync(); // safe to sync in here since other threads will exit

@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 #include <quda_internal.h>
+#include <timer.h>
 #include <color_spinor_field.h>
 #include <blas_quda.h>
 
@@ -267,8 +268,6 @@ void initFields(prec_pair_t prec_pair)
   QudaPrecision prec = prec_pair.first;
   QudaPrecision prec_other = prec_pair.second;
 
-  checkCudaError();
-
   param.setPrecision(prec, prec, true);
   vD = new cudaColorSpinorField(param);
   wD = new cudaColorSpinorField(param);
@@ -306,9 +305,6 @@ void initFields(prec_pair_t prec_pair)
 
   param.composite_dim = Nsrc;
   zmoD = new cudaColorSpinorField(param);
-
-  // check for successful allocation
-  checkCudaError();
 
   // only do copy if not doing half precision with mg
   bool flag = !(param.nSpin == 2 && (prec < QUDA_SINGLE_PRECISION || prec_other < QUDA_HALF_PRECISION));
@@ -367,10 +363,8 @@ double benchmark(Kernel kernel, const int niter)
   quda::Complex * A2 = new quda::Complex[Nsrc*Nsrc]; // for the block cDotProductNorm test
   double *Ar = new double[Nsrc * Msrc];
 
-  cudaEvent_t start, end;
-  cudaEventCreate(&start);
-  cudaEventCreate(&end);
-  cudaEventRecord(start, 0);
+  device_timer_t timer;
+  timer.start();
 
   {
     switch (kernel) {
@@ -534,19 +528,15 @@ double benchmark(Kernel kernel, const int niter)
     }
   }
 
-  cudaEventRecord(end, 0);
-  cudaEventSynchronize(end);
-  float runTime;
-  cudaEventElapsedTime(&runTime, start, end);
-  cudaEventDestroy(start);
-  cudaEventDestroy(end);
+  timer.stop();
+
   delete[] A;
   delete[] B;
   delete[] C;
   delete[] A2;
   delete[] Ar;
-  double secs = runTime / 1000;
-  return secs;
+
+  return timer.last();
 }
 
 #define ERROR(a) fabs(blas::norm2(*a##D) - blas::norm2(*a##H)) / blas::norm2(*a##H)
@@ -681,7 +671,6 @@ double test(Kernel kernel)
 
   case Kernel::norm2:
     *xD = *xH;
-    *yH = *xD;
     error = fabs(blas::norm2(*xD) - blas::norm2(*xH)) / blas::norm2(*xH);
     break;
 
@@ -1030,7 +1019,7 @@ int main(int argc, char** argv)
   setSpinorSiteSize(24);
   initComms(argc, argv, gridsize_from_cmdline);
   display_test_info();
-  initQuda(device);
+  initQuda(device_ordinal);
 
   setVerbosity(verbosity);
 

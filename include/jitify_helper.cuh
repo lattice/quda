@@ -8,7 +8,12 @@
    directly.
 */
 
-#ifdef JITIFY
+#include <quda_define.h>
+#if defined(JITIFY) && !defined(QUDA_TARGET_CUDA)
+#error "Jitify compilation cannot be enabled unless targeting CUDA"
+#endif
+
+#if defined(JITIFY)
 
 #ifdef HOST_DEBUG
 
@@ -40,6 +45,7 @@
 
 #include "jitify_options.hpp"
 #include <jitify.hpp>
+#include <device.h>
 
 #endif
 
@@ -56,10 +62,16 @@ namespace quda {
     if (!jitify_init) {
       kernel_cache = new jitify::JitCache;
 
-      std::vector<std::string> options = {"-std=c++14", "-ftz=true", "-prec-div=false", "-prec-sqrt=false"};
+      std::vector<std::string> options = {"-ftz=true", "-prec-div=false", "-prec-sqrt=false", "-remove-unused-globals"};
 
 #ifdef DEVICE_DEBUG
       options.push_back(std::string("-G"));
+#endif
+
+#if __cplusplus >= 201703L
+      options.push_back(std::string("-std=c++17"));
+#else
+      options.push_back(std::string("-std=c++14"));
 #endif
 
       // add an extra compilation options specific to this instance
@@ -68,6 +80,15 @@ namespace quda {
       program = new jitify::Program(kernel_cache->program(file, 0, options));
       jitify_init = true;
     }
+  }
+
+  template <typename instance_t>
+  void set_max_shared_bytes(instance_t &instance)
+  {
+    instance.set_func_attribute(CU_FUNC_ATTRIBUTE_PREFERRED_SHARED_MEMORY_CARVEOUT, 100);
+    auto shared_size = instance.get_func_attribute(CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES);
+    instance.set_func_attribute(CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES,
+                                device::max_dynamic_shared_memory() - shared_size);
   }
 
 #endif

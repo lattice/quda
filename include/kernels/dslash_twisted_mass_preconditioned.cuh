@@ -145,11 +145,10 @@ namespace quda
        - no xpay: out(x) = M*in = a*(1+i*b*gamma_5)D * in
        - with xpay:  out(x) = M*in = x + a*(1+i*b*gamma_5)D * in
     */
-    __device__ __host__ inline void operator()(int idx, int s, int parity)
+    __device__ __host__ inline void operator()(int idx, int, int parity)
     {
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
-      typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
 
       bool active
         = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)

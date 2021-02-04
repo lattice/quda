@@ -448,9 +448,9 @@ namespace quda {
 		    -i  0  0  0
 		     0  i  0  0
     */
-    __device__ __host__ inline ColorSpinor<Float,Nc,4> sigma(int mu, int nu) {
+    __device__ __host__ inline ColorSpinor<Float,Nc,4> sigma(int mu, int nu) const {
       ColorSpinor<Float,Nc,4> a;
-      ColorSpinor<Float,Nc,4> &b = *this;
+      const ColorSpinor<Float,Nc,4> &b = *this;
       complex<Float> j(0.0,1.0);
 
       switch(mu) {
@@ -901,6 +901,44 @@ namespace quda {
       }
     }
   };
+
+  /**
+     @brief Compute the inner product over color and spin
+     dot = \sum_s,c conj(a(s,c)) * b(s,c)
+     @param a Left-hand side ColorSpinor
+     @param b Right-hand side ColorSpinor
+     @return The inner product
+  */
+  template <typename Float, int Nc, int Ns>
+  __device__ __host__ inline void caxpy(const complex<Float> &a, const ColorSpinor<Float, Nc, Ns> &x,
+                                        ColorSpinor<Float, Nc, Ns> &y)
+  {
+#pragma unroll
+    for (int i = 0; i < Nc * Ns; i++) {
+      y(i).real( a.real() * x(i).real() + y(i).real());
+      y(i).real(-a.imag() * x(i).imag() + y(i).real());
+      y(i).imag( a.imag() * x(i).real() + y(i).imag());
+      y(i).imag( a.real() * x(i).imag() + y(i).imag());
+    }
+  }
+
+  /**
+     @brief Compute the L2 norm squared over color and spin
+     nrm = \sum_s,c conj(a(s,c)) * a(s,c)
+     @param a ColorSpinor we taking the norm
+     @return The L2 norm squared
+  */
+  template <typename Float, int Nc, int Ns>
+  __device__ __host__ inline Float norm2(const ColorSpinor<Float, Nc, Ns> &a)
+  {
+    Float nrm = 0.0;
+#pragma unroll
+    for (int i = 0; i < Nc * Ns; i++) {
+      nrm += a(i).real() * a(i).real();
+      nrm += a(i).imag() * a(i).imag();
+    }
+    return nrm;
+  }
 
   /**
      @brief Compute the inner product over color and spin

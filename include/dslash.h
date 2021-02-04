@@ -98,18 +98,17 @@ namespace quda
           // kernel, then we only have to update the non-p2p ghosts,
           // since these may have been assigned to zero-copy memory
           if (!comm_peer2peer_enabled(dir, dim) || arg.kernel_type == INTERIOR_KERNEL) {
-            ghost[2 * dim + dir]
-              = (typename Arg::Float *)((char *)in.Ghost2() + in.GhostOffset(dim, dir) * in.GhostPrecision());
+            ghost[2 * dim + dir] = (typename Arg::Float *)((char *)in.Ghost2() + in.GhostOffset(dim, dir));
           }
         }
       }
 
-      arg.in.resetGhost(in, ghost);
+      arg.in.resetGhost(ghost);
 
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) {
         arg.blocks_per_dir = tp.aux.x;
         arg.setPack(true); // need to recompute for updated block_per_dir
-        arg.in.resetGhost(in, this->packBuffer);
+        arg.in.resetGhost(this->packBuffer);
         tp.grid.x += arg.pack_blocks;
       }
     }
@@ -151,14 +150,6 @@ namespace quda
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1; // packing blocks per direction
     }
 
-    template <typename T> inline void launch(T *f, const TuneParam &tp, const qudaStream_t &stream)
-    {
-      if (deviceProp.major >= 7) { // should test whether this is always optimal on Volta
-        this->setMaxDynamicSharedBytesPerBlock(f);
-      }
-      qudaLaunchKernel(f, tp, stream, arg);
-    }
-
     /**
        @brief This is a helper class that is used to instantiate the
        correct templated kernel for the dslash.  This can be used for
@@ -166,9 +157,10 @@ namespace quda
        compilation time.
     */
     template <template <bool, QudaPCType, typename> class P, int nParity, bool dagger, bool xpay, KernelType kernel_type>
-    inline void Launch(TuneParam &tp, const qudaStream_t &stream)
+    inline void launch(TuneParam &tp, const qudaStream_t &stream)
     {
-      launch(dslashGPU<D, P, nParity, dagger, xpay, kernel_type, Arg>, tp, stream);
+      tp.set_max_shared_bytes = true;
+      qudaLaunchKernel(dslashGPU<D, P, nParity, dagger, xpay, kernel_type, Arg>, tp, stream, arg);
     }
 
 #ifdef JITIFY
@@ -212,16 +204,17 @@ namespace quda
         errorQuda("Not implemented");
       } else {
 #ifdef JITIFY
-        Tunable::jitify_error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
+        auto error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, device::get_cuda_stream(stream)).launch(arg);
+        Tunable::launch_error = error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
 #else
         switch (arg.kernel_type) {
-        case INTERIOR_KERNEL: Launch<P, nParity, dagger, xpay, INTERIOR_KERNEL>(tp, stream); break;
+        case INTERIOR_KERNEL: launch<P, nParity, dagger, xpay, INTERIOR_KERNEL>(tp, stream); break;
 #ifdef MULTI_GPU
-        case EXTERIOR_KERNEL_X: Launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_X>(tp, stream); break;
-        case EXTERIOR_KERNEL_Y: Launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_Y>(tp, stream); break;
-        case EXTERIOR_KERNEL_Z: Launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_Z>(tp, stream); break;
-        case EXTERIOR_KERNEL_T: Launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_T>(tp, stream); break;
-        case EXTERIOR_KERNEL_ALL: Launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_ALL>(tp, stream); break;
+        case EXTERIOR_KERNEL_X: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_X>(tp, stream); break;
+        case EXTERIOR_KERNEL_Y: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_Y>(tp, stream); break;
+        case EXTERIOR_KERNEL_Z: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_Z>(tp, stream); break;
+        case EXTERIOR_KERNEL_T: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_T>(tp, stream); break;
+        case EXTERIOR_KERNEL_ALL: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_ALL>(tp, stream); break;
         default: errorQuda("Unexpected kernel type %d", arg.kernel_type);
 #else
         default: errorQuda("Unexpected kernel type %d for single-GPU build", arg.kernel_type);
@@ -241,7 +234,8 @@ namespace quda
     inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
     {
 #ifdef JITIFY
-      Tunable::jitify_error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
+      auto error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, device::get_cuda_stream(stream)).launch(arg);
+      Tunable::launch_error = error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
 #else
       if (arg.dagger)
         instantiate<P, nParity, true, xpay>(tp, stream);
@@ -260,7 +254,8 @@ namespace quda
     inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
     {
 #ifdef JITIFY
-      Tunable::jitify_error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
+      auto error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, device::get_cuda_stream(stream)).launch(arg);
+      Tunable::launch_error = error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
 #else
       switch (arg.nParity) {
       case 1: instantiate<P, 1, xpay>(tp, stream); break;
@@ -280,7 +275,8 @@ namespace quda
     inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
     {
 #ifdef JITIFY
-      Tunable::jitify_error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
+      auto error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, device::get_cuda_stream(stream)).launch(arg);
+      Tunable::launch_error = error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
 #else
       if (arg.xpay)
         instantiate<P, true>(tp, stream);
@@ -337,8 +333,7 @@ namespace quda
       for (int dim = 0; dim < 4; dim++) {
         for (int dir = 0; dir < 2; dir++) {
           if ((location & Remote) && comm_peer2peer_enabled(dir, dim)) { // pack to p2p remote
-            packBuffer[2 * dim + dir]
-              = static_cast<char *>(in.remoteFace_d(dir, dim)) + in.Precision() * in.GhostOffset(dim, 1 - dir);
+            packBuffer[2 * dim + dir] = static_cast<char *>(in.remoteFace_d(dir, dim)) + in.GhostOffset(dim, 1 - dir);
           } else if (location & Host && !comm_peer2peer_enabled(dir, dim)) { // pack to cpu memory
             packBuffer[2 * dim + dir] = in.myFace_hd(dir, dim);
           } else { // pack to local gpu memory
@@ -440,7 +435,6 @@ namespace quda
         break;
       }
       case INTERIOR_KERNEL:
-        if (arg.pack_threads) { flops_ += pack_flops * arg.nParity * in.getDslashConstant().Ls * arg.pack_threads; }
       case KERNEL_POLICY: {
         long long sites = in.Volume();
         flops_ = (num_dir * (in.Nspin() / 4) * in.Ncolor() * in.Nspin() + // spin project (=0 for staggered)
@@ -456,6 +450,8 @@ namespace quda
           if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
         flops_ -= ghost_flops * ghost_sites;
 
+        if (arg.kernel_type == INTERIOR_KERNEL && arg.pack_threads)
+          flops_ += pack_flops * arg.nParity * in.getDslashConstant().Ls * arg.pack_threads;
         break;
       }
       }
@@ -486,7 +482,6 @@ namespace quda
         break;
       }
       case INTERIOR_KERNEL:
-        if (arg.pack_threads) { bytes_ += pack_bytes * arg.nParity * in.getDslashConstant().Ls * arg.pack_threads; }
       case KERNEL_POLICY: {
         long long sites = in.Volume();
         bytes_ = (num_dir * gauge_bytes + ((num_dir - 2) * spinor_bytes + 2 * proj_spinor_bytes) + spinor_bytes) * sites;
@@ -499,6 +494,8 @@ namespace quda
           if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
         bytes_ -= ghost_bytes * ghost_sites;
 
+        if (arg.kernel_type == INTERIOR_KERNEL && arg.pack_threads)
+          bytes_ += pack_bytes * arg.nParity * in.getDslashConstant().Ls * arg.pack_threads;
         break;
       }
       }
@@ -587,7 +584,7 @@ namespace quda
 #endif
     } else if (U.Precision() == QUDA_QUARTER_PRECISION) {
 #if QUDA_PRECISION & 1
-      instantiate<Apply, Recon, char>(out, in, U, args...);
+      instantiate<Apply, Recon, int8_t>(out, in, U, args...);
 #else
       errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
 #endif
@@ -606,6 +603,7 @@ namespace quda
      @param[in] U Gauge field
      @param[in] args Additional arguments for different dslash kernels
   */
+#if (QUDA_PRECISION & 2) || (QUDA_PRECISION & 1)
   template <template <typename, int, QudaReconstructType> class Apply, typename Recon = WilsonReconstruct, typename... Args>
   inline void instantiatePreconditioner(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
                                         Args &&... args)
@@ -618,7 +616,7 @@ namespace quda
 #endif
     } else if (U.Precision() == QUDA_QUARTER_PRECISION) {
 #if QUDA_PRECISION & 1
-      instantiate<Apply, Recon, char>(out, in, U, args...);
+      instantiate<Apply, Recon, int8_t>(out, in, U, args...);
 #else
       errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
 #endif
@@ -626,5 +624,18 @@ namespace quda
       errorQuda("Unsupported precision %d\n", U.Precision());
     }
   }
+#else
+  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = WilsonReconstruct, typename... Args>
+  inline void instantiatePreconditioner(ColorSpinorField &, const ColorSpinorField &, const GaugeField &U, Args &&...)
+  {
+    if (U.Precision() == QUDA_HALF_PRECISION) {
+      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+    } else if (U.Precision() == QUDA_QUARTER_PRECISION) {
+      errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+    } else {
+      errorQuda("Unsupported precision %d\n", U.Precision());
+    }
+  }
+#endif
 
 } // namespace quda

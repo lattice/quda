@@ -44,7 +44,7 @@ namespace quda
        out(x) = M*in = A(x)*x(x) + D * in(x-mu)
        Note this routine only exists in xpay form.
     */
-    __device__ __host__ inline void operator()(int idx, int s, int parity)
+    __device__ __host__ inline void operator()(int idx, int, int parity)
     {
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;

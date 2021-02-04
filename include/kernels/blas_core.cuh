@@ -2,6 +2,7 @@
 
 #include <color_spinor_field_order.h>
 #include <blas_helper.cuh>
+#include <kernel.h>
 
 namespace quda
 {
@@ -11,9 +12,12 @@ namespace quda
 
     /**
        Parameter struct for generic blas kernel
+       @tparam n real numbers per thread
     */
-    template <typename store_t, int N, typename y_store_t, int Ny, typename Functor>
+    template <typename real_, int n_, typename store_t, int N, typename y_store_t, int Ny, typename Functor>
     struct BlasArg {
+      using real = real_;
+      static constexpr int n = n_;
       Spinor<store_t, N> X;
       Spinor<y_store_t, Ny> Y;
       Spinor<store_t, N> Z;
@@ -21,8 +25,8 @@ namespace quda
       Spinor<y_store_t, Ny> V;
       Functor f;
 
-      const int length;
       const int nParity;
+      dim3 threads;
       BlasArg(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w,
               ColorSpinorField &v, Functor f, int length, int nParity) :
         X(x),
@@ -31,25 +35,25 @@ namespace quda
         W(w),
         V(v),
         f(f),
-        length(length),
-        nParity(nParity)
+        nParity(nParity),
+        threads(length, nParity, 1)
       { ; }
     };
 
     /**
-       Generic blas kernel with four loads and up to four stores.
+       Generic blas functor  with four loads and up to four stores.
     */
-    template <typename real, int n, typename Arg> __global__ void blasKernel(Arg arg)
-    {
-      // n is real numbers per thread
-      using vec = vector_type<complex<real>, n/2>;
-      unsigned int i = blockIdx.x * blockDim.x + threadIdx.x;
-      unsigned int parity = blockIdx.y;
-      unsigned int gridSize = gridDim.x * blockDim.x;
+    template <typename Arg> struct Blas_ {
+      Arg &arg;
+      constexpr Blas_(Arg &arg) : arg(arg) {}
+      static constexpr const char *filename() { return KERNEL_FILE; }
 
-      arg.f.init();
+      __device__ __host__ inline void operator()(int i, int parity)
+      {
+        using vec = vector_type<complex<typename Arg::real>, Arg::n/2>;
 
-      while (i < arg.length) {
+        arg.f.init();
+
         vec x, y, z, w, v;
         if (arg.f.read.X) arg.X.load(x, i, parity);
         if (arg.f.read.Y) arg.Y.load(y, i, parity);
@@ -64,39 +68,8 @@ namespace quda
         if (arg.f.write.Z) arg.Z.save(z, i, parity);
         if (arg.f.write.W) arg.W.save(w, i, parity);
         if (arg.f.write.V) arg.V.save(v, i, parity);
-
-        i += gridSize;
       }
-    }
-
-    /**
-       Generic blas kernel with four loads and up to four stores.
-    */
-    template <typename real, int n, typename Arg> void blasCPU(Arg arg)
-    {
-      // n is real numbers per thread
-      using vec = vector_type<complex<real>, n/2>;
-
-      arg.f.init();
-      for (int parity = 0; parity < arg.nParity; parity++) {
-        for (int i = 0; i < arg.length; i++) {
-          vec x, y, z, w, v;
-          if (arg.f.read.X) arg.X.load(x, i, parity);
-          if (arg.f.read.Y) arg.Y.load(y, i, parity);
-          if (arg.f.read.Z) arg.Z.load(z, i, parity);
-          if (arg.f.read.W) arg.W.load(w, i, parity);
-          if (arg.f.read.V) arg.V.load(v, i, parity);
-
-          arg.f(x, y, z, w, v);
-
-          if (arg.f.write.X) arg.X.save(x, i, parity);
-          if (arg.f.write.Y) arg.Y.save(y, i, parity);
-          if (arg.f.write.Z) arg.Z.save(z, i, parity);
-          if (arg.f.write.W) arg.W.save(w, i, parity);
-          if (arg.f.write.V) arg.V.save(v, i, parity);
-        }
-      }
-    }
+    };
 
     /**
        Base class from which all blas functors should derive
@@ -114,8 +87,8 @@ namespace quda
       static constexpr memory_access<0, 0, 0, 0, 1> write{ };
       const real a;
       const real b;
-      axpbyz_(const real &a, const real &b, const real &c) : a(a), b(b) { ; }
-      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
+      axpbyz_(const real &a, const real &b, const real &) : a(a), b(b) { ; }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &, T &, T &v)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) v[i] = a * x[i] + b * y[i];
@@ -130,8 +103,8 @@ namespace quda
       static constexpr memory_access<1> read{ };
       static constexpr memory_access<1> write{ };
       const real a;
-      ax_(const real &a, const real &b, const real &c) : a(a) { ; }
-      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
+      ax_(const real &a, const real &, const real &) : a(a) { ; }
+      template <typename T> __device__ __host__ void operator()(T &x, T &, T &, T &, T &)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) x[i] *= a;
@@ -146,8 +119,8 @@ namespace quda
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<0, 1> write{ };
       const complex<real> a;
-      caxpy_(const complex<real> &a, const complex<real> &b, const complex<real> &c) : a(a) { ; }
-      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
+      caxpy_(const complex<real> &a, const complex<real> &, const complex<real> &) : a(a) { ; }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &, T &, T &)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) y[i] = cmac(a, x[i], y[i]);
@@ -179,8 +152,8 @@ namespace quda
       static constexpr memory_access<0, 1> write{ };
       const complex<real> a;
       const complex<real> b;
-      caxpby_(const complex<real> &a, const complex<real> &b, const complex<real> &c) : a(a), b(b) { ; }
-      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
+      caxpby_(const complex<real> &a, const complex<real> &b, const complex<real> &) : a(a), b(b) { ; }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &, T &, T &)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) _caxpby(a, x[i], b, y[i]);
@@ -195,7 +168,7 @@ namespace quda
       const complex<real> b;
       const complex<real> c;
       caxpbypczw_(const complex<real> &a, const complex<real> &b, const complex<real> &c) : a(a), b(b), c(c) { ; }
-      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
@@ -217,7 +190,7 @@ namespace quda
       const real b;
       const real c;
       axpyBzpcx_(const real &a, const real &b, const real &c) : a(a), b(b), c(c) { ; }
-      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
@@ -236,8 +209,8 @@ namespace quda
       static constexpr memory_access<1, 1> write{ };
       const real a;
       const real b;
-      axpyZpbx_(const real &a, const real &b, const real &c) : a(a), b(b) { ; }
-      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
+      axpyZpbx_(const real &a, const real &b, const real &) : a(a), b(b) { ; }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
@@ -256,8 +229,8 @@ namespace quda
       static constexpr memory_access<1, 1> write{ };
       const complex<real> a;
       const complex<real> b;
-      caxpyBzpx_(const complex<real> &a, const complex<real> &b, const complex<real> &c) : a(a), b(b) { ; }
-      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
+      caxpyBzpx_(const complex<real> &a, const complex<real> &b, const complex<real> &) : a(a), b(b) { ; }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
@@ -276,8 +249,8 @@ namespace quda
       static constexpr memory_access<0, 1, 1> write{ };
       const complex<real> a;
       const complex<real> b;
-      caxpyBxpz_(const complex<real> &a, const complex<real> &b, const complex<real> &c) : a(a), b(b) { ; }
-      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
+      caxpyBxpz_(const complex<real> &a, const complex<real> &b, const complex<real> &) : a(a), b(b) { ; }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
@@ -296,8 +269,8 @@ namespace quda
       static constexpr memory_access<0, 1, 1> write{ };
       const complex<real> a;
       const complex<real> b;
-      caxpbypzYmbw_(const complex<real> &a, const complex<real> &b, const complex<real> &c) : a(a), b(b) { ; }
-      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
+      caxpbypzYmbw_(const complex<real> &a, const complex<real> &b, const complex<real> &) : a(a), b(b) { ; }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
@@ -317,8 +290,8 @@ namespace quda
       static constexpr memory_access<1, 1> write{ };
       const real a;
       const complex<real> b;
-      cabxpyAx_(const complex<real> &a, const complex<real> &b, const complex<real> &c) : a(a.real()), b(b) { ; }
-      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
+      cabxpyAx_(const complex<real> &a, const complex<real> &b, const complex<real> &) : a(a.real()), b(b) { ; }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &, T &, T &)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
@@ -338,8 +311,8 @@ namespace quda
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<1, 1> write{ };
       const complex<real> a;
-      caxpyxmaz_(const complex<real> &a, const complex<real> &b, const complex<real> &c) : a(a) { ; }
-      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
+      caxpyxmaz_(const complex<real> &a, const complex<real> &, const complex<real> &) : a(a) { ; }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
@@ -363,18 +336,23 @@ namespace quda
       static constexpr memory_access<1, 1> write{ };
       complex<real> a;
       double3 *Ar3;
-      caxpyxmazMR_(const real &a, const real &b, const real &c) :
+      bool init_;
+      caxpyxmazMR_(const real &a, const real &, const real &) :
         a(a),
-        Ar3(static_cast<double3 *>(reducer::get_device_buffer()))
+        Ar3(static_cast<double3 *>(reducer::get_device_buffer())),
+        init_(false)
       { ; }
 
       __device__ __host__ void init()
       {
-        double3 result = *Ar3;
-        a = a.real() * complex<real>((real)result.x, (real)result.y) * ((real)1.0 / (real)result.z);
+        if (!init_) {
+          double3 result = *Ar3;
+          a = a.real() * complex<real>((real)result.x, (real)result.y) * ((real)1.0 / (real)result.z);
+          init_ = true;
+        }
       }
 
-      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
@@ -397,8 +375,8 @@ namespace quda
       static constexpr memory_access<0, 1, 1, 1> write{ };
       const real a;
       const real b;
-      tripleCGUpdate_(const real &a, const real &b, const real &c) : a(a), b(b) { ; }
-      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
+      tripleCGUpdate_(const real &a, const real &b, const real &) : a(a), b(b) { ; }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &)
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {

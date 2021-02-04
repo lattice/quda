@@ -95,8 +95,7 @@ namespace quda
     virtual long long bytes() const
     {
       int gauge_bytes = arg.reconstruct * in.Precision();
-      bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
-      int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed ? sizeof(float) : 0);
+      int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed<typename Arg::Float>::value ? sizeof(float) : 0);
       int proj_spinor_bytes = in.Nspin() == 4 ? spinor_bytes / 2 : spinor_bytes;
       int ghost_bytes = (proj_spinor_bytes + gauge_bytes) + 2 * spinor_bytes; // 2 since we have to load the partial
       int num_dir = (arg.dir == 4 ? 2 * 4 : 2 * 3);                           // 3D or 4D operator
@@ -149,9 +148,14 @@ namespace quda
 
   template <typename Float, int nColor, QudaReconstructType recon> struct LaplaceApply {
 
+#if defined(GPU_STAGGERED_DIRAC) || defined(GPU_WILSON_DIRAC)
     inline LaplaceApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir,
                         double a, double b, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
                         TimeProfile &profile)
+#else
+    inline LaplaceApply(ColorSpinorField &, const ColorSpinorField &in, const GaugeField &, int,
+                        double, double, const ColorSpinorField &, int, bool, const int *, TimeProfile &)
+#endif
     {
       if (in.Nspin() == 1) {
 #ifdef GPU_STAGGERED_DIRAC
@@ -163,9 +167,8 @@ namespace quda
         dslash::DslashPolicyTune<decltype(laplace)> policy(
           laplace, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
           in.GhostFaceCB(), profile);
-        policy.apply(0);
 #else
-        errorQuda("nSpin=1 Laplace operator required staggered dslash to be enabled");
+        errorQuda("nSpin=%d Laplace operator required staggered dslash to be enabled", in.Nspin());
 #endif
       } else if (in.Nspin() == 4) {
 #ifdef GPU_WILSON_DIRAC
@@ -177,15 +180,12 @@ namespace quda
         dslash::DslashPolicyTune<decltype(laplace)> policy(
           laplace, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
           in.GhostFaceCB(), profile);
-        policy.apply(0);
 #else
-        errorQuda("nSpin=4 Laplace operator required wilson dslash to be enabled");
+        errorQuda("nSpin=%d Laplace operator required wilson dslash to be enabled", in.Nspin());
 #endif
       } else {
         errorQuda("Unsupported nSpin= %d", in.Nspin());
       }
-
-      checkCudaError();
     }
   };
 

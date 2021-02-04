@@ -76,7 +76,7 @@ int main(int argc, char **argv)
   for (int i=0; i<inv_param.num_offset; i++) inv_param.offset[i] = offset[i];
 
   // initialize the QUDA library
-  initQuda(device);
+  initQuda(device_ordinal);
 
   // Set some dimension parameters for the host routines
   if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
@@ -137,7 +137,8 @@ int main(int argc, char **argv)
     qudaInMulti[i] = quda::ColorSpinorField::Create(cs_param);
     inMulti[i] = qudaInMulti[i]->V();
     // Populate the host spinor with random numbers.
-    constructRandomSpinorSource(qudaInMulti[i]->V(), 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
+    constructRandomSpinorSource(qudaInMulti[i]->V(), 4, 3, inv_param.cpu_prec, inv_param.solution_type, gauge_param.X,
+                                *rng);
   }
   // Vector construct END
   //-----------------------------------------------------------------------------------
