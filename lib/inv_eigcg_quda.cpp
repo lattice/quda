@@ -1609,6 +1609,8 @@ printfQuda("Running logical RHS : %d with min search space restarts %d, %d, %d, 
       param.eig_param.n_ev = param.eig_param.n_conv;
     }
 
+    eigcg_args->logical_rhs_id = 0;
+
     if (param.eig_param.n_conv == param.eig_param.n_ev || param.eig_param.is_last_rhs) {
       if (getVerbosity() == QUDA_DEBUG_VERBOSE) {
         blas::zero(out);
@@ -1626,8 +1628,6 @@ printfQuda("Running logical RHS : %d with min search space restarts %d, %d, %d, 
       delete eigcg_args; 
       eigcg_args = nullptr;
     }
-
-    eigcg_args->logical_rhs_id = 0;
 
     return;
   }
