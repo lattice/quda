@@ -105,3 +105,11 @@ target_include_directories(propagator_quda PUBLIC ${EXAMPLES_INC})
 add_executable(correlator_quda correlator_quda.cpp)
 target_link_libraries(correlator_quda ${EXAMPLES_LIBS})
 target_include_directories(correlator_quda PUBLIC ${EXAMPLES_INC})
+
+add_executable(wilson_flow_quda wilson_flow_quda.cpp)
+target_link_libraries(wilson_flow_quda ${EXAMPLES_LIBS})
+target_include_directories(wilson_flow_quda PUBLIC ${EXAMPLES_INC})
+
+add_executable(heatbath_quda heatbath_quda.cpp)
+target_link_libraries(heatbath_quda ${EXAMPLES_LIBS})
+target_include_directories(heatbath_quda PUBLIC ${EXAMPLES_INC})

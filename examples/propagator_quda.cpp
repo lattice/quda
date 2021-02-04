@@ -7,7 +7,6 @@
 // QUDA headers
 #include <quda.h>
 #include <propagator.h>
-//#include <color_spinor_field.h> // convenient quark field container
 #include <vector_io.h>
 #include <blas_quda.h>
 #include <dslash_quda.h>
@@ -23,7 +22,7 @@
 // This is a simple dump to stdout for the test type and parameters.
 void display_test_info()
 {
-  printfQuda("running the following test:\n");
+  printfQuda("running the following measurement:\n");
   printfQuda("prec    prec_sloppy   multishift  matpc_type  recon  recon_sloppy solve_type S_dimension T_dimension "
              "Ls_dimension   dslash_type  normalization\n");
   printfQuda(
@@ -565,7 +564,7 @@ int main(int argc, char **argv)
     if (clover_inv) free(clover_inv);
   }
 
-  // finalize the QUDA library
+  // Finalize the QUDA library
   endQuda();
   finalizeComms();
 

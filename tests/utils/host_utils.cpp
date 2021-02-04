@@ -186,6 +186,21 @@ void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc
   constructQudaGaugeField(gauge, construct_type, gauge_param.cpu_prec, &gauge_param);
 }
 
+void saveHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, QudaLinkType link_type)
+{
+  if (strcmp(gauge_outfile, "")) {
+    // save gauge field using QIO and LIME
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Saving the gauge field in %s\n", gauge_outfile);
+    QudaLinkType temp = gauge_param.type;
+    gauge_param.type = link_type;
+    saveGaugeQuda(gauge, &gauge_param);
+    write_gauge_field(gauge_outfile, gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char**)0);
+    gauge_param.type = temp;
+  } else {
+    printfQuda("No output file specified.\n");
+  }
+}
+
 void constructHostCloverField(void *clover, void *, QudaInvertParam &inv_param)
 {
   double norm = 0.01; // clover components are random numbers in the range (-norm, norm)
