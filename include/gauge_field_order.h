@@ -10,7 +10,7 @@
 #include <type_traits>
 
 #include <register_traits.h>
-#include <quda_mathfuncs.h>
+#include <math_helper.cuh>
 #include <convert.h>
 #include <complex_quda.h>
 #include <quda_matrix.h>

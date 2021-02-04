@@ -4,7 +4,7 @@
 // this removes ghost accessor reducing the parameter space needed
 #define DISABLE_GHOST true // do not rename this (it is both a template parameter and a macro)
 
-#include <quda_mathfuncs.h>
+#include <math_helper.cuh>
 #include <color_spinor_field_order.h>
 #include <block_reduction_kernel.h>
 

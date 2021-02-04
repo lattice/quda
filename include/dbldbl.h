@@ -43,7 +43,7 @@
  *     observed maximum relative error.
  */
 
-#include <quda_mathfuncs.h>
+#include <math_helper.cuh>
 
 #if !defined(DBLDBL_H_)
 #define DBLDBL_H_

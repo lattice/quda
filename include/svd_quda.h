@@ -1,7 +1,7 @@
 #pragma once
 
 #include <float.h>
-#include <quda_mathfuncs.h>
+#include <math_helper.cuh>
 
 #define DEVICEHOST __device__ __host__
 #define SVDPREC 1e-11

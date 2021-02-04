@@ -4,9 +4,9 @@
 #include <iostream>
 
 #include <register_traits.h>
-#include <quda_mathfuncs.h>
 #include <float_vector.h>
 #include <complex_quda.h>
+#include <math_helper.cuh>
 
 namespace quda {
 
