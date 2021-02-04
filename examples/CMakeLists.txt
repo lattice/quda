@@ -32,12 +32,9 @@ set(QUDA_SOURCE_HOME "" CACHE PATH "Path to QUDA source")
 find_library(QUDA quda ${QUDA_BUILD_HOME}/lib)
 find_library(QUDA_TEST quda_test ${QUDA_BUILD_HOME}/tests)
 
-find_library(QIO qio ${QUDA_BUILD_HOME}/usqcd/lib)
-find_library(QMP qmp ${QUDA_BUILD_HOME}/usqcd/lib)
-find_library(LIME lime ${QUDA_BUILD_HOME}/usqcd/lib)
-
 # Multi-GPU options
-option(USE_QMP "link to the QMP multi-GPU code" ON)
+option(USE_QIO "link to the QIO code (requires QMP)" OFF)
+option(USE_QMP "link to the QMP multi-GPU code" OFF)
 option(USE_MPI "link to the MPI multi-GPU code" OFF)
 
 if(USE_MPI AND USE_QMP)
@@ -75,6 +72,36 @@ else()
   set(MPI_LIBS "")
 endif()
 
+if(USE_QIO)
+  find_library(QIO qio ${QUDA_BUILD_HOME}/usqcd/lib)
+  find_library(LIME lime ${QUDA_BUILD_HOME}/usqcd/lib)
+endif()
+if(USE_QMP)
+  find_library(QMP qmp ${QUDA_BUILD_HOME}/usqcd/lib)
+endif()
+
+# Create library dependency
+set(EXAMPLES_LIBS ${QUDA} ${QUDA_TEST})
+if(USE_QIO)
+  list(APPEND EXAMPLES_LIBS ${QIO} ${LIME})
+endif()
+if(USE_QMP)
+  list(APPEND EXAMPLES_LIBS ${QMP} ${MPI_LIBS})
+elseif(USE_MPI)
+  list(APPEND EXAMPLES_LIBS ${MPI_LIBS})
+endif()
+
+# Create includes
+set(EXAMPLES_INC ${QUDA_BUILD_HOME}/include ${QUDA_SOURCE_HOME}/tests/utils ${QUDA_SOURCE_HOME}/tests/host_reference ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+
+# Set install path
+include(GNUInstallDirs)
+set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_FULL_LIBDIR})
+
 add_executable(propagator_quda propagator_quda.cpp)
-target_link_libraries(propagator_quda ${QUDA} ${QUDA_TEST} ${QIO} ${QMP} ${LIME} ${MPI_LIBS})
-target_include_directories(propagator_quda PUBLIC ${QUDA_BUILD_HOME}/include ${QUDA_SOURCE_HOME}/tests/utils ${QUDA_SOURCE_HOME}/tests/host_reference ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+target_link_libraries(propagator_quda ${EXAMPLES_LIBS})
+target_include_directories(propagator_quda PUBLIC ${EXAMPLES_INC})
+
+add_executable(correlator_quda correlator_quda.cpp)
+target_link_libraries(correlator_quda ${EXAMPLES_LIBS})
+target_include_directories(correlator_quda PUBLIC ${EXAMPLES_INC})
