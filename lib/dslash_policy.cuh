@@ -1896,11 +1896,12 @@ public:
 
           enable_policy(QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK);
           enable_policy(QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK_FUSED_HALO);
-
+          if (comm_nvshmem_enabled()) {
             enable_policy(QudaDslashPolicy::QUDA_SHMEM_UBER_PACKINTRA_DSLASH);
             enable_policy(QudaDslashPolicy::QUDA_SHMEM_UBER_PACKFULL_DSLASH);
             enable_policy(QudaDslashPolicy::QUDA_SHMEM_PACKINTRA_DSLASH);
             enable_policy(QudaDslashPolicy::QUDA_SHMEM_PACKFULL_DSLASH);
+          }
         }
         // construct string specifying which policies have been enabled
         for (int i = 0; i < (int)QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED; i++) {
