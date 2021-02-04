@@ -162,6 +162,9 @@ namespace quda {
     int surface[QUDA_MAX_DIM];
     int surfaceCB[QUDA_MAX_DIM];
 
+    int local_surface[QUDA_MAX_DIM];
+    int local_surfaceCB[QUDA_MAX_DIM];
+
     /** The extended lattice radius (if applicable) */
     int r[QUDA_MAX_DIM];
 
@@ -523,6 +526,18 @@ namespace quda {
        @return The single-parity surface of dimension i
     */
     int SurfaceCB(const int i) const { return surfaceCB[i]; }
+
+    /**
+       @param i The dimension of the requested local surface
+       @return The single-parity local surface of dimension i
+    */
+    const int* LocalSurfaceCB() const { return local_surfaceCB; }
+
+    /**
+       @param i The dimension of the requested local surface
+       @return The single-parity local surface of dimension i
+    */
+    int LocalSurfaceCB(const int i) const { return local_surfaceCB[i]; }
 
     /**
        @return The single-parity stride of the field

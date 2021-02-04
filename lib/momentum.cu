@@ -70,15 +70,13 @@ namespace quda {
 
   template <typename Float, int nColor, QudaReconstructType recon>
   class ActionMom : TunableReduction2D<> {
-    MomActionArg<Float, nColor, recon> arg;
-    const GaugeField &meta;
+    const GaugeField &mom;
     double &action;
 
   public:
     ActionMom(const GaugeField &mom, double &action) :
       TunableReduction2D(mom),
-      arg(mom),
-      meta(mom),
+      mom(mom),
       action(action)
     {
       apply(device::get_default_stream());
@@ -87,11 +85,12 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      MomActionArg<Float, nColor, recon> arg(mom);
       launch<MomAction>(action, tp, stream, arg);
     }
 
-    long long flops() const { return 4*2*arg.threads.x*23; }
-    long long bytes() const { return 4*2*arg.threads.x*arg.mom.Bytes(); }
+    long long flops() const { return mom.Geometry()*mom.Volume()*23; }
+    long long bytes() const { return mom.Bytes(); }
   };
 
   double computeMomAction(const GaugeField& mom) {
