@@ -75,12 +75,11 @@ int main(int argc, char **argv)
   //----------------------------------------------------------------------------
 
   
-  // Topological charge, plaquette and gauge energy
+  // Plaquette measurement
   //--------------------------------------------------------------------------
   // start the timer
   double time0 = -((double)clock());
   QudaGaugeObservableParam param = newQudaGaugeObservableParam();
-  param.compute_qcharge = QUDA_BOOLEAN_TRUE;
   param.compute_plaquette = QUDA_BOOLEAN_TRUE;
 
   // Run the QUDA computation
@@ -91,11 +90,7 @@ int main(int argc, char **argv)
   time0 /= CLOCKS_PER_SEC;
   
   printfQuda("Computed plaquette is %.16e (spatial = %.16e, temporal = %.16e)\n", param.plaquette[0], param.plaquette[1], param.plaquette[2]);
-  
-  printfQuda("Computed Etot, Es, Et, Q is\n%.16e %.16e, %.16e %.16e\nDone in %g secs\n",
-	     param.energy[0], param.energy[1], param.energy[2], param.qcharge, time0);
-  //--------------------------------------------------------------------------
-  
+  //--------------------------------------------------------------------------  
   
   // Wilson Flow
   //--------------------------------------------------------------------------
@@ -110,7 +105,7 @@ int main(int argc, char **argv)
   time0 /= CLOCKS_PER_SEC;
 
   printfQuda("Total time for Wilson Flow = %g secs\n", time0);
-  //----------------------------------------------------------------------------
+  //--------------------------------------------------------------------------
 
   // If the --save-gauge flag was passed, this will save the Wilson flowed gauge field
   saveHostGaugeField(gauge, gauge_param, QUDA_SMEARED_LINKS);
