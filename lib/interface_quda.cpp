@@ -5594,9 +5594,9 @@ void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval
 
   if (getVerbosity() >= QUDA_SUMMARIZE) {
     gaugeObservables(*in, param, profileWFlow);
-    printfQuda("flow t, plaquette, E_tot, E_spatial, E_temporal, Q charge\n");
-    printfQuda("%le %.16e %+.16e %+.16e %+.16e %+.16e\n", 0.0, param.plaquette[0], param.energy[0], param.energy[1],
-               param.energy[2], param.qcharge);
+    printfQuda("flow t \t plaquette \t E_tot \t E_spatial \t E_temporal \t Q charge\n");
+    printfQuda("%le %.16e %+.16e %+.16e %+.16e %+.16e\n", 0.0, param.plaquette[0], param.energy[0],
+	       param.energy[1], param.energy[2], param.qcharge);
   }
 
   for (unsigned int i = 0; i < n_steps; i++) {
