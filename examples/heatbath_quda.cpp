@@ -103,6 +103,8 @@ int main(int argc, char **argv)
     return app->exit(e);
   }
 
+  // Initialise QUDA
+  //----------------------------------------------------------------------------
   // Set values for precisions via the command line.
   setQudaPrecisions();
   
@@ -118,8 +120,6 @@ int main(int argc, char **argv)
   // Set verbosity
   setVerbosity(verbosity);
 
-  // Allocate host side memory for the gauge field.
-  //----------------------------------------------------------------------------
   // Set QUDA's internal parameters
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setWilsonGaugeParam(gauge_param);
@@ -139,11 +139,6 @@ int main(int argc, char **argv)
   display_info();
   //----------------------------------------------------------------------------
   
-
-  // Reunitarisation failure checking
-  int *num_failures_h = (int *)mapped_malloc(sizeof(int));
-  int *num_failures_d = (int *)get_mapped_device_pointer(num_failures_h);
-  *num_failures_h = 0;
 
   // Construct an extended device gauge field
   //--------------------------------------------------------------------------
@@ -200,7 +195,12 @@ int main(int argc, char **argv)
   
   
   // Begin Heatbath simulation
-  //--------------------------------------------------------------------------   
+  //--------------------------------------------------------------------------
+  // Reunitarisation failure checking
+  int *num_failures_h = (int *)mapped_malloc(sizeof(int));
+  int *num_failures_d = (int *)get_mapped_device_pointer(num_failures_h);
+  *num_failures_h = 0;
+  
   // Reunitarization setup
   setReunitarizationConsts();
   
