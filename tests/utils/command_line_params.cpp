@@ -226,6 +226,7 @@ bool mg_eig_preserve_deflation = false;
 double heatbath_beta_value = 6.2;
 int heatbath_warmup_steps = 10;
 int heatbath_num_steps = 10;
+int heatbath_step_start = 0;
 int heatbath_checkpoint = 5;
 int heatbath_num_heatbath_per_step = 5;
 int heatbath_num_overrelax_per_step = 5;
@@ -1031,7 +1032,9 @@ void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--heatbath-num-or-per-step", heatbath_num_overrelax_per_step,
                        "Number of overrelaxation hits per heatbath step (default 5)");
   opgroup->add_option("--heatbath-num-steps", heatbath_num_steps,
-                       "Number of measurement steps in heatbath test (default 10)");
+		      "Number of measurement steps in heatbath test (default 10)");
+  opgroup->add_option("--heatbath-step-start", heatbath_step_start,
+                       "The number from which to start the test (default 0)");
   opgroup->add_option("--heatbath-warmup-steps", heatbath_warmup_steps,
                        "Number of warmup steps in heatbath test (default 10)");
   opgroup->add_option("--heatbath-checkpoint", heatbath_checkpoint,

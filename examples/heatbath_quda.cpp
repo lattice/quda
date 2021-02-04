@@ -84,6 +84,7 @@ void display_info()
   printfQuda(" - Start type %s\n", strcmp(latfile,"") ? "loaded" : (heatbath_coldstart ? "cold" : "hot"));
   printfQuda(" - Warm up steps %d\n", heatbath_warmup_steps);
   printfQuda(" - Measurement Steps %d\n", heatbath_num_steps);
+  printfQuda(" - Step start %d\n", heatbath_step_start);
   printfQuda(" - Checkpoint Steps %d\n", heatbath_checkpoint);
   printfQuda(" - Beta %f\n", heatbath_beta_value);
   
@@ -138,6 +139,7 @@ int main(int argc, char **argv)
   int nwarm = heatbath_warmup_steps;
   int checkpoint = heatbath_checkpoint;
   int nhbsteps = heatbath_num_heatbath_per_step;
+  int nstart = heatbath_step_start;
   int novrsteps = heatbath_num_overrelax_per_step;
   bool coldstart = heatbath_coldstart;
   double beta_value = heatbath_beta_value;
@@ -214,7 +216,7 @@ int main(int argc, char **argv)
   // Start the timer
   time0 = -((double)clock());
   
-  for (int step = 0; step < nwarm + nsteps; ++step) {
+  for (int step = nstart; step < nstart + nwarm + nsteps; ++step) {
     Monte(*gaugeEx, *randstates, beta_value, nhbsteps, novrsteps);
     
     quda::unitarizeLinks(*gaugeEx, num_failures_d);
