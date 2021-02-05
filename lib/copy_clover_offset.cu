@@ -30,8 +30,8 @@ namespace quda
       } else if (in.Order() == QUDA_QDPJIT_CLOVER_ORDER) {
 #ifdef BUILD_QDPJIT_INTERFACE
         using C = QDPJITOrder<Float, length>;
-        C out_accessor(out, inverse, Out);
-        C in_accessor(in, inverse, In);
+        C out_accessor(out, inverse);
+        C in_accessor(in, inverse);
         CopyFieldOffsetArg<Field, Element, C> arg(out_accessor, out, in_accessor, in, offset);
         CopyFieldOffset<decltype(arg)> copier(arg, in);
 #else
@@ -40,8 +40,8 @@ namespace quda
       } else if (in.Order() == QUDA_BQCD_CLOVER_ORDER) {
 #ifdef BUILD_BQCD_INTERFACE
         using C = BQCDOrder<Float, length>;
-        C out_accessor(out, inverse, Out);
-        C in_accessor(in, inverse, In);
+        C out_accessor(out, inverse);
+        C in_accessor(in, inverse);
         CopyFieldOffsetArg<Field, Element, C> arg(out_accessor, out, in_accessor, in, offset);
         CopyFieldOffset<decltype(arg)> copier(arg, in);
 #else
