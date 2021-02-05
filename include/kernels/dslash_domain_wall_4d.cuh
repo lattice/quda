@@ -2,7 +2,8 @@
 
 #include <kernels/dslash_wilson.cuh>
 
-#include <mma_tensor_op/gemm.cuh>
+#include <mma_tensor_op/shared_memory_object.cuh>
+#include <mma_tensor_op/hmma_fp32_tf32_tf32_fp32_m16n8k4_sm80.cuh>
 
 #include <cuda/barrier>
 #include <cooperative_groups.h>
@@ -34,22 +35,6 @@ namespace quda
     float a_t = __uint_as_float(__float_as_uint(a) & mask);
     float b_t = __uint_as_float(__float_as_uint(b) & mask);
     return a_t * b_t;
-  }
-
-  /**
-     @brief Compute the checkerboard 1-d index for the nearest
-     neighbor
-     @param[in] lattice coordinates
-     @param[in] mu dimension in which to add 1
-     @param[in] dir direction (+1 or -1)
-     @param[in] arg parameter struct
-     @return 1-d checkboard index
-   */
-  template <typename Coord, typename Arg>
-  __device__ __host__ inline int getNeighborIndexCB_dyn(const Coord &x, int mu, int dir, const Arg &arg)
-  {
-    int rtn = (x[mu] == ((dir + 1) / 2) * (arg.X[mu] - 1) ? x.X - dir * arg.mZ[mu] : x.X + dir * arg.Z[mu]) >> 1;
-    return rtn;
   }
 
   using barrier = cuda::barrier<cuda::thread_scope_block>;
@@ -174,8 +159,8 @@ namespace quda
           = (coord[d] + arg.nFace >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if (!ghost) { // TODO: zero the ghost ones.
-          colorspinor_t in = arg.in(fwd_idx * Ls + s, their_spinor_parity);
-          // colorspinor_t in = arg.in(fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
+          // colorspinor_t in = arg.in(fwd_idx * Ls + s, their_spinor_parity);
+          colorspinor_t in = arg.in(fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
           colorspinor_t in_p = in.project(d, proj_dir).reconstruct(d, proj_dir);
           link_t U;
           if (s == 0) {
@@ -204,8 +189,8 @@ namespace quda
         const bool ghost = (coord[d] - arg.nFace < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if (!ghost) {
-          colorspinor_t in = arg.in(back_idx * Ls + s, their_spinor_parity);
-          // colorspinor_t in = arg.in(back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
+          // colorspinor_t in = arg.in(back_idx * Ls + s, their_spinor_parity);
+          colorspinor_t in = arg.in(back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
           colorspinor_t in_p = in.project(d, proj_dir).reconstruct(d, proj_dir);
           link_t U;
           if (s == 0) {
@@ -234,8 +219,8 @@ namespace quda
     const int my_spinor_parity = nParity == 2 ? parity : 0;
     colorspinor_t out;
     load_colorspinor<Config::Ls>(buffer_index, s, out, smem_obj_c);
-    arg.out(coord.x_cb * Ls + s, my_spinor_parity) = out;
-    // arg.out(coord.x_cb + s * arg.dc.volume_4d_cb, my_spinor_parity) = out;
+    // arg.out(coord.x_cb * Ls + s, my_spinor_parity) = out;
+    arg.out(coord.x_cb + s * arg.dc.volume_4d_cb, my_spinor_parity) = out;
   }
 
   template <class Config, class A, class B, class C>
@@ -247,19 +232,71 @@ namespace quda
     constexpr int bN = Config::bN;
     constexpr int bK = Config::bK;
 
+    constexpr int b_dim = (Config::smem_buffer_size / Config::compute_warp);
+    constexpr int m_dim = (bM / warp_size);
+    float acc[b_dim * m_dim * bN];
+
+// #pragma unroll
     for (int kk = 0; kk < K; kk += bK) {
 
       __syncthreads(); // "The buffers are ready."
 
-      for (int b = thread / warp_size; b < Config::smem_buffer_size; b += Config::compute_warp) {
-#if 0
-        for (int m = thread % warp_size; m < bM; m += warp_size) {
+#pragma unroll
+      for (int br = 0; br < b_dim; br++) {
+        int b = br * Config::compute_warp + thread / warp_size;
+#if 1
+#pragma unroll
+        for (int mr = 0; mr < m_dim; mr++) {
+          int m = mr * warp_size + thread % warp_size;
+#pragma unroll
           for (int n = 0; n < bN; n++) {
-            float acc = kk == 0 ? 0 : smem_obj_c(m, n + bN * b);
-            for (int k = 0; k < bK; k++) { acc += smem_obj_a(m, k + bK * b) * smem_obj_b(n, k + bK * b); }
-            smem_obj_c(m, n + Config::bN * b) = acc;
+            if (kk == 0) { acc[br * m_dim * bN + mr * bN + n] = 0; }
+            for (int k = 0; k < bK; k++) {
+              acc[br * m_dim * bN + mr * bN + n] += smem_obj_a(m, k + bK * b) * smem_obj_b(n, k + bK * b);
+            }
+            if (kk == K - bK) { smem_obj_c(m, n + bN * b) = acc[br * m_dim * bN + mr * bN + n]; }
           }
-        }
+        } 
+#else
+        mma::WarpRegisterMapping wrm(thread);
+
+        constexpr int warp_dim_m = (bM + mma::MMA_M - 1) / mma::MMA_M; // 12 * 8 / 16 = 6
+        constexpr int warp_dim_n = (bN + mma::MMA_N - 1) / mma::MMA_N; // 6 / 8 = 1
+        constexpr int warp_dim_k = (bK + mma::MMA_K - 1) / mma::MMA_K;
+
+        constexpr int warp_cycle = warp_dim_m * warp_dim_n;
+
+#pragma unroll
+        for (int c = 0; c < warp_cycle; c++) {
+
+          mma::MmaOperandC op_c;
+
+          // The logical warp assigned to each part of the matrix.
+          const int tile_m = c / warp_dim_n;
+          const int tile_n = c - tile_m * warp_dim_n;
+
+          if (kk == 0) {
+            op_c.zero();
+          } else {
+            op_c.load(smem_obj_c, tile_m, tile_n, wrm);
+          }
+
+          for (int tile_k = 0; tile_k < warp_dim_k; tile_k++) {
+
+            mma::MmaOperandA op_a;
+            op_a.load(smem_obj_a, tile_k, tile_m, wrm);
+
+            mma::MmaOperandB op_b;
+            op_b.load(smem_obj_b, tile_k, tile_n, wrm);
+
+            mma::gemm(op_c, op_a, op_b);
+
+          } // tile_k
+
+          op_c.store(smem_obj_c, tile_m * mma::MMA_M, tile_n * mma::MMA_N, wrm);
+
+        }   // c
+
 #endif
       }
 
@@ -287,6 +324,7 @@ namespace quda
     mma::SharedMemoryObject<float_type, bM, bK * smem_buffer_size, 1, smem_a_ldm> smem_obj_a(reinterpret_cast<float_type *>(smem_ptr));
     mma::SharedMemoryObject<float_type, bN, bK * smem_buffer_size, 1, smem_b_ldm> smem_obj_b(smem_obj_a.ptr + bK * smem_a_ldm * smem_buffer_size);
     mma::SharedMemoryObject<float_type, bM, bN * smem_buffer_size, 1, smem_c_ldm> smem_obj_c(smem_obj_b.ptr + bK * smem_b_ldm * smem_buffer_size);
+    // mma::SharedMemoryObject<float_type, bM, bN * smem_buffer_size, 1, smem_c_ldm> smem_obj_c(reinterpret_cast<float_type *>(smem_ptr));
 
     int thread_idx = threadIdx.x + threadIdx.y * blockDim.x;
 
@@ -320,18 +358,23 @@ namespace quda
         blockDim.x * blockDim.y == total threads
       */
       constexpr int Ls = 12;                      // How many 5th dimension sites are there
-      if (tp.block.y == 8) {
-        constexpr int block_y = 8;                // How many spatial sites are there in this block
-        constexpr int smem_buffer_size = block_y; // How many buffers are there
+      constexpr int block_y = 8;                // How many spatial sites are there in this block
+      constexpr int smem_buffer_size = block_y; // How many buffers are there
+      
+      if (tp.block.x - Ls == 4) {
         constexpr int compute_warp = 1;           // How many compute/MMA warps are there
-
         using Config = Dummy<Ls, block_y, smem_buffer_size, compute_warp>;
         qudaLaunchKernel(specialized_dslash_kernel<Config, nParity, dagger, xpay, kernel_type, Arg>, tp, stream, arg);
-      } else if (tp.block.y == 16) {
-        constexpr int block_y = 16;               // How many spatial sites are there in this block
-        constexpr int smem_buffer_size = block_y; // How many buffers are there
+      } else if (tp.block.x - Ls == 8) {
         constexpr int compute_warp = 2;           // How many compute/MMA warps are there
-
+        using Config = Dummy<Ls, block_y, smem_buffer_size, compute_warp>;
+        qudaLaunchKernel(specialized_dslash_kernel<Config, nParity, dagger, xpay, kernel_type, Arg>, tp, stream, arg);
+      } else if (tp.block.x - Ls == 16) {
+        constexpr int compute_warp = 4;           // How many compute/MMA warps are there
+        using Config = Dummy<Ls, block_y, smem_buffer_size, compute_warp>;
+        qudaLaunchKernel(specialized_dslash_kernel<Config, nParity, dagger, xpay, kernel_type, Arg>, tp, stream, arg);
+      } else if (tp.block.x - Ls == 32) {
+        constexpr int compute_warp = 8;           // How many compute/MMA warps are there
         using Config = Dummy<Ls, block_y, smem_buffer_size, compute_warp>;
         qudaLaunchKernel(specialized_dslash_kernel<Config, nParity, dagger, xpay, kernel_type, Arg>, tp, stream, arg);
       } else {
@@ -340,26 +383,26 @@ namespace quda
     }
 
     unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return ((arg.dc.Ls * 8 + 8) * 3 + 6 * 3 + (arg.dc.Ls * 8 + 4) * 6) * sizeof(float) * param.block.y; }
+    // unsigned int sharedBytesPerBlock(const TuneParam &param) const { return ((arg.dc.Ls * 8 + 4) * 6) * sizeof(float) * 8; }
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return ((arg.dc.Ls * 8 + 8) * 3 + 6 * 3 + (arg.dc.Ls * 8 + 4) * 6) * sizeof(float) * 8; }
 
     bool advanceTuneParam(TuneParam &param) const {
-      if (param.block.y < blockMax()) {
-        param.block.y += blockStep();
-        param.shared_bytes = sharedBytesPerBlock(param);
+      if (param.block.x - 12 < blockMax()) {
+        param.block.x = (param.block.x - 12) * 2 + 12;
         return true;
       } else {
         return false;
       }
     }
 
-    virtual int blockStep() const { return 8; }
-    virtual int blockMin() const { return 8; }
-    virtual int blockMax() const { return 16; }
+    virtual int blockStep() const { return 4; }
+    virtual int blockMin() const { return 4; }
+    virtual int blockMax() const { return 32; }
 
     void initTuneParam(TuneParam &param) const
     {
-      param.block.x = 16; // 12 + 4
-      param.block.y = blockMin();
+      param.block.x = 12 + blockMin(); // 12 + 4
+      param.block.y = 8;
       param.block.z = 1;
 
       param.grid.x = arg.dc.volume_4d_cb / param.block.y;

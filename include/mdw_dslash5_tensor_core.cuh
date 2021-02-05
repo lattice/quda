@@ -14,11 +14,11 @@
 
 #if (__COMPUTE_CAPABILITY__ < 750)
 
-#include <mma_tensor_op/hmma_m16n16k16_sm70.cuh>
+#include <mma_tensor_op/hmma_fp32_fp16_fp16_fp32_m16n16k4_sm70.cuh>
 
 #else // (__COMPUTE_CAPABILITY__ < 750)
 
-#include <mma_tensor_op/hmma_m16n8k8_sm80.cuh>
+#include <mma_tensor_op/hmma_fp32_fp16_fp16_fp32_m16n8k8_sm80.cuh>
 
 #endif // (__COMPUTE_CAPABILITY__ < 750)
 

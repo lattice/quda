@@ -4,13 +4,15 @@
 
 #if (__COMPUTE_CAPABILITY__ == 700)
 
-#include <mma_tensor_op/hmma_m16n16k16_sm70.cuh>
+#include <mma_tensor_op/hmma_fp32_fp16_fp16_fp32_m16n16k4_sm70.cuh>
 
 #else
 
-#include <mma_tensor_op/hmma_m16n8k8_sm80.cuh>
+#include <mma_tensor_op/hmma_fp32_fp16_fp16_fp32_m16n8k8_sm80.cuh>
 
 #endif
+
+#include <mma_tensor_op/shared_memory_object.cuh>
 
 namespace quda
 {
@@ -20,35 +22,6 @@ namespace quda
     constexpr int shared_memory_bytes(int bM, int bN, int bK)
     {
       return (bM + pad_size(bM) + bN + pad_size(bN)) * bK * 2 * sizeof(half);
-    }
-
-    // A shared memory object that bakes with it a 2-d index access method.
-    template <class T, int M_, int N_, int ldm_, int ldn_> struct SharedMemoryObject {
-
-      static constexpr int M = M_;
-      static constexpr int N = N_;
-      static constexpr int ldm = ldm_;
-      static constexpr int ldn = ldn_;
-
-      T *ptr;
-
-      __device__ inline SharedMemoryObject(T *ptr_) : ptr(ptr_) { }
-
-      __device__ inline T &operator()(int i, int j) { return ptr[i * ldm + j * ldn]; }
-
-      __device__ inline const T &operator()(int i, int j) const { return ptr[i * ldm + j * ldn]; }
-
-      template <class VecType> __device__ inline void vector_load(int i, int j, VecType vec)
-      {
-        VecType *ptr_ = reinterpret_cast<VecType *>(ptr);
-        constexpr int vector_length = sizeof(VecType) / sizeof(T);
-        ptr_[(i * ldm + j * ldn) / vector_length] = vec;
-      }
-    };
-
-    template <int M, int N, int ldm, int ldn, class T> __device__ inline auto make_smem_obj(T *ptr_)
-    {
-      return SharedMemoryObject<T, M, N, ldm, ldn> {ptr_};
     }
 
     /**
