@@ -116,7 +116,7 @@ namespace quda {
 
     real cosTheta;
     if (fabs(s) >= arg.unitarize_eps) { // faster when this conditional is removed?
-      const real rsqrt_s = rsqrt(s);
+      const real rsqrt_s = quda::rsqrt(s);
       r = c[2]*0.5 - (c[0]*one_third)*(c[1] - c[0]*c[0]*one_ninth);
       cosTheta = r*rsqrt_s*rsqrt_s*rsqrt_s;
 
@@ -130,7 +130,7 @@ namespace quda {
 
 #if 0 // experimental version
       real as, ac;
-      sincos( theta*one_third, &as, &ac );
+      quda::sincos( theta*one_third, &as, &ac );
       g[0] = c[0]*one_third + 2*sqrt_s*ac;
       //g[1] = c[0]*one_third + 2*sqrt_s*(ac*cos(1*FL_UNITARIZE_PI23) - as*sin(1*FL_UNITARIZE_PI23));
       g[1] = c[0]*one_third - 2*sqrt_s*(0.5*ac + as*0.8660254037844386467637);
