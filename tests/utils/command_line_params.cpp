@@ -223,6 +223,7 @@ quda::mgarray<QudaPrecision> mg_eig_save_prec = {};
 bool mg_eig_coarse_guess = false;
 bool mg_eig_preserve_deflation = false;
 
+// Heatbath params
 double heatbath_beta_value = 6.2;
 int heatbath_warmup_steps = 10;
 int heatbath_num_steps = 10;
@@ -231,6 +232,17 @@ int heatbath_checkpoint = 5;
 int heatbath_num_heatbath_per_step = 5;
 int heatbath_num_overrelax_per_step = 5;
 bool heatbath_coldstart = false;
+
+// HMC params
+int hmc_start = 0;
+int hmc_updates = 100;
+int hmc_therm_updates = 100;
+int hmc_checkpoint = 5;
+int hmc_traj_steps = 25;
+double hmc_step_size = 0.04;
+double hmc_traj_length = 1.0;
+bool hmc_coldstart = false;
+double hmc_beta = 6.2;
 
 int eofa_pm = 1;
 double eofa_shift = -1.2345;
@@ -1026,7 +1038,7 @@ void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app)
   auto opgroup = quda_app->add_option_group("heatbath", "Options controlling heatbath routines");
   opgroup->add_option("--heatbath-beta", heatbath_beta_value, "Beta value used in heatbath test (default 6.2)");
   opgroup->add_option("--heatbath-coldstart", heatbath_coldstart,
-                       "Whether to use a cold or hot start in heatbath test (default false)");
+                       "Whether to use a cold or hot start in heatbath (default false)");
   opgroup->add_option("--heatbath-num-hb-per-step", heatbath_num_heatbath_per_step,
                        "Number of heatbath hits per heatbath step (default 5)");
   opgroup->add_option("--heatbath-num-or-per-step", heatbath_num_overrelax_per_step,
@@ -1039,8 +1051,29 @@ void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app)
                        "Number of warmup steps in heatbath test (default 10)");
   opgroup->add_option("--heatbath-checkpoint", heatbath_checkpoint,
                        "Number of measurement steps in heatbath before checkpointing (default 5)");
-
 }
+
+void add_hmc_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  // Option group for hmc related options
+  auto opgroup = quda_app->add_option_group("hmc", "Options controlling hmc routines");
+  opgroup->add_option("--hmc-beta", hmc_beta, "Beta value used in hmc test (default 6.2)");
+  opgroup->add_option("--hmc-coldstart", hmc_coldstart,
+                       "Whether to use a cold or hot start in hmc (default false)");
+  opgroup->add_option("--hmc-traj-length", hmc_traj_length,
+                       "The length of the trajectory in MD time (default 1.0)");
+  opgroup->add_option("--hmc-step-size", hmc_step_size,
+                       "The step size of the integration trajectory (default 0.04)");
+  opgroup->add_option("--hmc-traj-steps", hmc_traj_steps,
+		      "The number of steps in the integration trajectory (default 25)");
+  opgroup->add_option("--hmc-therm-updates", hmc_therm_updates,
+		      "The number of trajectorys to traverse before measurement (default 100)");
+  opgroup->add_option("--hmc-updates", hmc_traj_steps,
+		      "the number of updates to perfrom after thermalisation (default 100)");
+  opgroup->add_option("--hmc-checkpoint", hmc_checkpoint,
+		      "Number of measurement steps in hmc before checkpointing (default 5)");
+}
+
 
 void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
 {

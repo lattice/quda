@@ -279,3 +279,7 @@ void setStaggeredMGInvertParam(QudaInvertParam &inv_param);
 void setGaugeParam(QudaGaugeParam &gauge_param);
 void setWilsonGaugeParam(QudaGaugeParam &gauge_param);
 void setStaggeredGaugeParam(QudaGaugeParam &gauge_param);
+
+// Simulation param types
+void setHMCParam(QudaHMCParam &hmc_param);
+void setHeatbathParam(QudaHeatbathParam &hb_param);

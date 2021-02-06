@@ -135,7 +135,7 @@ public:
   template <typename T>
   CLI::Option *add_psoption(CLI::Option_group *group, std::string option_name,
                             std::array<std::array<T, 4>, QUDA_MAX_SOURCES> &variable, CLI::Validator trans,
-                            std::string option_description = "", bool defaulted = false)
+                            std::string option_description = "")
   {
 
     CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {
@@ -173,7 +173,7 @@ public:
   template <typename T>
   CLI::Option *add_fileoption(CLI::Option_group *group, std::string option_name,
                               std::array<T, QUDA_MAX_SOURCES> &variable, CLI::Validator trans,
-                              std::string option_description = "", bool defaulted = false)
+                              std::string option_description = "")
   {
 
     CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {
@@ -213,6 +213,7 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app);
+void add_hmc_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_contraction_option_group(std::shared_ptr<QUDAApp> quda_app);
 
@@ -432,6 +433,7 @@ extern quda::mgarray<QudaPrecision> mg_eig_save_prec;
 extern bool mg_eig_coarse_guess;
 extern bool mg_eig_preserve_deflation;
 
+// Heatbath params
 extern double heatbath_beta_value;
 extern int heatbath_warmup_steps;
 extern int heatbath_step_start;
@@ -440,6 +442,17 @@ extern int heatbath_checkpoint;
 extern int heatbath_num_heatbath_per_step;
 extern int heatbath_num_overrelax_per_step;
 extern bool heatbath_coldstart;
+
+// HMC params
+extern int hmc_start;
+extern int hmc_updates;
+extern int hmc_therm_updates;
+extern int hmc_checkpoint;
+extern int hmc_traj_steps;
+extern double hmc_step_size;
+extern double hmc_traj_length;
+extern bool hmc_coldstart;
+extern double hmc_beta;
 
 extern int eofa_pm;
 extern double eofa_shift;

@@ -974,6 +974,81 @@ void printQudaBLASParam(QudaBLASParam *param)
 #endif
 }
 
+#if defined INIT_PARAM
+QudaHeatbathParam newQudaHeatbathParam(void)
+{
+  QudaHeatbathParam ret;
+#elif defined CHECK_PARAM
+static void checkHeatbathParam(QudaHeatbathParam *param)
+{
+#else
+void printQudaHeatbathParam(QudaHeatbathParam *param)
+{
+  printfQuda("QUDA heatbath parameters:\n");
+#endif
+
+#ifdef INIT_PARAM
+  P(start, INVALID_INT);
+  P(updates, INVALID_INT);
+  P(therm_updates, INVALID_INT);
+  P(hb_per_update, INVALID_INT);
+  P(or_per_update, INVALID_INT);
+  P(coldstart, QUDA_BOOLEAN_FALSE);
+  P(beta, INVALID_DOUBLE);
+#else
+  P(start, INVALID_INT);
+  P(updates, INVALID_INT);
+  P(therm_updates, INVALID_INT);
+  P(hb_per_update, INVALID_INT);
+  P(or_per_update, INVALID_INT);
+  P(coldstart, QUDA_BOOLEAN_FALSE);
+  P(beta, INVALID_DOUBLE);
+#endif
+
+#ifdef INIT_PARAM
+  return ret;
+#endif
+}
+
+#if defined INIT_PARAM
+ QudaHMCParam newQudaHMCParam(void)
+ {
+   QudaHMCParam ret;
+#elif defined CHECK_PARAM
+static void checkHMCParam(QudaHMCParam *param)
+{
+#else
+void printQudaHMCParam(QudaHMCParam *param)
+{
+  printfQuda("QUDA HMC parameters:\n");
+#endif
+
+#ifdef INIT_PARAM
+  P(start, INVALID_INT);
+  P(updates, INVALID_INT);
+  P(therm_updates, INVALID_INT);
+  P(steps, INVALID_INT);
+  P(step_size, INVALID_DOUBLE);
+  P(traj_length, INVALID_DOUBLE); 
+  P(coldstart, QUDA_BOOLEAN_FALSE);
+  P(beta, INVALID_DOUBLE);
+#else
+  P(start, INVALID_INT);
+  P(updates, INVALID_INT);
+  P(therm_updates, INVALID_INT);
+  P(steps, INVALID_INT);
+  P(step_size, INVALID_DOUBLE);
+  P(traj_length, INVALID_DOUBLE); 
+  P(coldstart, QUDA_BOOLEAN_INVALID);
+  P(beta, INVALID_DOUBLE);
+#endif
+  
+#ifdef INIT_PARAM
+  return ret;
+#endif
+}
+
+ 
 // clean up
 
 #undef INVALID_INT

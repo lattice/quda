@@ -113,3 +113,7 @@ target_include_directories(wilson_flow_quda PUBLIC ${EXAMPLES_INC})
 add_executable(heatbath_quda heatbath_quda.cpp)
 target_link_libraries(heatbath_quda ${EXAMPLES_LIBS})
 target_include_directories(heatbath_quda PUBLIC ${EXAMPLES_INC})
+
+add_executable(leapfrog_quda leapfrog_quda.cpp)
+target_link_libraries(leapfrog_quda ${EXAMPLES_LIBS})
+target_include_directories(leapfrog_quda PUBLIC ${EXAMPLES_INC})

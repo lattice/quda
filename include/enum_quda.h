@@ -556,6 +556,13 @@ typedef enum QudaCorrelatorFlavors_s {
   QUDA_CORRELATOR_QL,
   QUDA_CORRELATOR_INVALID = QUDA_INVALID_ENUM
 } QudaCorrelatorFlavors;
+
+typedef enum QudaGaugeActionType_s {
+  QUDA_GAUGE_ACTION_TYPE_WILSON,
+  QUDA_GAUGE_ACTION_TYPE_SYMANZIK,
+  QUDA_GAUGE_ACTION_TYPE_LUSCHER_WEISZ,
+  QUDA_GAUGE_ACTION_TYPE_INVALID = QUDA_INVALID_ENUM
+} QudaGaugeActionType;
   
 typedef enum QudaGaugeSmearType_s {
   QUDA_GAUGE_SMEAR_TYPE_APE,

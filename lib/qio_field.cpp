@@ -294,7 +294,7 @@ void read_spinor_field(const char *filename, void *V[], QudaPrecision precision,
 }
 
 void read_propagator_field(const char *filename, void *V[], QudaPrecision precision, const int *X, QudaSiteSubset subset,
-                           QudaParity parity, int nColor, int nSpin, int Nprop, int argc, char *argv[])
+                           QudaParity parity, int nColor, int nSpin, int Nprop, int, char *[])
 {
   quda_this_node = QMP_get_node_number();
 
@@ -519,7 +519,7 @@ void write_spinor_field(const char *filename, void *V[], QudaPrecision precision
 }
 
 void write_propagator_field(const char *filename, void *V[], QudaPrecision precision, const int *X, QudaSiteSubset subset,
-                            QudaParity parity, int nColor, int nSpin, int Nprop, int argc, char *argv[])
+                            QudaParity parity, int nColor, int nSpin, int Nprop, int, char *[])
 {
   quda_this_node = QMP_get_node_number();
 

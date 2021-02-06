@@ -306,7 +306,7 @@ namespace quda
     {
       constexpr int nSpin = Arg::nSpin;
       constexpr int nColor = Arg::nColor;
-       using real = typename Arg::real;
+      using real = typename Arg::real;
       using Vector = ColorSpinor<real, nColor, nSpin>;
 
       reduce_t result_all_channels = spinor_array();

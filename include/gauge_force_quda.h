@@ -1,5 +1,4 @@
-#ifndef _GAUGE_FORCE_QUDA_H
-#define _GAUGE_FORCE_QUDA_H
+#pragma once
 
 namespace quda {
 
@@ -16,7 +15,15 @@ namespace quda {
    */
   void gaugeForce(GaugeField& mom, const GaugeField& u, double coeff, int ***input_path,
 		  int *length, double *path_coeff, int num_paths, int max_length);
+
+  /**
+     @brief Compute the gauge-force contribution to the momentum
+     @param[out] mom Momentum field
+     @param[in] u Gauge field (extended when running no multiple GPUs)
+     @param[in] action_type Wilson/Symanzik/Luscher-Weiss
+     @param[in] epsilon Step-size coefficient
+     @param[in] path_coeff Coefficients of the various staples
+  */
+  void gaugeForceNew(GaugeField& mom, const GaugeField& u, const QudaGaugeActionType action_type, const double epsilon, const double* path_coeff);
+  
 } // namespace quda
-
-
-#endif // _GAUGE_FORCE_QUDA_H

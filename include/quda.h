@@ -765,7 +765,35 @@ extern "C" {
 
   } QudaBLASParam;
 
-  /*
+  typedef struct QudaHeatbathParam_s {
+
+    int start;                 /**< The update step from which to start */
+    int updates;               /**< Total number of updates to perform */
+    int therm_updates;         /**< Number of updates to perfrom prior to thermalisation */
+    int hb_per_update;         /**< Number of heatbath sweeps to perform per step */
+    int or_per_update;         /**< Number of overrelaxation sweeps per step */
+    QudaBoolean coldstart;     /**< Whether to initialise the gauge field with unit valued elements of SU(N) [cold start] or random elements of SU(N) [hot start]  */
+    double beta;               /**< The beta value of the simulation */
+
+  } QudaHeatbathParam;
+
+  typedef struct QudaHMCParam_s {
+
+    int start;                 /**< The update step from which to start */
+    int updates;               /**< Total number of updates to perform */
+    int therm_updates;         /**< Number of updates to perfrom prior to thermalisation */
+    int steps;                 /**< Number of integrations steps*/
+    double step_size;          /**< Size of integration steps */
+    double traj_length;        /**< The length of the integration trajectory */
+    QudaBoolean coldstart;     /**< Whether to initialise the gauge field with unit valued elements of SU(N) [cold start] or random elements of SU(N) [hot start]  */
+    double beta;               /**< The beta value of the simulation */
+
+  } QudaHMCParam;
+
+
+
+  
+  /**
    * Interface functions, found in interface_quda.cpp
    */
 
@@ -941,6 +969,24 @@ extern "C" {
    */
   QudaBLASParam newQudaBLASParam(void);
 
+  /**
+   * A new QudaHeatbathParam should always be initialized immediately
+   * after it's defined (and prior to explicitly setting its members)
+   * using this function.  Typical usage is as follows:
+   *
+   *   QudaHeatbathParam hb_param = newQudaHeatbathParam();
+   */
+  QudaHeatbathParam newQudaHeatbathParam(void);
+
+  /**
+   * A new QudaHMCParam should always be initialized immediately
+   * after it's defined (and prior to explicitly setting its members)
+   * using this function. Typical usage is as follows:
+   *
+   *   QudaHMCParam hb_param = newQudaHMCParam();
+   */
+  QudaHMCParam newQudaHMCParam(void);
+  
   /**
    * Print the members of QudaGaugeParam.
    * @param param The QudaGaugeParam whose elements we are to print.
@@ -1459,6 +1505,7 @@ extern "C" {
    * @param[in] param The parameters of the external fields and the computation settings
    * @param[out] timeinfo
    */
+  
   int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
                                 const unsigned int verbose_interval, const double relax_boost, const double tolerance,
                                 const unsigned int reunit_interval, const unsigned int stopWtheta,
@@ -1498,7 +1545,23 @@ extern "C" {
   void make4DMidPointProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_param5D, QudaInvertParam *inv_param4D,
                           const int *X);
 
-  
+  /**
+   * Performs Heatbath in place on gaugePrecise
+   * @param hb_param Parameter structure containing heatbath parameters
+   */
+  void performHeatbath(QudaHeatbathParam hb_param);
+
+  /**
+   * Performs one leapfrog HMC step on gaugePrecise, copies the updated gauge 
+   * into gauge evolved.
+   * @param h_x Solution spinor field
+   * @param h_b Source spinor field
+   * @param hmc_param Parameter structure containing HMC parameters
+   * @param inv_param Parameter structure containing inversion parameters
+   * @param step The step label in the Markov chain.
+   */
+  void performLeapfrogStep(void *h_x, void *h_b, QudaHMCParam *hmc_param, QudaInvertParam *inv_param, int step);
+
   /**
    * @brief Flush the chronological history for the given index
    * @param[in] index Index for which we are flushing

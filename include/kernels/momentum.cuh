@@ -131,13 +131,16 @@ namespace quda {
         // compute force norms
         norm = operator()(make_double2(f.L1(), f.L2()), norm);
 
-        m = m + arg.coeff * f;
-
+	// DMH unit tests passing with double and single
+	
+        //m = m + arg.coeff * f;
         // strictly speaking this shouldn't be needed since the
         // momentum should already be traceless anti-hermitian but at
         // present the unit test will fail without this
-        makeAntiHerm(m);
-        arg.mom(d, x_cb, parity) = m;
+        // makeAntiHerm(m);
+	//arg.mom(d, x_cb, parity) = m;
+        arg.mom(d, x_cb, parity) = m + arg.coeff * f;
+
       }
       return norm;
     }
