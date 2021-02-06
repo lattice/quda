@@ -58,7 +58,9 @@ int main(int argc, char **argv)
   }
 
   initComms(argc, argv, gridsize_from_cmdline);
-
+  for (int d = 0; d < 4; d++) {
+    if (dim_partitioned[d]) { commDimPartitionedSet(d); }
+  }
   // Ensure gtest prints only from rank 0
   ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
   if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
@@ -71,7 +73,7 @@ int main(int argc, char **argv)
   int attempts = 1;
   dslash_test_wrapper.dslashRef();
   for (int i=0; i<attempts; i++) {
-    dslash_test_wrapper.run_test(2);
+    dslash_test_wrapper.run_test(niter);
     if (verify_results) {
       ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
       if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
