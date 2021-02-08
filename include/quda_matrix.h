@@ -6,6 +6,7 @@
 #include <register_traits.h>
 #include <float_vector.h>
 #include <complex_quda.h>
+#include <math_helper.cuh>
 
 namespace quda {
 
@@ -1022,7 +1023,7 @@ namespace quda {
       //[25]
       theta  = acos(c0/c0_max);
 
-      sincos(theta * inv3, &w_p, &u_p);
+      quda::sincos(theta * inv3, &w_p, &u_p);
       //[23]
       u_p *= sqrt_c1_inv3;
 
@@ -1034,7 +1035,7 @@ namespace quda {
       matType w_sq = w_p * w_p;
       matType denom_inv = 1.0 / (9 * u_sq - w_sq);
       matType exp_iu_re, exp_iu_im;
-      sincos(u_p, &exp_iu_im, &exp_iu_re);
+      quda::sincos(u_p, &exp_iu_im, &exp_iu_re);
       matType exp_2iu_re = exp_iu_re * exp_iu_re - exp_iu_im * exp_iu_im;
       matType exp_2iu_im = 2 * exp_iu_re * exp_iu_im;
       matType cos_w = cos(w_p);
