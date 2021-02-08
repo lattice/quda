@@ -788,7 +788,7 @@ namespace quda
           float elapsed_time = timer.last() / tunable.tuningIter();
 	  //warningQuda("timer.last(): %g", timer.last());
 	  //warningQuda("tunable.tuningIter(): %i", tunable.tuningIter());
-	  warningQuda("tune elapsed_time: %g", elapsed_time);
+	  //warningQuda("tune elapsed_time: %g", elapsed_time);
 	  //warningQuda("error: %i", error);
 	  //warningQuda("tunable.launchError(): %i", tunable.launchError());
           if ((elapsed_time < best_time) && (error == QUDA_SUCCESS) && (tunable.launchError() == QUDA_SUCCESS)) {
