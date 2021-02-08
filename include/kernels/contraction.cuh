@@ -273,7 +273,7 @@ namespace quda
     ContractionSummedArg(const ColorSpinorField &x, const ColorSpinorField &y,
 			 const int source_position_in[4], const int mom_mode_in[4],
 			 const int s1, const int b1) :
-      ReduceArg<spinor_array>(x.X(reduction_dim)),
+      ReduceArg<spinor_array>(x.X()[reduction_dim]),
       x(x),
       y(y),
       s1(s1),
@@ -306,7 +306,7 @@ namespace quda
     {
       constexpr int nSpin = Arg::nSpin;
       constexpr int nColor = Arg::nColor;
-       using real = typename Arg::real;
+      using real = typename Arg::real;
       using Vector = ColorSpinor<real, nColor, nSpin>;
 
       reduce_t result_all_channels = spinor_array();
