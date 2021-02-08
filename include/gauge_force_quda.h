@@ -24,6 +24,6 @@ namespace quda {
      @param[in] epsilon Step-size coefficient
      @param[in] path_coeff Coefficients of the various staples
   */
-  void gaugeForceNew(GaugeField& mom, const GaugeField& u, const QudaGaugeActionType action_type, const double epsilon, const double* path_coeff);
+  void gaugeForceNew(GaugeField& mom, const GaugeField& u, const QudaGaugeActionType action_type, const double epsilon, void *path_coeff);
   
 } // namespace quda

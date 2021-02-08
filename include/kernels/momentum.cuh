@@ -55,7 +55,7 @@ namespace quda {
         local_sum += mom(0,2).imag() * mom(0,2).imag();
         local_sum += mom(1,2).real() * mom(1,2).real();
         local_sum += mom(1,2).imag() * mom(1,2).imag();
-	local_sum -= 4.0;
+	local_sum -= 0.0;
 
 	action = plus::operator()(action, local_sum);
       }
@@ -131,16 +131,12 @@ namespace quda {
         // compute force norms
         norm = operator()(make_double2(f.L1(), f.L2()), norm);
 
-	// DMH unit tests passing with double and single
-	
-        //m = m + arg.coeff * f;
+        m = m + arg.coeff * f;
         // strictly speaking this shouldn't be needed since the
         // momentum should already be traceless anti-hermitian but at
         // present the unit test will fail without this
-        // makeAntiHerm(m);
-	//arg.mom(d, x_cb, parity) = m;
-        arg.mom(d, x_cb, parity) = m + arg.coeff * f;
-
+	makeAntiHerm(m);
+	arg.mom(d, x_cb, parity) = m;
       }
       return norm;
     }

@@ -23,11 +23,11 @@ namespace quda
     int dx[4] = { };
 #pragma unroll
     for (int mu = 0; mu < 4 ; mu++) {
-      // Identify directions orthogonal to the link and
-      // ignore the dir_ignore direction (usually the temporal dim
-      // when used with STOUT or APE for measurement smearing)
-      if (mu != nu && mu != dir_ignore) {
-        {
+      // Identify directions orthogonal to the link.
+      // Over-Improved stout is usually done for topological
+      // measurements which will include the temporal direction.
+      if (mu != nu && mu != dir_ignore) {	
+	{
           // Get link U_{\mu}(x)
           Link U1 = static_cast<Link>(arg.in(mu, linkIndexShift(x, dx, X), parity));
 	  
@@ -77,52 +77,53 @@ namespace quda
     for (int mu = 0; mu < 4 ; mu++) {
       // Identify directions orthogonal to the link
       if (mu != nu) {
-        {
+	{
 	  // Positive mu
 	  //-------------------------------------------------------------------
 	  // Start from the end of the link
 	  dx[nu]++;
-          // Get link U_{\mu}(x+nu)
-          Link U1 = static_cast<Link>(arg.in(mu, linkIndexShift(x, dx, X), 1 - parity));
-
-          // Get link U_{\nu}(x+\mu)
-          dx[mu]++;
+	  // Get link U_{\mu}(x+nu)
+	  Link U1 = static_cast<Link>(arg.in(mu, linkIndexShift(x, dx, X), 1 - parity));
+	
+	  // Get link U_{\nu}(x+\mu)
+	  dx[mu]++;
 	  dx[nu]--;
 	  U1 = U1 * conj(static_cast<Link>(arg.in(nu, linkIndexShift(x, dx, X), 1 - parity)));
-
-          // Get link U_{\mu}(x)
-          dx[mu]--;
-          U1 = U1 * conj(static_cast<Link>(arg.in(mu, linkIndexShift(x, dx, X), parity)));
 	  
-          // staple += U_{\mu}(x) * U_{\nu}(x+\mu) * U^\dag_{\mu}(x+\nu)
-          staple = staple + U1;
+	  // Get link U_{\mu}(x)
+	  dx[mu]--;
+	  U1 = U1 * conj(static_cast<Link>(arg.in(mu, linkIndexShift(x, dx, X), parity)));
+	  
+	  // staple += U_{\mu}(x) * U_{\nu}(x+\mu) * U^\dag_{\mu}(x+\nu)
+	  staple = staple + U1;
 	  //-------------------------------------------------------------------
 	}
-
+	
 	{
 	  // Negative mu
 	  //-------------------------------------------------------------------
 	  dx[nu]++;
-          // Get link U_{\mu}(x+\nu-\mu)
-          dx[mu]--;
-          Link U1 = conj(static_cast<Link>(arg.in(mu, linkIndexShift(x, dx, X), parity)));
-          // Get link U_{\nu}(x-\mu)
+	  // Get link U_{\mu}(x+\nu-\mu)
+	  dx[mu]--;
+	  Link U1 = conj(static_cast<Link>(arg.in(mu, linkIndexShift(x, dx, X), parity)));
+	  // Get link U_{\nu}(x-\mu)
 	  dx[nu]--;
-          U1 = U1 * conj(static_cast<Link>(arg.in(nu, linkIndexShift(x, dx, X), 1 - parity)));
-
-          // Get link U_{\mu}(x-\mu)
-          U1 = U1 * static_cast<Link>(arg.in(mu, linkIndexShift(x, dx, X), 1 - parity));
-
-          // reset dx
-          dx[mu]++;
-
-          // staple += U^\dag_{\mu}(x-\mu) * U_{\nu}(x-\mu) * U_{\mu}(x-\mu+\nu)
-          staple = staple + U1;
+	  U1 = U1 * conj(static_cast<Link>(arg.in(nu, linkIndexShift(x, dx, X), 1 - parity)));
+	  
+	  // Get link U_{\mu}(x-\mu)
+	  U1 = U1 * static_cast<Link>(arg.in(mu, linkIndexShift(x, dx, X), 1 - parity));
+	  
+	  // reset dx
+	  dx[mu]++;
+	  
+	  // staple += U^\dag_{\mu}(x-\mu) * U_{\nu}(x-\mu) * U_{\mu}(x-\mu+\nu)
+	  staple = staple + U1;
 	  //-------------------------------------------------------------------
-        }
+	}
       }
     }
   }
+ 
 
   // This function will get the three 2x1 rectangles and the central 1x1 square
   // that define the Symanzik staple around the link.

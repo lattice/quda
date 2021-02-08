@@ -27,6 +27,7 @@
 #include <staggered_oprod.h>
 #include <ks_improved_force.h>
 #include <ks_force_quda.h>
+#include <pgauge_monte.h>
 #include <random_quda.h>
 #include <mpi_comm_handle.h>
 
@@ -137,6 +138,9 @@ cudaGaugeField *gaugeSmeared = nullptr;
 cudaGaugeField *gaugeEvolved = nullptr;
 cudaGaugeField *gaugeFixed = nullptr;
 
+// This is the momemntum field used by QUDA
+cudaGaugeField *momResident = nullptr;
+
 // These are the clover versions of the lower precision fields
 cudaCloverField *cloverPrecise = nullptr;
 cudaCloverField *cloverSloppy = nullptr;
@@ -144,7 +148,6 @@ cudaCloverField *cloverPrecondition = nullptr;
 cudaCloverField *cloverRefinement = nullptr;
 cudaCloverField *cloverEigensolver = nullptr;
 
-cudaGaugeField *momResident = nullptr;
 cudaGaugeField *extendedGaugeResident = nullptr;
 
 std::vector<cudaColorSpinorField*> solutionResident;
@@ -231,12 +234,6 @@ static TimeProfile profileOvrImpSTOUT("OvrImpSTOUTQuda");
 
 //!< Profiler for wFlowQuda
 static TimeProfile profileWFlow("wFlowQuda");
-
-//!< Profiler for heatbathQuda
-static TimeProfile profileHeatbath("heatbathQuda");
-
-//!< Profiler for leapfrogQuda
-static TimeProfile profileLeapfrog("leapfrogQuda");
 
 //!< Profiler for projectSU3Quda
 static TimeProfile profileProject("projectSU3Quda");
@@ -1263,9 +1260,12 @@ void freeGaugeQuda(void)
   gaugeFatPrecise = nullptr;
   gaugeFatExtended = nullptr;
 
-  if (gaugeSmeared) delete gaugeSmeared;
-
+  if (gaugeSmeared) delete gaugeSmeared;  
   gaugeSmeared = nullptr;
+
+  if (gaugeEvolved) delete gaugeEvolved;  
+  gaugeEvolved = nullptr;
+  
   // Need to merge extendedGaugeResident and gaugeFatPrecise/gaugePrecise
   if (extendedGaugeResident) {
     delete extendedGaugeResident;
@@ -1599,8 +1599,6 @@ void endQuda(void)
     profileSTOUT.Print();
     profileOvrImpSTOUT.Print();
     profileWFlow.Print();
-    profileHeatbath.Print();
-    profileLeapfrog.Print();
     profileProject.Print();
     profilePhase.Print();
     profileMomAction.Print();
@@ -4213,17 +4211,23 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   profileGaugeForce.TPSTART(QUDA_PROFILE_COMPUTE);
   if (!forceMonitor()) {
     //gaugeForce(*cudaMom, *cudaGauge, eb3, input_path_buf,  path_length, loop_coeff, num_paths, max_length);
-    double path_coeff[3] = {1.0, 1.0, 1.0};
+    double path_coeff[3];
+    for(int i=0; i<3; i++) path_coeff[i] = i*1.0;
+
     //gaugeForceNew(*cudaMom, *cudaGauge, QUDA_GAUGE_ACTION_TYPE_WILSON, eb3, path_coeff);
     //gaugeForceNew(*cudaMom, *cudaGauge, QUDA_GAUGE_ACTION_TYPE_SYMANZIK, eb3, path_coeff);
     gaugeForceNew(*cudaMom, *cudaGauge, QUDA_GAUGE_ACTION_TYPE_LUSCHER_WEISZ, eb3, path_coeff);
   } else {
-    // if we are monitoring the force, separate the force computation from the momentum update
+    // if we are monitoring the force, separate the force computation from the
+    // momentum update. Use a dummy zero field to collect the momentum contribution
+    // performed in gaugeForce. The epsilon param is irrelevant.
     GaugeFieldParam gParam(*cudaMom);
     gParam.create = QUDA_ZERO_FIELD_CREATE;
     GaugeField *force = GaugeField::Create(gParam);
     //gaugeForce(*force, *cudaGauge, 1.0, input_path_buf,  path_length, loop_coeff, num_paths, max_length);
-    double path_coeff[3] = {1.0, 1.0, 1.0};
+    double path_coeff[3];
+    for(int i=0; i<3; i++) path_coeff[i] = i*1.0;
+    
     //gaugeForceNew(*cudaMom, *cudaGauge, QUDA_GAUGE_ACTION_TYPE_WILSON, eb3, path_coeff);
     //gaugeForceNew(*cudaMom, *cudaGauge, QUDA_GAUGE_ACTION_TYPE_SYMANZIK, eb3, path_coeff);
     gaugeForceNew(*cudaMom, *cudaGauge, QUDA_GAUGE_ACTION_TYPE_LUSCHER_WEISZ, eb3, path_coeff);
@@ -5007,7 +5011,7 @@ void updateGaugeFieldQuda(void* gauge,
 
   GaugeFieldParam gParamMom(momentum, *param);
   gParamMom.reconstruct = (gParamMom.order == QUDA_TIFR_GAUGE_ORDER || gParamMom.order == QUDA_TIFR_PADDED_GAUGE_ORDER) ?
-   QUDA_RECONSTRUCT_NO : QUDA_RECONSTRUCT_10;
+    QUDA_RECONSTRUCT_NO : QUDA_RECONSTRUCT_10;
   gParamMom.link_type = QUDA_ASQTAD_MOM_LINKS;
   gParamMom.site_offset = param->mom_offset;
   gParamMom.site_size = param->site_size;
@@ -5962,12 +5966,17 @@ void gaugeObservablesQuda(QudaGaugeObservableParam *param)
   checkGaugeObservableParam(param);
 
   cudaGaugeField *gauge = nullptr;
-  if (!gaugeSmeared) {
+  if (!gaugeSmeared && !gaugeEvolved) {
     if (!extendedGaugeResident) extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileGaugeObs);
     gauge = extendedGaugeResident;
-  } else {
+  } else if(gaugeSmeared && !gaugeEvolved) {
     gauge = gaugeSmeared;
+  } else if(gaugeEvolved) {
+    gauge = gaugeEvolved;
+  } else {
+    errorQuda("No gauge fields are loaded\n");
   }
+  
 
   gaugeObservables(*gauge, *param, profileGaugeObs);
   profileGaugeObs.TPSTOP(QUDA_PROFILE_TOTAL);
@@ -6067,25 +6076,29 @@ void make4DChiralProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_para
   profileMake4DProp.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-void performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMCParam *hmc_param, QudaInvertParam *inv_param, int step)
+void performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMCParam *hmc_param, int step)
 {
-  profilerStart(__func__);
+  profileInit.TPSTART(QUDA_PROFILE_TOTAL);
+  // Transfer the inv_param and gauge_param structures contained in hmc_param
+  QudaInvertParam *inv_param = hmc_param->invert_param;
+  QudaGaugeParam *gauge_param = hmc_param->gauge_param;
 
   if (inv_param->dslash_type != QUDA_WILSON_DSLASH) {
     errorQuda("Leapfrog HMC implemented for Wilson dslash only.");
   }
   
-  profileLeapfrog.TPSTART(QUDA_PROFILE_TOTAL);
   if (!initialized) errorQuda("QUDA not initialized");
   pushVerbosity(inv_param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    printQudaHMCParam(hmc_param);    
+    printQudaHMCParam(hmc_param);
     printQudaInvertParam(inv_param);
+    printQudaGaugeParam(gauge_param);
   }
 
   checkHMCParam(hmc_param);
   checkInvertParam(inv_param);
-
+  checkGaugeParam(gauge_param);
+  
   // check the gauge fields have been created
   cudaGaugeField *cudaGauge = checkGauge(inv_param);
 
@@ -6125,18 +6138,47 @@ void performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMC
   Dirac &diracSloppy = *dSloppy;
   Dirac &diracPre = *dPre;
   Dirac &diracEig = *dEig;
+
+  // Define gauge coefficients
+  QudaGaugeActionType gauge_action_type = QUDA_GAUGE_ACTION_TYPE_WILSON;
+  double path_coeff[3] = {1.0, 1.0, 1.0};
+  double epsilon = (hmc_param->traj_length/(1.0*hmc_param->traj_steps));
+  double eps_scaled = epsilon * hmc_param->beta/3.0;
   //---------------------------------------------------------------------
-  
+
   // Create a new gauge field and copy gauge precise. We will evolve ths
   // gauge field.
   //---------------------------------------------------------------------
   if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");  
+  // Make an extended gauge field from the loaded gauge field
   if (gaugeEvolved != nullptr) delete gaugeEvolved;
-  gaugeEvolved = createExtendedGauge(*gaugePrecise, R, profileLeapfrog);
-  GaugeFieldParam gauge_param(*gaugeEvolved);
-  auto *cudaGaugeTemp = new cudaGaugeField(gauge_param);
+  gaugeEvolved = createExtendedGauge(*gaugePrecise, R, profileInit);
+  
+  // An auxilliary field
+  GaugeFieldParam aux_param(*gaugeEvolved);
+  auto *gaugeTemp = new cudaGaugeField(aux_param);
+  profileInit.TPSTOP(QUDA_PROFILE_TOTAL);
+  
+  // Create device momentum field
+  //---------------------------------------------------------------------
+  GaugeFieldParam device_mom_param(*gaugeEvolved);
+  device_mom_param.create = QUDA_NULL_FIELD_CREATE;
+  device_mom_param.order = QUDA_FLOAT2_GAUGE_ORDER;
+  device_mom_param.link_type = QUDA_ASQTAD_MOM_LINKS;
+  device_mom_param.reconstruct = QUDA_RECONSTRUCT_10;
+  device_mom_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  device_mom_param.pad = 0;
+  device_mom_param.setPrecision(inv_param->cuda_prec, true);
+  cudaGaugeField *device_mom = new cudaGaugeField(device_mom_param);
+
+  profileGauss.TPSTART(QUDA_PROFILE_TOTAL);
+  profileGauss.TPSTART(QUDA_PROFILE_COMPUTE);
+  quda::gaugeGauss(*device_mom, 1234+step, 1.0);
+  profileGauss.TPSTOP(QUDA_PROFILE_COMPUTE);
+  profileGauss.TPSTOP(QUDA_PROFILE_TOTAL);  
   //---------------------------------------------------------------------
   
+  /*  
   // Create device spinor fields for the fermion force
   //---------------------------------------------------------------------  
   ColorSpinorField *source = nullptr;
@@ -6189,109 +6231,120 @@ void performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMC
   spinorNoise(*source, *rng, QUDA_NOISE_GAUSS);
   d->M(*solution, *source); // apply the operator
   //---------------------------------------------------------------------
+  */
   
-  // Measure the action
-  //---------------------------------------------------------------------
+  // Start HMC trajectory
+  //---------------------------------------------------------------------  
+  const double unitarize_eps = 1e-14;
+  const double max_error = 1e-10;
+  const int reunit_allow_svd = 1;
+  const int reunit_svd_only  = 1;
+  const double svd_rel_error = 1e-6;
+  const double svd_abs_error = 1e-6;
+  quda::setUnitarizeLinksConstants(unitarize_eps, max_error,
+				   reunit_allow_svd, reunit_svd_only,
+				   svd_rel_error, svd_abs_error);  
+  
+  // Measure gauge and Q charge
   QudaGaugeObservableParam gauge_obs_param = newQudaGaugeObservableParam();
   gauge_obs_param.compute_plaquette = QUDA_BOOLEAN_TRUE;
-  gauge_obs_param.compute_qcharge = QUDA_BOOLEAN_TRUE;
+  gauge_obs_param.compute_qcharge = QUDA_BOOLEAN_TRUE;  
   gaugeObservablesQuda(&gauge_obs_param);
-
-  double gauge_norm = 1.0/source->Volume();
-  double gauge_action = hmc_param->beta*(1.0 - gauge_obs_param.plaquette[0]);
-  double fermion_action = blas::norm2(*source);
-
-  /*
   
-  // These will be passed in to the function
-  void* mom;
-  QudaGaugeParam* gauge_param;
+  // Measure momentum
+  profileMomAction.TPSTART(QUDA_PROFILE_TOTAL);
+  profileMomAction.TPSTART(QUDA_PROFILE_COMPUTE);
+  double momentum_action = computeMomAction(*device_mom);
+  profileMomAction.TPSTOP(QUDA_PROFILE_COMPUTE);
+  profileMomAction.TPSTOP(QUDA_PROFILE_TOTAL);
+  
+  double gauge_action = 6.0 * (1.0 - gauge_obs_param.plaquette[0]) * gaugeTemp->Volume() * hmc_param->beta;
+  
+  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Pre  step %d: gauge action %.16e momentum action %.16e Q charge %.16e plaq = %.16e\n",
+						 step, gauge_action, momentum_action, gauge_obs_param.qcharge, gauge_obs_param.plaquette[0]);
+  
+  // Initial half step.
+  // P_{1/2} = P_0 - dtau/2 * (fU - fD)
+  // Compute the gauge force and update the momentum field
+  profileGaugeUpdate.TPSTART(QUDA_PROFILE_TOTAL);
+  profileGaugeUpdate.TPSTART(QUDA_PROFILE_COMPUTE);
+  updateGaugeField(*gaugeTemp, 0.5*epsilon, *gaugeEvolved, *device_mom, false, false);
+  copyExtendedGauge(*gaugeEvolved, *gaugeTemp, QUDA_CUDA_FIELD_LOCATION);
+  gaugeEvolved->exchangeExtendedGhost(gaugeEvolved->R(), false);
+  profileGaugeUpdate.TPSTOP(QUDA_PROFILE_COMPUTE);
+  profileGaugeUpdate.TPSTOP(QUDA_PROFILE_TOTAL);
 
-  // Construct a momentum field parameter using the gauge field param.
-  GaugeFieldParam mom_param(mom, *gauge_param, QUDA_MOMENTUM_LINKS);
-  mom_param.reconstruct = QUDA_RECONSTRUCT_10;
+  for(int k=1; k<hmc_param->traj_steps; k++) {
+    // Perform the gauge field update
+    // U_{k} = exp(i dtau P_{k-1/2}) * U_{k-1} 
+    profileGaugeForce.TPSTART(QUDA_PROFILE_TOTAL);
+    profileGaugeForce.TPSTART(QUDA_PROFILE_COMPUTE);
+    gaugeForceNew(*device_mom, *gaugeEvolved, gauge_action_type, hmc_param->beta*epsilon/3.0, path_coeff);
+    profileGaugeForce.TPSTOP(QUDA_PROFILE_COMPUTE);
+    profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
 
-  // If the user passes in a momentum field, we use that one.
-  cpuGaugeField* host_mom = (gauge_param->use_resident_mom) ? nullptr : new cpuGaugeField(mom_param);
+    profileGaugeUpdate.TPSTART(QUDA_PROFILE_TOTAL);
+    profileGaugeUpdate.TPSTART(QUDA_PROFILE_COMPUTE);
+    if(k != hmc_param->traj_steps-1) updateGaugeField(*gaugeTemp, epsilon, *gaugeEvolved, *device_mom, false, true);
+    else updateGaugeField(*gaugeTemp, 0.5*epsilon, *gaugeEvolved, *device_mom, false, true);    
+    copyExtendedGauge(*gaugeEvolved, *gaugeTemp, QUDA_CUDA_FIELD_LOCATION);
+    gaugeEvolved->exchangeExtendedGhost(gaugeEvolved->R(), false);
+    profileGaugeUpdate.TPSTOP(QUDA_PROFILE_COMPUTE);
+    profileGaugeUpdate.TPSTOP(QUDA_PROFILE_TOTAL);
 
-  // Construct a device momentum field
-  cudaGaugeField* device_mom = nullptr;
-  if (gauge_param->use_resident_mom) {
-    if (!momResident) errorQuda("No resident momentum field to use");
-    device_mom = momResident;
-    if (gauge_param->overwrite_mom) device_mom->zero();
-    profileGaugeForce.TPSTOP(QUDA_PROFILE_INIT);
-    
-  } else {
-    mom_param.create = gauge_param->overwrite_mom ? QUDA_ZERO_FIELD_CREATE : QUDA_NULL_FIELD_CREATE;
-    mom_param.reconstruct = QUDA_RECONSTRUCT_10;
-    mom_param.link_type = QUDA_MOMENTUM_LINKS;
-    mom_param.setPrecision(gauge_param->cuda_prec, true);
-    mom_param.create = QUDA_ZERO_FIELD_CREATE;
-    devive_mom = new cudaGaugeField(mom_param);
-    profileGaugeForce.TPSTOP(QUDA_PROFILE_INIT);
-    
-    if (!gauge_param->overwrite_mom) {
-      profileGaugeForce.TPSTART(QUDA_PROFILE_H2D);
-      device_mom->loadCPUField(*host_mom);
-      profileGaugeForce.TPSTOP(QUDA_PROFILE_H2D);
+    *num_failures_h = 0;
+    quda::unitarizeLinks(*gaugeEvolved, num_failures_d); // unitarize on the gpu
+    if (*num_failures_h>0) errorQuda("Error in unitarization component of the hisq fattening: %d failures\n", *num_failures_h);
+  }
+  
+  // Measure gauge and Q charge
+  gaugeObservablesQuda(&gauge_obs_param);
+  
+  // Measure momentum
+  profileMomAction.TPSTART(QUDA_PROFILE_TOTAL);
+  profileMomAction.TPSTART(QUDA_PROFILE_COMPUTE);
+  double post_momentum_action = computeMomAction(*device_mom);
+  profileMomAction.TPSTOP(QUDA_PROFILE_COMPUTE);
+  profileMomAction.TPSTOP(QUDA_PROFILE_TOTAL);
+
+  double post_gauge_action = 6.0 * (1.0 - gauge_obs_param.plaquette[0]) * gaugeTemp->Volume() * hmc_param->beta;
+
+  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Post step %d: gauge action %.16e momentum action %.16e Q charge %+.16e plaq = %.16e\n",
+						 step, post_gauge_action, post_momentum_action, gauge_obs_param.qcharge, gauge_obs_param.plaquette[0]);
+
+  // Metropolis step
+  double dH = (post_gauge_action + post_momentum_action - gauge_action - momentum_action);
+  double expdH = exp(-dH);
+  double prob = 0.0;
+  
+  // If the update is accepted, copy gaugeEvolved into gaugePrecise
+  if(dH < 0 || step < hmc_param->therm_updates) {
+    gaugePrecise->copy(*gaugeEvolved);
+  } else if(step > hmc_param->therm_updates) {
+    prob = ((double)rand())/RAND_MAX;
+    if(prob < expdH) {
+      gaugePrecise->copy(*gaugeEvolved);
     }
   }
   
-  if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
-
-  if (gaugeEvolved != nullptr) delete gaugeEvolved;
-  gaugeEvolved = createExtendedGauge(*gaugePrecise, R, profileGaugeForce);
-
-  GaugeFieldParam gParamEx(*gaugeEvolved);
-  auto *gaugeAux = GaugeField::Create(gParamEx);
-
-  GaugeFieldParam gParam(*gaugePrecise);
-  gParam.reconstruct = QUDA_RECONSTRUCT_NO; // temporary field is not on manifold so cannot use reconstruct
-  auto *gaugeTemp = GaugeField::Create(gParam);
-
-  GaugeField *in = gaugeSmeared;
-  GaugeField *out = gaugeAux;
-
-
-
-
-
+  bool accept = (dH < 0 ||
+		 step < hmc_param->therm_updates ||
+		 prob < expdH);    
   
-
-  // actually do the computation
-  profileGaugeForce.TPSTART(QUDA_PROFILE_COMPUTE);
-  if (!forceMonitor()) {
-    gaugeForce(*device_momom, *gaugeEvolved, eb3, input_path_buf,  path_length, loop_coeff, num_paths, max_length);
-  } else {
-    // if we are monitoring the force, separate the force computation from the momentum update
-    GaugeFieldParam gParam(*cudaMom);
-    gParam.create = QUDA_ZERO_FIELD_CREATE;
-    GaugeField *force = GaugeField::Create(gParam);
-    gaugeForce(*force, *cudaGauge, 1.0, input_path_buf,  path_length, loop_coeff, num_paths, max_length);
-    updateMomentum(*cudaMom, eb3, *force, "gauge");
-    delete force;
+  if (getVerbosity() >= QUDA_VERBOSE) {
+    printfQuda("Trajectory %d: %s delta H %+.8e expdH %.8e prob %.8e\n",
+	       step, accept ? "accepted" : "rejected", dH, expdH, prob);	  
   }
-
-
-
   
-  if (getVerbosity() >= QUDA_SUMMARIZE) {
-    printfQuda("Leapfrog pre step %d: %.16e %.16e %+.16e\n", step, fermion_action, gauge_action, gauge_obs_param.qcharge);
-  }  
-  //---------------------------------------------------------------------  
-
-  // These are pointers to fields that will be created by dirac.prepare/
-  //ColorSpinorField *in = nullptr;
-  //ColorSpinorField *out = nullptr;
-  */
-
+  if(getVerbosity() >= QUDA_SUMMARIZE) {
+    printfQuda("Trajectory %d: acceptance %d dH %+.16e expdH %.16e plaq %.16e Q %+.16e\n", step, (int)accept, dH, expdH, gauge_obs_param.plaquette[0], gauge_obs_param.qcharge);
+  }
   
-
-
-
-
-
-
-
+  delete device_mom;
+  delete gaugeTemp;
+  delete d;
+  delete dSloppy;
+  delete dPre;
+  delete dEig;
+  popVerbosity();
 }

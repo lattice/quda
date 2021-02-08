@@ -20,112 +20,19 @@ int length[] = {
   5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
 };
 
-/*
-float loop_coeff_f[]={
-  1.1,
-  1.2,
-  1.3,
-  1.4,
-  1.5,
-  1.6,
-  2.5,
-  2.6,
-  2.7,
-  2.8,
-  2.9,
-  3.0,
-  3.1,
-  3.2,
-  3.3,
-  3.4,
-  3.5,
-  3.6,
-  3.7,
-  3.8,
-  3.9,
-  4.0,
-  4.1,
-  4.2,
-  4.3,
-  4.4,
-  4.5,
-  4.6,
-  4.7,
-  4.8,
-  4.9,
-  5.0,
-  5.1,
-  5.2,
-  5.3,
-  5.4,
-  5.5,
-  5.6,
-  5.7,
-  5.8,
-  5.9,
-  5.0,
-  6.1,
-  6.2,
-  6.3,
-  6.4,
-  6.5,
-  6.6,
-};
-*/
 
-
-float loop_coeff_f[]={
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-  1.0,
-};
-
-
+float loop_coeff_f[48];
+void set_loop_coeff_f(float *loop_coeff_f) {
+  for(int i=0; i<6; i++) {
+    loop_coeff_f[i] = 1.0;
+  }
+  for(int i=6; i<24; i++) {
+    loop_coeff_f[i] = 2.0;
+  }
+  for(int i=24; i<48; i++) {
+    loop_coeff_f[i] = 3.0;
+  }
+}
 
 int path_dir_x[][5] = {
   {1, 7, 6 }, //1x1 staples
@@ -308,6 +215,7 @@ void gauge_force_test(void)
 
   setDims(gauge_param.X);
 
+  set_loop_coeff_f((float*)&loop_coeff_f);
   double loop_coeff_d[sizeof(loop_coeff_f)/sizeof(float)];
   for(unsigned int i=0;i < sizeof(loop_coeff_f)/sizeof(float); i++){
     loop_coeff_d[i] = loop_coeff_f[i];
@@ -319,8 +227,10 @@ void gauge_force_test(void)
   } else {
     loop_coeff = loop_coeff_d;
   }
+  
   double eb3 = 0.3;
   int num_paths = sizeof(path_dir_x)/sizeof(path_dir_x[0]);
+  //int num_paths = 6;
   
   int** input_path_buf[4];
   for (int dir = 0; dir < 4; dir++) {

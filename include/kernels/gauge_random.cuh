@@ -67,7 +67,7 @@ namespace quda {
     ret(2, 0) = complex<real>(-temp1[3], temp2[0]);
     ret(1, 2) = complex<real>(temp2[1], temp2[2]);
     ret(2, 1) = complex<real>(-temp2[1], temp2[2]);
-
+    
     return ret;
   }
 
@@ -95,12 +95,13 @@ namespace quda {
         for (int mu = 0; mu < 4; mu++) {
           RNGState localState = arg.rng[parity * arg.threads.x + x_cb];
 
-          // generate Gaussian distributed su(n) fiueld
+          // generate Gaussian distributed su(n) field
           Link u = gauss_su3<real, Link>(localState);
           if (arg.group) {
             u = arg.sigma * u;
             expsu3<real>(u);
           }
+	  //if(x_cb == parity && parity == 0) printLink(u);
           arg.U(mu, linkIndex(x, arg.E), parity) = u;
 
           arg.rng[parity * arg.threads.x + x_cb] = localState;

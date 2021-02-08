@@ -8,8 +8,7 @@ void setHMCParam(QudaHMCParam &hmc_param)
   hmc_param.start = hmc_start;
   hmc_param.updates = hmc_updates;
   hmc_param.therm_updates = hmc_therm_updates;
-  hmc_param.steps = hmc_traj_steps;
-  hmc_param.step_size = hmc_step_size;
+  hmc_param.traj_steps = hmc_traj_steps;
   hmc_param.traj_length = hmc_traj_length;
   hmc_param.coldstart = hmc_coldstart ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   hmc_param.beta = hmc_beta;  

@@ -449,6 +449,7 @@ extern int hmc_updates;
 extern int hmc_therm_updates;
 extern int hmc_checkpoint;
 extern int hmc_traj_steps;
+extern QudaGaugeActionType hmc_gauge_action;
 extern double hmc_step_size;
 extern double hmc_traj_length;
 extern bool hmc_coldstart;

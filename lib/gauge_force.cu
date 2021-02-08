@@ -22,6 +22,8 @@ namespace quda {
       strcat(aux, std::to_string(arg.p.num_paths).c_str());
       strcat(aux, comm_dim_partitioned_string());
       apply(device::get_default_stream());
+      printfQuda("count = %d, num_paths = %d, volumeCB = %lu\n", p.count, p.num_paths, mom.VolumeCB());
+      printfQuda("count = %d u_bytes = %lu, mom_bytes = %lu\n", p.count, u.Bytes(), mom.Bytes());
     }
 
     void apply(const qudaStream_t &stream) {
@@ -32,8 +34,12 @@ namespace quda {
     void preTune() { arg.mom.save(); }
     void postTune() { arg.mom.load(); }
 
-    long long flops() const { return (arg.p.count - arg.p.num_paths + 1) * 198ll * 2 * arg.mom.volumeCB * 4; }
-    long long bytes() const { return ((arg.p.count + 1ll) * arg.u.Bytes() + 2ll*arg.mom.Bytes()) * 2 * arg.mom.volumeCB * 4; }
+    long long flops() const {
+      return (arg.p.count - arg.p.num_paths + 1) * 198ll * 2 * arg.mom.volumeCB * 4;
+    }
+    long long bytes() const {
+      return ((arg.p.count + 1ll) * arg.u.Bytes() + 2ll*arg.mom.Bytes()) * 2 * arg.mom.volumeCB * 4;
+    }
   };
 
 #ifdef GPU_GAUGE_FORCE

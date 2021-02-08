@@ -779,13 +779,16 @@ extern "C" {
 
   typedef struct QudaHMCParam_s {
 
+    QudaInvertParam *invert_param;  /** Used to store information pertinent to the operator **/
+    QudaGaugeParam *gauge_param;    /** Used to store information pertinent to the gauge field **/
+    
     int start;                 /**< The update step from which to start */
     int updates;               /**< Total number of updates to perform */
     int therm_updates;         /**< Number of updates to perfrom prior to thermalisation */
-    int steps;                 /**< Number of integrations steps*/
-    double step_size;          /**< Size of integration steps */
+    int traj_steps;            /**< Number of integrations steps*/
     double traj_length;        /**< The length of the integration trajectory */
     QudaBoolean coldstart;     /**< Whether to initialise the gauge field with unit valued elements of SU(N) [cold start] or random elements of SU(N) [hot start]  */
+    QudaBoolean monitor_force; /**< Whether to accumulate force data and dump to file. Can also be triggered with the environment variable QUDA_ENABLE_FORCE_MONITOR=1 */
     double beta;               /**< The beta value of the simulation */
 
   } QudaHMCParam;
@@ -1557,10 +1560,9 @@ extern "C" {
    * @param h_x Solution spinor field
    * @param h_b Source spinor field
    * @param hmc_param Parameter structure containing HMC parameters
-   * @param inv_param Parameter structure containing inversion parameters
    * @param step The step label in the Markov chain.
    */
-  void performLeapfrogStep(void *h_x, void *h_b, QudaHMCParam *hmc_param, QudaInvertParam *inv_param, int step);
+  void performLeapfrogStep(void *h_x, void *h_b, QudaHMCParam *hmc_param, int step);
 
   /**
    * @brief Flush the chronological history for the given index

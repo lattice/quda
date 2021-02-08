@@ -24,7 +24,7 @@ namespace quda {
       sigma(static_cast<Float>(sigma)),
       group(U.LinkType() == QUDA_SU3_LINKS)
     {
-      if (getVerbosity() >= QUDA_SUMMARIZE) {
+      if (getVerbosity() >= QUDA_VERBOSE) {
         if (group) printfQuda("Creating Gaussian distrbuted Lie group field with sigma = %e\n", sigma);
         else printfQuda("Creating Gaussian distrbuted Lie algebra field\n");
       }
@@ -55,8 +55,12 @@ namespace quda {
     if (U.LinkType() != QUDA_SU3_LINKS && U.LinkType() != QUDA_MOMENTUM_LINKS)
       errorQuda("Unexpected link type %d", U.LinkType());
 
-    instantiate<GaugeGauss, ReconstructFull>(U, rng, sigma);
-
+    if (U.LinkType() == QUDA_MOMENTUM_LINKS) {
+      instantiate<GaugeGauss, ReconstructMom>(U, rng, sigma);
+    } else {      
+      instantiate<GaugeGauss, ReconstructFull>(U, rng, sigma);
+    }
+    
     // ensure multi-gpu consistency if required
     if (U.GhostExchange() == QUDA_GHOST_EXCHANGE_EXTENDED) {
       U.exchangeExtendedGhost(U.R());
@@ -64,7 +68,7 @@ namespace quda {
       U.exchangeGhost();
     }
   }
-
+  
   void gaugeGauss(GaugeField &U, unsigned long long seed, double sigma)
   {
     RNG *randstates = new RNG(U, seed);

@@ -24,6 +24,7 @@ endif()
 
 set (QUDA_OBJS
   # cmake-format: sortable
+  gauge_force_new.cu 
   dirac_coarse.cpp dslash_coarse.cu dslash_coarse_dagger.cu
   coarse_op.cu coarsecoarse_op.cu
   coarse_op_preconditioned.cu staggered_coarse_op.cu
@@ -50,7 +51,7 @@ set (QUDA_OBJS
   dirac_improved_staggered.cpp dirac_improved_staggered_kd.cpp dirac_domain_wall.cpp
   dirac_domain_wall_4d.cpp dirac_mobius.cpp dirac_twisted_clover.cpp
   dirac_twisted_mass.cpp 
-  llfat_quda.cu gauge_force.cu gauge_force_new.cu gauge_random.cu
+  llfat_quda.cu gauge_force.cu gauge_random.cu
   gauge_field_strength_tensor.cu clover_quda.cu dslash_quda.cu
   dslash_staggered.cu dslash_improved_staggered.cu
   dslash_wilson.cu dslash_wilson_clover.cu dslash5_domain_wall.cu

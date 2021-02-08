@@ -239,9 +239,9 @@ int hmc_updates = 100;
 int hmc_therm_updates = 100;
 int hmc_checkpoint = 5;
 int hmc_traj_steps = 25;
-double hmc_step_size = 0.04;
 double hmc_traj_length = 1.0;
 bool hmc_coldstart = false;
+QudaGaugeActionType hmc_gauge_action = QUDA_GAUGE_ACTION_TYPE_WILSON;
 double hmc_beta = 6.2;
 
 int eofa_pm = 1;
@@ -459,6 +459,10 @@ namespace
 
   CLI::TransformPairs<QudaExtLibType> extlib_map {{"eigen", QUDA_EIGEN_EXTLIB}, {"magma", QUDA_MAGMA_EXTLIB}};
 
+  CLI::TransformPairs<QudaGaugeActionType> gauge_action_type_map {{"wilson", QUDA_GAUGE_ACTION_TYPE_WILSON},
+                                                                  {"symanzik", QUDA_GAUGE_ACTION_TYPE_SYMANZIK},
+								  {"luscher-weisz", QUDA_GAUGE_ACTION_TYPE_LUSCHER_WEISZ}};
+  
 } // namespace
 
 std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_name)
@@ -1055,6 +1059,8 @@ void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app)
 
 void add_hmc_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
+  CLI::QUDACheckedTransformer gauge_action_type_transform(gauge_action_type_map);
+  
   // Option group for hmc related options
   auto opgroup = quda_app->add_option_group("hmc", "Options controlling hmc routines");
   opgroup->add_option("--hmc-beta", hmc_beta, "Beta value used in hmc test (default 6.2)");
@@ -1062,16 +1068,16 @@ void add_hmc_option_group(std::shared_ptr<QUDAApp> quda_app)
                        "Whether to use a cold or hot start in hmc (default false)");
   opgroup->add_option("--hmc-traj-length", hmc_traj_length,
                        "The length of the trajectory in MD time (default 1.0)");
-  opgroup->add_option("--hmc-step-size", hmc_step_size,
-                       "The step size of the integration trajectory (default 0.04)");
   opgroup->add_option("--hmc-traj-steps", hmc_traj_steps,
 		      "The number of steps in the integration trajectory (default 25)");
   opgroup->add_option("--hmc-therm-updates", hmc_therm_updates,
 		      "The number of trajectorys to traverse before measurement (default 100)");
-  opgroup->add_option("--hmc-updates", hmc_traj_steps,
+  opgroup->add_option("--hmc-updates", hmc_updates,
 		      "the number of updates to perfrom after thermalisation (default 100)");
   opgroup->add_option("--hmc-checkpoint", hmc_checkpoint,
 		      "Number of measurement steps in hmc before checkpointing (default 5)");
+  opgroup->add_option("--hmc-gauge-action", hmc_gauge_action, "The gauge action type to use: wilson, symanzik, luscher-weisz (default wilson)")
+    ->transform(CLI::QUDACheckedTransformer(gauge_action_type_map));
 }
 
 

@@ -1663,7 +1663,7 @@ template <typename real> double mom_action(real *mom_, int len)
     double local = 0.0;
     for (int j = 0; j < 6; j++) local += mom[j] * mom[j];
     for (int j = 6; j < 9; j++) local += 0.5 * mom[j] * mom[j];
-    local -= 4.0;
+    local -= 0.0;
     action += local;
   }
 
