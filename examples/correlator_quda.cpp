@@ -5,6 +5,10 @@
 
 // C++
 #include <iostream>
+#include <stdio.h>
+#include <time.h>
+#include <math.h>
+#include <string.h>
 
 // Local Enum type for IO
 typedef enum CorrelatorFlavors_s {
@@ -142,8 +146,8 @@ void save_correlators_to_file(const void* correlation_function_sum, const Correl
   corr_file.close();
 }
 
-void set_kappa(const double new_kappa, QudaInvertParam &inv_param, QudaMultigridParam &mg_param,
-               QudaInvertParam &mg_inv_param, void *&clover, void *&clover_inv, void *&mg_preconditioner)
+void construct_operator(const double new_kappa, QudaInvertParam &inv_param, QudaMultigridParam &mg_param,
+			QudaInvertParam &mg_inv_param, void *&mg_preconditioner)
 {
   const double kappa_backup = kappa;
   kappa = new_kappa;
@@ -151,17 +155,15 @@ void set_kappa(const double new_kappa, QudaInvertParam &inv_param, QudaMultigrid
     setMultigridInvertParam(inv_param);
     mg_param.invert_param = &mg_inv_param;
     setMultigridParam(mg_param);
+    mg_preconditioner = newMultigridQuda(&mg_param);
+    inv_param.preconditioner = mg_preconditioner;
   } else {
     setInvertParam(inv_param);
   }
+  
   inv_param.eig_param = nullptr;
 
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
-    if (inv_multigrid) {
-      if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE) {
-        inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
-      }
-    }
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     // If you pass nullptr to QUDA, it will automatically compute
     // the clover and clover inverse terms. If you need QUDA to return
     // clover fields to you, pass valid pointers to the function
@@ -171,9 +173,8 @@ void set_kappa(const double new_kappa, QudaInvertParam &inv_param, QudaMultigrid
     // inv_param.return_clover = 1;
     // inv_param.return_clover_inverse = 1;
     loadCloverQuda(nullptr, nullptr, &inv_param);
-    if (inv_multigrid) { inv_param.solve_type = solve_type; }
   }
-  if (inv_multigrid) { inv_param.preconditioner = mg_preconditioner; }
+  
   kappa = kappa_backup;
 }
 
@@ -184,12 +185,13 @@ void invert_and_contract(void **source_array_ptr, void **prop_array_ptr_1, void 
                          quda::ColorSpinorParam &cs_param, const QudaGaugeParam &gauge_param, QudaInvertParam &inv_param)
 {
   // Loop over the number of sources to use. Default is prop_n_sources=1 and source position = 0 0 0 0
-  for (int n = 0; n < prop_n_sources; n++) {
-    printfQuda("Source position: %d %d %d %d\n", prop_source_position[n][0], prop_source_position[n][1],
-               prop_source_position[n][2], prop_source_position[n][3]);
+  for (int n = 0; n < prop_n_sources; n++) {    
     const int source[4]
       = {prop_source_position[n][0], prop_source_position[n][1], prop_source_position[n][2], prop_source_position[n][3]};
-
+    
+    printfQuda("Source position: %d %d %d %d\n", prop_source_position[n][0], prop_source_position[n][1],
+	       prop_source_position[n][2], prop_source_position[n][3]);
+    
     // The overall shift of the position of the corr. need this when the source is not at origin.
     corr_param.overall_shift_dim = source[corr_param.corr_dim];
 
@@ -209,6 +211,7 @@ void invert_and_contract(void **source_array_ptr, void **prop_array_ptr_1, void 
     // Print and save correlators for this source
     print_correlators(correlation_function_sum, corr_param, n);
     save_correlators_to_file(correlation_function_sum, corr_param, n);
+
   }
 }
 
@@ -303,40 +306,26 @@ int main(int argc, char **argv)
   constructHostGaugeField(gauge, gauge_param, argc, argv);
   loadGaugeQuda((void *)gauge, &gauge_param); // copy gaugefield to GPU
 
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    // If you pass nullptr to QUDA, it will automatically compute
+    // the clover and clover inverse terms. If you need QUDA to return
+    // clover fields to you, pass valid pointers to the function
+    // and set:
+    // inv_param.compute_clover = 1;
+    // inv_param.compute_clover_inverse = 1;
+    // inv_param.return_clover = 1;
+    // inv_param.return_clover_inverse = 1;
+    loadCloverQuda(nullptr, nullptr, &inv_param);
+  }
   printfQuda("-----------------------------------------------------------------------------------\n");
 
   // compute plaquette
   double plaq[3];
   plaqQuda(plaq);
   printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
-
-  // Allocate host side memory for clover terms if needed.
-  void *clover = nullptr;
-  void *clover_inv = nullptr;
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
-    if (!compute_clover) { errorQuda("Specified clover dslash-type but did not specify compute-clover!"); }
-    clover = malloc(V * clover_site_size * host_clover_data_type_size);
-    clover_inv = malloc(V * clover_site_size * host_spinor_data_type_size);
-    constructHostCloverField(clover, clover_inv, inv_param);
-    if (inv_multigrid) {
-      // This line ensures that if we need to construct the clover inverse (in either the smoother or the solver) we do so
-      if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE) {
-        inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
-      }
-    }
-    loadCloverQuda(clover, clover_inv, &inv_param);
-    if (inv_multigrid) {
-      // Restore actual solve_type we want to do
-      inv_param.solve_type = solve_type;
-    }
-  }
-
+  
   // Now QUDA is initialised and the fields are loaded, we may setup the preconditioner
   void *mg_preconditioner = nullptr;
-  if (inv_multigrid) {
-    mg_preconditioner = newMultigridQuda(&mg_param);
-    inv_param.preconditioner = mg_preconditioner;
-  }
 
   // Wilson ColorSpinorParams
   quda::ColorSpinorParam cs_param;
@@ -382,6 +371,7 @@ int main(int argc, char **argv)
   void *correlation_function_sum = malloc(corr_param.corr_size_in_bytes); // This is where the result will be stored
 
   //calculate correlators
+  construct_operator(kappa, inv_param, mg_param, mg_inv_param, mg_preconditioner);
   invert_and_contract(source_array_ptr, prop_array_ptr, prop_array_ptr, correlation_function_sum, corr_param, cs_param,
                       gauge_param, inv_param);
 
@@ -395,14 +385,14 @@ int main(int argc, char **argv)
     }
 
     // first we calculate heavy-light correlators
-    set_kappa(kappa_array[0], inv_param, mg_param, mg_inv_param, clover, clover_inv, mg_preconditioner);
+    construct_operator(kappa_array[0], inv_param, mg_param, mg_inv_param, mg_preconditioner);
     constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
     corr_param.corr_flavors = CORRELATOR_QL;
     invert_and_contract(source_array_ptr, prop_array_ptr, prop_array_ptr_open, correlation_function_sum, corr_param,
                         cs_param, gauge_param, inv_param);
 
     // then we calculate heavy-strange correlators
-    set_kappa(kappa_array[1], inv_param, mg_param, mg_inv_param, clover, clover_inv, mg_preconditioner);
+    construct_operator(kappa_array[1], inv_param, mg_param, mg_inv_param, mg_preconditioner);
     constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
     corr_param.corr_flavors = CORRELATOR_QS;
     invert_and_contract(source_array_ptr, prop_array_ptr, prop_array_ptr_open, correlation_function_sum, corr_param,
@@ -415,11 +405,7 @@ int main(int argc, char **argv)
   if (inv_multigrid) destroyMultigridQuda(mg_preconditioner);
   freeGaugeQuda();
   for (auto &dir : gauge) free(dir);
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
-    freeCloverQuda();
-    if (clover) free(clover);
-    if (clover_inv) free(clover_inv);
-  }
+  
   free(source_array);
   free(prop_array);
   free(correlation_function_sum);
