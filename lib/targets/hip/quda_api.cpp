@@ -281,7 +281,7 @@ namespace quda {
   {
     PROFILE(auto error = hipMemcpy2D(dst, dpitch, src, spitch, width, height, qudaMemcpyKindToAPI(kind)), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
     if (error != hipSuccess)
-      errorQuda("hipMemcpy2D returned error %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+      errorQuda("hipMemcpy2D returned error %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
 
 
   }
@@ -346,12 +346,20 @@ namespace quda {
      return false;
    }
 
-  void qudaEventRecord_(qudaEvent_t &event, qudaStream_t stream, const char *func, const char *file, const char *line)
+  void qudaEventRecord_(qudaEvent_t &quda_event, qudaStream_t stream, const char *func, const char *file, const char *line)
     {
-	  cudaEvent_t &event = reinterpret_cast<cudaEvent_t&>(quda_event.event);
+      hipEvent_t &event = reinterpret_cast<hipEvent_t&>(quda_event.event);
       PROFILE(hipError_t error = hipEventRecord(event, device::get_cuda_stream(stream)), QUDA_PROFILE_EVENT_RECORD);
       set_runtime_error(error, __func__, func, file, line);
     }
+
+  void qudaStreamWaitEvent_(qudaStream_t stream, qudaEvent_t quda_event, unsigned int flags, const char *func,
+                             const char *file, const char *line)
+   {
+     hipEvent_t &hip_event = reinterpret_cast<hipEvent_t&>(quda_event.event);
+     PROFILE(hipError_t error = hipStreamWaitEvent(device::get_cuda_stream(stream), hip_event, flags), QUDA_PROFILE_STREAM_WAIT_EVENT);
+     set_runtime_error(error, __func__, func, file, line);
+   }
 
   qudaEvent_t qudaEventCreate_(const char *func, const char *file, const char *line)
   {
@@ -363,24 +371,6 @@ namespace quda {
     return quda_event;
   }
 
-  void qudaStreamWaitEvent_(qudaStream_t stream, qudaEvent_t quda_event, unsigned int flags, const char *func,
-                             const char *file, const char *line)
-   {
-     hipEvent_t &hip_event = reinterpret_cast<hipEvent_t&>(quda_event.event);
-     PROFILE(hipError_t error = hipStreamWaitEvent(device::get_cuda_stream(stream), hip_event, flags), QUDA_PROFILE_STREAM_WAIT_EVENT);
-     set_runtime_error(error, __func__, func, file, line);
-   }
-
-  qudaEvent_t qudaEventCreate_(const char *func, const char *file, const char *line)
-   {
-     hipEvent_t hip_event;
-     hipError_t error = hipEventCreateWithFlags(&hip_event, cudaEventDisableTiming);
-     set_runtime_error(error, __func__, func, file, line);
-     qudaEvent_t quda_event;
-     quda_event.event = reinterpret_cast<void*>(hip_event);
-     return quda_event;
-   }
-  
   qudaEvent_t qudaChronoEventCreate_(const char *func, const char *file, const char *line)
   {
     hipEvent_t hip_event;
@@ -458,27 +448,5 @@ namespace quda {
      apiTimer.Print();
  #endif
    }
-
-
-#if 0
-  void qudaEventCreateDisableTiming_(qudaEvent_t *event,  const char *func, const char *file, const char *line)
-  {
-    PROFILE(hipError_t error = hipEventCreateWithFlags((hipEvent_t*)event, hipEventDisableTiming), QUDA_PROFILE_EVENT_CREATE_DISABLED_TIMING);
-    set_runtime_error(error, "hipEventCreateWithFlags", func, file, line);
-  }
-
-  void qudaEventCreateIpcDisableTiming_(qudaEvent_t *event,  const char *func, const char *file, const char *line)
-  {
-    PROFILE(hipError_t error = hipEventCreateWithFlags((hipEvent_t*)event, hipEventDisableTiming | hipEventInterprocess), QUDA_PROFILE_EVENT_CREATE_DISABLED_TIMING);
-    set_runtime_error(error, "hipEventCreateWithFlags", func, file, line);
-  }
-#endif
-
-
-  
-
-
-
-
 
 } // namespace quda

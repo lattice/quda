@@ -15,7 +15,11 @@ namespace quda {
   template<typename T>
   inline __host__ __device__ void sincos(const T& a, T* s, T* c)
     {
-      ::sincos(a,s,c);
+        // Hip Does not have ::sincos(a,s,c);
+	// Just on device sincosf
+	// Need to do this as 2 stepper?
+	*s = sin(a);
+	*c = cos(a);
     }
 
  
@@ -35,7 +39,8 @@ namespace quda {
 #ifdef __HIP_DEVICE_COMPILE__
     __sincosf(a,s,c);
 #else
-    ::sincosf(a,s,c);
+    *s=sinf(a);
+    *c=cosf(a);
 #endif
   }
 
@@ -61,7 +66,10 @@ namespace quda {
     __device__ __host__ static T Atan2( const T &a, const T &b) { return ::atan2(a,b); }
     __device__ __host__ static T Sin( const T &a ) { return ::sin(a); }
     __device__ __host__ static T Cos( const T &a ) { return ::cos(a); }
-    __device__ __host__ static void SinCos(const T &a, T *s, T *c) { sincos(a, s, c); }
+    __device__ __host__ static void SinCos(const T &a, T *s, T *c) { 
+	*s = cos(a);
+        *c = cos(a);	
+    }
   };
   
   /**
@@ -92,7 +100,8 @@ namespace quda {
 #ifdef __HIP_DEVICE_COMPILE__
        __sincosf(a, s, c);
 #else
-       ::sincosf(a, s, c);
+       *s = sinf(a); 
+       *c = cosf(a);
 #endif
     }
   };
@@ -126,7 +135,9 @@ namespace quda {
 #ifdef __HIP_DEVICE_COMPILE__
       __sincosf(a * static_cast<float>(M_PI), s, c);
 #else
-      ::sincosf(a * static_cast<float>(M_PI), s, c);
+      auto ampi = a * static_cast<float>(M_PI);
+      *s = sinf(ampi);
+      *c = cosf(ampi);
 #endif
     }
   };

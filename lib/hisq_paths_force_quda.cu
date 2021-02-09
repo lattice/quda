@@ -326,7 +326,7 @@ namespace quda {
       auto Qmu = GaugeField::Create(gauge_param);
       auto Qnumu = GaugeField::Create(gauge_param);
 
-      QudaPrecision precision = checkPrecision(oprod, link, newOprod);
+      // not used:  QudaPrecision precision = checkPrecision(oprod, link, newOprod);
       instantiate<HisqStaplesForce, ReconstructNone>(*Pmu, *P3, *P5, *Pnumu, *Qmu, *Qnumu, newOprod, oprod, link, path_coeff_array);
 
       delete Pmu;

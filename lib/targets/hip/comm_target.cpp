@@ -32,7 +32,7 @@ int comm_peer2peer_performance(int local_gpuid, int neighbor_gpuid)
 void comm_create_neighbor_memory(void *remote[QUDA_MAX_DIM][2], void *local)
 {
   // handles for obtained ghost pointers
-  cudaIpcMemHandle_t remote_handle[2][QUDA_MAX_DIM];
+  hipIpcMemHandle_t remote_handle[2][QUDA_MAX_DIM];
 
   for (int dim=0; dim<4; ++dim) {
     if (comm_dim(dim)==1) continue;
