@@ -18,16 +18,18 @@ namespace quda
   template <typename T> using mgarray = std::array<T, QUDA_MAX_MG_LEVEL>;
   template <typename T> using file_array = std::array<T, QUDA_MAX_SOURCES>;
   template <typename T> using source_array = std::array<T, QUDA_MAX_SOURCES>;
+  template <typename T> using mass_array = std::array<T, QUDA_MAX_MASSES>;
 }
 
 class QUDAApp : public CLI::App
 {
-
-public:
+  
+ public:
   QUDAApp(std::string app_description = "", std::string app_name = "") : CLI::App(app_description, app_name) {};
 
   virtual ~QUDAApp() {};
 
+  // This template for strings
   template <typename T>
   CLI::Option *add_mgoption(std::string option_name, std::array<T, QUDA_MAX_MG_LEVEL> &variable, CLI::Validator trans,
                             std::string option_description = "", bool = false)
@@ -62,6 +64,7 @@ public:
     return opt;
   }
 
+  // This template for numbers
   template <typename T>
   CLI::Option *add_mgoption(CLI::Option_group *group, std::string option_name, std::array<T, QUDA_MAX_MG_LEVEL> &variable,
                             CLI::Validator trans, std::string option_description = "", bool = false)
@@ -69,7 +72,6 @@ public:
 
     CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {
       size_t l;
-      // T j; // results_t is just a vector of strings
       bool worked = true;
 
       CLI::Range validlevel(0, QUDA_MAX_MG_LEVEL);
@@ -208,38 +210,40 @@ public:
     return opt;
   }
 
-  // Add option to parse multiple masses/kappa
   template <typename T>
-    CLI::Option *add_fileoption(CLI::Option_group *group, std::string option_name,
-				std::array<T, QUDA_MAX_MASSES> &variable, CLI::Validator trans,
-				std::string option_description = "array of doubles for mass or kappa", bool defaulted = false)
-    {
-      
-      CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {
-	size_t l;
-	bool worked = true;
-	
-	CLI::Range validsource(0, QUDA_MAX_SOURCES);
-	for (size_t i {0}; i < vals.size() / 2; ++i) { // will always be a multiple of 2
-	  auto sourceok = validsource(vals.at(2 * i));
-	  auto transformok = trans(vals.at(2 * i + 1));
-	  if (!sourceok.empty()) throw CLI::ValidationError(option_name, sourceok);
-	  if (!transformok.empty()) throw CLI::ValidationError(option_name, transformok);
-	  worked = worked and CLI::detail::lexical_cast(vals.at(2 * i), l);
-	  auto &j = variable[l];
-	  worked = worked and CLI::detail::lexical_cast(vals.at(2 * i + 1), j);
-	}
-	return worked;
-      };
-      CLI::Option *opt = add_option(option_name, f, option_description);
-      auto valuename = std::string("MASS/KAPPA ") + std::string(CLI::detail::type_name<T>());
-      opt->type_name(valuename)->type_size(-2);
-      opt->expected(-1);
-      opt->check(CLI::Validator(trans.get_description()));
-      
-      group->add_option(opt);
-      return opt;
-    }
+  CLI::Option *add_massoption(CLI::Option_group *group, std::string option_name, std::array<T, QUDA_MAX_MASSES> &variable,
+                            CLI::Validator trans, std::string option_description = "", bool = false)
+  {
+
+    CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {
+      size_t l;
+      // T j; // results_t is just a vector of strings
+      bool worked = true;
+
+      CLI::Range validlevel(0, QUDA_MAX_MASSES);
+      for (size_t i {0}; i < vals.size() / 2; ++i) { // will always be a multiple of 2
+        auto levelok = validlevel(vals.at(2 * i));
+        auto transformok = trans(vals.at(2 * i + 1));
+        if (!levelok.empty()) throw CLI::ValidationError(option_name, levelok);
+        if (!transformok.empty()) throw CLI::ValidationError(option_name, transformok);
+        worked = worked and CLI::detail::lexical_cast(vals.at(2 * i), l);
+        auto &j = variable[l];
+        worked = worked and CLI::detail::lexical_cast(vals.at(2 * i + 1), j);
+
+        // if (worked) variable[l] = j;
+      }
+      return worked;
+    };
+    CLI::Option *opt = add_option(option_name, f, option_description);
+    auto valuename = std::string("MASS/KAPPA ") + std::string(CLI::detail::type_name<T>());
+    opt->type_name(valuename)->type_size(-2);
+    opt->expected(-1);
+    opt->check(CLI::Validator(trans.get_description()));
+    // opt->transform(trans);
+    // opt->default_str("");
+    group->add_option(opt);
+    return opt;
+  }
 };
 
 std::shared_ptr<QUDAApp> make_app(std::string app_description = "QUDA internal test", std::string app_name = "");
@@ -320,9 +324,9 @@ extern bool verify_results;
 extern bool low_mode_check;
 extern bool oblique_proj_check;
 extern double mass;
+extern quda::mass_array<double> mass_array;
 extern double kappa;
-extern double kappa_light;
-extern double kappa_strange;
+extern quda::mass_array<double> kappa_array;
 extern double mu;
 extern double epsilon;
 extern double m5;

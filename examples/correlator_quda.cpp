@@ -79,8 +79,8 @@ void save_correlators_to_file(const void* correlation_function_sum, const Correl
   if (correlator_file_affix[0] != '\0') { filepath << "_" << correlator_file_affix; }
   filepath << "_k" << std::setprecision(5) << std::fixed << kappa;
   switch (corr_param.corr_flavors) {
-  case CORRELATOR_QS: filepath << "_ks" << std::setprecision(5) << std::fixed << kappa_strange; break;
-  case CORRELATOR_QL: filepath << "_kl" << std::setprecision(5) << std::fixed << kappa_light; break;
+  case CORRELATOR_QS: filepath << "_ks" << std::setprecision(5) << std::fixed << kappa_array[1]; break;
+  case CORRELATOR_QL: filepath << "_kl" << std::setprecision(5) << std::fixed << kappa_array[0]; break;
   default: break;
   }
 
@@ -377,7 +377,7 @@ int main(int argc, char **argv)
   corr_param.global_corr_length = corr_param.local_corr_length * comm_dim(corr_param.corr_dim);
   corr_param.n_numbers_per_slice = 2 * cs_param.nSpin * cs_param.nSpin;
   corr_param.corr_size_in_bytes = Nmom * corr_param.n_numbers_per_slice * corr_param.global_corr_length * sizeof(double);
-  corr_param.corr_flavors = QUDA_CORRELATOR_QQ;
+  corr_param.corr_flavors = CORRELATOR_QQ;
 
   void *correlation_function_sum = malloc(corr_param.corr_size_in_bytes); // This is where the result will be stored
 
@@ -395,16 +395,16 @@ int main(int argc, char **argv)
     }
 
     // first we calculate heavy-light correlators
-    set_kappa(kappa_light, inv_param, mg_param, mg_inv_param, clover, clover_inv, mg_preconditioner);
+    set_kappa(kappa_array[0], inv_param, mg_param, mg_inv_param, clover, clover_inv, mg_preconditioner);
     constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
-    corr_param.corr_flavors = QUDA_CORRELATOR_QL;
+    corr_param.corr_flavors = CORRELATOR_QL;
     invert_and_contract(source_array_ptr, prop_array_ptr, prop_array_ptr_open, correlation_function_sum, corr_param,
                         cs_param, gauge_param, inv_param);
 
     // then we calculate heavy-strange correlators
-    set_kappa(kappa_strange, inv_param, mg_param, mg_inv_param, clover, clover_inv, mg_preconditioner);
+    set_kappa(kappa_array[1], inv_param, mg_param, mg_inv_param, clover, clover_inv, mg_preconditioner);
     constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
-    corr_param.corr_flavors = QUDA_CORRELATOR_QS;
+    corr_param.corr_flavors = CORRELATOR_QS;
     invert_and_contract(source_array_ptr, prop_array_ptr, prop_array_ptr_open, correlation_function_sum, corr_param,
                         cs_param, gauge_param, inv_param);
 

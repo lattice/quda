@@ -70,8 +70,8 @@ bool low_mode_check = false;
 bool oblique_proj_check = false;
 double mass = 0.1;
 double kappa = -1.0;
-double kappa_light = -1.0;
-double kappa_strange = -1.0;
+quda::mass_array<double> kappa_array = {};
+quda::mass_array<double> mass_array = {};
 double mu = 0.1;
 double epsilon = 0.01;
 double m5 = -1.5;
@@ -545,8 +545,6 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--inv-deflate", inv_deflate, "Deflate the inverter using the eigensolver");
   quda_app->add_option("--inv-multigrid", inv_multigrid, "Precondition the inverter using multigrid");
   quda_app->add_option("--kappa", kappa, "Kappa of Dirac operator (default 0.12195122... [equiv to mass])");
-  quda_app->add_option("--kappa-light", kappa_light, "Kappa of Dirac operator of light quark ud(default 0.12195122... [equiv to mass])");
-  quda_app->add_option("--kappa-strange", kappa_strange, "Kappa of Dirac operator of strange quark s(default 0.12195122... [equiv to mass])");
   quda_app->add_option(
     "--laplace3D", laplace3D,
     "Restrict laplace operator to omit the t dimension (n=3), or include all dims (n=4) (default 4)");
@@ -1141,4 +1139,11 @@ void add_contraction_option_group(std::shared_ptr<QUDAApp> quda_app)
     opgroup->add_option("--open-flavor", open_flavor,
                          "Compute the open flavor correlators (default false)");
     opgroup->add_option("--correlator-file-affix", correlator_file_affix, "Additional string to put into the correlator file name");
+
+    quda_app->add_massoption(opgroup, "--kappa-array", kappa_array, CLI::Validator(),
+			     "set the Nth kappa value of the Dirac operator)");
+    
+    quda_app->add_massoption(opgroup, "--mass-array", kappa_array, CLI::Validator(),
+			     "set the Nth mass value of the Dirac operator)");
+    
 }
