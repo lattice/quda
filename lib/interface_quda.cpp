@@ -527,6 +527,8 @@ void initQudaMemory()
 
   if (!comms_initialized) init_default_comms();
 
+  loadTuneCache();
+
   device::create_context();
   createDslashEvents();
 
@@ -538,8 +540,6 @@ void initQudaMemory()
 
   num_failures_h = static_cast<int*>(mapped_malloc(sizeof(int)));
   num_failures_d = static_cast<int*>(get_mapped_device_pointer(num_failures_h));
-
-  loadTuneCache();
 
   for (int d=0; d<4; d++) R[d] = 2 * (redundant_comms || commDimPartitioned(d));
 
@@ -5258,20 +5258,11 @@ void plaqQuda(double plaq[3])
 /*
  * Performs a deep copy from the internal extendedGaugeResident field.
  */
-void copyExtendedResidentGaugeQuda(void* resident_gauge, QudaFieldLocation loc)
+void copyExtendedResidentGaugeQuda(void* resident_gauge)
 {
-  //profilePlaq.TPSTART(QUDA_PROFILE_TOTAL);
-
   if (!gaugePrecise) errorQuda("Cannot perform deep copy of resident gauge field as there is no resident gauge field");
-
-  cudaGaugeField *data = extendedGaugeResident ? extendedGaugeResident : createExtendedGauge(*gaugePrecise, R, profilePlaq);
-  extendedGaugeResident = data;
-
-  auto* io_gauge = (cudaGaugeField*)resident_gauge;
-
-  copyExtendedGauge(*io_gauge, *extendedGaugeResident, loc);
-
-  //profilePlaq.TPSTOP(QUDA_PROFILE_TOTAL);
+  extendedGaugeResident = extendedGaugeResident ? extendedGaugeResident : createExtendedGauge(*gaugePrecise, R, profilePlaq);
+  static_cast<GaugeField*>(resident_gauge)->copy(*extendedGaugeResident);
 }
 
 void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, unsigned int n_steps, double alpha)

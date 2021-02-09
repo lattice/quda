@@ -1,6 +1,7 @@
 #pragma once
 
 #include <float.h>
+#include <math_helper.cuh>
 
 #define DEVICEHOST __device__ __host__
 #define SVDPREC 1e-11
@@ -89,11 +90,11 @@ namespace quda {
       c = 1.0; s = 0.0;
     }else if( fabs(beta) > fabs(alpha) ){
       ratio = -alpha/beta;
-      s = rsqrt(1.0 + ratio*ratio);
+      s = quda::rsqrt(1.0 + ratio*ratio);
       c = ratio*s;
     }else{
       ratio = -beta/alpha;
-      c = rsqrt(1.0 + ratio*ratio);
+      c = quda::rsqrt(1.0 + ratio*ratio);
       s = ratio*c;
     }
   }

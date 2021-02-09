@@ -168,6 +168,9 @@ namespace quda {
     int surface[QUDA_MAX_DIM];
     int surfaceCB[QUDA_MAX_DIM];
 
+    int local_surface[QUDA_MAX_DIM];
+    int local_surfaceCB[QUDA_MAX_DIM];
+
     /** The extended lattice radius (if applicable) */
     int r[QUDA_MAX_DIM];
 
@@ -537,6 +540,18 @@ namespace quda {
     int SurfaceCB(const int i) const { return surfaceCB[i]; }
 
     /**
+       @param i The dimension of the requested local surface
+       @return The single-parity local surface of dimension i
+    */
+    const int* LocalSurfaceCB() const { return local_surfaceCB; }
+
+    /**
+       @param i The dimension of the requested local surface
+       @return The single-parity local surface of dimension i
+    */
+    int LocalSurfaceCB(const int i) const { return local_surfaceCB[i]; }
+
+    /**
        @return The single-parity stride of the field
     */
     size_t Stride() const { return stride; }
@@ -806,6 +821,19 @@ namespace quda {
   inline const char *compile_type_str(const LatticeField &meta, QudaFieldLocation location_ = QUDA_INVALID_FIELD_LOCATION)
   {
     QudaFieldLocation location = (location_ == QUDA_INVALID_FIELD_LOCATION ? meta.Location() : location_);
+#ifdef JITIFY
+    return location == QUDA_CUDA_FIELD_LOCATION ? "GPU-jitify," : "CPU,";
+#else
+    return location == QUDA_CUDA_FIELD_LOCATION ? "GPU-offline," : "CPU,";
+#endif
+  }
+
+  /**
+     @brief Helper function for setting auxilary string
+     @return String containing location and compilation type
+   */
+  inline const char *compile_type_str(QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION)
+  {
 #ifdef JITIFY
     return location == QUDA_CUDA_FIELD_LOCATION ? "GPU-jitify," : "CPU,";
 #else

@@ -179,7 +179,7 @@ namespace quda {
 	s = c[1]/3. - c[0]*c[0]/18;
 	r = c[2]/2. - (c[0]/3.)*(c[1] - c[0]*c[0]/9.);
 
-	Float cosTheta = r*rsqrt(s*s*s);
+	Float cosTheta = r*quda::rsqrt(s*s*s);
 	if (fabs(s) < arg.unitarize_eps) {
 	  cosTheta = 1.;
 	  s = 0.0;

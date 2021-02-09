@@ -12,6 +12,7 @@
 #include <type_traits>
 
 #include <register_traits.h>
+#include <math_helper.cuh>
 #include <convert.h>
 #include <complex_quda.h>
 #include <quda_matrix.h>
@@ -22,7 +23,7 @@
 #include <atomic.cuh>
 #include <gauge_field.h>
 #include <index_helper.cuh>
-#include <trove_helper.cuh>
+#include <aos.h>
 #include <transform_reduce.h>
 
 namespace quda {
@@ -1536,7 +1537,7 @@ namespace quda {
           real row_sum_inv = static_cast<real>(1.0) / row_sum;
 
           real diff = u0_inv * u0_inv - row_sum;
-          real U00_mag = diff > 0.0 ? diff * rsqrt(diff) : static_cast<real>(0.0);
+          real U00_mag = diff > 0.0 ? diff * quda::rsqrt(diff) : static_cast<real>(0.0);
 
           out[0] *= U00_mag;
 
@@ -1547,7 +1548,7 @@ namespace quda {
           column_sum += out[3].imag() * out[3].imag();
 
           diff = u0_inv * u0_inv - column_sum;
-          real U20_mag = diff > 0.0 ? diff * rsqrt(diff) : static_cast<real>(0.0);
+          real U20_mag = diff > 0.0 ? diff * quda::rsqrt(diff) : static_cast<real>(0.0);
 
           out[6] *= U20_mag;
 
@@ -2039,18 +2040,6 @@ namespace quda {
       size_t Bytes() const { return reconLen * sizeof(Float); }
       };
 
-  /**
-     @brief This is just a dummy structure we use for trove to define the
-     required structure size
-     @param real Real number type
-     @param length Number of elements in the structure
-  */
-      template <typename real, int length> struct S {
-        real v[length];
-        __host__ __device__ const real &operator[](int i) const { return v[i]; }
-        __host__ __device__ real &operator[](int i) { return v[i]; }
-      };
-
       /**
          @brief The LegacyOrder defines the ghost zone storage and ordering for
          all cpuGaugeFields, which use the same ghost zone storage.
@@ -2097,34 +2086,14 @@ namespace quda {
 
         __device__ __host__ inline void loadGhost(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
         {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-          typedef S<Float, length> structure;
-          trove::coalesced_ptr<structure> ghost_((structure *)ghost[dir]);
-          structure v_ = ghost_[parity * faceVolumeCB[dir] + x];
-#else
-          auto v_ = &ghost[dir][(parity * faceVolumeCB[dir] + x) * length];
-#endif
-          for (int i = 0; i < length / 2; i++) v[i] = complex(v_[2 * i + 0], v_[2 * i + 1]);
+          auto in = &ghost[dir][(parity * faceVolumeCB[dir] + x) * length];
+          block_load<complex, length/2>(v, reinterpret_cast<complex*>(in));
         }
 
         __device__ __host__ inline void saveGhost(const complex v[length / 2], int x, int dir, int parity)
         {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-          typedef S<Float, length> structure;
-          trove::coalesced_ptr<structure> ghost_((structure *)ghost[dir]);
-          structure v_;
-          for (int i = 0; i < length / 2; i++) {
-            v_[2 * i + 0] = (Float)v[i].real();
-            v_[2 * i + 1] = (Float)v[i].imag();
-          }
-          ghost_[parity * faceVolumeCB[dir] + x] = v_;
-#else
-          auto v_ = &ghost[dir][(parity * faceVolumeCB[dir] + x) * length];
-          for (int i = 0; i < length / 2; i++) {
-            v_[2 * i + 0] = (Float)v[i].real();
-            v_[2 * i + 1] = (Float)v[i].imag();
-          }
-#endif
+          auto out = &ghost[dir][(parity * faceVolumeCB[dir] + x) * length];
+          block_store<complex, length/2>(reinterpret_cast<complex*>(out), v);
         }
 
         /**
@@ -2162,35 +2131,15 @@ namespace quda {
         __device__ __host__ inline void loadGhostEx(complex v[length / 2], int x, int, int dir, int dim, int g,
                                                     int parity, const int R[]) const
         {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-	typedef S<Float,length> structure;
-	trove::coalesced_ptr<structure> ghost_((structure*)ghost[dim]);
-	structure v_ = ghost_[((dir*2+parity)*R[dim]*faceVolumeCB[dim] + x)*geometry+g];
-#else
-          auto v_ = &ghost[dim][(((dir * 2 + parity) * R[dim] * faceVolumeCB[dim] + x) * geometry + g) * length];
-#endif
-        for (int i = 0; i < length / 2; i++) v[i] = complex(v_[2 * i + 0], v_[2 * i + 1]);
+          auto in = &ghost[dim][(((dir * 2 + parity) * R[dim] * faceVolumeCB[dim] + x) * geometry + g) * length];
+          block_load<complex, length/2>(v, reinterpret_cast<complex*>(in));
         }
 
         __device__ __host__ inline void saveGhostEx(const complex v[length / 2], int x, int, int dir, int dim,
                                                     int g, int parity, const int R[])
         {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-          typedef S<Float, length> structure;
-          trove::coalesced_ptr<structure> ghost_((structure *)ghost[dim]);
-          structure v_;
-          for (int i = 0; i < length / 2; i++) {
-            v_[2 * i + 0] = (Float)v[i].real();
-            v_[2 * i + 1] = (Float)v[i].imag();
-          }
-          ghost_[((dir * 2 + parity) * R[dim] * faceVolumeCB[dim] + x) * geometry + g] = v_;
-#else
-          auto v_ = &ghost[dim][(((dir * 2 + parity) * R[dim] * faceVolumeCB[dim] + x) * geometry + g) * length];
-          for (int i = 0; i < length / 2; i++) {
-            v_[2 * i + 0] = (Float)v[i].real();
-            v_[2 * i + 1] = (Float)v[i].imag();
-          }
-#endif
+          auto out = &ghost[dim][(((dir * 2 + parity) * R[dim] * faceVolumeCB[dim] + x) * geometry + g) * length];
+          block_store<complex, length/2>(reinterpret_cast<complex*>(out), v);
         }
       };
 
@@ -2213,34 +2162,14 @@ namespace quda {
 
       __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
       {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-	typedef S<Float,length> structure;
-	trove::coalesced_ptr<structure> gauge_((structure*)gauge[dir]);
-	structure v_ = gauge_[parity*volumeCB + x];
-#else
-        auto v_ = &gauge[dir][(parity * volumeCB + x) * length];
-#endif
-        for (int i = 0; i < length / 2; i++) v[i] = complex(v_[2 * i + 0], v_[2 * i + 1]);
+        auto in = &gauge[dir][(parity * volumeCB + x) * length];
+        block_load<complex, length/2>(v, reinterpret_cast<complex*>(in));
       }
 
       __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity)
       {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-	typedef S<Float,length> structure;
-	trove::coalesced_ptr<structure> gauge_((structure*)gauge[dir]);
-	structure v_;
-        for (int i = 0; i < length / 2; i++) {
-          v_[2 * i + 0] = (Float)v[i].real();
-          v_[2 * i + 1] = (Float)v[i].imag();
-        }
-        gauge_[parity * volumeCB + x] = v_;
-#else
-        auto v_ = &gauge[dir][(parity * volumeCB + x) * length];
-        for (int i = 0; i < length / 2; i++) {
-          v_[2 * i + 0] = (Float)v[i].real();
-          v_[2 * i + 1] = (Float)v[i].imag();
-        }
-#endif
+        auto out = &gauge[dir][(parity * volumeCB + x) * length];
+        block_store<complex, length/2>(reinterpret_cast<complex*>(out), v);
       }
 
       /**
@@ -2360,36 +2289,16 @@ namespace quda {
       gauge(order.gauge), volumeCB(order.volumeCB), geometry(order.geometry)
       { ; }
 
-      __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
-      {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-      typedef S<Float,length> structure;
-      trove::coalesced_ptr<structure> gauge_((structure*)gauge);
-      structure v_ = gauge_[(parity*volumeCB+x)*geometry + dir];
-#else
-        auto v_ = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
-#endif
-      for (int i = 0; i < length / 2; i++) v[i] = complex(v_[2 * i + 0], v_[2 * i + 1]);
+    __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
+    {
+      auto in = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
+      block_load<complex, length/2>(v, reinterpret_cast<complex*>(in));
     }
 
     __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity)
     {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-      typedef S<Float,length> structure;
-      trove::coalesced_ptr<structure> gauge_((structure*)gauge);
-      structure v_;
-      for (int i = 0; i < length / 2; i++) {
-        v_[2 * i + 0] = v[i].real();
-        v_[2 * i + 1] = v[i].imag();
-      }
-      gauge_[(parity*volumeCB+x)*geometry + dir] = v_;
-#else
-      auto v_ = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
-      for (int i = 0; i < length / 2; i++) {
-        v_[2 * i + 0] = v[i].real();
-        v_[2 * i + 1] = v[i].imag();
-      }
-#endif
+      auto out = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
+      block_store<complex, length/2>(reinterpret_cast<complex*>(out), v);
     }
 
     /**
@@ -2473,38 +2382,15 @@ namespace quda {
     __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
     {
       // get base pointer
-      const Float *gauge0 = reinterpret_cast<const Float*>(reinterpret_cast<const char*>(gauge) + (parity*volumeCB+x)*size + offset);
-
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-      typedef S<Float,length> structure;
-      trove::coalesced_ptr<structure> gauge_((structure*)gauge0);
-      structure v_ = gauge_[dir];
-#else
-      auto v_ = &gauge0[dir * length];
-#endif
-      for (int i = 0; i < length / 2; i++) v[i] = complex(v_[2 * i + 0], v_[2 * i + 1]);
+      auto in = reinterpret_cast<const Float*>(reinterpret_cast<const char*>(gauge) + (parity*volumeCB+x)*size + offset + dir * length);
+      block_load<complex, length/2>(v, reinterpret_cast<const complex*>(in));
     }
 
     __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity)
     {
       // get base pointer
-      Float *gauge0 = reinterpret_cast<Float*>(reinterpret_cast<char*>(gauge) + (parity*volumeCB+x)*size + offset);
-
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-      typedef S<Float,length> structure;
-      trove::coalesced_ptr<structure> gauge_((structure*)gauge0);
-      structure v_;
-      for (int i = 0; i < length / 2; i++) {
-        v_[2 * i + 0] = v[i].real();
-        v_[2 * i + 1] = v[i].imag();
-      }
-      gauge_[dir] = v_;
-#else
-      for (int i = 0; i < length / 2; i++) {
-        gauge0[dir * length + 2 * i + 0] = v[i].real();
-        gauge0[dir * length + 2 * i + 1] = v[i].imag();
-      }
-#endif
+      auto out = reinterpret_cast<Float*>(reinterpret_cast<char*>(gauge) + (parity*volumeCB+x)*size + offset + dir * length);
+      block_store<complex, length/2>(reinterpret_cast<complex*>(out), v);
     }
 
     /**
@@ -2579,41 +2465,28 @@ namespace quda {
     // we need to transpose and scale for CPS ordering
     __device__ __host__ inline void load(complex v[9], int x, int dir, int parity, Float = 1.0) const
     {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-      typedef S<Float,length> structure;
-      trove::coalesced_ptr<structure> gauge_((structure*)gauge);
-      structure v_ = gauge_[((parity*volumeCB+x)*geometry + dir)];
-#else
-      auto v_ = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
-#endif
+      auto in = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
+      complex v_[9];
+      block_load<complex, length/2>(v_, reinterpret_cast<complex*>(in));
+
       for (int i=0; i<Nc; i++) {
 	for (int j=0; j<Nc; j++) {
-          v[i * Nc + j] = complex(v_[(j * Nc + i) * 2 + 0], v_[(j * Nc + i) * 2 + 1]) * anisotropy_inv;
+          v[i * Nc + j] = v_[j * Nc + i] * anisotropy_inv;
         }
       }
     }
 
     __device__ __host__ inline void save(const complex v[9], int x, int dir, int parity)
     {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-      typedef S<Float,length> structure;
-      trove::coalesced_ptr<structure> gauge_((structure*)gauge);
-      structure v_;
-      for (int i=0; i<Nc; i++)
-        for (int j = 0; j < Nc; j++) {
-          v_[(j * Nc + i) * 2 + 0] = anisotropy * v[i * Nc + j].real();
-          v_[(j * Nc + i) * 2 + 1] = anisotropy * v[i * Nc + j].imag();
-        }
-      gauge_[((parity*volumeCB+x)*geometry + dir)] = v_;
-#else
-      auto v_ = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
+      auto out = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
+      complex v_[9];
       for (int i=0; i<Nc; i++) {
 	for (int j=0; j<Nc; j++) {
-          v_[(j * Nc + i) * 2 + 0] = anisotropy * v[i * Nc + j].real();
-          v_[(j * Nc + i) * 2 + 1] = anisotropy * v[i * Nc + j].imag();
+          v_[i * Nc + j] = v[j * Nc + i] * anisotropy;
         }
       }
-#endif
+
+      block_store<complex, length/2>(reinterpret_cast<complex*>(out), v_);
     }
 
     /**
@@ -2686,39 +2559,28 @@ namespace quda {
       // we need to transpose for BQCD ordering
       __device__ __host__ inline void load(complex v[9], int x, int dir, int parity, real = 1.0) const
       {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-        typedef S<Float, length> structure;
-        trove::coalesced_ptr<structure> gauge_((structure *)gauge);
-        structure v_ = gauge_[(dir * 2 + parity) * exVolumeCB + x];
-#else
-        auto v_ = &gauge[((dir * 2 + parity) * exVolumeCB + x) * length];
-#endif
+        auto in = &gauge[((dir * 2 + parity) * exVolumeCB + x) * length];
+        complex v_[9];
+        block_load<complex, 9>(v_, reinterpret_cast<complex*>(in));
+
         for (int i = 0; i < Nc; i++) {
-          for (int j = 0; j < Nc; j++) { v[i * Nc + j] = complex(v_[(j * Nc + i) * 2 + 0], v_[(j * Nc + i) * 2 + 1]); }
+          for (int j = 0; j < Nc; j++) {
+            v[i * Nc + j] = v_[j * Nc + i];
+          }
         }
       }
 
       __device__ __host__ inline void save(const complex v[9], int x, int dir, int parity)
       {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-	typedef S<Float,length> structure;
-	trove::coalesced_ptr<structure> gauge_((structure*)gauge);
-	structure v_;
-	for (int i=0; i<Nc; i++)
-          for (int j = 0; j < Nc; j++) {
-            v_[(j * Nc + i) * 2 + 0] = v[i * Nc + j].real();
-            v_[(j * Nc + i) * 2 + 1] = v[i * Nc + j].imag();
-          }
-        gauge_[(dir * 2 + parity) * exVolumeCB + x] = v_;
-#else
-        auto v_ = &gauge[((dir * 2 + parity) * exVolumeCB + x) * length];
+        auto out = &gauge[((dir * 2 + parity) * exVolumeCB + x) * length];
+        complex v_[9];
         for (int i = 0; i < Nc; i++) {
           for (int j = 0; j < Nc; j++) {
-            v_[(j * Nc + i) * 2 + 0] = v[i * Nc + j].real();
-            v_[(j * Nc + i) * 2 + 1] = v[i * Nc + j].imag();
+            v_[i * Nc + j] = v[j * Nc + i];
           }
         }
-#endif
+
+        block_store<complex, 9>(reinterpret_cast<complex*>(out), v_);
       }
 
       /**
@@ -2789,41 +2651,28 @@ namespace quda {
       // we need to transpose for TIFR ordering
       __device__ __host__ inline void load(complex v[9], int x, int dir, int parity, real = 1.0) const
       {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-        typedef S<Float, length> structure;
-        trove::coalesced_ptr<structure> gauge_((structure *)gauge);
-        structure v_ = gauge_[(dir * 2 + parity) * volumeCB + x];
-#else
-        auto v_ = &gauge[((dir * 2 + parity) * volumeCB + x) * length];
-#endif
+        auto in = &gauge[((dir * 2 + parity) * volumeCB + x) * length];
+        complex v_[9];
+        block_load<complex, 9>(v_, reinterpret_cast<complex*>(in));
+
         for (int i = 0; i < Nc; i++) {
           for (int j = 0; j < Nc; j++) {
-            v[i * Nc + j] = complex(v_[(j * Nc + i) * 2 + 0], v_[(j * Nc + i) * 2 + 1]) * scale_inv;
+            v[i * Nc + j] = v_[j * Nc + i] * scale_inv;
           }
         }
       }
 
       __device__ __host__ inline void save(const complex v[9], int x, int dir, int parity)
       {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-	typedef S<Float,length> structure;
-	trove::coalesced_ptr<structure> gauge_((structure*)gauge);
-	structure v_;
-	for (int i=0; i<Nc; i++)
-          for (int j = 0; j < Nc; j++) {
-            v_[(j * Nc + i) * 2 + 0] = v[i * Nc + j].real() * scale;
-            v_[(j * Nc + i) * 2 + 1] = v[i * Nc + j].imag() * scale;
-          }
-        gauge_[(dir * 2 + parity) * volumeCB + x] = v_;
-#else
-        auto v_ = &gauge[((dir * 2 + parity) * volumeCB + x) * length];
+        auto out = &gauge[((dir * 2 + parity) * volumeCB + x) * length];
+        complex v_[9];
         for (int i = 0; i < Nc; i++) {
           for (int j = 0; j < Nc; j++) {
-            v_[(j * Nc + i) * 2 + 0] = v[i * Nc + j].real() * scale;
-            v_[(j * Nc + i) * 2 + 1] = v[i * Nc + j].imag() * scale;
+            v_[i * Nc + j] = v[j * Nc + i] * scale;
           }
         }
-#endif
+
+        block_store<complex, 9>(reinterpret_cast<complex*>(out), v_);
       }
 
       /**
@@ -2923,17 +2772,13 @@ namespace quda {
       __device__ __host__ inline void load(complex v[9], int x, int dir, int parity, real = 1.0) const
       {
         int y = getPaddedIndex(x, parity);
+        auto in = &gauge[((dir * 2 + parity) * exVolumeCB + y) * length];
+        complex v_[9];
+        block_load<complex, 9>(v_, reinterpret_cast<complex*>(in));
 
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-	typedef S<Float,length> structure;
-	trove::coalesced_ptr<structure> gauge_((structure*)gauge);
-	structure v_ = gauge_[(dir*2+parity)*exVolumeCB + y];
-#else
-        auto v_ = &gauge[((dir * 2 + parity) * exVolumeCB + y) * length];
-#endif
         for (int i = 0; i < Nc; i++) {
           for (int j = 0; j < Nc; j++) {
-            v[i * Nc + j] = complex(v_[(j * Nc + i) * 2 + 0], v_[(j * Nc + i) * 2 + 1]) * scale_inv;
+            v[i * Nc + j] = v_[j * Nc + i] * scale_inv;
           }
         }
       }
@@ -2941,26 +2786,16 @@ namespace quda {
       __device__ __host__ inline void save(const complex v[9], int x, int dir, int parity)
       {
         int y = getPaddedIndex(x, parity);
+        auto out = &gauge[((dir * 2 + parity) * exVolumeCB + y) * length];
 
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-	typedef S<Float,length> structure;
-	trove::coalesced_ptr<structure> gauge_((structure*)gauge);
-	structure v_;
-	for (int i=0; i<Nc; i++)
-          for (int j = 0; j < Nc; j++) {
-            v_[(j * Nc + i) * 2 + 0] = v[i * Nc + j].real() * scale;
-            v_[(j * Nc + i) * 2 + 1] = v[i * Nc + j].imag() * scale;
-          }
-        gauge_[(dir * 2 + parity) * exVolumeCB + y] = v_;
-#else
-        auto v_ = &gauge[((dir * 2 + parity) * exVolumeCB + y) * length];
+        complex v_[9];
         for (int i = 0; i < Nc; i++) {
           for (int j = 0; j < Nc; j++) {
-            v_[(j * Nc + i) * 2 + 0] = v[i * Nc + j].real() * scale;
-            v_[(j * Nc + i) * 2 + 1] = v[i * Nc + j].imag() * scale;
+            v_[i * Nc + j] = v[j * Nc + i] * scale;
           }
         }
-#endif
+
+        block_store<complex, 9>(reinterpret_cast<complex*>(out), v_);
       }
 
       /**

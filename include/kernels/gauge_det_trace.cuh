@@ -31,16 +31,15 @@ namespace quda {
     __device__ __host__ auto init() const { return zero<double2>(); }
   };
 
-  template <typename Arg> struct DetTrace {
-
+  template <typename Arg> struct DetTrace : plus<double2> {
     using reduce_t = double2;
+    using plus<reduce_t>::operator();
     Arg &arg;
     constexpr DetTrace(Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     // return the determinant or trace at site (x_cb, parity)
-    template <typename Reducer>
-    __device__ __host__ inline reduce_t operator()(reduce_t &value, Reducer &r, int x_cb, int parity)
+    __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
     {
       int X[4];
 #pragma unroll
@@ -57,8 +56,9 @@ namespace quda {
       for (int mu = 0; mu < 4; mu++) {
         Matrix<complex<typename Arg::real>, Arg::nColor> U = arg.u(mu, linkIndex(x, X), parity);
         complex<double> local = Arg::type == 0 ? getDeterminant(U) : getTrace(U);
-        value = r(value, static_cast<reduce_t&>(local));
+        value = plus::operator()(value, static_cast<reduce_t&>(local));
       }
+
       return value;
     }
   };

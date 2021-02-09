@@ -28,12 +28,16 @@ namespace quda {
       out(out, Out),
       in(in, In),
       geometry(in.Geometry()),
-      threads(in.LocalVolumeCB(), 2, 1)
+      threads(in.VolumeCB() == out.VolumeCB() ? in.VolumeCB() : in.LocalVolumeCB(), 2, 1)
     {
       for (int d=0; d < in.Ndim(); d++) {
 	Xout[d] = out.X()[d];
 	Xin[d] = in.X()[d];
-        border[d] = regularToextended ? out.R()[d] : in.R()[d];
+        // if volumes match then both extended and just regular copy
+        border[d] = Xout[d] == Xin[d] ? 0 : regularToextended ? out.R()[d] : in.R()[d];
+        // sanity check that if the volumes match, we have the same border dimensions
+        if (in.VolumeCB() == out.VolumeCB() && out.R()[d] != in.R()[d])
+          errorQuda("Cannot copy extended fields of differing borders d = %d out = %d in = %d", d, out.R()[d], in.R()[d]);
       }
     }
   };

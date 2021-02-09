@@ -27,8 +27,9 @@ namespace quda {
     __device__ __host__ double init() const { return 0.0; }
   };
 
-  template <typename Arg> struct MomAction {
+  template <typename Arg> struct MomAction : plus<double> {
     using reduce_t = double;
+    using plus<reduce_t>::operator();
     Arg &arg;
     constexpr MomAction(Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
@@ -36,8 +37,7 @@ namespace quda {
     // calculate the momentum contribution to the action.  This uses the
     // MILC convention where we subtract 4.0 from each matrix norm in
     // order to increase stability
-    template <typename Reducer>
-    __device__ __host__ inline reduce_t operator()(reduce_t &action, Reducer &r, int x_cb, int parity)
+    __device__ __host__ inline reduce_t operator()(reduce_t &action, int x_cb, int parity)
     {
       using matrix = Matrix<complex<typename Arg::Float>, Arg::nColor>;
 
@@ -57,7 +57,7 @@ namespace quda {
         local_sum += mom(1,2).imag() * mom(1,2).imag();
 	local_sum -= 4.0;
 
-	action = r(action, local_sum);
+	action = plus::operator()(action, local_sum);
       }
       return action;
     }
@@ -90,33 +90,30 @@ namespace quda {
     __device__ __host__ double2 init() const{ return zero<double2>(); }
   };
 
-  /**
-     @brief Functor for finding the maximum over a vec2 field.  Each
-     lane is evaluated separately.
-   */
-  template <typename T>
-  struct max_reducer2 {
-    static constexpr bool do_sum = false;
-
-    __device__ __host__ inline T operator()(const T &a, const T &b) const {
-      auto c = a;
-      if (b.x > a.x) c.x = b.x;
-      if (b.y > a.y) c.y = b.y;
-      return c;
-    }
-  };
-
   template <typename Arg> struct MomUpdate {
     using reduce_t = double2;
     Arg &arg;
     constexpr MomUpdate(Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
+    static constexpr bool do_sum = false;
+
+    /**
+       @brief Functor for finding the maximum over a vec2 field.  Each
+       lane is evaluated separately.
+    */
+    __device__ __host__ inline reduce_t operator()(const reduce_t &a, const reduce_t &b) const
+    {
+      auto c = a;
+      if (b.x > a.x) c.x = b.x;
+      if (b.y > a.y) c.y = b.y;
+      return c;
+    }
+
     // calculate the momentum contribution to the action.  This uses the
     // MILC convention where we subtract 4.0 from each matrix norm in
     // order to increase stability
-    template <typename Reducer>
-    __device__ __host__ inline reduce_t operator()(reduce_t &norm, Reducer &r, int x_cb, int parity)
+    __device__ __host__ inline reduce_t operator()(reduce_t &norm, int x_cb, int parity)
     {
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
@@ -132,7 +129,7 @@ namespace quda {
         makeAntiHerm(f);
 
         // compute force norms
-        norm = r(make_double2(f.L1(), f.L2()), norm);
+        norm = operator()(make_double2(f.L1(), f.L2()), norm);
 
         m = m + arg.coeff * f;
 

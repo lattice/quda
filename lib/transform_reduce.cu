@@ -1,87 +1,24 @@
 #include <reduce_helper.h>
-#include <uint_to_char.h>
-#include <tune_quda.h>
 #include <transform_reduce.h>
+#include <tunable_reduction.h>
+#include <kernels/transform_reduce.cuh>
 
 namespace quda
 {
 
   template <typename reduce_t, typename T, typename count_t, typename transformer, typename reducer>
-  struct TransformReduceArg : public ReduceArg<reduce_t> {
-    static constexpr int block_size = 512;
-    static constexpr int n_batch_max = 8;
-    const T *v[n_batch_max];
-    count_t n_items;
-    int n_batch;
-    reduce_t init_value;
-    reduce_t result[n_batch_max];
-    transformer h;
-    reducer r;
-    TransformReduceArg(const std::vector<T *> &v, count_t n_items, transformer h, reduce_t init_value, reducer r) :
-      ReduceArg<reduce_t>(v.size()),
-      n_items(n_items),
-      n_batch(v.size()),
-      init_value(init_value),
-      h(h),
-      r(r)
-    {
-      if (n_batch > n_batch_max) errorQuda("Requested batch %d greater than max supported %d", n_batch, n_batch_max);
-      for (size_t j = 0; j < v.size(); j++) this->v[j] = v[j];
-    }
-
-    __device__ __host__ reduce_t init() const { return init_value; }
-  };
-
-  template <typename Arg> void transform_reduce(Arg &arg)
+  class TransformReduce : TunableMultiReduction<1>
   {
-    using count_t = decltype(arg.n_items);
-
-    for (int j = 0; j < arg.n_batch; j++) {
-      auto v = arg.v[j];
-      auto r_ = arg.init();
-      for (count_t i = 0; i < arg.n_items; i++) {
-        auto v_ = arg.h(v[i]);
-        r_ = arg.r(r_, v_);
-      }
-      arg.result[j] = r_;
-    }
-  }
-
-  template <typename Arg> __launch_bounds__(Arg::block_size) __global__ void transform_reduce_kernel(Arg arg)
-  {
-    using count_t = decltype(arg.n_items);
-
-    count_t i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y;
-    auto v = arg.v[j];
-    auto r_ = arg.init();
-
-    while (i < arg.n_items) {
-      auto v_ = arg.h(v[i]);
-      r_ = arg.r(r_, v_);
-      i += blockDim.x * gridDim.x;
-    }
-
-    reduce<Arg::block_size, 1, decltype(arg.r)>(arg, r_, j);
-  }
-
-  template <typename reduce_t, typename T, typename I, typename transformer, typename reducer>
-  class TransformReduce : Tunable
-  {
-    using Arg = TransformReduceArg<reduce_t, T, I, transformer, reducer>;
+    using Arg = TransformReduceArg<reduce_t, T, count_t, transformer, reducer>;
     QudaFieldLocation location;
     std::vector<reduce_t> &result;
     const std::vector<T *> &v;
-    I n_items;
+    count_t n_items;
     transformer &h;
     reduce_t init;
     reducer &r;
 
     bool tuneSharedBytes() const { return false; }
-    unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
-    int blockMin() const { return Arg::block_size; }
-    unsigned int maxBlockSize(const TuneParam &) const { return Arg::block_size; }
 
     bool advanceTuneParam(TuneParam &param) const // only do autotuning if we have device fields
     {
@@ -95,8 +32,9 @@ namespace quda
     }
 
   public:
-    TransformReduce(QudaFieldLocation location, std::vector<reduce_t> &result, const std::vector<T *> &v, I n_items,
+    TransformReduce(QudaFieldLocation location, std::vector<reduce_t> &result, const std::vector<T *> &v, count_t n_items,
                     transformer &h, reduce_t init, reducer &r) :
+      TunableMultiReduction(n_items, v.size(), location),
       location(location),
       result(result),
       v(v),
@@ -107,7 +45,6 @@ namespace quda
     {
       strcpy(aux, "batch_size=");
       u32toa(aux + 11, v.size());
-      if (location == QUDA_CPU_FIELD_LOCATION) strcat(aux, ",cpu");
       apply(device::get_default_stream());
     }
 
@@ -115,64 +52,22 @@ namespace quda
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Arg arg(v, n_items, h, init, r);
-
-      if (location == QUDA_CUDA_FIELD_LOCATION) {
-        arg.launch_error = qudaLaunchKernel(transform_reduce_kernel<Arg>, tp, stream, arg);
-        arg.complete(result, stream);
-      } else {
-        transform_reduce(arg);
-        for (size_t j = 0; j < result.size(); j++) result[j] = arg.result[j];
-      }
+      launch<transform_reducer, true>(result, tp, stream, arg);
     }
 
-    TuneKey tuneKey() const
-    {
-      char count[16];
-      u32toa(count, n_items);
-      return TuneKey(count, typeid(*this).name(), aux);
-    }
-
-    long long flops() const { return 0; } // just care about bandwidth
     long long bytes() const { return v.size() * n_items * sizeof(T); }
   };
 
-  /**
-     @brief QUDA implementation providing thrust::transform_reduce like
-     functionality.  Improves upon thrust's implementation since a
-     single kernel is used which writes the result directly to host
-     memory, and is a batched implementation.
-     @param[in] location Location where the reduction will take place
-     @param[out] result Vector of results
-     @param[in] v Vector of inputs
-     @param[in] n_items Number of elements to be reduced in each input
-     @param[in] transformer Functor that applies transform to each element
-     @param[in] init The results are initialized to this value
-     @param[in] reducer Functor that applies the reduction to each transformed element
-   */
-  template <typename reduce_t, typename T, typename I, typename transformer, typename reducer>
-  void transform_reduce(QudaFieldLocation location, std::vector<reduce_t> &result, const std::vector<T *> &v, I n_items,
+  template <typename reduce_t, typename T, typename count_t, typename transformer, typename reducer>
+  void transform_reduce(QudaFieldLocation location, std::vector<reduce_t> &result, const std::vector<T *> &v, count_t n_items,
                         transformer h, reduce_t init, reducer r)
   {
-    if (result.size() != v.size())
-      errorQuda("result %lu and input %lu set sizes do not match", result.size(), v.size());
-    TransformReduce<reduce_t, T, I, transformer, reducer> reduce(location, result, v, n_items, h, init, r);
+    if (result.size() != v.size()) errorQuda("result %lu and input %lu set sizes do not match", result.size(), v.size());
+    TransformReduce<reduce_t, T, count_t, transformer, reducer> reduce(location, result, v, n_items, h, init, r);
   }
 
-  /**
-     @brief QUDA implementation providing thrust::transform_reduce like
-     functionality.  Improves upon thrust's implementation since a
-     single kernel is used which writes the result directly to host
-     memory.
-     @param[in] location Location where the reduction will take place
-     @param[out] result Result
-     @param[in] v Input vector
-     @param[in] n_items Number of elements to be reduced
-     @param[in] transformer Functor that applies transform to each element
-     @param[in] init Results is initialized to this value
-     @param[in] reducer Functor that applies the reduction to each transformed element
-   */
-  template <typename reduce_t, typename T, typename I, typename transformer, typename reducer>
-  reduce_t transform_reduce(QudaFieldLocation location, const T *v, I n_items, transformer h, reduce_t init, reducer r)
+  template <typename reduce_t, typename T, typename count_t, typename transformer, typename reducer>
+  reduce_t transform_reduce(QudaFieldLocation location, const T *v, count_t n_items, transformer h, reduce_t init, reducer r)
   {
     std::vector<reduce_t> result = {0.0};
     std::vector<const T *> v_ = {v};
@@ -180,39 +75,15 @@ namespace quda
     return result[0];
   }
 
-  /**
-     @brief QUDA implementation providing thrust::reduce like
-     functionality.  Improves upon thrust's implementation since a
-     single kernel is used which writes the result directly to host
-     memory, and is a batched implementation.
-     @param[in] location Location where the reduction will take place
-     @param[out] result Result
-     @param[in] v Input vector
-     @param[in] n_items Number of elements to be reduced
-     @param[in] init The results are initialized to this value
-     @param[in] reducer Functor that applies the reduction to each transformed element
-   */
-  template <typename reduce_t, typename T, typename I, typename transformer, typename reducer>
-  void reduce(QudaFieldLocation location, std::vector<reduce_t> &result, const std::vector<T *> &v, I n_items,
+  template <typename reduce_t, typename T, typename count_t, typename transformer, typename reducer>
+  void reduce(QudaFieldLocation location, std::vector<reduce_t> &result, const std::vector<T *> &v, count_t n_items,
               reduce_t init, reducer r)
   {
     transform_reduce(location, result, v, n_items, identity<T>(), init, r);
   }
 
-  /**
-     @brief QUDA implementation providing thrust::reduce like
-     functionality.  Improves upon thrust's implementation since a
-     single kernel is used which writes the result directly to host
-     memory.
-     @param[in] location Location where the reduction will take place
-     @param[out] result Result
-     @param[in] v Input vector
-     @param[in] n_items Number of elements to be reduced
-     @param[in] init Result is initialized to this value
-     @param[in] reducer Functor that applies the reduction to each transformed element
-   */
-  template <typename reduce_t, typename T, typename I, typename reducer>
-  reduce_t reduce(QudaFieldLocation location, const T *v, I n_items, reduce_t init, reducer r)
+  template <typename reduce_t, typename T, typename count_t, typename reducer>
+  reduce_t reduce(QudaFieldLocation location, const T *v, count_t n_items, reduce_t init, reducer r)
   {
     std::vector<reduce_t> result = {0.0};
     std::vector<const T *> v_ = {v};

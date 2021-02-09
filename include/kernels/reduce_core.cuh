@@ -47,14 +47,14 @@ namespace quda
     /**
        Generic reduction kernel with up to five loads and saves.
     */
-    template <typename Arg> struct Reduce_ {
+    template <typename Arg> struct Reduce_ : plus<typename Arg::Reducer::reduce_t> {
       using reduce_t = typename Arg::Reducer::reduce_t;
+      using plus<reduce_t>::operator();
       Arg &arg;
       constexpr Reduce_(Arg &arg) : arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }
 
-      template <typename Reducer>
-      __device__ __host__ inline reduce_t operator()(reduce_t &sum, Reducer &, int tid, int)
+      __device__ __host__ inline reduce_t operator()(reduce_t &sum, int tid, int)
       {
         using vec = vector_type<complex<typename Arg::real>, Arg::n/2>;
 

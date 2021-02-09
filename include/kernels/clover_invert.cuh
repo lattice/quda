@@ -34,9 +34,9 @@ namespace quda
     __device__ __host__ auto init() const { return zero<double2>(); }
   };
 
-  template <typename Arg> struct InvertClover {
-
+  template <typename Arg> struct InvertClover : plus<double2> {
     using reduce_t = double2;
+    using plus<reduce_t>::operator();
     Arg &arg;
     constexpr InvertClover(Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
@@ -44,8 +44,7 @@ namespace quda
     /**
        Use a Cholesky decomposition and invert the clover matrix
     */
-    template <typename Reducer>
-    __device__ __host__ inline reduce_t operator()(reduce_t &value, Reducer &r, int x_cb, int parity)
+    __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
     {
       using real = typename Arg::real;
       constexpr int N = Arg::nColor * Arg::nSpin / 2;
@@ -74,7 +73,7 @@ namespace quda
 
       reduce_t result = zero<reduce_t>();
       parity ? result.y = trLogA : result.x = trLogA;
-      return r(result, value);
+      return operator()(result, value);
     }
 
   };

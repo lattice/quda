@@ -40,9 +40,9 @@ namespace quda {
     double getTheta(){ return result.y; }
   };
 
-  template <typename Arg> struct FixQualityOVR {
-
+  template <typename Arg> struct FixQualityOVR : plus<double2> {
     using reduce_t = double2;
+    using plus<reduce_t>::operator();
     Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
     constexpr FixQualityOVR(Arg &arg) : arg(arg) {}
@@ -50,8 +50,7 @@ namespace quda {
     /**
      * @brief Measure gauge fixing quality
      */
-    template <typename Reducer>
-    __device__ __host__ inline reduce_t operator()(reduce_t &value, Reducer &r, int x_cb, int parity)
+    __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
     {
       reduce_t data;
       using Link = Matrix<complex<typename Arg::real>, 3>;
@@ -91,7 +90,7 @@ namespace quda {
       //35
       //T=36*gauge_dir+65
 
-      return r(data, value);
+      return operator()(data, value);
     }
   };
 
