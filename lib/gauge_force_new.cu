@@ -55,8 +55,8 @@ namespace quda {
     void preTune() { mom.backup(); }
     void postTune() { mom.restore(); }
     
-    long long flops() const { return (288 - 48 + 1) * 198ll * 2 * mom.VolumeCB() * 4; }
-    long long bytes() const { return ((288 + 1ll) * in.Bytes() + 2ll*mom.Bytes()) * 2 * mom.VolumeCB() * 4; }
+    long long flops() const { return (288ll - 48ll + 1ll) * 198ll * 2 * mom.VolumeCB() * 4; }
+    long long bytes() const { return ((288ll + 1ll) * in.Bytes() + 2ll*mom.Bytes()) * 2 * mom.VolumeCB() * 4; }
   };
   
 #ifdef GPU_GAUGE_FORCE

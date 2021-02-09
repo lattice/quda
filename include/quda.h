@@ -755,10 +755,10 @@ extern "C" {
     int b_stride;              /**< stride of the B array in strided(batched) mode */
     int c_stride;              /**< stride of the C array in strided(batched) mode */
 
-    double_complex alpha; /**< scalar used for multiplication. */
-    double_complex beta;  /**< scalar used for multiplication. If beta==0, C does not have to be a valid input. */
+    double_complex alpha;      /**< scalar used for multiplication. */
+    double_complex beta;       /**< scalar used for multiplication. If beta==0, C does not have to be a valid input. */
 
-    int batch_count; /**< number of pointers contained in arrayA, arrayB and arrayC. */
+    int batch_count;           /**< number of pointers contained in arrayA, arrayB and arrayC. */
 
     QudaBLASDataType data_type;   /**< Specifies if using S(C) or D(Z) BLAS type */
     QudaBLASDataOrder data_order; /**< Specifies if using Row or Column major */
@@ -779,7 +779,7 @@ extern "C" {
 
   typedef struct QudaHMCParam_s {
 
-    QudaInvertParam *invert_param;  /** Used to store information pertinent to the operator **/
+    QudaInvertParam *invert_param;  /** Used to store information pertinent to the Dirac operator **/
     QudaGaugeParam *gauge_param;    /** Used to store information pertinent to the gauge field **/
     
     int start;                 /**< The update step from which to start */
@@ -792,8 +792,6 @@ extern "C" {
     double beta;               /**< The beta value of the simulation */
 
   } QudaHMCParam;
-
-
 
   
   /**

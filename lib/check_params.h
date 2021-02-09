@@ -1028,7 +1028,7 @@ void printQudaHMCParam(QudaHMCParam *param)
   P(updates, INVALID_INT);
   P(therm_updates, INVALID_INT);
   P(traj_steps, INVALID_INT);
-  P(traj_length, INVALID_DOUBLE); 
+  P(traj_length, INVALID_DOUBLE);
   P(coldstart, QUDA_BOOLEAN_FALSE);
   P(beta, INVALID_DOUBLE);
 #else
@@ -1036,7 +1036,7 @@ void printQudaHMCParam(QudaHMCParam *param)
   P(updates, INVALID_INT);
   P(therm_updates, INVALID_INT);
   P(traj_steps, INVALID_INT);
-  P(traj_length, INVALID_DOUBLE); 
+  P(traj_length, INVALID_DOUBLE);
   P(coldstart, QUDA_BOOLEAN_INVALID);
   P(beta, INVALID_DOUBLE);
 #endif

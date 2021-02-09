@@ -62,21 +62,33 @@ int main(int argc, char **argv)
 
   // Set the dimensions
   setDims(gauge_param.X);  
-  
-  // Allocate space on the host
-  void *gauge[4];
-  for (int dir = 0; dir < 4; dir++) gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
-  constructHostGaugeField(gauge, gauge_param, argc, argv);
-  // Load the gauge field to the device
-  loadGaugeQuda((void *)gauge, &gauge_param);
-
+      
   // All user inputs now defined
   display_info();
   //----------------------------------------------------------------------------
 
+  // Leapfrog HMC start
+  //--------------------------------------------------------------------------
+  QudaHMCParam hmc_param = newQudaHMCParam();
+  setHMCParam(hmc_param);
+  QudaInvertParam inv_param = newQudaInvertParam();
+  setInvertParam(inv_param);
+  hmc_param.invert_param = &inv_param;
+  hmc_param.gauge_param = &gauge_param;
+  
+  // Allocate space on the host for a gauge field, fill with a random gauge, a unit gauge
+  // or a user supplied gauge.
+  void *gauge[4];
+  for (int dir = 0; dir < 4; dir++) gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
+  constructHostGaugeField(gauge, gauge_param, argc, argv);  
+  // Load the gauge field to the device
+  loadGaugeQuda((void *)gauge, &gauge_param);
+
+  // By passing null pointers to this function, QUDA infers that you want QUDA
+  // compute the clover terms and inverses for you from the gaige feild
+  loadCloverQuda(nullptr, nullptr, &inv_param);
   
   // Plaquette measurement
-  //--------------------------------------------------------------------------
   // start the timer
   double time0 = -((double)clock());
   QudaGaugeObservableParam param = newQudaGaugeObservableParam();
@@ -92,27 +104,24 @@ int main(int argc, char **argv)
   printfQuda("Computed plaquette is %.16e (spatial = %.16e, temporal = %.16e)\n", param.plaquette[0], param.plaquette[1], param.plaquette[2]);
   //--------------------------------------------------------------------------  
   
-  // Leapfrog
-  //--------------------------------------------------------------------------
-  QudaHMCParam hmc_param = newQudaHMCParam();
-  setHMCParam(hmc_param);
-  QudaInvertParam inv_param = newQudaInvertParam();
-  setInvertParam(inv_param);
-  hmc_param.invert_param = &inv_param;
-  hmc_param.gauge_param = &gauge_param;
-  
   // Vector construct
   quda::ColorSpinorParam cs_param;
   constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
+  inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION;
+  inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
   auto in = quda::ColorSpinorField::Create(cs_param);
   auto out = quda::ColorSpinorField::Create(cs_param);
   auto check = quda::ColorSpinorField::Create(cs_param);
-  
+    
   // Start the timer
   time0 = -((double)clock());
 
+  // RNG for populating the host spinor with random numbers.
+  auto *rng = new quda::RNG(*check, 1234);
+  
   // Run the QUDA computation
   for(int i=0; i<hmc_param.updates; i++) {
+    constructRandomSpinorSource(in->V(), 4, 3, inv_param.cpu_prec, inv_param.solution_type, gauge_param.X, *rng);      
     performLeapfrogStep(out->V(), in->V(), &hmc_param, i);
   }
 
