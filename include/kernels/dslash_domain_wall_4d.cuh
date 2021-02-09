@@ -2,12 +2,6 @@
 
 #include <kernels/dslash_wilson.cuh>
 
-#include <mma_tensor_op/shared_memory_object.cuh>
-#include <mma_tensor_op/hmma_fp32_tf32_tf32_fp32_m16n8k4_sm80.cuh>
-
-#include <cuda/barrier>
-#include <cooperative_groups.h>
-
 namespace quda
 {
 
@@ -30,112 +24,57 @@ namespace quda
     }
   };
 
-  __device__ float truncated_multiply(float a, float b) {
-    constexpr unsigned int mask = 0xFFFFE000; // 1111 1111 1111 1110 0000 0000 0000
-    float a_t = __uint_as_float(__float_as_uint(a) & mask);
-    float b_t = __uint_as_float(__float_as_uint(b) & mask);
-    return a_t * b_t;
-  }
-
-  using barrier = cuda::barrier<cuda::thread_scope_block>;
-
   constexpr int warp_size = 32;
 
-  template <int Ls>
-  __device__ int inline s_spin_index(int s, int spin, int comp) {
-    return spin * (2 * Ls) + s * 2 + comp;
-  }
-
-  template <bool dagger, class S, class link_t>
-  __device__ void inline store_link(int buffer_index, int d, S smem_obj, const link_t &U)
-  {
+  __device__ void mma(float op_c[], const float op_a[], const float op_b) {
 #pragma unroll
-    for (int ci = 0; ci < 3; ci++) {
-#pragma unroll
-      for (int cj = 0; cj < 3; cj++) { // ind_n, ind_k
-        smem_obj(cj * 2 + 0, ci + (d * 2 + (dagger ? 0 : 0)) * 3 + buffer_index * 3) = dagger ? +U(ci, cj).real() : +U(cj, ci).real();
-        smem_obj(cj * 2 + 1, ci + (d * 2 + (dagger ? 0 : 0)) * 3 + buffer_index * 3) = dagger ? -U(ci, cj).imag() : +U(cj, ci).imag();
-      }
+    for (int r = 0; r < 8; r++) {
+      op_c[r * 2 + 0] += op_b;
+      op_c[r * 2 + 1] += -op_a[r];
     }
   }
 
-  template <int Ls, class S, class colorspinor_t>
-    __device__ void inline store_colorspinor(int buffer_index, int d, int s, int fwd_bwd, S smem_obj, const colorspinor_t &in_p)
-    {
-#pragma unroll
-      for (int spin = 0; spin < 4; spin++) {
-#pragma unroll
-        for (int color = 0; color < 3; color++) {
-          smem_obj(s_spin_index<Ls>(s, spin, 0), color + (d * 2 + fwd_bwd) * 3 + buffer_index * 3) = in_p(spin, color).real();
-          smem_obj(s_spin_index<Ls>(s, spin, 1), color + (d * 2 + fwd_bwd) * 3 + buffer_index * 3) = in_p(spin, color).imag();
-        }
-      }
-    }
-
-  template <int Ls, class S, class colorspinor_t>
-    __device__ void inline load_colorspinor(int buffer_index, int s, colorspinor_t &out, const S smem_obj)
-  {
-#pragma unroll
-    for (int spin = 0; spin < 4; spin++) {
-#pragma unroll
-      for (int color = 0; color < 3; color++) {
-        auto rr = smem_obj(s_spin_index<Ls>(s, spin, 0), color * 2 + 0 + buffer_index * 6);
-        auto ir = smem_obj(s_spin_index<Ls>(s, spin, 1), color * 2 + 0 + buffer_index * 6);
-        auto ri = smem_obj(s_spin_index<Ls>(s, spin, 0), color * 2 + 1 + buffer_index * 6);
-        auto ii = smem_obj(s_spin_index<Ls>(s, spin, 1), color * 2 + 1 + buffer_index * 6);
-
-        out(spin, color).real(rr - ii);
-        out(spin, color).imag(ri + ir);
-      }
-    }
-  }
-
-  template <int Ls_, int Lx_, int smem_buffer_size_, int compute_warp_>
-  struct Dummy {
-
-    static constexpr int Ls = Ls_;
-    static constexpr int Lx = Lx_;
-
-    static constexpr int Nc = 3;
-    static constexpr int Ns = 4;
-
-    static constexpr int M = Ls * Ns * 2; // Ls * spin * complex
-    static constexpr int N = Nc * 2;      // Nc * complex
-    static constexpr int K = Nc * 8;      // Nc * 8-way stencil
-
-    static constexpr int bM = M;
-    static constexpr int bN = N;
-    static constexpr int bK = Nc; // TODO: Change this for MMA.
-
-    static constexpr int compute_warp = compute_warp_;
-    static constexpr int smem_buffer_size = smem_buffer_size_;
-
-    static constexpr int smem_a_ldm = bM + 8;
-    static constexpr int smem_b_ldm = bN + 0;
-    static constexpr int smem_c_ldm = bM + 4;
-
-    static constexpr int smem_bytes = (bK * (smem_a_ldm + smem_b_ldm) + bN * smem_c_ldm) * smem_buffer_size;
-
-  };
-
-  template <class Config, int nParity, bool dagger, bool xpay, KernelType kernel_type, class A, class B, class C, typename Arg>
-  __device__ inline void data_movement(int thread_idx, A smem_obj_a, B smem_obj_b, C smem_obj_c, Arg &arg)
+  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  __global__ void specialized_dslash_kernel(Arg arg)
   {
     static_assert(kernel_type == INTERIOR_KERNEL, "Currently only for interior kernel.");
 
-    constexpr int Ls = Config::Ls;
-    constexpr int Lx = Config::Lx;
+    constexpr int Ls = 12;
+    constexpr int s_per_warp = 8;
 
-    int s = thread_idx % Ls;
-    int x = thread_idx / Ls;
-    int x_cb = x + blockIdx.x * Lx;
+    int thread_idx = threadIdx.x;
+    int lane_id = thread_idx % warp_size;
+    int warp_id = thread_idx / warp_size;
+
+    int warp_k = lane_id % 4;
+    int warp_m = lane_id / 4;
+    int warp_n = warp_m;
+
+    constexpr int reg_length_a = (s_per_warp * 8 / 16) * 2;
+    constexpr int reg_length_c = (s_per_warp * 8 / 16) * 4;
+
+    float op_a[reg_length_a];
+    float op_b;
+    float op_c[reg_length_c];
+
+    using float_type = typename mapper<typename Arg::Float>::type;
+    using fixed_type = typename Arg::Float;
+
+    using Spinor = ColorSpinor<float_type, 1, 4>;
+
+    fixed_type op_b_fixed;
+
+    int color = warp_k;
+    int s = warp_m + warp_id * s_per_warp;
+
+    int color_m = warp_k;
+    int color_n = warp_n / 2;
+    int comp = warp_n % 2;
+
+    int x_cb = blockIdx.x;
 
     constexpr int Ns = Arg::nSpin;
     constexpr int Nc = Arg::nColor;
-
-    using float_type = typename mapper<typename Arg::Float>::type;
-    using colorspinor_t = ColorSpinor<float_type, Nc, Ns>;
-    using link_t = Matrix<complex<float_type>, Nc>;
 
     int parity = nParity == 2 ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
     int their_spinor_parity = nParity == 2 ? 1 - parity : 0;
@@ -146,7 +85,8 @@ namespace quda
     bool active;
     auto coord = getCoords<QUDA_4D_PC, kernel_type>(arg, x_cb, s, parity, thread_dim);
 
-    int buffer_index = x % Config::smem_buffer_size;
+#pragma unroll
+    for (int r = 0; r < reg_length_c; r++) { op_c[r] = 0; }
 
 #pragma unroll
     for (int d = 0; d < 4; d++) { // loop over dimension - 4 and not nDim since this is used for DWF as well
@@ -158,27 +98,29 @@ namespace quda
         const bool ghost
           = (coord[d] + arg.nFace >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
-        if (!ghost) { // TODO: zero the ghost ones.
-          // colorspinor_t in = arg.in(fwd_idx * Ls + s, their_spinor_parity);
-          colorspinor_t in = arg.in(fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
-          colorspinor_t in_p = in.project(d, proj_dir).reconstruct(d, proj_dir);
-          link_t U;
-          if (s == 0) {
-            U = arg.U(d, gauge_idx, gauge_parity);
-          }
+        if (s < Ls  && warp_k < Nc && !ghost) {
+          // Spinor in = arg.in(fwd_idx + s * arg.dc.volume_4d_cb, their_spinor_parity, color);
+          Spinor in = arg.in(fwd_idx * Ls + s, their_spinor_parity, color);
+          Spinor projected_in = in.project(d, proj_dir).reconstruct(d, proj_dir);
 
-          if (d > 0) { __syncthreads(); } // "The buffers are filled."
-          // ready[y].arrive_and_wait(); // Wait until buffer for `x_cb` is ready to be filled.
-
-          if (s == 0) {
-            store_link<false>(buffer_index, 0, smem_obj_b, U); // dagger = false
+#pragma unroll
+          for (int r = 0; r < reg_length_a / 2; r++) {
+            op_a[r * 2 + 0] = projected_in(r).real();
+            op_a[r * 2 + 1] = projected_in(r).imag();
           }
-          store_colorspinor<Ls>(buffer_index, 0, s, 0, smem_obj_a, in_p);
-          // out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
-          
-          __syncthreads(); // "The buffers are filled."
-          // filled[y].arrive(); // Signal that the op_a and op_b for this `x_cb` are now filled
+        } else {
+#pragma unroll
+          for (int r = 0; r < reg_length_a; r++) { op_a[r] = 0; }
         }
+
+        if (warp_k < Nc && warp_n < Nc * 2 && !ghost) {
+          op_b_fixed = arg.U(gauge_idx, d, gauge_parity, color_m, color_n, comp); // color i, j, complex
+          op_b = static_cast<float_type>(op_b_fixed) * fixedInvMaxValue<fixed_type>::value;
+        } else {
+          op_b = 0;          
+        }
+
+        mma(op_c, op_a, op_b);
       }
 
       { // Backward gather - compute back offset for spinor and gauge fetch
@@ -188,151 +130,70 @@ namespace quda
 
         const bool ghost = (coord[d] - arg.nFace < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
-        if (!ghost) {
-          // colorspinor_t in = arg.in(back_idx * Ls + s, their_spinor_parity);
-          colorspinor_t in = arg.in(back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
-          colorspinor_t in_p = in.project(d, proj_dir).reconstruct(d, proj_dir);
-          link_t U;
-          if (s == 0) {
-            U = arg.U(d, gauge_idx, 1 - gauge_parity);
+        if (s < Ls  && warp_k < Nc && !ghost) {
+          // Spinor in = arg.in(back_idx + s * arg.dc.volume_4d_cb, their_spinor_parity, color);
+          Spinor in = arg.in(back_idx * Ls + s, their_spinor_parity, color);
+          Spinor projected_in = in.project(d, proj_dir).reconstruct(d, proj_dir);
+
+#pragma unroll
+          for (int r = 0; r < reg_length_a / 2; r++) {
+            op_a[r * 2 + 0] = projected_in(r).real();
+            op_a[r * 2 + 1] = projected_in(r).imag();
           }
-
-          __syncthreads(); // "The buffers are ready to be filled."
-          // ready[y].arrive_and_wait(); // Wait until buffer for `x_cb` is ready to be filled.
-
-          if (s == 0) {
-            store_link<true>(buffer_index, 0, smem_obj_b, U); // dagger = true
-          }
-          store_colorspinor<Ls>(buffer_index, 0, s, 0, smem_obj_a, in_p);
-          // out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
-
-          __syncthreads(); // "The buffers are filled."
-          // filled[y].arrive(); // Signal that the op_a and op_b for this `x_cb` are now filled
+        } else {
+#pragma unroll
+          for (int r = 0; r < reg_length_a; r++) { op_a[r] = 0; }
         }
+
+        if (warp_k < Nc && warp_n < Nc * 2 && !ghost) {
+          op_b_fixed = arg.U(gauge_idx, d, gauge_parity, color_n, color_m, comp); // color i, j, complex
+          if (comp == 1) { op_b_fixed = -op_b_fixed; }
+          op_b = static_cast<float_type>(op_b_fixed) * fixedInvMaxValue<fixed_type>::value;
+        } else {
+          op_b = 0;          
+        }
+
+        mma(op_c, op_a, op_b);
       }
     } // nDim
 
-    __syncthreads(); // "Compute is done."
-    // computed[y].arrive_and_wait(); // Wait for the results for this `x_cb` have been computed.
-
-    // Write output
-    const int my_spinor_parity = nParity == 2 ? parity : 0;
-    colorspinor_t out;
-    load_colorspinor<Config::Ls>(buffer_index, s, out, smem_obj_c);
-    // arg.out(coord.x_cb * Ls + s, my_spinor_parity) = out;
-    arg.out(coord.x_cb + s * arg.dc.volume_4d_cb, my_spinor_parity) = out;
-  }
-
-  template <class Config, class A, class B, class C>
-  __device__ inline void compute(int thread, A smem_obj_a, B smem_obj_b, C smem_obj_c)
-  {
-    constexpr int K = Config::K;
-
-    constexpr int bM = Config::bM;
-    constexpr int bN = Config::bN;
-    constexpr int bK = Config::bK;
-
-    constexpr int b_dim = (Config::smem_buffer_size / Config::compute_warp);
-    constexpr int m_dim = (bM / warp_size);
-    float acc[b_dim * m_dim * bN];
-
-// #pragma unroll
-    for (int kk = 0; kk < K; kk += bK) {
-
-      __syncthreads(); // "The buffers are ready."
-
+    unsigned max = 0;
 #pragma unroll
-      for (int br = 0; br < b_dim; br++) {
-        int b = br * Config::compute_warp + thread / warp_size;
-#if 1
-#pragma unroll
-        for (int mr = 0; mr < m_dim; mr++) {
-          int m = mr * warp_size + thread % warp_size;
-#pragma unroll
-          for (int n = 0; n < bN; n++) {
-            if (kk == 0) { acc[br * m_dim * bN + mr * bN + n] = 0; }
-            for (int k = 0; k < bK; k++) {
-              acc[br * m_dim * bN + mr * bN + n] += smem_obj_a(m, k + bK * b) * smem_obj_b(n, k + bK * b);
-            }
-            if (kk == K - bK) { smem_obj_c(m, n + bN * b) = acc[br * m_dim * bN + mr * bN + n]; }
-          }
-        } 
-#else
-        mma::WarpRegisterMapping wrm(thread);
-
-        constexpr int warp_dim_m = (bM + mma::MMA_M - 1) / mma::MMA_M; // 12 * 8 / 16 = 6
-        constexpr int warp_dim_n = (bN + mma::MMA_N - 1) / mma::MMA_N; // 6 / 8 = 1
-        constexpr int warp_dim_k = (bK + mma::MMA_K - 1) / mma::MMA_K;
-
-        constexpr int warp_cycle = warp_dim_m * warp_dim_n;
-
-#pragma unroll
-        for (int c = 0; c < warp_cycle; c++) {
-
-          mma::MmaOperandC op_c;
-
-          // The logical warp assigned to each part of the matrix.
-          const int tile_m = c / warp_dim_n;
-          const int tile_n = c - tile_m * warp_dim_n;
-
-          if (kk == 0) {
-            op_c.zero();
-          } else {
-            op_c.load(smem_obj_c, tile_m, tile_n, wrm);
-          }
-
-          for (int tile_k = 0; tile_k < warp_dim_k; tile_k++) {
-
-            mma::MmaOperandA op_a;
-            op_a.load(smem_obj_a, tile_k, tile_m, wrm);
-
-            mma::MmaOperandB op_b;
-            op_b.load(smem_obj_b, tile_k, tile_n, wrm);
-
-            mma::gemm(op_c, op_a, op_b);
-
-          } // tile_k
-
-          op_c.store(smem_obj_c, tile_m * mma::MMA_M, tile_n * mma::MMA_N, wrm);
-
-        }   // c
-
-#endif
+    for (int spin = 0; spin < 4; spin++) {
+      op_c[spin * 4 + 0 * 2 + 0] -= op_c[spin * 4 + 1 * 2 + 1];
+      op_c[spin * 4 + 1 * 2 + 0] += op_c[spin * 4 + 0 * 2 + 1];
+      if (max < __float_as_uint(fabs(op_c[spin * 4 + 0 * 2 + 0]))) {
+        max = __float_as_uint(fabs(op_c[spin * 4 + 0 * 2 + 0]));
       }
-
-      __syncthreads(); // "The buffers are ready to be filled." or "Compute is done."
+      if (max < __float_as_uint(fabs(op_c[spin * 4 + 1 * 2 + 0]))) {
+        max = __float_as_uint(fabs(op_c[spin * 4 + 1 * 2 + 0]));
+      }
     }
-  }
 
-  template <class Config, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  __global__ void specialized_dslash_kernel(Arg arg)
-  {
-    constexpr int bM = Config::bM;
-    constexpr int bN = Config::bN;
-    constexpr int bK = Config::bK;
-
-    constexpr int smem_a_ldm = Config::smem_a_ldm;
-    constexpr int smem_b_ldm = Config::smem_b_ldm;
-    constexpr int smem_c_ldm = Config::smem_c_ldm;
-
-    constexpr int smem_buffer_size = Config::smem_buffer_size;
-
-    extern __shared__ float smem_ptr[];
-
-    using float_type = typename mapper<typename Arg::Float>::type;
-
-    mma::SharedMemoryObject<float_type, bM, bK * smem_buffer_size, 1, smem_a_ldm> smem_obj_a(reinterpret_cast<float_type *>(smem_ptr));
-    mma::SharedMemoryObject<float_type, bN, bK * smem_buffer_size, 1, smem_b_ldm> smem_obj_b(smem_obj_a.ptr + bK * smem_a_ldm * smem_buffer_size);
-    mma::SharedMemoryObject<float_type, bM, bN * smem_buffer_size, 1, smem_c_ldm> smem_obj_c(smem_obj_b.ptr + bK * smem_b_ldm * smem_buffer_size);
-    // mma::SharedMemoryObject<float_type, bM, bN * smem_buffer_size, 1, smem_c_ldm> smem_obj_c(reinterpret_cast<float_type *>(smem_ptr));
-
-    int thread_idx = threadIdx.x + threadIdx.y * blockDim.x;
-
-    if (thread_idx < Config::Ls * Config::Lx) {
-      data_movement<Config, nParity, dagger, xpay, kernel_type>(thread_idx, smem_obj_a, smem_obj_b, smem_obj_c, arg);
-    } else {
-      compute<Config>(thread_idx - Config::Ls * Config::Lx, smem_obj_a, smem_obj_b, smem_obj_c);
+#pragma unroll
+    for (int offset = 2; offset > 0; offset /= 2) {
+      unsigned fetch = __shfl_down_sync(0xffffffff, max, offset);
+      if (max < fetch) { max = fetch; }
     }
+    max = __shfl_sync(0xffffffff, max, (lane_id / 4) * 4);
+
+    // if (blockIdx.x == 0) { printf("thread_idx = %2d, max = %8.4f\n", lane_id, __uint_as_float(max)); }
+    // TODO: Fix the parity.
+    // if (s < Ls && color == 0) arg.out.norm[x_cb + arg.dc.volume_4d_cb * s] = __uint_as_float(max);
+    if (s < Ls && color == 0) arg.out.norm[x_cb * Ls + s] = __uint_as_float(max);
+
+    complex<fixed_type> output[Ns];
+    float_type scale = fixedMaxValue<fixed_type>::value / __uint_as_float(max);
+    for (int spin = 0; spin < 4; spin++) {
+      fixed_type fixed_real = static_cast<fixed_type>(op_c[spin * 4 + 0 * 2 + 0] * scale);
+      fixed_type fixed_imag = static_cast<fixed_type>(op_c[spin * 4 + 1 * 2 + 0] * scale);
+      // TODO: Use vector_type
+      //if (s < Ls && color < 3) arg.out(x_cb + arg.dc.volume_4d_cb * s, parity, spin, color) = complex<fixed_type>(fixed_real, fixed_imag);
+      output[spin].real(fixed_real);
+      output[spin].imag(fixed_imag);
+    }
+    // arg.out.save_spinor(output, x_cb + arg.dc.volume_4d_cb * s, parity, color);
+    arg.out.save_spinor(output, x_cb * Ls + s, parity, color);
   }
 
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct domainWall4D;
@@ -351,61 +212,28 @@ namespace quda
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       tp.set_max_shared_bytes = true;
-      /**
-        block_y == blockDim.y
-        block_x * block_y == number of threads for data movement
-        (blockDim.x - block_x) * blockDim.y == number of threads for compute
-        blockDim.x * blockDim.y == total threads
-      */
-      constexpr int Ls = 12;                      // How many 5th dimension sites are there
-      constexpr int block_y = 8;                // How many spatial sites are there in this block
-      constexpr int smem_buffer_size = block_y; // How many buffers are there
-      
-      if (tp.block.x - Ls == 4) {
-        constexpr int compute_warp = 1;           // How many compute/MMA warps are there
-        using Config = Dummy<Ls, block_y, smem_buffer_size, compute_warp>;
-        qudaLaunchKernel(specialized_dslash_kernel<Config, nParity, dagger, xpay, kernel_type, Arg>, tp, stream, arg);
-      } else if (tp.block.x - Ls == 8) {
-        constexpr int compute_warp = 2;           // How many compute/MMA warps are there
-        using Config = Dummy<Ls, block_y, smem_buffer_size, compute_warp>;
-        qudaLaunchKernel(specialized_dslash_kernel<Config, nParity, dagger, xpay, kernel_type, Arg>, tp, stream, arg);
-      } else if (tp.block.x - Ls == 16) {
-        constexpr int compute_warp = 4;           // How many compute/MMA warps are there
-        using Config = Dummy<Ls, block_y, smem_buffer_size, compute_warp>;
-        qudaLaunchKernel(specialized_dslash_kernel<Config, nParity, dagger, xpay, kernel_type, Arg>, tp, stream, arg);
-      } else if (tp.block.x - Ls == 32) {
-        constexpr int compute_warp = 8;           // How many compute/MMA warps are there
-        using Config = Dummy<Ls, block_y, smem_buffer_size, compute_warp>;
-        qudaLaunchKernel(specialized_dslash_kernel<Config, nParity, dagger, xpay, kernel_type, Arg>, tp, stream, arg);
-      } else {
-        errorQuda("not supported");
-      }
+
+      qudaLaunchKernel(specialized_dslash_kernel<nParity, dagger, xpay, kernel_type, Arg>, tp, stream, arg);
     }
 
     unsigned int sharedBytesPerThread() const { return 0; }
-    // unsigned int sharedBytesPerBlock(const TuneParam &param) const { return ((arg.dc.Ls * 8 + 4) * 6) * sizeof(float) * 8; }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return ((arg.dc.Ls * 8 + 8) * 3 + 6 * 3 + (arg.dc.Ls * 8 + 4) * 6) * sizeof(float) * 8; }
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
     bool advanceTuneParam(TuneParam &param) const {
-      if (param.block.x - 12 < blockMax()) {
-        param.block.x = (param.block.x - 12) * 2 + 12;
-        return true;
-      } else {
-        return false;
-      }
+      return Tunable::advanceSharedBytes(param);
     }
 
-    virtual int blockStep() const { return 4; }
-    virtual int blockMin() const { return 4; }
-    virtual int blockMax() const { return 32; }
+    virtual int blockStep() const { return 64; }
+    virtual int blockMin() const { return 64; }
+    virtual int blockMax() const { return 64; }
 
     void initTuneParam(TuneParam &param) const
     {
-      param.block.x = 12 + blockMin(); // 12 + 4
-      param.block.y = 8;
+      param.block.x = blockMin();
+      param.block.y = 1;
       param.block.z = 1;
 
-      param.grid.x = arg.dc.volume_4d_cb / param.block.y;
+      param.grid.x = arg.dc.volume_4d_cb;
       param.grid.y = 1;
       param.grid.z = nParity;
 

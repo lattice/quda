@@ -1913,6 +1913,24 @@ namespace quda {
       }
 
       /**
+        @brief This accessor routine is for test only.
+       */
+      __device__ __host__ inline Float operator()(int x_cb, int dir, int parity, int m, int n, int real_imag) const
+      {
+        constexpr int M = reconLen / N;
+        int index = m * 6 + n * 2 + real_imag; // TODO: hard coded Nc, and this works for recon 18 only.
+        int i = index / N;
+        int j = index % N;
+
+        Float *ptr = reinterpret_cast<Float *>(gauge);
+#if 1
+        return ptr[parity * offset * N + dir * stride * reconLen + x_cb * reconLen + m * 6 + n * 2 + real_imag];
+#else
+        return ptr[(parity * offset + (dir * M + i) * stride + x_cb) * N + j];
+#endif
+      }
+
+      /**
 	 @brief This accessor routine returns a const gauge_wrapper to this object,
 	 allowing us to overload various operators for manipulating at
 	 the site level interms of matrix operations.

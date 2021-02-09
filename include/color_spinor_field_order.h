@@ -1102,15 +1102,17 @@ namespace quda {
   {
     real v[Ns * 2];
     norm_type nrm = isFixed<Float>::value ? vector_load<float>(norm, x + parity * norm_offset) : 0.0;
+#if 1 // AoS
     using vec_t = typename VectorType<Float, Ns * 2>::type;
-#if 1
     int index = parity * offset * N / (Ns * 2) + x * Nc + color;
     vec_t vecTmp = vector_load<vec_t>(field, index);
+    real scale_inv = fixedInvMaxValue<Float>::value * nrm;
 #pragma unroll
-    for (int j = 0; j < 8; j++) copy_and_scale(v[j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
-#else
-#pragma unroll
-    for (int i = 0; i < length / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
+    // for (int j = 0; j < Ns * 2; j++) copy_and_scale(v[j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
+    for (int j = 0; j < Ns * 2; j++) {
+      v[j] = i2f(reinterpret_cast<Float *>(&vecTmp)[j]) * scale_inv;
+    }
+#else // SoA
 #pragma unroll
     for (int spin = 0; spin < Ns; spin++) {
       auto tmp = this->operator()(x, parity, spin, color);
@@ -1165,10 +1167,10 @@ namespace quda {
   /**
     Save spinor 
   */
-  __device__ __host__ inline void save_spinor(const ::complex<Float> in[Ns], int x, int parity = 0)
+  __device__ __host__ inline void save_spinor(const ::complex<Float> in[Ns], int x, int parity, int color)
   {
     using vec_t = typename VectorType<Float, Ns * 2>::type;
-    vector_store(field, parity * offset * N / (Ns * 2) + x * Nc, *reinterpret_cast<const vec_t *>(in));
+    vector_store(field, parity * offset * N / (Ns * 2) + x * Nc + color, *reinterpret_cast<const vec_t *>(in));
   }
 
   /**
@@ -1238,11 +1240,11 @@ namespace quda {
   */
   __device__ __host__ inline const ::complex<Float> &operator()(int x_cb, int parity, int spin, int color) const
   {
-#if 0
+#if 1 // SoA
     int i = (spin * Nc + color) * 2 / N;
     int j = (spin * Nc + color) * 2 % N;
     return reinterpret_cast<::complex<Float> *>(field)[((parity * offset + x_cb + stride * i) * N + j) / 2];
-#else
+#else // AoS
     return reinterpret_cast<::complex<Float> *>(field)[parity * offset * N / 2 + x_cb * Ns * Nc + color * Ns + spin];
 #endif
   }
