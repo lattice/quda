@@ -96,7 +96,11 @@ Communicator::Communicator(Communicator &other, const int *comm_split)
 Communicator::~Communicator()
 {
   comm_finalize();
-  if (!user_set_comm_handle) { QMP_comm_free(QMP_COMM_HANDLE); }
+  if (!user_set_comm_handle) {
+    // FIXME: workaround for Chroma
+    QMP_comm_t temp = QMP_comm_get_default();
+    if (QMP_COMM_HANDLE != temp) QMP_comm_free(QMP_COMM_HANDLE);
+  }
 }
 
 // There are more efficient ways to do the following,
