@@ -1,5 +1,6 @@
 #pragma once
 #include <hip/hip_runtime.h>
+#include <algorithm>
 
 namespace quda {
 
@@ -94,7 +95,6 @@ namespace quda {
         return std::max(warp_size(), 256 / (block_size_y * block_size_z));
       }
 
-
     /**
      * @brief Helper function for the transform reduce blocksize
      */
@@ -128,7 +128,7 @@ namespace quda {
       // This is the specialized variant used when we have fast-compilation mode enabled
       return warp_size();
 #else
-      return 64;
+      return 128;
 #endif
     }
 

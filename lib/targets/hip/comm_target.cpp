@@ -1,10 +1,8 @@
 #include <comm_quda.h>
 #include <quda_api.h>
 #include <quda_hip_api.h>
-#include <quda_hip_api.h>
-#include <hip/hip_runtime_api.h>
 #include <algorithm>
-
+#include <hip/hip_runtime_api.h>
 
 #define CHECK_HIP_ERROR(func)						\
   quda::hip::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
@@ -16,8 +14,7 @@ bool comm_peer2peer_possible(int local_gpuid, int neighbor_gpuid)
   CHECK_HIP_ERROR(hipDeviceCanAccessPeer(&canAccessPeer[1], neighbor_gpuid, local_gpuid));
   
   // require symmetric peer-to-peer access to enable peer-to-peer
-  return canAccessPeer[0] && canAccessPeer[1];
-  
+  return canAccessPeer[0] && canAccessPeer[1];  
 }
 
 int comm_peer2peer_performance(int local_gpuid, int neighbor_gpuid)
@@ -35,7 +32,7 @@ int comm_peer2peer_performance(int local_gpuid, int neighbor_gpuid)
 void comm_create_neighbor_memory(void *remote[QUDA_MAX_DIM][2], void *local)
 {
   // handles for obtained ghost pointers
-  hipIpcMemHandle_t remote_handle[2][QUDA_MAX_DIM];
+  cudaIpcMemHandle_t remote_handle[2][QUDA_MAX_DIM];
 
   for (int dim=0; dim<4; ++dim) {
     if (comm_dim(dim)==1) continue;

@@ -3,12 +3,10 @@
 #include <quda_internal.h>
 #include <quda_hip_api.h>
 
-#include <hip/hip_runtime_api.h>
 
 static hipDeviceProp_t deviceProp;
 static hipStream_t *streams;
 static const int Nstream = 9;
-static int device_count = 0;
 
 #define CHECK_HIP_ERROR(func)						\
   hip::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
@@ -22,8 +20,7 @@ namespace quda
     static bool initialized = false;
 
     void init(int dev)
-    {
-      
+    {      
       if (initialized) return;
       initialized = true;
       printfQuda("*** HIP BACKEND ***\n");
@@ -36,13 +33,7 @@ namespace quda
       CHECK_HIP_ERROR(hipRuntimeGetVersion(&runtime_version));
       printfQuda("HIP Runtime version = %d\n", runtime_version);
 
-      //int deviceCount;
-      //hipGetDeviceCount(&deviceCount);
-      //if (deviceCount == 0) {
-      //errorQuda("No HIP devices found");
-      //}
-
-      for (int i = 0; i < device_count; i++) {
+      for (int i = 0; i < get_device_count(); i++) {
         CHECK_HIP_ERROR(hipGetDeviceProperties(&deviceProp, i));
         if (getVerbosity() >= QUDA_SUMMARIZE) {
 	  printfQuda("Found device %d: %s\n", i, deviceProp.name); }
@@ -62,6 +53,7 @@ namespace quda
 
     int get_device_count()
     {
+      static int device_count = 0;
       if (device_count == 0) {
         CHECK_HIP_ERROR(hipGetDeviceCount(&device_count));
         if (device_count == 0) errorQuda("No HIP devices found");

@@ -36,7 +36,7 @@ namespace quda {
   std::string qudaGetLastErrorString()
   {
     auto rtn = last_error_str;
-    last_error_str = QUDA_SUCCESS;
+    last_error_str = "QUDA_SUCCESS";
     return rtn;
   }
 

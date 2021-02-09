@@ -22,7 +22,7 @@
 namespace quda {
 
   static qudaError_t last_error = QUDA_SUCCESS;
-  static std::string last_error_str("HIP_SUCCESS");
+  static std::string last_error_str{"HIP_SUCCESS"};
 
   qudaError_t qudaGetLastError()
   {
@@ -34,7 +34,7 @@ namespace quda {
   std::string qudaGetLastErrorString()
   {
     auto rtn = last_error_str;
-    last_error_str = QUDA_SUCCESS;
+    last_error_str = "QUDA_SUCCESS";
     return rtn;
   }
 
@@ -63,38 +63,68 @@ namespace quda {
 
   using namespace hip;
   
-  inline 
-  hipMemcpyKind	 qudaMemcpyKindToAPI( const qudaMemcpyKind& k) 
-  {
-    switch(k) { 
-     case qudaMemcpyHostToHost : return hipMemcpyHostToHost; break; 
-     case qudaMemcpyHostToDevice : return hipMemcpyHostToDevice; break;
-     case qudaMemcpyDeviceToHost : return hipMemcpyDeviceToHost; break;
-     case qudaMemcpyDeviceToDevice : return hipMemcpyDeviceToDevice; break;
-     case qudaMemcpyDefault : return hipMemcpyDefault; break;
-     default: 
-	errorQuda(" unknown value for qudaMemcpyKind %d", static_cast<int>(k));
-	return hipMemcpyDefault; // keep warnings away
-     }
+  // Agnostic way to return a hipAPI flag
+  namespace {
+  	inline
+	hipMemcpyKind	 qudaMemcpyKindToAPI( const qudaMemcpyKind& k)
+  	{
+  	  switch(k) {
+  	  case qudaMemcpyHostToHost : return hipMemcpyHostToHost; break;
+  	  case qudaMemcpyHostToDevice : return hipMemcpyHostToDevice; break;
+  	  case qudaMemcpyDeviceToHost : return hipMemcpyDeviceToHost; break;
+  	  case qudaMemcpyDeviceToDevice : return hipMemcpyDeviceToDevice; break;
+  	  case qudaMemcpyDefault : return hipMemcpyDefault; break;
+  	  default:
+  	    errorQuda(" unknown value for qudaMemcpyKind %d", static_cast<int>(k));
+  	    return hipMemcpyDefault; // keep warnings away
+  	  }
+  	}
   }
+
+  // No need to abstract these across the library so keep these definitions local to CUDA target
+
+   /**
+      @brief Wrapper around cudaFuncSetAttribute with built-in error checking
+      @param[in] kernel Kernel function for which we are setting the attribute
+      @param[in] attr Attribute to set
+      @param[in] value Value to set
+   */
+   void qudaFuncSetAttribute_(const void *kernel, hipFuncAttribute attr, int value, const char *func, const char *file,
+                              const char *line);
+
+   /**
+      @brief Wrapper around cudaFuncGetAttributes with built-in error checking
+      @param[in] attr the cudaFuncGetAttributes object to store the output
+      @param[in] kernel Kernel function for which we are setting the attribute
+   */
+   void qudaFuncGetAttributes_(hipFuncAttributes &attr, const void *kernel, const char *func, const char *file,
+                               const char *line);
+
+ #define qudaFuncSetAttribute(kernel, attr, value)                                                                      \
+   ::quda::qudaFuncSetAttribute_(kernel, attr, value, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
+ #define qudaFuncGetAttributes(attr, kernel)                                                                            \
+   ::quda::qudaFuncGetAttributes_(attr, kernel, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
 
   static TimeProfile apiTimer("HIP API calls (runtime)");
 
   qudaError_t qudaLaunchKernel(const void *func, const TuneParam &tp, void **args, qudaStream_t stream)
   {
 #if 0
-    if (tp.set_max_shared_bytes) {
-      static std::unordered_set<const void *> cache;
-      auto search = cache.find(func);
-      if (search == cache.end()) {
-        cache.insert(func);
-        cudaFuncSetAttribute(func, cudaFuncAttributePreferredSharedMemoryCarveout, (int)cudaSharedmemCarveoutMaxShared);
-        hipFuncAttributes attributes;
-        hipFuncGetAttributes(&attributes, reinterpret_cast<const void*>(func));
-        cudaFuncSetAttribute(func, cudaFuncAttributeMaxDynamicSharedMemorySize,
-                             device::max_dynamic_shared_memory() - attributes.sharedSizeBytes);
-      }
-    }
+	// if launch requests the maximum shared memory and the device supports it then opt in
+	if (tp.set_max_shared_bytes && device::max_dynamic_shared_memory() > device::max_default_shared_memory()) {
+	  static std::unordered_set<const void *> cache;
+	  auto search = cache.find(func);
+	  if (search == cache.end()) {
+	    cache.insert(func);
+	    cudaFuncSetAttribute(func, cudaFuncAttributePreferredSharedMemoryCarveout, (int)cudaSharedmemCarveoutMaxShared);
+	    cudaFuncAttributes attributes;
+	    cudaFuncGetAttributes(&attributes, func);
+	    cudaFuncSetAttribute(func, cudaFuncAttributeMaxDynamicSharedMemorySize,
+	    		device::max_dynamic_shared_memory() - attributes.sharedSizeBytes);
+	  }
+	}
 #endif
 
     // no driver API variant here since we have C++ functions
@@ -191,9 +221,9 @@ namespace quda {
           case hipMemcpyDefault: type = QUDA_PROFILE_MEMCPY_DEFAULT_ASYNC; break;
           default: errorQuda("Unsupported cudaMemcpyTypeAsync %d", kind);
           }
-	  hipError_t error;
+          hipError_t error;
           PROFILE(error = hipMemcpyAsync(dst, src, count, kind, device::get_cuda_stream(stream)), type);
-	  set_runtime_error(error, "hipMemcpyAsync", func, file, line, active_tuning);
+          set_runtime_error(error, "hipMemcpyAsync", func, file, line, active_tuning);
         } else {
           hipError_t error = hipMemcpy(dst, src, count, kind);
           set_runtime_error(error, "hipMemcpy", func, file, line, active_tuning);
@@ -202,7 +232,7 @@ namespace quda {
         hipError_t error = async ?
           hipMemsetAsync(dst, value, count, device::get_cuda_stream(stream)) :
           hipMemset(dst, value, count);
-        set_runtime_error(error, async ? "hipMemsetAsync" : " hipMemset", func, file, line, active_tuning);
+        set_runtime_error(error, " hipMemset", func, file, line, active_tuning);
       }
     }
 
@@ -250,7 +280,10 @@ namespace quda {
                      qudaMemcpyKind kind, const char *func, const char *file, const char *line)
   {
     PROFILE(auto error = hipMemcpy2D(dst, dpitch, src, spitch, width, height, qudaMemcpyKindToAPI(kind)), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
-    set_runtime_error(error, "hipMemcpy2D", func, file, line);
+    if (error != hipSuccess)
+      errorQuda("hipMemcpy2D returned error %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+
+
   }
 
   void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
@@ -285,14 +318,14 @@ namespace quda {
                      const char *func, const char *file, const char *line)
   {
     hipError_t error = hipMemset2D(ptr, pitch, value, width, height);
-    set_runtime_error(error, "hipMemset2D", func, file, line);
+    set_runtime_error(error, __func__, func, file, line);
   }
   
   void qudaMemset2DAsync_(void *ptr, size_t pitch, int value, size_t width, size_t height,
                           const qudaStream_t &stream, const char *func, const char *file, const char *line)
   {
     hipError_t error = hipMemset2DAsync(ptr, pitch, value, width, height, device::get_cuda_stream(stream));
-    set_runtime_error(error, "hipMemset2DAsync", func, file, line);
+    set_runtime_error(error, __func__, func, file, line);
   }
 
   void qudaMemPrefetchAsync_(void *, size_t, QudaFieldLocation, const qudaStream_t &,
@@ -300,6 +333,25 @@ namespace quda {
   {
 	  // No prefetch 
   }
+
+
+  bool qudaEventQuery_(qudaEvent_t &event, const char *func, const char *file, const char *line)
+   {
+     PROFILE(hipError_t error = hipEventQuery(reinterpret_cast<hipEvent_t&>(event.event)), QUDA_PROFILE_EVENT_QUERY);
+     switch (error) {
+     case hipSuccess: return true;
+     case hipErrorNotReady: return false;
+     default: set_runtime_error(error, "hipEventQuery", func, file, line);
+     }
+     return false;
+   }
+
+  void qudaEventRecord_(qudaEvent_t &event, qudaStream_t stream, const char *func, const char *file, const char *line)
+    {
+	  cudaEvent_t &event = reinterpret_cast<cudaEvent_t&>(quda_event.event);
+      PROFILE(hipError_t error = hipEventRecord(event, device::get_cuda_stream(stream)), QUDA_PROFILE_EVENT_RECORD);
+      set_runtime_error(error, __func__, func, file, line);
+    }
 
   qudaEvent_t qudaEventCreate_(const char *func, const char *file, const char *line)
   {
@@ -311,12 +363,104 @@ namespace quda {
     return quda_event;
   }
 
-  void qudaEventCreate_(qudaEvent_t *event,  const char *func, const char *file, const char *line)
-  {    
-    PROFILE(auto error = hipEventCreate((hipEvent_t*)event), QUDA_PROFILE_EVENT_CREATE);
-    set_runtime_error(error, "hipEventCreate", func, file, line);
+  void qudaStreamWaitEvent_(qudaStream_t stream, qudaEvent_t quda_event, unsigned int flags, const char *func,
+                             const char *file, const char *line)
+   {
+     hipEvent_t &hip_event = reinterpret_cast<hipEvent_t&>(quda_event.event);
+     PROFILE(hipError_t error = hipStreamWaitEvent(device::get_cuda_stream(stream), hip_event, flags), QUDA_PROFILE_STREAM_WAIT_EVENT);
+     set_runtime_error(error, __func__, func, file, line);
+   }
+
+  qudaEvent_t qudaEventCreate_(const char *func, const char *file, const char *line)
+   {
+     hipEvent_t hip_event;
+     hipError_t error = hipEventCreateWithFlags(&hip_event, cudaEventDisableTiming);
+     set_runtime_error(error, __func__, func, file, line);
+     qudaEvent_t quda_event;
+     quda_event.event = reinterpret_cast<void*>(hip_event);
+     return quda_event;
+   }
+  
+  qudaEvent_t qudaChronoEventCreate_(const char *func, const char *file, const char *line)
+  {
+    hipEvent_t hip_event;
+    hipError_t error = hipEventCreate(&hip_event);
+    set_runtime_error(error, __func__, func, file, line);
+    qudaEvent_t quda_event;
+    quda_event.event = reinterpret_cast<void*>(hip_event);
+    return quda_event;
   }
   
+  float qudaEventElapsedTime_(const qudaEvent_t &quda_start, const qudaEvent_t &quda_end,
+ 			      const char *func, const char *file, const char *line)
+   {
+     float elapsed_time;
+     const hipEvent_t &hip_start = reinterpret_cast<const hipEvent_t&>(quda_start.event);
+     const hipEvent_t &hip_end = reinterpret_cast<const hipEvent_t&>(quda_end.event);
+
+     PROFILE(hipError_t error = hipEventElapsedTime(&elapsed_time, hip_start, hip_end), QUDA_PROFILE_EVENT_ELAPSED_TIME);
+     set_runtime_error(error, "hipEventElapsedTime", func, file, line);
+     return elapsed_time / 1000;
+   }
+
+
+  void qudaEventDestroy_(qudaEvent_t &event,  const char *func, const char *file, const char *line)
+   {
+     hipError_t error = hipEventDestroy(reinterpret_cast<hipEvent_t&>(event.event));
+     set_runtime_error(error, __func__, func, file, line);
+   }
+  
+  void qudaEventSynchronize_(const qudaEvent_t &quda_event, const char *func, const char *file, const char *line)
+   {
+     const hipEvent_t &event = reinterpret_cast<const hipEvent_t&>(quda_event.event);
+     PROFILE(hipError_t error = hipEventSynchronize(event), QUDA_PROFILE_EVENT_SYNCHRONIZE);
+     set_runtime_error(error, "hipEventSynchronize", func, file, line);
+   }
+
+   void qudaStreamSynchronize_(const qudaStream_t &stream, const char *func, const char *file, const char *line)
+   {
+     PROFILE(hipError_t error = hipStreamSynchronize(device::get_cuda_stream(stream)), QUDA_PROFILE_STREAM_SYNCHRONIZE);
+     set_runtime_error(error, "hipStreamSynchronize", func, file, line);
+   }
+
+   void qudaDeviceSynchronize_(const char *func, const char *file, const char *line)
+   {
+     PROFILE(hipError_t error = hipDeviceSynchronize(), QUDA_PROFILE_DEVICE_SYNCHRONIZE);
+     set_runtime_error(error, "hipDeviceSynchronize", func, file, line);
+   }
+
+   void* qudaGetSymbolAddress_(const char *symbol, const char *func, const char *file, const char *line)
+   {
+     void *ptr;
+     hipError_t error = hipGetSymbolAddress(&ptr, HIP_SYMBOL((const void *)symbol));
+     set_runtime_error(error, "hipGetSymbolAddress", func, file, line);
+     return ptr;
+   }
+
+   void qudaFuncSetAttribute_(const void *kernel, hipFuncAttribute attr, int value, const char *func, const char *file,
+                              const char *line)
+   {
+     // no driver API variant here since we have C++ functions
+     PROFILE(hipError_t error = hipFuncSetAttribute(kernel, attr, value), QUDA_PROFILE_FUNC_SET_ATTRIBUTE);
+     set_runtime_error(error, "hipFuncSetAttribute", func, file, line);
+   }
+
+   void qudaFuncGetAttributes_(hipFuncAttributes &attr, const void *kernel, const char *func, const char *file,
+                               const char *line)
+   {
+     // no driver API variant here since we have C++ functions
+     PROFILE(hipError_t error = hipFuncGetAttributes(&attr, reinterpret_cast<const void*>(kernel)), QUDA_PROFILE_FUNC_SET_ATTRIBUTE);
+     set_runtime_error(error, "hipFuncGetAttributes", func, file, line);
+   }
+
+   void printAPIProfile() {
+ #ifdef API_PROFILE
+     apiTimer.Print();
+ #endif
+   }
+
+
+#if 0
   void qudaEventCreateDisableTiming_(qudaEvent_t *event,  const char *func, const char *file, const char *line)
   {
     PROFILE(hipError_t error = hipEventCreateWithFlags((hipEvent_t*)event, hipEventDisableTiming), QUDA_PROFILE_EVENT_CREATE_DISABLED_TIMING);
@@ -328,113 +472,13 @@ namespace quda {
     PROFILE(hipError_t error = hipEventCreateWithFlags((hipEvent_t*)event, hipEventDisableTiming | hipEventInterprocess), QUDA_PROFILE_EVENT_CREATE_DISABLED_TIMING);
     set_runtime_error(error, "hipEventCreateWithFlags", func, file, line);
   }
-
-  void qudaEventDestroy_(qudaEvent_t &event,  const char *func, const char *file, const char *line)
-  {
-    hipError_t error = hipEventDestroy(reinterpret_cast<hipEvent_t&>(event.event));
-    set_runtime_error(error, "hipEventDestroy", func, file, line);
-  }  
-  
-  bool qudaEventQuery_(qudaEvent_t &event, const char *func, const char *file, const char *line)
-  {
-    PROFILE(hipError_t error = hipEventQuery(reinterpret_cast<hipEvent_t&>(event.event)), QUDA_PROFILE_EVENT_QUERY);
-    switch (error) {
-    case hipSuccess: return true;
-    case hipErrorNotReady: return false;
-    default: set_runtime_error(error, "hipEventQuery", func, file, line);
-    }
-    return false;
-  }
-  
-  void qudaEventRecord_(qudaEvent_t &event, qudaStream_t stream, const char *func, const char *file, const char *line)
-  {
-    PROFILE(hipError_t error = hipEventRecord(reinterpret_cast<hipEvent_t&>(event.event), device::get_cuda_stream(stream)), QUDA_PROFILE_EVENT_RECORD);
-    set_runtime_error(error, "hipEventRecord", func, file, line);
-  }
-
-  qudaEvent_t qudaChronoEventCreate_(const char *func, const char *file, const char *line)
-  {
-    hipEvent_t hip_event;
-    hipError_t error = hipEventCreate(&hip_event);
-    set_runtime_error(error, __func__, func, file, line);
-    qudaEvent_t quda_event;
-    quda_event.event = reinterpret_cast<void*>(hip_event);
-    return quda_event;
-  }
-  
-  void qudaEventElapsedTime_(float *ms, qudaEvent_t start, qudaEvent_t end, const char *func, const char *file, const char *line)
-  {
-    PROFILE(hipError_t error = hipEventElapsedTime(ms, reinterpret_cast<hipEvent_t&>(start.event), reinterpret_cast<hipEvent_t&>(end.event)), QUDA_PROFILE_EVENT_ELAPSED_TIME);
-    set_runtime_error(error, "hipEventElapsedTime", func, file, line);
-  }  
-
-  float qudaEventElapsedTime_(const qudaEvent_t &quda_start, const qudaEvent_t &quda_end,
-			      const char *func, const char *file, const char *line)
-  {
-    float elapsed_time;
-    const hipEvent_t &hip_start = reinterpret_cast<const hipEvent_t&>(quda_start.event);
-    const hipEvent_t &hip_end = reinterpret_cast<const hipEvent_t&>(quda_end.event);
-    
-    PROFILE(hipError_t error = hipEventElapsedTime(&elapsed_time, hip_start, hip_end), QUDA_PROFILE_EVENT_ELAPSED_TIME);
-    set_runtime_error(error, "hipEventElapsedTime", func, file, line);
-    return elapsed_time / 1000;
-  }  
-  
-  void qudaStreamWaitEvent_(qudaStream_t stream, qudaEvent_t quda_event, unsigned int flags, const char *func,
-                            const char *file, const char *line)
-  {
-    hipEvent_t &hip_event = reinterpret_cast<hipEvent_t&>(quda_event.event);
-    PROFILE(hipError_t error = hipStreamWaitEvent(device::get_cuda_stream(stream), hip_event, flags), QUDA_PROFILE_STREAM_WAIT_EVENT);
-    set_runtime_error(error, "hipStreamWait", func, file, line);
-  }
-
-  void qudaEventSynchronize_(const qudaEvent_t &quda_event, const char *func, const char *file, const char *line)
-  {
-    const hipEvent_t &event = reinterpret_cast<const hipEvent_t&>(quda_event.event);
-    PROFILE(hipError_t error = hipEventSynchronize(event), QUDA_PROFILE_EVENT_SYNCHRONIZE);
-    set_runtime_error(error, "hipEventSynchronize", func, file, line);
-  }
-
-  void qudaStreamSynchronize_(const qudaStream_t &stream, const char *func, const char *file, const char *line)
-  {
-    PROFILE(hipError_t error = hipStreamSynchronize(device::get_cuda_stream(stream)), QUDA_PROFILE_STREAM_SYNCHRONIZE);
-    set_runtime_error(error, "hipStreamSynchronize", func, file, line);
-  }
-
-  void qudaDeviceSynchronize_(const char *func, const char *file, const char *line)
-  {
-    PROFILE(hipError_t error = hipDeviceSynchronize(), QUDA_PROFILE_DEVICE_SYNCHRONIZE);
-    set_runtime_error(error, "hipDeviceSynchronize", func, file, line);
-  }
-
-  void* qudaGetSymbolAddress_(const char *symbol, const char *func, const char *file, const char *line)
-  {
-    void *ptr;
-    hipError_t error = hipGetSymbolAddress(&ptr, HIP_SYMBOL((const void *)symbol));
-    set_runtime_error(error, "hipGetSymbolAddress", func, file, line);
-    return ptr;
-  }
-
-  void qudaFuncSetAttribute_(const void *kernel, hipFuncAttribute attr, int value, const char *func, const char *file,
-                             const char *line)
-  {
-    // no driver API variant here since we have C++ functions
-    PROFILE(hipError_t error = hipFuncSetAttribute(kernel, attr, value), QUDA_PROFILE_FUNC_SET_ATTRIBUTE);
-    set_runtime_error(error, "hipFuncSetAttribute", func, file, line);
-  }
-
-  void qudaFuncGetAttributes_(hipFuncAttributes &attr, const void *kernel, const char *func, const char *file,
-                              const char *line)
-  {
-    // no driver API variant here since we have C++ functions
-    PROFILE(hipError_t error = hipFuncGetAttributes(&attr, reinterpret_cast<const void*>(kernel)), QUDA_PROFILE_FUNC_SET_ATTRIBUTE);
-    set_runtime_error(error, "hipFuncGetAttributes", func, file, line);
-  }
-  
-  void printAPIProfile() {
-#ifdef API_PROFILE
-    apiTimer.Print();
 #endif
-  }
+
+
+  
+
+
+
+
 
 } // namespace quda
