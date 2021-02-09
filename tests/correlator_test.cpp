@@ -58,7 +58,7 @@ void save_correlators_to_file(const void* correlation_function_sum, const QudaCo
     break;
   default: filepath << "_t"; // temporal
   }
-  filepath << "_s" << dim[0] << "t" << dim[3];
+  filepath << "_s" << dim[0]*gridsize_from_cmdline[0] << "t" << dim[3]*gridsize_from_cmdline[3];
   if (correlator_file_affix[0] != '\0') { filepath << "_" << correlator_file_affix; }
   filepath << "_k" << std::setprecision(5) << std::fixed << kappa;
   switch (corr_param.corr_flavors) {
