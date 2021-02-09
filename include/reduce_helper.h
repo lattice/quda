@@ -3,6 +3,8 @@
 #include <float_vector.h>
 #include <cub_helper.cuh>
 #include <target_device.h>
+#include <reducer.h>
+
 #ifdef QUAD_SUM
 using device_reduce_t = doubledouble;
 #else
@@ -16,7 +18,6 @@ using count_t = cuda::atomic<unsigned int, cuda::thread_scope_device>;
 using count_t = unsigned int;
 #endif
 
-#include <quda_define.h>
 
 namespace quda
 {

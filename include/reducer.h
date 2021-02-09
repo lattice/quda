@@ -7,7 +7,7 @@ namespace quda {
     __device__ __host__ T operator()(T a, T b) const { return a + b; }
   };
 
-#if 1
+#if 0
   // Dumb tests suggest this is still needed for some reason
   template<>
   struct plus<double2> {

@@ -1030,17 +1030,17 @@ namespace quda {
       w_p *= sqrt(c1);
 
       //[29] Construct objects for fj = hj/(9u^2 - w^2).
-      matType u_sq = u_p * u_p;
-      matType w_sq = w_p * w_p;
-      matType denom_inv = 1.0 / (9 * u_sq - w_sq);
-      matType exp_iu_re, exp_iu_im;
+      auto u_sq = u_p * u_p;
+      auto w_sq = w_p * w_p;
+      auto denom_inv = 1.0 / (9 * u_sq - w_sq);
+      real exp_iu_re, exp_iu_im;
       quda::sincos(u_p, &exp_iu_im, &exp_iu_re);
-      matType exp_2iu_re = exp_iu_re * exp_iu_re - exp_iu_im * exp_iu_im;
-      matType exp_2iu_im = 2 * exp_iu_re * exp_iu_im;
-      matType cos_w = cos(w_p);
-      matType sinc_w;
-      matType hj_re = 0.0;
-      matType hj_im = 0.0;
+      auto exp_2iu_re = exp_iu_re * exp_iu_re - exp_iu_im * exp_iu_im;
+      auto exp_2iu_im = 2 * exp_iu_re * exp_iu_im;
+      auto cos_w = cos(w_p);
+      real sinc_w;
+      real hj_re = 0.0;
+      real hj_im = 0.0;
 
       //[33] Added one more term to the series given in the paper.
       if (w_p < 0.05 && w_p > -0.05) {
