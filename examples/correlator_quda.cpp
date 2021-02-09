@@ -1,16 +1,33 @@
 // QUDA headers
 #include <quda.h>
-
-// External headers
 #include <host_utils.h>
 #include <command_line_params.h>
 
+// C++
 #include <iostream>
 
-const std::vector<std::string> QudaCorrelatorChannels
+// Local Enum type for IO
+typedef enum CorrelatorFlavors_s {
+  CORRELATOR_QQ,
+  CORRELATOR_QS,
+  CORRELATOR_QL,
+} CorrelatorFlavors;
+
+// Local struct for convenient data storage
+typedef struct CorrelatorParam_s {
+  size_t corr_dim;
+  size_t local_corr_length;
+  size_t global_corr_length;
+  size_t n_numbers_per_slice;
+  size_t corr_size_in_bytes;
+  size_t overall_shift_dim;
+  CorrelatorFlavors corr_flavors;
+} CorrelatorParam;
+
+const std::vector<std::string> CorrelatorChannels
   = {"G1", "G2", "G3", "G4", "G5G1", "G5G2", "G5G3", "G5G4", "1", "G5", "S12", "S13", "S14", "S23", "S24", "S34"};
 
-void print_correlators(const void *correlation_function_sum, const QudaCorrelatorParam corr_param, const int n)
+void print_correlators(const void *correlation_function_sum, const CorrelatorParam corr_param, const int n)
 {
   printfQuda("#src_x src_y src_z src_t    px    py    pz    pt     G   z/t          real          imag  channel\n");
   for (int px = 0; px <= momentum[0]; px++) {
@@ -29,7 +46,7 @@ void print_correlators(const void *correlation_function_sum, const QudaCorrelato
               printfQuda(" %5d %5d %5d %5d %5d %5d %5d %5d %5d %5lu % e % e #%s", prop_source_position[n][0],
                          prop_source_position[n][1], prop_source_position[n][2], prop_source_position[n][3], px, py, pz,
                          pt, G_idx, t, ((double *)correlation_function_sum)[index_real] * sign,
-                         ((double *)correlation_function_sum)[index_imag] * sign, QudaCorrelatorChannels[G_idx].c_str());
+                         ((double *)correlation_function_sum)[index_imag] * sign, CorrelatorChannels[G_idx].c_str());
               printfQuda("\n");
             }
           }
@@ -39,15 +56,15 @@ void print_correlators(const void *correlation_function_sum, const QudaCorrelato
   }
 }
 
-void save_correlators_to_file(const void* correlation_function_sum, const QudaCorrelatorParam &corr_param, const int n){
+void save_correlators_to_file(const void* correlation_function_sum, const CorrelatorParam &corr_param, const int n){
   std::ofstream corr_file;
   std::stringstream filepath;
   filepath << correlator_save_dir << "/";
   filepath << "mcorr";
   switch (corr_param.corr_flavors) {
-  case QUDA_CORRELATOR_QQ: filepath << "_qq"; break;
-  case QUDA_CORRELATOR_QS: filepath << "_qs"; break;
-  case QUDA_CORRELATOR_QL: filepath << "_ql"; break;
+  case CORRELATOR_QQ: filepath << "_qq"; break;
+  case CORRELATOR_QS: filepath << "_qs"; break;
+  case CORRELATOR_QL: filepath << "_ql"; break;
   default: break;
   }
   switch (contract_type) {
@@ -62,8 +79,8 @@ void save_correlators_to_file(const void* correlation_function_sum, const QudaCo
   if (correlator_file_affix[0] != '\0') { filepath << "_" << correlator_file_affix; }
   filepath << "_k" << std::setprecision(5) << std::fixed << kappa;
   switch (corr_param.corr_flavors) {
-  case QUDA_CORRELATOR_QS: filepath << "_ks" << std::setprecision(5) << std::fixed << kappa_strange; break;
-  case QUDA_CORRELATOR_QL: filepath << "_kl" << std::setprecision(5) << std::fixed << kappa_light; break;
+  case CORRELATOR_QS: filepath << "_ks" << std::setprecision(5) << std::fixed << kappa_strange; break;
+  case CORRELATOR_QL: filepath << "_kl" << std::setprecision(5) << std::fixed << kappa_light; break;
   default: break;
   }
 
@@ -140,13 +157,20 @@ void set_kappa(const double new_kappa, QudaInvertParam &inv_param, QudaMultigrid
   inv_param.eig_param = nullptr;
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
-    constructHostCloverField(clover, clover_inv, inv_param);
     if (inv_multigrid) {
       if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE) {
         inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
       }
     }
-    loadCloverQuda(clover, clover_inv, &inv_param);
+    // If you pass nullptr to QUDA, it will automatically compute
+    // the clover and clover inverse terms. If you need QUDA to return
+    // clover fields to you, pass valid pointers to the function
+    // and set:
+    // inv_param.compute_clover = 1;
+    // inv_param.compute_clover_inverse = 1;
+    // inv_param.return_clover = 1;
+    // inv_param.return_clover_inverse = 1;
+    loadCloverQuda(nullptr, nullptr, &inv_param);
     if (inv_multigrid) { inv_param.solve_type = solve_type; }
   }
   if (inv_multigrid) { inv_param.preconditioner = mg_preconditioner; }
@@ -156,7 +180,7 @@ void set_kappa(const double new_kappa, QudaInvertParam &inv_param, QudaMultigrid
 // Calculate propagator from source_array_ptr, save it in prop_array_ptr_2. Then contract propagators stored
 // in prop_array_ptr_1 and prop_array_ptr_2.
 void invert_and_contract(void **source_array_ptr, void **prop_array_ptr_1, void **prop_array_ptr_2,
-                         void *correlation_function_sum, QudaCorrelatorParam &corr_param,
+                         void *correlation_function_sum, CorrelatorParam &corr_param,
                          quda::ColorSpinorParam &cs_param, const QudaGaugeParam &gauge_param, QudaInvertParam &inv_param)
 {
   // Loop over the number of sources to use. Default is prop_n_sources=1 and source position = 0 0 0 0
@@ -177,9 +201,6 @@ void invert_and_contract(void **source_array_ptr, void **prop_array_ptr_1, void 
       inv_param.solver_normalization = QUDA_SOURCE_NORMALIZATION; // Make explicit for now.
       invertQuda(prop_array_ptr_2[i], source_array_ptr[i], &inv_param);
     }
-    // Coming soon....
-    // propagatorQuda(prop_array_ptr, source_array_ptr, &inv_param, &correlation_function_sum, contract_type, (void
-    // *)cs_param_ptr, gauge_param.X);
 
     memset(correlation_function_sum, 0, corr_param.corr_size_in_bytes); // zero out the result array
     contractFTQuda(prop_array_ptr_1, prop_array_ptr_2, &correlation_function_sum, contract_type,
@@ -338,7 +359,7 @@ int main(int argc, char **argv)
 
   // Decide between contract types (open or with gammas, summed or non-summed, spatial or temporal, finite momentum)
   // and set correlator parameters
-  QudaCorrelatorParam corr_param;
+  CorrelatorParam corr_param;
   int Nmom = (momentum[0] + 1) * (momentum[1] + 1);
   if (contract_type == QUDA_CONTRACT_TYPE_DR_FT_Z) {
     corr_param.corr_dim = 2;

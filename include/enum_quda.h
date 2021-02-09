@@ -549,14 +549,7 @@ typedef enum QudaContractGamma_s {
   QUDA_CONTRACT_GAMMA_S34 = 15,
   QUDA_CONTRACT_GAMMA_INVALID = QUDA_INVALID_ENUM
 } QudaContractGamma;
-  
-typedef enum QudaCorrelatorFlavors_s {
-  QUDA_CORRELATOR_QQ,
-  QUDA_CORRELATOR_QS,
-  QUDA_CORRELATOR_QL,
-  QUDA_CORRELATOR_INVALID = QUDA_INVALID_ENUM
-} QudaCorrelatorFlavors;
-  
+    
 typedef enum QudaGaugeSmearType_s {
   QUDA_GAUGE_SMEAR_TYPE_APE,
   QUDA_GAUGE_SMEAR_TYPE_STOUT,
