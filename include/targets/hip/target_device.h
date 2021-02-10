@@ -1,5 +1,6 @@
 #pragma once
 #include <hip/hip_runtime.h>
+#include <quda_api.h>
 #include <algorithm>
 
 namespace quda {
@@ -100,7 +101,7 @@ namespace quda {
      */
     constexpr unsigned int transform_reduce_block_size()
     {
-            return 256;
+          return 256;
     }
 
     /**
@@ -152,6 +153,13 @@ namespace quda {
     */
     constexpr int shared_memory_bank_width() { return 32; }
 
+    /**
+      @brief Return CUDA stream from QUDA stream.  This is a
+      temporary addition until all kernels have been made generic.
+      @param stream QUDA stream we which to convert to CUDA stream
+      @return CUDA stream
+    */
+    hipStream_t get_cuda_stream(const qudaStream_t& stream);
   }
 
 }

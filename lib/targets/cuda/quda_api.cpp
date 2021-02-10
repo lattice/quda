@@ -4,6 +4,7 @@
 #include <quda_internal.h>
 #include <timer.h>
 #include <device.h>
+#include <target_device.h>
 
 // if this macro is defined then we use the driver API, else use the
 // runtime API.  Typically the driver API has 10-20% less overhead

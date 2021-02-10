@@ -2,7 +2,7 @@
 #include <util_quda.h>
 #include <quda_internal.h>
 #include <quda_hip_api.h>
-
+#include <target_device.h>
 
 static hipDeviceProp_t deviceProp;
 static hipStream_t *streams;

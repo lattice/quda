@@ -4,6 +4,7 @@
 #include <quda_internal.h>
 #include <timer.h>
 #include <device.h>
+#include <target_device.h>
 #include <hip/hip_runtime.h>
 #include <hip/hcc_detail/hip_runtime_api.h>
 
