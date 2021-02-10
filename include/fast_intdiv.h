@@ -16,7 +16,6 @@
 
 #ifndef _INT_FASTDIV_KJGIUHFG
 #define _INT_FASTDIV_KJGIUHFG
-#include<quda_arch.h>
 
 class int_fastdiv
 {
@@ -119,7 +118,7 @@ __host__ __device__ __forceinline__
 int operator/(const int n, const int_fastdiv& divisor)
 {
   int q;
-#if defined( __CUDA_ARCH__ ) 
+#ifdef __CUDA_ARCH__
   asm("mul.hi.s32 %0, %1, %2;" : "=r"(q) : "r"(divisor.M), "r"(n));
 #else
   q = (((unsigned long long)((long long)divisor.M * (long long)n)) >> 32);
