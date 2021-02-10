@@ -20,7 +20,7 @@
 #include <qio_field.h>
 
 #include <gtest/gtest.h>
-
+#include <complex_quda.h>
 using namespace quda;
 
 class GaugeAlgTest : public ::testing::Test {
@@ -171,10 +171,10 @@ protected:
   }
 
   virtual void TearDown() {
-    auto detu = getLinkDeterminant(*U);
-    double2 tru = getLinkTrace(*U);
-    printfQuda("Det: %.16e:%.16e\n", double(detu.x), double(detu.y));
-    printfQuda("Tr: %.16e:%.16e\n", tru.x/3.0, tru.y/3.0);
+    complex<double> detu{getLinkDeterminant(*U)};
+    complex<double> tru{getLinkTrace(*U)};
+    printfQuda("Det: %.16e:%.16e\n", detu.real(), detu.imag());
+    printfQuda("Tr: %.16e:%.16e\n", tru.real()/3.0, tru.imag()/3.0);
 
     delete U;
     //Release all temporary memory used for data exchange between GPUs in multi-GPU mode
