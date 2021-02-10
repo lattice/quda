@@ -198,14 +198,16 @@ TEST_F(GaugeAlgTest, Generation)
   if (testgen) { ASSERT_TRUE(CheckDeterminant(detu)); }
 }
 
-#if defined(QUDA_TARGET_CUDA)
 TEST_F(GaugeAlgTest, Landau_Overrelaxation)
 {
   const int reunit_interval = 10;
   printfQuda("Landau gauge fixing with overrelaxation\n");
   gaugeFixingOVR(*U, 4, 100, 10, 1.5, 0, reunit_interval, 1);
   auto plaq_gf = plaquette(*U);
-  printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+  double av_plaq{plaq_gf.x};
+  double s_plaq{plaq_gf.y};
+  double t_plaq{plaq_gf.z};
+  printfQuda("Plaq: %.16e, %.16e, %.16e\n", av_plaq, s_plaq, t_plaq);
   ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
 }
 
@@ -215,10 +217,12 @@ TEST_F(GaugeAlgTest, Coulomb_Overrelaxation)
   printfQuda("Coulomb gauge fixing with overrelaxation\n");
   gaugeFixingOVR(*U, 3, 100, 10, 1.5, 0, reunit_interval, 1);
   auto plaq_gf = plaquette(*U);
-  printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+  double av_plaq{plaq_gf.x};
+  double s_plaq{plaq_gf.y};
+  double t_plaq{plaq_gf.z};
+  printfQuda("Plaq: %.16e, %.16e, %.16e\n", av_plaq, s_plaq, t_plaq);
   ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
 }
-#endif
 
 TEST_F(GaugeAlgTest, Landau_FFT)
 {
