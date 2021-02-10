@@ -274,6 +274,8 @@ void setMultigridInvertParam(QudaInvertParam &inv_param);
 void setDeflatedInvertParam(QudaInvertParam &inv_param);
 void setStaggeredInvertParam(QudaInvertParam &inv_param);
 void setStaggeredMGInvertParam(QudaInvertParam &inv_param);
+// Smearing uses the invert param to construct a laplace op
+void setFermionSmearParam(QudaInvertParam &inv_param, double omega, int steps);
 
 // Gauge param types
 void setGaugeParam(QudaGaugeParam &gauge_param);

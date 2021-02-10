@@ -5367,6 +5367,8 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
 
 void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned int n_steps)
 {
+  if(n_steps == 0) return;
+  
   profileGaussianSmear.TPSTART(QUDA_PROFILE_TOTAL);
   profileGaussianSmear.TPSTART(QUDA_PROFILE_INIT);
 

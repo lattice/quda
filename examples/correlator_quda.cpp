@@ -28,8 +28,7 @@ typedef struct CorrelatorParam_s {
   CorrelatorFlavors corr_flavors;
 } CorrelatorParam;
 
-const std::vector<std::string> CorrelatorChannels
-  = {"G1", "G2", "G3", "G4", "G5G1", "G5G2", "G5G3", "G5G4", "1", "G5", "S12", "S13", "S14", "S23", "S24", "S34"};
+const std::vector<std::string> CorrelatorChannels = {"G1", "G2", "G3", "G4", "G5G1", "G5G2", "G5G3", "G5G4", "1", "G5", "S12", "S13", "S14", "S23", "S24", "S34"};
 
 void print_correlators(const void *correlation_function_sum, const CorrelatorParam corr_param, const int n)
 {
@@ -40,17 +39,21 @@ void print_correlators(const void *correlation_function_sum, const CorrelatorPar
         for (int pt = 0; pt <= momentum[3]; pt++) {
           for (int G_idx = 0; G_idx < 16; G_idx++) {
             for (size_t t = 0; t < corr_param.global_corr_length; t++) {
-              size_t index_real = (px + py * (momentum[0] + 1) + pz * (momentum[0] + 1) * (momentum[1] + 1)
-                                   + pt * (momentum[0] + 1) * (momentum[1] + 1) * (momentum[2] + 1))
-                  * corr_param.n_numbers_per_slice * corr_param.global_corr_length
-                + corr_param.n_numbers_per_slice * ((t + corr_param.overall_shift_dim) % corr_param.global_corr_length)
-                + 2 * G_idx;
-              size_t index_imag = index_real + 1;
+
+	      size_t mom_mode =  (px +
+				  py * (momentum[0] + 1) +
+				  pz * (momentum[0] + 1) * (momentum[1] + 1) +
+				  pt * (momentum[0] + 1) * (momentum[1] + 1) * (momentum[2] + 1));
+	      
+              size_t index_real = corr_param.n_numbers_per_slice * (mom_mode * corr_param.global_corr_length + ((t + corr_param.overall_shift_dim) % corr_param.global_corr_length)) + 2 * G_idx;
+	      size_t index_imag = index_real + 1;
               double sign = G_idx < 8 ? -1. : 1.; // the minus sign from g5gm -> gmg5
-              printfQuda(" %5d %5d %5d %5d %5d %5d %5d %5d %5d %5lu % e % e #%s", prop_source_position[n][0],
-                         prop_source_position[n][1], prop_source_position[n][2], prop_source_position[n][3], px, py, pz,
-                         pt, G_idx, t, ((double *)correlation_function_sum)[index_real] * sign,
-                         ((double *)correlation_function_sum)[index_imag] * sign, CorrelatorChannels[G_idx].c_str());
+              printfQuda(" %5d %5d %5d %5d %5d %5d %5d %5d %5d %5lu % e % e #%s",
+			 prop_source_position[n][0], prop_source_position[n][1],
+			 prop_source_position[n][2], prop_source_position[n][3], px, py, pz, pt, G_idx, t,
+			 ((double *)correlation_function_sum)[index_real] * sign,
+                         ((double *)correlation_function_sum)[index_imag] * sign,
+			 CorrelatorChannels[G_idx].c_str());
               printfQuda("\n");
             }
           }
@@ -188,6 +191,12 @@ void invert_and_contract(void **source_array_ptr, void **prop_array_ptr_1, void 
                          void *correlation_function_sum, CorrelatorParam &corr_param,
                          quda::ColorSpinorParam &cs_param, const QudaGaugeParam &gauge_param, QudaInvertParam &inv_param)
 {
+  QudaInvertParam source_smear_param = newQudaInvertParam();
+  setFermionSmearParam(source_smear_param, prop_source_smear_coeff, prop_source_smear_steps);
+
+  QudaInvertParam sink_smear_param = newQudaInvertParam();
+  setFermionSmearParam(sink_smear_param, prop_sink_smear_coeff, prop_sink_smear_steps);
+  
   // Loop over the number of sources to use. Default is prop_n_sources=1 and source position = 0 0 0 0
   for (int n = 0; n < prop_n_sources; n++) {    
     const int source[4]
@@ -204,10 +213,16 @@ void invert_and_contract(void **source_array_ptr, void **prop_array_ptr_1, void 
       // FIXME add the smearing
       constructPointSpinorSource(source_array_ptr[i], cs_param.nSpin, cs_param.nColor, inv_param.cpu_prec,
                                  gauge_param.X, i, source);
-      inv_param.solver_normalization = QUDA_SOURCE_NORMALIZATION; // Make explicit for now.
-      invertQuda(prop_array_ptr_2[i], source_array_ptr[i], &inv_param);
-    }
 
+      // Gaussian smear the source.
+      performGaussianSmearNStep(source_array_ptr[i], &source_smear_param, prop_source_smear_steps);
+      
+      invertQuda(prop_array_ptr_2[i], source_array_ptr[i], &inv_param);
+
+      // Gaussian smear the sink.
+      performGaussianSmearNStep(prop_array_ptr_2[i], &sink_smear_param, prop_sink_smear_steps);
+    }
+    
     memset(correlation_function_sum, 0, corr_param.corr_size_in_bytes); // zero out the result array
     contractFTQuda(prop_array_ptr_1, prop_array_ptr_2, &correlation_function_sum, contract_type,
                    (void *)&cs_param, gauge_param.X, source, momentum.begin());
@@ -215,7 +230,6 @@ void invert_and_contract(void **source_array_ptr, void **prop_array_ptr_1, void 
     // Print and save correlators for this source
     print_correlators(correlation_function_sum, corr_param, n);
     save_correlators_to_file(correlation_function_sum, corr_param, n);
-
   }
 }
 

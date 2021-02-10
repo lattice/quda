@@ -171,7 +171,7 @@ void setInvertParam(QudaInvertParam &inv_param)
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
     // Use kappa * csw or supplied clover_coeff
     inv_param.clover_csw = clover_csw;
-    if (clover_coeff == -1.0) {
+    if (clover_coeff == 0.0) {
       inv_param.clover_coeff = clover_csw * inv_param.kappa;
     } else {
       inv_param.clover_coeff = clover_coeff;
@@ -261,6 +261,23 @@ void setInvertParam(QudaInvertParam &inv_param)
   // Whether or not to use native BLAS LAPACK
   inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 }
+
+void setFermionSmearParam(QudaInvertParam &smear_param, double omega, int steps)
+{
+  // Construct a copy of the current invert parameters
+  setInvertParam(smear_param);
+  
+  // Construct 4D smearing parameters.
+  smear_param.dslash_type = QUDA_LAPLACE_DSLASH;
+  double smear_coeff = - omega * omega / (4 * steps);
+  smear_param.mass = 1.0 / smear_coeff;
+  smear_param.kappa = 1.0 / (2.0 * (4.0 + mass));
+  smear_param.laplace3D = 3; // Omit t-dim
+  smear_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
+  smear_param.solution_type = QUDA_MAT_SOLUTION;
+  smear_param.solve_type = QUDA_DIRECT_SOLVE;
+}
+
 
 // Parameters defining the eigensolver
 void setEigParam(QudaEigParam &eig_param)
@@ -354,7 +371,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
     // Use kappa * csw or supplied clover_coeff
     inv_param.clover_csw = clover_csw;
-    if (clover_coeff == -1.0) {
+    if (clover_coeff == 0.0) {
       inv_param.clover_coeff = clover_csw * inv_param.kappa;
     } else {
       inv_param.clover_coeff = clover_coeff;
@@ -641,7 +658,7 @@ void setMultigridInvertParam(QudaInvertParam &inv_param)
 
   // Use kappa * csw or supplied clover_coeff
   inv_param.clover_csw = clover_csw;
-  if (clover_coeff == -1.0) {
+  if (clover_coeff == 0.0) {
     inv_param.clover_coeff = clover_csw * inv_param.kappa;
   } else {
     inv_param.clover_coeff = clover_coeff;
@@ -1207,7 +1224,7 @@ void setDeflatedInvertParam(QudaInvertParam &inv_param)
 
   // Use kappa * csw or supplied clover_coeff
   inv_param.clover_csw = clover_csw;
-  if (clover_coeff == -1.0) {
+  if (clover_coeff == 0.0) {
     inv_param.clover_coeff = clover_csw * inv_param.kappa;
   } else {
     inv_param.clover_coeff = clover_coeff;

@@ -247,8 +247,8 @@ quda::file_array<char[256]> prop_sink_outfile;
 quda::source_array<std::array<int, 4>> prop_source_position = {0, 0, 0, 0};
 
 
-int prop_source_smear_steps = 20;
-int prop_sink_smear_steps = 20;
+int prop_source_smear_steps = 0;
+int prop_sink_smear_steps = 0;
 double prop_source_smear_coeff = 2.0;
 double prop_sink_smear_coeff = 2.0;
 bool prop_read_sources = false;
