@@ -1,4 +1,3 @@
-#include "quda_define.h"
 #include <multigrid_helper.cuh>
 #include <fast_intdiv.h>
 
