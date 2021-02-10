@@ -55,8 +55,8 @@ namespace quda {
         allow_svd(allow_svd),
         svd_only(svd_only),
         svd_rel_error(svd_rel_error),
-        svd_abs_error(svd_abs_error), 
-	threads(u.VolumeCB(), 2, 1) { }
+        svd_abs_error(svd_abs_error),
+        threads(u.VolumeCB(), 2, 1) { }
     };
 
     template <class Real> class DerivativeCoefficients {
