@@ -2,7 +2,7 @@
 
 #include <invert_quda.h>
 #include <vector>
-#include "malloc_quda.h"
+#include <complex_quda.h>
 
 namespace quda {
 
@@ -52,11 +52,7 @@ namespace quda {
              cur_dim(cur_dim), use_inv_ritz(false), location(param.location) {
 
         if(param.nk == 0 || param.np == 0 || (param.np % param.nk != 0)) errorQuda("\nIncorrect deflation space parameters...\n");
-
-        //Check that RV is a composite field:
-        if(RV->IsComposite() == false) errorQuda("\nRitz vectors must be contained in a composite field.\n");
-
-	// redesign: param.nk => param.n_ev, param.np => param.deflation_grid*param.n_ev;
+        // redesign: param.nk => param.n_ev, param.np => param.deflation_grid*param.n_ev;
         tot_dim      = param.np;
         ld           = ((tot_dim+15) / 16) * tot_dim;
         //allocate deflation resources:
@@ -66,7 +62,7 @@ namespace quda {
         //Check that RV is a composite field:
         if(RV->IsComposite() == false) errorQuda("\nRitz vectors must be contained in a composite field.\n");
      }
-    
+
      ~DeflationParam(){
        pool_pinned_free(matProj);
         if(invRitzVals)       delete[]  invRitzVals;
