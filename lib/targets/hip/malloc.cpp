@@ -13,9 +13,6 @@
 #include "qdp_config.h"
 #endif
 
-#ifdef QUDA_BACKWARDSCPP
-#include "backward.hpp"
-#endif
 namespace quda
 {
 
@@ -206,7 +203,7 @@ namespace quda
     }
     track_malloc(DEVICE, a, ptr);
 #ifdef HOST_DEBUG
-    //hipMemset(ptr, 0xff, size);
+    hipMemset(ptr, 0xff, size);
 #endif
     return ptr;
 #else
@@ -245,7 +242,7 @@ namespace quda
     }
     track_malloc(DEVICE_PINNED, a, ptr);
 #ifdef HOST_DEBUG
-    //hipMemset(ptr, 0xff, size);
+    hipMemset(ptr, 0xff, size);
 #endif
     return ptr;
   }
@@ -289,7 +286,7 @@ namespace quda
     }
     track_malloc(PINNED, a, ptr);
 #ifdef HOST_DEBUG
-    //memset(ptr, 0xff, a.base_size);
+    memset(ptr, 0xff, a.base_size);
 #endif
     return ptr;
   }
@@ -311,7 +308,7 @@ namespace quda
 
     track_malloc(MAPPED, a, ptr);
 #ifdef HOST_DEBUG
-   // memset(ptr, 0xff, a.base_size);
+    memset(ptr, 0xff, a.base_size);
 #endif
     return ptr;
   }
@@ -334,7 +331,7 @@ namespace quda
     }
     track_malloc(MANAGED, a, ptr);
 #ifdef HOST_DEBUG
-    //hipMemset(ptr, 0xff, size);
+    hipMemset(ptr, 0xff, size);
 #endif
     return ptr;
   }

@@ -16,6 +16,7 @@
 
 #ifndef _INT_FASTDIV_KJGIUHFG
 #define _INT_FASTDIV_KJGIUHFG
+#include<quda_arch.h>
 
 class int_fastdiv
 {

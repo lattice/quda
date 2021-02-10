@@ -75,7 +75,7 @@ namespace quda {
     default: errorQuda("%s not implemented for %d threads", #kernel, tp.block.x);                                      \
     }                                                                                                                  \
   } else {                                                                                                             \
-    errorQuda("Not implemented for %d", (int)tp.aux.x);			\
+    errorQuda("Not implemented for %d", static_cast<int>(tp.aux.x));			\
   }
 
   /**

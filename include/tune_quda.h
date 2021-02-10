@@ -12,6 +12,7 @@
 #include <tune_key.h>
 #include <quda_internal.h>
 #include <device.h>
+#include <target_device.h>
 #include <uint_to_char.h>
 
 namespace quda {

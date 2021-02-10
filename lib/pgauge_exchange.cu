@@ -5,7 +5,6 @@
 #include <instantiate.h>
 #include <tunable_nd.h>
 #include <kernels/pgauge_exchange.cuh>
-#include <quda_api.h>
 
 namespace quda {
 

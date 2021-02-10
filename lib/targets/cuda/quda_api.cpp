@@ -1,6 +1,8 @@
 #include <unordered_set>
 #include <tune_quda.h>
 #include <uint_to_char.h>
+#include <cuda.h>
+#include <cuda_runtime.h>
 #include <quda_internal.h>
 #include <timer.h>
 #include <device.h>

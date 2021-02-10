@@ -16,10 +16,6 @@
 #include <inline_ptx.h>
 #endif
 
-#if defined(QUDA_TARGET_HIP)
-#include <hip/math_functions.h>
-#endif
-
 namespace quda {
 
   struct alignas(8) char8 {

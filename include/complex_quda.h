@@ -24,7 +24,7 @@
 #include <complex>
 #include <sstream>
 #include <cstdint>
-#include <target_device.h>
+#include <quda_arch.h>
 
 namespace quda {
   namespace gauge {

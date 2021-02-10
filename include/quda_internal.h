@@ -1,6 +1,6 @@
 #pragma once
 
-#include <quda_define.h>
+#include <quda_arch.h>
 #include <quda_api.h>
 
 #include <string>

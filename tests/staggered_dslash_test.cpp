@@ -283,7 +283,7 @@ DslashTime dslashCUDA(int niter) {
 
   comm_barrier();
   device_timer.start();
-  
+
   for (int i = 0; i < niter; i++) {
 
     host_timer.start();

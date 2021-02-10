@@ -765,8 +765,11 @@ namespace quda
           tunable.checkLaunchParam(param);
           if (verbosity >= QUDA_DEBUG_VERBOSE) {
             printfQuda("About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d)\n",
-                       (int)param.block.x, (int)param.block.y, (int)param.block.z, (int)param.grid.x, (int)param.grid.y, (int)param.grid.z,
-                       (int)param.shared_bytes, (int)param.aux.x, (int)param.aux.y, (int)param.aux.z);
+                       static_cast<int>(param.block.x), static_cast<int>(param.block.y),
+		       static_cast<int>(param.block.z), static_cast<int>(param.grid.x), 
+		       static_cast<int>(param.grid.y), static_cast<int>(param.grid.z),
+                       static_cast<int>(param.shared_bytes), static_cast<int>(param.aux.x), 
+		       static_cast<int>(param.aux.y), static_cast<int>(param.aux.z));
           }
 
           tunable.apply(stream); // do initial call in case we need to jit compile for these parameters or if policy tuning

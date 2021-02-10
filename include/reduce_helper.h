@@ -18,7 +18,6 @@ using count_t = cuda::atomic<unsigned int, cuda::thread_scope_device>;
 using count_t = unsigned int;
 #endif
 
-
 namespace quda
 {
 

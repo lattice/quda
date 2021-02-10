@@ -5,6 +5,8 @@
 #include <unistd.h>   // for getpagesize()
 #include <execinfo.h> // for backtrace
 #include <quda_internal.h>
+#include <cuda.h>
+#include <cuda_runtime.h>
 #include <device.h>
 
 #ifdef USE_QDPJIT

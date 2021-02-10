@@ -159,14 +159,13 @@ namespace quda {
   struct Launch<QUDA_CUDA_FIELD_LOCATION, Arg> {
     using Float = typename Arg::Float;
     static constexpr bool from_coarse = Arg::from_coarse;
-    
+
     Launch(Arg &arg, qudaError_t &qerror, TuneParam &tp, ComputeType type, bool use_mma, const qudaStream_t &stream)
     {
 #ifdef JITIFY
       using namespace jitify::reflection;
 #endif
       
-      //CUresult error = CUDA_SUCCESS;
       qudaError_t error = QUDA_SUCCESS;
       if (type == COMPUTE_UV) {
         if (use_mma && arg.dir != QUDA_IN_PLACE) {
@@ -176,15 +175,15 @@ namespace quda {
 #endif
 #endif
         } else {
-	  
+ 
           if (arg.dir != QUDA_BACKWARDS && arg.dir != QUDA_FORWARDS && arg.dir != QUDA_IN_PLACE) errorQuda("Undefined direction %d", arg.dir);
 #ifdef JITIFY
-	  error = program->kernel("quda::ComputeUVGPU")
-	    .instantiate(arg.dim,arg.dir,Type<Arg>())
-	    .configure(tp.grid,tp.block,tp.shared_bytes,device::get_cuda_stream(stream)).launch(arg);
+  error = program->kernel("quda::ComputeUVGPU")
+    .instantiate(arg.dim,arg.dir,Type<Arg>())
+    .configure(tp.grid,tp.block,tp.shared_bytes,device::get_cuda_stream(stream)).launch(arg);
 #else
-	  if (arg.dir == QUDA_BACKWARDS) {
-	    if      (arg.dim==0) qudaLaunchKernel(ComputeUVGPU<0,QUDA_BACKWARDS,Arg>, tp, stream, arg);
+  if (arg.dir == QUDA_BACKWARDS) {
+    if      (arg.dim==0) qudaLaunchKernel(ComputeUVGPU<0,QUDA_BACKWARDS,Arg>, tp, stream, arg);
           else if (arg.dim==1) qudaLaunchKernel(ComputeUVGPU<1,QUDA_BACKWARDS,Arg>, tp, stream, arg);
           else if (arg.dim==2) qudaLaunchKernel(ComputeUVGPU<2,QUDA_BACKWARDS,Arg>, tp, stream, arg);
           else if (arg.dim==3) qudaLaunchKernel(ComputeUVGPU<3,QUDA_BACKWARDS,Arg>, tp, stream, arg);

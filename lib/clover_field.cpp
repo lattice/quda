@@ -9,7 +9,6 @@
 #include <gauge_field.h>
 #include <color_spinor_field.h>
 #include <blas_quda.h>
-#include <quda_api.h>
 
 namespace quda {
 

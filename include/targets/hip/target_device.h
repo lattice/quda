@@ -1,5 +1,5 @@
 #pragma once
-#include <hip/hip_runtime.h>
+#include <quda_arch.h>
 #include <quda_api.h>
 #include <algorithm>
 
@@ -95,14 +95,6 @@ namespace quda {
       {
         return std::max(warp_size(), 256 / (block_size_y * block_size_z));
       }
-
-    /**
-     * @brief Helper function for the transform reduce blocksize
-     */
-    constexpr unsigned int transform_reduce_block_size()
-    {
-          return 256;
-    }
 
     /**
        @brief Helper function that returns the maximum number of threads

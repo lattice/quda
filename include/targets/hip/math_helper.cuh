@@ -54,7 +54,11 @@ namespace quda {
   template<typename T>
   inline __host__ __device__ T rsqrt(T a)
     {
+#if defined(__HIP_DEVICE_COMPILE__)
       return ::rsqrt(a);
+#else
+      return 1.0/sqrt(a);
+#endif
     }
 
 
