@@ -19,7 +19,6 @@
 #include <invert_quda.h>
 #include <eigensolve_quda.h>
 #include <color_spinor_field.h>
-#include <propagator.h>
 #include <clover_field.h>
 #include <llfat_quda.h>
 #include <unitarization_links.h>
