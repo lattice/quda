@@ -1,7 +1,5 @@
 #pragma once
 
-#include "quda_define.h"		
-
 /**
  * @file  gauge_field_order.h
  * @brief Main header file for host and device accessors to GaugeFields
