@@ -15,8 +15,6 @@
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
-#ifdef BUILD_MILC_INTERFACE
-
 // code for NVTX taken from Jiri Kraus' blog post:
 // http://devblogs.nvidia.com/parallelforall/cuda-pro-tip-generate-custom-application-profile-timelines-nvtx/
 
@@ -2713,5 +2711,3 @@ void qudaGaugeFixingFFT( int precision,
   printfQuda("Time D2H: %lf\n", timeinfo[2]);
   printfQuda("Time all: %lf\n", timeinfo[0]+timeinfo[1]+timeinfo[2]);
 }
-
-#endif // BUILD_MILC_INTERFACE
