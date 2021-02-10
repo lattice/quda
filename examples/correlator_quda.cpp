@@ -155,8 +155,6 @@ void construct_operator(const double new_kappa, QudaInvertParam &inv_param, Quda
     setMultigridInvertParam(inv_param);
     mg_param.invert_param = &mg_inv_param;
     setMultigridParam(mg_param);
-    mg_preconditioner = newMultigridQuda(&mg_param);
-    inv_param.preconditioner = mg_preconditioner;
   } else {
     setInvertParam(inv_param);
   }
@@ -174,7 +172,13 @@ void construct_operator(const double new_kappa, QudaInvertParam &inv_param, Quda
     // inv_param.return_clover_inverse = 1;
     loadCloverQuda(nullptr, nullptr, &inv_param);
   }
-  
+
+  // Now that the clover field is set, we may assign a
+  // new MG preconditioner 
+  if(inv_multigrid) {
+    mg_preconditioner = newMultigridQuda(&mg_param);
+    inv_param.preconditioner = mg_preconditioner;
+  }
   kappa = kappa_backup;
 }
 

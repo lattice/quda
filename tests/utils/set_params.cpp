@@ -169,7 +169,13 @@ void setInvertParam(QudaInvertParam &inv_param)
     inv_param.clover_cuda_prec_eigensolver = cuda_prec_eigensolver;
     inv_param.clover_cuda_prec_refinement_sloppy = cuda_prec_sloppy;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
-    inv_param.clover_coeff = clover_coeff;
+    // Use kappa * csw or supplied clover_coeff
+    inv_param.clover_csw = clover_csw;
+    if (clover_coeff == -1.0) {
+      inv_param.clover_coeff = clover_csw * inv_param.kappa;
+    } else {
+      inv_param.clover_coeff = clover_coeff;
+    }
     inv_param.compute_clover_trlog = compute_clover_trlog ? 1 : 0;
   }
 
@@ -346,7 +352,13 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     inv_param.clover_cuda_prec_eigensolver = cuda_prec_eigensolver;
     inv_param.clover_cuda_prec_refinement_sloppy = cuda_prec_sloppy;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
-    inv_param.clover_coeff = clover_coeff;
+    // Use kappa * csw or supplied clover_coeff
+    inv_param.clover_csw = clover_csw;
+    if (clover_coeff == -1.0) {
+      inv_param.clover_coeff = clover_csw * inv_param.kappa;
+    } else {
+      inv_param.clover_coeff = clover_coeff;
+    }
     inv_param.compute_clover_trlog = compute_clover_trlog ? 1 : 0;
   }
   
@@ -627,7 +639,13 @@ void setMultigridInvertParam(QudaInvertParam &inv_param)
     }
   }
 
-  inv_param.clover_coeff = clover_coeff;
+  // Use kappa * csw or supplied clover_coeff
+  inv_param.clover_csw = clover_csw;
+  if (clover_coeff == -1.0) {
+    inv_param.clover_coeff = clover_csw * inv_param.kappa;
+  } else {
+    inv_param.clover_coeff = clover_coeff;
+  }
 
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
@@ -1187,7 +1205,13 @@ void setDeflatedInvertParam(QudaInvertParam &inv_param)
     }
   }
 
-  inv_param.clover_coeff = clover_coeff;
+  // Use kappa * csw or supplied clover_coeff
+  inv_param.clover_csw = clover_csw;
+  if (clover_coeff == -1.0) {
+    inv_param.clover_coeff = clover_csw * inv_param.kappa;
+  } else {
+    inv_param.clover_coeff = clover_coeff;
+  }
 
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = normalization;

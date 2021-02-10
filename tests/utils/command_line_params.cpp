@@ -81,7 +81,8 @@ double anisotropy = 1.0;
 double tadpole_factor = 1.0;
 double eps_naik = 0.0;
 int n_naiks = 1;
-double clover_coeff = 0.1;
+double clover_csw = 1.0;
+double clover_coeff = -1.0;
 bool compute_clover = false;
 bool compute_clover_trlog = true;
 bool compute_fatlong = false;
@@ -464,7 +465,8 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     ca_lambda_max, "Conservative estimate of largest eigenvalue for Chebyshev basis CA-CG (default is to guess with power iterations)");
   quda_app->add_option("--cheby-basis-eig-min", ca_lambda_min,
                        "Conservative estimate of smallest eigenvalue for Chebyshev basis CA-CG (default 0)");
-  quda_app->add_option("--clover-coeff", clover_coeff, "Clover coefficient")->capture_default_str();
+  quda_app->add_option("--clover-csw", clover_csw, "Clover Csw coefficient")->capture_default_str();
+  quda_app->add_option("--clover-coeff", clover_coeff, "The overall clover coefficient, kappa * Csw (user su")->capture_default_str();
   quda_app->add_option("--compute-clover", compute_clover,
                        "Compute the clover field or use random numbers (default false)");
   quda_app->add_option("--compute-clover-trlog", compute_clover_trlog,
