@@ -6,6 +6,7 @@
 #include <register_traits.h>
 #include <float_vector.h>
 #include <complex_quda.h>
+#include <math_helper.cuh>
 
 namespace quda {
 
@@ -1235,8 +1236,8 @@ namespace quda {
       
       //[25]
       theta  = acos(c0/c0_max);
-      
-      sincos(theta * inv3, &w_p, &u_p);
+
+      quda::sincos(theta * inv3, &w_p, &u_p);
       //[23]
       u_p *= sqrt_c1_inv3;
       

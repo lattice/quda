@@ -104,9 +104,8 @@ namespace quda {
     Float mod = pow(norm(det), negative_one_on_2N);
     Float angle = arg(det);
     complex<Float> cTemp;
-    sincos(negative_one_on_N * angle, &cTemp.y, &cTemp.x);
 
+    quda::sincos(negative_one_on_N * angle, &cTemp.y, &cTemp.x);
     in = (mod*cTemp)*out;
-
   }
 } // namespace quda
