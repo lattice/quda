@@ -477,7 +477,6 @@ namespace quda
 
   QudaFieldLocation get_pointer_location(const void *ptr)
   {
-
     CUpointer_attribute attribute[] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE};
     CUmemorytype mem_type;
     void *data[] = {&mem_type};
@@ -510,6 +509,23 @@ namespace quda
     return device;
   }
 
+  void register_pinned_(const char *func, const char *file, int line, void *ptr, size_t bytes)
+  {
+    auto error = cudaHostRegister(ptr, bytes, cudaHostRegisterDefault);
+    if (error != cudaSuccess) {
+      errorQuda("cudaHostRegister failed with error %s (%s:%d in %s()",
+                cudaGetErrorString(error), file, line, func);
+    }
+  }
+
+  void unregister_pinned_(const char *func, const char *file, int line, void *ptr)
+  {
+    auto error = cudaHostUnregister(ptr);
+    if (error != cudaSuccess) {
+      errorQuda("cudaHostUnregister failed with error %s (%s:%d in %s()",
+                cudaGetErrorString(error), file, line, func);
+    }
+  }
 
   namespace pool
   {

@@ -174,6 +174,7 @@ void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc
   int construct_type = 0;
   if (strcmp(latfile, "")) {
     // load in the command line supplied gauge field using QIO and LIME
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Loading the gauge field in %s\n", latfile);
     read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
     construct_type = 2;
   } else {
@@ -336,7 +337,6 @@ void setDims(int *X) {
   Vsh_z = Vs_z/2;
   Vsh_t = Vs_t/2;
 
-
   E1=X[0]+4; E2=X[1]+4; E3=X[2]+4; E4=X[3]+4;
   E1h=E1/2;
   E[0] = E1;
@@ -345,7 +345,6 @@ void setDims(int *X) {
   E[3] = E4;
   V_ex = E1*E2*E3*E4;
   Vh_ex = V_ex/2;
-
 }
 
 void dw_setDims(int *X, const int L5)
@@ -1605,20 +1604,6 @@ double mom_action(void *mom, QudaPrecision prec, int len)
   }
   comm_allreduce(&action);
   return action;
-}
-
-static struct timeval startTime;
-
-void stopwatchStart() { gettimeofday(&startTime, NULL); }
-
-double stopwatchReadSeconds()
-{
-  struct timeval endTime;
-  gettimeofday(&endTime, NULL);
-
-  long ds = endTime.tv_sec - startTime.tv_sec;
-  long dus = endTime.tv_usec - startTime.tv_usec;
-  return ds + 0.000001*dus;
 }
 
 void performanceStats(std::vector<double> &time, std::vector<double> &gflops, std::vector<int> &iter)

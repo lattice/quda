@@ -11,13 +11,14 @@
  *  also.
  */
 
+#include <limits>
 #include <register_traits.h>
 #include <convert.h>
 #include <complex_quda.h>
 #include <index_helper.cuh>
 #include <color_spinor.h>
 #include <color_spinor_field.h>
-#include <trove_helper.cuh>
+#include <aos.h>
 #include <transform_reduce.h>
 
 namespace quda {
@@ -183,45 +184,6 @@ namespace quda {
   }
 
   namespace colorspinor {
-
-    template<typename ReduceType, typename Float> struct square_ {
-      square_(ReduceType) { }
-      __host__ __device__ inline ReduceType operator()(const quda::complex<Float> &x)
-      { return static_cast<ReduceType>(norm(x)); }
-    };
-
-    template<typename ReduceType> struct square_<ReduceType,short> {
-      const ReduceType scale;
-      square_(ReduceType scale) : scale(scale) { }
-      __host__ __device__ inline ReduceType operator()(const quda::complex<short> &x)
-      { return norm(scale * complex<ReduceType>(x.real(), x.imag())); }
-    };
-
-    template <typename ReduceType> struct square_<ReduceType, int8_t> {
-      const ReduceType scale;
-      square_(ReduceType scale) : scale(scale) { }
-      __host__ __device__ inline ReduceType operator()(const quda::complex<int8_t> &x)
-      { return norm(scale * complex<ReduceType>(x.real(), x.imag())); }
-    };
-
-    template<typename Float, typename storeFloat> struct abs_ {
-      abs_(const Float) { }
-      __host__ __device__ Float operator()(const quda::complex<storeFloat> &x) { return abs(x); }
-    };
-
-    template<typename Float> struct abs_<Float,short> {
-      Float scale;
-      abs_(const Float scale) : scale(scale) { }
-      __host__ __device__ Float operator()(const quda::complex<short> &x)
-      { return abs(scale * complex<Float>(x.real(), x.imag())); }
-    };
-
-    template <typename Float> struct abs_<Float, int8_t> {
-      Float scale;
-      abs_(const Float scale) : scale(scale) { }
-      __host__ __device__ Float operator()(const quda::complex<int8_t> &x)
-      { return abs(scale * complex<Float>(x.real(), x.imag())); }
-    };
 
     template <typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order> struct AccessorCB {
       AccessorCB(const ColorSpinorField &) { errorQuda("Not implemented"); }
@@ -1224,14 +1186,6 @@ namespace quda {
   }
     };
 
-    /**
-       @brief This is just a dummy structure we use for trove to define the
-       required structure size
-       @tparam real Real number type
-       @tparam length Number of elements in the structure
-    */
-    template <typename real, int length> struct S { real v[length]; };
-
     template <typename Float, int Ns, int Nc>
       struct SpaceColorSpinorOrder {
       using Accessor = SpaceColorSpinorOrder<Float, Ns, Nc>;
@@ -1259,44 +1213,28 @@ namespace quda {
 
   __device__ __host__ inline void load(complex v[length / 2], int x, int parity = 0) const
   {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-    typedef S<Float,length> structure;
-    trove::coalesced_ptr<structure> field_((structure*)field);
-    structure v_ = field_[parity*volumeCB + x];
-    for (int s=0; s<Ns; s++) {
-      for (int c = 0; c < Nc; c++) { v[s * Nc + c] = complex(v_.v[(c * Ns + s) * 2 + 0], v_.v[(c * Ns + s) * 2 + 1]); }
-    }
-#else
+    auto in = &field[(parity * volumeCB + x) * length];
+    complex v_[length/2];
+    block_load<complex, length/2>(v_, reinterpret_cast<const complex*>(in));
+
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
-        v[s * Nc + c] = complex(field[parity * offset + ((x * Nc + c) * Ns + s) * 2 + 0],
-                                field[parity * offset + ((x * Nc + c) * Ns + s) * 2 + 1]);
+        v[s * Nc + c] = v_[c * Ns + s];
       }
     }
-#endif
   }
 
   __device__ __host__ inline void save(const complex v[length / 2], int x, int parity = 0)
   {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-    typedef S<Float,length> structure;
-    trove::coalesced_ptr<structure> field_((structure*)field);
-    structure v_;
+    auto out = &field[(parity * volumeCB + x) * length];
+    complex v_[length/2];
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
-        v_.v[(c*Ns + s)*2 + 0] = (Float)v[s*Nc+c].real();
-        v_.v[(c*Ns + s)*2 + 1] = (Float)v[s*Nc+c].imag();
+        v_[c * Ns + s] = v[s * Nc + c];
       }
     }
-    field_[parity*volumeCB + x] = v_;
-#else
-    for (int s=0; s<Ns; s++) {
-      for (int c=0; c<Nc; c++) {
-        field[parity*offset + ((x*Nc + c)*Ns + s)*2 + 0] = v[s*Nc+c].real();
-        field[parity*offset + ((x*Nc + c)*Ns + s)*2 + 1] = v[s*Nc+c].imag();
-      }
-    }
-#endif
+
+    block_store<complex, length/2>(reinterpret_cast<complex*>(out), v_);
   }
 
   /**
@@ -1377,44 +1315,14 @@ namespace quda {
 
   __device__ __host__ inline void load(complex v[length / 2], int x, int parity = 0) const
   {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-    typedef S<Float,length> structure;
-    trove::coalesced_ptr<structure> field_((structure*)field);
-    structure v_ = field_[parity*volumeCB + x];
-    for (int s=0; s<Ns; s++) {
-      for (int c = 0; c < Nc; c++) { v[s * Nc + c] = complex(v_.v[(s * Nc + c) * 2 + 0], v_.v[(s * Nc + c) * 2 + 1]); }
-    }
-#else
-    for (int s=0; s<Ns; s++) {
-      for (int c=0; c<Nc; c++) {
-        v[s * Nc + c] = complex(field[parity * offset + ((x * Ns + s) * Nc + c) * 2 + 0],
-                                field[parity * offset + ((x * Ns + s) * Nc + c) * 2 + 1]);
-      }
-    }
-#endif
+    auto in = &field[(parity * volumeCB + x) * length];
+    block_load<complex, length/2>(v, reinterpret_cast<const complex*>(in));
   }
 
   __device__ __host__ inline void save(const complex v[length / 2], int x, int parity = 0)
   {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-    typedef S<Float,length> structure;
-    trove::coalesced_ptr<structure> field_((structure*)field);
-    structure v_;
-    for (int s=0; s<Ns; s++) {
-      for (int c=0; c<Nc; c++) {
-        v_.v[(s * Nc + c) * 2 + 0] = v[s * Nc + c].real();
-        v_.v[(s * Nc + c) * 2 + 1] = v[s * Nc + c].imag();
-      }
-    }
-    field_[parity*volumeCB + x] = v_;
-#else
-    for (int s=0; s<Ns; s++) {
-      for (int c=0; c<Nc; c++) {
-        field[parity * offset + ((x * Ns + s) * Nc + c) * 2 + 0] = v[s * Nc + c].real();
-        field[parity * offset + ((x * Ns + s) * Nc + c) * 2 + 1] = v[s * Nc + c].imag();
-      }
-    }
-#endif
+    auto out = &field[(parity * volumeCB + x) * length];
+    block_store<complex, length/2>(reinterpret_cast<complex*>(out), v);
   }
 
   /**
@@ -1521,47 +1429,15 @@ namespace quda {
   __device__ __host__ inline void load(complex v[length / 2], int x, int parity = 0) const
   {
     int y = getPaddedIndex(x, parity);
-
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-    typedef S<Float,length> structure;
-    trove::coalesced_ptr<structure> field_((structure*)field);
-    structure v_ = field_[parity*exVolumeCB + y];
-    for (int s=0; s<Ns; s++) {
-      for (int c = 0; c < Nc; c++) { v[s * Nc + c] = complex(v_.v[(s * Nc + c) * 2 + 0], v_.v[(s * Nc + c) * 2 + 1]); }
-    }
-#else
-    for (int s=0; s<Ns; s++) {
-      for (int c=0; c<Nc; c++) {
-        v[s * Nc + c] = complex(field[parity * offset + ((y * Ns + s) * Nc + c) * 2 + 0],
-                                field[parity * offset + ((y * Ns + s) * Nc + c) * 2 + 1]);
-      }
-    }
-#endif
+    auto in = &field[(parity * exVolumeCB + y) * length];
+    block_load<complex, length/2>(v, reinterpret_cast<const complex *>(in));
   }
 
   __device__ __host__ inline void save(const complex v[length / 2], int x, int parity = 0)
   {
     int y = getPaddedIndex(x, parity);
-
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-    typedef S<Float,length> structure;
-    trove::coalesced_ptr<structure> field_((structure*)field);
-    structure v_;
-    for (int s=0; s<Ns; s++) {
-      for (int c=0; c<Nc; c++) {
-        v_.v[(s * Nc + c) * 2 + 0] = v[s * Nc + c].real();
-        v_.v[(s * Nc + c) * 2 + 1] = v[s * Nc + c].imag();
-      }
-    }
-    field_[parity*exVolumeCB + y] = v_;
-#else
-    for (int s=0; s<Ns; s++) {
-      for (int c=0; c<Nc; c++) {
-        field[parity * offset + ((y * Ns + s) * Nc + c) * 2 + 0] = v[s * Nc + c].real();
-        field[parity * offset + ((y * Ns + s) * Nc + c) * 2 + 1] = v[s * Nc + c].imag();
-      }
-    }
-#endif
+    auto out = &field[(parity * exVolumeCB + y) * length];
+    block_store<complex, length/2>(reinterpret_cast<complex *>(out), v);
   }
 
   /**

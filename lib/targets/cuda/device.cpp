@@ -2,6 +2,7 @@
 #include <cuda_profiler_api.h>
 #include <util_quda.h>
 #include <quda_internal.h>
+#include <quda_cuda_api.h>
 
 #ifdef QUDA_NVML
 #include <nvml.h>
@@ -14,6 +15,9 @@
 static cudaDeviceProp deviceProp;
 static cudaStream_t *streams;
 static const int Nstream = 9;
+
+#define CHECK_CUDA_ERROR(func)                                          \
+  cuda::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
 
 namespace quda
 {
@@ -29,11 +33,11 @@ namespace quda
       initialized = true;
 
       int driver_version;
-      cudaDriverGetVersion(&driver_version);
+      CHECK_CUDA_ERROR(cudaDriverGetVersion(&driver_version));
       printfQuda("CUDA Driver version = %d\n", driver_version);
 
       int runtime_version;
-      cudaRuntimeGetVersion(&runtime_version);
+      CHECK_CUDA_ERROR(cudaRuntimeGetVersion(&runtime_version));
       printfQuda("CUDA Runtime version = %d\n", runtime_version);
 
 #ifdef QUDA_NVML
@@ -48,25 +52,15 @@ namespace quda
       if (NVML_SUCCESS != result) errorQuda("NVML Shutdown failed with error %d", result);
 #endif
 
-      int deviceCount;
-      cudaGetDeviceCount(&deviceCount);
-      if (deviceCount == 0) {
-        errorQuda("No CUDA devices found");
-      }
-
-      for (int i = 0; i < deviceCount; i++) {
-        cudaGetDeviceProperties(&deviceProp, i);
-        checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
+      for (int i = 0; i < get_device_count(); i++) {
+        CHECK_CUDA_ERROR(cudaGetDeviceProperties(&deviceProp, i));
         if (getVerbosity() >= QUDA_SUMMARIZE) {
           printfQuda("Found device %d: %s\n", i, deviceProp.name);
         }
       }
 
-      cudaGetDeviceProperties(&deviceProp, dev);
-      checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
-      if (deviceProp.major < 1) {
-        errorQuda("Device %d does not support CUDA", dev);
-      }
+      CHECK_CUDA_ERROR(cudaGetDeviceProperties(&deviceProp, dev));
+      if (deviceProp.major < 1) errorQuda("Device %d does not support CUDA", dev);
 
       // Check GPU and QUDA build compatibiliy
       // 4 cases:
@@ -77,7 +71,7 @@ namespace quda
 
       const int my_major = __COMPUTE_CAPABILITY__ / 100;
       const int my_minor = (__COMPUTE_CAPABILITY__  - my_major * 100) / 10;
-      // b) UDA was compiled for a higher compute capability
+      // b) QUDA was compiled for a higher compute capability
       if (deviceProp.major * 100 + deviceProp.minor * 10 < __COMPUTE_CAPABILITY__)
         errorQuda("** Running on a device with compute capability %i.%i but QUDA was compiled for %i.%i. ** \n --- Please set the correct QUDA_GPU_ARCH when running cmake.\n", deviceProp.major, deviceProp.minor, my_major, my_minor);
 
@@ -95,12 +89,13 @@ namespace quda
         warningQuda("** Running on a device with compute capability %i.%i but QUDA was compiled for %i.%i. **\n -- This might result in a lower performance. Please consider adjusting QUDA_GPU_ARCH when running cmake.\n", deviceProp.major, deviceProp.minor, my_major, my_minor);
       }
 
+      if (!deviceProp.unifiedAddressing) errorQuda("Device %d does not support unified addressing", dev);
+
       if (getVerbosity() >= QUDA_SUMMARIZE) {
         printfQuda("Using device %d: %s\n", dev, deviceProp.name);
       }
 #ifndef USE_QDPJIT
-      cudaSetDevice(dev);
-      checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
+      CHECK_CUDA_ERROR(cudaSetDevice(dev));
 #endif
 
 #ifdef NUMA_NVML
@@ -112,21 +107,27 @@ namespace quda
       }
 #endif
 
-      cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
+      CHECK_CUDA_ERROR(cudaDeviceSetCacheConfig(cudaFuncCachePreferL1));
       //cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
       // cudaGetDeviceProperties(&deviceProp, dev);
     }
 
+    int get_device_count()
+    {
+      static int device_count = 0;
+      if (device_count == 0) {
+        CHECK_CUDA_ERROR(cudaGetDeviceCount(&device_count));
+        if (device_count == 0) errorQuda("No CUDA devices found");
+      }
+      return device_count;
+    }
+
     void print_device_properties()
     {
-
-      int dev_count;
-      cudaGetDeviceCount(&dev_count);
-      int device;
-      for (device = 0; device < dev_count; device++) {
+      for (int device = 0; device < get_device_count(); device++) {
 
         // cudaDeviceProp deviceProp;
-        cudaGetDeviceProperties(&deviceProp, device);
+        CHECK_CUDA_ERROR(cudaGetDeviceProperties(&deviceProp, device));
         printfQuda("%d - name:                    %s\n", device, deviceProp.name);
         printfQuda("%d - totalGlobalMem:          %lu bytes ( %.2f Gbytes)\n", device, deviceProp.totalGlobalMem,
                    deviceProp.totalGlobalMem / (float)(1024 * 1024 * 1024));
@@ -186,20 +187,17 @@ namespace quda
 
       int greatestPriority;
       int leastPriority;
-      cudaDeviceGetStreamPriorityRange(&leastPriority, &greatestPriority);
+      CHECK_CUDA_ERROR(cudaDeviceGetStreamPriorityRange(&leastPriority, &greatestPriority));
       for (int i=0; i<Nstream-1; i++) {
-        cudaStreamCreateWithPriority(&streams[i], cudaStreamDefault, greatestPriority);
+        CHECK_CUDA_ERROR(cudaStreamCreateWithPriority(&streams[i], cudaStreamDefault, greatestPriority));
       }
-      cudaStreamCreateWithPriority(&streams[Nstream-1], cudaStreamDefault, leastPriority);
-
-      checkCudaError();
-
+      CHECK_CUDA_ERROR(cudaStreamCreateWithPriority(&streams[Nstream-1], cudaStreamDefault, leastPriority));
     }
 
     void destroy()
     {
       if (streams) {
-        for (int i=0; i<Nstream; i++) cudaStreamDestroy(streams[i]);
+        for (int i=0; i<Nstream; i++) CHECK_CUDA_ERROR(cudaStreamDestroy(streams[i]));
         delete []streams;
         streams = nullptr;
       }
@@ -207,7 +205,7 @@ namespace quda
       char *device_reset_env = getenv("QUDA_DEVICE_RESET");
       if (device_reset_env && strcmp(device_reset_env,"1") == 0) {
         // end this CUDA context
-        cudaDeviceReset();
+        CHECK_CUDA_ERROR(cudaDeviceReset());
       }
     }
 
@@ -258,7 +256,7 @@ namespace quda
     {
       static int max_shared_bytes = 0;
       if (!max_shared_bytes)
-        cudaDeviceGetAttribute(&max_shared_bytes, cudaDevAttrMaxSharedMemoryPerBlockOptin, comm_gpuid());
+        CHECK_CUDA_ERROR(cudaDeviceGetAttribute(&max_shared_bytes, cudaDevAttrMaxSharedMemoryPerBlockOptin, comm_gpuid()));
       return max_shared_bytes;
     }
 
@@ -276,7 +274,8 @@ namespace quda
     {
 #if CUDA_VERSION >= 11000
       static int max_blocks_per_sm = 0;
-      if (!max_blocks_per_sm) cudaDeviceGetAttribute(&max_blocks_per_sm, cudaDevAttrMaxBlocksPerMultiprocessor, comm_gpuid());
+      if (!max_blocks_per_sm)
+        CHECK_CUDA_ERROR(cudaDeviceGetAttribute(&max_blocks_per_sm, cudaDevAttrMaxBlocksPerMultiprocessor, comm_gpuid()));
       return max_blocks_per_sm;
 #else
       // these variables are taken from Table 14 of the CUDA 10.2 prgramming guide

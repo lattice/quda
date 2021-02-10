@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 #include <quda_internal.h>
+#include <timer.h>
 #include <color_spinor_field.h>
 #include <blas_quda.h>
 
@@ -362,10 +363,8 @@ double benchmark(Kernel kernel, const int niter)
   quda::Complex * A2 = new quda::Complex[Nsrc*Nsrc]; // for the block cDotProductNorm test
   double *Ar = new double[Nsrc * Msrc];
 
-  cudaEvent_t start, end;
-  cudaEventCreate(&start);
-  cudaEventCreate(&end);
-  cudaEventRecord(start, device::get_cuda_stream(device::get_default_stream()));
+  device_timer_t timer;
+  timer.start();
 
   {
     switch (kernel) {
@@ -529,19 +528,15 @@ double benchmark(Kernel kernel, const int niter)
     }
   }
 
-  cudaEventRecord(end, device::get_cuda_stream(device::get_default_stream()));
-  cudaEventSynchronize(end);
-  float runTime;
-  cudaEventElapsedTime(&runTime, start, end);
-  cudaEventDestroy(start);
-  cudaEventDestroy(end);
+  timer.stop();
+
   delete[] A;
   delete[] B;
   delete[] C;
   delete[] A2;
   delete[] Ar;
-  double secs = runTime / 1000;
-  return secs;
+
+  return timer.last();
 }
 
 #define ERROR(a) fabs(blas::norm2(*a##D) - blas::norm2(*a##H)) / blas::norm2(*a##H)

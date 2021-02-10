@@ -88,13 +88,13 @@ set (QUDA_OBJS
   staggered_oprod.cu clover_trace_quda.cu
   hisq_paths_force_quda.cu
   unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp
-  blas_magma.cu
+  blas_magma.cu tune.cpp
   inv_mpcg_quda.cpp inv_mpbicgstab_quda.cpp inv_gmresdr_quda.cpp
   pgauge_exchange.cu pgauge_init.cu pgauge_heatbath.cu random.cu
   gauge_fix_fft.cu gauge_fix_ovr.cu
   pgauge_det_trace.cu clover_outer_product.cu
   clover_sigma_outer_product.cu momentum.cu gauge_qcharge.cu
-  deflation.cpp checksum.cu
+  deflation.cpp checksum.cu transform_reduce.cu
   instantiate.cpp version.cpp )
 # cmake-format: on
 
@@ -162,7 +162,7 @@ target_link_libraries(quda PUBLIC ${CUDA_cuda_driver_LIBRARY})
 # set up QUDA compile options
 target_compile_definitions(
   quda PRIVATE $<$<CONFIG:DEVEL>:DEVEL> $<$<CONFIG:HOSTDEBUG>:HOST_DEBUG> $<$<CONFIG:DEVICEDEBUG>:DEVICE_DEBUG>
-               $<$<CONFIG:DEBUG>:HOST_DEBUGDEVICE_DEBUG> $<$<CONFIG:SANITIZE>:HOST_DEBUG>)
+               $<$<CONFIG:DEBUG>:HOST_DEBUG> $<$<CONFIG:DEBUG>:DEVICE_DEBUG> $<$<CONFIG:SANITIZE>:HOST_DEBUG>)
 
 target_compile_options(
   quda
@@ -261,10 +261,12 @@ endif()
 
 # Specific config dependent warning suppressions and lineinfo forwarding
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
-                            -lineinfo -Wreorder
+                            -Wreorder
                             -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function
-                            $<$<CONFIG:STRICT>:-Werror=all-warnings>
-                            $<$<CONFIG:SANITIZE>:-Xcompiler -fsanitize=address,undefined>
+                            $<$<CONFIG:DEVEL>:-Xptxas -warn-lmem-usage,-warn-spills -lineinfo>
+                            $<$<CONFIG:STRICT>: -Werror=all-warnings -lineinfo>
+                            $<$<CONFIG:HOSTDEBUG>:-lineinfo>
+                            $<$<CONFIG:SANITIZE>:-Xcompiler -fsanitize=address,undefined -lineinfo>
                             >)
 
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:

@@ -6,6 +6,7 @@
 // if not STRIPED then this means we assign one thread block per direction / dimension
 
 #include <dslash_quda.h>
+#include <tune_quda.h>
 #include <kernels/dslash_pack.cuh>
 #include <instantiate.h>
 

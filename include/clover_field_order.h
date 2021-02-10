@@ -6,13 +6,14 @@
  *
  */
 
+#include <limits>
 #include <register_traits.h>
 #include <convert.h>
 #include <clover_field.h>
 #include <complex_quda.h>
 #include <quda_matrix.h>
 #include <color_spinor.h>
-#include <trove_helper.cuh>
+#include <aos.h>
 #include <transform_reduce.h>
 
 namespace quda {
@@ -69,16 +70,6 @@ namespace quda {
   }
 
   namespace clover {
-
-    template<typename ReduceType, typename Float> struct square_ {
-      __host__ __device__ inline ReduceType operator()(const quda::complex<Float> &x)
-      { return static_cast<ReduceType>(norm(x)); }
-    };
-
-    template<typename ReduceType, typename Float> struct abs_ {
-      __host__ __device__ inline ReduceType operator()(const quda::complex<Float> &x)
-      { return static_cast<ReduceType>(abs(x)); }
-    };
 
     /**
        The internal ordering for each clover matrix has chirality as the
@@ -722,14 +713,6 @@ namespace quda {
       };
 
     /**
-       @brief This is just a dummy structure we use for trove to define the
-       required structure size
-       @tparam real Real number type
-       @tparam length Number of elements in the structure
-    */
-    template <typename real, int length> struct S { real v[length]; };
-
-    /**
        QDP ordering for clover fields
     */
     template <typename Float, int length = 72>
@@ -757,26 +740,15 @@ namespace quda {
 
 	__device__ __host__ inline void load(RegType v[length], int x, int parity) const {
 	  // factor of 0.5 comes from basis change
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-	  typedef S<Float,length> structure;
-	  trove::coalesced_ptr<structure> clover_((structure*)clover);
-	  structure v_ = clover_[parity*volumeCB + x];
-	  for (int i=0; i<length; i++) v[i] = 0.5*(RegType)v_.v[i];
-#else
-	  for (int i=0; i<length; i++) v[i] = 0.5*clover[parity*offset + x*length+i];
-#endif
+          Float v_[length];
+          block_load<Float, length>(v_, &clover[parity*offset + x*length]);
+          for (int i=0; i<length; i++) v[i] = 0.5*v_[i];
 	}
   
 	__device__ __host__ inline void save(const RegType v[length], int x, int parity) {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-	  typedef S<Float,length> structure;
-	  trove::coalesced_ptr<structure> clover_((structure*)clover);
-	  structure v_;
-	  for (int i=0; i<length; i++) v_.v[i] = 2.0*(Float)v[i];
-	  clover_[parity*volumeCB + x] = v_;
-#else
-	  for (int i=0; i<length; i++) clover[parity*offset + x*length+i] = 2.0*v[i];
-#endif
+          Float v_[length];
+          for (int i=0; i<length; i++) v_[i] = 2.0*v[i];
+          block_store<Float, length>(&clover[parity*offset + x*length], v_);
 	}
 
 	size_t Bytes() const { return length*sizeof(Float); }

@@ -12,15 +12,50 @@
 
 namespace quda {
 
-  template <bool grid_stride>
-  class TunableKernel1D_base : public Tunable
+  class TunableKernel : public Tunable
   {
-  protected:
-    const LatticeField &field;
-    QudaFieldLocation location;
 
+  protected:
     virtual unsigned int sharedBytesPerThread() const { return 0; }
     virtual unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
+
+    template <template <typename> class Functor, bool grid_stride = false, typename Arg>
+    void launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
+                       const std::vector<constant_param_t> &param = dummy_param)
+    {
+      ompwip();
+#ifdef JITIFY
+      launch_error = launch_jitify<Functor, grid_stride, Arg, false>(kernel.name, tp, stream, arg, param);
+#else
+      for (unsigned int i = 0; i < param.size(); i++)
+        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
+      launch_error = qudaLaunchKernel(kernel.func, tp, stream, arg);
+#endif
+    }
+
+  public:
+    /**
+       @brief Special kernel launcher used for raw CUDA kernels with no
+       assumption made about shape of parallelism.  Kernels launched
+       using this must take responsibility of bounds checking and
+       assignment of threads.
+     */
+    template <template <typename> class Functor, typename Arg>
+    void launch_cuda(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
+                     const std::vector<constant_param_t> &param = dummy_param) const
+    {
+      ompwip();
+      constexpr bool grid_stride = false;
+      const_cast<TunableKernel*>(this)->launch_device<Functor, grid_stride>(KERNEL(raw_kernel), tp, stream, arg, param);
+    }
+
+  };
+
+  template <bool grid_stride>
+  class TunableKernel1D_base : public TunableKernel
+  {
+  protected:
+    QudaFieldLocation location;
 
     /**
        Kernel1D (and its derivations Kernel2D and Kernel3D) do not
@@ -32,27 +67,7 @@ namespace quda {
     template <template <typename> class Functor, typename Arg>
     void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
     {
-      ompwip();
-#ifdef JITIFY
-      launch_error = launch_jitify<Functor>("quda::Kernel1D", tp, stream, arg, param);
-#else
-      for (unsigned int i = 0; i < param.size(); i++)
-        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
-      qudaLaunchKernel(Kernel1D<Functor, Arg, grid_stride>, tp, stream, arg);
-#endif
-    }
-
-    template <template <typename> class Functor, typename Arg>
-    void launch_cuda(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
-    {
-      ompwip();
-#ifdef JITIFY
-      launch_error = launch_jitify<Functor>("quda::raw_kernel", tp, stream, arg, param);
-#else
-      for (unsigned int i = 0; i < param.size(); i++)
-        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
-      qudaLaunchKernel(raw_kernel<Functor, Arg>, tp, stream, arg);
-#endif
+      TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Kernel1D), tp, stream, arg, param);
     }
 
     template <template <typename> class Functor, typename Arg>
@@ -93,12 +108,18 @@ namespace quda {
 
   public:
     TunableKernel1D_base(const LatticeField &field, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
-      field(field),
       location(location != QUDA_INVALID_FIELD_LOCATION ? location : field.Location())
     {
       strcpy(vol, field.VolString());
       strcpy(aux, compile_type_str(field, location));
       strcat(aux, field.AuxString());
+    }
+
+    TunableKernel1D_base(size_t n_items, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
+      location(location)
+    {
+      u64toa(vol, n_items);
+      strcpy(aux, compile_type_str(location));
     }
 
     virtual bool advanceTuneParam(TuneParam &param) const
@@ -122,6 +143,9 @@ namespace quda {
   public:
     TunableKernel1D(const LatticeField &field, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
       TunableKernel1D_base<false>(field, location) {}
+
+    TunableKernel1D(size_t n_items, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
+      TunableKernel1D_base<false>(n_items, location) {}
   };
 
   class TunableGridStrideKernel1D : public TunableKernel1D_base<true> {
@@ -131,8 +155,10 @@ namespace quda {
   public:
     TunableGridStrideKernel1D(const LatticeField &field, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
       TunableKernel1D_base<true>(field, location) {}
-  };
 
+    TunableGridStrideKernel1D(size_t n_items, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
+      TunableKernel1D_base<true>(n_items, location) {}
+  };
 
   /**
      @brief This derived class is for algorithms that deploy a vector
@@ -144,7 +170,6 @@ namespace quda {
   class TunableKernel2D_base : public TunableKernel1D_base<grid_stride>
   {
   protected:
-    using Tunable::launch_error;
     mutable unsigned int vector_length_y;
     mutable unsigned int step_y;
     bool tune_block_x;
@@ -153,11 +178,6 @@ namespace quda {
     void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
     {
       ompwip("OFFLOADING...");
-#ifdef JITIFY
-      launch_error = launch_jitify<Functor>("quda::Kernel2D", tp, stream, arg, param);
-#else
-      for (unsigned int i = 0; i < param.size(); i++)
-        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
 #ifdef QUDA_BACKEND_OMPTARGET
       const int gd = tp.grid.x*tp.grid.y*tp.grid.z;
       const int ld = tp.block.x*tp.block.y*tp.grid.z;
@@ -171,8 +191,7 @@ namespace quda {
         }
       }
 #else
-      qudaLaunchKernel(Kernel2D<Functor, Arg, grid_stride>, tp, stream, arg);
-#endif
+      TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Kernel2D), tp, stream, arg, param);
 #endif
     }
 
@@ -220,6 +239,14 @@ namespace quda {
     TunableKernel2D_base(const LatticeField &field, unsigned int vector_length_y,
                          QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
       TunableKernel1D_base<grid_stride>(field, location),
+      vector_length_y(vector_length_y),
+      step_y(1),
+      tune_block_x(true)
+    { }
+
+    TunableKernel2D_base(size_t n_items, unsigned int vector_length_y,
+                         QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
+      TunableKernel1D_base<grid_stride>(n_items, location),
       vector_length_y(vector_length_y),
       step_y(1),
       tune_block_x(true)
@@ -293,6 +320,10 @@ namespace quda {
     TunableKernel2D(const LatticeField &field, unsigned int vector_length_y,
                     QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
       TunableKernel2D_base<false>(field, vector_length_y, location) {}
+
+    TunableKernel2D(size_t n_items, unsigned int vector_length_y,
+                    QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
+      TunableKernel2D_base<false>(n_items, vector_length_y, location) {}
   };
 
   class TunableGridStrideKernel2D : public TunableKernel2D_base<true> {
@@ -301,8 +332,12 @@ namespace quda {
 
   public:
     TunableGridStrideKernel2D(const LatticeField &field, unsigned int vector_length_y,
-                    QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
+                              QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
       TunableKernel2D_base<true>(field, vector_length_y, location) {}
+
+    TunableGridStrideKernel2D(size_t n_items, unsigned int vector_length_y,
+                              QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
+      TunableKernel2D_base<true>(n_items, vector_length_y, location) {}
   };
 
   /**
@@ -316,7 +351,6 @@ namespace quda {
   class TunableKernel3D_base : public TunableKernel2D_base<grid_stride>
   {
   protected:
-    using Tunable::launch_error;
     using TunableKernel2D_base<grid_stride>::vector_length_y;
     mutable unsigned vector_length_z;
     mutable unsigned step_z;
@@ -326,13 +360,7 @@ namespace quda {
     void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
     {
       ompwip();
-#ifdef JITIFY
-      launch_error = launch_jitify<Functor>("quda::Kernel3D", tp, stream, arg, param);
-#else
-      for (unsigned int i = 0; i < param.size(); i++)
-        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
-      qudaLaunchKernel(Kernel3D<Functor, Arg, grid_stride>, tp, stream, arg);
-#endif
+      TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Kernel3D), tp, stream, arg, param);
     }
 
     template <template <typename> class Functor, typename Arg>
@@ -383,6 +411,13 @@ namespace quda {
     TunableKernel3D_base(const LatticeField &field, unsigned int vector_length_y, unsigned int vector_length_z,
                          QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
       TunableKernel2D_base<grid_stride>(field, vector_length_y, location),
+      vector_length_z(vector_length_z),
+      step_z(1),
+      tune_block_y(true) { }
+
+    TunableKernel3D_base(size_t n_items, unsigned int vector_length_y, unsigned int vector_length_z,
+                         QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
+      TunableKernel2D_base<grid_stride>(n_items, vector_length_y, location),
       vector_length_z(vector_length_z),
       step_z(1),
       tune_block_y(true) { }
@@ -456,6 +491,10 @@ namespace quda {
     TunableKernel3D(const LatticeField &field, unsigned int vector_length_y, unsigned int vector_length_z,
                     QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
       TunableKernel3D_base<false>(field, vector_length_y, vector_length_z, location) {}
+
+    TunableKernel3D(size_t n_items, unsigned int vector_length_y, unsigned int vector_length_z,
+                    QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
+      TunableKernel3D_base<false>(n_items, vector_length_y, vector_length_z, location) {}
   };
 
   class TunableGridStrideKernel3D : public TunableKernel3D_base<true> {
@@ -464,8 +503,12 @@ namespace quda {
 
   public:
     TunableGridStrideKernel3D(const LatticeField &field, unsigned int vector_length_y, unsigned int vector_length_z,
-                    QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
+                              QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
       TunableKernel3D_base<true>(field, vector_length_y, vector_length_z, location) {}
+
+    TunableGridStrideKernel3D(size_t n_items, unsigned int vector_length_y, unsigned int vector_length_z,
+                              QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
+      TunableKernel3D_base<true>(n_items, vector_length_y, vector_length_z, location) {}
   };
 
 }

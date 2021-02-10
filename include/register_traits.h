@@ -15,6 +15,26 @@
 
 namespace quda {
 
+  struct alignas(8) char8 {
+    char4 x;
+    char4 y;
+  };
+
+  struct alignas(16) short8 {
+    short4 x;
+    short4 y;
+  };
+
+  struct alignas(32) float8 {
+    float4 x;
+    float4 y;
+  };
+
+  struct alignas(64) double8 {
+    double4 x;
+    double4 y;
+  };
+
   /*
     Here we use traits to define the greater type used for mixing types of computation involving these types
   */

@@ -236,11 +236,6 @@ extern "C" {
   void plaq_quda_(double plaq[3]);
 
   /**
-   * @brief fTemporary function exposed for TIFR benchmarking
-   */
-  void set_kernel_pack_t_(int *pack);
-
-  /**
    * @brief Flush the chronological history for the given index
    * @param[in] index Index for which we are flushing
    */

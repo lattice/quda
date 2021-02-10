@@ -11,7 +11,11 @@ namespace quda {
     // size is equal to number of fine points per aggregate, rounded
     // up to a whole power of two.  So for example, 2x2x2x2 and
     // 3x3x3x1 aggregation would both use the same block size 32
+#ifndef QUDA_FAST_COMPILE_REDUCE
     static constexpr std::array<unsigned int, 6> block = {32, 64, 128, 256, 512, 1024};
+#else
+    static constexpr std::array<unsigned int, 1> block = {1024};
+#endif
 
     /**
        @brief Return the first power of two block that is larger than the required size
@@ -24,7 +28,11 @@ namespace quda {
     }
   };
 
+#ifndef QUDA_FAST_COMPILE_REDUCE
   constexpr std::array<unsigned int, 6> Aggregates::block;
+#else
+  constexpr std::array<unsigned int, 1> Aggregates::block;
+#endif
 
   template <typename Float, typename vFloat, int fineSpin, int fineColor, int coarseSpin, int coarseColor>
   class RestrictLaunch : public TunableBlock2D {

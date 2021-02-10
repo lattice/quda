@@ -1,4 +1,5 @@
 #include <quda_internal.h>
+#include <timer.h>
 #include <tune_quda.h>
 #include <gauge_field.h>
 #include <comm_quda.h>
@@ -14,7 +15,7 @@ namespace quda {
   class GaugeHB : TunableKernel1D {
     GaugeField &U;
     Float beta;
-    RNG &rngstate;
+    RNG &rng;
     int mu;
     int parity;
     bool heatbath; // true = heatbath, false = over relaxation
@@ -22,11 +23,11 @@ namespace quda {
     unsigned int minThreads() const { return U.LocalVolumeCB(); }
 
   public:
-    GaugeHB(GaugeField &U, double beta, RNG &rngstate) :
+    GaugeHB(GaugeField &U, double beta, RNG &rng) :
       TunableKernel1D(U),
       U(U),
       beta(static_cast<Float>(beta)),
-      rngstate(rngstate),
+      rng(rng),
       mu(0),
       parity(0),
       heatbath(false)
@@ -47,22 +48,22 @@ namespace quda {
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (heatbath) {
-        MonteArg<Float, nColor, recon, true> arg(U, beta, rngstate, mu, parity);
+        MonteArg<Float, nColor, recon, true> arg(U, beta, rng.State(), mu, parity);
         launch<HB>(tp, stream, arg);
       } else {
-        MonteArg<Float, nColor, recon, false> arg(U, beta, rngstate, mu, parity);
+        MonteArg<Float, nColor, recon, false> arg(U, beta, rng.State(), mu, parity);
         launch<HB>(tp, stream, arg);
       }
     }
 
     void preTune() {
       U.backup();
-      if (heatbath) rngstate.backup();
+      if (heatbath) rng.backup();
     }
 
     void postTune() {
       U.restore();
-      if (heatbath) rngstate.restore();
+      if (heatbath) rng.restore();
     }
 
     long long flops() const

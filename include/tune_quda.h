@@ -5,18 +5,15 @@
 #include <cstring>
 #include <cfloat>
 #include <algorithm>
-#include <tune_key.h>
-#include <quda_internal.h>
-#include <device.h>
-#include <target_device.h>
-
-// this file has some workarounds to allow compilation using nvrtc of kernels that include this file
-#ifndef __CUDACC_RTC__
 #include <cstdarg>
 #include <iomanip>
 #include <typeinfo>
 #include <map>
-#endif
+
+#include <tune_key.h>
+#include <quda_internal.h>
+#include <device.h>
+#include <uint_to_char.h>
 
 namespace quda {
 
@@ -33,18 +30,12 @@ namespace quda {
     float time;
     long long n_calls;
 
-    TuneParam() :
-      block(device::warp_size(), 1, 1), grid(1, 1, 1), shared_bytes(0), set_max_shared_bytes(false), aux(), time(FLT_MAX), n_calls(0)
-    {
-      aux = make_int4(1,1,1,1);
-    }
-
+    TuneParam();
     TuneParam(const TuneParam &) = default;
     TuneParam(TuneParam &&) = default;
     TuneParam& operator=(const TuneParam &) = default;
     TuneParam& operator=(TuneParam &&) = default;
 
-#ifndef __CUDACC_RTC__
     friend std::ostream& operator<<(std::ostream& output, const TuneParam& param) {
       output << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
       output << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
@@ -52,22 +43,20 @@ namespace quda {
       output << ", aux=(" << param.aux.x << "," << param.aux.y << "," << param.aux.z << "," << param.aux.w << ")";
       return output;
     }
-#endif
+
   };
 
-#ifndef __CUDACC_RTC__
   /**
    * @brief Returns a reference to the tunecache map
    * @return tunecache reference
    */
   const std::map<TuneKey, TuneParam> &getTuneCache();
-#endif
 
   class Tunable {
 
   protected:
-    virtual long long flops() const = 0;
-    virtual long long bytes() const { return 0; } // FIXME
+    virtual long long flops() const { return 0; }
+    virtual long long bytes() const { return 0; }
 
     // the minimum number of shared bytes per thread
     virtual unsigned int sharedBytesPerThread() const = 0;
@@ -108,8 +97,8 @@ namespace quda {
     */
     virtual int gridStep() const { return 1; }
 
-    virtual int blockStep() const { return device::warp_size(); }
-    virtual int blockMin() const { return device::warp_size(); }
+    virtual int blockStep() const;
+    virtual int blockMin() const;
 
     virtual void resetBlockDim(TuneParam &param) const {
       if (tuneGridDim()) {
@@ -206,12 +195,10 @@ namespace quda {
 
     int writeAuxString(const char *format, ...) {
       int n = 0;
-#ifndef __CUDACC_RTC__
       va_list arguments;
       va_start(arguments, format);
       n = vsnprintf(aux, TuneKey::aux_n, format, arguments);
       if (n < 0 || n >= TuneKey::aux_n) errorQuda("Error writing auxiliary string");
-#endif
       return n;
     }
 
@@ -226,7 +213,6 @@ namespace quda {
     */
     bool tuned()
     {
-#ifndef __CUDACC_RTC__
       // not tuning is equivalent to already tuned
       if (!getTuning()) return true;
 
@@ -234,9 +220,6 @@ namespace quda {
       if (use_managed_memory()) strcat(key.aux, ",managed");
       // if key is present in cache then already tuned
       return getTuneCache().find(key) != getTuneCache().end();
-#else
-      return true;
-#endif
     }
 
   public:
@@ -244,12 +227,10 @@ namespace quda {
     virtual ~Tunable() { }
     virtual TuneKey tuneKey() const = 0;
     virtual void apply(const qudaStream_t &stream) = 0;
-    void apply() { apply(device::get_default_stream()); }
     virtual void preTune() { }
     virtual void postTune() { }
     virtual int tuningIter() const { return 1; }
 
-#ifndef __CUDACC_RTC__
     virtual std::string paramString(const TuneParam &param) const
     {
       std::stringstream ps;
@@ -266,7 +247,6 @@ namespace quda {
       ss << gbytes << " GB/s";
       return ss.str();
     }
-#endif
 
     virtual void initTuneParam(TuneParam &param) const
     {

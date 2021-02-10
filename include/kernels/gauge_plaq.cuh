@@ -56,16 +56,15 @@ namespace quda {
     return getTrace( U1 * U2 * conj(U3) * conj(U4) ).real();
   }
 
-  template <typename Arg> struct Plaquette {
-
+  template <typename Arg> struct Plaquette : plus<double2> {
     using reduce_t = double2;
+    using plus<reduce_t>::operator();
     Arg &arg;
     constexpr Plaquette(Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     // return the plaquette at site (x_cb, parity)
-    template <typename Reducer>
-    __device__ __host__ inline reduce_t operator()(reduce_t &value, Reducer &r, int x_cb, int parity)
+    __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
     {
       reduce_t plaq = zero<reduce_t>();
 
@@ -84,7 +83,7 @@ namespace quda {
         plaq.y += plaquette(arg, x, parity, mu, 3);
       }
 
-      return r(plaq, value);
+      return plus::operator()(plaq, value);
     }
 
   };

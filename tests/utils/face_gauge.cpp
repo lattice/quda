@@ -4,7 +4,6 @@
 #include <sys/time.h>
 #include <assert.h>
 
-#include <quda_internal.h>
 #include <comm_quda.h>
 
 #include <host_utils.h>

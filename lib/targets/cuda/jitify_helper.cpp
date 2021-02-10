@@ -1,5 +1,6 @@
 #include <tune_quda.h>
 #include <quda_api.h>
+#include <quda_cuda_api.h>
 
 #ifdef HOST_DEBUG
 
@@ -69,8 +70,6 @@ namespace quda {
     }
   }
 
-  void qudaSetErrorString(const std::string &);
-
   qudaError_t launch_jitify(const std::string &file, const std::string &kernel,
                             const std::vector<std::string> &template_args,
                             const TuneParam &tp, const qudaStream_t &stream,
@@ -80,7 +79,8 @@ namespace quda {
     std::string kernel_file(std::string("kernels/") + file);
     create_jitify_program_v2(kernel_file);
 
-    auto instance = program_map[kernel_file]->kernel(kernel).instantiate(template_args);
+    std::string kernel_name(std::string("quda::") + kernel);
+    auto instance = program_map[kernel_file]->kernel(kernel_name).instantiate(template_args);
 
     if (tp.set_max_shared_bytes && device::max_dynamic_shared_memory() > device::max_default_shared_memory()) {
       instance.set_func_attribute(CU_FUNC_ATTRIBUTE_PREFERRED_SHARED_MEMORY_CARVEOUT, 100);
@@ -97,14 +97,8 @@ namespace quda {
     auto configured_instance = instance.configure(tp.grid, tp.block, tp.shared_bytes, device::get_cuda_stream(stream));
     auto error = configured_instance.launch(arg_ptrs, arg_types);
 
-    if (error != CUDA_SUCCESS) {
-      const char *str;
-      cuGetErrorString(error, &str);
-      qudaSetErrorString(std::string(str));
-      if (!activeTuning()) { // error only if not tuning
-        errorQuda("jitify returned error %s", str);
-      }
-    }
+    if (error != CUDA_SUCCESS)
+      cuda::set_driver_error(error, __func__, __func__, __FILE__, __STRINGIFY__(__LINE__), activeTuning());
 
     return error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
   }

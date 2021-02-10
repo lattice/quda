@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <quda_define.h>
 #include <lattice_field.h>
 
@@ -13,34 +14,19 @@ namespace quda {
   */
   class RNG {
 
-    RNGState *state;        /*! array with current curand rng state */
-    RNGState *backup_state; /*! array for backup of current curand rng state */
-    unsigned long long seed;  /*! initial rng seed */
-    int size;                 /*! @brief number of curand states */
-    int size_cb;        /*! @brief number of curand states checkerboarded (equal to size if we have a single parity) */
-    int X[4];           /*! @brief local lattice dimensions */
-    void AllocateRNG(); /*! @brief allocate curand rng states array in device memory */
+    size_t size;                     /*! @brief number of curand states */
+    std::shared_ptr<RNGState> state; /*! array with current curand rng state */
+    RNGState *backup_state;          /*! array for backup of current curand rng state */
+    unsigned long long seed;         /*! initial rng seed */
 
   public:
     /**
-       @brief Constructor that takes its metadata from a field
+       @brief Allocate and initialize RNG states.  Constructor that
+       takes its metadata from pre-existing field
        @param[in] meta The field whose data we use
        @param[in] seed Seed to initialize the RNG
     */
     RNG(const LatticeField &meta, unsigned long long seedin);
-
-    /**
-       @brief Constructor that takes its metadata from a param
-       @param[in] param The param whose data we use
-       @param[in] seed Seed to initialize the RNG
-    */
-    RNG(const LatticeFieldParam &param, unsigned long long seedin);
-
-    /*! free array */
-    void Release();
-
-    /*! initialize rng states with seed */
-    void Init();
 
     unsigned long long Seed() { return seed; };
 
@@ -50,7 +36,8 @@ namespace quda {
     /*! @brief Backup rng array states initialization */
     void backup();
 
-    constexpr RNGState *State() { return state; };
+    /*! @brief Get pointer to RNGState */
+    RNGState *State() { return state.get(); };
   };
 
 }

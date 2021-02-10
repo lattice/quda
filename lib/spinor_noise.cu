@@ -1,4 +1,5 @@
 #include <color_spinor_field.h>
+#include <random_quda.h>
 #include <tunable_nd.h>
 #include <kernels/spinor_noise.cuh>
 
@@ -26,10 +27,10 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       switch (type) {
       case QUDA_NOISE_GAUSS:
-        launch<NoiseSpinor>(tp, stream, SpinorNoiseArg<real, Ns, Nc, order, QUDA_NOISE_GAUSS>(v, rng));
+        launch<NoiseSpinor>(tp, stream, SpinorNoiseArg<real, Ns, Nc, order, QUDA_NOISE_GAUSS>(v, rng.State()));
         break;
       case QUDA_NOISE_UNIFORM:
-        launch<NoiseSpinor>(tp, stream, SpinorNoiseArg<real, Ns, Nc, order, QUDA_NOISE_UNIFORM>(v, rng));
+        launch<NoiseSpinor>(tp, stream, SpinorNoiseArg<real, Ns, Nc, order, QUDA_NOISE_UNIFORM>(v, rng.State()));
         break;
       default: errorQuda("Noise type %d not implemented", type);
       }
@@ -132,9 +133,7 @@ namespace quda {
   void spinorNoise(ColorSpinorField &src, unsigned long long seed, QudaNoiseType type)
   {
     RNG *randstates = new RNG(src, seed);
-    randstates->Init();
     spinorNoise(src, *randstates, type);
-    randstates->Release();
     delete randstates;
   }
 

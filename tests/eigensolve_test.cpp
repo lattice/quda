@@ -1,10 +1,10 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <time.h>
 #include <math.h>
 #include <string.h>
 #include <algorithm>
 
+#include <timer.h>
 #include <host_utils.h>
 #include <command_line_params.h>
 #include "misc.h"
@@ -154,16 +154,15 @@ int main(int argc, char **argv)
   // requested data, at the requested prec. All the information needed to perfom the
   // solve is in the eig_param container. If eig_param.arpack_check == true and
   // precision is double, the routine will use ARPACK rather than the GPU.
-  struct timeval start, end;
-  gettimeofday(&start, NULL);
+  host_timer_t host_timer;
+  host_timer.start();
   if (eig_param.arpack_check && !(eig_inv_param.cpu_prec == QUDA_DOUBLE_PRECISION)) {
     errorQuda("ARPACK check only available in double precision");
   }
 
   eigensolveQuda(host_evecs, host_evals, &eig_param);
-  gettimeofday(&end, NULL);
-  double time = ((end.tv_sec - start.tv_sec) * 1000000u + end.tv_usec - start.tv_usec) / 1.e6;
-  printfQuda("Time for %s solution = %f\n", eig_param.arpack_check ? "ARPACK" : "QUDA", time);
+  host_timer.stop();
+  printfQuda("Time for %s solution = %f\n", eig_param.arpack_check ? "ARPACK" : "QUDA", host_timer.last());
   // QUDA eigensolver test COMPLETE
   //----------------------------------------------------------------------------
 

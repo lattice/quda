@@ -42,7 +42,7 @@ void CallUnitarizeLinks(quda::cudaGaugeField *cudaInGauge)
   qudaMemset(num_failures_dev, 0, sizeof(int));
   unitarizeLinks(*cudaInGauge, num_failures_dev);
 
-  qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
+  qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), qudaMemcpyDeviceToHost);
   if (num_failures > 0) errorQuda("Error in the unitarization\n");
   device_free(num_failures_dev);
 }
@@ -248,7 +248,6 @@ int main(int argc, char **argv)
 
     // CURAND random generator initialization
     RNG *randstates = new RNG(*gauge, 1234);
-    randstates->Init();
     int nsteps = 10;
     int nhbsteps = 1;
     int novrsteps = 1;
@@ -450,7 +449,6 @@ int main(int argc, char **argv)
     //Release all temporary memory used for data exchange between GPUs in multi-GPU mode
     PGaugeExchangeFree();
 
-    randstates->Release();
     delete randstates;
   }
 

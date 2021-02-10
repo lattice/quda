@@ -51,10 +51,10 @@ namespace quda {
     using Gauge = typename gauge_mapper<real, recon>::type;
     int X[4]; // grid dimensions
     Gauge U;
-    RNG rng;
+    RNGState *rng;
     int border[4];
     dim3 threads; // number of active threads required
-    InitGaugeHotArg(const GaugeField &U, RNG &rng) :
+    InitGaugeHotArg(const GaugeField &U, RNGState *rng) :
       U(U),
       rng(rng),
       //the optimal number of RNG states in rngstate array must be equal to half the lattice volume
@@ -210,7 +210,7 @@ namespace quda {
       int X[4], x[4];
       for ( int dr = 0; dr < 4; ++dr ) X[dr] = arg.X[dr];
       for ( int dr = 0; dr < 4; ++dr ) X[dr] += 2 * arg.border[dr];
-      RNGState localState = arg.rng.State()[x_cb];
+      RNGState localState = arg.rng[x_cb];
       for (int parity = 0; parity < 2; parity++) {
         getCoords(x, x_cb, arg.X, parity);
         for (int dr = 0; dr < 4; dr++) x[dr] += arg.border[dr];
@@ -221,7 +221,7 @@ namespace quda {
           arg.U(d, e_cb, parity) = U;
         }
       }
-      arg.rng.State()[x_cb] = localState;
+      arg.rng[x_cb] = localState;
     }
   };
 

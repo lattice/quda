@@ -4,8 +4,7 @@
 #include <gauge_field.h>
 #include <gauge_field_order.h>
 #include <unitarization_links.h>
-#include <atomic.cuh>
-#include <index_helper.cuh>
+#include <gauge_tools.h>
 
 #include <FFT_Plans.h>
 #include <instantiate.h>
@@ -87,14 +86,16 @@ namespace quda {
 
   template <typename Arg> class GaugeFixerFFT : TunableKernel2D {
     Arg &arg;
+    const GaugeField &field;
     GaugeFixFFTKernel type;
     char aux_tmp[TuneKey::aux_n];
     unsigned int minThreads() const { return arg.threads.x; }
 
   public:
-    GaugeFixerFFT(Arg &arg, const GaugeField &meta) :
-      TunableKernel2D(meta, 2),
-      arg(arg)
+    GaugeFixerFFT(Arg &arg, const GaugeField &field) :
+      TunableKernel2D(field, 2),
+      arg(arg),
+      field(field)
     {
       strcpy(aux_tmp, aux);
     }

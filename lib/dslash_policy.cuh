@@ -1,6 +1,7 @@
 #include <array>
 #include <tune_quda.h>
 #include <index_helper.cuh>
+#include <timer.h>
 
 namespace quda
 {
@@ -10,12 +11,10 @@ namespace quda
 
     extern int it;
 
-    extern cudaEvent_t packEnd[]; // double buffered
-    extern cudaEvent_t gatherStart[];
-    extern cudaEvent_t gatherEnd[];
-    extern cudaEvent_t scatterStart[];
-    extern cudaEvent_t scatterEnd[];
-    extern cudaEvent_t dslashStart[]; // double buffered
+    extern qudaEvent_t packEnd[]; // double buffered
+    extern qudaEvent_t gatherEnd[];
+    extern qudaEvent_t scatterEnd[];
+    extern qudaEvent_t dslashStart[]; // double buffered
 
     // FIX this is a hack from hell
     // Auxiliary work that can be done while waiting on comms to finish
@@ -185,7 +184,7 @@ namespace quda
       if (!dslash.dslashParam.commDim[i]) continue;
 
       for (int dir=1; dir>=0; dir--) { // forwards gather
-        cudaEvent_t &event = (i!=3 || getKernelPackT()) ? packEnd[in.bufferIndex] : dslashStart[in.bufferIndex];
+        auto &event = (i!=3 || getKernelPackT()) ? packEnd[in.bufferIndex] : dslashStart[in.bufferIndex];
 
         PROFILE(qudaStreamWaitEvent(device::get_stream(2*i+dir), event, 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
 
@@ -567,7 +566,7 @@ namespace quda
           if (!dslashParam.commDim[i]) continue;
 
           if (!pack_event) {
-            cudaEventSynchronize(packEnd[in->bufferIndex]);
+            qudaEventSynchronize(packEnd[in->bufferIndex]);
             pack_event = true;
           }
 
@@ -650,7 +649,7 @@ namespace quda
           if (!dslashParam.commDim[i]) continue;
 
           if (!pack_event) {
-            cudaEventSynchronize(packEnd[in->bufferIndex]);
+            qudaEventSynchronize(packEnd[in->bufferIndex]);
             pack_event = true;
           }
 

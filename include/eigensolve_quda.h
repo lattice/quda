@@ -2,6 +2,7 @@
 
 #include <quda.h>
 #include <quda_internal.h>
+#include <timer.h>
 #include <dirac_quda.h>
 #include <color_spinor_field.h>
 

@@ -126,7 +126,6 @@ int main(int argc, char **argv)
     cudaGaugeField *gaugeEx = new cudaGaugeField(gParamEx);
     // CURAND random generator initialization
     RNG *randstates = new RNG(*gauge, 1234);
-    randstates->Init();
 
     int nsteps = heatbath_num_steps;
     int nwarm = heatbath_warmup_steps;
@@ -140,32 +139,22 @@ int main(int argc, char **argv)
     printfQuda("  %d Warmup steps\n", nwarm);
     printfQuda("  %d Measurement steps\n", nsteps);
 
-    if (strcmp(latfile, "")) { // Copy in loaded gauge field
-
-      printfQuda("Loading the gauge field in %s\n", latfile);
-
-      loadGaugeQuda(load_gauge, &gauge_param);
-      // Get pointer to internal resident gauge field
-      cudaGaugeField* extendedGaugeResident = new cudaGaugeField(gParamEx);
-      copyExtendedResidentGaugeQuda((void*)extendedGaugeResident, QUDA_CUDA_FIELD_LOCATION);
-      InitGaugeField(*gaugeEx);
-      copyExtendedGauge(*gaugeEx, *extendedGaugeResident, QUDA_CUDA_FIELD_LOCATION);
-      delete extendedGaugeResident;
-
-    } else if (link_recon != QUDA_RECONSTRUCT_8 && coldstart) {
-      InitGaugeField( *gaugeEx);
+    if (strcmp(latfile, "")) { // We loaded in a gauge field
+      // copy internal extended field to gaugeEx
+      copyExtendedResidentGaugeQuda((void*)gaugeEx);
     } else {
-      InitGaugeField( *gaugeEx, *randstates );
+      if (coldstart) InitGaugeField(*gaugeEx);
+      else InitGaugeField(*gaugeEx, *randstates);
+
+      // copy into regular field
+      copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
+
+      // load the gauge field from gauge
+      gauge_param.gauge_order = gauge->Order();
+      gauge_param.location = QUDA_CUDA_FIELD_LOCATION;
+
+      loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
     }
-
-    // copy into regular field
-    copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
-
-    // load the gauge field from gauge
-    gauge_param.gauge_order = gauge->Order();
-    gauge_param.location = QUDA_CUDA_FIELD_LOCATION;
-
-    loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
 
     QudaGaugeObservableParam param = newQudaGaugeObservableParam();
     param.compute_plaquette = QUDA_BOOLEAN_TRUE;
@@ -245,7 +234,6 @@ int main(int argc, char **argv)
     //Release all temporary memory used for data exchange between GPUs in multi-GPU mode
     PGaugeExchangeFree();
 
-    randstates->Release();
     delete randstates;
   }
 

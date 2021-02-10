@@ -367,10 +367,10 @@ namespace quda {
     static int buffer_recv_p2p_back[2][QUDA_MAX_DIM];
 
     /** Local copy of event used for peer-to-peer synchronization */
-    static cudaEvent_t ipcCopyEvent[2][2][QUDA_MAX_DIM];
+    static qudaEvent_t ipcCopyEvent[2][2][QUDA_MAX_DIM];
 
     /** Remote copy of event used for peer-to-peer synchronization */
-    static cudaEvent_t ipcRemoteCopyEvent[2][2][QUDA_MAX_DIM];
+    static qudaEvent_t ipcRemoteCopyEvent[2][2][QUDA_MAX_DIM];
 
     /** Whether we have initialized communication for this field */
     bool initComms;
@@ -471,12 +471,12 @@ namespace quda {
     /**
        Handle to local copy event used for peer-to-peer synchronization
     */
-    const cudaEvent_t& getIPCCopyEvent(int dir, int dim) const;
+    const qudaEvent_t& getIPCCopyEvent(int dir, int dim) const;
 
     /**
        Handle to remote copy event used for peer-to-peer synchronization
     */
-    const cudaEvent_t& getIPCRemoteCopyEvent(int dir, int dim) const;
+    const qudaEvent_t& getIPCRemoteCopyEvent(int dir, int dim) const;
 
     /**
        Static variable that is determined which ghost buffer we are using
@@ -800,6 +800,19 @@ namespace quda {
   inline const char *compile_type_str(const LatticeField &meta, QudaFieldLocation location_ = QUDA_INVALID_FIELD_LOCATION)
   {
     QudaFieldLocation location = (location_ == QUDA_INVALID_FIELD_LOCATION ? meta.Location() : location_);
+#ifdef JITIFY
+    return location == QUDA_CUDA_FIELD_LOCATION ? "GPU-jitify," : "CPU,";
+#else
+    return location == QUDA_CUDA_FIELD_LOCATION ? "GPU-offline," : "CPU,";
+#endif
+  }
+
+  /**
+     @brief Helper function for setting auxilary string
+     @return String containing location and compilation type
+   */
+  inline const char *compile_type_str(QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION)
+  {
 #ifdef JITIFY
     return location == QUDA_CUDA_FIELD_LOCATION ? "GPU-jitify," : "CPU,";
 #else

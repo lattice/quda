@@ -78,7 +78,7 @@ namespace quda {
   const int TimeProfile::nvtx_num_colors = sizeof(nvtx_colors)/sizeof(uint32_t);
 #endif
 
-  Timer TimeProfile::global_profile[QUDA_PROFILE_COUNT];
+  Timer<> TimeProfile::global_profile[QUDA_PROFILE_COUNT];
   bool TimeProfile::global_switchOff[QUDA_PROFILE_COUNT] = {};
   int TimeProfile::global_total_level[QUDA_PROFILE_COUNT] = {};
 

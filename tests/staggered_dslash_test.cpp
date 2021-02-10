@@ -277,19 +277,16 @@ struct DslashTime {
 DslashTime dslashCUDA(int niter) {
 
   DslashTime dslash_time;
-  timeval tstart, tstop;
 
-  cudaEvent_t start, end;
-  cudaEventCreate(&start);
-  cudaEventRecord(start, device::get_cuda_stream(device::get_default_stream()));
-  cudaEventSynchronize(start);
+  host_timer_t host_timer;
+  device_timer_t device_timer;
 
   comm_barrier();
-  cudaEventRecord(start, device::get_cuda_stream(device::get_default_stream()));
+  device_timer.start();
 
   for (int i = 0; i < niter; i++) {
 
-    gettimeofday(&tstart, NULL);
+    host_timer.start();
 
     switch (dtest_type) {
     case dslash_test_type::Dslash: dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity); break;
@@ -298,28 +295,18 @@ DslashTime dslashCUDA(int niter) {
     default: errorQuda("Test type %d not defined on staggered dslash.\n", static_cast<int>(dtest_type));
     }
 
-    gettimeofday(&tstop, NULL);
-    long ds = tstop.tv_sec - tstart.tv_sec;
-    long dus = tstop.tv_usec - tstart.tv_usec;
-    double elapsed = ds + 0.000001*dus;
+    host_timer.stop();
 
-    dslash_time.cpu_time += elapsed;
+    dslash_time.cpu_time += host_timer.last();
     // skip first and last iterations since they may skew these metrics if comms are not synchronous
     if (i>0 && i<niter) {
-      if (elapsed < dslash_time.cpu_min) dslash_time.cpu_min = elapsed;
-      if (elapsed > dslash_time.cpu_max) dslash_time.cpu_max = elapsed;
+      dslash_time.cpu_min = std::min(dslash_time.cpu_min, host_timer.last());
+      dslash_time.cpu_max = std::max(dslash_time.cpu_max, host_timer.last());
     }
   }
 
-  cudaEventCreate(&end);
-  cudaEventRecord(end, device::get_cuda_stream(device::get_default_stream()));
-  cudaEventSynchronize(end);
-  float runTime;
-  cudaEventElapsedTime(&runTime, start, end);
-  cudaEventDestroy(start);
-  cudaEventDestroy(end);
-
-  dslash_time.event_time = runTime / 1000;
+  device_timer.stop();
+  dslash_time.event_time = device_timer.last();
 
   return dslash_time;
 }

@@ -11,6 +11,11 @@ namespace quda
     void init(int dev);
 
     /**
+       @brief Get number of devices present on node
+    */
+    int get_device_count();
+
+    /**
        @brief Query and print to stdout device properties of all GPUs
     */
     void print_device_properties();

@@ -290,8 +290,7 @@ int main(int argc, char **argv)
   std::vector<double> gflops(Nsrc);
   std::vector<int> iter(Nsrc);
 
-  auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
-  rng->Init();
+  auto *rng = new quda::RNG(*check, 1234);
 
   for (int i = 0; i < Nsrc; i++) {
 
@@ -315,7 +314,6 @@ int main(int argc, char **argv)
   // QUDA invert test COMPLETE
   //----------------------------------------------------------------------------
 
-  rng->Release();
   delete rng;
 
   // free the multigrid solver

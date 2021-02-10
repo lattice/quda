@@ -1109,7 +1109,7 @@ extern "C" {
    * @param inverse Whether to apply the inverse of the clover term
    */
   void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param,
-      QudaParity *parity, int inverse);
+                  QudaParity parity, int inverse);
 
   /**
    * Apply the full Dslash matrix, possibly even/odd preconditioned.
@@ -1279,7 +1279,7 @@ extern "C" {
    * @param gauge_param Gauge field meta data
    * @param invert_param Dirac and solver meta data
    */
-  void computeStaggeredForceQuda(void* mom, double dt, double delta, void **x, void *gauge,
+  void computeStaggeredForceQuda(void* mom, double dt, double delta, void *gauge, void **x,
 				 QudaGaugeParam *gauge_param, QudaInvertParam *invert_param);
 
   /**
@@ -1331,10 +1331,9 @@ extern "C" {
 
   /**
    * Performs a deep copy from the internal extendedGaugeResident field.
-   * @param Pointer to externalGaugeResident cudaGaugeField
-   * @param Location of gauge field
+   * @param Pointer to externally allocated GaugeField
    */
-  void copyExtendedResidentGaugeQuda(void* resident_gauge, QudaFieldLocation loc);
+  void copyExtendedResidentGaugeQuda(void* resident_gauge);
 
   /**
    * Performs Wuppertal smearing on a given spinor using the gauge field

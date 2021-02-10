@@ -16,7 +16,11 @@ namespace quda {
     // size is equal to number of fine points per aggregate, rounded
     // up to a whole power of two.  So for example, 2x2x2x2 and
     // 3x3x3x1 aggregation would both use the same block size 32
+#ifndef QUDA_FAST_COMPILE_REDUCE
     static constexpr std::array<unsigned int, 6> block = {32, 64, 128, 256, 512, 1024};
+#else
+    static constexpr std::array<unsigned int, 1> block = {1024};
+#endif
 
     /**
        @brief Return the first power of two block that is larger than the required size
@@ -29,7 +33,11 @@ namespace quda {
     }
   };
 
+#ifndef QUDA_FAST_COMPILE_REDUCE
   constexpr std::array<unsigned int, 6> OrthoAggregates::block;
+#else
+  constexpr std::array<unsigned int, 1> OrthoAggregates::block;
+#endif
 
   using namespace quda::colorspinor;
 
@@ -220,9 +228,9 @@ namespace quda {
   {
     const int Nvec = B.size();
     if (V.Ncolor()/Nvec == 3) {
-      constexpr int nColor = 3;
 #ifdef NSPIN4
       if (V.Nspin() == 4) {
+        constexpr int nColor = 3;
         constexpr int nSpin = 4;
         if (spin_bs != 2) errorQuda("Unexpected spin block size = %d", spin_bs);
         constexpr int spinBlockSize = 2;
@@ -243,6 +251,7 @@ namespace quda {
 #endif // NSPIN4
 #ifdef NSPIN1
       if (V.Nspin() == 1) {
+        constexpr int nColor = 3;
         constexpr int nSpin = 1;
         if (spin_bs != 0) errorQuda("Unexpected spin block size = %d", spin_bs);
         constexpr int spinBlockSize = 0;

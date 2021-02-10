@@ -50,12 +50,10 @@ namespace quda {
     static constexpr int nDir = 2;
     static constexpr int nStream = nDim * nDir + 1;
 
-    cudaEvent_t packEnd[2];
-    cudaEvent_t gatherStart[nStream];
-    cudaEvent_t gatherEnd[nStream];
-    cudaEvent_t scatterStart[nStream];
-    cudaEvent_t scatterEnd[nStream];
-    cudaEvent_t dslashStart[2];
+    qudaEvent_t packEnd[2];
+    qudaEvent_t gatherEnd[nStream];
+    qudaEvent_t scatterEnd[nStream];
+    qudaEvent_t dslashStart[2];
 
     // these variables are used for benchmarking the dslash components in isolation
     bool dslash_pack_compute;
@@ -88,21 +86,16 @@ namespace quda {
   void createDslashEvents()
   {
     using namespace dslash;
-    // add cudaEventDisableTiming for lower sync overhead
     for (int i=0; i<nStream; i++) {
-      cudaEventCreateWithFlags(&gatherStart[i], cudaEventDisableTiming);
-      cudaEventCreateWithFlags(&gatherEnd[i], cudaEventDisableTiming);
-      cudaEventCreateWithFlags(&scatterStart[i], cudaEventDisableTiming);
-      cudaEventCreateWithFlags(&scatterEnd[i], cudaEventDisableTiming);
+      gatherEnd[i] = qudaEventCreate();
+      scatterEnd[i] = qudaEventCreate();
     }
     for (int i=0; i<2; i++) {
-      cudaEventCreateWithFlags(&packEnd[i], cudaEventDisableTiming);
-      cudaEventCreateWithFlags(&dslashStart[i], cudaEventDisableTiming);
+      packEnd[i] = qudaEventCreate();
+      dslashStart[i] = qudaEventCreate();
     }
 
     aux_worker = NULL;
-
-    checkCudaError();
 
     dslash_pack_compute = true;
     dslash_interior_compute = true;
@@ -125,24 +118,19 @@ namespace quda {
     strcat(policy_string, ",pol=");
   }
 
-
   void destroyDslashEvents()
   {
     using namespace dslash;
 
     for (int i=0; i<nStream; i++) {
-      cudaEventDestroy(gatherStart[i]);
-      cudaEventDestroy(gatherEnd[i]);
-      cudaEventDestroy(scatterStart[i]);
-      cudaEventDestroy(scatterEnd[i]);
+      qudaEventDestroy(gatherEnd[i]);
+      qudaEventDestroy(scatterEnd[i]);
     }
 
     for (int i=0; i<2; i++) {
-      cudaEventDestroy(packEnd[i]);
-      cudaEventDestroy(dslashStart[i]);
+      qudaEventDestroy(packEnd[i]);
+      qudaEventDestroy(dslashStart[i]);
     }
-
-    checkCudaError();
   }
 
   template <typename Float, int nColor> class GammaApply : public TunableKernel2D {
