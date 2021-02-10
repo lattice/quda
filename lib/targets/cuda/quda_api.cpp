@@ -1,12 +1,9 @@
 #include <unordered_set>
 #include <tune_quda.h>
 #include <uint_to_char.h>
-#include <cuda.h>
-#include <cuda_runtime.h>
 #include <quda_internal.h>
 #include <timer.h>
 #include <device.h>
-#include <target_device.h>
 
 // if this macro is defined then we use the driver API, else use the
 // runtime API.  Typically the driver API has 10-20% less overhead
@@ -68,7 +65,7 @@ namespace quda {
   }
 
   using namespace cuda;
-  
+
   // Agnostic way to return a cuda API flag
   namespace {
     inline
@@ -126,10 +123,10 @@ namespace quda {
       auto search = cache.find(func);
       if (search == cache.end()) {
         cache.insert(func);
-        cudaFuncSetAttribute(func, cudaFuncAttributePreferredSharedMemoryCarveout, (int)cudaSharedmemCarveoutMaxShared);
+        qudaFuncSetAttribute(func, cudaFuncAttributePreferredSharedMemoryCarveout, (int)cudaSharedmemCarveoutMaxShared);
         cudaFuncAttributes attributes;
-        cudaFuncGetAttributes(&attributes, func);
-        cudaFuncSetAttribute(func, cudaFuncAttributeMaxDynamicSharedMemorySize,
+        qudaFuncGetAttributes(attributes, func);
+        qudaFuncSetAttribute(func, cudaFuncAttributeMaxDynamicSharedMemorySize,
                              device::max_dynamic_shared_memory() - attributes.sharedSizeBytes);
       }
     }
@@ -193,8 +190,8 @@ namespace quda {
       apply(stream);
     }
 
-    inline QudaMem(void *dst, int value, size_t count, const qudaStream_t &stream, bool async,
-		   const char *func, const char *file, const char *line) :
+    inline QudaMem(void *dst, int value, size_t count, const qudaStream_t &stream, bool async, const char *func,
+                   const char *file, const char *line) :
       dst(dst),
       src(nullptr),
       count(count),
@@ -341,7 +338,8 @@ namespace quda {
   {
     if (count == 0) return;
     auto error = cudaMemcpyAsync(dst, src, count, cudaMemcpyDeviceToDevice, device::get_cuda_stream(stream));
-    set_runtime_error(error, "cudaMemcpyAsync", func, file, line);
+    if (error != cudaSuccess)
+      errorQuda("cudaMemcpyAsync returned %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
   void qudaMemcpy2D_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
@@ -555,7 +553,7 @@ namespace quda {
     set_runtime_error(error, __func__, func, file, line);
 #endif
   }
-  
+
   void qudaStreamSynchronize_(const qudaStream_t &stream, const char *func, const char *file, const char *line)
   {
 #ifdef USE_DRIVER_API
