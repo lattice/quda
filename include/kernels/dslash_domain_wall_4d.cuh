@@ -28,9 +28,6 @@ namespace quda
 
   template <class OpA>
     __device__ inline void mma(float op_c[], const OpA &op_a, float op_b) {
-      if (blockIdx.x == 0) {
-        // printf("thread = %2d, op_c = %f, op_b = %f, op_a = %f %f\n", threadIdx.x, op_c[0], op_b, op_a(0).real(), op_a(0).imag());
-      }
 #pragma unroll
       for (int r = 0; r < 2; r++) {
         asm volatile("mma.sync.aligned.m16n8k4.row.col.f32.tf32.tf32.f32 {%0,%1,%2,%3}, {%4,%5}, {%6}, {%0,%1,%2,%3};"
@@ -54,9 +51,6 @@ namespace quda
             : "r"(__float_as_uint(op_a(r * 2 + 0).imag())),
               "r"(__float_as_uint(op_a(r * 2 + 1).imag())),
               "r"(__float_as_uint(op_b))); 
-      }
-      if (blockIdx.x == 0) {
-        // printf("thread = %2d, op_c = %f, op_b = %f, op_a = %f %f\n", threadIdx.x, op_c[0], op_b, op_a(0).real(), op_a(0).imag());
       }
     }
 
@@ -159,7 +153,7 @@ namespace quda
         }
 
         if (warp_k < Nc && warp_n < Nc * 2 && !ghost) {
-          op_b_fixed = arg.U(gauge_idx, d, gauge_parity, color_m, color_n, comp); // color i, j, complex
+          op_b_fixed = arg.U(gauge_idx, d, 1 - gauge_parity, color_m, color_n, comp); // color i, j, complex
           if (comp == 1) { op_b_fixed = -op_b_fixed; }
           op_b = static_cast<float_type>(op_b_fixed) * fixedInvMaxValue<fixed_type>::value;
         } else {
@@ -177,9 +171,6 @@ namespace quda
       unsigned x = __float_as_uint(fabs(op_c[c]));
       if (max < x) { max = x; }
     }
-    if (blockIdx.x == 0) {
-      printf("thread = %2d, max = %f\n", threadIdx.x, __uint_as_float(max));
-    }
 
 #pragma unroll
     for (int offset = 2; offset > 0; offset /= 2) {
@@ -187,9 +178,6 @@ namespace quda
       if (max < fetch) { max = fetch; }
     }
     max = __shfl_sync(0xffffffff, max, (lane_id / 4) * 4);
-    if (blockIdx.x == 0) {
-      printf("thread = %2d, max = %f\n", threadIdx.x, __uint_as_float(max));
-    }
 
     // TODO: Fix the parity.
     if (s < Ls && color == 0) arg.out.norm[x_cb + arg.dc.volume_4d_cb * s] = __uint_as_float(max);
