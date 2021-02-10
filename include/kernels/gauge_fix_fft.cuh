@@ -70,10 +70,10 @@ namespace quda {
     }
   };
 
-  template <typename Float_, QudaReconstructType recon>
+  template <typename store_t, QudaReconstructType recon>
   struct GaugeFixArg {
-    using Float = Float_;
-    using Gauge = typename gauge_mapper<Float, recon>::type;
+    using Float = typename mapper<store_t>::type;
+    using Gauge = typename gauge_mapper<store_t, recon>::type;
     static constexpr int elems = recon / 2;
     Gauge data;
     int_fastdiv X[4];     // grid dimensions
@@ -185,13 +185,13 @@ namespace quda {
     Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
     constexpr FixQualityFFT(Arg &arg) : arg(arg) {}
-    
+
     /**
      * @brief Measure gauge fixing quality
      */
     __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
     {
-      reduce_t data = zero<reduce_t>(); 
+      reduce_t data = zero<reduce_t>();
       using matrix = Matrix<complex<typename Arg::real>, 3>;
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
