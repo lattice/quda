@@ -20,12 +20,6 @@ void display_info()
   printfQuda("%s   %s             %s            %s            %d/%d/%d          %d\n", get_prec_str(prec),
              get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy), xdim, ydim, zdim,
              tdim);
-  printfQuda("\nWilson Flow\n");
-  printfQuda(" - epsilon %f\n", wflow_epsilon);
-  printfQuda(" - Wilson flow steps %d\n", wflow_steps);
-  printfQuda(" - Wilson flow type %s\n", wflow_type == QUDA_WFLOW_TYPE_WILSON ? "Wilson" : "Symanzik");
-  printfQuda(" - Measurement interval %d\n", measurement_interval);
-
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
@@ -84,9 +78,13 @@ int main(int argc, char **argv)
   // Load the gauge field to the device
   loadGaugeQuda((void *)gauge, &gauge_param);
 
-  // By passing null pointers to this function, QUDA infers that you want QUDA
-  // compute the clover terms and inverses for you from the gaige feild
-  loadCloverQuda(nullptr, nullptr, &inv_param);
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    // By passing null pointers to this function, QUDA infers that you want QUDA
+    // compute the clover terms and inverses for you from the gauge field. If you
+    // Want to pass your own clover fields, study the example given in the `invert_test.cpp`
+    // file in quda/tests.
+    loadCloverQuda(nullptr, nullptr, &inv_param);
+  }
   
   // Plaquette measurement
   // start the timer
@@ -119,7 +117,7 @@ int main(int argc, char **argv)
   // RNG for populating the host spinor with random numbers.
   auto *rng = new quda::RNG(*check, 1234);
   
-  // Run the QUDA computation
+  // Run the QUDA computation. The the metropolis step is performed in the function.
   for(int i=0; i<hmc_param.updates; i++) {
     constructRandomSpinorSource(in->V(), 4, 3, inv_param.cpu_prec, inv_param.solution_type, gauge_param.X, *rng);      
     performLeapfrogStep(out->V(), in->V(), &hmc_param, i);
@@ -132,7 +130,6 @@ int main(int argc, char **argv)
   printfQuda("Total time for leapfrog  = %g secs\n", time0);
   //--------------------------------------------------------------------------
 
-  // If the --save-gauge flag was passed, this will save the Wilson flowed gauge field
   saveHostGaugeField(gauge, gauge_param, QUDA_WILSON_LINKS);
   
   // Clean up

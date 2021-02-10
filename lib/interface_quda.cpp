@@ -213,6 +213,9 @@ static TimeProfile profileGaugeUpdate("updateGaugeFieldQuda");
 //!<Profiler for createExtendedGaugeField
 static TimeProfile profileExtendedGauge("createExtendedGaugeField");
 
+//!<Profiler for computeWilsonForceQuda
+static TimeProfile profileWilsonForce("computeWilsonForceQuda");
+
 //!<Profiler for computeCloverForceQuda
 static TimeProfile profileCloverForce("computeCloverForceQuda");
 
@@ -1602,6 +1605,7 @@ void endQuda(void)
     profileGaugeForce.Print();
     profileGaugeUpdate.Print();
     profileExtendedGauge.Print();
+    profileWilsonForce.Print();
     profileCloverForce.Print();
     profileStaggeredForce.Print();
     profileHISQForce.Print();
@@ -1644,9 +1648,14 @@ namespace quda {
 
   void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, const bool pc)
   {
+    // Decide which fields to use. The Evolved fields take precedent over Precise fields
+    // because if it exists then gaugePrecise is being preserved.
+    cudaCloverField *cloverField = cloverEvolved ? cloverEvolved : cloverPrecise;
+    cudaGaugeField *gaugeField = gaugeEvolved ? gaugeEvolved : gaugePrecise;
+
     double kappa = inv_param->kappa;
     if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
-      kappa *= gaugePrecise->Anisotropy();
+      kappa *= gaugeField->Anisotropy();
     }
 
     switch (inv_param->dslash_type) {
@@ -1744,10 +1753,10 @@ namespace quda {
 
     diracParam.matpcType = inv_param->matpc_type;
     diracParam.dagger = inv_param->dagger;
-    diracParam.gauge = inv_param->dslash_type == QUDA_ASQTAD_DSLASH ? gaugeFatPrecise : gaugePrecise;
-    diracParam.fatGauge = gaugeFatPrecise;
-    diracParam.longGauge = gaugeLongPrecise;
-    diracParam.clover = cloverPrecise;
+    diracParam.gauge = inv_param->dslash_type == QUDA_ASQTAD_DSLASH ? gaugeFatPrecise : gaugeField; //DMH HMC FIXME
+    diracParam.fatGauge = gaugeFatPrecise; //DMH HMC FIXME
+    diracParam.longGauge = gaugeLongPrecise; //DMH HMC FIXME
+    diracParam.clover = cloverField; 
     diracParam.kappa = kappa;
     diracParam.mass = inv_param->mass;
     diracParam.m5 = inv_param->m5;
@@ -4836,14 +4845,25 @@ void computeHISQForceQuda(void* const milc_momentum,
   profileHISQForce.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
+void computeWilsonForceQuda(void *h_mom, double dt, void **h_x, void **dummy1,
+			    double *coeff, double kappa2, double ck,
+			    int nvector, double multiplicity, void *dummy2,
+			    QudaGaugeParam *gauge_param, QudaInvertParam *inv_param) {
+  
+  // Set ck to zero so that the clover path is not used.
+  ck = 0.0;
+  computeCloverForceQuda(h_mom, dt, h_x, dummy1, coeff, kappa2, ck,
+			 nvector, multiplicity, dummy2, gauge_param, inv_param);  
+}
+
 void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **,
 			    double *coeff, double kappa2, double ck,
 			    int nvector, double multiplicity, void *,
 			    QudaGaugeParam *gauge_param, QudaInvertParam *inv_param)
 { 
   using namespace quda;
-  profileCloverForce.TPSTART(QUDA_PROFILE_TOTAL);
-  profileCloverForce.TPSTART(QUDA_PROFILE_INIT);
+  profileWilsonForce.TPSTART(QUDA_PROFILE_TOTAL);
+  profileWilsonForce.TPSTART(QUDA_PROFILE_INIT);
 
   // Begin Wilson type spinor force computation (can be used for any Wilson
   // type spinor.
@@ -4918,10 +4938,10 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **,
   // create oprod and trace fields
   fParam.geometry = QUDA_TENSOR_GEOMETRY;
   cudaGaugeField oprod(fParam);
-   
-  profileCloverForce.TPSTOP(QUDA_PROFILE_INIT);
-  profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
-
+  
+  profileWilsonForce.TPSTOP(QUDA_PROFILE_INIT);
+  profileWilsonForce.TPSTART(QUDA_PROFILE_COMPUTE);
+  
   std::vector<double> force_coeff(nvector);
   // loop over different quark fields
   for(int i=0; i<nvector; i++){
@@ -4933,18 +4953,18 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **,
       qParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
       qParam.x[0] /= 2;
 
-      // Wrap the even-parity MILC quark field
-      profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
-      profileCloverForce.TPSTART(QUDA_PROFILE_INIT);
+      // Wrap the even-parity quark field
+      profileWilsonForce.TPSTOP(QUDA_PROFILE_COMPUTE);
+      profileWilsonForce.TPSTART(QUDA_PROFILE_INIT);
       qParam.v = h_x[i];
       cpuColorSpinorField cpuQuarkX(qParam); // create host quark field
-      profileCloverForce.TPSTOP(QUDA_PROFILE_INIT);
+      profileWilsonForce.TPSTOP(QUDA_PROFILE_INIT);
 
-      profileCloverForce.TPSTART(QUDA_PROFILE_H2D);
+      profileWilsonForce.TPSTART(QUDA_PROFILE_H2D);
       x.Even() = cpuQuarkX;
-      profileCloverForce.TPSTOP(QUDA_PROFILE_H2D);
+      profileWilsonForce.TPSTOP(QUDA_PROFILE_H2D);
 
-      profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
+      profileWilsonForce.TPSTART(QUDA_PROFILE_COMPUTE);
       gamma5(x.Even(), x.Even());
     } else {
       x.Even() = *(solutionResident[i]);
@@ -4962,16 +4982,20 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **,
     force_coeff[i] = 2.0*dt*coeff[i]*kappa2;
   }
 
-  computeCloverForce(cudaForce, *gaugePrecise, quarkX, quarkP, force_coeff);
+  computeWilsonForce(cudaForce, *gaugePrecise, quarkX, quarkP, force_coeff);
+  profileWilsonForce.TPSTOP(QUDA_PROFILE_COMPUTE);
+  profileWilsonForce.TPSTOP(QUDA_PROFILE_TOTAL);
   //--------------------------------------------------------------------------
 
   
   // Begin clover specific force computation
   //--------------------------------------------------------------------------
-
+  
   // Find a better was to delineate this without breaking the interface
-  if(ck != 0) {
-    // In double precision the clover derivative is faster with no reconstruct
+  if(ck != 0) {    
+    profileCloverForce.TPSTART(QUDA_PROFILE_TOTAL);
+    profileCloverForce.TPSTART(QUDA_PROFILE_INIT);
+     // In double precision the clover derivative is faster with no reconstruct
     cudaGaugeField *u = &gaugeEx;
     if (gaugeEx.Reconstruct() == QUDA_RECONSTRUCT_12 && gaugeEx.Precision() == QUDA_DOUBLE_PRECISION) {
       GaugeFieldParam param(gaugeEx);
@@ -4979,7 +5003,9 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **,
       u = new cudaGaugeField(param);
       u -> copy(gaugeEx);
     }
-    
+
+    profileCloverForce.TPSTOP(QUDA_PROFILE_INIT);
+    profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
     computeCloverSigmaTrace(oprod, *cloverPrecise, 2.0*ck*multiplicity*dt);
     
     /* Now the U dA/dU terms */
@@ -4991,6 +5017,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **,
     }
     
     computeCloverSigmaOprod(oprod, quarkX, quarkP, ferm_epsilon);
+    profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
     
     cudaGaugeField *oprodEx = createExtendedGauge(oprod, R, profileCloverForce);
     
@@ -4998,35 +5025,30 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **,
     
     cloverDerivative(cudaForce, *u, *oprodEx, 1.0, QUDA_ODD_PARITY);
     cloverDerivative(cudaForce, *u, *oprodEx, 1.0, QUDA_EVEN_PARITY);
+    profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
     
     if (u != &gaugeEx) delete u;
   }
-  
-  updateMomentum(cudaMom, -1.0, cudaForce, ck == 0 ? "wilson" : "clover");
-  profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  profileWilsonForce.TPSTART(QUDA_PROFILE_COMPUTE);
+  updateMomentum(cudaMom, -1.0, cudaForce, "wilson");
+  profileWilsonForce.TPSTOP(QUDA_PROFILE_COMPUTE);
   
   // copy the outer product field back to the host
-  profileCloverForce.TPSTART(QUDA_PROFILE_D2H);
+  profileWilsonForce.TPSTART(QUDA_PROFILE_D2H);
   cudaMom.saveCPUField(cpuMom);
-  profileCloverForce.TPSTOP(QUDA_PROFILE_D2H);
+  profileWilsonForce.TPSTOP(QUDA_PROFILE_D2H);
 
-  profileCloverForce.TPSTART(QUDA_PROFILE_FREE);
+  profileWilsonForce.TPSTART(QUDA_PROFILE_FREE);
 
   for (int i=0; i<nvector; i++) {
     delete quarkX[i];
     delete quarkP[i];
   }
-
-#if 0
-  if (inv_param->use_resident_solution) {
-    for (auto v : solutionResident) if (v) delete v;
-    solutionResident.clear();
-  }
-#endif
   delete dirac;
-  profileCloverForce.TPSTOP(QUDA_PROFILE_FREE);
-
-  profileCloverForce.TPSTOP(QUDA_PROFILE_TOTAL);
+  
+  profileWilsonForce.TPSTOP(QUDA_PROFILE_FREE);
+  profileWilsonForce.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
 
@@ -6152,21 +6174,6 @@ void performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMC
   inv_param->gflops = 0;
   inv_param->iter = 0;
 
-  // Create the dirac operator and operators for sloppy, precondition,
-  // and an eigensolver. 
-  //---------------------------------------------------------------------
-  Dirac *d = nullptr;
-  Dirac *dSloppy = nullptr;
-  Dirac *dPre = nullptr;
-  Dirac *dEig = nullptr;
-
-  createDiracWithEig(d, dSloppy, dPre, dEig, *inv_param, pc_solve);
-
-  Dirac &dirac = *d;
-  Dirac &diracSloppy = *dSloppy;
-  Dirac &diracPre = *dPre;
-  Dirac &diracEig = *dEig;
-
   // Define gauge coefficients
   QudaGaugeActionType gauge_action_type = QUDA_GAUGE_ACTION_TYPE_WILSON;
   double path_coeff[3] = {1.0, 1.0, 1.0};
@@ -6198,7 +6205,7 @@ void performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMC
   mom_param.pad = 0;
   mom_param.setPrecision(inv_param->cuda_prec, true);
   // If the resident momentum field exists, reuse.
-  GaugeField *device_mom = device_mom ? device_mom : GaugeField::Create(mom_param);
+  GaugeField *device_mom = GaugeField::Create(mom_param);
 
   // Populate the momentum field with rands, make anti hermitian
   // DMH FIXME: add a global seed to QUDA. 
@@ -6208,7 +6215,7 @@ void performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMC
   profileGauss.TPSTOP(QUDA_PROFILE_COMPUTE);
   profileGauss.TPSTOP(QUDA_PROFILE_TOTAL);
   
-  // Create a field for the outer product
+  // Create a field for clover the outer product
   GaugeFieldParam oprod_param(*gaugeEvolved);
   oprod_param.geometry = QUDA_TENSOR_GEOMETRY;
   GaugeField *oprod = GaugeField::Create(oprod_param); ;
@@ -6273,14 +6280,30 @@ void performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMC
   
   // Download any data from the host.
   *source = *host_source;
-  *solution = *host_solution;
 
+  // Create the dirac operator and operators for sloppy, precondition,
+  // and an eigensolver. We muct do this each time a gauge field is
+  // updated.
+  //---------------------------------------------------------------------
+  Dirac *d = nullptr;
+  Dirac *dSloppy = nullptr;
+  Dirac *dPre = nullptr;
+  Dirac *dEig = nullptr;
+  createDiracWithEig(d, dSloppy, dPre, dEig, *inv_param, pc_solve);
+  Dirac &dirac = *d;
+  Dirac &diracSloppy = *dSloppy;
+  Dirac &diracPre = *dPre;
+  Dirac &diracEig = *dEig;
+  
+  // Create a solver
+  DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre), mEig(diracEig);
+  SolverParam solverParam(*inv_param);
+  Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, mEig, profileInvert);
+  
   // Create Gaussian distributed fermion field chi
   auto *rng = new RNG(*gaugePrecise, 1234);
-  spinorNoise(*out, *rng, QUDA_NOISE_GAUSS);
-  dirac.M(*in, *out); // apply the operator to out(chi) place the result
-  // in in(phi)
-
+  spinorNoise(*solution, *rng, QUDA_NOISE_GAUSS);
+  dirac.M(*source, *solution); // apply the operator to out(chi) place the result in in(phi)
   // Rescale the source and solution vectors to help prevent the onset of underflow
   double nb = blas::norm2(*source);
   if (nb==0.0) errorQuda("Source has zero norm");
@@ -6291,7 +6314,6 @@ void performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMC
 
   // Rescale further dependening on kappa or mass normalisation
   massRescale(*static_cast<cudaColorSpinorField *>(source), *inv_param, false);
-
   // If requesting a preconditioned solve, we must prepare the vectors
   // with the red-black preconditioning.
   dirac.prepare(in, out, *solution, *source, inv_param->solution_type);
@@ -6301,21 +6323,23 @@ void performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMC
     printfQuda("Prepared source = %g\n", nin);
     printfQuda("Prepared solution = %g\n", nout);
   }
-
   if (getVerbosity() >= QUDA_VERBOSE) {
     double nin = blas::norm2(*in);
     printfQuda("Prepared source post mass rescale = %g\n", nin);
   }
 
-  // Some temporary fields for the force
+  // Some temporary fields for the force. These need to be full fields
+  ColorSpinorParam quark_param(cudaParam);
+  quark_param.siteSubset = QUDA_FULL_SITE_SUBSET;
+  quark_param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+  quark_param.create = QUDA_NULL_FIELD_CREATE;
+  quark_param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+  quark_param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+
   std::vector<ColorSpinorField*> quarkX, quarkP;
-  quarkX.push_back(ColorSpinorField::Create(cudaParam));
-  quarkP.push_back(ColorSpinorField::Create(cudaParam));
+  quarkX.push_back(ColorSpinorField::Create(quark_param));
+  quarkP.push_back(ColorSpinorField::Create(quark_param));
   
-  // Create a solver
-  DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre), mEig(diracEig);
-  SolverParam solverParam(*inv_param);
-  Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, mEig, profileInvert);
   //---------------------------------------------------------------------
     
   // Start HMC 
@@ -6349,10 +6373,11 @@ void performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMC
   (*solve)(*out, *in);
   solverParam.updateInvertParam(*inv_param);
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);  
-  dirac.reconstruct(*solution, *source, inv_param->solution_type);  
+  dirac.reconstruct(*solution, *source, inv_param->solution_type);
+  delete solve;
+  
   double fermion_action = blas::norm2(*solution);  
 
-  
   if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Pre  step %d: gauge action %.16e momentum action %.16e fermion_action %.16e Q charge %.16e plaq = %.16e\n",
 						 step, gauge_action, momentum_action, fermion_action, gauge_obs_param.qcharge, gauge_obs_param.plaquette[0]);
 
@@ -6366,26 +6391,41 @@ void performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMC
   gaugeEvolved->exchangeExtendedGhost(gaugeEvolved->R(), false);
   profileGaugeUpdate.TPSTOP(QUDA_PROFILE_COMPUTE);
   profileGaugeUpdate.TPSTOP(QUDA_PROFILE_TOTAL);
-
+  
   for(int k=1; k<hmc_param->traj_steps; k++) {
-
+    
     // We just evolved the gauge field, so we must recompute the fermion fields
     // and invert to calculate the impulse on the fermion.
+
+    // Create a solver
+    DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre), mEig(diracEig);
+    SolverParam solverParam(*inv_param);
+    Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, mEig, profileInvert);        
     createCloverQuda(inv_param);
     profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
     (*solve)(*out, *in);
     solverParam.updateInvertParam(*inv_param);
     profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);        
     dirac.reconstruct(*solution, *source, inv_param->solution_type);
+    delete solve;
     
-    quarkX[0]->Even() = *(solutionResidentNew[0]);    
+    printfQuda("Here step %d\n", k);    
+    quarkX[0]->Even() = solution->Even();
+    printfQuda("Here step %d.1\n", k);
     dirac.Dslash(quarkX[0]->Odd(), quarkX[0]->Even(), QUDA_ODD_PARITY);
+    printfQuda("Here step %d.2\n", k);
     dirac.M(quarkP[0]->Even(), quarkX[0]->Even());
+    printfQuda("Here step %d.3\n", k);
     dirac.Dagger(QUDA_DAG_YES);
+    printfQuda("Here step %d.4\n", k);
     dirac.Dslash(quarkP[0]->Odd(), quarkP[0]->Even(), QUDA_ODD_PARITY);
+    printfQuda("Here step %d.5\n", k);
     dirac.Dagger(QUDA_DAG_NO);
+    printfQuda("Here step %d.6\n", k);
     gamma5(*quarkX[0], *quarkX[0]);
+    printfQuda("Here step %d.7\n", k);
     gamma5(*quarkP[0], *quarkP[0]);
+    printfQuda("Here step %d.8\n", k);
     
     std::vector<double> force_coeff(1,2.0);//*epsilon*kappa*kappa*nnn; ???
     
@@ -6394,7 +6434,7 @@ void performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMC
     // DMH FIXME: Rename this to computeWilsonForce and propagator through
     // the kernels?
     profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
-    computeCloverForce(*force, *gaugeEvolved, quarkX, quarkP, force_coeff);
+    computeWilsonForce(*force, *gaugeEvolved, quarkX, quarkP, force_coeff);
     updateMomentum(*device_mom, -1.0, *force, "wilson");
     // DMH FIXME amalgamate these two functions.
     profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);

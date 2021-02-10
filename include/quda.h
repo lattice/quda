@@ -1304,6 +1304,28 @@ extern "C" {
   void createCloverQuda(QudaInvertParam* param);
 
   /**
+   * Compute the wilson force contributions in each dimension mu given
+   * the array of solution fields, and compute the resulting momentum
+   * field.
+   *
+   * @param mom Force matrix
+   * @param dt Integrating step size
+   * @param x Array of solution vectors
+   * @param p Array of intermediate vectors
+   * @param coeff Array of residues for each contribution (multiplied by stepsize)
+   * @param kappa2 -kappa*kappa parameter
+   * @param ck -clover_coefficient * kappa / 8
+   * @param nvec Number of vectors
+   * @param multiplicity Number fermions this bilinear reresents
+   * @param gauge Gauge Field
+   * @param gauge_param Gauge field meta data
+   * @param inv_param Dirac and solver meta data
+   */
+  void computeWilsonForceQuda(void *mom, double dt, void **x, void **p, double *coeff, double kappa2, double ck,
+			      int nvector, double multiplicity, void *gauge,
+			      QudaGaugeParam *gauge_param, QudaInvertParam *inv_param);
+  
+  /**
    * Compute the clover force contributions in each dimension mu given
    * the array of solution fields, and compute the resulting momentum
    * field.

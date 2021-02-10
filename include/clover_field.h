@@ -385,26 +385,6 @@ namespace quda {
   void cloverRho(CloverField &clover, double rho);
 
   /**
-     @brief Compute the force contribution from the solver solution fields
-   
-     Force(x, mu) = U(x, mu) * sum_i=1^nvec ( P_mu^+ x(x+mu) p(x)^\dag  +  P_mu^- p(x+mu) x(x)^\dag )
-
-      M = A_even - kappa^2 * Dslash * A_odd^{-1} * Dslash
-      x(even) = M^{-1} b(even)
-      x(odd)  = A_odd^{-1} * Dslash * x(even)
-      p(even) = M * x(even)
-      p(odd)  = A_odd^{-1} * Dslash^dag * M * x(even). 
-
-     @param force[out,in] The resulting force field
-     @param U The input gauge field
-     @param x Solution field (both parities)
-     @param p Intermediate vectors (both parities)
-     @param coeff Multiplicative coefficient (e.g., dt * residue)
-   */
-  void computeCloverForce(GaugeField& force, const GaugeField& U,
-			  std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &p,
-			  std::vector<double> &coeff);
-  /**
      @brief Compute the outer product from the solver solution fields
      arising from the diagonal term of the fermion bilinear in
      direction mu,nu and sum to outer product field.

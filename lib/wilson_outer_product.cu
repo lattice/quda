@@ -1,15 +1,15 @@
 #include <dslash_quda.h>
 #include <tunable_nd.h>
 #include <instantiate.h>
-#include <kernels/clover_outer_product.cuh>
+#include <kernels/wilson_outer_product.cuh>
 
 namespace quda {
 
   enum OprodKernelType { INTERIOR, EXTERIOR };
 
-  template <typename Float, int nColor, QudaReconstructType recon> class CloverForce : public TunableKernel1D {
+  template <typename Float, int nColor, QudaReconstructType recon> class WilsonForce : public TunableKernel1D {
     using real = typename mapper<Float>::type;
-    template <int dim = -1> using Arg = CloverForceArg<Float, nColor, recon, dim>;
+    template <int dim = -1> using Arg = WilsonForceArg<Float, nColor, recon, dim>;
     GaugeField &force;
     const GaugeField &U;
     const ColorSpinorField &inA;
@@ -23,7 +23,7 @@ namespace quda {
     unsigned int minThreads() const { return kernel == INTERIOR ? inB.VolumeCB() : inB.GhostFaceCB()[dir]; }
 
   public:
-    CloverForce(const GaugeField &U, GaugeField &force, const ColorSpinorField& inA,
+    WilsonForce(const GaugeField &U, GaugeField &force, const ColorSpinorField& inA,
                 const ColorSpinorField& inB, const ColorSpinorField& inC, const ColorSpinorField& inD,
                 int parity, double coeff) :
       TunableKernel1D(force),
@@ -88,7 +88,7 @@ namespace quda {
           * sizeof(Float);
       }
     }
-  }; // CloverForce
+  }; // WilsonForce
 
   void exchangeGhost(cudaColorSpinorField &a, int parity, int dag) {
     // this sets the communications pattern for the packing kernel
@@ -136,8 +136,8 @@ namespace quda {
     comm_barrier();
   }
 
-#ifdef GPU_CLOVER_DIRAC
-  void computeCloverForce(GaugeField &force, const GaugeField &U, std::vector<ColorSpinorField *> &x,
+#ifdef GPU_WILSON_DIRAC
+  void computeWilsonForce(GaugeField &force, const GaugeField &U, std::vector<ColorSpinorField *> &x,
                           std::vector<ColorSpinorField *> &p, std::vector<double> &coeff)
   {
     checkNative(*x[0], *p[0], force, U);
@@ -160,15 +160,15 @@ namespace quda {
         exchangeGhost(static_cast<cudaColorSpinorField&>(inB), parity, dag);
         exchangeGhost(static_cast<cudaColorSpinorField&>(inD), parity, 1-dag);
 
-        instantiate<CloverForce, ReconstructNo12>(U, force, inA, inB, inC, inD, parity, coeff[i]);
+        instantiate<WilsonForce, ReconstructNo12>(U, force, inA, inB, inC, inD, parity, coeff[i]);
       }
     }
   }
-#else // GPU_CLOVER_DIRAC not defined
-  void computeCloverForce(GaugeField &, const GaugeField &, std::vector<ColorSpinorField *> &,
+#else // GPU_WILSON_DIRAC not defined
+  void computeWilsonForce(GaugeField &, const GaugeField &, std::vector<ColorSpinorField *> &,
                           std::vector<ColorSpinorField *> &, std::vector<double> &)
   {
-    errorQuda("Clover Dirac operator has not been built!");
+    errorQuda("Wilson Dirac operator has not been built!");
   }
 #endif
 

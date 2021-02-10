@@ -9,7 +9,7 @@
 namespace quda {
 
   template <typename Float, int nColor_, QudaReconstructType recon, int dim_ = -1>
-  struct CloverForceArg {
+  struct WilsonForceArg {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 4;
@@ -32,7 +32,7 @@ namespace quda {
     real coeff;
     dim3 threads;
 
-    CloverForceArg(GaugeField &force, const GaugeField &U, const ColorSpinorField &inA, const ColorSpinorField &inB,
+    WilsonForceArg(GaugeField &force, const GaugeField &U, const ColorSpinorField &inA, const ColorSpinorField &inB,
                    const ColorSpinorField &inC, const ColorSpinorField &inD, const unsigned int parity, const double coeff) :
       force(force),
       inA(inA),
@@ -121,5 +121,4 @@ namespace quda {
       arg.force(Arg::dim, bulk_cb_idx, arg.parity) = result;
     }
   };
-
 }
