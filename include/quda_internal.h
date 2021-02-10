@@ -3,28 +3,6 @@
 #include <quda_define.h>
 #include <quda_api.h>
 
-#if defined(QUDA_TARGET_CUDA)
-#include <cuda.h>
-#include <cuda_runtime.h>
-#elif defined(QUDA_TARGET_HIP)
-#include "hip/hip_runtime_api.h"
-#ifndef __HIP_DEVICE_COMPILE__		
-inline double rsqrt(double x) { return 1.0/sqrt(x); }
-inline static void __sincos(const double &a, double *s, double *c) {
-  *s = sin(a);
-  *c = cos(a);
-}
-inline static void __sincos(const float &a, float *s, float *c) {
-  *s = sinf(a);
-  *c = cosf(a);
-}
-#else		
-#include <hip/math_functions.h>		
-#endif	
-#else
-#error "Must have a QUDA target defined"
-#endif
-
 #include <string>
 #include <complex>
 #include <vector>

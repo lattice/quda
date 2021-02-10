@@ -150,11 +150,11 @@ namespace quda {
   /**
    * @brief container to pass parameters for the gauge fixing quality kernel
    */
-  template <typename Float_, QudaReconstructType recon_, int gauge_dir_>
+  template <typename store_t, QudaReconstructType recon_, int gauge_dir_>
   struct GaugeFixQualityFFTArg : public ReduceArg<double2> {
-    using real = Float_;
+    using real = typename mapper<store_t>::type;
     static constexpr QudaReconstructType recon = recon_;
-    using Gauge = typename gauge_mapper<real, recon>::type;
+    using Gauge = typename gauge_mapper<store_t, recon>::type;
     static constexpr int gauge_dir = gauge_dir_;
 
     int_fastdiv X[4];     // grid dimensions
@@ -183,8 +183,8 @@ namespace quda {
     using reduce_t = double2;
     using plus<reduce_t>::operator();
     Arg &arg;
-    constexpr FixQualityFFT(Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
+    constexpr FixQualityFFT(Arg &arg) : arg(arg) {}
     
     /**
      * @brief Measure gauge fixing quality
