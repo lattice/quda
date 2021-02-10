@@ -98,10 +98,6 @@ set(EXAMPLES_INC ${QUDA_BUILD_HOME}/include ${QUDA_SOURCE_HOME}/tests/utils ${QU
 include(GNUInstallDirs)
 set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_FULL_LIBDIR})
 
-add_executable(propagator_quda propagator_quda.cpp)
-target_link_libraries(propagator_quda ${EXAMPLES_LIBS})
-target_include_directories(propagator_quda PUBLIC ${EXAMPLES_INC})
-
 add_executable(correlator_quda correlator_quda.cpp)
 target_link_libraries(correlator_quda ${EXAMPLES_LIBS})
 target_include_directories(correlator_quda PUBLIC ${EXAMPLES_INC})
