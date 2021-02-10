@@ -1,16 +1,36 @@
 // QUDA headers
 #include <quda.h>
-
-// External headers
 #include <host_utils.h>
 #include <command_line_params.h>
 
+// C++
 #include <iostream>
+#include <stdio.h>
+#include <time.h>
+#include <math.h>
+#include <string.h>
 
-const std::vector<std::string> QudaCorrelatorChannels
-  = {"G1", "G2", "G3", "G4", "G5G1", "G5G2", "G5G3", "G5G4", "1", "G5", "S12", "S13", "S14", "S23", "S24", "S34"};
+// Local Enum type for IO
+typedef enum CorrelatorFlavors_s {
+  CORRELATOR_QQ,
+  CORRELATOR_QS,
+  CORRELATOR_QL,
+} CorrelatorFlavors;
 
-void print_correlators(const void *correlation_function_sum, const QudaCorrelatorParam corr_param, const int n)
+// Local struct for convenient data storage
+typedef struct CorrelatorParam_s {
+  size_t corr_dim;
+  size_t local_corr_length;
+  size_t global_corr_length;
+  size_t n_numbers_per_slice;
+  size_t corr_size_in_bytes;
+  size_t overall_shift_dim;
+  CorrelatorFlavors corr_flavors;
+} CorrelatorParam;
+
+const std::vector<std::string> CorrelatorChannels = {"G1", "G2", "G3", "G4", "G5G1", "G5G2", "G5G3", "G5G4", "1", "G5", "S12", "S13", "S14", "S23", "S24", "S34"};
+
+void print_correlators(const void *correlation_function_sum, const CorrelatorParam corr_param, const int n)
 {
   printfQuda("#src_x src_y src_z src_t    px    py    pz    pt     G   z/t          real          imag  channel\n");
   for (int px = 0; px <= momentum[0]; px++) {
@@ -19,17 +39,21 @@ void print_correlators(const void *correlation_function_sum, const QudaCorrelato
         for (int pt = 0; pt <= momentum[3]; pt++) {
           for (int G_idx = 0; G_idx < 16; G_idx++) {
             for (size_t t = 0; t < corr_param.global_corr_length; t++) {
-              size_t index_real = (px + py * (momentum[0] + 1) + pz * (momentum[0] + 1) * (momentum[1] + 1)
-                                   + pt * (momentum[0] + 1) * (momentum[1] + 1) * (momentum[2] + 1))
-                  * corr_param.n_numbers_per_slice * corr_param.global_corr_length
-                + corr_param.n_numbers_per_slice * ((t + corr_param.overall_shift_dim) % corr_param.global_corr_length)
-                + 2 * G_idx;
-              size_t index_imag = index_real + 1;
+
+	      size_t mom_mode =  (px +
+				  py * (momentum[0] + 1) +
+				  pz * (momentum[0] + 1) * (momentum[1] + 1) +
+				  pt * (momentum[0] + 1) * (momentum[1] + 1) * (momentum[2] + 1));
+	      
+              size_t index_real = corr_param.n_numbers_per_slice * (mom_mode * corr_param.global_corr_length + ((t + corr_param.overall_shift_dim) % corr_param.global_corr_length)) + 2 * G_idx;
+	      size_t index_imag = index_real + 1;
               double sign = G_idx < 8 ? -1. : 1.; // the minus sign from g5gm -> gmg5
-              printfQuda(" %5d %5d %5d %5d %5d %5d %5d %5d %5d %5lu % e % e #%s", prop_source_position[n][0],
-                         prop_source_position[n][1], prop_source_position[n][2], prop_source_position[n][3], px, py, pz,
-                         pt, G_idx, t, ((double *)correlation_function_sum)[index_real] * sign,
-                         ((double *)correlation_function_sum)[index_imag] * sign, QudaCorrelatorChannels[G_idx].c_str());
+              printfQuda(" %5d %5d %5d %5d %5d %5d %5d %5d %5d %5lu % e % e #%s",
+			 prop_source_position[n][0], prop_source_position[n][1],
+			 prop_source_position[n][2], prop_source_position[n][3], px, py, pz, pt, G_idx, t,
+			 ((double *)correlation_function_sum)[index_real] * sign,
+                         ((double *)correlation_function_sum)[index_imag] * sign,
+			 CorrelatorChannels[G_idx].c_str());
               printfQuda("\n");
             }
           }
@@ -39,15 +63,15 @@ void print_correlators(const void *correlation_function_sum, const QudaCorrelato
   }
 }
 
-void save_correlators_to_file(const void* correlation_function_sum, const QudaCorrelatorParam &corr_param, const int n){
+void save_correlators_to_file(const void* correlation_function_sum, const CorrelatorParam &corr_param, const int n){
   std::ofstream corr_file;
   std::stringstream filepath;
   filepath << correlator_save_dir << "/";
   filepath << "mcorr";
   switch (corr_param.corr_flavors) {
-  case QUDA_CORRELATOR_QQ: filepath << "_qq"; break;
-  case QUDA_CORRELATOR_QS: filepath << "_qs"; break;
-  case QUDA_CORRELATOR_QL: filepath << "_ql"; break;
+  case CORRELATOR_QQ: filepath << "_qq"; break;
+  case CORRELATOR_QS: filepath << "_qs"; break;
+  case CORRELATOR_QL: filepath << "_ql"; break;
   default: break;
   }
   switch (contract_type) {
@@ -58,12 +82,12 @@ void save_correlators_to_file(const void* correlation_function_sum, const QudaCo
     break;
   default: filepath << "_t"; // temporal
   }
-  filepath << "_s" << dim[0] << "t" << dim[3];
+  filepath << "_s" << dim[0]*gridsize_from_cmdline[0] << "t" << dim[3]*gridsize_from_cmdline[3];
   if (correlator_file_affix[0] != '\0') { filepath << "_" << correlator_file_affix; }
   filepath << "_k" << std::setprecision(5) << std::fixed << kappa;
   switch (corr_param.corr_flavors) {
-  case QUDA_CORRELATOR_QS: filepath << "_ks" << std::setprecision(5) << std::fixed << kappa_strange; break;
-  case QUDA_CORRELATOR_QL: filepath << "_kl" << std::setprecision(5) << std::fixed << kappa_light; break;
+  case CORRELATOR_QS: filepath << "_ks" << std::setprecision(5) << std::fixed << kappa_array[1]; break;
+  case CORRELATOR_QL: filepath << "_kl" << std::setprecision(5) << std::fixed << kappa_array[0]; break;
   default: break;
   }
 
@@ -125,8 +149,8 @@ void save_correlators_to_file(const void* correlation_function_sum, const QudaCo
   corr_file.close();
 }
 
-void set_kappa(const double new_kappa, QudaInvertParam &inv_param, QudaMultigridParam &mg_param,
-               QudaInvertParam &mg_inv_param, void *&clover, void *&clover_inv, void *&mg_preconditioner)
+void construct_operator(const double new_kappa, QudaInvertParam &inv_param, QudaMultigridParam &mg_param,
+			QudaInvertParam &mg_inv_param, void *&mg_preconditioner)
 {
   const double kappa_backup = kappa;
   kappa = new_kappa;
@@ -137,35 +161,50 @@ void set_kappa(const double new_kappa, QudaInvertParam &inv_param, QudaMultigrid
   } else {
     setInvertParam(inv_param);
   }
+  
   inv_param.eig_param = nullptr;
 
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
-    constructHostCloverField(clover, clover_inv, inv_param);
-    if (inv_multigrid) {
-      if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE) {
-        inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
-      }
-    }
-    loadCloverQuda(clover, clover_inv, &inv_param);
-    if (inv_multigrid) { inv_param.solve_type = solve_type; }
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    // If you pass nullptr to QUDA, it will automatically compute
+    // the clover and clover inverse terms. If you need QUDA to return
+    // clover fields to you, pass valid pointers to the function
+    // and set:
+    // inv_param.compute_clover = 1;
+    // inv_param.compute_clover_inverse = 1;
+    // inv_param.return_clover = 1;
+    // inv_param.return_clover_inverse = 1;
+    loadCloverQuda(nullptr, nullptr, &inv_param);
   }
-  if (inv_multigrid) { inv_param.preconditioner = mg_preconditioner; }
+
+  // Now that the clover field is set, we may assign a
+  // new MG preconditioner 
+  if(inv_multigrid) {
+    mg_preconditioner = newMultigridQuda(&mg_param);
+    inv_param.preconditioner = mg_preconditioner;
+  }
   kappa = kappa_backup;
 }
 
 // Calculate propagator from source_array_ptr, save it in prop_array_ptr_2. Then contract propagators stored
 // in prop_array_ptr_1 and prop_array_ptr_2.
 void invert_and_contract(void **source_array_ptr, void **prop_array_ptr_1, void **prop_array_ptr_2,
-                         void *correlation_function_sum, QudaCorrelatorParam &corr_param,
+                         void *correlation_function_sum, CorrelatorParam &corr_param,
                          quda::ColorSpinorParam &cs_param, const QudaGaugeParam &gauge_param, QudaInvertParam &inv_param)
 {
+  QudaInvertParam source_smear_param = newQudaInvertParam();
+  setFermionSmearParam(source_smear_param, prop_source_smear_coeff, prop_source_smear_steps);
+
+  QudaInvertParam sink_smear_param = newQudaInvertParam();
+  setFermionSmearParam(sink_smear_param, prop_sink_smear_coeff, prop_sink_smear_steps);
+  
   // Loop over the number of sources to use. Default is prop_n_sources=1 and source position = 0 0 0 0
-  for (int n = 0; n < prop_n_sources; n++) {
-    printfQuda("Source position: %d %d %d %d\n", prop_source_position[n][0], prop_source_position[n][1],
-               prop_source_position[n][2], prop_source_position[n][3]);
+  for (int n = 0; n < prop_n_sources; n++) {    
     const int source[4]
       = {prop_source_position[n][0], prop_source_position[n][1], prop_source_position[n][2], prop_source_position[n][3]};
-
+    
+    printfQuda("Source position: %d %d %d %d\n", prop_source_position[n][0], prop_source_position[n][1],
+	       prop_source_position[n][2], prop_source_position[n][3]);
+    
     // The overall shift of the position of the corr. need this when the source is not at origin.
     corr_param.overall_shift_dim = source[corr_param.corr_dim];
 
@@ -174,13 +213,16 @@ void invert_and_contract(void **source_array_ptr, void **prop_array_ptr_1, void 
       // FIXME add the smearing
       constructPointSpinorSource(source_array_ptr[i], cs_param.nSpin, cs_param.nColor, inv_param.cpu_prec,
                                  gauge_param.X, i, source);
-      inv_param.solver_normalization = QUDA_SOURCE_NORMALIZATION; // Make explicit for now.
-      invertQuda(prop_array_ptr_2[i], source_array_ptr[i], &inv_param);
-    }
-    // Coming soon....
-    // propagatorQuda(prop_array_ptr, source_array_ptr, &inv_param, &correlation_function_sum, contract_type, (void
-    // *)cs_param_ptr, gauge_param.X);
 
+      // Gaussian smear the source.
+      performGaussianSmearNStep(source_array_ptr[i], &source_smear_param, prop_source_smear_steps);
+      
+      invertQuda(prop_array_ptr_2[i], source_array_ptr[i], &inv_param);
+
+      // Gaussian smear the sink.
+      performGaussianSmearNStep(prop_array_ptr_2[i], &sink_smear_param, prop_sink_smear_steps);
+    }
+    
     memset(correlation_function_sum, 0, corr_param.corr_size_in_bytes); // zero out the result array
     contractFTQuda(prop_array_ptr_1, prop_array_ptr_2, &correlation_function_sum, contract_type,
                    (void *)&cs_param, gauge_param.X, source, momentum.begin());
@@ -282,40 +324,26 @@ int main(int argc, char **argv)
   constructHostGaugeField(gauge, gauge_param, argc, argv);
   loadGaugeQuda((void *)gauge, &gauge_param); // copy gaugefield to GPU
 
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    // If you pass nullptr to QUDA, it will automatically compute
+    // the clover and clover inverse terms. If you need QUDA to return
+    // clover fields to you, pass valid pointers to the function
+    // and set:
+    // inv_param.compute_clover = 1;
+    // inv_param.compute_clover_inverse = 1;
+    // inv_param.return_clover = 1;
+    // inv_param.return_clover_inverse = 1;
+    loadCloverQuda(nullptr, nullptr, &inv_param);
+  }
   printfQuda("-----------------------------------------------------------------------------------\n");
 
   // compute plaquette
   double plaq[3];
   plaqQuda(plaq);
   printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
-
-  // Allocate host side memory for clover terms if needed.
-  void *clover = nullptr;
-  void *clover_inv = nullptr;
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
-    if (!compute_clover) { errorQuda("Specified clover dslash-type but did not specify compute-clover!"); }
-    clover = malloc(V * clover_site_size * host_clover_data_type_size);
-    clover_inv = malloc(V * clover_site_size * host_spinor_data_type_size);
-    constructHostCloverField(clover, clover_inv, inv_param);
-    if (inv_multigrid) {
-      // This line ensures that if we need to construct the clover inverse (in either the smoother or the solver) we do so
-      if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE) {
-        inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
-      }
-    }
-    loadCloverQuda(clover, clover_inv, &inv_param);
-    if (inv_multigrid) {
-      // Restore actual solve_type we want to do
-      inv_param.solve_type = solve_type;
-    }
-  }
-
+  
   // Now QUDA is initialised and the fields are loaded, we may setup the preconditioner
   void *mg_preconditioner = nullptr;
-  if (inv_multigrid) {
-    mg_preconditioner = newMultigridQuda(&mg_param);
-    inv_param.preconditioner = mg_preconditioner;
-  }
 
   // Wilson ColorSpinorParams
   quda::ColorSpinorParam cs_param;
@@ -338,7 +366,7 @@ int main(int argc, char **argv)
 
   // Decide between contract types (open or with gammas, summed or non-summed, spatial or temporal, finite momentum)
   // and set correlator parameters
-  QudaCorrelatorParam corr_param;
+  CorrelatorParam corr_param;
   int Nmom = (momentum[0] + 1) * (momentum[1] + 1);
   if (contract_type == QUDA_CONTRACT_TYPE_DR_FT_Z) {
     corr_param.corr_dim = 2;
@@ -356,11 +384,12 @@ int main(int argc, char **argv)
   corr_param.global_corr_length = corr_param.local_corr_length * comm_dim(corr_param.corr_dim);
   corr_param.n_numbers_per_slice = 2 * cs_param.nSpin * cs_param.nSpin;
   corr_param.corr_size_in_bytes = Nmom * corr_param.n_numbers_per_slice * corr_param.global_corr_length * sizeof(double);
-  corr_param.corr_flavors = QUDA_CORRELATOR_QQ;
+  corr_param.corr_flavors = CORRELATOR_QQ;
 
   void *correlation_function_sum = malloc(corr_param.corr_size_in_bytes); // This is where the result will be stored
 
   //calculate correlators
+  construct_operator(kappa, inv_param, mg_param, mg_inv_param, mg_preconditioner);
   invert_and_contract(source_array_ptr, prop_array_ptr, prop_array_ptr, correlation_function_sum, corr_param, cs_param,
                       gauge_param, inv_param);
 
@@ -374,16 +403,16 @@ int main(int argc, char **argv)
     }
 
     // first we calculate heavy-light correlators
-    set_kappa(kappa_light, inv_param, mg_param, mg_inv_param, clover, clover_inv, mg_preconditioner);
+    construct_operator(kappa_array[0], inv_param, mg_param, mg_inv_param, mg_preconditioner);
     constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
-    corr_param.corr_flavors = QUDA_CORRELATOR_QL;
+    corr_param.corr_flavors = CORRELATOR_QL;
     invert_and_contract(source_array_ptr, prop_array_ptr, prop_array_ptr_open, correlation_function_sum, corr_param,
                         cs_param, gauge_param, inv_param);
 
     // then we calculate heavy-strange correlators
-    set_kappa(kappa_strange, inv_param, mg_param, mg_inv_param, clover, clover_inv, mg_preconditioner);
+    construct_operator(kappa_array[1], inv_param, mg_param, mg_inv_param, mg_preconditioner);
     constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
-    corr_param.corr_flavors = QUDA_CORRELATOR_QS;
+    corr_param.corr_flavors = CORRELATOR_QS;
     invert_and_contract(source_array_ptr, prop_array_ptr, prop_array_ptr_open, correlation_function_sum, corr_param,
                         cs_param, gauge_param, inv_param);
 
@@ -394,11 +423,7 @@ int main(int argc, char **argv)
   if (inv_multigrid) destroyMultigridQuda(mg_preconditioner);
   freeGaugeQuda();
   for (auto &dir : gauge) free(dir);
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
-    freeCloverQuda();
-    if (clover) free(clover);
-    if (clover_inv) free(clover_inv);
-  }
+  
   free(source_array);
   free(prop_array);
   free(correlation_function_sum);

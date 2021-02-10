@@ -247,7 +247,8 @@ extern "C" {
     QudaCloverFieldOrder clover_order;     /**< The order of the input clover field */
     QudaUseInitGuess use_init_guess;       /**< Whether to use an initial guess in the solver or not */
 
-    double clover_coeff;                   /**< Coefficient of the clover term */
+    double clover_csw;                     /**< Csw coefficient of the clover term */
+    double clover_coeff;                   /**< Overall kappa * Csw coefficient of the clover term */
     double clover_rho;                     /**< Real number added to the clover diagonal (not to inverse) */
 
     int compute_clover_trlog;              /**< Whether to compute the trace log of the clover term */
@@ -727,16 +728,6 @@ extern "C" {
     QudaBoolean compute_qcharge_density; /**< Whether to compute the topological charge density */
     void *qcharge_density; /**< Pointer to host array of length volume where the q-charge density will be copied */
   } QudaGaugeObservableParam;
-
-  typedef struct QudaCorrelatorParam_s {
-    size_t corr_dim;
-    size_t local_corr_length;
-    size_t global_corr_length;
-    size_t n_numbers_per_slice;
-    size_t corr_size_in_bytes;
-    size_t overall_shift_dim;
-    QudaCorrelatorFlavors corr_flavors;
-  } QudaCorrelatorParam;
 
   typedef struct QudaBLASParam_s {
 

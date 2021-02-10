@@ -298,8 +298,9 @@ void constructPointSpinorSource(void *v, int nSpin, int nColor, QudaPrecision pr
   int local_idx_cb = local_idx / 2;
   int parity = local_idx % 2;
 
-  size_t bytes = V * my_spinor_site_size * host_spinor_data_type_size;
-  //memset(v, bytes, 0.0);
+  size_t bytes = (size_t)V;
+  bytes *= (size_t)my_spinor_site_size;
+  bytes *= (size_t)host_spinor_data_type_size;
   memset(v, 0, bytes);
 
   // Deduce where to place the point source. If the following is satisfied,

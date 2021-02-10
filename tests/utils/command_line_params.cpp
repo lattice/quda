@@ -70,8 +70,8 @@ bool low_mode_check = false;
 bool oblique_proj_check = false;
 double mass = 0.1;
 double kappa = -1.0;
-double kappa_light = -1.0;
-double kappa_strange = -1.0;
+quda::mass_array<double> kappa_array = {};
+quda::mass_array<double> mass_array = {};
 double mu = 0.1;
 double epsilon = 0.01;
 double m5 = -1.5;
@@ -81,7 +81,8 @@ double anisotropy = 1.0;
 double tadpole_factor = 1.0;
 double eps_naik = 0.0;
 int n_naiks = 1;
-double clover_coeff = 0.1;
+double clover_csw = 1.0;
+double clover_coeff = 0.0;
 bool compute_clover = false;
 bool compute_clover_trlog = true;
 bool compute_fatlong = false;
@@ -258,8 +259,8 @@ quda::file_array<char[256]> prop_sink_outfile;
 quda::source_array<std::array<int, 4>> prop_source_position = {0, 0, 0, 0};
 
 
-int prop_source_smear_steps = 20;
-int prop_sink_smear_steps = 20;
+int prop_source_smear_steps = 0;
+int prop_sink_smear_steps = 0;
 double prop_source_smear_coeff = 2.0;
 double prop_sink_smear_coeff = 2.0;
 bool prop_read_sources = false;
@@ -480,7 +481,11 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     ca_lambda_max, "Conservative estimate of largest eigenvalue for Chebyshev basis CA-CG (default is to guess with power iterations)");
   quda_app->add_option("--cheby-basis-eig-min", ca_lambda_min,
                        "Conservative estimate of smallest eigenvalue for Chebyshev basis CA-CG (default 0)");
-  quda_app->add_option("--clover-coeff", clover_coeff, "Clover coefficient")->capture_default_str();
+  quda_app->add_option("--clover-csw", clover_csw, "Clover Csw coefficient 1.0")->capture_default_str();
+  
+  quda_app->add_option("--clover-coeff", clover_coeff, "The overall clover coefficient, kappa * Csw. (default 0. Will be inferred from clover-csw and kappa. "
+		       "If the user populates this value with anything other than 0.0, the passed value will override the inferred value)")->capture_default_str();
+  
   quda_app->add_option("--compute-clover", compute_clover,
                        "Compute the clover field or use random numbers (default false)");
   quda_app->add_option("--compute-clover-trlog", compute_clover_trlog,
@@ -561,8 +566,6 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--inv-deflate", inv_deflate, "Deflate the inverter using the eigensolver");
   quda_app->add_option("--inv-multigrid", inv_multigrid, "Precondition the inverter using multigrid");
   quda_app->add_option("--kappa", kappa, "Kappa of Dirac operator (default 0.12195122... [equiv to mass])");
-  quda_app->add_option("--kappa-light", kappa_light, "Kappa of Dirac operator of light quark ud(default 0.12195122... [equiv to mass])");
-  quda_app->add_option("--kappa-strange", kappa_strange, "Kappa of Dirac operator of strange quark s(default 0.12195122... [equiv to mass])");
   quda_app->add_option(
     "--laplace3D", laplace3D,
     "Restrict laplace operator to omit the t dimension (n=3), or include all dims (n=4) (default 4)");
@@ -1180,4 +1183,11 @@ void add_contraction_option_group(std::shared_ptr<QUDAApp> quda_app)
     opgroup->add_option("--open-flavor", open_flavor,
                          "Compute the open flavor correlators (default false)");
     opgroup->add_option("--correlator-file-affix", correlator_file_affix, "Additional string to put into the correlator file name");
+
+    quda_app->add_massoption(opgroup, "--kappa-array", kappa_array, CLI::Validator(),
+			     "set the Nth kappa value of the Dirac operator)");
+    
+    quda_app->add_massoption(opgroup, "--mass-array", kappa_array, CLI::Validator(),
+			     "set the Nth mass value of the Dirac operator)");
+    
 }

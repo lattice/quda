@@ -104,7 +104,7 @@ namespace quda {
     Float angle = arg(det);
 
     complex<Float> cTemp;
-    sincos(negative_third * angle, &cTemp.y, &cTemp.x);
+    quda::sincos(negative_third * angle, &cTemp.y, &cTemp.x);
 
     in = (mod*cTemp)*out;
   }

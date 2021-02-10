@@ -939,7 +939,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 
   if ( (!h_clover && !h_clovinv) || inv_param->compute_clover ) {
     device_calc = true;
-    if (inv_param->clover_coeff == 0.0) errorQuda("called with neither clover term nor inverse and clover coefficient not set");
+    if (inv_param->clover_coeff == 0.0 && inv_param->clover_csw == 0.0) errorQuda("called with neither clover term nor inverse and clover coefficient nor Csw not set");
     if (gaugePrecise->Anisotropy() != 1.0) errorQuda("cannot compute anisotropic clover field");
   }
 
@@ -977,7 +977,13 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 
   CloverFieldParam clover_param;
   clover_param.nDim = 4;
-  clover_param.csw = inv_param->clover_coeff;
+  // If clover_coeff is not set manually, then it is the product Csw * kappa.
+  // If the user has set the coefficient manually, that value takes precedent.
+  clover_param.csw = inv_param->clover_csw;
+  clover_param.coeff = inv_param->clover_coeff == 0.0 ? inv_param->kappa * inv_param->clover_csw : inv_param->clover_coeff;
+  // We must also adjust inv_param->clover_coeff here for forward compatibility. If a user has set kappa
+  // and Csw, we must populate inv_param->clover_coeff for them as the computeClover routines uses that value
+  inv_param->clover_coeff = 0.0 ? inv_param->kappa * inv_param->clover_csw : inv_param->clover_coeff;
   clover_param.twisted = twisted;
   clover_param.mu2 = twisted ? 4.*inv_param->kappa*inv_param->kappa*inv_param->mu*inv_param->mu : 0.0;
   clover_param.siteSubset = QUDA_FULL_SITE_SUBSET;
@@ -993,10 +999,14 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   profileClover.TPSTOP(QUDA_PROFILE_INIT);
 
   // FIXME do we need to make this more robust to changing other meta data (compare cloverPrecise against clover_param)
+  // IF either of the clover params have changed, trigger a recompute
   bool clover_update = false;
   double csw_old = cloverPrecise ? cloverPrecise->Csw() : 0.0;
-  if (!cloverPrecise || invalidate_clover || inv_param->clover_coeff != csw_old) clover_update = true;
-
+  double coeff_old = cloverPrecise ? cloverPrecise->Coeff() : 0.0;
+  if (!cloverPrecise || invalidate_clover ||
+      inv_param->clover_coeff != coeff_old ||
+      inv_param->clover_csw != csw_old) clover_update = true;
+  
   // compute or download clover field only if gauge field has been updated or clover field doesn't exist
   if (clover_update) {
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating new clover field\n");
@@ -5462,6 +5472,8 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
 
 void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned int n_steps)
 {
+  if(n_steps == 0) return;
+  
   profileGaussianSmear.TPSTART(QUDA_PROFILE_TOTAL);
   profileGaussianSmear.TPSTART(QUDA_PROFILE_INIT);
 
@@ -5877,20 +5889,31 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
   auto cs_param = (ColorSpinorParam *)cs_param_ptr;
   const size_t nSpin = cs_param->nSpin;
   const size_t nColor = cs_param->nColor;
+  cs_param->location = QUDA_CPU_FIELD_LOCATION;
   cs_param->create = QUDA_REFERENCE_FIELD_CREATE;
 
   //FIXME can we merge the two propagators if they are the same to save mem?
-  Propagator *h_propagator_flavor1 = new Propagator(*cs_param, prop_array_flavor_1);
-  Propagator *h_propagator_flavor2 = new Propagator(*cs_param, prop_array_flavor_2);
-
+  // wrap CPU host side pointers
+  std::vector<ColorSpinorField*> h_prop1, h_prop2;
+  for(size_t i=0; i<nSpin*nColor; i++) {
+    cs_param->v = prop_array_flavor_1[i];
+    h_prop1.push_back(ColorSpinorField::Create(*cs_param));
+    cs_param->v = prop_array_flavor_2[i];
+    h_prop2.push_back(ColorSpinorField::Create(*cs_param));
+  }
+  
   // Create device spinor fields
   ColorSpinorParam cudaParam(*cs_param);
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
   cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
   cudaParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   cudaParam.setPrecision(cs_param->Precision(), cs_param->Precision(), true);
-  Propagator *d_propagator_flavor1 = new Propagator(cudaParam);
-  Propagator *d_propagator_flavor2 = new Propagator(cudaParam);
+  
+  std::vector<ColorSpinorField *> d_prop1, d_prop2;
+  for(size_t i=0; i<nSpin*nColor; i++) {
+    d_prop1.push_back(ColorSpinorField::Create(cudaParam));
+    d_prop2.push_back(ColorSpinorField::Create(cudaParam));
+  }
 
   // temporal or spatial correlator?
   size_t corr_dim = 0, local_decay_dim_slices = 0;
@@ -5910,8 +5933,10 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
 
   // Transfer data from host to device
   profileContractFT.TPSTART(QUDA_PROFILE_H2D);
-  *d_propagator_flavor1 = *h_propagator_flavor1;
-  *d_propagator_flavor2 = *h_propagator_flavor2;
+  for(size_t i=0; i<nSpin*nColor; i++) {
+    *d_prop1[i] = *h_prop1[i];
+    *d_prop2[i] = *h_prop2[i];
+  }
   profileContractFT.TPSTOP(QUDA_PROFILE_H2D);
 
   // Array for all decay slices and channels, is zeroed prior to kernel launch
@@ -5934,8 +5959,8 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
 		profileContractFT.TPSTART(QUDA_PROFILE_COMPUTE);
 	  
 		std::fill(result_global.begin(), result_global.end(), 0.0);
-		contractSummedQuda(*d_propagator_flavor1->Vectors(s1 * nColor + c1),
-				   *d_propagator_flavor2->Vectors(b1 * nColor + c1),
+		contractSummedQuda(*d_prop1[s1 * nColor + c1],
+				   *d_prop2[b1 * nColor + c1],
 				   result_global, cType, source_position, mom_mode, s1, b1);
 		
 		comm_allreduce_array((double *)&result_global[0], 2*elems_per_slice * global_decay_dim_slices);
@@ -5960,10 +5985,12 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
   
   profileContractFT.TPSTART(QUDA_PROFILE_FREE);
   // Free memory
-  delete d_propagator_flavor1;
-  delete d_propagator_flavor2;
-  delete h_propagator_flavor1;
-  delete h_propagator_flavor2;
+  for(size_t i=0; i<nSpin*nColor; i++) {
+    delete d_prop1[i];
+    delete d_prop2[i];
+    delete h_prop1[i];
+    delete h_prop2[i];
+  }
   
   profileContractFT.TPSTOP(QUDA_PROFILE_FREE);
   profileContractFT.TPSTOP(QUDA_PROFILE_TOTAL);
