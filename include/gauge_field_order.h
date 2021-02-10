@@ -1923,9 +1923,9 @@ namespace quda {
         int j = index % N;
 
         Float *ptr = reinterpret_cast<Float *>(gauge);
-#if 1
+#if 0 // AoS
         return ptr[parity * offset * N + dir * stride * reconLen + x_cb * reconLen + m * 6 + n * 2 + real_imag];
-#else
+#else // SoA
         return ptr[(parity * offset + (dir * M + i) * stride + x_cb) * N + j];
 #endif
       }

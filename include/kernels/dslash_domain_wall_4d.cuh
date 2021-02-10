@@ -26,20 +26,46 @@ namespace quda
 
   constexpr int warp_size = 32;
 
-  __device__ void mma(float op_c[], const float op_a[], const float op_b) {
+  template <class OpA>
+    __device__ inline void mma(float op_c[], const OpA &op_a, float op_b) {
+      if (blockIdx.x == 0) {
+        // printf("thread = %2d, op_c = %f, op_b = %f, op_a = %f %f\n", threadIdx.x, op_c[0], op_b, op_a(0).real(), op_a(0).imag());
+      }
 #pragma unroll
-    for (int r = 0; r < 8; r++) {
-      op_c[r * 2 + 0] += op_b;
-      op_c[r * 2 + 1] += -op_a[r];
+      for (int r = 0; r < 2; r++) {
+        asm volatile("mma.sync.aligned.m16n8k4.row.col.f32.tf32.tf32.f32 {%0,%1,%2,%3}, {%4,%5}, {%6}, {%0,%1,%2,%3};"
+            : "+f"(op_c[r * 4 + 0 + 0]),
+              "+f"(op_c[r * 4 + 0 + 1]),
+              "+f"(op_c[r * 4 + 2 + 0]),
+              "+f"(op_c[r * 4 + 2 + 1])
+            : "r"(__float_as_uint(op_a(r * 2 + 0).real())),
+              "r"(__float_as_uint(op_a(r * 2 + 1).real())),
+              "r"(__float_as_uint(op_b)));
+      }
+      if ((threadIdx.x / 4) % 2 == 1) { op_b = -op_b; }
+#pragma unroll
+      for (int r = 0; r < 2; r++) {
+        // Note the reverted order of real and imag for op_c
+        asm volatile("mma.sync.aligned.m16n8k4.row.col.f32.tf32.tf32.f32 {%0,%1,%2,%3}, {%4,%5}, {%6}, {%0,%1,%2,%3};"
+            : "+f"(op_c[r * 4 + 0 + 1]),
+              "+f"(op_c[r * 4 + 0 + 0]),
+              "+f"(op_c[r * 4 + 2 + 1]),
+              "+f"(op_c[r * 4 + 2 + 0])
+            : "r"(__float_as_uint(op_a(r * 2 + 0).imag())),
+              "r"(__float_as_uint(op_a(r * 2 + 1).imag())),
+              "r"(__float_as_uint(op_b))); 
+      }
+      if (blockIdx.x == 0) {
+        // printf("thread = %2d, op_c = %f, op_b = %f, op_a = %f %f\n", threadIdx.x, op_c[0], op_b, op_a(0).real(), op_a(0).imag());
+      }
     }
-  }
 
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   __global__ void specialized_dslash_kernel(Arg arg)
   {
     static_assert(kernel_type == INTERIOR_KERNEL, "Currently only for interior kernel.");
 
-    constexpr int Ls = 12;
+    constexpr int Ls = 16;
     constexpr int s_per_warp = 8;
 
     int thread_idx = threadIdx.x;
@@ -51,16 +77,18 @@ namespace quda
     int warp_n = warp_m;
 
     constexpr int reg_length_a = (s_per_warp * 8 / 16) * 2;
-    constexpr int reg_length_c = (s_per_warp * 8 / 16) * 4;
-
-    float op_a[reg_length_a];
-    float op_b;
-    float op_c[reg_length_c];
+    constexpr int reg_length_c = (s_per_warp * 8 / 16) * 2;
 
     using float_type = typename mapper<typename Arg::Float>::type;
     using fixed_type = typename Arg::Float;
-
     using Spinor = ColorSpinor<float_type, 1, 4>;
+
+    Spinor projected_in;
+    float op_c[reg_length_c];
+    float op_b;
+
+#pragma unroll
+    for (int c = 0; c < reg_length_c; c++) { op_c[c] = 0; }
 
     fixed_type op_b_fixed;
 
@@ -86,41 +114,32 @@ namespace quda
     auto coord = getCoords<QUDA_4D_PC, kernel_type>(arg, x_cb, s, parity, thread_dim);
 
 #pragma unroll
-    for (int r = 0; r < reg_length_c; r++) { op_c[r] = 0; }
-
-#pragma unroll
     for (int d = 0; d < 4; d++) { // loop over dimension - 4 and not nDim since this is used for DWF as well
       {                           // Forward gather - compute fwd offset for vector fetch
         const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
-        const int gauge_idx = coord.x_cb;
+        const int gauge_idx = x_cb;
         constexpr int proj_dir = dagger ? +1 : -1;
 
         const bool ghost
           = (coord[d] + arg.nFace >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if (s < Ls  && warp_k < Nc && !ghost) {
-          // Spinor in = arg.in(fwd_idx + s * arg.dc.volume_4d_cb, their_spinor_parity, color);
-          Spinor in = arg.in(fwd_idx * Ls + s, their_spinor_parity, color);
-          Spinor projected_in = in.project(d, proj_dir).reconstruct(d, proj_dir);
-
-#pragma unroll
-          for (int r = 0; r < reg_length_a / 2; r++) {
-            op_a[r * 2 + 0] = projected_in(r).real();
-            op_a[r * 2 + 1] = projected_in(r).imag();
-          }
+          Spinor in = arg.in(fwd_idx + s * arg.dc.volume_4d_cb, their_spinor_parity, color);
+          // Spinor in = arg.in(fwd_idx * Ls + s, their_spinor_parity, color);
+          projected_in = in.project(d, proj_dir).reconstruct(d, proj_dir);
         } else {
 #pragma unroll
-          for (int r = 0; r < reg_length_a; r++) { op_a[r] = 0; }
+          for (int r = 0; r < reg_length_a / 2; r++) { projected_in(r).real(0); projected_in(r).imag(0); }
         }
 
         if (warp_k < Nc && warp_n < Nc * 2 && !ghost) {
-          op_b_fixed = arg.U(gauge_idx, d, gauge_parity, color_m, color_n, comp); // color i, j, complex
+          op_b_fixed = arg.U(gauge_idx, d, gauge_parity, color_n, color_m, comp); // color i, j, complex
           op_b = static_cast<float_type>(op_b_fixed) * fixedInvMaxValue<fixed_type>::value;
         } else {
           op_b = 0;          
         }
 
-        mma(op_c, op_a, op_b);
+        mma(op_c, projected_in, op_b);
       }
 
       { // Backward gather - compute back offset for spinor and gauge fetch
@@ -131,43 +150,35 @@ namespace quda
         const bool ghost = (coord[d] - arg.nFace < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if (s < Ls  && warp_k < Nc && !ghost) {
-          // Spinor in = arg.in(back_idx + s * arg.dc.volume_4d_cb, their_spinor_parity, color);
-          Spinor in = arg.in(back_idx * Ls + s, their_spinor_parity, color);
-          Spinor projected_in = in.project(d, proj_dir).reconstruct(d, proj_dir);
-
-#pragma unroll
-          for (int r = 0; r < reg_length_a / 2; r++) {
-            op_a[r * 2 + 0] = projected_in(r).real();
-            op_a[r * 2 + 1] = projected_in(r).imag();
-          }
+          Spinor in = arg.in(back_idx + s * arg.dc.volume_4d_cb, their_spinor_parity, color);
+          // Spinor in = arg.in(back_idx * Ls + s, their_spinor_parity, color);
+          projected_in = in.project(d, proj_dir).reconstruct(d, proj_dir);
         } else {
 #pragma unroll
-          for (int r = 0; r < reg_length_a; r++) { op_a[r] = 0; }
+          for (int r = 0; r < reg_length_a / 2; r++) { projected_in(r).real(0); projected_in(r).imag(0); }
         }
 
         if (warp_k < Nc && warp_n < Nc * 2 && !ghost) {
-          op_b_fixed = arg.U(gauge_idx, d, gauge_parity, color_n, color_m, comp); // color i, j, complex
+          op_b_fixed = arg.U(gauge_idx, d, gauge_parity, color_m, color_n, comp); // color i, j, complex
           if (comp == 1) { op_b_fixed = -op_b_fixed; }
           op_b = static_cast<float_type>(op_b_fixed) * fixedInvMaxValue<fixed_type>::value;
         } else {
           op_b = 0;          
         }
 
-        mma(op_c, op_a, op_b);
+        mma(op_c, projected_in, op_b);
       }
     } // nDim
 
-    unsigned max = 0;
+    unsigned max = __float_as_uint(0);
+
 #pragma unroll
-    for (int spin = 0; spin < 4; spin++) {
-      op_c[spin * 4 + 0 * 2 + 0] -= op_c[spin * 4 + 1 * 2 + 1];
-      op_c[spin * 4 + 1 * 2 + 0] += op_c[spin * 4 + 0 * 2 + 1];
-      if (max < __float_as_uint(fabs(op_c[spin * 4 + 0 * 2 + 0]))) {
-        max = __float_as_uint(fabs(op_c[spin * 4 + 0 * 2 + 0]));
-      }
-      if (max < __float_as_uint(fabs(op_c[spin * 4 + 1 * 2 + 0]))) {
-        max = __float_as_uint(fabs(op_c[spin * 4 + 1 * 2 + 0]));
-      }
+    for (int c = 0; c < reg_length_c; c++) {
+      unsigned x = __float_as_uint(fabs(op_c[c]));
+      if (max < x) { max = x; }
+    }
+    if (blockIdx.x == 0) {
+      printf("thread = %2d, max = %f\n", threadIdx.x, __uint_as_float(max));
     }
 
 #pragma unroll
@@ -176,24 +187,25 @@ namespace quda
       if (max < fetch) { max = fetch; }
     }
     max = __shfl_sync(0xffffffff, max, (lane_id / 4) * 4);
+    if (blockIdx.x == 0) {
+      printf("thread = %2d, max = %f\n", threadIdx.x, __uint_as_float(max));
+    }
 
-    // if (blockIdx.x == 0) { printf("thread_idx = %2d, max = %8.4f\n", lane_id, __uint_as_float(max)); }
     // TODO: Fix the parity.
-    // if (s < Ls && color == 0) arg.out.norm[x_cb + arg.dc.volume_4d_cb * s] = __uint_as_float(max);
-    if (s < Ls && color == 0) arg.out.norm[x_cb * Ls + s] = __uint_as_float(max);
+    if (s < Ls && color == 0) arg.out.norm[x_cb + arg.dc.volume_4d_cb * s] = __uint_as_float(max);
+    // if (s < Ls && color == 0) arg.out.norm[x_cb * Ls + s] = __uint_as_float(max);
 
     complex<fixed_type> output[Ns];
     float_type scale = fixedMaxValue<fixed_type>::value / __uint_as_float(max);
+#pragma unroll
     for (int spin = 0; spin < 4; spin++) {
-      fixed_type fixed_real = static_cast<fixed_type>(op_c[spin * 4 + 0 * 2 + 0] * scale);
-      fixed_type fixed_imag = static_cast<fixed_type>(op_c[spin * 4 + 1 * 2 + 0] * scale);
-      // TODO: Use vector_type
-      //if (s < Ls && color < 3) arg.out(x_cb + arg.dc.volume_4d_cb * s, parity, spin, color) = complex<fixed_type>(fixed_real, fixed_imag);
+      fixed_type fixed_real = static_cast<fixed_type>(op_c[spin * 2 + 0] * scale);
+      fixed_type fixed_imag = static_cast<fixed_type>(op_c[spin * 2 + 1] * scale);
       output[spin].real(fixed_real);
       output[spin].imag(fixed_imag);
     }
-    // arg.out.save_spinor(output, x_cb + arg.dc.volume_4d_cb * s, parity, color);
-    arg.out.save_spinor(output, x_cb * Ls + s, parity, color);
+    if (s < Ls && color < 3) arg.out.save_spinor(output, x_cb + arg.dc.volume_4d_cb * s, parity, color);
+    // if (s < Ls && color < 3) arg.out.save_spinor(output, x_cb * Ls + s, parity, color);
   }
 
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct domainWall4D;

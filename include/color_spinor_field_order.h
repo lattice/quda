@@ -1102,7 +1102,7 @@ namespace quda {
   {
     real v[Ns * 2];
     norm_type nrm = isFixed<Float>::value ? vector_load<float>(norm, x + parity * norm_offset) : 0.0;
-#if 1 // AoS
+#if 0 // AoS
     using vec_t = typename VectorType<Float, Ns * 2>::type;
     int index = parity * offset * N / (Ns * 2) + x * Nc + color;
     vec_t vecTmp = vector_load<vec_t>(field, index);
@@ -1169,8 +1169,15 @@ namespace quda {
   */
   __device__ __host__ inline void save_spinor(const ::complex<Float> in[Ns], int x, int parity, int color)
   {
+#if 0 // AoS
     using vec_t = typename VectorType<Float, Ns * 2>::type;
     vector_store(field, parity * offset * N / (Ns * 2) + x * Nc + color, *reinterpret_cast<const vec_t *>(in));
+#else // SoA
+#pragma unroll
+    for (int spin = 0; spin < Ns; spin++) {
+      this->operator()(x, parity, spin, color) = in[spin];
+    }
+#endif
   }
 
   /**
@@ -1240,13 +1247,9 @@ namespace quda {
   */
   __device__ __host__ inline const ::complex<Float> &operator()(int x_cb, int parity, int spin, int color) const
   {
-#if 1 // SoA
     int i = (spin * Nc + color) * 2 / N;
     int j = (spin * Nc + color) * 2 % N;
     return reinterpret_cast<::complex<Float> *>(field)[((parity * offset + x_cb + stride * i) * N + j) / 2];
-#else // AoS
-    return reinterpret_cast<::complex<Float> *>(field)[parity * offset * N / 2 + x_cb * Ns * Nc + color * Ns + spin];
-#endif
   }
 
    /**

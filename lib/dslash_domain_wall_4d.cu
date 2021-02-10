@@ -50,8 +50,8 @@ namespace quda
     void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (tp.aux.x == 0) {
-        // first(stream);
-        second(stream);
+        first(stream);
+        // second(stream);
       } else {
         second(stream);
       }
