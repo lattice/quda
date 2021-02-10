@@ -569,6 +569,13 @@ typedef enum QudaWFlowType_s {
   QUDA_WFLOW_TYPE_INVALID = QUDA_INVALID_ENUM
 } QudaWFlowType;
 
+typedef enum QudaGaugeActionType_s {
+  QUDA_GAUGE_ACTION_TYPE_WILSON = 1,
+  QUDA_GAUGE_ACTION_TYPE_SYMANZIK = 2,
+  QUDA_GAUGE_ACTION_TYPE_LUSCHER_WEISZ = 3,
+  QUDA_GAUGE_ACTION_TYPE_INVALID = QUDA_INVALID_ENUM
+} QudaGaugeActionType;
+  
 // Allows to choose an appropriate external library
 typedef enum QudaExtLibType_s {
   QUDA_CUSOLVE_EXTLIB,
