@@ -31,7 +31,7 @@ extern "C" {
   Topology *comm_default_topology(void);
 
   // routines related to direct peer-2-peer access
-  void comm_set_neighbor_ranks(Topology *topo=nullptr);
+  void comm_set_neighbor_ranks(Topology *topo=NULL);
   int comm_neighbor_rank(int dir, int dim);
 
   /**
