@@ -1,9 +1,5 @@
 #pragma once
-#include "quda_define.h"
-#if defined (QUDA_TARGET_HIP)
-#include "hip/hip_runtime.h"
-#endif
-
+#include <quda_arch.h>
 #include <enum_quda.h>
 
 namespace quda {
