@@ -133,7 +133,7 @@ void save_correlators_to_file(const void* correlation_function_sum, const Correl
                         << std::setw(mom_width) << py
                         << std::setw(mom_width) << pz
                         << std::setw(mom_width) << pt
-                        << std::setw(src_width) << G_idx
+                        << std::setw(src_width) << CorrelatorChannels[G_idx].c_str()
                         << std::setw(src_width) << t
                         << std::setw(float_width) << std::setprecision(precision)
                         << std::scientific << ((double *)correlation_function_sum)[index_real] * sign
