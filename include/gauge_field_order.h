@@ -1641,7 +1641,6 @@ namespace quda {
         const int stride;
         const int geometry;
         const AllocInt phaseOffset;
-        void *backup_h; //! host memory for backing up the field when tuning
         size_t bytes;
 
         FloatNOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
@@ -1653,7 +1652,6 @@ namespace quda {
           stride(u.Stride()),
           geometry(u.Geometry()),
           phaseOffset(u.PhaseOffset() / sizeof(Float)),
-          backup_h(nullptr),
           bytes(u.Bytes())
         {
           if (geometry == QUDA_COARSE_GEOMETRY)
@@ -1667,26 +1665,6 @@ namespace quda {
             ghost[i] = ghost_ ? ghost_[i] : 0;
             faceVolumeCB[i] = u.SurfaceCB(i) * u.Nface(); // face volume equals surface * depth
           }
-      }
-
-      FloatNOrder(const FloatNOrder &order) :
-        reconstruct(order.reconstruct),
-        gauge(order.gauge),
-        offset(order.offset),
-        ghostExchange(order.ghostExchange),
-        volumeCB(order.volumeCB),
-        stride(order.stride),
-        geometry(order.geometry),
-        phaseOffset(order.phaseOffset),
-        backup_h(nullptr),
-        bytes(order.bytes)
-      {
-	for (int i=0; i<4; i++) {
-	  X[i] = order.X[i];
-	  R[i] = order.R[i];
-	  ghost[i] = order.ghost[i];
-	  faceVolumeCB[i] = order.faceVolumeCB[i];
-	}
       }
 
       __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
@@ -1908,25 +1886,6 @@ namespace quda {
                             + R[dim] * faceVolumeCB[dim] * M * N + buff_idx],
                  static_cast<real>(phase / (2. * M_PI)));
           }
-      }
-
-      /**
-	 @brief Backup the field to the host when tuning
-      */
-      void save_() {
-	if (backup_h) errorQuda("Already allocated host backup");
-        backup_h = safe_malloc(bytes);
-        qudaMemcpy(backup_h, gauge, bytes, qudaMemcpyDeviceToHost);
-      }
-
-      /**
-	 @brief Restore the field from the host after tuning
-      */
-      void load_()
-      {
-        qudaMemcpy(gauge, backup_h, bytes, qudaMemcpyHostToDevice);
-        host_free(backup_h);
-        backup_h = nullptr;
       }
 
       size_t Bytes() const { return reconLen * sizeof(Float); }
