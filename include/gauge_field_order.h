@@ -335,17 +335,6 @@ namespace quda {
 	resetScale(U.Scale());
       }
 
-      Accessor(const Accessor<Float, nColor, QUDA_QDP_GAUGE_ORDER, storeFloat> &a) :
-        volumeCB(a.volumeCB),
-        geometry(a.geometry),
-        cb_offset(a.cb_offset),
-        scale(a.scale),
-        scale_inv(a.scale_inv)
-      {
-        for (int d=0; d<QUDA_MAX_GEOMETRY; d++)
-	  u[d] = a.u[d];
-      }
-
       void resetScale(Float max) {
 	if (fixed) {
 	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
@@ -436,16 +425,6 @@ namespace quda {
 	resetScale(U.Scale());
       }
 
-      GhostAccessor(const GhostAccessor<Float, nColor, QUDA_QDP_GAUGE_ORDER, native_ghost, storeFloat> &a) :
-        scale(a.scale),
-        scale_inv(a.scale_inv)
-      {
-        for (int d=0; d<8; d++) {
-	  ghost[d] = a.ghost[d];
-	  ghostOffset[d] = a.ghostOffset[d];
-	}
-      }
-
       void resetScale(Float max) {
 	if (fixed) {
 	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
@@ -485,14 +464,6 @@ namespace quda {
 	scale(static_cast<Float>(1.0)), scale_inv(static_cast<Float>(1.0)) {
 	resetScale(U.Scale());
       }
-
-      Accessor(const Accessor<Float, nColor, QUDA_MILC_GAUGE_ORDER, storeFloat> &a) :
-        u(a.u),
-        volumeCB(a.volumeCB),
-        geometry(a.geometry),
-        scale(a.scale),
-        scale_inv(a.scale_inv)
-      { }
 
       void resetScale(Float max) {
 	if (fixed) {
@@ -592,16 +563,6 @@ namespace quda {
 	resetScale(U.Scale());
       }
 
-      GhostAccessor(const GhostAccessor<Float, nColor, QUDA_MILC_GAUGE_ORDER, native_ghost, storeFloat> &a) :
-        scale(a.scale),
-        scale_inv(a.scale_inv)
-      {
-        for (int d=0; d<8; d++) {
-	  ghost[d] = a.ghost[d];
-	  ghostOffset[d] = a.ghostOffset[d];
-	}
-      }
-
       void resetScale(Float max) {
 	if (fixed) {
 	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
@@ -665,17 +626,6 @@ namespace quda {
         max(static_cast<Float>(1.0)), scale(static_cast<Float>(1.0)), scale_inv(static_cast<Float>(1.0))
       {
 	resetScale(U.Scale());
-      }
-
-      Accessor(const Accessor<Float, nColor, QUDA_FLOAT2_GAUGE_ORDER, storeFloat> &a) :
-        u(a.u),
-        offset_cb(a.offset_cb),
-        volumeCB(a.volumeCB),
-        stride(a.stride),
-        geometry(a.geometry),
-        scale(a.scale),
-        scale_inv(a.scale_inv)
-      {
       }
 
       void resetScale(Float max_) {
@@ -767,18 +717,6 @@ namespace quda {
 	resetScale(U.Scale());
       }
 
-      GhostAccessor(const GhostAccessor<Float, nColor, QUDA_FLOAT2_GAUGE_ORDER, native_ghost, storeFloat> &a) :
-        volumeCB(a.volumeCB),
-        scale(a.scale),
-        scale_inv(a.scale_inv),
-        accessor(a.accessor)
-      {
-	for (int d=0; d<8; d++) {
-	  ghost[d] = a.ghost[d];
-	  ghostVolumeCB[d] = a.ghostVolumeCB[d];
-	}
-      }
-
       void resetScale(Float max) {
 	accessor.resetScale(max);
 	if (fixed) {
@@ -859,11 +797,6 @@ namespace quda {
 	  if (U.Reconstruct() != QUDA_RECONSTRUCT_NO)
 	    errorQuda("GaugeField ordering not supported with reconstruction");
 	}
-
-      FieldOrder(const FieldOrder &o) : volumeCB(o.volumeCB),
-	  nDim(o.nDim), geometry(o.geometry), location(o.location),
-	  accessor(o.accessor), ghostAccessor(o.ghostAccessor)
-	{ }
 
 	void resetScale(double max) {
 	  accessor.resetScale(max);
@@ -1980,7 +1913,7 @@ namespace quda {
       /**
 	 @brief Backup the field to the host when tuning
       */
-      void save() {
+      void save_() {
 	if (backup_h) errorQuda("Already allocated host backup");
         backup_h = safe_malloc(bytes);
         qudaMemcpy(backup_h, gauge, bytes, qudaMemcpyDeviceToHost);
@@ -1989,7 +1922,7 @@ namespace quda {
       /**
 	 @brief Restore the field from the host after tuning
       */
-      void load()
+      void load_()
       {
         qudaMemcpy(gauge, backup_h, bytes, qudaMemcpyHostToDevice);
         host_free(backup_h);
@@ -2028,18 +1961,6 @@ namespace quda {
           for (int i = 0; i < 4; i++) {
             ghost[i] = (ghost_) ? ghost_[i] : (Float *)(u.Ghost()[i]);
             faceVolumeCB[i] = u.SurfaceCB(i) * u.Nface(); // face volume equals surface * depth
-          }
-        }
-
-        LegacyOrder(const LegacyOrder &order) :
-          volumeCB(order.volumeCB),
-          stride(order.stride),
-          geometry(order.geometry),
-          hasPhase(0)
-        {
-          for (int i = 0; i < 4; i++) {
-            ghost[i] = order.ghost[i];
-            faceVolumeCB[i] = order.faceVolumeCB[i];
           }
         }
 
@@ -2115,9 +2036,6 @@ namespace quda {
     QDPOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0)
       : LegacyOrder<Float,length>(u, ghost_), volumeCB(u.VolumeCB())
 	{ for (int i=0; i<4; i++) gauge[i] = gauge_ ? ((Float**)gauge_)[i] : ((Float**)u.Gauge_p())[i]; }
-    QDPOrder(const QDPOrder &order) : LegacyOrder<Float,length>(order), volumeCB(order.volumeCB) {
-	for(int i=0; i<4; i++) gauge[i] = order.gauge[i];
-      }
 
       __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
       {
@@ -2177,9 +2095,6 @@ namespace quda {
     QDPJITOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0)
       : LegacyOrder<Float,length>(u, ghost_), volumeCB(u.VolumeCB())
 	{ for (int i=0; i<4; i++) gauge[i] = gauge_ ? ((Float**)gauge_)[i] : ((Float**)u.Gauge_p())[i]; }
-    QDPJITOrder(const QDPJITOrder &order) : LegacyOrder<Float,length>(order), volumeCB(order.volumeCB) {
-	for(int i=0; i<4; i++) gauge[i] = order.gauge[i];
-      }
 
       __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
       {
@@ -2244,9 +2159,6 @@ namespace quda {
   MILCOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0) :
     LegacyOrder<Float,length>(u, ghost_), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()),
       volumeCB(u.VolumeCB()), geometry(u.Geometry()) { ; }
-  MILCOrder(const MILCOrder &order) : LegacyOrder<Float,length>(order),
-      gauge(order.gauge), volumeCB(order.volumeCB), geometry(order.geometry)
-      { ; }
 
     __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
     {
@@ -2328,16 +2240,6 @@ namespace quda {
       if ((uintptr_t)((char *)gauge + offset) % 16 != 0) { errorQuda("MILC structure has misaligned offset"); }
     }
 
-    MILCSiteOrder(const MILCSiteOrder &order) :
-      LegacyOrder<Float, length>(order),
-      gauge(order.gauge),
-      volumeCB(order.volumeCB),
-      geometry(order.geometry),
-      offset(order.offset),
-      size(order.size)
-    {
-    }
-
     __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
     {
       // get base pointer
@@ -2409,16 +2311,6 @@ namespace quda {
       geometry(u.Geometry())
     {
       if (length != 18) errorQuda("Gauge length %d not supported", length);
-    }
-    CPSOrder(const CPSOrder &order) :
-      LegacyOrder<Float, length>(order),
-      gauge(order.gauge),
-      volumeCB(order.volumeCB),
-      anisotropy(order.anisotropy),
-      anisotropy_inv(order.anisotropy_inv),
-      geometry(order.geometry)
-    {
-      ;
     }
 
     // we need to transpose and scale for CPS ordering
@@ -2506,14 +2398,6 @@ namespace quda {
         exVolumeCB = u.X()[0]/2 + 2;
 	for (int i=1; i<4; i++) exVolumeCB *= u.X()[i] + 2;
       }
-      BQCDOrder(const BQCDOrder &order) :
-        LegacyOrder<Float, length>(order),
-        gauge(order.gauge),
-        volumeCB(order.volumeCB),
-        exVolumeCB(order.exVolumeCB)
-      {
-        if (length != 18) errorQuda("Gauge length %d not supported", length);
-      }
 
       // we need to transpose for BQCD ordering
       __device__ __host__ inline void load(complex v[9], int x, int dir, int parity, real = 1.0) const
@@ -2593,15 +2477,6 @@ namespace quda {
         gauge(gauge_ ? gauge_ : (Float *)u.Gauge_p()),
         volumeCB(u.VolumeCB()),
         scale(u.Scale()),
-        scale_inv(1.0 / scale)
-      {
-        if (length != 18) errorQuda("Gauge length %d not supported", length);
-      }
-      TIFROrder(const TIFROrder &order) :
-        LegacyOrder<Float, length>(order),
-        gauge(order.gauge),
-        volumeCB(order.volumeCB),
-        scale(order.scale),
         scale_inv(1.0 / scale)
       {
         if (length != 18) errorQuda("Gauge length %d not supported", length);
@@ -2698,19 +2573,6 @@ namespace quda {
         // exVolumeCB is the padded checkboard volume
         for (int i=0; i<4; i++) exVolumeCB *= exDim[i];
 	exVolumeCB /= 2;
-      }
-
-      TIFRPaddedOrder(const TIFRPaddedOrder &order) :
-        LegacyOrder<Float, length>(order),
-        gauge(order.gauge),
-        volumeCB(order.volumeCB),
-        exVolumeCB(order.exVolumeCB),
-        scale(order.scale),
-        scale_inv(order.scale_inv),
-        dim {order.dim[0], order.dim[1], order.dim[2], order.dim[3]},
-        exDim {order.exDim[0], order.exDim[1], order.exDim[2], order.exDim[3]}
-      {
-        if (length != 18) errorQuda("Gauge length %d not supported", length);
       }
 
       /**
