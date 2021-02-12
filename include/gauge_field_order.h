@@ -1145,10 +1145,6 @@ namespace quda {
         {
         }
 
-        Reconstruct(const Reconstruct<N, Float, ghostExchange_> &recon) : scale(recon.scale), scale_inv(recon.scale_inv)
-        {
-        }
-
         __device__ __host__ inline void Pack(real out[N], const complex in[N / 2]) const
         {
           if (isFixed<Float>::value) {
@@ -1266,17 +1262,6 @@ namespace quda {
         {
         }
 
-        Reconstruct(const Reconstruct<12, Float, ghostExchange_> &recon) :
-            anisotropy(recon.anisotropy),
-            tBoundary(recon.tBoundary),
-            firstTimeSliceBound(recon.firstTimeSliceBound),
-            lastTimeSliceBound(recon.lastTimeSliceBound),
-            isFirstTimeSlice(recon.isFirstTimeSlice),
-            isLastTimeSlice(recon.isLastTimeSlice),
-            ghostExchange(recon.ghostExchange)
-        {
-        }
-
         __device__ __host__ inline void Pack(real out[12], const complex in[9]) const
         {
 #pragma unroll
@@ -1332,7 +1317,6 @@ namespace quda {
         using complex = complex<real>;
 
         Reconstruct(const GaugeField &) { ; }
-        Reconstruct(const Reconstruct<11, Float, ghostExchange_> &) {}
 
         __device__ __host__ inline void Pack(real out[10], const complex in[9]) const
         {
@@ -1384,12 +1368,6 @@ namespace quda {
         const real scale_inv;
 
         Reconstruct(const GaugeField &u) : reconstruct_12(u), scale(u.Scale()), scale_inv(1.0 / scale) {}
-        Reconstruct(const Reconstruct<13, Float, ghostExchange_, stag_phase> &recon) :
-            reconstruct_12(recon.reconstruct_12),
-            scale(recon.scale),
-            scale_inv(recon.scale_inv)
-        {
-        }
 
         __device__ __host__ inline void Pack(real out[12], const complex in[9]) const
         {
@@ -1479,16 +1457,6 @@ namespace quda {
           isFirstTimeSlice(comm_coord(3) == 0 ? true : false),
           isLastTimeSlice(comm_coord(3) == comm_dim(3) - 1 ? true : false),
           ghostExchange(u.GhostExchange())
-        { }
-
-        Reconstruct(const Reconstruct<8, Float, ghostExchange_> &recon) :
-            anisotropy(recon.anisotropy),
-            tBoundary(recon.tBoundary),
-            firstTimeSliceBound(recon.firstTimeSliceBound),
-            lastTimeSliceBound(recon.lastTimeSliceBound),
-            isFirstTimeSlice(recon.isFirstTimeSlice),
-            isLastTimeSlice(recon.isLastTimeSlice),
-            ghostExchange(recon.ghostExchange)
         { }
 
         // Pack and unpack are described in https://arxiv.org/pdf/0911.3191.pdf
@@ -1624,13 +1592,6 @@ namespace quda {
         const real scale_inv;
 
         Reconstruct(const GaugeField &u) : reconstruct_8(u), scale(u.Scale()), scale_inv(1.0 / scale) {}
-
-        Reconstruct(const Reconstruct<9, Float, ghostExchange_, stag_phase> &recon) :
-            reconstruct_8(recon.reconstruct_8),
-            scale(recon.scale),
-            scale_inv(recon.scale_inv)
-        {
-        }
 
         __device__ __host__ inline real getPhase(const complex in[9]) const
         {
