@@ -692,7 +692,7 @@ namespace quda {
 #pragma unroll
       for (int i = 0; i < Nc*Ns; i++) {
 	for (int j = 0; j < Nc*Ns; j++) {
-	  ret.data[i] += data[j] * a(i,j);
+	  ret.data[i] += a(i,j) * data[j];
 	}
       }
       *this = ret;
