@@ -242,6 +242,7 @@ set(QUDA_RECONSTRUCT
 
 # Set CTest options
 option(QUDA_CTEST_SEP_DSLASH_POLICIES "Test Dslash policies separately in ctest instead of only autotuning them." OFF)
+option(QUDA_CTEST_DISABLE_BENCHMARKS "Disable benchmark test" ON)
 
 option(QUDA_FAST_COMPILE_REDUCE "enable fast compilation in blas and reduction kernels (single warp per reduction)" OFF)
 option(QUDA_FAST_COMPILE_DSLASH "enable fast compilation in dslash kernels (~20% perf impact)" OFF)
