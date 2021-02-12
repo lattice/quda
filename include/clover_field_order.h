@@ -465,7 +465,7 @@ namespace quda {
         }
 
         /**
-	 * @brief Returns the L2 norm suared of the field
+	 * @brief Returns the L2 norm squared of the field
 	 * @param[in] dim Which dimension we are taking the norm of (dummy for clover)
 	 * @return L1 norm
 	 */

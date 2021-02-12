@@ -1163,25 +1163,29 @@ namespace quda {
     }
   
   /**
-     @brief Perfrom a 12th order Taylor expansion of exp(iq) to approximate SU(N) matrix 
-     exponentiation
+     @brief Perform a 12th order Taylor expansion of exp(iQ=q) to approximate SU(N) matrix 
+     exponentiation. The argument q must be anti hermitian.
      @param[in/out] q The matrix to be exponentiated
   */  
-  template <class T, int Nc> __device__ __host__ void expsuNTaylor12th(Matrix<T, Nc> &q)
+  template <class T, int N> __device__ __host__ void expsuNTaylor12thAntiHerm(Matrix<T, N> &q)
   {
     // Port of the CHROMA implementation
-    // In place  q = 1 + q + (1/2)*q^2 + ...+ (1/n!)*(a_)^n up to n = 12
+    // In place  q = 1 + q + (1/2)*q^2 + (1/(2*3)*q^3 + ... + (1/n!)*(q)^n up to n = 12
     typedef decltype(q(0, 0).x) RealType;
+
+    T I(0.0,1.0);
+    q *= I;
     
-    Matrix<T,Nc> temp1 = q;
-    Matrix<T,Nc> temp2 = q;
-    Matrix<T,Nc> temp3;
-    Matrix<T,Nc> Id;
+    Matrix<T,N> temp1 = q;
+    Matrix<T,N> temp2 = q;
+    Matrix<T,N> temp3;
+    Matrix<T,N> Id;
     setIdentity(&Id);
     
+    // The first two terms...
     q += Id;
     
-    // Do a 12th order exponentiation
+    // ...of a 12th order expansion
     for(int i = 2; i <= 12; i++) {
       
       RealType coeff = 1.0/i;
@@ -1331,7 +1335,7 @@ namespace quda {
     }
     else {
       exp_iQ = Q;
-      expsuNTaylor12th(exp_iQ);
+      expsuNTaylor12thAntiHerm(exp_iQ);
     }     
     return exp_iQ;
   }
@@ -1417,7 +1421,7 @@ namespace quda {
       q(8) = y31 * conj(wl31) + y32 * conj(wl32) + y33 * conj(wl33);
     }
     else {
-      expsuNTaylor12th(q);
+      expsuNTaylor12thAntiHerm(q);
     }
   }
 } // end namespace quda
