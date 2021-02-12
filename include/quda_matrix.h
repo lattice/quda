@@ -117,7 +117,7 @@ namespace quda {
 #pragma unroll
 	  for (int i=0; i<N*N; i++) data[i] = b.data[i];
 	}
-
+	
 	template<typename S>
 	  __device__ __host__ inline Matrix(const gauge_wrapper<real, S> &s);
 
@@ -335,6 +335,13 @@ namespace quda {
 	for (int i=0; i<N*N; i++) data[i] = b.data[i];
       }
 
+      template<class U>
+	__device__ __host__ inline void operator+=(const HMatrix<U,N> & b) {
+#pragma unroll
+	for (int i=0; i<N*N; i++) data[i] += b.data[i];
+      }
+
+      
       template<typename S>
 	__device__ __host__ inline HMatrix(const clover_wrapper<T, S> &s);
 
@@ -653,6 +660,21 @@ namespace quda {
 #pragma unroll
         for (int j=i+1; j<N; ++j){
           (*m)(i,j) = (*m)(j,i) = 0;
+        }
+      }
+    }
+
+  
+  template<typename Float, int N>
+    __device__ __host__ inline
+    void setIdentity(HMatrix<Float,N>* h){
+    
+#pragma unroll
+    for (int i=0; i<N; ++i){
+        (*h)(i,i) = 1;
+#pragma unroll
+        for (int j=0; j<i; ++j){
+          (*h)(i,j) = 0;
         }
       }
     }
@@ -984,44 +1006,51 @@ namespace quda {
       //error is L2 norm, should be (very close) to zero.
       return error;
     }
-
-    /**
-       @brief Perfrom a 12th order Taylor expansion of exp(iq) to approximate SU(N) matrix
-       exponentiation
-       @param[in/out] q The matrix to be exponentiated
-    */
-  template <class T> __device__ __host__ void expsuNTaylor12th(Matrix<T, 6> &q)
-  {
-    // Port of the CHROMA implementation
-    // In place  q = 1 + q + (1/2)*q^2 + ...+ (1/n!)*(q)^n up to n = 12
-    typedef decltype(q(0,0).x) real;
-    
-    T I;
-    I.x = 0.0;
-    I.y = 1.0;    
-    q = I * q;
-
-    Matrix<T,6> temp1 = q;
-    Matrix<T,6> temp2 = q;
-    Matrix<T,6> temp3;
-    Matrix<T,6> Id;
-    setIdentity(&Id);
-    
-    q += Id;
-    
-    // Do a 12th order exponentiation
-    for(int i = 2; i <= 12; i++) {
+  
+  /**
+     @brief Perfrom a 19th order Taylor expansion of exp(iq) to approximate matrix
+     exponentiation
+     @param[in/out] q The matrix to be exponentiated
+  */
+  template <class T> __device__ __host__ void expsuNTaylor(Matrix<T, 6> &q)
+    {
+      // Port of the CHROMA implementation
+      // In place  q = 1 + q + (1/2)*q^2 + ... + (1/n!)*(q)^n up to n = 19
       
-      real coeff = 1.0/i;
+      typedef decltype(q(0, 0).x) Float;
       
-      temp3 = temp2 * temp1;
-      temp2 = temp3 * coeff;
-      q += temp2;
+      Matrix<T,6> temp1 = q;
+      Matrix<T,6> temp2 = q;
+      Matrix<T,6> temp3;
+      Matrix<T,6> Id;
+      setIdentity(&Id);
+      
+      q += Id;
+      
+      // Do a 19th order exponentiation
+      // 1/[(19-1)!] < DBM_MIN
+      for(int i = 2; i <= 19; i++) {
+	
+	Float coeff = 1.0/i;
+	
+	temp3 = temp2 * temp1;
+	temp2 = temp3 * coeff;
+	q += temp2;
+      }
     }
+  
+  /**
+     @brief Perfrom a 12th order Taylor expansion of exp(iq) to approximate SU(N) matrix
+     exponentiation
+     @param[in] q The matrix to be exponentiated
+     @return[in]  The exponentiated matrix
+  */
+  template <typename Float> __device__ __host__ Matrix<complex<Float>,6> hermCayleyHamilton(const HMatrix<Float, 6> &q)
+  {
+    Matrix<complex<Float>, 6> ret;
+    return ret;
   }
   
-
-    
     template <class T> __device__ __host__ inline auto exponentiate_iQ(const Matrix<T, 3> &Q)
     {
       // Use Cayley-Hamilton Theorem for SU(3) exp{iQ}.

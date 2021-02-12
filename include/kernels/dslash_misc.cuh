@@ -129,7 +129,7 @@ namespace quda {
     static constexpr int length = (nSpin / (nSpin/2)) * 2 * nColor * nColor * (nSpin/2) * (nSpin/2) / 2;
     static constexpr bool inverse = inverse_;
     static constexpr bool dynamic_clover = dynamic_clover_inverse();
-    static constexpr bool exp_clover = exponentiated_clover();
+    static constexpr bool exp_clover = !exponentiated_clover();
     
     typedef typename colorspinor_mapper<Float,nSpin,nColor>::type F;
     typedef typename clover_mapper<Float,length>::type C;
@@ -146,17 +146,22 @@ namespace quda {
     real a;
     real b;
     real c;
+    real kappa;
+    real c_sw;
     QudaTwistGamma5Type twist;
 
     CloverArg(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover,
-	      int parity, real kappa=0.0, real mu=0.0, real /*epsilon*/ = 0.0,
+	      int parity, real kappa=0.0, real mu=0.0, real c_sw = 0.0,
 	      bool dagger = false, QudaTwistGamma5Type twist=QUDA_TWIST_GAMMA5_INVALID)
       : out(out), in(in), clover(clover, twist == QUDA_TWIST_GAMMA5_INVALID ? inverse : false),
 	cloverInv(clover, (twist != QUDA_TWIST_GAMMA5_INVALID && !dynamic_clover) ? true : false),
 	nParity(in.SiteSubset()), parity(parity),
 	doublet(in.TwistFlavor() == QUDA_TWIST_DEG_DOUBLET || in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
         threads(doublet ? in.VolumeCB()/2 : in.VolumeCB(), in.SiteSubset(), 1),
-        volumeCB(doublet ? in.VolumeCB()/2 : in.VolumeCB()), a(0.0), b(0.0), c(0.0), twist(twist)
+        volumeCB(doublet ? in.VolumeCB()/2 : in.VolumeCB()), a(0.0), b(0.0), c(0.0),
+	kappa(kappa),
+	c_sw(c_sw),
+	twist(twist)
     {
       checkPrecision(out, in, clover);
       checkLocation(out, in, clover);
@@ -205,9 +210,12 @@ namespace quda {
           Cholesky<HMatrix, real, N> cholesky(A);
           chi = static_cast<real>(0.25) * cholesky.backward(cholesky.forward(chi));
 	} else if (arg.exp_clover) {
-	  // Initialise the Matrix U with the real elements of the HMatrix A 
-	  Matrix<Complex, N> U = A;	  
-	  expsuNTaylor12th(U);
+	  Matrix<Complex,N> U(A);
+	  
+	  U *= arg.c_sw * 2.0 * arg.kappa;
+	  expsuNTaylor(U);
+	  U *= 2.0 * arg.kappa;
+
 	  chi *= U;
         } else {
           chi = A * chi;
@@ -256,11 +264,15 @@ namespace quda {
 	
 	if (arg.exp_clover) {
 	  // Initialise the Matrix U with the real elements of the HMatrix A 
-	  Matrix<Complex, N> U = A;
 	  Matrix<Complex, N> Id;
 	  setIdentity(&Id);
-	  U += j*arg.a*Id;
-	  expsuNTaylor12th(U);
+	  Matrix<Complex, N> U(A);
+	  
+	  U = U + j*arg.a*Id;
+	  U *= arg.c_sw * 2.0 * arg.kappa;
+	  expsuNTaylor(U);
+	  U *= 2.0 * arg.kappa;
+	  
 	  in_chi *= U;
 	  out_chi = in_chi;
 	} else {
@@ -275,10 +287,14 @@ namespace quda {
             out_chi = static_cast<real>(0.25)*cholesky.backward(cholesky.forward(out_chi));
 	  } else if (arg.exp_clover) {
 	    // Initialise the Matrix U with the real elements of the HMatrix A 
-	    Matrix<Complex, N> Uinv(arg.cloverInv(x_cb, clover_parity, chirality));
-	    expsuNTaylor12th(Uinv);
-	    //out_chi *= Uinv;
-	    out_chi *= static_cast<real>(2.0) * Uinv;
+	    Mat Ainv = arg.cloverInv(x_cb, clover_parity, chirality);
+	    Matrix<Complex, N> U(Ainv);
+	    
+	    U *= arg.c_sw * 2.0 * arg.kappa;
+	    expsuNTaylor(U);
+	    U *= 2.0 * arg.kappa;
+	    
+	    out_chi *= static_cast<real>(2.0) * U;
 	  } else {
 	    Mat Ainv = arg.cloverInv(x_cb, clover_parity, chirality);
 	    out_chi = static_cast<real>(2.0)*(Ainv*out_chi);
@@ -287,7 +303,7 @@ namespace quda {
 	
         out += (out_chi).chiral_reconstruct(chirality);
       }
-
+      
       out.toNonRel(); // change basis back
       arg.out(x_cb, spinor_parity) = out;
     }
