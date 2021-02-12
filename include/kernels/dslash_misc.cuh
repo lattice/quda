@@ -129,7 +129,8 @@ namespace quda {
     static constexpr int length = (nSpin / (nSpin/2)) * 2 * nColor * nColor * (nSpin/2) * (nSpin/2) / 2;
     static constexpr bool inverse = inverse_;
     static constexpr bool dynamic_clover = dynamic_clover_inverse();
-
+    static constexpr bool exp_clover = exponentiated_clover();
+    
     typedef typename colorspinor_mapper<Float,nSpin,nColor>::type F;
     typedef typename clover_mapper<Float,length>::type C;
 
@@ -178,6 +179,7 @@ namespace quda {
   template <typename Arg> struct CloverApply {
     static constexpr int N = Arg::nColor * Arg::nSpin / 2;
     using real = typename Arg::real;
+    using Complex = complex<real>;
     using fermion = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin>;
     using half_fermion = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin / 2>;
     Arg &arg;
@@ -202,6 +204,11 @@ namespace quda {
         if (arg.dynamic_clover) {
           Cholesky<HMatrix, real, N> cholesky(A);
           chi = static_cast<real>(0.25) * cholesky.backward(cholesky.forward(chi));
+	} else if (arg.exp_clover) {
+	  // Initialise the Matrix U with the real elements of the HMatrix A 
+	  Matrix<Complex, N> U = A;	  
+	  expsuNTaylor12th(U);
+	  chi *= U;
         } else {
           chi = A * chi;
         }
@@ -219,6 +226,7 @@ namespace quda {
   template <typename Arg> struct TwistCloverApply {
     static constexpr int N = Arg::nColor * Arg::nSpin / 2;
     using real = typename Arg::real;
+    using Complex = complex<real>;
     using fermion = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin>;
     using half_fermion = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin / 2>;
     using Mat = HMatrix<typename Arg::real, N>;
@@ -242,22 +250,41 @@ namespace quda {
         const complex<real> j(0.0, chirality == 0 ? static_cast<real>(0.5) : -static_cast<real>(0.5));
 
         Mat A = arg.clover(x_cb, clover_parity, chirality);
-
+	
         half_fermion in_chi = in.chiral_project(chirality);
-        half_fermion out_chi = A*in_chi + j*arg.a*in_chi;
-
+        half_fermion out_chi;
+	
+	if (arg.exp_clover) {
+	  // Initialise the Matrix U with the real elements of the HMatrix A 
+	  Matrix<Complex, N> U = A;
+	  Matrix<Complex, N> Id;
+	  setIdentity(&Id);
+	  U += j*arg.a*Id;
+	  expsuNTaylor12th(U);
+	  in_chi *= U;
+	  out_chi = in_chi;
+	} else {
+	  out_chi = A*in_chi + j*arg.a*in_chi;
+	}
+	
         if (arg.inverse) {
           if (arg.dynamic_clover) {
             Mat A2 = A.square();
             A2 += arg.a*arg.a*static_cast<real>(0.25);
             Cholesky<HMatrix, real, N> cholesky(A2);
             out_chi = static_cast<real>(0.25)*cholesky.backward(cholesky.forward(out_chi));
-          } else {
-            Mat Ainv = arg.cloverInv(x_cb, clover_parity, chirality);
-            out_chi = static_cast<real>(2.0)*(Ainv*out_chi);
-          }
+	  } else if (arg.exp_clover) {
+	    // Initialise the Matrix U with the real elements of the HMatrix A 
+	    Matrix<Complex, N> Uinv(arg.cloverInv(x_cb, clover_parity, chirality));
+	    expsuNTaylor12th(Uinv);
+	    //out_chi *= Uinv;
+	    out_chi *= static_cast<real>(2.0) * Uinv;
+	  } else {
+	    Mat Ainv = arg.cloverInv(x_cb, clover_parity, chirality);
+	    out_chi = static_cast<real>(2.0)*(Ainv*out_chi);
+	  }
         }
-
+	
         out += (out_chi).chiral_reconstruct(chirality);
       }
 

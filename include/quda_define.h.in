@@ -40,6 +40,17 @@
 #undef QUDA_DYNAMIC_CLOVER
 #endif
 
+#cmakedefine QUDA_EXPONENTIATE_CLOVER
+#ifdef QUDA_EXPONENTIATE_CLOVER
+/**
+ * @def   EXPONENTIATE_CLOVER
+ * @brief This macro sets whether we are compiling QUDA with exponentiate
+ * clover support enabled or not
+ */
+#define EXPONENTIATE_CLOVER
+#undef QUDA_EXPONENTIATE_CLOVER
+#endif
+
 #cmakedefine QUDA_FLOAT8
 #ifdef QUDA_FLOAT8
 /**

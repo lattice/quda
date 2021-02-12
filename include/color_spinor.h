@@ -687,6 +687,18 @@ namespace quda {
     }
 
 
+    template <typename T> __device__ __host__ inline ColorSpinor<Float, Nc, 2> &operator*=(const Matrix<T,Nc*2> &a) {
+      ColorSpinor<Float, Nc, Ns> ret;	 
+#pragma unroll
+      for (int i = 0; i < Nc*Ns; i++) {
+	for (int j = 0; j < Nc*Ns; j++) {
+	  ret.data[i] += data[j] * a(i,j);
+	}
+      }
+      *this = ret;
+      return *this;
+    }      
+    
     __device__ __host__ inline ColorSpinor<Float, Nc, 2>& operator=(const ColorSpinor<Float, Nc, 2> &a) {
       if (this != &a) {
 #pragma unroll

@@ -985,6 +985,43 @@ namespace quda {
       return error;
     }
 
+    /**
+       @brief Perfrom a 12th order Taylor expansion of exp(iq) to approximate SU(N) matrix
+       exponentiation
+       @param[in/out] q The matrix to be exponentiated
+    */
+  template <class T> __device__ __host__ void expsuNTaylor12th(Matrix<T, 6> &q)
+  {
+    // Port of the CHROMA implementation
+    // In place  q = 1 + q + (1/2)*q^2 + ...+ (1/n!)*(q)^n up to n = 12
+    typedef decltype(q(0,0).x) real;
+    
+    T I;
+    I.x = 0.0;
+    I.y = 1.0;    
+    q = I * q;
+
+    Matrix<T,6> temp1 = q;
+    Matrix<T,6> temp2 = q;
+    Matrix<T,6> temp3;
+    Matrix<T,6> Id;
+    setIdentity(&Id);
+    
+    q += Id;
+    
+    // Do a 12th order exponentiation
+    for(int i = 2; i <= 12; i++) {
+      
+      real coeff = 1.0/i;
+      
+      temp3 = temp2 * temp1;
+      temp2 = temp3 * coeff;
+      q += temp2;
+    }
+  }
+  
+
+    
     template <class T> __device__ __host__ inline auto exponentiate_iQ(const Matrix<T, 3> &Q)
     {
       // Use Cayley-Hamilton Theorem for SU(3) exp{iQ}.
@@ -1198,5 +1235,5 @@ namespace quda {
       q(7) = y21 * conj(wl31) + y22 * conj(wl32) + y23 * conj(wl33);
       q(8) = y31 * conj(wl31) + y32 * conj(wl32) + y33 * conj(wl33);
     }
-
+    
 } // end namespace quda

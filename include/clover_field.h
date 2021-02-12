@@ -455,4 +455,18 @@ namespace quda {
 #endif
   }
 
+  /**
+     @brief Helper function that returns whether we have enabled
+     exponentiated clover or not.
+  */
+  constexpr bool exponentiated_clover()
+  {
+#ifdef EXPONENTIATED_CLOVER
+    return true;
+#else
+    return false;
+#endif
+  }
+
+  
 } // namespace quda
