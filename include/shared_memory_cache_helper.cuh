@@ -60,7 +60,7 @@ namespace quda
 #ifdef __CUDA_ARCH__
       extern __shared__ atom_t cache_[];
 #else
-      static atom_t *cache_;
+      atom_t *cache_;
 #endif
       return reinterpret_cast<atom_t*>(cache_);
     }

@@ -76,7 +76,7 @@ namespace quda
      */
     struct BlasFunctor {
       //! pre-computation routine before the main loop
-      virtual __device__ __host__ void init() { ; }
+      __device__ __host__ void init() { ; }
     };
 
     /**

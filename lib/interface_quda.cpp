@@ -523,16 +523,20 @@ void initQudaMemory()
 {
   profileInit.TPSTART(QUDA_PROFILE_TOTAL);
   profileInit.TPSTART(QUDA_PROFILE_INIT);
-
+  warningQuda("TRACE: %s %s %i", __FILE__, __func__, __LINE__);
   if (!comms_initialized) init_default_comms();
+  warningQuda("TRACE: %s %s %i", __FILE__, __func__, __LINE__);
 
   loadTuneCache();
 
   device::create_context();
   createDslashEvents();
+  warningQuda("TRACE: %s %s %i", __FILE__, __func__, __LINE__);
 
   blas_lapack::native::init();
+  warningQuda("TRACE: %s %s %i", __FILE__, __func__, __LINE__);
   blas::init();
+  warningQuda("TRACE: %s %s %i", __FILE__, __func__, __LINE__);
 
   // initalize the memory pool allocators
   pool::init();
@@ -542,6 +546,7 @@ void initQudaMemory()
 
   for (int d=0; d<4; d++) R[d] = 2 * (redundant_comms || commDimPartitioned(d));
 
+  warningQuda("TRACE: %s %s %i", __FILE__, __func__, __LINE__);
   profileInit.TPSTOP(QUDA_PROFILE_INIT);
   profileInit.TPSTOP(QUDA_PROFILE_TOTAL);
 }

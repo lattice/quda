@@ -94,10 +94,10 @@ namespace quda
       static constexpr bool site_unroll = site_unroll_;
 
       //! pre-computation routine called before the "M-loop"
-      virtual __device__ __host__ void pre() { ; }
+      __device__ __host__ void pre() { ; }
 
       //! post-computation routine called after the "M-loop"
-      virtual __device__ __host__ void post(reduce_t &) { ; }
+      __device__ __host__ void post(reduce_t &) { ; }
     };
 
     /**

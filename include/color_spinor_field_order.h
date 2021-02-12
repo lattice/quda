@@ -454,12 +454,12 @@ namespace quda {
 
         __device__ __host__ inline void real(const Float &a)
         {
-          return fixed ? v[idx].real(storeFloat(round(scale * a))) : v[idx].real(storeFloat(a));
+          return fixed ? v[idx].real(storeFloat(quda::round(scale * a))) : v[idx].real(storeFloat(a));
         }
 
         __device__ __host__ inline void imag(const Float &a)
         {
-          return fixed ? v[idx].imag(storeFloat(round(scale * a))) : v[idx].imag(storeFloat(a));
+          return fixed ? v[idx].imag(storeFloat(quda::round(scale * a))) : v[idx].imag(storeFloat(a));
         }
 
         /**
