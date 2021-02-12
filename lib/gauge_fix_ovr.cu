@@ -3,8 +3,6 @@
 #include <gauge_tools.h>
 #include <unitarization_links.h>
 #include <comm_quda.h>
-#include <reduce_helper.h>
-#include <thrust_helper.cuh>
 #include <instantiate.h>
 #include <tunable_reduction.h>
 #include <tunable_nd.h>
@@ -26,6 +24,7 @@ namespace quda {
     {
       for (int dir = 0; dir < 4; dir++) if (comm_dim_partitioned(dir)) nlinksfaces += u.LocalSurfaceCB(dir);
       apply(device::get_default_stream());
+      qudaDeviceSynchronize();
     }
 
     void apply(const qudaStream_t &stream)
@@ -48,20 +47,13 @@ namespace quda {
     int nlinksfaces = 0;
     for (int dir = 0; dir < 4; dir++) if (comm_dim_partitioned(dir)) nlinksfaces += 2 * u.LocalSurfaceCB(dir);
 
-    thrust::device_ptr<int> array_faceT[2];
-    thrust::device_ptr<int> array_interiorT[2];
-    for (int i = 0; i < 2; i++) array_faceT[i] = thrust::device_pointer_cast(borderpoints[i]);
-
     int size[2];
     for (int i = 0; i < 2; i++) {
-      //sort and remove duplicated lattice indices
-      thrust_allocator alloc;
-      thrust::sort(thrust::cuda::par(alloc), array_faceT[i], array_faceT[i] + nlinksfaces);
-      thrust::device_ptr<int> new_end = thrust::unique(array_faceT[i], array_faceT[i] + nlinksfaces);
-      size[i] = thrust::raw_pointer_cast(new_end) - thrust::raw_pointer_cast(array_faceT[i]);
+      std::sort(borderpoints[i], borderpoints[i] + nlinksfaces);
+      size[i] = std::unique(borderpoints[i], borderpoints[i] + nlinksfaces) - borderpoints[i];
     }
     if (size[0] == size[1]) threads = size[0];
-    else errorQuda("BORDER: Even and Odd sizes does not match, not supported!!!!, %d:%d", size[0], size[1]);
+    else errorQuda("BORDER: even and odd sizes does not match, not supported, %d:%d", size[0], size[1]);
   }
 
   /**
@@ -307,7 +299,7 @@ namespace quda {
     int threads;
     for (int dir = 0; dir < 4; dir++) if (comm_dim_partitioned(dir)) nlinksfaces += 2 * data.LocalSurfaceCB(dir);
     for (int i = 0; i < 2 && nlinksfaces; i++) { //even and odd ids
-      borderpoints[i] = static_cast<int*>(pool_device_malloc(nlinksfaces * sizeof(int)));
+      borderpoints[i] = static_cast<int*>(managed_malloc(nlinksfaces * sizeof(int)));
       qudaMemset(borderpoints[i], 0, nlinksfaces * sizeof(int));
     }
     if (comm_partitioned()) PreCalculateLatticeIndices(data, threads, borderpoints);
@@ -441,7 +433,7 @@ namespace quda {
       printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
     }
 
-    for (int i = 0; i < 2 && nlinksfaces; i++) pool_device_free(borderpoints[i]);
+    for (int i = 0; i < 2 && nlinksfaces; i++) managed_free(borderpoints[i]);
     host_free(num_failures_h);
 
     if ( comm_partitioned() ) {
