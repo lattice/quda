@@ -1008,11 +1008,11 @@ namespace quda {
     }
   
   /**
-     @brief Perfrom a 19th order Taylor expansion of exp(iq) to approximate matrix
+     @brief Perfrom an Mth order Taylor expansion of exp(q) to approximate matrix
      exponentiation
      @param[in/out] q The matrix to be exponentiated
   */
-  template <class T> __device__ __host__ void expsuNTaylor(Matrix<T, 6> &q)
+  template <int M=9, class T> __device__ __host__ void expsuNTaylor(Matrix<T, 6> &q)
     {
       // Port of the CHROMA implementation
       // In place  q = 1 + q + (1/2)*q^2 + ... + (1/n!)*(q)^n up to n = 19
@@ -1027,9 +1027,9 @@ namespace quda {
       
       q += Id;
       
-      // Do a 19th order exponentiation
+      // Do a Mth order exponentiation
       // 1/[(19-1)!] < DBM_MIN
-      for(int i = 2; i <= 19; i++) {
+      for(int i = 2; i <= M; i++) {
 	
 	Float coeff = 1.0/i;
 	

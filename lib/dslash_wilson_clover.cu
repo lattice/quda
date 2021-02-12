@@ -35,7 +35,7 @@ namespace quda
 
     long long flops() const
     {
-      int clover_flops = 504;
+      int clover_flops = 504; // DMH FIXME
       long long flops = Dslash::flops();
 
       switch (arg.kernel_type) {

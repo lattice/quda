@@ -211,10 +211,18 @@ namespace quda {
           chi = static_cast<real>(0.25) * cholesky.backward(cholesky.forward(chi));
 	} else if (arg.exp_clover) {
 	  Matrix<Complex,N> U(A);
+
+
+	  U *= 1.20536588031793 * 2.0 * 0.1317523057;
+	  expsuNTaylor<19>(U);
+	  U *= 2.0 * 0.1317523057;
+	  //if(x_cb == 0 && parity == 0) printf("hit\n");
 	  
+	  /*
 	  U *= arg.c_sw * 2.0 * arg.kappa;
 	  expsuNTaylor(U);
 	  U *= 2.0 * arg.kappa;
+	  */
 
 	  chi *= U;
         } else {
