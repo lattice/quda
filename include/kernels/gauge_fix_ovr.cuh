@@ -304,10 +304,10 @@ namespace quda {
       }
       if (!Arg::top) {
         switch (arg.dim) {
-        case 0: x[0] -= 1;
-        case 1: x[1] -= 1;
-        case 2: x[2] -= 1;
-        case 3: x[3] -= 1;
+        case 0: x[0] -= 1; break;
+        case 1: x[1] -= 1; break;
+        case 2: x[2] -= 1; break;
+        case 3: x[3] -= 1; break;
         }
         parity = 1 - parity;
       }
