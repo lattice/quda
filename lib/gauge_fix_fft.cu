@@ -43,7 +43,7 @@ namespace quda {
       switch (dir) {
       case 0: launch<FFTrotate>(tp, stream, Arg<0>(data, tmp0, tmp1)); break;
       case 1: launch<FFTrotate>(tp, stream, Arg<1>(data, tmp0, tmp1)); break;
-      default: errorQuda("Error in GaugeFixFFTRotate option.\n");
+      default: errorQuda("Error in GaugeFixFFTRotate option");
       }
     }
 
@@ -314,17 +314,12 @@ namespace quda {
     setUnitarizeLinksConstants(unitarize_eps, max_error,
                                reunit_allow_svd, reunit_svd_only,
                                svd_rel_error, svd_abs_error);
-    int num_failures = 0;
-    int* num_failures_dev = static_cast<int*>(pool_device_malloc(sizeof(int)));
-    qudaMemset(num_failures_dev, 0, sizeof(int));
-    unitarizeLinks(data, data, num_failures_dev);
-    qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), qudaMemcpyDeviceToHost);
+    int *num_failures_h = static_cast<int*>(mapped_malloc(sizeof(int)));
+    int *num_failures_d = static_cast<int*>(get_mapped_device_pointer(num_failures_h));
 
-    pool_device_free(num_failures_dev);
-    if ( num_failures > 0 ) {
-      errorQuda("Error in the unitarization\n");
-      exit(1);
-    }
+    *num_failures_h = 0;
+    unitarizeLinks(data, data, num_failures_d);
+    if (*num_failures_h > 0) errorQuda("Error in the unitarization");
     // end reunitarize
 
     arg.free();
@@ -364,6 +359,8 @@ namespace quda {
       gbytes = gbytes / (secs * 1e9);
       printfQuda("Time: %6.6f s, Gflop/s = %6.1f, GB/s = %6.1f\n", secs, gflops, gbytes);
     }
+
+    host_free(num_failures_h);
   }
 
   template<typename Float, int nColors, QudaReconstructType recon> struct GaugeFixingFFT {
@@ -402,7 +399,7 @@ namespace quda {
   {
 #ifdef MULTI_GPU
     if (comm_dim_partitioned(0) || comm_dim_partitioned(1) || comm_dim_partitioned(2) || comm_dim_partitioned(3))
-      errorQuda("Gauge Fixing with FFTs in multi-GPU support NOT implemented yet!\n");
+      errorQuda("Gauge Fixing with FFTs in multi-GPU support NOT implemented yet!");
 #else
     errorQuda("Gauge fixing has bot been built");
 #endif
