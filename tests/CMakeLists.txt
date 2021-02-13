@@ -593,6 +593,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
             --dslash-type ${DIRAC_NAME}
             --test 0
             --dim 20 20 20 20
+            --Lsdim 12
             --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json
             --gtest_filter=*benchmark/*n0)
     set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
@@ -616,6 +617,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
             --dslash-type ${DIRAC_NAME}
             --test 0
             --dim 20 20 20 20
+            --Lsdim 12
             --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json
             --gtest_filter=*benchmark/*n0)
     set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
@@ -638,6 +640,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
             --dslash-type ${DIRAC_NAME}
             --test 0
             --dim 20 20 20 20
+            --Lsdim 12
             --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json
             --gtest_filter=*benchmark/*n0)
     set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
