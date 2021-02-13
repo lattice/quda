@@ -74,7 +74,7 @@ namespace quda {
     int E[4]; // grid dimensions on force (possibly extended)
     int border[4]; //
 
-    UpdateMomArg(GaugeField &mom, const Float &coeff, GaugeField &force) :
+    UpdateMomArg(GaugeField &mom, const Float &coeff, const GaugeField &force) :
       BaseArg<Float, nColor, recon>(mom),
       mom(mom),
       force(force),

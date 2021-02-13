@@ -4,30 +4,41 @@
 
 namespace quda {
 
-  template <typename Arg>
+  template <typename Float, QudaReconstructType recon>
   class DerivativeClover : TunableKernel3D {
-
-    Arg arg;
-    const GaugeField &meta;
-    unsigned int minThreads() const { return meta.LocalVolumeCB(); }
+    GaugeField &force;
+    GaugeField &gauge;
+    GaugeField &oprod;
+    double coeff;
+    int parity;
+    unsigned int minThreads() const { return gauge.LocalVolumeCB(); }
 
   public:
-    DerivativeClover(const Arg &arg, const GaugeField &meta) :
-      TunableKernel3D(meta, 2, 4),
-      arg(arg),
-      meta(meta) { }
+    DerivativeClover(GaugeField &force, GaugeField &gauge, GaugeField &oprod, double coeff, int parity) :
+      TunableKernel3D(gauge, 2, 4),
+      force(force),
+      gauge(gauge),
+      oprod(oprod),
+      coeff(coeff),
+      parity(parity)
+    {
+      apply(device::get_default_stream());
+    }
 
     void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<CloverDerivative>(tp, stream, arg);
+      launch<CloverDerivative>(tp, stream, CloverDerivArg<Float, recon>(force, gauge, oprod, coeff, parity));
     }
 
     // The force field is updated so we must preserve its initial state
-    void preTune() { arg.force.save(); }
-    void postTune() { arg.force.load(); }
+    void preTune() { force.backup(); }
+    void postTune() { force.restore(); }
 
-    long long flops() const { return 16 * 198 * 3 * 4 * meta.LocalVolume(); }
-    long long bytes() const { return ((8*arg.gauge.Bytes() + 4*arg.oprod.Bytes())*3 + 2*arg.force.Bytes()) * 4 * meta.LocalVolume(); }
+    long long flops() const { return 16 * 198 * 3 * 4 * gauge.LocalVolume(); }
+    long long bytes() const
+    {
+      return ((8 * gauge.Reconstruct() + 4 * oprod.Reconstruct()) * 3 + 2 * force.Reconstruct()) * 4 * gauge.LocalVolume() * gauge.Precision();
+    }
   };
 
   template<typename Float>
@@ -38,15 +49,9 @@ namespace quda {
     if (force.Reconstruct() != QUDA_RECONSTRUCT_NO) errorQuda("Force field does not support reconstruction");
 
     if (force.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
-      typedef gauge::FloatNOrder<Float, 18, 2, 18> F;
-      typedef gauge::FloatNOrder<Float, 18, 2, 18> O;
-
       if (gauge.isNative()) {
 	if (gauge.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
-	  CloverDerivArg<Float,F,G,O> arg(force, gauge, oprod, coeff, parity);
-	  DerivativeClover<decltype(arg)> deriv(arg, gauge);
-	  deriv.apply(device::get_default_stream());
+	  DerivativeClover<Float, QUDA_RECONSTRUCT_NO> deriv(force, gauge, oprod, coeff, parity);
 	} else {
 	  errorQuda("Reconstruction type %d not supported",gauge.Reconstruct());
 	}
