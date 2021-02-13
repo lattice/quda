@@ -8,8 +8,6 @@ namespace quda {
   {
     GaugeForceArg<Float, nColor, recon_u, QUDA_RECONSTRUCT_10> arg;
     const GaugeField &meta;
-
-    unsigned int sharedBytesPerThread() const { return 4 * sizeof(int); } // for dynamic indexing array
     unsigned int minThreads() const { return arg.threads.x; }
 
   public:
@@ -26,7 +24,8 @@ namespace quda {
       printfQuda("count = %d u_bytes = %lu, mom_bytes = %lu\n", p.count, u.Bytes(), mom.Bytes());
     }
 
-    void apply(const qudaStream_t &stream) {
+    void apply(const qudaStream_t &stream)
+    {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       launch<GaugeForce>(tp, stream, arg);
     }
