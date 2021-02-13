@@ -21,6 +21,7 @@ namespace quda {
     F out;                // output vector field
     const F in;           // input vector field
     const int d;          // which gamma matrix are we applying
+    const int proj = 0;   // which gamma projection are we applying
     const int nParity;    // number of parities we're working on
     bool doublet;         // whether we applying the operator to a doublet
     dim3 threads;         // thread shape for this kernel
@@ -29,7 +30,7 @@ namespace quda {
     real b;               // chiral twist
     real c;               // flavor twist
 
-    GammaArg(ColorSpinorField &out, const ColorSpinorField &in, int d,
+    GammaArg(ColorSpinorField &out, const ColorSpinorField &in, int d, int proj = 0,
 	     real kappa=0.0, real mu=0.0, real epsilon=0.0,
 	     bool dagger=false, QudaTwistGamma5Type twist=QUDA_TWIST_GAMMA5_INVALID)
       : out(out), in(in), d(d), nParity(in.SiteSubset()),
@@ -40,6 +41,7 @@ namespace quda {
       checkPrecision(out, in);
       checkLocation(out, in);
       if (d < 0 || d > 4) errorQuda("Undefined gamma matrix %d", d);
+      if (proj < -1 || proj > 1) errorQuda("Undefined gamma projection %d", proj);
       if (in.Nspin() != 4) errorQuda("Cannot apply gamma5 to nSpin=%d field", in.Nspin());
       if (!in.isNative() || !out.isNative()) errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
 
@@ -91,6 +93,38 @@ namespace quda {
   };
 
   /**
+     @brief Application of chiral projection to a color spinor field
+  */
+  template <typename Arg> struct ChiralProject {
+    Arg &arg;
+    constexpr ChiralProject(Arg &arg) : arg(arg) {}
+    static constexpr const char* filename() { return KERNEL_FILE; }
+
+    __device__ __host__ void operator()(int x_cb, int parity)
+    {
+      ColorSpinor<typename Arg::real, Arg::nColor, 4> in = arg.in(x_cb, parity);
+      ColorSpinor<typename Arg::real, Arg::nColor, 2> chi;
+
+      // arg.proj is either +1 or -1, or 0.
+      // chiral_project/reconstruct(int p) expects 0 (+ve proj) or 1 (-ve proj)
+      // chiral_reconstruct(int p) returns the projected spinor with the
+      // opposite projection zerod out.
+      switch(arg.proj) {
+      case -1:
+	chi = in.chiral_project(1);
+	arg.out(x_cb, parity) = chi.chiral_reconstruct(1);
+	break;
+
+      case 1:
+	chi = in.chiral_project(0);
+	arg.out(x_cb, parity) = chi.chiral_reconstruct(0);
+	break;
+      case 0: break; 
+      }
+    }
+  };
+  
+  /**
      @brief Application of twist to a color spinor field 
   */
   template <typename Arg> struct TwistGamma {
@@ -129,8 +163,7 @@ namespace quda {
     static constexpr int length = (nSpin / (nSpin/2)) * 2 * nColor * nColor * (nSpin/2) * (nSpin/2) / 2;
     static constexpr bool inverse = inverse_;
     static constexpr bool dynamic_clover = dynamic_clover_inverse();
-    static constexpr bool exp_clover = !exponentiated_clover();
-    
+
     typedef typename colorspinor_mapper<Float,nSpin,nColor>::type F;
     typedef typename clover_mapper<Float,length>::type C;
 
@@ -146,22 +179,17 @@ namespace quda {
     real a;
     real b;
     real c;
-    real kappa;
-    real c_sw;
     QudaTwistGamma5Type twist;
 
     CloverArg(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover,
-	      int parity, real kappa=0.0, real mu=0.0, real c_sw = 0.0,
+	      int parity, real kappa=0.0, real mu=0.0, real /*epsilon*/ = 0.0,
 	      bool dagger = false, QudaTwistGamma5Type twist=QUDA_TWIST_GAMMA5_INVALID)
       : out(out), in(in), clover(clover, twist == QUDA_TWIST_GAMMA5_INVALID ? inverse : false),
 	cloverInv(clover, (twist != QUDA_TWIST_GAMMA5_INVALID && !dynamic_clover) ? true : false),
 	nParity(in.SiteSubset()), parity(parity),
 	doublet(in.TwistFlavor() == QUDA_TWIST_DEG_DOUBLET || in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
         threads(doublet ? in.VolumeCB()/2 : in.VolumeCB(), in.SiteSubset(), 1),
-        volumeCB(doublet ? in.VolumeCB()/2 : in.VolumeCB()), a(0.0), b(0.0), c(0.0),
-	kappa(kappa),
-	c_sw(c_sw),
-	twist(twist)
+        volumeCB(doublet ? in.VolumeCB()/2 : in.VolumeCB()), a(0.0), b(0.0), c(0.0), twist(twist)
     {
       checkPrecision(out, in, clover);
       checkLocation(out, in, clover);
@@ -184,7 +212,6 @@ namespace quda {
   template <typename Arg> struct CloverApply {
     static constexpr int N = Arg::nColor * Arg::nSpin / 2;
     using real = typename Arg::real;
-    using Complex = complex<real>;
     using fermion = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin>;
     using half_fermion = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin / 2>;
     Arg &arg;
@@ -209,22 +236,6 @@ namespace quda {
         if (arg.dynamic_clover) {
           Cholesky<HMatrix, real, N> cholesky(A);
           chi = static_cast<real>(0.25) * cholesky.backward(cholesky.forward(chi));
-	} else if (arg.exp_clover) {
-	  Matrix<Complex,N> U(A);
-
-
-	  U *= 1.20536588031793 * 2.0 * 0.1317523057;
-	  expsuNTaylor<19>(U);
-	  U *= 2.0 * 0.1317523057;
-	  //if(x_cb == 0 && parity == 0) printf("hit\n");
-	  
-	  /*
-	  U *= arg.c_sw * 2.0 * arg.kappa;
-	  expsuNTaylor(U);
-	  U *= 2.0 * arg.kappa;
-	  */
-
-	  chi *= U;
         } else {
           chi = A * chi;
         }
@@ -242,7 +253,6 @@ namespace quda {
   template <typename Arg> struct TwistCloverApply {
     static constexpr int N = Arg::nColor * Arg::nSpin / 2;
     using real = typename Arg::real;
-    using Complex = complex<real>;
     using fermion = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin>;
     using half_fermion = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin / 2>;
     using Mat = HMatrix<typename Arg::real, N>;
@@ -266,52 +276,25 @@ namespace quda {
         const complex<real> j(0.0, chirality == 0 ? static_cast<real>(0.5) : -static_cast<real>(0.5));
 
         Mat A = arg.clover(x_cb, clover_parity, chirality);
-	
+
         half_fermion in_chi = in.chiral_project(chirality);
-        half_fermion out_chi;
-	
-	if (arg.exp_clover) {
-	  // Initialise the Matrix U with the real elements of the HMatrix A 
-	  Matrix<Complex, N> Id;
-	  setIdentity(&Id);
-	  Matrix<Complex, N> U(A);
-	  
-	  U = U + j*arg.a*Id;
-	  U *= arg.c_sw * 2.0 * arg.kappa;
-	  expsuNTaylor(U);
-	  U *= 2.0 * arg.kappa;
-	  
-	  in_chi *= U;
-	  out_chi = in_chi;
-	} else {
-	  out_chi = A*in_chi + j*arg.a*in_chi;
-	}
-	
+        half_fermion out_chi = A*in_chi + j*arg.a*in_chi;
+
         if (arg.inverse) {
           if (arg.dynamic_clover) {
             Mat A2 = A.square();
             A2 += arg.a*arg.a*static_cast<real>(0.25);
             Cholesky<HMatrix, real, N> cholesky(A2);
             out_chi = static_cast<real>(0.25)*cholesky.backward(cholesky.forward(out_chi));
-	  } else if (arg.exp_clover) {
-	    // Initialise the Matrix U with the real elements of the HMatrix A 
-	    Mat Ainv = arg.cloverInv(x_cb, clover_parity, chirality);
-	    Matrix<Complex, N> U(Ainv);
-	    
-	    U *= arg.c_sw * 2.0 * arg.kappa;
-	    expsuNTaylor(U);
-	    U *= 2.0 * arg.kappa;
-	    
-	    out_chi *= static_cast<real>(2.0) * U;
-	  } else {
-	    Mat Ainv = arg.cloverInv(x_cb, clover_parity, chirality);
-	    out_chi = static_cast<real>(2.0)*(Ainv*out_chi);
-	  }
+          } else {
+            Mat Ainv = arg.cloverInv(x_cb, clover_parity, chirality);
+            out_chi = static_cast<real>(2.0)*(Ainv*out_chi);
+          }
         }
-	
+
         out += (out_chi).chiral_reconstruct(chirality);
       }
-      
+
       out.toNonRel(); // change basis back
       arg.out(x_cb, spinor_parity) = out;
     }

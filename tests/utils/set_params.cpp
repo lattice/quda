@@ -159,7 +159,13 @@ void setInvertParam(QudaInvertParam &inv_param)
     inv_param.clover_cuda_prec_eigensolver = cuda_prec_eigensolver;
     inv_param.clover_cuda_prec_refinement_sloppy = cuda_prec_sloppy;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
-    inv_param.clover_coeff = clover_coeff;
+    // Use kappa * csw or supplied clover_coeff
+    inv_param.clover_c_sw = clover_c_sw;
+    if (clover_coeff == 0.0) {
+      inv_param.clover_coeff = clover_c_sw * inv_param.kappa;
+    } else {
+      inv_param.clover_coeff = clover_coeff;
+    }
     inv_param.compute_clover_trlog = compute_clover_trlog ? 1 : 0;
   }
 
@@ -336,7 +342,13 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     inv_param.clover_cuda_prec_eigensolver = cuda_prec_eigensolver;
     inv_param.clover_cuda_prec_refinement_sloppy = cuda_prec_sloppy;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
-    inv_param.clover_coeff = clover_coeff;
+    // Use kappa * csw or supplied clover_coeff
+    inv_param.clover_c_sw = clover_c_sw;
+    if (clover_coeff == 0.0) {
+      inv_param.clover_coeff = clover_c_sw * inv_param.kappa;
+    } else {
+      inv_param.clover_coeff = clover_coeff;
+    }
     inv_param.compute_clover_trlog = compute_clover_trlog ? 1 : 0;
   }
   
@@ -588,7 +600,13 @@ void setMultigridInvertParam(QudaInvertParam &inv_param)
     inv_param.clover_cuda_prec_precondition = cuda_prec_precondition;
     inv_param.clover_cuda_prec_eigensolver = cuda_prec_eigensolver;
     inv_param.clover_cuda_prec_refinement_sloppy = cuda_prec_sloppy;
-    inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
+    // Use kappa * csw or supplied clover_coeff
+    inv_param.clover_c_sw = clover_c_sw;
+    if (clover_coeff == 0.0) {
+      inv_param.clover_coeff = clover_c_sw * inv_param.kappa;
+    } else {
+      inv_param.clover_coeff = clover_coeff;
+    }
     inv_param.compute_clover_trlog = compute_clover_trlog ? 1 : 0;
   }
 
@@ -1149,7 +1167,13 @@ void setDeflatedInvertParam(QudaInvertParam &inv_param)
     inv_param.clover_cuda_prec = cuda_prec;
     inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
     inv_param.clover_cuda_prec_precondition = cuda_prec_precondition;
-    inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
+    // Use kappa * csw or supplied clover_coeff
+    inv_param.clover_c_sw = clover_c_sw;
+    if (clover_coeff == 0.0) {
+      inv_param.clover_coeff = clover_c_sw * inv_param.kappa;
+    } else {
+      inv_param.clover_coeff = clover_coeff;
+    }
     inv_param.compute_clover_trlog = compute_clover_trlog ? 1 : 0;
   }
 

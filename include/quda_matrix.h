@@ -341,6 +341,16 @@ namespace quda {
 	for (int i=0; i<N*N; i++) data[i] += b.data[i];
       }
 
+      template<class U>
+	__device__ __host__ inline void operator-=(const HMatrix<U,N> & b) {
+#pragma unroll
+	for (int i=0; i<N*N; i++) data[i] += b.data[i];
+      }
+      
+      template<class U>
+	__device__ __host__ inline void operator*=(const HMatrix<U,N> & b) {
+	*this = b * (*this);
+      }
       
       template<typename S>
 	__device__ __host__ inline HMatrix(const clover_wrapper<T, S> &s);
@@ -559,7 +569,7 @@ namespace quda {
   }
 
 
-  // This is so that I can multiply real and complex matrice
+  // This is so that I can multiply real and complex matrices
   template <class T, class U, int N>
   __device__ __host__ inline Matrix<typename PromoteTypeId<T, U>::type, N> operator*(const Matrix<T, N> &a,
                                                                                      const Matrix<U, N> &b)
@@ -1012,17 +1022,17 @@ namespace quda {
      exponentiation
      @param[in/out] q The matrix to be exponentiated
   */
-  template <int M=9, class T> __device__ __host__ void expsuNTaylor(Matrix<T, 6> &q)
+  template <int M=19, class T> __device__ __host__ void expsuNTaylor(HMatrix<T, 6> &q)
     {
       // Port of the CHROMA implementation
       // In place  q = 1 + q + (1/2)*q^2 + ... + (1/n!)*(q)^n up to n = 19
       
-      typedef decltype(q(0, 0).x) Float;
+      //typedef decltype(q(0, 0).x) Float;
       
-      Matrix<T,6> temp1 = q;
-      Matrix<T,6> temp2 = q;
-      Matrix<T,6> temp3;
-      Matrix<T,6> Id;
+      HMatrix<T,6> temp1 = q;
+      HMatrix<T,6> temp2 = q;
+      HMatrix<T,6> temp3;
+      HMatrix<T,6> Id;
       setIdentity(&Id);
       
       q += Id;
@@ -1031,9 +1041,9 @@ namespace quda {
       // 1/[(19-1)!] < DBM_MIN
       for(int i = 2; i <= M; i++) {
 	
-	Float coeff = 1.0/i;
+	T coeff = 1.0/i;
 	
-	temp3 = temp2 * temp1;
+	temp3 = temp2 * temp1; 
 	temp2 = temp3 * coeff;
 	q += temp2;
       }

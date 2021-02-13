@@ -31,7 +31,8 @@ namespace quda {
       delete tmpp;
       delete tp;
     }
-
+    
+    destroyDeflationSpace();    
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
@@ -66,7 +67,23 @@ namespace quda {
 
       init = true;
     }
-
+    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+    
+    if (param.deflate) {
+      // Construct the eigensolver and deflation space if requested.
+      constructDeflationSpace(b, matEig);
+      if (deflate_compute) {
+        // compute the deflation space.
+        (*eig_solve)(evecs, evals);
+        deflate_compute = false;
+      }
+      if (recompute_evals) {
+        eig_solve->computeEvals(matEig, evecs, evals);
+        recompute_evals = false;
+      }
+    }
+    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+    
     ColorSpinorField &y = *yp;
     ColorSpinorField &r = *rp; 
     ColorSpinorField &p = *pp;
@@ -81,7 +98,7 @@ namespace quda {
 
     // compute initial residual depending on whether we have an initial guess or not
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      mat(r, x, y);
+      mat(r, x, y, *tmpp);
       r2 = blas::xmyNorm(b, r);
       blas::copy(y, x);
     } else {
@@ -90,6 +107,13 @@ namespace quda {
       blas::zero(x);
     }
 
+    if (param.deflate && param.maxiter > 1) {
+      // Deflate and accumulate to solution vector
+      eig_solve->deflate(y, r, evecs, evals, true);
+      mat(r, y, x, *tmpp);
+      r2 = blas::xmyNorm(b, r);
+    }
+    
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0) {
       if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
@@ -177,7 +201,8 @@ namespace quda {
     //double r0Norm = rNorm;
     double maxrr = rNorm;
     double maxrx = rNorm;
-
+    double maxr_deflate = rNorm; // The maximum residual since the last deflation
+    
     PrintStats("BiCGstab", k, r2, b2, heavy_quark_res);
     
     if (!param.is_preconditioner) { // do not do the below if we this is an inner solver
@@ -268,6 +293,17 @@ namespace quda {
 	mat(r, y, x);
 	r2 = blas::xmyNorm(b, r);
 
+        if (param.deflate && sqrt(r2) < maxr_deflate * param.tol_restart) {
+          // Deflate and accumulate to solution vector
+          eig_solve->deflate(y, r, evecs, evals, true);
+
+          // Compute r_defl = RHS - A * LHS
+          mat(r, y, x);
+          r2 = blas::xmyNorm(b, r);
+	  
+          maxr_deflate = sqrt(r2);
+        }
+	
 	if (x.Precision() != rSloppy.Precision()) blas::copy(rSloppy, r);            
 	blas::zero(xSloppy);
 

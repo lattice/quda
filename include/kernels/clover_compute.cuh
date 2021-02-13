@@ -13,7 +13,8 @@ namespace quda {
     using real = typename mapper<store_t>::type;
     static constexpr int nColor = 3;
     static constexpr int nSpin = 4;
-
+    static constexpr bool exp_clover = !exponentiated_clover();
+    
     using Clover = typename clover_mapper<store_t>::type;
     using Fmunu = typename gauge_mapper<store_t, QUDA_RECONSTRUCT_NO>::type;
 
@@ -21,13 +22,15 @@ namespace quda {
     const Fmunu f;
     dim3 threads; // number of active threads required
     int X[4]; // grid dimensions
-    real coeff;
+    const real kappa;
+    const real c_sw;
     
-    CloverArg(CloverField &clover, const GaugeField &f, double coeff) :
+    CloverArg(CloverField &clover, const GaugeField &f, const double kappa, const double c_sw) :
       clover(clover, 0),
       f(f),
       threads(f.VolumeCB(), 2, 1),
-      coeff(coeff)
+      kappa(kappa),
+      c_sw(c_sw)
     { 
       for (int dir=0; dir<4; ++dir) X[dir] = f.X()[dir];
     }
@@ -70,24 +73,34 @@ namespace quda {
       using real = typename Arg::real;
       using Complex = complex<real>;
       using Link = Matrix<Complex, Arg::nColor>;
-
+      using HClov = HMatrix<real,N>;
+      
       // Load the field-strength tensor from global memory
       Link F[6];
 #pragma unroll
       for (int i=0; i<6; ++i) F[i] = arg.f(i, x_cb, parity);
 
-      Complex I(0.0,1.0);
-      Complex coeff(0.0, arg.coeff);
+      const real coeff_re = arg.kappa * arg.c_sw;
+      const Complex coeff_im(0.0, coeff_re);
+      const Complex I(0.0,1.0);
       Link block1[2], block2[2];
-      block1[0] = coeff*(F[0]-F[5]); // (18 + 6*9=) 72 floating-point ops
-      block1[1] = coeff*(F[0]+F[5]); // 72 floating-point ops
-      block2[0] = arg.coeff*(F[1]+F[4] - I*(F[2]-F[3])); // 126 floating-point ops
-      block2[1] = arg.coeff*(F[1]-F[4] - I*(F[2]+F[3])); // 126 floating-point ops
+      HClov C;
+
+      if(arg.exp_clover) {
+	// Just compute the blocks, scale at the exponentiation
+	setIdentity(&C);
+	C *= 1.0/(2 * arg.kappa);
+      }
+      
+      block1[0] = coeff_im*(F[0]-F[5]); // (18 + 6*9=) 72 floating-point ops
+      block1[1] = coeff_im*(F[0]+F[5]); // 72 floating-point ops
+      block2[0] = coeff_re*(F[1]+F[4] - I*(F[2]-F[3])); // 126 floating-point ops
+      block2[1] = coeff_re*(F[1]-F[4] - I*(F[2]+F[3])); // 126 floating-point ops
 
       // This uses lots of unnecessary memory
 #pragma unroll
       for (int ch=0; ch<2; ++ch) {
-        HMatrix<real,N> A;
+        HClov A;
         // c = 0(1) => positive(negative) chiral block
         // Compute real diagonal elements
 #pragma unroll
@@ -119,6 +132,16 @@ namespace quda {
         A(5,4) =  block1[ch](2,1);
         A *= static_cast<real>(0.5);
 
+	// The clover mat is now defined and scaled:
+	// A = C_sw/(4+m0) * (i/4) * \sigma_{munu} \hat{F}_{munu}(x)
+	if(arg.exp_clover) {
+	  if(x_cb == 0 && parity == 0 && ch == 0) printf("Exping\n");
+	  // Exponentiate this matrix
+	  expsuNTaylor(A);
+	  // Scale and subtract the constant 1/(2kappa) terms
+	  A = A * C;
+	  A = A - C;
+	}
         arg.clover(x_cb, parity, ch) = A;
       } // ch
       // 84 floating-point ops

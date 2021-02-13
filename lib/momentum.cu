@@ -127,8 +127,8 @@ namespace quda {
       launch<MomUpdate>(force_max, tp, stream, arg);
     }
 
-    void preTune() { arg.mom.save();}
-    void postTune() { arg.mom.load();}
+    //void preTune() { arg.mom.save();}
+    //void postTune() { arg.mom.load();}
     long long flops() const { return 4*2*arg.threads.x*(36+42); }
     long long bytes() const { return 4*2*arg.threads.x*(2*arg.mom.Bytes()+arg.force.Bytes()); }
   };

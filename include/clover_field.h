@@ -36,7 +36,9 @@ namespace quda {
     void *norm;
     void *cloverInv;
     void *invNorm;
-    double csw;  //! Clover coefficient
+    double c_sw;  // Clover C_sw coefficient	
+    double kappa;
+    double coeff; // kappa * C_sw 
     bool twisted; // whether to create twisted mass clover
     double mu2;
     double rho;
@@ -92,7 +94,9 @@ namespace quda {
     void *cloverInv;
     void *invNorm;
 
-    double csw;
+    double kappa;
+    double c_sw;
+    double coeff; // kappa * C_sw 
     bool twisted; 
     double mu2;
     double rho;
@@ -153,10 +157,20 @@ namespace quda {
     int Nspin() const { return nSpin; }
 
     /**
-       @return Clover coefficient (usually includes kappa)
+       @return Kappa value
     */
-    double Csw() const { return csw; }
+    double Kappa() const { return kappa; }
+    
+    /**
+       @return Clover coefficient
+    */
+    double Csw() const { return c_sw; }
 
+    /**
+       @return Overall clover coefficient
+    */
+    double Coeff() const { return coeff; }
+    
     /**
        @return If the clover field is associated with twisted-clover fermions
     */
@@ -345,11 +359,11 @@ namespace quda {
      strength tensor.
      @param[out] clover Compute clover field
      @param[in] fmunu Field strength tensor
-     @param[in] coefft Clover coefficient
+     @param[in] c_sw Clover C_Sw coefficient
+     @param[in] kappa Kappa value
   */
-  void computeClover(CloverField &clover, const GaugeField &fmunu, double coeff);
-
-
+  void computeClover(CloverField &clover, const GaugeField &fmunu, const double kappa, const double c_sw);  
+  
   /**
      @brief This generic function is used for copying the clover field where
      in the input and output can be in any order and location.

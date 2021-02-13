@@ -23,9 +23,12 @@ namespace quda {
     }
 
     // The force field is updated so we must preserve its initial state
-    void preTune() { arg.force.save(); }
-    void postTune() { arg.force.load(); }
+    //void preTune() { arg.force.save(); }
+    //void postTune() { arg.force.load(); }
 
+    //void preTune() { arg.force.backup(); }
+    //void postTune() { arg.force.restore(); }
+    
     long long flops() const { return 16 * 198 * 3 * 4 * meta.LocalVolume(); }
     long long bytes() const { return ((8*arg.gauge.Bytes() + 4*arg.oprod.Bytes())*3 + 2*arg.force.Bytes()) * 4 * meta.LocalVolume(); }
   };

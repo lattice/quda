@@ -20,7 +20,7 @@ namespace quda {
       norm(NULL),
       cloverInv(NULL),
       invNorm(NULL),
-      csw(a.Csw()),
+      c_sw(a.Csw()),
       twisted(a.Twisted()),
       mu2(a.Mu2()),
       rho(a.Rho()),
@@ -36,7 +36,7 @@ namespace quda {
 
   CloverField::CloverField(const CloverFieldParam &param) :
     LatticeField(param), bytes(0), norm_bytes(0), nColor(3), nSpin(4), 
-    clover(0), norm(0), cloverInv(0), invNorm(0), csw(param.csw), rho(param.rho),
+    clover(0), norm(0), cloverInv(0), invNorm(0), c_sw(param.c_sw), rho(param.rho),
     order(param.order), create(param.create), trlog{0, 0}
   {
     if (nDim != 4) errorQuda("Number of dimensions must be 4, not %d", nDim);
@@ -366,11 +366,11 @@ namespace quda {
   }
 
   /**
-     Computes Fmunu given the gauge field U
+     Computes the clover field given the tensore field Fmunu
   */
-  void cudaCloverField::compute(const cudaGaugeField &gauge)
+  void cudaCloverField::compute(const cudaGaugeField &Fmunu)
   {
-    computeClover(*this, gauge, 1.0);
+    computeClover(*this, Fmunu, 1.0, 1.0);
   }
 
   cpuCloverField::cpuCloverField(const CloverFieldParam &param) : CloverField(param) {
@@ -421,7 +421,7 @@ namespace quda {
     output << "norm = "      << param.norm << std::endl;
     output << "cloverInv = " << param.cloverInv << std::endl;
     output << "invNorm = "   << param.invNorm << std::endl;
-    output << "csw = "       << param.csw << std::endl;
+    output << "c_sw = "      << param.c_sw << std::endl;
     output << "twisted = "   << param.twisted << std::endl;
     output << "mu2 = "       << param.mu2 << std::endl;
     output << "rho = "       << param.rho << std::endl;
