@@ -46,7 +46,7 @@ namespace quda
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
   */
   template <int nParity, bool dagger, int twist, KernelType kernel_type, typename Coord, typename Arg, typename Vector>
-  __device__ __host__ inline void applyWilsonTM(Vector &out, Arg &arg, Coord &coord, int parity, int idx, int thread_dim, bool &active)
+  __device__ __host__ __forceinline__ void applyWilsonTM(Vector &out, Arg &arg, Coord &coord, int parity, int idx, int thread_dim, bool &active)
   {
     static_assert(twist == 1 || twist == 2, "twist template must equal 1 or 2"); // ensure singlet or doublet
     typedef typename mapper<typename Arg::Float>::type real;
@@ -146,7 +146,7 @@ namespace quda
        - with xpay:  out(x) = M*in = x + a*(1+i*b*gamma_5)D * in
     */
     template <KernelType mykernel_type = kernel_type>
-    __device__ __host__ inline void operator()(int idx, int s, int parity)
+    __device__ __host__ __forceinline__ void operator()(int idx, int s, int parity)
     {
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;

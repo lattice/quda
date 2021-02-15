@@ -31,7 +31,7 @@ namespace quda
      @param[in] dim Dimension we are working on.  If dim=-1 (default
      argument) then we return true if type is any halo kernel.
   */
-  template <KernelType type> __host__ __device__ inline bool doHalo(int dim = -1)
+  template <KernelType type> __host__ __device__ __forceinline__ bool doHalo(int dim = -1)
   {
     switch (type) {
     case EXTERIOR_KERNEL_ALL: return true;
@@ -49,7 +49,7 @@ namespace quda
      computation
      @param[in] dim Dimension we are working on
   */
-  template <KernelType type> __host__ __device__ inline bool doBulk()
+  template <KernelType type> __host__ __device__ __forceinline__ bool doBulk()
   {
     switch (type) {
     case EXTERIOR_KERNEL_ALL:
@@ -69,7 +69,7 @@ namespace quda
      @param[in] Checkerboard space-time index
      @param[in] Parity we are acting on
   */
-  template <KernelType type, typename Arg, typename Coord> __host__ __device__ inline bool isComplete(const Arg &arg, const Coord &coord)
+  template <KernelType type, typename Arg, typename Coord> __host__ __device__ __forceinline__ bool isComplete(const Arg &arg, const Coord &coord)
   {
     int incomplete = 0; // Have all 8 contributions been computed for this site?
 

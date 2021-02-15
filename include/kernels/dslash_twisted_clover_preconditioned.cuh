@@ -47,7 +47,7 @@ namespace quda
        - with xpay:  out(x) = M*in = (1 + a*A(x)^{-1}D) * in(x-mu)
     */
     template <KernelType mykernel_type = kernel_type>
-    __device__ __host__ inline void operator()(int idx, int s, int parity)
+    __device__ __host__ __forceinline__ void operator()(int idx, int s, int parity)
     {
       using namespace linalg; // for Cholesky
       typedef typename mapper<typename Arg::Float>::type real;

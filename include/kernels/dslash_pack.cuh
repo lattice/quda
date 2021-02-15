@@ -342,7 +342,7 @@ namespace quda
   // 16 - barrier part II (wait on shmem to complete, all directions) -- not implemented
   template <bool dagger, QudaPCType pc, typename Arg> struct packShmem {
 
-    template <int twist> __device__ inline void operator()(Arg &arg, int s, int parity)
+    template <int twist> __device__ __forceinline__ void operator()(Arg &arg, int s, int parity)
     {
       // (active_dims * 2 + dir) * blocks_per_dir + local_block_idx
       int local_block_idx = blockIdx.x % arg.blocks_per_dir;
@@ -469,7 +469,7 @@ namespace quda
 #endif
     }
 
-    __device__ inline void operator()(Arg &arg, int s, int parity, int twist_pack)
+    __device__ __forceinline__ void operator()(Arg &arg, int s, int parity, int twist_pack)
     {
       switch (twist_pack) {
       case 0: this->operator()<0>(arg, s, parity); break;
@@ -532,7 +532,7 @@ namespace quda
 
   template <bool dagger, QudaPCType pc, typename Arg> struct packStaggeredShmem {
 
-    __device__ inline void operator()(Arg &arg, int s, int parity, int twist_pack = 0)
+    __device__ __forceinline__ void operator()(Arg &arg, int s, int parity, int twist_pack = 0)
     {
       // (active_dims * 2 + dir) * blocks_per_dir + local_block_idx
       int local_block_idx = blockIdx.x % arg.blocks_per_dir;

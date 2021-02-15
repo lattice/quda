@@ -35,7 +35,7 @@ namespace quda
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
     constexpr QudaPCType pc_type() const { return QUDA_5D_PC; }
 
-    template <KernelType mykernel_type> __device__ __host__ inline void apply(int idx, int parity)
+    template <KernelType mykernel_type> __device__ __host__ __forceinline__ void apply(int idx, int parity)
     {
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
@@ -89,7 +89,7 @@ namespace quda
       if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(coord.x_cb, my_spinor_parity) = out;
     }
 
-    template <KernelType mykernel_type = kernel_type> __host__ __device__ void operator()(int idx, int s, int parity)
+    template <KernelType mykernel_type = kernel_type> __host__ __device__ __forceinline__ void operator()(int idx, int s, int parity)
     {
       int x5_cb = s * arg.threads + idx; // 5-d checkerboard index
       apply<mykernel_type>(x5_cb, parity);
