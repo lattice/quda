@@ -276,6 +276,11 @@ extern "C" {
     /** Maximum size of Krylov space used by solver */
     int gcrNkrylov;
 
+    QudaBoolean gauge_smear;             /** Whether or not to perfrom gauge smearing */
+    double gauge_smear_coeff;            /** The coefficient of the gauge smearing */ 
+    int gauge_smear_steps;               /** The number of smearing steps to perform */
+    QudaGaugeSmearType gauge_smear_type; /** The type of smearing to perfrom */
+    
     /*
      * The following parameters are related to the solver
      * preconditioner, if enabled.

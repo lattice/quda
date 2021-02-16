@@ -2880,7 +2880,24 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   // check the gauge fields have been created
   cudaGaugeField *cudaGauge = checkGauge(param);
+  cudaGaugeField *gaugeTemp = nullptr;
+  
+  // Smear the gauge field
+  if (param->gauge_smear == QUDA_BOOLEAN_TRUE) {
+    
+    switch(param->gauge_smear_type) {
+    case QUDA_GAUGE_SMEAR_TYPE_APE: performAPEnStep(param->gauge_smear_steps, param->gauge_smear_coeff, 1); break;
+    case QUDA_GAUGE_SMEAR_TYPE_STOUT: performSTOUTnStep(param->gauge_smear_steps, param->gauge_smear_coeff, 1); break;
+    default: errorQuda("Unsupported smear type %d", param->gauge_smear_type);
+    }
 
+    // Copy the gauge field, restore after the solve
+    GaugeFieldParam gParam(*gaugeSmeared);
+    gaugeTemp = new cudaGaugeField(gParam);
+    gaugeTemp->copy(*gaugePrecise);
+    gaugePrecise->copy(*gaugeSmeared);
+  }
+  
   // It was probably a bad design decision to encode whether the system is even/odd preconditioned (PC) in
   // solve_type and solution_type, rather than in separate members of QudaInvertParam.  We're stuck with it
   // for now, though, so here we factorize everything for convenience.
@@ -3269,7 +3286,12 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   delete dSloppy;
   delete dPre;
   delete dEig;
-
+  
+  if (param->gauge_smear == QUDA_BOOLEAN_TRUE) {
+    gaugePrecise->copy(*gaugeTemp);
+    delete gaugeTemp;
+  }
+  
   profileInvert.TPSTOP(QUDA_PROFILE_FREE);
 
   popVerbosity();
@@ -5491,10 +5513,11 @@ void performAPEnStep(unsigned int n_steps, double alpha, int meas_interval)
 
   QudaGaugeObservableParam param = newQudaGaugeObservableParam();
   param.compute_qcharge = QUDA_BOOLEAN_TRUE;
-
-  if (getVerbosity() >= QUDA_SUMMARIZE) {
+  param.compute_plaquette = QUDA_BOOLEAN_TRUE;
+ 
+  if (getVerbosity() >= QUDA_VERBOSE) {
     gaugeObservablesQuda(&param);
-    printfQuda("Q charge at step %03d = %+.16e\n", 0, param.qcharge);
+    printfQuda("Step %03d: Plaquette = %+.16e Q charge = %+.16e\n", 0, param.plaquette[0], param.qcharge);
   }
 
   for (unsigned int i = 0; i < n_steps; i++) {
@@ -5503,7 +5526,7 @@ void performAPEnStep(unsigned int n_steps, double alpha, int meas_interval)
     profileAPE.TPSTOP(QUDA_PROFILE_COMPUTE);
     if ((i + 1) % meas_interval == 0 && getVerbosity() >= QUDA_VERBOSE) {
       gaugeObservablesQuda(&param);
-      printfQuda("Q charge at step %03d = %+.16e\n", i + 1, param.qcharge);
+      printfQuda("Step %03d: Plaquette = %+.16e Q charge = %+.16e\n", i+1, param.plaquette[0], param.qcharge);
     }
   }
 
@@ -5525,10 +5548,11 @@ void performSTOUTnStep(unsigned int n_steps, double rho, int meas_interval)
 
   QudaGaugeObservableParam param = newQudaGaugeObservableParam();
   param.compute_qcharge = QUDA_BOOLEAN_TRUE;
-
-  if (getVerbosity() >= QUDA_SUMMARIZE) {
+  param.compute_plaquette = QUDA_BOOLEAN_TRUE;
+  
+  if (getVerbosity() >= QUDA_VERBOSE) {
     gaugeObservablesQuda(&param);
-    printfQuda("Q charge at step %03d = %+.16e\n", 0, param.qcharge);
+    printfQuda("Step %03d: Plaquette = %+.16e Q charge = %+.16e\n", 0, param.plaquette[0], param.qcharge);
   }
 
   for (unsigned int i = 0; i < n_steps; i++) {
@@ -5537,7 +5561,7 @@ void performSTOUTnStep(unsigned int n_steps, double rho, int meas_interval)
     profileSTOUT.TPSTOP(QUDA_PROFILE_COMPUTE);
     if ((i + 1) % meas_interval == 0 && getVerbosity() >= QUDA_VERBOSE) {
       gaugeObservablesQuda(&param);
-      printfQuda("Q charge at step %03d = %+.16e\n", i + 1, param.qcharge);
+      printfQuda("Step %03d: Plaquette = %+.16e Q charge = %+.16e\n", i+1, param.plaquette[0], param.qcharge);
     }
   }
 
@@ -5559,10 +5583,11 @@ void performOvrImpSTOUTnStep(unsigned int n_steps, double rho, double epsilon, i
 
   QudaGaugeObservableParam param = newQudaGaugeObservableParam();
   param.compute_qcharge = QUDA_BOOLEAN_TRUE;
-
-  if (getVerbosity() >= QUDA_SUMMARIZE) {
+  param.compute_plaquette = QUDA_BOOLEAN_TRUE;
+  
+  if (getVerbosity() >= QUDA_VERBOSE) {
     gaugeObservablesQuda(&param);
-    printfQuda("Q charge at step %03d = %+.16e\n", 0, param.qcharge);
+    printfQuda("Step %03d: Plaquette = %+.16e Q charge = %+.16e\n", 0, param.plaquette[0], param.qcharge);
   }
 
   for (unsigned int i = 0; i < n_steps; i++) {
@@ -5571,7 +5596,7 @@ void performOvrImpSTOUTnStep(unsigned int n_steps, double rho, double epsilon, i
     profileOvrImpSTOUT.TPSTOP(QUDA_PROFILE_COMPUTE);
     if ((i + 1) % meas_interval == 0 && getVerbosity() >= QUDA_VERBOSE) {
       gaugeObservablesQuda(&param);
-      printfQuda("Q charge at step %03d = %+.16e\n", i + 1, param.qcharge);
+      printfQuda("Step %03d: Plaquette = %+.16e Q charge = %+.16e\n", i+1, param.plaquette[0], param.qcharge);
     }
   }
 

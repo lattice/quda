@@ -97,6 +97,7 @@ QudaMatPCType matpc_type = QUDA_MATPC_EVEN_EVEN;
 QudaSolveType solve_type = QUDA_NORMOP_PC_SOLVE;
 QudaSolutionType solution_type = QUDA_MAT_SOLUTION;
 QudaTboundary fermion_t_boundary = QUDA_ANTI_PERIODIC_T;
+bool gauge_smear = false;
 
 int mg_levels = 2;
 
@@ -246,7 +247,6 @@ quda::file_array<char[256]> prop_sink_infile;
 quda::file_array<char[256]> prop_sink_outfile;
 quda::source_array<std::array<int, 4>> prop_source_position = {0, 0, 0, 0};
 
-
 int prop_source_smear_steps = 0;
 int prop_sink_smear_steps = 0;
 double prop_source_smear_coeff = 2.0;
@@ -259,7 +259,7 @@ QudaPrecision prop_save_prec = QUDA_SINGLE_PRECISION;
 double stout_smear_rho = 0.1;
 double stout_smear_epsilon = -0.25;
 double ape_smear_rho = 0.6;
-int smear_steps = 50;
+int gauge_smear_steps = 5;
 double wflow_epsilon = 0.01;
 int wflow_steps = 100;
 QudaWFlowType wflow_type = QUDA_WFLOW_TYPE_WILSON;
@@ -1052,6 +1052,9 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   // Option group for SU(3) related options
   auto opgroup = quda_app->add_option_group("SU(3)", "Options controlling SU(3) tests");
+  
+  opgroup->add_option("--su3-smear", gauge_smear, "smear the gaueg field in the T dim prior to inversion (default false)");
+  
   opgroup->add_option("--su3-ape-rho", ape_smear_rho, "rho coefficient for APE smearing (default 0.6)");
 
   opgroup->add_option("--su3-stout-rho", stout_smear_rho,
@@ -1060,7 +1063,7 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--su3-stout-epsilon", stout_smear_epsilon,
                       "epsilon coefficient for Over-Improved Stout smearing (default -0.25)");
 
-  opgroup->add_option("--su3-smear-steps", smear_steps, "The number of smearing steps to perform (default 50)");
+  opgroup->add_option("--su3-smear-steps", gauge_smear_steps, "The number of smearing steps to perform (default 50)");
 
   opgroup->add_option("--su3-wflow-epsilon", wflow_epsilon, "The step size in the Runge-Kutta integrator (default 0.01)");
 
