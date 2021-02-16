@@ -14,22 +14,23 @@
 
 void display_info()
 {
-  printfQuda("running the following measurement:\n");
-
-  printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon S_dimension T_dimension\n");
-  printfQuda("%s   %s             %s            %s            %d/%d/%d          %d\n", get_prec_str(prec),
-             get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy), xdim, ydim, zdim,
-             tdim);
-  printfQuda("\nWilson Flow\n");
-  printfQuda(" - epsilon %f\n", wflow_epsilon);
-  printfQuda(" - Wilson flow steps %d\n", wflow_steps);
-  printfQuda(" - Wilson flow type %s\n", wflow_type == QUDA_WFLOW_TYPE_WILSON ? "Wilson" : "Symanzik");
-  printfQuda(" - Measurement interval %d\n", measurement_interval);
-
-  printfQuda("Grid partition info:     X  Y  Z  T\n");
-  printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
-             dimPartitioned(3));
-  return;
+  if (comm_rank() == 0) {
+    printf("running the following measurement:\n");
+    
+    printf("prec    sloppy_prec    link_recon  sloppy_link_recon S_dimension T_dimension\n");
+    printf("%s   %s             %s            %s            %d/%d/%d          %d\n", get_prec_str(prec),
+           get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy), xdim, ydim, zdim,
+           tdim);
+    printf("\nWilson Flow\n");
+    printf(" - epsilon %f\n", wflow_epsilon);
+    printf(" - Wilson flow steps %d\n", wflow_steps);
+    printf(" - Wilson flow type %s\n", wflow_type == QUDA_WFLOW_TYPE_WILSON ? "Wilson" : "Symanzik");
+    printf(" - Measurement interval %d\n", measurement_interval);
+    
+    printf("Grid partition info:     X  Y  Z  T\n");
+    printf("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
+           dimPartitioned(3));
+  }
 }
 
 int main(int argc, char **argv)
@@ -89,7 +90,7 @@ int main(int argc, char **argv)
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
   
-  printfQuda("Computed plaquette is %.16e (spatial = %.16e, temporal = %.16e)\n", param.plaquette[0], param.plaquette[1], param.plaquette[2]);
+  if (comm_rank() == 0) printf("Computed plaquette is %.16e (spatial = %.16e, temporal = %.16e)\n", param.plaquette[0], param.plaquette[1], param.plaquette[2]);
   //--------------------------------------------------------------------------  
   
   // Wilson Flow
@@ -104,7 +105,7 @@ int main(int argc, char **argv)
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
 
-  printfQuda("Total time for Wilson Flow = %g secs\n", time0);
+  if (comm_rank() == 0) printf("Total time for Wilson Flow = %g secs\n", time0);
   //--------------------------------------------------------------------------
 
   // If the --save-gauge flag was passed, this will save the Wilson flowed gauge field
