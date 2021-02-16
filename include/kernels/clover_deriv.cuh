@@ -6,7 +6,10 @@
 namespace quda
 {
 
-  template <class Float, typename Force, typename Gauge, typename Oprod> struct CloverDerivArg {
+  template <typename Float, QudaReconstructType recon> struct CloverDerivArg {
+    using Force = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type;
+    using Oprod = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type;
+    using Gauge = typename gauge_mapper<Float, recon>::type;
     using real = typename mapper<Float>::type;
     int X[4];
     int E[4];
