@@ -359,7 +359,7 @@ namespace quda {
 
     __device__ __host__ void operator()(int idd, int parity, int dir)
     {
-      int dim;
+      int dim = 0;
       for (int d = 0; d < 4; d++) if (idd >= arg.offset[d] && idd < arg.offset[d+1]) { dim = d; break; }
 
       int idx = idd - arg.offset[dim];

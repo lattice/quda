@@ -108,17 +108,6 @@ namespace quda
       {
       }
 
-      SpinorNorm(const SpinorNorm &sn) : norm(sn.norm), cb_norm_offset(sn.cb_norm_offset) {}
-
-      SpinorNorm &operator=(const SpinorNorm &src)
-      {
-        if (&src != this) {
-          norm = src.norm;
-          cb_norm_offset = src.cb_norm_offset;
-        }
-        return *this;
-      }
-
       void set(const ColorSpinorField &x)
       {
         norm = (norm_t *)x.Norm();
@@ -156,8 +145,6 @@ namespace quda
       using norm_t = float;
       SpinorNorm() {}
       SpinorNorm(const ColorSpinorField &) {}
-      SpinorNorm(const SpinorNorm &) {}
-      SpinorNorm &operator=(const SpinorNorm &) { return *this; }
       void set(const ColorSpinorField &) {}
       __device__ __host__ inline norm_t load_norm(const int, const int = 0) const { return 1.0; }
       template <typename real, int n>
@@ -191,19 +178,6 @@ namespace quda
         stride(x.Stride()),
         cb_offset(x.Bytes() / (2 * sizeof(store_t) * N))
       {
-      }
-
-      Spinor(const Spinor &st) : SN(st), spinor(st.spinor), stride(st.stride), cb_offset(st.cb_offset) {}
-
-      Spinor &operator=(const Spinor &src)
-      {
-        if (&src != this) {
-          SN::operator=(src);
-          spinor = src.spinor;
-          stride = src.stride;
-          cb_offset = src.cb_offset;
-        }
-        return *this;
       }
 
       void set(const ColorSpinorField &x)
