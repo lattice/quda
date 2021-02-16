@@ -2884,7 +2884,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   
   // Smear the gauge field
   if (param->gauge_smear == QUDA_BOOLEAN_TRUE) {
-    
+    profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);    
     switch(param->gauge_smear_type) {
     case QUDA_GAUGE_SMEAR_TYPE_APE: performAPEnStep(param->gauge_smear_steps, param->gauge_smear_coeff, 1); break;
     case QUDA_GAUGE_SMEAR_TYPE_STOUT: performSTOUTnStep(param->gauge_smear_steps, param->gauge_smear_coeff, 1); break;
@@ -2896,6 +2896,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     gaugeTemp = new cudaGaugeField(gParam);
     gaugeTemp->copy(*gaugePrecise);
     gaugePrecise->copy(*gaugeSmeared);
+    profileInvert.TPSTART(QUDA_PROFILE_TOTAL);    
   }
   
   // It was probably a bad design decision to encode whether the system is even/odd preconditioned (PC) in
@@ -5536,22 +5537,24 @@ void performAPEnStep(unsigned int n_steps, double alpha, int meas_interval)
 
 void performSTOUTnStep(unsigned int n_steps, double rho, int meas_interval)
 {
-  profileSTOUT.TPSTART(QUDA_PROFILE_TOTAL);
-
+  profileSTOUT.TPSTART(QUDA_PROFILE_TOTAL);  
   if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
-
   if (gaugeSmeared != nullptr) delete gaugeSmeared;
   gaugeSmeared = createExtendedGauge(*gaugePrecise, R, profileSTOUT);
 
+  profileSTOUT.TPSTART(QUDA_PROFILE_INIT);
   GaugeFieldParam gParam(*gaugeSmeared);
   auto *cudaGaugeTemp = new cudaGaugeField(gParam);
 
   QudaGaugeObservableParam param = newQudaGaugeObservableParam();
   param.compute_qcharge = QUDA_BOOLEAN_TRUE;
   param.compute_plaquette = QUDA_BOOLEAN_TRUE;
-  
+  profileSTOUT.TPSTOP(QUDA_PROFILE_INIT);  
+
   if (getVerbosity() >= QUDA_VERBOSE) {
+    profileSTOUT.TPSTOP(QUDA_PROFILE_TOTAL);  
     gaugeObservablesQuda(&param);
+    profileSTOUT.TPSTART(QUDA_PROFILE_TOTAL);  
     printfQuda("Step %03d: Plaquette = %+.16e Q charge = %+.16e\n", 0, param.plaquette[0], param.qcharge);
   }
 
@@ -5560,12 +5563,15 @@ void performSTOUTnStep(unsigned int n_steps, double rho, int meas_interval)
     STOUTStep(*gaugeSmeared, *cudaGaugeTemp, rho);
     profileSTOUT.TPSTOP(QUDA_PROFILE_COMPUTE);
     if ((i + 1) % meas_interval == 0 && getVerbosity() >= QUDA_VERBOSE) {
+      profileSTOUT.TPSTOP(QUDA_PROFILE_TOTAL);  
       gaugeObservablesQuda(&param);
+      profileSTOUT.TPSTART(QUDA_PROFILE_TOTAL);  
       printfQuda("Step %03d: Plaquette = %+.16e Q charge = %+.16e\n", i+1, param.plaquette[0], param.qcharge);
     }
   }
-
+  profileSTOUT.TPSTART(QUDA_PROFILE_FREE);
   delete cudaGaugeTemp;
+  profileSTOUT.TPSTOP(QUDA_PROFILE_FREE);
   profileSTOUT.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
