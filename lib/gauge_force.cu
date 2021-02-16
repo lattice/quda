@@ -6,34 +6,37 @@ namespace quda {
 
   template <typename Float, int nColor, QudaReconstructType recon_u> class ForceGauge : public TunableKernel3D
   {
-    GaugeForceArg<Float, nColor, recon_u, QUDA_RECONSTRUCT_10> arg;
-    const GaugeField &meta;
-
-    unsigned int sharedBytesPerThread() const { return 4 * sizeof(int); } // for dynamic indexing array
-    unsigned int minThreads() const { return arg.threads.x; }
+    const GaugeField &u;
+    GaugeField &mom;
+    double epsilon;
+    const paths &p;
+    unsigned int minThreads() const { return mom.VolumeCB(); }
 
   public:
     ForceGauge(const GaugeField &u, GaugeField &mom, double epsilon, const paths &p) :
       TunableKernel3D(u, 2, 4),
-      arg(mom, u, epsilon, p),
-      meta(u)
+      u(u),
+      mom(mom),
+      epsilon(epsilon),
+      p(p)
     {
       strcat(aux, ",num_paths=");
-      strcat(aux, std::to_string(arg.p.num_paths).c_str());
+      strcat(aux, std::to_string(p.num_paths).c_str());
       strcat(aux, comm_dim_partitioned_string());
       apply(device::get_default_stream());
     }
 
-    void apply(const qudaStream_t &stream) {
+    void apply(const qudaStream_t &stream)
+    {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<GaugeForce>(tp, stream, arg);
+      launch<GaugeForce>(tp, stream, GaugeForceArg<Float, nColor, recon_u, QUDA_RECONSTRUCT_10>(mom, u, epsilon, p));
     }
 
-    void preTune() { arg.mom.save(); }
-    void postTune() { arg.mom.load(); }
+    void preTune() { mom.backup(); }
+    void postTune() { mom.restore(); }
 
-    long long flops() const { return (arg.p.count - arg.p.num_paths + 1) * 198ll * 2 * arg.mom.volumeCB * 4; }
-    long long bytes() const { return ((arg.p.count + 1ll) * arg.u.Bytes() + 2ll*arg.mom.Bytes()) * 2 * arg.mom.volumeCB * 4; }
+    long long flops() const { return (p.count - p.num_paths + 1) * 198ll * mom.Volume() * 4; }
+    long long bytes() const { return (p.count + 1ll) * u.Bytes() + 2 * mom.Bytes(); }
   };
 
 #ifdef GPU_GAUGE_FORCE
