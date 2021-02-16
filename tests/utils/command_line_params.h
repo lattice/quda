@@ -354,6 +354,9 @@ extern QudaMatPCType matpc_type;
 extern QudaSolveType solve_type;
 extern QudaSolutionType solution_type;
 extern QudaTboundary fermion_t_boundary;
+extern double gauge_smear_coeff;
+extern bool gauge_smear;
+extern QudaGaugeSmearType gauge_smear_type;
 
 extern int mg_levels;
 
@@ -506,7 +509,7 @@ extern QudaPrecision prop_save_prec;
 extern double stout_smear_rho;
 extern double stout_smear_epsilon;
 extern double ape_smear_rho;
-extern int smear_steps;
+extern int gauge_smear_steps;
 extern double wflow_epsilon;
 extern int wflow_steps;
 extern QudaWFlowType wflow_type;

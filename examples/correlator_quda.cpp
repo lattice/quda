@@ -241,6 +241,7 @@ int main(int argc, char **argv)
   add_eigen_option_group(app);
   add_propagator_option_group(app);
   add_contraction_option_group(app);
+  add_su3_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
