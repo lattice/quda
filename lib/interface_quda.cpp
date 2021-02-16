@@ -116,6 +116,7 @@ cudaGaugeField *gaugeLongEigensolver = nullptr;
 cudaGaugeField *gaugeLongExtended = nullptr;
 
 cudaGaugeField *gaugeSmeared = nullptr;
+cudaGaugeField *gaugeEvolved = nullptr;
 
 cudaCloverField *cloverPrecise = nullptr;
 cudaCloverField *cloverSloppy = nullptr;
@@ -211,8 +212,11 @@ static TimeProfile profileOvrImpSTOUT("OvrImpSTOUTQuda");
 //!< Profiler for wFlowQuda
 static TimeProfile profileWFlow("wFlowQuda");
 
-//!< Profiler for projectSU3Quda
-static TimeProfile profileProject("projectSU3Quda");
+//!< Profiler for heatbathQuda
+static TimeProfile profileHeatbath("heatbathQuda");
+
+//!< Profiler for projectSUNQuda
+static TimeProfile profileProject("projectSUNQuda");
 
 //!< Profiler for staggeredPhaseQuda
 static TimeProfile profilePhase("staggeredPhaseQuda");
@@ -1258,7 +1262,7 @@ void freeGaugeQuda(void)
 
 void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *recon)
 {
-  // first do SU3 links (if they exist)
+  // first do SU(N) links (if they exist)
   if (gaugePrecise) {
     GaugeFieldParam gauge_param(*gaugePrecise);
     // switch the parameters for creating the mirror sloppy cuda gauge field
@@ -1582,6 +1586,7 @@ void endQuda(void)
     profileSTOUT.Print();
     profileOvrImpSTOUT.Print();
     profileWFlow.Print();
+    profileHeatbath.Print();
     profileProject.Print();
     profilePhase.Print();
     profileMomAction.Print();
@@ -4401,7 +4406,7 @@ void computeStaggeredForceQuda(void* h_mom, double dt, double delta, void *h_for
 
   ColorSpinorParam qParam;
   qParam.location = QUDA_CUDA_FIELD_LOCATION;
-  qParam.nColor = 3;
+  qParam.nColor = N_COLORS;
   qParam.nSpin = 1;
   qParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   qParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
@@ -4616,7 +4621,7 @@ void computeHISQForceQuda(void* const milc_momentum,
 
   { // do outer-product computation
     ColorSpinorParam qParam;
-    qParam.nColor = 3;
+    qParam.nColor = N_COLORS;
     qParam.nSpin = 1;
     qParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     qParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
@@ -4805,7 +4810,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **,
 
   ColorSpinorParam qParam;
   qParam.location = QUDA_CUDA_FIELD_LOCATION;
-  qParam.nColor = 3;
+  qParam.nColor = N_COLORS;
   qParam.nSpin = 4;
   qParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   qParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
@@ -4971,7 +4976,7 @@ void updateGaugeFieldQuda(void* gauge,
   profileGaugeUpdate.TPSTART(QUDA_PROFILE_INIT);
 
   // create the host fields
-  GaugeFieldParam gParam(gauge, *param, QUDA_SU3_LINKS);
+  GaugeFieldParam gParam(gauge, *param, QUDA_SUN_LINKS);
   gParam.site_offset = param->gauge_offset;
   gParam.site_size = param->site_size;
   bool need_cpu = !param->use_resident_gauge || param->return_result_gauge;
@@ -4994,7 +4999,7 @@ void updateGaugeFieldQuda(void* gauge,
   gParam.pad = 0;
   cudaGaugeField *cudaMom = !param->use_resident_mom ? new cudaGaugeField(gParam) : nullptr;
 
-  gParam.link_type = QUDA_SU3_LINKS;
+  gParam.link_type = QUDA_SUN_LINKS;
   gParam.reconstruct = param->reconstruct;
   cudaGaugeField *cudaInGauge = !param->use_resident_gauge ? new cudaGaugeField(gParam) : nullptr;
   auto *cudaOutGauge = new cudaGaugeField(gParam);
@@ -5057,7 +5062,7 @@ void updateGaugeFieldQuda(void* gauge,
   profileGaugeUpdate.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
- void projectSU3Quda(void *gauge_h, double tol, QudaGaugeParam *param) {
+ void projectSUNQuda(void *gauge_h, double tol, QudaGaugeParam *param) {
    profileProject.TPSTART(QUDA_PROFILE_TOTAL);
 
    profileProject.TPSTART(QUDA_PROFILE_INIT);
@@ -5090,15 +5095,15 @@ void updateGaugeFieldQuda(void* gauge,
    profileProject.TPSTART(QUDA_PROFILE_COMPUTE);
    *num_failures_h = 0;
 
-   // project onto SU(3)
+   // project onto SU(N)
    if (cudaGauge->StaggeredPhaseApplied()) cudaGauge->removeStaggeredPhase();
-   projectSU3(*cudaGauge, tol, num_failures_d);
+   projectSUN(*cudaGauge, tol, num_failures_d);
    if (!cudaGauge->StaggeredPhaseApplied() && param->staggered_phase_applied) cudaGauge->applyStaggeredPhase();
 
    profileProject.TPSTOP(QUDA_PROFILE_COMPUTE);
 
    if(*num_failures_h>0)
-     errorQuda("Error in the SU(3) unitarization: %d failures\n", *num_failures_h);
+     errorQuda("Error in the SU(%d) unitarization: %d failures\n", N_COLORS, *num_failures_h);
 
    profileProject.TPSTART(QUDA_PROFILE_D2H);
    if (param->return_result_gauge) cudaGauge->saveCPUField(*cpuGauge);
@@ -5632,6 +5637,41 @@ void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval
   popOutputPrefix();
 }
 
+/*
+void performHeatbath(double beta, unsigned int num_start, unsigned int num_steps, unsigned int num_warmup_steps, unsigned int num_heatbath_per_step, unsigned int num_overrelax_per_step, bool coldstart){
+  profileHeatbath.TPSTART(QUDA_PROFILE_TOTAL);
+
+  if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
+
+  if (gaugeEvolved != nullptr) delete gaugeEvolved;
+  gaugeEvolved = createExtendedGauge(*gaugePrecise, R, profileOvrImpSTOUT);
+
+  GaugeFieldParam gParam(*gaugeEvolved);
+  auto *cudaGaugeTemp = new cudaGaugeField(gParam);
+
+  QudaGaugeObservableParam param = newQudaGaugeObservableParam();
+  param.compute_qcharge = QUDA_BOOLEAN_TRUE;
+
+  if (getVerbosity() >= QUDA_SUMMARIZE) {
+    gaugeObservablesQuda(&param);
+    printfQuda("Heatbath Step %03d: Plaquette = %+.16e Qcharge = %+.16e\n", 0, param.plaquette[0], param.qcharge);
+  }
+
+  for (unsigned int i = 0; i < num_warmup_steps + num_steps; i++) {
+    profileHeatbath.TPSTART(QUDA_PROFILE_COMPUTE);
+    //heatbathStep(*gaugeSmeared, *cudaGaugeTemp, rho);
+    profileHeatbath.TPSTOP(QUDA_PROFILE_COMPUTE);
+    if(i >= num_warmup_steps) {
+      gaugeObservablesQuda(&param);
+      printfQuda("Heatbath Step %03d: Plaquette = %+.16e Qcharge = %+.16e\n", i, param.plaquette[0], param.qcharge);
+    }
+  }
+
+  delete cudaGaugeTemp;
+  profileHeatbath.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+*/
+
 int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
                               const unsigned int verbose_interval, const double relax_boost, const double tolerance,
                               const unsigned int reunit_interval, const unsigned int stopWtheta, QudaGaugeParam *param,
@@ -5960,6 +6000,7 @@ void gaugeObservablesQuda(QudaGaugeObservableParam *param)
 
   gaugeObservables(*gauge, *param, profileGaugeObs);
   profileGaugeObs.TPSTOP(QUDA_PROFILE_TOTAL);
+  saveTuneCache();
 }
 
 void make4DMidPointProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_param5D, QudaInvertParam *inv_param4D,

@@ -165,19 +165,19 @@ template <typename Float> void contractColor(Float *spinorX, Float *spinorY, Flo
 {
 
   Float re = 0.0, im = 0.0;
-
+  int Nc = N_COLORS;
   // Conjugate spinorX
   for (int i = 0; i < V; i++) {
     for (int s1 = 0; s1 < 4; s1++) {
       for (int s2 = 0; s2 < 4; s2++) {
 
         re = im = 0.0;
-        for (int c = 0; c < 3; c++) {
-          re += (((Float *)spinorX)[24 * i + 6 * s1 + 2 * c + 0] * ((Float *)spinorY)[24 * i + 6 * s2 + 2 * c + 0]
-                 + ((Float *)spinorX)[24 * i + 6 * s1 + 2 * c + 1] * ((Float *)spinorY)[24 * i + 6 * s2 + 2 * c + 1]);
+        for (int c = 0; c < Nc; c++) {
+          re += (((Float *)spinorX)[spinor_site_size * i + 2*Nc * s1 + 2 * c + 0] * ((Float *)spinorY)[spinor_site_size * i + 2*Nc * s2 + 2 * c + 0]
+                 + ((Float *)spinorX)[spinor_site_size * i + 2*Nc * s1 + 2 * c + 1] * ((Float *)spinorY)[spinor_site_size * i + 2*Nc * s2 + 2 * c + 1]);
 
-          im += (((Float *)spinorX)[24 * i + 6 * s1 + 2 * c + 0] * ((Float *)spinorY)[24 * i + 6 * s2 + 2 * c + 1]
-                 - ((Float *)spinorX)[24 * i + 6 * s1 + 2 * c + 1] * ((Float *)spinorY)[24 * i + 6 * s2 + 2 * c + 0]);
+          im += (((Float *)spinorX)[spinor_site_size * i + 2*Nc * s1 + 2 * c + 0] * ((Float *)spinorY)[spinor_site_size * i + 2*Nc * s2 + 2 * c + 1]
+                 - ((Float *)spinorX)[spinor_site_size * i + 2*Nc * s1 + 2 * c + 1] * ((Float *)spinorY)[spinor_site_size * i + 2*Nc * s2 + 2 * c + 0]);
         }
 
         ((Float *)h_result)[2 * (i * 16 + 4 * s1 + s2) + 0] = re;

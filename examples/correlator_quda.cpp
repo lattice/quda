@@ -32,7 +32,7 @@ const std::vector<std::string> CorrelatorChannels = {"G1", "G2", "G3", "G4", "G5
 
 void print_correlators(const void *correlation_function_sum, const CorrelatorParam corr_param, const int n)
 {
-  printfQuda("#src_x src_y src_z src_t    px    py    pz    pt     G   z/t          real          imag  channel\n");
+  printf("#src_x src_y src_z src_t    px    py    pz    pt     G   z/t          real          imag  channel\n");
   for (int px = 0; px <= momentum[0]; px++) {
     for (int py = 0; py <= momentum[1]; py++) {
       for (int pz = 0; pz <= momentum[2]; pz++) {
@@ -48,13 +48,13 @@ void print_correlators(const void *correlation_function_sum, const CorrelatorPar
               size_t index_real = corr_param.n_numbers_per_slice * (mom_mode * corr_param.global_corr_length + ((t + corr_param.overall_shift_dim) % corr_param.global_corr_length)) + 2 * G_idx;
 	      size_t index_imag = index_real + 1;
               double sign = G_idx < 8 ? -1. : 1.; // the minus sign from g5gm -> gmg5
-              printfQuda(" %5d %5d %5d %5d %5d %5d %5d %5d %5d %5lu % e % e #%s",
+              printf(" %5d %5d %5d %5d %5d %5d %5d %5d %5d %5lu % e % e #%s",
 			 prop_source_position[n][0], prop_source_position[n][1],
 			 prop_source_position[n][2], prop_source_position[n][3], px, py, pz, pt, G_idx, t,
 			 ((double *)correlation_function_sum)[index_real] * sign,
                          ((double *)correlation_function_sum)[index_imag] * sign,
 			 CorrelatorChannels[G_idx].c_str());
-              printfQuda("\n");
+              printf("\n");
             }
           }
         }
@@ -92,7 +92,7 @@ void save_correlators_to_file(const void* correlation_function_sum, const Correl
   }
 
   filepath << ".dat";
-  printfQuda("Saving correlator in %s \n", filepath.str().c_str());
+  if(comm_rank() == 0) printf("Saving correlator in %s \n", filepath.str().c_str());
 
   corr_file.open(filepath.str());
 
@@ -202,8 +202,8 @@ void invert_and_contract(void **source_array_ptr, void **prop_array_ptr_1, void 
     const int source[4]
       = {prop_source_position[n][0], prop_source_position[n][1], prop_source_position[n][2], prop_source_position[n][3]};
     
-    printfQuda("Source position: %d %d %d %d\n", prop_source_position[n][0], prop_source_position[n][1],
-	       prop_source_position[n][2], prop_source_position[n][3]);
+    if(comm_rank() == 0) printf("Source position: %d %d %d %d\n", prop_source_position[n][0], prop_source_position[n][1],
+				prop_source_position[n][2], prop_source_position[n][3]);
     
     // The overall shift of the position of the corr. need this when the source is not at origin.
     corr_param.overall_shift_dim = source[corr_param.corr_dim];
@@ -228,7 +228,7 @@ void invert_and_contract(void **source_array_ptr, void **prop_array_ptr_1, void 
                    (void *)&cs_param, gauge_param.X, source, momentum.begin());
     
     // Print and save correlators for this source
-    print_correlators(correlation_function_sum, corr_param, n);
+    if(comm_rank() == 0) print_correlators(correlation_function_sum, corr_param, n);
     save_correlators_to_file(correlation_function_sum, corr_param, n);
   }
 }
@@ -254,18 +254,18 @@ int main(int argc, char **argv)
   // Run-time parameter checks
   {
     if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH) {
-      printfQuda("dslash_type %d not supported\n", dslash_type);
+      if(comm_rank() == 0) printf("dslash_type %d not supported\n", dslash_type);
       exit(0);
     }
     if (inv_multigrid) {
       // Only these fermions are supported with MG
       if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH) {
-        printfQuda("dslash_type %d not supported for MG\n", dslash_type);
+        if(comm_rank() == 0) printf("dslash_type %d not supported for MG\n", dslash_type);
         exit(0);
       }
       // Only these solve types are supported with MG
       if (solve_type != QUDA_DIRECT_SOLVE && solve_type != QUDA_DIRECT_PC_SOLVE) {
-        printfQuda("Solve_type %d not supported with MG. Please use QUDA_DIRECT_SOLVE or QUDA_DIRECT_PC_SOLVE\n\n",
+        if(comm_rank() == 0) printf("Solve_type %d not supported with MG. Please use QUDA_DIRECT_SOLVE or QUDA_DIRECT_PC_SOLVE\n\n",
                    solve_type);
         exit(0);
       }
@@ -307,17 +307,17 @@ int main(int argc, char **argv)
   inv_param.eig_param = nullptr;
   if (inv_multigrid) {
     if (open_flavor) {
-      printfQuda("all the MG settings will be shared for qq, ql and qs propagator\n");
+      if(comm_rank() == 0) printf("all the MG settings will be shared for qq, ql and qs propagator\n");
       for (int i = 0; i < mg_levels; i++) {
          if (strcmp(mg_param.vec_infile[i], "") != 0 || strcmp(mg_param.vec_outfile[i], "") != 0){
-          printfQuda("Save or write vec not possible! As when open flavor turned on inverter will be called "
-                     "3 times thus vec will be over written\n");
-          exit(0);
-        }
+	   if(comm_rank() == 0) printf("Save or write vec not possible! As when open flavor turned on inverter will be called "
+				       "3 times thus vec will be over written\n");
+	   exit(0);
+	 }
       }
     }
   }
-
+  
   // allocate and load gaugefield on host
   void *gauge[4];
   for (auto &dir : gauge) dir = malloc(V * gauge_site_size * host_gauge_data_type_size);
@@ -335,12 +335,12 @@ int main(int argc, char **argv)
     // inv_param.return_clover_inverse = 1;
     loadCloverQuda(nullptr, nullptr, &inv_param);
   }
-  printfQuda("-----------------------------------------------------------------------------------\n");
+  if(comm_rank() == 0) printf("-----------------------------------------------------------------------------------\n");
 
   // compute plaquette
   double plaq[3];
   plaqQuda(plaq);
-  printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+  if(comm_rank() == 0) printf("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
   
   // Now QUDA is initialised and the fields are loaded, we may setup the preconditioner
   void *mg_preconditioner = nullptr;
@@ -427,7 +427,7 @@ int main(int argc, char **argv)
   free(source_array);
   free(prop_array);
   free(correlation_function_sum);
-  printfQuda("----------------------------------------------------------------------------------\n");
+  if(comm_rank() == 0) printf("----------------------------------------------------------------------------------\n");
   endQuda();
   finalizeComms();
 

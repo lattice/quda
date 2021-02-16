@@ -44,7 +44,7 @@ namespace quda
     int otherparity = (1 - arg.parity);
 
     const int tidx = mu > nu ? (mu - 1) * mu / 2 + nu : (nu - 1) * nu / 2 + mu;
-
+    
     if (yIndex == 0) { // do "this" force
 
       int x[4];
@@ -235,7 +235,7 @@ namespace quda
     {
       using real = typename Arg::real;
       using Complex = complex<real>;
-      typedef Matrix<Complex, 3> Link;
+      typedef Matrix<Complex, N_COLORS> Link;
 
       Link force;
 

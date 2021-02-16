@@ -71,7 +71,7 @@ void init(int argc, char **argv)
     Ls = 1;
   }
 
-  setSpinorSiteSize(24);
+  setSpinorSiteSize(2*4*N_COLORS);
 
   setInvertParam(inv_param);
   inv_param.dagger = dagger ? QUDA_DAG_YES : QUDA_DAG_NO;
@@ -128,7 +128,7 @@ void init(int argc, char **argv)
   }
 
   ColorSpinorParam csParam;
-  csParam.nColor = 3;
+  csParam.nColor = N_COLORS;
   csParam.nSpin = 4;
   csParam.nDim = 4;
   for (int d=0; d<4; d++) csParam.x[d] = gauge_param.X[d];
@@ -612,7 +612,7 @@ void dslashRef()
             inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
       else
       {
-        int tm_offset = 12*spinorRef->Volume();
+        int tm_offset = hw_site_size*spinorRef->Volume();
 
 	void *ref1 = spinorRef->V();
 	void *ref2 = (char*)ref1 + tm_offset*cpu_prec;
@@ -629,7 +629,7 @@ void dslashRef()
 	tm_matpc(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor, inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
       else
       {
-        int tm_offset = 12*spinorRef->Volume();
+        int tm_offset = hw_site_size*spinorRef->Volume();
 
 	void *ref1 = spinorRef->V();
 	void *ref2 = (char*)ref1 + tm_offset*cpu_prec;
@@ -645,7 +645,7 @@ void dslashRef()
 	tm_mat(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor, dagger, inv_param.cpu_prec, gauge_param);
       else
       {
-        int tm_offset = 12*spinorRef->Volume();
+        int tm_offset = hw_site_size*spinorRef->Volume();
 
 	void *evenOut = spinorRef->V();
 	void *oddOut  = (char*)evenOut + tm_offset*cpu_prec;
@@ -665,7 +665,7 @@ void dslashRef()
       }
       else
       {
-	int tm_offset = 12*spinorRef->Volume();
+	int tm_offset = hw_site_size*spinorRef->Volume();
 
 	void *ref1 = spinorRef->V();
 	void *ref2 = (char*)ref1 + tm_offset*cpu_prec;
@@ -689,7 +689,7 @@ void dslashRef()
       }
       else
       {
-	int tm_offset = 12*spinorRef->Volume();
+	int tm_offset = hw_site_size*spinorRef->Volume();
 
 	void *evenOut = spinorRef->V();
 	void *oddOut  = (char*)evenOut + tm_offset*cpu_prec;

@@ -150,7 +150,7 @@ void init(int precision, QudaReconstructType link_recon)
   }
 
   ColorSpinorParam csParam;
-  csParam.nColor = 3;
+  csParam.nColor = N_COLORS;
   csParam.nSpin = 4;
   csParam.nDim = 4;
   for (int d=0; d<4; d++) csParam.x[d] = gauge_param.X[d];

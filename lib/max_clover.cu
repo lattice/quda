@@ -40,7 +40,7 @@ namespace quda {
   double _norm(const CloverField &u, bool inverse, norm_type_ type) {
     double norm_ = 0.0;
     switch(u.Ncolor()) {
-    case  3: norm_ = norm<real, 3>(u, inverse, type); break;
+    case  N_COLORS: norm_ = norm<real, N_COLORS>(u, inverse, type); break;
     default: errorQuda("Unsupported color %d", u.Ncolor());
     }
     return norm_;

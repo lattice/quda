@@ -41,19 +41,19 @@ namespace quda {
 
   // B fields in general use float2 ordering except for fine-grid Wilson
   template <typename store_t, int nSpin, int nColor> struct BOrder { static constexpr QudaFieldOrder order = QUDA_FLOAT2_FIELD_ORDER; };
-  template<> struct BOrder<float, 4, 3> { static constexpr QudaFieldOrder order = QUDA_FLOAT4_FIELD_ORDER; };
+  template<> struct BOrder<float, 4, N_COLORS> { static constexpr QudaFieldOrder order = QUDA_FLOAT4_FIELD_ORDER; };
 #ifdef FLOAT8
-  template<> struct BOrder<short, 4, 3> { static constexpr QudaFieldOrder order = QUDA_FLOAT8_FIELD_ORDER; };
+  template<> struct BOrder<short, 4, N_COLORS> { static constexpr QudaFieldOrder order = QUDA_FLOAT8_FIELD_ORDER; };
 #else
-  template<> struct BOrder<short, 4, 3> { static constexpr QudaFieldOrder order = QUDA_FLOAT4_FIELD_ORDER; };
+  template<> struct BOrder<short, 4, N_COLORS> { static constexpr QudaFieldOrder order = QUDA_FLOAT4_FIELD_ORDER; };
 #endif
 
   template <typename vFloat, typename bFloat, int nSpin, int spinBlockSize, int nColor_, int coarseSpin, int nVec>
   class BlockOrtho : public TunableBlock2D {
 
     using real = typename mapper<vFloat>::type;
-    // we only support block-format on fine grid where Ncolor=3
-    static constexpr int nColor = isFixed<bFloat>::value ? 3 : nColor_;
+    // we only support block-format on fine grid where Ncolor=N_COLORS
+    static constexpr int nColor = isFixed<bFloat>::value ? N_COLORS : nColor_;
     static constexpr int chiral_blocks = nSpin == 1 ? 2 : nSpin / spinBlockSize;
     template <typename Rotator, typename Vector> using Arg = BlockOrthoArg<vFloat, Rotator, Vector, nSpin, nColor, coarseSpin, nVec>;
 
@@ -225,7 +225,8 @@ namespace quda {
                           const int *coarse_to_fine, const int *geo_bs, int spin_bs, int n_block_ortho)
   {
     const int Nvec = B.size();
-    if (V.Ncolor()/Nvec == 3) {
+    if (V.Ncolor()/Nvec == N_COLORS) {
+      constexpr int nColor = N_COLORS;
 #ifdef NSPIN4
       if (V.Nspin() == 4) {
         constexpr int nColor = 3;
@@ -233,9 +234,9 @@ namespace quda {
         if (spin_bs != 2) errorQuda("Unexpected spin block size = %d", spin_bs);
         constexpr int spinBlockSize = 2;
 
-        if (Nvec == 6) { // for Wilson free field
-          BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 6>(V, B, fine_to_coarse, coarse_to_fine,
-                                                                              geo_bs, n_block_ortho);
+        if (Nvec == 2*N_COLORS) { // for Wilson free field
+          BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 2*N_COLORS>(V, B, fine_to_coarse, coarse_to_fine,
+										       geo_bs, n_block_ortho);
         } else if (Nvec == 24) {
           BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 24>(V, B, fine_to_coarse, coarse_to_fine,
                                                                                geo_bs, n_block_ortho);
@@ -273,17 +274,17 @@ namespace quda {
         errorQuda("Unexpected nSpin = %d", V.Nspin());
       }
 
-    } else { // Nc != 3
+    } else { // Nc != N_COLORS
       if (V.Nspin() != 2) errorQuda("Unexpected nSpin = %d", V.Nspin());
       constexpr int nSpin = 2;
       if (spin_bs != 1) errorQuda("Unexpected spin block size = %d", spin_bs);
       constexpr int spinBlockSize = 1;
 
 #ifdef NSPIN4
-      if (V.Ncolor()/Nvec == 6) {
-        constexpr int nColor = 6;
-        if (Nvec == 6) {
-          BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 6>(V, B, fine_to_coarse, coarse_to_fine,
+      if (V.Ncolor()/Nvec == 2*N_COLORS) {
+        constexpr int nColor = 2*N_COLORS;
+        if (Nvec == 2*N_COLORS) {
+          BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 2*N_COLORS>(V, B, fine_to_coarse, coarse_to_fine,
                                                                               geo_bs, n_block_ortho);
         } else {
           errorQuda("Unsupported nVec %d\n", Nvec);
@@ -337,7 +338,7 @@ namespace quda {
       } else {
         errorQuda("Unsupported nColor %d\n", V.Ncolor()/Nvec);
       }
-    } // Nc != 3
+    } // Nc != N_COLORS
   }
 
 #ifdef GPU_MULTIGRID

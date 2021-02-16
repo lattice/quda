@@ -81,11 +81,11 @@ namespace quda {
       for (int p=0; p<2; p++)
         if (mapper(s,p) != spin_map[s][p]) errorQuda("Spin map does not match spin_mapper");
 
-    if (out.Ncolor() == 3) {
-      const int fineColor = 3;
+    if (out.Ncolor() == N_COLORS) {
+      const int fineColor = N_COLORS;
 #ifdef NSPIN4
-      if (nVec == 6) { // Free field Wilson
-        Prolongate<Float,fineSpin,fineColor,coarseSpin,6>(out, in, v, fine_to_coarse, parity);
+      if (nVec == 2*N_COLORS) { // Free field Wilson
+        Prolongate<Float,fineSpin,fineColor,coarseSpin,2*N_COLORS>(out, in, v, fine_to_coarse, parity);
       } else
 #endif // NSPIN4
       if (nVec == 24) {
@@ -104,10 +104,10 @@ namespace quda {
         errorQuda("Unsupported nVec %d", nVec);
       }
 #ifdef NSPIN4
-    } else if (out.Ncolor() == 6) { // for coarsening coarsened Wilson free field.
-      const int fineColor = 6;
-      if (nVec == 6) { // these are probably only for debugging only
-        Prolongate<Float,fineSpin,fineColor,coarseSpin,6>(out, in, v, fine_to_coarse, parity);
+    } else if (out.Ncolor() == 2*N_COLORS) { // for coarsening coarsened Wilson free field.
+      const int fineColor = 2*N_COLORS;
+      if (nVec == 2*N_COLORS) { // these are probably only for debugging only
+        Prolongate<Float,fineSpin,fineColor,coarseSpin,2*N_COLORS>(out, in, v, fine_to_coarse, parity);
       } else {
         errorQuda("Unsupported nVec %d", nVec);
       }

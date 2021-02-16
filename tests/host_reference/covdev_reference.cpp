@@ -27,10 +27,11 @@ template<typename Float>
 void display_link_internal(Float* link)
 {
   int i, j;
-    
-  for (i = 0;i < 3; i++){
-    for(j=0;j < 3; j++){
-      printf("(%10f,%10f) \t", link[i*3*2 + j*2], link[i*3*2 + j*2 + 1]);
+  int Nc = N_COLORS;
+  
+  for (i = 0;i < Nc; i++){
+    for(j = 0;j < Nc; j++){
+      printf("(%10f,%10f) \t", link[i*Nc*2 + j*2], link[i*Nc*2 + j*2 + 1]);
     }
     printf("\n");
   }
@@ -62,10 +63,10 @@ void covdevReference(sFloat *res, gFloat **link, sFloat *spinorField,
 
     if (daggerBit) {
       for (int s = 0; s < 4; s++)
-        su3Tmul(&gaugedSpinor[s*6], lnk, &spinor[s*6]);
+        su3Tmul(&gaugedSpinor[s*2*N_COLORS], lnk, &spinor[s*2*N_COLORS]);
     } else {
       for (int s = 0; s < 4; s++)
-        su3Mul (&gaugedSpinor[s*6], lnk, &spinor[s*6]);
+        su3Mul (&gaugedSpinor[s*2*N_COLORS], lnk, &spinor[s*2*N_COLORS]);
     }
 
     sum(&res[offset], &res[offset], gaugedSpinor, my_spinor_site_size);
@@ -204,10 +205,10 @@ void covdevReference_mg4dir(sFloat *res, gFloat **link, gFloat **ghostLink, sFlo
 
     if (daggerBit) {
       for (int s = 0; s < 4; s++)
-        su3Tmul(&gaugedSpinor[s*6], lnk, &spinor[s*6]);
+        su3Tmul(&gaugedSpinor[s*2*N_COLORS], lnk, &spinor[s*2*N_COLORS]);
     } else {
       for (int s = 0; s < 4; s++)
-        su3Mul (&gaugedSpinor[s*6], lnk, &spinor[s*6]);
+        su3Mul (&gaugedSpinor[s*2*N_COLORS], lnk, &spinor[s*2*N_COLORS]);
     }
     sum(&res[offset], &res[offset], gaugedSpinor, my_spinor_site_size);
   } // 4-d volume

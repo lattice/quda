@@ -6,12 +6,12 @@
 #include <random_quda.h>
 #include <color_spinor_field.h>
 
-#define gauge_site_size 18      // real numbers per link
-#define spinor_site_size 24     // real numbers per wilson spinor
-#define stag_spinor_site_size 6 // real numbers per staggered 'spinor'
-#define clover_site_size 72     // real numbers per block-diagonal clover matrix
-#define mom_site_size 10        // real numbers per momentum
-#define hw_site_size 12         // real numbers per half wilson
+#define gauge_site_size 2*N_COLORS*N_COLORS // real numbers per link
+#define spinor_site_size 2*4*N_COLORS       // real numbers per wilson spinor
+#define stag_spinor_site_size 2*N_COLORS    // real numbers per staggered 'spinor'
+#define clover_site_size 2*4*N_COLORS*N_COLORS // real numbers per block-diagonal clover matrix
+#define mom_site_size 10 // real numbers per momentum
+#define hw_site_size 4*N_COLORS // real numbers per half wilson
 
 extern int Z[4];
 extern int V;
@@ -240,7 +240,9 @@ inline int getReconstructNibble(QudaReconstructType recon)
   case QUDA_RECONSTRUCT_NO: return 4;
   case QUDA_RECONSTRUCT_13:
   case QUDA_RECONSTRUCT_12: return 2;
+#if (N_COLORS > 2)
   case QUDA_RECONSTRUCT_9:
+#endif
   case QUDA_RECONSTRUCT_8: return 1;
   default: return 0;
   }

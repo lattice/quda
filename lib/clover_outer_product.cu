@@ -77,6 +77,7 @@ namespace quda {
     void postTune() { force.restore(); }
 
     // spin trace + multiply-add (ignore spin-project)
+    // DMH FIXME
     long long flops() const { return minThreads() * (144 + 234) * (kernel == INTERIOR ? 4 : 1); }
 
     long long bytes() const

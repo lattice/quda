@@ -1195,14 +1195,14 @@ extern "C" {
   void staggeredPhaseQuda(void *gauge_h, QudaGaugeParam *param);
 
   /**
-   * Project the input field on the SU(3) group.  If the target
+   * Project the input field on the SU(N) group.  If the target
    * tolerance is not met, this routine will give a runtime error.
    *
    * @param gauge_h The gauge field to be updated
    * @param tol The tolerance to which we iterate
    * @param param The parameters of the gauge field
    */
-  void projectSU3Quda(void *gauge_h, double tol, QudaGaugeParam *param);
+  void projectSUNQuda(void *gauge_h, double tol, QudaGaugeParam *param);
 
   /**
    * Evaluate the momentum contribution to the Hybrid Monte Carlo
@@ -1291,7 +1291,7 @@ extern "C" {
    * @param fat7_coeff      The coefficients for the first level of smearing (fat7) in the quark action.
    * @param w_link          Unitarized link variables obtained by applying fat7 smearing and unitarization to the original links.
    * @param v_link          Fat7 link variables.
-   * @param u_link          SU(3) think link variables.
+   * @param u_link          SU(N) think link variables.
    * @param quark           The input fermion field.
    * @param num             The number of quark fields
    * @param num_naik        The number of naik contributions
@@ -1392,6 +1392,18 @@ extern "C" {
    */
   void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval, QudaWFlowType wflow_type);
 
+  /**
+   * Performs Heatbath on gaugePrecise
+   * @param beta Beta simulation value 
+   * @param num_start Starting label for simulation
+   * @param num_steps Number of simulation steps after warm up
+   * @param num_warmup_steps Number of simulation steps to warm up
+   * @param num_heatbath_per_step Number of heatbath iterations per step
+   * @param num_overrelax_per_step Number of overrelaxation iterations per step
+   * @param coldstart Whether to do a coldstart (unit gauge) or hot start (random gauge)
+   */
+  //void performHeatbath(double beta, unsigned int num_start, unsigned int num_steps, unsigned int num_warmup_steps, unsigned int num_heatbath_per_step, unsigned int num_overrelax_per_step, bool coldstart);
+  
   /**
    * @brief Calculates a variety of gauge-field observables.  If a
    * smeared gauge field is presently loaded (in gaugeSmeared) the

@@ -27,6 +27,9 @@
 
 using namespace std;
 
+#include <Eigen/Dense>
+using namespace Eigen;
+
 #define XUP 0
 #define YUP 1
 #define ZUP 2
@@ -242,7 +245,7 @@ void constructWilsonSpinorParam(quda::ColorSpinorParam *cs_param, const QudaInve
                                 const QudaGaugeParam *gauge_param)
 {
   // Lattice vector spacetime/colour/spin/parity properties
-  cs_param->nColor = 3;
+  cs_param->nColor = N_COLORS;
   cs_param->nSpin = 4;
   if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH || inv_param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
       || inv_param->dslash_type == QUDA_MOBIUS_DWF_DSLASH || inv_param->dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
@@ -642,9 +645,9 @@ int neighborIndexFullLattice_mg(int i, int dx4, int dx3, int dx2, int dx1)
 void printSpinorElement(void *spinor, int X, QudaPrecision precision)
 {
   if (precision == QUDA_DOUBLE_PRECISION)
-    for (int s = 0; s < 4; s++) printVector((double *)spinor + X * 24 + s * 6);
+    for (int s = 0; s < 4; s++) printVector((double *)spinor + X * spinor_site_size + s * 2*N_COLORS);
   else
-    for (int s = 0; s < 4; s++) printVector((float *)spinor + X * 24 + s * 6);
+    for (int s = 0; s < 4; s++) printVector((float *)spinor + X * spinor_site_size + s * 2*N_COLORS);
 }
 
 // X indexes the full lattice
@@ -652,15 +655,15 @@ void printGaugeElement(void *gauge, int X, QudaPrecision precision)
 {
   if (getOddBit(X) == 0) {
     if (precision == QUDA_DOUBLE_PRECISION)
-      for (int m = 0; m < 3; m++) printVector((double *)gauge + (X / 2) * gauge_site_size + m * 3 * 2);
+      for (int m = 0; m < N_COLORS; m++) printVector((double *)gauge + (X / 2) * gauge_site_size + m * N_COLORS * 2);
     else
-      for (int m = 0; m < 3; m++) printVector((float *)gauge + (X / 2) * gauge_site_size + m * 3 * 2);
+      for (int m = 0; m < N_COLORS; m++) printVector((float *)gauge + (X / 2) * gauge_site_size + m * N_COLORS * 2);
 
   } else {
     if (precision == QUDA_DOUBLE_PRECISION)
-      for (int m = 0; m < 3; m++) printVector((double *)gauge + (X / 2 + Vh) * gauge_site_size + m * 3 * 2);
+      for (int m = 0; m < N_COLORS; m++) printVector((double *)gauge + (X / 2 + Vh) * gauge_site_size + m * N_COLORS * 2);
     else
-      for (int m = 0; m < 3; m++) printVector((float *)gauge + (X / 2 + Vh) * gauge_site_size + m * 3 * 2);
+      for (int m = 0; m < N_COLORS; m++) printVector((float *)gauge + (X / 2 + Vh) * gauge_site_size + m * N_COLORS * 2);
   }
 }
 
@@ -1051,19 +1054,20 @@ template <typename Float> void applyGaugeFieldScaling(Float **gauge, int Vh, Qud
   }
 
   if (param->gauge_fix) {
+    const int Nc = N_COLORS;
     // set all gauge links (except for the last Z[0]*Z[1]*Z[2]/2) to the identity,
     // to simulate fixing to the temporal gauge.
     int iMax = (last_node_in_t() ? (Z[0] / 2) * Z[1] * Z[2] * (Z[3] - 1) : Vh);
     int dir = 3; // time direction only
     Float *even = gauge[dir];
     Float *odd = gauge[dir] + Vh * gauge_site_size;
-    for (int i = 0; i< iMax; i++) {
-      for (int m = 0; m < 3; m++) {
-	for (int n = 0; n < 3; n++) {
-	  even[i*(3*3*2) + m*(3*2) + n*(2) + 0] = (m==n) ? 1 : 0;
-	  even[i*(3*3*2) + m*(3*2) + n*(2) + 1] = 0.0;
-	  odd [i*(3*3*2) + m*(3*2) + n*(2) + 0] = (m==n) ? 1 : 0;
-	  odd [i*(3*3*2) + m*(3*2) + n*(2) + 1] = 0.0;
+    for (int i = 0; i < iMax; i++) {
+      for (int m = 0; m < Nc; m++) {
+	for (int n = 0; n < Nc; n++) {
+	  even[i*(Nc*Nc*2) + m*(Nc*2) + n*(2) + 0] = (m==n) ? 1 : 0;
+	  even[i*(Nc*Nc*2) + m*(Nc*2) + n*(2) + 1] = 0.0;
+	  odd [i*(Nc*Nc*2) + m*(Nc*2) + n*(2) + 0] = (m==n) ? 1 : 0;
+	  odd [i*(Nc*Nc*2) + m*(Nc*2) + n*(2) + 1] = 0.0;
 	}
       }
     }
@@ -1073,6 +1077,7 @@ template <typename Float> void applyGaugeFieldScaling(Float **gauge, int Vh, Qud
 // static void constructUnitGaugeField(Float **res, QudaGaugeParam *param) {
 template <typename Float> void constructUnitGaugeField(Float **res, QudaGaugeParam *param)
 {
+  const int Nc = N_COLORS;  
   Float *resOdd[4], *resEven[4];
   for (int dir = 0; dir < 4; dir++) {
     resEven[dir] = res[dir];
@@ -1081,12 +1086,12 @@ template <typename Float> void constructUnitGaugeField(Float **res, QudaGaugePar
 
   for (int dir = 0; dir < 4; dir++) {
     for (int i = 0; i < Vh; i++) {
-      for (int m = 0; m < 3; m++) {
-	for (int n = 0; n < 3; n++) {
-	  resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = (m==n) ? 1 : 0;
-	  resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = 0.0;
-	  resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = (m==n) ? 1 : 0;
-	  resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = 0.0;
+      for (int m = 0; m < Nc; m++) {
+	for (int n = 0; n < Nc; n++) {
+	  resEven[dir][i*(Nc*Nc*2) + m*(Nc*2) + n*(2) + 0] = (m==n) ? 1 : 0;
+	  resEven[dir][i*(Nc*Nc*2) + m*(Nc*2) + n*(2) + 1] = 0.0;
+	  resOdd[dir][i*(Nc*Nc*2) + m*(Nc*2) + n*(2) + 0] = (m==n) ? 1 : 0;
+	  resOdd[dir][i*(Nc*Nc*2) + m*(Nc*2) + n*(2) + 1] = 0.0;
 	}
       }
     }
@@ -1111,6 +1116,62 @@ static void orthogonalize(complex<Float> *a, complex<Float> *b, int len) {
   for (int i=0; i<len; i++) b[i] -= (complex<Float>)dot*a[i];
 }
 
+/*
+complex<double> det3helper(MatrixXcd a, int i1, int i2, int i3, int j1, int j2, int j3)
+{
+  return a(i1,j1)
+    * (a(i2,j2) * a(i3,j3) - a(i2,j3) * a(i3,j2));
+}
+
+template<int i, int j>
+complex<double> cofactor4x4(MatrixXcd a)
+{
+  enum {
+    i1 = (i+1) % 4,
+    i2 = (i+2) % 4,
+    i3 = (i+3) % 4,
+    j1 = (j+1) % 4,
+    j2 = (j+2) % 4,
+    j3 = (j+3) % 4
+  };      
+  return (det3helper(a, i1, i2, i3, j1, j2, j3) +
+	  det3helper(a, i2, i3, i1, j1, j2, j3) +
+	  det3helper(a, i3, i1, i2, j1, j2, j3));
+}
+
+void inverse4x4(MatrixXcd u) {
+
+  MatrixXcd uinv = MatrixXcd::Zero(4, 4);
+  
+  uinv(0,0) =  cofactor4x4<0,0>(u);
+  uinv(1,0) = -cofactor4x4<0,1>(u);
+  uinv(2,0) =  cofactor4x4<0,2>(u);
+  uinv(3,0) = -cofactor4x4<0,3>(u);
+  uinv(0,2) =  cofactor4x4<2,0>(u);
+  uinv(1,2) = -cofactor4x4<2,1>(u);
+  uinv(2,2) =  cofactor4x4<2,2>(u);
+  uinv(3,2) = -cofactor4x4<2,3>(u);
+  uinv(0,1) = -cofactor4x4<1,0>(u);
+  uinv(1,1) =  cofactor4x4<1,1>(u);
+  uinv(2,1) = -cofactor4x4<1,2>(u);
+  uinv(3,1) =  cofactor4x4<1,3>(u);
+  uinv(0,3) = -cofactor4x4<3,0>(u);
+  uinv(1,3) =  cofactor4x4<3,1>(u);
+  uinv(2,3) = -cofactor4x4<3,2>(u);
+  uinv(3,3) =  cofactor4x4<3,3>(u);
+
+  // Scale the result by column 0
+  complex<double> temp = 0.0;
+  for(int i=0; i<4; i++) {
+    temp += u(i,0) * uinv(0,i);
+  }
+  temp = 1.0/temp;
+  uinv *= temp;
+  
+  cout << uinv * u << endl << endl;
+}
+*/
+
 template <typename Float> void constructRandomGaugeField(Float **res, QudaGaugeParam *param, QudaDslashType dslash_type)
 {
   Float *resOdd[4], *resEven[4];
@@ -1119,55 +1180,110 @@ template <typename Float> void constructRandomGaugeField(Float **res, QudaGaugeP
     resOdd[dir] = res[dir] + Vh * gauge_site_size;
   }
 
-  for (int dir = 0; dir < 4; dir++) {
-    for (int i = 0; i < Vh; i++) {
-      for (int m = 1; m < 3; m++) { // last 2 rows
-	for (int n = 0; n < 3; n++) { // 3 columns
-	  resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = rand() / (Float)RAND_MAX;
-	  resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = rand() / (Float)RAND_MAX;
-	  resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = rand() / (Float)RAND_MAX;
-          resOdd[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = rand() / (Float)RAND_MAX;
-        }
+  const int Nc = N_COLORS;
+
+  if(Nc != 3) {
+    for (int dir = 0; dir < 4; dir++) {
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static, 32)
+#endif
+      for (int n = 0; n < Vh; n++) {
+	
+	// Construct a unitary matrix from a random matrix
+	MatrixXcd R = MatrixXcd::Random(Nc, Nc);
+	
+	// QR the random matrix
+	Eigen::HouseholderQR<MatrixXcd> qr(R);
+	MatrixXcd Q = qr.householderQ();
+	
+	// Q is now an element of U(Nc), make it an element of SU(Nc)      
+	Q *= pow(Q.determinant(), -1.0/Nc);
+	
+	// Populate array
+	for (int i = 0; i < Nc; i++) {
+	  for (int j = 0; j < Nc; j++) {
+	    resEven[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 0] = Q(i,j).real();
+	    resEven[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 1] = Q(i,j).imag();
+	  }
+	}
+
+	// Construct a unitary matrix from a random matrix	
+	for (int i = 0; i < Nc; i++) {
+	  for (int j = 0; j < Nc; j++) {
+	    R(i, j).real(rand() / (Float)RAND_MAX);
+	    R(i, j).imag(rand() / (Float)RAND_MAX);
+	  }
+	}
+	
+	// QR the random matrix
+	qr.compute(R);
+	Q = qr.householderQ();
+
+	// Test for unitarity
+	//inverse4x4(Q);
+	
+	// Q is now an element of U(Nc), make it an element of SU(Nc)      
+	Q *= pow(Q.determinant(), -1.0/Nc);
+
+	// Populate array
+	for (int i = 0; i < Nc; i++) {
+	  for (int j = 0; j < Nc; j++) {
+	    resOdd[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 0] = Q(i,j).real();
+	    resOdd[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 1] = Q(i,j).imag();
+	  }
+	}
       }
-      normalize((complex<Float>*)(resEven[dir] + (i*3+1)*3*2), 3);
-      orthogonalize((complex<Float>*)(resEven[dir] + (i*3+1)*3*2), (complex<Float>*)(resEven[dir] + (i*3+2)*3*2), 3);
-      normalize((complex<Float>*)(resEven[dir] + (i*3 + 2)*3*2), 3);
+    }
+  } else {
+    for (int dir = 0; dir < 4; dir++) {
+      for (int i = 0; i < Vh; i++) {
+	for (int m = 1; m < 3; m++) { // last 2 rows
+	  for (int n = 0; n < 3; n++) { // 3 columns
+	    resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = rand() / (Float)RAND_MAX;
+	    resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = rand() / (Float)RAND_MAX;
+	    resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = rand() / (Float)RAND_MAX;
+	    resOdd[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = rand() / (Float)RAND_MAX;
+	  }
+	}
+	normalize((complex<Float>*)(resEven[dir] + (i*3+1)*3*2), 3);
+	orthogonalize((complex<Float>*)(resEven[dir] + (i*3+1)*3*2), (complex<Float>*)(resEven[dir] + (i*3+2)*3*2), 3);
+	normalize((complex<Float>*)(resEven[dir] + (i*3 + 2)*3*2), 3);
 
-      normalize((complex<Float>*)(resOdd[dir] + (i*3+1)*3*2), 3);
-      orthogonalize((complex<Float>*)(resOdd[dir] + (i*3+1)*3*2), (complex<Float>*)(resOdd[dir] + (i*3+2)*3*2), 3);
-      normalize((complex<Float>*)(resOdd[dir] + (i*3 + 2)*3*2), 3);
+	normalize((complex<Float>*)(resOdd[dir] + (i*3+1)*3*2), 3);
+	orthogonalize((complex<Float>*)(resOdd[dir] + (i*3+1)*3*2), (complex<Float>*)(resOdd[dir] + (i*3+2)*3*2), 3);
+	normalize((complex<Float>*)(resOdd[dir] + (i*3 + 2)*3*2), 3);
 
-      {
-	Float *w = resEven[dir]+(i*3+0)*3*2;
-	Float *u = resEven[dir]+(i*3+1)*3*2;
-	Float *v = resEven[dir]+(i*3+2)*3*2;
+	{
+	  Float *w = resEven[dir]+(i*3+0)*3*2;
+	  Float *u = resEven[dir]+(i*3+1)*3*2;
+	  Float *v = resEven[dir]+(i*3+2)*3*2;
 
-        for (int n = 0; n < 6; n++) w[n] = 0.0;
-	accumulateConjugateProduct(w+0*(2), u+1*(2), v+2*(2), +1);
-	accumulateConjugateProduct(w+0*(2), u+2*(2), v+1*(2), -1);
-	accumulateConjugateProduct(w+1*(2), u+2*(2), v+0*(2), +1);
-	accumulateConjugateProduct(w+1*(2), u+0*(2), v+2*(2), -1);
-	accumulateConjugateProduct(w+2*(2), u+0*(2), v+1*(2), +1);
-	accumulateConjugateProduct(w+2*(2), u+1*(2), v+0*(2), -1);
+	  for (int n = 0; n < 6; n++) w[n] = 0.0;
+	  accumulateConjugateProduct(w+0*(2), u+1*(2), v+2*(2), +1);
+	  accumulateConjugateProduct(w+0*(2), u+2*(2), v+1*(2), -1);
+	  accumulateConjugateProduct(w+1*(2), u+2*(2), v+0*(2), +1);
+	  accumulateConjugateProduct(w+1*(2), u+0*(2), v+2*(2), -1);
+	  accumulateConjugateProduct(w+2*(2), u+0*(2), v+1*(2), +1);
+	  accumulateConjugateProduct(w+2*(2), u+1*(2), v+0*(2), -1);
+	}
+
+	{
+	  Float *w = resOdd[dir]+(i*3+0)*3*2;
+	  Float *u = resOdd[dir]+(i*3+1)*3*2;
+	  Float *v = resOdd[dir]+(i*3+2)*3*2;
+
+	  for (int n = 0; n < 6; n++) w[n] = 0.0;
+	  accumulateConjugateProduct(w+0*(2), u+1*(2), v+2*(2), +1);
+	  accumulateConjugateProduct(w+0*(2), u+2*(2), v+1*(2), -1);
+	  accumulateConjugateProduct(w+1*(2), u+2*(2), v+0*(2), +1);
+	  accumulateConjugateProduct(w+1*(2), u+0*(2), v+2*(2), -1);
+	  accumulateConjugateProduct(w+2*(2), u+0*(2), v+1*(2), +1);
+	  accumulateConjugateProduct(w+2*(2), u+1*(2), v+0*(2), -1);
+	}
       }
-
-      {
-	Float *w = resOdd[dir]+(i*3+0)*3*2;
-	Float *u = resOdd[dir]+(i*3+1)*3*2;
-	Float *v = resOdd[dir]+(i*3+2)*3*2;
-
-        for (int n = 0; n < 6; n++) w[n] = 0.0;
-	accumulateConjugateProduct(w+0*(2), u+1*(2), v+2*(2), +1);
-	accumulateConjugateProduct(w+0*(2), u+2*(2), v+1*(2), -1);
-	accumulateConjugateProduct(w+1*(2), u+2*(2), v+0*(2), +1);
-	accumulateConjugateProduct(w+1*(2), u+0*(2), v+2*(2), -1);
-	accumulateConjugateProduct(w+2*(2), u+0*(2), v+1*(2), +1);
-	accumulateConjugateProduct(w+2*(2), u+1*(2), v+0*(2), -1);
-      }
-
     }
   }
-
+  
   if (param->type == QUDA_WILSON_LINKS) {
     applyGaugeFieldScaling(res, Vh, param);
   } else if (param->type == QUDA_ASQTAD_LONG_LINKS) {
@@ -1187,6 +1303,7 @@ template <typename Float> void constructRandomGaugeField(Float **res, QudaGaugeP
     }
   }
 }
+
 
 template <typename Float> void constructUnitaryGaugeField(Float **res)
 {
@@ -1247,30 +1364,45 @@ template <typename Float> void constructUnitaryGaugeField(Float **res)
 
 template <typename Float> void constructCloverField(Float *res, double norm, double diag)
 {
-
   Float c = 2.0 * norm / RAND_MAX;
-
+  int len = (N_COLORS * N_COLORS * 4 * 2);
   for(int i = 0; i < V; i++) {
-    for (int j = 0; j < 72; j++) {
-      res[i*72 + j] = c*rand() - norm;
+    for (int j = 0; j < len; j++) {
+      res[i*len + j] = c*rand() - norm;
     }
 
     //impose clover symmetry on each chiral block
     for (int ch=0; ch<2; ch++) {
-      res[i*72 + 3 + 36*ch] = -res[i*72 + 0 + 36*ch];
-      res[i*72 + 4 + 36*ch] = -res[i*72 + 1 + 36*ch];
-      res[i*72 + 5 + 36*ch] = -res[i*72 + 2 + 36*ch];
-      res[i*72 + 30 + 36*ch] = -res[i*72 + 6 + 36*ch];
-      res[i*72 + 31 + 36*ch] = -res[i*72 + 7 + 36*ch];
-      res[i*72 + 32 + 36*ch] = -res[i*72 + 8 + 36*ch];
-      res[i*72 + 33 + 36*ch] = -res[i*72 + 9 + 36*ch];
-      res[i*72 + 34 + 36*ch] = -res[i*72 + 16 + 36*ch];
-      res[i*72 + 35 + 36*ch] = -res[i*72 + 17 + 36*ch];
+
+      //The diagons are first in the array
+      for(int k=0; k<N_COLORS; k++) {
+	res[i*len + N_COLORS + k + (len/2)*ch] = -res[i*len + k + (len/2)*ch];
+      }
+      
+      //res[i*len + 3 + (len/2)*ch] = -res[i*len + 0 + (len/2)*ch];
+      //res[i*len + 4 + (len/2)*ch] = -res[i*len + 1 + (len/2)*ch];
+      //res[i*len + 5 + (len/2)*ch] = -res[i*len + 2 + (len/2)*ch];
+
+      for(int k=2*N_COLORS; k<N_COLORS*N_COLORS+1; k++) {
+	res[i*len + (len/2) - k + (len/2)*ch] = -res[i*len + k + (len/2)*ch];
+      }
+      
+      //res[i*len + 30 + (len/2)*ch] = -res[i*len + 6 + (len/2)*ch];
+      //res[i*len + 31 + (len/2)*ch] = -res[i*len + 7 + (len/2)*ch];
+      //res[i*len + 32 + (len/2)*ch] = -res[i*len + 8 + (len/2)*ch];
+      //res[i*len + 33 + (len/2)*ch] = -res[i*len + 9 + (len/2)*ch];
+
+      for(int k=1; k<N_COLORS; k++) {
+	res[i*len + (len/2) - N_COLORS + k + (len/2)*ch] = -res[i*len + (N_COLORS+1)*(N_COLORS+1) + k - 1 + (len/2)*ch];
+      }
+      
+      //res[i*len + 34 + (len/2)*ch] = -res[i*len + 16 + (len/2)*ch];
+      //res[i*len + 35 + (len/2)*ch] = -res[i*len + 17 + (len/2)*ch];
     }
 
-    for (int j = 0; j<6; j++) {
-      res[i*72 + j] += diag;
-      res[i*72 + j+36] += diag;
+    for (int j = 0; j<2*N_COLORS; j++) {
+      res[i*len + j]           += diag;
+      res[i*len + j + (len/2)] += diag;
     }
   }
 }
@@ -1278,18 +1410,18 @@ template <typename Float> void constructCloverField(Float *res, double norm, dou
 template <typename Float>
 static void checkGauge(Float **oldG, Float **newG, double epsilon) {
 
-  const int fail_check = 17;
+  const int fail_check = 16;
   int fail[4][fail_check];
-  int iter[4][18];
+  int iter[4][2*N_COLORS*N_COLORS];
   for (int d=0; d<4; d++) for (int i=0; i<fail_check; i++) fail[d][i] = 0;
-  for (int d=0; d<4; d++) for (int i=0; i<18; i++) iter[d][i] = 0;
+  for (int d=0; d<4; d++) for (int i=0; i<2*N_COLORS*N_COLORS; i++) iter[d][i] = 0;
 
   for (int d=0; d<4; d++) {
     for (int eo=0; eo<2; eo++) {
       for (int i=0; i<Vh; i++) {
 	int ga_idx = (eo*Vh+i);
-	for (int j=0; j<18; j++) {
-	  double diff = fabs(newG[d][ga_idx*18+j] - oldG[d][ga_idx*18+j]);/// fabs(oldG[d][ga_idx*18+j]);
+	for (int j=0; j<2*N_COLORS*N_COLORS; j++) {
+	  double diff = fabs(newG[d][ga_idx*2*N_COLORS*N_COLORS+j] - oldG[d][ga_idx*2*N_COLORS*N_COLORS+j]);/// fabs(oldG[d][ga_idx*18+j]);
 
 	  for (int f=0; f<fail_check; f++) if (diff > pow(10.0,-(f+1))) fail[d][f]++;
 	  if (diff > epsilon) iter[d][j]++;
@@ -1299,13 +1431,13 @@ static void checkGauge(Float **oldG, Float **newG, double epsilon) {
   }
 
   printf("Component fails (X, Y, Z, T)\n");
-  for (int i=0; i<18; i++) printf("%d fails = (%8d, %8d, %8d, %8d)\n", i, iter[0][i], iter[1][i], iter[2][i], iter[3][i]);
+  for (int i=0; i<2*N_COLORS*N_COLORS; i++) printf("%d fails = (%8d, %8d, %8d, %8d)\n", i, iter[0][i], iter[1][i], iter[2][i], iter[3][i]);
 
   printf("\nDeviation Failures = (X, Y, Z, T)\n");
   for (int f=0; f<fail_check; f++) {
     printf("%e Failures = (%9d, %9d, %9d, %9d) = (%6.5f, %6.5f, %6.5f, %6.5f)\n", pow(10.0, -(f + 1)), fail[0][f],
-           fail[1][f], fail[2][f], fail[3][f], fail[0][f] / (double)(V * 18), fail[1][f] / (double)(V * 18),
-           fail[2][f] / (double)(V * 18), fail[3][f] / (double)(V * 18));
+           fail[1][f], fail[2][f], fail[3][f], fail[0][f] / (double)(V * 2*N_COLORS*N_COLORS), fail[1][f] / (double)(V * 2*N_COLORS*N_COLORS),
+           fail[2][f] / (double)(V * 2*N_COLORS*N_COLORS), fail[3][f] / (double)(V * 2*N_COLORS*N_COLORS));
   }
 
 }
@@ -1436,13 +1568,13 @@ int compareLink(Float **linkA, Float **linkB, int len) {
   int fail[fail_check];
   for (int f=0; f<fail_check; f++) fail[f] = 0;
 
-  int iter[18];
-  for (int i=0; i<18; i++) iter[i] = 0;
+  int iter[2*N_COLORS*N_COLORS];
+  for (int i=0; i<2*N_COLORS*N_COLORS; i++) iter[i] = 0;
 
   for(int dir=0;dir < 4; dir++){
     for (int i=0; i<len; i++) {
-      for (int j=0; j<18; j++) {
-	int is = i*18+j;
+      for (int j=0; j<2*N_COLORS*N_COLORS; j++) {
+	int is = i*2*N_COLORS*N_COLORS+j;
 	double diff = fabs(linkA[dir][is]-linkB[dir][is]);
 	for (int f=0; f<fail_check; f++)
 	  if (diff > pow(10.0,-(f+1))) fail[f]++;
@@ -1452,7 +1584,7 @@ int compareLink(Float **linkA, Float **linkB, int len) {
     }
   }
 
-  for (int i=0; i<18; i++) printfQuda("%d fails = %d\n", i, iter[i]);
+  for (int i=0; i<2*N_COLORS*N_COLORS; i++) printfQuda("%d fails = %d\n", i, iter[i]);
 
   int accuracy_level = 0;
   for(int f =0; f < fail_check; f++){
@@ -1462,7 +1594,7 @@ int compareLink(Float **linkA, Float **linkB, int len) {
   }
 
   for (int f=0; f<fail_check; f++) {
-    printfQuda("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)), fail[f], 4*len*18, fail[f] / (double)(4*len*18));
+    printfQuda("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)), fail[f], 4*len*2*N_COLORS*N_COLORS, fail[f] / (double)(4*len*2*N_COLORS*N_COLORS));
   }
 
   return accuracy_level;
@@ -1487,11 +1619,11 @@ compare_link(void **linkA, void **linkB, int len, QudaPrecision precision)
 static void printLinkElement(void *link, int X, QudaPrecision precision)
 {
   if (precision == QUDA_DOUBLE_PRECISION){
-    for (int i = 0; i < 3; i++) { printVector((double *)link + X * gauge_site_size + i * 6); }
+    for (int i = 0; i < N_COLORS; i++) { printVector((double *)link + X * gauge_site_size + i * 2*N_COLORS); }
 
   }
   else{
-    for (int i = 0; i < 3; i++) { printVector((float *)link + X * gauge_site_size + i * 6); }
+    for (int i = 0; i < N_COLORS; i++) { printVector((float *)link + X * gauge_site_size + i * 2*N_COLORS); }
   }
 }
 

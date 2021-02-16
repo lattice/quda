@@ -366,7 +366,7 @@ int main(int argc, char **argv)
   initQuda(device_ordinal);
   int X[4] = {xdim, ydim, zdim, tdim};
   setDims(X);
-  setSpinorSiteSize(24);
+  setSpinorSiteSize(2*4*N_COLORS);
   //-----------------------------------------------------------------------------
 
   int result = 0;

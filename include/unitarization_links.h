@@ -1,8 +1,5 @@
-#ifndef _UNITARIZATION_LINKS_QUDA_H
-#define _UNITARIZATION_LINKS_QUDA_H
-
+#pragma once
 #include <gauge_field.h>
-
 
 // ***************************************************
 //  Declarations for unitarization functions used 
@@ -26,7 +23,6 @@
 //  SVD is used to perform the unitarization.
 // ***************************************************  
 
-
 namespace quda {
 
   void setUnitarizeLinksConstants(double unitarize_eps, double max_error, 
@@ -41,6 +37,3 @@ namespace quda {
   bool isUnitary(const cpuGaugeField& field, double max_error);
 
 } // namespace quda
-
-
-#endif // _UNITARIZATION_LINKS_H

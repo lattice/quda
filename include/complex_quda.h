@@ -922,7 +922,7 @@ lhs.real()*rhs.imag()+lhs.imag()*rhs.real());
   template <typename ValueType>
     __host__ __device__
     inline complex<ValueType> operator*(const complex<ValueType>& lhs, const ValueType & rhs){
-    return complex<ValueType>(lhs.real()*rhs,lhs.imag()*rhs);
+    return complex<ValueType>(lhs.real()*rhs, lhs.imag()*rhs);
     // return cuCmulf(lhs,complex<float>(rhs));
   }
 

@@ -236,7 +236,7 @@ invert_test(void)
 
   // FIXME: currently assume staggered is SU(3)
   gaugeParam.type = dslash_type == QUDA_STAGGERED_DSLASH ?
-    QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;
+    QUDA_SUN_LINKS : QUDA_ASQTAD_FAT_LINKS;
   gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
   GaugeFieldParam cpuFatParam(fatlink, gaugeParam);
   cpuFatParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
@@ -256,7 +256,7 @@ invert_test(void)
 #endif
 
   gaugeParam.type = dslash_type == QUDA_STAGGERED_DSLASH ?
-    QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;
+    QUDA_SUN_LINKS : QUDA_ASQTAD_FAT_LINKS;
   gaugeParam.ga_pad = fat_pad;
   if (dslash_type == QUDA_STAGGERED_DSLASH) {
     gaugeParam.reconstruct = link_recon;
