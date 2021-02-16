@@ -1108,7 +1108,6 @@ namespace quda {
     vec_t vecTmp = vector_load<vec_t>(field, index);
     real scale_inv = fixedInvMaxValue<Float>::value * nrm;
 #pragma unroll
-    // for (int j = 0; j < Ns * 2; j++) copy_and_scale(v[j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
     for (int j = 0; j < Ns * 2; j++) {
       v[j] = i2f(reinterpret_cast<Float *>(&vecTmp)[j]) * scale_inv;
     }
@@ -1120,7 +1119,7 @@ namespace quda {
       copy_and_scale(v[spin * 2 + 1], tmp.imag(), nrm);
     }
 #endif
-    #pragma unroll
+#pragma unroll
     for (int i = 0; i < Ns; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
   }
 

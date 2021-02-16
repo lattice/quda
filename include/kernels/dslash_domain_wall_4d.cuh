@@ -70,21 +70,16 @@ namespace quda
     int warp_m = lane_id / 4;
     int warp_n = warp_m;
 
-    constexpr int reg_length_a = (s_per_warp * 8 / 16) * 2;
     constexpr int reg_length_c = (s_per_warp * 8 / 16) * 2;
 
     using float_type = typename mapper<typename Arg::Float>::type;
     using fixed_type = typename Arg::Float;
     using Spinor = ColorSpinor<float_type, 1, 4>;
 
-    Spinor projected_in;
     float op_c[reg_length_c];
-    float op_b;
 
 #pragma unroll
     for (int c = 0; c < reg_length_c; c++) { op_c[c] = 0; }
-
-    fixed_type op_b_fixed;
 
     int color = warp_k;
     int s = warp_m + warp_id * s_per_warp;
@@ -100,11 +95,10 @@ namespace quda
 
     int parity = nParity == 2 ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
     int their_spinor_parity = nParity == 2 ? 1 - parity : 0;
-
     const int gauge_parity = parity;
 
-    int thread_dim;
     bool active;
+    int thread_dim;
     auto coord = getCoords<QUDA_4D_PC, kernel_type>(arg, x_cb, s, parity, thread_dim);
 
 #pragma unroll
@@ -117,21 +111,17 @@ namespace quda
         const bool ghost
           = (coord[d] + arg.nFace >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
-        if (s < Ls  && warp_k < Nc && !ghost) {
-          Spinor in = arg.in(fwd_idx + s * arg.dc.volume_4d_cb, their_spinor_parity, color);
-          // Spinor in = arg.in(fwd_idx * Ls + s, their_spinor_parity, color);
-          projected_in = in.project(d, proj_dir).reconstruct(d, proj_dir);
-        } else {
-#pragma unroll
-          for (int r = 0; r < reg_length_a / 2; r++) { projected_in(r).real(0); projected_in(r).imag(0); }
-        }
+        bool load_link = (warp_k < Nc && warp_n < Nc * 2 && !ghost);
+        fixed_type op_b_fixed = load_link ? arg.U(gauge_idx, d, gauge_parity, color_n, color_m, comp) : 0; // color i, j, complex
+        float op_b = i2f(op_b_fixed) * fixedInvMaxValue<fixed_type>::value;
 
-        if (warp_k < Nc && warp_n < Nc * 2 && !ghost) {
-          op_b_fixed = arg.U(gauge_idx, d, gauge_parity, color_n, color_m, comp); // color i, j, complex
-          op_b = static_cast<float_type>(op_b_fixed) * fixedInvMaxValue<fixed_type>::value;
-        } else {
-          op_b = 0;          
-        }
+        bool load_spinor = (s < Ls  && warp_k < Nc && !ghost);
+#if 1
+        Spinor in = load_spinor ? arg.in(fwd_idx + s * arg.dc.volume_4d_cb, their_spinor_parity, color) : Spinor();
+#else
+        Spinor in = load_spinor ? arg.in(fwd_idx * Ls + s, their_spinor_parity, color) : Spinor();
+#endif
+        Spinor projected_in = in.project(d, proj_dir).reconstruct(d, proj_dir);
 
         mma(op_c, projected_in, op_b);
       }
@@ -143,22 +133,18 @@ namespace quda
 
         const bool ghost = (coord[d] - arg.nFace < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
-        if (s < Ls  && warp_k < Nc && !ghost) {
-          Spinor in = arg.in(back_idx + s * arg.dc.volume_4d_cb, their_spinor_parity, color);
-          // Spinor in = arg.in(back_idx * Ls + s, their_spinor_parity, color);
-          projected_in = in.project(d, proj_dir).reconstruct(d, proj_dir);
-        } else {
-#pragma unroll
-          for (int r = 0; r < reg_length_a / 2; r++) { projected_in(r).real(0); projected_in(r).imag(0); }
-        }
+        bool load_link = (warp_k < Nc && warp_n < Nc * 2 && !ghost);
+        fixed_type op_b_fixed = load_link ? arg.U(gauge_idx, d, 1 - gauge_parity, color_m, color_n, comp) : 0; // color i, j, complex
+        if (comp == 1) { op_b_fixed = -op_b_fixed; }
+        float op_b = i2f(op_b_fixed) * fixedInvMaxValue<fixed_type>::value;
 
-        if (warp_k < Nc && warp_n < Nc * 2 && !ghost) {
-          op_b_fixed = arg.U(gauge_idx, d, 1 - gauge_parity, color_m, color_n, comp); // color i, j, complex
-          if (comp == 1) { op_b_fixed = -op_b_fixed; }
-          op_b = static_cast<float_type>(op_b_fixed) * fixedInvMaxValue<fixed_type>::value;
-        } else {
-          op_b = 0;          
-        }
+        bool load_spinor = (s < Ls  && warp_k < Nc && !ghost);
+#if 1
+        Spinor in = load_spinor ? arg.in(back_idx + s * arg.dc.volume_4d_cb, their_spinor_parity, color) : Spinor();
+#else
+        Spinor in = load_spinor ? arg.in(back_idx * Ls + s, their_spinor_parity, color) : Spinor();
+#endif
+        Spinor projected_in = in.project(d, proj_dir).reconstruct(d, proj_dir);
 
         mma(op_c, projected_in, op_b);
       }
@@ -180,8 +166,11 @@ namespace quda
     max = __shfl_sync(0xffffffff, max, (lane_id / 4) * 4);
 
     // TODO: Fix the parity.
+#if 1
     if (s < Ls && color == 0) arg.out.norm[x_cb + arg.dc.volume_4d_cb * s] = __uint_as_float(max);
-    // if (s < Ls && color == 0) arg.out.norm[x_cb * Ls + s] = __uint_as_float(max);
+#else
+    if (s < Ls && color == 0) arg.out.norm[x_cb * Ls + s] = __uint_as_float(max);
+#endif
 
     complex<fixed_type> output[Ns];
     float_type scale = fixedMaxValue<fixed_type>::value / __uint_as_float(max);
@@ -192,8 +181,11 @@ namespace quda
       output[spin].real(fixed_real);
       output[spin].imag(fixed_imag);
     }
+#if 1
     if (s < Ls && color < 3) arg.out.save_spinor(output, x_cb + arg.dc.volume_4d_cb * s, parity, color);
-    // if (s < Ls && color < 3) arg.out.save_spinor(output, x_cb * Ls + s, parity, color);
+#else
+    if (s < Ls && color < 3) arg.out.save_spinor(output, x_cb * Ls + s, parity, color);
+#endif
   }
 
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct domainWall4D;
