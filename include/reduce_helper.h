@@ -130,7 +130,7 @@ namespace quda
       if (consumed) errorQuda("Cannot call complete more than once for each construction");
 
       for (int i = 0; i < n_reduce * n_item; i++) {
-        result_h[i].wait(init_value<system_atomic_t>(), cuda::std::memory_order_relaxed);
+        while (result_h[i].load(cuda::std::memory_order_relaxed) == init_value<system_atomic_t>()) {}
       }
 #else
       auto event = reducer::get_event();

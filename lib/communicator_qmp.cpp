@@ -55,6 +55,8 @@ Communicator::Communicator(int nDim, const int *commDims, QudaCommsMap rank_from
     MPI_COMM_HANDLE = *((MPI_Comm *)my_comm);
   }
 
+  is_qmp_handle_default = true; // the QMP handle is the default one.
+
   comm_init(nDim, commDims, rank_from_coords, map_data);
 }
 
@@ -84,6 +86,8 @@ Communicator::Communicator(Communicator &other, const int *comm_split)
   QMP_get_mpi_comm(QMP_COMM_HANDLE, &my_comm);
   MPI_COMM_HANDLE = *((MPI_Comm *)my_comm);
 
+  is_qmp_handle_default = false; // the QMP handle is not the default one.
+
   int my_rank_ = QMP_get_node_number();
 
   QudaCommsMap func = lex_rank_from_coords_dim_t;
@@ -96,7 +100,10 @@ Communicator::Communicator(Communicator &other, const int *comm_split)
 Communicator::~Communicator()
 {
   comm_finalize();
-  if (!user_set_comm_handle) { QMP_comm_free(QMP_COMM_HANDLE); }
+  if (!(user_set_comm_handle || is_qmp_handle_default)) {
+    // - if it's a user set handle, or if it's the default QMP handle, we don't free it.
+    QMP_comm_free(QMP_COMM_HANDLE);
+  }
 }
 
 // There are more efficient ways to do the following,

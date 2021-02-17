@@ -183,6 +183,7 @@ option(QUDA_INTERFACE_CPS "build cps interface" OFF)
 option(QUDA_INTERFACE_QDPJIT "build qdpjit interface" OFF)
 option(QUDA_INTERFACE_BQCD "build bqcd interface" OFF)
 option(QUDA_INTERFACE_TIFR "build tifr interface" OFF)
+option(QUDA_INTERFACE_ALL "enable all data-orders triggered by the various interfaces" OFF)
 
 # QDPJIT
 option(QUDA_QDPJIT "build QDP-JIT support?" OFF)
@@ -309,6 +310,7 @@ mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM_TAR)
 
 mark_as_advanced(QUDA_MPI_NVTX)
 mark_as_advanced(QUDA_INTERFACE_NVTX)
+mark_as_advanced(QUDA_INTERFACE_ALL)
 
 mark_as_advanced(QUDA_SSTEP)
 mark_as_advanced(QUDA_USE_EIGEN)
