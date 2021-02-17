@@ -1526,28 +1526,29 @@ namespace quda {
         const real scale_inv;
 
         Reconstruct(const GaugeField &u) : reconstruct_8(u), scale(u.Scale()), scale_inv(1.0 / scale) {}
-
+	
+        __device__ __host__ inline real getPhase(const complex in[N_COLORS*N_COLORS]) const
         {
 #if 1 // phase from cross product
           // denominator = (U[0][0]*U[1][1] - U[0][1]*U[1][0])*
           complex denom = conj(in[0] * in[4] - in[1] * in[3]) * scale_inv;
-          complex expINPhase = in[8] / denom; // numerator = U[2][2]
-          if (stag_phase == QUDA_STAGGERED_PHASE_NO) {
-            return arg(expINPhase) / static_cast<real>(N_COLORS);
+          complex expI3Phase = in[8] / denom; // numerator = U[2][2]
+
+          if (stag_phase == QUDA_STAGGERED_PHASE_NO) { // dynamic phasing
+            return arg(expI3Phase) / static_cast<real>(3.0);
           } else {
-            return expINPhase.real() > 0 ? 1 : -1;
+            return expI3Phase.real() > 0 ? 1 : -1;
           }
 #else // phase from determinant
-          Matrix<complex, N_COLORS> a;
+          Matrix<complex, N_COLCORS> a;
 #pragma unroll
-          for (int i = 0; i < N_COLORS*N_COLORS; i++) a(i) = scale_inv * in[i];
+          for (int i = 0; i < 2*N_COLORS*N_COLORS; i++) a(i) = scale_inv * in[i];
           const complex det = getDeterminant(a);
-          real phase = arg(det) / N_COLORS;
-          return phase;
+          return phase = arg(det) / N_COLORS;
 #endif
         }
-
-        // Rescale the U3 input matrix by exp(-I*phase) to obtain an SU3 matrix multiplied by a real scale factor,
+	
+	// Rescale the U3 input matrix by exp(-I*phase) to obtain an SU3 matrix multiplied by a real scale factor,
         __device__ __host__ inline void Pack(real out[N_COLORS*N_COLORS-1], const complex in[N_COLORS*N_COLORS]) const
         {
           real phase = getPhase(in);
