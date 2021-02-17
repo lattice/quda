@@ -187,6 +187,7 @@ namespace quda {
           // 8 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
           // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
         case 2: GaugeFixHit_NoAtomicAdd_LessSM<real, Arg::gauge_dir, 3>(link, arg.relax_boost, mu); break;
+        default: break;
         }
 
         arg.u(dim, idx, parity) = link;
@@ -213,6 +214,7 @@ namespace quda {
           // 4 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
           // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
         case 5: GaugeFixHit_NoAtomicAdd_LessSM<real, Arg::gauge_dir, 3>(link, link1, arg.relax_boost, mu); break;
+        default: break;
         }
 
         arg.u(mu, idx, parity) = link;
