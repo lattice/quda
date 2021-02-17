@@ -4,6 +4,7 @@
 // this removes ghost accessor reducing the parameter space needed
 #define DISABLE_GHOST true // do not rename this (it is both a template parameter and a macro)
 
+#include <math_helper.cuh>
 #include <color_spinor_field_order.h>
 #include <block_reduction_kernel.h>
 
@@ -217,7 +218,7 @@ namespace quda {
             }
 
             nrm = norm_reducer.AllSum(nrm);
-            auto nrm_inv = nrm > 0.0 ? rsqrt(nrm) : 0.0;
+            auto nrm_inv = nrm > 0.0 ? quda::rsqrt(nrm) : 0.0;
 
 #pragma unroll
             for (int tx = 0; tx < n_sites_per_thread; tx++) {

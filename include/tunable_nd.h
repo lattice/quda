@@ -193,6 +193,7 @@ namespace quda {
 #else
       TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Kernel2D), tp, stream, arg, param);
 #endif
+      TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Kernel2D), tp, stream, arg, param);
     }
 
     template <template <typename> class Functor, typename Arg>

@@ -90,7 +90,7 @@ namespace quda {
         asq += elems[threadIdx.x + blockSize * 3] * elems[threadIdx.x + blockSize * 3];
         Float a0sq = elems[threadIdx.x] * elems[threadIdx.x];
         Float x = (relax_boost * a0sq + asq) / (a0sq + asq);
-        Float r = rsqrt((a0sq + x * x * asq));
+        Float r = quda::rsqrt((a0sq + x * x * asq));
         elems[threadIdx.x] *= r;
         elems[threadIdx.x + blockSize] *= x * r;
         elems[threadIdx.x + blockSize * 2] *= x * r;
@@ -191,7 +191,7 @@ namespace quda {
         Float asq =  a1 * a1 + a2 * a2 + a3 * a3;
         Float a0sq = a0 * a0;
         Float x = (relax_boost * a0sq + asq) / (a0sq + asq);
-        Float r = rsqrt((a0sq + x * x * asq));
+        Float r = quda::rsqrt((a0sq + x * x * asq));
         elems[threadIdx.x] = a0 * r;
         elems[threadIdx.x + blockSize] = a1 * x * r;
         elems[threadIdx.x + blockSize * 2] = a2 * x * r;
@@ -316,7 +316,7 @@ namespace quda {
         asq += elems[tid + blockSize * 3] * elems[tid + blockSize * 3];
         Float a0sq = elems[tid] * elems[tid];
         Float x = (relax_boost * a0sq + asq) / (a0sq + asq);
-        Float r = rsqrt((a0sq + x * x * asq));
+        Float r = quda::rsqrt((a0sq + x * x * asq));
         elems[tid] *= r;
         elems[tid + blockSize] *= x * r;
         elems[tid + blockSize * 2] *= x * r;
@@ -397,7 +397,7 @@ namespace quda {
         asq += elems[threadIdx.x + blockSize * 3] * elems[threadIdx.x + blockSize * 3];
         Float a0sq = elems[threadIdx.x] * elems[threadIdx.x];
         Float x = (relax_boost * a0sq + asq) / (a0sq + asq);
-        Float r = rsqrt((a0sq + x * x * asq));
+        Float r = quda::rsqrt((a0sq + x * x * asq));
         elems[threadIdx.x] *= r;
         elems[threadIdx.x + blockSize] *= x * r;
         elems[threadIdx.x + blockSize * 2] *= x * r;
@@ -476,7 +476,7 @@ namespace quda {
         Float asq =  a1 * a1 + a2 * a2 + a3 * a3;
         Float a0sq = a0 * a0;
         Float x = (relax_boost * a0sq + asq) / (a0sq + asq);
-        Float r = rsqrt((a0sq + x * x * asq));
+        Float r = quda::rsqrt((a0sq + x * x * asq));
         elems[threadIdx.x] = a0 * r;
         elems[threadIdx.x + blockSize] = a1 * x * r;
         elems[threadIdx.x + blockSize * 2] = a2 * x * r;
@@ -565,7 +565,7 @@ namespace quda {
         asq += elems[tid + blockSize * 3] * elems[tid + blockSize * 3];
         Float a0sq = elems[tid] * elems[tid];
         Float x = (relax_boost * a0sq + asq) / (a0sq + asq);
-        Float r = rsqrt((a0sq + x * x * asq));
+        Float r = quda::rsqrt((a0sq + x * x * asq));
         elems[tid] *= r;
         elems[tid + blockSize] *= x * r;
         elems[tid + blockSize * 2] *= x * r;

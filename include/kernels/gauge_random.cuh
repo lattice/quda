@@ -52,17 +52,16 @@ namespace quda {
     for (int i = 0; i < 4; ++i) {
       phi[i] = 2.0 * M_PI * rand1[i];
       radius[i] = sqrt(-log(rand2[i]));
-      // sincos(phi[i], &temp2[i], &temp1[i]);
-      temp2[i] = sin(phi[i]);
-      temp1[i] = cos(phi[i]);
+      quda::sincos(phi[i], &temp2[i], &temp1[i]);
       temp1[i] *= radius[i];
       temp2[i] *= radius[i];
     }
 
     // construct Anti-Hermitian matrix
-    ret(0, 0) = complex<real>(0.0, temp1[2] + sqrt(1.0/3.0) * temp2[3]);
-    ret(1, 1) = complex<real>(0.0, -temp1[2] + sqrt(1.0/3.0) * temp2[3]);
-    ret(2, 2) = complex<real>(0.0, -2.0 * sqrt(1.0/3.0) * temp2[3]);
+    const real rsqrt_3 = quda::rsqrt(3.0);
+    ret(0, 0) = complex<real>(0.0, temp1[2] + rsqrt_3 * temp2[3]);
+    ret(1, 1) = complex<real>(0.0, -temp1[2] + rsqrt_3 * temp2[3]);
+    ret(2, 2) = complex<real>(0.0, -2.0 * rsqrt_3 * temp2[3]);
     ret(0, 1) = complex<real>(temp1[0], temp1[1]);
     ret(1, 0) = complex<real>(-temp1[0], temp1[1]);
     ret(0, 2) = complex<real>(temp1[3], temp2[0]);
