@@ -14,14 +14,13 @@ namespace quda {
    * @param[out] q, column index pointing to the SU(N) matrix
   */
   template<int NCOLORS>
-  static __host__ __device__ inline void IndexBlock(int block, int &p, int &q)
+  __host__ __device__ inline void IndexBlock(int block, int &p, int &q)
   {
     if ( NCOLORS == 3 ) {
       if ( block == 0 ) { p = 0; q = 1; }
       else if ( block == 1 ) { p = 1; q = 2; }
       else{ p = 0; q = 2; }
-    }
-    else{
+    } else {
       int i1;
       int found = 0;
       int del_i = 0;
@@ -43,19 +42,21 @@ namespace quda {
 
   /**
    * Device function to perform gauge fixing with overrelxation.
-   * Uses 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
+   * Uses 8 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
    * This implementation needs 8x more shared memory than the implementation using atomicadd 
    */
-  template<int blockSize, typename Float, int gauge_dir, int NCOLORS>
-  __forceinline__ __device__ void GaugeFixHit_AtomicAdd(Matrix<complex<Float>,NCOLORS> &link, const Float relax_boost, const int tid)
+  template <typename Float, int gauge_dir, int NCOLORS>
+  inline __device__ void GaugeFixHit_AtomicAdd(Matrix<complex<Float>,NCOLORS> &link, const Float relax_boost, int mu)
   {
-    QUDA_RT_CONSTS;
+    auto blockSize = device::block_dim().x;
+    auto tid = device::thread_idx().x;
+
     //Container for the four real parameters of SU(2) subgroup in shared memory
     SharedMemoryCache<Float> cache;
     auto elems = cache.data();
 
     //initialize shared memory
-    if ( threadIdx.x < blockSize * 4 ) elems[threadIdx.x] = 0.0;
+    if (mu < 4) elems[mu * blockSize + tid] = 0.0;
     cache.sync();
 
     //Loop over all SU(2) subroups of SU(N)
@@ -65,11 +66,11 @@ namespace quda {
       //Get the two indices for the SU(N) matrix
       IndexBlock<NCOLORS>(block, p, q);
       Float asq = 1.0;
-      if ( threadIdx.x < blockSize * 4 ) asq = -1.0;
+      if (mu < 4) asq = -1.0;
       //FOR COULOMB AND LANDAU!!!!!!!!
       //if(nu0<gauge_dir){
       //In terms of thread index
-      if ( threadIdx.x < blockSize * gauge_dir || (threadIdx.x >= blockSize * 4 && threadIdx.x < blockSize * (gauge_dir + 4))) {
+      if (mu < gauge_dir || (mu >= 4 && mu < (gauge_dir + 4))) {
         //Retrieve the four SU(2) parameters...
         // a0
         atomicAdd(elems + tid, (link(p,p)).x + (link(q,q)).x); //a0
@@ -83,24 +84,24 @@ namespace quda {
 
       cache.sync();
 
-      if ( threadIdx.x < blockSize ) {
+      if (mu==0) {
         //Over-relaxation boost
-        asq =  elems[threadIdx.x + blockSize] * elems[threadIdx.x + blockSize];
-        asq += elems[threadIdx.x + blockSize * 2] * elems[threadIdx.x + blockSize * 2];
-        asq += elems[threadIdx.x + blockSize * 3] * elems[threadIdx.x + blockSize * 3];
-        Float a0sq = elems[threadIdx.x] * elems[threadIdx.x];
+        asq =  elems[tid + blockSize] * elems[tid + blockSize];
+        asq += elems[tid + blockSize * 2] * elems[tid + blockSize * 2];
+        asq += elems[tid + blockSize * 3] * elems[tid + blockSize * 3];
+        Float a0sq = elems[tid] * elems[tid];
         Float x = (relax_boost * a0sq + asq) / (a0sq + asq);
         Float r = quda::rsqrt((a0sq + x * x * asq));
-        elems[threadIdx.x] *= r;
-        elems[threadIdx.x + blockSize] *= x * r;
-        elems[threadIdx.x + blockSize * 2] *= x * r;
-        elems[threadIdx.x + blockSize * 3] *= x * r;
+        elems[tid + blockSize * 0] *= r;
+        elems[tid + blockSize * 1] *= x * r;
+        elems[tid + blockSize * 2] *= x * r;
+        elems[tid + blockSize * 3] *= x * r;
       } //FLOP per lattice site = 22CUB: "Collective" Software Primitives for CUDA Kernel Development
 
       cache.sync();
 
       //_____________
-      if ( threadIdx.x < blockSize * 4 ) {
+      if (mu < 4) {
         complex<Float> m0;
         //Do SU(2) hit on all upward links
         //left multiply an su3_matrix by an su2 matrix
@@ -125,10 +126,10 @@ namespace quda {
         }
       }
       //_____________ //FLOP per lattice site = 8 * NCOLORS * 2 * (2*6+2) = NCOLORS * 224
-      if ( block < (NCOLORS * (NCOLORS - 1) / 2) - 1 ) {
+      if (block < (NCOLORS * (NCOLORS - 1) / 2) - 1) {
         cache.sync();
         //reset shared memory SU(2) elements
-        if ( threadIdx.x < blockSize * 4 ) elems[threadIdx.x] = 0.0;
+        if (mu < 4) elems[mu * blockSize + tid] = 0.0;
         cache.sync();
       }
     } //FLOP per lattice site = (block < NCOLORS * ( NCOLORS - 1) / 2) * (22 + 28 gauge_dir + 224 NCOLORS)
@@ -137,12 +138,14 @@ namespace quda {
 
   /**
    * Device function to perform gauge fixing with overrelxation.
-   * Uses 4 treads per lattice site, the reduction is performed by shared memory using atomicadd.
+   * Uses 4 threads per lattice site, the reduction is performed by shared memory using atomicadd.
    */
-  template<int blockSize, typename Float, int gauge_dir, int NCOLORS>
-  __forceinline__ __device__ void GaugeFixHit_NoAtomicAdd(Matrix<complex<Float>,NCOLORS> &link, const Float relax_boost, const int tid)
+  template <typename Float, int gauge_dir, int NCOLORS>
+  inline __device__ void GaugeFixHit_NoAtomicAdd(Matrix<complex<Float>,NCOLORS> &link, const Float relax_boost, int mu)
   {
-    QUDA_RT_CONSTS;
+    auto blockSize = device::block_dim().x;
+    auto tid = device::thread_idx().x;
+
     //Container for the four real parameters of SU(2) subgroup in shared memory
     SharedMemoryCache<Float> cache;
     auto elems = cache.data();
@@ -153,35 +156,27 @@ namespace quda {
       int p, q;
       //Get the two indices for the SU(N) matrix
       IndexBlock<NCOLORS>(block, p, q);
-      /*Float asq = 1.0;
-         if(threadIdx.x < blockSize * 4) asq = -1.0;
-         if(threadIdx.x < blockSize * gauge_dir || (threadIdx.x >= blockSize * 4 && threadIdx.x < blockSize * (gauge_dir + 4))){
-         elems[threadIdx.x] = link(p,p).x + link(q,q).x;
-         elems[threadIdx.x + blockSize * 8] = (link(p,q).y + link(q,p).y) * asq;
-         elems[threadIdx.x + blockSize * 8 * 2] = (link(p,q).x - link(q,p).x) * asq;
-         elems[threadIdx.x + blockSize * 8 * 3] = (link(p,p).y - link(q,q).y) * asq;
-         }*/
       //FLOP per lattice site = gauge_dir * 2 * 7 = gauge_dir * 14
-      if ( threadIdx.x < blockSize * gauge_dir ) {
-        elems[threadIdx.x] = link(p,p).x + link(q,q).x;
-        elems[threadIdx.x + blockSize * 8] = -(link(p,q).y + link(q,p).y);
-        elems[threadIdx.x + blockSize * 8 * 2] = -(link(p,q).x - link(q,p).x);
-        elems[threadIdx.x + blockSize * 8 * 3] = -(link(p,p).y - link(q,q).y);
+      if (mu < gauge_dir) {
+        elems[mu * blockSize + tid] = link(p,p).x + link(q,q).x;
+        elems[mu * blockSize + tid + blockSize * 8] = -(link(p,q).y + link(q,p).y);
+        elems[mu * blockSize + tid + blockSize * 8 * 2] = -(link(p,q).x - link(q,p).x);
+        elems[mu * blockSize + tid + blockSize * 8 * 3] = -(link(p,p).y - link(q,q).y);
       }
-      if ((threadIdx.x >= blockSize * 4 && threadIdx.x < blockSize * (gauge_dir + 4))) {
-        elems[threadIdx.x] = link(p,p).x + link(q,q).x;
-        elems[threadIdx.x + blockSize * 8] = (link(p,q).y + link(q,p).y);
-        elems[threadIdx.x + blockSize * 8 * 2] = (link(p,q).x - link(q,p).x);
-        elems[threadIdx.x + blockSize * 8 * 3] = (link(p,p).y - link(q,q).y);
+      if ((mu >= 4 && mu < (gauge_dir + 4))) {
+        elems[mu * blockSize + tid] = link(p,p).x + link(q,q).x;
+        elems[mu * blockSize + tid + blockSize * 8] = (link(p,q).y + link(q,p).y);
+        elems[mu * blockSize + tid + blockSize * 8 * 2] = (link(p,q).x - link(q,p).x);
+        elems[mu * blockSize + tid + blockSize * 8 * 3] = (link(p,p).y - link(q,q).y);
       }
       //FLOP per lattice site = gauge_dir * 2 * 7 = gauge_dir * 14
       cache.sync();
 
-      if ( threadIdx.x < blockSize ) {
+      if (mu == 0) {
         Float a0, a1, a2, a3;
         a0 = 0.0; a1 = 0.0; a2 = 0.0; a3 = 0.0;
       #pragma unroll
-        for ( int i = 0; i < gauge_dir; i++ ) {
+        for (int i = 0; i < gauge_dir; i++) {
           a0 += elems[tid + i * blockSize] + elems[tid + (i + 4) * blockSize];
           a1 += elems[tid + i * blockSize + blockSize * 8] + elems[tid + (i + 4) * blockSize + blockSize * 8];
           a2 += elems[tid + i * blockSize + blockSize * 8 * 2] + elems[tid + (i + 4) * blockSize + blockSize * 8 * 2];
@@ -192,14 +187,14 @@ namespace quda {
         Float a0sq = a0 * a0;
         Float x = (relax_boost * a0sq + asq) / (a0sq + asq);
         Float r = quda::rsqrt((a0sq + x * x * asq));
-        elems[threadIdx.x] = a0 * r;
-        elems[threadIdx.x + blockSize] = a1 * x * r;
-        elems[threadIdx.x + blockSize * 2] = a2 * x * r;
-        elems[threadIdx.x + blockSize * 3] = a3 * x * r;
+        elems[tid] = a0 * r;
+        elems[tid + blockSize] = a1 * x * r;
+        elems[tid + blockSize * 2] = a2 * x * r;
+        elems[tid + blockSize * 3] = a3 * x * r;
       } //FLOP per lattice site = 22 + 8 * 4
       cache.sync();
       //_____________
-      if ( threadIdx.x < blockSize * 4 ) {
+      if (mu < 4) {
         complex<Float> m0;
         //Do SU(2) hit on all upward links
         //left multiply an su3_matrix by an su2 matrix
@@ -210,8 +205,7 @@ namespace quda {
           link(p,j) = complex<Float>( elems[tid], elems[tid + blockSize * 3] ) * m0 + complex<Float>( elems[tid + blockSize * 2], elems[tid + blockSize] ) * link(q,j);
           link(q,j) = complex<Float>(-elems[tid + blockSize * 2], elems[tid + blockSize]) * m0 + complex<Float>( elems[tid],-elems[tid + blockSize * 3] ) * link(q,j);
         }
-      }
-      else{
+      } else {
         complex<Float> m0;
         //Do SU(2) hit on all downward links
         //right multiply an su3_matrix by an su2 matrix
@@ -234,10 +228,12 @@ namespace quda {
    * Uses 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
    * This implementation uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
    */
-  template<int blockSize, typename Float, int gauge_dir, int NCOLORS>
-  __forceinline__ __device__ void GaugeFixHit_NoAtomicAdd_LessSM(Matrix<complex<Float>,NCOLORS> &link, const Float relax_boost, const int tid)
+  template <typename Float, int gauge_dir, int NCOLORS>
+  inline __device__ void GaugeFixHit_NoAtomicAdd_LessSM(Matrix<complex<Float>,NCOLORS> &link, const Float relax_boost, int mu)
   {
-    QUDA_RT_CONSTS;
+    auto blockSize = device::block_dim().x;
+    auto tid = device::thread_idx().x;
+
     //Container for the four real parameters of SU(2) subgroup in shared memory
     SharedMemoryCache<Float> cache;
     auto elems = cache.data();
@@ -249,21 +245,21 @@ namespace quda {
       //Get the two indices for the SU(N) matrix
       IndexBlock<NCOLORS>(block, p, q);
 
-      if ( threadIdx.x < blockSize ) {
+      if (mu == 0) {
         elems[tid] = link(p,p).x + link(q,q).x;
         elems[tid + blockSize] = -(link(p,q).y + link(q,p).y);
         elems[tid + blockSize * 2] = -(link(p,q).x - link(q,p).x);
         elems[tid + blockSize * 3] = -(link(p,p).y - link(q,q).y);
       }
       cache.sync();
-      if ( threadIdx.x < blockSize * 2 && threadIdx.x >= blockSize ) {
+      if (mu == 1) {
         elems[tid] += link(p,p).x + link(q,q).x;
         elems[tid + blockSize] -= (link(p,q).y + link(q,p).y);
         elems[tid + blockSize * 2] -= (link(p,q).x - link(q,p).x);
         elems[tid + blockSize * 3] -= (link(p,p).y - link(q,q).y);
       }
       cache.sync();
-      if ( threadIdx.x < blockSize * 3 && threadIdx.x >= blockSize * 2 ) {
+      if (mu == 2) {
         elems[tid] += link(p,p).x + link(q,q).x;
         elems[tid + blockSize] -= (link(p,q).y + link(q,p).y);
         elems[tid + blockSize * 2] -= (link(p,q).x - link(q,p).x);
@@ -271,7 +267,7 @@ namespace quda {
       }
       if ( gauge_dir == 4 ) {
         cache.sync();
-        if ( threadIdx.x < blockSize * 4 && threadIdx.x >= blockSize * 3 ) {
+        if (mu == 3) {
           elems[tid] += link(p,p).x + link(q,q).x;
           elems[tid + blockSize] -= (link(p,q).y + link(q,p).y);
           elems[tid + blockSize * 2] -= (link(p,q).x - link(q,p).x);
@@ -279,21 +275,21 @@ namespace quda {
         }
       }
       cache.sync();
-      if ( threadIdx.x < blockSize * 5 && threadIdx.x >= blockSize * 4 ) {
+      if (mu == 4) {
         elems[tid] += link(p,p).x + link(q,q).x;
         elems[tid + blockSize] += (link(p,q).y + link(q,p).y);
         elems[tid + blockSize * 2] += (link(p,q).x - link(q,p).x);
         elems[tid + blockSize * 3] += (link(p,p).y - link(q,q).y);
       }
       cache.sync();
-      if ( threadIdx.x < blockSize * 6 && threadIdx.x >= blockSize * 5 ) {
+      if (mu == 5) {
         elems[tid] += link(p,p).x + link(q,q).x;
         elems[tid + blockSize] += (link(p,q).y + link(q,p).y);
         elems[tid + blockSize * 2] += (link(p,q).x - link(q,p).x);
         elems[tid + blockSize * 3] += (link(p,p).y - link(q,q).y);
       }
       cache.sync();
-      if ( threadIdx.x < blockSize * 7 && threadIdx.x >= blockSize * 6 ) {
+      if (mu == 6) {
         elems[tid] += link(p,p).x + link(q,q).x;
         elems[tid + blockSize] += (link(p,q).y + link(q,p).y);
         elems[tid + blockSize * 2] += (link(p,q).x - link(q,p).x);
@@ -301,7 +297,7 @@ namespace quda {
       }
       if ( gauge_dir == 4 ) {
         cache.sync();
-        if ( threadIdx.x < blockSize * 8 && threadIdx.x >= blockSize * 7 ) {
+        if (mu == 7) {
           elems[tid] += link(p,p).x + link(q,q).x;
           elems[tid + blockSize] += (link(p,q).y + link(q,p).y);
           elems[tid + blockSize * 2] += (link(p,q).x - link(q,p).x);
@@ -310,7 +306,7 @@ namespace quda {
       }
       //FLOP per lattice site = gauge_dir * 2 * 7 = gauge_dir * 14
       cache.sync();
-      if ( threadIdx.x < blockSize ) {
+      if (mu == 0) {
         Float asq =  elems[tid + blockSize] * elems[tid + blockSize];
         asq += elems[tid + blockSize * 2] * elems[tid + blockSize * 2];
         asq += elems[tid + blockSize * 3] * elems[tid + blockSize * 3];
@@ -324,7 +320,7 @@ namespace quda {
       } //FLOP per lattice site = 22 + 8 * 4
       cache.sync();
       //_____________
-      if ( threadIdx.x < blockSize * 4 ) {
+      if (mu < 4) {
         complex<Float> m0;
         //Do SU(2) hit on all upward links
         //left multiply an su3_matrix by an su2 matrix
@@ -356,20 +352,22 @@ namespace quda {
 
   /**
    * Device function to perform gauge fixing with overrelxation.
-   * Uses 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
+   * Uses 8 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
    * This implementation needs 8x more shared memory than the implementation using atomicadd 
    */
-  template<int blockSize, typename Float, int gauge_dir, int NCOLORS>
-  __forceinline__ __device__ void GaugeFixHit_AtomicAdd(Matrix<complex<Float>,NCOLORS> &link, Matrix<complex<Float>,NCOLORS> &link1,
-							const Float relax_boost, const int tid)
+  template <typename Float, int gauge_dir, int NCOLORS>
+  inline __device__ void GaugeFixHit_AtomicAdd(Matrix<complex<Float>,NCOLORS> &link, Matrix<complex<Float>,NCOLORS> &link1,
+							const Float relax_boost, int mu)
   {
-    QUDA_RT_CONSTS;
+    auto blockSize = device::block_dim().x;
+    auto tid = device::thread_idx().x;
+
     //Container for the four real parameters of SU(2) subgroup in shared memory
     SharedMemoryCache<Float> cache;
     auto elems = cache.data();
 
     //initialize shared memory
-    if ( threadIdx.x < blockSize * 4 ) elems[threadIdx.x] = 0.0;
+    if (mu < 4) elems[mu * blockSize + tid] = 0.0;
     cache.sync();
 
     //Loop over all SU(2) subroups of SU(N)
@@ -378,7 +376,7 @@ namespace quda {
       int p, q;
       //Get the two indices for the SU(N) matrix
       IndexBlock<NCOLORS>(block, p, q);
-      if ( threadIdx.x < blockSize * gauge_dir ) {
+      if (mu < gauge_dir) {
         //Retrieve the four SU(2) parameters...
         // a0
         atomicAdd(elems + tid, (link1(p,p)).x + (link1(q,q)).x + (link(p,p)).x + (link(q,q)).x); //a0
@@ -390,18 +388,18 @@ namespace quda {
         atomicAdd(elems + tid + blockSize * 3, (link1(p,p).y - link1(q,q).y) - (link(p,p).y - link(q,q).y)); //a3
       }
       cache.sync();
-      if ( threadIdx.x < blockSize ) {
+      if (mu == 0) {
         //Over-relaxation boost
-        Float asq =  elems[threadIdx.x + blockSize] * elems[threadIdx.x + blockSize];
-        asq += elems[threadIdx.x + blockSize * 2] * elems[threadIdx.x + blockSize * 2];
-        asq += elems[threadIdx.x + blockSize * 3] * elems[threadIdx.x + blockSize * 3];
-        Float a0sq = elems[threadIdx.x] * elems[threadIdx.x];
+        Float asq =  elems[tid + blockSize] * elems[tid + blockSize];
+        asq += elems[tid + blockSize * 2] * elems[tid + blockSize * 2];
+        asq += elems[tid + blockSize * 3] * elems[tid + blockSize * 3];
+        Float a0sq = elems[tid] * elems[tid];
         Float x = (relax_boost * a0sq + asq) / (a0sq + asq);
         Float r = quda::rsqrt((a0sq + x * x * asq));
-        elems[threadIdx.x] *= r;
-        elems[threadIdx.x + blockSize] *= x * r;
-        elems[threadIdx.x + blockSize * 2] *= x * r;
-        elems[threadIdx.x + blockSize * 3] *= x * r;
+        elems[tid] *= r;
+        elems[tid + blockSize] *= x * r;
+        elems[tid + blockSize * 2] *= x * r;
+        elems[tid + blockSize * 3] *= x * r;
       } //FLOP per lattice site = 22CUB: "Collective" Software Primitives for CUDA Kernel Development
       cache.sync();
       complex<Float> m0;
@@ -409,7 +407,7 @@ namespace quda {
       //left multiply an su3_matrix by an su2 matrix
       //link <- u * link
       //#pragma unroll
-      for ( int j = 0; j < NCOLORS; j++ ) {
+      for (int j = 0; j < NCOLORS; j++) {
         m0 = link(p,j);
         link(p,j) = complex<Float>( elems[tid], elems[tid + blockSize * 3] ) * m0 +
 	  complex<Float>( elems[tid + blockSize * 2], elems[tid + blockSize] ) * link(q,j);
@@ -430,7 +428,7 @@ namespace quda {
       if ( block < (NCOLORS * (NCOLORS - 1) / 2) - 1 ) {
         cache.sync();
         //reset shared memory SU(2) elements
-        if ( threadIdx.x < blockSize * 4 ) elems[threadIdx.x] = 0.0;
+        if (mu < 4) elems[mu * blockSize + tid] = 0.0;
         cache.sync();
       }
     }
@@ -438,31 +436,33 @@ namespace quda {
 
   /**
    * Device function to perform gauge fixing with overrelxation.
-   * Uses 4 treads per lattice site, the reduction is performed by shared memory using atomicadd.
+   * Uses 4 threads per lattice site, the reduction is performed by shared memory using atomicadd.
    */
-  template<int blockSize, typename Float, int gauge_dir, int NCOLORS>
-  __forceinline__ __device__ void GaugeFixHit_NoAtomicAdd(Matrix<complex<Float>,NCOLORS> &link, Matrix<complex<Float>,NCOLORS> &link1,
-							  const Float relax_boost, const int tid)
+  template <typename Float, int gauge_dir, int NCOLORS>
+  inline __device__ void GaugeFixHit_NoAtomicAdd(Matrix<complex<Float>,NCOLORS> &link, Matrix<complex<Float>,NCOLORS> &link1,
+                                                 const Float relax_boost, int mu)
   {
-    QUDA_RT_CONSTS;
+    auto blockSize = device::block_dim().x;
+    auto tid = device::thread_idx().x;
+
     //Container for the four real parameters of SU(2) subgroup in shared memory
     SharedMemoryCache<Float> cache;
     auto elems = cache.data();
 
     //Loop over all SU(2) subroups of SU(N)
     //#pragma unroll
-    for ( int block = 0; block < (NCOLORS * (NCOLORS - 1) / 2); block++ ) {
+    for (int block = 0; block < (NCOLORS * (NCOLORS - 1) / 2); block++) {
       int p, q;
       //Get the two indices for the SU(N) matrix
       IndexBlock<NCOLORS>(block, p, q);
-      if ( threadIdx.x < blockSize * gauge_dir ) {
-        elems[threadIdx.x] = link1(p,p).x + link1(q,q).x + link(p,p).x + link(q,q).x;
-        elems[threadIdx.x + blockSize * 4] = (link1(p,q).y + link1(q,p).y) - (link(p,q).y + link(q,p).y);
-        elems[threadIdx.x + blockSize * 4 * 2] = (link1(p,q).x - link1(q,p).x) - (link(p,q).x - link(q,p).x);
-        elems[threadIdx.x + blockSize * 4 * 3] = (link1(p,p).y - link1(q,q).y) - (link(p,p).y - link(q,q).y);
+      if (mu < gauge_dir) {
+        elems[mu * blockSize + tid] = link1(p,p).x + link1(q,q).x + link(p,p).x + link(q,q).x;
+        elems[mu * blockSize + tid + blockSize * 4] = (link1(p,q).y + link1(q,p).y) - (link(p,q).y + link(q,p).y);
+        elems[mu * blockSize + tid + blockSize * 4 * 2] = (link1(p,q).x - link1(q,p).x) - (link(p,q).x - link(q,p).x);
+        elems[mu * blockSize + tid + blockSize * 4 * 3] = (link1(p,p).y - link1(q,q).y) - (link(p,p).y - link(q,q).y);
       }
       cache.sync();
-      if ( threadIdx.x < blockSize ) {
+      if (mu == 0) {
         Float a0, a1, a2, a3;
         a0 = 0.0; a1 = 0.0; a2 = 0.0; a3 = 0.0;
       #pragma unroll
@@ -477,10 +477,10 @@ namespace quda {
         Float a0sq = a0 * a0;
         Float x = (relax_boost * a0sq + asq) / (a0sq + asq);
         Float r = quda::rsqrt((a0sq + x * x * asq));
-        elems[threadIdx.x] = a0 * r;
-        elems[threadIdx.x + blockSize] = a1 * x * r;
-        elems[threadIdx.x + blockSize * 2] = a2 * x * r;
-        elems[threadIdx.x + blockSize * 3] = a3 * x * r;
+        elems[tid] = a0 * r;
+        elems[tid + blockSize] = a1 * x * r;
+        elems[tid + blockSize * 2] = a2 * x * r;
+        elems[tid + blockSize * 3] = a3 * x * r;
       } //FLOP per lattice site = 22 + 8 * 4
       cache.sync();
       complex<Float> m0;
@@ -512,13 +512,15 @@ namespace quda {
 
   /**
    * Device function to perform gauge fixing with overrelxation.
-   * Uses 4 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
+   * Uses 4 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
    * This implementation uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
    */
-  template<int blockSize, typename Float, int gauge_dir, int NCOLORS>
-  __forceinline__ __device__ void GaugeFixHit_NoAtomicAdd_LessSM(Matrix<complex<Float>,NCOLORS> &link, Matrix<complex<Float>,NCOLORS> &link1, const Float relax_boost, const int tid)
+  template <typename Float, int gauge_dir, int NCOLORS>
+  inline __device__ void GaugeFixHit_NoAtomicAdd_LessSM(Matrix<complex<Float>,NCOLORS> &link, Matrix<complex<Float>,NCOLORS> &link1, const Float relax_boost, int mu)
   {
-    QUDA_RT_CONSTS;
+    auto blockSize = device::block_dim().x;
+    auto tid = device::thread_idx().x;
+
     //Container for the four real parameters of SU(2) subgroup in shared memory
     SharedMemoryCache<Float> cache;
     auto elems = cache.data();
@@ -529,21 +531,21 @@ namespace quda {
       int p, q;
       //Get the two indices for the SU(N) matrix
       IndexBlock<NCOLORS>(block, p, q);
-      if ( threadIdx.x < blockSize ) {
+      if (mu == 0) {
         elems[tid] = link1(p,p).x + link1(q,q).x + link(p,p).x + link(q,q).x;
         elems[tid + blockSize] = (link1(p,q).y + link1(q,p).y) - (link(p,q).y + link(q,p).y);
         elems[tid + blockSize * 2] = (link1(p,q).x - link1(q,p).x) - (link(p,q).x - link(q,p).x);
         elems[tid + blockSize * 3] = (link1(p,p).y - link1(q,q).y) - (link(p,p).y - link(q,q).y);
       }
       cache.sync();
-      if ( threadIdx.x < blockSize * 2 && threadIdx.x >= blockSize ) {
+      if (mu == 1) {
         elems[tid] += link1(p,p).x + link1(q,q).x + link(p,p).x + link(q,q).x;
         elems[tid + blockSize] += (link1(p,q).y + link1(q,p).y) - (link(p,q).y + link(q,p).y);
         elems[tid + blockSize * 2] += (link1(p,q).x - link1(q,p).x) - (link(p,q).x - link(q,p).x);
         elems[tid + blockSize * 3] += (link1(p,p).y - link1(q,q).y) - (link(p,p).y - link(q,q).y);
       }
       cache.sync();
-      if ( threadIdx.x < blockSize * 3 && threadIdx.x >= blockSize * 2 ) {
+      if (mu == 2) {
         elems[tid] += link1(p,p).x + link1(q,q).x + link(p,p).x + link(q,q).x;
         elems[tid + blockSize] += (link1(p,q).y + link1(q,p).y) - (link(p,q).y + link(q,p).y);
         elems[tid + blockSize * 2] += (link1(p,q).x - link1(q,p).x) - (link(p,q).x - link(q,p).x);
@@ -551,7 +553,7 @@ namespace quda {
       }
       if ( gauge_dir == 4 ) {
         cache.sync();
-        if ( threadIdx.x < blockSize * 4 && threadIdx.x >= blockSize * 3 ) {
+        if (mu == 3) {
           elems[tid] += link1(p,p).x + link1(q,q).x + link(p,p).x + link(q,q).x;
           elems[tid + blockSize] += (link1(p,q).y + link1(q,p).y) - (link(p,q).y + link(q,p).y);
           elems[tid + blockSize * 2] += (link1(p,q).x - link1(q,p).x) - (link(p,q).x - link(q,p).x);
@@ -559,7 +561,7 @@ namespace quda {
         }
       }
       cache.sync();
-      if ( threadIdx.x < blockSize ) {
+      if (mu == 0) {
         Float asq =  elems[tid + blockSize] * elems[tid + blockSize];
         asq += elems[tid + blockSize * 2] * elems[tid + blockSize * 2];
         asq += elems[tid + blockSize * 3] * elems[tid + blockSize * 3];

@@ -87,24 +87,6 @@ namespace quda {
   constexpr int flipDir(int dir) { return (7-dir); }
   constexpr bool isForwards(int dir) { return (dir <= 3); }
 
-  template <typename T, int n>
-  struct thread_array {
-    SharedMemoryCache<vector_type<T, n>> device_array;
-    int offset;
-    vector_type<T, n> host_array;
-    vector_type<T, n> &array;
-
-    __device__ __host__ constexpr thread_array() :
-      offset((device::thread_idx().z * device::block_dim().y + device::thread_idx().y) * device::block_dim().x + device::thread_idx().x),
-      array(device::is_device() ? *(device_array.data() + offset) : host_array)
-    {
-      array = vector_type<T, n>(); // call default constructor
-    }
-
-    __device__ __host__ T& operator[](int i) { return array[i]; }
-    __device__ __host__ const T& operator[](int i) const { return array[i]; }
-  };
-
   template <typename Arg, int dir>
   __device__ __host__ inline void GaugeForceKernel(Arg &arg, int idx, int parity)
   {

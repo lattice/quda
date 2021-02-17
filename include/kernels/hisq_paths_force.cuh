@@ -152,14 +152,14 @@ namespace quda {
                  real coeff, int overlap, HisqForceType type)
         : BaseForceArg(link, overlap), outA(newOprod), outB(newOprod), pMu(P3), p3(P3), qMu(qPrev),
         oProd(oProd), qProd(oProd), qPrev(qPrev), coeff(coeff), accumu_coeff(0), p_mu(false), q_mu(false), q_prev(true)
-      { if (type != FORCE_LEPAGE_MIDDLE_LINK) errorQuda("This constructor is for FORCE_MIDDLE_LINK"); }
+      { if (type != FORCE_LEPAGE_MIDDLE_LINK) errorQuda("This constructor is for FORCE_LEPAGE_MIDDLE_LINK"); }
 
       FatLinkArg(GaugeField &newOprod, GaugeField &shortP, const GaugeField &P3,
                  const GaugeField &qProd, const GaugeField &link, real coeff, real accumu_coeff, int overlap, HisqForceType type)
         : BaseForceArg(link, overlap), outA(newOprod), outB(shortP), pMu(P3), p3(P3), qMu(qProd), oProd(qProd), qProd(qProd),
         qPrev(qProd), coeff(coeff), accumu_coeff(accumu_coeff),
         p_mu(false), q_mu(false), q_prev(false)
-      { if (type != FORCE_SIDE_LINK) errorQuda("This constructor is for FORCE_SIDE_LINK or FORCE_ALL_LINK"); }
+      { if (type != FORCE_SIDE_LINK) errorQuda("This constructor is for FORCE_SIDE_LINK"); }
 
       FatLinkArg(GaugeField &newOprod, GaugeField &P3, const GaugeField &link,
                  real coeff, int overlap, HisqForceType type)

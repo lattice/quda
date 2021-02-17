@@ -106,31 +106,34 @@ namespace quda {
 
   template <typename Float, int nColor, QudaReconstructType recon>
   class UpdateMom : TunableReduction2D<> {
-    UpdateMomArg<Float, nColor, recon> arg;
-    const GaugeField &meta;
+    const GaugeField &force;
+    GaugeField &mom;
+    double coeff;
     std::vector<double> force_max;
 
   public:
-    UpdateMom(GaugeField &force, GaugeField &mom, double coeff, const char *fname) :
+    UpdateMom(const GaugeField &force, GaugeField &mom, double coeff, const char *fname) :
       TunableReduction2D(mom),
-      arg(mom, coeff, force),
-      meta(force),
+      force(force),
+      mom(mom),
+      coeff(coeff),
       force_max(2)
     {
       apply(device::get_default_stream());
-      if (forceMonitor()) forceRecord(force_max, arg.coeff, fname);
+      if (forceMonitor()) forceRecord(force_max, coeff, fname);
     }
 
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      UpdateMomArg<Float, nColor, recon> arg(mom, coeff, force);
       launch<MomUpdate>(force_max, tp, stream, arg);
     }
 
-    void preTune() { arg.mom.save();}
-    void postTune() { arg.mom.load();}
-    long long flops() const { return 4*2*arg.threads.x*(36+42); }
-    long long bytes() const { return 4*2*arg.threads.x*(2*arg.mom.Bytes()+arg.force.Bytes()); }
+    void preTune() { mom.backup();}
+    void postTune() { mom.restore();}
+    long long flops() const { return 4 * mom.Volume() * (36+42); }
+    long long bytes() const { return 2 * mom.Bytes() + force.Bytes(); }
   };
 
 #ifdef GPU_GAUGE_TOOLS
