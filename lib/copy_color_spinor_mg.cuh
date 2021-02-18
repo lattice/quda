@@ -135,7 +135,7 @@ namespace quda {
     }
   }
 
-  template <int Nc, typename dstFloat, typename srcFloat>
+  template <int Nc, typename dst_t, typename src_t>
   void CopyGenericColorSpinor(const copy_pack_t &pack)
   {
     auto &dst = std::get<0>(pack);
@@ -144,19 +144,19 @@ namespace quda {
 
     if (dst.Nspin() == 4) {
 #if defined(NSPIN4)
-      copyGenericColorSpinor<4,Nc>(dst, src, pack);
+      copyGenericColorSpinor<4, Nc, dst_t, src_t>(dst, src, pack);
 #else
       errorQuda("%s has not been built for Nspin=%d fields", __func__, src.Nspin());
 #endif
     } else if (dst.Nspin() == 2) {
 #if defined(NSPIN2)
-      copyGenericColorSpinor<2,Nc>(dst, src, pack);
+      copyGenericColorSpinor<2, Nc, dst_t, src_t>(dst, src, pack);
 #else
       errorQuda("%s has not been built for Nspin=%d fields", __func__, src.Nspin());
 #endif
     } else if (dst.Nspin() == 1) {
 #if defined(NSPIN1)
-      copyGenericColorSpinor<1,Nc>(dst, src, pack);
+      copyGenericColorSpinor<1, Nc, dst_t, src_t>(dst, src, pack);
 #else
       errorQuda("%s has not been built for Nspin=%d fields", __func__, src.Nspin());
 #endif
