@@ -27,7 +27,7 @@ namespace quda
   constexpr int warp_size = 32;
 
   template <class OpA>
-    __device__ inline void mma(float op_c[], const OpA &op_a, float op_b) {
+    __device__ inline void mma(float op_c[], const OpA &op_a, float op_b, bool flip) {
 #pragma unroll
       for (int r = 0; r < 2; r++) {
         asm volatile("mma.sync.aligned.m16n8k4.row.col.f32.tf32.tf32.f32 {%0,%1,%2,%3}, {%4,%5}, {%6}, {%0,%1,%2,%3};"
@@ -39,7 +39,6 @@ namespace quda
               "r"(__float_as_uint(op_a(r * 2 + 1).real())),
               "r"(__float_as_uint(op_b)));
       }
-      if ((threadIdx.x / 4) % 2 == 1) { op_b = -op_b; }
 #pragma unroll
       for (int r = 0; r < 2; r++) {
         // Note the reverted order of real and imag for op_c
@@ -50,12 +49,12 @@ namespace quda
               "+f"(op_c[r * 4 + 2 + 0])
             : "r"(__float_as_uint(op_a(r * 2 + 0).imag())),
               "r"(__float_as_uint(op_a(r * 2 + 1).imag())),
-              "r"(__float_as_uint(op_b))); 
+              "r"(__float_as_uint(flip ? -op_b : op_b)));
       }
     }
 
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  __global__ void specialized_dslash_kernel(Arg arg)
+  __global__ void __launch_bounds__(64, 32) specialized_dslash_kernel(Arg arg)
   {
     static_assert(kernel_type == INTERIOR_KERNEL, "Currently only for interior kernel.");
 
@@ -86,9 +85,15 @@ namespace quda
 
     int color_m = warp_k;
     int color_n = warp_n / 2;
-    int comp = warp_n % 2;
+    int color_c = warp_n % 2;
+    bool flip = color_c % 2 == 1;
 
+#if 0
     int x_cb = blockIdx.x;
+#else
+    __shared__ int x_cb;
+    if (thread_idx == 0) { x_cb = blockIdx.x; }
+#endif
 
     constexpr int Ns = Arg::nSpin;
     constexpr int Nc = Arg::nColor;
@@ -99,20 +104,26 @@ namespace quda
 
     bool active;
     int thread_dim;
+#if 0
     auto coord = getCoords<QUDA_4D_PC, kernel_type>(arg, x_cb, s, parity, thread_dim);
+#else
+    __shared__ Coord<4> coord;
+    if (thread_idx == 1) { coord = getCoords<QUDA_4D_PC, kernel_type>(arg, x_cb, 0, parity, thread_dim); }
+    __syncthreads();
+#endif
 
 #pragma unroll
     for (int d = 0; d < 4; d++) { // loop over dimension - 4 and not nDim since this is used for DWF as well
       {                           // Forward gather - compute fwd offset for vector fetch
-        const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
-        const int gauge_idx = x_cb;
+        int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
+        int gauge_idx = x_cb;
         constexpr int proj_dir = dagger ? +1 : -1;
 
-        const bool ghost
+        bool ghost
           = (coord[d] + arg.nFace >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         bool load_link = (warp_k < Nc && warp_n < Nc * 2 && !ghost);
-        fixed_type op_b_fixed = load_link ? arg.U(gauge_idx, d, gauge_parity, color_n, color_m, comp) : 0; // color i, j, complex
+        fixed_type op_b_fixed = load_link ? arg.U(gauge_idx, d, gauge_parity, color_n, color_m, color_c) : 0; // color i, j, complex
         float op_b = i2f(op_b_fixed) * fixedInvMaxValue<fixed_type>::value;
 
         bool load_spinor = (s < Ls  && warp_k < Nc && !ghost);
@@ -123,19 +134,18 @@ namespace quda
 #endif
         Spinor projected_in = in.project(d, proj_dir).reconstruct(d, proj_dir);
 
-        mma(op_c, projected_in, op_b);
+        mma(op_c, projected_in, op_b, flip);
       }
 
       { // Backward gather - compute back offset for spinor and gauge fetch
-        const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
-        const int gauge_idx = back_idx;
+        int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
+        int gauge_idx = back_idx;
         constexpr int proj_dir = dagger ? -1 : +1;
 
-        const bool ghost = (coord[d] - arg.nFace < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        bool ghost = (coord[d] - arg.nFace < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         bool load_link = (warp_k < Nc && warp_n < Nc * 2 && !ghost);
-        fixed_type op_b_fixed = load_link ? arg.U(gauge_idx, d, 1 - gauge_parity, color_m, color_n, comp) : 0; // color i, j, complex
-        if (comp == 1) { op_b_fixed = -op_b_fixed; }
+        fixed_type op_b_fixed = load_link ? arg.U(gauge_idx, d, 1 - gauge_parity, color_m, color_n, color_c) : 0; // color i, j, complex
         float op_b = i2f(op_b_fixed) * fixedInvMaxValue<fixed_type>::value;
 
         bool load_spinor = (s < Ls  && warp_k < Nc && !ghost);
@@ -146,7 +156,7 @@ namespace quda
 #endif
         Spinor projected_in = in.project(d, proj_dir).reconstruct(d, proj_dir);
 
-        mma(op_c, projected_in, op_b);
+        mma(op_c, projected_in, flip ? -op_b : op_b, flip);
       }
     } // nDim
 
@@ -155,13 +165,13 @@ namespace quda
 #pragma unroll
     for (int c = 0; c < reg_length_c; c++) {
       unsigned x = __float_as_uint(fabs(op_c[c]));
-      if (max < x) { max = x; }
+      max = fmaxf(max, x);
     }
 
 #pragma unroll
     for (int offset = 2; offset > 0; offset /= 2) {
       unsigned fetch = __shfl_down_sync(0xffffffff, max, offset);
-      if (max < fetch) { max = fetch; }
+      max = fmaxf(max, fetch);
     }
     max = __shfl_sync(0xffffffff, max, (lane_id / 4) * 4);
 
@@ -203,7 +213,7 @@ namespace quda
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      tp.set_max_shared_bytes = true;
+      tp.set_max_shared_bytes = false;
 
       qudaLaunchKernel(specialized_dslash_kernel<nParity, dagger, xpay, kernel_type, Arg>, tp, stream, arg);
     }
@@ -212,7 +222,7 @@ namespace quda
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
     bool advanceTuneParam(TuneParam &param) const {
-      return Tunable::advanceSharedBytes(param);
+      return false;
     }
 
     virtual int blockStep() const { return 64; }

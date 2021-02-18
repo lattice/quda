@@ -1917,15 +1917,15 @@ namespace quda {
        */
       __device__ __host__ inline Float operator()(int x_cb, int dir, int parity, int m, int n, int real_imag) const
       {
+        Float *ptr = reinterpret_cast<Float *>(gauge);
+#if 0 // AoS
+        return ptr[parity * offset * N + dir * stride * reconLen + x_cb * reconLen + m * 6 + n * 2 + real_imag];
+#else // SoA
         constexpr int M = reconLen / N;
         int index = m * 6 + n * 2 + real_imag; // TODO: hard coded Nc, and this works for recon 18 only.
         int i = index / N;
         int j = index % N;
 
-        Float *ptr = reinterpret_cast<Float *>(gauge);
-#if 0 // AoS
-        return ptr[parity * offset * N + dir * stride * reconLen + x_cb * reconLen + m * 6 + n * 2 + real_imag];
-#else // SoA
         return ptr[(parity * offset + (dir * M + i) * stride + x_cb) * N + j];
 #endif
       }
