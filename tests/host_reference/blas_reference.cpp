@@ -13,8 +13,7 @@
 
 using namespace std;
 
-#include <Eigen/Dense>
-using namespace Eigen;
+#include <eigen_helper.h>
 
 void fillEigenArray(MatrixXcd &EigenArr, complex<double> *arr, int rows, int cols, int ld, int offset)
 {
