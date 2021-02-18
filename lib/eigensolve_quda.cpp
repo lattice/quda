@@ -402,11 +402,11 @@ namespace quda
     // Compute spectral radius estimate
     double result = blas::reDotProduct(*out_ptr, *in_ptr);
 
-    // Increase final result by 10% for safety
-    return result * 1.10;
-
     // Save Chebyshev Max tuning
     saveTuneCache();
+
+    // Increase final result by 10% for safety
+    return result * 1.10;
   }
 
   bool EigenSolver::orthoCheck(std::vector<ColorSpinorField *> vecs, int size)
