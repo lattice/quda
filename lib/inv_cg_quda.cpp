@@ -350,8 +350,10 @@ namespace quda {
     }
 
     // for detecting HQ residual stalls
-    // let |r2/b2| drop to epsilon tolerance * 1e-10, semi-arbitrarily
-    const double hq_res_stall_check = uhigh * uhigh * 1e-20;
+    // let |r2/b2| drop to epsilon tolerance * 1e-30, semi-arbitrarily, but
+    // with the intent of letting the solve grind as long as possible before
+    // triggering a `NaN`
+    const double hq_res_stall_check = uhigh * uhigh * 1e-60;
 
     // compute initial residual
     double r2 = 0.0;
