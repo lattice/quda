@@ -24,6 +24,9 @@ endif()
 
 set (QUDA_OBJS
   # cmake-format: sortable
+
+  evec_project_sum.cu #color_cross.cu color_contract.cu
+  
   dirac_coarse.cpp dslash_coarse.cu dslash_coarse_dagger.cu
   coarse_op.cu coarsecoarse_op.cu
   coarse_op_preconditioned.cu staggered_coarse_op.cu
