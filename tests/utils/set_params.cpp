@@ -276,11 +276,11 @@ void setFermionSmearParam(QudaInvertParam &smear_param, double omega, int steps)
   
   // Construct 4D smearing parameters.
   smear_param.dslash_type = QUDA_LAPLACE_DSLASH;
-  double smear_coeff = - omega * omega / (4 * steps);
-  smear_param.mass = 1.0 / smear_coeff;
-  smear_param.kappa = 1.0 / (2.0 * (4.0 + mass));
-  smear_param.laplace3D = 3; // Omit t-dim
-  smear_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
+  double smear_coeff = -1.0 * omega * omega / (4 * steps);
+  smear_param.mass_normalization = QUDA_KAPPA_NORMALIZATION; // Enforce kappa normalisation
+  smear_param.mass = 1.0;
+  smear_param.kappa = smear_coeff;
+  smear_param.laplace3D = laplace3D; // Omit this dim
   smear_param.solution_type = QUDA_MAT_SOLUTION;
   smear_param.solve_type = QUDA_DIRECT_SOLVE;
 }
