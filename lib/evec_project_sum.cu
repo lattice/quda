@@ -39,7 +39,7 @@ namespace quda {
 	}
       }
 
-      EvecProjectionArg<Float, nColor> arg(x, y);
+      EvecProjectionArg<Float, nColor, 3> arg(x, y);
       launch<EvecProjection>(result_local, tp, stream, arg);
       
       // Copy results back to host array
@@ -49,7 +49,7 @@ namespace quda {
 	  result_global[comm_coord(3) * array_size + i].imag(result_local[2*i+1]);
 	}
       }
-    }    
+    }
 
     long long flops() const
     {

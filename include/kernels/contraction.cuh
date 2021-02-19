@@ -24,7 +24,7 @@ namespace quda {
     return (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]);
   }
 
-  template <typename Float, int nColor_>
+  template <typename Float, int nColor_, int red = 3>
   struct EvecProjectionArg : public ReduceArg<spinor_array>
   {
     using real = typename mapper<Float>::type;
