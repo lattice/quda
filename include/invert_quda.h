@@ -564,6 +564,21 @@ namespace quda {
     void PrintSummary(const char *name, int k, double r2, double b2, double r2_tol, double hq_tol);
 
     /**
+       @brief Helper function which returns the epsilon tolerance for a given precision
+    */
+    const double solverPrecisionEpsilonHelper(QudaPrecision prec) const;
+
+    /**
+       @brief Returns the epsilon tolerance of the solver precision
+    */
+    const double solverPrecisionEpsilon() const;
+
+    /**
+       @brief Returns the epsilon tolerance of the solver sloppy precision
+    */
+    const double solverPrecisionSloppyEpsilon() const;
+
+    /**
        @brief Constructs the deflation space and eigensolver
        @param[in] meta A sample ColorSpinorField with which to instantiate
        the eigensolver

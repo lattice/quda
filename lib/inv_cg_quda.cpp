@@ -327,13 +327,9 @@ namespace quda {
     // alternative reliable updates
     // alternative reliable updates - set precision - does not hurt performance here
 
-    const double u = param.precision_sloppy == 8 ?
-      std::numeric_limits<double>::epsilon() / 2. :
-      param.precision_sloppy == 4 ? std::numeric_limits<float>::epsilon() / 2. :
-                                    param.precision_sloppy == 2 ? pow(2., -13) : pow(2., -6);
-    const double uhigh = param.precision == 8 ? std::numeric_limits<double>::epsilon() / 2. :
-                                                param.precision == 4 ? std::numeric_limits<float>::epsilon() / 2. :
-                                                                       param.precision == 2 ? pow(2., -13) : pow(2., -6);
+    const double u = solverPrecisionSloppyEpsilon();
+    const double uhigh = solverPrecisionEpsilon();
+
     const double deps=sqrt(u);
     constexpr double dfac = 1.1;
     double d_new = 0;
@@ -352,6 +348,10 @@ namespace quda {
       mat(r, b, y, tmp3);
       Anorm = sqrt(blas::norm2(r)/b2);
     }
+
+    // for detecting HQ residual stalls
+    // let |r2/b2| drop to epsilon tolerance * 1e-10, semi-arbitrarily
+    const double hq_res_stall_check = uhigh * uhigh * 1e-20;
 
     // compute initial residual
     double r2 = 0.0;
@@ -536,8 +536,9 @@ namespace quda {
       // force a reliable update if we are within target tolerance (only if doing reliable updates)
       if ( convergence(r2, heavy_quark_res, stop, param.tol_hq) && param.delta >= param.tol ) updateX = 1;
 
-      // For heavy-quark inversion force a reliable update if we continue after
-      if ( use_heavy_quark_res and L2breakdown and convergenceHQ(r2, heavy_quark_res, stop, param.tol_hq) and param.delta >= param.tol ) {
+      // For heavy-quark inversion force a reliable update if we continue after,
+      // or if r2/b2 has fictitiously dropped too far below precision epsilon
+      if ( use_heavy_quark_res and L2breakdown and (convergenceHQ(r2, heavy_quark_res, stop, param.tol_hq) or (r2 / b2) < hq_res_stall_check ) and param.delta >= param.tol ) {
         updateX = 1;
       }
 
