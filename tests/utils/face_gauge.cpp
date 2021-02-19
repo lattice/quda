@@ -37,9 +37,6 @@ static void* back_nbr_staple[4];
 static void* fwd_nbr_staple_sendbuf[4];
 static void* back_nbr_staple_sendbuf[4];
 
-static int dims[4];
-static int X1,X2,X3,X4;
-static int volumeCB;
 static int Vs[4], Vsh[4];
 
 #include "gauge_field.h"
@@ -51,14 +48,7 @@ setup_dims(int* X)
   V = 1;
   for (int d=0; d< 4; d++) {
     V *= X[d];
-    dims[d] = X[d];
   }
-  volumeCB = V/2;
-  
-  X1=X[0];
-  X2=X[1];
-  X3=X[2];
-  X4=X[3];
 
   Vs[0] = Vs_x = X[1]*X[2]*X[3];
   Vs[1] = Vs_y = X[0]*X[2]*X[3];

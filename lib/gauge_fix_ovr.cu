@@ -296,7 +296,7 @@ namespace quda {
 
     int *borderpoints[2];
     int nlinksfaces = 0;
-    int threads;
+    int threads = 0;
     for (int dir = 0; dir < 4; dir++) if (comm_dim_partitioned(dir)) nlinksfaces += 2 * data.LocalSurfaceCB(dir);
     for (int i = 0; i < 2 && nlinksfaces; i++) { //even and odd ids
       borderpoints[i] = static_cast<int*>(managed_malloc(nlinksfaces * sizeof(int)));

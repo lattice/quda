@@ -6,6 +6,7 @@
 #include <multi_blas_helper.cuh>
 #include <float_vector.h>
 #include <kernel.h>
+#include <warp_collective.h>
 
 #ifndef QUDA_FAST_COMPILE_REDUCE
 #define WARP_SPLIT
@@ -66,22 +67,6 @@ namespace quda
     template <int warp_split_, typename real_, int n_, int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Functor>
     constexpr int MultiBlasArg<warp_split_, real_, n_, NXZ_, store_t, N, y_store_t, Ny, Functor>::NYW_max;
 
-    template <int warp_split, typename T> __device__ __host__ void warp_combine(T &x)
-    {
-      constexpr int warp_size = device::warp_size();
-      if (warp_split > 1) {
-#pragma unroll
-        for (int i = 0; i < x.size(); i++) {
-          // reduce down to the first group of column-split threads
-#pragma unroll
-          for (int offset = warp_size / 2; offset >= warp_size / warp_split; offset /= 2) {
-            x[i].real(x[i].real() + __shfl_down_sync(device::warp_converged_mask(), x[i].real(), offset));
-            x[i].imag(x[i].imag() + __shfl_down_sync(device::warp_converged_mask(), x[i].imag(), offset));
-          }
-        }
-      }
-    }
-
     /**
        @brief Generic multi-blas kernel with four loads and up to four stores.
        @param[in,out] arg Argument struct with required meta data
@@ -126,8 +111,8 @@ namespace quda
         }
 
         // now combine the results across the warp if needed
-        if (arg.f.write.Y) warp_combine<warp_split>(y);
-        if (arg.f.write.W) warp_combine<warp_split>(w);
+        if (arg.f.write.Y) y = warp_combine<warp_split>(y);
+        if (arg.f.write.W) w = warp_combine<warp_split>(w);
 
         if (l_idx == 0 || warp_split == 1) {
           if (arg.f.write.Y) arg.Y[k].save(y, idx, parity);
