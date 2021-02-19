@@ -89,7 +89,7 @@ namespace quda {
     {
       if (tp.block.x == Block::block[idx]) {
         constexpr unsigned int block = Block::block[idx];
-        kernel<Block::block[idx], Transformer, Arg>(arg);
+        kernel<block, Transformer, Arg>(arg);
       } else launch_host<idx - 1, Block, Transformer>(tp, arg);
     }
 

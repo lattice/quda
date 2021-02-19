@@ -23,9 +23,7 @@
 #include <misc.h>
 #include <qio_field.h>
 
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
-
-using namespace std;
+template <typename T> using complex = std::complex<T>;
 
 #define XUP 0
 #define YUP 1
