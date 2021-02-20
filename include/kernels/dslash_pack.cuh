@@ -333,6 +333,68 @@ namespace quda
     }
   }
 
+  template <typename Arg> __device__ inline void shmem_signal(int dim, int dir, Arg &arg)
+  {
+    const int shmemidx = 2 * dim + dir;
+    const bool intranode = getShmemBuffer<1, decltype(arg)>(shmemidx, arg) == nullptr;
+    const bool pack_intranode = (!arg.packkernel) != (!(arg.shmem & 1));
+    const bool pack_internode = (!arg.packkernel) != (!(arg.shmem & 2));
+
+    bool amLast;
+    if (!intranode && pack_internode) {
+      __syncthreads(); // make sure all threads in this block arrived here
+
+      if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
+        int ticket = retcount_inter[shmemidx].fetch_add(1);
+        // currently CST order -- want to make sure all stores are done before and for the last block we need that
+        // all uses of that data are visible
+        amLast = (ticket == arg.blocks_per_dir * gridDim.y * gridDim.z - 1);
+      }
+      if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
+        if (amLast) {
+          // send data over IB if necessary
+          if (getShmemBuffer<1, decltype(arg)>(shmemidx, arg) != nullptr) shmem_putbuffer(shmemidx, arg, blockDim.y * blockDim.z);
+          // is we are in the uber kernel signal here
+          if (!arg.packkernel) {
+            if (!(getNeighborRank(2 * dim + dir, arg) < 0))
+              nvshmem_long_atomic_set((long *)arg.sync_arr + 2 * dim + (1 - dir), arg.counter,
+                                      getNeighborRank(2 * dim + dir, arg));
+          }
+          retcount_inter[shmemidx].store(0); // this could probably be relaxed
+        }
+      }
+    }
+    // if we are not in the uber kernel
+    if (!intranode && !arg.packkernel && (!(arg.shmem & 2))) {
+      if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
+        if (!(getNeighborRank(2 * dim + dir, arg) < 0))
+          nvshmem_long_atomic_set((long *)arg.sync_arr + 2 * dim + (1 - dir), arg.counter,
+                                  getNeighborRank(2 * dim + dir, arg));
+      }
+    }
+
+    if (intranode && pack_intranode) {
+      __syncthreads(); // make sure all threads in this block arrived here
+      if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
+        // recount has system scope
+        int ticket = retcount_intra[shmemidx].fetch_add(1);
+        // currently CST order -- want to make sure all stores are done before (release) and check for ticket
+        // acquires. For the last block we need that all uses of that data are visible
+        amLast = (ticket == arg.blocks_per_dir * gridDim.y * gridDim.z- 1);
+      }
+      if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
+        if (amLast) {
+          if (arg.shmem & 8) {
+            if (!(getNeighborRank(2 * dim + dir, arg) < 0))
+              nvshmemx_long_signal((long *)arg.sync_arr + 2 * dim + (1 - dir), arg.counter,
+                                   getNeighborRank(2 * dim + dir, arg));
+          }
+          retcount_intra[shmemidx].store(0); // this could probably be relaxed
+        }
+      }
+    }
+  }
+
   // shmem bitfield encodes
   // 0 - no shmem
   // 1 - pack P2P
@@ -359,10 +421,8 @@ namespace quda
       int local_tid = local_block_idx * blockDim.x + threadIdx.x;
 
       // for shmem
-      // const int shmem = arg.shmem;
       const int shmemidx = 2 * dim + dir;
       const bool intranode = getShmemBuffer<1, decltype(arg)>(shmemidx, arg) == nullptr;
-      // constexpr int shmem = shmem_;
       const bool pack_intranode = (!arg.packkernel) != (!(arg.shmem & 1));
       const bool pack_internode = (!arg.packkernel) != (!(arg.shmem & 2));
 
@@ -412,60 +472,7 @@ namespace quda
       }
 
 #ifdef NVSHMEM_COMMS
-      // MWTODO: This can probably be merged
-      bool amLast;
-      if (!intranode && pack_internode) {
-        __syncthreads(); // make sure all threads in this block arrived here
-
-        if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z ==0) {
-          int ticket = retcount_inter[shmemidx].fetch_add(1);
-          // currently CST order -- want to make sure all stores are done before and for the last block we need that
-          // all uses of that data are visible
-          amLast = (ticket == arg.blocks_per_dir * gridDim.y * gridDim.z- 1);
-        }
-        if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z ==0) {
-          if (amLast) {
-            // send data over IB if necessary
-            if (getShmemBuffer<1, decltype(arg)>(shmemidx, arg) != nullptr) shmem_putbuffer(shmemidx, arg, blockDim.y * blockDim.z);
-            // is we are in the uber kernel signal here
-            if (!arg.packkernel) {
-              if (!(getNeighborRank(2 * dim + dir, arg) < 0))
-              nvshmem_long_atomic_set((long *)arg.sync_arr + 2 * dim + (1 - dir), arg.counter,
-                                        getNeighborRank(2 * dim + dir, arg));
-            }
-            retcount_inter[shmemidx].store(0); // this could probably be relaxed
-          }
-        }
-      }
-      // if we are not in the uber kernel
-      if (!intranode && !arg.packkernel && (!(arg.shmem & 2))) {
-        if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z ==0) {
-          if (!(getNeighborRank(2 * dim + dir, arg) < 0))
-            nvshmem_long_atomic_set((long *)arg.sync_arr + 2 * dim + (1 - dir), arg.counter,
-                                    getNeighborRank(2 * dim + dir, arg));
-        }
-      }
-
-      if (intranode && pack_intranode) {
-        __syncthreads(); // make sure all threads in this block arrived here
-        if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z ==0) {
-          // recount has system scope
-          int ticket = retcount_intra[shmemidx].fetch_add(1);
-          // currently CST order -- want to make sure all stores are done before (release) and check for ticket
-          // acquires. For the last block we need that all uses of that data are visible
-          amLast = (ticket == arg.blocks_per_dir * gridDim.y * gridDim.z- 1);
-        }
-        if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z ==0) {
-          if (amLast) {
-            if (arg.shmem & 8) {
-              if (!(getNeighborRank(2 * dim + dir, arg) < 0))
-                nvshmemx_long_signal((long *)arg.sync_arr + 2 * dim + (1 - dir), arg.counter,
-                                     getNeighborRank(2 * dim + dir, arg));
-            }
-            retcount_intra[shmemidx].store(0); // this could probably be relaxed
-          }
-        }
-      }
+      if (arg.shmem) shmem_signal(dim, dir, arg);
 #endif
     }
 
@@ -481,7 +488,6 @@ namespace quda
 
   template <bool dagger, int twist, QudaPCType pc, typename Arg> __global__ void packShmemKernel(Arg arg)
   {
-
     int s = blockDim.y * blockIdx.y + threadIdx.y;
     if (s >= arg.dc.Ls) return;
 
@@ -549,12 +555,11 @@ namespace quda
       int local_tid = local_block_idx * blockDim.x + threadIdx.x;
 
       // for shmem
-      const int shmem = arg.shmem;
       const int shmemidx = 2 * dim + dir;
       bool intranode = getShmemBuffer<1, decltype(arg)>(shmemidx, arg) == nullptr;
-      bool pack_intranode = (!arg.packkernel) != (!(shmem & 1));
-      bool pack_internode = (!arg.packkernel) != (!(shmem & 2));
-      if (shmem == 0 || (intranode && pack_intranode) || (!intranode && pack_internode)) {
+      bool pack_intranode = (!arg.packkernel) != (!(arg.shmem & 1));
+      bool pack_internode = (!arg.packkernel) != (!(arg.shmem & 2));
+      if (arg.shmem == 0 || (intranode && pack_intranode) || (!intranode && pack_internode)) {
         switch (dim) {
         case 0:
           while (local_tid < arg.nFace * arg.dc.ghostFaceCB[0]) {
@@ -600,69 +605,13 @@ namespace quda
       }
 
 #ifdef NVSHMEM_COMMS
-      // MWTODO: This can probably be merged
-      bool amLast;
-      // for intranode traffic -- this is used if we are useing a separate packing kernel for internode traffic
-      // (arg.packkernel) and traffic is internode
-      if (!intranode && pack_internode) {
-
-        __syncthreads(); // make sure all threads in this block arrived here
-
-        if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z ==0) {
-          int ticket = retcount_inter[shmemidx].fetch_add(1);
-          // currently CST order -- want to make sure all stores are done before and for the last block we need that
-          // all uses of that data are visible
-          amLast = (ticket == arg.blocks_per_dir * gridDim.y * gridDim.z- 1);
-        }
-        if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z ==0) {
-          if (amLast) {
-            // send data over IB if necessary
-            if (getShmemBuffer<1, decltype(arg)>(shmemidx, arg) != nullptr) shmem_putbuffer(shmemidx, arg, blockDim.y * blockDim.z);
-            if (!arg.packkernel) {
-              if (!(getNeighborRank(2 * dim + dir, arg) < 0))
-                nvshmem_long_atomic_set((long *)arg.sync_arr + 2 * dim + (1 - dir), arg.counter,
-                                        getNeighborRank(2 * dim + dir, arg));
-            }
-            retcount_inter[shmemidx].store(0); // this could probably be relaxed
-          }
-        }
-      }
-      // if this direction has already been taken care of we just signal here
-      if (!intranode && !arg.packkernel && (!(arg.shmem & 2))) {
-        if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z ==0) {
-          if (!(getNeighborRank(2 * dim + dir, arg) < 0))
-            nvshmem_long_atomic_set((long *)arg.sync_arr + 2 * dim + (1 - dir), arg.counter,
-                                    getNeighborRank(2 * dim + dir, arg));
-        }
-      }
-
-      if (intranode && pack_intranode) {
-        __syncthreads(); // make sure all threads in this block arrived here
-        if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z ==0) {
-          // recount has system scope
-          int ticket = retcount_intra[shmemidx].fetch_add(1);
-          // currently CST order -- want to make sure all stores are done before (release) and check for ticket
-          // acquires. For the last block we need that all uses of that data are visible
-          amLast = (ticket == arg.blocks_per_dir * gridDim.y * gridDim.z- 1);
-        }
-        if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z ==0) {
-          if (amLast) {
-            if (arg.shmem & 8) {
-              if (!(getNeighborRank(2 * dim + dir, arg) < 0))
-                nvshmemx_long_signal((long *)arg.sync_arr + 2 * dim + (1 - dir), arg.counter,
-                                     getNeighborRank(2 * dim + dir, arg));
-            }
-            retcount_intra[shmemidx].store(0); // this could probably be relaxed
-          }
-        }
-      }
+      if (arg.shmem) shmem_signal(dim, dir, arg);
 #endif
     }
   };
 
   template <typename Arg> __global__ void packStaggeredShmemKernel(Arg arg)
   {
-
     int s = blockDim.y * blockIdx.y + threadIdx.y;
     if (s >= arg.dc.Ls) return;
 
