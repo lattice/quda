@@ -146,7 +146,7 @@ int test(int contractionType, QudaPrecision test_prec)
   }
 
   // Perform GPU contraction.
-  contractQuda(spinorX, spinorY, d_result, cType, &inv_param, X);
+  //contractQuda(spinorX, spinorY, d_result, cType, &inv_param, X);
 
   // Compare each site contraction from the host and device.
   // It returns the number of faults it detects.

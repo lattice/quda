@@ -3,7 +3,7 @@
 #include <tunable_nd.h>
 #include <tunable_reduction.h>
 #include <instantiate.h>
-#include <kernels/contraction.cuh>
+#include <kernels/evec_project.cuh>
 
 namespace quda {
   
@@ -12,14 +12,14 @@ namespace quda {
   protected:
     const ColorSpinorField &x;
     const ColorSpinorField &y;
-    std::vector<Complex> &result;
-
+    complex<double> *result;
+    
   public:
-    EvecProject(const ColorSpinorField &x, const ColorSpinorField &y, std::vector<Complex> &result) :
+    EvecProject(const ColorSpinorField &x, const ColorSpinorField &y, void *result) :
       TunableMultiReduction(x, x.X()[3]),
       x(x),
       y(y),
-      result(result)
+      result(static_cast<complex<double>*>(result))
     {
       apply(device::get_default_stream());
     }
@@ -45,12 +45,11 @@ namespace quda {
       // Copy results back to host array
       if(!activeTuning()) {
 	for(int i=0; i<array_size; i++) {
-	  result_global[comm_coord(3) * array_size + i].real(result_local[2*i]);
-	  result_global[comm_coord(3) * array_size + i].imag(result_local[2*i+1]);
+          result[i] = std::complex<double>(result_local[2*i], result_local[2*i+1]);
 	}
       }
     }
-
+    
     long long flops() const
     {
       // 4 prop spins, 1 evec spin, 3 color, 6 complex, lattice volume
@@ -63,14 +62,20 @@ namespace quda {
     }
   };
   
-  
-  void evecProjectQuda(const ColorSpinorField &x, const ColorSpinorField &y, std::complex<double> &result)
+#ifdef GPU_CONTRACT  
+  void evecProjectQuda(const ColorSpinorField &x, const ColorSpinorField &y, void *result)
   {
     checkPrecision(x, y);
-    
+  
     if (x.Ncolor() != 3 || y.Ncolor() != 3) errorQuda("Unexpected number of colors x=%d y=%d", x.Ncolor(), y.Ncolor());
     if (x.Nspin() != 4 || y.Nspin() != 1) errorQuda("Unexpected number of spins x=%d y=%d", x.Nspin(), y.Nspin());
     
     instantiate<EvecProject>(x, y, result);
   }
+#else
+  void evecProjectQuda(const ColorSpinorField &x, const ColorSpinorField &y, std::vector<Complex> &) 
+  {
+    errorQuda("Contraction code has not been built"); 
+  }
+#endif  
 } // namespace quda

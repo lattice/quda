@@ -1665,7 +1665,7 @@ namespace quda {
             ghost[i] = ghost_ ? ghost_[i] : 0;
             faceVolumeCB[i] = u.SurfaceCB(i) * u.Nface(); // face volume equals surface * depth
           }
-      }
+        }
 
       __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
       {

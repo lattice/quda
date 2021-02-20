@@ -247,7 +247,8 @@ extern "C" {
     QudaCloverFieldOrder clover_order;     /**< The order of the input clover field */
     QudaUseInitGuess use_init_guess;       /**< Whether to use an initial guess in the solver or not */
 
-    double clover_coeff;                   /**< Coefficient of the clover term */
+    double clover_csw;                     /**< Csw coefficient of the clover term */
+    double clover_coeff;                   /**< Overall kappa * Csw coefficient of the clover term */
     double clover_rho;                     /**< Real number added to the clover diagonal (not to inverse) */
 
     int compute_clover_trlog;              /**< Whether to compute the trace log of the clover term */
@@ -275,6 +276,11 @@ extern "C" {
     /** Maximum size of Krylov space used by solver */
     int gcrNkrylov;
 
+    QudaBoolean gauge_smear;             /** Whether or not to perfrom gauge smearing */
+    double gauge_smear_coeff;            /** The coefficient of the gauge smearing */ 
+    int gauge_smear_steps;               /** The number of smearing steps to perform */
+    QudaGaugeSmearType gauge_smear_type; /** The type of smearing to perfrom */
+    
     /*
      * The following parameters are related to the solver
      * preconditioner, if enabled.
@@ -1336,17 +1342,16 @@ extern "C" {
   void copyExtendedResidentGaugeQuda(void* resident_gauge);
 
   /**
-   * Performs Wuppertal smearing on a given spinor using the gauge field
+   * Performs Gaussian smearing on a given spinor using the gauge field
    * gaugeSmeared, if it exist, or gaugePrecise if no smeared field is present.
-   * @param h_out  Result spinor field
-   * @param h_in   Input spinor field
-   * @param param  Contains all metadata regarding host and device
-   *               storage and operator which will be applied to the spinor
+   * @param h_in    Input spinor field to smear
+   * @param param   Contains all metadata regarding host and device
+   *                storage and operator which will be applied to the spinor
    * @param n_steps Number of steps to apply.
-   * @param alpha  Alpha coefficient for Wuppertal smearing.
+   * @param omega   The width of the Gaussian 
    */
-  void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param, unsigned int n_steps, double alpha);
-
+  void performGaussianSmearNStep(void *h_in, QudaInvertParam *param, const int n_steps, const double omega);
+  
   /**
    * Performs APE smearing on gaugePrecise and stores it in gaugeSmeared
    * @param n_steps Number of steps to apply.
@@ -1392,17 +1397,22 @@ extern "C" {
   void gaugeObservablesQuda(QudaGaugeObservableParam *param);
 
   /**
-   * Public function to perform color contractions of the host spinors x and y.
-   * @param[in] x pointer to host data
-   * @param[in] y pointer to host data
-   * @param[out] result pointer to the 16 spin projections per lattice site
+   * Public function to perform color contractions of the host spinorfields contained
+   * inside first two arguments. Used for cases where one wishes to contract data in
+   * either the T or Z dim, with a Fourier phase applied
+   * @param[in] h_prop_array_flavor_1 pointer to pointers of ColorSpinorField host data
+   * @param[in] h_prop_array_flavor_2 pointer to pointers of ColorSpinorField host data
+   * @param[out] h_result adress of pointer to the 16*corr_dim complex numbers of the
+   *            result correlators
    * @param[in] cType Which type of contraction (open, degrand-rossi, etc)
-   * @param[in] param meta data for construction of ColorSpinorFields.
-   * @param[in] X spacetime data for construction of ColorSpinorFields.
+   * @param[in] cs_param_ptr Pointer to a ColorSpinorParam meta data for
+   *            construction of ColorSpinorFields
+   * @param[in] X spacetime data for construction of ColorSpinorFields
    */
-  void contractQuda(const void *x, const void *y, void *result, const QudaContractType cType, QudaInvertParam *param,
-                    const int *X);
-
+  void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void **h_result,
+		      const QudaContractType cType, void *cs_param_ptr,
+		      const int *X, const int *const source_position, int* Mom);
+  
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
    * @param[in,out] gauge, gauge field to be fixed
@@ -1449,6 +1459,43 @@ extern "C" {
    */
   void blasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaBoolean native, QudaBLASParam *param);
 
+  void make4DChiralProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_param5D, QudaInvertParam *inv_param4D,
+			const int *X);
+  
+  void make4DMidPointProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_param5D, QudaInvertParam *inv_param4D,
+                          const int *X);
+  
+  /**
+   * @brief Hacks for Callat
+   */
+  void laphSinkProject(void *host_quark, void **host_evec, double_complex *host_sinks,
+		       QudaInvertParam inv_param, unsigned int nEv, const int X[4]);
+
+  void laphBaryonKernel(int n1, int n2, int n3, int nMom,
+			double _Complex *host_coeffs1, 
+			double _Complex *host_coeffs2, 
+			double _Complex *host_coeffs3,
+			double _Complex *momP, 
+			int nEv, void **evPtr, 
+			void *retArray,
+			int blockSizeMomProj,
+			const int X[4]);
+  
+  
+  void laphBaryonKernelComputeModeTripletA(int nMom, int nEv, int blockSizeMomProj,
+					   void **host_evec, 
+					   double _Complex *host_mom,
+					   double _Complex *return_array,
+					   const int X[4]);  
+  
+  void laphBaryonKernelComputeModeTripletB(int n1, int n2, int n3, int nMom, int nEv, 
+					   double _Complex *host_coeffs1, 
+					   double _Complex *host_coeffs2, 
+					   double _Complex *host_coeffs3,
+					   double _Complex *host_mode_trip_buf, 
+					   double _Complex *return_array);
+
+  
   /**
    * @brief Flush the chronological history for the given index
    * @param[in] index Index for which we are flushing

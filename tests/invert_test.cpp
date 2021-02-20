@@ -133,7 +133,8 @@ int main(int argc, char **argv)
   if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH
       && dslash_type != QUDA_TWISTED_MASS_DSLASH && dslash_type != QUDA_DOMAIN_WALL_4D_DSLASH
       && dslash_type != QUDA_MOBIUS_DWF_DSLASH && dslash_type != QUDA_MOBIUS_DWF_EOFA_DSLASH
-      && dslash_type != QUDA_TWISTED_CLOVER_DSLASH && dslash_type != QUDA_DOMAIN_WALL_DSLASH) {
+      && dslash_type != QUDA_TWISTED_CLOVER_DSLASH && dslash_type != QUDA_DOMAIN_WALL_DSLASH
+      && dslash_type != QUDA_LAPLACE_DSLASH) {
     printfQuda("dslash_type %d not supported\n", dslash_type);
     exit(0);
   }
@@ -253,7 +254,7 @@ int main(int argc, char **argv)
   // Vector construct START
   //-----------------------------------------------------------------------------------
   quda::ColorSpinorParam cs_param;
-  constructWilsonTestSpinorParam(&cs_param, &inv_param, &gauge_param);
+  constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
   auto in = quda::ColorSpinorField::Create(cs_param);
   auto out = quda::ColorSpinorField::Create(cs_param);
   auto check = quda::ColorSpinorField::Create(cs_param);

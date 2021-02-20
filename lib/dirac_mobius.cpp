@@ -373,9 +373,7 @@ namespace quda {
       shift2[d] = comm_dim_partitioned(d) ? 2 : 0;
     }
 
-    if (extended_gauge == nullptr) {
-      extended_gauge = createExtendedGauge(*gauge, shift2, profile, true);
-    }
+    if (extended_gauge == nullptr) { extended_gauge = createExtendedGauge(*gauge, shift2, profile, true); }
 
     checkDWF(in, out);
     // checkParitySpinor(in, out);
