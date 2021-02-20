@@ -73,7 +73,7 @@ namespace quda {
     instantiate<EvecProject>(x, y, result);
   }
 #else
-  void evecProjectQuda(const ColorSpinorField &x, const ColorSpinorField &y, std::vector<Complex> &) 
+  void evecProjectQuda(const ColorSpinorField &x, const ColorSpinorField &y, void*) 
   {
     errorQuda("Contraction code has not been built"); 
   }
