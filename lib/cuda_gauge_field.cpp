@@ -421,9 +421,6 @@ namespace quda {
       send_d[dim] = static_cast<char*>(ghost_send_buffer_d[b]) + offset;
       recv_d[dim] = static_cast<char*>(ghost_recv_buffer_d[b]) + offset;
 
-      // silence cuda-memcheck initcheck errors that arise since we
-      // have an oversized ghost buffer when doing the extended exchange
-      qudaMemsetAsync(send_d[dim], 0, 2 * ghost_face_bytes_aligned[dim], 0);
       offset += 2 * ghost_face_bytes_aligned[dim]; // factor of two from fwd/back
     }
 
