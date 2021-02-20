@@ -1495,6 +1495,7 @@ extern "C" {
 					   double _Complex *host_mode_trip_buf, 
 					   double _Complex *return_array);
 
+  void laphBaryonKernelComputeModeTripletEnd();
   
   /**
    * @brief Flush the chronological history for the given index

@@ -50,10 +50,8 @@ namespace quda {
   void colorContractQuda(const ColorSpinorField &x, const ColorSpinorField &y, void *result)
   {
     checkPrecision(x, y);
-    if (x.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS || y.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS)
-      errorQuda("Unexpected gamma basis x=%d y=%d", x.GammaBasis(), y.GammaBasis());
-    if (x.Nspin() != 4 || y.Nspin() != 4) errorQuda("Unexpected number of spins x=%d y=%d", x.Nspin(), y.Nspin());
-
+    if (x.Nspin() != 1 || y.Nspin() != 1) errorQuda("Unexpected number of spins x=%d y=%d", x.Nspin(), y.Nspin());
+    
     instantiate<ColorContract>(x, y, result);
   }
 #else

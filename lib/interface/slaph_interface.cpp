@@ -266,6 +266,9 @@ void laphBaryonKernel(int n1, int n2, int n3, int nMom,
   cublas_param_init.lda = nEv;
   cublas_param_init.ldb = 3 * nSites;
   cublas_param_init.ldc = 3 * nSites;
+  cublas_param_init.a_stride = nEv * nEv;
+  cublas_param_init.b_stride = 3 * nSites * 3 * nSites;
+  cublas_param_init.b_stride = 3 * nSites * 3 * nSites;
   cublas_param_init.c_offset = 0;
   cublas_param_init.batch_count = 1;
   cublas_param_init.alpha = (__complex__ double)alpha;  
@@ -282,6 +285,7 @@ void laphBaryonKernel(int n1, int n2, int n3, int nMom,
   cublas_param_mom_sum.lda = nSites;
   cublas_param_mom_sum.ldb = nSites;
   cublas_param_mom_sum.ldc = n1*n2*n3;
+  cublas_param_mom_sum.a_stride = nSites * nSites;
   cublas_param_mom_sum.c_offset = 0;
   cublas_param_mom_sum.batch_count = 1;
   cublas_param_mom_sum.alpha = (__complex__ double)alpha;  
@@ -317,7 +321,9 @@ void laphBaryonKernel(int n1, int n2, int n3, int nMom,
 	  // To gauge how to block the calls to remove launch latency.
 	  //printfQuda("dil1 = %d, dil2 = %d, dil3 = %d, nInBlock = %d\n", dil1, dil2, dil3, nInBlock);
 	  cublas_param_mom_sum.n = nInBlock;
-	  cublas_param_mom_sum.c_offset = (dil1*n2 + dil2)*n3 + dil3 - nInBlock + 1;;
+	  cublas_param_mom_sum.c_offset = (dil1*n2 + dil2)*n3 + dil3 - nInBlock + 1;
+          cublas_param_mom_sum.b_stride = nInBlock * nSites;
+          cublas_param_mom_sum.c_stride = nInBlock * nSites;
 	  getProfileBLAS().TPSTART(QUDA_PROFILE_COMPUTE);	  
 	  blas_lapack::native::stridedBatchGEMM(d_mom, d_tmp, d_ret, cublas_param_mom_sum, QUDA_CUDA_FIELD_LOCATION);
 	  getProfileBLAS().TPSTOP(QUDA_PROFILE_COMPUTE);	  
@@ -357,20 +363,13 @@ void laphBaryonKernel(int n1, int n2, int n3, int nMom,
   getProfileBaryonKernel().TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
- // Make this a class, save on malloc and memcopy
- void *d_mtb = nullptr;
- bool mtb_loaded = false;
-
-
 // GOOD
 void laphBaryonKernelComputeModeTripletA(int nMom, int nEv, int blockSizeMomProj,
                                          void **host_evec, 
                                          double _Complex *host_mom,
                                          double _Complex *return_arr,
-                                         const int X[4]) {
-  
-  // set to 0 to skip this part and test the B kernel
-#if 1
+                                         const int X[4])
+{  
   getProfileBaryonKernelModeTripletsA().TPSTART(QUDA_PROFILE_TOTAL);
   getProfileBaryonKernelModeTripletsA().TPSTART(QUDA_PROFILE_INIT);
   
@@ -465,7 +464,7 @@ void laphBaryonKernelComputeModeTripletA(int nMom, int nEv, int blockSizeMomProj
   total_bytes += data_mom_bytes;
   printfQuda("d_mom bytes = %fGB total_bytes = %fGB\n", (double)data_mom_bytes/(OneGB), (double)total_bytes/(OneGB)); 
 
-  getProfileBaryonKernelModeTripletsA().TPSTOP(QUDA_PROFILE_INIT);  
+  getProfileBaryonKernelModeTripletsA().TPSTOP(QUDA_PROFILE_INIT);
   //--------------------------------------------------------------------------------
   
   // Copy host data to device
@@ -482,61 +481,19 @@ void laphBaryonKernelComputeModeTripletA(int nMom, int nEv, int blockSizeMomProj
   cublas_param_mom_sum.trans_b = QUDA_BLAS_OP_T;
   cublas_param_mom_sum.m = nMom;
   cublas_param_mom_sum.k = nSites;
+  cublas_param_mom_sum.n = blockSizeMomProj;
   cublas_param_mom_sum.lda = nSites;
   cublas_param_mom_sum.ldb = nSites;
   cublas_param_mom_sum.ldc = nEvChoose3;
-  cublas_param_mom_sum.n = blockSizeMomProj;
+  cublas_param_mom_sum.a_stride = nSites * nSites;
   cublas_param_mom_sum.batch_count = 1;
   cublas_param_mom_sum.alpha = (__complex__ double)alpha;  
   cublas_param_mom_sum.beta  = (__complex__ double)beta;
   cublas_param_mom_sum.data_order = QUDA_BLAS_DATAORDER_ROW;
   cublas_param_mom_sum.data_type = QUDA_BLAS_DATATYPE_Z;
-
-  /*
-    cudaStream_t stream[64+1];
-    for (int i = 0; i < 64 + 1; i++) {
-    checkCuda(cudaStreamCreate(&stream[i]));
-    }
-  
-    int nInBlock = 0;  
-    int blockStart = 0;
-    for (int aEv=0; aEv<nEv; aEv++) {
-    for (int bEv=aEv+1; bEv<nEv; bEv++) {
-      
-    getProfileBaryonKernelModeTripletsA().TPSTART(QUDA_PROFILE_COMPUTE);
-    colorCrossQuda(*quda_evec[aEv], *quda_evec[bEv], *quda_diq[0]);
-    getProfileBaryonKernelModeTripletsA().TPSTOP(QUDA_PROFILE_COMPUTE);
-
-    for (int cEv=bEv+1; cEv<nEv; cEv++) {
-
-    nInBlock++;
-	
-    if (nInBlock == blockSizeMomProj) {
-    getProfileBaryonKernelModeTripletsA().TPSTART(QUDA_PROFILE_COMPUTE);
-	  
-    for(int b=0; b<nInBlock; b+=64) {
-    for(int s=0; s<64; s++) {
-    colorContractQuda(*quda_diq[0], *quda_evec[cEv], 
-    (std::complex<double>*)d_tmp + nSites*(b + s), stream[s+1]);
-    }
-    qudaDeviceSynchronize();
-    }
-    cublas_param_mom_sum.n = nInBlock;
-    cublas_param_mom_sum.c_offset = blockStart;
-    blas_lapack::native::stridedBatchGEMM(d_mom, d_tmp, d_ret, cublas_param_mom_sum, QUDA_CUDA_FIELD_LOCATION);
-    getProfileBaryonKernelModeTripletsA().TPSTOP(QUDA_PROFILE_COMPUTE);	  
-    blockStart += nInBlock;
-    nInBlock = 0;
-    }
-    }
-    }
-    }
-
-    for (int i = 0; i < 64 + 1; i++) {
-    checkCuda(cudaStreamDestroy(stream[i]));
-    }
-  */
     
+  getProfileBaryonKernelModeTripletsA().TPSTOP(QUDA_PROFILE_TOTAL); 
+
   int nInBlock = 0;  
   int blockStart = 0;
   for (int aEv=0; aEv<nEv; aEv++) {
@@ -559,6 +516,8 @@ void laphBaryonKernelComputeModeTripletA(int nMom, int nEv, int blockSizeMomProj
 	  //printfQuda("aEv = %d, bEv = %d, cEv = %d, nInBlock = %d\n", aEv, bEv, cEv, nInBlock);
 	  cublas_param_mom_sum.n = nInBlock;
 	  cublas_param_mom_sum.c_offset = blockStart;
+          cublas_param_mom_sum.b_stride = nSites * nInBlock;
+          cublas_param_mom_sum.c_stride = nEvChoose3 * nInBlock;
 	  getProfileBLAS().TPSTART(QUDA_PROFILE_COMPUTE);  
 	  blas_lapack::native::stridedBatchGEMM(d_mom, d_tmp, d_ret, cublas_param_mom_sum, QUDA_CUDA_FIELD_LOCATION);
 	  getProfileBLAS().TPSTOP(QUDA_PROFILE_COMPUTE);  
@@ -581,6 +540,7 @@ void laphBaryonKernelComputeModeTripletA(int nMom, int nEv, int blockSizeMomProj
   }
 
   // Copy return array back to host
+  getProfileBaryonKernelModeTripletsA().TPSTART(QUDA_PROFILE_TOTAL); 
   getProfileBaryonKernelModeTripletsA().TPSTART(QUDA_PROFILE_D2H);
   qudaMemcpy(retArrPtr, d_ret, data_ret_bytes, qudaMemcpyDeviceToHost);  
   getProfileBaryonKernelModeTripletsA().TPSTOP(QUDA_PROFILE_D2H);
@@ -600,20 +560,8 @@ void laphBaryonKernelComputeModeTripletA(int nMom, int nEv, int blockSizeMomProj
 
   getProfileBaryonKernelModeTripletsA().TPSTOP(QUDA_PROFILE_FREE);
   getProfileBaryonKernelModeTripletsA().TPSTOP(QUDA_PROFILE_TOTAL);
-#endif
 }
  
-/*
-  void laphBaryonKernelComputeModeTripletMid(int nMom, int nEv, 
-  double _Complex *temp_buf,
-  double _Complex *host_mode_trip_buf,
-  const int X[4]) { 
-  getProfileBaryonKernelModeTripletsMib().TPSTART(QUDA_PROFILE_TOTAL);
-  getProfileBaryonKernelModeTripletsB().TPSTART(QUDA_PROFILE_INIT);
-
-  }
-*/
-
 // Make this a class, save on malloc and memcopy
 void *d_mtb = nullptr;
 bool mtb_loaded = false;
@@ -704,6 +652,9 @@ void laphBaryonKernelComputeModeTripletB(int n1, int n2, int n3, int nMom, int n
   cublas_param_1.lda = nEv;
   cublas_param_1.ldb = nEv;
   cublas_param_1.ldc = n3;
+  cublas_param_1.a_stride = nEv * nEv;
+  cublas_param_1.b_stride = nEv * n3;
+  cublas_param_1.c_stride = n3 * n3;
   cublas_param_1.c_offset = 0;
   cublas_param_1.batch_count = 1;
   cublas_param_1.alpha = (__complex__ double)alpha;  
@@ -770,6 +721,8 @@ void laphBaryonKernelComputeModeTripletB(int n1, int n2, int n3, int nMom, int n
   cublas_param_2.ldb = n3;
   cublas_param_2.ldc = n3;
   cublas_param_2.a_stride = 0; // Instruct cuBLAS to use the only the data in d_coeffs2 (single batch sized array)
+  cublas_param_2.b_stride = n3 * n3;
+  cublas_param_2.c_stride = n3 * n3;
   cublas_param_2.batch_count = nSubEv;
   cublas_param_2.alpha = (__complex__ double)alpha;  
   cublas_param_2.beta  = (__complex__ double)beta;
@@ -786,6 +739,8 @@ void laphBaryonKernelComputeModeTripletB(int n1, int n2, int n3, int nMom, int n
   cublas_param_3.ldb = n2*n3;
   cublas_param_3.ldc = n2*n3;   
   cublas_param_3.a_stride = 0; // Instruct cuBLAS to use the only the data in d_coeffs1 (single batch sized array) 
+  cublas_param_3.b_stride = n2*n3 * n2*n3;
+  cublas_param_3.c_stride = n2*n3 * n2*n3;
   cublas_param_3.batch_count = 1;
   cublas_param_3.alpha = (__complex__ double)alpha;  
   cublas_param_3.beta  = (__complex__ double)beta;
@@ -821,4 +776,9 @@ void laphBaryonKernelComputeModeTripletB(int n1, int n2, int n3, int nMom, int n
 
   saveTuneCache();
   getProfileBaryonKernelModeTripletsB().TPSTOP(QUDA_PROFILE_TOTAL);  
+}
+
+void laphBaryonKernelComputeModeTripletEnd() {   
+  if(mtb_loaded) pool_device_free(d_mtb);
+  saveTuneCache();
 }

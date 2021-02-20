@@ -45,7 +45,7 @@ namespace quda
 #ifdef NATIVE_LAPACK_LIB
           cublasStatus_t error = cublasDestroy(handle);
           if (error != CUBLAS_STATUS_SUCCESS)
-            errorQuda("\nError indestroying cublas context, error code = %d\n", error);
+            errorQuda("\nError destroying cublas context, error code = %d\n", error);
           cublas_init = false;
 #endif
         }
