@@ -333,6 +333,7 @@ namespace quda
     }
   }
 
+#ifdef NVSHMEM_COMMS
   template <typename Arg> __device__ inline void shmem_signal(int dim, int dir, Arg &arg)
   {
     const int shmemidx = 2 * dim + dir;
@@ -394,6 +395,7 @@ namespace quda
       }
     }
   }
+#endif
 
   // shmem bitfield encodes
   // 0 - no shmem
