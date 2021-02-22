@@ -21,7 +21,7 @@ namespace quda
   {
     Base &base;
     const int Ls;
-    static constexpr int s_batch_max = 2;
+    static constexpr int s_batch_max = 4;
 
     char aux[TuneKey::aux_n];
     char vol_string[TuneKey::aux_n];
@@ -77,7 +77,7 @@ namespace quda
     void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }
 
     TuneKey tuneKey() const {
-      return TuneKey(base.tuneKey().volume, typeid(*this).name(), aux);
+      return TuneKey(base.tuneKey().volume, typeid(*this).name(), base.tuneKeyKernel());
     }
 
     long long flops() const { return base.flops(); }
@@ -116,6 +116,8 @@ namespace quda
       switch(s_batch) {
       case 1: Dslash::template instantiate<packShmem, 1>(tp, stream); break;
       case 2: Dslash::template instantiate<packShmem, 2>(tp, stream); break;
+      case 3: Dslash::template instantiate<packShmem, 3>(tp, stream); break;
+      case 4: Dslash::template instantiate<packShmem, 4>(tp, stream); break;
       default: errorQuda("Unsupported s_batch = %d", s_batch);
       }
 #endif

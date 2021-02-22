@@ -385,11 +385,20 @@ namespace quda
 
     void augmentAux(KernelType type, const char *extra) { strcat(aux[type], extra); }
 
+    auto tuneKeyKernel() const
+    {
+      return (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? aux_pack : aux[arg.kernel_type];
+    }
+
     virtual TuneKey tuneKey() const
     {
-      auto aux_ = (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? aux_pack : aux[arg.kernel_type];
+      auto aux_ = tuneKeyKernel();
       char aux_y[TuneKey::aux_n];
-      sprintf(aux_y, "%s,size_y=%d", aux_, get_vector_y());
+      if (arg.kernel_type == KERNEL_POLICY) {
+        sprintf(aux_y, "%s", aux_);
+      } else {
+        sprintf(aux_y, "%s,s_batch=%d", aux_, arg.dc.Ls / get_vector_y());
+      }
       return TuneKey(in.VolString(), typeid(*this).name(), aux_y);
     }
 
