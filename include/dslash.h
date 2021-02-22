@@ -9,6 +9,8 @@
 #include <jitify_helper.cuh>
 #include <instantiate.h>
 
+#include <type_traits>
+
 namespace quda
 {
 
@@ -156,8 +158,23 @@ namespace quda
        all dslash types, though in some cases we specialize to reduce
        compilation time.
     */
-    template <template <bool, QudaPCType, typename> class P, int nParity, bool dagger, bool xpay, KernelType kernel_type>
-    inline void launch(TuneParam &tp, const qudaStream_t &stream)
+    template <template <bool, QudaPCType, typename> class P, int s_batch, int nParity, bool dagger, bool xpay, KernelType kernel_type>
+    inline typename std::enable_if<(s_batch > 1), void>::type launch(TuneParam &tp, const qudaStream_t &stream)
+    {
+      if (deviceProp.major >= 7) { // should test whether this is always optimal on Volta
+        tp.set_max_shared_bytes = true;
+      }
+      qudaLaunchKernel(dslashGPU<D, P, s_batch, nParity, dagger, xpay, kernel_type, Arg>, tp, stream, arg);
+    }
+
+    /**
+       @brief This is a helper class that is used to instantiate the
+       correct templated kernel for the dslash.  This can be used for
+       all dslash types, though in some cases we specialize to reduce
+       compilation time.
+    */
+    template <template <bool, QudaPCType, typename> class P, int s_batch, int nParity, bool dagger, bool xpay, KernelType kernel_type>
+    inline typename std::enable_if<(s_batch == 1), void>::type launch(TuneParam &tp, const qudaStream_t &stream)
     {
       if (deviceProp.major >= 7) { // should test whether this is always optimal on Volta
         tp.set_max_shared_bytes = true;
@@ -199,7 +216,7 @@ namespace quda
        @param[in] tp The tuning parameters to use for this kernel
        @param[in] stream The qudaStream_t where the kernel will run
      */
-    template <template <bool, QudaPCType, typename> class P, int nParity, bool dagger, bool xpay>
+    template <template <bool, QudaPCType, typename> class P, int s_batch, int nParity, bool dagger, bool xpay>
     inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
     {
       if (in.Location() == QUDA_CPU_FIELD_LOCATION) {
@@ -209,13 +226,13 @@ namespace quda
         Tunable::jitify_error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
 #else
         switch (arg.kernel_type) {
-        case INTERIOR_KERNEL: launch<P, nParity, dagger, xpay, INTERIOR_KERNEL>(tp, stream); break;
+        case INTERIOR_KERNEL: launch<P, s_batch, nParity, dagger, xpay, INTERIOR_KERNEL>(tp, stream); break;
 #ifdef MULTI_GPU
-        case EXTERIOR_KERNEL_X: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_X>(tp, stream); break;
-        case EXTERIOR_KERNEL_Y: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_Y>(tp, stream); break;
-        case EXTERIOR_KERNEL_Z: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_Z>(tp, stream); break;
-        case EXTERIOR_KERNEL_T: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_T>(tp, stream); break;
-        case EXTERIOR_KERNEL_ALL: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_ALL>(tp, stream); break;
+        // case EXTERIOR_KERNEL_X: launch<P, s_batch, nParity, dagger, xpay, EXTERIOR_KERNEL_X>(tp, stream); break;
+        // case EXTERIOR_KERNEL_Y: launch<P, s_batch, nParity, dagger, xpay, EXTERIOR_KERNEL_Y>(tp, stream); break;
+        // case EXTERIOR_KERNEL_Z: launch<P, s_batch, nParity, dagger, xpay, EXTERIOR_KERNEL_Z>(tp, stream); break;
+        // case EXTERIOR_KERNEL_T: launch<P, s_batch, nParity, dagger, xpay, EXTERIOR_KERNEL_T>(tp, stream); break;
+        // case EXTERIOR_KERNEL_ALL: launch<P, s_batch, nParity, dagger, xpay, EXTERIOR_KERNEL_ALL>(tp, stream); break;
         default: errorQuda("Unexpected kernel type %d", arg.kernel_type);
 #else
         default: errorQuda("Unexpected kernel type %d for single-GPU build", arg.kernel_type);
@@ -231,16 +248,17 @@ namespace quda
        @param[in] tp The tuning parameters to use for this kernel
        @param[in] stream The qudaStream_t where the kernel will run
      */
-    template <template <bool, QudaPCType, typename> class P, int nParity, bool xpay>
+    template <template <bool, QudaPCType, typename> class P, int s_batch, int nParity, bool xpay>
     inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
     {
 #ifdef JITIFY
       Tunable::jitify_error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
 #else
-      if (arg.dagger)
-        instantiate<P, nParity, true, xpay>(tp, stream);
-      else
-        instantiate<P, nParity, false, xpay>(tp, stream);
+      if (arg.dagger) {
+        // instantiate<P, s_batch, nParity, true, xpay>(tp, stream);
+      } else {
+        instantiate<P, s_batch, nParity, false, xpay>(tp, stream);
+      }
 #endif
     }
 
@@ -250,15 +268,15 @@ namespace quda
        @param[in] tp The tuning parameters to use for this kernel
        @param[in] stream The qudaStream_t where the kernel will run
      */
-    template <template <bool, QudaPCType, typename> class P, bool xpay>
+    template <template <bool, QudaPCType, typename> class P, int s_batch, bool xpay>
     inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
     {
 #ifdef JITIFY
       Tunable::jitify_error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
 #else
       switch (arg.nParity) {
-      case 1: instantiate<P, 1, xpay>(tp, stream); break;
-      case 2: instantiate<P, 2, xpay>(tp, stream); break;
+      case 1: instantiate<P, s_batch, 1, xpay>(tp, stream); break;
+      // case 2: instantiate<P, s_batch, 2, xpay>(tp, stream); break;
       default: errorQuda("nParity = %d undefined\n", arg.nParity);
       }
 #endif
@@ -270,16 +288,16 @@ namespace quda
        @param[in] tp The tuning parameters to use for this kernel
        @param[in] stream The qudaStream_t where the kernel will run
      */
-    template <template <bool, QudaPCType, typename> class P>
+    template <template <bool, QudaPCType, typename> class P, int s_batch = 1>
     inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
     {
 #ifdef JITIFY
       Tunable::jitify_error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
 #else
       if (arg.xpay)
-        instantiate<P, true>(tp, stream);
+        instantiate<P, s_batch, true>(tp, stream);
       else
-        instantiate<P, false>(tp, stream);
+        instantiate<P, s_batch, false>(tp, stream);
 #endif
     }
 
@@ -370,7 +388,9 @@ namespace quda
     virtual TuneKey tuneKey() const
     {
       auto aux_ = (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? aux_pack : aux[arg.kernel_type];
-      return TuneKey(in.VolString(), typeid(*this).name(), aux_);
+      char aux_y[TuneKey::aux_n];
+      sprintf(aux_y, "%s,size_y=%d", aux_, get_vector_y());
+      return TuneKey(in.VolString(), typeid(*this).name(), aux_y);
     }
 
     /**
@@ -406,6 +426,7 @@ namespace quda
 
       For Wilson this should give 1344 for Nc=3,Ns=2 and 1368 for the xpay equivalent
     */
+
     virtual long long flops() const
     {
       int mv_flops = (8 * in.Ncolor() - 2) * in.Ncolor(); // SU(3) matrix-vector flops

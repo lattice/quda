@@ -509,6 +509,7 @@ namespace quda {
     }
 
     void resizeVector(int y) const { vector_length_y = y; }
+    unsigned get_vector_y() const { return vector_length_y; }
     void resizeStep(int y) const { step_y = y; }
   };
 
@@ -566,6 +567,7 @@ namespace quda {
     }
 
     void resizeVector(int y, int z) const { vector_length_z = z;  TunableVectorY::resizeVector(y); }
+    unsigned get_vector_z() const { return vector_length_z; }
     void resizeStep(int y, int z) const { step_z = z;  TunableVectorY::resizeStep(y); }
   };
 

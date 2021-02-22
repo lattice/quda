@@ -445,4 +445,40 @@ namespace quda
     }
   }
 
+  /**
+     @brief template for multiple s per thread (s_batch)
+   */
+  template <template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> class D,
+            template <bool dagger, QudaPCType pc, typename Arg> class P, int s_batch, int nParity, bool dagger, bool xpay,
+            KernelType kernel_type, typename Arg>
+  __global__ void dslashGPU(Arg arg)
+  {
+    D<nParity, dagger, xpay, kernel_type, Arg> dslash(arg);
+
+    int s = (blockDim.y * blockIdx.y + threadIdx.y) * s_batch;
+    if (s >= arg.dc.Ls) return;
+
+    // for full fields set parity from z thread index else use arg setting
+    int parity = nParity == 2 ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
+
+    if (kernel_type == INTERIOR_KERNEL && blockIdx.x < arg.pack_blocks) {
+      // first few blocks do packing kernel
+      P<dagger, dslash.pc_type(), Arg> packer;
+      packer(arg, s, 1 - parity, dslash.twist_pack()); // flip parity since pack is on input
+    } else {
+      const int dslash_block_offset = (kernel_type == INTERIOR_KERNEL ? arg.pack_blocks : 0);
+      int x_cb = (blockIdx.x - dslash_block_offset) * blockDim.x + threadIdx.x;
+      if (x_cb >= arg.threads) return;
+
+#ifdef QUDA_DSLASH_FAST_COMPILE
+      dslash.template operator()<s_batch>(x_cb, s, parity);
+#else
+      switch (parity) {
+      case 0: dslash.template operator()<s_batch>(x_cb, s, 0); break;
+      case 1: dslash.template operator()<s_batch>(x_cb, s, 1); break;
+      }
+#endif
+    }
+  }
+
 } // namespace quda
