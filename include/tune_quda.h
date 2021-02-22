@@ -22,13 +22,19 @@
 
 namespace quda {
 
+  enum class SharedMemoryConfig {
+    Default = 0,  // Default - use whatever configuration is available
+    Max = 1,      // Set maximum shared memory
+    Min = 2       // Set minimum shared memory
+  };
+
   class TuneParam {
 
   public:
     dim3 block;
     dim3 grid;
     int shared_bytes;
-    bool set_max_shared_bytes; // whether to opt in to max shared bytes per thread block
+    SharedMemoryConfig shared_bytes_config; // whether to opt in to max shared bytes per thread block
     int4 aux; // free parameter that can be used as an arbitrary autotuning dimension outside of launch parameters
 
     std::string comment;
@@ -36,7 +42,7 @@ namespace quda {
     long long n_calls;
 
     inline TuneParam() :
-      block(32, 1, 1), grid(1, 1, 1), shared_bytes(0), set_max_shared_bytes(false), aux(), time(FLT_MAX), n_calls(0)
+      block(32, 1, 1), grid(1, 1, 1), shared_bytes(0), shared_bytes_config(SharedMemoryConfig::Default), aux(), time(FLT_MAX), n_calls(0)
     {
       aux = make_int4(1,1,1,1);
     }
@@ -45,7 +51,7 @@ namespace quda {
       block(param.block),
       grid(param.grid),
       shared_bytes(param.shared_bytes),
-      set_max_shared_bytes(param.set_max_shared_bytes),
+      shared_bytes_config(param.shared_bytes_config),
       aux(param.aux),
       comment(param.comment),
       time(param.time),
@@ -58,7 +64,7 @@ namespace quda {
 	block = param.block;
 	grid = param.grid;
 	shared_bytes = param.shared_bytes;
-        set_max_shared_bytes = param.set_max_shared_bytes;
+        shared_bytes_config = param.shared_bytes_config;
         aux = param.aux;
         comment = param.comment;
         time = param.time;

@@ -576,7 +576,7 @@ namespace quda
 
       template <typename T> inline void launch(T *f, const TuneParam &tp, Arg &arg, const qudaStream_t &stream)
       {
-        const_cast<TuneParam &>(tp).set_max_shared_bytes = true;
+        const_cast<TuneParam &>(tp).shared_bytes_config = SharedMemoryConfig::Max;
         qudaLaunchKernel(f, tp, stream, arg);
       }
 

@@ -55,16 +55,19 @@ namespace quda {
 
   qudaError_t qudaLaunchKernel(const void *func, const TuneParam &tp, void **args, qudaStream_t stream)
   {
-    if (tp.set_max_shared_bytes) {
+    if (tp.shared_bytes_config == SharedMemoryConfig::Max || tp.shared_bytes_config == SharedMemoryConfig::Min) {
       static std::unordered_set<const void *> cache;
       auto search = cache.find(func);
       if (search == cache.end()) {
         cache.insert(func);
-        qudaFuncSetAttribute(func, cudaFuncAttributePreferredSharedMemoryCarveout, (int)cudaSharedmemCarveoutMaxShared);
-        cudaFuncAttributes attributes;
-        qudaFuncGetAttributes(attributes, func);
-        qudaFuncSetAttribute(func, cudaFuncAttributeMaxDynamicSharedMemorySize,
-                             device::max_dynamic_shared_memory() - attributes.sharedSizeBytes);
+        qudaFuncSetAttribute(func, cudaFuncAttributePreferredSharedMemoryCarveout,
+          int(tp.shared_bytes_config == SharedMemoryConfig::Max ? cudaSharedmemCarveoutMaxShared : cudaSharedmemCarveoutMaxL1));
+        if (tp.shared_bytes_config == SharedMemoryConfig::Max) {
+          cudaFuncAttributes attributes;
+          qudaFuncGetAttributes(attributes, func);
+          qudaFuncSetAttribute(func, cudaFuncAttributeMaxDynamicSharedMemorySize,
+              device::max_dynamic_shared_memory() - attributes.sharedSizeBytes);
+        }
       }
     }
 

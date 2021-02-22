@@ -162,7 +162,7 @@ namespace quda
     inline typename std::enable_if<(s_batch > 1), void>::type launch(TuneParam &tp, const qudaStream_t &stream)
     {
       if (deviceProp.major >= 7) { // should test whether this is always optimal on Volta
-        tp.set_max_shared_bytes = true;
+        tp.shared_bytes_config = SharedMemoryConfig::Min;
       }
       qudaLaunchKernel(dslashGPU<D, P, s_batch, nParity, dagger, xpay, kernel_type, Arg>, tp, stream, arg);
     }
@@ -177,7 +177,7 @@ namespace quda
     inline typename std::enable_if<(s_batch == 1), void>::type launch(TuneParam &tp, const qudaStream_t &stream)
     {
       if (deviceProp.major >= 7) { // should test whether this is always optimal on Volta
-        tp.set_max_shared_bytes = true;
+        tp.shared_bytes_config = SharedMemoryConfig::Max;
       }
       qudaLaunchKernel(dslashGPU<D, P, nParity, dagger, xpay, kernel_type, Arg>, tp, stream, arg);
     }
