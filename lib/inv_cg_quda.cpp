@@ -237,6 +237,9 @@ namespace quda {
     const int Np = (param.solution_accumulator_pipeline == 0 ? 1 : param.solution_accumulator_pipeline);
     if (Np < 0 || Np > 16) errorQuda("Invalid value %d for solution_accumulator_pipeline\n", Np);
 
+    // Detect whether this is a pure double solve or not; informs the necessity of some stability checks
+    bool is_pure_double = (param.precision == QUDA_DOUBLE_PRECISION && param.precision_sloppy == QUDA_DOUBLE_PRECISION);
+
     // whether to select alternative reliable updates
     bool alternative_reliable = param.use_alternative_reliable;
 
@@ -352,8 +355,9 @@ namespace quda {
     // for detecting HQ residual stalls
     // let |r2/b2| drop to epsilon tolerance * 1e-30, semi-arbitrarily, but
     // with the intent of letting the solve grind as long as possible before
-    // triggering a `NaN`
-    const double hq_res_stall_check = uhigh * uhigh * 1e-60;
+    // triggering a `NaN`. Ignored for pure double solves because if
+    // pure double has stability issues, bigger problems are at hand.
+    const double hq_res_stall_check = is_pure_double ? 0. : uhigh * uhigh * 1e-60;
 
     // compute initial residual
     double r2 = 0.0;
