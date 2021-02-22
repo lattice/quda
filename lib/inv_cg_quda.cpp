@@ -544,7 +544,9 @@ namespace quda {
 
       // For heavy-quark inversion force a reliable update if we continue after,
       // or if r2/b2 has fictitiously dropped too far below precision epsilon
-      if ( use_heavy_quark_res and L2breakdown and (convergenceHQ(r2, heavy_quark_res, stop, param.tol_hq) or (r2 / b2) < hq_res_stall_check ) and param.delta >= param.tol ) {
+      if (use_heavy_quark_res and L2breakdown
+          and (convergenceHQ(r2, heavy_quark_res, stop, param.tol_hq) or (r2 / b2) < hq_res_stall_check)
+          and param.delta >= param.tol) {
         updateX = 1;
       }
 
