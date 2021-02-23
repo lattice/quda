@@ -564,19 +564,11 @@ namespace quda {
     void PrintSummary(const char *name, int k, double r2, double b2, double r2_tol, double hq_tol);
 
     /**
-       @brief Helper function which returns the epsilon tolerance for a given precision
+       @brief Returns the epsilon tolerance for a given precision, by default returns
+       the solver precision.
+       @param[in] prec Input precision, default value is solver precision
     */
-    const double solverPrecisionEpsilonHelper(QudaPrecision prec) const;
-
-    /**
-       @brief Returns the epsilon tolerance of the solver precision
-    */
-    const double solverPrecisionEpsilon() const;
-
-    /**
-       @brief Returns the epsilon tolerance of the solver sloppy precision
-    */
-    const double solverPrecisionSloppyEpsilon() const;
+    const double precisionEpsilon(QudaPrecision prec = QUDA_INVALID_PRECISION);
 
     /**
        @brief Constructs the deflation space and eigensolver

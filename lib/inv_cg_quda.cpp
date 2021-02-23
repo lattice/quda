@@ -330,8 +330,8 @@ namespace quda {
     // alternative reliable updates
     // alternative reliable updates - set precision - does not hurt performance here
 
-    const double u = solverPrecisionSloppyEpsilon();
-    const double uhigh = solverPrecisionEpsilon();
+    const double u = precisionEpsilon(param.precision_sloppy);
+    const double uhigh = precisionEpsilon(); // solver precision
 
     const double deps=sqrt(u);
     constexpr double dfac = 1.1;

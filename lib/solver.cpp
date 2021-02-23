@@ -407,9 +407,11 @@ namespace quda {
     }
   }
 
-  const double Solver::solverPrecisionEpsilonHelper(QudaPrecision prec) const
+  const double Solver::precisionEpsilon(QudaPrecision prec)
   {
     double eps = 0.;
+    if (prec == QUDA_INVALID_PRECISION) { prec = param.precision; }
+
     switch (prec) {
     case QUDA_DOUBLE_PRECISION: eps = std::numeric_limits<double>::epsilon() / 2.; break;
     case QUDA_SINGLE_PRECISION: eps = std::numeric_limits<float>::epsilon() / 2.; break;
@@ -418,13 +420,6 @@ namespace quda {
     default: errorQuda("Invalid precision %d", param.precision); break;
     }
     return eps;
-  }
-
-  const double Solver::solverPrecisionEpsilon() const { return solverPrecisionEpsilonHelper(param.precision); }
-
-  const double Solver::solverPrecisionSloppyEpsilon() const
-  {
-    return solverPrecisionEpsilonHelper(param.precision_sloppy);
   }
 
   bool MultiShiftSolver::convergence(const double *r2, const double *r2_tol, int n) const {
