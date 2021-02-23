@@ -22,8 +22,6 @@
 
 using namespace quda;
 
-#define staggeredSpinorSiteSize 6
-
 dslash_test_type dtest_type = dslash_test_type::Dslash;
 CLI::TransformPairs<dslash_test_type> dtest_type_map {
   {"Dslash", dslash_test_type::Dslash}, {"MatPC", dslash_test_type::MatPC}, {"Mat", dslash_test_type::Mat}
@@ -232,7 +230,6 @@ struct StaggeredDslashTestWrapper {
       warningQuda("Ignoring Nsrc = %d, setting to 1.", Nsrc);
       Nsrc = 1;
     }
-    setSpinorSiteSize(staggeredSpinorSiteSize);
 
     // Allocate a lot of memory because I'm very confused
     void *milc_fatlink_cpu = malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
