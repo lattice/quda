@@ -180,8 +180,6 @@ int main(int argc, char **argv)
   // *** Everything between here and the timer is application specific
   setDims(gauge_param.X);
 
-  setSpinorSiteSize(24);
-
   // Allocate host side memory for the gauge field.
   //----------------------------------------------------------------------------
   void *gauge[4];

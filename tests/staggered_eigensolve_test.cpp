@@ -115,7 +115,6 @@ int main(int argc, char **argv)
 
   setDims(gauge_param.X);
   dw_setDims(gauge_param.X, 1); // so we can use 5-d indexing from dwf
-  setSpinorSiteSize(6);
 
   // Staggered Gauge construct START
   //-----------------------------------------------------------------------------------
@@ -158,7 +157,7 @@ int main(int argc, char **argv)
   // Host side arrays to store the eigenpairs computed by QUDA
   void **host_evecs = (void **)malloc(eig_n_conv * sizeof(void *));
   for (int i = 0; i < eig_n_conv; i++) {
-    host_evecs[i] = (void *)malloc(V * my_spinor_site_size * eig_inv_param.cpu_prec);
+    host_evecs[i] = (void *)malloc(V * stag_spinor_site_size * eig_inv_param.cpu_prec);
   }
   double _Complex *host_evals = (double _Complex *)malloc(eig_param.n_ev * sizeof(double _Complex));
 

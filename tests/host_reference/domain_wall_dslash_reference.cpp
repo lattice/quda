@@ -327,9 +327,8 @@ void dslashReference_4d_sgpu(sFloat *res, gFloat **gaugeFull, sFloat *spinorFiel
 #ifdef MULTI_GPU
 template <QudaPCType type, typename sFloat, typename gFloat>
 void dslashReference_4d_mgpu(sFloat *res, gFloat **gaugeFull, gFloat **ghostGauge, sFloat *spinorField,
-    sFloat **fwdSpinor, sFloat **backSpinor, int oddBit, int daggerBit)
+                             sFloat **fwdSpinor, sFloat **backSpinor, int oddBit, int daggerBit)
 {
-  // int my_spinor_site_size = 24;
   for (int i = 0; i < V5h * spinor_site_size; i++) res[i] = 0.0;
 
   gFloat *gaugeEven[4], *gaugeOdd[4];

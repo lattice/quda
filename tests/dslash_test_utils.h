@@ -140,8 +140,6 @@ struct DslashTestWrapper {
       Ls = 1;
     }
 
-    setSpinorSiteSize(24);
-
     inv_param.dagger = dagger ? QUDA_DAG_YES : QUDA_DAG_NO;
     not_dagger = dagger ? QUDA_DAG_NO : QUDA_DAG_YES;
 

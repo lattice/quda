@@ -1021,7 +1021,6 @@ int main(int argc, char** argv)
     Ncolor = 3;
   }
 
-  setSpinorSiteSize(24);
   initComms(argc, argv, gridsize_from_cmdline);
   display_test_info();
   initQuda(device_ordinal);
