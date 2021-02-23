@@ -1,5 +1,3 @@
-#pragma once
-
 #/*
 # enum_quda_fortran.h
 #
