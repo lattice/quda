@@ -568,7 +568,7 @@ namespace quda {
        the solver precision.
        @param[in] prec Input precision, default value is solver precision
     */
-    const double precisionEpsilon(QudaPrecision prec = QUDA_INVALID_PRECISION);
+    double precisionEpsilon(QudaPrecision prec = QUDA_INVALID_PRECISION) const;
 
     /**
        @brief Constructs the deflation space and eigensolver

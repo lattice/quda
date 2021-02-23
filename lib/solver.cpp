@@ -407,7 +407,7 @@ namespace quda {
     }
   }
 
-  const double Solver::precisionEpsilon(QudaPrecision prec)
+  double Solver::precisionEpsilon(QudaPrecision prec) const
   {
     double eps = 0.;
     if (prec == QUDA_INVALID_PRECISION) { prec = param.precision; }
