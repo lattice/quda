@@ -407,6 +407,21 @@ namespace quda {
     }
   }
 
+  double Solver::precisionEpsilon(QudaPrecision prec) const
+  {
+    double eps = 0.;
+    if (prec == QUDA_INVALID_PRECISION) { prec = param.precision; }
+
+    switch (prec) {
+    case QUDA_DOUBLE_PRECISION: eps = std::numeric_limits<double>::epsilon() / 2.; break;
+    case QUDA_SINGLE_PRECISION: eps = std::numeric_limits<float>::epsilon() / 2.; break;
+    case QUDA_HALF_PRECISION: eps = pow(2., -13); break;
+    case QUDA_QUARTER_PRECISION: eps = pow(2., -6); break;
+    default: errorQuda("Invalid precision %d", param.precision); break;
+    }
+    return eps;
+  }
+
   bool MultiShiftSolver::convergence(const double *r2, const double *r2_tol, int n) const {
 
     // check the L2 relative residual norm if necessary
