@@ -9,7 +9,6 @@ target_sources(
   dslash_test_helpers.cpp
   gauge_force_reference.cpp
   hisq_force_reference.cpp
-  hisq_force_reference2.cpp
   staggered_dslash_reference.cpp
   wilson_dslash_reference.cpp)
 

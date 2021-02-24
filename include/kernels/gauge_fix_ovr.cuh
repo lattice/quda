@@ -13,7 +13,8 @@ namespace quda {
    * @brief container to pass parameters for the gauge fixing quality kernel
    */
   template <typename store_t, QudaReconstructType recon_, int gauge_dir_>
-  struct GaugeFixQualityOVRArg : public ReduceArg<double2> {
+  struct GaugeFixQualityOVRArg : public ReduceArg<vector_type<double, 2>> {
+    using reduce_t = vector_type<double, 2>;
     using real = typename mapper<store_t>::type;
     static constexpr QudaReconstructType recon = recon_;
     using Gauge = typename gauge_mapper<store_t, recon>::type;
@@ -22,11 +23,11 @@ namespace quda {
     int X[4]; // grid dimensions
     int border[4];
     Gauge data;
-    double2 result;
+    reduce_t result;
     dim3 threads; // number of active threads required
 
     GaugeFixQualityOVRArg(const GaugeField &data) :
-      ReduceArg<double2>(1, true), // reset = true
+      ReduceArg<reduce_t>(1, true), // reset = true
       data(data),
       threads(data.LocalVolumeCB(), 2, 1)
     {
@@ -36,13 +37,13 @@ namespace quda {
       }
     }
 
-    __device__ __host__ double2 init() const { return zero<double2>(); }
-    double getAction(){ return result.x; }
-    double getTheta(){ return result.y; }
+    __device__ __host__ reduce_t init() const { return reduce_t(); }
+    double getAction(){ return result[0]; }
+    double getTheta(){ return result[1]; }
   };
 
-  template <typename Arg> struct FixQualityOVR : plus<double2> {
-    using reduce_t = double2;
+  template <typename Arg> struct FixQualityOVR : plus<vector_type<double, 2>> {
+    using reduce_t = vector_type<double, 2>;
     using plus<reduce_t>::operator();
     Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
@@ -75,7 +76,7 @@ namespace quda {
         delta -= U;
       }
       //18*gauge_dir
-      data.x = -delta(0, 0).real() - delta(1, 1).real() - delta(2, 2).real();
+      data[0] = -delta(0, 0).real() - delta(1, 1).real() - delta(2, 2).real();
       //2
       //load downward links
       for (int mu = 0; mu < Arg::gauge_dir; mu++) {
@@ -87,7 +88,7 @@ namespace quda {
       //18
       SubTraceUnit(delta);
       //12
-      data.y = getRealTraceUVdagger(delta, delta);
+      data[1] = getRealTraceUVdagger(delta, delta);
       //35
       //T=36*gauge_dir+65
 
@@ -187,6 +188,7 @@ namespace quda {
           // 8 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
           // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
         case 2: GaugeFixHit_NoAtomicAdd_LessSM<real, Arg::gauge_dir, 3>(link, arg.relax_boost, mu); break;
+        default: break;
         }
 
         arg.u(dim, idx, parity) = link;
@@ -213,6 +215,7 @@ namespace quda {
           // 4 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
           // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
         case 5: GaugeFixHit_NoAtomicAdd_LessSM<real, Arg::gauge_dir, 3>(link, link1, arg.relax_boost, mu); break;
+        default: break;
         }
 
         arg.u(mu, idx, parity) = link;

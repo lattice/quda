@@ -4,6 +4,7 @@
 #include <float_vector.h>
 #include <shared_memory_cache_helper.cuh>
 #include <kernel.h>
+#include <warp_collective.h>
 
 namespace quda {
 
@@ -305,16 +306,8 @@ namespace quda {
     if (dir==0 && dim==0) {
       const int my_spinor_parity = (arg.nParity == 2) ? parity : 0;
 
-#pragma unroll
-      for (int color_local=0; color_local<Mc; color_local++) {
-	// reduce down to the first group of column-split threads
-	constexpr int warp_size = device::warp_size(); // FIXME - this is buggy when x-dim * color_stride < 32
-#pragma unroll
-	for (int offset = warp_size/2; offset >= warp_size/Arg::color_stride; offset /= 2) {
-          out[color_local].real(out[color_local].real() + __shfl_down_sync(device::warp_converged_mask(), out[color_local].real(), offset));
-          out[color_local].imag(out[color_local].imag() + __shfl_down_sync(device::warp_converged_mask(), out[color_local].imag(), offset));
-        }
-      }
+      // reduce down to the first group of column-split threads
+      out = warp_combine<Arg::color_stride>(out);
 
 #pragma unroll
       for (int color_local=0; color_local<Mc; color_local++) {
