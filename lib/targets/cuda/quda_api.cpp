@@ -72,11 +72,11 @@ namespace quda {
     cudaMemcpyKind qudaMemcpyKindToAPI( const qudaMemcpyKind& k)
     {
       switch(k) {
-      case qudaMemcpyHostToHost : return cudaMemcpyHostToHost; break;
-      case qudaMemcpyHostToDevice : return cudaMemcpyHostToDevice; break;
-      case qudaMemcpyDeviceToHost : return cudaMemcpyDeviceToHost; break;
-      case qudaMemcpyDeviceToDevice : return cudaMemcpyDeviceToDevice; break;
-      case qudaMemcpyDefault : return cudaMemcpyDefault; break;
+      case qudaMemcpyHostToHost : return cudaMemcpyHostToHost;
+      case qudaMemcpyHostToDevice : return cudaMemcpyHostToDevice;
+      case qudaMemcpyDeviceToHost : return cudaMemcpyDeviceToHost;
+      case qudaMemcpyDeviceToDevice : return cudaMemcpyDeviceToDevice;
+      case qudaMemcpyDefault : return cudaMemcpyDefault;
       default:
 	errorQuda(" unknown value for qudaMemcpyKind %d", static_cast<int>(k));
 	return cudaMemcpyDefault; // keep warnings away

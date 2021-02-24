@@ -333,6 +333,10 @@ namespace quda {
 
     vector_type(const vector_type<scalar, n> &) = default;
     vector_type(vector_type<scalar, n> &&) = default;
+
+    template <typename... T>
+    constexpr vector_type(T... data) : data{data...} {}
+
     vector_type<scalar, n>& operator=(const vector_type<scalar, n> &) = default;
     vector_type<scalar, n>& operator=(vector_type<scalar, n> &&) = default;
   };

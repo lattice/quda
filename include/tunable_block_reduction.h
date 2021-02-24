@@ -68,7 +68,7 @@ namespace quda {
 #endif
     }
 
-    template <int block_size, template <int, typename> class Transformer, typename Arg>
+    template <unsigned int block_size, template <int, typename> class Transformer, typename Arg>
     void kernel(Arg &arg)
     {
       Transformer<block_size, Arg> t(arg);
@@ -83,14 +83,14 @@ namespace quda {
     template <int idx, typename Block, template <int, typename> class Transformer, typename Arg>
       typename std::enable_if<idx != 0, void>::type launch_host(const TuneParam &tp, Arg &arg)
     {
-      if (tp.block.x == Block::block[idx]) kernel<Block::block[idx], Transformer>(arg);
+      if (tp.block.x == Block::block[idx]) kernel<Block::block[idx], Transformer, Arg>(arg);
       else launch_host<idx - 1, Block, Transformer>(tp, arg);
     }
 
     template <int idx, typename Block, template <int, typename> class Transformer, typename Arg>
       typename std::enable_if<idx == 0, void>::type launch_host(const TuneParam &tp, Arg &arg)
     {
-      if (tp.block.x == Block::block[idx]) kernel<Block::block[idx], Transformer>(arg);
+      if (tp.block.x == Block::block[idx]) kernel<Block::block[idx], Transformer, Arg>(arg);
       else errorQuda("Unexpected block size %d\n", tp.block.x);
     }
 

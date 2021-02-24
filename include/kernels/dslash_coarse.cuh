@@ -5,6 +5,7 @@
 #include <float_vector.h>
 #include <shared_memory_cache_helper.cuh>
 #include <kernel.h>
+#include <warp_collective.h>
 
 namespace quda {
 
@@ -307,32 +308,9 @@ namespace quda {
     if (dir==0 && dim==0) {
       const int my_spinor_parity = (arg.nParity == 2) ? parity : 0;
 
-#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
+      // reduce down to the first group of column-split threads
+      out = warp_combine<Arg::color_stride>(out);
 
-#pragma unroll
-      for (int color_local=0; color_local<Mc; color_local++) {
-	// reduce down to the first group of column-split threads
-	constexpr int warp_size = device::warp_size(); // FIXME - this is buggy when x-dim * color_stride < 32
-#pragma unroll
-	
-	for (int offset = warp_size/2; offset >= warp_size/Arg::color_stride; offset /= 2) {
-	  // THIS LOOP DOES NOT GET EXECUTED on CPUs since there the Arg::color_stride = 1 
-#if defined(QUDA_TARGET_CUDA)
-	  out[color_local].real(out[color_local].real() + __shfl_down_sync(device::warp_converged_mask(), out[color_local].real(), offset));
-	  out[color_local].imag(out[color_local].imag() + __shfl_down_sync(device::warp_converged_mask(), out[color_local].imag(), offset));
-#elif defined(QUDA_TARGET_HIP)
-	  Float sh_r = Float(out[color_local].real());
-	  Float sh_i = Float(out[color_local].imag());
-
-	  
-	  out[color_local] += complex<Float>{ __shfl_down(sh_r,offset) , __shfl_down(sh_i,offset) };
-#else
-#error "This file needs some kind of shuffle"
-#endif
-	} // warp reduction loop
-      } // color local loop
-#endif // __CUDA_ARCH__ || __HIP_DEVICE_COMPILE__
-      
 #pragma unroll
       for (int color_local=0; color_local<Mc; color_local++) {
 	int c = color_block + color_local; // global color index

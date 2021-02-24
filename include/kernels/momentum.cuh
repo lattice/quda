@@ -64,8 +64,9 @@ namespace quda {
   };
 
   template<typename Float_, int nColor, QudaReconstructType recon>
-  struct UpdateMomArg : ReduceArg<double2>, BaseArg<Float_, nColor, recon>
+  struct UpdateMomArg : ReduceArg<vector_type<double, 2>>, BaseArg<Float_, nColor, recon>
   {
+    using reduce_t = vector_type<double, 2>;
     using Float = Float_;
     typename gauge_mapper<Float, QUDA_RECONSTRUCT_10>::type mom;
     typename gauge_mapper<Float, recon>::type force;
@@ -87,11 +88,11 @@ namespace quda {
       }
     }
 
-    __device__ __host__ double2 init() const{ return zero<double2>(); }
+    __device__ __host__ reduce_t init() const{ return reduce_t(); }
   };
 
   template <typename Arg> struct MomUpdate {
-    using reduce_t = double2;
+    using reduce_t = vector_type<double, 2>;
     Arg &arg;
     constexpr MomUpdate(Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
@@ -105,8 +106,8 @@ namespace quda {
     __device__ __host__ inline reduce_t operator()(const reduce_t &a, const reduce_t &b) const
     {
       auto c = a;
-      if (b.x > a.x) c.x = b.x;
-      if (b.y > a.y) c.y = b.y;
+      if (b[0] > a[0]) c[0] = b[0];
+      if (b[1] > a[1]) c[1] = b[1];
       return c;
     }
 
@@ -129,7 +130,7 @@ namespace quda {
         makeAntiHerm(f);
 
         // compute force norms
-        norm = operator()(make_double2(f.L1(), f.L2()), norm);
+        norm = operator()(reduce_t(f.L1(), f.L2()), norm);
 
         m = m + arg.coeff * f;
 
