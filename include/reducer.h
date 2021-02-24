@@ -1,9 +1,11 @@
+#include<quda_arch.h> // Load runtime for double2, double3 support
+
 #pragma once
 namespace quda {
 
   template <typename T> struct plus {
     static constexpr bool do_sum = true;
-    __device__ __host__ T operator()(T a, T b) const { return a + b; }
+    __device__ __host__ inline T operator()(T a, T b) const { return a + b; }
   };
   
   template<>
@@ -11,10 +13,26 @@ namespace quda {
     static constexpr bool do_sum = true;
 
     __device__ __host__ inline double2 operator()( double2 a, double2 b ) const {
-            return double2{ 
-		    static_cast<double>(a.x) + static_cast<double>(b.x),
-		    static_cast<double>(a.y) + static_cast<double>(b.y) 
-                   };;
+      return double2{
+	    static_cast<double>(a.x) + static_cast<double>(b.x),
+	    static_cast<double>(a.y) + static_cast<double>(b.y)
+      };
+
+    }
+  };
+
+
+  // Workaround HIP's strange double3 implementation
+  template<>
+  struct plus<double3> {
+    static constexpr bool do_sum = true;
+
+    __device__ __host__ inline double3 operator()( double3 a, double3 b ) const {
+      return double3{
+	    static_cast<double>(a.x) + static_cast<double>(b.x),
+		static_cast<double>(a.y) + static_cast<double>(b.y),
+		static_cast<double>(a.z) + static_cast<double>(b.z)
+      };
 		
     }
   };
