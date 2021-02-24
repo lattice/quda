@@ -151,7 +151,8 @@ namespace quda {
    * @brief container to pass parameters for the gauge fixing quality kernel
    */
   template <typename store_t, QudaReconstructType recon_, int gauge_dir_>
-  struct GaugeFixQualityFFTArg : public ReduceArg<double2> {
+  struct GaugeFixQualityFFTArg : public ReduceArg<vector_type<double, 2>> {
+    using reduce_t = vector_type<double, 2>;
     using real = typename mapper<store_t>::type;
     static constexpr QudaReconstructType recon = recon_;
     using Gauge = typename gauge_mapper<store_t, recon>::type;
@@ -160,12 +161,12 @@ namespace quda {
     int_fastdiv X[4];     // grid dimensions
     Gauge data;
     complex<real> *delta;
-    double2 result;
+    reduce_t result;
     int volume;
     dim3 threads;     // number of active threads required
 
     GaugeFixQualityFFTArg(const GaugeField &data, complex<real> *delta) :
-      ReduceArg<double2>(1, true), // reset = true
+      ReduceArg<reduce_t>(1, true), // reset = true
       data(data),
       delta(delta),
       volume(data.Volume()),
@@ -174,13 +175,13 @@ namespace quda {
       for (int dir = 0; dir < 4; dir++) X[dir] = data.X()[dir];
     }
 
-    __device__ __host__ double2 init() const { return zero<double2>(); }
-    double getAction() { return result.x; }
-    double getTheta() { return result.y; }
+    __device__ __host__ reduce_t init() const { return reduce_t(); }
+    double getAction() { return result[0]; }
+    double getTheta() { return result[1]; }
   };
 
-  template <typename Arg> struct FixQualityFFT : plus<double2> {
-    using reduce_t = double2;
+  template <typename Arg> struct FixQualityFFT : plus<vector_type<double, 2>> {
+    using reduce_t = vector_type<double, 2>;
     using plus<reduce_t>::operator();
     Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
@@ -203,7 +204,7 @@ namespace quda {
         delta -= U;
       }
       //18*gauge_dir
-      data.x = -delta(0, 0).x - delta(1, 1).x - delta(2, 2).x;
+      data[0] = -delta(0, 0).real() - delta(1, 1).real() - delta(2, 2).real();
       //2
       for (int mu = 0; mu < Arg::gauge_dir; mu++) {
         matrix U = arg.data(mu, linkIndexM1(x, arg.X, mu), 1 - parity);
@@ -225,7 +226,7 @@ namespace quda {
       arg.delta[idx + 5 * arg.volume] = delta(2,2);
 
       //12
-      data.y = getRealTraceUVdagger(delta, delta);
+      data[1] = getRealTraceUVdagger(delta, delta);
 
       //35
       //T=36*gauge_dir+65
