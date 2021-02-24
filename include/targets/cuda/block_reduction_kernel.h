@@ -40,7 +40,7 @@ namespace quda {
      templated, e.g., for efficient reductions, and typically the y
      thread dimension is a trivial vectorizable dimension.
   */
-  template <int block_size, template <int, typename> class Transformer, typename Arg>
+  template <unsigned int block_size, template <int, typename> class Transformer, typename Arg>
   __launch_bounds__(Arg::launch_bounds || block_size > 512 ? block_size : 0) __global__ void BlockKernel2D(Arg arg)
   {
     const dim3 block_idx(virtual_block_idx(arg), blockIdx.y, 0);
