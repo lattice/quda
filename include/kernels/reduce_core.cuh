@@ -94,10 +94,10 @@ namespace quda
       static constexpr bool site_unroll = site_unroll_;
 
       //! pre-computation routine called before the "M-loop"
-      virtual __device__ __host__ void pre() { ; }
+      __device__ __host__ void pre() { ; }
 
       //! post-computation routine called after the "M-loop"
-      virtual __device__ __host__ void post(reduce_t &) { ; }
+      __device__ __host__ void post(reduce_t &) { ; }
     };
 
     /**
@@ -429,8 +429,10 @@ namespace quda
        true.
     */
     template <typename real_reduce_t, typename real>
-    struct HeavyQuarkResidualNorm_ : public ReduceFunctor<typename VectorType<real_reduce_t, 3>::type, true> {
+    struct HeavyQuarkResidualNorm_ {
       using reduce_t = typename VectorType<real_reduce_t, 3>::type;
+      static constexpr bool site_unroll = true;
+
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<> write{ };
       reduce_t aux;
@@ -472,8 +474,10 @@ namespace quda
       be set true.
     */
     template <typename real_reduce_t, typename real>
-    struct xpyHeavyQuarkResidualNorm_ : public ReduceFunctor<typename VectorType<real_reduce_t, 3>::type, true> {
+    struct xpyHeavyQuarkResidualNorm_ {
       using reduce_t = typename VectorType<real_reduce_t, 3>::type;
+      static constexpr bool site_unroll = true;
+
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<> write{ };
       reduce_t aux;

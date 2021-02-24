@@ -165,14 +165,23 @@ namespace quda {
     /** Array storing the length of dimension */
     int x[QUDA_MAX_DIM];
 
-    int surface[QUDA_MAX_DIM];
-    int surfaceCB[QUDA_MAX_DIM];
-
-    int local_surface[QUDA_MAX_DIM];
-    int local_surfaceCB[QUDA_MAX_DIM];
-
     /** The extended lattice radius (if applicable) */
     int r[QUDA_MAX_DIM];
+
+    /** Array storing the local dimensions (x - 2 * r) */
+    int local_x[QUDA_MAX_DIM];
+
+    /** Array storing the surface size in each dimension */
+    int surface[QUDA_MAX_DIM];
+
+    /** Array storing the checkerboarded surface size in each dimension */
+    int surfaceCB[QUDA_MAX_DIM];
+
+    /** Array storing the local surface size in each dimension */
+    int local_surface[QUDA_MAX_DIM];
+
+    /** Array storing the local surface size in each dimension */
+    int local_surfaceCB[QUDA_MAX_DIM];
 
     /** Precision of the field */
     QudaPrecision precision;
@@ -508,6 +517,16 @@ namespace quda {
     const int* X() const { return x; }
 
     /**
+       @return Extended field radius
+    */
+    const int* R() const { return r; }
+
+    /**
+       @return Local checkboarded lattice dimensions
+    */
+    const int* LocalX() const { return local_x; }
+
+    /**
        @return The full-field volume
     */
     size_t Volume() const { return volume; }
@@ -561,11 +580,6 @@ namespace quda {
     */
     int Pad() const { return pad; }
     
-    /**
-       @return Extended field radius
-    */
-    const int* R() const { return r; }
-
     /**
        @return Type of ghost exchange
      */

@@ -13,39 +13,53 @@ namespace quda {
 
     template <typename Arg> class FatLinkForce : public TunableKernel3D {
       Arg &arg;
-      const GaugeField &meta;
+      const GaugeField &outA;
+      const GaugeField &outB;
+      const GaugeField &pMu;
+      const GaugeField &qMu;
+      const GaugeField &p3;
+      const GaugeField &link;
       const HisqForceType type;
       unsigned int minThreads() const { return arg.threads.x; }
 
     public:
-      FatLinkForce(Arg &arg, const GaugeField &meta, int sig, int mu, HisqForceType type) :
-        TunableKernel3D(meta, 2, type == FORCE_ONE_LINK ? 4 : 1),
+      FatLinkForce(Arg &arg, const GaugeField &link, int sig, int mu, HisqForceType type,
+                   const GaugeField &outA, const GaugeField &outB, const GaugeField &pMu,
+                   const GaugeField &qMu, const GaugeField &p3) :
+        TunableKernel3D(link, 2, type == FORCE_ONE_LINK ? 4 : 1),
         arg(arg),
-        meta(meta),
+        outA(outA),
+        outB(outB),
+        pMu(pMu),
+        qMu(qMu),
+        p3(p3),
+        link(link),
         type(type)
       {
         arg.sig = sig;
         arg.mu = mu;
-      }
 
-      TuneKey tuneKey() const {
-        std::stringstream aux;
-        aux << meta.AuxString() << comm_dim_partitioned_string() << ",threads=" << arg.threads.x;
+        strcat(aux, (std::string(comm_dim_partitioned_string()) + "threads=" + std::to_string(arg.threads.x)).c_str());
         if (type == FORCE_MIDDLE_LINK || type == FORCE_LEPAGE_MIDDLE_LINK)
-          aux << ",sig=" << arg.sig << ",mu=" << arg.mu << ",pMu=" << arg.p_mu << ",q_mu=" << arg.q_mu << ",q_prev=" << arg.q_prev;
+          strcat(aux, (std::string(",sig=") + std::to_string(arg.sig) +
+                       std::string(",mu=") + std::to_string(arg.mu) +
+                       std::string(",pMu=") + std::to_string(arg.p_mu) +
+                       std::string(",q_mu=") + std::to_string(arg.q_mu) +
+                       std::string(",q_prev=") + std::to_string(arg.q_prev)).c_str());
         else if (type != FORCE_ONE_LINK)
-          aux << ",mu=" << arg.mu; // no sig dependence needed for side link
+          strcat(aux, (std::string(",mu=") + std::to_string(arg.mu)).c_str()); // no sig dependence needed for side link
 
         switch (type) {
-        case FORCE_ONE_LINK:           aux << ",ONE_LINK";           break;
-        case FORCE_ALL_LINK:           aux << ",ALL_LINK";           break;
-        case FORCE_MIDDLE_LINK:        aux << ",MIDDLE_LINK";        break;
-        case FORCE_LEPAGE_MIDDLE_LINK: aux << ",LEPAGE_MIDDLE_LINK"; break;
-        case FORCE_SIDE_LINK:          aux << ",SIDE_LINK";          break;
-        case FORCE_SIDE_LINK_SHORT:    aux << ",SIDE_LINK_SHORT";    break;
+        case FORCE_ONE_LINK:           strcat(aux, ",ONE_LINK");           break;
+        case FORCE_ALL_LINK:           strcat(aux, ",ALL_LINK");           break;
+        case FORCE_MIDDLE_LINK:        strcat(aux, ",MIDDLE_LINK");        break;
+        case FORCE_LEPAGE_MIDDLE_LINK: strcat(aux, ",LEPAGE_MIDDLE_LINK"); break;
+        case FORCE_SIDE_LINK:          strcat(aux, ",SIDE_LINK");          break;
+        case FORCE_SIDE_LINK_SHORT:    strcat(aux, ",SIDE_LINK_SHORT");    break;
         default: errorQuda("Undefined force type %d", type);
         }
-        return TuneKey(meta.VolString(), typeid(*this).name(), aux.str().c_str());
+
+        apply(device::get_default_stream());
       }
 
       void apply(const qudaStream_t &stream)
@@ -125,28 +139,28 @@ namespace quda {
       void preTune() {
         switch (type) {
         case FORCE_ONE_LINK:
-          arg.outA.save();
+          outA.backup();
           break;
         case FORCE_ALL_LINK:
-          arg.outA.save();
-          arg.outB.save();
+          outA.backup();
+          outB.backup();
           break;
         case FORCE_MIDDLE_LINK:
-          arg.pMu.save();
-          arg.qMu.save();
-          arg.outA.save();
-          arg.p3.save();
+          pMu.backup();
+          qMu.backup();
+          outA.backup();
+          p3.backup();
           break;
         case FORCE_LEPAGE_MIDDLE_LINK:
-          arg.outA.save();
-          arg.p3.save();
+          outA.backup();
+          p3.backup();
           break;
         case FORCE_SIDE_LINK:
-          arg.outB.save();
-          arg.outA.save();
+          outB.backup();
+          outA.backup();
           break;
         case FORCE_SIDE_LINK_SHORT:
-          arg.outA.save();
+          outA.backup();
           break;
         default: errorQuda("Undefined force type %d", type);
         }
@@ -155,28 +169,28 @@ namespace quda {
       void postTune() {
         switch (type) {
         case FORCE_ONE_LINK:
-          arg.outA.load();
+          outA.restore();
           break;
         case FORCE_ALL_LINK:
-          arg.outA.load();
-          arg.outB.load();
+          outA.restore();
+          outB.restore();
           break;
         case FORCE_MIDDLE_LINK:
-          arg.pMu.load();
-          arg.qMu.load();
-          arg.outA.load();
-          arg.p3.load();
+          pMu.restore();
+          qMu.restore();
+          outA.restore();
+          p3.restore();
           break;
         case FORCE_LEPAGE_MIDDLE_LINK:
-          arg.outA.load();
-          arg.p3.load();
+          outA.restore();
+          p3.restore();
           break;
         case FORCE_SIDE_LINK:
-          arg.outB.load();
-          arg.outA.load();
+          outB.restore();
+          outA.restore();
           break;
         case FORCE_SIDE_LINK_SHORT:
-          arg.outA.load();
+          outA.restore();
           break;
         default: errorQuda("Undefined force type %d", type);
         }
@@ -247,8 +261,7 @@ namespace quda {
         {
           FatLinkArg<real, nColor> arg(newOprod, oprod, link, OneLink, FORCE_ONE_LINK);
           arg.threads.z = 4;
-          FatLinkForce<decltype(arg)> oneLink(arg, link, 0, 0, FORCE_ONE_LINK);
-          oneLink.apply(device::get_default_stream());
+          FatLinkForce<decltype(arg)> oneLink(arg, link, 0, 0, FORCE_ONE_LINK, newOprod, newOprod, oprod, oprod, oprod);
         }
 
         for (int sig=0; sig<8; sig++) {
@@ -258,50 +271,43 @@ namespace quda {
             //3-link
             //Kernel A: middle link
             FatLinkArg<real, nColor> middleLinkArg(newOprod, Pmu, P3, Qmu, oprod, link, mThreeSt, 2, FORCE_MIDDLE_LINK);
-            FatLinkForce<decltype(middleLinkArg)> middleLink(middleLinkArg, link, sig, mu, FORCE_MIDDLE_LINK);
-            middleLink.apply(device::get_default_stream());
+            FatLinkForce<decltype(middleLinkArg)> middleLink(middleLinkArg, link, sig, mu, FORCE_MIDDLE_LINK, newOprod, newOprod, Pmu, P3, Qmu);
 
             for (int nu=0; nu < 8; nu++) {
               if (nu == sig || nu == opp_dir(sig) || nu == mu || nu == opp_dir(mu)) continue;
 
               //5-link: middle link
               //Kernel B
-              FatLinkArg<real, nColor> middleLinkArg( newOprod, Pnumu, P5, Qnumu, Pmu, Qmu, link, FiveSt, 1, FORCE_MIDDLE_LINK);
-              FatLinkForce<decltype(middleLinkArg)> middleLink(middleLinkArg, link, sig, nu, FORCE_MIDDLE_LINK);
-              middleLink.apply(device::get_default_stream());
+              FatLinkArg<real, nColor> middleLinkArg(newOprod, Pnumu, P5, Qnumu, Pmu, Qmu, link, FiveSt, 1, FORCE_MIDDLE_LINK);
+              FatLinkForce<decltype(middleLinkArg)> middleLink(middleLinkArg, link, sig, nu, FORCE_MIDDLE_LINK, newOprod, newOprod, Pnumu, P5, Qnumu);
 
               for (int rho = 0; rho < 8; rho++) {
                 if (rho == sig || rho == opp_dir(sig) || rho == mu || rho == opp_dir(mu) || rho == nu || rho == opp_dir(nu)) continue;
 
                 //7-link: middle link and side link
                 FatLinkArg<real, nColor> arg(newOprod, P5, Pnumu, Qnumu, link, SevenSt, FiveSt != 0 ? SevenSt/FiveSt : 0, 1, FORCE_ALL_LINK, true);
-                FatLinkForce<decltype(arg)> all(arg, link, sig, rho, FORCE_ALL_LINK);
-                all.apply(device::get_default_stream());
+                FatLinkForce<decltype(arg)> all(arg, link, sig, rho, FORCE_ALL_LINK, newOprod, P5, P5, P5, Qnumu);
 
               }//rho
 
               //5-link: side link
               FatLinkArg<real, nColor> arg(newOprod, P3, P5, Qmu, link, mFiveSt, (ThreeSt != 0 ? FiveSt/ThreeSt : 0), 1, FORCE_SIDE_LINK);
-              FatLinkForce<decltype(arg)> side(arg, link, sig, nu, FORCE_SIDE_LINK);
-              side.apply(device::get_default_stream());
+              FatLinkForce<decltype(arg)> side(arg, link, sig, nu, FORCE_SIDE_LINK, newOprod, P3, P5, P5, Qmu);
 
             } //nu
 
             //lepage
             if (Lepage != 0.) {
               FatLinkArg<real, nColor> middleLinkArg(newOprod, P5, Pmu, Qmu, link, Lepage, 2, FORCE_LEPAGE_MIDDLE_LINK);
-              FatLinkForce<decltype(middleLinkArg)> middleLink(middleLinkArg, link, sig, mu, FORCE_LEPAGE_MIDDLE_LINK);
-              middleLink.apply(device::get_default_stream());
+              FatLinkForce<decltype(middleLinkArg)> middleLink(middleLinkArg, link, sig, mu, FORCE_LEPAGE_MIDDLE_LINK, newOprod, newOprod, P5, P5, Qmu);
 
               FatLinkArg<real, nColor> arg(newOprod, P3, P5, Qmu, link, mLepage, (ThreeSt != 0 ? Lepage/ThreeSt : 0), 2, FORCE_SIDE_LINK);
-              FatLinkForce<decltype(arg)> side(arg, link, sig, mu, FORCE_SIDE_LINK);
-              side.apply(device::get_default_stream());
+              FatLinkForce<decltype(arg)> side(arg, link, sig, mu, FORCE_SIDE_LINK, newOprod, P3, P5, P5, Qmu);
             } // Lepage != 0.0
 
             // 3-link side link
             FatLinkArg<real, nColor> arg(newOprod, P3, link, ThreeSt, 1, FORCE_SIDE_LINK_SHORT);
-            FatLinkForce<decltype(arg)> side(arg, P3, sig, mu, FORCE_SIDE_LINK_SHORT);
-            side.apply(device::get_default_stream());
+            FatLinkForce<decltype(arg)> side(arg, P3, sig, mu, FORCE_SIDE_LINK_SHORT, newOprod, newOprod, P3, P3, P3);
           }//mu
         }//sig
       }
@@ -347,14 +353,16 @@ namespace quda {
     class HisqForce : public TunableKernel2D {
 
       Arg &arg;
+      GaugeField &force;
       const GaugeField &meta;
       const HisqForceType type;
       unsigned int minThreads() const { return arg.threads.x; }
 
     public:
-      HisqForce(Arg &arg, const GaugeField &meta, int sig, int mu, HisqForceType type) :
+      HisqForce(Arg &arg, GaugeField &force, const GaugeField &meta, int sig, int mu, HisqForceType type) :
         TunableKernel2D(meta, 2),
         arg(arg),
+        force(force),
         meta(meta),
         type(type)
       {
@@ -387,7 +395,7 @@ namespace quda {
         switch (type) {
         case FORCE_LONG_LINK:
         case FORCE_COMPLETE:
-          arg.outA.save(); break;
+          force.backup(); break;
         default: errorQuda("Undefined force type %d", type);
         }
       }
@@ -396,7 +404,7 @@ namespace quda {
         switch (type) {
         case FORCE_LONG_LINK:
         case FORCE_COMPLETE:
-          arg.outA.load(); break;
+          force.restore(); break;
         default: errorQuda("Undefined force type %d", type);
         }
       }
@@ -425,7 +433,7 @@ namespace quda {
       HisqLongLinkForce(GaugeField &newOprod, const GaugeField &oldOprod, const GaugeField &link, double coeff)
       {
         LongLinkArg<real, nColor, recon> arg(newOprod, link, oldOprod, coeff);
-        HisqForce<decltype(arg)> longLink(arg, link, 0, 0, FORCE_LONG_LINK);
+        HisqForce<decltype(arg)> longLink(arg, newOprod, link, 0, 0, FORCE_LONG_LINK);
       }
     };
 
@@ -449,7 +457,7 @@ namespace quda {
       HisqCompleteForce(GaugeField &force, const GaugeField &link)
       {
         CompleteForceArg<real, nColor, recon> arg(force, link);
-        HisqForce<decltype(arg)> completeForce(arg, link, 0, 0, FORCE_COMPLETE);
+        HisqForce<decltype(arg)> completeForce(arg, force, link, 0, 0, FORCE_COMPLETE);
       }
     };
 

@@ -47,13 +47,6 @@ protected:
 
   }
 
-  bool checkDimsPartitioned()
-  {
-    if (comm_dim_partitioned(0) || comm_dim_partitioned(1) || comm_dim_partitioned(2) || comm_dim_partitioned(3))
-      return true;
-    return false;
-  }
-
   bool comparePlaquette(double3 a, double3 b){
     double a0,a1,a2;
     a0 = std::abs(a.x - b.x);
@@ -140,7 +133,7 @@ protected:
     int *num_failures_h = (int *)mapped_malloc(sizeof(int));
     int *num_failures_d = (int *)get_mapped_device_pointer(num_failures_h);
 
-    if (link_recon != QUDA_RECONSTRUCT_8 && coldstart)
+    if (coldstart)
       InitGaugeField(*U);
     else
       InitGaugeField(*U, *randstates);
@@ -149,15 +142,14 @@ protected:
     SetReunitarizationConsts();
     plaquette(*U);
 
-    for(int step=1; step<=nsteps; ++step){
+    for (int step=1; step<=nsteps; ++step) {
       printfQuda("Step %d\n",step);
       Monte(*U, *randstates, beta_value, nhbsteps, novrsteps);
 
       //Reunitarize gauge links...
       *num_failures_h = 0;
       unitarizeLinks(*U, num_failures_d);
-      qudaDeviceSynchronize();
-      if (*num_failures_h > 0) errorQuda("Error in the unitarization\n");
+      if (*num_failures_h > 0) errorQuda("Error in the unitarization");
 
       plaquette(*U);
     }
@@ -226,7 +218,7 @@ TEST_F(GaugeAlgTest, Coulomb_Overrelaxation)
 
 TEST_F(GaugeAlgTest, Landau_FFT)
 {
-  if (!checkDimsPartitioned()) {
+  if (!comm_partitioned()) {
     printfQuda("Landau gauge fixing with steepest descent method with FFTs\n");
     gaugeFixingFFT(*U, 4, 100, 10, 0.08, 0, 0, 1);
     auto plaq_gf = plaquette(*U);
@@ -237,7 +229,7 @@ TEST_F(GaugeAlgTest, Landau_FFT)
 
 TEST_F(GaugeAlgTest, Coulomb_FFT)
 {
-  if (!checkDimsPartitioned()) {
+  if (!comm_partitioned()) {
     printfQuda("Coulomb gauge fixing with steepest descent method with FFTs\n");
     gaugeFixingFFT(*U, 3, 100, 10, 0.08, 0, 0, 1);
     auto plaq_gf = plaquette(*U);

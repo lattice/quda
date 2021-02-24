@@ -117,12 +117,15 @@ namespace quda {
     for (int i=0; i<nDim; i++) {
       x[i] = param.x[i];
       r[i] = ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED ? param.r[i] : 0;
-      volume *= param.x[i];
-      localVolume *= (x[i] - 2 * r[i]);
+      local_x[i] = x[i] - 2 * r[i];
+      volume *= x[i];
+      localVolume *= local_x[i];
       surface[i] = 1;
+      local_surface[i] = 1;
       for (int j=0; j<nDim; j++) {
 	if (i==j) continue;
 	surface[i] *= param.x[j];
+	local_surface[i] *= param.x[j] - 2 * param.r[j];
       }
     }
 
@@ -132,8 +135,10 @@ namespace quda {
     stride = volumeCB + pad;
 
     // for parity fields the factor of half is present for all surfaces dimensions except x, so add it manually
-    for (int i=0; i<nDim; i++)
+    for (int i=0; i<nDim; i++) {
       surfaceCB[i] = (siteSubset == QUDA_FULL_SITE_SUBSET || i==0) ? surface[i] / 2 : surface[i];
+      local_surfaceCB[i] = (siteSubset == QUDA_FULL_SITE_SUBSET || i==0) ? local_surface[i] / 2 : local_surface[i];
+    }
 
     // for 5-dimensional fields, we only communicate in the space-time dimensions
     nDimComms = nDim == 5 ? 4 : nDim;
@@ -152,8 +157,11 @@ namespace quda {
   }
 
   LatticeField::LatticeField(const LatticeField &field) :
-    volume(1),
-    localVolume(1),
+    volume(field.volume),
+    volumeCB(field.volumeCB),
+    localVolume(field.localVolume),
+    localVolumeCB(field.localVolumeCB),
+    stride(field.stride),
     pad(field.pad),
     total_bytes(0),
     nDim(field.nDim),
@@ -163,6 +171,7 @@ namespace quda {
     scale(field.scale),
     siteSubset(field.siteSubset),
     ghostExchange(field.ghostExchange),
+    nDimComms(field.nDimComms),
     ghost_bytes(0),
     ghost_bytes_old(0),
     ghost_face_bytes {},
@@ -198,27 +207,13 @@ namespace quda {
 
     for (int i=0; i<nDim; i++) {
       x[i] = field.x[i];
-      r[i] = ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED ? field.r[i] : 0;
-      volume *= field.x[i];
-      localVolume *= (x[i] - 2 * r[i]);
-      surface[i] = 1;
-      for (int j=0; j<nDim; j++) {
-	if (i==j) continue;
-	surface[i] *= field.x[j];
-      }
+      r[i] = field.r[i];
+      local_x[i] = field.local_x[i];
+      surface[i] = field.surface[i];
+      surfaceCB[i] = field.surfaceCB[i];
+      local_surface[i] = field.local_surface[i];
+      local_surfaceCB[i] = field.local_surfaceCB[i];
     }
-
-    if (siteSubset == QUDA_INVALID_SITE_SUBSET) errorQuda("siteSubset is not set");
-    volumeCB = (siteSubset == QUDA_FULL_SITE_SUBSET) ? volume / 2 : volume;
-    localVolumeCB = (siteSubset == QUDA_FULL_SITE_SUBSET) ? localVolume / 2 : localVolume;
-    stride = volumeCB + pad;
-
-    // for parity fields the factor of half is present for all surfaces dimensions except x, so add it manually
-    for (int i=0; i<nDim; i++)
-      surfaceCB[i] = (siteSubset == QUDA_FULL_SITE_SUBSET || i==0) ? surface[i] / 2 : surface[i];
-
-    // for 5-dimensional fields, we only communicate in the space-time dimensions
-    nDimComms = nDim == 5 ? 4 : nDim;
 
     setTuningString();
   }
@@ -569,6 +564,8 @@ namespace quda {
 	if (a.x[i] != x[i]) errorQuda("x[%d] does not match %d %d", i, x[i], a.x[i]);
 	if (a.surface[i] != surface[i]) errorQuda("surface[%d] does not match %d %d", i, surface[i], a.surface[i]);
 	if (a.surfaceCB[i] != surfaceCB[i]) errorQuda("surfaceCB[%d] does not match %d %d", i, surfaceCB[i], a.surfaceCB[i]);
+	if (a.local_surface[i] != local_surface[i]) errorQuda("local_surface[%d] does not match %d %d", i, local_surface[i], a.local_surface[i]);
+	if (a.local_surfaceCB[i] != local_surfaceCB[i]) errorQuda("local_surfaceCB[%d] does not match %d %d", i, local_surfaceCB[i], a.local_surfaceCB[i]);
       }
     }
   }
