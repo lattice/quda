@@ -31,7 +31,7 @@ namespace quda
 
     F out;      /** output vector field */
     const F in; /** input vector field */
-    const F in_pack; /** input vector field */
+    const F in_pack; /** input vector field used in packing to be able to independently resetGhost */
     const G U;  /** the gauge field */
     int mu;     /** The direction in which to apply the derivative */
 

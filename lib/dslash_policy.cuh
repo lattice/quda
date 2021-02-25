@@ -475,7 +475,7 @@ namespace quda
       const int packIndex = Nstream - 1;
       constexpr MemoryLocation location = static_cast<MemoryLocation>(Shmem);
 
-      if (!(((shmem & 2)) and (shmem & 1))) {
+      if (!((shmem & 2) and (shmem & 1))) {
         issuePack(*in, dslash, 1 - dslashParam.parity, location, packIndex, shmem);
       }
 
@@ -2023,7 +2023,6 @@ public:
         }                                     // p2p policies
 
         enableProfileCount();
-        // dslash::synccounter = 5000000;
         setPolicyTuning(true);
       }
       dslash_policy_init = true;

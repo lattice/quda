@@ -159,8 +159,8 @@ namespace quda {
     int x_cb;    // checkerboard lattice site index
     int s;       // fifth dimension coord
     int X;       // full lattice site index
-    constexpr const inline int& operator[](int i) const { return x[i]; }
-    constexpr inline int& operator[](int i) { return x[i]; }
+    constexpr const int& operator[](int i) const { return x[i]; }
+    constexpr int& operator[](int i) { return x[i]; }
   };
 
   /**

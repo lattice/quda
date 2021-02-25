@@ -17,13 +17,14 @@ namespace
 
 namespace quda
 {
-
+#ifdef NVSHMEM_COMMS
   namespace dslash
   {
     // helpers for in-kernel barriers in nvshmem
     extern long *sync_arr;
     extern long synccounter;
   } // namespace dslash
+#endif
 
   /**
      @brief Helper function to determine if we should do halo
@@ -268,7 +269,7 @@ namespace quda
     bool remote_write;      // used by the autotuner to switch on/off remote writing vs using copy engines
 
     int_fastdiv threads; // number of threads in x-thread dimension
-    int_fastdiv ext_threads; //  number of threads in x-thread dimension for fused exteriot dslash
+    int_fastdiv ext_threads; //  number of threads in x-thread dimension for fused exterior dslash
     int threadDimMapLower[4];
     int threadDimMapUpper[4];
 
@@ -426,7 +427,7 @@ namespace quda
     out << "active_dims = " << arg.active_dims << std::endl;
     out << "pack_blocks = " << arg.pack_blocks << std::endl;
     out << "ext_threads = " << arg.ext_threads;
-    out << "ext_blocks " << arg.ext_blocks;
+    out << "ext_blocks =" << arg.ext_blocks;
     return out;
   }
 
@@ -555,8 +556,13 @@ namespace quda
           }
           interior_done.wait(arg.counter - 1, cuda::std::memory_order_acquire);
         }
+        
         if (threadIdx.x < 8 && threadIdx.y == 0 && threadIdx.z == 0) {
-          // spin for my direction
+          /* the first 8 threads of each block are used for spinning on halo data coming
+             in from the 4*2 (dim*dir) neighbors. We figure out next on which neighbors the 
+             block actually needs to wait
+          */
+
           bool spin = threadIdx.x == dimdir ? true : false;
           // figure out which other directions also to spin for (to make corners work)
           switch (dim) {

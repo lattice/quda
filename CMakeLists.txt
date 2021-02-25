@@ -278,6 +278,7 @@ option(QUDA_DOWNLOAD_OPENBLAS "Download OpenBLAS software as requested by QUDA_O
 option(QUDA_JITIFY "build QUDA using Jitify" OFF)
 option(QUDA_DOWNLOAD_NVSHMEM "Download NVSHMEM" OFF)
 set(QUDA_DOWNLOAD_NVSHMEM_TAR "" CACHE STRING "location of NVSHMEM tarball")
+set(QUDA_GDRCOPY_HOME "/usr/local/gdrcopy" CACHE STRING "path to gdrcopy used when QUDA_DOWNLOAD_NVSHMEM is enabled")
 
 
 option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
@@ -307,7 +308,7 @@ mark_as_advanced(QUDA_DOWNLOAD_QIO_LEGACY)
 
 mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM)
 mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM_TAR)
-
+mark_as_advanced(QUDA_GDRCOPY_HOME)
 mark_as_advanced(QUDA_MPI_NVTX)
 mark_as_advanced(QUDA_INTERFACE_NVTX)
 mark_as_advanced(QUDA_INTERFACE_ALL)
@@ -485,7 +486,7 @@ endif()
 include(CMakeDependentOption)
 CMAKE_DEPENDENT_OPTION(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support (CUDA >= 11.0)?" ON "QUDA_HETEROGENEOUS_ATOMIC_SUPPORT" OFF)
 
-if(QUDA_HETEROGENEOUS_ATOMIC AND ${CMAKE_BUILD_TYPE} STREQUAL "SANITIZE")
+if((QUDA_HETEROGENEOUS_ATOMIC OR QUDA_NVSHMEM) AND ${CMAKE_BUILD_TYPE} STREQUAL "SANITIZE")
   message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON does not support SANITIZE build)")
 endif()
 if(QUDA_HETEROGENEOUS_ATOMIC AND QUDA_JITIFY)
@@ -582,7 +583,7 @@ if(QUDA_NVSHMEM)
                         PREFIX nvshmem
                         CONFIGURE_COMMAND ""
                         BUILD_IN_SOURCE ON
-                        BUILD_COMMAND  make NVSHMEM_PREFIX=<INSTALL_DIR> NVSHMEM_MPI_SUPPORT=1 GDRCOPY_HOME=/usr/local/gdrcopy/ install
+                        BUILD_COMMAND  make NVSHMEM_PREFIX=<INSTALL_DIR> NVSHMEM_MPI_SUPPORT=1 GDRCOPY_HOME=${QUDA_GDRCOPY_HOME} install
                         INSTALL_COMMAND ""
                         LOG_INSTALL ON
                         LOG_BUILD ON

@@ -36,7 +36,7 @@ namespace quda
 
     F out;      /** output vector field */
     const F in; /** input vector field */
-    const F in_pack; /** input vector field */
+    const F in_pack; /** input vector field used in packing to be able to independently resetGhost */
     const F x;  /** input vector when doing xpay */
     const GU U; /** the gauge field */
     const GL L; /** the long gauge field */

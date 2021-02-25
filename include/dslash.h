@@ -185,7 +185,7 @@ namespace quda
 
     virtual void initTuneParam(TuneParam &param) const
     {
-      if(arg.shmem & 64){  //FIXME later: For the uber kernel temporarily limit the grid y anz dimension to 1
+      if(arg.shmem & 64){
         step_y = vector_length_y;
         step_z = vector_length_z;
       }
@@ -196,7 +196,7 @@ namespace quda
 
     virtual void defaultTuneParam(TuneParam &param) const
     {
-      if(arg.shmem & 64){ //FIXME later: For the uber kernel temporarily limit the grid y anz dimension to 1
+      if(arg.shmem & 64){
         step_y = vector_length_y;
         step_z = vector_length_z;
       }
