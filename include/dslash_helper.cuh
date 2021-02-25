@@ -17,15 +17,13 @@ namespace
 
 namespace quda
 {
-#ifdef NVSHMEM_COMMS
   namespace dslash
   {
     // helpers for in-kernel barriers in nvshmem
     extern long *sync_arr;
     extern long synccounter;
   } // namespace dslash
-#endif
-
+  
   /**
      @brief Helper function to determine if we should do halo
      computation

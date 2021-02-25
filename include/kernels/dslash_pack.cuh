@@ -272,6 +272,7 @@ namespace quda
     } // while tid
   }
 
+#ifdef NVSHMEM_COMMS
   template <int dest, typename Arg> __device__ inline void *getShmemBuffer(int shmemindex, Arg &arg)
   {
     switch (shmemindex) {
@@ -333,7 +334,15 @@ namespace quda
     }
   }
 
-#ifdef NVSHMEM_COMMS
+  template <typename Arg> __device__ inline bool do_shmempack(int dim, int dir, Arg &arg)
+  {
+    const int shmemidx = 2 * dim + dir;
+    const bool intranode = getShmemBuffer<1, decltype(arg)>(shmemidx, arg) == nullptr;
+    const bool pack_intranode = (!arg.packkernel) != (!(arg.shmem & 1));
+    const bool pack_internode = (!arg.packkernel) != (!(arg.shmem & 2));
+    return (arg.shmem == 0 || (intranode && pack_intranode) || (!intranode && pack_internode))
+  }
+
   template <typename Arg> __device__ inline void shmem_signal(int dim, int dir, Arg &arg)
   {
     const int shmemidx = 2 * dim + dir;
@@ -422,13 +431,9 @@ namespace quda
 
       int local_tid = local_block_idx * blockDim.x + threadIdx.x;
 
-      // for shmem
-      const int shmemidx = 2 * dim + dir;
-      const bool intranode = getShmemBuffer<1, decltype(arg)>(shmemidx, arg) == nullptr;
-      const bool pack_intranode = (!arg.packkernel) != (!(arg.shmem & 1));
-      const bool pack_internode = (!arg.packkernel) != (!(arg.shmem & 2));
-
-      if (arg.shmem == 0 || (intranode && pack_intranode) || (!intranode && pack_internode)) {
+#ifdef NVSHMEM_COMMS
+      if (do_shmempack(dim, dir, arg)) {
+#endif
         switch (dim) {
         case 0:
           while (local_tid < arg.dc.ghostFaceCB[0]) {
@@ -471,9 +476,8 @@ namespace quda
           }
           break;
         }
-      }
-
 #ifdef NVSHMEM_COMMS
+      }
       if (arg.shmem) shmem_signal(dim, dir, arg);
 #endif
     }
@@ -556,12 +560,9 @@ namespace quda
 
       int local_tid = local_block_idx * blockDim.x + threadIdx.x;
 
-      // for shmem
-      const int shmemidx = 2 * dim + dir;
-      bool intranode = getShmemBuffer<1, decltype(arg)>(shmemidx, arg) == nullptr;
-      bool pack_intranode = (!arg.packkernel) != (!(arg.shmem & 1));
-      bool pack_internode = (!arg.packkernel) != (!(arg.shmem & 2));
-      if (arg.shmem == 0 || (intranode && pack_intranode) || (!intranode && pack_internode)) {
+#ifdef NVSHMEM_COMMS
+      if (do_shmempack(dim, dir, arg)) {
+#endif
         switch (dim) {
         case 0:
           while (local_tid < arg.nFace * arg.dc.ghostFaceCB[0]) {
@@ -604,9 +605,8 @@ namespace quda
           }
           break;
         }
-      }
-
 #ifdef NVSHMEM_COMMS
+      }
       if (arg.shmem) shmem_signal(dim, dir, arg);
 #endif
     }
