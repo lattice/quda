@@ -137,7 +137,7 @@ namespace quda
         printfQuda("%04d converged eigenvalues at restart iter %04d\n", num_converged, restart_iter + 1);
       }
 
-      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+      if (getVerbosity() >= QUDA_VERBOSE) {
         printfQuda("iter Conv = %d\n", iter_converged);
         printfQuda("iter Keep = %d\n", iter_keep);
         printfQuda("iter Lock = %d\n", iter_locked);

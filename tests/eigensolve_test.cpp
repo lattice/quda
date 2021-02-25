@@ -141,6 +141,10 @@ int main(int argc, char **argv)
     loadCloverQuda(clover, clover_inv, &eig_inv_param);
   }
 
+  double plaq[3];
+  plaqQuda(plaq);
+  printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+
   // QUDA eigensolver test BEGIN
   //----------------------------------------------------------------------------
   // Host side arrays to store the eigenpairs computed by QUDA
