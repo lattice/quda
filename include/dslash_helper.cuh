@@ -462,6 +462,26 @@ namespace quda
     }   // parity
   }
 
+#ifdef NVSHMEM_COMMS
+  /**
+   * @brief helper function for nvshmem uber kernel to signal that the interior kernel has completed
+   */
+  template <KernelType kernel_type, typename Arg> void __device__ shmem_signalinterior(const Arg &arg)
+  {
+    if (kernel_type == INTERIOR_KERNEL && (arg.shmem & 64)) {
+      __syncthreads();
+      if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
+        int amlast = interior_count.fetch_add(1, cuda::std::memory_order_acq_rel); // ensure that my block is done
+        if (amlast == (gridDim.x - arg.pack_blocks - arg.ext_blocks) * gridDim.y * gridDim.z - 1) {
+          interior_done.store(arg.counter, cuda::std::memory_order_release);
+          interior_done.notify_all();
+          interior_count.store(0, cuda::std::memory_order_relaxed);
+        }
+      }
+    }
+  }
+#endif
+
   /**
      @brief This is a helper routine for spawning a GPU kernel for
      applying a Dslash kernel.  The dslash to be applied is passed as
@@ -632,20 +652,7 @@ namespace quda
       }
 #endif
 #ifdef NVSHMEM_COMMS
-      const bool shmem_interiordone = (arg.shmem & 64);
-      if (shmem_interiordone) {
-        if (kernel_type == INTERIOR_KERNEL) {
-          __syncthreads();
-          if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
-            int amlast = interior_count.fetch_add(1, cuda::std::memory_order_acq_rel); // ensure that my block is done
-            if (amlast == (gridDim.x - arg.pack_blocks - arg.ext_blocks) * gridDim.y * gridDim.z - 1) {
-              interior_done.store(arg.counter, cuda::std::memory_order_release);
-              interior_done.notify_all();
-              interior_count.store(0, cuda::std::memory_order_relaxed);
-            }
-          }
-        }
-      }
+  shmem_signalinterior<kernel_type, Arg>(arg);
 #endif
     }
   }

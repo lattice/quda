@@ -340,7 +340,7 @@ namespace quda
     const bool intranode = getShmemBuffer<1, decltype(arg)>(shmemidx, arg) == nullptr;
     const bool pack_intranode = (!arg.packkernel) != (!(arg.shmem & 1));
     const bool pack_internode = (!arg.packkernel) != (!(arg.shmem & 2));
-    return (arg.shmem == 0 || (intranode && pack_intranode) || (!intranode && pack_internode))
+    return (arg.shmem == 0 || (intranode && pack_intranode) || (!intranode && pack_internode));
   }
 
   template <typename Arg> __device__ inline void shmem_signal(int dim, int dir, Arg &arg)
