@@ -1,4 +1,4 @@
-#include<quda_arch.h> // Load runtime for double2, double3 support
+// #include<quda_arch.h> // Load runtime for double2, double3 support
 
 #pragma once
 namespace quda {
@@ -21,8 +21,8 @@ namespace quda {
     }
   };
 
-
-  // Workaround HIP's strange double3 implementation
+#if 0
+  // Workaround
   template<>
   struct plus<double3> {
     static constexpr bool do_sum = true;
@@ -36,6 +36,7 @@ namespace quda {
 		
     }
   };
+#endif
 
   template <typename T> struct maximum {
     static constexpr bool do_sum = false;

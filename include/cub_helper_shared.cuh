@@ -17,7 +17,7 @@ namespace quda {
 
     __device__ __host__ inline T Sum(const T &value)
     {
-#if defined(__CUDA_ARCH__) || defined(__HIP_COMPILE_DEVICE__)
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
       typename warp_reduce_t::TempStorage dummy;
       warp_reduce_t warp_reduce(dummy);
       return warp_reduce.Sum(value);
@@ -48,7 +48,7 @@ namespace quda {
     template <bool pipeline = false>
     __device__ __host__ inline T Sum(const T &value_)
     {
-#if defined(__CUDA_ARCH__) || defined(__HIP_COMPILE_DEVICE__)
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
       block_reduce_t block_reduce(shared_state());
       if (!pipeline) __syncthreads(); // only need to synchronize if we are not pipelining
       T value = block_reduce.Sum(value_);
@@ -62,7 +62,7 @@ namespace quda {
     __device__ __host__ inline T AllSum(const T &value_)
     {
       T value = Sum<pipeline>(value_);
-#if defined( __CUDA_ARCH__) || defined(__HIP_COMPILE_DEVICE__)
+#if defined( __CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
       T &value_shared = reinterpret_cast<T&>(shared_state());
       if (threadIdx.x == 0 && threadIdx.y == 0) value_shared = value;
       __syncthreads();

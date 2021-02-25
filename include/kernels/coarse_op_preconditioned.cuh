@@ -135,7 +135,7 @@ namespace quda {
       int d = j_d / Arg::yhatTileType::N_tiles;
 
       auto max = computeYhat(arg, d, x_cb, parity, i * Arg::yhatTileType::M, j * Arg::yhatTileType::N);
-#ifdef __CUDA_ARCH__
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
       if (Arg::compute_max) atomicAbsMax(arg.max_d, max);
 #else
       // not omp safe (yet)

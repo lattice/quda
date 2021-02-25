@@ -76,7 +76,7 @@ namespace quda
     template <bool dynamic_shared>
     __device__ __host__ inline typename std::enable_if<dynamic_shared == false, atom_t>::type *cache()
     {
-#ifdef __CUDA_ARCH__
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
       static __shared__ atom_t cache_[n_element * block_size_x * block_size_y * block_size_z];
 #else
       static atom_t *cache_;

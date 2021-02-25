@@ -167,5 +167,16 @@ namespace quda {
 #endif
   }
 
+  // FIXME: Can it be that real is not float? 
+  // What then?
+  template <typename real> __device__ __host__ inline real fdivide(real a, real b)
+  {
+#ifdef __HIP_DEVICE_COMPILE__
+    return __fdividef(a, b);
+#else
+    return a / b;
+#endif
+  }
+
 
 }

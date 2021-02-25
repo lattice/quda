@@ -15,13 +15,13 @@ namespace quda {
    */
   template <typename Arg> __device__ constexpr int virtual_block_idx(const Arg &arg)
   {
-    int block_idx = blockIdx.x;
+    auto block_idx = blockIdx.x;
     if (arg.swizzle) {
       // the portion of the grid that is exactly divisible by the number of SMs
       const auto gridp = gridDim.x - gridDim.x % arg.swizzle_factor;
       
       block_idx = blockIdx.x;
-      if (blockIdx.x < gridp) {
+      if (block_idx < gridp) {
         // this is the portion of the block that we are going to transpose
         const auto i = blockIdx.x % arg.swizzle_factor;
         const auto j = blockIdx.x / arg.swizzle_factor;
@@ -44,11 +44,11 @@ NB: __launch_bounds__(Arg::launch_bound ? block_size : 0) becomes
 
   */
   template <int block_size, template <int, typename> class Transformer, typename Arg>
-  __global__ typename std::enable_if<Arg::launch_bounds>::type __launch_bounds__(block_size) BlockKernel2D(Arg arg)
+  __global__ typename std::enable_if<(Arg::launch_bounds || block_size > 512)>::type __launch_bounds__(block_size) BlockKernel2D(Arg arg)
   {
     const dim3 block_idx(virtual_block_idx(arg), blockIdx.y, 0);
     const dim3 thread_idx(threadIdx.x, threadIdx.y, 0);
-    const unsigned int j = blockDim.y*blockIdx.y + threadIdx.y;
+    auto j = blockDim.y*blockIdx.y + threadIdx.y;
     if (j >= arg.threads.y) return;
 
     Transformer<block_size, Arg> t(arg);
@@ -56,11 +56,11 @@ NB: __launch_bounds__(Arg::launch_bound ? block_size : 0) becomes
   }
 
    template <int block_size, template <int, typename> class Transformer, typename Arg>
-  __global__ typename std::enable_if<!Arg::launch_bounds>::type BlockKernel2D(Arg arg)
+  __global__ typename std::enable_if<! (Arg::launch_bounds || block_size > 512) >::type BlockKernel2D(Arg arg)
   {
     const dim3 block_idx(virtual_block_idx(arg), blockIdx.y, 0);
     const dim3 thread_idx(threadIdx.x, threadIdx.y, 0);
-    const unsigned int j = blockDim.y*blockIdx.y + threadIdx.y;
+    autoj = blockDim.y*blockIdx.y + threadIdx.y;
     if (j >= arg.threads.y) return;
 
     Transformer<block_size, Arg> t(arg);
