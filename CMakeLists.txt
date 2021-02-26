@@ -474,10 +474,10 @@ endif()
 # ######################################################################################################################
 # QUDA depends on Eigen this part makes sure we can download eigen if it is not found
 if(QUDA_DOWNLOAD_EIGEN)
-  set(EIGEN_VERSION 3.3.7)
+  set(EIGEN_VERSION 3.3.9)
   set(EIGEN_DOWNLOAD_LOCATION ${CMAKE_SOURCE_DIR}/externals/eigen/${EIGEN_VERSION}.tar.bz2)
   set(EIGEN_URL https://gitlab.com/libeigen/eigen/-/archive/${EIGEN_VERSION}/eigen-${EIGEN_VERSION}.tar.bz2)
-  set(EIGEN_SHA 685adf14bd8e9c015b78097c1dc22f2f01343756f196acdc76a678e1ae352e11)
+  set(EIGEN_SHA 0fa5cafe78f66d2b501b43016858070d52ba47bd9b1016b0165a7b8e04675677)
   if(NOT EXISTS ${EIGEN_DOWNLOAD_LOCATION})
     message(STATUS "Checking for Eigen tarball and downloading if necessary.")
   endif()
