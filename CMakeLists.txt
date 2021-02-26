@@ -328,6 +328,7 @@ elseif(${CPU_ARCH} STREQUAL "ppc64le")
 endif()
 
 set(CMAKE_CXX_STANDARD ${QUDA_CXX_STANDARD})
+
 # define CXX FLAGS
 set(CMAKE_CXX_FLAGS_DEVEL
     "-g -O3 -Wall -Wextra"
@@ -339,16 +340,16 @@ set(CMAKE_CXX_FLAGS_RELEASE
     "-O3 -w ${CXX_OPT} "
     CACHE STRING "Flags used by the C++ compiler during release builds.")
 set(CMAKE_CXX_FLAGS_HOSTDEBUG
-    "-Wall -Wextra -Wno-unknown-pragmas -g -fno-inline"
+    "-Wall -Wextra -g"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
 set(CMAKE_CXX_FLAGS_DEVICEDEBUG
-    "-Wall -Wextra -Wno-unknown-pragmas"
+    "-Wall -Wextra"
     CACHE STRING "Flags used by the C++ compiler during device-debug builds.")
 set(CMAKE_CXX_FLAGS_DEBUG
-    "-Wall -Wextra -Wno-unknown-pragmas -g -fno-inline"
+    "-Wall -Wextra -g -fno-inline"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(CMAKE_CXX_FLAGS_SANITIZE
-    "-Wall -Wextra -Wno-unknown-pragmas -g -fno-inline -fsanitize=address,undefined"
+    "-Wall -Wextra -g -fno-inline -fsanitize=address,undefined"
     CACHE STRING "Flags used by the C++ compiler during santizer debug builds.")
 
 enable_language(CXX)
@@ -364,7 +365,7 @@ set(CMAKE_C_FLAGS_RELEASE
     "-O3 -w"
     CACHE STRING "Flags used by the C compiler during release builds.")
 set(CMAKE_C_FLAGS_HOSTDEBUG
-    "-Wall -Wextra -Wno-unknown-pragmas -g -fno-inline"
+    "-Wall -Wextra -g"
     CACHE STRING "Flags used by the C compiler during host-debug builds.")
 set(CMAKE_C_FLAGS_DEVICEDEBUG
     "-Wall -Wextra"
