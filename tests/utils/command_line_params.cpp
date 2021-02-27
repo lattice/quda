@@ -1149,9 +1149,9 @@ void add_contraction_option_group(std::shared_ptr<QUDAApp> quda_app)
     opgroup->add_option("--correlator-file-affix", correlator_file_affix, "Additional string to put into the correlator file name");
 
     quda_app->add_massoption(opgroup, "--kappa-array", kappa_array, CLI::Validator(),
-			     "set the Nth kappa value of the Dirac operator)");
+			     "set the Nth<INT> kappa value<FLOAT> of the Dirac operator)");
     
     quda_app->add_massoption(opgroup, "--mass-array", kappa_array, CLI::Validator(),
-			     "set the Nth mass value of the Dirac operator)");
+			     "set the Nth<INT> mass value<FLOAT> of the Dirac operator)");
     
 }
