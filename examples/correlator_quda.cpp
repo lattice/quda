@@ -48,7 +48,7 @@ void print_correlators(const void *correlation_function_sum, const CorrelatorPar
               size_t index_real = corr_param.n_numbers_per_slice * (mom_mode * corr_param.global_corr_length + ((t + corr_param.overall_shift_dim) % corr_param.global_corr_length)) + 2 * G_idx;
 	      size_t index_imag = index_real + 1;
               double sign = G_idx < 8 ? -1. : 1.; // the minus sign from g5gm -> gmg5
-              printf(" %5d %5d %5d %5d %5d %5d %5d %5d %5d %5lu % e % e #%s",
+              printf(" %5d %5d %5d %5d %5d %5d %5d %5d %5d %5lu %+.16e %+.16e #%s",
 			 prop_source_position[n][0], prop_source_position[n][1],
 			 prop_source_position[n][2], prop_source_position[n][3], px, py, pz, pt, G_idx, t,
 			 ((double *)correlation_function_sum)[index_real] * sign,
@@ -92,7 +92,7 @@ void save_correlators_to_file(const void* correlation_function_sum, const Correl
   }
 
   filepath << ".dat";
-  if(comm_rank() == 0) printf("Saving correlator in %s \n", filepath.str().c_str());
+  if (comm_rank() == 0) printf("Saving correlator in %s \n", filepath.str().c_str());
 
   corr_file.open(filepath.str());
 
@@ -202,8 +202,8 @@ void invert_and_contract(void **source_array_ptr, void **prop_array_ptr_1, void 
     const int source[4]
       = {prop_source_position[n][0], prop_source_position[n][1], prop_source_position[n][2], prop_source_position[n][3]};
     
-    if(comm_rank() == 0) printf("Source position: %d %d %d %d\n", prop_source_position[n][0], prop_source_position[n][1],
-				prop_source_position[n][2], prop_source_position[n][3]);
+    if (comm_rank() == 0) printf("Source position: %d %d %d %d\n", prop_source_position[n][0], prop_source_position[n][1],
+                                 prop_source_position[n][2], prop_source_position[n][3]);
     
     // The overall shift of the position of the corr. need this when the source is not at origin.
     corr_param.overall_shift_dim = source[corr_param.corr_dim];
@@ -215,12 +215,12 @@ void invert_and_contract(void **source_array_ptr, void **prop_array_ptr_1, void 
                                  gauge_param.X, i, source);
 
       // Gaussian smear the source.
-      performGaussianSmearNStep(source_array_ptr[i], &source_smear_param, prop_source_smear_steps);
+      performGaussianSmearNStep(source_array_ptr[i], &source_smear_param, prop_source_smear_steps, prop_source_smear_coeff);
       
       invertQuda(prop_array_ptr_2[i], source_array_ptr[i], &inv_param);
 
       // Gaussian smear the sink.
-      performGaussianSmearNStep(prop_array_ptr_2[i], &sink_smear_param, prop_sink_smear_steps);
+      performGaussianSmearNStep(prop_array_ptr_2[i], &sink_smear_param, prop_sink_smear_steps, prop_sink_smear_coeff);
     }
     
     memset(correlation_function_sum, 0, corr_param.corr_size_in_bytes); // zero out the result array
@@ -228,7 +228,7 @@ void invert_and_contract(void **source_array_ptr, void **prop_array_ptr_1, void 
                    (void *)&cs_param, gauge_param.X, source, momentum.begin());
     
     // Print and save correlators for this source
-    if(comm_rank() == 0) print_correlators(correlation_function_sum, corr_param, n);
+    if (comm_rank() == 0) print_correlators(correlation_function_sum, corr_param, n);
     save_correlators_to_file(correlation_function_sum, corr_param, n);
   }
 }
@@ -255,19 +255,19 @@ int main(int argc, char **argv)
   // Run-time parameter checks
   {
     if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH) {
-      if(comm_rank() == 0) printf("dslash_type %d not supported\n", dslash_type);
+      if (comm_rank() == 0) printf("dslash_type %d not supported\n", dslash_type);
       exit(0);
     }
     if (inv_multigrid) {
       // Only these fermions are supported with MG
       if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH) {
-        if(comm_rank() == 0) printf("dslash_type %d not supported for MG\n", dslash_type);
+        if (comm_rank() == 0) printf("dslash_type %d not supported for MG\n", dslash_type);
         exit(0);
       }
       // Only these solve types are supported with MG
       if (solve_type != QUDA_DIRECT_SOLVE && solve_type != QUDA_DIRECT_PC_SOLVE) {
-        if(comm_rank() == 0) printf("Solve_type %d not supported with MG. Please use QUDA_DIRECT_SOLVE or QUDA_DIRECT_PC_SOLVE\n\n",
-                   solve_type);
+        if (comm_rank() == 0) printf("Solve_type %d not supported with MG. Please use QUDA_DIRECT_SOLVE or QUDA_DIRECT_PC_SOLVE\n\n",
+                                     solve_type);
         exit(0);
       }
     }
@@ -308,13 +308,13 @@ int main(int argc, char **argv)
   inv_param.eig_param = nullptr;
   if (inv_multigrid) {
     if (open_flavor) {
-      if(comm_rank() == 0) printf("all the MG settings will be shared for qq, ql and qs propagator\n");
+      if (comm_rank() == 0) printf("all the MG settings will be shared for qq, ql and qs propagator\n");
       for (int i = 0; i < mg_levels; i++) {
          if (strcmp(mg_param.vec_infile[i], "") != 0 || strcmp(mg_param.vec_outfile[i], "") != 0){
-	   if(comm_rank() == 0) printf("Save or write vec not possible! As when open flavor turned on inverter will be called "
-				       "3 times thus vec will be over written\n");
-	   exit(0);
-	 }
+           if (comm_rank() == 0) printf("Save or write vec not possible! As when open flavor turned on inverter will be called "
+                                        "3 times thus vec will be over written\n");
+           exit(0);
+         }
       }
     }
   }
@@ -336,12 +336,12 @@ int main(int argc, char **argv)
     // inv_param.return_clover_inverse = 1;
     loadCloverQuda(nullptr, nullptr, &inv_param);
   }
-  if(comm_rank() == 0) printf("-----------------------------------------------------------------------------------\n");
+  if (comm_rank() == 0) printf("-----------------------------------------------------------------------------------\n");
 
   // compute plaquette
   double plaq[3];
   plaqQuda(plaq);
-  if(comm_rank() == 0) printf("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+  if (comm_rank() == 0) printf("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
   
   // Now QUDA is initialised and the fields are loaded, we may setup the preconditioner
   void *mg_preconditioner = nullptr;
@@ -378,7 +378,7 @@ int main(int argc, char **argv)
     momentum[3] = 0;
     Nmom *= (momentum[2] + 1);
   } else {
-    errorQuda("Unsupported contraction type %d given", contract_type);
+    if (comm_rank() == 0) errorQuda("Unsupported contraction type %d given", contract_type);
   }
   // some lengths and sizes
   corr_param.local_corr_length = gauge_param.X[corr_param.corr_dim];
@@ -428,7 +428,7 @@ int main(int argc, char **argv)
   free(source_array);
   free(prop_array);
   free(correlation_function_sum);
-  if(comm_rank() == 0) printf("----------------------------------------------------------------------------------\n");
+  if (comm_rank() == 0) printf("----------------------------------------------------------------------------------\n");
   endQuda();
   finalizeComms();
 

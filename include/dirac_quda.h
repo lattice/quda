@@ -213,6 +213,16 @@ namespace quda {
 			    const double &k) const = 0;
 
     /**
+       @brief Similar to the Xpay version of Dslash, but used only by the Laplace op for 
+       smearing.
+    */    
+    virtual void SmearOp(ColorSpinorField &, const ColorSpinorField &, 
+                         const double &, const double &) const 
+    {
+      errorQuda("Not implemented!\n");
+    }
+    
+    /**
        @brief Apply M for the dirac op. E.g. the Schur Complement operator
     */
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const = 0;
@@ -1790,6 +1800,8 @@ public:
 			     const QudaSolutionType) const;
     virtual bool hermitian() const { return true; }
 
+    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double &a, const double &b) const;
+    
     virtual QudaDiracType getDiracType() const { return QUDA_GAUGE_LAPLACE_DIRAC; }
   };
 
