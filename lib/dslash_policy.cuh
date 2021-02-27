@@ -26,8 +26,8 @@ namespace quda
     extern bool dslash_comms;
     extern bool dslash_copy;
 
-    extern long *sync_arr;
-    extern long synccounter;
+    extern shmem_sync_t *sync_arr;
+    extern shmem_sync_t synccounter;
     static cudaColorSpinorField *inSpinor;
 
     /**

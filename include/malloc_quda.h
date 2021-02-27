@@ -55,12 +55,7 @@ namespace quda {
   void device_comms_pinned_free_(const char *func, const char *file, int line, void *ptr);
   void managed_free_(const char *func, const char *file, int line, void *ptr);
   void host_free_(const char *func, const char *file, int line, void *ptr);
-#ifdef NVSHMEM_COMMS
-  void *shmem_malloc_(const char *func, const char *file, int line, size_t size);
-  void *shmem_pinned_malloc_(const char *func, const char *file, int line, size_t size);
-  void shmem_free_(const char *func, const char *file, int line, void *ptr);
-  void shmem_pinned_free_(const char *func, const char *file, int line, void *ptr);
-#endif
+
   // strip path from __FILE__
   inline constexpr const char* str_end(const char *str) { return *str ? str_end(str + 1) : str; }
   inline constexpr bool str_slant(const char *str) { return *str == '/' ? true : (*str ? str_slant(str + 1) : false); }
@@ -100,12 +95,6 @@ namespace quda {
 #define host_free(ptr) quda::host_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 #define get_mapped_device_pointer(ptr) quda::get_mapped_device_pointer_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 
-#ifdef NVSHMEM_COMMS
-#define shmem_malloc(size) quda::shmem_malloc_(__func__, quda::file_name(__FILE__), __LINE__, size)
-#define shmem_pinned_malloc(size) quda::shmem_malloc_(__func__, quda::file_name(__FILE__), __LINE__, size)
-#define shmem_free(ptr) quda::shmem_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
-#define shmem_pinned_free(ptr) quda::shmem_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
-#endif
 
 namespace quda {
 
@@ -153,12 +142,6 @@ namespace quda {
        @brief Free all outstanding pinned-memory allocations.
     */
     void flush_pinned();
-
-#ifdef NVSHMEM_COMMS
-    void *shmem_malloc_(const char *func, const char *file, int line, size_t size);
-    void *shmem_free_(const char *func, const char *file, int line, size_t size);
-    void flush_remote();
-#endif
 
   } // namespace pool
 

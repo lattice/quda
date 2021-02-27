@@ -369,8 +369,8 @@ namespace quda
     return ptr;
   }
   /**
-   * Allocate shemm device memory. This function should only be called via the
-   * shmem_malloc() macro, defined in malloc_quda.h
+   * Allocate shemm device memory. This function should only be called via
+   * device_comms_pinned_malloc_() 
    */
 #ifdef NVSHMEM_COMMS
   void *shmem_malloc_(const char *func, const char *file, int line, size_t size)
@@ -412,7 +412,8 @@ namespace quda
 #endif
 
   /**
-   * TODO
+   * Allocate pinned or symmetric (shmem) device memory for comms. Should only be called via the 
+   * device_comms_pinned_malloc macro, defined in malloc_quda.h
    */
   void *device_comms_pinned_malloc_(const char *func, const char *file, int line, size_t size)
   {
@@ -521,6 +522,9 @@ namespace quda
   }
 
 #ifdef NVSHMEM_COMMS
+  /**
+   * Free symmetric memory allocated with shmem_malloc_. Should only be called via the device_comms_* functions.
+   */
   void shmem_free_(const char *func, const char *file, int line, void *ptr)
   {
     if (!ptr) {
@@ -536,6 +540,10 @@ namespace quda
   }
 #endif
 
+  /**
+   * Free device comms memory allocated with device_comms_pinned_malloc(). This function should only be 
+   * called via the device_comms_pinned_free() macro, defined in malloc_quda.h
+   */
   void device_comms_pinned_free_(const char *func, const char *file, int line, void *ptr)
   {
 #ifdef NVSHMEM_COMMS
@@ -833,6 +841,7 @@ namespace quda
     }
 
 #ifdef NVSHMEM_COMMS
+#define shmem_free(ptr) quda::shmem_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
     void flush_shmem()
     {
       if (shmem_memory_pool) {
@@ -844,6 +853,7 @@ namespace quda
         shmemCache.clear();
       }
     }
+#undef shmem_free
 #endif
 
   } // namespace pool

@@ -87,8 +87,8 @@ namespace quda
     // 16 - barrier part II (wait on shmem to complete, all directions) -- not implemented
     int shmem;
 
-    volatile long *sync_arr;
-    long counter;
+    volatile shmem_sync_t *sync_arr;
+    shmem_sync_t counter;
 
     PackArg(void **ghost, const ColorSpinorField &in, int nFace, bool dagger, int parity, int threads, double a,
             double b, double c, int shmem_ = 0) :

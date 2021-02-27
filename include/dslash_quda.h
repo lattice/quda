@@ -11,6 +11,11 @@
 namespace quda {
 
   /**
+   * @brief type used for shmem signaling
+   */
+  using shmem_sync_t = long;
+
+  /**
     @param pack Sets whether to use a kernel to pack the T dimension
     */
   void setKernelPackT(bool pack);
