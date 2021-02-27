@@ -131,7 +131,7 @@ namespace quda {
     }
   };
 
-/*
+  /*
     @brief Fast power function that works for negative "a" argument
     @param a argument we want to raise to some power
     @param b power that we want to raise a to
@@ -152,5 +152,13 @@ namespace quda {
 #endif
   }
 
+  template <typename real> __device__ __host__ inline real fdivide(real a, real b)
+  {
+#ifdef __CUDA_ARCH__
+    return __fdividef(a, b);
+#else
+    return a / b;
+#endif
+  }
 
 }

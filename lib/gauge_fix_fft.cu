@@ -67,8 +67,8 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       launch<FixQualityFFT>(arg.result, tp, stream, arg);
       if (!activeTuning()) {
-        arg.result.x /= (double)(3 * Arg::gauge_dir * meta.Volume());
-        arg.result.y /= (double)(3 * meta.Volume());
+        arg.result[0] /= (double)(3 * Arg::gauge_dir * meta.Volume());
+        arg.result[1] /= (double)(3 * meta.Volume());
       }
     }
 
