@@ -10,6 +10,9 @@
 #include <linalg.cuh>
 #include <dslash_policy.cuh>
 #include <instantiate.h>
+#ifdef NVSHMEM_COMMS
+#include <cuda/atomic>
+#endif
 
 namespace quda {
 
@@ -59,6 +62,11 @@ namespace quda {
     // for shmem lightweight sync
     shmem_sync_t *sync_arr;
     shmem_sync_t synccounter = 1;
+    #ifdef NVSHMEM_COMMS
+    void* dslash_atomic_workspace = nullptr;
+    void* dslash_atomic_pack_workspace = nullptr;
+    #endif
+
     // these variables are used for benchmarking the dslash components in isolation
     bool dslash_pack_compute;
     bool dslash_interior_compute;
@@ -87,6 +95,12 @@ namespace quda {
     Worker *aux_worker;
   }
 
+  // need to use placement new constructor to initialize the atomic counters
+  template <typename T> __global__ void init_dslash_atomic(T *counter, int max)
+  {
+    for (int i = 0; i < max; i++) new (counter + i) T {0};
+  }
+
   void createDslashEvents()
   {
     using namespace dslash;
@@ -105,7 +119,21 @@ namespace quda {
     sync_arr = (shmem_sync_t *)device_comms_pinned_malloc(2 * QUDA_MAX_DIM * sizeof(shmem_sync_t));
     cudaMemset(sync_arr, 0, 2 * QUDA_MAX_DIM * sizeof(shmem_sync_t));
     synccounter = 1;
+
+    TuneParam tp;
+    tp.grid = dim3(1, 1, 1);
+    tp.block = dim3(1, 1, 1);
+    
+    // atomic for controlling signaling in nvshmem packing
+    dslash_atomic_pack_workspace = device_pinned_malloc(4 * QUDA_MAX_DIM * sizeof(cuda::atomic<int>));
+    qudaLaunchKernel(init_dslash_atomic<cuda::atomic<int>>, tp, 0,
+                     static_cast<cuda::atomic<int> *>(dslash_atomic_pack_workspace), 4 * QUDA_MAX_DIM);
+    // workspace for interior done sync in uber kernel
+    dslash_atomic_workspace = device_pinned_malloc(2 * sizeof(cuda::atomic<long>));
+    qudaLaunchKernel(init_dslash_atomic<cuda::atomic<long>>, tp, 0,
+                     static_cast<cuda::atomic<long> *>(dslash_atomic_workspace), 2);
 #endif
+
     aux_worker = NULL;
 
     checkCudaError();
@@ -149,6 +177,8 @@ namespace quda {
     }
 #ifdef NVSHMEM_COMMS
     device_comms_pinned_free(sync_arr);
+    device_pinned_free(dslash_atomic_workspace);
+    device_pinned_free(dslash_atomic_pack_workspace);
 #endif
     checkCudaError();
   }

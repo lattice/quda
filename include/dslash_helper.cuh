@@ -6,15 +6,6 @@
 #include <index_helper.cuh>
 #include <shmem_helper.cuh>
 
-#ifdef NVSHMEM_COMMS
-namespace
-{
-  __device__ cuda::atomic<long, cuda::thread_scope_system> intersync {0};
-  __device__ cuda::atomic<long, cuda::thread_scope_device> interior_done {0};
-  __device__ cuda::atomic<int, cuda::thread_scope_block> interior_count {0};
-} // namespace
-#endif
-
 namespace quda
 {
   namespace dslash
@@ -22,6 +13,8 @@ namespace quda
     // helpers for in-kernel barriers in nvshmem
     extern long *sync_arr;
     extern long synccounter;
+    extern void *dslash_atomic_workspace;
+    extern void *dslash_atomic_pack_workspace;
   } // namespace dslash
 
   /**
@@ -293,9 +286,13 @@ namespace quda
     void *packBuffer[4 * QUDA_MAX_DIM];
     int neighbor_ranks[2 * QUDA_MAX_DIM];
     int bytes[2 * QUDA_MAX_DIM];
-    volatile long *sync_arr;
-    long counter;
+    volatile shmem_sync_t *sync_arr;
+    shmem_sync_t counter;
     int shmem;
+    cuda::atomic<long, cuda::thread_scope_device> &interior_done;
+    cuda::atomic<long, cuda::thread_scope_block> &interior_count;
+    cuda::atomic<int, cuda::thread_scope_system>* retcount_intra;
+    cuda::atomic<int, cuda::thread_scope_device>* retcount_inter; 
 
     // constructor needed for staggered to set xpay from derived class
     DslashArg(const ColorSpinorField &in, const GaugeField &U, int parity, bool dagger, bool xpay, int nFace,
@@ -327,8 +324,13 @@ namespace quda
       ext_blocks(0),
       sync_arr(dslash::sync_arr),
       counter(dslash::synccounter),
-      shmem(shmem_)
-    {
+      shmem(shmem_),
+      interior_done(*(static_cast<cuda::atomic<long, cuda::thread_scope_device>*>(dslash::dslash_atomic_workspace) + 0)),
+      interior_count(*(static_cast<cuda::atomic<long, cuda::thread_scope_block>*>(dslash::dslash_atomic_workspace) + 1)),
+      retcount_intra(static_cast<cuda::atomic<int, cuda::thread_scope_system>*>(dslash::dslash_atomic_pack_workspace)),
+      retcount_inter(static_cast<cuda::atomic<int, cuda::thread_scope_device>*>(dslash::dslash_atomic_pack_workspace)+2*QUDA_MAX_DIM)
+     
+      {
       for (int d = 0; d < 4; d++) {
         commDim[d] = (comm_override[d] == 0) ? 0 : comm_dim_partitioned(d);
       }
@@ -471,11 +473,11 @@ namespace quda
     if (kernel_type == INTERIOR_KERNEL && (arg.shmem & 64)) {
       __syncthreads();
       if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
-        int amlast = interior_count.fetch_add(1, cuda::std::memory_order_acq_rel); // ensure that my block is done
+        int amlast = arg.interior_count.fetch_add(1, cuda::std::memory_order_acq_rel); // ensure that my block is done
         if (amlast == (gridDim.x - arg.pack_blocks - arg.ext_blocks) * gridDim.y * gridDim.z - 1) {
-          interior_done.store(arg.counter, cuda::std::memory_order_release);
-          interior_done.notify_all();
-          interior_count.store(0, cuda::std::memory_order_relaxed);
+          arg.interior_done.store(arg.counter, cuda::std::memory_order_release);
+          arg.interior_done.notify_all();
+          arg.interior_count.store(0, cuda::std::memory_order_relaxed);
         }
       }
     }
@@ -531,12 +533,12 @@ namespace quda
     if (shmembarrier) {
 
       if (shmem_interiordone && threadIdx.x == blockDim.x - 1 && threadIdx.y == 0 && threadIdx.z == 0) {
-        long tst_val = interior_done.load(cuda::std::memory_order_relaxed);
+        long tst_val = arg.interior_done.load(cuda::std::memory_order_relaxed);
         while (tst_val < arg.counter - 1) {
-          interior_done.compare_exchange_strong(tst_val, arg.counter - 1, cuda::std::memory_order_relaxed,
+          arg.interior_done.compare_exchange_strong(tst_val, arg.counter - 1, cuda::std::memory_order_relaxed,
                                                 cuda::std::memory_order_relaxed);
         }
-        interior_done.wait(arg.counter - 1, cuda::std::memory_order_acquire);
+        arg.interior_done.wait(arg.counter - 1, cuda::std::memory_order_acquire);
       }
 
       if (threadIdx.x < 8 && threadIdx.y == 0 && threadIdx.z == 0) {

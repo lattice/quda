@@ -6,29 +6,6 @@
 #include <dslash_helper.cuh>
 #include <shmem_helper.cuh>
 
-#ifdef NVSHMEM_COMMS
-
-namespace
-{
-  /**
-   * @brief for each dim /dir (2* QUDA_MAX_DIM) define an atomic counter to check if all blocks
-   * working for that packing direction are finished for intra-node packing.
-   */
-  __device__ cuda::atomic<int, cuda::thread_scope_system> retcount_intra[] {
-    ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0),
-    ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0),
-    ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0)};
-  /**
-   * @brief for each dim /dir (2* QUDA_MAX_DIM) define an atomic counter to check if all blocks
-   * working for that packing direction are finished for inter-node packing.
-   */
-  __device__ cuda::atomic<int, cuda::thread_scope_device> retcount_inter[] {
-    ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0),
-    ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0),
-    ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0)};
-} // namespace
-#endif
-
 namespace quda
 {
   int *getPackComms();
@@ -86,9 +63,10 @@ namespace quda
     // 8 - barrier part I (just the put part)
     // 16 - barrier part II (wait on shmem to complete, all directions) -- not implemented
     int shmem;
-
     volatile shmem_sync_t *sync_arr;
     shmem_sync_t counter;
+    cuda::atomic<int, cuda::thread_scope_system>* retcount_intra;
+    cuda::atomic<int, cuda::thread_scope_device>* retcount_inter; 
 
     PackArg(void **ghost, const ColorSpinorField &in, int nFace, bool dagger, int parity, int threads, double a,
             double b, double c, int shmem_ = 0) :
@@ -106,7 +84,9 @@ namespace quda
       twist((a != 0.0 && b != 0.0) ? (c != 0.0 ? 2 : 1) : 0),
       shmem(shmem_),
       sync_arr(dslash::sync_arr),
-      counter(dslash::synccounter)
+      counter(dslash::synccounter),
+      retcount_intra(static_cast<cuda::atomic<int, cuda::thread_scope_system>*>(dslash::dslash_atomic_pack_workspace)),
+      retcount_inter(static_cast<cuda::atomic<int, cuda::thread_scope_device>*>(dslash::dslash_atomic_pack_workspace)+2*QUDA_MAX_DIM)
     {
       for (int i = 0; i < 4 * QUDA_MAX_DIM; i++) { packBuffer[i] = static_cast<char *>(ghost[i]); }
       for (int dim = 0; dim < 4; dim++) {
@@ -355,7 +335,7 @@ namespace quda
       __syncthreads(); // make sure all threads in this block arrived here
 
       if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
-        int ticket = retcount_inter[shmemidx].fetch_add(1);
+        int ticket = arg.retcount_inter[shmemidx].fetch_add(1);
         // currently CST order -- want to make sure all stores are done before and for the last block we need that
         // all uses of that data are visible
         amLast = (ticket == arg.blocks_per_dir * gridDim.y * gridDim.z - 1);
@@ -370,7 +350,7 @@ namespace quda
               nvshmem_long_atomic_set((long *)arg.sync_arr + 2 * dim + (1 - dir), arg.counter,
                                       getNeighborRank(2 * dim + dir, arg));
           }
-          retcount_inter[shmemidx].store(0); // this could probably be relaxed
+          arg.retcount_inter[shmemidx].store(0); // this could probably be relaxed
         }
       }
     }
@@ -387,7 +367,7 @@ namespace quda
       __syncthreads(); // make sure all threads in this block arrived here
       if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
         // recount has system scope
-        int ticket = retcount_intra[shmemidx].fetch_add(1);
+        int ticket = arg.retcount_intra[shmemidx].fetch_add(1);
         // currently CST order -- want to make sure all stores are done before (release) and check for ticket
         // acquires. For the last block we need that all uses of that data are visible
         amLast = (ticket == arg.blocks_per_dir * gridDim.y * gridDim.z- 1);
@@ -399,7 +379,7 @@ namespace quda
               nvshmemx_long_signal((long *)arg.sync_arr + 2 * dim + (1 - dir), arg.counter,
                                    getNeighborRank(2 * dim + dir, arg));
           }
-          retcount_intra[shmemidx].store(0); // this could probably be relaxed
+          arg.retcount_intra[shmemidx].store(0); // this could probably be relaxed
         }
       }
     }
