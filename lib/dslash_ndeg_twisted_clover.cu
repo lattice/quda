@@ -39,13 +39,14 @@ namespace quda
       
       long long flops() const
       {
-        int clover_flops = 504 + 48;
+        int clover_flops = 504;
         long long flops = Dslash::flops();
         switch (arg.kernel_type) {
         case INTERIOR_KERNEL:
         case KERNEL_POLICY:
+          // b and c multiply (= 2 * 48 * in.Volume())
           flops += 2 * in.Ncolor() * 4 * 4 * in.Volume(); // complex * Nc * Ns * fma * vol
-          flops += 2 * clover_flops * in.Volume();
+          flops += clover_flops * in.Volume();
           break;
         default: break; // twisted-mass flops are in the interior kernel
         }
@@ -58,7 +59,6 @@ namespace quda
         long long bytes = Dslash::bytes();
         switch (arg.kernel_type) {
         case INTERIOR_KERNEL:
-          // factor 2 needed for clover fields?
         case KERNEL_POLICY: bytes += clover_bytes * in.Volume(); break;
         default: break;
         }
