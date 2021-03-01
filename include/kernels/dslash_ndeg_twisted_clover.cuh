@@ -5,13 +5,15 @@
 
 namespace quda
 {
-
+  
   template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_>
     struct NdegTwistedCloverArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
 
+    using WilsonArg<Float, nColor, reconstruct_>::nSpin;
+    static constexpr int length = (nSpin / (nSpin / 2)) * 2 * nColor * nColor * (nSpin / 2) * (nSpin / 2) / 2;
     typedef typename clover_mapper<Float, length, true>::type C;
     typedef typename mapper<Float>::type real;
-
+    
     const C A; /** the clover field */
     real a; /** this is the Wilson-dslash scale factor */
     real b; /** this is the chiral twist factor */
@@ -69,38 +71,29 @@ namespace quda
         Vector x0 = arg.x(coord.x_cb + 0 * arg.dc.volume_4d_cb, my_spinor_parity);
         Vector x1 = arg.x(coord.x_cb + 1 * arg.dc.volume_4d_cb, my_spinor_parity);
 
-        x0.toRel(); // switch to chiral basis
-        x1.toRel(); // switch to chiral basis
-
+        Vector x = flavor == 0 ? x0 : x1;
+        x.toRel(); // switch to chiral basis
+        
         Vector tmp;
-        if(flavor == 0) {
 #pragma unroll
-          for (int chirality = 0; chirality < 2; chirality++) {
-            constexpr int n = Arg::nColor * Arg::nSpin / 2;
-            HMatrix<real, n> A = arg.A(coord.x_cb, parity, chirality);
-            HalfVector x0_chi = x0.chiral_project(chirality);
-            HalfVector Ax0_chi = A * x0_chi;
-            // i * mu * gamma_5 * tau_3
-            const complex<real> b(0.0, chirality == 0 ? static_cast<real>(arg.b) : -static_cast<real>(arg.b));
-            Ax0_chi += b * x0_chi;
-            Ax0_chi += arg.c * x1_chi;
-            tmp += Ax0_chi.chiral_reconstruct(chirality);
-          }
-        } else {
-#pragma unroll
-          for (int chirality = 0; chirality < 2; chirality++) {
-            constexpr int n = Arg::nColor * Arg::nSpin / 2;
-            HMatrix<real, n> A = arg.A(coord.x_cb, parity, chirality);
-            HalfVector x1_chi = x1.chiral_project(chirality);
-            HalfVector Ax1_chi = A * x1_chi;
-            // i * mu * gamma_5 * tau_3
-            const complex<real> b(0.0, chirality == 0 ? -static_cast<real>(arg.b) : static_cast<real>(arg.b));
-            Ax1_chi += b * x1_chi;
-            Ax1_chi += arg.c * x0_chi;
-            tmp += Ax1_chi.chiral_reconstruct(chirality);
-          }
+        for (int chirality = 0; chirality < 2; chirality++) {
+          constexpr int n = Arg::nColor * Arg::nSpin / 2;
+          HMatrix<real, n> A = arg.A(coord.x_cb, parity, chirality);
+          HalfVector x_chi = x.chiral_project(chirality);
+          HalfVector Ax_chi = A * x_chi;
+          // i * mu * gamma_5 * tau_3
+          // i * mu * gamma_5
+          const complex<real> b(0.0, chirality == 0 ? static_cast<real>(arg.b) : -static_cast<real>(arg.b));
+          // tau_3
+          b *= (flavor == 0 ? 1 : -1);
+          Ax_chi += b * x_chi;
         }
-        tmp.toNonRel(); // switch back to non-chiral basis
+
+        tmp.toNonRel();
+        // c * tau_1
+        tmp += (flavor == 0 ? arg.c * x1 : arg.c * x0);
+
+        // The Wilson part with normalisation
         out = tmp + arg.a * out;
 
       } else if (active) {
