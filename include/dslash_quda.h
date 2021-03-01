@@ -7,6 +7,9 @@
 #include <gauge_field.h>
 #include <clover_field.h>
 #include <worker.h>
+#ifdef NVSHMEM_COMMS
+#include<cuda/atomic>
+#endif
 
 namespace quda {
 
@@ -14,7 +17,12 @@ namespace quda {
    * @brief type used for shmem signaling
    */
   using shmem_sync_t = long;
-
+#ifdef NVSHMEM_COMMS
+  using shmem_retcount_intra_t = cuda::atomic<int, cuda::thread_scope_system>;
+  using shmem_retcount_inter_t = cuda::atomic<int, cuda::thread_scope_device>;
+  using shmem_interior_done_t = cuda::atomic<long, cuda::thread_scope_device>;
+  using shmem_interior_count_t = cuda::atomic<long, cuda::thread_scope_block>;
+#endif
   /**
     @param pack Sets whether to use a kernel to pack the T dimension
     */

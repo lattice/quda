@@ -66,8 +66,8 @@ namespace quda
     shmem_sync_t counter;
 #ifdef NVSHMEM_COMMS
     volatile shmem_sync_t *sync_arr;
-    cuda::atomic<int, cuda::thread_scope_system> *retcount_intra;
-    cuda::atomic<int, cuda::thread_scope_device> *retcount_inter;
+    shmem_retcount_intra_t *retcount_intra;
+    shmem_retcount_inter_t *retcount_inter;
 #endif
     PackArg(void **ghost, const ColorSpinorField &in, int nFace, bool dagger, int parity, int threads, double a,
             double b, double c, int shmem_ = 0) :
@@ -89,9 +89,8 @@ namespace quda
       shmem(shmem_),
       counter(dslash::synccounter),
       sync_arr(dslash::sync_arr),
-      retcount_intra(static_cast<cuda::atomic<int, cuda::thread_scope_system> *>(dslash::dslash_atomic_pack_workspace)),
-      retcount_inter(static_cast<cuda::atomic<int, cuda::thread_scope_device> *>(dslash::dslash_atomic_pack_workspace)
-                     + 2 * QUDA_MAX_DIM)
+      retcount_intra(dslash::_retcount_intra),
+      retcount_inter(dslash::_retcount_inter)
 #endif
     {
       for (int i = 0; i < 4 * QUDA_MAX_DIM; i++) { packBuffer[i] = static_cast<char *>(ghost[i]); }

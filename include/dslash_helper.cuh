@@ -11,11 +11,13 @@ namespace quda
   namespace dslash
   {
     // helpers for in-kernel barriers in nvshmem
-    extern long synccounter;
+    extern shmem_sync_t synccounter;
 #ifdef NVSHMEM_COMMS
-    extern long *sync_arr;
-    extern void *dslash_atomic_workspace;
-    extern void *dslash_atomic_pack_workspace;
+    extern shmem_sync_t *sync_arr;
+    extern shmem_retcount_intra_t* _retcount_intra;
+    extern shmem_retcount_inter_t* _retcount_inter;
+    extern shmem_interior_done_t* _interior_done;
+    extern shmem_interior_count_t* _interior_count;
 #endif
   } // namespace dslash
   /**
@@ -291,10 +293,10 @@ namespace quda
     shmem_sync_t counter;
 #ifdef NVSHMEM_COMMS
     volatile shmem_sync_t *sync_arr;
-    cuda::atomic<long, cuda::thread_scope_device> &interior_done;
-    cuda::atomic<long, cuda::thread_scope_block> &interior_count;
-    cuda::atomic<int, cuda::thread_scope_system> *retcount_intra;
-    cuda::atomic<int, cuda::thread_scope_device> *retcount_inter;
+    shmem_retcount_intra_t *retcount_intra;
+    shmem_retcount_inter_t *retcount_inter;
+    shmem_interior_done_t &interior_done;
+    shmem_interior_count_t &interior_count;
 #endif
 
     // constructor needed for staggered to set xpay from derived class
@@ -332,11 +334,10 @@ namespace quda
       shmem(shmem_),
       counter(dslash::synccounter),
       sync_arr(dslash::sync_arr),
-      interior_done(*(static_cast<cuda::atomic<long, cuda::thread_scope_device> *>(dslash::dslash_atomic_workspace) + 0)),
-      interior_count(*(static_cast<cuda::atomic<long, cuda::thread_scope_block> *>(dslash::dslash_atomic_workspace) + 1)),
-      retcount_intra(static_cast<cuda::atomic<int, cuda::thread_scope_system> *>(dslash::dslash_atomic_pack_workspace)),
-      retcount_inter(static_cast<cuda::atomic<int, cuda::thread_scope_device> *>(dslash::dslash_atomic_pack_workspace)
-                     + 2 * QUDA_MAX_DIM)
+      interior_done(*dslash::_interior_done),
+      interior_count(*dslash::_interior_count),
+      retcount_intra(dslash::_retcount_intra),
+      retcount_inter(dslash::_retcount_inter)
 #endif
 
     {
