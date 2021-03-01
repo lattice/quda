@@ -15,13 +15,13 @@ namespace quda {
    */
   template <typename Arg> __device__ constexpr int virtual_block_idx(const Arg &arg)
   {
-    auto block_idx = blockIdx.x;
+    unsigned int  block_idx = blockIdx.x;
     if (arg.swizzle) {
       // the portion of the grid that is exactly divisible by the number of SMs
       const auto gridp = gridDim.x - gridDim.x % arg.swizzle_factor;
       
       block_idx = blockIdx.x;
-      if (block_idx < gridp) {
+      if (blockIdx.x < gridp) {
         // this is the portion of the block that we are going to transpose
         const auto i = blockIdx.x % arg.swizzle_factor;
         const auto j = blockIdx.x / arg.swizzle_factor;
@@ -60,7 +60,7 @@ NB: __launch_bounds__(Arg::launch_bound ? block_size : 0) becomes
   {
     const dim3 block_idx(virtual_block_idx(arg), blockIdx.y, 0);
     const dim3 thread_idx(threadIdx.x, threadIdx.y, 0);
-    autoj = blockDim.y*blockIdx.y + threadIdx.y;
+    auto j = blockDim.y*blockIdx.y + threadIdx.y;
     if (j >= arg.threads.y) return;
 
     Transformer<block_size, Arg> t(arg);
