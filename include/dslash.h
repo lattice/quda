@@ -83,6 +83,10 @@ namespace quda
 
     virtual unsigned int minGridSize() const
     {
+      /* when using nvshmem we perform the exterior Dslash using a grid strided loop and uniquely assign communication
+       * directions to CUDA block and have all communication directions resident. We therefore figure out the number of
+       * communicating dimensions and make sure that the number of blocks is a multiple of the communicating directions (2*dim)
+       */
       if (arg.kernel_type == EXTERIOR_KERNEL_ALL && arg.shmem > 0) {
         int nDimComms = 0;
         for (int d = 0; d < in.Ndim(); d++) nDimComms += arg.commDim[d];
@@ -94,6 +98,7 @@ namespace quda
 
     virtual int gridStep() const
     {
+      /* see comment for minGridSize above for gridStep choice when using nvshmem */
       if (arg.kernel_type == EXTERIOR_KERNEL_ALL && arg.shmem > 0) {
         int nDimComms = 0;
         for (int d = 0; d < in.Ndim(); d++) nDimComms += arg.commDim[d];
@@ -158,8 +163,7 @@ namespace quda
     virtual bool advanceAux(TuneParam &param) const
     {
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) {
-        // if doing the fused kernel we tune how many blocks to use for
-        // communication
+        /* if doing the fused packing + interior kernel we tune how many blocks to use for communication */
         constexpr int max_blocks_per_dir = 6;
         if (param.aux.x + 1 <= max_blocks_per_dir) {
           param.aux.x++;
@@ -167,6 +171,9 @@ namespace quda
         } else {
           param.aux.x = 1;
           if (arg.ext_dims > 0) {
+            /* if doing a fused interior+exterior kernel we use aux.y to control the number of blocks we add for the
+             * exterior. We make sure to use multiple blocks per communication direction.
+             */
             auto maxgridsize = TunableVectorYZ::maxGridSize();
             if ((param.aux.y + 1) * arg.ext_dims * 8 <= static_cast<int>(maxgridsize)) {
               param.aux.y++;
@@ -185,6 +192,9 @@ namespace quda
 
     virtual void initTuneParam(TuneParam &param) const
     {
+      /* for nvshmem uber kernels the current synchronization requires use to keep the y and z dimension local to the
+       * block. This can be removed when we introduce a finer grained synchronization which takes into account the y and z
+       * components explicitly */
       if(arg.shmem & 64){
         step_y = vector_length_y;
         step_z = vector_length_z;
@@ -196,6 +206,9 @@ namespace quda
 
     virtual void defaultTuneParam(TuneParam &param) const
     {
+      /* for nvshmem uber kernels the current synchronization requires use to keep the y and z dimension local to the
+       * block. This can be removed when we introduce a finer grained synchronization which takes into account the y and
+       * z components explicitly. */
       if(arg.shmem & 64){
         step_y = vector_length_y;
         step_z = vector_length_z;
