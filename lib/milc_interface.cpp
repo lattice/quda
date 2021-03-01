@@ -15,8 +15,6 @@
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
-#ifdef BUILD_MILC_INTERFACE
-
 // code for NVTX taken from Jiri Kraus' blog post:
 // http://devblogs.nvidia.com/parallelforall/cuda-pro-tip-generate-custom-application-profile-timelines-nvtx/
 
@@ -51,7 +49,9 @@ static const int num_colors = sizeof(colors)/sizeof(uint32_t);
 
 
 static bool initialized = false;
-static int gridDim[4];
+#ifdef MULTI_GPU
+static int commsGridDim[4];
+#endif
 static int localDim[4];
 
 static bool invalidate_quda_gauge = true;
@@ -145,15 +145,14 @@ void qudaSetLayout(QudaLayout_t input)
   for(int dir=0; dir<4; ++dir) localDim[dir] = local_dim[dir];
 
 #ifdef MULTI_GPU
-  for(int dir=0; dir<4; ++dir)  gridDim[dir] = input.machsize[dir];
+  for(int dir=0; dir<4; ++dir)  commsGridDim[dir] = input.machsize[dir];
 #ifdef QMP_COMMS
-  initCommsGridQuda(4, gridDim, nullptr, nullptr);
+  initCommsGridQuda(4, commsGridDim, nullptr, nullptr);
 #else
-  initCommsGridQuda(4, gridDim, rankFromCoords, (void *)(gridDim));
+  initCommsGridQuda(4, commsGridDim, rankFromCoords, (void *)(commsGridDim));
 #endif
   static int device = -1;
 #else
-  for(int dir=0; dir<4; ++dir)  gridDim[dir] = 1;
   static int device = input.device;
 #endif
 
@@ -2724,5 +2723,3 @@ void qudaGaugeFixingFFT( int precision,
   printfQuda("Time D2H: %lf\n", timeinfo[2]);
   printfQuda("Time all: %lf\n", timeinfo[0]+timeinfo[1]+timeinfo[2]);
 }
-
-#endif // BUILD_MILC_INTERFACE
