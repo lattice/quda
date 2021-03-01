@@ -153,6 +153,7 @@ option(QUDA_DIRAC_TWISTED_MASS "build twisted mass Dirac operators" ${QUDA_DIRAC
 option(QUDA_DIRAC_TWISTED_CLOVER "build twisted clover Dirac operators" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_DIRAC_CLOVER_HASENBUSCH "build clover Hasenbusch twist operators" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_DIRAC_NDEG_TWISTED_MASS "build non-degenerate twisted mass Dirac operators" ${QUDA_DIRAC_DEFAULT})
+option(QUDA_DIRAC_NDEG_TWISTED_CLOVER "build non-degenerate twisted clover Dirac operators" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_FORCE_GAUGE "build code for (1-loop Symanzik) gauge force" OFF)
 option(QUDA_FORCE_HISQ "build code for hisq fermion force" OFF)
 option(QUDA_GAUGE_TOOLS "build auxiliary gauge-field tools" OFF)
