@@ -63,11 +63,12 @@ namespace quda
     // 8 - barrier part I (just the put part)
     // 16 - barrier part II (wait on shmem to complete, all directions) -- not implemented
     int shmem;
-    volatile shmem_sync_t *sync_arr;
     shmem_sync_t counter;
-    cuda::atomic<int, cuda::thread_scope_system>* retcount_intra;
-    cuda::atomic<int, cuda::thread_scope_device>* retcount_inter; 
-
+#ifdef NVSHMEM_COMMS
+    volatile shmem_sync_t *sync_arr;
+    cuda::atomic<int, cuda::thread_scope_system> *retcount_intra;
+    cuda::atomic<int, cuda::thread_scope_device> *retcount_inter;
+#endif
     PackArg(void **ghost, const ColorSpinorField &in, int nFace, bool dagger, int parity, int threads, double a,
             double b, double c, int shmem_ = 0) :
       in_pack(in, nFace, nullptr, nullptr, reinterpret_cast<Float **>(ghost)),
@@ -82,11 +83,16 @@ namespace quda
       twist_b(b),
       twist_c(c),
       twist((a != 0.0 && b != 0.0) ? (c != 0.0 ? 2 : 1) : 0),
+#ifndef NVSHMEM_COMMS
+      shmem(0)
+#else
       shmem(shmem_),
-      sync_arr(dslash::sync_arr),
       counter(dslash::synccounter),
-      retcount_intra(static_cast<cuda::atomic<int, cuda::thread_scope_system>*>(dslash::dslash_atomic_pack_workspace)),
-      retcount_inter(static_cast<cuda::atomic<int, cuda::thread_scope_device>*>(dslash::dslash_atomic_pack_workspace)+2*QUDA_MAX_DIM)
+      sync_arr(dslash::sync_arr),
+      retcount_intra(static_cast<cuda::atomic<int, cuda::thread_scope_system> *>(dslash::dslash_atomic_pack_workspace)),
+      retcount_inter(static_cast<cuda::atomic<int, cuda::thread_scope_device> *>(dslash::dslash_atomic_pack_workspace)
+                     + 2 * QUDA_MAX_DIM)
+#endif
     {
       for (int i = 0; i < 4 * QUDA_MAX_DIM; i++) { packBuffer[i] = static_cast<char *>(ghost[i]); }
       for (int dim = 0; dim < 4; dim++) {

@@ -60,12 +60,12 @@ namespace quda {
     cudaEvent_t dslashStart[2];
 
     // for shmem lightweight sync
-    shmem_sync_t *sync_arr;
     shmem_sync_t synccounter = 1;
-    #ifdef NVSHMEM_COMMS
-    void* dslash_atomic_workspace = nullptr;
-    void* dslash_atomic_pack_workspace = nullptr;
-    #endif
+#ifdef NVSHMEM_COMMS
+    shmem_sync_t *sync_arr;
+    void *dslash_atomic_workspace = nullptr;
+    void *dslash_atomic_pack_workspace = nullptr;
+#endif
 
     // these variables are used for benchmarking the dslash components in isolation
     bool dslash_pack_compute;

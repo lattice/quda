@@ -25,9 +25,10 @@ namespace quda
     extern bool dslash_exterior_compute;
     extern bool dslash_comms;
     extern bool dslash_copy;
-
-    extern shmem_sync_t *sync_arr;
     extern shmem_sync_t synccounter;
+#ifdef NVSHMEM_COMMS
+    extern shmem_sync_t *sync_arr;
+#endif
     static cudaColorSpinorField *inSpinor;
 
     /**
