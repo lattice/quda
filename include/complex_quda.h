@@ -462,7 +462,7 @@ public:
       imag(im);
     }
 
-  __host__ __device__ complex<float>(const complex<float> & z) : float2(z) {}
+  //__host__ __device__ complex<float>(const complex<float> & z) : float2(z) {}
   __host__ __device__ complex<float>& operator=(const complex<float> &z)
     {
       real(z.real());
@@ -535,11 +535,11 @@ public:
     }
 
   // Let the compiler synthesize the copy and assignment operators.
-  __host__ __device__ inline complex<float>(const volatile complex<float> & z)
-  {
-    real(z.real());
-    imag(z.imag());
-  }
+  //__host__ __device__ inline complex<float>(const volatile complex<float> & z)
+  //{
+  //real(z.real());
+  //imag(z.imag());
+  //}
 
   __host__ __device__ inline float real() const volatile{ return x; }
   __host__ __device__ inline float imag() const volatile{ return y; }
@@ -582,7 +582,7 @@ public:
       imag(im);
     }
 
-  __host__ __device__ complex<double>(const complex<double> & z) : double2(z) {}
+  //__host__ __device__ complex<double>(const complex<double> & z) : double2(z) {}
   __host__ __device__ complex<double>& operator=(const complex<double> &z)
     {
       x = z.x;
@@ -666,11 +666,11 @@ public:
       return *this;
     }
 
-  __host__ __device__ inline complex<double>(const volatile complex<double> & z)
-  {
-    real(z.real());
-    imag(z.imag());
-  }
+  //__host__ __device__ inline complex<double>(const volatile complex<double> & z)
+  // {
+  //real(z.real());
+  //imag(z.imag());
+  //}
 
   // Let the compiler synthesize the copy and assignment operators.
   __host__ __device__ inline double real() const volatile { return x; }

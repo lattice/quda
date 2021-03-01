@@ -2,8 +2,8 @@
 #include <quda_internal.h>
 
 //static auto mySelector = sycl::default_selector();
-static auto mySelector = sycl::host_selector();
-//static auto mySelector = sycl::cpu_selector();
+//static auto mySelector = sycl::host_selector();
+static auto mySelector = sycl::cpu_selector();
 //static auto mySelector = sycl::gpu_selector();
 static sycl::device myDevice;
 static sycl::queue *streams;
@@ -21,11 +21,11 @@ namespace quda
     {
       if (initialized) return;
       initialized = true;
-      {
-	auto dh = sycl::device(sycl::host_selector());
-	printfQuda("Name: %s\n", dh.get_info<sycl::info::device::name>().c_str());
-	printfQuda("Version: %s\n", dh.get_info<sycl::info::device::version>().c_str());
-      }
+      //{
+      //auto dh = sycl::device(sycl::host_selector());
+      //printfQuda("Name: %s\n", dh.get_info<sycl::info::device::name>().c_str());
+      //printfQuda("Version: %s\n", dh.get_info<sycl::info::device::version>().c_str());
+      //}
 
       //if (getVerbosity() >= QUDA_SUMMARIZE) {
       auto ps = sycl::platform::get_platforms();
@@ -34,8 +34,9 @@ namespace quda
 	printfQuda("  %s\n", p.get_info<sycl::info::platform::name>().c_str());
       }
 
-      //auto p = sycl::platform(mySelector);
-      auto p = sycl::platform(sycl::host_selector());
+      auto p = sycl::platform(mySelector);
+      //auto p = sycl::platform(sycl::host_selector());
+      //auto p = ps.back();
       printfQuda("Selected platform: %s\n", p.get_info<sycl::info::platform::name>().c_str());
       printfQuda("  Vendor: %s\n", p.get_info<sycl::info::platform::vendor>().c_str());
       printfQuda("  Version: %s\n", p.get_info<sycl::info::platform::version>().c_str());
@@ -175,7 +176,7 @@ namespace quda
     void destroy()
     {
       if (streams) {
-        for (int i=0; i<Nstream; i++) streams[i].~queue();
+        //for (int i=0; i<Nstream; i++) streams[i].~queue();
         delete []streams;
         streams = nullptr;
       }
@@ -256,12 +257,14 @@ namespace quda
     }
 
     unsigned int max_threads_per_block() {
-      auto val = myDevice.get_info<sycl::info::device::max_work_group_size>();
+      //auto val = myDevice.get_info<sycl::info::device::max_work_group_size>();
+      auto val = 128;
       return val;
     }
 
     unsigned int max_threads_per_processor() { // not in portable SYCL
-      auto val = myDevice.get_info<sycl::info::device::max_work_group_size>();
+      //auto val = myDevice.get_info<sycl::info::device::max_work_group_size>();
+      auto val = 128;
       return 2*val;
     }
 

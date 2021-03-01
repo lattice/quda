@@ -38,7 +38,7 @@ namespace quda {
       //warningQuda("launch_device 1D: %s", tp.comment.c_str());
       for(int i = 0; i < param.size(); i++)
 	qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
-      launch_error =
+      TunableKernel::launch_error =
 	launchKernel1D<Functor, Arg, grid_stride>(tp, stream, arg);
     }
 
@@ -149,7 +149,8 @@ namespace quda {
       //TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Kernel2D), tp, stream, arg, param);
       for (unsigned int i = 0; i < param.size(); i++)
 	qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
-      launchKernel2D<Functor, Arg, grid_stride>(tp, stream, arg);
+      TunableKernel::launch_error =
+	launchKernel2D<Functor, Arg, grid_stride>(tp, stream, arg);
     }
 
     template <template <typename> class Functor, typename Arg>
@@ -170,7 +171,13 @@ namespace quda {
     {
       const_cast<Arg &>(arg).threads.y = vector_length_y;
       if (TunableKernel1D_base<grid_stride>::location == QUDA_CUDA_FIELD_LOCATION) {
+	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+	  printfQuda("TunableKernel2D_base launch_device\n");
+	}
         launch_device<Functor, Arg>(tp, stream, arg, param);
+	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+	  printfQuda("end TunableKernel2D_base launch_device\n");
+	}
       } else {
 	errorQuda("CPU not supported yet");
       }

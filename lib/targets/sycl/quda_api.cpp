@@ -307,17 +307,11 @@ namespace quda {
 
   bool qudaEventQuery_(qudaEvent_t &quda_event, const char *func, const char *file, const char *line)
   {
-    errorQuda("qudaEventQuery_ unimplemented\n");
-#if 0
-    cudaEvent_t &event = reinterpret_cast<cudaEvent_t&>(quda_event.event);
-    PROFILE(cudaError_t error = cudaEventQuery(event), QUDA_PROFILE_EVENT_QUERY);
-    switch (error) {
-    case cudaSuccess: return true;
-    case cudaErrorNotReady: return false;
-    default: set_runtime_error(error, __func__, func, file, line);
-    }
-#endif
-    return false;
+    auto pe = reinterpret_cast<sycl::event *>(quda_event.event);
+    auto status = (*pe).get_info<sycl::info::event::command_execution_status>();
+    auto val = false;
+    if(status==sycl::info::event_command_status::complete) val=true;
+    return val;
   }
 
   void qudaEventRecord_(qudaEvent_t &quda_event, qudaStream_t stream, const char *func, const char *file, const char *line)
@@ -386,9 +380,11 @@ namespace quda {
 
   void qudaDeviceSynchronize_(const char *func, const char *file, const char *line)
   {
-    errorQuda("qudaDeviceSynchronize_ unimplemented\n");
-    auto q = device::defaultQueue();
-    q.wait();
+    int n = device::get_default_stream_idx();
+    for(int i=0; i<=n; i++) {
+      auto s = device::get_stream(i);
+      qudaStreamSynchronize_(s, func, file, line);
+    }
   }
 
   void printAPIProfile() {

@@ -26,9 +26,9 @@ namespace quda {
     sycl::range<3> localSize{tp.block.x, tp.block.y, tp.block.z};
     sycl::nd_range<3> ndRange{globalSize, localSize};
     auto q = device::get_target_stream(stream);
-    //warningQuda("launchKernel1D %s", grid_stride?"true":"false");
-    //warningQuda("%s  %s", str(globalSize).c_str(), str(localSize).c_str());
-    //warningQuda("%s", str(arg.threads).c_str());
+    warningQuda("launchKernel1D %s", grid_stride?"true":"false");
+    warningQuda("%s  %s", str(globalSize).c_str(), str(localSize).c_str());
+    warningQuda("%s", str(arg.threads).c_str());
     q.submit([&](sycl::handler& h) {
 	       h.parallel_for<class Kernel1D>(ndRange,
 				 [=](sycl::nd_item<3> ndi)
@@ -37,7 +37,7 @@ namespace quda {
 				  });
 	     });
     //managed_free(a);
-    //warningQuda("end launchKernel1D");
+    warningQuda("end launchKernel1D");
     return QUDA_SUCCESS;
   }
 
@@ -46,33 +46,40 @@ namespace quda {
   {
     Functor<Arg> f(arg);
 
-    auto i = threadIdx.x + blockIdx.x * blockDim.x;
-    auto j = threadIdx.y + blockIdx.y * blockDim.y;
+    //auto i = threadIdx.x + blockIdx.x * blockDim.x;
+    //auto j = threadIdx.y + blockIdx.y * blockDim.y;
+    auto i = ndi.get_global_id(0);
+    auto j = ndi.get_global_id(1);
     if (j >= arg.threads.y) return;
 
     while (i < arg.threads.x) {
       f(i, j);
-      if (grid_stride) i += gridDim.x * blockDim.x; else break;
+      //if (grid_stride) i += gridDim.x * blockDim.x; else break;
+      if (grid_stride) i += ndi.get_global_range(0); else break;
     }
   }
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   qudaError_t
   launchKernel2D(const TuneParam &tp, const qudaStream_t &stream, Arg arg)
   {
-    auto a = (Arg *)managed_malloc(sizeof(Arg));
-    memcpy((void*)a, &arg, sizeof(Arg));
+    //auto a = (Arg *)managed_malloc(sizeof(Arg));
+    //memcpy((void*)a, &arg, sizeof(Arg));
     sycl::range<3> globalSize{tp.grid.x*tp.block.x, tp.grid.y*tp.block.y, tp.grid.z*tp.block.z};
     sycl::range<3> localSize{tp.block.x, tp.block.y, tp.block.z};
     sycl::nd_range<3> ndRange{globalSize, localSize};
     auto q = device::get_target_stream(stream);
+    warningQuda("launchKernel2D %s", grid_stride?"true":"false");
+    warningQuda("%s  %s", str(globalSize).c_str(), str(localSize).c_str());
+    warningQuda("%s", str(arg.threads).c_str());
     q.submit([&](sycl::handler& h) {
 	       h.parallel_for<class Kernel2D>(ndRange,
 					      [=](sycl::nd_item<3> ndi)
 				  {
-				    quda::Kernel2D<Functor, Arg, grid_stride>(*a, ndi);
+				    quda::Kernel2D<Functor, Arg, grid_stride>(arg, ndi);
 				  });
 	     });
-    managed_free(a);
+    //managed_free(a);
+    warningQuda("end launchKernel2D");
     return QUDA_SUCCESS;
   }
 

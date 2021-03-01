@@ -970,6 +970,9 @@ namespace quda {
       faceVolumeCB[i] = a.SurfaceCB(i)*nFace;
     }
     resetGhost(ghost_ ? (void **)ghost_ : a.Ghost());
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+      printfQuda("FloatNOrder field: %p\n", field);
+    }
   }
 
   void resetGhost(void *const *ghost_) const

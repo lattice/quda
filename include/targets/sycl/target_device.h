@@ -10,7 +10,7 @@ namespace quda {
     */
     constexpr bool is_device()
     {
-#ifdef __CUDA_ARCH__
+#ifdef __SYCL_DEVICE_ONLY__
       return true;
 #else
       return false;
@@ -23,7 +23,7 @@ namespace quda {
     */
     constexpr bool is_host()
     {
-#ifdef __CUDA_ARCH__
+#ifdef __SYCL_DEVICE_ONLY__
       return false;
 #else
       return true;
@@ -37,7 +37,7 @@ namespace quda {
     */
     inline dim3 block_dim()
     {
-#ifdef __CUDA_ARCH__
+#ifdef __SYCL_DEVICE_ONLY__
       return dim3(blockDim.x, blockDim.y, blockDim.z);
 #else
       return dim3(0, 0, 0);
@@ -51,7 +51,7 @@ namespace quda {
     */
     inline dim3 block_idx()
     {
-#ifdef __CUDA_ARCH__
+#ifdef __SYCL_DEVICE_ONLY__
       return dim3(blockIdx.x, blockIdx.y, blockIdx.z);
 #else
       return dim3(0, 0, 0);
@@ -67,7 +67,7 @@ namespace quda {
     */
     __device__ __host__ inline dim3 thread_idx()
     {
-#ifdef __CUDA_ARCH__
+#ifdef __SYCL_DEVICE_ONLY__
       return dim3(threadIdx.x, threadIdx.y, threadIdx.z);
 #else
       return dim3(0, 0, 0);
@@ -78,7 +78,7 @@ namespace quda {
        @brief Helper function that returns the warp-size of the
        architecture we are running on.
     */
-    constexpr int warp_size() { return 32; }
+    constexpr int warp_size() { return 8; }
 
     /**
        @brief Return the thread mask for a converged warp.

@@ -252,6 +252,30 @@ namespace quda
     }
 
 #else
+  inline double toGroupReduceType(double in) {
+    return in;
+  }
+  inline sycl::double2 toGroupReduceType(vec2<double> in) {
+    return sycl::double2{in.x, in.y};
+  }
+  inline sycl::double3 toGroupReduceType(vec3<double> in) {
+    return sycl::double3{in.x, in.y, in.z};
+  }
+  inline sycl::double4 toGroupReduceType(vec4<double> in) {
+    return sycl::double4{in.x, in.y, in.z, in.w};
+  }
+  template<typename T> inline T fromGroupReduceType(double in) {
+    return T{in};
+  }
+  template<typename T> inline T fromGroupReduceType(sycl::double2 in) {
+    return T{in.x(), in.y()};
+  }
+  template<typename T> inline T fromGroupReduceType(sycl::double3 in) {
+    return T{in.x(), in.y(), in.z()};
+  }
+  template<typename T> inline T fromGroupReduceType(sycl::double4 in) {
+    return T{in.x(), in.y(), in.z(), in.w()};
+  }
     /**
        @brief Generic reduction function that reduces block-distributed
        data "in" per thread to a single value.  This is the legacy
@@ -269,8 +293,10 @@ namespace quda
       auto ndi = getNdItem();
       auto grp = getGroup();
       //T aggregate = Reducer::do_sum ? BlockReduce(cub_tmp).Sum(in) : BlockReduce(cub_tmp).Reduce(in, r);
-      //T aggregate = Reducer::do_sum ? sycl::ONEAPI::reduce(grp, in, sycl::ONEAPI::plus<>()) : sycl::ONEAPI::reduce(grp, in, sycl::ONEAPI::plus<>());  // FIXME non sum
-      T aggregate;
+      auto inX = toGroupReduceType(in);
+      auto aggregateX = Reducer::do_sum ? sycl::ONEAPI::reduce(grp, inX, sycl::ONEAPI::plus<>()) : sycl::ONEAPI::reduce(grp, inX, sycl::ONEAPI::plus<>());  // FIXME non sum
+      T aggregate = fromGroupReduceType<T>(aggregateX);
+      //T aggregate;
 
       auto llid = ndi.get_local_linear_id();
       auto grpRg = ndi.get_group_range(0);
@@ -281,12 +307,14 @@ namespace quda
 	arg.partial[idx*grpRg + grpId] = aggregate;
 	ndi.mem_fence(sycl::access::fence_space::global_and_local);  // flush result
 	// increment global block counter
-	unsigned int value = atomicAdd(&arg.count[idx], gridDim.x);
+	unsigned int value = atomicAdd(&arg.count[idx], grpRg);
 	// determine if last block
 	isLastBlockDone = (value == (grpRg-1));
       }
-      isLastBlockDone = sycl::ONEAPI::broadcast(grp, isLastBlockDone);
+      ////      isLastBlockDone = sycl::ONEAPI::broadcast(grp, isLastBlockDone);
+      //isLastBlockDone = group_broadcast(grp, isLastBlockDone);
 
+#if 0
       // finish the reduction if last block
       if (isLastBlockDone) {
 	uint i = llid;
@@ -304,6 +332,8 @@ namespace quda
 	  arg.count[idx] = 0; // set to zero for next time
 	}
       }
+#endif
+
 #if 0
       using BlockReduce = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y>;
       __shared__ typename BlockReduce::TempStorage cub_tmp;
