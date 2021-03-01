@@ -170,14 +170,42 @@ endif()
 # set up QUDA compile options
 target_compile_definitions(
   quda PRIVATE $<$<CONFIG:DEVEL>:DEVEL> $<$<CONFIG:HOSTDEBUG>:HOST_DEBUG> $<$<CONFIG:DEVICEDEBUG>:DEVICE_DEBUG>
-  $<$<CONFIG:DEBUG>:HOST_DEBUG> $<$<CONFIG:DEBUG>:DEVICE_DEBUG> $<$<CONFIG:SANITIZE>:HOST_DEBUG>)
+               $<$<CONFIG:DEBUG>:HOST_DEBUG> $<$<CONFIG:DEBUG>:DEVICE_DEBUG> $<$<CONFIG:SANITIZE>:HOST_DEBUG>)
 
-if (QUDA_TARGET_CUDA)
-  # malloc.cpp uses both the driver and runtime api So we need to find the
-  # CUDA_CUDA_LIBRARY (driver api) or the stub version for cmake 3.8 and later this
-  # has been integrated into  FindCUDALibs.cmake
-  target_link_libraries(quda PUBLIC ${CUDA_cuda_driver_LIBRARY})
-  
+# set host compiler-specific options
+target_compile_options(quda PRIVATE -Wall -Wextra
+                            $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>>: -Wno-unknown-pragmas>
+                            $<$<CXX_COMPILER_ID:NVHPC>:>)
+
+target_compile_options(
+  quda
+  PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
+          -ftz=true
+          -prec-div=false
+          -prec-sqrt=false>
+          $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
+          -fcuda-flush-denormals-to-zero
+          -fcuda-approx-transcendentals
+          -Xclang -fcuda-allow-variadic-functions>)
+target_compile_options(
+  quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:-Wno-unknown-cuda-version> $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
+               -Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH} --expt-relaxed-constexpr>)
+
+target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -ftz=true -prec-div=false -prec-sqrt=false>)
+target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -Wno-deprecated-gpu-targets
+                                    -arch=${QUDA_GPU_ARCH} --expt-relaxed-constexpr>)
+target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>: --cuda-path=${CUDAToolkit_TARGET_DIR}
+                                    --cuda-gpu-arch=${QUDA_GPU_ARCH}>)
+target_link_options(quda PUBLIC $<$<CUDA_COMPILER_ID:Clang>: --cuda-path=${CUDAToolkit_TARGET_DIR}>)
+
+if(QUDA_VERBOSE_BUILD)
+  target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:--ptxas-options=-v>)
+endif(QUDA_VERBOSE_BUILD)
+
+# workaround for 10.2
+if(CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA"
+   AND ${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL "10.2"
+   AND ${CMAKE_CUDA_COMPILER_VERSION} VERSION_LESS "10.3")
   target_compile_options(
     quda
     PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
@@ -252,32 +280,23 @@ add_subdirectory(targets/generic)
 add_subdirectory(interface)
 
 # propagate CXX flags to CUDA host compiler
-if(QUDA_TARGET_CUDA) 
-  if(${QUDA_PROPAGATE_CXX_FLAGS})
-
-    # Pick the right set of flags Apparently I cannot do this with generator expressions
-    if(CMAKE_BUILD_TYPE STREQUAL "DEVEL")
-      set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_DEVEL}")
-    elseif(CMAKE_BUILD_TYPE STREQUAL "STRICT")
-      set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_STRICT}")
-    elseif(CMAKE_BUILD_TYPE STREQUAL "RELEASE")
-      set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_RELEASE}")
-    elseif(CMAKE_BUILD_TYPE STREQUAL "DEBUG")
-      set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_DEBUG}")
-    elseif(CMAKE_BUILD_TYPE STREQUAL "HOSTDEBUG")
-      set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_HOSTDEBUG}")
-    elseif(CMAKE_BUILD_TYPE STREQUAL "DEVICEDEBUG")
-      set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_DEVICEDEBUG}")
-    elseif(CMAKE_BUILD_TYPE STREQUAL "SANITIZE")
-      set(PROPAGATED_FLAGS "${CMAKE_CUDA_FLAGS_SANITIZE}")
-    endif()
-    
-    # Turne the flags into a CMAKE list
-    string(REPLACE " " ";" PROPAGATED_FLAG_LIST ${PROPAGATED_FLAGS})
-    
-    foreach(FLAG ${PROPAGATED_FLAG_LIST})
-      target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -Xcompiler=${FLAG}>)
-    endforeach()
+#TODO: Do we still need that? 
+if(${QUDA_PROPAGATE_CXX_FLAGS})
+  # Pick the right set of flags Apparently I cannot do this with generator expressions
+  if(CMAKE_BUILD_TYPE STREQUAL "DEVEL")
+    set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_DEVEL}")
+  elseif(CMAKE_BUILD_TYPE STREQUAL "STRICT")
+    set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_STRICT}")
+  elseif(CMAKE_BUILD_TYPE STREQUAL "RELEASE")
+    set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_RELEASE}")
+  elseif(CMAKE_BUILD_TYPE STREQUAL "DEBUG")
+    set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_DEBUG}")
+  elseif(CMAKE_BUILD_TYPE STREQUAL "HOSTDEBUG")
+    set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_HOSTDEBUG}")
+  elseif(CMAKE_BUILD_TYPE STREQUAL "DEVICEDEBUG")
+    set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_DEVICEDEBUG}")
+  elseif(CMAKE_BUILD_TYPE STREQUAL "SANITIZE")
+    set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_SANITIZE}")
   endif()
 
   # Turne the flags into a CMAKE list
@@ -291,7 +310,6 @@ endif()
 # Specific config dependent warning suppressions and lineinfo forwarding
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
                             -Wreorder
-                            -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function
                             $<$<CONFIG:DEVEL>:-Xptxas -warn-lmem-usage,-warn-spills -lineinfo>
                             $<$<CONFIG:STRICT>: -Werror=all-warnings -lineinfo>
                             $<$<CONFIG:HOSTDEBUG>:-lineinfo>
@@ -299,7 +317,6 @@ target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
                             >)
 
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
-                            -Wall -Wextra -Wno-unknown-pragmas -Wno-unused-function
                             $<$<CONFIG:STRICT>:-Werror -Wno-error=pass-failed>
                             $<$<CONFIG:SANITIZE>:-fsanitize=address,-fsanitize=undefined>
                             >)

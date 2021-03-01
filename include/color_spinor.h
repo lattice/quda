@@ -377,15 +377,15 @@ namespace quda {
 	case 1: // positive projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
-            proj(0, i) = 2 * t(0, i);
-            proj(1, i) = 2 * t(1, i);
+            proj(0, i) = static_cast<Float>(2.0) * t(0, i);
+            proj(1, i) = static_cast<Float>(2.0) * t(1, i);
           }
 	  break;
 	case -1: // negative projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
-            proj(0, i) = 2 * t(2, i);
-            proj(1, i) = 2 * t(3, i);
+            proj(0, i) = static_cast<Float>(2.0) * t(2, i);
+            proj(1, i) = static_cast<Float>(2.0) * t(3, i);
           }
 	  break;
 	}

@@ -15,8 +15,6 @@
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
-#ifdef BUILD_MILC_INTERFACE
-
 // code for NVTX taken from Jiri Kraus' blog post:
 // http://devblogs.nvidia.com/parallelforall/cuda-pro-tip-generate-custom-application-profile-timelines-nvtx/
 
@@ -51,7 +49,10 @@ static const int num_colors = sizeof(colors)/sizeof(uint32_t);
 
 
 static bool initialized = false;
+#ifdef MULTI_GPU
 static int commsGridDim[4];
+#endif
+
 static int localDim[4];
 
 static bool invalidate_quda_gauge = true;
@@ -153,7 +154,10 @@ void qudaSetLayout(QudaLayout_t input)
 #endif
   static int device = -1;
 #else
+<<<<<<< HEAD
   for(int dir=0; dir<4; ++dir)  commsGridDim[dir] = 1;
+=======
+>>>>>>> feature/generic_kernel
   static int device = input.device;
 #endif
 
@@ -2724,5 +2728,3 @@ void qudaGaugeFixingFFT( int precision,
   printfQuda("Time D2H: %lf\n", timeinfo[2]);
   printfQuda("Time all: %lf\n", timeinfo[0]+timeinfo[1]+timeinfo[2]);
 }
-
-#endif // BUILD_MILC_INTERFACE
