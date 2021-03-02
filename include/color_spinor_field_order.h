@@ -983,7 +983,9 @@ namespace quda {
       static constexpr int M_ghost = length_ghost / N_ghost;
       using Accessor = FloatNOrder<Float, Ns, Nc, N, spin_project, huge_alloc>;
       using real = typename mapper<Float>::type;
+      using reduced_real = typename reduced_mapper<Float>::type;
       using complex = complex<real>;
+      using reduced_complex = ::complex<reduced_real>;
       using Vector = typename VectorType<Float, N>::type;
       using GhostVector = typename VectorType<Float, N_ghost>::type;
       using AllocInt = typename AllocType<huge_alloc>::type;
@@ -1032,11 +1034,12 @@ namespace quda {
     }
   }
 
-  __device__ __host__ inline void load(complex out[length / 2], int x, int parity = 0) const
+  template<class float_type>
+  __device__ __host__ inline void load(::complex<float_type> out[length / 2], int x, int parity = 0) const
   {
-    real v[length];
+    float_type v[length];
     norm_type nrm;
-    if (isFixed<Float>::value) {
+    if (isFixed<Float>::value && !std::is_same<float_type, __half>::value) {
       nrm = vector_load<float>(norm, x + parity * norm_offset);
     }
 
@@ -1050,7 +1053,7 @@ namespace quda {
     }
 
 #pragma unroll
-    for (int i = 0; i < length / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
+    for (int i = 0; i < length / 2; i++) out[i] = ::complex<float_type>(v[2 * i + 0], v[2 * i + 1]);
   }
 
   __device__ __host__ inline void save(const complex in[length / 2], int x, int parity = 0)
@@ -1119,6 +1122,14 @@ namespace quda {
   __device__ __host__ inline const colorspinor_wrapper<real, Accessor> operator()(int x_cb, int parity) const
   {
     return colorspinor_wrapper<real, Accessor>(const_cast<Accessor &>(*this), x_cb, parity);
+  }
+
+  __device__ __host__ inline const colorspinor_wrapper<reduced_real, Accessor> operator()(real &nrm, int x_cb, int parity) const
+  {
+    if (std::is_same<reduced_real, __half>::value) {
+      nrm = vector_load<float>(norm, x_cb + parity * norm_offset);
+    }
+    return colorspinor_wrapper<reduced_real, Accessor>(const_cast<Accessor &>(*this), x_cb, parity);
   }
 
   __device__ __host__ inline void loadGhost(complex out[length_ghost / 2], int x, int dim, int dir, int parity = 0) const

@@ -697,7 +697,7 @@ namespace quda {
       for (int i=0; i<N; ++i){
 #pragma unroll
         for (int j=0; j<N; ++j){
-          (*m)(i,j) = 0;
+          (*m)(i,j) = T(0);
         }
       }
     }

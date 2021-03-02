@@ -100,11 +100,20 @@ namespace quda
 
           out += (U * in).reconstruct(d, proj_dir);
         } else if (doBulk<kernel_type>() && !ghost) {
-
+#if 0
           Link U = arg.U(d, gauge_idx, gauge_parity);
           Vector in = arg.in(fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
 
           out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+#else
+          using reduced_real = typename reduced_mapper<typename Arg::Float>::type;
+          using reduced_link = Matrix<complex<reduced_real>, Arg::nColor>;
+          reduced_link U = arg.U.get_reduced(d, gauge_idx, gauge_parity);
+          using reduced_vector = ColorSpinor<reduced_real, Arg::nColor, 4>;
+          real norm = 1.0;
+          reduced_vector in = arg.in(norm, fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
+          out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir).convert_and_scale(norm);
+#endif
         }
       }
 
@@ -127,11 +136,20 @@ namespace quda
 
           out += (conj(U) * in).reconstruct(d, proj_dir);
         } else if (doBulk<kernel_type>() && !ghost) {
-
+#if 0
           Link U = arg.U(d, gauge_idx, 1 - gauge_parity);
           Vector in = arg.in(back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
 
           out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+#else 
+          using reduced_real = typename reduced_mapper<typename Arg::Float>::type;
+          using reduced_link = Matrix<complex<reduced_real>, Arg::nColor>;
+          reduced_link U = arg.U.get_reduced(d, gauge_idx, 1 - gauge_parity);
+          using reduced_vector = ColorSpinor<reduced_real, Arg::nColor, 4>;
+          real norm = 1.0;
+          reduced_vector in = arg.in(norm, back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
+          out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir).convert_and_scale(norm);
+#endif
         }
       }
     } // nDim

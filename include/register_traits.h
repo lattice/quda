@@ -82,6 +82,12 @@ namespace quda {
     typedef short type;
   };
 
+  template<typename> struct reduced_mapper { };
+  template<> struct reduced_mapper<double> { typedef double type; };
+  template<> struct reduced_mapper<float> { typedef float type; };
+  template<> struct reduced_mapper<short> { typedef __half type; };
+  template<> struct reduced_mapper<int8_t> { typedef __half type; };
+
   /*
     Here we use traits to define the mapping between storage type and
     register type:

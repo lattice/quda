@@ -524,7 +524,7 @@ namespace quda
 #endif
     } else if (U.Reconstruct() == Recon::recon[2]) {
 #if QUDA_RECONSTRUCT & 1
-      Apply<Float, nColor, Recon::recon[2]>(out, in, U, args...);
+      // Apply<Float, nColor, Recon::recon[2]>(out, in, U, args...);
 #else
       errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-8/9", QUDA_RECONSTRUCT);
 #endif

@@ -265,6 +265,7 @@ namespace quda {
   template <> struct RealType<char4> {
     typedef int8_t type;
   };
+  template<> struct RealType<complex<__half> > { typedef __half type; };
 
 #ifndef __CUDACC_RTC__
   inline std::ostream &operator<<(std::ostream &output, const double2 &a)

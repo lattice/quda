@@ -27,6 +27,8 @@
 #include <sstream>
 //#include <cuComplex.h>
 
+#include <cuda_fp16.h>
+
 namespace quda {
   namespace gauge {
     template<typename Float, typename storeFloat> struct fieldorder_wrapper;
@@ -795,6 +797,58 @@ public:
   template <typename T>
   inline __host__ __device__ operator complex<T>() const { return complex<T>(static_cast<T>(real()),static_cast<T>(imag())); }
 
+};
+
+template<>
+struct complex<__half> : public __half2
+{
+  public:
+    using value_type = __half;
+    using __half2::operator=;
+
+    __host__ __device__ inline complex<__half>(){};
+
+    __host__ __device__ inline complex<__half>(const __half& re, const __half& im = __half())
+    {
+      real(re);
+      imag(im);
+    }
+
+    __host__ __device__ inline complex<__half>(const complex<__half> & z) : __half2(z){}
+
+    __host__ __device__ inline complex<__half>& operator+=(const complex<__half> z)
+    {
+#ifdef __CUDA_ARCH__
+      real(real() + z.real());
+      imag(imag() + z.imag());
+#else
+      real(__half2float(real()) + __half2float(z.real()));
+      imag(__half2float(imag()) + __half2float(z.imag()));
+#endif
+      return *this;
+    }
+
+    __host__ __device__ inline complex<__half>& operator-=(const complex<__half> z)
+    {
+#ifdef __CUDA_ARCH__
+      real(real() - z.real());
+      imag(imag() - z.imag());
+#else
+      real(__half2float(real()) - __half2float(z.real()));
+      imag(__half2float(imag()) - __half2float(z.imag()));
+#endif
+      return *this;
+    }
+
+    __host__ __device__ inline __half real() const { return x; }
+    __host__ __device__ inline __half imag() const { return y; }
+    __host__ __device__ inline void real(__half re) { x = re; }
+    __host__ __device__ inline void imag(__half im) { y = im; }
+
+    // cast operators
+    inline operator std::complex<__half>() const { return std::complex<__half>(real(),imag()); }
+    template <typename T>
+      inline __host__ __device__ operator complex<T>() const { return complex<T>(static_cast<T>(real()),static_cast<T>(imag())); }
 };
 
 template<>

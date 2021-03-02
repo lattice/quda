@@ -67,10 +67,17 @@ namespace quda
   }
 
   template <typename T1, typename T2>
-  __host__ __device__ inline typename std::enable_if<!isFixed<T1>::value && isFixed<T2>::value, void>::type
+  __host__ __device__ inline typename std::enable_if<!isFixed<T1>::value && isFixed<T2>::value && !std::is_same<T1, __half>::value, void>::type
   copy(T1 &a, const T2 &b)
   {
     a = i2f(b) * fixedInvMaxValue<T2>::value;
+  }
+
+  template <typename T1, typename T2>
+  __host__ __device__ inline typename std::enable_if<!isFixed<T1>::value && isFixed<T2>::value && std::is_same<T1, __half>::value, void>::type
+  copy(T1 &a, const T2 &b)
+  {
+    a = __short2half_rn(b) * __float2half(fixedInvMaxValue<T2>::value);
   }
 
   template <typename T1, typename T2>
@@ -109,10 +116,16 @@ namespace quda
   }
 
   template <typename T1, typename T2, typename T3>
-  __host__ __device__ inline typename std::enable_if<isFixed<T2>::value, void>::type copy_and_scale(T1 &a, const T2 &b,
+  __host__ __device__ inline typename std::enable_if<isFixed<T2>::value && !std::is_same<T1, __half>::value, void>::type copy_and_scale(T1 &a, const T2 &b,
                                                                                                     const T3 &c)
   {
     a = i2f(b) * fixedInvMaxValue<T2>::value * c;
   }
 
+  template <typename T1, typename T2, typename T3>
+  __host__ __device__ inline typename std::enable_if<isFixed<T2>::value && std::is_same<T1, __half>::value, void>::type copy_and_scale(T1 &a, const T2 &b,
+                                                                                                    const T3 &c)
+  {
+    a = __short2half_rn(b) * __float2half(fixedInvMaxValue<T2>::value);
+  }
 } // namespace quda
