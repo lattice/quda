@@ -25,10 +25,6 @@ namespace quda
     extern bool dslash_exterior_compute;
     extern bool dslash_comms;
     extern bool dslash_copy;
-    extern shmem_sync_t synccounter;
-#ifdef NVSHMEM_COMMS
-    extern shmem_sync_t *sync_arr;
-#endif
     static cudaColorSpinorField *inSpinor;
 
     /**
@@ -494,7 +490,7 @@ namespace quda
         }
       }
 
-      dslash::synccounter++;
+      dslash::inc_shmem_sync_counter();
       in->bufferIndex = (1 - in->bufferIndex);
       profile.TPSTOP(QUDA_PROFILE_TOTAL);
 #else

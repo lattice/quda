@@ -8,18 +8,6 @@
 
 namespace quda
 {
-  namespace dslash
-  {
-    // helpers for in-kernel barriers in nvshmem
-    extern shmem_sync_t synccounter;
-#ifdef NVSHMEM_COMMS
-    extern shmem_sync_t *sync_arr;
-    extern shmem_retcount_intra_t* _retcount_intra;
-    extern shmem_retcount_inter_t* _retcount_inter;
-    extern shmem_interior_done_t* _interior_done;
-    extern shmem_interior_count_t* _interior_count;
-#endif
-  } // namespace dslash
   /**
      @brief Helper function to determine if we should do halo
      computation
@@ -290,13 +278,13 @@ namespace quda
     int neighbor_ranks[2 * QUDA_MAX_DIM];
     int bytes[2 * QUDA_MAX_DIM];
     int shmem;
-    shmem_sync_t counter;
+    dslash::shmem_sync_t counter;
 #ifdef NVSHMEM_COMMS
-    volatile shmem_sync_t *sync_arr;
-    shmem_retcount_intra_t *retcount_intra;
-    shmem_retcount_inter_t *retcount_inter;
-    shmem_interior_done_t &interior_done;
-    shmem_interior_count_t &interior_count;
+    volatile dslash::shmem_sync_t *sync_arr;
+    dslash::shmem_retcount_intra_t *retcount_intra;
+    dslash::shmem_retcount_inter_t *retcount_inter;
+    dslash::shmem_interior_done_t &interior_done;
+    dslash::shmem_interior_count_t &interior_count;
 #endif
 
     // constructor needed for staggered to set xpay from derived class
@@ -332,12 +320,12 @@ namespace quda
       counter(0)
 #else
       shmem(shmem_),
-      counter(dslash::synccounter),
-      sync_arr(dslash::sync_arr),
-      interior_done(*dslash::_interior_done),
-      interior_count(*dslash::_interior_count),
-      retcount_intra(dslash::_retcount_intra),
-      retcount_inter(dslash::_retcount_inter)
+      counter(dslash::get_shmem_sync_counter()),
+      sync_arr(dslash::get_shmem_sync_arr()),
+      interior_done(*dslash::get_shmem_interior_done()),
+      interior_count(*dslash::get_shmem_interior_count()),
+      retcount_intra(dslash::get_shmem_retcount_intra()),
+      retcount_inter(dslash::get_shmem_retcount_inter())
 #endif
 
     {

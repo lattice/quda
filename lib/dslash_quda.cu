@@ -60,15 +60,21 @@ namespace quda {
     cudaEvent_t dslashStart[2];
 
     // for shmem lightweight sync
-    shmem_sync_t synccounter = 1;
+    shmem_sync_t sync_counter = 1;
+    shmem_sync_t get_shmem_sync_counter() { return sync_counter; }
+    shmem_sync_t set_shmem_sync_counter(shmem_sync_t count) { return sync_counter = count; }
+    shmem_sync_t inc_shmem_sync_counter() { return sync_counter++; }
 #ifdef NVSHMEM_COMMS
-    shmem_sync_t *sync_arr;
-    void *dslash_atomic_workspace = nullptr;
-    void *dslash_atomic_pack_workspace = nullptr;
-    shmem_retcount_intra_t *_retcount_intra;
-    shmem_retcount_inter_t *_retcount_inter;
-    shmem_interior_done_t *_interior_done;
-    shmem_interior_count_t *_interior_count;
+    shmem_sync_t *sync_arr = nullptr;
+    shmem_retcount_intra_t *_retcount_intra = nullptr;
+    shmem_retcount_inter_t *_retcount_inter = nullptr;
+    shmem_interior_done_t *_interior_done = nullptr;
+    shmem_interior_count_t *_interior_count = nullptr;
+    shmem_sync_t *get_shmem_sync_arr() { return sync_arr; }
+    shmem_retcount_intra_t *get_shmem_retcount_intra() { return _retcount_intra; }
+    shmem_retcount_inter_t *get_shmem_retcount_inter() { return _retcount_inter; }
+    shmem_interior_done_t *get_shmem_interior_done() { return _interior_done; }
+    shmem_interior_count_t *get_shmem_interior_count() { return _interior_count; }
 #endif
 
     // these variables are used for benchmarking the dslash components in isolation
@@ -122,7 +128,7 @@ namespace quda {
 #ifdef NVSHMEM_COMMS
     sync_arr = (shmem_sync_t *)device_comms_pinned_malloc(2 * QUDA_MAX_DIM * sizeof(shmem_sync_t));
     cudaMemset(sync_arr, 0, 2 * QUDA_MAX_DIM * sizeof(shmem_sync_t));
-    synccounter = 1;
+    sync_counter = 1;
 
     TuneParam tp;
     tp.grid = dim3(1, 1, 1);

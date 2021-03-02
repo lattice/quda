@@ -63,11 +63,11 @@ namespace quda
     // 8 - barrier part I (just the put part)
     // 16 - barrier part II (wait on shmem to complete, all directions) -- not implemented
     int shmem;
-    shmem_sync_t counter;
+    dslash::shmem_sync_t counter;
 #ifdef NVSHMEM_COMMS
-    volatile shmem_sync_t *sync_arr;
-    shmem_retcount_intra_t *retcount_intra;
-    shmem_retcount_inter_t *retcount_inter;
+    volatile dslash::shmem_sync_t *sync_arr;
+    dslash::shmem_retcount_intra_t *retcount_intra;
+    dslash::shmem_retcount_inter_t *retcount_inter;
 #endif
     PackArg(void **ghost, const ColorSpinorField &in, int nFace, bool dagger, int parity, int threads, double a,
             double b, double c, int shmem_ = 0) :
@@ -87,10 +87,10 @@ namespace quda
       shmem(0)
 #else
       shmem(shmem_),
-      counter(dslash::synccounter),
-      sync_arr(dslash::sync_arr),
-      retcount_intra(dslash::_retcount_intra),
-      retcount_inter(dslash::_retcount_inter)
+      counter(dslash::get_shmem_sync_counter()),
+      sync_arr(dslash::get_shmem_sync_arr()),
+      retcount_intra(dslash::get_shmem_retcount_intra()),
+      retcount_inter(dslash::get_shmem_retcount_inter())
 #endif
     {
       for (int i = 0; i < 4 * QUDA_MAX_DIM; i++) { packBuffer[i] = static_cast<char *>(ghost[i]); }

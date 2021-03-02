@@ -138,16 +138,17 @@ namespace quda
         arg.setPack(true, this->packBuffer); // need to recompute for updated block_per_dir
         arg.in_pack.resetGhost(in, this->packBuffer);
         tp.grid.x += arg.pack_blocks;
-        arg.counter = dslash::synccounter;
+        arg.counter = dslash::get_shmem_sync_counter();
       }
       if (arg.shmem > 0 && arg.kernel_type == EXTERIOR_KERNEL_ALL) {
         int nDimComms = 0;
         for (int d = 0; d < in.Ndim(); d++) nDimComms += arg.commDim[d];
-        arg.counter = (activeTuning() && !policyTuning()) ? -1 : dslash::synccounter;
+        arg.counter = (activeTuning() && !policyTuning()) ? -1 : dslash::get_shmem_sync_counter();
       }
       if (arg.shmem > 0 && arg.kernel_type == INTERIOR_KERNEL) {
-        arg.counter = activeTuning() ? (uberTuning() && !policyTuning() ? dslash::synccounter++ : dslash::synccounter) :
-                                       dslash::synccounter;
+        arg.counter = activeTuning() ?
+          (uberTuning() && !policyTuning() ? dslash::inc_shmem_sync_counter() : dslash::get_shmem_sync_counter()) :
+          dslash::get_shmem_sync_counter();
         arg.ext_blocks = 8 * tp.aux.y * arg.ext_dims;
         tp.grid.x += arg.ext_blocks;
       }

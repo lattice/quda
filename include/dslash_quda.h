@@ -14,16 +14,6 @@
 namespace quda {
 
   /**
-   * @brief type used for shmem signaling
-   */
-  using shmem_sync_t = long;
-#ifdef NVSHMEM_COMMS
-  using shmem_retcount_intra_t = cuda::atomic<int, cuda::thread_scope_system>;
-  using shmem_retcount_inter_t = cuda::atomic<int, cuda::thread_scope_device>;
-  using shmem_interior_done_t = cuda::atomic<long, cuda::thread_scope_device>;
-  using shmem_interior_count_t = cuda::atomic<long, cuda::thread_scope_block>;
-#endif
-  /**
     @param pack Sets whether to use a kernel to pack the T dimension
     */
   void setKernelPackT(bool pack);
@@ -48,6 +38,28 @@ namespace quda {
 
   void createDslashEvents();
   void destroyDslashEvents();
+
+  namespace dslash
+  {
+    /**
+     * @brief type used for shmem signaling
+     */
+    using shmem_sync_t = long;
+    shmem_sync_t get_shmem_sync_counter();
+    shmem_sync_t set_shmem_sync_counter(shmem_sync_t count);
+    shmem_sync_t inc_shmem_sync_counter();
+#ifdef NVSHMEM_COMMS
+    using shmem_retcount_intra_t = cuda::atomic<int, cuda::thread_scope_system>;
+    using shmem_retcount_inter_t = cuda::atomic<int, cuda::thread_scope_device>;
+    using shmem_interior_done_t = cuda::atomic<long, cuda::thread_scope_device>;
+    using shmem_interior_count_t = cuda::atomic<long, cuda::thread_scope_block>;
+    shmem_sync_t *get_shmem_sync_arr();
+    shmem_retcount_intra_t *get_shmem_retcount_intra();
+    shmem_retcount_inter_t *get_shmem_retcount_inter();
+    shmem_interior_done_t *get_shmem_interior_done();
+    shmem_interior_count_t *get_shmem_interior_count();
+#endif
+  } // namespace dslash
 
   /**
      @brief Driver for applying the Wilson stencil

@@ -204,7 +204,7 @@ public:
       if (in.Nspin() == 4) {
         using Arg = PackArg<Float, nColor, 4, spin_project>;
         Arg arg(ghost, in, nFace, dagger, parity, threads, a, b, c, shmem);
-        arg.counter = dslash::synccounter;
+        arg.counter = dslash::get_shmem_sync_counter();
         arg.swizzle = tp.aux.x;
         arg.sites_per_block = (arg.threads + tp.grid.x - 1) / tp.grid.x;
         arg.blocks_per_dir = tp.grid.x / (2 * arg.active_dims); // set number of blocks per direction
@@ -275,7 +275,7 @@ public:
       } else if (in.Nspin() == 1) {
         using Arg = PackArg<Float, nColor, 1, false>;
         Arg arg(ghost, in, nFace, dagger, parity, threads, a, b, c);
-        arg.counter = dslash::synccounter;
+        arg.counter = dslash::get_shmem_sync_counter();
         arg.swizzle = tp.aux.x;
         arg.sites_per_block = (arg.threads + tp.grid.x - 1) / tp.grid.x;
         arg.blocks_per_dir = tp.grid.x / (2 * arg.active_dims); // set number of blocks per direction
