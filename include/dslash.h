@@ -194,9 +194,9 @@ namespace quda
     virtual void initTuneParam(TuneParam &param) const
     {
       /* for nvshmem uber kernels the current synchronization requires use to keep the y and z dimension local to the
-       * block. This can be removed when we introduce a finer grained synchronization which takes into account the y and z
-       * components explicitly */
-      if(arg.shmem & 64){
+       * block. This can be removed when we introduce a finer grained synchronization which takes into account the y and
+       * z components explicitly */
+      if (arg.shmem & 64) {
         step_y = vector_length_y;
         step_z = vector_length_z;
       }
@@ -210,7 +210,7 @@ namespace quda
       /* for nvshmem uber kernels the current synchronization requires use to keep the y and z dimension local to the
        * block. This can be removed when we introduce a finer grained synchronization which takes into account the y and
        * z components explicitly. */
-      if(arg.shmem & 64){
+      if (arg.shmem & 64) {
         step_y = vector_length_y;
         step_z = vector_length_z;
       }

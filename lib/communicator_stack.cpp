@@ -37,7 +37,9 @@ Communicator &get_current_communicator()
 
 void push_communicator(const quda::CommKey &split_key)
 {
-  if(comm_nvshmem_enabled()) errorQuda("Split-grid is currently not supported with NVSHMEM. Please set QUDA_ENABLE_NVSHMEM=0 to disable NVSHMEM.");
+  if (comm_nvshmem_enabled())
+    errorQuda(
+      "Split-grid is currently not supported with NVSHMEM. Please set QUDA_ENABLE_NVSHMEM=0 to disable NVSHMEM.");
   auto search = communicator_stack.find(split_key);
   if (search == communicator_stack.end()) {
     communicator_stack.emplace(std::piecewise_construct, std::forward_as_tuple(split_key),

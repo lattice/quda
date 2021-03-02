@@ -52,7 +52,8 @@ namespace quda
      @param[in] Checkerboard space-time index
      @param[in] Parity we are acting on
   */
-  template <KernelType type, typename Arg, typename Coord> __host__ __device__ __forceinline__ bool isComplete(const Arg &arg, const Coord &coord)
+  template <KernelType type, typename Arg, typename Coord>
+  __host__ __device__ __forceinline__ bool isComplete(const Arg &arg, const Coord &coord)
   {
     int incomplete = 0; // Have all 8 contributions been computed for this site?
 
@@ -534,7 +535,7 @@ namespace quda
         long tst_val = arg.interior_done.load(cuda::std::memory_order_relaxed);
         while (tst_val < arg.counter - 1) {
           arg.interior_done.compare_exchange_strong(tst_val, arg.counter - 1, cuda::std::memory_order_relaxed,
-                                                cuda::std::memory_order_relaxed);
+                                                    cuda::std::memory_order_relaxed);
         }
         arg.interior_done.wait(arg.counter - 1, cuda::std::memory_order_acquire);
       }
@@ -641,8 +642,8 @@ namespace quda
                && ((kernel_type == EXTERIOR_KERNEL_ALL && arg.ext_blocks == 0)
                    || (kernel_type == INTERIOR_KERNEL && arg.ext_blocks > 0
                        && blockIdx.x >= (gridDim.x - arg.ext_blocks)))) {
-                        shmem_exterior< D<nParity, dagger, xpay, kernel_type, Arg>, Arg, nParity>(dslash, arg, s);
-                        #endif
+      shmem_exterior<D<nParity, dagger, xpay, kernel_type, Arg>, Arg, nParity>(dslash, arg, s);
+#endif
     } else {
       const int dslash_block_offset = (kernel_type == INTERIOR_KERNEL ? arg.pack_blocks : 0);
       int x_cb = (blockIdx.x - dslash_block_offset) * blockDim.x + threadIdx.x;
@@ -657,7 +658,7 @@ namespace quda
       }
 #endif
 #ifdef NVSHMEM_COMMS
-  shmem_signalinterior<kernel_type, Arg>(arg);
+      shmem_signalinterior<kernel_type, Arg>(arg);
 #endif
     }
   }

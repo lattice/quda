@@ -8,7 +8,7 @@
 #include <clover_field.h>
 #include <worker.h>
 #ifdef NVSHMEM_COMMS
-#include<cuda/atomic>
+#include <cuda/atomic>
 #endif
 
 namespace quda {

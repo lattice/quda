@@ -375,7 +375,7 @@ namespace quda
         int ticket = arg.retcount_intra[shmemidx].fetch_add(1);
         // currently CST order -- want to make sure all stores are done before (release) and check for ticket
         // acquires. For the last block we need that all uses of that data are visible
-        amLast = (ticket == arg.blocks_per_dir * gridDim.y * gridDim.z- 1);
+        amLast = (ticket == arg.blocks_per_dir * gridDim.y * gridDim.z - 1);
       }
       if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
         if (amLast) {

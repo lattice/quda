@@ -134,14 +134,16 @@ namespace quda {
     tp.grid = dim3(1, 1, 1);
     tp.block = dim3(1, 1, 1);
     // atomic for controlling signaling in nvshmem packing
-    _retcount_intra = static_cast<shmem_retcount_intra_t*>(device_pinned_malloc(2 * QUDA_MAX_DIM * sizeof(shmem_retcount_intra_t)));
-    qudaLaunchKernel(init_dslash_atomic<shmem_retcount_intra_t>, tp, 0,_retcount_intra, 2 * QUDA_MAX_DIM);
-    _retcount_inter = static_cast<shmem_retcount_inter_t*>(device_pinned_malloc(2 * QUDA_MAX_DIM * sizeof(shmem_retcount_inter_t)));
-    qudaLaunchKernel(init_dslash_atomic<shmem_retcount_inter_t>, tp, 0,_retcount_inter, 2 * QUDA_MAX_DIM);
+    _retcount_intra
+      = static_cast<shmem_retcount_intra_t *>(device_pinned_malloc(2 * QUDA_MAX_DIM * sizeof(shmem_retcount_intra_t)));
+    qudaLaunchKernel(init_dslash_atomic<shmem_retcount_intra_t>, tp, 0, _retcount_intra, 2 * QUDA_MAX_DIM);
+    _retcount_inter
+      = static_cast<shmem_retcount_inter_t *>(device_pinned_malloc(2 * QUDA_MAX_DIM * sizeof(shmem_retcount_inter_t)));
+    qudaLaunchKernel(init_dslash_atomic<shmem_retcount_inter_t>, tp, 0, _retcount_inter, 2 * QUDA_MAX_DIM);
     // workspace for interior done sync in uber kernel
-    _interior_done = static_cast<shmem_interior_done_t*>(device_pinned_malloc(sizeof(shmem_interior_done_t)));
+    _interior_done = static_cast<shmem_interior_done_t *>(device_pinned_malloc(sizeof(shmem_interior_done_t)));
     qudaLaunchKernel(init_dslash_atomic<shmem_interior_done_t>, tp, 0, _interior_done, 1);
-    _interior_count = static_cast<shmem_interior_count_t*>(device_pinned_malloc(sizeof(shmem_interior_count_t)));
+    _interior_count = static_cast<shmem_interior_count_t *>(device_pinned_malloc(sizeof(shmem_interior_count_t)));
     qudaLaunchKernel(init_dslash_atomic<shmem_interior_count_t>, tp, 0, _interior_count, 1);
 #endif
 

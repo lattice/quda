@@ -89,7 +89,8 @@ namespace quda
       if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(coord.x_cb, my_spinor_parity) = out;
     }
 
-    template <KernelType mykernel_type = kernel_type> __host__ __device__ __forceinline__ void operator()(int idx, int s, int parity)
+    template <KernelType mykernel_type = kernel_type>
+    __host__ __device__ __forceinline__ void operator()(int idx, int s, int parity)
     {
       int x5_cb = s * arg.threads + idx; // 5-d checkerboard index
       apply<mykernel_type>(x5_cb, parity);
