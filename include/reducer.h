@@ -7,37 +7,7 @@ namespace quda {
     static constexpr bool do_sum = true;
     __device__ __host__ inline T operator()(T a, T b) const { return a + b; }
   };
-  
-  template<>
-  struct plus<double2> {
-    static constexpr bool do_sum = true;
-
-    __device__ __host__ inline double2 operator()( double2 a, double2 b ) const {
-      return double2{
-	    static_cast<double>(a.x) + static_cast<double>(b.x),
-	    static_cast<double>(a.y) + static_cast<double>(b.y)
-      };
-
-    }
-  };
-
-#if 0
-  // Workaround
-  template<>
-  struct plus<double3> {
-    static constexpr bool do_sum = true;
-
-    __device__ __host__ inline double3 operator()( double3 a, double3 b ) const {
-      return double3{
-	    static_cast<double>(a.x) + static_cast<double>(b.x),
-		static_cast<double>(a.y) + static_cast<double>(b.y),
-		static_cast<double>(a.z) + static_cast<double>(b.z)
-      };
-		
-    }
-  };
-#endif
-
+ 
   template <typename T> struct maximum {
     static constexpr bool do_sum = false;
     __device__ __host__ T operator()(T a, T b) const { return a > b ? a : b; }
