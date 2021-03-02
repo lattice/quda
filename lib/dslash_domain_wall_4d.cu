@@ -16,6 +16,77 @@
 namespace quda
 {
 
+  template <class Base>
+  struct TuneY: Tunable
+  {
+    Base &base;
+    const int Ls;
+    static constexpr int s_batch_max = 4;
+
+    char aux[TuneKey::aux_n];
+    char vol_string[TuneKey::aux_n];
+
+    unsigned int sharedBytesPerThread() const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+
+    TuneY(Base &base, int Ls) : base(base), Ls(Ls) {
+      strcpy(aux, "tune_y");
+      if (!tuned()) {
+        disableProfileCount(); // purely for profiling reasons, don't want to profile tunings.
+
+        // before we do policy tuning we must ensure the kernel
+        // constituents have been tuned since we can't do nested tuning
+        for (int s_batch = 1; s_batch <= s_batch_max; s_batch++) {
+          if (Ls % s_batch == 0) {
+            base.TunableVectorY::resizeVector(Ls / s_batch);
+            base.apply(0);
+          }
+        }
+
+        enableProfileCount();
+        setPolicyTuning(true);
+      }
+    }
+
+    void apply(const qudaStream_t &stream) {
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      base.TunableVectorY::resizeVector(Ls / tp.aux.x);
+      base.apply(stream);
+    }
+
+    bool advanceAux(TuneParam &param) const
+    {
+      do {
+        param.aux.x++;
+      } while(Ls % param.aux.x != 0 && param.aux.x <= s_batch_max);
+      if (param.aux.x <= s_batch_max) {
+        return true;
+      } else {
+        param.aux.x = 1;
+        return false;
+      }
+    }
+
+    bool advanceTuneParam(TuneParam &param) const { return advanceAux(param); }
+
+    void initTuneParam(TuneParam &param) const
+    {
+      param.aux.x = 1;
+    }
+
+    void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }
+
+    TuneKey tuneKey() const {
+      return TuneKey(base.tuneKey().volume, typeid(*this).name(), base.tuneKeyKernel());
+    }
+
+    long long flops() const { return base.flops(); }
+    long long bytes() const { return base.bytes(); }
+
+    void preTune() {}  // FIXME - use write to determine what needs to be saved
+    void postTune() {} // FIXME - use write to determine what needs to be saved
+  };
+
   template <typename Arg> class DomainWall4D : public Dslash<domainWall4D, Arg>
   {
     using Dslash = Dslash<domainWall4D, Arg>;
@@ -28,11 +99,11 @@ namespace quda
       TunableVectorYZ::resizeVector(in.X(4), arg.nParity);
     }
 
-    void apply(const qudaStream_t &stream)
+    void launch_s_batch(TuneParam &tp, const qudaStream_t &stream)
     {
-      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash::setParam(tp);
       typedef typename mapper<typename Arg::Float>::type real;
+      if (arg.dc.Ls % TunableVectorY::get_vector_y() != 0) { errorQuda("arg.dc.Ls %% get_vector_y() != 0"); }
+      int s_batch = arg.dc.Ls / TunableVectorY::get_vector_y();
 #ifdef JITIFY
       // we need to break the dslash launch abstraction here to get a handle on the constant memory pointer in the kernel module
       auto instance = Dslash::template kernel_instance<packShmem>();
@@ -42,8 +113,29 @@ namespace quda
 #else
       cudaMemcpyToSymbolAsync(mobius_d, arg.a_5, QUDA_MAX_DWF_LS * sizeof(complex<real>), 0, cudaMemcpyHostToDevice,
                               streams[Nstream - 1]);
-      Dslash::template instantiate<packShmem>(tp, stream);
+      switch(s_batch) {
+      case 1: Dslash::template instantiate<packShmem, 1>(tp, stream); break;
+      case 2: Dslash::template instantiate<packShmem, 2>(tp, stream); break;
+      case 3: Dslash::template instantiate<packShmem, 3>(tp, stream); break;
+      case 4: Dslash::template instantiate<packShmem, 4>(tp, stream); break;
+      default: errorQuda("Unsupported s_batch = %d", s_batch);
+      }
 #endif
+    }
+
+    void apply(const qudaStream_t &stream)
+    {
+      static bool tuning = false;
+      if (!tuning) {
+        tuning = true;
+        TuneY<decltype(*this)> tune_y(*this, arg.dc.Ls);
+        tune_y.apply(stream);
+        tuning = false;
+      } else {
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        Dslash::setParam(tp);
+        launch_s_batch(tp, stream);
+      }
     }
   };
 

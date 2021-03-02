@@ -47,6 +47,7 @@ namespace quda
     constexpr domainWall4D(Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
+    template <int s_batch = 1>
     __device__ __host__ inline void operator()(int idx, int s, int parity)
     {
       typedef typename mapper<typename Arg::Float>::type real;
@@ -58,19 +59,22 @@ namespace quda
       auto coord = getCoords<QUDA_4D_PC, kernel_type>(arg, idx, s, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
-      Vector out;
-      applyWilson<nParity, dagger, kernel_type>(out, arg, coord, parity, idx, thread_dim, active);
+      Vector out[s_batch];
+      applyWilson<nParity, dagger, kernel_type, s_batch>(out, arg, coord, parity, idx, thread_dim, active);
 
-      int xs = coord.x_cb + s * arg.dc.volume_4d_cb;
-      if (xpay && kernel_type == INTERIOR_KERNEL) {
-        Vector x = arg.x(xs, my_spinor_parity);
-        out = x + arg.a5(s) * out;
-      } else if (kernel_type != INTERIOR_KERNEL && active) {
-        Vector x = arg.out(xs, my_spinor_parity);
-        out = x + (xpay ? arg.a5(s) * out : out);
+#pragma unroll
+      for (int ss = 0; ss < s_batch; ss++) {
+        int xs = coord.x_cb + (s + ss) * arg.dc.volume_4d_cb;
+        if (xpay && kernel_type == INTERIOR_KERNEL) {
+          Vector x = arg.x(xs, my_spinor_parity);
+          out[ss] = x + arg.a5(s + ss) * out[ss];
+        } else if (kernel_type != INTERIOR_KERNEL && active) {
+          Vector x = arg.out(xs, my_spinor_parity);
+          out[ss] = x + (xpay ? arg.a5(s + ss) * out[ss] : out[ss]);
+        }
+
+        if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(xs, my_spinor_parity) = out[ss];
       }
-
-      if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(xs, my_spinor_parity) = out;
     }
   };
 

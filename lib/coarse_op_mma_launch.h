@@ -46,7 +46,7 @@ namespace quda
       tp.grid = dim3(min_threads * t_m * t_n, 2, 1);
 
       auto kernel = ComputeUVMMA<from_coarse, dim, dir, bM, bN, bK, block_y, block_z, Arg>;
-      tp.set_max_shared_bytes = true;
+      tp.shared_bytes_config = SharedMemoryConfig::Max;
       qudaLaunchKernel(kernel, tp, stream, arg);
     }
 
@@ -343,7 +343,7 @@ namespace quda
       tp.grid = dim3(min_threads * t_m * t_n, 2, 1);
 
       auto kernel = ComputeVUVMMA<from_coarse, dim, dir, bM, bN, bK, block_y, block_z, Arg>;
-      tp.set_max_shared_bytes = true;
+      tp.shared_bytes_config = SharedMemoryConfig::Max;
       qudaLaunchKernel(kernel, tp, stream, arg);
     }
 

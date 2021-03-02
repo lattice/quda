@@ -100,7 +100,7 @@ namespace quda
       {
         if (shared && (arg.type == M5_EOFA || arg.type == M5INV_EOFA)) {
           // if inverse kernel uses shared memory then maximize total shared memory
-          tp.set_max_shared_bytes = true;
+          tp.shared_bytes_config = SharedMemoryConfig::Max;
         }
         qudaLaunchKernel(f, tp, stream, arg);
       }

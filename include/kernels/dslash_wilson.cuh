@@ -68,8 +68,8 @@ namespace quda
      @param[in] idx Thread index (equal to face index for exterior kernels)
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
   */
-  template <int nParity, bool dagger, KernelType kernel_type, typename Coord, typename Arg, typename Vector>
-  __device__ __host__ inline void applyWilson(Vector &out, Arg &arg, Coord &coord, int parity, int idx, int thread_dim, bool &active)
+  template <int nParity, bool dagger, KernelType kernel_type, int s_batch, typename Coord, typename Arg, typename Vector>
+  __device__ __host__ inline void applyWilson(Vector out[s_batch], Arg &arg, Coord &coord, int parity, int idx, int thread_dim, bool &active)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
@@ -95,24 +95,33 @@ namespace quda
             ghostFaceIndex<1, Arg::nDim>(coord, arg.dim, d, arg.nFace) : idx;
 
           Link U = arg.U(d, gauge_idx, gauge_parity);
-          HalfVector in = arg.in.Ghost(d, 1, ghost_idx + coord.s * arg.dc.ghostFaceCB[d], their_spinor_parity);
-          if (d == 3) in *= arg.t_proj_scale; // put this in the Ghost accessor and merge with any rescaling?
+#pragma unroll
+          for (int ss = 0; ss < s_batch; ss++) {
+            HalfVector in = arg.in.Ghost(d, 1, ghost_idx + (coord.s + ss) * arg.dc.ghostFaceCB[d], their_spinor_parity);
+            if (d == 3) in *= arg.t_proj_scale; // put this in the Ghost accessor and merge with any rescaling?
 
-          out += (U * in).reconstruct(d, proj_dir);
+            out[ss] += (U * in).reconstruct(d, proj_dir);
+          }
         } else if (doBulk<kernel_type>() && !ghost) {
 #if 0
           Link U = arg.U(d, gauge_idx, gauge_parity);
-          Vector in = arg.in(fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
+#pragma unroll
+          for (int ss = 0; ss < s_batch; ss++) {
+            Vector in = arg.in(fwd_idx + (coord.s + ss) * arg.dc.volume_4d_cb, their_spinor_parity);
 
-          out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+            out[ss] += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+          }
 #else
           using reduced_real = typename reduced_mapper<typename Arg::Float>::type;
           using reduced_link = Matrix<complex<reduced_real>, Arg::nColor>;
           reduced_link U = arg.U.get_reduced(d, gauge_idx, gauge_parity);
           using reduced_vector = ColorSpinor<reduced_real, Arg::nColor, 4>;
-          real norm = 1.0;
-          reduced_vector in = arg.in(norm, fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
-          out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir).convert_and_scale(norm);
+#pragma unroll
+          for (int ss = 0; ss < s_batch; ss++) {
+            real norm = 1.0;
+            reduced_vector in = arg.in(norm, fwd_idx + (coord.s + ss) * arg.dc.volume_4d_cb, their_spinor_parity);
+            out[ss] += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir).convert_and_scale(norm);
+          }
 #endif
         }
       }
@@ -131,28 +140,47 @@ namespace quda
 
           const int gauge_ghost_idx = (Arg::nDim == 5 ? ghost_idx % arg.dc.ghostFaceCB[d] : ghost_idx);
           Link U = arg.U.Ghost(d, gauge_ghost_idx, 1 - gauge_parity);
-          HalfVector in = arg.in.Ghost(d, 0, ghost_idx + coord.s * arg.dc.ghostFaceCB[d], their_spinor_parity);
-          if (d == 3) in *= arg.t_proj_scale;
+#pragma unroll
+          for (int ss = 0; ss < s_batch; ss++) {
+            HalfVector in = arg.in.Ghost(d, 0, ghost_idx + (coord.s + ss) * arg.dc.ghostFaceCB[d], their_spinor_parity);
+            if (d == 3) in *= arg.t_proj_scale;
 
-          out += (conj(U) * in).reconstruct(d, proj_dir);
+            out[ss] += (conj(U) * in).reconstruct(d, proj_dir);
+          }
         } else if (doBulk<kernel_type>() && !ghost) {
 #if 0
           Link U = arg.U(d, gauge_idx, 1 - gauge_parity);
-          Vector in = arg.in(back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
+#pragma unroll
+          for (int ss = 0; ss < s_batch; ss++) {
+            Vector in = arg.in(back_idx + (coord.s + ss) * arg.dc.volume_4d_cb, their_spinor_parity);
 
+            out[ss] += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+          }
           out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
 #else
           using reduced_real = typename reduced_mapper<typename Arg::Float>::type;
           using reduced_link = Matrix<complex<reduced_real>, Arg::nColor>;
           reduced_link U = arg.U.get_reduced(d, gauge_idx, 1 - gauge_parity);
           using reduced_vector = ColorSpinor<reduced_real, Arg::nColor, 4>;
-          real norm = 1.0;
-          reduced_vector in = arg.in(norm, back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
-          out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir).convert_and_scale(norm);
+#pragma unroll
+          for (int ss = 0; ss < s_batch; ss++) {
+            real norm = 1.0;
+            reduced_vector in = arg.in(norm, back_idx + (coord.s + ss) * arg.dc.volume_4d_cb, their_spinor_parity);
+            out[ss] += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir).convert_and_scale(norm);
+          }
 #endif
         }
       }
     } // nDim
+  }
+
+  /**
+     @brief for s_batch == 1
+  */
+  template <int nParity, bool dagger, KernelType kernel_type, typename Coord, typename Arg, typename Vector>
+  __device__ __host__ inline void applyWilson(Vector &out, Arg &arg, Coord &coord, int parity, int idx, int thread_dim, bool &active)
+  {
+    applyWilson<nParity, dagger, kernel_type, 1, Coord, Arg, Vector>(&out, arg, coord, parity, idx, thread_dim, active);
   }
 
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct wilson : dslash_default {

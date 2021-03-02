@@ -47,7 +47,7 @@ namespace quda
       tp.grid = dim3(min_threads * t_m * t_n, 2, 4);
 
       auto kernel = mma::CalculateYhatGPU<compute_max_only, Arg, bM, bN, bK, block_y, block_z, min_block_cta>;
-      tp.set_max_shared_bytes = true;
+      tp.shared_bytes_config = SharedMemoryConfig::Max;
       qudaLaunchKernel(kernel, tp, stream, arg);
     }
 

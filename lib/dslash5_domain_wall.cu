@@ -112,7 +112,7 @@ public:
     {
       if (shared && (arg.type == M5_INV_DWF || arg.type == M5_INV_MOBIUS || arg.type == M5_INV_ZMOBIUS)) {
         // if inverse kernel uses shared memory then maximize total shared memory pool
-        tp.set_max_shared_bytes = true;
+        tp.shared_bytes_config = SharedMemoryConfig::Max;
       }
       qudaLaunchKernel(f, tp, stream, arg);
     }
