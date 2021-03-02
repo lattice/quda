@@ -387,15 +387,15 @@ namespace quda {
 	case 1: // positive projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
-            proj(0, i) = complex<Float>(2, 0) * t(0, i);
-            proj(1, i) = complex<Float>(2, 0) * t(1, i);
+            proj(0, i) = Float(2) * t(0, i);
+            proj(1, i) = Float(2) * t(1, i);
           }
 	  break;
 	case -1: // negative projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
-            proj(0, i) = complex<Float>(2, 0) * t(2, i);
-            proj(1, i) = complex<Float>(2, 0) * t(3, i);
+            proj(0, i) = Float(2) * t(2, i);
+            proj(1, i) = Float(2) * t(3, i);
           }
 	  break;
 	}
@@ -1176,8 +1176,7 @@ namespace quda {
   */
   template <typename Float, int Nc, int Ns>
   __device__ __host__ inline
-    typename std::enable_if<!std::is_same<Float, __half>::value, ColorSpinor<Float, Nc, Ns>>::type
-    operator*(const Matrix<complex<Float>, Nc> &A, const ColorSpinor<Float, Nc, Ns> &x)
+    ColorSpinor<Float, Nc, Ns> operator*(const Matrix<complex<Float>, Nc> &A, const ColorSpinor<Float, Nc, Ns> &x)
   {
 
     ColorSpinor<Float,Nc,Ns> y;
@@ -1202,60 +1201,6 @@ namespace quda {
 	}
       }
     }
-
-    return y;
-  }
-
-  /**
-     @brief Compute the matrix-vector product y = A * x
-     @param[in] A Input matrix
-     @param[in] x Input vector
-     @return The vector A * x
-  */
-  template <typename Float, int Nc, int Ns>
-  __device__ __host__ inline typename std::enable_if<std::is_same<Float, half>::value, ColorSpinor<Float, Nc, Ns>>::type
-  operator*(const Matrix<complex<Float>, Nc> &A, const ColorSpinor<Float, Nc, Ns> &x)
-  {
-
-    ColorSpinor<Float, Nc, Ns> y;
-
-#ifdef __CUDA_ARCH__
-
-#pragma unroll
-    for (int i = 0; i < Nc; i++) {
-#pragma unroll
-      for (int s = 0; s < Ns; s++) { y.data[s * Nc + i] = __hcmadd(A(i, 0), x.data[s * Nc + 0], half2(0, 0)); }
-#pragma unroll
-      for (int j = 1; j < Nc; j++) {
-#pragma unroll
-        for (int s = 0; s < Ns; s++) { y.data[s * Nc + i] = __hcmadd(A(i, j), x.data[s * Nc + j], y.data[s * Nc + i]); }
-      }
-    }
-
-#else
-
-#pragma unroll
-    for (int i = 0; i < Nc; i++) {
-#pragma unroll
-      for (int s = 0; s < Ns; s++) {
-        y.data[s * Nc + i].x = A(i, 0).real() * x.data[s * Nc + 0].real();
-        y.data[s * Nc + i].x -= A(i, 0).imag() * x.data[s * Nc + 0].imag();
-        y.data[s * Nc + i].y = A(i, 0).real() * x.data[s * Nc + 0].imag();
-        y.data[s * Nc + i].y += A(i, 0).imag() * x.data[s * Nc + 0].real();
-      }
-#pragma unroll
-      for (int j = 1; j < Nc; j++) {
-#pragma unroll
-        for (int s = 0; s < Ns; s++) {
-          y.data[s * Nc + i].x += A(i, j).real() * x.data[s * Nc + j].real();
-          y.data[s * Nc + i].x -= A(i, j).imag() * x.data[s * Nc + j].imag();
-          y.data[s * Nc + i].y += A(i, j).real() * x.data[s * Nc + j].imag();
-          y.data[s * Nc + i].y += A(i, j).imag() * x.data[s * Nc + j].real();
-        }
-      }
-    }
-
-#endif
 
     return y;
   }

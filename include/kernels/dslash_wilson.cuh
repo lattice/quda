@@ -156,7 +156,6 @@ namespace quda
 
             out[ss] += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
           }
-          out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
 #else
           using reduced_real = typename reduced_mapper<typename Arg::Float>::type;
           using reduced_link = Matrix<complex<reduced_real>, Arg::nColor>;
