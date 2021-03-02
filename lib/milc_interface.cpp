@@ -154,10 +154,6 @@ void qudaSetLayout(QudaLayout_t input)
 #endif
   static int device = -1;
 #else
-<<<<<<< HEAD
-  for(int dir=0; dir<4; ++dir)  commsGridDim[dir] = 1;
-=======
->>>>>>> feature/generic_kernel
   static int device = input.device;
 #endif
 

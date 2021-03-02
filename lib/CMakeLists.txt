@@ -203,6 +203,7 @@ if(QUDA_VERBOSE_BUILD)
 endif(QUDA_VERBOSE_BUILD)
 
 # workaround for 10.2
+if(QUDA_TARGET_CUDA)
 if(CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA"
    AND ${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL "10.2"
    AND ${CMAKE_CUDA_COMPILER_VERSION} VERSION_LESS "10.3")
@@ -240,8 +241,8 @@ if(CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA"
       quda PRIVATE "$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:SHELL: -Xcicc \"--Xllc -dag-vectorize-ops=1\" " >)
   endif()
   target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:--cuda-path=${CUDAToolkit_TARGET_DIR}>)
-endif(QUDA_TARGET_CUDA)
-
+endif()
+endif()
 
 target_include_directories(quda PRIVATE .)
 target_include_directories(quda PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
