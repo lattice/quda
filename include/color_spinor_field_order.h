@@ -1034,7 +1034,7 @@ namespace quda {
     }
   }
 
-  template<class float_type>
+  template <class float_type>
   __device__ __host__ inline void load(::complex<float_type> out[length / 2], int x, int parity = 0) const
   {
     float_type v[length];
@@ -1124,11 +1124,10 @@ namespace quda {
     return colorspinor_wrapper<real, Accessor>(const_cast<Accessor &>(*this), x_cb, parity);
   }
 
-  __device__ __host__ inline const colorspinor_wrapper<reduced_real, Accessor> operator()(real &nrm, int x_cb, int parity) const
+  __device__ __host__ inline const colorspinor_wrapper<reduced_real, Accessor> operator()(real &nrm, int x_cb,
+                                                                                          int parity) const
   {
-    if (std::is_same<reduced_real, __half>::value) {
-      nrm = vector_load<float>(norm, x_cb + parity * norm_offset);
-    }
+    if (std::is_same<reduced_real, __half>::value) { nrm = vector_load<float>(norm, x_cb + parity * norm_offset); }
     return colorspinor_wrapper<reduced_real, Accessor>(const_cast<Accessor &>(*this), x_cb, parity);
   }
 

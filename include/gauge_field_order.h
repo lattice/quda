@@ -1282,12 +1282,14 @@ namespace quda {
         }
 
         template <typename float_type, typename I>
-        __device__ __host__ inline void Unpack(::complex<float_type> out[N / 2], const float_type in[N], int idx, int dir, real phase,
-                                               const I *X, const int *R) const
+        __device__ __host__ inline void Unpack(::complex<float_type> out[N / 2], const float_type in[N], int idx,
+                                               int dir, real phase, const I *X, const int *R) const
         {
           if (isFixed<Float>::value) {
 #pragma unroll
-            for (int i = 0; i < N / 2; i++) { out[i] = static_cast<float_type>(scale) * ::complex<float_type>(in[2 * i + 0], in[2 * i + 1]); }
+            for (int i = 0; i < N / 2; i++) {
+              out[i] = static_cast<float_type>(scale) * ::complex<float_type>(in[2 * i + 0], in[2 * i + 1]);
+            }
           } else {
 #pragma unroll
             for (int i = 0; i < N / 2; i++) { out[i] = ::complex<float_type>(in[2 * i + 0], in[2 * i + 1]); }
@@ -1402,8 +1404,8 @@ namespace quda {
         }
 
         template <typename float_type, typename I>
-        __device__ __host__ inline void Unpack(::complex<float_type> out[9], const float_type in[12], int idx, int dir, real phase,
-                                               const I *X, const int *R) const
+        __device__ __host__ inline void Unpack(::complex<float_type> out[9], const float_type in[12], int idx, int dir,
+                                               real phase, const I *X, const int *R) const
         {
 #pragma unroll
           for (int i = 0; i < 6; i++) out[i] = ::complex<float_type>(in[2 * i + 0], in[2 * i + 1]);
@@ -1877,19 +1879,19 @@ namespace quda {
           phaseOffset(u.PhaseOffset() / sizeof(Float)),
           backup_h(nullptr),
           bytes(u.Bytes())
-          {
-            if (geometry == QUDA_COARSE_GEOMETRY)
-              errorQuda("This accessor does not support coarse-link fields (lacks support for bidirectional ghost zone");
+        {
+          if (geometry == QUDA_COARSE_GEOMETRY)
+            errorQuda("This accessor does not support coarse-link fields (lacks support for bidirectional ghost zone");
 
-            // static_assert( !(stag_phase!=QUDA_STAGGERED_PHASE_NO && reconLenParam != 18 && reconLenParam != 12),
-            // 	       "staggered phase only presently supported for 18 and 12 reconstruct");
-            for (int i = 0; i < 4; i++) {
-              X[i] = u.X()[i];
-              R[i] = u.R()[i];
-              ghost[i] = ghost_ ? ghost_[i] : 0;
-              faceVolumeCB[i] = u.SurfaceCB(i) * u.Nface(); // face volume equals surface * depth
-            }
+          // static_assert( !(stag_phase!=QUDA_STAGGERED_PHASE_NO && reconLenParam != 18 && reconLenParam != 12),
+          // 	       "staggered phase only presently supported for 18 and 12 reconstruct");
+          for (int i = 0; i < 4; i++) {
+            X[i] = u.X()[i];
+            R[i] = u.R()[i];
+            ghost[i] = ghost_ ? ghost_[i] : 0;
+            faceVolumeCB[i] = u.SurfaceCB(i) * u.Nface(); // face volume equals surface * depth
           }
+        }
 
         FloatNOrder(const FloatNOrder &order) :
           reconstruct(order.reconstruct),
@@ -1903,7 +1905,7 @@ namespace quda {
           backup_h(nullptr),
           bytes(order.bytes)
         {
-          for (int i=0; i<4; i++) {
+          for (int i = 0; i < 4; i++) {
             X[i] = order.X[i];
             R[i] = order.R[i];
             ghost[i] = order.ghost[i];
@@ -1911,11 +1913,12 @@ namespace quda {
           }
         }
 
-      template <class float_type>
-      __device__ __host__ inline void load(::complex<float_type> v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
-      {
-        const int M = reconLen / N;
-        float_type tmp[reconLen];
+        template <class float_type>
+        __device__ __host__ inline void load(::complex<float_type> v[length / 2], int x, int dir, int parity,
+                                             real inphase = 1.0) const
+        {
+          const int M = reconLen / N;
+          float_type tmp[reconLen];
 
 #pragma unroll
         for (int i=0; i<M; i++){
@@ -2001,8 +2004,8 @@ namespace quda {
         @return Instance of a gauge_wrapper that curries in access to
         this field at the above coordinates.
        */
-      __device__ __host__ inline const gauge_wrapper<reduced_real, Accessor>
-      get_reduced(int dim, int x_cb, int parity, real phase = 1.0) const
+      __device__ __host__ inline const gauge_wrapper<reduced_real, Accessor> get_reduced(int dim, int x_cb, int parity,
+                                                                                         real phase = 1.0) const
       {
         return gauge_wrapper<reduced_real, Accessor>(const_cast<Accessor &>(*this), dim, x_cb, parity, phase);
       }

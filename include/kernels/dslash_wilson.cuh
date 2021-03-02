@@ -141,7 +141,7 @@ namespace quda
           Vector in = arg.in(back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
 
           out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
-#else 
+#else
           using reduced_real = typename reduced_mapper<typename Arg::Float>::type;
           using reduced_link = Matrix<complex<reduced_real>, Arg::nColor>;
           reduced_link U = arg.U.get_reduced(d, gauge_idx, 1 - gauge_parity);
