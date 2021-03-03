@@ -88,7 +88,7 @@ namespace quda
     U = arg.in(dir, linkIndex(x, arg.E), parity);
     Z0 *= conj(U);
     arg.temp(dir, x_cb, parity) = Z0;
-    Z0 *= (1.0 / 4.0) * arg.epsilon;
+    Z0 *= static_cast<typename Arg::real>(1.0 / 4.0) * arg.epsilon;
     return Z0;
   }
 
@@ -96,13 +96,13 @@ namespace quda
   __host__ __device__ inline auto computeW2Step(Arg &arg, Link &U, const int *x, const int parity, const int x_cb, const int dir)
   {
     // Compute staples and Z1
-    Link Z1 = (8.0/9.0) * computeStaple(arg, x, parity, dir);
+    Link Z1 = static_cast<typename Arg::real>(8.0 / 9.0) * computeStaple(arg, x, parity, dir);
     U = arg.in(dir, linkIndex(x, arg.E), parity);
     Z1 *= conj(U);
 
     // Retrieve Z0, (8/9 Z1 - 17/36 Z0) stored in temp
     Link Z0 = arg.temp(dir, x_cb, parity);
-    Z0 *= (17.0 / 36.0);
+    Z0 *= static_cast<typename Arg::real>(17.0 / 36.0);
     Z1 = Z1 - Z0;
     arg.temp(dir, x_cb, parity) = Z1;
     Z1 *= arg.epsilon;
@@ -113,7 +113,7 @@ namespace quda
   __host__ __device__ inline auto computeVtStep(Arg &arg, Link &U, const int *x, const int parity, const int x_cb, const int dir)
   {
     // Compute staples and Z2
-    Link Z2 = (3.0/4.0) * computeStaple(arg, x, parity, dir);
+    Link Z2 = static_cast<typename Arg::real>(3.0/4.0) * computeStaple(arg, x, parity, dir);
     U = arg.in(dir, linkIndex(x, arg.E), parity);
     Z2 *= conj(U);
 

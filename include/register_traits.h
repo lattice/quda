@@ -142,42 +142,6 @@ namespace quda {
     typedef float8 type;
   };
 
-  template<typename,typename> struct bridge_mapper { };
-  template<> struct bridge_mapper<double2,double2> { typedef double2 type; };
-  template<> struct bridge_mapper<double2,float2> { typedef double2 type; };
-  template<> struct bridge_mapper<double2,short2> { typedef float2 type; };
-  template<> struct bridge_mapper<double2,char2> { typedef float2 type; };
-  template<> struct bridge_mapper<double2,float4> { typedef double4 type; };
-  template<> struct bridge_mapper<double2,short4> { typedef float4 type; };
-  template<> struct bridge_mapper<double2,char4> { typedef float4 type; };
-  template<> struct bridge_mapper<float4,double2> { typedef float2 type; };
-  template<> struct bridge_mapper<float4,float4> { typedef float4 type; };
-  template<> struct bridge_mapper<float4,short4> { typedef float4 type; };
-  template<> struct bridge_mapper<float4,char4> { typedef float4 type; };
-  template<> struct bridge_mapper<float2,double2> { typedef float2 type; };
-  template<> struct bridge_mapper<float2,float2> { typedef float2 type; };
-  template<> struct bridge_mapper<float2,short2> { typedef float2 type; };
-  template<> struct bridge_mapper<float2,char2> { typedef float2 type; };
-
-  template <> struct bridge_mapper<double2, short8> {
-    typedef double8 type;
-  };
-  template <> struct bridge_mapper<double2, char8> {
-    typedef double8 type;
-  };
-  template <> struct bridge_mapper<float8, short8> {
-    typedef float8 type;
-  };
-  template <> struct bridge_mapper<float8, char8> {
-    typedef float8 type;
-  };
-  template <> struct bridge_mapper<float4, short8> {
-    typedef float8 type;
-  };
-  template <> struct bridge_mapper<float4, char8> {
-    typedef float8 type;
-  };
-
   template<typename> struct vec_length { static const int value = 0; };
   template <> struct vec_length<double8> {
     static const int value = 8;

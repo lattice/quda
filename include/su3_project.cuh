@@ -94,7 +94,7 @@ namespace quda {
     constexpr int max_iter = 100;
     int i = 0;
     do { // iterate until matrix is unitary
-      out = 0.5*(out + conj(inv));
+      out = static_cast<Float>(0.5)*(out + conj(inv));
       inv = inverse(out);
     } while (!checkUnitary(inv, out, tol) && ++i < max_iter);
 

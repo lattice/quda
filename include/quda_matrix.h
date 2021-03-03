@@ -745,7 +745,7 @@ namespace quda {
     for (int i=0; i<N; i++) {
       am(i,i).y -= imag_trace/N;
     }
-    m = 0.5*am;
+    m = static_cast<real>(0.5)*am;
   }
 
   template <typename Complex, int N> __device__ __host__ inline void makeHerm(Matrix<Complex, N> &m)
