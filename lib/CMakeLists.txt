@@ -164,6 +164,11 @@ target_compile_definitions(
   quda PRIVATE $<$<CONFIG:DEVEL>:DEVEL> $<$<CONFIG:HOSTDEBUG>:HOST_DEBUG> $<$<CONFIG:DEVICEDEBUG>:DEVICE_DEBUG>
                $<$<CONFIG:DEBUG>:HOST_DEBUG> $<$<CONFIG:DEBUG>:DEVICE_DEBUG> $<$<CONFIG:SANITIZE>:HOST_DEBUG>)
 
+# set host compiler-specific options
+target_compile_options(quda PRIVATE -Wall -Wextra
+                            $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>>: -Wno-unknown-pragmas>
+                            $<$<CXX_COMPILER_ID:NVHPC>:>)
+
 target_compile_options(
   quda
   PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
@@ -248,7 +253,7 @@ if(${QUDA_PROPAGATE_CXX_FLAGS})
   elseif(CMAKE_BUILD_TYPE STREQUAL "DEVICEDEBUG")
     set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_DEVICEDEBUG}")
   elseif(CMAKE_BUILD_TYPE STREQUAL "SANITIZE")
-    set(PROPAGATED_FLAGS "${CMAKE_CUDA_FLAGS_SANITIZE}")
+    set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_SANITIZE}")
   endif()
 
   # Turne the flags into a CMAKE list
@@ -262,7 +267,6 @@ endif()
 # Specific config dependent warning suppressions and lineinfo forwarding
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
                             -Wreorder
-                            -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function
                             $<$<CONFIG:DEVEL>:-Xptxas -warn-lmem-usage,-warn-spills -lineinfo>
                             $<$<CONFIG:STRICT>: -Werror=all-warnings -lineinfo>
                             $<$<CONFIG:HOSTDEBUG>:-lineinfo>
@@ -270,7 +274,6 @@ target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
                             >)
 
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
-                            -Wall -Wextra -Wno-unknown-pragmas -Wno-unused-function
                             $<$<CONFIG:STRICT>:-Werror -Wno-error=pass-failed>
                             $<$<CONFIG:SANITIZE>:-fsanitize=address,-fsanitize=undefined>
                             >)

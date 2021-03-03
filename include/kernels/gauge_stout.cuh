@@ -133,8 +133,8 @@ namespace quda
         X[dr] += 2 * arg.border[dr];
       }
 
-      double staple_coeff = (5.0 - 2.0 * arg.epsilon) / 3.0;
-      double rectangle_coeff = (1.0 - arg.epsilon) / 12.0;
+      real staple_coeff = (5.0 - 2.0 * arg.epsilon) / 3.0;
+      real rectangle_coeff = (1.0 - arg.epsilon) / 12.0;
 
       int dx[4] = {0, 0, 0, 0};
       Link U, UDag, Stap, Rect, Omega, OmegaDiff, ODT, Q;

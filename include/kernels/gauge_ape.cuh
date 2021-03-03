@@ -74,8 +74,7 @@ namespace quda
       Stap = Stap * (arg.alpha / ((real)(2. * (3. - 1.)))); // DMH: color dependence here?
       setIdentity(&I);
 
-      TestU = I * (1. - arg.alpha) + Stap * conj(U);
-      polarSUN<real>(TestU, arg.tolerance);
+      TestU = I * (static_cast<real>(1.0) - arg.alpha) + Stap * conj(U);
       U = TestU * U;
     
       arg.out(dir, linkIndexShift(x, dx, X), parity) = U;
