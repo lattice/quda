@@ -164,11 +164,6 @@ target_compile_definitions(
   quda PRIVATE $<$<CONFIG:DEVEL>:DEVEL> $<$<CONFIG:HOSTDEBUG>:HOST_DEBUG> $<$<CONFIG:DEVICEDEBUG>:DEVICE_DEBUG>
                $<$<CONFIG:DEBUG>:HOST_DEBUG> $<$<CONFIG:DEBUG>:DEVICE_DEBUG> $<$<CONFIG:SANITIZE>:HOST_DEBUG>)
 
-# set host compiler-specific options
-target_compile_options(quda PRIVATE -Wall -Wextra
-                            $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>>: -Wno-unknown-pragmas>
-                            $<$<CXX_COMPILER_ID:NVHPC>:>)
-
 target_compile_options(
   quda
   PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
@@ -207,7 +202,8 @@ target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:--cuda-p
 target_include_directories(quda PRIVATE .)
 target_include_directories(quda PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(quda SYSTEM PRIVATE ../include/externals)
-target_include_directories(quda SYSTEM PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
+target_include_directories(quda SYSTEM PUBLIC $<$<OR:$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>,$<COMPILE_LANG_AND_ID:CUDA,Clang>>:${CUDAToolkit_INCLUDE_DIRS}>)
+
 target_include_directories(quda SYSTEM PRIVATE ${EIGEN_INCLUDE_DIRS})
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/>
                                        $<INSTALL_INTERFACE:include/>)
@@ -267,6 +263,7 @@ endif()
 # Specific config dependent warning suppressions and lineinfo forwarding
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
                             -Wreorder
+                            $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>>: -Xcompiler -Wno-unknown-pragmas> # only set for g++ or clang
                             $<$<CONFIG:DEVEL>:-Xptxas -warn-lmem-usage,-warn-spills -lineinfo>
                             $<$<CONFIG:STRICT>: -Werror=all-warnings -lineinfo>
                             $<$<CONFIG:HOSTDEBUG>:-lineinfo>
@@ -274,6 +271,7 @@ target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
                             >)
 
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
+                            -Wall -Wextra -Wno-unknown-pragmas
                             $<$<CONFIG:STRICT>:-Werror -Wno-error=pass-failed>
                             $<$<CONFIG:SANITIZE>:-fsanitize=address,-fsanitize=undefined>
                             >)

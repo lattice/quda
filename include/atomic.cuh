@@ -180,3 +180,13 @@ static inline __device__ float atomicAbsMax(float *addr, float val){
   return atomicMax(addr_, val_);
 }
 #endif
+
+template <typename T> __device__ __host__ void atomic_update(T *addr, T val)
+{
+#ifdef __CUDA_ARCH__
+  atomicAdd(addr, val);
+#else
+#pragma omp atomic update
+  *addr += val;
+#endif
+}

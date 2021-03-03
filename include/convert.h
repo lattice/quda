@@ -9,6 +9,7 @@
  */
 
 #include <type_traits>
+#include <target_device.h>
 #include <register_traits.h>
 
 namespace quda
@@ -59,7 +60,7 @@ namespace quda
     static constexpr float value = 7.874015748031e-3f;
   };
 
-  template <typename T> __host__ __device__ inline float i2f(T a)
+  template <typename T> constexpr float i2f(T a)
   {
 #if 1
     return static_cast<float>(a);
@@ -74,26 +75,38 @@ namespace quda
 #endif
   }
 
-  // Fast float to integer round
-  __device__ __host__ inline int f2i(float f)
+  /**
+     @brief Fast float to integer round used on the device
+  */
+  template <bool is_device> constexpr std::enable_if_t<is_device, int> f2i(float f)
   {
-#ifdef __CUDA_ARCH__
     f += 12582912.0f;
     return reinterpret_cast<int &>(f);
-#else
-    return static_cast<int>(f);
-#endif
   }
 
-  // Fast double to integer round
-  __device__ __host__ inline int d2i(double d)
+  /**
+     @brief Regular float to integer round used on the host
+  */
+  template <bool is_device> constexpr std::enable_if_t<!is_device, int> f2i(float f)
   {
-#ifdef __CUDA_ARCH__
+    return static_cast<int>(f);
+  }
+
+  /**
+     @brief Fast double to integer round used on the device
+  */
+  template <bool is_device> constexpr std::enable_if_t<is_device, int> d2i(double d)
+  {
     d += 6755399441055744.0;
     return reinterpret_cast<int &>(d);
-#else
+  }
+
+  /**
+     @brief Regular double to integer round used on the host
+  */
+  template <bool is_device> constexpr std::enable_if_t<!is_device, int> d2i(double d)
+  {
     return static_cast<int>(d);
-#endif
   }
 
   /**
@@ -104,24 +117,21 @@ namespace quda
      the output to be on the same range.
   */
   template <typename T1, typename T2>
-  __host__ __device__ inline typename std::enable_if<!isFixed<T1>::value && !isFixed<T2>::value, void>::type
-  copy(T1 &a, const T2 &b)
+  constexpr std::enable_if_t<!isFixed<T1>::value && !isFixed<T2>::value, void> copy(T1 &a, const T2 &b)
   {
     a = b;
   }
 
   template <typename T1, typename T2>
-  __host__ __device__ inline typename std::enable_if<!isFixed<T1>::value && isFixed<T2>::value, void>::type
-  copy(T1 &a, const T2 &b)
+  constexpr std::enable_if_t<!isFixed<T1>::value && isFixed<T2>::value, void> copy(T1 &a, const T2 &b)
   {
     a = i2f(b) * fixedInvMaxValue<T2>::value;
   }
 
   template <typename T1, typename T2>
-  __host__ __device__ inline typename std::enable_if<isFixed<T1>::value && !isFixed<T2>::value, void>::type
-  copy(T1 &a, const T2 &b)
+  constexpr std::enable_if_t<isFixed<T1>::value && !isFixed<T2>::value, void> copy(T1 &a, const T2 &b)
   {
-    a = f2i(b * fixedMaxValue<T1>::value);
+    a = f2i<device::is_device()>(b * fixedMaxValue<T1>::value);
   }
 
   /**
@@ -129,15 +139,15 @@ namespace quda
      scaling factor has already been done.
   */
   template <typename T1, typename T2>
-  __host__ __device__ inline typename std::enable_if<!isFixed<T1>::value, void>::type copy_scaled(T1 &a, const T2 &b)
+  constexpr std::enable_if_t<!isFixed<T1>::value, void> copy_scaled(T1 &a, const T2 &b)
   {
     copy(a, b);
   }
 
   template <typename T1, typename T2>
-  __host__ __device__ inline typename std::enable_if<isFixed<T1>::value, void>::type copy_scaled(T1 &a, const T2 &b)
+  constexpr std::enable_if_t<isFixed<T1>::value, void> copy_scaled(T1 &a, const T2 &b)
   {
-    a = f2i(b);
+    a = f2i<device::is_device()>(b);
   }
 
   /**
@@ -146,15 +156,13 @@ namespace quda
      the input type (b) is either a short or char vector.
   */
   template <typename T1, typename T2, typename T3>
-  __host__ __device__ inline typename std::enable_if<!isFixed<T2>::value, void>::type copy_and_scale(T1 &a, const T2 &b,
-                                                                                                     const T3 &)
+  constexpr std::enable_if_t<!isFixed<T2>::value, void> copy_and_scale(T1 &a, const T2 &b, const T3 &)
   {
     copy(a, b);
   }
 
   template <typename T1, typename T2, typename T3>
-  __host__ __device__ inline typename std::enable_if<isFixed<T2>::value, void>::type copy_and_scale(T1 &a, const T2 &b,
-                                                                                                    const T3 &c)
+  constexpr std::enable_if_t<isFixed<T2>::value, void> copy_and_scale(T1 &a, const T2 &b, const T3 &c)
   {
     a = i2f(b) * fixedInvMaxValue<T2>::value * c;
   }
