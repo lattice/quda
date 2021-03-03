@@ -87,7 +87,7 @@ namespace quda
         prev = i;
       }
 
-      param.ext_threads = param.threads;
+      param.exterior_threads = param.threads;
       param.kernel_type = EXTERIOR_KERNEL_ALL;
     }
 
@@ -466,7 +466,7 @@ namespace quda
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
       dslash.setShmem(shmem);
-      dslashParam.setExt(shmem & 64);
+      dslashParam.setExteriorDims(shmem & 64);
 
       // record start of the dslash
       const int packIndex = Nstream - 1;

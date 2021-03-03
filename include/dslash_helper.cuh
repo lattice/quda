@@ -252,7 +252,7 @@ namespace quda
     bool remote_write;      // used by the autotuner to switch on/off remote writing vs using copy engines
 
     int_fastdiv threads; // number of threads in x-thread dimension
-    int_fastdiv ext_threads; //  number of threads in x-thread dimension for fused exterior dslash
+    int_fastdiv exterior_threads; //  number of threads in x-thread dimension for fused exterior dslash
     int threadDimMapLower[4];
     int threadDimMapUpper[4];
 
@@ -270,8 +270,8 @@ namespace quda
     int dim_map[4];
     int active_dims;
     int pack_blocks; // total number of blocks used for packing in the dslash
-    int ext_dims;    // dimension to run in the exterior Dslash
-    int ext_blocks;
+    int exterior_dims;    // dimension to run in the exterior Dslash
+    int exterior_blocks;
 
     // for shmem ...
     static constexpr bool packkernel = false;
@@ -282,10 +282,10 @@ namespace quda
     dslash::shmem_sync_t counter;
 #ifdef NVSHMEM_COMMS
     volatile dslash::shmem_sync_t *sync_arr;
-    dslash::shmem_retcount_intra_t *retcount_intra;
-    dslash::shmem_retcount_inter_t *retcount_inter;
     dslash::shmem_interior_done_t &interior_done;
     dslash::shmem_interior_count_t &interior_count;
+    dslash::shmem_retcount_intra_t *retcount_intra;
+    dslash::shmem_retcount_inter_t *retcount_inter;
 #endif
 
     // constructor needed for staggered to set xpay from derived class
@@ -302,7 +302,7 @@ namespace quda
       xpay(xpay),
       kernel_type(INTERIOR_KERNEL),
       threads(in.VolumeCB()),
-      ext_threads(0),
+      exterior_threads(0),
       threadDimMapLower {},
       threadDimMapUpper {},
       spin_project(spin_project),
@@ -314,8 +314,8 @@ namespace quda
       dim_map {},
       active_dims(0),
       pack_blocks(0),
-      ext_dims(0),
-      ext_blocks(0),
+      exterior_dims(0),
+      exterior_blocks(0),
 #ifndef NVSHMEM_COMMS
       shmem(0),
       counter(0)
@@ -378,14 +378,14 @@ namespace quda
       }
     }
 
-    void setExt(bool ext)
+    void setExteriorDims(bool exterior)
     {
-      if (ext) {
+      if (exterior) {
         int nDimComms = 0;
         for (int d = 0; d < 4; d++) nDimComms += commDim[d];
-        ext_dims = nDimComms;
+        exterior_dims = nDimComms;
       } else {
-        ext_dims = 0;
+        exterior_dims = 0;
       }
     }
   };
@@ -425,8 +425,8 @@ namespace quda
     out << std::endl;
     out << "active_dims = " << arg.active_dims << std::endl;
     out << "pack_blocks = " << arg.pack_blocks << std::endl;
-    out << "ext_threads = " << arg.ext_threads;
-    out << "ext_blocks =" << arg.ext_blocks;
+    out << "exterior_threads = " << arg.exterior_threads;
+    out << "exterior_blocks =" << arg.exterior_blocks;
     return out;
   }
 
@@ -473,7 +473,7 @@ namespace quda
       __syncthreads();
       if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
         int amlast = arg.interior_count.fetch_add(1, cuda::std::memory_order_acq_rel); // ensure that my block is done
-        if (amlast == (gridDim.x - arg.pack_blocks - arg.ext_blocks) * gridDim.y * gridDim.z - 1) {
+        if (amlast == (gridDim.x - arg.pack_blocks - arg.exterior_blocks) * gridDim.y * gridDim.z - 1) {
           arg.interior_done.store(arg.counter, cuda::std::memory_order_release);
           arg.interior_done.notify_all();
           arg.interior_count.store(0, cuda::std::memory_order_relaxed);
@@ -488,13 +488,13 @@ namespace quda
 
     // figure out some details on blocks
     const bool shmem_interiordone = (arg.shmem & 64);
-    const int myblockidx = arg.ext_blocks > 0 ? blockIdx.x - (gridDim.x - arg.ext_blocks) : blockIdx.x;
+    const int myblockidx = arg.exterior_blocks > 0 ? blockIdx.x - (gridDim.x - arg.exterior_blocks) : blockIdx.x;
     const int nComm = arg.commDim[0] + arg.commDim[1] + arg.commDim[2] + arg.commDim[3];
-    const int blocks_per_dim = (arg.ext_blocks > 0 ? arg.ext_blocks : gridDim.x) / (nComm);
+    const int blocks_per_dim = (arg.exterior_blocks > 0 ? arg.exterior_blocks : gridDim.x) / (nComm);
     const int blocks_per_dir = blocks_per_dim / 2;
 
     int dir = (myblockidx % blocks_per_dim) / (blocks_per_dir);
-    // this id the dimdir we are working on ...
+    // this is the dimdir we are working on ...
     int dim;
     int threadl;
     int threads_my_dir;
@@ -584,7 +584,7 @@ namespace quda
       // do exterior
     }
     arg.kernel_type = EXTERIOR_KERNEL_ALL;
-    arg.threads = arg.ext_threads;
+    arg.threads = arg.exterior_threads;
     int local_tid = threadIdx.x + blockDim.x * (myblockidx % (blocks_per_dir)); // index within the block
     int tid = local_tid + threadl + dir * threads_my_dir; // global index corresponfing to local_tid
 
@@ -636,12 +636,12 @@ namespace quda
 
       // we use that when running the exterior -- this is either
       // * an explicit call to the exterior when not merged with the interior or
-      // * the interior with ext_blocks > 0
+      // * the interior with exterior_blocks > 0
 #ifdef NVSHMEM_COMMS
     } else if (arg.shmem > 0
-               && ((kernel_type == EXTERIOR_KERNEL_ALL && arg.ext_blocks == 0)
-                   || (kernel_type == INTERIOR_KERNEL && arg.ext_blocks > 0
-                       && blockIdx.x >= (gridDim.x - arg.ext_blocks)))) {
+               && ((kernel_type == EXTERIOR_KERNEL_ALL && arg.exterior_blocks == 0)
+                   || (kernel_type == INTERIOR_KERNEL && arg.exterior_blocks > 0
+                       && blockIdx.x >= (gridDim.x - arg.exterior_blocks)))) {
       shmem_exterior<D<nParity, dagger, xpay, kernel_type, Arg>, Arg, nParity>(dslash, arg, s);
 #endif
     } else {

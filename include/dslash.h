@@ -149,8 +149,8 @@ namespace quda
         arg.counter = activeTuning() ?
           (uberTuning() && !policyTuning() ? dslash::inc_shmem_sync_counter() : dslash::get_shmem_sync_counter()) :
           dslash::get_shmem_sync_counter();
-        arg.ext_blocks = 8 * tp.aux.y * arg.ext_dims;
-        tp.grid.x += arg.ext_blocks;
+        arg.exterior_blocks = 8 * tp.aux.y * arg.exterior_dims;
+        tp.grid.x += arg.exterior_blocks;
       }
     }
 
@@ -171,12 +171,12 @@ namespace quda
           return true;
         } else {
           param.aux.x = 1;
-          if (arg.ext_dims > 0) {
+          if (arg.exterior_dims > 0) {
             /* if doing a fused interior+exterior kernel we use aux.y to control the number of blocks we add for the
              * exterior. We make sure to use multiple blocks per communication direction.
              */
             auto maxgridsize = TunableVectorYZ::maxGridSize();
-            if ((param.aux.y + 1) * arg.ext_dims * 8 <= static_cast<int>(maxgridsize)) {
+            if ((param.aux.y + 1) * arg.exterior_dims * 8 <= static_cast<int>(maxgridsize)) {
               param.aux.y++;
               return true;
             } else {
@@ -202,7 +202,7 @@ namespace quda
       }
       TunableVectorYZ::initTuneParam(param);
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1; // packing blocks per direction
-      if (arg.ext_dims && arg.kernel_type == INTERIOR_KERNEL) param.aux.y = 1;     // exterior blocks
+      if (arg.exterior_dims && arg.kernel_type == INTERIOR_KERNEL) param.aux.y = 1;     // exterior blocks
     }
 
     virtual void defaultTuneParam(TuneParam &param) const
@@ -216,7 +216,7 @@ namespace quda
       }
       TunableVectorYZ::defaultTuneParam(param);
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1; // packing blocks per direction
-      if (arg.ext_dims && arg.kernel_type == INTERIOR_KERNEL) param.aux.y = 1;     // exterior blocks
+      if (arg.exterior_dims && arg.kernel_type == INTERIOR_KERNEL) param.aux.y = 1;     // exterior blocks
     }
 
     /**
@@ -439,7 +439,7 @@ namespace quda
       case Device: strcat(aux_pack, ",device-device"); break;
       case Host: strcat(aux_pack, comm_peer2peer_enabled_global() ? ",host-device" : ",host-host"); break;
       case Shmem:
-        strcat(aux_pack, arg.ext_dims > 0 ? ",shmemuber" : ",shmem");
+        strcat(aux_pack, arg.exterior_dims > 0 ? ",shmemuber" : ",shmem");
         strcat(aux_pack, (arg.shmem & 1 && arg.shmem & 2) ? "3" : "1");
         break;
 
