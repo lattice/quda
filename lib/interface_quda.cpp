@@ -6053,4 +6053,6 @@ void make4DChiralProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_para
   delete h_out4D[0];
   profileMake4DProp.TPSTOP(QUDA_PROFILE_FREE);
   profileMake4DProp.TPSTOP(QUDA_PROFILE_TOTAL);
+=======
+>>>>>>> origin/feature/Nc_agnosticism
 }

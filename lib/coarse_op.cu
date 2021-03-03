@@ -114,7 +114,7 @@ namespace quda {
 
 #ifdef NSPIN4
     const int coarseSpin = 2;
-    const int coarseColor = Y.Ncolor() / coarseSpin;
+    const int coarseColor = Y.Ncolor() / coarseSpin;    
     if (coarseColor == 2*N_COLORS) { // free field Wilson
       calculateY<Float,vFloat,fineColor,fineSpin,2*N_COLORS,coarseSpin>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mass, mu, mu_factor, dirac, matpc);
     } else if (coarseColor == 24) {

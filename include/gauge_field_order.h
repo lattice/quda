@@ -1526,7 +1526,8 @@ namespace quda {
         const real scale_inv;
 
         Reconstruct(const GaugeField &u) : reconstruct_8(u), scale(u.Scale()), scale_inv(1.0 / scale) {}
-
+	
+        __device__ __host__ inline real getPhase(const complex in[N_COLORS*N_COLORS]) const
         {
 #if 1 // phase from cross product
           // denominator = (U[0][0]*U[1][1] - U[0][1]*U[1][0])*
@@ -1538,16 +1539,13 @@ namespace quda {
             return expINPhase.real() > 0 ? 1 : -1;
           }
 #else // phase from determinant
-          Matrix<complex, N_COLORS> a;
-#pragma unroll
           for (int i = 0; i < N_COLORS*N_COLORS; i++) a(i) = scale_inv * in[i];
           const complex det = getDeterminant(a);
-          real phase = arg(det) / N_COLORS;
-          return phase;
+          return phase = arg(det) / N_COLORS;
 #endif
         }
-
-        // Rescale the U3 input matrix by exp(-I*phase) to obtain an SU3 matrix multiplied by a real scale factor,
+	
+	// Rescale the U3 input matrix by exp(-I*phase) to obtain an SU3 matrix multiplied by a real scale factor,
         __device__ __host__ inline void Pack(real out[N_COLORS*N_COLORS-1], const complex in[N_COLORS*N_COLORS]) const
         {
           real phase = getPhase(in);

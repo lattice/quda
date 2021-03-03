@@ -92,6 +92,7 @@ void save_correlators_to_file(const void* correlation_function_sum, const Correl
   }
 
   filepath << ".dat";
+  
   if (comm_rank() == 0) printf("Saving correlator in %s \n", filepath.str().c_str());
 
   corr_file.open(filepath.str());
@@ -161,8 +162,13 @@ void construct_operator(const double new_kappa, QudaInvertParam &inv_param, Quda
   } else {
     setInvertParam(inv_param);
   }
-  
-  inv_param.eig_param = nullptr;
+  QudaEigParam eig_param = newQudaEigParam();
+  if (inv_deflate) {
+    setEigParam(eig_param);
+    inv_param.eig_param = &eig_param;
+  } else {
+    inv_param.eig_param = nullptr;
+  }
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     // If you pass nullptr to QUDA, it will automatically compute
@@ -217,6 +223,7 @@ void invert_and_contract(void **source_array_ptr, void **prop_array_ptr_1, void 
       // Gaussian smear the source.
       performGaussianSmearNStep(source_array_ptr[i], &source_smear_param, prop_source_smear_steps, prop_source_smear_coeff);
       
+      //if (inv_deflate) inv_param.eig_param.preserve_deflation = (i < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
       invertQuda(prop_array_ptr_2[i], source_array_ptr[i], &inv_param);
 
       // Gaussian smear the sink.
@@ -285,7 +292,7 @@ int main(int argc, char **argv)
   QudaMultigridParam mg_param = newQudaMultigridParam();
   QudaInvertParam mg_inv_param = newQudaInvertParam();
   QudaEigParam mg_eig_param[mg_levels];
-  //QudaEigParam eig_param = newQudaEigParam();
+  QudaEigParam eig_param = newQudaEigParam();
   if (inv_multigrid) {
     setQudaMgSolveTypes();
     setMultigridInvertParam(inv_param);
@@ -305,7 +312,13 @@ int main(int argc, char **argv)
   } else {
     setInvertParam(inv_param);
   }
-  inv_param.eig_param = nullptr;
+  if (inv_deflate) {
+    setEigParam(eig_param);
+    inv_param.eig_param = &eig_param;
+  } else {
+    inv_param.eig_param = nullptr;
+  }
+
   if (inv_multigrid) {
     if (open_flavor) {
       if (comm_rank() == 0) printf("all the MG settings will be shared for qq, ql and qs propagator\n");
