@@ -26,8 +26,8 @@ namespace quda
       A(A, false),
       a(a),
       // if dagger flip the chiral twist
-      b(dagger ? -0.5 * b : 0.5 * b) // factor of 1/2 comes from clover normalization we need to correct for, do we?
-      c(0.5*c)
+      b(dagger ? -0.5 * b : 0.5 * b) // factor of 1/2 comes from clover normalization 
+      c(c)
       {
         checkPrecision(U, A);
         checkLocation(U, A);
