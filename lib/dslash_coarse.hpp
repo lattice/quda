@@ -434,11 +434,11 @@ namespace quda {
   // string used as a tunekey to ensure we retune if the dslash policy env changes
   static char policy_string[TuneKey::aux_n];
 
-  static void enable_policy(DslashCoarsePolicy p) {
+  static inline void enable_policy(DslashCoarsePolicy p) {
     policies[static_cast<std::size_t>(p)] = p;
   }
 
-  static void disable_policy(DslashCoarsePolicy p) {
+  static inline void disable_policy(DslashCoarsePolicy p) {
     policies[static_cast<std::size_t>(p)] = DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED;
   }
 

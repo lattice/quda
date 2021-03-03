@@ -6,8 +6,9 @@ namespace quda
 {
 
   template <typename Float_, int nColor_, QudaReconstructType recon_, bool density_ = false> struct QChargeArg :
-    public ReduceArg<double3>
+    public ReduceArg<vector_type<double, 3>>
   {
+    using reduce_t = vector_type<double, 3>;
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
@@ -20,17 +21,17 @@ namespace quda
     dim3 threads; // number of active threads required
 
     QChargeArg(const GaugeField &Fmunu, Float *qDensity = nullptr) :
-      ReduceArg<double3>(),
+      ReduceArg<reduce_t>(),
       f(Fmunu),
       qDensity(qDensity),
       threads(Fmunu.VolumeCB(), 2, 1) {}
 
-    __device__ __host__ double3 init() const { return zero<double3>(); }
+    __device__ __host__ auto init() const { return reduce_t(); }
   };
 
   // Core routine for computing the topological charge from the field strength
-  template <typename Arg> struct qCharge : plus<double3> {
-    using reduce_t = double3;
+  template <typename Arg> struct qCharge : plus<vector_type<double, 3>> {
+    using reduce_t = vector_type<double, 3>;
     using plus<reduce_t>::operator();
     Arg &arg;
     constexpr qCharge(Arg &arg) : arg(arg) {}
@@ -44,8 +45,8 @@ namespace quda
       constexpr real q_norm = static_cast<real>(-1.0 / (4*M_PI*M_PI));
       constexpr real n_inv = static_cast<real>(1.0 / Arg::nColor);
 
-      reduce_t E_local = zero<reduce_t>();
-      double &Q = E_local.z;
+      reduce_t E_local;
+      double &Q = E_local[2];
 
       // Load the field-strength tensor from global memory
       //F0 = F[Y,X], F1 = F[Z,X], F2 = F[Z,Y],
@@ -62,8 +63,8 @@ namespace quda
         auto tmp = F[i] - n_inv * getTrace(F[i]) * iden;
 
         // Sum trace of square, normalise in .cu
-        if (i<3) E_local.x -= getTrace(tmp * tmp).real(); //spatial
-        else     E_local.y -= getTrace(tmp * tmp).real(); //temporal
+        if (i<3) E_local[0] -= getTrace(tmp * tmp).real(); //spatial
+        else     E_local[1] -= getTrace(tmp * tmp).real(); //temporal
       }
 
       // now compute topological charge

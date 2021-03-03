@@ -73,7 +73,7 @@ namespace quda
       Stap = Stap * (arg.alpha / ((real)(2. * (3. - 1.))));
       setIdentity(&I);
 
-      TestU = I * (1. - arg.alpha) + Stap * conj(U);
+      TestU = I * (static_cast<real>(1.0) - arg.alpha) + Stap * conj(U);
       polarSu3<real>(TestU, arg.tolerance);
       U = TestU * U;
     

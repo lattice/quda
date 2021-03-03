@@ -630,11 +630,7 @@ namespace quda {
             for (int i = 0; i < block; i++) scale = fabsf((norm_type)v[i]) > scale ? fabsf((norm_type)v[i]) : scale;
             norm[parity*norm_offset + chirality*stride + x] = scale;
 
-#ifdef __CUDA_ARCH__
-            real scale_inv = __fdividef(fixedMaxValue<Float>::value, scale);
-#else
-            real scale_inv = fixedMaxValue<Float>::value / scale;
-#endif
+            real scale_inv = fdivide(fixedMaxValue<Float>::value, scale);
 #pragma unroll
             for (int i = 0; i < block; i++) tmp[i] = v[i] * scale_inv;
           } else {
