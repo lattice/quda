@@ -453,17 +453,20 @@ namespace quda
     if (alloc[HOST].count(ptr)) {
       track_free(HOST, ptr);
       free(ptr);
-    } else if (alloc[PINNED].count(ptr)) {ompwip("alloc[PINNED].count(ptr)");/*
+    } else if (alloc[PINNED].count(ptr)) {
+      ompwip("alloc[PINNED].count(ptr)");
+/*
       cudaError_t err = cudaHostUnregister(ptr);
       if (err != cudaSuccess) { errorQuda("Failed to unregister pinned memory (%s:%d in %s())\n", file, line, func); }
       track_free(PINNED, ptr);
       free(ptr);
-    */} else if (alloc[MAPPED].count(ptr)) {
+*/
+    } else if (alloc[MAPPED].count(ptr)) {
 #ifdef HOST_ALLOC
       ompwip("HOST_ALLOC alloc[MAPPED].count(ptr)");/*
       cudaError_t err = cudaFreeHost(ptr);
       if (err != cudaSuccess) { errorQuda("Failed to free host memory (%s:%d in %s())\n", file, line, func); }
-      */
+*/
 #else
       ompwip("!HOST_ALLOC alloc[MAPPED].count(ptr)");/*
       cudaError_t err = cudaHostUnregister(ptr);
@@ -471,7 +474,7 @@ namespace quda
         errorQuda("Failed to unregister host-mapped memory (%s:%d in %s())\n", file, line, func);
       }
       free(ptr);
-      */
+*/
 #endif
       // track_free(MAPPED, ptr);
     } else {
@@ -531,7 +534,9 @@ namespace quda
   */}
 
   void *get_mapped_device_pointer_(const char *func, const char *file, int line, const void *host)
-  {ompwip("return nullptr");return nullptr;/*
+  {
+    ompwip("return nullptr");return nullptr;
+/*
     void *device;
     auto error = cudaHostGetDevicePointer(&device, const_cast<void *>(host), 0);
     if (error != cudaSuccess) {
@@ -539,24 +544,31 @@ namespace quda
                 cudaGetErrorString(error), file, line, func);
     }
     return device;
+*/
   }
 
   void register_pinned_(const char *func, const char *file, int line, void *ptr, size_t bytes)
-  {ompwip();
+  {
+    ompwip();
+/*
     auto error = cudaHostRegister(ptr, bytes, cudaHostRegisterDefault);
     if (error != cudaSuccess) {
       errorQuda("cudaHostRegister failed with error %s (%s:%d in %s()",
                 cudaGetErrorString(error), file, line, func);
     }
+*/
   }
 
   void unregister_pinned_(const char *func, const char *file, int line, void *ptr)
-  {ompwip();
+  {
+    ompwip();
+/*
     auto error = cudaHostUnregister(ptr);
     if (error != cudaSuccess) {
       errorQuda("cudaHostUnregister failed with error %s (%s:%d in %s()",
                 cudaGetErrorString(error), file, line, func);
     }
+*/
   }
 
   namespace pool

@@ -55,7 +55,7 @@ namespace quda
                                   QudaFieldLocation location)
       {
         if (getVerbosity() >= QUDA_VERBOSE)
-          printfQuda("BatchInvertMatrix (generic - Eigen): Nc = %d, batch = %llu\n", n, batch);
+          printfQuda("BatchInvertMatrix (generic - Eigen): Nc = %d, batch = %lu\n", n, batch);
 
         size_t size = 2 * n * n * batch * prec;
         void *A_h = (location == QUDA_CUDA_FIELD_LOCATION ? pool_pinned_malloc(size) : A);

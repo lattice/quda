@@ -1,179 +1,23 @@
 #pragma once
 
 #ifdef QUDA_BACKEND_OMPTARGET
-
-#include <omp.h>
-#include <cstdlib>
-#include <cstring>
-#include <iostream>
-#include <functional>
-#include <string_view>
-
-#include <util_quda.h>
-
-template <typename T>
-constexpr auto type_name() noexcept {
-  std::string_view name = "Error: unsupported compiler", prefix, suffix;
-#ifdef __clang__
-  name = __PRETTY_FUNCTION__;
-  prefix = "auto type_name() [T = ";
-  suffix = "]";
-#elif defined(__GNUC__)
-  name = __PRETTY_FUNCTION__;
-  prefix = "constexpr auto type_name() [with T = ";
-  suffix = "]";
-#endif
-  name.remove_prefix(prefix.size());
-  name.remove_suffix(suffix.size());
-  return name;
-}
-
-template <typename...Arg>
-struct seq_args_call{
-  static constexpr size_t n = sizeof...(Arg);
-  template <typename F, std::size_t...IX>
-  void operator()(F *func, void *args[n], std::index_sequence<IX...>)
-  {(*func)(*(Arg*)args[IX]...);}
-};
-
-template <typename T>
-T * to_device(const T * x, size_t s) {
-  if(0<omp_get_num_devices()){
-    const int d = omp_get_default_device();
-    const int h = omp_get_initial_device();
-    void *p = omp_target_alloc(s, d);
-    printfQuda("# to_device: host_ptr@%d = %p  device_ptr@%d = %p  size = %zu\n", h, x, d, p, s);
-    omp_target_memcpy(p, (void *)x, s, 0, 0, d, h);
-    return (T *)p;
-  }else{
-    return x;
-  }
-}
-
-template <typename T>
-T * to_device(const T& x) {
-  constexpr size_t s = sizeof(T);
-  return to_device(&x, s);
-}
-
+// OMPTARGET SPECIFIC workarounds
 #define __host__
 #define __device__
 #define __shared__
 #define __global__
 #define __constant__ static
-#define __launch_bounds__(x)
+#define __launch_bounds__(...)
 #define __syncthreads() _Pragma("omp barrier")
+#define __forceinline__ inline __attribute__((always_inline))
 
 #define CUDA_SUCCESS QUDA_SUCCESS
 
-using size_t = std::size_t;
+#define QUDA_RT_CONSTS ompwip();const dim3 threadIdx(omp_get_thread_num(),0,0),blockDim(omp_get_num_threads()),blockIdx(omp_get_team_num(),0,0),gridDim(omp_get_num_teams())
 
-#define __forceinline__ inline __attribute__((always_inline))
-
-enum cudaMemcpyKind{cudaMemcpyHostToHost, cudaMemcpyHostToDevice, cudaMemcpyDeviceToHost, cudaMemcpyDeviceToDevice, cudaMemcpyDefault};
-enum cudaError_t{cudaSuccess,cudaErrorNotReady};
-enum {cudaEventDisableTiming,cudaEventInterprocess};
-enum {cudaHostRegisterDefault};
-enum {cudaIpcMemLazyEnablePeerAccess};
-enum {cudaStreamDefault};
-
-static inline cudaError_t
-ompwip_(const char * const file, const size_t line, const char * const func, const char * const msg, std::function<void(void)>f = [](){})
-{
-  if(0==omp_get_team_num()&&0==omp_get_thread_num()) std::cerr<<"OMP WIP:"<<msg<<": "<<file<<':'<<line<<' '<<func<<std::endl;
-  f();
-  return cudaSuccess;
-}
-static inline cudaError_t
-ompwip_(const char * const file, const size_t line, const char * const func, std::function<void(void)>f = [](){})
-{return ompwip_(file,line,func,"",f);}
-#define ompwip(...) ompwip_(__FILE__,__LINE__,__PRETTY_FUNCTION__,##__VA_ARGS__)
-
-#define __shfl_down_sync(a,b,c) ompwip("__shfl_down_sync")
-
-#define cuMemcpy(a,b,c) ompwip()
-#define cuMemcpyAsync(a,b,c,d) ompwip()
-#define cuMemcpyDtoD(a,b,c) ompwip()
-#define cuMemcpyDtoDAsync(a,b,c,d) ompwip()
-#define cuMemcpyDtoH(a,b,c) ompwip()
-#define cuMemcpyDtoHAsync(a,b,c,d) ompwip()
-#define cuMemcpyHtoD(a,b,c) ompwip()
-#define cuMemcpyHtoDAsync(a,b,c,d) ompwip()
-#define cudaMemcpy(a,b,c,d) ompwip([&](){printfQuda("memcpy %p <- %p\n",a,b);ompwipMemcpy(a,(void*)b,c,d);})
-#define cudaMemcpy2D(a,b,c,d,e,f,g) ompwip()
-#define cudaMemcpy2DAsync(a,b,c,d,e,f,g,h) ompwip()
-#define cudaMemcpyAsync(a,b,c,d,e) ompwip()
-#define cudaMemcpyToSymbolAsync(a,b,c,d,e,f) ompwip()
-#define cudaMemset(a,b,c) ompwip([&](){printfQuda("memset %p\n",a);ompwipMemset(a,b,c);})
-#define cudaMemset2D(a,b,c,d,e) ompwip()
-#define cudaMemset2DAsync(a,b,c,d,e,f) ompwip()
-#define cudaMemsetAsync(a,b,c,d) ompwip()
-
-static inline void
-ompwipMemset(void *p, unsigned char b, std::size_t s)
-{
-#pragma omp target teams distribute parallel for simd is_device_ptr(p)
-  for(std::size_t i=0;i<s;++i) *(unsigned char *)p = b;
-}
-
-static inline void
-ompwipMemcpy(void *d, void *s, std::size_t c, cudaMemcpyKind k)
-{
-  switch(k){
-  case cudaMemcpyHostToHost: memcpy(d,s,c); break;
-  case cudaMemcpyHostToDevice:
-    if(0<omp_get_num_devices()) omp_target_memcpy(d,s,c,0,0,omp_get_default_device(),omp_get_initial_device());
-    else warningQuda("cudaMemcpyHostToDevice without a device");
-    break;
-  case cudaMemcpyDeviceToHost:
-    if(0<omp_get_num_devices()) omp_target_memcpy(d,s,c,0,0,omp_get_initial_device(),omp_get_default_device());
-    else warningQuda("cudaMemcpyDeviceToHost without a device");
-    break;
-  case cudaMemcpyDeviceToDevice:
-    warningQuda("unimplemented for cudaMemcpyDeviceToDevice");
-    break;
-  case cudaMemcpyDefault:
-    warningQuda("unimplemented for cudaMemcpyDefault");
-    break;
-  default: errorQuda("Unsupported cudaMemcpyType %d", k);
-  }
-}
-
-#define cudaDeviceSynchronize() ompwip()
-#define cudaEventCreate(a,...) ompwip([&](){(*(a))=0;})
-#define cudaEventCreateWithFlags(a,b) ompwip()
-#define cudaEventDestroy(a) ompwip()
-#define cudaEventElapsedTime(a,b,c) ompwip([&](){(*(a))=0;})
-#define cudaEventQuery(a) ompwip()
-#define cudaEventRecord(a,b) ompwip()
-#define cudaEventSynchronize(a) ompwip()
-#define cudaFuncGetAttributes(a,b) ompwip()
-#define cudaFuncSetAttribute(a,b,c) ompwip()
-#define cudaGetErrorString(a) "FIXME"
-#define cudaGetLastError() ompwip()
-#define cudaGetSymbolAddress(a,b) ompwip()
-#define cudaHostRegister(a,b,c) ompwip()
-#define cudaHostUnregister(a) ompwip()
-#define cudaIpcCloseMemHandle(a) ompwip()
-#define cudaIpcGetEventHandle(a,b) ompwip([&](){(*(a))=0;})
-#define cudaIpcGetMemHandle(a,b) ompwip([&](){(*(a))=0;})
-#define cudaIpcOpenEventHandle(a,b) ompwip([&](){(*(a))=0;})
-#define cudaIpcOpenMemHandle(a,b,c) ompwip()
-#define cudaStreamCreate(a) ompwip([&](){(*(a))=0;})
-#define cudaStreamDestroy(a) ompwip()
-#define cudaStreamSynchronize(a) ompwip()
-#define cudaStreamWaitEvent(a,b,c) ompwip()
-
-static char FIXME[]="FIXME";
-#define cuGetErrorString(a,b) ompwip([&](){(*(b))=FIXME;})
-#define cuGetErrorName(a,b) ompwip([&](){(*(b))=FIXME;})
-
-using qudaStream_t = int;
-using cudaStream_t = int;
-using CUresult = int;
-using cudaIpcMemHandle_t = int;
-using cudaIpcEventHandle_t = int;
-using cudaEvent_t = int;
+#include <functional>
+#include <iostream>
+#include <omp.h>
 
 struct dim3 {unsigned int x,y,z;
   constexpr dim3():x(1u),y(1u),z(1u){}
@@ -209,18 +53,24 @@ static inline double3 make_double3(double x,double y,double z){return double3{x,
 struct double4 {double x,y,z,w;};
 static inline double4 make_double4(double x,double y,double z,double w){return double4{x,y,z,w};}
 
-#define QUDA_RT_CONSTS ompwip();const dim3 threadIdx(omp_get_thread_num(),0,0),blockDim(omp_get_num_threads()),blockIdx(omp_get_team_num(),0,0),gridDim(omp_get_num_teams())
+static inline int
+ompwip_(const char * const file, const size_t line, const char * const func, const char * const msg, std::function<void(void)>f = [](){})
+{
+  if(0==omp_get_team_num()&&0==omp_get_thread_num()) std::cerr<<"OMP WIP:"<<msg<<": "<<file<<':'<<line<<' '<<func<<std::endl;
+  f();
+  return 0;
+}
+static inline int
+ompwip_(const char * const file, const size_t line, const char * const func, std::function<void(void)>f = [](){})
+{return ompwip_(file,line,func,"",f);}
+#define ompwip(...) ompwip_(__FILE__,__LINE__,__PRETTY_FUNCTION__,##__VA_ARGS__)
 
-#else  // QUDA_BACKEND_OMPTARGET
+using cudaStream_t = int;  // device.h:/cudaStream_t
+using CUresult = int;  // ../lib/coarse_op.cuh:/CUresult
 
-#define QUDA_RT_CONSTS
+#else // QUDA_BACKEND_OMPTARGET
 
-#ifndef __CUDACC_RTC__
-#include <cuda.h>
-#include <cuda_runtime.h>
-#endif
-
-#endif  // QUDA_BACKEND_OMPTARGET
+#endif // QUDA_BACKEND_OMPTARGET
 
 #include <quda_define.h>
 #include <string>

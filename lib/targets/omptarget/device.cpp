@@ -1,6 +1,7 @@
 #include <omp.h>
 #include <util_quda.h>
 #include <quda_internal.h>
+#include <quda_cuda_api.h>
 
 #ifdef QUDA_NVML
 #include <nvml.h>
@@ -21,13 +22,21 @@ struct cudaDeviceProp{
   unsigned int maxThreadsDim[3];
   unsigned int maxGridSize[3];
   unsigned int multiProcessorCount;
+  unsigned int warpSize;
+  unsigned long totalGlobalMem;
+  unsigned long totalConstMem;
+  unsigned long memPitch;
+  unsigned int regsPerBlock;
+  int unifiedAddressing;
+  int deviceOverlap;
 };
 
 static void cudaDriverGetVersion(int*v){*v=0;}
 static void cudaRuntimeGetVersion(int*v){*v=0;}
-static void cudaGetDeviceCount(int*c){*c=omp_get_num_devices();}
-static void cudaGetDeviceProperties(cudaDeviceProp*p,int dev)
+static int cudaGetDeviceCount(int*c){*c=omp_get_num_devices();return 0;}
+static int cudaGetDeviceProperties(cudaDeviceProp*p,int dev)
 {
+  /* FIXME totally fake numbers */
   if(0<omp_get_num_devices()){
     p->name = ompdevname;
     p->major = 7;
@@ -57,19 +66,33 @@ static void cudaGetDeviceProperties(cudaDeviceProp*p,int dev)
     p->maxGridSize[2] = 8;
     p->multiProcessorCount = 64;
   }
+  p->warpSize = 32;
+  p->totalGlobalMem = 1u<34;
+  p->totalConstMem = 1u<34;
+  p->memPitch = 1u<34;
+  p->regsPerBlock = 1024;
+  p->unifiedAddressing = 1;
+  p->deviceOverlap = 0;
+  return 0;
 }
 
-#define cudaSetDevice omp_set_default_device
-#define cudaDeviceSetCacheConfig(a)
-static void cudaDeviceGetStreamPriorityRange(int*lo,int*hi){lo=0;hi=0;}
-static void cudaStreamCreateWithPriority(qudaStream_t*s,int lo,int hi){*s=0;}
-#define cudaDeviceReset()
+enum {cudaFuncCachePreferL1};
+enum {cudaStreamDefault};
+static int cudaSetDevice(int d){omp_set_default_device(d); return 0;}
+static int cudaDeviceSetCacheConfig(int a){ompwip();return 0;}
+static int cudaDeviceGetStreamPriorityRange(int*lo,int*hi){ompwip();lo=0;hi=0;return 0;}
+static int cudaStreamCreateWithPriority(cudaStream_t*s,int lo,int hi){ompwip();*s=0;return 0;}
+static int cudaStreamDestroy(cudaStream_t s){ompwip();return 0;}
+static int cudaDeviceReset(){ompwip();return 0;}
 enum {cudaDevAttrMaxSharedMemoryPerBlockOptin};
-static void cudaDeviceGetAttribute(int*b,int o,int i){*b=98304;}
+static int cudaDeviceGetAttribute(int*b,int o,int i){ompwip();*b=98304;return 0;}
 
 static cudaDeviceProp deviceProp;
 static cudaStream_t *streams;
 static const int Nstream = 9;
+
+#define CHECK_CUDA_ERROR(func)                                          \
+  cuda::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
 
 namespace quda
 {

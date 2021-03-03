@@ -2,6 +2,7 @@
 
 #include <color_spinor_field.h>
 #include <reduce_helper.h>
+#include <math_helper.cuh>
 
 //#define QUAD_SUM
 #ifdef QUAD_SUM

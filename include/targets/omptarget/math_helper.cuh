@@ -119,5 +119,9 @@ namespace quda {
     return std::pow(a, b);
   }
 
+  template <typename real> __device__ __host__ inline real fdivide(real a, real b)
+  {
+    return a / b;
+  }
 
 }

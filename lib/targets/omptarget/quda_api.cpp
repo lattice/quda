@@ -8,6 +8,69 @@
 enum cudaFuncAttribute{cudaFuncAttributePreferredSharedMemoryCarveout};
 using cudaFuncAttributes = int;
 using CUdeviceptr = void*;
+using cudaError_t = int;
+enum {cudaSuccess,cudaErrorNotReady};
+enum cudaMemcpyKind{cudaMemcpyHostToHost, cudaMemcpyHostToDevice, cudaMemcpyDeviceToHost, cudaMemcpyDeviceToDevice, cudaMemcpyDefault};
+
+static char FIXME[]="OMP FIXME";
+
+#define cudaGetErrorString(a) "OMP FIXME"
+#define cuGetErrorName(a,b) ompwip([&](){(*(b))=FIXME;})
+
+#define cudaMemcpy(a,b,c,d) ompwip([&](){printfQuda("memcpy %p <- %p\n",a,b);ompwipMemcpy(a,(void*)b,c,d);})
+#define cudaMemcpyAsync(a,b,c,d,e) ompwip([&](){printfQuda("memcpy %p <- %p\n",a,b);ompwipMemcpy(a,(void*)b,c,d);})
+#define cudaMemcpy2D(a,b,c,d,e,f,g) ompwip("unimplemented")
+#define cudaMemcpy2DAsync(a,b,c,d,e,f,g,h) ompwip("unimplemented")
+#define cudaMemset(a,b,c) ompwip([&](){printfQuda("memset %p\n",a);ompwipMemset(a,b,c);})
+#define cudaMemsetAsync(a,b,c,d) ompwip([&](){printfQuda("memset %p\n",a);ompwipMemset(a,b,c);})
+#define cudaMemset2D(a,b,c,d,e) ompwip("unimplemented")
+#define cudaMemset2DAsync(a,b,c,d,e,f) ompwip("unimplemented")
+
+static inline void
+ompwipMemset(void *p, unsigned char b, std::size_t s)
+{
+#pragma omp target teams distribute parallel for simd is_device_ptr(p)
+  for(std::size_t i=0;i<s;++i) *(unsigned char *)p = b;
+}
+
+static inline void
+ompwipMemcpy(void *d, void *s, std::size_t c, cudaMemcpyKind k)
+{
+  switch(k){
+  case cudaMemcpyHostToHost: memcpy(d,s,c); break;
+  case cudaMemcpyHostToDevice:
+    if(0<omp_get_num_devices()) omp_target_memcpy(d,s,c,0,0,omp_get_default_device(),omp_get_initial_device());
+    else warningQuda("cudaMemcpyHostToDevice without a device");
+    break;
+  case cudaMemcpyDeviceToHost:
+    if(0<omp_get_num_devices()) omp_target_memcpy(d,s,c,0,0,omp_get_initial_device(),omp_get_default_device());
+    else warningQuda("cudaMemcpyDeviceToHost without a device");
+    break;
+  case cudaMemcpyDeviceToDevice:
+    warningQuda("unimplemented for cudaMemcpyDeviceToDevice");
+    break;
+  case cudaMemcpyDefault:
+    warningQuda("unimplemented for cudaMemcpyDefault");
+    break;
+  default: errorQuda("Unsupported cudaMemcpyType %d", k);
+  }
+}
+
+using cudaEvent_t = int*;
+enum {cudaEventDisableTiming};
+#define cudaEventCreate(a) ompwip("cudaEventCreate")
+#define cudaEventCreateWithFlags(a,b) ompwip("cudaEventCreateWithFlags")
+#define cudaEventElapsedTime(a,b,c) ompwip([&](){(*(a))=0;})
+#define cudaEventQuery(a) ompwip("cudaEventQuery")
+#define cudaEventRecord(a,b) ompwip("cudaEventRecord")
+#define cudaEventSynchronize(a) ompwip("cudaEventSynchronize")
+#define cudaEventDestroy(a) ompwip("cudaEventDestroy")
+#define cudaStreamWaitEvent(a,b,c) ompwip("cudaStreamWaitEvent")
+#define cudaStreamSynchronize(a) ompwip("cudaStreamSynchronize")
+#define cudaDeviceSynchronize() ompwip("cudaDeviceSynchronize")
+#define cudaGetSymbolAddress(a,b) ompwip("cudaGetSymbolAddress")
+#define cudaFuncGetAttributes(a,b) ompwip("cudaFuncGetAttributes")
+#define cudaFuncSetAttribute(a,b,c) ompwip("cudaFuncSetAttribute")
 
 // if this macro is defined then we use the driver API, else use the
 // runtime API.  Typically the driver API has 10-20% less overhead
@@ -495,7 +558,7 @@ namespace quda {
     return false;
   }
 
-  void qudaEventRecord_(cudaEvent_t &event, qudaStream_t stream, const char *func, const char *file, const char *line)
+  void qudaEventRecord_(qudaEvent_t &quda_event, qudaStream_t stream, const char *func, const char *file, const char *line)
   {
     cudaEvent_t &event = reinterpret_cast<cudaEvent_t&>(quda_event.event);
 #ifdef USE_DRIVER_API
@@ -507,7 +570,7 @@ namespace quda {
 #endif
   }
 
-  void qudaStreamWaitEvent_(qudaStream_t stream, cudaEvent_t event, unsigned int flags, const char *func,
+  void qudaStreamWaitEvent_(qudaStream_t stream, qudaEvent_t quda_event, unsigned int flags, const char *func,
                             const char *file, const char *line)
   {
     cudaEvent_t &event = reinterpret_cast<cudaEvent_t&>(quda_event.event);
@@ -556,7 +619,7 @@ namespace quda {
     set_runtime_error(error, __func__, func, file, line);
   }
 
-  void qudaEventSynchronize_(const cudaEvent_t &event, const char *func, const char *file, const char *line)
+  void qudaEventSynchronize_(const qudaEvent_t &quda_event, const char *func, const char *file, const char *line)
   {
     const cudaEvent_t &event = reinterpret_cast<const cudaEvent_t&>(quda_event.event);
 #ifdef USE_DRIVER_API
