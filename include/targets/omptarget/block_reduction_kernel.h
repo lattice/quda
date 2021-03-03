@@ -13,16 +13,16 @@ namespace quda {
      which is the effective matrix dimension that we are tranposing in
      this mapping.
    */
-  template <typename Arg> __device__ int virtual_block_idx(const Arg &arg)
+  template <typename Arg> __device__ constexpr int virtual_block_idx(const Arg &arg)
   {
     QUDA_RT_CONSTS;
-    int block_idx = blockIdx.x;
+    auto block_idx = blockIdx.x;
     if (arg.swizzle) {
       // the portion of the grid that is exactly divisible by the number of SMs
-      const int gridp = gridDim.x - gridDim.x % arg.swizzle_factor;
+      const auto gridp = gridDim.x - gridDim.x % arg.swizzle_factor;
 
       block_idx = blockIdx.x;
-      if (blockIdx.x < gridp) {
+      if (block_idx < gridp) {
         // this is the portion of the block that we are going to transpose
         const int i = blockIdx.x % arg.swizzle_factor;
         const int j = blockIdx.x / arg.swizzle_factor;
@@ -41,13 +41,13 @@ namespace quda {
      templated, e.g., for efficient reductions, and typically the y
      thread dimension is a trivial vectorizable dimension.
   */
-  template <int block_size, template <int, typename> class Transformer, typename Arg>
-  __launch_bounds__(Arg::launch_bounds ? block_size : 0) __global__ void BlockKernel2D(Arg arg)
+  template <unsigned int block_size, template <int, typename> class Transformer, typename Arg>
+  __launch_bounds__(Arg::launch_bounds || block_size > 512 ? block_size : 0) __global__ void BlockKernel2D(Arg arg)
   {
     QUDA_RT_CONSTS;
     const dim3 block_idx(virtual_block_idx(arg), blockIdx.y, 0);
     const dim3 thread_idx(threadIdx.x, threadIdx.y, 0);
-    const int j = blockDim.y*blockIdx.y + threadIdx.y;
+    auto j = blockDim.y*blockIdx.y + threadIdx.y;
     if (j >= arg.threads.y) return;
 
     Transformer<block_size, Arg> t(arg);

@@ -323,6 +323,7 @@ namespace quda
       errorQuda("cudaHostAlloc failed of size %zu (%s:%d in %s())\n", size, file, line, func); }
     }
 #else
+    /* FIXME: this likely won't work. */
     void *ptr = aligned_malloc(a, size);
     ompwip([=](){printfQuda("mapped_malloc_ host: %p\n",ptr);});
     if(0<omp_get_num_devices()){
@@ -538,8 +539,25 @@ namespace quda
                 cudaGetErrorString(error), file, line, func);
     }
     return device;
-  */}
+  }
 
+  void register_pinned_(const char *func, const char *file, int line, void *ptr, size_t bytes)
+  {ompwip();
+    auto error = cudaHostRegister(ptr, bytes, cudaHostRegisterDefault);
+    if (error != cudaSuccess) {
+      errorQuda("cudaHostRegister failed with error %s (%s:%d in %s()",
+                cudaGetErrorString(error), file, line, func);
+    }
+  }
+
+  void unregister_pinned_(const char *func, const char *file, int line, void *ptr)
+  {ompwip();
+    auto error = cudaHostUnregister(ptr);
+    if (error != cudaSuccess) {
+      errorQuda("cudaHostUnregister failed with error %s (%s:%d in %s()",
+                cudaGetErrorString(error), file, line, func);
+    }
+  }
 
   namespace pool
   {

@@ -8,7 +8,7 @@ namespace quda {
     QUDA_RT_CONSTS;
     Functor<Arg> f(arg);
 
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    auto i = threadIdx.x + blockIdx.x * blockDim.x;
 
     while (i < arg.threads.x) {
       f(i);
@@ -22,8 +22,8 @@ namespace quda {
     QUDA_RT_CONSTS;
     Functor<Arg> f(arg);
 
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    int j = threadIdx.y + blockIdx.y * blockDim.y;
+    auto i = threadIdx.x + blockIdx.x * blockDim.x;
+    auto j = threadIdx.y + blockIdx.y * blockDim.y;
     if (j >= arg.threads.y) return;
 
     while (i < arg.threads.x) {
@@ -38,9 +38,9 @@ namespace quda {
     QUDA_RT_CONSTS;
     Functor<Arg> f(arg);
 
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    int j = threadIdx.y + blockIdx.y * blockDim.y;
-    int k = threadIdx.z + blockIdx.z * blockDim.z;
+    auto i = threadIdx.x + blockIdx.x * blockDim.x;
+    auto j = threadIdx.y + blockIdx.y * blockDim.y;
+    auto k = threadIdx.z + blockIdx.z * blockDim.z;
     if (j >= arg.threads.y) return;
     if (k >= arg.threads.z) return;
 
@@ -50,9 +50,8 @@ namespace quda {
     }
   }
 
-  template <template <typename> class Functor, typename Arg>
-  // __launch_bounds__(Arg::block_dim, Arg::min_blocks)
-  __global__ void raw_kernel(Arg arg)
+  template <template <typename> class Functor, typename Arg, bool grid_stride = false>
+  __launch_bounds__(Arg::block_dim, Arg::min_blocks) __global__ void raw_kernel(Arg arg)
   {
     Functor<Arg> f(arg);
     f();
