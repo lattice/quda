@@ -276,7 +276,7 @@ void setEigParam(QudaEigParam &eig_param)
       // if not defined use 4
       eig_param.geo_block_size[j] = eig_comp_geo_block_size[0][j] ? eig_comp_geo_block_size[0][j] : 4;
     }    
-    eig_param.compress = (eig_comp ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
+    eig_param.compress = QUDA_BOOLEAN_TRUE;
     eig_param.n_block_ortho = eig_comp_n_block_ortho;
   }
   

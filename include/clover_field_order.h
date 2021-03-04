@@ -254,18 +254,20 @@ namespace quda {
 	  int k = N*(N-1)/2 - (N-col)*(N-col-1)/2 + row - col - 1;
           int idx = N + 2*k;
 
-          return 2.0*complex<Float>(a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(idx+0,stride,x) ],
-				    a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(idx+1,stride,x) ]);
+	  complex<Float> ret(2.0*a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(idx+0,stride,x) ],
+			     2.0*a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(idx+1,stride,x) ]);
+	  return ret;
 	} else {
 	  // requesting upper triangular so return conjugate transpose
 	  // switch coordinates to count from bottom right instead of top left of matrix
 	  int k = N*(N-1)/2 - (N-row)*(N-row-1)/2 + col - row - 1;
           int idx = N + 2*k;
 
-          return 2*complex<Float>( a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(idx+0,stride,x) ],
-				  -a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(idx+1,stride,x) ]);
+	  complex<Float> ret(2.0*a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(idx+0,stride,x) ],
+			     -2.0*a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(idx+1,stride,x)]);
+          return ret;
 	}
-
+	
       }
 
       template <typename helper, typename reducer>

@@ -27,7 +27,8 @@ namespace quda
     eig_param(eig_param),
     profile(profile),
     tmp1(nullptr),
-    tmp2(nullptr)
+    tmp2(nullptr),
+    transfer(nullptr)
   {
     bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
     if (!profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
@@ -95,7 +96,7 @@ namespace quda
     // Parse compression parameters
     if(eig_param->compress == QUDA_BOOLEAN_TRUE) {
       compress = true;
-      spin_block_size = 1; //?
+      spin_block_size = 2; //?
       n_block_ortho = eig_param->n_block_ortho;
       for(int i=0; i<4; i++) geo_block_size[i] = eig_param->geo_block_size[i];
     }
@@ -1207,13 +1208,17 @@ namespace quda
   {
     if (tmp1) delete tmp1;
     if (tmp2) delete tmp2;
-    //if(transfer) delete transfer;    
+    if(transfer) delete transfer;
+    for (auto &vec : orthonormalised_basis)
+      if (vec) delete vec;
+    
+    orthonormalised_basis.resize(0);    
   }
 
   void EigenSolver::verifyCompression(std::vector<ColorSpinorField *> &kSpace)
   {
-    //if(transfer) delete transfer;
-
+    if(transfer) delete transfer;
+    
     ColorSpinorParam csParamClone(*kSpace[0]);
     csParamClone.create = QUDA_ZERO_FIELD_CREATE;
     for (unsigned int i = 0; i<kSpace.size(); i++) {
