@@ -1723,8 +1723,6 @@ void milcSetMultigridEigParam(QudaEigParam &mg_eig_param, mgInputStruct &input_s
   strcpy(mg_eig_param.vec_outfile, "");
   mg_eig_param.io_parity_inflate = QUDA_BOOLEAN_FALSE; // do not inflate coarse vectors
   mg_eig_param.save_prec = QUDA_SINGLE_PRECISION;      // cannot save in fixed point
-
-  strcpy(mg_eig_param.QUDA_logfile, "" /*eig_QUDA_logfile*/);
 }
 
 void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precision, QudaPrecision device_precision,

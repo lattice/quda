@@ -4,6 +4,8 @@
 #include <externals/CLI11.hpp>
 #include <quda.h>
 
+# define QUDA_MAX_EIG_COMP_LEVEL 1
+
 // for compatibility while porting - remove later
 extern void usage(char **);
 
@@ -90,41 +92,79 @@ public:
   }
 
   template <typename T>
-  CLI::Option *add_mgoption(CLI::Option_group *group, std::string option_name, std::array<std::array<T, 4>, QUDA_MAX_MG_LEVEL> &variable,
-                            CLI::Validator trans, std::string option_description = "", bool = false)
-  {
-
-    CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {
-      size_t l;
-      T j; // results_t is just a vector of strings
-      bool worked = true;
-
-      CLI::Range validlevel(0, QUDA_MAX_MG_LEVEL);
-      for (size_t i {0}; i < vals.size() / (4 + 1); ++i) {
-        auto levelok = validlevel(vals.at((4 + 1) * i));
-
-        if (!levelok.empty()) throw CLI::ValidationError(option_name, levelok);
-        worked = worked and CLI::detail::lexical_cast(vals.at((4 + 1) * i), l);
-
-        for (int k = 0; k < 4; k++) {
-          auto transformok = trans(vals.at((4 + 1) * i + k + 1));
-          if (!transformok.empty()) throw CLI::ValidationError(option_name, transformok);
-          worked = worked and CLI::detail::lexical_cast(vals.at((4 + 1) * i + k + 1), j);
-          if (worked) variable[l][k] = j;
-        }
-      }
-      return worked;
-    };
-    CLI::Option *opt = add_option(option_name, f, option_description);
-    auto valuename = std::string("LEVEL ") + std::string(CLI::detail::type_name<T>());
-    opt->type_name(valuename)->type_size(-4 - 1);
-    opt->expected(-1);
-    opt->check(CLI::Validator(trans.get_description()));
-    // opt->transform(trans);
-    // opt->default_str("");
-    group->add_option(opt);
-    return opt;
-  }
+    CLI::Option *add_mgoption(CLI::Option_group *group, std::string option_name, std::array<std::array<T, 4>, QUDA_MAX_MG_LEVEL> &variable,
+			      CLI::Validator trans, std::string option_description = "", bool = false)
+    {
+      
+      CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {
+	size_t l;
+	T j; // results_t is just a vector of strings
+	bool worked = true;
+	
+	CLI::Range validlevel(0, 1);
+	for (size_t i {0}; i < vals.size() / (4 + 1); ++i) {
+	  auto levelok = validlevel(vals.at((4 + 1) * i));
+	  
+	  if (!levelok.empty()) throw CLI::ValidationError(option_name, levelok);
+	  worked = worked and CLI::detail::lexical_cast(vals.at((4 + 1) * i), l);
+	  
+	  for (int k = 0; k < 4; k++) {
+	    auto transformok = trans(vals.at((4 + 1) * i + k + 1));
+	    if (!transformok.empty()) throw CLI::ValidationError(option_name, transformok);
+	    worked = worked and CLI::detail::lexical_cast(vals.at((4 + 1) * i + k + 1), j);
+	    if (worked) variable[l][k] = j;
+	  }
+	}
+	return worked;
+      };
+      CLI::Option *opt = add_option(option_name, f, option_description);
+      auto valuename = std::string("LEVEL ") + std::string(CLI::detail::type_name<T>());
+      opt->type_name(valuename)->type_size(-4 - 1);
+      opt->expected(-1);
+      opt->check(CLI::Validator(trans.get_description()));
+      // opt->transform(trans);
+      // opt->default_str("");
+      group->add_option(opt);
+      return opt;
+    }
+  
+  template <typename T>
+    CLI::Option *add_eigcompoption(CLI::Option_group *group, std::string option_name, std::array<std::array<T, 4>, QUDA_MAX_MG_LEVEL> &variable,
+				   CLI::Validator trans, std::string option_description = "", bool = false)
+    {
+      
+      CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {
+	size_t l;
+	T j; // results_t is just a vector of strings
+	bool worked = true;
+	
+	CLI::Range validlevel(0, 1);
+	for (size_t i {0}; i < vals.size() / (4 + 1); ++i) {
+	  auto levelok = validlevel(vals.at((4 + 1) * i));
+	  
+	  if (!levelok.empty()) throw CLI::ValidationError(option_name, levelok);
+	  worked = worked and CLI::detail::lexical_cast(vals.at((4 + 1) * i), l);
+	  
+	  for (int k = 0; k < 4; k++) {
+	    auto transformok = trans(vals.at((4 + 1) * i + k + 1));
+	    if (!transformok.empty()) throw CLI::ValidationError(option_name, transformok);
+	    worked = worked and CLI::detail::lexical_cast(vals.at((4 + 1) * i + k + 1), j);
+	    if (worked) variable[l][k] = j;
+	  }
+	}
+	return worked;
+      };
+      CLI::Option *opt = add_option(option_name, f, option_description);
+      auto valuename = std::string("LEVEL ") + std::string(CLI::detail::type_name<T>());
+      opt->type_name(valuename)->type_size(-4 - 1);
+      opt->expected(-1);
+      opt->check(CLI::Validator(trans.get_description()));
+      // opt->transform(trans);
+      // opt->default_str("");
+      group->add_option(opt);
+      return opt;
+    }
+  
 };
 
 std::shared_ptr<QUDAApp> make_app(std::string app_description = "QUDA internal test", std::string app_name = "");
@@ -317,6 +357,15 @@ extern char eig_vec_infile[256];
 extern char eig_vec_outfile[256];
 extern bool eig_io_parity_inflate;
 extern QudaPrecision eig_save_prec;
+
+// Parameters for eigensolver compression
+extern bool eig_comp;
+extern quda::mgarray<std::array<int, 4>> eig_comp_geo_block_size;
+extern int eig_comp_max_restarts;
+extern int eig_comp_n_block_ortho;
+extern int eig_comp_n_ev;
+extern int eig_comp_n_kr;
+extern int eig_comp_n_conv;         // If unchanged, will be set to eig_comp_n_ev
 
 // Parameters for the MG eigensolver.
 // The coarsest grid params are for deflation,

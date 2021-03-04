@@ -92,6 +92,14 @@ namespace quda
       spectrum[0] = 'S';
     }
 
+    // Parse compression parameters
+    if(eig_param->compress == QUDA_BOOLEAN_TRUE) {
+      compress = true;
+      spin_block_size = 1; //?
+      n_block_ortho = eig_param->n_block_ortho;
+      for(int i=0; i<4; i++) geo_block_size[i] = eig_param->geo_block_size[i];
+    }
+    
     if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
 
@@ -281,6 +289,8 @@ namespace quda
     // Save TRLM tuning
     saveTuneCache();
 
+    if(compress) verifyCompression(kSpace);
+    
     mat.flops();
 
     if (getVerbosity() >= QUDA_SUMMARIZE) {
@@ -299,7 +309,7 @@ namespace quda
     }
     mat(out, in, *tmp1, *tmp2);
 
-    // Save mattrix * vector tuning
+    // Save matrix * vector tuning
     saveTuneCache();
   }
 
@@ -1197,5 +1207,23 @@ namespace quda
   {
     if (tmp1) delete tmp1;
     if (tmp2) delete tmp2;
+    //if(transfer) delete transfer;    
+  }
+
+  void EigenSolver::verifyCompression(std::vector<ColorSpinorField *> &kSpace)
+  {
+    //if(transfer) delete transfer;
+
+    ColorSpinorParam csParamClone(*kSpace[0]);
+    csParamClone.create = QUDA_ZERO_FIELD_CREATE;
+    for (unsigned int i = 0; i<kSpace.size(); i++) {
+      orthonormalised_basis.push_back(ColorSpinorField::Create(csParamClone));
+    }
+    
+    // Create the transfer operator
+    transfer = new Transfer(orthonormalised_basis, kSpace.size(), n_block_ortho, geo_block_size,
+			    spin_block_size, kSpace[0]->Precision(), QUDA_TRANSFER_AGGREGATE,
+			    profile);
+    
   }
 } // namespace quda

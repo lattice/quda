@@ -396,8 +396,6 @@ extern "C" {
   // Parameter set for solving eigenvalue problems.
   typedef struct QudaEigParam_s {
 
-    // EIGENSOLVER PARAMS
-    //-------------------------------------------------
     /** Used to store information pertinent to the operator **/
     QudaInvertParam *invert_param;
 
@@ -450,16 +448,15 @@ extern "C" {
     /** Which part of the spectrum to solve **/
     QudaEigSpectrumType spectrum;
 
+    /** Number of requested converged eigenvectors to use in deflation **/
+    int n_ev_deflate;
+    
     /** Size of the eigenvector search space **/
     int n_ev;
     /** Total size of Krylov space **/
     int n_kr;
-    /** Max number of locked eigenpairs (deduced at runtime) **/
-    int nLockedMax;
     /** Number of requested converged eigenvectors **/
     int n_conv;
-    /** Number of requested converged eigenvectors to use in deflation **/
-    int n_ev_deflate;
     /** Tolerance on the least well known eigenvalue's residual **/
     double tol;
     /** Tolerance on the QR iteration **/
@@ -478,9 +475,27 @@ extern "C" {
     /** For Arpack cross check, name of the Arpack logfile **/
     char arpack_logfile[512];
 
-    /** Name of the QUDA logfile (residua, upper Hessenberg/tridiag matrix updates) **/
-    char QUDA_logfile[512];
+    // COMPRESSION PARAMS
+    //-------------------------------------------------
+    /** Employ compression in the eigensolver **/
+    QudaBoolean compress;
+    /** Size of the eigenvector search space **/
+    int comp_n_ev;
+    /** Total size of Krylov space **/
+    int comp_n_kr;
+    /** Number of requested converged eigenvectors **/
+    int comp_n_conv;
+    /** For IRLM/IRAM, quit after n restarts of the fine eigensolver **/
+    int comp_max_restarts;
 
+    /** Geometric block size to use */
+    int geo_block_size[QUDA_MAX_DIM];
+
+    /** Spin block size to use */
+    int spin_block_size;
+
+    /** Number of times to repeat Gram-Schmidt in orthogonalization */
+    int n_block_ortho;
     //-------------------------------------------------
 
     // EIG-CG PARAMS

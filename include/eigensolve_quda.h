@@ -6,6 +6,9 @@
 #include <dirac_quda.h>
 #include <color_spinor_field.h>
 
+// For the compression
+#include <transfer.h>
+
 namespace quda
 {
 
@@ -46,18 +49,31 @@ protected:
     int num_converged;
     int num_locked;
     int num_keep;
-
+    
     std::vector<double> residua;
 
-    // Device side vector workspace
-    std::vector<ColorSpinorField *> r;
-    std::vector<ColorSpinorField *> d_vecs_tmp;
+    std::vector<ColorSpinorField *> r; /** Current residual vector(s) */
+    std::vector<ColorSpinorField *> d_vecs_tmp; /** temp vector(s) */
+    
+    ColorSpinorField *tmp1; /** temp vector for dslash */ 
+    ColorSpinorField *tmp2; /** temp vector for dslash */ 
 
-    ColorSpinorField *tmp1;
-    ColorSpinorField *tmp2;
+    QudaPrecision save_prec; /** Write vectors to disk at this prec */
 
-    QudaPrecision save_prec;
+    // Compression variables
+    //----------------------
+    bool compress;
+    std::vector<ColorSpinorField *> decompressed_vector; /** Current decompressed vector(s) */
+    std::vector<ColorSpinorField *> orthonormalised_basis; /** Compressed vector(s) */
+    
+    /** This is the transfer operator that defines the prolongation and restriction operators */
+    Transfer *transfer;
 
+    /** We define here the bare minimum of parameters needed to create a Transfer operator */
+    int geo_block_size[4];
+    int spin_block_size;
+    int n_block_ortho;
+    
   public:
     /**
        @brief Constructor for base Eigensolver class
@@ -413,8 +429,12 @@ protected:
        @param[in] y An array whose elements will be permuted in tandem with x
     */
     void sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<double> &x, std::vector<double> &y);
-  };
 
+    
+    void verifyCompression(std::vector<ColorSpinorField *> &kSpace);
+    
+  };
+  
   /**
      @brief Thick Restarted Lanczos Method.
   */

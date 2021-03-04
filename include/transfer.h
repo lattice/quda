@@ -1,5 +1,4 @@
-#ifndef _TRANSFER_H
-#define _TRANSFER_H
+#pragma once
 
 /**
  * @file transfer.h
@@ -22,12 +21,11 @@ namespace quda {
      object creation time, and defined by the null-space vectors and
      the coarsening pattern that are passed to it.
 
-     At present only the restriction (R) and prolongation (P) methods
-     have been offloaded to run on the GPU, with the block
-     orthogonlization yet to be offloaded.
-   */
+     The restriction (R) and prolongation (P) methods and block
+     orthogonlization have been offloaded to run on the GPU.
+  */
   class Transfer {
-
+    
   private:
 
     /** The raw null space components */
@@ -341,4 +339,4 @@ namespace quda {
                          const int *const *spin_map, int parity = QUDA_INVALID_PARITY);
 
 } // namespace quda
-#endif // _TRANSFER_H
+

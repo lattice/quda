@@ -141,14 +141,14 @@ namespace quda {
   {
     if (out.Nspin() != 2) errorQuda("Unsupported nSpin %d", out.Nspin());
     constexpr int coarseSpin = 2;
-
+    
     // Template over fine color
     if (in.Ncolor() == 3) { // standard QCD
 #ifdef NSPIN4
       if (in.Nspin() == 4) {
         constexpr int fineColor = 3;
         constexpr int fineSpin = 4;
-
+	
         // first check that the spin_map matches the spin_mapper
         spin_mapper<fineSpin,coarseSpin> mapper;
         for (int s=0; s<fineSpin; s++)

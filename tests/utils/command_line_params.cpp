@@ -193,6 +193,15 @@ char eig_vec_outfile[256] = "";
 bool eig_io_parity_inflate = false;
 QudaPrecision eig_save_prec = QUDA_DOUBLE_PRECISION;
 
+// Parameters for eigensolver compression
+bool eig_comp = false;
+quda::mgarray<std::array<int, 4>> eig_comp_geo_block_size = {};
+int eig_comp_max_restarts;
+int eig_comp_n_block_ortho;
+int eig_comp_n_ev;
+int eig_comp_n_kr;
+int eig_comp_n_conv; // If unchanged, will be set to eig_comp_n_ev
+
 // Parameters for the MG eigensolver.
 // The coarsest grid params are for deflation,
 // all others are for PR vectors.
@@ -740,6 +749,24 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--eig-use-normop", eig_use_normop,
                       "Solve the MdagM problem instead of M (MMdag if eig-use-dagger == true) (default false)");
   opgroup->add_option("--eig-use-poly-acc", eig_use_poly_acc, "Use Chebyshev polynomial acceleration in the eigensolver");
+
+  auto eigcompgroup = quda_app->add_option_group("EigCompress", "Options controlling eigensolver compression");
+  
+  quda_app->add_eigcompoption(eigcompgroup, "--eig-compress-block-size", eig_comp_geo_block_size, CLI::Validator(),
+			      "Set the geometric block size for the transfer operator (default 4 4 4 4)");
+  
+  opgroup->add_option("--eig-comp", eig_comp, "Whether to employ compression in the eigensolver default (false)");
+
+  opgroup->add_option("--eig-compress-max-restarts", eig_comp_max_restarts, "Perform n iterations of the restart in the eigensolver");
+    
+  opgroup->add_option("--eig-compress-n-conv", eig_comp_n_conv, "The number of converged eigenvalues requested in the full eigensover (default eig_n_ev)");
+  
+  opgroup->add_option("--eig-compress-n-ev", eig_comp_n_ev, "The size of eigenvector search space in the full eigensolver");
+  
+  opgroup->add_option("--eig-compress-n-kr", eig_comp_n_kr, "The size of the Krylov subspace to use in the full eigensolver");
+  
+  opgroup->add_option("--eig-compress-n-block-ortho", eig_comp_n_block_ortho, "The number of times to run Gram-Schmidt during block orthonormalization in the transfer operator (default 1)");
+  
 }
 
 void add_deflation_option_group(std::shared_ptr<QUDAApp> quda_app)

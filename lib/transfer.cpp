@@ -1,4 +1,3 @@
-
 #include <transfer.h>
 
 #include <blas_quda.h>
@@ -16,9 +15,9 @@
 namespace quda {
 
   /*
-  * for the staggered case, there is no spin blocking, 
-  * however we do even-odd to preserve chirality (that is straightforward)
-  */
+   * for the staggered case, there is no spin blocking, 
+   * however we do even-odd to preserve chirality (that is straightforward)
+   */
   Transfer::Transfer(const std::vector<ColorSpinorField *> &B, int Nvec, int n_block_ortho, int *geo_bs, int spin_bs,
                      QudaPrecision null_precision, const QudaTransferType transfer_type, TimeProfile &profile) :
     B(B),

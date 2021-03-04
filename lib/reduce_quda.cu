@@ -198,7 +198,7 @@ namespace quda {
     {
       return instantiateReduce<cabxpyzaxnorm, false>(Complex(a), b, Complex(0.0), x, y, z, x, x);
     }
-
+    
     Complex cDotProduct(ColorSpinorField &x, ColorSpinorField &y)
     {
       auto cdot = instantiateReduce<Cdot, false>(0.0, 0.0, 0.0, x, y, x, x, x);
