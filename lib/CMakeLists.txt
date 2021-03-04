@@ -263,6 +263,7 @@ endif()
 # Specific config dependent warning suppressions and lineinfo forwarding
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
                             -Wreorder
+                            $<$<CXX_COMPILER_ID:Clang>: -Xcompiler -Wno-unused-function>
                             $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>>: -Xcompiler -Wno-unknown-pragmas> # only set for g++ or clang
                             $<$<CONFIG:DEVEL>:-Xptxas -warn-lmem-usage,-warn-spills -lineinfo>
                             $<$<CONFIG:STRICT>: -Werror=all-warnings -lineinfo>
