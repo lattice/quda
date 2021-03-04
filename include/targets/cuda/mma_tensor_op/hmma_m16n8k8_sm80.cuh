@@ -316,21 +316,21 @@ namespace quda
           if (!check_bounds || (n_index < M && m_index < N)) {
             value.x = +static_cast<store_type>(__half2float(r2.x) * scale);
             value.y = -static_cast<store_type>(__half2float(i2.x) * scale);
-            atomicAdd(&ptr[(n_index + 0) * ldc + m_index], value);
+            atomic_fetch_add(&ptr[(n_index + 0) * ldc + m_index], value);
 
             value.x = +static_cast<store_type>(__half2float(r2.y) * scale);
             value.y = -static_cast<store_type>(__half2float(i2.y) * scale);
-            atomicAdd(&ptr[(n_index + 1) * ldc + m_index], value);
+            atomic_fetch_add(&ptr[(n_index + 1) * ldc + m_index], value);
           }
         } else {
           if (!check_bounds || (m_index < M && n_index < N)) {
             value.x = +static_cast<store_type>(__half2float(r2.x) * scale);
             value.y = +static_cast<store_type>(__half2float(i2.x) * scale);
-            atomicAdd(&ptr[m_index * ldc + (n_index + 0)], value);
+            atomic_fetch_add(&ptr[m_index * ldc + (n_index + 0)], value);
 
             value.x = +static_cast<store_type>(__half2float(r2.y) * scale);
             value.y = +static_cast<store_type>(__half2float(i2.y) * scale);
-            atomicAdd(&ptr[m_index * ldc + (n_index + 1)], value);
+            atomic_fetch_add(&ptr[m_index * ldc + (n_index + 1)], value);
           }
         }
       }
@@ -365,21 +365,21 @@ namespace quda
           if (!check_bounds || (n_index < M && m_index < N)) {
             value.x = +static_cast<store_type>(op_c_real.reg[i * 2 + 0] * scale);
             value.y = -static_cast<store_type>(op_c_imag.reg[i * 2 + 0] * scale);
-            atomicAdd(&ptr[(n_index + 0) * ldc + m_index], value);
+            atomic_fetch_add(&ptr[(n_index + 0) * ldc + m_index], value);
 
             value.x = +static_cast<store_type>(op_c_real.reg[i * 2 + 1] * scale);
             value.y = -static_cast<store_type>(op_c_imag.reg[i * 2 + 1] * scale);
-            atomicAdd(&ptr[(n_index + 1) * ldc + m_index], value);
+            atomic_fetch_add(&ptr[(n_index + 1) * ldc + m_index], value);
           }
         } else {
           if (!check_bounds || (m_index < M && n_index < N)) {
             value.x = +static_cast<store_type>(op_c_real.reg[i * 2 + 0] * scale);
             value.y = +static_cast<store_type>(op_c_imag.reg[i * 2 + 0] * scale);
-            atomicAdd(&ptr[m_index * ldc + (n_index + 0)], value);
+            atomic_fetch_add(&ptr[m_index * ldc + (n_index + 0)], value);
 
             value.x = +static_cast<store_type>(op_c_real.reg[i * 2 + 1] * scale);
             value.y = +static_cast<store_type>(op_c_imag.reg[i * 2 + 1] * scale);
-            atomicAdd(&ptr[m_index * ldc + (n_index + 1)], value);
+            atomic_fetch_add(&ptr[m_index * ldc + (n_index + 1)], value);
           }
         }
       }
