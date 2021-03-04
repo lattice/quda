@@ -494,7 +494,7 @@ namespace quda
       in->bufferIndex = (1 - in->bufferIndex);
       profile.TPSTOP(QUDA_PROFILE_TOTAL);
 #else
-      errorQuda("NVSHMEM Dslash policies not build.");
+      errorQuda("NVSHMEM Dslash policies not built.");
 #endif
     }
   };

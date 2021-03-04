@@ -126,8 +126,8 @@ namespace quda {
       cudaEventCreateWithFlags(&dslashStart[i], cudaEventDisableTiming);
     }
 #ifdef NVSHMEM_COMMS
-    sync_arr = (shmem_sync_t *)device_comms_pinned_malloc(2 * QUDA_MAX_DIM * sizeof(shmem_sync_t));
-    cudaMemset(sync_arr, 0, 2 * QUDA_MAX_DIM * sizeof(shmem_sync_t));
+    sync_arr = static_cast<shmem_sync_t *>(device_comms_pinned_malloc(2 * QUDA_MAX_DIM * sizeof(shmem_sync_t)));
+    qudaMemset(sync_arr, 0, 2 * QUDA_MAX_DIM * sizeof(shmem_sync_t));
     sync_counter = 1;
 
     TuneParam tp;

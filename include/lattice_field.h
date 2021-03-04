@@ -664,6 +664,12 @@ namespace quda {
     */
     void *remoteFace_d(int dir, int dim) const { return ghost_remote_send_buffer_d[bufferIndex][dim][dir]; }
 
+    /**
+       @brief Return base pointer to the ghost recv buffer. Since this is a
+       base pointer, one still needs to take care of offsetting to the
+       correct point for each direction/dimension.
+       @return Pointer to remote memory buffer
+     */
     void *remoteFace_r() const { return ghost_recv_buffer_d[bufferIndex]; }
 
     virtual void gather(int nFace, int dagger, int dir, qudaStream_t *stream_p = NULL) { errorQuda("Not implemented"); }

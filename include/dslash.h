@@ -394,9 +394,9 @@ namespace quda
 #endif
     }
 
-    void setShmem(int shmem_)
+    void setShmem(int shmem)
     {
-      arg.shmem = shmem_;
+      arg.shmem = shmem;
       setUberTuning(arg.shmem & 64);
     }
 
@@ -414,9 +414,12 @@ namespace quda
           } else if (location & Host && !comm_peer2peer_enabled(dir, dim)) { // pack to cpu memory
             packBuffer[2 * dim + dir] = in.myFace_hd(dir, dim);
           } else if (location & Shmem) {
+            // we check whether we can directly pack into the in.remoteFace_d(dir, dim) buffer on the remote GPU
+            // pack directly into remote or local memory
             packBuffer[2 * dim + dir] = in.remoteFace_d(dir, dim) ?
               static_cast<char *>(in.remoteFace_d(dir, dim)) + in.GhostOffset(dim, 1 - dir) :
               in.myFace_d(dir, dim);
+            // whether we need to shmem_putmem into the receiving buffer
             packBuffer[2 * QUDA_MAX_DIM + 2 * dim + dir] = in.remoteFace_d(dir, dim) ?
               nullptr :
               static_cast<char *>(in.remoteFace_r()) + in.GhostOffset(dim, 1 - dir);

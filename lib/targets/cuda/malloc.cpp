@@ -405,7 +405,7 @@ namespace quda
 
     track_malloc(SHMEM, a, ptr);
 #ifdef HOST_DEBUG
-    cudaMemset(ptr, 0xff, size);
+    qudaMemset(ptr, 0xff, size);
 #endif
     return ptr;
   }

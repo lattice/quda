@@ -162,7 +162,7 @@ protected:
 
 public:
   Pack(void *ghost[], const ColorSpinorField &in, MemoryLocation location, int nFace, bool dagger, int parity, double a,
-       double b, double c, int shmem_) :
+       double b, double c, int shmem) :
     TunableVectorYZ((in.Ndim() == 5 ? in.X(4) : 1), in.SiteSubset()),
     ghost(ghost),
     in(in),
@@ -175,7 +175,7 @@ public:
     a(a),
     b(b),
     c(c),
-    shmem(shmem_)
+    shmem(shmem)
   {
     fillAux();
 
