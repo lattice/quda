@@ -25,6 +25,8 @@
 #include <sstream>
 #include <cstdint>
 
+#include <quda_api.h>
+
 namespace quda {
   namespace gauge {
     template<typename Float, typename storeFloat> struct fieldorder_wrapper;
