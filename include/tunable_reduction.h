@@ -188,6 +188,9 @@ namespace quda {
       strcpy(vol, field.VolString());
       strcpy(aux, compile_type_str(field, location));
       strcat(aux, field.AuxString());
+#ifdef QUDA_FAST_COMPILE_REDUCE
+      strcat(aux, ",fast_compile");
+#endif
     }
 
     TunableReduction2D(size_t n_items, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :

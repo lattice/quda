@@ -147,6 +147,9 @@ namespace quda {
       strcpy(aux, compile_type_str(field, location));
       if (location == QUDA_CPU_FIELD_LOCATION) strcat(aux, getOmpThreadStr());
       strcat(aux, field.AuxString());
+#ifdef QUDA_FAST_COMPILE_REDUCE
+      strcat(aux, ",fast_compile");
+#endif
     }
 
     bool advanceBlockDim(TuneParam &param) const
