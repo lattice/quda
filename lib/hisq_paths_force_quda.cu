@@ -318,6 +318,7 @@ namespace quda {
     {
       checkNative(link, oprod, newOprod);
       checkLocation(newOprod, oprod, link);
+      checkPrecision(oprod, link, newOprod);
 
       // create color matrix fields with zero padding
       GaugeFieldParam gauge_param(link);
@@ -332,7 +333,6 @@ namespace quda {
       auto Qmu = GaugeField::Create(gauge_param);
       auto Qnumu = GaugeField::Create(gauge_param);
 
-      QudaPrecision precision = checkPrecision(oprod, link, newOprod);
       instantiate<HisqStaplesForce, ReconstructNone>(*Pmu, *P3, *P5, *Pnumu, *Qmu, *Qnumu, newOprod, oprod, link, path_coeff_array);
 
       delete Pmu;

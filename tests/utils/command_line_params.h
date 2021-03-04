@@ -235,7 +235,7 @@ class QUDAApp : public CLI::App
       return worked;
     };
     CLI::Option *opt = add_option(option_name, f, option_description);
-    auto valuename = std::string("MASS/KAPPA ") + std::string(CLI::detail::type_name<T>());
+    auto valuename = std::string("FLAVOR<INT> ") + std::string(CLI::detail::type_name<T>());
     opt->type_name(valuename)->type_size(-2);
     opt->expected(-1);
     opt->check(CLI::Validator(trans.get_description()));

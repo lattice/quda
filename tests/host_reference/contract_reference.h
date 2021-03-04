@@ -9,7 +9,7 @@ extern int Vh;
 extern int V;
 
 using namespace quda;
-using namespace std;
+template <typename T> using complex = std::complex<T>;
 
 template <typename Float> void contractDegrandRossi(Float *h_result_)
 {

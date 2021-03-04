@@ -6,7 +6,8 @@
 namespace quda
 {
 
-  template <typename store_t_, bool twist_> struct CloverInvertArg : public ReduceArg<double2> {
+  template <typename store_t_, bool twist_> struct CloverInvertArg : public ReduceArg<vector_type<double, 2>> {
+    using reduce_t = vector_type<double, 2>;
     using store_t = store_t_;
     using real = typename mapper<store_t>::type;
     static constexpr bool twist = twist_;
@@ -21,7 +22,7 @@ namespace quda
     real mu2;
 
     CloverInvertArg(CloverField &field, bool compute_tr_log) :
-      ReduceArg<double2>(),
+      ReduceArg<reduce_t>(),
       threads(field.VolumeCB(), 2, 1),
       inverse(field, true),
       clover(field, false),
@@ -31,11 +32,11 @@ namespace quda
       if (!field.isNative()) errorQuda("Clover field %d order not supported", field.Order());
     }
 
-    __device__ __host__ auto init() const { return zero<double2>(); }
+    __device__ __host__ auto init() const { return reduce_t(); }
   };
 
-  template <typename Arg> struct InvertClover : plus<double2> {
-    using reduce_t = double2;
+  template <typename Arg> struct InvertClover : plus<vector_type<double, 2>> {
+    using reduce_t = vector_type<double, 2>;
     using plus<reduce_t>::operator();
     Arg &arg;
     constexpr InvertClover(Arg &arg) : arg(arg) {}
@@ -71,8 +72,8 @@ namespace quda
         arg.inverse(x_cb, parity, ch) = Ainv;
       }
 
-      reduce_t result = zero<reduce_t>();
-      parity ? result.y = trLogA : result.x = trLogA;
+      reduce_t result;
+      parity ? result[1] = trLogA : result[0] = trLogA;
       return operator()(result, value);
     }
 

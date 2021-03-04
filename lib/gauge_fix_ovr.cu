@@ -184,8 +184,8 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       launch<FixQualityOVR>(arg.result, tp, stream, arg);
       if (!activeTuning()) {
-        arg.result.x /= (double)(3 * Arg::gauge_dir * 2 * arg.threads.x * comm_size());
-        arg.result.y /= (double)(3 * 2 * arg.threads.x * comm_size());
+        arg.result[0] /= (double)(3 * Arg::gauge_dir * 2 * arg.threads.x * comm_size());
+        arg.result[1] /= (double)(3 * 2 * arg.threads.x * comm_size());
       }
     }
 
@@ -296,7 +296,7 @@ namespace quda {
 
     int *borderpoints[2];
     int nlinksfaces = 0;
-    int threads;
+    int threads = 0;
     for (int dir = 0; dir < 4; dir++) if (comm_dim_partitioned(dir)) nlinksfaces += 2 * data.LocalSurfaceCB(dir);
     for (int i = 0; i < 2 && nlinksfaces; i++) { //even and odd ids
       borderpoints[i] = static_cast<int*>(managed_malloc(nlinksfaces * sizeof(int)));

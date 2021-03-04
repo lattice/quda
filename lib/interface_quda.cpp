@@ -2894,7 +2894,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   
   // Smear the gauge field
   if (param->gauge_smear == QUDA_BOOLEAN_TRUE) {
-    profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
+    profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);    
     if(!gaugeSmeared) {
       switch(param->gauge_smear_type) {
       case QUDA_GAUGE_SMEAR_TYPE_APE: performAPEnStep(param->gauge_smear_steps, param->gauge_smear_coeff, 1); break;
@@ -5324,82 +5324,8 @@ void copyExtendedResidentGaugeQuda(void* resident_gauge)
   static_cast<GaugeField*>(resident_gauge)->copy(*extendedGaugeResident);
 }
 
-void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, unsigned int n_steps, double alpha)
-{
-  profileWuppertal.TPSTART(QUDA_PROFILE_TOTAL);
-
-  if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
-
-  pushVerbosity(inv_param->verbosity);
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
-
-  cudaGaugeField *precise = nullptr;
-
-  if (gaugeSmeared != nullptr) {
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Wuppertal smearing done with gaugeSmeared\n");
-    GaugeFieldParam gParam(*gaugePrecise);
-    gParam.create = QUDA_NULL_FIELD_CREATE;
-    precise = new cudaGaugeField(gParam);
-    copyExtendedGauge(*precise, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
-    precise->exchangeGhost();
-  } else {
-    if (getVerbosity() >= QUDA_VERBOSE)
-      printfQuda("Wuppertal smearing done with gaugePrecise\n");
-    precise = gaugePrecise;
-  }
-
-  ColorSpinorParam cpuParam(h_in, *inv_param, precise->X(), false, inv_param->input_location);
-  ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
-
-  ColorSpinorParam cudaParam(cpuParam, *inv_param);
-  cudaColorSpinorField in(*in_h, cudaParam);
-
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(*in_h);
-    double gpu = blas::norm2(in);
-    printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
-  }
-
-  cudaParam.create = QUDA_NULL_FIELD_CREATE;
-  cudaColorSpinorField out(in, cudaParam);
-  int parity = 0;
-
-  // Computes out(x) = 1/(1+6*alpha)*(in(x) + alpha*\sum_mu (U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)))
-  double a = alpha/(1.+6.*alpha);
-  double b = 1./(1.+6.*alpha);
-
-  for (unsigned int i = 0; i < n_steps; i++) {
-    if (i) in = out;
-    ApplyLaplace(out, in, *precise, 3, a, b, in, parity, false, nullptr, profileWuppertal);
-    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-      double norm = blas::norm2(out);
-      printfQuda("Step %d, vector norm %e\n", i, norm);
-    }
-  }
-
-  cpuParam.v = h_out;
-  cpuParam.location = inv_param->output_location;
-  ColorSpinorField *out_h = ColorSpinorField::Create(cpuParam);
-  *out_h = out;
-
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(*out_h);
-    double gpu = blas::norm2(out);
-    printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
-  }
-
-  if (gaugeSmeared != nullptr)
-    delete precise;
-
-  delete out_h;
-  delete in_h;
-
-  popVerbosity();
-
-  profileWuppertal.TPSTOP(QUDA_PROFILE_TOTAL);
-}
-
-void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned int n_steps)
+ 
+void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, const int n_steps, const double omega)
 {
   if(n_steps == 0) return;
   
@@ -5407,9 +5333,9 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned 
   profileGaussianSmear.TPSTART(QUDA_PROFILE_INIT);
 
   if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
-
+  
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
-
+  
   cudaGaugeField *gauge_ptr = nullptr;
 
   if (gaugeSmeared != nullptr) {
@@ -5451,7 +5377,6 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned 
   // Create the laplace operator
   //------------------------------------------------------
   bool pc_solve = false;
-
   Dirac *d = nullptr;
   Dirac *dSloppy = nullptr;
   Dirac *dPre = nullptr;
@@ -5459,8 +5384,6 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned 
   Dirac &dirac = *d;
   DiracM laplace_op(dirac);
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_INIT);
-
-  // massRescale(*static_cast<cudaColorSpinorField*>(in_h), *inv_param);
 
   // Copy host data to device
   profileGaussianSmear.TPSTART(QUDA_PROFILE_H2D);
@@ -5471,21 +5394,23 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, unsigned 
   profileGaussianSmear.TPSTART(QUDA_PROFILE_COMPUTE);
   blas::ax(1e6, *in);
 
-  // Computes out(x) = (in(x) + (\omega/(4N) * \sum_mu (U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))))
-  if (n_steps == 0) std::swap(in, out);
-  for (unsigned int i = 0; i < n_steps; i++) {
-    // If performing an iteration greater that i=0, swap the `out` and `in` pointers.
-    // This will feed the previous iteration's result into the loop, and
-    // overwrite the previous `in`.
+  double alpha = - (omega * omega) / (4 * n_steps);  
+  double a = -alpha;
+  double b = (6.0*alpha + 1.0);  
+
+  for (int i = 0; i < n_steps; i++) {
     if (i > 0) std::swap(in, out);
-    laplace_op.Expose()->M(*out, *in);
-    blas::ax(1.0 / inv_param->mass, *out);
+    // The SmearOp computes:
+    // out(x) = b * in(x) - a * \sum_mu (U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
+    // Which gives the use finer control over the operation that DslashXpay and
+    // allows us to omit a vector rescaling.
+    laplace_op.Expose()->SmearOp(*out, *in, a, b);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       double norm = blas::norm2(*out);
       printfQuda("Step %d, vector norm %e\n", i, norm);
     }
   }
-
+  
   // Normalise the source
   double nout = blas::norm2(*out);
   blas::ax(1.0 / sqrt(nout), *out);
@@ -6133,4 +6058,6 @@ void make4DChiralProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_para
   delete h_out4D[0];
   profileMake4DProp.TPSTOP(QUDA_PROFILE_FREE);
   profileMake4DProp.TPSTOP(QUDA_PROFILE_TOTAL);
+=======
+>>>>>>> origin/feature/Nc_agnosticism
 }
