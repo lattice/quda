@@ -53,17 +53,23 @@ namespace quda
     const int stride;
 
     /**
+       @brief This is a dummy instantiation for the host compiler
+    */
+    template <bool dynamic_shared, bool is_device>
+    inline std::enable_if_t<!is_device, atom_t> *cache()
+    {
+      static atom_t *cache_;
+      return reinterpret_cast<atom_t*>(cache_);
+    }
+
+    /**
        @brief This is the handle to the shared memory, dynamic specialization
        @return Shared memory pointer
      */
-    template <bool dynamic_shared>
-    __device__ __host__ inline std::enable_if_t<dynamic_shared == true, atom_t> *cache()
+    template <bool dynamic_shared, bool is_device>
+    __device__ inline std::enable_if_t<dynamic_shared == true && is_device, atom_t> *cache()
     {
-#ifdef __CUDA_ARCH__
       extern __shared__ atom_t cache_[];
-#else
-      static atom_t *cache_;
-#endif
       return reinterpret_cast<atom_t*>(cache_);
     }
 
@@ -71,14 +77,10 @@ namespace quda
        @brief This is the handle to the shared memory, static specialization
        @return Shared memory pointer
      */
-    template <bool dynamic_shared>
-    __device__ __host__ inline std::enable_if_t<dynamic_shared == false, atom_t> *cache()
+    template <bool dynamic_shared, bool is_device>
+    __device__ inline std::enable_if_t<dynamic_shared == false && is_device, atom_t> *cache()
     {
-#ifdef __CUDA_ARCH__
       static __shared__ atom_t cache_[n_element * block_size_x * block_size_y * block_size_z];
-#else
-      static atom_t *cache_;
-#endif
       return reinterpret_cast<atom_t*>(cache_);
     }
 
@@ -88,7 +90,7 @@ namespace quda
       memcpy(tmp, (void*)&a, sizeof(T));
       int j = (z * block.y + y) * block.x + x;
 #pragma unroll
-      for (int i = 0; i < n_element; i++) cache<dynamic>()[i * stride + j] = tmp[i];
+      for (int i = 0; i < n_element; i++) cache<dynamic, device::is_device()>()[i * stride + j] = tmp[i];
     }
 
     __device__ __host__ inline T load_detail(int x, int y, int z)
@@ -96,11 +98,21 @@ namespace quda
       atom_t tmp[n_element];
       int j = (z * block.y + y) * block.x + x;
 #pragma unroll
-      for (int i = 0; i < n_element; i++) tmp[i] = cache<dynamic>()[i * stride + j];
+      for (int i = 0; i < n_element; i++) tmp[i] = cache<dynamic, device::is_device()>()[i * stride + j];
       T a;
       memcpy((void*)&a, tmp, sizeof(T));
       return a;
     }
+
+    /**
+       @brief Dummy instantiation for the host compiler
+    */
+    template <bool is_device> inline std::enable_if_t<!is_device, void> sync_detail() { }
+
+    /**
+       @brief Synchronize the cache when on the device
+    */
+    template <bool is_device> __device__ inline std::enable_if_t<is_device, void> sync_detail() { __syncthreads(); }
 
   public:
     /**
@@ -119,7 +131,7 @@ namespace quda
     /**
        @brief Grab the raw base address to shared memory.
     */
-    __device__ __host__ inline T* data() { return reinterpret_cast<T*>(cache<dynamic>()); }
+    __device__ __host__ inline T* data() { return reinterpret_cast<T*>(cache<dynamic, device::is_device()>()); }
 
     /**
        @brief Save the value into the 3-d shared memory cache.
@@ -186,12 +198,7 @@ namespace quda
     /**
        @brief Synchronize the cache
     */
-    __device__ __host__ inline void sync()
-    {
-#ifdef __CUDA_ARCH__
-      __syncthreads();
-#endif
-    }
+    __device__ __host__ void sync() { sync_detail<device::is_device()>(); }
   };
 
   template <typename T, int n>
