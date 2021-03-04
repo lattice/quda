@@ -2529,7 +2529,12 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   // host side gamma basis.
   if (!(eig_param->arpack_check)) {
     profileEigensolve.TPSTART(QUDA_PROFILE_D2H);
-    for (int i = 0; i < eig_param->n_conv; i++) *host_evecs_[i] = *kSpace[i];
+    for (int i = 0; i < eig_param->n_conv; i++) {
+      //DMH TEMP
+      printfQuda("Start %d copy\n", i);
+      *host_evecs_[i] = *kSpace[i];
+      printfQuda("End %d copy\n", i);
+    }
     profileEigensolve.TPSTOP(QUDA_PROFILE_D2H);
   }
 
@@ -2889,13 +2894,15 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   
   // Smear the gauge field
   if (param->gauge_smear == QUDA_BOOLEAN_TRUE) {
-    profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);    
-    switch(param->gauge_smear_type) {
-    case QUDA_GAUGE_SMEAR_TYPE_APE: performAPEnStep(param->gauge_smear_steps, param->gauge_smear_coeff, 1); break;
-    case QUDA_GAUGE_SMEAR_TYPE_STOUT: performSTOUTnStep(param->gauge_smear_steps, param->gauge_smear_coeff, 1); break;
-    default: errorQuda("Unsupported smear type %d", param->gauge_smear_type);
+    profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
+    if(!gaugeSmeared) {
+      switch(param->gauge_smear_type) {
+      case QUDA_GAUGE_SMEAR_TYPE_APE: performAPEnStep(param->gauge_smear_steps, param->gauge_smear_coeff, 1); break;
+      case QUDA_GAUGE_SMEAR_TYPE_STOUT: performSTOUTnStep(param->gauge_smear_steps, param->gauge_smear_coeff, 1); break;
+      default: errorQuda("Unsupported smear type %d", param->gauge_smear_type);
+      }
     }
-
+      
     // Copy the gauge field, restore after the solve
     GaugeFieldParam gParam(*gaugeSmeared);
     gaugeTemp = new cudaGaugeField(gParam);
