@@ -167,3 +167,13 @@ static inline __device__ float atomicAbsMax(float *addr, float val){
   uint32_t *addr_ = reinterpret_cast<uint32_t*>(addr);
   return atomicMax(addr_, val_);
 }
+
+template <typename T> __device__ __host__ void atomic_update(T *addr, T val)
+{
+#ifdef __CUDA_ARCH__
+  atomicAdd(addr, val);
+#else
+#pragma omp atomic update
+  *addr += val;
+#endif
+}
