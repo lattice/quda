@@ -359,30 +359,19 @@ namespace quda {
 
       template<typename theirFloat>
       __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col,
-                                                 const complex<theirFloat> &val) const {
-#ifdef __CUDA_ARCH__
-	typedef typename vector<storeFloat,2>::type vec2;
+                                                 const complex<theirFloat> &val) const
+      {
+	using vec2 = typename vector<storeFloat,2>::type;
 	vec2 *u2 = reinterpret_cast<vec2*>(u[dim] + parity*cb_offset + (x_cb*nColor + row)*nColor + col);
-	if (fixed && !match<storeFloat,theirFloat>()) {
+
+        if (fixed && !match<storeFloat,theirFloat>()) {
 	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
-	  atomicAdd(u2, (vec2&)val_);
+          atomic_update(&u2->x, val_.real());
+          atomic_update(&u2->y, val_.imag());
 	} else {
-	  atomicAdd(u2, (vec2&)val);
+          atomic_update(&u2->x, static_cast<storeFloat>(val.real()));
+          atomic_update(&u2->y, static_cast<storeFloat>(val.imag()));
 	}
-#else
-	if (fixed && !match<storeFloat,theirFloat>()) {
-	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
-#pragma omp atomic update
-	  u[dim][ parity*cb_offset + (x_cb*nColor + row)*nColor + col].x += val_.x;
-#pragma omp atomic update
-	  u[dim][ parity*cb_offset + (x_cb*nColor + row)*nColor + col].y += val_.y;
-	} else {
-#pragma omp atomic update
-	  u[dim][ parity*cb_offset + (x_cb*nColor + row)*nColor + col].x += static_cast<storeFloat>(val.x);
-#pragma omp atomic update
-	  u[dim][ parity*cb_offset + (x_cb*nColor + row)*nColor + col].y += static_cast<storeFloat>(val.y);
-	}
-#endif
       }
 
       template <typename helper, typename reducer>
@@ -499,30 +488,18 @@ namespace quda {
 	    (u, (((parity*volumeCB+x)*geometry + d)*nColor + row)*nColor + col, scale, scale_inv); }
 
       template <typename theirFloat>
-      __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col, const complex<theirFloat> &val) const {
-#ifdef __CUDA_ARCH__
-	typedef typename vector<storeFloat,2>::type vec2;
+      __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col, const complex<theirFloat> &val) const
+      {
+        using vec2 = typename vector<storeFloat,2>::type;
 	vec2 *u2 = reinterpret_cast<vec2*>(u + (((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col);
 	if (fixed && !match<storeFloat,theirFloat>()) {
 	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
-	  atomicAdd(u2, (vec2&)val_);
+	  atomic_update(&u2->x, val_.real());
+	  atomic_update(&u2->y, val_.imag());
 	} else {
-	  atomicAdd(u2, (vec2&)val);
+	  atomic_update(&u2->x, static_cast<storeFloat>(val.real()));
+	  atomic_update(&u2->y, static_cast<storeFloat>(val.imag()));
 	}
-#else
-	if (fixed && !match<storeFloat,theirFloat>()) {
-	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
-#pragma omp atomic update
-	  u[(((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col].x += val_.x;
-#pragma omp atomic update
-	  u[(((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col].y += val_.y;
-	} else {
-#pragma omp atomic update
-	  u[(((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col].x += static_cast<storeFloat>(val.x);
-#pragma omp atomic update
-	  u[(((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col].y += static_cast<storeFloat>(val.y);
-	}
-#endif
       }
 
       template <typename helper, typename reducer>
@@ -655,29 +632,17 @@ namespace quda {
 
       template <typename theirFloat>
       __device__ __host__ void atomic_add(int dim, int parity, int x_cb, int row, int col, const complex<theirFloat> &val) const {
-#ifdef __CUDA_ARCH__
-	typedef typename vector<storeFloat,2>::type vec2;
+	using vec2 = typename vector<storeFloat,2>::type;
 	vec2 *u2 = reinterpret_cast<vec2*>(u + parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb);
+
 	if (fixed && !match<storeFloat,theirFloat>()) {
 	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
-	  atomicAdd(u2, (vec2&)val_);
+	  atomic_update(&u2->x, val_.real());
+	  atomic_update(&u2->y, val_.imag());
 	} else {
-	  atomicAdd(u2, (vec2&)val);
+	  atomic_update(&u2->x, static_cast<storeFloat>(val.real()));
+	  atomic_update(&u2->y, static_cast<storeFloat>(val.imag()));
 	}
-#else
-        if (fixed && !match<storeFloat,theirFloat>()) {
-	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
-#pragma omp atomic update
-	  u[parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb].x += val_.x;
-#pragma omp atomic update
-	  u[parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb].y += val_.y;
-	  } else {
-#pragma omp atomic update
-	  u[parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb].x += static_cast<storeFloat>(val.x);
-#pragma omp atomic update
-	  u[parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb].y += static_cast<storeFloat>(val.y);
-	}
-#endif
       }
 
       template <typename helper, typename reducer>
