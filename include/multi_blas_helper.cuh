@@ -21,7 +21,7 @@ namespace quda
     static char *Bmatrix_h;
     static char *Cmatrix_h;
 
-    template <bool multi_1d = false, typename Arg, typename T> typename std::enable_if<multi_1d, void>::type
+    template <bool multi_1d = false, typename Arg, typename T> std::enable_if_t<multi_1d, void>
     set_param(std::vector<constant_param_t> &, Arg &arg, char select, const T &h)
     {
       using coeff_t = typename decltype(arg.f)::coeff_t;
@@ -36,7 +36,7 @@ namespace quda
       for (int i = 0; i < N; i++) buf_arg[i] = coeff_t(h.data[i]);
     }
 
-    template <bool multi_1d = false, typename Arg, typename T> typename std::enable_if<!multi_1d, void>::type
+    template <bool multi_1d = false, typename Arg, typename T> std::enable_if_t<!multi_1d, void>
     set_param(std::vector<constant_param_t> &params, Arg &arg, char select, const T &h)
     {
       constant_param_t param;

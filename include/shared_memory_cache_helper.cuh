@@ -57,7 +57,7 @@ namespace quda
        @return Shared memory pointer
      */
     template <bool dynamic_shared>
-    __device__ __host__ inline typename std::enable_if<dynamic_shared == true, atom_t>::type *cache()
+    __device__ __host__ inline std::enable_if_t<dynamic_shared == true, atom_t> *cache()
     {
 #ifdef __CUDA_ARCH__
       extern __shared__ atom_t cache_[];
@@ -72,7 +72,7 @@ namespace quda
        @return Shared memory pointer
      */
     template <bool dynamic_shared>
-    __device__ __host__ inline typename std::enable_if<dynamic_shared == false, atom_t>::type *cache()
+    __device__ __host__ inline std::enable_if_t<dynamic_shared == false, atom_t> *cache()
     {
 #ifdef __CUDA_ARCH__
       static __shared__ atom_t cache_[n_element * block_size_x * block_size_y * block_size_z];
