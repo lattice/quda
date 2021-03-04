@@ -60,13 +60,6 @@ namespace quda
     }
   };
 
-#ifdef NVSHMEM_COMMS
-  // FIXME: Temporary value, based on DGX-1V layout
-  constexpr auto max_devices = 16;
-  static std::size_t texture_alignment[max_devices] = {0};
-  static bool has_texture_alignment[max_devices] = {false};
-#endif
-
   static std::map<void *, MemAlloc> alloc[N_ALLOC_TYPE];
   static long total_bytes[N_ALLOC_TYPE] = {0};
   static long max_total_bytes[N_ALLOC_TYPE] = {0};
@@ -104,11 +97,10 @@ namespace quda
   static void print_alloc(AllocType type)
   {
     const char *type_str[] = {"Device", "Device Pinned", "Host  ", "Pinned", "Mapped", "Managed", "Shmem "};
-    std::map<void *, MemAlloc>::iterator entry;
 
-    for (entry = alloc[type].begin(); entry != alloc[type].end(); entry++) {
-      void *ptr = entry->first;
-      MemAlloc a = entry->second;
+    for (auto entry : alloc[type]) {
+      void *ptr = entry.first;
+      MemAlloc a = entry.second;
       printfQuda("%s  %15p  %15lu  %s(), %s:%d\n", type_str[type], ptr, (unsigned long)a.base_size, a.func.c_str(),
                  a.file.c_str(), a.line);
 #ifdef QUDA_BACKWARDSCPP
@@ -379,30 +371,11 @@ namespace quda
 
     a.size = a.base_size = size;
 
-    auto dev = 0;
-    auto err = cudaGetDevice(&dev);
-    if (err != cudaSuccess) {
-      printfQuda("ERROR: cudaGetDevice failed in shmem_malloc_ (%s:%d in %s())\n", file, line, func);
-      errorQuda("Aborting");
-    }
-
-    if (!has_texture_alignment[dev]) {
-      auto tmp = 0;
-      err = cudaDeviceGetAttribute(&tmp, cudaDevAttrTextureAlignment, dev);
-      if (err != cudaSuccess) {
-        printfQuda("Error: cudaDeviceGetAttribute failed in shmem_malloc_ (%s:%d in %s())\n", file, line, func);
-        errorQuda("Aborting");
-      }
-      texture_alignment[dev] = tmp;
-      has_texture_alignment[dev] = true;
-    }
-
-    auto ptr = nvshmem_align(texture_alignment[dev], size);
+    auto ptr = nvshmem_malloc(size);
     if (ptr == nullptr) {
       printfQuda("ERROR: Failed to allocate shmem memory of size %zu (%s:%d in %s())\n", size, file, line, func);
       errorQuda("Aborting");
     }
-
     track_malloc(SHMEM, a, ptr);
 #ifdef HOST_DEBUG
     qudaMemset(ptr, 0xff, size);
@@ -656,10 +629,6 @@ namespace quda
 
     /** whether to use a memory pool allocator for pinned memory */
     static bool pinned_memory_pool = true;
-#ifdef NVSHMEM_COMMS
-    /** whether to use a memory pool allocator for shmem memory */
-    static bool shmem_memory_pool = true;
-#endif
 
     void init()
     {
@@ -698,12 +667,10 @@ namespace quda
     {
       void *ptr = nullptr;
       if (pinned_memory_pool) {
-        std::multimap<size_t, void *>::iterator it;
-
         if (pinnedCache.empty()) {
           ptr = quda::pinned_malloc_(func, file, line, nbytes);
         } else {
-          it = pinnedCache.lower_bound(nbytes);
+          auto it = pinnedCache.lower_bound(nbytes);
           if (it != pinnedCache.end()) { // sufficiently large allocation found
             nbytes = it->first;
             ptr = it->second;
@@ -738,12 +705,10 @@ namespace quda
     {
       void *ptr = nullptr;
       if (device_memory_pool) {
-        std::multimap<size_t, void *>::iterator it;
-
         if (deviceCache.empty()) {
           ptr = quda::device_malloc_(func, file, line, nbytes);
         } else {
-          it = deviceCache.lower_bound(nbytes);
+          auto it = deviceCache.lower_bound(nbytes);
           if (it != deviceCache.end()) { // sufficiently large allocation found
             nbytes = it->first;
             ptr = it->second;
@@ -777,53 +742,19 @@ namespace quda
 #ifdef NVSHMEM_COMMS
     void *shmem_malloc_(const char *func, const char *file, int line, size_t nbytes)
     {
-      void *ptr = nullptr;
-      if (shmem_memory_pool) {
-        std::multimap<size_t, void *>::iterator it;
-
-        if (shmemCache.empty()) {
-          ptr = quda::shmem_malloc_(func, file, line, nbytes);
-        } else {
-          it = shmemCache.lower_bound(nbytes);
-          if (it != shmemCache.end()) { // sufficiently large allocation found
-            nbytes = it->first;
-            ptr = it->second;
-            shmemCache.erase(it);
-          } else { // sacrifice the smallest cached allocation
-            it = shmemCache.begin();
-            ptr = it->second;
-            shmemCache.erase(it);
-            quda::shmem_free_(func, file, line, ptr);
-            ptr = quda::shmem_malloc_(func, file, line, nbytes);
-          }
-        }
-        shmemSize[ptr] = nbytes;
-      } else {
-        ptr = quda::shmem_malloc_(func, file, line, nbytes);
-      }
-      return ptr;
+      return quda::shmem_malloc_(func, file, line, nbytes);
     }
 
     void shmem_free_(const char *func, const char *file, int line, void *ptr)
     {
-      if (shmem_memory_pool) {
-        if (!shmemSize.count(ptr)) { errorQuda("Attempt to free invalid pointer"); }
-        shmemCache.insert(std::make_pair(shmemSize[ptr], ptr));
-        shmemSize.erase(ptr);
-      } else {
         quda::shmem_free_(func, file, line, ptr);
-      }
     }
 #endif
 
     void flush_pinned()
     {
       if (pinned_memory_pool) {
-        std::multimap<size_t, void *>::iterator it;
-        for (it = pinnedCache.begin(); it != pinnedCache.end(); it++) {
-          void *ptr = it->second;
-          host_free(ptr);
-        }
+        for (auto it : pinnedCache) { host_free(it.second); }
         pinnedCache.clear();
       }
     }
@@ -831,30 +762,10 @@ namespace quda
     void flush_device()
     {
       if (device_memory_pool) {
-        std::multimap<size_t, void *>::iterator it;
-        for (it = deviceCache.begin(); it != deviceCache.end(); it++) {
-          void *ptr = it->second;
-          device_free(ptr);
-        }
+        for (auto it : deviceCache) { device_free(it.second); }
         deviceCache.clear();
       }
     }
-
-#ifdef NVSHMEM_COMMS
-#define shmem_free(ptr) quda::shmem_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
-    void flush_shmem()
-    {
-      if (shmem_memory_pool) {
-        std::multimap<size_t, void *>::iterator it;
-        for (it = shmemCache.begin(); it != shmemCache.end(); it++) {
-          void *ptr = it->second;
-          shmem_free(ptr);
-        }
-        shmemCache.clear();
-      }
-    }
-#undef shmem_free
-#endif
 
   } // namespace pool
 
