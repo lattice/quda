@@ -11,7 +11,6 @@
 
 namespace quda
 {
-
   // Local enum for the LU axpy block type
   enum blockType { PENCIL, LOWER_TRI, UPPER_TRI };
 
@@ -75,6 +74,11 @@ protected:
     int geo_block_size[4];
     int spin_block_size;
     int n_block_ortho;
+
+    int fine_n_ev;         /** Size of initial factorisation */
+    int fine_n_kr;         /** Size of Krylov space after extension */
+    int fine_n_conv;       /** Number of converged eigenvalues requested */
+    int fine_max_restarts; /** Maximum number of restarts to perform */
     
   public:
     /**
@@ -476,6 +480,12 @@ protected:
     */
     void operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
 
+    /**
+       @brief Perform the TRLM solve
+       @param[in] kSpace Krylov vector space
+    */
+    bool trlmSolve(std::vector<ColorSpinorField *> &kSpace);
+    
     /**
        @brief Lanczos step: extends the Krylov space.
        @param[in] v Vector space

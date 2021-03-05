@@ -2431,7 +2431,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
     kSpace.push_back(ColorSpinorField::Create(cudaParam));
     // Copy data from the host array into the the kSpace. QUDA interprets this as a
     // user supplied initial guess.
-    *kSpace[i] = *host_evecs[i];
+    *kSpace[i] = *host_evecs_[i];
   }
     
   // If you use polynomial acceleration on a non-symmetric matrix,

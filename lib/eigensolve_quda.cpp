@@ -95,6 +95,18 @@ namespace quda
 
     // Parse compression parameters
     if(eig_param->compress == QUDA_BOOLEAN_TRUE) {
+      fine_n_ev = eig_param->comp_n_ev;
+      fine_n_kr = eig_param->comp_n_kr;
+      fine_n_conv = eig_param->comp_n_conv;
+      fine_max_restarts = eig_param->comp_max_restarts;
+
+      // Sanity checks
+      if (fine_n_kr <= fine_n_ev) errorQuda("fine_n_kr = %d is less than or equal to fine_n_ev = %d", fine_n_kr, fine_n_ev);
+      if (fine_n_ev < fine_n_conv) errorQuda("fine_n_conv=%d is greater than fine_n_ev=%d", fine_n_conv, fine_n_ev);
+      if (fine_n_ev == 0) errorQuda("fine_n_ev=0 passed to Eigensolver");
+      if (fine_n_kr == 0) errorQuda("fine_n_kr=0 passed to Eigensolver");
+      if (fine_n_conv == 0) errorQuda("fine_n_conv=0 passed to Eigensolver");      
+      
       compress = true;
       spin_block_size = 2;
       n_block_ortho = eig_param->n_block_ortho;
@@ -139,14 +151,21 @@ namespace quda
   //------------------------------------------------------------------------------
   void EigenSolver::prepareInitialGuess(std::vector<ColorSpinorField *> &kSpace)
   {
+    double guess_norm = 0;
     if (kSpace[0]->Location() == QUDA_CPU_FIELD_LOCATION) {
       for (int b = 0; b < block_size; b++) {
-        if (sqrt(blas::norm2(*kSpace[b])) == 0.0) { kSpace[b]->Source(QUDA_RANDOM_SOURCE); }
+	guess_norm = sqrt(blas::norm2(*kSpace[b]));
+	if (guess_norm == 0.0 || isnan(guess_norm)) { kSpace[b]->Source(QUDA_RANDOM_SOURCE); }
+	guess_norm = sqrt(blas::norm2(*kSpace[b]));
+	if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Initial guess %d norm = %e\n", b, guess_norm);
       }
     } else {
       RNG *rng = new RNG(*kSpace[0], 1234);
       for (int b = 0; b < block_size; b++) {
-        if (sqrt(blas::norm2(*kSpace[b])) == 0.0) { spinorNoise(*kSpace[b], *rng, QUDA_NOISE_UNIFORM); }
+	guess_norm = sqrt(blas::norm2(*kSpace[b]));
+	if (guess_norm == 0.0 || isnan(guess_norm)) { spinorNoise(*kSpace[b], *rng, QUDA_NOISE_UNIFORM); }
+	guess_norm = sqrt(blas::norm2(*kSpace[b]));
+	if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Initial guess %d norm = %e\n", b, guess_norm);
       }
       delete rng;
     }
@@ -177,16 +196,18 @@ namespace quda
 
   void EigenSolver::prepareKrylovSpace(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)
   {
-    int size = kSpace.size();
+    int k_size = kSpace.size();
+    int r_size = r.size();
+    int e_size = evals.size();
     ColorSpinorParam csParamClone(*kSpace[0]);
     // Increase Krylov space to n_kr+block_size vectors, create residual
     kSpace.reserve(n_kr + block_size);
-    for (int i = size; i < n_kr + block_size; i++) kSpace.push_back(ColorSpinorField::Create(csParamClone));
+    for (int i = k_size; i < n_kr + block_size; i++) kSpace.push_back(ColorSpinorField::Create(csParamClone));
     csParamClone.create = QUDA_ZERO_FIELD_CREATE;
-    for (int b = 0; b < block_size; b++) { r.push_back(ColorSpinorField::Create(csParamClone)); }
+    for (int b = r_size; b < block_size; b++) { r.push_back(ColorSpinorField::Create(csParamClone)); }
     // Increase evals space to n_ev
     evals.reserve(n_kr);
-    for (int i = size; i < n_kr; i++) evals.push_back(0.0);
+    for (int i = e_size; i < n_kr; i++) evals.push_back(0.0);
   }
 
   void EigenSolver::printEigensolverSetup()
@@ -290,7 +311,7 @@ namespace quda
 
     if(compress) verifyCompression(kSpace);
     
-    // Save TRLM tuning
+    // Save tuning
     saveTuneCache();
     
     mat.flops();

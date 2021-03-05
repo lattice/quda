@@ -271,6 +271,8 @@ void setEigParam(QudaEigParam &eig_param)
     } else {
       eig_param.comp_n_conv = eig_comp_n_conv;
     }
+    eig_param.comp_n_ev = eig_comp_n_ev;
+    eig_param.comp_n_kr = eig_comp_n_kr;
     eig_param.comp_max_restarts = eig_comp_max_restarts;
     for (int j = 0; j < 4; j++) {
       // if not defined use 4
