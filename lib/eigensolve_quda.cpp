@@ -156,7 +156,7 @@ namespace quda
       orthonormalizeMGS(kSpace, block_size);
       if (getVerbosity() >= QUDA_SUMMARIZE) {
         if (block_size > 1)
-          printfQuda("Orthonormalising initial guesses with Modified Gram Schmidt, iter k=%d/5\n", (k + 1));
+          printfQuda("Orthonormalising initial guesses with Modified Gram Schmidt, iter k=%d of %d\n", (k + 1), kmax);
         else
           printfQuda("Orthonormalising initial guess\n");
       }
@@ -165,7 +165,7 @@ namespace quda
     }
     if (!orthed) errorQuda("Failed to orthonormalise initial guesses");
   }
-
+  
   void EigenSolver::checkChebyOpMax(const DiracMatrix &mat, std::vector<ColorSpinorField *> &kSpace)
   {
     if (eig_param->use_poly_acc && eig_param->a_max <= 0.0) {
@@ -177,15 +177,16 @@ namespace quda
 
   void EigenSolver::prepareKrylovSpace(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)
   {
+    int size = kSpace.size();
     ColorSpinorParam csParamClone(*kSpace[0]);
     // Increase Krylov space to n_kr+block_size vectors, create residual
     kSpace.reserve(n_kr + block_size);
-    for (int i = n_conv; i < n_kr + block_size; i++) kSpace.push_back(ColorSpinorField::Create(csParamClone));
+    for (int i = size; i < n_kr + block_size; i++) kSpace.push_back(ColorSpinorField::Create(csParamClone));
     csParamClone.create = QUDA_ZERO_FIELD_CREATE;
     for (int b = 0; b < block_size; b++) { r.push_back(ColorSpinorField::Create(csParamClone)); }
     // Increase evals space to n_ev
     evals.reserve(n_kr);
-    for (int i = n_conv; i < n_kr; i++) evals.push_back(0.0);
+    for (int i = size; i < n_kr; i++) evals.push_back(0.0);
   }
 
   void EigenSolver::printEigensolverSetup()
@@ -287,10 +288,10 @@ namespace quda
       for (unsigned int i = 0; i < kSpace.size() && save_prec < prec; i++) delete vecs_ptr[i];
     }
 
+    if(compress) verifyCompression(kSpace);
+    
     // Save TRLM tuning
     saveTuneCache();
-
-    if(compress) verifyCompression(kSpace);
     
     mat.flops();
 

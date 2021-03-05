@@ -60,7 +60,7 @@ namespace quda
     }
 
     // Check for an initial guess. If none present, populate with rands, then
-    // orthonormalise
+    // orthonormalise.
     prepareInitialGuess(kSpace);
 
     // Increase the size of kSpace passed to the function, will be trimmed to
@@ -206,8 +206,8 @@ namespace quda
   void TRLM::lanczosStep(std::vector<ColorSpinorField *> v, int j)
   {
     // Compute r = A * v_j - b_{j-i} * v_{j-1}
+    
     // r = A * v_j
-
     chebyOp(mat, *r[0], *v[j]);
 
     // a_j = v_j^dag * r
@@ -278,7 +278,6 @@ namespace quda
   {
     profile.TPSTART(QUDA_PROFILE_EIGEN);
     int dim = n_kr - num_locked;
-    // int arrow_pos = std::max(num_keep - num_locked + 1, 2);
     int arrow_pos = num_keep - num_locked;
 
     // Eigen objects

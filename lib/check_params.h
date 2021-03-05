@@ -170,6 +170,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(n_kr, 0);
   P(n_conv, 0);
   P(n_ev_deflate, -1);
+  P(block_size, 1);
   P(batched_rotate, 0);
   P(tol, 0.0);
   P(qr_tol, 0.0);
@@ -197,6 +198,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(n_kr, INVALID_INT);
   P(n_conv, INVALID_INT);
   P(n_ev_deflate, INVALID_INT);
+  P(block_size, INVALID_INT);
   P(batched_rotate, INVALID_INT);
   P(tol, INVALID_DOUBLE);
   P(qr_tol, INVALID_DOUBLE);
@@ -214,7 +216,6 @@ void printQudaEigParam(QudaEigParam *param) {
 #ifdef CHECK__PARAM
   if (param->eig_type == QUDA_EIG_BLK_TR_LANCZOS)
 #endif
-    P(block_size, INVALID_INT);
 
 #if defined INIT_PARAM
   P(location, QUDA_CUDA_FIELD_LOCATION);

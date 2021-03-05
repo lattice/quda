@@ -2425,10 +2425,15 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   // Ensure device vectors qre in UKQCD basis for Wilson type fermions
   if (cudaParam.nSpin != 1) cudaParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 
-  std::vector<Complex> evals(eig_param->n_conv, 0.0);
+  std::vector<Complex> evals;
   std::vector<ColorSpinorField *> kSpace;
-  for (int i = 0; i < eig_param->n_conv; i++) { kSpace.push_back(ColorSpinorField::Create(cudaParam)); }
-
+  for (int i = 0; i < eig_param->block_size; i++) {
+    kSpace.push_back(ColorSpinorField::Create(cudaParam));
+    // Copy data from the host array into the the kSpace. QUDA interprets this as a
+    // user supplied initial guess.
+    *kSpace[i] = *host_evecs[i];
+  }
+    
   // If you use polynomial acceleration on a non-symmetric matrix,
   // the solver will fail.
   if (eig_param->use_poly_acc && !eig_param->use_norm_op && !(inv_param->dslash_type == QUDA_LAPLACE_DSLASH)) {

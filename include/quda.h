@@ -417,8 +417,9 @@ extern "C" {
         deflation_space struct, pointed to by preserve_deflation_space */
     QudaBoolean preserve_deflation;
 
-    /** This is where we store the deflation space.  This will point
-        to an instance of deflation_space. When a deflated solver is enabled, the deflation space will be obtained from this.  */
+    /** This is where we store the deflation space.  This will point to an instance of
+	deflation_space. When a deflated solver is enabled, the deflation space will 
+	be obtained from this.  */
     void *preserve_deflation_space;
 
     /** If we restore the deflation space, this boolean indicates
@@ -495,7 +496,7 @@ extern "C" {
     int spin_block_size;
 
     /** Number of times to repeat Gram-Schmidt in orthogonalization */
-    int n_block_ortho;
+    int n_block_ortho;    
     //-------------------------------------------------
 
     // EIG-CG PARAMS
