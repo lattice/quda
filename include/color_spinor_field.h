@@ -475,6 +475,7 @@ namespace quda {
     int Ncolor() const { return nColor; }
     int Nspin() const { return nSpin; }
     int Nvec() const { return nVec; }
+    int Order() const { return fieldOrder; }
     QudaTwistFlavorType TwistFlavor() const { return twistFlavor; }
     int Ndim() const { return nDim; }
     const int* X() const { return x; }

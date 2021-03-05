@@ -96,7 +96,7 @@ namespace quda
     // Parse compression parameters
     if(eig_param->compress == QUDA_BOOLEAN_TRUE) {
       compress = true;
-      spin_block_size = 2; //?
+      spin_block_size = 2;
       n_block_ortho = eig_param->n_block_ortho;
       for(int i=0; i<4; i++) geo_block_size[i] = eig_param->geo_block_size[i];
     }
@@ -1226,9 +1226,28 @@ namespace quda
     }
     
     // Create the transfer operator
-    transfer = new Transfer(orthonormalised_basis, kSpace.size(), n_block_ortho, geo_block_size,
-			    spin_block_size, kSpace[0]->Precision(), QUDA_TRANSFER_AGGREGATE,
-			    profile);
+    QudaPrecision prec = kSpace[0]->Precision();
+    QudaFieldLocation location = kSpace[0]->Location();
+    transfer = new Transfer(kSpace, kSpace.size(), n_block_ortho, geo_block_size,
+			    spin_block_size, prec, QUDA_TRANSFER_AGGREGATE, profile);
+    ColorSpinorField *tmp_coarse = kSpace[0]->CreateCoarse(geo_block_size, spin_block_size,
+							   kSpace.size(), prec, location);
+
+    // may want to revisit this---these were relaxed for cases where ghost_precision < precision
+    // these were set while hacking in tests of quarter precision ghosts
+    double tol = (prec == QUDA_QUARTER_PRECISION || prec == QUDA_HALF_PRECISION) ? 5e-2 : prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-8;
     
+    for (unsigned int i = 0; i < kSpace.size(); i++) {      
+      *tmp1 =  *kSpace[i];
+      transfer->R(*tmp_coarse, *tmp1);
+      transfer->P(*tmp2, *tmp_coarse);
+      double deviation = sqrt(blas::xmyNorm(*tmp1, *tmp2) / blas::norm2(*tmp1));
+      
+      if (getVerbosity() >= QUDA_VERBOSE)
+	printfQuda( "Vector %d: norms v_k = %e P^\\dagger v_k = %e (1 - P P^\\dagger) v_k = %e, L2 relative deviation = %e\n",
+		    i, blas::norm2(*tmp1), blas::norm2(*tmp_coarse), blas::norm2(*tmp2), deviation);
+      if (deviation > tol) errorQuda("L2 relative deviation for k=%d failed, %e > %e", i, deviation, tol);
+    }
+    delete tmp_coarse;
   }
 } // namespace quda
