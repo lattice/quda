@@ -22,7 +22,7 @@ namespace quda
     Oprod oprod;
     const F inA[nvector];
     const F inB[nvector];
-    Float coeff[nvector][2];
+    real coeff[nvector][2];
     dim3 threads;
 
     CloverSigmaOprodArg(GaugeField &oprod, const std::vector<ColorSpinorField*> &inA,

@@ -132,32 +132,47 @@ namespace quda
       const int NYW;
       MultiBlasFunctor(int NXZ, int NYW) : NXZ(NXZ), NYW(NYW) {}
 
-      __device__ __host__ inline coeff_t a(int i, int j) const
+      template <bool is_device>
+      __device__ __host__ inline std::enable_if_t<is_device, coeff_t> a(int i, int j) const
       {
-#ifdef __CUDA_ARCH__
         return reinterpret_cast<coeff_t *>(Amatrix_d)[i * NYW + j];
-#else
+      }
+
+      template <bool is_device>
+      __device__ __host__ inline std::enable_if_t<!is_device, coeff_t> a(int i, int j) const
+      {
         return reinterpret_cast<coeff_t *>(Amatrix_h)[i * NYW + j];
-#endif
       }
 
-      __device__ __host__ inline coeff_t b(int i, int j) const
+      __device__ __host__ inline coeff_t a(int i, int j) const { return a<device::is_device()>(i, j); }
+
+      template <bool is_device>
+      __device__ __host__ inline std::enable_if_t<is_device, coeff_t> b(int i, int j) const
       {
-#ifdef __CUDA_ARCH__
         return reinterpret_cast<coeff_t *>(Bmatrix_d)[i * NYW + j];
-#else
-        return reinterpret_cast<coeff_t *>(Bmatrix_h)[i * NYW + j];
-#endif
       }
 
-      __device__ __host__ inline coeff_t c(int i, int j) const
+      template <bool is_device>
+      __device__ __host__ inline std::enable_if_t<!is_device, coeff_t> b(int i, int j) const
       {
-#ifdef __CUDA_ARCH__
-        return reinterpret_cast<coeff_t *>(Cmatrix_d)[i * NYW + j];
-#else
-        return reinterpret_cast<coeff_t *>(Cmatrix_h)[i * NYW + j];
-#endif
+        return reinterpret_cast<coeff_t *>(Bmatrix_h)[i * NYW + j];
       }
+
+      __device__ __host__ inline coeff_t b(int i, int j) const { return b<device::is_device()>(i, j); }
+
+      template <bool is_device>
+      __device__ __host__ inline std::enable_if_t<is_device, coeff_t> c(int i, int j) const
+      {
+        return reinterpret_cast<coeff_t *>(Cmatrix_d)[i * NYW + j];
+      }
+
+      template <bool is_device>
+      __device__ __host__ inline std::enable_if_t<!is_device, coeff_t> c(int i, int j) const
+      {
+        return reinterpret_cast<coeff_t *>(Cmatrix_h)[i * NYW + j];
+      }
+
+      __device__ __host__ inline coeff_t c(int i, int j) const { return c<device::is_device()>(i, j); }
     };
 
     /**
