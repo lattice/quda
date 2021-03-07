@@ -76,38 +76,46 @@ namespace quda
   }
 
   /**
-     @brief Fast float to integer round used on the device
-  */
-  template <bool is_device> constexpr std::enable_if_t<is_device, int> f2i(float f)
-  {
-    f += 12582912.0f;
-    return reinterpret_cast<int &>(f);
-  }
-
-  /**
      @brief Regular float to integer round used on the host
   */
-  template <bool is_device> constexpr std::enable_if_t<!is_device, int> f2i(float f)
-  {
-    return static_cast<int>(f);
-  }
+  template <bool is_device> struct f2i {
+    constexpr int operator()(float f)
+    {
+      return static_cast<int>(f);
+    }
+  };
 
   /**
-     @brief Fast double to integer round used on the device
+     @brief Fast float to integer round used on the device
   */
-  template <bool is_device> constexpr std::enable_if_t<is_device, int> d2i(double d)
-  {
-    d += 6755399441055744.0;
-    return reinterpret_cast<int &>(d);
-  }
+  template <> struct f2i<true> {
+    __device__ inline int operator()(float f)
+    {
+      f += 12582912.0f;
+      return reinterpret_cast<int &>(f);
+    }
+  };
 
   /**
      @brief Regular double to integer round used on the host
   */
-  template <bool is_device> constexpr std::enable_if_t<!is_device, int> d2i(double d)
-  {
-    return static_cast<int>(d);
-  }
+  template <bool is_device> struct d2i {
+    constexpr int operator()(double d)
+    {
+      return static_cast<int>(d);
+    }
+  };
+
+  /**
+     @brief Fast double to integer round used on the device
+  */
+  template <> struct d2i<true> {
+    __device__ inline int operator()(double d)
+    {
+      d += 6755399441055744.0;
+      return reinterpret_cast<int &>(d);
+    }
+  };
 
   /**
      @brief Copy function which is trival between floating point
@@ -131,7 +139,7 @@ namespace quda
   template <typename T1, typename T2>
   constexpr std::enable_if_t<isFixed<T1>::value && !isFixed<T2>::value, void> copy(T1 &a, const T2 &b)
   {
-    a = f2i<device::is_device()>(b * fixedMaxValue<T1>::value);
+    a = target::dispatch<f2i>(b * fixedMaxValue<T1>::value);
   }
 
   /**
@@ -147,7 +155,7 @@ namespace quda
   template <typename T1, typename T2>
   constexpr std::enable_if_t<isFixed<T1>::value, void> copy_scaled(T1 &a, const T2 &b)
   {
-    a = f2i<device::is_device()>(b);
+    a = target::dispatch<f2i>(b);
   }
 
   /**

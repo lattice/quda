@@ -119,58 +119,14 @@ namespace quda
        @tparam reduce_t The fundamental reduction type
        @tparam coeff_t The type of any coefficients we multiply by
     */
-    template <typename reduce_t_, typename coeff_t_> struct MultiReduceFunctor {
+    template <typename reduce_t_, typename coeff_t_> struct MultiReduceFunctor : MultiBlasParam<coeff_t_> {
       using reduce_t = reduce_t_;
       using coeff_t = coeff_t_;
       static constexpr bool reducer = true;
       static constexpr bool coeff_mul  = false;
       static constexpr bool multi_1d = false;
-      const int NXZ;
-      const int NYW;
 
-      MultiReduceFunctor(int NXZ, int NYW) : NXZ(NXZ), NYW(NYW) {}
-
-      template <bool is_device>
-      __device__ __host__ inline std::enable_if_t<is_device, coeff_t> a(int i, int j) const
-      {
-        return reinterpret_cast<coeff_t *>(Amatrix_d)[i * NYW + j];
-      }
-
-      template <bool is_device>
-      __device__ __host__ inline std::enable_if_t<!is_device, coeff_t> a(int i, int j) const
-      {
-        return reinterpret_cast<coeff_t *>(Amatrix_h)[i * NYW + j];
-      }
-
-      __device__ __host__ inline coeff_t a(int i, int j) const { return a<device::is_device()>(i, j); }
-
-      template <bool is_device>
-      __device__ __host__ inline std::enable_if_t<is_device, coeff_t> b(int i, int j) const
-      {
-        return reinterpret_cast<coeff_t *>(Bmatrix_d)[i * NYW + j];
-      }
-
-      template <bool is_device>
-      __device__ __host__ inline std::enable_if_t<!is_device, coeff_t> b(int i, int j) const
-      {
-        return reinterpret_cast<coeff_t *>(Bmatrix_h)[i * NYW + j];
-      }
-
-      __device__ __host__ inline coeff_t b(int i, int j) const { return b<device::is_device()>(i, j); }
-
-      template <bool is_device>
-      __device__ __host__ inline std::enable_if_t<is_device, coeff_t> c(int i, int j) const
-      {
-        return reinterpret_cast<coeff_t *>(Cmatrix_d)[i * NYW + j];
-      }
-
-      template <bool is_device>
-      __device__ __host__ inline std::enable_if_t<!is_device, coeff_t> c(int i, int j) const
-      {
-        return reinterpret_cast<coeff_t *>(Cmatrix_h)[i * NYW + j];
-      }
-
-      __device__ __host__ inline coeff_t c(int i, int j) const { return c<device::is_device()>(i, j); }
+      MultiReduceFunctor(int NXZ, int NYW) : MultiBlasParam<coeff_t>(NXZ, NYW) {}
     };
 
     /**

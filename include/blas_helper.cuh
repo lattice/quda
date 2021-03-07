@@ -126,7 +126,7 @@ namespace quda
         for (int i = 0; i < n; i++) scale = fmaxf(max_[i], scale);
         norm[x + parity * cb_norm_offset] = scale;
 
-        return fdivide(fixedMaxValue<store_t>::value, scale);
+        return fdividef(fixedMaxValue<store_t>::value, scale);
       }
 
       norm_t *Norm() { return norm; }

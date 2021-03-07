@@ -71,6 +71,39 @@ namespace quda
       params.push_back(param);
     }
 
+    template <typename coeff_t>
+    struct MultiBlasParam {
+      const int NXZ;
+      const int NYW;
+      MultiBlasParam(int NXZ, int NYW) : NXZ(NXZ), NYW(NYW) {}
+
+      template <bool is_device, typename dummy = void> struct get_matrix {
+        constexpr coeff_t* operator()(char select) const {
+          switch (select) {
+          case 'a': return reinterpret_cast<coeff_t *>(Amatrix_h); break;
+          case 'b': return reinterpret_cast<coeff_t *>(Bmatrix_h); break;
+          case 'c': return reinterpret_cast<coeff_t *>(Cmatrix_h); break;
+          }
+          return nullptr;
+        }
+      };
+
+      template <typename dummy> struct get_matrix<true, dummy> {
+        constexpr coeff_t* operator()(char select) const {
+          switch (select) {
+          case 'a': return reinterpret_cast<coeff_t *>(Amatrix_d); break;
+          case 'b': return reinterpret_cast<coeff_t *>(Bmatrix_d); break;
+          case 'c': return reinterpret_cast<coeff_t *>(Cmatrix_d); break;
+          }
+          return nullptr;
+        }
+      };
+
+      __device__ __host__ inline coeff_t a(int i, int j) const { return target::dispatch<get_matrix>('a')[i * NYW + j]; }
+      __device__ __host__ inline coeff_t b(int i, int j) const { return target::dispatch<get_matrix>('b')[i * NYW + j]; }
+      __device__ __host__ inline coeff_t c(int i, int j) const { return target::dispatch<get_matrix>('c')[i * NYW + j]; }
+    };
+
     /**
        @param[in] x Value we are testing
        @return True if x is a power of two

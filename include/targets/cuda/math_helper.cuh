@@ -1,6 +1,7 @@
 #pragma once
 
-#include <math.h>
+#include <cmath>
+#include <target_device.h>
 
 namespace quda {
 
@@ -152,13 +153,12 @@ namespace quda {
 #endif
   }
 
-  template <typename real> __device__ __host__ inline real fdivide(real a, real b)
-  {
-#ifdef __CUDA_ARCH__
-    return __fdividef(a, b);
-#else
-    return a / b;
-#endif
-  }
+  template <bool is_device> struct _fdividef { inline float operator()(float a, float b) { return a / b; } };
+  template <> struct _fdividef<true> { __device__ inline float operator()(float a, float b) { return __fdividef(a, b); } };
+
+  /**
+     @brief Optimized division routine on the device
+  */
+  __device__ __host__ inline float fdividef(float a, float b) { return target::dispatch<_fdividef>(a, b); }
 
 }
