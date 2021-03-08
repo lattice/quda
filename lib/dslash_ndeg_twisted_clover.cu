@@ -70,28 +70,28 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon> struct NdegTwistedCloverApply {
     
     inline NdegTwistedCloverApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                                  const CloverField &C, double a,
+                                  const CloverField &A, double a,
                                   double b, double c, const ColorSpinorField &x, int parity, bool dagger,
                                   const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      NdegTwistedCloverArg<Float, nColor, nDim, recon> arg(out, in, U, C, a, b, c, x, parity, dagger, comm_override);
+      NdegTwistedCloverArg<Float, nColor, nDim, recon> arg(out, in, U, A, a, b, c, x, parity, dagger, comm_override);
       NdegTwistedClover<decltype(arg)> twisted(arg, out, in);
       // why not in.VolumeCB() and in. GhostFaceCB() ??
       dslash::DslashPolicyTune<decltype(twisted)> policy(
         twisted, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
-        in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
+        in.VolumeCB(), in.GhostFaceCB(), profile);
       policy.apply(0);
     }
   };
   
-  void ApplyNdegTwistedClover(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &C,
+  void ApplyNdegTwistedClover(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
                               double a, double b,
                               double c, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
                               TimeProfile &profile)
   {
 #ifdef GPU_NDEG_TWISTED_CLOVER_DIRAC
-    instantiate<NdegTwistedCloverApply>(out, in, U, C, a, b, c, x, parity, dagger, comm_override, profile);
+    instantiate<NdegTwistedCloverApply>(out, in, U, A, a, b, c, x, parity, dagger, comm_override, profile);
 #else
     errorQuda("Non-degenerate twisted-clover dslash has not been built");
 #endif // GPU_NDEG_TWISTED_CLOVER_DIRAC
