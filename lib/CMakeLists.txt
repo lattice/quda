@@ -268,13 +268,13 @@ target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
                             $<$<CONFIG:DEVEL>:-Xptxas -warn-lmem-usage,-warn-spills -lineinfo>
                             $<$<CONFIG:STRICT>: -Werror=all-warnings -lineinfo>
                             $<$<CONFIG:HOSTDEBUG>:-lineinfo>
-                            $<$<CONFIG:SANITIZE>:-Xcompiler -fsanitize=address,undefined -lineinfo>
+                            $<$<CONFIG:SANITIZE>:-lineinfo>
                             >)
 
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
                             -Wall -Wextra -Wno-unknown-pragmas
                             $<$<CONFIG:STRICT>:-Werror -Wno-error=pass-failed>
-                            $<$<CONFIG:SANITIZE>:-fsanitize=address,-fsanitize=undefined>
+                            $<$<CONFIG:SANITIZE>:-fsanitize=address -fsanitize=undefined>
                             >)
 
 # some clang warnings should be warning even when turning warnings into errors
