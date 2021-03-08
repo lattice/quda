@@ -86,7 +86,7 @@ namespace quda
           // i * mu * gamma_5
           const complex<real> b(0.0, chirality == 0 ? static_cast<real>(arg.b) : -static_cast<real>(arg.b));
           // tau_3
-          b *= (flavor == 0 ? 1 : -1);
+          b = (flavor == 0 ? b : -b);
           Ax_chi += b * x_chi;
         }
 
