@@ -4,13 +4,24 @@
 
 namespace quda {
 
-  namespace device {
+  namespace target {
+
+    // nvcc or clang: compile-time dispatch
+    template <template <bool, typename ...> class f, typename ...Args>
+      __host__ __device__ auto dispatch(Args &&... args)
+    {
+#ifdef __CUDA_ARCH__
+      return f<true>()(args...);
+#else
+      return f<false>()(args...);
+#endif
+    }
 
     /**
        @brief Helper function that returns if the current execution
        region is on the device
     */
-    constexpr bool is_device()
+    __device__ __host__ inline bool is_device()
     {
 #ifdef __CUDA_ARCH__
       return true;
@@ -23,7 +34,7 @@ namespace quda {
        @brief Helper function that returns if the current execution
        region is on the host
     */
-    constexpr bool is_host()
+    __device__ __host__ inline bool is_host()
     {
 #ifdef __CUDA_ARCH__
       return false;
@@ -31,6 +42,10 @@ namespace quda {
       return true;
 #endif
     }
+
+  }
+
+  namespace device {
 
     /**
        @brief Helper function that returns the thread block

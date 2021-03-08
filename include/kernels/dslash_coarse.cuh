@@ -118,7 +118,7 @@ namespace quda {
 
     SharedMemoryCache<V> cache(device::block_dim());
 
-    if (!thread_dir || device::is_host()) {
+    if (!thread_dir || target::is_host()) {
 
       //Forward gather - compute fwd offset for spinor fetch
 #pragma unroll
@@ -173,10 +173,10 @@ namespace quda {
       } // nDim
 
       // only need to write to shared memory if not master thread
-      if (device::is_device() && thread_dim > 0) cache.save(out);
+      if (target::is_device() && thread_dim > 0) cache.save(out);
     }
 
-    if (thread_dir || device::is_host()) {
+    if (thread_dir || target::is_host()) {
 
       //Backward gather - compute back offset for spinor and gauge fetch
 #pragma unroll
@@ -227,13 +227,13 @@ namespace quda {
 
       } //nDim
 
-      if (device::is_device()) cache.save(out);
+      if (target::is_device()) cache.save(out);
     } // forwards / backwards thread split
 
-    if (device::is_device()) cache.sync(); // device path has to recombine the foward and backward results
+    if (target::is_device()) cache.sync(); // device path has to recombine the foward and backward results
 
     // (colorspin * dim_stride + dim * 2 + dir)
-    if (device::is_device() && thread_dim == 0 && thread_dir == 0) {
+    if (target::is_device() && thread_dim == 0 && thread_dir == 0) {
 
       // full split over dimension and direction
 #pragma unroll
@@ -250,7 +250,7 @@ namespace quda {
 
       out *= -arg.kappa;
 
-    } else if (device::is_host()) {
+    } else if (target::is_host()) {
 
       out *= -arg.kappa;
 
@@ -329,16 +329,15 @@ namespace quda {
 
     __device__ __host__ inline void operator()(int x_cb_color_offset, int parity, int sMd)
     {
-      using namespace device;
       int x_cb = x_cb_color_offset;
       int color_offset = 0;
 
-      if (is_device() && Arg::color_stride > 1) { // on the device we support warp fission of the inner product
-        const int lane_id = thread_idx().x % warp_size();
-        const int warp_id = thread_idx().x / warp_size();
-        const int vector_site_width = warp_size() / Arg::color_stride; // number of sites per warp
+      if (target::is_device() && Arg::color_stride > 1) { // on the device we support warp fission of the inner product
+        const int lane_id = device::thread_idx().x % device::warp_size();
+        const int warp_id = device::thread_idx().x / device::warp_size();
+        const int vector_site_width = device::warp_size() / Arg::color_stride; // number of sites per warp
 
-        x_cb = block_idx().x * (block_dim().x / Arg::color_stride) + warp_id * (warp_size() / Arg::color_stride) + lane_id % vector_site_width;
+        x_cb = device::block_idx().x * (device::block_dim().x / Arg::color_stride) + warp_id * (device::warp_size() / Arg::color_stride) + lane_id % vector_site_width;
         color_offset = lane_id / vector_site_width;
       }
 
