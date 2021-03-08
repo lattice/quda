@@ -509,6 +509,8 @@ void initQudaMemory()
 
   device::create_context();
 
+  loadTuneCache();
+
   // initalize the memory pool allocators
   pool::init();
 
@@ -519,8 +521,6 @@ void initQudaMemory()
 
   num_failures_h = static_cast<int*>(mapped_malloc(sizeof(int)));
   num_failures_d = static_cast<int*>(get_mapped_device_pointer(num_failures_h));
-
-  loadTuneCache();
 
   for (int d=0; d<4; d++) R[d] = 2 * (redundant_comms || commDimPartitioned(d));
 
