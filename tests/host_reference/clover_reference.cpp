@@ -241,6 +241,51 @@ void twistCloverGamma5(void *out, void *in, void *clover, void *cInv, const int 
   free(tmp1);
 }
 
+// Apply (C + i*a*gamma_5)/(C^2 + a^2)
+void ndegTwistCloverGamma5(void *out1, void * out2, void *in1, void * in2,
+                           void *clover, void *cInv, const int dagger,
+                           const double kappa, const double mu,
+                           const double epsilon, const int parity,
+                           QudaTwistGamma5Type twist, QudaPrecision precision) {
+  void *tmp1 = malloc(Vh * spinor_site_size * precision);
+  void *tmp2 = malloc(Vh * spinor_site_size * precision);
+
+  double a = 0.0, b = 0.0, d = 0.0;
+
+  if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
+    a = 2.0 * kappa * mu;
+    b = -2.0 * kappa * epsilon;
+    d = 1.0;
+    
+    if (dagger) a *= -1.0;
+
+    apply_clover(tmp1, clover, in1, parity, precision);
+    apply_clover(tmp2, clover, in2, parity, precision);
+    // i * mu * gamma_5 * tau_3
+    applyTwist(out1, in1, tmp1, a, precision);
+    applyTwist(out2, in2, tmp2, -a, precision);
+    // epsilon * tau_1
+    xpay(out1, b, in2, Vh * spinor_site_size, precision);
+    xpay(out2, b, in1, Vh * spinor_site_size, precision);
+  //}
+  //else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
+  //  a = -2.0 * kappa * mu * flavor;
+
+  //  if (dagger) a *= -1.0;
+
+  //  apply_clover(tmp1, clover, in, parity, precision);
+  //  applyTwist(tmp2, in, tmp1, a, precision);
+  //  apply_clover(out, cInv, tmp2, parity, precision);
+  } else {
+    printf("Twist type %d not defined\n", twist);
+    exit(0);
+  }
+
+  free(tmp2);
+  free(tmp1);
+}
+
+
 void tmc_dslash(void *out, void **gauge, void *in, void *clover, void *cInv, double kappa, double mu, QudaTwistFlavorType flavor,
 		int parity, QudaMatPCType matpc_type, int dagger, QudaPrecision precision, QudaGaugeParam &param) {
   void *tmp1 = malloc(Vh * spinor_site_size * precision);
@@ -349,6 +394,57 @@ void tmc_matpc(void *out, void **gauge, void *in, void *clover, void *cInv, doub
   free(tmp2);
   free(tmp1);
 }
+
+void tmc_ndeg_mat(void *evenOut, void* oddOut, void **gauge, void *clover, void *evenIn, void *oddIn,  double kappa, double mu, double epsilon, int daggerBit, QudaPrecision precision, QudaGaugeParam &gauge_param) 
+{
+  //V-4d volume and Vh=V/2
+  void *inEven1   = evenIn;
+  void *inEven2 = (char *)evenIn + precision * Vh * spinor_site_size;
+
+  void *inOdd1    = oddIn;
+  void *inOdd2 = (char *)oddIn + precision * Vh * spinor_site_size;
+
+  void *outEven1  = evenOut;
+  void *outEven2 = (char *)evenOut + precision * Vh * spinor_site_size;
+
+  void *outOdd1   = oddOut;
+  void *outOdd2 = (char *)oddOut + precision * Vh * spinor_site_size;
+
+  void *tmpEven1 = malloc(Vh * spinor_site_size * precision);
+  void *tmpEven2 = malloc(Vh * spinor_site_size * precision);
+
+  void *tmpOdd1 = malloc(Vh * spinor_site_size * precision);
+  void *tmpOdd2 = malloc(Vh * spinor_site_size * precision);
+
+  // full dslash operator:
+  wil_dslash(outOdd1, gauge, inEven1, 1, daggerBit, precision, gauge_param);
+  wil_dslash(outOdd2, gauge, inEven2, 1, daggerBit, precision, gauge_param);
+  // apply the twisted clover term
+  ndegTwistCloverGamma5(tmpEven1, tmpEven2, inEven1, inEven2, clover, NULL,
+                        daggerBit, kappa, mu, epsilon, 0,
+                        QUDA_TWIST_GAMMA5_DIRECT, precision);
+
+  wil_dslash(outEven1, gauge, inOdd1, 0, daggerBit, precision, gauge_param);
+  wil_dslash(outEven2, gauge, inOdd2, 0, daggerBit, precision, gauge_param);
+  // apply the twisted clover term
+  ndegTwistCloverGamma5(tmpOdd1, tmpOdd2, inOdd1, inOdd2, clover, NULL,
+                        daggerBit, kappa, mu, epsilon, 1,
+                        QUDA_TWIST_GAMMA5_DIRECT, precision);
+
+  // combine
+  xpay(tmpOdd1, -kappa, outOdd1, Vh * spinor_site_size, precision);
+  xpay(tmpOdd2, -kappa, outOdd2, Vh * spinor_site_size, precision);
+
+  xpay(tmpEven1, -kappa, outEven1, Vh * spinor_site_size, precision);
+  xpay(tmpEven2, -kappa, outEven2, Vh * spinor_site_size, precision);
+
+  free(tmpOdd1);
+  free(tmpOdd2);
+  //
+  free(tmpEven1);
+  free(tmpEven2);
+}
+
 
 // Apply the full twisted-clover operator
 //   for now   [  A             -k D            ]
