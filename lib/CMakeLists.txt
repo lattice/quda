@@ -57,6 +57,7 @@ set (QUDA_OBJS
   dslash_wilson_clover_preconditioned.cu 
   dslash_twisted_mass.cu dslash_twisted_mass_preconditioned.cu
   dslash_ndeg_twisted_mass.cu dslash_ndeg_twisted_mass_preconditioned.cu
+  dslash_ndeg_twisted_clover.cu
   dslash_twisted_clover.cu dslash_twisted_clover_preconditioned.cu
   dslash_wilson_clover_hasenbusch_twist.cu
   dslash_wilson_clover_hasenbusch_twist_preconditioned.cu
@@ -321,6 +322,11 @@ endif(QUDA_DIRAC_CLOVER_HASENBUSCH)
 if(QUDA_DIRAC_NDEG_TWISTED_MASS)
   target_compile_definitions(quda PUBLIC GPU_NDEG_TWISTED_MASS_DIRAC)
 endif(QUDA_DIRAC_NDEG_TWISTED_MASS)
+
+if(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
+  target_compile_definitions(quda PUBLIC GPU_NDEG_TWISTED_CLOVER_DIRAC)
+endif(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
+
 
 if(${QUDA_BUILD_NATIVE_LAPACK} STREQUAL "ON")
   target_link_libraries(quda PUBLIC ${CUDA_cublas_LIBRARY})
