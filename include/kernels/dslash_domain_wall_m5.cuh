@@ -271,14 +271,14 @@ namespace quda
 
       {
         int exp = s_ < s ? arg.Ls - s + s_ : s_ - s;
-        real factorR = inv * __fast_pow(k, exp) * (s_ < s ? -arg.m_f : static_cast<real>(1.0));
+        real factorR = inv * fpow(k, exp) * (s_ < s ? -arg.m_f : static_cast<real>(1.0));
         constexpr int proj_dir = Arg::dagger ? -1 : +1;
         out += factorR * (in.project(4, proj_dir)).reconstruct(4, proj_dir);
       }
 
       {
         int exp = s_ > s ? arg.Ls - s_ + s : s - s_;
-        real factorL = inv * __fast_pow(k, exp) * (s_ > s ? -arg.m_f : static_cast<real>(1.0));
+        real factorL = inv * fpow(k, exp) * (s_ > s ? -arg.m_f : static_cast<real>(1.0));
         constexpr int proj_dir = Arg::dagger ? +1 : -1;
         out += factorL * (in.project(4, proj_dir)).reconstruct(4, proj_dir);
       }
