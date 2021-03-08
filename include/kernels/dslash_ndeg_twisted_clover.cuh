@@ -9,7 +9,7 @@ namespace quda
   template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_>
     struct NdegTwistedCloverArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
 
-    using WilsonArg<Float, nColor, reconstruct_>::nSpin;
+    using WilsonArg<Float, nColor, nDim, reconstruct_>::nSpin;
     static constexpr int length = (nSpin / (nSpin / 2)) * 2 * nColor * nColor * (nSpin / 2) * (nSpin / 2) / 2;
     typedef typename clover_mapper<Float, length, true>::type C;
     typedef typename mapper<Float>::type real;
