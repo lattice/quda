@@ -288,32 +288,32 @@ namespace quda
     }
   }
 
-  template <typename Arg> __device__ inline void shmem_putbuffer(int shmemindex, Arg &arg, int blockdimyz)
+  template <typename Arg> __device__ inline void shmem_putbuffer(int shmemindex, Arg &arg)
   {
     switch (shmemindex) {
     case 0:
-      nvshmem_putmem_nbi(getShmemBuffer<1>(0, arg), getShmemBuffer<0>(0, arg), arg.bytes[0] * blockdimyz, arg.neighbor_ranks[0]);
+      nvshmem_putmem_nbi(getShmemBuffer<1>(0, arg), getShmemBuffer<0>(0, arg), arg.bytes[0], arg.neighbor_ranks[0]);
       return;
     case 1:
-      nvshmem_putmem_nbi(getShmemBuffer<1>(1, arg), getShmemBuffer<0>(1, arg), arg.bytes[1] * blockdimyz, arg.neighbor_ranks[1]);
+      nvshmem_putmem_nbi(getShmemBuffer<1>(1, arg), getShmemBuffer<0>(1, arg), arg.bytes[1], arg.neighbor_ranks[1]);
       return;
     case 2:
-      nvshmem_putmem_nbi(getShmemBuffer<1>(2, arg), getShmemBuffer<0>(2, arg), arg.bytes[2] * blockdimyz, arg.neighbor_ranks[2]);
+      nvshmem_putmem_nbi(getShmemBuffer<1>(2, arg), getShmemBuffer<0>(2, arg), arg.bytes[2], arg.neighbor_ranks[2]);
       return;
     case 3:
-      nvshmem_putmem_nbi(getShmemBuffer<1>(3, arg), getShmemBuffer<0>(3, arg), arg.bytes[3] * blockdimyz, arg.neighbor_ranks[3]);
+      nvshmem_putmem_nbi(getShmemBuffer<1>(3, arg), getShmemBuffer<0>(3, arg), arg.bytes[3], arg.neighbor_ranks[3]);
       return;
     case 4:
-      nvshmem_putmem_nbi(getShmemBuffer<1>(4, arg), getShmemBuffer<0>(4, arg), arg.bytes[4] * blockdimyz, arg.neighbor_ranks[4]);
+      nvshmem_putmem_nbi(getShmemBuffer<1>(4, arg), getShmemBuffer<0>(4, arg), arg.bytes[4], arg.neighbor_ranks[4]);
       return;
     case 5:
-      nvshmem_putmem_nbi(getShmemBuffer<1>(5, arg), getShmemBuffer<0>(5, arg), arg.bytes[5] * blockdimyz, arg.neighbor_ranks[5]);
+      nvshmem_putmem_nbi(getShmemBuffer<1>(5, arg), getShmemBuffer<0>(5, arg), arg.bytes[5], arg.neighbor_ranks[5]);
       return;
     case 6:
-      nvshmem_putmem_nbi(getShmemBuffer<1>(6, arg), getShmemBuffer<0>(6, arg), arg.bytes[6] * blockdimyz, arg.neighbor_ranks[6]);
+      nvshmem_putmem_nbi(getShmemBuffer<1>(6, arg), getShmemBuffer<0>(6, arg), arg.bytes[6], arg.neighbor_ranks[6]);
       return;
     case 7:
-      nvshmem_putmem_nbi(getShmemBuffer<1>(7, arg), getShmemBuffer<0>(7, arg), arg.bytes[7] * blockdimyz, arg.neighbor_ranks[7]);
+      nvshmem_putmem_nbi(getShmemBuffer<1>(7, arg), getShmemBuffer<0>(7, arg), arg.bytes[7], arg.neighbor_ranks[7]);
       return;
     default: return;
     }
@@ -348,7 +348,7 @@ namespace quda
       if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
         if (amLast) {
           // send data over IB if necessary
-          if (getShmemBuffer<1, decltype(arg)>(shmemidx, arg) != nullptr) shmem_putbuffer(shmemidx, arg, blockDim.y * blockDim.z);
+          if (getShmemBuffer<1, decltype(arg)>(shmemidx, arg) != nullptr) shmem_putbuffer(shmemidx, arg);
           // is we are in the uber kernel signal here
           if (!arg.packkernel) {
             if (!(getNeighborRank(2 * dim + dir, arg) < 0))
