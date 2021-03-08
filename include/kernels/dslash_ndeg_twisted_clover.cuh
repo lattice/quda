@@ -8,7 +8,7 @@ namespace quda
   
   template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_>
     struct NdegTwistedCloverArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
-
+    
     using WilsonArg<Float, nColor, nDim, reconstruct_>::nSpin;
     static constexpr int length = (nSpin / (nSpin / 2)) * 2 * nColor * nColor * (nSpin / 2) * (nSpin / 2) / 2;
     typedef typename clover_mapper<Float, length, true>::type C;
@@ -22,25 +22,26 @@ namespace quda
   NdegTwistedCloverArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
                        const CloverField &A, double a, double b,
                        double c, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
-    WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, U, C, a, x, parity, dagger, comm_override),
+    WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, U, a, x, parity, dagger, comm_override),
       A(A, false),
       a(a),
       // if dagger flip the chiral twist
-      b(dagger ? -0.5 * b : 0.5 * b) // factor of 1/2 comes from clover normalization 
+      // factor of 1/2 comes from clover normalization 
+      b(dagger ? -0.5 * b : 0.5 * b),
       c(c)
       {
         checkPrecision(U, A);
         checkLocation(U, A);
       }
   };
-
+  
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct nDegTwistedClover : dslash_default {
-
+    struct nDegTwistedClover : dslash_default {
+    
     Arg &arg;
     constexpr nDegTwistedClover(Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
-
+    
     /**
        @brief Apply the non-degenerate twisted-clover dslash
        out(x) = M*in = A(x)*in(x) + a * D * in + (1 + i*b*gamma_5*tau_3 + c*tau_1)*in
@@ -51,15 +52,15 @@ namespace quda
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
       typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
-
+      
       bool active
         = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
       auto coord = getCoords<QUDA_4D_PC, kernel_type>(arg, idx, flavor, parity, thread_dim);
-
+      
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
-
+      
       // defined in dslash_wilson.cuh
       applyWilson<nParity, dagger, kernel_type>(out, arg, coord, parity, idx, thread_dim, active);
 
