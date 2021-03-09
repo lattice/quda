@@ -168,14 +168,24 @@ static inline __device__ float atomicAbsMax(float *addr, float val){
   return atomicMax(addr_, val_);
 }
 
-template <typename T> __device__ __host__ void atomic_fetch_add(T *addr, T val)
-{
-#ifdef __CUDA_ARCH__
-  atomicAdd(addr, val);
-#else
+template <bool is_device> struct atomic_fetch_add_impl {
+  template <typename T> inline void operator()(T *addr, T val)
+  {
 #pragma omp atomic update
-  *addr += val;
-#endif
+    *addr += val;
+  }
+};
+
+template <> struct atomic_fetch_add_impl<true> {
+  template <typename T> __device__ inline void operator()(T *addr, T val) { atomicAdd(addr, val); }
+};
+
+/**
+   @brief atomic_fetch_add function performs similarly as atomic_ref::fetch_add
+ */
+template <typename T> __device__ __host__ inline void atomic_fetch_add(T *addr, T val)
+{
+  target::dispatch<atomic_fetch_add_impl>(addr, val);
 }
 
 template <typename T, int n> __device__ __host__ void atomic_fetch_add(vector_type<T, n> *addr, vector_type<T, n> val)
