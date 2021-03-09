@@ -7,13 +7,13 @@
 
 namespace quda
 {
-
-  template <typename Float, int nColor, QudaReconstructType reconstruct_, bool dynamic_clover_>
-  struct NdegTwistedCloverArg : WilsonArg<Float, nColor, reconstruct_> {
-    using WilsonArg<Float, nColor, reconstruct_>::nSpin;
+  
+  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_, bool dynamic_clover_>
+    struct NdegTwistedCloverArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
+    using WilsonArg<Float, nColor, nDim, reconstruct_>::nSpin;
     static constexpr int length = (nSpin / (nSpin / 2)) * 2 * nColor * nColor * (nSpin / 2) * (nSpin / 2) / 2;
     static constexpr bool dynamic_clover = dynamic_clover_;
-
+    
     typedef typename mapper<Float>::type real;
     typedef typename clover_mapper<Float, length>::type C;
     const C A;
@@ -21,18 +21,18 @@ namespace quda
     real a;          /** this is the Wilson-dslash scale factor */
     real b;          /** this is the chiral twist factor */
     real c;          /** this is the flavor twist factor */
-
-    NdegTwistedCloverArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
-                         double a, double b, double c, bool xpay, const ColorSpinorField &x, int parity, bool dagger,
-                         const int *comm_override) :
-        WilsonArg<Float, nColor, reconstruct_>(out, in, U, xpay ? 1.0 : 0.0, x, parity, dagger, comm_override),
-        A(A, false),
-        A2inv(A, dynamic_clover ? false : true), // if dynamic clover we don't want the inverse field
-        a(a),
-        b(dagger ? -0.5 * b : 0.5 * b), // if dagger flip the chiral twist
-        c(0.5*c)
-    {
-    }
+    
+  NdegTwistedCloverArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
+                       double a, double b, double c, bool xpay, const ColorSpinorField &x, int parity, bool dagger,
+                       const int *comm_override) :
+    WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, U, xpay ? 1.0 : 0.0, x, parity, dagger, comm_override),
+      A(A, false),
+      A2inv(A, dynamic_clover ? false : true), // if dynamic clover we don't want the inverse field
+      a(a),
+      b(dagger ? -0.5 * b : 0.5 * b), // if dagger flip the chiral twist
+      c(0.5*c)
+      {
+      }
   };
 
   /**
@@ -82,7 +82,7 @@ namespace quda
         cache.save(chi); // put "chi" in shared memory so the other flavor can access it
 
         HalfVector A_chi = A * chi;
-        const complex<real> b(0.0, chirality == 0 ? arg.b : -arg.b);
+        const complex<real> b(0.0, (chirality^flavor) == 0 ? arg.b : -arg.b);
         A_chi += b * chi;
 
         cache.sync(); // safe to sync in here since other threads will exit
