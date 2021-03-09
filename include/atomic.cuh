@@ -182,6 +182,9 @@ template <> struct atomic_fetch_add_impl<true> {
 
 /**
    @brief atomic_fetch_add function performs similarly as atomic_ref::fetch_add
+   @param[in,out] addr The memory address of the variable we are
+   updating atomically
+   @param[in] val The value we summing to the value at addr
  */
 template <typename T> __device__ __host__ inline void atomic_fetch_add(T *addr, T val)
 {
@@ -191,4 +194,28 @@ template <typename T> __device__ __host__ inline void atomic_fetch_add(T *addr, 
 template <typename T, int n> __device__ __host__ void atomic_fetch_add(vector_type<T, n> *addr, vector_type<T, n> val)
 {
   for (int i = 0; i < n; i++) atomic_fetch_add(&(*addr)[i], val[i]);
+}
+
+template <bool is_device> struct atomic_fetch_abs_max_impl {
+  template <typename T> inline void operator()(T *addr, T val)
+  {
+#pragma omp atomic update
+    *addr = std::max(*addr, val);
+  }
+};
+
+template <> struct atomic_fetch_abs_max_impl<true> {
+  template <typename T> __device__ inline void operator()(T *addr, T val) { atomicAbsMax(addr, val); }
+};
+
+/**
+   @brief atomic_fetch_max function that does an atomic max.
+   @param[in,out] addr The memory address of the variable we are
+   updating atomically
+   @param[in] val The value we are comparing against.  Must be
+   positive valued else result is undefined.
+ */
+template <typename T> __device__ __host__ inline void atomic_fetch_abs_max(T *addr, T val)
+{
+  target::dispatch<atomic_fetch_abs_max_impl>(addr, val);
 }

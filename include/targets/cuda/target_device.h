@@ -24,7 +24,7 @@ namespace quda {
 
 #else
 
-    // nvcc or clang: compile-time dispatch based on __CUDA_ARCH__
+    // nvcc or clang: compile-time dispatch
     template <template <bool, typename ...> class f, typename ...Args>
       __host__ __device__ auto dispatch(Args &&... args)
     {
