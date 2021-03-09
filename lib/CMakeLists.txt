@@ -413,13 +413,11 @@ endif()
 
 if(QUDA_QMP)
   if(QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
-    add_dependencies(quda QMP)
-    add_dependencies(quda_cpp QMP)
+    add_dependencies(quda QMPBuild)
+    add_dependencies(quda_cpp QMPBuild)
   endif()
-  target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_QMPHOME}/include>)
   target_compile_definitions(quda PUBLIC QMP_COMMS)
-  target_link_libraries(quda INTERFACE ${QUDA_QMP_LDFLAGS} ${QUDA_QMP_LIBS})
-  target_link_libraries(quda PUBLIC MPI::MPI_CXX)
+  target_link_libraries(quda PUBLIC QMP::qmp)
 endif()
 
 if(QUDA_QIO)
@@ -428,9 +426,7 @@ if(QUDA_QIO)
     add_dependencies(quda_cpp QIO)
   endif()
   target_compile_definitions(quda PUBLIC HAVE_QIO)
-  target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_QIOHOME}/include>)
-  target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_LIMEHOME}/include>)
-  target_link_libraries(quda INTERFACE ${QUDA_QIO_LDFLAGS} ${QUDA_QIO_LIBS})
+  target_link_libraries(quda PUBLIC QIO::qio)
 endif()
 
 if(QUDA_QDPJIT)
@@ -585,13 +581,20 @@ add_custom_command(
   PRE_LINK
   COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_CURRENT_BINARY_DIR}/libquda.a ${CMAKE_CURRENT_BINARY_DIR}/libquda.so)
 
+set_target_properties(quda PROPERTIES INSTALL_RPATH_USE_LINK_PATH ON )
+
 install(
   TARGETS quda
-  EXPORT qudaTargets
+  EXPORT QUDATargets
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib
-  INCLUDES
-  DESTINATION include)
+  RUNTIME DESTINATION bin
+  INCLUDES DESTINATION include)
+
+install(EXPORT QUDATargets
+	FILE QUDATargets.cmake
+	NAMESPACE QUDA::
+	DESTINATION lib/cmake/QUDA)
 
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include)
 
@@ -609,17 +612,7 @@ write_basic_package_version_file(
   VERSION ${QUDA_VERSION}
   COMPATIBILITY AnyNewerVersion)
 
-export(
-  EXPORT qudaTargets
-  FILE "${CMAKE_CURRENT_BINARY_DIR}/qudaTargets.cmake"
-  NAMESPACE quda::)
 
-set(ConfigPackageLocation lib/cmake/quda/)
-
-install(
-  EXPORT qudaTargets
-  NAMESPACE quda::
-  DESTINATION ${ConfigPackageLocation})
 
 add_custom_target(
   mpi_nvtx
