@@ -155,7 +155,7 @@ namespace quda
      */
     __device__ __host__ inline void save(const T &a)
     {
-      save_detail(a, device::thread_idx().x, device::thread_idx().y, device::thread_idx().z);
+      save_detail(a, target::thread_idx().x, target::thread_idx().y, target::thread_idx().z);
     }
 
     /**
@@ -167,7 +167,7 @@ namespace quda
      */
     __device__ __host__ inline T load(int x = -1, int y = -1, int z = -1)
     {
-      auto tid = device::thread_idx();
+      auto tid = target::thread_idx();
       x = (x == -1) ? tid.x : x;
       y = (y == -1) ? tid.y : y;
       z = (z == -1) ? tid.z : z;
@@ -181,7 +181,7 @@ namespace quda
     */
     __device__ __host__ inline T load_x(int x = -1)
     {
-      auto tid = device::thread_idx();
+      auto tid = target::thread_idx();
       x = (x == -1) ? tid.x : x;
       return load_detail(x, tid.y, tid.z);
     }
@@ -193,7 +193,7 @@ namespace quda
     */
     __device__ __host__ inline T load_y(int y = -1)
     {
-      auto tid = device::thread_idx();
+      auto tid = target::thread_idx();
       y = (y == -1) ? tid.y : y;
       return load_detail(tid.x, y, tid.z);
     }
@@ -205,7 +205,7 @@ namespace quda
     */
     __device__ __host__ inline T load_z(int z = -1)
     {
-      auto tid = device::thread_idx();
+      auto tid = target::thread_idx();
       z = (z == -1) ? tid.z : z;
       return load_detail(tid.x, tid.y, z);
     }
@@ -224,7 +224,7 @@ namespace quda
     vector_type<T, n> &array;
 
     __device__ __host__ constexpr thread_array() :
-      offset((device::thread_idx().z * device::block_dim().y + device::thread_idx().y) * device::block_dim().x + device::thread_idx().x),
+      offset((target::thread_idx().z * target::block_dim().y + target::thread_idx().y) * target::block_dim().x + target::thread_idx().x),
       array(target::is_device() ? *(device_array.data() + offset) : host_array)
     {
       array = vector_type<T, n>(); // call default constructor
