@@ -4,7 +4,7 @@
 
 namespace quda {
 
-  template <bool is_device> struct warp_combine_impl { template <typename T> T operator()(T &x, int warp_split) { return x; } };
+  template <bool is_device> struct warp_combine_impl { template <typename T> T operator()(T &x, int) { return x; } };
 
   template <> struct warp_combine_impl<true> {
     template <typename T> __device__ inline T operator()(T &x, int warp_split)
