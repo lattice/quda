@@ -260,6 +260,8 @@ namespace quda
       return max_shared_bytes;
     }
 
+    unsigned int warp_size_property() { return deviceProp.warpSize; }
+
     unsigned int max_threads_per_block() { return deviceProp.maxThreadsPerBlock; }
 
     unsigned int max_threads_per_processor() { return deviceProp.maxThreadsPerMultiProcessor; }
