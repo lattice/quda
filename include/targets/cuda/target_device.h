@@ -5,6 +5,10 @@
 #include <nv/target>
 #endif
 
+#if defined(__CUDACC__) ||  defined(__NVCOMPILER) || (defined(__clang__) && defined(__CUDA__))
+#define QUDA_CUDA_CC
+#endif
+
 namespace quda {
 
   namespace target {
@@ -58,7 +62,9 @@ namespace quda {
 
 
     template <bool is_device> struct block_dim_impl { dim3 operator()() { return dim3(1, 1, 1); } };
+#ifdef QUDA_CUDA_CC
     template <> struct block_dim_impl<true> { __device__ dim3 operator()() { return dim3(blockDim.x, blockDim.y, blockDim.z); } };
+#endif
 
     /**
        @brief Helper function that returns the thread block
@@ -69,7 +75,9 @@ namespace quda {
 
 
     template <bool is_device> struct block_idx_impl { dim3 operator()() { return dim3(0, 0, 0); } };
+#ifdef QUDA_CUDA_CC
     template <> struct block_idx_impl<true> { __device__ dim3 operator()() { return dim3(blockIdx.x, blockIdx.y, blockIdx.z); } };
+#endif
 
     /**
        @brief Helper function that returns the thread indices within a
@@ -80,7 +88,9 @@ namespace quda {
 
 
     template <bool is_device> struct thread_idx_impl { dim3 operator()() { return dim3(0, 0, 0); } };
+#ifdef QUDA_CUDA_CC
     template <> struct thread_idx_impl<true> { __device__ dim3 operator()() { return dim3(threadIdx.x, threadIdx.y, threadIdx.z); } };
+#endif
 
     /**
        @brief Helper function that returns the thread indices within a
@@ -167,3 +177,5 @@ namespace quda {
   }
 
 }
+
+#undef QUDA_CUDA_CC
