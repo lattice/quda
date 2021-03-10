@@ -273,7 +273,7 @@ namespace quda {
   };
 
   /**
-     @brief Block orthogonnalize the matrix field, where the blocks are
+     @brief Block orthogonalize the matrix field, where the blocks are
      defined by lookup tables that map the fine grid points to the
      coarse grid points, and similarly for the spin degrees of
      freedom.

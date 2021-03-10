@@ -99,11 +99,13 @@ namespace quda
       n_kr = eig_param->n_kr;
       n_conv = eig_param->n_conv;
       max_restarts = eig_param->max_restarts;
-
-      prepareKrylovSpace(kSpace, evals);
+      createTransferBasis(kSpace);
+      
+      prepareCompressedKrylovSpace(kSpace, evals);
+      compressed_mode = true;
       
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
-      converged = trlmSolve(kSpace);    
+      converged = trlmSolve(compressed_space);    
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     }
     
@@ -238,6 +240,7 @@ namespace quda
   void TRLM::lanczosStep(std::vector<ColorSpinorField *> v, int j)
   {
     // Compute r = A * v_j - b_{j-i} * v_{j-1}
+    if(compressed_mode) promoteVectors(fine_vector, compressed_space, j);
     
     // r = A * v_j
     chebyOp(mat, *r[0], *v[j]);
@@ -256,22 +259,51 @@ namespace quda
       beta_.reserve(j - start);
       std::vector<ColorSpinorField *> v_;
       v_.reserve(j - start);
-      for (int i = start; i < j; i++) {
-        beta_.push_back(-beta[i]);
-        v_.push_back(v[i]);
+      if(compressed_mode) {
+	int iter_size = fine_vector.size();
+	int iterations = (j - start)/iter_size;	
+	int remainder = (j - start)%iter_size;
+	// We promote a block of vectors of size `iter_size` 
+	for (int iter = 0; iter < iterations; iter++) {
+	  int idx = start + iter*iter_size;
+	  promoteVectors(fine_vector, compressed_space, idx);
+	  // Allocate beta values as assign pointers for this iteration
+	  for(int k=0; k<iter_size; k++) {
+	    beta_.push_back(-beta[idx]);
+	    v_.push_back(fine_vector[k]);
+	  }
+	  // r = r - b_{j-1} * v_{j-1}
+	  blas::axpy(beta_.data(), v_, r_);	  
+	}
+	if(remainder > 0) {
+	  int idx = start + iterations*iter_size;
+	  promoteVectors(fine_vector, compressed_space, idx);
+	  // Allocate beta values as assign pointers for this iteration
+	  for(int k=0; k<iter_size; k++) {
+	    beta_.push_back(-beta[idx]);
+	    v_.push_back(fine_vector[k]);
+	  }
+	  // r = r - b_{j-1} * v_{j-1}
+	  blas::axpy(beta_.data(), v_, r_);
+	}
+      } else { 	      
+	for (int i = start; i < j; i++) {
+	  beta_.push_back(-beta[i]);
+	  v_.push_back(v[i]);
+	}
+	// r = r - b_{j-1} * v_{j-1}
+	blas::axpy(beta_.data(), v_, r_);
       }
-      // r = r - b_{j-1} * v_{j-1}
-      blas::axpy(beta_.data(), v_, r_);
     }
-
+    
     // Orthogonalise r against the Krylov space
     for (int k = 0; k < 1; k++) blockOrthogonalize(v, r, j + 1);
-
+    
     // b_j = ||r||
     beta[j] = sqrt(blas::norm2(*r[0]));
 
     // Prepare next step.
-    // v_{j+1} = r / b_j
+    // v_{j+1} = r / b_j    
     blas::zero(*v[j + 1]);
     blas::axpy(1.0 / beta[j], *r[0], *v[j + 1]);
 

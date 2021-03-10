@@ -108,6 +108,7 @@ namespace quda
       if (fine_n_conv == 0) errorQuda("fine_n_conv=0 passed to Eigensolver");      
       
       compress = true;
+      compressed_mode = false;
       spin_block_size = 2;
       n_block_ortho = eig_param->n_block_ortho;
       for(int i=0; i<4; i++) geo_block_size[i] = eig_param->geo_block_size[i];
@@ -210,6 +211,40 @@ namespace quda
     for (int i = e_size; i < n_kr; i++) evals.push_back(0.0);
   }
 
+  void EigenSolver::prepareCompressedKrylovSpace(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)
+  {
+    int c_size = compressed_space.size();
+    if(c_size != 0) errorQuda("A compressed space already exists");
+    int f_size = fine_vector.size();
+    int e_size = evals.size();
+    
+    // Create a coarse grid vector using the fine space, which is fine
+    QudaPrecision prec = kSpace[0]->Precision();
+    QudaFieldLocation location = kSpace[0]->Location();
+    ColorSpinorField *tmp_coarse = kSpace[0]->CreateCoarse(geo_block_size,
+							   spin_block_size,
+							   kSpace.size(), prec,
+							   location);
+
+    // Clone the coarse paramters
+    ColorSpinorParam csParamCoarse(*tmp_coarse);
+    
+    // Increase coarse space to n_kr + block_size vectors
+    compressed_space.reserve(n_kr + block_size);
+    for (int i = c_size; i < n_kr + block_size; i++) compressed_space.push_back(ColorSpinorField::Create(csParamCoarse));
+    
+    // Create fine vectors
+    ColorSpinorParam csParamClone(*kSpace[0]);
+    csParamClone.create = QUDA_ZERO_FIELD_CREATE;
+    for (int b = f_size; b < (block_size > batched_rotate ? block_size : batched_rotate); b++) { fine_vector.push_back(ColorSpinorField::Create(csParamClone)); }
+    // Increase evals space to n_ev
+    evals.reserve(n_kr);
+    for (int i = e_size; i < n_kr; i++) evals.push_back(0.0);
+
+    // Compress the existing fine Krylov space
+    compressVectors(kSpace, compressed_space, 0);
+  }  
+  
   void EigenSolver::printEigensolverSetup()
   {
     if (getVerbosity() >= QUDA_SUMMARIZE) {
@@ -1230,33 +1265,44 @@ namespace quda
   {
     if (tmp1) delete tmp1;
     if (tmp2) delete tmp2;
-    if(transfer) delete transfer;
-    for (auto &vec : orthonormalised_basis)
-      if (vec) delete vec;
     
-    orthonormalised_basis.resize(0);    
+    if(transfer) delete transfer;
+    for (auto &vec : compressed_space)
+      if (vec) delete vec;    
+    compressed_space.resize(0);
+
+    for (auto &vec : r)
+      if (vec) delete vec;    
+    r.resize(0);    
+    
+    for (auto &vec : fine_vector)
+      if (vec) delete vec;    
+    fine_vector.resize(0);    
   }
 
-  void EigenSolver::verifyCompression(std::vector<ColorSpinorField *> &kSpace)
+  void EigenSolver::createTransferBasis(std::vector<ColorSpinorField *> &kSpace)
   {
     if(transfer) delete transfer;
     
-    ColorSpinorParam csParamClone(*kSpace[0]);
-    csParamClone.create = QUDA_ZERO_FIELD_CREATE;
-    for (unsigned int i = 0; i<kSpace.size(); i++) {
-      orthonormalised_basis.push_back(ColorSpinorField::Create(csParamClone));
-    }
-    
     // Create the transfer operator
     QudaPrecision prec = kSpace[0]->Precision();
-    QudaFieldLocation location = kSpace[0]->Location();
     transfer = new Transfer(kSpace, kSpace.size(), n_block_ortho, geo_block_size,
 			    spin_block_size, prec, QUDA_TRANSFER_AGGREGATE, profile);
-    ColorSpinorField *tmp_coarse = kSpace[0]->CreateCoarse(geo_block_size, spin_block_size,
-							   kSpace.size(), prec, location);
-
-    // may want to revisit this---these were relaxed for cases where ghost_precision < precision
-    // these were set while hacking in tests of quarter precision ghosts
+  }
+  
+  void EigenSolver::verifyCompression(std::vector<ColorSpinorField *> &kSpace)
+  {
+    createTransferBasis(kSpace);
+    QudaPrecision prec = kSpace[0]->Precision();
+    QudaFieldLocation location = kSpace[0]->Location();
+    ColorSpinorField *tmp_coarse = kSpace[0]->CreateCoarse(geo_block_size,
+							   spin_block_size,
+							   kSpace.size(), prec,
+							   location);
+    
+    // may want to revisit this---these were relaxed for cases where
+    // ghost_precision < precision these were set while hacking in tests of quarter
+    // precision ghosts
     double tol = (prec == QUDA_QUARTER_PRECISION || prec == QUDA_HALF_PRECISION) ? 5e-2 : prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-8;
     
     for (unsigned int i = 0; i < kSpace.size(); i++) {      
@@ -1271,5 +1317,31 @@ namespace quda
       if (deviation > tol) errorQuda("L2 relative deviation for k=%d failed, %e > %e", i, deviation, tol);
     }
     delete tmp_coarse;
+  }
+  
+  void EigenSolver::compressVectors(const std::vector<ColorSpinorField *> &fine,
+				    std::vector<ColorSpinorField *> &coarse,
+				    const int position)
+  {
+    if(!transfer) errorQuda("Eigensolver transfer operator not yet constructed");
+    if(fine.size() + position > coarse.size())
+      errorQuda("Attempting to compress %lu vectors into a vector space of size %lu at position %d", fine.size(), coarse.size(), position);
+    
+    for (unsigned int i = 0; i < fine.size(); i++) {      
+      transfer->R(*coarse[position+i], *fine[i]);
+    }
+  }
+
+  void EigenSolver::promoteVectors(const std::vector<ColorSpinorField *> &fine,
+				   std::vector<ColorSpinorField *> &coarse,
+				   const int position)
+  {
+    if(!transfer) errorQuda("Eigensolver transfer operator not yet constructed");
+    if(fine.size() + position > coarse.size())
+      errorQuda("Attempting to promote %lu vectors from a vector space of size %lu at position %d", fine.size(), coarse.size(), position);
+    
+    for (unsigned int i = 0; i < fine.size(); i++) {      
+      transfer->P(*fine[i], *coarse[position+i]);
+    }
   }
 } // namespace quda

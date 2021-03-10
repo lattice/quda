@@ -52,7 +52,6 @@ protected:
     std::vector<double> residua;
 
     std::vector<ColorSpinorField *> r; /** Current residual vector(s) */
-    std::vector<ColorSpinorField *> d_vecs_tmp; /** temp vector(s) */
     
     ColorSpinorField *tmp1; /** temp vector for dslash */ 
     ColorSpinorField *tmp2; /** temp vector for dslash */ 
@@ -61,16 +60,15 @@ protected:
 
     // Compression variables
     //----------------------
-    bool compress;
-    std::vector<ColorSpinorField *> decompressed_vector; /** Current decompressed vector(s) */
-    std::vector<ColorSpinorField *> orthonormalised_basis; /** Compressed vector(s) */
+    bool compress; /** indicates that we wish to perform a fine, then compressed solve */
+    std::vector<ColorSpinorField *> fine_vector; /** Current decompressed vector(s) */
+    std::vector<ColorSpinorField *> compressed_space; /** Compressed vector(s) */
     
     /** This is the transfer operator that defines the prolongation and restriction 
 	operators */
     Transfer *transfer;
 
-    /** We define here the bare minimum of parameters needed to create a Transfer 
-	operator */
+    /** We define here the parameters needed to create a Transfer operator */
     int geo_block_size[4];
     int spin_block_size;
     int n_block_ortho;
@@ -79,6 +77,7 @@ protected:
     int fine_n_kr;         /** Size of Krylov space after extension */
     int fine_n_conv;       /** Number of converged eigenvalues requested */
     int fine_max_restarts; /** Maximum number of restarts to perform */
+    bool compressed_mode;  /** if true, the solver will apply promotion/projection to the vectors prior/after computations */
     
   public:
     /**
@@ -128,12 +127,20 @@ protected:
     void checkChebyOpMax(const DiracMatrix &mat, std::vector<ColorSpinorField *> &kSpace);
 
     /**
-       @brief Extend the Krylov space
+       @brief Extend the Krylov space passed to the eigensolver
        @param[in] kSpace The Krylov space vectors
        @param[in] evals The eigenvalue array
     */
     void prepareKrylovSpace(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
 
+    /**
+       @brief Extend the compressed Krylov space. The compressed space in internal 
+       to the eigensolver and IO routines only
+       @param[in] kSpace The fine Krylov space vectors
+       @param[in] evals The eigenvalue array
+    */
+    void prepareCompressedKrylovSpace(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
+    
     /**
        @brief Set the epsilon parameter
        @param[in] prec Precision of the solver instance
@@ -426,8 +433,8 @@ protected:
     void sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<Complex> &x, std::vector<double> &y);
 
     /**
-       @brief Sort array the first n elements of x according to spec_type, y comes along for the ride
-       Overloaded version with real x and real y
+       @brief Sort array the first n elements of x according to spec_type, y comes 
+       along for the ride. Overloaded version with real x and real y
        @param[in] spec_type The spectrum type (Largest/Smallest)(Modulus/Imaginary/Real) that
        determines the sorting condition
        @param[in] n The number of elements to sort
@@ -436,8 +443,27 @@ protected:
     */
     void sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<double> &x, std::vector<double> &y);
 
-    
+    /**
+       @brief Construct a transfer operator, restrict, then prolong the eigenvectors,
+       and then check for fidelity with the originals.
+       @param[in] kSpace The basis to transfer
+    */    
     void verifyCompression(std::vector<ColorSpinorField *> &kSpace);
+
+    /**
+       @brief Construct a transfer operator from the supplied vector space.
+       @param[in] kSpace The basis to transfer
+    */        
+    void createTransferBasis(std::vector<ColorSpinorField *> &kSpace);
+
+    void compressVectors(const std::vector<ColorSpinorField *> &fine,
+			 std::vector<ColorSpinorField *> &coarse,
+			 const int position);
+    
+    void promoteVectors(const std::vector<ColorSpinorField *> &fine,
+			std::vector<ColorSpinorField *> &coarse,
+			const int position);
+    
     
   };
   
