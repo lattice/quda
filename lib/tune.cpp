@@ -12,7 +12,7 @@
 #include <list>
 #include <unistd.h>
 #include <uint_to_char.h>
-#include <target_device.h> // for device::warp_size
+#include <device.h>
 
 #include <deque>
 #include <queue>
@@ -642,7 +642,7 @@ namespace quda
   }
 
   TuneParam::TuneParam() :
-    block(device::warp_size(), 1, 1),
+    block(device::warp_size_property(), 1, 1),
     grid(1, 1, 1),
     shared_bytes(0),
     set_max_shared_bytes(false),
@@ -653,8 +653,8 @@ namespace quda
       aux = make_int4(1,1,1,1);
     }
 
-  int Tunable::blockStep() const { return device::warp_size(); }
-  int Tunable::blockMin() const { return device::warp_size(); }
+  int Tunable::blockStep() const { return device::warp_size_property(); }
+  int Tunable::blockMin() const { return device::warp_size_property(); }
 
   static TimeProfile launchTimer("tuneLaunch");
 
@@ -795,11 +795,7 @@ namespace quda
               printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(),
                          tunable.perfString(elapsed_time).c_str());
             } else {
-              if (tunable.launchError() == QUDA_SUCCESS) { // must be regular error
-                printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), qudaGetLastErrorString().c_str());
-              } else { // else must be a manually thrown error
-                printfQuda("    %s gives thrown error\n", tunable.paramString(param).c_str());
-              }
+              printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), qudaGetLastErrorString().c_str());
             }
           }
           tuning = tunable.advanceTuneParam(param);

@@ -122,57 +122,13 @@ namespace quda
     };
 
     template <typename coeff_t_, bool multi_1d_ = false>
-    struct MultiBlasFunctor {
+    struct MultiBlasFunctor : MultiBlasParam<coeff_t_> {
       using coeff_t = coeff_t_;
       static constexpr bool reducer = false;
       static constexpr bool coeff_mul = true;
       static constexpr bool multi_1d = multi_1d_;
 
-      const int NXZ;
-      const int NYW;
-      MultiBlasFunctor(int NXZ, int NYW) : NXZ(NXZ), NYW(NYW) {}
-
-      template <bool is_device>
-      __device__ __host__ inline std::enable_if_t<is_device, coeff_t> a(int i, int j) const
-      {
-        return reinterpret_cast<coeff_t *>(Amatrix_d)[i * NYW + j];
-      }
-
-      template <bool is_device>
-      __device__ __host__ inline std::enable_if_t<!is_device, coeff_t> a(int i, int j) const
-      {
-        return reinterpret_cast<coeff_t *>(Amatrix_h)[i * NYW + j];
-      }
-
-      __device__ __host__ inline coeff_t a(int i, int j) const { return a<device::is_device()>(i, j); }
-
-      template <bool is_device>
-      __device__ __host__ inline std::enable_if_t<is_device, coeff_t> b(int i, int j) const
-      {
-        return reinterpret_cast<coeff_t *>(Bmatrix_d)[i * NYW + j];
-      }
-
-      template <bool is_device>
-      __device__ __host__ inline std::enable_if_t<!is_device, coeff_t> b(int i, int j) const
-      {
-        return reinterpret_cast<coeff_t *>(Bmatrix_h)[i * NYW + j];
-      }
-
-      __device__ __host__ inline coeff_t b(int i, int j) const { return b<device::is_device()>(i, j); }
-
-      template <bool is_device>
-      __device__ __host__ inline std::enable_if_t<is_device, coeff_t> c(int i, int j) const
-      {
-        return reinterpret_cast<coeff_t *>(Cmatrix_d)[i * NYW + j];
-      }
-
-      template <bool is_device>
-      __device__ __host__ inline std::enable_if_t<!is_device, coeff_t> c(int i, int j) const
-      {
-        return reinterpret_cast<coeff_t *>(Cmatrix_h)[i * NYW + j];
-      }
-
-      __device__ __host__ inline coeff_t c(int i, int j) const { return c<device::is_device()>(i, j); }
+      MultiBlasFunctor(int NXZ, int NYW) : MultiBlasParam<coeff_t>(NXZ, NYW) {}
     };
 
     /**

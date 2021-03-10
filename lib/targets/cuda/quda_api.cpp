@@ -36,7 +36,7 @@ namespace quda {
   std::string qudaGetLastErrorString()
   {
     auto rtn = last_error_str;
-    last_error_str = QUDA_SUCCESS;
+    last_error_str = "CUDA_SUCCESS";
     return rtn;
   }
 
@@ -338,8 +338,7 @@ namespace quda {
   {
     if (count == 0) return;
     auto error = cudaMemcpyAsync(dst, src, count, cudaMemcpyDeviceToDevice, device::get_cuda_stream(stream));
-    if (error != cudaSuccess)
-      errorQuda("cudaMemcpyAsync returned %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    set_runtime_error(error, "cudaMemcpyAsync", func, file, line);
   }
 
   void qudaMemcpy2D_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
@@ -366,15 +365,10 @@ namespace quda {
     default: errorQuda("Unsupported cuMemcpyType2DAsync %d", qudaMemcpyKindToAPI(kind));
     }
     PROFILE(auto error = cuMemcpy2D(&param), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
-    if (error != CUDA_SUCCESS) {
-      const char *str;
-      cuGetErrorName(error, &str);
-      errorQuda("cuMemcpy2D returned error %s\n (%s:%s in %s())", str, file, line, func);
-    }
+    set_driver_error(error, "cuMemcpy2D", func, file, line);
 #else
     PROFILE(auto error = cudaMemcpy2D(dst, dpitch, src, spitch, width, height, qudaMemcpyKindToAPI(kind)), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
-    if (error != cudaSuccess)
-      errorQuda("cudaMemcpy2D returned error %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    set_runtime_error(error, "cudaMemcpy2D", func, file, line);
 #endif
   }
 

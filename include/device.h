@@ -84,6 +84,14 @@ namespace quda
      */
     size_t max_dynamic_shared_memory();
 
+
+    /**
+       @brief Helper function that returns the warp-size of the
+       architecture we are running on.  This is a run-time function as
+       opposed to the constexpr variant warp_size
+    */
+    unsigned int warp_size_property();
+
     /**
        @brief Return the maximum number of threads per block
        @return The maximum number of threads per block

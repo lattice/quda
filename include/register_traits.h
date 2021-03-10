@@ -9,6 +9,7 @@
 
 #include <quda_internal.h>
 #include <complex_quda.h>
+#include <target_device.h>
 #include <inline_ptx.h>
 
 namespace quda {
@@ -421,91 +422,57 @@ namespace quda {
     return recast;
   }
 
-  template <typename VectorType>
-    __device__ __host__ inline void vector_store(void *ptr, int idx, const VectorType &value) {
-    reinterpret_cast< VectorType* >(ptr)[idx] = value;
-  }
+  template <bool is_device> struct vector_store_impl {
+    template <typename T> inline void operator()(void *ptr, int idx, const T &value) { reinterpret_cast<T*>(ptr)[idx] = value; }
+  };
 
-  template <>
-    __device__ __host__ inline void vector_store(void *ptr, int idx, const double2 &value) {
-#if defined(__CUDA_ARCH__)
-    store_streaming_double2(reinterpret_cast<double2*>(ptr)+idx, value.x, value.y);
-#else
-    reinterpret_cast<double2*>(ptr)[idx] = value;
-#endif
-  }
+  template <> struct vector_store_impl<true> {
+    template <typename T> __device__ inline void operator()(void *ptr, int idx, const T &value) { reinterpret_cast<T*>(ptr)[idx] = value; }
 
-  template <>
-    __device__ __host__ inline void vector_store(void *ptr, int idx, const float4 &value) {
-#if defined(__CUDA_ARCH__)
-    store_streaming_float4(reinterpret_cast<float4*>(ptr)+idx, value.x, value.y, value.z, value.w);
-#else
-    reinterpret_cast<float4*>(ptr)[idx] = value;
-#endif
-  }
+    __device__ inline void operator()(void *ptr, int idx, const double2 &value)
+    {
+      store_streaming_double2(reinterpret_cast<double2*>(ptr)+idx, value.x, value.y);
+    }
 
-  template <>
-    __device__ __host__ inline void vector_store(void *ptr, int idx, const float2 &value) {
-#if defined(__CUDA_ARCH__)
-    store_streaming_float2(reinterpret_cast<float2*>(ptr)+idx, value.x, value.y);
-#else
-    reinterpret_cast<float2*>(ptr)[idx] = value;
-#endif
-  }
+    __device__ inline void operator()(void *ptr, int idx, const float4 &value)
+    {
+      store_streaming_float4(reinterpret_cast<float4*>(ptr)+idx, value.x, value.y, value.z, value.w);
+    }
 
-  template <>
-    __device__ __host__ inline void vector_store(void *ptr, int idx, const short4 &value) {
-#if defined(__CUDA_ARCH__)
-    store_streaming_short4(reinterpret_cast<short4*>(ptr)+idx, value.x, value.y, value.z, value.w);
-#else
-    reinterpret_cast<short4*>(ptr)[idx] = value;
-#endif
-  }
+    __device__ inline void operator()(void *ptr, int idx, const float2 &value)
+    {
+      store_streaming_float2(reinterpret_cast<float2*>(ptr)+idx, value.x, value.y);
+    }
 
-  template <>
-    __device__ __host__ inline void vector_store(void *ptr, int idx, const short2 &value) {
-#if defined(__CUDA_ARCH__)
-    store_streaming_short2(reinterpret_cast<short2*>(ptr)+idx, value.x, value.y);
-#else
-    reinterpret_cast<short2*>(ptr)[idx] = value;
-#endif
-  }
+    __device__ inline void operator()(void *ptr, int idx, const short4 &value)
+    {
+      store_streaming_short4(reinterpret_cast<short4*>(ptr)+idx, value.x, value.y, value.z, value.w);
+    }
 
-  // A char4 is the same size as a short2
-  template <>
-    __device__ __host__ inline void vector_store(void *ptr, int idx, const char4 &value) {
-#if defined(__CUDA_ARCH__)
-    store_streaming_short2(reinterpret_cast<short2*>(ptr)+idx, reinterpret_cast<const short2*>(&value)->x, reinterpret_cast<const short2*>(&value)->y);
-#else
-    reinterpret_cast<char4*>(ptr)[idx] = value;
-#endif
-  }
+    __device__ inline void operator()(void *ptr, int idx, const short8 &value)
+    {
+      this->operator()(ptr, idx, *reinterpret_cast<const float4 *>(&value));
+    }
 
-  template <>
-    __device__ __host__ inline void vector_store(void *ptr, int idx, const char2 &value) {
-#if defined(__CUDA_ARCH__)
-    vector_store(ptr, idx, *reinterpret_cast<const short*>(&value));
-#else
-    reinterpret_cast<char2*>(ptr)[idx] = value;
-#endif
-  }
+    __device__ inline void operator()(void *ptr, int idx, const short2 &value)
+    {
+      store_streaming_short2(reinterpret_cast<short2*>(ptr)+idx, value.x, value.y);
+    }
 
-  template <> __device__ __host__ inline void vector_store(void *ptr, int idx, const short8 &value)
+    __device__ inline void operator()(void *ptr, int idx, const char8 &value)
+    {
+      this->operator()(ptr, idx, *reinterpret_cast<const float2 *>(&value));
+    }
+
+    __device__ inline void operator()(void *ptr, int idx, const char4 &value)
+    {
+      this->operator()(ptr, idx, *reinterpret_cast<const short2*>(&value)); // A char4 is the same as a short2
+    }
+  };
+
+  template <typename VectorType> __device__ __host__ inline void vector_store(void *ptr, int idx, const VectorType &value)
   {
-#if defined(__CUDA_ARCH__)
-    vector_store(ptr, idx, *reinterpret_cast<const float4 *>(&value));
-#else
-    reinterpret_cast<short8 *>(ptr)[idx] = value;
-#endif
-  }
-
-  template <> __device__ __host__ inline void vector_store(void *ptr, int idx, const char8 &value)
-  {
-#if defined(__CUDA_ARCH__)
-    vector_store(ptr, idx, *reinterpret_cast<const float2 *>(&value));
-#else
-    reinterpret_cast<char8 *>(ptr)[idx] = value;
-#endif
+    target::dispatch<vector_store_impl>(ptr, idx, value);
   }
 
   template<bool large_alloc> struct AllocType { };

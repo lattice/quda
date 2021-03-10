@@ -349,7 +349,7 @@ set(CMAKE_CXX_FLAGS_DEBUG
     "-Wall -Wextra -g -fno-inline"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(CMAKE_CXX_FLAGS_SANITIZE
-    "-Wall -Wextra -g -fno-inline -fsanitize=address,undefined"
+    "-Wall -Wextra -g -fno-inline \"-fsanitize=address,undefined\""
     CACHE STRING "Flags used by the C++ compiler during santizer debug builds.")
 
 enable_language(CXX)
@@ -374,7 +374,7 @@ set(CMAKE_C_FLAGS_DEBUG
     "-Wall -Wextra -g -fno-inline"
     CACHE STRING "Flags used by the C compiler during full (host+device) debug builds.")
 set(CMAKE_C_FLAGS_SANITIZE
-    "-Wall -Wextra -g -fno-inline -fsanitize=address,undefined"
+    "-Wall -Wextra -g -fno-inline \"-fsanitize=address,undefined\""
     CACHE STRING "Flags used by the C compiler during sanitizer debug builds.")
 
 enable_language(C)
