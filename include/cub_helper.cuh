@@ -35,7 +35,7 @@ namespace quda {
     template <bool is_device, typename dummy = void> struct sum { T operator()(const T &value) { return value; } };
 
     template <typename dummy> struct sum<true, dummy> {
-      T operator()(const T &value) {
+      __device__ inline T operator()(const T &value) {
         typename warp_reduce_t::TempStorage dummy_storage;
         warp_reduce_t warp_reduce(dummy_storage);
         return warp_reduce.Sum(value);
