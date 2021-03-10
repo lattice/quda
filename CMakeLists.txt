@@ -319,6 +319,7 @@ if(QUDA_MPI AND QUDA_QMP)
       "Specifying QUDA_QMP and QUDA_MPI might result in undefined behavior. If you intend to use QMP set QUDA_MPI=OFF.")
 endif()
 
+set(BUILD_SHARED_LIBS ${QUDA_BUILD_SHAREDLIB})
 # COMPILER FLAGS Linux: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64" Mac: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64" Power:
 # CMAKE_HOST_SYSTEM_PROCESSOR "ppc64le"
 
@@ -548,12 +549,6 @@ if(QUDA_MPI OR QUDA_QMP)
   find_package(MPI)
 endif()
 
-if(QUDA_DOWNLOAD_USQCD)
-  find_program(MAKE_EXE NAMES gmake nmake make)
-  find_program(INSTALL_EXE NAMES install)
-  find_program(AUTORECONF_EXE NAMES autoreconf)
-endif()
-
 if(QUDA_QDPJIT)
   if(NOT QUDA_QMP)
     message(WARNING "Specifying QUDA_QDPJIT requires use of QUDA_QMP. Please set QUDA_QMP=ON and set QUDA_QMPHOME.")
@@ -577,7 +572,13 @@ if(QUDA_QMP)
   endif()
 
   if(QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
-    message(FATAL_ERROR "This Branch doesn't do downloads just now. CPM is coming")
+    include(cmake/CPM.cmake)
+    CPMAddPackage(
+      NAME QMP
+      GITHUB_REPOSITORY usqcd-software/qmp
+      GIT_TAG fa386db
+      OPTIONS "QMP_MPI ON" 
+    )
   endif()
 endif()
 
@@ -592,8 +593,17 @@ if(QUDA_QIO)
   else() 
     message(STATUS "QIO Not Found")
 
-    if(QUDA_DOWNLOAD_USQCD)
-	message(FATAL_ERROR "This Branch doesn't do downloads just now. CPM is coming")
+  if(QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
+    include(cmake/CPM.cmake)
+    CPMAddPackage(
+      NAME QIO
+      GITHUB_REPOSITORY usqcd-software/qio
+      GIT_TAG 3c99383
+      OPTIONS 
+        "QIO_ENABLE_QMP_ROUTE OFF" 
+        "QIO_ENABLE_OUTPUT_BUFFERING ON" 
+        "QIO_DML_BUF_BYTES 33554432"
+    )
     endif()
   endif()
 endif()

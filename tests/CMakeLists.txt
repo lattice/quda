@@ -11,18 +11,6 @@ target_compile_options(quda_test PUBLIC -fPIC)
 add_subdirectory(utils)
 add_subdirectory(host_reference)
 
-if(QUDA_QIO
-   AND QUDA_DOWNLOAD_USQCD
-   AND NOT QIO_FOUND)
-  add_dependencies(quda_test QIO)
-endif()
-
-if(QUDA_QMP
-   AND QUDA_DOWNLOAD_USQCD
-   AND NOT QMP_FOUND)
-  add_dependencies(quda_test QMP)
-endif()
-
 set(TEST_LIBS quda_test)
 
 macro(QUDA_CHECKBUILDTEST mytarget qudabuildtests)
@@ -31,18 +19,6 @@ macro(QUDA_CHECKBUILDTEST mytarget qudabuildtests)
   if(NOT ${qudabuildtests})
     set_property(TARGET ${mytarget} PROPERTY EXCLUDE_FROM_ALL 1)
     set(QUDA_EXCLUDE_FROM_INSTALL "EXCLUDE_FROM_ALL")
-  endif()
-
-  if(QUDA_QIO
-     AND QUDA_DOWNLOAD_USQCD
-     AND NOT QIO_FOUND)
-    add_dependencies(${mytarget} QIO)
-  endif()
-
-  if(QUDA_QMP
-     AND QUDA_DOWNLOAD_USQCD
-     AND NOT QMP_FOUND)
-    add_dependencies(${mytarget} QMP)
   endif()
 endmacro()
 

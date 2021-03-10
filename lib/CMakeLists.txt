@@ -412,19 +412,11 @@ if(QUDA_MPI)
 endif()
 
 if(QUDA_QMP)
-  if(QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
-    add_dependencies(quda QMPBuild)
-    add_dependencies(quda_cpp QMPBuild)
-  endif()
   target_compile_definitions(quda PUBLIC QMP_COMMS)
   target_link_libraries(quda PUBLIC QMP::qmp)
 endif()
 
 if(QUDA_QIO)
-  if(QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
-    add_dependencies(quda QIO)
-    add_dependencies(quda_cpp QIO)
-  endif()
   target_compile_definitions(quda PUBLIC HAVE_QIO)
   target_link_libraries(quda PUBLIC QIO::qio)
 endif()
@@ -597,11 +589,17 @@ install(EXPORT QUDATargets
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include)
 
 # If the USQCD stack was automatically downloaded, this will copy the usqcd library
-# to the install path
-if(QUDA_DOWNLOAD_USQCD)
-  if(QUDA_QMP OR QUDA_QIO)
-    install(DIRECTORY ${CMAKE_BINARY_DIR}/usqcd DESTINATION ".")
-  endif()
+# to the usqcd directory and include in the install. This is hacky as hell ...
+if(QMP_ADDED)
+  add_custom_command(TARGET quda POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${QMP_BINARY_DIR} ${CMAKE_BINARY_DIR}/usqcd)
+  add_custom_command(TARGET quda POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${QMP_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/usqcd/include)
+endif()
+if(QMP_ADDED)
+  add_custom_command(TARGET quda POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${QIO_BINARY_DIR} ${CMAKE_BINARY_DIR}/usqcd)
+  add_custom_command(TARGET quda POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${QIO_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/usqcd/include)
+endif()
+if(QMP_ADDED OR QIO_ADDED)
+  install(DIRECTORY ${CMAKE_BINARY_DIR}/usqcd DESTINATION ".")
 endif()
 
 include(CMakePackageConfigHelpers)
