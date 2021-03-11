@@ -10,7 +10,6 @@
 #include <quda_internal.h>
 #include <complex_quda.h>
 #include <target_device.h>
-#include <inline_ptx.h>
 
 namespace quda {
 
@@ -395,81 +394,6 @@ namespace quda {
   template <> struct VectorType<int8_t, 8> {
     typedef char8 type;
   };
-
-  template <typename VectorType>
-    __device__ __host__ inline VectorType vector_load(const void *ptr, int idx)
-  {
-    return reinterpret_cast< const VectorType * >(ptr)[idx];
-  }
-
-  template <> __device__ __host__ inline short8 vector_load(const void *ptr, int idx)
-  {
-    float4 tmp = vector_load<float4>(ptr, idx);
-    short8 recast;
-    memcpy(&recast, &tmp, sizeof(float4));
-    return recast;
-  }
-
-  template <> __device__ __host__ inline char8 vector_load(const void *ptr, int idx)
-  {
-    float2 tmp = vector_load<float2>(ptr, idx);
-    char8 recast;
-    memcpy(&recast, &tmp, sizeof(float2));
-    return recast;
-  }
-
-  template <bool is_device> struct vector_store_impl {
-    template <typename T> inline void operator()(void *ptr, int idx, const T &value) { reinterpret_cast<T*>(ptr)[idx] = value; }
-  };
-
-  template <> struct vector_store_impl<true> {
-    template <typename T> __device__ inline void operator()(void *ptr, int idx, const T &value) { reinterpret_cast<T*>(ptr)[idx] = value; }
-
-    __device__ inline void operator()(void *ptr, int idx, const double2 &value)
-    {
-      store_streaming_double2(reinterpret_cast<double2*>(ptr)+idx, value.x, value.y);
-    }
-
-    __device__ inline void operator()(void *ptr, int idx, const float4 &value)
-    {
-      store_streaming_float4(reinterpret_cast<float4*>(ptr)+idx, value.x, value.y, value.z, value.w);
-    }
-
-    __device__ inline void operator()(void *ptr, int idx, const float2 &value)
-    {
-      store_streaming_float2(reinterpret_cast<float2*>(ptr)+idx, value.x, value.y);
-    }
-
-    __device__ inline void operator()(void *ptr, int idx, const short4 &value)
-    {
-      store_streaming_short4(reinterpret_cast<short4*>(ptr)+idx, value.x, value.y, value.z, value.w);
-    }
-
-    __device__ inline void operator()(void *ptr, int idx, const short8 &value)
-    {
-      this->operator()(ptr, idx, *reinterpret_cast<const float4 *>(&value));
-    }
-
-    __device__ inline void operator()(void *ptr, int idx, const short2 &value)
-    {
-      store_streaming_short2(reinterpret_cast<short2*>(ptr)+idx, value.x, value.y);
-    }
-
-    __device__ inline void operator()(void *ptr, int idx, const char8 &value)
-    {
-      this->operator()(ptr, idx, *reinterpret_cast<const float2 *>(&value));
-    }
-
-    __device__ inline void operator()(void *ptr, int idx, const char4 &value)
-    {
-      this->operator()(ptr, idx, *reinterpret_cast<const short2*>(&value)); // A char4 is the same as a short2
-    }
-  };
-
-  template <typename VectorType> __device__ __host__ inline void vector_store(void *ptr, int idx, const VectorType &value)
-  {
-    target::dispatch<vector_store_impl>(ptr, idx, value);
-  }
 
   template<bool large_alloc> struct AllocType { };
   template<> struct AllocType<true> { typedef size_t type; };
