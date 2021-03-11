@@ -87,8 +87,7 @@ namespace quda
     // Begin TRLM Eigensolver computation
     //---------------------------------------------------------------------------
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
-    converged = trlmSolve(kSpace);    
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    converged = trlmSolve(kSpace);
 
     // Switch to the full problem parameters and continue in compressed mode
     if(compress && converged) {
@@ -99,12 +98,11 @@ namespace quda
       n_kr = eig_param->n_kr;
       n_conv = eig_param->n_conv;
       max_restarts = eig_param->max_restarts;
-      createTransferBasis(kSpace);
       
+      createTransferBasis(kSpace);
       prepareCompressedKrylovSpace(kSpace, evals);
       compressed_mode = true;
       
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
       converged = trlmSolve(compressed_space);    
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     }
@@ -240,44 +238,64 @@ namespace quda
   void TRLM::lanczosStep(std::vector<ColorSpinorField *> v, int j)
   {
     // Compute r = A * v_j - b_{j-i} * v_{j-1}
-    if(compressed_mode) promoteVectors(fine_vector, compressed_space, j);
+    std::vector<ColorSpinorField *> v_j;
+    if(compressed_mode) {
+      promoteVectors(fine_vector, v, j);
+      v_j.reserve(fine_vector.size());      
+      for (unsigned int i = 0; i < fine_vector.size(); i++) {
+	//printfQuda("Wrapping vector %d\n", i);
+	v_j.push_back(fine_vector[i]);
+      }
+    } else {
+      v_j.push_back(v[j]);
+    }
     
     // r = A * v_j
-    chebyOp(mat, *r[0], *v[j]);
-
+    //printfQuda("cheby op pre\n");
+    chebyOp(mat, *r[0], *v_j[0]);
+    //printfQuda("cheby op post\n");
+    
     // a_j = v_j^dag * r
-    alpha[j] = blas::reDotProduct(*v[j], *r[0]);
-
+    //printfQuda("reDot op pre\n");
+    alpha[j] = blas::reDotProduct(*v_j[0], *r[0]);
+    //printfQuda("reDot op post\n");
+    
     // r = r - a_j * v_j
-    blas::axpy(-alpha[j], *v[j], *r[0]);
-
+    //printfQuda("axpy op pre\n");
+    blas::axpy(-alpha[j], *v_j[0], *r[0]);
+    //printfQuda("axpy op post\n");
+    
     int start = (j > num_keep) ? j - 1 : 0;
 
     if (j - start > 0) {
       std::vector<ColorSpinorField *> r_ {r[0]};
       std::vector<double> beta_;
-      beta_.reserve(j - start);
       std::vector<ColorSpinorField *> v_;
-      v_.reserve(j - start);
-      if(compressed_mode) {
+      if(compressed_mode) {	
 	int iter_size = fine_vector.size();
 	int iterations = (j - start)/iter_size;	
 	int remainder = (j - start)%iter_size;
+
+	beta_.reserve(iter_size);
+	v_.reserve(iter_size);
+	
 	// We promote a block of vectors of size `iter_size` 
 	for (int iter = 0; iter < iterations; iter++) {
 	  int idx = start + iter*iter_size;
-	  promoteVectors(fine_vector, compressed_space, idx);
+	  promoteVectors(fine_vector, v, idx);
 	  // Allocate beta values as assign pointers for this iteration
 	  for(int k=0; k<iter_size; k++) {
 	    beta_.push_back(-beta[idx]);
 	    v_.push_back(fine_vector[k]);
 	  }
 	  // r = r - b_{j-1} * v_{j-1}
-	  blas::axpy(beta_.data(), v_, r_);	  
+	  //printfQuda("axpy CM op pre\n");
+	  blas::axpy(beta_.data(), v_, r_);
+	  //printfQuda("axpy CM op post\n");
 	}
 	if(remainder > 0) {
 	  int idx = start + iterations*iter_size;
-	  promoteVectors(fine_vector, compressed_space, idx);
+	  promoteVectors(fine_vector, v, idx);
 	  // Allocate beta values as assign pointers for this iteration
 	  for(int k=0; k<iter_size; k++) {
 	    beta_.push_back(-beta[idx]);
@@ -286,7 +304,11 @@ namespace quda
 	  // r = r - b_{j-1} * v_{j-1}
 	  blas::axpy(beta_.data(), v_, r_);
 	}
-      } else { 	      
+	// We may now compress v_j
+	compressVectors(fine_vector, v, j);
+      } else {
+	beta_.reserve(j - start);
+	v_.reserve(j - start);	
 	for (int i = start; i < j; i++) {
 	  beta_.push_back(-beta[i]);
 	  v_.push_back(v[i]);
@@ -297,16 +319,39 @@ namespace quda
     }
     
     // Orthogonalise r against the Krylov space
-    for (int k = 0; k < 1; k++) blockOrthogonalize(v, r, j + 1);
+    if(compressed_mode) {
+      std::vector<Complex> s(j+1);
+      for (int i = 0; i < j+1; i++) {
+	promoteVectors(fine_vector, v, i);
+	s[i] = blas::cDotProduct(*fine_vector[0], *r[0]);
+      }
+      
+      for (int i = 0; i < j+1; i++) {
+	promoteVectors(fine_vector, v, i);
+	blas::caxpy(-1.0*s[i], *fine_vector[0], *r[0]);
+      }
+    } else {
+      for (int k = 0; k < 1; k++) {
+	blockOrthogonalize(v, r, j + 1);
+      }
+    }
+
+    //printfQuda("Residual orthonormalised\n");
     
     // b_j = ||r||
     beta[j] = sqrt(blas::norm2(*r[0]));
 
     // Prepare next step.
-    // v_{j+1} = r / b_j    
-    blas::zero(*v[j + 1]);
-    blas::axpy(1.0 / beta[j], *r[0], *v[j + 1]);
-
+    // v_{j+1} = r / b_j
+    if(compressed_mode) {
+      promoteVectors(fine_vector, v, j+1);
+      blas::zero(*fine_vector[0]);
+      blas::axpy(1.0 / beta[j], *r[0], *fine_vector[0]);
+      compressVectors(fine_vector, v, j+1);      
+    } else {
+      blas::zero(*v[j + 1]);
+      blas::axpy(1.0 / beta[j], *r[0], *v[j + 1]);
+    }
     // Save Lanczos step tuning
     saveTuneCache();
   }

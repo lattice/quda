@@ -243,6 +243,7 @@ namespace quda
 
     // Compress the existing fine Krylov space
     compressVectors(kSpace, compressed_space, 0);
+    
   }  
   
   void EigenSolver::printEigensolverSetup()
@@ -1283,11 +1284,15 @@ namespace quda
   void EigenSolver::createTransferBasis(std::vector<ColorSpinorField *> &kSpace)
   {
     if(transfer) delete transfer;
+    // The fine Krylov space may now be trimmed to the desired size
+    for(unsigned int i=n_ev; i<kSpace.size(); i++) delete kSpace[i];
+    kSpace.resize(n_ev);
     
     // Create the transfer operator
     QudaPrecision prec = kSpace[0]->Precision();
     transfer = new Transfer(kSpace, kSpace.size(), n_block_ortho, geo_block_size,
 			    spin_block_size, prec, QUDA_TRANSFER_AGGREGATE, profile);
+    printfQuda("Transfer created\n");
   }
   
   void EigenSolver::verifyCompression(std::vector<ColorSpinorField *> &kSpace)
@@ -1327,8 +1332,10 @@ namespace quda
     if(fine.size() + position > coarse.size())
       errorQuda("Attempting to compress %lu vectors into a vector space of size %lu at position %d", fine.size(), coarse.size(), position);
     
-    for (unsigned int i = 0; i < fine.size(); i++) {      
+    for (unsigned int i = 0; i < fine.size(); i++) {
+      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
       transfer->R(*coarse[position+i], *fine[i]);
+      profile.TPSTART(QUDA_PROFILE_COMPUTE);
     }
   }
 
@@ -1340,8 +1347,10 @@ namespace quda
     if(fine.size() + position > coarse.size())
       errorQuda("Attempting to promote %lu vectors from a vector space of size %lu at position %d", fine.size(), coarse.size(), position);
     
-    for (unsigned int i = 0; i < fine.size(); i++) {      
+    for (unsigned int i = 0; i < fine.size(); i++) {
+      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
       transfer->P(*fine[i], *coarse[position+i]);
+      profile.TPSTART(QUDA_PROFILE_COMPUTE);
     }
   }
 } // namespace quda

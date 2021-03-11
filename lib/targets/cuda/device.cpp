@@ -107,9 +107,9 @@ namespace quda
       }
 #endif
 
-      //CHECK_CUDA_ERROR(cudaDeviceSetCacheConfig(cudaFuncCachePreferL1));
-      cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
-      cudaGetDeviceProperties(&deviceProp, dev);
+      CHECK_CUDA_ERROR(cudaDeviceSetCacheConfig(cudaFuncCachePreferL1));
+      //cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
+      // cudaGetDeviceProperties(&deviceProp, dev);
     }
 
     int get_device_count()
