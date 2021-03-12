@@ -30,7 +30,7 @@ namespace quda {
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorField &field)
     : LatticeField(field), init(false), ghost_precision_allocated(QUDA_INVALID_PRECISION), v(0), norm(0),
-      ghost( ), ghostNorm( ), ghostFace( ),
+      ghost( ), ghostNorm( ), ghostFace( ), dslash_constant(std::make_unique<DslashConstant>()),
       bytes(0), norm_bytes(0), even(0), odd(0),
      composite_descr(field.composite_descr), components(0)
   {
@@ -83,7 +83,7 @@ namespace quda {
     if (isNative()) ghost_bytes = ALIGNMENT_ADJUST(ghost_bytes);
 
     { // compute temporaries needed by dslash and packing kernels
-      auto &dc = *(dslash_constant.get());
+      auto &dc = *dslash_constant;
       auto &X = dc.X;
       for (int dim=0; dim<nDim; dim++) X[dim] = x[dim];
       for (int dim=nDim; dim<QUDA_MAX_DIM; dim++) X[dim] = 1;

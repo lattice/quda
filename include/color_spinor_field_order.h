@@ -18,6 +18,7 @@
 #include <index_helper.cuh>
 #include <color_spinor.h>
 #include <color_spinor_field.h>
+#include <load_store.h>
 #include <aos.h>
 #include <transform_reduce.h>
 
